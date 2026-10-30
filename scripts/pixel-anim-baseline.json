@@ -467,9 +467,6 @@
  "kf:foilDiamondBorderPulse": {
   "blur": 4
  },
- "kf:foilSweepLoop": {
-  "drehung": 3
- },
  "kf:freeAbilityPulse": {
   "blur": 2
  },
@@ -679,9 +676,6 @@
  },
  "kf:shieldedPulse": {
   "blur": 2
- },
- "kf:shop-reveal-appear": {
-  "drehung": 2
  },
  "kf:skatesCreaturePulse": {
   "blur": 2

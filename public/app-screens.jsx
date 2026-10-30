@@ -3724,11 +3724,8 @@ function PurchaseCelebration({ cx, cy, onDone }) {
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
-    const ctx = canvas.getContext('2d');
-    canvas.width = window.innerWidth;
-    canvas.height = window.innerHeight;
-    const ox = cx ?? canvas.width / 2;
-    const oy = cy ?? canvas.height / 2;
+    const ox = cx ?? window.innerWidth / 2;
+    const oy = cy ?? window.innerHeight / 2;
     const particles = [];
     const colors = ['#fad54a', '#f9ac20', '#f7f7ad', '#fb1ea9', '#1aedff', '#b1ff1a', '#f87420', '#ffffff'];
     const shapes = ['star', 'circle', 'diamond', 'spark'];
@@ -3758,49 +3755,10 @@ function PurchaseCelebration({ cx, cy, onDone }) {
         rotation: 0, rotSpeed: 0, gravity: 0,
       });
     }
-    let frame;
-    const draw = () => {
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-      let alive = false;
-      for (const p of particles) {
-        if (p.life <= 0) continue;
-        alive = true;
-        p.x += p.vx; p.y += p.vy; p.vy += p.gravity;
-        p.life -= p.decay; p.rotation += p.rotSpeed;
-        ctx.save();
-        ctx.translate(p.x, p.y);
-        ctx.rotate(p.rotation);
-        ctx.globalAlpha = Math.max(0, p.life);
-        ctx.fillStyle = p.color;
-        ctx.shadowColor = p.color;
-        ctx.shadowBlur = 8;
-        const s = p.size * (0.5 + p.life * 0.5);
-        if (p.shape === 'circle') {
-          ctx.beginPath(); ctx.arc(0, 0, s, 0, Math.PI * 2); ctx.fill();
-        } else if (p.shape === 'diamond') {
-          ctx.beginPath(); ctx.moveTo(0, -s); ctx.lineTo(s * 0.6, 0); ctx.lineTo(0, s); ctx.lineTo(-s * 0.6, 0); ctx.closePath(); ctx.fill();
-        } else if (p.shape === 'star') {
-          ctx.beginPath();
-          for (let j = 0; j < 5; j++) {
-            const a = (j * Math.PI * 2 / 5) - Math.PI / 2;
-            const r = j % 2 === 0 ? s : s * 0.4;
-            j === 0 ? ctx.moveTo(Math.cos(a) * r, Math.sin(a) * r) : ctx.lineTo(Math.cos(a) * r, Math.sin(a) * r);
-            const a2 = ((j + 0.5) * Math.PI * 2 / 5) - Math.PI / 2;
-            ctx.lineTo(Math.cos(a2) * s * 0.4, Math.sin(a2) * s * 0.4);
-          }
-          ctx.closePath(); ctx.fill();
-        } else {
-          ctx.fillRect(-s, -1, s * 2, 2);
-          ctx.fillRect(-1, -s, 2, s * 2);
-        }
-        ctx.restore();
-      }
-      if (alive) frame = requestAnimationFrame(draw);
-      else onDone();
-    };
-    frame = requestAnimationFrame(draw);
+    // ★ W86u2 (Pixelart): gezeichnet von `ppPixelPartikel` (app-shared.jsx) — ganze Kunstpixel, 30 Hz, Dither statt Alpha, keine Drehung/Weichzeichner.
+    const stopp = window.ppPixelPartikel(canvas, particles, { px: 2, onFertig: onDone, maxMs: 2500 });
     const timer = setTimeout(onDone, 2500);
-    return () => { cancelAnimationFrame(frame); clearTimeout(timer); };
+    return () => { stopp(); clearTimeout(timer); };
   }, []);
   return (
     <div style={{ position: 'fixed', inset: 0, zIndex: 99999, pointerEvents: 'none' }}>
@@ -4440,7 +4398,7 @@ function ShopScreen() {
       {randomReveal && (
         <div className="modal-overlay" style={{ zIndex: 90000 }} onClick={() => setRandomReveal(null)}>
           <div className="shop-reveal-modal animate-in" onClick={e => e.stopPropagation()}>
-            <div className="shop-reveal-glow" />
+            <PpVerlauf className="shop-reveal-glow" px={4} gradient="radial-gradient(circle, rgba(250,213,74,.25) 0%, rgba(249,172,32,.1) 40%, transparent 70%)" />
             <div className="shop-reveal-img-wrap">
               <img src={randomReveal.imgUrl} draggable={false} />
             </div>

@@ -534,12 +534,14 @@ select optgroup {
 /* Ein Durchgang belegt nur die ersten 40 % des Taktes — der Rest ist
    Pause. Vier Bänder mit unterschiedlicher Laufzeit ergeben daraus ein
    Muster, das sich nicht sichtbar wiederholt. */
-@keyframes foilSweepLoop {
-  0%   { transform: translateX(var(--band-from)) rotate(var(--band-rot, 22deg)); opacity: 0; }
-  3%   { opacity: var(--band-o, .45); }
-  34%  { opacity: var(--band-o, .45); }
-  40%  { transform: translateX(var(--band-to)) rotate(var(--band-rot, 22deg)); opacity: 0; }
-  100% { transform: translateX(var(--band-to)) rotate(var(--band-rot, 22deg)); opacity: 0; }
+/* ★ W86u2 (Pixelart): die Neigung steckt jetzt im Verlaufswinkel des Streifens (harte Kanten, kein gedrehtes Element), das Band blendet
+   hart ein/aus (statt Deckkraft 0 → .45 → 0). Gleicher Takt wie vorher (40 % Durchlauf, 60 % Pause). */
+@keyframes ppGlanzFahrt {
+  0%   { transform: translateX(var(--band-from)); opacity: 0; }
+  3%   { opacity: 1; }
+  37%  { opacity: 1; }
+  40%  { transform: translateX(var(--band-to)); opacity: 0; }
+  100% { transform: translateX(var(--band-to)); opacity: 0; }
 }
 @keyframes foilShimmer {
   0%, 100% { opacity: .10; background-position: 0% 0%; }
@@ -786,8 +788,7 @@ select optgroup {
   /* `screen` statt roher Deckkraft: das Band ADDIERT Licht, statt die
      Karte zu übermalen. Dunkle Bildstellen bleiben dunkel, helle
      blühen auf — der Unterschied zwischen „Folie" und „Farbschleier". */
-  mix-blend-mode: screen;
-  animation: foilSweepLoop var(--band-dur, 4s) linear infinite;
+  animation: ppGlanzFahrt var(--band-dur, 4s) linear infinite;
   animation-delay: var(--band-delay, 0s);
   opacity: 0;
   will-change: transform, opacity;
@@ -798,7 +799,7 @@ select optgroup {
   background: linear-gradient(to right,
     transparent 34%, rgba(255,255,255,.55) 46%, rgba(255,255,255,.95) 50%,
     rgba(255,255,255,.55) 54%, transparent 66%);
-  filter: blur(.6px);
+  /* ★ W86u2: kein `filter: blur` mehr (Pixelart). */
 }
 /* Die Prägung IM Licht: `multiply` schneidet Rillen in das Band,
    deckungsgleich mit der Texturlage darunter. Dadurch sieht man die
@@ -807,7 +808,6 @@ select optgroup {
   content: ''; position: absolute; inset: -50%;
   background: repeating-linear-gradient(112deg,
     rgba(0,0,0,.6) 0 1px, transparent 1px 7px);
-  transform: rotate(calc(-1 * var(--band-rot, 22deg)));
   mix-blend-mode: multiply;
 }
 /* Diamond: die Facettenkanten schneiden das Licht, nicht Rillen. */
@@ -14007,7 +14007,8 @@ body:has(.modal-overlay) { --pz-tooltip-z: 10086; }
   font-size: 42px;
   font-weight: 900;
   color: #fad54a;
-  text-shadow: 0 0 20px rgba(250,213,74,.8), 0 0 40px rgba(249,172,32,.5), 0 2px 0 #a87c00;
+  /* ★ W86u2 (Pixelart): harte Kontur + Fuss statt Weichzeichner-Schein. */
+  text-shadow: 2px 0 0 #a87c00, -2px 0 0 #a87c00, 0 2px 0 #a87c00, 0 -2px 0 #a87c00, 0 4px 0 #72541d;
   letter-spacing: 4px;
   animation: purchase-text-in 2s ease-out forwards;
   pointer-events: none;
@@ -14084,12 +14085,14 @@ body:has(.modal-overlay) { --pz-tooltip-z: 10086; }
 
 /* ===== SHOP RANDOM REVEAL MODAL ===== */
 
+/* ★ W86u2 (Pixelart): das 3D-Kippen (rotateY) ist eine Breitenstauchung (scaleX) — Kante-auf-Kante-Flip ohne Drehung. */
 @keyframes shop-reveal-appear {
-  0% { transform: scale(0.4) rotateY(90deg); opacity: 0; }
-  40% { transform: scale(1.1) rotateY(-5deg); opacity: 1; }
-  60% { transform: scale(0.95) rotateY(2deg); }
-  80% { transform: scale(1.02) rotateY(0deg); }
-  100% { transform: scale(1) rotateY(0deg); }
+  0% { transform: scale(0.4, 0.4); opacity: 0; }
+  20% { transform: scale(0.15, 1.1); opacity: 1; }
+  40% { transform: scale(1.1, 1.1); opacity: 1; }
+  60% { transform: scale(0.95, 0.95); }
+  80% { transform: scale(1.02, 1.02); }
+  100% { transform: scale(1, 1); }
 }
 @keyframes shop-reveal-glow-pulse {
   0%, 100% { opacity: 0.4; transform: translate(-50%, -50%) scale(1); }
@@ -14101,10 +14104,11 @@ body:has(.modal-overlay) { --pz-tooltip-z: 10086; }
   flex-direction: column;
   align-items: center;
   padding: 32px 40px;
-  background: linear-gradient(145deg, #1a1a2e 0%, #08060c 100%);
-  border: 3px solid #fad54a;
-  border-radius: 12px;
-  box-shadow: 0 0 40px rgba(250,213,74,.3), 0 0 80px rgba(250,213,74,.1), 0 20px 60px rgba(0,0,0,.8);
+  /* ★ W86u2 (Pixelart): flache Flaeche statt Verlauf, eckiger Rahmen, harte Ringe statt Weichzeichner-Schein. */
+  background: #12101f;
+  border: 4px solid #fad54a;
+  border-radius: 0;
+  box-shadow: 0 0 0 4px #08060c, 0 0 0 8px #72541d, 0 12px 0 8px rgba(0,0,0,.6);
   position: relative;
   overflow: visible;
   animation: shop-reveal-appear 0.7s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
@@ -14117,18 +14121,17 @@ body:has(.modal-overlay) { --pz-tooltip-z: 10086; }
   transform: translate(-50%, -50%);
   width: 280px;
   height: 280px;
-  border-radius: 50%;
-  background: radial-gradient(circle, rgba(250,213,74,.25) 0%, rgba(249,172,32,.1) 40%, transparent 70%);
-  animation: shop-reveal-glow-pulse 2s ease-in-out infinite;
+  /* ★ W86u2 (Pixelart): der Radialverlauf ist ein Dither-Pixelbild (`PpVerlauf`, ShopScreen), kein Vektorkreis. */
+  animation: shop-reveal-glow-pulse 2s steps(1, end) infinite;
   pointer-events: none;
 }
 
 .shop-reveal-img-wrap {
   width: 180px;
-  border-radius: 8px;
+  border-radius: 0;
   overflow: hidden;
   border: 2px solid #fad54a;
-  box-shadow: 0 0 20px rgba(250,213,74,.4), 0 8px 30px rgba(0,0,0,.6);
+  box-shadow: 0 0 0 4px #72541d, 0 8px 0 4px rgba(0,0,0,.6);
   position: relative;
   z-index: 1;
 }
@@ -14144,10 +14147,9 @@ body:has(.modal-overlay) { --pz-tooltip-z: 10086; }
   font-family: var(--font-display), sans-serif;
   font-size: 16px;
   font-weight: 800;
-  background: linear-gradient(105deg, #fad54a 0%, #f7f7ad 30%, #f9ac20 60%, #fad54a 100%);
-  background-clip: text;
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
+  /* ★ W86u2 (Pixelart): flaches Gold mit hartem Fuss statt Text-Verlauf. */
+  color: #fad54a;
+  text-shadow: 0 2px 0 #a87c00;
   text-align: center;
   letter-spacing: 1px;
   position: relative;
@@ -22355,19 +22357,30 @@ body[data-tb-hl] .hero-idle-platz.hero-idle-hover { scale: none; }
   --band-to: var(--glanz-bis, 400%);
   --band-rot: 22deg;
   --band-o: var(--glanz-staerke, .85);
-  mix-blend-mode: screen;
   opacity: 0;
-  animation: foilSweepLoop var(--glanz-dauer, 4.5s) linear infinite;
+  animation: ppGlanzFahrt var(--glanz-dauer, 4.5s) linear infinite;
   animation-delay: var(--glanz-verzug, .6s);
   will-change: transform, opacity;
 }
-.pp-glanz-band::before {
+/* ★ W86u2 (Pixelart): der Streifen besteht aus harten Stufen statt Verlauf — Kern (4 px, deckend) und beidseitig ein Schachbrett-Dither
+   (4 px je Seite, jedes zweite Pixel). Die Neigung (`--band-rot`) liegt im Verlaufswinkel; Verlaeufe mit harten Stopps malt der Browser
+   ohne Kantenglaettung (Treppenkante). Die Schichten ragen seitlich ueber das Band hinaus (`inset: 0 -100%`), damit die Schraege nicht
+   an der Bandbreite abreisst. */
+.pp-glanz-band::before, .pp-glanz-band::after {
   content: '';
   position: absolute;
-  inset: 0;
-  background: linear-gradient(to right,
-    transparent 30%, rgba(255,255,255,.45) 44%, rgba(255,255,255,.95) 50%,
-    rgba(255,255,255,.45) 56%, transparent 70%);
+  top: 0; bottom: 0; left: -100%; right: -100%;
+}
+.pp-glanz-band::before {                       /* Kern */
+  background: linear-gradient(calc(90deg + var(--band-rot)),
+    transparent calc(50% - var(--glanz-kern, 1px)), #fff calc(50% - var(--glanz-kern, 1px)), #fff calc(50% + var(--glanz-kern, 1px)), transparent calc(50% + var(--glanz-kern, 1px)));
+}
+.pp-glanz-band::after {                        /* Flanken: Schachbrett */
+  background: linear-gradient(calc(90deg + var(--band-rot)),
+    transparent calc(50% - var(--glanz-flanke, 5px)), #fff calc(50% - var(--glanz-flanke, 5px)), #fff calc(50% + var(--glanz-flanke, 5px)), transparent calc(50% + var(--glanz-flanke, 5px)));
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='4' height='4' shape-rendering='crispEdges'%3E%3Crect width='2' height='2'/%3E%3Crect x='2' y='2' width='2' height='2'/%3E%3C/svg%3E") 0 0 / 4px 4px;
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='4' height='4' shape-rendering='crispEdges'%3E%3Crect width='2' height='2'/%3E%3Crect x='2' y='2' width='2' height='2'/%3E%3C/svg%3E") 0 0 / 4px 4px;
+  image-rendering: pixelated;
 }
 /* Schriftzug im Hauptmenue: auf die Buchstaben maskiert (Alpha von
    logo.png — dieselbe Datei, dieselbe Streckung wie das Bild, also
@@ -22384,6 +22397,8 @@ body[data-tb-hl] .hero-idle-platz.hero-idle-hover { scale: none; }
   --glanz-dauer: 7s;
   --glanz-verzug: 1.2s;
   --glanz-staerke: .9;
+  --glanz-kern: 2px;
+  --glanz-flanke: 7px;
 }
 
 /* Lotse: pulsierender Schein aussen um den Wirt. Fester Schatten, es

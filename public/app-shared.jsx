@@ -1787,6 +1787,80 @@ function PpVerlauf({ gradient, px = 4, className, style, retroBlend, retroGradie
 }
 window.PpVerlauf = PpVerlauf;
 
+/**
+ * ★ W86u2 — Pixel-Partikelmaschine fuer Konfetti/Funken (Canvas): alles in ganzen Kunstpixeln (Zelle `px` CSS-px), 30 Hz (`ppTaktRaf`),
+ * keine Drehung, kein `shadowBlur`, keine `globalAlpha`-Mischung — Ausblenden per Bayer-Dither, Formen als Pixelsprites (Kreis, Raute,
+ * Stern, Funke), Farben auf die Palette gerastet. Das Canvas wird in Zellaufloesung gemalt und per `image-rendering: pixelated` vergroessert.
+ *
+ *   const stopp = ppPixelPartikel(canvas, teile, { px: 2, onFertig, maxMs })
+ *   teile: [{ x, y, vx, vy, gravity, size, color, shape: 'circle'|'diamond'|'star'|'spark', life: 1, decay }]  (x/y/vx/vy in CSS-px, vx/vy je 60-Hz-Bild)
+ */
+const _ppPtSprites = new Map();
+function _ppPtSprite(form, r) {
+  const key = form + r;
+  let l = _ppPtSprites.get(key); if (l) return l;
+  l = [];
+  for (let dy = -r; dy <= r; dy++) for (let dx = -r; dx <= r; dx++) {
+    let an;
+    if (form === 'circle') an = dx * dx + dy * dy <= r * r + r * 0.6;
+    else if (form === 'diamond') an = Math.abs(dx) + Math.abs(dy) <= r;
+    else if (form === 'star') an = (dx === 0 || dy === 0) || (Math.abs(dx) === 1 && Math.abs(dy) === 1 && r >= 2);
+    else an = dx === 0 || dy === 0;                                   // 'spark': duenne Kreuzarme
+    if (an) l.push(dx, dy);
+  }
+  _ppPtSprites.set(key, l);
+  return l;
+}
+function ppPixelPartikel(canvas, teile, opt) {
+  opt = opt || {};
+  const px = opt.px || 2;
+  const W = Math.max(8, Math.ceil(window.innerWidth / px)), H = Math.max(8, Math.ceil(window.innerHeight / px));
+  canvas.width = W; canvas.height = H;
+  canvas.style.imageRendering = 'pixelated';
+  const g = canvas.getContext('2d');
+  g.imageSmoothingEnabled = false;
+  const farbe = {};
+  const rgb = (hex) => {
+    if (farbe[hex]) return farbe[hex];
+    const sn = window.ppSnap ? window.ppSnap(hex) : hex;
+    const m = /^#?([0-9a-f]{6})$/i.exec(sn) || /^#?([0-9a-f]{6})$/i.exec('#ffffff');
+    const n = parseInt(m[1], 16);
+    return (farbe[hex] = [(n >> 16) & 255, (n >> 8) & 255, n & 255]);
+  };
+  const raf = window.ppTaktRaf || window.requestAnimationFrame;
+  const caf = window.cancelAnimationFrame;
+  let id = 0, letzt = 0, aus = false;
+  const t0 = performance.now();
+  const bild = g.createImageData(W, H), d = bild.data;
+  const schritt = (t) => {
+    id = 0; if (aus) return;
+    const dt = letzt ? Math.min(3, (t - letzt) / 16.667) : 1; letzt = t;
+    d.fill(0);
+    let lebt = false;
+    for (const p of teile) {
+      if (p.life <= 0) continue;
+      lebt = true;
+      p.x += p.vx * dt; p.y += p.vy * dt; p.vy += (p.gravity || 0) * dt; p.life -= p.decay * dt;
+      if (p.life <= 0) continue;
+      const r = Math.max(1, Math.round(p.size * (0.5 + Math.min(1, p.life) * 0.5) / (px * 2)));
+      const sp = _ppPtSprite(p.shape || 'circle', r), c = rgb(p.color);
+      const cx = Math.floor(p.x / px), cy = Math.floor(p.y / px), voll = p.life >= 1 ? 1 : p.life * 1.2;
+      for (let i = 0; i < sp.length; i += 2) {
+        const x = cx + sp[i], y = cy + sp[i + 1];
+        if (x < 0 || y < 0 || x >= W || y >= H) continue;
+        if (voll < 1 && voll <= ppBayer(x, y)) continue;
+        const o = (y * W + x) * 4; d[o] = c[0]; d[o + 1] = c[1]; d[o + 2] = c[2]; d[o + 3] = 255;
+      }
+    }
+    g.putImageData(bild, 0, 0);
+    if (lebt && (!opt.maxMs || t - t0 < opt.maxMs + 500)) id = raf(schritt);
+    else if (opt.onFertig) opt.onFertig();
+  };
+  id = raf(schritt);
+  return () => { aus = true; if (id) caf(id); };
+}
+window.ppPixelPartikel = ppPixelPartikel;
+
 window.PxZeichen = PxZeichen;
 window.PxIcon = PxIcon;
 window.pxHintergrund = pxHintergrund;
