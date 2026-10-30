@@ -10,6 +10,8 @@ bereits auf der VOLLEN Leinwand liegen (L.platz) und werfen ClipError, wenn etwa
     pixel_setzen(a, punkte, farbe, dx, dy)    # einzelne Pixel einfärben (Augen, Glanzpunkte)
     augen(a, gruppen, stufe, ...)             # Glühen der Augen in Stufen (nur Farben der Rampe aus dem Sprite)
     kiefer(a, zaehne, farbe, innen, tiefe)    # Kiefer klappt auf/zu (Zähne rutschen nach unten, Mundinneres füllt nach)
+    band_diagonal(a, punkte, rampe, d)        # Lichtband wandert diagonal über ein glänzendes Objekt (eine Stufe heller)
+    stern_ebene(h, w, cx, cy, stufe, mitte, arm)   # vierzackiger Glitzerstern am Objekt (Stufe 1 → 2 → 1)
     glanz_pfad(a, pfad, hell, basis, pos)     # ein Lichtpunkt wandert an einem Horn/Knochen/Klinge entlang
     glut_ebene(h, w, i, n, puffs, farben)     # Funken/Glut aufsteigend (puff_ebene, aber mit Verglimmen an Anfang und Ende)
 """
@@ -123,6 +125,38 @@ def glut_ebene(h, w, i, n, puffs, farben, rand=0.06):
             continue
         L.einsetzen(out, L.puff_ebene(h, w, i, n, [pf], farben))
     return out
+
+
+def band_diagonal(a, punkte, rampe, d, breite=2, ox=0, oy=0):
+    """Lichtband: alle Pixel aus `punkte` (Sprite-Koordinaten (x, y)), deren Diagonale x + y in [d, d + breite) liegt, werden um eine
+    Stufe der Farbrampe `rampe` ({Farbe: hellere Farbe}, alles Farben des Sprites) heller. d wandert von Frame zu Frame
+    (diagonal über das Objekt, z. B. d = start + Schritt). ox/oy = Versatz Sprite → Leinwand. Pixel, die nicht in der Rampe stehen, bleiben."""
+    for (x, y) in punkte:
+        if d <= x + y < d + breite:
+            col = tuple(int(v) for v in a[y + oy, x + ox, :3])
+            if a[y + oy, x + ox, 3] and col in rampe:
+                a[y + oy, x + ox, :3] = rampe[col]
+    return a
+
+
+def stern_ebene(h, w, cx, cy, stufe, mitte, arm):
+    """Vierzackiger Glitzerstern (Pixelart) um die Leinwandposition (cx, cy): stufe 1 = nur Mitte, 2 = Mitte + 4 Arme à 1 px,
+    3 = Mitte + 4 Arme à 2 px, 0 = nichts. Der Stern wächst/schrumpft über die Stufen und bleibt am Objekt (wird NACH der Figur gelegt).
+    ClipError, wenn er aus der Leinwand ragen würde."""
+    e = L.leer(h, w)
+    if stufe <= 0:
+        return e
+    pts = [(0, 0, mitte)]
+    n = {1: 0, 2: 1, 3: 2}[min(stufe, 3)]
+    for k in range(1, n + 1):
+        pts += [(k, 0, arm), (-k, 0, arm), (0, k, arm), (0, -k, arm)]
+    for dx, dy, col in pts:
+        x, y = cx + dx, cy + dy
+        if not (0 <= x < w and 0 <= y < h):
+            raise L.ClipError(f'Stern bei ({x},{y}) liegt außerhalb der Leinwand {w}×{h}')
+        e[y, x, :3] = col
+        e[y, x, 3] = 255
+    return e
 
 
 def glanz_pfad(a, pfad, hell, basis, pos):

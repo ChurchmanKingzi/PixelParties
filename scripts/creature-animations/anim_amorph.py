@@ -14,6 +14,9 @@ Bausteine für weiche Körper (Schleime) — alles Pixelart, nur ganze Pixel, nu
     auf_leinwand(zeilen, h, w, boden, dy)            Zeilenfeld auf die Leinwand setzen — die Unterkante bleibt am Boden
     glanzband(a, t, rampe, maske)                    Lichtreflex wandert diagonal über den Sprite (Farben eine Stufe heller)
     ausdruck_pruefen(frames, spr, …)                 4-Verbundenheit der Figur (ein Teil je Frame) und Randpixel-Farben
+    stern(ebene, x, y, stufe, farben)                vierzackiger Glitzerstern am Objekt (Mitte + 4 Arme, wächst/schrumpft)
+    farb_schritt(a, rampe, maske)                    Edelstein pulsiert: Farben eine Rampenstufe heller/dunkler
+    suche_marke(a, farbe)                            Punkt des Sprites durch Zeilen-/Spaltenumbau verfolgen (Markierfarbe)
     offene_koerperkanten(fig, ausnahme, y0, umriss) Randpixel ohne Umrissfarbe = offene Kanten (nach Squash/Wabbeln prüfen!)
 """
 import math
@@ -206,6 +209,46 @@ def ausdruck_pruefen(frames, spr, name='', erlaubt=()):
     print(f'{name} Randprüfung: {len(frames) - len(schlecht)}/{len(frames)} Frames ohne Befund' +
           ('' if not schlecht else '; Befunde (Frame, Teile, offene Randpixel): ' + str(schlecht[:8])))
     return schlecht
+
+
+def stern(ebene, x, y, stufe, farben):
+    """Vierzackiger Glitzerstern (kein Partikel: er sitzt AM Objekt) auf die Ebene zeichnen. stufe 0 = nur die Mitte, 1 = Mitte + 4 Arme
+    (Länge 1), 2 = Arme der Länge 2. farben = {'m': Mitte, 'a': innere Arme, 's': Armspitzen}. Lebenslauf eines Glitzers z. B.
+    [0, 1, 2, 1, 0] über 5 Frames (wächst/schrumpft). Ragt etwas aus der Ebene, gibt es ClipError."""
+    pix = [(0, 0, 'm')]
+    if stufe >= 1:
+        pix += [(1, 0, 'a'), (-1, 0, 'a'), (0, 1, 'a'), (0, -1, 'a')]
+    if stufe >= 2:
+        pix += [(2, 0, 's'), (-2, 0, 's'), (0, 2, 's'), (0, -2, 's')]
+    h, w = ebene.shape[:2]
+    for dx, dy, k in pix:
+        if not (0 <= x + dx < w and 0 <= y + dy < h):
+            raise L.ClipError(f'Glitzerstern bei ({x + dx},{y + dy}) liegt außerhalb der Leinwand {w}×{h}')
+        ebene[y + dy, x + dx, :3] = farben[k]
+        ebene[y + dy, x + dx, 3] = 255
+    return ebene
+
+
+def farb_schritt(a, rampe, maske=None):
+    """Alle Pixel, deren Farbe in `rampe` steht ({alt: neu}), um eine Stufe ersetzen (optional nur in `maske`) — Pulsieren von Edelsteinen."""
+    out = a.copy()
+    for alt, neu in rampe.items():
+        m = L.farbmaske(a, [alt])
+        if maske is not None:
+            m &= maske
+        out[m, :3] = neu
+    return out
+
+
+def suche_marke(a, farbe):
+    """Position (x, y) des ersten Pixels dieser Farbe in einer Ebene (oder None) — um einen Punkt des Sprites durch Zeilen-/Spaltenumbau
+    zu verfolgen: Pixel vorher mit einer Markierfarbe überschreiben, hinterher suchen und die Farbe zurücksetzen."""
+    m = L.farbmaske(a, [farbe])
+    if not m.any():
+        return None
+    ys, xs = np.nonzero(m)
+    k = int(np.argmin(ys * 1000 + xs))
+    return int(xs[k]), int(ys[k])
 
 
 def offene_koerperkanten(fig, ausnahme, y0, umriss):

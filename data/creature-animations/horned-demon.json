@@ -1,15 +1,15 @@
 {
   "creature": "Horned Demon",
   "sheet": "horned-demon.png",
-  "frameWidth": 28,
-  "frameHeight": 51,
-  "frames": 48,
-  "frameMs": 70,
+  "frameWidth": 34,
+  "frameHeight": 55,
+  "frames": 36,
+  "frameMs": 65,
   "loop": true,
   "layout": "horizontal",
-  "padTop": 4,
+  "padTop": 6,
   "padLeft": 4,
-  "padRight": 4,
+  "padRight": 5,
   "padBottom": 4,
-  "faceX": 14.0
+  "faceX": 17.0
 }

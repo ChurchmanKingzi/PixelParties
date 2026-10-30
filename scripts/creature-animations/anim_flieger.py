@@ -15,6 +15,11 @@ Bausteine, die bei mehreren Fliegern gebraucht werden:
                                                ein Teil klappt NUR in eine Richtung auf (Flügel/Arm spreizt sich nach außen), Ruhe bei s = 0
     flammen_spitzen(a, phase, farbe, …)        Flammenzungen züngeln: die oberste Pixelreihe jeder Spalte (Farbe `farbe`) wird 0…2 px länger/kürzer,
                                                je Spalte andere Phase (nur Spaltenenden, bleibt 4-verbunden)
+    heller(farbe, rampe, stufen)               Farbe um `stufen` Stufen auf einer Rampe (dunkel → hell, Farben des Sprites) verschieben
+    lichtband(ebene, maske, pad_l, pad_t, i, n, start, dauer, rampe, …)   diagonales Lichtband wandert über die Pixel von `maske`
+    stern_stufe(i, n, start, folge)            Phase eines Glitzer-Sterns (0 = nur Mitte, 1 = Arme 1 px, 2 = Arme 2 px) oder None
+    stern(ebene, x, y, stufe, kern, arm1, arm2)  vierzackiger Glitzer-Stern (Mitte + 4 Arme) auf eine fertige Leinwand-Ebene
+    puls(i, n, x, y, versatz, periode)         0/1-Puls pro Pixel (Facetten pulsieren, wandern über das Objekt)
     kacheln(frames, x0, x1, y0, y1, sc)        Ausschnitt mehrerer Frames nebeneinander, ganzzahlig vergrößert (Nahaufnahme für Nähte)
     stapeln(bilder)                            PIL-Bilder untereinander zu einem Kontrollbild
 """
@@ -173,3 +178,68 @@ def flammen_spitzen(a, phase, farbe, lauf=1.3, amp=1.6, min_hoehe=3):
                 else:
                     break
     return out
+
+
+def heller(farbe, rampe, stufen):
+    """Farbe `stufen` Stufen weiter auf der Rampe (Liste dunkel → hell, nur Farben des Sprites). Steht die Farbe nicht in der
+    Rampe oder läuft sie über das Ende, bleibt sie (bzw. die Endfarbe)."""
+    f = tuple(int(v) for v in farbe)
+    if f not in rampe:
+        return f
+    return rampe[max(0, min(len(rampe) - 1, rampe.index(f) + stufen))]
+
+
+def lichtband(ebene, maske, pad_l, pad_t, i, n, start, dauer, rampe, stufen=1, breite=2.2, achse=(1.0, 1.0), kern_stufen=None):
+    """Ein Lichtband wandert diagonal über das Objekt: Im Zeitfenster [start, start+dauer) (Frames, zyklisch mod n) läuft ein Band
+    der Breite `breite` entlang u = achse[0]·x + achse[1]·y über alle Pixel von `maske` (Sprite-Koordinaten); Pixel im Band werden
+    `stufen` Stufen heller auf `rampe` (in der Bandmitte `kern_stufen`, falls angegeben). Bearbeitet `ebene` (Leinwand) an Ort
+    und Stelle; die Ebene muss noch unverschoben liegen (Sprite-Koordinaten + Rand). Außerhalb des Fensters passiert nichts."""
+    k = (i - start) % n
+    if k >= dauer:
+        return ebene
+    ys, xs = np.nonzero(maske)
+    if not len(ys):
+        return ebene
+    u = achse[0] * xs + achse[1] * ys
+    umin, umax = float(u.min()), float(u.max())
+    mitte = umin - breite + (k + 0.5) / dauer * (umax - umin + 2 * breite)
+    for y, x, uu in zip(ys, xs, u):
+        d = abs(uu - mitte)
+        if d > breite / 2.0 + 0.001:
+            continue
+        py, px_ = pad_t + int(y), pad_l + int(x)
+        if not ebene[py, px_, 3]:
+            continue
+        st = kern_stufen if (kern_stufen is not None and d <= breite / 4.0) else stufen
+        ebene[py, px_, :3] = heller(ebene[py, px_, :3], rampe, st)
+    return ebene
+
+
+def stern_stufe(i, n, start, folge=(0, 1, 2, 1)):
+    """Glitzer-Stern: ab Frame `start` (zyklisch) durchläuft er `folge` (0 Mitte, 1 Arme 1 px, 2 Arme 2 px) — sonst None."""
+    k = (i - start) % n
+    return folge[k] if k < len(folge) else None
+
+
+def stern(ebene, x, y, stufe, kern, arm1, arm2=None):
+    """Vierzackiger Glitzer-Stern: Mitte (x, y) + je ein Arm nach oben/unten/links/rechts (Stufe 1: 1 px in `arm1`,
+    Stufe 2: 2 px, der zweite in `arm2` bzw. `arm1`). Direkt auf Leinwand-Koordinaten; muss ganz auf die Leinwand passen."""
+    h, w = ebene.shape[:2]
+    pts = [(0, 0, kern)]
+    if stufe >= 1:
+        pts += [(1, 0, arm1), (-1, 0, arm1), (0, 1, arm1), (0, -1, arm1)]
+    if stufe >= 2:
+        a2 = arm2 or arm1
+        pts += [(2, 0, a2), (-2, 0, a2), (0, 2, a2), (0, -2, a2)]
+    for dx, dy, c in pts:
+        xx, yy = x + dx, y + dy
+        if not (0 <= xx < w and 0 <= yy < h):
+            raise L.ClipError(f'Stern bei ({xx},{yy}) liegt außerhalb der Leinwand {w}×{h}')
+        ebene[yy, xx, :3] = c
+        ebene[yy, xx, 3] = 255
+    return ebene
+
+
+def puls(i, n, x, y, periode=1, versatz=0.9):
+    """0 oder 1: Facetten pulsieren, die Hellphase wandert diagonal über das Objekt (je Pixel anderer Phasenversatz)."""
+    return 1 if math.sin(2 * math.pi * periode * i / n + versatz * (x + y)) > 0.55 else 0

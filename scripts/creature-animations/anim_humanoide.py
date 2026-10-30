@@ -22,6 +22,8 @@ abgeschnitten wird.
                                         `kopf`-mal zusätzlich eingefügt; alles darüber steigt, alles darunter (Beine, Boden,
                                         Waffe am Boden) bleibt stehen. Der Kopf läuft der Brust nach (Sekundärbewegung).
     klecks(a, x, y, groesse, kern, rand) kleines Funkeln als runder Klecks: 1 = Punkt, 2 = 2×2 (keine Kreuz-/Rautenform)
+    eckkontakte(frame)                  Menge der Pixelpaare, die sich NUR über eine Ecke berühren (beide gemeinsamen Nachbarpixel leer):
+                                        lesen sich als Lücke (Regel 11). Frames mit Eckkontakten vergleichen, die Frame 0 nicht hat.
     ruhepose(frame, spr, off)           Pflichtkontrolle: Frame 0 muss dem Original entsprechen (Regel 9); gibt Abweichungen
     kontaktbogen(pfad, frames, idx, …)  Schlüsselposen groß als Bild (Regel 10)
 """
@@ -123,6 +125,23 @@ def klecks(a, x, y, groesse, kern, rand, off=(0, 0)):
     elif groesse >= 2:
         setze(a, {(x, y): kern, (x + 1, y): rand, (x, y + 1): rand, (x + 1, y + 1): rand}, off)
     return a
+
+
+def eckkontakte(frame):
+    """Alle diagonal benachbarten deckenden Pixelpaare ((x1,y1),(x2,y2)), bei denen die beiden gemeinsamen orthogonalen Nachbarn
+    leer sind (Berührung nur über die Ecke). Zum Aufspüren von Nähten, die sich als Lücke lesen."""
+    m = frame[..., 3] > 0
+    h, w = m.shape
+    paare = set()
+    for y in range(h - 1):
+        for x in range(w):
+            if not m[y, x]:
+                continue
+            for dx in (-1, 1):
+                x2 = x + dx
+                if 0 <= x2 < w and m[y + 1, x2] and not m[y, x2] and not m[y + 1, x]:
+                    paare.add(((x, y), (x2, y + 1)))
+    return paare
 
 
 def ruhepose(frame, spr, off):

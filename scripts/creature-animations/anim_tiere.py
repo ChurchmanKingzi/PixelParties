@@ -9,7 +9,8 @@ die bereits auf der VOLLEN Leinwand liegen (L.platz) — so schneidet nichts sti
     zucken_zeilen(teil, pivot_y, dx)           # Ohr/Fühler zuckt: Zeilen oberhalb des Ansatzes weichen seitlich aus
     ohr_haengend(teil, {zeile: dx}, seite)     # Schlappohr schwingt unten nach außen, bleibt am Kopf angewachsen
     pixel_tauschen(ebene, {(x, y): rgb})       # einzelne Pixel umfärben (Blinzeln, Glühen), Koordinaten = Leinwand
-    funken_ebene(h, w, i, n, funken, farben)   # einzelne Glutfunken (1 px) steigen langsam auf, verglimmen flackernd
+    funken_ebene(h, w, i, n, funken, farben)   # Glutfunken (1 px) und Glutwölkchen steigen langsam auf, ohne Sprung am Loop-Ende
+    spalten_hub(a, zeile, k_von_x)             # Atmen/Wiegen spaltenweise (Rumpf neigt sich, Füße bleiben)
     nachbarn4(maske)                           # 4er-Dilatation
     hilfsbilder(...)                           # Prüfbilder: Schlüsselposen groß, Nahaufnahmen, Teile einzeln
 """
@@ -182,25 +183,61 @@ def huellkurve(i, n, start, laenge):
     return math.sin(math.pi * (t + 0.5) / laenge) ** 2 if laenge > 1 else 1.0
 
 
-# ── Glutfunken ───────────────────────────────────────────────────────────────────────────────────────────────
+# ── Glutfunken & Glutwölkchen ───────────────────────────────────────────────────────────────────────────────
+STUFEN = {'k': ['k'], 's': ['k', 's'], 'o': ['k', 's', 'o'], 'm': ['k', 's', 'o', 'm']}   # Wachstumsstufen (PUFF_FORMEN der Bibliothek)
+
+
 def funken_ebene(h, w, i, n, funken, farben):
-    """Einzelne Glutfunken (je 1 Pixel, rund im Sinne von „Punkt“), die langsam aufsteigen. funken: Liste von
-    dict(x, y, vx, vy, off, wackeln=0, farbe='c'); (x, y) Startpunkt auf der Leinwand, (vx, vy) Gesamtweg über die Lebensdauer
-    (= n Frames, nahtlos), off = Phasenversatz in Frames, farbe = Schlüssel in `farben`.
-    Lebenslauf t: 0–0,12 noch unsichtbar (liegt hinter dem Körper) → 0,12–0,72 sichtbar → 0,72–0,92 verglimmt flackernd
-    (jedes zweite Frame) → danach aus; so gibt es am Schleifenende keinen Sprung."""
+    """Glutfunken (1 px) und kleine Glutwölkchen, die langsam aufsteigen, ohne Sprung am Schleifenende.
+    funken: Liste von dict(x, y, vx, vy, off, wackeln=0, form='k'|'s'|'o'|'m', farbe=Schlüssel in `farben`);
+    farben = {Schlüssel: (kern_rgb, rand_rgb)}. (x, y) Startpunkt auf der Leinwand, (vx, vy) Gesamtweg über die Lebensdauer
+    (= n Frames, nahtlos), off = Phasenversatz in Frames.
+    Lebenslauf t: 0–0,12 noch unsichtbar (der Startpunkt liegt am/hinter dem Körper) → Wachstum Funke → Klecks → volle Form
+    (bis 0,45) → volle Form (bis 0,62) → schrumpft wieder (bis 0,8) → Funke flackert (jedes zweite Frame) bis 0,92 → aus.
+    Einzelfunken ('k') leuchten 0,12–0,72 und verglimmen flackernd bis 0,92. Am Schleifenende ist nichts mehr sichtbar."""
     ebene = L.leer(h, w)
     for f in funken:
-        t = ((i + f.get('off', 0)) % n) / n
-        if t < 0.12 or t >= 0.92 or (t >= 0.72 and (i + f.get('off', 0)) % 2):
+        j = i + f.get('off', 0)
+        t = (j % n) / n
+        if t < 0.12 or t >= 0.92:
             continue
-        x = int(round(f['x'] + f.get('vx', 0) * t + f.get('wackeln', 0) * math.sin(2 * math.pi * t)))
+        kette = STUFEN[f.get('form', 'k')]
+        if len(kette) == 1:
+            if t >= 0.72 and j % 2:
+                continue
+            form = 'k'
+        elif t < 0.45:
+            form = kette[min(len(kette) - 1, int((t - 0.12) / 0.33 * len(kette)))]
+        elif t < 0.62:
+            form = kette[-1]
+        elif t < 0.8:
+            form = kette[max(0, len(kette) - 1 - int((t - 0.62) / 0.18 * len(kette)))]
+        else:
+            if j % 2:
+                continue
+            form = 'k'
+        x = int(round(f['x'] + f.get('vx', 0) * t + f.get('wackeln', 0) * math.sin(2 * math.pi * t + f.get('ph', 0))))
         y = int(round(f['y'] + f.get('vy', 0) * t))
-        if not (0 <= y < h and 0 <= x < w):
-            raise L.ClipError(f'Funke bei ({x},{y}) liegt außerhalb der Leinwand {w}×{h}')
-        ebene[y, x, :3] = farben[f.get('farbe', 'c')]
-        ebene[y, x, 3] = 255
+        kern, rand = farben[f.get('farbe', 'rot')]
+        for (dx, dy, k) in L.PUFF_FORMEN[form]:
+            xx, yy = x + dx, y + dy
+            if not (0 <= yy < h and 0 <= xx < w):
+                raise L.ClipError(f'Funke bei ({xx},{yy}) liegt außerhalb der Leinwand {w}×{h}')
+            ebene[yy, xx, :3] = kern if k == 'c' else rand
+            ebene[yy, xx, 3] = 255
     return ebene
+
+
+def spalten_hub(a, zeile, k_von_x):
+    """Atmen/Wiegen spaltenweise: in jeder Spalte x wird bei `zeile` k_von_x(x) Zeilen eingefügt (k > 0: alles darüber steigt, die
+    Beine darunter werden länger) oder entfernt (k < 0: alles darüber sinkt, die Beine werden kürzer). Verschiedene k je Spalte
+    neigen den Rumpf (Gewichtsverlagerung); die Füße bleiben am Boden."""
+    out = np.zeros_like(a)
+    for x in range(a.shape[1]):
+        if not a[:, x, 3].any():
+            continue
+        out[:, x:x + 1] = L.streck_zeile(a[:, x:x + 1], zeile, int(k_von_x(x)))
+    return out
 
 
 # ── Prüfbilder ─────────────────────────────────────────────────────────────────────────────────────────────────

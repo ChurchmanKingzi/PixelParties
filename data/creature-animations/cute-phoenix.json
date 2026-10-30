@@ -1,0 +1,15 @@
+{
+  "creature": "Cute Phoenix",
+  "sheet": "cute-phoenix.png",
+  "frameWidth": 48,
+  "frameHeight": 57,
+  "frames": 40,
+  "frameMs": 70,
+  "loop": true,
+  "layout": "horizontal",
+  "padTop": 4,
+  "padLeft": 5,
+  "padRight": 5,
+  "padBottom": 7,
+  "faceX": 24.0
+}
