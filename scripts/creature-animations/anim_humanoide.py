@@ -13,6 +13,9 @@ abgeschnitten wird.
     laubwelle(s, i, n, wellenlaenge, zyklen)  fortlaufende Welle 0…1 über die Diagonale s = x + 0,6·y (läuft mit i nach s+), mit Hüllkurve
                                         sin²(π·i/n) → in Frame 0 und am Schleifenende überall 0 (Ruhepose), dazwischen kräftig;
                                         `zyklen` volle Wellenperioden pro Schleife. Für wogendes Laub/Haar/Umhang.
+    zeilen_versatz(a, off, {zeile: dx})   ganze Zeilen (Spritezeilen) waagerecht verschieben (Hutspitze/Zipfel biegt sich); Unterschied benachbarter
+                                        Zeilen ≤ 1 und gleich bei einpixeligen Spitzenzeilen halten, sonst bleibt nur ein Eckkontakt
+    spalten_versatz(a, off, {spalte: (dy, y0, y1)})   Spalte x nur in den Zeilen y0…y1 senkrecht verschieben (Krempenende flattert)
     farbe_stufe(farbe, rampe, stufen)   Farbe um `stufen` Stufen auf einer Rampe (dunkel → hell, Farben des Sprites) verschieben
     lichtband(a, maske, off, i, n, start, dauer, rampe, stufen, breite, achse, kern)
                                         Rule 12: diagonales Lichtband wandert über die Pixel von `maske` (Metall, Gold, Rahmen): die Pixel
@@ -69,6 +72,37 @@ def laubwelle(s, i, n, wellenlaenge, zyklen):
     """Wert 0 … 1: max(0, sin(2π·(s/wellenlaenge − zyklen·i/n))) · sin²(π·i/n). Nahtlos (ganzzahlige zyklen), in Frame 0 = 0."""
     env = math.sin(math.pi * i / n) ** 2
     return env * max(0.0, math.sin(2 * math.pi * (s / wellenlaenge - zyklen * i / n)))
+
+
+def zeilen_versatz(a, off, zeilen):
+    for y, dx in zeilen.items():
+        Y = y + off[1]
+        xs = np.nonzero(a[Y, :, 3])[0]
+        if not len(xs) or not dx:
+            continue
+        if xs.min() + dx < 0 or xs.max() + dx >= a.shape[1]:
+            raise L.ClipError(f'Zeile {y} würde um {dx} px aus der Leinwand geschoben')
+        zeile = a[Y].copy()
+        a[Y] = 0
+        for x in xs:
+            a[Y, x + dx] = zeile[x]
+    return a
+
+
+def spalten_versatz(a, off, spalten):
+    for x, (dy, y0, y1) in spalten.items():
+        X = x + off[0]
+        ys = [y for y in range(y0, y1 + 1) if a[y + off[1], X, 3]]
+        if not ys or not dy:
+            continue
+        sp = {y: a[y + off[1], X].copy() for y in ys}
+        for y in ys:
+            a[y + off[1], X] = 0
+        for y, px in sp.items():
+            if not 0 <= y + dy + off[1] < a.shape[0]:
+                raise L.ClipError(f'Spalte {x} würde aus der Leinwand geschoben')
+            a[y + dy + off[1], X] = px
+    return a
 
 
 def farbe_stufe(farbe, rampe, stufen):
