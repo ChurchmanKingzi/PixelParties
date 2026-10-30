@@ -29,8 +29,8 @@ Ablauf (48 Frames à 65 ms = 3,12 s; Frame 0 = Original, Partikel ausgenommen):
   Hinter der Hand bleibt schwarzes Körperstück stehen (ERGÄNZUNG, s. u.), die Röhre des Arms bleibt an der Schulter.
 * Flügel rascheln: die äußeren Strebenspalten (x 1–2 / 17–18, y ≤ 10) wippen senkrecht, außen stärker (x 1: ±2 px, x 2: ±1 px, links Periode 16, rechts 24, die zweite Spalte
   1 Frame später); wandert eine Spalte nach oben, wird die Lücke zum unteren Flügel mit dem untersten Strebenpixel gefüllt (ERGÄNZUNG).
-* Glut-Partikel (hinter der Figur, 9 Stück, Lebensdauer 48 Frames, langsam aufsteigend, leichtes Wabern, wachsen/schrumpfen, Formen k, o): rosarote Funken (Kern (207,64,64),
-  Rand (172,2,3)) an Hörnern und Schultern, dunkelrote Rauchkugeln (Kern (114,2,2), Rand (82,3,4)) an den Seiten und über dem Schädel; alle Farben aus dem Sprite. Sie bleiben nah
+* Glut-Partikel (hinter der Figur, 10 Stück, Lebensdauer 48 Frames, langsam aufsteigend, leichtes Wabern, wachsen/schrumpfen, Formen k, o): rosarote Funken (Kern (207,64,64),
+  Rand (172,2,3)) an Hörnern und Schultern, dunkelgraue Rauchkugeln (Kern (31,33,33), Rand (114,2,2)) an den Händen und über den Flügeln; alle Farben aus dem Sprite. Sie bleiben nah
   an der Figur (Zuschnitt, s. u.).
 Kein Glanz, kein Funkeln (Regel 14: Knochen/Schädel sind kein Metall; die grauen Wangenpixel sind Knochen). Kein Feuer (Regel 15 entfällt).
 Randpixel-Test (Regel 16): `U.kontur_schliessen` setzt in jeder Pose fehlende Umrisspixel (Schwarz) an Flügelspalten und Händen; im Ruhebild ändert es nichts.
@@ -78,7 +78,9 @@ BLINZ = {15: 1, 16: 2, 17: 2, 18: 1, 38: 1, 39: 2, 40: 2, 41: 1}                
 ZUCK_L, ZUCK_R = {19, 20, 21}, {9, 10, 11, 34, 35, 36}
 
 GLUT = {'c': ROSA, 'r': ROT}                           # rosarote Funken
-RAUCH = {'c': ROSTROT, 'r': DUNKELROT}                 # dunkelrote Rauchkugeln
+GRAU = (31, 33, 33)
+assert GRAU in _vorh
+RAUCH = {'c': GRAU, 'r': ROSTROT}                      # dunkelgraue Rauchkugeln mit rotem Rand (heben sich von den dunkelroten Flügelspitzen ab)
 P = lambda x, y: (GPL + x, GPT + y)
 PUFFS_GLUT = [
     dict(x=P(7, 1)[0], y=P(7, 1)[1], vx=-2, vy=-4, off=0, form='k', wackeln=1),            # von den Hornspitzen
@@ -91,7 +93,8 @@ PUFFS_GLUT = [
 PUFFS_RAUCH = [
     dict(x=P(1, 17)[0], y=P(1, 17)[1], vx=-1, vy=-9, off=4, form='o', wackeln=1),           # aufsteigend an den Händen
     dict(x=P(18, 17)[0], y=P(18, 17)[1], vx=1, vy=-9, off=28, form='o', wackeln=1),
-    dict(x=P(9, 2)[0], y=P(9, 2)[1], vx=0, vy=-5, off=16, form='o', wackeln=1),             # über dem Schädel zwischen den Hörnern
+    dict(x=P(2, 6)[0], y=P(2, 6)[1], vx=-1, vy=-6, off=16, form='o', wackeln=1),            # über den Flügeln
+    dict(x=P(17, 6)[0], y=P(17, 6)[1], vx=1, vy=-6, off=40, form='o', wackeln=1),
 ]
 
 
