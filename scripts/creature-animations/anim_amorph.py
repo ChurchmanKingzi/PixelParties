@@ -15,6 +15,7 @@ Bausteine für weiche Körper (Schleime) — alles Pixelart, nur ganze Pixel, nu
     glanzband(a, t, rampe, maske)                    Lichtreflex wandert diagonal über den Sprite (Farben eine Stufe heller)
     ausdruck_pruefen(frames, spr, …)                 4-Verbundenheit der Figur (ein Teil je Frame) und Randpixel-Farben
     verbinde4(a)                                     Eckkontakte durch Brückenpixel 4-verbinden (dünne, schräg gestellte Spitzen)
+    verbinde_luecken8(a, max_len)                    Wie verbinde_luecken, aber nur für Teile, die auch über eine Pixelecke nicht mehr hängen (8-Verbund; Diagonalfiguren)
     verbinde_luecken(a, max_len)                     Abgerissene Reststücke (keine Eckberührung mehr) über einen kurzen 4-verbundenen Pfad
                                                      (≤ max_len Pixel, Farbe des Reststücks) an den Hauptteil hängen
     umriss_ergaenzen(fig, erlaubt, umriss)          frei liegende Füllpixel am Rand mit Umrissfarbe einfassen
@@ -425,3 +426,60 @@ def strahlenfunke(rnd, mitte, kern, strahl, kern_pixel=None, n_strahlen=(5, 7), 
     for (dx, dy) in kern_pixel:
         setze(cx + dx, cy + dy, kern)
     return out
+
+
+def verbinde_luecken8(a, max_len=3):
+    """Wie verbinde_luecken, aber mit 8-Verbund als Maßstab: nur Teile, die auch über eine Pixelecke NICHT mehr zusammenhängen, werden über den kürzesten Pfad leerer Felder
+    (höchstens `max_len` neue Pixel, Farbe des Pixels, an dem der Pfad beginnt) an den größten Teil gehängt. Für 1-px-Diagonalfiguren (Spinnenbeine, Drähte), deren Original nur
+    8-verbunden ist. Gibt (Ebene, [(x, y), …], [nicht verbundene Teile])."""
+    import cv2
+    from collections import deque
+    out = a.copy()
+    h, w = out.shape[:2]
+    neu, offen = [], []
+    for _ in range(12):
+        m = (out[..., 3] > 0).astype(np.uint8)
+        n, lab = cv2.connectedComponents(m, connectivity=8)
+        if n <= 2:
+            break
+        groessen = {k: int((lab == k).sum()) for k in range(1, n)}
+        haupt = max(groessen, key=groessen.get)
+        getan = False
+        for k in sorted(groessen, key=groessen.get):
+            if k == haupt:
+                continue
+            start = [(int(x), int(y)) for y, x in zip(*np.nonzero(lab == k))]
+            dist = {pt: (0, pt) for pt in start}
+            elter = {}
+            q = deque(start)
+            ziel = None
+            while q and ziel is None:
+                x, y = q.popleft()
+                d0, ur = dist[(x, y)]
+                for nx, ny in ((x + 1, y), (x - 1, y), (x, y + 1), (x, y - 1), (x + 1, y + 1), (x - 1, y - 1), (x + 1, y - 1), (x - 1, y + 1)):
+                    if not (0 <= nx < w and 0 <= ny < h) or (nx, ny) in dist:
+                        continue
+                    if lab[ny, nx] == haupt:
+                        ziel = (x, y)
+                        break
+                    if lab[ny, nx] == 0 and d0 + 1 <= max_len:
+                        dist[(nx, ny)] = (d0 + 1, ur)
+                        elter[(nx, ny)] = (x, y)
+                        q.append((nx, ny))
+            if ziel is None:
+                if k not in offen:
+                    offen.append(k)
+                continue
+            ux, uy = dist[ziel][1]
+            farbe = out[uy, ux, :3].copy()
+            pt = ziel
+            while pt in elter:
+                out[pt[1], pt[0], :3] = farbe
+                out[pt[1], pt[0], 3] = 255
+                neu.append(pt)
+                pt = elter[pt]
+            getan = True
+            break
+        if not getan:
+            break
+    return out, neu, offen

@@ -1,0 +1,15 @@
+{
+  "creature": "Deepsea Skeleton",
+  "sheet": "deepsea-skeleton.png",
+  "frameWidth": 37,
+  "frameHeight": 27,
+  "frames": 48,
+  "frameMs": 65,
+  "loop": true,
+  "layout": "horizontal",
+  "padTop": 1,
+  "padLeft": 2,
+  "padRight": 1,
+  "padBottom": 1,
+  "faceX": 18.5
+}

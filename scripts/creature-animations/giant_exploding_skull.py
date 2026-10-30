@@ -26,14 +26,14 @@ Ablauf (48 Frames à 65 ms = 3,12 s, nahtlos) — Konventionen der Basiskarte, l
 * Schwerer Hüpfer: der ganze Riese hebt sich 1 px (Frames 4–20, ein langsamer Zyklus), sonst steht er (Frame 0 = Original).
 * Füße: die acht senkrechten Beinspitzen scharren abwechselnd 1 px nach außen und zurück (Zeilenversatz wächst zur Spitze, Periode 24, je Fuß andere Phase); der Ansatz bleibt fest, die
   dicken Beine bleiben 4-verbunden.
-* Zünddrähte: die drei Drähte schwingen im Luftzug (Zeilenversatz wächst zum freien Ende bis ±2 px, Nachlauf, Perioden 24/16/48 — die Brückenpixel gegen Lücken (verbinde_luecken) kommen in der Farbe des Drahts).
+* Zünddrähte: die drei Drähte schwingen im Luftzug (Zeilenversatz wächst zum freien Ende bis ±2 px, Nachlauf, Perioden 24/16/48 — die Brückenpixel gegen Lücken (verbinde_luecken8) kommen in der Farbe des Drahts).
 * Zündfunke: die Garbe am Schnurende flackert zwischen acht Posen (Pose 0 = Original, Posen 2–3 Frames; weißer Kern, unregelmäßige gelbe Strahlen von 2–6 px), dazu steigen zwölf
   1-px-Funken (Weiß → Gelb → Olivgelb) 3–5 px auf und kreiseln leicht (Partikel).
 * Mundglühen: das Gelb im Mund flackert (vier Zustände, 2–3 Frames: eine bzw. zwei Stufen heller/dunkler auf der Gelb-Oliv-Rampe der Quelle); die Augen glühen nicht.
 * Blinzeln: beide Augen (Frames 14–17 und 38–41, das linke einen Frame früher): zornig → halb zu → zu; die Lidfarbe ist die umgebende Knochenfarbe (je Pixel die häufigste Knochenstufe im
   3-px-Umkreis außerhalb der Augen), der schwarze Augenrand bleibt.
 * KEIN Glanz (Regel 14): Knochen glänzen nicht, keine Glitzersterne.
-Ergänzungen: Durch den Drahtversatz entstehen Lücken zwischen den 1-px-Drähten: `anim_amorph.verbinde_luecken` setzt Pfadpixel (≤ 3 px) in der Drahtfarbe; die Funkengarbe wird je Pose neu
+Ergänzungen: Durch den Drahtversatz entstehen Lücken zwischen den 1-px-Drähten: `anim_amorph.verbinde_luecken8` setzt Pfadpixel (≤ 3 px) in der Drahtfarbe; die Funkengarbe wird je Pose neu
 gezeichnet (nur auf freien Feldern, nie über Schnur oder Schädel), daher weicht Frame 0 nur bei Pose 0 nicht ab.
 Frame: Sprite plus 3 px links/rechts, 4 px oben (Garbe + Hüpfer), 2 px unten — Figur zentriert; Funken liegen in der 2-px-Zone um die Figur.
 Alle Bewegungen laufen auf der vollen Leinwand (anim_lib/anim_amorph werfen ClipError). Nur ganze Pixel, nur Farben der Quelle.
@@ -140,7 +140,7 @@ assert HOP[0] == 0 and MUND_ZUSTAND[0] == 0 and 0 not in BLINZELN_L
 
 _rnd = random.Random(2468)
 FUNKEN_POSE = [None] + [A.strahlenfunke(_rnd, (16, 8), CL, CG, kern_pixel=[(-1, -1), (0, -1), (1, -1), (-1, 0), (0, 0), (1, 0), (2, 0), (-1, 1), (0, 1), (1, 1), (2, 1), (0, 2), (1, 2)],
-                                         n_strahlen=(5, 7), laenge=(3, 6), box=(8, 2, 22, 15), dick=0.45) for _ in range(7)]
+                                         n_strahlen=(8, 10), laenge=(3, 6), box=(7, 1, 22, 15), dick=0.85) for _ in range(7)]
 FOLGE_F = A.pose_folge(random.Random(21), 8, tempo=(2, 3))
 ZUENDFUNKEN = [(2, -1), (6, 0), (10, 1), (14, -1), (18, 0), (22, 1), (26, -1), (30, 0), (34, 1), (38, -1), (42, 0), (46, 1)]       # Startframe, seitlicher Weg
 
@@ -219,8 +219,8 @@ def figur(i):
     neu = FUNKE | (~OPAK & (sp[..., 3] > 0))                                      # Funkengarbe (Original und neu gesetzte Pixel)
     ebenen.append((L.platz(np.where(neu[..., None], sp, 0).astype(np.uint8), H, W, PAD_L, PAD_T), 0, dyb))
     fig = L.zusammen(H, W, ebenen)
-    fig, brueck = A.verbinde4(fig)
-    fig, pfad, offen = A.verbinde_luecken(fig, 3)
+    fig, pfad, offen = A.verbinde_luecken8(fig, 3)                                  # nur wenn ein Teil auch über eine Ecke nicht mehr hängt (das Original ist nur 8-verbunden)
+    brueck = []
     return dict(fig=fig, brueck=brueck, pfad=pfad, offen=offen)
 
 
