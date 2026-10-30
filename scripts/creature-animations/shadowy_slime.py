@@ -20,7 +20,7 @@ Fest bleiben: Umriss, Ohrenform, die Lichtpunkte (sie wandern nur mit dem Gel).
 Ablauf (48 Frames à 65 ms = 3,12 s, nahtlos):
 * Gel-Körper (Squash & Stretch, Periode 24): beim Strecken (Frames 2–10 und 26–34) werden Körperzeile 8 (dunkles Band) und Zeile 10 verdoppelt (Schleim wird 1–2 px höher); beim Stauchen
   (Frames 15–21 und 39–45) wird er je Zeile 1 Spalte je Seite breiter (die Spalte neben dem Umriss wird verdoppelt, nie der Umriss). Die Unterkante sitzt fest am Boden.
-* Kopfwiegen: die Ohren/Kopfzeilen 0–5 neigen sich seitlich (Zeilenversatz wächst zu den Ohrspitzen, bis ±1 px, Periode 24, Nachlauf); Frame 0 = Quellform.
+* Kopfwiegen: die Ohren (Zeilen 0–3) neigen sich seitlich (Zeilenversatz wächst zu den Ohrspitzen, bis ±1 px, Periode 24, Nachlauf); Frame 0 = Quellform.
 * Blinzeln: beide Augenkerne (Frames 15–17 und 39–41, das rechte einen Frame später): der dunkle Kern wird zur umgebenden Violettfarbe (je Pixel die häufigste Stufe der hellen Nachbarpixel).
 * Schattendunst (Partikel): acht kleine runde Violett-Punkte (Formen k/s) steigen links und rechts vom Schleim langsam auf (24 Frames Lebenszeit).
 Ergänzungen: beim Kopfwiegen liegt gelegentlich ein helles Innenpixel (Lichtpunkt oder „V“) am Rand frei; sein leeres Nachbarfeld bekommt den Umriss A=(10,0,41) (umriss_ergaenzen, Regel 16, 0–6 Pixel je Frame).
@@ -98,7 +98,7 @@ POSEN = {-1: ({}, 1), 0: ({}, 0), 1: ({10: 1}, 0), 2: ({8: 1, 10: 1}, 0)}       
 BLINZELN_L = {15, 16, 17, 39, 40, 41}
 BLINZELN_R = {16, 17, 18, 40, 41, 42}
 assert S[0] == 0 and 0 not in BLINZELN_L
-KOPF_ZEILEN = 6                                                                          # Zeilen 0–5 wiegen
+KOPF_ZEILEN = 4                                                                          # Zeilen 0–3 (Ohren) wiegen
 
 DUNST = {'c': (113, 6, 182), 'r': (89, 19, 130)}
 for _c in DUNST.values():
@@ -124,7 +124,7 @@ def kopf_dx(i):
             continue
         frac = (KOPF_ZEILEN - k) / float(KOPF_ZEILEN)
         ph = 2 * math.pi * i / 24
-        out.append(int(round(1.4 * frac * (math.sin(ph - 0.6 * frac) - math.sin(-0.6 * frac)))))
+        out.append(int(round(1.0 * frac * (math.sin(ph - 0.6 * frac) - math.sin(-0.6 * frac)))))
     return out
 
 
