@@ -19,16 +19,18 @@ Identifikation (Sprite 12×16, Hund von vorn, fast schwarz):
 * Kein Schwanz, keine Zunge und kein Hecheln im Sprite sichtbar — nichts davon erfunden.
 Bleibt fest: Augenbrauen, Nase, Schnauze/Kinn, Halsband, Brust.
 
-Ablauf (40 Frames à 80 ms = 3,2 s), alle Bewegungen unabhängig:
-* Atmen (Periode 40, Frames 8–27 oben): Brustzeile 12 wird eingefügt — Kopf, Ohren, Halsband und Brust heben sich 1 px, die Füße
-  bleiben am Boden.
-* Schlappohren: das linke schwingt in Frames 4–11, das rechte in Frames 22–29 nach außen und zurück: erst nur die Spitzenzeile
-  (Zeile 5), dann die Zeilen 3–5 gemeinsam je 1 px (so entsteht keine Beule an der verjüngten Spitze). Oben am Ansatz (Zeilen 0–2)
-  bleiben sie am Kopf; die Lücke zum Kopf wird mit dem inneren Randpixel der Zeile geschlossen.
-* Blick: die Augen wandern 1 px nach links (Frames 14–21) und 1 px nach rechts (Frames 32–36); beide Augen gemeinsam.
-* Blinzeln (Frames 25–27): oberes Augenpixel verschwindet, dann beide Augen zu (Fellfarbe, unten dunkler Lidstrich), dann halb offen.
-* Pfote tippt: die rechte Vorderpfote hebt sich zweimal um 1 px (Frames 12–13 und 16–17), die linke einmal (Frames 33–34) —
-  die untere Beinzeile 14 entfällt, die Fußlinie rückt hoch.
+Ablauf (48 Frames à 70 ms = 3,36 s), alle Bewegungen unabhängig und öfter als in Version 1:
+* Atmen (Periode 24, 2× pro Schleife; oben in Frames 4–15 und 28–39): Brustzeile 12 wird eingefügt — Kopf, Ohren, Halsband und Brust
+  heben sich 1 px, die Füße bleiben am Boden.
+* Schlappohren: links in Frames 3, 19, 35, rechts in Frames 11, 27, 40 (je 7 Frames) nach außen und zurück: erst nur die Spitzenzeile
+  (Zeile 5), dann Zeilen 3–5 gemeinsam je 1 px; oben bleiben sie am Kopf, die Lücke zum Kopf wird mit dem Randpixel geschlossen.
+* Blick: die Augen schauen 1 px nach links (Frames 14–21) und 1 px nach rechts (Frames 38–45); die hellbraunen Augenbrauen
+  (4,2) und (7,2) wandern mit (die frei werdende Stelle bekommt die Gesichtsfarbe).
+* Blinzeln, deutlich sichtbar (zweimal pro Schleife, alle 24 Frames ≈ 1,7 s: Frames 8–11 und 32–35): beide Augenpixel werden zu einem
+  rosabraunen Lid (Farbe H des Halsbandglanzes, klar heller als das fast schwarze Gesicht und von den Brauen abgesetzt): erst oberes
+  Pixel, dann beide, zwei Frames lang, dann wieder oberes Pixel.
+* Pfoten tippen: die rechte Vorderpfote hebt sich um 1 px in Frames 12–13, 16–17 und 36–37, die linke in 26–27, 30 und 44–45
+  (die untere Beinzeile 14 entfällt, die Fußlinie rückt hoch).
 Alle Bewegungen laufen auf der vollen Leinwand (anim_lib wirft ClipError). Nur ganze Pixel, nur Farben der Quelle.
 
 Ergänzungen: keine gemalten Pixel (Ohr-Lücken werden mit dem Randpixel des Ohres geschlossen, siehe anim_tiere.ohr_haengend).
@@ -40,7 +42,7 @@ import numpy as np
 import anim_lib as L
 import anim_tiere as T
 
-N, MS = 40, 80
+N, MS = 48, 70
 PAD_L, PAD_R, PAD_T, PAD_B = 4, 4, 4, 3
 
 spr = L.lade('loyal-rottweiler')
@@ -57,6 +59,8 @@ koerper = vorhanden & ~ohr_l & ~ohr_r & ~pfote_r & ~pfote_l
 
 AUGE_OBEN, AUGE_UNTEN = (66, 61, 83), (50, 47, 68)               # bläuliches Grau
 KOPF, KOPF_DUNKEL = (36, 35, 40), (25, 23, 28)                   # Gesichtsfläche / dunklere Fläche
+LID = (169, 90, 96)                                              # rosa-braunes Lid (Farbe des Halsband-Glanzes H) — klar abgesetzt vom schwarzen Gesicht und von den Brauen
+BRAUE_L, BRAUE_R = (137, 84, 68), (163, 111, 98)                 # Augenbrauen (4,2) und (7,2)
 AUGEN_X = (4, 7)                                                 # Ruhelage der Augen (links, rechts)
 BAUCHZEILE = 12                                                  # hier wird beim Atmen eine Zeile eingefügt
 
@@ -76,34 +80,41 @@ def ohr_profil(env, richtung):
     return {PAD_T + y: richtung for y in range(6 - stufe, 6)} if stufe else {}
 
 
+PFOTE_R = (12, 13, 16, 17, 36, 37)
+PFOTE_L = (26, 27, 30, 44, 45)
+
+
 def zustand(i):
-    atem = 1 if 8 <= i < 28 else 0
-    ohr_li = T.huellkurve(i, N, 4, 8)
-    ohr_re = T.huellkurve(i, N, 22, 8)
-    blick = -1 if 14 <= i < 22 else (1 if 32 <= i < 37 else 0)
-    lid = {25: 1, 26: 2, 27: 1}.get(i, 0)
-    tipp_r = 1 if i in (12, 13, 16, 17) else 0
-    tipp_l = 1 if i in (33, 34) else 0
-    return atem, ohr_li, ohr_re, blick, lid, tipp_r, tipp_l
+    atem = 1 if (i % 24) in range(4, 16) else 0
+    ohr_li = max(T.huellkurve(i, N, s, 7) for s in (3, 19, 35))
+    ohr_re = max(T.huellkurve(i, N, s, 7) for s in (11, 27, 40))
+    blick = -1 if 14 <= i < 22 else (1 if 38 <= i < 46 else 0)
+    lid = 0
+    for s in (8, 32):
+        if 0 <= i - s < 4:
+            lid = (1, 2, 2, 1)[i - s]
+    return atem, ohr_li, ohr_re, blick, lid, 1 if i in PFOTE_R else 0, 1 if i in PFOTE_L else 0
 
 
 def frame(i, nur=None):
     atem, ohr_li, ohr_re, blick, lid, tipp_r, tipp_l = zustand(i)
     z = PAD_T + BAUCHZEILE
     k = teil(koerper)
-    # Blick (Augen wandern 1 px) und Blinzeln — auf dem Körper-Layer, bevor er gestreckt wird
+    # Blick (Augen und Augenbrauen wandern 1 px) und Blinzeln — auf dem Körper-Layer, bevor er gestreckt wird
     ex = [x + blick for x in AUGEN_X]
     if blick:
-        for x0, x1 in zip(AUGEN_X, ex):
+        for x0, x1, c in zip(AUGEN_X, ex, (BRAUE_L, BRAUE_R)):
+            k[PAD_T + 2, PAD_L + x0, :3] = KOPF                       # Braue geht, Augen gehen
             k[PAD_T + 3, PAD_L + x0, :3] = KOPF
             k[PAD_T + 4, PAD_L + x0, :3] = KOPF
+            k[PAD_T + 2, PAD_L + x1, :3] = c                          # Braue und Augen kommen an
             k[PAD_T + 3, PAD_L + x1, :3] = AUGE_OBEN
             k[PAD_T + 4, PAD_L + x1, :3] = AUGE_UNTEN
     if lid:
         for x in ex:
-            k[PAD_T + 3, PAD_L + x, :3] = KOPF
+            k[PAD_T + 3, PAD_L + x, :3] = LID
             if lid == 2:
-                k[PAD_T + 4, PAD_L + x, :3] = KOPF_DUNKEL
+                k[PAD_T + 4, PAD_L + x, :3] = LID
     k = L.streck_zeile(k, z, atem)
     ol = L.streck_zeile(T.ohr_haengend(teil(ohr_l), ohr_profil(ohr_li, -1), 'links'), z, atem)
     orr = L.streck_zeile(T.ohr_haengend(teil(ohr_r), ohr_profil(ohr_re, 1), 'rechts'), z, atem)
