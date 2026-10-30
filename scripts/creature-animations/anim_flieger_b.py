@@ -13,6 +13,7 @@ Skelettflügel aus Schlüsselpunkten, nur aus Knochen (Pixelart, nur ganze Pixel
     verbunden4(a, start)                    Maske aller deckenden Pixel, die über KANTEN (4er-Nachbarschaft) mit `start` zusammenhängen
     linie(p0, p1) / linie4(p0, p1)          Bresenham (8er- bzw. 4er-verbunden)
     umriss_schliessen(frame, erlaubt, hell, dunkel)   Randpixel-Test/-Reparatur (Regel 16)
+    spalten_schub(a, pivot_x, dy_fn)        Federflügel: Spalten als Ganzes verschieben (Textur bleibt); zusammen_mit_karte / umriss_je_ebene: Ebenenkarte und Umriss je Ebene
 Koordinaten der Posen sind Leinwandkoordinaten (Float); gezeichnet wird auf die nächsten ganzen Pixel.
 """
 import math
@@ -252,3 +253,51 @@ def umriss_schliessen(frame, erlaubt, hell, dunkel):
         frame[y, x, :3] = hell if sum(c) / 3.0 > 120 else dunkel
         n += 1
     return n
+
+
+# ── Federflügel: Spalten schieben (Textur bleibt erhalten), Ebenenkarte, Umriss pro Ebene ───────────────────────────────────
+def spalten_schub(a, pivot_x, dy_fn):
+    """Jede Spalte von `a` wandert als Ganzes senkrecht um round(dy_fn(f)) (positiv = nach unten); f = |x − pivot_x| / größter Abstand (0…1).
+    Es wird nichts kopiert oder gestreckt — die Federtextur bleibt Pixel für Pixel erhalten. ClipError, wenn eine Spalte aus der Leinwand ragen würde."""
+    out = L.leer(*a.shape[:2])
+    h, w = a.shape[:2]
+    spalten = [x for x in range(w) if a[:, x, 3].any()]
+    maxd = max(1, max(abs(x - pivot_x) for x in spalten)) if spalten else 1
+    for x in spalten:
+        dy = int(round(dy_fn(abs(x - pivot_x) / maxd)))
+        ys = np.nonzero(a[:, x, 3])[0]
+        if ys.min() + dy < 0 or ys.max() + dy >= h:
+            raise L.ClipError(f'Spalte {x} würde um {dy} px aus der Leinwand (Höhe {h}) geschoben')
+        for y in ys:
+            out[y + dy, x] = a[y, x]
+    return out
+
+
+def zusammen_mit_karte(h, w, ebenen):
+    """Wie L.zusammen, liefert zusätzlich eine Karte (h×w, int), welche Ebene das oberste Pixel liefert. ebenen = [(Ebene, dx, dy, Nummer ≥ 1)], zuerst = unten."""
+    f = L.leer(h, w)
+    karte = np.zeros((h, w), np.int16)
+    for (a, dx, dy, nr) in ebenen:
+        t = L.einsetzen(L.leer(h, w), a, dx, dy)
+        m = t[..., 3] > 0
+        f[m] = t[m]
+        karte[m] = nr
+    return f, karte
+
+
+def umriss_je_ebene(frame, karte, erlaubt, farbe_je_ebene):
+    """Randpixel-Test/-Reparatur mit Umrissfarbe je Ebene: Jedes deckende Pixel mit transparentem 4er-Nachbarn (auch am Leinwandrand), dessen Farbe nicht in
+    `erlaubt` steht, bekommt die Umrissfarbe seiner Ebene (`farbe_je_ebene[karte[y, x]]`) — z. B. wenn eine verschobene Federspalte Innenfarbe an die Kante bringt.
+    Gibt die Zahl der umgefärbten Pixel zurück; ändert `frame` an Ort und Stelle."""
+    deck = frame[..., 3] > 0
+    p = np.pad(deck, 1)
+    rand = deck & (~p[:-2, 1:-1] | ~p[2:, 1:-1] | ~p[1:-1, :-2] | ~p[1:-1, 2:])
+    n = 0
+    for y, x in zip(*np.nonzero(rand)):
+        c = tuple(int(v) for v in frame[y, x, :3])
+        if c in erlaubt:
+            continue
+        frame[y, x, :3] = farbe_je_ebene[int(karte[y, x])]
+        n += 1
+    return n
+

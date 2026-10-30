@@ -24,8 +24,9 @@ Identifikation (Sprite-Koordinaten x, y):
 * Die Flügel der Karte sind weich durchscheinend; hier deckend (wie bei den Bomblebees und dem Sparkfly Architect).
 
 Ablauf (48 Frames à 60 ms = 2,88 s):
-* Kräftiger Flügelschlag: achtmal pro Schleife (Periode 6); jede Flügelspalte wandert senkrecht, je weiter außen desto mehr (Spitze etwa −5 … +5 px), Spitze hinkt nach; die Blätter bleiben
-  vollständig (Spalten werden als Ganzes versetzt, F.fluegel_welle, Zusammenhang erzwungen) und liegen hinter dem Körper. Beide Flügel schlagen gleichzeitig.
+* Kräftiger Flügelschlag: achtmal pro Schleife (Periode 6): jedes Blatt dreht sich als Ganzes um seine Wurzel (links (6,12), rechts (9,13)), die Spitze beschreibt einen großen Bogen:
+  Aufschlag bis fast senkrecht (+35°), Abschlag bis unter die Waagerechte (−70°), Abschlag schneller als Aufschlag, Ruhepose (Frame 0) = Original. Drehung per Rückrechnung
+  (Nächster-Nachbar, keine Mischfarben, Alpha 0/255, Kanten geglättet), die Blätter bleiben vollständig und liegen hinter dem Körper. Beide Flügel schlagen gleichzeitig (gespiegelt).
 * Schwebe-Bob zweistufig bis 2 px nach oben (0 → 1 → 2 → 1 → 0, Periode 12); der Beutel schwingt mit Verzögerung: Beine und Beutel pendeln unterhalb des Körpers bis 2 px
   (F.zeilen_pendel, Aufhängung fest).
 * Blinzeln (Frames 33–34): die Augen schließen sich — Lid in Körperfarbe (42,27,14), die Augenpixel werden zu Körper.
@@ -33,7 +34,7 @@ Ablauf (48 Frames à 60 ms = 2,88 s):
 
 Ergänzungen: keine nötig — die Flügel liegen vollständig hinter dem Körper (die ganzen Blätter sind in der Ebene vorhanden), nichts Verdecktes fehlt.
 Rahmen: auf die Figur zugeschnitten (Vereinigung aller Frames + 1 px freier Rand), keine Effekte außerhalb der Figur.
-Randpixel-Test (Regel 16): Flügelversatz legt Innenfarbe an den Kanten frei → F.umranden setzt den Flügelrand (58,56,6); zusätzlich randtest.py.
+Randpixel-Test (Regel 16): Die Drehung kann Innenfarbe an die Kanten legen → F.umranden setzt den Flügelrand (58,56,6); zusätzlich randtest.py.
 Alle Bewegungen laufen auf der vollen (größeren) Arbeitsleinwand (anim_lib wirft ClipError). Nur ganze Pixel, nur Farben der Quelle, Alpha nur 0/255.
 """
 import math
@@ -64,6 +65,8 @@ AUGEN = [(11, 8), (13, 8), (11, 9), (13, 9)]
 UMRISS = F.umriss_farben(spr)
 FLUEGELRAND = (58, 56, 6)
 BEUTELRAND = (33, 20, 7)
+THETA_C, THETA_A = math.radians(-17.5), math.radians(52.5)    # Drehwinkel −70° … +35° (Ruhe 0°)
+THETA_P0 = math.asin(-THETA_C / THETA_A)
 Y_AUFH = PAD_T + 13                                          # Körperunterkante: darunter hängen Beine und Beutel
 
 
@@ -76,9 +79,11 @@ def frame(i, partikel=True, effekte=True):
     if i in (33, 34):                                          # Blinzeln: Lid = Körperfarbe
         F.setze(kp, PAD_L, PAD_T, {p: KOERPER for p in AUGEN})
 
-    # Flügelschlag: Spitze etwa −5 … +5 px
-    wl = F.fluegel_welle(wl, PAD_L + 8, 5.0, ph, potenz=1.0, nur_rechts=False, lauf=0.12, zusammenhang=True)
-    wr = F.fluegel_welle(wr, PAD_L + 8, 5.0, ph, potenz=1.0, nur_rechts=True, lauf=0.12, zusammenhang=True)
+    # Flügelschlag: jedes Blatt dreht sich um seine Wurzel (Spitze beschreibt einen Bogen): Aufschlag fast senkrecht, Abschlag bis unter die Waagerechte
+    ph2 = ph + 0.4 * math.sin(ph)                              # Abschlag schneller als Aufschlag
+    theta = THETA_C + THETA_A * math.sin(ph2 + THETA_P0)       # links: im Uhrzeigersinn (+) = Spitze richtet sich auf; Ruhe (Frame 0) = 0
+    wl = F.drehen(wl, PAD_L + 6.5, PAD_T + 12, theta, glatt=True)
+    wr = F.drehen(wr, PAD_L + 9.5, PAD_T + 13, -theta, glatt=True)
     # Beine und Beutel pendeln an der Aufhängung
     bt = F.zeilen_pendel(bt, Y_AUFH, 2.2, L.sinus(i, N / 2) , 1.0, lauf=0.5)
 
