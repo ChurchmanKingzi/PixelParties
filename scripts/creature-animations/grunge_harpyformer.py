@@ -61,7 +61,7 @@ FLUEGEL_FARBEN = [(246, 255, 255), (242, 255, 255), (255, 255, 255), (226, 226, 
                   (255, 246, 172), (2, 2, 14), (40, 42, 55), (60, 65, 77), (166, 168, 181)]
 M_STRAP = fig & L.farbmaske(spr, STRAP_FARBEN) & (xx <= 15) & (yy >= 6) & (yy <= 13)
 M_FUESSE = fig & (yy >= 22)
-M_KOPF = fig & (yy <= 11) & (xx >= 14) & ~M_STRAP
+M_KOPF = fig & (yy <= 11) & (xx >= 13) & ~M_STRAP
 M_FLUEGEL = fig & (yy >= 12) & (yy <= 17) & (xx >= 19) & L.farbmaske(spr, FLUEGEL_FARBEN) & ~M_KOPF
 M_GITARRE = fig & (xx <= 11) & ~M_STRAP & ~M_KOPF
 M_REST = fig & ~(M_KOPF | M_FLUEGEL | M_GITARRE | M_FUESSE)
