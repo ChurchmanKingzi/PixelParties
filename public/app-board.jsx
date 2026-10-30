@@ -2135,7 +2135,7 @@ function ppPlatzierungsKamera() {
     if (!sc) return;
     // Support-Zonen-Wahl (Pollution Tokens …) UND „waehle einen Nutzer": sind meine Helden als Ziel markiert (Spell/Attack/Creature per Tipp, mehrere moegliche Wirker),
     // fahren die Kamera zu ihnen.
-    const els = Array.from(sc.querySelectorAll('[data-support-zone].zone-pick-target, [data-support-zone].zone-bounce-place-target, [data-hero-zone].board-zone-play-target, [data-hero-zone].attach-pick-target'));
+    const els = Array.from(sc.querySelectorAll('[data-support-zone].zone-pick-target, [data-support-zone].zone-bounce-place-target, [data-support-zone].zone-drag-valid, [data-hero-zone].board-zone-play-target, [data-hero-zone].attach-pick-target'));   // zone-drag-valid: Handkarte angetippt (Artefakt/Kreatur) — die gueltigen Support-Zonen liegen sonst hinter der Handleiste
     if (!els.length) { _ppPlatzSchluessel = ''; return; }
     if (document.querySelector('.textbox-overlay')) return;   // im Tutorial hat die Textbox-Kamera Vorrang
     if (document.querySelector('.panel-zielwahl')) return;    // das Zielwahl-Fenster steuert die Kamera selbst
