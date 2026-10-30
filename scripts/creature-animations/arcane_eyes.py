@@ -40,13 +40,23 @@ import numpy as np
 import anim_lib as L
 import anim_untote as U
 
+
+_OHNE_PARTIKEL = [False]
+
+
+def _glut(*a, **k):
+    """Partikelebene (leer, wenn nur die Figur gerendert wird — für den Zuschnitt)."""
+    if _OHNE_PARTIKEL[0]:
+        return L.leer(a[0], a[1])
+    return U.glut_ebene(*a, **k)
+
 N, MS = 48, 60
-PAD_L, PAD_R, PAD_T, PAD_B = 9, 8, 9, 5
+GPL, GPR, GPT, GPB = 9, 8, 9, 5
 SCHATTEN = True
 
 spr = L.lade('arcane-eyes')
 sh, sw = spr.shape[:2]
-H, W = sh + PAD_T + PAD_B, sw + PAD_L + PAD_R
+H, W = sh + GPT + GPB, sw + GPL + GPR
 yy, xx = np.mgrid[0:sh, 0:sw]
 vorhanden = L.deckend(spr)
 
@@ -195,43 +205,60 @@ assert all(np.array_equal(auge(k, 0)[AUGE[k]], spr[AUGE[k]]) for k in range(2))
 
 PUR = {'c': D_, 'r': C_}
 WEISS = {'c': E_, 'r': F_}
-P = lambda x, y: (PAD_L + x, PAD_T + y)
+P = lambda x, y: (GPL + x, GPT + y)
 PUFFS_PUR = [
-    dict(x=P(-3, 11)[0], y=P(-3, 11)[1], vx=-1, vy=-9, off=0, form='o', wackeln=1),       # außen links, steigt am linken Auge auf
+    dict(x=P(1, 11)[0], y=P(1, 11)[1], vx=-1, vy=-9, off=0, form='o', wackeln=1),        # außen links, steigt am linken Auge auf
     dict(x=P(22, 12)[0], y=P(22, 12)[1], vx=1, vy=-10, off=17, form='k', wackeln=1),      # zwischen den Augen
     dict(x=P(30, 10)[0], y=P(30, 10)[1], vx=0, vy=-9, off=33, form='o', wackeln=1),
     dict(x=P(27, 13)[0], y=P(27, 13)[1], vx=0, vy=-10, off=8, form='k', wackeln=1),
-    dict(x=P(57, 11)[0], y=P(57, 11)[1], vx=1, vy=-9, off=25, form='o', wackeln=1),       # außen rechts
+    dict(x=P(53, 11)[0], y=P(53, 11)[1], vx=1, vy=-9, off=25, form='o', wackeln=1),       # außen rechts
     dict(x=P(36, 12)[0], y=P(36, 12)[1], vx=-1, vy=-9, off=40, form='k', wackeln=1),
 ]
 PUFFS_WEISS = [
     dict(x=P(19, 8)[0], y=P(19, 8)[1], vx=1, vy=-8, off=12, form='k', wackeln=1),
-    dict(x=P(-2, 5)[0], y=P(-2, 5)[1], vx=-1, vy=-8, off=30, form='k', wackeln=1),
+    dict(x=P(-1, 5)[0], y=P(-1, 5)[1], vx=-1, vy=-8, off=30, form='k', wackeln=1),
     dict(x=P(33, 6)[0], y=P(33, 6)[1], vx=-1, vy=-8, off=3, form='k', wackeln=1),
-    dict(x=P(55, 6)[0], y=P(55, 6)[1], vx=1, vy=-9, off=21, form='k', wackeln=1),
+    dict(x=P(54, 6)[0], y=P(54, 6)[1], vx=1, vy=-9, off=21, form='k', wackeln=1),
 ]
 PERIODE_BOB = [24, 16]
 
 
-def frame(i, nur=None):
+def frame_gross(i, nur=None):
     ebenen = []
     for k in range(2):
         b = U.stufe(i, PERIODE_BOB[k], 2)                                  # 0-1-2-1-0 px Schweben
         dx = (U.stufe(i, N, 2, form='sin') - 1) * (1 if k == 0 else -1)       # langsames Treiben, die Augen gegenläufig
-        ebenen.append((L.platz(schatten(k, b), H, W, PAD_L, PAD_T), dx, 0))
-        ebenen.append((L.platz(auge(k, i), H, W, PAD_L, PAD_T), dx, -b))
+        ebenen.append((L.platz(schatten(k, b), H, W, GPL, GPT), dx, 0))
+        ebenen.append((L.platz(auge(k, i), H, W, GPL, GPT), dx, -b))
     koerper = L.zusammen(H, W, ebenen)
     if nur == 'koerper':
         return koerper
-    pur = U.glut_ebene(H, W, i, N, PUFFS_PUR, PUR)
-    weiss = U.glut_ebene(H, W, i, N, PUFFS_WEISS, WEISS)
+    pur = _glut(H, W, i, N, PUFFS_PUR, PUR)
+    weiss = _glut(H, W, i, N, PUFFS_WEISS, WEISS)
     return L.zusammen(H, W, [(pur, 0, 0), (weiss, 0, 0), (koerper, 0, 0)])
+
+
+# Zuschnitt auf die Figur (Nutzerwunsch): symmetrisch um die Ruhefigur; Partikel dürfen den Frame höchstens 2 px über den Figurenrand hinaus vergrößern
+def _figur(i):
+    _OHNE_PARTIKEL[0] = True
+    try:
+        return frame_gross(i, 'figur')
+    finally:
+        _OHNE_PARTIKEL[0] = False
+
+
+BOX = U.zuschnitt([frame_gross(i) for i in range(N)], [_figur(i) for i in range(N)], (GPL, GPT, GPL + sw, GPT + sh))
+PAD_L, PAD_T = GPL - BOX[0], GPT - BOX[1]
+
+
+def frame(i, nur=None):
+    return U.beschneiden(frame_gross(i, nur), BOX)
 
 
 if __name__ == '__main__':
     frames = [frame(i) for i in range(N)]
     prev = sys.argv[sys.argv.index('--preview') + 1] if '--preview' in sys.argv else None
-    L.pruefe(frames, quelle=spr)
+    L.pruefe(frames, quelle=spr, min_rand=1)
     L.speichern('arcane-eyes', 'Arcane Eyes', frames, MS, prev)
     if prev:
         L.streifen(prev + '/arcane-eyes-strip.png', [frames[k] for k in (0, 6, 12, 18, 24, 30, 36, 42)], spalten=4, scale=6)

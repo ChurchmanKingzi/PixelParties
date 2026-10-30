@@ -1,0 +1,15 @@
+{
+  "creature": "Cute Bunny",
+  "sheet": "cute-bunny.png",
+  "frameWidth": 42,
+  "frameHeight": 24,
+  "frames": 56,
+  "frameMs": 66,
+  "loop": true,
+  "layout": "horizontal",
+  "padTop": 2,
+  "padLeft": 3,
+  "padRight": 3,
+  "padBottom": 2,
+  "faceX": 21.0
+}

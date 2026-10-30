@@ -45,12 +45,22 @@ import numpy as np
 import anim_lib as L
 import anim_untote as U
 
+
+_OHNE_PARTIKEL = [False]
+
+
+def _glut(*a, **k):
+    """Partikelebene (leer, wenn nur die Figur gerendert wird — für den Zuschnitt)."""
+    if _OHNE_PARTIKEL[0]:
+        return L.leer(a[0], a[1])
+    return U.glut_ebene(*a, **k)
+
 N, MS = 36, 65
-PAD_L, PAD_R, PAD_T, PAD_B = 9, 9, 22, 4
+GPL, GPR, GPT, GPB = 9, 9, 22, 4
 
 spr = L.lade('horned-demon')
 sh, sw = spr.shape[:2]
-H, W = sh + PAD_T + PAD_B, sw + PAD_L + PAD_R
+H, W = sh + GPT + GPB, sw + GPL + GPR
 yy, xx = np.mgrid[0:sh, 0:sw]
 vorhanden = L.deckend(spr)
 
@@ -91,7 +101,7 @@ AUGEN_FARBEN = dict(glut=[STUFE1, STUFE2], lid=LID, lid_dunkel=LID_DUNKEL)
 
 
 def cv(gruppen):                      # Sprite- → Leinwandkoordinaten
-    return [dict(hell=[(PAD_L + x, PAD_T + y) for x, y in g['hell']], rand=[(PAD_L + x, PAD_T + y) for x, y in g['rand']]) for g in gruppen]
+    return [dict(hell=[(GPL + x, GPT + y) for x, y in g['hell']], rand=[(GPL + x, GPT + y) for x, y in g['rand']]) for g in gruppen]
 
 
 AUGEN_C = cv(AUGEN)
@@ -99,21 +109,22 @@ AUGEN_C = cv(AUGEN)
 GLUT = {'c': PFIRSICH, 'r': GOLD_HELL}          # Glutfunken: Kern Pfirsich, Rand Gold
 RAUCH = {'c': c(4, 1), 'r': c(5, 9)}            # Rauch: Kern H (157,112,91), Rand I (138,84,48)
 # Startpunkte in Sprite-Koordinaten (x, y); vx/vy = Weg über eine Lebensdauer (vy < 0 = aufwärts)
-P = lambda x, y: (PAD_L + x, PAD_T + y)
+P = lambda x, y: (GPL + x, GPT + y)
+# Partikel bleiben nah an der Figur (Zuschnitt: Effekte vergrößern den Frame höchstens 2 px über den Figurenrand hinaus)
 GLUT_PUFFS = [
-    dict(x=P(4, -3)[0], y=P(4, -3)[1], vx=-1, vy=-13, off=0, form='o', wackeln=1),       # über der linken Hornspitze
-    dict(x=P(11, -3)[0], y=P(11, -3)[1], vx=1, vy=-14, off=18, form='k', wackeln=1),     # über der rechten Hornspitze
-    dict(x=P(0, 16)[0], y=P(0, 16)[1], vx=-3, vy=-12, off=7, form='k', wackeln=1),       # von der linken Schulter
-    dict(x=P(15, 16)[0], y=P(15, 16)[1], vx=3, vy=-12, off=25, form='o', wackeln=1),     # von der rechten Schulter
-    dict(x=P(-1, 25)[0], y=P(-1, 25)[1], vx=-2, vy=-14, off=12, form='k', wackeln=1),    # seitlich vom Körper links
-    dict(x=P(16, 25)[0], y=P(16, 25)[1], vx=2, vy=-14, off=30, form='k', wackeln=1),     # seitlich rechts
-    dict(x=P(8, -4)[0], y=P(8, -4)[1], vx=0, vy=-12, off=9, form='k', wackeln=1),        # zwischen den Hörnern
+    dict(x=P(4, 1)[0], y=P(4, 1)[1], vx=-1, vy=-4, off=0, form='o', wackeln=1),          # über der linken Hornspitze
+    dict(x=P(11, 1)[0], y=P(11, 1)[1], vx=1, vy=-5, off=18, form='k', wackeln=1),        # über der rechten Hornspitze
+    dict(x=P(0, 16)[0], y=P(0, 16)[1], vx=-2, vy=-12, off=7, form='k', wackeln=1),       # von der linken Schulter
+    dict(x=P(15, 16)[0], y=P(15, 16)[1], vx=1, vy=-12, off=25, form='o', wackeln=1),     # von der rechten Schulter
+    dict(x=P(0, 25)[0], y=P(0, 25)[1], vx=-1, vy=-14, off=12, form='k', wackeln=1),      # seitlich vom Körper links
+    dict(x=P(15, 25)[0], y=P(15, 25)[1], vx=1, vy=-14, off=30, form='k', wackeln=1),     # seitlich rechts
+    dict(x=P(8, 0)[0], y=P(8, 0)[1], vx=0, vy=-4, off=9, form='k', wackeln=1),           # zwischen den Hörnern
 ]
 RAUCH_PUFFS = [
-    dict(x=P(3, -2)[0], y=P(3, -2)[1], vx=-2, vy=-12, off=5, form='m', wackeln=1),       # Rauch über der linken Hornspitze
-    dict(x=P(12, -2)[0], y=P(12, -2)[1], vx=2, vy=-12, off=23, form='m', wackeln=1),
-    dict(x=P(0, 17)[0], y=P(0, 17)[1], vx=-3, vy=-9, off=14, form='m', wackeln=1),       # Rauch von der Schulter
-    dict(x=P(15, 17)[0], y=P(15, 17)[1], vx=3, vy=-9, off=32, form='m', wackeln=1),
+    dict(x=P(3, 0)[0], y=P(3, 0)[1], vx=-1, vy=-3, off=5, form='m', wackeln=1),          # Rauch über der linken Hornspitze
+    dict(x=P(12, 0)[0], y=P(12, 0)[1], vx=1, vy=-3, off=23, form='m', wackeln=1),
+    dict(x=P(1, 17)[0], y=P(1, 17)[1], vx=-1, vy=-9, off=14, form='m', wackeln=1),       # Rauch von der Schulter
+    dict(x=P(14, 17)[0], y=P(14, 17)[1], vx=1, vy=-9, off=32, form='m', wackeln=1),
 ]
 
 GLOW12 = [0, 0, 0, 0, 1, 2, 2, 1, 0, 0, 0, 0]       # Augenglühen (Periode 12), 0 = Original
@@ -123,7 +134,7 @@ STIEFEL_PFAD = [(4, 27), (5, 27), (5, 26)]            # Glanzpixel wandert diago
 
 def teil(maske):
     t, _ = L.trenne(spr, maske)
-    return L.platz(t, H, W, PAD_L, PAD_T)                       # sofort auf die volle Leinwand
+    return L.platz(t, H, W, GPL, GPT)                       # sofort auf die volle Leinwand
 
 
 def brust(i):
@@ -133,7 +144,7 @@ def brust(i):
     return min(2, basis + (1 if i in HOPS else 0)), basis
 
 
-def frame(i):
+def frame_gross(i, nur=None):
     # --- Atmen: Brust zuerst, Kopf hinterher (nie höher als die Brust, höchstens 1 px tiefer) ---
     r_b, _ = brust(i)
     _, basis_spaet = brust((i - 2) % N)
@@ -160,13 +171,13 @@ def frame(i):
     o_l = L.versetze(teil(ohr_l_kopie), -ohr_l, 0)
     o_r = L.versetze(teil(ohr_r_kopie), ohr_r, 0)
     for (o, (ex, ey)) in ((o_l, OHR_ERG[0]), (o_r, OHR_ERG[1])):
-        o[PAD_T + ey, PAD_L + ex] = [*OHR_UMRISS, 255]
+        o[GPT + ey, GPL + ex] = [*OHR_UMRISS, 255]
     kopf_ges = L.zusammen(H, W, [(kopf, 0, 0), (o_l, 0, 0), (o_r, 0, 0)])
 
     # --- Rumpf, Arme, Beine ---
-    rp = L.streck_zeile(teil(rumpf), PAD_T + 22, r_b)
-    al = U.haengen(teil(arm_l), PAD_T + 19, arm_l_aus)
-    ar = U.haengen(teil(arm_r), PAD_T + 19, arm_r_aus)
+    rp = L.streck_zeile(teil(rumpf), GPT + 22, r_b)
+    al = U.haengen(teil(arm_l), GPT + 19, arm_l_aus)
+    ar = U.haengen(teil(arm_r), GPT + 19, arm_r_aus)
     if reif_l:
         al = _reif(al, reif_l)
     if reif_r:
@@ -176,9 +187,9 @@ def frame(i):
         if p0 <= i <= p1:
             k = min(len(STIEFEL_PFAD) - 1, (i - p0) // 2)
             x, y = STIEFEL_PFAD[k]
-            bo[PAD_T + y, PAD_L + x + px, :3] = STIEFEL_GLANZ
-    glut = U.glut_ebene(H, W, i, N, GLUT_PUFFS, GLUT)
-    rauch = U.glut_ebene(H, W, i, N, RAUCH_PUFFS, RAUCH)
+            bo[GPT + y, GPL + x + px, :3] = STIEFEL_GLANZ
+    glut = _glut(H, W, i, N, GLUT_PUFFS, GLUT)
+    rauch = _glut(H, W, i, N, RAUCH_PUFFS, RAUCH)
 
     # --- Glitzersterne nur an den goldenen Armreifen (nach der Figur gelegt; sie bleiben am Reif) ---
     sterne = L.leer(H, W)
@@ -187,7 +198,7 @@ def frame(i):
     for (st, bx, aus) in ((sr_l, 2, arm_l_aus), (sr_r, 13, arm_r_aus)):
         if st:
             dx = int(round(aus * 0.5))
-            L.einsetzen(sterne, U.stern_ebene(H, W, PAD_L + bx + dx, PAD_T + 21 - r_b, st, GLANZ, PFIRSICH))
+            L.einsetzen(sterne, U.stern_ebene(H, W, GPL + bx + dx, GPT + 21 - r_b, st, GLANZ, PFIRSICH))
 
     return L.zusammen(H, W, [(rauch, 0, 0), (glut, 0, 0), (bo, 0, 0), (rp, 0, 0), (al, 0, -r_b), (ar, 0, -r_b), (kopf_ges, 0, -r_k), (sterne, 0, 0)])
 
@@ -203,10 +214,27 @@ def _reif(arm, farben):
     return arm
 
 
+# Zuschnitt auf die Figur (Nutzerwunsch): symmetrisch um die Ruhefigur; Partikel dürfen den Frame höchstens 2 px über den Figurenrand hinaus vergrößern
+def _figur(i):
+    _OHNE_PARTIKEL[0] = True
+    try:
+        return frame_gross(i, 'figur')
+    finally:
+        _OHNE_PARTIKEL[0] = False
+
+
+BOX = U.zuschnitt([frame_gross(i) for i in range(N)], [_figur(i) for i in range(N)], (GPL, GPT, GPL + sw, GPT + sh))
+PAD_L, PAD_T = GPL - BOX[0], GPT - BOX[1]
+
+
+def frame(i, nur=None):
+    return U.beschneiden(frame_gross(i, nur), BOX)
+
+
 if __name__ == '__main__':
     frames = [frame(i) for i in range(N)]
     prev = sys.argv[sys.argv.index('--preview') + 1] if '--preview' in sys.argv else None
-    L.pruefe(frames, quelle=spr)
+    L.pruefe(frames, quelle=spr, min_rand=1)
     L.speichern('horned-demon', 'Horned Demon', frames, MS, prev)
     if prev:
         L.streifen(prev + '/horned-demon-strip.png', [frames[k] for k in (0, 6, 12, 18, 24, 30)], spalten=3, scale=8)

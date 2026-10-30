@@ -1,0 +1,15 @@
+{
+  "creature": "Coreling",
+  "sheet": "coreling.png",
+  "frameWidth": 30,
+  "frameHeight": 33,
+  "frames": 48,
+  "frameMs": 65,
+  "loop": true,
+  "layout": "horizontal",
+  "padTop": 2,
+  "padLeft": 2,
+  "padRight": 2,
+  "padBottom": 2,
+  "faceX": 15.0
+}

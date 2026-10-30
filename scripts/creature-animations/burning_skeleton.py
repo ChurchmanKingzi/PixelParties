@@ -46,12 +46,22 @@ import numpy as np
 import anim_lib as L
 import anim_untote as U
 
+
+_OHNE_PARTIKEL = [False]
+
+
+def _glut(*a, **k):
+    """Partikelebene (leer, wenn nur die Figur gerendert wird — für den Zuschnitt)."""
+    if _OHNE_PARTIKEL[0]:
+        return L.leer(a[0], a[1])
+    return U.glut_ebene(*a, **k)
+
 N, MS = 48, 60
-PAD_L, PAD_R, PAD_T, PAD_B = 8, 8, 18, 5
+GPL, GPR, GPT, GPB = 8, 8, 18, 5
 
 spr = L.lade('burning-skeleton')
 sh, sw = spr.shape[:2]
-H, W = sh + PAD_T + PAD_B, sw + PAD_L + PAD_R
+H, W = sh + GPT + GPB, sw + GPL + GPR
 yy, xx = np.mgrid[0:sh, 0:sw]
 vorhanden = L.deckend(spr)
 
@@ -215,7 +225,7 @@ AUGENFARBE = [M_, E_]
 
 HEISS = {'c': P_, 'r': G_}                          # heiße Funken/Kugeln: Kern gelb, Rand orange
 GLUT = {'c': G_, 'r': E_}                           # Glut: Kern orange, Rand rot
-P = lambda x, y: (PAD_L + x, PAD_T + y)
+P = lambda x, y: (GPL + x, GPT + y)
 PUFFS_HEISS = [
     dict(x=P(9, 2)[0], y=P(9, 2)[1], vx=1, vy=-12, off=0, form='k', wackeln=1),          # Funken über der Flamme
     dict(x=P(12, 1)[0], y=P(12, 1)[1], vx=1, vy=-12, off=16, form='k', wackeln=1),
@@ -234,7 +244,7 @@ PUFFS_GLUT = [
 
 def teil(maske):
     t, _ = L.trenne(spr, maske)
-    return L.platz(t, H, W, PAD_L, PAD_T)                       # sofort auf die volle Leinwand
+    return L.platz(t, H, W, GPL, GPT)                       # sofort auf die volle Leinwand
 
 
 def stufe2(i):
@@ -242,7 +252,7 @@ def stufe2(i):
     return int(round(2 * (1 - abs(2 * t - 1))))                  # 0-1-2-1-0
 
 
-def frame(i, nur=None):
+def frame_gross(i, nur=None):
     r_b = stufe2(i)
     r_k = max(min(r_b, stufe2(i - 2)), r_b - 1)                   # Schädel + Flamme folgen der Brust, nie höher
     aus = 2.5 * U.buckel(i, 0, 24, n=24)
@@ -252,30 +262,47 @@ def frame(i, nur=None):
     # --- Feuer: Basis, Zungen, abreißende Funken (alle Pixel aus E/G/P) ---
     fl = L.leer(H, W)
     for (x, y), col in flamme_pixel(i).items():
-        fl[PAD_T + y, PAD_L + x, :3] = col
-        fl[PAD_T + y, PAD_L + x, 3] = 255
+        fl[GPT + y, GPL + x, :3] = col
+        fl[GPT + y, GPL + x, 3] = 255
     # --- Schädel mit Glutaugen ---
     kp = teil(kopf)
     for (x, y) in AUGEN:
-        kp[PAD_T + y, PAD_L + x, :3] = B_ if blink == 2 else (AUGENFARBE[0] if blink == 1 else AUGENFARBE[glut])
+        kp[GPT + y, GPL + x, :3] = B_ if blink == 2 else (AUGENFARBE[0] if blink == 1 else AUGENFARBE[glut])
     # --- Rumpf, Arme, Beine (Beine intakt, jeder Frame vollständig und deckend) ---
-    rp = L.streck_zeile(teil(rumpf), PAD_T + 20, r_b)
-    al = U.haengen(teil(arm_l), PAD_T + 18, -aus)
-    ar = U.haengen(teil(arm_r), PAD_T + 18, aus)
+    rp = L.streck_zeile(teil(rumpf), GPT + 20, r_b)
+    al = U.haengen(teil(arm_l), GPT + 18, -aus)
+    ar = U.haengen(teil(arm_r), GPT + 18, aus)
     bn = teil(beine)
     koerper = L.zusammen(H, W, [(bn, 0, 0), (rp, 0, 0), (al, 0, -r_b), (ar, 0, -r_b), (kp, 0, -r_k)])
     koerper = U.kontur_schliessen(koerper, UMRISS, A_)             # Regel 16: Umriss an Armen/Händen in jeder Pose geschlossen
     if nur == 'koerper':                                           # Randpixel-Test: Körper ohne Flamme (Feuer hat keinen Umriss) und Partikel
         return koerper
-    heiss = U.glut_ebene(H, W, i, N, PUFFS_HEISS, HEISS)
-    kalt = U.glut_ebene(H, W, i, N, PUFFS_GLUT, GLUT)
+    heiss = _glut(H, W, i, N, PUFFS_HEISS, HEISS)
+    kalt = _glut(H, W, i, N, PUFFS_GLUT, GLUT)
     return L.zusammen(H, W, [(kalt, 0, 0), (heiss, 0, 0), (koerper, 0, 0), (fl, 0, -r_k)])
+
+
+# Zuschnitt auf die Figur (Nutzerwunsch): symmetrisch um die Ruhefigur; Partikel dürfen den Frame höchstens 2 px über den Figurenrand hinaus vergrößern
+def _figur(i):
+    _OHNE_PARTIKEL[0] = True
+    try:
+        return frame_gross(i, 'figur')
+    finally:
+        _OHNE_PARTIKEL[0] = False
+
+
+BOX = U.zuschnitt([frame_gross(i) for i in range(N)], [_figur(i) for i in range(N)], (GPL, GPT, GPL + sw, GPT + sh))
+PAD_L, PAD_T = GPL - BOX[0], GPT - BOX[1]
+
+
+def frame(i, nur=None):
+    return U.beschneiden(frame_gross(i, nur), BOX)
 
 
 if __name__ == '__main__':
     frames = [frame(i) for i in range(N)]
     prev = sys.argv[sys.argv.index('--preview') + 1] if '--preview' in sys.argv else None
-    L.pruefe(frames, quelle=spr)
+    L.pruefe(frames, quelle=spr, min_rand=1)
     L.speichern('burning-skeleton', 'Burning Skeleton', frames, MS, prev)
     if prev:
         L.streifen(prev + '/burning-skeleton-strip.png', [frames[k] for k in (0, 6, 12, 18, 24, 30, 36, 42)], spalten=4, scale=7)
