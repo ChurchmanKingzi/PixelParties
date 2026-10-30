@@ -1,0 +1,15 @@
+{
+  "creature": "Chosen Sacrifice",
+  "sheet": "chosen-sacrifice.png",
+  "frameWidth": 24,
+  "frameHeight": 37,
+  "frames": 48,
+  "frameMs": 65,
+  "loop": true,
+  "layout": "horizontal",
+  "padTop": 1,
+  "padLeft": 1,
+  "padRight": 3,
+  "padBottom": 4,
+  "faceX": 12.0
+}
