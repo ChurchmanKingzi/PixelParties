@@ -463,13 +463,15 @@ function _ppAufloesung(v, laengePx) {
  * (Elementgroesse) halten die Pixel quadratisch und ~2 px gross; ohne
  * Angabe wird ein Quadrat angenommen.
  */
-function ppPxVerlaufUrl(gradient, breitePx = 0, hoehePx = 0) {
+function ppPxVerlaufUrl(gradient, breitePx = 0, hoehePx = 0, pxGroesse = 0) {
   const v = ppVerlaufLesen(gradient);
   if (!v) return '';
   const W = breitePx > 0 ? breitePx : (hoehePx > 0 ? hoehePx : 1);
   const H = hoehePx > 0 ? hoehePx : W;
   const q = (x) => Math.max(1, Math.round(x / 4) * 4);           // Merk-Schluessel groeber
-  const nx = _ppAufloesung(v, breitePx > 0 ? q(W) : 0);
+  // ★ W86u2: `pxGroesse` (Kunstpixel in CSS-px, z. B. 4) — Bildschirmgrosse Schleier/Scheine (Titelkulisse) bekommen ein festes Raster
+  // statt der 160-Pixel-Obergrenze; die Pixel bleiben quadratisch und ganzzahlig gross.
+  const nx = pxGroesse > 0 ? Math.max(2, Math.min(720, Math.round(W / pxGroesse))) : _ppAufloesung(v, breitePx > 0 ? q(W) : 0);
   const ny = breitePx > 0 || hoehePx > 0 ? Math.max(2, Math.round(nx * H / W)) : nx;
   return ppPxBild('vl:' + nx + 'x' + ny + ':' + gradient, nx, ny, (setze) => {
     const cx = v.linear ? 0.5 : v.cx, cy = v.linear ? 0.5 : v.cy;
@@ -1755,6 +1757,35 @@ function ppRandDimUrl(nx, ny) {
   }, 1);
 }
 window.ppRandDimUrl = ppRandDimUrl;
+
+/**
+ * ★ W86u2 — Schein/Schleier als Pixelbild in Elementgroesse (Titelkulisse, Menuehintergrund): `gradient` ist ein `radial-gradient(...)`/
+ * `linear-gradient(...)` wie in CSS; zwischen den Farbstopps wird gedithert (Bayer), Alpha wird deckend/leer (`ppPxVerlaufUrl`), jede Farbe rastet
+ * auf die Palette. `px` = Kunstpixel in CSS-px (Standard 4). Das Element behaelt Groesse/Lage/Animation aus CSS (Klasse); nur der Hintergrund kommt
+ * von hier und wird bei Groessenaenderung neu gemalt. Retro-Modus: der Verlauf bleibt, wie er war.
+ */
+function PpVerlauf({ gradient, px = 4, className, style, retroBlend, retroGradient }) {
+  const ref = useRef(null);
+  const retro = !!window.PP_RETRO;
+  useLayoutEffect(() => {
+    const el = ref.current; if (!el || retro) return undefined;
+    const zeichnen = () => {
+      const W = el.offsetWidth, H = el.offsetHeight;
+      if (!W || !H) return;
+      const raster = px * 8;                                          // Groesse grob gerastert: wenige verschiedene Bilder beim Skalieren
+      const url = ppPxVerlaufUrl(gradient, Math.max(raster, Math.round(W / raster) * raster), Math.max(raster, Math.round(H / raster) * raster), px);
+      if (url) el.style.backgroundImage = `url(${url})`;
+    };
+    zeichnen();
+    const ro = window.ResizeObserver ? new ResizeObserver(zeichnen) : null;
+    if (ro) ro.observe(el);
+    return () => { if (ro) ro.disconnect(); };
+  }, [gradient, px, retro]);
+  return retro
+    ? <div className={className} style={{ ...style, background: retroGradient || gradient, ...(retroBlend ? { mixBlendMode: retroBlend } : {}) }} />
+    : <div ref={ref} className={className} data-pp-px="aus" style={{ ...style, backgroundSize: '100% 100%', backgroundRepeat: 'no-repeat', imageRendering: 'pixelated' }} />;
+}
+window.PpVerlauf = PpVerlauf;
 
 window.PxZeichen = PxZeichen;
 window.PxIcon = PxIcon;

@@ -212,14 +212,14 @@ body {
 /* ===== ANIMATIONS ===== */
 @keyframes pulse { 0%,100% { opacity:1; } 50% { opacity:.6; } }
 @keyframes glow {
-  0%,100% { box-shadow: 0 0 5px var(--accent), 0 0 10px rgba(102,182,255,.25); }
-  50% { box-shadow: 0 0 15px var(--accent), 0 0 30px rgba(102,182,255,.4); }
+  0%,100% { box-shadow: 0 0 0 2px var(--accent); }
+  50% { box-shadow: 0 0 0 2px var(--accent), 0 0 0 4px color-mix(in srgb, var(--accent) 72%, #08060c), 0 0 0 6px color-mix(in srgb, var(--accent) 44%, #08060c), 0 0 0 8px #2d4362; }
 }
 @keyframes slideIn { from { transform: translateY(20px); opacity:0; } to { transform: translateY(0); opacity:1; } }
 @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
 @keyframes flashSave {
-  0%, 100% { border-color: #fc1c5f; color: #fc1c5f; background: rgba(252,28,95,.08); box-shadow: 0 0 4px rgba(252,28,95,.2); }
-  50% { border-color: #e92f38; color: #fff; background: rgba(252,28,95,.45); box-shadow: 0 0 18px rgba(252,28,95,.5); }
+  0%, 100% { border-color: #fc1c5f; color: #fc1c5f; background: rgba(252,28,95,.08); box-shadow: none; }
+  50% { border-color: #e92f38; color: #fff; background: rgba(252,28,95,.45); box-shadow: 0 0 0 2px #710122, 0 0 0 4px #55011a, 0 0 0 6px #4b1021; }
 }
 @keyframes scanline {
   0% { background-position: 0 0; }
@@ -472,7 +472,7 @@ select optgroup {
 .card-mini.drag-over { border-color: var(--accent3); box-shadow: 0 0 12px rgba(177,255,26,.4); }
 .card-mini-cover {
   border-color: #fad54a !important;
-  box-shadow: 0 0 8px rgba(250,213,74,.5), 0 0 16px rgba(250,213,74,.25);
+  box-shadow: 0 0 0 2px #72541d, 0 0 0 4px #72541d;
   animation: coverCardGlow 2s ease-in-out infinite;
 }
 .card-mini-cover::after {
@@ -487,8 +487,8 @@ select optgroup {
   animation: coverStarPulse 1.5s ease-in-out infinite;
 }
 @keyframes coverCardGlow {
-  0%, 100% { box-shadow: 0 0 8px rgba(250,213,74,.5), 0 0 16px rgba(250,213,74,.25); }
-  50% { box-shadow: 0 0 12px rgba(250,213,74,.7), 0 0 24px rgba(250,213,74,.4); }
+  0%, 100% { box-shadow: 0 0 0 2px #72541d, 0 0 0 4px #72541d; }
+  50% { box-shadow: 0 0 0 2px #d1a148, 0 0 0 4px #72541d, 0 0 0 6px #72541d; }
 }
 @keyframes coverStarPulse {
   0%, 100% { opacity: .8; transform: scale(1); }
@@ -2169,12 +2169,8 @@ select optgroup {
   height: 860px;
   border-radius: 50%;
   transform: translate(-50%, -50%);
-  background: radial-gradient(circle, rgba(255,241,150,.4), rgba(255,155,58,.12) 22%, rgba(233,47,56,.03) 40%, transparent 56%);
-  /* v1265 (Ruckeln im Login): `filter: blur(9px)` entfernt. Der Verlauf
-     ist ohnehin weich (Rand bei 56 % transparent); der Filter lag aber auf
-     einer 860-px-Flaeche, die ununterbrochen skaliert — der Weichzeichner
-     wurde damit in jedem Frame neu gerechnet. */
-  mix-blend-mode: screen;
+  /* ★ W86u2 (Pixelart): der Radialverlauf ist ein Dither-Pixelbild (`PpVerlauf`, app-screens.jsx); `screen`-Mischung entfaellt — die
+     Bildpunkte sind deckend und liegen als helle Punkte ueber der Kulisse. */
   pointer-events: none;
   animation: ab-glowpulse 10s ease-in-out infinite;
   will-change: transform, opacity;
@@ -2182,8 +2178,6 @@ select optgroup {
 .anim-flash {
   position: absolute;
   inset: 0;
-  background: radial-gradient(circle at 56% 41%, #fff, rgba(255,251,210,.55) 30%, transparent 58%);
-  mix-blend-mode: screen;
   pointer-events: none;
   animation: ab-flashburst 10s steps(1, end) infinite;
 }
@@ -2191,7 +2185,6 @@ select optgroup {
   position: absolute;
   inset: 0;
   pointer-events: none;
-  background: radial-gradient(circle at 50% 44%, transparent 40%, rgba(8,6,12,.4) 80%, rgba(8,6,12,.64) 100%);
   animation: ab-vignettepulse 6s ease-in-out infinite;
 }
 /* ── Lightning (see .anim-lightning in AnimatedTitleBackdrop) ──
@@ -2209,7 +2202,7 @@ select optgroup {
    den ~95 % der Zeit ohne Blitz; die Blitze einzeln sind bei Deckkraft 0
    gar nicht erst zu zeichnen. Ergebnis gleich: beide mischen gegen
    dieselbe Kulisse darunter. */
-.anim-lightning > * { mix-blend-mode: screen; }
+/* ★ W86u2: kein `screen` mehr (Pixelart: Bildpunkte deckend, Blitze hell auf dunkler Kulisse). */
 .anim-lflash {
   position: absolute;
   inset: 0;
@@ -2217,11 +2210,9 @@ select optgroup {
   will-change: opacity;
 }
 .anim-lflash-impact {
-  background: radial-gradient(circle at 46% 26%, rgba(189,220,239,.95), rgba(102,182,255,.35) 42%, transparent 72%);
   animation: ab-strike 10s linear infinite;
 }
 .anim-lflash-ambient {
-  background: radial-gradient(circle at 62% 22%, rgba(179,216,249,.9), rgba(102,182,255,.3) 40%, transparent 70%);
   animation: ab-strike-ambient 13s linear infinite;
 }
 .anim-bolt {
@@ -2230,16 +2221,19 @@ select optgroup {
   height: 62%;
   opacity: 0;
   will-change: opacity;
-  filter: drop-shadow(0 0 5px #bddcef) drop-shadow(0 0 13px #66b6ff);
+  /* ★ W86u2 (Pixelart): kein `drop-shadow`-Schein — harte Treppenlinie (crispEdges), Kern hell, Aussenkontur blau. */
+  shape-rendering: crispEdges;
 }
 .anim-bolt polyline {
   fill: none;
   stroke: #e5f5fa;
-  stroke-width: 3.2;
-  stroke-linecap: round;
-  stroke-linejoin: round;
+  stroke-width: 4;
+  stroke-linecap: square;
+  stroke-linejoin: miter;
   vector-effect: non-scaling-stroke;
+  shape-rendering: crispEdges;
 }
+.anim-bolt polyline.anim-bolt-rand { stroke: #66b6ff; stroke-width: 10; }
 .anim-bolt-a { left: 15%; width: 9%;  animation: ab-strike 10s linear infinite; }
 .anim-bolt-b { right: 19%; width: 8%; animation: ab-strike 10s linear infinite; }
 .anim-bolt-c { left: 53%; width: 8%;  animation: ab-strike-ambient 13s linear infinite; }
@@ -2386,8 +2380,7 @@ select optgroup {
 .google-btn--prominent {
   width: 320px; height: 52px; font-size: 15px; font-weight: 600;
   border: 2px solid var(--accent);
-  box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent) 22%, transparent),
-              0 6px 18px rgba(0, 0, 0, .45);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent) 22%, transparent), 0 6px 0 2px rgba(0, 0, 0, .45);
   animation: googleBtnPulse 2.4s ease-in-out infinite;
 }
 .google-btn--prominent:hover:not(:disabled) {
@@ -2395,8 +2388,8 @@ select optgroup {
   transform: translateY(-1px);
 }
 @keyframes googleBtnPulse {
-  0%, 100% { box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent) 22%, transparent), 0 6px 18px rgba(0,0,0,.45); }
-  50%      { box-shadow: 0 0 0 8px color-mix(in srgb, var(--accent) 10%, transparent), 0 6px 22px rgba(0,0,0,.5); }
+  0%, 100% { box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent) 22%, transparent), 0 6px 0 2px rgba(0,0,0,.45); }
+  50%      { box-shadow: 0 0 0 8px color-mix(in srgb, var(--accent) 10%, transparent), 0 6px 0 2px rgba(0,0,0,.5); }
 }
 /* Bewegungsempfindliche Nutzer: Groesse und Rahmen bleiben, das
    Pulsieren faellt weg. */
@@ -2487,7 +2480,8 @@ select optgroup {
 }
 .pp-logo-img {
   display: block;
-  filter: drop-shadow(0 6px 0 rgba(0,0,0,.45)) drop-shadow(0 0 18px color-mix(in srgb, var(--player-color, #66b6ff) 45%, transparent));
+  /* ★ W86u2 (Pixelart): nur der harte Schlagschatten — der weiche Spielerfarben-Schein (0 0 18px) entfaellt. */
+  filter: drop-shadow(0 6px 0 rgba(0,0,0,.45));
   /* 2 Bildschirmpixel je Rasterpixel (61 Rasterzeilen) — ganzzahlig,
      damit die Bloecke gleich breit bleiben. */
   height: 122px;
@@ -2558,9 +2552,7 @@ select optgroup {
   width: var(--p-size, 4px);
   height: var(--p-size, 4px);
   background: var(--p-color, var(--player-color, #66b6ff));
-  box-shadow:
-    0 0 8px var(--p-color, var(--player-color, #66b6ff)),
-    0 0 16px var(--p-color, var(--player-color, #66b6ff));
+  /* ★ W86u2 (Pixelart): kein Weichzeichner-Schein (war 0 0 8px/16px) — das Teilchen bleibt ein hartes Quadrat. */
   image-rendering: pixelated;
   opacity: 0;
   transform: translate(0, 0) scale(.6);
@@ -2614,9 +2606,7 @@ body:has(.pz-layout) .pp-bg-particles { display: none; }
   width: var(--p-size, 4px);
   height: var(--p-size, 4px);
   background: var(--p-color, var(--player-color, #66b6ff));
-  box-shadow:
-    0 0 8px var(--p-color, var(--player-color, #66b6ff)),
-    0 0 16px var(--p-color, var(--player-color, #66b6ff));
+  /* ★ W86u2 (Pixelart): kein Weichzeichner-Schein (war 0 0 8px/16px). */
   image-rendering: pixelated;
   opacity: 0;
   transform: translate(0, 0) scale(.6);
@@ -2790,12 +2780,12 @@ body:has(.pz-layout) .pp-bg-particles { display: none; }
 
 /* ===== PROFILE CARD ===== */
 @keyframes profileGlow {
-  0%, 100% { box-shadow: 0 0 30px var(--rank-glow, rgba(102,182,255,.2)), 0 2px 40px rgba(0,0,0,.6); }
-  50% { box-shadow: 0 0 50px var(--rank-glow, rgba(102,182,255,.3)), 0 2px 40px rgba(0,0,0,.6); }
+  0%, 100% { box-shadow: 0 0 0 2px var(--rank-glow, rgba(102,182,255,.2)), 0 0 0 4px color-mix(in srgb, var(--rank-glow, rgba(102,182,255,.2)) 72%, #08060c), 0 0 0 6px color-mix(in srgb, var(--rank-glow, rgba(102,182,255,.2)) 44%, #08060c), 0 2px 0 4px rgba(0,0,0,.6); }
+  50% { box-shadow: 0 0 0 2px var(--rank-glow, rgba(102,182,255,.3)), 0 0 0 4px color-mix(in srgb, var(--rank-glow, rgba(102,182,255,.3)) 72%, #08060c), 0 0 0 6px color-mix(in srgb, var(--rank-glow, rgba(102,182,255,.3)) 44%, #08060c), 0 2px 0 4px rgba(0,0,0,.6); }
 }
 @keyframes avatarPulse {
-  0%, 100% { box-shadow: 0 0 20px var(--rank-glow), 0 0 40px var(--rank-glow), inset 0 0 15px var(--rank-glow); }
-  50% { box-shadow: 0 0 30px var(--rank-glow), 0 0 60px var(--rank-glow), inset 0 0 20px var(--rank-glow); }
+  0%, 100% { box-shadow: 0 0 0 2px var(--rank-glow), 0 0 0 4px color-mix(in srgb, var(--rank-glow) 72%, #08060c), 0 0 0 6px color-mix(in srgb, var(--rank-glow) 44%, #08060c), 0 0 0 8px var(--rank-glow), inset 0 0 0 2px var(--rank-glow), inset 0 0 0 4px color-mix(in srgb, var(--rank-glow) 72%, #08060c), inset 0 0 0 6px color-mix(in srgb, var(--rank-glow) 44%, #08060c); }
+  50% { box-shadow: 0 0 0 2px var(--rank-glow), 0 0 0 4px color-mix(in srgb, var(--rank-glow) 72%, #08060c), 0 0 0 6px color-mix(in srgb, var(--rank-glow) 44%, #08060c), 0 0 0 8px var(--rank-glow), inset 0 0 0 2px var(--rank-glow), inset 0 0 0 4px color-mix(in srgb, var(--rank-glow) 72%, #08060c), inset 0 0 0 6px color-mix(in srgb, var(--rank-glow) 44%, #08060c); }
 }
 @keyframes badgeShine {
   0% { background-position: -100% 0; }
@@ -13677,7 +13667,7 @@ body:has(.modal-overlay) { --pz-tooltip-z: 10086; }
   height: 6px;
   border-radius: 50%;
   background: #fad54a;
-  box-shadow: 0 0 6px 2px rgba(250,213,74,.7), 0 0 12px 4px rgba(250,213,74,.3);
+  box-shadow: 0 0 0 2px #d1a148, 0 0 0 4px #72541d, 0 0 0 6px #72541d;
   animation: shop-owned-particle 4s linear infinite;
   pointer-events: none;
   top: -4px;
@@ -13725,8 +13715,8 @@ body:has(.modal-overlay) { --pz-tooltip-z: 10086; }
   pointer-events: none;
 }
 @keyframes shop-unowned-glow {
-  0%, 100% { box-shadow: 0 0 6px rgba(102,182,255,.25), 0 0 14px rgba(169,82,255,.12); }
-  50%      { box-shadow: 0 0 18px rgba(102,182,255,.6), 0 0 32px rgba(251,30,169,.38); }
+  0%, 100% { box-shadow: none; }
+  50%      { box-shadow: 0 0 0 2px #405f8c, 0 0 0 4px #2d4362, 0 0 0 6px #2d4362, 0 0 0 8px #5a023a; }
 }
 /* Hover: shimmer the gradient border + quicken the glow pulse. */
 .shop-item:not(.shop-owned):not(.structure-deck-default):not(.shop-selected):hover {
@@ -13791,8 +13781,8 @@ body:has(.modal-overlay) { --pz-tooltip-z: 10086; }
   border-width: 3px;
 }
 @keyframes structure-deck-equipped-pulse {
-  0%, 100% { box-shadow: 0 0 16px rgba(76,235,112,.7), 0 0 28px rgba(76,235,112,.35); }
-  50%      { box-shadow: 0 0 22px rgba(102,255,162,.9), 0 0 44px rgba(76,235,112,.5); }
+  0%, 100% { box-shadow: 0 0 0 2px #2ca058, 0 0 0 4px #3b9159, 0 0 0 6px #1a4128, 0 0 0 8px #29663f; }
+  50%      { box-shadow: 0 0 0 2px #75f091, 0 0 0 4px #5bbd7e, 0 0 0 6px #29663f, 0 0 0 8px #3b9159; }
 }
 
 /* Slight gray-out on unbought non-skin items */
@@ -13908,10 +13898,10 @@ body:has(.modal-overlay) { --pz-tooltip-z: 10086; }
 }
 
 @keyframes shop-sparkle {
-  0%, 100% { background-position: 0% 50%; text-shadow: 0 0 4px rgba(250,213,74,.3); }
-  25% { background-position: 100% 50%; text-shadow: 0 0 8px rgba(250,213,74,.6), 0 0 16px rgba(249,172,32,.25); }
-  50% { background-position: 50% 0%; text-shadow: 0 0 6px rgba(250,213,74,.5), 0 0 20px rgba(255,198,28,.3); }
-  75% { background-position: 0% 100%; text-shadow: 0 0 10px rgba(250,213,74,.7), 0 0 24px rgba(249,172,32,.35); }
+  0%, 100% { background-position: 0% 50%; text-shadow: 2px 0 0 #6b4a2a, -2px 0 0 #6b4a2a, 0 2px 0 #6b4a2a, 0 -2px 0 #6b4a2a; }
+  25% { background-position: 100% 50%; text-shadow: 2px 0 0 #72541d, -2px 0 0 #72541d, 0 2px 0 #72541d, 0 -2px 0 #72541d, 2px 0 0 #5a3c14, -2px 0 0 #5a3c14, 0 2px 0 #5a3c14, 0 -2px 0 #5a3c14; }
+  50% { background-position: 50% 0%; text-shadow: 2px 0 0 #72541d, -2px 0 0 #72541d, 0 2px 0 #72541d, 0 -2px 0 #72541d, 2px 0 0 #72541d, -2px 0 0 #72541d, 0 2px 0 #72541d, 0 -2px 0 #72541d; }
+  75% { background-position: 0% 100%; text-shadow: 2px 0 0 #72541d, -2px 0 0 #72541d, 0 2px 0 #72541d, 0 -2px 0 #72541d, 2px 0 0 #5a3c14, -2px 0 0 #5a3c14, 0 2px 0 #5a3c14, 0 -2px 0 #5a3c14; }
 }
 
 /* Hero/Skin flip toggle under each skin tile (replaces the old skin-name and
@@ -14518,7 +14508,7 @@ body:has(.modal-overlay) { --pz-tooltip-z: 10086; }
 
 /* ===== TURN INDICATOR ON AVATARS ===== */
 .avatar-active {
-  box-shadow: 0 0 10px rgba(102,182,255,.6), 0 0 20px rgba(102,182,255,.3), 0 0 4px rgba(102,182,255,.8) inset;
+  box-shadow: 0 0 0 2px #405f8c, 0 0 0 4px #2d4362, 0 0 0 6px #2d4362, inset 0 0 0 2px #399edf;
   border: 2px solid rgba(102,182,255,.7) !important;
   animation: avatar-pulse 1.5s ease-in-out infinite;
 }
@@ -14527,8 +14517,8 @@ body:has(.modal-overlay) { --pz-tooltip-z: 10086; }
   border: 2px solid transparent !important;
 }
 @keyframes avatar-pulse {
-  0%, 100% { box-shadow: 0 0 10px rgba(102,182,255,.6), 0 0 20px rgba(102,182,255,.3); }
-  50% { box-shadow: 0 0 14px rgba(102,182,255,.8), 0 0 28px rgba(102,182,255,.4); }
+  0%, 100% { box-shadow: 0 0 0 2px #405f8c, 0 0 0 4px #2d4362, 0 0 0 6px #2d4362; }
+  50% { box-shadow: 0 0 0 2px #399edf, 0 0 0 4px #405f8c, 0 0 0 6px #2d4362, 0 0 0 8px #2d4362; }
 }
 
 /* ===== CARD PING FLASH ===== */
@@ -16287,8 +16277,8 @@ body:has(.textbox-overlay) .tooltip {
 }
 @keyframes tutorial-card-grow {
   0%   { transform: scale(1); filter: brightness(1); }
-  10%  { transform: scale(1.5); filter: brightness(1.8) saturate(1.5); box-shadow: 0 0 40px rgba(255,198,28,.9), 0 0 80px rgba(248,116,32,.5); }
-  30%  { transform: scale(1.35); filter: brightness(1.4); box-shadow: 0 0 30px rgba(255,198,28,.6); }
+  10%  { transform: scale(1.5); filter: brightness(1.8) saturate(1.5); box-shadow: 0 0 0 2px #ffb91a, 0 0 0 4px #a87c00, 0 0 0 6px #72541d, 0 0 0 8px #7d3911; }
+  30%  { transform: scale(1.35); filter: brightness(1.4); box-shadow: 0 0 0 2px #a87c00, 0 0 0 4px #72541d, 0 0 0 6px #5a3c14; }
   100% { transform: scale(1); filter: brightness(1); box-shadow: none; }
 }
 /* Weiter-/Schliessen-Pfeil: gezeichnete Pixel-Dreiecke statt der
@@ -16354,7 +16344,7 @@ body:has(.textbox-overlay) .tooltip {
 .textbox-highlight {
   z-index: 90001;
   border-radius: 6px;
-  box-shadow: 0 0 16px rgba(102,182,255,.6), 0 0 30px rgba(102,182,255,.25);
+  box-shadow: 0 0 0 2px #405f8c, 0 0 0 4px #2d4362, 0 0 0 6px #2d4362;
   animation: textbox-hl-glow 1.5s ease-in-out infinite;
   overflow: hidden;
 }
@@ -16416,8 +16406,8 @@ body:has(.textbox-overlay) .tooltip {
   outline-offset: -1px;
 }
 @keyframes textbox-hl-glow {
-  0%, 100% { box-shadow: 0 0 16px rgba(102,182,255,.6), 0 0 30px rgba(102,182,255,.25); }
-  50%      { box-shadow: 0 0 24px rgba(102,182,255,.8), 0 0 40px rgba(102,182,255,.4); }
+  0%, 100% { box-shadow: 0 0 0 2px #405f8c, 0 0 0 4px #2d4362, 0 0 0 6px #2d4362; }
+  50%      { box-shadow: 0 0 0 2px #399edf, 0 0 0 4px #405f8c, 0 0 0 6px #2d4362, 0 0 0 8px #2d4362; }
 }
 /* Jedes Highlight pulsiert leicht (TextBox setzt `.textbox-highlight-pulse`):
    ein paar Prozent Groesse und ein atmender Schein — beides aus dem
@@ -16764,7 +16754,8 @@ body:has(.rotate-device-overlay.rotate-gate) .pp-bg-particles * { animation: non
   /* Push the card art back into "wallpaper": a soft blur + slight darken/
      desaturate so individual cards stop competing with the foreground
      panels for attention. The blur also softens the grid seams. */
-  filter: blur(1.5px) brightness(.85) saturate(.95);
+  /* ★ W86u2 (Pixelart): kein Weichzeichner mehr (war blur(1.5px)) — die Abdunklung uebernimmt der geditherte Schleier. */
+  filter: brightness(.85) saturate(.95);
 }
 /* Dark veil so the menu stays readable over the bright card art. The
    centre is kept darker (not lighter) than before so the three panels —
@@ -16772,8 +16763,7 @@ body:has(.rotate-device-overlay.rotate-gate) .pp-bg-particles * { animation: non
 .menu-card-bg-veil {
   position: absolute;
   inset: 0;
-  background:
-    radial-gradient(ellipse at center, rgba(8,6,12,.58) 0%, rgba(8,6,12,.78) 70%, rgba(8,6,12,.9) 100%);
+  /* ★ W86u2 (Pixelart): der Schleier ist ein Dither-Pixelbild (`PpVerlauf`, MenuCardBg in app-screens.jsx). */
 }
 /* EXPERIMENTAL — faint pixel dither over the scrolling card wall, just to add a
    touch of texture to the background. Sits above the cards + veil but below all
@@ -17003,12 +16993,13 @@ body:has(.rotate-device-overlay.rotate-gate) .pp-bg-particles * { animation: non
   margin-bottom: 16px;
 }
 .menu-live-dot {
-  width: 10px; height: 10px; border-radius: 50%;
+  /* ★ W86u2 (Pixelart): Quadrat mit hartem Ring statt Vektorkreis mit Schein; Blinken in zwei harten Stufen. */
+  width: 8px; height: 8px;
   background: var(--success, #4ceb70);
-  box-shadow: 0 0 10px var(--success, #4ceb70);
-  animation: menu-live-pulse 1.8s ease-in-out infinite;
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--success, #4ceb70) 45%, #08060c);
+  animation: menu-live-pulse 1.8s steps(1, end) infinite;
 }
-@keyframes menu-live-pulse { 0%, 100% { opacity: 1; } 50% { opacity: .35; } }
+@keyframes menu-live-pulse { 0%, 49% { opacity: 1; } 50%, 100% { opacity: .35; } }
 
 /* Leaderboard list */
 .menu-lb-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 5px; }
@@ -17195,22 +17186,23 @@ body:has(.rotate-device-overlay.rotate-gate) .pp-bg-particles * { animation: non
   width: var(--p-size, 4px);
   height: var(--p-size, 4px);
   margin: calc(var(--p-size, 4px) / -2) 0 0 calc(var(--p-size, 4px) / -2);
-  /* Pixel-Kreuz statt Quadrat: zwei Balken, ein Drittel breit — liest
-     sich als Funkeln, nicht als Staub. */
-  background:
-    linear-gradient(var(--p-color, #fad54a), var(--p-color, #fad54a)) center / 100% 34% no-repeat,
-    linear-gradient(var(--p-color, #fad54a), var(--p-color, #fad54a)) center / 34% 100% no-repeat;
-  filter: drop-shadow(0 0 3px var(--p-color, #fad54a)) drop-shadow(0 0 1px #fff);
+  /* Pixel-Kreuz statt Quadrat: zwei 2-px-Balken (Kunstpixel) — liest sich als Funkeln, nicht als Staub.
+     ★ W86u2 (Pixelart): Balken als ::before/::after statt Verlauf-Hintergrund, kein `drop-shadow`-Schein, keine Drehung
+     (Groesse `--p-size` ist gerade, siehe `PixelParticles gerade`). */
+  background: none;
   image-rendering: pixelated;
   opacity: 0;
   animation: pp-glitzer-flug var(--p-dur, 1.8s) ease-out var(--p-delay, 0s) infinite;
   will-change: transform, opacity;
 }
+.pp-sc-glitzer-teil::before, .pp-sc-glitzer-teil::after { content: ''; position: absolute; background: var(--p-color, #fad54a); }
+.pp-sc-glitzer-teil::before { left: 0; right: 0; top: calc(50% - 1px); height: 2px; }
+.pp-sc-glitzer-teil::after { top: 0; bottom: 0; left: calc(50% - 1px); width: 2px; }
 @keyframes pp-glitzer-flug {
-  0%   { opacity: 0; transform: translate(0, 0) scale(.3) rotate(0deg); }
-  15%  { opacity: var(--p-max, .9); transform: translate(calc(var(--p-dx, 0px) * .25), calc(var(--p-dy, 0px) * .25)) scale(1.2) rotate(45deg); }
+  0%   { opacity: 0; transform: translate(0, 0) scale(.5); }
+  15%  { opacity: var(--p-max, .9); transform: translate(calc(var(--p-dx, 0px) * .25), calc(var(--p-dy, 0px) * .25)) scale(1.5); }
   60%  { opacity: var(--p-max, .9); }
-  100% { opacity: 0; transform: translate(var(--p-dx, 0px), var(--p-dy, 0px)) scale(.4) rotate(90deg); }
+  100% { opacity: 0; transform: translate(var(--p-dx, 0px), var(--p-dy, 0px)) scale(.5); }
 }
 @media (prefers-reduced-motion: reduce) {
   .pp-sc-glitzer-teil { animation: none; opacity: 0; }
@@ -17319,8 +17311,8 @@ body:has(.rotate-device-overlay.rotate-gate) .pp-bg-particles * { animation: non
 
 /* ═══ Daily challenge button ═══ */
 @keyframes daily-glow {
-  0%, 100% { box-shadow: 0 0 8px rgba(250,213,74,.55), 0 0 16px rgba(250,213,74,.25); border-color: #fad54a; }
-  50%      { box-shadow: 0 0 18px rgba(250,213,74,.95), 0 0 32px rgba(250,213,74,.45); border-color: #f7f7ad; }
+  0%, 100% { box-shadow: 0 0 0 2px #72541d, 0 0 0 4px #72541d; border-color: #fad54a; }
+  50%      { box-shadow: 0 0 0 2px #fad54a, 0 0 0 4px #d1a148, 0 0 0 6px #72541d, 0 0 0 8px #72541d; border-color: #f7f7ad; }
 }
 .menu-daily-btn { transition: transform .15s, filter .15s; }
 .menu-daily-btn:hover { transform: scale(1.04); filter: brightness(1.15); }
@@ -22274,7 +22266,7 @@ body[data-tb-hl] .hero-idle-platz.hero-idle-hover { scale: none; }
 .pp-cer-regen b {
   position: absolute; inset: 0; display: block;
   background: url(/data/sc.png) center / contain no-repeat; image-rendering: pixelated;
-  filter: drop-shadow(0 0 6px rgba(250,213,74,.55));
+  filter: drop-shadow(2px 0 0 #72541d) drop-shadow(-2px 0 0 #72541d) drop-shadow(0 2px 0 #72541d) drop-shadow(0 -2px 0 #72541d);
   animation: ppCerDreh 1s ease-in-out infinite;
 }
 /* Glanz: ein kleiner Vierstern, der kurz aufblitzt */
@@ -22295,7 +22287,7 @@ body[data-tb-hl] .hero-idle-platz.hero-idle-hover { scale: none; }
 }
 @keyframes ppCerDreh {
   0%, 100% { transform: scaleX(1); }
-  50%      { transform: scaleX(.12); filter: drop-shadow(0 0 10px rgba(247,247,173,.9)) brightness(1.35); }
+  50%      { transform: scaleX(.12); filter: drop-shadow(2px 0 0 #e0c085) drop-shadow(-2px 0 0 #e0c085) drop-shadow(0 2px 0 #e0c085) drop-shadow(0 -2px 0 #e0c085) brightness(1.35); /* pp-ok: blur (harte Konturen, kein Weichzeichner) */ }
 }
 @keyframes ppCerGlanz {
   0%, 62%, 100% { opacity: 0; transform: scale(.2) rotate(0deg); }
@@ -22402,9 +22394,10 @@ body[data-tb-hl] .hero-idle-platz.hero-idle-hover { scale: none; }
   inset: 0;
   pointer-events: none;
   border-radius: inherit;
+  /* ★ W86u2 (Pixelart): harte Ringe statt Weichzeichner-Schein (war 0 0 16px 2px + 0 0 40px 10px) — innen voll, aussen gedaempft. */
   box-shadow:
-    0 0 16px 2px var(--lotse-farbe),
-    0 0 40px 10px color-mix(in srgb, var(--lotse-farbe) 50%, transparent);
+    0 0 0 4px var(--lotse-farbe),
+    0 0 0 8px color-mix(in srgb, var(--lotse-farbe) 45%, #08060c);
   opacity: .45;
   animation: pp-lotse-puls 2.4s ease-in-out infinite;
 }
@@ -22442,9 +22435,9 @@ body[data-tb-hl] .hero-idle-platz.hero-idle-hover { scale: none; }
 .vscpu-raccoon { --lotse-min: .35; }
 .vscpu-raccoon > .pp-lotse-schein {
   box-shadow:
-    0 0 0 3px var(--lotse-farbe),
-    0 0 22px 6px var(--lotse-farbe),
-    0 0 60px 20px color-mix(in srgb, var(--lotse-farbe) 55%, transparent);
+    0 0 0 4px var(--lotse-farbe),
+    0 0 0 8px var(--lotse-farbe),
+    0 0 0 12px color-mix(in srgb, var(--lotse-farbe) 45%, #08060c);
 }
 .pp-lotse:disabled > .pp-lotse-schein,
 .pp-lotse:disabled > .pp-glanz { display: none; }
@@ -22457,7 +22450,6 @@ body[data-tb-hl] .hero-idle-platz.hero-idle-hover { scale: none; }
    kostet nichts Nennenswertes). Dieselbe Schwelle wie der Lite-Block. */
 @media (pointer: coarse) and (max-height: 600px) {
   .pp-lotse-schein { animation: none; opacity: .75; }
-  .pp-sc-glitzer-teil { filter: none; }
   .pp-sc-glitzer-teil:nth-child(n+11) { display: none; }
 }
 
@@ -24100,16 +24092,17 @@ body.pp-dialog-offen .foil-diamond-rare:not(.modal-overlay *):not(.card-tooltip 
   letter-spacing: 1px;
   color: #1f0f04;
   text-shadow: none;
-  background: linear-gradient(180deg, #fff196 0%, #fad54a 55%, #c79e05 100%);
+  /* ★ W86u2 (Pixelart): flaches Gold mit hartem Licht (oben) und Schatten (unten) statt Verlauf, keine Schraegstellung (Text drehen
+     liefert nur Viertelschritte), Wippen in zwei harten Stufen, kein Schein. */
+  background: #fad54a;
   border: 2px solid var(--pp-kontur, #08060c);
-  box-shadow: 2px 2px 0 rgba(0, 0, 0, .6), 0 0 12px rgba(250,213,74,.55);
-  transform: rotate(8deg);
-  animation: menu-badge-wippen 1.6s ease-in-out infinite;
+  box-shadow: 2px 2px 0 rgba(0, 0, 0, .6), inset 0 2px 0 #fff196, inset 0 -2px 0 #c79e05;
+  animation: menu-badge-wippen 1.6s steps(1, end) infinite;
   pointer-events: none;
 }
 @keyframes menu-badge-wippen {
-  0%, 100% { transform: rotate(8deg) translateY(0); }
-  50%      { transform: rotate(4deg) translateY(-3px); }
+  0%, 49%   { transform: translateY(0); }
+  50%, 100% { transform: translateY(-2px); }
 }
 
 /* Halbe Knoepfe (Puzzle-Paar): ohne Icon, also normales Polster, und
@@ -24591,12 +24584,12 @@ body.pp-dialog-offen .foil-diamond-rare:not(.modal-overlay *):not(.card-tooltip 
 }
 /* Nicht gekauft: Regenbogenrahmen, der Puls laeuft mit Kontur und Schatten. */
 @keyframes shop-unowned-glow {
-  0%, 100% { box-shadow: 0 0 0 5px var(--pp-kontur), 6px 7px 0 3px rgba(0, 0, 0, .4), 0 0 8px rgba(102,182,255,.25), 0 0 14px rgba(169,82,255,.12); }
-  50%      { box-shadow: 0 0 0 5px var(--pp-kontur), 6px 7px 0 3px rgba(0, 0, 0, .4), 0 0 20px rgba(102,182,255,.55), 0 0 32px rgba(251,30,169,.35); }
+  0%, 100% { box-shadow: 0 0 0 5px var(--pp-kontur), 6px 7px 0 3px rgba(0, 0, 0, .4); }
+  50%      { box-shadow: 0 0 0 5px var(--pp-kontur), 6px 7px 0 3px rgba(0, 0, 0, .4), 0 0 0 2px #405f8c, 0 0 0 4px #2d4362, 0 0 0 6px #2d4362, 0 0 0 8px #5a023a; }
 }
 @keyframes structure-deck-equipped-pulse {
-  0%, 100% { box-shadow: 0 0 0 2px var(--pp-kontur), 6px 7px 0 rgba(0,0,0,.4), 0 0 16px rgba(76,235,112,.6); }
-  50%      { box-shadow: 0 0 0 2px var(--pp-kontur), 6px 7px 0 rgba(0,0,0,.4), 0 0 28px rgba(102,255,162,.85); }
+  0%, 100% { box-shadow: 0 0 0 2px var(--pp-kontur), 6px 7px 0 rgba(0,0,0,.4), 0 0 0 2px #2ca058, 0 0 0 4px #29663f, 0 0 0 6px #1a4128; }
+  50%      { box-shadow: 0 0 0 2px var(--pp-kontur), 6px 7px 0 rgba(0,0,0,.4), 0 0 0 2px #4bcd7c, 0 0 0 4px #3b9159, 0 0 0 6px #29663f; }
 }
 
 /* ═══ TITEL MIT PIXEL-SHADING ═══════════════════════════════════════════
@@ -25783,12 +25776,12 @@ body.pp-dialog-offen .foil-diamond-rare:not(.modal-overlay *):not(.card-tooltip 
 /* Der Puls der Zustaende traegt die Ringe mit (die alten Bilder setzten
    `box-shadow` komplett und haetten sie geloescht). */
 @keyframes shop-unowned-glow {
-  0%, 100% { box-shadow: 0 0 0 2px var(--pp-kontur), 0 0 0 4px #2b0b47, 0 0 0 6px var(--pp-kontur), inset 0 0 0 1px var(--pp-kontur), 8px 9px 0 rgba(0, 0, 0, .45), 0 0 10px rgba(102,182,255,.25), 0 0 18px rgba(169,82,255,.14); }
-  50%      { box-shadow: 0 0 0 2px var(--pp-kontur), 0 0 0 4px #58238c, 0 0 0 6px var(--pp-kontur), inset 0 0 0 1px var(--pp-kontur), 8px 9px 0 rgba(0, 0, 0, .45), 0 0 22px rgba(102,182,255,.55), 0 0 36px rgba(251,30,169,.35); }
+  0%, 100% { box-shadow: 0 0 0 2px var(--pp-kontur), 0 0 0 4px #2b0b47, 0 0 0 6px var(--pp-kontur), inset 0 0 0 1px var(--pp-kontur), 8px 9px 0 rgba(0, 0, 0, .45); }
+  50%      { box-shadow: 0 0 0 2px var(--pp-kontur), 0 0 0 4px #58238c, 0 0 0 6px var(--pp-kontur), inset 0 0 0 1px var(--pp-kontur), 8px 9px 0 rgba(0, 0, 0, .45), 0 0 0 2px #405f8c, 0 0 0 4px #2d4362, 0 0 0 6px #2d4362, 0 0 0 8px #5a023a; }
 }
 @keyframes structure-deck-equipped-pulse {
-  0%, 100% { box-shadow: 0 0 0 2px var(--pp-kontur), 0 0 0 4px #3b9159, 0 0 0 6px var(--pp-kontur), inset 0 0 0 1px var(--pp-kontur), 8px 9px 0 rgba(0, 0, 0, .45), 0 0 16px rgba(76,235,112,.55); }
-  50%      { box-shadow: 0 0 0 2px var(--pp-kontur), 0 0 0 4px #2ca058, 0 0 0 6px var(--pp-kontur), inset 0 0 0 1px var(--pp-kontur), 8px 9px 0 rgba(0, 0, 0, .45), 0 0 28px rgba(102,255,162,.8); }
+  0%, 100% { box-shadow: 0 0 0 2px var(--pp-kontur), 0 0 0 4px #3b9159, 0 0 0 6px var(--pp-kontur), inset 0 0 0 1px var(--pp-kontur), 8px 9px 0 rgba(0, 0, 0, .45), 0 0 0 2px #3b9159, 0 0 0 4px #29663f, 0 0 0 6px #1a4128; }
+  50%      { box-shadow: 0 0 0 2px var(--pp-kontur), 0 0 0 4px #2ca058, 0 0 0 6px var(--pp-kontur), inset 0 0 0 1px var(--pp-kontur), 8px 9px 0 rgba(0, 0, 0, .45), 0 0 0 2px #4bcd7c, 0 0 0 4px #3b9159, 0 0 0 6px #29663f; }
 }
 
 /* Das Zier-Element: Eckschnoerkel (::before) und Lichtkante (::after). */
@@ -25829,11 +25822,18 @@ body.pp-dialog-offen .foil-diamond-rare:not(.modal-overlay *):not(.card-tooltip 
 /* Nicht gekauft: die Schnoerkel wandern durch den Regenbogen. */
 .shop-item:not(.shop-owned):not(.structure-deck-default):not(.shop-selected):not(.shop-equipped) .shop-item-zier::before {
   background: #6be9fa;
-  animation: shop-zier-regenbogen 6s linear infinite;
+  animation: shop-zier-regenbogen 6s steps(1, end) infinite;
 }
+/* ★ W86u2 (Pixelart): der Regenbogen laeuft in 8 harten Palettenstufen statt per stufenlosem `hue-rotate` (der Farben ausserhalb der Palette mischt). */
 @keyframes shop-zier-regenbogen {
-  from { filter: drop-shadow(1px 1px 0 rgba(0, 0, 0, .7)) hue-rotate(0deg); }
-  to   { filter: drop-shadow(1px 1px 0 rgba(0, 0, 0, .7)) hue-rotate(360deg); }
+  0%     { background-color: #6be9fa; }
+  12.5%  { background-color: #66b6ff; }
+  25%    { background-color: #a36afb; }
+  37.5%  { background-color: #fb1ea9; }
+  50%    { background-color: #fc1c5f; }
+  62.5%  { background-color: #fad54a; }
+  75%    { background-color: #4ceb70; }
+  87.5%  { background-color: #1aedff; }
 }
 @media (prefers-reduced-motion: reduce) {
   .shop-item-zier::before { animation: none !important; }

@@ -7,7 +7,7 @@ const { api, socket, AppContext, CardMini, cardImageUrl,
         typeColor, skinImageUrl, CardTooltipContent, isDeckLegal } = window;
 const { ALL_CARDS, CARDS_BY_NAME, AVAILABLE_CARDS, AVAILABLE_MAP, SKINS_DB } = window;
 const { useAntoniaPresent, setAntoniaPresent, tutorialStartsWithAntonia } = window;
-const { GlanzBand, LotsenGlanz } = window;   // v1264: Glanzband + Lotsen-Schein
+const { GlanzBand, LotsenGlanz, PpVerlauf } = window;   // v1264: Glanzband + Lotsen-Schein; W86u2: Pixel-Schleier (Dither)
 
 // Eye / eye-off glyphs for the password show/hide toggle.
 const EyeIcon = () => (
@@ -327,6 +327,7 @@ function AnimatedTitleBackdrop() {
       const size = 2 + Math.random() * 5;
       return {
         size,
+        px: Math.max(2, Math.round(size / 2) * 2),   // W86u2: Pixelart — Quadrat in ganzen Kunstpixeln (2/4/6 px), kein Rundkorn mit Schein
         dur: 7 + Math.random() * 9,
         delay: -Math.random() * 16,
         left: Math.random() * 100,
@@ -352,17 +353,17 @@ function AnimatedTitleBackdrop() {
             panel and gets no flash either — so the whole laser reads as one uniform
             piece. (The jagged bolts render ABOVE the characters — see below.) */}
         <div className="anim-lightning">
-          <div className="anim-lflash anim-lflash-impact" />
-          <div className="anim-lflash anim-lflash-ambient" />
+          <PpVerlauf className="anim-lflash anim-lflash-impact" retroBlend="screen" gradient="radial-gradient(circle at 46% 26%, rgba(189,220,239,.95), rgba(102,182,255,.35) 42%, transparent 72%)" />
+          <PpVerlauf className="anim-lflash anim-lflash-ambient" retroBlend="screen" gradient="radial-gradient(circle at 62% 22%, rgba(179,216,249,.9), rgba(102,182,255,.3) 40%, transparent 70%)" />
         </div>
-        <div className="anim-flash" />
+        <PpVerlauf className="anim-flash" retroBlend="screen" gradient="radial-gradient(circle at 56% 41%, #fff, rgba(255,251,210,.55) 30%, transparent 58%)" />
         {/* Vignette also renders BELOW the characters, for the same reason as the
             flash: it's a full-screen dark radial, and golem is pinned to the right
             edge where the vignette is darkest — so above the characters it would
             dim golem's beam while the central burst (in the panel, above the
             vignette) stays bright, breaking the seam. Below the characters it
             frames only the background and leaves every sprite at its true colour. */}
-        <div className="anim-vignette" />
+        <PpVerlauf className="anim-vignette" gradient="radial-gradient(circle at 50% 44%, transparent 40%, rgba(8,6,12,.4) 80%, rgba(8,6,12,.64) 100%)" />
         {/* 1 — hammer girl */}
         <div style={layer('hammer.png', { transformOrigin: '72% 28%', '--mx': 'calc(var(--abw,1vw) * 0.469)', '--my': 'calc(var(--abh,1vh) * -1.389)', '--mr': '2deg', animation: 'ab-floaty 4.2s ease-in-out -0.6s infinite' })} />
         {/* 2 — Explosionskern. ★ v1266 (Al 22.9.: „das Login-Menue ist
@@ -374,7 +375,7 @@ function AnimatedTitleBackdrop() {
             Drehpunkt und Takt wie zuvor. */}
         <div className="anim-explosion" style={layer('explosion.png', { transformOrigin: '52% 42%', animation: 'ab-coreTether 4.8s ease-in-out infinite' })} />
         {/* 3 — central bloom */}
-        <div className="anim-bloom" />
+        <PpVerlauf className="anim-bloom" retroBlend="screen" gradient="radial-gradient(circle, rgba(255,241,150,.4), rgba(255,155,58,.12) 24%, transparent 46%)" />
         {/* 4 — Broghan (right shooter), nudged flush to the right edge */}
         <div style={{ position: 'absolute', inset: 0, transform: 'translate(calc(var(--abw,1vw) * 5.781), calc(var(--abh,1vh) * 0.278))' }}>
           <div style={layer('golem.png', { animation: 'ab-broghanTether 4.8s ease-in-out infinite' })} />
@@ -402,12 +403,15 @@ function AnimatedTitleBackdrop() {
             character, so they jolt in sync with the scene. */}
         <div className="anim-lightning">
           <svg className="anim-bolt anim-bolt-a" viewBox="0 0 100 400" preserveAspectRatio="none" aria-hidden="true">
+            <polyline className="anim-bolt-rand" points="52,0 40,70 62,80 38,150 60,165 34,240 58,255 30,340 50,360 42,400" />
             <polyline points="52,0 40,70 62,80 38,150 60,165 34,240 58,255 30,340 50,360 42,400" />
           </svg>
           <svg className="anim-bolt anim-bolt-b" viewBox="0 0 100 400" preserveAspectRatio="none" aria-hidden="true">
+            <polyline className="anim-bolt-rand" points="48,0 62,75 38,88 60,160 36,175 58,250 34,265 56,345 40,375 50,400" />
             <polyline points="48,0 62,75 38,88 60,160 36,175 58,250 34,265 56,345 40,375 50,400" />
           </svg>
           <svg className="anim-bolt anim-bolt-c" viewBox="0 0 100 400" preserveAspectRatio="none" aria-hidden="true">
+            <polyline className="anim-bolt-rand" points="50,0 58,80 40,92 60,175 38,190 56,270 36,285 52,370 46,400" />
             <polyline points="50,0 58,80 40,92 60,175 38,190 56,270 36,285 52,370 46,400" />
           </svg>
         </div>
@@ -416,8 +420,8 @@ function AnimatedTitleBackdrop() {
           {embers.map((e, i) => (
             <span key={i} style={{
               position: 'absolute', bottom: 'calc(var(--abh,1vh) * -1.296)', left: e.left.toFixed(2) + '%',
-              width: e.size.toFixed(1) + 'px', height: e.size.toFixed(1) + 'px', borderRadius: '50%',
-              background: e.color, boxShadow: '0 0 ' + (e.size * 2.4).toFixed(1) + 'px ' + e.color,
+              width: e.px + 'px', height: e.px + 'px',
+              background: e.color,
               opacity: 0, animation: 'ab-emberrise ' + e.dur.toFixed(1) + 's linear ' + e.delay.toFixed(1) + 's infinite',
               '--drift': e.drift + 'vw',
             }} />
@@ -1210,7 +1214,7 @@ function MenuCardBackground() {
         {tile}
         {tile}
       </div>
-      <div className="menu-card-bg-veil" />
+      <PpVerlauf className="menu-card-bg-veil" px={4} retroGradient="radial-gradient(ellipse at center, rgba(8,6,12,.58) 0%, rgba(8,6,12,.78) 70%, rgba(8,6,12,.9) 100%)" gradient="radial-gradient(ellipse at center, rgba(8,6,12,.52) 0%, rgba(8,6,12,.76) 70%, rgba(8,6,12,.9) 100%)" />
     </div>
   );
 }
@@ -1484,6 +1488,7 @@ function PixelParticles({
   // Ohne beide Angaben verhaelt sich die Komponente exakt wie bisher.
   radial = false,
   farben = null,
+  gerade = false,     // ★ W86u2: Groesse auf gerade px runden (Pixelart-Kreuz, ganze Kunstpixel)
 }) {
   const particles = useMemo(() => {
     const arr = [];
@@ -1505,7 +1510,8 @@ function PixelParticles({
       }
       arr.push({
         top, left,
-        size:  minGroesse + Math.floor(Math.random() * (maxGroesse - minGroesse)),
+        size:  gerade ? Math.max(2, Math.round((minGroesse + Math.random() * (maxGroesse - minGroesse)) / 2) * 2)
+                      : minGroesse + Math.floor(Math.random() * (maxGroesse - minGroesse)),
         dur,
         delay: -Math.random() * dur,                     // negativ → mitten im Zyklus starten
         dx, dy,
@@ -1565,6 +1571,7 @@ function ScGlitzer() {
     anzahl={22}
     klasse="pp-sc-glitzer"
     teilchenKlasse="pp-sc-glitzer-teil"
+    gerade
     radial
     farben={SC_GLITZER_FARBEN}
     minGroesse={4}

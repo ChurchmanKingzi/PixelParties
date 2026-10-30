@@ -70,14 +70,14 @@ body { color: var(--text); font-family: var(--font-body), sans-serif; overflow: 
 /* ===== ANIMATIONS ===== */
 @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: .6; } }
 @keyframes glow {
-  0%,100% { box-shadow: 0 0 0 1px var(--accent), 0 0 0 2px #3e3e51; }
-  50% { box-shadow: 0 0 0 2px var(--accent), 0 0 0 3px #7e7d9b; }
+  0%,100% { box-shadow: 0 0 0 2px var(--accent); }
+  50% { box-shadow: 0 0 0 2px var(--accent), 0 0 0 4px color-mix(in srgb, var(--accent) 72%, #08060c), 0 0 0 6px color-mix(in srgb, var(--accent) 44%, #08060c), 0 0 0 8px #3e3e51; }
 }
 @keyframes slideIn { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
 @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
 @keyframes flashSave {
-  0%, 100% { border-color: #fe5154; color: #fe5154; background: transparent; box-shadow: 0 0 0 1px #55011a; }
-  50% { border-color: #e92f38; color: #ffffff; background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='4' height='4' shape-rendering='crispEdges'%3E%3Crect x='2' y='0' width='2' height='2' fill='%23fe5154'/%3E%3Crect x='0' y='2' width='2' height='2' fill='%23fe5154'/%3E%3C/svg%3E") 0 0 / 4px 4px; box-shadow: 0 0 0 2px #8c0014; }
+  0%, 100% { border-color: #fe5154; color: #fe5154; background: transparent; box-shadow: none; }
+  50% { border-color: #e92f38; color: #ffffff; background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='4' height='4' shape-rendering='crispEdges'%3E%3Crect x='2' y='0' width='2' height='2' fill='%23fe5154'/%3E%3Crect x='0' y='2' width='2' height='2' fill='%23fe5154'/%3E%3C/svg%3E") 0 0 / 4px 4px; box-shadow: 0 0 0 2px #55011a, 0 0 0 4px #55011a, 0 0 0 6px #55011a; }
 }
 @keyframes scanline {
   0% { background-position: 0 0; }
@@ -209,11 +209,11 @@ select optgroup { background: var(--bg); color: var(--text); }
 .card-mini:hover { border-color: var(--accent); transform: translateY(-2px); box-shadow: 0 2px 0 0 #000000; }
 .card-mini.dimmed { opacity: .35; }
 .card-mini.drag-over { border-color: var(--accent3); box-shadow: 0 0 0 2px #167927; }
-.card-mini-cover { border-color: #fad54a !important; box-shadow: 0 0 0 2px #a87c00, 0 0 0 2px #72541d; animation: coverCardGlow 2s steps(24, end) infinite; }
+.card-mini-cover { border-color: #fad54a !important; box-shadow: 0 0 0 2px #72541d, 0 0 0 4px #72541d; animation: coverCardGlow 2s steps(24, end) infinite; }
 .card-mini-cover::after { content: '⭐'; position: absolute; top: 2px; left: 2px; font-size: 10px; filter: drop-shadow(1px 0 0 #a87c00) drop-shadow(-1px 0 0 #a87c00) drop-shadow(0 1px 0 #a87c00) drop-shadow(0 -1px 0 #a87c00); z-index: 3; pointer-events: none; animation: coverStarPulse 1.5s steps(24, end) infinite; }
 @keyframes coverCardGlow {
-  0%, 100% { box-shadow: 0 0 0 2px #a87c00, 0 0 0 2px #72541d; }
-  50% { box-shadow: 0 0 0 2px #fad54a, 0 0 0 3px #a87c00; }
+  0%, 100% { box-shadow: 0 0 0 2px #72541d, 0 0 0 4px #72541d; }
+  50% { box-shadow: 0 0 0 2px #a87c00, 0 0 0 4px #72541d, 0 0 0 6px #72541d; }
 }
 @keyframes coverStarPulse {
   0%, 100% { opacity: .8; transform: scale(1); }
@@ -1207,9 +1207,9 @@ select optgroup { background: var(--bg); color: var(--text); }
    jolts in sync with the laser impacts. On its own wrapper so the panel's
    .animate-in entrance transform is preserved. */
 .auth-panel-shake { --shake: 1; animation: ab-shake 10s steps(1, end) infinite; will-change: transform; }
-.anim-bloom { position: absolute; left: 52%; top: 42%; width: 860px; height: 860px; border-radius: 0; transform: translate(-50%, -50%); background: radial-gradient(circle, transparent 0% 56%); mix-blend-mode: screen; pointer-events: none; animation: ab-glowpulse 10s steps(24, end) infinite; will-change: transform, opacity; }
-.anim-flash { position: absolute; inset: 0; background: radial-gradient(circle at 56% 41%, #ffffff 0% 25.71%, transparent 25.71% 58%); mix-blend-mode: screen; pointer-events: none; animation: ab-flashburst 10s steps(1, end) infinite; }
-.anim-vignette { position: absolute; inset: 0; pointer-events: none; background: radial-gradient(circle at 50% 44%, transparent 40% 100%); animation: ab-vignettepulse 6s steps(24, end) infinite; }
+.anim-bloom { position: absolute; left: 52%; top: 42%; width: 860px; height: 860px; border-radius: 0; transform: translate(-50%, -50%); pointer-events: none; animation: ab-glowpulse 10s steps(24, end) infinite; will-change: transform, opacity; }
+.anim-flash { position: absolute; inset: 0; pointer-events: none; animation: ab-flashburst 10s steps(1, end) infinite; }
+.anim-vignette { position: absolute; inset: 0; pointer-events: none; animation: ab-vignettepulse 6s steps(24, end) infinite; }
 /* ── Lightning (see .anim-lightning in AnimatedTitleBackdrop) ──
    Cool blue flashes + jagged bolts. ab-strike (10s) fires ON the two shake
    impact beats; ab-strike-ambient (13s, off the shake clock) adds occasional
@@ -1220,12 +1220,13 @@ select optgroup { background: var(--bg); color: var(--text); }
    den ~95 % der Zeit ohne Blitz; die Blitze einzeln sind bei Deckkraft 0
    gar nicht erst zu zeichnen. Ergebnis gleich: beide mischen gegen
    dieselbe Kulisse darunter. */
-.anim-lightning > * { mix-blend-mode: screen; }
+/* ★ W86u2: kein `screen` mehr (Pixelart: Bildpunkte deckend, Blitze hell auf dunkler Kulisse). */
 .anim-lflash { position: absolute; inset: 0; opacity: 0; will-change: opacity; }
-.anim-lflash-impact { background: radial-gradient(circle at 46% 26%, #bddcef 0% 23.33%, transparent 23.33% 72%); animation: ab-strike 10s steps(24, end) infinite; }
-.anim-lflash-ambient { background: radial-gradient(circle at 62% 22%, #bddcef 0% 22.22%, transparent 22.22% 70%); animation: ab-strike-ambient 13s steps(24, end) infinite; }
-.anim-bolt { position: absolute; top: -2%; height: 62%; opacity: 0; will-change: opacity; filter: drop-shadow(1px 0 0 #bddcef) drop-shadow(-1px 0 0 #bddcef) drop-shadow(0 1px 0 #bddcef) drop-shadow(0 -1px 0 #bddcef) drop-shadow(1px 0 0 #66b6ff) drop-shadow(-1px 0 0 #66b6ff) drop-shadow(0 1px 0 #66b6ff) drop-shadow(0 -1px 0 #66b6ff); }
-.anim-bolt polyline { fill: none; stroke: #e5edfa; stroke-width: 3.2; stroke-linecap: round; stroke-linejoin: round; vector-effect: non-scaling-stroke; }
+.anim-lflash-impact { animation: ab-strike 10s steps(24, end) infinite; }
+.anim-lflash-ambient { animation: ab-strike-ambient 13s steps(24, end) infinite; }
+.anim-bolt { position: absolute; top: -2%; height: 62%; opacity: 0; will-change: opacity; shape-rendering: crispEdges; }
+.anim-bolt polyline { fill: none; stroke: #e5edfa; stroke-width: 4; stroke-linecap: square; stroke-linejoin: miter; vector-effect: non-scaling-stroke; shape-rendering: crispEdges; }
+.anim-bolt polyline.anim-bolt-rand { stroke: #66b6ff; stroke-width: 10; }
 .anim-bolt-a { left: 15%; width: 9%; animation: ab-strike 10s steps(24, end) infinite; }
 .anim-bolt-b { right: 19%; width: 8%; animation: ab-strike 10s steps(24, end) infinite; }
 .anim-bolt-c { left: 53%; width: 8%; animation: ab-strike-ambient 13s steps(24, end) infinite; }
@@ -1348,11 +1349,11 @@ select optgroup { background: var(--bg); color: var(--text); }
    Flaeche wie sie ist, und die Aufmerksamkeit kommt ueber Groesse,
    einen Akzentrahmen und ein ruhiges Pulsieren. Nur diese Variante,
    damit der Knopf anderswo unveraendert bleibt. */
-.google-btn--prominent { width: 320px; height: 52px; font-size: 15px; font-weight: 600; border: 2px solid var(--accent); box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent) 22%, transparent), 0 3px 0 0 #000000; animation: googleBtnPulse 2.4s steps(24, end) infinite; }
+.google-btn--prominent { width: 320px; height: 52px; font-size: 15px; font-weight: 600; border: 2px solid var(--accent); box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent) 22%, transparent), 0 6px 0 2px #08060c; animation: googleBtnPulse 2.4s steps(24, end) infinite; }
 .google-btn--prominent:hover:not(:disabled) { border-color: var(--accent); transform: translateY(-1px); }
 @keyframes googleBtnPulse {
-  0%, 100% { box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent) 22%, transparent), 0 3px 0 0 #000000; }
-  50%      { box-shadow: 0 0 0 8px color-mix(in srgb, var(--accent) 10%, transparent), 0 3px 0 0 #000000; }
+  0%, 100% { box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent) 22%, transparent), 0 6px 0 2px #08060c; }
+  50%      { box-shadow: 0 0 0 8px color-mix(in srgb, var(--accent) 10%, transparent), 0 6px 0 2px #000000; }
 }
 /* Bewegungsempfindliche Nutzer: Groesse und Rahmen bleiben, das
    Pulsieren faellt weg. */
@@ -1394,7 +1395,7 @@ select optgroup { background: var(--bg); color: var(--text); }
    Pixelated scaling keeps the chunky pixels crisp; the drop-shadow lifts it
    off the scrolling card-wall behind. */
 .pp-logo-stack { position: relative; display: inline-block; line-height: 0; isolation: isolate; }
-.pp-logo-img { display: block; filter: drop-shadow(0 6px 0 #000000) drop-shadow(1px 0 0 var(--player-color, #66b6ff)) drop-shadow(-1px 0 0 var(--player-color, #66b6ff)) drop-shadow(0 1px 0 var(--player-color, #66b6ff)) drop-shadow(0 -1px 0 var(--player-color, #66b6ff)); height: 122px; width: auto; max-height: calc(24dvh / var(--ui-scale, 1)); image-rendering: pixelated; }
+.pp-logo-img { display: block; filter: drop-shadow(0 6px 0 #000000); height: 122px; width: auto; max-height: calc(24dvh / var(--ui-scale, 1)); image-rendering: pixelated; }
 /* Spielerfarbe, Schicht 1: data/logo-tint-mask.png deckt alle graustufigen
    Stellen ab (Bandflaeche, Rand, Enden, Schriftkontur). Multipliziert
    ergibt Weiss die volle Spielerfarbe, Grau deren dunklere Toene — die
@@ -1424,7 +1425,7 @@ select optgroup { background: var(--bg); color: var(--text); }
    damit keine Bildschirmliste gepflegt werden muss, die beim naechsten
    neuen Menue veraltet. */
 .pp-bg-particles { position: fixed; inset: 0; z-index: 0; pointer-events: none; overflow: hidden; }
-.pp-bg-particle { position: absolute; width: var(--p-size, 4px); height: var(--p-size, 4px); background: var(--p-color, var(--player-color, #66b6ff)); box-shadow: 0 0 0 2px var(--p-color, var(--player-color, #66b6ff)); image-rendering: pixelated; opacity: 0; transform: translate(0, 0) scale(.6); animation: pp-particle-float var(--p-dur, 8s) ease-in-out var(--p-delay, 0s) infinite; }
+.pp-bg-particle { position: absolute; width: var(--p-size, 4px); height: var(--p-size, 4px); background: var(--p-color, var(--player-color, #66b6ff)); image-rendering: pixelated; opacity: 0; transform: translate(0, 0) scale(.6); animation: pp-particle-float var(--p-dur, 8s) ease-in-out var(--p-delay, 0s) infinite; }
 body:has(.ui-noscale) .pp-bg-particles { display: none; }
 /* Im Hauptmenue uebernimmt `.pp-menu-particles` (v810) — die feste
    Schicht laege dort ohnehin hinter der deckenden Kartenwand und wuerde
@@ -1452,7 +1453,7 @@ body:has(.pz-layout) .pp-bg-particles { display: none; }
    particles tuck behind the crisp letters while the rest haloes the edges.
    Cosmetic only — pointer-events:none. */
 .pp-logo-particles { position: absolute; inset: -60px -92px; z-index: -1; pointer-events: none; }
-.pp-logo-particle { position: absolute; width: var(--p-size, 4px); height: var(--p-size, 4px); background: var(--p-color, var(--player-color, #66b6ff)); box-shadow: 0 0 0 2px var(--p-color, var(--player-color, #66b6ff)); image-rendering: pixelated; opacity: 0; transform: translate(0, 0) scale(.6); animation: pp-particle-float var(--p-dur, 3.5s) ease-in-out var(--p-delay, 0s) infinite; will-change: transform, opacity; }
+.pp-logo-particle { position: absolute; width: var(--p-size, 4px); height: var(--p-size, 4px); background: var(--p-color, var(--player-color, #66b6ff)); image-rendering: pixelated; opacity: 0; transform: translate(0, 0) scale(.6); animation: pp-particle-float var(--p-dur, 3.5s) ease-in-out var(--p-delay, 0s) infinite; will-change: transform, opacity; }
 @keyframes pp-particle-float {
   0%   { opacity: 0; transform: translate(0, 0) scale(.55); }
   20%  { opacity: var(--p-max, .85); }
@@ -1521,12 +1522,12 @@ body:has(.pz-layout) .pp-bg-particles { display: none; }
 
 /* ===== PROFILE CARD ===== */
 @keyframes profileGlow {
-  0%, 100% { box-shadow: 0 0 0 3px var(--rank-glow, rgba(102,182,255,.2)), 0 1px 0 0 #000000; }
-  50% { box-shadow: 0 0 0 3px var(--rank-glow, rgba(102,182,255,.3)), 0 1px 0 0 #000000; }
+  0%, 100% { box-shadow: 0 0 0 2px var(--rank-glow, rgba(102,182,255,.2)), 0 0 0 4px color-mix(in srgb, var(--rank-glow, #1a1a2e) 72%, #08060c), 0 0 0 6px color-mix(in srgb, var(--rank-glow, #1a1a2e) 44%, #08060c), 0 2px 0 4px #000000; }
+  50% { box-shadow: 0 0 0 2px var(--rank-glow, rgba(102,182,255,.3)), 0 0 0 4px color-mix(in srgb, var(--rank-glow, #3e3e51) 72%, #08060c), 0 0 0 6px color-mix(in srgb, var(--rank-glow, #3e3e51) 44%, #08060c), 0 2px 0 4px #000000; }
 }
 @keyframes avatarPulse {
-  0%, 100% { box-shadow: inset 0 0 0 2px var(--rank-glow), 0 0 0 3px var(--rank-glow); }
-  50% { box-shadow: inset 0 0 0 2px var(--rank-glow), 0 0 0 3px var(--rank-glow); }
+  0%, 100% { box-shadow: 0 0 0 2px var(--rank-glow), 0 0 0 4px color-mix(in srgb, var(--rank-glow) 72%, #08060c), 0 0 0 6px color-mix(in srgb, var(--rank-glow) 44%, #08060c), 0 0 0 8px var(--rank-glow), inset 0 0 0 2px var(--rank-glow), inset 0 0 0 4px color-mix(in srgb, var(--rank-glow) 72%, #08060c), inset 0 0 0 6px color-mix(in srgb, var(--rank-glow) 44%, #08060c); }
+  50% { box-shadow: 0 0 0 2px var(--rank-glow), 0 0 0 4px color-mix(in srgb, var(--rank-glow) 72%, #08060c), 0 0 0 6px color-mix(in srgb, var(--rank-glow) 44%, #08060c), 0 0 0 8px var(--rank-glow), inset 0 0 0 2px var(--rank-glow), inset 0 0 0 4px color-mix(in srgb, var(--rank-glow) 72%, #08060c), inset 0 0 0 6px color-mix(in srgb, var(--rank-glow) 44%, #08060c); }
 }
 @keyframes badgeShine {
   0% { background-position: -100% 0; }
@@ -6732,7 +6733,7 @@ body:has(.modal-overlay) { --pz-tooltip-z: 10086; }
   0% { background-position: 100% 100%; }
   100% { background-position: -100% -100%; }
 }
-.shop-item.shop-owned::after { content: ''; position: absolute; width: 6px; height: 6px; border-radius: 0; background: #fad54a; box-shadow: 0 0 0 2px #fad54a, 0 0 0 4px #72541d; animation: shop-owned-particle 4s steps(24, end) infinite; pointer-events: none; top: -4px; left: 20%; }
+.shop-item.shop-owned::after { content: ''; position: absolute; width: 6px; height: 6px; border-radius: 0; background: #fad54a; box-shadow: 0 0 0 2px #a87c00, 0 0 0 4px #72541d, 0 0 0 6px #72541d; animation: shop-owned-particle 4s steps(24, end) infinite; pointer-events: none; top: -4px; left: 20%; }
 @keyframes shop-owned-particle {
   0% { left: -5%; top: -4px; opacity: 0; }
   10% { opacity: 1; }
@@ -6753,8 +6754,8 @@ body:has(.modal-overlay) { --pz-tooltip-z: 10086; }
 .shop-item:not(.shop-owned):not(.structure-deck-default):not(.shop-selected) { position: relative; border-color: transparent; overflow: visible; animation: shop-unowned-glow 3s steps(24, end) infinite; }
 .shop-item:not(.shop-owned):not(.structure-deck-default):not(.shop-selected)::before { content: ''; position: absolute; inset: -3px; border-radius: 0; border: 2px solid transparent; background: linear-gradient(120deg, #1aedff 0% 1.85%, #6be9fa 1.85% 3.7%, #07aec5 3.7% 5.56%, #66b6ff 5.56% 14.81%, #2f539d 14.81% 16.67%, #ba74ff 16.67% 26.67%, #903ae6 26.67% 41.67%, #fb1ea9 41.67% 58.33%, #903ae6 58.33% 73.33%, #ba74ff 73.33% 83.33%, #2f539d 83.33% 85.19%, #66b6ff 85.19% 94.44%, #07aec5 94.44% 96.3%, #6be9fa 96.3% 98.15%, #1aedff 98.15% 100%) border-box; background-size: 200% 100%; -webkit-mask: linear-gradient(#000000 0 0) padding-box, linear-gradient(#000000 0 0); -webkit-mask-composite: xor; mask-composite: exclude; pointer-events: none; }
 @keyframes shop-unowned-glow {
-  0%, 100% { box-shadow: 0 0 0 1px #3e3e51; }
-  50%      { box-shadow: 0 0 0 2px #66b6ff, 0 0 0 3px #c80480; }
+  0%, 100% { box-shadow: none; }
+  50%      { box-shadow: 0 0 0 2px #7e7d9b, 0 0 0 4px #3e3e51, 0 0 0 6px #3e3e51, 0 0 0 8px #5a023a; }
 }
 /* Hover: shimmer the gradient border + quicken the glow pulse. */
 .shop-item:not(.shop-owned):not(.structure-deck-default):not(.shop-selected):hover { animation-duration: 1.4s; }
@@ -6785,8 +6786,8 @@ body:has(.modal-overlay) { --pz-tooltip-z: 10086; }
 .structure-deck-item:hover:not([disabled]) { box-shadow: 0 3px 0 0 #000000; }
 .structure-deck-item.structure-deck-default { animation: structure-deck-equipped-pulse 2s steps(24, end) infinite; background: linear-gradient(180deg, transparent 0% 100%); border-width: 3px; }
 @keyframes structure-deck-equipped-pulse {
-  0%, 100% { box-shadow: 0 0 0 2px #4ceb70, 0 0 0 3px #167927; }
-  50%      { box-shadow: 0 0 0 2px #4ceb70, 0 0 0 3px #167927; }
+  0%, 100% { box-shadow: 0 0 0 2px #167927, 0 0 0 4px #167927, 0 0 0 6px #1a4128, 0 0 0 8px #1a4128; }
+  50%      { box-shadow: 0 0 0 2px #4ceb70, 0 0 0 4px #167927, 0 0 0 6px #1a4128, 0 0 0 8px #167927; }
 }
 
 /* Slight gray-out on unbought non-skin items */
@@ -6832,10 +6833,10 @@ body:has(.modal-overlay) { --pz-tooltip-z: 10086; }
 .shop-item-name { padding: 6px 6px 2px; font-size: 10px; color: var(--text); text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; width: 100%; font-weight: 600; }
 
 @keyframes shop-sparkle {
-  0%, 100% { background-position: 0% 50%; text-shadow: 1px 1px 0 #3a2412; }
-  25% { background-position: 100% 50%; text-shadow: 1px 1px 0 #3a2412; }
-  50% { background-position: 50% 0%; text-shadow: 1px 1px 0 #3a2412; }
-  75% { background-position: 0% 100%; text-shadow: 1px 1px 0 #3a2412; }
+  0%, 100% { background-position: 0% 50%; text-shadow: 2px 0 0 #6e4421, -2px 0 0 #6e4421; }
+  25% { background-position: 100% 50%; text-shadow: 2px 0 0 #72541d, -2px 0 0 #72541d; }
+  50% { background-position: 50% 0%; text-shadow: 2px 0 0 #72541d, -2px 0 0 #72541d; }
+  75% { background-position: 0% 100%; text-shadow: 2px 0 0 #72541d, -2px 0 0 #72541d; }
 }
 
 /* Hero/Skin flip toggle under each skin tile (replaces the old skin-name and
@@ -7007,11 +7008,11 @@ body:has(.modal-overlay) { --pz-tooltip-z: 10086; }
 
 
 /* ===== TURN INDICATOR ON AVATARS ===== */
-.avatar-active { box-shadow: inset 0 0 0 1px #66b6ff, 0 0 0 2px #66b6ff; border: 2px solid #7e7d9b !important; animation: avatar-pulse 1.5s steps(24, end) infinite; }
+.avatar-active { box-shadow: 0 0 0 2px #7e7d9b, 0 0 0 4px #3e3e51, 0 0 0 6px #3e3e51, inset 0 0 0 2px #66b6ff; border: 2px solid #7e7d9b !important; animation: avatar-pulse 1.5s steps(24, end) infinite; }
 .avatar-inactive { filter: grayscale(0.7) brightness(0.6); border: 2px solid transparent !important; }
 @keyframes avatar-pulse {
-  0%, 100% { box-shadow: 0 0 0 2px #66b6ff, 0 0 0 2px #3e3e51; }
-  50% { box-shadow: 0 0 0 2px #66b6ff, 0 0 0 3px #7e7d9b; }
+  0%, 100% { box-shadow: 0 0 0 2px #7e7d9b, 0 0 0 4px #3e3e51, 0 0 0 6px #3e3e51; }
+  50% { box-shadow: 0 0 0 2px #66b6ff, 0 0 0 4px #7e7d9b, 0 0 0 6px #3e3e51, 0 0 0 8px #3e3e51; }
 }
 
 /* ===== CARD PING FLASH ===== */
@@ -7681,8 +7682,8 @@ body:has(.textbox-overlay) .tooltip { z-index: 90003 !important; }
 .tutorial-boost-anim { animation: tutorial-card-grow 2s steps(24, end) !important; z-index: 100 !important; position: relative !important; }
 @keyframes tutorial-card-grow {
   0%   { transform: scale(1); filter: brightness(1); }
-  10%  { transform: scale(1.5); filter: brightness(1.8) saturate(1.5); box-shadow: 0 0 0 3px #ffd61a, 0 0 0 3px #bd440f; }
-  30%  { transform: scale(1.35); filter: brightness(1.4); box-shadow: 0 0 0 3px #f9ac20; }
+  10%  { transform: scale(1.5); filter: brightness(1.8) saturate(1.5); box-shadow: 0 0 0 2px #f9ac20, 0 0 0 4px #a87c00, 0 0 0 6px #72541d, 0 0 0 8px #7d3911; }
+  30%  { transform: scale(1.35); filter: brightness(1.4); box-shadow: 0 0 0 2px #a87c00, 0 0 0 4px #72541d, 0 0 0 6px #6e4421; }
   100% { transform: scale(1); filter: brightness(1); box-shadow: none; }
 }
 /* Weiter-/Schliessen-Pfeil: gezeichnete Pixel-Dreiecke statt der
@@ -7703,7 +7704,7 @@ body:has(.textbox-overlay) .tooltip { z-index: 90003 !important; }
 .textbox-back:hover { opacity: 1; }
 
 /* ── Textbox highlight overlays — cloned cards above the veil ── */
-.textbox-highlight { z-index: 90001; border-radius: 0; box-shadow: 0 0 0 2px #66b6ff, 0 0 0 3px #3e3e51; animation: textbox-hl-glow 1.5s steps(24, end) infinite; overflow: hidden; }
+.textbox-highlight { z-index: 90001; border-radius: 0; box-shadow: 0 0 0 2px #7e7d9b, 0 0 0 4px #3e3e51, 0 0 0 6px #3e3e51; animation: textbox-hl-glow 1.5s steps(24, end) infinite; overflow: hidden; }
 .textbox-highlight-clone { width: 100%; height: 100%; pointer-events: none; }
 .textbox-highlight-clone,
 .textbox-highlight-clone * { filter: none !important; opacity: 1 !important; visibility: visible !important; }
@@ -7732,8 +7733,8 @@ body:has(.textbox-overlay) .tooltip { z-index: 90003 !important; }
    selbst — nur in der Tutorial-Farbe statt der Spielerfarbe. */
 .textbox-highlight-hand { border-radius: 0; outline: 2px solid #1aedff; outline-offset: -1px; }
 @keyframes textbox-hl-glow {
-  0%, 100% { box-shadow: 0 0 0 2px #66b6ff, 0 0 0 3px #3e3e51; }
-  50%      { box-shadow: 0 0 0 3px #66b6ff, 0 0 0 3px #7e7d9b; }
+  0%, 100% { box-shadow: 0 0 0 2px #7e7d9b, 0 0 0 4px #3e3e51, 0 0 0 6px #3e3e51; }
+  50%      { box-shadow: 0 0 0 2px #66b6ff, 0 0 0 4px #7e7d9b, 0 0 0 6px #3e3e51, 0 0 0 8px #3e3e51; }
 }
 /* Jedes Highlight pulsiert leicht (TextBox setzt `.textbox-highlight-pulse`):
    ein paar Prozent Groesse und ein atmender Schein — beides aus dem
@@ -7962,7 +7963,7 @@ body:has(.rotate-device-overlay.rotate-gate) .pp-bg-particles * { animation: non
 /* Dark veil so the menu stays readable over the bright card art. The
    centre is kept darker (not lighter) than before so the three panels —
    which sit over the middle of the screen — clearly read as on top. */
-.menu-card-bg-veil { position: absolute; inset: 0; background: radial-gradient(ellipse at center, transparent 0% 0%, #08060c 0% 100%); }
+.menu-card-bg-veil { position: absolute; inset: 0; }
 /* EXPERIMENTAL — faint pixel dither over the scrolling card wall, just to add a
    touch of texture to the background. Sits above the cards + veil but below all
    menu content (the whole .menu-card-bg layer is z-index:0; content is z-index
@@ -8049,8 +8050,8 @@ body:has(.rotate-device-overlay.rotate-gate) .pp-bg-particles * { animation: non
 
 /* Live counter strip */
 .menu-side-live { display: flex; align-items: center; gap: 9px; font-size: 14px; color: var(--text); margin-bottom: 16px; }
-.menu-live-dot { width: 10px; height: 10px; border-radius: 0; background: var(--success, #4ceb70); box-shadow: 0 0 0 2px var(--success, #4ceb70); animation: menu-live-pulse 1.8s steps(24, end) infinite; }
-@keyframes menu-live-pulse { 0%, 100% { opacity: 1; } 50% { opacity: .35; } }
+.menu-live-dot { width: 8px; height: 8px; background: var(--success, #4ceb70); box-shadow: 0 0 0 2px color-mix(in srgb, var(--success, #4ceb70) 45%, #08060c); animation: menu-live-pulse 1.8s steps(1, end) infinite; }
+@keyframes menu-live-pulse { 0%, 49% { opacity: 1; } 50%, 100% { opacity: .35; } }
 
 /* Leaderboard list */
 .menu-lb-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 5px; }
@@ -8147,13 +8148,15 @@ body:has(.rotate-device-overlay.rotate-gate) .pp-bg-particles * { animation: non
    ihr und fliegen rundum davon (`ScGlitzer`, app-screens.jsx). */
 .menu-stat-coin-wrap { position: relative; display: inline-flex; flex-shrink: 0; }
 .pp-sc-glitzer { position: absolute; inset: -4px; pointer-events: none; z-index: 1; }
-.pp-sc-glitzer-teil { position: absolute; width: var(--p-size, 4px); height: var(--p-size, 4px); margin: calc(var(--p-size, 4px) / -2) 0 0 calc(var(--p-size, 4px) / -2); background: linear-gradient(var(--p-color, #fad54a), var(--p-color, #fad54a)) center / 100% 34% no-repeat,
-    linear-gradient(var(--p-color, #fad54a), var(--p-color, #fad54a)) center / 34% 100% no-repeat; filter: drop-shadow(1px 0 0 var(--p-color, #fad54a)) drop-shadow(-1px 0 0 var(--p-color, #fad54a)) drop-shadow(0 1px 0 var(--p-color, #fad54a)) drop-shadow(0 -1px 0 var(--p-color, #fad54a)) drop-shadow(1px 0 0 #ffffff) drop-shadow(-1px 0 0 #ffffff) drop-shadow(0 1px 0 #ffffff) drop-shadow(0 -1px 0 #ffffff); image-rendering: pixelated; opacity: 0; animation: pp-glitzer-flug var(--p-dur, 1.8s) ease-out var(--p-delay, 0s) infinite; will-change: transform, opacity; }
+.pp-sc-glitzer-teil { position: absolute; width: var(--p-size, 4px); height: var(--p-size, 4px); margin: calc(var(--p-size, 4px) / -2) 0 0 calc(var(--p-size, 4px) / -2); background: none; image-rendering: pixelated; opacity: 0; animation: pp-glitzer-flug var(--p-dur, 1.8s) ease-out var(--p-delay, 0s) infinite; will-change: transform, opacity; }
+.pp-sc-glitzer-teil::before, .pp-sc-glitzer-teil::after { content: ''; position: absolute; background: var(--p-color, #fad54a); }
+.pp-sc-glitzer-teil::before { left: 0; right: 0; top: calc(50% - 1px); height: 2px; }
+.pp-sc-glitzer-teil::after { top: 0; bottom: 0; left: calc(50% - 1px); width: 2px; }
 @keyframes pp-glitzer-flug {
-  0%   { opacity: 0; transform: translate(0, 0) scale(.3) rotate(0deg); }
-  15%  { opacity: var(--p-max, .9); transform: translate(calc(var(--p-dx, 0px) * .25), calc(var(--p-dy, 0px) * .25)) scale(1.2) rotate(45deg); }
+  0%   { opacity: 0; transform: translate(0, 0) scale(.5); }
+  15%  { opacity: var(--p-max, .9); transform: translate(calc(var(--p-dx, 0px) * .25), calc(var(--p-dy, 0px) * .25)) scale(1.5); }
   60%  { opacity: var(--p-max, .9); }
-  100% { opacity: 0; transform: translate(var(--p-dx, 0px), var(--p-dy, 0px)) scale(.4) rotate(90deg); }
+  100% { opacity: 0; transform: translate(var(--p-dx, 0px), var(--p-dy, 0px)) scale(.5); }
 }
 @media (prefers-reduced-motion: reduce) {
   .pp-sc-glitzer-teil { animation: none; opacity: 0; }
@@ -8209,8 +8212,8 @@ body:has(.rotate-device-overlay.rotate-gate) .pp-bg-particles * { animation: non
 
 /* ═══ Daily challenge button ═══ */
 @keyframes daily-glow {
-  0%, 100% { box-shadow: 0 0 0 2px #fad54a, 0 0 0 2px #72541d; border-color: #fad54a; }
-  50%      { box-shadow: 0 0 0 2px #fad54a, 0 0 0 3px #a87c00; border-color: #f7f7ad; }
+  0%, 100% { box-shadow: 0 0 0 2px #72541d, 0 0 0 4px #72541d; border-color: #fad54a; }
+  50%      { box-shadow: 0 0 0 2px #fad54a, 0 0 0 4px #a87c00, 0 0 0 6px #72541d, 0 0 0 8px #72541d; border-color: #f7f7ad; }
 }
 .menu-daily-btn { transition: transform .15s steps(4, end),filter .15s steps(4, end); }
 .menu-daily-btn:hover { transform: scale(1.04); filter: brightness(1.15); }
@@ -11166,7 +11169,7 @@ body[data-tb-hl] .hero-idle-platz.hero-idle-hover { scale: none; }
 .pp-cer-win .pp-cer-reward { background: #12101f; }
 .pp-cer-regen { position: absolute; inset: 0; overflow: hidden; pointer-events: none; z-index: 1; }
 .pp-cer-regen i { position: absolute; top: -60px; display: block; animation: ppCerRegen 6s steps(24, end) infinite; opacity: 0; }
-.pp-cer-regen b { position: absolute; inset: 0; display: block; background: url(/data/sc.png) center / contain no-repeat; image-rendering: pixelated; filter: drop-shadow(1px 0 0 #72541d) drop-shadow(-1px 0 0 #72541d) drop-shadow(0 1px 0 #72541d) drop-shadow(0 -1px 0 #72541d); animation: ppCerDreh 1s steps(24, end) infinite; }
+.pp-cer-regen b { position: absolute; inset: 0; display: block; background: url(/data/sc.png) center / contain no-repeat; image-rendering: pixelated; filter: drop-shadow(2px 0 0 #72541d) drop-shadow(-2px 0 0 #72541d) drop-shadow(0 2px 0 #72541d) drop-shadow(0 -2px 0 #72541d); animation: ppCerDreh 1s steps(24, end) infinite; }
 /* Glanz: ein kleiner Vierstern, der kurz aufblitzt */
 .pp-cer-regen u { position: absolute; left: 60%; top: 10%; width: 12px; height: 12px; display: block; background: linear-gradient(90deg, transparent 42% 46.8%, #ffffff 46.8% 53.2%, transparent 53.2% 58%),
     linear-gradient(0deg, transparent 42% 46.8%, #ffffff 46.8% 53.2%, transparent 53.2% 58%); filter: drop-shadow(1px 0 0 #ffffff) drop-shadow(-1px 0 0 #ffffff) drop-shadow(0 1px 0 #ffffff) drop-shadow(0 -1px 0 #ffffff) drop-shadow(1px 0 0 #fad54a) drop-shadow(-1px 0 0 #fad54a) drop-shadow(0 1px 0 #fad54a) drop-shadow(0 -1px 0 #fad54a); opacity: 0; transform: scale(.2) rotate(0deg); animation: ppCerGlanz 2.6s steps(24, end) infinite; }
@@ -11178,7 +11181,7 @@ body[data-tb-hl] .hero-idle-platz.hero-idle-hover { scale: none; }
 }
 @keyframes ppCerDreh {
   0%, 100% { transform: scaleX(1); }
-  50%      { transform: scaleX(.12); filter: drop-shadow(1px 0 0 #f7f7ad) drop-shadow(-1px 0 0 #f7f7ad) drop-shadow(0 1px 0 #f7f7ad) drop-shadow(0 -1px 0 #f7f7ad) brightness(1.35); }
+  50%      { transform: scaleX(.12); filter: drop-shadow(2px 0 0 #e0c085) drop-shadow(-2px 0 0 #e0c085) drop-shadow(0 2px 0 #e0c085) drop-shadow(0 -2px 0 #e0c085) brightness(1.35); }
 }
 @keyframes ppCerGlanz {
   0%, 62%, 100% { opacity: 0; transform: scale(.2) rotate(0deg); }
@@ -11233,7 +11236,7 @@ body[data-tb-hl] .hero-idle-platz.hero-idle-hover { scale: none; }
 /* Lotse: pulsierender Schein aussen um den Wirt. Fester Schatten, es
    pulsiert nur seine Deckkraft (Compositor statt Neuzeichnen). */
 .pp-lotse { --lotse-farbe: #58238c; position: relative; }
-.pp-lotse-schein { position: absolute; inset: 0; pointer-events: none; border-radius: 0; box-shadow: 0 0 0 3px var(--lotse-farbe), 0 0 40px 10px color-mix(in srgb, var(--lotse-farbe) 50%, transparent); opacity: .45; animation: pp-lotse-puls 2.4s steps(24, end) infinite; }
+.pp-lotse-schein { position: absolute; inset: 0; pointer-events: none; border-radius: 0; box-shadow: 0 0 0 4px var(--lotse-farbe), 0 0 0 8px color-mix(in srgb, var(--lotse-farbe) 45%, #08060c); opacity: .45; animation: pp-lotse-puls 2.4s steps(24, end) infinite; }
 @keyframes pp-lotse-puls {
   0%, 100% { opacity: var(--lotse-min, .3); }
   50%      { opacity: 1; }
@@ -11258,7 +11261,7 @@ body[data-tb-hl] .hero-idle-platz.hero-idle-hover { scale: none; }
    zwischen vielen gleichartigen — sie bekommt einen harten Ring in der
    Lotsenfarbe, einen breiteren Schein und faellt im Puls nie unter 65 %. */
 .vscpu-raccoon { --lotse-min: .35; }
-.vscpu-raccoon > .pp-lotse-schein { box-shadow: 0 0 0 3px var(--lotse-farbe), 0 0 0 5px var(--lotse-farbe), 0 0 60px 20px color-mix(in srgb, var(--lotse-farbe) 55%, transparent); }
+.vscpu-raccoon > .pp-lotse-schein { box-shadow: 0 0 0 4px var(--lotse-farbe), 0 0 0 8px var(--lotse-farbe), 0 0 0 12px color-mix(in srgb, var(--lotse-farbe) 45%, #08060c); }
 .pp-lotse:disabled > .pp-lotse-schein,
 .pp-lotse:disabled > .pp-glanz { display: none; }
 @media (prefers-reduced-motion: reduce) {
@@ -11270,7 +11273,6 @@ body[data-tb-hl] .hero-idle-platz.hero-idle-hover { scale: none; }
    kostet nichts Nennenswertes). Dieselbe Schwelle wie der Lite-Block. */
 @media (pointer: coarse) and (max-height: 600px) {
   .pp-lotse-schein { animation: none; opacity: .75; }
-  .pp-sc-glitzer-teil { filter: none; }
   .pp-sc-glitzer-teil:nth-child(n+11) { display: none; }
 }
 
@@ -12129,10 +12131,10 @@ body.pp-dialog-offen .foil-diamond-rare:not(.modal-overlay *):not(.card-tooltip 
 .pp-glanz--knopf { --glanz-breite: 22%; --glanz-von: -140%; --glanz-bis: 560%; --glanz-dauer: 5.5s; --glanz-verzug: 1.5s; --glanz-staerke: .55; border-radius: 0; }
 
 /* NEW-Schild am DAILY-Knopf (heute noch nicht gestartet). */
-.menu-nav-badge { position: absolute; top: -11px; right: -10px; z-index: 3; padding: 3px 7px 2px; font-size: 11px; line-height: 1.2; letter-spacing: 1px; color: #000000; text-shadow: none; background: linear-gradient(180deg, #fff196 0% 18.33%, #fad54a 18.33% 100%); border: 2px solid var(--pp-kontur, #08060c); box-shadow: 2px 2px 0 0 #000000, 0 0 0 2px #fad54a; transform: rotate(8deg); animation: menu-badge-wippen 1.6s steps(24, end) infinite; pointer-events: none; }
+.menu-nav-badge { position: absolute; top: -11px; right: -10px; z-index: 3; padding: 3px 7px 2px; font-size: 11px; line-height: 1.2; letter-spacing: 1px; color: #000000; text-shadow: none; background: #fad54a; border: 2px solid var(--pp-kontur, #08060c); box-shadow: 2px 2px 0 0 #000000, inset 0 2px 0 0 #fff196, inset 0 -2px 0 0 #a87c00; animation: menu-badge-wippen 1.6s steps(1, end) infinite; pointer-events: none; }
 @keyframes menu-badge-wippen {
-  0%, 100% { transform: rotate(8deg) translateY(0); }
-  50%      { transform: rotate(4deg) translateY(-3px); }
+  0%, 49%   { transform: translateY(0); }
+  50%, 100% { transform: translateY(-2px); }
 }
 
 /* Halbe Knoepfe (Puzzle-Paar): ohne Icon, also normales Polster, und
@@ -12359,12 +12361,12 @@ body.pp-dialog-offen .foil-diamond-rare:not(.modal-overlay *):not(.card-tooltip 
 .shop-item.shop-selected { box-shadow: 0 0 0 2px var(--pp-kontur), inset 2px 2px 0 0 #3a2412, inset -2px -2px 0 0 #08060c, 6px 7px 0 0 #08060c, 0 0 0 2px #a87c00 !important; }
 /* Nicht gekauft: Regenbogenrahmen, der Puls laeuft mit Kontur und Schatten. */
 @keyframes shop-unowned-glow {
-  0%, 100% { box-shadow: 0 0 0 5px var(--pp-kontur), 6px 7px 0 3px #08060c, 0 0 0 2px #3e3e51; }
-  50%      { box-shadow: 0 0 0 5px var(--pp-kontur), 6px 7px 0 3px #08060c, 0 0 0 2px #66b6ff, 0 0 0 3px #5a023a; }
+  0%, 100% { box-shadow: 0 0 0 5px var(--pp-kontur), 6px 7px 0 3px #08060c; }
+  50%      { box-shadow: 0 0 0 5px var(--pp-kontur), 6px 7px 0 3px #08060c, 0 0 0 2px #7e7d9b, 0 0 0 4px #3e3e51, 0 0 0 6px #3e3e51, 0 0 0 8px #5a023a; }
 }
 @keyframes structure-deck-equipped-pulse {
-  0%, 100% { box-shadow: 0 0 0 2px var(--pp-kontur), 6px 7px 0 0 #08060c, 0 0 0 2px #4ceb70; }
-  50%      { box-shadow: 0 0 0 2px var(--pp-kontur), 6px 7px 0 0 #08060c, 0 0 0 3px #4ceb70; }
+  0%, 100% { box-shadow: 0 0 0 2px var(--pp-kontur), 6px 7px 0 0 #08060c, 0 0 0 2px #167927, 0 0 0 4px #1a4128, 0 0 0 6px #1a4128; }
+  50%      { box-shadow: 0 0 0 2px var(--pp-kontur), 6px 7px 0 0 #08060c, 0 0 0 2px #4ceb70, 0 0 0 4px #167927, 0 0 0 6px #1a4128; }
 }
 
 /* ═══ TITEL MIT PIXEL-SHADING ═══════════════════════════════════════════
@@ -13076,12 +13078,12 @@ body.pp-dialog-offen .foil-diamond-rare:not(.modal-overlay *):not(.card-tooltip 
 /* Der Puls der Zustaende traegt die Ringe mit (die alten Bilder setzten
    `box-shadow` komplett und haetten sie geloescht). */
 @keyframes shop-unowned-glow {
-  0%, 100% { box-shadow: 0 0 0 2px var(--pp-kontur), 0 0 0 4px #2b0b47, 0 0 0 6px var(--pp-kontur), inset 0 0 0 2px var(--pp-kontur), 8px 9px 0 0 #08060c, 0 0 0 2px #3e3e51; }
-  50%      { box-shadow: 0 0 0 2px var(--pp-kontur), 0 0 0 4px #58238c, 0 0 0 6px var(--pp-kontur), inset 0 0 0 2px var(--pp-kontur), 8px 9px 0 0 #08060c, 0 0 0 2px #66b6ff, 0 0 0 3px #5a023a; }
+  0%, 100% { box-shadow: 0 0 0 2px var(--pp-kontur), 0 0 0 4px #2b0b47, 0 0 0 6px var(--pp-kontur), inset 0 0 0 2px var(--pp-kontur), 8px 9px 0 0 #08060c; }
+  50%      { box-shadow: 0 0 0 2px var(--pp-kontur), 0 0 0 4px #58238c, 0 0 0 6px var(--pp-kontur), inset 0 0 0 2px var(--pp-kontur), 8px 9px 0 0 #08060c, 0 0 0 2px #7e7d9b, 0 0 0 4px #3e3e51, 0 0 0 6px #3e3e51, 0 0 0 8px #5a023a; }
 }
 @keyframes structure-deck-equipped-pulse {
-  0%, 100% { box-shadow: 0 0 0 2px var(--pp-kontur), 0 0 0 4px #167927, 0 0 0 6px var(--pp-kontur), inset 0 0 0 2px var(--pp-kontur), 8px 9px 0 0 #08060c, 0 0 0 2px #4ceb70; }
-  50%      { box-shadow: 0 0 0 2px var(--pp-kontur), 0 0 0 4px #167927, 0 0 0 6px var(--pp-kontur), inset 0 0 0 2px var(--pp-kontur), 8px 9px 0 0 #08060c, 0 0 0 3px #4ceb70; }
+  0%, 100% { box-shadow: 0 0 0 2px var(--pp-kontur), 0 0 0 4px #167927, 0 0 0 6px var(--pp-kontur), inset 0 0 0 2px var(--pp-kontur), 8px 9px 0 0 #08060c, 0 0 0 2px #167927, 0 0 0 4px #1a4128, 0 0 0 6px #1a4128; }
+  50%      { box-shadow: 0 0 0 2px var(--pp-kontur), 0 0 0 4px #167927, 0 0 0 6px var(--pp-kontur), inset 0 0 0 2px var(--pp-kontur), 8px 9px 0 0 #08060c, 0 0 0 2px #4ceb70, 0 0 0 4px #167927, 0 0 0 6px #1a4128; }
 }
 
 /* Das Zier-Element: Eckschnoerkel (::before) und Lichtkante (::after). */
@@ -13096,10 +13098,17 @@ body.pp-dialog-offen .foil-diamond-rare:not(.modal-overlay *):not(.card-tooltip 
 /* Innere Lichtkante des Rahmens — auch ueber dem Regenbogenring. */
 .shop-item-zier::after { content: ''; position: absolute; inset: -3px; box-shadow: inset 1px 1px 0 0 #59606e, inset -1px -1px 0 0 #08060c; }
 /* Nicht gekauft: die Schnoerkel wandern durch den Regenbogen. */
-.shop-item:not(.shop-owned):not(.structure-deck-default):not(.shop-selected):not(.shop-equipped) .shop-item-zier::before { background: #6be9fa; animation: shop-zier-regenbogen 6s steps(24, end) infinite; }
+.shop-item:not(.shop-owned):not(.structure-deck-default):not(.shop-selected):not(.shop-equipped) .shop-item-zier::before { background: #6be9fa; animation: shop-zier-regenbogen 6s steps(1, end) infinite; }
+/* ★ W86u2 (Pixelart): der Regenbogen laeuft in 8 harten Palettenstufen statt per stufenlosem `hue-rotate` (der Farben ausserhalb der Palette mischt). */
 @keyframes shop-zier-regenbogen {
-  from { filter: drop-shadow(2px 2px 0 #000000) hue-rotate(0deg); }
-  to   { filter: drop-shadow(2px 2px 0 #000000) hue-rotate(360deg); }
+  0%     { background-color: #6be9fa; }
+  12.5%  { background-color: #66b6ff; }
+  25%    { background-color: #ba74ff; }
+  37.5%  { background-color: #fb1ea9; }
+  50%    { background-color: #fe5154; }
+  62.5%  { background-color: #fad54a; }
+  75%    { background-color: #4ceb70; }
+  87.5%  { background-color: #1aedff; }
 }
 @media (prefers-reduced-motion: reduce) {
   .shop-item-zier::before { animation: none !important; }

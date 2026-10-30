@@ -274,12 +274,6 @@
  "kf:attachPickPanelPulse": {
   "blur": 2
  },
- "kf:avatar-pulse": {
-  "blur": 2
- },
- "kf:avatarPulse": {
-  "blur": 2
- },
  "kf:batterySpark": {
   "drehung": 4
  },
@@ -370,9 +364,6 @@
  "kf:cosmicWarp": {
   "drehung": 11
  },
- "kf:coverCardGlow": {
-  "blur": 2
- },
  "kf:creatureEffectPulse": {
   "blur": 2
  },
@@ -387,9 +378,6 @@
  },
  "kf:crossSideBolt": {
   "drehung": 2
- },
- "kf:daily-glow": {
-  "blur": 2
  },
  "kf:darkControlPulse": {
   "blur": 1
@@ -473,9 +461,6 @@
  "kf:flameSlashTrail": {
   "drehung": 4
  },
- "kf:flashSave": {
-  "blur": 2
- },
  "kf:foilBorderPulse": {
   "blur": 3
  },
@@ -500,17 +485,11 @@
  "kf:giftRise": {
   "drehung": 1
  },
- "kf:glow": {
-  "blur": 2
- },
  "kf:goldGiftFly": {
   "drehung": 3
  },
  "kf:goldStealCoin": {
   "drehung": 3
- },
- "kf:googleBtnPulse": {
-  "blur": 2
  },
  "kf:guardian-pulse": {
   "blur": 2
@@ -553,9 +532,6 @@
  },
  "kf:loveHeartPulse": {
   "blur": 2
- },
- "kf:menu-badge-wippen": {
-  "drehung": 2
  },
  "kf:moeHeartRing": {
   "drehung": 3
@@ -629,17 +605,11 @@
  "kf:pp-debt-coin-rise": {
   "drehung": 1
  },
- "kf:pp-glitzer-flug": {
-  "drehung": 1
- },
  "kf:pp-invest-coin-drop": {
   "drehung": 2
  },
  "kf:ppCerBand": {
   "drehung": 2
- },
- "kf:ppCerDreh": {
-  "blur": 1
  },
  "kf:ppCerFunke": {
   "drehung": 2
@@ -655,9 +625,6 @@
  },
  "kf:ppSpinneBein": {
   "drehung": 2
- },
- "kf:profileGlow": {
-  "blur": 2
  },
  "kf:promptMarkedPulse": {
   "blur": 2
@@ -716,15 +683,6 @@
  "kf:shop-reveal-appear": {
   "drehung": 2
  },
- "kf:shop-sparkle": {
-  "blur": 4
- },
- "kf:shop-unowned-glow": {
-  "blur": 6
- },
- "kf:shop-zier-regenbogen": {
-  "blur": 2
- },
  "kf:skatesCreaturePulse": {
   "blur": 2
  },
@@ -764,9 +722,6 @@
  "kf:stNicolasPickPulse": {
   "blur": 2
  },
- "kf:structure-deck-equipped-pulse": {
-  "blur": 6
- },
  "kf:styxTorStrudel": {
   "drehung": 3
  },
@@ -789,9 +744,6 @@
   "drehung": 4
  },
  "kf:targetValidPulse": {
-  "blur": 2
- },
- "kf:textbox-hl-glow": {
   "blur": 2
  },
  "kf:tgeKreisDreh": {
@@ -829,9 +781,6 @@
   "drehung": 1
  },
  "kf:treacherousCrystalPulse": {
-  "blur": 2
- },
- "kf:tutorial-card-grow": {
   "blur": 2
  },
  "kf:vscpuSprung": {
