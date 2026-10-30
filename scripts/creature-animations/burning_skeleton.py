@@ -67,111 +67,116 @@ rumpf = vorhanden & (yy >= 16) & (yy <= 23) & ~arm_l & ~arm_r
 beine = vorhanden & (yy >= 24) & ~arm_l & ~arm_r
 assert (flamme | kopf | arm_l | arm_r | rumpf | beine).sum() == vorhanden.sum()
 
-# --- FEUER (Regel 15) ---------------------------------------------------------------------------------------
-# Basis (Zeilen 7–8) breit und ruhig = Originalpixel; darüber fünf Zungen bei x 8–12 mit eigenen Posenfolgen (2–3 Frames je Pose).
-# Zungenformen relativ zum Fußpunkt (x0, Zeile 7): (dx, dy, Farbe), dy < 0 = aufwärts; unten orange G, oben rot E, 1 px breit (spitz zulaufend).
-FARBE = {'E': E_, 'G': G_, 'P': P_}
-FORMEN = {
-    'N0': [],
-    'S1': [(0, -1, 'E')],
-    'S2': [(0, -1, 'G'), (0, -2, 'E')],
-    'S3': [(0, -1, 'G'), (0, -2, 'E'), (0, -3, 'E')],
-    'S4': [(0, -1, 'G'), (0, -2, 'G'), (0, -3, 'E'), (0, -4, 'E')],
-    'S5': [(0, -1, 'G'), (0, -2, 'G'), (0, -3, 'E'), (0, -4, 'E'), (0, -5, 'E')],
-    'S6': [(0, -1, 'G'), (0, -2, 'G'), (0, -3, 'G'), (0, -4, 'E'), (0, -5, 'E'), (0, -6, 'E')],
-    'R3': [(0, -1, 'G'), (0, -2, 'G'), (1, -2, 'E'), (1, -3, 'E')],            # Spitze lehnt rechts (4-verbunden über (0,-2)-(1,-2))
-    'R4': [(0, -1, 'G'), (0, -2, 'G'), (0, -3, 'G'), (1, -3, 'E'), (1, -4, 'E')],
-    'L3': [(0, -1, 'G'), (0, -2, 'G'), (-1, -2, 'E'), (-1, -3, 'E')],
-    'L4': [(0, -1, 'G'), (0, -2, 'G'), (0, -3, 'G'), (-1, -3, 'E'), (-1, -4, 'E')],
-    'O3': [(0, -1, 'E'), (0, -2, 'E'), (0, -3, 'E')],                          # Originalzunge bei x 9
+# --- FEUER (Regel 15) — Farbschichten schwanken UNABHÄNGIG --------------------------------------------------
+# Sechs Flammenspalten x 7–12 über der Basis (Zeile 8 = Höhe 0). Je Spalte drei verschachtelte Schichten mit eigener Höhe: rote Außenhaut (hR) ≥ orange (hO)
+# ≥ gelber Kern (hY). Farbe auf Höhenstufe l: l < hY gelb, l < hO orange, l < hR rot. Jede Schicht schwankt in Höhe (Summe zweier Sinus mit eigener Periode,
+# gehalten in 2–3-Frame-Stufen, bei Frame 0 genau 0 → Originalflamme), die rote Spitze lehnt sich links/rechts (Knick mit Verbindungspixel), die hohe Mittelzunge spaltet
+# sich kurz in zwei Spitzen und verschmilzt wieder, der gelbe Kern wandert seitlich (P ↔ G auf Zeile 8), Aufhellblitze heben Orange und Gelb für 2 Frames,
+# aus hohen Zungen reißen Spitzen ab und steigen als Funken auf.
+BASIS_R = {7: 1, 8: 2, 9: 5, 10: 2, 11: 3, 12: 2}
+BASIS_O = {7: 0, 8: 1, 9: 2, 10: 1, 11: 2, 12: 0}
+BASIS_Y = {7: 0, 8: 0, 9: 1, 10: 0, 11: 0, 12: 0}
+MIN_R = {7: 1, 8: 2, 9: 2, 10: 2, 11: 2, 12: 2}          # die breite Basis (Zeilen 7–8) bleibt immer stehen
+MAX_R = {7: 1, 8: 4, 9: 8, 10: 5, 11: 6, 12: 4}
+SCHWANK = {                                              # (Spalte, Schicht): [(Amplitude in px, Periode in Frames, Haltedauer in Frames), …]
+    (8, 'R'): [(1.4, 12, 2), (0.8, 8, 3)], (9, 'R'): [(2.6, 16, 2), (1.4, 6, 3)], (10, 'R'): [(1.6, 24, 3), (1.0, 8, 2)],
+    (11, 'R'): [(2.2, 12, 2), (1.2, 16, 3)], (12, 'R'): [(1.4, 16, 3), (0.9, 6, 2)],
+    (8, 'O'): [(1.2, 8, 3)], (9, 'O'): [(1.8, 12, 2), (0.9, 24, 3)], (10, 'O'): [(1.2, 16, 2)], (11, 'O'): [(1.4, 6, 3), (0.7, 12, 2)],
+    (12, 'O'): [(1.3, 24, 2)], (7, 'O'): [(0.8, 16, 3)],
+    (8, 'Y'): [(0.9, 24, 3)], (9, 'Y'): [(1.7, 8, 2), (0.9, 16, 3)], (10, 'Y'): [(1.1, 12, 2)], (11, 'Y'): [(1.0, 16, 3)],
 }
-FOLGEN = {          # Zunge bei x0: Liste (Form, Dauer in Frames); Summe je Zunge = 48
-    8: [('N0', 3), ('S1', 2), ('S2', 3), ('S3', 2), ('L3', 2), ('S2', 3), ('S1', 2), ('N0', 2), ('S2', 2), ('S3', 3), ('S2', 2), ('L3', 2),
-        ('S1', 3), ('S2', 2), ('S3', 3), ('S2', 2), ('N0', 2), ('S1', 2), ('S2', 3), ('N0', 3)],
-    9: [('O3', 2), ('S4', 3), ('S3', 2), ('R4', 3), ('S5', 2), ('S4', 3), ('S6', 2), ('S4', 2), ('L4', 3), ('S3', 2), ('S5', 3), ('S4', 2), ('R3', 2),
-        ('S2', 2), ('S4', 3), ('S5', 2), ('L3', 3), ('S4', 2), ('S3', 2), ('S2', 3)],
-    10: [('N0', 2), ('S2', 3), ('S3', 2), ('S1', 2), ('S2', 3), ('R3', 2), ('S3', 3), ('S4', 2), ('S2', 2), ('N0', 2), ('S3', 3), ('S2', 2), ('L3', 3),
-         ('S4', 3), ('S3', 2), ('S2', 3), ('S1', 2), ('S3', 2), ('S2', 2), ('N0', 3)],
-    11: [('S1', 2), ('S2', 3), ('S3', 2), ('R3', 3), ('S2', 2), ('S4', 3), ('S3', 2), ('S1', 2), ('S3', 3), ('L3', 2), ('S4', 3), ('S2', 3), ('S5', 2),
-         ('S3', 3), ('S2', 2), ('S1', 2), ('S4', 3), ('S2', 3), ('S1', 3)],
-    12: [('N0', 2), ('S1', 3), ('S2', 2), ('S3', 3), ('R3', 2), ('S2', 3), ('S1', 2), ('S3', 2), ('S4', 3), ('S3', 2), ('S2', 3), ('S1', 2), ('N0', 3),
-         ('S2', 2), ('S3', 3), ('R3', 2), ('S2', 2), ('S1', 2), ('S2', 3), ('N0', 2)],
-}
-for _x, _f in FOLGEN.items():
-    assert sum(d for _, d in _f) == N, (_x, sum(d for _, d in _f))
+NEIGUNG = {8: (12, 3), 9: (16, 2), 10: (24, 3), 11: (12, 2), 12: (16, 3)}   # Spalte: (Periode, Haltedauer) der Neigung ±1 der roten Spitze
+BLITZ = {14, 15, 36, 37}                                  # Aufhellblitze (Orange und Gelb heben sich um eine Stufe)
+SPALT = {10, 11, 12, 30, 31, 32}                          # Mittelzunge (Spalte 9) spaltet sich kurz in zwei Spitzen
 
 
-def zunge(x0, i):
-    """(Form, Frames seit Posenbeginn, Posenbeginn) der Zunge x0 im Frame i."""
+def _delta(x, e, t):
+    z = 0.0
+    for (amp, per, halt) in SCHWANK.get((x, e), []):
+        z += amp * math.sin(2 * math.pi * ((t // halt) * halt) / per)
+    return int(round(z))
+
+
+def hoehen(i):
+    """Höhen (hR, hO, hY) je Spalte im Frame i; bei Frame 0 genau die Originalhöhen."""
     t = i % N
-    acc = 0
-    for form, d in FOLGEN[x0]:
-        if t < acc + d:
-            return form, t - acc, acc
-        acc += d
+    hr, ho, hy = {}, {}, {}
+    for x in BASIS_R:
+        r = min(MAX_R[x], max(MIN_R[x], BASIS_R[x] + _delta(x, 'R', t)))
+        o = BASIS_O[x] + _delta(x, 'O', t) + (1 if t in BLITZ and x in (8, 9, 10, 11) else 0)
+        y = BASIS_Y[x] + _delta(x, 'Y', t) + (1 if t in BLITZ and x in (8, 9, 10, 11) else 0)
+        o = max(0, min(o, r - 1 if r > 1 else r))              # Orange immer unterhalb der roten Spitze
+        y = max(0, min(y, o))                                  # Gelb im Orange
+        hr[x], ho[x], hy[x] = r, o, y
+    for x in sorted(hr, key=lambda c: (-hr[c], c)):            # „Täler“: neben einer Zunge ≥ 3 px bleiben Nachbarn ≤ 2 px (Zungen bleiben einzeln)
+        if hr[x] >= 3:
+            for nb in (x - 1, x + 1):
+                if nb in hr and hr[nb] > 2 and hr[nb] <= hr[x] and (hr[nb] < hr[x] or nb > x):
+                    hr[nb] = 2
+                    ho[nb], hy[nb] = min(ho[nb], 1), min(hy[nb], 1)
+    return hr, ho, hy
 
 
-HOCH = {'S4', 'S5', 'S6', 'R4', 'L4'}                  # nach diesen Formen reißt die Spitze ab (Funken)
-ABREISS = []                                           # (Startframe, Zunge x0, Drift)
-for _x, _f in FOLGEN.items():
-    _acc = 0
-    for _k, (_form, _d) in enumerate(_f):
-        if _form in HOCH and _acc > 0:
-            ABREISS.append((_acc, _x, {'R4': 1, 'L4': -1}.get(_form, (1, -1)[_k % 2])))
-        _acc += _d
+def spitzen_neigung(x, t):
+    per, halt = NEIGUNG[x]
+    z = math.sin(2 * math.pi * ((t // halt) * halt) / per)
+    return 0 if abs(z) < 0.6 else (1 if z > 0 else -1)
 
 
-def basis_pixel(i):
-    """Basis y 7–8 = Originalpixel (ruhig); der heiße Kern flackert nur kurz: P wandert nach (10,8) bzw. (8,8)."""
-    px = {(x, y): tuple(int(v) for v in spr[y, x, :3]) for y in (7, 8) for x in range(sw) if spr[y, x, 3]}
-    if i % N:
-        if i % 12 in (6, 7):
-            px[(10, 8)] = P_
-        if i % 12 in (9, 10):
-            px[(8, 8)] = P_
+def flamme_basis(i):
+    """Flammenpixel (x, y) → Farbe ohne abreißende Funken."""
+    t = i % N
+    hr, ho, hy = hoehen(i)
+    px = {}
+    for x in BASIS_R:
+        lean = spitzen_neigung(x, t) if x in NEIGUNG else 0
+        for l in range(hr[x]):
+            y = 8 - l
+            if l < hy[x]:
+                px[(x, y)] = P_
+            elif l < ho[x]:
+                px[(x, y)] = G_
+            else:
+                rot_nr = l - ho[x]
+                n_rot = hr[x] - ho[x]
+                dx = lean if (n_rot >= 3 and rot_nr >= 1) else 0
+                px[(x + dx, y)] = E_
+                if dx and rot_nr == 1:
+                    px[(x, y)] = E_                           # Knick: Verbindungspixel (4-verbunden)
+        if x == 9 and t in SPALT and hr[9] >= 4:                # Mittelzunge spaltet sich in zwei Spitzen
+            ls = hr[9] - 2
+            for l in range(ls + 1, hr[9]):
+                px.pop((9, 8 - l), None)
+                px.pop((9 + lean, 8 - l), None)
+            for dx in (-1, 1):
+                px[(9 + dx, 8 - ls)] = E_
+                px[(9 + dx, 8 - ls - 1)] = E_
+            px[(9, 8 - ls)] = E_
+    cx = int(round(math.sin(2 * math.pi * ((t // 2) * 2) / 24)))   # gelber Kern wandert seitlich
+    if cx and px.get((9, 8)) == P_ and px.get((9 + cx, 8)) == G_:
+        px[(9, 8)], px[(9 + cx, 8)] = G_, P_
     return px
 
 
-def hoehe(form):
-    return -min((dy for _, dy, _ in FORMEN[form]), default=0)
+def _hoehen_alle():
+    return [hoehen(t)[0] for t in range(N)]
 
 
-def formen_tal(i):
-    """Form jeder Zunge im Frame i mit „Tälern“: eine Zunge von ≥ 2 px lässt ihre unmittelbaren Nachbarn nicht ebenfalls ≥ 2 px hoch werden
-    (höhere Zunge zuerst, bei Gleichstand die linke) — die Zungen erscheinen einzeln und spitz und verschmelzen nicht zu einem Block."""
-    formen = {x0: zunge(x0, i)[0] for x0 in FOLGEN}
-    frei = []
-    for x0 in sorted(formen, key=lambda x: (-hoehe(formen[x]), x)):
-        if hoehe(formen[x0]) >= 2:
-            if any(abs(x0 - a) == 1 for a in frei):
-                formen[x0] = 'S1'
-            else:
-                frei.append(x0)
-    return formen
+_HR = _hoehen_alle()
+ABREISS = []                                             # (Startframe, Spalte, Drift, x_Spitze, y_Spitze)
+for _t in range(1, 43):
+    for _x in BASIS_R:
+        if _HR[_t - 1][_x] >= 4 and _HR[_t][_x] <= _HR[_t - 1][_x] - 2:
+            ABREISS.append((_t, _x, (1, -1)[(_t + _x) % 2], _x, 8 - (_HR[_t - 1][_x] - 1)))
 
 
 def flamme_pixel(i):
-    """Alle Flammenpixel (x, y) → Farbe im Frame i: Basis + Zungen + abreißende Funken + Ur-Funke."""
-    px = dict(basis_pixel(i))
-    abgerissen = {(x0, f0) for (f0, x0, _) in ABREISS if i % N == f0}
-    formen = formen_tal(i)
-    for x0 in FOLGEN:
-        form = formen[x0]
-        pts = FORMEN[form]
-        if (x0, i % N) in abgerissen and pts:                    # Spitze reißt in diesem Frame ab
-            pts = pts[:-1]
-        for dx, dy, ch in pts:
-            px[(x0 + dx, 7 + dy)] = FARBE[ch]
-    for (f0, x0, drift) in ABREISS:                              # aufsteigende Funken (6 Frames, 5 px): orange → rot, mit Seitendrift
-        for kk in range(6):
-            if (i - f0) % N == kk:
-                form = formen_tal(f0)[x0]
-                if not FORMEN[form]:
-                    continue
-                top = min(FORMEN[form], key=lambda t: t[1])
-                x = x0 + top[0] + (drift * (kk // 3))
-                y = 7 + top[1] - 1 - int(round(0.85 * kk))
-                px[(x, y)] = G_ if kk < 3 else E_
+    """Alle Flammenpixel im Frame i: Basis + Zungen + abreißende Funken + Ur-Funke."""
+    px = dict(flamme_basis(i))
+    for (f0, x0, drift, tx, ty) in ABREISS:                      # abgerissene Spitzen steigen als Funken auf (6 Frames, 5 px): orange → rot
+        kk = (i - f0) % N
+        if kk < 6:
+            px[(tx + drift * (kk // 3), ty - 1 - int(round(0.85 * kk)))] = G_ if kk < 3 else E_
     t = i % N                                                    # Ur-Funke (11,0)/(12,1)/(12,2) steigt in den ersten Frames weg
     if t < 7:
         for (x, y) in ((11, 0), (12, 1), (12, 2)):

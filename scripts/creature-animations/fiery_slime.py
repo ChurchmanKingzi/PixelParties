@@ -54,7 +54,6 @@ sh, sw = spr.shape[:2]
 H, W = sh + PAD_T + PAD_B, sw + PAD_L + PAD_R
 BODEN = PAD_T + sh - 1
 KOERPER_Y0 = 14                              # erste Körperzeile; darüber (0–13) das Feuer
-BASIS = 10                                   # ab dieser Zeile steht die Flamme starr
 
 # ── Farben der Quelle ──
 FA, FB, FC, FD, FE, FF, FG, FH, FI, FJ, FK, FL, FM = (165, 9, 10), (212, 89, 9), (181, 25, 26), (150, 6, 5), (195, 57, 31), (31, 15, 15), \
@@ -91,35 +90,19 @@ def koerper_dy(i):
     return top - KOERPER_Y0 - PAD_T
 
 
-# ── Flammenzungen: Spaltengruppen, jede mit eigener unregelmäßiger Höhenfolge ──
-ZUNGEN = [(0, 1), (2, 3), (4, 4), (5, 6), (7, 8), (9, 10), (11, 12), (13, 13), (14, 15), (16, 17)]
-SPITZ = {2}                                                                     # die hohe dünne Spitze: größerer Ausschlag
+# ── Feuer: verschachtelte Flammenzungen (anim_feuer) ──
+import anim_feuer as FEU
 
-
-def _hoehenfolge(g):
-    """48 Frames Höhenversatz (Pixel gegenüber dem Original) für Zunge g: Posen zu je 2–3 Frames, Start (Frame 0) = Original."""
-    rnd = random.Random(1000 + 37 * g)
-    werte = [-3, -2, -1, 0, 0, 1, 1, 2, 2, 3, 4] if g in SPITZ else [-2, -1, -1, 0, 0, 1, 1, 2, 2, 3]
-    folge, posen = [], []
-    d, dauer = 0, 2 + (g % 2)                                                   # Frame 0: Originalhöhe
-    while len(folge) < N:
-        posen.append((len(folge), d))
-        folge += [d] * dauer
-        neu = d
-        while neu == d or abs(neu - d) > 3:                                     # kein Sprung über 3 px
-            neu = rnd.choice(werte)
-        d = neu
-        dauer = rnd.choice((2, 3))
-    return folge[:N], posen
-
-
-ZUNGENFOLGE = [_hoehenfolge(g) for g in range(len(ZUNGEN))]
-ZUNGE_VON_SPALTE = {x: g for g, (x0, x1) in enumerate(ZUNGEN) for x in range(x0, x1 + 1)}
-
-
-def zungenhoehe(x, i, s):
-    """Höhenversatz der Flammenspalte x in Frame i (−3 … +5 px)."""
-    return ZUNGENFOLGE[ZUNGE_VON_SPALTE[x]][0][i] + int(round(0.6 * s))
+# Zungen in Sprite-Koordinaten (x, Fußzeile, Höhe, Halbbreite am Fuß); Höhe/Lage entsprechen den Zungen des Originals
+ZUNGEN_SPRITE = [(1.0, 13, 9, 2.4), (3.0, 12, 11, 2.8), (4.5, 11, 11, 1.2), (6.5, 10, 7.5, 2.8), (9.0, 10, 6.5, 2.8),
+                 (11.5, 10, 8.5, 2.8), (13.5, 11, 9.5, 2.6), (15.5, 13, 11, 2.8), (16.8, 13, 7, 1.8)]
+yy_, xx_ = np.mgrid[0:sh, 0:sw]
+KUPPEL = (((yy_ >= 11) & (yy_ <= 13) & (xx_ >= 4) & (xx_ <= 13)) | ((yy_ == 10) & (xx_ >= 6) & (xx_ <= 11))) & (spr[..., 3] > 0)   # feste Schleimkuppel im Feuer
+KUPPEL_C = np.zeros((H, W), bool)
+KUPPEL_C[PAD_T:PAD_T + sh, PAD_L:PAD_L + sw] = KUPPEL
+RAMPE = {'rand': FA, 'rot': FC, 'orange': FB, 'gelb': FG, 'hell': FI}
+FEUER = FEU.Feuer(H, W, [FEU.Zunge(x + PAD_L, b + PAD_T, h, w) for (x, b, h, w) in ZUNGEN_SPRITE], RAMPE, n=N, seed=11, posen=12,
+                  amplitude=1.0, sperre=KUPPEL_C)
 
 
 def sprite_mit_effekten(i):
@@ -134,45 +117,6 @@ def sprite_mit_effekten(i):
     return sp
 
 
-def spaltenkopf(x, i, s):
-    """(Oberkante der Flammenspalte x in Quellkoordinaten, neue Länge der Spitzenzone) oder None."""
-    ys = np.nonzero(spr[:KOERPER_Y0, x, 3])[0]
-    t0 = int(ys.min())
-    if t0 >= BASIS:
-        return None
-    n = BASIS - t0
-    return t0, n, max(2, n + zungenhoehe(x, i, s))
-
-
-def feuer_ebene(sp, i, s, dy):
-    """Feuer (Zeilen 0–13): jede Spalte wird in der Spitzenzone (über Zeile BASIS) gestreckt/gestaucht, die Basis steht starr."""
-    f = L.platz(np.where((np.arange(sh)[:, None, None] < KOERPER_Y0), sp, 0).astype(np.uint8), H, W, PAD_L, PAD_T)
-    out = L.leer(H, W)
-    b = PAD_T + BASIS
-    for xs_ in range(sw):
-        x = PAD_L + xs_
-        out[b:, x] = f[b:, x]
-        k = spaltenkopf(xs_, i, s)
-        if k is None:
-            continue
-        t0, n, n2 = k
-        t0c = PAD_T + t0
-        y0 = b - n2
-        for y in range(y0, b):
-            out[y, x] = f[t0c + (y - y0) * n // n2, x]
-    out, brueck = A.verbinde4(out)
-    BRUECKEN[i_aktuell[0]] = brueck
-    # Zungenrand: freiliegende Füllpixel der Spitzenzone bekommen den dunkelroten Flammenrand (wie in der Quelle: Rand A, innen Orange/Gelb)
-    for y, x in zip(*np.nonzero(A.randpixel(out))):
-        if y < b and tuple(int(v) for v in out[y, x, :3]) not in (FA, FC, FD):
-            out[y, x, :3] = FA
-    return L.versetze(out, 0, dy)
-
-
-BRUECKEN = {}
-i_aktuell = [0]
-
-
 def figur(i):
     sp = sprite_mit_effekten(i)
     s = S[i]
@@ -183,61 +127,18 @@ def figur(i):
     else:
         z, quelle = A.koerper_pose(koerper, loeschen=loesch, doppeln=dopp, p=p, paare=PAARE_SCHMAL, x0=PAD_L)
     kb, top = A.auf_leinwand(z, H, BODEN, LIFT.get(i, 0))
-    i_aktuell[0] = i
-    fe = feuer_ebene(sp, i, s, top - KOERPER_Y0 - PAD_T)
+    dy = top - KOERPER_Y0 - PAD_T
+    flamme = FEUER.ebene(i, hoehen_bonus=int(round(0.6 * s)))
+    kuppel = L.platz(np.where(KUPPEL[..., None], sp, 0).astype(np.uint8), H, W, PAD_L, PAD_T)
+    fe = L.versetze(L.zusammen(H, W, [(flamme, 0, 0), (kuppel, 0, 0)]), 0, dy)
     fig = L.zusammen(H, W, [(kb, 0, 0), (fe, 0, 0)])
     return dict(fig=fig, fe=fe, top=top, kb=kb)
 
 
-# ── Funken: abgerissene Zungenspitzen ──
-FUNKEN_LEBEN = 12
-
-
-def _funken():
-    """[(Startframe, x, y, Drift)]: Fällt eine hohe Zunge (≥ +2 px) um ≥ 3 px, reißt ihre (alte) Spitze ab."""
-    ev = []
-    for g, (x0, x1) in enumerate(ZUNGEN):
-        folge, posen = ZUNGENFOLGE[g]
-        for k in range(1, len(posen)):
-            f, d_neu = posen[k]
-            d_alt = folge[f - 1]
-            if d_alt >= 2 and d_alt - d_neu >= 3:                                # eine hohe Zunge verliert 3 px: Spitze reißt ab
-                i = f - 1
-                s = S[i]
-                best = min((spaltenkopf(x, i, s) for x in range(x0, x1 + 1) if spaltenkopf(x, i, s)), key=lambda q: q[1] - q[2], default=None)
-                if best is None:
-                    continue
-                xs_ = max((x for x in range(x0, x1 + 1) if spaltenkopf(x, i, s)), key=lambda x: spaltenkopf(x, i, s)[2] - spaltenkopf(x, i, s)[1])
-                t0, n, n2 = spaltenkopf(xs_, i, s)
-                y = PAD_T + BASIS - n2 + koerper_dy(i) - 1
-                ev.append((f, PAD_L + xs_, y, [-1, 0, 1][(g + f) % 3]))
-    return ev
-
-
-FUNKEN = _funken()
-
-
-def funken_ebene(i):
-    e = L.leer(H, W)
-    for (f, x0, y0, drift) in FUNKEN:
-        a = (i - f) % N
-        if a >= FUNKEN_LEBEN:
-            continue
-        x = x0 + int(round(drift * a / 4.0)) + int(round(0.8 * math.sin(2 * math.pi * a / 8.0)))
-        y = y0 - int(round(0.55 * a))
-        farbe = FUNKEN_FARBEN[min(3, a * 4 // FUNKEN_LEBEN)]
-        pix = [(0, 0)]                                                              # runder Funke (1 px)
-        for dx, dy in pix:
-            if not (0 <= y + dy < H and 0 <= x + dx < W):
-                raise L.ClipError(f'Funke bei ({x + dx},{y + dy}) außerhalb der Leinwand {W}×{H}')
-            e[y + dy, x + dx, :3] = farbe
-            e[y + dy, x + dx, 3] = 255
-    return e
-
-
 def frame(i):
     f = figur(i)
-    return L.zusammen(H, W, [(f['fig'], 0, 0), (funken_ebene(i), 0, 0)])
+    funken = FEUER.funken(i, dy=koerper_dy)
+    return L.zusammen(H, W, [(f['fig'], 0, 0), (funken, 0, 0)])
 
 
 def koerper_offen(f):
@@ -259,12 +160,13 @@ if __name__ == '__main__':
     figs = [f['fig'] for f in fs]
     prev = sys.argv[sys.argv.index('--preview') + 1] if '--preview' in sys.argv else None
     ref = L.platz(spr, H, W, PAD_L, PAD_T)
-    print('Frame 0 = Original:', bool((figs[0] == ref).all()))
+    k0 = figs[0][PAD_T + KOERPER_Y0:] == ref[PAD_T + KOERPER_Y0:]
+    print('Körper in Frame 0 = Original:', bool(k0.all()), '(das Feuer wird neu gezeichnet und weicht ab)')
     n = L.pruefe(frames, quelle=spr)
     print('Pixel je Frame:', n)
     offen = [(i, koerper_offen(fs[i])) for i in range(N) if koerper_offen(fs[i])]
     print('offene Körperkanten (Frame, [(x, y, Farbe)]):', offen if offen else 'keine')
-    print('Posen je Zunge:', [len(p[1]) for p in ZUNGENFOLGE], '| Funken pro Schleife:', len(FUNKEN), '| Brückenpixel:', sum(len(v) for v in BRUECKEN.values()))
+    print('Zungen:', len(FEUER.zungen), '| Funken pro Schleife:', len(FEUER.ereignisse))
     A.ausdruck_pruefen(figs, spr, 'fiery-slime')
     L.speichern('fiery-slime', 'Fiery Slime', frames, MS, prev)
     if prev:

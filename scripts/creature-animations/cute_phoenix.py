@@ -125,7 +125,7 @@ def frame(i, partikel=True):
 
     glut = L.zusammen(H, W, [(L.puff_ebene(H, W, i, N, PUFFS1, FUNKEN1), 0, 0), (L.puff_ebene(H, W, i, N, PUFFS2, FUNKEN2), 0, 0)]) \
         if partikel else L.leer(H, W)
-    f = L.zusammen(H, W, [(glut, 0, 0), (kp, 0, 0), (wl, 0, 0), (wr, 0, 0)])
+    f = L.zusammen(H, W, [(glut, 0, 0), (wl, 0, 0), (wr, 0, 0), (kp, 0, 0)])        # Flügel hinter Fächer/Körper
     # Randpixel-Test (Regel 16): Drehung/Dehnung legt Innenfarbe an den Rändern frei → Kante in Umrissfarbe (Gelb unten/seitlich, Orange oben)
     F.umranden(f, [wl, wr], UMRISS, ORANGE, GELB, GELB)
     return f
