@@ -64,6 +64,26 @@ FEUER = FEU.Feuer(H, W, [FEU.Zunge(PAD_L + 3.5, (H - 1) - (PAD_T + FUSS), 6.5, 3
                   RAMPE, n=N, seed=5, posen=12, amplitude=1.0, sperre=fest[::-1].copy())
 
 
+FUESSE = [(1, 6), (10, 15)]                                  # Spalten (Sprite) der beiden Düsenfüße in der Fußzeile
+RAND = (202, 44, 41)
+
+
+def fuss_festlegen(fl):
+    """Fußzeile der Flammen (direkt unter dem grauen Band) steht fest: genau die Düsenbreite des Originals (x 1–6 und 10–15), nie schmaler
+    (sonst läge das graue Band frei, Regel 16) und nie breiter. Fehlende Fußpixel übernehmen die Farbe des nächsten Nachbarn der Zeile."""
+    y = PAD_T + FUSS
+    for x0, x1 in FUESSE:
+        da = [x for x in range(x0, x1 + 1) if fl[y, PAD_L + x, 3]]
+        for x in range(x0, x1 + 1):
+            if not fl[y, PAD_L + x, 3]:
+                nah = min(da, key=lambda q: abs(q - x)) if da else None
+                fl[y, PAD_L + x] = fl[y, PAD_L + nah] if nah is not None else (*RAND, 255)
+        for x in (x0 - 1, x1 + 1):
+            if 0 <= PAD_L + x < W and not (7 <= x <= 9):
+                fl[y, PAD_L + x, 3] = 0
+    return fl
+
+
 def bob_von(i):
     return -int(round(2 * (1 - math.cos(2 * math.pi * i / (N / 4))) / 2))     # 0 → −1 → −2 → −1 → 0 (nur nach oben)
 
@@ -78,9 +98,10 @@ def frame(i, partikel=True, effekte=True):
                 kp[PAD_T + y, PAD_L + x, :3] = F.heller(kp[PAD_T + y, PAD_L + x, :3], ROT_RAMPE, st)
         F.lichtband(kp, metall_maske, PAD_L, PAD_T, i, N // 2, 6, 9, METALL, stufen=1, breite=3.0, achse=(1.0, 0.7))
     kp = L.versetze(kp, 0, bob)
-    flammen = FEUER.ebene(i)[::-1].copy()                                      # zurückgespiegelt: Flamme brennt nach unten
+    flammen = fuss_festlegen(FEUER.ebene(i)[::-1].copy())                      # zurückgespiegelt: Flamme brennt nach unten
     flammen = L.versetze(flammen, 0, bob)
     f = L.zusammen(H, W, [(flammen, 0, 0), (kp, 0, 0)])
+    F.umranden(f, [flammen], UMRISS, RAND, RAND, RAND)                          # Randpixel-Test (Regel 16): freie Flammenkanten = Außenhaut
     if partikel:
         funken = FEUER.funken(i, dy=lambda fr: -bob_von(fr))[::-1].copy()
         f = L.zusammen(H, W, [(f, 0, 0), (funken, 0, 0)])
