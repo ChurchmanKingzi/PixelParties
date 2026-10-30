@@ -174,7 +174,7 @@ module.exports = {
       const rpick = await engine.promptGeneric(pi, {
         type: 'pickHandCard',
         title: `${CARD_NAME} — Swap In`,
-        description: `Pick a different-named Creature with level ≤ ${chosenLevel} to take ${chosenName}'s place.`,
+        description: `Pick a different-named Creature with level ${chosenLevel} or lower to take ${chosenName}'s place.`,
         instruction: 'Click a highlighted card in your hand.',
         eligibleIndices,
         cancellable: true,

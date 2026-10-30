@@ -95,7 +95,7 @@ module.exports = attachSteamEngine({
       type: 'cardGallery',
       cards: galleryCards,
       title: CARD_NAME,
-      description: `Sacrifice this Creature to summon any Creature from your deck with max HP ≤ ${curHp} (this Creature's current HP). Additional sacrifice costs are negated.`,
+      description: `Sacrifice this Creature to summon any Creature from your deck with max HP of ${curHp} or lower (this Creature's current HP). Additional sacrifice costs are negated.`,
       confirmClass: 'btn-info',
       cancellable: true,
     });

@@ -5344,7 +5344,7 @@ function PuzzleCreator() {
                         style={{ flex: 1, padding: '10px 0', fontSize: 12, borderColor: active ? '#4ceb70' : 'var(--bg4)' }}
                         onClick={() => setEditAntiMagicLevel(lv)}>
                         Level {lv}
-                        <div style={{ fontSize: 10, opacity: 0.8, marginTop: 2 }}>Immune to ≤ Lv{lv} Spells</div>
+                        <div style={{ fontSize: 10, opacity: 0.8, marginTop: 2 }}>Immune to Lv{lv} or lower Spells</div>
                       </button>
                     );
                   })}
