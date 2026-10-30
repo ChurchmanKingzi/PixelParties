@@ -26547,3 +26547,14 @@ Repros (lokal, `docs/niche-tests/repro/W85/`): `c-01` (Messpunkte: nie in der Ha
 * Heart of Cards / The Oracle of Heaven / Codumbus: bei gelöschter Treffer-Karte wird „zieh 2" trotzdem ausgeführt (Al bestätigt).
 
 Repro (lokal, `docs/niche-tests/repro/W85/d-01`): Edge/Journal/Stone mit und ohne Atta, Bifab mit und ohne Atta (5 rot → grün).
+
+## CPU-Auswertungs-Scope — reine Abfragen werden je Bewertung einmal gerechnet (29.10.2026)
+
+Die CPU-Bewertung (`_cpu.js` → `evaluateState`) ist synchron und schreibt nichts; der Zustand ist während EINES Aufrufs eingefroren. Die Stufenprüfung dort lief bisher als Durchlauf über alle Kartenobjekte je Karte × Held × Zone (Bone Rush: ~35 `heroMeetsLevelReq` je Bewertung, ~7000 Bewertungen je Partie). Deshalb öffnet `evaluateState` einen **Scope**: `engine._scoped(name, schlüssel, rechne)` rechnet je Name und Schlüssel einmal, außerhalb eines Scopes (echtes Spiel) immer neu. Eingehängt sind `heroMeetsLevelReq`, die Liste der Stufensenker (`reduceCardLevel`) je Seite, `heldTraegtKommunikationsGeraet`, `heroAcceptsAbilitiesInSupport`, `_handLevelSetFor` sowie in `_cpu.js` `estimateHandCardValueFor`, `listEligibleHeroesForActionCard` und `mctsEnemyHeroDynamicValue`.
+
+**Verträge für Kartenskripte:**
+* `reduceCardLevel`, `canBypassLevelReq`, `canBypassLevelReqForCard` und die `cpuMeta`-Abfragen sind **reine Lesefunktionen** — sie dürfen den Zustand nicht verändern und keine Zufallszahlen für Spielentscheidungen ziehen. Sie laufen bei der CPU-Bewertung seltener als zuvor, ihr Ergebnis gilt für die ganze Bewertung.
+* **Probe mit vorübergehend verändertem Zustand** (HP/Gold setzen, rechnen, zurücksetzen — wie Golden Ankhs `cpuShouldPlay` oder `computeGoldDemand`): die Probe MUSS in `engine._withFreshEvalScope(() => …)` laufen, sonst käme ihr Ergebnis aus dem Cache des unveränderten Zustands (oder die Probe vergiftet den Cache). Die vorhandenen Aufrufer (`reviveCardSituation`, `deadHeroCouldCastWithReviveInHand`, `computeGoldDemand`) tun das schon.
+* **Neue Abfrage einhängen:** nur rein lesende Funktionen, der Schlüssel enthält ALLE Argumente (Karten über `engine._scopeCardIdOf(cardData)`, nicht über den Namen), und Arrays/Objekte kopiert zurückgeben.
+
+**Prüfen:** `PP_EVAL_SCOPE_CHECK=1` rechnet bei jedem Treffer zusätzlich ungecacht nach und meldet Abweichungen (`[eval-scope] ABWEICHUNG …`, am Ende `Prüfung: N Treffer gegengerechnet, M Abweichungen`). Über 10 Deck×Profil-Kombinationen und rund 22 Mio. Treffer: 0 Abweichungen, die Spielaufzeichnungen eines geseedeten Laufs sind mit und ohne Scope identisch (Ausnahme: Decks, deren Basislauf wegen Wanduhr-Limits selbst nicht reproduzierbar ist).

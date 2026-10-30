@@ -4417,6 +4417,14 @@ function cardCanBouncePlaceAtHero(engine, pi, heroIdx, cardName) {
 // Als Ruling (Al 26.10.): „Rocky Slime reduziert nur das Level einer einzelnen Kopie!“ — `handIdx` (optional) = die konkrete Handkopie — dann gilt das Heldenstufen-Tor DIESER Kopie,
 // sonst „irgendeine Kopie genügt" (Namensliste). Aufrufer, die eine Kopie spielen wollen, geben ihren Index mit (nicht für Karten aus Crestinas Vorrat).
 function listEligibleHeroesForActionCard(engine, pi, cardData, handIdx) {
+  // Im Auswertungs-Scope einmal je (Seite, Karte, Handkopie); der Aufrufer bekommt eine Kopie (er sortiert/ergänzt die Liste teils).
+  if (engine._evalScope && cardData && typeof cardData === 'object') {
+    const key = pi + '|' + engine._scopeCardIdOf(cardData) + '|' + (Number.isInteger(handIdx) ? handIdx : '');
+    return engine._scoped('eligibleHeroes', key, () => listEligibleHeroesForActionCardRoh(engine, pi, cardData, handIdx)).map(e => ({ ...e }));
+  }
+  return listEligibleHeroesForActionCardRoh(engine, pi, cardData, handIdx);
+}
+function listEligibleHeroesForActionCardRoh(engine, pi, cardData, handIdx) {
   const gs = engine.gs;
   const ps = gs.players[pi];
   const eligible = [];
@@ -10470,6 +10478,12 @@ function isHostileAttachment(cardName) {
 }
 
 function mctsEnemyHeroDynamicValue(engine, oppIdx, hi, teamMaxSchoolLvl) {
+  if (engine._evalScope) {
+    return engine._scoped('enemyHeroValue', oppIdx + '|' + hi + '|' + teamMaxSchoolLvl, () => mctsEnemyHeroDynamicValueRoh(engine, oppIdx, hi, teamMaxSchoolLvl));
+  }
+  return mctsEnemyHeroDynamicValueRoh(engine, oppIdx, hi, teamMaxSchoolLvl);
+}
+function mctsEnemyHeroDynamicValueRoh(engine, oppIdx, hi, teamMaxSchoolLvl) {
   const gs = engine.gs;
   const ps = gs.players[oppIdx];
   const hero = ps?.heroes?.[hi];
@@ -10804,7 +10818,8 @@ function deadHeroCouldCastWithReviveInHand(engine, pi, cd) {
     hero.hp = 100;
     let ok = false;
     try {
-      ok = listEligibleHeroesForActionCard(engine, pi, cd).some(e => e.hi === hi);
+      // Der Zustand ist hier vorübergehend verändert (hp) — darin gilt ein frischer Auswertungs-Scope, sonst käme das Ergebnis aus dem Cache des unveränderten Zustands.
+      ok = engine._withFreshEvalScope(() => listEligibleHeroesForActionCard(engine, pi, cd)).some(e => e.hi === hi);
     } catch { /* defensiv */ } finally {
       hero.hp = savedHp;
     }
@@ -10840,7 +10855,8 @@ function reviveCardSituation(engine, pi, cardName) {
     let useful = false;
     // Fail-open: wirft die Probe, behandeln wir den Revive als nützlich —
     // ein fälschlicher Malus wäre schlimmer als ein fälschlicher Fetch.
-    try { useful = !!script.cpuShouldPlay(engine, pi); } catch { useful = true; }
+    // Die Probe setzt hp vorübergehend (Golden Ankh) — darin gilt ein frischer Auswertungs-Scope.
+    try { useful = !!engine._withFreshEvalScope(() => script.cpuShouldPlay(engine, pi)); } catch { useful = true; }
     return { hasDead: true, useful };
   }
   return { hasDead: true, useful: true };
@@ -11024,6 +11040,14 @@ function interferenceAoeDiscount(engine, pi, cardName) {
 }
 
 function estimateHandCardValueFor(engine, pi, cardName, seenCount = 0) {
+  // Im Auswertungs-Scope je (Seite, Karte) nur einmal rechnen; `seenCount` wirkt ausschließlich als letzter Faktor (zweite Kopie = halber Wert).
+  if (engine._evalScope && engine._getCardDB()[cardName]) {
+    const base = engine._scoped('handCardValue', pi + '|' + cardName, () => estimateHandCardValueForRoh(engine, pi, cardName, 0));
+    return seenCount >= 1 ? base * 0.5 : base;
+  }
+  return estimateHandCardValueForRoh(engine, pi, cardName, seenCount);
+}
+function estimateHandCardValueForRoh(engine, pi, cardName, seenCount = 0) {
   const cardDB = engine._getCardDB();
   const cd = cardDB[cardName];
   if (!cd) return 15;
@@ -11543,16 +11567,19 @@ function computeGoldDemand(engine, pi) {
   const origGold = ps.gold;
   ps.gold = 1e9;
   try {
-    for (let handIdx = 0; handIdx < (ps.hand || []).length; handIdx++) {
-      const name = ps.hand[handIdx];
-      if (seenArtifact.has(name)) continue;
-      const cd = cardDB[name];
-      if (!cd || cd.cardType !== 'Artifact') continue;
-      const plan = planArtifactPlay(engine, pi, name, handIdx, cd);
-      if (!plan) continue;
-      seenArtifact.add(name);
-      demand += cpuArtifactCost(engine, pi, name, handIdx);
-    }
+    // Gold ist hier vorübergehend 1e9 — darin gilt ein frischer Auswertungs-Scope (sonst gälten die Treffer des Scopes mit echtem Gold).
+    engine._withFreshEvalScope(() => {
+      for (let handIdx = 0; handIdx < (ps.hand || []).length; handIdx++) {
+        const name = ps.hand[handIdx];
+        if (seenArtifact.has(name)) continue;
+        const cd = cardDB[name];
+        if (!cd || cd.cardType !== 'Artifact') continue;
+        const plan = planArtifactPlay(engine, pi, name, handIdx, cd);
+        if (!plan) continue;
+        seenArtifact.add(name);
+        demand += cpuArtifactCost(engine, pi, name, handIdx);
+      }
+    });
   } finally {
     ps.gold = origGold;
   }
@@ -11688,6 +11715,13 @@ function brettwertNeuFuer(engine, cpuIdx) {
 }
 
 function evaluateState(engine, cpuIdx) {
+  // Auswertungs-Scope: Die Bewertung ist synchron und schreibt nichts — reine Regelabfragen (Stufenprüfung, Handwerte …) werden
+  // innerhalb EINES Aufrufs nur einmal gerechnet (siehe `GameEngine._scoped`).
+  const prevScope = engine._evalScopeOpen();
+  try { return evaluateStateRoh(engine, cpuIdx); }
+  finally { engine._evalScopeClose(prevScope); }
+}
+function evaluateStateRoh(engine, cpuIdx) {
   const gs = engine.gs;
   const ps = gs.players[cpuIdx];
   const oppIdx = cpuIdx === 0 ? 1 : 0;

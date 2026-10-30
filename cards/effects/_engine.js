@@ -579,6 +579,18 @@ function todesWacheAn() {
 }
 
 const _v8Stat = require('v8');   // billige Heap-Statistik für `_crashProbe` (statt process.memoryUsage())
+// Auswertungs-Scope (siehe `GameEngine._scoped`): Prüfmodus und Karten-Kennungen für Schlüssel.
+const EVAL_SCOPE_CHECK = process.env.PP_EVAL_SCOPE_CHECK === '1';
+const EVAL_SCOPE_MISMATCHES = { count: 0, checked: 0 };
+if (EVAL_SCOPE_CHECK) process.on('exit', () => console.error(`[eval-scope] Prüfung: ${EVAL_SCOPE_MISMATCHES.checked} Treffer gegengerechnet, ${EVAL_SCOPE_MISMATCHES.count} Abweichungen`));
+const _scopeCardIds = new WeakMap();
+let _scopeCardNext = 1;
+function _scopeCardId(cardData) {
+  let id = _scopeCardIds.get(cardData);
+  if (id === undefined) { id = _scopeCardNext++; _scopeCardIds.set(cardData, id); }
+  return id;
+}
+
 class GameEngine {
   /**
    * @param {object} room - The room object from server.js
@@ -52329,6 +52341,10 @@ this._deathWatch = (this._deathWatchStack || []).length
    * Namenspruefung aus.
    */
   heroAcceptsAbilitiesInSupport(playerIdx, heroIdx, excludeInstId = null) {
+    return this._scoped('akzeptiertSupportAbilities', playerIdx + '|' + heroIdx + '|' + excludeInstId, () => this._heroAcceptsAbilitiesInSupportRoh(playerIdx, heroIdx, excludeInstId));
+  }
+
+  _heroAcceptsAbilitiesInSupportRoh(playerIdx, heroIdx, excludeInstId = null) {
     const hero = this.gs.players[playerIdx]?.heroes?.[heroIdx];
     if (!hero?.name) return false;
     if (this.heroScript(hero)?.abilitiesInSupportZones) return true;
@@ -52624,6 +52640,10 @@ this._deathWatch = (this._deathWatchStack || []).length
 
   /** Traegt der Held (Brettseite `seite`, `heroIdx`) ein offenes „Communication Device"? */
   heldTraegtKommunikationsGeraet(seite, heroIdx) {
+    return this._scoped('kommGeraet', seite + '|' + heroIdx, () => this._heldTraegtKommunikationsGeraetRoh(seite, heroIdx));
+  }
+
+  _heldTraegtKommunikationsGeraetRoh(seite, heroIdx) {
     return (this.cardInstances || []).some(c =>
       c.zone === ZONES.SUPPORT && c.name === 'Communication Device' && !c.faceDown
       && c.heroIdx === heroIdx && this.physicalSide(c) === seite);
@@ -53229,7 +53249,77 @@ this._deathWatch = (this._deathWatchStack || []).length
     return rawLevel;
   }
 
+  // ═══════════════════════════════════════════════════════════════════
+  //  AUSWERTUNGS-SCOPE (nur innerhalb von `evaluateState`)
+  //
+  //  Die CPU-Bewertung (`_cpu.js` → `evaluateState`) ist synchron und schreibt nichts: der Spielzustand ist während EINES Aufrufs
+  //  eingefroren. Die Stufenprüfung dort ist aber ein Durchlauf über alle Kartenobjekte pro Karte × Held × Zone (Bone Rush: rund
+  //  35 `heroMeetsLevelReq` je Bewertung, 7000 Bewertungen je Partie). Reine Abfragen, die sich in diesem Fenster nicht ändern
+  //  können, werden deshalb je Bewertung nur einmal gerechnet. Außerhalb des Fensters (`_evalScope` leer) läuft alles wie bisher.
+  //
+  //  Regeln für eine Abfrage, die hier eingehängt wird: rein lesend, Schlüssel enthält ALLE Argumente, Ergebnis darf vom Aufrufer
+  //  nicht verändert werden (Arrays/Objekte also kopiert zurückgeben). `PP_EVAL_SCOPE_CHECK=1` rechnet bei jedem Treffer zusätzlich
+  //  ungecacht nach und meldet Abweichungen.
+  // ═══════════════════════════════════════════════════════════════════
+  _evalScopeOpen() {
+    const prev = this._evalScope;
+    this._evalScope = new Map();
+    return prev;
+  }
+  _evalScopeClose(prev) { this._evalScope = prev; }
+  _scopeCardIdOf(cardData) { return _scopeCardId(cardData); }
+  /**
+   * Für Proben, die den Zustand VORÜBERGEHEND verändern (HP setzen, rechnen, zurücksetzen): Darin gilt ein FRISCHER Scope — der Zustand ist
+   * während der Probe konstant, nur anders als davor, die Treffer des äußeren Scopes passen also nicht. Danach gilt der äußere unverändert weiter.
+   */
+  _withFreshEvalScope(fn) {
+    const prev = this._evalScope;
+    this._evalScope = new Map();
+    try { return fn(); } finally { this._evalScope = prev; }
+  }
+  _scoped(name, key, compute, sig) {
+    const sc = this._evalScope;
+    if (!sc) return compute();
+    let m = sc.get(name);
+    if (!m) sc.set(name, m = new Map());
+    if (m.has(key)) {
+      const hit = m.get(key);
+      if (EVAL_SCOPE_CHECK) {
+        const fresh = compute();
+        const a = JSON.stringify(sig ? sig(fresh) : fresh), b = JSON.stringify(sig ? sig(hit) : hit);
+        if (a !== b) {
+          console.error(`[eval-scope] ABWEICHUNG ${name} ${key}: gecacht=${b} frisch=${a}`);
+          EVAL_SCOPE_MISMATCHES.count++;
+        }
+        EVAL_SCOPE_MISMATCHES.checked++;
+      }
+      return hit;
+    }
+    const v = compute();
+    m.set(key, v);
+    return v;
+  }
+
   heroMeetsLevelReq(playerIdx, heroIdx, cardData, opts = {}) {
+    // Nur cachen, wenn die Optionen reine Werte sind (kein Objekt/keine Funktion im Schlüssel) und die Karte ein Objekt ist.
+    if (this._evalScope && cardData && typeof cardData === 'object') {
+      let okKey = '';
+      if (opts) {
+        for (const k of Object.keys(opts).sort()) {
+          const t = typeof opts[k];
+          if (t !== 'number' && t !== 'string' && t !== 'boolean' && opts[k] != null) { okKey = null; break; }
+          okKey += k + '=' + opts[k] + ';';
+        }
+      }
+      if (okKey !== null) {
+        return this._scoped('heroMeetsLevelReq', playerIdx + '|' + heroIdx + '|' + _scopeCardId(cardData) + '|' + okKey,
+          () => this._heroMeetsLevelReqRoh(playerIdx, heroIdx, cardData, opts));
+      }
+    }
+    return this._heroMeetsLevelReqRoh(playerIdx, heroIdx, cardData, opts);
+  }
+
+  _heroMeetsLevelReqRoh(playerIdx, heroIdx, cardData, opts = {}) {
     const ps = this.gs.players[playerIdx];
     const hero = ps?.heroes?.[heroIdx];
     if (!hero?.name) return false;
@@ -53307,6 +53397,10 @@ this._deathWatch = (this._deathWatchStack || []).length
    * @returns {number|null} gesetzte Stufe oder null, wenn keine gilt.
    */
   _handLevelSetFor(playerIdx, cardName, handIdx) {
+    return this._scoped('handLevelSet', playerIdx + '|' + cardName + '|' + handIdx, () => this._handLevelSetForRoh(playerIdx, cardName, handIdx));
+  }
+
+  _handLevelSetForRoh(playerIdx, cardName, handIdx) {
     if (!cardName) return null;
     const ps = this.gs?.players?.[playerIdx];
     if (!ps?.hand?.length) return null;
@@ -53580,29 +53674,38 @@ this._deathWatch = (this._deathWatchStack || []).length
     // `0` liefert. Die Heldenschleife ist deshalb ersatzlos weg — EIN
     // Weg fuer alle Senker. Heldenskripte lesen ihren eigenen Platz aus
     // `inst.heroIdx`, der Wirker steht in `heroIdx`.
-    for (const inst of this.cardInstances) {
-      if (inst.faceDown) continue;
-      // Respect the script's `activeIn` restriction — a card with
-      // `activeIn: ['support']` should not reduce levels from the hand.
-      if (!inst.isActiveIn()) continue;
-      const script = loadCardEffect(inst.name);
-      if (typeof script?.reduceCardLevel !== 'function') continue;
-      // ★ W7a (Al): eine gefrorene/betäubte/negierte Kreatur bzw. ein so stillgelegter Held/eine Ability senkt nichts
-      // (B-03 Elven Forager & Co., H02-heroes-23 Junshi) — EIN Prüfer, `isCardPassiveDormant`.
-      if (this.isCardPassiveDormant(inst)) continue;
-      // Controller filter: by default only the spell-resolving player's
-      // own instances contribute reductions (Cataclysm's self-rebate,
-      // Elven Forager, etc.). A script can opt-in to GLOBAL reductions
-      // by exporting `globalReduceCardLevel: true` — used by Area
-      // effects like Spider Hive that reduce face-down Surprise levels
-      // on BOTH sides of the board.
-      // Styx 28.9.: der EFFEKTIVE Kontrolleur (ein uebernommener Held wie
-      // Damus senkt fuer den, der ihn gerade kontrolliert).
-      if (!script.globalReduceCardLevel && this.effektiveSeiten(inst).controller !== playerIdx) continue;
-      // v654: `evalOpts.excludeReducerInstId` — „waere die Karte auch
-      // OHNE diese eine Quelle spielbar?" (Forbidden Grimoire misst
-      // damit ihre eigene Unentbehrlichkeit).
-      if (evalOpts.excludeReducerInstId && inst.id === evalOpts.excludeReducerInstId) continue;
+    // Welche Instanzen senken überhaupt (aktiv, nicht stillgelegt, richtige Seite)? Hängt nur von der Seite ab, nicht von Karte/Held —
+    // im Auswertungs-Scope also einmal je Seite statt je Prüfung (sonst läuft jede Stufenprüfung über ALLE Kartenobjekte).
+    const reducers = this._scoped('reducers', playerIdx + '|' + (evalOpts.excludeReducerInstId || ''), () => {
+      const out = [];
+      for (const inst of this.cardInstances) {
+        if (inst.faceDown) continue;
+        // Respect the script's `activeIn` restriction — a card with
+        // `activeIn: ['support']` should not reduce levels from the hand.
+        if (!inst.isActiveIn()) continue;
+        const script = loadCardEffect(inst.name);
+        if (typeof script?.reduceCardLevel !== 'function') continue;
+        // ★ W7a (Al): eine gefrorene/betäubte/negierte Kreatur bzw. ein so stillgelegter Held/eine Ability senkt nichts
+        // (B-03 Elven Forager & Co., H02-heroes-23 Junshi) — EIN Prüfer, `isCardPassiveDormant`.
+        if (this.isCardPassiveDormant(inst)) continue;
+        // Controller filter: by default only the spell-resolving player's
+        // own instances contribute reductions (Cataclysm's self-rebate,
+        // Elven Forager, etc.). A script can opt-in to GLOBAL reductions
+        // by exporting `globalReduceCardLevel: true` — used by Area
+        // effects like Spider Hive that reduce face-down Surprise levels
+        // on BOTH sides of the board.
+        // Styx 28.9.: der EFFEKTIVE Kontrolleur (ein uebernommener Held wie
+        // Damus senkt fuer den, der ihn gerade kontrolliert).
+        if (!script.globalReduceCardLevel && this.effektiveSeiten(inst).controller !== playerIdx) continue;
+        // v654: `evalOpts.excludeReducerInstId` — „waere die Karte auch
+        // OHNE diese eine Quelle spielbar?" (Forbidden Grimoire misst
+        // damit ihre eigene Unentbehrlichkeit).
+        if (evalOpts.excludeReducerInstId && inst.id === evalOpts.excludeReducerInstId) continue;
+        out.push({ inst, script });
+      }
+      return out;
+    }, v => v.map(r => r.inst.id));
+    for (const { inst, script } of reducers) {
       try {
         // Pass the contributing instance as a 4th arg + the casting Hero's
         // heroIdx as a 5th arg + the evaluation opts as a 6th arg so per-
