@@ -208,6 +208,8 @@ function AreaBackgrounds({ areaZones, myIdx, oppIdx, spielstand }) {
 //  `pp-area-dyn` und werden dort ganz ausgeblendet. Anzahl bewegter
 //  Elemente immer ueber `ppAreaN` (Telefon-Deckel, Desktop-Faktor, zwei Szenen).
 // ═══════════════════════════════════════════════════════════════════
+// ★ W86a: 1x1 deckend weisses PNG als Maskenfläche (statt `linear-gradient(#fff …)`-Masken mit harten Stopps)
+const PP_WEISS = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAAC0lEQVR4nGP4DwQACfsD/fteaysAAAAASUVORK5CYII=';
 const ppArt = (n) => `calc(${n} * var(--px))`;
 const ppArtX = (x, bezugsbreite) => `calc(50% + ${x - bezugsbreite / 2} * var(--px))`;
 
@@ -235,6 +237,108 @@ function PpRandDim() {
   return retro
     ? <div className="pp-rand-dim" style={{ background: 'radial-gradient(ellipse 75% 70% at 50% 50%, rgba(0,0,0,0) 55%, rgba(0,0,0,.3) 100%)' }} />
     : <div ref={ref} className="pp-rand-dim" data-pp-px="aus" />;
+}
+
+// ★ W86a — Leuchtflecken (Glut, Schein, Blitzlicht) als Pixelart. Statt `radial-/linear-gradient` mit Alpha (weicher Verlauf) malt `ppGlowUrl`
+// ein Bayer-gedithertes Bild aus DECKENDEN Pixeln: eine Zelle = ein Szenen-Kunstpixel, die Dichte der Punkte folgt dem alten Alpha-Verlauf.
+// `form`: 'kreis' | 'ellipse' (Radialverlauf, Mitte bei cx/cy, Radius wie `farthest-corner`), 'hoch' / 'runter' (linear nach oben / unten).
+// `stops`: [[Lage 0..1, [r, g, b], Alpha], …] wie bei CSS; Farben rasten über `ppPxBild` auf die Palette.
+function ppGlowUrl(form, stops, cx, cy, nx, ny) {
+  nx = Math.max(2, Math.min(600, Math.round(nx))); ny = Math.max(2, Math.min(400, Math.round(ny)));
+  const key = 'glow:' + form + ':' + cx + ',' + cy + ':' + nx + 'x' + ny + ':' + stops.map(s => s[0] + s[1].join('.') + s[2]).join('|');
+  return window.ppPxBild(key, nx, ny, (setze) => {
+    const fx = Math.max(cx, 1 - cx) * nx, fy = Math.max(cy, 1 - cy) * ny;
+    const Rk = Math.hypot(fx, fy), Rx = fx * Math.SQRT2, Ry = fy * Math.SQRT2;
+    for (let y = 0; y < ny; y++) {
+      for (let x = 0; x < nx; x++) {
+        const px = x + 0.5, py = y + 0.5;
+        let t;
+        if (form === 'hoch') t = 1 - py / ny;
+        else if (form === 'runter') t = py / ny;
+        else if (form === 'ellipse') t = Math.hypot((px - cx * nx) / Rx, (py - cy * ny) / Ry);
+        else t = Math.hypot(px - cx * nx, py - cy * ny) / Rk;
+        if (t >= stops[stops.length - 1][0]) continue;
+        let k = 0; while (k < stops.length - 2 && t > stops[k + 1][0]) k++;
+        const [t0, c0, a0] = stops[k], [t1, c1, a1] = stops[k + 1];
+        const u = t <= t0 ? 0 : Math.min(1, (t - t0) / Math.max(1e-6, t1 - t0));
+        const a = a0 + (a1 - a0) * u;
+        if (a > ppBayer(x, y)) setze(x, y, [(c0[0] + (c1[0] - c0[0]) * u) * .8, (c0[1] + (c1[1] - c0[1]) * u) * .8, (c0[2] + (c1[2] - c0[2]) * u) * .8, 1]);      // etwas abgedunkelt: deckende Punkte wirken sonst heller als der alte Alpha-Schein
+      }
+    }
+  }, 1);
+}
+window.ppGlowUrl = ppGlowUrl;
+
+// ★ W86a — Stopps der Leuchtflecken (vorher CSS-Verläufe mit Alpha): [Lage, [r, g, b], Alpha]
+const GL_AR_SCHEIN = { form: 'kreis', stops: [[0, [251, 200, 106], .34], [.45, [255, 155, 58], .14], [.7, [255, 155, 58], 0]] };
+const GL_BG_GLUT = { form: 'kreis', stops: [[0, [255, 155, 58], .30], [.45, [248, 116, 32], .12], [.7, [248, 116, 32], 0]] };
+const GL_DOC_BLITZ = { form: 'runter', stops: [[0, [210, 210, 219], .2], [.45, [210, 210, 219], .07], [.8, [210, 210, 219], 0]] };
+const GL_DC_PULS = { form: 'kreis', stops: [[0, [255, 26, 26], .55], [.4, [200, 0, 0], .25], [.7, [120, 0, 0], 0]] };
+const GL_DC_GLUT = { form: 'kreis', stops: [[0, [255, 26, 26], .6], [.7, [255, 26, 26], 0]] };
+const GL_DC_BLITZ = { form: 'kreis', stops: [[0, [255, 133, 102], .35], [.45, [239, 41, 41], .12], [.7, [255, 26, 26], 0]] };
+const GL_RVG_AUGE = { form: 'ellipse', stops: [[0, [255, 26, 26], .5], [.7, [255, 26, 26], 0]] };
+const GL_RVG_BODEN = { form: 'ellipse', stops: [[0, [255, 139, 26], .42], [.45, [255, 73, 26], .16], [.7, [255, 73, 26], 0]] };
+const GL_FC4 = { form: 'hoch', stops: [[0, [255, 185, 26], .30], [.38, [255, 139, 26], .12], [.62, [255, 125, 0], 0]] };
+const GL_FI = { form: 'ellipse', cy: .62, stops: [[0, [255, 155, 58], .34], [.45, [248, 116, 32], .14], [.7, [255, 73, 26], 0]] };
+const GL_SX = { form: 'ellipse', cy: .6, stops: [[0, [255, 154, 26], .32], [.5, [255, 73, 26], .12], [.72, [255, 73, 26], 0]] };
+const GL_SV = { form: 'ellipse', stops: [[0, [255, 26, 26], .30], [.5, [255, 26, 26], .1], [.72, [255, 26, 26], 0]] };
+const GL_EG = { form: 'ellipse', stops: [[0, [144, 58, 230], .30], [.5, [102, 24, 180], .12], [.72, [102, 24, 180], 0]] };
+
+/** Leuchtfleck-Element (`<i>`): Größe und Lage kommen aus der Klasse bzw. dem Stil; das Bild wird auf die Zellenzahl (Elementgröße / Szenenpixel) gemalt. */
+function PpGlow({ form = 'kreis', stops, cx = 0.5, cy = 0.5, className, style }) {
+  const ref = useRef(null);
+  useLayoutEffect(() => {
+    const el = ref.current; if (!el) return undefined;
+    const szene = el.closest('.pp-pixel-scene');
+    const zeichnen = () => {
+      const artH = +(szene && szene.getAttribute('data-art-h')) || 100;
+      const px = (szene ? szene.clientHeight : 0) / artH;
+      const W = el.clientWidth, H = el.clientHeight;
+      if (!(px > 0) || !W || !H) return;
+      el.style.backgroundImage = `url(${ppGlowUrl(form, stops, cx, cy, W / px, H / px)})`;
+    };
+    zeichnen();
+    const ro = window.ResizeObserver ? new ResizeObserver(zeichnen) : null;
+    if (ro) ro.observe(el);
+    return () => { if (ro) ro.disconnect(); };
+  }, []);
+  return <i ref={ref} className={'pp-glow ' + (className || '')} style={style} />;
+}
+
+/** Farbfilter (brightness/hue-rotate …) einmal in ein Pixelbild rechnen (statt CSS-`filter` zur Laufzeit); Ergebnis als data-URL, rastet auf die Palette. */
+const _ppFilterBilder = new Map();
+function ppFarbfilterBild(src, filter, fertig) {
+  const key = src + '|' + filter;
+  if (_ppFilterBilder.has(key)) { fertig(_ppFilterBilder.get(key)); return; }
+  const im = new Image();
+  im.onload = () => {
+    try {
+      const cv = document.createElement('canvas'); cv.width = im.naturalWidth; cv.height = im.naturalHeight;
+      const g = cv.getContext('2d', { willReadFrequently: true }); g.imageSmoothingEnabled = false; g.drawImage(im, 0, 0);
+      const id = g.getImageData(0, 0, cv.width, cv.height), d = id.data;
+      const rein = window.PPPixelAnim && window.PPPixelAnim.rein, liste = rein && rein.farbFilterLesen(filter);
+      for (let i = 0; i < d.length; i += 4) {
+        if (d[i + 3] < 128) { d[i + 3] = 0; continue; }
+        d[i + 3] = 255;
+        const c = liste ? rein.farbFilterAnwenden(liste, d[i], d[i + 1], d[i + 2]) : [d[i], d[i + 1], d[i + 2]];
+        const q = window.ppSnapRgb ? window.ppSnapRgb(c[0], c[1], c[2]) : c;
+        d[i] = q[0]; d[i + 1] = q[1]; d[i + 2] = q[2];
+      }
+      g.putImageData(id, 0, 0);
+      const u = cv.toDataURL('image/png'); _ppFilterBilder.set(key, u); fertig(u);
+    } catch (e) { /* bleibt beim Original */ }
+  };
+  im.src = src;
+}
+/** `<i>` mit Sprite-Blatt `src`, dessen Farben vorab durch `filter` gerechnet sind (Klasse liefert Größe und Blatt-Verschiebung). */
+function PpFarbfilterSprite({ src, filter, className, style }) {
+  const ref = useRef(null);
+  useLayoutEffect(() => {
+    let weg = false;
+    ppFarbfilterBild(src, filter, (u) => { if (!weg && ref.current) ref.current.style.backgroundImage = `url(${u})`; });
+    return () => { weg = true; };
+  }, [src, filter]);
+  return <i ref={ref} className={className} style={style} />;
 }
 
 function PixelScene({ artH, bg, className, children }) {
@@ -267,17 +371,16 @@ function PixelScene({ artH, bg, className, children }) {
         @keyframes ppSprite2 { 0% { background-position: 0 0; } 50% { background-position: 100% 0; } }
         @keyframes ppSprite3 { 0% { background-position: 0 0; } 33.3% { background-position: 50% 0; } 66.6% { background-position: 100% 0; } }
         @keyframes ppBob { from { translate: 0 0; } to { translate: 0 var(--bob, var(--px)); } }
-        @keyframes ppDrehen { to { rotate: 360deg; } }
         .pp-quer { position: absolute; left: 0; }
         @keyframes ppQuerLtr { from { transform: translateX(calc(-30 * var(--px))); } to { transform: translateX(calc(100cqw + 10 * var(--px))); } }
         @keyframes ppQuerRtl { from { transform: translateX(calc(100cqw + 10 * var(--px))); } to { transform: translateX(calc(-30 * var(--px))); } }
         /* Weisses Funkelkreuz (Karten: Crystal Well), 3×3 Kunstpixel */
-        .pp-px-funkeln {
-          position: absolute; width: calc(3 * var(--px)); height: calc(3 * var(--px)); opacity: 0;
-          background:
-            linear-gradient(#fff, #fff) 50% 0 / var(--px) 100% no-repeat,
-            linear-gradient(#fff, #fff) 0 50% / 100% var(--px) no-repeat;
-        }
+        /* ★ W86a: die zwei Balken des Kreuzes sind Pseudo-Elemente (deckendes Weiss) statt zwei Verlaeufen */
+        .pp-px-funkeln { position: absolute; width: calc(3 * var(--px)); height: calc(3 * var(--px)); opacity: 0; }
+        .pp-px-funkeln::before, .pp-px-funkeln::after { content: ''; position: absolute; background: var(--funkel, #fff); }
+        .pp-px-funkeln::before { left: var(--px); top: 0; width: var(--px); height: 100%; }
+        .pp-px-funkeln::after { left: 0; top: var(--px); width: 100%; height: var(--px); }
+        .pp-glow { position: absolute; background-size: 100% 100%; background-repeat: no-repeat; image-rendering: pixelated; }
         @keyframes ppFunkeln { 0%, 60% { opacity: 0; } 64% { opacity: .6; } 70% { opacity: 1; } 80% { opacity: .6; } 84%, 100% { opacity: 0; } }
         /* Leichte Randabdunklung — die Karten bleiben das Hellste */
         .pp-rand-dim { position: absolute; inset: 0; pointer-events: none; background-size: 100% 100%; background-repeat: no-repeat; image-rendering: pixelated; }
@@ -714,10 +817,11 @@ const PangaiaOverlay = React.memo(function PangaiaOverlay() {
         .pgn-glitzer {
           position: absolute; inset: 0;
           background: url(${PGN}glitter.png) 0 0 / calc(32 * var(--px)) calc(96 * var(--px)) repeat;
-          -webkit-mask-image: url(${PGN}mask-water.png), linear-gradient(to right, #fff calc(50% - ${PGN_W / 2} * var(--px)), transparent 0 calc(50% + ${PGN_W / 2} * var(--px)), #fff 0);
-          mask-image: url(${PGN}mask-water.png), linear-gradient(to right, #fff calc(50% - ${PGN_W / 2} * var(--px)), transparent 0 calc(50% + ${PGN_W / 2} * var(--px)), #fff 0);
-          -webkit-mask-size: calc(${PGN_W} * var(--px)) 100%, 100% 100%; mask-size: calc(${PGN_W} * var(--px)) 100%, 100% 100%;
-          -webkit-mask-position: 50% 0, 0 0; mask-position: 50% 0, 0 0;
+          -webkit-mask-image: url(${PGN}mask-water.png), url(${PP_WEISS}), url(${PP_WEISS});
+          mask-image: url(${PGN}mask-water.png), url(${PP_WEISS}), url(${PP_WEISS});
+          -webkit-mask-size: calc(${PGN_W} * var(--px)) 100%, calc(50% - ${PGN_W / 2} * var(--px)) 100%, calc(50% - ${PGN_W / 2} * var(--px)) 100%;
+          mask-size: calc(${PGN_W} * var(--px)) 100%, calc(50% - ${PGN_W / 2} * var(--px)) 100%, calc(50% - ${PGN_W / 2} * var(--px)) 100%;
+          -webkit-mask-position: 50% 0, 0 0, 100% 0; mask-position: 50% 0, 0 0, 100% 0;
           -webkit-mask-repeat: no-repeat; mask-repeat: no-repeat;
           animation: pgnGlitzer 2.7s steps(1) infinite;
         }
@@ -863,7 +967,7 @@ const BoardOfKingsOverlay = React.memo(function BoardOfKingsOverlay() {
       <i className="pp-area-dyn bok-wolke b" />
       {tauben.map((t, i) => (
         <div key={'ts' + i} className="pp-area-dyn bok-flug" style={{ top: ppArt(t.y + 8), marginLeft: ppArt(-6), animation: `${t.rtl ? 'bokFlugRtl' : 'bokFlugLtr'} ${t.dur.toFixed(1)}s linear ${t.delay.toFixed(1)}s infinite` }}>
-          <i className="bok-taube schatten" style={{ transform: t.rtl ? 'scaleX(-1)' : undefined }} />
+          <PpFarbfilterSprite src={BOK + 'dove.png'} filter="brightness(0)" className="bok-taube schatten" style={{ transform: t.rtl ? 'scaleX(-1)' : undefined }} />
         </div>
       ))}
       {bienen.map((b, i) => (
@@ -905,7 +1009,7 @@ const BoardOfKingsOverlay = React.memo(function BoardOfKingsOverlay() {
           95.5% { background-position-x: 71.43%; } 97% { background-position-x: 85.71%; }
           98.5%, 100% { background-position-x: 0%; }
         }
-        .bok-funkeln { filter: sepia(1) saturate(2.2) brightness(1.05); }
+        .bok-funkeln { --funkel: #f7f7ad; }
         .bok-wolke {
           position: absolute; top: 0; left: 0; width: calc(112 * var(--px)); height: calc(60 * var(--px));
           background: url(${BOK}cloud.png) 0 0 / 100% 100% no-repeat;
@@ -940,7 +1044,7 @@ const BoardOfKingsOverlay = React.memo(function BoardOfKingsOverlay() {
           70% { transform: translate(calc(7 * var(--px)), calc(1 * var(--px))); } 85% { transform: translate(calc(2 * var(--px)), calc(4 * var(--px))); }
         }
         .bok-biene-ort { position: absolute; width: var(--px); height: var(--px); }
-        .bok-biene { position: absolute; width: calc(2 * var(--px)); height: var(--px); background: linear-gradient(90deg, #1f0f04 50%, #fad54a 50%); }
+        .bok-biene { position: absolute; width: calc(2 * var(--px)); height: var(--px); background: #fad54a; box-shadow: inset var(--px) 0 0 0 #1f0f04; }
         @keyframes bokFluegel { 0% { box-shadow: 0 calc(-1 * var(--px)) 0 rgba(229,237,250,.8); } 50% { box-shadow: var(--px) calc(-1 * var(--px)) 0 rgba(229,237,250,.55); } }
         @keyframes bokSummA {
           0%, 100% { transform: translate(0, 0); } 12.5% { transform: translate(calc(3 * var(--px)), calc(-2 * var(--px))); }
@@ -961,7 +1065,7 @@ const BoardOfKingsOverlay = React.memo(function BoardOfKingsOverlay() {
           background: url(${BOK}dove.png) 0 0 / 300% 100% no-repeat;
           animation: bokSchlag .6s steps(1) infinite;
         }
-        .bok-taube.schatten { filter: brightness(0); opacity: .22; }
+        .bok-taube.schatten { background-image: none; opacity: .22; }      /* ★ W86a: Silhouette als vorgerechnetes Bild (PpFarbfilterSprite) statt filter: brightness(0) */
         @keyframes bokSchlag { 0% { background-position: 0 0; } 25% { background-position: 50% 0; } 50% { background-position: 100% 0; } 75% { background-position: 50% 0; } }
         .bok-kaefer {
           position: absolute; top: 0; width: calc(3 * var(--px)); height: calc(4 * var(--px));
@@ -1331,7 +1435,7 @@ const AcidRainOverlay = React.memo(function AcidRainOverlay() {
       <div className="pp-pixel-layer ar-dunst" style={{ top: ppArt(47) }} />
       <PixelPiece src={AR + 'court.png'} w={AR_W} />
       {AR_LATERNEN.map((x, i) => (
-        <i key={'l' + i} className="ar-schein" style={{ left: ppArtX(x - 7, AR_W), top: ppArt(27), animationDelay: `${-i * .9}s` }} />
+        <PpGlow {...GL_AR_SCHEIN} key={'l' + i} className="ar-schein" style={{ left: ppArtX(x - 7, AR_W), top: ppArt(27), animationDelay: `${-i * .9}s` }} />
       ))}
       {AR_BANNER.map((x, i) => (
         <i key={'b' + i} className="ar-banner" style={{ left: ppArtX(x, AR_W), top: ppArt(8), animationDuration: `${1.1 + i * .17}s` }} />
@@ -1386,8 +1490,12 @@ const AcidRainOverlay = React.memo(function AcidRainOverlay() {
         @keyframes arBlitzForm { 0%, 94% { background-position: 0 0; } 94.2%, 100% { background-position: 100% 0; } }
         @keyframes arBlitzFern { 0%, 95% { opacity: 0; } 95.6% { opacity: .75; } 96.4%, 100% { opacity: 0; } }
         .ar-blitzlicht {
-          position: absolute; inset: 0; background: #ff6666; mix-blend-mode: soft-light; opacity: 0;
-          animation: arBlitzLicht 13s steps(1) -4s infinite;
+          /* ★ W86a: kein Mischmodus mehr — das Aufhellen ist ein heller Rosa-Dither (Deckkraft = Punktdichte, vom Pixelierer gedithert) */
+          position: absolute; inset: 0; background: #f9b3b3; opacity: 0;
+          animation: arBlitzLicht2 13s steps(1) -4s infinite;
+        }
+        @keyframes arBlitzLicht2 {
+          0%, 91% { opacity: 0; } 92% { opacity: .25; } 93% { opacity: .06; } 94.5% { opacity: .2; } 95.5% { opacity: .06; } 96.5%, 100% { opacity: 0; }
         }
         @keyframes arBlitzLicht {
           0%, 91% { opacity: 0; } 92% { opacity: .5; } 93% { opacity: .1; } 94.5% { opacity: .4; } 95.5% { opacity: .12; } 96.5%, 100% { opacity: 0; }
@@ -1415,8 +1523,7 @@ const AcidRainOverlay = React.memo(function AcidRainOverlay() {
           background: url(${AR}foam.png) 0 0 / 300% 100% no-repeat; animation: ppSprite3 .42s steps(1) infinite;
         }
         .ar-schein {
-          position: absolute; width: calc(14 * var(--px)); height: calc(14 * var(--px)); border-radius: 50%;
-          background: radial-gradient(circle, rgba(251,200,106,.34) 0%, rgba(255,155,58,.14) 45%, rgba(255,155,58,0) 70%);
+          position: absolute; width: calc(14 * var(--px)); height: calc(14 * var(--px));
           animation: arSchein 1.7s steps(1) infinite;
         }
         @keyframes arSchein { 0% { opacity: .85; } 18% { opacity: 1; } 31% { opacity: .7; } 52% { opacity: .95; } 71% { opacity: .78; } 86% { opacity: 1; } }
@@ -1516,7 +1623,7 @@ const COT_KAMIN = [143, 6];                // Schornsteinmündung (Stück-x, y)
 const CottageOverlay = React.memo(function CottageOverlay() {
   const falter = useMemo(() => ppZufall(ppAreaN(3), (i) => ({
     y: 40 + Math.random() * 46, dur: 22 + Math.random() * 14, delay: -Math.random() * 30,
-    bob: 2 + Math.random() * 3, rtl: i % 2 === 1, farbe: i === 1 ? 'hue-rotate(160deg) saturate(.6) brightness(1.3)' : undefined,
+    bob: 2 + Math.random() * 3, rtl: i % 2 === 1, farbe: i === 1 ? 'hue-rotate(160deg) saturate(.6) brightness(1.3)' : undefined,   // pp-ok: drehung (Farbfilter-Text, keine Drehung: wird in PpFarbfilterSprite ins Bild gerechnet)
   })), []);
   const blaetter = useMemo(() => ppZufall(ppAreaN(6), () => ({
     x: Math.random() * 100, dur: 9 + Math.random() * 7, delay: -Math.random() * 14,
@@ -1563,7 +1670,8 @@ const CottageOverlay = React.memo(function CottageOverlay() {
       ))}
       {falter.map((f, i) => (
         <div key={'f' + i} className="pp-area-dyn pp-quer" style={ppQuer(f.y, f.dur, f.delay, f.rtl)}>
-          <i className="cot-falter" style={{ '--bob': ppArt(f.bob), transform: f.rtl ? 'scaleX(-1)' : undefined, filter: f.farbe }} />
+          {f.farbe ? <PpFarbfilterSprite src={COT + 'butterfly.png'} filter={f.farbe} className="cot-falter" style={{ '--bob': ppArt(f.bob), transform: f.rtl ? 'scaleX(-1)' : undefined }} />
+            : <i className="cot-falter" style={{ '--bob': ppArt(f.bob), transform: f.rtl ? 'scaleX(-1)' : undefined }} />}
         </div>
       ))}
       <PpRandDim />
@@ -1587,7 +1695,8 @@ const CottageOverlay = React.memo(function CottageOverlay() {
         @keyframes cotRauchZug { from { transform: translate(0, 0); } to { transform: translate(calc(-26 * var(--px)), calc(-7 * var(--px))); } }
         .cot-gluehw {
           position: absolute; width: var(--px); height: var(--px); background: #fff196; opacity: 0;
-          box-shadow: 0 0 calc(2 * var(--px)) calc(.5 * var(--px)) rgba(203,255,102,.55);
+          /* ★ W86a: Schein = vier dunklere Nachbarpixel (Kreuz) statt weichem Halo */
+          box-shadow: 0 calc(-1 * var(--px)) 0 0 #80bf59, 0 var(--px) 0 0 #80bf59, calc(-1 * var(--px)) 0 0 0 #80bf59, var(--px) 0 0 0 #80bf59;
         }
         @keyframes cotGlueh { 0%, 45% { opacity: 0; } 50% { opacity: .6; } 56%, 74% { opacity: 1; } 80% { opacity: .5; } 85%, 100% { opacity: 0; } }
         @keyframes cotSchweb { from { translate: 0 0; } to { translate: calc(4 * var(--px)) calc(-3 * var(--px)); } }
@@ -1889,7 +1998,7 @@ const DarkOceanOverlay = React.memo(function DarkOceanOverlay() {
       ))}
       <div className="pp-pixel-layer pp-area-dyn doc-regen" />
       <PixelBand src={DOC + 'fog.png'} className="doc-nebel" />
-      <div className="pp-area-dyn doc-blitz" />
+      <PpGlow {...GL_DOC_BLITZ} className="pp-area-dyn doc-blitz" />
       <PpRandDim />
       <style>{`
         .doc-see { animation: docSee 8.1s steps(18) infinite; }
@@ -1947,7 +2056,6 @@ const DarkOceanOverlay = React.memo(function DarkOceanOverlay() {
         @keyframes docWippen { 0% { translate: 0 0; } 50% { translate: 0 var(--px); } }
         .doc-blitz {
           position: absolute; inset: 0; opacity: 0;
-          background: linear-gradient(180deg, rgba(210,210,219,.2) 0%, rgba(210,210,219,.07) 45%, rgba(210,210,219,0) 80%);
           animation: docBlitz 23s steps(1) infinite;
         }
         @keyframes docBlitz { 0%, 88% { opacity: 0; } 88.4% { opacity: .8; } 88.9% { opacity: .15; } 89.6% { opacity: .55; } 90.3%, 100% { opacity: 0; } }
@@ -2177,17 +2285,98 @@ const DC_MAX = 20;
 // Schädel an den Viertelmarken (Kunstpixel neben der Uhrmitte)
 const DC_SCHAEDEL = [[0, -33], [33, 0], [0, 33], [-33, 0]];
 // Zeigerbilder: Breite, Höhe, Drehpunkt (Pixel im Bild)
+const DC_ZEIGER_BILD = { std: 'hand-hour.png', min: 'hand-min.png', sek: 'hand-sec.png' };
 const DC_ZEIGER = { std: [9, 28, 4, 22], min: [7, 37, 3, 31], sek: [5, 44, 2, 34] };
 // Schwebende Zahnräder (x neben der Mitte, y, groß?) — nur neben der Uhr
 const DC_RAEDER = [[-60, 22, 0], [-86, 44, 1], [-140, 30, 0], [62, 30, 1], [96, 14, 0], [138, 46, 1]];
 // Blitze in der Ferne (x neben der Mitte)
 const DC_BLITZE = [-138, -96, -62, 66, 104, 146];
+// ★ W86a — Zeiger der Doom Clock als gedrehte Pixel-Sprites. Der Zeiger dreht nicht per CSS (weich gesampelt), sondern wird je Winkel mit
+// `PPPixelAnim.drehen` (RotSprite-artig: harte Kanten, Palettenfarben) aus dem Quellbild neu gesampelt und als Hintergrund gesetzt; der
+// Übergang zum neuen Stand (1,4 s) läuft im 30-Hz-Takt (`ppTaktRaf`). `sekunde`: tickt im Sekundentakt der Uhr. Ohne Pipeline (Retro): CSS-Drehung.
+const _dcZeigerDaten = new Map();
+function dcZeigerDaten(src, fertig) {
+  const hit = _dcZeigerDaten.get(src);
+  if (hit && hit.daten) { fertig(hit.daten); return; }
+  if (hit) { hit.wartend.push(fertig); return; }
+  const eintrag = { daten: null, wartend: [fertig] };
+  _dcZeigerDaten.set(src, eintrag);
+  const im = new Image();
+  im.onload = () => {
+    const cv = document.createElement('canvas'); cv.width = im.naturalWidth; cv.height = im.naturalHeight;
+    const g = cv.getContext('2d', { willReadFrequently: true }); g.imageSmoothingEnabled = false; g.drawImage(im, 0, 0);
+    eintrag.daten = { w: cv.width, h: cv.height, data: g.getImageData(0, 0, cv.width, cv.height).data };
+    for (const f of eintrag.wartend.splice(0)) f(eintrag.daten);
+  };
+  im.src = src;
+}
+if (typeof Image !== 'undefined') ['hand-hour', 'hand-min', 'hand-sec'].forEach((n) => dcZeigerDaten('/areas/doom-clock/' + n + '.png', () => {}));   // vorladen
+function DcZeiger({ cls, bild, pivot, winkel, sekunde, style }) {
+  const ref = useRef(null);
+  const zu = useRef({ ist: null, daten: null, raf: 0, cache: new Map() });
+  const [zx, zy] = pivot;
+  useLayoutEffect(() => {
+    const el = ref.current; if (!el) return undefined;
+    const z = zu.current;
+    const szene = el.closest('.pp-pixel-scene');
+    const pa = window.PPPixelAnim;
+    const mitSprite = !!(pa && pa.KONFIG && pa.KONFIG.aktiv && pa.drehen);
+    const P = () => ((szene ? szene.clientHeight : 0) / 100) || 0;
+    const zeigen = (grad) => {
+      z.ist = grad;
+      const px = P(); if (!(px > 0)) return;
+      if (!mitSprite) { el.style.backgroundImage = `url(${bild})`; el.style.transformOrigin = `${(zx + .5) * px}px ${(zy + .5) * px}px`; el.style.transform = `rotate(${grad}deg)`; return; }   // pp-ok: drehung (nur Retro-Modus ohne Pipeline)
+      if (!z.daten) return;
+      const g1 = Math.round(grad) % 360, key = px.toFixed(3) + ':' + g1;
+      let r = z.cache.get(key);
+      if (!r) {
+        const rad = g1 * Math.PI / 180, c = Math.cos(rad), sn = Math.sin(rad);
+        const res = pa.drehen(z.daten, 0, 0, [c, sn, -sn, c], [(zx + .5) * px, (zy + .5) * px], { raster: px });
+        if (!res) return;
+        const cv = document.createElement('canvas'); cv.width = res.w; cv.height = res.h;
+        const g = cv.getContext('2d'); const id = g.createImageData(res.w, res.h); id.data.set(res.data); g.putImageData(id, 0, 0);
+        r = { url: cv.toDataURL('image/png'), res };
+        if (z.cache.size > 400) z.cache.clear();
+        z.cache.set(key, r);
+      }
+      const st = el.style;
+      st.backgroundImage = `url(${r.url})`; st.transform = 'none';
+      st.width = r.res.w * px + 'px'; st.height = r.res.h * px + 'px';
+      st.marginLeft = r.res.x0 + 'px'; st.marginTop = r.res.y0 + 'px';
+    };
+    z.zeigen = zeigen;
+    dcZeigerDaten(bild, (d) => { z.daten = d; zeigen(z.ist == null ? winkel : z.ist); });
+    const ro = window.ResizeObserver && szene ? new ResizeObserver(() => zeigen(z.ist == null ? winkel : z.ist)) : null;
+    if (ro) ro.observe(szene);
+    let tick = 0;
+    if (sekunde) {
+      const jetzt = () => zeigen(6 * new Date().getSeconds());
+      jetzt();
+      tick = setInterval(jetzt, 250);          // beim Sekundenwechsel höchstens 250 ms zu spät
+    } else zeigen(winkel);
+    return () => { if (ro) ro.disconnect(); if (tick) clearInterval(tick); if (z.raf) cancelAnimationFrame(z.raf); };
+  }, []);
+  // Übergang zum neuen Winkel (nur Stunden-/Minutenzeiger)
+  useLayoutEffect(() => {
+    const z = zu.current; if (sekunde || z.ist == null || z.ist === winkel || !z.zeigen) return undefined;
+    const von = z.ist, nach = winkel, t0 = performance.now(), D = 1400;
+    const ease = (t) => t * t * (3 - 2 * t);
+    const raf = window.ppTaktRaf || window.requestAnimationFrame;
+    const schritt = (jetzt) => {
+      const t = Math.min(1, ((jetzt || performance.now()) - t0) / D);
+      z.zeigen(von + (nach - von) * ease(t));
+      z.raf = t < 1 ? raf(schritt) : 0;
+    };
+    z.raf = raf(schritt);
+    return () => { if (z.raf) { cancelAnimationFrame(z.raf); z.raf = 0; } };
+  }, [winkel]);
+  return <i ref={ref} className={'dc-zeiger ' + cls} style={style} />;
+}
 const DoomClockOverlay = React.memo(function DoomClockOverlay({ besitzer = [], spielstand = {} }) {
   const zaehler = Math.max(0, ...besitzer.map(i => spielstand.doomCounters?.[i] || 0));
   const t = Math.min(1, zaehler / DC_MAX);
   const winkelMin = 360 * t;               // 0 → :00, 20 → einmal herum
   const winkelStd = 330 + 30 * t;          // 11 Uhr → 12 Uhr
-  const sek = useMemo(() => -new Date().getSeconds(), []);
   const asche = useMemo(() => ppZufall(ppAreaN(18), () => ({
     x: Math.random() * 100, dur: 6 + Math.random() * 6, delay: -Math.random() * 12, glut: Math.random() < .5,
   })), []);
@@ -2201,12 +2390,11 @@ const DoomClockOverlay = React.memo(function DoomClockOverlay({ besitzer = [], s
   const kraehen = useMemo(() => ppZufall(ppAreaN(3), (i) => ({
     y: 6 + Math.random() * 26, dur: 22 + Math.random() * 16, delay: -Math.random() * 30, rtl: i % 2 === 0,
   })), []);
-  const zeiger = (cls, stil) => {
+  const zeiger = (cls, winkel, sekunde) => {
     const [bw, bh, zx, zy] = DC_ZEIGER[cls];
     return (
-      <i className={'dc-zeiger ' + cls} style={{
+      <DcZeiger cls={cls} bild={DCL + DC_ZEIGER_BILD[cls]} pivot={[zx, zy]} winkel={winkel} sekunde={sekunde} style={{
         left: ppArtX(-(zx + .5), 0), top: ppArt(DC_MITTE_Y - zy - .5), width: ppArt(bw), height: ppArt(bh),
-        transformOrigin: `${ppArt(zx + .5)} ${ppArt(zy + .5)}`, ...stil,
       }} />
     );
   };
@@ -2215,7 +2403,7 @@ const DoomClockOverlay = React.memo(function DoomClockOverlay({ besitzer = [], s
       <PixelBand src={DCL + 'sky.png'} />
       {blitze.map((b, i) => (
         <React.Fragment key={'b' + i}>
-          <i className="pp-area-dyn dc-blitzschein" style={{ left: ppArtX(b.x - 20, 0), top: ppArt(b.y - 6), animation: `dcBlitz ${b.dur.toFixed(2)}s linear ${b.delay.toFixed(2)}s infinite` }} />
+          <PpGlow {...GL_DC_BLITZ} className="pp-area-dyn dc-blitzschein" style={{ left: ppArtX(b.x - 20, 0), top: ppArt(b.y - 6), animation: `dcBlitz ${b.dur.toFixed(2)}s linear ${b.delay.toFixed(2)}s infinite` }} />
           <i className="pp-area-dyn dc-blitz" style={{ left: ppArtX(b.x - 5.5, 0), top: ppArt(b.y), backgroundPosition: `${b.bild * 50}% 0`, animation: `dcBlitz ${b.dur.toFixed(2)}s steps(1) ${b.delay.toFixed(2)}s infinite` }} />
         </React.Fragment>
       ))}
@@ -2233,15 +2421,15 @@ const DoomClockOverlay = React.memo(function DoomClockOverlay({ besitzer = [], s
       ))}
       <PixelBand src={DCL + 'clouds-near.png'} className="dc-nah" />
       <PixelBand src={DCL + 'smoke.png'} className="dc-rauch" />
-      <i className="dc-puls" style={{ '--dc-t': t, animationDuration: (3.2 - 2.4 * t).toFixed(2) + 's' }} />
+      <PpGlow {...GL_DC_PULS} className="dc-puls" style={{ '--dc-t': t, animationDuration: (3.2 - 2.4 * t).toFixed(2) + 's' }} />
       <PixelPiece src={DCL + 'clock.png'} w={91} />
       <i className="dc-spirale" style={{ animationDuration: (7 - 5 * t).toFixed(2) + 's' }} />
       {DC_SCHAEDEL.map(([dx, dy], i) => (
-        <i key={'g' + i} className="pp-area-dyn dc-glut" style={{ left: ppArtX(dx - 4, 0), top: ppArt(DC_MITTE_Y + dy - 4.5), animationDelay: (-i * .7) + 's' }} />
+        <PpGlow {...GL_DC_GLUT} key={'g' + i} className="pp-area-dyn dc-glut" style={{ left: ppArtX(dx - 4, 0), top: ppArt(DC_MITTE_Y + dy - 4.5), animationDelay: (-i * .7) + 's' }} />
       ))}
-      {zeiger('std', { rotate: winkelStd + 'deg' })}
-      {zeiger('min', { rotate: winkelMin + 'deg' })}
-      {zeiger('sek', { animation: `ppDrehen 60s steps(60) ${sek}s infinite` })}
+      {zeiger('std', winkelStd)}
+      {zeiger('min', winkelMin)}
+      {zeiger('sek', 0, true)}
       <i className="dc-kappe" style={{ left: ppArtX(-3.5, 0), top: ppArt(DC_MITTE_Y - 3.5) }} />
       <PixelBand src={DCL + 'wisps.png'} className="dc-schwaden" />
       {asche.map((a, i) => (
@@ -2256,8 +2444,7 @@ const DoomClockOverlay = React.memo(function DoomClockOverlay({ besitzer = [], s
         .dc-schwaden { animation: dcWolken 75s steps(128) infinite; }
         .dc-puls {
           position: absolute; left: calc(50% - 60 * var(--px)); top: calc(${DC_MITTE_Y} * var(--px) - 60 * var(--px));
-          width: calc(120 * var(--px)); height: calc(120 * var(--px)); border-radius: 50%;
-          background: radial-gradient(circle, rgba(255,26,26,.55) 0%, rgba(200,0,0,.25) 40%, rgba(120,0,0,0) 70%);
+          width: calc(120 * var(--px)); height: calc(120 * var(--px));
           animation: dcPuls 3s ease-in-out infinite;
         }
         @keyframes dcPuls {
@@ -2273,21 +2460,16 @@ const DoomClockOverlay = React.memo(function DoomClockOverlay({ besitzer = [], s
           animation: dcSpirale 7s steps(14) infinite;
         }
         @keyframes dcSpirale { from { background-position: 0 0; } to { background-position: 0 calc(-854 * var(--px)); } }
-        .dc-zeiger { position: absolute; background-size: 100% 100%; background-repeat: no-repeat; transition: rotate 1.4s cubic-bezier(.5, 0, .2, 1); }
-        .dc-zeiger.std { background-image: url(${DCL}hand-hour.png); }
-        .dc-zeiger.min { background-image: url(${DCL}hand-min.png); }
-        .dc-zeiger.sek { background-image: url(${DCL}hand-sec.png); transition: none; }
+        .dc-zeiger { position: absolute; background-size: 100% 100%; background-repeat: no-repeat; }
         .dc-kappe { position: absolute; width: calc(7 * var(--px)); height: calc(7 * var(--px)); background: url(${DCL}cap.png) 0 0 / 100% 100% no-repeat; }
         .dc-glut {
           position: absolute; width: calc(8 * var(--px)); height: calc(8 * var(--px));
-          background: radial-gradient(circle, rgba(255,26,26,.6) 0%, rgba(255,26,26,0) 70%);
           animation: dcGlut 2.8s ease-in-out infinite alternate;
         }
         @keyframes dcGlut { from { opacity: .25; } to { opacity: 1; } }
         .dc-blitz { position: absolute; width: calc(11 * var(--px)); height: calc(30 * var(--px)); background: url(${DCL}bolt.png) 0 0 / 300% 100% no-repeat; opacity: 0; }
         .dc-blitzschein {
           position: absolute; width: calc(40 * var(--px)); height: calc(40 * var(--px)); opacity: 0;
-          background: radial-gradient(circle, rgba(255,133,102,.35) 0%, rgba(239,41,41,.12) 45%, rgba(255,26,26,0) 70%);
         }
         @keyframes dcBlitz { 0%, 90% { opacity: 0; } 91% { opacity: 1; } 92% { opacity: .15; } 93.5% { opacity: 1; } 96%, 100% { opacity: 0; } }
         .dc-rad { position: absolute; width: calc(9 * var(--px)); height: calc(9 * var(--px)); background: url(${DCL}gear-s.png) 0 0 / 300% 100% no-repeat; }
@@ -2464,7 +2646,7 @@ const GraveyardOfLimitedPowerOverlay = React.memo(function GraveyardOfLimitedPow
           100% { transform: translate(var(--dx), calc(-10 * var(--px))); opacity: 0; }
         }
         .gyd-blatt { position: absolute; width: calc(2 * var(--px)); height: var(--px); background: #68332a; box-shadow: var(--px) 0 0 #8e503a; opacity: 0; }
-        .gyd-blatt.rot { background: #68332a; box-shadow: var(--px) 0 0 #311402; }
+        .gyd-blatt.rot { background: #68332a; box-shadow: var(--px) 0 0 #311402; }   /* pp-ok: blur (harter Schatten, Unschärfe 0; die Hex-Farbe liest der Wächter als Zahl) */
         @keyframes gydFallen {
           0% { transform: translate(0, 0); opacity: 0; } 2% { opacity: 1; }
           10% { transform: translate(calc(2 * var(--px)), calc(6 * var(--px))); }
@@ -2866,7 +3048,7 @@ const RiotingVillageOverlay = React.memo(function RiotingVillageOverlay() {
       ))}
       <PixelPiece src={RVG + 'house.png'} w={RVG_HAUS_W} />
       <PixelPiece src={RVG + 'house-glow.png'} w={RVG_HAUS_W} className="rvg-schein" />
-      <i className="rvg-augenglut" style={{ left: ppArtX(RVG_AUGE.x - 4, 0), top: ppArt(RVG_AUGE.y - 4) }} />
+      <PpGlow {...GL_RVG_AUGE} className="rvg-augenglut" style={{ left: ppArtX(RVG_AUGE.x - 4, 0), top: ppArt(RVG_AUGE.y - 4) }} />
       <i className="rvg-auge" style={{ left: ppArtX(RVG_AUGE.x, 0), top: ppArt(RVG_AUGE.y) }} />
       <i className="rvg-fackel" style={{ left: ppArtX(RVG_HAUSFACKEL.x - 2.5, 0), top: ppArt(RVG_HAUSFACKEL.y - 6), animationDuration: '.47s' }} />
       <i className="rvg-schild" style={{ left: ppArtX(RVG_SCHILD.x, 0), top: ppArt(RVG_SCHILD.y) }} />
@@ -2875,7 +3057,7 @@ const RiotingVillageOverlay = React.memo(function RiotingVillageOverlay() {
       ))}
       {feuer.map((f, i) => (
         <React.Fragment key={'b' + i}>
-          <i className="rvg-bodenschein" style={{
+          <PpGlow {...GL_RVG_BODEN} className="rvg-bodenschein" style={{
             left: ppArtX(f.x - f.w * 1.7, 0), top: ppArt(f.fuss - f.w * 1.5), width: ppArt(f.w * 3.4), height: ppArt(f.w * 2.4),
             animationDuration: f.schein + 's', animationDelay: (-f.schein * i / 3).toFixed(2) + 's',
           }} />
@@ -2932,8 +3114,7 @@ const RiotingVillageOverlay = React.memo(function RiotingVillageOverlay() {
         @keyframes rvgFlackern { from { background-position: 0 0; } to { background-position: var(--rvg-lauf) 0; } }
         .rvg-haufen { position: absolute; background-size: 100% 100%; background-repeat: no-repeat; }
         .rvg-bodenschein {
-          position: absolute; border-radius: 50%;
-          background: radial-gradient(ellipse, rgba(255,139,26,.42) 0%, rgba(255,73,26,.16) 45%, rgba(255,73,26,0) 70%);
+          position: absolute;
           animation: rvgSchein 1.1s steps(1) infinite;
         }
         .rvg-puff { position: absolute; width: calc(9 * var(--px)); height: calc(8 * var(--px)); background: url(${RVG}puff.png) 0 0 / 400% 100% no-repeat; opacity: 0; }
@@ -2952,7 +3133,6 @@ const RiotingVillageOverlay = React.memo(function RiotingVillageOverlay() {
         }
         .rvg-augenglut {
           position: absolute; width: calc(19 * var(--px)); height: calc(13 * var(--px));
-          background: radial-gradient(ellipse, rgba(255,26,26,.5) 0%, rgba(255,26,26,0) 70%);
           animation: rvgAugenglut 2.4s ease-in-out infinite alternate;
         }
         @keyframes rvgAugenglut { from { opacity: .45; } to { opacity: 1; } }
@@ -4132,7 +4312,7 @@ const TempleOfSacrificeOverlay = React.memo(function TempleOfSacrificeOverlay() 
         }
         .ts-gluehwurm {
           position: absolute; width: var(--px); height: var(--px); background: #fff196; opacity: 0;
-          box-shadow: 0 0 calc(2 * var(--px)) calc(.6 * var(--px)) rgba(203,255,102,.45);
+          box-shadow: 0 calc(-1 * var(--px)) 0 0 #80bf59, 0 var(--px) 0 0 #80bf59, calc(-1 * var(--px)) 0 0 0 #80bf59, var(--px) 0 0 0 #80bf59;
         }
         @keyframes tsGluehen {
           0% { transform: translate(0, 0); opacity: 0; } 20% { opacity: .9; } 40% { opacity: .25; }
@@ -4209,7 +4389,7 @@ const BonegrinderOverlay = React.memo(function BonegrinderOverlay() {
       <PixelBand src={BGR + 'chains.png'} className="bg-ketten" style={{ backgroundSize: 'auto 300%' }} />
       {fackeln.map((f, i) => (
         <React.Fragment key={'f' + i}>
-          <i className="bg-glut" style={{
+          <PpGlow {...GL_BG_GLUT} className="bg-glut" style={{
             left: ppArtX(f.x - 9, 0), top: ppArt(BGR_FACKEL_Y - 14), animation: `bgGlut ${f.glut.toFixed(2)}s steps(1) ${f.delay.toFixed(2)}s infinite`,
           }} />
           <i className="bg-flamme" style={{
@@ -4252,7 +4432,6 @@ const BonegrinderOverlay = React.memo(function BonegrinderOverlay() {
         @keyframes bgPendel { 0% { background-position: 50% 0%; } 25% { background-position: 50% 50%; } 50% { background-position: 50% 0%; } 75% { background-position: 50% 100%; } }
         .bg-glut {
           position: absolute; width: calc(18 * var(--px)); height: calc(18 * var(--px));
-          background: radial-gradient(circle, rgba(255,155,58,.30) 0%, rgba(248,116,32,.12) 45%, rgba(248,116,32,0) 70%);
         }
         @keyframes bgGlut { 0% { opacity: .8; } 22% { opacity: 1; } 40% { opacity: .65; } 63% { opacity: .95; } 81% { opacity: .75; } }
         .bg-flamme {
@@ -4858,7 +5037,7 @@ const BigGwenOverlay = React.memo(function BigGwenOverlay() {
         @keyframes gwWiegen { 0% { background-position: 50% 0%; } 25% { background-position: 50% 50%; } 50% { background-position: 50% 0%; } 75% { background-position: 50% 100%; } }
         .gw-gluehwurm {
           position: absolute; width: var(--px); height: var(--px); background: #f0f075; opacity: 0;
-          box-shadow: 0 0 calc(2 * var(--px)) calc(.5 * var(--px)) rgba(240,240,117,.45);
+          box-shadow: 0 calc(-1 * var(--px)) 0 0 #d1a148, 0 var(--px) 0 0 #d1a148, calc(-1 * var(--px)) 0 0 0 #d1a148, var(--px) 0 0 0 #d1a148;
         }
         @keyframes gwSchwirren {
           0%, 100% { transform: translate(0, 0); } 25% { transform: translate(calc(4 * var(--px)), calc(-3 * var(--px))); }
@@ -5371,7 +5550,7 @@ const FourthCircleOfHellOverlay = React.memo(function FourthCircleOfHellOverlay(
   return (
     <PixelScene artH={100} bg="#000000" className="fourth-circle-overlay">
       <PixelBand src={FCI + 'back.png'} style={{ backgroundPosition: '0 0' }} />
-      <div className="pp-area-dyn fc4-glut" />
+      <PpGlow {...GL_FC4} className="pp-area-dyn fc4-glut" />
       <div className="fc4-volk">
         {hagel.map((h, i) => (
           <React.Fragment key={'h' + i}>
@@ -5403,8 +5582,7 @@ const FourthCircleOfHellOverlay = React.memo(function FourthCircleOfHellOverlay(
       <style>{`
         .fc4-volk { position: absolute; inset: 0; }
         .fc4-glut {
-          position: absolute; inset: 0; opacity: .85;
-          background: linear-gradient(to top, rgba(255,185,26,.30), rgba(255,139,26,.12) 38%, rgba(255,125,0,0) 62%);
+          position: absolute; inset: 0; opacity: 0;
           animation: fc4Puls 6s ease-in-out infinite alternate;
         }
         @keyframes fc4Puls { from { opacity: .55; } to { opacity: 1; } }
@@ -5490,7 +5668,7 @@ const FifthCircleOfHellOverlay = React.memo(function FifthCircleOfHellOverlay() 
       <div className="fi-volk">
         {fontaenen.map((f, i) => (
           <React.Fragment key={'f' + i}>
-            <i className="pp-area-dyn fi-glut" style={{ left: ppArt(f.x - 30), animation: `fiGlut 3s ease-in-out ${f.delay}s infinite alternate` }} />
+            <PpGlow {...GL_FI} className="pp-area-dyn fi-glut" style={{ left: ppArt(f.x - 30), animation: `fiGlut 3s ease-in-out ${f.delay}s infinite alternate` }} />
             <i className={'fi-fontaene ' + (f.gross ? 'gross' : 'klein')} style={{
               left: ppArt(f.x - (f.gross ? 15 : 11)), top: ppArt(f.gross ? 14 : 30),
               animation: `${f.gross ? 'fiFontA' : 'fiFontB'} 1.2s steps(1) ${f.delay}s infinite`,
@@ -5531,8 +5709,7 @@ const FifthCircleOfHellOverlay = React.memo(function FifthCircleOfHellOverlay() 
         @keyframes fiFontA { ${[0,1,2,3,4,5,6,7].map(b => `${(b * 12.5)}% { background-position-x: ${(b * 100 / 7).toFixed(3)}%; }`).join(' ')} }
         @keyframes fiFontB { ${[0,1,2,3,4,5,6,7].map(b => `${(b * 12.5)}% { background-position-x: ${(b * 100 / 7).toFixed(3)}%; }`).join(' ')} }
         /* Schein der Fontaenen: warmes Pulsieren */
-        .fi-glut { position: absolute; top: calc(10 * var(--px)); width: calc(60 * var(--px)); height: calc(80 * var(--px)); opacity: .5;
-          background: radial-gradient(ellipse at 50% 62%, rgba(255,155,58,.34), rgba(248,116,32,.14) 45%, rgba(255,73,26,0) 70%); }
+        .fi-glut { position: absolute; top: calc(10 * var(--px)); width: calc(60 * var(--px)); height: calc(80 * var(--px)); opacity: 0; }
         @keyframes fiGlut { from { opacity: .35; } to { opacity: .8; } }
         .fi-held { position: absolute; top: calc(42 * var(--px)); width: calc(26 * var(--px)); height: calc(36 * var(--px)); background: url(${FII}hero.png) 0 0 / ${FI_BILDER * 100}% 200% no-repeat; }
         @keyframes fiHeld { ${FI_KEYFRAMES} }
@@ -5596,7 +5773,7 @@ const SixthCircleOfHellOverlay = React.memo(function SixthCircleOfHellOverlay() 
         ))}
         {[[34, 46, 0], [100, 34, -0.5], [196, 42, -0.9]].map(([nx, ny, d], i) => (
           <React.Fragment key={'n' + i}>
-            <i className="pp-area-dyn sx-glut" style={{ left: SX(nx - 5), top: ppArt(ny - 8), animation: `sxGlut 3s ease-in-out ${d}s infinite alternate` }} />
+            <PpGlow {...GL_SX} className="pp-area-dyn sx-glut" style={{ left: SX(nx - 5), top: ppArt(ny - 8), animation: `sxGlut 3s ease-in-out ${d}s infinite alternate` }} />
             <i className="sx-feuer" style={{ left: SX(nx + 1), top: ppArt(ny + 3), animation: `sxFeuer 1.2s steps(1) ${d * .6}s infinite` }} />
           </React.Fragment>
         ))}
@@ -5623,8 +5800,7 @@ const SixthCircleOfHellOverlay = React.memo(function SixthCircleOfHellOverlay() 
         @keyframes sxHimmel { ${sxReihe(8)} }
         .sx-feuer { position: absolute; width: calc(12 * var(--px)); height: calc(18 * var(--px)); background: url(${SXX}grave-fire.png) 0 0 / 800% 100% no-repeat; }
         @keyframes sxFeuer { ${sxReihe(8)} }
-        .sx-glut { position: absolute; width: calc(24 * var(--px)); height: calc(34 * var(--px)); opacity: .5;
-          background: radial-gradient(ellipse at 50% 60%, rgba(255,154,26,.32), rgba(255,73,26,.12) 50%, rgba(255,73,26,0) 72%); }
+        .sx-glut { position: absolute; width: calc(24 * var(--px)); height: calc(34 * var(--px)); opacity: 0; }
         @keyframes sxGlut { from { opacity: .3; } to { opacity: .8; } }
         .sx-gott { position: absolute; top: calc(31 * var(--px)); width: calc(46 * var(--px)); height: calc(48 * var(--px)); background: url(${SXX}god.png) 0 0 / ${12 * 100}% 100% no-repeat; }
         @keyframes sxGott { ${sxFolge(SX_GOTT, 12)} }
@@ -5688,7 +5864,7 @@ const SeventhCircleOfHellOverlay = React.memo(function SeventhCircleOfHellOverla
       </div>
       <PixelPiece src={SVX + 'bank.png'} w={SV_PAN} />
       <div className="sv-volk">
-        <i className="pp-area-dyn sv-augenglut" style={{ left: SV(113 - 6), animation: 'svGlut 2s ease-in-out infinite alternate' }} />
+        <PpGlow {...GL_SV} className="pp-area-dyn sv-augenglut" style={{ left: SV(113 - 6), animation: 'svGlut 2s ease-in-out infinite alternate' }} />
         <i className="sv-held" style={{ left: SV(30), animation: 'svHeld 6s steps(1) -1.7s infinite' }} />
         <i className="sv-augen" style={{ left: SV(113), animation: 'svAugen 2s steps(1) infinite' }} />
         <i className="sv-blut" style={{ left: SV(128 - 8 - 2), animation: 'svBlut 1s steps(1) infinite' }} />
@@ -5714,8 +5890,7 @@ const SeventhCircleOfHellOverlay = React.memo(function SeventhCircleOfHellOverla
         @keyframes svHeld { ${sxFolge(SX_HELD, 12)} }
         .sv-augen { position: absolute; top: calc(31 * var(--px)); width: calc(30 * var(--px)); height: calc(5 * var(--px)); background: url(${SVX}eyes.png) 0 0 / 400% 100% no-repeat; }
         @keyframes svAugen { ${sxReihe(4)} }
-        .sv-augenglut { position: absolute; top: calc(20 * var(--px)); width: calc(42 * var(--px)); height: calc(28 * var(--px)); opacity: .5;
-          background: radial-gradient(ellipse at 50% 50%, rgba(255,26,26,.30), rgba(255,26,26,.1) 50%, rgba(255,26,26,0) 72%); }
+        .sv-augenglut { position: absolute; top: calc(20 * var(--px)); width: calc(42 * var(--px)); height: calc(28 * var(--px)); opacity: 0; }
         @keyframes svGlut { from { opacity: .3; } to { opacity: .85; } }
         .sv-blut { position: absolute; top: calc(36 * var(--px)); width: calc(7 * var(--px)); height: calc(42 * var(--px)); background: url(${SVX}blood.png) 0 0 / 400% 100% no-repeat; }
         @keyframes svBlut { ${sxReihe(4)} }
@@ -5765,7 +5940,7 @@ const EighthCircleOfHellOverlay = React.memo(function EighthCircleOfHellOverlay(
       <PixelBand src={EIX + 'back.png'} style={{ backgroundPosition: '50% 0' }} />
       <PixelPiece src={EIX + 'ground.png'} w={EG_PAN} />
       <div className="eg-volk">
-        <i className="pp-area-dyn eg-glut" style={{ left: EG(150 - 56), animation: 'egGlut 3s ease-in-out infinite alternate' }} />
+        <PpGlow {...GL_EG} className="pp-area-dyn eg-glut" style={{ left: EG(150 - 56), animation: 'egGlut 3s ease-in-out infinite alternate' }} />
         <i className="eg-portal" style={{ left: EG(150 - 36), animation: 'egPortal 4s steps(1) infinite' }} />
         <i className="eg-fluss a" style={{ left: EG(2), animation: 'egFluss 6s steps(1) infinite' }} />
         <i className="eg-fluss b" style={{ left: EG(208), animation: 'egFluss 6s steps(1) -2s infinite' }} />
@@ -5783,8 +5958,7 @@ const EighthCircleOfHellOverlay = React.memo(function EighthCircleOfHellOverlay(
         .eg-volk { position: absolute; inset: 0; }
         .eg-portal { position: absolute; top: 0; width: calc(72 * var(--px)); height: calc(80 * var(--px)); background: url(${EIX}portal.png) 0 0 / 2400% 100% no-repeat; }
         @keyframes egPortal { ${sxReihe(24)} }
-        .eg-glut { position: absolute; top: calc(-20 * var(--px)); width: calc(112 * var(--px)); height: calc(120 * var(--px)); opacity: .5;
-          background: radial-gradient(ellipse at 50% 50%, rgba(144,58,230,.30), rgba(102,24,180,.12) 50%, rgba(102,24,180,0) 72%); }
+        .eg-glut { position: absolute; top: calc(-20 * var(--px)); width: calc(112 * var(--px)); height: calc(120 * var(--px)); opacity: 0; }
         @keyframes egGlut { from { opacity: .3; } to { opacity: .9; } }
         .eg-fluss { position: absolute; top: 0; height: calc(100 * var(--px)); background-size: 2400% 100%; background-repeat: no-repeat; }
         .eg-fluss.a { width: calc(36 * var(--px)); background-image: url(${EIX}flow-a.png); }
