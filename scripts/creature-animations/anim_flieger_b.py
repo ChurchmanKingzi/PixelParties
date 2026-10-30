@@ -375,3 +375,24 @@ def wolken_ebene(h, w, i, n, puffs, farben):
             e[y, x, :3] = farben[k]
             e[y, x, 3] = 255
     return e
+
+
+def spalten_schub_gefuellt(a, pivot_x, dy_fn, maxd=None, ab_x=None):
+    """Wie `spalten_schub`, aber ein Flügel, der sich nach UNTEN schiebt, bleibt am Körper angewachsen: die oben frei werdenden Zellen jeder Spalte (dy > 0) füllt das oberste
+    Pixel der Spalte (Farbe der Quelle), es entstehen keine Löcher zwischen Flügel und Rumpf/Kinn. Spalten links von `ab_x` (falls angegeben) werden nicht angefasst."""
+    out = L.leer(*a.shape[:2])
+    h, w = a.shape[:2]
+    spalten = [x for x in range(w) if a[:, x, 3].any()]
+    if maxd is None:
+        maxd = max(1, max(abs(x - pivot_x) for x in spalten)) if spalten else 1
+    for x in spalten:
+        dy = 0 if (ab_x is not None and x < ab_x) else int(round(dy_fn(abs(x - pivot_x) / maxd)))
+        ys = np.nonzero(a[:, x, 3])[0]
+        if ys.min() + dy < 0 or ys.max() + dy >= h:
+            raise L.ClipError(f'Spalte {x} würde um {dy} px aus der Leinwand (Höhe {h}) geschoben')
+        for y in ys:
+            out[y + dy, x] = a[y, x]
+        for y in range(int(ys.min()), int(ys.min()) + max(0, dy)):
+            if not out[y, x, 3]:
+                out[y, x] = a[int(ys.min()), x]
+    return out
