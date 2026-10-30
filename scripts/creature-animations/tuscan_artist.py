@@ -17,16 +17,14 @@ Was im Sprite ist (x, y im 24×37-Sprite):
 * Overall/Anzug grau (y 20–34), Beine ab Zeile 34 getrennt, Schuhe mit silbernen/weißen Kappen (Z/V, y 35).
 
 Ablauf (48 Frames à 62 ms = 2,98 s, nahtlos) — der Künstler MALT sein Gemälde:
-* Frame 0 = Ruhepose (Original). Frames 1–6: Der linke Arm hebt sich seitlich (links neben der Schulter) vom Hüftpinsel zum Bild; der Pinsel dreht sich dabei in die Waagerechte
-  (Spitze nach rechts) und streicht am Rahmen entlang nach oben. Frames 7–24: sechs Tupfer-/Pinselstriche von oben nach unten am linken Bildrand — pro Strich 3 Frames
-  (heranführen, auftupfen = Pinsel 1 px nach rechts, zurück); im Auftupf-Frame färbt sich die Farbzeile (x 8–10) um: Zeile 4 blau→grün, 5 blau→orange, 6 rot→blau, 7 rot→grün, 8 rot→orange,
-  9 rot→blau. Frames 25–42: derselbe Weg von unten nach oben, dabei übermalt der Künstler die Zeilen wieder in den Originalfarben. Frames 43–47: der Arm senkt sich zurück zur Hüfte,
-  der Pinsel hängt wieder; Frame 48 = Frame 0 (nahtlos).
-* Der Arm ist neu gezeichnet (nur Quellfarben: Hautbraun J/Y, Hand/Pinsel aus dem Sprite): Hand und Pinsel sind die Original-Pixel (der Pinsel gedreht), der Arm eine 3 px breite Linie
-  von der Schulter (links neben dem Puffärmel) zur Hand (unten grauer Ärmel A|B|C, ab dem Ellbogen brauner Unterarm J|Y|J). Ergänzt wird der Körperumriss, der sonst vom Pinsel verdeckt war: (6,26) … (6,31) in Umrissfarbe A (23,21,22); um den bewegten Arm läuft automatisch ein A-Umriss (Regel 16).
+* Der SICHTBARE Arm bleibt, wo er ist: die linke Hand und der Pinsel hängen unverändert wie im Sprite (sie steigen nur mit dem Körper beim Auf und ab). Es wird KEIN Arm gezeichnet.
+  Der malende Arm ist der vorgestreckte, vom Körper verdeckte rechte Arm — er wird nur ANGEDEUTET: eine kleine Pinselspitze (3 Kernpixel in Quellfarben: Stielgrau (161,147,144), Zwinge V (189,189,189),
+  Borsten Z (225,215,217), dazu ein A-Umriss) taucht links am Rand des Rahmens auf, tupft und taucht wieder ab. Sie liegt auf der Zeile der gerade bemalten Farbzeile (Bildzeilen 4 … 9) und steigt mit dem Bild.
+* Mal-Rhythmus (Frames 5–45): Frame 5/6 die Spitze schwebt heran (x 3 → 4), Frames 7–24 sechs Tupfer von oben nach unten (Zeilen 4 → 9), pro Tupfer 3 Frames: Spitze am Rahmenrand (x 5), TUPFEN (x 6, die Spitze
+  liegt 1 px über der dunklen Rahmenkante), zurück (x 5). Im Tupf-Frame färbt sich die Farbzeile (x 8–10) um: Zeile 4 blau→grün, 5 blau→orange, 6 rot→blau, 7 rot→grün, 8 rot→orange, 9 rot→blau.
+  Frames 25–42: derselbe Weg von unten nach oben, dabei werden die Zeilen wieder in den Originalfarben übermalt. Frames 43/44 die Spitze schwebt ab (x 4 → 3), 45–47 keine Spitze, Frame 48 = Frame 0 (nahtlos).
 * Auf und ab (zweistufig, Periode 24 = zweimal pro Schleife): Brust zuerst 1 px (Zeile 32 des Anzugs wird einmal doppelt eingefügt: Schultern, Arme, Pinsel und Bild steigen, Beine/Schuhe bleiben),
-  das Bild läuft 3 Frames nach und hebt sich um ein weiteres px (Zeile 13, Schulterlinie, wird verlängert): Bild 0 → 1 → 2 → 1 → 0 px, Brust 0 → 1 → 0. Der Malarm folgt dem Bild (Hand und Pinsel
-  steigen mit dem Gemälde, der Unterarm streckt sich dabei).
+  das Bild läuft 3 Frames nach und hebt sich um ein weiteres px (Zeile 13, Schulterlinie, wird verlängert): Bild 0 → 1 → 2 → 1 → 0 px, Brust 0 → 1 → 0.
 * Gold glänzt (Regel 14: Gold/Metall): ein Lichtband läuft zweimal pro Schleife diagonal über den Rahmen (Frames 2–15 und 26–39, 1–2 Stufen heller auf der Goldrampe); je ein vierzackiger Glitzer-Stern an
   der Außenkante des Rahmens (oben links Frames 8–11, rechte Kante 22–25, oben rechts 36–39). Die silbernen Schuhkappen glänzen: ein heller Pixel Z wandert viermal pro Schleife über die Kappen.
 KEINE Partikel (Farbtupfer entfernt), KEIN Windrad (durch das Malen ersetzt).
@@ -41,7 +39,7 @@ import anim_humanoide as Hm
 import anim_lib as L
 
 N, MS = 48, 62
-PAD_L, PAD_R, PAD_T, PAD_B = 8, 6, 9, 3
+PAD_L, PAD_R, PAD_T, PAD_B = 5, 6, 7, 3
 
 spr = L.lade('tuscan-artist')
 sh, sw = spr.shape[:2]
@@ -58,7 +56,6 @@ def f(x, y):
 # Farben des Sprites
 Z, V, UMRISS = f(7, 35), f(8, 35), f(3, 28)         # Z (225,215,217) weiß, V (189,189,189) silber, A (23,21,22) Umriss
 HAUT_J, HAUT_Y = f(2, 21), f(3, 23)                 # J (156,105,62) Hautbraun, Y (245,203,161) Hautlicht
-ARMEL_B, ARMEL_C = f(4, 27) if False else (124, 112, 112), (91, 82, 83)     # Ärmel grau (Puffärmel-Farben B/C des Sprites)
 GOLD = [(63, 31, 15), (103, 64, 32), (136, 95, 49), (156, 105, 62), (175, 127, 64), (199, 159, 97), (232, 200, 136)]
 G_HELL, P_GOLD = GOLD[-1], GOLD[-2]
 
@@ -73,27 +70,7 @@ KANTE0 = Hm.kantenmaske(spr)
 ERLAUBT = Hm.umrissfarben(spr)                       # Farben der Außenkante im Original (Regel 16)
 rahmen &= ~KANTE0                                    # Lichtband nur auf Innenpixel des Rahmens, die Randpixel (Umriss) bleiben unverändert
 
-# Linke Hand (Hautfarben J/Y/a in x ≤ 5, y 21–25) und Pinsel (x 3–6, y 26–31)
-HAND = {(x, y): f(x, y) for y in range(21, 26) for x in range(0, 6) if vorhanden[y, x] and f(x, y) in (HAUT_J, HAUT_Y, f(4, 25))}
-PINSEL = {}
-for _y in range(26, 32):
-    for _x in range(3, 7):
-        if not vorhanden[_y, _x]:
-            continue
-        if _y in (26, 27) and _x in (4, 5, 6):
-            PINSEL[(_x, _y)] = f(_x, _y)
-        elif _y in (28, 29, 30):
-            PINSEL[(_x, _y)] = f(_x, _y)
-        elif _y == 31 and _x in (4, 5, 6):
-            PINSEL[(_x, _y)] = f(_x, _y)
-hand_m = np.zeros((sh, sw), bool)
-for (px, py) in list(HAND) + list(PINSEL):
-    hand_m[py, px] = True
-koerper = vorhanden & ~hand_m
-# Ergänzung: Körperumriss links, den der Pinsel verdeckt hat (nur sichtbar, wenn der Pinsel weg ist; im Ruhezustand liegt der Pinsel darüber)
-ERGAENZUNG = {(6, y): UMRISS for y in range(26, 32)}
-for (ex, ey) in ERGAENZUNG:
-    assert not koerper[ey, ex] or True
+koerper = vorhanden                                   # der ganze Körper inkl. linker Hand und Pinsel bleibt unverändert
 
 # Malzellen (x 8–10): Zeile, Farbe vorher (Original), Farbe nachher
 ZELLEN = [(4, f(8, 4), f(12, 9) if False else f(16, 5)),         # blau → grün (M)
@@ -114,19 +91,23 @@ def teil(maske):
     return L.platz(t, H, W, PAD_L, PAD_T)
 
 
-def pose(i):
-    """(k, zelle, dab): k = Hubstufe des Arms 0 (Hüfte) … 6 (am Bild); zelle = Index der gerade bearbeiteten Zelle oder None; dab = 1 beim Auftupfen."""
-    if i == 0:
-        return 0, None, 0
-    if i <= 6:
-        return i, None, 0
-    if i <= 24:
-        c = (i - 7) // 3
-        return 6, c, 1 if (i - 7) % 3 == 1 else 0
-    if i <= 42:
-        c = 5 - (i - 25) // 3
-        return 6, c, 1 if (i - 25) % 3 == 1 else 0
-    return 48 - i, None, 0                                  # 43…47 → k = 5 … 1
+def pinsel_pose(i):
+    """(zelle, xt) der angedeuteten Pinselspitze in Frame i oder None: zelle = Index der Farbzeile (Bildzeile ZELLEN[zelle][0]), xt = x der Borstenspitze (Sprite)."""
+    if i in (5, 6):
+        return 0, i - 2                                     # schwebt heran (x 3, 4)
+    if 7 <= i <= 24:
+        return (i - 7) // 3, (5, 6, 5)[(i - 7) % 3]         # Tupfer vorwärts: Rand, TUPFEN, zurück
+    if 25 <= i <= 42:
+        return 5 - (i - 25) // 3, (5, 6, 5)[(i - 25) % 3]    # Tupfer rückwärts
+    if i in (43, 44):
+        return 0, 47 - i                                    # schwebt ab (x 4, 3)
+    return None
+
+
+def tupf_frame(i):
+    """Der Frame, in dem die Spitze auftupft (x 6), sonst None."""
+    p = pinsel_pose(i)
+    return p[0] if p and p[1] == 6 else None
 
 
 def gemalt(i, c):
@@ -136,58 +117,25 @@ def gemalt(i, c):
     return vor <= i < rueck
 
 
-def pinsel_waagerecht(c0, y0):
-    """Der Pinsel um 90° gedreht (Handende links, Spitze rechts): Original (x, y) → (c0 + (y − 26), y0 + (x − 3))."""
-    out = {(c0 + (y - 26), y0 + (x - 3)): c for (x, y), c in PINSEL.items()}
-    for xx_ in (c0, c0 + 1):
-        out.setdefault((xx_, y0), UMRISS)
-    return out
+STIEL, FERRULE = (161, 147, 144), V                          # Pinsel-Farben des Sprites (Stiel, Zwinge); Borsten = Z
+SPITZE = [(-2, STIEL), (-1, FERRULE), (0, Z)]                # (Versatz zur Borstenspitze, Farbe): Pinsel zeigt nach rechts zum Rahmen
 
 
-def arm_zeichnen(k, c, dab, brust, kopf):
-    """Pixel (Spritekoordinaten, y bereits um den Hub korrigiert) von Unterarm, Hand und Pinsel für die Pose."""
-    px = {}
-    if k == 0:
-        # Ruhe: Original-Hand und -Pinsel, mit der Brust gehoben
-        for (x, y), col in {**HAND, **PINSEL}.items():
-            px[(x, y - brust)] = col
-        return px
-    t = k / 6.0
-    hx = int(round(2 - 4 * t))
-    hy = int(round(21 - 19 * t))
-    if k == 6 and c is not None:
-        hy = 2 + c
-    hx += dab
-    w = t                                                    # der Arm folgt mit wachsendem k dem Bild (Kopfhub), sonst der Brust
-    dy = -(brust + int(round(kopf * w)))
-    # Hand (Original-Pixel, relativ zu (2,21)) und Pinsel waagerecht (Handende rechts neben der Hand, Zeilen hy+1 … hy+4)
-    for (x, y), col in HAND.items():
-        px[(hx + (x - 2), hy + (y - 21) + dy)] = col
-    for (x, y), col in pinsel_waagerecht(hx + 4, hy + 1).items():
-        px[(x, y + dy)] = col
-    # Arm: 2 px breite Linie von der Schulter (links neben dem Puffärmel, Zeile 16 − brust) zur Handunterkante: unten der graue Ärmel (B | C), ab dem Ellbogen
-    # (55 %) der braune Unterarm (J | Y/J). Beide Teile aus Sprite-Farben. Die Außenkante bekommt in frame() einen A-Umriss.
-    y_oben, y_unten = hy + 5 + dy, 16 - brust
-    ax, bx = hx + 1.5, 2.0                                   # Handmitte unten → Schulter
-    grenze = y_oben + 0.55 * (y_unten - y_oben)
-    for y in range(y_oben, y_unten + 1):
-        s = 0.0 if y_unten == y_oben else (y - y_oben) / float(y_unten - y_oben)
-        x = int(round(ax + (bx - ax) * s))
-        if y <= grenze:                                      # Unterarm (nackt)
-            px[(x, y)] = HAUT_J
-            px[(x + 1, y)] = HAUT_Y if (y % 2 == 0) else HAUT_J
-        else:                                                # Ärmel
-            px[(x, y)] = ARMEL_B
-            px[(x + 1, y)] = ARMEL_C
-    return px
+def spitze_pixel(zeile, xt):
+    """Kernpixel + Umriss der Pinselspitze (Spritekoordinaten); Umriss A links, oben und unten (und rechts, solange nicht am Rahmen)."""
+    kern = {(xt + dx, zeile): c for dx, c in SPITZE}
+    ring = {}
+    for x in range(xt - 2, xt + 1):
+        ring[(x, zeile - 1)] = UMRISS
+        ring[(x, zeile + 1)] = UMRISS
+    ring[(xt - 3, zeile)] = UMRISS
+    ring[(xt + 1, zeile)] = UMRISS
+    return kern, ring
 
 
 def frame(i):
     k = teil(koerper)
     gl = L.leer(H, W)                                        # Glitzer-Sterne (liegen als Effekt über der Figur)
-    for (ex, ey), col in ERGAENZUNG.items():
-        Hm.setze(k, {(ex, ey): col}, OFF)
-    kz, zelle, dab = pose(i)
     # --- Gemälde: bemalte Zellen ---
     for c, (zy, alt, neu) in enumerate(ZELLEN):
         if gemalt(i, c):
@@ -208,20 +156,17 @@ def frame(i):
     kopf = Hm.stufe(i - 3, N / 2, 1)
     k = Hm.atmen(k, PAD_T + 32, PAD_T + 13, brust, kopf)
     gl = Hm.atmen(gl, PAD_T + 32, PAD_T + 13, brust, kopf)
-    # --- Malarm (nach dem Atmen, in Leinwandkoordinaten) mit A-Umriss ---
-    arm = L.leer(H, W)
-    px = arm_zeichnen(kz, zelle, dab, brust, kopf)
-    Hm.setze(arm, px, OFF)
-    if kz:
-        belegt = (k[..., 3] > 0) | (arm[..., 3] > 0)
-        ring = {}
-        for y, x in zip(*np.nonzero(arm[..., 3] > 0)):
-            for dx, dy in ((1, 0), (-1, 0), (0, 1), (0, -1)):
-                nx, ny = x + dx, y + dy
-                if 0 <= nx < W and 0 <= ny < H and not belegt[ny, nx]:
-                    ring[(nx - PAD_L, ny - PAD_T)] = UMRISS
-        Hm.setze(arm, ring, OFF)
-    fig = L.zusammen(H, W, [(k, 0, 0), (arm, 0, 0)])
+    # --- Pinselspitze des (verdeckten) rechten Malarms: nach dem Atmen, steigt mit dem Bild; Umriss nur dort, wo kein Figurenpixel liegt ---
+    pinsel = L.leer(H, W)
+    p = pinsel_pose(i)
+    if p:
+        kern, ring = spitze_pixel(ZELLEN[p[0]][0], p[1])
+        dyb = -(brust + kopf)
+        belegt = k[..., 3] > 0
+        ring = {(x, y): c for (x, y), c in ring.items()
+                if not (0 <= y + PAD_T + dyb < H and 0 <= x + PAD_L < W and belegt[y + PAD_T + dyb, x + PAD_L])}
+        Hm.setze(pinsel, {**ring, **{(x, y): c for (x, y), c in kern.items()}}, (OFF[0], OFF[1] + dyb))
+    fig = L.zusammen(H, W, [(k, 0, 0), (pinsel, 0, 0)])
     Hm.kontur_schliessen(fig, ERLAUBT, UMRISS)                # Regel 16: Außenkante in jeder Pose in Umrissfarbe
     return L.zusammen(H, W, [(fig, 0, 0), (gl, 0, 0)])
 

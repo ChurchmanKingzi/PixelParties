@@ -275,9 +275,11 @@ def puls(i, n, x, y, periode=1, versatz=0.9):
     return 1 if math.sin(2 * math.pi * periode * i / n + versatz * (x + y)) > 0.55 else 0
 
 
-def zeilen_pendel(a, pivot_y, amp, phase, potenz=1.0):
+def zeilen_pendel(a, pivot_y, amp, phase, potenz=1.0, lauf=0.0, einseitig=False):
     """Wie L.zeilen_welle, aber nur Zeilen UNTERHALB von pivot_y wandern (Beine, Hinterleib, Schwanz): dx = round(amp · f^potenz · sin(phase)),
     f = (y − pivot_y) / maxAbstand. Die Zeilen oberhalb und die Pivotzeile bleiben stehen.
+    einseitig=True: die Zeilen wandern nur in Richtung +x (0 … amp·f^potenz), Ruhe bei phase = 0 (Schwanz, der nicht ins Bein schlagen darf).
+    lauf > 0: Wellenlauf — die Spitze hinkt um `lauf` rad hinterher (Trunk/Schwanz peitscht nach); die Ruhepose (phase = 0) bleibt unverändert.
     Zusammenhang: Ändert sich dx von einer Zeile zur nächsten so, dass ein Pixel seinen senkrechten Nachbarn darüber verlöre (dünne Beine,
     Spitzen), behält die Zeile das dx der Zeile darüber — die Figur bleibt 4-verbunden."""
     out = L.leer(*a.shape[:2])
@@ -288,7 +290,15 @@ def zeilen_pendel(a, pivot_y, amp, phase, potenz=1.0):
         xs_ = np.nonzero(a[y, :, 3])[0]
         if not len(xs_):
             continue
-        dx = 0 if y <= pivot_y else int(round(amp * ((y - pivot_y) / maxd) ** potenz * math.sin(phase)))
+        if y <= pivot_y:
+            dx = 0
+        else:
+            fr = (y - pivot_y) / maxd
+            if einseitig:                                       # nur nach rechts (0 … amp): (cos(−lauf·f) − cos(phase − lauf·f)) / 2
+                u = (math.cos(-lauf * fr) - math.cos(phase - lauf * fr)) / 2
+            else:
+                u = math.sin(phase - lauf * fr) - math.sin(-lauf * fr)
+            dx = int(round(amp * fr ** potenz * u))
         if y > pivot_y and dx != prev:
             for x in xs_:
                 if a[y - 1, x, 3]:                            # war oben angeschlossen: das muss nach dem Versatz so bleiben

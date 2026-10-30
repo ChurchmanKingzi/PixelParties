@@ -19,7 +19,7 @@ Identifikation (Sprite 14×16, Hund von vorn, dunkelbraun-schwarz, lockig):
 * Kein Schwanz, keine Zunge sichtbar — nichts davon erfunden.
 Bleibt fest: Stirnfleck, Schnauze/Nase, Brust, Beine bis auf die Pfoten.
 
-Ablauf (50 Frames à 70 ms = 3,5 s), alle Bewegungen unabhängig; der Kopf bleibt als Ganzes stehen, nur die Augen blicken:
+Ablauf (50 Frames à 70 ms = 3,5 s), alle Bewegungen unabhängig; der Kopf bleibt als Ganzes stehen:
 * Atmen (Periode 25, 2× pro Schleife; oben in Frames 3–14 und 28–39): Zeile 12 (Brust) wird eingefügt — Kopf, Ohren und Halsband heben
   sich 1 px, die Füße bleiben am Boden.
 * Lockige Ohren schwingen: links in Frames 2, 14, 27, 39, rechts in 8, 20, 33, 44 (je 6 Frames) nach außen und zurück: erst nur die
@@ -28,8 +28,8 @@ Ablauf (50 Frames à 70 ms = 3,5 s), alle Bewegungen unabhängig; der Kopf bleib
 * Locken wippen: die drei Fellbüschel oben (3,0) (7,0) (10,0) sind zugleich der Umriss über der Kopf-/Ohroberkante (Zeile 1) — sie dürfen deshalb
   nicht wegrutschen (das legte den Ohrrand frei). Stattdessen kringelt sich jede Locke unabhängig: ein zweites Pixel erscheint 1 px seitlich
   (über dem Umrisspixel von Zeile 1) und verschwindet wieder (Frames 4–8, 30–34 links/rechts, 16–20, 37–41, 8–12, 23–27).
-* Blick nur mit den Augen, hoch/runter (Frames 15–20 hoch, 26–31 runter, 44–48 hoch); die frei werdende Stelle bekommt die Fellfarbe. Der Blick wechselt nie
-  während oder direkt nach dem Blinzeln: nach dem Öffnen stehen die Augen exakt dort, wo sie vor dem Schließen standen.
+* Kein Blickwechsel: die Augen bleiben auf ihrer Ruhezeile (Nutzerwunsch; der frühere Hoch-/Runterblick ist entfernt). Beim Blinzeln ersetzt das Lid nur die
+  Augenpixel, danach stehen sie wieder genau dort, wo sie vorher standen.
 * Blinzeln (Frames 9–12 und 34–37, alle 25 Frames ≈ 1,75 s): Die braunen Augen schließen sich mit dem DUNKLEN Lid in der Fellfarbe des Gesichts
   (B (51,47,44), wie das Fell neben den Augen): erst nur das obere Augenpixel (halb), dann beide (ganz, zwei Frames), dann wieder das obere. Der
   Wechsel ist gut sichtbar, weil die braunen Augen für diese Frames verschwinden.
@@ -96,7 +96,7 @@ LOCKEN = {3: ((4, 9, -1), (30, 35, 1)), 7: ((16, 21, 1), (37, 42, -1)), 10: ((8,
 
 def zustand(i):
     atem = 1 if (i % 25) in range(3, 15) else 0
-    blick = 1 if im_fenster(i, (15, 21), (44, 49)) else (-1 if im_fenster(i, (26, 32)) else 0)    # +1 hoch, −1 runter (nie während/unmittelbar nach dem Blinzeln 9–12, 34–37)
+    blick = 0                                                       # kein Hoch-/Runterblicken: die Augen bleiben auf ihrer Ruhezeile (Nutzerwunsch)
     ohr_li = max(T.huellkurve(i, N, s, 6) for s in (2, 14, 27, 39))
     ohr_re = max(T.huellkurve(i, N, s, 6) for s in (8, 20, 33, 44))
     lid = 0

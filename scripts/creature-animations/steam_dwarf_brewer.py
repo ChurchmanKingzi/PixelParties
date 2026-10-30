@@ -1,9 +1,13 @@
 # -*- coding: utf-8 -*-
 """Idle-Animation für „Steam Dwarf Brewer“ (Creature) — der Dampfzwerg mit den drei Dampfrohren auf dem Kopf.
 
-Quelle: src/steam-dwarf-brewer.png (24×28 px, 25 Farben).
-PICK: [["MotiveSteamDwarfs", 441, 1]]      (Ebene „Ebene #88“, Figur 1; Fässer/Kessel daneben (Ebene 443) und Flammen (Ebene 440) sind Beiwerk
-                                            und nicht Teil dieses Sprites)
+Quelle: src/steam-dwarf-brewer.png (34×29 px, 30 Farben) = Komposit aus zwei Ebenen derselben Datei (Positionen per Template-Matching mit Farbtoleranz aus der Kartenkunst
+Steam_Dwarf_Brewer.png abgeglichen):
+PICK: [["MotiveSteamDwarfs", 441, 1], ["MotiveSteamDwarfs", 443, 5]]
+  * Ebene 441 (Figur 1, 24×28 px): der Zwerg bei (0, 0)                              → src/steam-dwarf-brewer-zwerg.png
+  * Ebene 443 (Figur 5, 16×14 px): das UMGEKIPPTE FASS (grauer Stahlzylinder auf der Seite, dunkle Öffnungsscheibe rechts) bei (18, 15) → src/steam-dwarf-brewer-fass.png
+    Es liegt in der Kartenkunst HINTER dem Zwerg (der rechte Umhang verdeckt die linke obere Fasspartie); die Fassebene ist vollständig (verdeckte Teile sind da).
+  Die anderen Fässer der Ebene 443 (aufrecht, zum Teil mit Flüssigkeit) und die Flammen (Ebene 440) bleiben Beiwerk der Kunst und sind nicht im Sprite.
 
 Aufruf:   python3 steam_dwarf_brewer.py [--preview <ordner>]
 Ausgabe:  ../../data/creature-animations/steam-dwarf-brewer.png + .json
@@ -19,7 +23,10 @@ Was im Sprite ist (x, y im 24×28-Sprite):
   Umriss C (106,106,106) links/rechts und einer Unterkante C (y 26) + schwarzem Umriss (y 27) mit Lücke in der Mitte.
 * UMHANG/ÄRMEL: links (x 0–5, y 16–26) und rechts (x 16–23, y 16–23) dunkelrot (O (23,0,0) < X < Y < N (61,0,0) < H (84,0,0) < S (110,0,0)) mit schwarzem Umriss A;
   hängt neben dem Bart herab (Deutung unsicher: Schulterpartie/Mantel/Ärmel).
-Fest bleiben: Kopf-Haut, Augen, Nase, Bartform (außer Atmen/Glanz), Haarkranzkante.
+* FASS (x 18–33, y 15–28 im 34×29-Komposit): grauer Stahlzylinder auf der Seite (Umriss A (43,43,43), Stahlrampe B (89,89,89) < C (137,137,137) < D (160,160,160) < E (205,205,205),
+  senkrechte Lichtstreifen), rechts die dunkle Öffnungsscheibe (Zeilen 1–7, x 11–15; rechts unten ist der Rumpf ausgespart: dort zeigt die Kunst eine Pfütze/Dunst – nicht eindeutig, deshalb
+  nicht animiert). Das Fass liegt fest und bewegt sich nicht; nur der Stahl glänzt (Lichtband), wenn die Rohre glänzen (Regel 14).
+Fest bleiben: Kopf-Haut, Augen, Nase, Bartform (außer Atmen/Glanz), Haarkranzkante, Fass (außer Glanz).
 
 Ablauf (48 Frames à 62 ms = 2,98 s, nahtlos):
 * Auf und ab (zweistufig, Periode 24 = zweimal pro Schleife): Brust zuerst 1 px (Bartzeile 21 wird einmal doppelt eingefügt: Kopf, Rohre, Bart, Umhang steigen, Bartspitze/Unterkante
@@ -27,17 +34,17 @@ Ablauf (48 Frames à 62 ms = 2,98 s, nahtlos):
   Kinnzeile fest). Kopf mit Rohren 0 → 1 → 2 → 1 → 0 px, Bart/Umhang 0 → 1 → 0.
 * Dampfrohre zittern (Dampfdruck): die oberen Rohrzeilen (0–2) jedes Rohrs schlagen seitlich ±1 px aus, jedes Rohr mit eigener Periode (links/rechts 12 Frames gegenphasig,
   Mitte 16); die Zeilen 0–2 verschieben sich gemeinsam, daher bleibt jedes Rohr 4-verbunden.
-* Umhang weht: der Umhang (links Zeilen 18–26, rechts Zeilen 18–23) spreizt sich abwechselnd links/rechts nach außen (bis 2 px am unteren Ende, Periode 24): der innerste
+* Umhang weht (ruhig): der Umhang (links Zeilen 18–26, rechts Zeilen 18–23) spreizt sich abwechselnd links/rechts nach außen (höchstens 1 px am unteren Ende, eine Welle pro Schleife, Periode 48): der innerste
   Umhangpixel jeder Zeile bleibt am Bartumriss angewachsen, alles Äußere rückt hinaus, die Lücke wird mit der Umhangfarbe gefüllt (`Hm.rand_dehnen`) — der Umhang reißt also nie
   vom Bart ab. Nach innen geht nichts (da liegt der Bart).
 * Dampf steigt aus allen drei Rohren auf (Partikel): neun runde Dampfwolken ('m' Wölkchen, 'o' Oval, 'k' Funke) in Weiß/Hellgrau steigen langsam auf (16–19 px pro Schleife),
   mit leichtem Wackeln, wachsen/schrumpfen (L.puff_ebene), hinter der Figur.
-* Metall glänzt (Regel 12/14: nur Metall): ein Lichtband läuft zweimal pro Schleife (Frames 3–16 und 27–40) diagonal über Rohre und Metallstreifen, 1–2 Stufen heller auf der Rampe des Sprites
-  (Bart, Umhang und Dampf glänzen nicht); je ein vierzackiger Glitzer-Stern an der linken Rohrspitze (Frames 10–13), an der rechten (Frames 26–29) und am Metallstreifen
+* Metall glänzt (Regel 12/14: nur Metall): ein Lichtband läuft zweimal pro Schleife (Frames 3–16 und 27–40) diagonal über Rohre und Metallstreifen, danach (Frames 9–22 und 33–46) über das Stahlfass,
+  jeweils 1 Stufe heller auf der Rampe des Sprites, nur auf Innenpixeln (Bart, Umhang, Dampf und Umrisse glänzen nicht); je ein vierzackiger Glitzer-Stern an der linken Rohrspitze (Frames 10–13), an der rechten (Frames 26–29) und am Metallstreifen
   rechts (Frames 40–43).
 Frame 0 = Original (Ruhepose), der Dampf ausgenommen. Kontrolle: anim_humanoide.ruhepose / eckkontakt_typen.
 Alle Bewegungen laufen auf der vollen Leinwand (anim_lib wirft ClipError). Nur ganze Pixel, nur Farben der Quelle.
-Ergänzungen: keine (es wird nichts verschoben, was Verdecktes freilegt; Umhang schwingt frei am oberen Ansatz).
+Ergänzungen: keine (das Fass liegt vollständig vor; der Umhang schwingt frei am oberen Ansatz und geht höchstens 1 px über das Fass).
 """
 import math
 import sys
@@ -48,18 +55,22 @@ import anim_humanoide as Hm
 import anim_lib as L
 
 N, MS = 48, 62
-PAD_L, PAD_R, PAD_T, PAD_B = 8, 8, 22, 3
+PAD_L, PAD_R, PAD_T, PAD_B = 6, 5, 22, 3
 
-spr = L.lade('steam-dwarf-brewer')
-sh, sw = spr.shape[:2]
-H, W = sh + PAD_T + PAD_B, sw + PAD_L + PAD_R
+spr = L.lade('steam-dwarf-brewer')                    # Komposit (Zwerg + Fass): Referenz für Ruhepose und Randpixel-Test
+zw = L.lade('steam-dwarf-brewer-zwerg')               # nur der Zwerg (24×28) — alle Masken/Koordinaten unten beziehen sich auf ihn
+FASS = L.lade('steam-dwarf-brewer-fass')              # das umgekippte Fass (16×14)
+FASS_POS = (18, 15)
+ch, cw = spr.shape[:2]
+sh, sw = zw.shape[:2]
+H, W = ch + PAD_T + PAD_B, cw + PAD_L + PAD_R
 OFF = (PAD_L, PAD_T)
 yy, xx = np.mgrid[0:sh, 0:sw]
-vorhanden = L.deckend(spr)
+vorhanden = L.deckend(zw)
 
 
 def f(x, y):
-    return tuple(int(v) for v in spr[y, x, :3])
+    return tuple(int(v) for v in zw[y, x, :3])
 
 
 PIPE_RAMPE = [(62, 62, 62), (81, 81, 81), (108, 108, 108), (156, 156, 156), (189, 189, 189)]
@@ -78,7 +89,7 @@ for m in (arm_l, arm_r):                                   # nur dunkle Umhangfa
             m[y, x] = False
 kopfteil = vorhanden & ~arm_l & ~arm_r
 
-KANTE0 = Hm.kantenmaske(spr)
+KANTE0 = Hm.kantenmaske(zw)
 ERLAUBT = Hm.umrissfarben(spr)                                   # Farben der Außenkante im Original (Regel 16)
 
 # Masken für das Lichtband
@@ -107,12 +118,18 @@ def rohr_stufe(i, name):
 
 
 def umhang_dx(y, y0, ymax, v):
-    return int(round(2.0 * (y - y0) / (ymax - y0) * v))
+    return int(round(1.0 * (y - y0) / (ymax - y0) * v))               # höchstens 1 px (nur am unteren Ende, wenn die Welle fast voll ist)
 
 
 def teil(maske_):
-    t, _ = L.trenne(spr, maske_)
+    t, _ = L.trenne(zw, maske_)
     return L.platz(t, H, W, PAD_L, PAD_T)
+
+
+# Fass: Innenpixel für den Glanz (Umrisspixel bleiben unverändert)
+FASS_RAMPE = [(43, 43, 43), (89, 89, 89), (137, 137, 137), (160, 160, 160), (205, 205, 205)]
+m_fass = L.deckend(FASS) & ~Hm.kantenmaske(FASS)
+FASS_OFF = (PAD_L + FASS_POS[0], PAD_T + FASS_POS[1])
 
 
 def frame(i, dampf=True):
@@ -130,8 +147,8 @@ def frame(i, dampf=True):
             tab = ROHR_STUFE[min(2, abs(a))]
             Hm.bereich_versatz(kp, OFF, {y: int(math.copysign(d, a)) for y, d in tab.items()}, x0, x1)
     # --- Umhang weht (spreizt sich nur nach außen, am Bart bleibt er angewachsen): links Zeilen 18–26, rechts Zeilen 18–23 ---
-    vl = max(0.0, math.sin(L.sinus(i, N / 2)))
-    vr = max(0.0, math.sin(L.sinus(i, N / 2) + math.pi))
+    vl = max(0.0, math.sin(L.sinus(i, N)))
+    vr = max(0.0, math.sin(L.sinus(i, N) + math.pi))
     Hm.rand_dehnen(al, OFF, {y: umhang_dx(y, 17, 26, vl) for y in range(18, 27)}, 'l')
     Hm.rand_dehnen(ar, OFF, {y: umhang_dx(y, 17, 23, vr) for y in range(18, 24)}, 'r')
     # --- Auf und ab: Brust zuerst (Bartzeile 21), Kopf 3 Frames später (Kinnzeile 16, nur Kopfteil) ---
@@ -144,7 +161,11 @@ def frame(i, dampf=True):
     if kopf:
         kp = L.streck_zeile(kp, PAD_T + 16 - brust, kopf)
     hub = brust + kopf
-    fig = L.zusammen(H, W, [(al, 0, 0), (ar, 0, 0), (kp, 0, 0)])
+    # --- das Fass liegt hinter dem Zwerg; nur der Stahl glänzt (zweimal pro Schleife, im Anschluss an die Rohre) ---
+    fa = L.platz(FASS, H, W, FASS_OFF[0], FASS_OFF[1])
+    for start in (9, 33):
+        Hm.lichtband(fa, m_fass, FASS_OFF, i, N, start, 14, FASS_RAMPE, stufen=1, breite=3.0, achse=(1.0, 1.0), kern=1)
+    fig = L.zusammen(H, W, [(fa, 0, 0), (al, 0, 0), (ar, 0, 0), (kp, 0, 0)])
     Hm.kontur_schliessen(fig, ERLAUBT, (0, 0, 0))                 # Regel 16: Außenkante in jeder Pose in Umrissfarbe (z. B. am Umhang)
     # --- Glitzer-Sterne an den Rohrspitzen und am Metallstreifen (Effekt über der Figur, mit dem Kopf mitgehoben) ---
     gl = L.leer(H, W)

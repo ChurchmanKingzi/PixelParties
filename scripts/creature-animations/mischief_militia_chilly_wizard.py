@@ -25,9 +25,9 @@ Ablauf (48 Frames à 62 ms = 2,98 s, nahtlos):
   4-verbunden (Eckkontakt-Kontrolle in der Prüfung).
 * Krempenenden flattern: das linke (x 0, C) und rechte (x 14, A) Krempenende wächst gegenphasig um 1 Umrisspixel nach oben bzw. unten (Periode 24), 4-verbunden mit der Nachbarspalte.
 * KEIN Glanz (Regel 14): Hut, Sterne und Eisrand glänzen/funkeln NICHT (kein Lichtband, keine Glitzersterne, keine blinkenden Hutsterne).
-* Magiefunken (6 kreisende + 2 auf und ab): acht kleine runde Funken (1 px, einige wachsen in Ellipsenmitte zu 2×2) in Hutblau B/G, Weiß/Lavendel N/J und Gelb I (alles Farben des Sprites)
-  kreisen langsam (eine Runde pro Schleife) in flachen Ellipsen um Hut (drei, Rechtslauf) und Körper (drei, Linkslauf); zwei weitere steigen links/rechts neben der Krempe sanft auf und ab. Die Funken
-  auf der Rückseite der Ellipse liegen hinter der Figur, die auf der Vorderseite davor; Hut-Funken steigen mit dem Hut, Körper-Funken mit dem Körper.
+* Magiefunken (6 kreisende + 2 auf und ab): acht runde Funken (Tiefenwirkung: auf der Vorderseite der Bahn groß 2×2, auf der Rückseite klein 1 px — die Größe hängt nur von der Tiefe ab, nicht von der Zeit) in Hutblau B/G, Weiß/Lavendel N/J und Gelb I (alles Farben des Sprites)
+  kreisen langsam (eine Runde pro Schleife) in flachen Ellipsen um Hut (drei, Rechtslauf) und Körper (drei, Linkslauf); zwei weitere (2×2, stehen vor dem Hut) steigen links/rechts neben der Krempe sanft auf und ab. Die Funken
+  auf der Rückseite der Ellipse liegen hinter der Figur (1 px), die auf der Vorderseite davor (2×2); Hut-Funken steigen mit dem Hut, Körper-Funken mit dem Körper.
 Frame 0 = Original (Ruhepose), die Funken ausgenommen. Kontrolle: anim_humanoide.ruhepose / eckkontakt_typen.
 Alle Bewegungen laufen auf der vollen Leinwand (anim_lib wirft ClipError). Nur ganze Pixel, nur Farben der Quelle.
 Ergänzungen: keine (es wird nichts verschoben, was Verdecktes freilegt).
@@ -87,7 +87,7 @@ def teil(maske):
     return L.platz(t, H, W, PAD_L, PAD_T)
 
 
-# Magiefunken: kleine runde Funken (1 px oder 2×2) kreisen langsam in flachen Ellipsen um Hut und Körper (eine Runde pro Schleife) und bobben sanft auf und ab.
+# Magiefunken: kleine runde Funken (Vorderseite der Bahn 2×2, Rückseite 1 px) kreisen langsam in flachen Ellipsen um Hut und Körper (eine Runde pro Schleife) und bobben sanft auf und ab.
 # (cx, cy) Mittelpunkt in Spritekoordinaten, (rx, ry) Halbachsen, Phase (0–1), Richtung ±1, Farbe, Bezug: 'hut' steigt mit dem Hut, 'koerper' mit dem Körper
 FUNKEN = [
     dict(cx=7.5, cy=6.0, rx=9.5, ry=2.5, ph=0.00, r=+1, farbe=GELB, bez='hut', gross=True),
@@ -102,7 +102,8 @@ FUNKEN = [
 
 
 def funken_ebenen(i, brust, hub):
-    """(hinten, vorn): zwei Leinwandebenen; Funken auf der Rückseite der Ellipse (sin < 0) liegen hinter der Figur, die auf der Vorderseite davor."""
+    """(hinten, vorn): zwei Leinwandebenen; Funken auf der Rückseite der Ellipse (sin < 0) liegen hinter der Figur und sind klein (1 px),
+    die auf der Vorderseite (sin > 0) davor und groß (2×2) — die Größe hängt nur von der Tiefe auf der Bahn ab."""
     hinten, vorn = L.leer(H, W), L.leer(H, W)
     for sp in FUNKEN:
         th = 2 * math.pi * (sp['r'] * i / N + sp['ph'])
@@ -111,7 +112,7 @@ def funken_ebenen(i, brust, hub):
         y -= hub if sp['bez'] == 'hut' else brust
         ebene = vorn if math.sin(th) > 0 else hinten
         X, Y = PAD_L + int(round(x)), PAD_T + int(round(y))
-        gross = sp['gross'] and abs(math.sin(th)) > 0.6                        # 2×2 nur in Ellipsenmitte-Nähe oben/unten (wächst/schrumpft)
+        gross = math.sin(th) > 0 or sp['rx'] < 1.5                             # Tiefe: Vorderseite der Bahn 2×2, Rückseite 1 px (die zwei Seitenfunken stehen vor dem Hut: 2×2)
         pts = [(X, Y)] + ([(X + 1, Y), (X, Y + 1), (X + 1, Y + 1)] if gross else [])
         for (px, py) in pts:
             if not (0 <= px < W and 0 <= py < H):

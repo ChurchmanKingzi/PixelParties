@@ -43,7 +43,7 @@ import anim_humanoide as Hm
 import anim_lib as L
 
 N, MS = 48, 62
-PAD_L, PAD_R, PAD_T, PAD_B = 6, 8, 14, 3
+PAD_L, PAD_R, PAD_T, PAD_B = 6, 6, 6, 3
 
 spr = L.lade('chaorc-pyre-grill-master')                     # zusammengesetzte Ruhepose (Referenz, Randpixel-Test)
 FEUER0 = L.lade('chaorc-pyre-grill-master-feuer')
@@ -80,7 +80,7 @@ for k in range(N_ZUNGEN):
         continue
     oben = sum(prof[x][0] for x in xs) / len(xs)
     unten = max(prof[x][1] for x in xs)
-    ZUNGEN.append(FEU.Zunge(x0 + PAD_L, unten + PAD_T, round(unten - oben + 1), 4.0))
+    ZUNGEN.append(FEU.Zunge(x0 + PAD_L, unten + PAD_T, round(0.92 * (unten - oben + 1)), 4.0))
 # Koch ist fest im Weg (Feuer wird nicht über ihn gezeichnet); der Spieß liegt davor und wird nicht ausgespart (Feuer darunter, kein Loch beim Gleiten)
 sperre = np.zeros((H, W), bool)
 for y in range(KOCH.shape[0]):
@@ -97,7 +97,7 @@ class FeuerKompakt(FEU.Feuer):
     h_bereich   Höhenfaktoren der Posen (Standard 0.86 … 1.14), lean/bend/dk wie das Original, aber gemäßigt."""
 
     def __init__(self, h, w, zungen, rampe, n=48, seed=1, posen=12, amplitude=1.0, sperre=None, tempo=(2, 3),
-                 min_breite=2, faden_max=2, spalten=0.06, spalt_ab=3.8, h_bereich=(0.86, 1.14)):
+                 min_breite=2, faden_max=2, spalten=0.06, spalt_ab=3.8, h_bereich=(0.9, 1.1)):
         import random
         self.min_breite, self.faden_max, self.spalten, self.spalt_ab, self.h_bereich = min_breite, faden_max, spalten, spalt_ab, h_bereich
         self.h, self.w, self.zungen, self.rampe, self.n, self.amp = h, w, list(zungen), rampe, n, amplitude
@@ -169,30 +169,20 @@ class FeuerKompakt(FEU.Feuer):
                             idx[y, x] = k
 
     def _faeden_kuerzen(self, idx):
-        """Kürzt 1-px-breite Spitzen auf höchstens `faden_max` Zeilen (schneidet überlange Fäden an der Spitze ab)."""
-        for _ in range(60):
-            m = idx >= 0
-            pad = np.pad(m, 1)
-            links, rechts = pad[1:-1, :-2], pad[1:-1, 2:]
-            duenn = m & ~links & ~rechts                                        # Zeile mit Lauflänge 1
-            oben = ~pad[:-2, 1:-1] & ~pad[:-2, :-2] & ~pad[:-2, 2:]             # nichts darüber (auch nicht schräg)
-            gekappt = False
-            for y, x in zip(*np.nonzero(duenn & oben)):
-                lang, cx = 1, x                                                 # Kettenlänge nach unten
-                yy = y
-                while yy + 1 < self.h and lang <= self.faden_max:
-                    nxt = [xx for xx in (cx - 1, cx, cx + 1) if 0 <= xx < self.w and m[yy + 1, xx]]
-                    if len(nxt) == 1 and duenn[yy + 1, nxt[0]]:
-                        yy += 1
-                        cx = nxt[0]
-                        lang += 1
-                    else:
-                        break
-                if lang > self.faden_max:
-                    idx[y, x] = -1
-                    gekappt = True
-            if not gekappt:
-                break
+        """Alles, was dünner als 2 px ist (Fäden, Haken, 1-px-Äste), wird auf höchstens `faden_max` px Länge zurückgestutzt: Öffnung mit 2×2 (Kern bleibt)
+        und danach höchstens `faden_max` Schritte (4er-Nachbarschaft) zurück zum Original — so behalten die Spitzen ihre 1–2 Pixel Auslauf."""
+        m = (idx >= 0)
+        voll = m | self.sperre                                                  # der feste Koch zählt als Material
+        pad = np.pad(voll, ((0, 1), (0, 1)))
+        er = pad[:-1, :-1] & pad[:-1, 1:] & pad[1:, :-1] & pad[1:, 1:]          # linke obere Ecke eines vollen 2×2-Blocks
+        e = np.pad(er, ((1, 0), (1, 0)))
+        kern = e[1:, 1:] | e[1:, :-1] | e[:-1, 1:] | e[:-1, :-1]                # Dilatation mit 2×2 = Öffnung
+        kern &= voll
+        r = kern.copy()
+        for _ in range(self.faden_max):
+            q = np.pad(r, 1)
+            r = r | (voll & (q[:-2, 1:-1] | q[2:, 1:-1] | q[1:-1, :-2] | q[1:-1, 2:]))
+        idx[m & ~r] = -1
 
     def _luecken_fuellen(self, idx):
         """Füllt 1-px-Schlitze (links+rechts oder oben+unten belegt) und eingeschlossene Löcher mit Rot — keine Gabeln mit hauchdünner Kerbe."""

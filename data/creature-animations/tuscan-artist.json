@@ -1,15 +1,15 @@
 {
   "creature": "Tuscan Artist",
   "sheet": "tuscan-artist.png",
-  "frameWidth": 38,
-  "frameHeight": 49,
+  "frameWidth": 35,
+  "frameHeight": 47,
   "frames": 48,
   "frameMs": 62,
   "loop": true,
   "layout": "horizontal",
-  "padTop": 5,
+  "padTop": 3,
   "padLeft": 5,
   "padRight": 6,
   "padBottom": 3,
-  "faceX": 19.0
+  "faceX": 17.5
 }

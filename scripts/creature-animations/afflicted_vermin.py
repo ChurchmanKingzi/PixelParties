@@ -7,7 +7,7 @@ das obere linke (Ausschnitt x 0–13, y 0–19 der extrahierten Figur, Rest = da
 Die Ebene hat nur Alpha 0/255 (keine Halbtransparenz).
 
 Aufruf:   python3 afflicted_vermin.py [--preview <ordner>]
-Ausgabe:  ../../data/creature-animations/afflicted-vermin.png + .json   (Frame 22×25 px, 48 Frames)
+Ausgabe:  ../../data/creature-animations/afflicted-vermin.png + .json   (Frame 24×25 px, 48 Frames)
 
 Was im Sprite ist (Koordinaten im Sprite, x/y ab 0):
 * Tongefäß (Zeilen 9–19, x 0–13): Krug in vier ocker-gelben Stufen A=(194,150,0), B=(234,180,9), F=(254,197,22), L=(255,219,79) (Lichtpunkte bei
@@ -28,16 +28,16 @@ Ablauf (48 Frames à 65 ms = 3,12 s, nahtlos):
 * Pilz: der Hut schwingt an der Spitze bis ±2 px seitlich (Periode 16, Versatz wächst zur Spitze, Spitze hinkt nach).
 * Nase zuckt (hüpft 1 px nach oben, Frames 6–7, 14–15, 30–31, 38–39); Augen blinzeln (Frames 20–22 und 40–42: rot → Fell) und glimmen
   schwächer (rot → dunkles Rosa, Frames 10–11, 26–27, 44).
-* Sporen (Partikel): acht kleine runde Sporen lösen sich links und rechts unter dem Pilzhut und regnen langsam (0,5 px/Frame) nach unten, seitlich
-  leicht auswärts treibend: erst 1 px (Pilzviolett R), dann 2×2 (Kern N, Rand R), vor dem Verschwinden wieder 1 px und blinkend (verglimmt).
-  Sie fallen neben der Figur und die letzten Pixel vor dem Krug-Rand; nie unter den Rand des Frames (Fallhöhe ≤ Spritehöhe). Zwei Zyklen je 48 Frames.
+* Sporen (Partikel): acht kleine runde Sporen lösen sich links und rechts unter dem Pilzhut, driften erst 1–4 px nach außen (an Ohren und Kopf vorbei) und
+  regnen dann langsam (0,6–0,7 px/Frame) senkrecht nach unten (Leben 18 von 24 Frames, etwa sechs gleichzeitig sichtbar): erst 1 px (Pilzviolett R), dann 2×2 (Kern N, Rand R), vor dem Verschwinden wieder 1 px und blinkend (verglimmt).
+  Sie fallen neben der Figur und am Ende ein Stück vor dem Krugrand; nie unter den Rand des Frames (Fallhöhe ≤ 13 px). Zwei Zyklen je 48 Frames.
 * KEIN Glanz (Regel 14): weder Lichtband noch Glitzersterne noch Goldstaub — Krug (Ton), Fell und Pilz glänzen nicht.
 Ergänzungen: Hals der Ratte im Krugmund bei Zeile 9: (5–8, 9) in Halsfarbe H=(66,60,47), dazu Seitenumriss (4, 9) D=(82,60,38) und (9, 9)
 M=(29,20,14) — wird sichtbar, sobald sich der Kopf hebt (liegt bei Ruhe hinter dem Kinn). Außerdem werden Innenpixel, die beim
 Schwingen des Pilzes oder Heben des Kopfes am Rand frei liegen, mit der Umrissfarbe eingefasst (Pilz J, Kopf D, Krug A).
 Nähte (Regel 11) und Randpixel (Regel 16): Kopf, Pilz, Hals und Krug liegen 4-verbunden; je Frame prüft das Skript, dass die Figur aus
 genau einem 4-zusammenhängenden Teil besteht (`randtest.py`: 0 Frames mit Randpixeln in Nicht-Umrissfarbe).
-Frame: nur so groß wie nötig — Figur 14×20 px mit 4 px Rand links/rechts (Platz für die Sporen), 3 px oben, 2 px unten (Mindestabstand).
+Frame: nur so groß wie nötig — Figur 14×20 px mit 5 px Rand links/rechts (Platz für die Sporen), 3 px oben, 2 px unten (Mindestabstand).
 Alle Bewegungen laufen auf der vollen Leinwand (anim_lib/anim_amorph werfen ClipError). Nur ganze Pixel, nur Farben der Quelle.
 """
 import math
@@ -49,7 +49,7 @@ import anim_lib as L
 import anim_amorph as A
 
 N, MS = 48, 65
-PAD_L, PAD_R, PAD_T, PAD_B = 4, 4, 3, 2
+PAD_L, PAD_R, PAD_T, PAD_B = 5, 5, 3, 2
 
 spr = L.lade('afflicted-vermin')
 sh, sw = spr.shape[:2]
@@ -84,11 +84,14 @@ AUGEN_DIMM = {10, 11, 26, 27, 44}
 NASE_ZUCKT = {6, 7, 14, 15, 30, 31, 38, 39}
 assert KOPF_DY[0] == 0
 
-# Sporen: (x, y) = Startpunkt im Sprite (unter dem Pilzhut), (vx, vy) = Gesamtweg über die Lebensdauer, Phase = Startframe
-LEBEN, PERIODE = 20, 24
+# Sporen: (x0, y0) = Startpunkt im Sprite (links/rechts unter dem Pilzhut), vx = seitlicher Weg in den ersten 6 Frames (danach fallen sie senkrecht,
+# damit sie nie über Ohren oder Kopf laufen), vy = Fallweg über die Lebensdauer, f0 = Startframe, wig = seitliches Pendeln (0/1 px)
+LEBEN, PERIODE = 18, 24
 SPOREN = [
-    dict(x=5, y=3, vx=-3, vy=10, f0=0), dict(x=12, y=2, vx=2, vy=10, f0=3), dict(x=3, y=1, vx=-2, vy=11, f0=6), dict(x=13, y=1, vx=1, vy=12, f0=9),
-    dict(x=5, y=2, vx=-2, vy=9, f0=12), dict(x=12, y=4, vx=2, vy=8, f0=15), dict(x=4, y=0, vx=-1, vy=12, f0=18), dict(x=13, y=3, vx=2, vy=10, f0=21),
+    dict(x=4, y=1, vx=-4, vy=12, f0=0, wig=1), dict(x=12, y=1, vx=2, vy=12, f0=3, wig=1),
+    dict(x=4, y=2, vx=-3, vy=11, f0=6, wig=0), dict(x=12, y=2, vx=1, vy=11, f0=9, wig=0),
+    dict(x=3, y=0, vx=-3, vy=13, f0=12, wig=1), dict(x=12, y=0, vx=2, vy=13, f0=15, wig=1),
+    dict(x=4, y=1, vx=-4, vy=11, f0=18, wig=0), dict(x=12, y=1, vx=1, vy=12, f0=21, wig=0),
 ]
 
 
@@ -99,11 +102,11 @@ def sporen_ebene(i):
         a = (i - sp['f0']) % PERIODE
         if a >= LEBEN:
             continue
-        x = sp['x'] + int(round(sp['vx'] * a / float(LEBEN))) + int(round(0.7 * math.sin(2 * math.pi * a / 10.0)))
+        x = sp['x'] + int(round(sp['vx'] * min(1.0, a / 6.0))) + sp['wig'] * int(round(0.7 * math.sin(2 * math.pi * a / 10.0)))
         y = sp['y'] + int(round(sp['vy'] * a / float(LEBEN)))
         if a < 3:
             pix = [(0, 0, VR)]
-        elif a < LEBEN - 6:
+        elif a < LEBEN - 7:
             pix = [(0, 0, VN), (1, 0, VR), (0, 1, VR), (1, 1, VR)]
         elif a < LEBEN - 1 and a % 2 == 0:
             pix = [(0, 0, VR)]

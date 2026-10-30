@@ -1,0 +1,15 @@
+{
+  "creature": "Slippery Whoolmoth",
+  "sheet": "slippery-whoolmoth.png",
+  "frameWidth": 85,
+  "frameHeight": 57,
+  "frames": 48,
+  "frameMs": 70,
+  "loop": true,
+  "layout": "horizontal",
+  "padTop": 6,
+  "padLeft": 9,
+  "padRight": 9,
+  "padBottom": 4,
+  "faceX": 42.5
+}
