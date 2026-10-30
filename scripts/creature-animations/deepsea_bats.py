@@ -17,14 +17,14 @@ Identifikation (Sprite-Koordinaten x, y; jede Fledermaus von vorn, Flügel = tü
 Ablauf (48 Frames à 60 ms = 2,88 s):
 * Durchgehender Flügelschlag, jede Fledermaus in ihrem eigenen konstanten Rhythmus (alle teilen sich 48): A Periode 12, B Periode 8 (kleiner, schneller), C Periode 12. Jeder Flügel dreht sich um seine Schulter am Körper;
   die rechte Seite ist das exakte Spiegelbild der linken (Flügel und Körper des Sprites sind spiegelgleich). A und B schlagen aus der V-Haltung (Frame 0 = Original) bis 75° bzw. 70° nach unten (Drehung der Flügel, Rückwärtsabbildung, Nächster Nachbar); bei C (waagerechte Rauten) würde Drehen
-  die Raute zerreißen, dort wandert jede Flügelspalte senkrecht (Spaltenversatz bis 4 px an der Spitze nach unten und oben, Frame 0 = Original). Die Flügel behalten ihre Pixeltextur; der Abschlag ist etwas schneller als der Aufschlag.
+  die Raute zerreißen, dort wandert jede Flügelspalte senkrecht (Spaltenversatz an der Spitze bis 4 px nach unten und 1,5 px nach oben, Frame 0 = Original; so bleibt zu Fledermaus B immer mindestens 1 px Luft). Die Flügel behalten ihre Pixeltextur; der Abschlag ist etwas schneller als der Aufschlag.
 * Schwebe-Bob je Fledermaus zweistufig bis 2 px nach oben (0 → 1 → 2 → 1 → 0) im Takt ihres Flügelschlags (Periode 12 bzw. 8): der Körper hebt sich im Abschlag.
 * Blinzeln, jede Fledermaus einmal pro Schleife zu einer anderen Zeit (3 Frames), Lid = Körperfarbe (21,34,57).
 * Kein Glanz, kein Feuer, keine Partikel.
 
 Ergänzungen: keine nötig — die Flügel sitzen außen am Körper, nichts ist verdeckt. Wo das Drehen einen Flügel von der Schulter lösen würde, schließt ein Pixel in der Flughautfarbe (21,34,57) die Lücke (8-verbunden).
 Rahmen: auf die Figur zugeschnitten (Vereinigung aller Frames + 2 px freier Rand, zentriert), keine Effekte außerhalb der Figur.
-Randpixel-Test (Regel 16): die Randfarben der Quelle sind alle vier Quellfarben, das Drehen legt nur Quellfarben an den Rand; zusätzlich randtest.py.
+Randpixel-Test (Regel 16): die Randfarben der Quelle sind die drei Körper-/Flügelfarben (21,34,57), (41,75,96), (61,108,122); Drehen und Spaltenversatz legen nur diese an den Rand; zusätzlich randtest.py.
 Alle Bewegungen laufen auf der vollen (größeren) Arbeitsleinwand (anim_lib wirft ClipError). Nur ganze Pixel, nur Farben der Quelle, Alpha nur 0/255.
 """
 import math
@@ -53,7 +53,7 @@ assert n_teile == 4, n_teile
 BATS = [
     dict(name='A', typ='V', auge=(7, 5), T=12, tief=75.0, blinz=(14, 15, 16)),
     dict(name='B', typ='V', auge=(29, 14), T=8, tief=70.0, blinz=(33, 34, 35)),
-    dict(name='C', typ='flat', auge=(13, 20), T=12, amp=4.0, amp_hoch=2.0, blinz=(25, 26, 27)),
+    dict(name='C', typ='flat', auge=(13, 20), T=12, amp=4.0, amp_hoch=1.5, blinz=(25, 26, 27)),
 ]
 for b in BATS:
     ax, ay = b['auge']
