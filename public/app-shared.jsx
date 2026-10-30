@@ -12011,7 +12011,7 @@ function PPDialogBox({ text, eingabe, vorgabe, okText, abbruchText, gefahr, fert
         {eingabe && <input ref={eingabeRef} className="input" value={wert} onChange={(e) => setWert(e.target.value)} style={{ width: '100%', boxSizing: 'border-box', marginBottom: 12, fontSize: 13 }} />}
         <div style={{ display: 'flex', gap: 10, justifyContent: 'center' }}>
           <button className={'btn' + (gefahr ? ' btn-danger' : ' btn-success')} style={{ padding: '8px 22px', fontSize: 12 }} onClick={ok}>{okText || 'OK'}</button>
-          <button className="btn" style={{ padding: '8px 22px', fontSize: 12 }} onClick={nein}>{abbruchText || 'Cancel'}</button>
+          {abbruchText !== false && <button className="btn" style={{ padding: '8px 22px', fontSize: 12 }} onClick={nein}>{abbruchText || 'Cancel'}</button>}
         </div>
       </div>
     </div>
@@ -12028,6 +12028,8 @@ function _ppDialogOeffnen(props) {
   });
 }
 window.ppConfirm = (text, opts) => _ppDialogOeffnen({ text, ...(opts || {}) });
+// Hinweis mit nur einem OK-Knopf (z. B. „Server ist voll“).
+window.ppHinweis = (text, opts) => _ppDialogOeffnen({ text, abbruchText: false, ...(opts || {}) });
 // ── KARTEN VORWAERMEN (tropfenweise, siehe CardImageShim.warmDrip) ───────────────────────────────────────────────────────────────────────
 // Tutorial-Karten: einmal pro Sitzung holen (Server rechnet die Liste aus den Missionen) und im Leerlauf nach und nach bereitlegen.
 let _ppTutorialWarm = false;

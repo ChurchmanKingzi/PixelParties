@@ -1348,6 +1348,27 @@ function getRandomDefaultAvatar() {
   } catch { return null; }
 }
 
+/** Gast-Namen und -Avatare: „Guest <Heldenname>" mit dem zugeschnittenen Kartenbild des Helden (public/avatars/gast/<Name>.png, gebaut von
+ *  scripts/guest-avatars/build.py). Doppelte Namen (gleichzeitig mehrere Gaeste mit demselben Helden) bekommen eine Zahl: „Guest Elana 2". */
+let _gastHelden = null;
+function gastHelden() {
+  if (_gastHelden) return _gastHelden;
+  try { _gastHelden = fs.readdirSync(path.join(__dirname, 'public', 'avatars', 'gast')).filter(f => f.endsWith('.png')).map(f => f.slice(0, -4)); }
+  catch { _gastHelden = []; }
+  return _gastHelden;
+}
+async function neuerGastName(id) {
+  const namen = gastHelden();
+  if (!namen.length) return { username: 'Guest-' + id.slice(0, 8), avatar: getRandomDefaultAvatar() };
+  const held = namen[Math.floor(Math.random() * namen.length)];
+  const avatar = '/avatars/gast/' + encodeURIComponent(held) + '.png';
+  for (let n = 1; n <= 30; n++) {
+    const username = 'Guest ' + held + (n > 1 ? ' ' + n : '');
+    if (!(await db.get('SELECT 1 FROM users WHERE username = ? COLLATE NOCASE', [username]))) return { username, avatar };
+  }
+  return { username: 'Guest-' + id.slice(0, 8), avatar };
+}
+
 /** Pick a random vivid hex color for a brand-new player. The schema's
  *  static `#00f0ff` default made every fresh account share the same
  *  cyan in lobby lists / chat / hero accents — this hand-tuned palette
@@ -2005,13 +2026,13 @@ async function purgeAllGuests() {
 app.post('/api/auth/guest', async (req, res) => {
   try {
     const id = uuidv4();
-    const username = 'Guest-' + id.slice(0, 8);
+    const { username, avatar: gastAvatar } = await neuerGastName(id);
     const passwordHash = unusablePasswordHash(); // nie bekanntes Passwort dahinter: Gaeste koennen sich nicht per Passwort anmelden
     await db.run(
       // Fixed default blue (the login-screen accent, `--accent` in style.css) so the guest UI doesn't flicker a
       // new random colour every session.
       'INSERT INTO users (id, username, password_hash, avatar, color, is_guest) VALUES (?, ?, ?, ?, ?, 1)',
-      [id, username, passwordHash, getRandomDefaultAvatar(), STANDARD_FARBE]
+      [id, username, passwordHash, gastAvatar, STANDARD_FARBE]
     );
     try { await seedInitialOpponents(id); } catch (err) { console.error('[guest] seedInitialOpponents failed:', err.message); }
     // Pin a random Starter Deck as the guest's default so a deck is preselected.
@@ -3847,6 +3868,7 @@ const HERO_ANIM_DIR = path.join(__dirname, 'data', 'hero-animations');
 // setzt die Messung zurueck (zwischen Lasttest-Laeufen). Keine Nutzerdaten, nur Zahlen.
 const { monitorEventLoopDelay } = require('perf_hooks');
 const _elHist = monitorEventLoopDelay({ resolution: 10 }); _elHist.enable();
+app.get('/stats', (req, res) => res.sendFile(path.join(__dirname, 'public', 'stats.html')));   // Statistik-Seite fuer den Betreiber (Token wird im Browser eingegeben)
 app.get('/api/health', (req, res) => {
   const ms = (ns) => Math.round(ns / 1e4) / 100;
   const out = {
@@ -18144,7 +18166,7 @@ io.on('connection', (socket) => {
     // wartet kurz, als dass alle ruckeln. Kampagne und Tutorials (kein MCTS) sind ausgenommen.
     if (!campaign && aktiveCpuPartien() >= MAX_CPU_PARTIEN) {
       console.warn(`[createCpuBattle] abgelehnt: ${aktiveCpuPartien()} laufende CPU-Partien (Grenze ${MAX_CPU_PARTIEN})`);
-      socket.emit('cpu_battle_error', 'The server is very busy right now — please try again in a minute.');
+      socket.emit('cpu_battle_error', 'The server is very busy right now — please try again in a minute.', { busy: true });
       return;
     }
 

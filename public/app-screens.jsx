@@ -5343,8 +5343,11 @@ function SingleplayerScreen() {
         setCpuBattleState(state);
       }
     };
-    const onError = (msg) => {
+    const onError = (msg, meta) => {
       console.error('[SP cpu_battle_error]', msg);
+      setStarting(false);
+      // Server ausgelastet (Zulassungsgrenze): ein ruhiger Hinweis im Spielstil statt der roten Fehlermeldung.
+      if (meta && meta.busy && window.ppHinweis) { window.ppHinweis('The arena is packed right now!\nPlease try again in a minute.', { okText: 'OK' }); return; }
       notify('CPU battle error: ' + msg, 'error');
     };
     socket.on('game_state', onGameState);
