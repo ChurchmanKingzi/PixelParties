@@ -9,7 +9,8 @@ Bausteine für weiche Körper (Schleime) — alles Pixelart, nur ganze Pixel, nu
                                                      verdoppelt/entfernt, der Umriss wandert unverändert nach außen/innen
     dx_zeilen(gewichte, amp, phase)                  Wabbel-Versatz je Körperzeile (Quellzeilen-Index → Pixel); Umrissstufen bleiben
                                                      unverändert, weil nur Zeilen mit senkrechtem Umriss gegeneinander versetzt werden
-    verschiebe_zeilen(zeilen, dxs)                   Zeilen waagerecht versetzen (ClipError statt stillem Abschneiden)
+    verschiebe_zeilen(zeilen, quelle, dx_quelle)     Zeilen waagerecht versetzen (ClipError statt stillem Abschneiden);
+    verschiebe_ausgabezeilen(zeilen, dxs)            dasselbe mit fertigem Versatz je Ausgabezeile
     auf_leinwand(zeilen, h, w, boden, dy)            Zeilenfeld auf die Leinwand setzen — die Unterkante bleibt am Boden
     glanzband(a, t, rampe, maske)                    Lichtreflex wandert diagonal über den Sprite (Farben eine Stufe heller)
     ausdruck_pruefen(frames, spr, …)                 4-Verbundenheit der Figur (ein Teil je Frame) und Randpixel-Farben
@@ -109,6 +110,20 @@ def verschiebe_zeilen(zeilen, quelle, dx_quelle):
             raise L.ClipError(f'Zeile {j} würde um {dx} px aus der Leinwand (Breite {w}) geschoben')
         for x in xs:
             out[j, x + dx] = zeilen[j, x]
+    return out
+
+
+def verschiebe_ausgabezeilen(zeilen, dxs):
+    """Wie verschiebe_zeilen, aber mit einem fertigen Versatz je AUSGABEZEILE (nach Löschen/Verdoppeln berechnet — so bleibt der
+    Versatzverlauf von Zeile zu Zeile höchstens 1 px, auch wenn Übergangszeilen entfallen sind)."""
+    out = np.zeros_like(zeilen)
+    w = zeilen.shape[1]
+    for j in range(zeilen.shape[0]):
+        xs = np.nonzero(zeilen[j, :, 3])[0]
+        if len(xs) and (xs.min() + dxs[j] < 0 or xs.max() + dxs[j] >= w):
+            raise L.ClipError(f'Zeile {j} würde um {dxs[j]} px aus der Leinwand (Breite {w}) geschoben')
+        for x in xs:
+            out[j, x + dxs[j]] = zeilen[j, x]
     return out
 
 

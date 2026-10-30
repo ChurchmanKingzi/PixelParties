@@ -27,8 +27,8 @@ Ablauf (24 Frames à 70 ms = 1,68 s):
 * Der rechte Flügel spreizt sich etwa ein Frame später als der linke (nicht im Gleichtakt).
 * Knochenstaub (Partikel): vier einzelne graue Staubkörner rieseln langsam von den Flügelenden und den Händen.
 
-Ergänzungen: keine nötig — Körper und Bänder überlappen sich im Original nirgends (Körper allein: Umriss ringsum geschlossen,
-siehe Kontrollbild). Alle Bewegungen laufen auf der vollen Leinwand (anim_lib wirft ClipError, wenn etwas herausragen würde).
+Ergänzungen: Körper und Bänder überlappen sich im Original nirgends. Nur am Schädel fehlt der dunkle Umriss, sobald das Band
+wegspreizt: (6,3), (6,4), (5,4), (4,5) und gespiegelt (13,3), (13,4), (14,4), (15,5) = (32,32,32), unter den Bändern gezeichnet. Alle Bewegungen laufen auf der vollen Leinwand (anim_lib wirft ClipError, wenn etwas herausragen würde).
 Nur ganze Pixel, nur Farben der Quelle.
 """
 import math
@@ -40,7 +40,7 @@ import anim_lib as L
 import anim_flieger as F
 
 N, MS = 24, 70
-PAD_L, PAD_R, PAD_T, PAD_B = 6, 6, 5, 8
+PAD_L, PAD_R, PAD_T, PAD_B = 7, 7, 5, 8
 
 spr = L.lade('winged-skeleton')
 sh, sw = spr.shape[:2]
@@ -54,6 +54,16 @@ band_l = vorhanden & (((yy <= 2) & (xx <= 7)) | ((yy >= 3) & (yy <= 4) & (xx <= 
 band_r = vorhanden & band_l[:, ::-1]                                           # Spiegel x ↔ 19 − x
 assert not (band_l & band_r).any()
 koerper = vorhanden & ~band_l & ~band_r
+
+# Ergänzung (Regel 2): Am Schädel liegt links/rechts der Flügel-Innenkante direkt an; spreizen sich die Bänder, bleibt dort die Schädelkante
+# ohne dunklen Umriss stehen ((7,4) mittelgrau, (5,5)/(6,5) hellgrau). Fertiggezeichnet wird der dunkle Umriss (Farbe (32,32,32) wie die
+# Flügelspitzen): (6,3), (6,4), (5,4), (4,5) und gespiegelt (13,3), (13,4), (14,4), (15,5). Die Pixel liegen UNTER den Bändern
+# (sie verdecken sie in Ruhe, Frame 0 = Original) und kommen erst beim Spreizen zum Vorschein.
+DUNKEL = (32, 32, 32)
+ERG = {(6, 3): DUNKEL, (6, 4): DUNKEL, (5, 4): DUNKEL, (4, 5): DUNKEL,
+       (13, 3): DUNKEL, (13, 4): DUNKEL, (14, 4): DUNKEL, (15, 5): DUNKEL}
+spr_k, erg_maske = F.ergaenzen(spr, ERG)
+koerper_k = koerper | erg_maske
 # Symmetrie-Kontrolle: Form (Alpha) des Sprites ist spiegelsymmetrisch
 assert (vorhanden == vorhanden[:, ::-1]).all()
 
@@ -65,10 +75,10 @@ def px(x, y):
 
 
 PUFFS = [                                                    # einzelne Staubkörner, rieseln langsam von den Flügelenden
-    dict(x=px(0, 19)[0], y=px(0, 19)[1], vx=-1, vy=7, off=0, form='k', wackeln=1),
-    dict(x=px(19, 19)[0], y=px(19, 19)[1], vx=1, vy=7, off=12, form='k', wackeln=1),
-    dict(x=px(1, 18)[0], y=px(1, 18)[1], vx=-1, vy=6, off=8, form='k', wackeln=1),
-    dict(x=px(18, 18)[0], y=px(18, 18)[1], vx=1, vy=6, off=20, form='k', wackeln=1),
+    dict(x=px(-2, 19)[0], y=px(-2, 19)[1], vx=-1, vy=7, off=0, form='k', wackeln=1),
+    dict(x=px(21, 19)[0], y=px(21, 19)[1], vx=1, vy=7, off=12, form='k', wackeln=1),
+    dict(x=px(-2, 16)[0], y=px(-2, 16)[1], vx=-1, vy=6, off=8, form='k', wackeln=1),
+    dict(x=px(21, 16)[0], y=px(21, 16)[1], vx=1, vy=6, off=20, form='k', wackeln=1),
 ]
 
 
@@ -88,10 +98,10 @@ def frame(i, partikel=True):
     hr = L.versetze(F.ebene(spr, band_r & (yy >= 15), H, W, PAD_L, PAD_T), hand_r, 0)
     wl = L.zusammen(H, W, [(wl, 0, 0), (hl, 0, 0)])
     wr = L.zusammen(H, W, [(wr, 0, 0), (hr, 0, 0)])
-    kp = F.ebene(spr, koerper, H, W, PAD_L, PAD_T)
+    kp = F.ebene(spr_k, koerper_k, H, W, PAD_L, PAD_T)
     wl, wr, kp = (L.streck_zeile(a, zeile, atem) for a in (wl, wr, kp))
     staub = L.puff_ebene(H, W, i, N, PUFFS, STAUB) if partikel else L.leer(H, W)
-    return L.zusammen(H, W, [(staub, 0, 0), (wl, 0, 0), (wr, 0, 0), (kp, 0, 0)])
+    return L.zusammen(H, W, [(staub, 0, 0), (kp, 0, 0), (wl, 0, 0), (wr, 0, 0)])        # Körper unten, Bänder obenauf
 
 
 if __name__ == '__main__':

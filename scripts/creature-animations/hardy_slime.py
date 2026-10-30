@@ -12,13 +12,13 @@ Ausgabe:  ../../data/creature-animations/hardy-slime.png + .json
 
 Was im Sprite ist (Koordinaten im Sprite):
 * Helm, Zeilen 0–13: dunkler Spitzhelm mit Stahlglanz (graue Lichter (8,3), (9,3), (8,4), (9,4), (7–10,6), (5,7), (12,7), Krempe (4–6, 8),
-  (11–13, 8), (3,9), (14,9) …), schwarze Backenränder (2,11–13) und (15,11–13), zwei schwarze Punkte (7,10), (10,10) zwischen den
-  Augenschlitzen, Visier/„Gesichtsfenster“ (7–10, 9) und Augenschlitze (5–6, 10–11), (11–12, 10–11), durch die der Schleim zu sehen ist.
+  (11–13, 8), (3,9), (14,9) …), schwarze Backenränder (2,11–13) und (15,11–13), Visier/„Gesichtsfenster“ (7–10, 9) und 
+  Augenschlitze (5–7, 10–11), (10–12, 10–11), durch die der Schleim zu sehen ist.
   Der Helm ist ein starres Teil (= alle Pixel, die vom nackten Körper abweichen: Maske im Skript).
 * Schleim darunter/daneben: grüner Gelkörper mit dunkelgrünem Umriss (41,65,0); Augen = dunkle Pupillenpixel (5–6,10), (5,11) und
-  (11–12,10), (12,11) mit weißen Lichtpunkten (6,11), (11,11); Mund = dunkelgrünes Band (7–10, 14) mit Mundwinkeln (6,13), (10–11,13)
+  (11–12,10), (12,11), schwarzen Pupillenpunkten (7,10), (10,10) und weißen Lichtpunkten (6,11), (11,11); Mund = dunkelgrünes Band (7–10, 14) mit Mundwinkeln (6,13), (10–11,13)
   und Schatten (7–10, 15); unten die Pfütze (y 14–18) mit hellen Glanzflecken (11,15), (4–6,16), (10–11,17).
-Fest bleiben: Mundwinkel, Glanzflecken der Pfütze, die schwarzen Helmpunkte.
+Fest bleiben: Mundwinkel, Glanzflecken der Pfütze, schwarze Backenränder des Helms (mit dem Helm starr).
 
 Ablauf (40 Frames à 75 ms = 3,0 s, nahtlos):
 * Atmen (Frames 0–19): der untere Körper (Zeilen 12–13, Wangen) wird um 1 Zeile gestreckt bzw. gestaucht; der ganze Kopfblock
@@ -48,7 +48,7 @@ import anim_lib as L
 import anim_amorph as A
 
 N, MS = 40, 75
-PAD_L, PAD_R, PAD_T, PAD_B = 7, 7, 8, 3
+PAD_L, PAD_R, PAD_T, PAD_B = 8, 8, 8, 3
 
 spr = L.lade('hardy-slime')
 sh, sw = spr.shape[:2]
@@ -100,7 +100,7 @@ assert all(a in _farben and b in _farben for a, b in STAHL.items())
 BLASE_C, BLASE_R = (160, 204, 147), (136, 204, 118)
 assert BLASE_C in _farben and BLASE_R in _farben
 
-AUGEN_L, AUGEN_R = [(5, 10), (6, 10), (5, 11), (6, 11)], [(11, 10), (12, 10), (11, 11), (12, 11)]
+AUGEN_L, AUGEN_R = [(5, 10), (6, 10), (7, 10), (5, 11), (6, 11)], [(10, 10), (11, 10), (12, 10), (11, 11), (12, 11)]   # inkl. schwarzer Pupille
 
 # ── Zeitachsen (Frame → Wert) ──
 S = [0, 0, 0, 1, 1, 1, 1, 0, 0, 0, 0, -1, -1, -1, 0, 0, 0, 0, 0, 0,          # Atmen
@@ -113,9 +113,8 @@ GLANZ = {i: 6 + 2 * (i - 2) for i in range(2, 15)}                            # 
 assert len(S) == N
 
 # Körperzeilen: Index 0 = Sprite-Zeile 5 … 13 = Zeile 18; Gesichtszeilen (Index 4–6 = Zeilen 9–11) werden nie verdoppelt
-GEWICHT = [1.0] * 7 + [0.6, 0.2] + [0] * 5
 POSEN = {                                                                      # s → (löschen, doppeln, p unten)
-    -2: ({7, 8}, (), 2), -1: ({7}, (), 1), 0: ((), (), 0), 1: ((), {7}, 0), 2: ((), {7: 2}, -1),
+    -2: ({7, 8}, (), 1), -1: ({7}, (), 1), 0: ((), (), 0), 1: ((), {7}, 0), 2: ((), {7: 2}, -1),
 }
 
 
@@ -180,8 +179,18 @@ def figur(i):
     z, quelle = A.koerper_pose(zeilen, loeschen=loesch, doppeln=dopp, p=p,
                                paare=PAARE_UNTEN if p >= 0 else PAARE_SCHMAL,
                                paare_je_zeile=PAARE_OBEN, x0=PAD_L, p_je_zeile=breiten(p))
-    dxq = A.dx_zeilen(GEWICHT, lehnen(i), math.pi / 2)
-    z = A.verschiebe_zeilen(z, quelle, dxq)
+    # Versatz je AUSGABEZEILE: Kopfblock (Zeilen 5–11) voll, erste Wangenzeile halb, letzte Wangenzeile und Pfütze 0 — die letzte
+    # Wangenzeile muss mit der Pfütze gehen (Schulter dazwischen hat schon eine Umrissstufe von 1 px), und von Zeile zu Zeile darf der
+    # Versatz nur um 1 px springen, sonst läge ein Füllpixel ohne Umriss frei. Bei nur einer Wangenzeile (Stauchung) lehnt der Kopf höchstens 1 px.
+    wangen = [j for j, q in enumerate(quelle) if q in (7, 8)]
+    lean = lehnen(i)
+    if len(wangen) < 2:
+        lean = max(-1.4, min(1.4, lean))
+    dxq = []
+    for j, q in enumerate(quelle):
+        w = 1.0 if q < 7 else (0.5 if (q in (7, 8) and j == wangen[0] and len(wangen) > 1) else 0.0)
+        dxq.append(int(round(lean * w)))
+    z = A.verschiebe_ausgabezeilen(z, dxq)
     kb, top = A.auf_leinwand(z, H, BODEN, LIFT.get(i, 0))
     hm = L.platz(helm_mit_glanz(i), H, W, PAD_L, PAD_T)
     hm = L.versetze(hm, dxq[0], top - KOERPER_Y0 - PAD_T + HELM_DY.get(i, 0))
