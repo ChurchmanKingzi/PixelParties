@@ -18,7 +18,7 @@ Identifikation (Sprite 22×15, symmetrisch um x = 10,5; rosa Wicht von vorn mit 
 Bleibt fest: Gesicht (außer Augäpfel/Träne), Rumpf (außer Hover), Mund.
 
 Ablauf (48 Frames à 66 ms = 3,2 s), alle Bewegungen unabhängig:
-* Flügelschlag (Periode 12, 4× pro Schleife): jede Flügelspalte wandert senkrecht, je weiter vom Kopf desto mehr (Spitze ca. −3 … +4 px), beide Flügel gleichzeitig; Ansatz am Kopf bleibt.
+* Flügelschlag (Periode 12, 4× pro Schleife): jede Flügelspalte wandert senkrecht, je weiter vom Kopf desto mehr (Spitze ca. −3 … +4 px), beide Flügel gleichzeitig; Ansatz am Kopf bleibt; die äußerste Spalte nimmt den Anteil ihrer Nachbarin (Spitzenpixel bleibt 4er-verbunden).
 * Schweben: der ganze Wicht hebt sich beim Abschlag um 1 px, die Flügel gehen mit.
 * Beine baumeln (Periode 16, 3× pro Schleife): die beiden Beinspitzen (Zeile 14) pendeln gemeinsam 1 px nach links/rechts, die Goldfüßchen darüber bleiben.
 * Blinzeln (Frames 10–12 und 34–36): die roten Augäpfel verschwinden in der Fellfarbe B (Lid = Fell), das schwarze Oberlid bleibt als geschlossene Linie.
@@ -88,6 +88,24 @@ def orig(x, y):
     return tuple(int(v) for v in spr[y, x, :3])
 
 
+def biegen(a, pivot, amp, phase, potenz=1.0, bias=0.0):
+    """Wie L.spalten_welle (Spalte wandert um round((amp · sin(phase) + bias) · Abstandsanteil^potenz)), aber die äußerste Spalte bekommt den Anteil ihrer
+    Nachbarspalte: der einzelne Umrisspixel an der Flügelspitze bliebe sonst bei einem Rundungsunterschied nur diagonal am Flügel hängen (wirkt wie ein loses Pixel)."""
+    out = L.leer(*a.shape[:2])
+    h = a.shape[0]
+    cols = [x for x in range(a.shape[1]) if a[:, x, 3].any()]
+    maxd = max(abs(x - pivot) for x in cols)
+    for x in cols:
+        frac = min(abs(x - pivot), maxd - 1) / float(maxd)
+        dy = int(round((amp * math.sin(phase) + bias) * frac ** potenz))
+        ys = np.nonzero(a[:, x, 3])[0]
+        if ys.min() + dy < 0 or ys.max() + dy >= h:
+            raise L.ClipError(f'Spalte {x} würde um {dy} px aus der Leinwand geschoben')
+        for y in ys:
+            out[y + dy, x] = a[y, x]
+    return out
+
+
 def gesicht(k, i):
     blick = BLICK.get(i, 0)
     lid = i in BLINK
@@ -140,8 +158,8 @@ def frame(i, nur=None):
     k = teil(koerper)
     gesicht(k, i)
     beine(k, BEINE[i % 16])
-    fl = L.spalten_welle(teil(fl_l), PAD_L + 7, 3.6, ph, potenz=1.1, bias=0.45)
-    fr_ = L.spalten_welle(teil(fl_r), PAD_L + 14, 3.6, ph, potenz=1.1, bias=0.45)
+    fl = biegen(teil(fl_l), PAD_L + 7, 3.6, ph, potenz=1.1, bias=0.45)
+    fr_ = biegen(teil(fl_r), PAD_L + 14, 3.6, ph, potenz=1.1, bias=0.45)
     ebenen = {'koerper': k, 'fl_l': fl, 'fl_r': fr_}
     wahl = nur or ('koerper', 'fl_l', 'fl_r', 'glanz')
     ganz = L.zusammen(H, W, [(ebenen[n], 0, dy) for n in wahl if n in ebenen])

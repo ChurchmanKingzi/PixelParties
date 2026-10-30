@@ -1,9 +1,9 @@
 # -*- coding: utf-8 -*-
 """Idle-Animation für „Classical Harpyformer“ (Creature) — graue Harpyie schwebt und spielt mit einem Bogen Geige; goldene Klangschnur und Funkelsterne.
 
-PICK: [["Motive", 32, "Harpyie (Ebene „Harpyformer Band“, 20×27 px)"], ["Motive", 31, "rechte Flügelsichel („#5“)"], ["Motive", 30, "Geige (Ebene „#2“, nur x 203–228 der 229 px breiten Ebene)"], ["Motive", 29, "goldene Schnur + Ohrring + Fußschmuck (Ebene „#7“, ohne den Kachelblock rechts)"], ["Motive", 28, "Kopfschmuck („#3“)"], ["Motive", 27, "Bogen („#4“)"], ["Motive", 26, "linke Flügelsichel („#1“)"], ["Motive", 25, "Funkelsterne („#6“)"]]
-Quelle: Motive.xcf. Die acht Ebenen heißen „Harpyformer Band …“ (die Karte hieß einmal so) und passen Pixel für Pixel zur Kartenkunst data/card-art/native/Classical_Harpyformer.png
-(Abgleich über Farbvergleich je Ebene: Ebenen 25/26/27 treffen mit 100 %, die übrigen werden von der Geige/den Sternen verdeckt; Kartenursprung = Motive (283, 220)). Sie wurden mit ihren
+PICK: [["Motive", 32, "Harpyie (Ebene „Harpyformer Band“, 20×27 px)"], ["Motive", 31, "rechte Flügelsichel („#5“)"], ["Motive", 30, "Geige (Ebene „#2“, nur x 203–228 der 229 px breiten Ebene)"], ["Motive", 29, "goldene Schnur + Ohrring + Fußschmuck (Ebene „#7“, ohne den Kachelblock rechts)"], ["Motive", 27, "Bogen („#4“)"], ["Motive", 26, "linke Flügelsichel („#1“)"], ["Motive", 25, "Funkelsterne („#6“)"]]
+Quelle: Motive.xcf. Die sieben Ebenen heißen „Harpyformer Band …“ (die Karte hieß einmal so) und passen Pixel für Pixel zur Kartenkunst data/card-art/native/Classical_Harpyformer.png
+(Abgleich Pixel für Pixel: 98 % der Spritepixel stehen in der Karte genauso — Kartenursprung = Motive (283, 220); die restlichen 2 % sind verdeckt oder Kartenhintergrund). Sie wurden mit ihren
 Ebenen-Versätzen auf eine gemeinsame 42×46-Leinwand gelegt (Ursprung Motive (307, 219); die Geigenspitze liegt in der Karte um 1 Zeile angeschnitten, die Ebene ist vollständig). Es liegen vor:
   src/classical-harpyformer.png           Gesamtbild (Ruhepose, Referenz für den Randpixel-Test)
   src/classical-harpyformer-harpyie.png   Harpyie (Haare, Gesicht, Körper, verdeckte Teile, Beine)
@@ -11,10 +11,10 @@ Ebenen-Versätzen auf eine gemeinsame 42×46-Leinwand gelegt (Ursprung Motive (3
   src/classical-harpyformer-fluegel-r.png rechte Flügelsichel (hinter der Geige, ragt rechts daneben heraus)
   src/classical-harpyformer-geige.png     Geige mit Hals und Saiten
   src/classical-harpyformer-bogen.png     Bogen
-  src/classical-harpyformer-schmuck.png   Kopfschmuck (Feder/Pfeil am Schopf)
   src/classical-harpyformer-gold.png      goldene Schnur, Ohrring, Fußring und Krallenspitzen
   src/classical-harpyformer-sterne.png    13 Funkelsterne
-Nicht verwendet: der rote Kachelblock am rechten Rand der Ebene „#7“ (Teil des Kartenhintergrunds) und die Kachelmuster der Karte.
+Nicht verwendet: der rote Kachelblock am rechten Rand der Ebene „#7“ (Teil des Kartenhintergrunds), die Kachelmuster der Karte und die Ebene „Harpyformer Band #3“ (Motive 28, Feder/Pfeil
+am Schopf, 19 px): sie steht NICHT in der Kartenkunst (dort endet der Schopf als dunkelgraue Spitze) und gehört zu einer anderen Harpyformer-Karte oder ist ungenutzt.
 
 Aufruf:   python3 classical_harpyformer.py [--preview <ordner>]
 Ausgabe:  ../../data/creature-animations/classical-harpyformer.png + .json
@@ -29,8 +29,7 @@ Identifikation (Sprite-Koordinaten x, y):
 * Geige (x 14–38, y 0–45): braune Decke (123,69,0) (160,90,0) (193,108,0), langer Hals schräg nach oben rechts (schwarz mit beigen Saiten (202,183,140) (147,133,104)), Schnecke oben
   rechts (x 33–37, y 0–5). Der Bogen (x 12–26, y 20–34): schwarzer Stab mit weißem Rand und beigem Haar, liegt schräg über der Geige.
 * Goldene Schnur (x 31–39, y 3–41): geflochtene Schnur (154,94,10) (253,237,88) (254,253,151), hängt von der Geigenschnecke herab (oben 3 px breit, unten 8 px) — „Klangschnur“.
-  Ohrring (x 4–6, y 30–33), Fußring (x 7–10, y 40–42) und drei Krallenspitzen (5,44) (8,44) (14,44) sind ebenfalls Gold (gleiche Ebene).
-* Kopfschmuck (x 13–19, y 18–24): kleine Feder/Pfeil in Braun, Grau und Weiß am Schopf.
+  Ohrring (x 4–6, y 30–33), Fußring um das linke Bein (x 7–10, y 40–42) und drei Krallenspitzen (5,44) (8,44) (14,44) sind ebenfalls Gold (gleiche Ebene).
 * 13 weiße Funkelsterne in drei Wuchsstufen (wie bei Ballad Harpyformer): Raute (4 px) bei (31,11) (37,16) (40,24) (7,29) (32,36) (39,40) (11,42); X (5 px) bei (38,6) (30,20) (40,29) (1,35)
   (32,42); großes Plus (8 px) bei (35,26). Sie schweben um die Geige.
 
@@ -38,7 +37,7 @@ Ablauf (48 Frames à 65 ms = 3,12 s); Frame 0 = Ruhepose = Original. Sie SCHWEBT
 * Flügelschlag, durchgehend: ein Schlag = 12 Frames (780 ms), 4 pro Schleife; Abschlag 5 Frames. Beide Flügelsicheln schwingen — jede Spalte wandert als Ganzes senkrecht (Federtextur bleibt, nichts
   wird kopiert), Betrag wächst mit dem Abstand zum Ansatz (links x 8, rechts x 21), links bis 3 px, rechts bis 3 px nach unten, die Spitzen hinken 1 Frame nach, rechts 0,35 Frame später.
 * Schwebe-Bob: Harpyie samt Geige, Bogen, Schnur und Flügeln hebt sich im Takt bis 2 px (am höchsten in der Schlagmitte); die Füße baumeln nach (60 %, 1,5 Frames verzögert, die Lücke
-  füllen doppelte Beinzeilen).
+  füllen doppelte Beinzeilen; der Fußring wandert mit den Füßen).
 * Bogenstrich: der Bogen gleitet in seiner eigenen Richtung (x+, y−) hin und her, ±2 px, Periode 16 Frames (drei Striche pro Schleife — gegen den Flügelschlag versetzt).
 * Saiten (Metall): bei jedem Strich läuft ein Lichtband über die Saitenpixel des Halses (beige → heller → weiß), abwechselnd abwärts/aufwärts (Frames 2–11, 18–27, 34–43).
 * Goldene Schnur (Gold): hängt von der Schnecke und pendelt als Welle (Periode 24 Frames, Ausschlag unten bis 2 px, die Spitze hinkt nach); zusätzlich läuft zweimal pro Schleife ein Lichtband
@@ -48,7 +47,7 @@ Ablauf (48 Frames à 65 ms = 3,12 s); Frame 0 = Ruhepose = Original. Sie SCHWEBT
 * Ohrring (Gold): zweimal pro Schleife blitzt ein kleiner Glitzerstern auf (Frames 6–8 und 30–32).
 * Funkelsterne: jeder wächst und vergeht in 24 Frames (Raute → X → Plus → X → Raute → aus), zwei Mal pro Schleife, je Stern in eigener Phase; Frame 0 = Stufe der Karte.
   (Wie bei Ballad: schwebende Musik-Funken der Kunst; falls unerwünscht STERNE_AN = False.)
-* Fest bleiben: Gesicht (außer Blinzeln), Schopf und Kopfschmuck (sie wippen nur mit dem Körper), die Geigendecke (Holz, kein Glanz).
+* Fest bleiben: Gesicht (außer Blinzeln) und Schopf (wippen nur mit dem Körper), die Geigendecke (Holz, kein Glanz).
 
 Ergänzungen: keine nötig — die Ebenen sind vollständig (Geige unter dem Bogen, Gesicht unter der Flügelsichel, Körper unter der Geige).
 Randpixel-Test (Regel 16): `B.umriss_je_ebene` setzt Randpixel in Nicht-Umrissfarbe auf die Umrissfarbe der Ebene.
@@ -100,11 +99,9 @@ FL_L = teil('fluegel-l')
 FL_R = teil('fluegel-r')
 GEIGE = teil('geige')
 BOGEN = teil('bogen')
-SCHMUCK = teil('schmuck')
 STRANG = teil('gold', xx >= 28)
 OHRRING = teil('gold', (xx <= 8) & (yy <= 35))
-FUSSRING_K = teil('gold', (xx <= 20) & (yy == 40))        # oberste Zeile des Fußrings gehört noch zum Körper
-FUSSGOLD = teil('gold', (xx <= 20) & (yy >= CUT))          # Rest des Fußrings + Krallenspitzen: wandern mit den Füßen
+FUSSGOLD = teil('gold', (xx <= 20) & (yy >= 40))           # Fußring (y 40–42) + Krallenspitzen: wandern mit den Füßen
 
 # ── Farben (alle aus dem Sprite) ───────────────────────────────────────────────────────────────────────────────────
 HAUT_L, HAUT_O, WANGE = (246, 189, 123), (246, 205, 139), (238, 156, 123)
@@ -115,8 +112,7 @@ STERN_WEISS = (255, 255, 255)
 M_SAITEN = L.farbmaske(L.lade('classical-harpyformer-geige'), SAITEN_RAMPE[:2])
 M_STRANG = L.farbmaske(L.lade('classical-harpyformer-gold'), GOLD_RAMPE) & (xx >= 28)
 # Umrissfarbe je Ebene für die Randpixel-Reparatur (Regel 16) und erlaubte Randfarben (= Randfarben der Quelle, siehe randtest)
-UMRISS = {1: (49, 24, 0), 2: (49, 24, 0), 3: (246, 255, 255), 4: (246, 255, 255), 5: (0, 0, 0), 6: (0, 0, 0), 7: (154, 94, 10), 8: (49, 24, 0), 9: (49, 24, 0),
-          10: (154, 94, 10), 11: (255, 255, 255), 12: (255, 255, 255)}
+UMRISS = {1: (75, 70, 51), 2: (49, 24, 0), 3: (246, 255, 255), 4: (38, 19, 9), 5: (246, 255, 255), 6: (0, 0, 0), 7: (154, 94, 10), 8: (154, 94, 10)}   # 1 Körper, 2 Füße, 3/5 Flügel, 4 Geige, 6 Bogen, 7 Schnur, 8 Gold
 _m = spr[..., 3] > 0
 _p = np.pad(_m, 1)
 _kante = _m & (~_p[:-2, 1:-1] | ~_p[2:, 1:-1] | ~_p[1:-1, :-2] | ~_p[1:-1, 2:])
@@ -222,8 +218,7 @@ def frame(i, partikel=True, nur=None):
         fuesse, fussgold = FUESSE, FUSSGOLD
         luecke = n - k
         if luecke > 0:
-            fuesse = L.streck_zeile(fuesse, PAD_T + CUT, luecke)
-            fussgold = L.streck_zeile(fussgold, PAD_T + CUT, luecke)
+            fuesse = L.streck_zeile(fuesse, PAD_T + CUT, luecke)          # nur die Beine strecken; der Fußring behält seine Höhe
         # Flügelsicheln schlagen (Spalten als Ganzes)
         fl_l = B.spalten_schub(FL_L, PAD_L + X_L, dy_fn(i, A_L), MAXD_L)
         fl_r = B.spalten_schub(FL_R, PAD_L + X_R, dy_fn(i, A_R, 0.35), MAXD_R)
@@ -243,8 +238,8 @@ def frame(i, partikel=True, nur=None):
         st = F.stern_stufe(i, N, 6, (0, 1, 0))
         if st is None:
             st = F.stern_stufe(i, N, 30, (0, 1, 0))
-        schichten += [(koerper, 0, -n, 1), (fuesse, 0, -k, 2), (fussgold, 0, -k, 8), (FUSSRING_K, 0, -n, 8),
-                      (fl_r, 0, -n, 3), (geige, 0, -n, 4), (strang, 0, -n, 7), (SCHMUCK, 0, -n, 9), (ohr, 0, -n, 8),
+        schichten += [(koerper, 0, -n, 1), (fuesse, 0, -k, 2), (fussgold, 0, -k, 8),
+                      (fl_r, 0, -n, 3), (geige, 0, -n, 4), (strang, 0, -n, 7), (ohr, 0, -n, 8),
                       (BOGEN, s, -n - s, 6), (fl_l, 0, -n, 5)]
     f, karte = B.zusammen_mit_karte(H, W, schichten)
     if 'figur' in ebenen:
@@ -259,7 +254,7 @@ def frame(i, partikel=True, nur=None):
 if __name__ == '__main__':
     frames = [frame(i) for i in range(N)]
     prev = sys.argv[sys.argv.index('--preview') + 1] if '--preview' in sys.argv else None
-    teile = ('harpyie', 'fluegel-l', 'fluegel-r', 'geige', 'bogen', 'schmuck', 'gold', 'sterne')
+    teile = ('harpyie', 'fluegel-l', 'fluegel-r', 'geige', 'bogen', 'gold', 'sterne')
     quelle = np.concatenate([spr.reshape(-1, 4)] + [L.lade('classical-harpyformer-' + t).reshape(-1, 4) for t in teile])        # alle Ebenen (auch Verdecktes)
     n = L.pruefe(frames, quelle=quelle)
     print('Pixel je Frame:', n)

@@ -16,7 +16,7 @@ Identifikation (Sprite-Koordinaten x, y):
 * Beine/Krallen (je Seite y 8–15): gebogene Knochenglieder, die vom Schädelrand nach außen unten laufen und in einer Spitze enden (Zeilen 9–15, bei x 2–5 bzw. 16–19).
 
 Ablauf (48 Frames à 60 ms = 2,88 s):
-* Durchgehender Flügelschlag (Periode 12, viermal pro Schleife): beide Flügel drehen sich gegengleich (symmetrisch) um die Schulter im Schädel (8, 5,5) bzw. (13, 5,5)
+* Durchgehender Flügelschlag (Periode 12, viermal pro Schleife): beide Flügel schlagen exakt symmetrisch (die rechte Seite ist das Spiegelbild der linken, Sprite-Flügel und -Beine sind spiegelgleich), gedreht wird um die Schulter im Schädel (8, 5,5) bzw. (13, 5,5)
   von leicht abgesenkt (−9°, der Fächer bleibt offen) bis steil nach oben (+34°); der Abschlag ist schneller als der Aufschlag. Die Knochenspangen behalten dabei ihre Pixeltextur (Rückwärtsabbildung, Nächster Nachbar),
   Frame 0 ist die Ruhelage (Original). Gedreht wird ohne Glätten (dünne 1-px-Linien blieben sonst nicht stehen); wo das Drehen eine Spange von der Schulter lösen würde, schließt ein Umrisspixel (13,6,0) die Lücke (8-verbunden).
 * Schwebe-Bob zweistufig bis 2 px nach oben (0 → 1 → 2 → 1 → 0, Periode 12): der Körper hebt sich im Abschlag.
@@ -65,6 +65,7 @@ def ebene(m):
 
 P_FL, P_FR, P_BL, P_BR, P_KP = ebene(m_fl_l), ebene(m_fl_r), ebene(m_bn_l), ebene(m_bn_r), ebene(m_kopf)
 assert (L.zusammen(H, W, [(p, 0, 0) for p in (P_FL, P_FR, P_BL, P_BR, P_KP)])[PAD_T:PAD_T + sh, PAD_L:PAD_L + sw] == spr).all()
+assert (P_FR == P_FL[:, ::-1]).all() and (P_BR == P_BL[:, ::-1]).all(), 'Flügel/Beine sind nicht spiegelgleich'
 
 UMRISS = F.umriss_farben(spr)
 THETA_C, THETA_A = math.radians(12.5), math.radians(21.5)     # Drehwinkel −9° … +34° (Ruhe 0°); positiv = Flügel hebt sich
@@ -111,18 +112,23 @@ def frame(i, partikel=True, effekte=True):
     ph2 -= 0.4 * math.sin(THETA_P0)
     theta = THETA_C + THETA_A * math.cos(ph2 + THETA_P0)
 
+    # Nur die linke Seite wird gerechnet, die rechte ist ihr Spiegelbild (Flügel und Beine des Sprites sind spiegelgleich) → beide Seiten bleiben exakt symmetrisch
     fl = F.drehen(P_FL, PIV_L[0], PIV_L[1], theta, glatt=False)
-    fr = F.drehen(P_FR, PIV_R[0], PIV_R[1], -theta, glatt=False)
-    # Beine pendeln nach (gegengleich links/rechts), gegenüber dem Flügelschlag verzögert
-    bl = F.zeilen_pendel(P_BL, Y_BEIN, 1.8, ph, 1.0, lauf=1.2)
-    br = F.zeilen_pendel(P_BR, Y_BEIN, -1.8, ph, 1.0, lauf=1.2)
+    bl = F.zeilen_pendel(P_BL, Y_BEIN, 1.8, ph, 1.0, lauf=1.2)         # Beine pendeln nach, gegenüber dem Flügelschlag verzögert
     kp = P_KP.copy()
     if effekte and i in BLINZ:
         for y, x in zip(*np.nonzero(m_auge)):
             kp[PAD_T + y, PAD_L + x, :3] = SCHAEDEL
-    fl, fr, bl, br, kp = (L.versetze(a, 0, bob) for a in (fl, fr, bl, br, kp))
-    f = L.zusammen(H, W, [(fl, 0, 0), (fr, 0, 0), (bl, 0, 0), (br, 0, 0), (kp, 0, 0)])
-    bruecken8(f, (PAD_L + 10, PAD_T + 8 + bob))
+    links = L.zusammen(H, W, [(fl, 0, 0), (bl, 0, 0), (kp, 0, 0)])
+    mit = bruecken8(links.copy(), (PAD_L + 10, PAD_T + 8))              # lose Teile über Umrisspixel anbinden (nur Umrisspixel kommen dazu)
+    brk = L.leer(H, W)
+    neu = (mit[..., 3] > 0) & ~(links[..., 3] > 0)
+    brk[neu] = mit[neu]
+    spiegel = lambda a: a[:, ::-1].copy()
+    brk_l = brk
+    fr, br, brk_r = spiegel(fl), spiegel(bl), spiegel(brk)
+    fl, fr, bl, br, kp, brk_l, brk_r = (L.versetze(a, 0, bob) for a in (fl, fr, bl, br, kp, brk_l, brk_r))
+    f = L.zusammen(H, W, [(brk_l, 0, 0), (brk_r, 0, 0), (fl, 0, 0), (fr, 0, 0), (bl, 0, 0), (br, 0, 0), (kp, 0, 0)])
     return f
 
 
