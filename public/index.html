@@ -101,32 +101,41 @@
     #boot-splash {
       position: fixed; inset: 0; z-index: 9999;
       display: flex; align-items: center; justify-content: center;
-      background-image: url('/title.png'), linear-gradient(135deg, #08060c 0%, #19062d 50%, #141414 100%);
-      background-size: 100% 100%, auto;
-      background-position: center center, center center;
-      background-repeat: no-repeat, no-repeat;
+      background-image: url('/title.png');
+      background-size: 100% 100%;
+      background-position: center center;
+      background-repeat: no-repeat;
       background-color: #08060c;
       font-family: 'Segoe UI', system-ui, sans-serif;
     }
     #boot-splash .bs-panel {
       display: flex; flex-direction: column; align-items: center; gap: 18px;
       padding: 28px 44px;
-      background: rgba(8,6,12,.82);
-      backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
-      border: 1px solid rgba(178,120,237,.35); border-radius: 12px;
-      box-shadow: 0 0 40px rgba(0, 0, 0, .75), 0 0 60px rgba(178,120,237,.15);
+      /* W86u2 (Pixelart): deckende Flaeche, harter Rahmen statt Weichzeichner/Alpha/Rundung. */
+      background: #08060c;
+      border: 4px solid #7e41ba; border-radius: 0;
+      box-shadow: 0 0 0 4px #08060c, 8px 8px 0 4px rgba(0, 0, 0, .6);
     }
     #boot-splash .bs-title {
       font-size: 24px; font-weight: 800; letter-spacing: 6px;
-      text-transform: uppercase; color: #1aedff; text-shadow: 0 0 24px rgba(102,182,255,.55);
+      text-transform: uppercase; color: #1aedff; text-shadow: 2px 2px 0 #405f8c;
     }
     #boot-splash .bs-sub { font-size: 12px; letter-spacing: 4px; color: #7e7d9b; }
+    /* W86u2 (Pixelart): Lade-Anzeige aus acht 6-px-Quadraten (Achteck), das helle Quadrat laeuft im Achtertakt — kein gedrehter Vektorring. */
     #boot-splash .bs-ring {
-      width: 38px; height: 38px; border-radius: 50%;
-      border: 3px solid rgba(102,182,255,.18); border-top-color: #1aedff;
-      animation: bs-spin .8s linear infinite;
+      width: 6px; height: 6px; margin: 16px 0;
+      animation: bs-spin .8s steps(1, end) infinite;
     }
-    @keyframes bs-spin { to { transform: rotate(360deg); } }
+    @keyframes bs-spin {
+      0% { box-shadow: 0px -14px 0 0 #1aedff, 10px -10px 0 0 #2d4362, 14px 0px 0 0 #2d4362, 10px 10px 0 0 #2d4362, 0px 14px 0 0 #2d4362, -10px 10px 0 0 #2d4362, -14px 0px 0 0 #405f8c, -10px -10px 0 0 #1788bd; }
+      12.5% { box-shadow: 0px -14px 0 0 #1788bd, 10px -10px 0 0 #1aedff, 14px 0px 0 0 #2d4362, 10px 10px 0 0 #2d4362, 0px 14px 0 0 #2d4362, -10px 10px 0 0 #2d4362, -14px 0px 0 0 #2d4362, -10px -10px 0 0 #405f8c; }
+      25% { box-shadow: 0px -14px 0 0 #405f8c, 10px -10px 0 0 #1788bd, 14px 0px 0 0 #1aedff, 10px 10px 0 0 #2d4362, 0px 14px 0 0 #2d4362, -10px 10px 0 0 #2d4362, -14px 0px 0 0 #2d4362, -10px -10px 0 0 #2d4362; }
+      37.5% { box-shadow: 0px -14px 0 0 #2d4362, 10px -10px 0 0 #405f8c, 14px 0px 0 0 #1788bd, 10px 10px 0 0 #1aedff, 0px 14px 0 0 #2d4362, -10px 10px 0 0 #2d4362, -14px 0px 0 0 #2d4362, -10px -10px 0 0 #2d4362; }
+      50% { box-shadow: 0px -14px 0 0 #2d4362, 10px -10px 0 0 #2d4362, 14px 0px 0 0 #405f8c, 10px 10px 0 0 #1788bd, 0px 14px 0 0 #1aedff, -10px 10px 0 0 #2d4362, -14px 0px 0 0 #2d4362, -10px -10px 0 0 #2d4362; }
+      62.5% { box-shadow: 0px -14px 0 0 #2d4362, 10px -10px 0 0 #2d4362, 14px 0px 0 0 #2d4362, 10px 10px 0 0 #405f8c, 0px 14px 0 0 #1788bd, -10px 10px 0 0 #1aedff, -14px 0px 0 0 #2d4362, -10px -10px 0 0 #2d4362; }
+      75% { box-shadow: 0px -14px 0 0 #2d4362, 10px -10px 0 0 #2d4362, 14px 0px 0 0 #2d4362, 10px 10px 0 0 #2d4362, 0px 14px 0 0 #405f8c, -10px 10px 0 0 #1788bd, -14px 0px 0 0 #1aedff, -10px -10px 0 0 #2d4362; }
+      87.5% { box-shadow: 0px -14px 0 0 #2d4362, 10px -10px 0 0 #2d4362, 14px 0px 0 0 #2d4362, 10px 10px 0 0 #2d4362, 0px 14px 0 0 #2d4362, -10px 10px 0 0 #405f8c, -14px 0px 0 0 #1788bd, -10px -10px 0 0 #1aedff; }
+    }
   </style>
 
   <!-- Card DB globals must exist before app-shared.js runs. This inline

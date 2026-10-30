@@ -13361,10 +13361,11 @@ body.summon-pick .board-zone.board-zone-ability:not(.zone-drag-valid):not(.board
 .podium-shown .podium-name { transform: none; }
 .podium-block { width: 100%; display: flex; align-items: center; justify-content: center; border-radius: 0; transform: scaleY(0); transform-origin: bottom; transition: transform .55s steps(13, end),box-shadow .6s steps(14, end); }
 .podium-shown .podium-block { transform: scaleY(1); }
-.podium-trophy { display: inline-block; animation: podiumBounce 1.4s steps(24, end) infinite; filter: drop-shadow(1px 0 0 #a87c00) drop-shadow(-1px 0 0 #a87c00) drop-shadow(0 1px 0 #a87c00) drop-shadow(0 -1px 0 #a87c00); }
-@keyframes podiumBounce { 0%,100% { transform: translateY(0) scale(1); } 50% { transform: translateY(-8px) scale(1.08); } }
+.podium-trophy { display: inline-block; animation: podiumBounce 1.4s steps(24, end) infinite; filter: drop-shadow(2px 0 0 #72541d) drop-shadow(-2px 0 0 #72541d) drop-shadow(0 2px 0 #72541d) drop-shadow(0 -2px 0 #72541d); }
+@keyframes podiumBounce { 0%,100% { transform: translateY(0) scale(1); } 50% { transform: translateY(-8px) scale(1.1); } }
 .podium-confetti { position: absolute; inset: 38px 0 0 0; overflow: hidden; pointer-events: none; z-index: 5; }
-.podium-confetti span { position: absolute; top: -20px; border-radius: 0; opacity: .9; animation-name: podiumConfetti; animation-timing-function: steps(6, end); animation-iteration-count: infinite; }
+/* ★ W86u2 (Pixelart): harte Rechtecke aus ganzen Kunstpixeln, deckend und ohne Drehung. */
+.podium-confetti span { position: absolute; top: -20px; animation-name: podiumConfetti; animation-timing-function: steps(6, end); animation-iteration-count: infinite; }
 @keyframes podiumConfetti { 0% { top: -20px; margin-left: 0; } 50% { margin-left: 22px; } 100% { top: 105%; margin-left: -16px; } }
 @media (prefers-reduced-motion: reduce) {
   .podium-block, .podium-name { transition: none; transform: none; }

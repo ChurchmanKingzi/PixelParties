@@ -499,48 +499,90 @@ function TapBackdropCanvas({ hostRef }) {
       Promise.all(NAMES.map(n => new Promise(res => { const im = new Image(); im.onload = () => res(im); im.onerror = () => res(null); im.src = DIR + n + '.png'; }))).then(list => {
         loading = false; if (disposed || list.some(x => !x)) return;
         // vorskalieren: Bildschirmmass der Buehne (S = Pixel je Buehnenpixel), spart jedem Bild das Herunterrechnen von 1920x1080
-        const sc = Math.min(1, S * 1.25); imgs = {};
+        const sc = Math.min(1, S); imgs = {};   // ★ W86u2: genau Bildschirmmass (1 : 1 auf die Kunstpixel-Leinwand), keine Zwischenverkleinerung
         list.forEach((im, i) => {
           const n = NAMES[i], rf = ANIM_SPRITE_RAHMEN[n + '.png'];
           // Figuren auf ihren sichtbaren Kasten zuschneiden (wie die DOM-Kulisse): nur dieser Teil wird pro Bild gezeichnet
           const x0 = rf ? Math.max(0, rf[0] - 2) : 0, y0 = rf ? Math.max(0, rf[1] - 2) : 0, x1 = rf ? Math.min(1920, rf[2] + 2) : 1920, y1 = rf ? Math.min(1080, rf[3] + 2) : 1080;
           const c = document.createElement('canvas'); c.width = Math.max(1, Math.round((x1 - x0) * sc)); c.height = Math.max(1, Math.round((y1 - y0) * sc));
-          const g = c.getContext('2d'); g.imageSmoothingQuality = 'high'; g.drawImage(im, x0, y0, x1 - x0, y1 - y0, 0, 0, c.width, c.height);
+          const g = c.getContext('2d'); g.imageSmoothingEnabled = false; g.drawImage(im, x0, y0, x1 - x0, y1 - y0, 0, 0, c.width, c.height);   // ★ W86u2: Naechster-Nachbar (keine Mischfarben)
           imgs[n] = { c, x0, y0, w: x1 - x0, h: y1 - y0 };
         });
         imgs._sc = sc;
       });
     };
+    // ★ W86u2 (Pixelart): die Kulisse wird in KUNSTPIXEL-Aufloesung gemalt (1 Canvas-Pixel = 2 CSS-px, per `image-rendering: pixelated` vergroessert):
+    // keine Glaettung (`imageSmoothingEnabled = false`), Versatz nur in ganzen Pixeln, keine Drehung, Schein als Dither-Muster statt Radialverlauf
+    // mit Alpha, Blitze als Pixellinien, Glut als Quadrate mit Dither-Ausblendung. (Vorher: weiche Verlaeufe, `globalAlpha`, gedrehte Ebenen.)
+    const KP = 2;
     const resize = () => {
-      const w = window.innerWidth, h = window.innerHeight, dpr = Math.min(window.devicePixelRatio || 1, 1.5) * q;
-      W = Math.max(1, Math.round(w * dpr)); H = Math.max(1, Math.round(h * dpr)); cv.width = W; cv.height = H; S = Math.max(W / 1920, H / 1080);
+      const w = window.innerWidth, h = window.innerHeight;
+      W = Math.max(1, Math.round(w / KP * q)); H = Math.max(1, Math.round(h / KP * q)); cv.width = W; cv.height = H; S = Math.max(W / 1920, H / 1080);
+      cv.style.imageRendering = 'pixelated';
+      const g = cv.getContext('2d'); g.imageSmoothingEnabled = false;
+    };
+    // Dither-Kachel (4x4) in Farbe `col`, Stufe 0..16 → CanvasPattern (gemerkt)
+    const muster = (() => {
+      const cache = new Map();
+      return (g, col, stufe) => {
+        const k = col + stufe; let m = cache.get(k); if (m) return m;
+        const t = document.createElement('canvas'); t.width = 4; t.height = 4; const c = t.getContext('2d'); c.fillStyle = col;
+        for (let y = 0; y < 4; y++) for (let x = 0; x < 4; x++) if (window.ppBayer(x, y) < stufe / 16) c.fillRect(x, y, 1, 1);
+        m = g.createPattern(t, 'repeat'); cache.set(k, m); return m;
+      };
+    })();
+    // Pixelkreis aus Zeilenbalken (kein Vektorrand): Muster `stufe` fuellt alle Pixel innerhalb `r`
+    const scheibe = (g, cx, cy, r, mus) => {
+      g.fillStyle = mus; cx = Math.round(cx); cy = Math.round(cy); r = Math.round(r);
+      for (let y = -r; y <= r; y++) { const hw = Math.floor(Math.sqrt(r * r - y * y)); g.fillRect(cx - hw, cy + y, 2 * hw + 1, 1); }
+    };
+    const pixelLinie = (g, x0, y0, x1, y1, dick) => {
+      x0 = Math.round(x0); y0 = Math.round(y0); x1 = Math.round(x1); y1 = Math.round(y1);
+      const dx = Math.abs(x1 - x0), dy = -Math.abs(y1 - y0), sx = x0 < x1 ? 1 : -1, sy = y0 < y1 ? 1 : -1; let err = dx + dy;
+      for (;;) { g.fillRect(x0 - (dick >> 1), y0 - (dick >> 1), dick, dick); if (x0 === x1 && y0 === y1) break; const e2 = 2 * err; if (e2 >= dy) { err += dy; x0 += sx; } if (e2 <= dx) { err += dx; y0 += sy; } }
     };
     const draw = (now) => {
       if (!imgs) return; const g = cv.getContext('2d'), t = now / 1000, tau = t + 0.1, pc = (tau % 10) / 10 * 100, sc = imgs._sc, k = S / sc;
+      g.imageSmoothingEnabled = false;
       // Kamera: 80 s Hin- und Rueckfahrt, leichter Zoom
-      const ph = (t % 80) / 80, e = 0.5 - 0.5 * Math.cos(ph * Math.PI * 2), zoom = 1.04;   // fester Zoom: ein sich staendig aenderndes Mass skaliert jede Ebene in jedem Bild neu (Flimmern)
+      const ph = (t % 80) / 80, e = 0.5 - 0.5 * Math.cos(ph * Math.PI * 2), zoom = 1;   // fester Zoom (★ W86u2: 1 — ein Zoom ≠ 1 vergroessert die Kunstpixel ungleichmaessig); ein sich aenderndes Mass wuerde jede Ebene in jedem Bild neu skalieren (Flimmern)
       const viewW = W / S, ramp = Math.max(0, (1920 - viewW / zoom) / 2 - 10), camX = lerp(ramp, -ramp, e), camY = lerp(-14, 14, e), sh = shakeAt(pc);
       g.setTransform(1, 0, 0, 1, 0, 0); g.fillStyle = '#12101f'; g.fillRect(0, 0, W, H);
-      g.setTransform(S * zoom, 0, 0, S * zoom, W / 2 - 960 * S * zoom + camX * S * zoom + sh[0] * S * zoom, H / 2 - 540 * S * zoom + camY * S * zoom + sh[1] * S * zoom);
+      // Versatz der ganzen Buehne nur in ganzen Pixeln
+      g.setTransform(S * zoom, 0, 0, S * zoom, Math.round(W / 2 - 960 * S * zoom + camX * S * zoom + sh[0] * S * zoom), Math.round(H / 2 - 540 * S * zoom + camY * S * zoom + sh[1] * S * zoom));
       g.drawImage(imgs.background.c, -38.4, -21.6, 1996.8, 1123.2);
       const aI = kfLin(KF_STRIKE, pc), aA = kfLin(KF_AMB, ((tau % 13) / 13) * 100);
-      const glow = (cx, cy, R, a, col) => { if (a < 0.02) return; const gr = g.createRadialGradient(cx, cy, 0, cx, cy, R); gr.addColorStop(0, col + 'ff'); gr.addColorStop(0.45, col + '55'); gr.addColorStop(1, col + '00'); g.globalAlpha = Math.min(1, a); g.globalCompositeOperation = 'screen'; g.fillStyle = gr; g.fillRect(cx - R, cy - R, 2 * R, 2 * R); g.globalAlpha = 1; g.globalCompositeOperation = 'source-over'; };
+      // Schein: fuenf Pixelringe, Dichte nach aussen abnehmend (Bayer-Dither) — Bildschirmpixel, daher ohne Buehnen-Transformation
+      const glow = (cx, cy, R, a, col) => {
+        if (a < 0.04) return; const m = g.getTransform(); g.setTransform(1, 0, 0, 1, 0, 0);
+        const px = m.a * cx + m.e, py = m.d * cy + m.f, pr = R * m.a, G = [0.9, 0.55, 0.3, 0.14, 0.05];
+        for (let i = 4; i >= 0; i--) { const stufe = Math.round(Math.min(1, a * G[i]) * 16); if (stufe > 0) scheibe(g, px, py, pr * (i + 1) / 5, muster(g, col, stufe)); }
+        g.setTransform(m);
+      };
       glow(883, 281, 900, aI * 0.7, '#66b6ff'); glow(1190, 238, 900, aA * 0.6, '#66b6ff');
       if ((pc >= 1 && pc < 5) || (pc >= 50 && pc < 54)) glow(1075, 443, 700, pc < 5 ? 0.45 : 0.4, '#fffbd2');
       const fl2 = (dur, delay, mx, my, mr) => { const f = floaty(tau, dur, delay); return [mx * f, my * f, mr * f]; }, tp = floaty(tau, 4.8, 0);
-      const lay = (name, ox, oy, tx, ty, rot, sca, wx, wy) => { g.save(); g.translate(ox * 1920 + tx + (wx || 0), oy * 1080 + ty + (wy || 0)); g.rotate(rot * Math.PI / 180); if (sca && sca !== 1) g.scale(sca, sca); const I = imgs[name]; g.drawImage(I.c, I.x0 - ox * 1920, I.y0 - oy * 1080, I.w, I.h); g.restore(); };
+      // Ebene: nur Versatz (ganze Bildschirmpixel), keine Drehung/Skalierung — die Schwebebewegung bleibt, die Neigung (+-4 Grad) entfaellt
+      const lay = (name, ox, oy, tx, ty, rot, sca, wx, wy) => { g.save(); const m = g.getTransform(); const X = ox * 1920 + tx + (wx || 0), Y = oy * 1080 + ty + (wy || 0);
+        g.setTransform(m.a, 0, 0, m.d, Math.round(m.a * X + m.e), Math.round(m.d * Y + m.f)); const I = imgs[name]; g.drawImage(I.c, I.x0 - ox * 1920, I.y0 - oy * 1080, I.w, I.h); g.restore(); };
       let a = fl2(4.2, -0.6, 9, -15, 2); lay('hammer', 0.72, 0.28, a[0], a[1], a[2], 1);
-      lay('explosion', 0.52, 0.42, 0, 4 * tp, 0, 1 - 0.021 * tp);
+      lay('explosion', 0.52, 0.42, 0, 4 * tp, 0, 1);
       lay('golem', 0.5, 0.5, -9 * tp, 4 * tp, 0, 1, 111, 3);
       a = fl2(6, -2, -11, -15, 2.6); lay('horned', 0.8, 1, a[0], a[1], a[2], 1, 0, 161);
       a = fl2(5, 0, 0, -12, -1.4); lay('angel', 0.2, 0.3, a[0], a[1], a[2], 1);
       a = fl2(6.5, -1.5, 4, -9, 1); lay('blonde', 0.2, 0.5, a[0], a[1], a[2], 1);
       lay('rabbit', 0.5, 0.5, 9 * tp, 4 * tp, 0, 1);
       a = fl2(5.5, -2.5, 8, -14, -2); lay('ninja', 0.16, 0.8, a[0], a[1], a[2], 1, 0, 215);
-      for (const [bx, bw, kind, pts] of BOLTS) { const al = kind === 'S' ? aI : aA; if (al < 0.1) continue; const P = pts.map(([px, py]) => [bx + px / 100 * bw, -21.6 + py / 400 * 670]);
-        g.lineJoin = 'round'; g.lineCap = 'round'; for (const [col, lw] of al > 0.5 ? [['#66b6ff', 11], ['#bddcef', 6], ['#e5f5fa', 3]] : [['#66b6ff', 5], ['#e5f5fa', 2]]) { g.strokeStyle = col; g.lineWidth = lw; g.beginPath(); P.forEach(([x, y], i) => i ? g.lineTo(x, y) : g.moveTo(x, y)); g.stroke(); } }
-      for (const m of EMB) { const c = (((tau - m.delay) / m.dur) % 1 + 1) % 1, y = 1080 + 14 - m.size + lerp(20, -1210, c), x = m.left + m.drift * c, op = c < 0.08 ? 0.95 * c / 0.08 : (c < 0.78 ? lerp(0.95, 0.7, (c - 0.08) / 0.7) : lerp(0.7, 0, (c - 0.78) / 0.22)); if (y < -12 || y > 1090 || op < 0.05) continue; g.globalAlpha = op; g.fillStyle = m.col; const z = Math.max(4, Math.round(m.size / 2) * 2); g.fillRect(Math.round(x), Math.round(y), z, z); }
-      g.globalAlpha = 1;
+      // Blitze: Pixellinien (Bresenham) in drei Lagen — aussen blau, Mitte hell, Kern weiss
+      { const m = g.getTransform(); g.setTransform(1, 0, 0, 1, 0, 0);
+        for (const [bx, bw, kind, pts] of BOLTS) { const al = kind === 'S' ? aI : aA; if (al < 0.1) continue; const P = pts.map(([px, py]) => [m.a * (bx + px / 100 * bw) + m.e, m.d * (-21.6 + py / 400 * 670) + m.f]);
+          for (const [col, dk] of al > 0.5 ? [['#66b6ff', 4], ['#bddcef', 2], ['#e5f5fa', 1]] : [['#66b6ff', 2], ['#e5f5fa', 1]]) { g.fillStyle = col; for (let i = 0; i + 1 < P.length; i++) pixelLinie(g, P[i][0], P[i][1], P[i + 1][0], P[i + 1][1], dk); } }
+        g.setTransform(m); }
+      // Glut: Quadrate, Ausblenden per Dither-Muster statt Alpha
+      { const m = g.getTransform(); g.setTransform(1, 0, 0, 1, 0, 0);
+        for (const em of EMB) { const c = (((tau - em.delay) / em.dur) % 1 + 1) % 1, y = 1080 + 14 - em.size + lerp(20, -1210, c), x = em.left + em.drift * c, op = c < 0.08 ? 0.95 * c / 0.08 : (c < 0.78 ? lerp(0.95, 0.7, (c - 0.08) / 0.7) : lerp(0.7, 0, (c - 0.78) / 0.22)); if (y < -12 || y > 1090 || op < 0.05) continue;
+          const z = Math.max(1, Math.round(em.size / 2 * S * zoom)); g.fillStyle = muster(g, em.col, Math.max(1, Math.round(op * 16))); g.fillRect(Math.round(m.a * x + m.e), Math.round(m.d * y + m.f), z, z); }
+        g.setTransform(m); }
       a = fl2(3.4, -0.5, 14, -9, 3); lay('cat_top', 0.23, 0.05, a[0], a[1], a[2], 1);
       a = fl2(2.9, -0.8, -11, 9, -3); lay('cat_mid', 0.37, 0.3, a[0], a[1], a[2], 1);
       a = fl2(3.0, -1.7, 16, -12, 4); lay('cat_bottom', 0.05, 0.48, a[0], a[1], a[2], 1);
@@ -552,7 +594,7 @@ function TapBackdropCanvas({ hostRef }) {
       if (!visible()) {
         if (!hiddenSince) hiddenSince = now;
         if (imgs && now - hiddenSince > 5000) imgs = null;   // Speicher zurueckgeben
-        timer = setTimeout(() => { timer = 0; raf = requestAnimationFrame(tick); }, 500); return;
+        timer = setTimeout(() => { timer = 0; raf = (window.ppTaktRaf || requestAnimationFrame)(tick); }, 500); return;
       }
       hiddenSince = 0; if (!imgs) { resize(); load(); }
       if (frameGap <= FRAME + 1 || now - lastDraw >= frameGap - 4) {
@@ -562,9 +604,9 @@ function TapBackdropCanvas({ hostRef }) {
           if (q > 0.55) { q = Math.max(0.5, q - 0.25); imgs = null; resize(); }
           else if (frameGap < 30) frameGap = 1000 / 30; }
       }
-      raf = requestAnimationFrame(tick);
+      raf = (window.ppTaktRaf || requestAnimationFrame)(tick);      // ★ W86u2: 30 Hz im globalen Takt (Pixelart-Pipeline)
     };
-    resize(); raf = requestAnimationFrame(tick);
+    resize(); raf = (window.ppTaktRaf || requestAnimationFrame)(tick);
     const onResize = () => { resize(); if (imgs) { imgs = null; } };
     window.addEventListener('resize', onResize); window.addEventListener('orientationchange', onResize);
     return () => { disposed = true; if (raf) cancelAnimationFrame(raf); if (timer) clearTimeout(timer); window.removeEventListener('resize', onResize); window.removeEventListener('orientationchange', onResize); imgs = null; };

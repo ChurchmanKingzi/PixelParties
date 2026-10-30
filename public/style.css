@@ -26234,13 +26234,14 @@ body.summon-pick .board-zone.board-zone-ability:not(.zone-drag-valid):not(.board
 .podium-col { display: flex; flex-direction: column; align-items: center; justify-content: flex-end; text-align: center; }
 .podium-name { margin-bottom: 8px; transform: translateY(14px); transition: opacity .5s .25s, transform .5s .25s; }
 .podium-shown .podium-name { transform: none; }
-.podium-block { width: 100%; display: flex; align-items: center; justify-content: center; border-radius: 6px 6px 0 0;
+.podium-block { width: 100%; display: flex; align-items: center; justify-content: center; border-radius: 0;     /* ★ W86u2: eckig (Pixelart) */
   transform: scaleY(0); transform-origin: bottom; transition: transform .55s cubic-bezier(.2,.9,.3,1.2), box-shadow .6s; }
 .podium-shown .podium-block { transform: scaleY(1); }
-.podium-trophy { display: inline-block; animation: podiumBounce 1.4s ease-in-out infinite; filter: drop-shadow(0 0 12px rgba(250,213,74,.8)); }
-@keyframes podiumBounce { 0%,100% { transform: translateY(0) scale(1); } 50% { transform: translateY(-8px) scale(1.08); } }
+.podium-trophy { display: inline-block; animation: podiumBounce 1.4s ease-in-out infinite; filter: drop-shadow(2px 0 0 #72541d) drop-shadow(-2px 0 0 #72541d) drop-shadow(0 2px 0 #72541d) drop-shadow(0 -2px 0 #72541d); /* pp-ok: blur (harte Kontur, kein Schein) */ }
+@keyframes podiumBounce { 0%,100% { transform: translateY(0) scale(1); } 50% { transform: translateY(-8px) scale(1.1); } }
 .podium-confetti { position: absolute; inset: 38px 0 0 0; overflow: hidden; pointer-events: none; z-index: 5; }
-.podium-confetti span { position: absolute; top: -20px; border-radius: 2px; opacity: .9; animation-name: podiumConfetti; animation-timing-function: linear; animation-iteration-count: infinite; }
+/* ★ W86u2 (Pixelart): harte Rechtecke aus ganzen Kunstpixeln, deckend und ohne Drehung. */
+.podium-confetti span { position: absolute; top: -20px; animation-name: podiumConfetti; animation-timing-function: linear; animation-iteration-count: infinite; }
 @keyframes podiumConfetti { 0% { top: -20px; margin-left: 0; } 50% { margin-left: 22px; } 100% { top: 105%; margin-left: -16px; } }
 @media (prefers-reduced-motion: reduce) {
   .podium-block, .podium-name { transition: none; transform: none; }
