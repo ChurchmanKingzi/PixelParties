@@ -8,6 +8,8 @@ abgeschnitten wird.
     welle01(i, n, versatz)              0…1, sanft (Kosinus) — Grundlage für Atmen/Wippen, nahtlos bei ganzzahligem n
     stufe(i, n, hoch, versatz)          ganzzahlige Stufe 0…hoch aus welle01 (Atem, Kopfwippen)
     folge(i, start, werte, n)           Ereignis-Fenster: werte[k] im Frame start+k, sonst None (Blinzeln, Ohrzucken, Funkeln)
+    takt(i, n, start, laenge)           1, wenn Frame i im Fenster [start, start+laenge) (alle n Frames wiederholt), sonst 0 —
+                                        z. B. Windstöße für Haarsträhnen: pro Strähne ein um 2 Frames versetztes Fenster = laufende Welle
     setze(a, {(x, y): farbe}, off)      einzelne Pixel setzen (Alpha 255); farbe None = Pixel löschen
     pixel_von(a, [(x, y), …], off)      Farben der Pixel lesen (RGB-Tupel oder None)
     atmen(a, brustzeile, halszeile, brust, kopf)
@@ -41,6 +43,11 @@ def folge(i, start, werte, n=None):
     auch über das Schleifenende hinweg (modulo n) — nahtlos."""
     k = (i - start) % n if n else i - start
     return werte[k] if 0 <= k < len(werte) else None
+
+
+def takt(i, n, start, laenge):
+    """1, wenn Frame i im Fenster [start, start + laenge) liegt (Fenster wiederholt sich alle n Frames, nahtlos), sonst 0."""
+    return 1 if 0 <= (i - start) % n < laenge else 0
 
 
 def setze(a, pixel, off=(0, 0)):

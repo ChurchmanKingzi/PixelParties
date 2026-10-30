@@ -10,6 +10,7 @@ bereits auf der VOLLEN Leinwand liegen (L.platz) und werfen ClipError, wenn etwa
     pixel_setzen(a, punkte, farbe, dx, dy)    # einzelne Pixel einfärben (Augen, Glanzpunkte)
     augen(a, gruppen, stufe, ...)             # Glühen der Augen in Stufen (nur Farben der Rampe aus dem Sprite)
     glanz_pfad(a, pfad, hell, basis, pos)     # ein Lichtpunkt wandert an einem Horn/Knochen/Klinge entlang
+    glut_ebene(h, w, i, n, puffs, farben)     # Funken/Glut aufsteigend (puff_ebene, aber mit Verglimmen an Anfang und Ende)
 """
 import math
 
@@ -92,6 +93,18 @@ def augen(a, gruppen, stufe_glut=0, blinzeln=0, farben=None):
             pixel_setzen(a, g['hell'], farben['lid_dunkel'])
             pixel_setzen(a, g['rand'], farben['lid'])
     return a
+
+
+def glut_ebene(h, w, i, n, puffs, farben, rand=0.06):
+    """Wie L.puff_ebene, aber jedes Teilchen fehlt in den ersten/letzten `rand` seiner Lebensdauer: der Funke verglimmt am Ende und
+    entsteht am Start neu, statt als einzelnes Pixel quer über das Bild zu springen (puff_ebene zeigt Funken immer)."""
+    out = L.leer(h, w)
+    for pf in puffs:
+        t = ((i + pf.get('off', 0)) % n) / n
+        if t < rand or t > 1 - rand:
+            continue
+        L.einsetzen(out, L.puff_ebene(h, w, i, n, [pf], farben))
+    return out
 
 
 def glanz_pfad(a, pfad, hell, basis, pos):

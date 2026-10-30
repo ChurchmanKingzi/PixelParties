@@ -62,6 +62,8 @@ for c in list(RAMPE) + list(RAMPE.values()) + [DUNKEL_F, WEISS]:
     assert c in {tuple(int(v) for v in p[:3]) for p in spr.reshape(-1, 4) if p[3]}, f'Farbe {c} nicht im Sprite'
 
 AUGEN_L, AUGEN_R = [(5, 10), (6, 10), (5, 11), (6, 11)], [(11, 10), (12, 10), (11, 11), (12, 11)]
+AUSSEN_OBEN = [(4, 10), (13, 10)]            # dunkle Augenaußenseite oben (fällt beim Schließen weg)
+UMRISS = (96, 83, 0)                          # Umrissfarbe des Schleims
 
 # ── Zeitachsen (Frame → Wert) ──
 S = [0, 0, 0, 0, 1, 1, 1, 1, 1, 0, 0, 0, -1, -1, -1, 0, 0, 0, 0, 0,          # Atmen
@@ -69,7 +71,7 @@ S = [0, 0, 0, 0, 1, 1, 1, 1, 1, 0, 0, 0, -1, -1, -1, 0, 0, 0, 0, 0,          # A
      0, 0, 1, 1, 0, 0, 0, 0]                                                  # Ausklingen
 LIFT = {22: 1, 23: 2, 24: 3, 25: 3, 26: 2, 27: 1}
 SINK = {22, 23, 28}                                                           # Krone sinkt 1 px in den Kopf
-BLINZELN = {8: 1, 9: 2, 10: 1, 34: 1, 35: 2, 36: 1}                           # 1 = Lid halb, 2 = zu
+BLINZELN = {16: 1, 17: 2, 18: 1, 34: 1, 35: 2, 36: 1}                           # 1 = Lid halb, 2 = zu
 GLANZ = {i: 4 + 2 * (i - 2) for i in range(2, 16)}                            # Frame → Diagonale x+y des Lichtbands
 assert len(S) == N
 
@@ -86,15 +88,15 @@ PAARE_ZEILE0 = [(5, 12), (6, 11)]                                              #
 def lehnen(i):
     """Seitliche Neigung des Kopfes (in Pixeln an der Oberkante, vor dem Runden)."""
     if i < 20:
-        v = 1.0 * math.sin(2 * math.pi * i / 20)
+        v = 1.4 * math.sin(2 * math.pi * i / 20)
     elif i < 32:
         v = 0.0
         if i >= 28:
             k = i - 28
-            v = 1.6 * (1 - k / 12) * math.sin(2 * math.pi * k / 8)
+            v = 2.4 * (1 - k / 12) * math.sin(2 * math.pi * k / 8)
     else:
         k = i - 28
-        v = 1.6 * (1 - k / 12) * math.sin(2 * math.pi * k / 8)
+        v = 2.4 * (1 - k / 12) * math.sin(2 * math.pi * k / 8)
     return max(-2.4, min(2.4, v))
 
 
@@ -108,6 +110,9 @@ def sprite_mit_augen(i):
                 sp[y, x, :3] = GOLD_B
             elif b == 2:
                 sp[y, x, :3] = DUNKEL_F
+        if b == 2:
+            for (x, y) in AUSSEN_OBEN:
+                sp[y, x, :3] = GOLD_B
     if i in GLANZ:
         t = GLANZ[i]
         sp = A.glanzband(sp, t, RAMPE, breite=2)
@@ -117,15 +122,15 @@ def sprite_mit_augen(i):
 
 GLITZER = [
     dict(x=PAD_L - 2, y=PAD_T + 12, vx=-1, vy=-7, off=0, form='s', wackeln=1),
-    dict(x=PAD_L + 19, y=PAD_T + 9, vx=1, vy=-7, off=10, form='s', wackeln=1),
-    dict(x=PAD_L - 1, y=PAD_T + 4, vx=-2, vy=-6, off=5, form='s', wackeln=1),
+    dict(x=PAD_L + 19, y=PAD_T + 9, vx=1, vy=-7, off=10, form='k', wackeln=1),
+    dict(x=PAD_L - 1, y=PAD_T + 4, vx=-2, vy=-6, off=5, form='k', wackeln=1),
     dict(x=PAD_L + 17, y=PAD_T + 2, vx=2, vy=-6, off=15, form='s', wackeln=1),
 ]
 STAUB = {'c': WEISS, 'r': GOLD_G}
 
 
 def figur(i):
-    """Körper + Krone (ohne Partikel) → (Frame, Körperebene, Körperoberkante)."""
+    """Körper + Krone (ohne Partikel) → (Figur, Kronenebene, Körperoberkante, Körperebene)."""
     sp = sprite_mit_augen(i)
     s = S[i]
     loesch, dopp, p = POSEN[s]
@@ -140,11 +145,18 @@ def figur(i):
     # Krone: Zeilen 0–7 des Sprites; Unterkante liegt auf top−1 (bzw. top bei Einsinken)
     kr = L.platz(np.where((np.arange(sh)[:, None, None] < KOERPER_Y0), sp, 0).astype(np.uint8), H, W, PAD_L, PAD_T)
     kr = L.versetze(kr, dxq[0], top - KOERPER_Y0 - PAD_T + (1 if i in SINK else 0))
-    return L.zusammen(H, W, [(kb, 0, 0), (kr, 0, 0)]), kb, top
+    fig = L.zusammen(H, W, [(kb, 0, 0), (kr, 0, 0)])
+    # Ergänzung: ist der Kopf (Stauchung) breiter als die Krone, braucht seine Oberkante neben der Krone einen Umriss — Umrissfarbe
+    # (96,83,0) in die Zeile über der Kopfoberkante, 4-verbunden an Kopf und Kronenumriss.
+    for x in np.nonzero(kb[top, :, 3])[0]:
+        if tuple(int(v) for v in kb[top, x, :3]) != UMRISS and not fig[top - 1, x, 3]:
+            fig[top - 1, x, :3] = UMRISS
+            fig[top - 1, x, 3] = 255
+    return fig, kr, top, kb
 
 
 def frame(i):
-    fig, _, _ = figur(i)
+    fig = figur(i)[0]
     staub = L.puff_ebene(H, W, i, 20, GLITZER, STAUB)
     return L.zusammen(H, W, [(staub, 0, 0), (fig, 0, 0)])
 
@@ -152,6 +164,11 @@ def frame(i):
 if __name__ == '__main__':
     frames = [frame(i) for i in range(N)]
     figs = [figur(i)[0] for i in range(N)]
+    offen = []
+    for i in range(N):
+        fig, kr, top, _ = figur(i)
+        offen += [(i, o) for o in A.offene_koerperkanten(fig, kr[..., 3] > 0, top, UMRISS)]
+    print('offene Körperkanten (Frame, (x, y, Farbe)):', offen if offen else 'keine')
     prev = sys.argv[sys.argv.index('--preview') + 1] if '--preview' in sys.argv else None
     # Ruhepose = Original (Frame 0 ohne Partikel)
     ref = L.platz(spr, H, W, PAD_L, PAD_T)
