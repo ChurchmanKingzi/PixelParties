@@ -43,7 +43,7 @@ function render(R){
 const TK='pp-stats-token';let token='';try{token=localStorage.getItem(TK)||''}catch(e){}
 async function health(){ try{const h=await (await fetch('/api/health',{cache:'no-store'})).json();const L=h.loopLagMs||{};
   const ok=(L.p95||0)<100, warm=(L.p95||0)<300;
-  $('health').innerHTML=[['Läuft seit',Math.round(h.uptimeS/60)+' min'],['Laufende CPU-Partien',h.cpuAktiv+' / '+h.cpuGrenze],['Server-Verzögerung (p95)',(L.p95||0)+' ms '+(ok?'🟢':warm?'🟡':'🔴')],['Rechenbudget der CPU',Math.round((h.budgetFaktor||1)*100)+' %'],['Speicher',h.rssMb+' MB']].map(([a,b])=>'<div class="card"><b style="font-size:20px">'+b+'</b><span>'+a+'</span></div>').join('');}
+  $('health').innerHTML=[['Läuft seit',Math.round(h.uptimeS/60)+' min'],['Laufende CPU-Partien',h.cpuAktiv+' / '+h.cpuGrenze],['Server-Verzögerung (p95)',(L.p95||0)+' ms '+(ok?'(gut)':warm?'(erhöht)':'(hoch)')],['Rechenbudget der CPU',Math.round((h.budgetFaktor||1)*100)+' %'],['Speicher',h.rssMb+' MB']].map(([a,b])=>'<div class="card"><b style="font-size:20px">'+b+'</b><span>'+a+'</span></div>').join('');}
   catch(e){$('health').innerHTML='<div class="err">Server nicht erreichbar: '+esc(e.message)+'</div>';} }
 async function load(){ health(); $('msg').textContent='lädt …';$('msg').className='note';
   if(!token){$('login').style.display='block';$('out').innerHTML='';$('msg').textContent='';return;}
