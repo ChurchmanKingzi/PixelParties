@@ -123,6 +123,10 @@ def sprite_mit_effekten(i):
     return sp
 
 
+BRUECKEN = {}
+i_aktuell = [0]
+
+
 def feuer_ebene(sp, i, s, dy):
     """Feuer (Zeilen 0–13): Spalten wachsen/schrumpfen an der Spitze, Spitzen lehnen sich; Basis ab Zeile BASIS starr."""
     f = L.platz(np.where((np.arange(sh)[:, None, None] < KOERPER_Y0), sp, 0).astype(np.uint8), H, W, PAD_L, PAD_T)
@@ -158,6 +162,8 @@ def feuer_ebene(sp, i, s, dy):
             raise L.ClipError(f'Feuerzeile {y} würde um {dx} aus der Leinwand')
         for x in xs:
             res[y, x + dx] = out[y, x]
+    res, brueck = A.verbinde4(res)
+    BRUECKEN[i_aktuell[0]] = brueck
     return L.versetze(res, 0, dy)
 
 
@@ -171,6 +177,7 @@ def figur(i):
     else:
         z, quelle = A.koerper_pose(koerper, loeschen=loesch, doppeln=dopp, p=p, paare=PAARE_SCHMAL, x0=PAD_L)
     kb, top = A.auf_leinwand(z, H, BODEN, LIFT.get(i, 0))
+    i_aktuell[0] = i
     fe = feuer_ebene(sp, i, s, top - KOERPER_Y0 - PAD_T)
     fig = L.zusammen(H, W, [(kb, 0, 0), (fe, 0, 0)])
     return dict(fig=fig, fe=fe, top=top, kb=kb)

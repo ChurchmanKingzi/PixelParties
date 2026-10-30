@@ -14,6 +14,7 @@ Bausteine für weiche Körper (Schleime) — alles Pixelart, nur ganze Pixel, nu
     auf_leinwand(zeilen, h, w, boden, dy)            Zeilenfeld auf die Leinwand setzen — die Unterkante bleibt am Boden
     glanzband(a, t, rampe, maske)                    Lichtreflex wandert diagonal über den Sprite (Farben eine Stufe heller)
     ausdruck_pruefen(frames, spr, …)                 4-Verbundenheit der Figur (ein Teil je Frame) und Randpixel-Farben
+    verbinde4(a)                                     Eckkontakte durch Brückenpixel 4-verbinden (dünne, schräg gestellte Spitzen)
     stern(ebene, x, y, stufe, farben)                vierzackiger Glitzerstern am Objekt (Mitte + 4 Arme, wächst/schrumpft)
     farb_schritt(a, rampe, maske)                    Edelstein pulsiert: Farben eine Rampenstufe heller/dunkler
     suche_marke(a, farbe)                            Punkt des Sprites durch Zeilen-/Spaltenumbau verfolgen (Markierfarbe)
@@ -209,6 +210,44 @@ def ausdruck_pruefen(frames, spr, name='', erlaubt=()):
     print(f'{name} Randprüfung: {len(frames) - len(schlecht)}/{len(frames)} Frames ohne Befund' +
           ('' if not schlecht else '; Befunde (Frame, Teile, offene Randpixel): ' + str(schlecht[:8])))
     return schlecht
+
+
+def verbinde4(a, max_iter=12):
+    """Teile, die nach einer Bewegung nur noch über eine Pixelecke zusammenhängen (z. B. eine schräg gestellte 1-px-Flammenspitze), mit einem
+    Brückenpixel 4-verbinden: das Pixel (in der Farbe des loslösenden Pixels) kommt auf eines der zwei gemeinsamen Nachbarfelder. Gibt
+    (Ebene, [(x, y), …] der Brückenpixel) zurück. Teile ohne Eckkontakt bleiben unverbunden (dann prüfen/melden)."""
+    import cv2
+    out = a.copy()
+    h, w = out.shape[:2]
+    brueck = []
+    for _ in range(max_iter):
+        m = (out[..., 3] > 0).astype(np.uint8)
+        n, lab = cv2.connectedComponents(m, connectivity=4)
+        if n <= 2:
+            break
+        groessen = [int((lab == k).sum()) for k in range(1, n)]
+        gesetzt = False
+        for k in sorted(range(1, n), key=lambda q: groessen[q - 1]):
+            ys, xs = np.nonzero(lab == k)
+            for y, x in zip(ys, xs):
+                for dx, dy in ((1, 1), (-1, 1), (1, -1), (-1, -1)):
+                    X, Y = x + dx, y + dy
+                    if 0 <= X < w and 0 <= Y < h and lab[Y, X] not in (0, k):
+                        for (bx, by) in ((x + dx, y), (x, y + dy)):
+                            if not m[by, bx]:
+                                out[by, bx] = out[y, x]
+                                brueck.append((int(bx), int(by)))
+                                gesetzt = True
+                                break
+                    if gesetzt:
+                        break
+                if gesetzt:
+                    break
+            if gesetzt:
+                break
+        if not gesetzt:
+            break
+    return out, brueck
 
 
 def stern(ebene, x, y, stufe, farben):
