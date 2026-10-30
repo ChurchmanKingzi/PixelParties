@@ -169,7 +169,7 @@ def zopf_links(a, t):
 
 def zopf_rechts(a, t):
     """Wie links, an der senkrechten Mittelachse gespiegelt (das äußere Ende ist rechts)."""
-    return _zopf(a[:, ::-1].copy(), PAD_T + 13, PAD_T + 21, t, 24.0, 1.0)[:, ::-1].copy()
+    return _zopf(a[:, ::-1].copy(), PAD_T + 18, PAD_T + 21, t, 24.0, 1.0)[:, ::-1].copy()
 
 
 def blinzeln(i):
