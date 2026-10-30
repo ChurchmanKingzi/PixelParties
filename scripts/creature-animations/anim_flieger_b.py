@@ -445,3 +445,34 @@ def zeilen_klappen(a, y_piv, dx_fn, richtung=1, starr_oben=None):
         for x in xs_:
             out[y, x + dx] = a[y, x]
     return out
+
+
+def spalten_schub_4verbunden(a, pivot_x, dy_fn, maxd=None):
+    """Wie `spalten_schub`, aber dünne Linien (Trompetenröhre, Saiten, Federkiele) behalten ihren 4er-Zusammenhang: Waren zwei waagerecht benachbarte Pixel (x, y) und (x + 1, y)
+    verbunden und liegen sie nach dem Versatz in verschiedenen Zeilen (nur noch über die Ecke), wird die Eckzelle mit der Farbe des Pixels der einen Spalte ergänzt (die freie
+    der beiden Eckzellen; Treppenstufe statt Lücke). Es entstehen höchstens so viele Zusatzpixel wie Stufen in der Versatzfunktion."""
+    out = L.leer(*a.shape[:2])
+    h, w = a.shape[:2]
+    spalten = [x for x in range(w) if a[:, x, 3].any()]
+    if maxd is None:
+        maxd = max(1, max(abs(x - pivot_x) for x in spalten)) if spalten else 1
+    dys = {}
+    for x in spalten:
+        dy = int(round(dy_fn(abs(x - pivot_x) / maxd)))
+        ys = np.nonzero(a[:, x, 3])[0]
+        if ys.min() + dy < 0 or ys.max() + dy >= h:
+            raise L.ClipError(f'Spalte {x} würde um {dy} px aus der Leinwand (Höhe {h}) geschoben')
+        dys[x] = dy
+        for y in ys:
+            out[y + dy, x] = a[y, x]
+    for x in spalten:
+        if x + 1 not in dys or dys[x] == dys[x + 1]:
+            continue
+        for y in np.nonzero(a[:, x, 3] & a[:, x + 1, 3])[0]:                  # waagerecht verbundenes Paar vor dem Versatz
+            ya, yb = y + dys[x], y + dys[x + 1]
+            if ya == yb:
+                continue
+            if out[ya, x + 1, 3] or out[yb, x, 3]:                            # Ecke schon belegt → Zusammenhang besteht
+                continue
+            out[yb, x] = a[y, x]                                              # Eckzelle der linken Spalte auf Höhe der rechten füllen
+    return out

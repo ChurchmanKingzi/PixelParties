@@ -117,12 +117,11 @@ def frame_gross(i, nur=None):
     koerper = L.zusammen(H, W, [(BR_A, 0, br), (BM_A, 0, bm), (RE_A, 0, 0), (au, 0, 0), (fl, 0, 0), (SCH_A, 0, sw_)])
     koerper = U.kontur_schliessen(koerper, UMRISS, KOPF_SCHWARZ)
     # Brocken: gewünschter Pendelversatz; reißt dabei der 4er-Kontakt zu den Beinen ab (Brocken würde schweben), nimmt er den nächstbesten Versatz, der die Beine berührt
-    ohne = _k4(koerper)
-    figur = None
+    kandidaten = []
     for (ax, ay) in ((sx, sy), (sx, 0), (0, sy), (0, 0)):
-        figur = L.zusammen(H, W, [(koerper, 0, 0), (ST_A, ax, ay)])
-        if _k4(figur) <= ohne:
-            break
+        f = L.zusammen(H, W, [(koerper, 0, 0), (ST_A, ax, ay)])
+        kandidaten.append((_k4(f), f))
+    figur = min(kandidaten, key=lambda t: t[0])[1]                  # erster Kandidat mit den wenigsten 4er-Komponenten (= Brocken hängt an den Beinen)
     figur = L.versetze(figur, 0, bob) if bob else figur
     return figur
 

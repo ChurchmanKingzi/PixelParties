@@ -172,7 +172,7 @@ def frame(i, partikel=True, nur=None):
         arm = ARM.copy()
         for start in (6, 30):                                              # Trompete (Metall): Lichtband über das Gold, bevor der Arm schwingt
             F.lichtband(arm, M_GOLD, PAD_L, PAD_T, i, N, start, 12, GOLD, stufen=1, breite=3.0, achse=(1.0, 1.0))
-        arm = B.spalten_schub(arm, PAD_L + X_PIV, dy_fn(i), MAXD)
+        arm = B.spalten_schub_4verbunden(arm, PAD_L + X_PIV, dy_fn(i), MAXD)
         schichten += [(koerper, 0, -n, 1), (fuesse, 0, -k, 2), (schleppe(SCHLEPPE, i), 0, -n, 4), (arm, 0, -n, 3)]
         st = F.stern_stufe(i, N, 8, (0, 1, 0))
         if st is None:

@@ -21,7 +21,8 @@ Metall im Sprite: nur die 3 Silberpixel rechts (zu klein für ein Lichtband, wü
 
 Ablauf (48 Frames à 62 ms = 2,98 s, nahtlos):
 * Auf und ab (zweistufig, Periode 24): Brust zuerst 1 px (Saumzeile 18, glatt braun, wird einmal doppelt eingefügt: Robe, Gerät und Kopf steigen, der untere Zipfel bleibt), die Kapuze läuft 3 Frames nach und hebt
-  sich um ein weiteres px (Kragenzeile 9): Kapuze 0 → 1 → 2 → 1 → 0 px, Körper 0 → 1 → 0.
+  sich um ein weiteres px (Kragenzeile 9): Kapuze 0 → 1 → 2 → 1 → 0 px, Körper 0 → 1 → 0. Die entstehende zweite Kragenzeile (untere Kopie) läuft in die Robenfarbe darunter aus, damit kein doppelter grauer Block
+  mitten im Oberkörper steht; der Kragen bleibt eine Zeile hoch.
 * Gewichtsverlagerung: der Oberkörper (Zeilen 0–15) schiebt sich 1 px nach rechts (Frames 10–21) und später 1 px nach links (Frames 34–45); Gürtel, Saum und Zipfel (Zeilen 16–20) bleiben stehen.
 * Kapuzenneigen: Kapuze (Zeilen 0–9) neigt sich 1 px nach links (Frames 2–7) und 1 px nach rechts (Frames 24–31), getrennt von der Verlagerung.
 * Kapuzenzipfel schlägt aus: der spitze Zipfel links (Zeilen 4–6) streckt sich zweimal 1 px nach außen (Frames 14–19 und 28–33); das Innere des Zipfels bleibt, der Umriss wandert mit (`Hm.rand_dehnen_innen`).
@@ -49,6 +50,7 @@ vorhanden = L.deckend(spr)
 
 ERLAUBT = Hm.umrissfarben(spr)                                      # Farben der Außenkante im Original (Regel 16)
 UMRISS = (26, 0, 0)
+KRAGEN, ROBE = (38, 38, 38), (102, 0, 0)                            # grauer Kragen / Robenrot der Quelle
 
 zipfel = vorhanden & (xx <= 3) & (yy >= 4) & (yy <= 6)
 saum = vorhanden & (yy >= 17) & (yy <= 19)
@@ -83,6 +85,18 @@ def frame(i):
     kopf = Hm.stufe(i - 3, N / 2, 1)
     k = Hm.atmen(k, PAD_T + 18, PAD_T + 9, brust, kopf)
     zp = Hm.atmen(zp, PAD_T + 18, PAD_T + 9, brust, kopf)
+    if kopf:
+        # die untere Kopie der Kragenzeile läuft in die Robenfarbe darunter aus (kein doppelter grauer Kragenblock, nur Quellfarben)
+        z = PAD_T + 9 - brust
+        for x in range(W):
+            if k[z, x, 3] and tuple(int(v) for v in k[z, x, :3]) == KRAGEN:
+                for dy in (1, 2):
+                    c = k[z + dy, x]
+                    if c[3] and tuple(int(v) for v in c[:3]) != KRAGEN:
+                        k[z, x, :3] = c[:3]
+                        break
+                else:
+                    k[z, x, :3] = ROBE
     sa = Hm.atmen(sa, PAD_T + 18, PAD_T + 9, brust, 0)
     fig = L.zusammen(H, W, [(sa, 0, 0), (zp, 0, 0), (k, 0, 0)])
     # Regel 16: Randpixel in Nicht-Umrissfarbe werden Umriss
