@@ -1,0 +1,15 @@
+{
+  "creature": "Paraseed",
+  "sheet": "paraseed.png",
+  "frameWidth": 22,
+  "frameHeight": 30,
+  "frames": 48,
+  "frameMs": 65,
+  "loop": true,
+  "layout": "horizontal",
+  "padTop": 2,
+  "padLeft": 2,
+  "padRight": 2,
+  "padBottom": 2,
+  "faceX": 11.0
+}

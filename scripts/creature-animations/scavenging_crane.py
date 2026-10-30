@@ -134,7 +134,7 @@ def frame(i, partikel=True, nur=None):
         z = PAD_T + 11
         schichten += [(L.streck_zeile(KOERPER, z, n), 0, 0, 1), (L.streck_zeile(SCHWANZ_W(i), z, n), 0, 0, 1)]
     if 'hals' in ebenen:
-        sch = lambda a: B.spalten_schub(a, PAD_L + 18, lambda f: dy * f, 11)      # Hals/Kopf senken: Spalte x wandert um dy·(x−18)/11
+        sch = lambda a: B.spalten_schub(a, PAD_L + 18, lambda f: dy * min(1.0, f * 11 / 7.0), 11)   # Hals/Kopf senken: Spalten x 19–25 verformen den Bogen, Kopf und Schnabel (x ≥ 25) wandern starr um dy
         zu = 1 if schnabel_zu(i) else 0
         schichten += [(sch(HALS), 0, -n, 2), (sch(SPITZE_L), zu, -n, 2), (sch(SPITZE_R), -zu, -n, 2)]
     f, karte = B.zusammen_mit_karte(H, W, schichten)
