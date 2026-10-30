@@ -7,7 +7,7 @@
   "frameMs": 65,
   "loop": true,
   "layout": "horizontal",
-  "padTop": 3,
+  "padTop": 2,
   "padLeft": 2,
   "padRight": 2,
   "padBottom": 2,

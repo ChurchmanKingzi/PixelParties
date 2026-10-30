@@ -19,8 +19,8 @@ Ablauf (48 Frames à 65 ms = 3,12 s, nahtlos):
 * Schweben (Periode 24): das Ei streckt sich (Frames 1–11 und 25–35 wird die Zeile 12 ein zweites Mal eingefügt — die Zeilen 9–14 haben die volle Breite 0–17, es entsteht keine Randstufe) und hüpft in der Spitze
   (Frames 4–8 und 28–32) 1 px nach oben; unten bleibt der Boden fest. Frame 0 = Original.
 * Goldschimmer (Regel 14): zweimal pro Schleife (Frames 2–16 und 26–40) läuft ein breites diagonales Lichtband (x+y, 7 px breit) über das Ei (eine Stufe heller auf der Gold-Rampe C→B→A→H→I, nur Innenpixel).
-* Glitzersterne (Gold): vierzackige Sterne (5 Frames Lauf, wachsen/schrumpfen) blitzen an drei Stellen auf dem Ei (ganz im Inneren) und in den beiden freien oberen Ecken außerhalb des Eis auf
-  (Farben G, K, J des Sprites; die Eck-Sterne berühren das Ei nie).
+* Glitzersterne (Gold): vierzackige Sterne blitzen an drei Stellen auf dem Ei (ganz im Inneren; Lauf 0–1–2–1–0 über 5 Frames, wachsen/schrumpfen) und in den beiden freien oberen Ecken außerhalb des Eis
+  (Lauf 1–2–1 über 3 Frames, nie ein einzelner Punkt) auf (Farben G, K, J des Sprites; die Eck-Sterne berühren das Ei nie — das Skript prüft es in jedem Frame).
 Ergänzungen: keine (der Rand wird nie verändert).
 Frame: Sprite plus 3 px links/rechts, 5 px oben (Strecken + Hüpfer + Eck-Sterne), 2 px unten — Figur zentriert.
 Alle Bewegungen laufen auf der vollen Leinwand (anim_lib/anim_amorph werfen ClipError). Nur ganze Pixel, nur Farben der Quelle.
@@ -67,9 +67,10 @@ SWEEPS = [2, 26]
 SWEEP_N = 15
 
 # ── Sterne ──
-STERN_LAUF = [0, 1, 2, 1, 0]
+STERN_LAUF = [0, 1, 2, 1, 0]                                                           # auf dem Ei (Oberflächenfunkeln)
+STERN_LAUF_ECKE = [1, 2, 1]                                                            # in den Ecken: nie ein einzelner Punkt (kleinster Stern = Plus aus 5 Pixeln)
 ORTE = {'e1': (7, 9), 'e2': (10, 12), 'e3': (5, 15),                                    # auf dem Ei (ganz im Inneren)
-        'c1': (1, 0), 'c2': (16, 0)}                                                    # freie obere Ecken (außerhalb des Eis)
+        'c1': (1, -1), 'c2': (16, -1)}                                                    # freie obere Ecken (außerhalb des Eis)
 for _k in ('e1', 'e2', 'e3'):
     _x, _y = ORTE[_k]
     for (_dx, _dy) in [(d, 0) for d in range(-2, 3)] + [(0, d) for d in (-2, -1, 1, 2)]:
@@ -83,7 +84,12 @@ STERNE = [(3, 'c1'), (9, 'e1'), (15, 'c2'), (20, 'e2'), (27, 'c1'), (33, 'e3'), 
 
 
 def aktive_sterne(i):
-    return [(o, STERN_LAUF[(i - s) % N]) for (s, o) in STERNE if (i - s) % N < len(STERN_LAUF)]
+    out = []
+    for (s, o) in STERNE:
+        lauf = STERN_LAUF if o.startswith('e') else STERN_LAUF_ECKE
+        if (i - s) % N < len(lauf):
+            out.append((o, lauf[(i - s) % N]))
+    return out
 
 
 # ── Zeitachsen ──
@@ -137,6 +143,20 @@ if __name__ == '__main__':
     prev = sys.argv[sys.argv.index('--preview') + 1] if '--preview' in sys.argv else None
     ref = L.platz(spr, H, W, PAD_L, PAD_T)
     print('Frame 0 weicht vom Original in', int((figs[0] != ref).any(axis=2).sum()), 'Pixeln ab')
+    # Eck-Sterne dürfen das Ei nie berühren (auch nicht über die Ecke)
+    for i in range(N):
+        e = L.leer(H, W)
+        for ort, stufe in aktive_sterne(i):
+            if ort.startswith('c'):
+                A.stern(e, PAD_L + ORTE[ort][0], PAD_T + ORTE[ort][1], stufe, STERN_FARBEN)
+        st = e[..., 3] > 0
+        k = np.pad(figs[i][..., 3] > 0, 1)
+        nah = np.zeros_like(st)
+        for dy in (-1, 0, 1):
+            for dx in (-1, 0, 1):
+                nah |= k[1 + dy:1 + dy + H, 1 + dx:1 + dx + W]
+        if (st & nah).any():
+            print('Eck-Stern berührt das Ei in Frame', i)
     n = L.pruefe(frames, quelle=spr)
     print('Pixel je Frame:', n)
     schlecht = A.ausdruck_pruefen(figs, spr, 'the-egg-of-god')
