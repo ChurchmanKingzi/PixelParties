@@ -76,6 +76,9 @@ if '--koerper-neu' in sys.argv:
     sys.exit(0)
 
 body = L.lade('hardy-slime-body')
+# Die zwei schwarzen Pupillenpunkte (7,10), (10,10) gehören zu den Augen (neben dem weißen Lichtpunkt), nicht zum Helm
+for (x, y) in ((7, 10), (10, 10)):
+    body[y, x] = spr[y, x]
 # Helm = alles, was vom nackten Körper abweicht (Farbe anders oder dort gar kein Körperpixel)
 gleich = (body[..., 3] > 0) & (spr[..., 3] > 0) & (body[..., :3] == spr[..., :3]).all(axis=2)
 helm_maske = (spr[..., 3] > 0) & ~gleich
@@ -111,9 +114,15 @@ assert len(S) == N
 
 # Körperzeilen: Index 0 = Sprite-Zeile 5 … 13 = Zeile 18; Gesichtszeilen (Index 4–6 = Zeilen 9–11) werden nie verdoppelt
 GEWICHT = [1.0] * 7 + [0.6, 0.2] + [0] * 5
-POSEN = {                                                                      # s → (löschen, doppeln, p)
+POSEN = {                                                                      # s → (löschen, doppeln, p unten)
     -2: ({7, 8}, (), 2), -1: ({7}, (), 1), 0: ((), (), 0), 1: ((), {7}, 0), 2: ((), {7: 2}, -1),
 }
+
+
+def breiten(p):
+    """p je Körperzeile: Zeilen 5–8 (Index 0–3, ganz unter der Helmkuppe) bleiben schmal, die Gesichtszeilen 9–11 (Index 4–6) werden
+    höchstens 1 px je Seite breiter (neben dem Helmrand liegt dann nur der Umrisspixel frei), Wangen/Mund/Pfütze (ab Zeile 12) voll."""
+    return {k: 0 for k in range(0, 4)} | {k: (min(p, 1) if p > 0 else 0) for k in range(4, 7)}
 PAARE_UNTEN = ((8, 9), (7, 10), (6, 11))
 PAARE_SCHMAL = ((3, 14), (4, 13))
 PAARE_OBEN = {k: [(3, 14), (4, 13)] for k in range(0, 7)}                      # Zeilen 5–11: Spalten unter dem Helm (Wange), nie das Gesicht
@@ -170,7 +179,7 @@ def figur(i):
     zeilen = A.zeilen_von(koerper_mit_augen(i), KOERPER_Y0, sh - 1, H, W, PAD_L, PAD_T)
     z, quelle = A.koerper_pose(zeilen, loeschen=loesch, doppeln=dopp, p=p,
                                paare=PAARE_UNTEN if p >= 0 else PAARE_SCHMAL,
-                               paare_je_zeile=PAARE_OBEN, x0=PAD_L)
+                               paare_je_zeile=PAARE_OBEN, x0=PAD_L, p_je_zeile=breiten(p))
     dxq = A.dx_zeilen(GEWICHT, lehnen(i), math.pi / 2)
     z = A.verschiebe_zeilen(z, quelle, dxq)
     kb, top = A.auf_leinwand(z, H, BODEN, LIFT.get(i, 0))

@@ -64,22 +64,24 @@ def zeile_umbauen(r, p, paare):
     return out
 
 
-def koerper_pose(zeilen, loeschen=(), doppeln=(), p=0, paare=((8, 9), (7, 10), (6, 11)), paare_je_zeile=None, x0=0):
+def koerper_pose(zeilen, loeschen=(), doppeln=(), p=0, paare=((8, 9), (7, 10), (6, 11)), paare_je_zeile=None, x0=0, p_je_zeile=None):
     """Squash & Stretch eines Körpers. zeilen: (n, w, 4) wie von zeilen_von; loeschen: Menge von Zeilenindizes (0 = oberste Körperzeile); doppeln: Menge (je 1 Kopie) oder dict {Zeile: Kopien};
     p: Spalten je Seite (siehe zeile_umbauen); paare: Standard-Spaltenpaare; paare_je_zeile: {Zeilenindex: [Paare]} für Zeilen, in denen die
     Standardspalten etwas Wichtiges (Glanz, Auge) träfen. Gibt (n', w, 4) und die Liste der Quellzeilen-Indizes je Ausgabezeile zurück —
-    damit Wabbeln/Schräglage dieselbe Quellzeile immer gleich versetzen. Spaltenpaare gelten in Sprite-Koordinaten, x0 = pad_l.
+    damit Wabbeln/Schräglage dieselbe Quellzeile immer gleich versetzen. Spaltenpaare gelten in Sprite-Koordinaten, x0 = pad_l. p_je_zeile: {Zeilenindex: p} überschreibt p einzeln
+    (z. B. Zeilen, die ein starres Teil verdeckt, nicht verbreitern).
     Regel gegen offene Kanten: p für ALLE Körperzeilen gleich wählen (sonst wird eine Umrissstufe größer als 1 px und die
     Füllfarbe liegt frei); Zeilen, die frei über einem schmaleren Teil (z. B. Kopfoberkante unter einer Krone) liegen, brauchen
     nach dem Umbau einen ergänzten Umriss (siehe shiny_slime.py)."""
     paare_je_zeile = paare_je_zeile or {}
+    p_je_zeile = p_je_zeile or {}
     def lv(liste):
         return [(a + x0, b + x0) for a, b in liste]
     out, quelle = [], []
     for k in range(zeilen.shape[0]):
         if k in loeschen:
             continue
-        r = zeile_umbauen(zeilen[k], p, lv(paare_je_zeile.get(k, paare)))
+        r = zeile_umbauen(zeilen[k], p_je_zeile.get(k, p), lv(paare_je_zeile.get(k, paare)))
         out.append(r); quelle.append(k)
         extra = doppeln.get(k, 0) if isinstance(doppeln, dict) else (1 if k in doppeln else 0)
         for _ in range(extra):
