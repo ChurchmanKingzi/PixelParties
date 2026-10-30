@@ -587,6 +587,9 @@
  "kf:ppCerBand": {
   "drehung": 2
  },
+ "kf:ppCerDreh": {
+  "blur": 1
+ },
  "kf:ppCerFunke": {
   "drehung": 2
  },

@@ -212,8 +212,8 @@ body {
 /* ===== ANIMATIONS ===== */
 @keyframes pulse { 0%,100% { opacity:1; } 50% { opacity:.6; } }
 @keyframes glow {
-  0%,100% { box-shadow: 0 0 0 2px var(--accent); }
-  50% { box-shadow: 0 0 0 2px var(--accent), 0 0 0 4px color-mix(in srgb, var(--accent) 72%, #08060c), 0 0 0 6px color-mix(in srgb, var(--accent) 44%, #08060c), 0 0 0 8px #2d4362; }
+  0%,100% { box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 55%, #000), 0 0 0 4px #282834; }
+  50% { box-shadow: 0 0 0 4px var(--accent), 0 0 0 6px #2d4362; }
 }
 @keyframes slideIn { from { transform: translateY(20px); opacity:0; } to { transform: translateY(0); opacity:1; } }
 @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
@@ -14546,8 +14546,8 @@ body:has(.modal-overlay) { --pz-tooltip-z: 10086; }
   border: 2px solid transparent !important;
 }
 @keyframes avatar-pulse {
-  0%, 100% { box-shadow: 0 0 0 2px #405f8c, 0 0 0 4px #2d4362, 0 0 0 6px #2d4362; }
-  50% { box-shadow: 0 0 0 2px #399edf, 0 0 0 4px #405f8c, 0 0 0 6px #2d4362, 0 0 0 8px #2d4362; }
+  0%, 100% { box-shadow: 0 0 0 2px #1788bd, 0 0 0 4px #282834; }
+  50% { box-shadow: 0 0 0 4px #66b6ff, 0 0 0 6px #2d4362; }
 }
 
 /* ===== CARD PING FLASH ===== */
@@ -22318,7 +22318,7 @@ body[data-tb-hl] .hero-idle-platz.hero-idle-hover { scale: none; }
 }
 @keyframes ppCerDreh {
   0%, 100% { transform: scaleX(1); }
-  50%      { transform: scaleX(.12); filter: drop-shadow(2px 0 0 #e0c085) drop-shadow(-2px 0 0 #e0c085) drop-shadow(0 2px 0 #e0c085) drop-shadow(0 -2px 0 #e0c085) brightness(1.35); /* pp-ok: blur (harte Konturen, kein Weichzeichner) */ }
+  50%      { transform: scaleX(.12); filter: drop-shadow(4px 0 0 #f7f7ad) drop-shadow(-4px 0 0 #f7f7ad) drop-shadow(0 4px 0 #f7f7ad) drop-shadow(0 -4px 0 #f7f7ad) brightness(1.35); }
 }
 @keyframes ppCerGlanz {
   0%, 62%, 100% { opacity: 0; transform: scale(.2) rotate(0deg); }
