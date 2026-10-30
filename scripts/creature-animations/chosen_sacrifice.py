@@ -21,8 +21,8 @@ Ablauf (48 Frames à 65 ms = 3,12 s; Frame 0 = Original, Partikel und Glanz ausg
 * Blinzeln (Lid = umgebendes Gold): die blauen Augenpixel werden 3 Frames lang zu Gold, zweimal pro Schleife (Frame 15–17 und 39–41). Kein Glühen, kein Farbtausch sonst.
 * Glanz auf dem Gold (Regel 12/14: Gold glänzt): ein diagonales Lichtband (x + y, 3 px) läuft zweimal pro Schleife über den Helm (Start Frame 4 und 28, 12 Frames, jede Goldfarbe zwei Stufen heller), dazu blitzen
   vierzackige Glitzersterne (Mitte (251,242,120), Arme (228,178,30); 3 Frames, Arme 1 → 2 → 1 px) an den Helmlichtern (8,3) und (1,3) (Frame 10–12 / 14–16 und 34–36 / 38–40) und am Gürtel (7,20) (Frame 22–24 und 43–45); sie gehen mit dem Schweben mit.
-* Goldstaub (Partikel, hinter der Figur, 7 Stück, Lebensdauer 48 Frames, langsam aufsteigend, leichtes Wabern, wachsen/schrumpfen, Formen k, o): runde goldene Kugeln (Kern (228,178,30), Rand (179,119,0)) und
-  helle Funken (251,242,120) umschweben die Figur.
+* Goldstaub (Partikel, hinter der Figur, 7 Stück, Lebensdauer 48 Frames, langsam aufsteigend, leichtes Wabern, wachsen/schrumpfen, Form k = 1-px-Funke): goldene (228,178,30) und helle (251,242,120) Funken umschweben die Figur
+  (keine größeren Kugeln, damit nichts wie ein schwebender Ball wirkt).
 Regel 15 entfällt (das Feuer der Karte ist nicht im Sprite). Randpixel-Test (Regel 16): `U.kontur_schliessen` (Umrissfarbe (49,24,0)) in jeder Pose; im Ruhebild nichts. ERGÄNZUNG: keine gemalten Pixel.
 Zuschnitt: der Frame ist auf die Figur zugeschnitten (symmetrisch um die Ruhefigur; Partikel und Sterne vergrößern ihn höchstens 2 px darüber hinaus, dazu 1 px leerer Rand). Alle Bewegungen laufen auf der
 vollen Leinwand (anim_lib wirft ClipError). Nur ganze Pixel, nur Farben der Quelle.
@@ -76,9 +76,9 @@ GOLD1 = {'c': (228, 178, 30), 'r': (179, 119, 0)}
 GOLD2 = {'c': (251, 242, 120), 'r': (251, 242, 120)}
 P = lambda x, y: (GPL + x, GPT + y)
 PUFFS1 = [
-    dict(x=P(0, 14)[0], y=P(0, 14)[1], vx=-1, vy=-9, off=0, form='o', wackeln=1),
-    dict(x=P(13, 18)[0], y=P(13, 18)[1], vx=1, vy=-9, off=22, form='o', wackeln=1),
-    dict(x=P(3, 4)[0], y=P(3, 4)[1], vx=-1, vy=-5, off=36, form='o', wackeln=1),
+    dict(x=P(0, 14)[0], y=P(0, 14)[1], vx=-1, vy=-9, off=0, form='k', wackeln=1),
+    dict(x=P(13, 18)[0], y=P(13, 18)[1], vx=1, vy=-9, off=22, form='k', wackeln=1),
+    dict(x=P(3, 4)[0], y=P(3, 4)[1], vx=-1, vy=-5, off=36, form='k', wackeln=1),
 ]
 PUFFS2 = [
     dict(x=P(11, 5)[0], y=P(11, 5)[1], vx=1, vy=-6, off=8, form='k', wackeln=1),
