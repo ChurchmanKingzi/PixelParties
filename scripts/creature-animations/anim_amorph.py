@@ -168,10 +168,10 @@ def umrissfarben(a):
     return {tuple(int(v) for v in a[y, x, :3]) for y, x in zip(*np.nonzero(r))}
 
 
-def ausdruck_pruefen(frames, spr, name=''):
+def ausdruck_pruefen(frames, spr, name='', erlaubt=()):
     """Prüft je Frame (ohne Partikel: `frames` = nur die Figur): ein einziges 4-verbundenes Teil, und alle Randpixel haben eine Farbe,
     die auch am Rand des Original-Sprites vorkommt (sonst: offene Kante / fehlender Umriss). Gibt Verstöße aus, wirft nicht."""
-    ok = umrissfarben(spr)
+    ok = umrissfarben(spr) | {tuple(c) for c in erlaubt}
     schlecht = []
     for k, f in enumerate(frames):
         n = komponenten4(f[..., 3] > 0)
