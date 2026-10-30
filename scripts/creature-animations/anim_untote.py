@@ -1,0 +1,104 @@
+# -*- coding: utf-8 -*-
+"""Gemeinsame Bausteine für die Gruppe „Untote, Dämonen, Konstrukte, Yokai, Sonstiges“ (baut auf anim_lib auf, ändert sie nicht).
+
+Alles Pixelart: nur ganze Pixel, kein Alpha, nur Farben, die schon im Sprite stehen. Alle Funktionen erwarten Ebenen, die
+bereits auf der VOLLEN Leinwand liegen (L.platz) und werfen ClipError, wenn etwas herausragen würde.
+
+    stufe(i, n, stufen, versatz)              # 0 … stufen, sanft wiederkehrend, Ruhepose (Stufe 0) bei i = 0
+    puls(i, start, folge)                     # kurze Impulsfolge (Ohrenzucken, Blinzeln, Glanz): 1 in den Frames der Folge
+    haengen(a, pivot_y, ausschlag, potenz)    # hängendes Teil (Arm, Fetzen, Quaste) schwingt: Zeilenversatz wächst mit dem Abstand
+    pixel_setzen(a, punkte, farbe, dx, dy)    # einzelne Pixel einfärben (Augen, Glanzpunkte)
+    augen(a, gruppen, stufe, ...)             # Glühen der Augen in Stufen (nur Farben der Rampe aus dem Sprite)
+    glanz_pfad(a, pfad, hell, basis, pos)     # ein Lichtpunkt wandert an einem Horn/Knochen/Klinge entlang
+"""
+import math
+
+import numpy as np
+
+import anim_lib as L
+
+
+def stufe(i, n, stufen=2, versatz=0.0, form='cos'):
+    """Ganze Stufe 0 … stufen, die sich einmal pro n Frames auf- und abbaut (0 bei i = 0 bei versatz = 0).
+    form='cos': 0 → stufen → 0 weich (1 − cos); 'sin': Ausgangslage in der Mitte (schwingt ±stufen/2 um die Mitte)."""
+    ph = L.sinus(i, n, versatz)
+    if form == 'sin':
+        return int(round(stufen / 2.0 * (1 + math.sin(ph))))
+    return int(round(stufen / 2.0 * (1 - math.cos(ph))))
+
+
+def buckel(i, start, dauer, n=None):
+    """Weiche Welle 0 → 1 → 0 über `dauer` Frames ab `start` (sonst 0): für einzelne Bewegungen, die in der Ruhepose (Frame 0) beginnen."""
+    k = i - start
+    if n:
+        k %= n
+    if not 0 <= k < dauer:
+        return 0.0
+    return 0.5 * (1 - math.cos(2 * math.pi * k / dauer))
+
+
+def puls(i, start, folge, n=None):
+    """1, wenn Frame i in der Impulsfolge liegt: `folge` ist eine Liste von 0/1 ab Frame `start` (zyklisch bei n)."""
+    k = i - start
+    if n:
+        k %= n
+    return folge[k] if 0 <= k < len(folge) else 0
+
+
+def haengen(a, pivot_y, ausschlag, potenz=1.0, nach_unten=True):
+    """Hängendes Teil schwingt waagerecht: Zeile y wandert um round(ausschlag · (Abstand zum Pivot / größter Abstand)^potenz).
+    `ausschlag` in Pixeln (mit Vorzeichen) an der am weitesten entfernten Zeile. An der Aufhängung (pivot_y) bleibt alles stehen."""
+    out = L.leer(*a.shape[:2])
+    h, w = a.shape[:2]
+    zeilen = [y for y in range(h) if a[y, :, 3].any() and ((y > pivot_y) if nach_unten else (y < pivot_y))]
+    fest = [y for y in range(h) if a[y, :, 3].any() and y not in zeilen]
+    maxd = max([abs(y - pivot_y) for y in zeilen], default=1)
+    for y in fest:
+        out[y] = a[y]
+    for y in zeilen:
+        dx = int(round(ausschlag * (abs(y - pivot_y) / maxd) ** potenz))
+        xs_ = np.nonzero(a[y, :, 3])[0]
+        if xs_.min() + dx < 0 or xs_.max() + dx >= w:
+            raise L.ClipError(f'Zeile {y} würde um {dx} px aus der Leinwand (Breite {w}) geschoben')
+        for x in xs_:
+            out[y, x + dx] = a[y, x]
+    return out
+
+
+def pixel_setzen(a, punkte, farbe, dx=0, dy=0, nur_deckend=True):
+    """Pixel `punkte` (Liste (x, y) in Leinwandkoordinaten) auf `farbe` setzen; mit nur_deckend nur dort, wo schon etwas steht."""
+    for (x, y) in punkte:
+        x, y = x + dx, y + dy
+        if nur_deckend and not a[y, x, 3]:
+            continue
+        a[y, x, :3] = farbe
+        a[y, x, 3] = 255
+    return a
+
+
+def augen(a, gruppen, stufe_glut=0, blinzeln=0, farben=None):
+    """Augen in Stufen (nur Farben, die der Sprite schon hat).
+    gruppen: Liste von dict(hell=[(x,y)…], rand=[(x,y)…]) in Leinwandkoordinaten (hell = leuchtende Pixel, rand = Brauen-/Randpixel).
+    farben: dict(hell=Ruhefarbe, glut=[Stufe1, Stufe2], rand=Ruhefarbe, lid=Farbe, lid_dunkel=Farbe).
+    stufe_glut 0 = Original, 1/2 = schwächer glimmend. blinzeln 1 = halb zu, 2 = zu."""
+    for g in gruppen:
+        if blinzeln == 0:
+            if stufe_glut:
+                pixel_setzen(a, g['hell'], farben['glut'][stufe_glut - 1])
+        elif blinzeln == 1:
+            pixel_setzen(a, g['hell'], farben['glut'][-1])
+            pixel_setzen(a, g['rand'], farben['lid'])
+        else:
+            pixel_setzen(a, g['hell'], farben['lid_dunkel'])
+            pixel_setzen(a, g['rand'], farben['lid'])
+    return a
+
+
+def glanz_pfad(a, pfad, hell, basis, pos):
+    """Lichtpunkt an einem Pfad (Liste (x, y)): nur das Pixel `pos` (Index) wird `hell`, aber nur, wenn dort gerade `basis` steht."""
+    if pos is None or not 0 <= pos < len(pfad):
+        return a
+    x, y = pfad[pos]
+    if a[y, x, 3] and tuple(int(v) for v in a[y, x, :3]) == tuple(basis):
+        a[y, x, :3] = hell
+    return a
