@@ -48,6 +48,8 @@
     stufenMax: 800,      // Szenen: reine Stufenfolgen (`steps(n)`) bis zu so vielen Stufen je Durchlauf werden exakt an den Stufengrenzen gebacken
     globalMaxDauer: 8000,// dokumentweit (Oberflaeche) werden nur Animationen/Uebergaenge bis zu dieser Dauer (ms) gebacken (Countdown-Balken u. ae. bleiben)
     direkt: true,        // Blaetter ohne Kinder animieren `mask-image` selbst statt ueber eine vererbte Variable
+    hauptfaden: true,    // W86p: gebackene Animationen mit einer wirkungslosen, nicht kompositierbaren Eigenschaft (scroll-margin-top, wechselt je Bild) auf den Hauptthread zwingen —
+                         // Compositor-Animationen malen die Ebene mit festem Raster und skalieren/verschieben sie bilinear: Mischfarben und Halbalpha an jeder Kante (Palettenverstoss)
     aktiv: true,
   };
   const TAKT_MS = () => 1000 / KONFIG.takt;
@@ -771,11 +773,14 @@
     const offs = zeiten.map(z => z / D2).concat([1]);
     const frames = [];
     let letzte = null;
+    // W86p: nur Animationen, die skalieren (Faktor != 1): Ebenen mit reiner Verschiebung ganzer Pixel bleiben auch als Compositor-Animation scharf
+    const hauptfaden = KONFIG.hauptfaden && (roh.some(w => { const m = matrixLesen(w.transform || 'none'); const z = m && zerlegen(m); return z && (Math.abs(Math.abs(z.sx) - 1) > 0.02 || Math.abs(Math.abs(z.sy) - 1) > 0.02); })
+      || roh.some(w => w.scale && w.scale !== 'none' && w.scale !== '1') || roh.some(w => w.rotate && w.rotate !== 'none' && w.rotate !== '0deg'));
     for (let j = 0; j < rahmen.length; j++) {
       const s = JSON.stringify(rahmen[j]);
       const ende = j === rahmen.length - 1;
       if (s === letzte && !ende) continue;
-      frames.push(Object.assign({ offset: offs[j], easing: 'steps(1, end)', composite: 'replace' }, rahmen[j]));
+      frames.push(Object.assign({ offset: offs[j], easing: 'steps(1, end)', composite: 'replace' }, hauptfaden ? { scrollMarginTop: (frames.length % 2) + 'px' } : null, rahmen[j]));
       letzte = s;
     }
     if (frames.length < 2) frames.push(Object.assign({}, frames[0], { offset: 1 }));
@@ -886,7 +891,65 @@
         aus[j][p] = v;
       }
     }
+    if (!pe && !svgInnen && (props.includes('width') || props.includes('height'))) { try { ringBacken(el, cs, aus, raster, n); } catch (e) { if (KONFIG.debug) console.warn('[PPPixelAnim.ring]', e); } }
     return aus;
+  }
+
+  /**
+   * ★ W86p: Ring mit animierter GROESSE (`border-radius: 50 %` + `border`, durchsichtige Flaeche — Druckwellen, Zielringe): der Browser malt den Bogen als
+   * Vektor, jede Randpixel bekommt Teildeckkraft (Mischfarben ausserhalb der Palette). Je Bild wird der Ring stattdessen als Pixelbild gemalt (Kunstpixel-
+   * Raster, Palettenfarbe, deckend) und der Rand durchsichtig gesetzt; die Groesse (Layout) bleibt unveraendert.
+   */
+  const _ringCache = new Map();
+  function ringBild(nx, ny, d, rgb) {
+    const key = nx + 'x' + ny + ':' + d + ':' + rgb.join(',');
+    let u = _ringCache.get(key);
+    if (u !== undefined) return u;
+    const [cv, g] = neuesCanvas(nx, ny);
+    const id = g.createImageData(nx, ny), dat = id.data;
+    const ax = nx / 2, ay = ny / 2, bx = Math.max(0.0001, ax - d), by = Math.max(0.0001, ay - d);
+    for (let y = 0; y < ny; y++) for (let x = 0; x < nx; x++) {
+      const ux = x + 0.5 - ax, uy = y + 0.5 - ay;
+      const aussen = (ux * ux) / (ax * ax) + (uy * uy) / (ay * ay) <= 1;
+      const innen = ax - d > 0.5 && ay - d > 0.5 && (ux * ux) / (bx * bx) + (uy * uy) / (by * by) < 1;
+      if (aussen && !innen) { const i = (y * nx + x) * 4; dat[i] = rgb[0]; dat[i + 1] = rgb[1]; dat[i + 2] = rgb[2]; dat[i + 3] = 255; }
+    }
+    g.putImageData(id, 0, 0);
+    try { u = cv.toDataURL('image/png'); } catch (e) { u = ''; }
+    if (_ringCache.size > 300) _ringCache.clear();
+    _ringCache.set(key, u);
+    return u;
+  }
+  function ringBacken(el, cs, aus, raster, n) {
+    const bw = parseFloat(cs.borderTopWidth) || 0;
+    if (!(bw > 0) || cs.borderTopStyle !== 'solid') return;
+    const bc = farbeRgba(cs.borderTopColor);
+    if (!bc || bc[3] < 0.5) return;
+    const bg = farbeRgba(cs.backgroundColor);
+    if ((bg && bg[3] > 0.03) || (cs.backgroundImage && cs.backgroundImage !== 'none')) return;
+    const rr = cs.borderTopLeftRadius || '0px';
+    const rund = /%/.test(rr) ? parseFloat(rr) >= 45 : parseFloat(rr) >= Math.min(el.offsetWidth, el.offsetHeight) / 2 - 1;
+    if (!rund) return;
+    if (!(raster > 0)) raster = KONFIG.px;
+    const rgb = root.ppSnapRgb ? root.ppSnapRgb(bc[0] | 0, bc[1] | 0, bc[2] | 0) : [bc[0] | 0, bc[1] | 0, bc[2] | 0];
+    const bb = cs.boxSizing === 'border-box';
+    const mass = (v, fallback) => { const f = parseFloat(v); return f >= 0 ? f : fallback; };
+    const W0 = el.offsetWidth, H0 = el.offsetHeight;
+    const d = Math.max(1, Math.round(bw / raster));
+    const bilder = [];
+    for (let j = 0; j < n; j++) {
+      const w = mass(aus[j].width, bb ? W0 : W0 - 2 * bw), h = mass(aus[j].height, bb ? H0 : H0 - 2 * bw);
+      const AW = bb ? w : w + 2 * bw, AH = bb ? h : h + 2 * bw;
+      const nx = Math.max(2, Math.round(AW / raster)), ny = Math.max(2, Math.round(AH / raster));
+      const u = ringBild(nx, ny, d, rgb);
+      if (!u) return;
+      bilder.push(u);
+    }
+    for (let j = 0; j < n; j++) { aus[j].backgroundImage = `url("${bilder[j]}")`; aus[j].borderColor = 'transparent'; }
+    const st = el.style;
+    st.setProperty('background-size', '100% 100%'); st.setProperty('background-origin', 'border-box'); st.setProperty('background-repeat', 'no-repeat');
+    st.setProperty('image-rendering', 'pixelated');
+    stat.ringe = (stat.ringe || 0) + 1;
   }
 
   // ════════════════════════════════════════════════════════════════════════
@@ -1208,6 +1271,11 @@
       if (!cs.backgroundImage || cs.backgroundImage === 'none') {
         const bc = farbeRgba(cs.backgroundColor);
         if (bc && bc[3] > 0.03 && bc[3] < 0.97) a.bg = bc;
+      } else {
+        // ★ W86p: Bild UND halbdurchsichtige Grundfarbe (z. B. Partikel-Regel `background: url(schatten), var(--color) !important` mit rgba-Farbe): die Farbe
+        // mischte sich mit dem Untergrund (Farbe ausserhalb der Palette). Wie bei SVG-Formen: ab 50 % deckend in der Farbe, darunter weg.
+        const bc = farbeRgba(cs.backgroundColor);
+        if (bc && bc[3] > 0.03 && bc[3] < 0.97) a.bgUnter = bc;
       }
       if (animTr.has(el)) {
         // Die Animation uebernimmt die Transformation — der ruhende Inline-Wert vor ihrem Start (Delay) darf trotzdem nicht gedreht stehen.
@@ -1235,7 +1303,7 @@
         if (mm && bildVon(mm[2]) && bcol && bcol[3] >= 0.5) a.maskBild = { url: mm[2], farbe: bcol, groesse: cs.maskSize, lage: cs.maskPosition, wdh: cs.maskRepeat };
       }
       if (el.classList.contains('pp-px') && cs.display === 'inline-block' && /em\)?$|calc\(/.test((el.getAttribute('style') || '').match(/width:\s*([^;]*)/) ? el.getAttribute('style').match(/width:\s*([^;]*)/)[1] : '')) a.pxBox = [el.offsetWidth, el.offsetHeight];
-      if (a.opa !== undefined || a.bg || a.tr || a.basis || a.maskBild || a.pxBox || a.misch || a.farbFilter) auftraege.push(a);
+      if (a.opa !== undefined || a.bg || a.bgUnter || a.tr || a.basis || a.maskBild || a.pxBox || a.misch || a.farbFilter) auftraege.push(a);
     }
     let n = 0;
     for (const a of auftraege) {                                 // ── Schreiben ──
@@ -1296,6 +1364,11 @@
           const z = maskeVorbereiten(el, cs);
           el.style.setProperty('opacity', stufe === 0 ? '0' : '1');
           el.style.setProperty(z.vn, ditherMaske(stufe === 0 ? 1 : stufe));
+          n++;
+        }
+        if (a.bgUnter) {
+          const c = a.bgUnter;
+          el.style.setProperty('background-color', c[3] >= 0.5 ? snapFarben(`rgb(${Math.round(c[0])},${Math.round(c[1])},${Math.round(c[2])})`) : 'transparent', 'important');
           n++;
         }
         if (a.bg) {
