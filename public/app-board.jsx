@@ -11968,6 +11968,9 @@ function ppR1Pinsel(buf, gw, gh) {
   };
   return g;
 }
+// Welt-Animationen tragen FELD-Koordinaten (Fenster + Scrollstand des Brettes, s. ppFxWeltAnker). Ursprung (`ox`/`oy`) und Ziele (`targetPoints`) kommen als FENSTERpunkte aus dem
+// Brett-Zweig von `onZoneAnim` — ohne diesen Versatz lagen sie bei gescrolltem Brett (Handy) um den Scrollstand daneben (Flame Avalanche startete viel zu hoch).
+function ppR1FeldVersatz(p) { return (p && p.welt && window.ppFxScrollOffset) ? window.ppFxScrollOffset() : { dx: 0, dy: 0 }; }
 function ppR1Leinwand(malen, ende, mass, opt) {
   const o = opt || {}, S = 3, TAKT = 1000 / 30;
   return function R1Effekt(props) {
@@ -13022,10 +13025,11 @@ const ppR1FlameAvalanche = ppR1Leinwand((g, t, sz, teile) => {
   z: 10100,
   vorbereiten: (sz) => {
     const p = sz.props, W = Math.max(p.w || 900, 320), H = Math.max(p.h || 560, 240), links = p.x - W / 2, oben = p.y - H / 2;
-    const oX = (typeof p.ox === 'number' ? p.ox : p.x) - links, oY = (typeof p.oy === 'number' ? p.oy : p.y + H * 0.35) - oben, dauer = p.duration || 1600, flug = 520;
+    const _v = ppR1FeldVersatz(p);
+    const oX = (typeof p.ox === 'number' ? p.ox + _v.dx : p.x) - links, oY = (typeof p.oy === 'number' ? p.oy + _v.dy : p.y + H * 0.35) - oben, dauer = p.duration || 1600, flug = 520;
     let t0 = Math.round(W * 11 + H * 7 + oX * 3 + oY) >>> 0;
     const r = () => { t0 = (t0 * 1664525 + 1013904223) >>> 0; return t0 / 4294967296; };
-    let ziele = Array.isArray(p.targetPoints) && p.targetPoints.length ? p.targetPoints.map(q => ({ zx: q.x - links, zy: q.y - oben })) : null;
+    let ziele = Array.isArray(p.targetPoints) && p.targetPoints.length ? p.targetPoints.map(q => ({ zx: q.x + _v.dx - links, zy: q.y + _v.dy - oben })) : null;
     if (!ziele) { const vor = oY > H / 2 ? -1 : 1; ziele = Array.from({ length: 5 }, (_, i) => ({ zx: W * (0.15 + i * 0.175), zy: oY + vor * H * 0.55 })); }
     const bahnen = [], treffer = [], jeZiel = Math.max(4, Math.min(9, Math.floor(66 / ziele.length)));
     ziele.forEach((z, zi) => {
@@ -13109,7 +13113,8 @@ const R1HoleLeinwand = ppR1Leinwand((g, t, sz, teile) => {
   z: 10100,
   vorbereiten: (sz) => {
     const p = sz.props, W = Math.max(p.w || 900, 320), H = Math.max(p.h || 560, 240), links = p.x - W / 2, oben = p.y - H / 2, mx = W / 2, my = H / 2;
-    const ziele = (Array.isArray(p.targetPoints) ? p.targetPoints : []).map(q => ({ zx: q.x - links, zy: q.y - oben }));
+    const _v = ppR1FeldVersatz(p);
+    const ziele = (Array.isArray(p.targetPoints) ? p.targetPoints : []).map(q => ({ zx: q.x + _v.dx - links, zy: q.y + _v.dy - oben }));
     let s0 = Math.round(W * 13 + H * 5 + ziele.length * 97) >>> 0;
     const r = () => { s0 = (s0 * 1664525 + 1013904223) >>> 0; return s0 / 4294967296; };
     const splitter = [];
@@ -13140,7 +13145,8 @@ function HoleInTheSkyPullEffekt(props) {
   const { x, y, w, h, duration, targetPoints } = props;
   const W = Math.max(w || 900, 320), H = Math.max(h || 560, 240), links = x - W / 2, oben = y - H / 2, mx = W / 2, my = H / 2;
   const dauer = duration || 2400, Z = PP_R1_HOLE_ZUSCHNAPP;
-  const ziele = useMemo(() => (Array.isArray(targetPoints) ? targetPoints : []).map(p => ({ ...p, zx: p.x - links, zy: p.y - oben })), [targetPoints, links, oben]);
+  const _v = ppR1FeldVersatz(props);
+  const ziele = useMemo(() => (Array.isArray(targetPoints) ? targetPoints : []).map(p => ({ ...p, zx: p.x + _v.dx - links, zy: p.y + _v.dy - oben })), [targetPoints, links, oben]);
   // Die eingesogenen Karten: nur Kreaturen (Support-Platz + Name); Helden bleiben stehen. Die Zone wird SOFORT verborgen, der Notnagel gibt sie frei, falls die Rückreise (Engine) ausbleibt.
   const karten = useMemo(() => {
     let s0 = Math.round(W * 7 + H * 3 + ziele.length * 31) >>> 0;
