@@ -1,0 +1,15 @@
+{
+  "creature": "Deepsea Bats",
+  "sheet": "deepsea-bats.png",
+  "frameWidth": 44,
+  "frameHeight": 30,
+  "frames": 48,
+  "frameMs": 60,
+  "loop": true,
+  "layout": "horizontal",
+  "padTop": 2,
+  "padLeft": 2,
+  "padRight": 2,
+  "padBottom": 2,
+  "faceX": 22.0
+}

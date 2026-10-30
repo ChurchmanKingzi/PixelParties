@@ -353,3 +353,25 @@ def funkel_stern(ebene, mx, my, stufe, farbe):
         ebene[y, x, :3] = farbe
         ebene[y, x, 3] = 255
     return ebene
+
+
+def wolken_ebene(h, w, i, n, puffs, farben):
+    """Lesbare Wölkchen ohne Ein-Pixel-Punkte (Regel „Partikel ≥ 2×2“): wie L.puff_ebene (puffs: dict(x, y, vx, vy, off, form, wackeln); (x, y) = Startpunkt auf der Leinwand,
+    (vx, vy) = Gesamtweg über die Lebensdauer n = Schleifenlänge, daher nahtlos), aber Anfang und Ende sind die 2×2-Form 's' statt eines Funkens: erstes und letztes Fünftel
+    der Lebensdauer 's', dazwischen die volle Form (`form`: 's' 2×2, 'o' 4×4, 'm' 5×3). Farben: {'c': Kern, 'r': Rand}. ClipError, wenn ein Pixel aus der Leinwand ragt."""
+    e = L.leer(h, w)
+    for pf in puffs:
+        t = ((i + pf.get('off', 0)) % n) / n
+        cx = pf['x'] + pf.get('vx', 0) * t + pf.get('wackeln', 0) * math.sin(2 * math.pi * t)
+        cy = pf['y'] + pf.get('vy', 0) * t
+        cx, cy = int(round(cx)), int(round(cy))
+        form = pf.get('form', 's')
+        if t < 0.2 or t >= 0.8:
+            form = 's'
+        for (dx, dy, k) in L.PUFF_FORMEN[form]:
+            x, y = cx + dx, cy + dy
+            if not (0 <= y < h and 0 <= x < w):
+                raise L.ClipError(f'Wölkchen bei ({x},{y}) liegt außerhalb der Leinwand {w}×{h}')
+            e[y, x, :3] = farben[k]
+            e[y, x, 3] = 255
+    return e

@@ -16,8 +16,8 @@ Identifikation (Sprite-Koordinaten x, y; jede Fledermaus von vorn, Flügel = tü
 
 Ablauf (48 Frames à 60 ms = 2,88 s):
 * Durchgehender Flügelschlag, jede Fledermaus in ihrem eigenen konstanten Rhythmus (alle teilen sich 48): A Periode 12, B Periode 8 (kleiner, schneller), C Periode 12. Jeder Flügel dreht sich um seine Schulter am Körper;
-  die rechte Seite ist das exakte Spiegelbild der linken (Flügel und Körper des Sprites sind spiegelgleich). A und B schlagen aus der V-Haltung (Frame 0 = Original) bis 75° bzw. 70° nach unten, C aus der waagerechten
-  Haltung (Frame 0 = Original) 45° nach unten und 45° nach oben. Die Flügel behalten ihre Pixeltextur (Rückwärtsabbildung, Nächster Nachbar); der Abschlag ist etwas schneller als der Aufschlag.
+  die rechte Seite ist das exakte Spiegelbild der linken (Flügel und Körper des Sprites sind spiegelgleich). A und B schlagen aus der V-Haltung (Frame 0 = Original) bis 75° bzw. 70° nach unten (Drehung der Flügel, Rückwärtsabbildung, Nächster Nachbar); bei C (waagerechte Rauten) würde Drehen
+  die Raute zerreißen, dort wandert jede Flügelspalte senkrecht (Spaltenversatz bis 4 px an der Spitze nach unten und oben, Frame 0 = Original). Die Flügel behalten ihre Pixeltextur; der Abschlag ist etwas schneller als der Aufschlag.
 * Schwebe-Bob je Fledermaus zweistufig bis 2 px nach oben (0 → 1 → 2 → 1 → 0) im Takt ihres Flügelschlags (Periode 12 bzw. 8): der Körper hebt sich im Abschlag.
 * Blinzeln, jede Fledermaus einmal pro Schleife zu einer anderen Zeit (3 Frames), Lid = Körperfarbe (21,34,57).
 * Kein Glanz, kein Feuer, keine Partikel.
@@ -51,9 +51,9 @@ AUGE = (246, 255, 255)
 n_teile, lab = cv2.connectedComponents(vorhanden.astype(np.uint8), connectivity=8)
 assert n_teile == 4, n_teile
 BATS = [
-    dict(name='A', typ='V', auge=(6, 5), T=12, tief=75.0, blinz=(14, 15, 16)),
-    dict(name='B', typ='V', auge=(28, 14), T=8, tief=70.0, blinz=(33, 34, 35)),
-    dict(name='C', typ='flat', auge=(13, 20), T=12, tief=45.0, blinz=(25, 26, 27)),
+    dict(name='A', typ='V', auge=(7, 5), T=12, tief=75.0, blinz=(14, 15, 16)),
+    dict(name='B', typ='V', auge=(29, 14), T=8, tief=70.0, blinz=(33, 34, 35)),
+    dict(name='C', typ='flat', auge=(13, 20), T=12, amp=4.0, blinz=(25, 26, 27)),
 ]
 for b in BATS:
     ax, ay = b['auge']
@@ -149,9 +149,12 @@ def bat_ebenen(b, i, effekte=True):
     if b['typ'] == 'V':
         delta = -b['tief'] * (1 - math.cos(ph2)) / 2           # Frame 0: V-Haltung (Original), dann nach unten
     else:
-        delta = -b['tief'] * math.sin(ph2)                     # Frame 0: waagerecht (Original), erst nach unten, dann nach oben
+        delta = 0.0
     bob = -int(round(2 * (1 - math.cos(ph)) / 2 * 1.0))        # 0 → −1 → −2 → −1 → 0 (nur nach oben, zweistufig)
-    fl = F.drehen(b['P_fl'], b['piv'][0], b['piv'][1], math.radians(delta), glatt=False)
+    if b['typ'] == 'V':
+        fl = F.drehen(b['P_fl'], b['piv'][0], b['piv'][1], math.radians(delta), glatt=False)
+    else:                                                      # Rautenflügel: Spaltenversatz um die Schulter (Raute bleibt unverändert), Frame 0: waagerecht (Original), erst nach unten, dann nach oben
+        fl = F.fluegel_welle(b['P_fl'], b['piv'][0], b['amp'], ph2, 1.0, None, 0.0, True)
     rumpf = b['P_rumpf'].copy()
     if effekte and i in b['blinz']:
         for (x, y) in b['eyes']:

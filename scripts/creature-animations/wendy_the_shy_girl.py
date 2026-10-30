@@ -26,7 +26,7 @@ Ablauf (48 Frames à 62 ms = 2,98 s, nahtlos):
 * Haarsträhnen schwingen: die linke Seitensträhne (x 0–2, y 4–11) schwingt zweimal 1 px nach außen (Frames 14–19), die rechte später (Frames 38–43); die Zeile wird mit `Hm.rand_dehnen` gedehnt, innen
   bleibt alles am Kopf.
 * Arme: der linke Arm (Zeilen 12–17) spreizt sich 1 px nach außen (Frames 22–33), der rechte (Frames 2–9 und 46–47).
-* Händchen-Fummeln (schüchtern): die linke Hand (Frames 4–7) und die rechte Hand (Frames 28–31) rutschen 1 px tiefer (Spalte 1–2 bzw. 7–8, Zeilen 14–17: Umriss, Umriss, Hand, Hand statt Umriss, Hand, Hand, Umriss).
+* Händchen-Fummeln (schüchtern): die linke Hand (Frames 4–7) und die rechte Hand (Frames 28–31) rutschen 1 px hoch zur Brust (Spalte 1–2 bzw. 7–8, Zeilen 14–17: Hand, Hand, Umriss, Umriss statt Umriss, Hand, Hand, Umriss).
 * Blinzeln (Frames 19–21 und 41–43): die Augenpixel (Weiß und Iris) nehmen die umgebende Hautfarbe an; die Wimpern bleiben als Lidlinie. Kein Farbtausch, kein Augenglanz, die Wangen bleiben unverändert.
 * Fußtippen: der linke Stiefel hebt sich zweimal 1 px hinter das Bein (Frames 12–19), später der rechte (Frames 36–43).
 Frame 0 = Original (Ruhepose). Kontrolle: anim_humanoide.ruhepose / eckkontakt_typen / Randpixel-Test (Regel 16).
@@ -74,10 +74,10 @@ def ebene(m, dy=0):
     return L.platz(t, H, W, PAD_L, PAD_T + dy)
 
 
-def hand_tiefer(a, xs):
-    """Hand in den Spalten xs rutscht 1 px nach unten: Zeilen 14–17 (Umriss, Hand, Hand, Umriss) → (Umriss, Umriss, Hand, Hand)."""
+def hand_hoch(a, xs):
+    """Hand in den Spalten xs rutscht 1 px nach oben (zur Brust): Zeilen 14–17 (Umriss, Hand, Hand, Umriss) → (Hand, Hand, Umriss, Umriss)."""
     for x in xs:
-        Hm.setze(a, {(x, 15): f(x, 14), (x, 16): f(x, 15), (x, 17): f(x, 16)}, OFF)
+        Hm.setze(a, {(x, 14): f(x, 15), (x, 15): f(x, 16), (x, 16): f(x, 17), (x, 17): f(x, 14)}, OFF)
 
 
 def frame(i):
@@ -85,11 +85,11 @@ def frame(i):
     # --- Blinzeln: Weiß und Iris nehmen die Hautfarbe an ---
     if Hm.folge(i, 19, [1, 1, 1], N) or Hm.folge(i, 41, [1, 1, 1], N):
         Hm.setze(k, AUGEN, OFF)
-    # --- Händchen-Fummeln (Hände rutschen 1 px tiefer) ---
+    # --- Händchen-Fummeln (die Hände rutschen 1 px hoch zur Brust) ---
     if Hm.folge(i, 4, [1] * 4, N):
-        hand_tiefer(al, (1, 2))
+        hand_hoch(al, (1, 2))
     if Hm.folge(i, 28, [1] * 4, N):
-        hand_tiefer(k, (7, 8))
+        hand_hoch(k, (7, 8))
     # --- Haarsträhnen schwingen nach außen ---
     pat = [1, 1, 0, 0, 1, 1]
     if Hm.folge(i, 14, pat, N):

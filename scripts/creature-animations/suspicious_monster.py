@@ -20,6 +20,7 @@ Fest bleiben: Umriss, Kopf, Gesicht, Pfoten, Fellbüschel (sie wandern nur mit d
 
 Ablauf (48 Frames à 65 ms = 3,12 s, nahtlos):
 * Atmen (Periode 24): in der Hüfte (Quellzeile 19, in der Spitze zusätzlich 20) wird 1–2 Körperzeilen eingefügt — Kopf, Arme und Rumpf heben sich um 1–2 px, die Füße bleiben fest am Boden.
+* Seitenblick (Frames 14–21 nach rechts, 38–45 nach links): der Kopf samt Ohren und Fellbüscheln (Quellzeilen 0–10) rückt als Ganzes 1 px zur Seite — das Wesen schielt misstrauisch; Rumpf, Arme, Füße bleiben.
 * Ohren (je 3 Frames, Frames 8–10, 20–22, 32–34, 44–46 abwechselnd links und rechts): das jeweilige Ohr (Zeilen 0–1) kippt um 1 px zur Kopfmitte — als lausche das Wesen misstrauisch.
 * Füße (Frames 12–15/36–39 links, 24–27/44–47 rechts): der Fuß hebt sich 1 px (die unteren drei Beinzeilen rücken um eine Zeile nach oben), der andere bleibt am Boden.
 Ergänzungen: Umrisspixel A nur wo eine Bewegung eine Kante freilegt (siehe `ergaenzt`); keine Partikel.
@@ -58,8 +59,23 @@ OHR_R = {20, 21, 22, 44, 45, 46}
 LIFT_L = {12, 13, 14, 15, 36, 37, 38, 39}
 LIFT_R = {24, 25, 26, 27, 44, 45, 46, 47}
 assert N % 24 == 0
+BLICK = {**{i: 1 for i in range(14, 22)}, **{i: -1 for i in range(38, 46)}}             # misstrauischer Seitenblick: der Kopf (Quellzeilen 0–10) rückt 1 px zur Seite
+KOPF_ZEILEN = 11
 OHR_SPALTEN = {'l': (5, 8), 'r': (13, 16)}                                         # Quellspalten der Ohren (Zeilen 0–1)
 BEIN_SPALTEN = {'l': (5, 9), 'r': (12, 16)}                                        # Quellspalten der Beine (Zeilen 22–24)
+
+
+def _kopf(fig, top, dx):
+    """Kopf samt Ohren und Fellbüscheln (Quellzeilen 0–10) um dx Pixel waagerecht versetzen."""
+    out = fig.copy()
+    blk = fig[top:top + KOPF_ZEILEN].copy()
+    out[top:top + KOPF_ZEILEN] = 0
+    for y in range(KOPF_ZEILEN):
+        for x in np.nonzero(blk[y, :, 3])[0]:
+            if not 0 <= x + dx < W:
+                raise L.ClipError('Kopf aus der Leinwand')
+            out[top + y, x + dx] = blk[y, x]
+    return out
 
 
 def _ohr(fig, top, seite, dx):
@@ -99,6 +115,8 @@ def figur(i):
     koerper = A.zeilen_von(spr, 0, sh - 1, H, W, PAD_L, PAD_T)
     z, quelle = A.koerper_pose(koerper, doppeln=doppeln, x0=PAD_L)
     fig, top = A.auf_leinwand(z, H, BODEN, 0)
+    if i in BLICK:
+        fig = _kopf(fig, top, BLICK[i])
     if i in OHR_L:
         fig = _ohr(fig, top, 'l', 1)
     if i in OHR_R:

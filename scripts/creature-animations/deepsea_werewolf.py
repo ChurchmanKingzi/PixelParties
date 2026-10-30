@@ -13,19 +13,23 @@ Was ist was (x/y im Sprite):
   Kopf (x 11–24, y 11–19) mit zwei weißen 2×2-Augen (246,255,255) bei (14–15, 13–14) und (18–19, 13–14), dazu ein dunkler offener Mund (7,8,26) mit blauschwarzer Mitte bei (15–18, 17–19);
   Schultern/Arme (y 19–26, links bis x 6, rechts bis x 26), Rumpf (x 11–22, y 20–29), zwei kurze Beine (x 11–15 und 18–22, y 30–33).
 * Um die Figur laufen dünne, gekrümmte 1-px-Linien in Dunkelrot (70,10,10) und Dunkelblau (13,16,49) (Fesseln/Ranken; links und rechts je ein Bündel, oben eine rote Schnur, die zwischen den Ohren zur Stirn
-  (17, 11–13) läuft). Diese Linien hängen nur DIAGONAL zusammen (8er-Nachbarschaft: 1 Komponente, 4er-Nachbarschaft: 27) — sie bleiben deshalb vollständig an ihrem Platz bzw. bewegen sich nur mit dem Atemzug (siehe unten).
-Fest bleiben: Kopf-/Körperform, Augen-/Mundform im Ruhebild, alle Linien (Lage und Form), Schachbrettmuster.
+  (17, 11–13) läuft). Diese Linien hängen nur DIAGONAL zusammen (8er-Nachbarschaft: 1 Komponente, 4er-Nachbarschaft: 27). 384 ihrer Pixel liegen im 4-verbundenen Körper-Kern, 64 äußere Linienenden hängen frei.
+Fest bleiben: Kopf-/Körperform, Augen-/Mundform im Ruhebild, die Linien im Kern, Schachbrettmuster.
 
 Ablauf (48 Frames à 70 ms = 3,36 s; Frame 0 = Original, Partikel ausgenommen):
-* Atmen: alles oberhalb der Hüfte (Kopf, Ohren, Arme, Rumpf, die oberen Linienteile) hebt sich 1 px (Zeile y 28 wird einmal wiederholt: die Linien bleiben dadurch durchgehend), die Beine bleiben am Boden;
+* Atmen: alles oberhalb der Hüfte (Kopf, Ohren, Arme, Rumpf, die oberen Linienteile) hebt sich 1 px (Zeile y 28 wird einmal wiederholt — dort kreuzen die Linien nur einzeln, die Linien bleiben durchgehend und werden nicht dicker), die Beine bleiben am Boden;
   Periode 24, zweimal pro Schleife (oben in Frame 7–18 und 31–42).
 * Ohren zucken: linkes Ohr (Zeile 9–10) 1 px nach links (Frame 3–5) bzw. 1 px nach rechts (Frame 22–24); rechtes Ohr 1 px nach rechts (Frame 10–12 und 33–35) — die rote Schnur bleibt unverändert.
 * Blinzeln (Lid = Schachbrett-Haut): erst die obere Augenzeile, dann beide Zeilen; zweimal (Frame 6–8 und 27–29).
 * Heulen: der Mund öffnet sich weit (2 Zeilen länger, Frame 14–19), danach klappt er von unten zu (erst Zeile 19, dann 18–19 werden Haut; Frame 36–39: nur ein dünner Mundstrich bleibt).
+* Ranken wogen: die freien Linienenden (64 Pixel abseits des Kerns) verschieben sich waagerecht um höchstens 1 px, das Gewicht wächst mit dem Abstand zum Kern (0 am Kern, voll ab 4 px), die Welle läuft
+  spaltenweise von links nach rechts (Periode 24, zweimal pro Schleife). Von innen nach außen wird jedes Pixel so gesetzt, dass es 8er-Nachbar seines verschobenen Elternpixels bleibt — es reißt nichts, es entstehen keine Brücken- oder Klumpenpixel;
+  bleibt die 8er-Verbindung in allen 48 Frames bei 1 Komponente.
 * Beine heben abwechselnd 1 px (je 3 Frames, Periode 16: links Frame 3–5, rechts Frame 11–13).
-* Partikel (hinter der Figur): runde Wölkchen 2×2 → 3×3 → 2×2 (`U.wolke_ebene`), nie ein Einzelpixel, nie verdeckt; siehe PUFFS.
+* Partikel (hinter der Figur): vier Teal-Blasen (Kern (77,137,154), Rand (51,93,119)), runde Wölkchen 2×2 → 3×3 → 2×2 (`U.wolke_ebene`), nie ein Einzelpixel; in jeder Pose ≥ 2 px Abstand zur Figur und nie teilweise verdeckt
+  (per Skript über alle 48 Frames geprüft): zwei steigen links oben schräg auf (13 px, Lebensdauer 48 Frames, um 24 versetzt), zwei außen rechts senkrecht (18 px, versetzt).
 Kein Glanz (Regel 14: Fell/Haut), kein Feuer (Regel 15). Randpixel-Test (Regel 16): `U.kontur_schliessen` (Randfarben der Quelle) in jeder Pose; im Ruhebild nichts. Keine gemalten Pixel außer Farben der Quelle
-(Lider/Mundzuklappung im Haut-Karo, Mundöffnung in den vorhandenen Munfarben).
+(Lider/Mundzuklappung im Haut-Karo, Mundöffnung in den vorhandenen Mundfarben).
 Zuschnitt: Frame auf die Figur zugeschnitten (symmetrisch um die Ruhefigur; Partikel vergrößern ihn höchstens 2 px darüber hinaus, dazu 1 px leerer Rand). Alle Bewegungen laufen auf der vollen Leinwand
 (anim_lib wirft ClipError). Nur ganze Pixel.
 """
@@ -88,7 +92,13 @@ assert not (BEIN_L & BEIN_R).any() and OHRR.sum() == 7 and OHRL.sum() == 7 and i
 
 BLASE = {'c': TL_, 'r': TD_}
 P = lambda x, y: (GPL + x, GPT + y)
-PUFFS = []
+# Die Figur samt Ranken füllt ihr Feld fast ganz: nur zwei freie Bahnen (Abstand ≥ 2 px in jeder Pose, Partikel höchstens +2 px über den Körper-Rand hinaus): links oben (schräg aufsteigend) und rechts außen (senkrecht).
+PUFFS = [
+    dict(x=P(-2, 11)[0], y=P(-2, 11)[1], vx=5, vy=-13, off=0, wackeln=0.4),
+    dict(x=P(-2, 11)[0], y=P(-2, 11)[1], vx=5, vy=-13, off=24, wackeln=0.4),
+    dict(x=P(34, 17)[0], y=P(34, 17)[1], vx=0, vy=-18, off=10, wackeln=0.4),
+    dict(x=P(34, 17)[0], y=P(34, 17)[1], vx=0, vy=-18, off=34, wackeln=0.4),
+]
 
 
 def teil(maske):
