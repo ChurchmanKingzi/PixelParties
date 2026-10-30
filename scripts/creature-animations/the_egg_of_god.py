@@ -80,7 +80,7 @@ for _k in ('c1', 'c2'):
     for (_dx, _dy) in [(d, 0) for d in range(-2, 3)] + [(0, d) for d in (-2, -1, 1, 2)]:
         _X, _Y = _x + _dx, _y + _dy
         assert not (0 <= _Y < sh and 0 <= _X < sw and OPAK[_Y, _X]), (_k, _dx, _dy)
-STERNE = [(3, 'c1'), (9, 'e1'), (15, 'c2'), (20, 'e2'), (27, 'c1'), (33, 'e3'), (38, 'c2'), (44, 'e1'), (13, 'e3'), (30, 'e2')]
+STERNE = [(3, 'c1'), (9, 'e1'), (15, 'c2'), (20, 'e2'), (27, 'c1'), (33, 'e3'), (38, 'c2'), (40, 'e1'), (13, 'e3'), (30, 'e2')]
 
 
 def aktive_sterne(i):

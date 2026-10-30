@@ -1,0 +1,15 @@
+{
+  "creature": "Rosie, the School Idol",
+  "sheet": "rosie-the-school-idol.png",
+  "frameWidth": 22,
+  "frameHeight": 28,
+  "frames": 48,
+  "frameMs": 62,
+  "loop": true,
+  "layout": "horizontal",
+  "padTop": 2,
+  "padLeft": 2,
+  "padRight": 2,
+  "padBottom": 2,
+  "faceX": 11.0
+}

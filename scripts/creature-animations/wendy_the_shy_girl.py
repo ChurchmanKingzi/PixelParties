@@ -25,7 +25,7 @@ Ablauf (48 Frames à 62 ms = 2,98 s, nahtlos):
 * Kopfneigen: Kopf und Haarsträhnen (Zeilen 0–10) neigen sich 1 px nach links (Frames 2–7) und 1 px nach rechts (Frames 24–31) — das schüchterne Zur-Seite-Neigen.
 * Haarsträhnen schwingen: die linke Seitensträhne (x 0–2, y 4–11) schwingt zweimal 1 px nach außen (Frames 14–19), die rechte später (Frames 38–43); die Zeile wird mit `Hm.rand_dehnen` gedehnt, innen
   bleibt alles am Kopf.
-* Arme: der linke Arm (Zeilen 12–17) spreizt sich 1 px nach außen (Frames 22–33), der rechte (Frames 2–9 und 46–47).
+* Arme: nur der Ärmel (Zeilen 12–14, gelbgrün mit Umriss) spreizt sich 1 px nach außen — links (Frames 22–33), rechts (Frames 2–9 und 46–47); der Umriss wandert mit dem Ärmel, die Hände (Zeilen 15–17) bleiben. Keine losen Umrissblöcke neben dem Arm.
 * Händchen-Fummeln (schüchtern): die linke Hand (Frames 4–7) und die rechte Hand (Frames 28–31) rutschen 1 px hoch zur Brust (Spalte 1–2 bzw. 7–8, Zeilen 14–17: Hand, Hand, Umriss, Umriss statt Umriss, Hand, Hand, Umriss).
 * Blinzeln (Frames 19–21 und 41–43): die Augenpixel (Weiß und Iris) nehmen die umgebende Hautfarbe an; die Wimpern bleiben als Lidlinie. Kein Farbtausch, kein Augenglanz, die Wangen bleiben unverändert.
 * Fußtippen: der linke Stiefel hebt sich zweimal 1 px hinter das Bein (Frames 12–19), später der rechte (Frames 36–43).
@@ -100,9 +100,9 @@ def frame(i):
     dl = 1 if Hm.folge(i, 22, [1] * 12, N) else 0
     dr = 1 if (Hm.folge(i, 2, [1] * 8, N) or Hm.folge(i, 46, [1, 1], N)) else 0
     if dl:
-        Hm.rand_dehnen(al, OFF, {y: 1 for y in range(13, 18)}, 'l')
+        Hm.rand_dehnen(al, OFF, {y: 1 for y in range(12, 15)}, 'l')
     if dr:
-        Hm.rand_dehnen(ar, OFF, {y: 1 for y in range(13, 18)}, 'r')
+        Hm.rand_dehnen(ar, OFF, {y: 1 for y in range(12, 15)}, 'r')
     # --- Kopfneigen (Zeilen 0–10 samt Strähnen) und Gewichtsverlagerung (Zeilen 0–18 samt Strähnen/Armen) in getrennten Zeitfenstern ---
     kn = -1 if Hm.folge(i, 2, [1] * 6, N) else (1 if Hm.folge(i, 24, [1] * 8, N) else 0)
     if kn:

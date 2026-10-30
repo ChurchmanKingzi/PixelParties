@@ -81,6 +81,20 @@ def teil(maske):
 FL_A, FR_A, REST_A, FUSSL_A, FUSSR_A = teil(FLUEGEL_L), teil(FLUEGEL_R), teil(rest), teil(FUSS_L), teil(FUSS_R)
 
 
+def fluegel(a, pivot_x, amp, ph, breite=2):
+    """Flügelschlag wie `L.spalten_welle`, aber je `breite` Spalten (vom Gelenk aus gezählt) mit gleichem Versatz: so zerreißt keine 1-px-dünne Stelle (Flügelspitze) im 4er-Zusammenhang."""
+    out = L.leer(*a.shape[:2])
+    cols = [x for x in range(a.shape[1]) if a[:, x, 3].any()]
+    maxd = max(abs(x - pivot_x) for x in cols)
+    for x in cols:
+        d = abs(x - pivot_x)
+        frac = min(1.0, ((d // breite) * breite + breite / 2.0) / maxd) if d >= breite else 0.0
+        dy = int(round(amp * math.sin(ph) * frac))
+        for y in np.nonzero(a[:, x, 3])[0]:
+            out[y + dy, x] = a[y, x]
+    return out
+
+
 def set_px(a, x, y, farbe):
     a[GPT + y, GPL + x, :3] = farbe
     a[GPT + y, GPL + x, 3] = 255
@@ -100,8 +114,8 @@ def frame_gross(i, nur=None):
     for (x, y) in GLITZ.get(i, []):
         set_px(kb, x, y, WEISS)
     # Flügelschlag (Spalte für Spalte)
-    fl = L.spalten_welle(FL_A, GPL + 15, 3.0, ph)
-    fr = L.spalten_welle(FR_A, GPL + 30, 3.0, ph)
+    fl = fluegel(FL_A, GPL + 15, 3.0, ph)
+    fr = fluegel(FR_A, GPL + 30, 3.0, ph)
     # Schweben: Körper hebt sich beim Abschlag
     bob = -int(round(1.0 * math.sin(ph)))
     fb_l = 1 if (i % 16) in (3, 4, 5) else (-1 if (i % 16) in (11, 12, 13) else 0)
