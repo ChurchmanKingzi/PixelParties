@@ -23,16 +23,16 @@ Identifikation (Sprite-Koordinaten x, y):
 * Stuhl (x 0–15, y 5–37): eiserne Lehne mit Zierspitze (x 5–9, y 5–10), rotes Polster (x 3–13, y 17–31), Sitzbrett (y 32–34), Beine (y 35–37). Dunkelgrau (46,61,70) (127,146,160),
   Lichter (169,178,190) und Weiß; Polster (192,63,66) (149,47,49) (112,44,51) (76,24,24).
 * Harfe (x 14–38, y 7–37): goldener Rahmen (Töne (238,100,40) (242,154,62) (250,213,74) (247,247,173)), oben der Wirbelkasten mit hellblauen Stimmwirbeln (22–30, 9–10) und der
-  Schnecke rechts (x 33–38, y 7–13), unten der breite Fuß (y 33–37). Dazwischen elf Saiten (x 17–29, y 11–31), je ein Pixel breit und abwechselnd hell (203,219,252) /
+  Schnecke rechts (x 33–38, y 7–13), unten der breite Fuß (y 33–37). Dazwischen sieben Saiten (x 16–29, y 11–31), je ein Pixel breit und abwechselnd hell (203,219,252) /
   grau (155,173,183) in kurzen Abschnitten (die Saiten springen alle paar Zeilen eine Spalte — so gezeichnet).
 * Zehn weiße Funkelsterne in drei Wuchsstufen (so stehen sie auf der Karte): kleine Raute (4 px, Mitte leer) bei (30,4) (15,6) (38,19) (18,37); X (Mitte + Diagonalen) bei (21,1)
   (29,26) (26,40); großes Plus (Arme 2 px, Mitte leer) bei (42,5) (24,17) (36,35). Sie schweben um die Harfe, drei liegen vor der Harfe.
 
 Ablauf (48 Frames à 65 ms = 3,12 s); Frame 0 = Ruhepose = Original:
 * Flügel zupft die Saiten, durchgehend: ein Zug = 12 Frames (780 ms), 4 Züge pro Schleife — Abwärtszug (über die Saiten) 4 Frames, Rückweg 8 Frames. Die Flügelwurzel (x 8–13) bleibt am
-  Körper, die Federspalten der Spitze (x 14–18) wandern als Ganzes senkrecht, bis 3 px nach unten (Exponent 1,2, die Spitze hinkt 1 Frame nach). Nichts wird kopiert, die Federtextur bleibt.
-* Körper wippt im Takt: Oberkörper samt Haaren, Gesicht und Flügel hebt sich bis 2 px (am höchsten in der Mitte des Zugs), die Füße bleiben auf dem Kissen; die Lücke
-  schließt die verdoppelte letzte Haarzeile (y 24) — die Haarspitzen werden so kurz länger.
+  Körper, die Federspalten der Spitze (x 14–18) wandern als Ganzes senkrecht, bis 4 px nach unten (Exponent 1,2, die Spitze hinkt 1 Frame nach). Nichts wird kopiert, die Federtextur bleibt.
+* Körper wippt im Takt: Oberkörper samt Haaren, Gesicht und Flügel hebt sich bis 2 px (am höchsten in der Mitte des Zugs); die Füße heben sich 1 px mit (Fußwippen, nur bei 2 px
+  Hub), die verbleibende Lücke schließt die verdoppelte letzte Haarzeile (y 24) — die Haarspitzen werden so kurz länger.
 * Haare schwingen: die Strähne links (y 13–24) pendelt mit dem Abstand zum Kopf wachsend bis 1–2 px (Periode 16 Frames, damit sie nicht mit dem Zug im Gleichschritt läuft); das
   innere Ende bleibt am Kopf/Flügel (Pixel werden verdoppelt bzw. ausgelassen, keine Lücke).
 * Blinzeln: Frames 19–21 und 41–42; Lid = Hautfarbe (246,205,139) auf die drei Augenpixel.
@@ -41,7 +41,7 @@ Ablauf (48 Frames à 65 ms = 3,12 s); Frame 0 = Ruhepose = Original:
 * Goldrahmen der Harfe (Gold): zweimal pro Schleife wandert ein diagonales Lichtband (eine Stufe heller auf der Goldrampe) über den Rahmen (Frames 4–17, 28–41).
 * Funkelsterne: jeder Stern wächst und vergeht in 24 Frames (Raute → X → Plus → X → Raute → aus, zwei Mal pro Schleife), je Stern in eigener Phase; in Frame 0 steht jeder in der
   Stufe der Karte. (Sterne = schwebende Musik-Funken der Kunst, kein Glanz an Gefieder/Haut; falls der Nutzer sie als „Glitzer an Nicht-Metall“ ansieht, lässt sich STERNE_AN = False setzen.)
-* Der Stuhl bleibt fest (er trägt sie), ebenso Füße und das Harfengestell.
+* Der Stuhl bleibt fest (er trägt sie), ebenso das Harfengestell.
 
 Ergänzungen: keine nötig — die Harfenebene enthält die verdeckten Teile (Stuhl hinter der Harpyie, Harfenpfosten hinter dem Flügel). Unter der Flügelwurzel (x 8–13) ist kein Körper
 gezeichnet, deshalb bleibt die Wurzel fest und nur die Spitze (x 14–18) bewegt sich — dort liegt hinter dem Flügel der Goldpfosten der Harfe.
