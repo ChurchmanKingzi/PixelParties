@@ -1,0 +1,15 @@
+{
+  "creature": "The Thing in the Ship",
+  "sheet": "the-thing-in-the-ship.png",
+  "frameWidth": 35,
+  "frameHeight": 32,
+  "frames": 48,
+  "frameMs": 65,
+  "loop": true,
+  "layout": "horizontal",
+  "padTop": 2,
+  "padLeft": 4,
+  "padRight": 3,
+  "padBottom": 2,
+  "faceX": 17.5
+}

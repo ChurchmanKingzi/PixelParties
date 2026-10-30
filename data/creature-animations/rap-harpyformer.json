@@ -1,0 +1,15 @@
+{
+  "creature": "Rap Harpyformer",
+  "sheet": "rap-harpyformer.png",
+  "frameWidth": 30,
+  "frameHeight": 30,
+  "frames": 48,
+  "frameMs": 65,
+  "loop": true,
+  "layout": "horizontal",
+  "padTop": 2,
+  "padLeft": 2,
+  "padRight": 3,
+  "padBottom": 2,
+  "faceX": 15.0
+}

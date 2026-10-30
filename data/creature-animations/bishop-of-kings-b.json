@@ -1,0 +1,15 @@
+{
+  "creature": "Bishop of Kings [B]",
+  "sheet": "bishop-of-kings-b.png",
+  "frameWidth": 25,
+  "frameHeight": 32,
+  "frames": 48,
+  "frameMs": 62,
+  "loop": true,
+  "layout": "horizontal",
+  "padTop": 2,
+  "padLeft": 2,
+  "padRight": 2,
+  "padBottom": 2,
+  "faceX": 12.5
+}

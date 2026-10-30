@@ -169,7 +169,9 @@ def frame(i, partikel=True, effekte=True):
     neu = (mit[..., 3] > 0) & ~(ganz[..., 3] > 0)
     brk[neu] = mit[neu]
     fl, rumpf, fuss, kopf, haube, brk = (L.versetze(a, 0, bob) for a in (fl, rumpf, fuss, kopf, haube, brk))
-    return L.zusammen(H, W, [(brk, 0, 0), (fl, 0, 0), (rumpf, 0, 0), (fuss, 0, 0), (kopf, 0, 0), (haube, 0, 0)])
+    f = L.zusammen(H, W, [(brk, 0, 0), (fl, 0, 0), (rumpf, 0, 0), (fuss, 0, 0), (kopf, 0, 0), (haube, 0, 0)])
+    F.umranden(f, [fl, rumpf, fuss, haube], UMRISS, AUSSEN, AUSSEN, AUSSEN)           # Randpixel-Test (Regel 16): freigelegte Innenfarben → Umriss
+    return f
 
 
 def zuschneiden(frames, rand=2):
