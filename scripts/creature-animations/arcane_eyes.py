@@ -31,6 +31,8 @@ Ablauf (48 Frames à 60 ms = 2,88 s; Frame 0 = Original, Funken ausgenommen; jed
 Randpixel-Test (Regel 16): kein Randpixel der Augen ändert sich (Augapfel starr, alles Innere liegt im Augapfel-Inneren); die Schatten-Randpixel haben die Quellfarbe K.
 ERGÄNZUNG: (1) 46 Schattenpixel K deckend statt Alpha 204; (2) Lederhaut-Füllung unter der verschobenen Iris (Farben E/F/G des Sprites), nur sichtbar, wenn die Iris blickt.
 Alle Bewegungen laufen auf der vollen Leinwand (anim_lib wirft ClipError). Nur ganze Pixel, nur Farben der Quelle, kein Alpha.
+Zuschnitt: der Frame ist auf die Figur zugeschnitten (symmetrisch um die Ruhefigur, Partikel vergrößern ihn höchstens 2 px über den Figurenrand hinaus, dazu 1 px leerer Rand). Die Figur selbst ist
+in jedem Frame pixelgleich zur Fassung vor dem Zuschnitt (automatisch geprüft); nur die Leinwand ist kleiner; die Partikel laufen kürzere Wege.
 """
 import math
 import sys

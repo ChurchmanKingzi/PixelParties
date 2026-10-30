@@ -36,6 +36,8 @@ Ablauf (36 Frames à 65 ms = 2,34 s; Frame 0 = Original, die Partikel ausgenomme
 ERGÄNZUNG (1 Pixel je Seite): Deckelpixel (2,7) links und (13,7) rechts in Umrissfarbe B (31,9,1) — verhindert beim Ohrzucken ein
 1-px-Loch zwischen Ohrumriss und Hornansatz (im Ruhebild liegt dort schon B, Frame 0 bleibt identisch).
 Alle Bewegungen laufen auf der vollen Leinwand (anim_lib wirft ClipError). Nur ganze Pixel, nur Farben der Quelle.
+Zuschnitt: der Frame ist auf die Figur zugeschnitten (symmetrisch um die Ruhefigur, Partikel vergrößern ihn höchstens 2 px über den Figurenrand hinaus, dazu 1 px leerer Rand). Die Figur selbst ist
+in jedem Frame pixelgleich zur Fassung vor dem Zuschnitt (automatisch geprüft); nur die Leinwand ist kleiner; die Partikel laufen kürzere Wege.
 """
 import math
 import sys

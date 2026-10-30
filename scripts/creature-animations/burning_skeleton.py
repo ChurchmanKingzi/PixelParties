@@ -37,6 +37,8 @@ Randpixel-Test (Regel 16): `U.kontur_schliessen` ergänzt in jeder Pose fehlende
 ausgenommen (`frame(i, nur='koerper')` liefert für den Test den Körper ohne Flamme und Partikel).
 ERGÄNZUNG: die Beinzeilen 24–29 (52 Halbpixel, deckend in src, siehe oben). Die Flamme ist aus denselben Pixelfarben neu gezeichnet (Frame 0 = Original, per assert geprüft).
 Alle Bewegungen laufen auf der vollen Leinwand (anim_lib wirft ClipError). Nur ganze Pixel, nur Farben der Quelle.
+Zuschnitt: der Frame ist auf die Figur zugeschnitten (symmetrisch um die Ruhefigur, Partikel vergrößern ihn höchstens 2 px über den Figurenrand hinaus, dazu 1 px leerer Rand). Die Figur selbst ist
+in jedem Frame pixelgleich zur Fassung vor dem Zuschnitt (automatisch geprüft); nur die Leinwand ist kleiner, die Partikel sind unverändert.
 """
 import math
 import sys
