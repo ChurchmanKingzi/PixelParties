@@ -1,15 +1,15 @@
 {
   "creature": "Criminal Monkee",
   "sheet": "criminal-monkee.png",
-  "frameWidth": 21,
+  "frameWidth": 20,
   "frameHeight": 27,
   "frames": 48,
   "frameMs": 66,
   "loop": true,
   "layout": "horizontal",
   "padTop": 2,
-  "padLeft": 3,
+  "padLeft": 2,
   "padRight": 2,
   "padBottom": 2,
-  "faceX": 10.5
+  "faceX": 10.0
 }
