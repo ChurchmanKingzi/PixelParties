@@ -21,7 +21,7 @@ Identifikation (Sprite 53×33, Saurier im Profil, schaut nach RECHTS):
 Bleibt fest: Beine/Füße, Körper-/Kopfmuster.
 
 Ablauf (48 Frames à 66 ms = 3,2 s), alle Bewegungen unabhängig:
-* Brüllen (Periode 24, 2× pro Schleife): der Unterkiefer wandert spaltenweise senkrecht, je weiter vom Kiefergelenk (x = 39) desto mehr (Kinnspitze bis +3 px, beim Schließen bis −1 px);
+* Brüllen (Periode 24, 2× pro Schleife): der Unterkiefer wandert spaltenweise senkrecht, je weiter vom Kiefergelenk (x = 39) desto mehr (Kinnspitze bis +3 px; in Ruhe wie im Original, nie weiter zu als das Original);
   die Zähne gehen mit. Das Maul ist hinten offen (Luft), es muss nichts ergänzt werden.
 * Atmen/Heben (Periode 24, Frames 6–17): Kopf, Rumpf und Schwanzansatz heben sich 1 px — Zeile 21 (Beinansatz) wird einmal eingefügt (die Beine werden 1 px länger, nichts wird zum Block).
 * Schwanz schlägt (Periode 16, 3× pro Schleife): die Schwanzspalten (x ≤ 17) wandern senkrecht, je weiter vom Körper desto mehr (Spitze ca. ±3 px); der Ansatz bleibt.
@@ -78,15 +78,15 @@ def setze(k, x, y, farbe):
 
 
 def kiefer_biegen(a, pivot, amp, phase):
-    """Unterkiefer: Spalte x wandert um round(amp · sin · (x − pivot)/größter Abstand), nach oben (Schließen) höchstens 1 px."""
+    """Unterkiefer: Spalte x wandert um round(amp · v · (x − pivot)/größter Abstand), v = (1 − cos φ)/2 (0 in Ruhe = Original, 1 = ganz offen) — das Maul öffnet sich nur weiter
+    als im Original und schließt sich wieder; ein Schließen über die Ruhepose hinaus würde die unteren Zähne in die oberen schieben."""
     out = L.leer(*a.shape[:2])
     h = a.shape[0]
     cols = [x for x in range(a.shape[1]) if a[:, x, 3].any()]
     maxd = max(x - pivot for x in cols)
-    v = math.sin(phase)
+    v = 0.5 - 0.5 * math.cos(phase)
     for x in cols:
         dy = int(round(amp * v * (min(x - pivot, maxd - 1) / float(maxd))))
-        dy = max(-1, dy)
         ys = np.nonzero(a[:, x, 3])[0]
         if ys.min() + dy < 0 or ys.max() + dy >= h:
             raise L.ClipError(f'Spalte {x} würde um {dy} px aus der Leinwand geschoben')
