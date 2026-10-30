@@ -245,10 +245,11 @@ def glanz_pfad(a, pfad, hell, basis, pos):
     return a
 
 
-def zuschnitt(frames_voll, frames_koerper, ruhe, zugabe=2):
+def zuschnitt(frames_voll, frames_koerper, ruhe, zugabe=2, rand=1):
     """Frame auf die Figur zuschneiden (Nutzerwunsch): Box (x0, y0, x1, y1; x1/y1 exklusiv) auf der Leinwand, SYMMETRISCH um die Ruhefigur `ruhe` = (x0, y0, x1, y1)
     (Sprite-Rechteck auf der Leinwand). Rand je Achse = größter Überstand der Figur selbst (alle Frames ohne Effekte, `frames_koerper`) über die Ruhefigur hinaus;
-    Effekte/Partikel (`frames_voll`) dürfen den Frame höchstens um `zugabe` px über diesen Körper-Rand hinaus vergrößern (sonst AssertionError: Partikel enger führen)."""
+    Effekte/Partikel (`frames_voll`) dürfen den Frame höchstens um `zugabe` px über diesen Körper-Rand hinaus vergrößern (sonst AssertionError: Partikel enger führen);
+    dazu kommt `rand` = 1 px leerer Rand rundum (technisch nötig)."""
     rx0, ry0, rx1, ry1 = ruhe
 
     def ueberstand(frames):
@@ -263,7 +264,7 @@ def zuschnitt(frames_voll, frames_koerper, ruhe, zugabe=2):
     kx, ky = ueberstand(frames_koerper)
     ex, ey = ueberstand(frames_voll)
     assert ex - kx <= zugabe and ey - ky <= zugabe, f'Effekte vergrößern den Frame um {ex - kx} px (x) / {ey - ky} px (y) > {zugabe}'
-    mx, my = max(kx, ex), max(ky, ey)
+    mx, my = max(kx, ex) + rand, max(ky, ey) + rand          # + 1 px leerer Rand (anim_lib.speichern verlangt, dass kein Frame den Rand berührt)
     return rx0 - mx, ry0 - my, rx1 + mx, ry1 + my
 
 

@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""Idle-Animation für „Skeleton Necromancer“ (Creature) — Fassung 4 (stehende Figur am Loch im Boden mit Arm, kein Knochenglanz).
+"""Idle-Animation für „Skeleton Necromancer“ (Creature) — Fassung 5 (stehende Figur am Loch im Boden mit Arm, schwarzmagische Partikel, kein Knochenglanz).
 
 Quelle: src/skeleton-necromancer.png — Ebene „Skeleton Necromancer“ (20×34 px, 15 Farben) aus Motive.xcf.
 PICK: [["Motive", 813, 1], ["Motive", 813, 2]]
@@ -21,7 +21,7 @@ Was ist was (Koordinaten im Sprite, x/y):
   (B I B, 1 px weißer Knochen I mit braunem Umriss), dessen unteres Ende (10,30) im Loch steckt.
 Fest bleiben: Gesicht, Robe, alle Knochenpunkte (nur starr mit ihrem Teil), das Loch.
 
-Ablauf (40 Frames à 65 ms = 2,6 s; Frame 0 = Original, Wölkchen ausgenommen):
+Ablauf (40 Frames à 65 ms = 2,6 s; Frame 0 = Original, Partikel ausgenommen):
 * Die Figur STEHT (kein Schweben, keine Gesamtverschiebung): Standlinie = Unterkante des Rippenrings (y 20, die „Füße“ der Figur — der Sprite hat keine
   Füße; sie bleibt in jedem Frame an derselben Stelle über dem Loch). Atmen (Periode 20) = die Rippenzeile y 16 wird einmal eingefügt: Oberkörper
   (obere Rippen, Robe, Kapuze, Ärmel) hebt sich 1 px, die untere Rippenhälfte y 17–20 bleibt stehen.
@@ -33,14 +33,16 @@ Ablauf (40 Frames à 65 ms = 2,6 s; Frame 0 = Original, Wölkchen ausgenommen):
   wird die Unterarmzeile y 29 eingefügt, die Faust steigt, das Armende (10,30) bleibt im Loch. Die Faust öffnet und schließt sich (dreimal pro Schleife,
   Frame 9–11, 23–25, 35–37): die Faustzeile y 26 wird einmal eingefügt (Faust 1 px höher, Umrissenden wandern mit). Das Loch hinter dem Arm ist schwarz A
   (ERGÄNZUNG, siehe unten).
-* Seelenwölkchen (Partikel, hinter der Figur, 11 Stück, Lebensdauer 40 Frames, langsam aufsteigend, leichtes Wabern, Formen l, m, o, k): aus dem Ärmelbereich,
-  den Seiten des Rippenrings und über der Kapuze (nicht aus dem Loch). Kern Knochenweiß E (213,213,213) aus dem Sprite, Rand kaltes Violett
-  (128,102,178) = #8066b2 aus data/palette.json (AUSNAHME: neue Farbe, in L.pruefe freigegeben; mit SEELE_RAND schnell tauschbar).
+* Schwarzmagische Wölkchen (Partikel, hinter der Figur, 11 Stück, Lebensdauer 40 Frames, langsam aufsteigend, leichtes Wabern, wachsen und schrumpfen, Formen l, m, o, k):
+  Kern fast schwarz (18,6,20) (Dunkelviolett-Schwarz aus dem Sprite), schmaler Rand kaltes Violett (128,102,178) = #8066b2 aus data/palette.json (AUSNAHME: neue Farbe,
+  in L.pruefe freigegeben; mit SEELE_RAND schnell tauschbar). Keine weißen Wölkchen mehr. Sie steigen aus Rippenring und Ärmeln auf (nicht aus dem Loch) und bleiben
+  nah an der Figur (Zuschnitt, s. u.).
 Kein Glanz an Knochen (Regel 14): Lichtband und Glitzersterne sind entfallen.
 Randpixel-Test (Regel 16): `U.kontur_schliessen` ergänzt in jedem Frame fehlende Umrisspixel an Ärmeln und Armkanten (Farbe: häufigste Randfarbe der
 Umgebung, meist Schwarz A); im Ruhebild ändert es nichts.
 ERGÄNZUNG: 7 schwarze Pixel (A) im Loch hinter dem Arm bei (9,28) (10,28) (11,28) (9,29) (10,29) (11,29) (10,30) — im Ruhebild liegen dort die Armpixel,
 sie werden erst sichtbar, wenn der Arm steigt. Sonst nichts gemalt.
+Zuschnitt: der Frame ist auf die Figur zugeschnitten (symmetrisch um die Ruhefigur; Partikel vergrößern ihn höchstens 2 px über den Körperrand hinaus, dazu 1 px leerer Rand).
 Alle Bewegungen laufen auf der vollen Leinwand (anim_lib wirft ClipError). Nur ganze Pixel.
 """
 import math
@@ -52,11 +54,11 @@ import anim_lib as L
 import anim_untote as U
 
 N, MS = 40, 65
-PAD_L, PAD_R, PAD_T, PAD_B = 9, 9, 18, 6
+GPL, GPR, GPT, GPB = 9, 9, 18, 6
 
 spr = L.lade('skeleton-necromancer')
 sh, sw = spr.shape[:2]
-H, W = sh + PAD_T + PAD_B, sw + PAD_L + PAD_R
+H, W = sh + GPT + GPB, sw + GPL + GPR
 yy, xx = np.mgrid[0:sh, 0:sw]
 vorhanden = L.deckend(spr)
 
@@ -76,16 +78,18 @@ assert (aermel_l | aermel_r | haube | rippen | arm | loch).sum() == vorhanden.su
 UMRISS = U.umrissfarben(spr)
 LOCH_ERG = [(9, 28), (10, 28), (11, 28), (9, 29), (10, 29), (11, 29), (10, 30)]    # ERGÄNZUNG: schwarz hinter dem Arm
 
-SEELEN = {'c': SEELE_KERN, 'r': SEELE_RAND}
-P = lambda x, y: (PAD_L + x, PAD_T + y)
-PUFFS = [
-    dict(x=P(1, 19)[0], y=P(1, 19)[1], vx=-3, vy=-14, off=0, form='l', wackeln=1),        # groß, links vom Rippenring
-    dict(x=P(18, 20)[0], y=P(18, 20)[1], vx=3, vy=-15, off=14, form='l', wackeln=1),      # groß, rechts
-    dict(x=P(0, 9)[0], y=P(0, 9)[1], vx=-2, vy=-10, off=26, form='m', wackeln=1),         # über dem linken Ärmel
-    dict(x=P(19, 9)[0], y=P(19, 9)[1], vx=2, vy=-10, off=6, form='m', wackeln=1),         # über dem rechten Ärmel
-    dict(x=P(3, 17)[0], y=P(3, 17)[1], vx=-3, vy=-11, off=20, form='o', wackeln=1),       # aus dem Rippenring nach links
-    dict(x=P(16, 17)[0], y=P(16, 17)[1], vx=3, vy=-11, off=34, form='o', wackeln=1),      # … nach rechts
-    dict(x=P(10, -3)[0], y=P(10, -3)[1], vx=0, vy=-9, off=38, form='k', wackeln=1),       # Funke über der Kapuze
+SCHATTEN_KERN = (18, 6, 20)               # Dunkelviolett-Schwarz aus dem Sprite (I)
+assert SCHATTEN_KERN in {tuple(int(v) for v in q[:3]) for q in spr.reshape(-1, 4) if q[3]}
+SEELEN = {'c': SCHATTEN_KERN, 'r': SEELE_RAND}     # schwarzmagische Wölkchen: Kern fast schwarz, schmaler violetter Rand (Fassung 4)
+P = lambda x, y: (GPL + x, GPT + y)
+PUFFS = [                                          # nah an der Figur (Zuschnitt: Effekte höchstens +2 px über den Körperrand); nichts aus dem Loch (y ≥ 24)
+    dict(x=P(3, 18)[0], y=P(3, 18)[1], vx=-1, vy=-12, off=0, form='l', wackeln=1),        # groß, links vom Rippenring
+    dict(x=P(16, 19)[0], y=P(16, 19)[1], vx=1, vy=-12, off=14, form='l', wackeln=1),      # groß, rechts
+    dict(x=P(2, 10)[0], y=P(2, 10)[1], vx=0, vy=-8, off=26, form='m', wackeln=1),         # über dem linken Ärmel
+    dict(x=P(17, 10)[0], y=P(17, 10)[1], vx=0, vy=-8, off=6, form='m', wackeln=1),        # über dem rechten Ärmel
+    dict(x=P(4, 20)[0], y=P(4, 20)[1], vx=-1, vy=-10, off=20, form='o', wackeln=1),       # aus dem Rippenring nach links
+    dict(x=P(15, 20)[0], y=P(15, 20)[1], vx=1, vy=-10, off=34, form='o', wackeln=1),      # … nach rechts
+    dict(x=P(10, 1)[0], y=P(10, 1)[1], vx=0, vy=-5, off=38, form='k', wackeln=1),         # Funke über der Kapuze
     dict(x=P(8, 19)[0], y=P(8, 19)[1], vx=0, vy=-4, off=3, form='k', wackeln=0.5),        # Funken im hohlen Rippenring
     dict(x=P(11, 19)[0], y=P(11, 19)[1], vx=0, vy=-4, off=22, form='k', wackeln=0.5),
     dict(x=P(4, 22)[0], y=P(4, 22)[1], vx=-2, vy=-9, off=10, form='o', wackeln=1),        # an den unteren Rippen
@@ -96,7 +100,7 @@ ZUCK = {6, 7, 17, 18, 31, 32}                                    # kurze Zuckung
 
 def teil(maske):
     t, _ = L.trenne(spr, maske)
-    return L.platz(t, H, W, PAD_L, PAD_T)                       # sofort auf die volle Leinwand
+    return L.platz(t, H, W, GPL, GPT)                       # sofort auf die volle Leinwand
 
 
 def stufe2(i):
@@ -105,7 +109,7 @@ def stufe2(i):
     return int(round(2 * (1 - abs(2 * t - 1))))
 
 
-def frame(i):
+def frame_gross(i, nur=None):
     # --- Die Figur STEHT am Loch: Standlinie = Unterkante des Rippenrings (y 20), sie bleibt in jedem Frame fest. Atmen = eine Zeile (y 16) im Rippenring
     #     wird eingefügt, Oberkörper (Rippen oben, Robe, Kapuze, Ärmel) hebt sich um dieses 1 px, die untere Rippenhälfte (y 17–20) bleibt stehen ---
     r_b = U.stufe(i, N / 2, 1)                                   # Atem (0/1), Periode 20
@@ -118,30 +122,41 @@ def frame(i):
 
     hb0 = teil(haube)
     if tip:                                                      # Spitzenzeile y 0 (x 7–12) rutscht um tip nach links/rechts; bleibt an Zeile 1 (x 6–13) hängen
-        zeile = hb0[PAD_T, :, :].copy()
-        hb0[PAD_T, :, :] = 0
-        hb0[PAD_T, PAD_L + tip:PAD_L + sw + tip, :] = zeile[PAD_L:PAD_L + sw, :]
-    hb = L.streck_zeile(hb0, PAD_T + 5, r_c)
-    ri = L.streck_zeile(teil(rippen), PAD_T + 16, r_b)
-    al = L.spalten_welle(teil(aermel_l), PAD_L + 5, 1.6 * hump, ph, bias=-4.0 * hump, lauf=1.0, nur_rechts=False)
-    ar = L.spalten_welle(teil(aermel_r), PAD_L + 14, 1.6 * hump, ph, bias=-4.0 * hump, lauf=1.0, nur_rechts=True)
+        zeile = hb0[GPT, :, :].copy()
+        hb0[GPT, :, :] = 0
+        hb0[GPT, GPL + tip:GPL + sw + tip, :] = zeile[GPL:GPL + sw, :]
+    hb = L.streck_zeile(hb0, GPT + 5, r_c)
+    ri = L.streck_zeile(teil(rippen), GPT + 16, r_b)
+    al = L.spalten_welle(teil(aermel_l), GPL + 5, 1.6 * hump, ph, bias=-4.0 * hump, lauf=1.0, nur_rechts=False)
+    ar = L.spalten_welle(teil(aermel_r), GPL + 14, 1.6 * hump, ph, bias=-4.0 * hump, lauf=1.0, nur_rechts=True)
     # Loch fest am Boden (mit schwarzer Ergänzung hinter dem Arm), Arm wächst aus dem Loch
     lo = teil(loch)
     for (x, y) in LOCH_ERG:
-        lo[PAD_T + y, PAD_L + x, :3] = SCHWARZ
-        lo[PAD_T + y, PAD_L + x, 3] = 255
-    am = L.streck_zeile(teil(arm), PAD_T + 26, griff)                     # Faustzeile y 26 wird eingefügt: Faust öffnet sich (1 px höher)
-    am = L.streck_zeile(am, PAD_T + 29, n_arm)                            # Unterarmzeile y 29 wird eingefügt: Arm wird länger, Faust steigt
+        lo[GPT + y, GPL + x, :3] = SCHWARZ
+        lo[GPT + y, GPL + x, 3] = 255
+    am = L.streck_zeile(teil(arm), GPT + 26, griff)                     # Faustzeile y 26 wird eingefügt: Faust öffnet sich (1 px höher)
+    am = L.streck_zeile(am, GPT + 29, n_arm)                            # Unterarmzeile y 29 wird eingefügt: Arm wird länger, Faust steigt
     koerper = L.zusammen(H, W, [(lo, 0, 0), (am, 0, 0), (ri, 0, 0), (hb, 0, -r_b), (al, 0, -r_b), (ar, 0, -r_b)])
     koerper = U.kontur_schliessen(koerper, UMRISS, SCHWARZ)               # Regel 16: Umriss an Ärmeln/Armkanten in jeder Pose geschlossen
+    if nur == 'koerper':
+        return koerper
     seelen = U.glut_ebene(H, W, i, N, PUFFS, SEELEN)
     return L.zusammen(H, W, [(seelen, 0, 0), (koerper, 0, 0)])
+
+
+# Zuschnitt auf die Figur (Nutzerwunsch): symmetrisch um die Ruhefigur, Effekte höchstens +2 px über den Körperrand hinaus
+BOX = U.zuschnitt([frame_gross(i) for i in range(N)], [frame_gross(i, 'koerper') for i in range(N)], (GPL, GPT, GPL + sw, GPT + sh))
+PAD_L, PAD_T = GPL - BOX[0], GPT - BOX[1]
+
+
+def frame(i, nur=None):
+    return U.beschneiden(frame_gross(i, nur), BOX)
 
 
 if __name__ == '__main__':
     frames = [frame(i) for i in range(N)]
     prev = sys.argv[sys.argv.index('--preview') + 1] if '--preview' in sys.argv else None
-    L.pruefe(frames, quelle=spr, erlaubt=[SEELE_RAND])
+    L.pruefe(frames, quelle=spr, erlaubt=[SEELE_RAND], min_rand=1)
     L.speichern('skeleton-necromancer', 'Skeleton Necromancer', frames, MS, prev)
     if prev:
         L.streifen(prev + '/skeleton-necromancer-strip.png', [frames[k] for k in (0, 5, 10, 15, 20, 25, 30, 35)], spalten=4, scale=7)

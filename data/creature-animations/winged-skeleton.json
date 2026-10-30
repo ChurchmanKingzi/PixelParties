@@ -2,7 +2,7 @@
   "creature": "Winged Skeleton",
   "sheet": "winged-skeleton.png",
   "frameWidth": 50,
-  "frameHeight": 37,
+  "frameHeight": 38,
   "frames": 48,
   "frameMs": 65,
   "loop": true,
@@ -10,6 +10,6 @@
   "padTop": 2,
   "padLeft": 2,
   "padRight": 2,
-  "padBottom": 3,
+  "padBottom": 2,
   "faceX": 25.0
 }

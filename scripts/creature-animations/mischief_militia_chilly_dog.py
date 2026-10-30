@@ -33,7 +33,7 @@ Ablauf (54 Frames à 66 ms = 3,56 s), alle Bewegungen unabhängig:
 * Blinzeln (Frames 10–13 und 37–40): erst der schwarze Augenstrich, dann auch das blaugraue Pixel werden zur Fellfarbe B (214,213,244) des Gesichts, dann wieder auf.
 * Frösteln: zweimal pro Schleife (Frames 21–28 und 44–51) zittert der ganze Hund mit 1 px Hub (links/rechts im Takt von 2 Frames) — passend zu „Chilly“.
 * Pfoten tippen: Standbein vorn in Frames 7–8, 33–34, 52–53; Standbein hinten in 14–15 und 38–39 (die Fußzeile entfällt, die Fußlinie rückt 1 px hoch).
-* Kalter Atem: vier kleine runde Wölkchen (Farben des Fells) entstehen an der Nase, wachsen (Funke → 2×2 → Kreis), steigen langsam nach oben rechts und
+* Kalter Atem: vier kleine runde Wölkchen (Farben des Fells) entstehen an der Nase, wachsen (Funke → 2×2), steigen langsam schräg nach oben rechts und
   vergehen; sie liegen hinter dem Hund. Der Rahmen ist dafür nur 2 px breiter als der Hund allein (Rand rechts 5 statt 3).
 Alle Bewegungen laufen auf der vollen Leinwand (anim_lib wirft ClipError). Nur ganze Pixel, nur Farben der Quelle.
 
@@ -70,10 +70,10 @@ for (x, y) in ERGAENZUNG:
     hund_q[y, x, 3] = 255
 
 STAUB = {'fell': ((223, 224, 246), (204, 204, 242))}               # C (Kern) / D (Rand)
-ATEM = [dict(x=PAD_L + 19, y=PAD_T + 6, vx=0.5, vy=-5.0, off=0, form='o', farbe='fell', wackeln=0.0),
-        dict(x=PAD_L + 19, y=PAD_T + 6, vx=0.4, vy=-4.0, off=14, form='s', farbe='fell', wackeln=0.0),
-        dict(x=PAD_L + 19, y=PAD_T + 6, vx=0.5, vy=-5.0, off=27, form='o', farbe='fell', wackeln=0.0),
-        dict(x=PAD_L + 19, y=PAD_T + 6, vx=0.4, vy=-4.0, off=40, form='s', farbe='fell', wackeln=0.0)]
+ATEM = [dict(x=PAD_L + 19, y=PAD_T + 7, vx=1.4, vy=-3.2, off=0, form='s', farbe='fell', wackeln=0.0),
+        dict(x=PAD_L + 19, y=PAD_T + 7, vx=1.3, vy=-3.0, off=13, form='s', farbe='fell', wackeln=0.0),
+        dict(x=PAD_L + 19, y=PAD_T + 7, vx=1.4, vy=-3.4, off=27, form='s', farbe='fell', wackeln=0.0),
+        dict(x=PAD_L + 19, y=PAD_T + 7, vx=1.2, vy=-3.0, off=40, form='s', farbe='fell', wackeln=0.0)]
 TEST_EBENEN = ['hund', 'schal', 'kdet']
 RAND = T.rand_farben(spr)
 _f, _u, REGEL = T.umriss_regeln(spr, RAND)
