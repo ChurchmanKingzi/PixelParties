@@ -10,6 +10,11 @@ abgeschnitten wird.
     folge(i, start, werte, n)           Ereignis-Fenster: werte[k] im Frame start+k, sonst None (Blinzeln, Ohrzucken, Funkeln)
     takt(i, n, start, laenge)           1, wenn Frame i im Fenster [start, start+laenge) (alle n Frames wiederholt), sonst 0 —
                                         z. B. Windstöße für Haarsträhnen: pro Strähne ein um 2 Frames versetztes Fenster = laufende Welle
+    boe_mitte(i, n, start, laenge, von, bis)  Mitte einer diagonalen Windfront (Koordinate s = x + neigung·y), die im Fenster von `von`
+                                        nach `bis` wandert, sonst None. Laub-/Umhang-Böe: erst die Spitzen oben, die Wellenfront läuft
+                                        nach unten (Saum), „Spitze hinterher".
+    boe_aktiv(x, y, mitte, breite, neigung)   gehört (x, y) gerade zur Front?
+    heller(a, bedingung, rampe, off)    Pixel, deren Farbe in `rampe` (dunkel → hell) steht, um eine Stufe aufhellen (Laubglanz)
     setze(a, {(x, y): farbe}, off)      einzelne Pixel setzen (Alpha 255); farbe None = Pixel löschen
     pixel_von(a, [(x, y), …], off)      Farben der Pixel lesen (RGB-Tupel oder None)
     atmen(a, brustzeile, halszeile, brust, kopf)
@@ -48,6 +53,33 @@ def folge(i, start, werte, n=None):
 def takt(i, n, start, laenge):
     """1, wenn Frame i im Fenster [start, start + laenge) liegt (Fenster wiederholt sich alle n Frames, nahtlos), sonst 0."""
     return 1 if 0 <= (i - start) % n < laenge else 0
+
+
+def boe_mitte(i, n, start, laenge, von, bis):
+    """Mitte der Windfront im Frame i (Fenster [start, start+laenge) mod n), linear von `von` nach `bis`; außerhalb None."""
+    k = (i - start) % n
+    if not 0 <= k < laenge:
+        return None
+    return von + (bis - von) * k / max(1, laenge - 1)
+
+
+def boe_aktiv(x, y, mitte, breite=1.5, neigung=0.6):
+    return mitte is not None and abs(x + neigung * y - mitte) <= breite
+
+
+def heller(a, bedingung, rampe, off=(0, 0)):
+    """Jedes Pixel (x, y in Spritekoordinaten), für das bedingung(x, y) gilt und dessen RGB in `rampe` (dunkel → hell) steht,
+    bekommt die nächsthellere Stufe der Rampe (die hellste bleibt). Nur Farben des Sprites."""
+    h, w = a.shape[:2]
+    idx = {tuple(c): j for j, c in enumerate(rampe)}
+    for Y in range(h):
+        for X in range(w):
+            if not a[Y, X, 3]:
+                continue
+            j = idx.get(tuple(int(v) for v in a[Y, X, :3]))
+            if j is not None and j + 1 < len(rampe) and bedingung(X - off[0], Y - off[1]):
+                a[Y, X, :3] = rampe[j + 1]
+    return a
 
 
 def setze(a, pixel, off=(0, 0)):

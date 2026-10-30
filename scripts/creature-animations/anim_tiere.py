@@ -7,6 +7,7 @@ die bereits auf der VOLLEN Leinwand liegen (L.platz) — so schneidet nichts sti
     umriss_regeln(spr, umriss_farben)          # welche Umrissfarbe gehört zu welcher Füllfarbe? (aus dem Sprite abgeleitet)
     haengend_schwingen(teil, blocker, ...)     # Schwanz/Zipfel schwingt (Zeilenversatz mit Nachlauf), Umriss wird NEU gezogen
     zucken_zeilen(teil, pivot_y, dx)           # Ohr/Fühler zuckt: Zeilen oberhalb des Ansatzes weichen seitlich aus
+    ohr_haengend(teil, {zeile: dx}, seite)     # Schlappohr schwingt unten nach außen, bleibt am Kopf angewachsen
     pixel_tauschen(ebene, {(x, y): rgb})       # einzelne Pixel umfärben (Blinzeln, Glühen), Koordinaten = Leinwand
     funken_ebene(h, w, i, n, funken, farben)   # einzelne Glutfunken (1 px) steigen langsam auf, verglimmen flackernd
     nachbarn4(maske)                           # 4er-Dilatation
@@ -140,6 +141,36 @@ def zucken_zeilen(a, pivot_y, dx_oben, anteile=None):
             raise L.ClipError(f'Zeile {y} würde um {d} px aus der Leinwand geschoben')
         for x in xs_:
             out[y, x + d] = a[y, x]
+    return out
+
+
+def ohr_haengend(a, profil, seite):
+    """Hängendes Ohr (Schlappohr): oben am Kopf aufgehängt, einzelne Zeilen schwingen nach außen.
+    profil = {Zeile: Versatz in px, Vorzeichen = Richtung}; nicht genannte Zeilen bleiben stehen (der Ansatz oben).
+    Tipp: Versatz auf die untersten Zeilen gemeinsam legen (z. B. {3: d, 4: d, 5: d}), sonst entsteht eine Beule, wenn eine
+    Zeile (z. B. die verjüngte Spitze) schmaler ist als die darüber.
+    seite = 'links' (Ohr links vom Kopf, außen = links, d < 0) oder 'rechts' (außen = rechts, d > 0). Die Lücke zum Kopf wird mit
+    dem inneren Randpixel der Zeile gefüllt (das Ohr bleibt angewachsen und wird dabei um |d| px breiter)."""
+    h, w = a.shape[:2]
+    out = np.zeros_like(a)
+    for y in range(h):
+        xs_ = np.nonzero(a[y, :, 3])[0]
+        if not len(xs_):
+            continue
+        d = int(profil.get(y, 0))
+        if xs_.min() + d < 0 or xs_.max() + d >= w:
+            raise L.ClipError(f'Ohrzeile {y} würde um {d} px aus der Leinwand geschoben')
+        for x in xs_:
+            out[y, x + d] = a[y, x]
+        if d:
+            if seite == 'links':                       # innen = rechter Rand, außen = links (d < 0)
+                xi = int(xs_.max())
+                for x in range(xi + d + 1, xi + 1):
+                    out[y, x] = a[y, xi]
+            else:                                      # innen = linker Rand, außen = rechts (d > 0)
+                xi = int(xs_.min())
+                for x in range(xi, xi + d):
+                    out[y, x] = a[y, xi]
     return out
 
 

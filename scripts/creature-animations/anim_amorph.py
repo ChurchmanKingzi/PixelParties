@@ -65,7 +65,7 @@ def zeile_umbauen(r, p, paare):
 
 
 def koerper_pose(zeilen, loeschen=(), doppeln=(), p=0, paare=((8, 9), (7, 10), (6, 11)), paare_je_zeile=None, x0=0):
-    """Squash & Stretch eines Körpers. zeilen: (n, w, 4) wie von zeilen_von; loeschen/doppeln: Zeilenindizes (0 = oberste Körperzeile);
+    """Squash & Stretch eines Körpers. zeilen: (n, w, 4) wie von zeilen_von; loeschen: Menge von Zeilenindizes (0 = oberste Körperzeile); doppeln: Menge (je 1 Kopie) oder dict {Zeile: Kopien};
     p: Spalten je Seite (siehe zeile_umbauen); paare: Standard-Spaltenpaare; paare_je_zeile: {Zeilenindex: [Paare]} für Zeilen, in denen die
     Standardspalten etwas Wichtiges (Glanz, Auge) träfen. Gibt (n', w, 4) und die Liste der Quellzeilen-Indizes je Ausgabezeile zurück —
     damit Wabbeln/Schräglage dieselbe Quellzeile immer gleich versetzen. Spaltenpaare gelten in Sprite-Koordinaten, x0 = pad_l.
@@ -81,7 +81,8 @@ def koerper_pose(zeilen, loeschen=(), doppeln=(), p=0, paare=((8, 9), (7, 10), (
             continue
         r = zeile_umbauen(zeilen[k], p, lv(paare_je_zeile.get(k, paare)))
         out.append(r); quelle.append(k)
-        if k in doppeln:
+        extra = doppeln.get(k, 0) if isinstance(doppeln, dict) else (1 if k in doppeln else 0)
+        for _ in range(extra):
             out.append(r.copy()); quelle.append(k)
     return np.stack(out), quelle
 

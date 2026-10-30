@@ -1,0 +1,15 @@
+{
+  "creature": "Loyal Rottweiler",
+  "sheet": "loyal-rottweiler.png",
+  "frameWidth": 20,
+  "frameHeight": 23,
+  "frames": 40,
+  "frameMs": 80,
+  "loop": true,
+  "layout": "horizontal",
+  "padTop": 3,
+  "padLeft": 3,
+  "padRight": 3,
+  "padBottom": 3,
+  "faceX": 10.0
+}

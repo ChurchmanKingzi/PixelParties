@@ -11,6 +11,8 @@ Bausteine, die bei mehreren Fliegern gebraucht werden:
     setze(ebene, pad_l, pad_t, {(x, y): farbe}, dy=0)   einzelne Pixel überschreiben (Blinzeln, Glanz, Funkeln)
     glanz_pfad(i, n, start, pfad, laenge)      welche Pfadpunkte zum Frame i „aufglänzen“ (Lichtreflex wandert an einer Linie entlang)
     fluegel_welle(a, pivot_x, amp, phase, …)   wie L.spalten_welle, aber mit Wellenlauf UND Ruhepose bei phase = 0 (Spitze hinkt nach)
+    zeilen_schub(a, pivot_y, amp, s, potenz)   Zeilen wandern waagerecht um round(amp·f^potenz·s), f = Abstand zur Pivotzeile (0…1), s ∈ [0,1]:
+                                               ein Teil klappt NUR in eine Richtung auf (Flügel/Arm spreizt sich nach außen), Ruhe bei s = 0
     kacheln(frames, x0, x1, y0, y1, sc)        Ausschnitt mehrerer Frames nebeneinander, ganzzahlig vergrößert (Nahaufnahme für Nähte)
     stapeln(bilder)                            PIL-Bilder untereinander zu einem Kontrollbild
 """
@@ -118,4 +120,23 @@ def fluegel_welle(a, pivot_x, amp, phase, potenz=1.0, nur_rechts=None, lauf=0.0)
             raise L.ClipError(f'Spalte {x} würde um {dy} px aus der Leinwand (Höhe {h}) geschoben')
         for y in ys:
             out[y + dy, x] = a[y, x]
+    return out
+
+
+def zeilen_schub(a, pivot_y, amp, s, potenz=1.0):
+    """Zeilen wandern waagerecht um round(amp · f**potenz · s); f = |y − pivot_y| / maxAbstand (0…1), s ∈ [0, 1].
+    Anders als L.zeilen_welle (sin: hin und her) geht es nur in eine Richtung (Vorzeichen von amp) und ruht bei s = 0 —
+    z. B. ein angelegter Flügel, der sich nach außen spreizt. Zeilen oberhalb und unterhalb des Pivots wandern gleich weit je Abstand."""
+    out = L.leer(*a.shape[:2])
+    h, w = a.shape[:2]
+    maxd = max(1, max((abs(y - pivot_y) for y in range(h) if a[y, :, 3].any()), default=1))
+    for y in range(h):
+        xs_ = np.nonzero(a[y, :, 3])[0]
+        if not len(xs_):
+            continue
+        dx = int(round(amp * (abs(y - pivot_y) / maxd) ** potenz * s))
+        if xs_.min() + dx < 0 or xs_.max() + dx >= w:
+            raise L.ClipError(f'Zeile {y} würde um {dx} px aus der Leinwand (Breite {w}) geschoben')
+        for x in xs_:
+            out[y, x + dx] = a[y, x]
     return out

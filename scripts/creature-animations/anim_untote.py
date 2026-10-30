@@ -9,6 +9,7 @@ bereits auf der VOLLEN Leinwand liegen (L.platz) und werfen ClipError, wenn etwa
     haengen(a, pivot_y, ausschlag, potenz)    # hängendes Teil (Arm, Fetzen, Quaste) schwingt: Zeilenversatz wächst mit dem Abstand
     pixel_setzen(a, punkte, farbe, dx, dy)    # einzelne Pixel einfärben (Augen, Glanzpunkte)
     augen(a, gruppen, stufe, ...)             # Glühen der Augen in Stufen (nur Farben der Rampe aus dem Sprite)
+    kiefer(a, zaehne, farbe, innen, tiefe)    # Kiefer klappt auf/zu (Zähne rutschen nach unten, Mundinneres füllt nach)
     glanz_pfad(a, pfad, hell, basis, pos)     # ein Lichtpunkt wandert an einem Horn/Knochen/Klinge entlang
     glut_ebene(h, w, i, n, puffs, farben)     # Funken/Glut aufsteigend (puff_ebene, aber mit Verglimmen an Anfang und Ende)
 """
@@ -92,6 +93,23 @@ def augen(a, gruppen, stufe_glut=0, blinzeln=0, farben=None):
         else:
             pixel_setzen(a, g['hell'], farben['lid_dunkel'])
             pixel_setzen(a, g['rand'], farben['lid'])
+    return a
+
+
+def kiefer(a, zaehne, zahn_farbe, innen_farbe, tiefe, ox=0, oy=0):
+    """Kiefer klappt auf: die Zahnpixel `zaehne` (Liste (x, y) im Sprite) rutschen um `tiefe` Zeilen nach unten, die frei werdenden
+    Plätze werden zum Mundinneren (`innen_farbe`, eine Farbe, die der Mund im Sprite schon hat). ox/oy = Versatz Sprite → Leinwand.
+    Muss auf der Rumpf-/Kopfebene VOR dem Strecken/Verschieben laufen. tiefe = 0 ändert nichts."""
+    if tiefe <= 0:
+        return a
+    alt = [(x + ox, y + oy) for x, y in zaehne]
+    neu = [(x, y + tiefe) for x, y in alt]
+    for (x, y) in alt:
+        a[y, x, :3] = innen_farbe
+        a[y, x, 3] = 255
+    for (x, y) in neu:
+        a[y, x, :3] = zahn_farbe
+        a[y, x, 3] = 255
     return a
 
 
