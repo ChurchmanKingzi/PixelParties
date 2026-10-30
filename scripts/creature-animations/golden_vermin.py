@@ -87,8 +87,8 @@ def zeilen_dx(i):
 
 # ── Wölkchen (nur 2×2 / 4×4) rechts und links neben dem Sprite ──
 WOLKEN = [
-    dict(x=16, y=11, vx=1, vy=-6, off=0), dict(x=16, y=9, vx=-1, vy=-6, off=12),
-    dict(x=-1, y=12, vx=-1, vy=-6, off=6), dict(x=-1, y=10, vx=1, vy=-6, off=18),
+    dict(x=16, y=11, vx=0, vy=-6, off=0), dict(x=16, y=9, vx=-1, vy=-6, off=12),
+    dict(x=0, y=12, vx=0, vy=-6, off=6), dict(x=0, y=10, vx=1, vy=-6, off=18),
 ]
 
 
