@@ -20,9 +20,9 @@ Ablauf (48 Frames à 60 ms = 2,88 s):
 * Schwebe-Bob zweistufig bis 2 px nach oben (0 → 1 → 2 → 1 → 0, Periode 12); die Fühlerspitzen krümmen sich im Takt 1 px zum Kopf hin.
 * Glanz (Gold, Regel 14): ein dezentes Lichtband läuft alle 24 Frames über die goldenen Flächen (eine Stufe heller, nicht über Umriss/Naht), dazu zwei kleine weiße vierzackige Glitzersterne
   wechseln sich auf den Flügeldecken ab. Der Umriss, die Naht und die Fühler glänzen nicht.
-* Goldstaub: drei winzige runde Punkte (k) in Hellgold steigen langsam auf.
+* Kein Goldstaub (einzelne 1-px-Punkte neben der Figur wirken wie Fehlpixel): die Effekte sind nur Lichtband und Glitzersterne auf dem Gold.
 
-Rahmen: auf die Figur zugeschnitten (Vereinigung aller Frames + 1 px freier Rand), Staub und Sterne ragen höchstens 3 px über die Figur hinaus.
+Rahmen: auf die Figur zugeschnitten (Vereinigung der Körper-Frames + 2 px Rand, zentriert); die Sterne liegen auf dem Rücken und ragen nicht über die Figur hinaus.
 Randpixel-Test (Regel 16): Das Auseinanderrücken der Hälften lässt den Umriss an den Rändern (die Naht-Zeilen sind dunkelorange); F.umranden prüft zusätzlich jedes Frame; zusätzlich randtest.py.
 Alle Bewegungen laufen auf der vollen (größeren) Arbeitsleinwand (anim_lib wirft ClipError). Nur ganze Pixel, nur Farben der Quelle (außer dem Weiß der Glitzersterne), Alpha nur 0/255.
 """
@@ -57,16 +57,6 @@ Y_NAHT_O, Y_NAHT_U = PAD_T + 6, PAD_T + 8                    # obere/untere Naht
 FUEHLER_O = [(14, 4), (15, 4)]
 FUEHLER_U = [(14, 10), (15, 10)]
 STERNE = [(4, 3, 'o'), (7, 11, 'u')]                         # Mittelpunkte der Sterne (Sprite-Koordinaten) auf der oberen/unteren Flügeldecke
-GOLDSTAUB = {'c': (255, 254, 130), 'r': (255, 249, 78)}
-
-
-def px(x, y):
-    return PAD_L + x, PAD_T + y
-
-
-PUFFS = [dict(x=px(5, 0)[0], y=px(5, 0)[1], vx=-1, vy=-4, off=0, form='k', wackeln=1),
-         dict(x=px(8, 0)[0], y=px(8, 0)[1], vx=1, vy=-4, off=16, form='k', wackeln=1),
-         dict(x=px(6, 14)[0], y=px(6, 14)[1], vx=0, vy=4, off=32, form='k', wackeln=1)]
 
 
 def streck_unten(a, zeile, n):
@@ -117,9 +107,6 @@ def frame(i, partikel=True, effekte=True):
             st = F.stern_stufe(i, N // 2, 3 + 12 * k)
             if st is not None:
                 F.stern(f, PAD_L + sx, PAD_T + sy + bob + (-s if teil == 'o' else s), st, WEISS, WEISS)
-    if partikel:
-        pol = L.puff_ebene(H, W, i, N, PUFFS, GOLDSTAUB)
-        f = L.zusammen(H, W, [(f, 0, 0), (pol, 0, 0)])
     return f
 
 
@@ -133,8 +120,8 @@ def _fuehler(a, x, y, d):
     return a
 
 
-def zuschneiden(frames, koerper_frames, max_ueber=3):
-    """Frame auf die Figur zuschneiden: Vereinigung aller Frames + 1 px freier Rand; Effekte ragen höchstens max_ueber px über die Körper-Frames hinaus."""
+def zuschneiden(frames, koerper_frames, rand=2):
+    """Frame auf die Figur zuschneiden und zentrieren: Vereinigung der Körper-Frames + `rand` px; die Effekte (Sterne) müssen mit ≥ 1 px Abstand hineinpassen."""
     def bbox(fs):
         a = np.stack([f[..., 3] > 0 for f in fs]).any(axis=0)
         ys, xs = np.nonzero(a)
@@ -143,8 +130,8 @@ def zuschneiden(frames, koerper_frames, max_ueber=3):
     ex0, ey0, ex1, ey1 = bbox(frames)
     ueber = (bx0 - ex0, by0 - ey0, ex1 - bx1, ey1 - by1)
     print('Figur (Körper-Frames) x', bx0, '…', bx1, 'y', by0, '…', by1, '| Effekte ragen hinaus (links, oben, rechts, unten):', ueber)
-    assert max(ueber) <= max_ueber, f'Effekte ragen mehr als {max_ueber} px über die Figur: {ueber}'
-    x0, y0, x1, y1 = ex0 - 1, ey0 - 1, ex1 + 1, ey1 + 1
+    assert max(ueber) <= rand - 1, f'Effekte ragen zu weit über die Figur: {ueber}'
+    x0, y0, x1, y1 = bx0 - rand, by0 - rand, bx1 + rand, by1 + rand
     return [f[y0:y1 + 1, x0:x1 + 1].copy() for f in frames]
 
 

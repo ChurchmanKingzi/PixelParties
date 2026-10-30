@@ -50,11 +50,14 @@ vorhanden = L.deckend(spr)
 
 # ── Masken ───────────────────────────────────────────────────────────────────────────────────────────────────────────
 schwanz_m = vorhanden & (xx <= 5) & (yy >= 10) & (yy <= 15)
-hals_m = vorhanden & (xx >= 19) & (yy <= 12)
+spitze_l_m = np.zeros_like(vorhanden); spitze_l_m[11, 24] = True        # Schnabelspitzen (unterste Pixel der V-Linien)
+spitze_r_m = np.zeros_like(vorhanden); spitze_r_m[11, 29] = True
+assert vorhanden[11, 24] and vorhanden[11, 29]
+hals_m = vorhanden & (xx >= 19) & (yy <= 12) & ~spitze_l_m & ~spitze_r_m
 bein_l_m = vorhanden & (yy >= 13) & (xx <= 9) & ~schwanz_m
 bein_r_m = vorhanden & (yy >= 13) & (xx >= 10)
-koerper_m = vorhanden & ~schwanz_m & ~hals_m & ~bein_l_m & ~bein_r_m
-assert int((schwanz_m | hals_m | bein_l_m | bein_r_m | koerper_m).sum()) == int(vorhanden.sum())
+koerper_m = vorhanden & ~schwanz_m & ~hals_m & ~spitze_l_m & ~spitze_r_m & ~bein_l_m & ~bein_r_m
+assert int((schwanz_m | hals_m | spitze_l_m | spitze_r_m | bein_l_m | bein_r_m | koerper_m).sum()) == int(vorhanden.sum())
 assert not (hals_m & koerper_m).any()
 
 
@@ -64,6 +67,7 @@ def teil(maske):
 
 
 KOERPER, SCHWANZ, HALS, BEIN_L, BEIN_R = teil(koerper_m), teil(schwanz_m), teil(hals_m), teil(bein_l_m), teil(bein_r_m)
+SPITZE_L, SPITZE_R = teil(spitze_l_m), teil(spitze_r_m)
 
 # ── Farben (alle aus dem Sprite) ───────────────────────────────────────────────────────────────────────────────────
 SCHWARZ, GRAU_UMRISS, BEIN_GRAU = (0, 0, 0), (91, 91, 91), (147, 150, 153)
@@ -87,8 +91,9 @@ def hals_dy(i):
     return int(round(sanft + PECK.get(i, 0)))
 
 
-def schnabel_auf(i):
-    return -1 if i in (29, 30, 31) else (1 if i in (33, 34) else 0)         # −1 = weiter auf, +1 = Spitzen zusammen (Zuschnappen)
+def schnabel_zu(i):
+    """Schnabel schnappt zu: die beiden Spitzen rücken in den Frames 33–35 je 1 px nach innen (V-Linien werden senkrecht), sonst offen wie im Original."""
+    return i in (33, 34, 35)
 
 
 def atem(i):
@@ -129,11 +134,9 @@ def frame(i, partikel=True, nur=None):
         z = PAD_T + 11
         schichten += [(L.streck_zeile(KOERPER, z, n), 0, 0, 1), (L.streck_zeile(SCHWANZ_W(i), z, n), 0, 0, 1)]
     if 'hals' in ebenen:
-        hals = B.spalten_schub(HALS, PAD_L + 18, lambda f: dy * f, 11)             # Hals/Kopf senken: Spalte x wandert um dy·(x−18)/11
-        s = schnabel_auf(i)
-        if s:                                                                      # Schnabel: linke Linie nach außen/innen, rechte gegengleich
-            hals = schnabel(hals, s)
-        schichten.append((hals, 0, -n, 2))
+        sch = lambda a: B.spalten_schub(a, PAD_L + 18, lambda f: dy * f, 11)      # Hals/Kopf senken: Spalte x wandert um dy·(x−18)/11
+        zu = 1 if schnabel_zu(i) else 0
+        schichten += [(sch(HALS), 0, -n, 2), (sch(SPITZE_L), zu, -n, 2), (sch(SPITZE_R), -zu, -n, 2)]
     f, karte = B.zusammen_mit_karte(H, W, schichten)
     B.umriss_je_ebene(f, karte, ERLAUBT, EBENEN_FARBE)
     if partikel:
@@ -143,15 +146,6 @@ def frame(i, partikel=True, nur=None):
 
 def SCHWANZ_W(i):
     return L.zeilen_welle(SCHWANZ, PAD_T + 11, 1.2, L.sinus(i, 16.0, 0.4))
-
-
-def schnabel(hals, s):
-    """Schnabellinien (unter dem Kopf): linke Linie (x ≤ 25, y ≥ 9 + Kopfversatz) um s px nach links, rechte (x ≥ 28) um s px nach rechts; s < 0 = auf (Spalten auseinander), s > 0 = zu."""
-    out = hals.copy()
-    ys, xs = np.nonzero(hals[..., 3])
-    # Zeilen der Schnabellinien: unterhalb der Kopfunterkante (Sprite-Zeile ≥ 9 vor dem Versatz)
-    kopf_unten = max(y for y, x in zip(ys, xs) if x >= 26 and y <= PAD_T + 8 + 6)
-    return out
 
 
 if __name__ == '__main__':

@@ -37,7 +37,7 @@ import anim_lib as L
 import anim_tiere as T
 
 N, MS = 60, 66
-PAD_L, PAD_R, PAD_T, PAD_B = 5, 2, 3, 2
+PAD_L, PAD_R, PAD_T, PAD_B = 4, 2, 3, 2
 
 spr = L.lade('gigantisaur-ankylos')
 sh, sw = spr.shape[:2]
@@ -45,7 +45,7 @@ H, W = sh + PAD_T + PAD_B, sw + PAD_L + PAD_R
 yy, xx = np.mgrid[0:sh, 0:sw]
 vorhanden = L.deckend(spr)
 
-schwanz = vorhanden & (yy <= 19) & (xx <= 17)
+schwanz = vorhanden & (yy <= 17) & (xx <= 14)
 bein_h = vorhanden & (yy >= 33) & (xx >= 9) & (xx <= 19)
 bein_a = vorhanden & (yy >= 37) & (xx >= 32) & (xx <= 43)
 bein_b = vorhanden & (yy >= 35) & (xx >= 46) & (xx <= 56)
@@ -80,15 +80,15 @@ def zustand(i):
 
 
 def schwanz_schwingen(t, u):
-    """Schwanz (Zeilen 0–19, x 0–17): Zeile y wandert waagerecht um round(3,2 · f · sin(πu) · sin(4πu − 0,9 f)), f = (19 − y)/19 (Keule oben am meisten, Ansatz am Becken fest)."""
+    """Schwanz (Zeilen 0–17, x 0–14): Zeile y wandert waagerecht um round(3,2 · f · sin(πu) · sin(4πu − 0,9 f)), f = (17 − y)/17 (Keule oben am meisten, Ansatz am Becken fest)."""
     if u is None:
         return t
     out = L.leer(H, W)
-    for y in range(0, 20):
+    for y in range(0, 18):
         xs_ = np.nonzero(t[PAD_T + y, :, 3])[0]
         if not len(xs_):
             continue
-        f = (19 - y) / 19.0
+        f = (17 - y) / 17.0
         dx = int(round(3.2 * f * math.sin(math.pi * u) * math.sin(4 * math.pi * u - 0.9 * f)))
         if xs_.min() + dx < 0 or xs_.max() + dx >= W:
             raise L.ClipError(f'Schwanzzeile {y} würde aus der Leinwand geschoben')
