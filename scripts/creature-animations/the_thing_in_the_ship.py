@@ -19,7 +19,7 @@ Ablauf (48 Frames à 65 ms = 3,12 s, nahtlos):
 * Tentakel (Periode 24, rechts um ~46° versetzt zur linken Gruppe — rein gegenläufig würden sich die Gruppen berühren): jede Gruppe pendelt für sich — Zeilenversatz mit nach unten wachsendem Gewicht (oben am „Kopf“ fest, an den Spitzen ±2 px, die Spitze hinkt nach); wo zwei Nachbarzeilen
   einer Gruppe bei verschiedenem Versatz nicht 4-verbunden blieben, teilen sie sich den Versatz. Jede Gruppe bleibt ein 4-verbundenes Teil.
 * Blinzeln (zweimal je Schleife, Frames 13–15 und 37–39: halb – Linie – halb): die Augen haben keinen Körper hinter sich (der Hintergrund ist leer, also keine Lidfarbe), deshalb verengen sie sich auf einen
-  4×2-Streifen (Kreiszeilen 0 und 3 entfallen) und dann auf eine 4×1-Linie (nur Kreiszeile 1) und gehen wieder auf — nur Pixel der Augen, keine neuen Farben. Beide Augen blinzeln gemeinsam.
+  4×2-Streifen (Kreiszeilen 0 und 3 entfallen) und dann auf eine 4×1-Linie (nur Kreiszeile 1) und gehen wieder auf; der helle Kern (F) wird dabei zum Ringrot E, denn er läge sonst am Rand — nur Augenpixel, nur Farben der Quelle. Beide Augen blinzeln gemeinsam.
 Ergänzungen: keine (Umriss und Verbindungen entstehen nur aus Zeilenversatz).
 Frame: Sprite plus 4 px links/rechts (Pendeln ±2 + 2 px Rand), 2 px oben, 2 px unten — Figur zentriert.
 Alle Bewegungen laufen auf der vollen Leinwand (anim_lib/anim_amorph werfen ClipError). Nur ganze Pixel, nur Farben der Quelle.
@@ -41,6 +41,7 @@ H, W = sh + PAD_T + PAD_B, sw + PAD_L + PAD_R
 BODEN = PAD_T + sh - 1
 OPAK = spr[..., 3] > 0
 RAND_FARBEN = A.umrissfarben(spr)
+RING = (94, 0, 0)                                                                     # E: Ring der Augen
 
 import cv2  # noqa: E402
 
@@ -113,6 +114,8 @@ def figur(i):
                 if stufe == 3 and ry != 1:
                     continue
                 out[PAD_T + y, PAD_L + int(x)] = spr[y, x]
+                if stufe:
+                    out[PAD_T + y, PAD_L + int(x), :3] = RING                             # verengte Augen zeigen nur den dunkelroten Ring (der leuchtende Kern lag in der Mitte, nie am Rand)
     fig = out
     return dict(fig=fig)
 
