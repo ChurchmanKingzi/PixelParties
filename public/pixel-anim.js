@@ -44,6 +44,7 @@
     ditherMin: 400,      // Elemente mit kleinerer Flaeche (px², z. B. 20 x 20) blenden nur ein/aus statt zu dithern (billiger, bei Partikeln unsichtbar; 0 = alle dithern)
     globalMaxBilder: 40, // dokumentweit (Oberflaeche): hoechstens so viele Bilder je Durchlauf (Umgebungsteilchen mit langen Schleifen laufen dann ~10 Bilder/s)
     globalSofort: 14,    // dokumentweit: Animationen mit mehr Abtastungen werden in Zeitscheiben (~6 ms je ~30 ms) nachgebacken statt sofort
+    stufenMax: 800,      // Szenen: reine Stufenfolgen (`steps(n)`) bis zu so vielen Stufen je Durchlauf werden exakt an den Stufengrenzen gebacken
     globalMaxDauer: 8000,// dokumentweit (Oberflaeche) werden nur Animationen/Uebergaenge bis zu dieser Dauer (ms) gebacken (Countdown-Balken u. ae. bleiben)
     direkt: true,        // Blaetter ohne Kinder animieren `mask-image` selbst statt ueber eine vererbte Variable
     aktiv: true,
@@ -394,7 +395,7 @@
   }
 
   /** Ist diese Keyframe-Folge schon pixelkonform (gehaltene Bilder ≤ ~30 Hz, keine Zwischenwerte)? Dann nichts tun. */
-  function istKonform(kfs, props, dauer) {
+  function istKonform(kfs, props, dauer, strikt) {
     let schritte = 0;
     for (let i = 0; i < kfs.length - 1; i++) {
       const m = /^steps\(\s*(\d+)/.exec(String(kfs[i].easing || ''));
@@ -402,6 +403,25 @@
       schritte += +m[1];
     }
     if (schritte / dauer * 1000 > KONFIG.takt + 3) return false;
+    // ★ W86a (Szenen, `strikt`): auch die STUFEN muessen im Raster liegen. `steps(n)` mit n > 1 zwischen verschiedenen Werten von opacity/
+    // transform/… ergibt Zwischenwerte (Halb-Alpha, Bruchpixel); und Stufen/Dauern, die nicht auf ganze Takte fallen, wechseln auf
+    // beliebigen 60-Hz-Bildern statt im 30-Hz-Gleichschritt. Beides wird dann gebacken (Dither, Kunstpixel, Takt); reine Stufenfolgen
+    // (`steps(n)`) auch lange Schleifen exakt, an den Stufengrenzen (`stufenZeiten`).
+    if (strikt) {
+      const T = TAKT_MS(), ausser = (x) => Math.abs(x / T - Math.round(x / T)) * T;
+      if (ausser(dauer) > 0.5) return false;
+      for (let i = 0; i < kfs.length - 1; i++) {
+        const n = +/^steps\(\s*(\d+)/.exec(String(kfs[i].easing || ''))[1];
+        const o0 = kfs[i].computedOffset != null ? kfs[i].computedOffset : kfs[i].offset, o1 = kfs[i + 1].computedOffset != null ? kfs[i + 1].computedOffset : kfs[i + 1].offset;
+        if (!(o1 > o0)) continue;
+        const stufe = (o1 - o0) * dauer / n;
+        if (ausser(o0 * dauer) > 1.5 || ausser(stufe) > 1.5 || stufe < T - 1.5) return false;
+        if (n > 1) for (const p of props) {
+          if (/^background(Position|Size)?$/.test(p) || /^mask/.test(p)) continue;        // Sprite-Blaetter: gehaltene Stufen sind gewollt
+          if (kfs[i][p] !== kfs[i + 1][p]) return false;
+        }
+      }
+    }
     for (const kf of kfs) {
       for (const p of props) {
         const v = kf[p]; if (v == null) continue;
@@ -567,6 +587,9 @@
     if (_groesseGemacht.has(el) || !(el instanceof HTMLElement) || spriteZustand.has(el)) return;
     _groesseGemacht.add(el);
     if (cs.position !== 'absolute' && cs.position !== 'fixed') return;
+    // ★ W86a: Szenen (Raster = Szenenpixel, `--pp-raster`): die Groessen sind schon N Szenenpixel (calc(N * var(--px))), die Skalierung geht in
+    // Schritten von 1/raster (snapScale) — N x raster x n/raster ist eine ganze Zahl. Auf Vielfache von 4 px zu runden wuerde das zerstoeren.
+    if (cs.getPropertyValue('--pp-raster')) return;
     const l = parseFloat(cs.left), t = parseFloat(cs.top), cw = parseFloat(cs.width), ch = parseFloat(cs.height);
     if (!Number.isFinite(l) || !Number.isFinite(t) || !Number.isFinite(cw) || !Number.isFinite(ch)) return;
     // Aussenmass exakt (offsetWidth rundet): Inhaltsbreite + Innenabstand + Rahmen, falls content-box
@@ -619,7 +642,8 @@
     if (weich && !sofort && Math.min(KONFIG.globalMaxBilder, Math.ceil(dauer / TAKT_MS())) > KONFIG.globalSofort) { _warte.push([anim, weich]); _planen(); return false; }
     const props = eigenschaften(kfs);
     if (!props.length) return false;
-    if (istKonform(kfs, props, dauer)) {
+    const strikt = !!(el.closest && el.closest('.pp-pixel-scene'));       // Szenen (Areas): strengere Pruefung, Stufenfolgen exakt (W86a)
+    if (istKonform(kfs, props, dauer, strikt)) {
       // Schon gehaltene Bilder: nicht neu abtasten, aber Delay/Start aufs Raster legen (Spriteschleifen mit Dauern wie 200/400/800 ms
       // laufen dann im Gleichschritt mit den gebackenen Animationen)
       try {
@@ -631,12 +655,37 @@
     }
     const t0 = performance.now();
     let ok = false;
-    try { ok = backenInnen(anim, eff, el, kfs, props, dauer, budget, weich); } catch (e) { if (KONFIG.debug) console.warn('[PPPixelAnim]', e); }
+    try { ok = backenInnen(anim, eff, el, kfs, props, dauer, budget, weich, strikt); } catch (e) { if (KONFIG.debug) console.warn('[PPPixelAnim]', e); }
     stat.ms += performance.now() - t0;
     if (ok) stat.gebacken++;
     return ok;
   }
 
+  /**
+   * ★ W86a (Szenen): Bildzeiten reiner Stufenfolgen. Hat jedes Intervall `steps(n)`, wechselt der Wert nur an den Stufengrenzen: dort (auf ganze
+   * Takte gerundet) liegen die Bilder, abgetastet jeweils knapp NACH der Grenze. So tickt eine lange Schleife (`steps(189)` ueber 47 s) exakt im
+   * Raster, ohne dass 1400 Takte abgetastet werden muessten. null = keine reine Stufenfolge oder zu viele Stufen.
+   */
+  function stufenZeiten(kfs, D2, T, maxN) {
+    let n = 0;
+    const iv = [];
+    for (let i = 0; i < kfs.length - 1; i++) {
+      const m = /^steps\(\s*(\d+)\s*(?:,\s*(?:jump-)?end\s*)?\)$/.exec(String(kfs[i].easing || ''));
+      if (!m) return null;
+      const o0 = kfs[i].computedOffset != null ? kfs[i].computedOffset : kfs[i].offset, o1 = kfs[i + 1].computedOffset != null ? kfs[i + 1].computedOffset : kfs[i + 1].offset;
+      iv.push([o0, o1, +m[1]]); n += +m[1];
+    }
+    if (n > maxN) return null;
+    const grid = [], probe = [];
+    const setze = (tb) => {
+      const g = Math.round(tb / T) * T;
+      if (grid.length && g <= grid[grid.length - 1] + 1e-6) { probe[probe.length - 1] = tb + 0.02; return; }          // zwei Grenzen im selben Takt: die spaetere gilt
+      grid.push(g); probe.push(tb + 0.02);
+    };
+    setze(0);
+    for (const [o0, o1, k] of iv) for (let j = 0; j < k; j++) { const tb = (o0 + (o1 - o0) * j / k) * D2; if (tb > 1e-6 && tb < D2 - 1e-6) setze(tb); }
+    return { grid, probe };
+  }
   /**
    * Bildzeiten (ms, Aktivphase) einer Animation: Vielfache von `schritt` ab Start. Delay und Dauer werden beim Backen auf ganze Takte
    * gelegt (`backenInnen`), Start und Ende liegen also wie jedes Zwischenbild auf dem globalen 30-Hz-Raster; `startAusrichten` schiebt
@@ -652,14 +701,14 @@
     const tun = () => {
       try {
         if (anim.playState !== 'running' || anim.startTime == null) return;
-        const neu = Math.round(anim.startTime / T) * T;
+        const neu = Math.floor(anim.startTime / T + 1e-6) * T;     // ★ W86a: abrunden (nie spaeter als jetzt) — sonst steht das erste Bild noch im Ausgangszustand
         if (Math.abs(neu - anim.startTime) > 1e-3) anim.startTime = neu;
       } catch (e) { /* bleibt unausgerichtet */ }
     };
     try { anim.ready.then(tun, () => {}); } catch (e) { /* ohne */ }
   }
 
-  function backenInnen(anim, eff, el, kfs, props, dauer, budget, weich) {
+  function backenInnen(anim, eff, el, kfs, props, dauer, budget, weich, strikt) {
     const cs = getComputedStyle(el);
     const [W, H] = groesseVon(el);
     const raster = rasterVon(cs);
@@ -675,7 +724,11 @@
       const anteil = Math.max(6, Math.floor(budget.rest / Math.max(1, budget.offen)));
       stride = Math.max(stride, Math.ceil(D2 / T / anteil));
     }
-    const zeiten = bildZeiten(D2, stride * T);
+    let zeiten = bildZeiten(D2, stride * T), probeZeiten = null;
+    if (strikt) {
+      const sz = stufenZeiten(kfs, D2, T, KONFIG.stufenMax);
+      if (sz && (!budget || budget.rest === undefined || sz.grid.length <= Math.max(zeiten.length * 3, budget.rest / 4))) { zeiten = sz.grid; probeZeiten = sz.probe; }
+    }
     if (budget && budget.rest !== undefined) { budget.rest -= zeiten.length + 1; budget.offen = Math.max(1, budget.offen - 1); }
     // ── Probe: gleiche Keyframes als eigene WAAPI-Animation → abtasten ──
     const probeKfs = kfs.map(k => { const o = Object.assign({}, k); o.offset = k.computedOffset != null ? k.computedOffset : k.offset; delete o.computedOffset; return o; });
@@ -687,7 +740,7 @@
     const kProps = props.map(kebab);
     const roh = [];
     for (let j = 0; j <= zeiten.length; j++) {
-      probe.currentTime = j < zeiten.length ? zeiten[j] : D2 - 1e-3;
+      probe.currentTime = j < zeiten.length ? (probeZeiten ? probeZeiten[j] : zeiten[j]) : D2 - 1e-3;
       const w = {};
       for (let q = 0; q < kProps.length; q++) w[props[q]] = cs.getPropertyValue(kProps[q]);
       roh.push(w);

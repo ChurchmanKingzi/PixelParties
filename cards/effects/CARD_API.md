@@ -26595,3 +26595,12 @@ Zählt im Quelltext je Einheit (`reg:<Schlüssel>` = `ANIM_REGISTRY`-Eintrag, `k
 ### Bekannte Grenzen
 
 Kreis-/Ring-Animationen, deren **Größe** animiert wird (`border-radius: 50%` + `border`): der Browser malt den Bogen als Vektor (Alpha am Rand) — eigenes Pixel-Ring-Sprite nötig. Drehender Text (`?`, Schrift) und SVG-Formen mit `opacity`-Attribut. `filter: brightness()/hue-rotate()` und `mix-blend-mode` (Farbmischung mit dem Hintergrund) bleiben Sache der einzelnen Animation. Glyphen außerhalb der Pixel-Emoji-Schrift (z. B. das Symbol in `ox_impact`) rendert das System. Das erste Backen einer großen Animation kostet Hauptthread-Zeit (Explosion: ~70 Elemente ≈ 100–200 ms auf dem Desktop; das Telefon rechnet mit 40 % der Teilchen).
+
+### W86a – Area-Szenen (`public/app-areas.jsx`): Pixelart-Bausteine
+
+* **Glut/Schein/Blitzlicht:** `<PpGlow form="kreis|ellipse|hoch|runter" stops={[[Lage, [r,g,b], Alpha], …]} cx cy className style />` (Größe/Lage/Deckkraft-Animation kommen aus der Klasse) — malt ein Bayer-gedithertes Bild aus deckenden Pixeln (eine Zelle = ein Szenenpixel, `ppGlowUrl`) statt `radial-/linear-gradient` mit Alpha. Stopps der Szenen: Konstanten `GL_*`.
+* **Farbfilter am Sprite** (`hue-rotate`, `brightness(0)` …): `<PpFarbfilterSprite src filter className style />` rechnet den Filter einmal ins Bild (Palette), kein CSS-`filter`.
+* **Zeiger/Drehendes:** nicht per CSS drehen. Beispiel `DcZeiger` (Doom Clock): `PPPixelAnim.drehen` je Winkel, Übergang im 30-Hz-Takt (`ppTaktRaf`).
+* **Funkeln** (`.pp-px-funkeln`): Kreuz aus Pseudo-Elementen, Farbe über `--funkel`. **Glühwürmchen:** Schein = vier Nachbarpixel per `box-shadow … 0` statt weichem Halo. **Masken:** keine Verläufe (`PP_WEISS` = 1×1-Weiß-PNG als Maskenfläche).
+* **Pipeline in Szenen (`.pp-pixel-scene`):** `istKonform` ist strenger (`steps(n>1)` zwischen verschiedenen Werten und Stufen/Dauern abseits des 30-Hz-Rasters werden gebacken), reine Stufenfolgen (`steps(n)`, auch lange Schleifen) exakt an den Stufengrenzen (`stufenZeiten`, `KONFIG.stufenMax`); `groesseAusrichten` rundet in Szenen nicht (Größen sind N Szenenpixel); `startAusrichten` rundet ab statt auf (kein Ausgangsbild vor dem Start).
+
