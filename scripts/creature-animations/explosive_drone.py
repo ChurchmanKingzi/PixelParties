@@ -44,10 +44,10 @@ vorhanden = L.deckend(spr)
 ROT = [(96, 0, 0), (164, 0, 0), (210, 0, 0), (255, 0, 0), (255, 91, 91)]         # dunkel → hell
 METALL = [(59, 59, 59), (140, 138, 140), (165, 162, 165), (206, 207, 206)]
 BEIN = (26, 26, 26)
-kuppel = vorhanden & L.farbmaske(spr, ROT)
+kuppel = vorhanden & L.farbmaske(spr, ROT) & ~F.kanten(spr)                # nur das Innere der Kuppel blinkt (der Rand bleibt Umrissfarbe, Regel 16)
 beine = vorhanden & L.farbmaske(spr, [BEIN]) & (yy >= 3)
 koerper = vorhanden & ~beine
-metall_maske = L.farbmaske(spr, METALL)
+metall_maske = L.farbmaske(spr, METALL) & ~F.kanten(spr)
 UMRISS = F.umriss_farben(spr)
 BLINK = [0, 0, 0, 0, 1, 1, 1, 0, -1, -1, 0, 0]               # Warnlampe: Stufen auf der Rot-Rampe je Frame (Periode 12)
 ZITTERN = {40: 1, 41: -1, 42: 1, 43: -1}                      # kurzes Beben (dx) vor dem Loop-Ende
