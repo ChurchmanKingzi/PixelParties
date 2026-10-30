@@ -303,3 +303,53 @@ def umriss_je_ebene(frame, karte, erlaubt, farbe_je_ebene):
         n += 1
     return n
 
+
+
+# ── Harpyformer-Bausteine (gemeinsam für die Reihe) ──────────────────────────────────────────────────────────────────────
+def zeilen_dehnen_aussen(a, y0, y1, innen, dx_fn):
+    """Haarsträhnen schwingen, ohne vom Körper abzureißen: In den Zeilen y0…y1 (Leinwandzeilen) bleibt das INNERE Ende des Haarstücks stehen
+    (Spalte innen[y] − 1, `innen` = dict Zeile → erste Spalte NICHT mehr zum Haar gehörig, z. B. Gesicht/Flügelansatz), das äußere Ende (erstes deckendes Pixel
+    der Zeile) wandert um dx = round(dx_fn(y)) (negativ = nach außen/links). Dazwischen wird Pixel für Pixel nach dem Nächsten-Nachbar-Prinzip abgetastet —
+    nach außen wird dabei ein Pixel verdoppelt, nach innen eines ausgelassen; es entstehen keine Lücken und keine fremden Farben. Der äußere Umrisspixel bleibt der äußere."""
+    out = a.copy()
+    h, w = a.shape[:2]
+    for y in range(y0, y1 + 1):
+        xs_ = np.nonzero(a[y, :innen[y], 3])[0]
+        if not len(xs_):
+            continue
+        dx = int(round(dx_fn(y)))
+        if dx == 0:
+            continue
+        xa, xm = int(xs_.min()), int(innen[y])              # Haarstück = [xa, xm)
+        ws, wn = xm - xa, xm - xa - dx
+        if wn < 2 or xa + dx < 0:
+            raise L.ClipError(f'Zeile {y}: Haarstück ließe sich nicht um {dx} px schwingen (Breite {ws}, Leinwand-Rand {xa})')
+        out[y, min(xa, xa + dx):xm] = 0
+        for x in range(xa + dx, xm):
+            s = xa + int(round((x - (xa + dx)) * (ws - 1) / (wn - 1)))
+            out[y, x] = a[y, s]
+    return out
+
+
+# Funkelstern der Harpyformer-Kunst: drei Wuchsstufen derselben weißen Sterne (so stehen sie auf den Karten):
+#   1 = kleine Raute (4 Pixel, Mitte leer), 2 = X (Mitte + 4 Diagonalen), 3 = großes Plus (je 2 Pixel Arme, Mitte leer)
+FUNKEL_FORMEN = {1: [(0, -1), (-1, 0), (1, 0), (0, 1)],
+                 2: [(0, 0), (-1, -1), (1, -1), (-1, 1), (1, 1)],
+                 3: [(0, -2), (0, -1), (0, 1), (0, 2), (-2, 0), (-1, 0), (1, 0), (2, 0)]}
+
+
+def funkel_stufe(i, periode, k0, folge):
+    """Stufe (0 = aus, 1…3 = Form) des Funkelsterns im Frame i; `folge` = Stufen je Frame einer Periode, k0 = Index von `folge` bei Frame 0."""
+    return folge[(k0 + i) % periode]
+
+
+def funkel_stern(ebene, mx, my, stufe, farbe):
+    """Funkelstern der Stufe 1…3 mit Mitte (mx, my) auf eine Leinwand-Ebene zeichnen (Leinwandkoordinaten; ClipError am Rand)."""
+    h, w = ebene.shape[:2]
+    for dx, dy in FUNKEL_FORMEN.get(stufe, []):
+        x, y = mx + dx, my + dy
+        if not (0 <= x < w and 0 <= y < h):
+            raise L.ClipError(f'Funkelstern bei ({x},{y}) liegt außerhalb der Leinwand {w}×{h}')
+        ebene[y, x, :3] = farbe
+        ebene[y, x, 3] = 255
+    return ebene

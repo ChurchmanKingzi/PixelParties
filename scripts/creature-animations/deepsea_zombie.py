@@ -15,7 +15,7 @@ Was ist was (x/y im Sprite):
 Fest bleiben: Kopfform, Augengröße, Mundform im Ruhebild, Schachbrettmuster innerhalb jeder Zeile.
 
 Ablauf (48 Frames à 65 ms = 3,12 s; Frame 0 = Original, Blasen ausgenommen):
-* Schlurfendes Wiegen: der Körper pendelt um die Füße (Zeilenversatz wächst linear mit dem Abstand zu den Füßen, Kopf bis ±2 px, die Zeile darunter höchstens 1 px weniger — der Scheitel bleibt rund;
+* Schlurfendes Wiegen: der Körper pendelt um die Füße (Zeilenversatz in Gruppen, wächst linear mit dem Abstand zu den Füßen, Kopf bis ±2 px, Zeile 0–2 gleich — der Scheitel bleibt rund, Augen und Mund werden nicht verscheert;
   Periode 24, zweimal pro Schleife; die Füße y ≥ 19 stehen), dazu treibt die ganze Figur langsam ±1 px senkrecht (Periode 16, dreimal pro Schleife).
 * Blinzeln (Lid = Hautmuster): die weißen Augenpixel werden 3 Frames lang zu Teal im Schachbrettmuster ((51,93,119)/(77,137,154), passend zur Umgebung), zweimal pro Schleife (Frame 13–15 und 37–39).
 * Stöhnen: der dunkle Mund schließt sich halb und ganz (Zeile y 12, dann y 11–12 werden Haut im Schachbrettmuster), dreimal pro Schleife (Frame 6–9, 22–25, 38–41, je 4 Frames).
@@ -80,14 +80,20 @@ def teil(maske):
     return L.platz(t, H, W, GPL, GPT)                           # sofort auf die volle Leinwand
 
 
+GRUPPEN = [(0, 2), (3, 4), (5, 6), (7, 8), (9, 12), (13, 14), (15, 16), (17, 18)]      # Zeilengruppen mit gleichem Versatz: Augen (7–8) und Mund (9–12) werden nicht verscheert, die Schopfspitzen (0) bleiben an Zeile 1
+
+
 def wiegen(a, aus):
-    """Zeilenversatz um die Füße (Zeile y 19): wächst linear mit dem Abstand; die Zeilen 0 und 1 bekommen denselben Versatz (die einzelnen Schopf-Spitzen in Zeile 0 hängen nur senkrecht an Zeile 1)."""
+    """Wiegen um die Füße (Zeile y 19): der Versatz wächst linear mit dem Abstand der Zeilengruppe zu den Füßen; die Zeilen einer Gruppe verschieben sich gleich (Augen/Mund bleiben unverschert)."""
     out = L.leer(*a.shape[:2])
-    for y in range(sh):
-        gy = GPT + y
-        dx = int(round(aus * (19 - max(y, 1)) / 18.0)) if y < 19 else 0
-        for x in np.nonzero(a[gy, :, 3])[0]:
-            out[gy, x + dx] = a[gy, x]
+    for (y0, y1) in GRUPPEN:
+        dx = int(round(aus * (19 - (y0 + y1) / 2.0) / 18.0))
+        for y in range(y0, y1 + 1):
+            gy = GPT + y
+            for x in np.nonzero(a[gy, :, 3])[0]:
+                out[gy, x + dx] = a[gy, x]
+    for y in range(19, sh):                                       # Zeilen y ≥ 19 (Füße-Ansatz) stehen
+        out[GPT + y] = a[GPT + y]
     return out
 
 
