@@ -5020,52 +5020,40 @@ function VsCpuKachel({ farbe, zufall, disabled, onClick, bild, name, fuss }) {
   );
 }
 
-// ★ v1408 (Al 25.9.): ein ECHTER Würfel — 3D-Würfel aus sechs Seiten mit
-// Augen. Beim Hover wird immer wieder geworfen: Er hüpft hoch, über-
-// schlägt sich mehrfach und landet auf einer zufälligen Zahl, liegt kurz
-// still und wird erneut geworfen. Ohne Hover ruht er schräg auf seiner
-// letzten Zahl.
+// ★ v1408 (Al 25.9.): ein Würfel, der beim Hover immer wieder geworfen wird: er hüpft hoch, zeigt im Flug rasch wechselnde Augenzahlen und
+// landet auf einer zufälligen Zahl, liegt kurz still und wird erneut geworfen. Ohne Hover ruht er auf seiner letzten Zahl.
+// ★ W86u2 (Pixelart): FLACHER Pixelwürfel statt 3D-Quader (rotateX/rotateY, Perspektive, Rundungen) — die Überschläge sind Augenwechsel im
+// 80-ms-Takt, der Sprung eine reine Verschiebung; Flächen, Ränder und Augen sind harte Rechtecke (Palette).
 const WUERFEL_AUGEN = { 1: [4], 2: [0, 8], 3: [0, 4, 8], 4: [0, 2, 6, 8], 5: [0, 2, 4, 6, 8], 6: [0, 2, 3, 5, 6, 8] };
-// Seite → Drehung des Würfels, die sie nach vorn bringt (Grad, x/y).
-const WUERFEL_LAGE = { 1: [0, 0], 6: [0, 180], 3: [0, -90], 4: [0, 90], 5: [-90, 0], 2: [90, 0] };
-const WUERFEL_SEITEN = [
-  ['vorn', 1], ['hinten', 6], ['rechts', 3], ['links', 4], ['oben', 5], ['unten', 2],
-];
 function RollenderWuerfel({ rollt }) {
   const ruhig = typeof window !== 'undefined' && window.matchMedia
     && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-  const [wurf, setWurf] = useState({ x: 0, y: 0, n: 0, zahl: 5 });
+  const [wurf, setWurf] = useState({ n: 0, zahl: 5 });
   useEffect(() => {
     if (!rollt || ruhig) return;
-    const werfen = () => setWurf(w => {
-      let zahl = 1 + Math.floor(Math.random() * 6);
-      if (zahl === w.zahl) zahl = (zahl % 6) + 1;      // jedes Mal eine andere Zahl
-      const [zx, zy] = WUERFEL_LAGE[zahl];
-      // Immer vorwärts drehen: zur nächsten vollen Umdrehung aufrunden,
-      // ein bis zwei Extra-Überschläge je Achse, dann die Ziellage.
-      const weiter = (alt, ziel, extra) => Math.ceil(alt / 360) * 360 + extra * 360 + ziel;
-      return {
-        x: weiter(w.x, zx, 1 + Math.floor(Math.random() * 2)),
-        y: weiter(w.y, zy, 1 + Math.floor(Math.random() * 2)),
-        n: w.n + 1, zahl,
-      };
-    });
+    let timers = [], letzte = 0;
+    const werfen = () => {
+      timers.forEach(clearTimeout); timers = [];
+      setWurf(w => {
+        let zahl = 1 + Math.floor(Math.random() * 6);
+        if (zahl === w.zahl) zahl = (zahl % 6) + 1;      // jedes Mal eine andere Zahl
+        letzte = zahl;
+        return { n: w.n + 1, zahl: 1 + Math.floor(Math.random() * 6) };
+      });
+      // Flug: drei wechselnde Zahlen, dann die Ziel-Zahl (ein Bild je 80 ms)
+      for (let k = 1; k <= 3; k++) timers.push(setTimeout(() => setWurf(w => ({ n: w.n, zahl: k < 3 ? 1 + Math.floor(Math.random() * 6) : (letzte || w.zahl) })), 80 * k));
+    };
     werfen();
-    // v1409 (Al 25.9.): drastisch schneller — ein Wurf alle 0,4 s; Flug-
-    // und Sprungdauer in style.css (.vscpu-wuerfel / vscpuSprung) passen dazu.
+    // v1409 (Al 25.9.): drastisch schneller — ein Wurf alle 0,4 s; Sprungdauer in style.css (.vscpu-wuerfel-sprung / vscpuSprung) passt dazu.
     const iv = setInterval(werfen, 400);
-    return () => clearInterval(iv);
+    return () => { clearInterval(iv); timers.forEach(clearTimeout); };
   }, [rollt, ruhig]);
   return (
     <span className="vscpu-wuerfel-buehne" aria-hidden="true">
       <span key={wurf.n} className={'vscpu-wuerfel-sprung' + (wurf.n > 0 ? ' vscpu-wuerfel-sprung--an' : '')}>
-        <span className="vscpu-wuerfel" style={{ transform: `rotateX(${wurf.x}deg) rotateY(${wurf.y}deg)` }}>
-          {WUERFEL_SEITEN.map(([seite, zahl]) => (
-            <span key={seite} className={'vscpu-wuerfel-seite vscpu-wuerfel-' + seite}>
-              {Array.from({ length: 9 }, (_, i) => (
-                <i key={i} className={WUERFEL_AUGEN[zahl].includes(i) ? 'an' : ''} />
-              ))}
-            </span>
+        <span className={'vscpu-wuerfel vscpu-wuerfel-z' + wurf.zahl}>
+          {Array.from({ length: 9 }, (_, i) => (
+            <i key={i} className={WUERFEL_AUGEN[wurf.zahl].includes(i) ? 'an' : ''} />
           ))}
         </span>
       </span>

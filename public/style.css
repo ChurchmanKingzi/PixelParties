@@ -2281,10 +2281,12 @@ select optgroup {
   71.2% { opacity: .68; }
   72.2% { opacity: 0; }
 }
+/* ★ W86u2 (Pixelart): nur Verschiebung. Die Neigung (`--mr`, ±1–4°) faellt weg: die Pixel-Pipeline rastet animierte Drehungen auf 15°-Stufen,
+   die Neigung war damit unsichtbar — kostete aber je Figur ein neu gesampeltes Drehsprite (9 grosse Bilder im Titelbild). */
 @keyframes ab-floaty {
-  0%   { transform: translate(0,0) rotate(0deg); }
-  50%  { transform: translate(calc(var(--mx,calc(var(--abw,1vw) * 0)) * var(--pf,1)), calc(var(--my,calc(var(--abh,1vh) * -0.926)) * var(--pf,1))) rotate(calc(var(--mr,0deg) * var(--pf,1))); }
-  100% { transform: translate(0,0) rotate(0deg); }
+  0%   { transform: translate(0,0); }
+  50%  { transform: translate(calc(var(--mx,calc(var(--abw,1vw) * 0)) * var(--pf,1)), calc(var(--my,calc(var(--abh,1vh) * -0.926)) * var(--pf,1))); }
+  100% { transform: translate(0,0); }
 }
 @keyframes ab-jiggleTether {
   0%, 100% { transform: translate(0, 0); }
@@ -2920,9 +2922,12 @@ body:has(.pz-layout) .pp-bg-particles { display: none; }
   content: '';
   position: absolute;
   top: 0; left: -100%; right: -100%; bottom: 0;
-  background: linear-gradient(90deg, transparent 0%, rgba(255,255,255,.3) 50%, transparent 100%);
+  /* ★ W86u2 (Pixelart): harter Streifen mit Schachbrett-Dither (50 % der Punkte) statt Verlauf mit Alpha .3. */
+  background: linear-gradient(90deg, transparent 0 40%, #ffffff 40% 60%, transparent 60% 100%);
   background-size: 50% 100%;
-  animation: badgeShine 3s ease-in-out infinite;
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='4' height='4' shape-rendering='crispEdges'%3E%3Crect width='2' height='2'/%3E%3Crect x='2' y='2' width='2' height='2'/%3E%3C/svg%3E") 0 0 / 4px 4px;
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='4' height='4' shape-rendering='crispEdges'%3E%3Crect width='2' height='2'/%3E%3Crect x='2' y='2' width='2' height='2'/%3E%3C/svg%3E") 0 0 / 4px 4px;
+  animation: badgeShine 3s steps(24, end) infinite;
 }
 
 .profile-section {
@@ -13668,7 +13673,8 @@ body:has(.modal-overlay) { --pz-tooltip-z: 10086; }
   inset: -3px;
   border-radius: 8px;
   border: 2px solid transparent;
-  background: linear-gradient(135deg, transparent 30%, rgba(255,248,232,.4) 45%, rgba(250,213,74,.6) 50%, rgba(255,248,232,.4) 55%, transparent 70%) border-box;
+  /* ★ W86u2 (Pixelart): harter Streifen (Licht-Gold-Licht) statt weichem Verlauf mit Alpha. */
+  background: linear-gradient(135deg, transparent 0 38%, #f7f7ad 38% 45%, #fad54a 45% 55%, #f7f7ad 55% 62%, transparent 62% 100%) border-box;
   background-size: 300% 300%;
   -webkit-mask: linear-gradient(#000 0 0) padding-box, linear-gradient(#000 0 0);
   -webkit-mask-composite: xor;
@@ -13727,7 +13733,8 @@ body:has(.modal-overlay) { --pz-tooltip-z: 10086; }
   inset: -3px;
   border-radius: 8px;
   border: 2px solid transparent;
-  background: linear-gradient(120deg, #1aedff, #4580f6, #a952ff, #fb1ea9, #a952ff, #4580f6, #1aedff) border-box;
+  /* ★ W86u2 (Pixelart): harte Farbbaender statt stufenlosem Verlauf (Treppenkante, keine Mischfarben). */
+  background: linear-gradient(120deg, #1aedff 0 14.3%, #4580f6 14.3% 28.6%, #a952ff 28.6% 42.9%, #fb1ea9 42.9% 57.1%, #a952ff 57.1% 71.4%, #4580f6 71.4% 85.7%, #1aedff 85.7% 100%) border-box;
   background-size: 200% 100%;
   -webkit-mask: linear-gradient(#000 0 0) padding-box, linear-gradient(#000 0 0);
   -webkit-mask-composite: xor;
@@ -23302,10 +23309,10 @@ body.pp-dialog-offen .foil-diamond-rare:not(.modal-overlay *):not(.card-tooltip 
 .vscpu-zufall { position: relative; overflow: hidden; background: #08060c; }
 .vscpu-zufall-portrait {
   position: absolute; inset: 0;
-  filter: brightness(.42) saturate(.55) blur(1.2px);
-  animation: vscpuWalze .28s ease-out both;
+  filter: brightness(.42) saturate(.55);   /* ★ W86u2: kein blur() (Pixelart) */
+  animation: vscpuWalze .28s steps(4, end) both;
 }
-.vscpu-zufall--schnell .vscpu-zufall-portrait { animation-duration: .1s; filter: brightness(.5) saturate(.7) blur(2px); }
+.vscpu-zufall--schnell .vscpu-zufall-portrait { animation-duration: .1s; filter: brightness(.5) saturate(.7); }
 @keyframes vscpuWalze {
   0%   { transform: translateY(-18%); opacity: .2; }
   100% { transform: translateY(0); opacity: 1; }
@@ -23313,62 +23320,44 @@ body.pp-dialog-offen .foil-diamond-rare:not(.modal-overlay *):not(.card-tooltip 
 .vscpu-zufall-frage {
   position: absolute; left: 50%; top: 50%; z-index: 1;
   font-size: 58px; line-height: 1; color: #fad54a;
-  text-shadow: 0 0 14px rgba(255,198,28,.85), 0 0 30px rgba(249,172,32,.45), 4px 4px 0 rgba(0,0,0,.8);
+  /* ★ W86u2 (Pixelart): harte Kontur statt Schein; das Wippen ist eine Verschiebung in zwei harten Stufen (keine stufenlose Skalierung des Textes). */
+  text-shadow: 2px 0 0 #72541d, -2px 0 0 #72541d, 0 2px 0 #72541d, 0 -2px 0 #72541d, 4px 4px 0 rgba(0,0,0,.8);
   transform: translate(-50%, -50%);
-  animation: vscpuFrage 2.4s ease-in-out infinite;
+  animation: vscpuFrage 2.4s steps(1, end) infinite;
 }
 @keyframes vscpuFrage {
-  0%, 100% { transform: translate(-50%, -50%) scale(1); }
-  50%      { transform: translate(-50%, -56%) scale(1.06); }
+  0%, 49% { transform: translate(-50%, -50%); }
+  50%, 100% { transform: translate(-50%, calc(-50% - 4px)); }
 }
-/* ── v1408: echter 3D-Würfel (Al 25.9.) ── */
+/* ── v1408: Würfel (Al 25.9.); W86u2 (Pixelart): flacher Pixelwürfel, kein 3D ── */
 .vscpu-wuerfel-buehne {
   --w: 30px;
   position: absolute; right: 12px; top: 10px; z-index: 1;
   width: var(--w); height: var(--w);
-  perspective: 240px;
-  filter: drop-shadow(2px 3px 0 rgba(0,0,0,.6));
+  filter: drop-shadow(2px 2px 0 rgba(0,0,0,.6));   /* pp-ok: blur (harter Versatzschatten) */
 }
-/* feste Schräglage, damit man immer drei Seiten sieht */
-.vscpu-wuerfel-sprung {
-  position: absolute; inset: 0; transform-style: preserve-3d;
-  transform: rotateX(-22deg) rotateY(28deg);
-}
-/* jeder Wurf: hochspringen, aufschlagen, nachfedern */
-.vscpu-wuerfel-sprung--an { animation: vscpuSprung .34s cubic-bezier(.3,.7,.4,1) both; }
+.vscpu-wuerfel-sprung { position: absolute; inset: 0; }
+/* jeder Wurf: hochspringen, aufschlagen, nachfedern — nur Verschiebung, in harten Stufen */
+.vscpu-wuerfel-sprung--an { animation: vscpuSprung .34s steps(1, end) both; }
 @keyframes vscpuSprung {
-  0%   { transform: translateY(0)     rotateX(-22deg) rotateY(28deg) scale(1); }
-  30%  { transform: translateY(-16px) rotateX(-22deg) rotateY(28deg) scale(1.12); }
-  62%  { transform: translateY(0)     rotateX(-22deg) rotateY(28deg) scale(1.05, .92); }
-  78%  { transform: translateY(-4px)  rotateX(-22deg) rotateY(28deg) scale(1.02); }
-  100% { transform: translateY(0)     rotateX(-22deg) rotateY(28deg) scale(1); }
+  0%   { transform: translateY(0); }
+  15%  { transform: translateY(-10px); }
+  30%  { transform: translateY(-16px); }
+  50%  { transform: translateY(-8px); }
+  62%  { transform: translateY(0); }
+  78%  { transform: translateY(-4px); }
+  100% { transform: translateY(0); }
 }
 .vscpu-wuerfel {
-  position: absolute; inset: 0; transform-style: preserve-3d;
-  transition: transform .3s cubic-bezier(.2,.75,.25,1);   /* v1409: passend zum 0,4-s-Takt */
-}
-.vscpu-wuerfel-seite {
   position: absolute; inset: 0;
-  display: grid; grid-template: repeat(3, 1fr) / repeat(3, 1fr);
-  padding: 4px; gap: 1px;
-  background: linear-gradient(145deg, #ffffff, #e2d8cb);
-  border: 2px solid #282834; border-radius: 5px;
-  box-shadow: inset -2px -2px 0 rgba(0,0,0,.12), inset 2px 2px 0 rgba(255,255,255,.7);
-  backface-visibility: hidden;
+  display: grid; grid-template: repeat(3, 6px) / repeat(3, 6px); gap: 2px; justify-content: center; align-content: center;
+  background: #ffffff;
+  border: 2px solid #282834; border-radius: 0;
+  box-shadow: inset -2px -2px 0 #e2d8cb;
 }
-.vscpu-wuerfel-seite i { display: block; border-radius: 50%; }
-.vscpu-wuerfel-seite i.an { background: #282834; margin: 1px; }
-.vscpu-wuerfel-vorn i.an { background: #e92f38; }   /* die Eins in Rot, wie beim echten Würfel */
-.vscpu-wuerfel-vorn   { transform: translateZ(calc(var(--w) / 2)); }
-.vscpu-wuerfel-hinten { transform: rotateY(180deg) translateZ(calc(var(--w) / 2)); }
-.vscpu-wuerfel-rechts { transform: rotateY(90deg) translateZ(calc(var(--w) / 2)); }
-.vscpu-wuerfel-links  { transform: rotateY(-90deg) translateZ(calc(var(--w) / 2)); }
-.vscpu-wuerfel-oben   { transform: rotateX(90deg) translateZ(calc(var(--w) / 2)); }
-.vscpu-wuerfel-unten  { transform: rotateX(-90deg) translateZ(calc(var(--w) / 2)); }
-@media (prefers-reduced-motion: reduce) {
-  .vscpu-wuerfel-sprung--an { animation: none; }
-  .vscpu-wuerfel { transition: none; }
-}
+.vscpu-wuerfel i { display: block; }
+.vscpu-wuerfel i.an { background: #282834; }
+.vscpu-wuerfel-z1 i.an { background: #e92f38; }   /* die Eins in Rot, wie beim echten Würfel */
 @media (prefers-reduced-motion: reduce) {
   .vscpu-zufall-portrait, .vscpu-zufall-frage { animation: none; }
 }

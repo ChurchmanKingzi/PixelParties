@@ -157,9 +157,6 @@
  "jsxkf:app-board:yukiStreak": {
   "drehung": 2
  },
- "kf:ab-floaty": {
-  "drehung": 1
- },
  "kf:abilityBoltBounce": {
   "drehung": 2
  },
@@ -758,9 +755,6 @@
  },
  "kf:treacherousCrystalPulse": {
   "blur": 2
- },
- "kf:vscpuSprung": {
-  "drehung": 10
  },
  "kf:waflavEvoFlash": {
   "drehung": 3

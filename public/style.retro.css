@@ -1260,10 +1260,12 @@ select optgroup { background: var(--bg); color: var(--text); }
   71.2% { opacity: .68; }
   72.2% { opacity: 0; }
 }
+/* ★ W86u2 (Pixelart): nur Verschiebung. Die Neigung (`--mr`, ±1–4°) faellt weg: die Pixel-Pipeline rastet animierte Drehungen auf 15°-Stufen,
+   die Neigung war damit unsichtbar — kostete aber je Figur ein neu gesampeltes Drehsprite (9 grosse Bilder im Titelbild). */
 @keyframes ab-floaty {
-  0%   { transform: translate(0,0) rotate(0deg); }
-  50%  { transform: translate(calc(var(--mx,calc(var(--abw,1vw) * 0)) * var(--pf,1)), calc(var(--my,calc(var(--abh,1vh) * -0.926)) * var(--pf,1))) rotate(calc(var(--mr,0deg) * var(--pf,1))); }
-  100% { transform: translate(0,0) rotate(0deg); }
+  0%   { transform: translate(0,0); }
+  50%  { transform: translate(calc(var(--mx,calc(var(--abw,1vw) * 0)) * var(--pf,1)), calc(var(--my,calc(var(--abh,1vh) * -0.926)) * var(--pf,1))); }
+  100% { transform: translate(0,0); }
 }
 @keyframes ab-jiggleTether {
   0%, 100% { transform: translate(0, 0); }
@@ -6734,7 +6736,7 @@ body:has(.modal-overlay) { --pz-tooltip-z: 10086; }
 .shop-item { background: var(--bg2); border: 2px solid var(--bg4); border-radius: 0; overflow: hidden; transition: border-color .15s steps(4, end),box-shadow .15s steps(4, end),transform .15s steps(4, end); display: flex; flex-direction: column; align-items: center; padding-bottom: 8px; }
 .shop-item:hover { border-color: var(--accent); box-shadow: 0 3px 0 0 #000000; }
 .shop-item.shop-owned { border-color: #fad54a; border-width: 3px; box-shadow: 0 0 0 2px #72541d; position: relative; overflow: visible; }
-.shop-item.shop-owned::before { content: ''; position: absolute; inset: -3px; border-radius: 0; border: 2px solid transparent; background: linear-gradient(135deg, transparent 30% 70%) border-box; background-size: 300% 300%; -webkit-mask: linear-gradient(#000000 0 0) padding-box, linear-gradient(#000000 0 0); -webkit-mask-composite: xor; mask-composite: exclude; animation: shop-owned-shine 3s steps(24, end) infinite; pointer-events: none; }
+.shop-item.shop-owned::before { content: ''; position: absolute; inset: -3px; border-radius: 0; border: 2px solid transparent; background: linear-gradient(135deg, transparent 0% 38%, #f7f7ad 38% 45%, #fad54a 45% 55%, #f7f7ad 55% 62%, transparent 62% 100%) border-box; background-size: 300% 300%; -webkit-mask: linear-gradient(#000000 0 0) padding-box, linear-gradient(#000000 0 0); -webkit-mask-composite: xor; mask-composite: exclude; animation: shop-owned-shine 3s steps(24, end) infinite; pointer-events: none; }
 @keyframes shop-owned-shine {
   0% { background-position: 100% 100%; }
   100% { background-position: -100% -100%; }
@@ -6758,7 +6760,7 @@ body:has(.modal-overlay) { --pz-tooltip-z: 10086; }
    - .structure-deck-default → owned default deck (not flagged .shop-owned)
    - .shop-selected       → clicked, the gold selection highlight takes over */
 .shop-item:not(.shop-owned):not(.structure-deck-default):not(.shop-selected) { position: relative; border-color: transparent; overflow: visible; animation: shop-unowned-glow 3s steps(24, end) infinite; }
-.shop-item:not(.shop-owned):not(.structure-deck-default):not(.shop-selected)::before { content: ''; position: absolute; inset: -3px; border-radius: 0; border: 2px solid transparent; background: linear-gradient(120deg, #1aedff 0% 1.85%, #6be9fa 1.85% 3.7%, #07aec5 3.7% 5.56%, #66b6ff 5.56% 14.81%, #2f539d 14.81% 16.67%, #ba74ff 16.67% 26.67%, #903ae6 26.67% 41.67%, #fb1ea9 41.67% 58.33%, #903ae6 58.33% 73.33%, #ba74ff 73.33% 83.33%, #2f539d 83.33% 85.19%, #66b6ff 85.19% 94.44%, #07aec5 94.44% 96.3%, #6be9fa 96.3% 98.15%, #1aedff 98.15% 100%) border-box; background-size: 200% 100%; -webkit-mask: linear-gradient(#000000 0 0) padding-box, linear-gradient(#000000 0 0); -webkit-mask-composite: xor; mask-composite: exclude; pointer-events: none; }
+.shop-item:not(.shop-owned):not(.structure-deck-default):not(.shop-selected)::before { content: ''; position: absolute; inset: -3px; border-radius: 0; border: 2px solid transparent; background: linear-gradient(120deg, #1aedff 0% 14.3%, #2f539d 14.3% 28.6%, #903ae6 28.6% 42.9%, #fb1ea9 42.9% 57.1%, #903ae6 57.1% 71.4%, #2f539d 71.4% 85.7%, #1aedff 85.7% 100%) border-box; background-size: 200% 100%; -webkit-mask: linear-gradient(#000000 0 0) padding-box, linear-gradient(#000000 0 0); -webkit-mask-composite: xor; mask-composite: exclude; pointer-events: none; }
 @keyframes shop-unowned-glow {
   0%, 100% { box-shadow: none; }
   50%      { box-shadow: 0 0 0 2px #7e7d9b, 0 0 0 4px #3e3e51, 0 0 0 6px #3e3e51, 0 0 0 8px #5a023a; }
@@ -11739,45 +11741,35 @@ body.pp-dialog-offen .foil-diamond-rare:not(.modal-overlay *):not(.card-tooltip 
 
 /* ── Zufalls-Kachel: Spielautomat durch die Gegner ── */
 .vscpu-zufall { position: relative; overflow: hidden; background: #08060c; }
-.vscpu-zufall-portrait { position: absolute; inset: 0; filter: brightness(.42) saturate(.55); animation: vscpuWalze .28s steps(7, end) both; }
+.vscpu-zufall-portrait { position: absolute; inset: 0; filter: brightness(.42) saturate(.55); animation: vscpuWalze .28s steps(4, end) both; }
 .vscpu-zufall--schnell .vscpu-zufall-portrait { animation-duration: .1s; filter: brightness(.5) saturate(.7); }
 @keyframes vscpuWalze {
   0%   { transform: translateY(-18%); opacity: .2; }
   100% { transform: translateY(0); opacity: 1; }
 }
-.vscpu-zufall-frage { position: absolute; left: 50%; top: 50%; z-index: 1; font-size: 58px; line-height: 1; color: #fad54a; text-shadow: 1px 1px 0 #3a2412, 4px 4px 0 #000000; transform: translate(-50%, -50%); animation: vscpuFrage 2.4s steps(24, end) infinite; }
+.vscpu-zufall-frage { position: absolute; left: 50%; top: 50%; z-index: 1; font-size: 58px; line-height: 1; color: #fad54a; text-shadow: 2px 0 0 #72541d, -2px 0 0 #72541d; transform: translate(-50%, -50%); animation: vscpuFrage 2.4s steps(1, end) infinite; }
 @keyframes vscpuFrage {
-  0%, 100% { transform: translate(-50%, -50%) scale(1); }
-  50%      { transform: translate(-50%, -56%) scale(1.06); }
+  0%, 49% { transform: translate(-50%, -50%); }
+  50%, 100% { transform: translate(-50%, calc(-50% - 4px)); }
 }
-/* ── v1408: echter 3D-Würfel (Al 25.9.) ── */
-.vscpu-wuerfel-buehne { --w: 30px; position: absolute; right: 12px; top: 10px; z-index: 1; width: var(--w); height: var(--w); perspective: 240px; filter: drop-shadow(2px 4px 0 #000000); }
-/* feste Schräglage, damit man immer drei Seiten sieht */
-.vscpu-wuerfel-sprung { position: absolute; inset: 0; transform-style: preserve-3d; transform: rotateX(-22deg) rotateY(28deg); }
-/* jeder Wurf: hochspringen, aufschlagen, nachfedern */
-.vscpu-wuerfel-sprung--an { animation: vscpuSprung .34s steps(8, end) both; }
+/* ── v1408: Würfel (Al 25.9.); W86u2 (Pixelart): flacher Pixelwürfel, kein 3D ── */
+.vscpu-wuerfel-buehne { --w: 30px; position: absolute; right: 12px; top: 10px; z-index: 1; width: var(--w); height: var(--w); filter: drop-shadow(2px 2px 0 #000000); }
+.vscpu-wuerfel-sprung { position: absolute; inset: 0; }
+/* jeder Wurf: hochspringen, aufschlagen, nachfedern — nur Verschiebung, in harten Stufen */
+.vscpu-wuerfel-sprung--an { animation: vscpuSprung .34s steps(1, end) both; }
 @keyframes vscpuSprung {
-  0%   { transform: translateY(0)     rotateX(-22deg) rotateY(28deg) scale(1); }
-  30%  { transform: translateY(-16px) rotateX(-22deg) rotateY(28deg) scale(1.12); }
-  62%  { transform: translateY(0)     rotateX(-22deg) rotateY(28deg) scale(1.05, .92); }
-  78%  { transform: translateY(-4px)  rotateX(-22deg) rotateY(28deg) scale(1.02); }
-  100% { transform: translateY(0)     rotateX(-22deg) rotateY(28deg) scale(1); }
+  0%   { transform: translateY(0); }
+  15%  { transform: translateY(-10px); }
+  30%  { transform: translateY(-16px); }
+  50%  { transform: translateY(-8px); }
+  62%  { transform: translateY(0); }
+  78%  { transform: translateY(-4px); }
+  100% { transform: translateY(0); }
 }
-.vscpu-wuerfel { position: absolute; inset: 0; transform-style: preserve-3d; transition: transform .3s steps(7, end); }
-.vscpu-wuerfel-seite { position: absolute; inset: 0; display: grid; grid-template: repeat(3, 1fr) / repeat(3, 1fr); padding: 4px; gap: 1px; background: linear-gradient(145deg, #ffffff 0% 100%); border: 2px solid #1a1a2e; border-radius: 0; box-shadow: inset -2px -2px 0 0 #08060c, inset 2px 2px 0 0 #d2d2db; backface-visibility: hidden; }
-.vscpu-wuerfel-seite i { display: block; border-radius: 0; }
-.vscpu-wuerfel-seite i.an { background: #1a1a2e; margin: 1px; }
-.vscpu-wuerfel-vorn i.an { background: #e92f38; }   /* die Eins in Rot, wie beim echten Würfel */
-.vscpu-wuerfel-vorn   { transform: translateZ(calc(var(--w) / 2)); }
-.vscpu-wuerfel-hinten { transform: rotateY(180deg) translateZ(calc(var(--w) / 2)); }
-.vscpu-wuerfel-rechts { transform: rotateY(90deg) translateZ(calc(var(--w) / 2)); }
-.vscpu-wuerfel-links  { transform: rotateY(-90deg) translateZ(calc(var(--w) / 2)); }
-.vscpu-wuerfel-oben   { transform: rotateX(90deg) translateZ(calc(var(--w) / 2)); }
-.vscpu-wuerfel-unten  { transform: rotateX(-90deg) translateZ(calc(var(--w) / 2)); }
-@media (prefers-reduced-motion: reduce) {
-  .vscpu-wuerfel-sprung--an { animation: none; }
-  .vscpu-wuerfel { transition: none; }
-}
+.vscpu-wuerfel { position: absolute; inset: 0; display: grid; grid-template: repeat(3, 6px) / repeat(3, 6px); gap: 2px; justify-content: center; align-content: center; background: #ffffff; border: 2px solid #1a1a2e; border-radius: 0; box-shadow: inset -2px -2px 0 0 #d2d2db; }
+.vscpu-wuerfel i { display: block; }
+.vscpu-wuerfel i.an { background: #1a1a2e; }
+.vscpu-wuerfel-z1 i.an { background: #e92f38; }   /* die Eins in Rot, wie beim echten Würfel */
 @media (prefers-reduced-motion: reduce) {
   .vscpu-zufall-portrait, .vscpu-zufall-frage { animation: none; }
 }
