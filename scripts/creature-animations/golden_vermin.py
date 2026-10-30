@@ -21,9 +21,9 @@ Ablauf (48 Frames à 65 ms = 3,12 s, nahtlos):
 * Schwanzschlag: der eingerollte Schwanz und der Körperfuß (Zeilen 9–14) schwingen seitlich (Zeilenversatz wächst nach unten, bis ±1 px, Periode 16, Nachlauf); Frame 0 = Quellform.
 * Goldglanz (Regel 14: Gold): zweimal pro Schleife (Frames 4–13 und 28–37) zieht ein schmales diagonales Lichtband über das Gold (eine Stufe heller auf der Gold-Rampe B→C→E→G, nur Innenpixel);
   dazu blitzen vierzackige Glitzersterne an vier Lichtpunkten (4,1), (7,9), (13,10), (6,13) auf (5 Frames Lauf, wachsen/schrumpfen). Umriss, schwarzer Fleck und Randpixel glänzen nicht.
-* Goldstaub (Partikel): sechs runde Wölkchen (2×2 → 4×4 → 2×2, nie einzelne Punkte; Farben C und B des Sprites) steigen in den leeren Ecken des Sprite-Rechtecks langsam auf.
+* Goldstaub (Partikel): vier runde Wölkchen (2×2 → 4×4 → 2×2, nie einzelne Punkte; Farben C und B des Sprites) steigen rechts und links neben dem Sprite langsam auf, so dass sie sich nicht mit dem Gold der Figur vermischen.
 * Keine Augeneffekte: die Augen sind im Sprite nicht eindeutig (kein Blinzeln).
-Frame: Sprite plus 3 px links/rechts, 4 px oben (Strecken + Sterne), 3 px unten (Stern am Schwanz) — Figur zentriert; Sterne und Wölkchen liegen in der 2-px-Zone um die Figur.
+Frame: Sprite plus 5 px links/rechts (Goldstaub), 4 px oben (Strecken + Sterne), 3 px unten (Stern am Schwanz) — Figur zentriert; Sterne und Wölkchen liegen in der 2-px-Zone um die Figur.
 Alle Bewegungen laufen auf der vollen Leinwand (anim_lib/anim_amorph werfen ClipError). Nur ganze Pixel, nur Farben der Quelle.
 """
 import math
@@ -36,7 +36,7 @@ import anim_lib as L
 import anim_amorph as A
 
 N, MS = 48, 65
-PAD_L, PAD_R, PAD_T, PAD_B = 3, 3, 4, 3
+PAD_L, PAD_R, PAD_T, PAD_B = 5, 5, 4, 3
 
 spr = L.lade('golden-vermin')
 sh, sw = spr.shape[:2]
@@ -85,10 +85,10 @@ def zeilen_dx(i):
     return out
 
 
-# ── Wölkchen (nur 2×2 / 4×4) in den leeren Ecken des Sprite-Rechtecks: rechts oben und links unten ──
+# ── Wölkchen (nur 2×2 / 4×4) rechts und links neben dem Sprite ──
 WOLKEN = [
-    dict(x=11, y=5, vx=1, vy=-4, off=0), dict(x=12, y=7, vx=-1, vy=-4, off=8), dict(x=10, y=4, vx=1, vy=-4, off=16),
-    dict(x=2, y=13, vx=-1, vy=-4, off=4), dict(x=1, y=11, vx=1, vy=-4, off=12), dict(x=3, y=12, vx=-1, vy=-4, off=20),
+    dict(x=16, y=11, vx=1, vy=-6, off=0), dict(x=16, y=9, vx=-1, vy=-6, off=12),
+    dict(x=-1, y=12, vx=-1, vy=-6, off=6), dict(x=-1, y=10, vx=1, vy=-6, off=18),
 ]
 
 
