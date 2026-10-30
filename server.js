@@ -16985,6 +16985,10 @@ io.on('connection', (socket) => {
     // sie brauchen den Riegel eigens — Als Befund 5.8.: waehrend Ambush
     // aufloeste, liess sich per Spam-Klick eine Waflav-Form ascenden.
     if (gs._chainResolvingLock || gs._forceDiscardLock === pi) return;
+    // Ein Aufstieg laeuft bis zum Ende seiner Aufloesung (Bonus-Auswahl, Reaktionsfenster, Trample Sounds …) — ein zweiter Befehl in dieser Zeit
+    // (Doppeltipp, ruckelndes Handy) startete eine ZWEITE Aufloesung: Bonus und Reaktion doppelt, und der Handindex der zweiten Karte zeigte
+    // nach dem ersten Spleiss auf eine andere Handkarte, die verschwand (Tutorial 7: Flame Avalanche).
+    if (gs._aufstiegLaeuft) return;
     // Als Vorgabe 29.9.: `heroOwner` = Spalte des Helden. Ein geliehener
     // Held (Gegnerspalte) darf aufsteigen, solange `pi` ihn kontrolliert;
     // ein eigener Held, den gerade der Gegner kontrolliert, nicht.
@@ -16992,6 +16996,7 @@ io.on('connection', (socket) => {
     const _aufHeld = gs.players[hs]?.heroes?.[heroIdx];
     if (!_aufHeld?.name || room.engine.heroSideOf(hs, _aufHeld) !== pi) return;
     // Perform ascension via engine
+    gs._aufstiegLaeuft = true;
     try {
       const result = await room.engine.performAscension(pi, heroIdx, cardName, handIndex, { fromCreation, heroOwner: hs });
       if (!result.success) return;
@@ -17005,6 +17010,8 @@ io.on('connection', (socket) => {
       }
     } catch (err) {
       console.error('[Engine] ascend_hero error:', err.message, err.stack);
+    } finally {
+      gs._aufstiegLaeuft = false;
     }
     for (let i = 0; i < roomPlayerCount(room); i++) sendGameState(room, i);
     sendSpectatorGameState(room);
