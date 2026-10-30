@@ -25,7 +25,9 @@ Ablauf (48 Frames à 70 ms = 3,36 s; Frame 0 = Original, Blasen ausgenommen):
 * Das nachschleppende Binden-Ende rechts unten wellt sich: die Spitze (x ≥ 16) hebt/senkt sich ±1 px (Periode 12, hängt dabei immer am Ende fest).
 * Blinzeln (Lid = Binden-Farbe (13,16,49)): große Auge zuerst oben, dann ganz zu, kleines Auge zu; zweimal (Frame 19–21 und 42–44).
 * Blick: beide Augen wandern 1 px in der Höhle (Frame 4–9 nach links, 25–31 nach rechts); der frei gewordene Platz wird zur Augenhöhle (0,0,0) bzw. zu Binde (13,16,49).
-* Blasen (Partikel, hinter der Figur, 4 Stück, Lebensdauer 48 Frames, langsam aufsteigend, leichtes Wabern): runde Teal-Blasen, 2×2 → 3×3 → 2×2 (nie ein einzelner Punkt), Kern (77,137,154), Rand (51,93,119); `U.wolke_ebene`.
+* Partikel (hinter der Figur; die Figur füllt ihr Feld fast ganz, deshalb gibt es nur zwei freie Bahnen, in denen sie in JEDER Pose ≥ 2 px Abstand halten und nie verdeckt werden — per Skript über alle 48 Frames geprüft):
+  – Blase links oben neben dem Kopf, steigt 7 px auf (Lebensdauer 24 Frames, zweimal pro Schleife), runde Teal-Wolke 2×2 → 3×3 → 2×2 (nie ein Einzelpixel), Kern (77,137,154), Rand (51,93,119); `U.wolke_ebene`.
+  – Staubflöckchen rechts unten neben dem nachschleppenden Binden-Ende: zwei 2×2-Flöckchen (gleiche Farben), sinken je 8 px (Lebensdauer 24 Frames, um 12 Frames versetzt, 4 px Abstand zueinander); eigene Hilfsfunktion `_staub` (bleibt 2×2).
 Kein Glanz (Regel 14: Binden/Stoff), kein Feuer (Regel 15). Randpixel-Test (Regel 16): `U.kontur_schliessen` (Umrissfarbe (13,16,49)) in jeder Pose; im Ruhebild nichts. Keine gemalten Pixel außer den Farben der Quelle.
 Zuschnitt: der Frame ist auf die Figur zugeschnitten (symmetrisch um die Ruhefigur; Blasen vergrößern ihn höchstens 2 px darüber hinaus, dazu 1 px leerer Rand). Alle Bewegungen laufen auf der vollen
 Leinwand (anim_lib wirft ClipError). Nur ganze Pixel.
