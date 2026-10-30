@@ -1,9 +1,9 @@
 # -*- coding: utf-8 -*-
-"""Idle-Animation für „Skeleton Necromancer“ (Creature) — Fassung 3 (Loch im Boden mit Arm, kein Knochenglanz).
+"""Idle-Animation für „Skeleton Necromancer“ (Creature) — Fassung 4 (stehende Figur am Loch im Boden mit Arm, kein Knochenglanz).
 
 Quelle: src/skeleton-necromancer.png — Ebene „Skeleton Necromancer“ (20×34 px, 15 Farben) aus Motive.xcf.
 PICK: [["Motive", 813, 1], ["Motive", 813, 2]]
-  Figur 1 = Kapuzenfigur mit Rippenring (schwebt), Figur 2 = LOCH IM BODEN, aus dem ein ARM ragt (Kartenbild: schwarze Raute am Boden, darin ein
+  Figur 1 = Kapuzenfigur mit Rippenring (steht, Standlinie = Ringunterkante), Figur 2 = LOCH IM BODEN, aus dem ein ARM ragt (Kartenbild: schwarze Raute am Boden, darin ein
   Knochenarm mit Faust, der nach oben zeigt). Gleiche Ebene, Mittelachse, 2 px unter dem Rippenring; der lila Grabkreuz-Hintergrund der Karte ist nicht Teil der Ebene.
 
 Aufruf:   python3 skeleton_necromancer.py [--preview <ordner>]
@@ -22,9 +22,11 @@ Was ist was (Koordinaten im Sprite, x/y):
 Fest bleiben: Gesicht, Robe, alle Knochenpunkte (nur starr mit ihrem Teil), das Loch.
 
 Ablauf (40 Frames à 65 ms = 2,6 s; Frame 0 = Original, Wölkchen ausgenommen):
-* Schweben zweistufig (Periode 40, 0-1-2-1-0 px, nur OBERER Teil): der Rippenring steigt zuerst, Kapuze + Robe + Ärmel folgen 3 Frames später und
-  liegen nie höher als die Brust (der Saum taucht höchstens 1 px über den Ringansatz, nie entsteht ein Spalt).
-* Kapuze atmet (Periode 20): die Zeile y 5 wird einmal eingefügt, die Kuppe hebt sich 1 px.
+* Die Figur STEHT (kein Schweben, keine Gesamtverschiebung): Standlinie = Unterkante des Rippenrings (y 20, die „Füße“ der Figur — der Sprite hat keine
+  Füße; sie bleibt in jedem Frame an derselben Stelle über dem Loch). Atmen (Periode 20) = die Rippenzeile y 16 wird einmal eingefügt: Oberkörper
+  (obere Rippen, Robe, Kapuze, Ärmel) hebt sich 1 px, die untere Rippenhälfte y 17–20 bleibt stehen.
+* Kapuze: die Kuppe atmet 3 Frames später zusätzlich (Zeile y 5 wird einmal eingefügt, Kuppe 1 px höher); die Spitzenzeile y 0 pendelt −1/0/+1 px seitwärts
+  (Periode 40, bleibt an Zeile y 1 hängen).
 * Ärmel-Geste größer und öfter (Periode 20, beide Seiten SYNCHRON und gespiegelt): Spitzen heben sich bis 4 px, dazu flattert eine Welle
   (Periode 10, Spitze hinkt hinterher) mit bis ±1,6 px → insgesamt bis ca. ±5–6 px; Spaltenversatz wächst von der Schulter (x 5 / x 14) zur Hand.
 * ARM aus dem Loch: er reckt sich (Periode 40, 0-1-2-1-0 px, dazu kurze Zuckungen +1 px bei Frame 6–7, 17–18, 31–32; höchstens 3 px): im Arm-Layer
@@ -104,17 +106,23 @@ def stufe2(i):
 
 
 def frame(i):
-    # --- Schweben (oberer Teil): Rippenring (Brust) zuerst, Kapuze + Ärmel 3 Frames später (nie höher als die Brust, höchstens 1 px tiefer) ---
-    r_r = stufe2(i)
-    r_h = max(min(r_r, stufe2(i - 3)), r_r - 1)
-    r_c = U.stufe(i, N / 2, 1)                                   # Kapuze atmet (0/1)
+    # --- Die Figur STEHT am Loch: Standlinie = Unterkante des Rippenrings (y 20), sie bleibt in jedem Frame fest. Atmen = eine Zeile (y 16) im Rippenring
+    #     wird eingefügt, Oberkörper (Rippen oben, Robe, Kapuze, Ärmel) hebt sich um dieses 1 px, die untere Rippenhälfte (y 17–20) bleibt stehen ---
+    r_b = U.stufe(i, N / 2, 1)                                   # Atem (0/1), Periode 20
+    r_c = U.stufe(i - 3, N / 2, 1)                               # Kapuzenspitze atmet 3 Frames später zusätzlich (0/1)
+    tip = U.stufe(i, N, 2, form='sin') - 1                       # Kapuzenspitze (Zeile y 0) pendelt −1/0/+1 px (Periode 40; 0 bei Frame 0)
     hump = U.buckel(i, 0, 20, n=20)                              # Ärmel-Geste (Periode 20), Frame 0 = Ruhe
     ph = L.sinus(i, 10)
     n_arm = min(3, stufe2(i) + (1 if i in ZUCK else 0))          # Arm reckt sich aus dem Loch (0 … 3 px)
     griff = 1 if i in {9, 10, 11, 23, 24, 25, 35, 36, 37} else 0     # Faust öffnet/schließt sich
 
-    hb = L.streck_zeile(teil(haube), PAD_T + 5, r_c)
-    ri = teil(rippen)
+    hb0 = teil(haube)
+    if tip:                                                      # Spitzenzeile y 0 (x 7–12) rutscht um tip nach links/rechts; bleibt an Zeile 1 (x 6–13) hängen
+        zeile = hb0[PAD_T, :, :].copy()
+        hb0[PAD_T, :, :] = 0
+        hb0[PAD_T, PAD_L + tip:PAD_L + sw + tip, :] = zeile[PAD_L:PAD_L + sw, :]
+    hb = L.streck_zeile(hb0, PAD_T + 5, r_c)
+    ri = L.streck_zeile(teil(rippen), PAD_T + 16, r_b)
     al = L.spalten_welle(teil(aermel_l), PAD_L + 5, 1.6 * hump, ph, bias=-4.0 * hump, lauf=1.0, nur_rechts=False)
     ar = L.spalten_welle(teil(aermel_r), PAD_L + 14, 1.6 * hump, ph, bias=-4.0 * hump, lauf=1.0, nur_rechts=True)
     # Loch fest am Boden (mit schwarzer Ergänzung hinter dem Arm), Arm wächst aus dem Loch
@@ -124,7 +132,7 @@ def frame(i):
         lo[PAD_T + y, PAD_L + x, 3] = 255
     am = L.streck_zeile(teil(arm), PAD_T + 26, griff)                     # Faustzeile y 26 wird eingefügt: Faust öffnet sich (1 px höher)
     am = L.streck_zeile(am, PAD_T + 29, n_arm)                            # Unterarmzeile y 29 wird eingefügt: Arm wird länger, Faust steigt
-    koerper = L.zusammen(H, W, [(lo, 0, 0), (am, 0, 0), (ri, 0, -r_r), (hb, 0, -r_h), (al, 0, -r_h), (ar, 0, -r_h)])
+    koerper = L.zusammen(H, W, [(lo, 0, 0), (am, 0, 0), (ri, 0, 0), (hb, 0, -r_b), (al, 0, -r_b), (ar, 0, -r_b)])
     koerper = U.kontur_schliessen(koerper, UMRISS, SCHWARZ)               # Regel 16: Umriss an Ärmeln/Armkanten in jeder Pose geschlossen
     seelen = U.glut_ebene(H, W, i, N, PUFFS, SEELEN)
     return L.zusammen(H, W, [(seelen, 0, 0), (koerper, 0, 0)])

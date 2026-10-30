@@ -72,7 +72,7 @@ def frame(i, partikel=True):
     s_r = np.ones(H)
     for y in range(sh):
         frac = y / (sh - 1.0)
-        for (arr, versatz) in ((s_l, 0.0), (s_r, 0.5)):
+        for (arr, versatz) in ((s_l, 0.0), (s_r, 0.0)):             # links und rechts GLEICH (synchron, spiegelsymmetrisch)
             w0 = (1 - math.cos(-1.1 * frac - versatz)) / 2    # Ruhelage dieser Zeile (Frame 0 → Faktor 1)
             w1 = (1 - math.cos(ph - 1.1 * frac - versatz)) / 2
             arr[PAD_T + y] = min(1.0, 1.0 - 0.5 * (w1 - w0))
@@ -80,12 +80,11 @@ def frame(i, partikel=True):
     # linke Hälfte (x < Achse) und rechte Hälfte getrennt stauchen
     links = fl.copy(); links[:, int(ACHSE):] = 0
     rechts = fl.copy(); rechts[:, :int(ACHSE)] = 0
-    links = F.zeilen_stauchen(links, ACHSE, s_l)
-    rechts = F.zeilen_stauchen(rechts, ACHSE, s_r)
+    links = F.zeilen_stauchen(links, ACHSE, s_l, symmetrisch=True)
+    rechts = F.zeilen_stauchen(rechts, ACHSE, s_r, symmetrisch=True)
     kp = F.ebene(spr, koerper, H, W, PAD_L, PAD_T)
     f = L.zusammen(H, W, [(links, 0, 0), (rechts, 0, 0), (kp, 0, 0)])
-    # Seitenwippe der ganzen Figur, dann heben
-    f = F.spalten_kippen(f, ACHSE, 1.3, L.sinus(i, N / 2), maxd=11)
+    # nur senkrechtes Heben der ganzen Figur (symmetrisch) — keine Seitenwippe
     f = L.versetze(f, 0, bob)
     # Randpixel-Test (Regel 16): freigelegte Innenfarbe an der Außenkante → Umrissblau
     F.umranden(f, [f], UMRISS, UMRISS_BLAU, UMRISS_BLAU, UMRISS_BLAU)

@@ -1,15 +1,15 @@
 {
   "creature": "Loyal Bone Dog",
   "sheet": "loyal-bone-dog.png",
-  "frameWidth": 20,
-  "frameHeight": 27,
+  "frameWidth": 18,
+  "frameHeight": 23,
   "frames": 48,
   "frameMs": 65,
   "loop": true,
   "layout": "horizontal",
   "padTop": 3,
-  "padLeft": 4,
-  "padRight": 4,
-  "padBottom": 3,
-  "faceX": 10.0
+  "padLeft": 3,
+  "padRight": 3,
+  "padBottom": 2,
+  "faceX": 9.0
 }

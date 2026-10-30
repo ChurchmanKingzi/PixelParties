@@ -27,8 +27,9 @@ Ablauf (48 Frames à 65 ms = 3,12 s), alle Bewegungen unabhängig:
   geschlossenes Lid auf dem Schädel), dann wieder oben — der Wechsel schwarz → grauweiß ist deutlich.
 * Pfoten tippen: linker Fuß in Frames 6–7, 20–21 und 40–41, rechter Fuß in 12–13, 27–28 und 45–46 (die Beinzeile 13 des Fußes entfällt, die Fußlinie rückt
   1 px hoch; die Innenumrisse (4,12) und (7,12) bleiben am Körper).
-* Knochenstaub: vier einzelne helle Staubkörnchen (1 px, Farben B/C aus dem Sprite) rieseln langsam zwischen den Hinterbeinen nach unten (≈ 0,2 px/Frame),
-  verglimmen flackernd und sind am Schleifenende aus; sie liegen hinter dem Skelett. Kein Glanz, keine Kreuz-/Rautenform.
+* Knochenstaub: vier einzelne helle Staubkörnchen (1 px, Farben B/C aus dem Sprite) rieseln langsam zwischen den Hinterbeinen nach unten (≈ 0,1 px/Frame,
+  insgesamt ~4 px, höchstens 2 px unter die Fußlinie), verglimmen flackernd und sind am Schleifenende aus; sie liegen hinter dem Skelett. Kein Glanz,
+  keine Kreuz-/Rautenform. Der Rahmen ist auf die Figur zugeschnitten (18×23 px, Rand 3–4 px rundum, Figur zentriert); der Staub vergrößert ihn nicht.
 Alle Bewegungen laufen auf der vollen Leinwand (anim_lib wirft ClipError). Nur ganze Pixel, nur Farben der Quelle.
 
 Ergänzungen: keine gemalten Pixel.
@@ -41,7 +42,7 @@ import anim_lib as L
 import anim_tiere as T
 
 N, MS = 48, 65
-PAD_L, PAD_R, PAD_T, PAD_B = 4, 4, 4, 8
+PAD_L, PAD_R, PAD_T, PAD_B = 3, 3, 4, 4                         # Figur zentriert; der Staub rieselt höchstens 2 px unter die Füße, der Rahmen wächst dafür nicht
 
 spr = L.lade('loyal-bone-dog')
 sh, sw = spr.shape[:2]
@@ -77,10 +78,10 @@ def zustand(i):
     return atem, kiefer, lid, 1 if i in PFOTE_L else 0, 1 if i in PFOTE_R else 0
 
 
-STAUBKOERNER = [dict(x=PAD_L + 5, y=PAD_T + 12, vx=0, vy=7, off=0, form='k', farbe='rot', wackeln=0.6, ph=0.0),
-                dict(x=PAD_L + 6, y=PAD_T + 12, vx=1, vy=8, off=12, form='k', farbe='rot', wackeln=0.6, ph=1.5),
-                dict(x=PAD_L + 5, y=PAD_T + 12, vx=-1, vy=7, off=24, form='k', farbe='rot', wackeln=0.6, ph=3.0),
-                dict(x=PAD_L + 6, y=PAD_T + 12, vx=0, vy=8, off=36, form='k', farbe='rot', wackeln=0.6, ph=4.5)]
+STAUBKOERNER = [dict(x=PAD_L + 5, y=PAD_T + 12, vx=0, vy=4.2, off=0, form='k', farbe='rot', wackeln=0.6, ph=0.0),
+                dict(x=PAD_L + 6, y=PAD_T + 12, vx=1, vy=4.6, off=12, form='k', farbe='rot', wackeln=0.6, ph=1.5),
+                dict(x=PAD_L + 5, y=PAD_T + 12, vx=-1, vy=4.2, off=24, form='k', farbe='rot', wackeln=0.6, ph=3.0),
+                dict(x=PAD_L + 6, y=PAD_T + 12, vx=0, vy=4.6, off=36, form='k', farbe='rot', wackeln=0.6, ph=4.5)]
 
 
 def frame(i, nur=None):

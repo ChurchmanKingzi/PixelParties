@@ -21,11 +21,12 @@ Identifikation (x, y; Figur ist spiegelsymmetrisch um x = 9,5, Spiegel x ↔ 19 
 * Schulterstück am Körper: (4,5) dunkler Umriss und (4,10) (4,11) (4,12) (braun/weiß) bleiben am Körper (Schulter, Anschluss des Arms).
 
 Ablauf (48 Frames à 65 ms = 3,12 s):
-* FLÜGEL: schlagen zweimal pro Schleife (großer Schlag, dann kleiner Schlag); 12 Schlüsselposen (Posenblatt im Check-Bild: gefaltet = Original, lüften,
-  fächern, halb offen, weit offen oben, Spitzen knicken, Abschlag Mitte, Abschlag unten, Rückholen, anklappen, kleiner Schlag Mitte/unten), dazwischen weicher
-  Spline. Armknochen des Flügels laufen vom Rücken (hinter dem Schädel) zum Handgelenk des FLÜGELS (oben außen), vier Fingerknochen fächern vom
-  Handgelenk auf (mit Knick, Spitzen hinken nach, flattern), gezackte, zerrissene Flügelhaut in den Brauntönen des Sprites dazwischen. Der Flügel liegt hinter
-  Körper und Armen. Der rechte Flügel schlägt ~1 Frame später als der linke.
+* FLÜGEL: nur Knochen (keine Haut, keine Hand, kein Wulst, keine tan Spitzen): schlagen zweimal pro Schleife (großer Schlag, dann kleiner Schlag); 12 Schlüsselposen
+  (Posenblatt im Check-Bild: gefaltet = Original, lüften, fächern, halb offen, weit offen oben, Spitzen knicken, Abschlag Mitte, Abschlag unten, Rückholen,
+  anklappen, kleiner Schlag Mitte/unten), dazwischen weicher Spline. Ein Armknochen läuft vom Rücken (hinter dem Schädel/Schulterblatt, vom Körper
+  verdeckt) zum Gelenk des FLÜGELS (oben außen), dort sitzt ein 3×3-Gelenkknubbel; vier Fingerknochen fächern vom Gelenk auf (mit Knick, Spitzen hinken
+  nach, flattern). Dazwischen ist Freiraum. Knochen: weißer Kern (246,255,255) mit grauer Kante (156,156,156) im ersten Stück und am ganzen Armknochen, danach
+  graue Linien (4-verbunden, Stufenlinien); die Spitzen enden frei. Der Flügel liegt hinter Körper und Armen; der rechte schlägt ~1 Frame später als der linke.
 * ARME (unabhängig von den Flügeln, eigene Perioden): hängen an der Schulter und pendeln leicht aus (linker Arm Periode 16 Frames, rechter 24 Frames,
   Hand schwingt bis 2 px nach außen / 1 px nach innen, Ansatz an der Schulter steht); die Hände zucken (Faust hebt sich 1 px, Fingerspitzen werden dunkler):
   links ab Frame 7 und 31, rechts ab Frame 18 und 41.
@@ -36,10 +37,10 @@ Ablauf (48 Frames à 65 ms = 3,12 s):
 Ergänzungen / Neugezeichnetes (nur Farben des Sprites):
 * Verdecktes Flügelstück hinter dem Arm (in Ruhe vom Arm verdeckt, sichtbar sobald der Arm ausschwingt), siehe SUPP: (1,13)–(1,17) = (156,156,156);
   (2,11)–(2,14) = (246,255,255); (2,15)–(2,17) = (189,189,189); (3,10)–(3,14) = (156,156,156) (und gespiegelt x ↔ 19 − x).
-* Alle Flügelposen außer der gefalteten sind neu gezeichnet (Arm-/Fingerknochen weiß mit grauer Außenkante (156,156,156), graue Spitzen, Flügelhaut
-  (88,66,42) mit Rand (49,24,0) und Adern (63,46,26), Handgelenkswulst 3×3 braun mit tan Mitte).
+* Alle Flügelposen außer der gefalteten sind neu gezeichnet: Armknochen, Fingerknochen und Gelenkknubbel nur in (246,255,255) und (156,156,156) (beide im Sprite);
+  die Knochen beginnen bei Frame 4 aus den Quellspalten x = 1, 2, 2, 3 des gefalteten Flügels (roh → sauber pixelweise gedithert).
 * Randpixel-Test (Regel 16): jedes Randpixel eines Frames hat eine Umrissfarbe der Quelle ((32,32,32), (49,24,0), (156,156,156)); wo ein bewegtes Teil eine
-  andere Farbe an den Rand bringt, wird sie in `frame()` per `B.umriss_schliessen` zur nächsten Umrissfarbe (hell → grau, dunkel/braun → braun).
+  andere Farbe an den Rand bringt, wird sie in `frame()` per `B.umriss_schliessen` zur nächsten Umrissfarbe (hell → grau, dunkel/braun → braun); bei den Knochenflügeln greift das nur noch in den Übergangsframes (0–13 Pixel).
 Alle Bewegungen laufen auf der vollen Leinwand (anim_lib wirft ClipError, wenn etwas herausragen würde).
 Nur ganze Pixel, nur Farben der Quelle.
 """
@@ -63,8 +64,8 @@ vorhanden = L.deckend(spr)
 assert (vorhanden == vorhanden[:, ::-1]).all()
 
 # ── Farben (alle aus dem Sprite) ───────────────────────────────────────────────────────────────────────────────────
-Q, P, Nn, Lg, KG = (246, 255, 255), (213, 213, 213), (189, 189, 189), (156, 156, 156), (123, 123, 123)
-BR_D, BR_E, BR_F, BR_J, BR_M = (49, 24, 0), (63, 46, 26), (88, 66, 42), (150, 119, 88), (212, 178, 150)
+Q, P, Nn, Lg = (246, 255, 255), (213, 213, 213), (189, 189, 189), (156, 156, 156)
+BR_D, BR_J, BR_M = (49, 24, 0), (150, 119, 88), (212, 178, 150)
 DG = (32, 32, 32)
 UMRISS = {DG, BR_D, Lg}                                    # Umrissfarben der Quelle (Randpixel-Test)
 
@@ -115,10 +116,8 @@ BODY = ebene(spr, koerper)
 ARM_L0, ARM_R0 = ebene(spr, arm_l), ebene(spr, arm_r)
 WING_L0, WING_R0 = ebene(spr_w, wing_l | supp_l), ebene(spr_w, wing_r | supp_r)
 
-PAL = dict(knochen=[Q, P, Nn], schatten=Lg, haut=(BR_F, BR_E, BR_D, BR_E), binde=(BR_D, BR_F), knoten=BR_J,
-           rein=dict(knochen=[Q, P, Nn], manschette=(Nn, Lg, KG)))
+PAL = dict(knochen=[Q], schatten=Lg)               # Flügel nur aus Knochen: weißer Kern, graue Kante (156,156,156)
 SPALTEN = [1, 2, 2, 3]            # Quellspalten der vier Fingerknochen (links; Leitfinger = Außenkante x = 1)
-RISSE = [(0.45, 0.8), (0.75, 0.7)]
 
 
 def px(x, y):
@@ -126,20 +125,20 @@ def px(x, y):
 
 
 # ── Schlüsselposen (linker Flügel, Sprite-Koordinaten; Winkel in Grad: 90° = unten, 180° = links, 270° = oben) ──────────────
-def pose(S, Wr, ang, ln, knick, hueft, zacke=0.3, rho=0.0, rein=1.0, wulst=1.0, haut=1.0):
-    return dict(S=S, W=Wr, ang=list(ang), len=list(ln), knick=knick, hueft=hueft, zacke=zacke, rho=rho, rein=rein, wulst=wulst, haut=haut)
+def pose(S, Wr, ang, ln, knick, rho=0.0, rein=1.0, knubbel=1.0):
+    return dict(S=S, W=Wr, ang=list(ang), len=list(ln), knick=knick, rho=rho, rein=rein, knubbel=knubbel)
 
 
-S0, HUEFT = (6.5, 8.5), (6.5, 16.5)                           # Ansatz am Rücken, hinter dem Schädel/Schulterblatt (vom Körper verdeckt)
+S0 = (6.5, 8.5)                                           # Ansatz am Rücken, hinter dem Schädel/Schulterblatt (vom Körper verdeckt)
 POSEN = {
-    'ruhe':    pose(S0, (3, 6),     (90, 90, 90, 90),        (13, 12, 12, 12),        0, HUEFT, rho=1.0, rein=0.0, wulst=0.0, haut=0.0),
-    'lueften': pose(S0, (3, 5.5),   (100, 94, 88, 82),       (13, 12, 12, 12),        0, HUEFT, rho=0.8, rein=0.15, wulst=0.0, haut=0.0),
-    'luft2':   pose(S0, (2.5, 5),   (118, 106, 94, 84),      (13, 12, 12, 11.5),      4, HUEFT, rho=0.5, rein=0.6, wulst=0.0, haut=1.0),
-    'halb':    pose(S0, (1, 4.5),   (168, 144, 120, 97),     (12.5, 12, 12, 11),     10, HUEFT, rho=0.1),
-    'weit':    pose(S0, (-1, 2.5),  (222, 190, 160, 128),    (12.5, 12, 11, 10),     14, HUEFT),
-    'weit2':   pose(S0, (-1.5, 2), (228, 194, 162, 130),     (12.5, 12, 11, 10),     18, HUEFT),
-    'mitte':   pose(S0, (-1, 4.5),  (198, 168, 142, 114),    (12, 11.5, 10.5, 9.5),  18, HUEFT),
-    'unten':   pose(S0, (-1, 7),    (150, 124, 102, 84),     (11.5, 11.5, 10.5, 9),  22, HUEFT, zacke=0.25),
+    'ruhe':    pose(S0, (3, 6),     (90, 90, 90, 90),        (13, 12, 12, 12),        0, rho=1.0, rein=0.0, knubbel=0.0),
+    'lueften': pose(S0, (3, 5.5),   (100, 94, 88, 82),       (13, 12, 12, 12),        0, rho=0.8, rein=0.15, knubbel=0.0),
+    'luft2':   pose(S0, (2.5, 5),   (118, 106, 94, 84),      (13, 12, 12, 11.5),      4, rho=0.5, rein=0.6, knubbel=0.0),
+    'halb':    pose(S0, (1, 4.5),   (168, 144, 120, 97),     (12.5, 12, 12, 11),     10, rho=0.1),
+    'weit':    pose(S0, (-1, 2.5),  (222, 190, 160, 128),    (12.5, 12, 11, 10),     14),
+    'weit2':   pose(S0, (-1.5, 2), (228, 194, 162, 130),     (12.5, 12, 11, 10),     18),
+    'mitte':   pose(S0, (-1, 4.5),  (198, 168, 142, 114),    (12, 11.5, 10.5, 9.5),  18),
+    'unten':   pose(S0, (-1, 7),    (150, 124, 102, 84),     (11.5, 11.5, 10.5, 9),  22),
 }
 REST_VEC = B.pose_vektor(POSEN['ruhe'])
 
@@ -171,7 +170,6 @@ def pose_zu(t, finger_phase=0.0):
     for k in range(4):
         v = B.vektor_pose(B.spline(SCHLUESSEL, t - FINGER_LAG * k, N), POSEN['ruhe'])
         basis['ang'][k] = v['ang'][k]
-    basis['hueft'] = (basis['hueft'][0], basis['hueft'][1] + 0.55 * math.sin(L.sinus(t, N / 3.0, 0.4 + finger_phase)) * (1.0 - min(1.0, max(0.0, basis['rho']))))
     basis['rho'] = min(1.0, max(0.0, basis['rho']))
     basis['rein'] = min(1.0, max(0.0, basis['rein']))
     offen = 1.0 - basis['rho']
@@ -264,10 +262,8 @@ def fluegel_ebene(t, links, n_atem):
     pp = dict(p)
     pp['S'] = (PAD_L + p['S'][0], PAD_T + p['S'][1] - n_atem)
     pp['W'] = (PAD_L + p['W'][0], PAD_T + p['W'][1] - n_atem)
-    pp['hueft'] = (PAD_L + p['hueft'][0], PAD_T + p['hueft'][1])
-    pp['haut'] = 1 if p['haut'] > 0.5 else 0
-    pp['wulst'] = 1 if p['wulst'] > 0.5 else 0
-    a = B.knochenflügel(H, W, pp, PAL, spr_w, SPALTEN, 3, 6, risse=RISSE)
+    pp['knubbel'] = 1 if p['knubbel'] > 0.5 else 0
+    a = B.knochenflügel(H, W, pp, PAL, spr_w, SPALTEN, 3, 6)
     if not links:
         a = B.spiegeln(a)
     return a, pp

@@ -29,7 +29,7 @@ Ablauf (60 Frames à 65 ms = 3,9 s), alle Bewegungen unabhängig; der Kopf bleib
   außen und zurück, die Ohrbasis (Zeile 2) bleibt; der innere Umrisspixel der Zeile 1 bleibt zusätzlich stehen (Umriss geschlossen in jeder Pose).
 * Blick: nur das linke Auge samt Braue wandert 1 px (Frames 12–19 nach rechts, 29–36 nach links, 47–53 nach rechts); das Auge hinter dem Monokel bleibt.
 * Blinzeln: das linke Auge schließt sich 3 Frames lang in der umgebenden Fellfarbe (orange B) — bei 22, 41 und 57.
-* Hecheln (Zugabe, 2× pro Schleife, Frames 20–33 und 50–63): die Kinnpartie (5–6,9) wird Mundschwarz, dazu erscheint die Zunge in Ohrrosa (5–6,10), im
+* Hecheln (Zugabe, 2× pro Schleife, Frames 20–33 und 46–59): die Kinnpartie (5–6,9) wird Mundschwarz, dazu erscheint die Zunge in Ohrrosa (5–6,10), im
   Wechsel zweimal drei Stufen (zu/offen/Zunge), je 2 Frames — beide Farben stehen schon im Sprite.
 * Krone (Gold, Regel 12/14): ein Lichtband läuft diagonal über die Zacken (Frames 4–17 und 36–49, jedes Pixel 2 Frames eine Stufe heller), dazu blitzt je
   5 Frames lang ein kleiner Glitzerstern an der linken Zacke (Frame 24), der rechten Zacke (30) und der Kronenspitze (52).
@@ -115,7 +115,7 @@ def zustand(i):
     ohr_li = max(T.huellkurve(i, N, s, 6) for s in (2, 17, 31, 46))
     ohr_re = max(T.huellkurve(i, N, s, 6) for s in (9, 24, 40, 53))
     lid = muster(i, (22, 41, 57), (1, 1, 1))
-    pant = muster(i, (20, 50), PANT)
+    pant = muster(i, (20, 46), PANT)
     stern = muster(i, (58, 20, 42), STERN_BLITZ)
     band = -1
     for s in (4, 36):

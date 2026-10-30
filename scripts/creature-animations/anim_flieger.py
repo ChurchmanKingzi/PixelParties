@@ -445,10 +445,11 @@ def umranden(f, teile, erlaubt, oben, seite, unten):
     return f
 
 
-def zeilen_stauchen(a, achse_x, s_zeile):
+def zeilen_stauchen(a, achse_x, s_zeile, symmetrisch=False):
     """Jede Zeile y wird um die senkrechte Achse `achse_x` (Leinwand-Spalte, kann .5 sein) auf den Faktor s_zeile[y] (0 < s ≤ 1) zusammengeschoben:
     Ausgabepixel x holt sich die Quellspalte round((x − achse)/s + achse) (Nächster-Nachbar, keine Mischfarben, nichts wird breiter). So klappen
-    Flügel zur Körpermitte, ohne dass Texturen kopiert werden. Zeilen ohne Pixel bleiben leer."""
+    Flügel zur Körpermitte, ohne dass Texturen kopiert werden. Zeilen ohne Pixel bleiben leer.
+    symmetrisch=True: Quellspalte = Achse ± floor(|Abstand|/s + 0.5) — links und rechts der Achse entstehen exakte Spiegelbilder (bei ganzzahliger Achse)."""
     out = L.leer(*a.shape[:2])
     h, w = a.shape[:2]
     for y in range(h):
@@ -456,7 +457,11 @@ def zeilen_stauchen(a, achse_x, s_zeile):
             continue
         s = float(s_zeile[y])
         for x in range(w):
-            sx = int(math.floor((x - achse_x) / s + achse_x + 0.5))
+            if symmetrisch:                                   # Rundung am Betrag: linke und rechte Seite der Achse sind exakte Spiegelbilder
+                d = x - achse_x
+                sx = int(round(achse_x + math.copysign(math.floor(abs(d) / s + 0.5), d)))
+            else:
+                sx = int(math.floor((x - achse_x) / s + achse_x + 0.5))
             if 0 <= sx < w and a[y, sx, 3]:
                 out[y, x] = a[y, sx]
     return out

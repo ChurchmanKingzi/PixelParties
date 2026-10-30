@@ -81,9 +81,17 @@ BASIS_R = {7: 1, 8: 2, 9: 5, 10: 2, 11: 3, 12: 2}
 BASIS_O = {7: 0, 8: 1, 9: 2, 10: 1, 11: 2, 12: 0}
 BASIS_Y = {7: 0, 8: 0, 9: 1, 10: 0, 11: 0, 12: 0}
 MIN_R = {7: 1, 8: 2, 9: 3, 10: 2, 11: 2, 12: 2}          # die breite Basis (Zeilen 7–8) bleibt immer stehen
-MAX_R = {7: 1, 8: 4, 9: 7, 10: 5, 11: 6, 12: 4}
+MAX_R = {7: 1, 8: 8, 9: 12, 10: 9, 11: 10, 12: 7}
+# Fassung 2 (Nutzerfeedback: Flammen meist zu flach): im Mittel +2 … +4 px über dem Ruhewert. Die Zungen steigen in den ersten Frames auf ihre „hohe Lage“ (Hub LIFT_*),
+# bleiben dort (hohe Posen sind der Normalfall) und sinken erst in den letzten Frames der Schleife wieder auf die Originalflamme (Frame 0 = Original). Die Auf-/Abstiege
+# sind je Spalte gestaffelt (ANLAUF/ABKLANG), damit die Flamme nicht als Ganzes zuckt. Das Schwanken nach unten wird auf die Hälfte gedämpft (_delta): selten niedrig.
+LIFT_R = {7: 0, 8: 3, 9: 4, 10: 3, 11: 3, 12: 2}
+LIFT_O = {7: 0, 8: 1, 9: 3, 10: 1, 11: 2, 12: 1}
+LIFT_Y = {7: 0, 8: 0, 9: 2, 10: 1, 11: 1, 12: 0}
+ANLAUF = {7: 2, 8: 3, 9: 2, 10: 4, 11: 3, 12: 5}         # Frames bis zur vollen Höhe nach Frame 0
+ABKLANG = {7: 2, 8: 3, 9: 4, 10: 3, 11: 5, 12: 3}        # Frames vom Ende der Schleife rückwärts bis zur Ruhehöhe
 SCHWANK = {                                              # (Spalte, Schicht): [(Amplitude in px, Periode in Frames, Haltedauer in Frames), …]
-    (8, 'R'): [(1.4, 12, 2), (0.8, 8, 3)], (9, 'R'): [(2.6, 16, 2), (1.4, 6, 3)], (10, 'R'): [(1.6, 24, 3), (1.0, 8, 2)],
+    (8, 'R'): [(1.4, 12, 2), (0.8, 8, 3)], (9, 'R'): [(2.2, 24, 2), (1.4, 16, 3)], (10, 'R'): [(1.6, 24, 3), (1.0, 8, 2)],
     (11, 'R'): [(2.2, 12, 2), (1.2, 16, 3)], (12, 'R'): [(1.4, 16, 3), (0.9, 6, 2)],
     (8, 'O'): [(1.2, 8, 3)], (9, 'O'): [(1.8, 12, 2), (0.9, 24, 3)], (10, 'O'): [(1.2, 16, 2)], (11, 'O'): [(1.4, 6, 3), (0.7, 12, 2)],
     (12, 'O'): [(1.3, 24, 2)], (7, 'O'): [(0.8, 16, 3)],
@@ -98,7 +106,12 @@ def _delta(x, e, t):
     z = 0.0
     for (amp, per, halt) in SCHWANK.get((x, e), []):
         z += amp * math.sin(2 * math.pi * ((t // halt) * halt) / per)
-    return int(round(z))
+    return int(round(z)) if z >= 0 else int(round(0.5 * z))        # nach unten gedämpft: die Flamme ist selten niedrig
+
+
+def _hub(x, t):
+    """Anteil 0 … 1 der hohen Lage der Spalte x im Frame t (0 bei Frame 0; Aufstieg am Anfang, Abstieg am Ende der Schleife)."""
+    return max(0.0, min(1.0, t / ANLAUF[x], (N - t) / ABKLANG[x]))
 
 
 def hoehen(i):
@@ -106,17 +119,20 @@ def hoehen(i):
     t = i % N
     hr, ho, hy = {}, {}, {}
     for x in BASIS_R:
-        r = min(MAX_R[x], max(MIN_R[x], BASIS_R[x] + _delta(x, 'R', t)))
-        o = BASIS_O[x] + _delta(x, 'O', t) + (1 if t in BLITZ and x in (8, 9, 10, 11) else 0)
-        y = BASIS_Y[x] + _delta(x, 'Y', t) + (1 if t in BLITZ and x in (8, 9, 10, 11) else 0)
+        hub = _hub(x, t)
+        r = min(MAX_R[x], max(MIN_R[x], BASIS_R[x] + int(round(LIFT_R[x] * hub)) + _delta(x, 'R', t)))
+        o = BASIS_O[x] + int(round(LIFT_O[x] * hub)) + _delta(x, 'O', t) + (1 if t in BLITZ and x in (8, 9, 10, 11) else 0)
+        y = BASIS_Y[x] + int(round(LIFT_Y[x] * hub)) + _delta(x, 'Y', t) + (1 if t in BLITZ and x in (8, 9, 10, 11) else 0)
         o = max(1 if x in (8, 9, 10, 11) else 0, r // 3, o)    # die Zunge behält einen orangen Kern, der mit der Höhe wächst
         o = max(0, min(o, r - 1 if r > 1 else r))              # Orange immer unterhalb der roten Spitze
         y = max(0, min(y, o))                                  # Gelb im Orange
         hr[x], ho[x], hy[x] = r, o, y
+    fertig = set()
     for x in sorted(hr, key=lambda c: (-hr[c], c)):            # Spitzenprofil: neben einer Zunge ≥ 3 px ist jede Nachbarzunge niedriger (keine flachen Blöcke)
+        fertig.add(x)
         if hr[x] >= 3:
             for nb in (x - 1, x + 1):
-                if nb in hr and hr[nb] >= hr[x]:
+                if nb in hr and nb not in fertig and hr[nb] >= hr[x]:      # nur noch nicht geordnete (= niedrigere oder gleich hohe) Nachbarn
                     hr[nb] = max(MIN_R[nb], hr[x] - 1)
                     ho[nb] = min(ho[nb], hr[nb] - 1)
                     hy[nb] = min(hy[nb], ho[nb])
