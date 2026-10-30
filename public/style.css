@@ -26473,7 +26473,8 @@ input[type="checkbox"]:focus-visible, input[type="radio"]:focus-visible { outlin
   .panel-zielwahl-knoepfe .btn, .first-choice-panel .btn { min-width: calc(76px / var(--ui-scale, 1)); }
   /* Phasenleiste (im Brett, 1:1): Knoepfe und Phasen-Eintraege */
   .phase-column .phase-btn, .phase-buttons-row .phase-btn { min-height: 30px !important; font-size: 9px !important; padding: 3px 12px !important; }
-  .phase-column .board-phase-item { font-size: 8px !important; padding: 4px 6px !important; min-height: 26px !important; display: inline-flex; align-items: center; }
+  /* auch im Tutorial-Highlight (Klon der Leiste ausserhalb von `.phase-column`): sonst fielen die Eintraege dort auf die 6-px-Kompaktregel zurueck */
+  .phase-column .board-phase-item, .textbox-highlight-clone .board-phase-item { font-size: 8px !important; padding: 4px 6px !important; min-height: 26px !important; display: inline-flex; align-items: center; }
   /* Die Leiste liegt auf der Naht ueber den Area-Zonen (Area-Stapel liegt ein Stueck unter ihr): nur die Knoepfe selbst fangen Tipps ab, die leeren Flaechen drumherum reichen sie durch. */
   .phase-column, .phase-column .board-phase-tracker, .phase-column .phase-buttons-row { pointer-events: none !important; }
   .phase-column button, .phase-column .board-phase-item, .phase-column .phase-end-check { pointer-events: auto !important; }

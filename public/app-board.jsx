@@ -3493,6 +3493,8 @@ function HeroStatusPartikel({ effekte, kern, s, mitteX, fw, fh, saat }) {
  * Lage aller Heldenzonen/Support-Zonen im Moment des Aufrufs (Element -> Rechteck). Einschlag-Animationen (Magic Hammer, Keule, Dino …) suchen ihr Ziel
  * erst nach 300–500 ms; Verschiebt sich das Brett dazwischen (Handy: Kamerafahrt), lag der naechste Treffer ploetzlich ueber einem anderen Helden.
  */
+// Einschlag-Animationen, die ihre Zielzone selbst quetschen: bekommen das Zonen-Element direkt (`zoneEl`)
+const PP_SQUASH_ANIMS = new Set(['stranglehold_squeeze', 'magic_hammer', 'shattering_strike', 'spiked_club_smash', 'giant_dino_stomp', 'mammoth_stomp', 'ankylo_tail_smash']);
 function ppZonenFrost() {
   const m = new Map();
   try { document.querySelectorAll('[data-hero-zone],[data-support-zone]').forEach(el => m.set(el, el.getBoundingClientRect())); } catch (e) { /* ohne Frost: live messen */ }
@@ -17325,7 +17327,7 @@ const ANIM_REGISTRY = {
     };
   })(),
   stranglehold_squeeze: (() => {
-    return function StrangleholdSqueezeEffect({ x, y }) {
+    return function StrangleholdSqueezeEffect({ x, y, zoneEl }) {
       useEffect(() => {
         const _frost = ppZonenFrost();   // Lage der Zonen JETZT merken: bis der Einschlag kommt, kann die Kamera das Brett verschoben haben (Handy) — sonst traf der Squash den falschen Helden
         const timer = setTimeout(() => {
@@ -17337,6 +17339,8 @@ const ANIM_REGISTRY = {
             const d = Math.abs(cx - x) + Math.abs(cy - y);
             if (d < bestDist) { bestDist = d; best = el; }
           });
+          // Das Ziel-Element kommt direkt aus playAnimation: x/y liegen bei Weltverankerung im Welt-Koordinatensystem und passen nach einer Kamerafahrt nicht mehr zu den Bildschirm-Rechtecken (Tutorial 1: der Hammer quetschte die ausfuehrende Ida)
+          if (zoneEl && zoneEl.isConnected) { best = zoneEl; bestDist = 0; }
           if (best && bestDist < 80) {
             best.classList.add('stranglehold-squeezed');
             setTimeout(() => best.classList.remove('stranglehold-squeezed'), 1200);
@@ -21656,7 +21660,7 @@ const ANIM_REGISTRY = {
   })(),
   coffee_steam: ppR1CoffeeSteam,   // W86r1: Pixelart-Leinwand
   magic_hammer: (() => {
-    return function MagicHammerEffect({ x, y, w, h }) {
+    return function MagicHammerEffect({ x, y, w, h, zoneEl }) {
       const targetW = w || 70;
       const targetH = h || 90;
       const hammerW = 55;
@@ -21687,6 +21691,8 @@ const ANIM_REGISTRY = {
             const d = Math.abs(cx - x) + Math.abs(cy - y);
             if (d < bestDist) { bestDist = d; best = el; }
           });
+          // Das Ziel-Element kommt direkt aus playAnimation: x/y liegen bei Weltverankerung im Welt-Koordinatensystem und passen nach einer Kamerafahrt nicht mehr zu den Bildschirm-Rechtecken (Tutorial 1: der Hammer quetschte die ausfuehrende Ida)
+          if (zoneEl && zoneEl.isConnected) { best = zoneEl; bestDist = 0; }
           if (best && bestDist < 80) ppZonenSquash(best, 'magic-hammer-squashed', 650);
         }, 330);
         return () => clearTimeout(timer);
@@ -21761,7 +21767,7 @@ const ANIM_REGISTRY = {
         return { dx: Math.cos(angle) * speed, dy: Math.sin(angle) * speed * 0.35, size: 3 + Math.random() * 5, color: DUST[Math.floor(Math.random() * DUST.length)], delay: 310 + Math.random() * 60, dur: 380 + Math.random() * 220 }; }),
     }), { radius: (p) => [130, (p.h || 90) / 2 + 280], z: 10100 });
     return function ShatteringStrikeEffect(props) {
-      const { x, y } = props;
+      const { x, y, zoneEl } = props;
       useEffect(() => {
         const _frost = ppZonenFrost();   // Lage der Zonen JETZT merken: bis der Einschlag kommt, kann die Kamera das Brett verschoben haben (Handy) — sonst traf der Squash den falschen Helden
         const timer = setTimeout(() => {
@@ -21772,6 +21778,8 @@ const ANIM_REGISTRY = {
             const d = Math.abs(r.left + r.width / 2 - x) + Math.abs(r.top + r.height / 2 - y);
             if (d < bestDist) { bestDist = d; best = el; }
           });
+          // Das Ziel-Element kommt direkt aus playAnimation: x/y liegen bei Weltverankerung im Welt-Koordinatensystem und passen nach einer Kamerafahrt nicht mehr zu den Bildschirm-Rechtecken (Tutorial 1: der Hammer quetschte die ausfuehrende Ida)
+          if (zoneEl && zoneEl.isConnected) { best = zoneEl; bestDist = 0; }
           if (best && bestDist < 80) ppZonenSquash(best, 'magic-hammer-squashed', 550);
         }, 300);
         return () => clearTimeout(timer);
@@ -21789,7 +21797,7 @@ const ANIM_REGISTRY = {
   //  synchron mit dem `_delay(480)` in 3-headed-giant.js, das
   //  die 100 ms Mount-Vorlauf mitrechnet.
   spiked_club_smash: (() => {
-    return function SpikedClubSmashEffect({ x, y, w, h }) {
+    return function SpikedClubSmashEffect({ x, y, w, h, zoneEl }) {
       const targetH = h || 90;
       const clubW = 46;
       const clubH = 132;
@@ -21829,6 +21837,8 @@ const ANIM_REGISTRY = {
             const d = Math.abs(cx - x) + Math.abs(cy - y);
             if (d < bestDist) { bestDist = d; best = el; }
           });
+          // Das Ziel-Element kommt direkt aus playAnimation: x/y liegen bei Weltverankerung im Welt-Koordinatensystem und passen nach einer Kamerafahrt nicht mehr zu den Bildschirm-Rechtecken (Tutorial 1: der Hammer quetschte die ausfuehrende Ida)
+          if (zoneEl && zoneEl.isConnected) { best = zoneEl; bestDist = 0; }
           if (best && bestDist < 80) {
             best.classList.add('club-smash-squashed');
             setTimeout(() => best.classList.remove('club-smash-squashed'), 700);
@@ -21869,7 +21879,7 @@ const ANIM_REGISTRY = {
   //  from 820px up, and the squash on the target lingers
   //  longer before bouncing back.
   giant_dino_stomp: (() => {
-    return function GiantDinoStompEffect({ x, y, w, h }) {
+    return function GiantDinoStompEffect({ x, y, w, h, zoneEl }) {
       const targetH = h || 90;
       const legW = 120;
       const legH = 250;
@@ -21898,6 +21908,8 @@ const ANIM_REGISTRY = {
             const d = Math.abs(cx - x) + Math.abs(cy - y);
             if (d < bestDist) { bestDist = d; best = el; }
           });
+          // Das Ziel-Element kommt direkt aus playAnimation: x/y liegen bei Weltverankerung im Welt-Koordinatensystem und passen nach einer Kamerafahrt nicht mehr zu den Bildschirm-Rechtecken (Tutorial 1: der Hammer quetschte die ausfuehrende Ida)
+          if (zoneEl && zoneEl.isConnected) { best = zoneEl; bestDist = 0; }
           if (best && bestDist < 100) {
             best.classList.add('giant-dino-stomp-squashed');
             setTimeout(() => best.classList.remove('giant-dino-stomp-squashed'), 850);
@@ -21995,7 +22007,7 @@ const ANIM_REGISTRY = {
       return { dx: Math.cos(angle) * speed, dy: -Math.abs(Math.sin(angle) * speed) - 6, size: 4 + Math.random() * 9, color: STAUB[Math.floor(Math.random() * 6)], delay: 360 + Math.random() * 130, dur: 380 + Math.random() * 340 };
     }) }), { radius: (p) => [200, 1200], z: 10100 });
     return function MammothStompEffect(props) {
-      const { x, y } = props;
+      const { x, y, zoneEl } = props;
       // Schwerer Squash des Zielhelden — dieselbe Klasse wie beim Dino-Stampfer; die Stauchung selbst macht die Pipeline im Kunstpixelraster.
       useEffect(() => {
         const _frost = ppZonenFrost();   // Lage der Zonen JETZT merken: bis der Einschlag kommt, kann die Kamera das Brett verschoben haben (Handy) — sonst traf der Squash den falschen Helden
@@ -22008,6 +22020,8 @@ const ANIM_REGISTRY = {
             const d = Math.abs(cx - x) + Math.abs(cy - y);
             if (d < bestDist) { bestDist = d; best = el; }
           });
+          // Das Ziel-Element kommt direkt aus playAnimation: x/y liegen bei Weltverankerung im Welt-Koordinatensystem und passen nach einer Kamerafahrt nicht mehr zu den Bildschirm-Rechtecken (Tutorial 1: der Hammer quetschte die ausfuehrende Ida)
+          if (zoneEl && zoneEl.isConnected) { best = zoneEl; bestDist = 0; }
           if (best && bestDist < 100) {
             best.classList.add('giant-dino-stomp-squashed');
             setTimeout(() => best.classList.remove('giant-dino-stomp-squashed'), 850);
@@ -22146,7 +22160,7 @@ const ANIM_REGISTRY = {
   //  point (left edge of the assembly) so the heavy club lands
   //  cleanly on the target while the tail trails offscreen.
   ankylo_tail_smash: (() => {
-    return function AnkyloTailSmashEffect({ x, y }) {
+    return function AnkyloTailSmashEffect({ x, y, zoneEl }) {
       const tailLength    = 460;
       const tailThickness = 50;
       const clubSize      = 130;
@@ -22177,6 +22191,8 @@ const ANIM_REGISTRY = {
             const d = Math.abs(cx - x) + Math.abs(cy - y);
             if (d < bestDist) { bestDist = d; best = el; }
           });
+          // Das Ziel-Element kommt direkt aus playAnimation: x/y liegen bei Weltverankerung im Welt-Koordinatensystem und passen nach einer Kamerafahrt nicht mehr zu den Bildschirm-Rechtecken (Tutorial 1: der Hammer quetschte die ausfuehrende Ida)
+          if (zoneEl && zoneEl.isConnected) { best = zoneEl; bestDist = 0; }
           if (best && bestDist < 100) {
             best.classList.add('giant-dino-stomp-squashed');
             setTimeout(() => best.classList.remove('giant-dino-stomp-squashed'), 850);
@@ -54229,7 +54245,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     const entfernen = () => setGameAnims(prev => prev.filter(a => a.id !== id));
     let gestartet = false;
     const _gemountet = () => { if (gestartet) return; gestartet = true; setTimeout(entfernen, dur); };
-    setGameAnims(prev => [...prev, { id, type, x: r.left + r.width / 2 + _wo.dx, y: r.top + r.height / 2 + _wo.dy, w: r.width, h: r.height, welt: _wo.welt, ...options, _gemountet }]);
+    setGameAnims(prev => [...prev, { id, type, x: r.left + r.width / 2 + _wo.dx, y: r.top + r.height / 2 + _wo.dy, w: r.width, h: r.height, welt: _wo.welt, ...(PP_SQUASH_ANIMS.has(type) ? { zoneEl: el } : null), ...options, _gemountet }]);
     setTimeout(() => { if (!gestartet) { gestartet = true; entfernen(); } }, dur + 6000);
   };
 
@@ -63465,7 +63481,10 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       )}
 
       {/* ── Puzzle / Tutorial Result Overlay ── */}
-      {result && result.isPuzzle && !tutorialOutroPending && (() => {
+      {/* Der Abschlussmonolog wird erst im Effekt nach dem Ergebnis angemeldet (tutorialOutroPending): fuer genau diesen einen Render stand der Stage-Cleared-Schirm kurz da. Deshalb hier synchron mitpruefen. */}
+      {result && result.isPuzzle && !tutorialOutroPending
+        && !(result.isTutorial && result.puzzleResult === 'success' && (window.TUTORIAL_SCRIPTS || {})[window._currentTutorialNum]?.outro && tutorialOutroFiredRef.current !== window._currentTutorialNum)
+        && (() => {
         // The final tutorial (script flagged `isFinalTutorial: true`) gets
         // a celebratory upgrade: big multi-colored fireworks + a beefier
         // "TUTORIAL CLEARED!" banner instead of the usual "STAGE CLEARED!".
