@@ -84,7 +84,7 @@ def frame(i, partikel=True, effekte=True):
     ph = L.sinus(i, N / 8)                                     # Flügelschlag: achtmal pro Schleife (Periode 6)
     u = lambda t: (1 - math.cos(2 * math.pi * t / (N / 4))) / 2     # Bob: Periode 12
     bob = -int(round(2 * u(i)))                                # 0 → −1 → −2 → −1 → 0 (nur nach oben, zweistufig)
-    s = int(round(2 * (1 - math.cos(ph)) / 2))                 # Flügeldecken öffnen: 0 → 1 → 2 → 1 → 0
+    s = 1 if math.cos(ph) < 0.35 else 0                         # Flügeldecken öffnen: 0 (Ruhe) ↔ 1 px je Hälfte (Frame 0: cos = 1 → 0)
 
     kp = F.ebene(spr, m_koerper, H, W, PAD_L, PAD_T)
     kopf = F.ebene(spr, m_kopf, H, W, PAD_L, PAD_T)
@@ -95,6 +95,12 @@ def frame(i, partikel=True, effekte=True):
     # Flügeldecken öffnen: unten (ab Zeile 9) rückt nach unten, oben (bis Zeile 5) nach oben; die Naht-Zeilen werden verdoppelt
     kp = streck_unten(kp, Y_NAHT_U, s)
     kp = L.streck_zeile(kp, Y_NAHT_O, s)
+
+    # Hinterflügel strecken sich: bei geöffneten Decken werden die zwei Linien links um 2 px länger (Umrissfarbe, bleiben 4-verbunden)
+    if s:
+        for yline in (5 - s, 9 + s):
+            for dx in (-1, -2):
+                kp[PAD_T + yline, PAD_L + dx] = (*RAND, 255)
 
     # Fühler zucken zum Kopf hin (Frame 0 = Ruhe)
     d = 1 if math.sin(L.sinus(i, N / 4)) > 0.4 else 0           # Fühlerspitzen krümmen sich zum Kopf hin (bleiben so mit ihm verbunden)

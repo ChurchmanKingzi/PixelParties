@@ -18,11 +18,11 @@ Fest bleiben: Umriss, Kopfform samt Ohren und „V“ (die Kopfzeilen werden nie
 
 Ablauf (48 Frames à 65 ms = 3,12 s, nahtlos):
 * Gel-Körper (Squash & Stretch, Periode 24): beim Strecken (Frames 2–10 und 26–34) wird Körperzeile 10 (Frames 4–8 zusätzlich Zeile 8, das dunkle Band) verdoppelt, der Schleim wird 1–2 px höher;
-  beim Stauchen (Frames 15–21 und 39–45) wird er je Zeile 1 Spalte je Seite breiter (die Spalte neben dem Umriss wird verdoppelt, nie der Umriss). Die Unterkante sitzt fest am Boden. Frame 0 = Original.
+  beim Stauchen (Frames 15–21 und 39–45) wird er je Zeile 1 Spalte je Seite breiter (im Körper die Spalte neben dem Umriss, im Kopf (Zeilen 2–6) zwei Spalten mitten im „V“ — nie der Umriss, so bleiben Ohrränder und dunkle Ovale unverändert). Die Unterkante sitzt fest am Boden. Frame 0 = Original.
 * Lichtpunkte im Körper: beim Strecken (im Takt der Atmung) wandern die beiden hellen Punkte (4, 9) und (9, 9) 1 px nach innen — (4, 9) → (5, 9) und (9, 9) → (8, 9) — und beim Entspannen zurück
   (Tausch mit dem Nachbarpixel, keine neue Farbe).
 * Schattendunst (Partikel): acht kleine runde Violett-Punkte (Formen k/s) steigen links und rechts vom Schleim langsam auf (24 Frames Lebenszeit).
-Ergänzungen: keine (der Umriss wird nie verändert; beim Verdoppeln bleibt jede Randstufe ≤ 1 px).
+Ergänzungen: beim Verbreitern ragt das „V“ in Zeile 2 um 2 px über die dunkle Kappe darüber hinaus; die leeren Felder darüber bekommen den Umriss A=(10,0,41) (umriss_ergaenzen, Regel 16, 0–2 Pixel je Frame, in Frame 0 keine).
 Frame: Sprite plus 3 px links/rechts, 4 px oben (Strecken + Dunst), 2 px unten — Figur zentriert; Dunst liegt in der 2-px-Zone um die Figur.
 Alle Bewegungen laufen auf der vollen Leinwand (anim_lib/anim_amorph werfen ClipError). Nur ganze Pixel, nur Farben der Quelle.
 """
@@ -43,6 +43,8 @@ H, W = sh + PAD_T + PAD_B, sw + PAD_L + PAD_R
 BODEN = PAD_T + sh - 1
 OPAK = spr[..., 3] > 0
 RAND0 = A.randpixel(spr)
+RAND_FARBEN = A.umrissfarben(spr)
+UMRISS = (10, 0, 41)
 _farben = {tuple(int(v) for v in p[:3]) for p in spr.reshape(-1, 4) if p[3]}
 LICHT_K = (165, 84, 212)
 
@@ -65,6 +67,12 @@ for y in range(sh):
     PAARE_ZEILE[y] = [(links[0] if links else l + 2, rechts[0] if rechts else r - 2)]
     if PAARE_ZEILE[y][0][0] >= PAARE_ZEILE[y][0][1]:
         PAARE_ZEILE[y] = [(l + 1, r - 1)]
+
+# Kopfzeilen 2–6: die Spalten werden in der Mitte (am „V“) verdoppelt statt am Rand, damit die Ohrränder und die dunklen Ovale beim Stauchen nicht dicker werden — der Umriss
+# wandert trotzdem um 1 px nach außen (Randstufen bleiben ≤ 1 px)
+for _y, _pr in ((2, (6, 7)), (3, (6, 7)), (4, (6, 7)), (5, (6, 8)), (6, (6, 7))):
+    PAARE_ZEILE[_y] = [_pr]
+    assert OPAK[_y, _pr[0]] and OPAK[_y, _pr[1]]
 
 # ── Zeitachsen ──
 S = []
@@ -107,7 +115,9 @@ def figur(i):
     koerper = A.zeilen_von(sp, 0, sh - 1, H, W, PAD_L, PAD_T)
     z, quelle = A.koerper_pose(koerper, doppeln=doppeln, p=p, paare_je_zeile=PAARE_ZEILE, x0=PAD_L)
     fig, top = A.auf_leinwand(z, H, BODEN, 0)
-    return dict(fig=fig, top=top)
+    # Ergänzung (Regel 16): beim Verbreitern ragt das „V“ in Zeile 2 über die dunkle Kappe darüber hinaus — das leere Feld darüber bekommt den Umriss A
+    fig, neu = A.umriss_ergaenzen(fig, RAND_FARBEN, lambda x, y: UMRISS)
+    return dict(fig=fig, top=top, neu=neu)
 
 
 def frame(i):
@@ -118,6 +128,7 @@ def frame(i):
 
 if __name__ == '__main__':
     print('Paare:', PAARE_ZEILE)
+    print('ergänzte Umrisspixel je Frame:', [len(figur(i)['neu']) for i in range(N)])
     frames = [frame(i) for i in range(N)]
     figs = [figur(i)['fig'] for i in range(N)]
     prev = sys.argv[sys.argv.index('--preview') + 1] if '--preview' in sys.argv else None

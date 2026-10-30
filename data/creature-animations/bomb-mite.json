@@ -1,0 +1,15 @@
+{
+  "creature": "Bomb Mite",
+  "sheet": "bomb-mite.png",
+  "frameWidth": 30,
+  "frameHeight": 23,
+  "frames": 48,
+  "frameMs": 65,
+  "loop": true,
+  "layout": "horizontal",
+  "padTop": 1,
+  "padLeft": 2,
+  "padRight": 1,
+  "padBottom": 3,
+  "faceX": 15.0
+}

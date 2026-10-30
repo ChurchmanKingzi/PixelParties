@@ -1,7 +1,7 @@
 {
   "creature": "Golden Ladybug",
   "sheet": "golden-ladybug.png",
-  "frameWidth": 18,
+  "frameWidth": 20,
   "frameHeight": 25,
   "frames": 48,
   "frameMs": 60,
@@ -11,5 +11,5 @@
   "padLeft": 1,
   "padRight": 1,
   "padBottom": 1,
-  "faceX": 9.0
+  "faceX": 10.0
 }
