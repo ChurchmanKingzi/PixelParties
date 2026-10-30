@@ -35,7 +35,7 @@ Ablauf (48 Frames à 62 ms = 2,98 s, nahtlos):
 * Dampfrohre zittern (Dampfdruck): die oberen Rohrzeilen (0–2) jedes Rohrs schlagen seitlich ±1 px aus, jedes Rohr mit eigener Periode (links/rechts 12 Frames gegenphasig,
   Mitte 16); die Zeilen 0–2 verschieben sich gemeinsam, daher bleibt jedes Rohr 4-verbunden.
 * Umhang weht (ruhig): der Umhang (links Zeilen 18–26, rechts Zeilen 18–23) spreizt sich abwechselnd links/rechts nach außen (höchstens 1 px am unteren Ende, eine Welle pro Schleife, Periode 48): der innerste
-  Umhangpixel jeder Zeile bleibt am Bartumriss angewachsen, alles Äußere rückt hinaus, die Lücke wird mit der Umhangfarbe gefüllt (`Hm.rand_dehnen`) — der Umhang reißt also nie
+  Umhangpixel jeder Zeile bleibt am Bartumriss angewachsen, alles Äußere rückt hinaus, die Lücke wird mit dem inneren Umhangpixel gefüllt (`Hm.rand_dehnen_innen`: der Umriss wandert mit, kein Umrissblock am Saum) — der Umhang reißt also nie
   vom Bart ab. Nach innen geht nichts (da liegt der Bart).
 * Dampf steigt aus allen drei Rohren auf (Partikel): neun runde Dampfwolken ('m' Wölkchen, 'o' Oval, 'k' Funke) in Weiß/Hellgrau steigen langsam auf (16–19 px pro Schleife),
   mit leichtem Wackeln, wachsen/schrumpfen (L.puff_ebene), hinter der Figur.
@@ -149,8 +149,8 @@ def frame(i, dampf=True):
     # --- Umhang weht (spreizt sich nur nach außen, am Bart bleibt er angewachsen): links Zeilen 18–26, rechts Zeilen 18–23 ---
     vl = max(0.0, math.sin(L.sinus(i, N)))
     vr = max(0.0, math.sin(L.sinus(i, N) + math.pi))
-    Hm.rand_dehnen(al, OFF, {y: umhang_dx(y, 17, 26, vl) for y in range(18, 27)}, 'l')
-    Hm.rand_dehnen(ar, OFF, {y: umhang_dx(y, 17, 23, vr) for y in range(18, 24)}, 'r')
+    Hm.rand_dehnen_innen(al, OFF, {y: umhang_dx(y, 17, 26, vl) for y in range(18, 27)}, 'l')
+    Hm.rand_dehnen_innen(ar, OFF, {y: umhang_dx(y, 17, 23, vr) for y in range(18, 24)}, 'r')
     # --- Auf und ab: Brust zuerst (Bartzeile 21), Kopf 3 Frames später (Kinnzeile 16, nur Kopfteil) ---
     brust = Hm.stufe(i, N / 2, 1)
     kopf = Hm.stufe(i - 3, N / 2, 1)

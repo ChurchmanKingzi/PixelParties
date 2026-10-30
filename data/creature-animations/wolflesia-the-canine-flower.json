@@ -1,0 +1,15 @@
+{
+  "creature": "Wolflesia, the Canine Flower",
+  "sheet": "wolflesia-the-canine-flower.png",
+  "frameWidth": 30,
+  "frameHeight": 34,
+  "frames": 48,
+  "frameMs": 65,
+  "loop": true,
+  "layout": "horizontal",
+  "padTop": 2,
+  "padLeft": 2,
+  "padRight": 2,
+  "padBottom": 2,
+  "faceX": 15.0
+}

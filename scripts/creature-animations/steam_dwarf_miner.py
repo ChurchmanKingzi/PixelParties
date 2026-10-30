@@ -23,7 +23,7 @@ Ablauf (48 Frames à 62 ms = 2,98 s, nahtlos):
   Kapuze und Rohre 0 → 1 → 2 → 1 → 0 px, Gesicht/Bart/Umhang 0 → 1 → 0.
 * Dampfrohre zittern (Dampfdruck): die obersten drei Rohrzeilen (0–2) jedes Rohrs schlagen gemeinsam ±1 px seitlich aus (links/rechts Periode 12 gegenphasig, Mitte Periode 16), jedes Rohr bleibt 4-verbunden.
 * Umhang weht (ruhig): der Umhang spreizt sich abwechselnd links/rechts nach außen (höchstens 1 px, nur am unteren Ende, eine Welle pro Schleife, Periode 48); der innerste Umhangpixel jeder Zeile
-  bleibt am Bartumriss angewachsen, die Lücke wird mit Umhangfarbe gefüllt (`Hm.rand_dehnen`).
+  bleibt am Bartumriss angewachsen, die Lücke wird mit dem inneren Umhangpixel gefüllt (`Hm.rand_dehnen_innen`: der Umriss wandert mit, kein Umrissblock neben dem Umhang).
 * Blinzeln (Frames 19–21 und 40–42): beide Augen schließen sich — Iris/Weiß/Rot nehmen die umgebende Hautfarbe an (links (8,16) und (8,17) → Haut T (246,205,139), rechts (12,17) → Haut (246,189,123)).
   Kein Farbtausch, kein Augenglanz.
 * Dampf steigt aus allen drei Rohren auf (Partikel): sechs runde Dampfwolken ('m' Wölkchen und 'o' Oval) in Weiß/Hellgrau steigen langsam bis 4 px auf (Periode 24 Frames, je Rohr zwei Wölkchen um eine

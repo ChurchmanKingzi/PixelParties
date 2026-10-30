@@ -81,7 +81,13 @@ rest = vorhanden & ~FL_L & ~FL_R & ~KLINGE1 & ~KLINGE2 & ~SAUM[0] & ~SAUM[1] & ~
 
 BLASE = {'c': (189, 189, 189), 'r': (106, 106, 106)}
 P = lambda x, y: (GPL + x, GPT + y)
-PUFFS = []
+# Flügel, Saum und Sense füllen das Feld fast ganz: freie Bahnen (Abstand ≥ 2 px in jeder Pose, Partikel höchstens +2 px über den Körper-Rand hinaus) gibt es nur links und rechts neben dem Rumpf
+# (y 11–19) und rechts unten.
+BLASEN_N = 24                                                   # Lebensdauer 24 Frames, zweimal pro Schleife (je Bahn nur ein Wölkchen auf einmal)
+PUFFS = [
+    dict(x=P(-1, 19)[0], y=P(-1, 19)[1], vx=0, vy=-8, off=0, wackeln=0.4),
+    dict(x=P(32, 19)[0], y=P(32, 19)[1], vx=0, vy=-8, off=12, wackeln=0.4),
+]
 
 
 def teil(maske):
@@ -106,27 +112,35 @@ def fluegel(a, pivot_x, amp, ph, breite=2):
         dys[x] = int(round(amp * math.sin(ph) * frac))
         for y in np.nonzero(a[:, x, 3])[0]:
             out[y + dys[x], x] = a[y, x]
-    # Reparatur: von innen nach außen
+    # Reparatur: von innen nach außen; jede zusammenhängende Pixelfolge (Lauf) einer Spalte, die im Ruhebild waagerecht an der inneren Nachbarspalte lag, es nach dem Versatz aber nicht mehr tut, wird um die Lücke
+    # (Pixel in der Farbe ihres nächsten Pixels) bis zur inneren Spalte verlängert — die Spitze reißt nicht ab.
     step = -1 if min(cols) < pivot_x else 1
     for x in sorted(cols, key=lambda c: abs(c - pivot_x)):
-        xi = x - step                                              # innere Nachbarspalte
+        xi = x - step
         if xi not in dys or dys[xi] == dys[x]:
             continue
         r_in = set(np.nonzero(a[:, xi, 3])[0].tolist())
-        r_out = set(np.nonzero(a[:, x, 3])[0].tolist())
-        if not (r_in & r_out):
-            continue                                               # lag im Ruhebild nicht waagerecht aneinander
+        ys = np.nonzero(a[:, x, 3])[0].tolist()
+        runs, cur = [], [ys[0]]
+        for y in ys[1:]:
+            if y == cur[-1] + 1:
+                cur.append(y)
+            else:
+                runs.append(cur)
+                cur = [y]
+        runs.append(cur)
         s_in = {y + dys[xi] for y in r_in}
-        s_out = {y + dys[x] for y in r_out}
-        if s_in & s_out:
-            continue
-        # nächstes Paar (Zeile außen, Zeile innen) suchen und die Lücke in der äußeren Spalte füllen
-        yo, yi = min(((o, i_) for o in s_out for i_ in s_in), key=lambda t: abs(t[0] - t[1]))
-        lo, hi = sorted((yo, yi))
-        quelle = yo - dys[x]
-        for y in range(lo, hi + 1):
-            if not out[y, x, 3]:
-                out[y, x] = a[quelle, x]
+        for run in runs:
+            if not (set(run) & r_in):
+                continue                                           # lag im Ruhebild nicht waagerecht an der inneren Spalte
+            sr = [y + dys[x] for y in run]
+            if set(sr) & s_in:
+                continue
+            yo, yi = min(((o, i_) for o in sr for i_ in s_in), key=lambda t: abs(t[0] - t[1]))
+            lo, hi = sorted((yo, yi))
+            for y in range(lo, hi + 1):
+                if not out[y, x, 3]:
+                    out[y, x] = a[yo - dys[x], x]
     return out
 
 
@@ -172,7 +186,7 @@ def frame_gross(i, nur=None):
     koerper = U.kontur_schliessen(koerper, UMRISS, KONTUR)
     if nur == 'koerper':
         return koerper
-    blasen = _glut(H, W, i, N, PUFFS, BLASE)
+    blasen = _glut(H, W, i, BLASEN_N, PUFFS, BLASE)
     return L.zusammen(H, W, [(blasen, 0, 0), (koerper, 0, 0)])
 
 
