@@ -2,14 +2,14 @@
   "creature": "Lunatic Hawk",
   "sheet": "lunatic-hawk.png",
   "frameWidth": 55,
-  "frameHeight": 53,
+  "frameHeight": 48,
   "frames": 48,
   "frameMs": 65,
   "loop": true,
   "layout": "horizontal",
-  "padTop": 5,
+  "padTop": 2,
   "padLeft": 2,
   "padRight": 3,
-  "padBottom": 4,
+  "padBottom": 2,
   "faceX": 27.5
 }

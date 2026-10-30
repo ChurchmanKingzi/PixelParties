@@ -45,7 +45,7 @@ import anim_flieger_b as B
 
 N, MS = 48, 65
 BEAT, DOWN = 12, 5                                         # Frames je Schlag, davon Abschlag
-PAD_L, PAD_R, PAD_T, PAD_B = 4, 4, 6, 4
+PAD_L, PAD_R, PAD_T, PAD_B = 4, 4, 3, 2
 
 spr = L.lade('lunatic-hawk')                               # Falke + Kugeln (Ruhepose / Referenz für den Randpixel-Test)
 falke = L.lade('lunatic-hawk-falke')
