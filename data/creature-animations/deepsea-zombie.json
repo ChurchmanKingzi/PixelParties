@@ -1,0 +1,15 @@
+{
+  "creature": "Deepsea Zombie",
+  "sheet": "deepsea-zombie.png",
+  "frameWidth": 22,
+  "frameHeight": 29,
+  "frames": 48,
+  "frameMs": 65,
+  "loop": true,
+  "layout": "horizontal",
+  "padTop": 1,
+  "padLeft": 1,
+  "padRight": 1,
+  "padBottom": 2,
+  "faceX": 11.0
+}
