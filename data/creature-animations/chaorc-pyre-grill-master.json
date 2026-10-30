@@ -1,0 +1,15 @@
+{
+  "creature": "Chaorc Pyre Grill Master",
+  "sheet": "chaorc-pyre-grill-master.png",
+  "frameWidth": 76,
+  "frameHeight": 70,
+  "frames": 48,
+  "frameMs": 62,
+  "loop": true,
+  "layout": "horizontal",
+  "padTop": 12,
+  "padLeft": 6,
+  "padRight": 6,
+  "padBottom": 3,
+  "faceX": 38.0
+}

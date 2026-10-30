@@ -1,0 +1,15 @@
+{
+  "creature": "Royal Corgi",
+  "sheet": "royal-corgi.png",
+  "frameWidth": 21,
+  "frameHeight": 25,
+  "frames": 60,
+  "frameMs": 65,
+  "loop": true,
+  "layout": "horizontal",
+  "padTop": 3,
+  "padLeft": 3,
+  "padRight": 4,
+  "padBottom": 3,
+  "faceX": 10.5
+}
