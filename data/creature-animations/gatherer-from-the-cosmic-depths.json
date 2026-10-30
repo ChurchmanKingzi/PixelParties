@@ -1,0 +1,15 @@
+{
+  "creature": "Gatherer from the Cosmic Depths",
+  "sheet": "gatherer-from-the-cosmic-depths.png",
+  "frameWidth": 35,
+  "frameHeight": 37,
+  "frames": 48,
+  "frameMs": 70,
+  "loop": true,
+  "layout": "horizontal",
+  "padTop": 1,
+  "padLeft": 2,
+  "padRight": 1,
+  "padBottom": 1,
+  "faceX": 17.5
+}

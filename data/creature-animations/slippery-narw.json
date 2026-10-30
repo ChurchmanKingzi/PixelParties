@@ -1,0 +1,15 @@
+{
+  "creature": "Slippery Narw",
+  "sheet": "slippery-narw.png",
+  "frameWidth": 30,
+  "frameHeight": 58,
+  "frames": 48,
+  "frameMs": 66,
+  "loop": true,
+  "layout": "horizontal",
+  "padTop": 2,
+  "padLeft": 2,
+  "padRight": 2,
+  "padBottom": 2,
+  "faceX": 15.0
+}

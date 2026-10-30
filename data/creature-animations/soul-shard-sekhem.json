@@ -1,0 +1,15 @@
+{
+  "creature": "Soul Shard Sekhem",
+  "sheet": "soul-shard-sekhem.png",
+  "frameWidth": 25,
+  "frameHeight": 31,
+  "frames": 48,
+  "frameMs": 65,
+  "loop": true,
+  "layout": "horizontal",
+  "padTop": 2,
+  "padLeft": 3,
+  "padRight": 3,
+  "padBottom": 2,
+  "faceX": 12.5
+}
