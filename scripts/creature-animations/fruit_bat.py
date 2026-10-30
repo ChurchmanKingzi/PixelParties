@@ -23,7 +23,7 @@ Ablauf (48 Frames à 60 ms = 2,88 s):
 * Blinzeln: die Augen schließen sich für 3 Frames (Frame 26–28), das Lid ist die Apfelfarbe (154,98,114).
 * Kein Glanz (Frucht/Haut/Knochen), kein Feuer, keine Partikel.
 
-Ergänzungen: keine nötig — die Flügel sitzen außen am Körper, nichts Verdecktes wird sichtbar. Wo das Drehen den Flügel von der Wurzel lösen würde, schließt ein Pixel in der Flughautfarbe (95,55,74) die Lücke (8-verbunden).
+Ergänzungen: keine nötig — die Flügel sitzen außen am Körper, nichts Verdecktes wird sichtbar. Wo das Drehen den Flügel von der Wurzel lösen würde, schließt ein Pixel in der Flughautfarbe (95,55,74) die Lücke; Teile, die nur über eine Pixelecke hängen, bekommen ein Eckpixel in der Farbe ihres Randpixels (das Original ist durchgehend 4-verbunden).
 Rahmen: auf die Figur zugeschnitten (Vereinigung aller Frames + 2 px freier Rand, zentriert), keine Effekte außerhalb der Figur.
 Randpixel-Test (Regel 16): Drehen legt nur Farben des Flügels an dessen Ränder, die Flügelrandfarben sind alle in der Quelle Randfarben; zusätzlich randtest.py.
 Alle Bewegungen laufen auf der vollen (größeren) Arbeitsleinwand (anim_lib wirft ClipError). Nur ganze Pixel, nur Farben der Quelle, Alpha nur 0/255.
@@ -104,6 +104,39 @@ def bruecken8(f, start):
     return f
 
 
+def verbinde4(f):
+    """Teile, die nur über eine Pixelecke am Hauptteil hängen (4er-Nachbarschaft), bekommen ein Eckpixel in der Farbe ihres Randpixels (wie im Original, das durchgehend 4-verbunden ist)."""
+    for _ in range(6):
+        n, lab_ = cv2.connectedComponents((f[..., 3] > 0).astype(np.uint8), connectivity=4)
+        if n <= 2:
+            break
+        gr = [int((lab_ == k).sum()) for k in range(n)]
+        haupt = int(np.argmax(gr[1:])) + 1
+        gefunden = False
+        for k in range(1, n):
+            if k == haupt:
+                continue
+            for y, x in np.argwhere(lab_ == k):
+                for dy, dx in ((-1, -1), (-1, 1), (1, -1), (1, 1)):
+                    qy, qx = y + dy, x + dx
+                    if 0 <= qy < f.shape[0] and 0 <= qx < f.shape[1] and lab_[qy, qx] == haupt:
+                        for cy, cx in ((y, qx), (qy, x)):
+                            if not f[cy, cx, 3]:
+                                f[cy, cx, :3] = f[y, x, :3]
+                                f[cy, cx, 3] = 255
+                                gefunden = True
+                                break
+                    if gefunden:
+                        break
+                if gefunden:
+                    break
+            if gefunden:
+                break
+        if not gefunden:
+            break
+    return f
+
+
 def frame(i, partikel=True, effekte=True):
     ph = L.sinus(i, N / 4)                                     # Periode 12
     ph2 = ph + 0.3 * math.sin(ph)                              # Abschlag etwas schneller als Aufschlag (Frame 0 = Ruhelage)
@@ -125,7 +158,7 @@ def frame(i, partikel=True, effekte=True):
     ganz = L.zusammen(H, W, [(fl, 0, 0), (fr, 0, 0), (st, 0, 0), (ap, 0, 0)])
     ys, xs = np.nonzero(ap[..., 3])
     start = (PAD_L + 22, PAD_T + 25)
-    mit = bruecken8(ganz.copy(), start)
+    mit = verbinde4(bruecken8(ganz.copy(), start))
     brk = L.leer(H, W)
     neu = (mit[..., 3] > 0) & ~(ganz[..., 3] > 0)
     brk[neu] = mit[neu]
