@@ -891,7 +891,65 @@
         aus[j][p] = v;
       }
     }
+    if (!pe && !svgInnen && (props.includes('width') || props.includes('height'))) { try { ringBacken(el, cs, aus, raster, n); } catch (e) { if (KONFIG.debug) console.warn('[PPPixelAnim.ring]', e); } }
     return aus;
+  }
+
+  /**
+   * ★ W86p: Ring mit animierter GROESSE (`border-radius: 50 %` + `border`, durchsichtige Flaeche — Druckwellen, Zielringe): der Browser malt den Bogen als
+   * Vektor, jede Randpixel bekommt Teildeckkraft (Mischfarben ausserhalb der Palette). Je Bild wird der Ring stattdessen als Pixelbild gemalt (Kunstpixel-
+   * Raster, Palettenfarbe, deckend) und der Rand durchsichtig gesetzt; die Groesse (Layout) bleibt unveraendert.
+   */
+  const _ringCache = new Map();
+  function ringBild(nx, ny, d, rgb) {
+    const key = nx + 'x' + ny + ':' + d + ':' + rgb.join(',');
+    let u = _ringCache.get(key);
+    if (u !== undefined) return u;
+    const [cv, g] = neuesCanvas(nx, ny);
+    const id = g.createImageData(nx, ny), dat = id.data;
+    const ax = nx / 2, ay = ny / 2, bx = Math.max(0.0001, ax - d), by = Math.max(0.0001, ay - d);
+    for (let y = 0; y < ny; y++) for (let x = 0; x < nx; x++) {
+      const ux = x + 0.5 - ax, uy = y + 0.5 - ay;
+      const aussen = (ux * ux) / (ax * ax) + (uy * uy) / (ay * ay) <= 1;
+      const innen = ax - d > 0.5 && ay - d > 0.5 && (ux * ux) / (bx * bx) + (uy * uy) / (by * by) < 1;
+      if (aussen && !innen) { const i = (y * nx + x) * 4; dat[i] = rgb[0]; dat[i + 1] = rgb[1]; dat[i + 2] = rgb[2]; dat[i + 3] = 255; }
+    }
+    g.putImageData(id, 0, 0);
+    try { u = cv.toDataURL('image/png'); } catch (e) { u = ''; }
+    if (_ringCache.size > 300) _ringCache.clear();
+    _ringCache.set(key, u);
+    return u;
+  }
+  function ringBacken(el, cs, aus, raster, n) {
+    const bw = parseFloat(cs.borderTopWidth) || 0;
+    if (!(bw > 0) || cs.borderTopStyle !== 'solid') return;
+    const bc = farbeRgba(cs.borderTopColor);
+    if (!bc || bc[3] < 0.5) return;
+    const bg = farbeRgba(cs.backgroundColor);
+    if ((bg && bg[3] > 0.03) || (cs.backgroundImage && cs.backgroundImage !== 'none')) return;
+    const rr = cs.borderTopLeftRadius || '0px';
+    const rund = /%/.test(rr) ? parseFloat(rr) >= 45 : parseFloat(rr) >= Math.min(el.offsetWidth, el.offsetHeight) / 2 - 1;
+    if (!rund) return;
+    if (!(raster > 0)) raster = KONFIG.px;
+    const rgb = root.ppSnapRgb ? root.ppSnapRgb(bc[0] | 0, bc[1] | 0, bc[2] | 0) : [bc[0] | 0, bc[1] | 0, bc[2] | 0];
+    const bb = cs.boxSizing === 'border-box';
+    const mass = (v, fallback) => { const f = parseFloat(v); return f >= 0 ? f : fallback; };
+    const W0 = el.offsetWidth, H0 = el.offsetHeight;
+    const d = Math.max(1, Math.round(bw / raster));
+    const bilder = [];
+    for (let j = 0; j < n; j++) {
+      const w = mass(aus[j].width, bb ? W0 : W0 - 2 * bw), h = mass(aus[j].height, bb ? H0 : H0 - 2 * bw);
+      const AW = bb ? w : w + 2 * bw, AH = bb ? h : h + 2 * bw;
+      const nx = Math.max(2, Math.round(AW / raster)), ny = Math.max(2, Math.round(AH / raster));
+      const u = ringBild(nx, ny, d, rgb);
+      if (!u) return;
+      bilder.push(u);
+    }
+    for (let j = 0; j < n; j++) { aus[j].backgroundImage = `url("${bilder[j]}")`; aus[j].borderColor = 'transparent'; }
+    const st = el.style;
+    st.setProperty('background-size', '100% 100%'); st.setProperty('background-origin', 'border-box'); st.setProperty('background-repeat', 'no-repeat');
+    st.setProperty('image-rendering', 'pixelated');
+    stat.ringe = (stat.ringe || 0) + 1;
   }
 
   // ════════════════════════════════════════════════════════════════════════
