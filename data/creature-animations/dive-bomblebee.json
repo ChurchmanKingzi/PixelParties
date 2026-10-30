@@ -1,0 +1,15 @@
+{
+  "creature": "Dive Bomblebee",
+  "sheet": "dive-bomblebee.png",
+  "frameWidth": 57,
+  "frameHeight": 44,
+  "frames": 48,
+  "frameMs": 60,
+  "loop": true,
+  "layout": "horizontal",
+  "padTop": 6,
+  "padLeft": 10,
+  "padRight": 8,
+  "padBottom": 9,
+  "faceX": 28.5
+}

@@ -1,0 +1,15 @@
+{
+  "creature": "Mischief Militia - Chilly Wizard",
+  "sheet": "mischief-militia-chilly-wizard.png",
+  "frameWidth": 31,
+  "frameHeight": 36,
+  "frames": 48,
+  "frameMs": 62,
+  "loop": true,
+  "layout": "horizontal",
+  "padTop": 4,
+  "padLeft": 2,
+  "padRight": 3,
+  "padBottom": 3,
+  "faceX": 15.5
+}

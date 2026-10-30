@@ -1,0 +1,15 @@
+{
+  "creature": "Loyal Labradoodle",
+  "sheet": "loyal-labradoodle.png",
+  "frameWidth": 22,
+  "frameHeight": 23,
+  "frames": 50,
+  "frameMs": 70,
+  "loop": true,
+  "layout": "horizontal",
+  "padTop": 3,
+  "padLeft": 4,
+  "padRight": 4,
+  "padBottom": 3,
+  "faceX": 11.0
+}

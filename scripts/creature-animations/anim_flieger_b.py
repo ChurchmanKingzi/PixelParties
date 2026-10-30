@@ -38,6 +38,49 @@ def weich(t):
     return t * t * (3 - 2 * t)
 
 
+def pose_vektor(pose):
+    """Pose (dict) → flache Float-Liste, damit sie sich splinen lässt; vektor_pose() ist die Umkehrung (gleiche Struktur wie `vorlage`)."""
+    v = []
+    for k in sorted(pose):
+        x = pose[k]
+        v += list(x) if isinstance(x, (tuple, list)) else [x]
+    return v
+
+
+def vektor_pose(v, vorlage):
+    out, i = {}, 0
+    for k in sorted(vorlage):
+        x = vorlage[k]
+        if isinstance(x, (tuple, list)):
+            out[k] = type(x)(v[i:i + len(x)]); i += len(x)
+        else:
+            out[k] = v[i]; i += 1
+    return out
+
+
+def spline(schluessel, t, periode):
+    """Kubischer Hermite-Spline durch Schlüsselposen, periodisch (nahtlose Schleife). schluessel = [(zeit, vektor, halt)], zeit aufsteigend in
+    [0, periode); halt=True → Tangente 0 (Pose verharrt, z. B. gefalteter Flügel). Gibt den Vektor zur Zeit t (mod periode) zurück.
+    Durchläuft jede Schlüsselpose exakt und beschleunigt/bremst dazwischen weich (kein Stop-and-go an den Zwischenposen)."""
+    t = t % periode
+    n = len(schluessel)
+    ks = [(z - periode, v, h) for (z, v, h) in schluessel] + list(schluessel) + [(z + periode, v, h) for (z, v, h) in schluessel]
+    # Segment suchen
+    i = next(j for j in range(len(ks) - 1) if ks[j][0] <= t < ks[j + 1][0])
+    (z0, v0, h0), (z1, v1, h1) = ks[i], ks[i + 1]
+    zm, vm, _ = ks[i - 1]
+    zp, vp, _ = ks[i + 2]
+    d = z1 - z0
+    u = (t - z0) / d
+    out = []
+    for a in range(len(v0)):
+        m0 = 0.0 if h0 else (v1[a] - vm[a]) / (z1 - zm)
+        m1 = 0.0 if h1 else (vp[a] - v0[a]) / (zp - z0)
+        h00, h10, h01, h11 = 2 * u ** 3 - 3 * u ** 2 + 1, u ** 3 - 2 * u ** 2 + u, -2 * u ** 3 + 3 * u ** 2, u ** 3 - u ** 2
+        out.append(h00 * v0[a] + h10 * d * m0 + h01 * v1[a] + h11 * d * m1)
+    return out
+
+
 # ── Rasterhilfen ─────────────────────────────────────────────────────────────────────────────────────────────────────
 def linie(p0, p1):
     """Bresenham, Punkte (x, y) von p0 bis p1 (ganze Pixel, 8-verbunden)."""
@@ -132,10 +175,6 @@ def rein_farbe(pr, ab_wurzel, ab_spitze):
         return pr['manschette'][1]
     if ab_spitze == 2:
         return pr['manschette'][0]
-    if ab_spitze == 6:
-        return pr['binde'][0]
-    if ab_spitze == 7:
-        return pr['binde'][1]
     if ab_wurzel < 5:
         return pr['knochen'][0]
     return pr['knochen'][1] if ab_spitze > 3 else pr['knochen'][2]
@@ -266,16 +305,30 @@ def knochenflügel(h, w, pose, pal, quelle, spalten, x0, y0, risse=(), adern=Tru
         a[y, x, :3] = c
         a[y, x, 3] = 255
 
-    # ---- Armknochen (2 px dick, oben hell, darunter grau), 4-verbunden — nur wenn der Arm eine Länge hat
+    # ---- Armknochen (2 px dick, oben hell, darunter grau), 4-verbunden — nur wenn der Arm eine Länge hat; braune Binden darauf
     if len(arm) > 2:
         for (x, y) in arm:
             setze(x, y + 1, pal['knochen'][2])
         for k, (x, y) in enumerate(arm):
-            setze(x, y, pal['knochen'][1] if k % 6 == 3 else pal['knochen'][0])
-    # ---- Finger: hinten (letzter) zuerst, damit die Vorderkante oben liegt
+            setze(x, y, pal['knochen'][0])
+        for k in (len(arm) // 3, 2 * len(arm) // 3):
+            if 0 < k < len(arm) - 1:
+                setze(arm[k][0], arm[k][1] + 1, binde[0])
+                if k + 1 < len(arm):
+                    setze(arm[k + 1][0], arm[k + 1][1] + 1, binde[1])
+    # ---- Finger: hinten (letzter) zuerst, damit die Vorderkante oben liegt; Wurzelhälfte 2 px dick (Schattenpixel daneben)
     for k in range(n - 1, -1, -1):
-        for (x, y), c in fing_px[k].items():
+        pts = list(fing_px[k].items())
+        dick = pose.get('dick', 0.4)
+        for j, ((x, y), c) in enumerate(pts):
             setze(x, y, c)
+        if rein >= 0.5 and dick > 0 and k == 0:
+            ang = math.radians(angs[k])
+            flach = abs(math.cos(ang)) > abs(math.sin(ang))
+            for j, ((x, y), c) in enumerate(pts[:int(len(pts) * dick)]):
+                sx, sy = (x, y + 1) if flach else (x + 1, y)
+                if (sx, sy) not in fing_px[k] and 0 <= sy < h and 0 <= sx < w and not bone_m[sy, sx]:
+                    setze(sx, sy, pal['knochen'][2])
     # ---- Handgelenk: Wulst aus Binde (2×2) mit hellem Knöchel
     if pose.get('wulst', 0):
         wx, wy = int(round(Wr[0])), int(round(Wr[1]))

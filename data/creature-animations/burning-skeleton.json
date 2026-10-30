@@ -1,0 +1,15 @@
+{
+  "creature": "Burning Skeleton",
+  "sheet": "burning-skeleton.png",
+  "frameWidth": 36,
+  "frameHeight": 53,
+  "frames": 48,
+  "frameMs": 60,
+  "loop": true,
+  "layout": "horizontal",
+  "padTop": 8,
+  "padLeft": 6,
+  "padRight": 6,
+  "padBottom": 5,
+  "faceX": 18.0
+}

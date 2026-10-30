@@ -109,22 +109,39 @@ def stapeln(bilder):
     return out
 
 
-def fluegel_welle(a, pivot_x, amp, phase, potenz=1.0, nur_rechts=None, lauf=0.0):
+def fluegel_welle(a, pivot_x, amp, phase, potenz=1.0, nur_rechts=None, lauf=0.0, zusammenhang=False):
     """Wie L.spalten_welle (senkrechter Spaltenversatz wächst mit dem Abstand zum Gelenk, Positiv = nach unten), aber der
     Wellenlauf (`lauf`: die Spitze hinkt der Wurzel hinterher) ist so verschoben, dass bei phase = 0 JEDE Spalte genau auf
-    ihrer Originalposition steht (Ruhepose = Original). Spalten auf der nicht bewegten Seite des Gelenks (nur_rechts) bleiben stehen."""
+    ihrer Originalposition steht (Ruhepose = Original). Spalten auf der nicht bewegten Seite des Gelenks (nur_rechts) bleiben stehen.
+    zusammenhang=True: Ist eine Spalte nach dem Versatz von ihrer Nachbarspalte zur Wurzel hin nicht mehr 4-verbunden (kein gemeinsames
+    Zeilenpixel mehr, z. B. dünne Flügelspitzen aus 1–2 Pixeln), übernimmt sie deren Versatz — die Spitze reißt nicht ab."""
     out = L.leer(*a.shape[:2])
     h, w = a.shape[:2]
     maxd = max(1, max(abs(x - pivot_x) for x in range(w) if a[:, x, 3].any()))
+    dys = {}
     for x in range(w):
         if not a[:, x, 3].any():
             continue
         d = x - pivot_x
         if nur_rechts is True and d < 0 or nur_rechts is False and d > 0:
-            dy = 0
+            dys[x] = 0
         else:
             frac = abs(d) / maxd
-            dy = int(round(amp * (math.sin(phase - lauf * frac) - math.sin(-lauf * frac)) * frac ** potenz))
+            dys[x] = int(round(amp * (math.sin(phase - lauf * frac) - math.sin(-lauf * frac)) * frac ** potenz))
+    if zusammenhang:
+        links = sorted((x for x in dys if x < pivot_x), reverse=True)        # von der Wurzel nach außen
+        rechts = sorted(x for x in dys if x > pivot_x)
+        for reihe, innen in ((links, 1), (rechts, -1)):
+            for x in reihe:
+                xi = x + innen
+                if xi not in dys:
+                    continue
+                r0 = set(np.nonzero(a[:, x, 3])[0].tolist()), set(np.nonzero(a[:, xi, 3])[0].tolist())
+                war = bool(r0[0] & r0[1])                                   # im Original verbunden?
+                neu = {y + dys[x] for y in r0[0]} & {y + dys[xi] for y in r0[1]}
+                if war and not neu:
+                    dys[x] = dys[xi]
+    for x, dy in dys.items():
         ys = np.nonzero(a[:, x, 3])[0]
         if ys.min() + dy < 0 or ys.max() + dy >= h:
             raise L.ClipError(f'Spalte {x} würde um {dy} px aus der Leinwand (Höhe {h}) geschoben')
