@@ -169,7 +169,7 @@ def frame(i, partikel=True, nur=None):
         fuesse = FUESSE
         if n - k > 0:
             fuesse = L.streck_zeile(fuesse, PAD_T + 30, n - k)             # Beine: Lücke füllen doppelte oberste Beinzeile
-        fl_l = B.zeilen_klappen(FL_L, Y_PIV, dx_fn(i), richtung=-1)
+        fl_l = B.zeilen_klappen(FL_L, Y_PIV, dx_fn(i), richtung=-1, starr_oben=PAD_T + 9)      # der Federbogen oben (y 7–8) bleibt als Ganzes
         fl_r = B.zeilen_klappen(FL_R, Y_PIV, dx_fn(i, 0.3), richtung=1)
         schichten += [(fl_l, 0, -n, 1), (fl_r, 0, -n, 2), (koerper, 0, -n, 3), (fuesse, 0, -k, 4)]
     f, karte = B.zusammen_mit_karte(H, W, schichten)

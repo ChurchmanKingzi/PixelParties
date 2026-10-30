@@ -1,0 +1,15 @@
+{
+  "creature": "Future Tech Mech",
+  "sheet": "future-tech-mech.png",
+  "frameWidth": 20,
+  "frameHeight": 25,
+  "frames": 48,
+  "frameMs": 70,
+  "loop": true,
+  "layout": "horizontal",
+  "padTop": 1,
+  "padLeft": 1,
+  "padRight": 1,
+  "padBottom": 1,
+  "faceX": 10.0
+}

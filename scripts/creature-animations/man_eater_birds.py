@@ -56,7 +56,7 @@ BIRDS = [
     dict(name='A', auge=(10, 7), phi_orig=56.0, richtung=+1, bob_v=0, blinz=(14, 15, 16), pivot=(18.5, 8.0),
          fluegel=lambda x, y: (y <= 7) & (x >= 16)),
     dict(name='B', auge=(39, 17), phi_orig=-69.0, richtung=+1, bob_v=+1, blinz=(36, 37, 38), pivot=(47.0, 21.5),
-         fluegel=lambda x, y: (y >= 22) & (x >= 43) & (x <= 50)),
+         fluegel=lambda x, y: (y >= 22) & (x >= 43) & ~((x >= 51) & (y <= 25))),
     dict(name='C', auge=(4, 39), phi_orig=76.0, richtung=+1, bob_v=-1, blinz=(26, 27, 28), pivot=(12.5, 37.5),
          fluegel=lambda x, y: (y <= 37) & (x >= 9)),
 ]

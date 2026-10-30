@@ -413,11 +413,12 @@ def kleine_inseln_weg(a, min_px=4):
     return out
 
 
-def zeilen_klappen(a, y_piv, dx_fn, richtung=1):
+def zeilen_klappen(a, y_piv, dx_fn, richtung=1, starr_oben=None):
     """Aufrecht stehender Flügel (Engelsflügel, Klinge) klappt zur Seite: jede Zeile OBERHALB der Pivotzeile y_piv wandert als Ganzes waagerecht um
     richtung · round(dx_fn(f)), f = (y_piv − y) / größter Abstand (0…1; die Pivotzeile und alles darunter bleiben stehen). Die Federtextur jeder Zeile bleibt (nichts wird
     kopiert). Zusammenhang: war eine Zeile in der Ruhepose mit der Zeile darunter (8er-Nachbarschaft) verbunden, muss sie es nach dem Versatz bleiben — sonst übernimmt sie
-    den Versatz der Zeile darunter (dünne Bögen und Spitzen reißen nicht ab). richtung = +1 nach rechts, −1 nach links. ClipError, wenn etwas herausragt."""
+    den Versatz der Zeile darunter (dünne Bögen und Spitzen reißen nicht ab). starr_oben = Zeile: alle Zeilen darüber übernehmen deren Versatz (die Spitze bleibt als Ganzes
+    erhalten, z. B. ein Federbogen aus Einzelpixeln). richtung = +1 nach rechts, −1 nach links. ClipError, wenn etwas herausragt."""
     out = L.leer(*a.shape[:2])
     h, w = a.shape[:2]
     ys = [y for y in range(h) if a[y, :, 3].any()]
@@ -426,8 +427,9 @@ def zeilen_klappen(a, y_piv, dx_fn, richtung=1):
     dxs = {}
     prev = 0
     for y in sorted(ys, reverse=True):                                  # von unten (Ansatz) nach oben
-        dx = 0 if y >= y_piv else int(round(dx_fn((y_piv - y) / maxd))) * richtung
-        if y < y_piv and y + 1 in dxs:
+        yy_ = y if starr_oben is None else max(y, starr_oben)
+        dx = 0 if y >= y_piv else int(round(dx_fn((y_piv - yy_) / maxd))) * richtung
+        if y < y_piv and y + 1 in dxs and starr_oben is None:
             xs_ = set(np.nonzero(a[y, :, 3])[0].tolist())
             unten = set(np.nonzero(a[y + 1, :, 3])[0].tolist())
             war = any((x + d) in unten for x in xs_ for d in (-1, 0, 1))
