@@ -411,3 +411,22 @@ def kleine_inseln_weg(a, min_px=4):
         if k != gross and st[k, 4] < min_px:
             out[lab == k] = 0
     return out
+
+
+def zeilen_klappen(a, y_piv, dx_fn, richtung=1):
+    """Aufrecht stehender Flügel (Engelsflügel, Klinge) klappt zur Seite: jede Zeile OBERHALB der Pivotzeile y_piv wandert als Ganzes waagerecht um
+    richtung · round(dx_fn(f)), f = (y_piv − y) / größter Abstand (0…1; die Pivotzeile und alles darunter bleiben stehen). Benachbarte Zeilen unterscheiden sich
+    nur um wenige Pixel, die Federtextur jeder Zeile bleibt (nichts wird kopiert). richtung = +1 nach rechts, −1 nach links. ClipError, wenn etwas herausragt."""
+    out = L.leer(*a.shape[:2])
+    h, w = a.shape[:2]
+    ys = [y for y in range(h) if a[y, :, 3].any()]
+    oben = [y for y in ys if y < y_piv]
+    maxd = max(1, y_piv - min(oben)) if oben else 1
+    for y in ys:
+        dx = 0 if y >= y_piv else int(round(dx_fn((y_piv - y) / maxd))) * richtung
+        xs_ = np.nonzero(a[y, :, 3])[0]
+        if xs_.min() + dx < 0 or xs_.max() + dx >= w:
+            raise L.ClipError(f'Zeile {y} würde um {dx} px aus der Leinwand (Breite {w}) geschoben')
+        for x in xs_:
+            out[y, x + dx] = a[y, x]
+    return out

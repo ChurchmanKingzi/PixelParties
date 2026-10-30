@@ -17,7 +17,7 @@ Die drei Vögel sind dieselbe Figur in drei Flügelstellungen (oben, schräg, un
 Ablauf (48 Frames à 60 ms = 2,88 s):
 * Durchgehender Flügelschlag im konstanten Rhythmus (Periode 12, viermal pro Schleife), alle drei Vögel gleich schnell, aber gegeneinander versetzt: Jeder Flügel schwingt zwischen −69° (unten) und +80° (oben) um die Flügelwurzel am Rumpf,
   die Phase ist je Vogel so gewählt, dass in Frame 0 jeder Vogel genau in seiner Stellung der Karte steht (A schräg nach oben, auf dem Weg nach unten; B ganz unten; C fast ganz oben). Abschlag etwas schneller als Aufschlag.
-  Der Flügel dreht sich als ganzes Dreieck (Rückwärtsabbildung, Nächster Nachbar, Silhouette geglättet), liegt dabei hinter dem Rumpf; wo ein Flügel den Rumpfrand freigibt, bekommt die freie Kante den dunklen Umriss (27,27,27).
+  Der Flügel dreht sich als ganzes Dreieck (Rückwärtsabbildung, Nächster Nachbar, Silhouette geglättet), liegt dabei vor dem Rumpf (der nahe Flügel, er schwingt an der Seite des Vogels vorbei); wo die Drehung eine Kante freilegt, bekommt sie den dunklen Umriss (27,27,27).
 * Schwebe-Bob je Vogel zweistufig bis 2 px nach oben (0 → 1 → 2 → 1 → 0, Periode 12), gegeneinander um einen Frame verschoben (A 0, B +1, C −1; die Ruhestufe dauert 3 Frames, Frame 0 bleibt Original).
 * Blinzeln einmal pro Schleife je Vogel zu verschiedener Zeit (3 Frames: A 14–16, B 36–38, C 26–28), das Lid ist die Kopffarbe (45,45,45).
 * Kein Glanz, kein Feuer, keine Partikel; die weißen Zähne bleiben stehen.
@@ -112,7 +112,7 @@ def bruecken8(f, start):
 
 
 def bird_ebenen(b, i, effekte=True):
-    """Ebenen eines Vogels in Frame i: [(Ebene, dx, dy)] inkl. Bob; Flügel hinten, Rumpf vorn."""
+    """Ebenen eines Vogels in Frame i: [(Ebene, dx, dy)] inkl. Bob; Rumpf hinten, Flügel (der nahe Flügel) davor."""
     ph = 2 * math.pi * i / 12.0
     ph2 = ph + 0.3 * math.sin(ph + b['phi0'])                  # Abschlag etwas schneller als Aufschlag
     ph2 -= 0.3 * math.sin(b['phi0'])                           # Frame 0 = Ruhelage
@@ -125,14 +125,14 @@ def bird_ebenen(b, i, effekte=True):
     if effekte and i in b['blinz']:
         for (x, y) in b['eyes']:
             rumpf[PAD_T + y, PAD_L + x, :3] = KOPF
-    ganz = L.zusammen(H, W, [(fl, 0, 0), (rumpf, 0, 0)])
+    ganz = L.zusammen(H, W, [(rumpf, 0, 0), (fl, 0, 0)])
     ys, xs = np.nonzero(rumpf[..., 3])
     start = (int(xs[len(xs) // 2]), int(ys[len(ys) // 2]))
     mit = bruecken8(ganz.copy(), start)
     brk = L.leer(H, W)
     neu = (mit[..., 3] > 0) & ~(ganz[..., 3] > 0)
     brk[neu] = mit[neu]
-    return [(a, 0, bob) for a in (brk, fl, rumpf)]
+    return [(a, 0, bob) for a in (brk, rumpf, fl)]
 
 
 def frame(i, partikel=True, effekte=True):
@@ -141,7 +141,7 @@ def frame(i, partikel=True, effekte=True):
     for b in BIRDS:
         e = bird_ebenen(b, i, effekte)
         ebenen += e
-        teile += [L.versetze(a, dx, dy) for a, dx, dy in e[:2]]
+        teile += [L.versetze(a, dx, dy) for a, dx, dy in (e[0], e[1], e[2])]
     f = L.zusammen(H, W, ebenen)
     F.umranden(f, teile, UMRISS, UMRISS_DUNKEL, UMRISS_DUNKEL, UMRISS_DUNKEL)             # Randpixel-Test (Regel 16)
     return f
