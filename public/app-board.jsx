@@ -3505,10 +3505,12 @@ function ppFlugVerfolgen(fly, sourceEl, destEl, w0, ms, opEnd) {
     let dr = null;
     try { dr = destEl.isConnected ? destEl.getBoundingClientRect() : null; } catch (err) { dr = null; }
     if (dr && dr.width > 0) {
+      // Liegt die Karte in der Welt-Huelle, wandert ihr Grundpunkt mit dem Scrollstand des Bretts davon (`drift`). Die Karte soll aber bildschirmfest an der Handkarte
+      // starten und erst von dort zum Helden gleiten: Position = Start + e · (Ziel − Start), die Huellenverschiebung wird herausgerechnet.
       const wJetzt = (w0 && w0.welt && window.ppFxWeltAnker) ? window.ppFxWeltAnker(destEl) : { dx: 0, dy: 0 };
-      const baseX = sx + ((w0 && w0.welt) ? (w0.dx - wJetzt.dx) : 0), baseY = sy + ((w0 && w0.welt) ? (w0.dy - wJetzt.dy) : 0);
+      const driftX = (w0 && w0.welt) ? (w0.dx - wJetzt.dx) : 0, driftY = (w0 && w0.welt) ? (w0.dy - wJetzt.dy) : 0;
       const tx = dr.left + dr.width / 2, ty = dr.top + dr.height / 2;
-      fly.style.transform = `translate(${(tx - baseX) * e}px, ${(ty - baseY) * e}px) scale(${1 + (dr.width / sr.width - 1) * e})`;
+      fly.style.transform = `translate(${(tx - sx) * e - driftX}px, ${(ty - sy) * e - driftY}px) scale(${1 + (dr.width / sr.width - 1) * e})`;
       fly.style.opacity = String(1 - (1 - opEnd) * e);
     }
     if (q < 1) raf(schritt);
