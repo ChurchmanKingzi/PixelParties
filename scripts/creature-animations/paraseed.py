@@ -23,7 +23,7 @@ Ablauf (48 Frames à 65 ms = 3,12 s, nahtlos):
 * Kapuzenspitze: die oberen fünf Kapuzenzeilen neigen sich seitlich (Zeilenversatz wächst zur Spitze, bis ±1 px, Periode 24, Nachlauf); Frame 0 = Quellform.
 * Wurzeln: der Wurzelballen (Zeilen 20–23) wiegt sich unter dem Saum (Zeilenversatz wächst zur Wurzelspitze bis ±1 px, Periode 16, Nachlauf).
 * Sporen (Partikel): acht kleine runde Rot-Punkte (Formen k/s, Farben E und G des Sprites) steigen links und rechts von der Gestalt langsam auf (Samenflug, 24 Frames Lebenszeit).
-Ergänzungen: falls beim Neigen der Kapuze ein Innenpixel am Rand frei liegt, bekommt sein leeres Nachbarfeld den Umriss F=(68,68,68) (umriss_ergaenzen, Regel 16; 0–4 Pixel je Frame).
+Ergänzungen: falls beim Neigen der Kapuze ein Innenpixel am Rand frei liegt, bekommt sein leeres Nachbarfeld den Umriss — an der Kapuze F=(68,68,68), an den Wurzeln D=(102,0,0) (umriss_ergaenzen, Regel 16; 0–2 Pixel je Frame).
 Frame: Sprite plus 3 px links/rechts, 4 px oben (Strecken + Sporen), 2 px unten — Figur zentriert; Sporen liegen in der 2-px-Zone um die Figur.
 Alle Bewegungen laufen auf der vollen Leinwand (anim_lib/anim_amorph werfen ClipError). Nur ganze Pixel, nur Farben der Quelle.
 """
@@ -45,6 +45,7 @@ BODEN = PAD_T + sh - 1
 OPAK = spr[..., 3] > 0
 RAND_FARBEN = A.umrissfarben(spr)
 UMRISS = (68, 68, 68)
+UMRISS_WURZEL = (102, 0, 0)
 _farben = {tuple(int(v) for v in p[:3]) for p in spr.reshape(-1, 4) if p[3]}
 SPOREN = {'c': (181, 0, 0), 'r': (128, 0, 0)}
 for _c in SPOREN.values():
@@ -92,7 +93,7 @@ def figur(i):
     z, quelle = A.koerper_pose(koerper, doppeln=doppeln, p=0, x0=PAD_L)
     z = A.verschiebe_zeilen(z, quelle, zeilen_dx(i))
     fig, top = A.auf_leinwand(z, H, BODEN, 0)
-    fig, neu = A.umriss_ergaenzen(fig, RAND_FARBEN, lambda x, y: UMRISS)
+    fig, neu = A.umriss_ergaenzen(fig, RAND_FARBEN, lambda x, y: UMRISS_WURZEL if y >= PAD_T + WURZEL_Y0 else UMRISS)      # Wurzeln: dunkelrot, Kapuze: grau
     return dict(fig=fig, top=top, neu=neu)
 
 
