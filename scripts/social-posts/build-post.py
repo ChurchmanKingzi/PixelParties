@@ -1075,7 +1075,8 @@ def main():
             return out_img
 
     # ── Horror-Look und Opener „Silhouetten“ ──
-    T_SHIFT = 0.6                                                            # Sekunden Silhouetten-Flackern, dann zeigt sich der Held
+    SHIFT_DUR = [0.20, 0.19, 0.18, 0.17, 0.15, 0.14, 0.12, 0.11, 0.10, 0.09, 0.08, 0.07]   # Sekunden je Silhouette: erst langsam, dann immer schneller
+    T_SHIFT = sum(SHIFT_DUR)                                                 # Gesamtdauer des Silhouetten-Flackerns, dann zeigt sich der Held
 
     def band_glitch(img, rng, n, amp):
         """Bildstörung: waagerechte Bänder seitlich versetzen (Versatz in Rasterzellen)."""
@@ -1111,23 +1112,10 @@ def main():
         return out_
 
     if args_opener == 'shift':
-        SIL_SLUGS = ['bakhm-the-desert-digger', 'cool-rescuer-monia', 'reiza-the-chief-tormentor', 'bomb-berserker-bartas',
-                     'zsos-ssar-the-serpent-warlord', 'andras-the-human-weapon', 'cute-princess-mary', 'nao-the-barrier-priestess']
-
-        def silhouette(slug, k, px_fix=None):
-            """Schwarze Silhouette mit blutrotem Rand auf Standlinie und Mitte des Helden (als RGBA über das ganze Bild)."""
-            o = spr if slug == args.slug else Sprite(slug)
-            m = np.asarray(o.sheet.crop((k * o.fw, 0, (k + 1) * o.fw, o.fh)))[..., 3] > 20
-            rows = np.where(m.any(axis=1))[0]
-            px_o = px_fix or int(np.clip(round(560 / max(1, rows.max() - rows.min() + 1)), 6, 16))
-            ring = dilate(m, 1) & ~m
-            body = np.zeros(m.shape + (4,), dtype=np.uint8)
-            body[m] = (6, 2, 8, 255)
-            body[ring] = (176, 16, 34, 255)
-            big = Image.fromarray(body, 'RGBA').resize((o.fw * px_o, o.fh * px_o), Image.NEAREST)
-            lay = Image.new('RGBA', (W, H), (0, 0, 0, 0))
-            lay.paste(big, (round(card_x + CARD_W / 2 - o.center_x * px_o), feet_y - o.foot * px_o), big)
-            return lay
+        SIL_SLUGS = ['reiza-the-chief-tormentor', 'bomb-berserker-bartas', 'bakhm-the-desert-digger', 'nao-the-barrier-priestess',
+                     'andras-the-human-weapon', 'cool-rescuer-monia', 'cute-princess-mary', 'zsos-ssar-the-serpent-warlord',
+                     'sol-rym-the-thunder-djinn', 'beato-the-butterfly-witch', 'elana-the-rocky-rebel']
+        SIL_PX = {'bakhm-the-desert-digger': 12, 'cute-princess-mary': 12}           # sonst 14 wie in den Reels, höchstens so breit, dass es ins Bild passt
 
         def dilate(m, n=1):
             for _ in range(n):
@@ -1136,7 +1124,25 @@ def main():
                 m = o_
             return m
 
-        SILS = [silhouette(sl, 0) for sl in SIL_SLUGS[:5]] + [silhouette(args.slug, 0, spr.px)]
+        def silhouette(slug, k, px_fix=None, hot=False):
+            """Schwarze Silhouette mit blutrotem Rand auf Standlinie und Mitte des Helden (als RGBA über das ganze Bild); hot = Rand heller (erstes Bild nach dem Wechsel)."""
+            o = spr if slug == args.slug else Sprite(slug)
+            m = np.asarray(o.sheet.crop((k * o.fw, 0, (k + 1) * o.fw, o.fh)))[..., 3] > 20
+            cols = np.where(m.any(axis=0))[0]
+            px_o = px_fix or SIL_PX.get(slug, 14)
+            while (cols.max() - cols.min() + 1) * px_o > 1040 and px_o > 6:
+                px_o -= 1
+            ring = dilate(m, 1) & ~m
+            body = np.zeros(m.shape + (4,), dtype=np.uint8)
+            body[m] = (46, 8, 14, 255) if hot else (6, 2, 8, 255)
+            body[ring] = (255, 110, 110, 255) if hot else (176, 16, 34, 255)
+            big = Image.fromarray(body, 'RGBA').resize((o.fw * px_o, o.fh * px_o), Image.NEAREST)
+            lay = Image.new('RGBA', (W, H), (0, 0, 0, 0))
+            lay.paste(big, (round(card_x + CARD_W / 2 - o.center_x * px_o), feet_y - o.foot * px_o), big)
+            return lay
+
+        SILS = [(silhouette(sl, 0), silhouette(sl, 0, hot=True)) for sl in SIL_SLUGS] + [(silhouette(args.slug, 0, spr.px), silhouette(args.slug, 0, spr.px, hot=True))]
+        SHIFT_T0 = np.concatenate([[0.0], np.cumsum(SHIFT_DUR)[:-1]])
 
         def shift_fx(img, f):
             ts = f / float(fps)
@@ -1146,9 +1152,10 @@ def main():
             dark = Image.blend(img, Image.new('RGB', (W, H), (4, 2, 7)), 0.97)
             if ts < T_SHIFT:
                 out_ = dark.convert('RGBA')
-                lay = SILS[min(int(ts / 0.1), len(SILS) - 1)]
+                idx = int(np.searchsorted(SHIFT_T0, ts, side='right')) - 1
+                lay = SILS[idx][1 if ts - SHIFT_T0[idx] < 1.5 / fps else 0]            # im ersten Bild nach dem Wechsel leuchtet der Rand auf
                 out_.paste(lay, (int(rng.integers(-1, 2)) * U, 0), lay)
-                return band_glitch(out_.convert('RGB'), rng, 2 + int(ts / 0.1) % 3, 3)
+                return band_glitch(out_.convert('RGB'), rng, 1 + idx // 3 + int(rng.integers(0, 2)), 2 + idx // 4)
             q = (ts - T_SHIFT) / 0.35
             keep = np.repeat(np.repeat(((1 - q * 1.5) > BAY).astype(np.uint8) * 255, U, axis=0), U, axis=1)[:H, :W]
             out_ = img.copy()
