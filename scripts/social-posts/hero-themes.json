@@ -1343,7 +1343,7 @@
     8
    ]
   ],
-  "shiftTime": 4.0,
+  "shiftTime": 6.55,
   "shiftGlitch": [
    [
     0.14,
@@ -1366,6 +1366,7 @@
      "bomb-berserker-bartas"
     ]
    ]
-  ]
+  ],
+  "musicHit": 74.95
  }
 }

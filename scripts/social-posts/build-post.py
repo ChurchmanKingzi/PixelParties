@@ -1080,7 +1080,10 @@ def main():
                  'andras-the-human-weapon', 'bubbles-the-bouncy-bunny', 'cool-rescuer-monia', 'cute-princess-mary', 'orthos-the-loyal-guard-dog',
                  'zsos-ssar-the-serpent-warlord', 'sol-rym-the-thunder-djinn', 'argos-the-eye-of-the-cosmos', 'beato-the-butterfly-witch',
                  'calamitusk-the-chaorc-war-chief', 'elana-the-rocky-rebel', 'kit-the-shark-researcher', 'chaos-diamond-the-cracked-keeper',
-                 'victorica-the-eternal-empress', 'siphem-the-deepsea-demon', 'null-the-mage-slayer']          # Silhouetten des Openers (Reihenfolge = Abfolge)
+                 'victorica-the-eternal-empress', 'siphem-the-deepsea-demon', 'null-the-mage-slayer', 'arthor-the-king-of-blackport', 'maya-the-nature-fairy',
+                 'baaliel-the-demon-general', 'stellan-the-calm-cat', 'archibald-the-archmage', 'hel-the-bound-specter', 'thorad-strength-of-coolness',
+                 'luna-pele-the-flame-dancer', 'damus-the-prophet-of-apocalypse', 'mao-the-vengeful-guardian', 'xiong-the-bamboo-guardian',
+                 'klaus-the-cult-leader', 'taio-the-sun-fencer', 'vacarn-the-dark-goblin-necromancer']          # Silhouetten des Openers (Reihenfolge = Abfolge)
     T_SHIFT = args.shift_time or hero_cfg.get('shiftTime', 1.6)              # Sekunden Silhouetten-Sequenz, dann zeigt sich der Held (z. B. 4,0 = ein ganzer Musikaufbau)
     n_sil = int(np.clip(round(T_SHIFT * 5.5), 6, len(SIL_SLUGS) + 1))        # Anzahl Silhouetten inklusive der eigenen als letzte
     _raw = [0.4 * (0.07 / 0.4) ** (i / (n_sil - 1)) for i in range(n_sil)]    # erst langsam (0,4 s), dann immer schneller (0,07 s), zusammen genau T_SHIFT
@@ -1279,8 +1282,11 @@ def main():
         return
     for f in range(loop):
         render(f, False).save(fdir / f'f{f:03d}.png')
+    first_loops = 1                                                          # Länge des gesonderten ersten Segments in Schleifen (Vielfaches, damit der Übergang nahtlos bleibt)
+    if opener_on and args_opener == 'shift':
+        first_loops = max(1, -(-int((T_SHIFT + 0.3) * float(fps)) // loop))
     if first_on:
-        for f in range(loop):
+        for f in range(loop * first_loops):
             render(f, intro_on, punch_on, opener_on).save(fdir / f'i{f:03d}.png')
     cover = Image.open(fdir / ('f%03d.png' % (min(loop - 1, per * 3))) if reel else fdir / 'f000.png')
     cover_path = out / ('reel-cover.png' if reel else 'post.png')
@@ -1294,9 +1300,9 @@ def main():
     loops = max(1, math.ceil(duration / loop_s))
     dur = loop_s * loops
     cmd = ['ffmpeg', '-y', '-loglevel', 'error']
-    if first_on and loops >= 2:
+    if first_on and loops >= first_loops + 1:
         cmd += ['-framerate', str(fps), '-i', str(fdir / 'i%03d.png'),
-                '-framerate', str(fps), '-stream_loop', str(loops - 2), '-i', str(fdir / 'f%03d.png')]
+                '-framerate', str(fps), '-stream_loop', str(loops - first_loops - 1), '-i', str(fdir / 'f%03d.png')]
         vfilter = ['-filter_complex', '[0:v][1:v]concat=n=2:v=1:a=0[v]', '-map', '[v]']
         n_in = 2
     else:
@@ -1314,6 +1320,8 @@ def main():
             if opener_on:                                               # der Schlag soll auf die Detonation fallen, nicht auf Sekunde 0
                 t_hit = T_STORM if args_opener == 'storm' else T_SHIFT if args_opener == 'shift' else T_HEART
                 m_start = max(0.0, m_start - t_hit)
+                if hero_cfg.get('musicHit') is not None:                # ausdrücklich gewählter Bruch/Einsatz im Stück (Sekunden): der Opener endet genau dort
+                    m_start = max(0.0, float(hero_cfg['musicHit']) - t_hit)
             print(f'Musik: Start auf den Schlag bei {m_start:.2f} s' + (f' (Schlag bei Einschlag/Detonation, t = {t_hit} s)' if opener_on else ''))
         cmd += ['-ss', str(m_start), '-i', str(music)]
         fade_in = '' if (punch_on or opener_on) else 'afade=t=in:st=0:d=0.4,'
