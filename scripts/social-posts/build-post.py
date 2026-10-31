@@ -659,7 +659,7 @@ def main():
                 sel = (ys_ >= 11) & (ys_ <= 19)
                 tx_ = int(xs_[sel].min())
                 tips.append((tx_, float(ys_[sel][xs_[sel] == tx_].mean())))
-            wgeom.update(badge_rect=badge_rect, badge_img=badge_img,
+            wgeom.update(rain_sheet=spr.sheet, rain_fw=spr.fw, badge_rect=badge_rect, badge_img=badge_img,
                          hand_fn=lambda t_: (sx + (tips[(int(t_ * float(fps)) // per) % spr.n][0] + 0.5) * spr.px,
                                              sy + (tips[(int(t_ * float(fps)) // per) % spr.n][1] + 0.5) * spr.px))
             wind = windfx.WindShow(W, H, U, float(fps), loop, wgeom, loop * WIND_LOOPS / float(fps))

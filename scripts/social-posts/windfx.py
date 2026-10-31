@@ -280,6 +280,57 @@ def _smooth(x):
     return x * x * (3 - 2 * x)
 
 
+def extract_rain(sheet, fw):
+    """Regentropfen aus dem animierten Sprite (hellblaue Pixelgruppen abseits des Körpers) → (Striche, Spritzer) als kleine RGBA-Arrays.
+    Striche: dünne diagonale Linien (fallen schräg nach rechts unten), Spritzer: kleine Kronen/Tropfen."""
+    a = np.asarray(sheet.convert('RGBA')).astype(int)
+    h = a.shape[0]
+    seen_shapes, streaks, splashes = set(), [], []
+    for f in range(0, a.shape[1] // fw, 3):
+        fr = a[:, f * fw:(f + 1) * fw]
+        rain = (fr[..., 3] > 20) & (fr[..., 2] > 170) & (fr[..., 1] > 140) & (fr[..., 0] > 90)
+        body = (fr[..., 3] > 20) & ~rain
+        near = body.copy()
+        for _ in range(2):
+            n2 = near.copy()
+            n2[1:] |= near[:-1]; n2[:-1] |= near[1:]; n2[:, 1:] |= near[:, :-1]; n2[:, :-1] |= near[:, 1:]
+            near = n2
+        seen = np.zeros_like(rain)
+        for y in range(h):
+            for x in range(fw):
+                if rain[y, x] and not seen[y, x]:
+                    st, pts = [(y, x)], []
+                    seen[y, x] = True
+                    while st:
+                        cy, cx = st.pop()
+                        pts.append((cy, cx))
+                        for dy in (-1, 0, 1):
+                            for dx in (-1, 0, 1):
+                                ny, nx = cy + dy, cx + dx
+                                if 0 <= ny < h and 0 <= nx < fw and rain[ny, nx] and not seen[ny, nx]:
+                                    seen[ny, nx] = True
+                                    st.append((ny, nx))
+                    if any(near[q] for q in pts):
+                        continue                                                       # Glanzpunkte am Körper sind kein Regen
+                    ys, xs = [q[0] for q in pts], [q[1] for q in pts]
+                    hh, ww = max(ys) - min(ys) + 1, max(xs) - min(xs) + 1
+                    if hh >= 9 or ww >= 9:
+                        continue
+                    crop = np.zeros((hh, ww, 4), dtype=np.uint8)
+                    for (yy, xx) in pts:
+                        crop[yy - min(ys), xx - min(xs)] = list(fr[yy, xx, :3]) + [255]
+                    key = (crop.shape, crop.tobytes())
+                    if key in seen_shapes:
+                        continue
+                    seen_shapes.add(key)
+                    n = len(pts)
+                    if n <= max(hh, ww) + 2 and max(hh, ww) >= 3:
+                        streaks.append(crop)
+                    elif n >= 6 and 4 <= max(hh, ww) <= 7:
+                        splashes.append(crop)
+    return streaks, splashes
+
+
 class WindShow(WindFX):
     SHOCKS = (0.0, 4.5, 18.5)
     T_GUST = 0.0
@@ -303,6 +354,15 @@ class WindShow(WindFX):
         for c in self.cross:
             self.amb.append(dict(c, x0=rng.uniform(0, W + 200), kx=rng.uniform(0.6, 1.4), fall=rng.uniform(10, 50)))
         self.hand_fn = geom.get('hand_fn')
+        sheet = geom.get('rain_sheet')
+        self.rain_streaks, self.rain_splash = extract_rain(sheet, geom['rain_fw']) if sheet is not None else ([], [])
+        rr = np.random.default_rng(seed + 11)
+        # Regenschichten (fern/mittel/nah): Anzahl, Pixelgröße, Umläufe je Video (ganzzahlig → periodisch, nahtloser Loop), Helligkeit
+        self.rain_layers = []
+        for n_, px_, k_, br in ((170, 4, 22, 0.55), (110, 6, 30, 0.8), (64, 10, 42, 1.0)):
+            self.rain_layers.append(dict(px=px_, k=k_, br=br, items=[dict(x=rr.uniform(0, W), y=rr.uniform(0, H + 240), shape=int(rr.integers(len(self.rain_streaks) or 1)), th=rr.uniform(0, 1)) for _ in range(n_)]))
+        self.rain_splash_pos = [dict(x=rr.uniform(30, W - 30), y=int(rr.uniform(1840, 1890)), ph=rr.uniform(0, 1), shape=int(rr.integers(len(self.rain_splash) or 1)), px=int(rr.integers(5, 8))) for _ in range(26)]
+        self._rain_cache = {}
         # Sturmstoß (Opener und Schluss): Blätter wirbeln spiralig von Champion nach außen, dazu Speedlines
         self.burst = []
         for _ in range(190):
@@ -426,9 +486,54 @@ class WindShow(WindFX):
             px = max(4, int(round(p['px'] * scale)) + (1 if z > 0.5 else 0))
             self._put(canvas, p['kind'], p['var'], int(f * 0.3 + p['tum']), px, x, y)
 
+    # ───────── Regensturm ─────────
+    def _rain_stamp(self, kind, idx, px, mirror, br):
+        key = (kind, idx, px, mirror, br)
+        if key not in self._rain_cache:
+            arr = (self.rain_streaks if kind == 's' else self.rain_splash)[idx].copy()
+            arr[..., :3] = np.clip(arr[..., :3].astype(float) * br, 0, 255).astype(np.uint8)
+            im = Image.fromarray(arr, 'RGBA')
+            if mirror:
+                im = im.transpose(Image.FLIP_LEFT_RIGHT)
+            self._rain_cache[key] = im.resize((im.width * px, im.height * px), Image.NEAREST)
+        return self._rain_cache[key]
+
+    def _wind_push(self, t):
+        """Periodischer Windversatz des Regens (px): Böen drücken ihn kurz zur Seite, danach kehrt er zurück."""
+        return 170 * sum(math.copysign(1, a) * math.exp(-(((t - tg) / 0.55) ** 2)) * min(1.0, abs(a) / 14.0) for tg, a in self.GUSTS)
+
+    def _draw_rain(self, canvas, t):
+        if not self.rain_streaks:
+            return
+        k_ = min(len(self.X) - 1, int(t * self.fps))
+        wspeed = (self.X[min(len(self.X) - 1, k_ + 1)] - self.X[k_]) * self.fps
+        mirror = wspeed < -150                                                          # Gegenwind: Striche kippen zur anderen Seite
+        amount = 0.62 + 0.38 * min(1.0, abs(wspeed) / 1200.0)                          # Regensturm: stärker bei Böen
+        push = self._wind_push(t)
+        R = self.H + 240
+        for L in self.rain_layers:
+            speed = L['k'] * R / self.D
+            items = L['items'][:int(len(L['items']) * amount)]
+            for it in items:
+                shp = self.rain_streaks[it['shape'] % len(self.rain_streaks)]
+                sx = shp.shape[1] / float(shp.shape[0])                              # Neigung folgt der Form des Tropfens
+                dist = it['y'] + speed * t
+                y = dist % R - 120
+                x = (it['x'] + sx * 0.8 * (dist % R) * (-1 if mirror else 1) + push * L['br']) % (self.W + 240) - 120
+                im = self._rain_stamp('s', it['shape'] % len(self.rain_streaks), L['px'], mirror, L['br'])
+                canvas.paste(im, (int(x), int(y)), im)
+        if self.rain_splash:                                                             # Spritzer am unteren Rand
+            for sp in self.rain_splash_pos[:int(len(self.rain_splash_pos) * amount)]:
+                ph = (t * 5.5 + sp['ph']) % 1.0
+                if ph > 0.7:
+                    continue
+                im = self._rain_stamp('p', sp['shape'] % len(self.rain_splash), sp['px'], False, 0.9)
+                canvas.paste(im, (int(sp['x'] + 40 * math.sin(math.floor(t * 5.5 + sp['ph']) * 12.9)), sp['y'] - im.height), im)
+
     # ───────── Zeichnen ─────────
     def draw_behind(self, canvas, f):
         t = f / float(self.fps)
+        self._draw_rain(canvas, t)
         b = self.big(t)
         if b > 0:                                                                    # großer Tornado hinter der Karte
             self._draw_funnel(canvas, self.W / 2, self.t_top, self.t_bot, 560 * b, t, alpha=0.92)
@@ -564,10 +669,14 @@ class WindShow(WindFX):
                 x1, y1 = cx + math.cos(ln['a']) * head, cy + math.sin(ln['a']) * head
                 dr.line([(round(x0 / U) * U, round(y0 / U) * U), (round(x1 / U) * U, round(y1 / U) * U)], fill=cols[ln['col']] + (255,), width=U)
             out.alpha_composite(ov)
-        for b in self.burst:                                                             # Blätter
+        for b in self.burst:                                                             # Blätter: Stoß nach außen, danach fallen sie (taumelnd) nach unten
             r = b['s'] * (1 - math.exp(-3.5 * tau)) / 3.5 + 90
             ang = b['a'] + b['k'] * (1 - math.exp(-2.5 * tau))
             x, y = cx + math.cos(ang) * r, cy + math.sin(ang) * r * 1.05
+            tf = max(0.0, tau - 0.12)
+            vt = {'feather': 300, 'scrap': 480, 'twig': 640}.get(b['kind'], 540)         # Sinkgeschwindigkeit
+            y += vt * (tf - (1 - math.exp(-2 * tf)) / 2)
+            x += 55 * math.sin(2 * math.pi * 1.2 * tf + b['tum']) * (1 - math.exp(-tf))
             if x < -120 or x > self.W + 120 or y < -120 or y > self.H + 120:
                 continue
             self._put(out, b['kind'], b['var'], int(ts * 14 + b['tum']), b['px'], x, y)
@@ -576,7 +685,7 @@ class WindShow(WindFX):
 
     def opener_fx(self, img, f, t_gust=None):
         ts = f / float(self.fps)
-        if ts >= 1.4:
+        if ts >= 4.0:                                                                   # bis alle Blätter unten aus dem Bild gefallen sind
             return img
         out = img.convert('RGBA')
         self._storm_burst(out, ts + self.PRE, ts)
