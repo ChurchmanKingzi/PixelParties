@@ -57,31 +57,102 @@ def _components(img):
     return [c for c in comps if len(c) > 8]
 
 
-class CatSheet:
-    """Die drei Posen der „Cute Cat“ aus assets/cute-cat.png: A/B = frontal (Flügel hoch/waagerecht, Flügelschlag), S = von der Seite (blickt nach links)."""
+def _gray_mask(arr):
+    """Flügel = graue Pixel (R≈G≈B, mittlere Helligkeit)."""
+    a = arr.astype(int)
+    return (a[..., 3] > 0) & (abs(a[..., 0] - a[..., 1]) < 16) & (abs(a[..., 1] - a[..., 2]) < 16) & (a[..., 0] > 40) & (a[..., 0] < 220)
 
-    def __init__(self, path):
+
+def _flap_front(arr):
+    """Frontal fliegende Katze (Pose A, Flügel hoch): 8 Frames Flügelschlag. Die Flügelspitzen wandern spaltenweise nach unten (je weiter vom Körper,
+    desto mehr), beim Abwärtsschlag hebt sich der Körper um 1 Pixel."""
+    h, w = arr.shape[:2]
+    pad_t, pad_b = 3, 8
+    wing = _gray_mask(arr)
+    body = (arr[..., 3] > 0) & ~wing
+    cols = np.where(body[2:10].any(axis=0))[0]
+    cx, hw = (cols.min() + cols.max()) / 2.0, (cols.max() - cols.min()) / 2.0
+    frames = []
+    for s_, lift in ((0.0, 0), (0.25, 0), (0.5, 0), (0.75, 1), (0.95, 1), (0.75, 1), (0.5, 0), (0.25, 0)):
+        out = np.zeros((h + pad_t + pad_b, w, 4), dtype=np.uint8)
+        for x in range(w):
+            d = max(0.0, abs(x - cx) - hw)
+            dy = int(round(s_ * d))
+            ys = np.where(wing[:, x])[0]
+            for y in ys:
+                out[y + pad_t + dy - lift, x] = arr[y, x]
+        by, bx = np.where(body)
+        for y, x in zip(by, bx):
+            out[y + pad_t - lift, x] = arr[y, x]
+        frames.append(out)
+    return frames
+
+
+def _flap_side(arr):
+    """Seitlich fliegende Katze (Pose S, ein Flügel steil nach oben): 8 Frames, der Flügel schwingt zeilenweise nach hinten und wieder hoch."""
+    h, w = arr.shape[:2]
+    pad_t, pad_b, pad_r = 2, 3, 8
+    wing = _gray_mask(arr)
+    body = (arr[..., 3] > 0) & ~wing
+    root_y = 9.0
+    frames = []
+    for s_, lift in ((0.0, 0), (0.5, 0), (1.0, 0), (1.5, 1), (1.9, 1), (1.5, 1), (1.0, 0), (0.5, 0)):
+        out = np.zeros((h + pad_t + pad_b, w + pad_r, 4), dtype=np.uint8)
+        for y in range(h):
+            dx = int(round(s_ * max(0.0, root_y - y) * 0.9))
+            for x in np.where(wing[y])[0]:
+                out[y + pad_t - lift + (0 if y > root_y else 0), x + dx] = arr[y, x]
+        by, bx = np.where(body)
+        for y, x in zip(by, bx):
+            out[y + pad_t - lift, x] = arr[y, x]
+        frames.append(out)
+    return frames
+
+
+class CatSheet:
+    """Die drei „Cute Cat“-Typen, alle echt animiert (kein Spiegeln als Ersatz für Bewegung):
+       idle  – sitzende/schwebende Katze mit Flügelschlag, Schwanz und Blinzeln (24 Frames, vom Idle-Zyklus in assets/cute-cat-idle.png, 70 ms je Frame)
+       front – frontal fliegend, 8 Frames Flügelschlag (aus Pose A in assets/cute-cat.png, Zwischenbilder ergänzt)
+       side  – seitlich fliegend, 8 Frames Flügelschlag (aus Pose S)
+    Spiegeln wird nur noch für die Blickrichtung genutzt."""
+
+    FRAME_S = {'idle': 0.07, 'front': 0.07, 'side': 0.07}
+    SCALE = {'idle': 1.0, 'front': 1.0, 'side': 1.15}             # gleicher Gesamteindruck: Pixel je Sprite-Pixel relativ zur Breite der Typen
+
+    def __init__(self, path, idle_path=None):
         im = Image.open(path).convert('RGBA')
         arr = np.asarray(im)
-        self.poses = {}
+        poses = {}
         for pts in _components(im):
             ys, xs = [p[0] for p in pts], [p[1] for p in pts]
-            crop = Image.fromarray(arr[min(ys):max(ys) + 1, min(xs):max(xs) + 1].copy(), 'RGBA')
-            mask = np.zeros(crop.size[::-1], dtype=bool)
+            crop = arr[min(ys):max(ys) + 1, min(xs):max(xs) + 1].copy()
+            mask = np.zeros(crop.shape[:2], dtype=bool)
             for y, x in pts:
                 mask[y - min(ys), x - min(xs)] = True
-            a = np.asarray(crop).copy()
-            a[~mask] = 0                                                   # nur diese Pose (Nachbarposen im Rahmen entfernen)
-            crop = Image.fromarray(a, 'RGBA')
-            key = 'S' if crop.height >= 16 else None
-            self.poses[(min(ys), key or ('A' if min(ys) < 20 else 'B'))] = crop
-        self.poses = {k[1]: v for k, v in self.poses.items()}
+            crop[~mask] = 0                                                # Nachbarposen im Rahmen entfernen
+            key = 'S' if crop.shape[0] >= 16 else ('A' if min(ys) < 20 else 'B')
+            poses[key] = crop
+        self.frames = {'front': _flap_front(poses['A']), 'side': _flap_side(poses['S'])}
+        idle = np.asarray(Image.open(idle_path or str(path).replace('cute-cat.png', 'cute-cat-idle.png')).convert('RGBA'))
+        fh = idle.shape[0]
+        n = idle.shape[1] // 31
+        idle_frames = [idle[:, i * 31:(i + 1) * 31].copy() for i in range(n)]
+        ys_, xs_ = np.where(np.any([f[..., 3] > 0 for f in idle_frames], axis=0))
+        self.frames['idle'] = [f[ys_.min():ys_.max() + 1, xs_.min():xs_.max() + 1].copy() for f in idle_frames]      # Rand um die Katze weg: gleiche Breite wie die anderen Typen
+        self.frames = {k: [Image.fromarray(f, 'RGBA') for f in v] for k, v in self.frames.items()}
         self._cache = {}
 
-    def stamp(self, pose, px, mirror=False, rot=0):
-        key = (pose, px, mirror, rot)
+    def n(self, kind):
+        return len(self.frames[kind])
+
+    def frame_index(self, kind, t, phase):
+        return int((t + phase * self.n(kind) * self.FRAME_S[kind]) / self.FRAME_S[kind]) % self.n(kind)
+
+    def stamp(self, kind, idx, px, mirror=False, rot=0):
+        px = max(2, int(round(px * self.SCALE[kind])))
+        key = (kind, idx, px, mirror, rot)
         if key not in self._cache:
-            im = self.poses[pose]
+            im = self.frames[kind][idx]
             if mirror:
                 im = im.transpose(Image.FLIP_LEFT_RIGHT)
             if rot:
@@ -112,9 +183,9 @@ class MiniShow:
             x = (-20 if row % 2 else 40)
             while x < W + 100:
                 self.wall.append(dict(x=x + rng.uniform(-8, 8), y=y + rng.uniform(-6, 6), ph=rng.uniform(0, 1), sp=rng.uniform(900, 1700),
-                                      acc=rng.uniform(3000, 5200), px=7))
-                x += 118
-            y += 82
+                                      acc=rng.uniform(3000, 5200), px=7, kind=str(rng.choice(['idle', 'front', 'side'], p=[0.5, 0.3, 0.2])), mir=bool(rng.integers(2))))
+                x += 104
+            y += 70
             row += 1
         cxs, cys = W / 2, H * 0.47
         for c in self.wall:
@@ -150,13 +221,11 @@ class MiniShow:
         return out
 
     # ───────── Katzen zeichnen ─────────
-    def _pose(self, t, ph, speed=9.0):
-        return 'A' if int(t * speed + ph * 7) % 2 == 0 else 'B'
-
-    def _cat(self, canvas, t, x, y, px=7, ph=0.0, mirror=False, rot=0, pose=None, bob=4.0):
-        p = pose or self._pose(t, ph)
+    def _cat(self, canvas, t, x, y, px=7, ph=0.0, mirror=False, rot=0, kind='idle', bob=4.0, frame=None):
+        """Eine Katze zeichnen: kind = idle | front | side; frame erzwingt ein bestimmtes Bild, sonst läuft die Animation mit der Zeit (ph = Phasenversatz 0…1)."""
+        idx = frame if frame is not None else self.cats.frame_index(kind, t, ph)
         yy = y + bob * math.sin(2 * math.pi * (t * 1.4 + ph))
-        put(canvas, self.cats.stamp(p, px, mirror, rot), x, yy)
+        put(canvas, self.cats.stamp(kind, idx, px, mirror, rot), x, yy)
 
     # ───────── Wand / Sprengung ─────────
     def _wall_pos(self, c, tau):
@@ -178,7 +247,7 @@ class MiniShow:
                 x, y, vis = self._wall_pos(c, tau)
                 if not vis or x < -200 or x > self.W + 200 or y < -150 or y > self.H + 150:
                     continue
-                self._cat(canvas, t, x, y, c['px'], c['ph'], pose=None, bob=3.0)
+                self._cat(canvas, t, x, y, c['px'], c['ph'], mirror=c['mir'], kind=c['kind'], bob=3.0)
 
     # ───────── Banner-Raub ─────────
     def logo_state(self, t):
@@ -260,11 +329,11 @@ class MiniShow:
                 continue
             u = ease_out_back(s / 0.35) if s < 0.35 else (1.0 if s < 1.0 else 1 - ease_in_out((s - 1.0) / 0.5))
             if side == 'top':
-                self._cat(canvas, t, pos, py_ + 70 - 92 * u, 12, ph=pos / 300.0, bob=0)
+                self._cat(canvas, t, pos, py_ + 70 - 92 * u, 12, ph=pos / 300.0, bob=0, kind='idle')
             elif side == 'left':
-                self._cat(canvas, t, px_ + 70 - 92 * u, pos, 12, ph=pos / 300.0, rot=90, bob=0)
+                self._cat(canvas, t, px_ + 70 - 92 * u, pos, 12, ph=pos / 300.0, rot=90, bob=0, kind='idle')
             else:
-                self._cat(canvas, t, px_ + pw - 70 + 92 * u, pos, 12, ph=pos / 300.0, rot=-90, bob=0)
+                self._cat(canvas, t, px_ + pw - 70 + 92 * u, pos, 12, ph=pos / 300.0, rot=-90, bob=0, kind='idle')
         self._draw_orbit(canvas, t, back=True)
 
     # ───────── Orbit und Herz ─────────
@@ -327,7 +396,7 @@ class MiniShow:
                 continue
             items.append((z, i, x, y, px))
         for z, i, x, y, px in sorted(items):
-            self._cat(canvas, t, x, y, px, ph=i / 24.0, bob=2.0)
+            self._cat(canvas, t, x, y, px, ph=i / 24.0, bob=2.0, kind=('idle', 'front', 'side')[i % 3], mirror=(i % 2 == 0))
 
     # ───────── Einzel-Gags vorne ─────────
     def _draw_heist(self, canvas, t):
@@ -347,8 +416,8 @@ class MiniShow:
                 xl, xr = lx + 55 - 700 * u, lx + lw - 55 + 700 * u
                 yy = cyl - 260 * u
             if t < 4.9 + 0.5:
-                self._cat(canvas, t, xl, yy, 11, ph=0.1, bob=3)
-                self._cat(canvas, t, xr, yy, 11, ph=0.5, mirror=True, bob=3)
+                self._cat(canvas, t, xl, yy, 11, ph=0.1, bob=3, kind='front')
+                self._cat(canvas, t, xr, yy, 11, ph=0.5, mirror=True, bob=3, kind='front')
 
     def _draw_badge_cats(self, canvas, t):
         bx, by, bw, bh = self.g['badge_rect']
@@ -365,14 +434,15 @@ class MiniShow:
                 x = bx + bw + 82
             else:
                 x = bx + bw + 82 + 900 * ease_in_out((t - 10.4) / 0.5)
-            self._cat(canvas, t, x, bcy - 8, 11, ph=0.3, pose=('A' if t > 8.8 and t < 9.1 else None))
+            strike = 8.8 < t < 9.1
+            self._cat(canvas, t, x, bcy - 8, 11, ph=0.3, kind='front' if strike else 'idle', frame=0 if strike else None)
         if 11.1 <= t < 12.5:                                  # Lieferkatze
             dx, dy, _, _ = self.badge_state(t)
             if t < 12.0:
-                self._cat(canvas, t, bx + bw / 2 + dx, bcy - 70 + dy, 11, ph=0.6, bob=2)
+                self._cat(canvas, t, bx + bw / 2 + dx, bcy - 70 + dy, 11, ph=0.6, bob=2, kind='front')
             else:
                 u = ease_in_out((t - 12.0) / 0.5)
-                self._cat(canvas, t, bx + bw / 2 + 900 * u, bcy - 70 - 250 * u, 11, ph=0.6, bob=2)
+                self._cat(canvas, t, bx + bw / 2 + 900 * u, bcy - 70 - 250 * u, 11, ph=0.6, bob=2, kind='front')
 
     def _draw_v(self, canvas, t):
         if not 11.2 <= t < 12.9:
@@ -386,7 +456,7 @@ class MiniShow:
                 x, y = lead, 1700
             else:
                 x, y = lead - d * 125, 1700 + side * d * 62
-            self._cat(canvas, t, x, y, 6, ph=k / 9.0, pose='S', mirror=True, bob=6)
+            self._cat(canvas, t, x, y, 6, ph=k / 9.0, kind='side', mirror=True, bob=6)
 
     def _draw_bubble(self, canvas, t):
         for t0, t1, text in self.bubbles:
