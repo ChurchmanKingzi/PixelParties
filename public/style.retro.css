@@ -12195,7 +12195,7 @@ body.pp-dialog-offen .foil-diamond-rare:not(.modal-overlay *):not(.card-tooltip 
 .pp-portraet { --pf: var(--portraet, var(--player-color, #66b6ff)); position: relative; display: inline-flex; flex-shrink: 0; line-height: 0; margin: 7px; border: 3px solid; border-color: color-mix(in srgb, var(--pf) 60%, #ffffff)
     color-mix(in srgb, var(--pf) 72%, #000000)
     color-mix(in srgb, var(--pf) 62%, #000000)
-    color-mix(in srgb, var(--pf) 75%, #ffffff); box-shadow: inset 0 0 0 2px var(--pp-kontur), 0 0 0 2px var(--pp-kontur), 0 0 0 4px color-mix(in srgb, var(--pf) 25%, var(--pp-kontur)), 0 0 0 6px color-mix(in srgb, var(--pf) 80%, #000000), 0 0 0 8px var(--pp-kontur), 5px 7px 0 6px #08060c; background: var(--pp-kontur); }
+    color-mix(in srgb, var(--pf) 75%, #ffffff); box-shadow: inset 0 0 0 2px var(--pp-kontur), 0 0 0 2px var(--pp-kontur), 0 0 0 4px color-mix(in srgb, var(--pf) 25%, var(--pp-kontur)), 0 0 0 6px color-mix(in srgb, var(--pf) 80%, #000000), 0 0 0 8px var(--pp-kontur), var(--pp-ring, 0 0 0 0 transparent), 5px 7px 0 6px #08060c; background: var(--pp-kontur); }
 /* Das Bild selbst: ohne eigenen Rahmen (den traegt die Huelle). */
 .pp-portraet > .game-hand-avatar-big,
 .pp-portraet > .game-hand-avatar-crop { border: 2px solid var(--pp-kontur) !important; box-shadow: none; animation: none; }

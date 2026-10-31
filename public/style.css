@@ -24278,6 +24278,7 @@ body.pp-dialog-offen .foil-diamond-rare:not(.modal-overlay *):not(.card-tooltip 
     0 0 0 4px color-mix(in srgb, var(--pf) 25%, var(--pp-kontur)),
     0 0 0 6px color-mix(in srgb, var(--pf) 80%, #000),
     0 0 0 8px var(--pp-kontur),
+    var(--pp-ring, 0 0 0 0 transparent),   /* Spielende: harter Ring in Sieg-/Niederlagenfarbe (Sprecher), sonst leer */
     5px 7px 0 6px rgba(0, 0, 0, .35);
   background: var(--pp-kontur);
 }

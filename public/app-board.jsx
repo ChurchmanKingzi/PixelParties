@@ -41678,7 +41678,11 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
   // (z 1000) and give it a win/loss glow so the "speaker" is highlighted
   // instead of dimmed. The bottom hand already sits at z 10000; the opponent
   // row only has z 2, so it otherwise hides behind the veil.
-  const endGlow = (won) => 'drop-shadow(0 0 10px ' + (won ? 'var(--success)' : 'var(--danger)') + ')';
+  // ★ Kein Weichzeichner-Schein mehr (Als Befund 31.10.: „wenn Gegner sprechen, wird ihr Name umrandet — sieht nicht gut aus"): der
+  // `drop-shadow` lag auf der ganzen Info-Zeile (Portrait UND Name) und umrandete deshalb auch den Namen. Der Sprecher bleibt hervorgehoben —
+  // über den Z-Index-Lift (End-Veil / Blasen-Ebene), den ohnehin leuchtenden Portrait-Rahmen (`avatar-active`) und beim Spielende einen harten
+  // Pixelring in Sieg-/Niederlagenfarbe NUR ums Portrait (`--pp-ring`, `.pp-portraet` in style.css).
+  const endRing = (won) => '0 0 0 11px var(' + (won ? '--success' : '--danger') + '), 0 0 0 13px var(--pp-kontur)';
   // Mid-Game-Bark: solange die Sprechblase steht, leuchtet das Portrait
   // des Sprechers im Bark-Bernstein (#fad54a = Blasenrand). End-Game-
   // Glow hat Vorrang, weil showEndBubbles die Bark-Blase ohnehin
@@ -41696,11 +41700,10 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
   // zusätzlich zu isMyTurn.
   const oppBarking = !showEndBubbles && cpuBark && cpuBark.owner === oppIdx;
   const meBarking = !showEndBubbles && cpuBark && cpuBark.owner !== oppIdx;
-  const barkFilter = 'drop-shadow(0 0 10px #fad54a)';
-  const oppAvatarHighlight = oppBubbleMsg ? { zIndex: 1100, filter: endGlow(endOppWon) }
-    : (oppBarking ? { zIndex: 9650, filter: barkFilter } : undefined);
-  const meAvatarHighlight = meBubbleMsg ? { filter: endGlow(endMeWon) }
-    : (meBarking ? { filter: barkFilter } : undefined);
+  const oppAvatarHighlight = oppBubbleMsg ? { zIndex: 1100 }
+    : (oppBarking ? { zIndex: 9650 } : undefined);
+  const oppPortraetRing = oppBubbleMsg ? endRing(endOppWon) : null;
+  const mePortraetRing = meBubbleMsg ? endRing(endMeWon) : null;
 
   // ── Hand Shuffle & Sort with FLIP animation ──
   const captureHandRects = () => {
@@ -59761,7 +59764,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
             {/* Porträt im verzierten Pixelrahmen in der Farbe des Spielers
                 (`.pp-portraet`, style.css). Im Tutorial: Monia Bot bzw.
                 Antonia mit eigenem Bild und eigener Farbe. */}
-            <span className="pp-portraet" style={{ '--portraet': opp.color || '#ec2d62' }}>
+            <span className="pp-portraet" style={oppPortraetRing ? { '--portraet': opp.color || '#ec2d62', '--pp-ring': oppPortraetRing } : { '--portraet': opp.color || '#ec2d62' }}>
               {/* `result ? '' : …` statt `!result && …`: der &&-Ausdruck liefert bei gesetztem Ergebnis das BOOLEAN false, und `'…-big' + false` haengt woertlich "false" an den Klassennamen. Aus `game-hand-avatar-crop` wurde `game-hand-avatar-cropfalse` — der quadratische Rahmen fiel weg und der HeroArtCrop lief auf seine volle 135px-Breite aus, der Avatar wurde also im End-Screen ploetzlich breiter. */}
               <HandPortraet
                 src={tutorialGegner ? tutorialGegner.avatar : opp.avatar}
@@ -60793,10 +60796,10 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         {/* My hand (bottom player) — drag to reorder for players, face-down for spectators */}
         <div className="game-hand game-hand-me" ref={isSpectator ? undefined : handRef} style={{ '--hand-accent': me.color || '#66b6ff' }}>
           <HandAmbiance color={me.color} />
-          <div className="game-hand-info" ref={speechMeRef} style={meAvatarHighlight}>
+          <div className="game-hand-info" ref={speechMeRef}>
             {/* Porträt im verzierten Pixelrahmen in der Farbe des Spielers
                 (`.pp-portraet`, style.css). */}
-            <span className="pp-portraet" style={{ '--portraet': me.color || '#66b6ff' }}>
+            <span className="pp-portraet" style={mePortraetRing ? { '--portraet': me.color || '#66b6ff', '--pp-ring': mePortraetRing } : { '--portraet': me.color || '#66b6ff' }}>
               <HandPortraet src={me.avatar} heroName={portraetHeld(me)}
                 zustand={result ? '' : ((isMyTurn || meBarking) ? ' avatar-active' : ' avatar-inactive')} />
               <span className="pp-portraet-zier" aria-hidden="true" />
