@@ -495,6 +495,9 @@ module.exports = {
     const heads = inst.counters?.headCounter || 0;
     if (heads <= 0) return false;
 
+    // „Up to as many different targets as Head Counters": die Zahl begrenzen nur die Counter - NICHT die Ein-Ziel-Flaggen des Helden in
+    // der Spalte (Toras „never more than 1 target with an Attack", Ida, Friedhelm): der Hydra-Schlag ist weder Attack noch Zauber des Helden
+    // (`promptMultiTarget` nimmt Kreatureneffekte davon aus, Befund 31.10.: Hydra in Toras' Spalte traf nur 1 Ziel).
     const selected = await ctx.promptMultiTarget({
       side: 'any',
       types: ['hero', 'creature'],
