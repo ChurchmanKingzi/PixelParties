@@ -189,12 +189,12 @@ class MiniShow:
         row = 0
         y = -30
         while y < H + 90:
-            x = (-20 if row % 2 else 40)
+            x = (-20 if row % 2 else 46)
             while x < W + 100:
                 self.wall.append(dict(x=x + rng.uniform(-8, 8), y=y + rng.uniform(-6, 6), ph=rng.uniform(0, 1), sp=rng.uniform(900, 1700),
                                       acc=rng.uniform(3000, 5200), px=7, kind=str(rng.choice(['idle', 'front', 'side'], p=[0.5, 0.3, 0.2])), mir=bool(rng.integers(2))))
-                x += 104
-            y += 70
+                x += 132
+            y += 90
             row += 1
         cxs, cys = W / 2, H * 0.47
         for c in self.wall:
@@ -204,7 +204,7 @@ class MiniShow:
             c['delay'] = d / 1600.0 * 0.35
         self.wall.sort(key=lambda c: c['y'])
         # Orbit/Herz: 24 Katzen
-        self.n_orb = 24
+        self.n_orb = 18
         self.orb_phase = [2 * math.pi * i / self.n_orb for i in range(self.n_orb)]
         self.orb_entry = [(rng.choice([-300, W + 300]), rng.uniform(100, H - 100)) for _ in range(self.n_orb)]
         pts = self._heart_points()
@@ -371,7 +371,7 @@ class MiniShow:
             return None
         if t < T_X:
             ox, oy, oz = self._orbit_pos(i, t)
-            px = 6 + int(round(4 * (oz + 1) / 2))
+            px = 5 + int(round(3 * (oz + 1) / 2))
             x, y = ox, oy
             if t < t_arr + 0.8:                                 # fliegt vom Rand in den Kreis
                 ex, ey = self.orb_entry[i]
@@ -380,7 +380,7 @@ class MiniShow:
             return x, y, oz, px, True
         if t < T_X + 0.9:                                       # „ATTACK!“-Sprengung: radial nach außen, sehr schnell
             ox, oy, oz = self._orbit_pos(i, T_X)
-            px = 6 + int(round(4 * (oz + 1) / 2))
+            px = 5 + int(round(3 * (oz + 1) / 2))
             tau = t - T_X
             d = math.hypot(ox - self.cx, oy - (self.cy + 40)) or 1.0
             dx, dy = (ox - self.cx) / d, (oy - (self.cy + 40)) / d
@@ -399,7 +399,7 @@ class MiniShow:
                 ex, ey = self.orb_entry[i]
                 u = ease_out((t - t_h) / 0.85)
                 x, y = ex + (hx - ex) * u, ey + (hy - ey) * u
-            return x, y, 1.0, 8, True
+            return x, y, 1.0, 6, True
         if t < 18.9:                                            # Herz sprengt
             tau = t - 18.2
             hx, hy = self._heart_pos(i, 18.2)
@@ -409,7 +409,7 @@ class MiniShow:
             x, y = hx + dx * dist, hy + dy * dist
             if x < -250 or x > self.W + 250 or y < -250 or y > self.H + 250:
                 return None
-            return x, y, 1.0, 8, True
+            return x, y, 1.0, 6, True
         return None
 
     def _draw_orbit(self, canvas, t, back):
@@ -426,7 +426,7 @@ class MiniShow:
                 continue
             items.append((z, i, x, y, px))
         for z, i, x, y, px in sorted(items):
-            self._cat(canvas, t, x, y, px, ph=i / 24.0, bob=2.0, kind=('idle', 'front', 'side')[i % 3], mirror=(i % 2 == 0))
+            self._cat(canvas, t, x, y, px, ph=i / self.n_orb, bob=2.0, kind=('idle', 'front', 'side')[i % 3], mirror=(i % 2 == 0))
 
     # ───────── Einzel-Gags vorne ─────────
     def _draw_heist(self, canvas, t):
