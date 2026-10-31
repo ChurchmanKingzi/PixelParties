@@ -4553,8 +4553,23 @@ const ZONE_ANIM_SFX = {
   // sie wird ausgeloescht); `negate` ist der vorhandene „ist weg"-Klang,
   // tiefer gefahren fuer das Gewicht eines Helden.
   tempeluna_erase:         { name: 'negate', opts: { rate: 0.8, volume: 0.95, delay: 120 } },
-  dark_gear_spin_cw:       null,
-  dark_gear_spin_ccw:      null,
+  // Dark Gear (Als Befund 31.10.: „bei Dark Gears Animation fehlen Sounds"). Zwei Zahnrad-Auftritte je 1,5 s: erst am Ziel
+  // (`dark_gear_spin_cw`: das Rad greift in die Kreatur), nach dem Flug in die eigene Zone (`dark_gear_spin_ccw`: es zieht sich
+  // zu und legt die Negation an). Dunkles Brummen als Grundton, metallisches Einrasten (`chain_add`, gleiche Familie wie die Ketten-
+  // Klänge) beim Zugriff, ein dumpfer Abschluss beim Auslaufen. Ohne Sammelkategorie (`category: null`): der Kartenklang des
+  // Artefakts belegt den Slot 'effect' knapp davor; `dedupe` hält Wiederholungen derselben Kreatur auseinander.
+  dark_gear_spin_cw: [
+    { name: 'elem_dark', opts: { rate: 0.7, volume: 0.9, category: null, dedupe: 600 } },
+    { name: 'chain_add', opts: { rate: 0.7, volume: 0.75, delay: 170, category: null, dedupe: 600 } },
+    { name: 'chain_add', opts: { rate: 0.9, volume: 0.55, delay: 330, category: null, dedupe: 600 } },
+    { name: 'debuff',    opts: { rate: 0.7, volume: 0.6, delay: 1050, category: null, dedupe: 600 } },
+  ],
+  dark_gear_spin_ccw: [
+    { name: 'chain_add', opts: { rate: 0.85, volume: 0.8, category: null, dedupe: 600 } },
+    { name: 'elem_dark', opts: { rate: 0.9, volume: 0.8, delay: 110, category: null, dedupe: 600 } },
+    { name: 'chain_add', opts: { rate: 1.1, volume: 0.55, delay: 330, category: null, dedupe: 600 } },
+    { name: 'negate',    opts: { rate: 0.8, volume: 0.8, delay: 1100, category: null, dedupe: 600 } },
+  ],
   cloud_gather:            null,
   cloud_disperse:          null,
   sand_reset:              null,
@@ -4604,7 +4619,7 @@ const ZONE_ANIM_SFX = {
   // Regeln: (1) OHNE Sammelkategorie (`category: null`) — der Aktivierungs-/Zauberklang einer Karte belegt den Slot 'effect' meist
   // ~0-200 ms VOR der Animation und verschluckte sie (Burning Finger, Burning Skeleton); `dedupe` haelt Mehrfachziele davon ab, den
   // Klang zu stapeln. (2) Der Verzug sitzt auf dem Treffer: bei Animationen mit `_delay(N)` in der Karte ist es ~N − 100 (der
-  // Mount-Vorlauf kommt von `playSFXForZoneAnim` dazu). (3) Absichtlich stumm bleiben: Dauerschleifen und Deko (`dark_gear_spin_*`,
+  // Mount-Vorlauf kommt von `playSFXForZoneAnim` dazu). (3) Absichtlich stumm bleiben: Dauerschleifen und Deko (
   // Dampf, Blasen, Wolken, `anger_mark` …: `null`, begruendet oben bei den Eintraegen), die Kleinst-Animation des Weakening Crystal
   // (`crystal_drain`, laeuft zu JEDEM Rundenbeginn), `equip_flash` (begleitet den `card_reveal`-Klang des Ausloesers),
   // `creature_death`/`deck_shuffle_fx` (Klang kommt aus Log bzw. `deck_shuffle`).
