@@ -104,10 +104,10 @@ HEROES = {
         "pink crystal shards, sparkles and shadow mist",
         "#Crystals #DarkFantasy"),
     "Cute Annoyance Mini": (
-        "Discard a card, find a cute friend. 🐾",
-        "Once per turn, discard 1 card to search your deck for a \"Cute\" Creature. Discard 1 more, and Mini immediately summons it as an additional Action.",
-        "floating hearts and pink sparkles",
-        "#Cute #Kawaii"),
+        "Cute. Annoying. She brought the whole cat army. 😼🐾",
+        "Once per turn, Cute Annoyance Mini discards 1 card to search your deck for a \"Cute\" Creature. Discard 1 more, and she immediately summons it as an additional Action. Mine. Always mine.",
+        "an army of winged cats, floating hearts and pink sparkles",
+        "#Cute #Kawaii #Cats"),
     "Damus, the Prophet of Apocalypse": (
         "The Prophet of Apocalypse brings fire. 🔥",
         "Damus places \"Ifrit\" Creatures into your Heroes' free Support Zones and shields them from your opponent's cards and effects. Every Ifrit you control also makes the \"Armageddon\" Spells in your hand cheaper.",
@@ -332,8 +332,8 @@ TIKTOK = {
                                "Once per turn: shuffle your whole hand back into the deck and draw the same number of cards +1."),
     "Reiza, the Chief Tormentor": ("Stun. Poison. Double action. 🦇",
                                    "Every single-target hit Stuns and Poisons. Once all of your opponent's targets are Poisoned, Reiza gets a second Action every turn."),
-    "Cute Annoyance Mini": ("Discard a card, find a cute friend. 🐾",
-                            "Once per turn, discard 1 card to search your deck for a \"Cute\" Creature. Discard 1 more and Mini summons it as an extra Action."),
+    "Cute Annoyance Mini": ("Cute. Annoying. She brought the whole cat army. 😼🐾",
+                            "Once per turn, discard 1 card to find a \"Cute\" Creature. Discard 1 more and Mini summons it as an extra Action."),
 }
 
 

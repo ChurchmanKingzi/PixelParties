@@ -145,7 +145,7 @@ class MiniShow:
         cum = np.concatenate([[0], np.cumsum(seg)])
         out = []
         for i in range(self.n_orb):
-            k = np.searchsorted(cum, cum[-1] * i / self.n_orb)
+            k = np.searchsorted(cum, cum[-1] * (i + 0.5) / self.n_orb)          # um eine halbe Schrittweite versetzt: keine Katze in der Kerbe über Mini
             out.append((float(x[k]), float(y[k] + 2.0)))
         return out
 
@@ -282,8 +282,8 @@ class MiniShow:
         if s > 0:
             beat = 0.06 * max(0.0, math.sin(s * 2 * math.pi * 2.0)) ** 2
         hx, hy = self.heart[i]
-        k = 33.0 * (1 + beat)
-        return self.cx + hx * k, self.cy - 20 + hy * k
+        k = 30.0 * (1 + beat)
+        return self.cx + hx * k, self.cy + 15 + hy * k
 
     def _orbit_state(self, i, t):
         """(x, y, z, px, sichtbar) der Katze i im Orbit/Herz."""
@@ -293,8 +293,8 @@ class MiniShow:
         if t >= 18.2:                                           # Herz sprengt
             tau = t - 18.2
             hx, hy = self._heart_pos(i, 18.2)
-            d = math.hypot(hx - self.cx, hy - (self.cy - 20)) or 1.0
-            dx, dy = (hx - self.cx) / d, (hy - (self.cy - 20)) / d
+            d = math.hypot(hx - self.cx, hy - (self.cy + 15)) or 1.0
+            dx, dy = (hx - self.cx) / d, (hy - (self.cy + 15)) / d
             dist = 900 * tau + 0.5 * 4200 * tau * tau
             x, y = hx + dx * dist, hy + dy * dist
             if x < -250 or x > self.W + 250 or y < -250 or y > self.H + 250:

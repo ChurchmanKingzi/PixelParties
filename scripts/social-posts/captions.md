@@ -360,16 +360,16 @@ Datei: `cute-annoyance-mini.mp4`
 
 **Caption**
 
-> Discard a card, find a cute friend. 🐾
+> Cute. Annoying. She brought the whole cat army. 😼🐾
 >
-> Once per turn, discard 1 card to search your deck for a "Cute" Creature. Discard 1 more, and Mini immediately summons it as an additional Action.
+> Once per turn, Cute Annoyance Mini discards 1 card to search your deck for a "Cute" Creature. Discard 1 more, and she immediately summons it as an additional Action. Mine. Always mine.
 >
 > Pixel Parties is a free online TCG about assembling your party of Heroes and annihilating your opponent's party!
 > 👉 Play for free: pixelpartiestcg.com (link in bio)
 >
-> #PixelParties #TCG #CardGame #PixelArt #IndieGame #TradingCardGame #FreeToPlay #Cute #Kawaii
+> #PixelParties #TCG #CardGame #PixelArt #IndieGame #TradingCardGame #FreeToPlay #Cute #Kawaii #Cats
 
-**Alt-Text**: Animated pixel art trading card of Cute Annoyance Mini, with floating hearts and pink sparkles around the hero.
+**Alt-Text**: Animated pixel art trading card of Cute Annoyance Mini, with an army of winged cats, floating hearts and pink sparkles around the hero.
 
 ---
 
