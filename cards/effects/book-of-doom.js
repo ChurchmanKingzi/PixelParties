@@ -24,6 +24,8 @@ module.exports = {
     const hoptKey = `book-of-doom:${pi}`;
     if (gs.hoptUsed?.[hoptKey] === gs.turn) return false;
     // Gold check is handled by the server (checks cardData.cost before calling canActivate)
+    // X-Kosten (4 je Ziel): "any number of targets" schliesst 0 ein, dann kostet die Karte nichts - die Hand graut sie daher nicht am
+    // Grundpreis aus (`selfPricedArtifacts`, server.js); der Zielwaehler deckelt die Zielzahl nach Budget (`maxTotal`).
     return true;
   },
 

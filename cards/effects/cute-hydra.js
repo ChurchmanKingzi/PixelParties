@@ -425,6 +425,8 @@ module.exports = {
         // W71a (Al): "place that many Head Counters +1 on it" = X+1. W74b: bei Boris-Verzicht ist X die Groesse des Stapels.
         const x = skipped ? batchSize : discarded;
         const gained = x + HEAD_BONUS;
+        // Klang: kein Aufruf noetig - der Client vergleicht die Zaehler-Summen je Zustand (`ppZaehlerSummen`, app-board.jsx) und spielt bei jedem
+        // Anstieg von `headCounter` (wie bei allen Feldern `…Counter(s)`) den Zaehler-Klang.
         inst.counters.headCounter = (inst.counters.headCounter || 0) + gained;
         engine.log('cute_hydra_head_counters', {
           player: ps.username, gained, discarded,

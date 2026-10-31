@@ -4906,6 +4906,52 @@ window.ppApplauseFlash = function (key) {
   document.querySelectorAll(`[data-applause-key="${key}"]`).forEach(ppApplauseAufleuchten);
 };
 
+// ═══════════════════════════════════════════════════════════════
+//  ★ KLANG BEIM ERHALTEN VON COUNTERS (Als Befund 31.10.: „Cute Hydra braucht einen Sound beim Erhalten von Counters — generell soll
+//  das auf ALLEN Karten klingen")
+//
+//  Zentral über den Zustandsvergleich statt je Karte: Jedes Zähler-Feld an einer Kreatur (`creatureCounters`: headCounter, demonCounter,
+//  skullCounter, bunnyBombCounter, pythiaCounters …) oder einem Helden (`deepseaCounters`, `_timeCounters`, `_divinityCounters`,
+//  `_evolutionCounters`, `_investCounters`, `_luckCounter` …) zählt — das Namensmuster `…Counter(s)` (neue Zähler klingen damit von
+//  selbst) plus die Alt-Namen ohne Endung (`balance`, `preserve`, `luck`). Verglichen wird die SUMME je Zählerart über das ganze Brett:
+//  zieht eine Kreatur um oder wird neu beschworen, ohne dass ein Zähler dazukommt, bleibt die Summe gleich und es klingt nichts.
+//  Ausgenommen sind Zähler mit EIGENEM Klang, damit nichts doppelt klingt: Applause (`applause_gain`), Doom (`doom_tick`),
+//  Change Counter (`cosmic_counter_add`) und die Zähler der Time Bomblebee (`bomblebee_tick`).
+//  Neuer Zähler mit eigener Animation + Klang? Name in `PP_ZAEHLER_EIGENER_KLANG` ergänzen.
+// ═══════════════════════════════════════════════════════════════
+const PP_ZAEHLER_ALTE_NAMEN = new Set(['balance', 'preserve', 'luck']);
+const PP_ZAEHLER_EIGENER_KLANG = /change|^bombCounters$|applause|doom/i;
+const ppIstZaehlerFeld = (k) => !PP_ZAEHLER_EIGENER_KLANG.test(k) && (/Counters?$/.test(k) || PP_ZAEHLER_ALTE_NAMEN.has(k));
+/** Summe je Zählerart über Kreaturen und Helden beider Seiten. */
+function ppZaehlerSummen(gs) {
+  const sum = {};
+  const zaehle = (o) => {
+    if (!o) return;
+    for (const k of Object.keys(o)) {
+      const v = o[k];
+      if (typeof v === 'number' && v > 0 && ppIstZaehlerFeld(k)) sum[k] = (sum[k] || 0) + v;
+    }
+  };
+  const cc = gs && gs.creatureCounters;
+  if (cc) for (const pos of Object.keys(cc)) zaehle(cc[pos]);
+  for (const p of (gs && gs.players) || []) for (const h of (p && p.heroes) || []) zaehle(h);
+  return sum;
+}
+/** Hat sich in `jetzt` gegenüber `vorher` irgendeine Zählerart erhöht? */
+function ppZaehlerGestiegen(vorher, jetzt) {
+  if (!vorher || !jetzt) return false;
+  for (const k of Object.keys(jetzt)) if (jetzt[k] > (vorher[k] || 0)) return true;
+  return false;
+}
+function ppZaehlerKlang() {
+  if (!window.playSFX) return;
+  // zwei kurze, aufsteigende Töne (ein „+1"); ohne Sammelkategorie, damit der Karten-/Zauberklang davor ihn nicht verschluckt
+  window.playSFX('ping', { rate: 1.2, volume: 0.6, dedupe: 120, category: null });
+  window.playSFX('ping', { rate: 1.6, volume: 0.45, delay: 70, dedupe: 120, category: null });
+}
+window.ppZaehlerSummen = ppZaehlerSummen;
+window.ppZaehlerGestiegen = ppZaehlerGestiegen;
+
 function ApplauseBadge({ n, hand, akey }) {
   const ref = React.useRef(null);
   React.useEffect(() => {
@@ -41434,7 +41480,11 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           const baseAfterCrystal = applyCrystalCostMods(me, cardName, card.cost || 0);
           const effCost = Math.max(0, baseAfterCrystal - handReduction);
           // G1: inkl. Goldsperre; Karten mit Stufen-Preis (`goldLockSelfChecked`) prüfen ihre Kosten selbst - dort entscheidet `unactivatableArtifacts`.
-          if (!(me.goldLocked && (me.goldLockSelfChecked || []).includes(card.name)) && !goldKannZahlen(me, card.name, effCost)) return true;
+          // X-Kosten-Artefakte (`selfPricedArtifacts`: Dark Gear, Beer, Staff of Illusions …): der Grundpreis ist nur der Preis JE Stufe/Ziel -
+          // bei Stufe 0 oder ohne Ziel sind die Gesamtkosten 0, die Karte ist also auch ohne das Gold des Grundpreises spielbar.
+          // Ausgegraut wird sie dann nur über `unactivatableArtifacts` (echte Kosten, Goldsperre bei Preis je Ziel).
+          const selbstGerechnet = (me.selfPricedArtifacts || []).includes(card.name);
+          if (!selbstGerechnet && !(me.goldLocked && (me.goldLockSelfChecked || []).includes(card.name)) && !goldKannZahlen(me, card.name, effCost)) return true;
         }
         // Once-per-game artifacts (Smug Coin, etc.)
         if ((me.oncePerGameUsed || []).includes(cardName)) return true;
@@ -41628,7 +41678,11 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
   // (z 1000) and give it a win/loss glow so the "speaker" is highlighted
   // instead of dimmed. The bottom hand already sits at z 10000; the opponent
   // row only has z 2, so it otherwise hides behind the veil.
-  const endGlow = (won) => 'drop-shadow(0 0 10px ' + (won ? 'var(--success)' : 'var(--danger)') + ')';
+  // ★ Kein Weichzeichner-Schein mehr (Als Befund 31.10.: „wenn Gegner sprechen, wird ihr Name umrandet — sieht nicht gut aus"): der
+  // `drop-shadow` lag auf der ganzen Info-Zeile (Portrait UND Name) und umrandete deshalb auch den Namen. Der Sprecher bleibt hervorgehoben —
+  // über den Z-Index-Lift (End-Veil / Blasen-Ebene), den ohnehin leuchtenden Portrait-Rahmen (`avatar-active`) und beim Spielende einen harten
+  // Pixelring in Sieg-/Niederlagenfarbe NUR ums Portrait (`--pp-ring`, `.pp-portraet` in style.css).
+  const endRing = (won) => '0 0 0 11px var(' + (won ? '--success' : '--danger') + '), 0 0 0 13px var(--pp-kontur)';
   // Mid-Game-Bark: solange die Sprechblase steht, leuchtet das Portrait
   // des Sprechers im Bark-Bernstein (#fad54a = Blasenrand). End-Game-
   // Glow hat Vorrang, weil showEndBubbles die Bark-Blase ohnehin
@@ -41646,11 +41700,10 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
   // zusätzlich zu isMyTurn.
   const oppBarking = !showEndBubbles && cpuBark && cpuBark.owner === oppIdx;
   const meBarking = !showEndBubbles && cpuBark && cpuBark.owner !== oppIdx;
-  const barkFilter = 'drop-shadow(0 0 10px #fad54a)';
-  const oppAvatarHighlight = oppBubbleMsg ? { zIndex: 1100, filter: endGlow(endOppWon) }
-    : (oppBarking ? { zIndex: 9650, filter: barkFilter } : undefined);
-  const meAvatarHighlight = meBubbleMsg ? { filter: endGlow(endMeWon) }
-    : (meBarking ? { filter: barkFilter } : undefined);
+  const oppAvatarHighlight = oppBubbleMsg ? { zIndex: 1100 }
+    : (oppBarking ? { zIndex: 9650 } : undefined);
+  const oppPortraetRing = oppBubbleMsg ? endRing(endOppWon) : null;
+  const mePortraetRing = meBubbleMsg ? endRing(endMeWon) : null;
 
   // ── Hand Shuffle & Sort with FLIP animation ──
   const captureHandRects = () => {
@@ -55106,6 +55159,14 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
   const [creatureHealNumbers, setCreatureHealNumbers] = useState([]);
   const [goldGains, setGoldGains] = useState([]);
   const [goldLosses, setGoldLosses] = useState([]);
+  // ★ Klang beim Erhalten von Counters (Baustein `ppZaehlerSummen` oben): Vergleich der Zähler-Summen je Zustand; erster Zustand und Spielwechsel nur merken.
+  const prevZaehlerRef = useRef(null);
+  useEffect(() => {
+    const jetzt = { raum: gameState.roomId, summen: ppZaehlerSummen(gameState) };
+    const vorher = prevZaehlerRef.current;
+    prevZaehlerRef.current = jetzt;
+    if (vorher && vorher.raum === jetzt.raum && ppZaehlerGestiegen(vorher.summen, jetzt.summen)) ppZaehlerKlang();
+  }, [gameState]);
   const prevHpRef = useRef(null);
   const prevCreatureHpRef = useRef(null);
   const prevGoldRef = useRef(null);
@@ -59703,7 +59764,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
             {/* Porträt im verzierten Pixelrahmen in der Farbe des Spielers
                 (`.pp-portraet`, style.css). Im Tutorial: Monia Bot bzw.
                 Antonia mit eigenem Bild und eigener Farbe. */}
-            <span className="pp-portraet" style={{ '--portraet': opp.color || '#ec2d62' }}>
+            <span className="pp-portraet" style={oppPortraetRing ? { '--portraet': opp.color || '#ec2d62', '--pp-ring': oppPortraetRing } : { '--portraet': opp.color || '#ec2d62' }}>
               {/* `result ? '' : …` statt `!result && …`: der &&-Ausdruck liefert bei gesetztem Ergebnis das BOOLEAN false, und `'…-big' + false` haengt woertlich "false" an den Klassennamen. Aus `game-hand-avatar-crop` wurde `game-hand-avatar-cropfalse` — der quadratische Rahmen fiel weg und der HeroArtCrop lief auf seine volle 135px-Breite aus, der Avatar wurde also im End-Screen ploetzlich breiter. */}
               <HandPortraet
                 src={tutorialGegner ? tutorialGegner.avatar : opp.avatar}
@@ -60735,10 +60796,10 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         {/* My hand (bottom player) — drag to reorder for players, face-down for spectators */}
         <div className="game-hand game-hand-me" ref={isSpectator ? undefined : handRef} style={{ '--hand-accent': me.color || '#66b6ff' }}>
           <HandAmbiance color={me.color} />
-          <div className="game-hand-info" ref={speechMeRef} style={meAvatarHighlight}>
+          <div className="game-hand-info" ref={speechMeRef}>
             {/* Porträt im verzierten Pixelrahmen in der Farbe des Spielers
                 (`.pp-portraet`, style.css). */}
-            <span className="pp-portraet" style={{ '--portraet': me.color || '#66b6ff' }}>
+            <span className="pp-portraet" style={mePortraetRing ? { '--portraet': me.color || '#66b6ff', '--pp-ring': mePortraetRing } : { '--portraet': me.color || '#66b6ff' }}>
               <HandPortraet src={me.avatar} heroName={portraetHeld(me)}
                 zustand={result ? '' : ((isMyTurn || meBarking) ? ' avatar-active' : ' avatar-inactive')} />
               <span className="pp-portraet-zier" aria-hidden="true" />

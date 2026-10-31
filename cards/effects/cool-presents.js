@@ -47,8 +47,8 @@ module.exports = {
   goldPerTarget: true,   // G1 (A09-11): Grundpreis gilt je Uebergabe - unter der Goldsperre nur bei Preis 0 aktivierbar (server.js doUseArtifactEffect)
 
   /**
-   * Optimistic gate — need ≥1 hand card (besides the resolving copy),
-   * ≥4 gold (one transfer minimum), and a hand that isn't locked.
+   * Optimistic gate — need ≥1 hand card (besides the resolving copy)
+   * and a hand that isn't locked. No gold gate: 0 transfers cost 0.
    * The opponent's hand-lock is re-checked at resolve time.
    */
   canActivate(gs, pi, engine) {
@@ -58,7 +58,8 @@ module.exports = {
     // W5b-B6 (Al, Welle 5): Geben ist der EINZIGE Effekt – ist die Gegnerhand gesperrt (Hand-/Such-Sperre:
     // „cannot search or add cards to the hand"), würde er versagen, also ist die Karte gar nicht aktivierbar.
     if (engine && engine._isSearchBlocked(engine.opponentOf(pi), {}, 'deck')) return false;
-    if ((ps.gold || 0) < 4) return false;
+    // Kein Gold-Tor: "any number" schliesst 0 ein - ohne Uebergabe kostet die Karte nichts (Beer-Prinzip, `alwaysConfirmable`). Wie viele Karten
+    // man geben kann, deckelt der Zielwaehler nach Budget (`maxTotal`), die Goldsperre `goldPerTarget` (Preis je Karte > 0) sperrt der Server.
     // At least 2 cards in hand (Cool Presents + one to give) — though
     // sibling-copy plays can technically count the OTHER copy too, so
     // 2 cards is the floor either way.
