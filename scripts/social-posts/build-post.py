@@ -652,7 +652,16 @@ def main():
         lxw, lyw = (W - logo.width) // 2, 40 + oy + (args.logo_dy if args.logo_dy is not None else hero_cfg.get('logoDy', 0))
         wgeom = dict(logo_rect=(lxw, lyw, logo.width, logo.height), logo_img=logo, center=(card_x + CARD_W / 2, card_y + CARD_H * 0.47))
         if windshow_on:
-            wgeom.update(badge_rect=badge_rect, badge_img=badge_img)
+            tips = []                                                        # Fingerspitze des ausgestreckten Arms (links) je Sprite-Frame
+            for i_ in range(spr.n):
+                fr_ = np.asarray(spr.sheet.crop((i_ * spr.fw, 0, (i_ + 1) * spr.fw, spr.fh)))
+                ys_, xs_ = np.where((fr_[..., 3] > 20) & (fr_[..., 0] < 150))
+                sel = (ys_ >= 11) & (ys_ <= 19)
+                tx_ = int(xs_[sel].min())
+                tips.append((tx_, float(ys_[sel][xs_[sel] == tx_].mean())))
+            wgeom.update(badge_rect=badge_rect, badge_img=badge_img,
+                         hand_fn=lambda t_: (sx + (tips[(int(t_ * float(fps)) // per) % spr.n][0] + 0.5) * spr.px,
+                                             sy + (tips[(int(t_ * float(fps)) // per) % spr.n][1] + 0.5) * spr.px))
             wind = windfx.WindShow(W, H, U, float(fps), loop, wgeom, loop * WIND_LOOPS / float(fps))
         else:
             wind = windfx.WindFX(W, H, U, float(fps), loop, wgeom)
@@ -1112,7 +1121,7 @@ def main():
                  'baaliel-the-demon-general', 'stellan-the-calm-cat', 'archibald-the-archmage', 'hel-the-bound-specter', 'thorad-strength-of-coolness',
                  'luna-pele-the-flame-dancer', 'damus-the-prophet-of-apocalypse', 'mao-the-vengeful-guardian', 'xiong-the-bamboo-guardian',
                  'klaus-the-cult-leader', 'taio-the-sun-fencer', 'vacarn-the-dark-goblin-necromancer']          # Silhouetten des Openers (Reihenfolge = Abfolge)
-    T_WIND = 0.45                                                            # Sekunde der Böe im Wind-Opener (Musikschlag)
+    T_WIND = 0.0                                                             # Sekunde des Sturmstoßes im Wind-Opener (Musikschlag)
     T_SHIFT = args.shift_time or hero_cfg.get('shiftTime', 1.6)              # Sekunden Silhouetten-Sequenz, dann zeigt sich der Held (z. B. 4,0 = ein ganzer Musikaufbau)
     n_sil = int(np.clip(round(T_SHIFT * 5.5), 6, len(SIL_SLUGS) + 1))        # Anzahl Silhouetten inklusive der eigenen als letzte
     _raw = [0.4 * (0.07 / 0.4) ** (i / (n_sil - 1)) for i in range(n_sil)]    # erst langsam (0,4 s), dann immer schneller (0,07 s), zusammen genau T_SHIFT
@@ -1335,7 +1344,7 @@ def main():
         if (show_on or windshow_on) and os.environ.get('SHOW_SECONDS'):                       # Show-Vorschau: Zeitpunkte in Sekunden, kommagetrennt (Umgebungsvariable SHOW_SECONDS)
             for sec in os.environ['SHOW_SECONDS'].split(','):
                 prev = OUT / f'preview-{args.slug}-{tag}-{sec}s.png'
-                render(int(float(sec) * float(fps)), False).save(prev)
+                render(int(float(sec) * float(fps)), False, False, opener_on).save(prev)
                 print('Vorschau', prev)
             return
         prev = OUT / f'preview-{args.slug}-{tag}.png'

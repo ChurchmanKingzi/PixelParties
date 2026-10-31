@@ -266,14 +266,14 @@ class WindFX:
 
 # ══════════════════════════════════════════════════════════════════════════════════════════════
 #  Wind-SHOW: ein Tornado, der ins Bild kommt, mit dem Interface spielt und wieder geht (einmalige Zeitleiste, nahtloser Loop)
-#    0.0 –  1.9  Blätterwand wird weggeweht (Opener)
-#    1.9 –  4.0  Brise
-#    4.2 – 13.6  Champion beschwört mit der Klinge einen Tornado: er wächst, wandert unten durchs Bild, saugt das Link-Schild ein,
-#                zieht links hoch, jagt am oberen Rand entlang und reißt das Banner mit; Böen rütteln Karte und Champion
+#    0.0 –  1.4  Sturmstoß (Opener): Blitz, Druckwelle, Speedlines und ein Wirbel aus Blättern fliegen von Champion nach außen
+#    1.4 –  4.0  Brise
+#    4.0 – 13.6  Champion beschwört vor seinem ausgestreckten Arm einen Tornado: er wächst, löst sich, wandert unten durchs Bild, saugt das Link-Schild ein,
+#                zieht rechts hoch, jagt am oberen Rand nach links und reißt das Banner mit; Böen rütteln Karte und Champion
 #   13.6 – 15.4  Gegenwind von rechts, Banner und Schild sind zurück
 #   15.0 – 18.5  großer Tornado hinter der Karte (Champion bleibt frei), Kleinteile kreisen
 #   18.5 – 19.4  Sprengung aller Teile nach außen (Druckwelle)
-#   19.4 –   D   Blätter fliegen zurück in die Wand vom ersten Bild
+#   19.4 –   D   Blätter und Speedlines ziehen sich zusammen und leiten in den Sturmstoß vom ersten Bild über (nahtloser Loop)
 # ══════════════════════════════════════════════════════════════════════════════════════════════
 def _smooth(x):
     x = min(1.0, max(0.0, x))
@@ -281,12 +281,14 @@ def _smooth(x):
 
 
 class WindShow(WindFX):
-    SHOCKS = (4.3, 18.5)
-    T_GUST = 0.45
-    TW_KEYS = [(4.2, 735, 905, 60, 40), (5.0, 820, 1000, 260, 150), (5.8, 930, 1120, 480, 230), (6.6, 760, 1500, 440, 230),
-               (7.4, 540, 1560, 440, 240), (8.4, 340, 1560, 460, 250), (9.4, 150, 1300, 640, 320), (10.6, 120, 900, 720, 330),
-               (11.4, 330, 480, 430, 260), (12.0, 700, 470, 430, 260), (12.8, 1000, 470, 430, 260), (13.6, 1250, 600, 300, 180)]
-    GUSTS = [(4.3, 16), (5.6, 10), (9.6, 12), (12.3, 16), (13.9, -12), (18.5, 18)]       # (Sekunde, Stärke px): rütteln Karte und Champion
+    SHOCKS = (0.0, 4.5, 18.5)
+    T_GUST = 0.0
+    # (t, xc, y_bot, Höhe, Breite oben); 'hand' = vor Champions ausgestreckter Hand (Versatz in px), siehe twister()
+    TW_KEYS = [(4.0, 'hand', 'hand', 70, 45), (4.9, 'hand', 'hand', 250, 140), (5.8, 150, 1150, 440, 230), (6.6, 380, 1500, 440, 230),
+               (7.4, 540, 1560, 440, 240), (8.4, 760, 1560, 460, 250), (9.4, 940, 1300, 640, 320), (10.6, 960, 900, 720, 330),
+               (11.4, 760, 480, 430, 260), (12.0, 380, 470, 430, 260), (12.8, 40, 470, 430, 260), (13.6, -250, 600, 300, 180)]
+    HAND_OFF = (-95, 85)                                                                 # Tornado entsteht links neben der Fingerspitze, Fuß knapp darunter
+    GUSTS = [(0.0, 22), (4.5, 16), (5.6, 10), (9.6, 12), (12.3, 16), (13.9, -12), (18.5, 18)]       # (Sekunde, Stärke px): rütteln Karte und Champion
 
     def __init__(self, W, H, U, fps, loop, geom, D, seed=5):
         super().__init__(W, H, U, fps, loop, geom, seed)
@@ -300,18 +302,36 @@ class WindShow(WindFX):
         self.amb = []
         for c in self.cross:
             self.amb.append(dict(c, x0=rng.uniform(0, W + 200), kx=rng.uniform(0.6, 1.4), fall=rng.uniform(10, 50)))
-        # Opener/Closer: alle Blätter der Wand
-        self.bubble = None
+        self.hand_fn = geom.get('hand_fn')
+        # Sturmstoß (Opener und Schluss): Blätter wirbeln spiralig von Champion nach außen, dazu Speedlines
+        self.burst = []
+        for _ in range(190):
+            k = ['leaf', 'oak', 'leaf', 'oak', 'twig', 'scrap', 'feather'][int(rng.integers(7))]
+            self.burst.append(dict(kind=k, var=KIND_VARIANTS[k][int(rng.integers(len(KIND_VARIANTS[k])))], a=rng.uniform(0, 2 * math.pi),
+                                   s=rng.uniform(900, 2800), k=rng.uniform(-1.3, 1.3), px=int(rng.integers(6, 12)), tum=rng.uniform(0, 8)))
+        self.lines = [dict(a=rng.uniform(0, 2 * math.pi), v=rng.uniform(1600, 3800), L=rng.uniform(160, 460), col=int(rng.integers(3))) for _ in range(70)]
 
     # ───────── Zeitleisten ─────────
+    def _key(self, k):
+        """Schlüsselbild mit absoluten Werten; 'hand' wird zur Handposition (mit Versatz) zum Zeitpunkt des Schlüsselbilds."""
+        t, xc, yb, Ht, wt = k
+        if xc == 'hand' and self.hand_fn is not None:
+            hx, hy = self.hand_fn(t)
+            xc, yb = hx + self.HAND_OFF[0], hy + self.HAND_OFF[1]
+        return t, xc, yb, Ht, wt
+
     def twister(self, t):
-        keys = self.TW_KEYS
+        keys = [self._key(k) for k in self.TW_KEYS]
         if t < keys[0][0] or t > keys[-1][0]:
             return None
         for a, b in zip(keys[:-1], keys[1:]):
             if a[0] <= t <= b[0]:
                 u = _smooth((t - a[0]) / (b[0] - a[0]))
-                return tuple(a[i] + (b[i] - a[i]) * u for i in range(1, 5))                       # (xc, y_bot, H, w_top)
+                st = [a[i] + (b[i] - a[i]) * u for i in range(1, 5)]                          # (xc, y_bot, H, w_top)
+                if t < keys[1][0] and self.hand_fn is not None:                              # solange er „geschaffen“ wird, folgt er der Hand
+                    hx, hy = self.hand_fn(t)
+                    st[0], st[1] = hx + self.HAND_OFF[0] + self.sprite_dx(int(t * self.fps)), hy + self.HAND_OFF[1]
+                return tuple(st)
         return None
 
     def big(self, t):
@@ -469,14 +489,14 @@ class WindShow(WindFX):
             if t >= tg:
                 amp += min(3.5, abs(a) / 5.0) * math.exp(-(t - tg) / 0.5)
         dx = 0.0
-        if 11.7 <= t < 12.8:                                   # Tornado jagt das Banner nach rechts aus dem Bild
-            dx = 1250 * _smooth((t - 11.7) / 1.1) ** 1.5
+        if 11.7 <= t < 12.8:                                   # Tornado jagt das Banner nach links aus dem Bild
+            dx = -1250 * _smooth((t - 11.7) / 1.1) ** 1.5
             amp = 5.5
         elif 12.8 <= t < 13.6:
             return
-        elif 13.6 <= t < 14.7:                                 # kommt von links zurück, flattert aus
+        elif 13.6 <= t < 14.7:                                 # kommt von rechts zurück, flattert aus
             u = (t - 13.6) / 1.1
-            dx = -1250 * (1 - _smooth(u)) ** 1.5
+            dx = 1250 * (1 - _smooth(u)) ** 1.5
             amp = 1.5 + 4.0 * (1 - u)
         flag, pad = self._flag(self.g['logo_img'], amp, t)
         canvas.paste(flag, (int(lx + dx), ly - pad), flag)
@@ -505,9 +525,9 @@ class WindShow(WindFX):
             r = 20 + wt * 0.35
             x0, y0 = xc + r * math.cos(a), yb - Ht * 0.12 - Ht * 0.45 + 0.16 * r * math.sin(a)
             tau = t - 8.6
-            x, y = x0 - 900 * tau - 400 * tau * tau, y0 - 250 * tau + 500 * tau * tau * 0.4
+            x, y = x0 + 900 * tau + 400 * tau * tau, y0 - 250 * tau + 200 * tau * tau
             spin = a + 2 * math.pi * 4 * tau
-            if x < -400:
+            if x > self.W + 400:
                 return
         elif 9.8 <= t < 10.6:
             return
@@ -525,47 +545,52 @@ class WindShow(WindFX):
             img = img.resize((wcur, bh), Image.NEAREST)
         canvas.paste(img, (int(x - img.width / 2), int(y - img.height / 2)), img)
 
-    # ───────── Opener und Schluss: Blätterwand ─────────
-    def _wall_pass(self, img, tau_of, T_END_ok, rng_seed):
-        out = img.convert('RGBA')
-        rng = np.random.default_rng(rng_seed)
-        for c in self.wall:
-            tau = tau_of(c)
-            if tau <= 0:
-                x, y = c['x'] + rng.uniform(-6, 6), c['y'] + rng.uniform(-6, 6)
-            else:
-                x = c['x'] + c['sp'] * tau * (0.4 + tau) + 80 * tau
-                y = c['y'] + c['amp'] * math.sin(2 * math.pi * (1.5 * tau + c['ky'])) * min(1.0, tau * 2)
-                if x > self.W + 150:
+    # ───────── Opener und Schluss: Sturmstoß ─────────
+    def _storm_burst(self, out, tau, ts):
+        """Speedlines und spiralig nach außen wirbelnde Blätter, tau = Zeit seit dem Stoß (mit kleinem Vorlauf, damit schon das erste Bild gefüllt ist)."""
+        from PIL import ImageDraw
+        cx, cy = self.cx, self.cy
+        U = self.U
+        if tau < 0.5:                                                                   # Speedlines (kurz)
+            ov = Image.new('RGBA', (self.W, self.H), (0, 0, 0, 0))
+            dr = ImageDraw.Draw(ov)
+            cols = ((255, 255, 255), (214, 210, 255), (170, 160, 245))
+            for ln in self.lines:
+                head = 140 + ln['v'] * (1 - math.exp(-4 * tau)) / 4
+                tail = max(110, head - ln['L'] * min(1.0, tau / 0.25))
+                if head > 1700:
                     continue
-            yield out, c, x, y
+                x0, y0 = cx + math.cos(ln['a']) * tail, cy + math.sin(ln['a']) * tail
+                x1, y1 = cx + math.cos(ln['a']) * head, cy + math.sin(ln['a']) * head
+                dr.line([(round(x0 / U) * U, round(y0 / U) * U), (round(x1 / U) * U, round(y1 / U) * U)], fill=cols[ln['col']] + (255,), width=U)
+            out.alpha_composite(ov)
+        for b in self.burst:                                                             # Blätter
+            r = b['s'] * (1 - math.exp(-3.5 * tau)) / 3.5 + 90
+            ang = b['a'] + b['k'] * (1 - math.exp(-2.5 * tau))
+            x, y = cx + math.cos(ang) * r, cy + math.sin(ang) * r * 1.05
+            if x < -120 or x > self.W + 120 or y < -120 or y > self.H + 120:
+                continue
+            self._put(out, b['kind'], b['var'], int(ts * 14 + b['tum']), b['px'], x, y)
+
+    PRE = 0.06                                                                           # Vorlauf: schon das erste Bild zeigt den Stoß
 
     def opener_fx(self, img, f, t_gust=None):
-        t_gust = self.T_GUST if t_gust is None else t_gust
         ts = f / float(self.fps)
-        if ts >= t_gust + 1.5:
+        if ts >= 1.4:
             return img
-        out = None
-        for out, c, x, y in self._wall_pass(img, lambda c: ts - t_gust - 0.30 * (c['x'] / self.W), None, 4000 + f):
-            self._put(out, c['kind'], c['var'], int(ts * 14 + c['tum']), c['px'], x, y)
-        if out is None:
-            return img
-        if t_gust <= ts < t_gust + 0.9:
-            rng = np.random.default_rng(5000 + f)
-            for k in range(26):
-                y = int(rng.uniform(40, self.H - 40) // self.U * self.U)
-                L = int(rng.integers(30, 90)) * self.U
-                x = -L + (self.W + 2 * L) * ((ts - t_gust) / 0.7 * (0.7 + 0.6 * rng.random()))
-                out.paste(Image.new('RGBA', (L, self.U), (255, 255, 255, 255)), (int(x), y))
+        out = img.convert('RGBA')
+        self._storm_burst(out, ts + self.PRE, ts)
         return out.convert('RGB')
 
     def closer_fx(self, img, f):
-        """Letzte 2 s: Die Blätter fliegen (Umkehrung des Openers) zurück in die Wand vom ersten Bild → nahtloser Loop."""
+        """Letzte 0,8 s: Blätter und Speedlines ziehen sich zum Zentrum zusammen und das Bild hellt auf → geht nahtlos in den Sturmstoß des ersten Bilds über."""
         t = f / float(self.fps)
-        t_gust = self.T_GUST
-        if t < self.D - (t_gust + 1.5):
+        if t < self.D - 0.8:
             return img
-        out = None
-        for out, c, x, y in self._wall_pass(img, lambda c: (self.D - t) - t_gust - 0.30 * (c['x'] / self.W), None, 6000 + f):
-            self._put(out, c['kind'], c['var'], int(t * 14 + c['tum']), c['px'], x, y)
-        return out.convert('RGB') if out is not None else img
+        out = img.convert('RGBA')
+        self._storm_burst(out, (self.D - t) + self.PRE, t)
+        u = (t - (self.D - 0.8)) / 0.8
+        a = 0.42 * u * u                                                                  # Aufhellen wie der Blitz des Punch im ersten Bild
+        if a > 0:
+            out = Image.blend(out, Image.new('RGBA', out.size, (255, 255, 255, 255)), a)
+        return out.convert('RGB')
