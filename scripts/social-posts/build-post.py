@@ -535,7 +535,8 @@ def main():
     opener = args.opener or hero_cfg.get('opener') or 'none'
     args_opener = opener
     opener_on = opener in ('heart', 'storm', 'shift', 'wind')
-    wind_on = args.wind or bool(hero_cfg.get('wind'))
+    windshow_on = bool(hero_cfg.get('windshow'))                              # Wind-Show mit Zeitleiste (windfx.WindShow) statt Schleife
+    wind_on = args.wind or bool(hero_cfg.get('wind')) or windshow_on
     horror_on = args.horror or bool(hero_cfg.get('horror'))
     show_on = (args.show or hero_cfg.get('show') or 'none') == 'mini'
     if opener_on:
@@ -610,7 +611,7 @@ def main():
         us = 3
         pw, ph = um.width * us + 8 * U, um.height * us + 5 * U
         px0, py0 = (W - pw) // 2, (sub_y if sub else name_y + 40) + 30
-        badge_target = Image.new('RGBA', (W, H), (0, 0, 0, 0)) if show_on else mid_b       # Show: Schild als eigene Ebene (wird vom Kater geschubst)
+        badge_target = Image.new('RGBA', (W, H), (0, 0, 0, 0)) if (show_on or windshow_on) else mid_b       # Show: Schild als eigene Ebene (wird vom Kater geschubst)
         dr = ImageDraw.Draw(badge_target)
         dr.rectangle([px0 + U, py0, px0 + pw - U - 1, py0 + ph - 1], fill=INK)
         dr.rectangle([px0, py0 + U, px0 + pw - 1, py0 + ph - U - 1], fill=INK)
@@ -645,10 +646,16 @@ def main():
     box = (sx + spr.vleft * spr.px, sy + spr.vtop * spr.px, sx + spr.vright * spr.px, feet_y)
     theme_fx = fx.ThemeFX(fx.specs_for(names, None if args.themes else hero_cfg.get('particles')), args.slug, box, feet_y, loop)
     stick_col = mix(WHITE, accent, 0.25)
+    WIND_LOOPS = 5                                                           # Länge der Wind-Show in Schleifen der Sprite-Animation (5 × 4,32 s = 21,6 s)
     if wind_on:
         import windfx
         lxw, lyw = (W - logo.width) // 2, 40 + oy + (args.logo_dy if args.logo_dy is not None else hero_cfg.get('logoDy', 0))
-        wind = windfx.WindFX(W, H, U, float(fps), loop, dict(logo_rect=(lxw, lyw, logo.width, logo.height), logo_img=logo, center=(card_x + CARD_W / 2, card_y + CARD_H * 0.47)))
+        wgeom = dict(logo_rect=(lxw, lyw, logo.width, logo.height), logo_img=logo, center=(card_x + CARD_W / 2, card_y + CARD_H * 0.47))
+        if windshow_on:
+            wgeom.update(badge_rect=badge_rect, badge_img=badge_img)
+            wind = windfx.WindShow(W, H, U, float(fps), loop, wgeom, loop * WIND_LOOPS / float(fps))
+        else:
+            wind = windfx.WindFX(W, H, U, float(fps), loop, wgeom)
     SHOW_LOOPS = 9                                                           # Länge der Show in Schleifen der Sprite-Animation (9 × 2,24 s ≈ 20 s)
     if show_on:
         import minishow
@@ -1242,12 +1249,17 @@ def main():
         for lay, (t0, t1) in ((mid_a, T_A),) if name_front else ((mid_a, T_A), (mid_b, T_B)):
             l2 = dissolve(lay, (ts - t0) / (t1 - t0) if intro else 1.0)
             if l2 is not None:
-                canvas.alpha_composite(l2)
+                if windshow_on and lay is mid_a and wind.plate_dx(f):         # Böe rüttelt die Karte
+                    canvas.paste(l2, (wind.plate_dx(f), 0), l2)
+                else:
+                    canvas.alpha_composite(l2)
         if show_on:
             show.draw_logo(canvas, f / float(fps))
             show.draw_badge(canvas, f / float(fps))
         if wind_on:
             wind.draw_logo(canvas, f)
+            if windshow_on:
+                wind.draw_badge(canvas, f)
         # Themen-Partikel und Funkeln der Edelsteine: nur HINTER dem Sprite, damit nie etwas über dem Kopf liegt
         layer = Image.new('RGBA', (W, H), (0, 0, 0, 0))
         theme_fx.draw(layer, f)
@@ -1275,7 +1287,7 @@ def main():
             sx_d, sy_d = round(card_x + CARD_W / 2 - gl_spr.center_x * gl_spr.px), feet_y - gl_spr.foot * gl_spr.px
         else:
             o_dark, o_light, sp, pad_px = spr.layers(f // per, stick_col, INK)
-            sx_d, sy_d = sx, sy
+            sx_d, sy_d = sx + (wind.sprite_dx(f) if windshow_on else 0), sy
         if not hero_cfg.get('noShadow'):
             canvas.alpha_composite(shadow, (card_x + CARD_W // 2 - shadow.width // 2, feet_y - U + hero_cfg.get('shadowDy', 0)))      # shadowDy: Schatten tiefer setzen (schwebende Sprites)
         flash = intro and ts < T_SPR + T_FLASH
@@ -1298,6 +1310,9 @@ def main():
         if wind_on:
             wind.draw_front(canvas, f)
         out_img = canvas.convert('RGB')
+        if windshow_on:
+            for tb in wind.SHOCKS:                                           # Druckwellen: Beschwörung und Sprengung
+                out_img = punch_fx(out_img, f, tb)
         if show_on:
             for tb in show.SHOCKS:                                           # Druckwellen bei den drei Sprengungen (Wand, „ATTACK!“, Herz)
                 out_img = punch_fx(out_img, f, tb)
@@ -1310,11 +1325,14 @@ def main():
             arr[..., 2] = np.roll(arr[..., 2], -U, axis=1)
             out_img = Image.fromarray(arr, 'RGB')
         if opener:
-            return {'storm': lambda *a: storm_fx(*a), 'shift': lambda *a: shift_fx(*a), 'wind': lambda im, ff: wind.opener_fx(im, ff, T_WIND)}.get(args_opener, lambda *a: opener_fx(*a))(out_img, f)
+            res = {'storm': lambda *a: storm_fx(*a), 'shift': lambda *a: shift_fx(*a), 'wind': lambda im, ff: wind.opener_fx(im, ff, T_WIND)}.get(args_opener, lambda *a: opener_fx(*a))(out_img, f)
+            return wind.closer_fx(res, f) if windshow_on else res
+        if windshow_on:
+            return wind.closer_fx(out_img, f)
         return punch_fx(out_img, f) if punch else out_img
 
     if args.cover_only is not None:
-        if show_on and os.environ.get('SHOW_SECONDS'):                       # Show-Vorschau: Zeitpunkte in Sekunden, kommagetrennt (Umgebungsvariable SHOW_SECONDS)
+        if (show_on or windshow_on) and os.environ.get('SHOW_SECONDS'):                       # Show-Vorschau: Zeitpunkte in Sekunden, kommagetrennt (Umgebungsvariable SHOW_SECONDS)
             for sec in os.environ['SHOW_SECONDS'].split(','):
                 prev = OUT / f'preview-{args.slug}-{tag}-{sec}s.png'
                 render(int(float(sec) * float(fps)), False).save(prev)
@@ -1326,13 +1344,13 @@ def main():
         return
     for f in range(loop):
         render(f, False).save(fdir / f'f{f:03d}.png')
-    first_loops = SHOW_LOOPS if show_on else 1                                # Länge des gesonderten ersten Segments in Schleifen (Vielfaches, damit der Übergang nahtlos bleibt)
+    first_loops = SHOW_LOOPS if show_on else WIND_LOOPS if windshow_on else 1                                # Länge des gesonderten ersten Segments in Schleifen (Vielfaches, damit der Übergang nahtlos bleibt)
     if opener_on and args_opener == 'shift':
         first_loops = max(1, -(-int((T_SHIFT + 0.3) * float(fps)) // loop))
     if first_on:
         for f in range(loop * first_loops):
             render(f, intro_on, punch_on, opener_on).save(fdir / f'i{f:03d}.png')
-    cover = Image.open(fdir / ('i%03d.png' % int(17.4 * float(fps)))) if show_on else Image.open(fdir / ('f%03d.png' % (min(loop - 1, per * 3))) if reel else fdir / 'f000.png')
+    cover = Image.open(fdir / ('i%03d.png' % int((17.4 if show_on else 16.8) * float(fps)))) if (show_on or windshow_on) else Image.open(fdir / ('f%03d.png' % (min(loop - 1, per * 3))) if reel else fdir / 'f000.png')
     cover_path = out / ('reel-cover.png' if reel else 'post.png')
     cover.save(cover_path)
     print('Standbild', cover_path)
@@ -1341,8 +1359,8 @@ def main():
         return
     music = music_path(card_name, args.music or hero_cfg.get('music'))
     loop_s = loop / float(fps)
-    if show_on:
-        duration = loop * SHOW_LOOPS / float(fps) - 0.001
+    if show_on or windshow_on:
+        duration = loop * first_loops / float(fps) - 0.001
     loops = max(1, math.ceil(duration / loop_s))
     dur = loop_s * loops
     cmd = ['ffmpeg', '-y', '-loglevel', 'error']

@@ -262,3 +262,310 @@ class WindFX:
                 x = -L + (self.W + 2 * L) * ((ts - t_gust) / 0.7 * (0.7 + 0.6 * rng.random()))
                 out.paste(Image.new('RGBA', (L, self.U), (255, 255, 255, 255)), (int(x), y))
         return out.convert('RGB')
+
+
+# ══════════════════════════════════════════════════════════════════════════════════════════════
+#  Wind-SHOW: ein Tornado, der ins Bild kommt, mit dem Interface spielt und wieder geht (einmalige Zeitleiste, nahtloser Loop)
+#    0.0 –  1.9  Blätterwand wird weggeweht (Opener)
+#    1.9 –  4.0  Brise
+#    4.2 – 13.6  Champion beschwört mit der Klinge einen Tornado: er wächst, wandert unten durchs Bild, saugt das Link-Schild ein,
+#                zieht links hoch, jagt am oberen Rand entlang und reißt das Banner mit; Böen rütteln Karte und Champion
+#   13.6 – 15.4  Gegenwind von rechts, Banner und Schild sind zurück
+#   15.0 – 18.5  großer Tornado hinter der Karte (Champion bleibt frei), Kleinteile kreisen
+#   18.5 – 19.4  Sprengung aller Teile nach außen (Druckwelle)
+#   19.4 –   D   Blätter fliegen zurück in die Wand vom ersten Bild
+# ══════════════════════════════════════════════════════════════════════════════════════════════
+def _smooth(x):
+    x = min(1.0, max(0.0, x))
+    return x * x * (3 - 2 * x)
+
+
+class WindShow(WindFX):
+    SHOCKS = (4.3, 18.5)
+    T_GUST = 0.45
+    TW_KEYS = [(4.2, 735, 905, 60, 40), (5.0, 820, 1000, 260, 150), (5.8, 930, 1120, 480, 230), (6.6, 760, 1500, 440, 230),
+               (7.4, 540, 1560, 440, 240), (8.4, 340, 1560, 460, 250), (9.4, 150, 1300, 640, 320), (10.6, 120, 900, 720, 330),
+               (11.4, 330, 480, 430, 260), (12.0, 700, 470, 430, 260), (12.8, 1000, 470, 430, 260), (13.6, 1250, 600, 300, 180)]
+    GUSTS = [(4.3, 16), (5.6, 10), (9.6, 12), (12.3, 16), (13.9, -12), (18.5, 18)]       # (Sekunde, Stärke px): rütteln Karte und Champion
+
+    def __init__(self, W, H, U, fps, loop, geom, D, seed=5):
+        super().__init__(W, H, U, fps, loop, geom, seed)
+        self.D = D
+        n = int(D * fps) + 2
+        ts = np.arange(n) / fps
+        w = 140 + sum(a * np.exp(-(((ts - t0) / wd) ** 2)) for t0, a, wd in ((4.4, 1800, 0.5), (5.5, 900, 0.4), (9.5, 1200, 0.5), (12.0, 1500, 0.5),
+                                                                              (13.8, -1600, 0.5), (18.4, 1000, 0.4)))
+        self.X = np.cumsum(w) / fps                                                    # Windweg: bestimmt die Position der quer fliegenden Teile
+        rng = np.random.default_rng(seed + 7)
+        self.amb = []
+        for c in self.cross:
+            self.amb.append(dict(c, x0=rng.uniform(0, W + 200), kx=rng.uniform(0.6, 1.4), fall=rng.uniform(10, 50)))
+        # Opener/Closer: alle Blätter der Wand
+        self.bubble = None
+
+    # ───────── Zeitleisten ─────────
+    def twister(self, t):
+        keys = self.TW_KEYS
+        if t < keys[0][0] or t > keys[-1][0]:
+            return None
+        for a, b in zip(keys[:-1], keys[1:]):
+            if a[0] <= t <= b[0]:
+                u = _smooth((t - a[0]) / (b[0] - a[0]))
+                return tuple(a[i] + (b[i] - a[i]) * u for i in range(1, 5))                       # (xc, y_bot, H, w_top)
+        return None
+
+    def big(self, t):
+        """Großer Tornado hinter der Karte: Stärke 0 … 1 (wächst 15.0–16.2, hält bis 18.5)."""
+        if t < 15.0 or t >= 18.5:
+            return 0.0
+        return _smooth((t - 15.0) / 1.2)
+
+    def plate_dx(self, f):
+        t = f / float(self.fps)
+        dx = 0.0
+        for tg, a in self.GUSTS:
+            tau = t - tg
+            if tau >= 0:
+                dx += a * math.exp(-tau / 0.28) * math.cos(2 * math.pi * 4.5 * tau)
+        return int(round(dx / self.U)) * self.U
+
+    def sprite_dx(self, f):
+        return int(round(0.55 * self.plate_dx(f) / self.U)) * self.U
+
+    # ───────── Trichter mit freien Parametern ─────────
+    def _draw_funnel(self, canvas, xc0, y_top, y_bot, w_top, t, sway=60.0, alpha=0.9):
+        U, cw, ch = self.U, self.cw, self.ch
+        y0c, y1c = int(y_top / U), int(y_bot / U)
+        if y1c - y0c < 3:
+            return
+        rows = np.arange(y0c, y1c)
+        v = (rows - y0c) / float(y1c - y0c)
+        ph = t / 4.32
+        w = 20 + w_top * (1 - v) ** 1.3
+        xc = xc0 + sway * np.sin(2 * math.pi * (v * 1.1 + ph))
+        X = np.arange(cw)[None, :] + 0.5
+        d = (X * U - xc[:, None]) / w[:, None]
+        inside = np.abs(d) <= 1.0
+        theta = np.arcsin(np.clip(d, -1, 1))
+        bands = np.sin(5.0 * (theta + 2 * math.pi * 2 * ph) + 9.0 * v[:, None])
+        lvl = 1.3 + 0.95 * bands + 0.8 * d
+        lvl = np.where(np.abs(d) > 0.93, 0.0, lvl)
+        r0, r1 = max(0, y0c), min(ch, y1c)
+        if r1 <= r0:
+            return
+        sl = slice(r0 - y0c, r1 - y0c)
+        bay = self.BAY[r0:r1, :cw]
+        lv = lvl[sl]
+        lo = np.clip(np.floor(lv), 0, 2).astype(int)
+        idx = np.clip(lo + ((lv - np.floor(lv)) > bay), 0, 3)
+        rgb = np.asarray(STORM_PAL, dtype=np.uint8)[idx]
+        a_ = (alpha - 0.3 * v[sl, None]) * np.clip((1 - np.abs(d[sl])) * 5 + 0.25, 0, 1)
+        vis = inside[sl] & (bay < a_)
+        lay = np.zeros((r1 - r0, cw, 4), dtype=np.uint8)
+        lay[..., :3] = rgb
+        lay[..., 3] = np.where(vis, 255, 0)
+        im = Image.fromarray(lay, 'RGBA').resize((cw * U, (r1 - r0) * U), Image.NEAREST).crop((0, 0, self.W, (r1 - r0) * U))
+        canvas.paste(im, (0, r0 * U), im)
+
+    def _tw_geom(self, st):
+        xc, yb, Ht, wt = st
+        return xc, yb - Ht, yb, wt
+
+    def _orbit_state_for(self, p, t, geom):
+        xc0, y_top, y_bot, w_top = geom
+        ph = t / 4.32
+        v = (p['v'] - p['rise'] * ph) % 1.0
+        w = 20 + w_top * (1 - v) ** 1.3
+        xc = xc0 + 60.0 * math.sin(2 * math.pi * (v * 1.1 + ph))
+        y = y_top + (y_bot - y_top) * v
+        a = p['a0'] + p['dir'] * 2 * math.pi * p['K'] * ph
+        x = xc + p['rf'] * w * math.cos(a)
+        yy = y + 0.16 * p['rf'] * w * math.sin(a)
+        z = math.sin(a) * p['dir']
+        return x, yy, z, v
+
+    def _orbit_draw_for(self, canvas, t, f, geom, back, scale=0.9, count=70, burst=None):
+        items = []
+        for p in self.orbit[:count]:
+            x, y, z, v = self._orbit_state_for(p, t, geom)
+            if v < 0.04 or v > 0.96:
+                continue
+            if burst is not None:                                                    # Sprengung: radial vom Trichtermittelpunkt weg
+                tau = t - burst
+                cx0, cy0 = geom[0], (geom[1] + geom[2]) / 2
+                d = math.hypot(x - cx0, y - cy0) or 1.0
+                dist = 900 * tau + 0.5 * 4200 * tau * tau
+                x, y = x + (x - cx0) / d * dist, y + (y - cy0) / d * dist
+                if x < -200 or x > self.W + 200 or y < -200 or y > self.H + 200:
+                    continue
+                z = 1.0 if not back else -1.0
+            if (z < 0) != back:
+                continue
+            items.append((z, p, x, y))
+        for z, p, x, y in sorted(items, key=lambda a: a[0]):
+            px = max(4, int(round(p['px'] * scale)) + (1 if z > 0.5 else 0))
+            self._put(canvas, p['kind'], p['var'], int(f * 0.3 + p['tum']), px, x, y)
+
+    # ───────── Zeichnen ─────────
+    def draw_behind(self, canvas, f):
+        t = f / float(self.fps)
+        b = self.big(t)
+        if b > 0:                                                                    # großer Tornado hinter der Karte
+            self._draw_funnel(canvas, self.W / 2, self.t_top, self.t_bot, 560 * b, t, alpha=0.92)
+            self._orbit_draw_for(canvas, t, f, (self.W / 2, self.t_top, self.t_bot, 560 * b), back=True, scale=1.0, count=110)
+        elif 18.5 <= t < 19.4:
+            self._orbit_draw_for(canvas, t, f, (self.W / 2, self.t_top, self.t_bot, 560), back=True, scale=1.0, count=110, burst=18.5)
+
+    def _breeze(self, canvas, t, f):
+        """Quer fliegende Teile im Windweg und Böen-Streifen (Stärke folgt dem Wind)."""
+        k = min(len(self.X) - 1, int(t * self.fps))
+        Xt = self.X[k]
+        W = self.W
+        for c in self.amb:
+            x = ((c['x0'] + c['kx'] * Xt) % (W + 240)) - 120
+            y = (c['y'] + c['fall'] * t + c['amp'] * math.sin(2 * math.pi * (c['ky'] * t / 4.3 + c['ph']))) % (self.H + 160) - 80
+            self._put(canvas, c['kind'], c['var'], int(f * 0.3 + c['tum']), c['px'], x, y)
+        speed = abs(self.X[min(len(self.X) - 1, k + 1)] - self.X[k]) * self.fps
+        n = int(min(len(self.streaks), speed / 160))                                   # mehr Streifen bei stärkerem Wind
+        sign = 1 if self.X[min(len(self.X) - 1, k + 1)] >= self.X[k] else -1
+        for s_ in self.streaks[:n]:
+            s = (s_['K'] * t / 4.32 * 2 + s_['off']) % 1.0
+            L = s_['L'] * self.U
+            x = -L + (W + 2 * L) * (s if sign > 0 else 1 - s)
+            h = s_['th'] * self.U
+            canvas.paste(Image.new('RGBA', (L, h), ((255, 255, 255), (214, 210, 255), (168, 160, 240))[s_['col']] + (255,)), (int(x), s_['y']))
+
+    def draw_front(self, canvas, f):
+        t = f / float(self.fps)
+        self._breeze(canvas, t, f)
+        st = self.twister(t)
+        if st is not None:
+            geom = self._tw_geom(st)
+            self._orbit_draw_for(canvas, t, f, geom, back=True, scale=0.9, count=60)
+            self._draw_funnel(canvas, geom[0], geom[1], geom[2], geom[3], t, sway=40.0 + 0.1 * geom[3])
+            self._orbit_draw_for(canvas, t, f, geom, back=False, scale=0.9, count=60)
+        b = self.big(t)
+        if b > 0:
+            self._orbit_draw_for(canvas, t, f, (self.W / 2, self.t_top, self.t_bot, 560 * b), back=False, scale=1.0, count=110)
+        elif 18.5 <= t < 19.4:
+            self._orbit_draw_for(canvas, t, f, (self.W / 2, self.t_top, self.t_bot, 560), back=False, scale=1.0, count=110, burst=18.5)
+
+    # ───────── Banner und Link-Schild ─────────
+    def _flag(self, im, amp, t, step=3, speed=3.0):
+        arr = np.asarray(im)
+        h, w = arr.shape[:2]
+        pad = int(math.ceil(amp)) * step + step
+        out = np.zeros((h + 2 * pad, w, 4), dtype=np.uint8)
+        for x0 in range(0, w, step):
+            dy = int(round(amp * math.sin(2 * math.pi * (x0 / 340.0 - speed * t / 4.32)))) * step
+            out[pad + dy:pad + dy + h, x0:x0 + step] = arr[:, x0:x0 + step]
+        return Image.fromarray(out, 'RGBA'), pad
+
+    def draw_logo(self, canvas, f):
+        t = f / float(self.fps)
+        lx, ly, lw, lh = self.g['logo_rect']
+        amp = 1.2 + 0.9 * math.sin(2 * math.pi * t / 4.32) ** 2
+        for tg, a in self.GUSTS:
+            if t >= tg:
+                amp += min(3.5, abs(a) / 5.0) * math.exp(-(t - tg) / 0.5)
+        dx = 0.0
+        if 11.7 <= t < 12.8:                                   # Tornado jagt das Banner nach rechts aus dem Bild
+            dx = 1250 * _smooth((t - 11.7) / 1.1) ** 1.5
+            amp = 5.5
+        elif 12.8 <= t < 13.6:
+            return
+        elif 13.6 <= t < 14.7:                                 # kommt von links zurück, flattert aus
+            u = (t - 13.6) / 1.1
+            dx = -1250 * (1 - _smooth(u)) ** 1.5
+            amp = 1.5 + 4.0 * (1 - u)
+        flag, pad = self._flag(self.g['logo_img'], amp, t)
+        canvas.paste(flag, (int(lx + dx), ly - pad), flag)
+
+    def draw_badge(self, canvas, f):
+        t = f / float(self.fps)
+        bx, by, bw, bh = self.g['badge_rect']
+        img = self.g['badge_img']
+        cx0, cy0 = bx + bw / 2, by + bh / 2
+        x, y, spin = cx0, cy0, None
+        if 7.0 <= t < 8.6:                                      # eingesaugt: kreist spinnend um den Trichter und steigt auf
+            st = self.twister(t)
+            if st is None:
+                return
+            xc, yb, Ht, wt = st
+            u = _smooth((t - 7.0) / 0.5)
+            a = 2 * math.pi * 2.6 * (t - 7.0)
+            r = (20 + wt * 0.35) * u
+            ox, oy = xc + r * math.cos(a), yb - Ht * 0.12 - Ht * 0.45 * ((t - 7.0) / 1.6) + 0.16 * r * math.sin(a)
+            x, y = cx0 + (ox - cx0) * u, cy0 + (oy - cy0) * u
+            spin = a
+        elif 8.6 <= t < 9.8:                                    # weggeschleudert
+            st = self.twister(8.6)
+            xc, yb, Ht, wt = st
+            a = 2 * math.pi * 2.6 * 1.6
+            r = 20 + wt * 0.35
+            x0, y0 = xc + r * math.cos(a), yb - Ht * 0.12 - Ht * 0.45 + 0.16 * r * math.sin(a)
+            tau = t - 8.6
+            x, y = x0 - 900 * tau - 400 * tau * tau, y0 - 250 * tau + 500 * tau * tau * 0.4
+            spin = a + 2 * math.pi * 4 * tau
+            if x < -400:
+                return
+        elif 9.8 <= t < 10.6:
+            return
+        elif 10.6 <= t < 11.6:                                  # kommt vom Wind zurück gewirbelt und landet
+            u = (t - 10.6) / 1.0
+            e = _smooth(u)
+            x = -300 + (cx0 + 300) * e
+            y = cy0 - 220 * math.sin(math.pi * e) * (1 - e) + (-14 * math.exp(-8 * (u - 0.8)) * abs(math.cos(16 * (u - 0.8))) if u > 0.8 else 0)
+            spin = 2 * math.pi * 3 * (1 - e)
+        elif 11.6 <= t < 12.0:
+            s3 = t - 11.6
+            y = cy0 - 10 * math.exp(-8 * s3) * abs(math.cos(18 * s3))
+        if spin is not None:                                    # Münzdrehung: Breite folgt |cos|, Schild wirkt dreidimensional
+            wcur = max(6, int(bw * abs(math.cos(spin))))
+            img = img.resize((wcur, bh), Image.NEAREST)
+        canvas.paste(img, (int(x - img.width / 2), int(y - img.height / 2)), img)
+
+    # ───────── Opener und Schluss: Blätterwand ─────────
+    def _wall_pass(self, img, tau_of, T_END_ok, rng_seed):
+        out = img.convert('RGBA')
+        rng = np.random.default_rng(rng_seed)
+        for c in self.wall:
+            tau = tau_of(c)
+            if tau <= 0:
+                x, y = c['x'] + rng.uniform(-6, 6), c['y'] + rng.uniform(-6, 6)
+            else:
+                x = c['x'] + c['sp'] * tau * (0.4 + tau) + 80 * tau
+                y = c['y'] + c['amp'] * math.sin(2 * math.pi * (1.5 * tau + c['ky'])) * min(1.0, tau * 2)
+                if x > self.W + 150:
+                    continue
+            yield out, c, x, y
+
+    def opener_fx(self, img, f, t_gust=None):
+        t_gust = self.T_GUST if t_gust is None else t_gust
+        ts = f / float(self.fps)
+        if ts >= t_gust + 1.5:
+            return img
+        out = None
+        for out, c, x, y in self._wall_pass(img, lambda c: ts - t_gust - 0.30 * (c['x'] / self.W), None, 4000 + f):
+            self._put(out, c['kind'], c['var'], int(ts * 14 + c['tum']), c['px'], x, y)
+        if out is None:
+            return img
+        if t_gust <= ts < t_gust + 0.9:
+            rng = np.random.default_rng(5000 + f)
+            for k in range(26):
+                y = int(rng.uniform(40, self.H - 40) // self.U * self.U)
+                L = int(rng.integers(30, 90)) * self.U
+                x = -L + (self.W + 2 * L) * ((ts - t_gust) / 0.7 * (0.7 + 0.6 * rng.random()))
+                out.paste(Image.new('RGBA', (L, self.U), (255, 255, 255, 255)), (int(x), y))
+        return out.convert('RGB')
+
+    def closer_fx(self, img, f):
+        """Letzte 2 s: Die Blätter fliegen (Umkehrung des Openers) zurück in die Wand vom ersten Bild → nahtloser Loop."""
+        t = f / float(self.fps)
+        t_gust = self.T_GUST
+        if t < self.D - (t_gust + 1.5):
+            return img
+        out = None
+        for out, c, x, y in self._wall_pass(img, lambda c: (self.D - t) - t_gust - 0.30 * (c['x'] / self.W), None, 6000 + f):
+            self._put(out, c['kind'], c['var'], int(t * 14 + c['tum']), c['px'], x, y)
+        return out.convert('RGB') if out is not None else img
