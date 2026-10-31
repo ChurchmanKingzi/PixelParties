@@ -203,6 +203,11 @@ HEROES = {
         "Once per turn, Elana shuffles your entire hand back into your deck, then you draw the same number of cards +1. A fresh start, with a bonus card, every single turn.",
         "floating music notes, green sparkles and golden glints",
         "#Rockstar #Guitar"),
+    "???, the Shapeshifter": (
+        "Every night, a different face. 🎃👁️",
+        "Once per turn, ??? the Shapeshifter can equip a Hero with a different name from your hand, deck or discard pile, and gains its effects and name until the end of your opponent's turn. Each Hero can only be equipped once per game. Happy Halloween!",
+        "drifting dark mist, watching eyes, skulls and bats",
+        "#Halloween #Horror #Spooky #Creepy"),
     "Santa Klaus": (
         "A present for your opponent. 🎅",
         "Whenever Santa Klaus uses an Attack or Spell, you must add 2 cards from your hand to your opponent's hand. Merry Christmas?",
@@ -321,6 +326,8 @@ TIKTOK = {
                                  "His Support Zones double as Surprise Zones, and every activated Surprise lets you deal 100 damage to a target."),
     "Andras, the Human Weapon": ("Hit one target. Then hit another. 🔥",
                                  "Andras hits exactly one target with a normal Attack of a level below his Fighting level? You may choose a second target for it to hit afterwards."),
+    "???, the Shapeshifter": ("Every night, a different face. 🎃👁️",
+                              "Equip a Hero from your hand, deck or discard pile and ??? becomes it, name and effects. Once per Hero, per game. Happy Halloween!"),
     "Elana, the Rocky Rebel": ("Hate your hand? Shuffle it away. 🎸",
                                "Once per turn: shuffle your whole hand back into the deck and draw the same number of cards +1."),
     "Reiza, the Chief Tormentor": ("Stun. Poison. Double action. 🦇",

@@ -1291,5 +1291,57 @@
     26
    ]
   ]
+ },
+ "???, the Shapeshifter": {
+  "accent": "#b3121f",
+  "horror": true,
+  "opener": "shift",
+  "px": 14,
+  "headTop": 430,
+  "music": "scripts/social-posts/music/bgm_shapeshifter.ogg",
+  "particles": [
+   [
+    "gas",
+    "shadow",
+    34
+   ],
+   [
+    "gas",
+    "blood_mist",
+    14
+   ],
+   [
+    "glyph",
+    "crimson",
+    6,
+    {
+     "g": "eye",
+     "move": "float"
+    }
+   ],
+   [
+    "glyph",
+    "bone",
+    4,
+    {
+     "g": "skull",
+     "move": "float"
+    }
+   ],
+   [
+    "glyph",
+    "shadow",
+    6,
+    {
+     "g": "bat",
+     "move": "float"
+    }
+   ],
+   [
+    "spark",
+    "crimson",
+    8
+   ]
+  ]
  }
 }

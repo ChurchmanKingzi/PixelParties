@@ -514,8 +514,9 @@ def main():
     ap.add_argument('--head-top', type=int, default=None, help='Sprite so setzen, dass seine Oberkante bei y (px ab Bildoberkante) liegt, überschreibt feet/eyeAt')
     ap.add_argument('--px', type=int, default=None, help='Maßstab des Sprites (px je Sprite-Pixel), überschreibt hero-themes.json')
     ap.add_argument('--punch', action='store_true', help='Kraftvoller Start: die erste halbe Sekunde mit Bildschirmwackeln, Druckwelle und Blitz, Musik ohne Einblenden und auf einen Schlag der Musik geschnitten')
+    ap.add_argument('--horror', action='store_true', help='Horror-Look: entsättigt, Vignette, Lichtflackern und Bildstörungen (auch über horror in hero-themes.json)')
     ap.add_argument('--heart-time', type=float, default=None, help='Dauer der Herz-Phase des Openers in Sekunden bis zur Detonation (Standard 0,62; kürzer = der Held kommt früher ins Bild), überschreibt heartTime aus hero-themes.json')
-    ap.add_argument('--opener', choices=['none', 'heart', 'storm'], default=None, help='Eigener Start-Effekt statt der Standard-Druckwelle: heart = großes Flammenherz, das detoniert; storm = Gewitterwolke, in die ein Blitz einschlägt; beide geben den Helden frei (überschreibt opener aus hero-themes.json)')
+    ap.add_argument('--opener', choices=['none', 'heart', 'storm', 'shift'], default=None, help='Eigener Start-Effekt statt der Standard-Druckwelle: heart = großes Flammenherz, das detoniert; storm = Gewitterwolke, in die ein Blitz einschlägt; shift = flackernde Silhouetten anderer Helden, dann zeigt sich der Held; alle geben den Helden frei (überschreibt opener aus hero-themes.json)')
     args = ap.parse_args()
     reel = args.format == 'reel'
     tag = args.format
@@ -530,7 +531,8 @@ def main():
     hero_cfg = json.loads((HERE / 'hero-themes.json').read_text(encoding='utf-8')).get(card_name, {})
     opener = args.opener or hero_cfg.get('opener') or 'none'
     args_opener = opener
-    opener_on = opener in ('heart', 'storm')
+    opener_on = opener in ('heart', 'storm', 'shift')
+    horror_on = args.horror or bool(hero_cfg.get('horror'))
     if opener_on:
         punch_on = False                   # der Opener ersetzt die Standard-Druckwelle
     first_on = intro_on or punch_on or opener_on        # die erste Schleife wird gesondert gerendert (Einblenden und/oder Start-Effekt)
@@ -573,6 +575,8 @@ def main():
     mid_a.alpha_composite(card, (card_x, card_y))
     orn, gems = ornaments.frame_ornaments(plate_x, plate_y, plate.width, plate.height, accent, (W, H))
     mid_a.alpha_composite(orn)
+    lum = 0.3 * accent[0] + 0.59 * accent[1] + 0.11 * accent[2]
+    ui_accent = accent if lum >= 110 else mix(accent, WHITE, 0.4)       # sehr dunkle Akzente (z. B. Horror-Rot): Beiname und Link-Schild aufhellen, damit sie lesbar bleiben
     logo = tinted_logo(accent, args.logo_px or hero_cfg.get('logoPx', LOGO_PX_DEFAULT))
     name_front = bool(hero_cfg.get('nameFront'))            # Name/Beiname/Link-Schild vor dem Sprite (bei sehr großen, tiefen Sprites)
     logo_front = bool(hero_cfg.get('logoFront'))            # Logo vor dem Sprite (bei Helden, die es überragen)
@@ -592,7 +596,7 @@ def main():
     ornaments.place_divider(mid_b, accent, nx + nw + 2 * U, name_y - U, dl, 1)
     if sub:
         sub_scale = 3 if pixel_text_mask(sub).width * 3 <= 640 else 2
-        sx_, sy_, sw_, sh_ = draw_text(mid_b, sub, sub_scale, (W // 2, sub_y), color=accent, outline=None, shadow=INK)
+        sx_, sy_, sw_, sh_ = draw_text(mid_b, sub, sub_scale, (W // 2, sub_y), color=ui_accent, outline=None, shadow=INK)
         ornaments.place_divider(mid_b, accent, sx_ - 2 * U, sub_y - U // 2, 9, -1, thick=1, gem_r=1)
         ornaments.place_divider(mid_b, accent, sx_ + sw_ + 2 * U, sub_y - U // 2, 9, 1, thick=1, gem_r=1)
     if reel:                                  # Link-Schild unter dem Beinamen (im sicheren Bereich)
@@ -604,7 +608,7 @@ def main():
         dr = ImageDraw.Draw(mid_b)
         dr.rectangle([px0 + U, py0, px0 + pw - U - 1, py0 + ph - 1], fill=INK)
         dr.rectangle([px0, py0 + U, px0 + pw - 1, py0 + ph - U - 1], fill=INK)
-        dr.rectangle([px0 + U, py0 + U, px0 + pw - U - 1, py0 + ph - U - 1], fill=accent)
+        dr.rectangle([px0 + U, py0 + U, px0 + pw - U - 1, py0 + ph - U - 1], fill=ui_accent)
         draw_text(mid_b, url, us, (W // 2, py0 + ph // 2), color=INK, outline=None, anchor='mm')
 
     # Sprite-Lage: Gesichtsmitte über der Kartenmitte, Füße auf der Standlinie (im Kartenbild)
@@ -618,8 +622,9 @@ def main():
     if 'eyeAt' in hero_cfg and 'faceY' in spr.meta:            # Sprite so setzen, dass sein Auge/Gesicht (faceY) bei y = eyeAt (px ab Kartenoberkante) liegt
         sy = card_y + hero_cfg['eyeAt'] - spr.meta['faceY'] * spr.px
         feet_y = sy + spr.foot * spr.px
-    if args.head_top is not None:
-        sy = args.head_top - spr.vtop * spr.px
+    head_top = args.head_top if args.head_top is not None else hero_cfg.get('headTop')
+    if head_top is not None:
+        sy = head_top - spr.vtop * spr.px
         feet_y = sy + spr.foot * spr.px
     shadow = pixel_ellipse(max(10, min(44, round((spr.right - spr.left) * spr.px * 0.75 / U))), 4, INK, 170)
 
@@ -1069,6 +1074,92 @@ def main():
                 out_img = sh
             return out_img
 
+    # ── Horror-Look und Opener „Silhouetten“ ──
+    T_SHIFT = 0.6                                                            # Sekunden Silhouetten-Flackern, dann zeigt sich der Held
+
+    def band_glitch(img, rng, n, amp):
+        """Bildstörung: waagerechte Bänder seitlich versetzen (Versatz in Rasterzellen)."""
+        a = np.asarray(img).copy()
+        for _ in range(n):
+            y0 = int(rng.integers(0, H - 40))
+            h_ = int(rng.integers(2, 9)) * U
+            dx = int(rng.integers(-amp, amp + 1)) * U
+            a[y0:y0 + h_] = np.roll(a[y0:y0 + h_], dx, axis=1)
+        return Image.fromarray(a, 'RGB')
+
+    yy_h, xx_h = np.mgrid[0:H, 0:W]
+    rr_h = np.hypot((xx_h - W / 2) / (W * 0.62), (yy_h - H * 0.5) / (H * 0.55))
+    VIG = (1 - 0.7 * np.clip((rr_h - 0.55) / 0.75, 0, 1) ** 1.4).astype(np.float32)[..., None]
+
+    def horror_post(img, f):
+        """Entsättigen, Vignette, Lichtflackern (zweimal je Schleife) und kurze Bildstörungen mit Farbversatz."""
+        a = np.asarray(img).astype(np.float32)
+        gray = a.mean(axis=2, keepdims=True)
+        a = (gray + (a - gray) * 0.72) * VIG
+        fm = f % loop
+        for c0, n, v in ((0.17, 2, 0.45), (0.215, 1, 0.7), (0.70, 2, 0.5), (0.735, 1, 0.75)):
+            if 0 <= fm - int(c0 * loop) < n:
+                a = a * v
+        out_ = Image.fromarray(np.clip(a, 0, 255).astype(np.uint8), 'RGB')
+        for c0, n in ((0.46, 3), (0.90, 2)):
+            if 0 <= fm - int(c0 * loop) < n:
+                out_ = band_glitch(out_, np.random.default_rng(900 + f), 4, 4)
+                arr = np.asarray(out_).copy()
+                arr[..., 0] = np.roll(arr[..., 0], U, axis=1)
+                arr[..., 2] = np.roll(arr[..., 2], -U, axis=1)
+                out_ = Image.fromarray(arr, 'RGB')
+        return out_
+
+    if args_opener == 'shift':
+        SIL_SLUGS = ['bakhm-the-desert-digger', 'cool-rescuer-monia', 'reiza-the-chief-tormentor', 'bomb-berserker-bartas',
+                     'zsos-ssar-the-serpent-warlord', 'andras-the-human-weapon', 'cute-princess-mary', 'nao-the-barrier-priestess']
+
+        def silhouette(slug, k, px_fix=None):
+            """Schwarze Silhouette mit blutrotem Rand auf Standlinie und Mitte des Helden (als RGBA über das ganze Bild)."""
+            o = spr if slug == args.slug else Sprite(slug)
+            m = np.asarray(o.sheet.crop((k * o.fw, 0, (k + 1) * o.fw, o.fh)))[..., 3] > 20
+            rows = np.where(m.any(axis=1))[0]
+            px_o = px_fix or int(np.clip(round(560 / max(1, rows.max() - rows.min() + 1)), 6, 16))
+            ring = dilate(m, 1) & ~m
+            body = np.zeros(m.shape + (4,), dtype=np.uint8)
+            body[m] = (6, 2, 8, 255)
+            body[ring] = (176, 16, 34, 255)
+            big = Image.fromarray(body, 'RGBA').resize((o.fw * px_o, o.fh * px_o), Image.NEAREST)
+            lay = Image.new('RGBA', (W, H), (0, 0, 0, 0))
+            lay.paste(big, (round(card_x + CARD_W / 2 - o.center_x * px_o), feet_y - o.foot * px_o), big)
+            return lay
+
+        def dilate(m, n=1):
+            for _ in range(n):
+                o_ = m.copy()
+                o_[1:, :] |= m[:-1, :]; o_[:-1, :] |= m[1:, :]; o_[:, 1:] |= m[:, :-1]; o_[:, :-1] |= m[:, 1:]
+                m = o_
+            return m
+
+        SILS = [silhouette(sl, 0) for sl in SIL_SLUGS[:5]] + [silhouette(args.slug, 0, spr.px)]
+
+        def shift_fx(img, f):
+            ts = f / float(fps)
+            if ts >= T_SHIFT + 0.35:
+                return img
+            rng = np.random.default_rng(700 + f)
+            dark = Image.blend(img, Image.new('RGB', (W, H), (4, 2, 7)), 0.97)
+            if ts < T_SHIFT:
+                out_ = dark.convert('RGBA')
+                lay = SILS[min(int(ts / 0.1), len(SILS) - 1)]
+                out_.paste(lay, (int(rng.integers(-1, 2)) * U, 0), lay)
+                return band_glitch(out_.convert('RGB'), rng, 2 + int(ts / 0.1) % 3, 3)
+            q = (ts - T_SHIFT) / 0.35
+            keep = np.repeat(np.repeat(((1 - q * 1.5) > BAY).astype(np.uint8) * 255, U, axis=0), U, axis=1)[:H, :W]
+            out_ = img.copy()
+            out_.paste(dark, (0, 0), Image.fromarray(keep, 'L'))
+            out_ = band_glitch(out_, rng, 5, max(1, int(6 * (1 - q))))
+            a_fl = 0.6 * max(0.0, 1.0 - (ts - T_SHIFT) / 0.12) ** 1.5
+            if a_fl > 0:
+                out_ = Image.blend(out_, Image.new('RGB', (W, H), (255, 226, 226)), a_fl)
+            return out_
+
+
     def render(f, intro, punch=False, opener=False):
         ts = f / float(fps)
         canvas = bg.frame(f / loop)
@@ -1119,8 +1210,10 @@ def main():
             if l2 is not None:
                 canvas.alpha_composite(l2)
         out_img = canvas.convert('RGB')
+        if horror_on:
+            out_img = horror_post(out_img, f)
         if opener:
-            return (storm_fx if args_opener == 'storm' else opener_fx)(out_img, f)
+            return {'storm': lambda *a: storm_fx(*a), 'shift': lambda *a: shift_fx(*a)}.get(args_opener, lambda *a: opener_fx(*a))(out_img, f)
         return punch_fx(out_img, f) if punch else out_img
 
     if args.cover_only is not None:
@@ -1163,7 +1256,7 @@ def main():
         if (punch_on or opener_on) and args.music_start is None:
             m_start = snap_to_onset(music, m_start)
             if opener_on:                                               # der Schlag soll auf die Detonation fallen, nicht auf Sekunde 0
-                t_hit = T_STORM if args_opener == 'storm' else T_HEART
+                t_hit = T_STORM if args_opener == 'storm' else T_SHIFT if args_opener == 'shift' else T_HEART
                 m_start = max(0.0, m_start - t_hit)
             print(f'Musik: Start auf den Schlag bei {m_start:.2f} s' + (f' (Schlag bei Einschlag/Detonation, t = {t_hit} s)' if opener_on else ''))
         cmd += ['-ss', str(m_start), '-i', str(music)]
