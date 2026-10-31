@@ -41434,7 +41434,11 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           const baseAfterCrystal = applyCrystalCostMods(me, cardName, card.cost || 0);
           const effCost = Math.max(0, baseAfterCrystal - handReduction);
           // G1: inkl. Goldsperre; Karten mit Stufen-Preis (`goldLockSelfChecked`) prüfen ihre Kosten selbst - dort entscheidet `unactivatableArtifacts`.
-          if (!(me.goldLocked && (me.goldLockSelfChecked || []).includes(card.name)) && !goldKannZahlen(me, card.name, effCost)) return true;
+          // X-Kosten-Artefakte (`selfPricedArtifacts`: Dark Gear, Beer, Staff of Illusions …): der Grundpreis ist nur der Preis JE Stufe/Ziel -
+          // bei Stufe 0 oder ohne Ziel sind die Gesamtkosten 0, die Karte ist also auch ohne das Gold des Grundpreises spielbar.
+          // Ausgegraut wird sie dann nur über `unactivatableArtifacts` (echte Kosten, Goldsperre bei Preis je Ziel).
+          const selbstGerechnet = (me.selfPricedArtifacts || []).includes(card.name);
+          if (!selbstGerechnet && !(me.goldLocked && (me.goldLockSelfChecked || []).includes(card.name)) && !goldKannZahlen(me, card.name, effCost)) return true;
         }
         // Once-per-game artifacts (Smug Coin, etc.)
         if ((me.oncePerGameUsed || []).includes(cardName)) return true;

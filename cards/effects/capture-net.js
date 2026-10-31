@@ -119,6 +119,9 @@ module.exports = {
     cancellable: true,
     exclusiveTypes: true,
     maxPerType: { equip: 1 },
+    // Genau EIN Ziel (siehe Dark Gear): ohne eigenes `maxTotal` waere der Standard-Deckel floor(Gold / 4) = 0 unter 4 Gold, obwohl eine
+    // Stufe-0-Kreatur nichts kostet.
+    maxTotal: 1,
   },
 
   validateSelection: (selectedIds) => !!selectedIds && selectedIds.length === 1,

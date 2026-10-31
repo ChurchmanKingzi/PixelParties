@@ -5210,6 +5210,12 @@ function sendGameState(room, playerIdx, extra) {
       // pruefen Gold-Kosten selbst (Kosten 0 moeglich) - der Client darf sie unter der Sperre nicht pauschal ausgrauen (Grau-Liste: `unactivatableArtifacts`).
       goldLockSelfChecked: (ps.goldLocked && pi === playerIdx)
         ? [...new Set((ps.hand || []).filter(n => { const sc = loadCardEffect(n); return !!sc?.manualGoldCost && !sc.goldPerTarget; }))] : [],
+      // X-Kosten-Artefakte (`manualGoldCost`: Dark Gear, Staff of Illusions, Capture Net, Beer, Cool Presents, Book of Doom, Cool Repair):
+      // der Preis in cards.json ist nur der Preis JE EINHEIT (Stufe, Ziel, Karte) - die Gesamtkosten koennen 0 sein (Stufe-0-Kreatur,
+      // kein Ziel). Der Client darf sie deshalb nicht am Grundpreis ausgrauen; ob die Karte spielbar ist, sagen `unactivatableArtifacts`
+      // (`canActivate`/Ziele nach echten Kosten, bei `goldPerTarget` auch die Goldsperre) und der Zielwaehler (`maxTotal`).
+      selfPricedArtifacts: pi === playerIdx
+        ? [...new Set((ps.hand || []).filter(n => !!loadCardEffect(n)?.manualGoldCost))] : [],
       drawLocked: ps.drawLocked || false,
       // v1068: reiner Such-Lock (Cats of the Pharaoh) — Draws bleiben frei.
       // ★ v1123 („The Thing in the Ship", Als Vorgabe 15.9.): der
