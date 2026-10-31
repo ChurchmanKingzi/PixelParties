@@ -1286,7 +1286,7 @@ def main():
             show.draw_front(canvas, f / float(fps))
         out_img = canvas.convert('RGB')
         if show_on:
-            for tb in (show.BURST_T, 18.2):                                  # Druckwelle bei den beiden Sprengungen
+            for tb in show.SHOCKS:                                           # Druckwellen bei den drei Sprengungen (Wand, „ATTACK!“, Herz)
                 out_img = punch_fx(out_img, f, tb)
         if horror_on:
             out_img = horror_post(out_img, f)

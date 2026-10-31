@@ -175,6 +175,9 @@ def put(canvas, im, cx, cy):
 class MiniShow:
     BURST_T = 0.5                  # Sekunde der ersten Sprengung (Wand → Mini)
     BURST_LEN = 1.3                # so lange fliegen die Katzen nach außen (auch rückwärts am Ende)
+    ATTACK_T = 13.6                # „ATTACK!“: der Orbit beschleunigt …
+    SPIN_END = 15.4                # … und die Katzen schießen bei dieser Sekunde explosionsartig nach außen
+    SHOCKS = (0.5, 15.4, 18.2)     # Sekunden der drei Druckwellen (Wand, Orbit, Herz)
 
     def __init__(self, cats, W, H, U, fps, D, geom, draw_text, ink, white):
         self.cats, self.W, self.H, self.U, self.fps, self.D = cats, W, H, U, fps, D
@@ -206,13 +209,13 @@ class MiniShow:
         self.orb_entry = [(rng.choice([-300, W + 300]), rng.uniform(100, H - 100)) for _ in range(self.n_orb)]
         pts = self._heart_points()
         self.heart = pts
-        # Winkelverlauf des Orbits (Befehl „attack.“ bei 13.6 s beschleunigt)
+        # Winkelverlauf des Orbits: ruhig, ab „ATTACK!“ (13.6 s) immer schneller, bei 15.4 s sprengen die Katzen nach außen
         n = int(D * fps) + 2
         ts = np.arange(n) / fps
-        w = 1.3 + 3.2 * np.exp(-(((ts - 13.7) / 0.35) ** 2))
+        w = np.where(ts < self.ATTACK_T, 1.3, 1.3 + 7.5 * np.clip((ts - self.ATTACK_T) / (self.SPIN_END - self.ATTACK_T), 0, 1) ** 2)
         self.theta = np.cumsum(w) / fps
         # Sprechblasen: (von, bis, Text)
-        self.bubbles = [(2.35, 3.7, 'mine.'), (6.2, 7.3, 'boo.'), (9.3, 10.6, 'oops.'), (13.5, 14.6, 'attack.'), (17.1, 18.1, 'hehe.')]
+        self.bubbles = [(2.35, 3.7, 'mine.'), (6.2, 7.3, 'boo.'), (9.3, 10.6, 'oops.'), (13.5, 15.4, 'attack!'), (17.1, 18.1, 'hehe.')]
 
     def _heart_points(self):
         th = np.linspace(0, 2 * math.pi, 2000)
@@ -361,11 +364,43 @@ class MiniShow:
         return self.cx + hx * k, self.cy + 15 + hy * k
 
     def _orbit_state(self, i, t):
-        """(x, y, z, px, sichtbar) der Katze i im Orbit/Herz."""
+        """(x, y, z, px, sichtbar) der Katze i: Orbit (immer schneller) → Sprengung nach außen → Katzen kommen als Herz zurück → Herz sprengt."""
         t_arr = 12.0 + i * 0.045
-        if t < t_arr or t > 18.9:
+        T_X = self.SPIN_END
+        if t < t_arr:
             return None
-        if t >= 18.2:                                           # Herz sprengt
+        if t < T_X:
+            ox, oy, oz = self._orbit_pos(i, t)
+            px = 6 + int(round(4 * (oz + 1) / 2))
+            x, y = ox, oy
+            if t < t_arr + 0.8:                                 # fliegt vom Rand in den Kreis
+                ex, ey = self.orb_entry[i]
+                u = ease_out((t - t_arr) / 0.8)
+                x, y = ex + (ox - ex) * u, ey + (oy - ey) * u
+            return x, y, oz, px, True
+        if t < T_X + 0.9:                                       # „ATTACK!“-Sprengung: radial nach außen, sehr schnell
+            ox, oy, oz = self._orbit_pos(i, T_X)
+            px = 6 + int(round(4 * (oz + 1) / 2))
+            tau = t - T_X
+            d = math.hypot(ox - self.cx, oy - (self.cy + 40)) or 1.0
+            dx, dy = (ox - self.cx) / d, (oy - (self.cy + 40)) / d
+            dist = 1500 * tau + 0.5 * 7000 * tau * tau
+            x, y = ox + dx * dist, oy + dy * dist
+            if x < -250 or x > self.W + 250 or y < -250 or y > self.H + 250:
+                return None
+            return x, y, 1.0, px, True
+        t_h = 16.0 + i * 0.02
+        if t < t_h:
+            return None
+        if t < 18.2:                                            # Herz: Katzen kommen vom Rand und halten die Form
+            hx, hy = self._heart_pos(i, t)
+            x, y = hx, hy
+            if t < t_h + 0.85:
+                ex, ey = self.orb_entry[i]
+                u = ease_out((t - t_h) / 0.85)
+                x, y = ex + (hx - ex) * u, ey + (hy - ey) * u
+            return x, y, 1.0, 8, True
+        if t < 18.9:                                            # Herz sprengt
             tau = t - 18.2
             hx, hy = self._heart_pos(i, 18.2)
             d = math.hypot(hx - self.cx, hy - (self.cy + 15)) or 1.0
@@ -375,19 +410,7 @@ class MiniShow:
             if x < -250 or x > self.W + 250 or y < -250 or y > self.H + 250:
                 return None
             return x, y, 1.0, 8, True
-        ox, oy, oz = self._orbit_pos(i, t)
-        px = 6 + int(round(4 * (oz + 1) / 2))
-        x, y, z = ox, oy, oz
-        if t < t_arr + 0.8:                                     # fliegt vom Rand in den Kreis
-            ex, ey = self.orb_entry[i]
-            u = ease_out((t - t_arr) / 0.8)
-            x, y = ex + (ox - ex) * u, ey + (oy - ey) * u
-        if t >= 16.0:                                           # vom Kreis ins Herz
-            u = ease_in_out((t - 16.0) / 0.9)
-            hx, hy = self._heart_pos(i, t)
-            x, y, z = ox + (hx - ox) * u, oy + (hy - oy) * u, oz + (1.0 - oz) * u
-            px = int(round(px + (8 - px) * u))
-        return x, y, z, px, True
+        return None
 
     def _draw_orbit(self, canvas, t, back):
         items = []
@@ -396,9 +419,10 @@ class MiniShow:
             if st is None:
                 continue
             x, y, z, px, _ = st
-            if (z < 0) != back and not (t >= 16.0):
-                continue
-            if back and t >= 16.0:
+            if back:
+                if t >= self.SPIN_END or z >= 0:                # hinter dem Rahmen nur die Rückseite des Orbits
+                    continue
+            elif t < self.SPIN_END and z < 0:
                 continue
             items.append((z, i, x, y, px))
         for z, i, x, y, px in sorted(items):
@@ -465,37 +489,40 @@ class MiniShow:
             self._cat(canvas, t, x, y, 6, ph=k / 9.0, kind='side', mirror=True, bob=6)
 
     def _draw_bubble(self, canvas, t):
+        """Sprechblase über Minis Kopf: der Schwanz zeigt nach unten auf Mini (Spitze = Ziel), Text in Großbuchstaben."""
         for t0, t1, text in self.bubbles:
             if t0 <= t < t1:
+                text = text.upper()
                 u = ease_out_back((t - t0) / 0.18)
                 U = self.U
                 scale = 7
-                from_ = self.draw_text
-                # Größe messen: Text auf Probefläche
-                probe = Image.new('RGBA', (900, 160), (0, 0, 0, 0))
-                bbox = self._text_size(text, scale)
-                tw, th = bbox
+                tw, th = self._text_size(text, scale)
                 pad = 3 * U
                 w, h = tw + 2 * pad, th + 2 * pad
-                bx, by = self.cx + 215, self.g['card_top'] + 215
-                lay = Image.new('RGBA', (w + 2 * U, h + 8 * U), (0, 0, 0, 0))
+                L = 2 * U                                       # Rand links für den schrägen Schwanz
+                tail = 7
+                lay = Image.new('RGBA', (L + w + 2 * U, h + (tail + 2) * U), (0, 0, 0, 0))
                 d = ImageDraw.Draw(lay)
                 ink, white = self.INK + (255,), (255, 248, 252, 255)
-                # Blase mit abgeschnittenen Ecken
-                d.rectangle([U, 0, w, h + U], fill=ink)
-                d.rectangle([0, U, w + U, h], fill=ink)
-                d.rectangle([2 * U, U, w - U, h], fill=white)
-                d.rectangle([U, 2 * U, w, h - U], fill=white)
-                # Schwänzchen zu Mini hin
-                for k in range(3):
-                    d.rectangle([2 * U + k * U, h + k * U, 4 * U + k * U + 2 * U, h + (k + 1) * U + U], fill=ink)
-                for k in range(2):
-                    d.rectangle([3 * U + k * U, h - U + k * U, 4 * U + k * U + U, h + (k + 1) * U - U], fill=white)
-                self.draw_text(lay, text, scale, (w // 2 + U // 2, h // 2 + U // 2), color=self.INK, outline=None, shadow=None)
+                d.rectangle([L + U, 0, L + w, h + U], fill=ink)            # Blase mit abgeschnittenen Ecken
+                d.rectangle([L, U, L + w + U, h], fill=ink)
+                d.rectangle([L + 2 * U, U, L + w - U, h], fill=white)
+                d.rectangle([L + U, 2 * U, L + w, h - U], fill=white)
+                for k in range(tail):                           # Schwanz: wird nach unten schmaler und läuft schräg nach links auf Mini zu
+                    wk = max(2, 6 - k)
+                    x0 = L + 4 * U - (k * U) // 2
+                    d.rectangle([x0 - U, h + U + k * U, x0 + wk * U, h + 2 * U + k * U], fill=ink)
+                for k in range(tail - 1):
+                    wk = max(2, 6 - k)
+                    x0 = L + 4 * U - (k * U) // 2
+                    d.rectangle([x0, h + U + k * U, x0 + (wk - 1) * U + U // 2, h + U + k * U + U], fill=white)
+                self.draw_text(lay, text, scale, (L + w // 2 + U // 2, h // 2 + U // 2), color=self.INK, outline=None, shadow=None)
+                tip_x, tip_y = L + 4 * U - (tail * U) // 2, lay.height          # Ziel der Schwanzspitze in der Ebene
+                k = max(0.1, u)
                 if u != 1.0:
-                    k = max(0.1, u)
                     lay = lay.resize((max(1, int(lay.width * k)), max(1, int(lay.height * k))), Image.NEAREST)
-                canvas.paste(lay, (int(bx - lay.width / 2), int(by - lay.height)), lay)
+                tx, ty = self.cx + 55, self.g['card_top'] + 108      # Schwanzspitze zeigt auf Minis Kopf
+                canvas.paste(lay, (int(tx - tip_x * k), int(ty - tip_y * k)), lay)
 
     def _text_size(self, text, scale):
         from PIL import Image as _I
