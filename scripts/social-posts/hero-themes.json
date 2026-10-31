@@ -294,30 +294,19 @@
   ]
  },
  "Champion, the Stormbringer": {
+  "wind": true,
+  "opener": "wind",
+  "music": "scripts/social-posts/music/bgm_champion.ogg",
   "particles": [
-   [
-    "bolt",
-    "gold",
-    6
-   ],
    [
     "gas",
     "storm_smoke",
-    30
+    14
    ],
    [
-    "glyph",
-    "water",
-    30,
-    {
-     "g": "drop",
-     "move": "fall"
-    }
-   ],
-   [
-    "spark",
-    "gold",
-    5
+    "mote",
+    "arcane",
+    26
    ]
   ]
  },

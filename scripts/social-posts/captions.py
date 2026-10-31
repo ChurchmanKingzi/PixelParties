@@ -94,10 +94,10 @@ HEROES = {
         "embers, dust and dark smoke",
         "#Orc #WarChief"),
     "Champion, the Stormbringer": (
-        "Shake up both hands. ⚡",
+        "Shake up both hands. 🌪️",
         "Spend your Action to discard up to 5 cards from your hand and draw that many. Then your opponent must discard the same number of cards and draw that many, and this draw cannot be prevented. Once per turn.",
-        "lightning bolts, storm clouds and falling rain",
-        "#Lightning #Storm"),
+        "a swirling tornado, flying leaves and gusts of wind",
+        "#Wind #Storm #Tornado"),
     "Chaos-Diamond, the Cracked Keeper": (
         "Fifteen Spells. One cracked keeper. 💎",
         "As a starting Hero, Chaos-Diamond needs a Potion Deck of exactly 15 Spells with different names. Spend your Action to reveal its top 2 cards and have him perform them in order as additional Actions, regardless of their levels.",
@@ -328,6 +328,8 @@ TIKTOK = {
                                  "Andras hits exactly one target with a normal Attack of a level below his Fighting level? You may choose a second target for it to hit afterwards."),
     "???, the Shapeshifter": ("Every night, a different face. 🎃👁️",
                               "Equip a Hero from your hand, deck or discard pile and ??? becomes it, name and effects. Once per Hero, per game. Happy Halloween!"),
+    "Champion, the Stormbringer": ("Shake up both hands. 🌪️",
+                                   "Discard up to 5 cards and draw that many. Then your opponent must do the same, and that draw can't be prevented."),
     "Elana, the Rocky Rebel": ("Hate your hand? Shuffle it away. 🎸",
                                "Once per turn: shuffle your whole hand back into the deck and draw the same number of cards +1."),
     "Reiza, the Chief Tormentor": ("Stun. Poison. Double action. 🦇",

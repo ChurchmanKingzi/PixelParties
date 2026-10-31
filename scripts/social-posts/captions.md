@@ -322,16 +322,16 @@ Datei: `champion-the-stormbringer.mp4`
 
 **Caption**
 
-> Shake up both hands. ⚡
+> Shake up both hands. 🌪️
 >
 > Spend your Action to discard up to 5 cards from your hand and draw that many. Then your opponent must discard the same number of cards and draw that many, and this draw cannot be prevented. Once per turn.
 >
 > Pick your Heroes, build your party, crush the other side. That's Pixel Parties, the free online TCG!
 > 👉 Play for free: pixelpartiestcg.com (link in bio)
 >
-> #PixelParties #TCG #CardGame #PixelArt #IndieGame #TradingCardGame #FreeToPlay #Lightning #Storm
+> #PixelParties #TCG #CardGame #PixelArt #IndieGame #TradingCardGame #FreeToPlay #Wind #Storm #Tornado
 
-**Alt-Text**: Animated pixel art trading card of Champion, the Stormbringer, with lightning bolts, storm clouds and falling rain around the hero.
+**Alt-Text**: Animated pixel art trading card of Champion, the Stormbringer, with a swirling tornado, flying leaves and gusts of wind around the hero.
 
 ---
 

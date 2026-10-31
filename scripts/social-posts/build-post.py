@@ -514,11 +514,12 @@ def main():
     ap.add_argument('--head-top', type=int, default=None, help='Sprite so setzen, dass seine Oberkante bei y (px ab Bildoberkante) liegt, überschreibt feet/eyeAt')
     ap.add_argument('--px', type=int, default=None, help='Maßstab des Sprites (px je Sprite-Pixel), überschreibt hero-themes.json')
     ap.add_argument('--punch', action='store_true', help='Kraftvoller Start: die erste halbe Sekunde mit Bildschirmwackeln, Druckwelle und Blitz, Musik ohne Einblenden und auf einen Schlag der Musik geschnitten')
+    ap.add_argument('--wind', action='store_true', help='Wind-Look (windfx.py): Tornado hinter der Karte, wirbelnde Blätter und Kleinteile, Böen, flatterndes Banner (auch über wind in hero-themes.json)')
     ap.add_argument('--show', choices=['none', 'mini'], default=None, help='Einmalige Show über das ganze Video statt einer Schleife: mini = Cat-Army (minishow.py), überschreibt show aus hero-themes.json')
     ap.add_argument('--shift-time', type=float, default=None, help='Dauer der Silhouetten-Sequenz (Opener shift) in Sekunden bis zum Auftauchen des Helden (Standard 1,6), überschreibt shiftTime aus hero-themes.json')
     ap.add_argument('--horror', action='store_true', help='Horror-Look: entsättigt, Vignette, Lichtflackern und Bildstörungen (auch über horror in hero-themes.json)')
     ap.add_argument('--heart-time', type=float, default=None, help='Dauer der Herz-Phase des Openers in Sekunden bis zur Detonation (Standard 0,62; kürzer = der Held kommt früher ins Bild), überschreibt heartTime aus hero-themes.json')
-    ap.add_argument('--opener', choices=['none', 'heart', 'storm', 'shift'], default=None, help='Eigener Start-Effekt statt der Standard-Druckwelle: heart = großes Flammenherz, das detoniert; storm = Gewitterwolke, in die ein Blitz einschlägt; shift = flackernde Silhouetten anderer Helden, dann zeigt sich der Held; alle geben den Helden frei (überschreibt opener aus hero-themes.json)')
+    ap.add_argument('--opener', choices=['none', 'heart', 'storm', 'shift', 'wind'], default=None, help='Eigener Start-Effekt statt der Standard-Druckwelle: heart = großes Flammenherz, das detoniert; storm = Gewitterwolke, in die ein Blitz einschlägt; shift = flackernde Silhouetten anderer Helden, dann zeigt sich der Held; wind = Blätterwand, die weggeweht wird; alle geben den Helden frei (überschreibt opener aus hero-themes.json)')
     args = ap.parse_args()
     reel = args.format == 'reel'
     tag = args.format
@@ -533,7 +534,8 @@ def main():
     hero_cfg = json.loads((HERE / 'hero-themes.json').read_text(encoding='utf-8')).get(card_name, {})
     opener = args.opener or hero_cfg.get('opener') or 'none'
     args_opener = opener
-    opener_on = opener in ('heart', 'storm', 'shift')
+    opener_on = opener in ('heart', 'storm', 'shift', 'wind')
+    wind_on = args.wind or bool(hero_cfg.get('wind'))
     horror_on = args.horror or bool(hero_cfg.get('horror'))
     show_on = (args.show or hero_cfg.get('show') or 'none') == 'mini'
     if opener_on:
@@ -585,7 +587,7 @@ def main():
     logo_front = bool(hero_cfg.get('logoFront'))            # Logo vor dem Sprite (bei Helden, die es überragen)
     logo_layer = Image.new('RGBA', (W, H), (0, 0, 0, 0))
     logo_layer.alpha_composite(logo, ((W - logo.width) // 2, 40 + oy + (args.logo_dy if args.logo_dy is not None else hero_cfg.get('logoDy', 0))))
-    if not logo_front and not show_on:
+    if not logo_front and not show_on and not wind_on:
         mid_a.alpha_composite(logo_layer)
     mid_b = Image.new('RGBA', (W, H), (0, 0, 0, 0))
     parts = card_name.split(',', 1)
@@ -643,6 +645,10 @@ def main():
     box = (sx + spr.vleft * spr.px, sy + spr.vtop * spr.px, sx + spr.vright * spr.px, feet_y)
     theme_fx = fx.ThemeFX(fx.specs_for(names, None if args.themes else hero_cfg.get('particles')), args.slug, box, feet_y, loop)
     stick_col = mix(WHITE, accent, 0.25)
+    if wind_on:
+        import windfx
+        lxw, lyw = (W - logo.width) // 2, 40 + oy + (args.logo_dy if args.logo_dy is not None else hero_cfg.get('logoDy', 0))
+        wind = windfx.WindFX(W, H, U, float(fps), loop, dict(logo_rect=(lxw, lyw, logo.width, logo.height), logo_img=logo, center=(card_x + CARD_W / 2, card_y + CARD_H * 0.47)))
     SHOW_LOOPS = 9                                                           # Länge der Show in Schleifen der Sprite-Animation (9 × 2,24 s ≈ 20 s)
     if show_on:
         import minishow
@@ -1099,6 +1105,7 @@ def main():
                  'baaliel-the-demon-general', 'stellan-the-calm-cat', 'archibald-the-archmage', 'hel-the-bound-specter', 'thorad-strength-of-coolness',
                  'luna-pele-the-flame-dancer', 'damus-the-prophet-of-apocalypse', 'mao-the-vengeful-guardian', 'xiong-the-bamboo-guardian',
                  'klaus-the-cult-leader', 'taio-the-sun-fencer', 'vacarn-the-dark-goblin-necromancer']          # Silhouetten des Openers (Reihenfolge = Abfolge)
+    T_WIND = 0.45                                                            # Sekunde der Böe im Wind-Opener (Musikschlag)
     T_SHIFT = args.shift_time or hero_cfg.get('shiftTime', 1.6)              # Sekunden Silhouetten-Sequenz, dann zeigt sich der Held (z. B. 4,0 = ein ganzer Musikaufbau)
     n_sil = int(np.clip(round(T_SHIFT * 5.5), 6, len(SIL_SLUGS) + 1))        # Anzahl Silhouetten inklusive der eigenen als letzte
     _raw = [0.4 * (0.07 / 0.4) ** (i / (n_sil - 1)) for i in range(n_sil)]    # erst langsam (0,4 s), dann immer schneller (0,07 s), zusammen genau T_SHIFT
@@ -1230,6 +1237,8 @@ def main():
         canvas.alpha_composite(layer)
         if show_on:
             show.draw_behind(canvas, f / float(fps))                       # Katzen hinter dem Rahmen
+        if wind_on:
+            wind.draw_behind(canvas, f)                                    # Tornado und Rückseite der wirbelnden Teile
         for lay, (t0, t1) in ((mid_a, T_A),) if name_front else ((mid_a, T_A), (mid_b, T_B)):
             l2 = dissolve(lay, (ts - t0) / (t1 - t0) if intro else 1.0)
             if l2 is not None:
@@ -1237,6 +1246,8 @@ def main():
         if show_on:
             show.draw_logo(canvas, f / float(fps))
             show.draw_badge(canvas, f / float(fps))
+        if wind_on:
+            wind.draw_logo(canvas, f)
         # Themen-Partikel und Funkeln der Edelsteine: nur HINTER dem Sprite, damit nie etwas über dem Kopf liegt
         layer = Image.new('RGBA', (W, H), (0, 0, 0, 0))
         theme_fx.draw(layer, f)
@@ -1284,6 +1295,8 @@ def main():
                 canvas.alpha_composite(l2)
         if show_on:
             show.draw_front(canvas, f / float(fps))
+        if wind_on:
+            wind.draw_front(canvas, f)
         out_img = canvas.convert('RGB')
         if show_on:
             for tb in show.SHOCKS:                                           # Druckwellen bei den drei Sprengungen (Wand, „ATTACK!“, Herz)
@@ -1297,7 +1310,7 @@ def main():
             arr[..., 2] = np.roll(arr[..., 2], -U, axis=1)
             out_img = Image.fromarray(arr, 'RGB')
         if opener:
-            return {'storm': lambda *a: storm_fx(*a), 'shift': lambda *a: shift_fx(*a)}.get(args_opener, lambda *a: opener_fx(*a))(out_img, f)
+            return {'storm': lambda *a: storm_fx(*a), 'shift': lambda *a: shift_fx(*a), 'wind': lambda im, ff: wind.opener_fx(im, ff, T_WIND)}.get(args_opener, lambda *a: opener_fx(*a))(out_img, f)
         return punch_fx(out_img, f) if punch else out_img
 
     if args.cover_only is not None:
@@ -1353,7 +1366,7 @@ def main():
             if show_on:
                 m_start = max(0.0, m_start - show.BURST_T)                     # der Schlag fällt auf die erste Sprengung
             if opener_on:                                               # der Schlag soll auf die Detonation fallen, nicht auf Sekunde 0
-                t_hit = T_STORM if args_opener == 'storm' else T_SHIFT if args_opener == 'shift' else T_HEART
+                t_hit = T_STORM if args_opener == 'storm' else T_SHIFT if args_opener == 'shift' else T_WIND if args_opener == 'wind' else T_HEART
                 m_start = max(0.0, m_start - t_hit)
                 if hero_cfg.get('musicHit') is not None:                # ausdrücklich gewählter Bruch/Einsatz im Stück (Sekunden): der Opener endet genau dort
                     m_start = max(0.0, float(hero_cfg['musicHit']) - t_hit)
