@@ -4906,6 +4906,52 @@ window.ppApplauseFlash = function (key) {
   document.querySelectorAll(`[data-applause-key="${key}"]`).forEach(ppApplauseAufleuchten);
 };
 
+// ═══════════════════════════════════════════════════════════════
+//  ★ KLANG BEIM ERHALTEN VON COUNTERS (Als Befund 31.10.: „Cute Hydra braucht einen Sound beim Erhalten von Counters — generell soll
+//  das auf ALLEN Karten klingen")
+//
+//  Zentral über den Zustandsvergleich statt je Karte: Jedes Zähler-Feld an einer Kreatur (`creatureCounters`: headCounter, demonCounter,
+//  skullCounter, bunnyBombCounter, pythiaCounters …) oder einem Helden (`deepseaCounters`, `_timeCounters`, `_divinityCounters`,
+//  `_evolutionCounters`, `_investCounters`, `_luckCounter` …) zählt — das Namensmuster `…Counter(s)` (neue Zähler klingen damit von
+//  selbst) plus die Alt-Namen ohne Endung (`balance`, `preserve`, `luck`). Verglichen wird die SUMME je Zählerart über das ganze Brett:
+//  zieht eine Kreatur um oder wird neu beschworen, ohne dass ein Zähler dazukommt, bleibt die Summe gleich und es klingt nichts.
+//  Ausgenommen sind Zähler mit EIGENEM Klang, damit nichts doppelt klingt: Applause (`applause_gain`), Doom (`doom_tick`),
+//  Change Counter (`cosmic_counter_add`) und die Zähler der Time Bomblebee (`bomblebee_tick`).
+//  Neuer Zähler mit eigener Animation + Klang? Name in `PP_ZAEHLER_EIGENER_KLANG` ergänzen.
+// ═══════════════════════════════════════════════════════════════
+const PP_ZAEHLER_ALTE_NAMEN = new Set(['balance', 'preserve', 'luck']);
+const PP_ZAEHLER_EIGENER_KLANG = /change|^bombCounters$|applause|doom/i;
+const ppIstZaehlerFeld = (k) => !PP_ZAEHLER_EIGENER_KLANG.test(k) && (/Counters?$/.test(k) || PP_ZAEHLER_ALTE_NAMEN.has(k));
+/** Summe je Zählerart über Kreaturen und Helden beider Seiten. */
+function ppZaehlerSummen(gs) {
+  const sum = {};
+  const zaehle = (o) => {
+    if (!o) return;
+    for (const k of Object.keys(o)) {
+      const v = o[k];
+      if (typeof v === 'number' && v > 0 && ppIstZaehlerFeld(k)) sum[k] = (sum[k] || 0) + v;
+    }
+  };
+  const cc = gs && gs.creatureCounters;
+  if (cc) for (const pos of Object.keys(cc)) zaehle(cc[pos]);
+  for (const p of (gs && gs.players) || []) for (const h of (p && p.heroes) || []) zaehle(h);
+  return sum;
+}
+/** Hat sich in `jetzt` gegenüber `vorher` irgendeine Zählerart erhöht? */
+function ppZaehlerGestiegen(vorher, jetzt) {
+  if (!vorher || !jetzt) return false;
+  for (const k of Object.keys(jetzt)) if (jetzt[k] > (vorher[k] || 0)) return true;
+  return false;
+}
+function ppZaehlerKlang() {
+  if (!window.playSFX) return;
+  // zwei kurze, aufsteigende Töne (ein „+1"); ohne Sammelkategorie, damit der Karten-/Zauberklang davor ihn nicht verschluckt
+  window.playSFX('ping', { rate: 1.2, volume: 0.6, dedupe: 120, category: null });
+  window.playSFX('ping', { rate: 1.6, volume: 0.45, delay: 70, dedupe: 120, category: null });
+}
+window.ppZaehlerSummen = ppZaehlerSummen;
+window.ppZaehlerGestiegen = ppZaehlerGestiegen;
+
 function ApplauseBadge({ n, hand, akey }) {
   const ref = React.useRef(null);
   React.useEffect(() => {
@@ -55110,6 +55156,14 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
   const [creatureHealNumbers, setCreatureHealNumbers] = useState([]);
   const [goldGains, setGoldGains] = useState([]);
   const [goldLosses, setGoldLosses] = useState([]);
+  // ★ Klang beim Erhalten von Counters (Baustein `ppZaehlerSummen` oben): Vergleich der Zähler-Summen je Zustand; erster Zustand und Spielwechsel nur merken.
+  const prevZaehlerRef = useRef(null);
+  useEffect(() => {
+    const jetzt = { raum: gameState.roomId, summen: ppZaehlerSummen(gameState) };
+    const vorher = prevZaehlerRef.current;
+    prevZaehlerRef.current = jetzt;
+    if (vorher && vorher.raum === jetzt.raum && ppZaehlerGestiegen(vorher.summen, jetzt.summen)) ppZaehlerKlang();
+  }, [gameState]);
   const prevHpRef = useRef(null);
   const prevCreatureHpRef = useRef(null);
   const prevGoldRef = useRef(null);
