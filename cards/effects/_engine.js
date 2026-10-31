@@ -6461,7 +6461,14 @@ class GameEngine {
           ? cardInstance.heroOwner
           : (effectiveController ?? cardInstance.owner ?? -1);
         const casterHeroIdx = cardInstance.heroIdx ?? -1;
-        const casterHeroFlag = (flagOwner >= 0 && casterHeroIdx >= 0)
+        // ★ Als Befund 31.10. (Cute Hydra: „die CPU greift trotz mehrerer Head Counters nur EIN Ziel an"): die Ein-Ziel-Flaggen des Helden
+        // (Toras „never more than 1 target with an Attack", Idas Destruction Spells, Friedhelms Aktivierung) gelten fuer seine ATTACKS und
+        // ZAUBER. Der EFFEKT einer Kreatur in seiner Spalte (Hydra: „up to as many different targets as Head Counters") ist keins von beidem —
+        // `cardInstance.heroIdx` einer Kreatur ist nur die Spalte, in der sie liegt. Ein Zauber, den eine Kreatur wirkt (Demon's Gate,
+        // `_creatureCasterForSource`), behaelt die Flagge seines Gastgeber-Helden.
+        const _kreaturenEffekt = !cardInstance._creatureCasterForSource
+          && require('./_hooks').isCreatureSource(engine, cardInstance);
+        const casterHeroFlag = (!_kreaturenEffekt && flagOwner >= 0 && casterHeroIdx >= 0)
           ? engine.heroFlagsLive(flagOwner, casterHeroIdx)
           : null;
         const forceSingleByIda = !!(casterHeroFlag?.forcesSingleTarget
