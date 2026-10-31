@@ -89,22 +89,28 @@ def _flap_front(arr):
 
 
 def _flap_side(arr):
-    """Seitlich fliegende Katze (Pose S, ein Flügel steil nach oben): 8 Frames, der Flügel schwingt zeilenweise nach hinten und wieder hoch."""
+    """Seitlich fliegende Katze (Pose S, ein Flügel steil nach oben): 8 Frames. Der Flügelansatz (die Zeilen auf Höhe des Rückens) bleibt stehen und deckt den Rücken ab;
+    nur das Blatt darüber schwingt zeilenweise nach hinten und wieder hoch. Wo der Flügel den Kopf freigibt, wird dessen Kontur ergänzt."""
     h, w = arr.shape[:2]
     pad_t, pad_b, pad_r = 2, 3, 8
     wing = _gray_mask(arr)
     body = (arr[..., 3] > 0) & ~wing
-    root_y = 9.0
+    pivot = 8                                                       # ab dieser Zeile abwärts bleibt der Flügel (Ansatz) unverändert
+    outline = np.array([57, 8, 32, 255], dtype=np.uint8)
     frames = []
-    for s_, lift in ((0.0, 0), (0.5, 0), (1.0, 0), (1.5, 1), (1.9, 1), (1.5, 1), (1.0, 0), (0.5, 0)):
+    for s_ in (0.0, 0.35, 0.7, 1.0, 1.25, 1.0, 0.7, 0.35):         # höchstens ein Pixel Versatz je Zeile: der Flügel bleibt zusammenhängend
         out = np.zeros((h + pad_t + pad_b, w + pad_r, 4), dtype=np.uint8)
         for y in range(h):
-            dx = int(round(s_ * max(0.0, root_y - y) * 0.9))
+            dx = int(round(s_ * max(0, pivot - y) * 0.8))
             for x in np.where(wing[y])[0]:
-                out[y + pad_t - lift + (0 if y > root_y else 0), x + dx] = arr[y, x]
+                out[y + pad_t, x + dx] = arr[y, x]
         by, bx = np.where(body)
         for y, x in zip(by, bx):
-            out[y + pad_t - lift, x] = arr[y, x]
+            out[y + pad_t, x] = arr[y, x]
+        for y in range(3, pivot + 1):                               # Kopfkontur rechts, wo der Flügel (vorher davor) weggeschwungen ist
+            xs = np.where(body[y])[0]
+            if len(xs) and out[y + pad_t, xs.max() + 1, 3] == 0 and wing[y, xs.max() + 1:].any():
+                out[y + pad_t, xs.max() + 1] = outline
         frames.append(out)
     return frames
 
