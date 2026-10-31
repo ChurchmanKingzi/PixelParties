@@ -1342,6 +1342,30 @@
     "crimson",
     8
    ]
+  ],
+  "shiftTime": 4.0,
+  "shiftGlitch": [
+   [
+    0.14,
+    [
+     "bakhm-the-desert-digger",
+     "reiza-the-chief-tormentor"
+    ]
+   ],
+   [
+    0.42,
+    [
+     "sol-rym-the-thunder-djinn",
+     "cute-princess-mary"
+    ]
+   ],
+   [
+    0.75,
+    [
+     "andras-the-human-weapon",
+     "bomb-berserker-bartas"
+    ]
+   ]
   ]
  }
 }

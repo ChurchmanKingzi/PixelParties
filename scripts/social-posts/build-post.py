@@ -514,6 +514,7 @@ def main():
     ap.add_argument('--head-top', type=int, default=None, help='Sprite so setzen, dass seine Oberkante bei y (px ab Bildoberkante) liegt, überschreibt feet/eyeAt')
     ap.add_argument('--px', type=int, default=None, help='Maßstab des Sprites (px je Sprite-Pixel), überschreibt hero-themes.json')
     ap.add_argument('--punch', action='store_true', help='Kraftvoller Start: die erste halbe Sekunde mit Bildschirmwackeln, Druckwelle und Blitz, Musik ohne Einblenden und auf einen Schlag der Musik geschnitten')
+    ap.add_argument('--shift-time', type=float, default=None, help='Dauer der Silhouetten-Sequenz (Opener shift) in Sekunden bis zum Auftauchen des Helden (Standard 1,6), überschreibt shiftTime aus hero-themes.json')
     ap.add_argument('--horror', action='store_true', help='Horror-Look: entsättigt, Vignette, Lichtflackern und Bildstörungen (auch über horror in hero-themes.json)')
     ap.add_argument('--heart-time', type=float, default=None, help='Dauer der Herz-Phase des Openers in Sekunden bis zur Detonation (Standard 0,62; kürzer = der Held kommt früher ins Bild), überschreibt heartTime aus hero-themes.json')
     ap.add_argument('--opener', choices=['none', 'heart', 'storm', 'shift'], default=None, help='Eigener Start-Effekt statt der Standard-Druckwelle: heart = großes Flammenherz, das detoniert; storm = Gewitterwolke, in die ein Blitz einschlägt; shift = flackernde Silhouetten anderer Helden, dann zeigt sich der Held; alle geben den Helden frei (überschreibt opener aus hero-themes.json)')
@@ -1075,8 +1076,15 @@ def main():
             return out_img
 
     # ── Horror-Look und Opener „Silhouetten“ ──
-    SHIFT_DUR = [0.20, 0.19, 0.18, 0.17, 0.15, 0.14, 0.12, 0.11, 0.10, 0.09, 0.08, 0.07]   # Sekunden je Silhouette: erst langsam, dann immer schneller
-    T_SHIFT = sum(SHIFT_DUR)                                                 # Gesamtdauer des Silhouetten-Flackerns, dann zeigt sich der Held
+    SIL_SLUGS = ['reiza-the-chief-tormentor', 'bomb-berserker-bartas', 'alleria-the-queen-of-spiders', 'bakhm-the-desert-digger', 'nao-the-barrier-priestess',
+                 'andras-the-human-weapon', 'bubbles-the-bouncy-bunny', 'cool-rescuer-monia', 'cute-princess-mary', 'orthos-the-loyal-guard-dog',
+                 'zsos-ssar-the-serpent-warlord', 'sol-rym-the-thunder-djinn', 'argos-the-eye-of-the-cosmos', 'beato-the-butterfly-witch',
+                 'calamitusk-the-chaorc-war-chief', 'elana-the-rocky-rebel', 'kit-the-shark-researcher', 'chaos-diamond-the-cracked-keeper',
+                 'victorica-the-eternal-empress', 'siphem-the-deepsea-demon', 'null-the-mage-slayer']          # Silhouetten des Openers (Reihenfolge = Abfolge)
+    T_SHIFT = args.shift_time or hero_cfg.get('shiftTime', 1.6)              # Sekunden Silhouetten-Sequenz, dann zeigt sich der Held (z. B. 4,0 = ein ganzer Musikaufbau)
+    n_sil = int(np.clip(round(T_SHIFT * 5.5), 6, len(SIL_SLUGS) + 1))        # Anzahl Silhouetten inklusive der eigenen als letzte
+    _raw = [0.4 * (0.07 / 0.4) ** (i / (n_sil - 1)) for i in range(n_sil)]    # erst langsam (0,4 s), dann immer schneller (0,07 s), zusammen genau T_SHIFT
+    SHIFT_DUR = [d * T_SHIFT / sum(_raw) for d in _raw]
 
     def band_glitch(img, rng, n, amp):
         """Bildstörung: waagerechte Bänder seitlich versetzen (Versatz in Rasterzellen)."""
@@ -1111,10 +1119,38 @@ def main():
                 out_ = Image.fromarray(arr, 'RGB')
         return out_
 
+    SIL_PX_GLITCH = {'bakhm-the-desert-digger': 12, 'cute-princess-mary': 12, 'andras-the-human-weapon': 12}
+
+    # Shapeshift-Glitches: immer wieder wechselt der Held für Sekundenbruchteile in einen anderen (Config shiftGlitch: [[Anteil der Schleife, [Helden]], …])
+    GLITCH_EVENTS = []
+    if hero_cfg.get('shiftGlitch'):
+        GL_N = 7                                                              # Videobilder je Glitch
+        GL_PATTERN = [0, None, 0, 1, 1, None, 0]                              # Index in der Heldenliste, None = der Held selbst (gestört)
+        GL_SPR = {}
+        for frac, slugs in hero_cfg['shiftGlitch']:
+            for sl in slugs:
+                if sl not in GL_SPR:
+                    o = Sprite(sl)
+                    o_m = np.asarray(o.sheet.crop((0, 0, o.fw, o.fh)))[..., 3] > 20
+                    o_cols = np.where(o_m.any(axis=0))[0]
+                    o_rows = np.where(o_m.any(axis=1))[0]
+                    o.px = SIL_PX_GLITCH.get(sl, 14)
+                    while ((o_cols.max() - o_cols.min() + 1) * o.px > 1040 or (o_rows.max() - o_rows.min() + 1) * o.px > 980) and o.px > 6:
+                        o.px -= 1
+                    GL_SPR[sl] = o
+            GLITCH_EVENTS.append((int(frac * loop), slugs))
+
+    def glitch_state(f):
+        """(Sprite des anderen Helden oder None, Störung aktiv?) für das Videobild f."""
+        fm = f % loop
+        for start, slugs in GLITCH_EVENTS:
+            j = fm - start
+            if 0 <= j < GL_N:
+                who = GL_PATTERN[j]
+                return (GL_SPR[slugs[who % len(slugs)]] if who is not None else None), True
+        return None, False
+
     if args_opener == 'shift':
-        SIL_SLUGS = ['reiza-the-chief-tormentor', 'bomb-berserker-bartas', 'bakhm-the-desert-digger', 'nao-the-barrier-priestess',
-                     'andras-the-human-weapon', 'cool-rescuer-monia', 'cute-princess-mary', 'zsos-ssar-the-serpent-warlord',
-                     'sol-rym-the-thunder-djinn', 'beato-the-butterfly-witch', 'elana-the-rocky-rebel']
         SIL_PX = {'bakhm-the-desert-digger': 12, 'cute-princess-mary': 12}           # sonst 14 wie in den Reels, höchstens so breit, dass es ins Bild passt
 
         def dilate(m, n=1):
@@ -1130,7 +1166,8 @@ def main():
             m = np.asarray(o.sheet.crop((k * o.fw, 0, (k + 1) * o.fw, o.fh)))[..., 3] > 20
             cols = np.where(m.any(axis=0))[0]
             px_o = px_fix or SIL_PX.get(slug, 14)
-            while (cols.max() - cols.min() + 1) * px_o > 1040 and px_o > 6:
+            rws = np.where(m.any(axis=1))[0]
+            while ((cols.max() - cols.min() + 1) * px_o > 1040 or (rws.max() - rws.min() + 1) * px_o > 980) and px_o > 6:
                 px_o -= 1
             ring = dilate(m, 1) & ~m
             body = np.zeros(m.shape + (4,), dtype=np.uint8)
@@ -1141,12 +1178,12 @@ def main():
             lay.paste(big, (round(card_x + CARD_W / 2 - o.center_x * px_o), feet_y - o.foot * px_o), big)
             return lay
 
-        SILS = [(silhouette(sl, 0), silhouette(sl, 0, hot=True)) for sl in SIL_SLUGS] + [(silhouette(args.slug, 0, spr.px), silhouette(args.slug, 0, spr.px, hot=True))]
+        SILS = [(silhouette(sl, 0), silhouette(sl, 0, hot=True)) for sl in SIL_SLUGS[:n_sil - 1]] + [(silhouette(args.slug, 0, spr.px), silhouette(args.slug, 0, spr.px, hot=True))]
         SHIFT_T0 = np.concatenate([[0.0], np.cumsum(SHIFT_DUR)[:-1]])
 
         def shift_fx(img, f):
             ts = f / float(fps)
-            if ts >= T_SHIFT + 0.35:
+            if ts >= T_SHIFT + 0.3:
                 return img
             rng = np.random.default_rng(700 + f)
             dark = Image.blend(img, Image.new('RGB', (W, H), (4, 2, 7)), 0.97)
@@ -1156,7 +1193,7 @@ def main():
                 lay = SILS[idx][1 if ts - SHIFT_T0[idx] < 1.5 / fps else 0]            # im ersten Bild nach dem Wechsel leuchtet der Rand auf
                 out_.paste(lay, (int(rng.integers(-1, 2)) * U, 0), lay)
                 return band_glitch(out_.convert('RGB'), rng, 1 + idx // 3 + int(rng.integers(0, 2)), 2 + idx // 4)
-            q = (ts - T_SHIFT) / 0.35
+            q = (ts - T_SHIFT) / 0.3
             keep = np.repeat(np.repeat(((1 - q * 1.5) > BAY).astype(np.uint8) * 255, U, axis=0), U, axis=1)[:H, :W]
             out_ = img.copy()
             out_.paste(dark, (0, 0), Image.fromarray(keep, 'L'))
@@ -1198,7 +1235,13 @@ def main():
                 if l2 is not None:
                     canvas.alpha_composite(l2)
             return canvas.convert('RGB')
-        o_dark, o_light, sp, pad_px = spr.layers(f // per, stick_col, INK)
+        gl_spr, gl_on = glitch_state(f) if GLITCH_EVENTS else (None, False)
+        if gl_spr is not None:                                                # Shapeshift: kurz ist er ein anderer Held (gleiche Standlinie und Mitte)
+            o_dark, o_light, sp, pad_px = gl_spr.layers(f // per, stick_col, INK)
+            sx_d, sy_d = round(card_x + CARD_W / 2 - gl_spr.center_x * gl_spr.px), feet_y - gl_spr.foot * gl_spr.px
+        else:
+            o_dark, o_light, sp, pad_px = spr.layers(f // per, stick_col, INK)
+            sx_d, sy_d = sx, sy
         if not hero_cfg.get('noShadow'):
             canvas.alpha_composite(shadow, (card_x + CARD_W // 2 - shadow.width // 2, feet_y - U + hero_cfg.get('shadowDy', 0)))      # shadowDy: Schatten tiefer setzen (schwebende Sprites)
         flash = intro and ts < T_SPR + T_FLASH
@@ -1207,7 +1250,7 @@ def main():
                 white = Image.new('RGBA', im.size, WHITE + (255,))
                 white.putalpha(im.split()[3])
                 im = white
-            canvas.alpha_composite(im, (sx - pad_px, sy - pad_px))
+            canvas.alpha_composite(im, (sx_d - pad_px, sy_d - pad_px))
         if name_front:
             l2 = dissolve(mid_b, (ts - T_B[0]) / (T_B[1] - T_B[0]) if intro else 1.0)
             if l2 is not None:
@@ -1219,6 +1262,12 @@ def main():
         out_img = canvas.convert('RGB')
         if horror_on:
             out_img = horror_post(out_img, f)
+        if GLITCH_EVENTS and gl_on:                                           # Bildstörung und Farbversatz während des Wechsels
+            out_img = band_glitch(out_img, np.random.default_rng(1300 + f), 5, 4)
+            arr = np.asarray(out_img).copy()
+            arr[..., 0] = np.roll(arr[..., 0], U, axis=1)
+            arr[..., 2] = np.roll(arr[..., 2], -U, axis=1)
+            out_img = Image.fromarray(arr, 'RGB')
         if opener:
             return {'storm': lambda *a: storm_fx(*a), 'shift': lambda *a: shift_fx(*a)}.get(args_opener, lambda *a: opener_fx(*a))(out_img, f)
         return punch_fx(out_img, f) if punch else out_img
