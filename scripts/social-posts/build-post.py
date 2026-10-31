@@ -514,6 +514,7 @@ def main():
     ap.add_argument('--head-top', type=int, default=None, help='Sprite so setzen, dass seine Oberkante bei y (px ab Bildoberkante) liegt, überschreibt feet/eyeAt')
     ap.add_argument('--px', type=int, default=None, help='Maßstab des Sprites (px je Sprite-Pixel), überschreibt hero-themes.json')
     ap.add_argument('--punch', action='store_true', help='Kraftvoller Start: die erste halbe Sekunde mit Bildschirmwackeln, Druckwelle und Blitz, Musik ohne Einblenden und auf einen Schlag der Musik geschnitten')
+    ap.add_argument('--show', choices=['none', 'mini'], default=None, help='Einmalige Show über das ganze Video statt einer Schleife: mini = Cat-Army (minishow.py), überschreibt show aus hero-themes.json')
     ap.add_argument('--shift-time', type=float, default=None, help='Dauer der Silhouetten-Sequenz (Opener shift) in Sekunden bis zum Auftauchen des Helden (Standard 1,6), überschreibt shiftTime aus hero-themes.json')
     ap.add_argument('--horror', action='store_true', help='Horror-Look: entsättigt, Vignette, Lichtflackern und Bildstörungen (auch über horror in hero-themes.json)')
     ap.add_argument('--heart-time', type=float, default=None, help='Dauer der Herz-Phase des Openers in Sekunden bis zur Detonation (Standard 0,62; kürzer = der Held kommt früher ins Bild), überschreibt heartTime aus hero-themes.json')
@@ -534,9 +535,10 @@ def main():
     args_opener = opener
     opener_on = opener in ('heart', 'storm', 'shift')
     horror_on = args.horror or bool(hero_cfg.get('horror'))
+    show_on = (args.show or hero_cfg.get('show') or 'none') == 'mini'
     if opener_on:
         punch_on = False                   # der Opener ersetzt die Standard-Druckwelle
-    first_on = intro_on or punch_on or opener_on        # die erste Schleife wird gesondert gerendert (Einblenden und/oder Start-Effekt)
+    first_on = intro_on or punch_on or opener_on or show_on        # die erste Schleife wird gesondert gerendert (Einblenden und/oder Start-Effekt)
     if args.px:
         hero_cfg['px'] = args.px
     if args.shadow_dy is not None:
@@ -583,7 +585,7 @@ def main():
     logo_front = bool(hero_cfg.get('logoFront'))            # Logo vor dem Sprite (bei Helden, die es überragen)
     logo_layer = Image.new('RGBA', (W, H), (0, 0, 0, 0))
     logo_layer.alpha_composite(logo, ((W - logo.width) // 2, 40 + oy + (args.logo_dy if args.logo_dy is not None else hero_cfg.get('logoDy', 0))))
-    if not logo_front:
+    if not logo_front and not show_on:
         mid_a.alpha_composite(logo_layer)
     mid_b = Image.new('RGBA', (W, H), (0, 0, 0, 0))
     parts = card_name.split(',', 1)
@@ -606,11 +608,14 @@ def main():
         us = 3
         pw, ph = um.width * us + 8 * U, um.height * us + 5 * U
         px0, py0 = (W - pw) // 2, (sub_y if sub else name_y + 40) + 30
-        dr = ImageDraw.Draw(mid_b)
+        badge_target = Image.new('RGBA', (W, H), (0, 0, 0, 0)) if show_on else mid_b       # Show: Schild als eigene Ebene (wird vom Kater geschubst)
+        dr = ImageDraw.Draw(badge_target)
         dr.rectangle([px0 + U, py0, px0 + pw - U - 1, py0 + ph - 1], fill=INK)
         dr.rectangle([px0, py0 + U, px0 + pw - 1, py0 + ph - U - 1], fill=INK)
         dr.rectangle([px0 + U, py0 + U, px0 + pw - U - 1, py0 + ph - U - 1], fill=ui_accent)
-        draw_text(mid_b, url, us, (W // 2, py0 + ph // 2), color=INK, outline=None, anchor='mm')
+        draw_text(badge_target, url, us, (W // 2, py0 + ph // 2), color=INK, outline=None, anchor='mm')
+        badge_rect = (px0, py0, pw, ph)
+        badge_img = badge_target.crop((px0, py0, px0 + pw, py0 + ph))
 
     # Sprite-Lage: Gesichtsmitte über der Kartenmitte, Füße auf der Standlinie (im Kartenbild)
     feet_y = card_y + (args.feet if args.feet is not None else hero_cfg.get('feet', int(CARD_H * 0.52)))
@@ -638,6 +643,16 @@ def main():
     box = (sx + spr.vleft * spr.px, sy + spr.vtop * spr.px, sx + spr.vright * spr.px, feet_y)
     theme_fx = fx.ThemeFX(fx.specs_for(names, None if args.themes else hero_cfg.get('particles')), args.slug, box, feet_y, loop)
     stick_col = mix(WHITE, accent, 0.25)
+    SHOW_LOOPS = 9                                                           # Länge der Show in Schleifen der Sprite-Animation (9 × 2,24 s ≈ 20 s)
+    if show_on:
+        import minishow
+        lx_, ly_ = (W - logo.width) // 2, 40 + oy + (args.logo_dy if args.logo_dy is not None else hero_cfg.get('logoDy', 0))
+        show = minishow.MiniShow(
+            minishow.CatSheet(HERE / 'assets' / 'cute-cat.png'), W, H, U, float(fps), loop * SHOW_LOOPS / float(fps),
+            dict(logo_rect=(lx_, ly_, logo.width, logo.height), logo_img=logo, badge_rect=badge_rect, badge_img=badge_img,
+                 plate_rect=(plate_x, plate_y, plate.width, plate.height), card_top=plate_y,
+                 center=(card_x + CARD_W / 2, feet_y - 0.5 * (spr.foot - spr.vtop) * spr.px)),
+            draw_text, INK, WHITE)
 
     # Einblenden (nur erste Schleife): Pixel-Auflösung der Ebenen, dann Blitz beim Auftauchen des Sprites
     noise = np.random.default_rng(7).random((-(-H // U), -(-W // U)))
@@ -654,10 +669,10 @@ def main():
 
     T_PUNCH = 0.55                                                           # Sekunden
 
-    def punch_fx(img, f):
-        """Kraftvoller Start: Druckwelle (Pixelring, gedithert), kurzer Blitz und Bildschirmwackeln im Raster U, alles in der ersten halben Sekunde."""
-        ts = f / float(fps)
-        if ts >= T_PUNCH:
+    def punch_fx(img, f, t0=0.0):
+        """Kraftvoller Start: Druckwelle (Pixelring, gedithert), kurzer Blitz und Bildschirmwackeln im Raster U, alles in der ersten halben Sekunde (ab t0)."""
+        ts = f / float(fps) - t0
+        if ts < 0 or ts >= T_PUNCH:
             return img
         k = 1.0 - ts / T_PUNCH                                               # 1 → 0
         cw, ch = -(-W // U), -(-H // U)
@@ -1213,10 +1228,15 @@ def main():
         layer = Image.new('RGBA', (W, H), (0, 0, 0, 0))
         parts_bg.draw(layer, f)
         canvas.alpha_composite(layer)
+        if show_on:
+            show.draw_behind(canvas, f / float(fps))                       # Katzen hinter dem Rahmen
         for lay, (t0, t1) in ((mid_a, T_A),) if name_front else ((mid_a, T_A), (mid_b, T_B)):
             l2 = dissolve(lay, (ts - t0) / (t1 - t0) if intro else 1.0)
             if l2 is not None:
                 canvas.alpha_composite(l2)
+        if show_on:
+            show.draw_logo(canvas, f / float(fps))
+            show.draw_badge(canvas, f / float(fps))
         # Themen-Partikel und Funkeln der Edelsteine: nur HINTER dem Sprite, damit nie etwas über dem Kopf liegt
         layer = Image.new('RGBA', (W, H), (0, 0, 0, 0))
         theme_fx.draw(layer, f)
@@ -1262,7 +1282,12 @@ def main():
             l2 = dissolve(logo_layer, (ts - T_A[0]) / (T_A[1] - T_A[0]) if intro else 1.0)
             if l2 is not None:
                 canvas.alpha_composite(l2)
+        if show_on:
+            show.draw_front(canvas, f / float(fps))
         out_img = canvas.convert('RGB')
+        if show_on:
+            for tb in (show.BURST_T, 18.2):                                  # Druckwelle bei den beiden Sprengungen
+                out_img = punch_fx(out_img, f, tb)
         if horror_on:
             out_img = horror_post(out_img, f)
         if GLITCH_EVENTS and gl_on:                                           # Bildstörung und Farbversatz während des Wechsels
@@ -1276,19 +1301,25 @@ def main():
         return punch_fx(out_img, f) if punch else out_img
 
     if args.cover_only is not None:
+        if show_on and os.environ.get('SHOW_SECONDS'):                       # Show-Vorschau: Zeitpunkte in Sekunden, kommagetrennt (Umgebungsvariable SHOW_SECONDS)
+            for sec in os.environ['SHOW_SECONDS'].split(','):
+                prev = OUT / f'preview-{args.slug}-{tag}-{sec}s.png'
+                render(int(float(sec) * float(fps)), False).save(prev)
+                print('Vorschau', prev)
+            return
         prev = OUT / f'preview-{args.slug}-{tag}.png'
         render(args.cover_only % loop, False).save(prev)
         print('Vorschau', prev)
         return
     for f in range(loop):
         render(f, False).save(fdir / f'f{f:03d}.png')
-    first_loops = 1                                                          # Länge des gesonderten ersten Segments in Schleifen (Vielfaches, damit der Übergang nahtlos bleibt)
+    first_loops = SHOW_LOOPS if show_on else 1                                # Länge des gesonderten ersten Segments in Schleifen (Vielfaches, damit der Übergang nahtlos bleibt)
     if opener_on and args_opener == 'shift':
         first_loops = max(1, -(-int((T_SHIFT + 0.3) * float(fps)) // loop))
     if first_on:
         for f in range(loop * first_loops):
             render(f, intro_on, punch_on, opener_on).save(fdir / f'i{f:03d}.png')
-    cover = Image.open(fdir / ('f%03d.png' % (min(loop - 1, per * 3))) if reel else fdir / 'f000.png')
+    cover = Image.open(fdir / ('i%03d.png' % int(17.4 * float(fps)))) if show_on else Image.open(fdir / ('f%03d.png' % (min(loop - 1, per * 3))) if reel else fdir / 'f000.png')
     cover_path = out / ('reel-cover.png' if reel else 'post.png')
     cover.save(cover_path)
     print('Standbild', cover_path)
@@ -1297,6 +1328,8 @@ def main():
         return
     music = music_path(card_name, args.music or hero_cfg.get('music'))
     loop_s = loop / float(fps)
+    if show_on:
+        duration = loop * SHOW_LOOPS / float(fps) - 0.001
     loops = max(1, math.ceil(duration / loop_s))
     dur = loop_s * loops
     cmd = ['ffmpeg', '-y', '-loglevel', 'error']
@@ -1315,8 +1348,10 @@ def main():
         if m_start is None:
             m_start = pick_music_start(music, dur)
             print(f'Musik: energiereichstes Fenster ab {m_start:.1f} s')
-        if (punch_on or opener_on) and args.music_start is None:
+        if (punch_on or opener_on or show_on) and args.music_start is None:
             m_start = snap_to_onset(music, m_start)
+            if show_on:
+                m_start = max(0.0, m_start - show.BURST_T)                     # der Schlag fällt auf die erste Sprengung
             if opener_on:                                               # der Schlag soll auf die Detonation fallen, nicht auf Sekunde 0
                 t_hit = T_STORM if args_opener == 'storm' else T_SHIFT if args_opener == 'shift' else T_HEART
                 m_start = max(0.0, m_start - t_hit)
@@ -1324,7 +1359,7 @@ def main():
                     m_start = max(0.0, float(hero_cfg['musicHit']) - t_hit)
             print(f'Musik: Start auf den Schlag bei {m_start:.2f} s' + (f' (Schlag bei Einschlag/Detonation, t = {t_hit} s)' if opener_on else ''))
         cmd += ['-ss', str(m_start), '-i', str(music)]
-        fade_in = '' if (punch_on or opener_on) else 'afade=t=in:st=0:d=0.4,'
+        fade_in = '' if (punch_on or opener_on or show_on) else 'afade=t=in:st=0:d=0.4,'
         amap = ['-map', f'{n_in}:a', '-af', f'{fade_in}afade=t=out:st={dur - 1.2:.2f}:d=1.2,loudnorm=I=-14:TP=-1.5:LRA=11', '-c:a', 'aac', '-b:a', '192k']
         if not vfilter:
             vfilter = ['-map', '0:v']
