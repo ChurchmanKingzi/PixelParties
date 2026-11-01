@@ -229,23 +229,47 @@ class MiniShow:
             out.append((float(x[k]), float(y[k] + 2.0)))
         return out
 
-    # ───────── Soundeffekte (public/sounds): (Sekunde, Datei, Lautstärke in dB) – folgen den Zeitpunkten der Show ─────────
+    # ───────── Soundeffekte (public/sounds): gleiche Aktion = immer derselbe Sound ─────────
+    SND = {
+        'bubble':  [('ui_prompt_open', -6)],                                   # jede Sprechblase
+        'explode': [('heavy_impact', -2), ('elem_wind', -8, 0.10)],            # jede Sprengung (Wand, Orbit, Herz)
+        'arrive':  [('projectile', -9)],                                       # Katzen fliegen herein (Banner-Diebe, Schubser, V-Formation, Orbit, Herz, Rückkehr)
+        'lift':    [('draw', -5)],                                             # etwas wird getragen/gehoben (Banner raus und zurück, Schild zurück)
+        'land':    [('placement', -6)],                                        # etwas landet (Banner, Schild, Wand)
+        'peek':    [('ui_click', -8)],                                         # eine Katze lugt hervor
+        'knock':   [('slash', -3)],                                            # Schubser
+        'fall':    [('discard', -6)],                                          # das Schild fällt weg
+        'charge':  [('ascension', -9)],                                        # Anlauf von „ATTACK!“
+        'heal':    [('heal', -6), ('gold_gain', -9, 0.5)],                     # Herz bildet sich
+        'beat':    [('doom_tick', -10)],                                       # Herzschlag
+    }
+
     def sfx_events(self):
         B, A, X = self.BURST_T, self.ATTACK_T, self.SPIN_END
-        ev = [(B, 'heavy_impact', -2), (B + 0.05, 'shuffle', -6), (B + 0.2, 'elem_wind', -8),                         # Katzenwand sprengt
-              (2.0, 'projectile', -10), (2.35, 'ui_prompt_open', -6), (2.5, 'draw', -4),                                # Banner-Raub
-              (4.1, 'draw', -6), (4.9, 'placement', -5),
-              (5.3, 'ui_click', -8), (5.7, 'chain_add', -9), (6.1, 'ui_click', -8), (6.2, 'ui_prompt_open', -6),       # Peek-a-boo
-              (6.5, 'chain_add', -9), (6.9, 'ui_click', -8), (7.2, 'chain_add', -9),
-              (7.7, 'projectile', -12), (8.85, 'slash', -3), (9.0, 'discard', -6), (9.3, 'ui_error', -6),              # Link-Schild
-              (11.1, 'draw', -6), (12.0, 'placement', -7),
-              (11.2, 'elem_wind', -9), (12.0, 'shuffle', -6), (12.4, 'summon', -9),                                     # V-Formation, Orbit
-              (13.5, 'spell_cast', -4), (A + 0.0, 'ascension', -9),                                                     # ATTACK!: Anlauf …
-              (X, 'heavy_impact', -1), (X + 0.02, 'critical_strike', -7), (X + 0.1, 'elem_wind', -8),                  # … und Sprengung
-              (16.4, 'heal', -6), (16.9, 'gold_gain', -9), (17.1, 'ui_prompt_open', -7),                                # Herz
-              (17.25, 'doom_tick', -10), (17.75, 'doom_tick', -10),
-              (18.2, 'heavy_impact', -2), (18.22, 'critical_strike', -8),
-              (19.2, 'shuffle', -7), (self.D - 0.2, 'placement', -7)]                                                   # Katzen kehren zurück
+        ev = []
+
+        def add(t, kind):
+            for item in self.SND[kind]:
+                name, db = item[0], item[1]
+                ev.append((t + (item[2] if len(item) > 2 else 0.0), name, db))
+        for t0, t1, text in self.bubbles:                                      # eine Blase = immer derselbe Sound, genau zu ihrem Erscheinen
+            add(t0, 'bubble')
+        for t in (B, X, 18.2):
+            add(t, 'explode')
+        for t in (2.0, 7.7, 11.2, 12.0, 16.0, 19.2):
+            add(t, 'arrive')
+        for t in (2.5, 4.1, 11.1):
+            add(t, 'lift')
+        for t in (4.9, 12.0, self.D - 0.2):
+            add(t, 'land')
+        for t in (5.3, 5.7, 6.1, 6.5, 6.9, 7.2):
+            add(t, 'peek')
+        add(8.85, 'knock')
+        add(9.0, 'fall')
+        add(A, 'charge')
+        add(16.4, 'heal')
+        for t in (17.25, 17.75):
+            add(t, 'beat')
         return sorted(ev)
 
     # ───────── Katzen zeichnen ─────────
