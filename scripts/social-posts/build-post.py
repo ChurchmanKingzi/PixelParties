@@ -484,10 +484,22 @@ def mix_audio(music, m_start, dur, events, out_file, boost_db=4.0):
     cmd = ['ffmpeg', '-y', '-loglevel', 'error', '-ss', str(m_start), '-t', f'{dur:.3f}', '-i', str(music)]
     chains = [f'[0:a]afade=t=out:st={dur - 1.2:.2f}:d=1.2,loudnorm=I=-14:TP=-1.5:LRA=11,aresample=48000,aformat=channel_layouts=stereo[m]']
     labels = ['[m]']
-    for k, (t, name, db) in enumerate(events, start=1):
+    for k, ev in enumerate(events, start=1):
+        t, name, db = ev[:3]
+        rate = ev[3] if len(ev) > 3 else 1.0                          # Tonhöhe/Tempo (asetrate): > 1 = höher und schneller
+        trim = ev[4] if len(ev) > 4 else None                         # nur den Anfang des Sounds verwenden (Sekunden)
         cmd += ['-i', str(snd / f'{name}.ogg')]
         ms = int(round(t * 1000))
-        chains.append(f'[{k}:a]aresample=48000,aformat=channel_layouts=stereo,volume={db + boost_db}dB,adelay={ms}|{ms}[s{k}]')
+        f = f'[{k}:a]aresample=48000'
+        if trim:
+            f += f',atrim=0:{trim},asetpts=PTS-STARTPTS'
+        if rate != 1.0:
+            f += f',asetrate={int(48000 * rate)},aresample=48000'
+        eff = (trim or 1.0) / rate
+        if trim:
+            f += f',afade=t=out:st={max(0.0, eff - 0.12):.3f}:d=0.12'
+        f += f',aformat=channel_layouts=stereo,volume={db + boost_db}dB,adelay={ms}|{ms}[s{k}]'
+        chains.append(f)
         labels.append(f'[s{k}]')
     chains.append(''.join(labels) + f'amix=inputs={len(labels)}:duration=first:normalize=0,alimiter=limit=0.95,atrim=0:{dur:.3f}[a]')
     cmd += ['-filter_complex', ';'.join(chains), '-map', '[a]', '-c:a', 'aac', '-b:a', '192k', str(out_file)]

@@ -178,6 +178,7 @@ class MiniShow:
     ATTACK_T = 13.6                # „ATTACK!“: der Orbit beschleunigt …
     SPIN_END = 15.4                # … und die Katzen schießen bei dieser Sekunde explosionsartig nach außen
     SHOCKS = (0.5, 15.4, 18.2)     # Sekunden der drei Druckwellen (Wand, Orbit, Herz)
+    ORBIT_T = 12.15                # die ersten Katzen haben den Kreis erreicht, er beginnt zu kreisen (kurz nach dem Hereinfliegen bei 12,0)
 
     def __init__(self, cats, W, H, U, fps, D, geom, draw_text, ink, white):
         self.cats, self.W, self.H, self.U, self.fps, self.D = cats, W, H, U, fps, D
@@ -236,8 +237,8 @@ class MiniShow:
         'arrive':  [('projectile', -9)],                                       # Katzen fliegen herein (Banner-Diebe, Schubser, V-Formation, Orbit, Herz, Rückkehr)
         'lift':    [('draw', -5)],                                             # etwas wird getragen/gehoben (Banner raus und zurück, Schild zurück)
         'land':    [('placement', -6)],                                        # etwas landet (Banner, Schild, Wand)
-        'peek':    [('ui_click', -8)],                                         # eine Katze lugt hervor
-        'knock':   [('slash', -3)],                                            # Schubser
+        'peek':    [('ping', -9)],                                             # eine Katze lugt hervor (pro Katze eine Tonstufe höher, siehe sfx_events)
+        'knock':   [('ui_error', -6)],                                         # Schubser: „nö.“ (kein Schwert-Geräusch)
         'fall':    [('discard', -6)],                                          # das Schild fällt weg
         'charge':  [('ascension', -9)],                                        # Anlauf von „ATTACK!“
         'heal':    [('heal', -6), ('gold_gain', -9, 0.5)],                     # Herz bildet sich
@@ -262,8 +263,10 @@ class MiniShow:
             add(t, 'lift')
         for t in (4.9, 12.0, self.D - 0.2):
             add(t, 'land')
-        for t in (5.3, 5.7, 6.1, 6.5, 6.9, 7.2):
-            add(t, 'peek')
+        for k, t in enumerate((5.3, 5.7, 6.1, 6.5, 6.9, 7.2)):               # gleicher Sound, jede Katze eine Tonstufe höher und damit etwas schneller
+            ev.append((t, self.SND['peek'][0][0], self.SND['peek'][0][1], 2 ** (k * 2 / 12.0), 0.45))
+        for t, db, rate in ((self.ORBIT_T, -14, 0.85), (12.7, -12, 0.95), (13.4, -10, 1.1), (14.1, -8, 1.3), (14.7, -7, 1.55)):   # der Katzenkreis dreht sich an und wird schneller
+            ev.append((t, 'elem_wind', db, rate, 0.9))
         add(8.85, 'knock')
         add(9.0, 'fall')
         add(A, 'charge')
