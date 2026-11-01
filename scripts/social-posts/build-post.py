@@ -477,6 +477,24 @@ def snap_to_onset(path, start, back=1.5, fwd=3.5):
     return max(0.0, best - 0.02)
 
 
+def mix_audio(music, m_start, dur, events, out_file, boost_db=4.0):
+    """Musik (ab m_start, mit Ausblenden und Lautheitsnormierung wie sonst) plus Soundeffekte aus public/sounds zu einer Tonspur mischen.
+    events = [(Sekunde im Video, Dateiname ohne .ogg, Lautstärke in dB)]."""
+    snd = ROOT / 'public' / 'sounds'
+    cmd = ['ffmpeg', '-y', '-loglevel', 'error', '-ss', str(m_start), '-t', f'{dur:.3f}', '-i', str(music)]
+    chains = [f'[0:a]afade=t=out:st={dur - 1.2:.2f}:d=1.2,loudnorm=I=-14:TP=-1.5:LRA=11,aresample=48000,aformat=channel_layouts=stereo[m]']
+    labels = ['[m]']
+    for k, (t, name, db) in enumerate(events, start=1):
+        cmd += ['-i', str(snd / f'{name}.ogg')]
+        ms = int(round(t * 1000))
+        chains.append(f'[{k}:a]aresample=48000,aformat=channel_layouts=stereo,volume={db + boost_db}dB,adelay={ms}|{ms}[s{k}]')
+        labels.append(f'[s{k}]')
+    chains.append(''.join(labels) + f'amix=inputs={len(labels)}:duration=first:normalize=0,alimiter=limit=0.95,atrim=0:{dur:.3f}[a]')
+    cmd += ['-filter_complex', ';'.join(chains), '-map', '[a]', '-c:a', 'aac', '-b:a', '192k', str(out_file)]
+    subprocess.run(cmd, check=True)
+    return out_file
+
+
 def music_path(card_name, override):
     """Musik: ausdrückliche Datei, sonst wie im Spiel (server.js `bgmSlugForHero`): längste zusammenhängende Wortfolge des
     Namens, für die `public/music/bgm_<slug>.ogg` existiert (so findet „Luna Pele“ `bgm_lunapele.ogg`)."""
@@ -515,6 +533,7 @@ def main():
     ap.add_argument('--px', type=int, default=None, help='Maßstab des Sprites (px je Sprite-Pixel), überschreibt hero-themes.json')
     ap.add_argument('--punch', action='store_true', help='Kraftvoller Start: die erste halbe Sekunde mit Bildschirmwackeln, Druckwelle und Blitz, Musik ohne Einblenden und auf einen Schlag der Musik geschnitten')
     ap.add_argument('--wind', action='store_true', help='Wind-Look (windfx.py): Tornado hinter der Karte, wirbelnde Blätter und Kleinteile, Böen, flatterndes Banner (auch über wind in hero-themes.json)')
+    ap.add_argument('--no-sfx', action='store_true', help='Ohne Soundeffekte aus public/sounds (nur Musik), auch wenn die Show welche vorsieht')
     ap.add_argument('--show', choices=['none', 'mini'], default=None, help='Einmalige Show über das ganze Video statt einer Schleife: mini = Cat-Army (minishow.py), überschreibt show aus hero-themes.json')
     ap.add_argument('--shift-time', type=float, default=None, help='Dauer der Silhouetten-Sequenz (Opener shift) in Sekunden bis zum Auftauchen des Helden (Standard 1,6), überschreibt shiftTime aus hero-themes.json')
     ap.add_argument('--horror', action='store_true', help='Horror-Look: entsättigt, Vignette, Lichtflackern und Bildstörungen (auch über horror in hero-themes.json)')
@@ -1398,9 +1417,16 @@ def main():
                 if hero_cfg.get('musicHit') is not None:                # ausdrücklich gewählter Bruch/Einsatz im Stück (Sekunden): der Opener endet genau dort
                     m_start = max(0.0, float(hero_cfg['musicHit']) - t_hit)
             print(f'Musik: Start auf den Schlag bei {m_start:.2f} s' + (f' (Schlag bei Einschlag/Detonation, t = {t_hit} s)' if opener_on else ''))
-        cmd += ['-ss', str(m_start), '-i', str(music)]
-        fade_in = '' if (punch_on or opener_on or show_on) else 'afade=t=in:st=0:d=0.4,'
-        amap = ['-map', f'{n_in}:a', '-af', f'{fade_in}afade=t=out:st={dur - 1.2:.2f}:d=1.2,loudnorm=I=-14:TP=-1.5:LRA=11', '-c:a', 'aac', '-b:a', '192k']
+        sfx = show.sfx_events() if (show_on and not args.no_sfx) else []
+        if sfx:                                                         # Musik + Soundeffekte vorab zu einer Tonspur mischen
+            audio_file = mix_audio(music, m_start, dur, sfx, out / 'audio.m4a')
+            print(f'Soundeffekte: {len(sfx)} Einsätze aus public/sounds')
+            cmd += ['-i', str(audio_file)]
+            amap = ['-map', f'{n_in}:a', '-c:a', 'copy']
+        else:
+            cmd += ['-ss', str(m_start), '-i', str(music)]
+            fade_in = '' if (punch_on or opener_on or show_on) else 'afade=t=in:st=0:d=0.4,'
+            amap = ['-map', f'{n_in}:a', '-af', f'{fade_in}afade=t=out:st={dur - 1.2:.2f}:d=1.2,loudnorm=I=-14:TP=-1.5:LRA=11', '-c:a', 'aac', '-b:a', '192k']
         if not vfilter:
             vfilter = ['-map', '0:v']
     else:

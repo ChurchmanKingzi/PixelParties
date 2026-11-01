@@ -229,6 +229,25 @@ class MiniShow:
             out.append((float(x[k]), float(y[k] + 2.0)))
         return out
 
+    # ───────── Soundeffekte (public/sounds): (Sekunde, Datei, Lautstärke in dB) – folgen den Zeitpunkten der Show ─────────
+    def sfx_events(self):
+        B, A, X = self.BURST_T, self.ATTACK_T, self.SPIN_END
+        ev = [(B, 'heavy_impact', -2), (B + 0.05, 'shuffle', -6), (B + 0.2, 'elem_wind', -8),                         # Katzenwand sprengt
+              (2.0, 'projectile', -10), (2.35, 'ui_prompt_open', -6), (2.5, 'draw', -4),                                # Banner-Raub
+              (4.1, 'draw', -6), (4.9, 'placement', -5),
+              (5.3, 'ui_click', -8), (5.7, 'chain_add', -9), (6.1, 'ui_click', -8), (6.2, 'ui_prompt_open', -6),       # Peek-a-boo
+              (6.5, 'chain_add', -9), (6.9, 'ui_click', -8), (7.2, 'chain_add', -9),
+              (7.7, 'projectile', -12), (8.85, 'slash', -3), (9.0, 'discard', -6), (9.3, 'ui_error', -6),              # Link-Schild
+              (11.1, 'draw', -6), (12.0, 'placement', -7),
+              (11.2, 'elem_wind', -9), (12.0, 'shuffle', -6), (12.4, 'summon', -9),                                     # V-Formation, Orbit
+              (13.5, 'spell_cast', -4), (A + 0.0, 'ascension', -9),                                                     # ATTACK!: Anlauf …
+              (X, 'heavy_impact', -1), (X + 0.02, 'critical_strike', -7), (X + 0.1, 'elem_wind', -8),                  # … und Sprengung
+              (16.4, 'heal', -6), (16.9, 'gold_gain', -9), (17.1, 'ui_prompt_open', -7),                                # Herz
+              (17.25, 'doom_tick', -10), (17.75, 'doom_tick', -10),
+              (18.2, 'heavy_impact', -2), (18.22, 'critical_strike', -8),
+              (19.2, 'shuffle', -7), (self.D - 0.2, 'placement', -7)]                                                   # Katzen kehren zurück
+        return sorted(ev)
+
     # ───────── Katzen zeichnen ─────────
     def _cat(self, canvas, t, x, y, px=7, ph=0.0, mirror=False, rot=0, kind='idle', bob=4.0, frame=None):
         """Eine Katze zeichnen: kind = idle | front | side; frame erzwingt ein bestimmtes Bild, sonst läuft die Animation mit der Zeit (ph = Phasenversatz 0…1)."""
