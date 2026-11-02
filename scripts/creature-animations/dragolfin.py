@@ -39,7 +39,6 @@ import numpy as np
 
 import anim_lib as L
 import anim_tiere as T
-import anim_amorph as A
 import anim_drache as D
 
 N, MS = 48, 70

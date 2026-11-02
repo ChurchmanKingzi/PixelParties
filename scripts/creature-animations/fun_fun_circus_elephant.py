@@ -126,7 +126,7 @@ def frame(i, nur=None):
     kk = Hm.kantenmaske(fig)
     for y, x in zip(*np.nonzero(kk)):
         c = tuple(int(v) for v in fig[y, x, :3])
-        if c in GLANZ_ZU_BASIS:
+        if c in GLANZ_ZU_BASIS and y - OFF[1] < 24:                                    # nur im Ballonbündel (Podestrand bleibt)
             fig[y, x, :3] = GLANZ_ZU_BASIS[c]
     return fig
 

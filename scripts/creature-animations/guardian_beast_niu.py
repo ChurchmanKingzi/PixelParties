@@ -26,7 +26,7 @@ Ablauf (48 Frames à 80 ms = 3,84 s, nahtlos):
   gemischt, L.streck_zeile) — die Stiefel/Hände/Klingen bleiben (die Hände halten die Klingen, deshalb stehen die Klingen still).
 * KOPFNICKEN: der Kopf (Helm, Hörner, Gesicht, Haarsträhnen) sinkt in Frames 36–45 um 1 px in den Schal und hebt sich wieder (nur Senken/Heben, nie seitlich).
 * BLINZELN: Frames 18–20 und 44–46 (Haut als Lid; erst Hälfte, dann ganz zu, dann Hälfte).
-* HAARSTRÄHNEN: die unteren Enden der schwarzen Strähnen pendeln 1 px nach innen und wieder zurück (links/rechts gegenläufig, Periode 24).
+* HAARSTRÄHNEN: die Spitzen der schwarzen Strähnen (unterste Zeile y 23) pendeln 1 px nach innen und wieder zurück (links/rechts gegenläufig, Periode 24).
 * KLINGEN-GLITZER (Waffen = Metall, Regel 12): ein vierzackiger Stern blitzt für 5 Frames am oberen Dorn der linken (Frames 6–10) und später der rechten Klinge (Frames 30–34) auf;
   die Spitzen der Klingen (lavendelfarbener Auslauf) pulsieren eine Stufe heller/dunkler (Periode 16, beide Klingen versetzt).
 Frame 0 = Ruhepose (Original). Alle Bewegungen laufen auf der vollen Leinwand (anim_lib wirft ClipError). Nur ganze Pixel, nur Farben der Quelle.
@@ -96,11 +96,11 @@ def frame(i):
     if k:
         zeilen = (18, 19) if k == 1 else (18, 19, 20)
         Hm.setze(kopf, {p: HAUT for p in AUGE_L + AUGE_R if p[1] in zeilen}, OFF)
-    # Haarsträhnen: Enden (Zeilen 22–23) pendeln nach innen
+    # Haarsträhnen: die Strähnenspitzen (Zeile 23) pendeln nach innen
     s = int(round(np.sin(L.sinus(i, 24)) + 0.0001))                      # −1/0/+1
     if s > 0:
-        Hm.bereich_versatz(kopf, OFF, {22: 1, 23: 1}, 3, 6)
-        Hm.bereich_versatz(kopf, OFF, {22: -1, 23: -1}, 19, 22)
+        Hm.bereich_versatz(kopf, OFF, {23: 1}, 3, 6)
+        Hm.bereich_versatz(kopf, OFF, {23: -1}, 19, 22)
     kopf = L.versetze(kopf, 0, -brust + nick)
     # ── Klingen ──
     kl = ebene(klinge_l)

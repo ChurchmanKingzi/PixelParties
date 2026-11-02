@@ -1,0 +1,15 @@
+{
+  "creature": "The Nornstellar, Foretellers of Coolness",
+  "sheet": "the-nornstellar-foretellers-of-coolness.png",
+  "frameWidth": 60,
+  "frameHeight": 38,
+  "frames": 48,
+  "frameMs": 75,
+  "loop": true,
+  "layout": "horizontal",
+  "padTop": 2,
+  "padLeft": 2,
+  "padRight": 2,
+  "padBottom": 2,
+  "faceX": 30.0
+}

@@ -13,8 +13,8 @@ Identifikation (x, y im Sprite, symmetrisch um die Mittellinie x = 15,5):
 * Kopf (x 11–20, y 3–17): zwei Hörner/Falten (rosa-rot, x 11–12 bzw. 19–20, y 3–13), Gesicht (x 13–18, y 5–17) mit zwei Augen (links (13–14, 11–13): oben schwarz,
   links weiß (Q/O), Pupille blau (R) bei (14,13), rechts gespiegelt (17–18, 11–13)), Schnauze rosa (F/N, x 14–17, y 13–17) mit zwei schwarzen Nasenlöchern (14,16) und (17,16).
 * Arme/Schultern (x 5–12 und 19–26, y 13–24): rote Schuppenplatten; Hände unten bei (5–7, 18–21) bzw. (24–26, 18–21).
-* WEISSE Pixel: (3,14)(4,14)(5,14)? usw. = Krallen der Flügelhände (je drei einzelne Pixel links x 3–8, y 14–16 und rechts x 23–28, y 14–16) — KEINE Partikel, sie hängen an den
-  Flügelgelenken und folgen dem Flügel; unten (9,24–25) (11,24–25) (20,24–25) (22,24–25): Zehenkrallen der Füße.
+* WEISSE Pixel: Krallen der Flügelhände — links (3,15)(4,14)(5,14)(5,16)(6,15)(8,15)(8,16), rechts (23,15)(23,16)(25,15)(26,14)(26,16)(27,14)(28,15) — einzelne Pixel am unteren Flügelende, KEINE Partikel;
+  unten (9,25)(11,25)(20,25)(22,25) mit grauen Pixeln (10,24)(12,24)(19,24)(21,24) darüber: Zehenkrallen der Füße.
 * Feuerbauch (x 14–17, y 18–25): orange Glutplatten (J dunkelorange (189,57,8), I (213,98,16), G (230,131,16), H (246,164,24)).
 Bleibt fest: Gesichtszeichnung (außer Blinzeln), Hörner, Schuppenplatten, Krallenpixel (außer Mitbewegung), Zehenkrallen (außer Fußheben).
 
@@ -38,7 +38,6 @@ import numpy as np
 
 import anim_lib as L
 import anim_tiere as T
-import anim_flieger as F
 import anim_drache as D
 
 N, MS = 48, 70
@@ -67,7 +66,6 @@ FUSS_ZEILE = 22                                    # hier entfällt beim Fußheb
 WAND_L, WAND_R = PAD_L + 11, PAD_L + 20            # Flügelgelenke (Leinwandspalten)
 
 # Gesicht
-HAUT = tuple(int(v) for v in spr[14, 15, :3])      # Schnauzenfarbe (E, 192,67,67)? wird unten je Pixel gewählt
 AUGEN_L = [(13, 11), (14, 11), (13, 12), (14, 12), (13, 13), (14, 13)]
 AUGEN_R = [(18, 11), (17, 11), (18, 12), (17, 12), (18, 13), (17, 13)]
 LID = {(13, 11): (130, 43, 43), (14, 11): (130, 43, 43), (13, 12): (210, 121, 121), (14, 12): (210, 121, 121), (13, 13): (202, 97, 97), (14, 13): (202, 97, 97)}

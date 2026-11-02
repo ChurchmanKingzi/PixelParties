@@ -17,8 +17,9 @@ Was ist was (x, y im 24×29-Sprite):
 Knochen/Haut: kein Metall → kein Glanz. Kein Feuer.
 
 Ablauf (48 Frames à 65 ms = 3,12 s; Frame 0 = Original):
-* WINDEN (Hauptbewegung, Periode 24 → zwei Wellen je Schleife, die Welle wandert vom Loch zum Kopf, Wellenlänge 20 Zeilen): jede Zeile des Wurms (y 0–24) wird waagerecht verschoben, am Loch 0, am Kopf bis ±3 px;
+* WINDEN (Hauptbewegung, Periode 24 → zwei Wellen je Schleife, die Welle wandert vom Loch zum Hals, Wellenlänge 20 Zeilen): jede Zeile des Körpers (y 9–24) wird waagerecht verschoben, am Loch 0, am Hals bis ±3 px;
   das Gefälle zwischen benachbarten Zeilen ist ≤ 1 px, so bleibt der Wurm in jeder Pose ein einziger 4-verbundener Körper (für alle 48 Frames geprüft: 4er-Flecken = Original). Das Loch bleibt stehen.
+  Der KOPF (y 0–8) wird dabei NICHT geschert, sondern schwingt starr mit der obersten Körperzeile mit und nickt zusätzlich ±1 px seitlich (Periode 16, Auge und Kopfform bleiben unverändert).
 * ATMEN/Ringe (Periode 12): die hellen Ringzeilen pulsieren nicht (Farben bleiben), stattdessen wandert eine zweite, kleinere Welle (Wellenlänge 9 Zeilen, ±1 px) mit etwas anderer Geschwindigkeit (Periode 16) über den Körper, sodass sich der Wurm unregelmäßig windet.
 * AUGE blinzelt (Frames 18–20 und 41–43): die Augenpixel nehmen die Kopffarbe (118,118,118) an.
 Keine Partikel (graue Erdbrocken wirkten wie Fehlpixel und wurden wieder entfernt — Regel 25: im Zweifel weglassen).
@@ -46,8 +47,9 @@ UMRISS = U.umrissfarben(spr)
 KOPF = (118, 118, 118)
 AUGE = [(x, y) for y in range(5, 9) for x in range(1, 5) if vorhanden[y, x] and col(x, y) in {(136, 95, 93), (72, 44, 46), (3, 1, 1), (255, 255, 255)}]
 KOMP0 = V.komp4(spr)
-WURM_Y = list(range(24, -1, -1))                  # Fuß (y 24) → Kopf (y 0)
+WURM_Y = list(range(24, 8, -1))                   # Fuß (y 24) → Hals (y 9); der Kopf (y 0–8) schwingt starr mit dem Hals
 EBENE_Y = [OFF[1] + y for y in WURM_Y]
+KOPF_Y = [OFF[1] + y for y in range(0, 9)]
 TEST_EBENEN = 'koerper'
 
 
@@ -55,7 +57,11 @@ def offs(i):
     a = V.wellen_offs(EBENE_Y, 3.0, i, 24, 20.0, 0.0, 1.2)
     b = V.wellen_offs(EBENE_Y, 1.0, i, 16, 9.0, 1.3, 1.0)
     res = {y: a[y] + b[y] for y in EBENE_Y}
-    return V.glatt(res, EBENE_Y)
+    res = V.glatt(res, EBENE_Y)
+    nick = V.hub(i, 16, 1.0, 0.0)                                # Kopf nickt seitlich ±1 px gegen den Hals (starr)
+    for y in KOPF_Y:
+        res[y] = res[EBENE_Y[-1]] + nick
+    return res
 
 
 def frame(i, nur=None):

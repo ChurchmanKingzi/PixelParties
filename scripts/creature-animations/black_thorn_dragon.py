@@ -35,7 +35,6 @@ Alle Bewegungen laufen auf der vollen Leinwand (anim_lib wirft ClipError). Nur g
 Ergänzungen: (15,5) und (22,5) der Körperebene → Schwarz (0,0,0) (verdeckt, siehe oben); Randpixel-Korrektur (Regel 16): fehlende Umrisspixel an verschobenen Teilen werden in der Umrissfarbe des Originals
 (anim_tiere.umriss_schliessen) ergänzt.
 """
-import math
 import sys
 
 import numpy as np

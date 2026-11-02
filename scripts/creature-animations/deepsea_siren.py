@@ -20,7 +20,7 @@ Fest bleiben: Gesichtsform, Augengröße, Wangen, Notenformen.
 
 Ablauf (48 Frames à 70 ms = 3,36 s; Frame 0 = Original):
 * Schweben: die Sirene wiegt sich senkrecht ±1 px (Periode 24); der Flossenschwanz schlägt als Welle mit Nachlauf (Zeilenversatz ab y 40, bis ±2 px, Periode 16 und 24).
-* Singen: der Mund öffnet sich weiter (3×3, eine Zeile länger) bzw. schmaler (2×2) im Wechsel (Frame 4–9, 16–21, 28–33, 40–45 abwechselnd weit/schmal), dabei hebt sich der Kopf mit.
+* Singen: der Mund öffnet sich weiter (3×3, eine Zeile länger) bzw. schmaler (2×2) im Wechsel (weit: Frame 5–8 und 29–32; schmal: Frame 17–20 und 41–44), dabei hebt sich der Kopf mit.
 * Blinzeln beider Augen (Lid = Haut im Schachbrett): Frame 12–14 und 36–38.
 * Haar-Ranken wogen (Technik wie bei Deepsea Werewolf, `anim_tiefsee.Ranken`): von innen nach außen so versetzt, dass jedes Pixel 8er-Nachbar seines Elternpixels bleibt (bis ≈ 3 px waagerecht, Welle läuft von oben nach unten, Periode 24).
 * Noten schweben je für sich (unterschiedliche Perioden 48/24/16/12/48/24, ±2 px senkrecht, ±1 px waagerecht); Pixel der Sirene bzw. der Ranken, die im Ruhebild von einer Note verdeckt sind (15 Pixel, siehe HIDDEN), sind aus den Originalebenen
@@ -65,23 +65,17 @@ AUGEN = [(22, 31), (23, 31), (22, 32), (23, 32), (26, 31), (27, 31), (26, 32), (
 assert all(col(x, y) == WEISS for x, y in AUGEN)
 MUND = [(x, y) for y in (34, 35) for x in (23, 24, 25)]
 assert all(col(x, y) == SCHWARZ for x, y in MUND)
-WANGEN = [(x, y) for y in range(sh) for x in range(sw) if col(x, y) in ((255, 201, 237), (255, 128, 213)) and vorhanden[y, x]]
 
-# Körper mit den von Noten verdeckten Pixeln ergänzt
-KOERPER_A = S.teil(koerper)
+# Körper (ohne Noten) mit den im Ruhebild von Noten verdeckten Pixeln ergänzt
+body_spr = spr.copy()
+body_spr[notes] = 0
 for (x, y), c in HIDDEN.items():
-    assert not koerper[y, x] and notes[y, x], (x, y)
-    KOERPER_A[GPT + y, GPL + x, :3] = c
-    KOERPER_A[GPT + y, GPL + x, 3] = 255
-# die ergänzten Pixel dürfen im Ruhebild nicht sichtbar sein (Note liegt darüber) — Note wird später darübergelegt
-KORE = L.leer(H, W)                                       # Kern ohne Ranken für die Ranken-Technik
-R = T.Ranken(np.where(koerper[..., None], spr, 0).astype(np.uint8))
+    assert notes[y, x] and not koerper[y, x], (x, y)
+    body_spr[y, x, :3] = c
+    body_spr[y, x, 3] = 255
+R = T.Ranken(body_spr)
 KERN = R.kern
-KERN_A = S.teil(KERN)
-for (x, y), c in HIDDEN.items():
-    if c in ((51, 93, 119), (77, 137, 154)) or (c == (13, 16, 49) and False):
-        KERN_A[GPT + y, GPL + x, :3] = c
-        KERN_A[GPT + y, GPL + x, 3] = 255
+KERN_A = L.platz(L.trenne(body_spr, KERN)[0], H, W, GPL, GPT)
 NOTEN_A = [S.teil(m) for m in NOTEN]
 NOTE_PER = [(48, 2.0, 0.0, 48, 0.0), (24, 2.0, 1.3, 48, 1.7), (16, 2.0, 2.4, 48, 3.1), (12, 2.0, 0.7, 48, 4.4), (48, 2.0, 3.8, 48, 2.2), (24, 2.0, 5.1, 48, 5.3)]
 
@@ -124,11 +118,7 @@ def frame_gross(i, nur=None):
         for (x, y) in AUGEN:
             kb[GPT + y, GPL + x, :3] = haut(x, y)
     # Mund: weit / schmal im Wechsel
-    fenster = {4: 'weit', 16: 'schmal', 28: 'weit', 40: 'schmal'}
-    stufe = None
-    for s0, art in fenster.items():
-        if 0 <= i - s0 < 6 and (1 <= i - s0 <= 4):
-            stufe = art
+    stufe = 'weit' if (5 <= i <= 8 or 29 <= i <= 32) else ('schmal' if (17 <= i <= 20 or 41 <= i <= 44) else None)
     hub = 0
     if stufe == 'weit':
         for x in (23, 24, 25):

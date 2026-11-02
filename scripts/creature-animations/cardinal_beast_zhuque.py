@@ -127,7 +127,7 @@ def _frames(nur):
     return [frame_gross(i, nur) for i in range(N)]
 
 
-BOX = U.zuschnitt(_frames(None), _frames(TEST_EBENEN), (GPL, GPT, GPL + sw, GPT + sh), zugabe=24)
+BOX = U.zuschnitt(_frames(None), _frames(TEST_EBENEN), (GPL, GPT, GPL + sw, GPT + sh), zugabe=24, rand=2)
 PAD_L, PAD_T = GPL - BOX[0], GPT - BOX[1]
 
 
@@ -139,7 +139,7 @@ if __name__ == '__main__':
     import os
     frames = [frame(i) for i in range(N)]
     prev = sys.argv[sys.argv.index('--preview') + 1] if '--preview' in sys.argv else None
-    n = L.pruefe(frames, quelle=spr, min_rand=1)
+    n = L.pruefe(frames, quelle=spr, min_rand=2)
     print('Pixel je Frame:', n)
     r0 = frame(0, nur=TEST_EBENEN)
     ox, oy = PAD_L, PAD_T

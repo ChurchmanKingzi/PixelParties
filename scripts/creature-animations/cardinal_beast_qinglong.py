@@ -136,7 +136,7 @@ def _frames(nur):
 
 
 TEST_EBENEN = ('drache',)
-BOX = U.zuschnitt(_frames(None), _frames(TEST_EBENEN), (GPL, GPT, GPL + KW, GPT + KH), zugabe=3)
+BOX = U.zuschnitt(_frames(None), _frames(TEST_EBENEN), (GPL, GPT, GPL + KW, GPT + KH), zugabe=3, rand=2)
 PAD_L, PAD_T = GPL - BOX[0], GPT - BOX[1]
 
 
@@ -148,7 +148,7 @@ if __name__ == '__main__':
     frames = [frame(i) for i in range(N)]
     prev = sys.argv[sys.argv.index('--preview') + 1] if '--preview' in sys.argv else None
     quelle = np.concatenate([spr.reshape(-1, 4), BLITZ.reshape(-1, 4)]).reshape(-1, 1, 4)
-    n = L.pruefe(frames, quelle=quelle, min_rand=1)
+    n = L.pruefe(frames, quelle=quelle, min_rand=2)
     print('Pixel je Frame:', n)
     # Ruhepose = Original (Drache + Schädel + alle Blitze)
     orig = L.leer(H, W)

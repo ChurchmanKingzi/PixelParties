@@ -34,7 +34,6 @@ Alle Bewegungen laufen auf der vollen Leinwand (anim_lib wirft ClipError). Nur g
 
 Ergänzungen: keine Pixel erfunden; Randpixel-Korrektur (Regel 16): fehlende Umrisspixel an verschobenen Teilen werden in der Umrissfarbe des Originals (anim_tiere.umriss_schliessen) ergänzt.
 """
-import math
 import sys
 
 import numpy as np

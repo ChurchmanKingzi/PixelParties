@@ -1,0 +1,15 @@
+{
+  "creature": "Fun-Fun Circus Clown",
+  "sheet": "fun-fun-circus-clown.png",
+  "frameWidth": 38,
+  "frameHeight": 57,
+  "frames": 72,
+  "frameMs": 62,
+  "loop": true,
+  "layout": "horizontal",
+  "padTop": 3,
+  "padLeft": 2,
+  "padRight": 2,
+  "padBottom": 2,
+  "faceX": 19.0
+}
