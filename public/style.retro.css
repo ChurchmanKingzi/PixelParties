@@ -13782,7 +13782,8 @@ input[type="checkbox"]:focus-visible, input[type="radio"]:focus-visible { outlin
 .shop-coll-scroll .shop-item.shop-owned:not(:hover)::after { display: none; }
 
 /* ×5-Schalter für die Pull-Animationen: Checkbox in der Shop-Kopfzeile und Hinweisleiste im Reveal (Leertaste / Escape). */
-.shop-fast { position: relative; display: inline-flex; align-items: center; gap: 9px; margin-right: 8px; cursor: pointer; user-select: none; }
+.shop-fast { position: relative; display: inline-flex; align-items: center; justify-content: center; gap: 9px; margin: 2px 0; cursor: pointer; user-select: none; }
+.shop-random-wrap .shop-fast { display: flex; margin: 8px 0 0; }
 .shop-fast input { position: absolute; opacity: 0; width: 0; height: 0; }
 .shop-fast-box { position: relative; width: 16px; height: 16px; background: var(--bg3); box-shadow: 0 0 0 2px var(--pp-kontur), 0 0 0 4px var(--bg4); }
 .shop-fast input:checked + .shop-fast-box { background: #fad54a; box-shadow: 0 0 0 2px var(--pp-kontur), 0 0 0 4px #72541d; }
