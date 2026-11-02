@@ -5002,6 +5002,15 @@ function ShopScreen() {
     return { owned: items.filter(it => ownedSet[type].has(it.id)).length, total: items.length };
   };
 
+  // Tempo-Schalter der Pull-Animationen: direkt am Pull-Knopf (Gacha-Seiten und Zufalls-Structure-Deck), gemeinsamer Zustand.
+  const speedToggle = (
+    <label className="shop-fast" title="Play the pull animations at 5x speed. During an animation: Space toggles, Esc skips.">
+      <input type="checkbox" checked={fastPull} onChange={e => { setFastPull(e.target.checked); if (window.playSFX) window.playSFX('ui_click'); }} />
+      <span className="shop-fast-box" aria-hidden="true" />
+      <span className="shop-fast-text">ANIMATION SPEED x5</span>
+    </label>
+  );
+
   const renderGachaPage = (type) => {
     const def = gachaDefs[type];
     const items = def.items;
@@ -5036,6 +5045,7 @@ function ShopScreen() {
             <div className="shop-gacha-title">{def.title}</div>
             <div className="shop-gacha-capsule" aria-hidden="true"><span className="shop-gacha-q" /></div>
             <button className="btn shop-random-btn shop-gacha-btn" disabled={!canPull} onClick={pull}>{pullLabel}</button>
+            {speedToggle}
             <div className="shop-gacha-hint">
               {missing.length > 0
                 ? missing.length + ' ' + (missing.length === 1 ? def.noun.toLowerCase() : def.plural) + ' still to discover'
@@ -5146,6 +5156,7 @@ function ShopScreen() {
             onClick={buyRandomStructureDeck}>
             🎲 Random Structure Deck — <img src="/data/sc.png" className="shop-sc-icon" /> {randomPrice ?? '?'}
           </button>
+          {speedToggle}
           <span className="shop-random-hint">{unownedCount > 0 ? unownedCount + ' left to collect' : 'All collected!'}</span>
         </div>
         <div className="shop-grid">
@@ -5250,11 +5261,6 @@ function ShopScreen() {
         <button className="btn" onClick={() => setScreen('menu')}>← BACK</button>
         <h2 className="orbit-font" style={{ fontSize: 22, fontWeight: 800, color: 'var(--player-color)' }}>SHOP</h2>
         <div style={{ flex: 1 }} />
-        <label className="shop-fast" title="Play the pull animations at 5x speed. During an animation: Space toggles, Esc skips.">
-          <input type="checkbox" checked={fastPull} onChange={e => { setFastPull(e.target.checked); if (window.playSFX) window.playSFX('ui_click'); }} />
-          <span className="shop-fast-box" aria-hidden="true" />
-          <span className="shop-fast-text">SPEED x5</span>
-        </label>
         <div className="badge" style={{ background: 'rgba(250,213,74,.12)', color: '#fad54a', display: 'flex', alignItems: 'center', gap: 6, fontSize: 18, padding: '6px 14px' }}>
           <img src="/data/sc.png" style={{ width: 22, height: 22, imageRendering: 'pixelated' }} /> {user.sc || 0}
         </div>
