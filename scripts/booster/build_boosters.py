@@ -13,6 +13,7 @@ import colorsys, json, math, os, sys
 import numpy as np
 from PIL import Image
 import catalog as C
+import crops
 import designs as D
 import gfx as G
 import pal
@@ -25,7 +26,7 @@ FRAME_MS = 60
 # Layout (Pixel auf dem 192x320-Canvas)
 PLATE = (3, 24, 189, 86)
 FRAME = (8, 92, 184, 248)
-RIBBON = (4, 254, 188, 298)
+RIBBON = (4, 254, 188, 298)       # Innenfläche y 258..293, Mitte 275.5
 IX0, IY0, IX1, IY1 = 13, 97, 179, 243          # Innenfläche des Kunstrahmens (166 x 146)
 IW, IH = IX1 - IX0, IY1 - IY0
 CRIMP = 18
@@ -56,15 +57,50 @@ def art_score(name, wide=False):
     return s
 
 
-def pick_art(setcode, k, used):
-    names = [c['name'] for c in C.CARDS if C.norm_set(c['setID']) == setcode and 'Token' not in c['cardType']]
-    names = [n for n in names if art_score(n) > 0 and n not in used]
-    names.sort(key=lambda n: -art_score(n))
+BONUS = {'Hero': 0.5, 'Ascended Hero': 0.5, 'Creature': 0.5, 'Artifact': 0.1}     # Figuren tragen als Kachel am besten
+
+
+def tile_k(w, h):
+    return 2 if (w > 76 or h > 51) else 1
+
+
+def tile_rank(names, w, h):
+    """Karten, deren Kachel-Ausschnitt (w x h) funktioniert, beste zuerst."""
+    k = tile_k(w, h)
+    out = []
+    for n in names:
+        a = C.art(n)
+        if a is None or a.width > 80:
+            continue
+        q = crops.best_crop(n, w, h, k)[1]
+        if q > 0:
+            out.append((q + BONUS.get((C.BY_NAME.get(n) or {}).get('cardType', ''), 0), n))
+    out.sort(key=lambda t: (-t[0], t[1]))
+    return [n for _, n in out]
+
+
+def pick_art(setcode, k, used, w, h):
+    allnames = [c['name'] for c in C.CARDS if C.norm_set(c['setID']) == setcode and 'Token' not in c['cardType']]
+    names = [n for n in tile_rank(allnames, w, h) if n not in used]
+    if len(names) < 8:
+        # kleine Sets: auch weniger ideale Ausschnitte zulassen (Mitte-Ausschnitt), damit die Varianten verschieden bleiben
+        rest = [n for n in allnames if n not in names and n not in used and C.art(n) is not None and C.art(n).width <= 80
+                and n not in crops.BLOCK and not n.startswith('Mischief Militia')]
+        rest.sort(key=lambda n: (-art_score(n), n))
+        names += rest
     if not names:
         return None
-    n = names[k % min(len(names), 12)] if len(names) > 1 else names[0]
+    n = names[k % len(names)] if len(names) < 8 else names[k]
     used.add(n)
     return n
+
+
+def auto_tiles(pack, n, w, h, used):
+    """n Kacheln aus dem Kartenpool eines Packs, die noch nicht vergeben sind."""
+    pool = [c['name'] for c in C.cards_of(pack) if c['name'] not in used]
+    out = [x for x in tile_rank(pool, w, h) if x not in used][:n]
+    used.update(out)
+    return out
 
 
 USED = set()      # je Pack: bereits vergebene Kartenkunst (wird in main() mit allen ausdrücklich gewählten Motiven vorbelegt)
@@ -168,25 +204,32 @@ def draw_title(P, th, mt, pack):
 RARITY_PIPS = ['#929292', '#e8ecf2', '#44d888', '#4cc8f0', '#4a7ae8', '#a070f0', '#ff4aa8', '#fad54a', '#8ce1ff']
 
 
-def draw_pip(P, cx, cy, col):
-    # kleiner Edelstein 7x7: Raute mit heller Facette und dunkler Kante
-    m = (np.abs(XX - cx) + np.abs(YY - cy)) <= 3
-    P.shadow(m, 1, 1, 0.5)
+def draw_pip(P, cx, cy, col, r=2):
+    """Kleiner Edelstein (Raute, Radius r) mit Glanzpunkt."""
+    d = np.abs(XX - cx) + np.abs(YY - cy)
+    m = d <= r
     c = pal.snap1(col)
     P.paint(m, c, wt=1.0)
-    P.paint(m & (XX <= cx) & (YY <= cy) & ((np.abs(XX - cx) + np.abs(YY - cy)) <= 2), pal.lighten(c, 0.55), wt=1.0)
-    P.paint(m & (XX >= cx) & (YY >= cy) & ((np.abs(XX - cx) + np.abs(YY - cy)) >= 2), pal.darken(c, 0.35), wt=1.0)
-    P.paint(m & ((np.abs(XX - cx) + np.abs(YY - cy)) == 3), pal.darken(c, 0.62), wt=0.6)
-    P.paint((XX == cx - 1) & (YY == cy - 1), (255, 255, 255), wt=1.0)
+    P.paint(m & ((XX - cx) + (YY - cy) > 0), pal.darken(c, 0.35), wt=1.0)
+    P.paint(m & ((XX - cx) + (YY - cy) < 0), pal.lighten(c, 0.5), wt=1.0)
+    P.paint((XX == cx) & (YY == cy - 1), (255, 255, 255), wt=1.0)
+
+
+def draw_pips(P, mt):
+    """Seltenheitsleiter: neun Edelsteine, in die untere Rahmenkante des Kunstrahmens eingelassen."""
+    y = FRAME[3] - 4
+    for i in range(9):
+        draw_pip(P, 44 + 13 * i, y, RARITY_PIPS[i])
 
 
 def badge9(P, cx, cy, r, mt):
-    """Kleine Münzplakette mit der 9 (Zahl 2x, innerhalb der Plakette)."""
+    """Münzplakette mit der 9. Gerader Durchmesser: Mittelpunkt zwischen den Pixeln (cx-.5, cy-.5), die 9 (12x14) liegt exakt darin."""
     gold = G.metal('gold')
-    P.shadow(((XX - cx) ** 2 + (YY - cy) ** 2) <= r * r, 1, 1, 0.55)
+    d2 = (XX - (cx - 0.5)) ** 2 + (YY - (cy - 0.5)) ** 2
+    P.shadow(d2 <= r * r, 1, 1, 0.55)
     for rr, col in ((r, gold[3]), (r - 1, gold[0]), (r - 2, gold[1]), (r - 4, gold[3])):
-        P.paint(((XX - cx) ** 2 + (YY - cy) ** 2) <= rr * rr, col, wt=1.0)
-    P.paint(((XX - cx) ** 2 + (YY - cy) ** 2) <= (r - 4) ** 2, pal.darken(gold[3], 0.55), wt=0.6)
+        P.paint(d2 <= rr * rr, col, wt=1.0)
+    P.paint(d2 <= (r - 4) ** 2, pal.darken(gold[3], 0.55), wt=0.6)
     G.draw_text(P, '9', cx, cy - 7, 2, mt=gold, outline=1, shadow=0)
 
 
@@ -195,13 +238,11 @@ def draw_ribbon(P, th, mt):
     G.plate(P, mask, pal.hexrgb(th['plate'][0]), pal.hexrgb(th['plate'][1]), mt, thick=4)
     gold = G.metal('gold')
     x0, y0, x1, y1 = RIBBON
-    badge9(P, x0 + 20, y0 + 17, 12, mt)
-    tx = (x0 + 40 + x1 - 10) // 2
-    G.draw_text(P, 'Rarity Skins', tx, y0 + 8, 1, mt=gold, outline=1, shadow=1)
-    G.draw_text_flat(P, 'for your Collection!', tx, y0 + 21, pal.snap1('#ffffff'), mt=mt, spacing=0)
-    # Seltenheitsleiter: 9 Edelsteine
-    for i in range(9):
-        draw_pip(P, x0 + 20 + int(round((x1 - x0 - 40) * i / 8)), y0 + 36, RARITY_PIPS[i])
+    mid = (y0 + y1) // 2                       # senkrechte Mitte der Banderole (Innenfläche y0+4 .. y1-5)
+    badge9(P, x0 + 20, mid, 12, mt)
+    tx = 110
+    G.draw_text(P, 'Rarity Skins', tx, mid - 10, 1, mt=gold, outline=1, shadow=1)
+    G.draw_text_flat(P, 'for your Collection!', tx, mid + 1, pal.snap1('#ffffff'), mt=mt, spacing=0)
 
 
 def draw_frame_window(P, mt):
@@ -268,43 +309,73 @@ def sprite_k(im, maxw, maxh, kmax=6):
     return fit_scale(im, maxw, maxh, kmax)
 
 
-FOOT = {'Alice, the Puppeteer Girl': 28}     # Zeile (im Original-Sprite), auf der die Figur steht (Puppen schweben darunter)
+FOOT = {'Alice, the Puppeteer Girl': 28}     # Zeile im Original-Sprite, auf der die Figur steht (Puppen schweben darunter)
+SOLO_K = 3                                    # einheitliche Pixelgröße für alle Solo-Motive (Hero Packs, Monia)
 INNER = np.zeros((H, W), bool)
 INNER[IY0:IY1, IX0:IX1] = True
 
 
-def place_sprite(P, ref, cx, base_y, maxw, maxh, kmax=6, outline='#140806', shadow=True, top_min=None):
-    """Sprite ganzzahlig skalieren, so dass er komplett im Kunstrahmen bleibt; Schatten direkt unter den Füßen."""
-    im = load_sprite(ref)
-    if im is None:
+def largest_component(a):
+    """Größte 8er-zusammenhängende Fläche einer Bool-Maske."""
+    h, w = a.shape
+    lab = np.zeros((h, w), int)
+    best, best_n, n = None, 0, 0
+    for sy in range(h):
+        for sx in range(w):
+            if a[sy, sx] and not lab[sy, sx]:
+                n += 1
+                st = [(sy, sx)]; lab[sy, sx] = n; cnt = 0
+                while st:
+                    y0, x0 = st.pop(); cnt += 1
+                    for dy in (-1, 0, 1):
+                        for dx in (-1, 0, 1):
+                            yy, xx = y0 + dy, x0 + dx
+                            if 0 <= yy < h and 0 <= xx < w and a[yy, xx] and not lab[yy, xx]:
+                                lab[yy, xx] = n; st.append((yy, xx))
+                if cnt > best_n:
+                    best, best_n = n, cnt
+    return lab == best if best else a
+
+
+def place_sprite(P, ref, cx, base_y, k=SOLO_K, shadow=True):
+    """Sprite mit ganzzahligem Faktor k setzen (Füße auf base_y), komplett im Kunstrahmen; Schatten direkt unter den Füßen."""
+    orig = C.hero_sprite(ref) if not ref.startswith('file:') else Image.open(ref[5:]).convert('RGBA')
+    if orig is None:
         return None
-    top_min = IY0 + 8 if top_min is None else top_min
-    maxh = min(maxh, base_y - top_min)
-    maxw = min(maxw, IW - 16)
-    k = sprite_k(im, maxw, maxh, kmax)
+    bb = orig.getbbox()
+    im = orig.crop(bb)
+    while k > 1 and (im.width * k > IW - 12 or im.height * k > base_y - IY0 - 6):
+        k -= 1
     s = G.scaled(im, k)
     x = int(cx - s.width // 2)
     y = int(base_y - s.height)
     if shadow:
         foot = FOOT.get(ref)
-        fy = y + (foot * k if foot else s.height)
-        # Schattenbreite nach der Breite der Figur auf Fußhöhe (Zeilen knapp über dem Fuß)
-        a = np.asarray(s.convert('RGBA'))[..., 3] > 127
-        row = min(a.shape[0] - 1, (fy - y) - 2)
-        xs = np.where(a[row])[0] if row >= 0 else []
-        wfoot = (xs.max() - xs.min() + 1) if len(xs) else s.width // 2
-        fx = x + (xs.min() + xs.max()) // 2 if len(xs) else cx
-        G.ground_shadow(P, fx, fy, max(8, int(wfoot * 0.55) + 3), 4)
-    G.blit(P, s, x, y, wt=0.15, outline=pal.snap1(outline), mask_clip=INNER)
-    return (x, y, s.width, s.height)
+        a0 = np.asarray(im.convert('RGBA'))[..., 3] > 127
+        if foot:
+            frow = foot - bb[1]
+            comp = a0
+        else:
+            comp = largest_component(a0)          # die Figur selbst, ohne abgesetzte Teile (Herzchen, Funken …)
+            frow = np.where(comp.any(1))[0].max()
+        rows = comp[max(0, frow - 2):frow + 1]
+        xs = np.where(rows.any(0))[0]
+        wfoot = (xs.max() - xs.min() + 1) * k if len(xs) else s.width // 2
+        fx = x + ((xs.min() + xs.max() + 1) * k) // 2 if len(xs) else cx
+        G.ground_shadow(P, fx, y + (frow + 1) * k, max(8, int(wfoot * 0.55) + 3), 4)
+    G.blit(P, s, x, y, wt=0.15, mask_clip=INNER)
+    return (x, y, s.width, s.height, k)
 
 
 def tile_image(name, tw, th_):
-    """Kachelausschnitt einer Kartenkunst: 1x oder 2x je nach Kachelgröße."""
+    """Kachelausschnitt einer Kartenkunst (1x oder 2x je nach Kachelgröße), das Motiv liegt mittig."""
     a = C.art(name)
     if a is None:
         return None
-    k = 2 if (tw > a.width or th_ > a.height) else 1
+    k = tile_k(tw, th_)
+    im, q = crops.best_crop(name, tw, th_, k)
+    if im is not None:
+        return im
     big = G.scaled(a, k)
     return G.crop_center(big, min(tw, big.width), min(th_, big.height), 0.5, 0.45)
 
@@ -348,8 +419,11 @@ def grid_layout(n):
 
 
 def tpl_grid(P, th, mt, tiles, v=0, pack=None):
-    tiles = [resolve_art(t, pack, USED) if pack else t for t in tiles]
-    rects = grid_layout(len(tiles))
+    rects = grid_layout(9)
+    if tiles == 'auto':
+        tiles = auto_tiles(pack, 9, rects[0][2], rects[0][3], USED)
+    else:
+        tiles = [resolve_art(t, pack, USED) if pack else t for t in tiles]
     P.paint(INNER, pal.darken(pal.hexrgb(th['grad'][2][1]), 0.6), wt=0.3)
     for (x, y, w, h), name in zip(rects, tiles):
         im = tile_image(name, w, h)
@@ -360,25 +434,26 @@ def tpl_grid(P, th, mt, tiles, v=0, pack=None):
 
 def tpl_mosaic(P, th, mt, pack, v):
     """Ein Vertreter je Set (Reihenfolge der Sets, je Variante ein anderer Rang der besten Motive)."""
+    sets = D.MOSAIC_SETS[pack]
+    rects = grid_layout(len(sets))
     used = set()
     names = []
-    for s in D.MOSAIC_SETS[pack]:
-        n = pick_art(s, v, used)
-        names.append(n if n is not None else pick_art(s, 0, set()))
-    rects = grid_layout(len(names))
+    for s, (x, y, w, h) in zip(sets, rects):
+        n = pick_art(s, v, used, w, h)
+        names.append(n if n is not None else pick_art(s, 0, set(), w, h))
     P.paint(INNER, pal.darken(pal.hexrgb(th['grad'][2][1]), 0.6), wt=0.3)
     for (x, y, w, h), nm in zip(rects, names):
-        im = tile_image(nm, w, h)
+        im = tile_image(nm, w, h) if nm else None
         if im is not None:
             draw_tile(P, im, x, y, w, h, mt)
     return names
 
 
 def tpl_hero(P, th, mt, hero, **kw):
-    """Ein Held, groß, auf Strahlenkranz – ohne Namensschild."""
+    """Ein Held in einheitlicher Pixelgröße auf Strahlenkranz."""
     art_burst(P, th, rot=0.2)
     art_particles(P, th, 11)
-    place_sprite(P, hero, IX0 + IW // 2, IY1 - 9, 146, IH - 13, kmax=6, top_min=IY0 + 5)
+    place_sprite(P, hero, IX0 + IW // 2, IY0 + 126)
     return [hero]
 
 
@@ -388,13 +463,13 @@ def window_frame(P, mt, ax, ay, w=152, h=102):
     return m
 
 
-def tpl_scene(P, th, mt, window, sprite=None, pack=None, rot=0.5):
+def tpl_scene(P, th, mt, window, pack=None, rot=0.5, sprite=None):
     """Eine große Kartenkunst (2x) im Goldrahmen; optional eine einzelne Figur davor."""
     window = resolve_art(window, pack, USED, 10, wide=True) if pack else window
     art_burst(P, th, rot=rot)
     art_particles(P, th, 23)
     ax = IX0 + (IW - 152) // 2
-    ay = IY0 + (8 if sprite else (IH - 102) // 2)
+    ay = IY0 + (IH - 102) // 2
     a0 = C.art(window)
     im = G.crop_center(a0 if a0.width >= 150 else G.scaled(a0, 2), 152, 102)
     m = window_frame(P, mt, ax, ay)
@@ -403,15 +478,17 @@ def tpl_scene(P, th, mt, window, sprite=None, pack=None, rot=0.5):
     P.paint(G.dilate(m, 3) & ~G.dilate(m, 2), mt[0], wt=1.0)
     P.paint(G.dilate(m, 4) & ~G.dilate(m, 3), mt[3], wt=0.6)
     out = [window]
-    if sprite:
-        place_sprite(P, sprite, IX0 + IW // 2 + 44, IY1 - 6, 70, 76, kmax=3, top_min=ay + 60)
-        out.append(sprite)
     return out
 
 
 def tpl_focus(P, th, mt, big, tiles, pack=None):
     big = resolve_art(big, pack, USED, 10) if pack else big
-    tiles = [resolve_art(t, pack, USED, 10) if pack else t for t in tiles]
+    ty = IY0 + 5 + 102 + 12
+    th_ = IY1 - 3 - ty
+    if tiles == 'auto':
+        tiles = auto_tiles(pack, 3, 50, th_, USED)
+    else:
+        tiles = [resolve_art(t, pack, USED, 10) if pack else t for t in tiles]
     art_burst(P, th, rot=0.9)
     art_particles(P, th, 31, 10)
     ax, ay = IX0 + (IW - 152) // 2, IY0 + 5
@@ -449,16 +526,17 @@ def render_pack(pack, vi, template, theme, content):
     elif template == 'hero':
         subjects = tpl_hero(P, th, mt, content['hero'])
     elif template == 'scene':
-        subjects = tpl_scene(P, th, mt, content['window'], content.get('sprite'), pack=pack, rot=0.3 + vi * 0.37)
+        subjects = tpl_scene(P, th, mt, content['window'], pack=pack, rot=0.3 + vi * 0.37)
     elif template == 'focus':
         subjects = tpl_focus(P, th, mt, content['big'], content['tiles'], pack=pack)
     corner_gems(P, th, mt)
+    draw_pips(P, mt)
     draw_ribbon(P, th, mt)
     make_crimps(P, th, mt)
     sparks = sparkle_plan(seed)
     # feste Sterne im Standbild (jeder dritte, klein)
     for i, (x, y, r, ph) in enumerate(sparks):
-        if i >= 7 and i % 3 == 0:
+        if 7 <= i < 20 and i % 3 == 0:
             G.star(P.rgb, x, y, 2, pal.snap1(th['tint']))
     base = P.finish()
     return base, P.wt.copy(), P.raw.copy(), sparks, th, subjects
@@ -535,7 +613,7 @@ def main(argv):
         pdir = os.path.join(out, pack)
         USED.clear()
         for _t, _th, _c in D.VARIANTS[pack]:
-            USED.update([_c.get('window'), _c.get('big')] + list(_c.get('tiles', [])))
+            USED.update([_c.get('window'), _c.get('big')] + (list(_c['tiles']) if isinstance(_c.get('tiles'), list) else []))
         USED.discard(None)
         os.makedirs(pdir, exist_ok=True)
         entry = {'id': pack, 'name': D.TITLE_FULL[pack], 'tagline': manifest['tagline'], 'variants': []}

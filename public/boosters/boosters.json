@@ -240,12 +240,12 @@
     {
      "id": "clash-1",
      "theme": "Sunfire",
-     "template": "hero",
+     "template": "scene",
      "prism": false,
      "base": "clash/clash-1.png",
      "shimmer": "clash/clash-1.shimmer.png",
      "motifs": [
-      "Alex, Trainer of Heroes"
+      "Fireball"
      ]
     },
     {
@@ -261,13 +261,16 @@
     },
     {
      "id": "clash-3",
-     "theme": "Royal",
-     "template": "hero",
+     "theme": "Desert",
+     "template": "focus",
      "prism": false,
      "base": "clash/clash-3.png",
      "shimmer": "clash/clash-3.shimmer.png",
      "motifs": [
-      "Sabrina, the Psychic Witch"
+      "Treasure Chest",
+      "Alex, Trainer of Heroes",
+      "Mr. Jiggles",
+      "Legendary Explorer Dajan"
      ]
     },
     {
@@ -278,55 +281,70 @@
      "base": "clash/clash-4.png",
      "shimmer": "clash/clash-4.shimmer.png",
      "motifs": [
-      "Flame Avalanche",
-      "Fiedel, the Mercenary Mage"
+      "Flame Avalanche"
      ]
     },
     {
      "id": "clash-5",
-     "theme": "Frost",
-     "template": "hero",
+     "theme": "Royal",
+     "template": "grid",
      "prism": false,
      "base": "clash/clash-5.png",
      "shimmer": "clash/clash-5.shimmer.png",
      "motifs": [
-      "Gon, the Frostbringer"
+      "Treasure Huntress Semi",
+      "Timeless King Zi",
+      "Güldefaber, the King of Dwarfs",
+      "Grand Inquisitor Karian",
+      "Bow Sniper Darge",
+      "Omikron, the Faceless Illusionist",
+      "Bomb Berserker Bartas",
+      "Cute Angel Molinda",
+      "Tharx, the Never-Losing General"
      ]
     },
     {
      "id": "clash-6",
-     "theme": "Desert",
-     "template": "focus",
+     "theme": "Frost",
+     "template": "scene",
      "prism": false,
      "base": "clash/clash-6.png",
      "shimmer": "clash/clash-6.shimmer.png",
      "motifs": [
-      "Treasure Chest",
-      "Wanted Poster",
-      "Arcane Eyes",
-      "Teleport"
+      "Elixir of Cold"
      ]
     },
     {
      "id": "clash-7",
      "theme": "Noir",
-     "template": "hero",
+     "template": "focus",
      "prism": false,
      "base": "clash/clash-7.png",
      "shimmer": "clash/clash-7.shimmer.png",
      "motifs": [
-      "Sid, the King of Thieves"
+      "The Sun Sword",
+      "Andras, the Human Weapon",
+      "Haressassin",
+      "Ida, the Adept of Destruction"
      ]
     },
     {
      "id": "clash-8",
      "theme": "Rosebud",
-     "template": "scene",
+     "template": "grid",
      "prism": false,
      "base": "clash/clash-8.png",
      "shimmer": "clash/clash-8.shimmer.png",
      "motifs": [
-      "Rainbow's Arrow"
+      "Skeleton Healer",
+      "Arcane Lamp",
+      "Demon's Gate",
+      "Johanna, Crusader of Light",
+      "Heal",
+      "Time Distortion",
+      "Meditation",
+      "Acid Vial",
+      "Stoneskin"
      ]
     }
    ]
@@ -361,12 +379,12 @@
     {
      "id": "monia-3",
      "theme": "Sunfire",
-     "template": "hero",
+     "template": "scene",
      "prism": false,
      "base": "monia/monia-3.png",
      "shimmer": "monia/monia-3.shimmer.png",
      "motifs": [
-      "Cute Princess Mary"
+      "Cute Phoenix"
      ]
     },
     {
@@ -383,12 +401,20 @@
     {
      "id": "monia-5",
      "theme": "Royal",
-     "template": "hero",
+     "template": "grid",
      "prism": false,
      "base": "monia/monia-5.png",
      "shimmer": "monia/monia-5.shimmer.png",
      "motifs": [
-      "Cute Starlet Megu"
+      "Cute Starlet Megu",
+      "Black Marketeer",
+      "Cute Bird",
+      "Cute Annoyance Mini",
+      "Cute Dog",
+      "Cute Meanie Melissa",
+      "Sky Shaman",
+      "Sky Archeologist",
+      "Cute Nerd Magenta"
      ]
     },
     {
@@ -399,32 +425,40 @@
      "base": "monia/monia-6.png",
      "shimmer": "monia/monia-6.shimmer.png",
      "motifs": [
-      "Cute Cheese",
-      "Cute Camera",
-      "Cloud Pillow",
-      "Cute Crown"
+      "Singing",
+      "Slave Trader",
+      "Cute Bunny",
+      "Heart-Shaped Bow, the Final Proof of Cuteness"
      ]
     },
     {
      "id": "monia-7",
      "theme": "Amethyst",
-     "template": "hero",
+     "template": "scene",
      "prism": false,
      "base": "monia/monia-7.png",
      "shimmer": "monia/monia-7.shimmer.png",
      "motifs": [
-      "Cute Nerd Magenta"
+      "Army of the Cute"
      ]
     },
     {
      "id": "monia-8",
      "theme": "Platinum",
-     "template": "scene",
+     "template": "grid",
      "prism": true,
      "base": "monia/monia-8.png",
      "shimmer": "monia/monia-8.shimmer.png",
      "motifs": [
-      "Cute Phoenix"
+      "Wisdom",
+      "Cute Wings",
+      "Trial of Loyalty",
+      "Accusation",
+      "Cuteness Sensor",
+      "Cute Conversion",
+      "MOE Shield",
+      "Forbidden Curse of Aging",
+      "Phoenix Tackle"
      ]
     }
    ]
@@ -436,93 +470,109 @@
    "variants": [
     {
      "id": "future-1",
-     "theme": "Crimson",
-     "template": "hero",
-     "prism": false,
-     "base": "future/future-1.png",
-     "shimmer": "future/future-1.shimmer.png",
-     "motifs": [
-      "Damus, the Prophet of Apocalypse"
-     ]
-    },
-    {
-     "id": "future-2",
      "theme": "Ember",
      "template": "scene",
      "prism": true,
-     "base": "future/future-2.png",
-     "shimmer": "future/future-2.shimmer.png",
+     "base": "future/future-1.png",
+     "shimmer": "future/future-1.shimmer.png",
      "motifs": [
       "Armageddon"
      ]
     },
     {
-     "id": "future-3",
-     "theme": "Forest",
-     "template": "hero",
+     "id": "future-2",
+     "theme": "Sunfire",
+     "template": "scene",
      "prism": false,
-     "base": "future/future-3.png",
-     "shimmer": "future/future-3.shimmer.png",
+     "base": "future/future-2.png",
+     "shimmer": "future/future-2.shimmer.png",
      "motifs": [
-      "Mao, the Vengeful Guardian"
+      "Ifrit"
      ]
     },
     {
-     "id": "future-4",
+     "id": "future-3",
      "theme": "Desert",
      "template": "scene",
      "prism": false,
-     "base": "future/future-4.png",
-     "shimmer": "future/future-4.shimmer.png",
+     "base": "future/future-3.png",
+     "shimmer": "future/future-3.shimmer.png",
      "motifs": [
       "Guardian Beast Tu"
      ]
     },
     {
-     "id": "future-5",
-     "theme": "Platinum",
-     "template": "hero",
-     "prism": true,
-     "base": "future/future-5.png",
-     "shimmer": "future/future-5.shimmer.png",
-     "motifs": [
-      "Future Tech Gunslinger Riffel"
-     ]
-    },
-    {
-     "id": "future-6",
+     "id": "future-4",
      "theme": "Noir",
      "template": "scene",
      "prism": false,
-     "base": "future/future-6.png",
-     "shimmer": "future/future-6.shimmer.png",
+     "base": "future/future-4.png",
+     "shimmer": "future/future-4.shimmer.png",
      "motifs": [
       "Lunatic Golem"
      ]
     },
     {
-     "id": "future-7",
+     "id": "future-5",
+     "theme": "Royal",
+     "template": "scene",
+     "prism": false,
+     "base": "future/future-5.png",
+     "shimmer": "future/future-5.shimmer.png",
+     "motifs": [
+      "Mao, the Vengeful Guardian"
+     ]
+    },
+    {
+     "id": "future-6",
      "theme": "Ocean",
      "template": "focus",
+     "prism": false,
+     "base": "future/future-6.png",
+     "shimmer": "future/future-6.shimmer.png",
+     "motifs": [
+      "Deepsea Castle",
+      "Guardian Beast Ji",
+      "Guardian Beast Gou",
+      "Future Tech Gunslinger Riffel"
+     ]
+    },
+    {
+     "id": "future-7",
+     "theme": "Crimson",
+     "template": "grid",
      "prism": false,
      "base": "future/future-7.png",
      "shimmer": "future/future-7.shimmer.png",
      "motifs": [
-      "Deepsea Castle",
-      "Mao, the Vengeful Guardian",
-      "Guardian Beast Shu",
-      "Deepsea Treasure"
+      "Guardian Beast Hu",
+      "Guardian Beast Hou",
+      "Lolek, the Shard Knight",
+      "Guardian Beast Yang",
+      "Guardian Beast Ma",
+      "Guardian Beast Niu",
+      "Future Tech Mech",
+      "Explosive Drone",
+      "Future Tech Jetpack"
      ]
     },
     {
      "id": "future-8",
-     "theme": "Sunfire",
-     "template": "scene",
+     "theme": "Forest",
+     "template": "grid",
      "prism": false,
      "base": "future/future-8.png",
      "shimmer": "future/future-8.shimmer.png",
      "motifs": [
-      "Ifrit"
+      "Guard Duty",
+      "Future Tech Fists",
+      "Future Tech Database",
+      "Inventing",
+      "Kidnapping",
+      "Blind Destruction",
+      "Grasp the Future",
+      "Future Tech Barrage",
+      "Ancient Tech Infinite Energy Core"
      ]
     }
    ]
@@ -540,9 +590,9 @@
      "base": "world1/world1-1.png",
      "shimmer": "world1/world1-1.shimmer.png",
      "motifs": [
-      "Tuscan Aristocrat",
-      "Angry Cheese",
-      "Afflicted Vermin",
+      "Steam Dwarf Engineer",
+      "Teocuilatl, the Embodiment of Gods",
+      "Sarcophagus of Sealed Magic",
       "Willy, the Valiant Leprechaun"
      ]
     },
@@ -555,7 +605,7 @@
      "shimmer": "world1/world1-2.shimmer.png",
      "motifs": [
       "Harpthenean War Counselor",
-      "Doom Prophecy",
+      "Swift Eagle Warrior",
       "Thep, the Court Scribe",
       "Royal Corgi"
      ]
@@ -568,10 +618,10 @@
      "base": "world1/world1-3.png",
      "shimmer": "world1/world1-3.shimmer.png",
      "motifs": [
-      "Tree of Golden Apples",
-      "No Retreat!",
-      "Sickly Cheese",
-      "Hat of Madness"
+      "Elusive Hind",
+      "Ferocious Jaguar Warrior",
+      "Pure Advantage Camel",
+      "Distracting Crystal"
      ]
     },
     {
@@ -582,10 +632,10 @@
      "base": "world1/world1-4.png",
      "shimmer": "world1/world1-4.shimmer.png",
      "motifs": [
-      "Maya, the Nature Fairy",
-      "Shipwrecked",
-      "Soul Shard Sekhem",
-      "Crystal Well"
+      "White Sacrificial Bull",
+      "Winged Haressassin",
+      "Cybug BEE",
+      "The Hands of Big Gwen"
      ]
     },
     {
@@ -596,10 +646,10 @@
      "base": "world1/world1-5.png",
      "shimmer": "world1/world1-5.shimmer.png",
      "motifs": [
-      "Cykyran War Counselor",
-      "Ferocious Jaguar Warrior",
-      "Pharaoh, the Lone Living Being",
-      "Nerdy Cheese"
+      "Tuscan Aristocrat",
+      "Chosen Sacrifice",
+      "Noble Mummy Guards",
+      "Divine Gift of Time"
      ]
     },
     {
@@ -610,10 +660,10 @@
      "base": "world1/world1-6.png",
      "shimmer": "world1/world1-6.shimmer.png",
      "motifs": [
-      "Infallible Oracle Pythia",
-      "Very Special Prisoner",
-      "Cybug BEE",
-      "Mana Absorbing Crystal"
+      "3-Headed Giant",
+      "The Egg of God",
+      "Soul Shard Ren",
+      "Treacherous Crystal"
      ]
     },
     {
@@ -624,10 +674,10 @@
      "base": "world1/world1-7.png",
      "shimmer": "world1/world1-7.shimmer.png",
      "motifs": [
-      "Animal Training",
-      "Divinity",
-      "Soul Shard Ren",
-      "The Great Clock Tower \"Big Gwen\""
+      "Krates, the Smartass",
+      "Don Quisto, the Gold Seeker",
+      "Soul Shard Shut",
+      "Eraser Beam"
      ]
     },
     {
@@ -638,10 +688,10 @@
      "base": "world1/world1-8.png",
      "shimmer": "world1/world1-8.shimmer.png",
      "motifs": [
-      "Night Mare",
-      "Sacrificial Dagger",
-      "Fireshield",
-      "Rusting Crystal"
+      "Gigalopolis, the Mega-City",
+      "Guardian of Teocuilatl",
+      "Cybug ANTS",
+      "Hat of Madness"
      ]
     }
    ]
@@ -659,11 +709,11 @@
      "base": "world2/world2-1.png",
      "shimmer": "world2/world2-1.shimmer.png",
      "motifs": [
-      "Muscle Training",
-      "Taio, the Sun Fencer",
-      "Holy Cheese",
-      "Idej Lord Todugawin",
-      "Junshi, the Tactical Genius"
+      "Pinta, the Singing Ship",
+      "Tempeste Moana, the Rain Singer",
+      "Wolflesia, the Canine Flower",
+      "Treasure Skeleton",
+      "Cardinal Beast Qinglong"
      ]
     },
     {
@@ -674,11 +724,11 @@
      "base": "world2/world2-2.png",
      "shimmer": "world2/world2-2.shimmer.png",
      "motifs": [
-      "Pinta, the Singing Ship",
-      "Priest of Luna",
+      "Codumbus, the Clueless Voyager",
+      "Taio, the Sun Fencer",
       "Potion Juggler",
-      "Bonded Companion Humby",
-      "Cardinal Beast Zhuque"
+      "Rebelliokai Courtly Kirin",
+      "Junshi, the Tactical Genius"
      ]
     },
     {
@@ -690,10 +740,10 @@
      "shimmer": "world2/world2-3.shimmer.png",
      "motifs": [
       "Monsieur Pete, the Booty Raider",
-      "Dance of the Flame Pillars",
-      "Steam Dwarf Brewer",
-      "Idej Lord Shoguwana",
-      "Xiong, the Bamboo Guardian"
+      "Tempeste, the Weather Fairy",
+      "Clausss, the No-Nonsense Cultist",
+      "Rebelliokai Timid Tanuki",
+      "Ghuanjun, the Undead Martial Artist"
      ]
     },
     {
@@ -704,11 +754,11 @@
      "base": "world2/world2-4.png",
      "shimmer": "world2/world2-4.shimmer.png",
      "motifs": [
-      "Scavenging Crane",
-      "The Master's Key",
-      "Wolflesia, the Canine Flower",
-      "Rebelliokai Timid Tanuki",
-      "Cardinal Beast Xuanwu"
+      "Criminal Monkee",
+      "Chaorc Pyre Grill Master",
+      "Rocket Sneeze",
+      "Idej Lord Todugawin",
+      "Market Crash"
      ]
     },
     {
@@ -719,11 +769,11 @@
      "base": "world2/world2-5.png",
      "shimmer": "world2/world2-5.shimmer.png",
      "motifs": [
-      "Codumbus, the Clueless Voyager",
-      "Luna Pele, the Flame Dancer",
-      "Pollution Piranha",
-      "Idej Sword - Onima",
-      "Cardinal Beast Qinglong"
+      "Madaga, the Forsaken Seafarer",
+      "Bomblebee",
+      "Anti-Magnetic Armor",
+      "Idej Lord Shoguwana",
+      "Strong Ox Headbutt"
      ]
     },
     {
@@ -734,11 +784,11 @@
      "base": "world2/world2-6.png",
      "shimmer": "world2/world2-6.shimmer.png",
      "motifs": [
-      "Tri Ad, the Puppet Mistress",
-      "Tearing Mountain",
-      "Stellin, the Calm Dictator",
-      "Idej Sword - Kunagi",
-      "Bamboo Shield"
+      "Scavenging Crane",
+      "Chaorc Ruin Mourner",
+      "Ice Sculpture Garden",
+      "Bill, the Angry Auctioneer",
+      "Cardinal Beast Zhuque"
      ]
     },
     {
@@ -749,11 +799,11 @@
      "base": "world2/world2-7.png",
      "shimmer": "world2/world2-7.shimmer.png",
      "motifs": [
-      "Tri Fecta, the Puppet Master",
-      "Luna Kiai",
-      "Dream World Switcheroo",
-      "Philosopher's Stone",
-      "Bamboo Staff"
+      "Rool, the Troll Guard",
+      "Cats of the Pharaoh",
+      "Snowstorm Mischief",
+      "Rebelliokai Oblivious Oni",
+      "Xiong, the Bamboo Guardian"
      ]
     },
     {
@@ -764,11 +814,11 @@
      "base": "world2/world2-8.png",
      "shimmer": "world2/world2-8.shimmer.png",
      "motifs": [
-      "Rool, the Troll Guard",
-      "The Stormblade",
-      "Smug Mastermind Antonia",
-      "Weird Doll",
-      "Elixir of Mana"
+      "Resilient Monkee",
+      "Luna Kiai",
+      "Smugness",
+      "Idej Lord Daiyo",
+      "Cardinal Beast Xuanwu"
      ]
     }
    ]
@@ -780,102 +830,112 @@
    "variants": [
     {
      "id": "community-1",
-     "theme": "Verdant",
-     "template": "hero",
-     "prism": false,
-     "base": "community/community-1.png",
-     "shimmer": "community/community-1.shimmer.png",
-     "motifs": [
-      "Brackle, the Catapulting Turtle"
-     ]
-    },
-    {
-     "id": "community-2",
      "theme": "Ocean",
      "template": "scene",
      "prism": false,
-     "base": "community/community-2.png",
-     "shimmer": "community/community-2.shimmer.png",
+     "base": "community/community-1.png",
+     "shimmer": "community/community-1.shimmer.png",
      "motifs": [
       "Aurora Borealis"
      ]
     },
     {
-     "id": "community-3",
-     "theme": "Crimson",
-     "template": "hero",
-     "prism": false,
-     "base": "community/community-3.png",
-     "shimmer": "community/community-3.shimmer.png",
-     "motifs": [
-      "Madame Guillotine, the Great Equalizer"
-     ]
-    },
-    {
-     "id": "community-4",
+     "id": "community-2",
      "theme": "Prism",
      "template": "grid",
      "prism": true,
-     "base": "community/community-4.png",
-     "shimmer": "community/community-4.shimmer.png",
+     "base": "community/community-2.png",
+     "shimmer": "community/community-2.shimmer.png",
      "motifs": [
+      "Classical Harpyformer",
+      "Gigantisaur Spinor",
+      "Steam Dwarf Dragon Pilot",
+      "Tazune, the Angry Hot-Blood",
+      "Gigantisaur Triceras",
+      "Diamond, the Keeper of Peace",
       "Baby Spider",
-      "Luna, the Flame Fairy",
-      "Burning Skeleton",
-      "Arrival from the Cosmic Depths",
-      "Alchemic Journal",
-      "Golden Ankh",
-      "Shield of Life",
-      "500 Piranhas in a Monster Suit",
-      "Cloudy Slime"
+      "Xal, the Animated Armor",
+      "Logan, the Investment Monkee"
      ]
     },
     {
-     "id": "community-5",
-     "theme": "Rosebud",
-     "template": "hero",
-     "prism": false,
-     "base": "community/community-5.png",
-     "shimmer": "community/community-5.shimmer.png",
-     "motifs": [
-      "Fern, the Liberated Fairy"
-     ]
-    },
-    {
-     "id": "community-6",
+     "id": "community-3",
      "theme": "Amethyst",
      "template": "scene",
      "prism": false,
-     "base": "community/community-6.png",
-     "shimmer": "community/community-6.shimmer.png",
+     "base": "community/community-3.png",
+     "shimmer": "community/community-3.shimmer.png",
      "motifs": [
       "Greatmaw Siren"
      ]
     },
     {
-     "id": "community-7",
+     "id": "community-4",
      "theme": "Noir",
      "template": "focus",
+     "prism": false,
+     "base": "community/community-4.png",
+     "shimmer": "community/community-4.shimmer.png",
+     "motifs": [
+      "Luna, the Flame Fairy",
+      "Ballad Harpyformer",
+      "Fairy Queen Crestina, the Creation Fairy",
+      "Ska Harpyformer"
+     ]
+    },
+    {
+     "id": "community-5",
+     "theme": "Sunfire",
+     "template": "scene",
+     "prism": false,
+     "base": "community/community-5.png",
+     "shimmer": "community/community-5.shimmer.png",
+     "motifs": [
+      "The Fifth Circle of Hell"
+     ]
+    },
+    {
+     "id": "community-6",
+     "theme": "Verdant",
+     "template": "grid",
+     "prism": false,
+     "base": "community/community-6.png",
+     "shimmer": "community/community-6.shimmer.png",
+     "motifs": [
+      "Natas, the Master of Hell",
+      "Harpyformer Choir",
+      "Shanty Harpyformer",
+      "Golden Ladybug",
+      "Monster Nest",
+      "Rafflesia, the Poison Princess",
+      "Kent, the Indebted Apprentice",
+      "Key, the Cursed Thief",
+      "Tuscan Mystic"
+     ]
+    },
+    {
+     "id": "community-7",
+     "theme": "Rosebud",
+     "template": "scene",
      "prism": false,
      "base": "community/community-7.png",
      "shimmer": "community/community-7.shimmer.png",
      "motifs": [
-      "Monster Nest",
-      "Liquid Luck",
-      "The Third Circle of Hell",
-      "The Seventh Circle of Hell"
+      "Liquid Luck"
      ]
     },
     {
      "id": "community-8",
-     "theme": "Sunfire",
-     "template": "scene",
+     "theme": "Royal",
+     "template": "focus",
      "prism": false,
      "base": "community/community-8.png",
      "shimmer": "community/community-8.shimmer.png",
      "motifs": [
-      "Baby Spider",
-      "Kit, the Shark Researcher"
+      "Golden Ankh",
+      "Nao, the Barrier Priestess",
+      "Gigantisaur Chimera",
+      "Dante, the Wanderer of Hell"
      ]
     }
    ]
@@ -893,14 +953,14 @@
      "base": "trials/trials-1.png",
      "shimmer": "trials/trials-1.shimmer.png",
      "motifs": [
-      "Ethan, the Prodigy",
-      "Cooldin, King of Coolness",
-      "Initiation Ritual",
-      "Lilly, the Charming Infiltrator",
+      "Atta, Speaker of Desires",
+      "Wise Village Elder",
+      "Alleria, the Queen of Spiders",
+      "Mimic",
       "???, the Shapeshifter",
       "Flaming Dragonegg",
-      "Divine Gift of Edge",
-      "The Golden Gate",
+      "Cuberto, Supreme Lord of Edges",
+      "Tail Slap",
       "Mary Crestmas"
      ]
     },
@@ -912,14 +972,14 @@
      "base": "trials/trials-2.png",
      "shimmer": "trials/trials-2.shimmer.png",
      "motifs": [
-      "Phoenix Bombardment",
-      "Phatnir, Prototype of Coolness",
+      "Rosie, the School Idol",
+      "Lolki, Trickstar of Coolness",
       "Spirit of the Shattered Trident",
-      "Fiona, the Princess of Blackport",
+      "Boris, the Guardian of Blackport",
       "Earth-Shattering Hammer, Relic of Deri",
       "Glasowt",
-      "Divine Gift of Fire",
-      "Poison Pollen",
+      "Divine Gift of Skill",
+      "The Golden Gate",
       "The Root of all Presents"
      ]
     },
@@ -931,14 +991,14 @@
      "base": "trials/trials-3.png",
      "shimmer": "trials/trials-3.shimmer.png",
      "motifs": [
-      "Alice, the Transfer Student",
-      "Hipdall, Protector of Coolness",
-      "Laser Volley",
-      "Enigma, the Seller of Secrets",
+      "Lord Mithuru, the Rotten Mastermind",
+      "Phatnir, Prototype of Coolness",
+      "Coreling",
+      "Arthor, the King of Blackport",
       "Challenge",
-      "Sorbereus, the Adapting Dragon",
-      "Divine Gift of Magic",
-      "Tail Slap",
+      "Doomed Pirate",
+      "Divine Gift of Coolness",
+      "Poison Pollen",
       "Saint Nicolas"
      ]
     },
@@ -950,13 +1010,13 @@
      "base": "trials/trials-4.png",
      "shimmer": "trials/trials-4.shimmer.png",
      "motifs": [
-      "Ghostly Warning",
-      "Bifab, Bridge to Coolness",
-      "Heat Wave",
+      "Giant Exploding Skull",
+      "Cooldin, King of Coolness",
+      "Initiation Ritual",
       "Poisoned Meat",
       "Spy in the Enemy's Camp",
-      "Duigno, the Flaming Phoenix",
-      "Divine Gift of Creation",
+      "Sparkfly Queen",
+      "Divine Gift of Edge",
       "Pet Snake",
       "Santa Klaus"
      ]
@@ -969,13 +1029,13 @@
      "base": "trials/trials-5.png",
      "shimmer": "trials/trials-5.shimmer.png",
      "motifs": [
-      "Atta, Speaker of Desires",
-      "Freshya, Beauty of Coolness",
-      "Spirit of the Ultimate Gun",
-      "Beer",
+      "Celia, the Class Clown",
+      "Swagdri, Forger of Coolness",
+      "Laser Volley",
+      "Voodoo Curse",
       "Brilliant Idea",
-      "Motharch Squire",
-      "Divine Gift of Death",
+      "Rubin, the Dragoneer Champion",
+      "Divine Gift of Fire",
       "Sas'Za, the Snaka Adventurer",
       "Mary Crestmas"
      ]
@@ -988,14 +1048,14 @@
      "base": "trials/trials-6.png",
      "shimmer": "trials/trials-6.shimmer.png",
      "motifs": [
-      "Kai, the Rowdy",
-      "Lolki, Trickstar of Coolness",
-      "Kohta, the Silent Observer",
-      "Voodoo Curse",
+      "Moonlight Butterfly",
+      "Hipdall, Protector of Coolness",
+      "Divine Gift of Equality",
+      "Lilly, the Charming Infiltrator",
       "Prayer",
-      "Sparkfly Worker",
-      "Divine Gift of the Guardian",
-      "The Golden Gate",
+      "Fiery Slime",
+      "Divine Gift of Magic",
+      "Tail Slap",
       "The Root of all Presents"
      ]
     },
@@ -1007,14 +1067,14 @@
      "base": "trials/trials-7.png",
      "shimmer": "trials/trials-7.shimmer.png",
      "motifs": [
-      "Albrecht, the Nerd",
-      "Wowkyrie, Bringer of Coolness",
-      "Alleria, the Queen of Spiders",
-      "Charme",
+      "Flesh-Eating Swarm Trap",
+      "Thrysh, Robber of Coolness",
+      "Barrier of Faith",
+      "Fiona, the Princess of Blackport",
       "Null, the Mage Slayer",
-      "Angler Angel",
-      "Divine Gift of Coolness",
-      "Poison Pollen",
+      "Green Dragoneer",
+      "Divine Gift of Creation",
+      "The Golden Gate",
       "Saint Nicolas"
      ]
     },
@@ -1026,14 +1086,14 @@
      "base": "trials/trials-8.png",
      "shimmer": "trials/trials-8.shimmer.png",
      "motifs": [
-      "Nasty Prank",
-      "Swagdri, Forger of Coolness",
-      "Summoning Instructions",
-      "Mimic",
-      "???, the Shapeshifter",
-      "Sparkfly Attendant",
-      "Divine Gift of Rain",
-      "Tail Slap",
+      "Dangerous Knowledge",
+      "Thorad, Strength of Coolness",
+      "Knife Throw",
+      "Enigma, the Seller of Secrets",
+      "The Master's Orders",
+      "Icy Dragonegg",
+      "Divine Gift of Death",
+      "Poison Pollen",
       "Santa Klaus"
      ]
     }
