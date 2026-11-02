@@ -1286,7 +1286,8 @@ function MenuCardBackground() {
         {tile}
         {tile}
       </div>
-      <PpVerlauf className="menu-card-bg-veil" px={4} retroGradient="radial-gradient(ellipse at center, rgba(8,6,12,.58) 0%, rgba(8,6,12,.78) 70%, rgba(8,6,12,.9) 100%)" gradient="radial-gradient(ellipse at center, rgba(8,6,12,.22) 0%, rgba(8,6,12,.34) 70%, rgba(8,6,12,.5) 100%)" />
+      {/* ★ 2.11. (Al: Dither auf der Wand zu stark): im Pixel-Modus KEIN Dither-Schleier mehr — abgedunkelt wird ueber die Bilder (`filter` in .menu-card-bg-cell img); der Schleier bleibt nur im Retro-Modus */}
+      {window.PP_RETRO && <PpVerlauf className="menu-card-bg-veil" px={4} retroGradient="radial-gradient(ellipse at center, rgba(8,6,12,.58) 0%, rgba(8,6,12,.78) 70%, rgba(8,6,12,.9) 100%)" gradient="radial-gradient(ellipse at center, rgba(8,6,12,.58) 0%, rgba(8,6,12,.78) 70%, rgba(8,6,12,.9) 100%)" />}
     </div>
   );
 }

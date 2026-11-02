@@ -16642,7 +16642,7 @@ body:has(.rotate-device-overlay.rotate-gate) .pp-bg-particles * { animation: non
      desaturate so individual cards stop competing with the foreground
      panels for attention. The blur also softens the grid seams. */
   /* ★ W86u2 (Pixelart): kein Weichzeichner mehr (war blur(1.5px)) — die Abdunklung uebernimmt der geditherte Schleier. */
-  filter: brightness(.7) saturate(.95);   /* ★ 30.10. (Al): Wand leserlicher — hellere Bilder, dafuer ein duenner Schleier (vorher .85 + dichter Dither) */
+  filter: brightness(.55) saturate(.95);   /* ★ 30.10./2.11. (Al): Wand leserlicher, Dither duenner — die Abdunklung kommt aus den Bildern, der Dither-Schleier nur als sparsamer Rand (vorher .85 + dichter Dither) */
 }
 /* Dark veil so the menu stays readable over the bright card art. The
    centre is kept darker (not lighter) than before so the three panels —
