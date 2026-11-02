@@ -106,8 +106,8 @@ def frame(i):
     kl = ebene(klinge_l)
     kr = ebene(klinge_r)
     # lavendelfarbener Auslauf pulsiert (links/rechts versetzt)
-    for lay, x, vers in ((kl, 1, 0.0), (kr, 24, 2.4)):
-        sft = int(round(np.sin(L.sinus(i, 16, vers)) * 1.0))
+    for lay, x, vorz in ((kl, 1, 1), (kr, 24, -1)):
+        sft = vorz * int(round(np.sin(L.sinus(i, 16)) * 1.0))
         pix = {}
         for y, idx in zip(AUSLAUF_Y, AUSLAUF_IDX):
             if idx > 0:                                                   # weiße Zeilen bleiben weiß, der Auslauf wandert eine Stufe

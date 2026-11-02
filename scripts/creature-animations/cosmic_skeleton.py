@@ -80,16 +80,16 @@ PURPUR = {'c': B_, 'r': C_}                           # violette Kugeln
 P = lambda x, y: (GPL + x, GPT + y)
 # Partikel bleiben nah an der Figur: der Frame ist auf die Figur zugeschnitten, Effekte dürfen ihn höchstens 2 px über den Körperrand hinaus vergrößern
 PUFFS_GELB = [                                        # alle Wölkchen steigen NEBEN der Figur auf (nie hinter dem Körper versteckt, sonst entstehen halbe Klekse)
-    dict(x=P(-3, 16)[0], y=P(-3, 16)[1], vx=-1, vy=-11, off=0, wackeln=1),
-    dict(x=P(22, 12)[0], y=P(22, 12)[1], vx=1, vy=-10, off=14, wackeln=1),
-    dict(x=P(-3, 8)[0], y=P(-3, 8)[1], vx=-1, vy=-7, off=30, wackeln=1),
-    dict(x=P(22, 17)[0], y=P(22, 17)[1], vx=1, vy=-9, off=38, wackeln=1),
+    dict(x=P(-1, 19)[0], y=P(-1, 19)[1], vx=-1, vy=-12, off=0, wackeln=0),
+    dict(x=P(20, 14)[0], y=P(20, 14)[1], vx=1, vy=-9, off=14, wackeln=0),
+    dict(x=P(-1, 9)[0], y=P(-1, 9)[1], vx=-1, vy=-6, off=30, wackeln=0),
+    dict(x=P(20, 19)[0], y=P(20, 19)[1], vx=1, vy=-11, off=38, wackeln=0),
 ]
 PUFFS_PURPUR = [
-    dict(x=P(-4, 12)[0], y=P(-4, 12)[1], vx=-1, vy=-10, off=20, wackeln=1),
-    dict(x=P(23, 13)[0], y=P(23, 13)[1], vx=1, vy=-11, off=6, wackeln=1),
-    dict(x=P(-2, 19)[0], y=P(-2, 19)[1], vx=-1, vy=-10, off=42, wackeln=1),
-    dict(x=P(22, 7)[0], y=P(22, 7)[1], vx=1, vy=-7, off=26, wackeln=1),
+    dict(x=P(-2, 14)[0], y=P(-2, 14)[1], vx=-1, vy=-9, off=20, wackeln=0),
+    dict(x=P(21, 17)[0], y=P(21, 17)[1], vx=1, vy=-10, off=6, wackeln=0),
+    dict(x=P(-1, 20)[0], y=P(-1, 20)[1], vx=0, vy=-10, off=42, wackeln=0),
+    dict(x=P(20, 9)[0], y=P(20, 9)[1], vx=1, vy=-6, off=26, wackeln=0),
 ]
 
 

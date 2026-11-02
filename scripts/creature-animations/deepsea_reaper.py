@@ -20,7 +20,7 @@ Fest bleiben: Kopf-/Schädelform, Hörner, Augenform im Ruhebild, Schaft der Sen
 Ablauf (48 Frames à 70 ms = 3,36 s; Frame 0 = Original, Partikel ausgenommen):
 * Flügelschlag (RUNDE 2, Nutzer: „sollte mehr mit den Flügeln schlagen“): beide Flügel schlagen jetzt kräftig und gleichzeitig: Periode 16 Frames (1,12 s, dreimal pro Schleife; vorher ±2 px, Periode 24). Jeder Flügel (links x 0–7, rechts x 24–31, y 0–11:
   das waagerechte Flügelblatt y 6–11 und der obere Flügelfinger y 0–5) BIEGT sich entlang seiner Mittellinie (anim_flieger_r2.biege, Rückwärtsabbildung: jedes Zielpixel holt sich das Quellpixel an derselben Bogenlänge/Querstelle, keine Löcher, keine
-  Mischfarben, die Wurzel am Kopf bleibt stehen): das Blatt schlägt von der Ruhelage (Flügel hängen leicht) bis ca. 50° nach oben und ca. 17° nach unten (Spitze −6 … +2 px), die Spitze hinkt der Wurzel um 0,5 rad nach (Flügel biegt sich durch); der Flügelfinger schwenkt bis ca. 27° (Spitze ±2 px). Frame 0 = Original.
+  Mischfarben, die Wurzel am Kopf bleibt stehen): das Blatt schlägt von der Ruhelage (Flügel hängen leicht) bis ca. 58° nach oben und ca. 25° nach unten (Spitze ca. −7 … +4 px), die Spitze hinkt der Wurzel um 0,4 rad nach (Flügel biegt sich durch); der Flügelfinger schwenkt bis ca. 27° (Spitze ±2 px). Frame 0 = Original.
 * Schweben: der ganze Körper (Kopf, Rumpf, Sense) hebt sich 1 px beim Abschlag der Flügel und sinkt beim Aufschlag zurück (gegenläufig).
 * Saumfetzen: die drei Fetzen (y 17–21) pendeln unabhängig ±1 px zur Seite (Periode 16, versetzte Phasen).
 * Sense: die Klinge (y ≥ 24) pendelt ±1 px, ihre untere Hälfte (y ≥ 27) mit Verzögerung (Periode 24). Stahlglanz (Regel 14: Metall): ein heller Lichtpunkt läuft an der Schneide (Weiß (246,255,255)) entlang; zweimal pro Schleife.
@@ -152,9 +152,9 @@ def fluegel(a, pivot_x, amp, ph, breite=2):
 
 # ── Flügelschlag: Biegung entlang der Mittellinie ─────────────────────────────────────────────────────────────────────────────
 FL_PERIODE = 16
-A_BLATT = math.radians(34.0)                                 # Ausschlag des Blatts (Spitze: bis ca. +50° nach oben, −17° nach unten gegenüber der Ruhelage)
+A_BLATT = math.radians(42.0)                                 # Ausschlag des Blatts (Spitze: bis ca. +50° nach oben, −17° nach unten gegenüber der Ruhelage)
 FING_A = math.radians(18.0)
-LAUF = 0.5
+LAUF = 0.4
 #            Wurzelpunkt (Sprite)  Richtung zur Spitze (rad)           Länge   Drehsinn (+1 = oben ist im Uhrzeigersinn)
 BLATT_L = dict(p0=(8.0, 9.0), ang0=math.atan2(-0.5, -6.0), laenge=9.0, seite=+1)
 BLATT_R = dict(p0=(23.0, 9.0), ang0=math.atan2(-0.5, 6.0), laenge=9.0, seite=-1)
