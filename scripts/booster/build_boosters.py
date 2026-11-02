@@ -520,11 +520,14 @@ def tpl_hero(P, th, mt, hero, fx=None, **kw):
     """Ein Held in einheitlicher Pixelgröße auf Strahlenkranz."""
     art_burst(P, th, rot=0.2)
     art_particles(P, th, 11)
-    if fx:
-        draw_fx(P, fx, IX0 + IW // 2, IY0 + 126 - 38)      # Mitte der Figur (Sprite ca. 75 px hoch, Füße auf IY0+126)
+    base = IY0 + 126
+    if fx:      # Figur samt Effekt senkrecht in der Mitte der Kunstfläche
+        im, _ = load_solo(hero)
+        base = int(round(IY0 + IH / 2.0 + im.height * SOLO_K / 2.0))
+        draw_fx(P, fx, IX0 + IW // 2, int(round(IY0 + IH / 2.0)))
     if hero in PILE:
-        draw_pile(P, hero, IX0 + IW // 2, IY0 + 126)
-    place_sprite(P, hero, IX0 + IW // 2, IY0 + 126, shadow=hero not in PILE)
+        draw_pile(P, hero, IX0 + IW // 2, base)
+    place_sprite(P, hero, IX0 + IW // 2, base, shadow=hero not in PILE)
     return [hero]
 
 
