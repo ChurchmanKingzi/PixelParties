@@ -150,10 +150,10 @@ class Glied:
     def ruhe(self, versatze):
         return all(v == (0, 0) for v in versatze)
 
-    def zeichne(self, h, w, oy, ox, versatze):
+    def zeichne(self, h, w, oy, ox, versatze, neu_zeichnen=False):
         """RGBA-Ebene h×w; Spritepixel (y, x) landet bei (y + oy + dy, x + ox + dx). Bei Ruhe (alle Versätze 0) das Original."""
         e = L.leer(h, w)
-        if self.ruhe(versatze):
+        if self.ruhe(versatze) and not neu_zeichnen:
             for (y, x) in self.pixel:
                 e[y + oy, x + ox] = self.spr[y, x]
             return e

@@ -24,7 +24,7 @@ Ablauf (64 Frames à 90 ms, Frame 0 = Original; alles langsam, die Figur wird ni
   Füße bleiben am Boden. Einmal je Schleife (Frame 46–54) setzt sich der Golem beim Ausatmen mit einem Seufzer 1 px unter die Ruhelage (Zeile 17 entfällt) — schwerer Körper, der „einsinkt“.
 * Arme/Fäuste: folgen dem Atem mit Nachlauf (5 Frames) 1 px nach außen und zurück (die Zeilen y 13–21 samt Innenumriss rücken waagerecht, die Fuge zum Rumpf wird mit der Umrissfarbe (213,170,33) geschlossen,
   Arme werden nicht dicker, Gefälle zwischen Zeilen ≤ 1 px).
-* Glühen: die vier hellen Kugelkerne (Kopf, linke/rechte Schulter, Bauch) dunkeln nacheinander eine Stufe der Goldrampe ab und kehren zurück (Periode 32, je Kugel versetzt) — langsames Pochen.
+* Glühen: die vier hellen Kugelkerne (Kopf, linke/rechte Schulter, Bauch) dunkeln nacheinander eine Stufe der Goldrampe ab und kehren zurück (Periode 32, je Kugel versetzt; Fenster à 16 Frames) — langsames Pochen.
 * Glanz auf dem Gold (Regel 14: Gold): ein dezentes Lichtband (eine Stufe heller auf der Goldrampe, in der Bandmitte zwei) läuft einmal je Schleife über den Golem (Frame 8–34). Keine Glitzersterne (die hellste Quellfarbe ist
   zugleich die Körperfarbe — Sterne wären auf dem Gold unsichtbar). Umriss glänzt nicht.
 * Keine Partikel.
@@ -84,9 +84,14 @@ def arm_stufe(i):
 
 
 def pulse_stufe(i, k):
-    """Kugel k dunkelt langsam ab (0 hell, 1 / 2 eine bzw. zwei Stufen dunkler), je Kugel um 8 Frames versetzt."""
-    w = u01(i - 8 * k, N // 2)
-    return 0 if w < 0.35 else (1 if w < 0.8 else 2)
+    """Kugel k dunkelt langsam ab (0 hell, 1 / 2 eine bzw. zwei Stufen dunkler) und kehrt zurück: ein 16-Frames-Fenster je 32 Frames, die Fenster der vier Kugeln beginnen bei Frame 1 / 6 / 11 / 15 (Welle
+    Kopf → Schulter → Bauch → Schulter); in Frame 0 sind alle hell (= Original)."""
+    start = (1, 6, 11, 15)[k]
+    t = (i - start) % 32
+    if t >= 16:
+        return 0
+    w = 0.5 - 0.5 * math.cos(2 * math.pi * t / 16)
+    return 0 if w < 0.2 else (1 if w < 0.8 else 2)
 
 
 def kugeln_dimmen(a, i):

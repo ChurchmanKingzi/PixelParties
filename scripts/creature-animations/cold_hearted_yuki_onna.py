@@ -17,14 +17,21 @@ Was ist was (im 16×23-Raster; Ausgabe = ×2):
   Brust-Pixeln (36,50,85)/(67,76,117)/(15,31,65) in der Mitte (7–8, 15–16) (dort liegt in der Karte das Herz aus Eis); Ärmel/Hände (x 0–3 und 12–15, y 14–17) in Lavendel (188,198,233)/(220,217,235); Saum y 19–22.
 Fest bleiben: Gesicht, Kimonoform, Kragen, Brustmitte.
 
+Halbtransparenz: JSON-Feld `deckkraft: 0.5` (L.speichern extra) — im Sprite selbst bleibt Alpha 0/255; die Quellebene hatte 80 % Deckkraft, der Nutzer verlangt „halbtransparent“ (Annahme: 50 %).
+
 Ablauf (48 Frames à 65 ms = 3,12 s; Frame 0 = Original, Nebel ausgenommen) — Eis glänzt nicht (Regel 14), kein Feuer (Regel 15):
 * Atmen (Periode 24, 0/1 Rasterpixel = 2 Ausgabepixel): die dunkle Kragenzeile y 13 wird eingefügt, Kopf mit Haaren und Schultern heben sich, Hände, Kimono unten und Saum bleiben stehen.
-* Haare wehen: die beiden äußeren Strähnen (x 2–3 und x 12–13, y 4–10; starre Teile, vorab auf 4-Verbundenheit geprüft) schwingen ±1 Rasterpixel (Periode 24, die rechte Strähne 2 Frames später): nach innen überlappen sie das Haar, nach außen bleibt das Original stehen und die verschobene Kopie liegt daneben
-  (die Strähne wird 1 Rasterpixel breiter, keine Lücke zum Haar).
-* Ärmel/Hände schwingen starr ±1 Rasterpixel (links Periode 16, rechts Periode 24), der Saum (y ≥ 21) weht ±1 Rasterpixel mit Nachlauf (Periode 16).
+* Haare wehen im Wind (Runde 2, Nutzerfeedback wörtlich: „Die Haare sollen eher im Wind wehen als sich so seltsam seitwärts zu bewegen. Außerdem muss sie halbtransparent sein.“): früher schwangen zwei starre Strähnenblöcke
+  (x 2–3 / 12–13) ±1 Rasterpixel hin und her — das las sich als seitliches Wackeln. Jetzt weht das Haar wie von einem Wind von links: die Haarzeilen y 5–11 (alle Haartöne (15,3,7)/(17,15,18)/(29,27,38)/(5,4,10)/(54,50,71)/(0,2,0))
+  verschieben sich als FLIESSENDE Welle nach rechts (Windrichtung) — Versatz je Zeile `wind_dx`: Böe (Periode 24 = zweimal je Schleife) × (Abstand zur Wurzel)^1,2 plus eine Welle (Periode 16, Läufe von der Wurzel zur Spitze,
+  Phase wandert mit der Zeile), Wurzel y 5 bleibt, Spitze bis 3 Rasterpixel, Gefälle zwischen benachbarten Zeilen ≤ 1 Rasterpixel, nie negativ (in der Flaute liegt das Haar wieder wie im Original). Rechts bleiben in den Zeilen,
+  die ans Gesicht grenzen (y 5–9), die ersten dx Originalpixel als „Haar hinter dem Gesicht“ stehen (keine Lücke, das Gesicht behält seinen dunklen Rand); die freie Spitze (y 10–11) löst sich vom Hals und weht frei (nur über die
+  Zeile darüber 4-verbunden — pro Frame geprüft). Links drückt der Wind das Haar gegen das Gesicht (Versatz ≤ 1, Gesicht/Kragen liegen darüber). Es werden keine Spalten kopiert, nichts wird breiter als die verschobene Zeile.
+  Gesicht, Kragen und Kimono liegen als Basis über dem Haar.
+* Ärmel/Hände schwingen starr (links ±1 Rasterpixel Periode 16, rechts 0…1 Rasterpixel nach außen Periode 24 — bei 2 Rasterpixeln rissen früher einzelne Handpixel vom Ärmel ab), der Saum (y ≥ 21) weht ±1 Rasterpixel mit Nachlauf (Periode 16).
 * Eisnebel (Partikel, hinter der Figur, 6 Stück, Lebensdauer 48 Frames, langsam aufsteigend, leichtes Wabern): runde Eiswölkchen aus 1×1 bis 2×2 Rasterpixeln (= 2×2 bis 4×4 Ausgabepixel, nie kleiner als 2×2),
   Kern (198,225,234) bzw. (243,254,255), Rand (188,198,233) bzw. (198,225,234); sie steigen an den Seiten der Figur auf.
-Randpixel-Test (Regel 16): `U.kontur_schliessen` auf dem Raster (Umrissfarbe (15,3,7)); im Ruhebild nichts. ERGÄNZUNG: keine gemalten Pixel.
+Randpixel-Test (Regel 16): `U.kontur_schliessen` auf dem Raster (Umrissfarbe (15,3,7)); im Ruhebild nichts. ERGÄNZUNG: keine gemalten Pixel (die Haar-Originalpixel hinter dem Gesicht sind Quellpixel).
 Zuschnitt: der Frame ist auf die Figur zugeschnitten (symmetrisch um die Ruhefigur; der Nebel vergrößert ihn höchstens 2 Rasterpixel = 4 Ausgabepixel darüber hinaus, dazu 1 Rasterpixel leerer Rand).
 Alle Bewegungen laufen auf der vollen Leinwand (anim_lib wirft ClipError). Nur ganze Rasterpixel, nur Farben der Quelle.
 """
