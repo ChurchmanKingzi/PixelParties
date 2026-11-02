@@ -93,12 +93,17 @@ def frame_gross(i, nur=None):
     b = 1 if Hm.welle01(i, 24) > 0.5 else 0
     if b:
         k = L.streck_zeile(k, GP + 22, b)
-    k = Hm.kontur_schliessen(k, ERLAUBT, (39, 25, 12))
     s = teil(stab)
     kugel_farben(s, i)
-    st = Hm.folge(i, 6, [0, 1, 2, 1], N) if Hm.folge(i, 6, [0, 1, 2, 1], N) is not None else Hm.folge(i, 30, [0, 1, 2, 1], N)
-    Hm.stern4(s, 1, 10, st, STERN['kern'], STERN['arm1'], STERN['arm2'], OFF)
-    return L.zusammen(H, W, [(k, 0, 0), (s, 0, 0)])
+    fr = L.zusammen(H, W, [(k, 0, 0), (s, 0, 0)])
+    fr = Hm.kontur_schliessen(fr, ERLAUBT, (39, 25, 12))
+    if nur != 'koerper':
+        st = Hm.folge(i, 6, [0, 1, 2, 1], N) if Hm.folge(i, 6, [0, 1, 2, 1], N) is not None else Hm.folge(i, 30, [0, 1, 2, 1], N)
+        Hm.stern4(fr, 1, 10, st, STERN['kern'], STERN['arm1'], STERN['arm2'], OFF)
+    return fr
+
+
+TEST_EBENEN = 'koerper'
 
 
 def _box():

@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """Idle-Animation für „Harpthenean War Counselor“ (Creature) — die Harpyien-Kriegerin: Stahlhelm mit rotem Busch, eisblaue Flügel, schwarze Handschuhe, goldener Schurz, großer Rundschild, Krallenfüße.
 
-Quelle: src/harpthenean-war-counselor.png (26×36 px, 49 Farben, 537 Pixel).
+Quelle: src/harpthenean-war-counselor.png (26×36 px, 41 Farben, 537 Pixel).
 PICK: [["MotiveSteamDwarfs", 393, 1]]      (Ebene „Harpthenean War Counsellor“, Figur 1 = Pose mit Schild; nur in dieser Karte)
 Vorlage für Verdecktes: Kandidat 4 (MotiveSteamDwarfs 365, „Ebene #45“, 27×32) zeigt dieselbe Figur OHNE Schild: Hüfte/Schurz und beide Beine. Er wird nicht benutzt (der Schild gehört zur Kartenfigur), nur zum Verständnis.
 Abgleich mit der Kartenkunst Harpthenean_War_Counselor.png (76×51): Sprite sitzt dort 99,8 % pixelgleich. Der schwarze Schattenfleck unter der Figur (Ebenenteil, 4 Zeilen unter dem Schild) gehört nicht zum

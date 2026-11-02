@@ -44,6 +44,7 @@ from PIL import Image
 
 import anim_flieger_b as FB
 import anim_gbb as G
+import anim_humanoide as Hm
 import anim_lib as L
 import anim_untote as U
 
@@ -59,6 +60,7 @@ H, W = KH + GPT + GPB, KW + GPL + GPR
 yy, xx = np.mgrid[0:sh, 0:sw]
 vorhanden = L.deckend(spr)
 UMRISS = (0, 0, 0)
+ERLAUBT = Hm.umrissfarben(spr)
 
 SCHAEDEL = (vorhanden & L.farbmaske(spr, [(128, 128, 128), (179, 179, 179), (204, 204, 204), (242, 242, 242)]))
 KOERPER = vorhanden & ~SCHAEDEL
@@ -119,13 +121,14 @@ def drache(i):
 
 def frame_gross(i, nur=None):
     kp, sk, bob = drache(i)
+    dr = L.zusammen(H, W, [(sk, 0, bob), (kp, 0, bob)])
+    G.rand_schliessen(dr, ERLAUBT, UMRISS)                                      # Regel 16: Spaltenstufen legen Füllfarbe an der Kante frei → Umrissschwarz
     ebenen = []
     if not nur:
         for g in (1, 3, 4, 2):
             if i % N in AN[g]:
                 ebenen.append((BLITZ_G[g], 0, 0))
-    ebenen += [(sk, 0, bob), (kp, 0, bob)]
-    return L.zusammen(H, W, ebenen)
+    return L.zusammen(H, W, ebenen + [(dr, 0, 0)])
 
 
 def _frames(nur):

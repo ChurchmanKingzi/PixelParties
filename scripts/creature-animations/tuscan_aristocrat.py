@@ -2,7 +2,7 @@
 """Idle-Animation für „Tuscan Aristocrat“ (Creature) — der tuskische Aristokrat: riesige graue Locken-Perücke aus zwei Wülsten, kleines Gesicht mit blauem Auge und Monokel, Arme in die Seiten gestemmt,
 rot-weiße Strümpfe/Stiefel.
 
-Quelle: src/tuscan-aristocrat.png (24×25 px, 22 Farben, 399 Pixel) — MANUELL aus der Ebene herausgeschnitten.
+Quelle: src/tuscan-aristocrat.png (24×25 px, 21 Farben, 399 Pixel) — MANUELL aus der Ebene herausgeschnitten.
 PICK: [["MotiveGrailWar", 197, "manuell: Ebene „Tuscan Aristocrat“ (88×79 px) enthält Lava-Hintergrund UND die Figur unten; Figur = alle nicht-Lava-Pixel im Rechteck x 14–46, y 53–78 der Ebene, größte zusammenhängende Komponente"]]
 Warum manuell: creature_show.py findet für die Karte nur Baum/Gestein (Ebene 428 / 426 in MotiveGN, 16×30 bzw. 16×21, „Kunstmatch 97 %“ — das ist der tote Baum links im Bild), weil die Figur in der Ebene an die
 Lava stößt und mit ihr zu einer Komponente verschmilzt. Der Ebenenname „Tuscan Aristocrat“ (MotiveGrailWar 197) und die Lage in der Kartenkunst (x 27–50, y 20–45) stimmen mit der Figur überein.

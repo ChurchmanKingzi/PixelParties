@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """Idle-Animation für „Priest of Luna“ (Creature) — der Priester im roten Zackenhut mit weißem Stirnband, schmalen schwarzen Augenschlitzen, orangerotem Brustjuwel, blauer Gürtelschnalle und betend gefalteten Händen.
 
-Quelle: src/priest-of-luna.png (16×24 px, 20 Farben, 295 Pixel).
+Quelle: src/priest-of-luna.png (16×24 px, 20 Farben, 262 Pixel).
 PICK: [["MotiveHawaii", 200, 1]]      (Ebene „Ebene #13“ in MotiveHawaii, Deckkraft der Ebene 70 %, ganze Ebene = eine Figur, 16×24 px; kein Treffer von creature_show.py, weil die Karte sie halbtransparent mischt)
 Halbtransparente Quelle (Regel 22): die Ebenenpixel selbst sind voll deckend (Alpha 255), erst die Ebene hat 70 % Deckkraft; der Sprite ist daher voll deckend. Im Spiel soll die Figur nicht halbtransparent
 erscheinen (kein deckkraft-Feld), da der Nutzer das nicht verlangt hat.

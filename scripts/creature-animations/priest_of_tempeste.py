@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """Idle-Animation für „Priest of Tempeste“ (Creature) — der Priester im blauen Spitzhut mit weißem Stirnband, schmalen schwarzen Augenschlitzen, hellblauem Brustjuwel und betend gefalteten Händen.
 
-Quelle: src/priest-of-tempeste.png (16×22 px, 19 Farben, 271 Pixel).
+Quelle: src/priest-of-tempeste.png (16×23 px, 19 Farben, 234 Pixel).
 PICK: [["MotiveJapan", 117, 1]]      (Ebene „Priester“, Figur 1; bei creature_show.py als Kandidat 1 mit 87 % Treffer — die Ebene gehört zur Karte, die Kunst hat dort leicht verrauschte Farben)
 Abgleich mit der Kartenkunst Priest_of_Tempeste.png (76×51): der Priester sitzt dort bei (30,5) (Priesterbüste) — direkt darunter hängt die Ebene „Ebene #70“ (MotiveJapan 116, 18×22 px bei (29,28)): ein türkis umrandetes
 Flügelwappen mit einem blauen Hutträger von HINTEN (der Held Tempeste als Rückenfigur mit Aura, Flügeln und Füßchen). Diese Rückenfigur ist ein eigener, von der Büste getrennter Teil der Kartenszene (sie hat eigene Aura,
@@ -10,7 +10,7 @@ eigene Flügel und liegt in der Ebenenreihenfolge davor); sie wurde NICHT als Te
 Aufruf:   python3 priest_of_tempeste.py [--preview <ordner>]
 Ausgabe:  ../../data/creature-animations/priest-of-tempeste.png + .json
 
-Was im Sprite ist (x, y im 16×22-Sprite):
+Was im Sprite ist (x, y im 16×23-Sprite):
 * HUT (x 0–15, y 0–10): breitkrempiger blauer Hut in (3,17,37)/(21,47,102)/(18,66,131)/(21,91,176)/(39,79,152)/(47,115,218); die Spitze (x 8–14, y 0–4) hängt nach rechts herab; um die Krone liegt ein weißes
   Stirnband (246,255,255)/(213,213,213) bei y 9; zwei graue Metallnieten (189,189,189) sitzen auf der Krempe bei (4,8) und (11,8).
 * GESICHT (x 3–12, y 11–15): Haut (246,189,123)/(255,213,164)/(213,164,98)/(180,123,49), graue Brauen (123,123,123) bei (5–6,11) und (9–10,11), zwei schwarze Augenschlitze (0,0,0) bei (5–6,13) und (9–10,13)

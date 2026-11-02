@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """Idle-Animation für „Minocrete War Counselor“ (Creature) — der Minotaurus-Krieger mit Hörnerhelm, rotem Busch, rot glühenden Augen, weißer Pluderhose und riesiger Doppelaxt.
 
-Quelle: src/minocrete-war-counselor.png (52×30 px, 51 Farben, 668 Pixel).
+Quelle: src/minocrete-war-counselor.png (52×30 px, 35 Farben, 668 Pixel).
 PICK: [["MotiveSteamDwarfs", 391, 1]]      (Ebene „Minocrete War Counsellor“, ganze Ebene = eine Figur samt Axt, 52×30 px; nur in dieser Karte)
 Abgleich mit der Kartenkunst Minocrete_War_Counselor.png (76×51): Sprite sitzt dort 100 % pixelgleich. Auf der Karte stehen außerdem Felswand, Busch und Steinturm (Hintergrund) — nichts davon gehört zur Figur.
 

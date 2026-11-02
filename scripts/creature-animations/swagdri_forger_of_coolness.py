@@ -21,7 +21,7 @@ Metall (Hammerkopf, Amboss, Rüstung) glänzt (Regel 12/14). Kein Feuer, keine P
 
 Ablauf (48 Frames à 70 ms = 3,36 s, nahtlos; der Zwerg ist klein — ruhig, aber nie starr):
 * ATMEN (einmal je Schleife): die schwarze Gürtelzeile 28 wird einmal eingefügt (glatte Zeile): Kopf, Bart, Schultern steigen 1 px, Beine/Boden und Amboss bleiben.
-* HAMMERARM: Hand, Stiel und Hammerkopf sind EINE Gruppe (Regel 28): sie steigt mit dem Atem und hebt sich zusätzlich zweimal je Schleife (Frames 6–17 und 30–41) 1 px (Hammer „wiegt“), so folgt die Waffe immer der Hand.
+* HAMMERARM: Hand, Stiel und Hammerkopf sind EINE Gruppe (Regel 28): sie steigt mit dem Atem und hebt sich zusätzlich zweimal je Schleife (Frames 13–23 und 37–47) 1 px (Hammer „wiegt“), so folgt die Waffe immer der Hand.
   Die Gruppe liegt vor Zwerg und Amboss; freigelegte Pixel darunter (Amboss-Rand bei (16–18, 14–16), Zwergen-Schulterkante bei (20, 17–22)) stammen aus den Quell-Ebenen (s. Ergänzungen).
 * ZOPFSPITZE: die zwei obersten Haarpixel (26–27, 10) schwanken 1 px nach rechts (Frames 10–19) bzw. links (34–43) — an der Haarzeile 11 angeschlossen (4-verbunden).
 * GLANZ: Lichtband über den Amboss (Frames 2–15) mit Stern auf der Ambossplatte (9,15) Frames 7–10; Lichtband über den Hammerkopf (Frames 20–33) mit Stern (13,3) Frames 26–29;
@@ -63,9 +63,7 @@ ERG_ZWERG = {(20, 17): (41, 8, 0), (20, 18): (0, 0, 0), (20, 19): (32, 32, 32), 
 RAMPE_AMBOSS = [(21, 24, 38), (38, 43, 68), (58, 68, 102), (90, 105, 136), (139, 155, 180)]
 RAMPE_HAMMER = [(19, 19, 19), (32, 32, 32), (43, 43, 43), (59, 59, 59), (65, 65, 65), (106, 106, 106)]
 RAMPE_RUESTUNG = [(32, 32, 32), (65, 65, 65), (106, 106, 106), (123, 123, 123), (156, 156, 156), (189, 189, 189), (213, 213, 213)]
-M_AMBOSS = C.maske_farben(spr, RAMPE_AMBOSS, region=(0, 13, 18, 24)) & ANVIL_X
-M_AMBOSS &= ~C.maske_farben(spr, [(21, 24, 38)], ohne_rand=False)
-M_AMBOSS |= C.maske_farben(spr, RAMPE_AMBOSS[1:], region=(0, 13, 15, 24)) & ANVIL_X
+M_AMBOSS = C.maske_farben(spr, RAMPE_AMBOSS[1:], region=(0, 13, 15, 24)) & ANVIL_X
 M_HAMMER = C.maske_farben(spr, RAMPE_HAMMER, region=(11, 0, 26, 6)) & GRUPPE
 M_RUESTUNG = C.maske_farben(spr, RAMPE_RUESTUNG, region=(20, 19, 37, 31)) & ZWERG_M
 S_HELL, S_ARM, S_ARM2 = (213, 213, 213), (156, 156, 156), (189, 189, 189)

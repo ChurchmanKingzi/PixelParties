@@ -111,7 +111,8 @@ def frame_gross(i, nur=None):
     # Feuer: Pixel der Flamme liegen auf der gespiegelten Leinwand → zurückspiegeln
     fl = D.flip_v(FEUER.ebene(i))
     fk = D.flip_v(FEUER.funken(i, leben=10))
-    ebenen = [(fl, 0, 0), (f, 0, 0)]
+    f = U.kontur_schliessen(L.zusammen(H, W, [(fl, 0, 0), (f, 0, 0)]), UMRISS, ROT)       # Randpixel-Test auch für Flammenpixel am Körper
+    ebenen = [(f, 0, 0)]
     if nur != 'koerper':
         ebenen = [(fk, 0, 0)] + ebenen                           # Feuerfunken gehören zum Feuer (Zuschnitt), aber nicht zum Randpixel-Test
     if nur is None:
