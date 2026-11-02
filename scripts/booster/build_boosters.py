@@ -502,39 +502,26 @@ def tpl_mosaic(P, th, mt, pack, v):
     return names
 
 
-def draw_explosion(P, cx, cy, R=66, seed=5):
-    """Pixel-Explosion (Zellen 3x3 wie die Sprites): Zackenstern in vier Gluttönen, dunkle Kante, Funken."""
-    gold = G.metal('gold')
-    rng = np.random.RandomState(seed)
-    n = 13
-    rad = R * (0.62 + 0.38 * rng.rand(n))
-    rad[::2] *= 0.68
-    cxx = (XX // 3) * 3 + 1; cyy = (YY // 3) * 3 + 1
-    ang = np.arctan2(cyy - cy, cxx - cx); dist = np.hypot(cxx - cx, cyy - cy)
-    t = (ang + np.pi) / (2 * np.pi) * n
-    i0 = np.floor(t).astype(int) % n; i1 = (i0 + 1) % n; f = t - np.floor(t)
-    r = rad[i0] * (1 - f) + rad[i1] * f
-    q = dist / np.maximum(r, 1)
-    out = (q <= 1.0) & INNER
-    edge = out & (q > 0.86)
-    dark = pal.hexrgb('#4a0a00')
-    P.paint(G.dilate(out, 2) & ~out & INNER, dark, wt=0.6)
-    for lo, hi, col in ((0.0, 0.3, gold[4]), (0.3, 0.55, gold[0]), (0.55, 0.78, gold[1]), (0.78, 0.9, gold[2]), (0.9, 1.01, gold[3])):
-        P.paint(out & (q >= lo) & (q < hi), col, wt=1.0)
-    # Funken / Trümmer
-    for _ in range(14):
-        a = rng.rand() * 6.283; d = R * (0.95 + 0.5 * rng.rand())
-        x = int(cx + d * np.cos(a)) // 3 * 3; y = int(cy + d * np.sin(a)) // 3 * 3
-        m = G.rect_mask(x, y, x + 3, y + 3) & INNER
-        P.paint(m, [gold[0], gold[1], gold[4]][rng.randint(0, 3)], wt=1.0)
+FX_SPRITES = {'explosion': ('_effects/Motive/explosion/Motive_L1481_explosion_69x84.png', (33, 40))}   # (Datei im Sprites-Repo, Mitte der Aussparung im Sprite)
+
+
+FX_K = 2      # Faktor 3 wäre größer als der ganze Kunstrahmen (Effekt-Sprite 69x84)
+
+
+def draw_fx(P, name, cx, cy):
+    """Effekt-Sprite aus Motive.xcf (Sprites-Repo) in Faktor 2 hinter die Figur setzen; seine Aussparung liegt mittig um die Figur, Überstand wird am Rahmen abgeschnitten."""
+    path, (hx, hy) = FX_SPRITES[name]
+    im = Image.open(os.path.join(C.SPRITES, path)).convert('RGBA')
+    s = G.scaled(im, FX_K)
+    G.blit(P, s, int(cx - hx * FX_K), int(cy - hy * FX_K), wt=0.4, mask_clip=INNER)
 
 
 def tpl_hero(P, th, mt, hero, fx=None, **kw):
     """Ein Held in einheitlicher Pixelgröße auf Strahlenkranz."""
     art_burst(P, th, rot=0.2)
     art_particles(P, th, 11)
-    if fx == 'explosion':
-        draw_explosion(P, IX0 + IW // 2, IY0 + 84)
+    if fx:
+        draw_fx(P, fx, IX0 + IW // 2, IY0 + 126 - 38)      # Mitte der Figur (Sprite ca. 75 px hoch, Füße auf IY0+126)
     if hero in PILE:
         draw_pile(P, hero, IX0 + IW // 2, IY0 + 126)
     place_sprite(P, hero, IX0 + IW // 2, IY0 + 126, shadow=hero not in PILE)
