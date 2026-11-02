@@ -11714,12 +11714,18 @@ function brettwertNeuFuer(engine, cpuIdx) {
   return nur == null ? OPT_KREATUR_BRETTWERT : nur === cpuIdx;
 }
 
+// Wertnetz im Schattenmodus (`PP_VALUE_NET=shadow`): rechnet bei jeder Bewertung mit und ändert nichts. Ohne den Schalter wird das Modul nicht geladen.
+const VALUE_SHADOW = process.env.PP_VALUE_NET === 'shadow' ? require('./_value-shadow') : null;
+
 function evaluateState(engine, cpuIdx) {
   // Auswertungs-Scope: Die Bewertung ist synchron und schreibt nichts — reine Regelabfragen (Stufenprüfung, Handwerte …) werden
   // innerhalb EINES Aufrufs nur einmal gerechnet (siehe `GameEngine._scoped`).
   const prevScope = engine._evalScopeOpen();
-  try { return evaluateStateRoh(engine, cpuIdx); }
+  let v;
+  try { v = evaluateStateRoh(engine, cpuIdx); }
   finally { engine._evalScopeClose(prevScope); }
+  if (VALUE_SHADOW) VALUE_SHADOW.observe(engine, cpuIdx, v);
+  return v;
 }
 function evaluateStateRoh(engine, cpuIdx) {
   const gs = engine.gs;

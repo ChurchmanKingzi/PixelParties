@@ -1364,6 +1364,8 @@ function attachTrainingRecorder(engine, { pinnedIdx, pinnedName, opponentName, f
         equips,
         locks,
       };
+      // Schattenmodus des Wertnetzes (PP_VALUE_NET=shadow): Paare aus Evaluator und Netz samt Zeiten in die Zeile (sonst nichts).
+      if (process.env.PP_VALUE_NET === 'shadow') { const sm = require('./_value-shadow').summary(engine); if (sm) record.valueShadow = sm; }
       // Zustandslog hängt UNSICHTBAR am Record (nicht aufzählbar → nie in der jsonl); der Aufrufer packt ihn nach dem Schreiben der Zeile.
       if (valueLog) Object.defineProperty(record, '_valueLog', { value: valueLog, enumerable: false });
       return record;
