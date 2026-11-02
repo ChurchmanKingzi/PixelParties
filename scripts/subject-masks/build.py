@@ -8,12 +8,16 @@ des Motivs. Die Kartenkunst entsteht aus Ebenen der Motive-XCF-Dateien; die Eben
 hartem Alpha. Hier werden sie in der Kunst wiedergefunden (Position per Pixelvergleich) und ihr Alpha wird zur Maske.
 
 Verfahren je Karte:
-  1. Kandidaten: Sprites, deren Dateiname (oder Heldenordner) ein Wort des Kartennamens enthaelt (Woerter ab 4 Buchstaben).
-  2. Jeder Kandidat wird in der Kunst gesucht (Massstab 1 und 2); Trefferquote = Anteil der deckenden Sprite-Pixel, deren Farbe in
-     der Kunst innerhalb von 14 Summenstufen liegt. Ab 0,70 gilt er als Treffer.
-  3. Maske = Vereinigung der Treffer-Ebenen. Kleine geschlossene Luecken (bis 2 % der Kunstflaeche) werden gefuellt, damit
-     Luecken zwischen zwei Ebenen nicht als Hintergrund zaehlen.
-  4. Guete: "hoch" (alle Ebenen >= 0,90), "mittel" (>= 0,80), "knapp" (>= 0,70). Karten ohne Treffer bekommen keine Maske.
+  1. Namens-Treffer: Sprites, deren Dateiname (oder Heldenordner) ein Wort des Kartennamens enthaelt (Woerter ab 4 Buchstaben),
+     werden in der Kunst gesucht (Massstab 1 und 2; Trefferquote = Anteil der deckenden Sprite-Pixel, deren Farbe in der Kunst
+     innerhalb von 14 Summenstufen liegt; ab 0,70 gilt ein Treffer).
+  2. Globale Suche: ALLE Sprites werden per Farbsignatur (Farben auf 4 Bit gerundet) vorgefiltert und ueber Ankerpixel der seltensten
+     Farben in der Kunst gesucht (ab 0,80, kleine Sprites strenger, mehrere Kopien desselben Sprites werden gefunden). So kommen auch
+     Ebenen mit anderem Namen dazu (Karten in der Hand, Preisschilder, Muenzen).
+  3. Maske = Vereinigung aller Treffer-Ebenen. Dann Bereinigung: Randpixel in Farben, die nur im Hintergrund direkt ausserhalb der
+     Silhouette vorkommen (nicht im Motiv daneben), werden entfernt; winzige Splitter fliegen raus, kleine Luecken werden gefuellt.
+  4. Guete: "hoch" (alle Ebenen >= 0,90), "mittel" (>= 0,80), "knapp" (>= 0,70). Karten ohne jeden Sprite-Treffer bekommen, wenn opencv
+     installiert ist, eine grobe GrabCut-Maske ("grabcut"); sonst keine.
 
 WICHTIG: Automatische Masken sind nur Vorschlaege ("checked": false). Sie enthalten nur die Ebenen, deren Dateiname zum Kartennamen
 passt. Viele Kartenbilder sind aber ganze Szenen (Zimmer, Marktstand, Palast) mit mehreren Figuren und Requisiten auf eigenen Ebenen
@@ -29,7 +33,7 @@ Ausgabe: data/subject-masks.json
   { "version": 1, "cards": { "<Kartenname>": { "w": 152, "h": 102, "rle": [...], "q": "hoch", "score": 0.83, "src": ["<Sprite>", ...], "checked": false } } }
   w/h = Rastergroesse der Kunst im Atlas (public/cardgen/art.json, Schluessel "a"). rle = Lauflaengen abwechselnd Hintergrund /
   Motiv, zeilenweise, mit Hintergrund beginnend (ein Motiv in der ersten Zelle beginnt also mit 0).
-Abhaengigkeiten: numpy, Pillow.
+Abhaengigkeiten: numpy, Pillow; optional opencv-python-headless (GrabCut-Rueckfall fuer Kunst ohne Sprite-Treffer).
 """
 import argparse
 import json
@@ -92,6 +96,7 @@ def init(sprite_dir):
     for i, (rel, tk) in enumerate(_sprites):
         for t in tk:
             _by_token.setdefault(t, []).append(i)
+    load_global()
 
 
 def load_sprite(rel):
@@ -155,6 +160,194 @@ def fill_holes(mask, max_area):
     return out
 
 
+_global = None
+
+
+def _qkey(rgb):
+    rgb = rgb.astype(np.int32)
+    return ((rgb[..., 0] >> 4) << 8) | ((rgb[..., 1] >> 4) << 4) | (rgb[..., 2] >> 4)
+
+
+def load_global():
+    """Alle Sprites mit Pixellisten und Farbsignatur (fuer die globale Suche)."""
+    global _global
+    out = []
+    for rel, _ in _sprites:
+        a = load_sprite(rel)
+        ys, xs = np.nonzero(a[..., 3] > 128)
+        if len(ys) < 40:
+            continue
+        rgb = a[ys, xs, :3].astype(np.int16)
+        key = _qkey(rgb)
+        uk, ui, uc = np.unique(key, return_index=True, return_counts=True)
+        if len(uk) < 3:
+            continue
+        out.append({'rel': rel, 'ys': ys.astype(np.int32), 'xs': xs.astype(np.int32), 'rgb': rgb, 'uk': uk, 'ui': ui, 'uc': uc, 'n': len(ys)})
+    _global = out
+
+
+def _art_info(art):
+    H, W, _ = art.shape
+    key = _qkey(art).ravel()
+    order = np.argsort(key, kind='stable')
+    uk, start, cnt = np.unique(key[order], return_index=True, return_counts=True)
+    return {'H': H, 'W': W, 'art': art.astype(np.int16), 'order': order, 'uk': uk, 'start': start, 'cnt': cnt}
+
+
+def _needed_fraction(area):
+    return 0.80 if area >= 150 else 0.90 if area >= 60 else 0.95
+
+
+def _scaled(sp, scale):
+    ys, xs, rgb = sp['ys'], sp['xs'], sp['rgb']
+    if scale == 1:
+        return ys, xs, rgb
+    dy = np.array([0, 0, 1, 1])
+    dx = np.array([0, 1, 0, 1])
+    return (ys[:, None] * 2 + dy[None, :]).ravel(), (xs[:, None] * 2 + dx[None, :]).ravel(), np.repeat(rgb, 4, axis=0)
+
+
+def global_layers(art, scales=(1,), maxarea=0.40):
+    """Alle Sprites, die in der Kunst sichtbar sind -> [(quote, rel, dx, dy, scale)]."""
+    ai = _art_info(art)
+    H, W = ai['H'], ai['W']
+    found = []
+    for sp in _global:
+        for scale in scales:
+            area = sp['n'] * scale * scale
+            if area > maxarea * H * W or area < 40:
+                continue
+            inart = np.isin(sp['uk'], ai['uk'], assume_unique=True)
+            if sp['uc'][inart].sum() / sp['n'] < 0.85:
+                break
+            idx = np.searchsorted(ai['uk'], sp['uk'][inart])
+            sel = np.argsort(ai['cnt'][idx])[:3]
+            ys, xs, rgb = _scaled(sp, scale)
+            cands = set()
+            for k, ui in zip(sp['uk'][inart][sel], sp['ui'][inart][sel]):
+                j = np.searchsorted(ai['uk'], k)
+                pos = ai['order'][ai['start'][j]:ai['start'][j] + min(int(ai['cnt'][j]), 120)]
+                ay, ax = pos // W, pos % W
+                if scale == 1:
+                    offs = [(int(ys_i), int(xs_i)) for ys_i, xs_i in [(sp['ys'][ui], sp['xs'][ui])]]
+                else:
+                    offs = [(int(sp['ys'][ui]) * 2 + a, int(sp['xs'][ui]) * 2 + b) for a in (0, 1) for b in (0, 1)]
+                for sy, sx in offs:
+                    for y, x in zip(ay, ax):
+                        cands.add((int(x - sx), int(y - sy)))
+            need = _needed_fraction(area)
+            res = []
+            for dx, dy in list(cands)[:400]:
+                yy, xx = ys + dy, xs + dx
+                inb = (yy >= 0) & (yy < H) & (xx >= 0) & (xx < W)
+                if inb.sum() < 25 or inb.sum() < 0.5 * len(yy):
+                    continue
+                d = np.abs(ai['art'][yy[inb], xx[inb]] - rgb[inb]).sum(1)
+                frac = float((d <= TOLERANCE).mean())
+                if frac >= need:
+                    res.append((frac, dx, dy, scale))
+            res.sort(reverse=True)
+            kept = []
+            for f, dx, dy, sc in res:
+                if (f >= 0.9 or not kept) and all(abs(dx - k[1]) + abs(dy - k[2]) > 2 for k in kept):
+                    kept.append((f, dx, dy, sc))
+            for f, dx, dy, sc in kept[:12]:
+                found.append((f, sp['rel'], dx, dy, sc))
+    return found
+
+
+def clean_mask(art, mask):
+    """Randfransen aus Hintergrundfarbe entfernen, Splitter entfernen, kleine Luecken fuellen."""
+    H, W = mask.shape
+    m = mask.copy()
+    key = _qkey(art)
+
+    def dilate(a, n):
+        o = a.copy()
+        for _ in range(n):
+            p = np.pad(o, 1)
+            o = o | p[:-2, 1:-1] | p[2:, 1:-1] | p[1:-1, :-2] | p[1:-1, 2:]
+        return o
+
+    def erode(a, n):
+        return ~dilate(~a, n)
+    for _ in range(2):                                   # zwei Durchgaenge: Fransen koennen zwei Pixel breit sein
+        outside = dilate(m, 3) & ~m                      # Hintergrund direkt ausserhalb
+        inside = erode(m, 2) if m.sum() > 50 else m      # Motiv ohne Randband
+        band = m & ~inside
+        if not band.any() or not outside.any() or not inside.any():
+            break
+        bg_keys = set(np.unique(key[outside]).tolist())
+        ys, xs = np.nonzero(band)
+        for y, x in zip(ys, xs):
+            k = int(key[y, x])
+            if k not in bg_keys:
+                continue
+            y0, y1, x0, x1 = max(0, y - 6), min(H, y + 7), max(0, x - 6), min(W, x + 7)
+            loc_in = inside[y0:y1, x0:x1]
+            if loc_in.any() and k in set(np.unique(key[y0:y1, x0:x1][loc_in]).tolist()):
+                continue                                 # die Farbe kommt auch im Motiv daneben vor (z. B. Flammen)
+            m[y, x] = False
+    # Splitter: Komponenten unter 6 Pixeln entfernen (8er-Nachbarschaft), Luecken bis 3 Pixel fuellen
+    for target, limit, to in ((True, 5, False), (False, 3, True)):
+        seen = np.zeros_like(m, dtype=bool)
+        for y0 in range(H):
+            for x0 in range(W):
+                if m[y0, x0] != target or seen[y0, x0]:
+                    continue
+                stack = [(y0, x0)]
+                seen[y0, x0] = True
+                comp = []
+                border = False
+                while stack:
+                    y, x = stack.pop()
+                    comp.append((y, x))
+                    if y in (0, H - 1) or x in (0, W - 1):
+                        border = True
+                    for dy in (-1, 0, 1):
+                        for dx in (-1, 0, 1):
+                            ny, nx = y + dy, x + dx
+                            if (dy or dx) and (target or (dy == 0 or dx == 0)) and 0 <= ny < H and 0 <= nx < W and m[ny, nx] == target and not seen[ny, nx]:
+                                seen[ny, nx] = True
+                                stack.append((ny, nx))
+                if len(comp) <= limit and (target or not border):
+                    for y, x in comp:
+                        m[y, x] = to
+    return m
+
+
+def grabcut_mask(art):
+    """Rueckfall fuer Kunst ohne passende Sprite-Ebene: grobe Freistellung per GrabCut (optional, braucht opencv-python-headless)."""
+    try:
+        import cv2
+    except ImportError:
+        return None
+    H, W, _ = art.shape
+    sc = 4 if W <= 100 else 2
+    big = cv2.resize(art, (W * sc, H * sc), interpolation=cv2.INTER_NEAREST)
+    h, w = big.shape[:2]
+    gc = np.full((h, w), cv2.GC_PR_BGD, np.uint8)
+    m = int(min(h, w) * 0.06)
+    gc[:m, :] = gc[-m:, :] = gc[:, :m] = gc[:, -m:] = cv2.GC_BGD
+    el = np.zeros((h, w), np.uint8)
+    cv2.ellipse(el, (w // 2, h // 2), (int(w * 0.32), int(h * 0.38)), 0, 0, 360, 1, -1)
+    gc[el == 1] = cv2.GC_PR_FGD
+    core = np.zeros((h, w), np.uint8)
+    cv2.ellipse(core, (w // 2, h // 2), (int(w * 0.16), int(h * 0.2)), 0, 0, 360, 1, -1)
+    gc[core == 1] = cv2.GC_FGD
+    try:
+        cv2.grabCut(big, gc, None, np.zeros((1, 65)), np.zeros((1, 65)), 6, cv2.GC_INIT_WITH_MASK)
+    except cv2.error:
+        return None
+    fg = ((gc == cv2.GC_FGD) | (gc == cv2.GC_PR_FGD)).astype(np.uint8)
+    n, lab, st, _ = cv2.connectedComponentsWithStats(fg)
+    if n < 2:
+        return None
+    fg = (lab == 1 + int(np.argmax(st[1:, cv2.CC_STAT_AREA]))).astype(np.uint8)
+    small = cv2.resize(fg, (W, H), interpolation=cv2.INTER_AREA) > 0.5
+    return small
+
+
 def mask_for(name):
     """-> (maske | None, [(trefferquote, sprite), ...])"""
     art = art_of(name)
@@ -164,7 +357,7 @@ def mask_for(name):
     for t in name_tokens:
         if len(t) >= 4 or len(name_tokens) == 1:
             cand.update(_by_token.get(t, []))
-    found = []
+    layers = {}                                           # rel -> (quote, maske)
     for ci in sorted(cand):
         rel = _sprites[ci][0]
         spr = load_sprite(rel)
@@ -175,20 +368,36 @@ def mask_for(name):
             if r and (best is None or r[0] > best[0]):
                 best = (r[0], r[1], r[2], s)
         if best and best[0] >= THRESHOLD:
-            area = int((best[3][..., 3] > 128).sum())
-            if 0.02 * H * W <= area <= 0.75 * H * W:
-                found.append((best[0], rel, best))
-    if not found:
-        return None, []
+            a = best[3][..., 3] > 128
+            if 0.02 * H * W <= int(a.sum()) <= 0.75 * H * W:
+                mk = np.zeros((H, W), bool)
+                h, w = a.shape
+                sub = a[:H - best[2], :W - best[1]]
+                mk[best[2]:best[2] + sub.shape[0], best[1]:best[1] + sub.shape[1]] |= sub
+                layers[rel] = (best[0], mk)
+    for f, rel, dx, dy, scale in global_layers(art, (1, 2) if W >= 140 else (1,)):
+        sp = next(x for x in _global if x['rel'] == rel)
+        ys, xs, _rgb = _scaled(sp, scale)
+        yy, xx = ys + dy, xs + dx
+        inb = (yy >= 0) & (yy < H) & (xx >= 0) & (xx < W)
+        mk = np.zeros((H, W), bool)
+        mk[yy[inb], xx[inb]] = True
+        key = rel if (rel not in layers and scale == 1 and dx == 0 and dy == 0) else '%s@%d,%d' % (rel, dx, dy)
+        if key not in layers or layers[key][0] < f:
+            layers[key] = (f, mk)
+    if not layers:
+        gcm = grabcut_mask(art)
+        if gcm is None or not (0.05 * H * W <= gcm.sum() <= 0.60 * H * W):
+            return None, []
+        return fill_holes(gcm, max(4, int(HOLE_FRACTION * H * W))), [(0.0, 'GrabCut (Rueckfall, ungenau)')]
     mask = np.zeros((H, W), bool)
-    for _, _, (_, dx, dy, s) in found:
-        a = s[..., 3] > 128
-        h, w = a.shape
-        mask[dy:dy + h, dx:dx + w] |= a
+    for f, mk in layers.values():
+        mask |= mk
+    mask = clean_mask(art, mask)
     mask = fill_holes(mask, max(4, int(HOLE_FRACTION * H * W)))
-    if not (0.03 * H * W <= mask.sum() <= 0.70 * H * W):
+    if not (0.02 * H * W <= mask.sum() <= 0.70 * H * W):
         return None, []
-    return mask, [(round(f, 3), rel) for f, rel, _ in found]
+    return mask, sorted(((round(f, 3), k) for k, (f, _) in layers.items()), reverse=True)
 
 
 def rle_encode(mask):
@@ -208,6 +417,8 @@ def rle_encode(mask):
 
 
 def quality(matches):
+    if matches and matches[0][1].startswith('GrabCut'):
+        return 'grabcut'
     m = min(f for f, _ in matches)
     return 'hoch' if m >= 0.90 else 'mittel' if m >= 0.80 else 'knapp'
 
