@@ -52,7 +52,7 @@ for _i in range(N):
     S.append(2 if _v >= 0.9 else 1 if _v >= 0.35 else 0)
 POSEN = {0: {}, 1: {22: 1}, 2: {22: 1, 23: 1}}                                                                      # s → eingefügte Zeilen (Rippen, unterhalb des Kopfes)
 assert S[0] == 0
-_ext = [(int(np.nonzero(OPAK[y])[0].min()), int(np.nonzero(OPAK[y])[0].max())) for y in range(sh)]   # (Prüfung der Einfügezeilen unten mit dem Körper OHNE Henkelkreuz)
+_ext = [(int(np.nonzero(OPAK[y])[0].min()), int(np.nonzero(OPAK[y])[0].max())) for y in range(sh)]
 for _s, _d in POSEN.items():
     for _y in _d:
         assert _ext[_y] in (_ext[_y - 1], _ext[_y + 1]), ('Einfügezeile mit Randstufe', _y)

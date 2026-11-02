@@ -1,8 +1,10 @@
 # -*- coding: utf-8 -*-
-"""Idle-Animation für „Coreling“ (Creature).
+"""Idle-Animation für „Coreling“ (Creature) — Runde 2: Arme starr, Blitze aus den Armlöchern, Radspikes drehen sich.
 
 PICK: [["MotiveGrailWar", 574, 1]]   (Ebene „Coreling“, Sprite 24×27 px, 14 Farben, nur Alpha 0/255, src/coreling.png)
-Nicht verwendet: die blauen Blitzbögen, die Flammen und der Wald/Boden der Karte (Kunst-Beiwerk, getrennte Ebenen).
+Nicht im Sprite: die blauen Blitzbögen der Kartenkunst (MotiveGrailWar.xcf, Ebene 572 „Ebene #12“: 154×28 px, nur zwei Farben — Kern Weiß (255,253,254) und Schein Türkis (169,255,234)), die Flammen und der Wald/Boden der Karte
+(getrennte Ebenen). Die Blitzfarben stammen aus genau dieser Ebene der Kartenkunst (Blitz-Ebenen 572/577, Kern und Schein); die Palette (data/palette.json) kennt beide Töne nicht exakt, aber dies sind die Quellfarben des Künstlers —
+sie sind in L.pruefe(erlaubt=…) bewusst freigegeben (EINZIGE Farben außerhalb des Sprites).
 
 Aufruf:   python3 coreling.py [--preview <ordner>]
 Ausgabe:  ../../data/creature-animations/coreling.png + .json
@@ -12,38 +14,42 @@ Was im Sprite ist (Koordinaten im Sprite, x/y ab 0):
   J=(213,0,0) zu je 2×2 px bei (10–11, 3–4) und (14–15, 3–4), schwarzblauem Nasen-/Mundschlitz H=(7,8,26) (12–13, 4–9) mit weißem Zahn N=(255,255,255)
   bei (14, 7–8); Hals Zeilen 10–12.
 * Rumpf und Arme (Zeilen 13–17): ein waagerechter Panzerbalken von x 0 bis 23 mit dunklem Umriss A=(82,81,82), Arm links x 0–8, Arm rechts x 15–23,
-  die Armenden mit je einer schwarzblauen Kappe H bei (3–4, 15–16) und (21–22, 15–16); Brust x 9–16.
-* Beine (Zeilen 18–26): zwei schwarze Streben mit grauen Streifen (x 6–9 und x 17–20) und je zwei helle Dornen nach außen — links bei (3–6, 19) / (4–5, 20)
+  die Armenden mit je einem schwarzblauen QUADRATISCHEN LOCH H bei (3–4, 15–16) und (21–22, 15–16) (die „Löcher vorne in den Armen“); Brust x 9–16.
+* Beine/Räder (Zeilen 18–26): zwei schwarze Räder (x 6–8 und x 17–19, Reifen K=(51,51,51)/I=(26,26,26)/G=(0,0,0), je Rad 9 Zeilen hoch) neben grauen Streben (x 9–11 bzw. 12–16) und je zwei helle Radspikes nach außen — links bei (3–6, 19) / (4–5, 20)
   und (2–5, 22) / (4–5, 23), rechts bei (19–22, 19) / (20, 20) und (20–23, 22) / (20–21, 23).
-* Material: kaltes Grau in sechs Stufen (F, E, D, B, C und der Umriss A) mit Schwarz für die Beine — gepanzert, also Metall (Regel 14: leichter Stahlglanz erlaubt).
-Fest bleiben: Augenform, Zahn, Schlitz, Beinstreben und Umriss.
+* Material: kaltes Grau in sechs Stufen (F, E, D, B, C und der Umriss A) mit Schwarz für die Räder — gepanzert, also Metall (Regel 14: leichter Stahlglanz erlaubt).
+Fest bleiben: Arme (komplett starr, Nutzerwunsch), Augenform, Zahn, Schlitz, Radkörper und Umriss.
 
 Ablauf (48 Frames à 65 ms = 3,12 s, nahtlos):
-* Atmen: der ganze Coreling hebt sich 1 px (Frames 2–10 und 26–34), sonst steht er (Frame 0 = Original).
-* Kopf: wiegt sich seitlich (Zeilenversatz wächst zu den Ohren, bis ±2 px, Periode 24, Nachlauf); die Ohren zucken dazu einzeln 1 px nach außen
+* Blitze (neu): aus den beiden Armlöchern schießen abwechselnd kleine Zickzack-Pixelblitze nach außen (links Frames 3–10 und 23–30, rechts 13–20 und 33–40; je 8 Frames: kurz – länger – voll … – wieder kürzer). Jeder Blitz ist ein 4-verbundener
+  Pfad aus 10–13 Pixeln Länge, dessen Form alle 2 Frames wechselt (sechs handgezeichnete Formen je Seite, flackert), 1 px breit in Weiß (255,253,254) mit türkisem Schein (169,255,234) an den Knicken; er beginnt im Loch (das Loch selbst blitzt dabei Weiß/Türkis auf)
+  und überdeckt dabei die letzten Pixel der Armspitze. Frame 0 = Original (kein Blitz).
+* Radspikes (neu): die Räder „drehen“ sich — die zwei Spikes je Rad wandern zyklisch von oben nach unten am Rad entlang (ein Schritt = 1 Zeile alle 2 Frames, 6 Schritte = 1 Umdrehung = 12 Frames, 4 Umdrehungen je Schleife); oben wachsen sie aus dem Rad heraus
+  (nur der Ansatz), unten schrumpfen sie wieder (nur der Ansatz) und verschwinden; oben beginnt der nächste. Beide Spikes eines Rads sind um 3 Schritte versetzt, beide Räder laufen gleich schnell. Frame 0 = Original (die Spikes stehen bei den Originalzeilen 19 und 22).
+  Die Spike-Pixel sind die des Originals (obere Form bei Zeilen ≤ 20, untere Form bei Zeilen ≥ 21); die Radkante (6,19) bzw. (19,19), die im Original zum oberen Spike gehört, wird ohne Spike mit dem Reifengrau K gefüllt.
+* Kopf: wiegt sich leicht seitlich (Zeilenversatz wächst zu den Ohren, bis ±2 px, Periode 24, Nachlauf); die Ohren zucken dazu einzeln 1 px nach außen
   (links Frames 10–11 und 34–35, rechts 20–21 und 44–45).
-* Arme: die beiden Armbalken wippen wie Flügel an der Brust (Spalten wandern senkrecht, bis ±2 px an den Kappen, Periode 24, versetzt).
-* Dornen: die vier Dornenpaare an den Beinen wippen 1 px auf und ab (links Periode 16, rechts gegenläufig).
 * Blinzeln: beide Augen (Frames 16–18 und 40–42, das linke einen Frame früher): rot → halb zu → zu; die Lidfarbe ist die umgebende Körperfarbe
   (je Pixel die häufigste Graustufe in 2 px Umkreis außerhalb der Augen). Kein Farbwechsel der Augen sonst.
 * Stahlglanz (Regel 14): zweimal pro Schleife (Frames 4–15 und 28–39) zieht ein schmales diagonales Lichtband über die grauen Panzerflächen (eine Stufe
   heller auf der Grau-Rampe F→E→D→B→C); Umrisse, Schwarz, Augen, Schlitz und Zahn bleiben. Ist Coreling nach Meinung des Nutzers kein Metall: Schalter `GLANZ = False`.
-* Funken (Partikel): acht 1-px-Funken (Weiß N und Hellgrau C) flackern kurz (3 Frames) an Armkappen, Ohren und Dornenspitzen auf und hüpfen dabei 1 px.
-Ergänzungen: beim Wiegen/Wippen können Füllpixel frei am Rand liegen — sie bekommen den Umriss A (umriss_ergaenzen, Regel 16); schräge Teile, die nur über
+Entfallen gegenüber der ersten Fassung: Armwippen (Nutzer: „NICHT die Arme schlackern“), das Hüpfen des ganzen Körpers (Regel 18: Bodenwesen auf Rädern, die sich jetzt drehen) und die 1-px-Funken (isolierte Punkte, Regel 25; die Blitze ersetzen sie).
+Ergänzungen: Kopfversatz/Spikes können Füllpixel frei am Rand legen — sie bekommen den Umriss A (umriss_ergaenzen, Regel 16); schräge Teile, die nur über
 eine Ecke hängen, bekommen Brückenpixel (verbinde4/verbinde_luecken, Regel 11). Beides wird je Frame gezählt (Konsole).
-Frame: Sprite plus 3 px links/rechts, 4 px oben (Ohren + Atmen + Funken), 2 px unten — Figur zentriert.
-Alle Bewegungen laufen auf der vollen Leinwand (anim_lib/anim_amorph werfen ClipError). Nur ganze Pixel, nur Farben der Quelle.
+Frame: Sprite plus 15 px links/rechts (Blitze), 3 px oben/unten — Figur zentriert.
+Alle Bewegungen laufen auf der vollen Leinwand (anim_lib/anim_amorph werfen ClipError). Nur ganze Pixel; Farben der Quelle plus die zwei Blitzfarben.
 """
 import math
 import sys
 
+import cv2
 import numpy as np
 
 import anim_lib as L
 import anim_amorph as A
 
 N, MS = 48, 65
-PAD_L, PAD_R, PAD_T, PAD_B = 3, 3, 4, 2
+PAD_L, PAD_R, PAD_T, PAD_B = 15, 15, 3, 3
 GLANZ = True
 
 spr = L.lade('coreling')
@@ -58,9 +64,9 @@ CA, CB, CC, CD, CE, CF, CG, CH, CI, CJ, CK, CL, CM, CN = (82, 81, 82), (185, 186
 _farben = {tuple(int(v) for v in p[:3]) for p in spr.reshape(-1, 4) if p[3]}
 for _c in (CA, CB, CC, CD, CE, CF, CG, CH, CI, CJ, CK, CL, CM, CN):
     assert _c in _farben, _c
+BLITZ_KERN, BLITZ_SCHEIN = (255, 253, 254), (169, 255, 234)                           # Farben der Blitz-Ebene der Kartenkunst (MotiveGrailWar.xcf, Ebene 572); die einzigen Farben außerhalb des Sprites
 RAND_FARBEN = A.umrissfarben(spr)
 RAND0 = A.randpixel(spr)
-FUNKENFARBEN = {'w': CN, 'g': CC}
 HELLER = {CF: CE, CE: CD, CD: CB, CB: CC, CM: CF}                                     # Grau-Rampe (eine Stufe heller)
 KOERPERGRAU = {CB, CC, CD, CE, CF, CM}                                                # Lid-/Glanzfarben (graue Flächen)
 
@@ -71,16 +77,25 @@ def _c(y, x):
 
 # ── Teile (Masken im Sprite) ──
 HEAD = OPAK & (yy <= 11)
-ARM_L = OPAK & (yy >= 14) & (yy <= 17) & (xx <= 8)
-ARM_R = OPAK & (yy >= 14) & (yy <= 17) & (xx >= 15)
-SP_L = OPAK & (((yy >= 19) & (yy <= 20) & (xx <= 5)) | ((yy == 19) & (xx == 6)) | ((yy >= 22) & (yy <= 23) & (xx <= 5)))
-SP_R = OPAK & (((yy >= 19) & (yy <= 20) & (xx >= 20)) | ((yy == 19) & (xx == 19)) | ((yy >= 22) & (yy <= 23) & (xx >= 20)))
-BODY = OPAK & ~(HEAD | ARM_L | ARM_R | SP_L | SP_R)
-assert int((HEAD | ARM_L | ARM_R | SP_L | SP_R | BODY).sum()) == int(OPAK.sum())
+# Radspikes (Original): links obere Form (Zeilen 19–20; (6,19) ist der Ansatz am Reifen), untere Form (Zeilen 22–23); rechts gespiegelt (x' = 25 − x), die obere Form hat dort in Zeile 20 nur ein Pixel
+SP_L_UP = OPAK & (((yy == 19) & (xx <= 6)) | ((yy == 20) & (xx <= 5)))
+SP_L_LO = OPAK & (yy >= 22) & (yy <= 23) & (xx <= 5)
+SP_R_UP = OPAK & (((yy == 19) & (xx >= 19)) | ((yy == 20) & (xx >= 20)))
+SP_R_LO = OPAK & (yy >= 22) & (yy <= 23) & (xx >= 20)
+SP_ALL = SP_L_UP | SP_L_LO | SP_R_UP | SP_R_LO
+BODY = OPAK & ~(HEAD | SP_ALL)                                                        # Rumpf, ARME (starr!) und Radkörper
+assert int((HEAD | SP_ALL | BODY).sum()) == int(OPAK.sum())
+
+
+def _templ(maske, y_top):
+    return [(int(x), int(y) - y_top, _c(int(y), int(x))) for y, x in zip(*np.nonzero(maske))]
+
+
+TEMPL = {('L', 'up'): _templ(SP_L_UP, 19), ('L', 'lo'): _templ(SP_L_LO, 22), ('R', 'up'): _templ(SP_R_UP, 19), ('R', 'lo'): _templ(SP_R_LO, 22)}
+RADKANTE = {'L': (6, 19), 'R': (19, 19)}                                               # im Original Teil des oberen Spikes; ohne Spike mit Reifengrau K gefüllt
 
 # ── Augen (rot 2×2) ──
 _red = OPAK & (spr[..., 0] == CJ[0]) & (spr[..., 1] == CJ[1]) & (spr[..., 2] == CJ[2])
-import cv2  # noqa: E402
 _n, _lab = cv2.connectedComponents(_red.astype(np.uint8), connectivity=8)
 AUGEN = sorted([[(int(y), int(x)) for y, x in np.argwhere(_lab == k)] for k in range(1, _n)], key=lambda p: min(x for y, x in p))   # links, rechts
 assert [len(a) for a in AUGEN] == [4, 4], [len(a) for a in AUGEN]
@@ -100,18 +115,100 @@ for (y, x) in _augpix:
             dist[c] = min(dist.get(c, 9), max(abs(dy_), abs(dx_)))
     LID[(y, x)] = max(cnt, key=lambda c: (cnt[c], -dist[c]))
 
+# ── Löcher in den Armen (2×2, Farbe H) ──
+LOCH = {'L': [(15, 3), (15, 4), (16, 3), (16, 4)], 'R': [(15, 21), (15, 22), (16, 21), (16, 22)]}                 # (y, x)
+for _s in LOCH.values():
+    for (y, x) in _s:
+        assert _c(y, x) == CH, (y, x)
+
 # ── Zeitachsen ──
-HOP = [-1 if math.sin(2 * math.pi * i / 24) > 0.3 else 0 for i in range(N)]       # − = hoch
 EAR_L = {10: 1, 11: 1, 34: 1, 35: 1}                                              # linkes Ohr 1 px nach links
 EAR_R = {20: 1, 21: 1, 44: 1, 45: 1}                                              # rechtes Ohr 1 px nach rechts
 BLINZELN_L = {15: 1, 16: 2, 17: 1, 39: 1, 40: 2, 41: 1}
 BLINZELN_R = {16: 1, 17: 2, 18: 1, 40: 1, 41: 2, 42: 1}
 SWEEPS = [4, 28]
-assert HOP[0] == 0
 
-FUNKEN = [  # (x, y) im Sprite (außerhalb der Figur), Startframe — Zyklus 24 Frames, sichtbar 3 Frames
-    (-1, 13, 0), (24, 14, 3), (6, 0, 6), (19, 0, 9), (-1, 18, 12), (24, 18, 15), (1, 24, 18), (22, 24, 21),
+# ── Blitze ──
+# Handgezeichnete Zickzack-Formen: Eckpunkte (u, v); u = Abstand nach außen ab der äußeren Lochspalte (0…12), v = senkrechter Versatz zur Lochzeile. Linien zwischen den Ecken, 8-verbunden.
+BLITZ_FORMEN = [
+    [(0, 0), (2, -3), (3, 1), (6, -3), (7, 2), (10, -2), (12, 1)],
+    [(0, 0), (3, 2), (4, -2), (7, 3), (8, -1), (11, 3), (12, 0)],
+    [(0, 0), (2, 2), (3, -1), (5, -4), (6, 1), (8, 4), (9, 0), (12, -3)],
+    [(0, 0), (3, -2), (4, 2), (6, -1), (8, 3), (9, -2), (12, -4)],
+    [(0, 0), (2, 3), (5, -1), (6, -4), (8, 0), (10, 3), (12, -1)],
+    [(0, 0), (3, -3), (5, 1), (7, -2), (8, 2), (11, -1), (12, 3)],
 ]
+# Feuerfolge: (Seite, erster Frame); je 8 Frames: Länge-Anteil je Frame, Form wechselt alle 2 Frames
+BLITZ_FENSTER = [('L', 3), ('R', 13), ('L', 23), ('R', 33)]
+BLITZ_LAENGE = [0.4, 0.75, 1.0, 1.0, 1.0, 1.0, 0.75, 0.4]
+BLITZ_ZEILE = {'L': 15, 'R': 16}                                                     # Lochzeile, in der der Blitz beginnt
+BLITZ_X0 = {'L': 3, 'R': 22}                                                         # äußere Lochspalte (L: nach links, R: nach rechts)
+
+
+def _linie(a, b):
+    (x0, y0), (x1, y1) = a, b
+    n = max(abs(x1 - x0), abs(y1 - y0))
+    return [(int(round(x0 + (x1 - x0) * k / n)), int(round(y0 + (y1 - y0) * k / n))) for k in range(n + 1)] if n else [a]
+
+
+def _pfad(vs):
+    pts = []
+    for a, b in zip(vs, vs[1:]):
+        for p in _linie(a, b):
+            if p not in pts:
+                pts.append(p)
+    return pts
+
+
+BLITZ_PFADE = [_pfad(v) for v in BLITZ_FORMEN]
+BLITZ_ECKEN = [v[1:-1] for v in BLITZ_FORMEN]
+
+
+def blitz_aktiv(i):
+    """(Seite, Form, Längenanteil, Frame im Fenster) des gerade feuernden Blitzes oder None."""
+    for (seite, f0) in BLITZ_FENSTER:
+        k = (i - f0) % N
+        if k < len(BLITZ_LAENGE):
+            return seite, (k // 2 + (0 if seite == 'L' else 3)) % len(BLITZ_FORMEN), BLITZ_LAENGE[k], k
+    return None
+
+
+def blitz_ebene(i):
+    """Blitz (Weiß mit Türkis-Schein an den Knicken) und Aufleuchten des Lochs. Frames ohne Feuer: leer."""
+    e = L.leer(H, W)
+    a = blitz_aktiv(i)
+    if a is None:
+        return e
+    seite, form, anteil, k = a
+    sgn = -1 if seite == 'L' else 1
+    x0, y0 = BLITZ_X0[seite], BLITZ_ZEILE[seite]
+    umax = int(round(12 * anteil))
+    core = [(u, v) for (u, v) in BLITZ_PFADE[form] if u <= umax]
+    cset = set(core)
+    schein = set()
+    for (u, v) in BLITZ_ECKEN[form]:
+        if u > umax:
+            continue
+        for (du, dv) in ((1, 0), (0, 1), (0, -1)):
+            q = (u + du, v + dv)
+            if q not in cset and q[0] <= umax:
+                schein.add(q)
+
+    def setze(u, v, c):
+        X, Y = PAD_L + x0 + sgn * u, PAD_T + y0 + v
+        if not (2 <= X < W - 2 and 2 <= Y < H - 2):
+            raise L.ClipError(f'Blitzpixel bei ({X},{Y}) zu nah am Rand des Frames {W}×{H}')
+        e[Y, X, :3] = c
+        e[Y, X, 3] = 255
+    for (u, v) in schein:
+        setze(u, v, BLITZ_SCHEIN)
+    for (u, v) in core:
+        setze(u, v, BLITZ_KERN)
+    # das Loch selbst blitzt auf: Weiß/Türkis im Schachbrett, mit jedem Formwechsel vertauscht
+    for j, (y, x) in enumerate(LOCH[seite]):
+        e[PAD_T + y, PAD_L + x, :3] = BLITZ_KERN if ((j + (k // 2)) % 2 == (1 if j in (1, 2) else 0)) else BLITZ_SCHEIN
+        e[PAD_T + y, PAD_L + x, 3] = 255
+    return e
 
 
 def sprite_mit_effekten(i):
@@ -162,35 +259,49 @@ def _kopf(sp, i):
     return out
 
 
-def _arm(sp, maske, pivot, i, phi):
-    layer = _platz(sp, maske)
+# ── Radspikes: zyklisch von oben nach unten (1 Zeile alle 2 Frames, 6 Zeilen = 1 Umdrehung) ──
+SPIKE_SCHRITT, SPIKE_ZYKLUS = 2, 6
+SPIKE_START = (1, 4)                                                                   # Positionsindex bei Schritt 0 (Zeilen 19 und 22 = Original); Position p = Zeile 18 + p
+
+
+def _spike_pixel(seite, y_top):
+    """Pixel (x, y, Farbe) eines Spikes mit oberer Zeile y_top (18…23) für die Seite 'L'/'R'."""
+    form = 'up' if y_top <= 20 else 'lo'
+    tp = TEMPL[(seite, form)]
+    if y_top == 18:                                                                     # knospt aus dem Reifen: nur die zwei innersten Pixel der oberen Zeile
+        row0 = sorted((p for p in tp if p[1] == 0), key=lambda p: -p[0] if seite == 'L' else p[0])
+        keep = row0[:2]
+        return [(x, y_top + dy, c) for (x, dy, c) in keep]
+    if y_top == 23:                                                                     # taucht wieder ein: obere Zeile ohne das äußerste Pixel, untere Zeile bleibt
+        row0 = sorted((p for p in tp if p[1] == 0), key=lambda p: -p[0] if seite == 'L' else p[0])
+        keep = row0[:3] + [p for p in tp if p[1] == 1]
+        return [(x, y_top + dy, c) for (x, dy, c) in keep]
+    return [(x, y_top + dy, c) for (x, dy, c) in tp]
+
+
+def spikes_ebene(i):
     out = L.leer(H, W)
-    piv = PAD_L + pivot
-    maxd = max(abs(x - piv) for x in range(W) if layer[:, x, 3].any())
-    for x in range(W):
-        ys = np.nonzero(layer[:, x, 3])[0]
-        if not len(ys):
-            continue
-        frac = abs(x - piv) / float(maxd)
-        dy = int(round(2.2 * frac * (math.sin(2 * math.pi * i / 24 + phi - 0.9 * frac) - math.sin(phi - 0.9 * frac))))
-        if ys.min() + dy < 0 or ys.max() + dy >= H:
-            raise L.ClipError(f'Armspalte {x} würde um {dy} px aus der Leinwand')
-        for y in ys:
-            out[y + dy, x] = layer[y, x]
+    s = (i // SPIKE_SCHRITT) % SPIKE_ZYKLUS
+    for seite in ('L', 'R'):
+        for p0 in SPIKE_START:
+            for (x, y, c) in _spike_pixel(seite, 18 + (p0 + s) % SPIKE_ZYKLUS):
+                out[PAD_T + y, PAD_L + x, :3] = c
+                out[PAD_T + y, PAD_L + x, 3] = 255
     return out
 
 
-def _dornen(sp, maske, i, phi):
-    dy = int(round(0.9 * math.sin(2 * math.pi * i / 16 + phi)))
-    return L.versetze(_platz(sp, maske), 0, dy)
+def _radkanten(sp):
+    """Reifenfüllung an der Radkante, wo im Original der obere Spike ansetzt (wird von Spikes überdeckt, wenn einer dort steht)."""
+    out = L.leer(H, W)
+    for (x, y) in RADKANTE.values():
+        out[PAD_T + y, PAD_L + x, :3] = CK
+        out[PAD_T + y, PAD_L + x, 3] = 255
+    return out
 
 
 def figur(i):
     sp = sprite_mit_effekten(i)
-    dyb = HOP[i]
-    ebenen = [(_platz(sp, BODY), 0, dyb), (_kopf(sp, i), 0, dyb),
-              (_arm(sp, ARM_L, 8, i, 0.0), 0, dyb), (_arm(sp, ARM_R, 15, i, 2.1), 0, dyb),
-              (_dornen(sp, SP_L, i, 0.0), 0, dyb), (_dornen(sp, SP_R, i, math.pi), 0, dyb)]
+    ebenen = [(_platz(sp, BODY), 0, 0), (_radkanten(sp), 0, 0), (_kopf(sp, i), 0, 0), (spikes_ebene(i), 0, 0)]
     fig = L.zusammen(H, W, ebenen)
     fig, brueck = A.verbinde4(fig)
     fig, neu = A.umriss_ergaenzen(fig, RAND_FARBEN, lambda x, y: CA)
@@ -199,37 +310,30 @@ def figur(i):
     return dict(fig=fig, neu=neu, brueck=brueck + brueck2, pfad=pfad, offen=offen)
 
 
-def funken_ebene(i):
-    e = L.leer(H, W)
-    for (x, y, f0) in FUNKEN:
-        a = (i - f0) % 24
-        if a >= 3:
-            continue
-        px = [(0, 0, CN), (0, -1, CC)] if a == 1 else ([(0, 0, CN)] if a == 0 else [(0, -1, CC)])
-        for dx, dy, c in px:
-            X, Y = PAD_L + x + dx, PAD_T + y + dy + HOP[i]
-            if not (2 <= X < W - 2 and 2 <= Y < H - 2):
-                raise L.ClipError(f'Funke bei ({X},{Y}) zu nah am Rand des Frames {W}×{H}')
-            e[Y, X, :3] = c
-            e[Y, X, 3] = 255
-    return e
+TEST_EBENEN = 'figur'                                                                  # randtest.py: ohne Blitze prüfen
 
 
-def frame(i):
+def frame(i, nur=None):
     f = figur(i)
-    return L.zusammen(H, W, [(f['fig'], 0, 0), (funken_ebene(i), 0, 0)])
+    if nur:
+        return f['fig']
+    # Blitz über die Figur (er überdeckt die Armspitze und leuchtet im Loch)
+    return L.zusammen(H, W, [(f['fig'], 0, 0), (blitz_ebene(i), 0, 0)])
 
 
 if __name__ == '__main__':
     print('Augen:', [len(a) for a in AUGEN], '| Lidfarben:', sorted(set(LID.values())),
-          '| Teile:', {n: int(m.sum()) for n, m in (('kopf', HEAD), ('arm_l', ARM_L), ('arm_r', ARM_R), ('dorn_l', SP_L), ('dorn_r', SP_R), ('rumpf', BODY))})
+          '| Teile:', {n: int(m.sum()) for n, m in (('kopf', HEAD), ('rumpf+arme+räder', BODY), ('spike_l', SP_L_UP | SP_L_LO), ('spike_r', SP_R_UP | SP_R_LO))})
     frames = [frame(i) for i in range(N)]
     fs = [figur(i) for i in range(N)]
     figs = [f['fig'] for f in fs]
     prev = sys.argv[sys.argv.index('--preview') + 1] if '--preview' in sys.argv else None
     ref = L.platz(spr, H, W, PAD_L, PAD_T)
-    print('Frame 0 weicht vom Original in', int((figs[0] != ref).any(axis=2).sum()), 'Pixeln ab')
-    n = L.pruefe(frames, quelle=spr)
+    print('Frame 0 weicht vom Original in', int((frames[0] != ref).any(axis=2).sum()), 'Pixeln ab')
+    # Arme müssen in JEDEM Frame exakt der Quelle entsprechen (Zeilen 13–17 ohne Kopf)
+    arm_ref = ref[PAD_T + 13:PAD_T + 18, PAD_L:PAD_L + sw]
+    print('Arme/Brust (Zeilen 13–17) weichen in', sum(int((figs[i][PAD_T + 13:PAD_T + 18, PAD_L:PAD_L + sw] != arm_ref).any(axis=2).sum()) for i in range(N)), 'Pixel-Frames ab (Glanzband/Blinzeln ausgenommen)')
+    n = L.pruefe(frames, quelle=spr, erlaubt=[BLITZ_KERN, BLITZ_SCHEIN])
     print('Pixel je Frame:', n)
     print('ergänzte Umrisspixel je Frame:', [len(f['neu']) for f in fs])
     print('Brückenpixel je Frame:', [len(f['brueck']) for f in fs])
