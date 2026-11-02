@@ -4568,12 +4568,18 @@ body:has(.pz-layout) .pp-bg-particles { display: none; }
   z-index: 1;
 }
 .zone-ability-free-activatable::after {
-  content: '✦';
+  /* ★ Pixel-Sprite statt Schriftzeichen (Befund 2.11.: „das Aktivierungs-Icon von Alchemy war komplett schwarz"): das ✦ ist als einziges
+     Bereit-Zeichen ein EINFARBIGES Schriftzeichen und nimmt seine Farbe aus `color` (Palettenindex 0xFFFF / `currentColor`); wo die Schrift die
+     Vordergrundfarbe nicht anwendet, wird es schwarz — mit der schwarzen Kontur (`filter` weiter unten) dann ganz. ⚡ ⚔ ⚙ 💚 ⚖ tragen feste Farben.
+     Das Sprite (16×16, wie die Glyphe) hat die Farbe fest eingebaut und braucht keine Schrift. */
+  content: '';
+  width: 24px;
+  height: 24px;
+  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' shape-rendering='crispEdges'%3E%3Cpath fill='%23b3f9cf' d='M7 0h2v1h-2zM7 1h2v1h-2zM6 2h4v1h-4zM6 3h4v1h-4zM5 4h6v1h-6zM4 5h8v1h-8zM2 6h12v1h-12zM0 7h16v1h-16zM0 8h16v1h-16zM2 9h12v1h-12zM4 10h8v1h-8zM5 11h6v1h-6zM6 12h4v1h-4zM6 13h4v1h-4zM7 14h2v1h-2zM7 15h2v1h-2z'/%3E%3C/svg%3E") center / 100% 100% no-repeat;
+  image-rendering: pixelated;
   position: absolute;
-  top: -10px;
-  right: -10px;
-  font-size: 22px;
-  color: #b3f9cf;
+  top: -12px;
+  right: -12px;
   filter: drop-shadow(0 0 8px rgba(104,253,193,1)) drop-shadow(0 0 14px rgba(75,205,124,.8));
   animation: abilityBoltBounce 0.5s ease-in-out infinite alternate;
   z-index: 10;
