@@ -24,7 +24,7 @@ NF = 16          # Schimmer-Bilder
 FRAME_MS = 60
 
 # Layout (Pixel auf dem 192x320-Canvas)
-PLATE = (3, 24, 189, 86)
+PLATE = (3, 22, 189, 88)
 FRAME = (8, 92, 184, 248)
 RIBBON = (4, 254, 188, 298)       # Innenfläche y 258..293, Mitte 275.5
 IX0, IY0, IX1, IY1 = 13, 97, 179, 243          # Innenfläche des Kunstrahmens (166 x 146)
@@ -95,10 +95,14 @@ def pick_art(setcode, k, used, w, h):
     return n
 
 
-def auto_tiles(pack, n, w, h, used):
+def auto_tiles(pack, n, w, h, used, pool=None):
     """n Kacheln aus dem Kartenpool eines Packs, die noch nicht vergeben sind."""
-    pool = [c['name'] for c in C.cards_of(pack) if c['name'] not in used]
+    pool = [c['name'] for c in C.cards_of(pack) if c['name'] not in used] if pool is None else [n_ for n_ in pool if n_ not in used]
     out = [x for x in tile_rank(pool, w, h) if x not in used][:n]
+    if len(out) < n:      # kleiner Pool (z. B. ein Archetyp): mit den bestmöglichen übrigen Karten auffüllen, Ausschnitt trotzdem zentriert
+        rest = [x for x in pool if x not in used and x not in out and C.art(x) is not None and C.art(x).width <= 80]
+        rest.sort(key=lambda x: (-art_score(x), x))
+        out += rest[:n - len(out)]
     used.update(out)
     return out
 
@@ -190,11 +194,12 @@ def draw_title(P, th, mt, pack):
     def sc(s):
         return 3 if pxfont.text_mask(s, scale=3, spacing=0).shape[1] <= 152 else 2
     s1, s2 = sc(l1), sc(l2)
-    h1, h2 = 7 * s1, 7 * s2
+    h1 = pxfont.text_mask(l1, scale=s1, spacing=0).shape[0]
+    h2 = pxfont.text_mask(l2, scale=s2, spacing=0).shape[0]
     gap = 6
     total = h1 + gap + h2
-    cy = (PLATE[1] + PLATE[3]) // 2
-    ytop = cy - total // 2 + 1
+    mid = (PLATE[1] + PLATE[3] - 1) / 2.0                 # Mitte der Platteninnenfläche (Rand 4 px je Seite)
+    ytop = int(round(mid - (total - 1) / 2.0))
     cx = W // 2
     G.draw_text(P, l1, cx, ytop, s1, mt=gold, outline=2, shadow=2)
     G.draw_text(P, l2, cx, ytop + h1 + gap, s2, mt=gold, outline=2, shadow=3 if s2 == 3 else 2)
@@ -230,7 +235,9 @@ def badge9(P, cx, cy, r, mt):
     for rr, col in ((r, gold[3]), (r - 1, gold[0]), (r - 2, gold[1]), (r - 4, gold[3])):
         P.paint(d2 <= rr * rr, col, wt=1.0)
     P.paint(d2 <= (r - 4) ** 2, pal.darken(gold[3], 0.55), wt=0.6)
-    G.draw_text(P, '9', cx, cy - 7, 2, mt=gold, outline=1, shadow=0)
+    import pxfont
+    h9 = pxfont.text_mask('9', scale=2, spacing=0).shape[0]
+    G.draw_text(P, '9', cx, int(round((cy - 0.5) - (h9 - 1) / 2.0)), 2, mt=gold, outline=1, shadow=0)
 
 
 def draw_ribbon(P, th, mt):
@@ -309,17 +316,20 @@ def sprite_k(im, maxw, maxh, kmax=6):
     return fit_scale(im, maxw, maxh, kmax)
 
 
-FOOT = {'Alice, the Puppeteer Girl': 28}     # Zeile im Original-Sprite, auf der die Figur steht (Puppen schweben darunter)
+FOOT = {'Alice, the Puppeteer Girl': 27}      # letzte Körperzeile im Original-Sprite (Puppen schweben darunter)
+HOVER = {'Cool Rescuer Monia': 26, 'Monia Bot, the Foretold Rescuer of Coolness': 26}      # fliegen mit Jetpack: Pixel über dem Boden
+PILE = {'Treasure Huntress Semi': (33, 51)}   # Semi steht auf dem Münz- und Edelsteinberg ihrer Kartenkunst (Zeilen der Kunst)
 SOLO_K = 3                                    # einheitliche Pixelgröße für alle Solo-Motive (Hero Packs, Monia)
 INNER = np.zeros((H, W), bool)
 INNER[IY0:IY1, IX0:IX1] = True
 
 
-def largest_component(a):
-    """Größte 8er-zusammenhängende Fläche einer Bool-Maske."""
+def components(a):
+    """8er-zusammenhängende Flächen einer Bool-Maske als Liste von Masken."""
     h, w = a.shape
     lab = np.zeros((h, w), int)
-    best, best_n, n = None, 0, 0
+    n = 0
+    sizes = []
     for sy in range(h):
         for sx in range(w):
             if a[sy, sx] and not lab[sy, sx]:
@@ -332,37 +342,75 @@ def largest_component(a):
                             yy, xx = y0 + dy, x0 + dx
                             if 0 <= yy < h and 0 <= xx < w and a[yy, xx] and not lab[yy, xx]:
                                 lab[yy, xx] = n; st.append((yy, xx))
-                if cnt > best_n:
-                    best, best_n = n, cnt
-    return lab == best if best else a
+                sizes.append(cnt)
+    return [lab == i + 1 for i in range(n)], sizes
+
+
+def largest_component(a):
+    comps, sizes = components(a)
+    return comps[int(np.argmax(sizes))] if comps else a
+
+
+def load_solo(ref):
+    """Held-Sprite ohne abgesetzte Splitter (Funken, lose Pixel), auf den Inhalt zugeschnitten. -> (Bild, bbox im Original)"""
+    orig = C.hero_sprite(ref) if not ref.startswith('file:') else Image.open(ref[5:]).convert('RGBA')
+    if orig is None:
+        return None, None
+    a = np.asarray(orig)[..., 3] > 127
+    comps, sizes = components(a)
+    arr = np.array(orig)
+    for m, s in zip(comps, sizes):
+        if s < 10:
+            arr[m] = (0, 0, 0, 0)
+    orig = Image.fromarray(arr, 'RGBA')
+    bb = orig.getbbox()
+    return orig.crop(bb), bb
+
+
+def draw_pile(P, name, cx, base_y):
+    """Berg aus der Kartenkunst (Münzen, Edelsteine), 3x, als gedithertes Oval unter den Füßen der Figur."""
+    r0, r1 = PILE[name]
+    a = C.art(name)
+    x0 = a.width // 2 - 27
+    big = G.scaled(a.crop((x0, r0, x0 + 54, r1)), SOLO_K)
+    top = base_y - 34
+    cyc = top + big.height // 2
+    e = ((XX - cx) / 80.0) ** 2 + ((YY - cyc) / (big.height / 2.0)) ** 2
+    mask = (e <= 0.86 + 0.28 * BAY) & INNER
+    G.blit(P, big, cx - big.width // 2, top, wt=0.3, mask_clip=mask)
 
 
 def place_sprite(P, ref, cx, base_y, k=SOLO_K, shadow=True):
-    """Sprite mit ganzzahligem Faktor k setzen (Füße auf base_y), komplett im Kunstrahmen; Schatten direkt unter den Füßen."""
-    orig = C.hero_sprite(ref) if not ref.startswith('file:') else Image.open(ref[5:]).convert('RGBA')
-    if orig is None:
+    """Sprite mit ganzzahligem Faktor k (Füße auf base_y; Flieger schweben darüber), komplett im Kunstrahmen; Schatten direkt unter den Füßen."""
+    im, bb = load_solo(ref)
+    if im is None:
         return None
-    bb = orig.getbbox()
-    im = orig.crop(bb)
+    hover = HOVER.get(ref, 0)
+    ground = base_y
+    base_y = base_y - hover
     while k > 1 and (im.width * k > IW - 12 or im.height * k > base_y - IY0 - 6):
         k -= 1
     s = G.scaled(im, k)
     x = int(cx - s.width // 2)
     y = int(base_y - s.height)
     if shadow:
-        foot = FOOT.get(ref)
-        a0 = np.asarray(im.convert('RGBA'))[..., 3] > 127
-        if foot:
-            frow = foot - bb[1]
-            comp = a0
+        a0 = np.asarray(im)[..., 3] > 127
+        if hover:
+            G.ground_shadow(P, cx, ground - 2, 20, 3)
         else:
-            comp = largest_component(a0)          # die Figur selbst, ohne abgesetzte Teile (Herzchen, Funken …)
-            frow = np.where(comp.any(1))[0].max()
-        rows = comp[max(0, frow - 2):frow + 1]
-        xs = np.where(rows.any(0))[0]
-        wfoot = (xs.max() - xs.min() + 1) * k if len(xs) else s.width // 2
-        fx = x + ((xs.min() + xs.max() + 1) * k) // 2 if len(xs) else cx
-        G.ground_shadow(P, fx, y + (frow + 1) * k, max(8, int(wfoot * 0.55) + 3), 4)
+            foot = FOOT.get(ref)
+            if foot:
+                frow = foot - bb[1]
+                comp = a0
+            else:
+                comp = largest_component(a0)
+                widths = comp.sum(1)
+                frow = int(np.where(widths >= 0.35 * widths.max())[0].max())     # unterste Zeile mit nennenswerter Breite (keine Zehenspitzen/Beinenden)
+            rows = comp[max(0, frow - 2):frow + 1]
+            xs = np.where(rows.any(0))[0]
+            wfoot = (xs.max() - xs.min() + 1) * k if len(xs) else s.width // 2
+            fx = x + ((xs.min() + xs.max() + 1) * k) // 2 if len(xs) else cx
+            G.ground_shadow(P, fx, y + (frow + 1) * k - 1, max(8, int(wfoot * 0.55) + 3), 4)
     G.blit(P, s, x, y, wt=0.15, mask_clip=INNER)
     return (x, y, s.width, s.height, k)
 
@@ -401,7 +449,7 @@ def draw_tile(P, im, x, y, w, h, mt, stamp=None, wt=0.2):
 
 
 def grid_layout(n):
-    rows = {3: [3], 4: [2, 2], 5: [3, 2], 9: [3, 3, 3], 12: [3, 3, 3, 3]}[n]
+    rows = {3: [3], 4: [2, 2], 5: [3, 2], 8: [3, 3, 2], 9: [3, 3, 3], 12: [3, 3, 3, 3]}[n]
     gut = 2
     rh = (IH - gut * (len(rows) - 1)) // len(rows)
     rects = []
@@ -420,10 +468,13 @@ def grid_layout(n):
 
 def tpl_grid(P, th, mt, tiles, v=0, pack=None):
     rects = grid_layout(9)
-    if tiles == 'auto':
+    if isinstance(tiles, dict):                 # Pool eines Archetyps (z. B. nur Guardian Beasts)
+        pool = [c['name'] for c in C.CARDS if c.get('archetype') == tiles['archetype']]
+        tiles = auto_tiles(pack, 9, rects[0][2], rects[0][3], USED, pool)
+    elif tiles == 'auto':
         tiles = auto_tiles(pack, 9, rects[0][2], rects[0][3], USED)
     else:
-        tiles = [resolve_art(t, pack, USED) if pack else t for t in tiles]
+        USED.update(tiles)
     P.paint(INNER, pal.darken(pal.hexrgb(th['grad'][2][1]), 0.6), wt=0.3)
     for (x, y, w, h), name in zip(rects, tiles):
         im = tile_image(name, w, h)
@@ -453,7 +504,9 @@ def tpl_hero(P, th, mt, hero, **kw):
     """Ein Held in einheitlicher Pixelgröße auf Strahlenkranz."""
     art_burst(P, th, rot=0.2)
     art_particles(P, th, 11)
-    place_sprite(P, hero, IX0 + IW // 2, IY0 + 126)
+    if hero in PILE:
+        draw_pile(P, hero, IX0 + IW // 2, IY0 + 126)
+    place_sprite(P, hero, IX0 + IW // 2, IY0 + 126, shadow=hero not in PILE)
     return [hero]
 
 
@@ -488,7 +541,7 @@ def tpl_focus(P, th, mt, big, tiles, pack=None):
     if tiles == 'auto':
         tiles = auto_tiles(pack, 3, 50, th_, USED)
     else:
-        tiles = [resolve_art(t, pack, USED, 10) if pack else t for t in tiles]
+        USED.update(tiles)
     art_burst(P, th, rot=0.9)
     art_particles(P, th, 31, 10)
     ax, ay = IX0 + (IW - 152) // 2, IY0 + 5

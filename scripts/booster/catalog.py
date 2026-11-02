@@ -26,13 +26,13 @@ def norm_set(s):
 # Kennungen, die im aktuellen cards.json (noch) nicht vorkommen, schaden nicht — sie decken künftige Karten ab.
 PACK_SETS = {
     'clash':     ['COH', 'SET1', 'SET01'],
-    'monia':     ['ROM', 'SET2', 'SET02', 'MOE'],          # MOE = „Rise of Monia“ (Cool Rescuer Monia steht in PP MOE)
+    'monia':     ['ROM', 'SET2', 'SET02', 'MOE', 'SOD'],          # MOE = „Rise of Monia“ (Cool Rescuer Monia steht in PP MOE)
     'future':    ['DRF', 'SET3', 'SET03', 'GBT', 'DD'],      # „Dreadful Future“: DRF ist nur teilweise eingetragen; GBT, DD und die Archetypen darunter gehören dazu
     'world1':    ['MS1', 'MS01', 'MSAZ', 'MSEG', 'MSGB'],
     'world2':    ['MS2', 'MS02', 'MS3', 'MS03', 'MSIN', 'MSHW', 'MSRU', 'MSJP', 'MSCH'],
     'community': ['MBS', 'MBS1'],
 }
-# „Trials and Tribulations“ = alles, was in keinem anderen Set-Pack landet (ART, THW, WAW, SOB, SOD, CROSS, DIB, ASQ, CRESTMAS, ...)
+# „Trials and Tribulations“ = alles, was in keinem anderen Set-Pack landet (ART, THW, WAW, SOB, CROSS, DIB, ASQ, CRESTMAS, ...)
 
 
 # Karten, die trotz anderer Set-ID zu „Dreadful Future“ gehören: Archetypen Lunatic und Guardian Beasts sowie das Kartenset um Damus, Ifrit und Armageddon
@@ -74,12 +74,33 @@ def cards_of(pack):
     return out
 
 
+def _fix_corners(im):
+    """Manche Kartenbilder tragen in den Ecken ein 3x3-Dreieck in Fremdfarbe (Rahmenzuschnitt). Es wird mit dem Bildinhalt daneben überdeckt."""
+    a = im.load()
+    w, h = im.size
+    wedge = [(0, 0), (1, 0), (2, 0), (0, 1), (1, 1), (0, 2)]
+    for sx, sy in ((0, 0), (1, 0), (0, 1), (1, 1)):
+        def pt(dx, dy):
+            x = dx if not sx else w - 1 - dx
+            y = dy if not sy else h - 1 - dy
+            return x, y
+        cols = [a[pt(dx, dy)][:3] for dx, dy in wedge]
+        mean = [sum(c[i] for c in cols) / len(cols) for i in range(3)]
+        flat = all(sum(abs(c[i] - mean[i]) for i in range(3)) < 45 for c in cols)
+        refs = [a[pt(dx + 3, dy + 3)][:3] for dx, dy in wedge]
+        ref = [sum(c[i] for c in refs) / len(refs) for i in range(3)]
+        if flat and sum(abs(mean[i] - ref[i]) for i in range(3)) > 70:
+            for dx, dy in wedge:
+                a[pt(dx, dy)] = a[pt(dx + 3, dy + 3)]
+    return im
+
+
 def art(name):
     v = ART_INDEX.get(name)
     if not v:
         return None
     p = os.path.join(ROOT, 'data', 'card-art', 'native', v['id'] + '.png')
-    return Image.open(p).convert('RGBA') if os.path.exists(p) else None
+    return _fix_corners(Image.open(p).convert('RGBA')) if os.path.exists(p) else None
 
 
 _HERO_SHEETS = {}
