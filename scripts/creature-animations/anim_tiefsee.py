@@ -89,6 +89,26 @@ def gruppen_scher(a, gruppen, dxs):
     return out
 
 
+def fluegel(a, pivot_x, amp, i, per, lag=0.0, potenz=1.0, bias=0.0, dy0=0):
+    """Flügelschlag spaltenweise: Spalte x wandert um round((amp · (sin(Phase − lag·f) − sin(−lag·f)) + bias·f) · f^potenz) senkrecht (f = Abstand zum Gelenk / größter Abstand).
+    Bei i = 0 ist der Versatz überall 0 (Ruhepose = Original), `lag` lässt die Spitze der Wurzel hinterherschlagen. dy0 = zusätzlicher Versatz des ganzen Flügels.
+    Positiv = nach unten. Jede Spalte bleibt ein starres Stück (Textur ändert sich nicht)."""
+    h, w = a.shape[:2]
+    out = L.leer(h, w)
+    cols = [x for x in range(w) if a[:, x, 3].any()]
+    maxd = max([abs(x - pivot_x) for x in cols], default=1) or 1
+    ph = L.sinus(i, per)
+    for x in cols:
+        f = abs(x - pivot_x) / maxd
+        dy = int(round((amp * (math.sin(ph - lag * f) - math.sin(-lag * f)) + bias * f) * f ** potenz)) + dy0
+        ys = np.nonzero(a[:, x, 3])[0]
+        if ys.min() + dy < 0 or ys.max() + dy >= h:
+            raise L.ClipError(f'Spalte {x} würde um {dy} px aus der Leinwand (Höhe {h}) geschoben')
+        for y in ys:
+            out[y + dy, x] = a[y, x]
+    return out
+
+
 def zusammenhang(a):
     """Anzahl der 8er-Komponenten der deckenden Pixel."""
     import cv2

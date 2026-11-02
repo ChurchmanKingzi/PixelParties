@@ -72,11 +72,11 @@ m239 = np.zeros((sh, sw), bool)
 m239[29:29 + e239.shape[0], 0:e239.shape[1]] = e239[..., 3] > 0
 assert (spr[m239] == np.concatenate([e239[e239[..., 3] > 0]])).all()
 # Das Gesichts-Stück (Schnabelansatz, 14 px) ist im Quell-Sprite ergänzt (siehe Kopf der Datei); es liegt NICHT in Ebene 239, gehört also zum Kopf.
-m_fluegel = vorhanden & ~m239 & (xx >= 39)                     # langer Flügel rechts
+m_fluegel = vorhanden & ~m239 & (xx >= 39) & (yy <= 34)        # langer Flügel rechts (das einzelne Kartenpixel (42,43) am Fuß gehört zum Fuß, nicht zum Flügel)
 m_kopf = vorhanden & ~m239 & (xx < 39)
 m_blatt = m_kopf & (xx <= 19) & (yy <= 26)                     # zweiter Flügel links (rosabraunes Blatt)
 m_horn = m_kopf & (xx >= 21) & (yy <= 18)                      # dunkles Horn neben dem Auge
-m_koerper = vorhanden & m239
+m_koerper = vorhanden & (m239 | (~m239 & (xx >= 39) & (yy > 34)))   # Rumpf + Fuß (Ebene 239) und das Kartenpixel (42,43) am Fuß
 m_auge = vorhanden & L.farbmaske(spr, AUGEN_FARBEN)
 m_fuss = m_koerper & (xx >= 38) & (yy >= 40)                    # Füße am Rumpf
 m_wurzel = m_fluegel & ((xx - 42.0) ** 2 + (yy - 31.0) ** 2 <= 5.6 ** 2)      # Schulter: bleibt am Rumpf (der Flügel biegt sich dahinter heraus)
