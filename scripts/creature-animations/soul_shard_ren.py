@@ -15,7 +15,7 @@ Was im Sprite ist (Koordinaten im Sprite 44×37, x/y ab 0):
 Fest bleiben: Umriss, Kopfform, Gesicht, Gliedmaßen (der Körper streckt sich nur durch eingefügte Rippenzeilen unterhalb des Kopfes).
 
 Ablauf (48 Frames à 65 ms = 3,12 s, nahtlos):
-* Atmen (Periode 24): unterhalb des Kopfes werden im Rippenkorb 1–2 Zeilen eingefügt (Quellzeile 33, in der Spitze zusätzlich 34; Zeilen gleicher Breite, keine Randstufe) — Kopf, Arme und Rumpf heben sich um 1–2 px, die Füße bleiben fest am Boden.
+* Atmen (Periode 24): unterhalb des Kopfes werden im Rippenkorb 1–2 Zeilen eingefügt (Quellzeile 31, in der Spitze zusätzlich 33 — zwei getrennte Rippenzeilen statt der früheren Beinzeilen 33/34, damit keine hohen Einheitsblöcke und keine verlängerten Beine entstehen; Textur der Nachbarzeile eingemischt) — Kopf, Arme und Rumpf heben sich um 1–2 px, die Füße bleiben fest am Boden.
 * Blinzeln (zweimal je Schleife, Frames 13–15 und 37–39: halb – zu – halb): die gelb-orangen Augenpixel werden zum dunklen Maskenblau (Lid = häufigste Maskenfarbe K/O im Umkreis 2–3 px; Stufe 1 schließt die oberen zwei
   Augenzeilen, Stufe 2 alle).
 * Goldschimmer (zweimal je Schleife, Frames 2–18 und 26–42): ein diagonales Lichtband (x+y, 8 px) läuft über die goldenen Innenpixel des Kopftuchs (eine Stufe heller auf der Rampe H→I→N→B→A→F; Umrisspixel und Augen bleiben).
@@ -60,12 +60,12 @@ S = []
 for _i in range(N):
     _v = math.sin(2 * math.pi * _i / 24)
     S.append(2 if _v >= 0.9 else 1 if _v >= 0.35 else 0)
-POSEN = {0: {}, 1: {33: 1}, 2: {33: 1, 34: 1}}                                                                      # s → eingefügte Zeilen (Rippen, unterhalb des Kopfes)
+POSEN = {0: {}, 1: {31: 1}, 2: {31: 1, 33: 1}}                                                                      # s → eingefügte Zeilen (Rippen, unterhalb des Kopfes; zwei GETRENNTE Zeilen, damit keine hohen Einheitsblöcke und keine verlängerten Beine entstehen)
 assert S[0] == 0
 _ext = [(int(np.nonzero(OPAK[y])[0].min()), int(np.nonzero(OPAK[y])[0].max())) for y in range(sh)]
 for _s, _d in POSEN.items():
     for _y in _d:
-        assert _ext[_y] in (_ext[_y - 1], _ext[_y + 1]), ('Einfügezeile mit Randstufe', _y)
+        assert max(abs(_ext[_y][0] - _ext[_y - 1][0]), abs(_ext[_y][1] - _ext[_y - 1][1])) <= 1, ('Einfügezeile mit Randstufe', _y)
 
 # ── Gold: das Kopftuch (Nemes) glänzt (Regel 14, Gold) ──
 yy, xx = np.mgrid[0:sh, 0:sw]

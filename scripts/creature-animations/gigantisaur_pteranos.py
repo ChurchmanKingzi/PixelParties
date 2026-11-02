@@ -50,6 +50,7 @@ import numpy as np
 
 import anim_lib as L
 import anim_flieger as F
+import anim_flieger_r2 as R2
 
 N, MS = 48, 60
 BEAT, DOWN, UP = 16, 6, 8                                      # Frames je Flügelschlag: Abschlag 6, Aufschlag 8, 2 Frames Ruhe oben (damit Frame 0 trotz Spitzenverzögerung = Original)
@@ -121,58 +122,9 @@ def delta(fl, s, t):
     return fl['A'] * a * f
 
 
-def biege(a, fl, t, pad_l=PAD_L, pad_t=PAD_T, ds=0.25):
-    """Ebene `a` (Leinwand) entlang der gebogenen Mittellinie neu abtasten. Zielpixel (x, y) → nächster Punkt der gebogenen Mittellinie (Bogenlänge s, Querabstand q) →
-    Quellpixel an p0 + s·u0 + q·n0 (u0 = Quellrichtung, n0 = Quernormale). Nächster-Nachbar: nur Farben der Quelle, keine Löcher, konstante Breite."""
-    h, w = a.shape[:2]
-    p0 = (pad_l + fl['p0'][0], pad_t + fl['p0'][1])
-    ss = np.arange(-6.0, fl['laenge'] + 4.0 + 1e-9, ds)
-    phi = fl['ang0'] + np.array([delta(fl, s, t) for s in ss])
-    i0 = int(np.argmin(np.abs(ss)))
-    cx, cy = np.zeros_like(ss), np.zeros_like(ss)
-    cx[i0], cy[i0] = p0
-    for k in range(i0 + 1, len(ss)):
-        pm = 0.5 * (phi[k] + phi[k - 1])
-        cx[k], cy[k] = cx[k - 1] + math.cos(pm) * ds, cy[k - 1] + math.sin(pm) * ds
-    for k in range(i0 - 1, -1, -1):
-        pm = 0.5 * (phi[k] + phi[k + 1])
-        cx[k], cy[k] = cx[k + 1] - math.cos(pm) * ds, cy[k + 1] - math.sin(pm) * ds
-    X, Y = np.meshgrid(np.arange(w), np.arange(h))
-    X, Y = X.ravel().astype(float), Y.ravel().astype(float)
-    # nur Zielpixel in Reichweite der Mittellinie (Breite des Flügels + Reserve)
-    D = (X[:, None] - cx[None, :]) ** 2 + (Y[:, None] - cy[None, :]) ** 2
-    k = np.argmin(D, axis=1)
-    dx, dy = X - cx[k], Y - cy[k]
-    cp, sp_ = np.cos(phi[k]), np.sin(phi[k])
-    along = dx * cp + dy * sp_
-    q = -dx * sp_ + dy * cp                                     # Querabstand (Normale n = (−sin φ, cos φ))
-    u0 = (math.cos(fl['ang0']), math.sin(fl['ang0']))
-    n0 = (-math.sin(fl['ang0']), math.cos(fl['ang0']))
-    sx = p0[0] + ss[k] * u0[0] + q * n0[0]
-    sy = p0[1] + ss[k] * u0[1] + q * n0[1]
-    ix, iy = np.floor(sx + 0.5).astype(int), np.floor(sy + 0.5).astype(int)
-    ok = (np.abs(along) <= 1.0) & (ix >= 0) & (ix < w) & (iy >= 0) & (iy < h)
-    out = L.leer(h, w)
-    ok_idx = np.nonzero(ok)[0]
-    quelle = a[iy[ok_idx], ix[ok_idx]]
-    treffer = quelle[:, 3] > 0
-    idx = ok_idx[treffer]
-    out.reshape(-1, 4)[idx] = quelle[treffer]
-    return inseln_weg(out)
-
-
-def inseln_weg(a, min_px=4):
-    """Kleine 4-verbundene Reste (Abtast-Staub an den Flügelkanten) entfernen; der größte Teil bleibt."""
-    n, lab = cv2.connectedComponents((a[..., 3] > 0).astype(np.uint8), connectivity=4)
-    if n <= 2:
-        return a
-    out = a.copy()
-    groessen = [int((lab == k).sum()) for k in range(n)]
-    haupt = int(np.argmax(groessen[1:])) + 1
-    for k in range(1, n):
-        if k != haupt and groessen[k] < min_px:
-            out[lab == k] = 0
-    return out
+def biege(a, fl, t):
+    """Ebene `a` (Leinwand) entlang der gebogenen Mittellinie des Flügels `fl` zum Zeitpunkt t neu abtasten (Rückwärtsabbildung, siehe anim_flieger_r2.biege)."""
+    return R2.biege(a, (PAD_L + fl['p0'][0], PAD_T + fl['p0'][1]), fl['ang0'], fl['laenge'], lambda s: delta(fl, s, t))
 
 
 def bruecken8(f, start):

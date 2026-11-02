@@ -39,6 +39,7 @@ import numpy as np
 
 import anim_lib as L
 import anim_tiere as T
+import anim_tier as G
 
 N, MS = 60, 64
 PAD_L, PAD_R, PAD_T, PAD_B = 3, 2, 3, 2
@@ -101,7 +102,7 @@ def frame(i, nur=None):
     if lid:
         for (x, y) in AUGEN[:2] if lid == 1 else AUGEN:
             k[PAD_T + y, PAD_L + x, :3] = KOPF
-    kr = krone_wiegen(teil(krone), i)
+    kr = G.isolierte_binden(krone_wiegen(teil(krone), i))             # abgerissene Wedelspitze (Einzelpixel) anbinden
     bl = L.spalten_welle(teil(blatt), PAD_L + 26, 2.4, 2 * math.pi * i / 15.0 + 0.2, potenz=1.0, nur_rechts=True, lauf=0.4)
     ebenen = {'koerper': k, 'krone': kr, 'blatt': bl}
     wahl = nur or ('koerper', 'krone', 'blatt')

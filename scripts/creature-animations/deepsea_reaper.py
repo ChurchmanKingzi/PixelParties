@@ -18,8 +18,9 @@ Was ist was (x/y im Sprite):
 Fest bleiben: Kopf-/Schädelform, Hörner, Augenform im Ruhebild, Schaft der Sense, Karomuster.
 
 Ablauf (48 Frames à 70 ms = 3,36 s; Frame 0 = Original, Partikel ausgenommen):
-* Flügelschlag: beide Flügel schlagen gleichzeitig, jeweils 2 Spalten gemeinsam bis ±2 px senkrecht (wächst mit dem Abstand zum Gelenk bei x 8 bzw. 23, die Gelenkspalten stehen); Periode 24, zweimal pro Schleife.
-  Die dünnen Flügelspitzen bleiben im 4er-Zusammenhang: reißt ein waagerechter Kontakt zwischen zwei Spaltenpaaren, wird die äußere Spalte um 1–2 Pixel (Farbe ihres nächsten Pixels) bis zur inneren verlängert (Körperpixel 554–561 statt 556).
+* Flügelschlag (RUNDE 2, Nutzer: „sollte mehr mit den Flügeln schlagen“): beide Flügel schlagen jetzt kräftig und gleichzeitig: Periode 16 Frames (1,12 s, dreimal pro Schleife; vorher ±2 px, Periode 24). Jeder Flügel (links x 0–7, rechts x 24–31, y 0–11:
+  das waagerechte Flügelblatt y 6–11 und der obere Flügelfinger y 0–5) BIEGT sich entlang seiner Mittellinie (anim_flieger_r2.biege, Rückwärtsabbildung: jedes Zielpixel holt sich das Quellpixel an derselben Bogenlänge/Querstelle, keine Löcher, keine
+  Mischfarben, die Wurzel am Kopf bleibt stehen): das Blatt schlägt von der Ruhelage (Flügel hängen leicht) bis ca. 50° nach oben und ca. 17° nach unten (Spitze −6 … +2 px), die Spitze hinkt der Wurzel um 0,5 rad nach (Flügel biegt sich durch); der Flügelfinger schwenkt bis ca. 27° (Spitze ±2 px). Frame 0 = Original.
 * Schweben: der ganze Körper (Kopf, Rumpf, Sense) hebt sich 1 px beim Abschlag der Flügel und sinkt beim Aufschlag zurück (gegenläufig).
 * Saumfetzen: die drei Fetzen (y 17–21) pendeln unabhängig ±1 px zur Seite (Periode 16, versetzte Phasen).
 * Sense: die Klinge (y ≥ 24) pendelt ±1 px, ihre untere Hälfte (y ≥ 27) mit Verzögerung (Periode 24). Stahlglanz (Regel 14: Metall): ein heller Lichtpunkt läuft an der Schneide (Weiß (246,255,255)) entlang; zweimal pro Schleife.
@@ -40,6 +41,7 @@ import numpy as np
 
 import anim_lib as L
 import anim_untote as U
+import anim_flieger_r2 as R2
 
 N, MS = 48, 70
 GPL, GPR, GPT, GPB = 7, 7, 7, 5
@@ -98,7 +100,8 @@ def teil(maske):
     return L.platz(t, H, W, GPL, GPT)                           # sofort auf die volle Leinwand
 
 
-FLL_A, FLR_A, REST_A, K1_A, K2_A = teil(FL_L), teil(FL_R), teil(rest), teil(KLINGE1), teil(KLINGE2)
+FLL_FAN, FLL_FING, FLR_FAN, FLR_FING = teil(FL_L & (yy >= 6)), teil(FL_L & (yy <= 5)), teil(FL_R & (yy >= 6)), teil(FL_R & (yy <= 5))
+REST_A, K1_A, K2_A = teil(rest), teil(KLINGE1), teil(KLINGE2)
 SAUM_A = [teil(m) for m in SAUM]
 
 
@@ -147,6 +150,37 @@ def fluegel(a, pivot_x, amp, ph, breite=2):
     return out
 
 
+# ── Flügelschlag: Biegung entlang der Mittellinie ─────────────────────────────────────────────────────────────────────────────
+FL_PERIODE = 16
+A_BLATT = math.radians(34.0)                                 # Ausschlag des Blatts (Spitze: bis ca. +50° nach oben, −17° nach unten gegenüber der Ruhelage)
+FING_A = math.radians(18.0)
+LAUF = 0.5
+#            Wurzelpunkt (Sprite)  Richtung zur Spitze (rad)           Länge   Drehsinn (+1 = oben ist im Uhrzeigersinn)
+BLATT_L = dict(p0=(8.0, 9.0), ang0=math.atan2(-0.5, -6.0), laenge=9.0, seite=+1)
+BLATT_R = dict(p0=(23.0, 9.0), ang0=math.atan2(-0.5, 6.0), laenge=9.0, seite=-1)
+FING_L = dict(p0=(8.0, 5.0), ang0=math.atan2(-5.0, -2.0), laenge=5.5, seite=+1)
+FING_R = dict(p0=(23.0, 5.0), ang0=math.atan2(-5.0, 2.0), laenge=5.5, seite=-1)
+
+
+def _v(ph, f):
+    """Schlagwert: 0 bei Frame 0 (Ruhe = Original), Spitze (f = 1) hinkt der Wurzel um LAUF rad nach."""
+    return math.sin(ph - LAUF * f) - math.sin(-LAUF * f)
+
+
+def blatt(a, fl, ph):
+    def delta(s):
+        f = min(1.0, max(0.0, (s - 1.5) / (fl['laenge'] - 1.5)))
+        return fl['seite'] * _v(ph, f) * A_BLATT * f
+    return R2.biege(a, (GPL + fl['p0'][0], GPT + fl['p0'][1]), fl['ang0'], fl['laenge'], delta)
+
+
+def finger(a, fl, ph):
+    def delta(s):
+        f = min(1.0, max(0.0, s / fl['laenge']))
+        return fl['seite'] * _v(ph, f) * FING_A * f
+    return R2.biege(a, (GPL + fl['p0'][0], GPT + fl['p0'][1]), fl['ang0'], fl['laenge'], delta, inseln=0)
+
+
 def set_px(a, x, y, farbe):
     a[GPT + y, GPL + x, :3] = farbe
     a[GPT + y, GPL + x, 3] = 255
@@ -162,15 +196,15 @@ def versatz(i, per, ph, amp=1.2):
 
 
 def frame_gross(i, nur=None):
-    ph = 2 * math.pi * i / 24
+    ph = 2 * math.pi * i / FL_PERIODE
     kb = REST_A.copy()
     bl = BLINZ.get(i, 0)
     if bl:
         for (x, y) in AUGEN:
             if bl == 2 or y == 12:
                 set_px(kb, x, y, SCHWARZ)
-    fl = fluegel(FLL_A, GPL + 8, 2.5, ph)
-    fr = fluegel(FLR_A, GPL + 23, 2.5, ph)
+    fl = L.zusammen(H, W, [(blatt(FLL_FAN, BLATT_L, ph), 0, 0), (finger(FLL_FING, FING_L, ph), 0, 0)])
+    fr = L.zusammen(H, W, [(blatt(FLR_FAN, BLATT_R, ph), 0, 0), (finger(FLR_FING, FING_R, ph), 0, 0)])
     # Sense: Klinge pendelt, Schneide glänzt
     k1, k2 = K1_A.copy(), K2_A.copy()
     g = GLANZ.get(i)

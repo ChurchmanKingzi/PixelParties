@@ -14,7 +14,7 @@ Was im Sprite ist (Koordinaten im Sprite 23×32, x/y ab 0):
 Fest bleiben: Umriss, Kopfform, Gesicht, Gliedmaßen (der Körper streckt sich nur durch eingefügte Rippenzeilen unterhalb des Kopfes).
 
 Ablauf (48 Frames à 65 ms = 3,12 s, nahtlos):
-* Atmen (Periode 24): unterhalb des Kopfes werden im Rippenkorb 1–2 Zeilen eingefügt (Quellzeile 22, in der Spitze zusätzlich 23; Zeilen gleicher Breite, keine Randstufe) — Kopf, Arme und Rumpf heben sich um 1–2 px, die Füße bleiben fest am Boden.
+* Atmen (Periode 24): unterhalb des Kopfes werden im Rippenkorb 1–2 Zeilen eingefügt (Quellzeile 22, in der Spitze zusätzlich 25 — zwei getrennte Zeilen statt zweier aufeinanderfolgender, damit die Bandenstruktur erhalten bleibt; Textur der Nachbarzeile eingemischt). Das Henkelkreuz (20 Goldpixel) ist ein starres Teil: es steigt mit der Hand und wird NICHT gestreckt — Kopf, Arme und Rumpf heben sich um 1–2 px, die Füße bleiben fest am Boden.
 * Goldschimmer (zweimal je Schleife, Frames 2–18 und 26–42; NICHT auf den Augen): ein diagonales Lichtband (x+y, 6 px) läuft über die goldenen Innenpixel (eine Stufe heller auf der Gold-Rampe R→S→K→N und Q→V→T→K; Umrisspixel bleiben).
 * Glitzersterne (Gold): vierzackige Sterne (Lauf 0-1-2-1-0 über 5 Frames) blitzen im Henkel und auf dem Querbalken des Henkelkreuzes auf (Farben N, K, T des Sprites; Frames 6–10, 14–18, 30–34, 38–42).
 Frame: Sprite plus 3 px links/rechts, 4 px oben (Atmen), 2 px unten, Figur zentriert.
@@ -50,12 +50,12 @@ S = []
 for _i in range(N):
     _v = math.sin(2 * math.pi * _i / 24)
     S.append(2 if _v >= 0.9 else 1 if _v >= 0.35 else 0)
-POSEN = {0: {}, 1: {22: 1}, 2: {22: 1, 23: 1}}                                                                      # s → eingefügte Zeilen (Rippen, unterhalb des Kopfes)
+POSEN = {0: {}, 1: {22: 1}, 2: {22: 1, 25: 1}}                                                                      # s → eingefügte Zeilen (Rippen, unterhalb des Kopfes; zwei GETRENNTE Zeilen, kein hoher Einheitsblock)
 assert S[0] == 0
 _ext = [(int(np.nonzero(OPAK[y])[0].min()), int(np.nonzero(OPAK[y])[0].max())) for y in range(sh)]
 for _s, _d in POSEN.items():
     for _y in _d:
-        assert _ext[_y] in (_ext[_y - 1], _ext[_y + 1]), ('Einfügezeile mit Randstufe', _y)
+        assert abs(_ext[_y][1] - _ext[_y - 1][1]) <= 1, ('Einfügezeile mit Randstufe rechts', _y)               # links liegt das (starre) Henkelkreuz, dessen Stielende die linke Kante bestimmt
 
 # ── Gold: Henkelkreuz und Stirnband glänzen (Regel 14, Gold) ──
 yy, xx = np.mgrid[0:sh, 0:sw]

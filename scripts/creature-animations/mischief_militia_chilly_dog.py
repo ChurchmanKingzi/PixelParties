@@ -50,6 +50,7 @@ import numpy as np
 
 import anim_lib as L
 import anim_tiere as T
+import anim_tier as G
 
 N, MS = 54, 66
 PAD_L, PAD_R, PAD_T, PAD_B = 3, 5, 3, 3
@@ -147,7 +148,7 @@ def frame(i, nur=None):
     wahl = nur or ('atem', 'hund', 'schal', 'kdet')
     teile = []
     if 'atem' in wahl:
-        teile.append((T.funken_ebene(H, W, i, N, ATEM, STAUB), 0, 0))
+        teile.append((G.einzelpixel_weg(T.funken_ebene(H, W, i, N, ATEM, STAUB)), 0, 0))     # Wölkchen erscheinen erst ab 2×2 (keine 1-px-Punkte, Regel 25)
     ganz = L.zusammen(H, W, [(ebenen[n], 0, 0) for n in ('hund', 'schal', 'kdet') if n in wahl])
     # Randpixel-Test (Regel 16): wo das wehende Schalende eine Füllfarbe an den Rand schiebt, wird ein Umrisspixel (Farbe aus dem Original) ergänzt
     ganz = T.umriss_schliessen(ganz, RAND, REGEL)

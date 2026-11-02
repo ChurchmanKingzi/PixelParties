@@ -16,7 +16,7 @@ Was im Sprite ist (Koordinaten im Sprite 24×22, x/y ab 0):
 Fest bleiben: Umriss, Kopfform, Gesicht, Zierstränge. NICHTS wird verbreitert: Kein Spaltendoppeln, die Bögen behalten ihre Form.
 
 Ablauf (48 Frames à 65 ms = 3,12 s, nahtlos):
-* Atmen (Periode 24): unterhalb des Kopfes werden im Rippenkorb 1–2 Zeilen eingefügt (Quellzeile 15, in der Spitze zusätzlich 14; Zeilen gleicher Breite, keine Randstufe, Textur der Nachbarzeile eingemischt) — Kopf,
+* Atmen (Periode 24): unterhalb des Kopfes werden im Rippenkorb 1–2 Zeilen eingefügt (Quellzeile 15, in der Spitze zusätzlich 18 — zwei getrennte Zeilen statt zweier aufeinanderfolgender, damit die senkrechten Bandagenstreifen nicht zu langen Balken werden; Textur der Nachbarzeile eingemischt) — Kopf,
   Arme und Rumpf heben sich um 1–2 px, die Füße bleiben fest am Boden.
 * Arme heben (zweimal je Schleife, Frames 9–14 und 33–38; 1–2 px nach oben, mit Zwischenstufe): die Bögen werden starr als Ganzes angehoben (alle 46 Armpixel gleich, nichts wird gestreckt). Unter den Armenden
   wird der Mumienkörper (Schultern) prozedural fertiggezeichnet: freiliegend werden (7,13) und (16,13) in Bandagenfarbe F, ihr schwarzer Außenumriss (6,13)/(17,13) und (bei 2 px Hub) der obere Umriss (7,12)/(16,12).
@@ -53,7 +53,7 @@ assert int(ARM.sum()) == 46, int(ARM.sum())
 ARME = spr.copy(); ARME[~ARM] = 0
 KOERPER = spr.copy(); KOERPER[ARM] = 0
 ARM_PIX = [(int(y), int(x)) for y, x in zip(*np.nonzero(ARM))]
-assert all(y <= 13 for y, x in ARM_PIX)                       # alle Armpixel liegen oberhalb der Einfügezeilen: sie heben sich mit der Brust
+assert all(y <= 13 for y, x in ARM_PIX)                       # alle Armpixel liegen oberhalb der Einfügezeilen (15, 18): sie heben sich mit der Brust
 
 # ── Ergänzung: Schultern unter den Armenden (nur sichtbar, wenn frei) ──
 BANDAGE = (187, 187, 187)
@@ -66,12 +66,12 @@ S = []
 for _i in range(N):
     _v = math.sin(2 * math.pi * _i / 24)
     S.append(2 if _v >= 0.9 else 1 if _v >= 0.35 else 0)
-POSEN = {0: {}, 1: {15: 1}, 2: {14: 1, 15: 1}}                                                                      # s → eingefügte Zeilen (Rippen, unterhalb des Kopfes)
+POSEN = {0: {}, 1: {15: 1}, 2: {15: 1, 18: 1}}                                                                      # s → eingefügte Zeilen (Rippen, unterhalb des Kopfes; zwei GETRENNTE Zeilen, damit die senkrechten Bandagenstreifen nicht zu langen Balken werden)
 assert S[0] == 0
 _ext = [(int(np.nonzero(OPAK[y])[0].min()), int(np.nonzero(OPAK[y])[0].max())) for y in range(sh)]
 for _s, _d in POSEN.items():
     for _y in _d:
-        assert _ext[_y] in (_ext[_y - 1], _ext[_y + 1]), ('Einfügezeile mit Randstufe', _y)
+        assert max(abs(_ext[_y][0] - _ext[_y - 1][0]), abs(_ext[_y][1] - _ext[_y - 1][1])) <= 1, ('Einfügezeile mit Randstufe', _y)
 
 HUB = [0] * N                                                                                 # Armhub je Frame (px nach oben)
 for _s0 in (9, 33):

@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""Idle-Animation für „Cosmic Skeleton“ (Creature) — Fassung 3 (stehend, Augenhöhle glüht tiefrot, ohne Glanz: Kosmos-Fläche ist kein Metall, Regel 14).
+"""Idle-Animation für „Cosmic Skeleton“ (Creature) — Fassung 4 (Runde 2: stehend, die Füße/Beine bleiben starr am Boden — kein Hin-und-her-Schlackern mehr; Augenhöhle glüht tiefrot, ohne Glanz: Kosmos-Fläche ist kein Metall, Regel 14).
 
 Quelle: src/cosmic-skeleton.png — Ebene „Cosmic Skele“ (20×21 px, 7 Farben) aus Motive.xcf. Die Ebene ist vollständig deckend (Alpha nur 0/255,
 nichts fehlt). Der große sternförmige Violett-Schein, der helle Lila-Schädel links oben und die vielen gelben Sternpunkte der Karte sind eigene Ebenen
@@ -20,17 +20,17 @@ Was ist was (Koordinaten im Sprite, x/y):
 Fest bleiben: Schädelform, Rippenmuster, Umrisse A, die drei Sternpixel.
 
 Ablauf (48 Frames à 60 ms = 2,88 s; Frame 0 = Original, Staub ausgenommen) — kein Lichtband, kein Funkeln, keine Glitzersterne (Regel 14):
-* STEHENDE Figur (Fassung 3): kein Schweben, kein Wallen, keine Gesamt- oder Zeilenwelle; die Füße bleiben fest am Boden. Einzige Gesamtbewegung: Atmen (s. u.).
+* STEHENDE Figur: kein Schweben, kein Wallen, keine Gesamt- oder Zeilenwelle; Beine und Füße bleiben fest am Boden. Einzige Gesamtbewegung: Atmen (s. u.).
 * Augenhöhle (11–12, 4–5; vier transparente Pixel, ringsum deckend) glüht dreimal pro Schleife TIEFROT (je 8 Frames ab Frame 7, 23, 39, mit Anlauf
   dunkelrot (91,1,2) → (120,0,0) → tiefrot (143,0,0) → … → dunkelrot): die Höhlenpixel werden gefüllt, danach wieder transparent. Die drei Rottöne stammen aus
   data/palette.json (Ausnahme: nicht im Sprite, in L.pruefe freigegeben). Kein Glanz, kein Stern.
 * Arme schwingen synchron und gespiegelt nach außen (Periode 24, bis 3 px, wächst von der Schulter y 9 zur Hand), die Unterarme pendeln zusätzlich
   mit einer Welle (Periode 12, Spitze hinkt hinterher, ±1 px, nur während der Schwingung).
-* Beine baumeln: beide Beine pendeln gleichgerichtet (Periode 16, ±1,6 px, wächst vom Becken y 15 zum Fuß); die Naht zum Becken bleibt über Kanten verbunden.
+* Beine und Füße (y 16–20) stehen STARR am Boden (Nutzer-Korrektur „soll stehen, die Füße schlackern nicht hin und her“): keine Pendelbewegung mehr.
 * Atmen (Periode 24, 0/1 px, einzige Gesamtbewegung): im Rumpf-Layer wird Zeile y 12 einmal eingefügt; Schultern, Kopf und Arme heben sich 1 px über Becken und Beine. Kopf und Rumpf
   bleiben sonst starr (kein Wallen/Scheren mehr, das hatte den Kopf neben die Schultern gekippt).
-* Sternenstaub (Partikel, hinter der Figur, 12 Stück, Lebensdauer 48 Frames, langsam aufsteigend, Formen k, o): gelbe Funken (Kern F, Rand E) und
-  violette Kugeln (Kern B, Rand C) rund um die Figur. Alle Farben aus dem Sprite.
+* Sternenstaub (Partikel, hinter der Figur, 8 Stück neben dem Körper, Lebensdauer 48 Frames, langsam aufsteigend, Wölkchen 2×2 → 3×3 → 2×2 (Regel 25: nie kleiner als 2×2)): gelbe Wölkchen (Kern F, Rand E) und
+  violette Wölkchen (Kern B, Rand C) rund um die Figur. Alle Farben aus dem Sprite.
 ERGÄNZUNG: keine gemalten Pixel (Kopf sinkt nur über Rumpfpixel; Arme/Beine lösen sich nur seitlich bei überlappender Naht).
 Randpixel-Test (Regel 16): `U.kontur_schliessen` ergänzt in jeder Pose fehlende Umrisspixel (Schwarzviolett A) an Armen, Beinen und Wallkanten; im Ruhebild
 ändert es nichts.
@@ -79,21 +79,17 @@ STAUB = {'c': GF_, 'r': GE_}                          # Sternenstaub gelb
 PURPUR = {'c': B_, 'r': C_}                           # violette Kugeln
 P = lambda x, y: (GPL + x, GPT + y)
 # Partikel bleiben nah an der Figur: der Frame ist auf die Figur zugeschnitten, Effekte dürfen ihn höchstens 2 px über den Körperrand hinaus vergrößern
-PUFFS_GELB = [
-    dict(x=P(-1, 12)[0], y=P(-1, 12)[1], vx=-1, vy=-10, off=0, form='k', wackeln=1),
-    dict(x=P(20, 12)[0], y=P(20, 12)[1], vx=1, vy=-11, off=14, form='k', wackeln=1),
-    dict(x=P(9, 3)[0], y=P(9, 3)[1], vx=1, vy=-5, off=27, form='k', wackeln=1),
-    dict(x=P(5, 20)[0], y=P(5, 20)[1], vx=-2, vy=-11, off=36, form='o', wackeln=1),
-    dict(x=P(14, 21)[0], y=P(14, 21)[1], vx=2, vy=-11, off=8, form='k', wackeln=1),
-    dict(x=P(12, 8)[0], y=P(12, 8)[1], vx=3, vy=-9, off=21, form='k', wackeln=1),
+PUFFS_GELB = [                                        # alle Wölkchen steigen NEBEN der Figur auf (nie hinter dem Körper versteckt, sonst entstehen halbe Klekse)
+    dict(x=P(-3, 16)[0], y=P(-3, 16)[1], vx=-1, vy=-11, off=0, wackeln=1),
+    dict(x=P(22, 12)[0], y=P(22, 12)[1], vx=1, vy=-10, off=14, wackeln=1),
+    dict(x=P(-3, 8)[0], y=P(-3, 8)[1], vx=-1, vy=-7, off=30, wackeln=1),
+    dict(x=P(22, 17)[0], y=P(22, 17)[1], vx=1, vy=-9, off=38, wackeln=1),
 ]
 PUFFS_PURPUR = [
-    dict(x=P(1, 15)[0], y=P(1, 15)[1], vx=-2, vy=-12, off=20, form='o', wackeln=1),
-    dict(x=P(18, 15)[0], y=P(18, 15)[1], vx=2, vy=-12, off=40, form='o', wackeln=1),
-    dict(x=P(6, 3)[0], y=P(6, 3)[1], vx=-2, vy=-5, off=32, form='o', wackeln=1),
-    dict(x=P(13, 3)[0], y=P(13, 3)[1], vx=2, vy=-5, off=6, form='o', wackeln=1),
-    dict(x=P(10, 21)[0], y=P(10, 21)[1], vx=0, vy=-11, off=44, form='o', wackeln=1),
-    dict(x=P(3, 6)[0], y=P(3, 6)[1], vx=-3, vy=-8, off=12, form='k', wackeln=1),
+    dict(x=P(-4, 12)[0], y=P(-4, 12)[1], vx=-1, vy=-10, off=20, wackeln=1),
+    dict(x=P(23, 13)[0], y=P(23, 13)[1], vx=1, vy=-11, off=6, wackeln=1),
+    dict(x=P(-2, 19)[0], y=P(-2, 19)[1], vx=-1, vy=-10, off=42, wackeln=1),
+    dict(x=P(22, 7)[0], y=P(22, 7)[1], vx=1, vy=-7, off=26, wackeln=1),
 ]
 
 
@@ -105,7 +101,6 @@ def teil(maske):
 def frame_gross(i, nur=None):
     hump = U.buckel(i, 0, 24, n=24)
     aus = 3.0 * hump
-    bein = 1.6 * math.sin(L.sinus(i, 16))
     ph = L.sinus(i, 12)
 
     atem = U.stufe(i, N / 2, 1)                                  # Atmen: 0/1 px (Periode 24) — die einzige Gesamtbewegung, kein Schweben, kein Wallen
@@ -121,19 +116,22 @@ def frame_gross(i, nur=None):
     ar = L.spalten_welle(ar, GPL + 15, 1.0 * hump, ph, lauf=1.0, nur_rechts=True)
     al = U.haengen(al, GPT + 9, -aus)
     ar = U.haengen(ar, GPT + 9, aus)
-    bn = U.haengen(teil(beine), GPT + 15, bein)
+    bn = teil(beine)                                             # Beine/Füße stehen starr
     koerper = L.zusammen(H, W, [(bn, 0, 0), (rp, 0, 0), (al, 0, -atem), (ar, 0, -atem), (kp, 0, -atem)])
     koerper = U.kontur_schliessen(koerper, UMRISS, A_)             # Regel 16: Umriss an allen bewegten Kanten in jeder Pose geschlossen
     if nur == 'koerper':
         return koerper
-    gelb = U.glut_ebene(H, W, i, N, PUFFS_GELB, STAUB)
-    purpur = U.glut_ebene(H, W, i, N, PUFFS_PURPUR, PURPUR)
+    gelb = U.wolke_ebene(H, W, i, N, PUFFS_GELB, STAUB)
+    purpur = U.wolke_ebene(H, W, i, N, PUFFS_PURPUR, PURPUR)
     return L.zusammen(H, W, [(purpur, 0, 0), (gelb, 0, 0), (koerper, 0, 0)])
 
 
 # Zuschnitt auf die Figur (Nutzerwunsch): symmetrisch um die Ruhefigur, Effekte höchstens +2 px über den Körperrand hinaus
-BOX = U.zuschnitt([frame_gross(i) for i in range(N)], [frame_gross(i, 'koerper') for i in range(N)], (GPL, GPT, GPL + sw, GPT + sh))
+BOX = U.zuschnitt([frame_gross(i) for i in range(N)], [frame_gross(i, 'koerper') for i in range(N)], (GPL, GPT, GPL + sw, GPT + sh), zugabe=3)
 PAD_L, PAD_T = GPL - BOX[0], GPT - BOX[1]
+
+
+TEST_EBENEN = 'koerper'                              # Randpixel-Test: nur die Figur (ohne Staub)
 
 
 def frame(i, nur=None):

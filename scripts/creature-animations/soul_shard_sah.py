@@ -16,8 +16,8 @@ Was im Sprite ist (Koordinaten im Sprite 21×25, x/y ab 0):
 Fest bleiben: Umriss, Kopf-/Kapuzenform, Gesicht (kein seitliches Kopfneigen mehr — Nutzer-Feedback), Gliedmaßen; der Stab steht starr am Boden (er wird nicht gestreckt: die Hand rutscht beim Atmen daran entlang).
 
 Ablauf (48 Frames à 65 ms = 3,12 s, nahtlos):
-* Atmen (Periode 24): unterhalb des Kopfes werden im Rippenkorb 1–2 Zeilen eingefügt (Quellzeile 18, in der Spitze zusätzlich 17; Zeilen gleicher Breite, keine Randstufe, die eingefügten Zeilen mischen die Textur
-  der Nachbarzeile ein) — Kopf und Rumpf heben sich um 1–2 px, die Füße bleiben fest am Boden. Der Stab (x ≤ 3) ist eine eigene starre Ebene und bleibt stehen.
+* Atmen (Periode 24): unterhalb des Kopfes werden im Rippenkorb 1–2 Zeilen eingefügt (Quellzeile 18, in der Spitze zusätzlich 21 — zwei getrennte Zeilen statt zweier aufeinanderfolgender, damit keine hohen Einheitsblöcke
+  entstehen; die eingefügten Zeilen mischen die Textur der Nachbarzeile ein) — Kopf und Rumpf heben sich um 1–2 px, die Füße bleiben fest am Boden. Der Stab (x ≤ 3) ist eine eigene starre Ebene und bleibt stehen.
 * Schnabel-Pendel (Frames 5–10: 1 px nach rechts, Frames 29–34: 1 px nach links): der Schnabel inklusive Gabel und Spitze wird als Ganzes verschoben; das freigelegte Feld bekommt die Farbe der Nachbarzelle
   (schwarze Gesichtsleere, Kapuzensaum bzw. Rippenfarbe), die Kapuze selbst bewegt sich nicht.
 * Blinzeln (zweimal je Schleife, Frames 19–21 und 43–45: halb – zu – halb): die weißen Augenpixel (je 1×2) werden zur Kapuzenfarbe. Lidfarbe = umgebende Körperfarbe (je Augenpixel häufigste Farbe im Umkreis von
@@ -59,12 +59,12 @@ S = []
 for _i in range(N):
     _v = math.sin(2 * math.pi * _i / 24)
     S.append(2 if _v >= 0.9 else 1 if _v >= 0.35 else 0)
-POSEN = {0: {}, 1: {19: 1}, 2: {18: 1, 19: 1}}                                                                      # s → eingefügte Zeilen (Rippen, unterhalb des Kopfes)
+POSEN = {0: {}, 1: {18: 1}, 2: {18: 1, 21: 1}}                                                                      # s → eingefügte Zeilen (Rippen, unterhalb des Kopfes; zwei GETRENNTE Zeilen, kein hoher Einheitsblock)
 assert S[0] == 0
 _ext = [(int(np.nonzero(KOERPER[y, :, 3])[0].min()), int(np.nonzero(KOERPER[y, :, 3])[0].max())) if KOERPER[y, :, 3].any() else None for y in range(sh)]
 for _s, _d in POSEN.items():
     for _y in _d:
-        assert _ext[_y][1] in (_ext[_y - 1][1], _ext[_y + 1][1]) and abs(_ext[_y][0] - _ext[_y - 1][0]) <= 1, ('Einfügezeile mit Randstufe', _y, _ext[_y - 1:_y + 2])
+        assert max(abs(_ext[_y][0] - _ext[_y - 1][0]), abs(_ext[_y][1] - _ext[_y - 1][1])) <= 1, ('Einfügezeile mit Randstufe', _y, _ext[_y - 1:_y + 2])
 
 # ── Augen und Lidfarben ──
 AUGEN = [(5, 9), (6, 9), (5, 14), (6, 14)]                                                                      # (y, x) der Augenpixel

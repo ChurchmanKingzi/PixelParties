@@ -17,7 +17,7 @@ Was im Sprite ist (Koordinaten im Sprite 19×25, x/y ab 0):
 Fest bleiben: Umriss, Kopfform, Gesicht, Mähne, Zunge/Zähne.
 
 Ablauf (48 Frames à 65 ms = 3,12 s, nahtlos):
-* Atmen (Periode 24): unterhalb der Arme werden im Umhang/Rippenkorb 1–2 Zeilen eingefügt (Quellzeile 18, in der Spitze zusätzlich 19; nur im Rumpf, Textur der Nachbarzeile eingemischt) — Kopf, Rumpf UND beide Arme samt
+* Atmen (Periode 24): unterhalb der Arme werden im Umhang/Rippenkorb 1–2 Zeilen eingefügt (Quellzeile 17, in der Spitze zusätzlich 20 — zwei getrennte Zeilen, damit die Bandenstruktur erhalten bleibt; nur im Rumpf, Textur der Nachbarzeile eingemischt) — Kopf, Rumpf UND beide Arme samt
   Bandagen heben sich starr um 1–2 px mit (die Arme bleiben unverformt, die Bandagen werden nicht gestreckt), die Füße bleiben am Boden.
 * Armheben (links Frames 6–11 und 30–35, rechts Frames 18–23 und 42–47; 1 px zusätzlich nach oben): Arm und Bandage wandern als Ganzes; was der Arm freigibt (Umhangkante), bleibt Körper, offene Kanten werden
   mit der Umrissfarbe geschlossen.
@@ -65,12 +65,12 @@ S = []
 for _i in range(N):
     _v = math.sin(2 * math.pi * _i / 24)
     S.append(2 if _v >= 0.9 else 1 if _v >= 0.35 else 0)
-POSEN = {0: {}, 1: {18: 1}, 2: {18: 1, 19: 1}}                                                                      # s → eingefügte Zeilen (nur Rumpf, unterhalb der Arme)
+POSEN = {0: {}, 1: {17: 1}, 2: {17: 1, 20: 1}}                                                                      # s → eingefügte Zeilen (nur Rumpf, unterhalb der Arme; zwei GETRENNTE Zeilen, damit die Rippenbänder erhalten bleiben)
 assert S[0] == 0
 _ext = [(int(np.nonzero(KOERPER[y, :, 3])[0].min()), int(np.nonzero(KOERPER[y, :, 3])[0].max())) for y in range(sh)]
 for _s, _d in POSEN.items():
     for _y in _d:
-        assert abs(_ext[_y][0] - _ext[_y - 1][0]) <= 1 and abs(_ext[_y][1] - _ext[_y - 1][1]) <= 1, ('Einfügezeile mit Randstufe', _y, _ext[_y - 1:_y + 2])
+        assert abs(_ext[_y][0] - _ext[_y - 1][0]) <= 2 and abs(_ext[_y][1] - _ext[_y - 1][1]) <= 2, ('Einfügezeile mit Randstufe', _y, _ext[_y - 1:_y + 2])
 
 HUB = {'l': [0] * N, 'r': [0] * N}                                                                                 # zusätzlicher Armhub je Frame (px nach oben)
 for _k, _starts in (('l', (6, 30)), ('r', (18, 42))):

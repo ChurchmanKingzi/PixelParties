@@ -128,7 +128,7 @@ def frame(i, nur=None):
     if lid:
         for (x, y) in (AUGE[:1] if lid == 1 else AUGE):
             k[PAD_T + y, PAD_L + x, :3] = FELL
-    sw_ = schwanz_wedeln(teil(schwanz), u, b)
+    sw_ = G.isolierte_binden(schwanz_wedeln(teil(schwanz), u, b))      # abgerissene Schwanzspitze mit dem Strich verbinden
     k = L.versetze(k, 0, b)
     sw_ = L.versetze(sw_, 0, b)
     # Beine als eigene Ebenen (Sprite-Koordinaten, Versatz PAD_L/PAD_T)

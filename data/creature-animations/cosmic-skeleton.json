@@ -1,7 +1,7 @@
 {
   "creature": "Cosmic Skeleton",
   "sheet": "cosmic-skeleton.png",
-  "frameWidth": 28,
+  "frameWidth": 30,
   "frameHeight": 27,
   "frames": 48,
   "frameMs": 60,
@@ -10,6 +10,6 @@
   "padTop": 1,
   "padLeft": 1,
   "padRight": 2,
-  "padBottom": 3,
-  "faceX": 14.0
+  "padBottom": 2,
+  "faceX": 15.0
 }

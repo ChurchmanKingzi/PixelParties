@@ -1,0 +1,15 @@
+{
+  "creature": "Guardian Beast Niu",
+  "sheet": "guardian-beast-niu.png",
+  "frameWidth": 34,
+  "frameHeight": 54,
+  "frames": 48,
+  "frameMs": 80,
+  "loop": true,
+  "layout": "horizontal",
+  "padTop": 6,
+  "padLeft": 3,
+  "padRight": 3,
+  "padBottom": 3,
+  "faceX": 17.0
+}
