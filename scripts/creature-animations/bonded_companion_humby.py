@@ -17,11 +17,18 @@ Identifikation (Sprite 23×20, Chibi-Löwe im Profil, schaut nach RECHTS):
 * Schwanz (x 0–8, Zeilen 0–13): Eingerollt wie ein „C“ — setzt am Rumpf unten links an ((4–9,12) orange E / D), läuft an der linken Seite (x 0–2) hoch, oben im Bogen (3–6, 0–1) nach rechts
   und endet mit einer Quaste/Spitze (7–8, 1–3).
 * Kein Glanz (Fell, Regel 14), keine Partikel. Ohren/Beine nicht eindeutig lesbar → fest. Auge ist schon geschlossen (Lachauge) → kein Blinzeln, kein Blick.
-Bleibt fest: Gesicht (Auge, Nase, Zunge), Beine, Rumpf unter Zeile 11.
+Bleibt fest: Gesicht (Auge, Nase, Zunge), Rumpf unter Zeile 11.
+
+Runde 2 (Nutzerkorrektur wörtlich: „soll seine Beine bewegen.“): Die vier Beinchen sind jetzt EIGENE Ebenen (Zeilen 15–19; die Hüftzeile 15 bleibt am Rumpf) und laufen am Ort im Diagonalgang:
+* Hinterbeine: hinten-nah x 1–3 (Umriss x 1, Füllung x 2 (rosa/orange C/D/I), Fußumriss (2–3,18)), hinten-fern x 4–6 (Füllung x 4, Fuß mit hellem Pixel B (4,18), Fußumriss (4–5,19)).
+  Vorderbeine: vorn-nah x 9–11 (Füllung x 10–11 C/D/B, Fuß (11,18) C, Umriss unten (11–12,19)), vorn-fern x 12–14 (Füllung x 12–13 I/D, Fußumriss (13,18)). Je Bein 1 px breite Füllung, Umriss rechts/links.
+* Gang: hinten-nah und vorn-fern laufen in Phase 0, hinten-fern und vorn-nah um ½ Zyklus versetzt (Periode 12 Frames = 0,84 s, 4 Zyklen pro Schleife): jede Zeile unter der Hüfte wandert waagerecht (Fuß bis ±2 px (meist ±1)
+  nach vorn/hinten, Schwungphase 45 %), in der Schwungphase hebt der Fuß 1 px (eine Beinzeile entfällt).
+* Der frühere Hüpfer (das ganze Tier hebt ab) ist durch ein 1-px-Wippen im Schritttakt ersetzt (Bodenwesen, kein Hüpfen).
 
 Ablauf (48 Frames à 70 ms = 3,4 s), alle Bewegungen unabhängig:
 * Schwanzwiegen (Periode 16, 3× pro Schleife): die Zeilen des Schwanzes oberhalb von Zeile 8 (x ≤ 8) wandern waagerecht, je höher desto mehr (die diagonale Schwanzwurzel darunter bleibt, sonst reißt sie diagonal auf) (Quaste bis 3 px nach links, höchstens 1 px nach rechts, damit sie nicht am Kopf anliegt); der Ansatz am Rumpf bleibt.
-* Hüpfer (Periode 24, 2× pro Schleife): das ganze Tier hebt 1–2 px ab und landet wieder.
+* (ersetzt) Hüpfer → Wippen 1 px im Schritttakt, siehe oben.
 * Kopf hebt sich (Periode 24, Frames 10–18): Kopf samt Mähne steigt 1 px — in den Spalten x ≥ 9 wird die Mähnenunterkante (Zeile 11) einmal eingefügt (anim_tiere.spalten_hub),
   Beine und Rumpf darunter bleiben stehen, der Schwanz bleibt am Rumpf.
 * Randpixel-Korrektur (Regel 16): anim_tiere.umriss_schliessen.
@@ -36,6 +43,7 @@ import numpy as np
 
 import anim_lib as L
 import anim_tiere as T
+import anim_tier as G
 
 N, MS = 48, 70
 PAD_L, PAD_R, PAD_T, PAD_B = 4, 2, 4, 2
@@ -47,12 +55,18 @@ yy, xx = np.mgrid[0:sh, 0:sw]
 vorhanden = L.deckend(spr)
 
 schwanz = vorhanden & (xx <= 8) & (yy <= 11)
-koerper = vorhanden & ~schwanz
+bein_hn = vorhanden & (yy >= 15) & (xx >= 1) & (xx <= 3)                        # hinten nah
+bein_hf = vorhanden & (yy >= 15) & (xx >= 4) & (xx <= 6)                        # hinten fern
+bein_vn = vorhanden & (yy >= 15) & (xx >= 9) & (xx <= 11)                       # vorn nah
+bein_vf = vorhanden & (yy >= 15) & (xx >= 12) & (xx <= 14)                      # vorn fern
+beine = bein_hn | bein_hf | bein_vn | bein_vf
+koerper = vorhanden & ~schwanz & ~beine
 
 RAND = T.rand_farben(spr)
 REGEL = T.umriss_regeln(spr, RAND)[2]
 
-HUEPFER = [0, 0, 0, 1, 2, 2, 1, 0] + [0] * 16                       # Periode 24
+ZYKLUS = 12                                                        # Frames je Schrittzyklus (4 pro Schleife)
+WIPPEN = [0, 1, 1, 0, 0, 0]                                        # Periode 6 (2× je Zyklus): 1 = Tier 1 px höher
 KOPF = [0] * 10 + [1] * 9 + [0] * 5                                 # Periode 24: Kopf hebt sich
 
 
@@ -81,14 +95,24 @@ def wiegen(a, pivot_y, amp, phase):
     return out
 
 
+def bein_ebene(maske, i, versatz):
+    dx, lift = G.gang(i / float(ZYKLUS) + versatz, 1.7, 0.45, 1.0)
+    dx, lift = -G.runde(dx), int(round(lift))                      # Tier schaut nach rechts: Schwung = vorwärts = rechts
+    t = teil(maske)
+    rows = {PAD_T + 16: G.runde(dx * 0.25), PAD_T + 17: G.runde(dx * 0.5), PAD_T + 18: G.runde(dx * 0.75), PAD_T + 19: dx}
+    t = G.zeilen_versatz(t, rows)
+    return L.heben_unten(t, PAD_T + 17, lift) if lift else t
+
+
 def frame(i, nur=None):
-    hub = HUEPFER[i % 24]
+    hub = WIPPEN[i % 6]
     kopf = KOPF[i % 24]
     amp = 3.2 + 0.6 * (0.5 - 0.5 * math.cos(2 * math.pi * i / N))
     k = T.spalten_hub(teil(koerper), PAD_T + 11, lambda x: kopf if x >= PAD_L + 9 else 0)
     s = wiegen(teil(schwanz), PAD_T + 8, amp, L.sinus(i, 16))
-    ebenen = {'koerper': k, 'schwanz': s}
-    wahl = nur or ('koerper', 'schwanz')
+    ebenen = {'koerper': k, 'schwanz': s, 'bein_hn': bein_ebene(bein_hn, i, 0.0), 'bein_hf': bein_ebene(bein_hf, i, 0.5),
+              'bein_vn': bein_ebene(bein_vn, i, 0.5), 'bein_vf': bein_ebene(bein_vf, i, 0.0)}
+    wahl = nur or tuple(ebenen)
     ganz = L.zusammen(H, W, [(ebenen[n], 0, -hub) for n in wahl])
     return T.umriss_schliessen(ganz, RAND, REGEL)                  # Randpixel-Test (Regel 16)
 

@@ -1,29 +1,37 @@
 # -*- coding: utf-8 -*-
-"""Idle-Animation für „Demon's Gate“ (Creature).
+"""Idle-Animation für „Demon's Gate“ (Creature) — Runde 2: mit FLÜGELN (Nachbarebene), beide Augen blinzeln gleichzeitig.
 
-PICK: [["Motive", 1518, 1]]   Ebene „Demons Gate“ (Motive.xcf, Ebene 1518, 38×33 px, 23 Farben, nur Alpha 0/255; die Ebene „Demons Gate-Kopie“ (1517) ist pixelgleich) → src/demons-gate.png.
-Nicht verwendet: die Flügel („Demons Gate #2“ und „#4“, dunkelgraue Schwingen links und rechts), die Lava und die Kunstumgebung (andere Ebenen) sowie das halbtransparente „Demons Gate #1“ (Alpha 102).
+PICK: [["Motive", 1518, 1], ["Motive", 1519, "beide Flügel"]]
+  * Ebene „Demons Gate“ (Motive.xcf, Ebene 1518, 38×33 px, 23 Farben, nur Alpha 0/255; die Ebene „Demons Gate-Kopie“ (1517) ist pixelgleich) → src/demons-gate.png (der Dämon selbst, unverändert).
+  * Ebene „Demons Gate #2“ (Motive.xcf, Ebene 1519, 175×48 px, 6 Farben, nur Alpha 0/255) → src/demons-gate-fluegel.png: das PAAR dunkelgrauer Fledermausflügel (Knochenspangen (38,41,43)/(15,17,18), rote Flughaut (64,0,0)/(108,0,0)/(26,0,0),
+    Umriss (0,0,1)), linker Flügel x 0–81, rechter x 94–174. Im xcf sitzt der Dämon in dieser Ebenengruppe bei (314,115), die Flügel bei (245,90): der Dämon liegt also im Flügelsprite bei (69,25) und deckt die Flügelwurzeln
+    (Schultern/Handgelenke) ab; die Kartenkunst (data/card-art/native/Demons_Gate.png) zeigt von den Flügeln nur den inneren Ausschnitt. Das Flügelsprite ist unverändert aus der Ebene übernommen.
+Nicht verwendet: „Demons Gate #4“ (Ebene 1520: der zackige Steinpfad mit Lava unter dem Dämon — Kulisse, kein Teil der Figur), das halbtransparente „Demons Gate #1“ (Alpha 102, ein dunkler Schleier über den Augen), die Lava und die Kunstumgebung.
 
 Aufruf:   python3 demons_gate.py [--preview <ordner>]
 Ausgabe:  ../../data/creature-animations/demons-gate.png + .json
 
-Was im Sprite ist (Koordinaten im Sprite 38×33, x/y ab 0):
+Was im Sprite ist (Koordinaten im Dämonensprite 38×33, x/y ab 0; im Gesamtbild +(69,25)):
 * Ein roter Dämon in Frontansicht, spiegelsymmetrisch: Kopf (x 11–26, y 0–9) mit zwei gebogenen weißgrauen Hörnern L=(242,240,240)/P/N/H und zwei gelben Augen W=(248,246,32) bei (17, 8) und (20, 8);
   Rumpf (x 12–25, y 10–24) mit einer sandfarbenen Brustplatte (F=(167,138,59), K=(203,171,95), M=(220,200,146), J=(95,81,49)) und dunkelroten Schatten A=(51,1,1), E=(64,0,0), D=(108,0,0), G=(133,0,0), I=(158,0,0), O=(196,0,0).
 * Waagerecht ausgestreckte Arme (x 0–11 und 26–37, y 10–16) mit hellroten Muskeln (O, S=(196,59,59)) und weißgrauen Klauen B=(64,64,64), H=(192,192,192), L bei (0–5, 10–16) und (32–37, 10–16).
 * Beine (y 24–32) breit gestellt, am Ende weißgraue Zehenklauen (B, H, T, N) bei (8–14, 29–32) und (23–29, 29–32).
-* Es gibt kein Flammenfeuer im Sprite (Rottöne sind Haut/Schatten); Material: Haut und Horn — KEIN Glanz (Regel 14).
+* Zwei große Fledermausflügel hinter dem Dämon (siehe PICK): Spannweite 175 px, Knochenspangen von den Schultern schräg nach oben außen, Flughaut mit gezackter Unterkante.
+* Es gibt kein Flammenfeuer im Sprite (Rottöne sind Haut/Schatten/Flughaut); Material: Haut, Horn, Flughaut — KEIN Glanz (Regel 14).
 Fest bleiben: Kopf mit Hörnern, Gesicht, Umriss.
 
 Ablauf (48 Frames à 65 ms = 3,12 s, nahtlos):
+* Flügelschlag (neu): beide Flügel schlagen ruhig (Periode 24 Frames, zweimal je Schleife): jede Spalte wandert senkrecht um round(4,6 · (Abstand zur Mitte/Spannweite)^1,25 · [sin(φ − 0,5·Abstand) − sin(−0,5·Abstand)]) Pixel — an den Schultern 0, an den Spitzen
+  bis +7/−2 px (die Ruhepose ist die gehobene Stellung, der Schlag geht nach unten und wieder zurück, die Spitze hinkt nach); der rechte Flügel ist um 0,4 rad gegen den linken versetzt (kein perfektes Spiegelbild). Frame 0 = Original. Der Dämon liegt vor den Flügeln.
 * Atmen (Periode 24): der Rumpf streckt sich 1–2 px nach oben (Frames 2–10 und 26–34 wird Rumpfzeile 19, in der Spitze 4–8 und 28–32 zusätzlich Zeile 20 verdoppelt; die Zeilen 18–21 haben gleiche Ränder,
   keine offene Kante); Kopf, Arme und Hörner heben sich mit, die Füße bleiben am Boden. Frame 0 = Original.
-* Arme: beide Arme wiegen sich wie Flügel an der Schulter (Spalten wandern senkrecht, bis ±2 px an der Klaue, Periode 24, die Spitze hinkt nach, gegenläufig; die Klaue (x ≤ 5 bzw. x ≥ 32) bewegt sich als starrer Block, ihre Finger bleiben 4-verbunden); Frame 0 = Quellform.
+* Arme: beide Arme wiegen sich leicht wie Flügel an der Schulter (Spalten wandern senkrecht, bis ±1–2 px an der Klaue, Periode 24, die Spitze hinkt nach, gegenläufig; die Klaue (x ≤ 5 bzw. x ≥ 32) bewegt sich als starrer Block, ihre Finger bleiben 4-verbunden).
 * Fußtritt: abwechselnd hebt sich die linke Zehenklaue 1 px (Frames 12–15, 36–39) und die rechte (24–27, 44–47).
-* Blinzeln: beide Augen (Frames 15–17 und 39–41, das rechte einen Frame später): Gelb → die umgebende Hautfarbe (je Pixel die häufigste dunkelrote Stufe im 2-px-Umkreis); sonst kein Farbwechsel.
-* Glut (Partikel): sechs runde Wölkchen (2×2 → 4×4 → 2×2, nie einzelne Punkte; Farben O und G des Sprites) steigen in den freien Flächen links und rechts vom Rumpf zwischen Armen und Beinen langsam auf.
-Ergänzungen (Regel 16): wo sich beim Armwiegen oder Fußtritt ein Innenpixel am Rand frei legt, bekommt das leere Nachbarfeld den Umriss A=(51,1,1) bzw. an den Klauen B=(64,64,64) (umriss_ergaenzen).
-Frame: Sprite plus 3 px links/rechts, 4 px oben (Strecken), 2 px unten — Figur zentriert; die Glut liegt innerhalb des Sprite-Rechtecks (keine zusätzliche Frame-Vergrößerung).
+* Blinzeln: beide Augen GLEICHZEITIG (Frames 15–17 und 39–41): Gelb → die umgebende Hautfarbe (je Pixel die häufigste dunkelrote Stufe im 2-px-Umkreis); sonst kein Farbwechsel.
+* Glut (Partikel): sechs runde Wölkchen (2×2 → 4×4 → 2×2, nie einzelne Punkte; Farben O und G des Sprites) steigen in den freien Flächen links und rechts vom Rumpf zwischen Armen und Beinen langsam auf (vor den Flügeln, hinter dem Dämon).
+Ergänzungen (Regel 16): wo sich beim Armwiegen oder Fußtritt ein Innenpixel am Rand frei legt, bekommt das leere Nachbarfeld den Umriss A=(51,1,1) bzw. an den Klauen B=(64,64,64) (umriss_ergaenzen); an den Flügeln bekommt ein am Rand frei liegendes Pixel
+  den Umriss (0,0,1) (umriss_ergaenzen, wo eine Spalte höher/tiefer als die Nachbarspalte steht), und Teile, die nur über eine Ecke hängen, Brückenpixel (verbinde4).
+Frame: Flügelsprite (175×58 mit dem Dämon) plus 4 px links/rechts, 10 px oben (Flügelschlag nach oben), 4 px unten — Figur zentriert; die Glut liegt innerhalb des Dämonenrechtecks.
 Alle Bewegungen laufen auf der vollen Leinwand (anim_lib/anim_amorph werfen ClipError). Nur ganze Pixel, nur Farben der Quelle.
 """
 import math
@@ -36,17 +44,17 @@ import anim_lib as L
 import anim_amorph as A
 
 N, MS = 48, 65
-PAD_L, PAD_R, PAD_T, PAD_B = 3, 3, 4, 2
+DPL, DPR, DPT, DPB = 3, 3, 4, 2
 
-spr = L.lade('demons-gate')
-sh, sw = spr.shape[:2]
-H, W = sh + PAD_T + PAD_B, sw + PAD_L + PAD_R
-BODEN = PAD_T + sh - 1
-OPAK = spr[..., 3] > 0
-RAND_FARBEN = A.umrissfarben(spr)
+spr_d = L.lade('demons-gate')
+sh, sw = spr_d.shape[:2]
+DH, DW = sh + DPT + DPB, sw + DPL + DPR
+BODEN = DPT + sh - 1
+OPAK = spr_d[..., 3] > 0
+RAND_FARBEN = A.umrissfarben(spr_d)
 UMRISS_ROT = (51, 1, 1)
 UMRISS_KLAUE = (64, 64, 64)
-_farben = {tuple(int(v) for v in p[:3]) for p in spr.reshape(-1, 4) if p[3]}
+_farben = {tuple(int(v) for v in p[:3]) for p in spr_d.reshape(-1, 4) if p[3]}
 GLUT = {'c': (196, 0, 0), 'r': (133, 0, 0)}
 for _c in GLUT.values():
     assert _c in _farben, _c
@@ -54,7 +62,7 @@ CW = (248, 246, 32)
 
 
 def _col(y, x):
-    return tuple(int(v) for v in spr[y, x, :3])
+    return tuple(int(v) for v in spr_d[y, x, :3])
 
 
 # ── Augen (gelb) und Lidfarben (häufigste dunkelrote Stufe im Umkreis) ──
@@ -84,11 +92,12 @@ for _i in range(N):
     S.append(2 if _v >= 0.85 else 1 if _v >= 0.3 else 0)
 POSEN = {0: {}, 1: {19: 1}, 2: {19: 1, 20: 1}}
 BLINZELN_L = {15, 16, 17, 39, 40, 41}
-BLINZELN_R = {16, 17, 18, 40, 41, 42}
+BLINZELN_R = BLINZELN_L                                                              # beide Augen blinzeln GLEICHZEITIG (Nutzerwunsch)
 LIFT_L = {12, 13, 14, 15, 36, 37, 38, 39}
 LIFT_R = {24, 25, 26, 27, 44, 45, 46, 47}
 assert S[0] == 0 and 0 not in BLINZELN_L
 
+AMP_ARM = 1.8                                                                        # Arme wiegen nur noch leicht (die Flügel sind jetzt die große Bewegung)
 ARM_PIVOT = {'l': 11, 'r': 26}                                                       # Schulterspalten
 ARM_ZEILEN = (10, 16)
 FUSS_ZEILEN = (29, 32)
@@ -100,25 +109,25 @@ GLUT_WOLKEN = [
 
 
 def glut_ebene(i):
-    e = L.leer(H, W)
+    e = L.leer(DH, DW)
     for w in GLUT_WOLKEN:
         t = ((i + w['off']) % 24) / 24.0
         if t > 0.92:
             continue
         form = 's' if (t < 0.22 or t > 0.72) else 'o'
-        cx = PAD_L + w['x'] + int(round(w['vx'] * t))
-        cy = PAD_T + w['y'] + int(round(w['vy'] * t))
+        cx = DPL + w['x'] + int(round(w['vx'] * t))
+        cy = DPT + w['y'] + int(round(w['vy'] * t))
         for (dx, dy, k) in L.PUFF_FORMEN[form]:
             X, Y = cx + dx, cy + dy
-            if not (2 <= X < W - 2 and 2 <= Y < H - 2):
-                raise L.ClipError(f'Glutwölkchen bei ({X},{Y}) zu nah am Rand des Frames {W}×{H}')
+            if not (2 <= X < DW - 2 and 2 <= Y < DH - 2):
+                raise L.ClipError(f'Glutwölkchen bei ({X},{Y}) zu nah am Rand des Frames {DW}×{DH}')
             e[Y, X, :3] = GLUT[k]
             e[Y, X, 3] = 255
     return e
 
 
 def sprite_mit_effekten(i):
-    sp = spr.copy()
+    sp = spr_d.copy()
     for k, (y, x) in enumerate(AUGEN):
         if i in (BLINZELN_L if k == 0 else BLINZELN_R):
             sp[y, x, :3] = LID[(y, x)]
@@ -128,27 +137,27 @@ def sprite_mit_effekten(i):
 def _arm_ebene(fig, seite, top, i):
     """Arm aus der fertigen Figur herauslösen (Zeilen 10–16 der Quelle, links x ≤ 11 / rechts x ≥ 26) und spaltenweise senkrecht wiegen; Frame 0 = Quellform."""
     y0, y1 = top + ARM_ZEILEN[0], top + ARM_ZEILEN[1]
-    xs = range(0, PAD_L + ARM_PIVOT['l'] + 1) if seite == 'l' else range(PAD_L + ARM_PIVOT['r'], W)
-    arm = L.leer(H, W)
+    xs = range(0, DPL + ARM_PIVOT['l'] + 1) if seite == 'l' else range(DPL + ARM_PIVOT['r'], DW)
+    arm = L.leer(DH, DW)
     rest = fig.copy()
     for x in xs:
         for y in range(y0, y1 + 1):
             if fig[y, x, 3]:
                 arm[y, x] = fig[y, x]
                 rest[y, x] = 0
-    piv = PAD_L + ARM_PIVOT[seite]
-    maxd = max(abs(x - piv) for x in range(W) if arm[:, x, 3].any())
-    out = L.leer(H, W)
+    piv = DPL + ARM_PIVOT[seite]
+    maxd = max(abs(x - piv) for x in range(DW) if arm[:, x, 3].any())
+    out = L.leer(DH, DW)
     phi = 0.0 if seite == 'l' else math.pi
     ph = 2 * math.pi * i / 24
-    for x in range(W):
+    for x in range(DW):
         ys = np.nonzero(arm[:, x, 3])[0]
         if not len(ys):
             continue
-        x_eff = max(x, PAD_L + 5) if seite == 'l' else min(x, PAD_L + 32)                  # die Klaue (x ≤ 5 bzw. x ≥ 32) schwingt als starrer Block mit
+        x_eff = max(x, DPL + 5) if seite == 'l' else min(x, DPL + 32)                  # die Klaue (x ≤ 5 bzw. x ≥ 32) schwingt als starrer Block mit
         frac = abs(x_eff - piv) / float(maxd)
-        dy = int(round(2.6 * frac * (math.sin(ph + phi - 0.9 * frac) - math.sin(phi - 0.9 * frac))))
-        if ys.min() + dy < 0 or ys.max() + dy >= H:
+        dy = int(round(AMP_ARM * frac * (math.sin(ph + phi - 0.9 * frac) - math.sin(phi - 0.9 * frac))))
+        if ys.min() + dy < 0 or ys.max() + dy >= DH:
             raise L.ClipError(f'Armspalte {x} würde um {dy} px aus der Leinwand')
         for y in ys:
             out[y + dy, x] = arm[y, x]
@@ -159,8 +168,8 @@ def _fuss_ebene(fig, seite):
     """Zehenklaue (Zeilen 29–32 der Quelle am Boden) um 1 px heben."""
     boden = BODEN
     y0, y1 = boden - (FUSS_ZEILEN[1] - FUSS_ZEILEN[0]), boden
-    xs = range(0, PAD_L + 15) if seite == 'l' else range(PAD_L + 22, W)
-    fuss = L.leer(H, W)
+    xs = range(0, DPL + 15) if seite == 'l' else range(DPL + 22, DW)
+    fuss = L.leer(DH, DW)
     rest = fig.copy()
     for x in xs:
         for y in range(y0, y1 + 1):
@@ -172,9 +181,9 @@ def _fuss_ebene(fig, seite):
 
 def figur(i):
     sp = sprite_mit_effekten(i)
-    koerper = A.zeilen_von(sp, 0, sh - 1, H, W, PAD_L, PAD_T)
-    z, quelle = A.koerper_pose(koerper, doppeln=POSEN[S[i]], p=0, x0=PAD_L)
-    fig, top = A.auf_leinwand(z, H, BODEN, 0)
+    koerper = A.zeilen_von(sp, 0, sh - 1, DH, DW, DPL, DPT)
+    z, quelle = A.koerper_pose(koerper, doppeln=POSEN[S[i]], p=0, x0=DPL)
+    fig, top = A.auf_leinwand(z, DH, BODEN, 0)
     rest, teile = fig, []
     for seite in ('l', 'r'):
         rest, arm = _arm_ebene(rest, seite, top, i)
@@ -182,33 +191,91 @@ def figur(i):
     for seite, lift in (('l', LIFT_L), ('r', LIFT_R)):
         rest, fuss = _fuss_ebene(rest, seite)
         teile.append((fuss, 0, -1 if i in lift else 0))
-    fin = L.zusammen(H, W, [(rest, 0, 0)] + teile)
-    fin, neu = A.umriss_ergaenzen(fin, RAND_FARBEN, lambda x, y: UMRISS_KLAUE if (y >= BODEN - 4 or x < PAD_L + 6 or x > PAD_L + sw - 7) else UMRISS_ROT)
+    fin = L.zusammen(DH, DW, [(rest, 0, 0)] + teile)
+    fin, neu = A.umriss_ergaenzen(fin, RAND_FARBEN, lambda x, y: UMRISS_KLAUE if (y >= BODEN - 4 or x < DPL + 6 or x > DPL + sw - 7) else UMRISS_ROT)
     fin, pfad, offen = A.verbinde_luecken8(fin, 3)
     return dict(fig=fin, top=top, neu=neu, pfad=pfad, offen=offen)
 
 
-def frame(i):
+
+# ── Flügel ──
+FL = L.lade('demons-gate-fluegel')
+fh, fw = FL.shape[:2]
+OXD, OYD = 69, 25                                                                    # Lage des Dämons im Flügelsprite
+PADL, PADR, PADT, PADB = 4, 4, 10, 4
+GH = max(fh, OYD + sh)
+H, W = GH + PADT + PADB, fw + PADL + PADR
+UMRISS_FL = (0, 0, 1)
+RAND_FL = A.umrissfarben(FL)
+assert RAND_FL == {UMRISS_FL}
+FLUEGEL_PER, FLUEGEL_AMP, FLUEGEL_POT, FLUEGEL_LAG = 24, 4.6, 1.25, 0.5
+FLUEGEL_VERSATZ = {'l': 0.0, 'r': 0.4}                                               # rechter Flügel etwas versetzt
+MITTE = PADL + (fw - 1) / 2.0
+_cols = [x for x in range(fw) if FL[:, x, 3].any()]
+MAXD = max(abs(PADL + x - MITTE) for x in _cols)
+
+# Gesamtbild (Dämon vor den Flügeln) = „Quelle“ für Prüfung und randtest
+spr = np.zeros((GH, fw, 4), np.uint8)
+spr = L.einsetzen(spr, FL)
+spr = L.einsetzen(spr, spr_d, OXD, OYD)
+
+
+def fluegel_ebene(i):
+    layer = L.platz(FL, H, W, PADL, PADT)
+    out = L.leer(H, W)
+    for x in range(W):
+        ys = np.nonzero(layer[:, x, 3])[0]
+        if not len(ys):
+            continue
+        f = abs(x - MITTE) / MAXD
+        seite = 'l' if x < MITTE else 'r'
+        ph = 2 * math.pi * i / FLUEGEL_PER + FLUEGEL_VERSATZ[seite]
+        ph0 = FLUEGEL_VERSATZ[seite]
+        dy = int(round(FLUEGEL_AMP * f ** FLUEGEL_POT * (math.sin(ph - FLUEGEL_LAG * f * 2) - math.sin(ph0 - FLUEGEL_LAG * f * 2))))
+        if ys.min() + dy < 0 or ys.max() + dy >= H:
+            raise L.ClipError(f'Flügelspalte {x} würde um {dy} px aus der Leinwand')
+        for y in ys:
+            out[y + dy, x] = layer[y, x]
+    out, neu = A.umriss_ergaenzen(out, RAND_FL, lambda x, y: UMRISS_FL)
+    out, brueck = A.verbinde4(out)
+    return out, neu, brueck
+
+
+TEST_EBENEN = 'figur'                                                                  # randtest.py: nur Flügel + Dämon ohne Glut prüfen
+
+
+def frame(i, nur=None):
+    fl, _, _ = fluegel_ebene(i)
     f = figur(i)
-    return L.zusammen(H, W, [(glut_ebene(i), 0, 0), (f['fig'], 0, 0)])
+    ox, oy = PADL + OXD - DPL, PADT + OYD - DPT
+    ebenen = [(fl, 0, 0)]
+    if not nur:
+        ebenen.append((glut_ebene(i), ox, oy))
+    ebenen.append((f['fig'], ox, oy))
+    return L.zusammen(H, W, ebenen)
 
 
 if __name__ == '__main__':
-    print('Farben:', len(_farben), '| Lidfarben:', sorted(set(LID.values())), '| Randfarben:', sorted(RAND_FARBEN))
+    print('Farben (Dämon):', len(_farben), '| Lidfarben:', sorted(set(LID.values())), '| Randfarben:', sorted(RAND_FARBEN))
     frames = [frame(i) for i in range(N)]
     fs = [figur(i) for i in range(N)]
     figs = [f['fig'] for f in fs]
+    fls = [fluegel_ebene(i) for i in range(N)]
     prev = sys.argv[sys.argv.index('--preview') + 1] if '--preview' in sys.argv else None
-    ref = L.platz(spr, H, W, PAD_L, PAD_T)
-    print('Frame 0 weicht vom Original in', int((figs[0] != ref).any(axis=2).sum()), 'Pixeln ab')
-    print('ergänzte Umrisspixel je Frame:', [len(f['neu']) for f in fs])
-    print('Pfadpixel je Frame:', [len(f['pfad']) for f in fs], '| unverbundene Teile:', [f['offen'] for f in fs if f['offen']])
+    ref = L.platz(spr, H, W, PADL, PADT)
+    nur_figur = [frame(i, nur=True) for i in range(N)]
+    print('Frame 0 weicht vom Original (Dämon + Flügel) in', int((nur_figur[0] != ref).any(axis=2).sum()), 'Pixeln ab')
+    print('ergänzte Umrisspixel Dämon je Frame:', [len(f['neu']) for f in fs])
+    print('ergänzte Umrisspixel Flügel je Frame:', [len(f[1]) for f in fls])
+    print('Brückenpixel Flügel je Frame:', [len(f[2]) for f in fls])
+    print('Pfadpixel Dämon je Frame:', [len(f['pfad']) for f in fs], '| unverbundene Teile:', [f['offen'] for f in fs if f['offen']])
     n = L.pruefe(frames, quelle=spr)
     print('Pixel je Frame:', n)
     k8 = [int(cv2.connectedComponents((f[..., 3] > 0).astype(np.uint8), connectivity=8)[0] - 1) for f in figs]
-    print('8-Komponenten je Frame (soll überall 1):', sorted(set(k8)), '| 4-Komponenten Original:', A.komponenten4(OPAK), '| je Frame:', sorted({A.komponenten4(f[..., 3] > 0) for f in figs}))
-    schlecht = A.ausdruck_pruefen(figs, spr, "demons-gate")
-    print('offene Randpixel (Frames):', [k for (k, n_, offen) in schlecht if offen])
+    print('8-Komponenten Dämon je Frame (soll überall 1):', sorted(set(k8)), '| 4-Komponenten Dämon Original:', A.komponenten4(OPAK), '| je Frame:', sorted({A.komponenten4(f[..., 3] > 0) for f in figs}))
+    schlecht = A.ausdruck_pruefen(figs, spr_d, "demons-gate (Dämon)")
+    print('offene Randpixel Dämon (Frames):', [k for (k, n_, offen) in schlecht if offen])
+    print('Flügel: 4-Komponenten je Frame', sorted({A.komponenten4(f[0][..., 3] > 0) for f in fls}), '(Original links+rechts =', A.komponenten4(FL[..., 3] > 0), ')')
     L.speichern('demons-gate', "Demon's Gate", frames, MS, prev)
     if prev:
-        L.streifen(prev + '/demons-gate-strip.png', frames[::2], spalten=12, scale=4)
+        L.streifen(prev + '/demons-gate-strip.png', frames[::4], spalten=6, scale=3)
