@@ -139,7 +139,11 @@ function DeckBuilder() {
     try { const data = await api('/decks', { method: 'POST', body: JSON.stringify({ name: 'Deck ' + (decks.length + 1) }) }); setDecks([...decks, data.deck]); setActiveIdx(decks.length); setSampleActive(-1); }
     catch (e) { notify(e.message, 'error'); }
   };
-  const [filtersCollapsed, setFiltersCollapsed] = useState(false);
+  // ★ Handy quer (Als Befund 2.11.: „der Filter-Bereich nimmt mehr Platz ein als die Kartengalerie"): die Filter starten eingeklappt, die Galerie
+  // bekommt das ganze Panel; ▾ FILTERS klappt sie auf (dann höchstens knapp die Hälfte, style.css `.db-panel-right`).
+  const [filtersCollapsed, setFiltersCollapsed] = useState(() => !!(window.matchMedia && window.matchMedia('(max-height: 500px)').matches));
+  const galerieScrollRef = useRef(null);
+  const istTouch = 'ontouchstart' in window;
   // Highlights the first 6 main-deck cards as a simulated starting hand (toggled by Shuffle/Sort)
   const [handHighlight, setHandHighlight] = useState(false);
   // Drop the highlight when switching to another deck
@@ -1875,7 +1879,8 @@ function DeckBuilder() {
           </div>
           )}
           {/* Card grid */}
-          <div style={{ flex: 1, overflowY: 'auto', padding: 6 }}>
+          <div className="db-gallery-wrap" style={{ flex: 1, minHeight: 0, position: 'relative', display: 'flex' }}>
+          <div className="db-gallery-scroll" ref={galerieScrollRef} style={{ flex: 1, minWidth: 0, overflowY: 'auto', padding: 6, ...(istTouch ? { paddingRight: 40, scrollbarWidth: 'none', WebkitOverflowScrolling: 'touch' } : {}) }}>
             {/* v1299: Kleinansicht — leichte Foil-Schicht (FoilKleinContext, app-shared). */}
             <FoilKleinContext.Provider value={true}><div className="db-card-grid" ref={gridRef} style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 4 }}>
               {pageCards.map((card, i) => {
@@ -1897,6 +1902,8 @@ function DeckBuilder() {
               })}
             </div></FoilKleinContext.Provider>
             {filteredCards.length === 0 && <div style={{ textAlign: 'center', color: 'var(--text2)', fontSize: 12, padding: 20 }}>No cards match filters</div>}
+          </div>
+          {istTouch && window.TouchScrollbar && <window.TouchScrollbar scrollRef={galerieScrollRef} />}
           </div>
           {pageCount > 1 && (
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, padding: 6, borderTop: '1px solid var(--bg4)' }}>

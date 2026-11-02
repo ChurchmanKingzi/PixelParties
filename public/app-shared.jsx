@@ -8441,6 +8441,55 @@ function CardMini({ card, onClick, onRightClick, count, maxCount, dimmed, style,
  * Mausrad-Scrollen (`.card-tooltip-info`, App-weiter Wheel-Handler in
  * app-main) greifen damit automatisch fuer beide.
  */
+/**
+ * ★ Breiter, mit dem Finger greifbarer Bildlaufstreifen für Galerien auf Touch-Geräten (Als Befund 2.11.: „die Scrollbar für Kartengalerien auf Mobile ist zu
+ * schmal und schwer zu scrollen"). Die nativen Leisten sind auf dem Handy ein dünner, kurz sichtbarer Strich. Der Streifen liegt absolut rechts im
+ * Elternelement (das `position: relative` sein muss), folgt `scrollRef.current` (Scrollen, Größe, Inhalt) und lässt sich am Griff ziehen oder durch Tippen
+ * auf die Spur setzen. Pointer-Ereignisse mit Capture; `touch-action: none` hält die Seite still. Stil: `.pp-bildlauf-spur` / `.pp-bildlauf-griff` (style.css).
+ */
+function TouchScrollbar({ scrollRef }) {
+  const spur = useRef(null), griff = useRef(null), zug = useRef(null);
+  const nachziehen = useCallback(() => {
+    const el = scrollRef.current, sp = spur.current, gr = griff.current;
+    if (!el || !sp || !gr) return;
+    if (!(el.clientHeight > 0 && el.scrollHeight > el.clientHeight + 1)) { sp.style.display = 'none'; return; }
+    sp.style.display = '';
+    const h = sp.clientHeight, gh = Math.max(56, Math.min(h, h * el.clientHeight / el.scrollHeight));
+    const pos = el.scrollTop / Math.max(1, el.scrollHeight - el.clientHeight);
+    gr.style.height = gh + 'px'; gr.style.top = Math.round(pos * (h - gh)) + 'px';
+  }, [scrollRef]);
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el) return undefined;
+    el.addEventListener('scroll', nachziehen, { passive: true });
+    const ro = new ResizeObserver(nachziehen); ro.observe(el);
+    const mo = new MutationObserver(nachziehen); mo.observe(el, { childList: true, subtree: true });   // Seitenwechsel, Filter: der Inhalt wird länger/kürzer
+    nachziehen();
+    return () => { el.removeEventListener('scroll', nachziehen); ro.disconnect(); mo.disconnect(); };
+  }, [scrollRef, nachziehen]);
+  const zuSpurPosition = (clientY) => {
+    const el = scrollRef.current, sp = spur.current, gr = griff.current;
+    if (!el || !sp || !gr) return;
+    const r = sp.getBoundingClientRect(), gh = gr.clientHeight;
+    const anteil = Math.min(1, Math.max(0, (clientY - r.top - gh / 2) / Math.max(1, r.height - gh)));
+    el.scrollTop = anteil * (el.scrollHeight - el.clientHeight);
+  };
+  const runter = (e) => {
+    e.stopPropagation();
+    try { e.currentTarget.setPointerCapture(e.pointerId); } catch (_) { /* ohne Capture */ }
+    zug.current = true;
+    zuSpurPosition(e.clientY);
+  };
+  const bewegt = (e) => { if (zug.current) { e.stopPropagation(); zuSpurPosition(e.clientY); } };
+  const hoch = (e) => { zug.current = false; try { e.currentTarget.releasePointerCapture(e.pointerId); } catch (_) { /* ok */ } };
+  return (
+    <div ref={spur} className="pp-bildlauf-spur" onPointerDown={runter} onPointerMove={bewegt} onPointerUp={hoch} onPointerCancel={hoch}>
+      <div ref={griff} className="pp-bildlauf-griff" />
+    </div>
+  );
+}
+window.TouchScrollbar = TouchScrollbar;
+
 function CardSideTooltip({ card, imgUrl, inGallery }) {
   if (!card) return null;
   const foilType = card.foil;
