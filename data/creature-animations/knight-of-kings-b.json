@@ -1,15 +1,15 @@
 {
   "creature": "Knight of Kings [B]",
   "sheet": "knight-of-kings-b.png",
-  "frameWidth": 34,
+  "frameWidth": 32,
   "frameHeight": 27,
   "frames": 48,
   "frameMs": 62,
   "loop": true,
   "layout": "horizontal",
   "padTop": 2,
-  "padLeft": 3,
-  "padRight": 3,
+  "padLeft": 2,
+  "padRight": 2,
   "padBottom": 2,
-  "faceX": 17.0
+  "faceX": 16.0
 }

@@ -1,15 +1,15 @@
 {
   "creature": "Dragolfin",
   "sheet": "dragolfin.png",
-  "frameWidth": 62,
-  "frameHeight": 47,
+  "frameWidth": 58,
+  "frameHeight": 39,
   "frames": 48,
   "frameMs": 70,
   "loop": true,
   "layout": "horizontal",
-  "padTop": 8,
-  "padLeft": 4,
-  "padRight": 6,
-  "padBottom": 6,
-  "faceX": 31.0
+  "padTop": 3,
+  "padLeft": 3,
+  "padRight": 3,
+  "padBottom": 3,
+  "faceX": 29.0
 }

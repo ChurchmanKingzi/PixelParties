@@ -99,3 +99,21 @@ def klekse_ebene(h, w, i, n, puffs, farben, formen=('s', 'o', 's'), rand=0.08):
             out[y, x, :3] = farben[k]
             out[y, x, 3] = 255
     return out
+
+
+def fuelle_oben(neu, alt, stuetze):
+    """Spaltenwelle senkt eine Spalte von `alt` nach `neu` (Schwanz unter dem Rumpf): die frei werdenden obersten Zellen werden mit dem obersten Pixel der Spalte gefüllt,
+    wenn die Spalte im Original oben an `stuetze` (Bool-Maske des Rumpfes) anschloss — der Schwanz bleibt am Rumpf angewachsen. Gibt eine neue Ebene zurück."""
+    out = neu.copy()
+    h, w = alt.shape[:2]
+    for x in range(w):
+        ys_a = np.nonzero(alt[:, x, 3])[0]
+        ys_n = np.nonzero(neu[:, x, 3])[0]
+        if not len(ys_a) or not len(ys_n):
+            continue
+        y0, y1 = int(ys_a.min()), int(ys_n.min())
+        if y1 > y0 and y0 > 0 and stuetze[y0 - 1, x]:
+            for y in range(y0, y1):
+                if not out[y, x, 3]:
+                    out[y, x] = alt[y0, x]
+    return out

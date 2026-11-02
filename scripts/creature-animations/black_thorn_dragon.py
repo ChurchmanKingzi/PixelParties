@@ -24,16 +24,15 @@ Bleibt fest: Beine/Füße (Bodenwesen: der Schatten auf der Karte liegt direkt u
 
 Ablauf (60 Frames à 70 ms = 4,2 s), alle Bewegungen unabhängig:
 * Flügelschlag: zweimal pro Schleife (Periode 30), langsam und weit: die Flügel heben sich bis 4 px, senken sich bis 2 px (D.fluegel_asym, Spitze hinkt nach, Spalten bleiben ganz, Ruhepose = Frame 0).
-* Atmen (Periode 30, versetzt zum Flügel): Zeile 20 (Bauchmitte, Textur) wird eingefügt (L.streck_zeile, Texturmischung): Rumpf, Schwanzansatz, Arme, Flügel und Kopf heben sich 1 px, die Beine bleiben am Boden.
-* Kopf nickt (Frames 8–19 und 38–49): der ganze Kopf samt Zähnen senkt sich zusätzlich 1 px (starr, als eigene Ebene — die Körperebene darunter ist vollständig gezeichnet, es entsteht keine Lücke).
-* Schwanz schwingt: der Schwanz samt Dornenknochen biegt sich um die Spaltenachse x = 26 (Spitze bis ±3 px, Gefälle höchstens 1 px je Spalte, die Spitze hinkt nach), Periode 20 (3× pro Schleife); eingefügte
-  Brückenpixel verbinden Teile, die nur noch über eine Ecke hängen (A.verbinde4).
+* Atmen (Periode 30, oben in Frames 8–21 und 38–51, versetzt zum Flügel): Zeile 20 (Bauchmitte, Textur) wird eingefügt (L.streck_zeile, Texturmischung): Rumpf, Schwanzansatz, Arme, Flügel und Kopf heben sich 1 px, die Beine bleiben am Boden.
+* Kopf nickt (Frames 23–33 und 53–59, außerhalb der Atem-Hebung): der ganze Kopf samt Zähnen senkt sich zusätzlich 1 px (starr, als eigene Ebene — die Körperebene darunter ist vollständig gezeichnet, es entsteht keine Lücke).
+* Schwanz schwingt: der Schwanz samt Dornenknochen biegt sich um die Spaltenachse x = 26 (Spitze bis ±3 px, Gefälle höchstens 1 px je Spalte, die Spitze hinkt nach), Periode 20 (3× pro Schleife).
 * Füße treten abwechselnd (links Frames 10–15 und 40–45, rechts 25–30 und 55–60): eine Fußzeile entfällt kurz, die Zehenkrallen rücken 1 px hoch.
 * Blinzeln (Frames 22–25 und 52–55): beide roten Augen schließen sich (Lid in Gesichtsfarbe Schwarz, halb → zu → zu → halb).
 Alle Bewegungen laufen auf der vollen Leinwand (anim_lib wirft ClipError). Nur ganze Pixel, nur Farben der Quelle.
 
 Ergänzungen: (15,5) und (22,5) der Körperebene → Schwarz (0,0,0) (verdeckt, siehe oben); Randpixel-Korrektur (Regel 16): fehlende Umrisspixel an verschobenen Teilen werden in der Umrissfarbe des Originals
-(anim_tiere.umriss_schliessen) ergänzt.
+(anim_tiere.umriss_schliessen) ergänzt; reißt ein Dorn der Dornenkette (nur über Pixelecken verbunden) beim Schwanzschwingen ab, hängt ihn A.verbinde_luecken8 mit höchstens 3 Pfadpixeln wieder an.
 """
 import sys
 
@@ -45,7 +44,7 @@ import anim_amorph as A
 import anim_drache as D
 
 N, MS = 60, 70
-PAD_L, PAD_R, PAD_T, PAD_B = 6, 6, 9, 4
+PAD_L, PAD_R, PAD_T, PAD_B = 3, 3, 4, 3
 
 spr = L.lade('black-thorn-dragon')
 l5, l4, l3 = (L.lade(f'black-thorn-dragon_{k}') for k in ('l5', 'l4', 'l3'))
@@ -85,8 +84,8 @@ def teil(quelle, maske):
 
 def zustand(i):
     ph = L.sinus(i, N / 2)
-    atem = 1 if ((i + 6) % 30) in range(4, 20) else 0
-    nick = 1 if (i in range(8, 20) or i in range(38, 50)) else 0
+    atem = 1 if ((i - 8) % 30) < 14 else 0
+    nick = 1 if (i in range(23, 34) or i in range(53, 60)) else 0
     bl = 0
     for s in (22, 52):
         bl = max(bl, D.blinzeln(i, s))
@@ -122,7 +121,7 @@ def frame(i, nur=None):
     ebenen = {'schwanz': schwanz, 'torso': torso, 'fluegel_l': wl, 'fluegel_r': wr, 'bein_l': bl_, 'bein_r': br_, 'arme': arme, 'kopf': kopf}
     wahl = nur or tuple(ebenen)
     ganz = L.zusammen(H, W, [(ebenen[n], 0, 0) for n in wahl])
-    ganz, _ = A.verbinde4(ganz)                                   # nur über eine Ecke hängende Teile (Schwanz/Dornen) 4-verbinden
+    ganz, _, _ = A.verbinde_luecken8(ganz, max_len=3)            # ein Dorn, der um eine Ecke weggerutscht wäre, wird kurz wieder angehängt (nur 8er-getrennte Teile)
     return T.umriss_schliessen(ganz, RAND, REGEL)                  # Randpixel-Test (Regel 16)
 
 

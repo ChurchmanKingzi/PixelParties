@@ -198,3 +198,38 @@ def verschieben_teil(a, maske, dx, dy):
     """Pixel in `maske` (Leinwand) starr um (dx, dy) verschieben; der Rest bleibt, verschobene Pixel liegen oben auf."""
     teil, rest = L.trenne(a, maske)
     return L.zusammen(a.shape[0], a.shape[1], [(rest, 0, 0), (teil, dx, dy)])
+
+
+def _teil_komp(a, zeilen, offs):
+    """4er-Flecken der Zeilen `zeilen` von a, jede um offs[y] verschoben (offs=None: unverschoben). Breite wird großzügig erweitert."""
+    h, w = a.shape[:2]
+    pad = 12
+    out = np.zeros((h, w + 2 * pad, 4), np.uint8)
+    for y in zeilen:
+        d = 0 if offs is None else offs[y]
+        xs = np.nonzero(a[y, :, 3])[0]
+        for x in xs:
+            out[y, x + d + pad] = a[y, x]
+    return komp4(out)
+
+
+def verbunden_offs(a, ys, ziel, start=0):
+    """Wanderwelle, die den Wurm nie zerreißt: ys = Leinwandzeilen von der festen Stelle zum freien Ende, ziel[y] = gewünschter ganzzahliger Versatz.
+    Je Zeile werden die Kandidaten (Vorgänger −1, ±0, +1) nach Nähe zum Ziel geprüft; angenommen wird der erste, bei dem die bisher aufgebauten Zeilen
+    genauso viele 4-verbundene Flecken haben wie im Original (dünne Stacheln, die nur über eine Pixelspalte anschließen, verbieten ein Abknicken an dieser Stelle).
+    Fällt keiner durch, bleibt der Versatz des Vorgängers (relative Verschiebung 0 ändert nichts an der Verbundenheit)."""
+    res = {}
+    prev = start
+    for k, y in enumerate(ys):
+        zeilen = list(ys[:k + 1])
+        ref = _teil_komp(a, zeilen, None)
+        cands = sorted({prev - 1, prev, prev + 1}, key=lambda c: (abs(c - ziel[y]), abs(c - prev)))
+        ok = prev
+        for c in cands:
+            res[y] = c
+            if _teil_komp(a, zeilen, res) == ref:
+                ok = c
+                break
+        res[y] = ok
+        prev = ok
+    return res

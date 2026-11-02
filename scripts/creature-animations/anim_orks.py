@@ -6,6 +6,7 @@ Alles Pixelart: nur ganze Pixel, kein Alpha, nur Farben, die schon im Sprite ste
     rauschen(x, y, i, n, ...)                  zeitlich nahtloses, nach links fließendes Feld −1 … 1 (für kochendes Feuer)
     feuerball(h, w, i, n, mitte, radius, rampe, schweif, ...)   Feuerball (Regel 15): ruhiger runder Körper (kochende Farbschichten, atmender Rand) mit einem Schweif aus
                                                Flammenzungen (anim_feuer.Feuer, um 90° gedreht: „oben“ der Zunge = links) und abreißenden Funken
+    spalten_welle0(a, pivot_x, amp, i, n, lauf)  Wellenlauf wie L.spalten_welle, aber Frame 0 = Ruhepose (Verschiebung relativ zu Frame 0)
     kontur(a, farbe)                            alle Randpixel (4-Nachbar leer) einer Ebene in `farbe` (Außenhaut)
 """
 import math
@@ -22,6 +23,27 @@ def rauschen(x, y, i, n, z=(0.0, 0.0)):
     x, y = x + z[0], y + z[1]
     v = (math.sin(0.85 * x + 0.45 * y + t) + math.sin(0.5 * x - 0.9 * y + 2 * t + 1.3) + math.sin(1.25 * x + 0.3 * y + 3 * t + 2.1)) / 3.0
     return v
+
+
+def spalten_welle0(a, pivot_x, amp, i, n, lauf=1.0, zyklen=1, potenz=1.0):
+    """Wie L.spalten_welle (Spalte wandert senkrecht um round(amp · sin(Phase − lauf·Abstandsanteil) · Abstandsanteil^potenz)), aber relativ zu Frame 0:
+    Frame 0 ist exakt die Ruhepose (Verschiebung 0), der Phasenlauf (laufende Welle) bleibt erhalten."""
+    h, w = a.shape[:2]
+    cols = [x for x in range(w) if a[:, x, 3].any()]
+    maxd = max(1, max(abs(x - pivot_x) for x in cols)) if cols else 1
+    out = L.leer(h, w)
+
+    def dy(x, ii):
+        frac = abs(x - pivot_x) / maxd
+        return int(round(amp * math.sin(2 * math.pi * zyklen * ii / n - lauf * frac) * frac ** potenz))
+    for x in cols:
+        d = dy(x, i) - dy(x, 0)
+        ys = np.nonzero(a[:, x, 3])[0]
+        if ys.min() + d < 0 or ys.max() + d >= h:
+            raise L.ClipError(f'Spalte {x} würde um {d} px aus der Leinwand (Höhe {h}) geschoben')
+        for y in ys:
+            out[y + d, x] = a[y, x]
+    return out
 
 
 def kontur(a, farbe):

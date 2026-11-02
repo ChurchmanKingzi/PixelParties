@@ -42,7 +42,7 @@ import anim_amorph as A
 import anim_drache as D
 
 N, MS = 48, 70
-PAD_L, PAD_R, PAD_T, PAD_B = 5, 5, 9, 9
+PAD_L, PAD_R, PAD_T, PAD_B = 3, 3, 4, 7
 
 spr = L.lade('sorbereus-the-adapting-dragon')
 sh, sw = spr.shape[:2]

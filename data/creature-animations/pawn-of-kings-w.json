@@ -1,15 +1,15 @@
 {
   "creature": "Pawn of Kings [W]",
   "sheet": "pawn-of-kings-w.png",
-  "frameWidth": 20,
-  "frameHeight": 19,
+  "frameWidth": 19,
+  "frameHeight": 18,
   "frames": 48,
   "frameMs": 70,
   "loop": true,
   "layout": "horizontal",
-  "padTop": 3,
-  "padLeft": 3,
+  "padTop": 2,
+  "padLeft": 2,
   "padRight": 2,
   "padBottom": 2,
-  "faceX": 10.0
+  "faceX": 9.5
 }

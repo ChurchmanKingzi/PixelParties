@@ -25,10 +25,10 @@ Identifikation (x, y im 34×40-Sprite):
 
 Ablauf (48 Frames à 80 ms = 3,84 s, nahtlos):
 * KOBRA STEIGT UND SCHWANKT: Haube + Hals heben sich in zwei Stufen um bis zu 2 px (Hals-Zeile 25 wird 1–2× eingefügt; die Hals-Streifen sind senkrechte Verläufe, also keine sichtbare
-  Zeilenkopie) und schwanken dabei langsam (Periode 48): jede Zeile von y 27 aufwärts wandert waagerecht, oben bis ±2 px (Scherung, benachbarte Zeilen ≤ 1 px Unterschied, die Haube schwingt
-  als Ganzes). Das ist eine Schlange, kein Humanoider — sie darf pendeln.
-* SCHWANZ: die Schlinge und der Balken (y 21–33) schwingen als Scherung um die Spirale (Periode 16, drei Wellen je Schleife, oben bis ±2 px); die Schlinge bleibt dabei starr beisammen und
-  um den Stab gelegt; hinter dem Stab verlaufende Teile werden nur dort sichtbar, wo der Schwanz wirklich liegt.
+  Zeilenkopie; Periode 24) und schwanken dabei langsam (Periode 48): die Haube samt Gesicht wandert starr bis ±2 px waagerecht, nur der Hals (y 21–27) biegt sich dabei als S-Kurve
+  (Gefälle ≤ 1 px je Zeile, Zusammenhang bleibt, Haubenrand/Saum werden nicht geschert). Das ist eine Schlange, kein Humanoider — sie darf pendeln.
+* SCHWANZ: die Schlinge und der Balken (y 21–33) schwingen als Scherung um die Spirale (Periode 16, drei Wellen je Schleife, oben bis ±3 px, die Schlinge starr als Ganzes mit y 25);
+  hinter dem Stab verlaufende Teile werden nur dort sichtbar, wo der Schwanz wirklich liegt.
 * BLINZELN: Frames 30–32 (Lid = Hellgrau (174,174,174), erst obere Reihe, dann beide).
 * GOLD GLÄNZT (Regel 12): ein Lichtband läuft (Frames 6–19) über das goldene Haubensaum-Paar (eine Stufe auf der Goldrampe); ein vierzackiger Stern blitzt am goldenen Stabknoten (Frames 22–26)
   und an der metallischen Stabspitze (Frames 38–42) auf.

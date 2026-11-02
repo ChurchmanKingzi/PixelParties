@@ -11,6 +11,9 @@ und bekommt eigene Zeitfenster (Phasenversatz), damit schwarze und weiße Figur 
     glitzer_folge(i, n, start, folge)           Ereignisfenster: liefert die Form im Frame i oder 'ORIG' (außerhalb des Fensters bleibt das Original)
     lid(a, off, pixel, farbe)                   Augen/Pixel mit Lidfarbe überdecken (Blinzeln)
     rampe_aus(spr, kandidaten)                  Farbrampe (dunkel → hell) aus den Farben, die im Sprite wirklich vorkommen
+    rund / kippen / spalten_dy                  symmetrisches Runden; starres Kippen eines Schwerts/Stabs um ein Gelenk (Spaltenversatz, Gefälle ≤ 1 px)
+    zuschneiden(frames, rand) / lauf(...)       Zuschnitt aller Frames auf die Figur (Randabstand 2) und Standard-Abschluss eines Skripts (Ruhepose, Prüfung, Speichern, Streifen)
+    Ritter / Bauer / Dame / Turm                Animationsbauer für Knight / Pawn / Queen / Rook of Kings (je [W] und [B], mit eigenen Zeitfenstern)
 """
 import math
 
@@ -192,6 +195,22 @@ class Ritter:
         return Hm.kontur_schliessen(fig, self.umriss, self.schwarz)
 
 
+def zuschneiden(frames, rand=2):
+    """Alle Frames gemeinsam auf die Vereinigung aller deckenden Pixel zuschneiden (plus `rand` px rundherum)."""
+    a = np.stack([f[..., 3] > 0 for f in frames])
+    ys = np.nonzero(a.any(axis=(0, 2)))[0]
+    xs = np.nonzero(a.any(axis=(0, 1)))[0]
+    y0, y1, x0, x1 = int(ys.min()) - rand, int(ys.max()) + rand + 1, int(xs.min()) - rand, int(xs.max()) + rand + 1
+    out = []
+    for f in frames:
+        h, w = f.shape[:2]
+        g = np.zeros((y1 - y0, x1 - x0, 4), np.uint8)
+        sy0, sy1, sx0, sx1 = max(y0, 0), min(y1, h), max(x0, 0), min(x1, w)
+        g[sy0 - y0:sy1 - y0, sx0 - x0:sx1 - x0] = f[sy0:sy1, sx0:sx1]
+        out.append(g)
+    return out
+
+
 def lauf(modul_name, karte, frames, ms, prev, spr, off, extra=None, erlaubt=()):
     """Standard-Abschluss eines Skripts: Ruhepose, Prüfung, Speichern, Streifen."""
     diff = Hm.ruhepose(frames[0], spr, off)
@@ -199,6 +218,8 @@ def lauf(modul_name, karte, frames, ms, prev, spr, off, extra=None, erlaubt=()):
     n = L.pruefe(frames, quelle=spr, erlaubt=erlaubt)
     print('Pixel je Frame:', n)
     kontakt_bericht(frames)
+    frames = zuschneiden(frames, 2)                                    # Regel 27: auf die Figur zugeschnitten (Randabstand 2 über alle Frames)
+    print('zugeschnitten auf', frames[0].shape[1], '×', frames[0].shape[0])
     L.speichern(modul_name.replace('_', '-'), karte, frames, ms, prev, extra=extra)
     if prev:
         import os

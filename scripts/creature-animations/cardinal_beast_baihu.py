@@ -23,7 +23,7 @@ Fest bleiben: Gesicht (außer Blinzeln), Maul, Beine, Krallenstriche.
 
 Ablauf (48 Frames à 80 ms = 3,84 s, nahtlos):
 * ATMEN (zweistufig): Kopf, Ohren und beide Fächerwurzeln steigen in zwei Stufen um bis zu 2 px (Kragenzeile 25 wird 1–2× eingefügt, mit Nachbartextur gemischt); Beine/Krallen bleiben am Boden.
-* SCHMUCKFÄCHER (vier unabhängige Bewegungen): jedes Bündel schlägt mit der Spitze bis ±2 px auf und ab (Spaltenversatz um die Wurzel, 4-verbunden): oben links Periode 24, unten links 16 (gegenläufig),
+* SCHMUCKFÄCHER (vier unabhängige Bewegungen): jedes Bündel schlägt mit der Spitze bis ±1,7 px auf und ab (Kippen der Spalten um die Wurzel, 4-verbunden): oben links Periode 24, unten links 16 (gegenläufig),
   oben rechts 48, unten rechts 12 (gegenläufig) — Wurzeln (x 14–17 / 30–33) bleiben stehen, die Federtextur wird nur verschoben, nie kopiert.
 * OHRZUCKEN: linkes Ohr (Frames 8–13) und rechtes Ohr (Frames 30–35) klappen mit der oberen Hälfte 1 px nach außen und zurück (Zeilenversatz, Umriss wandert mit).
 * BLINZELN: Frames 20–22 und 42–44 (Augenschlitz schließt sich zu einer dunklen Linie, Lid = Fellgrau (165,164,185)).

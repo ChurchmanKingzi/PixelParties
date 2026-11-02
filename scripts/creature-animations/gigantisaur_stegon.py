@@ -43,7 +43,7 @@ import anim_tiere as T
 import anim_drache as D
 
 N, MS = 60, 70
-PAD_L, PAD_R, PAD_T, PAD_B = 5, 5, 9, 4
+PAD_L, PAD_R, PAD_T, PAD_B = 3, 3, 4, 3
 
 spr = L.lade('gigantisaur-stegon')
 sh, sw = spr.shape[:2]
@@ -94,7 +94,7 @@ def frame(i, nur=None):
     schwanz = L.zusammen(H, W, [(teil(schwanz_m), 0, 0), (teil(faecher_m), 0, 0)])
     k = L.streck_zeile(k, PAD_T + ZEILE, atem)
     schwanz = L.streck_zeile(schwanz, PAD_T + ZEILE, atem)
-    schwanz = D.schwanz_biegen(schwanz, PAD_L + 56, 3.0, L.sinus(i, N / 2), lauf=1.0, richtung=1, spitze_ab=PAD_L + 62)
+    schwanz = D.schwanz_biegen(schwanz, PAD_L + 56, 3.0, L.sinus(i, N / 2), lauf=1.0, richtung=1, spitze_ab=PAD_L + 59)
     kopf = L.versetze(kopf, 0, -atem + nick)
     ba = L.heben_unten(teil(bein_a), PAD_T + FUSS_ZEILE, fuss[0])
     bb = L.heben_unten(teil(bein_b), PAD_T + FUSS_ZEILE, fuss[1])

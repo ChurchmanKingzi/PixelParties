@@ -42,7 +42,7 @@ import anim_tiere as T
 import anim_drache as D
 
 N, MS = 48, 70
-PAD_L, PAD_R, PAD_T, PAD_B = 8, 6, 9, 6
+PAD_L, PAD_R, PAD_T, PAD_B = 7, 3, 4, 3
 
 spr = L.lade('dragolfin')
 sh, sw = spr.shape[:2]

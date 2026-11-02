@@ -19,10 +19,10 @@ Was im Sprite ist (x, y im 16×30-Sprite):
 Gold: nur die zwei Paar Zahnspitzen → ein kurzes Funkeln (Regel 14); Stoff, Hut, Horn, Maske glänzen nicht. Hörner/Maske/Gesicht bleiben fest (Regel 1/21: nicht geraten). Keine Partikel, kein Feuer.
 
 Ablauf (48 Frames à 70 ms = 3,36 s, nahtlos):
-* ATMEN (Periode 24): die Hosenzeile 26 wird einmal eingefügt: Körper, Kopf, Maske, Hörner, Hut steigen 1 px, Stiefel bleiben.
-* HUT LÜPFEN: der Zylinder (Ebene 26) hebt sich zusätzlich bis 2 px (Frames 8–12 hoch, 30–33 kurz 1 px) und senkt sich wieder — starr, der Kopf darunter (Hörner, Gesicht) bleibt (Verdecktes ist in Ebene 29 vollständig vorhanden: Kopfoberseite y 8).
+* ATMEN (Periode 16, drei Atemzüge je Schleife): die Hosenzeile 26 wird einmal eingefügt: Körper, Kopf, Maske, Hörner, Hut steigen 1 px, Stiefel bleiben.
+* HUT LÜPFEN: der Zylinder (Ebene 26) hebt sich zusätzlich bis 2 px (Frames 8–12 hoch, 26–28 und 38–41 kurz 1 px) und senkt sich wieder — starr, der Kopf darunter (Hörner, Gesicht) bleibt (Verdecktes ist in Ebene 29 vollständig vorhanden: Kopfoberseite y 8).
 * ÄRMEL: beide Frackärmel pendeln einwärts (starre Zeilenverschiebung der Ärmel-Enden um 1 px über den Rock; links Frames 14–23, rechts Frames 34–43).
-* FUNKELN: die goldenen Zahnspitzen links blitzen weiß (Frames 20–21), rechts (Frames 40–41).
+* FUNKELN: die goldenen Zahnspitzen links blitzen weiß (Frames 20–21 und 44–45), rechts (Frames 40–41 und 3–4).
 Frame 0 = Original (Ruhepose). Ergänzungen: keine; beim Hutlüpfen werden zwei vom Hut verdeckte Quellpixel sichtbar: (5,10) Maskenrand (187,187,187) aus Ebene 28 und (9,9) Wangenlicht (204,95,92) aus Ebene 29
 (Farben der Quellebenen, in L.pruefe(erlaubt=…) freigegeben).
 """
@@ -68,17 +68,17 @@ def eb(a, m=None, dy=0):
 
 
 def frame(i, nur=None):
-    hub = Hm.stufe(i, 24, 1)
+    hub = Hm.stufe(i, 16, 1)
     hop = 0
     w = Hm.folge(i, 8, [1, 2, 2, 2, 1], N)
     if w:
         hop = w
-    w2 = Hm.folge(i, 30, [1, 1, 1, 1], N)
+    w2 = Hm.folge(i, 26, [1, 1, 1], N) or Hm.folge(i, 38, [1, 1, 1, 1], N)
     if w2:
         hop = max(hop, w2)
     # Körper mit Gold (Funkeln: weißer Blitz auf den Zahnspitzen)
     kb = eb(E29, KOERPER)
-    for s, m in ([] if nur else ((20, GOLD_L), (40, GOLD_R))):
+    for s, m in ([] if nur else ((20, GOLD_L), (40, GOLD_R), (3, GOLD_R), (44, GOLD_L))):
         if Hm.folge(i, s, [1, 1], N):
             for y, x in zip(*np.nonzero(m)):
                 kb[y + OFF[1], x + OFF[0], :3] = WEISS

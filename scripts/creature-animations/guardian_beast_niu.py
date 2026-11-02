@@ -27,8 +27,9 @@ Ablauf (48 Frames à 80 ms = 3,84 s, nahtlos):
 * KOPFNICKEN: der Kopf (Helm, Hörner, Gesicht, Haarsträhnen) sinkt in Frames 36–45 um 1 px in den Schal und hebt sich wieder (nur Senken/Heben, nie seitlich).
 * BLINZELN: Frames 18–20 und 44–46 (Haut als Lid; erst Hälfte, dann ganz zu, dann Hälfte).
 * HAARSTRÄHNEN: die Spitzen der schwarzen Strähnen (unterste Zeile y 23) pendeln 1 px nach innen und wieder zurück (links/rechts gegenläufig, Periode 24).
-* KLINGEN-GLITZER (Waffen = Metall, Regel 12): ein vierzackiger Stern blitzt für 5 Frames am oberen Dorn der linken (Frames 6–10) und später der rechten Klinge (Frames 30–34) auf;
-  die Spitzen der Klingen (lavendelfarbener Auslauf) pulsieren eine Stufe heller/dunkler (Periode 16, beide Klingen versetzt).
+* KLINGEN (Waffen = Metall, Regel 12): ein dreizeiliger hellvioletter Lichtstreifen ((239,219,242)/(213,179,214), nur in der Mittelspalte, die weißen Randpixel bleiben) läuft die linke Klinge
+  (Frames 4–19) und später die rechte Klinge (Frames 28–43) hinab; ein vierzackiger Glitzerstern blitzt für 5 Frames an der oberen Ecke des breiten Klingenteils der linken (Frames 6–10) und
+  der rechten Klinge (Frames 30–34) auf; der lavendelfarbene Auslauf der Klingenspitzen pulsiert eine Stufe heller/dunkler (Periode 16, beide Klingen gegenläufig; das Randpixel der Spitze (y 44) bleibt fest).
 Frame 0 = Ruhepose (Original). Alle Bewegungen laufen auf der vollen Leinwand (anim_lib wirft ClipError). Nur ganze Pixel, nur Farben der Quelle.
 Ergänzungen: keine (Kopf sinkt vor dem Schal, dabei wird nichts freigelegt).
 """

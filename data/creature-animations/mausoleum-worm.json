@@ -1,0 +1,15 @@
+{
+  "creature": "Mausoleum Worm",
+  "sheet": "mausoleum-worm.png",
+  "frameWidth": 37,
+  "frameHeight": 35,
+  "frames": 48,
+  "frameMs": 65,
+  "loop": true,
+  "layout": "horizontal",
+  "padTop": 3,
+  "padLeft": 6,
+  "padRight": 3,
+  "padBottom": 2,
+  "faceX": 18.5
+}

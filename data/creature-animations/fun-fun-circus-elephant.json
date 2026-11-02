@@ -1,15 +1,15 @@
 {
   "creature": "Fun-Fun Circus Elephant",
   "sheet": "fun-fun-circus-elephant.png",
-  "frameWidth": 56,
-  "frameHeight": 76,
+  "frameWidth": 52,
+  "frameHeight": 75,
   "frames": 72,
   "frameMs": 70,
   "loop": true,
   "layout": "horizontal",
-  "padTop": 3,
-  "padLeft": 4,
-  "padRight": 4,
+  "padTop": 2,
+  "padLeft": 2,
+  "padRight": 2,
   "padBottom": 2,
-  "faceX": 28.0
+  "faceX": 26.0
 }

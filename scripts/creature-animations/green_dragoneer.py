@@ -37,7 +37,7 @@ import anim_tiere as T
 import anim_drache as D
 
 N, MS = 60, 70
-PAD_L, PAD_R, PAD_T, PAD_B = 5, 6, 6, 3
+PAD_L, PAD_R, PAD_T, PAD_B = 3, 5, 4, 3
 
 spr = L.lade('green-dragoneer')
 sh, sw = spr.shape[:2]
