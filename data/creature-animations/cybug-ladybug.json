@@ -2,7 +2,7 @@
   "creature": "Cybug LADYBUG",
   "sheet": "cybug-ladybug.png",
   "frameWidth": 32,
-  "frameHeight": 34,
+  "frameHeight": 31,
   "frames": 48,
   "frameMs": 60,
   "loop": true,

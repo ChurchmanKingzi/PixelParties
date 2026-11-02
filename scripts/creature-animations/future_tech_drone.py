@@ -15,7 +15,10 @@ Identifikation (Sprite-Koordinaten x, y; Drohne mit zwei Schubdüsen, schwebend)
 
 Ablauf (48 Frames à 60 ms = 2,88 s):
 * Feuer (Regel 15) mit dem Modul anim_feuer.py (unverändert benutzt): beide Düsenflammen werden neu gezeichnet — verschachtelte Zungen aus fünf Farbschichten (Außenhaut/rot, orange, gelb, cremeweißer Kern),
-  jede Schicht mit eigener Höhe, Breite und seitlicher Verschiebung je Pose; die Zungen biegen sich, wachsen und schrumpfen, je Zunge eine eigene Posenfolge (12 Posen à 2–3 Frames, nahtlos).
+  jede Schicht mit eigener Höhe, Breite und seitlicher Verschiebung je Pose; die Zungen biegen sich, wachsen und schrumpfen (12 Posen à 2–3 Frames, nahtlos).
+  RUNDE 2 (Nutzerfeedback „die beiden Flammen sollen sich synchron verhalten“): es wird NUR EINE Flamme (die linke Düse) simuliert; die rechte ist ihr exaktes Spiegelbild (Spiegelachse = Gehäusemitte x = 8),
+  also in jedem Frame gleiche Pose, gleiche Phase, gleiche Höhe/Breite/Neigung (nur gespiegelt); auch die abreißenden Funken werden gespiegelt (gleiche Zeit, gleiche Bahn). Ein Test im Skript (SYNCHRON-Test)
+  prüft Frame für Frame, dass der rechte Flammen- und Funkenbereich exakt das gespiegelte linke ist.
   Weil die Flamme nach unten brennt, läuft das Modul auf einer senkrecht gespiegelten Leinwand (Fuß oben am Gehäuse) und das Ergebnis wird zurückgespiegelt; abgerissene Spitzen fallen als Funken (1 px, Feuerfunken)
   nach unten und kühlen ab (cremeweiß → gelb → orange → rot). Das Gehäuse steht fest; die Fußzeile der Flammen (Sprite-Zeile 2, direkt unter dem grauen Band) hat immer genau die Breite der Original-Düsen
   (x 1–6 und 10–15), damit das Band nie freiliegt (Regel 16). Die Brückenpixel, die das Feuermodul unter dem Gehäuse setzen würde (es macht alles 4-verbunden), werden entfernt: die Standbeine hängen im Original nur
@@ -62,8 +65,22 @@ RAMPE = {'rand': (202, 44, 41), 'rot': (202, 44, 41), 'orange': (244, 123, 34), 
 FUSS = 2                                                     # Fußzeile der Flammen im Sprite (direkt unter dem grauen Querband)
 fest = np.zeros((H, W), bool)
 fest[PAD_T:PAD_T + sh, PAD_L:PAD_L + sw] = koerper
-FEUER = FEU.Feuer(H, W, [FEU.Zunge(PAD_L + 3.5, (H - 1) - (PAD_T + FUSS), 6.5, 3.0), FEU.Zunge(PAD_L + 12.5, (H - 1) - (PAD_T + FUSS), 6.5, 3.0)],
+FEUER = FEU.Feuer(H, W, [FEU.Zunge(PAD_L + 3.5, (H - 1) - (PAD_T + FUSS), 6.5, 3.0)],        # nur die LINKE Flamme; die rechte ist ihr Spiegelbild
                   RAMPE, n=N, seed=5, posen=12, amplitude=1.0, sperre=fest[::-1].copy())
+MITTE = PAD_L + 8                                            # Spiegelachse (Gehäusemitte, Leinwandspalte); W = 2·PAD_L + 17 → Spiegeln = ::-1 über die ganze Breite
+assert W == 2 * MITTE + 1
+
+
+def linke_haelfte(a):
+    """Nur die linke Seite (Spalten < MITTE) behalten: die Flamme der linken Düse (das Feuermodul soll nie über die Mitte hinausragen)."""
+    a = a.copy()
+    a[:, MITTE:] = 0
+    return a
+
+
+def spiegeln_paar(a):
+    """Links + exaktes Spiegelbild nach rechts (Achse = MITTE)."""
+    return L.zusammen(a.shape[0], a.shape[1], [(a, 0, 0), (a[:, ::-1].copy(), 0, 0)])
 
 
 FUESSE = [(1, 6), (10, 15)]                                  # Spalten (Sprite) der beiden Düsenfüße in der Fußzeile
@@ -93,7 +110,12 @@ def bob_von(i):
     return -int(round(2 * (1 - math.cos(2 * math.pi * i / (N / 4))) / 2))     # 0 → −1 → −2 → −1 → 0 (nur nach oben)
 
 
-def frame(i, partikel=True, effekte=True):
+TEST_EBENEN = ['koerper']                                    # randtest.py: ohne die abreißenden Feuerfunken (gewollte Funken, Regel 15)
+
+
+def frame(i, partikel=True, effekte=True, nur=None):
+    if nur:
+        partikel = False
     bob = bob_von(i)
     kp = F.ebene(spr, koerper, H, W, PAD_L, PAD_T)
     if effekte:
@@ -103,14 +125,24 @@ def frame(i, partikel=True, effekte=True):
                 kp[PAD_T + y, PAD_L + x, :3] = F.heller(kp[PAD_T + y, PAD_L + x, :3], ROT_RAMPE, st)
         F.lichtband(kp, metall_maske, PAD_L, PAD_T, i, N // 2, 6, 9, METALL, stufen=1, breite=3.0, achse=(1.0, 0.7))
     kp = L.versetze(kp, 0, bob)
-    flammen = fuss_festlegen(FEUER.ebene(i)[::-1].copy())                      # zurückgespiegelt: Flamme brennt nach unten
+    flammen = fuss_festlegen(spiegeln_paar(linke_haelfte(FEUER.ebene(i)[::-1].copy())))   # zurückgespiegelt: Flamme brennt nach unten; rechts = Spiegelbild von links
     flammen = L.versetze(flammen, 0, bob)
     f = L.zusammen(H, W, [(flammen, 0, 0), (kp, 0, 0)])
     F.umranden(f, [flammen], UMRISS, RAND, RAND, RAND)                          # Randpixel-Test (Regel 16): freie Flammenkanten = Außenhaut
     if partikel:
-        funken = FEUER.funken(i, dy=lambda fr: -bob_von(fr))[::-1].copy()
+        funken = spiegeln_paar(linke_haelfte(FEUER.funken(i, dy=lambda fr: -bob_von(fr))[::-1].copy()))
         f = L.zusammen(H, W, [(f, 0, 0), (funken, 0, 0)])
     return f
+
+
+def synchron_test(frames_arbeit):
+    """SYNCHRON-Test: in jedem Frame ist die Flamme (und der Funkenflug) rechts der Mitte das exakte Spiegelbild der linken (Alpha und Farbe, Pixel für Pixel), ohne Gehäuse."""
+    for k in range(N):
+        fl = fuss_festlegen(spiegeln_paar(linke_haelfte(FEUER.ebene(k)[::-1].copy())))
+        fu = spiegeln_paar(linke_haelfte(FEUER.funken(k, dy=lambda fr: -bob_von(fr))[::-1].copy()))
+        for e in (fl, fu):
+            assert (e == e[:, ::-1]).all(), f'Frame {k}: Flammen/Funken nicht spiegelsymmetrisch'
+    print('SYNCHRON-Test bestanden: linke und rechte Flamme (samt Funken) sind in allen', N, 'Frames exakte Spiegelbilder')
 
 
 def zuschneiden(frames, rand=2):
@@ -124,6 +156,7 @@ def zuschneiden(frames, rand=2):
 
 if __name__ == '__main__':
     frames = [frame(i) for i in range(N)]
+    synchron_test(frames)
     frames = zuschneiden(frames)
     prev = sys.argv[sys.argv.index('--preview') + 1] if '--preview' in sys.argv else None
     n = L.pruefe(frames, quelle=spr)

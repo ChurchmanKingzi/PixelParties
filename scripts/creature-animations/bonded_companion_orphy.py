@@ -13,14 +13,16 @@ Identifikation (Sprite 30×34, Orphy von vorn mit Gitarre):
 * Antenne (x 11–20, Zeilen 0–12): hoher grüner Stiel mit blauer Feder (Blautöne) oben rechts.
 * Gesicht (x 10–17, Zeilen 13–22): limonengrün (98e525), dunkelgrüner Mittelstreifen (x 13–15); Augen je 2×2: links (12–13, 16–17), rechts (15–16, 16–17) — links weiß, rechts gelb;
   Mund = dunkelroter Block (12–16, 19–20) (oben 5 breit, unten 3 breit).
-* Flügel: links Regenbogen (rot–orange–gelb, x 0–9, Zeilen 16–31, zwei Lappen oben/unten); rechts ein violetter Flügel (x 18–24, Zeilen 15–28, zwei Lappen), halb hinter der Gitarre.
+* Flügel: links Regenbogen (rot–orange–gelb, x 0–9, Zeilen 16–31, zwei Lappen oben/unten); rechts ein violetter Flügel (x 18–24, zwei Lappen: oben Zeilen 15–20, unten Zeilen 25–31), halb hinter der Gitarre.
 * Gitarre (rot, Körper x 8–17, Zeilen 25–33; Hals grau-schwarz mit Bundstäbchen schräg nach rechts oben bis (29,14)): sitzt vor dem Rumpf und den Flügeln.
 * Kein Glanz: die Gitarre ist roter Lack, Hals und Tonabnehmer sind grau-weiß — nicht eindeutig Metall (Regel 14), also fest/matt. Keine Partikel.
 Bleibt fest: Gesichtsmuster, Gitarre.
 
 Ablauf (48 Frames à 66 ms = 3,2 s), alle Bewegungen unabhängig:
-* Flügelschlag (Periode 12, 4× pro Schleife, durchgehend): jede Flügelspalte wandert senkrecht, je weiter vom Körper desto mehr (Spitze ca. −4 … +4 px); beide Flügel gleichzeitig; Ansatz am
-  Körper bleibt. Der Gitarrenhals bleibt vor dem violetten Flügel.
+* Flügelschlag (Periode 12, 4× pro Schleife, durchgehend): jede Flügelspalte wandert senkrecht, je weiter vom Körper desto mehr (Spitze ca. −4 … +4 px); der Regenbogenflügel links und der OBERE
+  lila Lappen (x 19–23, Zeilen 15–20) gleichzeitig; Ansatz am Körper bleibt. Der Gitarrenhals bleibt vor dem violetten Flügel.
+* Der UNTERE lila Lappen (x 18–23, Zeilen 25–31, unter dem Gitarrenhals, rechts am Korpus) schlägt NICHT mit (Nutzer-Feedback): er gehört zur Ebene `koerper` und bewegt sich nur mit dem Schweben —
+  relativ zur Gitarre steht er also still.
 * Schweben/Bob: der ganze Orphy hebt sich beim Abschlag um 1 px, Flügel und Gitarre gehen mit.
 * Antenne wiegt (Periode 16, 3× pro Schleife): die Antennenzeilen oberhalb von Zeile 13 wandern seitlich, je höher desto mehr (Spitze bis ±2 px), mit Phasenverzug zur Spitze.
 * Blinzeln (Frames 14–17 und 38–41): die Augen schließen sich in der Gesichtsfarbe (links limone, rechts dunkelgrün), erst die untere Augenzeile, dann beide, dann wieder auf.
@@ -57,8 +59,10 @@ _n, _lab = cv2.connectedComponents(fl_r.astype(np.uint8), connectivity=4)
 for _k in range(1, _n):                                          # einzelne Streupixel der Farbregel (Halsschatten) gehören nicht zum Flügel
     if (_lab == _k).sum() < 5:
         fl_r &= ~(_lab == _k)
+fl_r_u = fl_r & (yy >= 23)                                       # UNTERER lila Lappen (x 18–23, Zeilen 25–31, samt Randpixel (23,27)): hängt an Gitarrenkorpus und -hals → fest zur Gitarre
+fl_r = fl_r & (yy <= 22)                                         # oberer lila Lappen (x 19–23, Zeilen 15–20): schlägt weiter mit dem Flügel
 antenne = vorhanden & (yy <= 12)
-koerper = vorhanden & ~fl_l & ~fl_r & ~antenne
+koerper = vorhanden & ~fl_l & ~fl_r & ~antenne                   # Körper samt Gitarre UND unterem lila Lappen (bewegt sich nur mit dem Schweben)
 
 RAND = T.rand_farben(spr)
 REGEL = T.umriss_regeln(spr, RAND)[2]
@@ -149,7 +153,7 @@ def frame(i, nur=None):
     fl = biegen(teil(fl_l), PAD_L + 9, 4.2, ph, potenz=1.0, bias=0.4)
     fr_ = biegen(teil(fl_r), PAD_L + 17, 3.4, ph, potenz=1.0, bias=0.3)
     an = antenne_wiegen(teil(antenne), PAD_T + 13, 2.0, i)
-    ebenen = {'fl_l': fl, 'fl_r': fr_, 'koerper': k, 'antenne': an}
+    ebenen = {'fl_l': fl, 'fl_r': fr_, 'koerper': k, 'antenne': an}      # Ebenenfolge unten → oben; der untere lila Lappen steckt in `koerper`
     wahl = nur or ('fl_l', 'fl_r', 'koerper', 'antenne')
     ganz = L.zusammen(H, W, [(ebenen[n], 0, dy) for n in wahl])
     return T.umriss_schliessen(ganz, RAND, REGEL)                  # Randpixel-Test (Regel 16)

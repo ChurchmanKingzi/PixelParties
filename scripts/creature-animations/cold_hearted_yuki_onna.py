@@ -58,12 +58,14 @@ def hoch(a):
 spr = hoch(lo)                                                   # der Sprite in Ausgabeauflösung (32×46, wie in der Ebene)
 sh, sw = spr.shape[:2]
 
-haar_l = vorhanden & (xx <= 3) & (yy >= 4) & (yy <= 10)
-haar_r = vorhanden & (xx >= 12) & (yy >= 4) & (yy <= 10)
+HAARFARBEN = {(15, 3, 7), (17, 15, 18), (29, 27, 38), (5, 4, 10), (54, 50, 71), (0, 2, 0)}      # Haartöne (B, E, F, H, K, Q der Pixelkarte)
+ist_haar = np.array([[vorhanden[y, x] and col(x, y) in HAARFARBEN for x in range(lw)] for y in range(lh)])
+FLUSS_Y0, FLUSS_Y1 = 5, 11                                       # Haarzeilen, die im Wind fließen (Wurzel y 5 bleibt, Spitze y 11 am freiesten)
+haar_fluss = ist_haar & (yy >= FLUSS_Y0) & (yy <= FLUSS_Y1)      # alle Haarpixel y 5–11 (links x < 7, rechts x ≥ 7); Gesicht/Kragen liegen als Basis DARÜBER
 hand_l = vorhanden & (xx <= 3) & (yy >= 14) & (yy <= 17)
 hand_r = vorhanden & (xx >= 12) & (yy >= 14) & (yy <= 17)
 saum = vorhanden & (yy >= 21)
-basis_m = vorhanden & ~haar_l & ~haar_r & ~hand_l & ~hand_r & ~saum
+basis_m = vorhanden & ~haar_fluss & ~hand_l & ~hand_r & ~saum
 
 NEBEL1 = {'c': (198, 225, 234), 'r': (188, 198, 233)}
 NEBEL2 = {'c': (243, 254, 255), 'r': (198, 225, 234)}
@@ -91,21 +93,73 @@ def pend(i, amp, lag, per):
     return int(round(amp * (f(i) - f(0))))                       # 0 bei Frame 0
 
 
+def wind_dx(i):
+    """Versatz (ganze Rasterpixel, nach rechts = Windrichtung) der Haarzeilen y 5…11 im Frame i: eine Böe (Periode 24 = zweimal je Schleife) schiebt das Haar je tiefer, desto weiter nach rechts
+    (Wurzel y 5 bleibt, Spitze bis 3 px, nie mehr), dazu läuft eine Welle (Periode 16, drei Läufe je Schleife) von der Wurzel zur Spitze nach unten. Frame 0 = 0 (beide Terme verschwinden). Gefälle zwischen
+    benachbarten Zeilen ≤ 1 Rasterpixel, Versatz nie negativ (das Haar weht nur in die Windrichtung und kehrt in der Flaute in die Ruhelage zurück)."""
+    g = 0.5 * (1 - math.cos(2 * math.pi * i / 24))                # Böe 0…1
+    dx, vor = {}, 0
+    for y in range(FLUSS_Y0, FLUSS_Y1 + 1):
+        sx = (y - FLUSS_Y0) / (FLUSS_Y1 - FLUSS_Y0)               # 0 an der Wurzel … 1 an der Spitze
+        k = 2.6 * sx
+        welle = 1.2 * sx * (math.sin(2 * math.pi * i / 16 - k) - math.sin(-k))
+        roh = 2.4 * g * sx ** 1.2 + welle
+        d = max(0, min(3, int(round(roh))))
+        d = max(vor - 1, min(vor + 1, d))                         # Gefälle ≤ 1
+        dx[y] = d
+        vor = d
+    return dx
+
+
+UNTERLAGE_Y1 = 9                                                 # bis hier grenzt das Haar ans Gesicht (y 5–9); darunter (y 10–11) hängt die freie Spitze neben dem Kragen
+
+
+def haar_ebene(i, n, dx_l_max=1):
+    """Fließende Haarsträhnen als eigene Ebene (unter dem Gesicht/Kragen): jede Zeile y 5…11 wird als Ganzes um wind_dx(y) nach rechts geschoben.
+    * y 5–9 (Haar grenzt ans Gesicht): Versatz höchstens 2 (links 1: dort weht das Haar gegen das Gesicht und verschwindet dahinter); rechts bleiben die ersten dx Originalpixel der Zeile stehen
+      (Haar hinter dem Gesicht → keine Lücke am Gesicht, das Gesicht behält seinen dunklen Rand).
+    * y 10–11 (freie Spitze, 3 bzw. 1 Pixel): Versatz bis 3, die Spitze löst sich vom Hals und weht frei im Wind (nur noch über die Zeile darüber verbunden).
+    Es werden keine Spalten kopiert. Oberhalb von y 5 (Scheitel) bleibt alles stehen.
+    Zusammenhang: Jede Zeile berührt die Zeile darüber über eine KANTE (4-verbunden, nicht nur diagonal) — die schmale Spitze darf nie weiter wegwandern, als die Zeile darüber reicht: der Versatz wird dann
+    Schritt für Schritt zum Versatz der Zeile darüber zurückgenommen. Gefälle zwischen benachbarten Zeilen ≤ 1 Rasterpixel."""
+    out = L.leer(H, W)
+    dx = wind_dx(i)
+    vor = {'l': (0, None), 'r': (0, None)}                          # (Versatz, Spaltenmenge) der Zeile darüber je Seite
+    for y in range(FLUSS_Y0, FLUSS_Y1 + 1):
+        for seite in ('l', 'r'):
+            xs_ = sorted(x for x in range(lw) if haar_fluss[y, x] and ((x < 7) == (seite == 'l')))
+            if not xs_:
+                continue
+            frei = y > UNTERLAGE_Y1
+            dd = dx[y] if frei else min(dx[y], 2)
+            if seite == 'l':
+                dd = min(dd, dx_l_max)
+            vd, vmenge = vor[seite]
+            dd = max(vd - 1, min(vd + 1, dd))                       # Gefälle ≤ 1 auch nach der Begrenzung
+
+            def spalten(d):
+                m = {x + d for x in xs_}
+                if seite == 'r' and not frei:
+                    m |= set(xs_[:d])                               # Originalpixel hinter dem Gesicht
+                return m
+
+            if vmenge is not None:
+                while dd != vd and not ({x + dd for x in xs_} & vmenge):      # 4-verbunden mit der Zeile darüber, sonst Versatz zurücknehmen
+                    dd += 1 if vd > dd else -1
+            m = spalten(dd)
+            vor[seite] = (dd, m)
+            for x in m:
+                src = x - dd if (x - dd) in xs_ else x              # verschobenes Pixel bzw. Original (Gesichtsseite)
+                out[GPT + y - n, GPL + x] = lo[y, src]
+    return out
+
+
 def frame_gross(i, nur=None):
     n = U.stufe(i, 24, 1)                                        # Atmen 0/1 Rasterpixel
-    d_hl, d_hr = pend(i, 1.0, 0, 24), pend(i, 1.0, 2, 24)         # Haarsträhnen
-    d_al, d_ar = pend(i, 1.0, 0, 16), pend(i, 1.0, 5, 24)         # Hände
+    d_al, d_ar = pend(i, 1.0, 0, 16), pend(i, 0.5, 5, 24)         # Hände (rechts 0…1 px nach außen; bei 2 px risse ein Handpixel vom Ärmel ab)
     d_s = pend(i, 1.0, 3, 16)                                    # Saum
     bs = L.streck_zeile(teil(basis_m), GPT + 13, n)
-    hl, hr = teil(haar_l), teil(haar_r)
-    # Strähne nach außen: Original bleibt stehen, die verschobene Kopie liegt darüber (Strähne wird 1 Rasterpixel breiter, keine Lücke); nach innen: nur die verschobene Strähne
-    ebenen = [(teil(saum), d_s, 0), (teil(hand_l), d_al, 0), (teil(hand_r), d_ar, 0), (bs, 0, 0)]
-    if d_hl < 0:
-        ebenen.append((hl, 0, -n))
-    if d_hr > 0:
-        ebenen.append((hr, 0, -n))
-    ebenen += [(hl, d_hl, -n), (hr, d_hr, -n)]
-    koerper = L.zusammen(H, W, ebenen)
+    koerper = L.zusammen(H, W, [(teil(saum), d_s, 0), (teil(hand_l), d_al, 0), (teil(hand_r), d_ar, 0), (haar_ebene(i, n), 0, 0), (bs, 0, 0)])
     koerper = U.kontur_schliessen(koerper, UMRISS, KONTUR)
     if nur == 'koerper':
         return koerper
@@ -114,6 +168,7 @@ def frame_gross(i, nur=None):
     return L.zusammen(H, W, [(n1, 0, 0), (n2, 0, 0), (koerper, 0, 0)])
 
 
+TEST_EBENEN = 'koerper'                                          # randtest.py: nur die Figur ohne Eisnebel prüfen
 _OHNE_PARTIKEL = [False]
 
 
@@ -137,6 +192,6 @@ if __name__ == '__main__':
     frames = [frame(i) for i in range(N)]
     prev = sys.argv[sys.argv.index('--preview') + 1] if '--preview' in sys.argv else None
     L.pruefe(frames, quelle=spr, min_rand=2)
-    L.speichern('cold-hearted-yuki-onna', 'Cold-Hearted Yuki-Onna', frames, MS, prev)
+    L.speichern('cold-hearted-yuki-onna', 'Cold-Hearted Yuki-Onna', frames, MS, prev, extra={'deckkraft': 0.5})
     if prev:
         L.streifen(prev + '/cold-hearted-yuki-onna-strip.png', [frames[k] for k in (0, 6, 12, 18, 24, 30, 36, 42)], spalten=4, scale=4)

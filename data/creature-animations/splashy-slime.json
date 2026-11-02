@@ -1,8 +1,8 @@
 {
   "creature": "Splashy Slime",
   "sheet": "splashy-slime.png",
-  "frameWidth": 24,
-  "frameHeight": 17,
+  "frameWidth": 26,
+  "frameHeight": 22,
   "frames": 48,
   "frameMs": 65,
   "loop": true,
@@ -11,5 +11,5 @@
   "padLeft": 2,
   "padRight": 2,
   "padBottom": 2,
-  "faceX": 12.0
+  "faceX": 13.0
 }

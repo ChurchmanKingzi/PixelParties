@@ -1,47 +1,49 @@
 # -*- coding: utf-8 -*-
-"""Idle-Animation für „Steam Dwarf Engineer“ (Creature) — der gehörnte Zwerg in goldener Dampfrüstung mit dem Ofen im Bauch.
+"""Idle-Animation für „Steam Dwarf Engineer“ (Creature) — der goldene Dampfzwerg-INGENIEUR selbst: goldene Kapuze, grauer Bart, drei Dampfrohre auf dem Rücken, Schraubenschlüssel in der Hand.
 
-Quelle: src/steam-dwarf-engineer.png (28×38 px, 17 Farben).
-PICK: [["MotiveSteamDwarfs", 419, 1]]      (Ebene „Ebene #30“, Figur 1; nur in dieser Karte)
-Die Kartenkunst zeigt zwei Figuren: den großen, mittig stehenden gehörnten Zwerg (Ebene 419, 28×38; er füllt die Kartenmitte) und links davon einen kleinen goldkapuzigen Zwerg im Profil mit drei Rauchrohren
-und einer Gabel (Ebenen 418 und 417, zusammen 28×28 — nur Brustbild, kein Körper). Ich habe die große, vollständige Figur genommen (sie liegt in der Kartenmitte und ist komplett erhalten);
-der kleine Zwerg bleibt unverwendet (Beiwerk der Kunst) und könnte bei Bedarf eine eigene Creature-Animation bekommen.
+Quelle: src/steam-dwarf-engineer.png (28×28 px, 24 Farben) — beide Ebenen derselben xcf, Lage per xcf-Koordinaten (gegen die Kartenkunst Steam_Dwarf_Engineer.png geprüft: 356 von 368 Pixeln stimmen):
+PICK: [["MotiveSteamDwarfs", 418, 1], ["MotiveSteamDwarfs", 417, 1]]
+  * Ebene 418 („Ebene #33“, 21×28 px bei (228,291)): der Ingenieur (Zwerg mit goldener Kapuze, Bart, drei Rohren).
+  * Ebene 417 („Ebene #34“, 8×8 px bei (248,304)): sein Schraubenschlüssel (liegt am rechten Rand des Zwergs, Griff berührt den Körper bei (20,19)).
+  Nicht verwendet: Ebene 419 („Ebene #30“, 28×38 px) = das goldene Drachen-BAUPROJEKT, an dem der Ingenieur arbeitet (in der alten Fassung war NUR das dargestellt; der Nutzer: „es fehlt der Engineer, du hast nur
+  sein Bauprojekt dargestellt“). Das Bauprojekt steht in der Kunst neben dem Zwerg, ist größer als er und mit ihm nicht verbunden → Beiwerk, nicht Teil der Figur, daher weggelassen.
 Aufruf:   python3 steam_dwarf_engineer.py [--preview <ordner>]
 Ausgabe:  ../../data/creature-animations/steam-dwarf-engineer.png + .json
 
-Was im Sprite ist (x, y im 28×38-Sprite, symmetrisch):
-* ZWEI HÖRNER (x 6–8 und 19–21, y 0–7): Weiß G (251,250,245) mit grauer Schattenkante D (148,154,154), dunkelgrüner Umriss A (16,32,0); sie wachsen schräg nach oben außen aus dem goldenen Helm.
-* HELM/GESICHT: goldener Helm (y 7–9: H (250,245,143) hell, C (234,194,107), F (204,163,83), B (109,84,20) dunkel), darunter ein schwarzes Band E (0,0,0) (y 10–11, x 10–17; Haarband/Visier),
-  das Gesicht (y 12–14, x 12–15: Hautgold C) mit zwei braunen Augen Q (150,84,47) bei (12,14) und (15,14). Seitlich graue Ohr-/Schulterstücke (I, P, K).
-* BRUSTPANZER (y 15–24): weiß-grau gerippter Stahl (G, I, D, K) zwischen zwei Goldsäulen (Schulterpanzer, x 3–8 und 19–24, H/C/B).
-* BAUCHOFEN (y 25–34, x 8–19): runder Ofen mit schwarzem Schlund E (0,0,0), grauen Gitterstäben (M (128,128,128), L (104,104,104)) und dunklem Rand J (45,45,45) — ohne Flammenfarben im Sprite,
-  daher wird kein Feuer gezeichnet (Regel 15: es gibt keins).
-* ARME/SCHULTERN (x 0–6 und 21–27, y 21–35): große goldene Panzerarme (C, H, F, B) mit dunklem Umriss, an den Seiten hängend. Füße y 35–37 (blasse Cyan-Pixel O/N an den Sohlen).
+Was im Sprite ist (x, y im 28×28-Sprite):
+* DREI DAMPFROHRE (grau, B (81,81,81)/D (62,62,62)/K (108,108,108)/L (106,106,106)) auf dem Rücken, links im Bild: Rohr A (x 6–10, y 0–7), Rohr B (x 2–7, y 4–13), Rohr C (x 0–5, y 9–17); jedes Rohr
+  hat oben einen schwarzen Schlitz R (0,0,0) (Austritt): A (7–8, 1), B (3–4, 5), C (1–2, 10). Sie laufen schräg nach unten zur Schulter.
+* KAPUZE/HELM (x 7–20, y 7–14): goldbraun (C (204,163,83), H (234,194,107), J (235,188,96), F (156,120,29), I (184,142,34), E (109,84,20)) mit dunkelbraunem Umriss A (74,57,14).
+* GESICHT (x 14–19, y 14–16): Haut Q (246,189,123); EIN Auge in Dreiviertelansicht: graue/weiße Lidöffnung (16,14) V (130,130,130) und (17,14) W (210,210,210), umrahmt von braunem Lid/Wimpern A (15,14), (16,15), (17,15).
+* BART (x 9–19, y 14–18): grau/weiß (M (189,189,189), N (162,162,162), O (156,156,156), P (213,213,213), S (246,255,255)).
+* WESTE/KÖRPER (x 5–20, y 17–27): goldbraune Streifen (E, F, I, C), unten eine graue Metallplatte (15–19, 23–26: L (106,106,106), P, S, M) mit hellem Glanzpixel (18,23).
+* SCHRAUBENSCHLÜSSEL (x 20–27, y 13–20): grauer Maulschlüssel G (85,85,85)/N (162,162,162), Maul oben rechts (24–27, 13–16), Griff läuft schräg nach unten links zum Körper.
+Metall im Sprite: Rohre, Schlüssel, Metallplatte (Regel 14). Kapuze/Weste sind goldbraun (Stoff oder Messing — im Zweifel KEIN Glanz).
 
 Ablauf (48 Frames à 62 ms = 2,98 s, nahtlos):
-* Auf und ab (zweistufig, Periode 24 = zweimal pro Schleife): Brust zuerst 1 px (die Bauchofen-Unterkante, Zeile 34, wird einmal doppelt eingefügt: Rumpf, Arme, Kopf und Hörner steigen, die Füße bleiben am
-  Boden), der Kopf läuft 3 Frames nach und hebt sich um ein weiteres px (Gesichtszeile 13, ein glatter Hautstreifen über den Augen, wird verlängert). Kopf/Hörner 0 → 1 → 2 → 1 → 0 px, Rumpf 0 → 1 → 0.
-* Blinzeln (Frames 19–21 und 40–42): die zwei braunen Augenpixel Q (12,14)/(15,14) schließen sich — sie nehmen die umgebende Hautfarbe C (234,194,107) an (kein Lid-Extrapixel, nur die Augen verschwinden
-  für 3 Frames). Kein Farbtausch, kein Augenglanz.
-* Hörnerzucken: erst das linke Horn (Frames 8–13), später das rechte (Frames 31–36): die drei obersten Hornzeilen (0–2) neigen sich gemeinsam 1 px nach außen und zurück (4-verbunden;
-  die dabei freigelegte Hornkante wird zum Umriss geschlossen).
-* Metall glänzt (Regel 12/14: Gold und Stahl, nicht Haut und Haare): ein Lichtband läuft zweimal pro Schleife (Frames 5–18 und 29–42) diagonal von links oben nach rechts unten über Rüstung, Hörner und
-  Ofengitter (Gold B < F < C < H, Stahl J < L < K < D < I < G jeweils 1–2 Stufen heller auf der Rampe des Sprites); nur Innenpixel, das Gesicht und die Umrisse bleiben. Dazu je ein vierzackiger Glitzer-Stern
-  (weißer Kern, helle Goldarme) an einer Goldkante: Helm links (Frames 10–13), rechter Panzerarm (26–29), linke Schulter (40–43).
-KEIN Dampf und KEIN Feuer (der Sprite enthält weder Rohre noch Flammenfarben). Keine Partikel.
-Frame 0 = Original (Ruhepose). Kontrolle: anim_humanoide.ruhepose / eckkontakt_typen / Randpixel-Test (Regel 16).
+* Auf und ab (Periode 24 = zweimal pro Schleife): die Westenzeile 21 wird einmal doppelt eingefügt (L.streck_zeile mit Texturmischung): Kapuze, Rohre, Arm/Schlüssel steigen als Ganzes 1 px, der unterste Weste/Platte bleibt am Boden.
+* Rohre zittern (Dampfdruck, je Rohr eigener Takt): die obersten drei Rohrzeilen jedes Rohrs schlagen ±1 px seitlich aus (A Periode 12, B Periode 16, C Periode 24, gegenphasig), jedes Rohr bleibt 4-verbunden; Ausschlag nur, wenn der Sinus > 0,55 bzw. < −0,55 ist (sonst Ruhe, Frame 0 = Ruhe).
+* Dampf: aus allen drei Rohrschlitzen steigen kleine runde Wölkchen (5×3, wachsen aus 2×2, schrumpfen wieder; Farben P (213,213,213)/N (162,162,162) aus dem Sprite) langsam bis 4 px auf, je Rohr zwei Wölkchen um eine
+  halbe Periode versetzt (Periode 24, Rohr B und C um 8 bzw. 16 Frames gegeneinander versetzt).
+* Schraubenschlüssel tippt (der Zwerg dreht an einer Schraube): der ganze Schlüssel hebt sich starr 1 px mit der Hand (je 3 Frames, alle 12 Frames), der Griff bleibt am Körper 4-verbunden.
+* Blinzeln (Frames 20–22 und 41–43): das Auge schließt sich — (16,14) und (17,14) nehmen die umgebende Hautfarbe Q an (nur dieses eine Auge).
+* Metall glänzt (Regel 12/14, nur Rohre, Schlüssel, Metallplatte): ein Lichtband läuft diagonal von links oben nach rechts unten — erst über die Rohre (Frames 2–11 und 26–35), dann über den Schlüssel
+  (Frames 12–19 und 38–45), dann die Platte (Frames 20–25 und 30–35); dazu ein vierzackiger Glitzer-Stern am Schlüsselmaul (Frames 14–17) und an der Plattenecke (Frames 38–41).
+Frame 0 = Original (Ruhepose), Dampf/Glitzer ausgenommen. Kontrolle: anim_humanoide.ruhepose / eckkontakt_typen / Randpixel-Test (Regel 16).
 Alle Bewegungen laufen auf der vollen Leinwand (anim_lib wirft ClipError). Nur ganze Pixel, nur Farben der Quelle.
-Ergänzungen: keine (die Figur ist vollständig; freigelegte Hornkanten werden in Umrissfarbe A geschlossen).
+Ergänzungen: keine (der Schlüssel liegt über Körper und Hintergrund; nichts Verdecktes wird freigelegt).
 """
+import math
 import sys
 
 import numpy as np
 
+import anim_dwarf as Dw
 import anim_humanoide as Hm
 import anim_lib as L
 
 N, MS = 48, 62
-PAD_L, PAD_R, PAD_T, PAD_B = 3, 3, 4, 2          # Figur knapp zugeschnitten: Kopfhub 2 px (oben), Sterne liegen innerhalb der Figurfläche, Randabstand ≥ 2
+PAD_L, PAD_R, PAD_T, PAD_B = 5, 3, 8, 2          # Dampf links/oben, Rohrzittern ±1 px, Schlüssel ±1 px
 
 spr = L.lade('steam-dwarf-engineer')
 sh, sw = spr.shape[:2]
@@ -54,73 +56,106 @@ def f(x, y):
     return tuple(int(v) for v in spr[y, x, :3])
 
 
-# Farben des Sprites
-UMRISS = f(6, 0)                                                   # A (16,32,0)
-AUGE, HAUT = f(12, 14), f(13, 14)                                  # Q (150,84,47) Augenpixel, C (234,194,107) umgebende Hautfarbe
-GOLD = [(109, 84, 20), (204, 163, 83), (234, 194, 107), (250, 245, 143)]                        # B < F < C < H
-STAHL = [(45, 45, 45), (104, 104, 104), (125, 125, 123), (148, 154, 154), (220, 221, 215), (251, 250, 245)]   # J < L < K < D < I < G
-WEISS, H_GOLD, C_GOLD = (251, 250, 245), (250, 245, 143), (234, 194, 107)
-
 KANTE0 = Hm.kantenmaske(spr)
-ERLAUBT = Hm.umrissfarben(spr)                                     # Farben der Außenkante im Original (Regel 16)
-gesicht = np.zeros((sh, sw), bool)
-gesicht[12:15, 12:16] = True                                       # Haut: kein Glanz
+ERLAUBT = Hm.umrissfarben(spr)
+UMRISS = (74, 57, 14)
+HAUT = f(14, 14)                                                              # Q (246,189,123)
+GRAU = [(62, 62, 62), (81, 81, 81), (82, 82, 82), (85, 85, 85), (106, 106, 106), (108, 108, 108), (130, 130, 130), (156, 156, 156), (162, 162, 162),
+        (189, 189, 189), (213, 213, 213), (246, 255, 255)]                    # Grauwerte des Sprites (dunkel → hell)
+GRAU_ALLE = set(GRAU) | {(210, 210, 210)}
+DAMPF_C, DAMPF_R = (213, 213, 213), (162, 162, 162)
+
+yy, xx = np.mgrid[0:sh, 0:sw]
 
 
-def maske(farben):
-    m = np.zeros((sh, sw), bool)
-    for y in range(sh):
-        for x in range(sw):
-            if vorhanden[y, x] and f(x, y) in farben and not KANTE0[y, x] and not gesicht[y, x]:
-                m[y, x] = True
-    return m
+def maske(bed):
+    return np.array([[bool(vorhanden[y, x] and bed(x, y)) for x in range(sw)] for y in range(sh)])
 
 
-m_gold, m_stahl = maske(GOLD), maske(STAHL)
-m_metall = m_gold | m_stahl
+m_schluessel = maske(lambda x, y: x >= 20 and 13 <= y <= 20 and f(x, y) in GRAU_ALLE and (x, y) != (20, 14))
+m_rohr = maske(lambda x, y: x <= 11 and y <= 17 and f(x, y) in GRAU_ALLE)
+m_platte = maske(lambda x, y: 15 <= x <= 19 and 23 <= y <= 26 and f(x, y) in GRAU_ALLE)
+m_rohr_glanz = m_rohr & ~KANTE0
+m_schl_glanz = m_schluessel
+m_platte_glanz = m_platte & ~KANTE0
+
+# Rohre: (Zeilen, x-Bereich) der obersten drei Zeilen, Periode, Phase
+ROHR = {'A': ((0, 1, 2), (5, 10), 12, 0.0), 'B': ((4, 5, 6), (0, 6), 16, 0.0), 'C': ((9, 10, 11), (0, 3), 24, 0.0)}
 
 
-def frame(i):
-    k = L.platz(spr, H, W, PAD_L, PAD_T)
-    gl = L.leer(H, W)                                              # Glitzer-Sterne (Effekt über der Figur)
-    # --- Blinzeln: die Augenpixel nehmen die Hautfarbe an ---
-    if Hm.folge(i, 19, [1, 1, 1], N) or Hm.folge(i, 40, [1, 1, 1], N):
-        Hm.setze(k, {(12, 14): HAUT, (15, 14): HAUT}, OFF)
-    # --- Hörnerzucken: Hornzeilen 0–2 gemeinsam 1 px nach außen ---
-    if Hm.folge(i, 8, [1, 1, 0, 1, 1, 0], N):
-        Hm.bereich_versatz(k, OFF, {0: -1, 1: -1, 2: -1}, 4, 10)
-    if Hm.folge(i, 31, [1, 1, 0, 1, 1, 0], N):
-        Hm.bereich_versatz(k, OFF, {0: 1, 1: 1, 2: 1}, 17, 23)
-    # --- Glanz (Regel 14): Lichtband über Gold und Stahl, nur Innenpixel (ohne Gesicht) ---
-    for start in (5, 29):
-        Hm.lichtband(k, m_metall, OFF, i, N, start, 14, GOLD, stufen=1, breite=3.0, achse=(1.0, 1.0), kern=2)
-        Hm.lichtband(k, m_metall, OFF, i, N, start, 14, STAHL, stufen=1, breite=3.0, achse=(1.0, 1.0), kern=2)
-    # --- Auf und ab: Bauchofen-Unterkante (Zeile 34) = Rumpf, Gesichtszeile 13 läuft 3 Frames nach ---
+def rohr_stufe(i, name):
+    zeilen, bereich, per, ph = ROHR[name]
+    v = math.sin(2 * math.pi * i / per + ph)
+    return 1 if v > 0.55 else (-1 if v < -0.55 else 0)                         # Ruhe bei Frame 0, dazwischen kurze Ausschläge
+
+
+# Dampfquellen (Mitte der Austrittsschlitze im Sprite): A (7.5, 1), B (3.5, 5), C (1.5, 10) — Wölkchen starten 2 px darüber
+QUELLEN = {'A': (8, 0, 0), 'B': (4, 4, 8), 'C': (2, 9, 16)}
+
+
+def frame(i, dampf=True, nur=None):
+    if nur:
+        dampf = False
+    schl, rest = L.trenne(spr, m_schluessel)
+    k = L.platz(rest, H, W, PAD_L, PAD_T)
+    sc = L.platz(schl, H, W, PAD_L, PAD_T)
+    gl = L.leer(H, W)
+    # --- Glanz (nur Metall): Lichtband über Rohre, Schlüssel, Platte ---
+    for start in (2, 26):
+        Hm.lichtband(k, m_rohr_glanz, OFF, i, N, start, 10, GRAU, stufen=1, breite=3.0, achse=(1.0, 1.0), kern=2)
+    for start in (12, 38):
+        Hm.lichtband(sc, m_schl_glanz, OFF, i, N, start, 8, GRAU, stufen=1, breite=3.0, achse=(1.0, 1.0), kern=2)
+    for start in (20, 30):
+        Hm.lichtband(k, m_platte_glanz, OFF, i, N, start, 6, GRAU, stufen=1, breite=2.4, achse=(1.0, 1.0), kern=2)
+    # --- Blinzeln: das eine Auge schließt sich (Lid = Hautfarbe) ---
+    if Hm.folge(i, 20, [1, 1, 1], N) or Hm.folge(i, 41, [1, 1, 1], N):
+        Hm.setze(k, {(16, 14): HAUT, (17, 14): HAUT}, OFF)
+    # --- Rohrzittern (je Rohr eigener Takt) ---
+    for name, (zeilen, (x0, x1), per, ph) in ROHR.items():
+        a = rohr_stufe(i, name)
+        if a:
+            Hm.bereich_versatz(k, OFF, {y: a for y in zeilen}, x0, x1)
+    # --- Schlüssel tippt (der Zwerg dreht an einer Schraube): der ganze Schlüssel hebt sich starr 1 px mit der Hand (zweimal drei Frames je Takt von 12) ---
+    if Hm.takt(i, 12, 6, 3):
+        sc = L.versetze(sc, 0, -1)
+    # --- Auf und ab: Westenzeile 21 wird einmal doppelt eingefügt; Körper und Schlüssel gleichermaßen ---
     brust = Hm.stufe(i, N / 2, 1)
-    kopf = Hm.stufe(i - 3, N / 2, 1)
-    k = Hm.atmen(k, PAD_T + 34, PAD_T + 13, brust, kopf)
-    gl = Hm.atmen(gl, PAD_T + 34, PAD_T + 13, brust, kopf)
-    Hm.kontur_schliessen(k, ERLAUBT, UMRISS)                       # Regel 16: Außenkante in jeder Pose in Umrissfarbe
-    # --- Glitzer-Sterne an Goldkanten (mit dem jeweiligen Körperteil gehoben) ---
-    hub = brust + kopf
-    for (sx, sy, start, dy) in ((10, 8, 10, hub), (25, 26, 26, brust), (4, 14, 40, hub)):
+    k = Hm.atmen(k, PAD_T + 21, PAD_T + 14, brust, 0)
+    sc = Hm.atmen(sc, PAD_T + 21, PAD_T + 14, brust, 0)
+    fig = L.zusammen(H, W, [(k, 0, 0), (sc, 0, 0)])
+    Hm.kontur_schliessen(fig, ERLAUBT, UMRISS)
+    # --- Glitzer-Sterne (nur Metall): Schlüsselmaul, Plattenecke ---
+    for (sx, sy, start, dx_) in (() if nur else ((25, 14, 14, 0), (16, 23, 38, 0))):
         st = Hm.folge(i, start, [0, 1, 2, 1], N)
-        Hm.stern4(gl, sx, sy - dy, st, WEISS, H_GOLD, C_GOLD, OFF)
-    return L.zusammen(H, W, [(k, 0, 0), (gl, 0, 0)])
+        Hm.stern4(gl, sx, sy - brust, st, (246, 255, 255), (213, 213, 213), (189, 189, 189), OFF)
+    ebenen = []
+    if dampf:
+        spec = []
+        for name, (cx, cy, off0) in QUELLEN.items():
+            sy0 = PAD_T + cy - 2
+            spec.append(dict(x=PAD_L + cx, y=sy0, vx=0, vy=-4, off=off0, form='m', wackeln=0.5))
+            spec.append(dict(x=PAD_L + cx, y=sy0, vx=0, vy=-4, off=off0 + 12, form='m', wackeln=-0.5))
+        ebenen.append((Dw.puff(H, W, i % 24, 24, spec, {'c': DAMPF_C, 'r': DAMPF_R}), 0, 0))
+    ebenen += [(fig, 0, 0), (gl, 0, 0)]
+    return L.zusammen(H, W, ebenen)
 
+
+TEST_EBENEN = ('figur',)
 
 if __name__ == '__main__':
     frames = [frame(i) for i in range(N)]
     prev = sys.argv[sys.argv.index('--preview') + 1] if '--preview' in sys.argv else None
-    diff = Hm.ruhepose(frames[0], spr, OFF)
-    print('Ruhepose weicht vom Original ab bei:', diff if diff else 'nichts')
+    diff = Hm.ruhepose(frame(0, dampf=False, nur=True), spr, OFF)
+    print('Ruhepose (ohne Dampf/Glitzer) weicht vom Original ab bei:', diff if diff else 'nichts')
     n = L.pruefe(frames, quelle=spr)
     print('Pixel je Frame:', n)
-    e0 = Hm.eckkontakt_typen(frames[0])
-    neu = {i: dict(Hm.eckkontakt_typen(g) - e0) for i, g in enumerate(frames) if Hm.eckkontakt_typen(g) - e0}
-    print('neue Eckkontakte gegenüber Frame 0:', neu if neu else 'keine')
+    ohne = [frame(i, nur=True) for i in range(N)]
+    print('Pixel je Frame (nur Figur):', [int((g[..., 3] > 0).sum()) for g in ohne])
+    e0 = Hm.eckkontakt_typen(ohne[0])
+    neu = {i: dict(Hm.eckkontakt_typen(g) - e0) for i, g in enumerate(ohne) if Hm.eckkontakt_typen(g) - e0}
+    print('neue Eckkontakte (Figur ohne Dampf) gegenüber Frame 0:', neu if neu else 'keine')
     L.speichern('steam-dwarf-engineer', 'Steam Dwarf Engineer', frames, MS, prev)
     if prev:
         import os
         os.makedirs(prev, exist_ok=True)
-        L.streifen(prev + '/steam-dwarf-engineer-strip.png', frames, spalten=12, scale=4)
+        L.streifen(prev + '/steam-dwarf-engineer-strip.png', frames, spalten=12, scale=6)

@@ -27,13 +27,14 @@ Fest bleiben: Schädelform, Umriss, Zähne, Fadenbogen.
 Ablauf (48 Frames à 65 ms = 3,12 s, nahtlos):
 * Heißer Hüpfer: der ganze Schädel hüpft zweimal pro Schleife bis zu 2 px (Frames 2–10 und 26–34, Spitze in 4–8 bzw. 28–32); sonst steht er (Frame 0 = Original).
 * Zittern: in den Hüpfern (Frames 4–8 und 28–32) rattert der Schädel samt Umriss 1 px nach links und rechts (der Faden bleibt, er hängt 4-verbunden an der Schädeldecke).
-* Zündfunke: der Funke am Schnurende flackert zwischen acht Gelb/Weiß-Gruppen (Pose 0 = Original, Posen 1–2 Frames); dazu steigen acht 1-px-Funken (Weiß → Gelb → Hellgrau)
-  2–3 px auf und kreiseln leicht (Partikel).
-* Dampf (Partikel): sechs kleine runde Dampfpunkte (Formen k/s, Weißgrau/Grau) steigen links und rechts vom heißen Schädel auf.
+* Zündfunke: der Funke am Schnurende flackert zwischen acht Gelb/Weiß-Gruppen (Pose 0 = Original, Posen 1–2 Frames; das ist Teil der Figur, keine losen Partikel); dazu steigen acht 1-px-Funken
+  (Feuerfunken nach Regel 15/25, reines Gelb (255,255,0) über die ganze Lebensdauer) 2–3 px auf und kreiseln leicht.
+* RUNDE 2 (Nutzerwunsch „gerne ohne die weißen Particles“): der weißgraue Dampf (sechs Wölkchen/Punkte in (242,242,242)/(213,213,213) links und rechts vom Schädel) entfällt komplett; auch die aufsteigenden
+  Funken sind nicht mehr weiß/hellgrau (früher Weiß → Gelb → Hellgrau), sondern nur noch gelb. Es gibt jetzt keine weißen/grauen losen Partikel mehr.
 * Blinzeln: beide Augenhöhlen (Frames 15–16/39–40 links, 16–17/40–41 rechts) schließen sich 2 Frames lang; die Lidfarbe ist die umgebende Knochenfarbe (je Pixel die häufigste
   Knochenstufe im 2-px-Umkreis). Sonst keine Farbwechsel.
 * KEIN Glanz (Regel 14): Knochen glänzen nicht.
-Frame: Sprite plus 3 px links/rechts, 4 px oben (Zündfunken + Hüpfer), 2 px unten — Figur zentriert; Funken/Dampf liegen in der 2-px-Zone um die Figur.
+Frame: Sprite plus 3 px links/rechts, 4 px oben (Zündfunken + Hüpfer), 2 px unten — Figur zentriert; die Funken liegen in der 2-px-Zone um die Figur.
 Alle Bewegungen laufen auf der vollen Leinwand (anim_lib/anim_amorph werfen ClipError). Nur ganze Pixel, nur Farben der Quelle.
 """
 import math
@@ -130,17 +131,6 @@ BLINZELN_R = {16, 17, 40, 41}
 assert HOP[0] == 0 and FOLGE_F[0] == 0 and 0 not in ZITTERN
 
 ZUENDFUNKEN = [(3, -1), (9, 0), (15, 1), (21, -1), (27, 0), (33, 1), (39, -1), (45, 0)]      # Startframe, seitlicher Weg
-PUFFS = [
-    dict(x=PAD_L + 3, y=PAD_T + 13, vx=-1, vy=-6, off=0, form='k', wackeln=1),
-    dict(x=PAD_L + 15, y=PAD_T + 12, vx=0, vy=-6, off=4, form='k', wackeln=0),
-    dict(x=PAD_L + 2, y=PAD_T + 10, vx=-1, vy=-5, off=8, form='s', wackeln=0),
-    dict(x=PAD_L + 14, y=PAD_T + 14, vx=0, vy=-7, off=12, form='s', wackeln=0),
-    dict(x=PAD_L + 4, y=PAD_T + 14, vx=-1, vy=-6, off=16, form='k', wackeln=1),
-    dict(x=PAD_L + 15, y=PAD_T + 9, vx=0, vy=-5, off=20, form='k', wackeln=0),
-]
-STAUBFARBEN = {'c': CI, 'r': CD}
-
-
 def sprite_mit_effekten(i):
     sp = spr.copy()
     if FOLGE_F[i]:
@@ -182,14 +172,18 @@ def funken_ebene(i):
             continue
         x = 1 + drift * (a // 3) + int(round(0.7 * math.sin(2 * math.pi * a / 6.0)))
         y = 1 - int(round(0.35 * a))
-        pix(x, y, CI if a < 3 else (CG if a < 6 else CH))
+        pix(x, y, CG)
     return e
 
 
-def frame(i):
+TEST_EBENEN = ('fig',)
+
+
+def frame(i, nur=None):
     f = figur(i)
-    dampf = L.puff_ebene(H, W, i, 24, PUFFS, STAUBFARBEN)
-    return L.zusammen(H, W, [(dampf, 0, 0), (f['fig'], 0, 0), (funken_ebene(i), 0, 0)])
+    if nur is not None:
+        return f['fig']
+    return L.zusammen(H, W, [(f['fig'], 0, 0), (funken_ebene(i), 0, 0)])
 
 
 if __name__ == '__main__':

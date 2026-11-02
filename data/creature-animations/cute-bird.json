@@ -1,15 +1,15 @@
 {
   "creature": "Cute Bird",
   "sheet": "cute-bird.png",
-  "frameWidth": 86,
-  "frameHeight": 55,
+  "frameWidth": 20,
+  "frameHeight": 18,
   "frames": 48,
-  "frameMs": 65,
+  "frameMs": 60,
   "loop": true,
   "layout": "horizontal",
   "padTop": 2,
   "padLeft": 2,
-  "padRight": 3,
+  "padRight": 2,
   "padBottom": 2,
-  "faceX": 43.0
+  "faceX": 10.0
 }

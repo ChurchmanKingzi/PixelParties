@@ -2,20 +2,26 @@
 """Idle-Animation für „Soul Shard Sekhem“ (Creature).
 
 PICK: [["MotiveEgypt", 226, 1]]   Ebene „Sekhem“ (MotiveEgypt.xcf, Ebene 226, 19×25 px, 25 Farben, nur Alpha 0/255, ein einziges 4-verbundenes Teil) → src/soul-shard-sekhem.png.
-Per Pixelvergleich gegen die Kartenkunst (data/card-art/native/Soul_Shard_Sekhem.png, 76×51) abgeglichen: die Ebene sitzt dort bei (28,17) mit 67 (Kopf 100 % Treffer. %, Körper: In der Kartenkunst liegt über Brust und Armen ein rötliches, halbtransparentes Lavalicht, das die grauen Knochen rosa färbt — dieses Licht gehört nicht zur Figur und wird nicht übernommen; die Ebene selbst ist pixelsauber)
+Per Pixelvergleich gegen die Kartenkunst (data/card-art/native/Soul_Shard_Sekhem.png, 76×51) abgeglichen: die Ebene sitzt dort bei (28,17); der Kopf trifft zu 100 %, im Körper liegt in der Kartenkunst über Brust und Armen
+ein rötliches, halbtransparentes Lavalicht, das die grauen Knochen rosa färbt — dieses Licht gehört nicht zur Figur und wird nicht übernommen; die Ebene selbst ist pixelsauber.
 
 Aufruf:   python3 soul_shard_sekhem.py [--preview <ordner>]
 Ausgabe:  ../../data/creature-animations/soul-shard-sekhem.png + .json
 
 Was im Sprite ist (Koordinaten im Sprite 19×25, x/y ab 0):
-* Ein Skelett mit Löwenkopf: dunkelrote Mähne (B, C, E, F, G, H, O; Zeilen 0–13), Gesicht in Pfirsich J/M/P mit zwei gelben Augen Q=(255,255,12) bei (7–8,7) und (11–12,7), weißen Reißzähnen K/U und roter Zunge R/V;
-  darunter Skelettkörper in Grau (D, I, K, T; Zeilen 13–24) mit gespreizten Armen.
+* Ein Skelett mit Löwenkopf: dunkelrote Mähne/Umhang (B, C, E, F, G, H, O; Zeilen 0–19), Gesicht in Pfirsich J/M/P mit zwei gelben Augen Q=(255,255,12) bei (7–8,7) und (11–12,7), weißen Reißzähnen K/U und roter Zunge R/V;
+  darunter Skelettkörper in Grau (D, I, K, T; Zeilen 13–24).
+* Die Arme (Nutzer: „die von den Armen hängenden Bandagen sollen sich mit den Armen mitbewegen“): links Zeilen 13–16 bei x 1–4 (Umriss A oben, Knochen I/D/K), rechts bei x 15–18; von der Unterkante jedes Arms hängt ein
+  schräger Bandagenstreifen herab (links (1–3,17), (0–2,18), (0–1,19); rechts (15–17,17), (16–18,18), (17–18,19); Mitte I bzw. D, Umriss A). Arm + Bandage sind je ein starres Teil (24 Pixel zusammen).
 * Material: Knochen, Stoff, Fell/Schuppen — KEIN Glanz und keine Glitzersterne (Regel 14); kein Feuer (Regel 15). Keine Partikel.
-Fest bleiben: Umriss, Kopfform, Gesicht, Gliedmaßen (der Körper streckt sich nur durch eingefügte Rippenzeilen unterhalb des Kopfes).
+Fest bleiben: Umriss, Kopfform, Gesicht, Mähne, Zunge/Zähne.
 
 Ablauf (48 Frames à 65 ms = 3,12 s, nahtlos):
-* Atmen (Periode 24): unterhalb des Kopfes werden im Rippenkorb 1–2 Zeilen eingefügt (Quellzeile 19, in der Spitze zusätzlich 18; Zeilen gleicher Breite, keine Randstufe) — Kopf, Arme und Rumpf heben sich um 1–2 px, die Füße bleiben fest am Boden.
-* Blinzeln (zweimal je Schleife, Frames 13–14 und 37–38, je 2 Frames zu): die gelben Augenpixel (je 2×1) werden zur Gesichts-/Mähnenfarbe. Lidfarbe = umgebende Körperfarbe (je Augenpixel häufigste Farbe im Umkreis von 2–3 px, ohne Umriss und Augenfarbe).
+* Atmen (Periode 24): unterhalb der Arme werden im Umhang/Rippenkorb 1–2 Zeilen eingefügt (Quellzeile 18, in der Spitze zusätzlich 19; nur im Rumpf, Textur der Nachbarzeile eingemischt) — Kopf, Rumpf UND beide Arme samt
+  Bandagen heben sich starr um 1–2 px mit (die Arme bleiben unverformt, die Bandagen werden nicht gestreckt), die Füße bleiben am Boden.
+* Armheben (links Frames 6–11 und 30–35, rechts Frames 18–23 und 42–47; 1 px zusätzlich nach oben): Arm und Bandage wandern als Ganzes; was der Arm freigibt (Umhangkante), bleibt Körper, offene Kanten werden
+  mit der Umrissfarbe geschlossen.
+* Blinzeln (zweimal je Schleife, Frames 13–14 und 37–38, je 2 Frames zu): die gelben Augenpixel (je 2×1) werden zur Gesichts-/Mähnenfarbe. Lidfarbe = umgebende Körperfarbe.
 Frame: Sprite plus 3 px links/rechts, 4 px oben (Atmen), 2 px unten, Figur zentriert.
 Alle Bewegungen laufen auf der vollen Leinwand (anim_lib/anim_amorph werfen ClipError). Nur ganze Pixel, nur Farben der Quelle.
 """
@@ -26,6 +32,7 @@ import numpy as np
 
 import anim_lib as L
 import anim_amorph as A
+import anim_shard as SH
 
 N, MS = 48, 65
 PAD_L, PAD_R, PAD_T, PAD_B = 3, 3, 4, 2
@@ -37,62 +44,59 @@ BODEN = PAD_T + sh - 1
 OPAK = spr[..., 3] > 0
 RAND_FARBEN = A.umrissfarben(spr)
 UMRISS = (12, 12, 12)
+MAHNE_UMRISS = (14, 2, 2)
 
-
-def _col(y, x):
-    return tuple(int(v) for v in spr[y, x, :3])
-
+# ── Arme + hängende Bandagen als starre Teile (Sprite-Koordinaten (y, x)) ──
+ARM_L = [(13, 2), (13, 3), (13, 4), (14, 1), (14, 2), (14, 3), (14, 4), (15, 1), (15, 2), (15, 3), (16, 2), (16, 3)]
+BAND_L = [(17, 1), (17, 2), (17, 3), (18, 0), (18, 1), (18, 2), (19, 0), (19, 1)]
+ARM_R = [(13, 15), (13, 16), (13, 17), (14, 15), (14, 16), (14, 17), (14, 18), (15, 16), (15, 17), (15, 18), (16, 16), (16, 17)]
+BAND_R = [(17, 15), (17, 16), (17, 17), (18, 16), (18, 17), (18, 18), (19, 17), (19, 18)]
+TEILE = {'l': ARM_L + BAND_L, 'r': ARM_R + BAND_R}
+for _k, _p in TEILE.items():
+    for (_y, _x) in _p:
+        assert OPAK[_y, _x], (_k, _y, _x)
+KOERPER = spr.copy()
+for _p in TEILE.values():
+    for (_y, _x) in _p:
+        KOERPER[_y, _x] = 0
 
 # ── Zeitachsen ──
 S = []
 for _i in range(N):
     _v = math.sin(2 * math.pi * _i / 24)
     S.append(2 if _v >= 0.9 else 1 if _v >= 0.35 else 0)
-POSEN = {0: {}, 1: {19: 1}, 2: {18: 1, 19: 1}}                                                                      # s → eingefügte Zeilen (Rippen, unterhalb des Kopfes)
+POSEN = {0: {}, 1: {18: 1}, 2: {18: 1, 19: 1}}                                                                      # s → eingefügte Zeilen (nur Rumpf, unterhalb der Arme)
 assert S[0] == 0
-_ext = [(int(np.nonzero(OPAK[y])[0].min()), int(np.nonzero(OPAK[y])[0].max())) for y in range(sh)]
+_ext = [(int(np.nonzero(KOERPER[y, :, 3])[0].min()), int(np.nonzero(KOERPER[y, :, 3])[0].max())) for y in range(sh)]
 for _s, _d in POSEN.items():
     for _y in _d:
-        assert _ext[_y] in (_ext[_y - 1], _ext[_y + 1]), ('Einfügezeile mit Randstufe', _y)
+        assert abs(_ext[_y][0] - _ext[_y - 1][0]) <= 1 and abs(_ext[_y][1] - _ext[_y - 1][1]) <= 1, ('Einfügezeile mit Randstufe', _y, _ext[_y - 1:_y + 2])
+
+HUB = {'l': [0] * N, 'r': [0] * N}                                                                                 # zusätzlicher Armhub je Frame (px nach oben)
+for _k, _starts in (('l', (6, 30)), ('r', (18, 42))):
+    for _s0 in _starts:
+        for _d in range(6):
+            HUB[_k][_s0 + _d] = 1
 
 # ── Augen und Lidfarben ──
 AUGEN = [(7, 7), (7, 8), (7, 11), (7, 12)]                                                                      # (y, x) der Augenpixel
-LID_AUS = {(255, 255, 12), (14, 2, 2)}                                                                   # Farben, die nie als Lidfarbe dienen (Umriss, Augenfarben)
+LID_AUS = {(255, 255, 12), MAHNE_UMRISS}                                                                   # Farben, die nie als Lidfarbe dienen (Umriss, Augenfarben)
 BLINK = {13: 2, 14: 2, 37: 2, 38: 2}                                                                      # Frame → Stufe (1: obere Augenzeile, 2: alle)
 
 
-def _lid(fig, top, stufe):
-    out = fig.copy()
-    h, w = fig.shape[:2]
-    ymin = min(y for (y, x) in AUGEN)
-    pix = [(top + y, PAD_L + x) for (y, x) in AUGEN if stufe == 2 or y == ymin]
-    eigen = {(top + y, PAD_L + x) for (y, x) in AUGEN}
-    for (y, x) in pix:
-        for rad in (2, 3):
-            cnt, dist = {}, {}
-            for dy in range(-rad, rad + 1):
-                for dx in range(-rad, rad + 1):
-                    yy, xx = y + dy, x + dx
-                    if not (0 <= yy < h and 0 <= xx < w) or not fig[yy, xx, 3] or (yy, xx) in eigen:
-                        continue
-                    c = tuple(int(v) for v in fig[yy, xx, :3])
-                    if c in LID_AUS:
-                        continue
-                    cnt[c] = cnt.get(c, 0) + 1
-                    dist[c] = min(dist.get(c, 9), max(abs(dy), abs(dx)))
-            if cnt:
-                out[y, x, :3] = max(cnt, key=lambda q: (cnt[q], -dist[q]))
-                break
-    return out
-
-
 def figur(i):
-    koerper = A.zeilen_von(spr, 0, sh - 1, H, W, PAD_L, PAD_T)
-    z, quelle = A.koerper_pose(koerper, doppeln=POSEN[S[i]], x0=PAD_L)
-    fig, top = A.auf_leinwand(z, H, BODEN, 0)
+    ebene, top, quelle = SH.ebene_atmung(KOERPER, POSEN[S[i]], H, W, PAD_L, PAD_T, BODEN)
+    teile = L.leer(H, W)
+    for k, pix in TEILE.items():
+        for (y, x) in pix:
+            teile[top + y - HUB[k][i], PAD_L + x] = spr[y, x]
+    # Arm über dem Umhang (Arm liegt vor der Mähnenkante); Körper darunter
+    fig = L.zusammen(H, W, [(ebene, 0, 0), (teile, 0, 0)])
     if i in BLINK:
-        fig = _lid(fig, top, BLINK[i])
-    fig, neu = A.umriss_ergaenzen(fig, RAND_FARBEN, lambda x, y: (14, 2, 2) if y < PAD_T + 13 else UMRISS)
+        ymin = min(y for (y, x) in AUGEN)
+        pix = [(top + y, PAD_L + x) for (y, x) in AUGEN if BLINK[i] == 2 or y == ymin]
+        fig = SH.lid(fig, pix, LID_AUS, eigen={(top + y, PAD_L + x) for (y, x) in AUGEN})
+    fig, neu = A.umriss_ergaenzen(fig, RAND_FARBEN, lambda x, y: MAHNE_UMRISS if y < top + 13 else UMRISS)
     fig, brueck = A.verbinde4(fig)
     fig, pfad, offen = A.verbinde_luecken(fig, 3)
     return dict(fig=fig, top=top, quelle=quelle, neu=neu, brueck=brueck, pfad=pfad, offen=offen)

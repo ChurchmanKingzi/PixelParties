@@ -2,14 +2,15 @@
   "creature": "Lunatic Golem",
   "sheet": "lunatic-golem.png",
   "frameWidth": 28,
-  "frameHeight": 32,
-  "frames": 48,
-  "frameMs": 60,
+  "frameHeight": 31,
+  "frames": 64,
+  "frameMs": 90,
   "loop": true,
   "layout": "horizontal",
   "padTop": 2,
   "padLeft": 2,
   "padRight": 2,
   "padBottom": 2,
-  "faceX": 14.0
+  "faceX": 14.0,
+  "deckkraft": 0.5
 }

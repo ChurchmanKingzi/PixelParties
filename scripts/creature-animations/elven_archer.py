@@ -26,8 +26,9 @@ Ablauf (48 Frames à 62 ms = 2,98 s, nahtlos):
   anliegenden Locke (5,y), siehe Funktion luecke_bogen).
 * Haare im Wind (drei Böen, alle 16 Frames, Start 4/20/36; die Welle läuft von der Locke zur Strähnenspitze, je Stufe 2 Frames später):
   1. Spitze der rechten Locke (12,14): blasser Pixel schlägt nach außen auf (13,14) über die Schulter, (12,14) wird Umrissbraun.
-  2. Freie Strähne über der rechten Schulter, Zeile 14: Orange wird 1–2 px breiter, der rotbraune Rand rückt nach (16,14)/(17,14).
-  3. Strähnenspitze Zeile 15: Rand wird 2–3 px lang ((15..17,15)).
+  2. Freie Strähne über der rechten Schulter, Zeile 14: Orange wird 1 px länger, der rotbraune Rand rückt nach (16,14).   [Runde 2: höchstens +1 px über die Ruhelage (x 15) hinaus;
+     vorher bis (17,14), also 2 px — Nutzer: „Haare außen werden immer noch etwas zu weit nach außen gezogen“.]
+  3. Strähnenspitze Zeile 15: Rand wird 1–2 px lang ((15..16,15)); nie weiter als x 16.
   4. Feder: biegt sich mit der Böe leicht nach rechts (1 px, 2 Stufen), ohne dass etwas aus ihr ausströmt.
   Alle Zustände sind 4-verbunden (Eckkontakt-Kontrolle in der Prüfung).
 * Linke Lockenspitze (5,14): außen liegt der Bogenumriss (4,14), nach außen geht nichts — sie schlägt dreimal pro Schleife kurz nach
@@ -98,8 +99,8 @@ FEDER = {1: {(15, 0): None, (16, 0): WEISS, (16, 1): HELLBLAU},
          2: {(15, 0): None, (14, 1): None, (16, 0): WEISS, (15, 1): WEISS, (16, 1): HELLBLAU, (14, 2): WEISS, (15, 2): HELLBLAU}}
 # Böe: Verlauf je Frame nach dem Böenstart (Locke → Strähne Zeile 14 → Strähnenspitze Zeile 15, Feder eilt 1 Frame voraus)
 BOE_SPITZE = [1, 1, 1, 1, 1, 1]
-BOE_S14 = [0, 0, 1, 2, 2, 2, 1, 1]
-BOE_S15 = [0, 0, 0, 0, 1, 2, 2, 1]
+BOE_S14 = [0, 0, 1, 1, 1, 1, 0, 0]                              # Runde 2: höchstens 1 px über die Ruhelage hinaus (vorher 2 → zu weit nach außen)
+BOE_S15 = [0, 0, 0, 1, 1, 1, 1, 0]
 BOE_FEDER = [1, 2, 2, 2, 2, 1]
 BOEN = (4, 20, 36)
 

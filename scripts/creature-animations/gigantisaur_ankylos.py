@@ -18,15 +18,21 @@ Identifikation (Sprite 60×41, braungrauer Ankylosaurus im Profil, nach rechts b
 * Kein Glanz (Panzer/Knochen/Haut, Regel 14), keine Partikel. Die hellen Stachelpunkte sind schon gezeichnet und bleiben fest.
 Bleibt fest: Panzerrücken (bis auf das Heben), Stacheln, Kopf (außer Hub), Zehenlinien, die hellbraune Rasterfläche.
 
+Runde 2 (Nutzerkorrektur wörtlich: „Der Unterkiefer bewegt sich nie mit dem Rest des Kopfes mit.“): Kopf UND Unterkiefer sind jetzt EIN starres Teil (eigene Ebene). Der Kopf umfasst alles ab x ≥ 47 bis
+Zeile 27 (Schädel, Augen, Schnauze, Kinnumriss) und rechts von x ≥ 51 auch die Zeilen 28–29 (Unterkiefer: Ober-/Unterlippe, Kieferfläche S/T/U und Unterkante D, x 51–58, Zeilen 26–29). Die Oberkante der Vorderbeine
+(x 47–50, Zeilen 28–29) bleibt beim Körper. Hebt sich der Kopf (Atmen und Schnüffeln), wandert der ganze Kopf samt Kiefer starr 1 px (bzw. 2 px) nach oben; die dabei freiwerdende Kehlzeile (x 47–50) wird
+mit dem Beinpixel darunter gefüllt (Ergänzung), unter dem Kiefer bleibt es leer (freie Luft).
+
 Ablauf (60 Frames à 66 ms = 3,96 s), alle Bewegungen unabhängig:
-* Atmen (Periode 30, 2× pro Schleife; oben in Frames 3–16 und 33–46): Zeile 24 (Flanke) wird eingefügt — Rücken, Kopf, Schwanz und Stacheln heben sich 1 px, die Beine bleiben am Boden.
+* Atmen (Periode 30, 2× pro Schleife; oben in Frames 3–16 und 33–46): Zeile 24 (Flanke) wird eingefügt — Rücken, Schwanz und Stacheln heben sich 1 px und der KOPF (samt Unterkiefer, starr) hebt sich mit, die Beine bleiben am Boden.
 * Schwanz schwingt: zweimal pro Schleife (Frames 3–26 und 32–55) schwingt der Schwanz mit der Keule zweimal seitlich hin und her (bis ±3 px an der Keule, wandernde Welle, am Becken fest);
   dazwischen hängt er wie im Original.
-* Kopf hebt sich (Schnüffeln): zweimal pro Schleife (Frames 19–26 und 49–56) hebt sich der Kopf (x ≥ 47) 1 px gegenüber dem Rücken (Zeile 26 wird nur dort eingefügt), dann senkt er sich wieder.
+* Kopf hebt sich (Schnüffeln): zweimal pro Schleife (Frames 18–29 und 48–59) hebt sich der ganze Kopf samt Unterkiefer 1 px gegenüber dem Rücken (starre Ebene), dann senkt er sich wieder.
 * Beine treten: hinten (x 9–19) in Frames 10–11 und 40–41; vorn innen (x 33–43) in 18–19 und 48–49; vorn außen (x 47–56) in 27–28 und 57–58 (je eine Fußzeile entfällt kurz, der Fuß rückt 1 px hoch).
 Alle Bewegungen laufen auf der vollen Leinwand (anim_lib wirft ClipError). Nur ganze Pixel, nur Farben der Quelle.
 
-Ergänzungen: Randpixel-Korrektur (Regel 16): wo die Schwanzbewegung oder das Kopfheben eine Füllfarbe an den Rand schiebt, wird ein Umrisspixel (Farbe aus dem Original) ergänzt (anim_tiere.umriss_schliessen).
+Ergänzungen: Randpixel-Korrektur (Regel 16): wo die Schwanzbewegung oder das Kopfheben eine Füllfarbe an den Rand schiebt, wird ein Umrisspixel (Farbe aus dem Original) ergänzt (anim_tiere.umriss_schliessen);
+beim Kopfheben werden die freiwerdenden Kehlpixel (x 47–50 unter dem Kopf) mit dem Pixel des Beins darunter gefüllt (Pixel (47..50, 28) werden nach (47..50, 27) bzw. (47..50, 26) kopiert).
 """
 import math
 import sys
@@ -49,14 +55,15 @@ schwanz = vorhanden & (yy <= 17) & (xx <= 14)
 bein_h = vorhanden & (yy >= 33) & (xx >= 9) & (xx <= 19)
 bein_a = vorhanden & (yy >= 37) & (xx >= 32) & (xx <= 43)
 bein_b = vorhanden & (yy >= 35) & (xx >= 46) & (xx <= 56)
-koerper = vorhanden & ~schwanz & ~bein_h & ~bein_a & ~bein_b
+kopf_m = vorhanden & (xx >= 47) & ((yy <= 27) | ((xx >= 51) & (yy <= 29)))        # Kopf samt Unterkiefer (starr)
+koerper = vorhanden & ~schwanz & ~bein_h & ~bein_a & ~bein_b & ~kopf_m
 
 RAND = T.rand_farben(spr)
 REGEL = T.umriss_regeln(spr, RAND)[2]
 ZEILE = 24                                                         # hier wird beim Atmen eine Zeile eingefügt
 KOPF_ZEILE = 26                                                    # hier wird beim Kopfheben (nur x ≥ 47) eine Zeile eingefügt
 FENSTER_SCHWANZ = [(3, 27), (32, 56)]
-FENSTER_KOPF = [(19, 27), (49, 57)]
+FENSTER_KOPF = [(18, 30), (48, 60)]
 
 
 def teil(maske):
@@ -100,15 +107,26 @@ def schwanz_schwingen(t, u):
 def frame(i, nur=None):
     atem, u_s, kopf, tipp_h, tipp_a, tipp_b = zustand(i)
     k = teil(koerper)
-    if kopf:
-        k = T.spalten_hub(k, PAD_T + KOPF_ZEILE, lambda x: 1 if x >= PAD_L + 47 else 0)
+    kp = teil(kopf_m)
+    d = atem + kopf                                                # Kopf steigt starr um d Pixel (Atmen + Schnüffeln)
+    kp = L.versetze(kp, 0, -d)
+    # frei werdende Kehlzeilen (x 47–50) unter dem Kopf mit dem Pixel des Beins darunter füllen
+    for x in range(47, 51):
+        ys_ = np.nonzero(kopf_m[:, x])[0]
+        if not len(ys_) or not d:
+            continue
+        yb = int(ys_.max())
+        unter = spr[yb + 1, x] if yb + 1 < sh and vorhanden[yb + 1, x] and not kopf_m[yb + 1, x] else None
+        if unter is not None:
+            for dy in range(d):
+                k[PAD_T + yb - dy, PAD_L + x] = unter
     sw_ = schwanz_schwingen(teil(schwanz), u_s)
     bh = L.heben_unten(teil(bein_h), PAD_T + 33, tipp_h)
     ba = L.heben_unten(teil(bein_a), PAD_T + 37, tipp_a)
     bb = L.heben_unten(teil(bein_b), PAD_T + 35, tipp_b)
     k = L.streck_zeile(k, PAD_T + ZEILE, atem)
     sw_ = L.streck_zeile(sw_, PAD_T + ZEILE, atem)
-    ebenen = {'koerper': k, 'schwanz': sw_, 'bein_h': bh, 'bein_a': ba, 'bein_b': bb}
+    ebenen = {'koerper': k, 'schwanz': sw_, 'bein_h': bh, 'bein_a': ba, 'bein_b': bb, 'kopf': kp}
     wahl = nur or tuple(ebenen)
     ganz = L.zusammen(H, W, [(ebenen[n], 0, 0) for n in wahl])
     return T.umriss_schliessen(ganz, RAND, REGEL)                  # Randpixel-Test (Regel 16)

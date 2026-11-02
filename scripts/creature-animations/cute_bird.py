@@ -1,45 +1,29 @@
 # -*- coding: utf-8 -*-
-"""Idle-Animation für „Cute Bird“ (Creature) — Harpyien-Mädchen mit Federflügeln, fliegt (Dauerschlag + Bob).
+"""Idle-Animation für „Cute Bird“ (Creature) — NUR der kleine weiße Vogel (ohne das Engel-Mädchen, auf dessen Kopf er sitzt). Er fliegt auf der Stelle.
 
-PICK: [["MotiveMoe", 440, "Flügelpaar (Komponente x 0–75, y 0–47)"], ["MotiveMoe", 439, 1], ["MotiveMoe", 437, 1], ["MotiveMoe", 438, "Hut-Vogel (Ausschnitt x 116–129, y 132–143)"]]
-Quelle (alle aus MotiveMoe.xcf; die Ebenen heißen „Cute Bird #1“ = Flügel, „#2“ = Mädchen, „#3“ = Haare/Arme, „Cute Bird“ = Sammelblatt kleiner Vögel; auf der Karte
-liegen sie 1:1 übereinander, die Kunst ist 76×51 px). Die Teile wurden mit ihren Ebenen-Versätzen auf eine 76×48-Leinwand gelegt und liegen als
-  src/cute-bird.png            Gesamtbild (Ruhepose, Referenz für den Randpixel-Test)
-  src/cute-bird-fluegel.png    Flügelpaar (voll, auch der unter dem Mädchen verdeckte Teil — die Ebene enthält die ganzen Flügel)
-  src/cute-bird-maedchen.png   Mädchen ohne Flügel/Hut/Arme (voll, auch der unter Hut und Armen verdeckte Teil)
-  src/cute-bird-hut.png        kleiner weißer Vogel auf ihrem Kopf
-  src/cute-bird-arme.png       Haarsträhnen/Arme an ihren Seiten
-vor. (Die übrigen kleinen Vögel auf der Karte — weiß-lavendel rechts, zwei dunkelgraue unten — sind eigene Tiere der Kunst und nicht Teil dieser Figur.)
+PICK: [["MotiveMoe", 438, "Hut-Vogel (Ausschnitt x 116–129, y 132–143 der Ebene „Cute Bird“ = Sammelblatt kleiner Vögel)"]]
+RUNDE 2 (Nutzer: „NUR den kleinen weißen Vogel anzeigen, ohne den Engel, auf dessen Kopf er liegt!“): Die Kartenkunst „Cute Bird“ zeigt ein Mädchen mit Flügelpaar; der kleine weiße Vogel auf
+ihrem Kopf ist ein eigenes 14×12-px-Sprite in der Ebene 438 von MotiveMoe.xcf. Der Sprite ist vollständig (auch die Schwanzfedern oben und die Flügelspitzen unten, nichts wird vom Mädchen verdeckt)
+und wird als src/cute-bird.png neu abgelegt. Die früheren Teilbilder (Flügel, Mädchen, Arme, Hut) entfallen.
 
 Aufruf:   python3 cute_bird.py [--preview <ordner>]
 Ausgabe:  ../../data/creature-animations/cute-bird.png + .json
 
-Identifikation (Sprite-Koordinaten x, y):
-* Linker Flügel: lavendel-weiß (x 0–37, y 0–47): Federn mit violetter Schattierung (153,102,255), dunkelviolettem Umriss (70,46,116), weißen Lichtern. Die Spitzen zeigen
-  nach oben-links, der Ansatz sitzt unten am Mädchen. Rechter Flügel: grau (x 38–75): Federn (122,122,122) mit schwarzem Umriss (0,0,0), hellgrauen Lichtern. Beide Flügel
-  stoßen hinter dem Mädchen (x 34–41) aneinander; die Ebene enthält sie vollständig.
-* Mädchen (x 32–43, y 25–47): braune Haare (hell (170,85,0), Umriss (49,24,0)), Gesicht (x 34–42, y 29–38) mit je zwei 2×2-Augen (35–36, 31–32) und (39–40, 31–32) (weiß,
-  braune Iris), rosa Wangen (35,33) (40,33), Lächeln mit weißen Zähnen (37–38, 35), Kleid rosabraun (y 37–43), Gürtel mit goldener Schnalle (37–38, 42), nackte Beine/Füße (y 44–47).
-  Graue/schwarze Pixel (36–39, 29–30) am Haaransatz gehören zum Kopfschmuck (unklar) — bleiben fest am Kopf.
-* Hut-Vogel (x 31–44, y 19–30): kleiner weißer Vogel von vorn mit Federbüscheln (34,19) (39,19), Körper lavendel (204,204,255) mit dunklem Umriss (85,85,139), schwarzen Augen
-  (37,28) (39,28) und rosa Wangen (36,28) (40,28).
-* Haare/Arme (x 32–34 und 40–43, y 28–37): Haarsträhnen mit den dünnen Armen, hängen an den Seiten.
+Identifikation (Sprite-Koordinaten x, y; 14×12 px, 6 Farben):
+* Der Vogel ist von OBEN gesehen (Flügel seitlich ausgebreitet, Kopf unten): Umriss (85,85,139), Federn (204,204,255) mit Schattierung (165,165,207) und weißen Lichtern (246,255,255).
+* Schwanzfedern oben: zwei kleine Spitzen — links (3, 0)–(3, 1)–(4, 1), rechts (8, 0)–(7, 1)–(8, 1); darunter der Rumpf (y 2–9, x 3–10).
+* Flügel: links x 0–3 und rechts x 10–13, y 5–11 (Federn mit Umrissstufen an den Spitzen (0–1, 8–9) / (12–13, 8–9) und (1–2, 10–11) / (11–12, 10–11)); die Flügelwurzel trennt ein dunkler Umriss vom Rumpf.
+* Gesicht (y 9): schwarze Augen (6, 9) und (8, 9) (0,0,0), rosa Wangen (5, 9) und (9, 9) (255,118,255), Schnabel (7, 9) (165,165,207); darunter Brust/Bauch (7, 10–11).
 
-Ablauf (48 Frames à 65 ms = 3,12 s) — sie FLIEGT:
-* Flügelschlag, durchgehend und gleichmäßig: ein Schlag = 16 Frames (1,04 s), 3 Schläge pro Schleife. Abschlag (Spitzen oben → unten) schnell, 6 Frames; Aufschlag 10 Frames.
-  Jede Federspalte der Flügel wandert als Ganzes senkrecht (nichts wird kopiert oder gestreckt, die Federtextur bleibt Pixel für Pixel): Verschiebung ≈ 13 px · Schlagphase · Abstand^1,15
-  (Spitzen am weitesten), die Spitzen hinken der Wurzel 1,2 Frames nach (Wellenlauf); am Aufschlag-Ende heben sich die Spitzen 2 px über die Ruhelage. Der rechte Flügel
-  schlägt 0,35 Frames später. Die Spalten an der Naht unter dem Mädchen (x 34–41) bewegen sich kaum.
-* Bob: die ganze Figur hebt und senkt sich im Takt (±2 px): am höchsten kurz nach dem Abschlag unten, am tiefsten am Ende des Aufschlags. Die Füße baumeln nach (60 %, 1,5 Frames
-  verzögert; die Lücke zum Kleid füllen doppelte Beinzeilen). Haare/Arme pendeln zusätzlich leicht (links Periode 16, rechts 24 Frames, bis 1 px).
-* Hut-Vogel: flattert mit den Seiten und Büscheln (sechs Mal pro Schleife, bis 1 px) und blinzelt (Frames 30–32).
-* Mädchen blinzelt (Frames 19–21 und 41–42, Lid = Hautfarbe).
-* Goldene Gürtelschnalle (Metall): zweimal pro Schleife blitzt ein kleiner Glitzerstern auf (Frames 10–12 und 34–36). Sonst kein Glanz (Federn, Haare, Haut sind kein Metall).
-* Federflocken (Partikel): kleine lavendelfarbene und graue Punkte sinken langsam von den Flügeln, nahtlos.
+Ablauf (48 Frames à 60 ms = 2,88 s):
+* Flügelschlag: sechsmal pro Schleife (Periode 8 Frames): jede Flügelspalte wandert als Ganzes senkrecht (nichts wird kopiert oder gestreckt), je weiter außen, desto mehr (Spitze ±2–3 px, Wurzelspalte kaum);
+  die Spitze hinkt der Wurzel nach (Wellenlauf 0,8 rad), der Zusammenhang zum Rumpf wird erzwungen (F.fluegel_welle). Frame 0 = Original.
+* Schweben: der ganze Vogel hebt sich beim Abschlag 1 px (Periode 8), dazu pendelt er langsam waagerecht ±1 px (Periode 24, Schwebeflug) und ein zweites, langsames Auf und Ab ±1 px (Periode 24).
+* Schwanzfedern zucken: beide Spitzen wandern unabhängig 1 px nach innen/außen (Perioden 12 und 16 bzw. 16 und 24), sie bleiben über die Zeile darunter 4-verbunden.
+* Blinzeln (Frames 14–16 und 38–40): Lid = Federfarbe (204,204,255) auf den beiden schwarzen Augenpixeln (Rule 21: Lid in umgebender Körperfarbe); die rosa Wangen bleiben.
+Keine Partikel (zu klein, Regel 25), kein Glanz (Federn, Regel 14).
 
-Ergänzungen: keine nötig — die Ebenen enthalten die verdeckten Teile (Flügel unter dem Mädchen, Mädchen unter Hut und Armen).
-Randpixel-Test (Regel 16): verschobene Federspalten und die Arme können an der Außenkante Innenfarbe freilegen; solche Randpixel werden in der Umrissfarbe ihrer Ebene gesetzt
-(linker Flügel (70,46,116), rechter Flügel (0,0,0), Mädchen (49,24,0), Hut (85,85,139)) — in `frame()` per `B.umriss_je_ebene`.
+Ergänzungen: keine — der Sprite ist vollständig. Randpixel-Test (Regel 16): verschobene Flügelspalten legen an Seitenkanten Innenfarbe frei; solche Randpixel werden in der Umrissfarbe (85,85,139) gesetzt (B.umriss_je_ebene).
 Alle Bewegungen laufen auf der vollen Leinwand (anim_lib wirft ClipError, wenn etwas herausragen würde). Nur ganze Pixel, nur Farben der Quelle.
 """
 import math
@@ -51,153 +35,91 @@ import anim_lib as L
 import anim_flieger as F
 import anim_flieger_b as B
 
-N, MS = 48, 65
-BEAT, DOWN = 16, 6                                         # Frames je Schlag, davon Abschlag
-PAD_L, PAD_R, PAD_T, PAD_B = 5, 5, 3, 4
+N, MS = 48, 60
+PAD_L, PAD_R, PAD_T, PAD_B = 7, 7, 7, 7                    # großzügige Leinwand: Flügelhub (3 px) + Schweben (2 px); am Ende auf die Vereinigung aller Frames + 2 px zugeschnitten
 
-spr = L.lade('cute-bird')                                  # Gesamtbild (Ruhepose / Referenz für den Randpixel-Test)
+spr = L.lade('cute-bird')                                  # 14×12: der kleine weiße Vogel
 sh, sw = spr.shape[:2]
 H, W = sh + PAD_T + PAD_B, sw + PAD_L + PAD_R
+yy, xx = np.mgrid[0:sh, 0:sw]
+vorhanden = L.deckend(spr)
 
-# ── Ebenen auf die volle Leinwand legen (Regel 3) ───────────────────────────────────────────────────────────────────
-fl = L.lade('cute-bird-fluegel')
-FL_L = L.platz(np.where((np.arange(sw) <= 37)[None, :, None], fl, 0).astype(np.uint8), H, W, PAD_L, PAD_T)
-FL_R = L.platz(np.where((np.arange(sw) >= 38)[None, :, None], fl, 0).astype(np.uint8), H, W, PAD_L, PAD_T)
-MAED = L.platz(L.lade('cute-bird-maedchen'), H, W, PAD_L, PAD_T)
-HUT = L.platz(L.lade('cute-bird-hut'), H, W, PAD_L, PAD_T)
-arme = L.lade('cute-bird-arme')
-ARM_L = L.platz(np.where((np.arange(sw) <= 37)[None, :, None], arme, 0).astype(np.uint8), H, W, PAD_L, PAD_T)
-ARM_R = L.platz(np.where((np.arange(sw) >= 38)[None, :, None], arme, 0).astype(np.uint8), H, W, PAD_L, PAD_T)
-CUT = PAD_T + 44                                           # ab dieser Zeile beginnen die Beine des Mädchens
-MAED_OBEN = MAED.copy(); MAED_OBEN[CUT:] = 0
-MAED_BEINE = MAED.copy(); MAED_BEINE[:CUT] = 0
+UMRISS = (85, 85, 139)
+FEDER = (204, 204, 255)                                    # Lid beim Blinzeln = Federfarbe
+ERLAUBT = F.umriss_farben(spr)                             # Umrissfarben der Quelle (Randpixel-Test)
+AUGEN = [(6, 9), (8, 9)]
+assert all(tuple(spr[y, x, :3]) == (0, 0, 0) for x, y in AUGEN)
 
-# ── Farben (alle aus dem Sprite) ───────────────────────────────────────────────────────────────────────────────────
-UMRISS_VIOLETT, UMRISS_SCHWARZ, UMRISS_HUT, UMRISS_HAAR = (70, 46, 116), (0, 0, 0), (85, 85, 139), (49, 24, 0)
-ERLAUBT = {UMRISS_VIOLETT, UMRISS_SCHWARZ, UMRISS_HUT, UMRISS_HAAR}        # Umrissfarben der Quelle (Randpixel-Test)
-HAUT_A, HAUT_B = (246, 205, 139), (246, 189, 152)                          # Lid = Hautfarbe
-HUT_LID = (204, 204, 255)                                                  # Lid des Hut-Vogels = Federfarbe
-EBENEN_FARBE = {1: UMRISS_VIOLETT, 2: UMRISS_SCHWARZ, 3: UMRISS_HAAR, 4: UMRISS_HUT}
-AUGE_L = [(35, 31), (36, 31), (35, 32), (36, 32)]
-AUGE_R = [(39, 31), (40, 31), (39, 32), (40, 32)]
-HUT_AUGEN = [(37, 28), (39, 28)]
+# ── Teile (alle sofort auf die volle Leinwand legen, Regel 3) ──────────────────────────────────────────────────────────────
+fl_l = vorhanden & (xx <= 3) & (yy >= 5)
+fl_r = vorhanden & (xx >= 10) & (yy >= 5)
+tuft_l = vorhanden & (xx <= 4) & (yy <= 1)
+tuft_r = vorhanden & (xx >= 7) & (yy <= 1)
+rumpf = vorhanden & ~fl_l & ~fl_r & ~tuft_l & ~tuft_r
 
 
-def px(x, y):
-    return PAD_L + x, PAD_T + y
+def teil(m):
+    t, _ = L.trenne(spr, m)
+    return L.platz(t, H, W, PAD_L, PAD_T)
 
 
-# ── Flügelschlag ─────────────────────────────────────────────────────────────────────────────────────────────────────
-FL_AMP, FL_POT, FL_HEBEN, FL_LAG = 13.0, 1.15, 2.2, 1.2
+FL_L, FL_R, TF_L, TF_R, RUMPF = teil(fl_l), teil(fl_r), teil(tuft_l), teil(tuft_r), teil(rumpf)
+assert (L.zusammen(H, W, [(a, 0, 0) for a in (RUMPF, FL_L, FL_R, TF_L, TF_R)])[PAD_T:PAD_T + sh, PAD_L:PAD_L + sw] == spr).all()
+
+BEAT = 8                                                   # Flügelschlag: 6 Schläge pro Schleife
+FL_AMP, FL_LAUF = 1.7, 0.8
 
 
-def welle(t):
-    """Schlagphase 0 (Flügel oben) … 1 (unten): Abschlag in DOWN Frames, Aufschlag in BEAT − DOWN Frames; an den Wendepunkten weich (Cosinus)."""
-    u = t % BEAT
-    if u < DOWN:
-        return 0.5 - 0.5 * math.cos(math.pi * u / DOWN)
-    return 0.5 + 0.5 * math.cos(math.pi * (u - DOWN) / (BEAT - DOWN))
+def sinz(i, per, ph=0.0):
+    return math.sin(2 * math.pi * i / per + ph)
 
 
-def fluegel(ebene, pivot_x, t):
-    """Flügel schlagen: Spalte mit Abstandsanteil f wandert um FL_AMP·s·f^POT nach unten (s = verzögerte Schlagphase) und am oberen Wendepunkt bis FL_HEBEN px nach oben."""
-    def dy(f):
-        s = welle(t - FL_LAG * f)
-        return FL_AMP * s * f ** FL_POT - FL_HEBEN * (1.0 - s) * f
-    return B.spalten_schub(ebene, pivot_x, dy)
+def tuft_dx(i, per, ph):
+    """Schwanzfeder zuckt: −1 / 0 / +1 px (nur ganze Pixel); Frame 0 steht still."""
+    s = sinz(i, per, ph) - sinz(0, per, ph)
+    return 0 if abs(s) < 0.7 else (1 if s > 0 else -1)
 
 
-# ── Flug: ganze Figur hebt/senkt sich im Takt ─────────────────────────────────────────────────────────────────────────
-BOB_AMP, BOB_MAX_T = 2.4, 7.0                              # px; Frame im Schlag, in dem die Figur am höchsten ist
+def blinz(i):
+    return i % 24 in (14, 15, 16)
 
 
-def bob(t):
-    """Versatz der Figur in px (negativ = oben): hoch kurz nach dem Abschlag unten, tief am Ende des Aufschlags."""
-    return -int(round(BOB_AMP * math.cos(2 * math.pi * (t - BOB_MAX_T) / BEAT)))
-
-
-def fuss_versatz(t):
-    """Füße baumeln nach: 1,5 Frames verzögert und zu 60 % (nie höher als der Körper)."""
-    return max(bob(t), int(round(0.6 * bob(t - 1.5))))
-
-
-def blinzeln(i, starts, folge=(1, 2, 1)):
-    for s in starts:
-        k = (i - s) % N
-        if k < len(folge):
-            return folge[k]
-    return 0
-
-
-# ── Partikel: Federflocken, sinken langsam ─────────────────────────────────────────────────────────────────────────────
-FED_LAVENDEL = {'c': (204, 204, 255), 'r': (153, 102, 255)}
-FED_GRAU = {'c': (158, 158, 158), 'r': (122, 122, 122)}
-PUFFS_L = [
-    dict(x=px(2, 20)[0], y=px(2, 20)[1], vx=-2, vy=15, off=0, form='k', wackeln=2),
-    dict(x=px(8, 34)[0], y=px(8, 34)[1], vx=1, vy=12, off=16, form='s', wackeln=2),
-    dict(x=px(20, 8)[0], y=px(20, 8)[1], vx=-1, vy=16, off=32, form='k', wackeln=2),
-    dict(x=px(-1, 30)[0], y=px(-1, 30)[1], vx=-1, vy=12, off=8, form='k', wackeln=1),
-]
-PUFFS_R = [
-    dict(x=px(73, 20)[0], y=px(73, 20)[1], vx=2, vy=15, off=24, form='k', wackeln=2),
-    dict(x=px(67, 34)[0], y=px(67, 34)[1], vx=-1, vy=12, off=40, form='s', wackeln=2),
-    dict(x=px(55, 8)[0], y=px(55, 8)[1], vx=1, vy=16, off=8, form='k', wackeln=2),
-    dict(x=px(76, 30)[0], y=px(76, 30)[1], vx=1, vy=12, off=0, form='k', wackeln=1),
-]
-TEST_EBENEN = ('fluegel', 'figur')                         # für den Randpixel-Test: ohne Partikel
-
-
-def frame(i, partikel=True, nur=None):
-    ebenen = nur if nur is not None else TEST_EBENEN
-    if nur is not None:
-        partikel = False
-    dy_u, dy_f = bob(i), fuss_versatz(i)
-    schichten = []
-    if 'fluegel' in ebenen:
-        schichten += [(fluegel(FL_L, PAD_L + 37, i), 0, dy_u, 1), (fluegel(FL_R, PAD_L + 38, i - 0.35), 0, dy_u, 2)]
-    if 'figur' in ebenen:
-        # Mädchen: Körper um dy_u, Beine um dy_f, Lücke dazwischen füllen doppelte Beinzeilen
-        maed = MAED_OBEN.copy()
-        beine = MAED_BEINE
-        if dy_f - dy_u > 0:
-            beine = L.streck_zeile(beine, CUT + 1, dy_f - dy_u)
-        # Blinzeln: Lid = Hautfarbe
-        b = blinzeln(i, (19, 41), (1, 2, 1))
-        if b:
-            for (x, y) in AUGE_L + AUGE_R:
-                if b == 2 or y == 31:
-                    maed[PAD_T + y, PAD_L + x, :3] = HAUT_A if y == 31 else HAUT_B
-        # Hut-Vogel: Seiten flattern (sechs Mal pro Schleife), Lid = Federfarbe
-        s_h = 0.5 - 0.5 * math.cos(2 * math.pi * i / 8.0)
-        hut = B.spalten_schub(HUT, PAD_L + 37, lambda f: 1.4 * s_h * f)
-        if blinzeln(i, (30,), (1, 1, 1)):
-            for (x, y) in HUT_AUGEN:
-                hut[PAD_T + y, PAD_L + x, :3] = HUT_LID
-        # Haare/Arme pendeln leicht (links Periode 16, rechts 24)
-        arm_l = L.zeilen_welle(ARM_L, PAD_T + 29, 1.3, L.sinus(i, 16.0, 0.5))
-        arm_r = L.zeilen_welle(ARM_R, PAD_T + 29, 1.3, L.sinus(i, 24.0, 2.0))
-        # Gürtelschnalle (Metall): kleiner Glitzerstern
-        schichten += [(maed, 0, dy_u, 3), (beine, 0, dy_f, 3), (hut, 0, dy_u, 4), (arm_l, 0, dy_u, 3), (arm_r, 0, dy_u, 3)]
-    f, karte = B.zusammen_mit_karte(H, W, schichten)
-    if 'figur' in ebenen:
-        for start in (10, 34):
-            st = F.stern_stufe(i, N, start, (0, 1, 0))
-            if st is not None:
-                F.stern(f, PAD_L + 38, PAD_T + 42 + dy_u, st, (246, 255, 255), (207, 207, 0))
-    B.umriss_je_ebene(f, karte, ERLAUBT, EBENEN_FARBE)
-    if partikel:
-        p_l = L.puff_ebene(H, W, i, N, PUFFS_L, FED_LAVENDEL)
-        p_r = L.puff_ebene(H, W, i, N, PUFFS_R, FED_GRAU)
-        f = L.zusammen(H, W, [(p_l, 0, 0), (p_r, 0, 0), (f, 0, 0)])
+def frame_gross(i):
+    ph = 2 * math.pi * i / BEAT
+    fl_l_ = F.fluegel_welle(FL_L, PAD_L + 4, FL_AMP, ph, nur_rechts=False, lauf=FL_LAUF, zusammenhang=True)
+    fl_r_ = F.fluegel_welle(FL_R, PAD_L + 9, FL_AMP, ph, nur_rechts=True, lauf=FL_LAUF, zusammenhang=True)
+    rumpf_ = RUMPF.copy()
+    if blinz(i):
+        for (x, y) in AUGEN:
+            rumpf_[PAD_T + y, PAD_L + x, :3] = FEDER
+    tl = L.versetze(TF_L, tuft_dx(i, 12, 0.0), 0)
+    tr = L.versetze(TF_R, tuft_dx(i, 16, 1.3), 0)
+    f = L.zusammen(H, W, [(fl_l_, 0, 0), (fl_r_, 0, 0), (tl, 0, 0), (tr, 0, 0), (rumpf_, 0, 0)])
+    # Schweben: Abschlag hebt den Vogel 1 px (Periode 8); dazu langsames Pendeln waagerecht ±1 (Periode 24) — alles ganze Pixel, Frame 0 = Ruhe
+    dy = -1 if math.sin(ph) > 0.5 else 0
+    dx = int(round(sinz(i, 24)))
+    f = L.versetze(f, dx, dy)
+    B.umriss_je_ebene(f, np.ones((H, W), np.int16), ERLAUBT, {1: UMRISS})        # Randpixel-Test (Regel 16)
     return f
+
+
+_ALLE = [frame_gross(i) for i in range(N)]
+_u = np.stack([f[..., 3] > 0 for f in _ALLE]).any(axis=0)
+_ys, _xs = np.nonzero(_u)
+BOX = (int(_xs.min()) - 2, int(_ys.min()) - 2, int(_xs.max()) + 3, int(_ys.max()) + 3)       # Vereinigung aller Frames + 2 px Rand (nie abschneiden, Regel 3/27)
+assert BOX[0] >= 0 and BOX[1] >= 0 and BOX[2] <= W and BOX[3] <= H, BOX
+
+
+def frame(i, partikel=True, effekte=True):
+    x0, y0, x1, y1 = BOX
+    return frame_gross(i)[y0:y1, x0:x1].copy()
 
 
 if __name__ == '__main__':
     frames = [frame(i) for i in range(N)]
     prev = sys.argv[sys.argv.index('--preview') + 1] if '--preview' in sys.argv else None
-    quelle = np.concatenate([a.reshape(-1, 4) for a in (spr, fl, L.lade('cute-bird-maedchen'), L.lade('cute-bird-hut'), arme)])   # alle Ebenen (auch Verdecktes)
-    n = L.pruefe(frames, quelle=quelle)
+    n = L.pruefe(frames, quelle=spr)
     print('Pixel je Frame:', n)
     L.speichern('cute-bird', 'Cute Bird', frames, MS, prev)
     if prev:
-        L.streifen(prev + '/cute-bird-strip.png', frames, spalten=8, scale=4)
+        L.streifen(prev + '/cute-bird-strip.png', frames, spalten=12, scale=8)

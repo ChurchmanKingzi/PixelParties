@@ -18,8 +18,11 @@ Was ist was (x/y im Sprite):
 Fest bleiben: Körperform, Kopf, Augenform im Ruhebild, Beine (soweit nicht unten angegeben).
 
 Ablauf (48 Frames à 70 ms = 3,36 s; Frame 0 = Original):
-* Flügelflattern: beide Flügel zusammen neigen sich aus dem Gelenk (y 17): Zeilengruppen (y 0–2, 3–5, 6–8, 9–11, 12–14, 15–16) wandern bis ±2 px waagerecht (wächst zur Spitze, benachbarte Gruppen ≤ 1 px verschieden),
-  Periode 12, viermal pro Schleife; Leib und Beine stehen dabei.
+* Flügelschlag (RUNDE 2, Nutzer: „die beiden Auswüchse oben sollen Flügel darstellen“): Die beiden Fächer sind Vorder- (links, x 6–16, y 0–16) und Hinterflügel (rechts, x 15–23, y 3–16) eines
+  Insekts; sie stehen im Original senkrecht. Jetzt schlagen beide als Flügelpaar um ihre Wurzel (Zeile 16, direkt über dem Rumpf): jeder Flügel kippt abwechselnd nach vorn (zum Kopf) und nach hinten (zum Hinterleib),
+  ±30° (Flügelspitze ±8 px, senkt sich dabei bis 2 px), Periode 8 Frames (sechsmal pro Schleife). Kein Drehen von Pixelfeldern: die Zeilen werden starr verschoben (Versatz round(h·sin θ), Gefälle ≤ 1 px je Zeile)
+  und senkrecht nächster-Nachbar gestaucht (Zeilen fallen aus, h·cos θ) — Rippen und Umrisse bleiben ganze Pixel. Der Flügel biegt sich dabei: die Spitze hinkt der Wurzel hinterher (Vorderflügel 0,5 rad, Hinterflügel 0,9 rad),
+  Frame 0 = Ruhepose = Original. Der Vorderflügel liegt beim Überlappen vor dem Hinterflügel. Leib und Beine stehen dabei.
 * Schweben: die ganze Figur hebt und senkt sich ±1 px (Periode 24, zweimal pro Schleife).
 * Hinterleib wippt: die Hinterleibspitze (x ≥ 27, y ≤ 19) hebt/senkt sich ±1 px (Periode 16).
 * Brocken schwingt wie ein Pendel: ±1 px waagerecht (Periode 24) und ±1 px senkrecht (Periode 16), solange er die Beine (4er-Kontakt) berührt, sonst bleibt er in der berührenden Lage; wo er die Beine verdeckte, kommt das Bein darunter wieder zum Vorschein (Beine aus der Körperebene).
@@ -40,6 +43,9 @@ import anim_lib as L
 import anim_untote as U
 
 N, MS = 48, 70
+FL_PERIODE = 8                                                 # Flügelschlag: sechsmal pro Schleife
+FL_WINKEL = math.radians(30.0)                                 # Kippwinkel ± gegen die Senkrechte
+WURZEL = 16                                                    # letzte Flügelzeile (bleibt stehen, sitzt am Rumpf)
 GPL, GPR, GPT, GPB = 6, 6, 6, 5
 
 spr = L.lade('gatherer-from-the-cosmic-depths')
@@ -63,12 +69,15 @@ assert int(augen.sum()) == 4
 
 # Teile des Körpers (Masken im Körper-Sprite)
 fluegel = vk & (((yy <= 15) & (xx >= 6) & (xx <= 23)) | ((yy == 16) & (xx >= 8) & (xx <= 21)))
+# Grenze zwischen Vorder- (links) und Hinterflügel (rechts): letzte Spalte des Vorderflügels je Zeile (die hellgrüne/olive Außenlinie des Vorderflügels, rechts davon beginnt der Hinterflügel)
+XB = [16, 16, 16, 16, 15, 14, 13, 12, 12, 12, 13, 13, 14, 14, 14, 14, 14]
+vorder = fluegel & np.array([[x <= XB[y] if y <= WURZEL else False for x in range(sw)] for y in range(sh)])
+hinter = fluegel & ~vorder
 schwanz = vk & (xx >= 27) & (yy <= 19)
 beine_r = vk & (xx >= 17) & (xx <= 26) & (yy >= 26)
 beine_m = vk & (xx >= 12) & (xx <= 16) & (yy >= 26)
 rest = vk & ~fluegel & ~schwanz & ~beine_r & ~beine_m & ~augen
 assert not (fluegel & schwanz).any()
-GRUPPEN = [(0, 2), (3, 5), (6, 8), (9, 11), (12, 14), (15, 16)]
 
 BLINZ = {13, 14, 15, 37, 38, 39}
 
@@ -78,7 +87,7 @@ def teil(a, maske):
     return L.platz(t, H, W, GPL, GPT)                           # sofort auf die volle Leinwand
 
 
-FL_A, SCH_A, BR_A, BM_A, RE_A, AU_A = teil(spr_k, fluegel), teil(spr_k, schwanz), teil(spr_k, beine_r), teil(spr_k, beine_m), teil(spr_k, rest), teil(spr_k, augen)
+VF_A, HF_A, SCH_A, BR_A, BM_A, RE_A, AU_A = teil(spr_k, vorder), teil(spr_k, hinter), teil(spr_k, schwanz), teil(spr_k, beine_r), teil(spr_k, beine_m), teil(spr_k, rest), teil(spr_k, augen)
 ST_A = teil(spr, stein)
 
 
@@ -86,15 +95,35 @@ def sinz(i, per, ph=0.0):
     return math.sin(2 * math.pi * i / per + ph)
 
 
-def fluegel_flattern(a, aus):
-    """Flügel neigen sich aus dem Gelenk (Zeile y 17): der Versatz wächst mit dem Abstand der Zeilengruppe; die Zeilen einer Gruppe verschieben sich gleich."""
+def fluegel_kippen(a, theta0, lauf, ph):
+    """Flügel kippt um die Wurzelzeile (GPT + WURZEL): der Kippwinkel an der Höhe h über der Wurzel ist
+    θ(h) = θ0·(sin(ph − lauf·h/H) − sin(−lauf·h/H)) — die Spitze hinkt der Wurzel hinterher, bei ph = 0 steht alles senkrecht (Ruhepose = Original).
+    Jede Zeile wird starr um round(h·sin θ) waagerecht versetzt und senkrecht nächster-Nachbar gestaucht (Quellhöhe wächst um 1/cos θ je Ausgabezeile):
+    keine gedrehten Pixelfelder, Rippen/Umrisse bleiben ganz; Versatzgefälle ≤ 1 px je Zeile (Zusammenhang bleibt 4-verbunden)."""
     out = L.leer(*a.shape[:2])
-    for (y0, y1) in GRUPPEN:
-        dx = int(round(aus * (17 - (y0 + y1) / 2.0) / 17.0))
-        for y in range(y0, y1 + 1):
-            gy = GPT + y
-            for x in np.nonzero(a[gy, :, 3])[0]:
-                out[gy, x + dx] = a[gy, x]
+    yw = GPT + WURZEL
+    zeilen = np.nonzero(a[..., 3].any(axis=1))[0]
+    top = int(zeilen.min())
+    hm = yw - top
+    hs, k, dx_alt = 0.0, 0, 0
+    while True:
+        f = min(1.0, hs / hm) if hm else 0.0
+        th = theta0 * (math.sin(ph - lauf * f) - math.sin(-lauf * f))
+        ys = yw - int(round(min(hs, hm)))
+        dx = int(round(min(hs, hm) * math.sin(th)))
+        dx = max(dx_alt - 1, min(dx_alt + 1, dx))                 # Gefälle ≤ 1 px je Zeile
+        dx_alt = dx
+        xs_ = np.nonzero(a[ys, :, 3])[0]
+        for x in xs_:
+            if not (0 <= x + dx < a.shape[1] and 0 <= yw - k < a.shape[0]):
+                raise L.ClipError('Flügelpixel würde aus der Leinwand ragen')
+            out[yw - k, x + dx] = a[ys, x]
+        if hs >= hm:
+            break
+        k += 1
+        hs += 1.0 / max(0.5, math.cos(th))
+        if hs > hm:
+            hs = hm                                               # letzte Ausgabezeile = oberste Quellzeile (Umrisslinie oben bleibt erhalten)
     return out
 
 
@@ -103,8 +132,9 @@ def _k4(a):
 
 
 def frame_gross(i, nur=None):
-    aus = 2.2 * sinz(i, 12)                                       # 0 bei Frame 0
-    fl = fluegel_flattern(FL_A, aus)
+    ph = 2 * math.pi * i / FL_PERIODE                             # Flügelschlag (0 bei Frame 0)
+    vf = fluegel_kippen(VF_A, FL_WINKEL, 0.5, ph)
+    hf = fluegel_kippen(HF_A, FL_WINKEL, 0.9, ph)
     bob = int(round(1.0 * sinz(i, 24)))
     sw_ = int(round(1.0 * sinz(i, 16)))
     br = -1 if (i % 16) in (2, 3, 4) else 0
@@ -114,7 +144,7 @@ def frame_gross(i, nur=None):
         au[au[..., 3] > 0, :3] = KOPF_SCHWARZ
     sx = int(round(sinz(i, 24)))
     sy = int(round(sinz(i, 16)))
-    koerper = L.zusammen(H, W, [(BR_A, 0, br), (BM_A, 0, bm), (RE_A, 0, 0), (au, 0, 0), (fl, 0, 0), (SCH_A, 0, sw_)])
+    koerper = L.zusammen(H, W, [(BR_A, 0, br), (BM_A, 0, bm), (RE_A, 0, 0), (au, 0, 0), (hf, 0, 0), (vf, 0, 0), (SCH_A, 0, sw_)])
     koerper = U.kontur_schliessen(koerper, UMRISS, KOPF_SCHWARZ)
     # Brocken: gewünschter Pendelversatz; reißt dabei der 4er-Kontakt zu den Beinen ab (Brocken würde schweben), nimmt er den nächstbesten Versatz, der die Beine berührt
     kandidaten = []

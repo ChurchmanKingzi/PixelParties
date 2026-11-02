@@ -22,18 +22,20 @@ Identifikation (Sprite-Koordinaten x, y):
   Farben (185,69,29)/(232,138,54)/(97,39,33)/(65,39,33), Umriss (45,27,30).
 * Beine: schwarze Bögen links und rechts der Brust (x 6–27, y 9–27).
 
-Ablauf (48 Frames à 60 ms = 2,88 s):
-* Schwebe-Bob zweistufig bis 2 px nach oben (0 → 1 → 2 → 1 → 0, Periode 12), die Krone folgt etwas später.
-* Die beiden Seitenplatten (Arme/Schilde) schwingen gegenläufig: die Unterkante wandert −1 … +2 px (Periode 24; in einer Füllzeile werden Zeilen verdoppelt/entnommen, Oberkante, Umriss
-  und Muster bleiben, F.heben_unten bzw. Zeileneinschub).
-* Der Hinterleib pulsiert: er wird beim Einatmen 1 px länger (Periode 24, eine Streifenzeile wird verdoppelt).
-* Blinzeln (Frames 33–34): die Augen werden zur Körperfarbe (42,27,14) (Lid = Körperfarbe).
-* Glanz NUR an Metall/Gold/Edelsteinen: Krone — dezentes Lichtband über das Gold (eine Stufe heller, alle 24 Frames), die Edelsteine pulsieren (dunkelrot ↔ rot), zwei vierzackige weiße
+Ablauf (48 Frames à 60 ms = 2,88 s) — Runde 2, Nutzerfeedback „Krone und Thron sollen sich nicht bewegen“:
+* KRONE und THRON (= die ganze Rüstung: Kuppel mit weißen Perlen, Mittelplatte, beide orangenen Seitenplatten) sind in jedem Frame EXAKT das Quellbild an derselben Stelle (kein Bob, keine Seitenplatten-Bewegung,
+  kein Nachlauf); ein Test im Skript (STATISCH-Test) prüft das Pixel für Pixel. Die Königin SITZT auf dem Thron: kein Schweben mehr (Regel 18).
+* Nur die Königin selbst lebt (Körper-Ebene und Fühler), alles innerhalb ihrer Silhouette:
+  - Atmen in zwei Stufen: Brustkorb (Zeile 18, schwarze Brust) und Hinterleib (Streifenzeile 26) werden je bis zu 1 px länger (Periode 24, der Hinterleib mit Nachlauf); Kopf, Fühleransatz und Krone bleiben stehen,
+    der Hinterleib sackt 0 … 2 px nach unten (nur Zeilen unterhalb der Einfügezeile rücken, nichts wird breiter).
+  - Fühler zucken: die beiden Fühler (links (10–13,5–9), rechts (20–23,5–9)) schwenken ab Zeile 7 um 1 px nach außen/innen (links Periode 24, rechts Periode 16, Gefälle ≤ 1 px, 8-verbunden wie im Original).
+  - Blinzeln (Frames 33–34): die Augen werden zur Körperfarbe (42,27,14) (Lid = Körperfarbe, Regel 21).
+* Glanz NUR an Metall/Gold/Edelsteinen (Regel 12/14), an der FESTEN Krone: dezentes Lichtband über das Gold (eine Stufe heller, alle 24 Frames), die Edelsteine pulsieren (dunkelrot ↔ rot), zwei vierzackige weiße
   Glitzersterne wechseln sich an den Kronenspitzen ab. Rüstung, Körper, Fühler und Beine glänzen nicht.
-* Funken: drei kleine runde goldene Punkte (k, s) steigen langsam von der Krone auf und schwinden.
+* Keine Partikel mehr (die früheren goldenen Funken über der Krone sind weg: Regel 25 verbietet 1-px-Punkte, und die Krone soll ruhen).
 
-Ergänzungen: keine nötig — die Ebenen sind vollständig (Körper unter Krone/Rüstung, Platten komplett).
-Rahmen: auf die Figur zugeschnitten (Vereinigung aller Frames + 1 px freier Rand), Sterne/Funken ragen höchstens 3 px über die Figur hinaus.
+Ergänzungen: keine nötig — die Ebenen sind vollständig (Körper unter Krone/Rüstung, Platten komplett); die Einfügezeilen kopieren nur vorhandene Körperzeilen.
+Rahmen: auf die Figur zugeschnitten (Vereinigung aller Frames + 2 px freier Rand), die Sterne ragen höchstens 3 px über die Figur hinaus.
 Randpixel-Test (Regel 16): Zeileneinschub und Hinterleib lassen die Umrissfarbe an den Rändern; F.umranden prüft zusätzlich jedes Frame; zusätzlich randtest.py.
 Alle Bewegungen laufen auf der vollen (größeren) Arbeitsleinwand (anim_lib wirft ClipError). Nur ganze Pixel, nur Farben der Quelle, Alpha nur 0/255.
 """
@@ -92,10 +94,23 @@ def px(x, y):
     return PAD_L + x, PAD_T + y
 
 
-FUNKEN = {'c': GOLD_H, 'r': GOLD_D}
-PUFFS = [dict(x=px(14, 0)[0], y=px(14, 0)[1], vx=-1, vy=-4, off=0, form='k', wackeln=1),
-         dict(x=px(19, 0)[0], y=px(19, 0)[1], vx=1, vy=-4, off=16, form='s', wackeln=1),
-         dict(x=px(17, 0)[0], y=px(17, 0)[1], vx=0, vy=-4, off=32, form='k', wackeln=1)]
+# Fühler (Körper-Ebene, Sprite-Koordinaten): links (13,5) (12,5) (11,6) (11,7) (10,8) (10,9), rechts gespiegelt (20,5) (21,5) (22,6) (22,7) (23,8) (23,9)
+FUEHLER_L = ((xx <= 12) & (yy <= 9) & (S_KOERPER[..., 3] > 0)) | ((xx == 13) & (yy == 5) & (S_KOERPER[..., 3] > 0))
+FUEHLER_R = ((xx >= 21) & (yy <= 9) & (S_KOERPER[..., 3] > 0)) | ((xx == 20) & (yy == 5) & (S_KOERPER[..., 3] > 0))
+P_FL, P_FR = ebene(S_KOERPER, FUEHLER_L), ebene(S_KOERPER, FUEHLER_R)
+P_KOERPER = ebene(S_KOERPER, (S_KOERPER[..., 3] > 0) & ~FUEHLER_L & ~FUEHLER_R)
+P_STATISCH = L.zusammen(H, W, [(P_MITTE, 0, 0), (P_PL, 0, 0), (P_PR, 0, 0)])           # Thron: nie bewegt
+assert (L.zusammen(H, W, [(p, 0, 0) for p in (P_MITTE, P_PL, P_PR, P_KOERPER, P_FL, P_FR, P_BEINE, P_KRONE)])[PAD_T:PAD_T + sh, PAD_L:PAD_L + sw] == spr).all()
+Y_BRUST, Y_BAUCH = PAD_T + 18, PAD_T + 26                  # Einfügezeilen: Brustkorb (schwarz), Hinterleib (Streifen)
+
+
+def fuehler_schwenk(a, dx, ab_zeile=7):
+    """Fühler zuckt: alle Zeilen ab `ab_zeile` (Sprite-Zeile) wandern um dx (−1, 0, +1) waagerecht, die Wurzel (Zeilen darüber) bleibt — Gefälle ≤ 1 px, bleibt (8-)verbunden."""
+    out = L.leer(*a.shape[:2])
+    for y in range(a.shape[0]):
+        for x in np.nonzero(a[y, :, 3])[0]:
+            out[y, x + (dx if y >= PAD_T + ab_zeile else 0)] = a[y, x]
+    return out
 
 
 def streck_unten(a, zeile, n):
@@ -111,49 +126,76 @@ def streck_unten(a, zeile, n):
     return a[rows].copy()
 
 
-def frame(i, partikel=True, effekte=True):
-    u = lambda t: (1 - math.cos(2 * math.pi * t / (N / 4))) / 2     # Bob: Periode 12
-    bob = -int(round(2 * u(i)))                                # 0 → −1 → −2 → −1 → 0 (nur nach oben, zweistufig)
-    kron = -int(round(2 * u(i - 1.3))) + int(round(2 * u(-1.3)))   # Krone folgt später (Frame 0 = Ruhe)
-    ph = L.sinus(i, N / 2)
-    arm_l = int(round(1.5 * math.sin(ph))) - 0
-    arm_r = int(round(1.5 * math.sin(ph + math.pi)))
-    bauch = int(round(1.2 * (1 - math.cos(ph)) / 2))           # Hinterleib 0 … 1 px länger
+def frame(i, partikel=True, effekte=True, nur=None):
+    if nur:                                                    # Randpixel-Test: ohne Glanz/Sterne (die weißen Sterne sind gewollte Effekte an der Krone)
+        effekte = False
+    ph = L.sinus(i, N / 2)                                     # Atmen: Periode 24
+    n_brust = int(round(1.1 * (1 - math.cos(ph)) / 2))         # Brustkorb 0 … 1 px länger
+    n_bauch = int(round(1.1 * (1 - math.cos(ph - 0.9)) / 2))   # Hinterleib hinterher: 0 … 1 px länger
+    dx_l = int(round(1.2 * math.sin(L.sinus(i, N / 2))))       # Fühler links: Periode 24
+    dx_r = int(round(1.2 * math.sin(L.sinus(i, N / 3))))       # Fühler rechts: Periode 16
 
-    mitte, pl, pr = P_MITTE.copy(), P_PL.copy(), P_PR.copy()
+    mitte, pl, pr = P_MITTE.copy(), P_PL.copy(), P_PR.copy()                    # Thron: unverändert
     koerper, beine, krone = P_KOERPER.copy(), P_BEINE.copy(), P_KRONE.copy()
+    fl, fr = P_FL.copy(), P_FR.copy()
 
     if i in (33, 34):                                          # Blinzeln: Lid = Körperfarbe
         F.setze(koerper, PAD_L, PAD_T, {p: KOERPER for p in AUGEN})
-    if effekte:
+    if effekte:                                                # Glanz nur an der Krone (Gold, Edelsteine)
         F.lichtband(krone, gold_maske, PAD_L, PAD_T, i, N // 2, 6, 8, [GOLD_D, GOLD_H], stufen=1, breite=3.0, achse=(1.0, 0.8))
         for (x, y) in gem_pix:                                 # Edelsteine pulsieren
             c = GEM_H if F.puls(i, N, x, y, periode=4, versatz=0.9) else GEM_D
             krone[PAD_T + y, PAD_L + x, :3] = c
 
-    # Seitenplatten: Unterkante wandert, Oberkante/Umriss bleiben (Füllzeile y 19 wird verdoppelt/entnommen)
-    pl = streck_unten(pl, PAD_T + 19, arm_l)
-    pr = streck_unten(pr, PAD_T + 19, arm_r)
-    koerper = streck_unten(koerper, PAD_T + 26, bauch)         # Hinterleib atmet (Streifenzeile)
+    # Atmen: Brustkorb und Hinterleib werden länger (alles unterhalb der Einfügezeile rückt nach unten, Kopf bleibt)
+    koerper = streck_unten(koerper, Y_BRUST, n_brust)
+    koerper = streck_unten(koerper, Y_BAUCH + n_brust, n_bauch)
+    fl, fr = fuehler_schwenk(fl, dx_l), fuehler_schwenk(fr, dx_r)
 
-    mitte, pl, pr, koerper, beine = (L.versetze(a, 0, bob) for a in (mitte, pl, pr, koerper, beine))
-    krone = L.versetze(krone, 0, bob + kron)
-    f = L.zusammen(H, W, [(mitte, 0, 0), (pl, 0, 0), (pr, 0, 0), (koerper, 0, 0), (beine, 0, 0), (krone, 0, 0)])
-    F.umranden(f, [pl, pr], UMRISS, RUESTRAND, RUESTRAND, RUESTRAND)             # Randpixel-Test (Regel 16)
-    F.umranden(f, [beine, koerper], UMRISS, (0, 0, 0), (0, 0, 0), (0, 0, 0))     # freiliegende Beinspitzen/Körperränder: Schwarz
+    f = L.zusammen(H, W, [(mitte, 0, 0), (pl, 0, 0), (pr, 0, 0), (koerper, 0, 0), (fl, 0, 0), (fr, 0, 0), (beine, 0, 0), (krone, 0, 0)])
+    F.umranden(f, [beine, koerper, fl, fr], UMRISS, (0, 0, 0), (0, 0, 0), (0, 0, 0))     # freiliegende Beinspitzen/Körperränder: Schwarz
     if effekte:
-        for k, (sx, sy) in enumerate(STERNE):                  # Glitzersterne nur an der Gold-Krone
+        for k, (sx, sy) in enumerate(STERNE):                  # Glitzersterne nur an der Gold-Krone (fest)
             st = F.stern_stufe(i, N // 2, 4 + 12 * k)
             if st is not None:
-                F.stern(f, PAD_L + sx, PAD_T + sy + bob + kron, st, WEISS, WEISS)
-    if partikel:
-        pol = L.puff_ebene(H, W, i, N, PUFFS, FUNKEN)
-        f = L.zusammen(H, W, [(f, 0, 0), (pol, 0, 0)])
+                F.stern(f, PAD_L + sx, PAD_T + sy, st, WEISS, WEISS)
     return f
 
 
+def koenigin_ebenen(i):
+    """Die bewegten Ebenen der Königin (Körper, Fühler, Beine) in Frame i (ohne Thron/Krone) — für den Test."""
+    ph = L.sinus(i, N / 2)
+    n_brust = int(round(1.1 * (1 - math.cos(ph)) / 2))
+    n_bauch = int(round(1.1 * (1 - math.cos(ph - 0.9)) / 2))
+    k = streck_unten(streck_unten(P_KOERPER.copy(), Y_BRUST, n_brust), Y_BAUCH + n_brust, n_bauch)
+    return k, P_BEINE, *[fuehler_schwenk(e, d) for e in (P_FL, P_FR) for d in (-1, 0, 1)]
+
+
+TEST_EBENEN = ['koerper']
+
+
+def statisch_test(frames):
+    """STATISCH-Test: Thron (Rüstung) und Krone sind in JEDEM Frame pixelgleich dem Quellbild. Thronpixel außerhalb der Fläche, die die Königin (Körper/Fühler/Beine) in irgendeinem Frame
+    bedeckt, haben in allen Frames exakt die Quellfarbe; jedes Kronenpixel steht in jedem Frame an seiner Quellposition (die Farbe darf durch Glanz/Edelsteinpuls eine Stufe wechseln)."""
+    flaeche = np.zeros((H, W), bool)
+    for i in range(N):
+        for e in koenigin_ebenen(i):
+            flaeche |= e[..., 3] > 0
+    thron = (P_STATISCH[..., 3] > 0) & ~flaeche & ~(P_KRONE[..., 3] > 0)
+    kr = P_KRONE[..., 3] > 0
+    for k, f in enumerate(frames):
+        assert (f[thron, 3] > 0).all() and (f[thron, :3] == P_STATISCH[thron, :3]).all(), f'Frame {k}: Thron verändert'
+        assert (f[kr, 3] > 0).all(), f'Frame {k}: Krone verändert (Pixel fehlt)'
+        # kein Kronenpixel an anderer Stelle: alle Pixel oberhalb der Krone/des Throns, die nicht Stern sind, fehlen
+        oben = np.zeros((H, W), bool)
+        oben[:PAD_T + 5] = True
+        fremd = (f[..., 3] > 0) & oben & ~kr & ~(P_FL[..., 3] > 0) & ~(P_FR[..., 3] > 0)
+        assert fremd.sum() <= 12, f'Frame {k}: Fremdpixel über der Krone: {int(fremd.sum())}'
+    print('STATISCH-Test bestanden: Thron (', int(thron.sum()), 'sichtbare Pixel) und Krone ( 48 Frames) an ihrer Quellposition; Fläche der Königin:', int(flaeche.sum()), 'px')
+
+
 def zuschneiden(frames, koerper_frames, max_ueber=3):
-    """Frame auf die Figur zuschneiden: Vereinigung aller Frames + 1 px freier Rand; Effekte ragen höchstens max_ueber px über die Körper-Frames hinaus."""
+    """Frame auf die Figur zuschneiden: Vereinigung aller Frames + 2 px freier Rand; Effekte ragen höchstens max_ueber px über die Körper-Frames hinaus."""
     def bbox(fs):
         a = np.stack([f[..., 3] > 0 for f in fs]).any(axis=0)
         ys, xs = np.nonzero(a)
@@ -163,16 +205,17 @@ def zuschneiden(frames, koerper_frames, max_ueber=3):
     ueber = (bx0 - ex0, by0 - ey0, ex1 - bx1, ey1 - by1)
     print('Figur (Körper-Frames) x', bx0, '…', bx1, 'y', by0, '…', by1, '| Effekte ragen hinaus (links, oben, rechts, unten):', ueber)
     assert max(ueber) <= max_ueber, f'Effekte ragen mehr als {max_ueber} px über die Figur: {ueber}'
-    x0, y0, x1, y1 = ex0 - 1, ey0 - 1, ex1 + 1, ey1 + 1
+    x0, y0, x1, y1 = ex0 - 2, ey0 - 2, ex1 + 2, ey1 + 2
     return [f[y0:y1 + 1, x0:x1 + 1].copy() for f in frames]
 
 
 if __name__ == '__main__':
     koerper_frames = [frame(i, False, False) for i in range(N)]
     frames = [frame(i) for i in range(N)]
+    statisch_test(frames)
     frames = zuschneiden(frames, koerper_frames)
     prev = sys.argv[sys.argv.index('--preview') + 1] if '--preview' in sys.argv else None
-    n = L.pruefe(frames, quelle=spr, min_rand=1)
+    n = L.pruefe(frames, quelle=spr)
     print('Pixel je Frame:', n)
     L.speichern('sparkfly-queen', 'Sparkfly Queen', frames, MS, prev)
     if prev:

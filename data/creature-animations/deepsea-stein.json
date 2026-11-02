@@ -2,14 +2,14 @@
   "creature": "Deepsea Stein",
   "sheet": "deepsea-stein.png",
   "frameWidth": 23,
-  "frameHeight": 29,
+  "frameHeight": 36,
   "frames": 48,
   "frameMs": 70,
   "loop": true,
   "layout": "horizontal",
-  "padTop": 1,
+  "padTop": 2,
   "padLeft": 2,
-  "padRight": 1,
+  "padRight": 2,
   "padBottom": 2,
   "faceX": 11.5
 }

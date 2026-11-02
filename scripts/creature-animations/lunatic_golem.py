@@ -1,30 +1,37 @@
 # -*- coding: utf-8 -*-
-"""Idle-Animation für „Lunatic Golem“ (Creature) — Regeln 14/15/16 (Gold: Glanz erlaubt; kein Feuer).
+"""Idle-Animation für „Lunatic Golem“ (Creature) — Runde 2: schwer, am Boden, gemächlich, halbtransparent.
 
 PICK: [["MotiveGN", 215, 1]]
-Quelle: src/lunatic-golem.png — schwebender Gold-Golem (22×26 px, 6 Farben) aus MotiveGN.xcf, Ebene 215 („Lunatic Golem“, Ebenendeckkraft 50 %, unsichtbar geschaltet), vollständig deckend (Alpha nur 255), nichts ging
-verloren. Der Layer fand sich nicht über den Pixelabgleich der Kartenkunst (Ebene wird dort mit 50 % Deckkraft und Leuchten eingeblendet: die Karte zeigt ihn weich und gelb verwaschen), sondern über den Ebenennamen in der xcf.
-Die Kartenkunst (152×102 px, 2×2-Blöcke) zeigt dieselbe Figur: Kopf mit hellem Kern, zwei Schulterkugeln, helle Bauchkugel, zwei Fäuste, zwei Füße (Abgleich bestanden).
+Quelle: src/lunatic-golem.png — Gold-Golem (22×26 px, 6 Farben) aus MotiveGN.xcf, Ebene 215 („Lunatic Golem“, Ebenendeckkraft 50 %), im Sprite voll deckend (Alpha nur 255), nichts ging verloren. Die Nachbarebenen
+(211–220 der xcf: Mond/Busch/Gras/andere Figuren) enthalten keine Teile des Golems; Abgleich mit der Kartenkunst (data/card-art/native/Lunatic_Golem.png, 152×102): Kopf mit hellem Kern, zwei Schulterkugeln,
+helle Bauchkugel, zwei Fäuste, zwei Füße — die Figur STEHT dort auf dem Gras (kein Schweben).
 
 Aufruf:   python3 lunatic_golem.py [--preview <ordner>]
-Ausgabe:  ../../data/creature-animations/lunatic-golem.png + .json  (Frame auf die Figur zugeschnitten)
+Ausgabe:  ../../data/creature-animations/lunatic-golem.png + .json (Frame auf die Figur zugeschnitten; JSON-Feld `deckkraft: 0.5` = im Spiel halbtransparent, der Sprite selbst hat nur Alpha 0/255)
 
-Identifikation (Sprite-Koordinaten x, y; Golem von vorn, schwebend):
-* Kopf (x 7–14, y 0–5) mit hellem Kern, Schultern (x 3–18, y 5–8), Rumpf (x 6–15, y 9–20) mit heller Bauchkugel (x 8–13, y 14–20), seitlich zwei Arme/Fäuste (x 0–4 und 17–21, y 8–20), unten zwei Füße (x 3–8 und 13–18, y 22–25).
-* Farben: Goldrampe von dunkel nach hell (213,170,33) Umriss, (244,196,38), (244,214,66), (249,238,103), (250,242,130), (249,246,199); die helle Spitze = die Kugeln der Kartenkunst.
-* Keine Flügel im Sprite (der Golem schwebt): also kein Flügelschlag.
+Nutzerfeedback (wörtlich): „soll schwer am Boden stehen, sich gemächlich bewegen und halbtransparent sein.“
+→ kein Schweben mehr (kein Hover-Bob, kein Pendeln der ganzen Figur), die Füße bleiben die ganze Schleife über auf dem Boden; alles läuft langsam (64 Frames à 90 ms = 5,76 s); halbtransparent über
+`extra={'deckkraft': 0.5}`.
 
-Ablauf (48 Frames à 60 ms = 2,88 s):
-* Schwebe-Bob zweistufig bis 2 px nach oben (0 → 1 → 2 → 1 → 0, Periode 12) und langsames seitliches Pendeln der ganzen Figur um ±1 px (Periode 24, nur ganze Pixel).
-* Die Füße baumeln nach (die Reihen 22–25 pendeln um die Unterkante des Rumpfs bis 1–2 px, Periode 12, verzögert); die Unterarme/Fäuste (Reihen 13–20) schwingen im Takt des Bobs bis 1 px nach außen.
-* Glanz auf dem Gold (Regel 14): ein dezentes Lichtband (eine Stufe heller auf der Goldrampe) läuft zweimal pro Schleife (alle 24 Frames) über Kopf, Rumpf, Arme und Füße; zwei kleine vierzackige Glitzersterne (Farbe (249,246,199),
-  die hellste Quellfarbe) blitzen abwechselnd auf den Armlinien auf. Der Umriss/Rand glänzt nicht.
+Identifikation (Sprite-Koordinaten x, y; Golem von vorn):
+* Kopf (x 7–14, y 0–5) mit hellem Kern (Kopfkugel), Schultern (x 3–18, y 5–8) mit zwei hellen Schulterkugeln (x 2–5 / 16–19, y 8–10), Rumpf (x 6–15, y 9–20) mit heller Bauchkugel (x 9–12, y 13–19), seitlich zwei
+  Arme/Fäuste (x 0–4 und 17–21, y 12–20; innen von einer 1–2 px breiten Umrisslinie bei x 5 / x 16 vom Rumpf getrennt), unten zwei Füße (x 3–9 und 12–18, y 22–25), Hüftlinie y 21.
+* Farben: Goldrampe von dunkel nach hell (213,170,33) Umriss, (244,196,38), (244,214,66), (249,238,103), (250,242,130), (249,246,199); die hellen Pixel in den vier Kugeln = Glanzkerne.
+* Keine Flügel, keine Waffe, keine Partikelquellen.
+
+Ablauf (64 Frames à 90 ms, Frame 0 = Original; alles langsam, die Figur wird nie leichter als die Füße es zulassen):
+* Atmen (Periode 32, zweimal je Schleife): Brust und Kopf heben sich langsam um 1 px (`L.streck_zeile` an Zeile 17 — mischt die Textur der Nachbarzeile in die eingefügte Zeile), halten oben, sinken wieder; die
+  Füße bleiben am Boden. Einmal je Schleife (Frame 46–54) setzt sich der Golem beim Ausatmen mit einem Seufzer 1 px unter die Ruhelage (Zeile 17 entfällt) — schwerer Körper, der „einsinkt“.
+* Arme/Fäuste: folgen dem Atem mit Nachlauf (5 Frames) 1 px nach außen und zurück (die Zeilen y 13–21 samt Innenumriss rücken waagerecht, die Fuge zum Rumpf wird mit der Umrissfarbe (213,170,33) geschlossen,
+  Arme werden nicht dicker, Gefälle zwischen Zeilen ≤ 1 px).
+* Glühen: die vier hellen Kugelkerne (Kopf, linke/rechte Schulter, Bauch) dunkeln nacheinander eine Stufe der Goldrampe ab und kehren zurück (Periode 32, je Kugel versetzt) — langsames Pochen.
+* Glanz auf dem Gold (Regel 14: Gold): ein dezentes Lichtband (eine Stufe heller auf der Goldrampe, in der Bandmitte zwei) läuft einmal je Schleife über den Golem (Frame 8–34). Keine Glitzersterne (die hellste Quellfarbe ist
+  zugleich die Körperfarbe — Sterne wären auf dem Gold unsichtbar). Umriss glänzt nicht.
 * Keine Partikel.
 
-Ergänzungen: keine nötig, nichts ist verdeckt.
-Rahmen: auf die Figur zugeschnitten (Vereinigung aller Frames + 2 px Rand, zentriert); die Sterne liegen auf dem Körper und ragen nicht über die Figur hinaus.
-Randpixel-Test (Regel 16): Das Fußpendeln kann Innenfarbe an die Ränder legen → F.umranden setzt dort den Umriss (213,170,33); Glanz und Sterne bleiben im Inneren; zusätzlich randtest.py.
-Alle Bewegungen laufen auf der vollen (größeren) Arbeitsleinwand (anim_lib wirft ClipError). Nur ganze Pixel, nur Farben der Quelle, Alpha nur 0/255.
+Ergänzungen: keine nötig, nichts ist verdeckt (die Fuge zwischen Arm und Rumpf wird beim Armversatz mit der Umrissfarbe geschlossen; das ist kein neues Motiv).
+Rahmen: auf die Figur zugeschnitten (Vereinigung aller Frames + 2 px Rand, zentriert). Alle Bewegungen laufen auf der vollen (größeren) Arbeitsleinwand (anim_lib wirft ClipError). Nur ganze Pixel, nur Farben der Quelle,
+Alpha nur 0/255. Randpixel-Test (Regel 16): Umrisspixel bleiben außen; zusätzlich randtest.py.
 """
 import math
 import sys
@@ -33,8 +40,9 @@ import numpy as np
 
 import anim_lib as L
 import anim_flieger as F
+import anim_humanoide as H_
 
-N, MS = 48, 60
+N, MS = 64, 90
 PAD_L, PAD_R, PAD_T, PAD_B = 8, 8, 8, 8                      # Arbeitsleinwand (am Ende zugeschnitten)
 
 spr = L.lade('lunatic-golem')
@@ -46,40 +54,92 @@ vorhanden = L.deckend(spr)
 RAMPE = [(213, 170, 33), (244, 196, 38), (244, 214, 66), (249, 238, 103), (250, 242, 130), (249, 246, 199)]      # dunkel → hell
 UMRISS_GOLD = RAMPE[0]
 HELL = RAMPE[5]
-
-m_fuss = vorhanden & (yy >= 21)                                # Füße samt unterer Rumpfkante (Zeile 21 = Pivot, bleibt stehen)
-m_arm_l = vorhanden & (xx <= 4) & (yy >= 13) & (yy <= 20)      # Unterarme/Fäuste (Pivot: Zeile 12 am Schulteransatz)
-m_arm_r = vorhanden & (xx >= 17) & (yy >= 13) & (yy <= 20)
-m_koerper = vorhanden & ~m_fuss & ~m_arm_l & ~m_arm_r
 glanz_maske = vorhanden & ~F.kanten(spr)
 UMRISS = F.umriss_farben(spr)
-Y_FUSS = PAD_T + 21
-Y_ARM = PAD_T + 12
-STERNE = [(5, 16), (16, 12)]                                   # Sternmitten (Sprite-Koordinaten) auf den Armlinien links/rechts
+
+ZEILE = 17                                                     # Brustzeile: hier wird eingefügt/entfernt
+ARM_Y0, ARM_Y1 = 13, 21                                        # Armzeilen (Sprite) — der Versatz beginnt erst ab Zeile 13 (Gefälle ≤ 1 px an der Schulter)
+ARM_L_X, ARM_R_X = 5, 16                                       # letzte Spalte des linken / erste Spalte des rechten Arms (= Innenumriss)
+
+# Glühkerne (Sprite-Koordinaten): Kopf, linke Schulter, Bauch, rechte Schulter — jeweils die hellsten Pixel in der Box
+KUGELN = [(8, 1, 12, 4), (2, 8, 5, 10), (9, 13, 12, 19), (16, 8, 19, 10)]
 
 
-def frame(i, partikel=True, effekte=True):
-    u = lambda t: (1 - math.cos(2 * math.pi * t / (N / 4))) / 2     # Bob: Periode 12
-    bob = -int(round(2 * u(i)))                                # 0 → −1 → −2 → −1 → 0 (nur nach oben, zweistufig)
-    dx = int(round(1.0 * math.sin(2 * math.pi * i / (N / 2))))     # Seitwärtspendeln ±1 px (Periode 24)
+def u01(i, n, versatz=0.0):
+    return 0.5 - 0.5 * math.cos(2 * math.pi * (i / n) + versatz)
 
-    kp = F.ebene(spr, m_koerper, H, W, PAD_L, PAD_T)
-    fuss = F.ebene(spr, m_fuss, H, W, PAD_L, PAD_T)
-    arm_l = F.ebene(spr, m_arm_l, H, W, PAD_L, PAD_T)
-    arm_r = F.ebene(spr, m_arm_r, H, W, PAD_L, PAD_T)
+
+def brust_stufe(i):
+    """Brusthub −1 … +1: zweimal je Schleife langsam heben (0 → 1), oben halten, senken; einmal der Seufzer (−1)."""
+    u = u01(i, N // 2)
+    c = 1 if u > 0.55 else 0
+    if 46 <= i <= 54:
+        c = -1 if 48 <= i <= 52 else 0
+    return c
+
+
+def arm_stufe(i):
+    """Arme folgen dem Atem mit 5 Frames Nachlauf (0 oder 1 px nach außen)."""
+    return 1 if u01(i - 5, N // 2) > 0.55 and not (46 <= i <= 56) else 0
+
+
+def pulse_stufe(i, k):
+    """Kugel k dunkelt langsam ab (0 hell, 1 / 2 eine bzw. zwei Stufen dunkler), je Kugel um 8 Frames versetzt."""
+    w = u01(i - 8 * k, N // 2)
+    return 0 if w < 0.35 else (1 if w < 0.8 else 2)
+
+
+def kugeln_dimmen(a, i):
+    """Glühkerne pochen: hellste Pixel (Index 5 der Rampe) in den Kugel-Boxen eine Stufe dunkler, bei Stufe 2 auch Index 4 → 3 (Frame 0 = Original, weil u01(0) = 0)."""
+    for k, (x0, y0, x1, y1) in enumerate(KUGELN):
+        st = pulse_stufe(i, k)
+        if not st:
+            continue
+        for y in range(y0, y1 + 1):
+            for x in range(x0, x1 + 1):
+                if not a[PAD_T + y, PAD_L + x, 3]:
+                    continue
+                c = tuple(int(v) for v in a[PAD_T + y, PAD_L + x, :3])
+                if c == RAMPE[5]:
+                    a[PAD_T + y, PAD_L + x, :3] = RAMPE[4]
+                elif c == RAMPE[4] and st == 2:
+                    a[PAD_T + y, PAD_L + x, :3] = RAMPE[3]
+    return a
+
+
+def arme_versetzen(f, c, d):
+    """Arme (Zeilen ARM_Y0…ARM_Y1 des Sprites, in der gestreckten Leinwand um −c verschoben, wo y ≤ ZEILE) um d px nach außen; die Fuge zum Rumpf wird mit der Umrissfarbe geschlossen."""
+    if not d:
+        return f
+    y0 = PAD_T + ARM_Y0 - c
+    y1 = PAD_T + ARM_Y1
+    out = f.copy()
+    for (xa, xb, s) in ((0, ARM_L_X, -d), (ARM_R_X, sw - 1, +d)):          # Spaltenbereich im Sprite, Verschieberichtung
+        for y in range(y0, y1 + 1):
+            for x in range(xa, xb + 1):
+                out[y, PAD_L + x] = 0
+        for y in range(y0, y1 + 1):
+            for x in range(xa, xb + 1):
+                if f[y, PAD_L + x, 3]:
+                    out[y, PAD_L + x + s] = f[y, PAD_L + x]
+            fuge = ARM_L_X if s < 0 else ARM_R_X
+            if f[y, PAD_L + fuge, 3]:
+                out[y, PAD_L + fuge, :3] = UMRISS_GOLD
+                out[y, PAD_L + fuge, 3] = 255
+    return out
+
+
+def frame(i, partikel=True, effekte=True, nur=None):
+    c = brust_stufe(i)
+    d = arm_stufe(i)
+    koerper = L.platz(spr, H, W, PAD_L, PAD_T)
     if effekte:
-        for ebene_ in (kp, fuss, arm_l, arm_r):
-            F.lichtband(ebene_, glanz_maske, PAD_L, PAD_T, i, N // 2, 4, 10, RAMPE, stufen=1, breite=3.5, achse=(1.0, 0.7))
-        for k, (sx, sy) in enumerate(STERNE):
-            st = F.stern_stufe(i, N // 2, 3 + 11 * k, folge=(0, 1, 2, 1))
-            if st is not None:
-                F.stern(kp, PAD_L + sx, PAD_T + sy, st, HELL, HELL)
-    fuss = F.zeilen_pendel(fuss, Y_FUSS, 1.8, L.sinus(i, N / 4), 1.0, lauf=1.0)
-    arm_l = F.zeilen_pendel(arm_l, Y_ARM, -1.0, L.sinus(i, N / 4), 1.0, lauf=1.0, einseitig=True)      # Fäuste schwingen mit dem Bob 0…1 px nach außen
-    arm_r = F.zeilen_pendel(arm_r, Y_ARM, 1.0, L.sinus(i, N / 4), 1.0, lauf=1.0, einseitig=True)
-    kp, fuss, arm_l, arm_r = (L.versetze(a, dx, bob) for a in (kp, fuss, arm_l, arm_r))
-    f = L.zusammen(H, W, [(fuss, 0, 0), (arm_l, 0, 0), (arm_r, 0, 0), (kp, 0, 0)])
-    F.umranden(f, [fuss, arm_l, arm_r, kp], UMRISS, UMRISS_GOLD, UMRISS_GOLD, UMRISS_GOLD)                    # Randpixel-Test (Regel 16)
+        kugeln_dimmen(koerper, i)
+        F.lichtband(koerper, glanz_maske, PAD_L, PAD_T, i, N, 8, 26, RAMPE, stufen=1, kern_stufen=2, breite=4.0, achse=(1.0, 0.7))
+    if c:
+        koerper = L.streck_zeile(koerper, PAD_T + ZEILE, c)
+    f = arme_versetzen(koerper, c, d)
+    F.umranden(f, [f], UMRISS, UMRISS_GOLD, UMRISS_GOLD, UMRISS_GOLD)                    # Randpixel-Test (Regel 16)
     return f
 
 
@@ -98,6 +158,6 @@ if __name__ == '__main__':
     prev = sys.argv[sys.argv.index('--preview') + 1] if '--preview' in sys.argv else None
     n = L.pruefe(frames, quelle=spr)
     print('Pixel je Frame:', n)
-    L.speichern('lunatic-golem', 'Lunatic Golem', frames, MS, prev)
+    L.speichern('lunatic-golem', 'Lunatic Golem', frames, MS, prev, extra={'deckkraft': 0.5})
     if prev:
         L.streifen(prev + '/lunatic-golem-strip.png', frames, spalten=8, scale=6)

@@ -1,15 +1,15 @@
 {
   "creature": "Classical Harpyformer",
   "sheet": "classical-harpyformer.png",
-  "frameWidth": 48,
-  "frameHeight": 52,
+  "frameWidth": 50,
+  "frameHeight": 51,
   "frames": 48,
   "frameMs": 65,
   "loop": true,
   "layout": "horizontal",
-  "padTop": 2,
-  "padLeft": 2,
-  "padRight": 2,
+  "padTop": 3,
+  "padLeft": 3,
+  "padRight": 3,
   "padBottom": 2,
-  "faceX": 24.0
+  "faceX": 25.0
 }

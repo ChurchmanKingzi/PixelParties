@@ -21,13 +21,15 @@ Identifikation (Sprite-Koordinaten x, y; Fliege von vorn, spiegelsymmetrisch um 
 Ablauf (48 Frames à 60 ms = 2,88 s):
 * Kräftiger Flügelschlag: achtmal pro Schleife (Periode 6); jede Flügelspalte wandert senkrecht, je weiter außen desto mehr (Spitze etwa −4 … +4 px, hinkt nach), Textur bleibt,
   Spalten bleiben ganz (F.fluegel_welle, Zusammenhang erzwungen). Die Wurzelspalte steht fest, beide Flügel schlagen gleichzeitig (spiegelsymmetrisch).
-* Schwebe-Bob zweistufig bis 2 px nach oben (0 → 1 → 2 → 1 → 0, Periode 12); das Werkzeug folgt etwas später.
-* Das Werkzeug (Spitzhacke) bleibt starr — eine Drehung zerreißt die 1 px dünnen Diagonalen — und klopft: es hebt sich nach dem Körper 0 … 2 px (Periode 12) und schwingt ±1 px seitlich (Periode 24).
+* Schwebe-Bob zweistufig bis 2 px nach oben (0 → 1 → 2 → 1 → 0, Periode 12) — die Biene schwebt als Ganzes.
+* Die Spitzhacke ist FEST mit der Biene verbunden (Nutzerfeedback Runde 2: „soll NICHT unabhängig von der Biene sein“): sie wird von der rechten unteren Beinspitze gehalten (Beinspitze (17,14) berührt
+  den Stiel bei (18,15)) und bekommt in jedem Frame EXAKT denselben Versatz wie Körper, Beine und Flügelwurzeln (Bob), kein eigener Nachlauf, kein Klopfen, kein Seitenschwingen. Hand (Bein) und Werkzeug
+  verlassen einander nie; ein Test im Skript (HALTE-Test) prüft in jedem Frame, dass Beinspitze und Stiel noch Nachbarn (8-verbunden, wie im Original) sind.
 * Blinzeln (Frames 33–34): die Augen schließen sich (Brauntöne des Gesichts).
 * Keine Partikel (die Fliege hat nichts, was Funken/Staub abgäbe; ein Pollenstaub aus Olivpunkten sah wie Pixelfehler aus). Kein Glanz (Chitin/Flügel sind kein Metall).
 
 Ergänzungen: keine nötig — Flügelpaneele und Körper liegen nebeneinander, nichts verdeckt etwas Wichtiges.
-Rahmen: auf die Figur zugeschnitten (Vereinigung aller Frames + 1 px freier Rand); es gibt keine Effekte außerhalb der Figur.
+Rahmen: auf die Figur zugeschnitten (Vereinigung aller Frames + 2 px freier Rand); es gibt keine Effekte außerhalb der Figur.
 Randpixel-Test (Regel 16): Spaltenversatz legt an den Flügelkanten Innenfarbe frei → F.umranden setzt dort den Flügelrand (58,56,6); zusätzlich randtest.py.
 Alle Bewegungen laufen auf der vollen (größeren) Arbeitsleinwand (anim_lib wirft ClipError). Nur ganze Pixel, nur Farben der Quelle, Alpha nur 0/255.
 """
@@ -65,7 +67,6 @@ def frame(i, partikel=True, effekte=True):
     ph = L.sinus(i, N / 8)                                     # Flügelschlag: achtmal pro Schleife (Periode 6)
     u = lambda t: (1 - math.cos(2 * math.pi * t / (N / 4))) / 2     # Bob: Periode 12
     bob = -int(round(2 * u(i)))                                # 0 → −1 → −2 → −1 → 0 (nur nach oben, zweistufig)
-    lag = -int(round(2 * u(i - 1.3))) + int(round(2 * u(-1.3)))    # Werkzeug folgt später (Frame 0 = Ruhe)
 
     wl = F.ebene(spr, wing_l, H, W, PAD_L, PAD_T)
     wr = F.ebene(spr, wing_r, H, W, PAD_L, PAD_T)
@@ -79,10 +80,8 @@ def frame(i, partikel=True, effekte=True):
     wl = F.fluegel_welle(wl, PAD_L + 6, 4.4, ph, potenz=1.0, nur_rechts=False, lauf=0.12, zusammenhang=True)
     wr = F.fluegel_welle(wr, PAD_L + 14, 4.4, ph, potenz=1.0, nur_rechts=True, lauf=0.12, zusammenhang=True)
     wl, wr, kp = (L.versetze(a, 0, bob) for a in (wl, wr, kp))
-    # Werkzeug: starr (Drehung zerreißt die dünnen Diagonalen), hebt sich nach dem Körper und klopft: 0 … −2 px, dazu ±1 px seitliches Schwingen
-    tipp = int(round(1.5 * (1 - math.cos(L.sinus(i, N / 4) - 1.3)) / 2)) - int(round(1.5 * (1 - math.cos(-1.3)) / 2))
-    schw = int(round(math.sin(L.sinus(i, N / 2) + 0.6) - math.sin(0.6)))
-    wz = L.versetze(wz, schw, lag - tipp)
+    # Werkzeug: starr (Drehung zerreißt die dünnen Diagonalen) und fest mit der Biene verbunden: derselbe Versatz wie der Körper (die Hand ist die rechte untere Beinspitze)
+    wz = L.versetze(wz, 0, bob)
 
     f = L.zusammen(H, W, [(wl, 0, 0), (wr, 0, 0), (kp, 0, 0), (wz, 0, 0)])
     F.umranden(f, [wl, wr], UMRISS, FLUEGELRAND, FLUEGELRAND, FLUEGELRAND)       # Randpixel-Test (Regel 16)
@@ -90,7 +89,7 @@ def frame(i, partikel=True, effekte=True):
 
 
 def zuschneiden(frames, koerper_frames, max_ueber=3):
-    """Frame auf die Figur zuschneiden: Vereinigung aller Frames + 1 px freier Rand; Effekte ragen höchstens max_ueber px über die Körper-Frames hinaus."""
+    """Frame auf die Figur zuschneiden: Vereinigung aller Frames + 2 px freier Rand; Effekte ragen höchstens max_ueber px über die Körper-Frames hinaus."""
     def bbox(fs):
         a = np.stack([f[..., 3] > 0 for f in fs]).any(axis=0)
         ys, xs = np.nonzero(a)
@@ -100,16 +99,35 @@ def zuschneiden(frames, koerper_frames, max_ueber=3):
     ueber = (bx0 - ex0, by0 - ey0, ex1 - bx1, ey1 - by1)
     print('Figur (Körper-Frames) x', bx0, '…', bx1, 'y', by0, '…', by1, '| Effekte ragen hinaus (links, oben, rechts, unten):', ueber)
     assert max(ueber) <= max_ueber, f'Effekte ragen mehr als {max_ueber} px über die Figur: {ueber}'
-    x0, y0, x1, y1 = ex0 - 1, ey0 - 1, ex1 + 1, ey1 + 1
+    x0, y0, x1, y1 = ex0 - 2, ey0 - 2, ex1 + 2, ey1 + 2
     return [f[y0:y1 + 1, x0:x1 + 1].copy() for f in frames]
+
+
+def halte_test(frames):
+    """Die Spitzhacke gehört zur Biene: in JEDEM Frame ist der Versatz des Werkzeugs (rote/graue Pixel) gleich dem Versatz des Körpers (weiße Augenpixel bzw. bei geschlossenen
+    Augen das gelbe Band) gegenüber Frame 0 — und die Beinspitze (17,14) bleibt Nachbar (8-verbunden) des Stiels (18,15)."""
+    def lage(f, farben):
+        m = L.farbmaske(f, farben)
+        ys, xs = np.nonzero(m)
+        return int(ys.min()), int(xs.min())
+    tool0 = lage(frames[0], [ROT, GRAU])
+    band0 = lage(frames[0], [(191, 186, 24)])
+    for k, f in enumerate(frames):
+        dt = (lage(f, [ROT, GRAU])[0] - tool0[0], lage(f, [ROT, GRAU])[1] - tool0[1])
+        db = (lage(f, [(191, 186, 24)])[0] - band0[0], lage(f, [(191, 186, 24)])[1] - band0[1])
+        assert dt == db, f'Frame {k}: Werkzeug-Versatz {dt} != Körper-Versatz {db}'
+        tip = (PAD_L + 17, PAD_T + 14 + db[0]); stiel = (PAD_L + 18, PAD_T + 15 + db[0])
+        assert tuple(f[tip[1], tip[0], :3]) == (19, 12, 6) and tuple(f[stiel[1], stiel[0], :3]) == (42, 46, 40), f'Frame {k}: Hand und Stiel getrennt'
+    print('HALTE-Test bestanden: Werkzeug und Körper haben in allen', len(frames), 'Frames denselben Versatz; Beinspitze und Stiel bleiben Nachbarn')
 
 
 if __name__ == '__main__':
     koerper_frames = [frame(i, False) for i in range(N)]
     frames = [frame(i) for i in range(N)]
+    halte_test(frames)
     frames = zuschneiden(frames, koerper_frames)
     prev = sys.argv[sys.argv.index('--preview') + 1] if '--preview' in sys.argv else None
-    n = L.pruefe(frames, quelle=spr, min_rand=1)
+    n = L.pruefe(frames, quelle=spr)
     print('Pixel je Frame:', n)
     L.speichern('sparkfly-architect', 'Sparkfly Architect', frames, MS, prev)
     if prev:

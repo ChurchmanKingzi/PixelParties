@@ -19,13 +19,13 @@ Identifikation (Sprite 15×19, Spinne von oben/vorn, symmetrisch um x = 7):
 * Keine Augen, kein Schwanz, kein Mund.
 Bleibt fest: Diamant (außer Lichtband), Körper, Hälse, Kristallfüße, Beinansätze.
 
-Ablauf (60 Frames à 66 ms = 3,96 s), alle Bewegungen unabhängig (Edelstein: Glanz und Glitzer sind erlaubt, Regel 14):
-* Lichtband: ein schmales Lichtband läuft diagonal (links oben → rechts unten) über Diamant und Kristallfüße, dreimal pro Schleife (Frames 2–19, 22–39, 42–59, je 1 Schrägzeile
-  pro Frame); die türkisen Pixel im Band sind eine Stufe heller auf der Rampe der Quelle (B → D → E → Weiß).
-* Glitzersterne: jeder der sieben Sterne schrumpft in zwei Stufen bis auf nichts (große Kreuze: Arme 2 px → 1 px → aus; X-Sterne: Stern → Mittelpixel → aus; kleine Kreuze: an/aus)
-  und wächst wieder (Muster 2-1-0-0-1-2, je 6 Frames), je Stern zweimal pro Schleife, zeitlich versetzt; im Frame 0 sind alle Sterne an wie im Original.
-* Beinspiel: die Spitze jedes Beins schnippt für 3 Frames ein Pixel nach oben (bleibt am Nachbarpixel angewachsen), reihum L1 → R1 → L2 → … zweimal pro Schleife je Bein.
-* Schweben: die Spinne (Diamant, Körper, Beine) hebt sich beim Atmen um 1 px (Periode 30, oben in Frames 5–18 und 35–48); die Sterne bleiben stehen.
+Ablauf (84 Frames à 70 ms = 5,88 s) — Runde 2, Nutzerfeedback „die weißen Sparkle-Elemente sollten *viel länger* nicht zu sehen sein“. Edelstein: Glanz und Glitzer sind erlaubt (Regel 14), aber nur noch selten:
+* Glitzer-Welle: nur EINMAL pro Schleife (Frames 12–22) läuft ein schmales Lichtband (3 Schrägzeilen breit, 3 Schrägzeilen je Frame, links oben → rechts unten, eine Stufe heller auf der Rampe der Quelle: B → D → E → Weiß) über
+  Diamant und Kristallfüße, und die sieben weißen Glitzersterne blitzen genau dann auf, wenn das Band ihre Schrägzeile (x + y) erreicht: klein → groß → klein (Muster 1-2-1, je 3 Frames; große Kreuze: Arme 1 px → 2 px → 1 px; X-Sterne:
+  Mittelpixel → Stern → Mittelpixel; kleine Kreuze an/aus). Sonst sind die Sterne UNSICHTBAR: in 73 von 84 Frames ist KEIN weißes Sparkle-Pixel zu sehen (11 Frames sichtbar, 73 unsichtbar = 6,6-mal so lange unsichtbar wie sichtbar;
+  jeder einzelne Stern ist 3 Frames sichtbar, 81 Frames unsichtbar = 27-mal). Frame 0 hat deshalb keine Sterne (in Runde 1 standen sie fast immer, Frame 0 = Original mit allen Sternen).
+* Beinspiel: die Spitze jedes der acht Beine schnippt für 3 Frames ein Pixel nach oben (bleibt am Nachbarpixel angewachsen), reihum L1 → R1 → L2 → … , jedes Bein dreimal pro Schleife (alle 28 Frames); es ist fast immer ein Bein in Bewegung.
+* Kein Schweben mehr (Regel 18: Bodenwesen, die Spinne stand in Runde 1 beim „Atmen“ 1 px in der Luft): Diamant, Körper und Hälse bleiben fest.
 Alle Bewegungen laufen auf der vollen Leinwand (anim_lib wirft ClipError). Nur ganze Pixel, nur Farben der Quelle. Keine Partikel.
 
 Ergänzungen: keine gemalten Pixel.
@@ -37,7 +37,7 @@ import numpy as np
 
 import anim_lib as L
 
-N, MS = 60, 66
+N, MS = 84, 70
 PAD_L, PAD_R, PAD_T, PAD_B = 2, 2, 2, 2
 
 spr = L.lade('diamond-spider')
@@ -63,46 +63,46 @@ for _k in range(1, _n):
         innen = [(cx, cy)] if (cx, cy) in pix else pix
     STERNE.append(dict(mitte=(cx, cy), voll=pix, innen=innen))
 STERNE.sort(key=lambda s: (s['mitte'][1], s['mitte'][0]))
-# Zwei Zeitpunkte je Stern (Start-Frames, 6 Frames Dauer; keiner liegt am Schleifenanfang oder -ende)
-STERN_START = [(3, 33), (8, 41), (14, 46), (20, 52), (25, 38), (31, 49), (37, 10)]
-STERN_MUSTER = (2, 1, 0, 0, 1, 2)
 
-# Beine: (Spitze, ausgelenkte Position, Startframes)
-BEINE = [((0, 7), (0, 6), (4, 34)), ((14, 7), (14, 6), (9, 39)), ((1, 9), (1, 8), (14, 44)), ((13, 9), (13, 8), (19, 49)),
-         ((1, 12), (1, 11), (24, 54)), ((13, 12), (13, 11), (29, 7)), ((3, 12), (3, 11), (12, 41)), ((11, 12), (11, 11), (17, 47))]
+# Glitzer-Welle (einmal pro Schleife): das Lichtband läuft ab T0 mit 3 Schrägzeilen je Frame von x + y = 2 bis 29; jeder Stern blitzt, wenn das Band seine Schrägzeile erreicht
+T0, BAND_SCHRITT, BAND_BREITE = 12, 3, 1
+STERN_MUSTER = (1, 2, 1)
+STERN_START = [T0 + int(round((s['mitte'][0] + s['mitte'][1] - 2) / BAND_SCHRITT)) for s in STERNE]
+BAND_FRAMES = 10
+
+# Beine: (Spitze, ausgelenkte Position), Startframes je Bein (dreimal pro Schleife, alle 28 Frames; reihum)
+BEINE = [((0, 7), (0, 6)), ((14, 7), (14, 6)), ((1, 9), (1, 8)), ((13, 9), (13, 8)),
+         ((1, 12), (1, 11)), ((13, 12), (13, 11)), ((3, 12), (3, 11)), ((11, 12), (11, 11))]
+BEIN_START = [[2 + 3 * j + 28 * k for k in range(3)] for j in range(len(BEINE))]
 BEIN_DAUER = 3
 
 
 def zustand(i):
-    band = -1
-    for s in (2, 22, 42):
-        if 0 <= i - s < 18:
-            band = 7 + (i - s)                                     # Schrägzeile x + y
+    band = None
+    if 0 <= i - T0 < BAND_FRAMES:
+        band = 2 + BAND_SCHRITT * (i - T0)                          # Schrägzeile x + y der Bandmitte
     sterne = []
-    for starts in STERN_START:
-        st = 2
-        for s in starts:
-            if 0 <= i - s < len(STERN_MUSTER):
-                st = STERN_MUSTER[i - s]
+    for start in STERN_START:
+        st = 0
+        if 0 <= i - start < len(STERN_MUSTER):
+            st = STERN_MUSTER[i - start]
         sterne.append(st)
-    beine = [any(0 <= i - s < BEIN_DAUER for s in starts) for (_, _, starts) in BEINE]
-    hub = 1 if (i % 30) in range(5, 19) else 0
-    return band, sterne, beine, hub
+    beine = [any(0 <= i - s < BEIN_DAUER for s in starts) for starts in BEIN_START]
+    return band, sterne, beine
 
 
 def frame(i, nur=None):
-    band, sterne, beine, hub = zustand(i)
+    band, sterne, beine = zustand(i)
     k, _ = L.trenne(spr, koerper_maske)
     k = L.platz(k, H, W, PAD_L, PAD_T)
-    if band >= 0 and (nur is None or 'glanz' in nur):                # Lichtband = Glanz (Edelstein); beim Randpixel-Test (nur=…) ohne
+    if band is not None and (nur is None or 'glanz' in nur):          # Lichtband = Glanz (Edelstein); beim Randpixel-Test (nur=…) ohne
         for y, x in zip(*np.nonzero(STEIN)):
-            if x + y == band:
+            if abs(x + y - band) <= BAND_BREITE:
                 c = tuple(int(v) for v in spr[y, x, :3])
                 k[PAD_T + y, PAD_L + x, :3] = STEIN_RAMPE[c]
-    for (tx, ty), (nx, ny), _ in [b for b, f in zip(BEINE, beine) if f]:
+    for (tx, ty), (nx, ny) in [b for b, f in zip(BEINE, beine) if f]:
         k[PAD_T + ny, PAD_L + nx] = k[PAD_T + ty, PAD_L + tx]
         k[PAD_T + ty, PAD_L + tx] = 0
-    k = L.versetze(k, 0, -hub)
     stern = L.leer(H, W)
     for s, st in zip(STERNE, sterne):
         pix = s['voll'] if st == 2 else (s['innen'] if st == 1 else [])
@@ -122,6 +122,11 @@ if __name__ == '__main__':
     frames = [frame(i) for i in range(N)]
     n = L.pruefe(frames, quelle=spr, erlaubt=[])
     print('Pixel je Frame:', n)
+    # Sichtbarkeit der weißen Sparkle-Elemente (Nutzerwunsch: 5–10-mal länger unsichtbar als sichtbar)
+    sichtbar = [any(st for st in zustand(i)[1]) or (zustand(i)[0] is not None) for i in range(N)]
+    nv = sum(sichtbar)
+    print(f'Glitzer sichtbar (Sterne oder Lichtband) in {nv} von {N} Frames, unsichtbar in {N - nv} → Verhältnis unsichtbar : sichtbar = {(N - nv) / nv:.1f} : 1')
+    assert 5 <= (N - nv) / nv <= 10
     prev = sys.argv[sys.argv.index('--preview') + 1] if '--preview' in sys.argv else None
     L.speichern('diamond-spider', 'Diamond Spider', frames, MS, prev)
     if prev:

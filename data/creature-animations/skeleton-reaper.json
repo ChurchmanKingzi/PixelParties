@@ -1,15 +1,21 @@
 {
   "creature": "Skeleton Reaper",
   "sheet": "skeleton-reaper.png",
-  "frameWidth": 44,
-  "frameHeight": 50,
-  "frames": 48,
+  "frameWidth": 49,
+  "frameHeight": 60,
+  "frames": 56,
   "frameMs": 65,
   "loop": true,
   "layout": "horizontal",
   "padTop": 1,
   "padLeft": 1,
-  "padRight": 3,
-  "padBottom": 5,
-  "faceX": 22.0
+  "padRight": 1,
+  "padBottom": 1,
+  "faceX": 18.0,
+  "kern": {
+    "x": 9,
+    "y": 15,
+    "w": 18,
+    "h": 27
+  }
 }

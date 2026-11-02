@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""Idle-Animation für „Monster Nest“ (Creature).
+"""Idle-Animation für „Monster Nest“ (Creature) — Runde 2: statische Eier, auf denen kleine Risse erscheinen und verschwinden.
 
 PICK: [["Motive", 831, 1]]   Ebene „Monster Nest“ (Motive.xcf, Ebene 831, 39×33 px, 8 Farben, nur Alpha 0/255) → src/monster-nest.png (ganzes Sprite, ein einziges 4-verbundenes Teil).
 Nicht verwendet: die Lava und das Mauerwerk der Karte (andere Ebenen).
@@ -8,124 +8,71 @@ Aufruf:   python3 monster_nest.py [--preview <ordner>]
 Ausgabe:  ../../data/creature-animations/monster-nest.png + .json
 
 Was im Sprite ist (Koordinaten im Sprite 39×33, x/y ab 0):
-* Ein Haufen aus fünf würfelförmigen, weiß-grauen Kapseln (B=(208,208,208), C=(237,237,237), F=(129,129,129), schwarzer Umriss A=(0,0,0)), jede mit einer roten, achteckigen Raute in der Mitte
+* Ein Haufen aus fünf würfelförmigen, weiß-grauen Eiern/Kapseln (B=(208,208,208), C=(237,237,237), F=(129,129,129), schwarzer Umriss A=(0,0,0)), jede mit einer roten, achteckigen Raute in der Mitte
   (D=(170,74,76), E=(158,52,55), G=(87,31,32)) und zwei roten Eckmarken oben; die Rautenmitten liegen bei (30.5, 8.5) (oben rechts), (15.5, 11.5) (oben Mitte), (7.5, 17.5) (links), (25.5, 18.5)
-  (Mitte rechts) und (16.5, 25.5) (unten). Die Kapseln berühren sich und teilen ihre schwarzen Umrisslinien. Ein einzelnes gelbes Pixel H=(250,213,74) bei (0, 22) gehört zum Original (Lavaschimmer).
-* Material: Ei-/Kapselschale in Weißgrau mit roten Marken — kein erkennbarer Edelstein/Gold/Metall: KEIN Glanz (Regel 14), kein Flammenfeuer (Regel 15).
-Fest bleiben: Kapselform, Umriss, rote Rauten (keine Farbwechsel).
+  (Mitte rechts) und (16.5, 25.5) (unten). Die Eier berühren sich und teilen ihre schwarzen Umrisslinien. Ein einzelnes gelbes Pixel H=(250,213,74) bei (0, 22) und die dunkelroten
+  Pixel daneben gehören zum Original (Lavaschimmer/Schatten der Kunst) und bleiben fest.
+* Material: Ei-/Kapselschale — kein Edelstein/Gold/Metall: KEIN Glanz (Regel 14), kein Flammenfeuer (Regel 15).
 
-Zuordnung der Pixel zu den fünf Kapseln: jedes deckende Pixel gehört zur Kapsel mit der nächsten Rautenmitte (Voronoi, deckt sich mit den schwarzen Trennlinien).
+Nutzerwunsch (Runde 2): „soll anders animiert werden – kleine Risse auf den einzelnen statischen Eiern, die erscheinen und verschwinden“.
+→ Die Eier bleiben KOMPLETT STATISCH (kein Squash & Stretch, kein Wackeln, kein Rucken, kein Dampf mehr). Das Einzige, was sich ändert, sind kleine Risse:
 
-Ablauf (48 Frames à 65 ms = 3,12 s, nahtlos):
-* Wackeln: jede Kapsel wippt einzeln 1 px auf und ab (Periode 24, je Kapsel eine andere Phase; Frame 0 = Original) — das Nest „atmet“ und die Eier stoßen gegeneinander.
-* Rucken: reihum rutscht eine Kapsel für 2 Frames 1 px zur Seite (links Frames 8–9, oben rechts 20–21, unten 32–33, Mitte rechts 42–43), als regte sich etwas darin.
-* Dampf (Partikel): sechs runde Wölkchen (2×2 → 4×4 → 2×2, nie einzelne Punkte; Farben Weiß C und Grau B des Sprites) steigen in den leeren Ecken des Nests (links oben, rechts unten, links unten) langsam auf.
-Ergänzungen (Regel 16): wo sich zwei Kapseln beim Wackeln trennen, liegt die weiße Schale an der neuen Lücke frei; das leere Nachbarfeld bekommt dann den schwarzen Umriss A (umriss_ergaenzen, 0–10 Pixel je Frame).
-Teile, die dadurch nur über eine Ecke hängen, bekommen Brückenpixel (verbinde4/verbinde_luecken, Regel 11).
-Frame: Sprite plus 3 px links/rechts, 3 px oben, 3 px unten — Figur zentriert; der Dampf liegt innerhalb des Sprite-Rechtecks (keine zusätzliche Frame-Vergrößerung).
-Alle Bewegungen laufen auf der vollen Leinwand (anim_lib/anim_amorph werfen ClipError). Nur ganze Pixel, nur Farben der Quelle.
+Ablauf (60 Frames à 75 ms = 4,5 s, nahtlos):
+* Zehn Risse (zwei je Ei, an verschiedenen Stellen der hellen Schale), jeder aus 2 Pixeln in der Umrissfarbe A (schwarz): erst 1 Pixel, dann 2 Pixel (zackig, diagonal bzw. senkrecht),
+  steht kurz, schrumpft wieder auf 1 Pixel, dann ist er weg (Verlauf 1-1-2-2-2-2-2-2-2-2-1-1 Frames, 12 Frames = 0,9 s; ein Riss mit kürzerem Verlauf 1-2-2-2-2-2-1).
+  Die Risse starten reihum zeitversetzt (alle 5 Frames einer, Eier in der Reihenfolge links, oben rechts, unten, Mitte rechts, oben Mitte, dann zweite Runde) — es sind immer 1–3 Risse gleichzeitig sichtbar.
+  Frame 0 ist rissfrei (= Original); die Risse liegen nur auf hellen Schalenpixeln (B/C), nie auf Raute, Umriss oder Rand.
+Ergänzungen: keine. Nur ganze Pixel, nur Quellfarben (Risse = Umrissschwarz A des Sprites), kein Alpha.
+Frame: Sprite plus 3 px Rand rundum — Figur zentriert.
 """
-import math
 import sys
 
 import numpy as np
 
 import anim_lib as L
-import anim_amorph as A
+import anim_eier as E
 
-N, MS = 48, 65
-PAD_L, PAD_R, PAD_T, PAD_B = 3, 3, 3, 3
+N, MS = 60, 75
+PAD = 3
 
 spr = L.lade('monster-nest')
 sh, sw = spr.shape[:2]
-H, W = sh + PAD_T + PAD_B, sw + PAD_L + PAD_R
+H, W = sh + 2 * PAD, sw + 2 * PAD
 OPAK = spr[..., 3] > 0
-RAND_FARBEN = A.umrissfarben(spr)
 SCHWARZ = (0, 0, 0)
-_farben = {tuple(int(v) for v in p[:3]) for p in spr.reshape(-1, 4) if p[3]}
-WOLKEN_FARBEN = {'c': (237, 237, 237), 'r': (208, 208, 208)}
-for _c in WOLKEN_FARBEN.values():
-    assert _c in _farben, _c
+HELL = [(208, 208, 208), (237, 237, 237)]                                                # Schalenfarben B, C (nur dort liegen Risse)
 
-# ── Kapseln (Voronoi um die Rautenmitten) ──
-SAMEN = {'A': (30.5, 8.5), 'B': (15.5, 11.5), 'C': (7.5, 17.5), 'D': (25.5, 18.5), 'E': (16.5, 25.5)}
-NAMEN = sorted(SAMEN, key=lambda k: SAMEN[k][1])                                       # Zeichenreihenfolge: obere Kapsel zuerst (hinten), untere vorn
-yy, xx = np.mgrid[0:sh, 0:sw]
-_dist = np.stack([(xx - SAMEN[k][0]) ** 2 + (yy - SAMEN[k][1]) ** 2 for k in NAMEN])
-KAPSEL = {k: OPAK & (np.argmin(_dist, axis=0) == j) for j, k in enumerate(NAMEN)}
-assert sum(int(m.sum()) for m in KAPSEL.values()) == int(OPAK.sum())
-
-# ── Bewegungen ──
-PHASEN = {'A': 0.0, 'B': 1.4, 'C': 2.8, 'D': 4.2, 'E': 5.6}
-RUCKEN = {'C': (range(8, 10), -1), 'A': (range(20, 22), 1), 'E': (range(32, 34), -1), 'D': (range(42, 44), 1)}
-
-
-def versatz(k, i):
-    ph = 2 * math.pi * i / 24
-    dy = int(round(0.55 * (math.sin(ph + PHASEN[k]) - math.sin(PHASEN[k]))))
-    dx = 0
-    if k in RUCKEN and i in RUCKEN[k][0]:
-        dx = RUCKEN[k][1]
-    return dx, dy
-
-
-# ── Wölkchen: nur 2×2 und 4×4 (nie 1 px), steigen in den leeren Ecken des Sprite-Rechtecks auf ──
-WOLKEN = [
-    dict(x=5, y=7, vx=-1, vy=-5, off=0, gross=True), dict(x=4, y=6, vx=1, vy=-5, off=8, gross=True), dict(x=6, y=8, vx=-1, vy=-5, off=16, gross=True),
-    dict(x=33, y=29, vx=1, vy=-5, off=4, gross=True), dict(x=34, y=28, vx=-1, vy=-5, off=14, gross=True),
-    dict(x=5, y=29, vx=1, vy=-5, off=20, gross=True),
+# ── Risse (x, y im Sprite; Pixel 1 zuerst, dann 2) ──
+RISSE = [
+    E.Riss([(4, 15), (5, 16)], start=2),                    # links
+    E.Riss([(35, 8), (36, 9)], start=7),                    # oben rechts
+    E.Riss([(21, 25), (22, 26)], start=12),                 # unten
+    E.Riss([(30, 18), (31, 19)], start=17),                 # Mitte rechts
+    E.Riss([(20, 10), (21, 11)], start=22),                 # oben Mitte
+    E.Riss([(22, 16), (23, 17)], start=27),                 # Mitte rechts, zweiter Riss
+    E.Riss([(12, 9), (13, 10)], start=32, profil=E.PROFIL_KURZ),   # oben Mitte, zweiter Riss
+    E.Riss([(12, 16), (12, 17)], start=37),                 # links, zweiter Riss
+    E.Riss([(18, 30), (17, 29)], start=42),                 # unten, zweiter Riss
+    E.Riss([(27, 6), (27, 7)], start=47, profil=E.PROFIL_KURZ),    # oben rechts, zweiter Riss
 ]
+for _r in RISSE:
+    for (_x, _y) in _r.pix:
+        assert OPAK[_y, _x] and tuple(int(v) for v in spr[_y, _x, :3]) in HELL, (_x, _y)
 
-
-def wolken_ebene(i):
-    e = L.leer(H, W)
-    for w in WOLKEN:
-        t = ((i + w['off']) % 24) / 24.0
-        if t > 0.92:
-            continue
-        form = 's' if (t < 0.22 or t > 0.72 or not w['gross']) else 'o'
-        cx = PAD_L + w['x'] + int(round(w['vx'] * t))
-        cy = PAD_T + w['y'] + int(round(w['vy'] * t))
-        for (dx, dy, k) in L.PUFF_FORMEN[form]:
-            X, Y = cx + dx, cy + dy
-            if not (2 <= X < W - 2 and 2 <= Y < H - 2):
-                raise L.ClipError(f'Wölkchen bei ({X},{Y}) zu nah am Rand des Frames {W}×{H}')
-            e[Y, X, :3] = WOLKEN_FARBEN[k]
-            e[Y, X, 3] = 255
-    return e
-
-
-def figur(i):
-    ebenen = []
-    for k in NAMEN:
-        dx, dy = versatz(k, i)
-        ebenen.append((L.platz(np.where(KAPSEL[k][..., None], spr, 0).astype(np.uint8), H, W, PAD_L, PAD_T), dx, dy))
-    fig = L.zusammen(H, W, ebenen)
-    fig, neu = A.umriss_ergaenzen(fig, RAND_FARBEN, lambda x, y: SCHWARZ)
-    fig, brueck = A.verbinde4(fig)
-    fig, pfad, offen = A.verbinde_luecken(fig, 3)
-    return dict(fig=fig, neu=neu, brueck=brueck, pfad=pfad, offen=offen)
+REF = L.platz(spr, H, W, PAD, PAD)
 
 
 def frame(i):
-    f = figur(i)
-    return L.zusammen(H, W, [(wolken_ebene(i), 0, 0), (f['fig'], 0, 0)])
+    return E.auf_figur(REF, E.risse_ebene(H, W, i, N, RISSE, SCHWARZ, PAD, PAD, gueltig=OPAK))
 
 
 if __name__ == '__main__':
-    print('Kapseln (Pixel):', {k: int(KAPSEL[k].sum()) for k in NAMEN})
     frames = [frame(i) for i in range(N)]
-    fs = [figur(i) for i in range(N)]
-    figs = [f['fig'] for f in fs]
     prev = sys.argv[sys.argv.index('--preview') + 1] if '--preview' in sys.argv else None
-    ref = L.platz(spr, H, W, PAD_L, PAD_T)
-    print('Frame 0 weicht vom Original in', int((figs[0] != ref).any(axis=2).sum()), 'Pixeln ab')
-    print('ergänzte Umrisspixel je Frame:', [len(f['neu']) for f in fs])
-    print('Brücken-/Pfadpixel je Frame:', [len(f['brueck']) + len(f['pfad']) for f in fs], '| unverbundene Teile:', [f['offen'] for f in fs if f['offen']])
+    mx, leer = E.gleichzeitig(RISSE, N)
+    print('Frame 0 weicht vom Original in', int((frames[0] != REF).any(axis=2).sum()), 'Pixeln ab | höchstens', mx, 'Risse gleichzeitig | Frames ohne Riss:', leer)
+    print('Pixel, die sich je Frame vom Original unterscheiden:', [int((f != REF).any(axis=2).sum()) for f in frames])
     n = L.pruefe(frames, quelle=spr)
-    print('Pixel je Frame:', n)
-    schlecht = A.ausdruck_pruefen(figs, spr, 'monster-nest')
-    print('Frames mit Befund:', [(k, n_, offen) for (k, n_, offen) in schlecht][:6])
     L.speichern('monster-nest', 'Monster Nest', frames, MS, prev)
     if prev:
-        L.streifen(prev + '/monster-nest-strip.png', frames[::2], spalten=12, scale=6)
+        L.streifen(prev + '/monster-nest-strip.png', frames[::3], spalten=10, scale=6)
