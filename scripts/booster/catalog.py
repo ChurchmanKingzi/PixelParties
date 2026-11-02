@@ -27,12 +27,23 @@ def norm_set(s):
 PACK_SETS = {
     'clash':     ['COH', 'SET1', 'SET01'],
     'monia':     ['ROM', 'SET2', 'SET02', 'MOE'],          # MOE = „Rise of Monia“ (Cool Rescuer Monia steht in PP MOE)
-    'future':    ['DRF', 'SET3', 'SET03'],
+    'future':    ['DRF', 'SET3', 'SET03', 'GBT', 'DD'],      # „Dreadful Future“: DRF ist nur teilweise eingetragen; GBT, DD und die Archetypen darunter gehören dazu
     'world1':    ['MS1', 'MS01', 'MSAZ', 'MSEG', 'MSGB'],
     'world2':    ['MS2', 'MS02', 'MS3', 'MS03', 'MSIN', 'MSHW', 'MSRU', 'MSJP', 'MSCH'],
     'community': ['MBS', 'MBS1'],
 }
-# „Trials and Tribulations“ = alles, was in keinem anderen Set-Pack landet (ART, THW, WAW, SOB, SOD, DD, GBT, CROSS, DIB, ASQ, CRESTMAS, ...)
+# „Trials and Tribulations“ = alles, was in keinem anderen Set-Pack landet (ART, THW, WAW, SOB, SOD, CROSS, DIB, ASQ, CRESTMAS, ...)
+
+
+# Karten, die trotz anderer Set-ID zu „Dreadful Future“ gehören: Archetypen Lunatic und Guardian Beasts sowie das Kartenset um Damus, Ifrit und Armageddon
+FUTURE_ARCHETYPES = {'Lunatic', 'Guardian Beasts'}
+FUTURE_NAMES = {'Damus, the Prophet of Apocalypse', 'Ifrit', 'Armageddon'}
+
+
+def pack_of_card(c):
+    if c.get('archetype') in FUTURE_ARCHETYPES or c['name'] in FUTURE_NAMES:
+        return 'future'
+    return pack_of_set(norm_set(c['setID']))
 
 
 def pack_of_set(norm):
@@ -57,7 +68,7 @@ def cards_of(pack):
         elif pack == 'hero':
             ok = t in ('Hero', 'Ascended Hero')
         else:
-            ok = pack_of_set(norm_set(c['setID'])) == pack
+            ok = pack_of_card(c) == pack
         if ok:
             out.append(c)
     return out

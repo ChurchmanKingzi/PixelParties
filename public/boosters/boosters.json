@@ -144,7 +144,7 @@
    "variants": [
     {
      "id": "hero-1",
-     "theme": "Royal",
+     "theme": "Rosebud",
      "template": "hero",
      "prism": false,
      "base": "hero/hero-1.png",
@@ -155,7 +155,7 @@
     },
     {
      "id": "hero-2",
-     "theme": "Sunfire",
+     "theme": "Crimson",
      "template": "hero",
      "prism": false,
      "base": "hero/hero-2.png",
@@ -166,7 +166,7 @@
     },
     {
      "id": "hero-3",
-     "theme": "Verdant",
+     "theme": "Noir",
      "template": "hero",
      "prism": false,
      "base": "hero/hero-3.png",
@@ -177,7 +177,7 @@
     },
     {
      "id": "hero-4",
-     "theme": "Noir",
+     "theme": "Forest",
      "template": "hero",
      "prism": false,
      "base": "hero/hero-4.png",
@@ -188,18 +188,18 @@
     },
     {
      "id": "hero-5",
-     "theme": "Ocean",
+     "theme": "Sunfire",
      "template": "hero",
      "prism": false,
      "base": "hero/hero-5.png",
      "shimmer": "hero/hero-5.shimmer.png",
      "motifs": [
-      "Cuberto, Supreme Lord of Edges"
+      "Bomb Berserker Bartas"
      ]
     },
     {
      "id": "hero-6",
-     "theme": "Rosebud",
+     "theme": "Amethyst",
      "template": "hero",
      "prism": false,
      "base": "hero/hero-6.png",
@@ -210,9 +210,9 @@
     },
     {
      "id": "hero-7",
-     "theme": "Prism",
+     "theme": "Golden",
      "template": "hero",
-     "prism": true,
+     "prism": false,
      "base": "hero/hero-7.png",
      "shimmer": "hero/hero-7.shimmer.png",
      "motifs": [
@@ -240,113 +240,93 @@
     {
      "id": "clash-1",
      "theme": "Sunfire",
-     "template": "stage",
+     "template": "hero",
      "prism": false,
      "base": "clash/clash-1.png",
      "shimmer": "clash/clash-1.shimmer.png",
      "motifs": [
-      "Fireball",
-      "Ida, the Adept of Destruction",
-      "Alex, Trainer of Heroes",
-      "Treasure Huntress Semi"
+      "Alex, Trainer of Heroes"
      ]
     },
     {
      "id": "clash-2",
      "theme": "Skyline",
-     "template": "stage",
+     "template": "scene",
      "prism": false,
      "base": "clash/clash-2.png",
      "shimmer": "clash/clash-2.shimmer.png",
      "motifs": [
-      "Chain Lightning",
-      "Alice, the Puppeteer Girl",
-      "Cute Angel Molinda",
-      "Andras, the Human Weapon"
+      "Chain Lightning"
      ]
     },
     {
      "id": "clash-3",
-     "theme": "Ember",
-     "template": "stage",
-     "prism": true,
+     "theme": "Royal",
+     "template": "hero",
+     "prism": false,
      "base": "clash/clash-3.png",
      "shimmer": "clash/clash-3.shimmer.png",
      "motifs": [
-      "Flame Avalanche",
-      "Bomb Berserker Bartas",
-      "Alex, Trainer of Heroes",
-      "Sid, the King of Thieves"
-     ]
-    },
-    {
-     "id": "clash-4",
-     "theme": "Royal",
-     "template": "stage",
-     "prism": false,
-     "base": "clash/clash-4.png",
-     "shimmer": "clash/clash-4.shimmer.png",
-     "motifs": [
-      "Resistance",
-      "Medea, the Swamp Witch",
-      "Cute Angel Molinda",
       "Sabrina, the Psychic Witch"
      ]
     },
     {
-     "id": "clash-5",
-     "theme": "Noir",
-     "template": "stage",
-     "prism": false,
-     "base": "clash/clash-5.png",
-     "shimmer": "clash/clash-5.shimmer.png",
+     "id": "clash-4",
+     "theme": "Ember",
+     "template": "scene",
+     "prism": true,
+     "base": "clash/clash-4.png",
+     "shimmer": "clash/clash-4.shimmer.png",
      "motifs": [
-      "Wealth",
-      "Sid, the King of Thieves",
-      "Treasure Huntress Semi",
-      "Chuck, the Crazy Veteran"
-     ]
-    },
-    {
-     "id": "clash-6",
-     "theme": "Ocean",
-     "template": "stage",
-     "prism": false,
-     "base": "clash/clash-6.png",
-     "shimmer": "clash/clash-6.shimmer.png",
-     "motifs": [
-      "Elixir of Cold",
-      "Gon, the Frostbringer",
-      "Silent Water Mizune",
+      "Flame Avalanche",
       "Fiedel, the Mercenary Mage"
      ]
     },
     {
+     "id": "clash-5",
+     "theme": "Frost",
+     "template": "hero",
+     "prism": false,
+     "base": "clash/clash-5.png",
+     "shimmer": "clash/clash-5.shimmer.png",
+     "motifs": [
+      "Gon, the Frostbringer"
+     ]
+    },
+    {
+     "id": "clash-6",
+     "theme": "Desert",
+     "template": "focus",
+     "prism": false,
+     "base": "clash/clash-6.png",
+     "shimmer": "clash/clash-6.shimmer.png",
+     "motifs": [
+      "Treasure Chest",
+      "Wanted Poster",
+      "Arcane Eyes",
+      "Teleport"
+     ]
+    },
+    {
      "id": "clash-7",
-     "theme": "Platinum",
-     "template": "stage",
-     "prism": true,
+     "theme": "Noir",
+     "template": "hero",
+     "prism": false,
      "base": "clash/clash-7.png",
      "shimmer": "clash/clash-7.shimmer.png",
      "motifs": [
-      "Anti Magic Shield",
-      "Johanna, Crusader of Light",
-      "Toras, Master of all Weapons",
-      "Timeless King Zi"
+      "Sid, the King of Thieves"
      ]
     },
     {
      "id": "clash-8",
      "theme": "Rosebud",
-     "template": "stage",
+     "template": "scene",
      "prism": false,
      "base": "clash/clash-8.png",
      "shimmer": "clash/clash-8.shimmer.png",
      "motifs": [
-      "Telekinesis",
-      "Nomu, Wanderer of Worlds",
-      "Beato, the Butterfly Witch",
-      "Card Game Player Inya"
+      "Rainbow's Arrow"
      ]
     }
    ]
@@ -370,43 +350,34 @@
     {
      "id": "monia-2",
      "theme": "Rosebud",
-     "template": "stage",
+     "template": "scene",
      "prism": false,
      "base": "monia/monia-2.png",
      "shimmer": "monia/monia-2.shimmer.png",
      "motifs": [
-      "The Final Trial",
-      "Cute Starlet Megu",
-      "Cool Rescuer Monia",
-      "Cute Princess Mary"
+      "The Final Trial"
      ]
     },
     {
      "id": "monia-3",
      "theme": "Sunfire",
-     "template": "stage",
+     "template": "hero",
      "prism": false,
      "base": "monia/monia-3.png",
      "shimmer": "monia/monia-3.shimmer.png",
      "motifs": [
-      "Cute Phoenix",
-      "Cute Nerd Magenta",
-      "Molinda, the Cutest Being in the Sky",
-      "Cute Meanie Melissa"
+      "Cute Princess Mary"
      ]
     },
     {
      "id": "monia-4",
      "theme": "Prism",
-     "template": "stage",
+     "template": "scene",
      "prism": true,
      "base": "monia/monia-4.png",
      "shimmer": "monia/monia-4.shimmer.png",
      "motifs": [
-      "Flying Island in the Sky",
-      "Cute Annoyance Mini",
-      "Cool Rescuer Monia",
-      "Cute Ditz Monami"
+      "Flying Island in the Sky"
      ]
     },
     {
@@ -417,46 +388,43 @@
      "base": "monia/monia-5.png",
      "shimmer": "monia/monia-5.shimmer.png",
      "motifs": [
-      "Molinda, the Cutest Being in the Sky"
+      "Cute Starlet Megu"
      ]
     },
     {
      "id": "monia-6",
      "theme": "Ocean",
-     "template": "stage",
+     "template": "focus",
      "prism": false,
      "base": "monia/monia-6.png",
      "shimmer": "monia/monia-6.shimmer.png",
      "motifs": [
-      "Cute Bird",
-      "Cute Ditz Monami",
-      "Cute Starlet Megu",
-      "Cute Meanie Melissa"
+      "Cute Cheese",
+      "Cute Camera",
+      "Cloud Pillow",
+      "Cute Crown"
      ]
     },
     {
      "id": "monia-7",
-     "theme": "Frost",
+     "theme": "Amethyst",
      "template": "hero",
      "prism": false,
      "base": "monia/monia-7.png",
      "shimmer": "monia/monia-7.shimmer.png",
      "motifs": [
-      "Cute Princess Mary"
+      "Cute Nerd Magenta"
      ]
     },
     {
      "id": "monia-8",
-     "theme": "Noir",
-     "template": "stage",
-     "prism": false,
+     "theme": "Platinum",
+     "template": "scene",
+     "prism": true,
      "base": "monia/monia-8.png",
      "shimmer": "monia/monia-8.shimmer.png",
      "motifs": [
-      "Trial of Coolness",
-      "Cute Nerd Magenta",
-      "Cool Rescuer Monia",
-      "Cute Annoyance Mini"
+      "Cute Phoenix"
      ]
     }
    ]
@@ -469,94 +437,92 @@
     {
      "id": "future-1",
      "theme": "Crimson",
-     "template": "stage",
+     "template": "hero",
      "prism": false,
      "base": "future/future-1.png",
      "shimmer": "future/future-1.shimmer.png",
      "motifs": [
-      "Grasp the Future",
-      "Tushu, the Knowledge Keeper"
+      "Damus, the Prophet of Apocalypse"
      ]
     },
     {
      "id": "future-2",
-     "theme": "Noir",
-     "template": "stage",
-     "prism": false,
+     "theme": "Ember",
+     "template": "scene",
+     "prism": true,
      "base": "future/future-2.png",
      "shimmer": "future/future-2.shimmer.png",
      "motifs": [
-      "Traveler from the Future",
-      "Tushu, the Knowledge Keeper"
+      "Armageddon"
      ]
     },
     {
      "id": "future-3",
-     "theme": "Toxic",
-     "template": "stage",
+     "theme": "Forest",
+     "template": "hero",
      "prism": false,
      "base": "future/future-3.png",
      "shimmer": "future/future-3.shimmer.png",
      "motifs": [
-      "Glimpse of the Future"
+      "Mao, the Vengeful Guardian"
      ]
     },
     {
      "id": "future-4",
-     "theme": "Ember",
-     "template": "stage",
-     "prism": true,
+     "theme": "Desert",
+     "template": "scene",
+     "prism": false,
      "base": "future/future-4.png",
      "shimmer": "future/future-4.shimmer.png",
      "motifs": [
-      "End of the Future",
-      "Tushu, the Knowledge Keeper"
+      "Guardian Beast Tu"
      ]
     },
     {
      "id": "future-5",
-     "theme": "Amethyst",
-     "template": "stage",
-     "prism": false,
+     "theme": "Platinum",
+     "template": "hero",
+     "prism": true,
      "base": "future/future-5.png",
      "shimmer": "future/future-5.shimmer.png",
      "motifs": [
-      "Glimpse of the Future"
+      "Future Tech Gunslinger Riffel"
      ]
     },
     {
      "id": "future-6",
-     "theme": "Prism",
-     "template": "stage",
-     "prism": true,
+     "theme": "Noir",
+     "template": "scene",
+     "prism": false,
      "base": "future/future-6.png",
      "shimmer": "future/future-6.shimmer.png",
      "motifs": [
-      "Grasp the Future",
-      "Tushu, the Knowledge Keeper"
+      "Lunatic Golem"
      ]
     },
     {
      "id": "future-7",
      "theme": "Ocean",
-     "template": "stage",
+     "template": "focus",
      "prism": false,
      "base": "future/future-7.png",
      "shimmer": "future/future-7.shimmer.png",
      "motifs": [
-      "Traveler from the Future",
-      "Tushu, the Knowledge Keeper"
+      "Deepsea Castle",
+      "Mao, the Vengeful Guardian",
+      "Guardian Beast Shu",
+      "Deepsea Treasure"
      ]
     },
     {
      "id": "future-8",
-     "theme": "Platinum",
-     "template": "stage",
-     "prism": true,
+     "theme": "Sunfire",
+     "template": "scene",
+     "prism": false,
      "base": "future/future-8.png",
      "shimmer": "future/future-8.shimmer.png",
      "motifs": [
-      "End of the Future"
+      "Ifrit"
      ]
     }
    ]
@@ -814,124 +780,102 @@
    "variants": [
     {
      "id": "community-1",
-     "theme": "Toxic",
-     "template": "stage",
+     "theme": "Verdant",
+     "template": "hero",
      "prism": false,
      "base": "community/community-1.png",
      "shimmer": "community/community-1.shimmer.png",
      "motifs": [
-      "Aurora Borealis",
-      "Argos, the Eye of the Cosmos",
-      "Asriel, the Sapling Sacrificer",
-      "Baaliel, the Demon General"
+      "Brackle, the Catapulting Turtle"
      ]
     },
     {
      "id": "community-2",
-     "theme": "Crimson",
-     "template": "stage",
+     "theme": "Ocean",
+     "template": "scene",
      "prism": false,
      "base": "community/community-2.png",
      "shimmer": "community/community-2.shimmer.png",
      "motifs": [
-      "Armageddon",
-      "Bad Birthday Girl Cecilia",
-      "Baaliel, the Demon General",
-      "Cecilia, the Harrowing Crusader"
+      "Aurora Borealis"
      ]
     },
     {
      "id": "community-3",
-     "theme": "Prism",
-     "template": "grid",
-     "prism": true,
+     "theme": "Crimson",
+     "template": "hero",
+     "prism": false,
      "base": "community/community-3.png",
      "shimmer": "community/community-3.shimmer.png",
      "motifs": [
+      "Madame Guillotine, the Great Equalizer"
+     ]
+    },
+    {
+     "id": "community-4",
+     "theme": "Prism",
+     "template": "grid",
+     "prism": true,
+     "base": "community/community-4.png",
+     "shimmer": "community/community-4.shimmer.png",
+     "motifs": [
       "Baby Spider",
       "Luna, the Flame Fairy",
-      "Ifrit",
+      "Burning Skeleton",
       "Arrival from the Cosmic Depths",
       "Alchemic Journal",
-      "Armageddon",
-      "Aurora Borealis",
+      "Golden Ankh",
+      "Shield of Life",
       "500 Piranhas in a Monster Suit",
       "Cloudy Slime"
      ]
     },
     {
-     "id": "community-4",
-     "theme": "Ocean",
-     "template": "stage",
-     "prism": false,
-     "base": "community/community-4.png",
-     "shimmer": "community/community-4.shimmer.png",
-     "motifs": [
-      "Greatmaw Siren",
-      "Kit, the Shark Researcher",
-      "Brackle, the Catapulting Turtle",
-      "Blackstache, Scourge of the Pixel Seas"
-     ]
-    },
-    {
      "id": "community-5",
-     "theme": "Royal",
-     "template": "stage",
+     "theme": "Rosebud",
+     "template": "hero",
      "prism": false,
      "base": "community/community-5.png",
      "shimmer": "community/community-5.shimmer.png",
      "motifs": [
-      "Luna, the Flame Fairy",
-      "Hel, the Bound Specter",
-      "Dante, the Wanderer of Hell",
-      "Damus, the Prophet of Apocalypse"
+      "Fern, the Liberated Fairy"
      ]
     },
     {
      "id": "community-6",
-     "theme": "Verdant",
-     "template": "stage",
+     "theme": "Amethyst",
+     "template": "scene",
      "prism": false,
      "base": "community/community-6.png",
      "shimmer": "community/community-6.shimmer.png",
      "motifs": [
-      "Luna, the Flame Fairy",
-      "Fern, the Liberated Fairy",
-      "Jenny, the Class Fairy",
-      "Luna, the Flame Fairy"
+      "Greatmaw Siren"
      ]
     },
     {
      "id": "community-7",
      "theme": "Noir",
-     "template": "grid",
+     "template": "focus",
      "prism": false,
      "base": "community/community-7.png",
      "shimmer": "community/community-7.shimmer.png",
      "motifs": [
-      "Luna, the Flame Fairy",
-      "Golden Ankh",
-      "Ifrit",
-      "Burning Skeleton",
-      "Shield of Life",
+      "Monster Nest",
+      "Liquid Luck",
       "The Third Circle of Hell",
-      "The Fifth Circle of Hell",
-      "The Seventh Circle of Hell",
-      "Liquid Luck"
+      "The Seventh Circle of Hell"
      ]
     },
     {
      "id": "community-8",
      "theme": "Sunfire",
-     "template": "stage",
+     "template": "scene",
      "prism": false,
      "base": "community/community-8.png",
      "shimmer": "community/community-8.shimmer.png",
      "motifs": [
       "Baby Spider",
-      "Madame Guillotine, the Great Equalizer",
-      "Devlin, the Masked Butcher",
-      "Mao, the Vengeful Guardian"
+      "Kit, the Shark Researcher"
      ]
     }
    ]
@@ -954,8 +898,6 @@
       "Initiation Ritual",
       "Lilly, the Charming Infiltrator",
       "???, the Shapeshifter",
-      "Saya, the Plant Princess",
-      "Future Tech Gunslinger Riffel",
       "Flaming Dragonegg",
       "Divine Gift of Edge",
       "The Golden Gate",
@@ -975,8 +917,6 @@
       "Spirit of the Shattered Trident",
       "Fiona, the Princess of Blackport",
       "Earth-Shattering Hammer, Relic of Deri",
-      "Lolek, the Shard Knight",
-      "Blind Destruction",
       "Glasowt",
       "Divine Gift of Fire",
       "Poison Pollen",
@@ -996,8 +936,6 @@
       "Laser Volley",
       "Enigma, the Seller of Secrets",
       "Challenge",
-      "Glass Sword",
-      "Birthday Present",
       "Sorbereus, the Adapting Dragon",
       "Divine Gift of Magic",
       "Tail Slap",
@@ -1017,8 +955,6 @@
       "Heat Wave",
       "Poisoned Meat",
       "Spy in the Enemy's Camp",
-      "Deepsea Treasure",
-      "Visionary Genius Heinz",
       "Duigno, the Flaming Phoenix",
       "Divine Gift of Creation",
       "Pet Snake",
@@ -1038,8 +974,6 @@
       "Spirit of the Ultimate Gun",
       "Beer",
       "Brilliant Idea",
-      "Rha'Bi, the Living Skeleton",
-      "Future Tech Drone",
       "Motharch Squire",
       "Divine Gift of Death",
       "Sas'Za, the Snaka Adventurer",
@@ -1059,8 +993,6 @@
       "Kohta, the Silent Observer",
       "Voodoo Curse",
       "Prayer",
-      "Deepsea Castle",
-      "Ancient Tech Infinite Energy Core",
       "Sparkfly Worker",
       "Divine Gift of the Guardian",
       "The Golden Gate",
@@ -1080,8 +1012,6 @@
       "Alleria, the Queen of Spiders",
       "Charme",
       "Null, the Mage Slayer",
-      "Spreading Rumor",
-      "Surprising Opportunity",
       "Angler Angel",
       "Divine Gift of Coolness",
       "Poison Pollen",
@@ -1101,8 +1031,6 @@
       "Summoning Instructions",
       "Mimic",
       "???, the Shapeshifter",
-      "Missing People",
-      "Explosive Drone",
       "Sparkfly Attendant",
       "Divine Gift of Rain",
       "Tail Slap",

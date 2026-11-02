@@ -79,6 +79,7 @@ class Pack:
     def __init__(self):
         self.rgb = np.zeros((H, W, 3))
         self.wt = np.zeros((H, W))
+        self.raw = np.zeros((H, W), bool)      # 1:1 übernommene Kartenkunst/Sprites: behalten ihre Originalfarben (keine Palette)
         self.sparks = []        # (x, y, r_max, phase, tint)
         # Körper mit Siegelzacken (Zahnbreite 8, Tiefe 4)
         tri = np.abs((np.arange(W) % 8) - 4)               # 4,3,2,1,0,1,2,3
@@ -90,6 +91,7 @@ class Pack:
     # --- Malen ---
     def paint(self, mask, color, wt=None, d=0):
         m = mask & self.body
+        self.raw[m] = False
         col = np.asarray(color, float)
         if col.ndim == 3:
             self.rgb[m] = col[m]
@@ -123,6 +125,7 @@ class Pack:
     def finish(self):
         """Palette + harte Alphakante. Gibt (H,W,4) uint8 zurück."""
         rgb = pal.snap(self.rgb)
+        rgb[self.raw] = np.clip(np.rint(self.rgb[self.raw]), 0, 255).astype(np.uint8)
         out = np.zeros((H, W, 4), np.uint8)
         out[..., :3] = rgb
         out[..., 3] = np.where(self.body, 255, 0)
@@ -324,8 +327,8 @@ def scaled(im, k):
     return im.resize((im.width * k, im.height * k), Image.NEAREST)
 
 
-def blit(P, im, x, y, wt=0.2, outline=None, mask_clip=None):
-    """RGBA-Bild (harte Alpha) an (x,y) legen; optional 1px Kontur."""
+def blit(P, im, x, y, wt=0.2, outline=None, mask_clip=None, raw=True):
+    """RGBA-Bild (harte Alpha) an (x,y) legen; optional 1px Kontur. raw=True: Farben 1:1 (nicht auf die Palette gerastet)."""
     a = to_np(im)
     h, w = a.shape[:2]
     full_rgb = np.zeros((H, W, 3))
@@ -345,6 +348,8 @@ def blit(P, im, x, y, wt=0.2, outline=None, mask_clip=None):
             ring &= mask_clip
         P.paint(ring, outline, wt=0.4)
     P.paint(full_m, full_rgb, wt=wt)
+    if raw:
+        P.raw[full_m & P.body] = True
     return full_m
 
 
