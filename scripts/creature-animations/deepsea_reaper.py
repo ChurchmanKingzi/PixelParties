@@ -42,6 +42,7 @@ import numpy as np
 import anim_lib as L
 import anim_untote as U
 import anim_flieger_r2 as R2
+import anim_amorph as A
 
 N, MS = 48, 70
 GPL, GPR, GPT, GPB = 7, 7, 7, 5
@@ -152,7 +153,7 @@ def fluegel(a, pivot_x, amp, ph, breite=2):
 
 # ── Flügelschlag: Biegung entlang der Mittellinie ─────────────────────────────────────────────────────────────────────────────
 FL_PERIODE = 16
-A_BLATT = math.radians(42.0)                                 # Ausschlag des Blatts (Spitze: bis ca. +50° nach oben, −17° nach unten gegenüber der Ruhelage)
+A_BLATT = math.radians(40.0)                                 # Ausschlag des Blatts (Spitze: bis ca. +50° nach oben, −17° nach unten gegenüber der Ruhelage)
 FING_A = math.radians(18.0)
 LAUF = 0.4
 #            Wurzelpunkt (Sprite)  Richtung zur Spitze (rad)           Länge   Drehsinn (+1 = oben ist im Uhrzeigersinn)
@@ -170,7 +171,7 @@ def _v(ph, f):
 def blatt(a, fl, ph):
     def delta(s):
         f = min(1.0, max(0.0, (s - 1.5) / (fl['laenge'] - 1.5)))
-        return fl['seite'] * _v(ph, f) * A_BLATT * f
+        return fl['seite'] * _v(ph, f) * A_BLATT * f ** 0.45        # Biegung früh (nah an der Wurzel), damit sich die Spitze fast wie bei einer Drehung bewegt
     return R2.biege(a, (GPL + fl['p0'][0], GPT + fl['p0'][1]), fl['ang0'], fl['laenge'], delta)
 
 
@@ -220,6 +221,7 @@ def frame_gross(i, nur=None):
     bob = -int(round(1.0 * math.sin(ph)))
     koerper = L.zusammen(H, W, [(fl, 0, 0), (fr, 0, 0), (kb, 0, 0)] + [(a, dx, dy) for (a, dx, dy) in saum] + [(k1, s1, 0), (k2, s2, 0)])
     koerper = L.versetze(koerper, 0, bob) if bob else koerper
+    koerper, _ = A.verbinde4(koerper)                           # Flügelfinger-Spitze, die nur über eine Pixelecke hängt: Brückenpixel (Farbe des Spitzenpixels)
     koerper = U.kontur_schliessen(koerper, UMRISS, KONTUR)
     if nur == 'koerper':
         return koerper

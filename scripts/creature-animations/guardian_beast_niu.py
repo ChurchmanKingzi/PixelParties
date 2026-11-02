@@ -71,7 +71,7 @@ AUGE_R = [(15, 18), (16, 18), (15, 19), (16, 19), (15, 20), (16, 20)]
 # Auslauf der Klingenspitzen (Mittelspalte x=1 bzw. x=24, y 34–44): Index in der Rampe [weiß, hell, mittel, dunkel] je Zeile
 RAMPE = [WEISS, C_, J_, N_]
 AUSLAUF_Y = list(range(34, 45))
-AUSLAUF_IDX = [0, 0, 0, 1, 0, 0, 1, 1, 2, 2, 3]
+AUSLAUF_IDX = [0, 0, 0, 1, 0, 0, 1, 1, 2, 2, 3]                  # y=44 (Randpixel der Spitze) bleibt fest
 
 
 def ebene(m, dx=0, dy=0):
@@ -110,14 +110,21 @@ def frame(i):
         sft = vorz * int(round(np.sin(L.sinus(i, 16)) * 1.0))
         pix = {}
         for y, idx in zip(AUSLAUF_Y, AUSLAUF_IDX):
-            if idx > 0:                                                   # weiße Zeilen bleiben weiß, der Auslauf wandert eine Stufe
+            if idx > 0 and y < 44:                                        # weiße Zeilen bleiben weiß, der Auslauf wandert eine Stufe
                 pix[(x, y)] = RAMPE[max(0, min(3, idx + sft))]
         Hm.setze(lay, pix, OFF)
-    # Glitzer: vierzackiger Stern am oberen Dorn
-    for lay, cx, start in ((kl, 1, 6), (kr, 24, 30)):
+    # Lichtschimmer: ein dreizeiliger hellvioletter Streifen (Mittelspalte, die Randpixel bleiben weiß) läuft die Klinge hinab (Metall, Regel 12)
+    for lay, x, start in ((kl, 1, 4), (kr, 24, 28)):
+        k = (i - start) % N
+        if k < 16:
+            y = 6 + int(round(k * 26 / 15.0))
+            pix = {(x, y0): c for y0, c in ((y - 1, C_), (y, J_), (y + 1, C_)) if 6 <= y0 <= 33 and f(x, y0) == WEISS}
+            Hm.setze(lay, pix, OFF)
+    # Glitzer: vierzackiger Stern an der oberen Ecke des breiten Klingenteils (Mitte (0,6) bzw. (25,6))
+    for lay, cx, start in ((kl, 0, 6), (kr, 25, 30)):
         st = Hm.folge(i, start, [0, 1, 2, 1, 0], N)
         if st is not None:
-            Hm.stern4(lay, cx, 2, st, WEISS, WEISS, WEISS, OFF)
+            Hm.stern4(lay, cx, 6, st, WEISS, WEISS, WEISS, OFF)
     fig = L.zusammen(H, W, [(rumpf, 0, 0), (kl, 0, 0), (kr, 0, 0), (kopf, 0, 0)])
     Hm.kontur_schliessen(fig, ERLAUBT, UMRISS)
     return fig

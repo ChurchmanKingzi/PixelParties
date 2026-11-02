@@ -11,5 +11,11 @@
   "padLeft": 1,
   "padRight": 2,
   "padBottom": 5,
-  "faceX": 13.0
+  "faceX": 13.0,
+  "kern": {
+    "x": 3,
+    "y": 9,
+    "w": 20,
+    "h": 17
+  }
 }

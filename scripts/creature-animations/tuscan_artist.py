@@ -21,8 +21,8 @@ Metall im Sprite: nur die Schuhkappen (Regel 14). Der goldene Rahmen bekommt weg
 Ablauf (48 Frames à 62 ms = 2,98 s, nahtlos):
 * Atmen / Schulterheben (Periode 24 = zweimal pro Schleife): der Körper unter dem Bild steigt 1 px (Schultern, Ärmel, Hände mit Pinsel, Overall; die Schuhe bleiben am Boden): die Anzugzeile 32 wird einmal doppelt
   eingefügt (L.streck_zeile) und die oberste Körperzeile 12 (Halstuch-Oberkante) entfällt — das Halstuch wird dabei 1 px kürzer, das Bild bleibt auf seiner Zeile (Kopf nur senkrecht, hier gar nicht bewegt).
-* Rechte Hand schwingt (leerer Arm schlackert locker, Periode 24, nur nach außen): Unterarm und Hand (x ≥ 19, y 21–25) pendeln um die Ärmelkante (Zeilenversatz mit Gefälle ≤ 1 px je Zeile, unten höchstens 1 px); der freigelegte
-  Zwischenraum zum Körper ist Hintergrund, die Kontur wird per Kontur-Schließen in Umrissfarbe zu.
+* Rechte Hand zuckt (leere Hand, Frames 4–9 und 28–33): die Hautpixel der Hand (x ≥ 18, y 21–26: braun (156,105,62), hell (245,203,161), orange (239,161,95)) rutschen starr 1 px nach oben in den Ärmelsaum; unten bleibt
+  ein Pixel der Kontur, nichts wird aufgerissen.
 * Schuhkappen glänzen (Metall): ein heller Pixel (225,215,217) wandert viermal pro Schleife über die Kappen (Frames 3–8 + je 12k), links x 8–10 und rechts x 14–16.
 Frame 0 = Original (Ruhepose). Kontrolle: anim_humanoide.ruhepose / eckkontakt_typen / Randpixel-Test (Regel 16).
 Alle Bewegungen laufen auf der vollen Leinwand (anim_lib wirft ClipError). Nur ganze Pixel, nur Farben der Quelle.
@@ -57,7 +57,8 @@ ERLAUBT = Hm.umrissfarben(spr)
 
 bild = vorhanden & (yy <= 11)                      # das Gemälde (Zeilen 0–11): STATISCH
 koerper = vorhanden & (yy >= 12)
-arm_r = koerper & (xx >= 19) & (yy >= 21) & (yy <= 25)       # rechter Unterarm + Hand (leer)
+HAUTFARBEN = {(156, 105, 62), (245, 203, 161), (239, 161, 95)}                          # J, Y, a (Unterarm/Hand)
+arm_r = koerper & (xx >= 18) & (yy >= 21) & (yy <= 26) & np.array([[f(x, y) in HAUTFARBEN if vorhanden[y, x] else False for x in range(sw)] for y in range(sh)])   # rechte Hand (leer)
 
 
 def teil(m):
@@ -76,11 +77,10 @@ def frame(i, nur=None):
     if g is not None and not nur:
         x, y = KAPPEN[g]
         Hm.setze(k, {(x, y): Z}, OFF)
-    # --- rechter Unterarm schwingt nach außen (Zeilenversatz mit Gefälle, nur ≥ 0) ---
-    ar, rest = L.trenne(k, np.pad(arm_r, ((PAD_T, PAD_B), (PAD_L, PAD_R))))
-    s = max(0.0, math.sin(L.sinus(i, 24)))
-    ar = L.zeilen_welle(ar, PAD_T + 20, 1.2, math.asin(min(1.0, s)))
-    k = L.zusammen(H, W, [(rest, 0, 0), (ar, 0, 0)])
+    # --- rechte Hand (leer) zuckt: sie rutscht 1 px nach oben in den Ärmel (Frames 4–9 und 28–33); die Hautpixel liegen dann über dem Ärmelsaum, unten wird nichts freigelegt ---
+    if Hm.folge(i, 4, [1] * 6, N) or Hm.folge(i, 28, [1] * 6, N):
+        ar, rest = L.trenne(k, np.pad(arm_r, ((PAD_T, PAD_B), (PAD_L, PAD_R))))
+        k = L.zusammen(H, W, [(rest, 0, 0), (L.versetze(ar, 0, -1), 0, 0)])
     # --- Atmen: Körper steigt 1 px (oberste Körperzeile 12 entfällt, Zeile 32 doppelt), das Bild bleibt ---
     brust = Hm.stufe(i, N / 2, 1)
     if brust:

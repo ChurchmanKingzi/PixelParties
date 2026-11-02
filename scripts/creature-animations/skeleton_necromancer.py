@@ -44,6 +44,7 @@ ERGÄNZUNG: 7 schwarze Pixel (A) im Loch hinter dem Arm bei (9,28) (10,28) (11,2
 sie werden erst sichtbar, wenn der Arm steigt. Sonst nichts gemalt.
 Zuschnitt: der Frame ist auf die Figur zugeschnitten (symmetrisch um die Ruhefigur; Partikel vergrößern ihn höchstens 2 px über den Körperrand hinaus, dazu 1 px leerer Rand).
 Alle Bewegungen laufen auf der vollen Leinwand (anim_lib wirft ClipError). Nur ganze Pixel.
+Runde 2: Animation unverändert; neu ist nur das JSON-Feld `kern` (Körperkern ohne Kapuzenkuppe und ohne Loch/Arm, damit die Platzierung am Skelett selbst hängt).
 """
 import math
 import sys
@@ -157,6 +158,9 @@ if __name__ == '__main__':
     frames = [frame(i) for i in range(N)]
     prev = sys.argv[sys.argv.index('--preview') + 1] if '--preview' in sys.argv else None
     L.pruefe(frames, quelle=spr, erlaubt=[SEELE_RAND], min_rand=1)
-    L.speichern('skeleton-necromancer', 'Skeleton Necromancer', frames, MS, prev)
+    # Runde 2 (Nutzer: „Animation passt; sein Mittelpunkt muss auf der y-Achse deutlich versetzt sein, damit das Skelett selbst nicht oben aus der Karte/Zone rausguckt“):
+    # Körperkern = die Kapuzenfigur mit Ärmeln, Robe und Rippenring (Sprite x 0–19, y 4–20) OHNE Kapuzenkuppe (y 0–3) und OHNE Loch/Arm unten (y 24–33); in Rahmenpixeln.
+    kern = {'x': PAD_L, 'y': PAD_T + 4, 'w': sw, 'h': 17}
+    L.speichern('skeleton-necromancer', 'Skeleton Necromancer', frames, MS, prev, extra={'kern': kern})
     if prev:
         L.streifen(prev + '/skeleton-necromancer-strip.png', [frames[k] for k in (0, 5, 10, 15, 20, 25, 30, 35)], spalten=4, scale=7)
