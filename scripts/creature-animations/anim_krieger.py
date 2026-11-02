@@ -96,6 +96,62 @@ def bob(a, zeile, n, mischen=True):
     return a[rows[n:]].copy()
 
 
+def schieben_fuellen(a, off, zeilen, x0, x1):
+    """Wie Hm.bereich_versatz (Pixel x0 ≤ x ≤ x1 jeder Zeile wandern um dx), aber die freigewordenen Zellen bekommen die Farbe des Nachbarpixels auf der
+    freigelegten Seite (x0−1 bei dx > 0, x1+1 bei dx < 0) — der Hintergrund hinter einem pendelnden Bart/Zipfel wird ergänzt, es entstehen keine Löcher."""
+    for y, dx in zeilen.items():
+        Y = y + off[1]
+        X0, X1 = x0 + off[0], x1 + off[0]
+        if not dx:
+            continue
+        zeile = {x: a[Y, x].copy() for x in range(X0, X1 + 1) if a[Y, x, 3]}
+        if not zeile:
+            continue
+        if min(zeile) + dx < 0 or max(zeile) + dx >= a.shape[1]:
+            raise L.ClipError(f'Zeile {y} würde aus der Leinwand geschoben')
+        nb = X0 - 1 if dx > 0 else X1 + 1
+        fuell = a[Y, nb].copy() if 0 <= nb < a.shape[1] and a[Y, nb, 3] else None
+        for x in zeile:
+            a[Y, x] = 0
+        for x, px in zeile.items():
+            a[Y, x + dx] = px
+        if fuell is not None:
+            for x in (list(zeile)):
+                if not a[Y, x, 3]:
+                    a[Y, x] = fuell
+    return a
+
+
+def scheren(a, pivot_y, amp):
+    """Flügel/Zipfel um ein Gelenk (Zeile pivot_y) neigen: jede Zeile wandert waagerecht um round(amp · Abstand/maxAbstand) (wie L.zeilen_welle), aber so,
+    dass benachbarte Zeilen 4-verbunden bleiben: überlappt eine Zeile nach der Verschiebung die weiter innen liegende Zeile nicht mehr (dünne Federspitze),
+    übernimmt sie deren Versatz — die Spitze reißt nicht als Einzelpixel ab."""
+    out = L.leer(*a.shape[:2])
+    h, w = a.shape[:2]
+    ys = [y for y in range(h) if a[y, :, 3].any()]
+    if not ys:
+        return out
+    maxd = max(1, max(abs(y - pivot_y) for y in ys))
+    shift = {}
+    # von der Wurzel (nächste Zeile am Gelenk) nach außen
+    for y in sorted(ys, key=lambda v: abs(v - pivot_y)):
+        s = int(round(amp * abs(y - pivot_y) / maxd))
+        inner = y + (1 if y < pivot_y else -1)
+        if inner in shift:
+            xs = set(np.nonzero(a[y, :, 3])[0] + s)
+            xi = set(np.nonzero(a[inner, :, 3])[0] + shift[inner])
+            if not (xs & xi):
+                s = shift[inner]
+        shift[y] = s
+    for y in ys:
+        xs = np.nonzero(a[y, :, 3])[0]
+        if xs.min() + shift[y] < 0 or xs.max() + shift[y] >= w:
+            raise L.ClipError(f'Zeile {y} würde um {shift[y]} px aus der Leinwand geschoben')
+        for x in xs:
+            out[y, x + shift[y]] = a[y, x]
+    return out
+
+
 def kontur(a, erlaubt, wahl):
     """Regel 16: jedes Randpixel (4-Nachbar leer), dessen Farbe keine Umrissfarbe des Originals ist, bekommt die Farbe wahl(farbe, x, y) — so bleibt die Kontur in jeder Pose geschlossen
     und der neue Umriss passt zur Umgebung (roter Federbusch → dunkles Rot, nicht Schwarz)."""

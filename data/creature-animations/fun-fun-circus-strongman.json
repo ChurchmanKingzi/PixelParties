@@ -1,0 +1,15 @@
+{
+  "creature": "Fun-Fun Circus Strongman",
+  "sheet": "fun-fun-circus-strongman.png",
+  "frameWidth": 35,
+  "frameHeight": 37,
+  "frames": 72,
+  "frameMs": 62,
+  "loop": true,
+  "layout": "horizontal",
+  "padTop": 2,
+  "padLeft": 3,
+  "padRight": 3,
+  "padBottom": 2,
+  "faceX": 17.5
+}

@@ -71,13 +71,15 @@ def spalten_schieben(a, dy_fn, fuell=None):
     return out
 
 
-def fluegel_asym(a, pivot_x, ph, hoch, runter, lauf=0.0, nur_rechts=None, potenz=1.0, zusammenhang=True, gruppen=None):
+def fluegel_asym(a, pivot_x, ph, hoch, runter, lauf=0.0, nur_rechts=None, potenz=1.0, zusammenhang=True, gruppen=None, fuell=None):
     """Flügelschlag mit ungleichen Ausschlägen: Spalte x wandert um round(f^potenz · g(s)), s = sin(ph − lauf·f) − sin(−lauf·f) ∈ [−2, 2], f = Abstand/größter Abstand,
     g(s) = −hoch · |s| bei s < 0 (Flügelspitze hebt sich), runter · s bei s > 0 (senkt sich). Bei ph = 0 steht jede Spalte auf ihrer Originalposition (Ruhepose).
     nur_rechts: True/False = nur eine Seite des Gelenks bewegen. zusammenhang: eine Spalte, die von ihrer Nachbarspalte zur Wurzel hin nicht mehr 4-verbunden wäre,
     übernimmt deren Versatz (dünne Spitzen reißen nicht ab).
     gruppen: [(x0, x1), …] (Leinwandspalten): alle Spalten einer Gruppe wandern gemeinsam (Versatz der mittleren Spalte) — z. B. ein Krallenfinger am Flügelrand, der sonst
-    beim Schlag vom Flügel abreißt."""
+    beim Schlag vom Flügel abreißt.
+    fuell: Bool-Maske der Leinwand (Rumpf unter dem Flügel): hebt sich eine Spalte (dy < 0) und lag im Original unter ihrem untersten Pixel Rumpf, wird die Lücke mit dem untersten
+    Pixel der Spalte gefüllt (der Flügel bleibt am Rumpf angewachsen)."""
     out = L.leer(*a.shape[:2])
     h, w = a.shape[:2]
     spalten = [x for x in range(w) if a[:, x, 3].any()]
@@ -117,6 +119,12 @@ def fluegel_asym(a, pivot_x, ph, hoch, runter, lauf=0.0, nur_rechts=None, potenz
             raise L.ClipError(f'Spalte {x} würde um {dy} px aus der Leinwand (Höhe {h}) geschoben')
         for y in ys:
             out[y + dy, x] = a[y, x]
+        if fuell is not None and dy < 0:
+            yb = int(ys.max())
+            if yb + 1 < h and fuell[yb + 1, x]:
+                for y in range(yb + dy + 1, yb + 1):
+                    if not out[y, x, 3]:
+                        out[y, x] = a[yb, x]
     return out, dys
 
 

@@ -21,7 +21,7 @@ Ablauf (48 Frames à 65 ms = 3,12 s; Frame 0 = Original, Tropfen/Dampf ausgenomm
 * Ohren schwingen unabhängig (links Periode 24, rechts Periode 16): die Zeilen über y 10 wandern seitlich, bis ±2 px an der Schlaufe, mit Wellenlauf (Spitze hinkt nach); bleiben 4-verbunden.
 * Atmen zweistufig 0-1-2-1-0 px (Periode 24, zweimal pro Schleife): die Bauchzeile y 23 des Rumpfs wird 1–2× eingefügt (anim_lib.streck_zeile mit Texturmischung); Kopf samt Ohren und beide Arme steigen, Beine/Füße
   bleiben am Boden. Der Kopf folgt der Brust 2 Frames später (nie höher als die Brust).
-* Wasserhände schwingen leicht nach außen (je ≤ 1 px, gegengleich, Periode 16).
+* Wasserhände schwingen leicht nach außen (je ≤ 1 px, gegengleich, links Periode 24, rechts Periode 16).
 * Füße wippen starr im Wechsel (rechter Frame 5–7 und 29–31, linker Frame 17–19 und 41–43): das Bein wird 1 px kürzer (Zeile 27 entfällt, Fuß hebt sich), Beine y 25–29.
 * Wasser (Partikel, hinter der Figur): zwei Dampfwölkchen steigen von den Ohrschlaufen langsam auf (hell (187,243,253), Rand (129,177,187), 2×2 → 4×4 → 2×2, leichtes Wabern); je ein Tropfen (2×2, (4,212,240)/(187,243,253))
   löst sich von der linken und rechten Hand und fällt 5–6 px; ein Wölkchen am Boden neben den Füßen. Alle Farben aus dem Sprite.
@@ -105,7 +105,7 @@ def frame_gross(i, nur=None):
     fl_ = L.heben_unten(T_FUSS_L, GPT + 27, bl) if bl else T_FUSS_L
     fr_ = L.heben_unten(T_FUSS_R, GPT + 27, br) if br else T_FUSS_R
     beine_ = L.zusammen(H, W, [(fl_, 0, 0), (fr_, 0, 0)])
-    al = U.haengen(T_AL, GPT + 19, -1.0 * U.buckel(i, 0, 16, n=16), 1.0)
+    al = U.haengen(T_AL, GPT + 19, -1.0 * U.buckel(i, 0, 24, n=24), 1.0)
     ar = U.haengen(T_AR, GPT + 19, 1.0 * U.buckel(i, 0, 16, n=16), 1.0)
     f = L.zusammen(H, W, [(beine_, 0, 0), (rp, 0, 0), (al, 0, -n), (ar, 0, -n), (T_KOPF, 0, -n_kopf), (ol, 0, -n_kopf), (orr, 0, -n_kopf)])
     f = U.kontur_schliessen(f, UMRISS, KONTUR)

@@ -19,7 +19,7 @@ Metall/Edelstein: nichts → KEIN Glanz (Knochen, Stoff; Regel 14). Kein Feuer, 
 Ablauf (48 Frames à 70 ms = 3,36 s, nahtlos; Ebenen: Robe, Schädelgruppe, Wirbel, linkes Knochenstück, Kreuzknochen):
 * Atmen der Robe (Periode 24, zweimal pro Schleife): die Robenzeile 22 wird einmal doppelt eingefügt (L.streck_zeile, Texturmischung): Kopf, Brust und Gürtel steigen 1 px, der Saum (y 23–25) bleibt.
 * Schädelgruppe schwebt (Periode 16, dreimal pro Schleife): beide Schädel samt Kronenknochen steigen starr um 1 px und sinken wieder (Heben/Senken); die frei werdende Zeile 11 unter dem Kiefer wird mit dem dunklen Marineblau der Kapuze (23,16,44) gefüllt, solange die Robe darunter nicht mitgestiegen ist.
-* Wirbel am Kinn von Schädel 2 pendelt (Periode 12, viermal pro Schleife): Zeilen 20–23 wandern waagerecht (Gelenk Zeile 19, Spitze bis ±2 px), er hängt am Schädel und bobbt mit ihm.
+* Wirbel am Kinn von Schädel 2 schwingt (Periode 12, viermal pro Schleife): der dünne Knochen (x 20–24, y 20–23) wandert starr 0 → +1 → 0 → −1 px waagerecht (nur starr, damit der schmale Umriss nicht reißt), er hängt am Schädel und bobbt mit ihm.
 * Linkes Knochenstück an der Robe pendelt (Periode 16 versetzt): Zeilen 24–28 wandern waagerecht (Gelenk Zeile 23, Spitze bis ±2 px), Zeile 23 bleibt an der Robe.
 * Kreuzknochen schweben (Periode 24 versetzt): sie sinken von der Ruhelage 0 → 1 px nach unten (nur nach unten, damit sie sich nicht an die Robe heften) und zurück.
 * Blinzeln der drei hellblauen Augenpixel (Frames 21–23 und 41–43): sie nehmen das Marineblau (45,26,70) der Kapuze an (Lid = Umgebungsfarbe).
@@ -99,8 +99,8 @@ def frame_gross(i, nur=None):
                 r[GP + 11, GP + x, :3] = MARINE
                 r[GP + 11, GP + x, 3] = 255
     # Wirbel am Kinn von Schädel 2: pendelt, hängt am Schädel
-    w = L.zeilen_welle(teil(wirbel), GP + 19, 2.0, L.sinus(i, 12))
-    w = L.versetze(w, 0, sk)
+    sw_ = math.sin(L.sinus(i, 12))
+    w = L.versetze(teil(wirbel), 1 if sw_ > 0.5 else (-1 if sw_ < -0.5 else 0), sk)
     # linkes Knochenstück an der Robe: pendelt
     kl = L.zeilen_welle(teil(knochen_l), GP + 23, 1.6, L.sinus(i, 16, 0.0))
     # Kreuzknochen schweben 0/+1

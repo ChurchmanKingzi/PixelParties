@@ -23,7 +23,7 @@ Ablauf (48 Frames à 62 ms = 2,98 s, nahtlos):
 * Auf und ab (Periode 24 = zweimal pro Schleife): die Haarzeile 19 wird einmal doppelt eingefügt (Texturmischung): Kopf, Helm, Gesicht, Haare und beide Flügel steigen 1 px, Balken, Beine und Füße bleiben unten.
   Die Flügel sind eigene Ebenen und steigen starr mit; der Kopf bleibt starr (kein seitliches Neigen).
 * Flügel öffnen und schließen sich (Periode 24, zweimal pro Schleife): jede Federzeile wandert um die Schulter (Gelenk y 20) waagerecht nach außen, die Spitze bis 3 px, nach unten auslaufend (Gefälle < 0,2 px je Zeile,
-  L.zeilen_welle); die Federn selbst bleiben unverändert (keine Spaltenkopie), die Flügel hängen unten an der Schulter.
+  K.scheren: wie L.zeilen_welle, aber die dünne Federspitze übernimmt den Versatz der Zeile darunter, falls sie sonst nur diagonal anläge); die Federn selbst bleiben unverändert (keine Spaltenkopie), die Flügel hängen unten an der Schulter.
 * Helmbusch wiegt (Zeilen 0–5): zwei Wellen (3 s und 1 s) bis ±2 px an der Spitze, nach unten auslaufend (Gefälle ≤ 1 px je Zeile).
 * Blinzeln (Frames 19–21 und 41–43): zuerst nehmen die türkisen Pixel, dann auch die weißen und goldenen Augenpixel die Hautfarbe (246,205,139) an (Lid = Haut, schwarze Wimpernpixel bleiben als Lidlinie); kein Glanzpunkt.
 * Metall glänzt (Regel 14): ein Lichtband läuft zweimal über den Helm (Frames 4–11 und 28–35), dazu ein Glitzerstern auf dem Helm (Frames 12–15 und 36–39).
@@ -77,8 +77,8 @@ def frame(i, nur=None):
     Hm.zeilen_versatz(k, OFF, K.gefaelle(list(range(0, 6)), d))
     # --- Flügel öffnen/schließen ---
     off = 1.5 * (1 - math.cos(2 * math.pi * i / 24))            # 0 … 3 px an der Spitze
-    wl = L.zeilen_welle(sz.ebene(m_fl), PT + 20, -off, math.pi / 2)
-    wr = L.zeilen_welle(sz.ebene(m_fr), PT + 20, off, math.pi / 2)
+    wl = K.scheren(sz.ebene(m_fl), PT + 20, -off)
+    wr = K.scheren(sz.ebene(m_fr), PT + 20, off)
     # --- Auf und ab: Haarzeile 19 doppelt, Flügel starr mit ---
     brust = Hm.stufe(i, N / 2, 1)
     k = K.bob(k, PT + 19, brust)

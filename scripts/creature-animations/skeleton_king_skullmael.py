@@ -25,7 +25,7 @@ Ablauf (48 Frames à 65 ms = 3,12 s; Frame 0 = Original):
   Das SCHWERT steigt starr mit der haltenden Hand mit (Regel 28); nichts wird gestreckt außer der Halszeile.
 * SCHWERTSPITZE pendelt (Periode 36): die Klinge schwingt unterhalb der Hand (y ≥ 9) bis 1 px nach links/rechts (Zeilenversatz mit Gefälle ≤ 1, Griff und Knauf bleiben bei der Hand).
 * LICHTBAND (Periode 48, zweimal pro Schleife versetzt): ein diagonales Band wandert über das GOLD (Krone, Pauldrons, Knauf, Stiefel), danach ein zweites über die KLINGE; eine Stufe heller auf der Farbrampe des Sprites.
-* GLITZERSTERNE (kleine Vierzack-Sterne, Mitte weiß, Arme hellgelb, 1 → 2 → 2 → 1 → 0 Stufen, am Objekt): Krone (22,2), linkes Schulterstück (11,4), Knauf (4,5)… der Stern an der Klingenspitze (16,15); rechter Pauldron (27,5), Stiefel (15,21).
+* GLITZERSTERNE (kleine Vierzack-Sterne, Mitte weiß, Arme hellgelb, 1 → 2 → 2 → 1 → 0 Stufen, am Objekt): Krone (22,2), linkes Schulterstück (11,4), Knauf (4,5), rechter Pauldron (27,5), Stiefel (15,21) und (23,21).
 * AUGEN blinzeln (Frames 12–14 und 35–37): die roten Augenpixel nehmen die Farbe der Augenhöhle (15,15,15) an.
 Kein Kopfneigen, keine seitliche Verlagerung (Regel 17); die Füße bleiben am Boden (Regel 18). Alle Bewegungen laufen auf der vollen Leinwand (anim_lib wirft ClipError). Nur ganze Pixel, nur Farben der Quelle.
 Ergänzungen: keine gemalten Pixel; Randpixel-Test (Regel 16) mit `U.kontur_schliessen`.
@@ -89,8 +89,8 @@ def frame(i, nur=None):
     k = ebene(koenig, KOENIG_OFF)
     s = ebene(schwert, SCHWERT_OFF)
     # Lichtbänder (Sprite-Koordinaten, Diagonale x + y): Gold in den ersten 20 Frames, Klinge später
-    d_gold = -4 + 2 * ((i - 2) % 24) if 0 <= (i - 2) % 24 < 18 else None
-    d_klinge = 8 + 2 * ((i - 14) % 24) if 0 <= (i - 14) % 24 < 12 else None
+    d_gold = -3 + 3 * ((i - 2) % 24) if 0 <= (i - 2) % 24 < 18 else None
+    d_klinge = 8 + 2 * ((i - 4) % 24) if 0 <= (i - 4) % 24 < 12 else None
     if d_gold is not None:
         V.glanz_band(k, GOLD_K, GOLD, d_gold, 3, OFF)
         V.glanz_band(s, GOLD_S, GOLD, d_gold, 3, OFF)
@@ -103,12 +103,13 @@ def frame(i, nur=None):
     aus = 1.4 * math.sin(2 * math.pi * i / 36)
     s = U.haengen(s, OFF[1] + 9, aus, 1.0)
     f = L.zusammen(H, W, [(s, 0, -n), (kb, 0, 0)])
+    f = U.kontur_schliessen(f, UMRISS, KONTUR)
     if nur is None:                                                          # Glitzersterne am Gold (nach der Figur, am Objekt)
-        for (sx, sy, st0, dy_) in ((22, 2, 4, -n), (11, 4, 16, -n), (4, 5, 26, -n), (27, 5, 36, -n), (15, 21, 9, 0), (16, 15, 31, -n)):
+        for (sx, sy, st0, dy_) in ((22, 2, 4, -n), (11, 4, 16, -n), (4, 5, 26, -n), (27, 5, 36, -n), (15, 21, 9, 0), (23, 21, 41, 0)):
             st = stern_folge(i, st0)
             if st:
                 V.stern(f, sx, sy + dy_, st, (255, 255, 255), (255, 222, 90), OFF)
-    return U.kontur_schliessen(f, UMRISS, KONTUR) if nur else f
+    return f
 
 
 if __name__ == '__main__':

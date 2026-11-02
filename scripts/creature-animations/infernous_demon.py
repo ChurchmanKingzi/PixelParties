@@ -19,7 +19,7 @@ Fest bleiben: Hörner, Gesichtsform, Mund, Füße.
 Ablauf (48 Frames à 65 ms = 3,12 s; Frame 0 = Original, Funken ausgenommen):
 * Atmen zweistufig 0-1-2-1-0 px (Periode 24, zweimal pro Schleife): die Bauchzeile y 23 des Rumpfs wird 1–2× eingefügt (anim_lib.streck_zeile mit Texturmischung); Kopf samt Hörnern und beide Arme steigen, die Füße bleiben am Boden. Der Kopf folgt
   der Brust 2 Frames später (nie höher als die Brust, sinkt höchstens 1 px in die Schultern).
-* Arme schwingen locker nach außen (je ≤ 1 px, gegengleich, Periode 16 bzw. 24) — Spaltenversatz wächst von der Schulter zur Faust.
+* Arme schwingen locker nach außen (je ≤ 1 px, gegengleich, Periode 24 bzw. 16) — Spaltenversatz wächst von der Schulter zur Faust.
 * Blinzeln (Lid = Gesichtsfarben (222,57,4)/(237,92,11)): beide Augenschlitze Frame 9–11 und 33–35. Die Brauen bleiben.
 * Glut: Funken (Regel 15: 1 px, runde Glutpunkte, steigen langsam auf, verglimmen am Ende) lösen sich von den Hornspitzen, den Schultern und aus der Luft neben dem Körper (hinter der Figur, 8 Stück, Lebensdauer 48 Frames, leichtes Wabern;
   Farben (245,131,49)/(232,103,43)/(240,69,12) aus dem Sprite). Kein Glanz/Glitzer (Regel 14), keine erfundene Flamme (der Sprite enthält keine).
@@ -97,7 +97,7 @@ def frame_gross(i, nur=None):
             kp[GPT + y, GPL + x, :3] = c
     rp = L.streck_zeile(T_RUMPF, GPT + 23, n)
     al = U.haengen(T_AL, GPT + 16, -1.0 * U.buckel(i, 0, 16, n=16), 1.0)
-    ar = U.haengen(T_AR, GPT + 16, 1.0 * U.buckel(i, 8, 24, n=24), 1.0)
+    ar = U.haengen(T_AR, GPT + 16, 1.0 * U.buckel(i, 0, 16, n=16), 1.0)
     f = L.zusammen(H, W, [(rp, 0, 0), (al, 0, -n), (ar, 0, -n), (kp, 0, -n_kopf)])
     f = U.kontur_schliessen(f, UMRISS, KONTUR)
     if nur == 'koerper':

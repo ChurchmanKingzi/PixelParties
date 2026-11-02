@@ -1,0 +1,15 @@
+{
+  "creature": "Ifrit",
+  "sheet": "ifrit.png",
+  "frameWidth": 20,
+  "frameHeight": 49,
+  "frames": 48,
+  "frameMs": 65,
+  "loop": true,
+  "layout": "horizontal",
+  "padTop": 2,
+  "padLeft": 1,
+  "padRight": 1,
+  "padBottom": 1,
+  "faceX": 10.0
+}
