@@ -105,7 +105,7 @@ def _linie(a, b):
 class Glied:
     """Dünnes, schlangenartiges Glied (heller Kern + 1 px Umriss). Der Kern wird ab `wurzel` per Breitensuche (8-verbunden) in Wellenfronten (Tiefe t) zerlegt;
     jede Wellenfront wird als Ganzes um einen Vektor senkrecht zum Gliedverlauf verschoben (laufende Welle, Wurzel fest). Lücken zwischen Nachbarfronten
-    schließen Linienpixel (Kernfarbe), der Umriss wird um den neuen Kern neu gezogen (8 Nachbarn) — das Glied bleibt 4-verbunden, ohne Lücken.
+    schließen Linienpixel (Kernfarbe), der Umriss wird um den neuen Kern neu gezogen (4 Nachbarn, wie im Original) — das Glied bleibt 4-verbunden, ohne Lücken.
     pixel: Menge (y, x) aller Pixel des Glieds im Sprite (Kern + Umriss); wurzel: (y, x) eines Kernpixels am Körper."""
 
     def __init__(self, spr, pixel, wurzel, dunkel=((0, 0, 0), (12, 12, 12)), umriss=(12, 12, 12)):
@@ -179,10 +179,9 @@ class Glied:
             e[y + oy, x + ox, :3] = c
             e[y + oy, x + ox, 3] = 255
         for (y, x) in list(neu):
-            for dy in (-1, 0, 1):
-                for dx in (-1, 0, 1):
-                    r = (y + dy, x + dx)
-                    if r not in neu:
-                        e[r[0] + oy, r[1] + ox, :3] = self.umriss
-                        e[r[0] + oy, r[1] + ox, 3] = 255
+            for dy, dx in ((1, 0), (-1, 0), (0, 1), (0, -1)):          # Umriss: 4 Nachbarn (wie im Original-Sprite)
+                r = (y + dy, x + dx)
+                if r not in neu:
+                    e[r[0] + oy, r[1] + ox, :3] = self.umriss
+                    e[r[0] + oy, r[1] + ox, 3] = 255
         return e
