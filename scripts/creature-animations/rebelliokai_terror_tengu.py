@@ -64,14 +64,13 @@ def frame(i):
     k = R.teil(spr, rumpf, H, W, OFF)
     tl = R.teil(spr, schwanz_l, H, W, OFF)
     tr = R.teil(spr, schwanz_r, H, W, OFF)
-    # Flügelspitzen wehen nach außen
-    def aus(i_, per, vers, amp):
-        s = (math.sin(L.sinus(i_, per) + vers) - math.sin(vers)) / 2.0          # 0 bei Frame 0
-        return max(0.0, -s) * amp * 2 if s < 0 else 0.0
-    sl = (math.sin(L.sinus(i, N / 3) + 0.9) - math.sin(0.9)) / 2.0
-    sr = (math.sin(L.sinus(i, N / 2) + 2.0) - math.sin(2.0)) / 2.0
-    tl = R.zeilen_pendel(tl, PAD_T + 16, 2.3 * max(0.0, -sl) * 2 + 0.0, math.pi / 2, lauf=0.0)
-    tr = R.zeilen_pendel(tr, PAD_T + 16, -2.3 * max(0.0, -sr) * 2 + 0.0, math.pi / 2, lauf=0.0)
+    # Flügelspitzen wehen nach außen (nie zum Körper): u ∈ [0, 1], 0 in Frame 0
+    def aus(per1, per2):
+        u1 = 0.5 * (1 - math.cos(L.sinus(i, per1)))
+        u2 = 0.5 * (1 - math.cos(L.sinus(i, per2)))
+        return min(1.0, 0.7 * u1 + 0.3 * u2)
+    tl = R.zeilen_pendel(tl, PAD_T + 16, -2.4 * aus(N / 3, N / 5), math.pi / 2)
+    tr = R.zeilen_pendel(tr, PAD_T + 16, 2.4 * aus(N / 2, N / 7.5), math.pi / 2)
     # Federspitzen flickern
     if Hm.folge(i, 8, [1] * 6, N):
         Hm.bereich_versatz(k, OFF, {1: -1}, 0, 6)

@@ -21,7 +21,7 @@ Ablauf (48 Frames à 65 ms = 3,12 s; Frame 0 = Original):
   das Gefälle zwischen benachbarten Zeilen ist ≤ 1 px, so bleibt der Wurm in jeder Pose ein einziger 4-verbundener Körper (für alle 48 Frames geprüft: 4er-Flecken = Original). Das Loch bleibt stehen.
 * ATMEN/Ringe (Periode 12): die hellen Ringzeilen pulsieren nicht (Farben bleiben), stattdessen wandert eine zweite, kleinere Welle (Wellenlänge 9 Zeilen, ±1 px) mit etwas anderer Geschwindigkeit (Periode 16) über den Körper, sodass sich der Wurm unregelmäßig windet.
 * AUGE blinzelt (Frames 18–20 und 41–43): die Augenpixel nehmen die Kopffarbe (118,118,118) an.
-* ERDBROCKEN: kleine Erdwölkchen (2×2 → 3×3 → 2×2, Farben (118,118,118)/(82,82,82)) steigen langsam neben dem Loch auf (Lebensdauer 24 Frames, 4 Stück, 5 px Hub).
+Keine Partikel (graue Erdbrocken wirkten wie Fehlpixel und wurden wieder entfernt — Regel 25: im Zweifel weglassen).
 Ruhepose = Original (die Wellen werden bei Frame 0 abgezogen). Alle Bewegungen laufen auf der vollen Leinwand (anim_lib wirft ClipError). Nur ganze Pixel, nur Farben der Quelle.
 Ergänzungen: keine gemalten Pixel.
 """
@@ -58,13 +58,6 @@ def offs(i):
     return V.glatt(res, EBENE_Y)
 
 
-# Erdbrocken
-STAUB = {'c': (118, 118, 118), 'r': (82, 82, 82)}
-P = lambda x, y: (OFF[0] + x, OFF[1] + y)
-PUFFS = [dict(x=P(10, 24)[0], y=P(10, 24)[1], vx=-2, vy=-6, off=0, wackeln=1), dict(x=P(22, 24)[0], y=P(22, 24)[1], vx=2, vy=-6, off=12, wackeln=1),
-         dict(x=P(14, 26)[0], y=P(14, 26)[1], vx=-1, vy=-5, off=6, wackeln=1), dict(x=P(21, 26)[0], y=P(21, 26)[1], vx=1, vy=-5, off=18, wackeln=1)]
-
-
 def frame(i, nur=None):
     k = L.platz(spr.copy(), H, W, OFF[0], OFF[1])
     if V.fenster(i, N, 18, 3) or V.fenster(i, N, 41, 3):                     # Blinzeln
@@ -75,9 +68,6 @@ def frame(i, nur=None):
     wurm = V.zeilen_versatz4(wurm, offs(i))
     f = L.zusammen(H, W, [(boden, 0, 0), (wurm, 0, 0)])
     f = U.kontur_schliessen(f, UMRISS, (26, 26, 26))
-    if nur is None:
-        staub = U.wolke_ebene(H, W, i, 24, PUFFS, STAUB)
-        f = L.zusammen(H, W, [(staub, 0, 0), (f, 0, 0)])
     return f
 
 
