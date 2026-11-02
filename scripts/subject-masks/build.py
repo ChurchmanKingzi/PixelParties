@@ -15,13 +15,18 @@ Verfahren je Karte:
      Luecken zwischen zwei Ebenen nicht als Hintergrund zaehlen.
   4. Guete: "hoch" (alle Ebenen >= 0,90), "mittel" (>= 0,80), "knapp" (>= 0,70). Karten ohne Treffer bekommen keine Maske.
 
+WICHTIG: Automatische Masken sind nur Vorschlaege ("checked": false). Sie enthalten nur die Ebenen, deren Dateiname zum Kartennamen
+passt. Viele Kartenbilder sind aber ganze Szenen (Zimmer, Marktstand, Palast) mit mehreren Figuren und Requisiten auf eigenen Ebenen
+(Karten in der Hand, Preisschilder, Haarflammen, Muenzen), und was "Motiv" ist, ist eine kuenstlerische Entscheidung je Karte. Eine Karte
+darf erst mit Umbra/Stained gedruckt werden, wenn ihre Maske von Hand geprueft ist ("manual": true, "checked": true).
+
 Von Hand korrigierte Masken (Eintrag mit "manual": true) werden nie ueberschrieben.
 
 Aufruf (aus dem Wurzelverzeichnis des Spiels):
   python3 scripts/subject-masks/build.py [--sprites ../pixelpartiessprites] [--jobs 4] [--only "Pyraga" "Fireball"] [--resume]
 
 Ausgabe: data/subject-masks.json
-  { "version": 1, "cards": { "<Kartenname>": { "w": 152, "h": 102, "rle": [...], "q": "hoch", "score": 0.83, "src": ["<Sprite>", ...] } } }
+  { "version": 1, "cards": { "<Kartenname>": { "w": 152, "h": 102, "rle": [...], "q": "hoch", "score": 0.83, "src": ["<Sprite>", ...], "checked": false } } }
   w/h = Rastergroesse der Kunst im Atlas (public/cardgen/art.json, Schluessel "a"). rle = Lauflaengen abwechselnd Hintergrund /
   Motiv, zeilenweise, mit Hintergrund beginnend (ein Motiv in der ersten Zelle beginnt also mit 0).
 Abhaengigkeiten: numpy, Pillow.
