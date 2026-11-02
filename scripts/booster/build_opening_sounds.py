@@ -3,6 +3,7 @@
 Spiel-Sounds: Vorbis, mono, 22,05 kHz). Zeitpunkte je Bild stehen in opening.json (`sounds`), erzeugt von build_opening.py.
 
 Aufruf:  python3 scripts/booster/build_opening_sounds.py [--out DIR]
+Ablage:  public/sounds/ (Wiedergabe im Spiel) und eine Kopie in data/shop/Boosterpacks/opening/sounds/ (zusammen mit Packs und Animation)
 Dateien (booster_*.ogg):
   slide      Pack gleitet ein und setzt auf          buildup  Spannungsaufbau (1,4 s) bis zum Blitz: Crescendo, schneller werdender Herzschlag
   rip        Folie reißt (Knistern, wachsendes Zischen)   strip    abgerissener Streifen schießt nach oben
@@ -10,7 +11,7 @@ Dateien (booster_*.ogg):
   card_whoosh  Karte fliegt                           card_land  Karte landet (Tonhöhe wird zur Laufzeit je Karte gesteigert)
   ready      Glockenakkord, wenn alle neun liegen
 """
-import os, subprocess, sys, wave
+import os, shutil, subprocess, sys, wave
 import numpy as np
 
 ROOT = os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '..'))
@@ -231,10 +232,14 @@ def main(argv):
     if '--out' in args:
         i = args.index('--out'); out = args[i + 1]; del args[i:i + 2]
     os.makedirs(out, exist_ok=True)
+    # Kopie bei den Boosterpacks (data/shop/Boosterpacks/opening/sounds), damit Packs, Animation und Klänge zusammenliegen
+    pack_dir = os.path.join(ROOT, 'data', 'shop', 'Boosterpacks', 'opening', 'sounds')
+    os.makedirs(pack_dir, exist_ok=True)
     for name, fn in SOUNDS.items():
         p = os.path.join(out, 'booster_%s.ogg' % name)
         x = fn()
         to_ogg(x, p)
+        shutil.copyfile(p, os.path.join(pack_dir, os.path.basename(p)))
         print('ok', name, '%.2f s' % (len(x) / SR), os.path.getsize(p) // 1024, 'KB')
 
 

@@ -51,3 +51,12 @@ test('Öffnungsanimation: jeder Klang der Zeitleiste liegt als .ogg in public/so
     assert.ok(fs.existsSync(path.join(__dirname, '..', 'public', 'sounds', s.name + '.ogg')), s.name + '.ogg fehlt');
   }
 });
+
+test('Klänge liegen zusätzlich bei den Boosterpacks (opening/sounds) und sind identisch', () => {
+  const o = JSON.parse(fs.readFileSync(path.join(dir, 'opening', 'opening.json'), 'utf8'));
+  for (const n of new Set(o.sounds.map(s => s.name))) {
+    const a = fs.readFileSync(path.join(__dirname, '..', 'public', 'sounds', n + '.ogg'));
+    const b = fs.readFileSync(path.join(dir, 'opening', 'sounds', n + '.ogg'));
+    assert.ok(a.equals(b), n + ': Kopie weicht ab');
+  }
+});

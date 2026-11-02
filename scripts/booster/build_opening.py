@@ -537,7 +537,7 @@ def main(argv):
     cues += [(land[8] + 1, 'ready', 0.85, 1.0)]
     sounds = [{'f': f, 'ms': int(round(f * 1000.0 / FPS)), 'name': 'booster_' + n, 'volume': v, 'rate': r} for f, n, v, r in sorted(cues)]
     meta = {
-        'version': 1, 'soundDir': '/sounds/', 'sounds': sounds, 'fps': FPS, 'frames': F, 'stage': [SW, SH], 'columns': COLS, 'packOrigin': [PX, PY], 'packSize': [PW, PHH],
+        'version': 1, 'soundDir': '/sounds/', 'soundCopy': 'sounds/', 'sounds': sounds, 'fps': FPS, 'frames': F, 'stage': [SW, SH], 'columns': COLS, 'packOrigin': [PX, PY], 'packSize': [PW, PHH],
         'cut': {'top': 'cut-top.png', 'body': 'cut-body.png', 'line': CUT},
         'events': {'slide': T_SLIDE, 'idle': T_IDLE, 'charge': T_CHARGE, 'rip': T_RIP, 'flash': T_FLASH, 'cards': T_CARDS, 'ambient': T_AMBIENT,
                    'cardLanding': [T_CARDS + n * 2 + 15 for n in range(9)]},
