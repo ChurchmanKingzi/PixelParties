@@ -21,12 +21,12 @@ PX, PY = 64, 48                   # Pack-Ursprung (Pack 192x320)
 PW, PHH = 192, 320
 CX, CY = PX + PW // 2, PY + PHH // 2
 FPS = 30
-F = 116
+F = 102
 COLS = 9
 CUT = 20                          # Reißkante (Zeile im Pack): unter dem Siegelstreifen, über der Titelplatte
 STRIP_H = 26                      # Höhe des Streifens samt Zacken
 
-T_SLIDE, T_IDLE, T_CHARGE, T_RIP, T_FLASH, T_CARDS, T_AMBIENT = 0, 8, 16, 38, 58, 66, 104
+T_SLIDE, T_IDLE, T_CHARGE, T_RIP, T_FLASH, T_CARDS, T_AMBIENT = 0, 6, 8, 24, 44, 52, 90
 RIP_LEN = 18          # so viele Bilder wandert die Reißfront von links nach rechts über den Siegelstreifen
 SL = 4               # Breite der Streifen-Scheiben (Pixel) für das stufenweise Aufreißen
 NS = 192 // 4
@@ -107,9 +107,22 @@ def ease_out(t):
 
 
 def load_cardback():
-    im = Image.open(os.path.join(ROOT, 'public', 'cardback.png')).convert('RGBA')
-    a = np.asarray(im)[5::10, 5::10]               # Mitte jedes 10x10-Blocks -> 75x105
-    return np.ascontiguousarray(a)
+    """Standard-Sleeve (750x1050) auf 75x105 bringen, ohne dass das Dithering verloren geht: Flächenmittel (BOX), danach mit der eigenen Farbpalette
+    des Sleeves (häufige Farben) und geordnetem Bayer-Dithering neu gerastert. Ein reines Herausgreifen jedes 10. Pixels verwischt/verzackt es."""
+    im = Image.open(os.path.join(ROOT, 'public', 'cardback.png')).convert('RGB')
+    a = np.asarray(im).reshape(-1, 3)
+    u, cnt = np.unique(a, axis=0, return_counts=True)
+    P = u[cnt > 150].astype(float)
+    arr = np.asarray(im.resize((75, 105), Image.BOX)).astype(float)
+    Bm = np.array([[0, 8, 2, 10], [12, 4, 14, 6], [3, 11, 1, 9], [15, 7, 13, 5]]) / 16.0 - 0.5
+    h, w = arr.shape[:2]
+    off = np.tile(Bm, (h // 4 + 1, w // 4 + 1))[:h, :w][..., None] * 22
+    d = ((pal._lab(np.clip(arr + off, 0, 255)).reshape(-1, 1, 3) - pal._lab(P)[None]) ** 2).sum(-1)
+    rgb = P[d.argmin(1)].reshape(h, w, 3).astype(np.uint8)
+    out = np.zeros((h, w, 4), np.uint8)
+    out[..., :3] = rgb
+    out[..., 3] = 255
+    return np.ascontiguousarray(out)
 
 
 CARD_W, CARD_H = 75, 105
@@ -142,7 +155,7 @@ def strip_offsets(t):
 
 
 def pack_timeline():
-    slide = [100, 60, 34, 18, 9, 4, 1, 0]
+    slide = [100, 52, 24, 9, 2, 0]
     bob = [0, 0, -1, -1, -2, -2, -2, -2, -1, -1, 0, 0, -1, -1, -2, -2, -2, -1, -1, 0]
     rng = np.random.RandomState(11)
     tl = []
