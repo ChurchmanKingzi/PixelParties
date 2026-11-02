@@ -3791,51 +3791,23 @@ function ProfileScreen() {
 // ═══════════════════════════════════════════
 
 // Purchase celebration overlay — centered on the bought item
-function PurchaseCelebration({ cx, cy, label, onDone }) {
+function PurchaseCelebration({ cx, cy, onDone }) {
   const canvasRef = useRef(null);
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
     const ox = cx ?? window.innerWidth / 2;
     const oy = cy ?? window.innerHeight / 2;
-    const particles = [];
-    const colors = ['#fad54a', '#f9ac20', '#f7f7ad', '#fb1ea9', '#1aedff', '#b1ff1a', '#f87420', '#ffffff'];
-    const shapes = ['star', 'circle', 'diamond', 'spark'];
-    // Burst from item position
-    for (let i = 0; i < 120; i++) {
-      const angle = (Math.PI * 2 * i / 120) + (Math.random() - 0.5) * 0.5;
-      const speed = 3 + Math.random() * 9;
-      particles.push({
-        x: ox, y: oy,
-        vx: Math.cos(angle) * speed, vy: Math.sin(angle) * speed - 2,
-        size: 3 + Math.random() * 8, color: colors[Math.floor(Math.random() * colors.length)],
-        shape: shapes[Math.floor(Math.random() * shapes.length)],
-        life: 1, decay: 0.008 + Math.random() * 0.012,
-        rotation: Math.random() * Math.PI * 2, rotSpeed: (Math.random() - 0.5) * 0.2,
-        gravity: 0.06 + Math.random() * 0.04,
-      });
-    }
-    // Sparkle ring around item
-    for (let i = 0; i < 40; i++) {
-      const angle = (Math.PI * 2 * i / 40);
-      const dist = 50 + Math.random() * 30;
-      particles.push({
-        x: ox + Math.cos(angle) * dist, y: oy + Math.sin(angle) * dist,
-        vx: Math.cos(angle) * 1.5, vy: Math.sin(angle) * 1.5,
-        size: 2 + Math.random() * 4, color: '#fad54a',
-        shape: 'spark', life: 1, decay: 0.015 + Math.random() * 0.01,
-        rotation: 0, rotSpeed: 0, gravity: 0,
-      });
-    }
     // ★ W86u2 (Pixelart): gezeichnet von `ppPixelPartikel` (app-shared.jsx) — ganze Kunstpixel, 30 Hz, Dither statt Alpha, keine Drehung/Weichzeichner.
-    const stopp = window.ppPixelPartikel(canvas, particles, { px: 2, onFertig: onDone, maxMs: 2500 });
+    const stopp = window.ppPixelPartikel(canvas, shopBurstParticles(ox, oy, 260, 1.2), { px: 2, onFertig: onDone, maxMs: 2500 });
     const timer = setTimeout(onDone, 2500);
     return () => { stopp(); clearTimeout(timer); };
   }, []);
   return (
     <div style={{ position: 'fixed', inset: 0, zIndex: 99999, pointerEvents: 'none' }}>
+      <div className="shop-buy-flash" />
       <canvas ref={canvasRef} style={{ width: '100%', height: '100%' }} />
-      <div className="shop-purchase-text" style={{ top: Math.max(40, (cy ?? window.innerHeight / 2) - 60), left: cx ?? '50%' }}>{label || 'PURCHASED!'}</div>
+      <div className="shop-purchase-text" style={{ top: Math.max(40, (cy ?? window.innerHeight / 2) - 60), left: cx ?? '50%' }}>PURCHASED!</div>
     </div>
   );
 }
@@ -3869,6 +3841,180 @@ function ShopPullPreview({ pool, type, count = 4, onHover }) {
           {it.name && <div className="shop-item-name" title={it.name}>{it.name}</div>}
         </div>
       ))}
+    </div>
+  );
+}
+
+
+// Gemeinsame Partikel-Salve für Shop-Effekte (Kauf-Fanfare und Pull-Reveal): bunte Pixelsprites in Palettenfarben
+// plus ein Funkenring. Gezeichnet von `ppPixelPartikel` (app-shared.jsx): ganze Kunstpixel, Dither statt Alpha.
+function shopBurstParticles(ox, oy, n, speedMul) {
+  const colors = ['#fad54a', '#f9ac20', '#f7f7ad', '#fb1ea9', '#1aedff', '#b1ff1a', '#f87420', '#ffffff'];
+  const shapes = ['star', 'circle', 'diamond', 'spark'];
+  const sm = speedMul || 1;
+  const particles = [];
+  for (let i = 0; i < n; i++) {
+    const angle = (Math.PI * 2 * i / n) + (Math.random() - 0.5) * 0.5;
+    const speed = (3 + Math.random() * 9) * sm;
+    particles.push({
+      x: ox, y: oy,
+      vx: Math.cos(angle) * speed, vy: Math.sin(angle) * speed - 2,
+      size: 3 + Math.random() * 9, color: colors[Math.floor(Math.random() * colors.length)],
+      shape: shapes[Math.floor(Math.random() * shapes.length)],
+      life: 1, decay: 0.007 + Math.random() * 0.011,
+      rotation: 0, rotSpeed: 0,
+      gravity: 0.06 + Math.random() * 0.04,
+    });
+  }
+  const ring = Math.round(n / 3);
+  for (let i = 0; i < ring; i++) {
+    const angle = (Math.PI * 2 * i / ring);
+    const dist = 50 + Math.random() * 30;
+    particles.push({
+      x: ox + Math.cos(angle) * dist, y: oy + Math.sin(angle) * dist,
+      vx: Math.cos(angle) * 1.5 * sm, vy: Math.sin(angle) * 1.5 * sm,
+      size: 2 + Math.random() * 4, color: '#fad54a',
+      shape: 'spark', life: 1, decay: 0.015 + Math.random() * 0.01,
+      rotation: 0, rotSpeed: 0, gravity: 0,
+    });
+  }
+  return particles;
+}
+
+// Eine Salve als eigene Vollbild-Zeichenfläche (zum Stapeln mehrerer Salven nacheinander).
+function ShopPixelBurst({ x, y, n = 200, speedMul = 1 }) {
+  const ref = useRef(null);
+  useEffect(() => {
+    const cv = ref.current; if (!cv) return undefined;
+    const stopp = window.ppPixelPartikel(cv, shopBurstParticles(x, y, n, speedMul), { px: 3, maxMs: 2600 });
+    return () => stopp();
+  }, []);
+  return <canvas ref={ref} className="pull-fx-burst" />;
+}
+
+// Der Pull-Reveal: Aufladen (Karte zittert, Strahlen wachsen) → Blitz → Enthüllung mit Strahlenkranz, Partikelsalven,
+// Banner und Funkeln. Reine Pixelart: Strahlen werden auf einem grob aufgelösten Raster mit Bayer-Dither gezeichnet,
+// Bewegung läuft in harten Schritten (steps()), Rahmenfarben blinken statt weich zu pulsieren. Klick überspringt.
+function ShopPullReveal({ reveal, onClose }) {
+  const reduced = useMemo(() => { try { return window.matchMedia('(prefers-reduced-motion: reduce)').matches; } catch { return false; } }, []);
+  const [phase, setPhase] = useState(reduced ? 'reveal' : 'charge'); // 'charge' | 'flash' | 'reveal'
+  const [hard, setHard] = useState(false);       // zweite Aufladestufe: stärkeres Zittern
+  const [bursts, setBursts] = useState([]);      // Salven { id, x, y, n, speedMul }
+  const [canClose, setCanClose] = useState(false);
+  const timers = useRef([]);
+  const revealed = useRef(false);
+  const phaseRef = useRef(phase);
+  phaseRef.current = phase;
+  const rayRef = useRef(null);
+  const sfx = (name, opt) => { try { if (window.playSFX) window.playSFX(name, opt); } catch {} };
+  const later = (fn, ms) => { timers.current.push(setTimeout(fn, ms)); };
+  const addBurst = (fx, fy, n, speedMul) => setBursts(b => [...b, { id: b.length + 1, x: window.innerWidth * fx, y: window.innerHeight * fy, n, speedMul }]);
+
+  const toReveal = () => {
+    if (revealed.current) return;
+    revealed.current = true;
+    timers.current.forEach(clearTimeout); timers.current = [];
+    setPhase('reveal');
+    sfx('reveal'); sfx('shop_purchase', { delay: 140, dedupe: 0 });
+    addBurst(0.5, 0.5, 220, 1.15);
+    later(() => { addBurst(0.34, 0.46, 120, 0.9); addBurst(0.66, 0.46, 120, 0.9); sfx('gold_gain', { dedupe: 0 }); }, 420);
+    later(() => addBurst(0.5, 0.4, 160, 1.3), 900);
+    later(() => setCanClose(true), 800);
+  };
+
+  useEffect(() => {
+    if (reduced) { revealed.current = false; toReveal(); return () => timers.current.forEach(clearTimeout); }
+    sfx('ui_click', { dedupe: 0 });
+    later(() => sfx('ui_click', { dedupe: 0 }), 280);
+    later(() => { setHard(true); sfx('ui_click', { dedupe: 0 }); }, 560);
+    later(() => sfx('ui_click', { dedupe: 0 }), 740);
+    later(() => sfx('ui_click', { dedupe: 0 }), 880);
+    later(() => { setPhase('flash'); sfx('heavy_impact', { dedupe: 0 }); }, 1000);
+    later(toReveal, 1330);
+    return () => timers.current.forEach(clearTimeout);
+  }, []);
+
+  // Strahlenkranz auf grobem Raster (6 px je Kunstpixel), zum Rand hin mit Bayer-Dither ausgeblendet.
+  useEffect(() => {
+    const cv = rayRef.current; if (!cv) return undefined;
+    const CELL = 6;
+    const W = Math.max(16, Math.ceil(window.innerWidth / CELL)), H = Math.max(16, Math.ceil(window.innerHeight / CELL));
+    cv.width = W; cv.height = H; cv.style.imageRendering = 'pixelated';
+    const g = cv.getContext('2d'); g.imageSmoothingEnabled = false;
+    const img = g.createImageData(W, H), d = img.data;
+    const cx = W / 2, cy = H * 0.46, maxD = Math.hypot(Math.max(cx, W - cx), Math.max(cy, H - cy));
+    const ang = new Float32Array(W * H), dist = new Float32Array(W * H);
+    for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+      const i = y * W + x;
+      ang[i] = Math.atan2(y - cy, x - cx) + Math.PI;
+      dist[i] = Math.hypot(x - cx, y - cy) / maxD;
+    }
+    const BAYER = [0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5];
+    const rgb = (hex) => {
+      const sn = window.ppSnap ? window.ppSnap(hex) : hex;
+      const n = parseInt(String(sn).replace('#', ''), 16);
+      return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+    };
+    const HOT = rgb('#f7f7ad'), GOLD = rgb('#fad54a'), ORANGE = rgb('#f9ac20');
+    const t0 = performance.now(); let tick = 0;
+    const draw = () => {
+      tick++;
+      const ph = phaseRef.current, el = (performance.now() - t0) / 1000;
+      const N = ph === 'reveal' ? 18 : 10;
+      const spin = tick * (ph === 'reveal' ? 0.05 : 0.1);
+      const gain = ph === 'charge' ? Math.min(0.95, 0.1 + el * 0.85) : ph === 'flash' ? 1.3 : 1.15;
+      d.fill(0);
+      for (let i = 0; i < ang.length; i++) {
+        const a = (((ang[i] + spin) / (2 * Math.PI)) * N) % 1;
+        if (a >= 0.5) continue;
+        const inten = (1 - dist[i]) * gain;
+        const x = i % W, y = (i / W) | 0;
+        if (inten <= BAYER[(y & 3) * 4 + (x & 3)] / 16) continue;
+        const c = inten > 0.66 ? HOT : (a < 0.25 ? GOLD : ORANGE);
+        const o = i * 4; d[o] = c[0]; d[o + 1] = c[1]; d[o + 2] = c[2]; d[o + 3] = 255;
+      }
+      g.putImageData(img, 0, 0);
+    };
+    draw();
+    const id = setInterval(draw, 66);
+    return () => clearInterval(id);
+  }, []);
+
+  const click = () => {
+    if (phase !== 'reveal') { toReveal(); return; }
+    if (canClose) onClose();
+  };
+  // Funkeln: feste Plätze um die Karte, jedes blinkt mit eigenem Takt (steps).
+  const STARS = [[-62, 12], [-74, 40], [-58, 70], [-70, 98], [58, 8], [72, 36], [60, 66], [74, 92], [-34, -4], [34, -2], [-20, 108], [22, 106]];
+
+  return (
+    <div className={'pull-fx pull-fx-ph-' + phase} onClick={click}>
+      <canvas ref={rayRef} className="pull-fx-rays" />
+      {phase === 'flash' && <div className="pull-fx-flash" />}
+      {bursts.map(b => <ShopPixelBurst key={b.id} x={b.x} y={b.y} n={b.n} speedMul={b.speedMul} />)}
+      <div className={'pull-fx-stage' + (phase !== 'charge' ? ' pull-fx-quake' : '')} onClick={e => e.stopPropagation()}>
+        {phase === 'reveal' && <div className="pull-fx-banner"><span>NEW PULL!</span></div>}
+        <div className="pull-fx-cardslot">
+          {phase !== 'reveal' ? (
+            <img src="/cardback.png" className={'pull-fx-back' + (hard ? ' pull-fx-back-hard' : '')} draggable={false} />
+          ) : (
+            <React.Fragment>
+              <div className="pull-fx-front"><img src={reveal.imgUrl} draggable={false} /></div>
+              {STARS.map((s, i) => (
+                <span key={i} className="pull-fx-star" style={{ left: s[0] + '%', top: s[1] + '%', animationDelay: (i * 110) + 'ms' }} />
+              ))}
+            </React.Fragment>
+          )}
+        </div>
+        {phase === 'reveal' && (
+          <React.Fragment>
+            {reveal.label && <div className="pull-fx-label">{reveal.label}</div>}
+            {reveal.subtitle && <div className="pull-fx-subtitle">{reveal.subtitle}</div>}
+            <button className={'btn pull-fx-btn' + (canClose ? ' pull-fx-btn-on' : '')} disabled={!canClose}
+              onClick={(e) => { e.stopPropagation(); onClose(); }}>NICE!</button>
+          </React.Fragment>
+        )}
+      </div>
     </div>
   );
 }
@@ -3961,9 +4107,12 @@ function ShopScreen() {
   // Fires the "Khekhekhe!" speech bubble + celebration + SFX trio that
   // every purchase path shares. Centralized so adding a new buy handler
   // automatically gets the shopkeep reaction.
-  const triggerPurchaseFanfare = useCallback((pos) => {
-    setCelebration(pos);
-    if (window.playSFX) window.playSFX('shop_purchase');
+  const triggerPurchaseFanfare = useCallback((pos, opt) => {
+    // Pulls: Konfetti und Klang liefert der Reveal (ShopPullReveal) selbst.
+    if (!(opt && opt.pull)) {
+      setCelebration(pos);
+      if (window.playSFX) window.playSFX('shop_purchase');
+    }
     lastPurchaseAtRef.current = Date.now();
     setBubble(prev => ({ visible: true, key: prev.key + 1, text: 'Khekhekhe!', chatter: false }));
     if (bubbleTimerRef.current) clearTimeout(bubbleTimerRef.current);
@@ -4044,7 +4193,7 @@ function ShopScreen() {
     try {
       const data = await api('/shop/buy-random-structure-deck', { method: 'POST' });
       setUser(u => ({ ...u, sc: data.sc }));
-      triggerPurchaseFanfare(pos);
+      triggerPurchaseFanfare(pos, { pull: true });
       setRandomReveal({
         imgUrl: (data.coverCard && window.cardImageUrl) ? (window.cardImageUrl(data.coverCard) || '/cardback.png') : '/cardback.png',
         label: data.name,
@@ -4134,7 +4283,7 @@ function ShopScreen() {
       const data = await api('/shop/buy-random-skin', { method: 'POST' });
       setOwned(prev => ({ ...prev, skin: [...prev.skin, data.skinName] }));
       setUser(u => ({ ...u, sc: data.sc }));
-      triggerPurchaseFanfare({ ...pos, label: 'NEW PULL!' });
+      triggerPurchaseFanfare(pos, { pull: true });
       setRandomReveal({
         imgUrl: '/cards/skins/' + encodeURIComponent(data.skinName) + '.png',
         label: data.skinName,
@@ -4154,7 +4303,7 @@ function ShopScreen() {
       const data = await api('/shop/buy-random', { method: 'POST', body: JSON.stringify({ itemType }) });
       setOwned(prev => ({ ...prev, [itemType]: [...prev[itemType], data.itemId] }));
       setUser(u => ({ ...u, sc: data.sc }));
-      triggerPurchaseFanfare({ ...pos, label: 'NEW PULL!' });
+      triggerPurchaseFanfare(pos, { pull: true });
       const subdir = itemType === 'avatar' ? 'avatars' : 'sleeves';
       setRandomReveal({
         imgUrl: '/data/shop/' + subdir + '/' + encodeURIComponent(data.itemId) + '.png',
@@ -4181,9 +4330,6 @@ function ShopScreen() {
     board: new Set(owned.board),
     skin: new Set(owned.skin),
   };
-
-  // Gather unique hero names for skin filter
-  const heroNames = [...new Set((catalog.skins || []).map(s => s.heroName))].sort();
 
   const isSelected = (type, id) => selected && selected.type === type && selected.id === id;
 
@@ -4354,8 +4500,9 @@ function ShopScreen() {
       <React.Fragment>🎲 PULL — <img src="/data/sc.png" className="shop-sc-icon" /> {price ?? '?'}</React.Fragment>
     );
 
+    const heroQuery = skinFilter.trim().toLowerCase();
     const filtered = items.filter(it => {
-      if (type === 'skin' && skinFilter && it.heroName !== skinFilter) return false;
+      if (type === 'skin' && heroQuery && !String(it.heroName).toLowerCase().includes(heroQuery)) return false;
       const own = ownedSet[type].has(it.id);
       return collFilter === 'owned' ? own : collFilter === 'missing' ? !own : true;
     });
@@ -4366,11 +4513,12 @@ function ShopScreen() {
     ];
 
     return (
-      <React.Fragment>
+      <div className="shop-gacha-page">
+        <div className="shop-gacha-pinned">
         <div className="shop-gacha">
           <div className="shop-gacha-machine">
             <div className="shop-gacha-title">{def.title}</div>
-            <div className="shop-gacha-capsule" aria-hidden="true">?</div>
+            <div className={'shop-gacha-capsule' + (buying ? ' shop-gacha-capsule-pulling' : '')} aria-hidden="true">?</div>
             <button className="btn shop-random-btn shop-gacha-btn" disabled={!canPull} onClick={pull}>{pullLabel}</button>
             <div className="shop-gacha-hint">
               {missing.length > 0
@@ -4382,9 +4530,7 @@ function ShopScreen() {
             <div className="shop-gacha-preview-title">
               {missing.length > 0 ? 'POSSIBLE PULLS' : 'YOU HAVE THEM ALL'}
             </div>
-            <div className="shop-gacha-rule">
-              {def.plural.charAt(0).toUpperCase() + def.plural.slice(1)} can’t be bought directly — every pull unlocks a random {def.noun.toLowerCase()} you don’t own yet.
-            </div>
+            <div className="shop-gacha-rule">No buying — every pull unlocks a random {def.noun.toLowerCase()} you don’t own yet.</div>
             {missing.length > 0 && (
               <ShopPullPreview pool={missing} type={type}
                 onHover={type === 'skin' ? (it => setHoverSkin(it ? { skinName: it.name, heroName: it.heroName } : null)) : null} />
@@ -4407,15 +4553,15 @@ function ShopScreen() {
                 </button>
               ))}
               {type === 'skin' && (
-                <select className="shop-coll-select" value={skinFilter} onChange={e => setSkinFilter(e.target.value)} aria-label="Filter by Hero">
-                  <option value="">All Heroes</option>
-                  {heroNames.map(h => <option key={h} value={h}>{h}</option>)}
-                </select>
+                <input type="text" className="shop-coll-search" value={skinFilter} placeholder="Filter by Hero name…"
+                  onChange={e => setSkinFilter(e.target.value)} aria-label="Filter by Hero name" spellCheck={false} autoComplete="off" />
               )}
             </div>
-            <button className="btn shop-random-btn shop-coll-pull" disabled={!canPull} onClick={pull}>{pullLabel}</button>
           </div>
         </div>
+        </div>
+
+        <div className="shop-coll-scroll">
 
         {filtered.length === 0 ? (
           <div className="shop-empty">
@@ -4442,9 +4588,9 @@ function ShopScreen() {
                   onClick={type === 'skin' ? undefined : () => { if (isOwned && !equipped) equipItem(type, it.id); }}>
                   <span className="shop-item-zier" aria-hidden="true" />
                   <div className="shop-item-img-wrap">
-                    <img src={imgSrc} draggable={false} className={isOwned ? '' : 'shop-skin-locked'} />
+                    <img src={imgSrc} draggable={false} className={isOwned || showHero ? '' : 'shop-skin-locked'} />
                     {equipped ? <div className="shop-owned-badge shop-equipped-badge">EQUIPPED</div>
-                      : isOwned ? <div className="shop-owned-badge">OWNED</div> : (
+                      : isOwned ? <div className="shop-owned-badge">OWNED</div> : showHero ? null : (
                         <div className="shop-lock-overlay">
                           <span className="shop-lock-badge" aria-label="Locked">🔒</span>
                         </div>
@@ -4464,7 +4610,8 @@ function ShopScreen() {
             })}
           </div>
         )}
-      </React.Fragment>
+        </div>
+      </div>
     );
   };
 
@@ -4581,21 +4728,8 @@ function ShopScreen() {
           {tutorial5Cleared ? 'Antonia' : 'Raccoon Shopkeep'}
         </span>
       </div>
-      {celebration && <PurchaseCelebration cx={celebration.cx} cy={celebration.cy} label={celebration.label} onDone={() => setCelebration(null)} />}
-      {randomReveal && (
-        <div className="modal-overlay" style={{ zIndex: 90000 }} onClick={() => setRandomReveal(null)}>
-          <div className="shop-reveal-modal animate-in" onClick={e => e.stopPropagation()}>
-            <PpVerlauf className="shop-reveal-glow" px={4} gradient="radial-gradient(circle, rgba(250,213,74,.25) 0%, rgba(249,172,32,.1) 40%, transparent 70%)" />
-            <div className="shop-reveal-img-wrap">
-              <img src={randomReveal.imgUrl} draggable={false} />
-            </div>
-            {randomReveal.label && <div className="shop-reveal-label">{randomReveal.label}</div>}
-            {randomReveal.subtitle && <div className="shop-reveal-subtitle">{randomReveal.subtitle}</div>}
-            <button className="btn" style={{ marginTop: 16, padding: '8px 32px', fontSize: 13, borderColor: '#fad54a', color: '#fad54a' }}
-              onClick={() => setRandomReveal(null)}>NICE!</button>
-          </div>
-        </div>
-      )}
+      {celebration && <PurchaseCelebration cx={celebration.cx} cy={celebration.cy} onDone={() => setCelebration(null)} />}
+      {randomReveal && <ShopPullReveal reveal={randomReveal} onClose={() => setRandomReveal(null)} />}
       <div className="top-bar">
         <button className="btn" onClick={() => setScreen('menu')}>← BACK</button>
         <h2 className="orbit-font" style={{ fontSize: 22, fontWeight: 800, color: 'var(--player-color)' }}>SHOP</h2>
@@ -4612,7 +4746,7 @@ function ShopScreen() {
           </button>
         ))}
       </div>
-      <div className="shop-content animate-in">
+      <div className={'shop-content animate-in' + ((tab === 'skins' || tab === 'avatars' || tab === 'sleeves') ? ' shop-content-gacha' : '')}>
         {tab === 'skins' && renderGachaPage('skin')}
         {tab === 'avatars' && renderGachaPage('avatar')}
         {tab === 'sleeves' && renderGachaPage('sleeve')}

@@ -13585,7 +13585,7 @@ input[type="checkbox"]:focus-visible, input[type="radio"]:focus-visible { outlin
                          Filter, kleiner Pull-Knopf), darunter das Raster.
    Pixelart: harte Ringe aus gestapelten box-shadows, keine Unschaerfe, Bewegung
    in ganzen Pixeln mit steps(). */
-.shop-gacha { display: grid; grid-template-columns: 250px minmax(0, 1fr); gap: 22px; max-width: 900px; margin: 8px auto 26px; padding: 18px; box-sizing: border-box; background: var(--bg2); border: 3px solid color-mix(in srgb, var(--player-color, var(--accent)) 70%, #000000); box-shadow: 0 0 0 2px var(--pp-kontur), 0 0 0 4px color-mix(in srgb, var(--player-color, var(--accent)) 50%, #000000), 0 0 0 6px var(--pp-kontur), 8px 9px 0 0 #08060c; }
+.shop-gacha { display: grid; grid-template-columns: 250px minmax(0, 1fr); gap: 22px; max-width: 900px; margin: 8px auto 18px; padding: 14px 18px; box-sizing: border-box; background: var(--bg2); border: 3px solid color-mix(in srgb, var(--player-color, var(--accent)) 70%, #000000); box-shadow: 0 0 0 2px var(--pp-kontur), 0 0 0 4px color-mix(in srgb, var(--player-color, var(--accent)) 50%, #000000), 0 0 0 6px var(--pp-kontur), 8px 9px 0 0 #08060c; }
 .shop-gacha-machine { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; text-align: center; padding-right: 22px; border-right: 3px solid var(--bg4); }
 .shop-gacha-title { font-family: var(--font-display), sans-serif; font-size: 18px; letter-spacing: 2px; color: #fad54a; text-shadow: 2px 2px 0 #000000; }
 .shop-gacha-capsule { width: 84px; height: 84px; margin: 10px 0; display: flex; align-items: center; justify-content: center; font-family: var(--font-display), sans-serif; font-size: 46px; color: #fad54a; text-shadow: 3px 3px 0 #000000; background: var(--bg3); box-shadow: 0 0 0 3px var(--pp-kontur), 0 0 0 6px #fad54a, 0 0 0 9px var(--pp-kontur), 6px 7px 0 9px #08060c; animation: shop-capsule-hop 1s steps(1) infinite; }
@@ -13597,7 +13597,7 @@ input[type="checkbox"]:focus-visible, input[type="radio"]:focus-visible { outlin
 .shop-gacha-hint { font-size: 11px; color: var(--text2); }
 .shop-gacha-preview { min-width: 0; display: flex; flex-direction: column; gap: 8px; }
 .shop-gacha-preview-title { font-family: var(--font-display), sans-serif; font-size: 14px; letter-spacing: 2px; color: var(--text); text-shadow: 2px 2px 0 #000000; }
-.shop-gacha-rule { font-size: 11px; line-height: 1.5; color: var(--text2); margin-bottom: 8px; }
+.shop-gacha-rule { font-size: 11px; line-height: 1.5; color: var(--text2); margin-bottom: 4px; }
 .shop-pull-strip { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px; padding: 8px 8px 12px; }
 .shop-pull-tile { cursor: default; }
 .shop-pull-tile .shop-item-name { padding-bottom: 0; }
@@ -13609,21 +13609,171 @@ input[type="checkbox"]:focus-visible, input[type="radio"]:focus-visible { outlin
 .shop-coll-count { font-family: var(--font-display), sans-serif; font-size: 15px; color: #fad54a; text-shadow: 2px 2px 0 #000000; }
 .shop-coll-bar { flex: 1 1 140px; min-width: 120px; height: 14px; background: var(--bg3); box-shadow: 0 0 0 2px var(--pp-kontur), 0 0 0 4px var(--bg4); }
 .shop-coll-bar > span { display: block; height: 100%; background: repeating-linear-gradient(90deg, #fad54a 0 6px, #a87c00 6px 8px); }
-.shop-coll-filters { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.shop-coll-filters { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-left: auto; }
 .shop-coll-chip { font-family: var(--font-display), sans-serif; font-size: 11px; letter-spacing: 1px; padding: 5px 10px; background: var(--bg3); color: var(--text2); border: 0; cursor: pointer; box-shadow: 0 0 0 2px var(--pp-kontur), 0 0 0 4px var(--bg4); }
 .shop-coll-chip:hover { color: var(--text); }
 .shop-coll-chip-active,
 .shop-coll-chip-active:hover { color: #fad54a; box-shadow: 0 0 0 2px var(--pp-kontur), 0 0 0 4px #fad54a; }
 .shop-coll-chip-n { opacity: .8; margin-left: 2px; }
-.shop-coll-select { font-family: var(--font-display), sans-serif; font-size: 11px; padding: 5px 8px; background: var(--bg3); color: var(--text); border: 0; max-width: 170px; box-shadow: 0 0 0 2px var(--pp-kontur), 0 0 0 4px var(--bg4); }
-.shop-coll-pull { order: 4; padding: 6px 16px !important; font-size: 12px !important; }
-.shop-coll-filters { order: 5; flex: 1 1 100%; }
+.shop-coll-search { font-family: var(--font-display), sans-serif; font-size: 11px; padding: 6px 10px; width: 190px; background: var(--bg3); color: var(--text); border: 0; outline: 0; box-shadow: 0 0 0 2px var(--pp-kontur), 0 0 0 4px var(--bg4); }
+.shop-coll-search:focus { box-shadow: 0 0 0 2px var(--pp-kontur), 0 0 0 4px #fad54a; }
+.shop-coll-search::placeholder { color: var(--text2); }
 .shop-item.shop-missing { cursor: default; }
 
 @media (max-width: 760px) {
   .shop-gacha { grid-template-columns: 1fr; gap: 16px; }
   .shop-gacha-machine { padding-right: 0; border-right: 0; padding-bottom: 16px; border-bottom: 3px solid var(--bg4); }
   .shop-pull-strip { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+/* Angepinnt: Pull-Bereich + Kopfzeile der Sammlung bleiben stehen, NUR die Sammlung scrollt.
+   Auf kleinen Fenstern (zu wenig Platz) bleibt es beim einfachen Scrollen der ganzen Seite. */
+.shop-gacha-pinned { display: contents; }
+.shop-coll-scroll { padding-bottom: 12px; }
+@media (min-width: 761px) and (min-height: 640px) {
+  .shop-content.shop-content-gacha { overflow: hidden; display: flex; flex-direction: column; padding-bottom: 0; }
+  .shop-gacha-page { display: flex; flex-direction: column; flex: 1; min-height: 0; }
+  .shop-gacha-pinned { display: block; flex: 0 0 auto; }
+  .shop-gacha-pinned .shop-coll-head { position: static; margin-bottom: 0; }
+  .shop-coll-scroll { flex: 1; min-height: 0; overflow-y: auto; margin: 0 -16px; padding: 16px 16px 30px; }
+}
+@media (max-height: 820px) {
+  .shop-pull-strip { grid-template-columns: repeat(4, minmax(0, 96px)); justify-content: start; padding-bottom: 6px; }
+  .shop-gacha-capsule { width: 56px; height: 56px; font-size: 30px; margin: 4px 0; box-shadow: 0 0 0 3px var(--pp-kontur), 0 0 0 5px #fad54a, 0 0 0 8px var(--pp-kontur); }
+  .shop-gacha-machine { gap: 8px; }
+}
+
+/* Kapsel zittert, solange der Pull läuft (ganze Pixel, harter Takt). */
+.shop-gacha-capsule-pulling { animation: shop-capsule-shake .12s steps(1) infinite; }
+@keyframes shop-capsule-shake {
+  0%   { transform: translate(-3px, 0); }
+  25%  { transform: translate(3px, -3px); }
+  50%  { transform: translate(-3px, 3px); }
+  75%  { transform: translate(3px, 0); }
+}
+
+/* ═══ SHOP: KAUF- UND PULL-ANIMATION ═══════════════════════════════════
+   (1) `.shop-buy-flash` + `.shop-purchase-text`: die Kauf-Fanfare für Boards/Structure Decks — harter
+       Farbblitz (Vollbild, 4 Bilder), Text springt in ganzen Posen statt weich zu skalieren.
+   (2) `.pull-fx*`: der Pull-Reveal (ShopPullReveal in app-screens.jsx): Aufladen → Blitz → Enthüllung.
+   Alles Pixelart: Rahmen aus harten Ringen, Bewegung in ganzen Pixeln, Blinken per steps(1), Strahlen auf
+   gröbem Dither-Raster (Canvas). */
+.shop-buy-flash { position: absolute; inset: 0; animation: shop-buy-flash .32s steps(1, end) forwards; }
+@keyframes shop-buy-flash {
+  0%   { background: #ffffff; }
+  25%  { background: #fad54a; }
+  50%  { background: #ffffff; }
+  75%  { background: #f9ac20; }
+  100% { background: transparent; }
+}
+.shop-purchase-text { font-size: 56px; letter-spacing: 6px; text-shadow: 3px 0 0 #a87c00, -3px 0 0 #a87c00; animation: shop-purchase-pop 2s steps(1, end) forwards; }
+@keyframes shop-purchase-pop {
+  0%   { transform: translateX(-50%) scale(0.4); opacity: 1; color: #ffffff; }
+  8%   { transform: translateX(-50%) scale(1.5); color: #fad54a; }
+  16%  { transform: translateX(-50%) translate(-6px, 4px) scale(1.2); color: #ffffff; }
+  24%  { transform: translateX(-50%) translate(6px, -4px) scale(1.25); color: #fad54a; }
+  32%  { transform: translateX(-50%) scale(1.2); color: #f7f7ad; }
+  40%  { transform: translateX(-50%) scale(1.2); color: #fad54a; }
+  48%  { transform: translateX(-50%) scale(1.2); color: #ffffff; }
+  56%  { transform: translateX(-50%) scale(1.2); color: #fad54a; }
+  80%  { transform: translateX(-50%) scale(1.2); color: #fad54a; }
+  90%  { transform: translateX(-50%) translateY(-10px) scale(1.2); color: #fad54a; }
+  100% { transform: translateX(-50%) translateY(-30px) scale(1.2); opacity: 0; }
+}
+
+.pull-fx { position: fixed; inset: 0; z-index: 90000; display: flex; align-items: center; justify-content: center; overflow: hidden; cursor: pointer; background: #08060c; }
+.pull-fx-ph-charge { background: var(--pp-kachel-4) 0 0 / 8px 8px, var(--pp-kachel-4) 4px 4px / 8px 8px; }
+.pull-fx-rays, .pull-fx-burst { position: absolute; inset: 0; width: 100%; height: 100%; image-rendering: pixelated; pointer-events: none; }
+.pull-fx-flash { position: absolute; inset: 0; z-index: 5; pointer-events: none; animation: pull-fx-flash .33s steps(1, end) forwards; }
+@keyframes pull-fx-flash {
+  0%   { background: #ffffff; }
+  25%  { background: #fad54a; }
+  50%  { background: #ffffff; }
+  75%  { background: #f7f7ad; }
+  100% { background: #ffffff; }
+}
+.pull-fx-stage { position: relative; z-index: 2; display: flex; flex-direction: column; align-items: center; gap: 12px; cursor: default; }
+.pull-fx-quake { animation: pull-fx-quake .6s steps(1, end); }
+@keyframes pull-fx-quake {
+  0%   { transform: translate(0, 0); }
+  8%   { transform: translate(-10px, 6px); }
+  16%  { transform: translate(10px, -6px); }
+  24%  { transform: translate(-8px, -6px); }
+  32%  { transform: translate(8px, 6px); }
+  40%  { transform: translate(-4px, 2px); }
+  48%  { transform: translate(4px, -2px); }
+  56%  { transform: translate(-2px, 0); }
+  64%  { transform: translate(0, 0); }
+}
+.pull-fx-cardslot { position: relative; width: min(200px, 26vh); }
+
+/* Aufladen: Kartenrücken zittert, der Rahmen blinkt durch die Farben. */
+.pull-fx-back { display: block; width: 100%; aspect-ratio: 5 / 7; object-fit: cover; image-rendering: pixelated; animation: pull-fx-shake .24s steps(1) infinite, pull-fx-ring .4s steps(1) infinite; }
+.pull-fx-back-hard { animation: pull-fx-shake-hard .1s steps(1) infinite, pull-fx-ring .2s steps(1) infinite; }
+@keyframes pull-fx-shake {
+  0%   { transform: translate(0, 0); }
+  25%  { transform: translate(-4px, 2px); }
+  50%  { transform: translate(4px, -2px); }
+  75%  { transform: translate(-2px, -4px); }
+}
+@keyframes pull-fx-shake-hard {
+  0%   { transform: translate(-8px, 0); }
+  25%  { transform: translate(8px, -6px); }
+  50%  { transform: translate(-6px, 6px); }
+  75%  { transform: translate(6px, 4px); }
+}
+@keyframes pull-fx-ring {
+  0%   { box-shadow: 0 0 0 4px #fad54a, 0 0 0 8px #08060c, 0 0 0 12px #f9ac20; }
+  25%  { box-shadow: 0 0 0 4px #ffffff, 0 0 0 8px #08060c, 0 0 0 12px #1aedff; }
+  50%  { box-shadow: 0 0 0 4px #fb1ea9, 0 0 0 8px #08060c, 0 0 0 12px #fad54a; }
+  75%  { box-shadow: 0 0 0 4px #b1ff1a, 0 0 0 8px #08060c, 0 0 0 12px #ffffff; }
+}
+
+/* Enthüllung: Karte klappt in ganzen Schritten auf (Breitenstauchung, keine Drehung), Rahmen blinkt. */
+.pull-fx-front { width: 100%; border: 4px solid #fad54a; background: #12101f; animation: pull-fx-front-in .42s steps(1, end) forwards, pull-fx-ring .5s steps(1) .42s infinite; }
+.pull-fx-front img { display: block; width: 100%; aspect-ratio: 5 / 7; object-fit: cover; image-rendering: pixelated; }
+@keyframes pull-fx-front-in {
+  0%   { transform: scale(0.08, 1.15); }
+  20%  { transform: scale(0.35, 1.1); }
+  40%  { transform: scale(0.7, 1.05); }
+  60%  { transform: scale(1.18, 1.18); }
+  80%  { transform: scale(0.94, 0.94); }
+  100% { transform: scale(1, 1); }
+}
+
+/* Banner „NEW PULL!“: fällt in Pixelschritten herein, blinkt danach Gold/Weiß. */
+.pull-fx-banner { font-family: var(--font-display), sans-serif; font-weight: 900; font-size: clamp(30px, 6vh, 54px); letter-spacing: 6px; white-space: nowrap; text-shadow: 3px 0 0 #a87c00, -3px 0 0 #a87c00; padding: 6px 24px; background: #08060c; box-shadow: 0 0 0 4px #fad54a, 0 0 0 8px #08060c, 0 0 0 12px #72541d; animation: pull-fx-banner-in .5s steps(1, end) both; }
+.pull-fx-banner span { display: inline-block; animation: pull-fx-blink .5s steps(1) .5s infinite; color: #fad54a; }
+@keyframes pull-fx-banner-in {
+  0%   { transform: translateY(-120px) scale(1.6); opacity: 0; }
+  20%  { transform: translateY(-60px) scale(1.4); opacity: 1; }
+  40%  { transform: translateY(12px) scale(1.2); }
+  60%  { transform: translateY(-14px) scale(1.1); }
+  80%  { transform: translateY(4px) scale(1.05); }
+  100% { transform: translateY(0) scale(1); opacity: 1; }
+}
+@keyframes pull-fx-blink {
+  0%   { color: #fad54a; }
+  50%  { color: #ffffff; }
+}
+
+.pull-fx-label { font-family: var(--font-display), sans-serif; font-size: 20px; font-weight: 800; letter-spacing: 1px; text-align: center; color: #fad54a; text-shadow: 2px 0 0 #72541d, -2px 0 0 #72541d; padding: 5px 16px; background: #08060c; box-shadow: 0 0 0 3px #72541d, 0 0 0 6px #08060c; animation: pull-fx-text-in .3s steps(1, end) .4s both; }
+.pull-fx-subtitle { font-size: 12px; color: #f7f7ad; text-align: center; padding: 3px 12px; background: #08060c; box-shadow: 0 0 0 3px #08060c; animation: pull-fx-text-in .3s steps(1, end) .6s both; }
+@keyframes pull-fx-text-in {
+  0%   { opacity: 0; transform: translateY(10px); }
+  50%  { opacity: 1; transform: translateY(-4px); }
+  100% { opacity: 1; transform: translateY(0); }
+}
+.pull-fx-btn { margin-top: 6px; padding: 8px 32px !important; font-size: 13px !important; border-color: #fad54a !important; color: #fad54a !important; visibility: hidden; }
+.pull-fx-btn-on { visibility: visible; animation: pull-fx-text-in .3s steps(1, end) both; }
+
+/* Funkeln: kleine Pixelsterne (Kreuz mit hellem Kern), jedes blinkt in eigenem Takt. */
+.pull-fx-star { position: absolute; width: 27px; height: 27px; margin: -13px 0 0 -13px; background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='9' height='9' shape-rendering='crispEdges'%3E%3Crect x='4' y='0' width='1' height='9' fill='%23fad54a'/%3E%3Crect x='0' y='4' width='9' height='1' fill='%23fad54a'/%3E%3Crect x='3' y='3' width='3' height='3' fill='%23ffffff'/%3E%3C/svg%3E") center / 100% 100% no-repeat; image-rendering: pixelated; pointer-events: none; animation: pull-fx-twinkle .6s steps(1) infinite; }
+@keyframes pull-fx-twinkle {
+  0%   { opacity: 1; transform: scale(1); }
+  35%  { opacity: 1; transform: scale(0.5); }
+  60%  { opacity: 0; }
+  80%  { opacity: 1; transform: scale(1.3); }
 }
 
 
