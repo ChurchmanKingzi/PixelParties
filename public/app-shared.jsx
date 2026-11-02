@@ -1930,7 +1930,7 @@ function ppPixelPartikel(canvas, teile, opt) {
   const bild = g.createImageData(W, H), d = bild.data;
   const schritt = (t) => {
     id = 0; if (aus) return;
-    const dt = letzt ? Math.min(3, (t - letzt) / 16.667) : 1; letzt = t;
+    const dt = (letzt ? Math.min(3, (t - letzt) / 16.667) : 1) * (opt.tempo ? opt.tempo() : 1); letzt = t;   // opt.tempo(): Zeitfaktor (Shop: ×5-Modus)
     d.fill(0);
     let lebt = false;
     for (const p of teile) {

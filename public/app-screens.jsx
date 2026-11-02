@@ -3984,7 +3984,7 @@ function shopSealedArt() {
 }
 
 // Mosaik-Auflösung: das Avatar-Bild setzt sich aus groben Blöcken zu voller Schärfe zusammen (Pixelart-typisch, in harten Stufen).
-function ShopMosaic({ src }) {
+function ShopMosaic({ src, fast }) {
   const ref = useRef(null);
   useEffect(() => {
     const cv = ref.current; if (!cv) return undefined;
@@ -4004,7 +4004,7 @@ function ShopMosaic({ src }) {
         g.clearRect(0, 0, N, N);
         if (b) { tmp.width = tmp.height = b; tg.imageSmoothingEnabled = true; tg.drawImage(img, 0, 0, b, b); g.drawImage(tmp, 0, 0, N, N); }
         else g.drawImage(img, 0, 0, N, N);
-        if (i < steps.length) timer = setTimeout(tick, 110);
+        if (i < steps.length) timer = setTimeout(tick, fast ? 24 : 110);
       };
       tick();
     };
@@ -4022,7 +4022,7 @@ function ShopMosaic({ src }) {
 // Gemeinsam: Dither-Einblendung, fünf Risse (sie überziehen die ganze Fläche), „Überladung“, Explosion (Druckwellenring, Strahlen,
 // Beben, Salven), Enthüllung mit Banner, Sternenring und Münzregen. Klang und Bild sind gekoppelt: Töne laufen NUR über `cue()`.
 // Klick überspringt. Der Reveal öffnet sofort beim Drücken von PULL (`reveal.pending`) und wartet am Höhepunkt auf den Server.
-function ShopPullReveal({ reveal, onClose }) {
+function ShopPullReveal({ reveal, onClose, fast, onToggleFast }) {
   const AV = (reveal && reveal.kind) === 'avatar';
   const reduced = useMemo(() => { try { return window.matchMedia('(prefers-reduced-motion: reduce)').matches; } catch { return false; } }, []);
   const [phase, setPhase] = useState('charge');   // 'charge' | 'shatter' | 'reveal'
@@ -4031,9 +4031,18 @@ function ShopPullReveal({ reveal, onClose }) {
   const [quake, setQuake] = useState(0);          // Zähler: Bildschirm bebt
   const [sheen, setSheen] = useState(0);          // Zähler: Lichtstreifen über dem Banner
   const [canClose, setCanClose] = useState(false);
-  const timers = useRef([]);
   const alive = useRef(true);
   const climaxed = useRef(false);
+  const abortRef = useRef(false);                  // Escape: Animation abbrechen, direkt zum Ergebnis
+  const rootRef = useRef(null);
+  // Zeit der Inszenierung: eine virtuelle Uhr (ms seit dem Öffnen), die mit Faktor 1 oder 5 läuft. Zeitplan, Szene, Partikel und
+  // CSS-Animationen hängen alle an ihr, so lässt sich der Tempo-Schalter (Checkbox im Shop / Leertaste) auch mitten im Lauf umlegen.
+  const vt = useRef(0);
+  const ev = useRef([]);                           // Zeitplan: { at, fn } in virtueller Zeit
+  const speedRef = useRef(fast ? 5 : 1);
+  speedRef.current = fast ? 5 : 1;
+  const toggleRef = useRef(onToggleFast); toggleRef.current = onToggleFast;
+  const closeRef = useRef(onClose); closeRef.current = onClose;
   const revealed = useRef(false);
   const revealRef = useRef(reveal);
   revealRef.current = reveal;
@@ -4045,7 +4054,7 @@ function ShopPullReveal({ reveal, onClose }) {
   const partRef = useRef(null);
   const parts = useRef([]);
   const grid = SHOP_CRACK_GRID[AV ? 'avatar' : 'card'];
-  const S = useRef({ t0: performance.now(), stage: 0, lit: 0, litTarget: 0, pw: 0, ripple: 0, blast: 0, tun: 0, bigQuake: false, tReveal: 0, overload: 0, crack: [-1, -1, -1, -1, -1] });
+  const S = useRef({ t0: 0, stage: 0, lit: 0, litTarget: 0, pw: 0, ripple: 0, blast: 0, tun: 0, bigQuake: false, tReveal: 0, overload: 0, crack: [-1, -1, -1, -1, -1] });
   const NC = AV ? 8 : 6, NR = 8;
   const shards = useMemo(() => Array.from({ length: NC * NR }, (_, i) => {
     const col = i % NC, row = (i / NC) | 0;
@@ -4053,7 +4062,8 @@ function ShopPullReveal({ reveal, onClose }) {
   }), []);
   const sealedUrl = useMemo(() => (AV ? shopSealedArt() : null), []);
   const backUrl = AV ? sealedUrl : '/cardback.png';
-  const later = (fn, ms) => { timers.current.push(setTimeout(fn, ms)); };
+  const later = (fn, ms) => { ev.current.push({ at: vt.current + ms, fn }); };
+  const clearLater = () => { ev.current = []; };
 
   // Eine gemeinsame Partikelfläche für alle Salven.
   const emit = (list) => {
@@ -4069,11 +4079,14 @@ function ShopPullReveal({ reveal, onClose }) {
   const cue = (c) => {
     try {
       if (window.playSFX) {
-        if (c.sound) window.playSFX(c.sound, { dedupe: 0, ...(c.opt || {}) });
-        for (const sd of (c.sounds || [])) window.playSFX(sd[0], { dedupe: 0, ...(sd[1] || {}) });
+        // ×5: die langen Aufbau-Klänge entfallen, schnell aufeinanderfolgende gleiche Klänge werden zusammengefasst
+        const quick = speedRef.current > 1, skipQuick = { pull_circle: 1, pull_swell: 1, pull_sparkle: 1 };
+        const play = (name, opt) => { if (quick && skipQuick[name]) return; window.playSFX(name, { dedupe: quick ? 150 : 0, ...(opt || {}) }); };
+        if (c.sound) play(c.sound, c.opt);
+        for (const sd of (c.sounds || [])) play(sd[0], sd[1]);
       }
     } catch {}
-    const st = S.current, now = performance.now();
+    const st = S.current, now = vt.current;
     if (c.overload) { st.overload = now; setOverload(true); }
     if (c.stage != null) st.stage = c.stage;
     if (c.lit != null) st.litTarget = c.lit;
@@ -4091,8 +4104,8 @@ function ShopPullReveal({ reveal, onClose }) {
   const toReveal = () => {
     if (revealed.current) return;
     revealed.current = true;
-    timers.current.forEach(clearTimeout); timers.current = [];
-    S.current.tReveal = performance.now();
+    clearLater();
+    S.current.tReveal = vt.current;
     setPhase('reveal');
     cue({ sound: 'pull_reveal', stage: 7, quake: true, burst: [0.5, 0.5, 200, 1.1] });                  // Siegel steigt/löst sich auf, Banner fällt, Strahlen blenden ein
     later(() => cue({ sound: 'pull_sparkle', stars: 28, sheen: true }), 200);                          // Sternenring + Lichtstreifen über dem Banner
@@ -4106,8 +4119,9 @@ function ShopPullReveal({ reveal, onClose }) {
     if (climaxed.current || !alive.current) return;
     if (revealRef.current && revealRef.current.pending) { later(climax, 80); return; }
     climaxed.current = true;
-    timers.current.forEach(clearTimeout); timers.current = [];
+    clearLater();
     try { const im = new Image(); im.src = revealRef.current.imgUrl; } catch {}
+    if (abortRef.current) { toReveal(); return; }       // Escape: ohne Explosion direkt zum Ergebnis
     setPhase('shatter');
     // Splitter + Druckwellenring + Strahlen + starkes Beben + Salve; der Klang ist die Explosion (mit tiefem Einschlag darunter)
     cue({ sounds: [['pull_shatter'], ['heavy_impact', { rate: 0.72, volume: 0.7 }]], stage: 6, ripple: !AV, blast: true, quake: 2, burst: [0.5, 0.5, 340, 1.7] });
@@ -4117,7 +4131,7 @@ function ShopPullReveal({ reveal, onClose }) {
   };
 
   useEffect(() => {
-    if (reduced) { later(climax, 0); return () => { alive.current = false; timers.current.forEach(clearTimeout); }; }
+    if (reduced) { later(climax, 0); return () => { alive.current = false; clearLater(); }; }
     // Klangkulisse = Animation: Kreis/Tunnel baut sich auf (Swell), fünf Risse (Knacken + je ein Glockenton, Dur-Arpeggio steigt),
     // Überladung (steigender Sweep), Explosion, Enthüllung (Akkord), Sternenring (Glockenarpeggio), Münzen.
     later(() => cue({ sound: 'pull_circle', opt: AV ? { rate: 1.25 } : {} }), 60);
@@ -4133,14 +4147,54 @@ function ShopPullReveal({ reveal, onClose }) {
     later(() => emit(shopBurstParticles(window.innerWidth * 0.5, window.innerHeight * 0.5, 50, 0.8)), 2750);
     later(() => emit(shopBurstParticles(window.innerWidth * 0.5, window.innerHeight * 0.5, 70, 1.0)), 2950);
     later(climax, 3350);
-    return () => { alive.current = false; timers.current.forEach(clearTimeout); };
+    return () => { alive.current = false; clearLater(); };
+  }, []);
+
+  // Uhr: lässt die virtuelle Zeit mit Faktor 1 oder 5 laufen, führt fällige Zeitplan-Einträge aus und zieht die CSS-Animationen
+  // des Reveals (Beben, Splitter, Banner, Sterne …) auf dasselbe Tempo.
+  useEffect(() => {
+    let last = performance.now(), lastAnim = 0;
+    const id = setInterval(() => {
+      const now = performance.now(), sp = speedRef.current;
+      vt.current += (now - last) * sp; last = now;
+      const due = ev.current.filter(e => e.at <= vt.current);
+      if (due.length) {
+        ev.current = ev.current.filter(e => e.at > vt.current);
+        due.sort((a, b) => a.at - b.at);
+        for (const e of due) { try { e.fn(); } catch {} }
+      }
+      if (rootRef.current && now - lastAnim > 50) {
+        lastAnim = now;
+        try { for (const a of rootRef.current.getAnimations({ subtree: true })) if (a.playbackRate !== sp) a.playbackRate = sp; } catch {}
+      }
+    }, 16);
+    return () => clearInterval(id);
+  }, []);
+
+  // Tasten: Escape bricht die Animation ab (direkt zum Ergebnis, ein zweites Escape schließt), Leertaste schaltet ×5 um.
+  // Die Handler sitzen im Capture und halten die Ereignisse an, damit ein fokussierter Knopf (PULL!) nicht erneut auslöst.
+  useEffect(() => {
+    const abort = () => {
+      if (phaseRef.current === 'reveal') { closeRef.current(); return; }
+      abortRef.current = true;
+      if (climaxed.current) toReveal(); else climax();
+    };
+    const kd = (e) => {
+      if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); if (!e.repeat) abort(); }
+      else if (e.key === ' ' || e.code === 'Space') { e.preventDefault(); e.stopPropagation(); if (!e.repeat && toggleRef.current) toggleRef.current(); }
+    };
+    const ku = (e) => { if (e.key === ' ' || e.code === 'Space') { e.preventDefault(); e.stopPropagation(); } };
+    window.addEventListener('keydown', kd, true);
+    window.addEventListener('keyup', ku, true);
+    try { if (document.activeElement && document.activeElement.blur) document.activeElement.blur(); } catch {}
+    return () => { window.removeEventListener('keydown', kd, true); window.removeEventListener('keyup', ku, true); };
   }, []);
 
   // Partikelfläche (ein unsichtbarer Dauer-Partikel hält die Schleife am Leben).
   useEffect(() => {
     const cv = partRef.current; if (!cv) return undefined;
     parts.current.push({ x: -9999, y: -9999, vx: 0, vy: 0, size: 1, color: '#ffffff', shape: 'circle', life: 1e12, decay: 0, rotation: 0, rotSpeed: 0, gravity: 0 });
-    const stopp = window.ppPixelPartikel(cv, parts.current, { px: 3 });
+    const stopp = window.ppPixelPartikel(cv, parts.current, { px: 3, tempo: () => speedRef.current });
     return () => stopp();
   }, []);
 
@@ -4196,9 +4250,9 @@ function ShopPullReveal({ reveal, onClose }) {
     };
 
     const draw = () => {
-      const now = performance.now(), st = S.current, tt = now - st.t0, ph = phaseRef.current;
+      const now = vt.current, st = S.current, tt = now - st.t0, ph = phaseRef.current, sp = speedRef.current;
       const [ccx, ccy, half] = center();
-      const ov = st.overload > 0 ? 1.8 : 1;
+      const ov = (st.overload > 0 ? 1.8 : 1) * sp;      // Überladung × Tempo-Schalter (Inkremente pro Bild)
       // 1) Dither-Einblendung der Dunkelheit (die Shop-Seite scheint zuerst noch durch)
       const fade = Math.min(1, tt / 700);
       if (fade >= 1) buf.fill(BG);
@@ -4244,7 +4298,7 @@ function ShopPullReveal({ reveal, onClose }) {
           const a = -rot * 0.5 + (k / 36) * Math.PI * 2;
           for (let r = 0.86; r <= 0.98; r += 0.04) plot(cxg + Math.cos(a) * rx * r, cyg + Math.sin(a) * ry * r, k % 3 === 0 ? ringCol : DIM);
         }
-        if (st.lit < st.litTarget) st.lit++;
+        if (st.lit < st.litTarget) st.lit = Math.min(st.litTarget, st.lit + sp);
         for (let k = 0; k < RUNES; k++) {
           if (cp < (k + 1) / RUNES) break;
           const a = rot + (k / RUNES) * Math.PI * 2, x = cxg + Math.cos(a) * rx * 0.67, y = cyg + Math.sin(a) * ry * 0.67;
@@ -4277,7 +4331,7 @@ function ShopPullReveal({ reveal, onClose }) {
         }
       } else if (ph !== 'reveal') {
         // 3e) Avatar: Tunnel aus Quadraten, die vom Siegel nach außen strömen (je Stufe schneller, in der Überladung am schnellsten)
-        st.tun += 0.00032 * (1 + st.stage * 0.9) * ov * 66;
+        st.tun += 0.00032 * (1 + st.stage * 0.9) * ov * 66;   // ov enthält das Tempo
         const N = 7, frac = st.tun % 1, pulse = Math.floor(tt / 400);
         for (let k = 0; k < N; k++) {
           const f = (k + frac) / N, h = 6 + f * f * Math.max(W, H) * 0.8, inten = (1 - f * 0.85) * (0.55 + 0.1 * st.stage);
@@ -4388,9 +4442,15 @@ function ShopPullReveal({ reveal, onClose }) {
   const ab = (n, base) => (n > 0 ? base + (n % 2 ? '-a' : '-b') : '');
 
   return (
-    <div className={'pull-fx pull-fx-ph-' + phase + (AV ? ' pull-fx-avatar' : '')} onClick={click}>
+    <div ref={rootRef} className={'pull-fx pull-fx-ph-' + phase + (AV ? ' pull-fx-avatar' : '')} onClick={click}>
       <canvas ref={sceneRef} className="pull-fx-scene" />
       <canvas ref={partRef} className="pull-fx-burst" />
+      <div className="pull-fx-hud" onClick={e => e.stopPropagation()}>
+        <button type="button" tabIndex={-1} className={'pull-fx-hud-btn' + (fast ? ' pull-fx-hud-on' : '')} onClick={() => onToggleFast && onToggleFast()}>
+          SPACE: SPEED x5 {fast ? 'ON' : 'OFF'}
+        </button>
+        <span className="pull-fx-hud-key">ESC: SKIP</span>
+      </div>
       <div className={'pull-fx-stage ' + ab(quake, S.current.bigQuake ? 'pull-fx-bquake' : 'pull-fx-quake')} onClick={e => e.stopPropagation()}>
         {phase === 'reveal' && (
           <div className="pull-fx-banner">
@@ -4416,7 +4476,7 @@ function ShopPullReveal({ reveal, onClose }) {
           {phase === 'reveal' && (
             <React.Fragment>
               {AV
-                ? <div className="pull-fx-front pull-fx-front-sq"><ShopMosaic src={reveal.imgUrl} /></div>
+                ? <div className="pull-fx-front pull-fx-front-sq"><ShopMosaic src={reveal.imgUrl} fast={fast} /></div>
                 : <div className="pull-fx-front"><img src={reveal.imgUrl} draggable={false} /></div>}
               {STARS.map((s, i) => (
                 <span key={i} className="pull-fx-star" style={{ left: s[0] + '%', top: s[1] + '%', animationDelay: (i * 160) + 'ms' }} />
@@ -4492,6 +4552,9 @@ function ShopScreen() {
   const [buying, setBuying] = useState(false);
   const [tab, setTab] = useState('skins');
   const [skinFilter, setSkinFilter] = useState('');
+  // ×5-Modus für die Pull-Animationen (auch per Leertaste im Reveal umschaltbar), pro Gerät gemerkt
+  const [fastPull, setFastPull] = useState(() => { try { return localStorage.getItem('pp_pull_fast') === '1'; } catch { return false; } });
+  useEffect(() => { try { localStorage.setItem('pp_pull_fast', fastPull ? '1' : '0'); } catch {} }, [fastPull]);
   const [collFilter, setCollFilter] = useState('all'); // Sammlungsansicht: 'all' | 'owned' | 'missing'
   const [selected, setSelected] = useState(null); // { type, id }
   const [celebration, setCelebration] = useState(null); // { cx, cy } or null
@@ -5182,11 +5245,16 @@ function ShopScreen() {
         </span>
       </div>
       {celebration && <PurchaseCelebration cx={celebration.cx} cy={celebration.cy} onDone={() => setCelebration(null)} />}
-      {randomReveal && <ShopPullReveal reveal={randomReveal} onClose={() => setRandomReveal(null)} />}
+      {randomReveal && <ShopPullReveal reveal={randomReveal} fast={fastPull} onToggleFast={() => setFastPull(v => !v)} onClose={() => setRandomReveal(null)} />}
       <div className="top-bar">
         <button className="btn" onClick={() => setScreen('menu')}>← BACK</button>
         <h2 className="orbit-font" style={{ fontSize: 22, fontWeight: 800, color: 'var(--player-color)' }}>SHOP</h2>
         <div style={{ flex: 1 }} />
+        <label className="shop-fast" title="Play the pull animations at 5x speed. During an animation: Space toggles, Esc skips.">
+          <input type="checkbox" checked={fastPull} onChange={e => { setFastPull(e.target.checked); if (window.playSFX) window.playSFX('ui_click'); }} />
+          <span className="shop-fast-box" aria-hidden="true" />
+          <span className="shop-fast-text">SPEED x5</span>
+        </label>
         <div className="badge" style={{ background: 'rgba(250,213,74,.12)', color: '#fad54a', display: 'flex', alignItems: 'center', gap: 6, fontSize: 18, padding: '6px 14px' }}>
           <img src="/data/sc.png" style={{ width: 22, height: 22, imageRendering: 'pixelated' }} /> {user.sc || 0}
         </div>
