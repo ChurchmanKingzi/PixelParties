@@ -14,7 +14,8 @@ Was im Sprite ist (Koordinaten im Sprite 19×24, x/y ab 0):
 Fest bleiben: Umriss, Kopfform, Gesicht, Gliedmaßen (der Körper streckt sich nur durch eingefügte Rippenzeilen unterhalb des Kopfes).
 
 Ablauf (48 Frames à 65 ms = 3,12 s, nahtlos):
-* Atmen (Periode 24): unterhalb des Kopfes werden im Rippenkorb 1–2 Zeilen eingefügt (Quellzeile 19, in der Spitze zusätzlich 18; Zeilen gleicher Breite, keine Randstufe) — Kopf, Arme und Rumpf heben sich um 1–2 px, die Füße bleiben fest am Boden.
+* Atmen (Periode 24): unterhalb des Kopfes werden im Rippenkorb 1–2 Zeilen eingefügt (Quellzeile 17, in der Spitze zusätzlich 20 — bewusst zwei GETRENNTE Zeilen, damit keine hohen, einförmigen Blöcke entstehen; jede eingefügte
+  Zeile mischt über A.koerper_pose die Textur der ähnlichsten Nachbarzeile ein, Nutzer-Feedback „nicht einfach Zeilen kopieren“) — Kopf, Arme und Rumpf heben sich um 1–2 px, die Füße bleiben fest am Boden.
 * Ohren (je 3 Frames, Frames 8–10 und 32–34 links, 20–22 und 44–46 rechts): die Ohrspitzen (Quellzeilen 0–2) kippen 1 px zur Kopfmitte und bleiben dabei am Kopf angeschlossen.
 * Blinzeln (zweimal je Schleife, Frames 13–14 und 37–38, je 2 Frames zu): die grünen Augenpixel (je 2×1) werden zur Fellfarbe. Lidfarbe = umgebende Körperfarbe (je Augenpixel häufigste Farbe im Umkreis von 2–3 px, ohne Umriss und Augenfarbe).
 Frame: Sprite plus 3 px links/rechts, 4 px oben (Atmen), 2 px unten, Figur zentriert.
@@ -49,12 +50,12 @@ S = []
 for _i in range(N):
     _v = math.sin(2 * math.pi * _i / 24)
     S.append(2 if _v >= 0.9 else 1 if _v >= 0.35 else 0)
-POSEN = {0: {}, 1: {19: 1}, 2: {18: 1, 19: 1}}                                                                      # s → eingefügte Zeilen (Rippen, unterhalb des Kopfes)
+POSEN = {0: {}, 1: {17: 1}, 2: {17: 1, 20: 1}}                                                                      # s → eingefügte Zeilen (Rippen, unterhalb des Kopfes; zwei getrennte Zeilen statt zwei aufeinanderfolgender)
 assert S[0] == 0
 _ext = [(int(np.nonzero(OPAK[y])[0].min()), int(np.nonzero(OPAK[y])[0].max())) for y in range(sh)]
 for _s, _d in POSEN.items():
     for _y in _d:
-        assert _ext[_y] in (_ext[_y - 1], _ext[_y + 1]), ('Einfügezeile mit Randstufe', _y)
+        assert max(abs(_ext[_y][0] - _ext[_y - 1][0]), abs(_ext[_y][1] - _ext[_y - 1][1])) <= 1, ('Einfügezeile mit Randstufe', _y)
 
 # ── Augen und Lidfarben ──
 AUGEN = [(8, 7), (8, 8), (8, 12), (8, 13)]                                                                      # (y, x) der Augenpixel

@@ -27,9 +27,9 @@ Ablauf (48 Frames à 65 ms = 3,12 s, nahtlos):
   (Zeilen 2–6) zwei Spalten mitten im „V“ — nie der Umriss). Die Unterkante sitzt fest am Boden. Frame 0 = Original.
 * Sockel wabbelt (Periode 16, 3 Zyklen je Schleife): die Sockelzeilen 13–15 schwanken um bis zu ±1 (Zeile 15: ±2) px seitlich (die unteren Zeilen kräftiger als die oberen, Gefälle ≤ 1 px je Zeile).
 * Lichtpunkte im Körper: beim Strecken wandern die beiden hellen Punkte (6, 9) und (11, 9) 1 px nach innen und beim Entspannen zurück (Tausch mit dem Nachbarpixel, keine neue Farbe).
-* Schattendunst (Partikel): kleine runde Violett-Punkte (Formen k/s) steigen links und rechts vom Schleim langsam auf (24 Frames Lebenszeit).
+* Keine Partikel mehr: der frühere Schattendunst (1-px-Punkte und 2×2-Wölkchen in den Körperfarben) entfällt (Regel 25: keine isolierten 1-px-Punkte; in Körperfarbe verschmolz er mit dem Rand und las sich als Rauschen).
 Ergänzungen: wo ein Randpixel durch Verbreitern/Wabbeln ohne Umriss frei liegt, bekommen die leeren Nachbarfelder den Umriss A=(10,0,41) (umriss_ergaenzen, Regel 16).
-Frame: Sprite plus 3 px links/rechts, 4 px oben (Strecken + Dunst), 2 px unten — Figur zentriert. Alle Bewegungen laufen auf der vollen Leinwand. Nur ganze Pixel, nur Farben der Quelle.
+Frame: Sprite plus 4 px links/rechts (Verbreitern + Sockelschwanken), 4 px oben (Strecken), 2 px unten — Figur zentriert. Alle Bewegungen laufen auf der vollen Leinwand. Nur ganze Pixel, nur Farben der Quelle.
 """
 import math
 import sys
@@ -40,7 +40,7 @@ import anim_lib as L
 import anim_amorph as A
 
 N, MS = 48, 65
-PAD_L, PAD_R, PAD_T, PAD_B = 4, 4, 5, 2
+PAD_L, PAD_R, PAD_T, PAD_B = 4, 4, 4, 2
 
 spr = L.lade('shadowy-slime')
 sh, sw = spr.shape[:2]
@@ -99,21 +99,6 @@ def sockel_dx(i, quelle_zeile):
     return int(round(WABBEL_GEW.get(quelle_zeile, 0.0) * math.sin(2 * math.pi * i / 16)))
 
 
-DUNST = {'c': (113, 6, 182), 'r': (89, 19, 130)}
-for _c in DUNST.values():
-    assert _c in _farben, _c
-PUFFS = [
-    dict(x=PAD_L + 0, y=PAD_T + 12, vx=-1, vy=-7, off=0, form='s', wackeln=0),
-    dict(x=PAD_L + 17, y=PAD_T + 12, vx=1, vy=-7, off=3, form='s', wackeln=0),
-    dict(x=PAD_L + 1, y=PAD_T + 9, vx=-1, vy=-6, off=6, form='s', wackeln=0),
-    dict(x=PAD_L + 16, y=PAD_T + 9, vx=1, vy=-6, off=9, form='s', wackeln=0),
-    dict(x=PAD_L + 0, y=PAD_T + 14, vx=-1, vy=-6, off=12, form='s', wackeln=0),
-    dict(x=PAD_L + 17, y=PAD_T + 14, vx=1, vy=-6, off=15, form='s', wackeln=0),
-    dict(x=PAD_L + 2, y=PAD_T + 5, vx=-1, vy=-5, off=18, form='s', wackeln=0),
-    dict(x=PAD_L + 15, y=PAD_T + 5, vx=1, vy=-5, off=21, form='s', wackeln=0),
-]
-
-
 def sprite_mit_effekten(i):
     sp = spr.copy()
     if S[i] >= 1:                                                                    # Lichtpunkte wandern beim Strecken 1 px nach innen (Tausch mit dem Nachbarpixel)
@@ -137,10 +122,7 @@ def figur(i):
 
 def frame(i, nur=None):
     f = figur(i)
-    if nur is not None:
-        return f['fig']
-    dunst = L.puff_ebene(H, W, i, 24, PUFFS, DUNST)
-    return L.zusammen(H, W, [(dunst, 0, 0), (f['fig'], 0, 0)])
+    return f['fig']
 
 
 if __name__ == '__main__':

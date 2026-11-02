@@ -10,8 +10,8 @@ PICK: [["MotiveRussia", 15, 1], ["MotiveRussia", 13, 1]]
 
 Runde 2 (Nutzerkorrektur wörtlich: „Die Wurst hinten *ist* sein Schwanz, nicht noch einen separaten Eis-Schwanz darstellen.“): Das rot-goldene Wurstgebilde, das hinten links hochsteht, ist der SCHWANZ des Hundes
 (ein Chili-Dog: die Wurst liegt auf dem Rücken, ihr hinteres Ende ist der Schwanz). Der weiße Hundeschwanz (x 1–3, Zeilen 5–8), der in der Hund-Ebene unter der Wurst versteckt lag und beim Wedeln der Wurst frei wurde,
-ist ENTFERNT (Pixel (1,5) (1,6) (2,6) (1,7) (2,7) (3,7) (1,8)); die Kruppe schließt dort jetzt mit einer Rückenlinie ab ((2,8) (3,8) in Umrissfarbe A — Ergänzung). Die Wurst (Schal-Ebene, Spalten links vom Hals) wedelt nun
-als Schwanz: größerer Ausschlag (bis ±3 px an der Spitze) mit Laufwelle; darunter bleibt nur der Rücken/die Kruppe des Hundes sichtbar. Die frühere Ergänzung (0,6) (Umrisspixel der Hundeschwanzspitze) entfällt.
+ist ENTFERNT (Pixel (1,5) (1,6) (2,6) (1,7) (2,7) (3,7) (1,8), dazu (4,8), das linke Ende der Rückenlinie, das beim Wedeln als Einzelpixel zwischen den Wurstpixeln aufblitzen würde); wo die Kruppe (x 2–4, ab Zeile 8) beim Wedeln der Wurst frei liegt, bekommt sie ihren Umriss von anim_tiere.umriss_schliessen (Ergänzung, Farbe A). Die Wurst (Schal-Ebene) wedelt nun
+als Schwanz: nur das freie Ende (x 0–4, Drehpunkt x 5; die Wurst auf dem Rücken liegt fest, sonst würde die Rückenlinie des Hundes zwischen den Wurstpixeln aufblitzen) mit größerem Ausschlag (bis ±3 px an der Spitze) und Laufwelle; darunter bleibt nur der Rücken/die Kruppe des Hundes sichtbar. Die frühere Ergänzung (0,6) (Umrisspixel der Hundeschwanzspitze) entfällt.
 
 Aufruf:   python3 mischief_militia_chilly_dog.py [--preview <ordner>]
 Ausgabe:  ../../data/creature-animations/mischief-militia-chilly-dog.png + .json
@@ -31,7 +31,7 @@ Bleibt fest: Kopf (bis auf Ohrspitze und Auge), Nase, Bauch/Brust, Schalband am 
 
 Ablauf (54 Frames à 66 ms = 3,56 s), alle Bewegungen unabhängig:
 * Atmen (Periode 27, 2× pro Schleife; oben in Frames 3–15 und 30–42): Zeile 12 wird eingefügt — Kopf, Rücken, Schal heben sich 1 px, die Beine bleiben am Boden.
-* Wurst-Schwanz wedelt: die Spalten links vom Hals (x 0–6) schwingen als wandernde Welle bis ±3 px auf und ab (3 Wellen pro Schleife); das Halsband bleibt am Kopf.
+* Wurst-Schwanz wedelt: das freie Ende (Spalten x 0–4, Drehpunkt x 5) schwingt als wandernde Welle bis ±3 px auf und ab (3 Wellen pro Schleife); das Halsband bleibt am Kopf.
   Darunter wird nur noch der Rücken/die Kruppe des Hundes sichtbar (kein weißer Schwanz mehr).
 * Ohr zuckt nach hinten: 4× pro Schleife (Frames 4, 19, 31, 46, je 6 Frames) schnippen die oberen zwei Zeilen der Ohrspitze 1 px nach links, der rechte Umrisspixel
   der unteren Zeile bleibt stehen (Umriss geschlossen).
@@ -69,8 +69,8 @@ FELL = (214, 213, 244)                                             # B: Fell im 
 UMRISS = (121, 120, 207)                                           # A
 AUGE_OBEN, AUGE_UNTEN = (118, 128, 163), (83, 97, 132)
 # Umrisspixel, die im Original unter dem Schal liegen und fehlen: die Schwanzspitze (1,6) hat links keinen Umriss.
-ERGAENZUNG = [(2, 8), (3, 8)]                                       # Rückenlinie über der Kruppe (der weiße Hundeschwanz ist entfernt)
-SCHWANZ_ENTFERNT = [(1, 5), (1, 6), (2, 6), (1, 7), (2, 7), (3, 7), (1, 8)]
+ERGAENZUNG = []                                                    # (die Kruppe bekommt ihren Umriss, wo sie frei liegt, von anim_tiere.umriss_schliessen)
+SCHWANZ_ENTFERNT = [(1, 5), (1, 6), (2, 6), (1, 7), (2, 7), (3, 7), (1, 8), (4, 8)]   # (4,8) = linkes Ende der Rückenlinie: läge beim Wedeln als Einzelpixel frei
 for (x, y) in SCHWANZ_ENTFERNT:                                    # der Wurst-Schwanz IST der Schwanz: kein zweiter (weißer) Schwanz darunter
     hund_q[y, x] = 0
 for (x, y) in ERGAENZUNG:
@@ -124,7 +124,10 @@ def frame(i, nur=None):
         if lid == 2:
             hund[PAD_T + 6, PAD_L + 14, :3] = FELL
     # Schalende weht (Spalten links vom Hals), wandernde Welle
-    schal = L.spalten_welle(schal, PAD_L + 7, 2.8, 2 * np.pi * i / 18.0 + 0.22, potenz=1.0, nur_rechts=False, lauf=0.9)   # Frame 0 = Original
+    cols0 = np.arange(W)[None, :] + np.zeros((H, 1), int)
+    spitze_s, rumpf_s = L.trenne(schal, cols0 <= PAD_L + 4)                  # freier Wurst-Schwanz (x 0–4) / Wurst auf dem Rücken (bleibt liegen)
+    spitze_s = L.spalten_welle(spitze_s, PAD_L + 5, 2.8, 2 * np.pi * i / 18.0 + 0.22, potenz=1.0, nur_rechts=False, lauf=0.9)
+    schal = L.zusammen(H, W, [(rumpf_s, 0, 0), (spitze_s, 0, 0)])   # Frame 0 = Original
     # Atmen: Zeile 12 einfügen, alles darüber steigt
     hund = L.streck_zeile(hund, PAD_T + ZEILE, atem)
     schal = L.streck_zeile(schal, PAD_T + ZEILE, atem)

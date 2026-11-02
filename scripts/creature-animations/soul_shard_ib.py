@@ -27,6 +27,7 @@ import numpy as np
 
 import anim_lib as L
 import anim_amorph as A
+import anim_shard as SH
 
 N, MS = 48, 65
 PAD_L, PAD_R, PAD_T, PAD_B = 3, 3, 4, 2
@@ -51,7 +52,7 @@ for _i in range(N):
     S.append(2 if _v >= 0.9 else 1 if _v >= 0.35 else 0)
 POSEN = {0: {}, 1: {22: 1}, 2: {22: 1, 23: 1}}                                                                      # s → eingefügte Zeilen (Rippen, unterhalb des Kopfes)
 assert S[0] == 0
-_ext = [(int(np.nonzero(OPAK[y])[0].min()), int(np.nonzero(OPAK[y])[0].max())) for y in range(sh)]
+_ext = [(int(np.nonzero(OPAK[y])[0].min()), int(np.nonzero(OPAK[y])[0].max())) for y in range(sh)]   # (Prüfung der Einfügezeilen unten mit dem Körper OHNE Henkelkreuz)
 for _s, _d in POSEN.items():
     for _y in _d:
         assert _ext[_y] in (_ext[_y - 1], _ext[_y + 1]), ('Einfügezeile mit Randstufe', _y)
@@ -73,6 +74,8 @@ GOLDFARBEN = [(169, 123, 48), (224, 174, 75), (255, 226, 98), (255, 245, 201), (
 for _c in GOLDFARBEN:
     assert _c in {tuple(int(v) for v in p[:3]) for p in spr.reshape(-1, 4) if p[3]}, _c
 GOLD = INNEN & _maske(*GOLDFARBEN) & ~((yy >= 10) & (yy <= 12))      # die gelb-orangen AUGEN (Zeilen 10–12) bekommen keinen Goldschein (Rückmeldung des Spielgestalters)
+ANKH = _maske(*GOLDFARBEN) & (xx <= 4) & (yy >= 14)                    # das Henkelkreuz (Loop, Querbalken, Stiel): ein starres Teil, das mit der Hand steigt und beim Atmen NICHT gestreckt wird
+assert int(ANKH.sum()) == 20, int(ANKH.sum())
 HELLER = {(169, 123, 48): (224, 174, 75), (224, 174, 75): (255, 226, 98), (255, 226, 98): (255, 245, 201), (217, 122, 0): (255, 153, 0), (255, 153, 0): (255, 217, 0), (255, 217, 0): (255, 226, 98)}
 STERN_FARBEN = {'m': (255, 245, 201), 'a': (255, 226, 98), 's': (255, 217, 0)}
 SWEEPS = [2, 26]
@@ -105,9 +108,12 @@ def sterne_ebene(i, f):
 
 
 def figur(i):
-    koerper = A.zeilen_von(sprite_mit_effekten(i), 0, sh - 1, H, W, PAD_L, PAD_T)
-    z, quelle = A.koerper_pose(koerper, doppeln=POSEN[S[i]], x0=PAD_L)
-    fig, top = A.auf_leinwand(z, H, BODEN, 0)
+    sp = sprite_mit_effekten(i)
+    ohne = sp.copy(); ohne[ANKH] = 0
+    ankh = sp.copy(); ankh[~ANKH] = 0
+    ebene, top, quelle = SH.ebene_atmung(ohne, POSEN[S[i]], H, W, PAD_L, PAD_T, BODEN)
+    ankh_ebene = L.platz(ankh, H, W, PAD_L, top)                          # starr: so hoch wie die Hand
+    fig = L.zusammen(H, W, [(ebene, 0, 0), (ankh_ebene, 0, 0)])
     fig, neu = A.umriss_ergaenzen(fig, RAND_FARBEN, lambda x, y: UMRISS)
     brueck, pfad, offen = [], [], []
     return dict(fig=fig, top=top, quelle=quelle, neu=neu, brueck=brueck, pfad=pfad, offen=offen)

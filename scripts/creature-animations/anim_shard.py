@@ -16,9 +16,9 @@ import anim_lib as L
 import anim_amorph as A
 
 
-def lid(fig, pix, lid_aus, eigen=None, rad=(2, 3)):
+def lid(fig, pix, lid_aus, eigen=None, rad=(2, 3), erlaubt=None):
     """Blinzeln: jedes Augenpixel (y, x) von `pix` bekommt die häufigste Körperfarbe im Umkreis von 2–3 px (ohne Farben aus `lid_aus`, ohne `eigen`
-    = alle Augenpixel). Lid = umgebende Körperfarbe, nichts Neues."""
+    = alle Augenpixel; mit `erlaubt` nur diese Farben). Lid = umgebende Körperfarbe, nichts Neues."""
     out = fig.copy()
     h, w = fig.shape[:2]
     eigen = set(eigen) if eigen is not None else set(pix)
@@ -31,7 +31,7 @@ def lid(fig, pix, lid_aus, eigen=None, rad=(2, 3)):
                     if not (0 <= yy < h and 0 <= xx < w) or not fig[yy, xx, 3] or (yy, xx) in eigen:
                         continue
                     c = tuple(int(v) for v in fig[yy, xx, :3])
-                    if c in lid_aus:
+                    if c in lid_aus or (erlaubt is not None and c not in erlaubt):
                         continue
                     cnt[c] = cnt.get(c, 0) + 1
                     dist[c] = min(dist.get(c, 9), max(abs(dy), abs(dx)))

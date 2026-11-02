@@ -23,7 +23,9 @@ Ablauf (48 Frames à 65 ms = 3,12 s) — er steht, späht und pickt. Ein Flügel
 * Atmen: Rumpf hebt sich um 1 px (zweimal pro Schleife; Zeile 11 doppelt, die Beine bleiben).
 * Schwanz wedelt (bis 1 px, Periode 16 Frames).
 * Waten: die Beine heben sich abwechselnd (bis 2 px, Periode 24 Frames, versetzt) — der Fuß taucht in der Zwischenzeit wieder ein.
-* Wasserringe (Partikel): flache weiße Wölkchen breiten sich langsam um die Füße aus, nahtlos. Kein Glanz (Federn).
+* Schaum (RUNDE 2, Nutzer: „soll nie eine Lücke zwischen den Beinen und den Schaum-Effekten geben!“): An jedem Fuß liegt ein flaches Schaumpolster aus Weiß (255,255,255) mit hellgrauem Rand (190,190,190); seine OBERE Reihe liegt
+  immer direkt (4-verbunden) unter dem untersten Beinpixel — es hängt am Fuß und steigt mit, wenn das Bein sich hebt, es wandert nicht mehr davon. Es pulsiert zwischen drei Größen (3 × 1, 5 × 2, 7 × 3 px, Periode 16 Frames, die Füße
+  um 8 Frames versetzt; Frame 0 = klein). Die losgelösten Wasserringe (Partikel, die vom Fuß wegwanderten) entfallen. Kein Glanz (Federn).
 
 Ergänzungen: keine nötig.
 Randpixel-Test (Regel 16): verschobene Halsspalten legen an Seitenkanten Innenfarbe frei; solche Randpixel werden in der Umrissfarbe ihrer Ebene gesetzt (Hals/Kopf (0,0,0), Rumpf (91,91,91),
@@ -40,7 +42,7 @@ import anim_flieger as F
 import anim_flieger_b as B
 
 N, MS = 48, 65
-PAD_L, PAD_R, PAD_T, PAD_B = 4, 2, 3, 2
+PAD_L, PAD_R, PAD_T, PAD_B = 4, 5, 3, 5
 
 spr = L.lade('scavenging-crane')
 sh, sw = spr.shape[:2]
@@ -110,14 +112,34 @@ def bein(a, k):
     return L.heben_unten(a, PAD_T + 16, k) if k else a
 
 
-# ── Partikel: Wasserringe um die Füße ──────────────────────────────────────────────────────────────────────────────────
-RING = {'c': (255, 255, 255), 'r': (190, 190, 190)}
-PUFFS = [
-    dict(x=px(5, 21)[0], y=px(5, 21)[1], vx=-5, vy=0, off=0, form='m', wackeln=0),
-    dict(x=px(5, 21)[0], y=px(5, 21)[1], vx=-5, vy=0, off=24, form='m', wackeln=0),
-    dict(x=px(14, 21)[0], y=px(14, 21)[1], vx=5, vy=0, off=12, form='m', wackeln=0),
-    dict(x=px(14, 21)[0], y=px(14, 21)[1], vx=5, vy=0, off=36, form='m', wackeln=0),
+# ── Schaum am Fuß: hängt immer direkt unter dem untersten Beinpixel ──────────────────────────────────────────────────────────
+SCHAUM_W, SCHAUM_R = (255, 255, 255), (190, 190, 190)
+# Zeilen unter dem Fuß: je Zeile (x-Versatz → Farbe); 'c' = weißer Kern, 'r' = grauer Rand. Stufe 0 klein … 2 groß.
+SCHAUM_FORMEN = [
+    [[(-1, 'r'), (0, 'c'), (1, 'r')]],
+    [[(-2, 'r'), (-1, 'c'), (0, 'c'), (1, 'c'), (2, 'r')], [(-1, 'r'), (0, 'r'), (1, 'r')]],
+    [[(-3, 'r'), (-2, 'c'), (-1, 'c'), (0, 'c'), (1, 'c'), (2, 'c'), (3, 'r')], [(-2, 'r'), (-1, 'c'), (0, 'c'), (1, 'c'), (2, 'r')], [(-1, 'r'), (0, 'r'), (1, 'r')]],
 ]
+SCHAUM_FOLGE = [0, 0, 1, 1, 2, 2, 2, 2, 1, 1, 0, 0, 0, 0, 0, 0]          # Größenstufe je Frame (Periode 16)
+FUESSE = {'l': (4, 20), 'r': (14, 20)}                                     # unterste Beinpixel (Sprite)
+
+
+def schaum(i, ks):
+    """Schaumpolster unter den beiden Füßen. ks = {'l': k, 'r': k} = Hebung des Beins in px (der Schaum steigt mit dem Fuß)."""
+    e = L.leer(H, W)
+    for nr, (name, (fx, fy)) in enumerate(FUESSE.items()):
+        stufe = SCHAUM_FOLGE[(i + 8 * nr) % 16]
+        x0, y0 = PAD_L + fx, PAD_T + fy - ks[name]
+        for zeile, reihe in enumerate(SCHAUM_FORMEN[stufe]):
+            for dx, k in reihe:
+                x, y = x0 + dx, y0 + 1 + zeile
+                if not (0 <= x < W and 0 <= y < H):
+                    raise L.ClipError(f'Schaumpixel bei ({x},{y}) außerhalb der Leinwand {W}×{H}')
+                e[y, x, :3] = SCHAUM_W if k == 'c' else SCHAUM_R
+                e[y, x, 3] = 255
+    return e
+
+
 TEST_EBENEN = ('koerper', 'hals', 'beine')                  # für den Randpixel-Test: ohne Partikel
 
 
@@ -128,8 +150,9 @@ def frame(i, partikel=True, nur=None):
     n = atem(i)
     dy = hals_dy(i)
     schichten = []
+    ks = {'l': anheben(i, 0.0), 'r': anheben(i, math.pi)}
     if 'beine' in ebenen:
-        schichten += [(bein(BEIN_L, anheben(i, 0.0)), 0, 0, 3), (bein(BEIN_R, anheben(i, math.pi)), 0, 0, 3)]
+        schichten += [(bein(BEIN_L, ks['l']), 0, 0, 3), (bein(BEIN_R, ks['r']), 0, 0, 3)]
     if 'koerper' in ebenen:
         z = PAD_T + 11
         schichten += [(L.streck_zeile(KOERPER, z, n), 0, 0, 1), (L.streck_zeile(SCHWANZ_W(i), z, n), 0, 0, 1)]
@@ -140,7 +163,7 @@ def frame(i, partikel=True, nur=None):
     f, karte = B.zusammen_mit_karte(H, W, schichten)
     B.umriss_je_ebene(f, karte, ERLAUBT, EBENEN_FARBE)
     if partikel:
-        f = L.zusammen(H, W, [(L.puff_ebene(H, W, i, N, PUFFS, RING), 0, 0), (f, 0, 0)])
+        f = L.zusammen(H, W, [(schaum(i, ks), 0, 0), (f, 0, 0)])
     return f
 
 

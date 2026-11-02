@@ -28,9 +28,9 @@ Identifikation (Sprite-Koordinaten x, y):
 * Flügel (x 39–72, y 0–33): ein langer schmaler Flügel schräg nach rechts oben (≈ 45°), dunkler Umriss (25,4,3) auf beiden Seiten, Füllung in vier Brauntönen; Wurzel am Rücken bei (39–45, 26–33).
 
 Ablauf (48 Frames à 60 ms = 2,88 s):
-* Durchgehender Flügelschlag BEIDER Flügel (Periode 16 = 960 ms, dreimal pro Schleife; Abschlag 6 Frames, Aufschlag 10 Frames, Cosinus-weich): der lange Flügel rechts biegt sich von der Ausgangshaltung (46° über der Waagerechten, Frame 0 = Original)
-  bis zu 60° nach unten (Spitze dann ca. 14° UNTER der Waagerechten), das Flügelblatt links biegt sich gegen den Uhrzeigersinn um bis zu 75° nach außen/unten (Spitze zeigt dann nach links). Beide schlagen gemeinsam (das linke 1 Frame später).
-  Die Biegung wächst von der Wurzel zur Spitze (erste 4 px bleiben fest am Rumpf bzw. Kopf), die Spitze hinkt der Wurzel um 2,5 Frames nach (Wellenlauf, wie ein biegsamer Flügel). Technik: Rückwärtsabbildung um eine gekrümmte Mittellinie
+* Durchgehender Flügelschlag BEIDER Flügel (Periode 16 = 960 ms, dreimal pro Schleife; Abschlag 6 Frames, Aufschlag 8 Frames, 2 Frames Ruhe oben, Cosinus-weich): der lange Flügel rechts biegt sich von der Ausgangshaltung (46° über der Waagerechten, Frame 0 = Original)
+  bis zu 60° nach unten (Spitze dann ca. 14° UNTER der Waagerechten), das Flügelblatt links biegt sich gegen den Uhrzeigersinn um bis zu 95° nach außen/unten (Spitze zeigt dann nach links). Beide schlagen gemeinsam (das linke 0,5 Frames später).
+  Die Biegung wächst von der Wurzel zur Spitze (erste 4 px des Flügels rechts bzw. 2 px des Blatts links bleiben fest am Rumpf bzw. Kopf), die Spitze hinkt der Wurzel um 2 (rechts) bzw. 1,5 (links) Frames nach (Wellenlauf, wie ein biegsamer Flügel). Technik: Rückwärtsabbildung um eine gekrümmte Mittellinie
   (jedes Zielpixel holt sich das Quellpixel an derselben Stelle der Bogenlänge und desselben Querabstands, Nächster-Nachbar, keine Mischfarben, keine Löcher, die Breite des Flügels bleibt erhalten); Umrisslinien bleiben als Linien lesbar.
 * Schwebe-Bob zweistufig bis 2 px nach oben (0 → 1 → 2 → 1 → 0), das ganze Tier hebt sich kurz nach dem Abschlag.
 * Das Horn (dunkle Spitze neben dem Auge, y ≤ 18) wippt mit Verzögerung leicht nach (bis 1 px, Periode 16). Die Füße am Rumpf schwingen leicht nach (bis 1–2 px an den Spitzen, Periode 16).
@@ -52,7 +52,7 @@ import anim_lib as L
 import anim_flieger as F
 
 N, MS = 48, 60
-BEAT, DOWN = 16, 6                                             # Frames je Flügelschlag, davon Abschlag
+BEAT, DOWN, UP = 16, 6, 8                                      # Frames je Flügelschlag: Abschlag 6, Aufschlag 8, 2 Frames Ruhe oben (damit Frame 0 trotz Spitzenverzögerung = Original)
 PAD_L, PAD_R, PAD_T, PAD_B = 10, 20, 8, 10                    # Arbeitsleinwand (am Ende zugeschnitten); rechts Platz für den abgesenkten Flügel
 
 spr = L.lade('gigantisaur-pteranos')
@@ -98,16 +98,18 @@ BLINZ = {32, 33, 34}
 
 # ── Flügel biegen: Rückwärtsabbildung um eine gekrümmte Mittellinie ──────────────────────────────────────────────────────────
 #                 Wurzelpunkt (Sprite)  Richtung zur Spitze (rad, y nach unten)   Länge   Drehsinn · Ausschlag   Wurzelzone  Verzögerung der Spitze
-FLUEGEL_R = dict(p0=(42.0, 31.0), ang0=math.atan2(-29.5, 28.5), laenge=41.0, A=math.radians(+60.0), s0=4.0, lag=2.5, versatz=0.0)
-FLUEGEL_L = dict(p0=(17.0, 25.0), ang0=math.atan2(-14.0, -1.0), laenge=15.0, A=math.radians(-75.0), s0=4.0, lag=2.5, versatz=1.0)
+FLUEGEL_R = dict(p0=(42.0, 31.0), ang0=math.atan2(-29.5, 28.5), laenge=41.0, A=math.radians(+60.0), s0=4.0, lag=2.0, versatz=0.0)
+FLUEGEL_L = dict(p0=(17.0, 25.0), ang0=math.atan2(-14.0, -1.0), laenge=15.0, A=math.radians(-95.0), s0=2.0, lag=1.5, versatz=0.5)
 
 
 def welle(t):
-    """Schlagphase 0 (Flügel oben = Original) … 1 (unten): Abschlag in DOWN Frames, Aufschlag in BEAT − DOWN Frames; an den Wendepunkten weich."""
+    """Schlagphase 0 (Flügel oben = Original) … 1 (unten): Abschlag in DOWN Frames, Aufschlag in UP Frames, danach 2 Frames Ruhe oben; an den Wendepunkten weich."""
     u = t % BEAT
     if u < DOWN:
         return 0.5 - 0.5 * math.cos(math.pi * u / DOWN)
-    return 0.5 + 0.5 * math.cos(math.pi * (u - DOWN) / (BEAT - DOWN))
+    if u < DOWN + UP:
+        return 0.5 + 0.5 * math.cos(math.pi * (u - DOWN) / UP)
+    return 0.0
 
 
 def delta(fl, s, t):

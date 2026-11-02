@@ -1,15 +1,15 @@
 {
   "creature": "Golden Vermin",
   "sheet": "golden-vermin.png",
-  "frameWidth": 25,
+  "frameWidth": 26,
   "frameHeight": 22,
   "frames": 48,
   "frameMs": 65,
   "loop": true,
   "layout": "horizontal",
   "padTop": 2,
-  "padLeft": 3,
+  "padLeft": 2,
   "padRight": 2,
   "padBottom": 2,
-  "faceX": 12.5
+  "faceX": 13.0
 }

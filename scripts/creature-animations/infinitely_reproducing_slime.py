@@ -22,7 +22,7 @@ Ablauf (48 Frames à 65 ms = 3,12 s, nahtlos) — Nutzerwunsch „mehr Squash an
 * Landung: Stauchung (breit und flach), Rückfederung (kurz gestreckt), Ausschwingen. Pose und Höhe wechseln alle 1–2 Frames, Frame 0 = Original.
 * Schleimperlen (Partikel): zwei runde Wölkchen (2×2 → 4×4 → 2×2, nie einzelne Punkte; Farben D und C des Sprites) quellen rechts neben dem Schleim auf und steigen langsam auf.
 Ergänzungen: wo ein Randpixel durch die Verformung ohne Umriss frei liegt, bekommen die leeren Nachbarfelder den Umriss A (umriss_ergaenzen, Regel 16).
-Frame: Sprite plus 5 px links/rechts, 11 px oben (Strecken + Sprung), 2 px unten. Alle Bewegungen laufen auf der vollen Leinwand. Nur ganze Pixel, nur Farben der Quelle.
+Frame: Sprite plus 5 px links, 8 px rechts (Perlen), 11 px oben (Strecken + Sprung), 2 px unten. Alle Bewegungen laufen auf der vollen Leinwand. Nur ganze Pixel, nur Farben der Quelle.
 """
 import math
 import sys
@@ -33,7 +33,7 @@ import anim_lib as L
 import anim_amorph as A
 
 N, MS = 48, 65
-PAD_L, PAD_R, PAD_T, PAD_B = 5, 5, 11, 2
+PAD_L, PAD_R, PAD_T, PAD_B = 5, 8, 11, 2
 TEST_EBENEN = ('fig',)
 
 spr = L.lade('infinitely-reproducing-slime')
@@ -102,9 +102,9 @@ assert len(ABLAUF) == N, len(ABLAUF)
 assert ABLAUF[0] == ('R', 0)
 MAX_DY = max(d for _, d in ABLAUF)
 
-# ── Perlen (nur 2×2 / 4×4), rechts neben der Kuppel (x 17–20 im Sprite-Raster) ──
+# ── Perlen (nur 2×2 / 4×4), rechts neben dem Schleim (x 19–22 im Sprite-Raster, auch bei der breitesten Stauchung ≥ 1 px Abstand) ──
 PERLEN = [
-    dict(x=17, y=10, vx=0, vy=-8, off=0), dict(x=16, y=10, vx=1, vy=-8, off=12),
+    dict(x=20, y=10, vx=0, vy=-8, off=0), dict(x=19, y=10, vx=1, vy=-8, off=12),
 ]
 
 

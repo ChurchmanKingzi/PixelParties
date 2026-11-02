@@ -5,6 +5,10 @@ Quelle: src/pinaxolotl.png — der Ananas-Axolotl (40×16 px, 12 Farben) aus Mot
 Mann mit Hut, der zur Kartenszene gehört und nicht zur Creature).
 PICK: [["MotiveGrailWar", 417, 3]]
 
+Runde 2 (Nutzerkorrektur wörtlich: „das kleine gespiegelte grüne L über dem Schwanz weglassen.“): Das freistehende Stück oben rechts — drei dunkelgrüne Pixel A (47,85,64) bei (39,0) (38,1) (39,1), die ein
+gespiegeltes „L“ über der Schwanzspitze bilden (im Original durch eine leere Zeile 2 vom Schwanzblatt getrennt) — ist ENTFERNT: das Skript löscht sie nach dem Laden aus dem Sprite (src/pinaxolotl.png bleibt
+unverändert) und lässt sie nie wieder zeichnen; die Leinwand ist entsprechend oben 2 px niedriger. Alles andere unverändert.
+
 Aufruf:   python3 pinaxolotl.py [--preview <ordner>]
 Ausgabe:  ../../data/creature-animations/pinaxolotl.png + .json
 
@@ -37,9 +41,11 @@ import anim_lib as L
 import anim_tiere as T
 
 N, MS = 60, 64
-PAD_L, PAD_R, PAD_T, PAD_B = 3, 2, 5, 2
+PAD_L, PAD_R, PAD_T, PAD_B = 3, 2, 3, 2
 
 spr = L.lade('pinaxolotl')
+for (_x, _y) in ((39, 0), (38, 1), (39, 1)):                        # das gespiegelte grüne „L“ über dem Schwanz (Nutzerwunsch: weglassen)
+    spr[_y, _x] = 0
 sh, sw = spr.shape[:2]
 H, W = sh + PAD_T + PAD_B, sw + PAD_L + PAD_R
 yy, xx = np.mgrid[0:sh, 0:sw]

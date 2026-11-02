@@ -1,8 +1,8 @@
 {
   "creature": "Hammer Skeleton",
   "sheet": "hammer-skeleton.png",
-  "frameWidth": 28,
-  "frameHeight": 38,
+  "frameWidth": 26,
+  "frameHeight": 36,
   "frames": 48,
   "frameMs": 65,
   "loop": true,
@@ -10,6 +10,6 @@
   "padTop": 1,
   "padLeft": 1,
   "padRight": 2,
-  "padBottom": 2,
-  "faceX": 14.0
+  "padBottom": 1,
+  "faceX": 13.0
 }

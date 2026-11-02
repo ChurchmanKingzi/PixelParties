@@ -1,7 +1,7 @@
 {
   "creature": "Infinitely Reproducing Slime",
   "sheet": "infinitely-reproducing-slime.png",
-  "frameWidth": 27,
+  "frameWidth": 30,
   "frameHeight": 29,
   "frames": 48,
   "frameMs": 65,
@@ -11,5 +11,5 @@
   "padLeft": 3,
   "padRight": 3,
   "padBottom": 2,
-  "faceX": 13.5
+  "faceX": 15.0
 }

@@ -26,10 +26,10 @@ Ablauf (48 Frames à 65 ms = 3,12 s, nahtlos):
 * Schwanzschlag: der eingerollte Schwanz und der Körperfuß (Zeilen 9–14) schwingen seitlich (Zeilenversatz wächst nach unten, bis ±1 px, Periode 16, Nachlauf); Frame 0 = Quellform.
 * Goldglanz (Regel 14: Gold): zweimal pro Schleife (Frames 4–13 und 28–37) zieht ein schmales diagonales Lichtband über das Gold (eine Stufe heller auf der Gold-Rampe B→C→E→G, nur Innenpixel);
   dazu blitzen vierzackige Glitzersterne an vier Lichtpunkten (4,1), (7,9), (13,10), (6,13) auf (5 Frames Lauf, wachsen/schrumpfen). Umriss, schwarzer Fleck und Randpixel glänzen nicht.
-* Goldstaub (Partikel): vier runde Wölkchen (2×2 → 4×4 → 2×2, nie einzelne Punkte; Farben C und B des Sprites) steigen rechts und links neben dem Sprite langsam auf, so dass sie sich nicht mit dem Gold der Figur vermischen.
+* Goldstaub (Partikel): vier runde 2×2-Wölkchen (nie einzelne Punkte; Farben C und B des Sprites) steigen rechts und links neben dem Sprite langsam auf; sie berühren die Figur und das Loch nie (≥ 1 px Abstand, im Skript geprüft).
 * Keine Augeneffekte: die Augen sind im Sprite nicht eindeutig (kein Blinzeln).
 Ergänzungen: beim Zurückziehen des Kopfes bekommen freiliegende linke Kopfkanten (am Loch) den Umriss A=(148,27,0) (umriss_ergaenzen, 0–3 Pixel je Frame); Frame 0 unverändert.
-Frame: Sprite plus 5 px links/rechts (Goldstaub), 4 px oben (Strecken + Sterne), 3 px unten (Stern am Schwanz) — Figur zentriert; Sterne und Wölkchen liegen in der 2-px-Zone um die Figur.
+Frame: Sprite plus 5 px links, 6 px rechts (Goldstaub), 4 px oben (Strecken + Sterne), 3 px unten (Stern am Schwanz) — Figur zentriert; Sterne und Wölkchen liegen in der 2-px-Zone um die Figur.
 Alle Bewegungen laufen auf der vollen Leinwand (anim_lib/anim_amorph werfen ClipError). Nur ganze Pixel, nur Farben der Quelle.
 """
 import math
@@ -42,7 +42,7 @@ import anim_lib as L
 import anim_amorph as A
 
 N, MS = 48, 65
-PAD_L, PAD_R, PAD_T, PAD_B = 5, 5, 4, 3
+PAD_L, PAD_R, PAD_T, PAD_B = 5, 6, 4, 3
 
 spr = L.lade('golden-vermin')
 sh, sw = spr.shape[:2]
@@ -103,8 +103,8 @@ def zeilen_dx(i):
 
 # ── Wölkchen (nur 2×2 / 4×4) rechts und links neben dem Sprite ──
 WOLKEN = [
-    dict(x=16, y=11, vx=0, vy=-6, off=0), dict(x=16, y=9, vx=-1, vy=-6, off=12),
-    dict(x=0, y=12, vx=0, vy=-6, off=6), dict(x=0, y=10, vx=1, vy=-6, off=18),
+    dict(x=17, y=11, vx=0, vy=-6, off=0), dict(x=17, y=9, vx=0, vy=-6, off=12),
+    dict(x=-3, y=12, vx=0, vy=-6, off=6), dict(x=-3, y=10, vx=0, vy=-6, off=18),
 ]
 
 
@@ -114,7 +114,7 @@ def wolken_ebene(i):
         t = ((i + w['off']) % 24) / 24.0
         if t > 0.92:
             continue
-        form = 's' if (t < 0.22 or t > 0.72) else 'o'
+        form = 's'
         cx = PAD_L + w['x'] + int(round(w['vx'] * t))
         cy = PAD_T + w['y'] + int(round(w['vy'] * t))
         for (dx, dy, k) in L.PUFF_FORMEN[form]:

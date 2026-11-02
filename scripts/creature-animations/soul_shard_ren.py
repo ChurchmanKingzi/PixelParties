@@ -9,12 +9,16 @@ Ausgabe:  ../../data/creature-animations/soul-shard-ren.png + .json
 
 Was im Sprite ist (Koordinaten im Sprite 44×37, x/y ab 0):
 * Ein Pharao-Skelett: großes blau-goldenes Kopftuch (Nemes; Gold A, B, F, H, I, N, V, X; Blau C, D, G, K, O, P, W, Z; Zeilen 0–27) mit Gesichtsmaske (Zeilen 15–27; weiße/rote Augenpunkte S, R, a) und Skelettkörper (J, L, M, E; Zeilen 26–36).
-* Material: Gold (Kopftuch) → Glanz und Glitzer erlaubt (Regel 14); Blau/Knochen glänzen nicht. Augen: unklar (Maske) → KEIN Blinzeln. Kein Feuer (Regel 15).
+* Augen (Nutzer: „blinzelt nicht“): zwei gelb-orange Augen in der dunkelblauen Maske, je 5 Pixel — links V=(255,199,0) bei (18,22), (18,23), (19,24) und X=(255,232,0) bei (19,23), (20,23); rechts X bei (25,22), (24,23),
+  (25,23) und V bei (23,23), (24,24). Darüber braune Brauen R/a, in der Mitte der blaue Schnabel (P, W, Z), außen weiße/graue Wangenstreifen S/T — die bleiben fest.
+* Material: Gold (Kopftuch) → Glanz und Glitzer erlaubt (Regel 14); Blau/Knochen glänzen nicht. Der Goldschimmer läuft NICHT über die Augen (Regel 21: kein Farbspiel in Augen) — V/X sind aus der Goldrampe entfernt. Kein Feuer (Regel 15).
 Fest bleiben: Umriss, Kopfform, Gesicht, Gliedmaßen (der Körper streckt sich nur durch eingefügte Rippenzeilen unterhalb des Kopfes).
 
 Ablauf (48 Frames à 65 ms = 3,12 s, nahtlos):
 * Atmen (Periode 24): unterhalb des Kopfes werden im Rippenkorb 1–2 Zeilen eingefügt (Quellzeile 33, in der Spitze zusätzlich 34; Zeilen gleicher Breite, keine Randstufe) — Kopf, Arme und Rumpf heben sich um 1–2 px, die Füße bleiben fest am Boden.
-* Goldschimmer (zweimal je Schleife, Frames 2–18 und 26–42): ein diagonales Lichtband (x+y, 8 px) läuft über die goldenen Innenpixel des Kopftuchs (eine Stufe heller auf der Rampe H→I→N→B→A→F und V→X; Umrisspixel bleiben).
+* Blinzeln (zweimal je Schleife, Frames 13–15 und 37–39: halb – zu – halb): die gelb-orangen Augenpixel werden zum dunklen Maskenblau (Lid = häufigste Maskenfarbe K/O im Umkreis 2–3 px; Stufe 1 schließt die oberen zwei
+  Augenzeilen, Stufe 2 alle).
+* Goldschimmer (zweimal je Schleife, Frames 2–18 und 26–42): ein diagonales Lichtband (x+y, 8 px) läuft über die goldenen Innenpixel des Kopftuchs (eine Stufe heller auf der Rampe H→I→N→B→A→F; Umrisspixel und Augen bleiben).
 * Glitzersterne (Gold): vierzackige Sterne blitzen an drei Stellen ganz im Inneren des Kopftuchs (Lauf 0-1-2-1-0 über 5 Frames) und in den beiden freien oberen Ecken außerhalb der Figur (Lauf 1-2-1, nie ein einzelner Punkt) auf (Farben weiß, F, A des Sprites).
 Frame: Sprite plus 3 px links/rechts, 4 px oben (Atmen), 2 px unten, Figur zentriert.
 Alle Bewegungen laufen auf der vollen Leinwand (anim_lib/anim_amorph werfen ClipError). Nur ganze Pixel, nur Farben der Quelle.
@@ -26,6 +30,7 @@ import numpy as np
 
 import anim_lib as L
 import anim_amorph as A
+import anim_shard as SH
 
 N, MS = 48, 65
 PAD_L, PAD_R, PAD_T, PAD_B = 3, 3, 4, 2
@@ -42,6 +47,13 @@ UMRISS = (12, 12, 12)
 def _col(y, x):
     return tuple(int(v) for v in spr[y, x, :3])
 
+
+# ── Augen und Lidfarben ──
+AUGEN = [(22, 18), (23, 18), (23, 19), (23, 20), (24, 19), (22, 25), (23, 23), (23, 24), (23, 25), (24, 24)]       # (y, x) der Augenpixel (V/X)
+for _y, _x in AUGEN:
+    assert tuple(int(v) for v in spr[_y, _x, :3]) in ((255, 199, 0), (255, 232, 0)), (_y, _x)
+MASKE_BLAU = {(0, 18, 51), (0, 29, 84)}                                                                                                        # K, O: dunkles Maskenblau = Lid
+BLINK = {13: 1, 14: 2, 15: 1, 37: 1, 38: 2, 39: 1}                                                                                              # Frame → Stufe (1: obere Zeilen 22–23, 2: alle)
 
 # ── Zeitachsen ──
 S = []
@@ -68,11 +80,11 @@ def _maske(*cs):
     return m & OPAK
 
 
-GOLDFARBEN = [(253, 223, 111), (203, 168, 52), (245, 239, 153), (112, 64, 16), (144, 100, 37), (172, 137, 83), (255, 199, 0), (255, 232, 0)]   # A, B, F, H, I, N, V, X
+GOLDFARBEN = [(253, 223, 111), (203, 168, 52), (245, 239, 153), (112, 64, 16), (144, 100, 37), (172, 137, 83)]   # A, B, F, H, I, N  (V/X = Augenfarben: NICHT im Goldschimmer)
 for _c in GOLDFARBEN:
     assert _c in {tuple(int(v) for v in p[:3]) for p in spr.reshape(-1, 4) if p[3]}, _c
 GOLD = INNEN & _maske(*GOLDFARBEN)
-HELLER = {(112, 64, 16): (144, 100, 37), (144, 100, 37): (172, 137, 83), (172, 137, 83): (203, 168, 52), (203, 168, 52): (253, 223, 111), (253, 223, 111): (245, 239, 153), (255, 199, 0): (255, 232, 0)}
+HELLER = {(112, 64, 16): (144, 100, 37), (144, 100, 37): (172, 137, 83), (172, 137, 83): (203, 168, 52), (203, 168, 52): (253, 223, 111), (253, 223, 111): (245, 239, 153)}
 STERN_FARBEN = {'m': (255, 255, 255), 'a': (245, 239, 153), 's': (253, 223, 111)}
 SWEEPS = [2, 26]
 SWEEP_N = 17
@@ -123,6 +135,9 @@ def figur(i):
     koerper = A.zeilen_von(sprite_mit_effekten(i), 0, sh - 1, H, W, PAD_L, PAD_T)
     z, quelle = A.koerper_pose(koerper, doppeln=POSEN[S[i]], x0=PAD_L)
     fig, top = A.auf_leinwand(z, H, BODEN, 0)
+    if i in BLINK:
+        pix = [(top + y, PAD_L + x) for (y, x) in AUGEN if BLINK[i] == 2 or y <= 23]
+        fig = SH.lid(fig, pix, set(), eigen={(top + y, PAD_L + x) for (y, x) in AUGEN}, erlaubt=MASKE_BLAU)
     fig, neu = A.umriss_ergaenzen(fig, RAND_FARBEN, lambda x, y: UMRISS)
     fig, brueck = A.verbinde4(fig)
     fig, pfad, offen = A.verbinde_luecken(fig, 3)
