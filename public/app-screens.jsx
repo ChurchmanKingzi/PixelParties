@@ -3881,57 +3881,123 @@ function shopBurstParticles(ox, oy, n, speedMul) {
   return particles;
 }
 
-// Eine Salve als eigene Vollbild-Zeichenfläche (zum Stapeln mehrerer Salven nacheinander).
-function ShopPixelBurst({ x, y, n = 200, speedMul = 1 }) {
-  const ref = useRef(null);
-  useEffect(() => {
-    const cv = ref.current; if (!cv) return undefined;
-    const stopp = window.ppPixelPartikel(cv, shopBurstParticles(x, y, n, speedMul), { px: 3, maxMs: 2600 });
-    return () => stopp();
-  }, []);
-  return <canvas ref={ref} className="pull-fx-burst" />;
+// Weitere Partikelformen für die Pull-Inszenierung (Palettenfarben, ganze Kunstpixel — Zeichnen übernimmt ppPixelPartikel).
+// Sog: Funken fliegen von einem Ring um die Mitte nach innen.
+function shopConvergeParticles(ox, oy, n, color, radius) {
+  const out = [];
+  for (let i = 0; i < n; i++) {
+    const a = (Math.PI * 2 * i / n) + Math.random() * 0.3, r = radius * (0.75 + Math.random() * 0.5), frames = 22;
+    out.push({ x: ox + Math.cos(a) * r, y: oy + Math.sin(a) * r, vx: -Math.cos(a) * r / frames, vy: -Math.sin(a) * r / frames,
+      size: 5 + Math.random() * 5, color, shape: Math.random() < 0.5 ? 'spark' : 'diamond', life: 1, decay: 1 / frames, rotation: 0, rotSpeed: 0, gravity: 0 });
+  }
+  return out;
+}
+// Münzregen: Gold fällt von oben über die ganze Breite.
+function shopCoinParticles(n) {
+  const cols = ['#fad54a', '#f9ac20', '#f7f7ad', '#fad54a'], out = [];
+  for (let i = 0; i < n; i++) {
+    out.push({ x: Math.random() * window.innerWidth, y: -20 - Math.random() * 260, vx: (Math.random() - 0.5) * 1.5, vy: 2 + Math.random() * 3,
+      size: 8 + Math.random() * 6, color: cols[i % cols.length], shape: Math.random() < 0.6 ? 'circle' : 'diamond',
+      life: 1, decay: 0.006 + Math.random() * 0.004, rotation: 0, rotSpeed: 0, gravity: 0.09 });
+  }
+  return out;
+}
+// Sternenring: große Kreuz-Sterne fliegen nach außen.
+function shopStarParticles(ox, oy, n) {
+  const cols = ['#ffffff', '#f7f7ad', '#fad54a', '#1aedff'], out = [];
+  for (let i = 0; i < n; i++) {
+    const a = (Math.PI * 2 * i / n), v = 5 + (i % 3) * 2;
+    out.push({ x: ox, y: oy, vx: Math.cos(a) * v, vy: Math.sin(a) * v, size: 14 + (i % 2) * 6, color: cols[i % cols.length], shape: 'star',
+      life: 1, decay: 0.014, rotation: 0, rotSpeed: 0, gravity: 0 });
+  }
+  return out;
 }
 
 // Der Pull-Reveal: Aufladen (Karte zittert, Strahlen wachsen) → Blitz → Enthüllung mit Strahlenkranz, Partikelsalven,
 // Banner und Funkeln. Reine Pixelart: Strahlen werden auf einem grob aufgelösten Raster mit Bayer-Dither gezeichnet,
 // Bewegung läuft in harten Schritten (steps()), Rahmenfarben blinken statt weich zu pulsieren. Klick überspringt.
+// REGEL: Jeder Ton hat sein eigenes Bild. Töne laufen NUR über `cue()` — das spielt den Klang und löst im selben
+// Atemzug einen Effekt aus (Sog, Schockring, Randblitz, Vollbildblitz, Salve, Sternenring, Münzregen, Strahlenstoß).
 function ShopPullReveal({ reveal, onClose }) {
   const reduced = useMemo(() => { try { return window.matchMedia('(prefers-reduced-motion: reduce)').matches; } catch { return false; } }, []);
   const [phase, setPhase] = useState(reduced ? 'reveal' : 'charge'); // 'charge' | 'flash' | 'reveal'
   const [hard, setHard] = useState(false);       // zweite Aufladestufe: stärkeres Zittern
-  const [bursts, setBursts] = useState([]);      // Salven { id, x, y, n, speedMul }
+  const [els, setEls] = useState([]);            // kurzlebige Bild-Elemente { id, type: 'ring'|'edge'|'blip', color }
   const [canClose, setCanClose] = useState(false);
   const timers = useRef([]);
   const revealed = useRef(false);
+  const alive = useRef(true);
+  const idSeq = useRef(0);
+  const kick = useRef(0);                        // Strahlenstoß: wird bei jedem Ton hochgesetzt und klingt ab
   const phaseRef = useRef(phase);
   phaseRef.current = phase;
   const rayRef = useRef(null);
-  const sfx = (name, opt) => { try { if (window.playSFX) window.playSFX(name, opt); } catch {} };
+  const partRef = useRef(null);
+  const parts = useRef([]);
   const later = (fn, ms) => { timers.current.push(setTimeout(fn, ms)); };
-  const addBurst = (fx, fy, n, speedMul) => setBursts(b => [...b, { id: b.length + 1, x: window.innerWidth * fx, y: window.innerHeight * fy, n, speedMul }]);
+  const cx = () => window.innerWidth / 2, cy = () => window.innerHeight * 0.46;
+
+  // Eine gemeinsame Partikelfläche für alle Salven (statt einer Vollbild-Zeichenfläche je Effekt).
+  const emit = (list) => {
+    const a = parts.current;
+    let w = 0;
+    for (let i = 0; i < a.length; i++) if (a[i].life > 0) a[w++] = a[i];
+    a.length = w;
+    for (const p of list) a.push(p);
+  };
+  const addEl = (type, color) => {
+    const id = ++idSeq.current;
+    setEls(l => [...l, { id, type, color }]);
+    setTimeout(() => { if (alive.current) setEls(l => l.filter(e => e.id !== id)); }, 900);
+  };
+
+  // cue = Klang + Bild. spec: { sound, opt, ring: [Farben], edge, blip, conv: [n, Farbe], burst: [fx, fy, n, speed],
+  //                            stars: n, coins: n, kick: Zahl, quake: bool }
+  const cue = (spec) => {
+    try { if (spec.sound && window.playSFX) window.playSFX(spec.sound, { dedupe: 0, ...(spec.opt || {}) }); } catch {}
+    kick.current = Math.max(kick.current, spec.kick || 0.4);
+    (spec.ring || []).forEach((c, i) => { if (i === 0) addEl('ring', c); else setTimeout(() => { if (alive.current) addEl('ring', c); }, i * 90); });
+    if (spec.edge) addEl('edge', spec.edge);
+    if (spec.blip) addEl('blip', spec.blip);
+    if (spec.conv) emit(shopConvergeParticles(cx(), cy(), spec.conv[0], spec.conv[1], Math.min(window.innerWidth, window.innerHeight) * 0.55));
+    if (spec.burst) emit(shopBurstParticles(window.innerWidth * spec.burst[0], window.innerHeight * spec.burst[1], spec.burst[2], spec.burst[3]));
+    if (spec.stars) emit(shopStarParticles(cx(), cy(), spec.stars));
+    if (spec.coins) emit(shopCoinParticles(spec.coins));
+  };
 
   const toReveal = () => {
     if (revealed.current) return;
     revealed.current = true;
     timers.current.forEach(clearTimeout); timers.current = [];
     setPhase('reveal');
-    sfx('reveal'); sfx('shop_purchase', { delay: 140, dedupe: 0 });
-    addBurst(0.5, 0.5, 220, 1.15);
-    later(() => { addBurst(0.34, 0.46, 120, 0.9); addBurst(0.66, 0.46, 120, 0.9); sfx('gold_gain', { dedupe: 0 }); }, 420);
-    later(() => addBurst(0.5, 0.4, 160, 1.3), 900);
+    cue({ sound: 'reveal', kick: 1, ring: ['#fad54a', '#ffffff'], burst: [0.5, 0.46, 220, 1.15], edge: '#fad54a' });
+    later(() => cue({ sound: 'shop_purchase', opt: { dedupe: 0 }, kick: 0.9, ring: ['#f9ac20'], stars: 28, edge: '#ffffff' }), 140);
+    later(() => cue({ sound: 'gold_gain', kick: 0.8, ring: ['#fad54a'], coins: 90, burst: [0.3, 0.5, 110, 0.9] }), 420);
+    later(() => emit(shopBurstParticles(window.innerWidth * 0.7, window.innerHeight * 0.5, 110, 0.9)), 430);
+    later(() => emit(shopBurstParticles(cx(), window.innerHeight * 0.4, 160, 1.3)), 900);
     later(() => setCanClose(true), 800);
   };
 
   useEffect(() => {
-    if (reduced) { revealed.current = false; toReveal(); return () => timers.current.forEach(clearTimeout); }
-    sfx('ui_click', { dedupe: 0 });
-    later(() => sfx('ui_click', { dedupe: 0 }), 280);
-    later(() => { setHard(true); sfx('ui_click', { dedupe: 0 }); }, 560);
-    later(() => sfx('ui_click', { dedupe: 0 }), 740);
-    later(() => sfx('ui_click', { dedupe: 0 }), 880);
-    later(() => { setPhase('flash'); sfx('heavy_impact', { dedupe: 0 }); }, 1000);
+    if (reduced) { revealed.current = false; toReveal(); return () => { alive.current = false; timers.current.forEach(clearTimeout); }; }
+    // Aufladen: fünf Klicks, jeder mit stärkerem Sog, anderer Farbe und eigenem Randeffekt.
+    cue({ sound: 'ui_click', kick: 0.35, conv: [24, '#fad54a'], ring: ['#fad54a'] });
+    later(() => cue({ sound: 'ui_click', kick: 0.45, conv: [36, '#1aedff'], ring: ['#1aedff'] }), 280);
+    later(() => { setHard(true); cue({ sound: 'ui_click', kick: 0.55, conv: [50, '#fb1ea9'], ring: ['#fb1ea9'], edge: '#fb1ea9' }); }, 560);
+    later(() => cue({ sound: 'ui_click', kick: 0.65, conv: [64, '#b1ff1a'], ring: ['#b1ff1a', '#fad54a'], edge: '#b1ff1a' }), 740);
+    later(() => cue({ sound: 'ui_click', kick: 0.8, conv: [90, '#ffffff'], ring: ['#ffffff', '#1aedff'], edge: '#ffffff', blip: '#ffffff' }), 880);
+    // Einschlag: der Vollbildblitz IST das Bild; darüber laufen dunkle Schockringe, darunter eine Salve.
+    later(() => { setPhase('flash'); cue({ sound: 'heavy_impact', kick: 1, ring: ['#08060c', '#fb1ea9', '#08060c'], burst: [0.5, 0.46, 160, 1.4] }); }, 1000);
     later(toReveal, 1330);
-    return () => timers.current.forEach(clearTimeout);
+    return () => { alive.current = false; timers.current.forEach(clearTimeout); };
+  }, []);
+
+  // Partikelfläche: läuft, solange der Reveal offen ist (ein unsichtbarer Dauer-Partikel hält die Schleife am Leben).
+  useEffect(() => {
+    const cv = partRef.current; if (!cv) return undefined;
+    parts.current.push({ x: -9999, y: -9999, vx: 0, vy: 0, size: 1, color: '#ffffff', shape: 'circle', life: 1e12, decay: 0, rotation: 0, rotSpeed: 0, gravity: 0 });
+    const stopp = window.ppPixelPartikel(cv, parts.current, { px: 3 });
+    return () => stopp();
   }, []);
 
   // Strahlenkranz auf grobem Raster (6 px je Kunstpixel), zum Rand hin mit Bayer-Dither ausgeblendet.
@@ -3942,12 +4008,12 @@ function ShopPullReveal({ reveal, onClose }) {
     cv.width = W; cv.height = H; cv.style.imageRendering = 'pixelated';
     const g = cv.getContext('2d'); g.imageSmoothingEnabled = false;
     const img = g.createImageData(W, H), d = img.data;
-    const cx = W / 2, cy = H * 0.46, maxD = Math.hypot(Math.max(cx, W - cx), Math.max(cy, H - cy));
+    const rcx = W / 2, rcy = H * 0.46, maxD = Math.hypot(Math.max(rcx, W - rcx), Math.max(rcy, H - rcy));
     const ang = new Float32Array(W * H), dist = new Float32Array(W * H);
     for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
       const i = y * W + x;
-      ang[i] = Math.atan2(y - cy, x - cx) + Math.PI;
-      dist[i] = Math.hypot(x - cx, y - cy) / maxD;
+      ang[i] = Math.atan2(y - rcy, x - rcx) + Math.PI;
+      dist[i] = Math.hypot(x - rcx, y - rcy) / maxD;
     }
     const BAYER = [0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5];
     const rgb = (hex) => {
@@ -3962,7 +4028,9 @@ function ShopPullReveal({ reveal, onClose }) {
       const ph = phaseRef.current, el = (performance.now() - t0) / 1000;
       const N = ph === 'reveal' ? 18 : 10;
       const spin = tick * (ph === 'reveal' ? 0.05 : 0.1);
-      const gain = ph === 'charge' ? Math.min(0.95, 0.1 + el * 0.85) : ph === 'flash' ? 1.3 : 1.15;
+      const base = ph === 'charge' ? Math.min(0.95, 0.1 + el * 0.85) : ph === 'flash' ? 1.3 : 1.15;
+      const gain = base + kick.current;           // jeder Ton stößt die Strahlen an …
+      kick.current *= 0.55;                       // … und sie sinken in ein paar Bildern wieder ab
       d.fill(0);
       for (let i = 0; i < ang.length; i++) {
         const a = (((ang[i] + spin) / (2 * Math.PI)) * N) % 1;
@@ -3991,7 +4059,8 @@ function ShopPullReveal({ reveal, onClose }) {
     <div className={'pull-fx pull-fx-ph-' + phase} onClick={click}>
       <canvas ref={rayRef} className="pull-fx-rays" />
       {phase === 'flash' && <div className="pull-fx-flash" />}
-      {bursts.map(b => <ShopPixelBurst key={b.id} x={b.x} y={b.y} n={b.n} speedMul={b.speedMul} />)}
+      <canvas ref={partRef} className="pull-fx-burst" />
+      {els.map(e => <div key={e.id} className={'pull-fx-' + e.type} style={{ '--c': e.color }} />)}
       <div className={'pull-fx-stage' + (phase !== 'charge' ? ' pull-fx-quake' : '')} onClick={e => e.stopPropagation()}>
         {phase === 'reveal' && <div className="pull-fx-banner"><span>NEW PULL!</span></div>}
         <div className="pull-fx-cardslot">
@@ -4016,6 +4085,36 @@ function ShopPullReveal({ reveal, onClose }) {
         )}
       </div>
     </div>
+  );
+}
+
+// Raster, das nur die ersten Kacheln rendert und beim Scrollen nachlädt: ~220 Avatar-Kacheln auf einmal
+// (DOM, Bilder, Styles) kosteten beim Reiterwechsel spürbar Zeit. Der Wächter am Ende lädt nach, sobald er
+// (mit Vorlauf) in den Sichtbereich des scrollenden Elternelements kommt.
+function ShopLazyGrid({ items, renderItem, className, resetKey, step = 48 }) {
+  const [limit, setLimit] = useState(step);
+  const sentinel = useRef(null);
+  useEffect(() => { setLimit(step); }, [resetKey]);
+  useEffect(() => {
+    const el = sentinel.current;
+    if (!el || limit >= items.length || typeof IntersectionObserver === 'undefined') return undefined;
+    let root = el.parentElement;
+    while (root && root !== document.body) {
+      const oy = getComputedStyle(root).overflowY;
+      if (oy === 'auto' || oy === 'scroll') break;
+      root = root.parentElement;
+    }
+    if (root === document.body) root = null;
+    const io = new IntersectionObserver((es) => { if (es.some(e => e.isIntersecting)) setLimit(l => l + step); },
+      { root, rootMargin: '0px 0px 700px 0px' });
+    io.observe(el);
+    return () => io.disconnect();
+  }, [limit, items.length]);
+  return (
+    <React.Fragment>
+      <div className={className}>{items.slice(0, limit).map(renderItem)}</div>
+      {limit < items.length && <div ref={sentinel} style={{ height: 1 }} />}
+    </React.Fragment>
   );
 }
 
@@ -4044,6 +4143,7 @@ function ShopScreen() {
   const [buying, setBuying] = useState(false);
   const [tab, setTab] = useState('skins');
   const [skinFilter, setSkinFilter] = useState('');
+  const [pullFlash, setPullFlash] = useState(false); // Farbblitz an Kapsel + Pull-Knopf beim Drücken (zum Klickton)
   const [collFilter, setCollFilter] = useState('all'); // Sammlungsansicht: 'all' | 'owned' | 'missing'
   const [selected, setSelected] = useState(null); // { type, id }
   const [celebration, setCelebration] = useState(null); // { cx, cy } or null
@@ -4495,7 +4595,10 @@ function ShopScreen() {
     const ownedN = items.length - missing.length;
     const pct = Math.round(100 * ownedN / items.length);
     const canPull = !buying && missing.length > 0 && (user.sc || 0) >= price;
-    const pull = (e) => (type === 'skin' ? buyRandomSkin(e) : buyRandom(type, e));
+    const pull = (e) => {
+      setPullFlash(true); setTimeout(() => setPullFlash(false), 380);
+      return type === 'skin' ? buyRandomSkin(e) : buyRandom(type, e);
+    };
     const pullLabel = (
       <React.Fragment>🎲 PULL — <img src="/data/sc.png" className="shop-sc-icon" /> {price ?? '?'}</React.Fragment>
     );
@@ -4518,8 +4621,8 @@ function ShopScreen() {
         <div className="shop-gacha">
           <div className="shop-gacha-machine">
             <div className="shop-gacha-title">{def.title}</div>
-            <div className={'shop-gacha-capsule' + (buying ? ' shop-gacha-capsule-pulling' : '')} aria-hidden="true">?</div>
-            <button className="btn shop-random-btn shop-gacha-btn" disabled={!canPull} onClick={pull}>{pullLabel}</button>
+            <div className={'shop-gacha-capsule' + (pullFlash ? ' shop-gacha-capsule-flash' : '')} aria-hidden="true">?</div>
+            <button className={'btn shop-random-btn shop-gacha-btn' + (pullFlash ? ' shop-gacha-btn-flash' : '')} disabled={!canPull} onClick={pull}>{pullLabel}</button>
             <div className="shop-gacha-hint">
               {missing.length > 0
                 ? missing.length + ' ' + (missing.length === 1 ? def.noun.toLowerCase() : def.plural) + ' still to discover'
@@ -4570,8 +4673,9 @@ function ShopScreen() {
               : 'Nothing to show for this filter.'}
           </div>
         ) : (
-          <div className={'shop-grid' + (type === 'skin' ? ' shop-grid-skins' : '')}>
-            {filtered.map(it => {
+          <ShopLazyGrid key={type} items={filtered} resetKey={type + '|' + collFilter + '|' + heroQuery}
+            className={'shop-grid' + (type === 'skin' ? ' shop-grid-skins' : '')}
+            renderItem={(it) => {
               const isOwned = ownedSet[type].has(it.id);
               const equipped = type !== 'skin' && isOwned && isEquipped(type, it.id);
               const showHero = type === 'skin' && skinShowHero.has(it.id);
@@ -4588,7 +4692,7 @@ function ShopScreen() {
                   onClick={type === 'skin' ? undefined : () => { if (isOwned && !equipped) equipItem(type, it.id); }}>
                   <span className="shop-item-zier" aria-hidden="true" />
                   <div className="shop-item-img-wrap">
-                    <img src={imgSrc} draggable={false} className={isOwned || showHero ? '' : 'shop-skin-locked'} />
+                    <img src={imgSrc} draggable={false} loading="lazy" decoding="async" className={isOwned || showHero ? '' : 'shop-skin-locked'} />
                     {equipped ? <div className="shop-owned-badge shop-equipped-badge">EQUIPPED</div>
                       : isOwned ? <div className="shop-owned-badge">OWNED</div> : showHero ? null : (
                         <div className="shop-lock-overlay">
@@ -4607,8 +4711,7 @@ function ShopScreen() {
                   )}
                 </div>
               );
-            })}
-          </div>
+            }} />
         )}
         </div>
       </div>
