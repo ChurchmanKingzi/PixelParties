@@ -1359,5 +1359,17 @@
    ]
   ],
   "musicHit": 74.95
+ },
+ "Alice, the Puppeteer Girl": {
+  "aliceshow": true,
+  "opener": "wind",
+  "music": "scripts/social-posts/music/bgm_alice.ogg",
+  "particles": [
+   [
+    "spark",
+    "crimson",
+    6
+   ]
+  ]
  }
 }

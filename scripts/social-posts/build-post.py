@@ -566,7 +566,8 @@ def main():
     opener = args.opener or hero_cfg.get('opener') or 'none'
     args_opener = opener
     opener_on = opener in ('heart', 'storm', 'shift', 'wind')
-    windshow_on = bool(hero_cfg.get('windshow'))                              # Wind-Show mit Zeitleiste (windfx.WindShow) statt Schleife
+    aliceshow_on = bool(hero_cfg.get('aliceshow'))                            # Alice-Show (alicefx.AliceShow): nutzt dieselbe Schnittstelle wie die Wind-Show
+    windshow_on = bool(hero_cfg.get('windshow')) or aliceshow_on              # Show mit Zeitleiste (windfx.WindShow / alicefx.AliceShow) statt Schleife
     wind_on = args.wind or bool(hero_cfg.get('wind')) or windshow_on
     horror_on = args.horror or bool(hero_cfg.get('horror'))
     show_on = (args.show or hero_cfg.get('show') or 'none') == 'mini'
@@ -694,6 +695,13 @@ def main():
                          hand_fn=lambda t_: (sx + (tips[(int(t_ * float(fps)) // per) % spr.n][0] + 0.5) * spr.px,
                                              sy + (tips[(int(t_ * float(fps)) // per) % spr.n][1] + 0.5) * spr.px))
             wind = windfx.WindShow(W, H, U, float(fps), loop, wgeom, loop * WIND_LOOPS / float(fps))
+            if aliceshow_on:
+                import alicefx
+                ag = dict(logo_rect=wgeom['logo_rect'], logo_img=logo, badge_rect=badge_rect, badge_img=badge_img, plate_rect=(plate_x, plate_y, plate.width, plate.height),
+                          alice_c=(sx + spr.center_x * spr.px, sy + 19 * spr.px),
+                          hands=((sx + 14.5 * spr.px, sy + 21.5 * spr.px), (sx + 33.0 * spr.px, sy + 21.5 * spr.px)),
+                          draw_text=draw_text, ink=INK, white=WHITE, jiggles_path=str(HERE / 'assets' / 'mr-jiggles.png'))
+                wind = alicefx.AliceShow(W, H, U, float(fps), loop, ag, loop * WIND_LOOPS / float(fps))
         else:
             wind = windfx.WindFX(W, H, U, float(fps), loop, wgeom)
     SHOW_LOOPS = 9                                                           # Länge der Show in Schleifen der Sprite-Animation (9 × 2,24 s ≈ 20 s)
@@ -1350,6 +1358,8 @@ def main():
         if wind_on:
             wind.draw_front(canvas, f)
         out_img = canvas.convert('RGB')
+        if windshow_on and hasattr(wind, 'post_fx'):
+            out_img = wind.post_fx(out_img, f)                                  # z. B. rote Spannungs-Vignette
         if windshow_on:
             for tb in wind.SHOCKS:                                           # Druckwellen: Beschwörung und Sprengung
                 out_img = punch_fx(out_img, f, tb)
