@@ -1,0 +1,15 @@
+{
+  "creature": "Disgruntled Forest Warden",
+  "sheet": "disgruntled-forest-warden.png",
+  "frameWidth": 26,
+  "frameHeight": 32,
+  "frames": 48,
+  "frameMs": 66,
+  "loop": true,
+  "layout": "horizontal",
+  "padTop": 2,
+  "padLeft": 2,
+  "padRight": 2,
+  "padBottom": 3,
+  "faceX": 13.0
+}

@@ -83,7 +83,7 @@ def frame(i):
         k, sk, left, right = (L.streck_zeile(e, PAD_T + 19, 1) for e in (k, sk, left, right))
     fig, etik = R.schichten(H, W, [(left, 'umhang'), (right, 'umhang'), (k, 'umhang'), (sk, 'schaedel')])
     fig, _br = R.verbinde(fig)
-    R.neue_loecher_fuellen(fig, LOCH0, ERLAUBT)
+    R.neue_loecher_fuellen(fig, LOCH0, ERLAUBT, max_groesse=6)
     R.kontur_je_teil(fig, etik, ERLAUBT, {'schaedel': f(0, 5), 'umhang': UMHANG_UMRISS}, standard=UMRISS)
     return fig
 

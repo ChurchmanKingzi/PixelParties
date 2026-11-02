@@ -71,6 +71,9 @@ AUGEN_LID = [(8, 7), (9, 7), (14, 7), (15, 7)]
 STERN_X, STERN_Y = 41, 10
 
 
+LOCH0 = R.loecher(L.platz(spr, H, W, *OFF))
+
+
 def stern(a, x, y, stufe, dy):
     """Vierzackiger Glanzstern (Spritekoordinaten) an der Klinge: stufe 0 = Mitte, 1 = Arme 1 px, 2 = Arme 2 px; dy = aktuelle Klingenverschiebung."""
     if stufe is None:
@@ -141,6 +144,7 @@ def frame(i):
     if st is not None:
         stern(fig, STERN_X, STERN_Y, st, int(round(a * (0.3 + 0.7 * (STERN_X - 24) / (sw - 25)))) - b)
     fig, _br = R.verbinde(fig)                                       # Klingenstufe: Eckkontakt → 4-verbunden
+    R.neue_loecher_fuellen(fig, LOCH0, ERLAUBT, max_groesse=2)       # 1-px-Taschen zwischen Griff und Klingenansatz
     kk = Hm.kantenmaske(fig)
     for y, x in zip(*np.nonzero(kk)):
         c = tuple(int(v) for v in fig[y, x, :3])
