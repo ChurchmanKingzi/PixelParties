@@ -21,11 +21,15 @@ PX, PY = 64, 48                   # Pack-Ursprung (Pack 192x320)
 PW, PHH = 192, 320
 CX, CY = PX + PW // 2, PY + PHH // 2
 FPS = 30
-F = 126
+F = 140
 COLS = 9
-CUT = 44                          # Reißkante (Zeile im Pack)
+CUT = 20                          # Reißkante (Zeile im Pack): unter dem Siegelstreifen, über der Titelplatte
+STRIP_H = 26                      # Höhe des Streifens samt Zacken
 
-T_SLIDE, T_IDLE, T_CHARGE, T_RIP, T_FLASH, T_CARDS, T_AMBIENT = 0, 10, 30, 60, 68, 76, 114
+T_SLIDE, T_IDLE, T_CHARGE, T_RIP, T_FLASH, T_CARDS, T_AMBIENT = 0, 10, 30, 60, 82, 90, 128
+RIP_LEN = 20          # so viele Bilder wandert die Reißfront von links nach rechts über den Siegelstreifen
+SL = 4               # Breite der Streifen-Scheiben (Pixel) für das stufenweise Aufreißen
+NS = 192 // 4
 
 YY, XX = np.mgrid[0:SH, 0:SW]
 _B = np.array([[0, 8, 2, 10], [12, 4, 14, 6], [3, 11, 1, 9], [15, 7, 13, 5]]) / 16.0
@@ -119,6 +123,25 @@ def slot(i):
 
 
 # ---------------------------------------------------------------- Zeitleiste des Packs
+def strip_offsets(t):
+    """Siegelstreifen als NS Scheiben: die Reißfront wandert (beschleunigend) von links nach rechts, hinter ihr hebt sich der Streifen
+    immer stärker ab (Rampe), vorne hängt er noch fest. Nach dem Durchreißen fliegt der ganze Streifen nach rechts oben davon."""
+    prog = t / float(RIP_LEN)
+    front = (192 + 14) * (min(prog, 1.0) ** 1.5)
+    fly = max(0, t - RIP_LEN)
+    dy, dx = [], []
+    for s in range(NS):
+        xs = s * SL + SL // 2
+        d = front - xs
+        oy, ox = 0, 0
+        if d > 0:
+            oy = -int(min(40, 2 + d * 0.5)); ox = int(min(8, d * 0.1))
+        if fly:
+            oy -= 5 * fly + 2 * fly * fly; ox += 4 * fly
+        dy.append(oy); dx.append(ox)
+    return front, dy, dx
+
+
 def pack_timeline():
     slide = [100, 68, 44, 27, 15, 8, 4, 2, 1, 0]
     bob = [0, 0, -1, -1, -2, -2, -2, -2, -1, -1, 0, 0, -1, -1, -2, -2, -2, -1, -1, 0]
@@ -138,13 +161,13 @@ def pack_timeline():
                 e['x'] = amp * (1 if (f % 2 == 0) else -1)
                 e['y'] = int(rng.randint(0, 2)) + (2 if f >= T_RIP - 4 else 0)
             e['shimmer'] = f % 16
-        elif f < T_FLASH + 2:
-            e['mode'] = 'split'
+        elif f <= T_RIP + RIP_LEN + 6:
             t = f - T_RIP
-            tx = [0, 1, 2, 4, 6, 9, 12, 16, 22, 28][t]
-            ty = [-2, -5, -9, -14, -20, -27, -35, -44, -56, -70][t]
-            e['top'] = {'x': tx, 'y': ty}
-            e['body'] = {'x': (2 if f % 2 == 0 else -2), 'y': min(t, 3)}
+            front, dy, dx = strip_offsets(t)
+            e['mode'] = 'rip'
+            e['strip'] = {'dy': dy, 'dx': dx}
+            if f <= T_FLASH + 1:
+                e['body'] = {'x': (3 if f % 2 == 0 else -3) if t < RIP_LEN else (2 if f % 2 == 0 else -2), 'y': min(t // 3, 3)}
         out = e
         tl.append(out)
     return tl
@@ -237,78 +260,68 @@ def build_pack(pack, card):
                 s = 2 if k == 0 else 1
                 front.px(f, xx, yy, c, s, s)
 
-    # --- E5 Lichtrisse über dem Pack (vorn), wachsen von der Reißkante nach unten
-    cut_y = PY + CUT
-    cracks = []
-    for ci in range(9):
-        x = PX + 14 + ci * 20 + int(rng.randint(-5, 6)); y = cut_y
-        pts = []
-        for s in range(46):
-            pts.append((x, y))
-            y += 2 + int(rng.randint(0, 3)); x += int(rng.randint(-2, 3))
-        cracks.append(pts)
-        # Seitenast
-        bx, by = pts[len(pts) // 3]
-        br = []
-        for s in range(18):
-            br.append((bx, by)); by += 2; bx += (3 if ci % 2 else -3) + int(rng.randint(-1, 2))
-        cracks.append(br)
-    for f in range(T_CHARGE + 2, T_RIP):
-        k = (f - T_CHARGE) / float(T_RIP - T_CHARGE)
-        n = int(len(cracks[0]) * min(1.0, k * 1.15))
-        shakex = tl[f]['x']; shakey = tl[f]['y']
-        for pts in cracks:
-            for j, (x, y) in enumerate(pts[:max(1, int(len(pts) * min(1.0, k * 1.15)))]):
-                if not (PX + 3 < x < PX + PW - 3 and PY + CUT - 2 < y < PY + PHH - 22):
-                    continue
-                core = WHITE if (f + j) % 3 else GOLD_L
-                front.px(f, x + shakex, y + shakey, core, 2, 1)
-                if j % 2 == 0:
-                    front.px(f, x + 1 + shakex, y + shakey, GOLD)
-                    front.px(f, x - 1 + shakex, y + shakey, GOLD_O if f % 2 else GOLD)
-    # leuchtende Naht an der Reißkante
-    for f in range(T_CHARGE + 8, T_RIP):
-        k = (f - T_CHARGE - 8) / float(T_RIP - T_CHARGE - 8)
-        for x in range(PX + 2, PX + PW - 2):
-            zig = 42 + abs((x - PX) % 12 - 6)
-            if BAY[0, x % SW] < k or (x + f) % 3 == 0 and k > 0.4:
-                front.px(f, x + tl[f]['x'], PY + zig + tl[f]['y'], WHITE if (x + f) % 2 else GOLD_L)
-
-    # --- E6 Reißen: Licht quillt durch den Spalt zwischen Siegelstreifen und Pack, Lichtsäule nach oben
+    # --- E5 Licht schimmert vor dem Aufreißen an der linken Ecke der Naht durch
     xs = np.arange(PX, PX + PW)
-    zig = 42 + np.abs((xs - PX) % 12 - 6)
-    for f in range(T_RIP, T_FLASH + 4):
+    zig = 18 + np.abs((xs - PX) % 12 - 6) // 2
+    for f in range(T_RIP - 9, T_RIP):
+        k = (f - (T_RIP - 9)) / 9.0
+        for j in range(2 + int(14 * k)):
+            front.px(f, PX + j + tl[f]['x'], PY + zig[j] + tl[f]['y'], WHITE if (j + f) % 2 else GOLD_L)
+        for q in range(3):
+            front.star(f, PX + int(rng.randint(-3, 10)) + tl[f]['x'], PY + CUT - int(rng.randint(2, 12)), 1 + int(k * 2), GOLD, WHITE)
+
+    # --- E6 Aufreißen: Licht im Spalt, Rissränder, Funken und Papierfetzen an der Reißfront, Lichtsäule über der aufgerissenen Stelle
+    sparks = []
+    for t in range(1, RIP_LEN + 2):
+        fr = strip_offsets(t)[0]
+        for q in range(4):
+            sparks.append((T_RIP + t, PX + fr, rng.uniform(-4.5, 0.5), -rng.uniform(2.0, 7.5), q % 3, 0))
+        sparks.append((T_RIP + t, PX + fr, rng.uniform(0.5, 3.5), -rng.uniform(3.0, 8.5), 0, 1))      # Papierfetzen
+    for (f0, sx, vx, vy, ci, paper) in sparks:
+        x, y = float(sx), float(PY + CUT)
+        for k2 in range(14 if paper else 9):
+            f = f0 + k2
+            x += vx; y += vy; vy += 0.6
+            col = C('#e8ecf2') if paper else (WHITE, GOLD_L, light)[ci]
+            if paper:
+                front.px(f, x, y, col, 2, 2)
+            else:
+                front.px(f, x, y, col, 2 if k2 < 3 else 1, 2 if k2 < 3 else 1)
+    for f in range(T_RIP, T_FLASH + 3):
+        e = tl[f]
+        if e['mode'] != 'rip':
+            continue
         t = f - T_RIP
-        e = tl[f] if f < len(tl) else None
-        ty = e['top']['y'] if e and e['mode'] == 'split' else -70
-        by = e['body']['y'] if e and e['mode'] == 'split' else 3
-        tx = e['top']['x'] if e and e['mode'] == 'split' else 28
+        front_x, dy, dx = strip_offsets(t)
+        bx = e['body']['x'] if 'body' in e else 0
+        by = e['body']['y'] if 'body' in e else 3
         for k, x in enumerate(xs):
-            y_top = PY + zig[k] + ty
-            y_bot = PY + zig[k] + by
-            if y_bot > y_top:
-                for yy in range(max(int(y_top), 0), int(y_bot)):
-                    front.px(f, x, yy, WHITE if (x + yy + f) % 3 else GOLD_L)
-        # glühende Kante an beiden Rissrändern
-        for k, x in enumerate(xs):
-            for yy in (PY + zig[k] + ty, PY + zig[k] + by - 1):
-                front.px(f, x, yy, GOLD_L)
-                front.px(f, x, yy + 1, GOLD if (x + f) % 2 else GOLD_O)
-        # Lichtsäule über dem Pack (trapezförmig, gedithert), strahlt nach oben aus der Öffnung
-        gap_y = PY + CUT + ty // 2
-        w = 22 + t * 11
-        up = (YY < gap_y) & (np.abs(XX - CX) < w * np.clip(1.0 - (gap_y - YY) / 600.0, 0.2, 1.0))
-        back.m(f, up & (BAY < 0.5 + 0.045 * t), light)
-        back.m(f, up & (np.abs(XX - CX) < w * 0.5) & (BAY < 0.65), WHITE)
-        # schwächerer Lichtfächer nach unten
-        dn = (YY > gap_y) & (YY < gap_y + 16 + t * 7) & (np.abs(XX - CX) < 70 + t * 4) & (BAY < 0.35 - (YY - gap_y) / 500.0)
-        back.m(f, dn, GOLD_L)
+            s = k // SL
+            y_strip = PY + zig[k] + dy[s]
+            y_body = PY + zig[k] + by
+            if 'body' in e and y_body > y_strip:
+                for yy in range(max(int(y_strip), 0), int(y_body)):
+                    front.px(f, x + bx, yy, WHITE if (x + yy + f) % 3 else GOLD_L)
+            if dy[s] != 0:
+                front.px(f, x + dx[s], y_strip, WHITE)                  # Rissrand des Streifens
+                front.px(f, x + dx[s], y_strip - 1, GOLD_L if (x + f) % 2 else WHITE)
+                if 'body' in e:
+                    front.px(f, x + bx, y_body, GOLD_L)                  # Rissrand des Packs
+                    front.px(f, x + bx, y_body + 1, GOLD if (x + f) % 2 else GOLD_O)
+        # Lichtsäule über der aufgerissenen Stelle (hinter dem Pack)
+        if 'body' in e:
+            gap_y = PY + CUT - 6
+            fx = min(PX + front_x, PX + PW)
+            fall = np.clip(1.0 - (gap_y - YY) / (150.0 + 6 * t), 0.0, 1.0)
+            up = (YY < gap_y) & (XX >= PX - 2) & (XX <= fx) & (BAY < 0.14 + 0.03 * t) & (fall > 0.05)
+            back.m(f, up & (BAY < fall), light)
+            back.m(f, up & (BAY < fall * 0.5), WHITE)
 
     # --- E7 Blitz (Dithering von Weiß) + großer Funkelstern + Lichtstrahlen
-    flash = {68: 0.45, 69: 1.05, 70: 1.05, 71: 0.7, 72: 0.4, 73: 0.22, 74: 0.1}
-    for f, d in flash.items():
-        front.m(f, BAY < d, WHITE if d > 0.3 else GOLD_L)
-    for f, R in zip(range(66, 82), (20, 40, 70, 110, 150, 150, 130, 110, 90, 75, 60, 48, 36, 26, 16, 8)):
+    flash = {0: 0.45, 1: 1.05, 2: 1.05, 3: 0.7, 4: 0.4, 5: 0.22, 6: 0.1}
+    for k_, d in flash.items():
+        front.m(T_FLASH + k_, BAY < d, WHITE if d > 0.3 else GOLD_L)
+    for f, R in zip(range(T_FLASH - 2, T_FLASH + 14), (20, 40, 70, 110, 150, 150, 130, 110, 90, 75, 60, 48, 36, 26, 16, 8)):
         ah = (np.abs(YY - CY) <= (1 - np.abs(XX - CX) / float(R)) * 5) & (np.abs(XX - CX) < R)
         av = (np.abs(XX - CX) <= (1 - np.abs(YY - CY) / float(R)) * 5) & (np.abs(YY - CY) < R)
         front.m(f, ah | av, WHITE)
@@ -365,7 +378,7 @@ def build_pack(pack, card):
 
     # --- E10 Konfetti-/Glitzerregen
     n_c = 120
-    c_start = rng.randint(T_FLASH + 6, 106, n_c)
+    c_start = rng.randint(T_FLASH + 6, T_AMBIENT - 24, n_c)
     c_x = rng.rand(n_c) * SW
     c_v = 2.0 + rng.rand(n_c) * 2.6
     c_sw = rng.rand(n_c) * 6.283
@@ -479,7 +492,7 @@ def save_sheet(layer, path):
 def cut_masks(out):
     top = np.zeros((PHH, PW, 4), np.uint8); body = np.zeros((PHH, PW, 4), np.uint8)
     for x in range(PW):
-        cut = 42 + abs(x % 12 - 6)
+        cut = 18 + abs(x % 12 - 6) // 2
         top[:cut, x] = (255, 255, 255, 255)
         body[cut:, x] = (255, 255, 255, 255)
     Image.fromarray(top, 'RGBA').save(os.path.join(out, 'cut-top.png'))
@@ -510,6 +523,7 @@ def main(argv):
         'events': {'slide': T_SLIDE, 'idle': T_IDLE, 'charge': T_CHARGE, 'rip': T_RIP, 'flash': T_FLASH, 'cards': T_CARDS, 'ambient': T_AMBIENT,
                    'cardLanding': [T_CARDS + n * 2 + 15 for n in range(9)]},
         'ambientLoop': [T_AMBIENT, F - 1],
+        'rip': {'start': T_RIP, 'length': RIP_LEN, 'slice': SL, 'height': STRIP_H},
         'cardSlots': [list(slot(i)) for i in range(9)], 'cardSize': [CARD_W, CARD_H],
         'layers': {'back': '<pack>.back.png', 'front': '<pack>.front.png'},
         'timeline': tl,
