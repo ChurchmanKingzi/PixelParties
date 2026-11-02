@@ -27,7 +27,7 @@ Ablauf (48 Frames à 65 ms = 3,12 s; Frame 0 = Original, Partikel ausgenommen):
 * Federbuschspitze (2×2 bei (9–10, 8–9)) wippt seitlich −1/0/+1 px (Periode 16, hängt an der Buschbasis, wandert mit dem Kopf).
 * Blinzeln des Heilers (Lidfarbe = umgebendes Knochenweiß (246,255,255)): beide grünen Augen werden 3 Frames weiß, zweimal pro Schleife (Frame 13–15 und 37–39).
 * Erhobene Hand (rechts) winkt/segnet: Handschuh + Handgelenk heben sich 0-1-2-1-0 px (Periode 16, 3× pro Schleife; das Handgelenk wird dabei nur länger, nicht dicker) zusätzlich zum Atmen.
-* Helmkopf B hebt sich mit dem Atem des Heilers (gleiche 0–2 px, damit der Federbusch nie über den Helmrand lugt) plus kleiner Hub 0/1 px (Periode 16); KEIN seitliches Treiben. Das Blatt wippt (die Spitze (22,0) springt für 4 Frames nach (21,0), Frame 10–13 und 34–37).
+* Helmkopf B hebt sich starr mit dem Kopf des Heilers (gleiche 0–2 px; ein eigener Hub würde Federbuschpixel unter dem Helmrand freilegen); KEIN seitliches Treiben. Das Blatt wippt (die Spitze (22,0) springt für 4 Frames nach (21,0), Frame 10–13 und 34–37).
   B liegt über A; die unter B verdeckten Pixel von A sind aus der Ebene vorhanden (nichts neu gemalt).
 * Heilwölkchen (Partikel, hinter den Figuren, 5 Stück, Lebensdauer 48 Frames, langsam aufsteigend, 2×2 → 3×3 → 2×2): grün (Kern Handschuhgrün (0,135,0), Rand (0,90,0) / (20,130,17)), steigen von der erhobenen Hand,
   vom Handschuh links und neben dem Blatt auf.
@@ -102,7 +102,6 @@ def verschieben_y(a, dy):
 
 def frame_gross(i, nur=None):
     n_a = U.stufe(i, 24, 2)                                      # Heiler atmet 0-1-2-1-0
-    hub_b = U.stufe(i, 16, 1)                                    # kleiner Hub 0/1 (Periode 16)
     wink = U.stufe(i - 4, 16, 2)                                 # erhobene Hand winkt 0-1-2-1-0 (Periode 16)
     tip = U.stufe(i, 16, 2, form='sin') - 1                      # Federbuschspitze −1/0/+1
 
@@ -134,7 +133,7 @@ def frame_gross(i, nur=None):
     if i in BLATT_FRAMES:
         pb[GPT + BLATT[1], GPL + BLATT[0] - 1] = pb[GPT + BLATT[1], GPL + BLATT[0]]
         pb[GPT + BLATT[1], GPL + BLATT[0]] = 0
-    koerper_ges = L.zusammen(H, W, [(pk, 0, 0), (pp, 0, 0), (ph, 0, 0), (pb, 0, -n_a - hub_b)])
+    koerper_ges = L.zusammen(H, W, [(pk, 0, 0), (pp, 0, 0), (ph, 0, 0), (pb, 0, -n_a)])
     koerper_ges = U.kontur_schliessen(koerper_ges, UMRISS, SCHWARZ_AUSSEN)
     if nur == 'koerper':
         return koerper_ges

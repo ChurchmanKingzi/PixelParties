@@ -2,7 +2,7 @@
   "creature": "Skeleton Healer",
   "sheet": "skeleton-healer.png",
   "frameWidth": 28,
-  "frameHeight": 40,
+  "frameHeight": 38,
   "frames": 48,
   "frameMs": 65,
   "loop": true,
@@ -10,6 +10,6 @@
   "padTop": 1,
   "padLeft": 1,
   "padRight": 1,
-  "padBottom": 4,
+  "padBottom": 3,
   "faceX": 14.0
 }

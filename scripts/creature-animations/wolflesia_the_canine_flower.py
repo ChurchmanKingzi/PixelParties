@@ -13,17 +13,21 @@ Was im Sprite ist (Koordinaten im Sprite 20×28, x/y ab 0):
   (G, M, N, D; Zeilen 8–15) mit zwei roten Augen O=(116,0,0) (links (7,10)+(8,11), rechts (12,10)+(11,11), schräg gestellt), dunkler Nase/Schnauze und zwei Reißzähnen P=(192,188,166) bei (8–9,14)/(10–11,14),
   darunter ein grüner Blattkörper (H, I, J, K, L, B; Zeilen 16–27). 8-verbunden (ein Teil); 4-verbunden 5 Teile (Hauptkörper und 4 kleine Seitenblättchen) — die Mähne hängt an vielen Stellen nur über Pixelecken.
 * Material: Blüte, Fell, Blätter — KEIN Glanz und keine Glitzersterne (Regel 14); kein Feuer (Regel 15).
-Fest bleiben: Umriss, Gesicht, Kopf, Körper, Seitenblättchen (sie wandern nur mit dem Körper).
+Fest bleiben: Umriss, Gesicht, Kopf, Körper (die Seitenhaare wehen jetzt, siehe unten).
 
 Ablauf (48 Frames à 65 ms = 3,12 s, nahtlos):
 * Atmen (Periode 24): im Blattkörper (Quellzeile 23, in der Spitze zusätzlich 22 — unterhalb des Gesichts; beide Zeilen haben dieselbe Breite x 4–15, keine Randstufe) wird 1–2 Zeilen eingefügt: Kopf und Mähne
   heben sich um 1–2 px, die Füße (Blattspitzen) bleiben fest am Boden.
 * Mähne rascheln (Periode 24): der obere Teil der Blütenmähne (Quellzeilen 0–8, nach unten abnehmendes Gewicht) wird zeilenweise ±1 px hin und her versetzt — die Blütenblätter wiegen sich im Wind.
+* UNTERE HAARE (Nutzerkorrektur Runde 2: „die unteren Haare (in rosa) bewegen sich noch gar nicht“): die losen Haarsträhnen links und rechts neben dem Kopf und dem Blattkörper (die rosa/braunen Pixelreihen x 0–4 bzw. 15–19,
+  Zeilen 9–21 in den Farben A=(63,43,45), C=(119,62,69), E=(203,120,132), F=(124,78,83); die Haarmaske sind genau diese vier Farben in diesen Spalten/Zeilen, 52 Pixel) wehen und wallen: jede Zeile der Strähnen wird
+  waagerecht um bis zu ±2 px versetzt, die Auslenkung wächst von der Mähne nach unten (Gewicht (Zeile − 8)/13); oben schwingen sie mit Periode 24, unten (die Spitzen) mit Periode 16 (links) bzw. 12 (rechts),
+  dazwischen Mischung — so läuft eine Welle die Strähnen hinab, die Spitzen flattern schneller. Nachbarzeilen unterscheiden sich um höchstens 1 px; die Strähnen liegen hinter dem Körper. Frame 0 = Original.
 * Blinzeln (zweimal je Schleife, Frames 19–21 und 43–45: halb – zu – halb): die vier roten Augenpixel nehmen die umgebende Fellfarbe an (je Pixel häufigste Farbe im Umkreis von 2 px, ohne Rot/Zahnweiß/Umriss).
 * Giftpollen (Partikel): je ein rosa 2×2-Wölkchen (Form „s“: Glanzpunkt E oben links, Körper F) steigt links und rechts neben der Mähne langsam auf (20 Frames, versetzt, senkrecht) und
   löst sich oben auf. Nie ein einzelner Punkt, berührt den Körper nie (das Skript prüft es in jedem Frame).
-Ergänzungen: Umrisspixel A nur wo das Rascheln eine Kante freilegt (siehe `ergaenzt`); keine Brückenpixel nötig.
-Frame: Sprite plus 5 px links/rechts (Pollen), 4 px oben (Atmen), 2 px unten — Figur zentriert.
+Ergänzungen: Umrisspixel A nur wo das Rascheln eine Kante freilegt (siehe `ergaenzt`); Brückenpixel (verbinde_luecken8, höchstens 3 Pixel) nur, wenn eine Strähne beim Wehen den 8-Verbund zur Figur verlöre.
+Frame: Sprite plus 8 px links/rechts (Pollen und Haarausschlag), 4 px oben (Atmen), 2 px unten — Figur zentriert.
 Alle Bewegungen laufen auf der vollen Leinwand (anim_lib/anim_amorph werfen ClipError). Nur ganze Pixel, nur Farben der Quelle.
 """
 import math
@@ -35,7 +39,8 @@ import anim_lib as L
 import anim_amorph as A
 
 N, MS = 48, 65
-PAD_L, PAD_R, PAD_T, PAD_B = 5, 5, 4, 2
+PAD_L, PAD_R, PAD_T, PAD_B = 8, 8, 4, 2
+TEST_EBENEN = ('fig',)
 
 spr = L.lade('wolflesia-the-canine-flower')
 sh, sw = spr.shape[:2]
@@ -60,6 +65,37 @@ AUGEN_PX = [(10, 7), (11, 8), (10, 12), (11, 11)]                               
 for (y, x) in AUGEN_PX:
     assert _col(y, x) == ROT, (y, x)
 
+# ── Untere Haare (rosa/braune Strähnen links und rechts, Zeilen 9–21) ──
+HAARFARBEN = [(63, 43, 45), (119, 62, 69), (203, 120, 132), (124, 78, 83)]                    # A, C, E, F
+yy_, xx_ = np.mgrid[0:sh, 0:sw]
+HAAR = OPAK & ((xx_ <= 4) | (xx_ >= 15)) & (yy_ >= 9) & (yy_ <= 21) & L.farbmaske(spr, HAARFARBEN)
+for _y in range(sh):                                                                       # rechte Strähnen müssen zum Blattkörper/Kopf passen: Haarpixel dürfen den Körper nie ersetzen
+    pass
+HAAR_ZEILEN = (9, 21)
+HAAR_AMP = 2.2
+
+
+def haar_dx(i, y, seite):
+    """Waagerechter Versatz der Haarzeile y (Quellzeile 9–21) in Frame i; seite 0 = links, 1 = rechts. Oben Periode 24, unten 16 (links) bzw. 12 (rechts); in Frame 0 überall 0."""
+    if not HAAR_ZEILEN[0] <= y <= HAAR_ZEILEN[1]:
+        return 0
+    k = y - HAAR_ZEILEN[0]
+    w = (k + 1) / float(HAAR_ZEILEN[1] - HAAR_ZEILEN[0] + 1)
+    unten = 16 if seite == 0 else 12
+    f = (1 - w) * math.sin(2 * math.pi * i / 24) + w * math.sin(2 * math.pi * i / unten)
+    return int(round(HAAR_AMP * w * f))
+
+
+def haar_dx_liste(i, seite):
+    """Versatz je Quellzeile 0..sh−1 mit Gefälle ≤ 1 px von Zeile zu Zeile (von oben nach unten begrenzt)."""
+    out = [0] * sh
+    for y in range(HAAR_ZEILEN[0], HAAR_ZEILEN[1] + 1):
+        d = haar_dx(i, y, seite)
+        vorher = out[y - 1]
+        out[y] = max(vorher - 1, min(vorher + 1, d))
+    return out
+
+
 # ── Zeitachsen ──
 S = []
 for _i in range(N):
@@ -74,8 +110,8 @@ AMP = 1.4
 
 # ── Pollen: 2×2-Wölkchen links/rechts neben der Mähne (Sprite-Koordinaten der linken oberen Ecke) ──
 POLLEN = [
-    dict(x0=-3, x1=-3, y0=16, y1=2, off=0, flug=20),                                # links
-    dict(x0=21, x1=21, y0=16, y1=2, off=12, flug=20),                               # rechts
+    dict(x0=-5, x1=-5, y0=16, y1=2, off=0, flug=20),                                # links (außerhalb des Haarausschlags)
+    dict(x0=23, x1=23, y0=16, y1=2, off=12, flug=20),                               # rechts
 ]
 
 
