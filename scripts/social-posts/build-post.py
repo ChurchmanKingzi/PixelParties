@@ -699,7 +699,7 @@ def main():
                 import alicefx
                 ag = dict(logo_rect=wgeom['logo_rect'], logo_img=logo, badge_rect=badge_rect, badge_img=badge_img, plate_rect=(plate_x, plate_y, plate.width, plate.height),
                           alice_c=(sx + spr.center_x * spr.px, sy + 19 * spr.px),
-                          hands=((sx + 14.5 * spr.px, sy + 21.5 * spr.px), (sx + 33.0 * spr.px, sy + 21.5 * spr.px)),
+                          hands=((sx + 16.5 * spr.px, sy + 18.5 * spr.px), (sx + 30.5 * spr.px, sy + 18.5 * spr.px)), grid=(sx, sy, spr.px),
                           draw_text=draw_text, ink=INK, white=WHITE, jiggles_path=str(HERE / 'assets' / 'mr-jiggles.png'))
                 wind = alicefx.AliceShow(W, H, U, float(fps), loop, ag, loop * WIND_LOOPS / float(fps))
         else:

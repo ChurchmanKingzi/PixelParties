@@ -62,6 +62,12 @@ class Jiggles:
             out[H_ - nh + y, 2 + dx:2 + dx + w] = b[y]
         return out
 
+    def top_row(self, idx):
+        """Oberste belegte Zeile der Kopfmitte (Fadenansatz) im 16-Zeilen-Rahmen des Frames idx."""
+        a = self._arr(idx, 0, False)
+        col = a[:, 7, 3] > 0                                                             # Mitte des 15 Spalten breiten Rahmens
+        return int(np.argmax(col)) if col.any() else 4
+
     def stamp(self, idx, charge, blink, px, mirror=False):
         key = (idx % 8, charge, blink, px, mirror)
         if key not in self._cache:
@@ -76,8 +82,8 @@ class AliceShow:
     SHOCKS = (0.0, 13.8, 18.0)
     T_GUST = 0.0
     N = 7
-    ANCHORS = [(-390, 170), (390, 170), (-445, -120), (445, -120), (-330, 500), (330, 500), (0, 650)]
-    PX = 11
+    ANCHORS = [(-440, 70), (440, 70), (-440, -230), (440, -230), (-400, 480), (400, 480), (0, 690)]
+    PX = 14                                                                        # dieselbe Pixelgröße wie Alice' Sprite (und ihre Fäden)
     # (Start, Ende, Puppe, Ziel) der Laser; Ziel: (x, y) oder 'badge'/'point'
     SHOTS = [(9.0, 9.4, 2, (30, 330)), (9.6, 10.0, 3, (1050, 520)), (10.2, 10.6, 4, (30, 1480)),
              (10.6, 10.95, 0, 'strL'), (10.6, 10.95, 1, 'strR'),
@@ -89,6 +95,7 @@ class AliceShow:
         self.g = geom
         self.cx, self.cy = geom['alice_c']
         self.hands = geom['hands']
+        self.ox, self.oy, self.gp = geom['grid']                                          # Raster des Sprites (Ursprung und Pixelgröße)
         self.draw_text, self.INK, self.WHITE = geom['draw_text'], geom['ink'], geom['white']
         self.j = Jiggles(geom['jiggles_path'])
         rng = np.random.default_rng(seed)
@@ -193,15 +200,24 @@ class AliceShow:
             d.rectangle([x - U // 2, y - k * U, x + U // 2, y + k * U], fill=(255, 235, 235, 255))
         d.rectangle([x - U, y - U, x + U, y + U], fill=(255, 60, 70, 255))
 
+    STRING_COLORS = ((75, 1, 117), (154, 47, 231))                                    # dunkel / hell wie im Sprite
+
     def _string(self, canvas, a, b, sag):
-        """Dünner lila Faden (wie im Sprite) mit Durchhang."""
+        """Faden wie in Alice' Sprite: Quadrate in der Pixelgröße des Sprites auf seinem Raster, dunkel und hell im Wechsel."""
+        gp, ox, oy = self.gp, self.ox, self.oy
+        n = max(8, int(math.hypot(b[0] - a[0], b[1] - a[1]) / (gp * 0.4)))
+        cells = []
+        for k in range(n + 1):
+            u = k / float(n)
+            x = a[0] + (b[0] - a[0]) * u
+            y = a[1] + (b[1] - a[1]) * u + sag * 4 * u * (1 - u)
+            c = (int(math.floor((x - ox) / gp)), int(math.floor((y - oy) / gp)))
+            if not cells or cells[-1] != c:
+                cells.append(c)
         d = ImageDraw.Draw(canvas)
-        pts = []
-        for k in range(21):
-            u = k / 20.0
-            pts.append((a[0] + (b[0] - a[0]) * u, a[1] + (b[1] - a[1]) * u + sag * 4 * u * (1 - u)))
-        d.line(pts, fill=(120, 30, 190, 255), width=3)
-        d.line([(x + 1, y - 1) for x, y in pts], fill=(190, 110, 255, 255), width=1)
+        for k, (ci, cj) in enumerate(cells):
+            col = self.STRING_COLORS[k % 2] + (255,)
+            d.rectangle([ox + ci * gp, oy + cj * gp, ox + (ci + 1) * gp - 1, oy + (cj + 1) * gp - 1], fill=col)
 
     # ───────── Interface-Zustände ─────────
     def banner_state(self, t):
@@ -240,6 +256,48 @@ class AliceShow:
     def draw_behind(self, canvas, f):
         pass
 
+    def _placements(self, t):
+        """Püppchen platzieren (auf dem Raster des Sprites); die Fäden enden genau an der Kopfmitte des jeweiligen Frames."""
+        pos, place = {}, {}
+        gp = self.gp
+        for i in range(self.N):
+            st = self.puppet(i, t)
+            if st is None:
+                continue
+            pos[i] = st
+            x, y, charge, blink, fire, limp = st
+            idx = int(t * 14 + self.ph[i] * 8)
+            im = self.j.stamp(idx, 3 if fire else charge, blink, self.PX, mirror=self.ANCHORS[i][0] > 0)
+            left = self.ox + round((x - im.width / 2 - self.ox) / gp) * gp
+            top = self.oy + round((y - im.height + 6 * self.PX - self.oy) / gp) * gp
+            attach = (left + 7.5 * self.PX, top + (self.j.top_row(idx) + 0.5) * self.PX)
+            place[i] = (im, left, top, attach)
+        return pos, place
+
+    def _draw_strings(self, canvas, t):
+        """Alle Fäden (Püppchen, Banner, zurückkehrendes Link-Schild): hinter Alice' Sprite, über der Karte – sie kommen aus ihren Ärmeln."""
+        pos, place = self._placements(t)
+        for i, st in pos.items():
+            hand = self.hands[0 if self.ANCHORS[i][0] <= 0 else 1]
+            attach = place[i][3]
+            limp = st[5]
+            dist = math.hypot(attach[0] - hand[0], attach[1] - hand[1])
+            self._string(canvas, hand, attach, sag=(0.06 + 0.4 * limp) * dist * (0.2 + 0.8 * limp) + 14 * limp)
+        # Banner-Fäden (Alice bewegt das Banner)
+        bdx, bdy, bsh, bstr = self.banner_state(t)
+        if bstr:
+            lx, ly, lw, lh = self.g['logo_rect']
+            self._string(canvas, self.hands[0], (lx + 90 + bdx, ly + lh + bdy), 20)
+            self._string(canvas, self.hands[1], (lx + lw - 90 + bdx, ly + lh + bdy), 20)
+        # Rückkehr des Link-Schilds an Fäden
+        bst = self.badge_state(t)
+        if bst is not None and 15.4 <= t < 16.2:
+            bx, by, bw, bh = self.g['badge_rect']
+            (ldx, ldy, _), (rdx, rdy, _), _, _ = bst
+            self._string(canvas, self.hands[0], (bx + bw * 0.25 + ldx, by + bh / 2), 30)
+            self._string(canvas, self.hands[1], (bx + bw * 0.75 + rdx, by + bh / 2), 30)
+
+
     def _shear(self, im, shear):
         if not shear:
             return im, 0
@@ -256,6 +314,7 @@ class AliceShow:
 
     def draw_badge(self, canvas, f):
         t = f / float(self.fps)
+        self._draw_strings(canvas, t)
         bx, by, bw, bh = self.g['badge_rect']
         st = self.badge_state(t)
         img = self.g['badge_img']
@@ -276,32 +335,7 @@ class AliceShow:
     def draw_front(self, canvas, f):
         t = f / float(self.fps)
         W, H, U = self.W, self.H, self.U
-        # Fäden zu den Püppchen (zuerst, damit sie hinter den Püppchen liegen)
-        pos = {}
-        for i in range(self.N):
-            st = self.puppet(i, t)
-            if st is None:
-                continue
-            pos[i] = st
-            x, y, charge, blink, fire, limp = st
-            hand = self.hands[0 if self.ANCHORS[i][0] <= 0 else 1]
-            top = (x, y - 5.5 * self.PX)
-            taut = 1.0 - 0.9 * limp
-            dist = math.hypot(top[0] - hand[0], top[1] - hand[1])
-            self._string(canvas, hand, top, sag=(0.06 + 0.4 * limp) * dist * (1 - 0.8 * taut) + 14 * limp)
-        # Banner-Fäden (Alice bewegt das Banner)
-        bdx, bdy, bsh, bstr = self.banner_state(t)
-        if bstr:
-            lx, ly, lw, lh = self.g['logo_rect']
-            self._string(canvas, self.hands[0], (lx + 90 + bdx, ly + lh + bdy), 20)
-            self._string(canvas, self.hands[1], (lx + lw - 90 + bdx, ly + lh + bdy), 20)
-        # Rückkehr des Link-Schilds an Fäden
-        bst = self.badge_state(t)
-        if bst is not None and 15.4 <= t < 16.2:
-            bx, by, bw, bh = self.g['badge_rect']
-            (ldx, ldy, _), (rdx, rdy, _), _, _ = bst
-            self._string(canvas, self.hands[0], (bx + bw * 0.25 + ldx, by + bh / 2), 30)
-            self._string(canvas, self.hands[1], (bx + bw * 0.75 + rdx, by + bh / 2), 30)
+        pos, place = self._placements(t)
         # Laser
         for t0, t1, p, tg in self.SHOTS:
             if t0 <= t < t1 and p in pos:
@@ -328,10 +362,8 @@ class AliceShow:
             self._spark(canvas, int(self.T[0]), int(self.T[1]), 3 + int((t - 17.2) * 6))
         # Püppchen (über den Fäden und Lasern)
         for i in sorted(pos, key=lambda k: pos[k][1]):
-            x, y, charge, blink, fire, limp = pos[i]
-            idx = int(t * 14 + self.ph[i] * 8)
-            im = self.j.stamp(idx, 3 if fire else charge, blink, self.PX, mirror=self.ANCHORS[i][0] > 0)
-            canvas.paste(im, (int(x - im.width / 2), int(y - im.height + 6 * self.PX)), im)
+            im, left, top, attach = place[i]
+            canvas.paste(im, (int(left), int(top)), im)
         # Schadenszahlen
         for tn, txt, (nx, ny) in ((13.45, '-100', (self.g['badge_rect'][0] + 120, self.g['badge_rect'][1] - 30)),
                                   (13.6, '-100', (self.g['badge_rect'][0] + self.g['badge_rect'][2] - 120, self.g['badge_rect'][1] - 30))):
