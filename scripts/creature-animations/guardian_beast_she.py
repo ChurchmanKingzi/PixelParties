@@ -89,6 +89,10 @@ def ebene(m, dx=0, dy=0):
     return L.platz(t, H, W, PAD_L + dx, PAD_T + dy)
 
 
+def _umriss_nah(fig, x, y):
+    return None
+
+
 def frame(i):
     # ── Stab: Dreizack + oberer Schaft (hinter dem Schwanz) ──
     stab = ebene(stab_oben)
@@ -120,13 +124,14 @@ def frame(i):
         Hm.setze(kopf, {p: LID for p in AUGEN if k == 2 or p[1] == 12}, OFF)
     r = int(round(2 * (0.5 - 0.5 * np.cos(L.sinus(i, 24)))))                    # 0…2 px, zweimal je Schleife
     kopf = L.streck_zeile(kopf, PAD_T + 25, r)
-    kd = G.gefaelle(range(PAD_T + 3 - r, PAD_T + 28), PAD_T + 27, 2.0, L.sinus(i, N), potenz=1.0)
+    D = int(round(2.0 * np.sin(L.sinus(i, N))))                                      # Haube als Ganzes ±2 px, nur der Hals biegt sich (S-Kurve über 6 Zeilen)
+    kd = {y: int(round(D * min(1.0, (PAD_T + 27 - y) / 6.0))) for y in range(PAD_T + 3 - r, PAD_T + 28)}
     kopf = G.zeilen_dx(kopf, kd)
 
     unten = ebene(unten_m)
     fig = L.zusammen(H, W, [(stab, 0, 0), (sw_, 0, 0), (kopf, 0, 0), (unten, 0, 0), (vorn, 0, 0)])
     fig, _ = A.verbinde4(fig)
-    G.rand_schliessen(fig, ERLAUBT, UMRISS)
+    G.rand_schliessen(fig, ERLAUBT, _umriss_nah)
     return fig
 
 
