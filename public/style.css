@@ -26938,3 +26938,21 @@ input[type="checkbox"]:focus-visible, input[type="radio"]:focus-visible { outlin
 }
 .shop-coll-scroll .shop-item.shop-owned:not(:hover)::before,
 .shop-coll-scroll .shop-item.shop-owned:not(:hover)::after { display: none; }
+
+/* ×5-Schalter für die Pull-Animationen: Checkbox in der Shop-Kopfzeile und Hinweisleiste im Reveal (Leertaste / Escape). */
+.shop-fast { position: relative; display: inline-flex; align-items: center; gap: 9px; margin-right: 8px; cursor: pointer; user-select: none; }
+.shop-fast input { position: absolute; opacity: 0; width: 0; height: 0; }
+.shop-fast-box { position: relative; width: 16px; height: 16px; background: var(--bg3); box-shadow: 0 0 0 2px var(--pp-kontur), 0 0 0 4px var(--bg4); }
+.shop-fast input:checked + .shop-fast-box { background: #fad54a; box-shadow: 0 0 0 2px var(--pp-kontur), 0 0 0 4px #72541d; }
+.shop-fast input:checked + .shop-fast-box::after { content: ''; position: absolute; inset: 4px; background: #08060c; }
+.shop-fast input:focus-visible + .shop-fast-box { box-shadow: 0 0 0 2px var(--pp-kontur), 0 0 0 4px var(--accent); }
+.shop-fast-text { font-family: var(--font-display), sans-serif; font-size: 12px; letter-spacing: 1px; color: var(--text2); }
+.shop-fast input:checked ~ .shop-fast-text, .shop-fast:hover .shop-fast-text { color: #fad54a; }
+.pull-fx-hud { position: absolute; left: 50%; bottom: 18px; transform: translateX(-50%); z-index: 5; display: flex; align-items: center; gap: 18px; }
+.pull-fx-hud-btn, .pull-fx-hud-key {
+  font-family: var(--font-display), sans-serif; font-size: 11px; letter-spacing: 1px; padding: 5px 12px; border: 0;
+  background: #08060c; color: #f7f7ad; box-shadow: 0 0 0 2px #72541d, 0 0 0 4px #08060c;
+}
+.pull-fx-hud-btn { cursor: pointer; }
+.pull-fx-hud-key { color: #a5b0c0; }
+.pull-fx-hud-on { background: #fad54a; color: #08060c; }
