@@ -90,11 +90,11 @@ class Data:
 
 
 # ── Netz ─────────────────────────────────────────────────────────────
-def init_params(data, dim, hidden, seed, dtype=np.float32):
+def init_params(data, dim, hidden, seed, dtype=np.float32, emb_init=0.1):
     rng = np.random.default_rng(seed)
     p = {}
-    p['E'] = (rng.standard_normal((data.vocab, dim)) * 0.1).astype(dtype)
-    p['Eo'] = (rng.standard_normal((data.vocab, dim)) * 0.1).astype(dtype)
+    p['E'] = (rng.standard_normal((data.vocab, dim)) * emb_init).astype(dtype)
+    p['Eo'] = (rng.standard_normal((data.vocab, dim)) * emb_init).astype(dtype)
     for g, spec in enumerate(data.groups):
         p[f'Wg{g}'] = (rng.standard_normal((spec['nx'], dim)) / np.sqrt(max(spec['nx'], 1)) * 0.7).astype(dtype)
         p[f'bg{g}'] = np.zeros(dim, dtype)
@@ -404,6 +404,8 @@ def main():
     ap.add_argument('--lr', type=float, default=2e-3)
     ap.add_argument('--wd', type=float, default=1e-4)
     ap.add_argument('--drop', type=float, default=0.0)
+    ap.add_argument('--emb-init', type=float, default=0.1, help='Streuung der Start-Einbettungen (0: nie gesehene Karten bleiben „unbekannt")')
+    ap.add_argument('--id-drop', type=float, default=0.0, help='Anteil der Kartennummern, die im Training auf 0 (unbekannt) gesetzt werden')
     ap.add_argument('--w-out', type=float, default=1.0, help='Gewicht des Ausgang-Ziels')
     ap.add_argument('--w-ev', type=float, default=0.5, help='Startgewicht des Evaluator-Ziels (sinkt linear auf 20 Prozent)')
     ap.add_argument('--w-rem', type=float, default=0.1)
@@ -474,7 +476,7 @@ def main():
     stackp_p = lambda idx: predict_logistic(wsp, stack_X(idx, True))
 
     dim, hidden, nh = args.dim, args.hidden, len(args.hidden)
-    p = init_params(data, dim, hidden, args.seed)
+    p = init_params(data, dim, hidden, args.seed, emb_init=args.emb_init)
     print(f'Netz: {n_params(p)} Parameter (dim {dim}, hidden {hidden})')
     m1 = {k: np.zeros_like(v) for k, v in p.items()}
     m2 = {k: np.zeros_like(v) for k, v in p.items()}
@@ -491,6 +493,11 @@ def main():
         nb = 0
         for i in range(0, len(perm) - args.batch + 1, args.batch):
             bt = data.batch(perm[i:i + args.batch])
+            if args.id_drop > 0:
+                for gb in bt['groups']:
+                    if gb is not None:
+                        gb['ids'] = np.where(drop_rng.random(len(gb['ids'])) < args.id_drop, 0, gb['ids'])
+                        gb['own'] = np.where(drop_rng.random(len(gb['own'])) < args.id_drop, 0, gb['own'])
             out, cache = forward(p, data, bt, dim, nh, args.drop, drop_rng)
             lo, le, lr_, dout = losses(out, bt, w)
             gr = backward(p, data, bt, cache, dout, dim, nh)
