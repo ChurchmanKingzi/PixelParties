@@ -599,71 +599,67 @@
     {
      "id": "world1-2",
      "theme": "Skyline",
-     "template": "mosaic",
+     "template": "scene",
      "prism": false,
      "base": "world1/world1-2.png",
      "shimmer": "world1/world1-2.shimmer.png",
      "motifs": [
-      "Harpthenean War Counselor",
-      "Swift Eagle Warrior",
-      "Thep, the Court Scribe",
-      "Royal Corgi"
+      "Tree of Golden Apples"
      ]
     },
     {
      "id": "world1-3",
      "theme": "Ember",
-     "template": "mosaic",
+     "template": "focus",
      "prism": true,
      "base": "world1/world1-3.png",
      "shimmer": "world1/world1-3.shimmer.png",
      "motifs": [
-      "Elusive Hind",
       "Ferocious Jaguar Warrior",
-      "Pure Advantage Camel",
-      "Distracting Crystal"
+      "Steam Dwarf Engineer",
+      "Teocuilatl, the Embodiment of Gods",
+      "Cybug SCARAB"
      ]
     },
     {
      "id": "world1-4",
      "theme": "Verdant",
-     "template": "mosaic",
+     "template": "scene",
      "prism": false,
      "base": "world1/world1-4.png",
      "shimmer": "world1/world1-4.shimmer.png",
      "motifs": [
-      "White Sacrificial Bull",
-      "Winged Haressassin",
-      "Cybug BEE",
-      "The Hands of Big Gwen"
+      "Soul Shard Sekhem"
      ]
     },
     {
      "id": "world1-5",
      "theme": "Royal",
-     "template": "mosaic",
+     "template": "grid",
      "prism": false,
      "base": "world1/world1-5.png",
      "shimmer": "world1/world1-5.shimmer.png",
      "motifs": [
-      "Tuscan Aristocrat",
-      "Chosen Sacrifice",
-      "Noble Mummy Guards",
-      "Divine Gift of Time"
+      "Cactus Creature",
+      "Thep, the Court Scribe",
+      "Cybug LADYBUG",
+      "Elusive Hind",
+      "Pure Advantage Camel",
+      "Bloom, the Maniacal Botanist",
+      "Harpthenean War Counselor",
+      "Cybug BEE",
+      "Sarcophagus of Sealed Magic"
      ]
     },
     {
      "id": "world1-6",
      "theme": "Ocean",
-     "template": "mosaic",
+     "template": "scene",
      "prism": false,
      "base": "world1/world1-6.png",
      "shimmer": "world1/world1-6.shimmer.png",
      "motifs": [
-      "3-Headed Giant",
-      "The Egg of God",
-      "Soul Shard Ren",
-      "Treacherous Crystal"
+      "Crystal Well"
      ]
     },
     {
@@ -683,15 +679,12 @@
     {
      "id": "world1-8",
      "theme": "Prism",
-     "template": "mosaic",
+     "template": "scene",
      "prism": true,
      "base": "world1/world1-8.png",
      "shimmer": "world1/world1-8.shimmer.png",
      "motifs": [
-      "Gigalopolis, the Mega-City",
-      "Guardian of Teocuilatl",
-      "Cybug ANTS",
-      "Hat of Madness"
+      "Doom Prophecy"
      ]
     }
    ]
@@ -718,77 +711,68 @@
     },
     {
      "id": "world2-2",
-     "theme": "Ocean",
-     "template": "mosaic",
+     "theme": "Sunfire",
+     "template": "scene",
      "prism": false,
      "base": "world2/world2-2.png",
      "shimmer": "world2/world2-2.shimmer.png",
      "motifs": [
-      "Codumbus, the Clueless Voyager",
-      "Taio, the Sun Fencer",
-      "Potion Juggler",
-      "Rebelliokai Courtly Kirin",
-      "Junshi, the Tactical Genius"
+      "Dance of the Flame Pillars"
      ]
     },
     {
      "id": "world2-3",
-     "theme": "Crimson",
-     "template": "mosaic",
+     "theme": "Verdant",
+     "template": "scene",
      "prism": false,
      "base": "world2/world2-3.png",
      "shimmer": "world2/world2-3.shimmer.png",
      "motifs": [
-      "Monsieur Pete, the Booty Raider",
-      "Tempeste, the Weather Fairy",
-      "Clausss, the No-Nonsense Cultist",
-      "Rebelliokai Timid Tanuki",
-      "Ghuanjun, the Undead Martial Artist"
+      "Scavenging Crane"
      ]
     },
     {
      "id": "world2-4",
-     "theme": "Amethyst",
-     "template": "mosaic",
+     "theme": "Crimson",
+     "template": "focus",
      "prism": false,
      "base": "world2/world2-4.png",
      "shimmer": "world2/world2-4.shimmer.png",
      "motifs": [
-      "Criminal Monkee",
-      "Chaorc Pyre Grill Master",
-      "Rocket Sneeze",
-      "Idej Lord Todugawin",
-      "Market Crash"
+      "Priest of Luna",
+      "Treasure Skeleton",
+      "Bonded Companion Mellvy",
+      "Pinta, the Singing Ship"
      ]
     },
     {
      "id": "world2-5",
-     "theme": "Sunfire",
-     "template": "mosaic",
+     "theme": "Amethyst",
+     "template": "scene",
      "prism": false,
      "base": "world2/world2-5.png",
      "shimmer": "world2/world2-5.shimmer.png",
      "motifs": [
-      "Madaga, the Forsaken Seafarer",
-      "Bomblebee",
-      "Anti-Magnetic Armor",
-      "Idej Lord Shoguwana",
-      "Strong Ox Headbutt"
+      "Idej Sword - Onima"
      ]
     },
     {
      "id": "world2-6",
-     "theme": "Verdant",
-     "template": "mosaic",
+     "theme": "Ocean",
+     "template": "grid",
      "prism": false,
      "base": "world2/world2-6.png",
      "shimmer": "world2/world2-6.shimmer.png",
      "motifs": [
-      "Scavenging Crane",
-      "Chaorc Ruin Mourner",
-      "Ice Sculpture Garden",
-      "Bill, the Angry Auctioneer",
-      "Cardinal Beast Zhuque"
+      "Cardinal Beast Xuanwu",
+      "Taio, the Sun Fencer",
+      "Rebelliokai Timid Tanuki",
+      "Idej Lord Shoguwana",
+      "Idej Lord Todugawin",
+      "Rebelliokai Courtly Kirin",
+      "Wolflesia, the Canine Flower",
+      "Criminal Monkee",
+      "Chaorc Pyre Grill Master"
      ]
     },
     {
@@ -809,16 +793,12 @@
     {
      "id": "world2-8",
      "theme": "Prism",
-     "template": "mosaic",
+     "template": "scene",
      "prism": true,
      "base": "world2/world2-8.png",
      "shimmer": "world2/world2-8.shimmer.png",
      "motifs": [
-      "Resilient Monkee",
-      "Luna Kiai",
-      "Smugness",
-      "Idej Lord Daiyo",
-      "Cardinal Beast Xuanwu"
+      "Cardinal Beast Zhuque"
      ]
     }
    ]
@@ -967,96 +947,67 @@
     {
      "id": "trials-2",
      "theme": "Sunfire",
-     "template": "mosaic",
+     "template": "scene",
      "prism": false,
      "base": "trials/trials-2.png",
      "shimmer": "trials/trials-2.shimmer.png",
      "motifs": [
-      "Rosie, the School Idol",
-      "Lolki, Trickstar of Coolness",
-      "Spirit of the Shattered Trident",
-      "Boris, the Guardian of Blackport",
-      "Earth-Shattering Hammer, Relic of Deri",
-      "Glasowt",
-      "Divine Gift of Skill",
-      "The Golden Gate",
-      "The Root of all Presents"
+      "Heat Wave"
      ]
     },
     {
      "id": "trials-3",
      "theme": "Verdant",
-     "template": "mosaic",
+     "template": "focus",
      "prism": false,
      "base": "trials/trials-3.png",
      "shimmer": "trials/trials-3.shimmer.png",
      "motifs": [
-      "Lord Mithuru, the Rotten Mastermind",
-      "Phatnir, Prototype of Coolness",
-      "Coreling",
-      "Arthor, the King of Blackport",
-      "Challenge",
-      "Doomed Pirate",
-      "Divine Gift of Coolness",
-      "Poison Pollen",
-      "Saint Nicolas"
+      "Bifab, Bridge to Coolness",
+      "Spirit of the Super-Killing Knife",
+      "Spirit of the Barbarian Sword",
+      "Spirit of the Shattered Trident"
      ]
     },
     {
      "id": "trials-4",
      "theme": "Noir",
-     "template": "mosaic",
+     "template": "scene",
      "prism": false,
      "base": "trials/trials-4.png",
      "shimmer": "trials/trials-4.shimmer.png",
      "motifs": [
-      "Giant Exploding Skull",
-      "Cooldin, King of Coolness",
-      "Initiation Ritual",
-      "Poisoned Meat",
-      "Spy in the Enemy's Camp",
-      "Sparkfly Queen",
-      "Divine Gift of Edge",
-      "Pet Snake",
-      "Santa Klaus"
+      "Challenge"
      ]
     },
     {
      "id": "trials-5",
      "theme": "Skyline",
-     "template": "mosaic",
+     "template": "grid",
      "prism": false,
      "base": "trials/trials-5.png",
      "shimmer": "trials/trials-5.shimmer.png",
      "motifs": [
-      "Celia, the Class Clown",
-      "Swagdri, Forger of Coolness",
-      "Laser Volley",
-      "Voodoo Curse",
-      "Brilliant Idea",
-      "Rubin, the Dragoneer Champion",
-      "Divine Gift of Fire",
-      "Sas'Za, the Snaka Adventurer",
-      "Mary Crestmas"
+      "Mimic",
+      "Alleria, the Queen of Spiders",
+      "Boris, the Guardian of Blackport",
+      "Glasowt",
+      "Wise Village Elder",
+      "Doomed Pirate",
+      "Sparkfly Queen",
+      "Lolki, Trickstar of Coolness",
+      "Phatnir, Prototype of Coolness"
      ]
     },
     {
      "id": "trials-6",
      "theme": "Crimson",
-     "template": "mosaic",
+     "template": "scene",
      "prism": false,
      "base": "trials/trials-6.png",
      "shimmer": "trials/trials-6.shimmer.png",
      "motifs": [
-      "Moonlight Butterfly",
-      "Hipdall, Protector of Coolness",
-      "Divine Gift of Equality",
-      "Lilly, the Charming Infiltrator",
-      "Prayer",
-      "Fiery Slime",
-      "Divine Gift of Magic",
-      "Tail Slap",
-      "The Root of all Presents"
+      "Voodoo Curse"
      ]
     },
     {
@@ -1081,20 +1032,12 @@
     {
      "id": "trials-8",
      "theme": "Prism",
-     "template": "mosaic",
+     "template": "scene",
      "prism": true,
      "base": "trials/trials-8.png",
      "shimmer": "trials/trials-8.shimmer.png",
      "motifs": [
-      "Dangerous Knowledge",
-      "Thorad, Strength of Coolness",
-      "Knife Throw",
-      "Enigma, the Seller of Secrets",
-      "The Master's Orders",
-      "Icy Dragonegg",
-      "Divine Gift of Death",
-      "Poison Pollen",
-      "Santa Klaus"
+      "Flaming Dragonegg"
      ]
     }
    ]

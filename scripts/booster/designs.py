@@ -71,7 +71,7 @@ FILE = lambda p: 'file:' + GN + p
 
 # Varianten: (Vorlage, Thema, Inhalt). Nur Hero Packs (und Cool Rescuer Monia auf Rise of Monia) zeigen einen einzelnen Helden; hero = ein Held auf Strahlenkranz, scene (eine große Kartenkunst, optional eine Figur),
 # focus (große Kartenkunst + drei Kacheln), grid (3x3 Kacheln), mosaic (ein Vertreter je Set).
-# Jedes Motiv kommt im ganzen Satz höchstens einmal vor.
+# Jedes Motiv kommt im ganzen Satz höchstens einmal vor. Mehrset-Packs (World 1/2, Trials) zeigen nur auf zwei Varianten einen Vertreter jedes Sets (mosaic).
 VARIANTS = {
     'ability': [
         ('focus', 'sunfire',  dict(big='Fighting', tiles=['Destruction Magic', 'Alchemy', 'Leadership'])),
@@ -123,9 +123,36 @@ VARIANTS = {
         ('grid',  'crimson',  dict(tiles='auto')),
         ('grid',  'forest',   dict(tiles='auto')),
     ],
-    'world1': [(('mosaic'), t, {}) for t in ('desert', 'skyline', 'ember', 'verdant', 'royal', 'ocean', 'platinum', 'prism')],
-    'world2': [(('mosaic'), t, {}) for t in ('rosebud', 'ocean', 'crimson', 'amethyst', 'sunfire', 'verdant', 'frost', 'prism')],
-    'trials': [(('mosaic'), t, {}) for t in ('royal', 'sunfire', 'verdant', 'noir', 'skyline', 'crimson', 'platinum', 'prism')],
+    'world1': [
+        ('mosaic', 'desert',   {}),
+        ('scene',  'skyline',  dict(window='Tree of Golden Apples')),
+        ('focus',  'ember',    dict(big='Ferocious Jaguar Warrior', tiles='auto')),
+        ('scene',  'verdant',  dict(window='Soul Shard Sekhem')),
+        ('grid',   'royal',    dict(tiles='auto')),
+        ('scene',  'ocean',    dict(window='Crystal Well')),
+        ('mosaic', 'platinum', {}),
+        ('scene',  'prism',    dict(window='Doom Prophecy')),
+    ],
+    'world2': [
+        ('mosaic', 'rosebud',  {}),
+        ('scene',  'sunfire',  dict(window='Dance of the Flame Pillars')),
+        ('scene',  'verdant',  dict(window='Scavenging Crane')),
+        ('focus',  'crimson',  dict(big='Priest of Luna', tiles='auto')),
+        ('scene',  'amethyst', dict(window='Idej Sword - Onima')),
+        ('grid',   'ocean',    dict(tiles='auto')),
+        ('mosaic', 'frost',    {}),
+        ('scene',  'prism',    dict(window='Cardinal Beast Zhuque')),
+    ],
+    'trials': [
+        ('mosaic', 'royal',    {}),
+        ('scene',  'sunfire',  dict(window='Heat Wave')),
+        ('focus',  'verdant',  dict(big='Bifab, Bridge to Coolness', tiles='auto')),
+        ('scene',  'noir',     dict(window='Challenge')),
+        ('grid',   'skyline',  dict(tiles='auto')),
+        ('scene',  'crimson',  dict(window='Voodoo Curse')),
+        ('mosaic', 'platinum', {}),
+        ('scene',  'prism',    dict(window='Flaming Dragonegg')),
+    ],
     'community': [
         ('scene', 'ocean',    dict(window='Aurora Borealis')),
         ('grid',  'prism',    dict(tiles='auto')),
