@@ -700,7 +700,14 @@ def main():
                 ag = dict(logo_rect=wgeom['logo_rect'], logo_img=logo, badge_rect=badge_rect, badge_img=badge_img, plate_rect=(plate_x, plate_y, plate.width, plate.height),
                           alice_c=(sx + spr.center_x * spr.px, sy + 19 * spr.px),
                           hands=((sx + 16.5 * spr.px, sy + 18.5 * spr.px), (sx + 30.5 * spr.px, sy + 18.5 * spr.px)), grid=(sx, sy, spr.px),
-                          draw_text=draw_text, ink=INK, white=WHITE, jiggles_path=str(HERE / 'assets' / 'mr-jiggles.png'))
+                          draw_text=draw_text, ink=INK, white=WHITE, jiggles_path=str(HERE / 'assets' / 'mr-jiggles.png'),
+                          sprite_eyes_fn=None)
+                seyes = []                                                     # Augenpixel (210,0,0) von Alice' Sprite-Püppchen je Frame
+                for i_ in range(spr.n):
+                    fr_ = np.asarray(spr.sheet.crop((i_ * spr.fw, 0, (i_ + 1) * spr.fw, spr.fh))).astype(int)
+                    ys_, xs_ = np.where((fr_[..., 0] > 180) & (fr_[..., 1] < 10) & (fr_[..., 2] < 10) & (fr_[..., 3] > 20))
+                    seyes.append(sorted(zip(xs_.tolist(), ys_.tolist())))
+                ag['sprite_eyes_fn'] = lambda t_: [(sx + (x_ + 0.5) * spr.px, sy + (y_ + 0.5) * spr.px) for (x_, y_) in seyes[(int(t_ * float(fps)) // per) % spr.n]]
                 wind = alicefx.AliceShow(W, H, U, float(fps), loop, ag, loop * WIND_LOOPS / float(fps))
         else:
             wind = windfx.WindFX(W, H, U, float(fps), loop, wgeom)

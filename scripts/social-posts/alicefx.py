@@ -1,8 +1,8 @@
 """Alice-Show für „Alice, the Puppeteer Girl“: ihre Mr. Jiggles (weiße Stoffpüppchen mit roten Augen, aus ihrem Sprite) tanzen an Fäden um sie,
 das Interface wird zur Marionette, und die Püppchen schießen dünne rote Laser aus den Augen – mit Spannungsbogen:
 
-   0.0 –  1.3  HOOK     Blitz, Druckwelle; die sieben Mr. Jiggles schießen ein Laser-Netz aus ihren 14 Augen
-   1.3 –  5.0  RUF      sie sacken schlaff zusammen und werden nacheinander an den Fäden hochgezogen (Ruck mit Überschwingen)
+   0.0 –  1.3  HOOK     Blitz, Druckwelle; Alice' eigenes Mr. Jiggles im Sprite schießt einen Laser-Fächer aus seinen Augen
+   1.3 –  5.0  RUF      die sieben äußeren Mr. Jiggles erscheinen erst bei ihrem Spawn-Sound – samt Faden, der von Alice' Hand mitwächst
    5.0 –  8.6  PUPPEN   Alice lässt das Banner an Fäden tanzen (ruckelnd, wie eine Marionette), Herzschlag, rote Vignette wächst
    8.6 – 12.6  PROBE    Augen glühen auf, erste Probeschüsse an den Bildrand, dann durchtrennen zwei Laser die Banner-Fäden
   12.6 – 16.0  ZIEL     zwei Laser (je 100) zerschneiden das Link-Schild; die Hälften kommen an Fäden zurück
@@ -123,7 +123,8 @@ class AliceShow:
         self.T = (W / 2, 1390)                                                           # Zielpunkt der Salve (Namensschild)
         self.F1, self.F2 = round(0.45 * D) / D, round(0.6 * D) / D                       # ganzzahlige Schwebezyklen je Video → nahtloser Loop
         # Hook-/Schluss-Laser: je Auge ein Laser mit eigener Drehrichtung
-        self.hook = [dict(th=rng.uniform(0, 2 * math.pi), om=rng.uniform(-2.2, 2.2)) for _ in range(2 * self.N)]
+        self.hook = [dict(th=rng.uniform(0, 2 * math.pi), om=rng.uniform(-2.2, 2.2)) for _ in range(14)]
+        self.seyes = geom['sprite_eyes_fn']                                               # Augenpixel des Sprite-Püppchens je Frame (Bildschirmkoordinaten)
 
     # ───────── Zeitleisten ─────────
     def tension(self, t):
@@ -138,30 +139,18 @@ class AliceShow:
         return (self.W / 2 + 470 * math.cos(a), 930 + 300 * math.sin(a))
 
     def limp_amount(self, i, t):
-        """Schlaffheit 0 (aufgezogen) … 1 (hängt schlaff); negativ = Überschwingen nach oben."""
-        up, up2 = self.t_app[i], 20.0 + 0.1 * i
-        if t < 1.3:
-            return 0.0
-        if t < 2.0:                                                                      # nach dem Hook sacken sie in sich zusammen
-            return smooth((t - 1.3) / 0.7)
-        if t < up:
-            return 1.0
-        if t < up + 0.6:                                                                 # Alice zieht an den Fäden: Ruck nach oben mit Überschwingen
-            return 1.0 - ease_out_back((t - up) / 0.6)
-        if t < 18.0:
-            return 0.0
-        if t < 18.5:                                                                     # nach der Salve schlaff
-            return smooth((t - 18.0) / 0.5)
-        if t < up2:
-            return 1.0
-        if t < up2 + 0.6:                                                                # …und für den Hook wieder hochgezogen
-            return 1.0 - ease_out_back((t - up2) / 0.6)
-        return 0.0
+        """Schlaffheit 0 (aufgezogen) … 1 (hängt schlaff): nur nach der Salve (ab 18,0 s)."""
+        return smooth((t - 18.0) / 0.5) if t >= 18.0 else 0.0
 
     def puppet(self, i, t):
-        """(x, y, Ladestufe, blinzelt, feuert, schlaff) der Puppe i – sie ist immer da (auch im Hook)."""
+        """(x, y, Ladestufe, blinzelt, feuert, schlaff) der Puppe i – oder None, solange sie nicht da ist (sie erscheint erst bei ihrem Spawn-Sound)."""
+        ta = self.t_app[i]
+        leave = 20.0 + 0.1 * i
+        if t < ta or t >= leave + 0.7:
+            return None
         ax, ay = self.cx + self.ANCHORS[i][0], self.cy + self.ANCHORS[i][1]
         ph = self.ph[i]
+        hx, hy = self.hands[0 if self.ANCHORS[i][0] <= 0 else 1]
         x = ax + 16 * math.sin(2 * math.pi * (t * self.F1 + ph))
         y = ay + 20 * math.sin(2 * math.pi * (t * self.F2 + ph * 1.3))
         ru = smooth((t - 15.8) / 0.7) * (1.0 - smooth((t - 18.0) / 0.3))
@@ -169,10 +158,14 @@ class AliceShow:
             rx, ry = self.ring_pos(i, t)
             x, y = x + (rx - x) * ru, y + (ry - y) * ru
         limp = self.limp_amount(i, t)
-        y += 130 * limp + (14 * math.sin(6 * (t - 18.0) + i) * math.exp(-1.5 * (t - 18.0)) if 18.0 <= t < 19.5 else 0.0)
+        y += 90 * limp + (14 * math.sin(6 * (t - 18.0) + i) * math.exp(-1.5 * (t - 18.0)) if 18.0 <= t < 19.5 else 0.0)
+        if t < ta + 0.6:                                                                 # Spawn: fliegt von Alice' Hand an seinen Platz (Faden wächst mit), Überschwingen
+            u = ease_out_back((t - ta) / 0.6)
+            x, y = hx + (x - hx) * u, hy + (y - hy) * u
+        if t >= leave:                                                                   # Ende: die Fäden ziehen sie zurück in die Hand
+            u = smooth((t - leave) / 0.7)
+            x, y = x + (hx - x) * u, y + (hy - y) * u
         charge, fire = 0, False
-        if t < 1.3 or t >= self.D - 1.0:                                                 # Hook und Rückkehr: Augen weiß-heiß, Laser-Netz
-            charge, fire = 3, True
         for t0, t1, p, tg in self.SHOTS:
             if p == i and t0 - 0.5 <= t < t1 + 0.25:
                 charge = 1 + min(2, int((t - (t0 - 0.5)) / 0.25)) if t < t0 else (3 if t < t1 else 1)
@@ -180,14 +173,12 @@ class AliceShow:
         if 16.0 <= t < 18.0:
             charge = max(charge, 1 + min(2, int((t - 16.0) / 0.7)))
             fire = fire or t >= 17.2
-        if 18.0 <= t < self.D - 1.0:
+        if t >= 18.0:
             charge, fire = 0, False
-        up = self.t_app[i]
-        if up <= t < up + 0.3 or (20.0 + 0.1 * i) <= t < (20.0 + 0.1 * i) + 0.3:       # Ruck an den Fäden: die Augen leuchten auf
+        if ta <= t < ta + 0.3:                                                           # Spawn: die Augen leuchten auf
             charge, fire = 3, False
         blink = (int(t * 2.2 + ph * 7) % 9 == 0) and charge == 0
         return x, y, charge, blink, fire, limp
-
 
     def plate_dx(self, f):
         t = f / float(self.fps)
@@ -402,38 +393,16 @@ class AliceShow:
                 for e in place[i][4]:
                     self._beam(canvas, e, self.T)
             self._spark(canvas, int(self.T[0]), int(self.T[1]), 3 + int((t - 17.2) * 6))
-        if t < 1.3 or t >= self.D - 1.0:                                                  # Hook und Rückkehr: Laser-Netz aus allen 14 Augen
+        if t < 1.3 or t >= self.D - 1.0:                                                  # Hook und Rückkehr: Laser-Fächer aus den Augen von Alice' eigenem Mr. Jiggles im Sprite
             te = t if t < 1.3 else self.D - t
             reach = 2800 * (1.0 - smooth((te - 1.0) / 0.3))
             if reach > 0:
-                for i in pos:
-                    for side, e in enumerate(place[i][4]):
-                        h = self.hook[2 * i + side]
+                for side, e in enumerate(self.seyes(t)):
+                    e = (e[0] + self.sprite_dx(int(t * self.fps)), e[1])
+                    for k in range(7):
+                        h = self.hook[(side * 7 + k) % len(self.hook)]
                         th = h['th'] + h['om'] * te
                         self._beam(canvas, e, (e[0] + math.cos(th) * reach, e[1] + math.sin(th) * reach))
-        # Aufwach-Effekt zum Summon-Sound: beim Ruck an den Fäden läuft ein Pixelring vom Kopf nach außen, dazu zwölf Funken
-        gp = self.gp
-        d_ = ImageDraw.Draw(canvas)
-        for i in pos:
-            for t0 in (self.t_app[i], 20.0 + 0.1 * i):
-                if t0 <= t < t0 + 0.5:
-                    u = (t - t0) / 0.5
-                    ax_, ay_ = place[i][3]
-                    ay_ += 3 * self.PX                                                       # etwa Gesichtshöhe
-                    for k in range(24):                                                      # Ring
-                        ang = 2 * math.pi * k / 24
-                        r = 50 + 190 * u
-                        cx_ = self.ox + int(math.floor((ax_ + math.cos(ang) * r - self.ox) / gp)) * gp
-                        cy_ = self.oy + int(math.floor((ay_ + math.sin(ang) * r - self.oy) / gp)) * gp
-                        if u < 0.7 or k % 2 == 0:
-                            d_.rectangle([cx_, cy_, cx_ + gp - 1, cy_ + gp - 1], fill=((255, 232, 232, 255) if u < 0.35 else (255, 50, 65, 255)))
-                    for k in range(12):                                                      # Funken, schneller als der Ring
-                        ang = 2 * math.pi * k / 12 + 0.26
-                        r = 30 + 330 * u
-                        cx_ = self.ox + int(math.floor((ax_ + math.cos(ang) * r - self.ox) / gp)) * gp
-                        cy_ = self.oy + int(math.floor((ay_ + math.sin(ang) * r - self.oy) / gp)) * gp
-                        if u < 0.8:
-                            d_.rectangle([cx_, cy_, cx_ + 2 * gp - 1, cy_ + 2 * gp - 1], fill=((255, 244, 244, 255) if k % 2 == 0 else (255, 90, 100, 255)))
         # Schadenszahlen
         for tn, txt, (nx, ny) in ((13.45, '-100', (self.g['badge_rect'][0] + 120, self.g['badge_rect'][1] - 30)),
                                   (13.6, '-100', (self.g['badge_rect'][0] + self.g['badge_rect'][2] - 120, self.g['badge_rect'][1] - 30))):
