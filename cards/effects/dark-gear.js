@@ -189,6 +189,9 @@ module.exports = {
     cancellable: true,
     exclusiveTypes: true,
     maxPerType: { equip: 1 },
+    // Genau EIN Ziel. Ohne eigenes `maxTotal` deckelt der Server X-Kosten-Karten auf floor(Gold / Grundpreis) - bei weniger als 5 Gold waere
+    // das 0, und die (kostenlose) Stufe-0-Kreatur liesse sich nicht mehr anklicken. Die Kosten (Stufe x 5) prueft `getStealableCreatures`.
+    maxTotal: 1,
   },
 
   validateSelection: (selectedIds) => selectedIds && selectedIds.length === 1,

@@ -60,6 +60,8 @@ module.exports = {
     const ps = gs.players[pi];
     if (!ps) return false;
     const cardDB = {}; // placeholder — real check below
+    // X-Kosten (10 je Stufe): Stufe 0 kostet 0. Die Hand graut die Karte deshalb nicht am Grundpreis 10 aus (`selfPricedArtifacts`,
+    // server.js) - ob sie spielbar ist, entscheidet allein dieses Tor mit den echten Kosten.
     // G1 (A09-11, Als Antwort): unter der Goldsperre ("cannot spend Gold") sind nur Gesamtkosten 0 erlaubt, also nur Stufe-0-Kreaturen
     // (Kartentext: Kosten = 10 x Stufe). Die "mindestens 10 Gold"-Regel unten ist KEINE Kartentext-Bedingung, nur die Vorpruefung
     // fuer Stufe >= 1 - sie sperrt die Karte unter der Goldsperre daher nicht mehr ganz, sondern laesst nur noch Stufe 0 zu.

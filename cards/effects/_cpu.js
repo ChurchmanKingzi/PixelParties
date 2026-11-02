@@ -5635,6 +5635,11 @@ async function attachAbilities(engine, helpers) {
         // school, so the copy is always better placed elsewhere).
         if (heroRejectsAbility(engine, cpuIdx, hi, cardName, cd)) continue;
 
+        // ── Anlegeschaden (`cpuMeta.attachDamage`, Performance: 50 an den Träger) ──
+        // Tödlich (HP <= Schaden) ist nie erlaubt: die CPU legte Performance an einen eigenen Helden mit 50 HP an und verlor ihn.
+        const anlegeSchaden = attachDamageOf(engine, cpuIdx, hi, cardName);
+        if (anlegeSchaden > 0 && hero.hp <= anlegeSchaden) continue;
+
         // ── Per-card placement biases (generic — driven by each
         //    Ability's `cpuMeta.cpuPlacementBias`) ──
         const bias = getBias(cardName);
@@ -5661,6 +5666,10 @@ async function attachAbilities(engine, helpers) {
         } else if (bias?.supportSlotByHero?.has(hi)) {
           place = { zoneSlot: -1, supportSlot: bias.supportSlotByHero.get(hi) };   // 24.10.: Stapel in einer Support Zone (Xal, Xalibur)
         }
+
+        // Der Anlegeschaden muss sich lohnen: ohne Nutzen (gesättigter oder toter Stapel, Bewertung 0) bleibt die Karte auf der Hand — außer
+        // der Held gehört zur Vorzugsmenge der Karte (`cpuPlacementBias`, Performance: Divinity-Stapel).
+        if (anlegeSchaden > 0 && !bias?.allowedHeroes?.has(hi) && !(scoreAbilityPlacement(engine, cpuIdx, hi, cardName) > 0)) continue;
 
         const entry = { handIdx, cardName, fromCreation: ausVorrat, heroIdx: hi, zoneSlot: place.zoneSlot, supportSlot: place.supportSlot };
         const thisHeroHasIt = heroHasAbility(ps, hi, cardName);
@@ -5731,6 +5740,35 @@ async function attachAbilities(engine, helpers) {
  *   supportSlot >= 0  : eine bestimmte Support Zone (Xal, Xalibur) — Performance auf einen Support-Stapel
  *   zoneSlot === -1   : `doPlayAbility` wählt selbst (vorhandener Stapel, sonst erste freie Zone — echte vor Support Zonen)
  */
+/** Schaden, den der Träger beim Anlegen der Ability nimmt (`cpuMeta.attachDamage` der Karte; 0 = keiner). */
+function attachDamageOf(engine, pi, hi, cardName) {
+  try {
+    const v = loadCardEffect(cardName)?.cpuMeta?.attachDamage;
+    const n = typeof v === 'function' ? v(engine, pi, hi) : v;
+    return Number.isFinite(Number(n)) && Number(n) > 0 ? Number(n) : 0;
+  } catch { return 0; }
+}
+
+/**
+ * Joker-Abilities (Performance) legen sich AUF einen vorhandenen Stapel und heben ihn um eine Stufe — welcher Stapel das ist, entscheidet
+ * der Nutzen: Bewertung = die der Basis-Ability des Stapels (`scoreAbilityPlacement`, als käme eine weitere Kopie dazu). Vorher wählte
+ * die CPU unter allen erlaubten Stapeln ZUFÄLLIG (Befund 31.10.: Performance hob eine unwichtige Ability, obwohl die Bewertung den besten
+ * Stapel meinte). Gleichstand: zufällig unter den besten.
+ */
+function besterJokerStapel(engine, pi, hi, cardName, candidates) {
+  const ps = engine.gs.players[pi];
+  let besteWerte = -Infinity, beste = [];
+  for (const c of candidates) {
+    const stapel = c.zoneSlot >= 0 ? (ps.abilityZones?.[hi]?.[c.zoneSlot] || []) : (ps.supportZones?.[hi]?.[c.supportSlot] || []);
+    const basis = stapel.find(n => n && n !== cardName && !loadCardEffect(n)?.isWildcardAbility);
+    let wert = 0;
+    if (basis) { try { wert = scoreAbilityPlacement(engine, pi, hi, basis, 1) || 0; } catch { wert = 0; } }
+    else wert = -1;   // Stapel ohne echte Basis (nur Joker): nie vorziehen
+    if (wert > besteWerte) { besteWerte = wert; beste = [c]; } else if (wert === besteWerte) beste.push(c);
+  }
+  return beste.length ? beste[Math.floor(Math.random() * beste.length)] : null;
+}
+
 function resolveAbilityPlace(engine, pi, hi, cardName) {
   const gs = engine.gs;
   const ps = gs.players[pi];
@@ -5757,6 +5795,7 @@ function resolveAbilityPlace(engine, pi, hi, cardName) {
       }
     }
     if (!candidates.length) return null;
+    if (script.isWildcardAbility) return besterJokerStapel(engine, pi, hi, cardName, candidates) || candidates[0];
     return candidates[Math.floor(Math.random() * candidates.length)];
   }
 
@@ -14786,4 +14825,4 @@ async function measureAreaValues(engine, helpers, cpuIdx) {
 // Gold-Bedarfsrechnung, die an zwei Stellen gepflegt wird, laeuft
 // garantiert auseinander. Rein additiv, kein Aufrufer geaendert.
 module.exports = { CPU_META_HELPERS, runCpuTurn, installCpuBrain, runTurbo, shouldMulliganStartingHand, setCpuVerbose, getCpuVerbose, setCpuTranscribeFn, setRolloutHorizon, getRolloutHorizon, setRolloutBrain, getRolloutBrain, mctsValueGoldVsDraw, mctsPickFromOptions, rolloutRestOfTurn, seedExploreAttempts, computeGoldDemand, mctsOpponentGoldEconomy,
-  _test: { evaluateState, pickEnemyTargets, pickHeroForEquip, activateCreatureEffects, activateHeroEffects, cpuGenericChoice, heroCheatBonusByName, heroEffectGateCheatBonus, candidateCheatBonus, heuristicCandidateCmp, ACTION_CHEAT_BONUS, pickCreatureZoneSlot, listEligibleHeroesForActionCard, resolveAbilityPlace, alleAbilityStapel, scoreAbilityPlacement, isAbilityStackSaturated, activateFreeAbilities, tryActionCostingAbility } };
+  _test: { attachAbilities, evaluateState, pickEnemyTargets, pickHeroForEquip, activateCreatureEffects, activateHeroEffects, cpuGenericChoice, heroCheatBonusByName, heroEffectGateCheatBonus, candidateCheatBonus, heuristicCandidateCmp, ACTION_CHEAT_BONUS, pickCreatureZoneSlot, listEligibleHeroesForActionCard, resolveAbilityPlace, alleAbilityStapel, scoreAbilityPlacement, isAbilityStackSaturated, activateFreeAbilities, tryActionCostingAbility } };

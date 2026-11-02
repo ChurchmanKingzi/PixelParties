@@ -15,6 +15,8 @@
 
 const { loadCardEffect } = require('./_loader');
 
+const ATTACH_DAMAGE = 50;   // „Deal 50 damage to the Hero you attach this Ability to"
+
 module.exports = {
   activeIn: ['ability'],
 
@@ -23,6 +25,10 @@ module.exports = {
   isWildcardAbility: true,
 
   cpuMeta: {
+    // Schaden, den der Träger beim ANLEGEN nimmt („Deal 50 damage to the Hero you attach this Ability to"). Die CPU legt Abilities ohne
+    // Auswertung der Folgen an (`attachAbilities`) und liest hier: tödlicher Anlegeschaden (HP <= Schaden) ist nie erlaubt, und der
+    // Schaden muss sich lohnen (Nutzen > 0, sonst bleibt die Karte auf der Hand). Zahl oder `(engine, pi, heroIdx) => Zahl`.
+    attachDamage: ATTACH_DAMAGE,
     // CPU ability-placement bias: prefer Heroes that already have a
     // Divinity stack (1-2 deep — full Lv3 zones aren't legal for
     // Performance per its customPlacement gate). When such heroes
@@ -38,6 +44,7 @@ module.exports = {
       for (let hi = 0; hi < heroes.length; hi++) {
         const hero = heroes[hi];
         if (!hero?.name || hero.hp <= 0) continue;
+        if (hero.hp <= ATTACH_DAMAGE) continue;   // würde den Anlegeschaden nicht überleben: kein Vorzugsziel (sonst bliebe sonst gar kein Kandidat)
         if (ps.abilityGivenThisTurn?.[hi]) continue;
         const abZones = ps.abilityZones?.[hi] || [];
         for (let z = 0; z < 3; z++) {

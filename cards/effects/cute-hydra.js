@@ -425,6 +425,8 @@ module.exports = {
         // W71a (Al): "place that many Head Counters +1 on it" = X+1. W74b: bei Boris-Verzicht ist X die Groesse des Stapels.
         const x = skipped ? batchSize : discarded;
         const gained = x + HEAD_BONUS;
+        // Klang: kein Aufruf noetig - der Client vergleicht die Zaehler-Summen je Zustand (`ppZaehlerSummen`, app-board.jsx) und spielt bei jedem
+        // Anstieg von `headCounter` (wie bei allen Feldern `…Counter(s)`) den Zaehler-Klang.
         inst.counters.headCounter = (inst.counters.headCounter || 0) + gained;
         engine.log('cute_hydra_head_counters', {
           player: ps.username, gained, discarded,
@@ -493,6 +495,9 @@ module.exports = {
     const heads = inst.counters?.headCounter || 0;
     if (heads <= 0) return false;
 
+    // „Up to as many different targets as Head Counters": die Zahl begrenzen nur die Counter - NICHT die Ein-Ziel-Flaggen des Helden in
+    // der Spalte (Toras „never more than 1 target with an Attack", Ida, Friedhelm): der Hydra-Schlag ist weder Attack noch Zauber des Helden
+    // (`promptMultiTarget` nimmt Kreatureneffekte davon aus, Befund 31.10.: Hydra in Toras' Spalte traf nur 1 Ziel).
     const selected = await ctx.promptMultiTarget({
       side: 'any',
       types: ['hero', 'creature'],

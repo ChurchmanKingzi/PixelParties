@@ -126,6 +126,8 @@ module.exports = {
 
   canActivate(gs, pi, engine) {
     const ps = gs.players[pi];
+    // X-Kosten (halber Preis der ausgerüsteten Karte): ein kostenloses Artefakt kostet 0 - die Hand graut die Karte darum nicht am
+    // Grundpreis 1 aus (`selfPricedArtifacts`, server.js); die Galerie unten filtert nach den echten Kosten.
     if (!_hasHeroWithFreeZone(ps, engine, pi)) return false;
     const gallery = _buildEligibleGallery(gs, pi, engine);
     return gallery.length > 0;
