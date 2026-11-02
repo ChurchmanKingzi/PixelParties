@@ -8,6 +8,18 @@ import catalog as C
 # Von Hand aussortiert: Ausschnitt trifft das Motiv nicht (dünne Gegenstände, Lücken zwischen Objekten …)
 BLOCK = {'Bamboo Staff', 'Bamboo Shield'}
 
+# Von Hand gesetzte Motivmitte (x, y) in Pixeln der Original-Kartenkunst (76x51): der Ausschnitt wird genau darauf zentriert
+SUBJECT = {
+    'Toughness': (26, 28), 'Wisdom': (30, 28), 'Cannibalism': (41, 27), 'Terror': (31, 24),
+    'Toras, Master of all Weapons': (40, 26), 'Alice, the Puppeteer Girl': (38, 27), 'Andras, the Human Weapon': (37, 25),
+    'Card Game Player Inya': (37, 14), 'Arcane Lamp': (38, 21), 'Sky Shaman': (37, 17), 'Cute Starlet Megu': (39, 25),
+    'Sky Archeologist': (42, 22), 'Cuteness Sensor': (38, 27), 'Deepsea Witch': (41, 31), 'Siphem, the Deepsea Demon': (38, 30),
+    'Deepsea Werewolf': (37, 29), 'Sinister Idol': (39, 26), 'Pinta, the Singing Ship': (45, 24), 'Cardinal Beast Xuanwu': (39, 28),
+    'Xiong, the Bamboo Guardian': (37, 28), 'Dive Bomblebee': (36, 24), 'Secret Blue Spice': (38, 26), 'Gigantisaur Spinor': (49, 22),
+    'Cuberto, Supreme Lord of Edges': (38, 20), 'Moonlight Butterfly': (39, 24),
+}
+PAD = 8          # so viele Original-Pixel darf der Ausschnitt über den Bildrand hinausragen (Randpixel werden fortgesetzt)
+
 _prep_cache = {}
 _best_cache = {}
 
@@ -21,6 +33,8 @@ def _prep(name, k):
         _prep_cache[key] = None
         return None
     im = a.convert('RGB')
+    if im.width >= 148:                    # hochaufgelöste Kunst (152x102) auf die übliche Pixelgröße bringen
+        im = im.resize((im.width // 2, im.height // 2), Image.NEAREST)
     if k > 1:
         im = im.resize((im.width * k, im.height * k), Image.NEAREST)
     x = np.asarray(im).astype(np.int32)
@@ -67,6 +81,15 @@ def best_crop(name, tw, th, k):
     im = p['im']
     W_, H_ = im.size
     tw, th = min(tw, W_), min(th, H_)
+    if name in SUBJECT:
+        # Motivmitte von Hand gesetzt; Ausschnitt darf bis PAD Pixel über den Rand reichen (Randpixel werden fortgesetzt)
+        pad = PAD * k
+        arr = np.pad(np.asarray(im), ((pad, pad), (pad, pad), (0, 0)), mode='edge')
+        sx, sy = SUBJECT[name]
+        x = int(round(min(max(sx * k - tw / 2, -pad), W_ - tw + pad))); y = int(round(min(max(sy * k - th / 2, -pad), H_ - th + pad)))
+        crop = Image.fromarray(arr[y + pad:y + pad + th, x + pad:x + pad + tw])
+        _best_cache[key] = (crop.convert('RGBA'), 2.0)
+        return _best_cache[key]
     if p["bgfrac"] > 0.55:
         # Motiv auf ruhigem Grund: nur brauchbar, wenn das ganze Motiv in den Ausschnitt passt und ihn ordentlich füllt
         x0, y0, x1, y1 = p['bb']

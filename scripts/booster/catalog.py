@@ -35,8 +35,8 @@ PACK_SETS = {
 # „Trials and Tribulations“ = alles, was in keinem anderen Set-Pack landet (ART, THW, WAW, SOB, CROSS, DIB, ASQ, CRESTMAS, ...)
 
 
-# Karten, die trotz anderer Set-ID zu „Dreadful Future“ gehören: Archetypen Lunatic und Guardian Beasts sowie das Kartenset um Damus, Ifrit und Armageddon
-FUTURE_ARCHETYPES = {'Lunatic', 'Guardian Beasts'}
+# Karten, die trotz anderer Set-ID zu „Dreadful Future“ gehören: Archetypen Lunatic, Guardian Beasts und Cybug sowie das Kartenset um Damus, Ifrit und Armageddon
+FUTURE_ARCHETYPES = {'Lunatic', 'Guardian Beasts', 'Cybug'}
 FUTURE_NAMES = {'Damus, the Prophet of Apocalypse', 'Ifrit', 'Armageddon'}
 
 

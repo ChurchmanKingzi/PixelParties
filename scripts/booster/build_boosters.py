@@ -317,7 +317,7 @@ def sprite_k(im, maxw, maxh, kmax=6):
 
 
 FOOT = {'Alice, the Puppeteer Girl': 27}      # letzte Körperzeile im Original-Sprite (Puppen schweben darunter)
-HOVER = {'Cool Rescuer Monia': 26, 'Monia Bot, the Foretold Rescuer of Coolness': 26}      # fliegen mit Jetpack: Pixel über dem Boden
+FLY = {'Cool Rescuer Monia': 197, 'Monia Bot, the Foretold Rescuer of Coolness': 221, 'Cute Angel Molinda': 201}      # Flieger (Jetpack, Flügel): Unterkante des Sprites; Schatten bleibt am Boden
 PILE = {'Treasure Huntress Semi': (33, 51)}   # Semi steht auf dem Münz- und Edelsteinberg ihrer Kartenkunst (Zeilen der Kunst)
 SOLO_K = 3                                    # einheitliche Pixelgröße für alle Solo-Motive (Hero Packs, Monia)
 INNER = np.zeros((H, W), bool)
@@ -385,18 +385,20 @@ def place_sprite(P, ref, cx, base_y, k=SOLO_K, shadow=True):
     im, bb = load_solo(ref)
     if im is None:
         return None
-    hover = HOVER.get(ref, 0)
     ground = base_y
-    base_y = base_y - hover
-    while k > 1 and (im.width * k > IW - 12 or im.height * k > base_y - IY0 - 6):
-        k -= 1
+    if ref in FLY:
+        base_y = FLY[ref]
+        ground = IY1 - 9
+    # Pixelgröße bleibt immer k (einheitlich bei allen Solo-Motiven)
     s = G.scaled(im, k)
-    x = int(cx - s.width // 2)
+    ma = np.asarray(s)[..., 3] > 127
+    mxc = np.where(ma)[1].mean()                  # Schwerpunkt statt Mitte des Umrisses: die Figur sitzt optisch mittig
+    x = int(round(cx - mxc))
     y = int(base_y - s.height)
     if shadow:
         a0 = np.asarray(im)[..., 3] > 127
-        if hover:
-            G.ground_shadow(P, cx, ground - 2, 20, 3)
+        if ref in FLY:
+            G.ground_shadow(P, cx, ground, 20, 3)
         else:
             foot = FOOT.get(ref)
             if foot:
@@ -500,10 +502,39 @@ def tpl_mosaic(P, th, mt, pack, v):
     return names
 
 
-def tpl_hero(P, th, mt, hero, **kw):
+def draw_explosion(P, cx, cy, R=66, seed=5):
+    """Pixel-Explosion (Zellen 3x3 wie die Sprites): Zackenstern in vier Gluttönen, dunkle Kante, Funken."""
+    gold = G.metal('gold')
+    rng = np.random.RandomState(seed)
+    n = 13
+    rad = R * (0.62 + 0.38 * rng.rand(n))
+    rad[::2] *= 0.68
+    cxx = (XX // 3) * 3 + 1; cyy = (YY // 3) * 3 + 1
+    ang = np.arctan2(cyy - cy, cxx - cx); dist = np.hypot(cxx - cx, cyy - cy)
+    t = (ang + np.pi) / (2 * np.pi) * n
+    i0 = np.floor(t).astype(int) % n; i1 = (i0 + 1) % n; f = t - np.floor(t)
+    r = rad[i0] * (1 - f) + rad[i1] * f
+    q = dist / np.maximum(r, 1)
+    out = (q <= 1.0) & INNER
+    edge = out & (q > 0.86)
+    dark = pal.hexrgb('#4a0a00')
+    P.paint(G.dilate(out, 2) & ~out & INNER, dark, wt=0.6)
+    for lo, hi, col in ((0.0, 0.3, gold[4]), (0.3, 0.55, gold[0]), (0.55, 0.78, gold[1]), (0.78, 0.9, gold[2]), (0.9, 1.01, gold[3])):
+        P.paint(out & (q >= lo) & (q < hi), col, wt=1.0)
+    # Funken / Trümmer
+    for _ in range(14):
+        a = rng.rand() * 6.283; d = R * (0.95 + 0.5 * rng.rand())
+        x = int(cx + d * np.cos(a)) // 3 * 3; y = int(cy + d * np.sin(a)) // 3 * 3
+        m = G.rect_mask(x, y, x + 3, y + 3) & INNER
+        P.paint(m, [gold[0], gold[1], gold[4]][rng.randint(0, 3)], wt=1.0)
+
+
+def tpl_hero(P, th, mt, hero, fx=None, **kw):
     """Ein Held in einheitlicher Pixelgröße auf Strahlenkranz."""
     art_burst(P, th, rot=0.2)
     art_particles(P, th, 11)
+    if fx == 'explosion':
+        draw_explosion(P, IX0 + IW // 2, IY0 + 84)
     if hero in PILE:
         draw_pile(P, hero, IX0 + IW // 2, IY0 + 126)
     place_sprite(P, hero, IX0 + IW // 2, IY0 + 126, shadow=hero not in PILE)
@@ -577,7 +608,7 @@ def render_pack(pack, vi, template, theme, content):
     elif template == 'grid':
         subjects = tpl_grid(P, th, mt, content['tiles'], v=vi, pack=pack)
     elif template == 'hero':
-        subjects = tpl_hero(P, th, mt, content['hero'])
+        subjects = tpl_hero(P, D.THEMES[content.get('bg', theme)], mt, content['hero'], fx=content.get('fx'))
     elif template == 'scene':
         subjects = tpl_scene(P, th, mt, content['window'], pack=pack, rot=0.3 + vi * 0.37)
     elif template == 'focus':
