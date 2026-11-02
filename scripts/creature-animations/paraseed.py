@@ -18,13 +18,14 @@ Was im Sprite ist (Koordinaten im Sprite 7×10, x/y ab 0):
 Fest bleiben: der Stängelfuß (Zeile 9) und der Umriss, soweit er sich nicht mit der Pflanze neigt.
 
 Ablauf (48 Frames à 65 ms = 3,12 s, nahtlos):
-* Wiegen (Periode 24, zwei Wiegen je Schleife): die ganze Blume neigt sich um den festen Stängelfuß hin und her (Zeilenversatz wächst nach oben, Spitze bis ±2 px; Nachbarzeilen unterscheiden sich um höchstens
-  1 px, der Stängel biegt sich dabei in einer weichen Kurve), darüber eine zweite, schnellere Neigung der Knospe (Periode 12, ±1 px, nur Zeilen 0–3), so dass die Blüte nicht starr mitschwingt.
-* Blütenblätter (Periode 16 = drei Zyklen): die beiden äußeren Blütenblatt-Spitzen heben sich 1 px (Umrisspixel (0,0) und (6,0) kommen dazu, die Spitzen werden länger) und senken sich wieder — die Blüte
-  öffnet und schließt sich leicht.
-* Atmen (Periode 24, Frames 2–10 und 26–34): der Kelch streckt sich 1 px (Zeile 4 verdoppelt, Texturmischung der Nachbarzeile via `A.koerper_pose`, die Knospe steigt), Zeile 9 bleibt am Boden.
-* Sporen (Partikel): drei kleine runde 2×2-Pollenwölkchen (Hellrosa/Rosa des Sprites) lösen sich über der Knospe und steigen langsam auf (24 Frames Lebenszeit, leicht pendelnd).
-Ergänzungen: Umrisspixel A bei den Blütenblatt-Spitzen (0,0)/(6,0) (nur in den „offenen“ Frames), sonst nur ggf. `umriss_ergaenzen` an freiliegenden Kelchkanten (0–2 Pixel je Frame).
+* Wiegen (Periode 24, zwei Wiegen je Schleife, dazu eine schnellere Nachschwingung der Periode 12): die ganze Blüte (Kelch samt Knospe und Blütenblättern, starr) wandert bis ±2 px hin und her; der Stängel
+  darunter BIEGT sich in einer weichen Kurve (Zeilenversatz wächst vom festen Fuß nach oben, Nachbarzeilen unterscheiden sich um höchstens 1 px, der Stängelkopf folgt der Blüte).
+* Blütenblätter (Periode 16 = drei Zyklen): die beiden äußeren Blütenblatt-Spitzen heben sich 1 px (Umrisspixel (0,0) und (6,0) kommen dazu) und senken sich wieder — die Blüte öffnet und schließt sich leicht.
+* Atmen (Periode 24, Frames 2–10 und 26–34): der Kelch streckt sich 1 px (Zeile 4 verdoppelt, Texturmischung der Nachbarzeile via `A.koerper_pose`, die Knospe steigt), der Stängelfuß bleibt am Boden.
+* Sporen (Partikel): drei kleine runde 2×2-Pollenwölkchen (Hellrosa/Rosa des Sprites, nie 1-px-Einzelpunkte) lösen sich über der Knospe und steigen langsam auf (24 Frames Lebenszeit, leicht pendelnd).
+Ergänzungen: (0) Brückenpixel (Stängelfarbe B bzw. A) dort, wo der schräg stehende 1-px-Stängel nur über eine Pixelecke hängt (A.verbinde4, 0–3 Pixel je Frame); (1) der Stängel ist um 3 Zeilen verlängert (Zeilen 10–12 des Skript-Sprites: B=(128,0,0) in Zeile 10–11 des Stängels, der dunkle Stängelfuß A=(102,0,0) rückt von Zeile 9 nach 12), damit er sich beim Wiegen
+sichtbar biegen kann; in der Kartenkunst verschwindet der Stängel hinter der Kapuze, die Verlängerung ist die dort verdeckte Fortsetzung. Frame 0 weicht deshalb vom extrahierten src-Sprite nur um diese 3 Stängelzeilen ab.
+(2) Umrisspixel A bei den Blütenblatt-Spitzen (0,0)/(6,0) in den „offenen“ Frames; sonst nur ggf. `umriss_ergaenzen` an freiliegenden Kelchkanten.
 Frame: Sprite plus 5 px links/rechts (Neigung), 12 px oben (Strecken + Sporen), 2 px unten — Figur zentriert. Alle Bewegungen laufen auf der vollen Leinwand. Nur ganze Pixel, nur Farben der Quelle.
 """
 import math
@@ -39,7 +40,14 @@ N, MS = 48, 65
 PAD_L, PAD_R, PAD_T, PAD_B = 5, 5, 12, 2
 TEST_EBENEN = ('fig',)
 
-spr = L.lade('paraseed')
+spr0 = L.lade('paraseed')                                                                 # extrahierter Sprite 7×10
+STAENGEL_PLUS = 3                                                                         # Ergänzung: Stängel um 3 Zeilen verlängert (siehe oben)
+_h0, _w0 = spr0.shape[:2]
+spr = np.zeros((_h0 + STAENGEL_PLUS, _w0, 4), np.uint8)
+spr[:_h0] = spr0
+spr[_h0 - 1:_h0 - 1 + STAENGEL_PLUS + 1, 2, :3] = (128, 0, 0)                                # Stängelzeilen 9–12 in B
+spr[_h0 - 1:_h0 - 1 + STAENGEL_PLUS + 1, 2, 3] = 255
+spr[_h0 - 1 + STAENGEL_PLUS, 2, :3] = (102, 0, 0)                                            # dunkler Fuß A ganz unten
 sh, sw = spr.shape[:2]
 H, W = sh + PAD_T + PAD_B, sw + PAD_L + PAD_R
 BODEN = PAD_T + sh - 1
@@ -55,28 +63,45 @@ def _col(y, x):
     return tuple(int(v) for v in spr[y, x, :3])
 
 
-assert _col(0, 3) == CE and _col(1, 0) == CA and _col(1, 6) == CA and _col(9, 2) == CA
+assert _col(0, 3) == CE and _col(1, 0) == CA and _col(1, 6) == CA and _col(sh - 1, 2) == CA and _col(9, 2) == CB
+KELCH_UNTEN = 6                                                                           # Quellzeilen 0–6 = Blüte (starr), 7… = Stängel (biegt sich)
 
 # ── Zeitachsen ──
 STRECK = [1 if math.sin(2 * math.pi * i / 24) >= 0.3 else 0 for i in range(N)]
 assert STRECK[0] == 0
 SPITZEN = [1 if math.sin(2 * math.pi * i / 16) > 0.35 else 0 for i in range(N)]       # 1 = Blütenblattspitzen gehoben
 assert SPITZEN[0] == 0
+SPOREN = [dict(x=3, vx=-1, off=0), dict(x=3, vx=2, off=8), dict(x=4, vx=0, off=16)]     # 2×2-Pollen über der Knospe (Sprite-Koordinaten)
 SPORENFARBEN = {'c': CE, 'r': CC}
-PUFFS = [
-    dict(x=PAD_L + 3, y=PAD_T - 3, vx=-1, vy=-7, off=0, form="s", wackeln=1),
-    dict(x=PAD_L + 3, y=PAD_T - 3, vx=2, vy=-7, off=8, form='s', wackeln=1),
-    dict(x=PAD_L + 4, y=PAD_T - 3, vx=0, vy=-7, off=16, form='s', wackeln=1),
-]
 
 
-def lean_dx(i, y_aus, h_aus):
-    """Seitlicher Versatz der Ausgabezeile y (0 = oberste Zeile der Blume, h_aus − 1 = Stängelfuß): Neigung um den festen Fuß.
-    f = Abstand zum Fuß / Höhe (0…1); die Knospe (f ≈ 1) bewegt sich am stärksten, der Stängel kaum."""
-    f = (h_aus - 1 - y_aus) / float(h_aus - 1)
-    grund = 2.2 * (f ** 1.25) * math.sin(2 * math.pi * i / 24)
-    zweit = 0.9 * (f ** 3) * math.sin(2 * math.pi * i / 12)
-    return int(round(grund + zweit))
+def bluete_dx(i):
+    """Seitlicher Versatz der ganzen Blüte (starr) im Frame i: Wiegen (Periode 24) + schnellere Nachschwingung (Periode 12), 0 in Frame 0."""
+    p = 2 * math.pi * i / 24
+    return int(round(2.0 * math.sin(p) + 0.7 * math.sin(2 * p)))
+
+
+def staengel_dx(i, quelle_zeile):
+    """Versatz einer Stängelzeile (Quellzeile ≥ 7): wächst vom festen Fuß (Zeile sh−1: 0) zur Blüte hin bis fast zum Versatz der Blüte."""
+    f = (sh - 1 - quelle_zeile) / float(sh - 1 - (KELCH_UNTEN + 1) + 1)                   # Fuß 0 … Stängelkopf < 1
+    return int(round(bluete_dx(i) * f ** 1.3))
+
+
+def sporen_ebene(i):
+    e = L.leer(H, W)
+    for sp in SPOREN:
+        t = ((i + sp['off']) % 24) / 24.0
+        if t > 0.92:
+            continue
+        cx = PAD_L + sp['x'] + int(round(sp['vx'] * t + math.sin(2 * math.pi * t) * 1.0))
+        cy = PAD_T - 4 - int(round(7 * t))
+        for (dx, dy, k) in L.PUFF_FORMEN['s']:
+            X, Y = cx + dx, cy + dy
+            if not (2 <= X < W - 2 and 2 <= Y < H - 2):
+                raise L.ClipError(f'Spore bei ({X},{Y}) zu nah am Rand des Frames {W}×{H}')
+            e[Y, X, :3] = SPORENFARBEN[k]
+            e[Y, X, 3] = 255
+    return e
 
 
 def sprite_mit_effekten(i):
@@ -92,20 +117,19 @@ def figur(i):
     sp = sprite_mit_effekten(i)
     koerper = A.zeilen_von(sp, 0, sh - 1, H, W, PAD_L, PAD_T)
     z, quelle = A.koerper_pose(koerper, doppeln={4: 1} if STRECK[i] else {}, p=0, x0=PAD_L)
-    n = z.shape[0]
-    dxs = [lean_dx(i, j, n) for j in range(n)]
+    dxs = [bluete_dx(i) if q <= KELCH_UNTEN else staengel_dx(i, q) for q in quelle]
     z = A.verschiebe_ausgabezeilen(z, dxs)
     fig, top = A.auf_leinwand(z, H, BODEN, 0)
     fig, neu = A.umriss_ergaenzen(fig, RAND_FARBEN, lambda x, y: CA)
-    return dict(fig=fig, top=top, neu=neu, dxs=dxs)
+    fig, brueck = A.verbinde4(fig)                                                         # schräg stehender 1-px-Stängel: Brückenpixel machen ihn 4-verbunden
+    return dict(fig=fig, top=top, neu=neu, dxs=dxs, brueck=brueck)
 
 
 def frame(i, nur=None):
     f = figur(i)
     if nur is not None:
         return f['fig']
-    sporen = L.puff_ebene(H, W, i, 24, PUFFS, SPORENFARBEN)
-    return L.zusammen(H, W, [(sporen, 0, 0), (f['fig'], 0, 0)])
+    return L.zusammen(H, W, [(sporen_ebene(i), 0, 0), (f['fig'], 0, 0)])
 
 
 if __name__ == '__main__':
@@ -116,6 +140,7 @@ if __name__ == '__main__':
     ref = L.platz(spr, H, W, PAD_L, PAD_T)
     print('Frame 0 weicht vom Original in', int((figs[0] != ref).any(axis=2).sum()), 'Pixeln ab')
     print('ergänzte Umrisspixel je Frame:', [len(f['neu']) for f in fs])
+    print('Brückenpixel je Frame:', [len(f['brueck']) for f in fs])
     print('größter Zeilenversatz-Sprung zwischen Nachbarzeilen:', max(max(abs(d[k + 1] - d[k]) for k in range(len(d) - 1)) for d in (f['dxs'] for f in fs)))
     n = L.pruefe(frames, quelle=spr)
     print('Pixel je Frame:', n)

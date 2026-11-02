@@ -17,12 +17,18 @@ Identifikation (Sprite 25×19, orangebraunes Eichhörnchen im Profil, schaut nac
 * Fäden (1 px, wellig): S1 (dunkelrot B) vom Schwanz nach oben-links (4,0)…(5,7); S5 (navy C) vom Schwanzansatz nach unten-links (6,13)…(3,15); S2 (C) (13,2)…(14,9), S3 (B) (17,2)…(17,9),
   S4 (B) (22,2)…(22,9) steigen vom Rücken/Kopf nach oben (≈ 7 px); S6 (C) hängt zwischen den Beinen nach unten (16,13)…(16,18). Sie sind Teil der Kunst (Infektion/Parasitenfäden).
 * Kein Glanz (Fell, Regel 14; das weiße Pixel ist ein Augenglanz im Fell, keine Metall-/Edelsteinfläche) — bleibt fest. Keine Partikel.
-Bleibt fest: Kopfmuster (Auge, Nase), Beine/Pfoten, Infektionsflecken. Keine Blinzel-/Blickbewegung (Auge nicht eindeutig lesbar).
+Bleibt fest: Kopfmuster (Auge, Nase), Infektionsflecken. Keine Blinzel-/Blickbewegung (Auge nicht eindeutig lesbar).
+
+Runde 2 (Nutzerkorrektur wörtlich: „die Füße/Beinchen sollen sich bewegen.“): Das Eichhörnchen ist im Sprung-/Laufstil gezeichnet (Körper waagerecht, Schwanz zurück). Die zwei Beinchen sind jetzt EIGENE Ebenen und laufen am Ort:
+* Hinterbein = Pixel x 8–14, Zeilen 13–16 (Oberschenkel Zeile 13 = Hüfte, bleibt am Körper; Zeilen 14–16: braun/orange I/C/M mit zwei blassrosa Ballenpixeln L/N (12–13,14), Fuß unten bei (8–11, 15–16) mit marineblauem Umriss D),
+  Vorderbein = Pixel x 15–19, Zeilen 13–16 (braun M/I, rosa Ballen N (16,14) und L (15,13), blaugrüner Teil G/F, Fußumriss D bei (16–17,15) und (18–20,16)). Die Fadenpixel (S6 hängt zwischen den Beinen) gehören nicht zu den Beinen.
+* Die Beine „strampeln“ abwechselnd (Gegentakt): jede Zeile unter der Hüfte wandert waagerecht (Scherung, Fuß bis ±2 px nach vorn/hinten) und der Fuß hebt in der Schwungphase 1 px (eine Beinzeile entfällt); Periode 12 Frames (4 Zyklen pro Schleife).
+* Der frühere Hüpfer (das ganze Tier hebt ab) ist ersetzt durch ein 1-px-Wippen im Takt der Schritte (Rumpf mit Beinen und Fäden, 2× pro Zyklus), denn ein Bodenwesen soll nicht hüpfen.
 
 Ablauf (48 Frames à 70 ms = 3,4 s), alle Bewegungen unabhängig:
 * Schwanzwippen (Periode 16, 3× pro Schleife): die Schwanzspalten links der Naht (x 0–5) wandern senkrecht, je weiter außen desto mehr (bis ±2 px); die beiden Fäden S1/S5 am Schwanz
   gehen mit derselben Spaltenverschiebung mit.
-* Hüpfer (Periode 24, 2× pro Schleife): das ganze Tier (mit allen Fäden) hebt 1–2 px ab und landet wieder; kurzes „Zucken“ des Eichhörnchens.
+* (ersetzt) Hüpfer → Wippen 1 px im Schritttakt, siehe oben.
 * Fäden wiegen (je ein Fenster von 18–20 Frames, 1,5 Schwingungen, Hüllkurve sin(πu); S2 ab Frame 2, S3 ab 14, S4 ab 26, S6 ab 28): die Fäden S2/S3/S4 pendeln oben bis ±2 px seitlich
   (der Ansatz am Körper bleibt), S6 unten; eine Laufwelle (Phasenverzug zur Spitze) lässt sie wellen. Reißt die Kette durch den Versatz auf, wird ein Pixel in Fadenfarbe nachgezogen (siehe unten).
 * Ohrzucken (Frames 10–12 und 30–32): die oberste Ohrzeile (17–19, 7) kippt 1 px nach vorn (rechts).
@@ -38,6 +44,7 @@ import numpy as np
 
 import anim_lib as L
 import anim_tiere as T
+import anim_tier as G
 
 N, MS = 48, 70
 PAD_L, PAD_R, PAD_T, PAD_B = 2, 3, 5, 2
@@ -65,12 +72,15 @@ for (x, y) in ALLE:
 
 ohr = vorhanden & (yy == 7) & (xx >= 17) & (xx <= 19)
 schwanz = vorhanden & ~faden_m & (xx <= 5)
-koerper = vorhanden & ~faden_m & ~schwanz & ~ohr
+bein_h = vorhanden & ~faden_m & (yy >= 13) & (xx >= 8) & (xx <= 14)                    # Hinterbein (Zeile 13 = Hüfte)
+bein_v = vorhanden & ~faden_m & (yy >= 13) & (xx >= 15) & (xx <= 19)                   # Vorderbein
+koerper = vorhanden & ~faden_m & ~schwanz & ~ohr & ~bein_h & ~bein_v
 
 RAND = T.rand_farben(spr)
 REGEL = T.umriss_regeln(spr, RAND)[2]
 
-HUEPFER = [0, 0, 0, 0, 1, 2, 2, 1, 0] + [0] * 15                        # Periode 24
+ZYKLUS = 12                                                        # Frames je Schrittzyklus (4 Zyklen pro Schleife)
+WIPPEN = [0, 1, 1, 0, 0, 0]                                        # Periode 6 (2× je Zyklus): 1 = Tier 1 px höher
 FENSTER = {'S2': (2, 20), 'S3': (14, 20), 'S4': (26, 20), 'S6': (28, 18)}   # (Start, Länge) in Frames
 OHR = {10, 11, 12, 30, 31, 32}
 
@@ -131,8 +141,21 @@ def wiegen(i, name, pix):
     return out
 
 
+def bein_pose(i, versatz):
+    """(dx, lift): dx = Fußversatz nach vorn (+, rechts) / hinten, lift = 0/1 (Schwungphase: der Fuß hebt)."""
+    dx, lift = G.gang(i / float(ZYKLUS) + versatz, 2.0, 0.5, 1.0)
+    return -G.runde(dx), int(round(lift))                           # Tier schaut nach rechts: Schwung = vorwärts = rechts
+
+
+def bein_ebene(maske, dx, lift):
+    t = teil(maske)
+    rows = {PAD_T + 14: G.runde(dx / 3.0), PAD_T + 15: G.runde(2 * dx / 3.0), PAD_T + 16: dx}
+    t = G.zeilen_versatz(t, rows)
+    return L.heben_unten(t, PAD_T + 15, lift) if lift else t
+
+
 def frame(i, nur=None):
-    hub = HUEPFER[i % 24]
+    hub = WIPPEN[i % 6]
     amp = 1.8 + 0.6 * (0.5 - 0.5 * math.cos(2 * math.pi * i / N))        # Hub des Schwanzes ±1,8 … ±2,4
     ph = L.sinus(i, 16)
     ebenen = {}
@@ -152,6 +175,8 @@ def frame(i, nur=None):
                 raise L.ClipError(f'Schwanzspalte {x} würde aus der Leinwand geschoben')
             sw_[ny, x] = t[y, x]
     ebenen['schwanz'] = sw_
+    ebenen['bein_h'] = bein_ebene(bein_h, *bein_pose(i, 0.0))
+    ebenen['bein_v'] = bein_ebene(bein_v, *bein_pose(i, 0.5))
     for name in ('S1', 'S5'):                                     # Schwanzfäden: gleiche Spaltenverschiebung wie der Schwanz
         pix = FAEDEN[name]
         ebenen[name] = kette(pix, [(0, schwanz_dy(x, amp, ph)) for (x, y) in pix], 0)

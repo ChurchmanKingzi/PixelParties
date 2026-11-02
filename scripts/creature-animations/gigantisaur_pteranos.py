@@ -10,6 +10,14 @@ Quelle: src/gigantisaur-pteranos.png — der ganze Flugsaurier (73×49 px, 14 Fa
   der Figur gerastet: (25,4,3)/(77,46,43)/(57,27,25)/(111,67,66)/(122,84,73) stammen aus Ebene 239, dazu aus der Kunst die Haut-Lichtfarbe (151,100,81) und die Augenfarben (158,82,80)/(86,14,12) (bei der Prüfung `erlaubt`:
   Farben der Kartenkunst). Danach: Löcher gefüllt (5 px), 3 verstreute Pixel entfernt, die Flügelspitze am Kartenrand mit zwei Umrisspixeln (71–72, 0) geschlossen.
 
+RUNDE 2 (Nutzer: „fehlt ein Stück vom Gesicht? Und die Flügelanimation (die nur einen Flügel animiert…) sieht schrecklich aus“):
+* GESICHT: Beim Herauslösen aus der Kartenkunst waren die hellen Schnabelfarben und das Gesichtsbraun am Schnabelansatz durchs Raster gefallen: unter dem Auge fehlte das Stück zwischen Kopf und Schnabel.
+  Ergänzt (Pixel aus der Kartenkunst, auf die Figurfarben gerastet; src/gigantisaur-pteranos.png neu): (19,26)(18,27) Kopfbraun (111,67,66); (20,26)(19,27)(17,28)(18,28) Creme (255,240,202);
+  (21,26)(20,27)(21,27)(19,28) Pfirsich (255,190,151); (20,28)(21,28) Hellbraun (223,165,117); (16,28)(22,28) Schnabelumriss (59,34,4). Auf Nachbarebenen liegt nichts davon (die Kopf-/Flügelpixel stehen in keiner xcf-Ebene).
+* FLÜGEL: Die Figur hat ZWEI Flügel in Flügelhautfarbe (122,84,73)/(151,100,81): den langen Flügel rechts oben UND das rosabraune Blatt links über dem Schnabel (x 13–19, y 11–26; vorher „Haube“ genannt).
+  Das dunkle Horn daneben (x 21–26, y 11–22, Kopffarbe) ist KEIN Flügel. Beide Flügel schlagen jetzt gemeinsam. Statt die Flügel als starre Stäbe zu drehen, BIEGT sich jeder entlang seiner Mittellinie (Rückwärtsabbildung
+  um eine gekrümmte Achse: Spitze schlägt am weitesten und hinkt der Wurzel nach, die Wurzel bleibt am Rumpf) — die Textur wird nicht kopiert, nur Pixel der Quelle neu abgetastet.
+
 Aufruf:   python3 gigantisaur_pteranos.py [--preview <ordner>]
 Ausgabe:  ../../data/creature-animations/gigantisaur-pteranos.png + .json  (Frame auf die Figur zugeschnitten)
 

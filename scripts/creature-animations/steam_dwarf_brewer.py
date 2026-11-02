@@ -27,11 +27,11 @@ Metall im Sprite: Rohre, Metallstreifen, Fass (Regel 14) — nur dort Glanz; die
 Ablauf (48 Frames à 62 ms = 2,98 s, nahtlos):
 * Auf und ab (Periode 24 = zweimal pro Schleife): Brust zuerst 1 px (Bartzeile 21 wird einmal doppelt eingefügt: Kopf, Rohre, Bart (samt Spritzern), Ärmel steigen), das Fass bleibt stehen.
 * Dampfrohre zittern (Dampfdruck): die obersten drei Rohrzeilen jedes Rohrs schlagen ±1 px seitlich aus (links/rechts Periode 12 gegenphasig, Mitte Periode 16), jedes Rohr bleibt 4-verbunden.
-* Rechter Ärmel (Hand am Fass) tippt/rührt: er sinkt 1 px (Frames 6–11, 30–35) und hebt sich wieder; das Fass darunter ist vollständig, es wird nichts Fehlendes freigelegt.
+* Rechter Ärmel (Hand am Fass) tippt/rührt: er hebt sich 1 px (Frames 6–11, 30–35) und sinkt wieder; das Fass darunter ist vollständig, es wird nichts Fehlendes freigelegt.
 * LAVA-SUPPE im Fass (Regel 15/29, „Lava wie Magma“): die 17 Suppenpixel wandern auf der Farbrampe (255,186,90) < (255,211,107) < (255,231,148) < (255,255,189) als Wellenmuster (je Pose 2 Frames, 12 Posen, Periode 24 Frames),
   die obere Randzeile (y 22) schwappt (Pixel wechseln zwischen Suppe und Stahl), zwei Blasen (hellste Farbe) steigen in der Suppe auf und platzen (Periode 24, gegeneinander versetzt). Kein Glanz.
 * LAVA-SUPPE-Spritzer im Bart: die 33 Spritzerpixel driften langsam auf derselben Rampe (±1 Stufe, Periode 16 bzw. 24, je Pixel entgegengesetzt), Frame 0 = Original.
-* Dampf: aus allen drei Rohren steigen kleine runde Wölkchen (anim_dwarf.puff: 2×2 → 5×3/4×4 → 2×2, Weiß/Hellgrau aus dem Bart) langsam bis 8 px auf, je Rohr zwei Wölkchen um eine halbe Periode versetzt (Periode 24), und zwei
+* Dampf: aus allen drei Rohren steigen kleine runde Wölkchen (anim_dwarf.puff: 2×2 → 5×3/4×4 → 2×2, Weiß/Hellgrau aus dem Bart) langsam bis 7 px auf, je Rohr zwei Wölkchen um eine halbe Periode versetzt (Periode 24), und zwei
   Wölkchen steigen aus der heißen Suppe (rechts am Fass) auf.
 * Metall glänzt (Regel 12/14: nur Metall): ein Lichtband läuft zweimal pro Schleife (Frames 3–16 und 27–40) diagonal über Rohre und Metallstreifen, danach (Frames 9–22 und 33–46) über das Stahlfass; je ein vierzackiger
   Glitzer-Stern an der linken Rohrspitze (Frames 10–13), an der rechten (26–29) und am Metallstreifen rechts (40–43).
@@ -48,7 +48,7 @@ import anim_humanoide as Hm
 import anim_lib as L
 
 N, MS = 48, 62
-PAD_L, PAD_R, PAD_T, PAD_B = 6, 3, 12, 3
+PAD_L, PAD_R, PAD_T, PAD_B = 4, 4, 11, 2
 
 spr = L.lade('steam-dwarf-brewer')                    # Komposit (Zwerg + Fass + Spritzer + Suppe): Referenz für Ruhepose und Randpixel-Test
 zw = L.lade('steam-dwarf-brewer-zwerg')               # nur der Zwerg (24×28) — alle Masken/Koordinaten unten beziehen sich auf ihn
@@ -180,9 +180,9 @@ def frame(i, dampf=True, nur=None):
         kp = L.streck_zeile(kp, PAD_T + 21, brust)
         al = L.streck_zeile(al, PAD_T + 21, brust)
         ar = L.streck_zeile(ar, PAD_T + 21, brust)
-    # --- rechter Ärmel (Hand am Fass) sinkt 1 px; das Fass darunter ist vollständig ---
+    # --- rechter Ärmel (Hand am Fass) hebt sich 1 px; das Fass darunter ist vollständig ---
     if Hm.folge(i, 6, [1] * 6, N) or Hm.folge(i, 30, [1] * 6, N):
-        ar = L.versetze(ar, 0, 1)
+        ar = L.versetze(ar, 0, -1)
     # --- das Fass liegt hinter dem Zwerg; Stahl glänzt, Suppe wallt ---
     fa = L.platz(FASS, H, W, FASS_OFF[0], FASS_OFF[1])
     for start in (9, 33):
@@ -201,8 +201,8 @@ def frame(i, dampf=True, nur=None):
         py = PAD_T - 2
         spec = []
         for cx, off0, form in ((PAD_L + 2, 0, 'm'), (PAD_L + 11, 8, 'o'), (PAD_L + 19, 16, 'm')):
-            spec.append(dict(x=cx, y=py, vx=0, vy=-8, off=off0, form=form, wackeln=0.8))
-            spec.append(dict(x=cx, y=py, vx=0, vy=-8, off=off0 + 12, form='o' if form == 'm' else 'm', wackeln=-0.8))
+            spec.append(dict(x=cx, y=py, vx=0, vy=-7, off=off0, form=form, wackeln=0.8))
+            spec.append(dict(x=cx, y=py, vx=0, vy=-7, off=off0 + 12, form='o' if form == 'm' else 'm', wackeln=-0.8))
         for cx, off0 in ((PAD_L + 31, 3), (PAD_L + 32, 15)):                         # heiße Suppe dampft (rechts am Fass, über dessen Oberkante)
             spec.append(dict(x=cx, y=PAD_T + 14, vx=1, vy=-7, off=off0, form='m', wackeln=0.6))
         ebenen.append((Dw.puff(H, W, i % 24, 24, spec, {'c': WEISS, 'r': HELLGRAU}), 0, 0))
