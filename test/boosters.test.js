@@ -42,3 +42,12 @@ test('Öffnungsanimation: Zeitleiste und Effektebenen je Pack vorhanden', () => 
   }
   for (const f of ['cut-top.png', 'cut-body.png']) assert.ok(fs.existsSync(path.join(dir, 'opening', f)), f);
 });
+
+test('Öffnungsanimation: jeder Klang der Zeitleiste liegt als .ogg in public/sounds', () => {
+  const o = JSON.parse(fs.readFileSync(path.join(dir, 'opening', 'opening.json'), 'utf8'));
+  assert.ok(o.sounds.length >= 20);
+  for (const s of o.sounds) {
+    assert.ok(s.f >= 0 && s.f < o.frames, s.name + ' Bild');
+    assert.ok(fs.existsSync(path.join(__dirname, '..', 'public', 'sounds', s.name + '.ogg')), s.name + '.ogg fehlt');
+  }
+});
