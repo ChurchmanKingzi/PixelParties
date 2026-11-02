@@ -19,7 +19,7 @@ Metall im Sprite: nichts → KEIN Glanz (Regel 14); kein Feuer, kein Dampf, kein
 
 Ablauf (48 Frames à 62 ms = 2,98 s, nahtlos):
 * Atmen (Periode 24 = zweimal pro Schleife): die Kragenzeile 9 wird einmal doppelt eingefügt (L.streck_zeile): der Kopf mit Ohren und Haar steigt 1 px, das untere Schulterstück und der Streifen bleiben stehen (Kopf hebt/senkt, nie seitlich).
-* Schreckzittern (Frames 14–19 und 38–43): der Kopf zittert in diesen Fenstern jeden zweiten Frame 1 px auf und ab (nur senkrecht).
+* Schreckzittern (Frames 14–19 und 38–43): in diesen Fenstern steigt der Kopf jeden zweiten Frame 1 px höher (die Kragenzeile wird einmal öfter eingefügt), nur senkrecht.
 * Augen wandern: die Pupillen blicken nach rechts (Frames 8–15 und 32–39): links (8,5) → (9,5), rechts (11,5) → (12,5) (Pupille und Weiß tauschen), sonst blicken sie nach links (Original).
 * Blinzeln (Frames 20–22 und 44–46): beide Augen (Weiß und Pupillen) nehmen die umgebende Hautfarbe C (246,189,123) an (Lid = Hautfarbe), die Brauen bleiben.
 Frame 0 = Original (Ruhepose). Kontrolle: anim_humanoide.ruhepose / eckkontakt_typen / Randpixel-Test (Regel 16).
@@ -54,27 +54,13 @@ def frame(i, nur=None):
         Hm.setze(k, {(x, y): HAUT for (x, y) in ((8, 4), (9, 4), (8, 5), (9, 5), (11, 4), (12, 4), (11, 5), (12, 5))}, OFF)
     elif Hm.folge(i, 8, [1] * 8, N) or Hm.folge(i, 32, [1] * 8, N):
         Hm.setze(k, {(8, 5): WEISS, (9, 5): PUPILLE, (11, 5): WEISS, (12, 5): PUPILLE}, OFF)
-    # --- Atmen: Kragenzeile 9 wird einmal doppelt eingefügt, der Kopf steigt ---
-    brust = Hm.stufe(i, N / 2, 1)
-    if brust:
-        k = L.streck_zeile(k, PAD_T + 9, brust)
-    # --- Schreckzittern: Kopf jeden zweiten Frame 1 px höher (nur senkrecht) ---
-    if (Hm.folge(i, 14, [1] * 6, N) or Hm.folge(i, 38, [1] * 6, N)) and i % 2 == 1:
-        k = shift_kopf(k)
+    # --- Atmen + Schreckzittern: Kragenzeile 9 wird 1× (Atmen) bzw. 2× (Atmen + Zittern, jeden zweiten Frame im Zitterfenster) doppelt eingefügt, der Kopf steigt (nur senkrecht) ---
+    zittern = (Hm.folge(i, 14, [1] * 6, N) or Hm.folge(i, 38, [1] * 6, N)) and i % 2 == 1
+    n_ = Hm.stufe(i, N / 2, 1) + (1 if zittern else 0)
+    if n_:
+        k = L.streck_zeile(k, PAD_T + 9, n_)
     Hm.kontur_schliessen(k, ERLAUBT, (49, 24, 0))
     return k
-
-
-def shift_kopf(k):
-    """Kopf (Zeilen 0…8 des Sprites, über der Kragenzeile) 1 px höher; darunter bleibt alles stehen. Die entstehende Lücke in Zeile 8 wird mit der Kragenfarbe
-    der Zeile darunter nicht gefüllt — die Kragenzeile 9 liegt direkt an (Kopf endet in Zeile 8 − 1 = 7, Kinn hängt 4-verbunden an Zeile 9)."""
-    out = k.copy()
-    y0, y1 = PAD_T, PAD_T + 8                              # Zeilen 0…7 des Sprites steigen
-    seg = k[y0:y1 + 1].copy()                              # Zeilen 0…8 (inkl. Kinnzeile 8) steigen, Zeile 8 wird zur Zeile 7
-    out[y0 - 1:y1] = seg
-    out[y1] = k[y1 + 1] * 0                                 # alte Kinnzeile 8 wird frei … wird gleich durch die Kopie von Zeile 9 überdeckt
-    out[y1] = k[y1]                                         # Kinnzeile bleibt (das Kinn „dehnt“ sich nicht): Zeile 8 unverändert
-    return out
 
 
 TEST_EBENEN = ('figur',)

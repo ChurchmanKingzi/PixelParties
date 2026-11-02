@@ -69,8 +69,8 @@ for (y, x) in AUGEN_PX:
 HAARFARBEN = [(63, 43, 45), (119, 62, 69), (203, 120, 132), (124, 78, 83)]                    # A, C, E, F
 yy_, xx_ = np.mgrid[0:sh, 0:sw]
 HAAR = OPAK & ((xx_ <= 4) | (xx_ >= 15)) & (yy_ >= 9) & (yy_ <= 21) & L.farbmaske(spr, HAARFARBEN)
-for _y in range(sh):                                                                       # rechte Strähnen müssen zum Blattkörper/Kopf passen: Haarpixel dürfen den Körper nie ersetzen
-    pass
+HAAR_L = HAAR & (xx_ <= 4)
+HAAR_R = HAAR & (xx_ >= 15)
 HAAR_ZEILEN = (9, 21)
 HAAR_AMP = 2.2
 
@@ -156,11 +156,21 @@ def _lid(fig, top, stufe):
 
 
 def figur(i):
-    koerper = A.zeilen_von(spr, 0, sh - 1, H, W, PAD_L, PAD_T)
+    rest_sp = np.where(HAAR[..., None], 0, spr).astype(np.uint8)
+    koerper = A.zeilen_von(rest_sp, 0, sh - 1, H, W, PAD_L, PAD_T)
     z, quelle = A.koerper_pose(koerper, doppeln=POSEN[S[i]], x0=PAD_L)
     dxq = A.dx_zeilen(GEWICHT, AMP, 2 * math.pi * i / 24)
     z = A.verschiebe_zeilen(z, quelle, dxq)
-    fig, top = A.auf_leinwand(z, H, BODEN, 0)
+    fig_rest, top = A.auf_leinwand(z, H, BODEN, 0)
+    ebenen = []
+    for seite, maske in ((0, HAAR_L), (1, HAAR_R)):                                          # untere Haare: eigene Ebene je Seite, dieselbe Atmung, eigener Versatz
+        hsp = np.where(maske[..., None], spr, 0).astype(np.uint8)
+        hz, hq = A.koerper_pose(A.zeilen_von(hsp, 0, sh - 1, H, W, PAD_L, PAD_T), doppeln=POSEN[S[i]], x0=PAD_L)
+        hdx = haar_dx_liste(i, seite)
+        hz = A.verschiebe_ausgabezeilen(hz, [hdx[q] for q in hq])
+        he, _ = A.auf_leinwand(hz, H, BODEN, 0)
+        ebenen.append((he, 0, 0))
+    fig = L.zusammen(H, W, ebenen + [(fig_rest, 0, 0)])                                       # Haare liegen hinter dem Körper
     if i in BLINK:
         fig = _lid(fig, top, BLINK[i])
     fig, neu = A.umriss_ergaenzen(fig, RAND_FARBEN, lambda x, y: UMRISS)
@@ -168,8 +178,10 @@ def figur(i):
     return dict(fig=fig, top=top, neu=neu, pfad=pfad, offen=offen)
 
 
-def frame(i):
+def frame(i, nur=None):
     f = figur(i)
+    if nur is not None:
+        return f['fig']
     return L.zusammen(H, W, [(pollen_ebene(i), 0, 0), (f['fig'], 0, 0)])
 
 

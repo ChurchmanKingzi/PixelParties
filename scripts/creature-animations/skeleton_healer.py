@@ -24,7 +24,7 @@ Ablauf (48 Frames à 65 ms = 3,12 s; Frame 0 = Original, Partikel ausgenommen):
 * Atmen zweistufig 0-1-2-1-0 px (Periode 24): Der ganze Oberkörper des Heilers — Federbusch, Kopf MIT Kinn, Hals, Schultern, Rippen bis y 21, Arme — hebt sich STARR um 0–2 px; die Zeile y 22 (Rippenunterkante, keine
   Wirbelsäule, keine Kieferpartie) wird 1–2× eingefügt (L.streck_zeile, Texturmischung), Becken, Beine und Stiefel bleiben am Boden. Hals und Kinn werden nicht länger (früher wurde Zeile y 21 mit der weißen
   Wirbelsäule gedoppelt: das war das „zu dicke Kinn“).
-* Federbuschspitze (2×2 bei (9–10, 8–9)) wippt seitlich −1/0/+1 px (Periode 16, hängt an der Buschbasis, wandert mit dem Kopf).
+* Federbuschspitze (2×2 bei (9–10, 8–9)) wippt seitlich 0/−1/−2 px nach links (Periode 16, hängt an der Buschbasis, wandert mit dem Kopf; nach rechts würde sie unter dem Helm verschwinden).
 * Blinzeln des Heilers (Lidfarbe = umgebendes Knochenweiß (246,255,255)): beide grünen Augen werden 3 Frames weiß, zweimal pro Schleife (Frame 13–15 und 37–39).
 * Erhobene Hand (rechts) winkt/segnet: Handschuh + Handgelenk heben sich 0-1-2-1-0 px (Periode 16, 3× pro Schleife; das Handgelenk wird dabei nur länger, nicht dicker) zusätzlich zum Atmen.
 * Helmkopf B hebt sich starr mit dem Kopf des Heilers (gleiche 0–2 px; ein eigener Hub würde Federbuschpixel unter dem Helmrand freilegen); KEIN seitliches Treiben. Das Blatt wippt (die Spitze (22,0) springt für 4 Frames nach (21,0), Frame 10–13 und 34–37).
@@ -103,7 +103,7 @@ def verschieben_y(a, dy):
 def frame_gross(i, nur=None):
     n_a = U.stufe(i, 24, 2)                                      # Heiler atmet 0-1-2-1-0
     wink = U.stufe(i - 4, 16, 2)                                 # erhobene Hand winkt 0-1-2-1-0 (Periode 16)
-    tip = U.stufe(i, 16, 2, form='sin') - 1                      # Federbuschspitze −1/0/+1
+    tip = -U.stufe(i, 16, 2)                                     # Federbuschspitze 0/−1/−2 (nach rechts liegt B davor)
 
     # --- A: Körper (alles ohne Federbusch und erhobene Hand) atmet: Oberkörper starr hoch, Zeile 22 wird gedoppelt ---
     pk = teil(A_SP, koerper)
