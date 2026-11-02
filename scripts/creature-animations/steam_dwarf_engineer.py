@@ -25,7 +25,7 @@ Ablauf (48 Frames à 62 ms = 2,98 s, nahtlos):
 * Rohre zittern (Dampfdruck, je Rohr eigener Takt): die obersten drei Rohrzeilen jedes Rohrs schlagen ±1 px seitlich aus (A Periode 12, B Periode 16, C Periode 24, gegenphasig), jedes Rohr bleibt 4-verbunden; Ausschlag nur, wenn der Sinus > 0,55 bzw. < −0,55 ist (sonst Ruhe, Frame 0 = Ruhe).
 * Dampf: aus allen drei Rohrschlitzen steigen kleine runde Wölkchen (5×3, wachsen aus 2×2, schrumpfen wieder; Farben P (213,213,213)/N (162,162,162) aus dem Sprite) langsam bis 4 px auf, je Rohr zwei Wölkchen um eine
   halbe Periode versetzt (Periode 24, Rohr B und C um 8 bzw. 16 Frames gegeneinander versetzt).
-* Schraubenschlüssel tippt (der Zwerg dreht an einer Schraube): der ganze Schlüssel hebt sich starr 1 px mit der Hand (je 3 Frames, alle 12 Frames), der Griff bleibt am Körper 4-verbunden.
+* Schraubenschlüssel tippt (der Zwerg dreht an einer Schraube): der Schlüssel hebt sich starr 1 px (je 3 Frames, alle 12 Frames); die untersten Griffzeilen (y ≥ 19, in der verdeckten Hand) bleiben stehen, damit der Griff am Körper 4-verbunden bleibt (der Griff wirkt 1 px länger).
 * Blinzeln (Frames 20–22 und 41–43): das Auge schließt sich — (16,14) und (17,14) nehmen die umgebende Hautfarbe Q an (nur dieses eine Auge).
 * Metall glänzt (Regel 12/14, nur Rohre, Schlüssel, Metallplatte): ein Lichtband läuft diagonal von links oben nach rechts unten — erst über die Rohre (Frames 2–11 und 26–35), dann über den Schlüssel
   (Frames 12–19 und 38–45), dann die Platte (Frames 20–25 und 30–35); dazu ein vierzackiger Glitzer-Stern am Schlüsselmaul (Frames 14–17) und an der Plattenecke (Frames 38–41).
@@ -117,7 +117,9 @@ def frame(i, dampf=True, nur=None):
             Hm.bereich_versatz(k, OFF, {y: a for y in zeilen}, x0, x1)
     # --- Schlüssel tippt (der Zwerg dreht an einer Schraube): der ganze Schlüssel hebt sich starr 1 px mit der Hand (zweimal drei Frames je Takt von 12) ---
     if Hm.takt(i, 12, 6, 3):
-        sc = L.versetze(sc, 0, -1)
+        unten = sc.copy()
+        unten[:PAD_T + 19] = 0                                                  # die untersten Griffzeilen (y ≥ 19) bleiben in der Hand → Griff bleibt am Körper 4-verbunden
+        sc = L.zusammen(H, W, [(unten, 0, 0), (L.versetze(sc, 0, -1), 0, 0)])
     # --- Auf und ab: Westenzeile 21 wird einmal doppelt eingefügt; Körper und Schlüssel gleichermaßen ---
     brust = Hm.stufe(i, N / 2, 1)
     k = Hm.atmen(k, PAD_T + 21, PAD_T + 14, brust, 0)
