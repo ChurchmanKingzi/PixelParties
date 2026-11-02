@@ -66,7 +66,7 @@ _put(6, (_Y >= 26) & (_X >= 24))
 WURZEL = {1: (10, 5), 2: (10, 34), 3: (23, 12), 4: (23, 25), 5: (28, 13), 6: (26, 24)}        # (y, x) eines Kernpixels am Körper
 GLIEDER = {k: SH.Glied(spr, [(int(y), int(x)) for y, x in zip(*np.nonzero(LAB == k))], WURZEL[k], umriss=BAND_UMRISS) for k in WURZEL}
 # Welle je Band: (Amplitude px, Wellen je Schleife, Phase, Wellenzahl je Front)
-WELLE = {1: (1.3, 3, 0.0, 0.7), 2: (1.3, 3, 2.1, 0.7), 3: (1.7, 2, 1.0, 0.45), 4: (1.7, 2, 3.6, 0.5), 5: (1.5, 3, 4.2, 0.8), 6: (1.2, 4, 0.7, 0.8)}
+WELLE = {1: (1.1, 3, 0.0, 0.7), 2: (1.1, 3, 2.1, 0.7), 3: (1.7, 2, 1.0, 0.45), 4: (1.7, 2, 3.6, 0.5), 5: (1.5, 3, 4.2, 0.8), 6: (1.0, 4, 0.7, 0.8)}
 KOERPER = spr.copy(); KOERPER[LAB > 0] = 0
 
 # ── Zeitachsen ──

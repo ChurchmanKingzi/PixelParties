@@ -71,7 +71,7 @@ STRECK = [1 if math.sin(2 * math.pi * i / 24) >= 0.3 else 0 for i in range(N)]
 assert STRECK[0] == 0
 SPITZEN = [1 if math.sin(2 * math.pi * i / 16) > 0.35 else 0 for i in range(N)]       # 1 = Blütenblattspitzen gehoben
 assert SPITZEN[0] == 0
-SPOREN = [dict(x=3, vx=-1, off=0), dict(x=3, vx=2, off=8), dict(x=4, vx=0, off=16)]     # 2×2-Pollen über der Knospe (Sprite-Koordinaten)
+SPOREN = [dict(x=1, vx=-1, off=0), dict(x=5, vx=1, off=8), dict(x=3, vx=0, off=16)]     # 2×2-Pollen über der Knospe (Sprite-Koordinaten)
 SPORENFARBEN = {'c': CE, 'r': CC}
 
 

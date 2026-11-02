@@ -130,8 +130,6 @@ def frame_gross(i, nur=None):
     ph = verschieben_y(ph, -n_a - wink)
     for k in range(1, wink + 1):
         ph[GPT + WRIST_Y - n_a - wink + k] = np.where(wrist[:, 3:4] > 0, wrist, ph[GPT + WRIST_Y - n_a - wink + k])
-    for k in range(1, n_a + 1):                                  # Handgelenk füllt auch beim Atem die Lücke zum Unterarm (Unterarm hebt sich mit dem Oberkörper, nichts zu füllen)
-        pass
     # --- B: Helmkopf ---
     pb = teil(B_SP, L.deckend(B_SP))
     if i in BLATT_FRAMES:
