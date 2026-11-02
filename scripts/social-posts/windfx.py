@@ -412,6 +412,50 @@ class WindShow(WindFX):
     def sprite_dx(self, f):
         return int(round(0.55 * self.plate_dx(f) / self.U)) * self.U
 
+    # ───────── Soundeffekte (public/sounds): gleiche Aktion = immer derselbe Sound (wie bei Mini) ─────────
+    SND = {
+        'explode': [('heavy_impact', -2), ('elem_wind', -8, 0.10)],             # jede Sprengung (Sturmstoß, großer Tornado)
+        'lift':    [('draw', -5)],                                              # etwas wird weggetragen/zurückgebracht (Link-Schild, Banner)
+        'land':    [('placement', -6)],                                         # etwas landet
+        'fling':   [('projectile', -9)],                                        # das Schild wird weggeschleudert
+        'cast':    [('spell_cast', -4)],                                        # Champion beschwört den Tornado
+        'charge':  [('ascension', -9)],                                         # der große Tornado baut sich auf
+        'rustle':  [('shuffle', -8)],                                           # Blätter ziehen sich zusammen (Schluss)
+    }
+
+    def sfx_events(self):
+        D = self.D
+        ev = []
+
+        def add(t, kind):
+            for item in self.SND[kind]:
+                ev.append((t + (item[2] if len(item) > 2 else 0.0), item[0], item[1]))
+        for t in (0.0, 18.5):                                                       # Sprengungen
+            add(t, 'explode')
+        add(4.0, 'cast')                                                            # Beschwörung vor der Hand
+        for tg, a in self.GUSTS:                                                    # jede Böe (ohne die beiden Sprengungen): derselbe Wind-Sound, stärker bei stärkerer Böe
+            if tg not in (0.0, 18.5):
+                ev.append((tg, 'elem_wind', -12 + 0.3 * min(abs(a), 22), 1.0, 0.8))
+        t = 4.3                                                                     # Tornado: Wind-Teppich, lauter solange er groß ist
+        while t < 13.4:
+            st = self.twister(t)
+            if st is not None:
+                ev.append((t, 'elem_wind', -17 + 8 * min(1.0, st[2] / 700.0), 0.8, 1.0))
+            t += 0.8
+        add(7.0, 'lift'); ev.append((8.6, self.SND['fling'][0][0], self.SND['fling'][0][1])); add(10.6, 'lift'); add(11.6, 'land')     # Link-Schild
+        add(11.7, 'lift'); add(13.6, 'lift'); add(14.7, 'land')                    # Banner
+        add(15.0, 'charge')                                                         # großer Tornado
+        t = 15.2
+        while t < 18.3:
+            ev.append((t, 'elem_wind', -10, 0.8, 0.9))
+            t += 0.6
+        t = 0.5                                                                     # Regen: leiser Teppich über das ganze Video
+        while t < D - 0.9:
+            ev.append((t, 'elem_water', -21, 1.0, 1.0))
+            t += 0.9
+        add(D - 0.8, 'rustle')
+        return sorted(ev)
+
     # ───────── Trichter mit freien Parametern ─────────
     def _draw_funnel(self, canvas, xc0, y_top, y_bot, w_top, t, sway=60.0, alpha=0.9):
         U, cw, ch = self.U, self.cw, self.ch
