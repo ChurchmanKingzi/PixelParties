@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""Idle-Animation für „Ska Harpyformer“ (Creature) — dunkelhaarige Harpyie spielt mit dem Flügel eine goldene Trompete; Notenzeichen steigen auf; schwebt.
+"""Idle-Animation für „Ska Harpyformer“ (Creature) — Runde 2: dunkelhaarige Harpyie spielt mit dem Flügel eine goldene Trompete; Notenzeichen schweben; der FUSS BLEIBT AM BODEN (kein Schweben, kein Hover-Bob).
 
 PICK: [["MotiveMoe", 114, "Ebene „Ska Harpyformer“ (87×229 px, enthält mehrere Figuren): nur die Trompeterin (Komponente 320 px, Ebene-Koordinaten x 6–31, y 16–38) und drei Notenzeichen (x 0–13, y 5–22)"]]
 Quelle: MotiveMoe.xcf, Ebene 114 „Ska Harpyformer“ (Versatz (178, 62)). Sie enthält mehrere voneinander getrennte Figuren: (a) die Trompeterin (8er-Komponente, 320 px), (b) das Mädchen im Rosa Kleid oben rechts
@@ -25,10 +25,11 @@ Identifikation (Sprite-Koordinaten x, y):
 * Körper (x 21–27, y 26–30): blaugraues Kleid (134,141,180) (108,117,155) (61,71,97) (38,38,61); Beine/Füße (x 20–25, y 30–33) mit weißen Krallenspitzen (246,255,255) und Beige-Orange (230,131,82).
 * Notenzeichen: Rot (178,11,0) (193,84,77) (x 5–6, y 0–5), Orange (224,114,46) (224,147,99) (x 11–13, y 9–13), Cyan (77,177,193) (118,218,193) (x 1–3, y 12–16).
 
-Ablauf (48 Frames à 65 ms = 3,12 s); Frame 0 = Ruhepose = Original. Sie SCHWEBT (Flieger):
+Ablauf (48 Frames à 65 ms = 3,12 s); Frame 0 = Ruhepose = Original. Der Fuß (x 20–25, y 30–33) steht in jedem Frame unverändert auf dem Pfeiler:
 * Flügelschlag, durchgehend im festen Rhythmus: ein Schlag = 12 Frames (780 ms), 4 pro Schleife; Abschlag 5 Frames. Der Flügelarm samt Trompete schwingt als Einheit um die Schulter: jede Spalte (x ≤ 20) wandert als Ganzes
   senkrecht, der Schallbecher hebt sich bis 4 px (Exponent 1,15, Spitze hinkt 1 Frame nach); Flügel und Trompete teilen sich dieselbe Spaltenverschiebung, ihre Lage zueinander bleibt daher erhalten. Federtextur bleibt, nichts wird kopiert.
-* Schwebe-Bob: Harpyie samt Flügel, Trompete und Haaren hebt sich im Takt bis 2 px (am höchsten in der Schlagmitte); die Füße baumeln nach (60 %, 1,5 Frames verzögert, die Lücke füllen doppelte Fußzeilen).
+* Ska-Wippen (statt Schwebe-Bob): im Offbeat (alle 6 Frames, Frame 3–4, acht Mal pro Schleife) federt die Harpyie 1 px ein: die Kleidzeile y 28 entfällt, alles darüber (Kopf, Haare, Flügel mit Trompete) rückt 1 px runter;
+  Fuß und Beinansatz (y ≥ 29) bleiben fest am Boden.
 * Trompete (Metall): Der Schallbecher und die Röhre bekommen zweimal pro Schleife ein diagonales Lichtband (eine Stufe heller auf der Goldrampe, Frames 6–17 und 30–41), dazu blitzt ein kleiner Glitzerstern
   am Becherrand auf (Frames 8–10 und 32–34, bei (8,15)).
 * Haarschleppe schwingt: die Strähnen rechts (x 25–31, y 11–32) pendeln unten bis 1,5 px (Periode 16 Frames); das innere Ende bleibt am Kopf.
@@ -49,6 +50,7 @@ import numpy as np
 import anim_lib as L
 import anim_flieger as F
 import anim_flieger_b as B
+import anim_harpyb as HB
 
 N, MS = 48, 65
 BEAT, DOWN = 12, 5                                         # Frames je Flügelschlag, davon Abschlag
@@ -110,16 +112,13 @@ def dy_fn(t):
     return dy
 
 
-# ── Schwebe-Bob, Füße, Schleppe, Blinzeln, Noten ────────────────────────────────────────────────────────────────────
-BOB_AMP = 1.0
+# ── Einfedern im Offbeat (Fuß fest), Schleppe, Blinzeln, Noten ──────────────────────────────────────────────────────
+Y_STAUCH = PAD_T + 28                                      # Kleidzeile (Textur, kein Gesicht/Hals), die beim Einfedern entfällt
 
 
-def hub(t):
-    return int(round(BOB_AMP * (1.0 - math.cos(2 * math.pi * t / BEAT))))
-
-
-def fuss_hub(t):
-    return min(hub(t), int(round(0.6 * hub(t - 1.5))))
+def einfedern(t):
+    """Oberkörper sinkt 1 px im Offbeat (Frame 3–4 jedes 6er-Takts); 0 = Ruhe (Frame 0 = Original)."""
+    return 1 if t % 6 in (3, 4) else 0
 
 
 def schleppe(a, t):
@@ -158,7 +157,7 @@ def frame(i, partikel=True, nur=None):
     ebenen = nur if nur is not None else TEST_EBENEN
     if nur is not None:
         partikel = False
-    n, k = hub(i), fuss_hub(i)
+    d = einfedern(i)
     schichten = []
     st = None
     if 'figur' in ebenen:
@@ -166,14 +165,12 @@ def frame(i, partikel=True, nur=None):
         if blinzeln(i):
             koerper = koerper.copy()
             koerper[PAD_T + AUGE[1], PAD_L + AUGE[0], :3] = LID
-        fuesse = FUESSE
-        if n - k > 0:
-            fuesse = L.streck_zeile(fuesse, PAD_T + 31, n - k)             # Füße: Lücke füllen doppelte oberste Fußzeile
         arm = ARM.copy()
         for start in (6, 30):                                              # Trompete (Metall): Lichtband über das Gold, bevor der Arm schwingt
             F.lichtband(arm, M_GOLD, PAD_L, PAD_T, i, N, start, 12, GOLD, stufen=1, breite=3.0, achse=(1.0, 1.0))
         arm = B.spalten_schub_4verbunden(arm, PAD_L + X_PIV, dy_fn(i), MAXD)
-        schichten += [(koerper, 0, -n, 1), (fuesse, 0, -k, 2), (schleppe(SCHLEPPE, i), 0, -n, 4), (arm, 0, -n, 3)]
+        koerper, schl, arm = (HB.stauche_zeile(a_, Y_STAUCH, d) for a_ in (koerper, schleppe(SCHLEPPE, i), arm))
+        schichten += [(koerper, 0, 0, 1), (FUESSE, 0, 0, 2), (schl, 0, 0, 4), (arm, 0, 0, 3)]
         st = F.stern_stufe(i, N, 8, (0, 1, 0))
         if st is None:
             st = F.stern_stufe(i, N, 32, (0, 1, 0))
@@ -181,7 +178,7 @@ def frame(i, partikel=True, nur=None):
     B.umriss_je_ebene(f, karte, ERLAUBT, UMRISS)
     if st is not None and st >= 1:                                         # Glitzerstern am Becherrand (folgt dem Becher und dem Bob)
         dyb = int(round(dy_fn(i)(abs(8 - X_PIV) / MAXD)))
-        F.stern(f, PAD_L + 8, PAD_T + 15 + dyb - n, st, (255, 233, 167), (255, 201, 40))
+        F.stern(f, PAD_L + 8, PAD_T + 15 + dyb + d, st, (255, 233, 167), (255, 201, 40))
     if partikel:
         ebenen_ = [(f, 0, 0)]
         for kk, nt in enumerate(NOTEN):

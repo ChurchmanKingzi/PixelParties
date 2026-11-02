@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""Idle-Animation für „Shanty Harpyformer“ (Creature) — singende Piratenharpyie (Totenkopfhut, Stelzbein, goldene Ohrringe) mit weißem und hellblauem Flügel, Notenzeichen und Funkelsternen; schwebt.
+"""Idle-Animation für „Shanty Harpyformer“ (Creature) — Runde 2: singende Piratenharpyie (Totenkopfhut, Stelzbein, goldene Ohrringe) mit weißem und hellblauem Flügel, Notenzeichen und Funkelsternen; STEHT am Boden (kein Schweben).
 
 PICK: [["MotiveGrailWar", 127, "Ebene „Shanty Harpyformer“ — nur die Figur oben Mitte (x 32–53, y 7–33 der 87×63 px großen Ebene) und drei Funkelsterne (x 27–36, y 0–9)"], ["MotiveGrailWar", 126, "Ebene „Shanty Harpyformer #1“: drei Notenzeichen (18×14 px)"]]
 Quelle: MotiveGrailWar.xcf. Ebene 127 enthält die GANZE Szene: oben mittig die singende Harpyie, daneben/darunter vier fremde Figuren (Pirat links unten mit grauem Hut und blauer Hose, Pirat mit roter Mütze unten Mitte,
@@ -27,10 +27,11 @@ Identifikation (Sprite-Koordinaten x, y):
 * Notenzeichen: Lila (140,111,207) (189,172,227) (x 14–17, y 0–5), Gelb (222,246,71) (236,250,149) (x 22–25, y 4–9), Cyan (0,255,255) (0,204,204) (x 8–12, y 8–13).
 * Funkelsterne (weiß): großes Plus (Arme 2 px, Mitte leer) bei (7,2), kleine Rauten (4 px) bei (12,6) und (1,8).
 
-Ablauf (48 Frames à 65 ms = 3,12 s); Frame 0 = Ruhepose = Original. Sie SCHWEBT (Flieger):
+Ablauf (48 Frames à 65 ms = 3,12 s); Frame 0 = Ruhepose = Original. Kein Flug, kein Hover-Bob (Nutzerwunsch Runde 2): Fuß und Stelzbein stehen fest am Boden:
 * Flügelschlag, durchgehend im festen Rhythmus: ein Schlag = 12 Frames (780 ms), 4 pro Schleife; Abschlag 5 Frames. Beide aufrechten Flügel klappen nach außen: Jede Zeile oberhalb der Schulter (Zeile 19) wandert als Ganzes
   waagerecht, bis 3 px an der Spitze (Exponent 1,15, Spitze hinkt 1 Frame nach, der rechte Flügel 0,3 Frames später); die Wurzeln (y ≥ 19) bleiben fest. Federtextur bleibt, nichts wird kopiert.
-* Schwebe-Bob: Harpyie samt Hut, Flügeln und Armen hebt sich im Takt bis 2 px (am höchsten in der Schlagmitte); Fuß und Stelzbein baumeln nach (60 %, 1,5 Frames verzögert, die Lücke füllen doppelte Beinzeilen).
+* Singen im Takt (statt Schwebe-Bob): Alle 8 Frames (sechs Mal pro Schleife, im Rhythmus der Silben) sinkt der Oberkörper 1 px (Knie/Atem, Frame 2–3 jeder Silbe): die Westenzeile y 26 entfällt, Hut, Gesicht, Flügel und Arme rücken
+  1 px runter; Fuß, Stelzbein und Zehen (y ≥ 27) bleiben stehen. Nichts schwebt.
 * Singen: der Mund öffnet und schließt sich im Rhythmus (Periode 8 Frames, sechs Silben pro Schleife): offen → halb → zu → halb. Der zugemachte Mund ist Hautfarbe (246,205,139) / Lippe (238,156,123). Die Augen sind schon geschlossen (Striche) — kein Blinzeln.
 * Notenzeichen schweben: jede Note wippt eigenständig (Ausschlag bis 2 px, Perioden 24 / 16 / 48 Frames) und schwankt leicht seitlich (1 px) — sie sind Teil der Kunst, keine Partikel; ganze Noten ohne Teilung.
 * Funkelsterne: jeder wächst und vergeht in 24 Frames (Raute → X → Plus → X → Raute → aus), zwei Mal pro Schleife; Frame 0 = Stufe der Karte (STERNE_AN = False schaltet sie ab).
@@ -49,6 +50,7 @@ import numpy as np
 import anim_lib as L
 import anim_flieger as F
 import anim_flieger_b as B
+import anim_harpyb as HB
 
 N, MS = 48, 65
 BEAT, DOWN = 12, 5                                         # Frames je Flügelschlag, davon Abschlag
@@ -111,16 +113,13 @@ def dx_fn(t, versatz=0.0):
     return dx
 
 
-# ── Schwebe-Bob, Füße, Mund, Noten, Sterne ───────────────────────────────────────────────────────────────────────────
-BOB_AMP = 1.0
+# ── Einfedern im Takt (Füße fest), Mund, Noten, Sterne ───────────────────────────────────────────────────────────────
+Y_STAUCH = PAD_T + 26                                      # Westenzeile (Textur, kein Gesicht/Mund/Hals), die beim Einfedern entfällt
 
 
-def hub(t):
-    return int(round(BOB_AMP * (1.0 - math.cos(2 * math.pi * t / BEAT))))
-
-
-def fuss_hub(t):
-    return min(hub(t), int(round(0.6 * hub(t - 1.5))))
+def einfedern(t):
+    """Oberkörper sinkt 1 px, alle 8 Frames in Frame 2–3 der Silbe; 0 = Ruhe (Frame 0 = Original)."""
+    return 1 if t % 8 in (2, 3) else 0
 
 
 def mund_stufe(t):
@@ -155,7 +154,7 @@ def frame(i, partikel=True, nur=None):
     ebenen = nur if nur is not None else TEST_EBENEN
     if nur is not None:
         partikel = False
-    n, k = hub(i), fuss_hub(i)
+    d = einfedern(i)
     schichten = []
     if 'figur' in ebenen:
         koerper = KOERPER.copy()
@@ -166,12 +165,10 @@ def frame(i, partikel=True, nur=None):
                     koerper[PAD_T + y, PAD_L + x, :3] = HAUT if y == 19 else LIPPE
                 elif y == 20:
                     koerper[PAD_T + y, PAD_L + x, :3] = LIPPE
-        fuesse = FUESSE
-        if n - k > 0:
-            fuesse = L.streck_zeile(fuesse, PAD_T + 30, n - k)             # Beine: Lücke füllen doppelte oberste Beinzeile
         fl_l = B.zeilen_klappen(FL_L, Y_PIV, dx_fn(i), richtung=-1, starr_oben=PAD_T + 9)      # der Federbogen oben (y 7–8) bleibt als Ganzes
         fl_r = B.zeilen_klappen(FL_R, Y_PIV, dx_fn(i, 0.3), richtung=1)
-        schichten += [(fl_l, 0, -n, 1), (fl_r, 0, -n, 2), (koerper, 0, -n, 3), (fuesse, 0, -k, 4)]
+        fl_l, fl_r, koerper = (HB.stauche_zeile(a_, Y_STAUCH, d) for a_ in (fl_l, fl_r, koerper))
+        schichten += [(fl_l, 0, 0, 1), (fl_r, 0, 0, 2), (koerper, 0, 0, 3), (FUESSE, 0, 0, 4)]
     f, karte = B.zusammen_mit_karte(H, W, schichten)
     B.umriss_je_ebene(f, karte, ERLAUBT, UMRISS)
     if partikel:
