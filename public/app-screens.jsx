@@ -1286,7 +1286,8 @@ function MenuCardBackground() {
         {tile}
         {tile}
       </div>
-      <PpVerlauf className="menu-card-bg-veil" px={4} retroGradient="radial-gradient(ellipse at center, rgba(8,6,12,.58) 0%, rgba(8,6,12,.78) 70%, rgba(8,6,12,.9) 100%)" gradient="radial-gradient(ellipse at center, rgba(8,6,12,.22) 0%, rgba(8,6,12,.34) 70%, rgba(8,6,12,.5) 100%)" />
+      {/* ★ 2.11. (Al: Dither auf der Wand zu stark): im Pixel-Modus KEIN Dither-Schleier mehr — abgedunkelt wird ueber die Bilder (`filter` in .menu-card-bg-cell img); der Schleier bleibt nur im Retro-Modus */}
+      {window.PP_RETRO && <PpVerlauf className="menu-card-bg-veil" px={4} retroGradient="radial-gradient(ellipse at center, rgba(8,6,12,.58) 0%, rgba(8,6,12,.78) 70%, rgba(8,6,12,.9) 100%)" gradient="radial-gradient(ellipse at center, rgba(8,6,12,.58) 0%, rgba(8,6,12,.78) 70%, rgba(8,6,12,.9) 100%)" />}
     </div>
   );
 }
@@ -3790,7 +3791,7 @@ function ProfileScreen() {
 // ═══════════════════════════════════════════
 
 // Purchase celebration overlay — centered on the bought item
-function PurchaseCelebration({ cx, cy, onDone }) {
+function PurchaseCelebration({ cx, cy, label, onDone }) {
   const canvasRef = useRef(null);
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -3834,7 +3835,40 @@ function PurchaseCelebration({ cx, cy, onDone }) {
   return (
     <div style={{ position: 'fixed', inset: 0, zIndex: 99999, pointerEvents: 'none' }}>
       <canvas ref={canvasRef} style={{ width: '100%', height: '100%' }} />
-      <div className="shop-purchase-text" style={{ top: Math.max(40, (cy ?? window.innerHeight / 2) - 60), left: cx ?? '50%' }}>PURCHASED!</div>
+      <div className="shop-purchase-text" style={{ top: Math.max(40, (cy ?? window.innerHeight / 2) - 60), left: cx ?? '50%' }}>{label || 'PURCHASED!'}</div>
+    </div>
+  );
+}
+
+// „Mögliche Pulls“: ein Streifen mit Beispielen aus dem Pool (nur, was der Spieler noch NICHT besitzt —
+// genau das kann der nächste Pull ergeben). Wechselt alle paar Sekunden hart (kein Überblenden: Pixelart).
+function ShopPullPreview({ pool, type, count = 4, onHover }) {
+  const sig = pool.map(p => p.id).join('|');
+  const order = useMemo(() => {
+    const a = pool.slice();
+    for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; }
+    return a;
+  }, [sig]);
+  const [start, setStart] = useState(0);
+  useEffect(() => {
+    setStart(0);
+    if (order.length <= count) return undefined;
+    const t = setInterval(() => setStart(s => (s + count) % order.length), 3500);
+    return () => clearInterval(t);
+  }, [order, count]);
+  const shown = Array.from({ length: Math.min(count, order.length) }, (_, i) => order[(start + i) % order.length]);
+  return (
+    <div className="shop-pull-strip">
+      {shown.map(it => (
+        <div key={it.id} className="shop-item shop-unowned-skin shop-pull-tile"
+          onMouseEnter={() => onHover && onHover(it)} onMouseLeave={() => onHover && onHover(null)}>
+          <span className="shop-item-zier" aria-hidden="true" />
+          <div className="shop-item-img-wrap">
+            <img src={it.src} draggable={false} />
+          </div>
+          {it.name && <div className="shop-item-name" title={it.name}>{it.name}</div>}
+        </div>
+      ))}
     </div>
   );
 }
@@ -3864,6 +3898,7 @@ function ShopScreen() {
   const [buying, setBuying] = useState(false);
   const [tab, setTab] = useState('skins');
   const [skinFilter, setSkinFilter] = useState('');
+  const [collFilter, setCollFilter] = useState('all'); // Sammlungsansicht: 'all' | 'owned' | 'missing'
   const [selected, setSelected] = useState(null); // { type, id }
   const [celebration, setCelebration] = useState(null); // { cx, cy } or null
   const [randomReveal, setRandomReveal] = useState(null); // { imgUrl, label, subtitle } or null
@@ -4065,7 +4100,8 @@ function ShopScreen() {
 
   // Get center coords of the clicked button's parent .shop-item
   const getItemCenter = (e) => {
-    const item = e.target.closest('.shop-item') || e.target.closest('.shop-random-wrap');
+    const item = e.target.closest('.shop-item') || e.target.closest('.shop-random-wrap')
+      || e.target.closest('.shop-gacha') || e.target.closest('.shop-coll-head');
     if (item) {
       const r = item.getBoundingClientRect();
       return { cx: r.left + r.width / 2, cy: r.top + r.height / 2 };
@@ -4098,7 +4134,7 @@ function ShopScreen() {
       const data = await api('/shop/buy-random-skin', { method: 'POST' });
       setOwned(prev => ({ ...prev, skin: [...prev.skin, data.skinName] }));
       setUser(u => ({ ...u, sc: data.sc }));
-      triggerPurchaseFanfare(pos);
+      triggerPurchaseFanfare({ ...pos, label: 'NEW PULL!' });
       setRandomReveal({
         imgUrl: '/cards/skins/' + encodeURIComponent(data.skinName) + '.png',
         label: data.skinName,
@@ -4118,7 +4154,7 @@ function ShopScreen() {
       const data = await api('/shop/buy-random', { method: 'POST', body: JSON.stringify({ itemType }) });
       setOwned(prev => ({ ...prev, [itemType]: [...prev[itemType], data.itemId] }));
       setUser(u => ({ ...u, sc: data.sc }));
-      triggerPurchaseFanfare(pos);
+      triggerPurchaseFanfare({ ...pos, label: 'NEW PULL!' });
       const subdir = itemType === 'avatar' ? 'avatars' : 'sleeves';
       setRandomReveal({
         imgUrl: '/data/shop/' + subdir + '/' + encodeURIComponent(data.itemId) + '.png',
@@ -4148,27 +4184,14 @@ function ShopScreen() {
 
   // Gather unique hero names for skin filter
   const heroNames = [...new Set((catalog.skins || []).map(s => s.heroName))].sort();
-  const filteredSkins = skinFilter
-    ? (catalog.skins || []).filter(s => s.heroName === skinFilter)
-    : (catalog.skins || []);
 
   const isSelected = (type, id) => selected && selected.type === type && selected.id === id;
 
+  // Nur noch Boards: Skins, Avatare und Sleeves gibt es ausschließlich per Pull (renderGachaPage).
   const renderItemGrid = (items, type, imgBase) => {
     if (items.length === 0) return <div className="shop-empty">No items available yet</div>;
-    const unownedCount = items.filter(it => !ownedSet[type].has(it.id)).length;
-    const hasRandom = type === 'avatar' || type === 'sleeve';
     return (
       <React.Fragment>
-        {hasRandom && (
-          <div className="shop-random-wrap">
-            <button className="btn shop-random-btn" disabled={buying || unownedCount === 0 || !((user.sc || 0) >= randomPrices[type])}
-              onClick={(e) => buyRandom(type, e)}>
-              🎲 Random {type === 'avatar' ? 'Avatar' : 'Sleeve'} — <img src="/data/sc.png" className="shop-sc-icon" /> {randomPrices[type] ?? '?'}
-            </button>
-            <span className="shop-random-hint">{unownedCount > 0 ? unownedCount + ' left to collect' : 'All collected!'}</span>
-          </div>
-        )}
         <div className="shop-grid">
           {items.map(item => {
             const isOwned = ownedSet[type].has(item.id);
@@ -4294,61 +4317,153 @@ function ShopScreen() {
     );
   };
 
-  const renderSkinGrid = () => {
-    if ((catalog.skins || []).length === 0) return <div className="shop-empty">No skins available yet</div>;
-    const allOwned = ownedSet.skin;
-    const unownedCount = (catalog.skins || []).filter(s => !allOwned.has(s.id)).length;
+  // ── Gacha-Seiten (Skins / Avatare / Sleeves) ────────────────────────────
+  // Diese drei Dinge kann man NICHT gezielt kaufen, nur ziehen (Pull): oben der Pull-Automat mit
+  // „Möglichen Pulls“, darunter die eigene Sammlung (Besitz = Karte in Farbe, noch Fehlendes = gesperrt).
+  const gachaDefs = {
+    skin: {
+      title: 'SKIN PULL', noun: 'Skin', plural: 'skins',
+      items: (catalog.skins || []).map(s => ({ id: s.id, name: s.skinName, sub: s.heroName, heroName: s.heroName,
+        src: '/cards/skins/' + encodeURIComponent(s.skinName) + '.png' })),
+    },
+    avatar: {
+      title: 'AVATAR PULL', noun: 'Avatar', plural: 'avatars',
+      items: (catalog.avatars || []).map(a => ({ id: a.id, name: a.name || '', src: '/data/shop/avatars/' + encodeURIComponent(a.file) })),
+    },
+    sleeve: {
+      title: 'SLEEVE PULL', noun: 'Sleeve', plural: 'sleeves',
+      items: (catalog.sleeves || []).map(s => ({ id: s.id, name: s.name || '', src: '/data/shop/sleeves/' + encodeURIComponent(s.file) })),
+    },
+  };
+  const gachaCounts = (type) => {
+    const items = gachaDefs[type].items;
+    return { owned: items.filter(it => ownedSet[type].has(it.id)).length, total: items.length };
+  };
+
+  const renderGachaPage = (type) => {
+    const def = gachaDefs[type];
+    const items = def.items;
+    if (items.length === 0) return <div className="shop-empty">No {def.plural} available yet</div>;
+    const price = randomPrices[type];
+    const missing = items.filter(it => !ownedSet[type].has(it.id));
+    const ownedN = items.length - missing.length;
+    const pct = Math.round(100 * ownedN / items.length);
+    const canPull = !buying && missing.length > 0 && (user.sc || 0) >= price;
+    const pull = (e) => (type === 'skin' ? buyRandomSkin(e) : buyRandom(type, e));
+    const pullLabel = (
+      <React.Fragment>🎲 PULL — <img src="/data/sc.png" className="shop-sc-icon" /> {price ?? '?'}</React.Fragment>
+    );
+
+    const filtered = items.filter(it => {
+      if (type === 'skin' && skinFilter && it.heroName !== skinFilter) return false;
+      const own = ownedSet[type].has(it.id);
+      return collFilter === 'owned' ? own : collFilter === 'missing' ? !own : true;
+    });
+    const chips = [
+      { id: 'all', label: 'ALL', n: items.length },
+      { id: 'owned', label: 'OWNED', n: ownedN },
+      { id: 'missing', label: 'MISSING', n: missing.length },
+    ];
+
     return (
       <React.Fragment>
-        {/* Random Skin Button */}
-        <div className="shop-random-wrap">
-          <button className="btn shop-random-btn" disabled={buying || unownedCount === 0 || !((user.sc || 0) >= randomPrices.skin)}
-            onClick={(e) => buyRandomSkin(e)}>
-            🎲 Random Skin — <img src="/data/sc.png" className="shop-sc-icon" /> {randomPrices.skin ?? '?'}
-          </button>
-          <span className="shop-random-hint">{unownedCount > 0 ? unownedCount + ' skin' + (unownedCount !== 1 ? 's' : '') + ' left to collect' : 'All collected!'}</span>
+        <div className="shop-gacha">
+          <div className="shop-gacha-machine">
+            <div className="shop-gacha-title">{def.title}</div>
+            <div className="shop-gacha-capsule" aria-hidden="true">?</div>
+            <button className="btn shop-random-btn shop-gacha-btn" disabled={!canPull} onClick={pull}>{pullLabel}</button>
+            <div className="shop-gacha-hint">
+              {missing.length > 0
+                ? missing.length + ' ' + (missing.length === 1 ? def.noun.toLowerCase() : def.plural) + ' still to discover'
+                : 'Collection complete!'}
+            </div>
+          </div>
+          <div className="shop-gacha-preview">
+            <div className="shop-gacha-preview-title">
+              {missing.length > 0 ? 'POSSIBLE PULLS' : 'YOU HAVE THEM ALL'}
+            </div>
+            <div className="shop-gacha-rule">
+              {def.plural.charAt(0).toUpperCase() + def.plural.slice(1)} can’t be bought directly — every pull unlocks a random {def.noun.toLowerCase()} you don’t own yet.
+            </div>
+            {missing.length > 0 && (
+              <ShopPullPreview pool={missing} type={type}
+                onHover={type === 'skin' ? (it => setHoverSkin(it ? { skinName: it.name, heroName: it.heroName } : null)) : null} />
+            )}
+          </div>
         </div>
-        <div className="shop-grid shop-grid-skins">
-          {filteredSkins.map(skin => {
-            const isOwned = ownedSet.skin.has(skin.id);
-            const sel = isSelected('skin', skin.id);
-            const showHero = skinShowHero.has(skin.id);
-            const imgSrc = showHero
-              ? (cardImageUrl(skin.heroName) || '/cardback.png')
-              : '/cards/skins/' + encodeURIComponent(skin.skinName) + '.png';
-            return (
-              <div key={skin.id} className={'shop-item shop-skin-item' + (isOwned ? ' shop-owned' : ' shop-unowned-skin') + (sel ? ' shop-selected' : '')}
-                onMouseEnter={() => setHoverSkin({ skinName: skin.skinName, heroName: skin.heroName })}
-                onMouseLeave={() => setHoverSkin(null)}
-                onClick={() => toggleSelect('skin', skin.id)}>
-                <span className="shop-item-zier" aria-hidden="true" />
-                <div className="shop-item-img-wrap">
-                  <img src={imgSrc} draggable={false}
-                    className={!isOwned ? 'shop-skin-locked' : ''} />
-                  {isOwned && <div className="shop-owned-badge">OWNED</div>}
-                  {!isOwned && (
-                    <div className="shop-lock-overlay">
-                      <span className="shop-lock-badge" aria-label="Locked">🔒</span>
-                    </div>
+
+        <div className="shop-coll-head">
+          <div className="shop-coll-head-in">
+            <div className="shop-coll-title">YOUR COLLECTION</div>
+            <div className="shop-coll-count">{ownedN} / {items.length}</div>
+            <div className="shop-coll-bar" role="progressbar" aria-valuemin={0} aria-valuemax={items.length} aria-valuenow={ownedN}>
+              <span style={{ width: pct + '%' }} />
+            </div>
+            <div className="shop-coll-filters">
+              {chips.map(c => (
+                <button key={c.id} className={'shop-coll-chip' + (collFilter === c.id ? ' shop-coll-chip-active' : '')}
+                  onClick={() => { setCollFilter(c.id); if (window.playSFX) window.playSFX('ui_click'); }}>
+                  {c.label} <span className="shop-coll-chip-n">{c.n}</span>
+                </button>
+              ))}
+              {type === 'skin' && (
+                <select className="shop-coll-select" value={skinFilter} onChange={e => setSkinFilter(e.target.value)} aria-label="Filter by Hero">
+                  <option value="">All Heroes</option>
+                  {heroNames.map(h => <option key={h} value={h}>{h}</option>)}
+                </select>
+              )}
+            </div>
+            <button className="btn shop-random-btn shop-coll-pull" disabled={!canPull} onClick={pull}>{pullLabel}</button>
+          </div>
+        </div>
+
+        {filtered.length === 0 ? (
+          <div className="shop-empty">
+            {collFilter === 'owned'
+              ? 'Nothing here yet — pull to start your ' + def.noun.toLowerCase() + ' collection!'
+              : 'Nothing to show for this filter.'}
+          </div>
+        ) : (
+          <div className={'shop-grid' + (type === 'skin' ? ' shop-grid-skins' : '')}>
+            {filtered.map(it => {
+              const isOwned = ownedSet[type].has(it.id);
+              const equipped = type !== 'skin' && isOwned && isEquipped(type, it.id);
+              const showHero = type === 'skin' && skinShowHero.has(it.id);
+              const imgSrc = showHero ? (cardImageUrl(it.heroName) || '/cardback.png') : it.src;
+              const cls = 'shop-item'
+                + (type === 'avatar' ? ' shop-avatar-item' : '')
+                + (type === 'skin' ? ' shop-skin-item' : '')
+                + (isOwned ? ' shop-owned' : ' shop-unowned-skin shop-missing')
+                + (equipped ? ' shop-equipped' : '');
+              return (
+                <div key={it.id} className={cls}
+                  onMouseEnter={type === 'skin' ? () => setHoverSkin({ skinName: it.name, heroName: it.heroName }) : undefined}
+                  onMouseLeave={type === 'skin' ? () => setHoverSkin(null) : undefined}
+                  onClick={type === 'skin' ? undefined : () => { if (isOwned && !equipped) equipItem(type, it.id); }}>
+                  <span className="shop-item-zier" aria-hidden="true" />
+                  <div className="shop-item-img-wrap">
+                    <img src={imgSrc} draggable={false} className={isOwned ? '' : 'shop-skin-locked'} />
+                    {equipped ? <div className="shop-owned-badge shop-equipped-badge">EQUIPPED</div>
+                      : isOwned ? <div className="shop-owned-badge">OWNED</div> : (
+                        <div className="shop-lock-overlay">
+                          <span className="shop-lock-badge" aria-label="Locked">🔒</span>
+                        </div>
+                      )}
+                  </div>
+                  {it.name && type !== 'skin' && <div className="shop-item-name" title={it.name}>{it.name}</div>}
+                  {/* Zwischen Skin- und Heldenbild umschalten, damit man sieht, zu welchem Helden ein Skin gehört
+                      (Skin-Namen sind für die Kachel meist zu lang). */}
+                  {type === 'skin' && (
+                    <button className="btn shop-skin-toggle"
+                      onClick={(e) => { e.stopPropagation(); toggleSkinHero(it.id); if (window.playSFX) window.playSFX('ui_click'); }}>
+                      {showHero ? 'Show Skin' : 'Show Hero'}
+                    </button>
                   )}
                 </div>
-                {/* Flip between the skin art and the original Hero art so the
-                    player can tell which Hero a skin belongs to (names removed
-                    because most skin names overflowed the tile). */}
-                <button className="btn shop-skin-toggle"
-                  onClick={(e) => { e.stopPropagation(); toggleSkinHero(skin.id); if (window.playSFX) window.playSFX('ui_click'); }}>
-                  {showHero ? 'Show Skin' : 'Show Hero'}
-                </button>
-                {!isOwned && (
-                  <button className="btn shop-buy-btn" disabled={buying || !((user.sc || 0) >= prices.skin)}
-                    onClick={(e) => buyItem('skin', skin.id, prices.skin, e)}>
-                    <img src="/data/sc.png" className="shop-sc-icon" /> {prices.skin}
-                  </button>
-                )}
-              </div>
-            );
-          })}
-        </div>
+              );
+            })}
+          </div>
+        )}
       </React.Fragment>
     );
   };
@@ -4434,10 +4549,11 @@ function ShopScreen() {
     );
   };
 
+  const tabCount = (type) => { const c = gachaCounts(type); return c.owned + '/' + c.total; };
   const tabs = [
-    { id: 'skins', label: '🎨 Skins', count: (catalog.skins || []).length },
-    { id: 'avatars', label: '👤 Avatars', count: (catalog.avatars || []).length },
-    { id: 'sleeves', label: '🃏 Sleeves', count: (catalog.sleeves || []).length },
+    { id: 'skins', label: '🎨 Skins', count: tabCount('skin') },
+    { id: 'avatars', label: '👤 Avatars', count: tabCount('avatar') },
+    { id: 'sleeves', label: '🃏 Sleeves', count: tabCount('sleeve') },
     { id: 'cpuSleeves', label: '🏆 Opponent Sleeves', count: (cpuSleeves.sleeves || []).length },
     { id: 'cpuAvatars', label: '🏆 Opponent Avatars', count: (cpuAvatars.avatars || []).length },
     { id: 'boards', label: '🎮 Boards', count: (catalog.boards || []).length },
@@ -4465,7 +4581,7 @@ function ShopScreen() {
           {tutorial5Cleared ? 'Antonia' : 'Raccoon Shopkeep'}
         </span>
       </div>
-      {celebration && <PurchaseCelebration cx={celebration.cx} cy={celebration.cy} onDone={() => setCelebration(null)} />}
+      {celebration && <PurchaseCelebration cx={celebration.cx} cy={celebration.cy} label={celebration.label} onDone={() => setCelebration(null)} />}
       {randomReveal && (
         <div className="modal-overlay" style={{ zIndex: 90000 }} onClick={() => setRandomReveal(null)}>
           <div className="shop-reveal-modal animate-in" onClick={e => e.stopPropagation()}>
@@ -4497,9 +4613,9 @@ function ShopScreen() {
         ))}
       </div>
       <div className="shop-content animate-in">
-        {tab === 'skins' && renderSkinGrid()}
-        {tab === 'avatars' && renderItemGrid(catalog.avatars || [], 'avatar', '/data/shop/avatars/')}
-        {tab === 'sleeves' && renderItemGrid(catalog.sleeves || [], 'sleeve', '/data/shop/sleeves/')}
+        {tab === 'skins' && renderGachaPage('skin')}
+        {tab === 'avatars' && renderGachaPage('avatar')}
+        {tab === 'sleeves' && renderGachaPage('sleeve')}
         {tab === 'cpuSleeves' && renderCpuSleeves()}
         {tab === 'cpuAvatars' && renderCpuAvatars()}
         {tab === 'boards' && renderItemGrid(catalog.boards || [], 'board', '/data/shop/boards/')}
