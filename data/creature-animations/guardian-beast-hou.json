@@ -1,0 +1,15 @@
+{
+  "creature": "Guardian Beast Hou",
+  "sheet": "guardian-beast-hou.png",
+  "frameWidth": 25,
+  "frameHeight": 37,
+  "frames": 48,
+  "frameMs": 64,
+  "loop": true,
+  "layout": "horizontal",
+  "padTop": 3,
+  "padLeft": 4,
+  "padRight": 4,
+  "padBottom": 2,
+  "faceX": 12.5
+}
