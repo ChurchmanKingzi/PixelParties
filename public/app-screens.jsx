@@ -28,7 +28,7 @@ function PasswordInput({ value, onChange, placeholder, onEnter, autoFocus, autoC
   const [show, setShow] = useState(false);
   return (
     <div className="pw-field">
-      <input
+      <input data-pp-tastatur="an"
         className="input" type={show ? 'text' : 'password'} placeholder={placeholder}
         value={value} autoFocus={autoFocus} autoComplete={autoComplete || 'current-password'}
         onChange={e => onChange(e.target.value)}
@@ -913,7 +913,7 @@ function AuthScreen() {
   );
 
   const codeField = (
-    <input className="input auth-code" inputMode="numeric" autoComplete="one-time-code"
+    <input data-pp-tastatur="an" className="input auth-code" inputMode="numeric" autoComplete="one-time-code"
       placeholder="6-digit code" maxLength={6} value={code} autoFocus
       onChange={e => setCode(e.target.value.replace(/\D/g, ''))}
       onKeyDown={e => e.key === 'Enter' && (mode === 'verify' ? submitVerify() : submitReset())} />
@@ -950,17 +950,17 @@ function AuthScreen() {
         <div className="auth-form-main">
           {mode === 'login' ? (
             <>
-              <input className="input" placeholder="Username or Email" value={identifier} autoComplete="username"
+              <input data-pp-tastatur="an" className="input" placeholder="Username or Email" value={identifier} autoComplete="username"
                 onChange={e => setIdentifier(e.target.value)} onKeyDown={e => e.key === 'Enter' && submitLogin()} />
             </>
           ) : (
             <>
-              <input className="input" placeholder="Username" value={username} autoComplete="username" maxLength={10}
+              <input data-pp-tastatur="an" className="input" placeholder="Username" value={username} autoComplete="username" maxLength={10}
                 onChange={e => setUsername(e.target.value)} onKeyDown={e => e.key === 'Enter' && submitSignup()} />
               {/* v1266: der Hinweis auf den Bestaetigungscode steht im
                   Platzhalter (vorher eine eigene, zweizeilige Fusszeile);
                   der naechste Schritt sagt ohnehin, wohin der Code ging. */}
-              <input className="input" type="email" placeholder="Email — we'll send you a code" value={email} autoComplete="email"
+              <input data-pp-tastatur="an" className="input" type="email" placeholder="Email — we'll send you a code" value={email} autoComplete="email"
                 onChange={e => setEmail(e.target.value)} onKeyDown={e => e.key === 'Enter' && submitSignup()} />
             </>
           )}
@@ -1050,7 +1050,7 @@ function AuthScreen() {
       <div className="auth-form auth-form--single">
         <div className="auth-step-title">Reset your password</div>
         <div className="auth-fine">Enter your account email and we'll send you a reset code.</div>
-        <input className="input" type="email" placeholder="Email" value={email} autoFocus autoComplete="email"
+        <input data-pp-tastatur="an" className="input" type="email" placeholder="Email" value={email} autoFocus autoComplete="email"
           onChange={e => setEmail(e.target.value)} onKeyDown={e => e.key === 'Enter' && submitForgot()} />
         {Msgs}
         <button className="btn btn-big" onClick={submitForgot} disabled={loading}>{loading ? '...' : 'SEND CODE'}</button>
@@ -3240,7 +3240,7 @@ function ProfileScreen() {
                 : obj.available ? 'var(--success)' : 'var(--danger)';
               return (
                 <div style={{ marginTop: 10, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 7 }}>
-                  <input className="input" value={nameInput} maxLength={10} autoFocus
+                  <input data-pp-tastatur="an" className="input" value={nameInput} maxLength={10} autoFocus
                     onChange={(e) => setNameInput(e.target.value)}
                     onKeyDown={(e) => { if (e.key === 'Enter') saveName(); else if (e.key === 'Escape') cancelNameEdit(); }}
                     style={{ textAlign: 'center', fontSize: 22, fontWeight: 800, width: 260, color, borderColor: tone, boxShadow: `0 0 10px ${tone}33` }} />
@@ -5332,9 +5332,9 @@ function GuestRegisterModal({ onClose, starterDeckId }) {
         <div className="orbit-font" style={{ fontSize: 11, color: 'var(--text2)', marginBottom: 16, letterSpacing: 1 }}>Keep your deck &amp; unlock everything</div>
         {step === 'form' ? (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-            <input className="input" placeholder="Username" value={username} autoComplete="username" maxLength={10} onChange={e => setUsername(e.target.value)} onKeyDown={e => e.key === 'Enter' && submitSignup()} />
-            <input className="input" type="email" placeholder="Email" value={email} autoComplete="email" onChange={e => setEmail(e.target.value)} onKeyDown={e => e.key === 'Enter' && submitSignup()} />
-            <input className="input" type="password" placeholder="Password" value={password} autoComplete="new-password" onChange={e => setPassword(e.target.value)} onKeyDown={e => e.key === 'Enter' && submitSignup()} />
+            <input data-pp-tastatur="an" className="input" placeholder="Username" value={username} autoComplete="username" maxLength={10} onChange={e => setUsername(e.target.value)} onKeyDown={e => e.key === 'Enter' && submitSignup()} />
+            <input data-pp-tastatur="an" className="input" type="email" placeholder="Email" value={email} autoComplete="email" onChange={e => setEmail(e.target.value)} onKeyDown={e => e.key === 'Enter' && submitSignup()} />
+            <input data-pp-tastatur="an" className="input" type="password" placeholder="Password" value={password} autoComplete="new-password" onChange={e => setPassword(e.target.value)} onKeyDown={e => e.key === 'Enter' && submitSignup()} />
             {error && <div className="auth-msg auth-err">{error}</div>}
             <button className="btn btn-big" onClick={submitSignup} disabled={loading}>{loading ? '...' : 'SIGN UP'}</button>
             <div className="auth-fine">We'll email you a 6-digit code to confirm your address.</div>
@@ -5342,7 +5342,7 @@ function GuestRegisterModal({ onClose, starterDeckId }) {
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
             <div className="auth-fine">We sent a 6-digit code to <b>{pendingEmail}</b>.</div>
-            <input className="input auth-code" inputMode="numeric" autoComplete="one-time-code" placeholder="6-digit code" maxLength={6} value={code} autoFocus onChange={e => setCode(e.target.value.replace(/\D/g, ''))} onKeyDown={e => e.key === 'Enter' && submitVerify()} />
+            <input data-pp-tastatur="an" className="input auth-code" inputMode="numeric" autoComplete="one-time-code" placeholder="6-digit code" maxLength={6} value={code} autoFocus onChange={e => setCode(e.target.value.replace(/\D/g, ''))} onKeyDown={e => e.key === 'Enter' && submitVerify()} />
             {error && <div className="auth-msg auth-err">{error}</div>}
             {info && <div className="auth-msg auth-ok">{info}</div>}
             <button className="btn btn-big" onClick={submitVerify} disabled={loading}>{loading ? '...' : 'VERIFY & PLAY'}</button>
