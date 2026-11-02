@@ -1,15 +1,15 @@
 {
   "creature": "Guardian Beast Gou",
   "sheet": "guardian-beast-gou.png",
-  "frameWidth": 28,
+  "frameWidth": 24,
   "frameHeight": 32,
   "frames": 48,
   "frameMs": 64,
   "loop": true,
   "layout": "horizontal",
   "padTop": 2,
-  "padLeft": 4,
-  "padRight": 4,
+  "padLeft": 2,
+  "padRight": 2,
   "padBottom": 2,
-  "faceX": 14.0
+  "faceX": 12.0
 }

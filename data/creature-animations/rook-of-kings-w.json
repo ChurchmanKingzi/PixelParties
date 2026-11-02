@@ -1,0 +1,15 @@
+{
+  "creature": "Rook of Kings [W]",
+  "sheet": "rook-of-kings-w.png",
+  "frameWidth": 28,
+  "frameHeight": 28,
+  "frames": 48,
+  "frameMs": 70,
+  "loop": true,
+  "layout": "horizontal",
+  "padTop": 3,
+  "padLeft": 3,
+  "padRight": 3,
+  "padBottom": 2,
+  "faceX": 14.0
+}

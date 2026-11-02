@@ -36,7 +36,7 @@ import anim_humanoide as Hm
 import anim_lib as L
 
 N, MS = 48, 64
-sz = G.Szene('guardian-beast-hu', (4, 4, 3, 2))
+sz = G.Szene('guardian-beast-hu', (2, 2, 2, 2))
 spr, OFF, H, W, f = sz.spr, sz.off, sz.H, sz.W, sz.f
 
 GESICHT = f(7, 11)                                               # (159,31,46) rote Gesichtsfarbe

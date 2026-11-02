@@ -1,0 +1,15 @@
+{
+  "creature": "Guardian Beast Yang",
+  "sheet": "guardian-beast-yang.png",
+  "frameWidth": 76,
+  "frameHeight": 41,
+  "frames": 48,
+  "frameMs": 80,
+  "loop": true,
+  "layout": "horizontal",
+  "padTop": 4,
+  "padLeft": 4,
+  "padRight": 4,
+  "padBottom": 3,
+  "faceX": 38.0
+}

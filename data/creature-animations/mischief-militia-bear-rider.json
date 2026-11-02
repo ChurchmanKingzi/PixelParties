@@ -1,0 +1,15 @@
+{
+  "creature": "Mischief Militia - Bear Rider",
+  "sheet": "mischief-militia-bear-rider.png",
+  "frameWidth": 60,
+  "frameHeight": 52,
+  "frames": 48,
+  "frameMs": 70,
+  "loop": true,
+  "layout": "horizontal",
+  "padTop": 4,
+  "padLeft": 2,
+  "padRight": 3,
+  "padBottom": 3,
+  "faceX": 30.0
+}

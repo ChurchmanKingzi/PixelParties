@@ -9,6 +9,7 @@ anim_humanoide aufbauen. Jede Figur hat ihre eigene Bewegung — dieses Modul en
     gefaelle(zeilen, d)         Zeilenversatz-Wörterbuch {zeile: dx} mit Gefälle ≤ 1 px je Zeile (oben d, nach unten auslaufend auf 0) — Federbusch, Zipfel
     bob(a, zeile, n)            Atmen/Wippen: Zeile `zeile` n-mal zusätzlich einfügen (L.streck_zeile mit Texturmischung); alles darüber steigt
     blinzeln(a, off, {(x, y): lidfarbe})   Augenpixel nehmen die Lidfarbe an
+    kontur(a, erlaubt, wahl)    Randpixel in Nicht-Umrissfarbe auf passende Umrissfarbe setzen (Regel 16)
     abschluss(...)              Standard-Hauptprogramm: Ruhepose, L.pruefe, Eckkontakte, Speichern, Kontaktbogen
 Alle Bewegungen laufen auf der vollen Leinwand (anim_lib wirft ClipError). Nur ganze Pixel, nur Farben der Quelle.
 """
@@ -80,9 +81,30 @@ def gefaelle(zeilen, d):
     return {z: int(round(d * (n - j) / n)) for j, z in enumerate(zeilen)}
 
 
-def bob(a, zeile, n):
-    """Wippen: Leinwandzeile `zeile` wird n-mal zusätzlich eingefügt, alles darüber steigt um n."""
-    return L.streck_zeile(a, zeile, n) if n else a
+def bob(a, zeile, n, mischen=True):
+    """Wippen: Leinwandzeile `zeile` wird n-mal zusätzlich eingefügt, alles darüber steigt um n.
+    mischen=True: L.streck_zeile (Texturmischung mit der ähnlichsten Nachbarzeile). mischen=False: schlichte Wiederholung — nur für Zeilen ohne
+    Textur, deren Nachbarzeile sonst Haut/Edelstein in die Zeile ziehen würde (Hals neben Robe, Juwel neben Robe)."""
+    if not n:
+        return a
+    if mischen:
+        return L.streck_zeile(a, zeile, n)
+    if a[:n, :, 3].any():
+        raise L.ClipError(f'bob würde {n} belegte Zeile(n) am oberen Rand abschneiden')
+    h = a.shape[0]
+    rows = list(range(zeile)) + [zeile] * (n + 1) + list(range(zeile + 1, h))
+    return a[rows[n:]].copy()
+
+
+def kontur(a, erlaubt, wahl):
+    """Regel 16: jedes Randpixel (4-Nachbar leer), dessen Farbe keine Umrissfarbe des Originals ist, bekommt die Farbe wahl(farbe, x, y) — so bleibt die Kontur in jeder Pose geschlossen
+    und der neue Umriss passt zur Umgebung (roter Federbusch → dunkles Rot, nicht Schwarz)."""
+    kk = Hm.kantenmaske(a)
+    for y, x in zip(*np.nonzero(kk)):
+        c = tuple(int(v) for v in a[y, x, :3])
+        if c not in erlaubt:
+            a[y, x, :3] = wahl(c, x, y)
+    return a
 
 
 def blinzeln(a, off, pixel):

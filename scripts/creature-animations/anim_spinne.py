@@ -89,16 +89,24 @@ def zerlege_beine(spr, bein_maske, koerper_maske, mitte_x=None, verbinden=True):
     return beine
 
 
-def zeichne_bein(ebene, bein, wirkung, dx=0, dy=0):
-    """Bein mit verschobenen Gelenken auf `ebene` zeichnen (dx, dy = Versatz des ganzen Beins auf der Leinwand)."""
+def zeichne_bein(ebene, bein, wirkung, dx=0, dy=0, kuerzen=0):
+    """Bein mit verschobenen Gelenken auf `ebene` zeichnen (dx, dy = Versatz des ganzen Beins auf der Leinwand).
+    kuerzen = k: die äußersten k Knoten fallen auf den Gelenkpunkt davor zurück (Fuß zieht an / Bein wird um k px kürzer) — ohne Knick und ohne Querstrich."""
     h, w = ebene.shape[:2]
     neu = []
     for n in bein['knoten']:
         ddx, ddy = wirkung(n)
         neu.append((n['x'] + dx + int(ddx), n['y'] + dy + int(ddy)))
+    if kuerzen:
+        for k, n in enumerate(bein['knoten']):
+            if n['maxd_minus'] < kuerzen:
+                a = k
+                for _ in range(kuerzen - n['maxd_minus']):
+                    a = bein['knoten'][a]['eltern'] if bein['knoten'][a]['eltern'] >= 0 else a
+                neu[k] = neu[a]
     for k, n in enumerate(bein['knoten']):
         p = neu[k]
-        pix = [p] if n['eltern'] < 0 else linie(neu[n['eltern']], p)
+        pix = [p] if n['eltern'] < 0 else linie(neu[n['eltern']], p)[1:]      # der Elternpixel gehört dem Eltern-Knoten (eigene Farbe)
         for (x, y) in pix:
             if not (0 <= x < w and 0 <= y < h):
                 raise L.ClipError(f'Beinpixel ({x},{y}) liegt außerhalb der Leinwand {w}×{h}')

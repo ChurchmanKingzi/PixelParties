@@ -1,0 +1,15 @@
+{
+  "creature": "Cute Spider",
+  "sheet": "cute-spider.png",
+  "frameWidth": 31,
+  "frameHeight": 26,
+  "frames": 48,
+  "frameMs": 70,
+  "loop": true,
+  "layout": "horizontal",
+  "padTop": 2,
+  "padLeft": 3,
+  "padRight": 4,
+  "padBottom": 2,
+  "faceX": 15.5
+}

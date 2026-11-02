@@ -1,0 +1,15 @@
+{
+  "creature": "Guardian Beast Zhu",
+  "sheet": "guardian-beast-zhu.png",
+  "frameWidth": 51,
+  "frameHeight": 24,
+  "frames": 48,
+  "frameMs": 80,
+  "loop": true,
+  "layout": "horizontal",
+  "padTop": 3,
+  "padLeft": 3,
+  "padRight": 3,
+  "padBottom": 3,
+  "faceX": 25.5
+}

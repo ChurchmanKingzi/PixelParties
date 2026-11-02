@@ -1,0 +1,15 @@
+{
+  "creature": "Queen of Kings [W]",
+  "sheet": "queen-of-kings-w.png",
+  "frameWidth": 22,
+  "frameHeight": 39,
+  "frames": 48,
+  "frameMs": 70,
+  "loop": true,
+  "layout": "horizontal",
+  "padTop": 2,
+  "padLeft": 2,
+  "padRight": 2,
+  "padBottom": 2,
+  "faceX": 11.0
+}

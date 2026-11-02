@@ -132,6 +132,105 @@ def luecken_fuellen(a, farbe_fn, minnachbarn=3):
     return out
 
 
+class Ranken:
+    """Dünne Linien/Ranken, die nur DIAGONAL am Körper hängen (Nutzerlob: Deepsea Werewolf): der Kern (größte 4-verbundene Fläche) bleibt stehen oder folgt `kern_dx`,
+    die übrigen Pixel („Ranken“) werden von innen nach außen (Breitensuche über 8er-Nachbarn) so versetzt, dass jedes Pixel 8er-Nachbar seines bereits versetzten Elternpixels bleibt.
+    So reißt keine Linie und es entstehen keine Brückenpixel. Der Versatz wächst mit dem Abstand zum Kern (Gewicht 0 am Kern, 1 ab `voll` px) und darf sich entlang der Linie summieren.
+
+        R = Ranken(spr)
+        ebene = R.ebene(i, H, W, GPL, GPT, wunsch=lambda x, y, g: (dx, dy), kern_dx=lambda y: 0)
+    """
+
+    def __init__(self, spr, kern=None, voll=4.0, entfernen=()):
+        import cv2
+        self.spr = spr
+        self.sh, self.sw = spr.shape[:2]
+        vor = spr[..., 3] > 0
+        for (x, y) in entfernen:
+            vor[y, x] = False
+        self.vor = vor
+        if kern is None:
+            n, lab = cv2.connectedComponents(vor.astype(np.uint8), connectivity=4)
+            gr = [int((lab == k).sum()) for k in range(1, n)]
+            kern = lab == (1 + int(np.argmax(gr)))
+        self.kern = kern
+        self.ranken = vor & ~kern
+        self.abst = cv2.distanceTransform((~kern).astype(np.uint8), cv2.DIST_C, 3)
+        self.RP = [(x, y) for y in range(self.sh) for x in range(self.sw) if self.ranken[y, x]]
+        self.gew = {p: min(1.0, max(0.0, (self.abst[p[1], p[0]] - 1) / voll)) for p in self.RP}
+        self.ordnung = self._reihenfolge()
+
+    def col(self, p):
+        return tuple(int(v) for v in self.spr[p[1], p[0], :3])
+
+    def _reihenfolge(self):
+        sw, sh, kern = self.sw, self.sh, self.kern
+        rest_ = set(self.RP)
+        fertig, ordnung, front = set(), [], []
+        for (x, y) in sorted(self.RP):
+            for dy in (-1, 0, 1):
+                for dx in (-1, 0, 1):
+                    q = (x + dx, y + dy)
+                    if (dx, dy) != (0, 0) and 0 <= q[0] < sw and 0 <= q[1] < sh and kern[q[1], q[0]]:
+                        front.append(((x, y), q))
+                        break
+                else:
+                    continue
+                break
+        while front:
+            nxt = []
+            for (p, par) in front:
+                if p in fertig:
+                    continue
+                fertig.add(p)
+                ordnung.append((p, par))
+                for dy in (-1, 0, 1):
+                    for dx in (-1, 0, 1):
+                        q = (p[0] + dx, p[1] + dy)
+                        if (dx, dy) != (0, 0) and q in rest_ and q not in fertig:
+                            nxt.append((q, p))
+            nxt.sort(key=lambda t: (self.col(t[0]) != self.col(t[1]) if t[1] in rest_ else False, t[0][1], t[0][0]))
+            front = nxt
+        # Ranken ohne Anschluss an den Kern (Inseln) bleiben stehen
+        self.inseln = [p for p in self.RP if p not in fertig]
+        return ordnung
+
+    def lage(self, i, wunsch, kern_dx=None, kern_dy=None):
+        """Neue Lage {Pixel: (x, y)} aller Ranken-Pixel in Frame i."""
+        pos = {}
+        for (p, par) in self.ordnung:
+            x, y = p
+            wx, wy = wunsch(x, y, self.gew[p])
+            if par in pos:
+                pp = pos[par]
+            else:
+                pp = (par[0] + (kern_dx(par[1]) if kern_dx else 0), par[1] + (kern_dy(par[1]) if kern_dy else 0))
+            best, bd = None, None
+            for oy in range(-4, 5):
+                for ox in range(-4, 5):
+                    q = (x + ox, y + oy)
+                    if max(abs(q[0] - pp[0]), abs(q[1] - pp[1])) > 1 or q == pp:
+                        continue
+                    d = (ox - wx) ** 2 + (oy - wy) ** 2 + 0.01 * (abs(ox) + abs(oy))
+                    if bd is None or d < bd:
+                        best, bd = q, d
+            pos[p] = best
+        for p in self.inseln:
+            pos[p] = p
+        return pos
+
+    def ebene(self, i, H, W, GPL, GPT, wunsch, kern_dx=None, kern_dy=None):
+        a = L.leer(H, W)
+        pos = self.lage(i, wunsch, kern_dx, kern_dy)
+        for p in self.RP:
+            x, y = pos[p]
+            if not (0 <= GPT + y < H and 0 <= GPL + x < W):
+                raise L.ClipError(f'Ranke bei ({x},{y}) liegt außerhalb der Leinwand')
+            a[GPT + y, GPL + x, :3] = self.col(p)
+            a[GPT + y, GPL + x, 3] = 255
+        return a
+
+
 class Szene:
     """Leinwand mit Rand um den Sprite; Zuschnitt (symmetrisch um die Ruhefigur) und Speichern.
 

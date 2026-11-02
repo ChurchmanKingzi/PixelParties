@@ -1,0 +1,15 @@
+{
+  "creature": "Chaorc Rider Warg",
+  "sheet": "chaorc-rider-warg.png",
+  "frameWidth": 37,
+  "frameHeight": 43,
+  "frames": 48,
+  "frameMs": 66,
+  "loop": true,
+  "layout": "horizontal",
+  "padTop": 2,
+  "padLeft": 2,
+  "padRight": 2,
+  "padBottom": 3,
+  "faceX": 18.5
+}

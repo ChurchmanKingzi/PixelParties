@@ -1,0 +1,15 @@
+{
+  "creature": "Deepsea Pirate",
+  "sheet": "deepsea-pirate.png",
+  "frameWidth": 25,
+  "frameHeight": 30,
+  "frames": 48,
+  "frameMs": 70,
+  "loop": true,
+  "layout": "horizontal",
+  "padTop": 2,
+  "padLeft": 1,
+  "padRight": 2,
+  "padBottom": 1,
+  "faceX": 12.5
+}

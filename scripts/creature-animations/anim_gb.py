@@ -79,10 +79,26 @@ class Szene:
                 fig[y, x, :3] = farbe
         return fig
 
+    def kontur_ebenen(self, fig, ebenen, standard):
+        """Wie kontur, aber je Teilebene eine eigene Umrissfarbe: `ebenen` = [(Ebene, farbe), …] (erste mit deckendem Pixel gewinnt),
+        sonst `standard`. Für Teile mit eigener Kontur (Flügel mit olivgoldenem Rand, Körper mit dunkelbraunem Umriss)."""
+        kk = Hm.kantenmaske(fig)
+        for y, x in zip(*np.nonzero(kk)):
+            c = tuple(int(v) for v in fig[y, x, :3])
+            if c in self.erlaubt:
+                continue
+            farbe = standard
+            for eb, fb in ebenen:
+                if eb[y, x, 3]:
+                    farbe = fb
+                    break
+            fig[y, x, :3] = farbe
+        return fig
 
-def abschluss(sz, frames, slug, karte, ms, prev, rampen=(), erlaubt=(), extra=None, ruhe_ausnahmen=None, strip_scale=6):
+
+def abschluss(sz, frames, slug, karte, ms, prev, rampen=(), erlaubt=(), extra=None, ruhe0=None, strip_scale=6):
     """Pflichtprüfungen (Ruhepose, L.pruefe, Eckkontakte) und Speichern; Vorschau-GIF + Kontaktbogen nach `prev`."""
-    diff = Hm.ruhepose(frames[0], sz.spr, sz.off)
+    diff = Hm.ruhepose(frames[0] if ruhe0 is None else ruhe0, sz.spr, sz.off)      # ruhe0: Frame 0 nur des Körpers (Figuren mit neu gezeichnetem Feuer)
     print('Ruhepose weicht vom Original ab bei:', diff if diff else 'nichts')
     n = L.pruefe(frames, quelle=sz.spr, erlaubt=erlaubt)
     print('Pixel je Frame:', n)

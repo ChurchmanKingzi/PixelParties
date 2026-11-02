@@ -1,0 +1,15 @@
+{
+  "creature": "Mischief Militia - Banner Bearer",
+  "sheet": "mischief-militia-banner-bearer.png",
+  "frameWidth": 38,
+  "frameHeight": 40,
+  "frames": 48,
+  "frameMs": 70,
+  "loop": true,
+  "layout": "horizontal",
+  "padTop": 4,
+  "padLeft": 3,
+  "padRight": 8,
+  "padBottom": 3,
+  "faceX": 19.0
+}

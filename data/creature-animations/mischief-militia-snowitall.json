@@ -1,0 +1,15 @@
+{
+  "creature": "Mischief Militia - SnowItAll",
+  "sheet": "mischief-militia-snowitall.png",
+  "frameWidth": 30,
+  "frameHeight": 28,
+  "frames": 48,
+  "frameMs": 68,
+  "loop": true,
+  "layout": "horizontal",
+  "padTop": 4,
+  "padLeft": 2,
+  "padRight": 2,
+  "padBottom": 3,
+  "faceX": 15.0
+}

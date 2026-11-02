@@ -2,7 +2,7 @@
   "creature": "Rebelliokai Backup Bakus",
   "sheet": "rebelliokai-backup-bakus.png",
   "frameWidth": 24,
-  "frameHeight": 27,
+  "frameHeight": 26,
   "frames": 48,
   "frameMs": 70,
   "loop": true,

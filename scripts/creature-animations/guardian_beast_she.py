@@ -107,7 +107,7 @@ def frame(i):
     Hm.setze(sw_, ERG_SCHWANZ, OFF)
     ph = L.sinus(i, 16)
     ys = range(PAD_T + 21, PAD_T + 34)
-    dxs = G.gefaelle(ys, PAD_T + 34, 2.0, ph, potenz=1.0)
+    dxs = G.gefaelle(ys, PAD_T + 34, 3.0, ph, potenz=1.0)
     for y in range(PAD_T + 21, PAD_T + 25):                                         # Schlinge: starr mit Zeile 25
         dxs[y] = dxs[PAD_T + 25]
     sw_ = G.zeilen_dx(sw_, dxs)

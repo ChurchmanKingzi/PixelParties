@@ -1,0 +1,15 @@
+{
+  "creature": "Phatnir, Prototype of Coolness",
+  "sheet": "phatnir-prototype-of-coolness.png",
+  "frameWidth": 37,
+  "frameHeight": 40,
+  "frames": 48,
+  "frameMs": 70,
+  "loop": true,
+  "layout": "horizontal",
+  "padTop": 2,
+  "padLeft": 2,
+  "padRight": 2,
+  "padBottom": 2,
+  "faceX": 18.5
+}

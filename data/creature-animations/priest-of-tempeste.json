@@ -1,0 +1,15 @@
+{
+  "creature": "Priest of Tempeste",
+  "sheet": "priest-of-tempeste.png",
+  "frameWidth": 24,
+  "frameHeight": 29,
+  "frames": 48,
+  "frameMs": 62,
+  "loop": true,
+  "layout": "horizontal",
+  "padTop": 2,
+  "padLeft": 4,
+  "padRight": 4,
+  "padBottom": 2,
+  "faceX": 12.0
+}

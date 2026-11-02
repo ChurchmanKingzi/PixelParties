@@ -1,0 +1,15 @@
+{
+  "creature": "Great Vanguard Demon",
+  "sheet": "great-vanguard-demon.png",
+  "frameWidth": 42,
+  "frameHeight": 62,
+  "frames": 48,
+  "frameMs": 70,
+  "loop": true,
+  "layout": "horizontal",
+  "padTop": 1,
+  "padLeft": 1,
+  "padRight": 1,
+  "padBottom": 2,
+  "faceX": 21.0
+}

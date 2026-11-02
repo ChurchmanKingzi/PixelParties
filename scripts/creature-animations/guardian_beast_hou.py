@@ -40,7 +40,7 @@ import anim_humanoide as Hm
 import anim_lib as L
 
 N, MS = 48, 64
-sz = G.Szene('guardian-beast-hou', (4, 4, 3, 2))
+sz = G.Szene('guardian-beast-hou', (2, 2, 2, 2))
 spr, OFF, H, W, f = sz.spr, sz.off, sz.H, sz.W, sz.f
 
 HAUT = f(5, 14)                                                  # (250,215,151) Stirnhaut = Lid

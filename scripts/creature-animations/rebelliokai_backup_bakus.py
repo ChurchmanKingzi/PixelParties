@@ -20,10 +20,9 @@ Was im Sprite ist (x, y im 20×20-Sprite):
 Kein Metall, Gold oder Edelstein im Sprite (die grauen Rippen sind Federn/Knochen) → KEIN Glanz (Regel 14). Kein Feuer, keine Partikel.
 
 Ablauf (48 Frames à 70 ms = 3,36 s, nahtlos; ein Bodenwesen: die Füße bleiben am Boden, kein Schweben):
-* OHRFLATTERN: jeder Fächer schwingt als Ganzes um sein Gelenk (Spalten x 5 / x 14): die Spaltenversätze wachsen mit dem Abstand (0…2–3 px an der Spitze, Gefälle ≤ 1 px je Spalte, die Spalte bleibt als Stapel
-  mitsamt Umriss zusammen). Das linke Ohr flattert dreimal in den Frames 3–20, das rechte dreimal in den Frames 27–44 (nie im Gleichschritt); dazu pendelt das Paar langsam (eine Welle je Schleife) um 1 px.
-* ATMEN: zweimal je Schleife wird die Zeile 17 (Körper) einmal doppelt eingefügt (Texturmischung): Kopf und Ohren steigen 1 px, die Füße bleiben stehen.
-* BLINZELN (Frames 17–19 und 38–40): die dunklen Augenpixel nehmen die Stirnfarbe an; die cyanfarbenen Striche bleiben.
+* OHRFLATTERN: jeder Fächer (x ≤ 4 bzw. x ≥ 15, y ≤ 10) bewegt sich als starrer Block um höchstens ±1 px (nach Test: gestaffelte oder 2-px-Versätze reißen die dünnen Rippen/den Umriss ab). Das linke Ohr flattert viermal in den Frames 3–20, das rechte viermal in den Frames 27–44 (nie im Gleichschritt); dazu pendelt das Paar langsam (eine Welle je Schleife) um 1 px.
+* ATMEN: zweimal je Schleife (je 12 Frames) wird die Zeile 16 (Körper) einmal doppelt eingefügt (Texturmischung): Kopf und Ohren steigen 1 px, die Füße bleiben stehen.
+* BLINZELN (Frames 17–19 und 38–40): die dunklen Augenpixel nehmen die Stirnfarbe an, ein 2-px-Lidstrich (23,12,0) bleibt bei (7–8,9) und (11–12,9); die cyanfarbenen Striche bleiben.
 Frame 0 = Original (Ruhepose). Kontrolle: Ruhepose / Eckkontakte / Randpixel-Test (Regel 16). Alle Bewegungen laufen auf der vollen Leinwand (ClipError statt Abschneiden). Nur ganze Pixel, nur Quellfarben.
 Ergänzungen: keine.
 """
@@ -37,7 +36,7 @@ import anim_lib as L
 import anim_rebel as R
 
 N, MS = 48, 70
-PAD_L, PAD_R, PAD_T, PAD_B = 2, 2, 5, 2
+PAD_L, PAD_R, PAD_T, PAD_B = 2, 2, 4, 2          # Ohrhub 1 px + Atemhub 1 px oben, Randabstand ≥ 2
 
 spr = L.lade('rebelliokai-backup-bakus')
 sh, sw = spr.shape[:2]
@@ -48,14 +47,18 @@ vorhanden = L.deckend(spr)
 f = lambda x, y: R.farbe(spr, x, y)
 
 ERLAUBT = Hm.umrissfarben(spr)
-UMRISS_G = f(6, 6)                                                  # (28,34,20)
+UMRISS_G = f(8, 6)                                                  # (28,34,20)
 UMRISS_B = f(2, 0)                                                  # (23,24,42)
 STIRN = f(9, 8)                                                     # (120,160,126), Lidfarbe
 AUGEN = [(8, 8), (7, 9), (8, 9), (11, 8), (12, 9), (11, 9)]
+UMRISS_AUGE = f(8, 8)                                               # (23,12,0), Lidstrich
 
 ohr_l = vorhanden & (xx <= 4) & (yy <= 10)
 ohr_r = vorhanden & (xx >= sw - 5) & (yy <= 10)
 rumpf = vorhanden & ~ohr_l & ~ohr_r
+
+
+STAFFEL = [0, 1, 1, 1, 1, 1]                                   # Abstand 0…5 vom Gelenk → Anteil der Amplitude (Spalten gruppiert, keine 1-px-Zacken)
 
 
 def frame(i, nur=None):
@@ -65,15 +68,16 @@ def frame(i, nur=None):
     # Blinzeln: dunkle Augenpixel → Stirnfarbe
     if Hm.folge(i, 17, [1, 1, 1], N) or Hm.folge(i, 38, [1, 1, 1], N):
         Hm.setze(k, {p: STIRN for p in AUGEN}, OFF)
+        Hm.setze(k, {(7, 9): UMRISS_AUGE, (8, 9): UMRISS_AUGE, (11, 9): UMRISS_AUGE, (12, 9): UMRISS_AUGE}, OFF)     # geschlossenes Lid = dunkler Strich
     # Ohrflattern (positiv = nach unten): Bursts + langsames Pendeln
     slow = 1.0 * math.sin(L.sinus(i, N))
-    a_l = 2.6 * R.burst(i, N, 3, 18, 3) + slow
-    a_r = 2.6 * R.burst(i, N, 27, 18, 3) + slow
-    ol = R.spalten_pendel(ol, PAD_L + 5, a_l, math.pi / 2)
-    orr = R.spalten_pendel(orr, PAD_L + sw - 6, a_r, math.pi / 2)
+    a_l = max(-1.0, min(1.0, 1.5 * R.burst(i, N, 3, 18, 4) + 0.5 * slow))        # starre Verschiebung höchstens ±1 px (größere Versätze reißen die Rippen ab)
+    a_r = max(-1.0, min(1.0, 1.5 * R.burst(i, N, 27, 18, 4) + 0.5 * slow))
+    ol = R.spalten_staffel(ol, PAD_L + 5, STAFFEL, a_l)
+    orr = R.spalten_staffel(orr, PAD_L + sw - 6, STAFFEL, a_r)
     # Atmen (Zeile 17), zweimal je Schleife
     b = Hm.stufe(i, N / 2, 1)
-    k, ol, orr = (L.streck_zeile(e, PAD_T + 17, b) if b else e for e in (k, ol, orr))
+    k, ol, orr = (L.streck_zeile(e, PAD_T + 16, b) if b else e for e in (k, ol, orr))
     fig = L.zusammen(H, W, [(k, 0, 0), (ol, 0, 0), (orr, 0, 0)])
     # Regel 16: Randpixel in Nicht-Umrissfarbe → Umriss (oben/Ohren navy, Körper dunkelgrün)
     kk = Hm.kantenmaske(fig)

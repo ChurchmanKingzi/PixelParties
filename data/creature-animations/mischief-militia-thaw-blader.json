@@ -1,0 +1,15 @@
+{
+  "creature": "Mischief Militia - Thaw Blader",
+  "sheet": "mischief-militia-thaw-blader.png",
+  "frameWidth": 40,
+  "frameHeight": 52,
+  "frames": 48,
+  "frameMs": 66,
+  "loop": true,
+  "layout": "horizontal",
+  "padTop": 6,
+  "padLeft": 2,
+  "padRight": 3,
+  "padBottom": 4,
+  "faceX": 20.0
+}

@@ -1,0 +1,15 @@
+{
+  "creature": "Hipdall, Protector of Coolness",
+  "sheet": "hipdall-protector-of-coolness.png",
+  "frameWidth": 28,
+  "frameHeight": 32,
+  "frames": 48,
+  "frameMs": 70,
+  "loop": true,
+  "layout": "horizontal",
+  "padTop": 2,
+  "padLeft": 2,
+  "padRight": 3,
+  "padBottom": 2,
+  "faceX": 14.0
+}

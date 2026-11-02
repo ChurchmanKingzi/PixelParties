@@ -60,9 +60,10 @@ def sprite_pixel(a, off, pixel):
     return Hm.setze(a, pixel, off)
 
 
-def zeilen_pendel(a, pivot_y, amp, phase, potenz=1.0, lauf=0.0, richtung=1):
+def zeilen_pendel(a, pivot_y, amp, phase, potenz=1.0, lauf=0.0, richtung=1, ruhe0=False, versatz=0.0):
     """Jede Zeile wandert waagerecht um round(amp·frac^potenz·sin(phase − lauf·frac)); frac = Abstand/maxAbstand vom Pivot (richtung 1 = unterhalb, -1 = oberhalb).
-    Der Unterschied benachbarter Zeilen bleibt klein, so reißt nichts ab. Nur Pixel auf der gegebenen Seite des Pivots bewegen sich."""
+    Der Unterschied benachbarter Zeilen bleibt klein, so reißt nichts ab. Nur Pixel auf der gegebenen Seite des Pivots bewegen sich.
+    ruhe0=True: von der Welle wird ihr Wert bei phase=0 abgezogen (Frame 0 = Ruhepose auch mit lauf/versatz)."""
     out = L.leer(*a.shape[:2])
     h, w = a.shape[:2]
     zeilen = [y for y in range(h) if a[y, :, 3].any() and (y - pivot_y) * richtung >= 0]
@@ -75,7 +76,8 @@ def zeilen_pendel(a, pivot_y, amp, phase, potenz=1.0, lauf=0.0, richtung=1):
             dx = 0
         else:
             frac = abs(y - pivot_y) / maxd
-            dx = int(round(amp * (frac ** potenz) * math.sin(phase - lauf * frac)))
+            wert = math.sin(phase + versatz - lauf * frac) - (math.sin(versatz - lauf * frac) if ruhe0 else 0.0)
+            dx = int(round(amp * (frac ** potenz) * wert))
         if xs.min() + dx < 0 or xs.max() + dx >= w:
             raise L.ClipError(f'Zeile {y} würde um {dx} px aus der Leinwand (Breite {w}) geschoben')
         for x in xs:
@@ -83,7 +85,7 @@ def zeilen_pendel(a, pivot_y, amp, phase, potenz=1.0, lauf=0.0, richtung=1):
     return out
 
 
-def spalten_pendel(a, pivot_x, amp, phase, potenz=1.0, lauf=0.0, seite=0, bias=0.0):
+def spalten_pendel(a, pivot_x, amp, phase, potenz=1.0, lauf=0.0, seite=0, bias=0.0, ruhe0=False, versatz=0.0):
     """Jede Spalte wandert senkrecht um round((amp·sin(phase − lauf·frac) + bias)·frac^potenz); seite 0 = beide Seiten des Pivots, +1 nur rechts, -1 nur links."""
     out = L.leer(*a.shape[:2])
     h, w = a.shape[:2]
@@ -97,7 +99,26 @@ def spalten_pendel(a, pivot_x, amp, phase, potenz=1.0, lauf=0.0, seite=0, bias=0
             dy = 0
         else:
             frac = abs(x - pivot_x) / maxd
-            dy = int(round((amp * math.sin(phase - lauf * frac) + bias) * (frac ** potenz)))
+            wert = math.sin(phase + versatz - lauf * frac) - (math.sin(versatz - lauf * frac) if ruhe0 else 0.0)
+            dy = int(round((amp * wert + bias) * (frac ** potenz)))
+        if ys.min() + dy < 0 or ys.max() + dy >= h:
+            raise L.ClipError(f'Spalte {x} würde um {dy} px aus der Leinwand (Höhe {h}) geschoben')
+        for y in ys:
+            out[y + dy, x] = a[y, x]
+    return out
+
+
+def spalten_staffel(a, pivot_x, faktoren, amp):
+    """Spaltenversatz in Gruppen (Fächer-/Flügelspitzen ohne 1-px-Zacken): die Spalte im Abstand d vom Pivot wandert um round(amp·faktoren[d]) senkrecht
+    (positiv = nach unten); faktoren ist eine Liste (Index = Abstand, danach gilt der letzte Wert). Spalten gleicher Gruppe bleiben als Block zusammen."""
+    out = L.leer(*a.shape[:2])
+    h, w = a.shape[:2]
+    for x in range(w):
+        ys = np.nonzero(a[:, x, 3])[0]
+        if not len(ys):
+            continue
+        d = abs(x - pivot_x)
+        dy = int(round(amp * faktoren[min(d, len(faktoren) - 1)]))
         if ys.min() + dy < 0 or ys.max() + dy >= h:
             raise L.ClipError(f'Spalte {x} würde um {dy} px aus der Leinwand (Höhe {h}) geschoben')
         for y in ys:
@@ -131,6 +152,16 @@ def abschluss(slug, karte, frames, ms, spr, off, prev, extra_erlaubt=(), face_x=
     e0 = Hm.eckkontakt_typen(frames[0])
     neu = {i: dict(Hm.eckkontakt_typen(g) - e0) for i, g in enumerate(frames) if Hm.eckkontakt_typen(g) - e0}
     print('neue Eckkontakte gegenüber Frame 0:', neu if neu else 'keine')
+    import cv2
+    def _komp(fr, c):
+        return cv2.connectedComponents((fr[..., 3] > 0).astype(np.uint8), connectivity=c)[0] - 1
+    k8_0, k4_0 = _komp(frames[0], 8), _komp(frames[0], 4)
+    mehr8 = {i: _komp(g, 8) for i, g in enumerate(frames) if _komp(g, 8) > k8_0}
+    mehr4 = {i: _komp(g, 4) for i, g in enumerate(frames) if _komp(g, 4) > k4_0}
+    print(f'Zusammenhangskomponenten Frame 0: 8er {k8_0}, 4er {k4_0}; Frames mit mehr (abgerissene Teile): 8er {mehr8 if mehr8 else "keine"}, 4er {dict(list(mehr4.items())[:8]) if mehr4 else "keine"}')
+    l0 = loecher(frames[0])
+    neue = {i: sorted(loecher(g) - l0) for i, g in enumerate(frames) if loecher(g) - l0}
+    print('neue eingeschlossene Löcher gegenüber Frame 0:', {i: v[:6] for i, v in list(neue.items())[:10]} if neue else 'keine')
     L.speichern(slug, karte, frames, ms, prev, face_x=face_x, extra=extra)
     if prev:
         os.makedirs(prev, exist_ok=True)
@@ -145,3 +176,89 @@ def abschluss(slug, karte, frames, ms, spr, off, prev, extra_erlaubt=(), face_x=
 
 def vorschau_arg():
     return sys.argv[sys.argv.index('--preview') + 1] if '--preview' in sys.argv else None
+
+
+def kette(punkte, farben, verschiebung, weiche=None):
+    """Dünne Linie (Schnurrhaar, Band, Ranke) als Pixelkette neu zeichnen. punkte = [(x, y), …] von der freien Spitze zum Anker, farben = Farbe je Punkt,
+    verschiebung = [(dx, dy), …] je Punkt. Zwischen zwei Punkten, die nach der Verschiebung weiter als 1 px (Chebyshev) auseinanderliegen, werden Brückenpixel
+    (Bresenham, Farbe des vorderen Punkts) gesetzt: die Linie bleibt zusammenhängend. Gibt {(x, y): Farbe}."""
+    out = {}
+    q = [(x + d[0], y + d[1]) for (x, y), d in zip(punkte, verschiebung)]
+    for k, p in enumerate(q):
+        out[p] = farben[k]
+        if k:
+            a, b = q[k - 1], p
+            n = max(abs(b[0] - a[0]), abs(b[1] - a[1]))
+            for s in range(1, n):
+                px = int(round(a[0] + (b[0] - a[0]) * s / n))
+                py = int(round(a[1] + (b[1] - a[1]) * s / n))
+                out.setdefault((px, py), farben[k - 1])
+    return out
+
+
+def schichten(H, W, ebenen):
+    """Ebenen übereinanderlegen (zuerst = unten). ebenen = [(RGBA-Ebene, Etikett), …]. Gibt (Frame, Etikettenkarte) zurück; die Karte hält je Pixel
+    das Etikett der Ebene, die es zuletzt geschrieben hat (None = leer). Zum Schließen der Kontur je Teil (kontur_je_teil)."""
+    fig = L.leer(H, W)
+    etik = np.full((H, W), None, object)
+    for a, name in ebenen:
+        m = a[..., 3] > 0
+        fig[m] = a[m]
+        etik[m] = name
+    return fig, etik
+
+
+def kontur_je_teil(fig, etik, erlaubt, farben, standard=None):
+    """Regel 16: jedes Randpixel (4-Nachbar leer) in einer Farbe, die nicht zu den Umrissfarben der Quelle (`erlaubt`) gehört, bekommt die Umrissfarbe seines Teils
+    (farben = {Etikett: (r, g, b)}). Gibt die Liste der geänderten Pixel zurück."""
+    kk = Hm.kantenmaske(fig)
+    geaendert = []
+    for y, x in zip(*np.nonzero(kk)):
+        c = tuple(int(v) for v in fig[y, x, :3])
+        if c in erlaubt:
+            continue
+        neu = farben.get(etik[y, x], standard)
+        if neu is not None:
+            fig[y, x, :3] = neu
+            geaendert.append((int(x), int(y)))
+    return geaendert
+
+
+def loecher(frame):
+    """Eingeschlossene leere Flächen (nicht über 4-Nachbarn mit dem Leinwandrand verbunden) als Menge von (x, y). Ein Loch, das Frame 0 nicht hat, ist meist ein Fehler
+    (Lücke zwischen verschobenem Teil und Körper)."""
+    import cv2
+    leer = (frame[..., 3] == 0).astype(np.uint8)
+    n, lab = cv2.connectedComponents(leer, connectivity=4)
+    rand = set(np.unique(np.concatenate([lab[0], lab[-1], lab[:, 0], lab[:, -1]])))
+    out = set()
+    for y, x in zip(*np.nonzero(leer)):
+        if lab[y, x] not in rand:
+            out.add((int(x), int(y)))
+    return out
+
+
+def neue_loecher_fuellen(fig, loch0, erlaubt=None, max_groesse=2):
+    """Kleine (≤ max_groesse px) eingeschlossene Leerstellen, die in Frame 0 nicht vorkamen (z. B. 1-px-Taschen zwischen einem verschobenen Blatt und dem Körper), mit der häufigsten
+    Farbe der 4-Nachbarn füllen (bevorzugt Umrissfarben `erlaubt`). Gibt die gefüllten Pixel zurück."""
+    import cv2
+    alle = loecher(fig) - loch0
+    if not alle:
+        return []
+    m = np.zeros(fig.shape[:2], np.uint8)
+    for (x, y) in alle:
+        m[y, x] = 1
+    n, lab = cv2.connectedComponents(m, connectivity=4)
+    neu = sorted((x, y) for (x, y) in alle if int((lab == lab[y, x]).sum()) <= max_groesse)
+    for (x, y) in neu:
+        zaehl = {}
+        for dx, dy in ((1, 0), (-1, 0), (0, 1), (0, -1)):
+            X, Y = x + dx, y + dy
+            if 0 <= X < fig.shape[1] and 0 <= Y < fig.shape[0] and fig[Y, X, 3]:
+                c = tuple(int(v) for v in fig[Y, X, :3])
+                zaehl[c] = zaehl.get(c, 0) + (3 if (erlaubt and c in erlaubt) else 1)
+        if zaehl:
+            c = max(zaehl, key=zaehl.get)
+            fig[y, x, :3] = c
+            fig[y, x, 3] = 255
+    return neu

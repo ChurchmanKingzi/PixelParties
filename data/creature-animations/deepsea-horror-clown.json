@@ -1,0 +1,15 @@
+{
+  "creature": "Deepsea Horror Clown",
+  "sheet": "deepsea-horror-clown.png",
+  "frameWidth": 68,
+  "frameHeight": 58,
+  "frames": 48,
+  "frameMs": 70,
+  "loop": true,
+  "layout": "horizontal",
+  "padTop": 1,
+  "padLeft": 1,
+  "padRight": 1,
+  "padBottom": 3,
+  "faceX": 34.0
+}

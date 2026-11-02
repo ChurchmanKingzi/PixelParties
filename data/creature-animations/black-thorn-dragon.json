@@ -1,0 +1,15 @@
+{
+  "creature": "Black-Thorn Dragon",
+  "sheet": "black-thorn-dragon.png",
+  "frameWidth": 58,
+  "frameHeight": 45,
+  "frames": 60,
+  "frameMs": 70,
+  "loop": true,
+  "layout": "horizontal",
+  "padTop": 8,
+  "padLeft": 6,
+  "padRight": 6,
+  "padBottom": 4,
+  "faceX": 29.0
+}

@@ -42,7 +42,7 @@ import anim_humanoide as Hm
 import anim_lib as L
 
 N, MS = 48, 64
-sz = G.Szene('guardian-beast-gou', (4, 4, 4, 2))                 # Rand: Antenne +1, Atem −1, Ohrplatte/Stern ±1, Randabstand ≥ 2
+sz = G.Szene('guardian-beast-gou', (2, 2, 4, 2))                 # Rand: Antenne +1, Atem −1, Randabstand ≥ 2
 spr, OFF, H, W, f = sz.spr, sz.off, sz.H, sz.W, sz.f
 
 DUNKELBLAU = f(10, 0)                                            # (34,57,98) Umriss/Antenne

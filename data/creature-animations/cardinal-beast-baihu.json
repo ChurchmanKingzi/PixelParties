@@ -1,0 +1,15 @@
+{
+  "creature": "Cardinal Beast Baihu",
+  "sheet": "cardinal-beast-baihu.png",
+  "frameWidth": 58,
+  "frameHeight": 49,
+  "frames": 48,
+  "frameMs": 80,
+  "loop": true,
+  "layout": "horizontal",
+  "padTop": 4,
+  "padLeft": 5,
+  "padRight": 5,
+  "padBottom": 3,
+  "faceX": 29.0
+}

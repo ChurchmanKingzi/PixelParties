@@ -60,14 +60,13 @@ for y, (a, b) in KOERPER_ZEILEN.items():
 koerper_maske &= vor
 bein_maske = vor & ~koerper_maske & ~faden_maske
 beine = S.zerlege_beine(spr, bein_maske, koerper_maske, mitte_x=9)
-# Pendel-Eigenschaften je Bein: Frequenz (Perioden je Schleife) und Vorzeichen; benachbarte Beine gegenphasig, Seiten gegenläufig
+# Pendel-Eigenschaften je Bein: alle Beine einer Seite pendeln im Gleichtakt (keine Überschneidungen), die Seiten spiegelbildlich (spreizen/schließen);
+# dazu ein kleineres, eigenes Wippen je Bein (3 Perioden je Schleife, benachbarte Beine gegensinnig) und das Fußzucken reihum.
 SCHWING = []
 for k, b in enumerate(beine):
     nr = [bb for bb in beine if bb['seite'] == b['seite']].index(b)
-    SCHWING.append(dict(freq=2 if nr % 2 == 0 else 3, vz=(1 if nr % 2 == 0 else -1) * (-1 if b['seite'] == 'l' else 1)))
-# Fußzucken: reihum, 2× pro Schleife, 3 Frames
-for k, b in enumerate(beine):
-    SCHWING[k]['zuck'] = [(3 + 3 * k + 24 * m) % N for m in range(2)]
+    SCHWING.append(dict(seite=-1 if b['seite'] == 'l' else 1, alt=1 if nr % 2 == 0 else -1,
+                        zuck=[(5 + 4 * k + 24 * m) % N for m in range(2)]))
 
 # Totenkopf: Rampe und Pixel
 RAMPE = [(71, 1, 0), (108, 1, 0), (156, 1, 0), (173, 1, 0), (255, 1, 0)]
@@ -110,15 +109,14 @@ def frame(i, nur=None):
     bl = L.leer(H, W)
     for kk, b in enumerate(beine):
         s = SCHWING[kk]
-        ph = 2 * math.pi * s['freq'] * i / N
-        flick = any(0 <= (i - st) % N < 3 for st in s['zuck'])
-        pen = S.pendel(2.0 * s['vz'], 0, ph, potenz=1.0)
-        kn = S.knick(s['vz'], -1 if flick else 0, 1) if flick else (lambda n: (0, 0))
+        gross = math.sin(2 * math.pi * 2 * i / N)
+        klein = math.sin(2 * math.pi * 3 * i / N)
+        fl = max([(1, 2, 1)[(i - st) % N] for st in s['zuck'] if 0 <= (i - st) % N < 3] or [0])      # Fuß zieht an: 1-2-1 px kürzer
 
-        def wirk(n, pen=pen, kn=kn):
-            a, b_ = pen(n); c, e = kn(n)
-            return a + c, b_ + e
-        S.zeichne_bein(bl, b, wirk, PAD_L, dy)
+        def wirk(n, s=s, gross=gross, klein=klein):
+            dx = n['anteil'] * (1.4 * gross * s['seite'] + 0.7 * klein * s['alt'])
+            return round(dx), 0
+        S.zeichne_bein(bl, b, wirk, PAD_L, dy, kuerzen=fl)
     ebenen.append(('beine', bl))
     wahl = nur or [n for n, _ in ebenen]
     return L.zusammen(H, W, [(e, 0, 0) for n, e in ebenen if n in wahl])

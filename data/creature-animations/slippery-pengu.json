@@ -1,0 +1,15 @@
+{
+  "creature": "Slippery Pengu",
+  "sheet": "slippery-pengu.png",
+  "frameWidth": 62,
+  "frameHeight": 27,
+  "frames": 48,
+  "frameMs": 62,
+  "loop": true,
+  "layout": "horizontal",
+  "padTop": 3,
+  "padLeft": 4,
+  "padRight": 13,
+  "padBottom": 3,
+  "faceX": 31.0
+}
