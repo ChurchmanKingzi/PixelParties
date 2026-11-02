@@ -43,6 +43,27 @@ window.ppZustandVeraltet = ppZustandVeraltet;
    ============================================================ */
 const { useState, useEffect, useLayoutEffect, useRef, useCallback, useMemo, createContext, useContext } = React;
 
+// ★ BILDSCHIRMTASTATUR NICHT VON SELBST AUFKLAPPEN (Als Befund 2.11.: „bei einem Mobile-Nutzer war die On-Screen-Tastatur angesprungen"): auf Touch-Geräten
+// (`pointer: coarse`) klappt jedes PROGRAMMATISCHE `focus()` auf ein Texteingabefeld die Tastatur auf — `autoFocus` (Such-/Filterfelder, Auth, Puzzle-Dialoge …)
+// ebenso wie `ref.current.focus()`. Antippen eines Felds fokussiert nativ und ist davon nicht betroffen. Hier wird das programmatische Fokussieren von Text-
+// feldern unterdrückt, AUSSER das Feld trägt `data-pp-tastatur="an"` (Eingaben, die der Nutzer gerade ausdrücklich gewollt hat: Umbenennen, Texteingabe-Dialog,
+// Chat-Nachricht). Mit Maus (Desktop, auch Touch-Notebooks mit Maus) ändert sich nichts.
+(function () {
+  try {
+    if (!window.matchMedia || !window.matchMedia('(pointer: coarse)').matches) return;
+    const TEXT = new Set(['text', 'search', 'email', 'password', 'number', 'tel', 'url', '']);
+    const bremsen = (Klasse) => {
+      const orig = Klasse.prototype.focus;
+      Klasse.prototype.focus = function () {
+        const art = this instanceof HTMLTextAreaElement ? '' : (this.getAttribute('type') || 'text').toLowerCase();
+        if (TEXT.has(art) && !(this.dataset && this.dataset.ppTastatur === 'an')) return;   // Tastatur bleibt zu
+        return orig.apply(this, arguments);
+      };
+    };
+    bremsen(HTMLInputElement); bremsen(HTMLTextAreaElement);
+  } catch (e) { /* ohne Bremse: altes Verhalten */ }
+})();
+
 // ===== TOUCH DETECTION =====
 window._isTouchDevice = false;
 window.addEventListener('touchstart', function onFirstTouch() {
@@ -12102,7 +12123,7 @@ function PPDialogBox({ text, eingabe, vorgabe, okText, abbruchText, gefahr, fert
     <div style={{ position: 'fixed', inset: 0, zIndex: 100002, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(8,6,12,.8)' }} onClick={nein}>
       <div onClick={(e) => e.stopPropagation()} style={{ minWidth: 260, maxWidth: 'min(92vw, 420px)', padding: '16px 18px', background: 'var(--bg2)', border: '3px solid ' + (gefahr ? 'var(--danger)' : 'var(--accent)'), textAlign: 'center' }}>
         <div style={{ fontSize: 13, color: 'var(--text)', lineHeight: 1.5, marginBottom: 12, whiteSpace: 'pre-wrap' }}>{text}</div>
-        {eingabe && <input ref={eingabeRef} className="input" value={wert} onChange={(e) => setWert(e.target.value)} style={{ width: '100%', boxSizing: 'border-box', marginBottom: 12, fontSize: 13 }} />}
+        {eingabe && <input ref={eingabeRef} data-pp-tastatur="an" className="input" value={wert} onChange={(e) => setWert(e.target.value)} style={{ width: '100%', boxSizing: 'border-box', marginBottom: 12, fontSize: 13 }} />}
         <div style={{ display: 'flex', gap: 10, justifyContent: 'center' }}>
           <button className={'btn' + (gefahr ? ' btn-danger' : ' btn-success')} style={{ padding: '8px 22px', fontSize: 12 }} onClick={ok}>{okText || 'OK'}</button>
           {abbruchText !== false && <button className="btn" style={{ padding: '8px 22px', fontSize: 12 }} onClick={nein}>{abbruchText || 'Cancel'}</button>}
