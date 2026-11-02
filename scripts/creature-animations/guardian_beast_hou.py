@@ -27,6 +27,7 @@ Ablauf (48 Frames à 64 ms = 3,07 s, nahtlos):
 * Atmen (Periode 24, zwei Atemzüge): die glatte Hosenzeile 26 wird einmal doppelt eingefügt, Rumpf, Arm, Kopf und Mütze steigen 1 px, Stiefel bleiben; der Stab bleibt stehen (die Hand liegt hinter dem Stab).
 * Mützenspitze weht: die oberen vier Mützenzeilen (6–9) biegen sich nach rechts (Frames 4–15, bis 2 px an der Spitze, Zeilenversatz-Gefälle ≤ 1 px) und später ein Stück nach links (Frames 28–37, 1 px); Nähte bleiben 4-verbunden.
 * Blinzeln (Frames 19–21 und 41–43): beide Augen schließen sich — die oberen Augenpixel nehmen die Stirnhaut an, der Glanzpunkt wird schwarz, es bleibt ein dunkler Lidstrich.  Zwinkern (Frames 28–31): nur das rechte Auge schließt sich.
+* Lächeln (Frames 11–16 und 37–41): der rechte Mundwinkel (9,18) wird rot (125,0,0), das Schmunzeln wird zum breiten Lächeln.
 * Fußtippen: der linke Stiefel hebt sich zweimal 1 px (Frames 8–15), später der rechte (Frames 36–43); er verschwindet teilweise hinter der Hose.
 * Gold funkelt (Regel 12/14, winzig): die Ohrringe blitzen abwechselnd (Frames 14–16 / 33–35), Anhänger und Schnalle blitzen als einzelne Pixel (Frames 22–24 / 44–46); kein Lichtband (nur 6 Goldpixel), keine Sterne.
 Frame 0 = Original (Ruhepose). Kontrolle: anim_humanoide.ruhepose / eckkontakt_typen / Randpixel-Test (Regel 16).
@@ -49,6 +50,7 @@ GLANZ = f(8, 8)                                                  # (255,252,240)
 OHRRING = f(3, 16)                                               # (255,245,194)
 GOLD_ANH = [f(6, 22), f(9, 22), f(7, 24), f(7, 25), f(8, 25)]
 UMRISS = f(3, 12)                                                # (49,24,0)
+MUND = f(6, 18)                                                  # (125,0,0) rotes Lächeln
 
 stab = sz.maske(14, 0, 16, 31)
 hut = sz.maske(6, 6, 9, 9)
@@ -85,6 +87,9 @@ def frame(i):
         sz.setze(k, AUGE_L); sz.setze(k, AUGE_R)
     elif Hm.folge(i, 28, [1, 1, 1, 1], N):
         sz.setze(k, AUGE_R)
+    # --- Lächeln: der rechte Mundwinkel (9,18) wird rot (schmales Schmunzeln → breites Lächeln) ---
+    if Hm.folge(i, 11, [1, 1, 1, 1, 1, 1], N) or Hm.folge(i, 37, [1, 1, 1, 1, 1], N):
+        sz.setze(k, {(9, 18): MUND})
     # --- Goldfunkeln (Ein-Pixel-Kleckse; Ohrringe, Anhänger/Schnalle) ---
     if Hm.folge(i, 14, [1, 1, 1], N):
         sz.setze(k, {(3, 16): GLANZ})

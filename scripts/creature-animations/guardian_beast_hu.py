@@ -48,9 +48,13 @@ AUGEN_L = [(3, 11), (4, 11), (4, 12), (6, 12), (6, 13)]
 AUGEN_R = [(14, 11), (13, 11), (13, 12), (11, 12), (11, 13)]
 
 stab = sz.maske(17, 0, 20, 30)
+krone = sz.maske(3, 2, 14, 8) & ~sz.punkte([(3, 8)])
 ohr_l = sz.punkte([(1, 7), (1, 8), (2, 8), (1, 9), (2, 9), (1, 10), (2, 10)])
 ohr_r = sz.punkte([(16, 7), (15, 8), (16, 8), (15, 9), (16, 9), (15, 10), (16, 10)])
-koerper = sz.vorhanden & ~stab & ~ohr_l & ~ohr_r
+koerper = sz.vorhanden & ~stab & ~ohr_l & ~ohr_r & ~krone
+m_sleeve = sz.maske(0, 24, 3, 27)
+sleeve = m_sleeve & koerper
+koerper = koerper & ~sleeve
 m_krone = sz.vorhanden & L.farbmaske(spr, GOLD) & (sz.yy <= 10) & (sz.xx <= 16)
 m_stab_gold = stab & L.farbmaske(spr, GOLD) & (sz.xx >= 18) & (sz.yy >= 7) & (sz.yy <= 28)
 AUGEN_FARBE = {}
