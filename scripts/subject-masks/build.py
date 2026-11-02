@@ -14,9 +14,11 @@ Verfahren je Karte:
   2. Globale Suche: ALLE Sprites werden per Farbsignatur (Farben auf 4 Bit gerundet) vorgefiltert und ueber Ankerpixel der seltensten
      Farben in der Kunst gesucht (ab 0,80, kleine Sprites strenger, mehrere Kopien desselben Sprites werden gefunden). So kommen auch
      Ebenen mit anderem Namen dazu (Karten in der Hand, Preisschilder, Muenzen).
-  3. Maske = Vereinigung aller Treffer-Ebenen. Dann Bereinigung: Randpixel in Farben, die nur im Hintergrund direkt ausserhalb der
+  3. Sprites, die ueber alle Karten hinweg auf 6 oder mehr Karten treffen (meist namenlose Kleinteile wie Lava-, Boden- und Wandstuecke),
+     gelten als Hintergrund und zaehlen nur, wenn sie ausserdem ein Namens-Treffer sind.
+  4. Maske = Vereinigung aller uebrigen Treffer-Ebenen. Dann Bereinigung: Randpixel in Farben, die nur im Hintergrund direkt ausserhalb der
      Silhouette vorkommen (nicht im Motiv daneben), werden entfernt; winzige Splitter fliegen raus, kleine Luecken werden gefuellt.
-  4. Guete: "hoch" (alle Ebenen >= 0,90), "mittel" (>= 0,80), "knapp" (>= 0,70). Karten ohne jeden Sprite-Treffer bekommen, wenn opencv
+  5. Guete: "hoch" (alle Ebenen >= 0,90), "mittel" (>= 0,80), "knapp" (>= 0,70). Karten ohne jeden Sprite-Treffer bekommen, wenn opencv
      installiert ist, eine grobe GrabCut-Maske ("grabcut"); sonst keine.
 
 WICHTIG: Automatische Masken sind nur Vorschlaege ("checked": false). Sie enthalten nur die Ebenen, deren Dateiname zum Kartennamen
@@ -24,10 +26,10 @@ passt. Viele Kartenbilder sind aber ganze Szenen (Zimmer, Marktstand, Palast) mi
 (Karten in der Hand, Preisschilder, Haarflammen, Muenzen), und was "Motiv" ist, ist eine kuenstlerische Entscheidung je Karte. Eine Karte
 darf erst mit Umbra/Stained gedruckt werden, wenn ihre Maske von Hand geprueft ist ("manual": true, "checked": true).
 
-Von Hand korrigierte Masken (Eintrag mit "manual": true) werden nie ueberschrieben.
+Von Hand korrigierte oder gepruefte Masken ("manual": true bzw. "checked": true) werden nie ueberschrieben.
 
 Aufruf (aus dem Wurzelverzeichnis des Spiels):
-  python3 scripts/subject-masks/build.py [--sprites ../pixelpartiessprites] [--jobs 4] [--only "Pyraga" "Fireball"] [--resume]
+  python3 scripts/subject-masks/build.py [--sprites ../pixelpartiessprites] [--jobs 4] [--only "Pyraga" "Fireball"] [--resume] [--cache zwischenstand.json]
 
 Ausgabe: data/subject-masks.json
   { "version": 1, "cards": { "<Kartenname>": { "w": 152, "h": 102, "rle": [...], "q": "hoch", "score": 0.83, "src": ["<Sprite>", ...], "checked": false } } }
@@ -348,16 +350,28 @@ def grabcut_mask(art):
     return small
 
 
-def mask_for(name):
-    """-> (maske | None, [(trefferquote, sprite), ...])"""
-    art = art_of(name)
+GENERIC_MIN = 6           # Sprites, die in so vielen Karten auftauchen, gelten als Hintergrund/Textur und werden nur bei Namens-Treffer genutzt
+_pix = {}
+
+
+def sprite_pixels(rel):
+    """(ys, xs, rgb) eines Sprites (aus dem globalen Satz oder frisch geladen)."""
+    if rel not in _pix:
+        a = load_sprite(rel)
+        ys, xs = np.nonzero(a[..., 3] > 128)
+        _pix[rel] = (ys.astype(np.int32), xs.astype(np.int32), a[ys, xs, :3].astype(np.int16))
+    return _pix[rel]
+
+
+def name_layers(art, name):
+    """Namens-Treffer: [(quote, rel, dx, dy, scale, 'name')]"""
     H, W, _ = art.shape
     name_tokens = tokens(name)
     cand = set()
     for t in name_tokens:
         if len(t) >= 4 or len(name_tokens) == 1:
             cand.update(_by_token.get(t, []))
-    layers = {}                                           # rel -> (quote, maske)
+    out = []
     for ci in sorted(cand):
         rel = _sprites[ci][0]
         spr = load_sprite(rel)
@@ -366,38 +380,58 @@ def mask_for(name):
             s = spr if scale == 1 else np.array(Image.fromarray(spr).resize((spr.shape[1] * 2, spr.shape[0] * 2), Image.NEAREST))
             r = best_match(art, s)
             if r and (best is None or r[0] > best[0]):
-                best = (r[0], r[1], r[2], s)
-        if best and best[0] >= THRESHOLD:
-            a = best[3][..., 3] > 128
-            if 0.02 * H * W <= int(a.sum()) <= 0.75 * H * W:
-                mk = np.zeros((H, W), bool)
-                h, w = a.shape
-                sub = a[:H - best[2], :W - best[1]]
-                mk[best[2]:best[2] + sub.shape[0], best[1]:best[1] + sub.shape[1]] |= sub
-                layers[rel] = (best[0], mk)
+                best = (r[0], r[1], r[2], scale, int((s[..., 3] > 128).sum()))
+        if best and best[0] >= THRESHOLD and 0.02 * H * W <= best[4] <= 0.75 * H * W:
+            out.append((best[0], rel, best[1], best[2], best[3], 'name'))
+    return out
+
+
+def find_layers(name):
+    """Alle Treffer-Ebenen einer Karte (Namens- und globale Suche); Rueckgabe fuer den zweiten Durchgang."""
+    art = art_of(name)
+    H, W, _ = art.shape
+    layers = name_layers(art, name)
     for f, rel, dx, dy, scale in global_layers(art, (1, 2) if W >= 140 else (1,)):
-        sp = next(x for x in _global if x['rel'] == rel)
-        ys, xs, _rgb = _scaled(sp, scale)
+        layers.append((f, rel, dx, dy, scale, 'global'))
+    return name, [(round(float(f), 3), rel, int(dx), int(dy), int(sc), tier) for f, rel, dx, dy, sc, tier in layers]
+
+
+def compose(name, layers, generic):
+    """Maske aus den Treffer-Ebenen (ohne Hintergrund-Sprites) -> (maske | None, [(quote, ebene), ...])"""
+    art = art_of(name)
+    H, W, _ = art.shape
+    use = [l for l in layers if not (l[5] == 'global' and l[1] in generic)]
+    mask = np.zeros((H, W), bool)
+    info = []
+    seen = set()
+    for f, rel, dx, dy, scale, tier in use:
+        if (rel, dx, dy) in seen:
+            continue
+        seen.add((rel, dx, dy))
+        ys, xs, _rgb = sprite_pixels(rel)
+        if scale == 2:
+            ys = (ys[:, None] * 2 + np.array([0, 0, 1, 1])[None, :]).ravel()
+            xs = (xs[:, None] * 2 + np.array([0, 1, 0, 1])[None, :]).ravel()
         yy, xx = ys + dy, xs + dx
         inb = (yy >= 0) & (yy < H) & (xx >= 0) & (xx < W)
-        mk = np.zeros((H, W), bool)
-        mk[yy[inb], xx[inb]] = True
-        key = rel if (rel not in layers and scale == 1 and dx == 0 and dy == 0) else '%s@%d,%d' % (rel, dx, dy)
-        if key not in layers or layers[key][0] < f:
-            layers[key] = (f, mk)
-    if not layers:
+        mask[yy[inb], xx[inb]] = True
+        info.append((f, '%s@%d,%d' % (rel, dx, dy)))
+    if not info:
         gcm = grabcut_mask(art)
         if gcm is None or not (0.05 * H * W <= gcm.sum() <= 0.60 * H * W):
             return None, []
         return fill_holes(gcm, max(4, int(HOLE_FRACTION * H * W))), [(0.0, 'GrabCut (Rueckfall, ungenau)')]
-    mask = np.zeros((H, W), bool)
-    for f, mk in layers.values():
-        mask |= mk
     mask = clean_mask(art, mask)
     mask = fill_holes(mask, max(4, int(HOLE_FRACTION * H * W)))
     if not (0.02 * H * W <= mask.sum() <= 0.70 * H * W):
         return None, []
-    return mask, sorted(((round(f, 3), k) for k, (f, _) in layers.items()), reverse=True)
+    return mask, sorted(info, reverse=True)
+
+
+def mask_for(name, generic=None):
+    """Einzelne Karte (fuer Tests und --only): -> (maske | None, [(quote, ebene), ...])"""
+    _, layers = find_layers(name)
+    return compose(name, layers, generic or set())
 
 
 def rle_encode(mask):
@@ -423,18 +457,6 @@ def quality(matches):
     return 'hoch' if m >= 0.90 else 'mittel' if m >= 0.80 else 'knapp'
 
 
-def work(name):
-    try:
-        mask, matches = mask_for(name)
-    except Exception as e:  # ein defektes Sprite darf den Lauf nicht beenden
-        return name, None, [('Fehler: %s' % e, '')]
-    if mask is None:
-        return name, None, []
-    entry = {'w': int(mask.shape[1]), 'h': int(mask.shape[0]), 'rle': rle_encode(mask),
-             'q': quality(matches), 'score': min(f for f, _ in matches), 'src': [rel for _, rel in matches]}
-    return name, entry, matches
-
-
 def write(cards):
     os.makedirs(os.path.dirname(OUT), exist_ok=True)
     with open(OUT, 'w', encoding='utf-8') as f:
@@ -445,12 +467,18 @@ def write(cards):
         f.write('}}\n')
 
 
+def entry_of(mask, matches):
+    return {'w': int(mask.shape[1]), 'h': int(mask.shape[0]), 'rle': rle_encode(mask), 'q': quality(matches),
+            'score': min(f for f, _ in matches), 'src': [rel for _, rel in matches], 'checked': False}
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument('--sprites', default=os.environ.get('PP_SPRITES', os.path.join(ROOT, '..', 'pixelpartiessprites')))
     ap.add_argument('--jobs', type=int, default=os.cpu_count() or 2)
     ap.add_argument('--only', nargs='*', help='nur diese Karten')
     ap.add_argument('--resume', action='store_true', help='schon vorhandene Karten ueberspringen')
+    ap.add_argument('--cache', help='Zwischenergebnis des ersten Durchgangs (JSON) lesen/schreiben')
     args = ap.parse_args()
     sprite_dir = os.path.abspath(args.sprites)
     if not os.path.isdir(sprite_dir):
@@ -466,21 +494,42 @@ def main():
     if os.path.exists(OUT):
         with open(OUT, encoding='utf-8') as f:
             cards = json.load(f)['cards']
-    manual = {n for n, e in cards.items() if e.get('manual')}
-    todo = [n for n in names if n not in manual and not (args.resume and n in cards)]
-    print('%d Karten, davon %d von Hand gepflegt (bleiben), %d zu berechnen, %d Prozesse' % (len(names), len(manual & set(names)), len(todo), args.jobs), flush=True)
+    keep = {n for n, e in cards.items() if e.get('manual') or e.get('checked')}
+    todo = [n for n in names if n not in keep and not (args.resume and n in cards)]
+    print('%d Karten, davon %d geprueft (bleiben), %d zu berechnen, %d Prozesse' % (len(names), len(keep & set(names)), len(todo), args.jobs), flush=True)
     t0 = time.time()
-    done = 0
+    layers = {}
+    if args.cache and os.path.exists(args.cache):
+        with open(args.cache, encoding='utf-8') as f:
+            layers = json.load(f)
+    todo1 = [n for n in todo if n not in layers]
     with Pool(args.jobs, initializer=init, initargs=(sprite_dir,)) as pool:
-        for name, entry, matches in pool.imap_unordered(work, todo, chunksize=4):
-            done += 1
-            if entry is not None:
-                cards[name] = entry
-            elif name in cards and name not in manual:
-                del cards[name]
-            if done % 50 == 0 or done == len(todo):
-                write(cards)
-                print('%d/%d  %d Masken  %.0f s' % (done, len(todo), len(cards), time.time() - t0), flush=True)
+        for i, (name, lay) in enumerate(pool.imap_unordered(find_layers, todo1, chunksize=4), 1):
+            layers[name] = lay
+            if i % 100 == 0 or i == len(todo1):
+                print('Durchgang 1: %d/%d  %.0f s' % (i, len(todo1), time.time() - t0), flush=True)
+    if args.cache:
+        with open(args.cache, 'w', encoding='utf-8') as f:
+            json.dump(layers, f)
+    # Haeufigkeit je Sprite ueber ALLE Karten: Hintergrund-Texturen kommen auf vielen Karten vor
+    freq = {}
+    for lay in layers.values():
+        for rel in {l[1] for l in lay if l[5] == 'global'}:
+            freq[rel] = freq.get(rel, 0) + 1
+    generic = {rel for rel, c in freq.items() if c >= GENERIC_MIN}
+    print('%d Sprites kommen auf >= %d Karten vor und werden nur bei Namens-Treffer genutzt' % (len(generic), GENERIC_MIN), flush=True)
+    init(sprite_dir)
+    done = 0
+    for name in todo:
+        mask, matches = compose(name, layers.get(name, []), generic)
+        done += 1
+        if mask is not None:
+            cards[name] = entry_of(mask, matches)
+        elif name in cards and name not in keep:
+            del cards[name]
+        if done % 100 == 0:
+            write(cards)
+            print('Durchgang 2: %d/%d  %d Masken  %.0f s' % (done, len(todo), len(cards), time.time() - t0), flush=True)
     write(cards)
     q = {}
     for e in cards.values():
