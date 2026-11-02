@@ -169,7 +169,7 @@ class AliceShow:
             rx, ry = self.ring_pos(i, t)
             x, y = x + (rx - x) * ru, y + (ry - y) * ru
         limp = self.limp_amount(i, t)
-        y += 90 * limp + (14 * math.sin(6 * (t - 18.0) + i) * math.exp(-1.5 * (t - 18.0)) if 18.0 <= t < 19.5 else 0.0)
+        y += 130 * limp + (14 * math.sin(6 * (t - 18.0) + i) * math.exp(-1.5 * (t - 18.0)) if 18.0 <= t < 19.5 else 0.0)
         charge, fire = 0, False
         if t < 1.3 or t >= self.D - 1.0:                                                 # Hook und Rückkehr: Augen weiß-heiß, Laser-Netz
             charge, fire = 3, True
@@ -182,6 +182,9 @@ class AliceShow:
             fire = fire or t >= 17.2
         if 18.0 <= t < self.D - 1.0:
             charge, fire = 0, False
+        up = self.t_app[i]
+        if up <= t < up + 0.3 or (20.0 + 0.1 * i) <= t < (20.0 + 0.1 * i) + 0.3:       # Ruck an den Fäden: die Augen leuchten auf
+            charge, fire = 3, False
         blink = (int(t * 2.2 + ph * 7) % 9 == 0) and charge == 0
         return x, y, charge, blink, fire, limp
 
@@ -373,7 +376,11 @@ class AliceShow:
         t = f / float(self.fps)
         W, H, U = self.W, self.H, self.U
         pos, place = self._placements(t)
-        # Laser: jeder startet in der Zelle eines Augenpixels und ist daran gebunden (die Augen werden jedes Bild neu aus dem gezeigten Frame berechnet)
+        # Püppchen (über den Fäden)
+        for i in sorted(pos, key=lambda k: pos[k][1]):
+            im, left, top, attach, _eyes = place[i]
+            canvas.paste(im, (int(left), int(top)), im)
+        # Laser (über den Püppchen, damit man sieht, dass sie am Augenpixel beginnen): jeder startet in der Zelle eines Augenpixels und ist daran gebunden
         bx, by, bw, bh = self.g['badge_rect']
         lx, ly, lw, lh = self.g['logo_rect']
         for t0, t1, p, tg in self.SHOTS:
@@ -404,10 +411,29 @@ class AliceShow:
                         h = self.hook[2 * i + side]
                         th = h['th'] + h['om'] * te
                         self._beam(canvas, e, (e[0] + math.cos(th) * reach, e[1] + math.sin(th) * reach))
-        # Püppchen (über den Fäden und Lasern)
-        for i in sorted(pos, key=lambda k: pos[k][1]):
-            im, left, top, attach, _eyes = place[i]
-            canvas.paste(im, (int(left), int(top)), im)
+        # Aufwach-Effekt zum Summon-Sound: beim Ruck an den Fäden läuft ein Pixelring vom Kopf nach außen, dazu zwölf Funken
+        gp = self.gp
+        d_ = ImageDraw.Draw(canvas)
+        for i in pos:
+            for t0 in (self.t_app[i], 20.0 + 0.1 * i):
+                if t0 <= t < t0 + 0.5:
+                    u = (t - t0) / 0.5
+                    ax_, ay_ = place[i][3]
+                    ay_ += 3 * self.PX                                                       # etwa Gesichtshöhe
+                    for k in range(24):                                                      # Ring
+                        ang = 2 * math.pi * k / 24
+                        r = 50 + 190 * u
+                        cx_ = self.ox + int(math.floor((ax_ + math.cos(ang) * r - self.ox) / gp)) * gp
+                        cy_ = self.oy + int(math.floor((ay_ + math.sin(ang) * r - self.oy) / gp)) * gp
+                        if u < 0.7 or k % 2 == 0:
+                            d_.rectangle([cx_, cy_, cx_ + gp - 1, cy_ + gp - 1], fill=((255, 232, 232, 255) if u < 0.35 else (255, 50, 65, 255)))
+                    for k in range(12):                                                      # Funken, schneller als der Ring
+                        ang = 2 * math.pi * k / 12 + 0.26
+                        r = 30 + 330 * u
+                        cx_ = self.ox + int(math.floor((ax_ + math.cos(ang) * r - self.ox) / gp)) * gp
+                        cy_ = self.oy + int(math.floor((ay_ + math.sin(ang) * r - self.oy) / gp)) * gp
+                        if u < 0.8:
+                            d_.rectangle([cx_, cy_, cx_ + 2 * gp - 1, cy_ + 2 * gp - 1], fill=((255, 244, 244, 255) if k % 2 == 0 else (255, 90, 100, 255)))
         # Schadenszahlen
         for tn, txt, (nx, ny) in ((13.45, '-100', (self.g['badge_rect'][0] + 120, self.g['badge_rect'][1] - 30)),
                                   (13.6, '-100', (self.g['badge_rect'][0] + self.g['badge_rect'][2] - 120, self.g['badge_rect'][1] - 30))):
