@@ -1,8 +1,8 @@
 """Alice-Show für „Alice, the Puppeteer Girl“: ihre Mr. Jiggles (weiße Stoffpüppchen mit roten Augen, aus ihrem Sprite) tanzen an Fäden um sie,
 das Interface wird zur Marionette, und die Püppchen schießen dünne rote Laser aus den Augen – mit Spannungsbogen:
 
-   0.0 –  1.6  HOOK     rote Laser-Spinne über dem Bild, Blitz, Druckwelle
-   1.6 –  5.0  RUF      sieben Mr. Jiggles fliegen von Alice' Händen auf ihre Plätze (Sprungfeder-Wackeln, Fäden werden gespannt)
+   0.0 –  1.3  HOOK     Blitz, Druckwelle; die sieben Mr. Jiggles schießen ein Laser-Netz aus ihren 14 Augen
+   1.3 –  5.0  RUF      sie sacken schlaff zusammen und werden nacheinander an den Fäden hochgezogen (Ruck mit Überschwingen)
    5.0 –  8.6  PUPPEN   Alice lässt das Banner an Fäden tanzen (ruckelnd, wie eine Marionette), Herzschlag, rote Vignette wächst
    8.6 – 12.6  PROBE    Augen glühen auf, erste Probeschüsse an den Bildrand, dann durchtrennen zwei Laser die Banner-Fäden
   12.6 – 16.0  ZIEL     zwei Laser (je 100) zerschneiden das Link-Schild; die Hälften kommen an Fäden zurück
@@ -62,6 +62,20 @@ class Jiggles:
             out[H_ - nh + y, 2 + dx:2 + dx + w] = b[y]
         return out
 
+    def eye_cells(self, idx):
+        """Zellen (Spalte, Zeile) der beiden Augen im 15×16-Rahmen des Frames idx (nicht gespiegelt; Wackeln, Stauchen und Scherung eingerechnet)."""
+        a = self._arr(idx, 0, False)
+        ys, xs = np.where((a[..., 0] == 210) & (a[..., 1] == 0) & (a[..., 2] == 0) & (a[..., 3] > 0))
+        pts = sorted(zip(xs.tolist(), ys.tolist()))
+        if len(pts) < 2:
+            return [(5, 8), (8, 8)]
+        mid = sum(p[0] for p in pts) / len(pts)
+        out = []
+        for side in (lambda x: x <= mid, lambda x: x > mid):
+            g = [p for p in pts if side(p[0])]
+            out.append((sum(p[0] for p in g) / len(g), sum(p[1] for p in g) / len(g)))
+        return out
+
     def top_row(self, idx):
         """Oberste belegte Zeile der Kopfmitte (Fadenansatz) im 16-Zeilen-Rahmen des Frames idx."""
         a = self._arr(idx, 0, False)
@@ -107,6 +121,9 @@ class AliceShow:
         rr = np.hypot((xx - W / 2) / (W * 0.62), (yy - H * 0.5) / (H * 0.55))
         self.vig = np.clip((rr - 0.45) / 0.8, 0, 1).astype(np.float32) ** 1.3
         self.T = (W / 2, 1390)                                                           # Zielpunkt der Salve (Namensschild)
+        self.F1, self.F2 = round(0.45 * D) / D, round(0.6 * D) / D                       # ganzzahlige Schwebezyklen je Video → nahtloser Loop
+        # Hook-/Schluss-Laser: je Auge ein Laser mit eigener Drehrichtung
+        self.hook = [dict(th=rng.uniform(0, 2 * math.pi), om=rng.uniform(-2.2, 2.2)) for _ in range(2 * self.N)]
 
     # ───────── Zeitleisten ─────────
     def tension(self, t):
@@ -120,31 +137,42 @@ class AliceShow:
         a = 2 * math.pi * i / self.N + 0.9 * (t - 15.8)
         return (self.W / 2 + 470 * math.cos(a), 930 + 300 * math.sin(a))
 
+    def limp_amount(self, i, t):
+        """Schlaffheit 0 (aufgezogen) … 1 (hängt schlaff); negativ = Überschwingen nach oben."""
+        up, up2 = self.t_app[i], 20.0 + 0.1 * i
+        if t < 1.3:
+            return 0.0
+        if t < 2.0:                                                                      # nach dem Hook sacken sie in sich zusammen
+            return smooth((t - 1.3) / 0.7)
+        if t < up:
+            return 1.0
+        if t < up + 0.6:                                                                 # Alice zieht an den Fäden: Ruck nach oben mit Überschwingen
+            return 1.0 - ease_out_back((t - up) / 0.6)
+        if t < 18.0:
+            return 0.0
+        if t < 18.5:                                                                     # nach der Salve schlaff
+            return smooth((t - 18.0) / 0.5)
+        if t < up2:
+            return 1.0
+        if t < up2 + 0.6:                                                                # …und für den Hook wieder hochgezogen
+            return 1.0 - ease_out_back((t - up2) / 0.6)
+        return 0.0
+
     def puppet(self, i, t):
-        """(x, y, sichtbar, Ladestufe, blinzelt, feuert, schlaff) der Puppe i."""
-        ta = self.t_app[i]
-        leave = 20.0 + 0.1 * i
-        if t < ta or t >= leave + 0.7:
-            return None
+        """(x, y, Ladestufe, blinzelt, feuert, schlaff) der Puppe i – sie ist immer da (auch im Hook)."""
         ax, ay = self.cx + self.ANCHORS[i][0], self.cy + self.ANCHORS[i][1]
         ph = self.ph[i]
-        hx, hy = self.hands[0 if self.ANCHORS[i][0] <= 0 else 1]
-        x = ax + 16 * math.sin(2 * math.pi * (t * 0.45 + ph))
-        y = ay + 20 * math.sin(2 * math.pi * (t * 0.6 + ph * 1.3))
-        ru = smooth((t - 15.8) / 0.7)
+        x = ax + 16 * math.sin(2 * math.pi * (t * self.F1 + ph))
+        y = ay + 20 * math.sin(2 * math.pi * (t * self.F2 + ph * 1.3))
+        ru = smooth((t - 15.8) / 0.7) * (1.0 - smooth((t - 18.0) / 0.3))
         if ru > 0:                                                                       # Finale: Kreis um die Karte
             rx, ry = self.ring_pos(i, t)
             x, y = x + (rx - x) * ru, y + (ry - y) * ru
-        limp = smooth((t - 18.0) / 0.5)
-        if t >= 18.0:                                                                    # schlaff: hängen tiefer, schwingen aus
-            y = y + 70 * limp + 14 * math.sin(6 * (t - 18.0) + i) * math.exp(-1.5 * (t - 18.0))
-        if t < ta + 0.6:                                                                 # kommen von der Hand mit Überschwingen
-            u = ease_out_back((t - ta) / 0.6)
-            x, y = hx + (x - hx) * u, hy + (y - hy) * u
-        if t >= leave:                                                                   # Fäden ziehen sie zur Hand zurück
-            u = smooth((t - leave) / 0.7)
-            x, y = x + (hx - x) * u, y + (hy - y) * u
+        limp = self.limp_amount(i, t)
+        y += 90 * limp + (14 * math.sin(6 * (t - 18.0) + i) * math.exp(-1.5 * (t - 18.0)) if 18.0 <= t < 19.5 else 0.0)
         charge, fire = 0, False
+        if t < 1.3 or t >= self.D - 1.0:                                                 # Hook und Rückkehr: Augen weiß-heiß, Laser-Netz
+            charge, fire = 3, True
         for t0, t1, p, tg in self.SHOTS:
             if p == i and t0 - 0.5 <= t < t1 + 0.25:
                 charge = 1 + min(2, int((t - (t0 - 0.5)) / 0.25)) if t < t0 else (3 if t < t1 else 1)
@@ -152,14 +180,11 @@ class AliceShow:
         if 16.0 <= t < 18.0:
             charge = max(charge, 1 + min(2, int((t - 16.0) / 0.7)))
             fire = fire or t >= 17.2
-        if t >= 18.0:
+        if 18.0 <= t < self.D - 1.0:
             charge, fire = 0, False
         blink = (int(t * 2.2 + ph * 7) % 9 == 0) and charge == 0
         return x, y, charge, blink, fire, limp
 
-    def eyes(self, x, y):
-        px = self.PX
-        return [(x - 1.5 * px, y - 1.5 * px), (x + 1.5 * px, y - 1.5 * px)]
 
     def plate_dx(self, f):
         t = f / float(self.fps)
@@ -174,23 +199,30 @@ class AliceShow:
         return int(round(0.4 * self.plate_dx(f) / self.U)) * self.U
 
     # ───────── Zeichenhelfer ─────────
+    LASER = (255, 40, 58)
+    LASER_HOT = (255, 232, 232)
+
     def _beam(self, canvas, p0, p1, power=1.0):
-        """Dünner roter Laser: Glühen, roter Strahl, heller Kern."""
-        x0, y0 = p0
-        x1, y1 = p1
-        pad = 12
-        bx0, by0 = int(min(x0, x1)) - pad, int(min(y0, y1)) - pad
-        bx1, by1 = int(max(x0, x1)) + pad, int(max(y0, y1)) + pad
-        bx0, by0, bx1, by1 = max(0, bx0), max(0, by0), min(self.W, bx1), min(self.H, by1)
-        if bx1 <= bx0 or by1 <= by0:
-            return
-        ov = Image.new('RGBA', (bx1 - bx0, by1 - by0), (0, 0, 0, 0))
-        d = ImageDraw.Draw(ov)
-        a, b = (x0 - bx0, y0 - by0), (x1 - bx0, y1 - by0)
-        d.line([a, b], fill=(255, 40, 60, int(70 * power)), width=11)
-        d.line([a, b], fill=(255, 40, 55, 255), width=max(3, int(5 * power)))
-        d.line([a, b], fill=(255, 225, 225, 255), width=2)
-        canvas.alpha_composite(ov, (bx0, by0))
+        """Dünner roter Laser im Pixelraster des Sprites: eine Zelle (14 px) breit, beginnt in der Zelle des Auges (p0) und läuft bis zum Ziel (p1) bzw. zum Bildrand."""
+        gp, ox, oy = self.gp, self.ox, self.oy
+        c0 = (int(math.floor((p0[0] - ox) / gp)), int(math.floor((p0[1] - oy) / gp)))
+        c1 = (int(math.floor((p1[0] - ox) / gp)), int(math.floor((p1[1] - oy) / gp)))
+        n = max(abs(c1[0] - c0[0]), abs(c1[1] - c0[1]))
+        d = ImageDraw.Draw(canvas)
+        last = None
+        for k in range(n + 1):
+            u = k / float(n) if n else 0.0
+            ci, cj = int(round(c0[0] + (c1[0] - c0[0]) * u)), int(round(c0[1] + (c1[1] - c0[1]) * u))
+            if (ci, cj) == last:
+                continue
+            last = (ci, cj)
+            x, y = ox + ci * gp, oy + cj * gp
+            if x < -gp or x > self.W or y < -gp or y > self.H:
+                if k > 2:
+                    break
+                continue
+            col = self.LASER_HOT if k == 0 else self.LASER
+            d.rectangle([x, y, x + gp - 1, y + gp - 1], fill=col + (255,))
 
     def _spark(self, canvas, x, y, r=3):
         U = self.U
@@ -271,7 +303,12 @@ class AliceShow:
             left = self.ox + round((x - im.width / 2 - self.ox) / gp) * gp
             top = self.oy + round((y - im.height + 6 * self.PX - self.oy) / gp) * gp
             attach = (left + 7.5 * self.PX, top + (self.j.top_row(idx) + 0.5) * self.PX)
-            place[i] = (im, left, top, attach)
+            mir = self.ANCHORS[i][0] > 0
+            eyes = []
+            for (ec, er) in self.j.eye_cells(idx):                                        # Augenpixel des gezeigten Frames (gespiegelt, wenn das Püppchen gespiegelt ist)
+                col = 14 - int(ec) if mir else int(ec)
+                eyes.append((left + (col + 0.5) * self.PX, top + (int(er) + 0.5) * self.PX))
+            place[i] = (im, left, top, attach, eyes)
         return pos, place
 
     def _draw_strings(self, canvas, t):
@@ -336,12 +373,11 @@ class AliceShow:
         t = f / float(self.fps)
         W, H, U = self.W, self.H, self.U
         pos, place = self._placements(t)
-        # Laser
+        # Laser: jeder startet in der Zelle eines Augenpixels und ist daran gebunden (die Augen werden jedes Bild neu aus dem gezeigten Frame berechnet)
+        bx, by, bw, bh = self.g['badge_rect']
+        lx, ly, lw, lh = self.g['logo_rect']
         for t0, t1, p, tg in self.SHOTS:
             if t0 <= t < t1 and p in pos:
-                x, y = pos[p][0], pos[p][1]
-                bx, by, bw, bh = self.g['badge_rect']
-                lx, ly, lw, lh = self.g['logo_rect']
                 if tg == 'badge':
                     tgt = (bx + bw / 2 + (8 if p == 5 else -8), by + bh / 2)
                 elif tg == 'strL':
@@ -350,19 +386,27 @@ class AliceShow:
                     tgt = ((self.hands[1][0] + lx + lw - 90) / 2, (self.hands[1][1] + ly + lh) / 2)
                 else:
                     tgt = tg
-                pw = 1.0 - 0.3 * ((t - t0) / (t1 - t0))
-                for e in self.eyes(x, y):
-                    self._beam(canvas, e, tgt, pw)
+                for e in place[p][4]:
+                    self._beam(canvas, e, tgt)
                 if int(t * 24) % 2 == 0:
                     self._spark(canvas, int(tgt[0]), int(tgt[1]), 2)
         if 17.2 <= t < 18.0:                                                              # Finale: Dauerfeuer auf einen Punkt
-            for i, st in pos.items():
-                for e in self.eyes(st[0], st[1]):
-                    self._beam(canvas, e, self.T, 0.8 + 0.2 * math.sin(t * 40))
+            for i in pos:
+                for e in place[i][4]:
+                    self._beam(canvas, e, self.T)
             self._spark(canvas, int(self.T[0]), int(self.T[1]), 3 + int((t - 17.2) * 6))
+        if t < 1.3 or t >= self.D - 1.0:                                                  # Hook und Rückkehr: Laser-Netz aus allen 14 Augen
+            te = t if t < 1.3 else self.D - t
+            reach = 2800 * (1.0 - smooth((te - 1.0) / 0.3))
+            if reach > 0:
+                for i in pos:
+                    for side, e in enumerate(place[i][4]):
+                        h = self.hook[2 * i + side]
+                        th = h['th'] + h['om'] * te
+                        self._beam(canvas, e, (e[0] + math.cos(th) * reach, e[1] + math.sin(th) * reach))
         # Püppchen (über den Fäden und Lasern)
         for i in sorted(pos, key=lambda k: pos[k][1]):
-            im, left, top, attach = place[i]
+            im, left, top, attach, _eyes = place[i]
             canvas.paste(im, (int(left), int(top)), im)
         # Schadenszahlen
         for tn, txt, (nx, ny) in ((13.45, '-100', (self.g['badge_rect'][0] + 120, self.g['badge_rect'][1] - 30)),
@@ -388,36 +432,17 @@ class AliceShow:
         arr = arr * (1 - m) + np.array([150, 0, 20], dtype=np.float32) * m
         return Image.fromarray(np.clip(arr, 0, 255).astype(np.uint8), 'RGB')
 
-    # ───────── Opener (Hook) und Schluss ─────────
-    def _web(self, img, ts, strength=1.0):
-        out = img.convert('RGBA')
-        if ts >= 1.3:
-            return out
-        k = max(0.0, 1.0 - ts / 1.2) * strength
-        d_ = 2400
-        for ln in self.web:
-            th = ln['th'] + ln['om'] * ts
-            cx, cy = ln['c']
-            dx, dy = math.cos(th) * d_, math.sin(th) * d_
-            self._beam(out, (cx - dx, cy - dy), (cx + dx, cy + dy), 0.5 + 0.8 * k)
-        return out
-
+    # ───────── Opener (Hook) und Schluss: die Laser kommen aus den Augen der Püppchen (siehe draw_front), hier nur der Blitz ─────────
     def opener_fx(self, img, f, t_gust=None):
-        ts = f / float(self.fps)
-        if ts >= 1.3:
-            return img
-        return self._web(img, ts).convert('RGB')
+        return img
 
     def closer_fx(self, img, f):
         t = f / float(self.fps)
         if t < self.D - 1.0:
             return img
-        out = self._web(img, self.D - t)
         u = (t - (self.D - 1.0)) / 1.0
-        a = 0.42 * u * u
-        if a > 0:
-            out = Image.blend(out, Image.new('RGBA', out.size, (255, 255, 255, 255)), a)
-        return out.convert('RGB')
+        a = 0.42 * u * u                                                                  # Aufhellen wie der Blitz des Punch im ersten Bild
+        return Image.blend(img.convert('RGB'), Image.new('RGB', img.size, (255, 255, 255)), a) if a > 0 else img
 
     # ───────── Soundeffekte (public/sounds): gleiche Aktion = gleicher Sound ─────────
     SND = {
