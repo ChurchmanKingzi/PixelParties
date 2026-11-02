@@ -4,7 +4,7 @@ Spiel-Sounds: Vorbis, mono, 22,05 kHz). Zeitpunkte je Bild stehen in opening.jso
 
 Aufruf:  python3 scripts/booster/build_opening_sounds.py [--out DIR]
 Dateien (booster_*.ogg):
-  slide      Pack gleitet ein und setzt auf          charge   Aufladen: steigender Ton, Funkeln, Knistern der Folie
+  slide      Pack gleitet ein und setzt auf          buildup  Spannungsaufbau (1,4 s) bis zum Blitz: Crescendo, schneller werdender Herzschlag
   rip        Folie reißt (Knistern, wachsendes Zischen)   strip    abgerissener Streifen schießt nach oben
   burst      Blitz: Knall, Luftstoß, Funkelkaskade   glitter  Glitzer-Nachklang
   card_whoosh  Karte fliegt                           card_land  Karte landet (Tonhöhe wird zur Laufzeit je Karte gesteigert)
@@ -91,22 +91,33 @@ def s_slide():
     return mix((0, sweep), (0.19, th), (0.2, crinkle), (0.24, crinkle * 0.6), n=n)
 
 
-def s_charge():
-    d = 0.64; n = int(SR * d); t = T(d); u = t / d
-    f = 170 * np.exp(np.log(6.5) * u ** 1.25) * (1 + 0.012 * np.sin(2 * np.pi * 6.5 * t) * u * 3)
-    tone = (osc(f) + 0.45 * osc(2 * f) + 0.3 * osc(1.5 * f)) * (u ** 1.5) * 0.4
-    sh = osc(exp_sweep(1800, 4400, n)) * (0.5 + 0.5 * np.sin(2 * np.pi * 15 * t)) * (u ** 2) * 0.22
-    rumble = lp_var(noise(d), 130) * (u ** 1.2) * 1.8
-    # Folienknistern: Impulse, dichter werdend
+def s_buildup():
+    """Spannungsaufbau vom Einblenden bis der Streifen weg ist: Crescendo aus steigendem Ton mit immer schnellerem Zittern, Windrauschen,
+    Funkeln, Folienknistern und einem Herzschlag, der immer schneller wird. Endet abrupt auf dem Höhepunkt (der Knall folgt sofort)."""
+    d = 1.4; n = int(SR * d); t = T(d); u = t / d
+    f = 110 * np.exp(np.log(14.0) * u ** 1.3)
+    trem = 1 + 0.55 * np.sin(2 * np.pi * np.cumsum(3 + 20 * u) / SR)
+    tone = (osc(f) + 0.5 * osc(2 * f) + 0.35 * osc(f * 1.006) + 0.2 * osc(3 * f)) * (u ** 2.0) * 0.55 * trem
+    sh = osc(exp_sweep(1500, 5200, n)) * (0.55 + 0.45 * np.sin(2 * np.pi * np.cumsum(10 + 28 * u) / SR)) * (u ** 2.5) * 0.28
+    wind = bp_var(noise(d), exp_sweep(300, 5200, n), q=1.0) * (u ** 2.0) * 1.1
+    rumble = lp_var(noise(d), 110) * (u ** 1.0) * 1.6
     cr = np.zeros(n)
-    rate = 8 + 70 * u ** 1.5
+    rate = 6 + 90 * u ** 1.6
     for i in range(n):
         if RNG.rand() < rate[i] / SR:
-            L = int(SR * 0.004)
-            cr[i:i + L] += (RNG.uniform(-1, 1, min(L, n - i))) * RNG.uniform(0.3, 0.9) if i + L <= n else 0
-    cr = hp_var(cr, 1200) * 0.9
-    out = tone + sh + rumble + cr
-    return out * np.minimum(t * 60, 1) * np.minimum((d - t) * 40, 1)
+            L = int(SR * 0.004); m = min(L, n - i)
+            cr[i:i + m] += RNG.uniform(-1, 1, m) * RNG.uniform(0.3, 0.9)
+    cr = hp_var(cr, 1200) * 0.8
+    # Herzschlag: Abstände schrumpfen von 0,42 s auf ~0,07 s, Stärke wächst
+    beats = np.zeros(n); tt = 0.12; k = 0
+    while tt < d - 0.03:
+        th = osc(exp_sweep(78, 42, int(SR * 0.09))) * np.exp(-T(0.09) * 30) * (0.25 + 0.95 * (tt / d) ** 1.1)
+        i = int(tt * SR); m = min(len(th), n - i)
+        beats[i:i + m] += th[:m]
+        tt += max(0.07, 0.42 * (0.17 ** (tt / d)))
+        k += 1
+    out = tone + sh + wind + rumble + cr + beats * 1.5
+    return out * np.minimum(t * 80, 1) * np.minimum((d - t) * 200, 1)
 
 
 def s_rip():
@@ -197,7 +208,7 @@ def s_ready():
 
 
 SOUNDS = {
-    'slide': s_slide, 'charge': s_charge, 'rip': s_rip, 'strip': s_strip, 'burst': s_burst, 'glitter': s_glitter,
+    'slide': s_slide, 'buildup': s_buildup, 'rip': s_rip, 'strip': s_strip, 'burst': s_burst, 'glitter': s_glitter,
     'card_whoosh': s_card_whoosh, 'card_land': s_card_land, 'ready': s_ready,
 }
 

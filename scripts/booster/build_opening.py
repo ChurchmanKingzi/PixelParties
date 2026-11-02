@@ -530,7 +530,7 @@ def main(argv):
         print('ok', pack, kb, kf, os.path.getsize(os.path.join(out, pack + '.back.png')) // 1024, 'KB /', os.path.getsize(os.path.join(out, pack + '.front.png')) // 1024, 'KB')
     tl = tl or pack_timeline()
     land = [T_CARDS + n * 2 + 15 for n in range(9)]
-    cues = [(0, 'slide', 0.9, 1.0), (T_RIP - 18, 'charge', 0.8, 1.0), (T_RIP, 'rip', 0.9, 1.0), (T_RIP + RIP_LEN - 6, 'strip', 0.7, 1.0),
+    cues = [(0, 'slide', 0.9, 1.0), (T_FLASH - 42, 'buildup', 1.0, 1.0), (T_RIP, 'rip', 1.0, 1.0), (T_RIP + RIP_LEN - 6, 'strip', 0.7, 1.0),
             (T_FLASH, 'burst', 1.0, 1.0), (T_FLASH + 4, 'glitter', 0.65, 1.0)]
     cues += [(T_CARDS + n * 2, 'card_whoosh', 0.55, round(0.92 + 0.03 * n, 3)) for n in range(9)]
     cues += [(land[n], 'card_land', 0.8, round(1.0 + 0.065 * n, 3)) for n in range(9)]     # Tonhöhe steigt mit jeder gelandeten Karte
