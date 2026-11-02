@@ -2663,7 +2663,7 @@ function DeckBuilder() {
           <div style={{ padding: '6px 12px', background: 'var(--bg3)', borderBottom: '1px solid var(--bg4)', display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
             {renaming ? (
               <div style={{ display: 'flex', gap: 4, flex: 1 }}>
-                <input className="input" value={renameVal} onChange={e => setRenameVal(e.target.value)}
+                <input className="input" data-pp-tastatur="an" value={renameVal} onChange={e => setRenameVal(e.target.value)}
                   onKeyDown={e => { if (e.key === 'Enter') finishRename(); }} autoFocus style={{ flex: 1 }} />
                 <button className="btn" style={{ padding: '2px 8px', fontSize: 9 }} onClick={finishRename}>OK</button>
               </div>

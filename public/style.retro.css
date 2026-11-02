@@ -2223,7 +2223,7 @@ body:has(.pz-layout) .pp-bg-particles { display: none; }
 
 /* Free-activatable ability zone glow (Main Phase, no action cost) */
 .zone-ability-free-activatable { animation: freeAbilityPulse 0.7s steps(17, end) infinite !important; position: relative; z-index: 1; }
-.zone-ability-free-activatable::after { content: '✦'; position: absolute; top: -10px; right: -10px; font-size: 22px; color: #f7f7ad; filter: drop-shadow(1px 0 0 #4ceb70) drop-shadow(-1px 0 0 #4ceb70) drop-shadow(0 1px 0 #4ceb70) drop-shadow(0 -1px 0 #4ceb70) drop-shadow(1px 0 0 #167927) drop-shadow(-1px 0 0 #167927) drop-shadow(0 1px 0 #167927) drop-shadow(0 -1px 0 #167927); animation: abilityBoltBounce 0.5s steps(12, end) infinite alternate; z-index: 10; }
+.zone-ability-free-activatable::after { content: ''; width: 24px; height: 24px; background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' shape-rendering='crispEdges'%3E%3Cpath fill='%23b3f9cf' d='M7 0h2v1h-2zM7 1h2v1h-2zM6 2h4v1h-4zM6 3h4v1h-4zM5 4h6v1h-6zM4 5h8v1h-8zM2 6h12v1h-12zM0 7h16v1h-16zM0 8h16v1h-16zM2 9h12v1h-12zM4 10h8v1h-8zM5 11h6v1h-6zM6 12h4v1h-4zM6 13h4v1h-4zM7 14h2v1h-2zM7 15h2v1h-2z'/%3E%3C/svg%3E") center / 100% 100% no-repeat; image-rendering: pixelated; position: absolute; top: -12px; right: -12px; filter: drop-shadow(1px 0 0 #4ceb70) drop-shadow(-1px 0 0 #4ceb70) drop-shadow(0 1px 0 #4ceb70) drop-shadow(0 -1px 0 #4ceb70) drop-shadow(1px 0 0 #167927) drop-shadow(-1px 0 0 #167927) drop-shadow(0 1px 0 #167927) drop-shadow(0 -1px 0 #167927); animation: abilityBoltBounce 0.5s steps(12, end) infinite alternate; z-index: 10; }
 @keyframes freeAbilityPulse {
   0%, 100% { box-shadow: 0 0 0 4px #4ceb70, 0 0 0 6px #1a4128, inset 0 0 0 4px #1a4128; border-color: #4ceb70; }
   50%      { box-shadow: 0 0 0 6px #f7f7ad, 0 0 0 8px #1a4128, inset 0 0 0 4px #f7f7ad; border-color: #f7f7ad; }
@@ -7135,11 +7135,11 @@ html:not([data-phase-bereit]) .phase-column { visibility: hidden; }
 /* Hide native scrollbar on touch devices — custom DOM scrollbar replaces it */
 @media (pointer: coarse) {
   .pz-search-results::-webkit-scrollbar { display: none; }
-  .pz-search-results { padding-right: 22px; }
+  .pz-search-results { padding-right: 42px; }
 }
 /* ── Custom touch scrollbar (real DOM element for mobile) ── */
-.pz-custom-scrollbar { position: absolute; right: 0; top: 0; bottom: 0; width: 20px; z-index: 10; touch-action: none; }
-.pz-custom-scrollbar-thumb { position: absolute; right: 2px; width: 16px; min-height: 40px; background: #59606e; border-radius: 0; touch-action: none; }
+.pz-custom-scrollbar { position: absolute; right: 0; top: 0; bottom: 0; width: 36px; z-index: 10; touch-action: none; }
+.pz-custom-scrollbar-thumb { position: absolute; right: 4px; width: 28px; min-height: 64px; background: #59606e; border-radius: 0; touch-action: none; }
 .pz-custom-scrollbar-thumb:active { background: var(--accent); }
 .pz-search-card { width: 100%; aspect-ratio: 5 / 7; border: 2px solid var(--bg4); border-radius: 0; overflow: hidden; cursor: pointer; transition: border-color .15s steps(4, end),transform .1s steps(2, end); position: relative; content-visibility: auto; contain-intrinsic-size: auto 140px; }
 .pz-search-card:hover { border-color: var(--accent); transform: scale(1.06); z-index: 2; }
@@ -8451,7 +8451,7 @@ body:has(.rotate-device-overlay.rotate-gate) .pp-bg-particles * { animation: non
 
   /* ── Card tooltip: image-only, v837 ~20 % groesser (240 statt 200,
      Als Vorgabe 8.9.) ── */
-  .card-tooltip { width: 240px !important; height: auto !important; max-height: calc(100 * var(--vh) - 40px) !important; top: 38px !important; }
+  .card-tooltip { width: min(240px, calc((100 * var(--vh, 1vh) - 40px) * 750 / 1050)) !important; height: auto !important; max-height: calc(100 * var(--vh) - 40px) !important; top: 38px !important; }
   /* Gallery tooltip: position to the LEFT of the gallery panel */
   .card-tooltip-gallery { right: var(--db-gallery-w) !important; }
   /* Hide text info, show only card image */
@@ -8462,6 +8462,24 @@ body:has(.rotate-device-overlay.rotate-gate) .pp-bg-particles * { animation: non
   .db-card-grid .card-mini { height: 80px !important; }
 }
 
+/* Das Bereit-Zeichen der freien Aktivierung (Pixel-Sprite, s. `.zone-ability-free-activatable::after`) schrumpft auf dem Handy mit den Zonen (~40 px breit):
+   16 px = ganzzahlig 1 px je Bildpunkt, bündig in der Ecke. */
+@media (max-height: 500px) {
+  .zone-ability-free-activatable::after { width: 16px; height: 16px; top: -8px; right: -8px; }
+}
+
+/* ★ Bildlaufstreifen für Galerien auf Touch-Geräten (`TouchScrollbar`, app-shared): breit genug für den Finger, harte Pixelkanten (Deckbuilder; der Puzzle Maker hat
+   seinen eigenen `.pz-custom-scrollbar`). */
+.pp-bildlauf-spur { position: absolute; right: 0; top: 0; bottom: 0; width: 36px; z-index: 10; touch-action: none; background: #1a1a2e; border-left: 2px solid #08060c; }
+.pp-bildlauf-griff { position: absolute; left: 4px; right: 4px; top: 0; min-height: 56px; touch-action: none; background: #59606e; border: 2px solid #08060c; box-shadow: inset 0 0 0 2px #7e7d9b; }
+.pp-bildlauf-spur:active .pp-bildlauf-griff { background: var(--accent); }
+
+/* Deckbuilder auf dem Handy quer: nur die Galerie scrollt (eigener Streifen), die Filter sind höchstens knapp die Hälfte des Panels. */
+@media (max-height: 500px) {
+  .db-panel-right { overflow: hidden !important; }
+  .db-panel-right > div[style*="flexShrink: 0"] { flex-shrink: 1 !important; max-height: 46%; overflow-y: auto; }
+}
+
 /* Touch devices: make tooltips tappable/scrollable */
 @media (pointer: coarse) {
   .board-tooltip, .tooltip { pointer-events: auto !important; cursor: url("/cursor-arrow.png?v=4") 2 2, default; }
@@ -8469,7 +8487,13 @@ body:has(.rotate-device-overlay.rotate-gate) .pp-bg-particles * { animation: non
 
 /* ═══ Board tooltip mobile ═══ */
 @media (max-height: 500px) {
-  .board-tooltip { width: 240px !important; font-size: 11px !important; top: var(--mob-opphand-h, 44px) !important; }
+  /* ★ Kartenbild immer GANZ sichtbar (Als Befund 2.11.: „auf Mobile sind die Karten in den Tooltips zu gross"): der Tooltip ist eine Spalte von
+     `top` bis `bottom` (Handleiste), das Kartenbild füllt ihre Breite (aspect 750/1050) und war bei 240 px Breite 336 px hoch — höher als die Spalte
+     (im Test 844x390: Spalte 272 px, Bild 315 px, unten abgeschnitten). Jetzt richtet sich die BREITE nach der Höhe: Bildhöhe = Spaltenhöhe, die Breite
+     folgt (+ 15 px Bildlaufstreifen), höchstens die alten 240 px. Text und Tokens scrollen darunter wie bisher. */
+  .board-tooltip { --tt-spalte-h: calc(100 * var(--vh, 1vh) - var(--mob-opphand-h, 44px) - 2px); }
+  body:has(.game-hand-me) .board-tooltip { --tt-spalte-h: calc(100 * var(--vh, 1vh) - var(--mob-opphand-h, 44px) - (var(--hand-min-h) - var(--hand-senkung, 0px)) - 2px); }
+  .board-tooltip { width: min(240px, calc(var(--tt-spalte-h) * 750 / 1050 + 15px)) !important; font-size: 11px !important; top: var(--mob-opphand-h, 44px) !important; }
   /* ★ v1257 (Als Vorgabe 19.9.): die Textinfo — aktuelle Stats und
      Effekttext — wird NICHT mehr ausgeblendet. Der On-Klick-Tooltip
      zeigt damit dasselbe wie der On-Hover-Tooltip am Desktop; wird der

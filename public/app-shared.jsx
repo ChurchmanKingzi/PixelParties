@@ -43,6 +43,27 @@ window.ppZustandVeraltet = ppZustandVeraltet;
    ============================================================ */
 const { useState, useEffect, useLayoutEffect, useRef, useCallback, useMemo, createContext, useContext } = React;
 
+// ★ BILDSCHIRMTASTATUR NICHT VON SELBST AUFKLAPPEN (Als Befund 2.11.: „bei einem Mobile-Nutzer war die On-Screen-Tastatur angesprungen"): auf Touch-Geräten
+// (`pointer: coarse`) klappt jedes PROGRAMMATISCHE `focus()` auf ein Texteingabefeld die Tastatur auf — `autoFocus` (Such-/Filterfelder, Auth, Puzzle-Dialoge …)
+// ebenso wie `ref.current.focus()`. Antippen eines Felds fokussiert nativ und ist davon nicht betroffen. Hier wird das programmatische Fokussieren von Text-
+// feldern unterdrückt, AUSSER das Feld trägt `data-pp-tastatur="an"` (Eingaben, die der Nutzer gerade ausdrücklich gewollt hat: Umbenennen, Texteingabe-Dialog,
+// Chat-Nachricht). Mit Maus (Desktop, auch Touch-Notebooks mit Maus) ändert sich nichts.
+(function () {
+  try {
+    if (!window.matchMedia || !window.matchMedia('(pointer: coarse)').matches) return;
+    const TEXT = new Set(['text', 'search', 'email', 'password', 'number', 'tel', 'url', '']);
+    const bremsen = (Klasse) => {
+      const orig = Klasse.prototype.focus;
+      Klasse.prototype.focus = function () {
+        const art = this instanceof HTMLTextAreaElement ? '' : (this.getAttribute('type') || 'text').toLowerCase();
+        if (TEXT.has(art) && !(this.dataset && this.dataset.ppTastatur === 'an')) return;   // Tastatur bleibt zu
+        return orig.apply(this, arguments);
+      };
+    };
+    bremsen(HTMLInputElement); bremsen(HTMLTextAreaElement);
+  } catch (e) { /* ohne Bremse: altes Verhalten */ }
+})();
+
 // ===== TOUCH DETECTION =====
 window._isTouchDevice = false;
 window.addEventListener('touchstart', function onFirstTouch() {
@@ -8441,6 +8462,55 @@ function CardMini({ card, onClick, onRightClick, count, maxCount, dimmed, style,
  * Mausrad-Scrollen (`.card-tooltip-info`, App-weiter Wheel-Handler in
  * app-main) greifen damit automatisch fuer beide.
  */
+/**
+ * ★ Breiter, mit dem Finger greifbarer Bildlaufstreifen für Galerien auf Touch-Geräten (Als Befund 2.11.: „die Scrollbar für Kartengalerien auf Mobile ist zu
+ * schmal und schwer zu scrollen"). Die nativen Leisten sind auf dem Handy ein dünner, kurz sichtbarer Strich. Der Streifen liegt absolut rechts im
+ * Elternelement (das `position: relative` sein muss), folgt `scrollRef.current` (Scrollen, Größe, Inhalt) und lässt sich am Griff ziehen oder durch Tippen
+ * auf die Spur setzen. Pointer-Ereignisse mit Capture; `touch-action: none` hält die Seite still. Stil: `.pp-bildlauf-spur` / `.pp-bildlauf-griff` (style.css).
+ */
+function TouchScrollbar({ scrollRef }) {
+  const spur = useRef(null), griff = useRef(null), zug = useRef(null);
+  const nachziehen = useCallback(() => {
+    const el = scrollRef.current, sp = spur.current, gr = griff.current;
+    if (!el || !sp || !gr) return;
+    if (!(el.clientHeight > 0 && el.scrollHeight > el.clientHeight + 1)) { sp.style.display = 'none'; return; }
+    sp.style.display = '';
+    const h = sp.clientHeight, gh = Math.max(56, Math.min(h, h * el.clientHeight / el.scrollHeight));
+    const pos = el.scrollTop / Math.max(1, el.scrollHeight - el.clientHeight);
+    gr.style.height = gh + 'px'; gr.style.top = Math.round(pos * (h - gh)) + 'px';
+  }, [scrollRef]);
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el) return undefined;
+    el.addEventListener('scroll', nachziehen, { passive: true });
+    const ro = new ResizeObserver(nachziehen); ro.observe(el);
+    const mo = new MutationObserver(nachziehen); mo.observe(el, { childList: true, subtree: true });   // Seitenwechsel, Filter: der Inhalt wird länger/kürzer
+    nachziehen();
+    return () => { el.removeEventListener('scroll', nachziehen); ro.disconnect(); mo.disconnect(); };
+  }, [scrollRef, nachziehen]);
+  const zuSpurPosition = (clientY) => {
+    const el = scrollRef.current, sp = spur.current, gr = griff.current;
+    if (!el || !sp || !gr) return;
+    const r = sp.getBoundingClientRect(), gh = gr.clientHeight;
+    const anteil = Math.min(1, Math.max(0, (clientY - r.top - gh / 2) / Math.max(1, r.height - gh)));
+    el.scrollTop = anteil * (el.scrollHeight - el.clientHeight);
+  };
+  const runter = (e) => {
+    e.stopPropagation();
+    try { e.currentTarget.setPointerCapture(e.pointerId); } catch (_) { /* ohne Capture */ }
+    zug.current = true;
+    zuSpurPosition(e.clientY);
+  };
+  const bewegt = (e) => { if (zug.current) { e.stopPropagation(); zuSpurPosition(e.clientY); } };
+  const hoch = (e) => { zug.current = false; try { e.currentTarget.releasePointerCapture(e.pointerId); } catch (_) { /* ok */ } };
+  return (
+    <div ref={spur} className="pp-bildlauf-spur" onPointerDown={runter} onPointerMove={bewegt} onPointerUp={hoch} onPointerCancel={hoch}>
+      <div ref={griff} className="pp-bildlauf-griff" />
+    </div>
+  );
+}
+window.TouchScrollbar = TouchScrollbar;
+
 function CardSideTooltip({ card, imgUrl, inGallery }) {
   if (!card) return null;
   const foilType = card.foil;
@@ -12053,7 +12123,7 @@ function PPDialogBox({ text, eingabe, vorgabe, okText, abbruchText, gefahr, fert
     <div style={{ position: 'fixed', inset: 0, zIndex: 100002, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(8,6,12,.8)' }} onClick={nein}>
       <div onClick={(e) => e.stopPropagation()} style={{ minWidth: 260, maxWidth: 'min(92vw, 420px)', padding: '16px 18px', background: 'var(--bg2)', border: '3px solid ' + (gefahr ? 'var(--danger)' : 'var(--accent)'), textAlign: 'center' }}>
         <div style={{ fontSize: 13, color: 'var(--text)', lineHeight: 1.5, marginBottom: 12, whiteSpace: 'pre-wrap' }}>{text}</div>
-        {eingabe && <input ref={eingabeRef} className="input" value={wert} onChange={(e) => setWert(e.target.value)} style={{ width: '100%', boxSizing: 'border-box', marginBottom: 12, fontSize: 13 }} />}
+        {eingabe && <input ref={eingabeRef} data-pp-tastatur="an" className="input" value={wert} onChange={(e) => setWert(e.target.value)} style={{ width: '100%', boxSizing: 'border-box', marginBottom: 12, fontSize: 13 }} />}
         <div style={{ display: 'flex', gap: 10, justifyContent: 'center' }}>
           <button className={'btn' + (gefahr ? ' btn-danger' : ' btn-success')} style={{ padding: '8px 22px', fontSize: 12 }} onClick={ok}>{okText || 'OK'}</button>
           {abbruchText !== false && <button className="btn" style={{ padding: '8px 22px', fontSize: 12 }} onClick={nein}>{abbruchText || 'Cancel'}</button>}

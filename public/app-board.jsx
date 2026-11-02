@@ -36051,16 +36051,20 @@ function ZielMarkenEbene({ marken, blitze, myIdx }) {
 // Pixelbilder erzeugt (Zwischenspeicher `_ppPxCache`, Schluessel nach Groesse) — bevor ein Kampf, vor allem ein Tutorial, startet.
 // Auf schwachen Handys kostet dieses erste Pixelieren Sekunden; im Menue stoert es niemanden, in Mission 1 verzoegerte es die erste Textbox.
 window._ppAnimWarm = window._ppAnimWarm || {};
-window.ppAnimVorwaermen = function (type, mass) {
+// `extras` (optional): `schluessel` = eigener Merker statt des Typnamens (derselbe Typ in anderer Groesse / mit anderem Bild), `props` = zusaetzliche
+// Animations-Eigenschaften (z. B. `cardbackUrl`), `bewegung: true` = auch die BEWEGUNG backen (gedrehte Sprites in den Zwischenspeicher) — das Vorwaermen
+// ueberspringt sie sonst; fuer kleine Animationen mit Drehung (Mischen) ist genau sie der teure Teil.
+window.ppAnimVorwaermen = function (type, mass, extras) {
   try {
-    if (window._playAnimations === false || window._ppAnimWarm[type] || !ANIM_REGISTRY[type] || !ReactDOM.createRoot) return;
-    window._ppAnimWarm[type] = true;
+    const merker = (extras && extras.schluessel) || type;
+    if (window._playAnimations === false || window._ppAnimWarm[merker] || !ANIM_REGISTRY[type] || !ReactDOM.createRoot) return;
+    window._ppAnimWarm[merker] = true;
     const host = document.createElement('div');
     host.setAttribute('aria-hidden', 'true');
     document.body.appendChild(host);
     const root = ReactDOM.createRoot(host);
     const fertig = () => setTimeout(() => { try { root.unmount(); host.remove(); } catch {} }, 300);
-    root.render(<GameAnimationRenderer type={type} x={window.innerWidth / 2} y={window.innerHeight / 2} w={(mass && mass.w) || 100} h={(mass && mass.h) || 100} welt={false} prewarm _gemountet={fertig} />);
+    root.render(<GameAnimationRenderer type={type} x={window.innerWidth / 2} y={window.innerHeight / 2} w={(mass && mass.w) || 100} h={(mass && mass.h) || 100} welt={false} prewarm prewarmBewegung={!!(extras && extras.bewegung)} _gemountet={fertig} {...((extras && extras.props) || {})} />);
     setTimeout(() => { try { root.unmount(); host.remove(); } catch {} }, 8000);   // Netz
   } catch (e) { /* Vorwaermen ist optional */ }
 };
@@ -36073,7 +36077,7 @@ function PixelHuelle({ className, style, children }) {
   return <div ref={ref} className={className} style={style}>{children}</div>;
 }
 
-function GameAnimationRenderer({ type, x, y, w, h, _gemountet, prewarm, ...rest }) {
+function GameAnimationRenderer({ type, x, y, w, h, _gemountet, prewarm, prewarmBewegung, ...rest }) {
   const Component = ANIM_REGISTRY[type];
   // Lebensdauer-Uhr erst NACH dem Pixelieren starten (s. playAnimation).
   useEffect(() => { if (typeof _gemountet === 'function') _gemountet(); }, []);
@@ -36081,7 +36085,7 @@ function GameAnimationRenderer({ type, x, y, w, h, _gemountet, prewarm, ...rest 
   // die Grafiken der Animation einmal beim Einblenden in Pixelart mit
   // Dithering um, vor dem ersten Bild (useLayoutEffect).
   const huelle = useRef(null);
-  useLayoutEffect(() => window.ppPixeliererAnhaengen ? window.ppPixeliererAnhaengen(huelle.current, { bewegung: !prewarm }) : undefined, []);
+  useLayoutEffect(() => window.ppPixeliererAnhaengen ? window.ppPixeliererAnhaengen(huelle.current, { bewegung: !prewarm || !!prewarmBewegung }) : undefined, []);
   if (!Component) return null;
   // Forward extra props (intensity, custom payload, etc.) so animations
   // that key off broadcast-side parameters can scale themselves. Extras
@@ -54597,6 +54601,27 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       }
     }, vorwaermVerzoegerung);
     return () => clearTimeout(t);
+  }, []);
+  // ★ Mischanimation vorwaermen (Als Befund 2.11.: „Mulligans laggy, der Elana-Effekt ruckelt mittendrin"): das erste `deck_shuffle_fx` (Mulligan, Elana,
+  // Leadership …) backt drei GEDREHTE Kartenrücken in Pixelbilder — am Rechner ~75 ms Hauptthread, auf dem Handy ein Vielfaches, und zwar genau zwischen
+  // Zurücklegen und Ziehen. Einmal unsichtbar mit Bewegung eingehängt (Maß und Rückenbild wie beim echten Mischen), liegen die gedrehten Bilder im
+  // Zwischenspeicher. Nach dem Brettaufbau im Leerlauf, eine Variante nach der anderen (je Maß/Rücken eine).
+  useEffect(() => {
+    if (window._playAnimations === false) return undefined;
+    const timers = [];
+    const t = setTimeout(() => {
+      const fest = new Set(); let n = 0;
+      for (const [sel, url] of [['[data-my-deck]', me.cardback], ['[data-opp-deck]', opp.cardback], ['[data-my-potion-deck]', me.cardback], ['[data-opp-potion-deck]', opp.cardback]]) {
+        const el = document.querySelector(sel); if (!el) continue;
+        const r = el.getBoundingClientRect(); if (!r.width) continue;
+        const bild = url || '/cardback.png';
+        const k = 'deck_shuffle_fx|' + bild + '|' + Math.round(r.width) + 'x' + Math.round(r.height);
+        if (fest.has(k)) continue; fest.add(k);
+        const lauf = () => { if (window.ppAnimVorwaermen) window.ppAnimVorwaermen('deck_shuffle_fx', { w: r.width, h: r.height }, { schluessel: k, bewegung: true, props: { cardbackUrl: bild } }); };
+        timers.push(setTimeout(() => { if (window.requestIdleCallback) requestIdleCallback(lauf, { timeout: 800 }); else lauf(); }, (n++) * 800));
+      }
+    }, vorwaermVerzoegerung + 1500);
+    return () => { clearTimeout(t); timers.forEach(clearTimeout); };
   }, []);
 
   // Listen for potion resolved — trigger explosion animation
