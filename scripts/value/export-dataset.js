@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // Zustandslogs (`<deck>.jsonl.states`, Stufe 1) → flache Binärarrays fürs Training (Stufe 2).
 //
-//   node scripts/value/export-dataset.js [--in data/training/value] [--out data/training/value/dataset]
+//   node scripts/value/export-dataset.js [--in data/training/value[,weitere Ordner]] [--out data/training/value/dataset]
 //
 // Jeder Zustand ergibt ZWEI Beispiele: die ehrliche Sicht von Sitz 0 und die von Sitz 1 (Netz sagt immer „gewinnt mein Sitz?").
 // Die Merkmale kommen aus `cards/effects/_value-features.js` — derselbe Code wie später im Spiel.
@@ -21,8 +21,8 @@ const F = require(path.join(ROOT, 'cards', 'effects', '_value-features'));
 
 const args = process.argv.slice(2);
 const getArg = (n, d) => { const i = args.indexOf(n); return i >= 0 && args[i + 1] != null ? args[i + 1] : d; };
-const IN_DIR = path.resolve(ROOT, getArg('--in', 'data/training/value'));
-const OUT_DIR = path.resolve(ROOT, getArg('--out', path.join(IN_DIR, 'dataset')));
+const IN_DIRS = getArg('--in', 'data/training/value').split(',').map(d => path.resolve(ROOT, d.trim())).filter(Boolean);
+const OUT_DIR = path.resolve(ROOT, getArg('--out', path.join(IN_DIRS[0], 'dataset')));
 const N_LIN = 15;
 
 /** Gepufferter Schreiber für eine Rohdatei aus Zahlen eines Typs. */
@@ -54,8 +54,8 @@ function linFeatures(view, out) {
 
 function main() {
   fs.mkdirSync(OUT_DIR, { recursive: true });
-  const files = fs.readdirSync(IN_DIR).filter(f => f.endsWith('.jsonl.states')).sort();
-  if (!files.length) throw new Error(`Keine .states-Dateien in ${IN_DIR}`);
+  const files = IN_DIRS.flatMap(dir => fs.readdirSync(dir).filter(f => f.endsWith('.jsonl.states')).sort().map(f => path.join(dir, f)));
+  if (!files.length) throw new Error(`Keine .states-Dateien in ${IN_DIRS.join(', ')}`);
 
   const per = {
     y: new Sink('y', Uint8Array), ev: new Sink('ev', Float32Array), turn: new Sink('turn', Int16Array), rem: new Sink('rem', Int16Array),
@@ -74,7 +74,7 @@ function main() {
   let nEx = 0, nGames = 0, nStates = 0;
   const lin = { push(v) { per.lin.push(v); } };
   files.forEach((file, fi) => {
-    const statesFile = path.join(IN_DIR, file);
+    const statesFile = file;
     const jsonl = statesFile.replace(/\.states$/, '');
     const rec = new Map();
     for (const line of fs.readFileSync(jsonl, { encoding: 'utf-8' }).split('\n')) {

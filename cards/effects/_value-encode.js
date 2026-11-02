@@ -14,8 +14,8 @@
 //  handgeschriebenen Evaluators je Sitz (`ev`, Anfütterung für die Destillation). Der Zustand ist die VOLLE Sicht ohne
 //  Deckreihenfolge; die ehrliche Sicht eines Sitzes (`honestView`) maskiert daraus Gegnerhand und verdeckte Karten des Gegners.
 //
-//  ERWEITERBAR: jeder Zustand endet mit einer Liste von Zusatzblöcken `(Typ, Länge, Bytes)`. Ein später ergänzter Block (etwa die
-//  obersten Karten beider Decks) bricht keinen alten Leser: unbekannte Typen werden als Rohbytes durchgereicht. Ändert sich das
+//  ERWEITERBAR: jeder Zustand endet mit einer Liste von Zusatzblöcken `(Typ, Länge, Bytes)`. Ein später ergänzter Block (Typ 1: die
+//  obersten Karten beider Decks, seit Stufe 2) bricht keinen alten Leser: unbekannte Typen werden als Rohbytes durchgereicht. Ändert sich das
 //  Grundlayout selbst, muss `FORMAT_VERSION` steigen. Die Kartennummern stammen aus `data/cpu-value/vocab.json` (nur anhängend,
 //  siehe `scripts/value/build-vocab.js`); 0 heißt „unbekannt/leer".
 //
@@ -102,6 +102,29 @@ class Reader {
   }
   sv() { const z = this.uv(); return z % 2 ? -(z + 1) / 2 : z / 2; }
   raw(n) { if (this.p + n > this.b.length) throw new RangeError('Ende der Daten'); const s = this.b.subarray(this.p, this.p + n); this.p += n; return s; }
+}
+
+// ── Zusatzblock 1: oberste Deckkarten ────────────────────────────────
+// Die nächsten TOP_N Karten beider Decks in Ziehreihenfolge (oberste zuerst; `mainDeck.shift()` zieht). Der Evaluator wertet sie mit
+// (offene Karten), das Netz bekommt sie erst, wenn die offene Variante gewollt ist. `honestView` gibt sie NICHT weiter. Sie stehen
+// nur in Spielen, die ab Einführung dieses Blocks gesammelt wurden — ältere Blöcke haben keinen (`topCards` liefert dann null).
+const EXTRA_TOP = 1;
+const TOP_N = 4;
+function topBlock(gs) {
+  const w = new Writer();
+  for (const si of [0, 1]) {
+    const top = (gs.players[si].mainDeck || []).slice(0, TOP_N);
+    w.uv(top.length);
+    for (const n of top) w.uv(idOf(typeof n === 'string' ? n : n && n.name));
+  }
+  return { type: EXTRA_TOP, bytes: Buffer.from(w.bytes()) };
+}
+/** Oberste Deckkarten je Sitz als Kartennummern (`[[Sitz 0…], [Sitz 1…]]`) oder null, wenn der Zustand den Block nicht trägt. */
+function topCards(S) {
+  const e = (S.extra || []).find(x => x.type === EXTRA_TOP);
+  if (!e) return null;
+  const r = new Reader(e.bytes);
+  return [0, 1].map(() => Array.from({ length: r.uv() }, () => r.uv()));
 }
 
 // ── Zustand aus der Engine ───────────────────────────────────────────
@@ -199,7 +222,7 @@ function extractState(engine, trig, ev) {
       Math.max(0, Math.min(40, turn - (inst.turnPlayed || 0))), num(ctr), buffs]);
   }
   for (const s of seats) s.sup.sort(byTuple);
-  return { trig, turn, phase: gs.currentPhase || 0, active: gs.activePlayer === 1 ? 1 : 0, seats, ev: ev || [null, null], extra: [] };
+  return { trig, turn, phase: gs.currentPhase || 0, active: gs.activePlayer === 1 ? 1 : 0, seats, ev: ev || [null, null], extra: [topBlock(gs)] };
 }
 
 // ── Zustand ⇄ Bytes ──────────────────────────────────────────────────
@@ -420,7 +443,7 @@ function statesPath(jsonlPath) { return jsonlPath + '.states'; }   // neben die 
 module.exports = {
   FORMAT_VERSION, HEADER_BYTES, SEAT_SCALARS, LOCK_KEYS, HERO_FIELDS, ABIL_FIELDS, SUP_FIELDS, SUR_FIELDS,
   loadVocab, idOf, nameOf, unknownNames,
-  Writer, Reader, extractState, writeState, readState, bodyOf, honestView,
+  Writer, Reader, extractState, writeState, readState, bodyOf, honestView, EXTRA_TOP, TOP_N, topCards,
   ValueLog, quietEval, packBlock, scanFile, readBlock, readBlockBytes, appendBlock, repairFile, mergeFiles,
   enabled, statesPath,
 };
