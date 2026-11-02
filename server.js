@@ -3968,6 +3968,8 @@ async function unlockCpuSkin(userId, skinName) {
 
 const SHOP_PRICES = { avatar: 50, sleeve: 50, board: 50, skin: 50 };
 const RANDOM_PRICES = { skin: 25, avatar: 25, sleeve: 25 };
+// Nur per Pull (Zufall) erhältlich, nicht gezielt kaufbar.
+const GACHA_ONLY_TYPES = new Set(['skin', 'avatar', 'sleeve']);
 const STRUCTURE_DECK_PRICE = 50;
 const STRUCTURE_DECK_RANDOM_PRICE = 25;
 
@@ -4207,6 +4209,8 @@ app.post('/api/shop/buy', authMiddleware, async (req, res) => {
   if (!itemType || !itemId) return res.status(400).json({ error: 'Missing itemType or itemId' });
   const price = SHOP_PRICES[itemType];
   if (price === undefined) return res.status(400).json({ error: 'Invalid item type' });
+  // Skins, Avatare und Sleeves gibt es nur noch per Zufalls-Pull (/api/shop/buy-random[-skin]) – nicht gezielt.
+  if (GACHA_ONLY_TYPES.has(itemType)) return res.status(403).json({ error: 'Skins, Avatars and Sleeves can only be pulled at random.' });
 
   // Verify item exists
   if (itemType === 'skin') {
