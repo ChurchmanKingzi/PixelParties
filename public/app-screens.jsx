@@ -3903,12 +3903,14 @@ function shopStarParticles(ox, oy, n) {
 }
 
 const SHOP_BAYER = [0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5];
-const SHOP_CRACK_W = 50, SHOP_CRACK_H = 70;   // Raster der Risse über der Karte (4 px je Rasterpunkt bei 200 px Kartenbreite)
+// Raster der Risse über dem Kartenrücken (Karte 5:7) bzw. dem Avatar-Siegel (quadratisch).
+const SHOP_CRACK_GRID = { card: { w: 50, h: 70 }, avatar: { w: 56, h: 56 } };
 
-// Ein Riss: eckiger Zickzackpfad von der Kartenmitte nach außen, mit Verästelungen. Liefert die Rasterpunkte nach Abstand
-// vom Zentrum sortiert (so wächst er von innen nach außen) und seine Hauptrichtung (für die Lichtstrahlen).
-function shopMakeCrack(a0) {
-  const W = SHOP_CRACK_W, H = SHOP_CRACK_H, cx = W / 2, cy = H / 2, seen = new Set(), pts = [];
+// Die Risse EINES Klicks: zwei Hauptbrüche in entgegengesetzte Richtungen, die gezielt bis an den Rand laufen (so überziehen
+// die fünf Klicks zusammen die ganze Fläche), mit Seitenästen zwischen den Strahlen und einem gezackten Ring (Spinnennetz).
+// Liefert die Rasterpunkte nach Abstand vom Zentrum sortiert (der Bruch wächst von innen nach außen) und die Hauptrichtungen.
+function shopMakeCracks(W, H, base, webR) {
+  const cx = W / 2, cy = H / 2, seen = new Set(), pts = [];
   const put = (x, y) => {
     x = Math.round(x); y = Math.round(y);
     if (x < 0 || y < 0 || x >= W || y >= H) return false;
@@ -3921,35 +3923,111 @@ function shopMakeCrack(a0) {
     for (let i = 0; i <= n; i++) if (!put(x0 + (x1 - x0) * i / n, y0 + (y1 - y0) * i / n)) return false;
     return true;
   };
-  const walk = (x, y, a, steps, depth) => {
-    for (let s = 0; s < steps; s++) {
-      a += (Math.random() - 0.5) * 1.3;                                  // scharfe Knicke
-      const len = 2 + Math.random() * 3;
-      const nx = x + Math.cos(a) * len, ny = y + Math.sin(a) * len;
+  // Schnittpunkt eines Strahls von (x, y) in Richtung a mit dem Rand, mal Anteil `share` (1 = bis zum Rand)
+  const toEdge = (x, y, a, share) => {
+    const dx = Math.cos(a), dy = Math.sin(a);
+    const tx = dx > 1e-6 ? (W - 1 - x) / dx : dx < -1e-6 ? (0 - x) / dx : Infinity;
+    const ty = dy > 1e-6 ? (H - 1 - y) / dy : dy < -1e-6 ? (0 - y) / dy : Infinity;
+    const t = Math.max(0, Math.min(tx, ty)) * share;
+    return [x + dx * t, y + dy * t];
+  };
+  const crack = (x, y, tgt, depth) => {
+    for (let guard = 0; guard < 60; guard++) {
+      const dist = Math.hypot(tgt[0] - x, tgt[1] - y);
+      if (dist < 2) return;
+      const toT = Math.atan2(tgt[1] - y, tgt[0] - x), ang = toT + (Math.random() - 0.5) * 1.0;   // scharfe Knicke um die Zielrichtung
+      const len = Math.min(dist, 3 + Math.random() * 3.5);
+      const nx = x + Math.cos(ang) * len, ny = y + Math.sin(ang) * len;
       if (!seg(x, y, nx, ny)) return;
       x = nx; y = ny;
-      if (depth < 2 && s > 2 && Math.random() < 0.2) walk(x, y, a + (Math.random() < 0.5 ? -1 : 1) * (0.55 + Math.random() * 0.6), Math.max(3, Math.floor(steps * 0.45)), depth + 1);
+      if (depth < 2 && dist > 10 && Math.random() < 0.12) {
+        const ba = toT + (Math.random() < 0.5 ? -1 : 1) * (0.6 + Math.random() * 0.5);
+        crack(x, y, toEdge(x, y, ba, 0.55 + Math.random() * 0.4), depth + 1);
+      }
     }
   };
-  walk(cx, cy, a0, 17, 0);
+  const a1 = base, a2 = base + Math.PI + (Math.random() - 0.5) * 0.5;
+  crack(cx, cy, toEdge(cx, cy, a1, 1), 0);
+  crack(cx, cy, toEdge(cx, cy, a2, 1), 0);
+  if (webR > 0) {                                                       // gezackter Ring um die Mitte
+    let t = Math.random() * 6.28, px = null, py = null;
+    const sweep = 0.9 + Math.random() * 0.7, ry = webR * H / W;
+    for (const end = t + sweep; t < end; t += 0.18 + Math.random() * 0.12) {
+      const j = (Math.random() - 0.5) * 1.6, x = cx + Math.cos(t) * (webR + j), y = cy + Math.sin(t) * (ry + j);
+      if (px !== null) seg(px, py, x, y);
+      px = x; py = y;
+    }
+  }
   pts.sort((p, q) => p.r - q.r);
-  return { pts, dir: a0 };
+  return { pts, dirs: [a1, a2] };
 }
 
-// Die Pull-Inszenierung („Beschwörung“) — Pixelart, ohne Vollbild-Blitze:
-//   1. Die Shop-Seite dunkelt per Dither ein, ein Beschwörungskreis zeichnet sich auf den Boden, Runen glimmen auf.
-//   2. Der Kartenrücken steigt aus dem Kreis. Mit jedem Klick wächst ein Riss über die Karte, mehr Runen zünden,
-//      die Lichtsäule wird breiter und die Funken kreisen enger und schneller.
-//   3. Einschlag: die Karte zerspringt in 48 Splitter, eine Welle läuft über den Kreis, der Bildschirm bebt.
-//   4. Enthüllung: die neue Karte steigt aus dem Licht, Strahlen blenden weich (Dither) ein, Banner, Sternenring, Münzregen.
-// Klang und Bild sind gekoppelt: Töne laufen NUR über `cue()`, und jede Cue-Beschreibung nennt ihr Bild (Riss, Runen,
-// Säule, Welle, Splitter, Salve, Sterne, Münzen). Klick überspringt. Der Reveal öffnet sofort beim Drücken von PULL
-// (`reveal.pending`) und wartet am Höhepunkt, falls die Antwort des Servers noch fehlt.
+// Das versiegelte Avatar-Tile (60×60 Pixel): dunkle Dither-Fläche, Rahmen aus Gold, Dunkel und Cyan, Eckstifte, Fragezeichen.
+// Als Bild erzeugt, damit es sich wie der Kartenrücken in Splitter zerlegen lässt.
+function shopSealedArt() {
+  const c = document.createElement('canvas'); c.width = c.height = 60;
+  const g = c.getContext('2d');
+  const col = (h) => (window.ppSnap ? window.ppSnap(h) : h);
+  g.fillStyle = col('#12101f'); g.fillRect(0, 0, 60, 60);
+  g.fillStyle = col('#2b0b47');
+  for (let y = 4; y < 56; y++) for (let x = 4; x < 56; x++) if (((x + y) & 1) === 0 && ((x >> 2) + (y >> 2)) % 3 === 0) g.fillRect(x, y, 1, 1);
+  const ring = (i, hex) => { g.fillStyle = col(hex); g.fillRect(i, i, 60 - 2 * i, 1); g.fillRect(i, 59 - i, 60 - 2 * i, 1); g.fillRect(i, i, 1, 60 - 2 * i); g.fillRect(59 - i, i, 1, 60 - 2 * i); };
+  ring(0, '#fad54a'); ring(1, '#fad54a'); ring(2, '#08060c'); ring(3, '#1aedff');
+  g.fillStyle = col('#fad54a');
+  for (const [x, y] of [[5, 5], [52, 5], [5, 52], [52, 52]]) g.fillRect(x, y, 3, 3);
+  const Q = [[1, 0, 3, 1], [0, 1, 1, 1], [4, 1, 1, 1], [4, 2, 1, 1], [3, 3, 1, 1], [2, 4, 1, 1], [2, 6, 1, 1]];   // 5×7-Fragezeichen
+  for (const [dx, dy] of [[2, 2], [0, 0]]) {
+    g.fillStyle = dx ? col('#08060c') : col('#fad54a');
+    for (const [x, y, w, h] of Q) g.fillRect(20 + x * 4 + dx, 16 + y * 4 + dy, w * 4, h * 4);
+  }
+  return c.toDataURL('image/png');
+}
+
+// Mosaik-Auflösung: das Avatar-Bild setzt sich aus groben Blöcken zu voller Schärfe zusammen (Pixelart-typisch, in harten Stufen).
+function ShopMosaic({ src }) {
+  const ref = useRef(null);
+  useEffect(() => {
+    const cv = ref.current; if (!cv) return undefined;
+    let dead = false, timer = 0;
+    const img = new Image();
+    img.onload = () => {
+      if (dead) return;
+      const N = img.naturalWidth || 200;
+      cv.width = N; cv.height = N;
+      const g = cv.getContext('2d'); g.imageSmoothingEnabled = false;
+      const tmp = document.createElement('canvas'), tg = tmp.getContext('2d');
+      const steps = [3, 5, 8, 12, 18, 28, 44, 0];
+      let i = 0;
+      const tick = () => {
+        if (dead) return;
+        const b = steps[i++];
+        g.clearRect(0, 0, N, N);
+        if (b) { tmp.width = tmp.height = b; tg.imageSmoothingEnabled = true; tg.drawImage(img, 0, 0, b, b); g.drawImage(tmp, 0, 0, N, N); }
+        else g.drawImage(img, 0, 0, N, N);
+        if (i < steps.length) timer = setTimeout(tick, 110);
+      };
+      tick();
+    };
+    img.src = src;
+    return () => { dead = true; clearTimeout(timer); };
+  }, [src]);
+  return <canvas ref={ref} className="pull-fx-mosaic" />;
+}
+
+// Die Pull-Inszenierung — Pixelart, ohne Vollbild-Blitze. Zwei Fassungen (`reveal.kind`):
+//   'card'   (Skins, Sleeves, Structure Decks — 5:7): Beschwörungskreis auf dem Boden, Lichtsäule, kreisende Funken; der
+//            Kartenrücken steigt aus dem Kreis, überzieht sich mit Rissen und zerspringt in 6×8 Splitter.
+//   'avatar' (quadratisch): ein versiegeltes Tile in einem Tunnel aus Quadraten, die nach außen strömen; Funken umrunden das Tile
+//            auf einer Quadratbahn; es zerspringt in 8×8 Splitter, der Avatar löst sich per Mosaik zu voller Schärfe auf.
+// Gemeinsam: Dither-Einblendung, fünf Risse (sie überziehen die ganze Fläche), „Überladung“, Explosion (Druckwellenring, Strahlen,
+// Beben, Salven), Enthüllung mit Banner, Sternenring und Münzregen. Klang und Bild sind gekoppelt: Töne laufen NUR über `cue()`.
+// Klick überspringt. Der Reveal öffnet sofort beim Drücken von PULL (`reveal.pending`) und wartet am Höhepunkt auf den Server.
 function ShopPullReveal({ reveal, onClose }) {
+  const AV = (reveal && reveal.kind) === 'avatar';
   const reduced = useMemo(() => { try { return window.matchMedia('(prefers-reduced-motion: reduce)').matches; } catch { return false; } }, []);
   const [phase, setPhase] = useState('charge');   // 'charge' | 'shatter' | 'reveal'
-  const [overload, setOverload] = useState(false); // letzte Stufe vor dem Einschlag: Karte zittert dauernd
-  const [tremor, setTremor] = useState(0);        // Zähler: Karte zuckt (gerade/ungerade = zwei gleiche Animationen im Wechsel)
+  const [overload, setOverload] = useState(false); // letzte Stufe vor dem Einschlag: das Siegel zittert dauernd
+  const [tremor, setTremor] = useState(0);        // Zähler: Zucken (gerade/ungerade = zwei gleiche Animationen im Wechsel)
   const [quake, setQuake] = useState(0);          // Zähler: Bildschirm bebt
   const [sheen, setSheen] = useState(0);          // Zähler: Lichtstreifen über dem Banner
   const [canClose, setCanClose] = useState(false);
@@ -3962,14 +4040,19 @@ function ShopPullReveal({ reveal, onClose }) {
   const phaseRef = useRef(phase);
   phaseRef.current = phase;
   const sceneRef = useRef(null);
+  const slotRef = useRef(null);
   const crackRef = useRef(null);
   const partRef = useRef(null);
   const parts = useRef([]);
-  const S = useRef({ t0: performance.now(), stage: 0, lit: 0, litTarget: 0, pw: 0, ripple: 0, tReveal: 0, overload: 0, crack: [-1, -1, -1, -1, -1] });
-  const shards = useMemo(() => Array.from({ length: 48 }, (_, i) => {
-    const col = i % 6, row = (i / 6) | 0;
-    return { col, row, dx: Math.round((col - 2.5) * 80 + (Math.random() - 0.5) * 50), dy: Math.round((row - 3.5) * 36 - 70 + (Math.random() - 0.5) * 50), d: Math.round(Math.random() * 100) };
+  const grid = SHOP_CRACK_GRID[AV ? 'avatar' : 'card'];
+  const S = useRef({ t0: performance.now(), stage: 0, lit: 0, litTarget: 0, pw: 0, ripple: 0, blast: 0, tun: 0, bigQuake: false, tReveal: 0, overload: 0, crack: [-1, -1, -1, -1, -1] });
+  const NC = AV ? 8 : 6, NR = 8;
+  const shards = useMemo(() => Array.from({ length: NC * NR }, (_, i) => {
+    const col = i % NC, row = (i / NC) | 0;
+    return { col, row, dx: Math.round((col - (NC - 1) / 2) * (AV ? 78 : 86) + (Math.random() - 0.5) * 60), dy: Math.round((row - 3.5) * 44 - 90 + (Math.random() - 0.5) * 70), d: Math.round(Math.random() * 90) };
   }), []);
+  const sealedUrl = useMemo(() => (AV ? shopSealedArt() : null), []);
+  const backUrl = AV ? sealedUrl : '/cardback.png';
   const later = (fn, ms) => { timers.current.push(setTimeout(fn, ms)); };
 
   // Eine gemeinsame Partikelfläche für alle Salven.
@@ -3981,8 +4064,8 @@ function ShopPullReveal({ reveal, onClose }) {
     for (const p of list) a.push(p);
   };
 
-  // cue = Klang + Bild. c: { sound | sounds: [[name, opts], …], stage, lit, crack, overload, ripple, tremor, quake, sheen,
-  //                          burst: [fx, fy, n, speed], stars, coins }
+  // cue = Klang + Bild. c: { sound | sounds: [[name, opts], …], stage, lit, crack, overload, ripple, blast, tremor, quake (true | 2 = stark),
+  //                          sheen, burst: [fx, fy, n, speed], stars, coins }
   const cue = (c) => {
     try {
       if (window.playSFX) {
@@ -3996,11 +4079,12 @@ function ShopPullReveal({ reveal, onClose }) {
     if (c.lit != null) st.litTarget = c.lit;
     if (c.crack != null) st.crack[c.crack] = now;
     if (c.ripple) st.ripple = now;
+    if (c.blast) st.blast = now;
     if (c.tremor) setTremor(n => n + 1);
-    if (c.quake) setQuake(n => n + 1);
+    if (c.quake) { st.bigQuake = c.quake === 2; setQuake(n => n + 1); }
     if (c.sheen) setSheen(n => n + 1);
     if (c.burst) emit(shopBurstParticles(window.innerWidth * c.burst[0], window.innerHeight * c.burst[1], c.burst[2], c.burst[3]));
-    if (c.stars) emit(shopStarParticles(window.innerWidth / 2, window.innerHeight * 0.46, c.stars));
+    if (c.stars) emit(shopStarParticles(window.innerWidth / 2, window.innerHeight * 0.5, c.stars));
     if (c.coins) emit(shopCoinParticles(c.coins));
   };
 
@@ -4010,14 +4094,14 @@ function ShopPullReveal({ reveal, onClose }) {
     timers.current.forEach(clearTimeout); timers.current = [];
     S.current.tReveal = performance.now();
     setPhase('reveal');
-    cue({ sound: 'pull_reveal', stage: 7, quake: true, burst: [0.5, 0.46, 200, 1.1] });                       // Karte steigt, Banner fällt, Strahlen blenden ein
+    cue({ sound: 'pull_reveal', stage: 7, quake: true, burst: [0.5, 0.5, 200, 1.1] });                  // Siegel steigt/löst sich auf, Banner fällt, Strahlen blenden ein
     later(() => cue({ sound: 'pull_sparkle', stars: 28, sheen: true }), 200);                          // Sternenring + Lichtstreifen über dem Banner
     later(() => cue({ sound: 'gold_gain', coins: 90, burst: [0.3, 0.5, 100, 0.9] }), 520);              // Münzregen
     later(() => emit(shopBurstParticles(window.innerWidth * 0.7, window.innerHeight * 0.5, 100, 0.9)), 530);
     later(() => setCanClose(true), 1000);
   };
 
-  // Höhepunkt: wartet, bis die Antwort des Servers da ist; dann zerspringt die Karte.
+  // Höhepunkt: wartet, bis die Antwort des Servers da ist; dann bricht es frei — eine Explosion.
   const climax = () => {
     if (climaxed.current || !alive.current) return;
     if (revealRef.current && revealRef.current.pending) { later(climax, 80); return; }
@@ -4025,26 +4109,29 @@ function ShopPullReveal({ reveal, onClose }) {
     timers.current.forEach(clearTimeout); timers.current = [];
     try { const im = new Image(); im.src = revealRef.current.imgUrl; } catch {}
     setPhase('shatter');
-    cue({ sound: 'pull_shatter', stage: 6, ripple: true, quake: true, burst: [0.5, 0.46, 170, 1.3] });   // Splitter, Welle, Beben, Salve
-    later(toReveal, 650);
+    // Splitter + Druckwellenring + Strahlen + starkes Beben + Salve; der Klang ist die Explosion (mit tiefem Einschlag darunter)
+    cue({ sounds: [['pull_shatter'], ['heavy_impact', { rate: 0.72, volume: 0.7 }]], stage: 6, ripple: !AV, blast: true, quake: 2, burst: [0.5, 0.5, 340, 1.7] });
+    later(() => emit(shopBurstParticles(window.innerWidth * 0.5, window.innerHeight * 0.5, 200, 2.1)), 130);
+    later(() => emit(shopBurstParticles(window.innerWidth * 0.5, window.innerHeight * 0.5, 160, 1.2)), 300);
+    later(toReveal, 780);
   };
 
   useEffect(() => {
     if (reduced) { later(climax, 0); return () => { alive.current = false; timers.current.forEach(clearTimeout); }; }
-    // Klangkulisse = Animation: der Kreis zeichnet sich (Swell), fünf Risse (Knacken + je ein Glockenton, Dur-Arpeggio steigt),
-    // Überladung (steigender Sweep), Einschlag (Splitter), Enthüllung (Akkord), Sternenring (Glockenarpeggio), Münzen.
-    later(() => cue({ sound: 'pull_circle' }), 60);
+    // Klangkulisse = Animation: Kreis/Tunnel baut sich auf (Swell), fünf Risse (Knacken + je ein Glockenton, Dur-Arpeggio steigt),
+    // Überladung (steigender Sweep), Explosion, Enthüllung (Akkord), Sternenring (Glockenarpeggio), Münzen.
+    later(() => cue({ sound: 'pull_circle', opt: AV ? { rate: 1.25 } : {} }), 60);
     const BEAT = (i, semis, burst) => () => cue({
       sounds: [['pull_crack', { rate: 0.94 + 0.07 * i, volume: 0.75 + 0.06 * i }], ['pull_note', { rate: Math.pow(2, semis / 12), volume: 0.55 + 0.05 * i }]],
-      stage: i + 1, lit: 4 * (i + 1), crack: i, tremor: true, burst: [0.5, 0.46, burst[0], burst[1]] });
+      stage: i + 1, lit: 4 * (i + 1), crack: i, tremor: true, burst: [0.5, 0.5, burst[0], burst[1]] });
     later(BEAT(0, 0, [18, 0.45]), 900);
     later(BEAT(1, 4, [26, 0.55]), 1400);
     later(BEAT(2, 7, [34, 0.65]), 1800);
     later(BEAT(3, 12, [44, 0.75]), 2150);
     later(BEAT(4, 16, [60, 0.9]), 2450);
-    later(() => cue({ sound: 'pull_swell', overload: true, burst: [0.5, 0.46, 40, 0.6] }), 2550);
-    later(() => emit(shopBurstParticles(window.innerWidth * 0.5, window.innerHeight * 0.46, 50, 0.8)), 2750);
-    later(() => emit(shopBurstParticles(window.innerWidth * 0.5, window.innerHeight * 0.46, 70, 1.0)), 2950);
+    later(() => cue({ sound: 'pull_swell', overload: true, burst: [0.5, 0.5, 40, 0.6] }), 2550);
+    later(() => emit(shopBurstParticles(window.innerWidth * 0.5, window.innerHeight * 0.5, 50, 0.8)), 2750);
+    later(() => emit(shopBurstParticles(window.innerWidth * 0.5, window.innerHeight * 0.5, 70, 1.0)), 2950);
     later(climax, 3350);
     return () => { alive.current = false; timers.current.forEach(clearTimeout); };
   }, []);
@@ -4057,7 +4144,7 @@ function ShopPullReveal({ reveal, onClose }) {
     return () => stopp();
   }, []);
 
-  // Szene auf grobem Raster (5 px je Kunstpixel): Dither-Einblendung, Dunst, Strahlen, Beschwörungskreis, Säule, Funken, Welle.
+  // Szene auf grobem Raster (5 px je Kunstpixel): Dither-Einblendung, Dunst, Strahlen, Kreis/Säule bzw. Tunnel, Funken, Explosion.
   useEffect(() => {
     const cv = sceneRef.current; if (!cv) return undefined;
     const CELL = 5;
@@ -4071,10 +4158,12 @@ function ShopPullReveal({ reveal, onClose }) {
       const n = parseInt(String(sn).replace('#', ''), 16);
       return ((255 << 24) | ((n & 255) << 16) | (((n >> 8) & 255) << 8) | ((n >> 16) & 255)) >>> 0;
     };
-    const BG = c32('#08060c'), HAZE = c32('#2b0b47'), HOT = c32('#f7f7ad'), GOLD = c32('#fad54a'), ORANGE = c32('#f9ac20');
-    const CYAN = c32('#1aedff'), PINK = c32('#fb1ea9'), DIM = c32('#58238c'), RUNEDIM = c32('#405f8c'), WHITE = c32('#ffffff');
+    const BG = c32('#08060c'), HOT = c32('#f7f7ad'), GOLD = c32('#fad54a'), ORANGE = c32('#f9ac20');
+    const CYAN = c32('#1aedff'), PINK = c32('#fb1ea9'), DIM = c32('#58238c'), RUNEDIM = c32('#405f8c'), WHITE = c32('#ffffff'), BLUE = c32('#4580f6');
+    const HAZE = AV ? c32('#2d4362') : c32('#2b0b47');
+    const RAY_HOT = AV ? WHITE : HOT, RAY_A = AV ? CYAN : GOLD, RAY_B = AV ? BLUE : ORANGE;
     const ang = new Float32Array(W * H), dist = new Float32Array(W * H);
-    const rcx = W / 2, rcy = H * 0.46, maxD = Math.hypot(Math.max(rcx, W - rcx), Math.max(rcy, H - rcy));
+    const rcx = W / 2, rcy = H * 0.5, maxD = Math.hypot(Math.max(rcx, W - rcx), Math.max(rcy, H - rcy));
     for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
       const i = y * W + x;
       ang[i] = Math.atan2(y - rcy, x - rcx) + Math.PI;
@@ -4082,19 +4171,34 @@ function ShopPullReveal({ reveal, onClose }) {
     }
     const cxg = W / 2, cyg = Math.round(H * 0.8), rx = W * 0.3, ry = rx * 0.27, axisX = Math.round(W / 2);
     const plot = (x, y, c) => { x = Math.round(x); y = Math.round(y); if (x < 0 || y < 0 || x >= W || y >= H) return; buf[y * W + x] = c; };
-    const motes = Array.from({ length: 40 }, (_, i) => ({ a: Math.random() * 6.283, h: Math.random(), r0: W * 0.03 + Math.random() * W * 0.13, c: i % 4 }));
-    const MOTE = [GOLD, HOT, CYAN, PINK];
+    const bay = (x, y) => SHOP_BAYER[((y | 0) & 3) * 4 + ((x | 0) & 3)] / 16;
+    const motes = Array.from({ length: 40 }, (_, i) => ({ a: Math.random() * 6.283, h: Math.random(), r0: W * 0.03 + Math.random() * W * 0.13, c: i % 4, u: Math.random(), k: i % 5 }));
+    const MOTE = AV ? [CYAN, PINK, WHITE, BLUE] : [GOLD, HOT, CYAN, PINK];
     const GLYPH = [[[0, -1], [-1, 0], [0, 0], [1, 0], [0, 1]], [[-1, -1], [0, -1], [1, -1], [0, 0], [0, 1]], [[-1, -1], [-1, 0], [-1, 1], [0, 1], [1, 1]], [[-1, -1], [1, -1], [0, 0], [-1, 1], [1, 1]]];
     const RUNES = 20, PW = [0, 3, 5, 8, 11, 15, 22, 6];
-    // Risse: verästelte Zickzackpfade von der Kartenmitte (Raster SHOP_CRACK_W × SHOP_CRACK_H über der Karte).
-    const cracks = [0, 1, 2, 3, 4].map(i => shopMakeCrack((i / 5) * Math.PI * 2 + 0.3 + (Math.random() - 0.5) * 0.7));
+    const blastDirs = Array.from({ length: 22 }, () => ({ a: Math.random() * Math.PI * 2, l: 0.45 + Math.random() * 0.55 }));
+    // Risse: je Klick ein Paar Hauptbrüche in entgegengesetzte Richtungen (36° Versatz von Klick zu Klick) + gezackter Ring.
+    const cracks = [0, 1, 2, 3, 4].map(i => shopMakeCracks(grid.w, grid.h, 0.2 + i * (Math.PI / 5) + (Math.random() - 0.5) * 0.3, 7 + i * 4.5));
     const cc = crackRef.current ? crackRef.current.getContext('2d') : null;
-    if (crackRef.current) { crackRef.current.width = SHOP_CRACK_W; crackRef.current.height = SHOP_CRACK_H; }
+    if (crackRef.current) { crackRef.current.width = grid.w; crackRef.current.height = grid.h; }
     const snap = (hex) => (window.ppSnap ? window.ppSnap(hex) : hex);
     const CC = { dark: snap('#08060c'), gold: snap('#fad54a'), orange: snap('#f9ac20'), hot: snap('#f7f7ad'), white: snap('#ffffff') };
+    // Mitte (in Rasterzellen) und halbe Breite des Siegels/der Karte
+    const center = () => {
+      const el = slotRef.current;
+      if (!el) return [W / 2, H / 2, 20];
+      const r = el.getBoundingClientRect();
+      return [(r.left + r.width / 2) / CELL, (r.top + r.height / 2) / CELL, r.width / CELL / 2];
+    };
+    const perim = (u, h) => {                                     // Punkt auf einer Quadratbahn mit halber Kantenlänge h (u: 0…1)
+      const t = u * 4, side = Math.floor(t) % 4, f = t - Math.floor(t);
+      return side === 0 ? [-h + 2 * h * f, -h] : side === 1 ? [h, -h + 2 * h * f] : side === 2 ? [h - 2 * h * f, h] : [-h, h - 2 * h * f];
+    };
 
     const draw = () => {
       const now = performance.now(), st = S.current, tt = now - st.t0, ph = phaseRef.current;
+      const [ccx, ccy, half] = center();
+      const ov = st.overload > 0 ? 1.8 : 1;
       // 1) Dither-Einblendung der Dunkelheit (die Shop-Seite scheint zuerst noch durch)
       const fade = Math.min(1, tt / 700);
       if (fade >= 1) buf.fill(BG);
@@ -4108,90 +4212,139 @@ function ShopPullReveal({ reveal, onClose }) {
         if ((1 - dd) * hazeGain * 1.6 > b) buf[i] = HAZE;
         if (rayK > 0) {
           const a = (((ang[i] + spin) / (2 * Math.PI)) * 18) % 1;
-          if (a < 0.5) { const inten = (1 - dd) * rayK * 0.95; if (inten > b) buf[i] = inten > 0.62 ? HOT : (a < 0.25 ? GOLD : ORANGE); }
+          if (a < 0.5) { const inten = (1 - dd) * rayK * 0.95; if (inten > b) buf[i] = inten > 0.62 ? RAY_HOT : (a < 0.25 ? RAY_A : RAY_B); }
         }
       }
-      // 3) Lichtsäule über dem Kreis (Breite folgt der Stufe)
-      st.pw += (PW[Math.min(st.stage, 7)] - st.pw) * 0.3;
-      const pw = st.pw;
-      if (pw > 0.5) {
-        for (let dx = -Math.ceil(pw); dx <= Math.ceil(pw); dx++) {
-          const inten = 1 - Math.abs(dx) / (pw + 0.01);
-          for (let y = 0; y < cyg; y++) {
-            const v = inten * (0.55 + 0.45 * (y / cyg)) + (Math.abs(dx) < 1 ? 0.3 : 0);
-            if (v > SHOP_BAYER[(y & 3) * 4 + ((axisX + dx) & 3)] / 16) plot(axisX + dx, y, inten > 0.65 ? HOT : (inten > 0.3 ? GOLD : ORANGE));
+      if (!AV) {
+        // 3a) Lichtsäule über dem Kreis (Breite folgt der Stufe)
+        st.pw += (PW[Math.min(st.stage, 7)] - st.pw) * 0.3;
+        const pw = st.pw;
+        if (pw > 0.5) {
+          for (let dx = -Math.ceil(pw); dx <= Math.ceil(pw); dx++) {
+            const inten = 1 - Math.abs(dx) / (pw + 0.01);
+            for (let y = 0; y < cyg; y++) {
+              const v = inten * (0.55 + 0.45 * (y / cyg)) + (Math.abs(dx) < 1 ? 0.3 : 0);
+              if (v > SHOP_BAYER[(y & 3) * 4 + ((axisX + dx) & 3)] / 16) plot(axisX + dx, y, inten > 0.65 ? HOT : (inten > 0.3 ? GOLD : ORANGE));
+            }
           }
         }
-      }
-      // 4) Beschwörungskreis: Ringe zeichnen sich im Uhrzeigersinn, Runen zünden mit den Klicks
-      const cp = Math.min(1, tt / 1300), rot = tt * 0.0004 * (1 + st.stage * 0.5);
-      const ringCol = st.stage === 0 ? RUNEDIM : (st.stage >= 6 ? HOT : GOLD), innerCol = st.stage >= 3 ? CYAN : RUNEDIM;
-      const ring = (rxr, col, thick) => {
-        const end = cp * Math.PI * 2;
-        for (let a = 0; a < end; a += 1 / Math.max(rxr, 1)) {
-          const x = cxg + Math.cos(a - Math.PI / 2) * rxr, y = cyg + Math.sin(a - Math.PI / 2) * rxr * (ry / rx);
-          plot(x, y, col); if (thick) plot(x, y + 1, col);
+        // 3b) Beschwörungskreis: Ringe zeichnen sich im Uhrzeigersinn, Runen zünden mit den Klicks
+        const cp = Math.min(1, tt / 1300), rot = tt * 0.0004 * (1 + st.stage * 0.5);
+        const ringCol = st.stage === 0 ? RUNEDIM : (st.stage >= 6 ? HOT : GOLD), innerCol = st.stage >= 3 ? CYAN : RUNEDIM;
+        const ring = (rxr, col, thick) => {
+          const end = cp * Math.PI * 2;
+          for (let a = 0; a < end; a += 1 / Math.max(rxr, 1)) {
+            const x = cxg + Math.cos(a - Math.PI / 2) * rxr, y = cyg + Math.sin(a - Math.PI / 2) * rxr * (ry / rx);
+            plot(x, y, col); if (thick) plot(x, y + 1, col);
+          }
+        };
+        ring(rx, ringCol, true); ring(rx * 0.84, innerCol, false); ring(rx * 0.5, ringCol, false);
+        for (let k = 0; k < 36; k++) {                                   // Zacken zwischen den Ringen
+          if (cp < k / 36) break;
+          const a = -rot * 0.5 + (k / 36) * Math.PI * 2;
+          for (let r = 0.86; r <= 0.98; r += 0.04) plot(cxg + Math.cos(a) * rx * r, cyg + Math.sin(a) * ry * r, k % 3 === 0 ? ringCol : DIM);
         }
-      };
-      ring(rx, ringCol, true); ring(rx * 0.84, innerCol, false); ring(rx * 0.5, ringCol, false);
-      for (let k = 0; k < 36; k++) {                                   // Zacken zwischen den Ringen
-        if (cp < k / 36) break;
-        const a = -rot * 0.5 + (k / 36) * Math.PI * 2;
-        for (let r = 0.86; r <= 0.98; r += 0.04) plot(cxg + Math.cos(a) * rx * r, cyg + Math.sin(a) * ry * r, k % 3 === 0 ? ringCol : DIM);
+        if (st.lit < st.litTarget) st.lit++;
+        for (let k = 0; k < RUNES; k++) {
+          if (cp < (k + 1) / RUNES) break;
+          const a = rot + (k / RUNES) * Math.PI * 2, x = cxg + Math.cos(a) * rx * 0.67, y = cyg + Math.sin(a) * ry * 0.67;
+          const lit = k < st.lit, col = lit ? (k % 2 ? CYAN : GOLD) : DIM;
+          for (const o of GLYPH[k % 4]) plot(x + o[0], y + o[1], col);
+          if (lit && k === st.lit - 1) { plot(x, y - 3, HOT); plot(x, y + 3, HOT); plot(x - 3, y, HOT); plot(x + 3, y, HOT); }
+        }
+        // 3c) kreisende Funken: je höher die Stufe, desto mehr, schneller und enger an der Säule
+        const active = Math.min(motes.length, st.stage * 7);
+        for (let i = 0; i < active; i++) {
+          const m = motes[i];
+          m.a += (0.07 + 0.045 * st.stage) * ov; m.h += (0.012 + 0.004 * st.stage) * ov;
+          if (m.h > 1) { m.h = 0; m.a = Math.random() * 6.283; m.r0 = W * 0.03 + Math.random() * W * 0.13; }
+          const r = m.r0 * (1 - 0.55 * Math.min(1, st.stage / 6));
+          const x = cxg + Math.cos(m.a) * r, y = cyg - m.h * cyg * 0.92 + Math.sin(m.a) * r * 0.25;
+          const col = MOTE[m.c];
+          plot(x, y, col); plot(x + 1, y, col); plot(x, y + 1, col); plot(x + 1, y + 1, col);
+          plot(cxg + Math.cos(m.a - 0.35) * r, y + 2, DIM);
+        }
+        // 3d) Einschlag-Welle auf dem Kreisboden
+        if (st.ripple) {
+          const age = (now - st.ripple) / 750;
+          if (age < 1) {
+            const rr = age * 1.8;
+            for (let a = 0; a < Math.PI * 2; a += 1 / (rx * Math.max(rr, 0.1))) {
+              const x = cxg + Math.cos(a) * rx * rr, y = cyg + Math.sin(a) * ry * rr, c = ((Math.round(x) + Math.round(y)) & 1) ? WHITE : GOLD;
+              plot(x, y, c); plot(x, y + 1, c); plot(x, y - 1, DIM);
+            }
+          }
+        }
+      } else if (ph !== 'reveal') {
+        // 3e) Avatar: Tunnel aus Quadraten, die vom Siegel nach außen strömen (je Stufe schneller, in der Überladung am schnellsten)
+        st.tun += 0.00032 * (1 + st.stage * 0.9) * ov * 66;
+        const N = 7, frac = st.tun % 1, pulse = Math.floor(tt / 400);
+        for (let k = 0; k < N; k++) {
+          const f = (k + frac) / N, h = 6 + f * f * Math.max(W, H) * 0.8, inten = (1 - f * 0.85) * (0.55 + 0.1 * st.stage);
+          const col = st.stage === 0 ? BLUE : (((k + pulse) & 1) ? CYAN : PINK), th = f < 0.4 ? 1 : 2;
+          const x0 = Math.round(ccx - h), x1 = Math.round(ccx + h), y0 = Math.round(ccy - h), y1 = Math.round(ccy + h);
+          for (let x = x0; x <= x1; x++) for (let q = 0; q < th; q++) {
+            if (inten > bay(x, y0 + q)) plot(x, y0 + q, col);
+            if (inten > bay(x, y1 - q)) plot(x, y1 - q, col);
+          }
+          for (let y = y0; y <= y1; y++) for (let q = 0; q < th; q++) {
+            if (inten > bay(x0 + q, y)) plot(x0 + q, y, col);
+            if (inten > bay(x1 - q, y)) plot(x1 - q, y, col);
+          }
+        }
+        // 3f) Funken umrunden das Siegel auf einer Quadratbahn
+        const active = Math.min(motes.length, st.stage * 8), dOrb = half * 1.35 + 3;
+        for (let i = 0; i < active; i++) {
+          const m = motes[i];
+          m.u = (m.u + (0.012 + 0.006 * st.stage) * ov) % 1;
+          const p = perim(m.u, dOrb + m.k * 0.6), t2 = perim((m.u + 0.97) % 1, dOrb + m.k * 0.6), col = MOTE[m.c];
+          plot(ccx + p[0], ccy + p[1], col); plot(ccx + p[0] + 1, ccy + p[1], col); plot(ccx + p[0], ccy + p[1] + 1, col); plot(ccx + p[0] + 1, ccy + p[1] + 1, col);
+          plot(ccx + t2[0], ccy + t2[1], DIM);
+        }
       }
-      if (st.lit < st.litTarget) st.lit++;
-      for (let k = 0; k < RUNES; k++) {
-        if (cp < (k + 1) / RUNES) break;
-        const a = rot + (k / RUNES) * Math.PI * 2, x = cxg + Math.cos(a) * rx * 0.67, y = cyg + Math.sin(a) * ry * 0.67;
-        const lit = k < st.lit, col = lit ? (k % 2 ? CYAN : GOLD) : DIM;
-        for (const o of GLYPH[k % 4]) plot(x + o[0], y + o[1], col);
-        if (lit && k === st.lit - 1) { plot(x, y - 3, HOT); plot(x, y + 3, HOT); plot(x - 3, y, HOT); plot(x + 3, y, HOT); }   // frisch gezündet: kleines Kreuz
-      }
-      // 5) kreisende Funken: je höher die Stufe, desto mehr, schneller und enger an der Säule
-      const active = Math.min(motes.length, st.stage * 7);
-      for (let i = 0; i < active; i++) {
-        const m = motes[i];
-        const ov = st.overload > 0 ? 1.8 : 1;
-        m.a += (0.07 + 0.045 * st.stage) * ov; m.h += (0.012 + 0.004 * st.stage) * ov;
-        if (m.h > 1) { m.h = 0; m.a = Math.random() * 6.283; m.r0 = W * 0.03 + Math.random() * W * 0.13; }
-        const r = m.r0 * (1 - 0.55 * Math.min(1, st.stage / 6));
-        const x = cxg + Math.cos(m.a) * r, y = cyg - m.h * cyg * 0.92 + Math.sin(m.a) * r * 0.25;
-        const col = MOTE[m.c];
-        plot(x, y, col); plot(x + 1, y, col); plot(x, y + 1, col); plot(x + 1, y + 1, col);
-        plot(cxg + Math.cos(m.a - 0.35) * r, y + 2, DIM);                // Schweif
-      }
-      // 6) Einschlag-Welle: läuft als Ring über den Kreisboden nach außen
-      if (st.ripple) {
-        const age = (now - st.ripple) / 750;
+      // 4) Explosion: Druckwellenring mit Dither-Rand + Strahlen vom Zentrum nach außen (kein Vollbildblitz)
+      if (st.blast) {
+        const age = (now - st.blast) / 800;
         if (age < 1) {
-          const rr = age * 1.8;
-          for (let a = 0; a < Math.PI * 2; a += 1 / (rx * Math.max(rr, 0.1))) {
-            const x = cxg + Math.cos(a) * rx * rr, y = cyg + Math.sin(a) * ry * rr, c = ((Math.round(x) + Math.round(y)) & 1) ? WHITE : GOLD;
-            plot(x, y, c); plot(x, y + 1, c); plot(x, y - 1, DIM);
+          const maxR = Math.hypot(W, H) * 0.62, R = (1 - (1 - age) * (1 - age)) * maxR, th = 4 + age * 9;
+          for (let a = 0; a < Math.PI * 2; a += 1 / Math.max(R * 0.8, 1)) {
+            const cs = Math.cos(a), sn = Math.sin(a);
+            for (let r = 0; r < th; r++) {
+              const rr = R - r; if (rr < 0) break;
+              const x = ccx + cs * rr, y = ccy + sn * rr, v = (1 - r / th) * (1 - age * 0.55) + 0.1;
+              if (v > bay(x, y)) plot(x, y, r < th * 0.25 ? HOT : (r < th * 0.6 ? GOLD : ORANGE));
+            }
+          }
+          for (const d of blastDirs) {
+            const L = R * d.l, cs = Math.cos(d.a), sn = Math.sin(d.a);
+            for (let u = R * 0.25; u < L; u += 1) {
+              const x = ccx + cs * u, y = ccy + sn * u;
+              if ((1 - u / (L + 1)) * (1 - age * 0.5) > bay(x, y)) plot(x, y, u < L * 0.5 ? HOT : GOLD);
+            }
           }
         }
       }
-      // 6b) Licht, das durch die Risse nach außen bricht: Strahlen in Rissrichtung, länger mit jeder Stufe, in der Überladung am längsten
-      if (ph === 'charge' && crackRef.current) {
-        const cr = crackRef.current.getBoundingClientRect(), ccx = (cr.left + cr.width / 2) / CELL, ccy = (cr.top + cr.height / 2) / CELL;
-        const over = st.overload > 0;
+      // 5) Licht, das durch die Risse nach außen bricht: Strahlen in Rissrichtung, länger mit jeder Stufe, in der Überladung am längsten
+      if (ph === 'charge') {
         for (let i = 0; i < 5; i++) {
           const t = st.crack[i]; if (t < 0) continue;
-          const grow = Math.min(1, (now - t) / 380), L = W * 0.06 * (1 + st.stage * 0.5) * (over ? 2.1 : 1) * grow, dir = cracks[i].dir;
-          const cs = Math.cos(dir), sn = Math.sin(dir);
-          for (let u = 0; u < L; u += 0.6) {
-            const fall = 1 - u / L, hw = Math.max(0.5, fall * (1.1 + st.stage * 0.35));
-            for (let o = -hw; o <= hw; o += 0.8) {
-              const x = ccx + cs * u - sn * o, y = ccy + sn * u + cs * o;
-              if (fall * 0.9 + 0.1 > SHOP_BAYER[((y | 0) & 3) * 4 + ((x | 0) & 3)] / 16) plot(x, y, fall > 0.55 ? HOT : GOLD);
+          const grow = Math.min(1, (now - t) / 380), L = W * 0.06 * (1 + st.stage * 0.5) * (st.overload > 0 ? 2.1 : 1) * grow;
+          for (const dir of cracks[i].dirs) {
+            const cs = Math.cos(dir), sn = Math.sin(dir);
+            for (let u = 0; u < L; u += 0.6) {
+              const fall = 1 - u / L, hw = Math.max(0.5, fall * (0.9 + st.stage * 0.25));
+              for (let o = -hw; o <= hw; o += 0.8) {
+                const x = ccx + cs * u - sn * o, y = ccy + sn * u + cs * o;
+                if (fall * 0.9 + 0.1 > bay(x, y)) plot(x, y, fall > 0.55 ? HOT : GOLD);
+              }
             }
           }
         }
       }
       g.putImageData(img, 0, 0);
-      // 7) Risse auf dem Kartenrücken: dunkle Kontur, gedithertes Leuchten, heller Kern; die Spitze wächst als weißer Funke
+      // 6) Risse auf dem Kartenrücken/Siegel: dunkle Kontur, gedithertes Leuchten, heller Kern; die Spitze wächst als weißer Funke
       if (cc) {
-        cc.clearRect(0, 0, SHOP_CRACK_W, SHOP_CRACK_H);
+        cc.clearRect(0, 0, grid.w, grid.h);
         if (ph === 'charge') {
           const over = st.overload > 0, stage = st.stage, tips = [], vis = [];
           for (let i = 0; i < 5; i++) {
@@ -4206,13 +4359,13 @@ function ShopPullReveal({ reveal, onClose }) {
             cc.fillStyle = CC.orange;
             for (const p of vis) if (((p.x + p.y) & 1) === 0) { cc.fillRect(p.x - 1, p.y, 1, 1); cc.fillRect(p.x + 1, p.y, 1, 1); cc.fillRect(p.x, p.y - 1, 1, 1); cc.fillRect(p.x, p.y + 1, 1, 1); }
           }
-          cc.fillStyle = over ? CC.white : (stage >= 3 ? CC.hot : CC.gold);
-          for (const p of vis) { cc.fillRect(p.x, p.y, 1, 1); if (stage >= 3 && p.r < 18) cc.fillRect(p.x + 1, p.y, 1, 1); }
+          cc.fillStyle = (over || stage >= 3) ? CC.hot : CC.gold;
+          for (const p of vis) { cc.fillRect(p.x, p.y, 1, 1); if (stage >= 4 && p.r < 10) cc.fillRect(p.x + 1, p.y, 1, 1); }
           cc.fillStyle = CC.white;
           for (const p of tips) cc.fillRect(p.x, p.y, 2, 2);
           if (tips.length) {                                          // Funken sprühen an den wachsenden Spitzen
             const r = crackRef.current.getBoundingClientRect(), sp = [];
-            for (const p of tips) for (let q = 0; q < 2; q++) sp.push({ x: r.left + (p.x + 0.5) * r.width / SHOP_CRACK_W, y: r.top + (p.y + 0.5) * r.height / SHOP_CRACK_H,
+            for (const p of tips) for (let q = 0; q < 2; q++) sp.push({ x: r.left + (p.x + 0.5) * r.width / grid.w, y: r.top + (p.y + 0.5) * r.height / grid.h,
               vx: (Math.random() - 0.5) * 6, vy: -1 - Math.random() * 3, size: 4, color: Math.random() < 0.5 ? '#fad54a' : '#f7f7ad', shape: 'spark',
               life: 1, decay: 0.07, gravity: 0.15, rotation: 0, rotSpeed: 0 });
             emit(sp);
@@ -4235,25 +4388,26 @@ function ShopPullReveal({ reveal, onClose }) {
   const ab = (n, base) => (n > 0 ? base + (n % 2 ? '-a' : '-b') : '');
 
   return (
-    <div className={'pull-fx pull-fx-ph-' + phase} onClick={click}>
+    <div className={'pull-fx pull-fx-ph-' + phase + (AV ? ' pull-fx-avatar' : '')} onClick={click}>
       <canvas ref={sceneRef} className="pull-fx-scene" />
       <canvas ref={partRef} className="pull-fx-burst" />
-      <div className={'pull-fx-stage ' + ab(quake, 'pull-fx-quake')} onClick={e => e.stopPropagation()}>
+      <div className={'pull-fx-stage ' + ab(quake, S.current.bigQuake ? 'pull-fx-bquake' : 'pull-fx-quake')} onClick={e => e.stopPropagation()}>
         {phase === 'reveal' && (
           <div className="pull-fx-banner">
             <span key={sheen} className={'pull-fx-sheen ' + ab(sheen, 'pull-fx-sheen')} />
             <span className="pull-fx-banner-text">NEW PULL!</span>
           </div>
         )}
-        <div className="pull-fx-cardslot">
+        <div ref={slotRef} className={'pull-fx-cardslot' + (AV ? ' pull-fx-slot-sq' : '')}>
           {phase === 'charge' && (
             <div className={'pull-fx-tremor ' + ab(tremor, 'pull-fx-trem') + (overload ? ' pull-fx-trem-hard' : '')}>
-              <img src="/cardback.png" className="pull-fx-back" draggable={false} />
+              <img src={backUrl} className={'pull-fx-back' + (AV ? ' pull-fx-back-sq' : '')} draggable={false} />
               <canvas ref={crackRef} className="pull-fx-cracks" />
             </div>
           )}
           {phase === 'shatter' && (
-            <div className="pull-fx-shards">
+            <div className={'pull-fx-shards' + (AV ? ' pull-fx-shards-sq' : '')}
+              style={{ '--cols': NC, '--rows': NR, '--c1': NC - 1, '--r1': NR - 1, '--img': 'url(' + backUrl + ')' }}>
               {shards.map((s, i) => (
                 <span key={i} className="pull-fx-shard" style={{ '--col': s.col, '--row': s.row, '--dx': s.dx + 'px', '--dy': s.dy + 'px', animationDelay: s.d + 'ms' }} />
               ))}
@@ -4261,7 +4415,9 @@ function ShopPullReveal({ reveal, onClose }) {
           )}
           {phase === 'reveal' && (
             <React.Fragment>
-              <div className="pull-fx-front"><img src={reveal.imgUrl} draggable={false} /></div>
+              {AV
+                ? <div className="pull-fx-front pull-fx-front-sq"><ShopMosaic src={reveal.imgUrl} /></div>
+                : <div className="pull-fx-front"><img src={reveal.imgUrl} draggable={false} /></div>}
               {STARS.map((s, i) => (
                 <span key={i} className="pull-fx-star" style={{ left: s[0] + '%', top: s[1] + '%', animationDelay: (i * 160) + 'ms' }} />
               ))}
@@ -4482,7 +4638,7 @@ function ShopScreen() {
     if (!((user.sc || 0) >= structureCatalog.randomPrice)) { notify('Not enough 🪙!', 'error'); return; }
     const pos = e ? getItemCenter(e) : { cx: window.innerWidth / 2, cy: window.innerHeight / 2 };
     setBuying(true);
-    setRandomReveal({ pending: true });   // die Inszenierung startet sofort, das Ergebnis kommt nach
+    setRandomReveal({ pending: true, kind: 'card' });   // die Inszenierung startet sofort, das Ergebnis kommt nach
     try {
       const data = await api('/shop/buy-random-structure-deck', { method: 'POST' });
       setUser(u => ({ ...u, sc: data.sc }));
@@ -4572,7 +4728,7 @@ function ShopScreen() {
     if (!((user.sc || 0) >= rp)) { notify('Not enough 🪙!', 'error'); return; }
     const pos = e ? getItemCenter(e) : { cx: window.innerWidth / 2, cy: window.innerHeight / 2 };
     setBuying(true);
-    setRandomReveal({ pending: true });
+    setRandomReveal({ pending: true, kind: 'card' });
     try {
       const data = await api('/shop/buy-random-skin', { method: 'POST' });
       setOwned(prev => ({ ...prev, skin: [...prev.skin, data.skinName] }));
@@ -4593,7 +4749,8 @@ function ShopScreen() {
     if (!((user.sc || 0) >= rp)) { notify('Not enough 🪙!', 'error'); return; }
     const pos = e ? getItemCenter(e) : { cx: window.innerWidth / 2, cy: window.innerHeight / 2 };
     setBuying(true);
-    setRandomReveal({ pending: true });
+    const kind = itemType === 'avatar' ? 'avatar' : 'card';   // Avatare sind quadratisch und haben eine eigene Inszenierung
+    setRandomReveal({ pending: true, kind });
     try {
       const data = await api('/shop/buy-random', { method: 'POST', body: JSON.stringify({ itemType }) });
       setOwned(prev => ({ ...prev, [itemType]: [...prev[itemType], data.itemId] }));
@@ -4603,7 +4760,8 @@ function ShopScreen() {
       setRandomReveal({
         imgUrl: '/data/shop/' + subdir + '/' + encodeURIComponent(data.itemId) + '.png',
         label: itemType === 'sleeve' ? ((catalog.sleeves || []).find(s => s.id === data.itemId)?.name || null) : null,
-        subtitle: itemType === 'avatar' ? 'New Avatar!' : 'New Sleeve!'
+        subtitle: itemType === 'avatar' ? 'New Avatar!' : 'New Sleeve!',
+        kind,
       });
     } catch (e) { setRandomReveal(null); notify(e.message, 'error'); }
     setBuying(false);

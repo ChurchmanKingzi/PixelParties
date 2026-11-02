@@ -26779,6 +26779,7 @@ input[type="checkbox"]:focus-visible, input[type="radio"]:focus-visible { outlin
 @keyframes pull-fx-quake-b { 0% { transform: translate(0, 0); } 8% { transform: translate(-10px, 6px); } 16% { transform: translate(10px, -6px); } 24% { transform: translate(-8px, -6px); } 32% { transform: translate(8px, 6px); } 40% { transform: translate(-4px, 2px); } 48% { transform: translate(4px, -2px); } 56% { transform: translate(-2px, 0); } 64% { transform: translate(0, 0); } }
 
 /* Die Karte steigt (nach kurzer Verzögerung) in 8 Schritten aus dem Kreis. */
+.pull-fx-slot-sq { width: min(240px, 31vh) !important; }
 .pull-fx-cardslot { position: relative; width: min(200px, 26vh); animation: pull-fx-rise .64s steps(8, end) .45s both; }
 @keyframes pull-fx-rise {
   0%   { transform: translateY(150px); visibility: hidden; }
@@ -26796,22 +26797,30 @@ input[type="checkbox"]:focus-visible, input[type="radio"]:focus-visible { outlin
   display: block; width: 100%; aspect-ratio: 5 / 7; object-fit: cover; image-rendering: pixelated;
   box-shadow: 0 0 0 4px #fad54a, 0 0 0 8px #08060c, 0 0 0 12px #72541d;
 }
+.pull-fx-back-sq { aspect-ratio: 1; }
+/* Explosion: starkes Beben (größere Ausschläge, länger) — wie .pull-fx-quake, nur wuchtiger. */
+.pull-fx-bquake-a { animation: pull-fx-bquake-a .9s steps(1, end); }
+.pull-fx-bquake-b { animation: pull-fx-bquake-b .9s steps(1, end); }
+@keyframes pull-fx-bquake-a { 0% { transform: translate(0, 0); } 6% { transform: translate(-22px, 12px); } 12% { transform: translate(22px, -12px); } 18% { transform: translate(-18px, -12px); } 24% { transform: translate(18px, 12px); } 30% { transform: translate(-14px, 6px); } 36% { transform: translate(14px, -6px); } 44% { transform: translate(-8px, 4px); } 52% { transform: translate(8px, -4px); } 60% { transform: translate(-4px, 2px); } 70% { transform: translate(2px, 0); } 80% { transform: translate(0, 0); } }
+@keyframes pull-fx-bquake-b { 0% { transform: translate(0, 0); } 6% { transform: translate(-22px, 12px); } 12% { transform: translate(22px, -12px); } 18% { transform: translate(-18px, -12px); } 24% { transform: translate(18px, 12px); } 30% { transform: translate(-14px, 6px); } 36% { transform: translate(14px, -6px); } 44% { transform: translate(-8px, 4px); } 52% { transform: translate(8px, -4px); } 60% { transform: translate(-4px, 2px); } 70% { transform: translate(2px, 0); } 80% { transform: translate(0, 0); } }
 .pull-fx-cracks { position: absolute; inset: 0; width: 100%; height: 100%; image-rendering: pixelated; pointer-events: none; }
 
-/* Einschlag: der Kartenrücken zerspringt in 6 × 8 Splitter (Ausschnitte desselben Bildes), die in Stufen fliegen und fallen. */
+/* Einschlag: der Kartenrücken (6 × 8) bzw. das Avatar-Siegel (8 × 8) zerspringt in Splitter (Ausschnitte desselben Bildes), die
+   in Stufen fliegen und fallen. Raster und Bild kommen als Variablen (--cols, --rows, --c1, --r1, --img) vom Container. */
 .pull-fx-shards { position: relative; width: 100%; aspect-ratio: 5 / 7; }
+.pull-fx-shards-sq { aspect-ratio: 1; }
 .pull-fx-shard {
   position: absolute;
-  width: calc(100% / 6); height: calc(100% / 8);
-  left: calc(var(--col) * 100% / 6); top: calc(var(--row) * 100% / 8);
-  background: url('/cardback.png') calc(var(--col) * 100% / 5) calc(var(--row) * 100% / 7) / 600% 800% no-repeat;
+  width: calc(100% / var(--cols)); height: calc(100% / var(--rows));
+  left: calc(var(--col) * 100% / var(--cols)); top: calc(var(--row) * 100% / var(--rows));
+  background: var(--img) calc(var(--col) * 100% / var(--c1)) calc(var(--row) * 100% / var(--r1)) / calc(var(--cols) * 100%) calc(var(--rows) * 100%) no-repeat;
   image-rendering: pixelated;
-  animation: pull-fx-shard .65s steps(10, end) both;
+  animation: pull-fx-shard .75s steps(12, end) both;
 }
 @keyframes pull-fx-shard {
   0%   { transform: translate(0, 0); }
-  40%  { transform: translate(calc(var(--dx) * .7), var(--dy)); }
-  100% { transform: translate(calc(var(--dx) * 1.4), calc(var(--dy) + 420px)); visibility: hidden; }
+  35%  { transform: translate(calc(var(--dx) * .9), var(--dy)); }
+  100% { transform: translate(calc(var(--dx) * 1.9), calc(var(--dy) + 480px)); visibility: hidden; }
 }
 
 /* Enthüllung: die neue Karte steigt aus dem Licht und klappt in ganzen Schritten auf (Breitenstauchung, keine Drehung). */
@@ -26819,6 +26828,16 @@ input[type="checkbox"]:focus-visible, input[type="radio"]:focus-visible { outlin
   width: 100%; border: 4px solid #fad54a; background: #12101f;
   box-shadow: 0 0 0 4px #08060c, 0 0 0 8px #72541d;
   animation: pull-fx-front-in .6s steps(1, end) both;
+}
+.pull-fx-front-sq { animation: pull-fx-front-pop .5s steps(1, end) both; }
+.pull-fx-mosaic { display: block; width: 100%; aspect-ratio: 1; image-rendering: pixelated; }
+@keyframes pull-fx-front-pop {
+  0%   { transform: scale(0.2); }
+  20%  { transform: scale(0.6); }
+  40%  { transform: scale(1.15); }
+  60%  { transform: scale(0.94); }
+  80%  { transform: scale(1.04); }
+  100% { transform: none; }
 }
 .pull-fx-front img { display: block; width: 100%; aspect-ratio: 5 / 7; object-fit: cover; image-rendering: pixelated; }
 @keyframes pull-fx-front-in {
