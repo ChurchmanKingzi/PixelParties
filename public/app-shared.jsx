@@ -2086,6 +2086,8 @@ const SFX_NAMES = [
   'summon', 'sunglasses_drop', 'turn_start', 'ui_cancel', 'ui_click',
   'ui_error', 'ui_prompt_open', 'victory',
   'doom_tick',   // v1421: Uhrzeiger-Tick der Doom Clock (synthetisiert)
+  // Shop-Pull-Inszenierung (synthetisiert, scripts/sfx/pull-sounds.py)
+  'pull_circle', 'pull_crack', 'pull_note', 'pull_swell', 'pull_shatter', 'pull_reveal', 'pull_sparkle',
 ];
 
 let _sfxCtx = null;

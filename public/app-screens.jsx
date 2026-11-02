@@ -3903,6 +3903,38 @@ function shopStarParticles(ox, oy, n) {
 }
 
 const SHOP_BAYER = [0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5];
+const SHOP_CRACK_W = 50, SHOP_CRACK_H = 70;   // Raster der Risse über der Karte (4 px je Rasterpunkt bei 200 px Kartenbreite)
+
+// Ein Riss: eckiger Zickzackpfad von der Kartenmitte nach außen, mit Verästelungen. Liefert die Rasterpunkte nach Abstand
+// vom Zentrum sortiert (so wächst er von innen nach außen) und seine Hauptrichtung (für die Lichtstrahlen).
+function shopMakeCrack(a0) {
+  const W = SHOP_CRACK_W, H = SHOP_CRACK_H, cx = W / 2, cy = H / 2, seen = new Set(), pts = [];
+  const put = (x, y) => {
+    x = Math.round(x); y = Math.round(y);
+    if (x < 0 || y < 0 || x >= W || y >= H) return false;
+    const k = y * W + x;
+    if (!seen.has(k)) { seen.add(k); pts.push({ x, y, r: Math.hypot(x - cx, y - cy) }); }
+    return true;
+  };
+  const seg = (x0, y0, x1, y1) => {
+    const n = Math.max(1, Math.ceil(Math.max(Math.abs(x1 - x0), Math.abs(y1 - y0))));
+    for (let i = 0; i <= n; i++) if (!put(x0 + (x1 - x0) * i / n, y0 + (y1 - y0) * i / n)) return false;
+    return true;
+  };
+  const walk = (x, y, a, steps, depth) => {
+    for (let s = 0; s < steps; s++) {
+      a += (Math.random() - 0.5) * 1.3;                                  // scharfe Knicke
+      const len = 2 + Math.random() * 3;
+      const nx = x + Math.cos(a) * len, ny = y + Math.sin(a) * len;
+      if (!seg(x, y, nx, ny)) return;
+      x = nx; y = ny;
+      if (depth < 2 && s > 2 && Math.random() < 0.2) walk(x, y, a + (Math.random() < 0.5 ? -1 : 1) * (0.55 + Math.random() * 0.6), Math.max(3, Math.floor(steps * 0.45)), depth + 1);
+    }
+  };
+  walk(cx, cy, a0, 17, 0);
+  pts.sort((p, q) => p.r - q.r);
+  return { pts, dir: a0 };
+}
 
 // Die Pull-Inszenierung („Beschwörung“) — Pixelart, ohne Vollbild-Blitze:
 //   1. Die Shop-Seite dunkelt per Dither ein, ein Beschwörungskreis zeichnet sich auf den Boden, Runen glimmen auf.
@@ -3916,6 +3948,7 @@ const SHOP_BAYER = [0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5];
 function ShopPullReveal({ reveal, onClose }) {
   const reduced = useMemo(() => { try { return window.matchMedia('(prefers-reduced-motion: reduce)').matches; } catch { return false; } }, []);
   const [phase, setPhase] = useState('charge');   // 'charge' | 'shatter' | 'reveal'
+  const [overload, setOverload] = useState(false); // letzte Stufe vor dem Einschlag: Karte zittert dauernd
   const [tremor, setTremor] = useState(0);        // Zähler: Karte zuckt (gerade/ungerade = zwei gleiche Animationen im Wechsel)
   const [quake, setQuake] = useState(0);          // Zähler: Bildschirm bebt
   const [sheen, setSheen] = useState(0);          // Zähler: Lichtstreifen über dem Banner
@@ -3932,7 +3965,7 @@ function ShopPullReveal({ reveal, onClose }) {
   const crackRef = useRef(null);
   const partRef = useRef(null);
   const parts = useRef([]);
-  const S = useRef({ t0: performance.now(), stage: 0, lit: 0, litTarget: 0, pw: 0, ripple: 0, tReveal: 0, crack: [-1, -1, -1, -1, -1] });
+  const S = useRef({ t0: performance.now(), stage: 0, lit: 0, litTarget: 0, pw: 0, ripple: 0, tReveal: 0, overload: 0, crack: [-1, -1, -1, -1, -1] });
   const shards = useMemo(() => Array.from({ length: 48 }, (_, i) => {
     const col = i % 6, row = (i / 6) | 0;
     return { col, row, dx: Math.round((col - 2.5) * 80 + (Math.random() - 0.5) * 50), dy: Math.round((row - 3.5) * 36 - 70 + (Math.random() - 0.5) * 50), d: Math.round(Math.random() * 100) };
@@ -3948,10 +3981,17 @@ function ShopPullReveal({ reveal, onClose }) {
     for (const p of list) a.push(p);
   };
 
-  // cue = Klang + Bild. c: { sound, stage, lit, crack, ripple, tremor, quake, sheen, burst: [fx, fy, n, speed], stars, coins }
+  // cue = Klang + Bild. c: { sound | sounds: [[name, opts], …], stage, lit, crack, overload, ripple, tremor, quake, sheen,
+  //                          burst: [fx, fy, n, speed], stars, coins }
   const cue = (c) => {
-    try { if (c.sound && window.playSFX) window.playSFX(c.sound, { dedupe: 0, ...(c.opt || {}) }); } catch {}
+    try {
+      if (window.playSFX) {
+        if (c.sound) window.playSFX(c.sound, { dedupe: 0, ...(c.opt || {}) });
+        for (const sd of (c.sounds || [])) window.playSFX(sd[0], { dedupe: 0, ...(sd[1] || {}) });
+      }
+    } catch {}
     const st = S.current, now = performance.now();
+    if (c.overload) { st.overload = now; setOverload(true); }
     if (c.stage != null) st.stage = c.stage;
     if (c.lit != null) st.litTarget = c.lit;
     if (c.crack != null) st.crack[c.crack] = now;
@@ -3970,8 +4010,8 @@ function ShopPullReveal({ reveal, onClose }) {
     timers.current.forEach(clearTimeout); timers.current = [];
     S.current.tReveal = performance.now();
     setPhase('reveal');
-    cue({ sound: 'reveal', stage: 7, quake: true, burst: [0.5, 0.46, 200, 1.1] });                       // Karte steigt, Banner fällt, Strahlen blenden ein
-    later(() => cue({ sound: 'shop_purchase', stars: 28, sheen: true }), 200);                          // Sternenring + Lichtstreifen über dem Banner
+    cue({ sound: 'pull_reveal', stage: 7, quake: true, burst: [0.5, 0.46, 200, 1.1] });                       // Karte steigt, Banner fällt, Strahlen blenden ein
+    later(() => cue({ sound: 'pull_sparkle', stars: 28, sheen: true }), 200);                          // Sternenring + Lichtstreifen über dem Banner
     later(() => cue({ sound: 'gold_gain', coins: 90, burst: [0.3, 0.5, 100, 0.9] }), 520);              // Münzregen
     later(() => emit(shopBurstParticles(window.innerWidth * 0.7, window.innerHeight * 0.5, 100, 0.9)), 530);
     later(() => setCanClose(true), 1000);
@@ -3985,19 +4025,27 @@ function ShopPullReveal({ reveal, onClose }) {
     timers.current.forEach(clearTimeout); timers.current = [];
     try { const im = new Image(); im.src = revealRef.current.imgUrl; } catch {}
     setPhase('shatter');
-    cue({ sound: 'heavy_impact', stage: 6, ripple: true, quake: true, burst: [0.5, 0.46, 170, 1.3] });   // Splitter, Welle, Beben, Salve
+    cue({ sound: 'pull_shatter', stage: 6, ripple: true, quake: true, burst: [0.5, 0.46, 170, 1.3] });   // Splitter, Welle, Beben, Salve
     later(toReveal, 650);
   };
 
   useEffect(() => {
     if (reduced) { later(climax, 0); return () => { alive.current = false; timers.current.forEach(clearTimeout); }; }
-    // Fünf Klicks: je ein neuer Riss, mehr Runen, breitere Säule, enger kreisende Funken.
-    later(() => cue({ sound: 'ui_click', stage: 1, lit: 4, crack: 0, tremor: true, burst: [0.5, 0.46, 18, 0.45] }), 900);
-    later(() => cue({ sound: 'ui_click', stage: 2, lit: 8, crack: 1, tremor: true, burst: [0.5, 0.46, 26, 0.55] }), 1450);
-    later(() => cue({ sound: 'ui_click', stage: 3, lit: 12, crack: 2, tremor: true, burst: [0.5, 0.46, 34, 0.65] }), 1900);
-    later(() => cue({ sound: 'ui_click', stage: 4, lit: 16, crack: 3, tremor: true, burst: [0.5, 0.46, 44, 0.75] }), 2250);
-    later(() => cue({ sound: 'ui_click', stage: 5, lit: 20, crack: 4, tremor: true, burst: [0.5, 0.46, 60, 0.9] }), 2500);
-    later(climax, 3000);
+    // Klangkulisse = Animation: der Kreis zeichnet sich (Swell), fünf Risse (Knacken + je ein Glockenton, Dur-Arpeggio steigt),
+    // Überladung (steigender Sweep), Einschlag (Splitter), Enthüllung (Akkord), Sternenring (Glockenarpeggio), Münzen.
+    later(() => cue({ sound: 'pull_circle' }), 60);
+    const BEAT = (i, semis, burst) => () => cue({
+      sounds: [['pull_crack', { rate: 0.94 + 0.07 * i, volume: 0.75 + 0.06 * i }], ['pull_note', { rate: Math.pow(2, semis / 12), volume: 0.55 + 0.05 * i }]],
+      stage: i + 1, lit: 4 * (i + 1), crack: i, tremor: true, burst: [0.5, 0.46, burst[0], burst[1]] });
+    later(BEAT(0, 0, [18, 0.45]), 900);
+    later(BEAT(1, 4, [26, 0.55]), 1400);
+    later(BEAT(2, 7, [34, 0.65]), 1800);
+    later(BEAT(3, 12, [44, 0.75]), 2150);
+    later(BEAT(4, 16, [60, 0.9]), 2450);
+    later(() => cue({ sound: 'pull_swell', overload: true, burst: [0.5, 0.46, 40, 0.6] }), 2550);
+    later(() => emit(shopBurstParticles(window.innerWidth * 0.5, window.innerHeight * 0.46, 50, 0.8)), 2750);
+    later(() => emit(shopBurstParticles(window.innerWidth * 0.5, window.innerHeight * 0.46, 70, 1.0)), 2950);
+    later(climax, 3350);
     return () => { alive.current = false; timers.current.forEach(clearTimeout); };
   }, []);
 
@@ -4038,20 +4086,12 @@ function ShopPullReveal({ reveal, onClose }) {
     const MOTE = [GOLD, HOT, CYAN, PINK];
     const GLYPH = [[[0, -1], [-1, 0], [0, 0], [1, 0], [0, 1]], [[-1, -1], [0, -1], [1, -1], [0, 0], [0, 1]], [[-1, -1], [-1, 0], [-1, 1], [0, 1], [1, 1]], [[-1, -1], [1, -1], [0, 0], [-1, 1], [1, 1]]];
     const RUNES = 20, PW = [0, 3, 5, 8, 11, 15, 22, 6];
-    // Risse: Zufallspfade von der Kartenmitte (40×56 Raster über der Karte).
-    const cracks = [0, 1, 2, 3, 4].map(i => {
-      let x = 20, y = 28, a = (i / 5) * Math.PI * 2 + (Math.random() - 0.5) * 0.6;
-      const pts = [[20, 28]];
-      for (let s = 0; s < 34; s++) {
-        a += (Math.random() - 0.5) * 0.9; x += Math.cos(a) * 1.4; y += Math.sin(a) * 1.4;
-        if (x < 0 || y < 0 || x >= 40 || y >= 56) break;
-        pts.push([Math.round(x), Math.round(y)]);
-      }
-      return pts;
-    });
+    // Risse: verästelte Zickzackpfade von der Kartenmitte (Raster SHOP_CRACK_W × SHOP_CRACK_H über der Karte).
+    const cracks = [0, 1, 2, 3, 4].map(i => shopMakeCrack((i / 5) * Math.PI * 2 + 0.3 + (Math.random() - 0.5) * 0.7));
     const cc = crackRef.current ? crackRef.current.getContext('2d') : null;
-    if (crackRef.current) { crackRef.current.width = 40; crackRef.current.height = 56; }
-    const css = { hot: window.ppSnap ? window.ppSnap('#f7f7ad') : '#f7f7ad', gold: window.ppSnap ? window.ppSnap('#fad54a') : '#fad54a' };
+    if (crackRef.current) { crackRef.current.width = SHOP_CRACK_W; crackRef.current.height = SHOP_CRACK_H; }
+    const snap = (hex) => (window.ppSnap ? window.ppSnap(hex) : hex);
+    const CC = { dark: snap('#08060c'), gold: snap('#fad54a'), orange: snap('#f9ac20'), hot: snap('#f7f7ad'), white: snap('#ffffff') };
 
     const draw = () => {
       const now = performance.now(), st = S.current, tt = now - st.t0, ph = phaseRef.current;
@@ -4111,7 +4151,8 @@ function ShopPullReveal({ reveal, onClose }) {
       const active = Math.min(motes.length, st.stage * 7);
       for (let i = 0; i < active; i++) {
         const m = motes[i];
-        m.a += 0.07 + 0.045 * st.stage; m.h += 0.012 + 0.004 * st.stage;
+        const ov = st.overload > 0 ? 1.8 : 1;
+        m.a += (0.07 + 0.045 * st.stage) * ov; m.h += (0.012 + 0.004 * st.stage) * ov;
         if (m.h > 1) { m.h = 0; m.a = Math.random() * 6.283; m.r0 = W * 0.03 + Math.random() * W * 0.13; }
         const r = m.r0 * (1 - 0.55 * Math.min(1, st.stage / 6));
         const x = cxg + Math.cos(m.a) * r, y = cyg - m.h * cyg * 0.92 + Math.sin(m.a) * r * 0.25;
@@ -4130,19 +4171,51 @@ function ShopPullReveal({ reveal, onClose }) {
           }
         }
       }
+      // 6b) Licht, das durch die Risse nach außen bricht: Strahlen in Rissrichtung, länger mit jeder Stufe, in der Überladung am längsten
+      if (ph === 'charge' && crackRef.current) {
+        const cr = crackRef.current.getBoundingClientRect(), ccx = (cr.left + cr.width / 2) / CELL, ccy = (cr.top + cr.height / 2) / CELL;
+        const over = st.overload > 0;
+        for (let i = 0; i < 5; i++) {
+          const t = st.crack[i]; if (t < 0) continue;
+          const grow = Math.min(1, (now - t) / 380), L = W * 0.06 * (1 + st.stage * 0.5) * (over ? 2.1 : 1) * grow, dir = cracks[i].dir;
+          const cs = Math.cos(dir), sn = Math.sin(dir);
+          for (let u = 0; u < L; u += 0.6) {
+            const fall = 1 - u / L, hw = Math.max(0.5, fall * (1.1 + st.stage * 0.35));
+            for (let o = -hw; o <= hw; o += 0.8) {
+              const x = ccx + cs * u - sn * o, y = ccy + sn * u + cs * o;
+              if (fall * 0.9 + 0.1 > SHOP_BAYER[((y | 0) & 3) * 4 + ((x | 0) & 3)] / 16) plot(x, y, fall > 0.55 ? HOT : GOLD);
+            }
+          }
+        }
+      }
       g.putImageData(img, 0, 0);
-      // 7) Risse auf dem Kartenrücken
+      // 7) Risse auf dem Kartenrücken: dunkle Kontur, gedithertes Leuchten, heller Kern; die Spitze wächst als weißer Funke
       if (cc) {
-        cc.clearRect(0, 0, 40, 56);
+        cc.clearRect(0, 0, SHOP_CRACK_W, SHOP_CRACK_H);
         if (ph === 'charge') {
+          const over = st.overload > 0, stage = st.stage, tips = [], vis = [];
           for (let i = 0; i < 5; i++) {
             const t = st.crack[i]; if (t < 0) continue;
-            const pts = cracks[i], n = Math.floor(Math.min(1, (now - t) / 450) * pts.length);
-            for (let k = 0; k < n; k++) {
-              const p = pts[k];
-              cc.fillStyle = css.gold; cc.fillRect(p[0] - 1, p[1], 3, 1); cc.fillRect(p[0], p[1] - 1, 1, 3);
-              cc.fillStyle = css.hot; cc.fillRect(p[0], p[1], 1, 1);
-            }
+            const c = cracks[i], n = Math.max(1, Math.floor(Math.min(1, (now - t) / 380) * c.pts.length));
+            for (let k = 0; k < n; k++) vis.push(c.pts[k]);
+            if (n < c.pts.length) tips.push(c.pts[n - 1]);
+          }
+          cc.fillStyle = CC.dark;
+          for (const p of vis) { cc.fillRect(p.x - 1, p.y, 1, 1); cc.fillRect(p.x + 1, p.y, 1, 1); cc.fillRect(p.x, p.y - 1, 1, 1); cc.fillRect(p.x, p.y + 1, 1, 1); }
+          if (stage >= 2) {                                           // Leuchten: jedes zweite Randpixel in Orange
+            cc.fillStyle = CC.orange;
+            for (const p of vis) if (((p.x + p.y) & 1) === 0) { cc.fillRect(p.x - 1, p.y, 1, 1); cc.fillRect(p.x + 1, p.y, 1, 1); cc.fillRect(p.x, p.y - 1, 1, 1); cc.fillRect(p.x, p.y + 1, 1, 1); }
+          }
+          cc.fillStyle = over ? CC.white : (stage >= 3 ? CC.hot : CC.gold);
+          for (const p of vis) { cc.fillRect(p.x, p.y, 1, 1); if (stage >= 3 && p.r < 18) cc.fillRect(p.x + 1, p.y, 1, 1); }
+          cc.fillStyle = CC.white;
+          for (const p of tips) cc.fillRect(p.x, p.y, 2, 2);
+          if (tips.length) {                                          // Funken sprühen an den wachsenden Spitzen
+            const r = crackRef.current.getBoundingClientRect(), sp = [];
+            for (const p of tips) for (let q = 0; q < 2; q++) sp.push({ x: r.left + (p.x + 0.5) * r.width / SHOP_CRACK_W, y: r.top + (p.y + 0.5) * r.height / SHOP_CRACK_H,
+              vx: (Math.random() - 0.5) * 6, vy: -1 - Math.random() * 3, size: 4, color: Math.random() < 0.5 ? '#fad54a' : '#f7f7ad', shape: 'spark',
+              life: 1, decay: 0.07, gravity: 0.15, rotation: 0, rotSpeed: 0 });
+            emit(sp);
           }
         }
       }
@@ -4174,7 +4247,7 @@ function ShopPullReveal({ reveal, onClose }) {
         )}
         <div className="pull-fx-cardslot">
           {phase === 'charge' && (
-            <div className={'pull-fx-tremor ' + ab(tremor, 'pull-fx-trem')}>
+            <div className={'pull-fx-tremor ' + ab(tremor, 'pull-fx-trem') + (overload ? ' pull-fx-trem-hard' : '')}>
               <img src="/cardback.png" className="pull-fx-back" draggable={false} />
               <canvas ref={crackRef} className="pull-fx-cracks" />
             </div>
