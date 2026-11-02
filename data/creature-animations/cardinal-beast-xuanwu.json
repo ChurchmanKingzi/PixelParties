@@ -1,0 +1,15 @@
+{
+  "creature": "Cardinal Beast Xuanwu",
+  "sheet": "cardinal-beast-xuanwu.png",
+  "frameWidth": 72,
+  "frameHeight": 35,
+  "frames": 64,
+  "frameMs": 80,
+  "loop": true,
+  "layout": "horizontal",
+  "padTop": 1,
+  "padLeft": 10,
+  "padRight": 1,
+  "padBottom": 3,
+  "faceX": 36.0
+}

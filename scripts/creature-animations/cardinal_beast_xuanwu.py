@@ -26,7 +26,7 @@ Nicht bewegt bleiben: Beine, Gesicht, Tuch, Panzerränder unten (y ≥ 19).
 Ablauf (64 Frames à 80 ms = 5,12 s, nahtlos; bewusst langsam — schwere Figur):
 * ATMEN (zweistufig, langsam): Panzer, Hals und Kopf (alles oberhalb von Zeile 19) heben sich in zwei Stufen um bis zu 2 px (Zeile 18 wird 1–2× eingefügt, mit Nachbartextur gemischt); Beine und Panzerunterkante bleiben am Boden.
 * OHRENZUCKEN: das linke Ohr (Frames 14–19) und das rechte Ohr (Frames 42–47) kippen mit den oberen drei Zeilen 1 px nach außen und zurück.
-* ATEMDUNST (kalte Luft, runde Wölkchen ≥ 2×2, steigen langsam auf): drei kleine Dunstwölkchen steigen vor dem Maul auf und treiben leicht nach vorn (Farben: Weiß (255,255,255) und Eisblau (196,212,225) des Sprites).
+* ATEMDUNST (kalte Luft, runde Wölkchen ≥ 2×2, steigen langsam auf): drei kleine Dunstwölkchen (2×2 → 3×3 → 2×2, nie kleiner) steigen vor dem Maul auf und treiben leicht nach vorn (Farben: Weiß (255,255,255) und Eisblau (196,212,225) des Sprites).
 Frame 0 = Ruhepose (Original, Dunst ausgenommen). Alle Bewegungen laufen auf der vollen Leinwand (anim_lib wirft ClipError). Nur ganze Pixel, nur Farben der Quelle.
 Zuschnitt: der Frame ist auf die Figur zugeschnitten, symmetrisch um die Ruhefigur; der Dunst darf ihn höchstens 12 px vergrößern.
 Ergänzungen: keine.
@@ -84,10 +84,10 @@ def frame_gross(i, nur=None):
     fig = L.zusammen(H, W, [(un, 0, 0), (ob, 0, 0), (ol, 0, 0), (orr, 0, 0)])
     G.rand_schliessen(fig, ERLAUBT, UMRISS)
     if not nur:
-        dunst = L.puff_ebene(H, W, i, N, [
-            dict(x=GPL + sw + 1, y=GPT + 12, vx=7, vy=-6, off=0, form='m', wackeln=0.8),
-            dict(x=GPL + sw + 1, y=GPT + 12, vx=7, vy=-6, off=21, form='m', wackeln=0.8),
-            dict(x=GPL + sw + 1, y=GPT + 12, vx=7, vy=-6, off=43, form='m', wackeln=0.8)], {'c': WEISS, 'r': EIS})
+        dunst = U.wolke_ebene(H, W, i, N, [
+            dict(x=GPL + sw + 1, y=GPT + 12, vx=7, vy=-6, off=0, wackeln=0.8),
+            dict(x=GPL + sw + 1, y=GPT + 12, vx=7, vy=-6, off=21, wackeln=0.8),
+            dict(x=GPL + sw + 1, y=GPT + 12, vx=7, vy=-6, off=43, wackeln=0.8)], {'c': WEISS, 'r': EIS})
         fig = L.zusammen(H, W, [(dunst, 0, 0), (fig, 0, 0)])
     return fig
 
