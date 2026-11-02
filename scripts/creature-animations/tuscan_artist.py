@@ -79,7 +79,7 @@ def frame(i, nur=None):
     # --- rechter Unterarm schwingt nach außen (Zeilenversatz mit Gefälle, nur ≥ 0) ---
     ar, rest = L.trenne(k, np.pad(arm_r, ((PAD_T, PAD_B), (PAD_L, PAD_R))))
     s = max(0.0, math.sin(L.sinus(i, 24)))
-    ar = L.zeilen_welle(ar, PAD_T + 20, 1.2, math.asin(min(1.0, s)) if s > 0 else 0.0)
+    ar = L.zeilen_welle(ar, PAD_T + 20, 1.2, math.asin(min(1.0, s)))
     k = L.zusammen(H, W, [(rest, 0, 0), (ar, 0, 0)])
     # --- Atmen: Körper steigt 1 px (oberste Körperzeile 12 entfällt, Zeile 32 doppelt), das Bild bleibt ---
     brust = Hm.stufe(i, N / 2, 1)
