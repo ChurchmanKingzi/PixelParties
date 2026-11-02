@@ -21,13 +21,13 @@ PX, PY = 64, 48                   # Pack-Ursprung (Pack 192x320)
 PW, PHH = 192, 320
 CX, CY = PX + PW // 2, PY + PHH // 2
 FPS = 30
-F = 140
+F = 116
 COLS = 9
 CUT = 20                          # Reißkante (Zeile im Pack): unter dem Siegelstreifen, über der Titelplatte
 STRIP_H = 26                      # Höhe des Streifens samt Zacken
 
-T_SLIDE, T_IDLE, T_CHARGE, T_RIP, T_FLASH, T_CARDS, T_AMBIENT = 0, 10, 30, 60, 82, 90, 128
-RIP_LEN = 20          # so viele Bilder wandert die Reißfront von links nach rechts über den Siegelstreifen
+T_SLIDE, T_IDLE, T_CHARGE, T_RIP, T_FLASH, T_CARDS, T_AMBIENT = 0, 8, 16, 38, 58, 66, 104
+RIP_LEN = 18          # so viele Bilder wandert die Reißfront von links nach rechts über den Siegelstreifen
 SL = 4               # Breite der Streifen-Scheiben (Pixel) für das stufenweise Aufreißen
 NS = 192 // 4
 
@@ -124,26 +124,25 @@ def slot(i):
 
 # ---------------------------------------------------------------- Zeitleiste des Packs
 def strip_offsets(t):
-    """Siegelstreifen als NS Scheiben: die Reißfront wandert (beschleunigend) von links nach rechts, hinter ihr hebt sich der Streifen
-    immer stärker ab (Rampe), vorne hängt er noch fest. Nach dem Durchreißen fliegt der ganze Streifen nach rechts oben davon."""
-    prog = t / float(RIP_LEN)
-    front = (192 + 14) * (min(prog, 1.0) ** 1.5)
-    fly = max(0, t - RIP_LEN)
+    """Siegelstreifen als NS Scheiben: die Reißfront wandert (beschleunigend) von links nach rechts. Jede Scheibe löst sich, sobald die Front sie
+    erreicht, und schießt danach beschleunigend nach oben aus dem Bild; vorne hängt der Streifen noch fest, hinten ist er schon weg."""
+    L = float(RIP_LEN)
+    front = (192 + 14) * (min(t / L, 1.0) ** 1.5)
     dy, dx = [], []
     for s in range(NS):
         xs = s * SL + SL // 2
-        d = front - xs
-        oy, ox = 0, 0
-        if d > 0:
-            oy = -int(min(40, 2 + d * 0.5)); ox = int(min(8, d * 0.1))
-        if fly:
-            oy -= 5 * fly + 2 * fly * fly; ox += 4 * fly
-        dy.append(oy); dx.append(ox)
+        t_tear = L * (xs / 206.0) ** (1.0 / 1.5)
+        age = t - t_tear
+        if age <= 0:
+            dy.append(0); dx.append(0)
+        else:
+            dy.append(-int(2 + 2.2 * age + 0.55 * age * age))
+            dx.append(int(min(6, age * 0.5)))
     return front, dy, dx
 
 
 def pack_timeline():
-    slide = [100, 68, 44, 27, 15, 8, 4, 2, 1, 0]
+    slide = [100, 60, 34, 18, 9, 4, 1, 0]
     bob = [0, 0, -1, -1, -2, -2, -2, -2, -1, -1, 0, 0, -1, -1, -2, -2, -2, -1, -1, 0]
     rng = np.random.RandomState(11)
     tl = []
@@ -161,7 +160,7 @@ def pack_timeline():
                 e['x'] = amp * (1 if (f % 2 == 0) else -1)
                 e['y'] = int(rng.randint(0, 2)) + (2 if f >= T_RIP - 4 else 0)
             e['shimmer'] = f % 16
-        elif f <= T_RIP + RIP_LEN + 6:
+        elif f <= T_RIP + RIP_LEN + 11:
             t = f - T_RIP
             front, dy, dx = strip_offsets(t)
             e['mode'] = 'rip'
