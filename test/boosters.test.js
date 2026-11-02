@@ -1,10 +1,10 @@
 'use strict';
-// Booster-Pack-Entwürfe (public/boosters): Manifest vollständig, alle Dateien da, Pflichtmotive vorhanden.
+// Booster-Pack-Entwürfe (data/shop/Boosterpacks): Manifest vollständig, alle Dateien da, Pflichtmotive vorhanden.
 const test = require('node:test');
 const assert = require('node:assert');
 const fs = require('fs');
 const path = require('path');
-const dir = path.join(__dirname, '..', 'public', 'boosters');
+const dir = path.join(__dirname, '..', 'data', 'shop', 'Boosterpacks');
 const man = JSON.parse(fs.readFileSync(path.join(dir, 'boosters.json'), 'utf8'));
 
 test('neun Packs mit je höchstens acht Varianten', () => {
@@ -29,4 +29,16 @@ test('Rise of Monia hat eine Variante mit Cool Rescuer Monia, Hero Pack genau ei
   assert.ok(monia.variants.some(v => v.motifs.includes('Cool Rescuer Monia')));
   const hero = man.packs.find(p => p.id === 'hero');
   for (const v of hero.variants) assert.strictEqual(v.motifs.length, 1, v.id);
+});
+
+test('Öffnungsanimation: Zeitleiste und Effektebenen je Pack vorhanden', () => {
+  const o = JSON.parse(fs.readFileSync(path.join(dir, 'opening', 'opening.json'), 'utf8'));
+  assert.strictEqual(o.timeline.length, o.frames);
+  assert.strictEqual(o.cardSlots.length, 9);
+  for (const p of man.packs) for (const l of ['back', 'front']) {
+    const b = fs.readFileSync(path.join(dir, 'opening', p.id + '.' + l + '.png'));
+    assert.strictEqual(b.readUInt32BE(16), o.stage[0] * o.columns, p.id + ' ' + l + ' Breite');
+    assert.strictEqual(b.readUInt32BE(20), o.stage[1] * Math.ceil(o.frames / o.columns), p.id + ' ' + l + ' Höhe');
+  }
+  for (const f of ['cut-top.png', 'cut-body.png']) assert.ok(fs.existsSync(path.join(dir, 'opening', f)), f);
 });

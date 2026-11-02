@@ -2,7 +2,7 @@
 """Booster-Pack-Entwürfe (9 Packs x bis zu 8 Varianten) als Pixelart rendern.
 
 Aufruf:  python3 scripts/booster/build_boosters.py [pack-id ...]  [--out DIR]
-Ausgabe (Standard public/boosters/):
+Ausgabe (Standard data/shop/Boosterpacks/):
   <pack>/<pack>-<n>.png          Pack 192x320, geprägt (Emboss), Foil-Muster, Funkelsterne
   <pack>/<pack>-<n>.shimmer.png  Schimmer-Overlay: 16 Bilder nebeneinander, nur die veränderten Pixel (harte Alpha); über das Pack legen
   boosters.json                  Manifest (Größe, Bildzahl, Takt, Packs, Varianten, Motive)
@@ -673,7 +673,7 @@ def shimmer_frames(base, wt, raw, sparks, th, nf=NF):
 
 # ---------------------------------------------------------------- Hauptprogramm
 def main(argv):
-    out = os.path.join(ROOT, 'public', 'boosters')
+    out = os.path.join(ROOT, 'data', 'shop', 'Boosterpacks')
     packs = []
     args = list(argv)
     if '--out' in args:
