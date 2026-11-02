@@ -22,6 +22,8 @@ Gold im Sprite: Krone, Stabbänder, Gürtelschloss, Armreife, Stiefelspitzen →
 
 Ablauf (48 Frames à 64 ms = 3,07 s, nahtlos):
 * Atmen (Periode 24, zwei Atemzüge): die texturierte Rockzeile 26 wird einmal doppelt eingefügt (mit Texturmischung), Kopf, Krone, Umhang und Arme steigen 1 px; die Stiefel bleiben am Boden, der Stab (mit Faust) bleibt stehen.
+* Krone federt: beim Einatmen hebt sich der Kopf zuerst, die Krone (Zeilen 2–8) folgt 3–4 Frames später (sie liegt dazwischen 1 px tiefer und überdeckt die Stirn), beim Ausatmen sinkt sie sofort mit.
+* Linker Ärmel schwingt: das untere Ärmelende (Zeilen 25–27, x 0–3) rückt zweimal 1 px nach außen (Frames 12–20 und 36–44) und zurück.
 * Ohren zucken: das linke Ohr (Frames 6–11) und später das rechte Ohr (Frames 30–35) rutschen ruckhaft 1 px nach unten und wieder hoch, sie bleiben am Kopf.
 * Blinzeln (Frames 19–21 und 41–43): die weißen/hellblauen Augenpixel nehmen die Gesichtsfarbe an; es bleibt der schwarze L-Block als Lidstrich (Lid = umgebende Körperfarbe).
 * Gold glänzt (Regel 12/14): ein Lichtband läuft diagonal über die Krone (Frames 4–15 und 28–39), ein zweites läuft an den goldenen Stabbändern hinab (Frames 14–25); Glitzersterne sitzen an der Krone (Frames 18–22, 36–40) und am Gürtelschloss (Frames 44–47).
@@ -65,26 +67,32 @@ AUGEN_FARBE[(11, 13)] = LILA
 
 
 def frame(i):
-    k, sb = sz.ebene(koerper), sz.ebene(stab)
+    k, sb, kr, sl = sz.ebene(koerper), sz.ebene(stab), sz.ebene(krone), sz.ebene(sleeve)
     # --- Blinzeln ---
     if Hm.folge(i, 19, [1, 1, 1], N) or Hm.folge(i, 41, [1, 1, 1], N):
         sz.setze(k, AUGEN_FARBE)
     # --- Gold glänzt: Krone (diagonal), Stabbänder (von oben nach unten), Sterne ---
-    Hm.lichtband(k, m_krone, OFF, i, N, 4, 12, GOLD, stufen=1, breite=2.6, achse=(1.0, 1.0), kern=2)
-    Hm.lichtband(k, m_krone, OFF, i, N, 28, 12, GOLD, stufen=1, breite=2.6, achse=(-1.0, 1.0), kern=2)
+    Hm.lichtband(kr, m_krone, OFF, i, N, 4, 12, GOLD, stufen=1, breite=2.6, achse=(1.0, 1.0), kern=2)
+    Hm.lichtband(kr, m_krone, OFF, i, N, 28, 12, GOLD, stufen=1, breite=2.6, achse=(-1.0, 1.0), kern=2)
     Hm.lichtband(sb, m_stab_gold, OFF, i, N, 14, 12, GOLD, stufen=1, breite=3.0, achse=(0.0, 1.0), kern=2)
-    for (x, y), start in (((8, 6), 18), ((12, 7), 36), ((8, 22), 44)):
+    for (x, y), start, eb in (((8, 6), 18, kr), ((12, 7), 36, kr), ((8, 22), 44, k)):
         st = Hm.folge(i, start, [0, 1, 1, 0], N)
         if st is not None:
-            Hm.stern4(k, x, y, st, GOLD[8], GOLD[7], off=OFF)
+            Hm.stern4(eb, x, y, st, GOLD[8], GOLD[7], off=OFF)
     # --- Ohren zucken (1 px nach unten, ruckhaft) ---
     zl = 1 if Hm.folge(i, 6, [1, 1, 0, 1, 1, 0], N) else 0
     zr = 1 if Hm.folge(i, 30, [1, 1, 0, 1, 1, 0], N) else 0
     ol, orr = sz.ebene(ohr_l, 0, zl), sz.ebene(ohr_r, 0, zr)
-    # --- Atmen (Rockzeile 26) ---
+    # --- linker Ärmel schwingt (Zeilen 25–27 rücken 1 px nach außen) ---
+    if Hm.folge(i, 12, [1] * 9, N) or Hm.folge(i, 36, [1] * 9, N):
+        sz.zeilen(sl, {25: -1, 26: -1, 27: -1})
+    # --- Atmen (Rockzeile 26); die Krone hinkt beim Heben 3–4 Frames hinterher (liegt dann 1 px tiefer, überdeckt die Stirn) ---
+    w = Hm.welle01(i, N / 2)
     brust = Hm.stufe(i, N / 2, 1)
-    k, ol, orr = sz.atmen([k, ol, orr], 26, brust)
-    fig = L.zusammen(H, W, [(ol, 0, 0), (orr, 0, 0), (k, 0, 0), (sb, 0, 0)])
+    krone_tief = 1 if (brust and w <= 0.8) else 0
+    k, ol, orr, kr, sl = sz.atmen([k, ol, orr, kr, sl], 26, brust)
+    kr = L.versetze(kr, 0, krone_tief)
+    fig = L.zusammen(H, W, [(ol, 0, 0), (orr, 0, 0), (sl, 0, 0), (k, 0, 0), (kr, 0, 0), (sb, 0, 0)])
     return sz.kontur(fig, UMRISS)
 
 
