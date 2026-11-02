@@ -13,15 +13,18 @@ Ausgabe:  ../../data/creature-animations/deepsea-succubus.png + .json
 Was ist was (x/y im Sprite):
 * Ein schwebender Succubus mit zwei großen Fledermausflügeln in Teal-Karo (51,93,119)/(77,137,154) mit dunkelblauen Flächen (13,16,49)/(24,39,65)/(30,48,81): Flügel links x 0–14, rechts x 31–45 (y 2–22,
   Knochen als dunkle Streben, Membran im Karo), dunkler Kopf/Haarmasse mit Hornspitzen oben (x 15–29, y 0–9), im Haar rechts ein blassgrüner Edelstein (159,222,211) 2×2 bei (25–26, 3–4);
-  Gesicht bei y 9–12 mit zwei Augen: links ein weißes 2×2-Auge (246,255,255) bei (20–21, 10–11), rechts ein rosa Herz (255,147,208)/(255,176,221)/(210,82,154) bei (26–28, 9–11);
+  Gesicht bei y 9–12 mit zwei Augen: links ein weißes 2×2-Auge (246,255,255) bei (20–21, 10–11), rechts (statt eines zweiten Auges) ein rosa Herz (255,147,208)/(255,176,221)/(210,82,154) bei (26–28, 9–11), das KEIN Auge ist;
   schmaler Rumpf (x 17–28, y 11–22) und kurze Beine mit Füßen (x 19–26, y 23–26).
 Fest bleiben: Kopf-/Haarmasse, Rumpf, Augen-/Herzform im Ruhebild, Karomuster der Membran/Haut.
 
 Ablauf (48 Frames à 70 ms = 3,36 s; Frame 0 = Original, Partikel ausgenommen):
-* Flügelschlag: beide Flügel schlagen gleichzeitig, jeweils 2 Spalten gemeinsam um bis zu ±3 px senkrecht (wächst mit dem Abstand zum Gelenk bei x 15 bzw. 30, die Gelenkspalten stehen; Spaltenpaare, damit die 1-px-dünne Flügelspitze im 4er-Zusammenhang bleibt); Periode 24, zweimal pro Schleife.
-* Schweben: der ganze Körper (Kopf, Rumpf, Beine) hebt sich beim Abschlag der Flügel 1 px und sinkt beim Aufschlag zurück (gegenläufig zum Flügelschlag).
+* Flügelschlag (RUNDE 2, Nutzer: „die Flügel sollen deutlich mehr schlagen“): beide Flügel (links x 0–14, rechts x 31–45, y 2–22: Knochenstreben + Karo-Membran) schlagen jetzt kräftig gleichzeitig: Periode 16 Frames (1,12 s, dreimal pro Schleife; vorher ±3 px, Periode 24).
+  Jeder Flügel BIEGT sich entlang seiner waagerechten Mittellinie um die Schulter (x 15 bzw. 30, y 12; anim_flieger_r2.biege = Rückwärtsabbildung um eine gekrümmte Achse: jedes Zielpixel holt sich das Quellpixel an derselben Bogenlänge/Querstelle, Nächster-Nachbar,
+  keine Löcher, keine Mischfarben, Knochen und Membran bleiben zusammen, die Schulter bleibt am Rumpf): die Flügelspitze schlägt von der Ruhelage bis ca. 50° nach oben und ca. 20° nach unten (Spitze ca. −9 … +4 px), die Spitze hinkt der Wurzel um 0,5 rad nach. Frame 0 = Original.
+* Brüste wippen (dezent): die beiden Brusthügel (x 19–26, y 15–19) bewegen sich als kleiner Block 1 px — sie hinken dem Körper beim Schweben nach, sinken also 1 px, wenn sich der Körper hebt, und heben sich 1 px beim Zurücksinken (Periode 16). Nichts wird aufgeblasen; die
+  frei werdende Zeile oben bzw. unten wird mit der Nachbarzeile der Haut gefüllt (Quellfarben). Frame 0 = Original.
 * Füße baumeln: die beiden Fußzeilen (y 26) versetzen sich abwechselnd 1 px zur Seite (Periode 16).
-* Blinzeln (Lid = dunkle Umgebungsfarbe (13,16,49)): das weiße Auge und das Herz-Auge schließen sich zusammen: erst die obere Zeile, dann alles; zweimal (Frame 11–13 und 35–37).
+* Blinzeln (Lid = dunkle Umgebungsfarbe (13,16,49)): NUR das weiße Auge (das einzige Auge) blinzelt — erst die obere Zeile, dann alles; zweimal (Frame 11–13 und 35–37). Das rosa Herz (26–28, 9–11) ist kein Auge und bleibt IMMER offen/unverändert (Nutzer: „das Herz soll nicht blinzeln, sie hat nur ein offenes Auge“).
 * Edelstein im Haar glitzert (Regel 14: nur Edelstein): ein weißer Lichtpunkt läuft diagonal über die 2×2-Fläche, dann die Gegendiagonale; zweimal pro Schleife (Frame 20–22 und 44–46).
 * Partikel (hinter der Figur): vier rosa runde Wölkchen 2×2 → 3×3 → 2×2 (`U.wolke_ebene`), Kern (255,147,208), Rand (210,82,154) (= Farben des Herzens), nie ein Einzelpixel; sie steigen links und rechts unterhalb der
   Flügel je 11 px auf (Lebensdauer 48 Frames, je zwei um 24 Frames versetzt; links und rechts um 12 versetzt). Nur diese Bahnen sind frei: in jeder Pose ≥ 2 px Abstand zur Figur und nie teilweise verdeckt (per Skript über alle 48 Frames geprüft).
@@ -36,6 +39,7 @@ import numpy as np
 
 import anim_lib as L
 import anim_untote as U
+import anim_flieger_r2 as R2
 
 N, MS = 48, 70
 GPL, GPR, GPT, GPB = 7, 7, 7, 5
@@ -88,17 +92,38 @@ def teil(maske):
 FL_A, FR_A, REST_A, FUSSL_A, FUSSR_A = teil(FLUEGEL_L), teil(FLUEGEL_R), teil(rest), teil(FUSS_L), teil(FUSS_R)
 
 
-def fluegel(a, pivot_x, amp, ph, breite=2):
-    """Flügelschlag wie `L.spalten_welle`, aber je `breite` Spalten (vom Gelenk aus gezählt) mit gleichem Versatz: so zerreißt keine 1-px-dünne Stelle (Flügelspitze) im 4er-Zusammenhang."""
-    out = L.leer(*a.shape[:2])
-    cols = [x for x in range(a.shape[1]) if a[:, x, 3].any()]
-    maxd = max(abs(x - pivot_x) for x in cols)
-    for x in cols:
-        d = abs(x - pivot_x)
-        frac = min(1.0, ((d // breite) * breite + breite / 2.0) / maxd) if d >= breite else 0.0
-        dy = int(round(amp * math.sin(ph) * frac))
-        for y in np.nonzero(a[:, x, 3])[0]:
-            out[y + dy, x] = a[y, x]
+# ── Flügelschlag: Biegung entlang der Mittellinie (Schulter → Spitze) ───────────────────────────────────────────────────────────
+FL_PERIODE = 16
+A_FL = math.radians(34.0)                                     # Ausschlag (Spitze: ca. +50° nach oben, −20° nach unten gegenüber der Ruhelage)
+LAUF = 0.5
+FL_L = dict(p0=(15.0, 12.0), ang0=math.pi, laenge=15.0, seite=+1)       # linker Flügel: Achse zeigt nach links; „oben“ = im Uhrzeigersinn
+FL_R = dict(p0=(30.0, 12.0), ang0=0.0, laenge=15.0, seite=-1)           # rechter Flügel: Achse zeigt nach rechts; „oben“ = gegen den Uhrzeigersinn
+
+
+def fluegel(a, fl, ph):
+    def delta(s):
+        f = min(1.0, max(0.0, (s - 1.0) / (fl['laenge'] - 1.0)))
+        v = math.sin(ph - LAUF * f) - math.sin(-LAUF * f)       # 0 bei Frame 0 (Ruhe = Original); die Spitze hinkt der Wurzel nach
+        return fl['seite'] * v * A_FL * f ** 0.5                # Biegung früh (nah an der Schulter): die Spitze bewegt sich fast wie bei einer Drehung
+    return R2.biege(a, (GPL + fl['p0'][0], GPT + fl['p0'][1]), fl['ang0'], fl['laenge'], delta)
+
+
+BRUST_X0, BRUST_X1, BRUST_Y0, BRUST_Y1 = 19, 26, 15, 19      # die beiden Brusthügel (Sprite-Koordinaten, einschließlich)
+
+
+def brust(kb, dy):
+    """Brusthügel als Block um dy ∈ {−1, 0, +1} px versetzen; die frei werdende Zeile wird mit der benachbarten Hautzeile (außerhalb des Blocks) gefüllt."""
+    if dy == 0:
+        return kb
+    out = kb.copy()
+    x0, x1 = GPL + BRUST_X0, GPL + BRUST_X1 + 1
+    y0, y1 = GPT + BRUST_Y0, GPT + BRUST_Y1 + 1
+    block = kb[y0:y1, x0:x1].copy()
+    out[y0 + dy:y1 + dy, x0:x1] = block
+    if dy > 0:
+        out[y0:y0 + dy, x0:x1] = kb[y0 - dy:y0, x0:x1]            # oben: Zeile über dem Block
+    else:
+        out[y1 + dy:y1, x0:x1] = kb[y1:y1 - dy, x0:x1]            # unten: Zeile unter dem Block
     return out
 
 
@@ -108,23 +133,24 @@ def set_px(a, x, y, farbe):
 
 
 def frame_gross(i, nur=None):
-    ph = 2 * math.pi * i / 24
+    ph = 2 * math.pi * i / FL_PERIODE
     kb = REST_A.copy()
     # Blinzeln (Lid = dunkle Umgebung)
     bl = BLINZ.get(i, 0)
     if bl:
-        for (x, y) in AUGE + HERZ:
+        for (x, y) in AUGE:                                      # nur das weiße Auge; das Herz (kein Auge) bleibt unverändert
             if bl == 2 or y <= 10:
-                if y <= 10 or bl == 2:
-                    set_px(kb, x, y, KONTUR)
+                set_px(kb, x, y, KONTUR)
     # Edelstein glitzert
     for (x, y) in GLITZ.get(i, []):
         set_px(kb, x, y, WEISS)
     # Flügelschlag (Spalte für Spalte)
-    fl = fluegel(FL_A, GPL + 15, 3.0, ph)
-    fr = fluegel(FR_A, GPL + 30, 3.0, ph)
+    fl = fluegel(FL_A, FL_L, ph)
+    fr = fluegel(FR_A, FL_R, ph)
     # Schweben: Körper hebt sich beim Abschlag
     bob = -int(round(1.0 * math.sin(ph)))
+    sb = math.sin(ph - 0.3)                                      # Brust hinkt dem Körper nach: sinkt 1 px, wenn er sich hebt; hebt sich 1 px beim Zurücksinken
+    kb = brust(kb, 1 if sb > 0.5 else (-1 if sb < -0.5 else 0))
     fb_l = 1 if (i % 16) in (3, 4, 5) else (-1 if (i % 16) in (11, 12, 13) else 0)
     fb_r = -fb_l
     koerper = L.zusammen(H, W, [(fl, 0, 0), (fr, 0, 0), (kb, 0, 0), (FUSSL_A, fb_l, 0), (FUSSR_A, fb_r, 0)])
