@@ -40,7 +40,7 @@ import anim_lib as L
 import anim_spinne as S
 
 N, MS = 48, 70
-PAD_L, PAD_R, PAD_T, PAD_B = 4, 4, 2, 5
+PAD_L, PAD_R, PAD_T, PAD_B = 4, 4, 3, 3
 FADEN0 = 9                     # sichtbare Fadenlänge in Frame 0 (Original: 21)
 DRIFT = 2                      # so weit gleitet die Spinne am Faden nach unten
 

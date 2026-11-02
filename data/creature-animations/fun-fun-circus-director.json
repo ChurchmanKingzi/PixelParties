@@ -1,0 +1,15 @@
+{
+  "creature": "Fun-Fun Circus Director",
+  "sheet": "fun-fun-circus-director.png",
+  "frameWidth": 22,
+  "frameHeight": 37,
+  "frames": 48,
+  "frameMs": 70,
+  "loop": true,
+  "layout": "horizontal",
+  "padTop": 2,
+  "padLeft": 3,
+  "padRight": 3,
+  "padBottom": 2,
+  "faceX": 11.0
+}

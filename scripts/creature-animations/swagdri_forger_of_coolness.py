@@ -93,11 +93,14 @@ def frame(i, nur=None):
     dx = 1 if Hm.folge(i, 10, [1] * 10, N) else (-1 if Hm.folge(i, 34, [1] * 10, N) else 0)
     if dx:
         Hm.bereich_versatz(zwerg, OFF, {10: dx}, 26, 27)
+        Hm.setze(zwerg, {(26, 11) if dx > 0 else (27, 11): f(25, 11)}, OFF)       # freigelegtes Haarpixel bekommt den dunklen Haarumriss (41,8,0)
     # --- Atmen: Gürtelzeile 28 (nur der Zwerg) ---
     n = Hm.stufe(i, N, 1)
+    wieg = 1 if Hm.welle01(i - 6, 24) > 0.6 else 0
+    if wieg:                                                        # Arm hebt sich: die Schulterkante (20,23) liegt frei und bekommt den Rüstungsumriss (32,32,32)
+        Hm.setze(zwerg, {(20, 23): f(24, 27)}, OFF)
     zwerg = L.streck_zeile(zwerg, PAD_T + 28, n)
     # --- Hammergruppe folgt der Hand: Atem + eigenes Wiegen ---
-    wieg = 1 if Hm.welle01(i - 6, 24) > 0.6 else 0
     dy = -(n + wieg)
     gruppe = L.versetze(gruppe, 0, dy) if dy else gruppe
     return L.zusammen(H, W, [(amboss, 0, 0), (zwerg, 0, 0), (gruppe, 0, 0)])

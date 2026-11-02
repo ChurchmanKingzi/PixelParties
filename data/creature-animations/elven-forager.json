@@ -1,0 +1,15 @@
+{
+  "creature": "Elven Forager",
+  "sheet": "elven-forager.png",
+  "frameWidth": 16,
+  "frameHeight": 25,
+  "frames": 48,
+  "frameMs": 62,
+  "loop": true,
+  "layout": "horizontal",
+  "padTop": 2,
+  "padLeft": 2,
+  "padRight": 2,
+  "padBottom": 3,
+  "faceX": 8.0
+}

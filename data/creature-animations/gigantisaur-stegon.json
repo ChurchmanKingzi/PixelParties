@@ -1,0 +1,15 @@
+{
+  "creature": "Gigantisaur Stegon",
+  "sheet": "gigantisaur-stegon.png",
+  "frameWidth": 84,
+  "frameHeight": 52,
+  "frames": 60,
+  "frameMs": 70,
+  "loop": true,
+  "layout": "horizontal",
+  "padTop": 8,
+  "padLeft": 5,
+  "padRight": 5,
+  "padBottom": 4,
+  "faceX": 42.0
+}

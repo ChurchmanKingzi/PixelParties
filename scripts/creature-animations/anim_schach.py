@@ -192,11 +192,11 @@ class Ritter:
         return Hm.kontur_schliessen(fig, self.umriss, self.schwarz)
 
 
-def lauf(modul_name, karte, frames, ms, prev, spr, off, extra=None):
+def lauf(modul_name, karte, frames, ms, prev, spr, off, extra=None, erlaubt=()):
     """Standard-Abschluss eines Skripts: Ruhepose, Prüfung, Speichern, Streifen."""
     diff = Hm.ruhepose(frames[0], spr, off)
     print('Ruhepose weicht vom Original ab bei:', diff if diff else 'nichts')
-    n = L.pruefe(frames, quelle=spr)
+    n = L.pruefe(frames, quelle=spr, erlaubt=erlaubt)
     print('Pixel je Frame:', n)
     kontakt_bericht(frames)
     L.speichern(modul_name.replace('_', '-'), karte, frames, ms, prev, extra=extra)

@@ -45,7 +45,7 @@ sh, sw = spr.shape[:2]
 H, W = sh + PAD_T + PAD_B, sw + PAD_L + PAD_R
 vor = L.deckend(spr)
 yy, xx = np.mgrid[0:sh, 0:sw]
-ECKEN = vor & (((yy <= 5) & ((xx <= 5) | (xx >= 19))) | ((yy >= 20) & ((xx <= 4) | (xx >= 20))))
+ECKEN = vor & (((yy <= 2) & ((xx <= 6) | (xx >= 18))) | ((yy >= 3) & (yy <= 5) & ((xx <= 4) | (xx >= 20))) | ((yy >= 20) & ((xx <= 4) | (xx >= 20))))
 gesicht = vor & ~ECKEN
 GESICHTSFARBE = (127, 38, 63)
 SCHWARZ_V = (17, 19, 19)

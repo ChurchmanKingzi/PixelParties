@@ -98,8 +98,8 @@ def frame_gross(i, nur=None):
             setze(layers[ziel[k]], pts, haut)
     for k, pts in ZAEHNE.items():
         if any(0 <= i - s < 2 for s in KLAPP[k]):
-            lz = layers['tail'] if k == 'schwanz' else (layers['mi'] if k == 'mund' else layers['re'])
             for (x, y) in pts:
+                lz = (layers['tail'] if y <= 5 else layers['re']) if k == 'schwanz' else (layers['mi'] if k == 'mund' else layers['re'])
                 c = tuple(int(v) for v in lz[GPT + y, GPL + x, :3])
                 lz[GPT + y, GPL + x, :3] = ROT if c == WEISS else WEISS
     li, mi = layers['li'], layers['mi']

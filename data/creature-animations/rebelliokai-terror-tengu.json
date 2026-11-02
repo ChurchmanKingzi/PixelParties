@@ -1,0 +1,15 @@
+{
+  "creature": "Rebelliokai Terror Tengu",
+  "sheet": "rebelliokai-terror-tengu.png",
+  "frameWidth": 32,
+  "frameHeight": 31,
+  "frames": 60,
+  "frameMs": 80,
+  "loop": true,
+  "layout": "horizontal",
+  "padTop": 2,
+  "padLeft": 4,
+  "padRight": 4,
+  "padBottom": 2,
+  "faceX": 16.0
+}
