@@ -203,6 +203,11 @@ HEROES = {
         "Once per turn, Elana shuffles your entire hand back into your deck, then you draw the same number of cards +1. A fresh start, with a bonus card, every single turn.",
         "floating music notes, green sparkles and golden glints",
         "#Rockstar #Guitar"),
+    "Alice, the Puppeteer Girl": (
+        "Seven puppets. 350 damage. 🎀🔴",
+        "Once per turn, Alice deals 50 damage to a target times the number of Creatures you control that weren't summoned this turn. Her Mr. Jiggles are always watching.",
+        "seven stringed puppets with glowing red eyes and thin red lasers",
+        "#Puppets #Creepy #Lasers"),
     "???, the Shapeshifter": (
         "Every night, a different face. 🎃👁️",
         "Once per turn, ??? the Shapeshifter can equip a Hero with a different name from your hand, deck or discard pile, and gains its effects and name until the end of your opponent's turn. Each Hero can only be equipped once per game. Happy Halloween!",
@@ -330,6 +335,8 @@ TIKTOK = {
                               "Equip a Hero from your hand, deck or discard pile and ??? becomes it, name and effects. Once per Hero, per game. Happy Halloween!"),
     "Champion, the Stormbringer": ("Shake up both hands. 🌪️",
                                    "Discard up to 5 cards and draw that many. Then your opponent must do the same, and that draw can't be prevented."),
+    "Alice, the Puppeteer Girl": ("Seven puppets. 350 damage. 🎀🔴",
+                                  "Once per turn: 50 damage times the number of Creatures you control that weren't summoned this turn. Alice's Mr. Jiggles do the rest."),
     "Elana, the Rocky Rebel": ("Hate your hand? Shuffle it away. 🎸",
                                "Once per turn: shuffle your whole hand back into the deck and draw the same number of cards +1."),
     "Reiza, the Chief Tormentor": ("Stun. Poison. Double action. 🦇",
