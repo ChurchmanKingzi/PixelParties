@@ -82,14 +82,30 @@ def ebene_von(spr, maske, h, w, off, dx=0, dy=0):
     return L.platz(t, h, w, off[0] + dx, off[1] + dy)
 
 
-def rand_schliessen(fig, erlaubt, farbe):
-    """Jedes Randpixel (ein 4er-Nachbar leer), dessen Farbe nicht in `erlaubt` steht, bekommt `farbe` (Zahl oder Funktion (x, y) → RGB)."""
+def rand_schliessen(fig, erlaubt, standard, nah=True):
+    """Jedes Randpixel (ein 4er-Nachbar leer), dessen Farbe nicht in `erlaubt` (Umrissfarben der Quelle) steht, bekommt eine Umrissfarbe: mit nah=True die häufigste
+    erlaubte Farbe unter seinen 8 Nachbarn (der Saum bleibt gold, wo er gold ist), sonst/ohne Nachbar `standard`. Gibt die Zahl der umgefärbten Pixel zurück."""
+    from collections import Counter
     m = fig[..., 3] > 0
     p = np.pad(m, 1)
     rand = m & (~p[:-2, 1:-1] | ~p[2:, 1:-1] | ~p[1:-1, :-2] | ~p[1:-1, 2:])
-    n = 0
+    h, w = m.shape
+    todo = []
     for y, x in zip(*np.nonzero(rand)):
         if tuple(int(v) for v in fig[y, x, :3]) not in erlaubt:
-            fig[y, x, :3] = farbe(x, y) if callable(farbe) else farbe
-            n += 1
-    return n
+            todo.append((y, x))
+    for y, x in todo:
+        c = standard
+        if nah:
+            z = Counter()
+            for dy in (-1, 0, 1):
+                for dx in (-1, 0, 1):
+                    yy_, xx_ = y + dy, x + dx
+                    if (dy or dx) and 0 <= yy_ < h and 0 <= xx_ < w and m[yy_, xx_] and rand[yy_, xx_]:
+                        col = tuple(int(v) for v in fig[yy_, xx_, :3])
+                        if col in erlaubt:
+                            z[col] += 2 if (dy == 0 or dx == 0) else 1
+            if z:
+                c = z.most_common(1)[0][0]
+        fig[y, x, :3] = c
+    return len(todo)

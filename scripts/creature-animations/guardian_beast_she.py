@@ -89,10 +89,6 @@ def ebene(m, dx=0, dy=0):
     return L.platz(t, H, W, PAD_L + dx, PAD_T + dy)
 
 
-def _umriss_nah(fig, x, y):
-    return None
-
-
 def frame(i):
     # ── Stab: Dreizack + oberer Schaft (hinter dem Schwanz) ──
     stab = ebene(stab_oben)
@@ -131,7 +127,7 @@ def frame(i):
     unten = ebene(unten_m)
     fig = L.zusammen(H, W, [(stab, 0, 0), (sw_, 0, 0), (kopf, 0, 0), (unten, 0, 0), (vorn, 0, 0)])
     fig, _ = A.verbinde4(fig)
-    G.rand_schliessen(fig, ERLAUBT, _umriss_nah)
+    G.rand_schliessen(fig, ERLAUBT, UMRISS)
     return fig
 
 
