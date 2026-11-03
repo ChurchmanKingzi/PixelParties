@@ -264,3 +264,108 @@ window.ppFx30Feuerball = ppFx30Feuerball;
   };
   setTimeout(() => (window.requestIdleCallback ? window.requestIdleCallback(los, { timeout: 4000 }) : los()), 2500);
 })();
+
+// ═════════════════════════════════════════════════════════════════
+//  Sandstrahl (`play_projectile_animation` mit `projectileShape: 'sandStream'`) — PIXELART statt 314 einzeln CSS-animierter Elemente
+//  Vorher: 280 Körner + 34 Schlieren als DOM-Elemente mit je eigener CSS-Animation (`sandStrahlFlug`, Alpha, Unschärfe-Kanal). `pixel-anim.js` backt jede startende Animation: Hauptfaden-Blockaden
+//  von 50–500 ms beim Start (Messung 3.11.: Long Tasks 53–510 ms, größter Bildabstand bis 517 ms). Jetzt EINE Leinwand (Rasterpixel = 2 Bildschirmpixel, 30 Bilder/s auf dem globalen Takt),
+//  gleiches Bild: Körner in vier Sandtönen fliegen einzeln von der Düse (eng) zum Ziel (gefächert), Schlieren entlang der Flugrichtung, ein blasser Staubkanal dazwischen (statt Unschärfe:
+//  gedithertes Streupunktband). Zeiten wie die CSS-Fassung: Korn: Verzug 0 – 0,7 · Dauer, Flug 240–390 ms linear, Deckkraft 0 → 1 (10 %), 0,95 (85 %), → 0; Schlieren Flug 200–290 ms.
+//  Deckkraft wird als Wahrscheinlichkeit gedithert (stabiler Hash je Teilchen), nicht als Alpha. Aufruf: ppFx30Sand({ sx, sy, tx, ty, dur }) (Fensterkoordinaten); gibt `null` zurück,
+//  wenn nichts gezeichnet werden konnte (dann läuft der alte Pfad).
+// ═════════════════════════════════════════════════════════════════
+const PP_FX30_SAND = [ppHex('#f9ecb3'), ppHex('#e0c085'), ppHex('#ca874e'), ppHex('#9d612f')];
+function ppFx30Sand(o) {
+  try {
+    if (!o || window._playAnimations === false) return null;
+    if (!isFinite(o.sx) || !isFinite(o.sy) || !isFinite(o.tx) || !isFinite(o.ty)) return null;
+    const S = 2, TAKT = 1000 / 30, H = ppFx30H, rd = Math.round;
+    const fo = window.ppFxScrollOffset ? window.ppFxScrollOffset() : { dx: 0, dy: 0 };
+    const welt = !!window.ppFxWeltSchicht;
+    const ax = o.sx + fo.dx, ay = o.sy + fo.dy, bx = o.tx + fo.dx, by = o.ty + fo.dy;
+    const dist = Math.hypot(bx - ax, by - ay) || 1, ux = (bx - ax) / dist, uy = (by - ay) / dist, nx = -uy, ny = ux;
+    const dauer = (o.dur > 0 ? o.dur : 950), strom = Math.round(dauer * 0.7);
+    const ENDE = (strom + 400) / 1000 + 0.05;
+    const nK = typeof ppFxN === 'function' ? ppFxN(280) : 280, nS = typeof ppFxN === 'function' ? ppFxN(34) : 34;
+    const gauss = (id, q) => (H(id, q) + H(id, q + 1) + H(id, q + 2)) / 3 - 0.5;
+    const M = 96;                                                               // Rand: Fächer (±32 px), Körner, Kanal
+    const lx = Math.floor((Math.min(ax, bx) - M) / S) * S, ly = Math.floor((Math.min(ay, by) - M) / S) * S;
+    const gw = Math.min(800, Math.ceil((Math.max(ax, bx) + M - lx) / S)), gh = Math.min(640, Math.ceil((Math.max(ay, by) + M - ly) / S));
+    if (gw < 8 || gh < 8) return null;
+    const P = (x, y) => [(x - lx) / S, (y - ly) / S];                           // Bildschirm → Raster
+    // Teilchen einmal würfeln (deterministisch je Aufruf)
+    const salt = Math.floor(Math.random() * 1e6);
+    const kor = [], sch = [];
+    for (let i = 0; i < nK; i++) {
+      const id = i + salt * 7, start = gauss(id, 1) * 10, ende = gauss(id, 4) * 64;
+      kor.push({ x: ax + nx * start + ux * H(id, 7) * 14, y: ay + ny * start + uy * H(id, 8) * 14, dx: (bx - ax) + nx * (ende - start), dy: (by - ay) + ny * (ende - start),
+        g: Math.max(1, rd((1 + rd(H(id, 9) * 25) / 10) / S)), c: PP_FX30_SAND[Math.floor(H(id, 10) * 4)], verzug: Math.round(H(id, 11) * strom), flug: Math.round(240 + H(id, 12) * 150), id });
+    }
+    for (let i = 0; i < nS; i++) {
+      const id = i + 5000 + salt * 3, start = gauss(id, 1) * 8, ende = gauss(id, 4) * 44;
+      sch.push({ x: ax + nx * start, y: ay + ny * start, dx: (bx - ax) + nx * (ende - start), dy: (by - ay) + ny * (ende - start), l: 8 + H(id, 7) * 14, verzug: Math.round(H(id, 8) * strom), flug: Math.round(200 + H(id, 9) * 90), id });
+    }
+    const kanalN = 70, kanal = Array.from({ length: kanalN }, (_, i) => ({ p: H(i + salt, 21), q: (H(i + salt, 22) - 0.5) * 24, id: i + 900 }));
+    const wurzel = document.createElement('div');
+    wurzel.setAttribute('aria-hidden', 'true'); wurzel.setAttribute('data-pp-px', 'aus');
+    wurzel.style.cssText = `position:fixed;left:${lx}px;top:${ly}px;pointer-events:none;z-index:10090;`;
+    const cv = document.createElement('canvas'); cv.width = gw; cv.height = gh;
+    cv.style.cssText = `width:${gw * S}px;height:${gh * S}px;image-rendering:pixelated;display:block;`;
+    wurzel.appendChild(cv);
+    const ctx = cv.getContext('2d'), img = ctx.createImageData(gw, gh), m = ppFx30Maler(img.data, gw, gh);
+    // Deckkraft-Verlauf der Körner/Schlieren (Keyframes: 0 → 1 bei 10 %, 0,95 bei 85 %, → 0)
+    const deck = (u) => (u <= 0 || u >= 1) ? 0 : (u < 0.1 ? u / 0.1 : (u < 0.85 ? 1 - 0.05 * ((u - 0.1) / 0.75) : 0.95 * (1 - (u - 0.85) / 0.15)));
+    const malen = (t) => {
+      const ms = t * 1000;
+      // Staubkanal: gedithertes Streupunktband (Deckkraft 0 → 1 bei 15 %, 0,8 bei 70 %, → 0)
+      const ku = ms / dauer, ka = ku <= 0 || ku >= 1 ? 0 : (ku < 0.15 ? ku / 0.15 : (ku < 0.7 ? 1 - 0.2 * ((ku - 0.15) / 0.55) : 0.8 * (1 - (ku - 0.7) / 0.3)));
+      if (ka > 0.02) {
+        const w = ppFx30Fl(t) >> 1;
+        for (const k of kanal) {
+          if (H(k.id + w * 13, 33) > ka * 0.55) continue;
+          const [X, Y] = P(ax + ux * dist * k.p + nx * k.q, ay + uy * dist * k.p + ny * k.q);
+          m.rect(rd(X), rd(Y), 1, 1, PP_FX30_SAND[1]);
+        }
+      }
+      for (const k of sch) {
+        const u = (ms - k.verzug) / k.flug, a = deck(u);
+        if (a <= 0 || H(k.id, 5) > a) continue;
+        const [X, Y] = P(k.x + k.dx * u, k.y + k.dy * u), [X0, Y0] = P(k.x + k.dx * u - ux * k.l, k.y + k.dy * u - uy * k.l);
+        m.linie(rd(X0), rd(Y0), rd(X), rd(Y), 1, PP_FX30_SAND[0]);
+      }
+      for (const k of kor) {
+        const u = (ms - k.verzug) / k.flug, a = deck(u);
+        if (a <= 0 || H(k.id, 5) > a) continue;
+        const [X, Y] = P(k.x + k.dx * u, k.y + k.dy * u);
+        m.rect(rd(X), rd(Y), k.g, k.g, k.c);
+      }
+    };
+    if (o.trocken) return [0.05, 0.2, 0.4, 0.7, 0.95].map((tt) => () => { m.d.x0 = gw; m.d.y0 = gh; m.d.x1 = 0; m.d.y1 = 0; img.data.fill(0); malen(tt); });
+    (welt ? window.ppFxWeltSchicht() : document.body).appendChild(wurzel);
+    const takt = window.ppTaktRaf || window.requestAnimationFrame, t0 = performance.now();
+    let raf = 0, letzte = -1, fertig = false, vor = null;
+    const ende = () => { if (fertig) return; fertig = true; try { cancelAnimationFrame(raf); } catch {} wurzel.remove(); };
+    const schritt = (jetzt) => {
+      if (fertig) return;
+      if (typeof jetzt !== 'number') jetzt = performance.now();
+      const ms = jetzt - t0;
+      if (ms / 1000 >= ENDE) { ende(); return; }
+      const fr = Math.floor(jetzt / TAKT);
+      if (fr !== letzte) {
+        letzte = fr;
+        const d = m.d, buf = img.data;
+        if (vor) { for (let j = vor.y0; j < vor.y1; j++) buf.fill(0, (j * gw + vor.x0) * 4, (j * gw + vor.x1) * 4); }
+        d.x0 = gw; d.y0 = gh; d.x1 = 0; d.y1 = 0;
+        malen(Math.floor(Math.max(0, ms) / TAKT + 1e-6) / 30);
+        const ux0 = Math.min(vor ? vor.x0 : gw, d.x0), uy0 = Math.min(vor ? vor.y0 : gh, d.y0), ux1 = Math.max(vor ? vor.x1 : 0, d.x1), uy1 = Math.max(vor ? vor.y1 : 0, d.y1);
+        if (ux1 > ux0 && uy1 > uy0) ctx.putImageData(img, 0, 0, ux0, uy0, ux1 - ux0, uy1 - uy0);
+        vor = d.x1 > d.x0 ? { x0: d.x0, y0: d.y0, x1: d.x1, y1: d.y1 } : null;
+      }
+      raf = takt(schritt);
+    };
+    raf = takt(schritt);
+    setTimeout(ende, ENDE * 1000 + 1500);
+    return ende;
+  } catch (e) { try { console.warn('ppFx30Sand', e); } catch {} return null; }
+}
+window.ppFx30Sand = ppFx30Sand;

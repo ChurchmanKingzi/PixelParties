@@ -49476,6 +49476,8 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         });
         if (ende30) return;
       }
+      // Sandstrahl (`sandStream`): Pixelart-Leinwand statt 314 einzeln CSS-animierter Elemente (Start-Blockade 50–500 ms, app-fx-30.jsx); `null` → alter Pfad.
+      if (projectileShape === 'sandStream' && window.ppFx30Sand && window.ppFx30Sand({ sx: sxPx, sy: syPx, tx: txPx, ty: tyPx, dur })) return;
       // Angle in degrees from src → tgt. CSS `rotate(0deg)` points
       // right; 0° here means a horizontal east-bound projectile, so
       // any projectile whose visual natively faces RIGHT (the SVG
