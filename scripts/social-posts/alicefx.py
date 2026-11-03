@@ -228,8 +228,9 @@ class AliceShow:
 
     STRING_COLORS = ((75, 1, 117), (154, 47, 231))                                    # dunkel / hell wie im Sprite
 
-    def _string(self, canvas, a, b, sag):
-        """Faden wie in Alice' Sprite: Quadrate in der Pixelgröße des Sprites auf seinem Raster, dunkel und hell im Wechsel."""
+    def _string(self, canvas, a, b, sag, own=None):
+        """Faden wie in Alice' Sprite: Quadrate in der Pixelgröße des Sprites auf seinem Raster, dunkel und hell im Wechsel.
+        own = (Bild, left, top) des eigenen Püppchens: dort bleibt das Püppchen über dem Faden."""
         gp, ox, oy = self.gp, self.ox, self.oy
         n = max(8, int(math.hypot(b[0] - a[0], b[1] - a[1]) / (gp * 0.4)))
         cells = []
@@ -240,10 +241,18 @@ class AliceShow:
             c = (int(math.floor((x - ox) / gp)), int(math.floor((y - oy) / gp)))
             if not cells or cells[-1] != c:
                 cells.append(c)
-        d = ImageDraw.Draw(canvas)
         for k, (ci, cj) in enumerate(cells):
-            col = self.STRING_COLORS[k % 2] + (255,)
-            d.rectangle([ox + ci * gp, oy + cj * gp, ox + (ci + 1) * gp - 1, oy + (cj + 1) * gp - 1], fill=col)
+            col = self.STRING_COLORS[k % 2]
+            x0, y0 = int(ox + ci * gp), int(oy + cj * gp)
+            box = (x0, y0, x0 + gp, y0 + gp)
+            mask = None
+            if own is not None:
+                im, ol, ot = own
+                if x0 < ol + im.width and x0 + gp > ol and y0 < ot + im.height and y0 + gp > ot:
+                    al = Image.new('L', (gp, gp), 0)
+                    al.paste(im.getchannel('A'), (int(ol) - x0, int(ot) - y0))
+                    mask = al.point(lambda v: 255 if v < 128 else 0)                      # nur dort zeichnen, wo das Püppchen nicht ist
+            canvas.paste(col, box, mask)
 
     # ───────── Interface-Zustände ─────────
     def banner_state(self, t):
@@ -305,28 +314,29 @@ class AliceShow:
             place[i] = (im, left, top, attach, eyes)
         return pos, place
 
-    def _draw_strings(self, canvas, t):
-        """Alle Fäden (Püppchen, Banner, zurückkehrendes Link-Schild): hinter Alice' Sprite, über der Karte – sie kommen aus ihren Ärmeln."""
-        pos, place = self._placements(t)
+    def _draw_strings(self, canvas, t, pos, place):
+        """Alle Fäden (Püppchen, Banner, zurückkehrendes Link-Schild): über allem, nur nicht über ihrem eigenen Mr. Jiggles; jeder beginnt in einer Hand von Alice."""
+        hdx = self.sprite_dx(int(t * self.fps))
+        hands = [(h[0] + hdx, h[1]) for h in self.hands]
         for i, st in pos.items():
-            hand = self.hands[0 if self.ANCHORS[i][0] <= 0 else 1]
+            hand = hands[0 if self.ANCHORS[i][0] <= 0 else 1]
             attach = place[i][3]
             limp = st[5]
             dist = math.hypot(attach[0] - hand[0], attach[1] - hand[1])
-            self._string(canvas, hand, attach, sag=(0.06 + 0.4 * limp) * dist * (0.2 + 0.8 * limp) + 14 * limp)
+            self._string(canvas, hand, attach, sag=(0.06 + 0.4 * limp) * dist * (0.2 + 0.8 * limp) + 14 * limp, own=(place[i][0], place[i][1], place[i][2]))
         # Banner-Fäden (Alice bewegt das Banner)
         bdx, bdy, bsh, bstr = self.banner_state(t)
         if bstr:
             lx, ly, lw, lh = self.g['logo_rect']
-            self._string(canvas, self.hands[0], (lx + 90 + bdx, ly + lh + bdy), 20)
-            self._string(canvas, self.hands[1], (lx + lw - 90 + bdx, ly + lh + bdy), 20)
+            self._string(canvas, hands[0], (lx + 90 + bdx, ly + lh + bdy), 20)
+            self._string(canvas, hands[1], (lx + lw - 90 + bdx, ly + lh + bdy), 20)
         # Rückkehr des Link-Schilds an Fäden
         bst = self.badge_state(t)
         if bst is not None and 15.4 <= t < 16.2:
             bx, by, bw, bh = self.g['badge_rect']
             (ldx, ldy, _), (rdx, rdy, _), _, _ = bst
-            self._string(canvas, self.hands[0], (bx + bw * 0.25 + ldx, by + bh / 2), 30)
-            self._string(canvas, self.hands[1], (bx + bw * 0.75 + rdx, by + bh / 2), 30)
+            self._string(canvas, hands[0], (bx + bw * 0.25 + ldx, by + bh / 2), 30)
+            self._string(canvas, hands[1], (bx + bw * 0.75 + rdx, by + bh / 2), 30)
 
 
     def _shear(self, im, shear):
@@ -345,7 +355,6 @@ class AliceShow:
 
     def draw_badge(self, canvas, f):
         t = f / float(self.fps)
-        self._draw_strings(canvas, t)
         bx, by, bw, bh = self.g['badge_rect']
         st = self.badge_state(t)
         img = self.g['badge_img']
@@ -403,6 +412,7 @@ class AliceShow:
                         h = self.hook[(side * 7 + k) % len(self.hook)]
                         th = h['th'] + h['om'] * te
                         self._beam(canvas, e, (e[0] + math.cos(th) * reach, e[1] + math.sin(th) * reach))
+        self._draw_strings(canvas, t, pos, place)                                          # Fäden zuletzt: über allem außer ihrem eigenen Püppchen
         # Schadenszahlen
         for tn, txt, (nx, ny) in ((13.45, '-100', (self.g['badge_rect'][0] + 120, self.g['badge_rect'][1] - 30)),
                                   (13.6, '-100', (self.g['badge_rect'][0] + self.g['badge_rect'][2] - 120, self.g['badge_rect'][1] - 30))):
