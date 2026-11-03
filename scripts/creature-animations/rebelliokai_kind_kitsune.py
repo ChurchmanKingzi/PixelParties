@@ -17,13 +17,13 @@ Was im Sprite ist (x, y im 37×36-Sprite):
 * KOPF (x 10–21, y 17–27): weißes Fell, die AUGEN sind zwei geschlossene, lachende „^“ aus je drei schwarzen Pixeln (0,0,0) bei (13,22)(12,23)(14,23) und (18,22)(17,23)(19,23) — kein Blinzeln nötig (sie sind schon zu); Schnauze/Nase dunkellila (62,53,70)/(127,112,138) bei (14–16, 24–25);
   weiße Wangenbüschel (255,255,255) bei (10,23–24) und (21,23–24); links ein diagonales Fellbüschel (x 4–11, y 17–24).
 * KÖRPER (x 10–21, y 25–31) mit kleinem lila-grauem Brustband (127,112,138)/(105,79,98) und zwei Beinen (y 32–35).
-* DREI SCHWEIFE in Rot/Orange: oben (x 5–15, y 0–11; zwei Spitzen), rechts (x 22–36, y 11–25) und links unten (x 0–10, y 18–31): Umriss (110,39,39), Körper (179,56,49)/(234,79,54), Lichter (245,125,74); die Zacken am Rand sind das Fell/die Fuchsfeuer-Spitzen, ich animiere sie als Schweife (Rückmeldung des Spielgestalters: „Schweife wehen“), nicht als Feuer.
+* DREI SCHWEIFE in Rot/Orange: oben (x 5–15, y 0–11; zwei Spitzen), rechts (x 22–36, y 11–25) und links unten (x 0–10, y 18–31): Umriss (110,39,39), Körper (179,56,49)/(234,79,54), Lichter (245,125,74); die Schweife sind dunkelorange FLAMMEN (Fuchsfeuer): sie werden mit dem Feuermodul anim_feuer2.py als Feuer animiert (Nutzerkorrektur, Runde 3).
 Kein Metall/Gold/Edelstein → KEIN Glanz. Keine Partikel.
 
 Ablauf (60 Frames à 70 ms = 4,2 s, nahtlos; Frame 0 = Original; ein Bodenwesen: die Füße bleiben am Boden):
-* DREI SCHWEIFE WEHEN unabhängig (Perioden 30/20/15 Frames, je mit einer schnelleren Oberwelle): oberer Schweif — jede Zeile oberhalb seines Ansatzes (y 11) wandert waagerecht, je weiter oben, desto mehr (bis ±3 px an der Spitze, Gefälle ≤ 0,3 px je Zeile, Nachlauf zur Spitze);
-  rechter Schweif — jede Spalte rechts von seinem Ansatz (x 24) wandert senkrecht (bis ±3 px an der Spitze); linker Schweif — jede Zeile unterhalb seines Ansatzes (y 19) wandert waagerecht (bis ±3 px an der Spitze).
-  Die Schweife liegen über dem Fuchs; frei werdende Fuchspixel kommen aus der Fuchs-Ebene (Ohrspitze, Wange), nichts wird erfunden.
+* DREI SCHWEIF-FLAMMEN (Feuer von Hand, anim_feuer2: die gemalte Flamme der Quelle ist die Vorlage, Zunge für Zunge animiert, Körper/Gesicht wie gehabt): oberer Schweif (Flamme nach oben, vier Zungen: Spitzen bei (10,0), (14,1), (5,2), (8,2)),
+  rechter Schweif (Flamme nach rechts, drei Zungen auf Zeile 19/21/23), linker Schweif (Flamme nach unten, drei Zungen: Spitzen (5,31), (9,30), (0,29)). Jede Zunge: Fuß ruhig, Länge, Neigung, S-Kurve und Kernhub wechseln nach eigener Folge handgesetzter Posen
+  (12 Posen à 2–3 Frames), zeitversetzt; der helle Kern (245,125,74) steigt und fällt, Spitzen reißen ab und steigen als kleine Funken (Flammenfarben der Quelle) auf. Randpixel der Flamme sind immer der dunkle Umriss (110,39,39).
 * OHREN: das linke Ohr wippt die Spitze (Zeilen y 7–12) 1 px seitlich (zweimal je Schleife), das rechte Ohr hebt/senkt seine Außenhälfte (Spalten x ≥ 22) bis 1 px (dreimal je Schleife, andere Phase).
 * ATMEN (3× je Schleife, je 10 Frames oben): die Rumpfzeile 28 wird einmal doppelt eingefügt (Texturmischung): Kopf, Ohren und die Schweif-Ansätze steigen 1 px (Schweife starr mit), die Beine bleiben am Boden.
 Fest: Gesicht (die „^“-Augen und Nase), Beine, Brustband. Alle Bewegungen laufen auf der vollen Leinwand (ClipError statt Abschneiden). Nur ganze Pixel, nur Quellfarben.
@@ -36,6 +36,7 @@ import cv2
 import numpy as np
 from PIL import Image
 
+import anim_feuer2 as FE2
 import anim_humanoide as Hm
 import anim_lib as L
 import anim_rebel as R
@@ -68,6 +69,24 @@ fox_rest = fox & ~ohr_l_spitze & ~ohr_r_aussen
 LOCH0 = R.loecher(L.platz(spr, H, W, *OFF))
 
 
+# --- Schweif-Flammen (anim_feuer2) ---
+def lay0(quelle, maske):
+    t, _ = L.trenne(quelle, maske)
+    return L.platz(t, H, W, OFF[0], OFF[1])
+
+
+FUCHS_M = np.zeros((H, W), bool)
+FUCHS_M[OFF[1]:OFF[1] + sh, OFF[0]:OFF[0] + sw] = fox
+Zk = lambda f_, s_, **k: FE2.Zunge((f_[0] + OFF[0], f_[1] + OFF[1]), (s_[0] + OFF[0], s_[1] + OFF[1]), **k)
+ZT_O = [Zk((10, 10), (10, 0), fuss_anteil=0.2), Zk((13, 10), (14, 1), fuss_anteil=0.2), Zk((6, 10), (5, 2), fuss_anteil=0.2, amp=0.9), Zk((8, 9), (8, 2), fuss_anteil=0.2, amp=0.7)]
+ZT_R = [Zk((26, 19), (34, 19), fuss_anteil=0.2, amp=0.8), Zk((26, 21), (36, 21), fuss_anteil=0.2), Zk((27, 23), (35, 23), fuss_anteil=0.2, amp=0.9)]
+ZT_L = [Zk((5, 24), (5, 31), fuss_anteil=0.2), Zk((8, 24), (9, 30), fuss_anteil=0.2, amp=0.9), Zk((2, 24), (0, 29), fuss_anteil=0.2, amp=0.8)]
+VL_O = FE2.Vorlage(lay0(schweife, t_oben), ZT_O, 'hoch', rand_farbe=UMRISS_SCHWEIF, sperre=FUCHS_M, faden=2)
+VL_R = FE2.Vorlage(lay0(schweife, t_rechts), ZT_R, 'rechts', rand_farbe=UMRISS_SCHWEIF, sperre=FUCHS_M, faden=2)
+VL_L = FE2.Vorlage(lay0(schweife, t_links), ZT_L, 'runter', rand_farbe=UMRISS_SCHWEIF, sperre=FUCHS_M, faden=2)
+FEUER = FE2.Feuer([VL_O, VL_R, VL_L], n=N, seed=41, bank='ruhig', amp=1.1, max_funken=6, funken_abstand=5, funken_leben=8)
+
+
 def lay(quelle, maske, dy=0):
     t, _ = L.trenne(quelle, maske)
     return L.platz(t, H, W, OFF[0], OFF[1] + dy)
@@ -83,24 +102,18 @@ def frame(i):
     ol = Hm.zeilen_versatz(ol, OFF, {y: (1 if s1 > 0.5 else 0) for y in range(7, 13)})
     s3 = math.sin(L.sinus(i, N / 3) - 1.0)
     orr = R.spalten_staffel(orr, PAD_L + 21, [0, 0, 1, 1, 1, 1, 1, 1, 1], -1 if s3 > 0.5 else 0)
-    # Schweife
-    to = lay(schweife, t_oben)
-    tr = lay(schweife, t_rechts)
-    tl = lay(schweife, t_links)
-    to = R.zeilen_pendel(to, PAD_T + 11, 2.2, L.sinus(i, N / 2), lauf=0.9, richtung=-1, ruhe0=True)
-    to = R.zeilen_pendel(to, PAD_T + 11, 0.6, L.sinus(i, N / 5), lauf=0.5, richtung=-1, ruhe0=True, versatz=1.0)
-    tr = R.spalten_pendel(tr, PAD_L + 24, 2.0, L.sinus(i, N / 4), lauf=0.9, seite=1, ruhe0=True, versatz=2.0)
-    tr = R.spalten_pendel(tr, PAD_L + 24, 0.5, L.sinus(i, N / 10), lauf=0.5, seite=1, ruhe0=True, versatz=0.5)
-    tl = R.zeilen_pendel(tl, PAD_T + 19, 2.2, L.sinus(i, N / 3), lauf=0.9, richtung=1, ruhe0=True, versatz=0.7)
-    tl = R.zeilen_pendel(tl, PAD_T + 19, 0.6, L.sinus(i, N / 7.5), lauf=0.5, richtung=1, ruhe0=True, versatz=2.0)
     if b:
         k = L.streck_zeile(k, PAD_T + 28, 1)
-        ol, orr, to, tr, tl = (L.versetze(e, 0, -1) for e in (ol, orr, to, tr, tl))
-    fig, etik = R.schichten(H, W, [(k, 'fuchs'), (ol, 'fuchs'), (orr, 'fuchs'), (to, 'schweif'), (tr, 'schweif'), (tl, 'schweif')])
+        ol, orr = (L.versetze(e, 0, -1) for e in (ol, orr))
+    feu = FEUER.ebene(i)
+    fk = FEUER.funken(i, dy=lambda f_: -(1 if Hm.takt(f_, N / 3, 4, 10) else 0))
+    if b:
+        feu = L.versetze(feu, 0, -1)
+    fig, etik = R.schichten(H, W, [(k, 'fuchs'), (ol, 'fuchs'), (orr, 'fuchs'), (feu, 'schweif')])
     fig, _br = R.verbinde(fig)                                       # Teile, die nur über eine Pixelecke hängen (dünne Schweifspitzen), werden 4-verbunden
     R.neue_loecher_fuellen(fig, LOCH0, ERLAUBT, max_groesse=4)
     R.kontur_je_teil(fig, etik, ERLAUBT, {'fuchs': UMRISS_FUCHS, 'schweif': UMRISS_SCHWEIF}, standard=UMRISS_SCHWEIF)
-    return fig
+    return L.zusammen(H, W, [(fig, 0, 0), (fk, 0, 0)])
 
 
 if __name__ == '__main__':
