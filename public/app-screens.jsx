@@ -312,7 +312,6 @@ const ANIM_LAYERS_DIR = window.PP_RETRO ? '/data/animated_screen/layers2-retro/'
 // (Alpha-Huellkasten, z.B. `PIL.Image.open(f).split()[-1].getbbox()`).
 // Fehlt ein Eintrag, faellt die Ebene auf das alte Vollbild zurueck —
 // richtig, nur teurer.
-const ANIM_BUEHNE_B = 1920, ANIM_BUEHNE_H = 1080;
 const ANIM_SPRITE_RAHMEN = {
   'angel.png':      [0, 0, 788, 603],
   'blonde.png':     [92, 283, 689, 1080],
@@ -326,66 +325,10 @@ const ANIM_SPRITE_RAHMEN = {
   'ninja.png':      [0, 303, 828, 1033],
   'rabbit.png':     [403, 479, 752, 803],
 };
-/**
- * Stil einer Kulissen-Ebene: auf den sichtbaren Rahmen zugeschnitten,
- * sonst identisch zur alten Vollbild-Ebene. `extra` wie bisher (Animation,
- * Bewegungsvariablen, `transformOrigin` in BUEHNEN-Prozent); `versatzX`
- * verschiebt die ganze Ebene waagerecht (vorher per `inset`).
- */
-function animEbene(file, extra = {}, { versatzX } = {}) {
-  const url = "url('" + ANIM_LAYERS_DIR + file + "')";
-  const r = ANIM_SPRITE_RAHMEN[file];
-  const { transformOrigin, ...rest } = extra;
-  if (!r) {
-    return { position: 'absolute', inset: 0, willChange: 'transform',
-      background: url + ' center / 100% 100% no-repeat',
-      ...(transformOrigin ? { transformOrigin } : {}), ...rest,
-      ...(versatzX ? { left: versatzX, right: `calc(-1 * ${versatzX})` } : {}) };
-  }
-  const RAND = 2;   // Buehnenpixel Luft um den Alpha-Kasten (Kantenglaettung)
-  const x0 = Math.max(0, r[0] - RAND), y0 = Math.max(0, r[1] - RAND);
-  const x1 = Math.min(ANIM_BUEHNE_B, r[2] + RAND), y1 = Math.min(ANIM_BUEHNE_H, r[3] + RAND);
-  const l = x0 / ANIM_BUEHNE_B, t = y0 / ANIM_BUEHNE_H;
-  const w = (x1 - x0) / ANIM_BUEHNE_B, h = (y1 - y0) / ANIM_BUEHNE_H;
-  const pct = (v) => (v * 100).toFixed(4) + '%';
-  const [ox, oy] = (transformOrigin || '50% 50%').split(/\s+/).map(v => parseFloat(v) / 100);
-  return {
-    position: 'absolute',
-    left: versatzX ? `calc(${pct(l)} + ${versatzX})` : pct(l),
-    top: pct(t), width: pct(w), height: pct(h),
-    willChange: 'transform',
-    backgroundImage: url,
-    backgroundRepeat: 'no-repeat',
-    backgroundSize: `${pct(1 / w)} ${pct(1 / h)}`,
-    // Prozent-Position: Punkt p des Bildes liegt auf Punkt p des Kastens —
-    // fuer den Versatz −l·Buehne gilt p = l / (1 − w).
-    backgroundPosition: `${w < 1 ? pct(l / (1 - w)) : '0%'} ${h < 1 ? pct(t / (1 - h)) : '0%'}`,
-    transformOrigin: `${pct((ox - l) / w)} ${pct((oy - t) / h)}`,
-    ...rest,
-  };
-}
 function AnimatedTitleBackdrop() {
-  // 46 randomized rising embers, generated once (see README §7).
-  const embers = useMemo(() => {
-    const colors = ['#ffd066', '#e37435', '#fe5154', '#f9ecb3', '#ffffff'];
-    return Array.from({ length: 46 }, () => {
-      const size = 2 + Math.random() * 5;
-      return {
-        size,
-        px: Math.max(2, Math.round(size / 2) * 2),   // W86u2: Pixelart — Quadrat in ganzen Kunstpixeln (2/4/6 px), kein Rundkorn mit Schein
-        dur: 7 + Math.random() * 9,
-        delay: -Math.random() * 16,
-        left: Math.random() * 100,
-        // Horizontal drift as a % of screen width (±50px on the 1920 stage).
-        drift: +((Math.random() * 2 - 1) * 2.604).toFixed(3),
-        color: colors[Math.floor(Math.random() * colors.length)],
-      };
-    });
-  }, []);
-  // Ebenen: `animEbene` (oben) — zugeschnitten, sonst wie die alten
-  // Vollbild-Ebenen (Streckung `100% 100%`, auf Nicht-16:9-Fenstern
-  // gestaucht statt beschnitten).
-  const layer = animEbene;
+  // Figuren, Explosionskern und Glut sind Pixelart-Leinwaende (app-fx-45.jsx, PpFx45Szene): vorher ~9 DOM-Ebenen mit CSS-Dauerlaeufen
+  // (ab-floaty / ab-*Tether) und 46 Glut-Quadrate (ab-emberrise), die bei jedem Start zur Laufzeit gebacken wurden.
+  const szene = { dir: ANIM_LAYERS_DIR, rahmen: ANIM_SPRITE_RAHMEN };
   return (
     <div className="anim-backdrop" aria-hidden="true">
       <div className="anim-shake">
@@ -409,36 +352,15 @@ function AnimatedTitleBackdrop() {
             vignette) stays bright, breaking the seam. Below the characters it
             frames only the background and leaves every sprite at its true colour. */}
         <PpVerlauf className="anim-vignette" px={2} gradient="radial-gradient(circle at 50% 44%, transparent 48%, rgba(8,6,12,.2) 82%, rgba(8,6,12,.36) 100%)" />
-        {/* 1 — hammer girl */}
-        <div style={layer('hammer.png', { transformOrigin: '72% 28%', '--mx': 'calc(var(--abw,1vw) * 0.469)', '--my': 'calc(var(--abh,1vh) * -1.389)', '--mr': '2deg', animation: 'ab-floaty 4.2s ease-in-out -0.6s infinite' })} />
-        {/* 2 — Explosionskern. ★ v1266 (Al 22.9.: „das Login-Menue ist
-            nicht schoen"): wieder HIER, in der Kulisse, statt im Kasten ueber
-            dessen Flaeche. Dort lag der gelb-rote Kern direkt hinter den
-            Eingabefeldern und zwang jeden Text in Pixel-Umrisse. Jetzt liegt
-            der Kasten davor; sichtbar bleibt der Kern im Kunstfenster oben
-            (hinter dem Logo) und seitlich um den Kasten herum. Ebene,
-            Drehpunkt und Takt wie zuvor. */}
-        <div className="anim-explosion" style={layer('explosion.png', { transformOrigin: '52% 42%', animation: 'ab-coreTether 4.8s ease-in-out infinite' })} />
+        {/* 1 — hammer girl, 2 — Explosionskern. ★ v1266 (Al 22.9.: „das Login-Menue ist nicht schoen"): der Kern liegt in der Kulisse, nicht im
+            Kasten (dort lag der gelb-rote Kern direkt hinter den Eingabefeldern und zwang jeden Text in Pixel-Umrisse); sichtbar bleibt er im Kunstfenster
+            oben (hinter dem Logo) und seitlich um den Kasten herum. */}
+        <PpFx45Szene ebenen={['hammer', 'explosion']} {...szene} />
         {/* 3 — central bloom */}
         <PpVerlauf className="anim-bloom" retroBlend="screen" gradient="radial-gradient(circle, rgba(255,241,150,.4), rgba(255,155,58,.12) 24%, transparent 46%)" />
-        {/* 4 — Broghan (right shooter), nudged flush to the right edge */}
-        <div style={{ position: 'absolute', inset: 0, transform: 'translate(calc(var(--abw,1vw) * 5.781), calc(var(--abh,1vh) * 0.278))' }}>
-          <div style={layer('golem.png', { animation: 'ab-broghanTether 4.8s ease-in-out infinite' })} />
-        </div>
-        {/* 5 — Kyli (tree girl), shifted down */}
-        <div style={{ position: 'absolute', inset: 0, transform: 'translateY(calc(var(--abh,1vh) * 14.907))' }}>
-          <div style={layer('horned.png', { transformOrigin: '80% 100%', '--mx': 'calc(var(--abw,1vw) * -0.573)', '--my': 'calc(var(--abh,1vh) * -1.389)', '--mr': '2.6deg', animation: 'ab-floaty 6s ease-in-out -2s infinite' })} />
-        </div>
-        {/* 6 — angel girl */}
-        <div style={layer('angel.png', { transformOrigin: '20% 30%', '--mx': 'calc(var(--abw,1vw) * 0)', '--my': 'calc(var(--abh,1vh) * -1.111)', '--mr': '-1.4deg', animation: 'ab-floaty 5s ease-in-out infinite' })} />
-        {/* 7 — blonde girl */}
-        <div style={layer('blonde.png', { transformOrigin: '20% 50%', '--mx': 'calc(var(--abw,1vw) * 0.208)', '--my': 'calc(var(--abh,1vh) * -0.833)', '--mr': '1deg', animation: 'ab-floaty 6.5s ease-in-out -1.5s infinite' })} />
-        {/* 8 — Jiggles (left shooter) */}
-        <div style={layer('rabbit.png', { animation: 'ab-jiggleTether 4.8s ease-in-out infinite' })} />
-        {/* 9 — Champion (swordsman), shifted down */}
-        <div style={{ position: 'absolute', inset: 0, transform: 'translateY(calc(var(--abh,1vh) * 19.907))' }}>
-          <div style={layer('ninja.png', { transformOrigin: '16% 80%', '--mx': 'calc(var(--abw,1vw) * 0.417)', '--my': 'calc(var(--abh,1vh) * -1.296)', '--mr': '-2deg', animation: 'ab-floaty 5.5s ease-in-out -2.5s infinite' })} />
-        </div>
+        {/* 4 — Broghan (right shooter, an den rechten Rand gerueckt), 5 — Kyli (tree girl, nach unten), 6 — angel girl, 7 — blonde girl,
+            8 — Jiggles (left shooter), 9 — Champion (swordsman, nach unten), 13 — rising embers (alles auf EINER Leinwand, von hinten nach vorn) */}
+        <PpFx45Szene ebenen={['golem', 'horned', 'angel', 'blonde', 'rabbit', 'ninja']} glut {...szene} />
         {/* 10-12 — flying cats live in <AnimatedTitleCatsOverlay/> instead, so
             they render ABOVE the login panel (can't rise above it from inside
             this z-index:0 stacking context). */}
@@ -450,18 +372,6 @@ function AnimatedTitleBackdrop() {
           {/* Pixelart-Leinwand (app-fx-40.jsx): drei Zickzack-Blitze auf dem 3-px-Raster, Deckkraft per Dither */}
           <PpFx40Blitze />
         </div>
-        {/* 13 — embers */}
-        <div className="anim-embers" style={{ position: 'absolute', inset: 0, pointerEvents: 'none', overflow: 'hidden' }}>
-          {embers.map((e, i) => (
-            <span key={i} style={{
-              position: 'absolute', bottom: 'calc(var(--abh,1vh) * -1.296)', left: e.left.toFixed(2) + '%',
-              width: e.px + 'px', height: e.px + 'px',
-              background: e.color,
-              opacity: 0, animation: 'ab-emberrise ' + e.dur.toFixed(1) + 's linear ' + e.delay.toFixed(1) + 's infinite',
-              '--drift': e.drift + 'vw',
-            }} />
-          ))}
-        </div>
       </div>
     </div>
   );
@@ -472,35 +382,14 @@ function AnimatedTitleBackdrop() {
 // stacking context). Same independent floats + screen-shake as the main scene
 // — in sync because both mount together. pointer-events:none so clicks still
 // reach the form beneath.
-// Wie weit `cat_mid` nach links rueckt, damit sie den Login-Kasten
-// freigibt. calc(var(--abw,1vw) * 8) sind bei 1900px Breite gut 150px — der Kasten ist mit
-// dem v466-Zoom rund 460px breit und beginnt damit bei etwa 38 %.
-const KATZE_LINKS = 'calc(var(--abw,1vw) * 8)';
-
 function AnimatedTitleCatsOverlay() {
-  const layer = animEbene;   // v1265: zugeschnittene Ebenen, siehe oben
+  // Drei Katzen auf EINER Pixelart-Leinwand (app-fx-45.jsx). cat_mid sass mit ihrem Bildmittelpunkt bei 37 % genau auf der linken Kante des
+  // Login-Kastens und lag als Vordergrundebene darueber — seit dem groesseren Zoom (v466) zu dominant (Al: „muss weiter links platziert werden").
+  // Der Versatz (KATZE_LINKS = 8 vw nach links, `wx` von cat_mid in PP_FX45_EBENEN) ist die einzige Stellschraube: groesser = weiter weg vom Kasten.
   return (
     <div className="anim-cats-front" aria-hidden="true">
       <div className="anim-shake">
-        <div style={layer('cat_top.png', { transformOrigin: '23% 5%', '--mx': 'calc(var(--abw,1vw) * 0.729)', '--my': 'calc(var(--abh,1vh) * -0.833)', '--mr': '3deg', animation: 'ab-floaty 3.4s ease-in-out -0.5s infinite' })} />
-        {/* cat_mid sass mit ihrem Bildmittelpunkt bei 37 % genau auf der
-            linken Kante des Login-Kastens und lag als Vordergrundebene
-            darueber — seit dem groesseren Zoom (v466) zu dominant.
-            Al: „muss weiter links platziert werden."
-
-            (v1265: jetzt `versatzX` in `animEbene` — ueber `left`.)
-            Verschoben ueber `inset` statt ueber `transform`: die Ebene
-            traegt eine laufende `ab-floaty`-Animation, und die
-            ueberschreibt jedes inline gesetzte `transform`. `inset` ist
-            davon unberuehrt. Links und rechts um denselben Betrag
-            versetzt, damit die Ebene GENAUSO BREIT bleibt — sonst
-            zieht das `100% 100%`-Hintergrundbild die Katze in die
-            Laenge.
-
-            KATZE_LINKS ist die einzige Stellschraube: groesser =
-            weiter weg vom Kasten. */}
-        <div style={layer('cat_mid.png', { transformOrigin: '37% 30%', '--mx': 'calc(var(--abw,1vw) * -0.573)', '--my': 'calc(var(--abh,1vh) * 0.833)', '--mr': '-3deg', animation: 'ab-floaty 2.9s ease-in-out -0.8s infinite' }, { versatzX: `calc(-1 * ${KATZE_LINKS})` })} />
-        <div style={layer('cat_bottom.png', { transformOrigin: '5% 48%', '--mx': 'calc(var(--abw,1vw) * 0.833)', '--my': 'calc(var(--abh,1vh) * -1.111)', '--mr': '4deg', animation: 'ab-floaty 3.0s ease-in-out -1.7s infinite' })} />
+        <PpFx45Szene ebenen={['cat_top', 'cat_mid', 'cat_bottom']} dir={ANIM_LAYERS_DIR} rahmen={ANIM_SPRITE_RAHMEN} />
       </div>
     </div>
   );

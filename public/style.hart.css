@@ -1,6 +1,17 @@
-/* PP-HART-GEBACKEN fbe32e8730c9db68 — ERZEUGT von scripts/hart/build-css.js aus style.css (pixel-hart.js vorab angewandt) — nicht von Hand ändern. */
+/* PP-HART-GEBACKEN ade8aa684aa57c44 — ERZEUGT von scripts/hart/build-css.js aus style.css (pixel-hart.js vorab angewandt) — nicht von Hand ändern. */
 .pp-hart-gebacken { --pp-hart: 1; }
 @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Rajdhani:wght@400;500;600;700&family=Orbitron:wght@400;500;600;700;800;900&display=swap');
+
+/* ═══ Pixel-Glühen der aktivierbaren Zonen: Schatten/Rand aus den Hilfsvariablen der Animation `ppZonePuls` (Schlüsselbilder siehe dort) ═══
+   GANZ OBEN, mit `!important`: so verhält es sich wie vorher die Schlüsselbilder auf box-shadow/border-color — es schlägt jede normale Regel (Hover-Ringe …), aber alle anderen
+   `!important`-Regeln (`.zone-ability-exhausted`, `.zone-pick-target` …) stehen weiter unten bzw. höher und setzen sich bei gleicher Gewichtung durch. Registriert (`inherits: false`),
+   damit die Stufenwechsel nicht den Stil der Zonenkinder (Karten) neu aufbauen. */
+@property --zp-sh { syntax: '*'; inherits: false; }
+@property --zp-bc { syntax: '*'; inherits: false; }
+.zone-ability-activatable, .zone-ability-free-activatable, .zone-creature-activatable, .zone-equip-activatable, .zone-hero-effect-active, .zone-permanent-activatable {
+  box-shadow: var(--zp-sh, 0 0 0 2px var(--gl-3), 0 0 0 4px #08060c, inset 0 0 0 2px var(--gl-3)) !important;
+  border-color: var(--zp-bc, var(--gl-2)) !important;
+}
 
 @font-face {
   font-family: 'Pixel Intv';
@@ -215,7 +226,19 @@ body {
 .orbit-font { font-family: var(--font-display), sans-serif; }
 
 /* ===== ANIMATIONS ===== */
-@keyframes pulse { 0%,100% { opacity:1; } 50% { opacity:.6; } }
+/* Vorgebacken (perfC): Deckkraft 1 → 0,6 → 1 (ease) als gehaltene Dither-Stufen 16/14/12/10 (`--pp-dither-N` aus pixel-anim.js, `none` = voll) —
+   dieselben Bilder, die der Laufzeit-Backer abgetastet hat; `steps(1, end)` je Abschnitt = schon konform, er lässt sie aus. Ein Zeichen auf allen Dauern
+   (1–1,8 s), die Prozentwerte folgen dem ease-Verlauf. Nur für Blattelemente (Text): eine Maske schneidet überstehende Kinder ab. */
+@keyframes pulse {
+  0%      { opacity: 1; -webkit-mask: none 0 0/8px 8px repeat; mask: none 0 0/8px 8px repeat; animation-timing-function: steps(1, end); }
+  4.444%  { opacity: 1; -webkit-mask: var(--pp-dither-14) 0 0/8px 8px repeat; mask: var(--pp-dither-14) 0 0/8px 8px repeat; animation-timing-function: steps(1, end); }
+  17.778% { opacity: 1; -webkit-mask: var(--pp-dither-12) 0 0/8px 8px repeat; mask: var(--pp-dither-12) 0 0/8px 8px repeat; animation-timing-function: steps(1, end); }
+  31.111% { opacity: 1; -webkit-mask: var(--pp-dither-10) 0 0/8px 8px repeat; mask: var(--pp-dither-10) 0 0/8px 8px repeat; animation-timing-function: steps(1, end); }
+  57.778% { opacity: 1; -webkit-mask: var(--pp-dither-12) 0 0/8px 8px repeat; mask: var(--pp-dither-12) 0 0/8px 8px repeat; animation-timing-function: steps(1, end); }
+  66.667% { opacity: 1; -webkit-mask: var(--pp-dither-14) 0 0/8px 8px repeat; mask: var(--pp-dither-14) 0 0/8px 8px repeat; animation-timing-function: steps(1, end); }
+  84.444% { opacity: 1; -webkit-mask: none 0 0/8px 8px repeat; mask: none 0 0/8px 8px repeat; animation-timing-function: steps(1, end); }
+  100%    { opacity: 1; -webkit-mask: none 0 0/8px 8px repeat; mask: none 0 0/8px 8px repeat; }
+}
 @keyframes glow {
   0%,100% { box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 55%, #000), 0 0 0 4px #282834; }
   50% { box-shadow: 0 0 0 4px var(--accent), 0 0 0 6px #2d4362; }
@@ -2273,24 +2296,21 @@ select optgroup {
   71.2% { opacity: .68; }
   72.2% { opacity: 0; }
 }
-/* ★ W86u2 (Pixelart): nur Verschiebung. Die Neigung (`--mr`, ±1–4°) faellt weg: die Pixel-Pipeline rastet animierte Drehungen auf 15°-Stufen,
-   die Neigung war damit unsichtbar — kostete aber je Figur ein neu gesampeltes Drehsprite (9 grosse Bilder im Titelbild). */
-@keyframes ab-floaty {
-  0%   { transform: translate(0,0); }
-  50%  { transform: translate(calc(var(--mx,calc(var(--abw,1vw) * 0)) * var(--pf,1)), calc(var(--my,calc(var(--abh,1vh) * -0.926)) * var(--pf,1))); }
-  100% { transform: translate(0,0); }
+/* Schweben (ab-floaty), Laserketten-Zucken (ab-jiggleTether / ab-broghanTether / ab-coreTether) und Glutaufstieg (ab-emberrise) laufen nicht mehr als
+   CSS-Animationen (die Pixel-Pipeline buk sie bei jedem Start): sie sind Pixelart-Leinwaende in app-fx-45.jsx (`PpFx45Szene`), Bewegung und Takt wie die frueheren Keyframes. */
+.pp-fx45-szene {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
 }
-@keyframes ab-jiggleTether {
-  0%, 100% { transform: translate(0, 0); }
-  50%  { transform: translate(calc(var(--tH,calc(var(--abw,1vw) * 0.469)) * var(--pf,1)), calc(var(--tV,calc(var(--abh,1vh) * 0.37)) * var(--pf,1))); }
-}
-@keyframes ab-broghanTether {
-  0%, 100% { transform: translate(0, 0); }
-  50%  { transform: translate(calc(var(--tH,calc(var(--abw,1vw) * 0.469)) * -1 * var(--pf,1)), calc(var(--tV,calc(var(--abh,1vh) * 0.37)) * var(--pf,1))); }
-}
-@keyframes ab-coreTether {
-  0%, 100% { transform: translate(0, 0) scale(1); }
-  50%  { transform: translate(0, calc(var(--tV,calc(var(--abh,1vh) * 0.37)) * var(--pf,1))) scale(calc(1 - var(--sAmp,0.021) * var(--pf,1))); }
+.pp-fx45-figur { pointer-events: none; }
+.pp-fx45-glut {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  image-rendering: pixelated;
 }
 @keyframes ab-shake {
   0%, 6%, 49%, 56%, 100% { transform: translate(0, 0); }
@@ -2323,12 +2343,6 @@ select optgroup {
 @keyframes ab-vignettepulse {
   0%, 100% { opacity: .5; }
   50%      { opacity: .72; }
-}
-@keyframes ab-emberrise {
-  0%   { transform: translateY(calc(var(--abh,1vh) * 1.852)) translateX(0); opacity: 0; }
-  8%   { opacity: .95; }
-  78%  { opacity: .7; }
-  100% { transform: translateY(calc(var(--abh,1vh) * -112)) translateX(var(--drift, calc(var(--abw,1vw) * 0))); opacity: 0; }
 }
 @media (prefers-reduced-motion: reduce) {
   .anim-shake, .anim-shake > *, .anim-shake > * > *,
@@ -3869,12 +3883,14 @@ body:has(.pz-layout) .pp-bg-particles { display: none; }
   /* harter 1-px-Pixelschatten löst die Figur von der Kulisse */
   filter: drop-shadow(0 calc(1px * var(--board-scale)) 0 #08060c);
   transition: opacity .4s ease;
-  animation: heroIdleKlipp .55s linear backwards;
+  animation: heroIdleKlipp .5667s linear backwards;
 }
-/* Beschnitt nur für die Dauer des Auftritts (gleiche Dauer wie `heroIdleAuftritt` am Canvas): unten an der Steherkante, ringsum
-   großzügig offen. `backwards`: danach gilt wieder der normale Stil ohne Beschnitt. */
+/* Beschnitt nur für die Dauer des Auftritts (gleiche Dauer wie der Auftritt am Canvas, 17 Bilder = 567 ms, siehe app-fx-46.jsx): unten an der
+   Steherkante, ringsum großzügig offen. `backwards`: danach gilt wieder der normale Stil ohne Beschnitt. `steps(1, end)` = ein gehaltenes Bild,
+   also schon konform (der Laufzeit-Backer lässt es aus). */
 @keyframes heroIdleKlipp {
-  from, to { clip-path: inset(-400px -400px 0 -400px); }
+  from { clip-path: inset(-400px -400px 0 -400px); animation-timing-function: steps(1, end); }
+  to   { clip-path: inset(-400px -400px 0 -400px); }
 }
 /* W86u1: der Schlagschatten liegt auf GANZEN Pixeln (die Brettskala ist gebrochen; ein Versatz von 0,68 px malt die Schattenkante weich) */
 @supports (width: round(up, 1.5px, 1px)) {
@@ -3884,9 +3900,9 @@ body:has(.pz-layout) .pp-bg-particles { display: none; }
   position: absolute;
   left: 0; top: 0;
   display: block;
-  /* `backwards`, nicht `both`: nach dem Auftritt gilt wieder der
-     normale Stil (sonst hielte das Animationsende Werte fest) */
-  animation: heroIdleAuftritt .55s steps(10, end) backwards;
+  /* Der Auftritt (Aufsteigen aus der Karte 100 % → 0 in zehn Stufen auf ganzen Kunstpixeln, Aufleuchten brightness 2,2 → 1,5 → 1) läuft nicht mehr als
+     CSS-Animation (der Laufzeit-Backer tastete ihn je Figur ab: Größe, Stufen, Filter), sondern als Skript im 30-Hz-Takt: `ppHeldAuftritt`
+     (app-fx-46.jsx) setzt für 17 Bilder `transform`/`filter` inline und räumt am Ende auf. */
 }
 /* ── Zurückziehen beim Hover (v1452, schlicht seit v1453) ──────────────
    Hovert man die Heldenkarte, zieht sich die Figur wie eine Projektion
@@ -4086,11 +4102,7 @@ body:has(.pz-layout) .pp-bg-particles { display: none; }
 }
 /* Unsichtbare Helden: halbtransparent wie ihre Karte */
 .hero-idle-unsichtbar .hero-idle-steher { opacity: 1; mask-image: var(--pp-dither-6); mask-size: 8px 8px; mask-repeat: repeat; }   /* der Schatten liegt im Steher und blendet mit */
-@keyframes heroIdleAuftritt {
-  0%   { transform: translateY(100%); filter: brightness(2.2); }
-  70%  { transform: translateY(0);    filter: brightness(1.5); }
-  100% { transform: translateY(0);    filter: none; }
-}
+/* (`heroIdleAuftritt` / `heroIdleSchatten`: kein CSS mehr, der Auftritt von Figur und Bodenschatten läuft als Skript, `ppHeldAuftritt` in app-fx-46.jsx) */
 /* Pixel-Bodenschatten unter den Füßen.
    ★ 11.10. (Als Befund, siehe `.hero-idle-steher`): liegt jetzt IM Steher, hinter der Figur (Lage `left`/`top` inline, `HeroIdleSprite`).
    Vorher lag er flach in der Brettebene — dort durchschnitt ihn die aufrecht stehende Figur an der Standlinie, und alles, was
@@ -4099,14 +4111,9 @@ body:has(.pz-layout) .pp-bg-particles { display: none; }
   position: absolute;
   height: calc(3px * var(--board-scale));
   background: radial-gradient(ellipse at center, #08060c 0 70%, transparent 71%);   /* W86u1: deckend (Pixelart, kein Alpha-Schleier) */
-  animation: heroIdleSchatten .55s ease-out backwards;
   transition: opacity .3s ease;
 }
 .hero-idle-platz.hero-idle-weg .hero-idle-schatten { opacity: 0; }
-@keyframes heroIdleSchatten {
-  from { opacity: 0; transform: scaleX(.3); }
-  to   { opacity: 1; transform: none; }
-}
 @media (prefers-reduced-motion: reduce) {
   .hero-idle-canvas, .hero-idle-schatten, .hero-idle-steher { animation: none; }
   /* ohne Bewegung: einfach aus- und einblenden */
@@ -6007,11 +6014,34 @@ body:has(.pz-layout) .pp-bg-particles { display: none; }
 }
 
 /* Damage numbers */
+/* Vorgebacken (pixel-anim.js hätte jede Zahl zur Laufzeit gebacken): gehaltene Bilder im 15-Hz-Raster — Verschiebung in ganzen 2-px-Schritten (Einzeleigenschaft `translate`, die -50 % Mitte
+   bleibt), Größe nur in halben Schritten (1 / 1,5 / 2: jedes Kunstpixel bleibt ganze Bildschirmpixel breit), Ausblenden als Bayer-Dither-Stufen (`--pp-dither-N`, vom Backer-Hilfsset) statt Alpha.
+   `steps(1, end)` je Abschnitt = schon konform, der Backer überspringt sie. Erzeugt aus den alten Schlüsselbildern (ease-out), 1,6 s. */
 @keyframes damageFloat {
-  0% { opacity: 1; transform: translate(-50%, 0) scale(1); }
-  15% { opacity: 1; transform: translate(-50%, -10px) scale(1.3); }
-  50% { opacity: .9; transform: translate(-50%, -35px) scale(1.5); }
-  100% { opacity: 0; transform: translate(-50%, -70px) scale(1.8); }
+  0%        { opacity: 1; translate: -50% 0px; transform: scale(1); -webkit-mask-image: none; mask-image: none; animation-timing-function: steps(1, end); }
+  4.167%    { opacity: 1; translate: -50% -4px; transform: scale(1); -webkit-mask-image: none; mask-image: none; animation-timing-function: steps(1, end); }
+  8.333%    { opacity: 1; translate: -50% -8px; transform: scale(1); -webkit-mask-image: none; mask-image: none; animation-timing-function: steps(1, end); }
+  12.5%     { opacity: 1; translate: -50% -10px; transform: scale(1.5); -webkit-mask-image: none; mask-image: none; animation-timing-function: steps(1, end); }
+  16.667%   { opacity: 1; translate: -50% -12px; transform: scale(1.5); -webkit-mask-image: none; mask-image: none; animation-timing-function: steps(1, end); }
+  20.833%   { opacity: 1; translate: -50% -16px; transform: scale(1.5); -webkit-mask-image: none; mask-image: none; animation-timing-function: steps(1, end); }
+  25%       { opacity: 1; translate: -50% -20px; transform: scale(1.5); -webkit-mask-image: none; mask-image: none; animation-timing-function: steps(1, end); }
+  29.167%   { opacity: 1; translate: -50% -24px; transform: scale(1.5); -webkit-mask-image: none; mask-image: none; animation-timing-function: steps(1, end); }
+  33.333%   { opacity: 1; translate: -50% -28px; transform: scale(1.5); -webkit-mask-image: none; mask-image: none; animation-timing-function: steps(1, end); }
+  37.5%     { opacity: 1; translate: -50% -30px; transform: scale(1.5); -webkit-mask-image: none; mask-image: none; animation-timing-function: steps(1, end); }
+  41.667%   { opacity: 1; translate: -50% -32px; transform: scale(1.5); -webkit-mask-image: none; mask-image: none; animation-timing-function: steps(1, end); }
+  45.833%   { opacity: 1; translate: -50% -34px; transform: scale(1.5); -webkit-mask-image: none; mask-image: none; animation-timing-function: steps(1, end); }
+  54.167%   { opacity: 1; translate: -50% -40px; transform: scale(1.5); -webkit-mask-image: var(--pp-dither-12); mask-image: var(--pp-dither-12); animation-timing-function: steps(1, end); }
+  58.333%   { opacity: 1; translate: -50% -44px; transform: scale(1.5); -webkit-mask-image: var(--pp-dither-10); mask-image: var(--pp-dither-10); animation-timing-function: steps(1, end); }
+  62.5%     { opacity: 1; translate: -50% -48px; transform: scale(1.5); -webkit-mask-image: var(--pp-dither-8); mask-image: var(--pp-dither-8); animation-timing-function: steps(1, end); }
+  66.667%   { opacity: 1; translate: -50% -52px; transform: scale(1.5); -webkit-mask-image: var(--pp-dither-8); mask-image: var(--pp-dither-8); animation-timing-function: steps(1, end); }
+  70.833%   { opacity: 1; translate: -50% -56px; transform: scale(1.5); -webkit-mask-image: var(--pp-dither-6); mask-image: var(--pp-dither-6); animation-timing-function: steps(1, end); }
+  75%       { opacity: 1; translate: -50% -58px; transform: scale(1.5); -webkit-mask-image: var(--pp-dither-4); mask-image: var(--pp-dither-4); animation-timing-function: steps(1, end); }
+  79.167%   { opacity: 1; translate: -50% -62px; transform: scale(1.5); -webkit-mask-image: var(--pp-dither-4); mask-image: var(--pp-dither-4); animation-timing-function: steps(1, end); }
+  83.333%   { opacity: 1; translate: -50% -64px; transform: scale(2); -webkit-mask-image: var(--pp-dither-2); mask-image: var(--pp-dither-2); animation-timing-function: steps(1, end); }
+  87.5%     { opacity: 1; translate: -50% -66px; transform: scale(2); -webkit-mask-image: var(--pp-dither-2); mask-image: var(--pp-dither-2); animation-timing-function: steps(1, end); }
+  91.667%   { opacity: 0; translate: -50% -68px; transform: scale(2); animation-timing-function: steps(1, end); }
+  95.833%   { opacity: 0; translate: -50% -70px; transform: scale(2); animation-timing-function: steps(1, end); }
+  100%      { opacity: 0; translate: -50% -70px; transform: scale(2); }
 }
 .damage-number {
   position: fixed;
@@ -6021,7 +6051,8 @@ body:has(.pz-layout) .pp-bg-particles { display: none; }
   color: #ef2929;
   text-shadow: rgb(91, 1, 2) -2px 0px 0px, rgb(91, 1, 2) 2px 0px 0px, rgb(91, 1, 2) 0px -2px 0px, rgb(91, 1, 2) 0px 2px 0px, rgb(91, 1, 2) -2px -2px 0px, rgb(91, 1, 2) 2px -2px 0px, rgb(91, 1, 2) -2px 2px 0px, rgb(91, 1, 2) 2px 2px 0px, rgb(0, 0, 0) 2px 2px 0px, rgb(0, 0, 0) -1px -1px 0px, rgb(0, 0, 0) 1px -1px 0px, rgb(0, 0, 0) -1px 1px 0px;
   pointer-events: none;
-  animation: damageFloat 1.6s ease-out forwards;
+  -webkit-mask-size: 8px 8px; mask-size: 8px 8px; -webkit-mask-repeat: repeat; mask-repeat: repeat;   /* Dither-Ausblenden (Schlüsselbilder) */
+  animation: damageFloat 1.6s steps(1, end) forwards;
 }
 .damage-number.heal-number {
   color: #3ddc57;
@@ -6130,7 +6161,8 @@ body:has(.pz-layout) .pp-bg-particles { display: none; }
   font-size: 22px;
   font-weight: 900;
   pointer-events: none;
-  animation: toughnessHpFloat 1.6s ease-out forwards;
+  -webkit-mask-size: 8px 8px; mask-size: 8px 8px; -webkit-mask-repeat: repeat; mask-repeat: repeat;
+  animation: toughnessHpFloat 1.6s steps(1, end) forwards;
 }
 .toughness-hp-up {
   color: #167927;
@@ -6140,11 +6172,30 @@ body:has(.pz-layout) .pp-bg-particles { display: none; }
   color: #8c0014;
   text-shadow: rgb(0, 0, 0) -2px 0px 0px, rgb(0, 0, 0) 2px 0px 0px, rgb(0, 0, 0) 0px -2px 0px, rgb(0, 0, 0) 0px 2px 0px, rgb(0, 0, 0) -2px -2px 0px, rgb(0, 0, 0) 2px -2px 0px, rgb(0, 0, 0) -2px 2px 0px, rgb(0, 0, 0) 2px 2px 0px, rgb(0, 0, 0) 2px 2px 0px, rgb(0, 0, 0) -1px -1px 0px, rgb(0, 0, 0) 1px -1px 0px, rgb(0, 0, 0) -1px 1px 0px;
 }
+/* Vorgebacken wie `damageFloat` (Werte: 0,8→1,5→1,2→1 Größe, 0/-6/-20/-55 px, Ausblenden ab 40 %). Gilt auch für `.fighting-atk-number`. */
 @keyframes toughnessHpFloat {
-  0% { opacity: 1; transform: translate(-50%, 0) scale(0.8); }
-  12% { opacity: 1; transform: translate(-50%, -6px) scale(1.5); }
-  40% { opacity: 1; transform: translate(-50%, -20px) scale(1.2); }
-  100% { opacity: 0; transform: translate(-50%, -55px) scale(1); }
+  0%        { opacity: 1; translate: -50% 0px; transform: scale(1); -webkit-mask-image: none; mask-image: none; animation-timing-function: steps(1, end); }
+  4.167%    { opacity: 1; translate: -50% -4px; transform: scale(1); -webkit-mask-image: none; mask-image: none; animation-timing-function: steps(1, end); }
+  8.333%    { opacity: 1; translate: -50% -6px; transform: scale(1.5); -webkit-mask-image: none; mask-image: none; animation-timing-function: steps(1, end); }
+  16.667%   { opacity: 1; translate: -50% -10px; transform: scale(1.5); -webkit-mask-image: none; mask-image: none; animation-timing-function: steps(1, end); }
+  20.833%   { opacity: 1; translate: -50% -12px; transform: scale(1.5); -webkit-mask-image: none; mask-image: none; animation-timing-function: steps(1, end); }
+  25%       { opacity: 1; translate: -50% -16px; transform: scale(1.5); -webkit-mask-image: none; mask-image: none; animation-timing-function: steps(1, end); }
+  29.167%   { opacity: 1; translate: -50% -18px; transform: scale(1.5); -webkit-mask-image: none; mask-image: none; animation-timing-function: steps(1, end); }
+  33.333%   { opacity: 1; translate: -50% -18px; transform: scale(1); -webkit-mask-image: none; mask-image: none; animation-timing-function: steps(1, end); }
+  37.5%     { opacity: 1; translate: -50% -20px; transform: scale(1); -webkit-mask-image: none; mask-image: none; animation-timing-function: steps(1, end); }
+  41.667%   { opacity: 1; translate: -50% -22px; transform: scale(1); -webkit-mask-image: none; mask-image: none; animation-timing-function: steps(1, end); }
+  45.833%   { opacity: 1; translate: -50% -26px; transform: scale(1); -webkit-mask-image: var(--pp-dither-14); mask-image: var(--pp-dither-14); animation-timing-function: steps(1, end); }
+  50%       { opacity: 1; translate: -50% -30px; transform: scale(1); -webkit-mask-image: var(--pp-dither-12); mask-image: var(--pp-dither-12); animation-timing-function: steps(1, end); }
+  54.167%   { opacity: 1; translate: -50% -32px; transform: scale(1); -webkit-mask-image: var(--pp-dither-10); mask-image: var(--pp-dither-10); animation-timing-function: steps(1, end); }
+  58.333%   { opacity: 1; translate: -50% -36px; transform: scale(1); -webkit-mask-image: var(--pp-dither-8); mask-image: var(--pp-dither-8); animation-timing-function: steps(1, end); }
+  62.5%     { opacity: 1; translate: -50% -38px; transform: scale(1); -webkit-mask-image: var(--pp-dither-8); mask-image: var(--pp-dither-8); animation-timing-function: steps(1, end); }
+  66.667%   { opacity: 1; translate: -50% -42px; transform: scale(1); -webkit-mask-image: var(--pp-dither-6); mask-image: var(--pp-dither-6); animation-timing-function: steps(1, end); }
+  70.833%   { opacity: 1; translate: -50% -44px; transform: scale(1); -webkit-mask-image: var(--pp-dither-4); mask-image: var(--pp-dither-4); animation-timing-function: steps(1, end); }
+  75%       { opacity: 1; translate: -50% -46px; transform: scale(1); -webkit-mask-image: var(--pp-dither-4); mask-image: var(--pp-dither-4); animation-timing-function: steps(1, end); }
+  79.167%   { opacity: 1; translate: -50% -50px; transform: scale(1); -webkit-mask-image: var(--pp-dither-2); mask-image: var(--pp-dither-2); animation-timing-function: steps(1, end); }
+  83.333%   { opacity: 1; translate: -50% -52px; transform: scale(1); -webkit-mask-image: var(--pp-dither-2); mask-image: var(--pp-dither-2); animation-timing-function: steps(1, end); }
+  91.667%   { opacity: 0; translate: -50% -54px; transform: scale(1); animation-timing-function: steps(1, end); }
+  100%      { opacity: 0; translate: -50% -54px; transform: scale(1); }
 }
 
 /* Fighting ATK change number above hero */
@@ -6155,7 +6206,8 @@ body:has(.pz-layout) .pp-bg-particles { display: none; }
   font-size: 22px;
   font-weight: 900;
   pointer-events: none;
-  animation: toughnessHpFloat 1.6s ease-out forwards;
+  -webkit-mask-size: 8px 8px; mask-size: 8px 8px; -webkit-mask-repeat: repeat; mask-repeat: repeat;
+  animation: toughnessHpFloat 1.6s steps(1, end) forwards;
 }
 .fighting-atk-up {
   color: #a8a8a8;
@@ -6548,11 +6600,15 @@ body.pp-dragging-card.pp-dragging-card.pp-dragging-card * {
 .board-round-counter-zahl {
   font-size: calc(42px * var(--board-scale));
   text-shadow: 2px 0 0 var(--pp-kontur), -2px 0 0 var(--pp-kontur), 0 2px 0 var(--pp-kontur), 0 -2px 0 var(--pp-kontur), 2px 2px 0 var(--pp-kontur), -2px -2px 0 var(--pp-kontur), 2px -2px 0 var(--pp-kontur), -2px 2px 0 var(--pp-kontur), 4px 4px 0 rgba(0, 0, 0, .65), -2px 0px 0 color-mix(in srgb, color-mix(in srgb, var(--runde-farbe, var(--accent)) 45%, transparent) 45%, #000), 2px 0px 0 color-mix(in srgb, color-mix(in srgb, var(--runde-farbe, var(--accent)) 45%, transparent) 45%, #000), 0px -2px 0 color-mix(in srgb, color-mix(in srgb, var(--runde-farbe, var(--accent)) 45%, transparent) 45%, #000);
-  animation: runde-pop .45s cubic-bezier(.2, 1.6, .4, 1);
+  -webkit-mask-size: 8px 8px; mask-size: 8px 8px; -webkit-mask-repeat: repeat; mask-repeat: repeat;
+  animation: runde-pop 467ms steps(1, end);
 }
+/* Vorgebacken: 7 gehaltene Bilder (15 Hz, 467 ms): Größe 0,5 → 1 (halbe Schritte), Einblenden als Dither-Stufe statt Alpha. Der Überschwung der alten Kurve (Faktor ~1,2) fiel im Raster ohnehin auf 1. */
 @keyframes runde-pop {
-  0%   { transform: scale(.4); opacity: 0; }
-  100% { transform: scale(1);  opacity: 1; }
+  0%        { opacity: 0; transform: scale(0.5); animation-timing-function: steps(1, end); }
+  14.286%   { opacity: 1; transform: scale(1); -webkit-mask-image: var(--pp-dither-12); mask-image: var(--pp-dither-12); animation-timing-function: steps(1, end); }
+  28.571%   { opacity: 1; transform: scale(1); -webkit-mask-image: none; mask-image: none; animation-timing-function: steps(1, end); }
+  100%      { opacity: 1; transform: scale(1); -webkit-mask-image: none; mask-image: none; }
 }
 @media (prefers-reduced-motion: reduce) {
   .board-round-counter-zahl { animation: none; }
@@ -15631,17 +15687,28 @@ html:not([data-phase-bereit]) .phase-column { visibility: hidden; }
   padding-top: 18px;
   background: var(--pp-kachel-7) 0 0 / 8px 8px;
   pointer-events: none;
-  animation: textbox-fade-in .25s ease-out;
+  animation: textbox-fade-in .2333s linear;
 }
 /* Pulstakt nur, solange Highlights stehen (Klasse vom TextBox-Render): eine dauernd animierte, vererbte Eigenschaft rechnet sonst JEDES Bild den Stil
    der ganzen Overlay-Ebene neu — auf schwachen Handys fast die halbe Rechenzeit im Tutorial (Kontrolllauf). */
-.textbox-overlay.textbox-puls { animation: textbox-fade-in .25s ease-out, textbox-puls-takt 1.4s steps(1, end) infinite; }
-@keyframes textbox-fade-in { from { opacity: 0; } to { opacity: 1; } }
+.textbox-overlay.textbox-puls { animation: textbox-fade-in .2333s linear, textbox-puls-takt 1.4s steps(1, end) infinite; }
+/* Ein-/Ausblenden der Textbox vorgebacken (perfC): gehaltene Bilder im 30-Hz-Raster (`steps(1, end)` je Abschnitt = schon konform, der Laufzeit-Backer
+   lässt sie aus). Dieselben Bilder, die er aus dem alten ease-out/ease-in-Verlauf abgetastet hat: Ebene mit Kindern blendet nur ein/aus (keine
+   Dither-Maske). Dauern auf ganze Takte: 7 Bilder (233 ms) bzw. 30 Bilder (1 s). */
+@keyframes textbox-fade-in {
+  0%      { opacity: 0; animation-timing-function: steps(1, end); }
+  28.571% { opacity: 1; animation-timing-function: steps(1, end); }
+  100%    { opacity: 1; }
+}
 .textbox-fading {
-  animation: textbox-fade-out 1s ease-in forwards;
+  animation: textbox-fade-out 1s linear forwards;
   pointer-events: none !important;
 }
-@keyframes textbox-fade-out { from { opacity: 1; } to { opacity: 0; } }
+@keyframes textbox-fade-out {
+  0%      { opacity: 1; animation-timing-function: steps(1, end); }
+  73.333% { opacity: 0; animation-timing-function: steps(1, end); }
+  100%    { opacity: 0; }
+}
 
 /* UI-Fenster, die ueber ALLEM liegen muessen — auch ueber der Textbox
    (90000) und ihren Highlight-Klonen (90001 + Faecherstapel). Die
@@ -15683,7 +15750,7 @@ body:has(.textbox-overlay) .tooltip {
     url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='2' height='2'%3E%3Crect width='1' height='1' fill='%23ffffff' fill-opacity='0.035'/%3E%3Crect x='1' y='1' width='1' height='1' fill='%23ffffff' fill-opacity='0.035'/%3E%3C/svg%3E") 0 0 / 4px 4px,
     linear-gradient(180deg, color-mix(in srgb, var(--tb-farbe) 11%, #12101f) 0 17%, color-mix(in srgb, var(--tb-farbe) 9%, #12101f) 17% 33%, color-mix(in srgb, var(--tb-farbe) 7%, #08060c) 33% 50%, color-mix(in srgb, var(--tb-farbe) 5%, #08060c) 50% 67%, color-mix(in srgb, var(--tb-farbe) 3%, #08060c) 67% 83%, color-mix(in srgb, var(--tb-farbe) 1%, #08060c) 83%);
   overflow: hidden;
-  animation: textbox-slide-in .3s ease-out;
+  animation: textbox-slide-in .3s linear;
   pointer-events: auto;
   cursor: pointer;
   transition: --tb-farbe .35s ease;
@@ -15693,9 +15760,19 @@ body:has(.textbox-overlay) .tooltip {
   --zier: var(--tb-farbe);
   border-radius: 0;
 }
+/* Vorgebacken (perfC): 9 gehaltene Bilder (30 Hz), Versatz in ganzen Kunstpixeln (2 px) — wie sie der Laufzeit-Backer aus dem alten ease-out-Einflug
+   (-20 px → 0, Deckkraft 0 → 1; Box mit Kindern: nur ein/aus) abgetastet hatte. */
 @keyframes textbox-slide-in {
-  from { opacity: 0; transform: translateY(-20px); }
-  to   { opacity: 1; transform: translateY(0); }
+  0%       { opacity: 0; transform: translateY(-20px); animation-timing-function: steps(1, end); }
+  11.111%  { opacity: 0; transform: translateY(-16px); animation-timing-function: steps(1, end); }
+  22.222%  { opacity: 0; transform: translateY(-14px); animation-timing-function: steps(1, end); }
+  33.333%  { opacity: 1; transform: translateY(-10px); animation-timing-function: steps(1, end); }
+  44.444%  { opacity: 1; transform: translateY(-8px); animation-timing-function: steps(1, end); }
+  55.556%  { opacity: 1; transform: translateY(-6px); animation-timing-function: steps(1, end); }
+  66.667%  { opacity: 1; transform: translateY(-4px); animation-timing-function: steps(1, end); }
+  77.778%  { opacity: 1; transform: translateY(-2px); animation-timing-function: steps(1, end); }
+  88.889%  { opacity: 1; transform: translateY(0); animation-timing-function: steps(1, end); }
+  100%     { opacity: 1; transform: translateY(0); }
 }
 
 .textbox-portrait {
@@ -15724,7 +15801,7 @@ body:has(.textbox-overlay) .tooltip {
   border-right: none;
   border-left: 3px solid color-mix(in srgb, var(--tb-farbe) 70%, #000);
   box-shadow: -2px 0 0 var(--pp-kontur);
-  animation: textbox-portrait-enter .5s ease-out;
+  animation: textbox-portrait-enter .5s linear;
 }
 /* Antonia tritt nach dem Tackle an Monias Stelle: Ankunfts-Aufleuchten. */
 .textbox-portrait-ankunft {
@@ -15748,9 +15825,25 @@ body:has(.textbox-overlay) .tooltip {
 .textbox-portrait-exit-left {
   animation: textbox-portrait-leave-left .5s ease-in forwards;
 }
+/* Vorgebacken (perfC): 15 gehaltene Bilder (30 Hz), Versatz aus der Portraitbreite (128 px) in ganzen Kunstpixeln auf dem alten ease-out-Verlauf;
+   Spalte mit Kindern: Deckkraft nur ein/aus (ab Bild 5). Bild- und Dauerraster wie beim Laufzeit-Backer, daher von ihm übersprungen. */
 @keyframes textbox-portrait-enter {
-  from { transform: translateX(100%); opacity: 0; }
-  to   { transform: translateX(0); opacity: 1; }
+  0%       { transform: translateX(128px); opacity: 0; animation-timing-function: steps(1, end); }
+  6.667%   { transform: translateX(114px); opacity: 0; animation-timing-function: steps(1, end); }
+  13.333%  { transform: translateX(100px); opacity: 0; animation-timing-function: steps(1, end); }
+  20%      { transform: translateX(88px); opacity: 0; animation-timing-function: steps(1, end); }
+  26.667%  { transform: translateX(76px); opacity: 0; animation-timing-function: steps(1, end); }
+  33.333%  { transform: translateX(66px); opacity: 1; animation-timing-function: steps(1, end); }
+  40%      { transform: translateX(54px); opacity: 1; animation-timing-function: steps(1, end); }
+  46.667%  { transform: translateX(46px); opacity: 1; animation-timing-function: steps(1, end); }
+  53.333%  { transform: translateX(36px); opacity: 1; animation-timing-function: steps(1, end); }
+  60%      { transform: translateX(28px); opacity: 1; animation-timing-function: steps(1, end); }
+  66.667%  { transform: translateX(20px); opacity: 1; animation-timing-function: steps(1, end); }
+  73.333%  { transform: translateX(14px); opacity: 1; animation-timing-function: steps(1, end); }
+  80%      { transform: translateX(8px); opacity: 1; animation-timing-function: steps(1, end); }
+  86.667%  { transform: translateX(4px); opacity: 1; animation-timing-function: steps(1, end); }
+  93.333%  { transform: translateX(2px); opacity: 1; animation-timing-function: steps(1, end); }
+  100%     { transform: translateX(0); opacity: 1; }
 }
 @keyframes textbox-portrait-leave {
   from { transform: translateX(0); opacity: 1; }
@@ -20043,7 +20136,6 @@ body[data-tb-hl] .hero-idle-platz.hero-idle-hover { scale: none; }
   /* Titelkulisse: Blitz/Bloom/Flash-Ebenen (Screen-Blending) aus,
      Glut-Funken auf 15 gedeckelt, Bolt-Filter aus */
   .anim-bloom, .anim-flash, .anim-lightning { display: none; }
-  .anim-embers > span:nth-child(n+16) { display: none; }
   .anim-vignette { display: none; }   /* grobes Dither-Schachbrett an den Raendern: auf dem Handy aus (sah pixelig aus, kostet Bilder) */
   /* DAILY-Glimmen: statisch statt animiert */
   .menu-daily-btn.is-available { animation: none; box-shadow: rgb(209, 161, 72) 0px 0px 0px 2px; border-color: #fad54a; }
@@ -21814,7 +21906,7 @@ body[data-tb-hl] .hero-idle-platz.hero-idle-hover { scale: none; }
   inset: -16px;
   pointer-events: none;
   opacity: .45;
-  animation: pp-lotse-puls 2.4s ease-in-out infinite;
+  animation: pp-lotse-puls 2.4s linear infinite;
 }
 .pp-lotse-schein::before {
   content: '';
@@ -21824,9 +21916,37 @@ body[data-tb-hl] .hero-idle-platz.hero-idle-hover { scale: none; }
     0 0 0 4px var(--lotse-farbe),
     0 0 0 8px color-mix(in srgb, var(--lotse-farbe) 45%, #08060c);
 }
+/* ★ Vorgebacken (perfC, Backzeit-Reste): Schein und Ping sind schon gehaltene Bilder im 30-Hz-Raster (`steps(1, end)` je Abschnitt, Dither-Masken
+   `--pp-dither-N` aus pixel-anim.js statt Deckkraft) — der Laufzeit-Backer (pixel-anim.js) lässt solche Keyframes aus (`istKonform`). Die Stufen
+   sind die Bilder, die er aus dem alten Verlauf (0,3|0,35 → 1 → 0,3|0,35, ease-in-out) abgetastet hatte; 6 = Untergrenze, `none` = voll sichtbar.
+   Der Raccoon-Wirt (`--lotse-min: .35`) hat leicht andere Übergangszeiten (`pp-lotse-puls-rac`). */
 @keyframes pp-lotse-puls {
-  0%, 100% { opacity: var(--lotse-min, .3); }
-  50%      { opacity: 1; }
+  0% { opacity: 1; -webkit-mask:var(--pp-dither-6) 0 0/8px 8px repeat; mask:var(--pp-dither-6) 0 0/8px 8px repeat; animation-timing-function: steps(1, end); }
+  13.889% { opacity: 1; -webkit-mask:var(--pp-dither-8) 0 0/8px 8px repeat; mask:var(--pp-dither-8) 0 0/8px 8px repeat; animation-timing-function: steps(1, end); }
+  22.222% { opacity: 1; -webkit-mask:var(--pp-dither-10) 0 0/8px 8px repeat; mask:var(--pp-dither-10) 0 0/8px 8px repeat; animation-timing-function: steps(1, end); }
+  27.778% { opacity: 1; -webkit-mask:var(--pp-dither-12) 0 0/8px 8px repeat; mask:var(--pp-dither-12) 0 0/8px 8px repeat; animation-timing-function: steps(1, end); }
+  33.333% { opacity: 1; -webkit-mask:var(--pp-dither-14) 0 0/8px 8px repeat; mask:var(--pp-dither-14) 0 0/8px 8px repeat; animation-timing-function: steps(1, end); }
+  44.444% { opacity: 1; -webkit-mask:none 0 0/8px 8px repeat; mask:none 0 0/8px 8px repeat; animation-timing-function: steps(1, end); }
+  58.333% { opacity: 1; -webkit-mask:var(--pp-dither-14) 0 0/8px 8px repeat; mask:var(--pp-dither-14) 0 0/8px 8px repeat; animation-timing-function: steps(1, end); }
+  69.444% { opacity: 1; -webkit-mask:var(--pp-dither-12) 0 0/8px 8px repeat; mask:var(--pp-dither-12) 0 0/8px 8px repeat; animation-timing-function: steps(1, end); }
+  75% { opacity: 1; -webkit-mask:var(--pp-dither-10) 0 0/8px 8px repeat; mask:var(--pp-dither-10) 0 0/8px 8px repeat; animation-timing-function: steps(1, end); }
+  80.556% { opacity: 1; -webkit-mask:var(--pp-dither-8) 0 0/8px 8px repeat; mask:var(--pp-dither-8) 0 0/8px 8px repeat; animation-timing-function: steps(1, end); }
+  88.889% { opacity: 1; -webkit-mask:var(--pp-dither-6) 0 0/8px 8px repeat; mask:var(--pp-dither-6) 0 0/8px 8px repeat; animation-timing-function: steps(1, end); }
+  100% { opacity: 1; -webkit-mask:var(--pp-dither-6) 0 0/8px 8px repeat; mask:var(--pp-dither-6) 0 0/8px 8px repeat; animation-timing-function: steps(1, end); }
+}
+@keyframes pp-lotse-puls-rac {
+  0% { opacity: 1; -webkit-mask:var(--pp-dither-6) 0 0/8px 8px repeat; mask:var(--pp-dither-6) 0 0/8px 8px repeat; animation-timing-function: steps(1, end); }
+  11.111% { opacity: 1; -webkit-mask:var(--pp-dither-8) 0 0/8px 8px repeat; mask:var(--pp-dither-8) 0 0/8px 8px repeat; animation-timing-function: steps(1, end); }
+  19.444% { opacity: 1; -webkit-mask:var(--pp-dither-10) 0 0/8px 8px repeat; mask:var(--pp-dither-10) 0 0/8px 8px repeat; animation-timing-function: steps(1, end); }
+  25% { opacity: 1; -webkit-mask:var(--pp-dither-12) 0 0/8px 8px repeat; mask:var(--pp-dither-12) 0 0/8px 8px repeat; animation-timing-function: steps(1, end); }
+  30.556% { opacity: 1; -webkit-mask:var(--pp-dither-14) 0 0/8px 8px repeat; mask:var(--pp-dither-14) 0 0/8px 8px repeat; animation-timing-function: steps(1, end); }
+  44.444% { opacity: 1; -webkit-mask:none 0 0/8px 8px repeat; mask:none 0 0/8px 8px repeat; animation-timing-function: steps(1, end); }
+  58.333% { opacity: 1; -webkit-mask:var(--pp-dither-14) 0 0/8px 8px repeat; mask:var(--pp-dither-14) 0 0/8px 8px repeat; animation-timing-function: steps(1, end); }
+  72.222% { opacity: 1; -webkit-mask:var(--pp-dither-12) 0 0/8px 8px repeat; mask:var(--pp-dither-12) 0 0/8px 8px repeat; animation-timing-function: steps(1, end); }
+  77.778% { opacity: 1; -webkit-mask:var(--pp-dither-10) 0 0/8px 8px repeat; mask:var(--pp-dither-10) 0 0/8px 8px repeat; animation-timing-function: steps(1, end); }
+  83.333% { opacity: 1; -webkit-mask:var(--pp-dither-8) 0 0/8px 8px repeat; mask:var(--pp-dither-8) 0 0/8px 8px repeat; animation-timing-function: steps(1, end); }
+  91.667% { opacity: 1; -webkit-mask:var(--pp-dither-6) 0 0/8px 8px repeat; mask:var(--pp-dither-6) 0 0/8px 8px repeat; animation-timing-function: steps(1, end); }
+  100% { opacity: 1; -webkit-mask:var(--pp-dither-6) 0 0/8px 8px repeat; mask:var(--pp-dither-6) 0 0/8px 8px repeat; animation-timing-function: steps(1, end); }
 }
 /* ★ v1266 (Al 22.9.: „der Glow beim Tutorial-Raccoon leuchtet/pulsiert
    noch nicht"). Er pulsierte — aber nur zwischen 65 % und 100 %
@@ -21843,18 +21963,26 @@ body[data-tb-hl] .hero-idle-platz.hero-idle-hover { scale: none; }
   inset: 16px;
   border: 2px solid var(--lotse-farbe);
   opacity: 0;
-  animation: pp-lotse-ping 2.4s steps(8, end) infinite;
+  animation: pp-lotse-ping 2.4s linear infinite;
 }
 @keyframes pp-lotse-ping {
-  0%   { inset: 16px; opacity: .95; }
-  70%  { inset: 0;    opacity: 0; }
-  100% { inset: 0;    opacity: 0; }
+  0% { inset: 16px; opacity: 1; -webkit-mask:var(--pp-dither-14) 0 0/8px 8px repeat; mask:var(--pp-dither-14) 0 0/8px 8px repeat; animation-timing-function: steps(1, end); }
+  11.111% { inset: 14px; opacity: 1; -webkit-mask:var(--pp-dither-14) 0 0/8px 8px repeat; mask:var(--pp-dither-14) 0 0/8px 8px repeat; animation-timing-function: steps(1, end); }
+  19.444% { inset: 12px; opacity: 1; -webkit-mask:var(--pp-dither-12) 0 0/8px 8px repeat; mask:var(--pp-dither-12) 0 0/8px 8px repeat; animation-timing-function: steps(1, end); }
+  27.778% { inset: 10px; opacity: 1; -webkit-mask:var(--pp-dither-10) 0 0/8px 8px repeat; mask:var(--pp-dither-10) 0 0/8px 8px repeat; animation-timing-function: steps(1, end); }
+  36.111% { inset: 8px; opacity: 1; -webkit-mask:var(--pp-dither-8) 0 0/8px 8px repeat; mask:var(--pp-dither-8) 0 0/8px 8px repeat; animation-timing-function: steps(1, end); }
+  44.444% { inset: 6px; opacity: 1; -webkit-mask:var(--pp-dither-6) 0 0/8px 8px repeat; mask:var(--pp-dither-6) 0 0/8px 8px repeat; animation-timing-function: steps(1, end); }
+  52.778% { inset: 4px; opacity: 1; -webkit-mask:var(--pp-dither-4) 0 0/8px 8px repeat; mask:var(--pp-dither-4) 0 0/8px 8px repeat; animation-timing-function: steps(1, end); }
+  63.889% { inset: 2px; opacity: 1; -webkit-mask:var(--pp-dither-2) 0 0/8px 8px repeat; mask:var(--pp-dither-2) 0 0/8px 8px repeat; animation-timing-function: steps(1, end); }
+  72.222% { inset: 0px; opacity: 0; -webkit-mask:var(--pp-dither-1) 0 0/8px 8px repeat; mask:var(--pp-dither-1) 0 0/8px 8px repeat; animation-timing-function: steps(1, end); }
+  100% { inset: 0px; opacity: 0; -webkit-mask:var(--pp-dither-1) 0 0/8px 8px repeat; mask:var(--pp-dither-1) 0 0/8px 8px repeat; animation-timing-function: steps(1, end); }
 }
 /* ★ v1265, zweiter Anlauf (Al 22.9.: „die Glow-Umrandung des Tutorial-
    Raccoons sollte noch deutlicher sein"). Die Kachel ist gross und steht
    zwischen vielen gleichartigen — sie bekommt einen harten Ring in der
    Lotsenfarbe, einen breiteren Schein und faellt im Puls nie unter 65 %. */
 .vscpu-raccoon { --lotse-min: .35; }
+.vscpu-raccoon > .pp-lotse-schein { animation-name: pp-lotse-puls-rac; }
 .vscpu-raccoon > .pp-lotse-schein::before {
   box-shadow:
     0 0 0 4px var(--lotse-farbe),
@@ -26024,10 +26152,12 @@ input[type="checkbox"]:focus-visible, input[type="radio"]:focus-visible { outlin
   box-shadow: 0 0 0 2px var(--gl-3), 0 0 0 4px #08060c, inset 0 0 0 2px var(--gl-3);
   animation: ppZonePuls 2s steps(1, end) infinite !important;
 }
-@keyframes ppZonePuls {      /* Atmen in fünf Stufen (statt zwei): auf, hell, hell, ab — ruhiger und ohne harten Sprung */
-  0%, 100% { box-shadow: 0 0 0 2px var(--gl-3), 0 0 0 4px #08060c, inset 0 0 0 2px var(--gl-3); border-color: var(--gl-2); }
-  20%, 80% { box-shadow: 0 0 0 2px var(--gl-2), 0 0 0 4px #08060c, inset 0 0 0 2px var(--gl-2); border-color: var(--gl-2); }
-  40%, 60% { box-shadow: 0 0 0 2px var(--gl-2), 0 0 0 4px var(--gl-3), 0 0 0 6px #08060c, inset 0 0 0 2px var(--gl-2); border-color: var(--gl-1); }
+@keyframes ppZonePuls {      /* Atmen in fünf Stufen (statt zwei): auf, hell, hell, ab — ruhiger und ohne harten Sprung.
+   Die Stufen wechseln nur die Hilfsvariablen --zp-sh / --zp-bc (Regel `.zone-ability-activatable, …` GANZ OBEN in dieser Datei setzt daraus Schatten und Rand):
+   so sieht der Pixel-Backer (pixel-anim.js) keine Schatten-Schlüsselbilder und backt die Animation je Zone nicht zur Laufzeit. */
+  0%, 100% { --zp-sh: 0 0 0 2px var(--gl-3), 0 0 0 4px #08060c, inset 0 0 0 2px var(--gl-3); --zp-bc: var(--gl-2); }
+  20%, 80% { --zp-sh: 0 0 0 2px var(--gl-2), 0 0 0 4px #08060c, inset 0 0 0 2px var(--gl-2); --zp-bc: var(--gl-2); }
+  40%, 60% { --zp-sh: 0 0 0 2px var(--gl-2), 0 0 0 4px var(--gl-3), 0 0 0 6px #08060c, inset 0 0 0 2px var(--gl-2); --zp-bc: var(--gl-1); }
 }
 /* Dither-Ring um die Zone: wechselt mit dem Pulsieren die Breite */
 .zone-ability-activatable::before, .zone-ability-free-activatable::before, .zone-creature-activatable::before, .zone-equip-activatable::before,
@@ -26225,17 +26355,31 @@ input[type="checkbox"]:focus-visible, input[type="radio"]:focus-visible { outlin
 }
 
 /* Gehighlightete Handkarte (Tutorial): ~50 % groesser fuer die Dauer des Highlights (`--tb-hoch` = Versatz nach oben, setzt TextBox in app-shared.jsx). */
+/* Vier gehaltene Stufen (wie `steps(4)`), Größe/Versatz je Stufe rechnet `ppFx44Stufen` (app-fx-44, im Raster der Kunstpixel) vor und legt sie als --tbs1..3 / --tbt1..3 inline ab. Die Schlüsselbilder wechseln nur
+   die Hilfsvariablen --tbs/--tbt (Wirkung: `scale`/`translate` der Hülle bzw. der Phasenleiste) — der Pixel-Backer lässt sie in Ruhe und backt nichts zur Laufzeit. */
+@property --tbs { syntax: '*'; inherits: false; }
+@property --tbt { syntax: '*'; inherits: false; }
 @keyframes tbHandGross {
-  from { scale: 1; translate: 0 0; }
-  to   { scale: 1.5; translate: 0 var(--tb-hoch, 0px); }
+  0%   { --tbs: 1;            --tbt: 0px;            animation-timing-function: steps(1, end); }
+  25%  { --tbs: var(--tbs1, 1.125); --tbt: var(--tbt1, 0px); animation-timing-function: steps(1, end); }
+  50%  { --tbs: var(--tbs2, 1.25);  --tbt: var(--tbt2, 0px); animation-timing-function: steps(1, end); }
+  75%  { --tbs: var(--tbs3, 1.375); --tbt: var(--tbt3, 0px); animation-timing-function: steps(1, end); }
+  100% { --tbs: 1.5;          --tbt: var(--tb-hoch, 0px); }
 }
 
 /* Gehighlightete Phasenleiste (Desktop): ~50 % groesser fuer die Dauer des Highlights, gestuft statt stufenlos. */
 .textbox-highlight.textbox-highlight-phase {
   transform-origin: 50% 50%;
-  animation: tbPhaseGross .24s steps(4, end) both;
+  scale: var(--tbs, 1);
+  animation: tbPhaseGross .24s steps(1, end) both;
 }
-@keyframes tbPhaseGross { from { scale: 1; } to { scale: 1.5; } }
+@keyframes tbPhaseGross {
+  0%   { --tbs: 1;                  animation-timing-function: steps(1, end); }
+  25%  { --tbs: var(--tbs1, 1.125); animation-timing-function: steps(1, end); }
+  50%  { --tbs: var(--tbs2, 1.25);  animation-timing-function: steps(1, end); }
+  75%  { --tbs: var(--tbs3, 1.375); animation-timing-function: steps(1, end); }
+  100% { --tbs: 1.5; }
+}
 
 
 /* ═══ SHOP: GACHA-SEITEN (Skins / Avatare / Sleeves) ═══════════════════

@@ -125,17 +125,19 @@
     /* W86u2 (Pixelart): Lade-Anzeige aus acht 6-px-Quadraten (Achteck), das helle Quadrat laeuft im Achtertakt — kein gedrehter Vektorring. */
     #boot-splash .bs-ring {
       width: 6px; height: 6px; margin: 16px 0;
+      box-shadow: var(--bs-sh, 0px -14px 0 0 #1aedff, 10px -10px 0 0 #2d4362, 14px 0px 0 0 #2d4362, 10px 10px 0 0 #2d4362, 0px 14px 0 0 #2d4362, -10px 10px 0 0 #2d4362, -14px 0px 0 0 #405f8c, -10px -10px 0 0 #1788bd);
       animation: bs-spin .8s steps(1, end) infinite;
     }
+    /* Gehaltene Bilder ueber eine Hilfsvariable (`--bs-sh`): der Pixel-Backer (pixel-anim.js) laesst Animationen, die nur Variablen wechseln, in Ruhe — Schatten-Schluesselbilder haette er zur Laufzeit neu gebacken. */
     @keyframes bs-spin {
-      0% { box-shadow: 0px -14px 0 0 #1aedff, 10px -10px 0 0 #2d4362, 14px 0px 0 0 #2d4362, 10px 10px 0 0 #2d4362, 0px 14px 0 0 #2d4362, -10px 10px 0 0 #2d4362, -14px 0px 0 0 #405f8c, -10px -10px 0 0 #1788bd; }
-      12.5% { box-shadow: 0px -14px 0 0 #1788bd, 10px -10px 0 0 #1aedff, 14px 0px 0 0 #2d4362, 10px 10px 0 0 #2d4362, 0px 14px 0 0 #2d4362, -10px 10px 0 0 #2d4362, -14px 0px 0 0 #2d4362, -10px -10px 0 0 #405f8c; }
-      25% { box-shadow: 0px -14px 0 0 #405f8c, 10px -10px 0 0 #1788bd, 14px 0px 0 0 #1aedff, 10px 10px 0 0 #2d4362, 0px 14px 0 0 #2d4362, -10px 10px 0 0 #2d4362, -14px 0px 0 0 #2d4362, -10px -10px 0 0 #2d4362; }
-      37.5% { box-shadow: 0px -14px 0 0 #2d4362, 10px -10px 0 0 #405f8c, 14px 0px 0 0 #1788bd, 10px 10px 0 0 #1aedff, 0px 14px 0 0 #2d4362, -10px 10px 0 0 #2d4362, -14px 0px 0 0 #2d4362, -10px -10px 0 0 #2d4362; }
-      50% { box-shadow: 0px -14px 0 0 #2d4362, 10px -10px 0 0 #2d4362, 14px 0px 0 0 #405f8c, 10px 10px 0 0 #1788bd, 0px 14px 0 0 #1aedff, -10px 10px 0 0 #2d4362, -14px 0px 0 0 #2d4362, -10px -10px 0 0 #2d4362; }
-      62.5% { box-shadow: 0px -14px 0 0 #2d4362, 10px -10px 0 0 #2d4362, 14px 0px 0 0 #2d4362, 10px 10px 0 0 #405f8c, 0px 14px 0 0 #1788bd, -10px 10px 0 0 #1aedff, -14px 0px 0 0 #2d4362, -10px -10px 0 0 #2d4362; }
-      75% { box-shadow: 0px -14px 0 0 #2d4362, 10px -10px 0 0 #2d4362, 14px 0px 0 0 #2d4362, 10px 10px 0 0 #2d4362, 0px 14px 0 0 #405f8c, -10px 10px 0 0 #1788bd, -14px 0px 0 0 #1aedff, -10px -10px 0 0 #2d4362; }
-      87.5% { box-shadow: 0px -14px 0 0 #2d4362, 10px -10px 0 0 #2d4362, 14px 0px 0 0 #2d4362, 10px 10px 0 0 #2d4362, 0px 14px 0 0 #2d4362, -10px 10px 0 0 #405f8c, -14px 0px 0 0 #1788bd, -10px -10px 0 0 #1aedff; }
+      0% { --bs-sh: 0px -14px 0 0 #1aedff, 10px -10px 0 0 #2d4362, 14px 0px 0 0 #2d4362, 10px 10px 0 0 #2d4362, 0px 14px 0 0 #2d4362, -10px 10px 0 0 #2d4362, -14px 0px 0 0 #405f8c, -10px -10px 0 0 #1788bd; }
+      12.5% { --bs-sh: 0px -14px 0 0 #1788bd, 10px -10px 0 0 #1aedff, 14px 0px 0 0 #2d4362, 10px 10px 0 0 #2d4362, 0px 14px 0 0 #2d4362, -10px 10px 0 0 #2d4362, -14px 0px 0 0 #2d4362, -10px -10px 0 0 #405f8c; }
+      25% { --bs-sh: 0px -14px 0 0 #405f8c, 10px -10px 0 0 #1788bd, 14px 0px 0 0 #1aedff, 10px 10px 0 0 #2d4362, 0px 14px 0 0 #2d4362, -10px 10px 0 0 #2d4362, -14px 0px 0 0 #2d4362, -10px -10px 0 0 #2d4362; }
+      37.5% { --bs-sh: 0px -14px 0 0 #2d4362, 10px -10px 0 0 #405f8c, 14px 0px 0 0 #1788bd, 10px 10px 0 0 #1aedff, 0px 14px 0 0 #2d4362, -10px 10px 0 0 #2d4362, -14px 0px 0 0 #2d4362, -10px -10px 0 0 #2d4362; }
+      50% { --bs-sh: 0px -14px 0 0 #2d4362, 10px -10px 0 0 #2d4362, 14px 0px 0 0 #405f8c, 10px 10px 0 0 #1788bd, 0px 14px 0 0 #1aedff, -10px 10px 0 0 #2d4362, -14px 0px 0 0 #2d4362, -10px -10px 0 0 #2d4362; }
+      62.5% { --bs-sh: 0px -14px 0 0 #2d4362, 10px -10px 0 0 #2d4362, 14px 0px 0 0 #2d4362, 10px 10px 0 0 #405f8c, 0px 14px 0 0 #1788bd, -10px 10px 0 0 #1aedff, -14px 0px 0 0 #2d4362, -10px -10px 0 0 #2d4362; }
+      75% { --bs-sh: 0px -14px 0 0 #2d4362, 10px -10px 0 0 #2d4362, 14px 0px 0 0 #2d4362, 10px 10px 0 0 #2d4362, 0px 14px 0 0 #405f8c, -10px 10px 0 0 #1788bd, -14px 0px 0 0 #1aedff, -10px -10px 0 0 #2d4362; }
+      87.5% { --bs-sh: 0px -14px 0 0 #2d4362, 10px -10px 0 0 #2d4362, 14px 0px 0 0 #2d4362, 10px 10px 0 0 #2d4362, 0px 14px 0 0 #2d4362, -10px 10px 0 0 #405f8c, -14px 0px 0 0 #1788bd, -10px -10px 0 0 #1aedff; }
     }
   </style>
 
@@ -225,6 +227,9 @@
   <script defer src="/dist/app-fx-40.js"></script>
   <script defer src="/dist/app-fx-41.js"></script>
   <script defer src="/dist/app-fx-43.js"></script>
+  <script defer src="/dist/app-fx-45.js"></script>
+  <script defer src="/dist/app-fx-46.js"></script>
+  <script defer src="/dist/app-fx-44.js"></script>
   <script defer src="/dist/app-campaign.js"></script>
   <script defer src="/skilltest-rules.js"></script>
   <script defer src="/skilltest-art.js"></script>

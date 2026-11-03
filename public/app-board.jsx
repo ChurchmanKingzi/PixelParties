@@ -3954,6 +3954,12 @@ function HeroIdleSprite({ cardName, angehalten, versteinert, eingefroren, effekt
       if (holo) holo.removeEventListener('animationend', auftauchenFertig);
     };
   }, [eintrag, ebene]);
+  // Auftritt (Aufsteigen aus der Karte, Aufleuchten, Bodenschatten): app-fx-46.jsx treibt ihn im 30-Hz-Takt per Skript — vorher drei CSS-Animationen, die der
+  // Laufzeit-Backer je Figur abtasten musste. Vor dem ersten Zeichnen starten (Layout-Effekt), sonst stünde die Figur ein Bild lang fertig da.
+  React.useLayoutEffect(() => {
+    if (!eintrag || !ebene || !platzRef.current) return;
+    try { if (window.ppHeldAuftritt) window.ppHeldAuftritt(platzRef.current); } catch {}
+  }, [eintrag, ebene]);
 
   const anker = <span ref={ankerRef} className="hero-idle-anker" />;
   if (!eintrag || !ebene) return anker;
@@ -53964,7 +53970,8 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         const bild = url || '/cardback.png';
         const k = 'deck_shuffle_fx|' + bild + '|' + Math.round(r.width) + 'x' + Math.round(r.height);
         if (fest.has(k)) continue; fest.add(k);
-        const lauf = () => { if (window.ppAnimVorwaermen) window.ppAnimVorwaermen('deck_shuffle_fx', { w: r.width, h: r.height }, { schluessel: k, bewegung: true, props: { cardbackUrl: bild } }); };
+        // Leinwand-Fassung (app-fx-44): nur das Rückenbild vorladen (Zellgitter), nichts mehr zu backen
+        const lauf = () => { if (window.ppFx44Vorladen && !window.__ppFxAlt) window.ppFx44Vorladen(bild, r.width, r.height); else if (window.ppAnimVorwaermen) window.ppAnimVorwaermen('deck_shuffle_fx', { w: r.width, h: r.height }, { schluessel: k, bewegung: true, props: { cardbackUrl: bild } }); };
         timers.push(setTimeout(() => { if (window.requestIdleCallback) requestIdleCallback(lauf, { timeout: 800 }); else lauf(); }, (n++) * 800));
       }
     }, vorwaermVerzoegerung + 1500);

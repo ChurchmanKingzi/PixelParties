@@ -7649,8 +7649,11 @@ function spawnZoneLandFx(el, opts) {
   // Funken in alle Richtungen — vom Einschlag UND von der Beschwoerung
   // genutzt (★ v1209, Als Befund: „zu klein, weil sie nicht die ganze
   // Karte highlightet").
+  // Funken-Daten für die Leinwand (app-fx-44, `ppFx44Funken`): ein Einschlag = EINE Leinwand statt 10–15 CSS-animierter Knoten (die der Backer je Start abtasten musste).
+  const funkenDaten = [];
   const funkenHtml = (anzahl) => {
     const out = [];
+    const leinwand = !!window.ppFx44Funken && !window.__ppFxAlt;
     for (let i = 0; i < anzahl; i++) {
       const w = (i / anzahl) * Math.PI * 2 + (Math.random() - 0.5) * 0.7;
       const weite = r.width * (0.45 + Math.random() * 0.45);
@@ -7660,6 +7663,10 @@ function spawnZoneLandFx(el, opts) {
       // eigene Flugbahn — ein runder Punkt allein liest sich bei dieser
       // Groesse als Staubkorn, nicht als Funkenflug.
       const winkelGrad = Math.atan2(dy, dx) * 180 / Math.PI;
+      if (leinwand) {
+        funkenDaten.push({ dx, dy, dur: 560 + Math.random() * 380, delay: Math.random() * 110, ang: winkelGrad, len: 7 + Math.random() * 9, dick: 2 + Math.random() * 2 });
+        continue;
+      }
       out.push(`<i class="zone-land-spark" style="--zdx:${dx.toFixed(0)}px;--zdy:${dy.toFixed(0)}px;`
         + `--zdur:${(560 + Math.random() * 380).toFixed(0)}ms;`
         + `--zdelay:${(Math.random() * 110).toFixed(0)}ms">`
@@ -7746,6 +7753,7 @@ function spawnZoneLandFx(el, opts) {
     teileS.push(...funkenHtml(n));
     oben.innerHTML = teileS.join('');
     schicht().appendChild(oben);
+    if (funkenDaten.length) window.ppFx44Funken(oben, funkenDaten, farbe);
     setTimeout(() => oben.remove(), ZONE_FX_SUMMON_MS + 150);
     return;
   }
@@ -7757,6 +7765,7 @@ function spawnZoneLandFx(el, opts) {
   const teile = ['<i class="zone-land-glow"></i>', '<i class="zone-land-ring"></i>', ...funkenHtml(n)];
   box.innerHTML = teile.join('');
   schicht().appendChild(box);
+  if (funkenDaten.length) window.ppFx44Funken(box, funkenDaten, farbe);
   setTimeout(() => box.remove(), ZONE_FX_MS + 150);
 }
 
@@ -11355,13 +11364,15 @@ function TextBox() {
         const gedreht = h.flat && (h.drehung != null || h.handkarte);
         const inner = (
           <div className={'textbox-highlight' + (h.pulse ? ' textbox-highlight-pulse' : '') + (h.handkarte ? ' textbox-highlight-hand' : '') + (h.phasenleiste ? ' textbox-highlight-phase' : '')}
-            style={gedreht
+            style={{ ...(gedreht
               ? { position: 'absolute', left: 0, top: 0, width: '100%', height: '100%', pointerEvents: 'none' }
               : h.flat
               ? { position: 'fixed', left: h.rect.left, top: h.rect.top,
                   width: h.rect.width, height: h.rect.height, pointerEvents: 'none' }
               : { position: 'absolute', left: h.local.left, top: h.local.top,
-                  width: h.local.width, height: h.local.height, pointerEvents: 'none' }}>
+                  width: h.local.width, height: h.local.height, pointerEvents: 'none' }),
+              // Phasenleiste: gestufte Größen des Wachsens (`tbPhaseGross`, app-fx-44) — im Raster der Kunstpixel
+              ...(h.phasenleiste && window.ppFx44Stufen ? window.ppFx44Stufen(h.flat ? h.rect.width : h.local.width, 0) : null) }}>
             <div className="textbox-highlight-clone" style={h.vars} dangerouslySetInnerHTML={{ __html: h.html }} />
           </div>
         );
@@ -11378,7 +11389,10 @@ function TextBox() {
             // Gehighlightete HANDKARTE: waehrend des Highlights ~50 % groesser (eigene Eigenschaften `scale`/`translate`, damit Faecherdrehung und Hover-Massstab darunter bleiben);
             // nach oben versetzt, damit die Karte nicht unten aus dem Bild waechst. Gestuft statt stufenlos (Pixelart).
             ...(h.handkarte ? { '--tb-hoch': `${Math.round(Math.min(0, window.innerHeight - 8 - (h.rect.top + h.rect.height * 1.25)))}px`,   // unterer Rand nach dem Wachsen (Mitte + 0,75·Hoehe) bleibt im Bild
-             animation: 'tbHandGross .24s steps(4, end) both' } : null),
+             // Größen/Versatz je Stufe vorgerechnet (app-fx-44): die Schlüsselbilder wechseln nur Hilfsvariablen, gebacken wird zur Laufzeit nichts
+             ...(window.ppFx44Stufen ? window.ppFx44Stufen(h.rect.width, Math.round(Math.min(0, window.innerHeight - 8 - (h.rect.top + h.rect.height * 1.25)))) : null),
+             scale: 'var(--tbs, 1)', translate: '0 var(--tbt, 0px)',
+             animation: 'tbHandGross .24s steps(1, end) both' } : null),
             pointerEvents: 'none', zIndex: 90001 + h.stapel + (h.hover ? 1000 : 0) + (h.handkarte ? 500 : 0),
           }}>{inner}</div>
         );

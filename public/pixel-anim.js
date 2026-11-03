@@ -443,6 +443,7 @@
           if (Math.abs(z.sx * 2 - Math.round(z.sx * 2)) > 0.02 || Math.abs(z.sy * 2 - Math.round(z.sy * 2)) > 0.02) return false;
           continue;
         }
+        if ((p === 'boxShadow' || p === 'textShadow') && schattenKonform(String(v))) continue;      // harte Ringe (Unschaerfe 0, volle Deckkraft) sind schon Pixelart — nicht neu abtasten
         if (p === 'rotate' || p === 'scale' || p === 'filter' || p === 'boxShadow' || p === 'textShadow' || p === 'backdropFilter') {
           if (String(v) !== 'none' && !(p === 'rotate' && /^(0|90|180|270|-90)deg$/.test(String(v)))) return false;
         }
@@ -464,6 +465,18 @@
     if (!v || v === 'none') return v;
     const rest = v.replace(/drop-shadow\((?:[^()]|\([^()]*\))*\)/g, '').replace(/blur\([^)]*\)/g, '').replace(/\s+/g, ' ').trim();
     return rest || 'none';
+  }
+  /** Besteht der Schatten nur aus harten Anteilen (Unschaerfe 0) mit voller Deckkraft (oder `none`)? Dann gibt es nichts zu backen. */
+  function schattenKonform(v) {
+    if (!v || v === 'none') return true;
+    for (const teil of listeTeilen(v)) {
+      const farbe = /(rgba?\([^)]*\)|#[0-9a-fA-F]{3,8})/.exec(teil);
+      if (!farbe) return false;                                  // Farbname/var(): nicht beurteilbar
+      const nums = (teil.replace(/rgba?\([^)]*\)/g, '').match(/-?[\d.]+(?:px)?/g) || []).map(parseFloat);
+      if (nums.length < 2 || nums.length > 4 || (nums[2] || 0) !== 0) return false;
+      if (/^rgba/.test(farbe[1])) { const a = parseFloat(farbe[1].replace(/^rgba\(|\)$/g, '').split(',')[3]); if (!(a >= 0.97)) return false; }
+    }
+    return true;
   }
   /** `box-shadow`/`text-shadow` mit Unschaerfe → harter Ring (Kunstpixel breit) bzw. weg; Alpha < 0,35 faellt weg. */
   function schattenHart(v, raster) {
