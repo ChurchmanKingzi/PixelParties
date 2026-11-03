@@ -8,9 +8,16 @@
 // Gelesen wird je Zeile `valueShadow` (siehe cards/effects/_value-shadow.js) zusammen mit dem Ausgang der Partie (`winnerIdx`).
 'use strict';
 const fs = require('fs');
+const path = require('path');
 
-const files = process.argv.slice(2);
-if (!files.length) { console.error('Aufruf: node scripts/value/shadow-report.js <out>.jsonl …'); process.exit(1); }
+// Optional: `--write-kappa <Netz-Ordner>` trägt κ (Bewertungspunkte je Einheit des KALIBRIERTEN Logits, aus den Stellungen innerhalb der
+// Suche) in dessen net.json ein. `std` = Verhältnis der Standardabweichungen Evaluator : Logit (erhält die Streuung zwischen Stellungen,
+// Maßstab für die Blattbewertung), `reg` = Regressionssteigung (schrumpft bei schwacher Korrelation, eher Vorhersage als Maßstab).
+const argv = process.argv.slice(2);
+const wk = argv.indexOf('--write-kappa');
+const kappaDir = wk >= 0 ? argv.splice(wk, 2)[1] : null;
+const files = argv;
+if (!files.length) { console.error('Aufruf: node scripts/value/shadow-report.js [--write-kappa <Netz-Ordner>] <out>.jsonl …'); process.exit(1); }
 
 const sum = () => ({ n: 0, sx: 0, sy: 0, sxx: 0, syy: 0, sxy: 0, sh: 0, shh: 0, sxh: 0 });
 const tot = { sim: sum(), real: sum() };
@@ -49,6 +56,7 @@ function auc(score, y) {
 }
 const f3 = (v) => (Number.isFinite(v) ? v.toFixed(3) : '–');
 
+let kappaRaw = null;
 console.log(`${games} Spiele · ${calls} Bewertungen (${(calls / games).toFixed(0)} je Spiel)`);
 console.log(`Kosten je Bewertung: Kodieren ${(1000 * msEnc / calls).toFixed(0)} µs · Netz ${(1000 * msNet / calls).toFixed(0)} µs`);
 for (const k of ['sim', 'real']) {
@@ -60,6 +68,18 @@ for (const k of ['sim', 'real']) {
   const y = p.map(q => q[3]);
   console.log(`\n${k === 'sim' ? 'Stellungen INNERHALB der Suche (Rollouts, Kandidaten)' : 'Echte Entscheidungsstellungen (außerhalb der Suche)'}: ${a.n} Bewertungen, ${p.length} Stichproben`);
   console.log(`  Evaluator ↔ Logit: r = ${f3(lg.r)} · Evaluator ↔ Evaluator-Kopf: r = ${f3(eh.r)}`);
-  console.log(`  κ (Bewertungspunkte je Logit-Einheit, Regression Evaluator auf Logit): ${lg.slope.toFixed(0)}`);
+  const sdEv = Math.sqrt(a.sxx / a.n - (a.sx / a.n) ** 2), sdLg = Math.sqrt(a.syy / a.n - (a.sy / a.n) ** 2);   // x = Evaluator, y = Logit
+  console.log(`  κ (Bewertungspunkte je Roh-Logit-Einheit): Regression Evaluator auf Logit ${lg.slope.toFixed(0)} · Streuungsverhältnis ${(sdEv / sdLg).toFixed(0)}`);
+  if (k === 'sim') kappaRaw = { reg: lg.slope, std: sdEv / sdLg, n: a.n };
   console.log(`  AUC gegen den Ausgang (Stichprobe): Evaluator ${f3(auc(p.map(q => q[0]), y))} · Netz ${f3(auc(p.map(q => q[1]), y))} · Evaluator-Kopf ${f3(auc(p.map(q => q[2]), y))}`);
+}
+
+if (kappaDir) {
+  if (!kappaRaw) { console.error('Kein κ geschrieben: zu wenige Stellungen innerhalb der Suche.'); process.exit(1); }
+  const headFile = path.join(kappaDir, 'net.json');
+  const head = JSON.parse(fs.readFileSync(headFile, { encoding: 'utf-8' }));
+  const a = head.calib ? head.calib.a : 1;        // logitCal = a·logit + b  →  Punkte je kalibrierter Einheit = Punkte je Roh-Einheit / a
+  head.kappa = { std: +(kappaRaw.std / a).toFixed(1), reg: +(kappaRaw.reg / a).toFixed(1), basis: 'sim', n: kappaRaw.n, games };
+  fs.writeFileSync(headFile, JSON.stringify(head), { encoding: 'utf-8' });
+  console.log(`\nκ eingetragen in ${headFile}: std ${head.kappa.std} · reg ${head.kappa.reg} (je Einheit des kalibrierten Logits)`);
 }

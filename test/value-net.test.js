@@ -48,6 +48,22 @@ test('Parität: JS-Inferenz liefert dieselben Zahlen wie die Python-Rechnung', (
   });
 });
 
+test('Kalibrierung: logitCal = a·logit + b, ohne Eintrag im Kopf bleibt der Roh-Logit; κ wird gelesen', () => {
+  const plain = new ValueNet(fixture.head, Float32Array.from(fixture.floats));
+  const cal = new ValueNet({ ...fixture.head, calib: { a: 0.8, b: -0.25 }, kappa: { std: 900, reg: 600 } }, Float32Array.from(fixture.floats));
+  assert.equal(plain.calib, null); assert.equal(plain.kappa, null);
+  assert.deepEqual(cal.kappa, { std: 900, reg: 600 });
+  for (const ex of fixture.examples) {
+    const r0 = { ...plain.predict(featFromFixture(ex)) };
+    const r1 = { ...cal.predict(featFromFixture(ex)) };
+    assert.equal(r0.logitCal, r0.logit, 'ohne Eintrag: gleich dem Roh-Logit');
+    assert.equal(r1.logit, r0.logit, 'der Roh-Logit ändert sich nicht');
+    assert.ok(Math.abs(r1.logitCal - (0.8 * r0.logit - 0.25)) < 1e-12);
+    assert.equal(r1.ev, r0.ev);
+  }
+  assert.equal(new ValueNet({ ...fixture.head, calib: { a: NaN, b: 0 } }, Float32Array.from(fixture.floats)).calib, null, 'unbrauchbare Werte werden ignoriert');
+});
+
 test('Parität: das Ergebnis hängt nicht von Resten früherer Aufrufe ab', () => {
   const net = new ValueNet(fixture.head, Float32Array.from(fixture.floats));
   const a = fixture.examples.map(ex => ({ ...net.predict(featFromFixture(ex)) }));

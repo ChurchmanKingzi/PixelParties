@@ -284,6 +284,37 @@ def predict_logistic(w, X):
     return sigmoid(np.c_[X, np.ones(len(X))] @ w)
 
 
+def fit_platt(z, y):
+    """Nachträgliche Kalibrierung: logistische Anpassung z' = a·z + b der Roh-Logits an die Ausgänge. Gibt (a, b) zurück."""
+    w = fit_logistic(np.asarray(z, np.float64)[:, None], np.asarray(y, np.float64), l2=1e-6)
+    return float(w[0]), float(w[1])
+
+
+def make_split(data, rng, holdout_decks=4, val_frac=0.1):
+    """Aufteilung nach Spiel und Deck: (Training, Validierung neuer Spiele bekannter Decks, ungesehene Decks, Holdout-Decks).
+    Verbraucht `rng` in fester Reihenfolge — derselbe Startwert ergibt immer dieselbe Aufteilung (auch in `calibrate.py`)."""
+    game = data.a['game']
+    ds, do = data.a['deckSelf'].astype(np.int64), data.a['deckOpp'].astype(np.int64)
+    held = rng.choice(len(data.m['decks']), size=holdout_decks, replace=False)
+    in_held = np.isin(ds, held) | np.isin(do, held)
+    games = np.unique(game[~in_held])
+    val_games = rng.choice(games, size=int(len(games) * val_frac), replace=False)
+    is_val = np.isin(game, val_games) & ~in_held
+    return np.flatnonzero(~in_held & ~is_val), np.flatnonzero(is_val), np.flatnonzero(in_held), held
+
+
+def load_net(folder):
+    """Gewichte aus `net.json` + `net.f32` zurück in ein Parameter-Wörterbuch (wie `init_params`). Gibt (p, head) zurück."""
+    with open(os.path.join(folder, 'net.json'), encoding='utf-8') as f:
+        head = json.load(f)
+    blob = np.fromfile(os.path.join(folder, 'net.f32'), dtype='<f4')
+    p = {}
+    for t in head['tensors']:
+        n = int(np.prod(t['shape']))
+        p[t['name']] = blob[t['offset']:t['offset'] + n].reshape(t['shape']).astype(np.float32)
+    return p, head
+
+
 def evaluate(p, data, idx, dim, nh, bs=4096):
     outs = []
     for i in range(0, len(idx), bs):
@@ -428,14 +459,7 @@ def main():
     decks = len(data.m['decks'])
     ds, do = data.a['deckSelf'].astype(np.int64), data.a['deckOpp'].astype(np.int64)
     if args.mode == 'split':
-        held = rng.choice(decks, size=args.holdout_decks, replace=False)
-        in_held = np.isin(ds, held) | np.isin(do, held)
-        games = np.unique(game[~in_held])
-        val_games = rng.choice(games, size=int(len(games) * args.val_frac), replace=False)
-        is_val = np.isin(game, val_games) & ~in_held
-        train_idx = np.flatnonzero(~in_held & ~is_val)
-        val_idx = np.flatnonzero(is_val)
-        test_idx = np.flatnonzero(in_held)
+        train_idx, val_idx, test_idx, held = make_split(data, rng, args.holdout_decks, args.val_frac)
         print(f'Holdout-Decks: {[data.m["decks"][i] for i in held]}')
         print(f'Training {len(train_idx)} · Validierung (neue Spiele) {len(val_idx)} · ungesehene Decks {len(test_idx)}')
     else:
@@ -529,11 +553,25 @@ def main():
     print(f'\nBeste Epoche: {ep_best} (Val-Log-Loss {ll_best:.4f})')
 
     report = {'epochBest': ep_best, 'params': n_params(p), 'args': vars(args)}
+    # Nachträgliche Kalibrierung (Platt): Faktor und Versatz auf den Roh-Logits, angepasst an den Validierungsspielen bekannter Decks.
+    # Die ungesehenen Decks gehen NICHT in die Anpassung ein — an ihnen zeigt sich, ob sie auch auf neue Decks trägt.
+    calib = None
+    if args.mode == 'split' and len(val_idx):
+        zv = evaluate(p_best, data, val_idx, dim, nh)[:, 0].astype(np.float64)
+        calib = fit_platt(zv, data.y[val_idx])
+        print(f'Kalibrierung: z\' = {calib[0]:.3f}·z {calib[1]:+.3f}')
     for title, idx in (('Validierung (neue Spiele, bekannte Decks)', val_idx), ('Ungesehene Decks', test_idx)):
         if len(idx) == 0:
             continue
         o = evaluate(p_best, data, idx, dim, 2 if False else nh)
         pn = sigmoid(o[:, 0])
+        if calib:
+            pc = sigmoid(calib[0] * o[:, 0].astype(np.float64) + calib[1])
+            ec, wc = calibration(pc, data.y[idx])
+            e0, w0 = calibration(pn, data.y[idx])
+            print(f'   {title}: nach Kalibrierung mittlere Abweichung {ec:.1f} Pp, größte {wc:.1f} Pp (vorher {e0:.1f} / {w0:.1f}) · '
+                  f'Log-Loss {logloss(pc, data.y[idx]):.4f} (vorher {logloss(pn, data.y[idx]):.4f})')
+            report.setdefault('calib', {})[title] = {'ece': round(ec, 2), 'worst': round(wc, 2), 'll': round(logloss(pc, data.y[idx]), 4)}
         seen = idx is val_idx
         sc = {'netz': o[:, 0], 'netzEv': o[:, 1], 'evaluator': np.nan_to_num(ev_all[idx]), 'linear': lin_p(idx), 'stapel': stack_p(idx)}
         pr = {'netz': pn, 'evaluator': ev_p(idx), 'linear': lin_p(idx), 'stapel': stack_p(idx)}
@@ -549,7 +587,10 @@ def main():
         e2, w2 = calibration(ev_p(idx), data.y[idx])
         print(f'   Kalibrierung Netz: mittlere Abweichung {e1:.1f} Pp, größte {w1:.1f} Pp · Evaluator (logistisch kalibriert): {e2:.1f} / {w2:.1f} Pp')
         report[title] = {'rows': rows, 'within': within, 'ece': round(float(e1), 2), 'worst': round(float(w1), 2)}
-    export(p_best, data, dim, hidden, args.out, {'epochs': ep_best, 'trainExamples': int(len(train_idx)), 'mode': args.mode})
+    extra = {'epochs': ep_best, 'trainExamples': int(len(train_idx)), 'mode': args.mode}
+    if calib:
+        extra['calib'] = {'a': calib[0], 'b': calib[1]}
+    export(p_best, data, dim, hidden, args.out, extra)
     with open(os.path.join(args.out, 'report.json'), 'w', encoding='utf-8') as f:
         json.dump(report, f, ensure_ascii=False, indent=1)
     print(f'\nGewichte: {args.out}/net.json + net.f32  ({time.time() - t0:.0f} s gesamt)')

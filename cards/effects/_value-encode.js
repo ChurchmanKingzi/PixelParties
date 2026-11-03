@@ -137,9 +137,10 @@ const num = (v) => {
   return 0;
 };
 const present = (v) => !!v && !(typeof v === 'object' && !Array.isArray(v) && Object.keys(v).length === 0) && !(Array.isArray(v) && v.length === 0);
+const POW2 = Array.from({ length: 53 }, (_, i) => 2 ** i);
 const statusMask = (st, bits) => {
   let m = 0;
-  if (st && typeof st === 'object') for (const [k, val] of Object.entries(st)) { if (val && bits.has(k)) m += 2 ** bits.get(k); }
+  if (st && typeof st === 'object') for (const k in st) { if (st[k]) { const b = bits.get(k); if (b !== undefined) m += POW2[b]; } }
   return m;
 };
 const flat = (v, out = []) => {
@@ -148,10 +149,21 @@ const flat = (v, out = []) => {
   else if (v && typeof v === 'object' && typeof v.name === 'string') out.push(v.name);
   return out;
 };
+/** Namen → [[Kartennummer, Anzahl], …] aufsteigend nach Nummer. */
 const countMap = (names) => {
-  const m = new Map();
-  for (const n of names) { const id = idOf(n); m.set(id, (m.get(id) || 0) + 1); }
-  return [...m.entries()].sort((a, b) => a[0] - b[0]);
+  const n = names.length;
+  if (!n) return [];
+  const ids = new Array(n);
+  for (let i = 0; i < n; i++) ids[i] = idOf(names[i]);
+  ids.sort((a, b) => a - b);
+  const out = [];
+  for (let i = 0; i < n;) {
+    let j = i + 1;
+    while (j < n && ids[j] === ids[i]) j++;
+    out.push([ids[i], j - i]);
+    i = j;
+  }
+  return out;
 };
 const byTuple = (a, b) => { for (let i = 0; i < a.length; i++) if (a[i] !== b[i]) return a[i] - b[i]; return 0; };
 
@@ -199,9 +211,10 @@ function seatState(engine, gs, seat, bits) {
 
 /**
  * Stellung als Zwischenform (siehe Kopfkommentar). `trig`: 0 = Zugbeginn, 1 = nach einer Aktion. `ev`: Bewertung je Sitz oder null.
- * Reine Abfrage — verändert die Engine nicht.
+ * Reine Abfrage — verändert die Engine nicht. `opts.top === false` lässt den Zusatzblock mit den obersten Deckkarten weg (das Netz im
+ * Spiel braucht ihn nicht; fürs Zustandslog bleibt er Standard).
  */
-function extractState(engine, trig, ev) {
+function extractState(engine, trig, ev, opts) {
   const gs = engine.gs;
   if (!gs || !gs.players || !gs.players[0] || !gs.players[1]) return null;
   const bits = loadVocab().statusBit;
@@ -213,16 +226,16 @@ function extractState(engine, trig, ev) {
     if (side !== 0 && side !== 1) continue;
     const c = inst.counters || {};
     let ctr = 0;
-    for (const [k, v] of Object.entries(c)) if (k !== 'currentHp' && typeof v === 'number') ctr += v;
+    for (const k in c) { const v = c[k]; if (k !== 'currentHp' && typeof v === 'number') ctr += v; }
     let buffs = 0;
-    if (c.buffs && typeof c.buffs === 'object') for (const v of Object.values(c.buffs)) if (v) buffs++;
+    if (c.buffs && typeof c.buffs === 'object') for (const k in c.buffs) if (c.buffs[k]) buffs++;
     const hp = c.currentHp != null ? c.currentHp : 0;
     seats[side].sup.push([inst.heroIdx ?? 0, inst.zoneSlot ?? 0, idOf(inst.name), num(hp), statusMask(inst.statuses, bits),
       (inst.faceDown ? 1 : 0) + ((inst.controller ?? inst.owner) !== side ? 2 : 0) + ((inst.turnPlayed || 0) === turn ? 4 : 0),
       Math.max(0, Math.min(40, turn - (inst.turnPlayed || 0))), num(ctr), buffs]);
   }
   for (const s of seats) s.sup.sort(byTuple);
-  return { trig, turn, phase: gs.currentPhase || 0, active: gs.activePlayer === 1 ? 1 : 0, seats, ev: ev || [null, null], extra: [topBlock(gs)] };
+  return { trig, turn, phase: gs.currentPhase || 0, active: gs.activePlayer === 1 ? 1 : 0, seats, ev: ev || [null, null], extra: opts && opts.top === false ? [] : [topBlock(gs)] };
 }
 
 // ── Zustand ⇄ Bytes ──────────────────────────────────────────────────

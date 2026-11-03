@@ -3,7 +3,8 @@
 //
 //  Liest die Gewichte, die `scripts/value/train.py` schreibt (`net.json` = Kopf mit Formen, `net.f32` = Float32 hintereinander), und
 //  rechnet die Vorwärtsrichtung. Keine native Abhängigkeit. Eingabe sind die Merkmale aus `_value-features.js` (`Features`),
-//  Ausgabe drei Zahlen: Logit „mein Sitz gewinnt", Evaluator-Wert in Bewertungspunkten (Destillationskopf) und Restzüge.
+//  Ausgabe: Roh-Logit „mein Sitz gewinnt" (`logit`), derselbe Logit kalibriert (`logitCal`, = Roh-Logit ohne Eintrag `calib` im Kopf),
+//  Evaluator-Wert in Bewertungspunkten (Destillationskopf `ev`) und Restzüge (`rem`).
 //
 //  Rechenweise (muss mit train.py übereinstimmen — `test/value-net.test.js` prüft das gegen eine Python-Rechnung):
 //    je Token  h = relu(E[id] + Eo[own] + x·Wg + bg)      (Gewichte je Gruppe, gleich für beide Seiten)
@@ -31,9 +32,10 @@ class ValueNet {
     this.hidden = head.hidden;
     this.poolScale = head.poolScale;
     const T = {};
+    // Als Float64 kopieren: dieselben Zahlenwerte (jede Float32 ist als Double exakt), aber ohne Umwandlung bei jedem Zugriff.
     for (const t of head.tensors) {
       const n = t.shape.reduce((a, b) => a * b, 1);
-      T[t.name] = floats.subarray(t.offset, t.offset + n);
+      T[t.name] = Float64Array.from(floats.subarray(t.offset, t.offset + n));
     }
     this.E = T.E; this.Eo = T.Eo;
     this.Wg = F.GROUPS.map((_, g) => T[`Wg${g}`]);
@@ -45,7 +47,12 @@ class ValueNet {
     this._acts = this.layers.map(l => new Float64Array(l.n));
     this._h = new Float64Array(this.dim);
     this.evScale = head.evScale; this.remScale = head.remScale;
-    this.out = { logit: 0, ev: 0, rem: 0 };
+    // Nachträgliche Kalibrierung (scripts/value/calibrate.py): logitCal = a·logit + b. Ohne Eintrag bleibt der Roh-Logit.
+    const c = head.calib;
+    this.calib = c && Number.isFinite(c.a) && Number.isFinite(c.b) ? { a: c.a, b: c.b } : null;
+    // κ: Bewertungspunkte je Einheit des KALIBRIERTEN Logits (scripts/value/shadow-report.js --write-kappa), sonst null.
+    this.kappa = head.kappa && Number.isFinite(head.kappa.std) ? head.kappa : null;
+    this.out = { logit: 0, logitCal: 0, ev: 0, rem: 0 };
   }
 
   static load(dir = DEFAULT_DIR) {
@@ -96,7 +103,8 @@ class ValueNet {
       a = out; nIn = n;
     }
     const r = this.out;
-    r.logit = a[0]; r.ev = a[1] * this.evScale; r.rem = a[2] * this.remScale;
+    r.logit = a[0]; r.logitCal = this.calib ? this.calib.a * a[0] + this.calib.b : a[0];
+    r.ev = a[1] * this.evScale; r.rem = a[2] * this.remScale;
     return r;
   }
 }

@@ -50,7 +50,7 @@ function observe(engine, cpuIdx, ev) {
     const n = net();
     if (!n) return;
     const t0 = process.hrtime.bigint();
-    const S = enc.extractState(engine, 0, null);
+    const S = enc.extractState(engine, 0, null, { top: false });
     if (!S) return;
     _feat.fill(enc.honestView(S, cpuIdx));
     const t1 = process.hrtime.bigint();

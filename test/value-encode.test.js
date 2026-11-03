@@ -115,6 +115,10 @@ test('extractState liest eine Engine-Stellung (Helden, Fähigkeiten, Support, Ab
   assert.deepEqual(V.topCards(S), [[ids('Skeleton Bard')[0], ids('Deepsea Idol')[0], 0, 0], []]);
   assert.deepEqual(V.topCards(V.readState(V.writeState(S))), V.topCards(S));
   assert.equal(V.topCards(state()), null, 'Zustände ohne den Block (ältere Aufnahmen) liefern null');
+  // Netzpfad ohne Zusatzblock: alles andere bleibt gleich
+  const noTop = V.extractState(eng, 1, [5, -5], { top: false });
+  assert.deepEqual(noTop.extra, []); assert.equal(V.topCards(noTop), null);
+  assert.deepEqual({ ...noTop, extra: S.extra }, S, 'ohne den Block unterscheidet sich nur `extra`');
   assert.deepEqual(V.honestView(S, 0).opp.sc.deck, 0, 'die ehrliche Sicht kennt nur die Größe des Gegnerdecks');
   assert.equal('top' in V.honestView(S, 0), false, 'und gibt die Deckreihenfolge nicht weiter');
 });
