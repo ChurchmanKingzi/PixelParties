@@ -7,9 +7,9 @@
   "frameMs": 70,
   "loop": true,
   "layout": "horizontal",
-  "padTop": 5,
-  "padLeft": 5,
-  "padRight": 5,
+  "padTop": 7,
+  "padLeft": 3,
+  "padRight": 3,
   "padBottom": 3,
   "faceX": 18.0,
   "kern": {

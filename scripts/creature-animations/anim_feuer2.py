@@ -69,7 +69,8 @@ BAENKE = {
 class Zunge:
     """Eine Flammenzunge der Vorlage: `fuss` = Punkt der Achse, wo sie im ruhigen Körper aufgeht, `spitze` = oberstes Pixel (Pixel der Vorlage).
     amp: Ausschlagfaktor (Standard 1), bank: eigene Posenbank, fuss_anteil: Anteil der Höhe, der ruhig bleibt, funke: Spitze darf abreißen."""
-    def __init__(self, fuss, spitze, amp=1.0, bank=None, fuss_anteil=0.3, funke=True):
+    def __init__(self, fuss, spitze, amp=1.0, bank=None, fuss_anteil=0.3, funke=True, s_max=None):
+        self.s_max = s_max                      # Obergrenze der Länge (z. B. damit ein Schweif nicht in die Figur ragt)
         self.fuss = (float(fuss[0]), float(fuss[1]))
         self.spitze = (float(spitze[0]), float(spitze[1]))
         self.amp, self.bank, self.fuss_anteil, self.funke = amp, bank, fuss_anteil, funke
@@ -237,6 +238,46 @@ def ascii_sprite(zeilen, farben):
     return a
 
 
+def tropfen(hoehe, breite, rampe, neigung=0.0, kern=True):
+    """Handgesetzte Flammenzunge (Tropfenform, Spitze oben, achsensymmetrisch mit ungeraden Zeilenbreiten) als RGBA-Feld + (fuss, spitze) in Feldkoordinaten.
+    breite = Breite am Fuß in px (ungerade ≥ 3), rampe = (rand, orange, gelb[, hell]) von außen nach innen: Rand 1 px, dann orange, gelb, bei breiten Zungen heller Kern.
+    neigung: die Spitze weicht um so viele px seitlich aus (Kurve u**1.6, Pixel-Treppe). Die Breite nimmt zur Spitze hin in Zweierschritten ab und endet in einer 1-px-Spitze (2 Zeilen)."""
+    h = int(hoehe)
+    w = int(breite) | 1
+    k = (w - 1) // 2
+    rows = []
+    for t in range(h + 1):
+        u = t / float(h)
+        if t >= h - 1:
+            j = 0
+        else:
+            j = int(round(k * (1 - ((t + 0.0) / max(1.0, h - 1.0)) ** 1.35)))
+            if t < 1:
+                j = k
+        rows.append((2 * j + 1, neigung * (u ** 1.6)))
+    pad = int(abs(round(neigung))) + 1
+    Wd = w + 2 * pad
+    a = L.leer(h + 1, Wd)
+    cx0 = pad + k
+    fuss = spitze = None
+    for t, (bw, c) in enumerate(rows):
+        y = h - t
+        xm = int(round(cx0 + c))
+        x0 = xm - (bw - 1) // 2
+        for q in range(bw):
+            tief = min(q, bw - 1 - q)
+            if t == h:
+                tief = 0
+            col = rampe[0] if tief == 0 else rampe[1] if tief == 1 else rampe[2] if (tief == 2 or len(rampe) < 4 or not kern) else rampe[3]
+            a[y, x0 + q, :3] = col
+            a[y, x0 + q, 3] = 255
+        if t == 0:
+            fuss = (float(xm), float(y))
+        if t == h:
+            spitze = (float(xm), float(y))
+    return a, fuss, spitze
+
+
 def zungen_bild(pfad, vl, zoom=16, box=None, zungen=None):
     """Kontrollbild: Vorlage vergrößert, Zungenachsen Fuß (blau) → Spitze (grün) eingezeichnet."""
     from PIL import Image, ImageDraw
@@ -329,7 +370,10 @@ class _Gruppe:
         folge, amp_z = self.folgen[j]
         s, l, b, c = folge[i % self.n]
         k = min(1.2, max(0.5, amp_z))
-        return 1.0 + (s - 1.0) * k, l * amp_z, b * amp_z, c
+        s = 1.0 + (s - 1.0) * k
+        if self.z[j]['z'].s_max is not None:
+            s = min(s, self.z[j]['z'].s_max)
+        return s, l * amp_z, b * amp_z, c
 
     def spitze_aus(self, j, s, l):
         """Spitze der Zunge j in Pose (s, l) in kanonischen Koordinaten (x, y) und effektiver Höhe."""
@@ -410,6 +454,8 @@ class Feuer:
             Dc += wgt * (c * np.sin(math.pi * uu))
             W += wgt
             anker |= (t_out <= b0) & (wgt > 0.5)
+        if not g.z:
+            anker[:] = True
         norm = np.maximum(W, 1.0)
         sx = np.rint(xx + Dx / norm).astype(int)
         sy = np.rint(yy + Dy / norm).astype(int)

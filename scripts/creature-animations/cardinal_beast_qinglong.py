@@ -28,8 +28,13 @@ Ablauf (48 Frames à 70 ms = 3,36 s, nahtlos):
 * DER DRACHE SCHWEBT UND SCHLÄNGELT: der ganze Drache hebt/senkt sich ±1 px (Periode 24); darüber läuft eine Welle vom Kopf zum Schweif: jede Spalte rechts vom Hals (x ≥ 22) wandert senkrecht
   um bis zu ±3 px am Schweifende (Periode 24, Wellenlauf, Spalten 4-verbunden), Kopf und Schädel bleiben als Block beisammen. Der Drache fliegt, deshalb darf er schweben.
 * SCHWEIFSPITZE: die oberen Zeilen des Schweifs (y 0–18) schwenken zusätzlich waagerecht bis ±2 px (Periode 16, Gefälle ≤ 1 px je Zeile), die ausgezogene Spitze peitscht mit.
-* BLITZE (Regel 15 gilt nur für Feuer; Blitze sind harte Ein/Aus-Blitze in Pixelart): jeder Blitzstamm leuchtet nur kurz in zuckenden Schüben auf und ist sonst aus — links Frames 0–3, 5–6, 27–30;
-  Mitte 0–3, 15–17, 36–40; rechts 0–4, 21–24, 43–46; der gelbe Blitz samt Cyan-Funken 0–2, 4–5, 31–34. In Frame 0 sind alle Blitze an (Original).
+* GELBER BLITZ (Runde 3: „gehört fest zum Sprite und soll permanent bleiben“): liegt wie in der Kartenkunst VOR dem Kopf, ist in JEDEM Frame sichtbar, folgt dem Schweben des Kopfes (±1 px) und bekommt zweimal je
+  Schleife einen Leuchtpuls (ein 5 Zeilen hohes Band läuft von der Spitze zum Kopf, Farben eine Stufe heller auf der Rampe des Blitzes).
+* RAUSCHEBART (Runde 3: „nach unten selbstständig weiterzeichnen, ein langer weißer Rauschebart“): die graue Kinnspitze des Schädels ist der Bart; ab Sprite-Zeile 51 (statt Abschlussumriss + Stiel) wird er
+  25 Zeilen lang weitergezeichnet (zottiger, leicht S-förmiger Strang, erst breiter, dann zur Spitze auslaufend, wellige Strähnenlinien, 1 px Außenumriss, Farben nur aus dem Schädel) und weht: eine Welle läuft vom Kinn
+  zur Spitze (bis ±3 px, Gefälle ≤ 1 px je Zeile) plus eine schnellere in der unteren Hälfte. Der Bart folgt dem Schweben des Kopfes.
+* BLITZE (Regel 15 gilt nur für Feuer; Blitze sind harte Ein/Aus-Blitze in Pixelart): die drei cyanfarbenen Blitzstämme leuchten nur kurz in zuckenden Schüben auf und sind sonst aus — links Frames 0–3, 5–6, 27–30;
+  Mitte 0–3, 15–17, 36–40; rechts 0–4, 21–24, 43–46; die kleinen Cyan-Funken beim gelben Blitz 0–2, 4–5, 31–34. In Frame 0 sind alle Blitze an (Original).
 Keine zusätzlichen Partikel. Alle Bewegungen laufen auf der vollen Leinwand (anim_lib wirft ClipError). Nur ganze Pixel, nur Farben der Quellen.
 Zuschnitt: symmetrisch um die Ruhefigur (Drache + Blitze); die Welle darf den Frame höchstens 3 px vergrößern.
 Ergänzungen: keine (die Blitze liegen hinter dem Drachen; die wenigen Blitzpixel, die er in der Ruhepose verdeckt, fehlen auch in der Kunst).

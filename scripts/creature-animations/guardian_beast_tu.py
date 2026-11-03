@@ -25,7 +25,7 @@ Ablauf (72 Frames à 70 ms = 5,04 s, nahtlos; Frame 0 = Ruhepose = Original):
   bekommen Zeilen), Füße verlassen den Boden, die Ohren hängen noch nach unten (Trägheit), Arme schwingen hoch) → Flug (15–24: parabelförmig bis 13 px Höhe, Körper komplett in der Luft, die Ohren schlagen nach oben (Frames 16–19), nach unten
   (20), wieder nach oben (21–22) und fallen; Arme hoch, beim Fallen strecken sich die Beine) → Landung (25–26: Quetschung um bis zu 4 Zeilen, Ohren kippen träge nach unten) → Nachwippen (27–30, kleiner Überschwinger).
 * KLEINER HÜPFER (Frames 45–55): kurze Hocke, 6 px hoch, Ohren schlagen einmal, Landung mit leichter Quetschung.
-* IDLE zwischendurch: Atmen (1 px, Zeile 17 doppelt), Ohrenschlagen (gegenläufig, Periode 24, Spitze ±2 px), Arme schlackern nach außen, Blinzeln (Frames 4–6 und 38–40), Goldkette glänzt (Lichtband Frames 56–69,
+* IDLE zwischendurch: Atmen (1 px, Zeile 17 doppelt), Ohrenschlagen (gegenläufig, Periode 24, Spitze ±2 px), Arme schlackern nach außen (links Periode 24, rechts 18 — beide teilen die Schleifenlänge 72, damit der Loop nahtlos ist), Blinzeln (Frames 4–6 und 38–40), Goldkette glänzt (Lichtband Frames 56–69,
   Glitzerstern Frames 34–37 am Anhänger, nur Gold).
 Technik: Der Körper (Kopf, Kleid, Beine) ist EINE Ebene; Strecken = Zeile 22 (Saum, die Zeilen 21 und 22 sind gleich) bzw. Zeile 25 (Bein) wird eingefügt, Quetschen = bis zu 4 Kleidzeilen (19–22) entfallen, die obere Hälfte rückt nach;
 Ohren und Arme sind eigene Ebenen: sie wandern starr mit der oberen Körperhälfte und werden als Spaltenscherung um den Ansatz (Ohr x 6/19, Schulter x 8/17) nach oben (Betrag in px an der Spitze) bzw. unten geschwenkt.
@@ -65,8 +65,8 @@ GOLD = [(143, 130, 52), (191, 174, 68), (204, 204, 170)]
 GOLD_M = vorhanden & L.farbmaske(spr, GOLD[:2])
 AUGEN = {'o': [(10, 4), (11, 4), (14, 4), (15, 4)], 'u': [(10, 5), (11, 5), (14, 5), (15, 5)]}
 
-ohr_l = vorhanden & (xx <= 5) & (yy >= 2) & (yy <= 8)
-ohr_r = vorhanden & (xx >= 20) & (yy >= 2) & (yy <= 8)
+ohr_l = vorhanden & (xx <= 5) & (yy >= 2) & (yy <= 8) & ~((xx == 5) & (yy == 2))      # (5,2)/(20,2) = Kopfumriss (65504f), gehört zum Kopf
+ohr_r = vorhanden & (xx >= 20) & (yy >= 2) & (yy <= 8) & ~((xx == 20) & (yy == 2))
 arm_l = vorhanden & (((xx <= 7) & (yy >= 14) & (yy <= 17)) | ((xx <= 6) & (yy >= 18) & (yy <= 20)))
 arm_r = vorhanden & (((xx >= 18) & (yy >= 14) & (yy <= 17)) | ((xx >= 19) & (yy >= 18) & (yy <= 20)))
 koerper_m = vorhanden & ~ohr_l & ~ohr_r & ~arm_l & ~arm_r
@@ -102,6 +102,51 @@ def ebene(m, dx=0, dy=0):
     return L.platz(t, H, W, PAD_L + dx, PAD_T + dy)
 
 
+OHR_BASIS = (4.75, 3.5)                                                          # Ohransatz (Sprite-Koordinaten, linkes Ohr)
+OHR_LAENGE, OHR_RUHE = 5.0, 45.0                                                # Kapsel-Achse (px) und Ruhewinkel (Grad unter der Waagerechten)
+OHR_FARBEN = {'g': f(0, 5), 'h': f(1, 5), 'i': f(2, 5), 'l': f(3, 5)}           # Umriss (97,57,58), hell (225,147,163), mittel (208,135,150), dunkel (198,127,142)
+
+
+def ohr_winkel(a):
+    """Winkel (Grad unter der Waagerechten) aus dem Ohrenhub a (px, den die Spitze gegenüber der Ruhe steigt; + = hoch)."""
+    sinw = float(np.clip(np.sin(np.radians(OHR_RUHE)) - a / OHR_LAENGE, -0.62, 0.92))
+    return float(np.degrees(np.arcsin(sinw)))
+
+
+def ohr_ebene(theta, rechts):
+    """Schlappohr als Kapsel um die Achse (Ansatz → Spitze, Länge 5, Winkel `theta`) — Pixel für Pixel gezeichnet, Umriss immer genau 1 px (Kapsel minus 4er-Erosion), Füllung hell/mittel/dunkel nach Lage zur Achse.
+    Bei theta = 45° und Halbbreite 1,7 (Ansatz (4,75; 3,5)) ist das exakt das Ohr des Quell-Sprites (geprüft: 26 von 26 Pixeln, alle Farben)."""
+    t = np.radians(theta)
+    d = (-np.cos(t), np.sin(t))
+    n = (np.sin(t), np.cos(t))
+    fl = 1 - min(1.0, abs(np.sin(t)) / np.sin(np.radians(OHR_RUHE)))                # 0 bei ≥ 45° (diagonal), 1 bei waagerecht: Achse 0,5 px tiefer, 0,2 px breiter → 4 Zeilen statt 5
+    wd = 1.7 + 0.2 * fl + 1e-9
+    Y, X = np.mgrid[0:H, 0:W]
+    sx, sy = X - PAD_L, Y - PAD_T
+    px, py = sx + 0.5 - OHR_BASIS[0], sy + 0.5 - (OHR_BASIS[1] + 0.5 * fl)
+    tt = np.clip(px * d[0] + py * d[1], 0, OHR_LAENGE)
+    m = (np.hypot(px - tt * d[0], py - tt * d[1]) <= wd) & (sx <= 5)
+    p = np.pad(m, 1)
+    innen = m & p[:-2, 1:-1] & p[2:, 1:-1] & p[1:-1, :-2] & p[1:-1, 2:]
+    vv = px * n[0] + py * n[1]
+    a = L.leer(H, W)
+    for y, x in zip(*np.nonzero(m)):
+        c = OHR_FARBEN['g'] if not innen[y, x] else (OHR_FARBEN['h'] if vv[y, x] < -0.35 else (OHR_FARBEN['l'] if vv[y, x] >= 0.35 else OHR_FARBEN['i']))
+        a[y, x, :3] = c
+        a[y, x, 3] = 255
+    return a[:, ::-1].copy() if rechts else a
+
+
+def arm_scher(a, pivot_x, hub, links):
+    """Arm schwenkt um die Schulter: Spaltenversatz wächst mit dem Abstand zum Ansatz (hub px an der Spitze, + = hoch); benachbarte Spalten unterscheiden sich um höchstens 1 px (G.kappe), damit keine Zacken entstehen."""
+    cols = [x for x in range(W) if a[:, x, 3].any() and ((x < pivot_x) if links else (x > pivot_x))]
+    if not cols or not hub:
+        return a
+    maxd = max(abs(x - pivot_x) for x in cols)
+    dys = G.kappe({x: -int(round(hub * abs(x - pivot_x) / maxd)) for x in sorted(cols)})
+    return G.spalten_dy(a, dys)
+
+
 def streck_bein(kp, n):
     """Beinzeile 25 (aEa..aEa) n-mal einfügen: die Beine werden länger, alles darüber (auch bereits gestreckt) rückt hoch. Wird NACH dem Kleid angewendet (Zeile 25 liegt darunter, bleibt am Platz)."""
     return L.streck_zeile(kp, PAD_T + 25, n) if n else kp
@@ -130,25 +175,24 @@ def frame(i):
     if s > 2:
         kp = streck_bein(kp, s - 2)
     hub = r + s                                                                   # Verschiebung der oberen Hälfte (+ = hoch)
-    # ── Ohren ──
-    idle_l = 2.4 * np.sin(L.sinus(i, 24)) * w                                     # + = nach unten (spalten_welle-Vorzeichen)
-    idle_r = 2.4 * np.sin(L.sinus(i, 24, np.pi)) * w
-    ol, orr = ebene(ohr_l), ebene(ohr_r)
-    ol = L.spalten_welle(ol, PAD_L + 6, 0.0, 0.0, nur_rechts=False, bias=-ohr * (1 - w) + idle_l)
-    orr = L.spalten_welle(orr, PAD_L + 19, 0.0, 0.0, nur_rechts=True, bias=-ohr * (1 - w) + idle_r)
+    # ── Ohren: Kapselzeichnung, der Winkel folgt Sprungplan (w = 0) bzw. dem Idle-Flattern (w = 1) ──
+    th_plan = ohr_winkel(ohr)
+    th_l = (1 - w) * th_plan + w * (OHR_RUHE + 25.0 * np.sin(L.sinus(i, 24)))
+    th_r = (1 - w) * th_plan + w * (OHR_RUHE + 25.0 * np.sin(L.sinus(i, 24, np.pi)))
+    ol, orr = ohr_ebene(th_l, False), ohr_ebene(th_r, True)
     ol, orr = L.versetze(ol, 0, -hub), L.versetze(orr, 0, -hub)
     # ── Arme ──
     al, ar = ebene(arm_l), ebene(arm_r)
     s_l = w * (0.5 - 0.5 * np.cos(L.sinus(i, 24))) + aus * (1 - w)             # Idle: Schlackern; Hocke/Landung: Arme seitlich aus
-    s_r = w * (0.5 - 0.5 * np.cos(L.sinus(i, 16))) + aus * (1 - w)
+    s_r = w * (0.5 - 0.5 * np.cos(L.sinus(i, 18))) + aus * (1 - w)
     al = L.streck_zeile(al, PAD_T + 17, r)
     ar = L.streck_zeile(ar, PAD_T + 17, r)
     dl = G.kappe({PAD_T + y: -int(round(2.0 * s_l * (y - 17) / 3.0)) for y in range(17, 21)})
     dr = G.kappe({PAD_T + y: int(round(2.0 * s_r * (y - 17) / 3.0)) for y in range(17, 21)})
     al, ar = G.zeilen_dx(al, dl), G.zeilen_dx(ar, dr)
     if arm_h:
-        al = L.spalten_welle(al, PAD_L + 8, 0.0, 0.0, nur_rechts=False, bias=-arm_h)
-        ar = L.spalten_welle(ar, PAD_L + 17, 0.0, 0.0, nur_rechts=True, bias=-arm_h)
+        al = arm_scher(al, PAD_L + 8, arm_h, True)
+        ar = arm_scher(ar, PAD_L + 17, arm_h, False)
     al, ar = L.versetze(al, 0, -s), L.versetze(ar, 0, -s)
     fig = L.zusammen(H, W, [(al, 0, 0), (ar, 0, 0), (ol, 0, 0), (orr, 0, 0), (kp, 0, 0)])
     fig, _ = A.verbinde4(fig)

@@ -22,7 +22,9 @@ Ablauf (48 Frames à 80 ms = 3,84 s, nahtlos):
 * ATMEN: Kopf samt Ohren und Armansatz heben sich in einer Stufe um 1 px (Zeile 13, der helle Brustfell-Streifen, wird einmal eingefügt, mit Nachbartextur gemischt) — Goldplatte, Pfoten
   und Füße bleiben am Boden (nur die Ohrspitzen steigen mit).
 * OHRZUCKEN: linkes Ohr (Frames 6–11 und 30–35) und rechtes Ohr (Frames 18–23 und 42–47) klappen mit der oberen Hälfte 1 px nach außen und zurück (Zeilenversatz mit Gefälle ≤ 1 px, Umriss wandert mit).
-* SCHWANZRING: die Mitte des Schwanzringes (y 12–17) beult sich 1–2 px nach außen und wieder zurück (Periode 24), Ansatz oben (y ≤ 11) und unten (y ≥ 18) bleiben fest.
+* SCHWANZ (Runde 3: „die Schwanzspitze bewegt sich nicht mit dem Rest des Schwanzes mit“): der Ansatz unten (y ≥ 18, hinter der rechten Pfote) bleibt fest, der Ring schwingt nach oben immer weiter aus
+  (Zeilenversatz ∝ Abstand vom Ansatz, Gefälle ≤ 1 px je Zeile, Periode 24, zum Kopf hin nur knapp halb so weit wie nach außen), die Schwanzspitze (y 9–11, die dünne Spitze an der Wange) schwingt als Block am
+  weitesten mit (bis +3 px; sie löst sich dabei von der Wange, das Pixel (17,9) ist Kopfumriss unter dem Ohr und bleibt am Kopf).
 * BLINZELN: Frames 20–22 (Lid = Fellgrau (90,89,94), erst halb, dann ganz, dann halb).
 * GOLD GLÄNZT (Regel 12): ein Lichtband läuft (Frames 4–17) über die Goldplatte (eine Stufe auf der Goldrampe); ein vierzackiger Stern blitzt bei (8,17) in den Frames 38–42.
 Frame 0 = Ruhepose (Original). Alle Bewegungen laufen auf der vollen Leinwand (anim_lib wirft ClipError). Nur ganze Pixel, nur Farben der Quelle.

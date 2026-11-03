@@ -26,10 +26,12 @@ Ablauf (60 Frames à 70 ms = 4,2 s), alle Bewegungen unabhängig:
   heben sich 1 px, der Kopf hebt sich mit, die Beine bleiben am Boden.
 * Kopf nickt/schnüffelt: zweimal pro Schleife (Frames 17–27 und 47–57, außerhalb der Atem-Hebung) senkt sich der ganze Kopf samt Unterkiefer starr 1 px unter die Ruhelage (eigene Ebene; die Körperebene darunter
   ist vollständig, es entsteht keine Lücke); beim Atmen hebt er sich mit dem Rücken 1 px.
-* Schwanz wedelt: zweimal pro Schleife (Periode 30) biegt sich der Schwanz um die Spaltenachse x = 56 senkrecht (Spitze bis ±3 px, Gefälle ≤ 1 px je Spalte, die Spitze hinkt nach); der Dornenfächer bewegt sich
-  starr mit der Schwanzspitze (D.schwanz_biegen mit spitze_ab).
-* Beine treten: je Fußgruppe zweimal pro Schleife kurz (eine Fußzeile entfällt, der Fuß rückt 1 px hoch): vorn Frames 8–13 und 38–43, Mitte 20–25 und 50–55, hinten 2–7 und 32–37 (Gangwechsel).
-* Blinzeln (Frames 24–27 und 54–57): das Auge schließt sich (Lid in Hautfarbe (193,125,94)/(143,80,62)).
+* Schwanz wedelt (Runde 3: „der Stachelschwanz sollte sich mehr bewegen“): zweimal pro Schleife (Periode 30) biegt sich der Schwanzstummel (x 56–60) senkrecht (Spitze samt Dornenfächer bis ±4 px,
+  Gefälle ≤ 1 px je Spalte, die Spitze hinkt nach); vorher bewegte sich der Fächer wegen der Normierung nur um ≈ 0,5 px. Zusätzlich fächert sich der Dornenfächer selbst: dreimal pro Schleife (Periode 20) neigt
+  er sich um seinen Fuß (Zeile 16) bis ±3 px seitlich (Zeilenversatz ∝ Höhe über dem Fuß, Gefälle ≤ 1 px je Zeile) — starre Dornen, nichts wird gedehnt.
+* Beine treten, jede Fußgruppe zweimal pro Schleife kurz (eine Fußzeile entfällt, der Fuß rückt hoch): hinten Frames 2–7 und 32–37, vorn 8–13 und 38–43, mittleres FERNES Bein (x 36–39, das dunkle hintere
+  der beiden mittleren Beine, 2 px Hub) 14–19 und 44–49, mittleres NAHES Bein (x 27–35) 20–25 und 50–55 — die beiden mittleren Beine treten nicht mehr gleichzeitig (Runde 3).
+* Blinzeln (Frames 24–27 und 54–57): BEIDE Augen (x 3 und x 7, je 1×2 px; Runde 3: vorher nur das rechte) schließen sich gleichzeitig (Lid in der Hautfarbe neben dem Auge (193,125,94)/(143,80,62)).
 Alle Bewegungen laufen auf der vollen Leinwand (anim_lib wirft ClipError). Nur ganze Pixel, nur Farben der Quelle.
 
 Ergänzungen: keine Pixel erfunden; Randpixel-Korrektur (Regel 16): fehlende Umrisspixel an verschobenen Teilen werden in der Umrissfarbe des Originals (anim_tiere.umriss_schliessen) ergänzt.
@@ -38,12 +40,13 @@ import sys
 
 import numpy as np
 
+import anim_gbb as G
 import anim_lib as L
 import anim_tiere as T
 import anim_drache as D
 
 N, MS = 60, 70
-PAD_L, PAD_R, PAD_T, PAD_B = 3, 3, 4, 3
+PAD_L, PAD_R, PAD_T, PAD_B = 3, 7, 7, 3
 
 spr = L.lade('gigantisaur-stegon')
 sh, sw = spr.shape[:2]
@@ -55,16 +58,49 @@ kopf_m = vorhanden & (((xx <= 8) & (yy >= 10)) | ((xx >= 9) & (xx <= 10) & (yy =
 faecher_m = vorhanden & (xx >= 59) & (yy <= 16)
 schwanz_m = vorhanden & (xx >= 56) & ~faecher_m
 bein_a = vorhanden & (xx <= 26) & (yy >= 30)
-bein_b = vorhanden & (xx >= 27) & (xx <= 39) & (yy >= 30)
+bein_b = vorhanden & (xx >= 27) & (xx <= 35) & (yy >= 30)                      # mittleres NAHES Bein (helles Bein samt gemeinsamem Umriss x 35)
+bein_d = vorhanden & (xx >= 36) & (xx <= 39) & (yy >= 30)                      # mittleres FERNES Bein (dunkel, dahinter; x 36–39)
 bein_c = vorhanden & (xx >= 40) & (xx <= 55) & (yy >= 30)
-koerper = vorhanden & ~kopf_m & ~faecher_m & ~schwanz_m & ~bein_a & ~bein_b & ~bein_c
+koerper = vorhanden & ~kopf_m & ~faecher_m & ~schwanz_m & ~bein_a & ~bein_b & ~bein_c & ~bein_d
 
 RAND = T.rand_farben(spr)
 REGEL = T.umriss_regeln(spr, RAND)[2]
 ZEILE = 19                                         # Rückenmitte: hier wird beim Atmen eine Zeile eingefügt
 FUSS_ZEILE = 33
-AUGE = {(7, 12): (193, 125, 94), (7, 13): (143, 80, 62)}
+AUGE = {(7, 12): (193, 125, 94), (7, 13): (143, 80, 62), (3, 12): (193, 125, 94), (3, 13): (143, 80, 62)}     # beide Augen (x 3 und x 7), Lid = Hautfarbe daneben
 assert all(c in {tuple(int(v) for v in p[:3]) for p in spr.reshape(-1, 4) if p[3]} for c in AUGE.values())
+
+
+SCHWANZ_AMP = 17.0         # Auslenkung des Schwanzstummels: der Normierungsnenner (Spalte 73 − Pivot 56 = 17) macht daraus ±4 px an der Spitze (Spalte 60), Fächer starr mit
+FAECHER_AMP = 3.0          # seitliche Neigung der Dornenspitzen um den Fächerfuß (px)
+
+
+def schwanz_biegen(a, pivot_x, spitze_x, amp, phase, lauf=1.0, max_gefaelle=1):
+    """Spalte x (pivot < x) wandert senkrecht um round(amp · f · (sin(phase − lauf·f) − sin(−lauf·f))), f = (min(x, spitze_x) − pivot) / 17; das Gefälle zwischen Nachbarspalten ist auf `max_gefaelle`
+    begrenzt (die Kontur reißt nicht auf); ab spitze_x wandert der Schwanz starr mit. Rückgabe: (Ebene, Versatz der Spitze). Phase 0 = Original."""
+    import math
+    h, w = a.shape[:2]
+    cols = [x for x in range(w) if a[:, x, 3].any() and x > pivot_x]
+    dys = {}
+    for x in sorted(cols):
+        f = (min(x, spitze_x) - pivot_x) / 17.0
+        d = int(round(amp * f * (math.sin(phase - lauf * f) - math.sin(-lauf * f))))
+        vor = x - 1
+        if vor in dys:
+            d = max(dys[vor] - max_gefaelle, min(dys[vor] + max_gefaelle, d))
+        dys[x] = d
+    dy_spitze = dys.get(spitze_x, 0)
+    out = L.leer(h, w)
+    for x in range(w):
+        ys = np.nonzero(a[:, x, 3])[0]
+        if not len(ys):
+            continue
+        dy = dys.get(x, 0)
+        if ys.min() + dy < 0 or ys.max() + dy >= h:
+            raise L.ClipError(f'Spalte {x} würde um {dy} px aus der Leinwand geschoben')
+        for y in ys:
+            out[y + dy, x] = a[y, x]
+    return out, dy_spitze
 
 
 def teil(maske):
@@ -80,7 +116,8 @@ def zustand(i):
         bl = max(bl, D.blinzeln(i, s))
     fuss = [1 if (i in range(8, 14) or i in range(38, 44)) else 0,
             1 if (i in range(20, 26) or i in range(50, 56)) else 0,
-            1 if (i in range(2, 8) or i in range(32, 38)) else 0]
+            1 if (i in range(2, 8) or i in range(32, 38)) else 0,
+            2 if (i in range(14, 20) or i in range(44, 50)) else 0]            # fernes mittleres Bein: eigener Takt, 2 px Hub
     return atem, nick, bl, fuss
 
 
@@ -91,15 +128,22 @@ def frame(i, nur=None):
     if bl:
         for (x, y), c in AUGE.items():
             kopf[PAD_T + y, PAD_L + x, :3] = c
-    schwanz = L.zusammen(H, W, [(teil(schwanz_m), 0, 0), (teil(faecher_m), 0, 0)])
+    schwanz = L.streck_zeile(teil(schwanz_m), PAD_T + ZEILE, atem)
+    faecher = L.streck_zeile(teil(faecher_m), PAD_T + ZEILE, atem)
     k = L.streck_zeile(k, PAD_T + ZEILE, atem)
-    schwanz = L.streck_zeile(schwanz, PAD_T + ZEILE, atem)
-    schwanz = D.schwanz_biegen(schwanz, PAD_L + 56, 3.0, L.sinus(i, N / 2), lauf=1.0, richtung=1, spitze_ab=PAD_L + 59)
+    schwanz, dy_f = schwanz_biegen(schwanz, PAD_L + 56, PAD_L + 60, SCHWANZ_AMP, L.sinus(i, N / 2), lauf=1.0)       # Stummel biegt sich, ab x 60 starr
+    faecher = L.versetze(faecher, 0, dy_f)                                                                                 # Fächer wandert starr mit der Schwanzspitze
+    sn = np.sin(L.sinus(i, N / 3) - 0.8)
+    fuss_y = PAD_T + 16 - atem + dy_f                                                                                      # Fuß des Fächers (Sprite-Zeile 16)
+    dxs = {y: int(round(FAECHER_AMP * (fuss_y - y) / 14.0 * (sn - np.sin(-0.8)))) for y in range(PAD_T - 6, fuss_y + 1)}
+    faecher = G.zeilen_dx(faecher, G.kappe(dxs))
+    schwanz = L.zusammen(H, W, [(schwanz, 0, 0), (faecher, 0, 0)])
     kopf = L.versetze(kopf, 0, -atem + nick)
     ba = L.heben_unten(teil(bein_a), PAD_T + FUSS_ZEILE, fuss[0])
     bb = L.heben_unten(teil(bein_b), PAD_T + FUSS_ZEILE, fuss[1])
     bc = L.heben_unten(teil(bein_c), PAD_T + FUSS_ZEILE, fuss[2])
-    ebenen = {'schwanz': schwanz, 'bein_a': ba, 'bein_b': bb, 'bein_c': bc, 'koerper': k, 'kopf': kopf}
+    bd = L.heben_unten(teil(bein_d), PAD_T + FUSS_ZEILE, fuss[3])
+    ebenen = {'schwanz': schwanz, 'bein_d': bd, 'bein_a': ba, 'bein_b': bb, 'bein_c': bc, 'koerper': k, 'kopf': kopf}
     wahl = nur or tuple(ebenen)
     ganz = L.zusammen(H, W, [(ebenen[n], 0, 0) for n in wahl])
     return T.umriss_schliessen(ganz, RAND, REGEL)                  # Randpixel-Test (Regel 16)

@@ -29,7 +29,13 @@ Ablauf (48 Frames à 62 ms = 2,98 s, nahtlos):
 * Metall glänzt (Regel 14): ein Lichtband läuft zweimal über den Helm (Frames 4–11 und 28–35), dazu ein Glitzerstern auf dem Helm (Frames 12–15 und 36–39).
 * Fußtippen: der linke Fuß hebt sich 1 px hinter das Bein (Frames 10–17), später der rechte (Frames 34–41).
 Frame 0 = Original (Ruhepose). Kontrolle: anim_humanoide.ruhepose / eckkontakt_typen / Randpixel-Test (Regel 16).
-Ergänzungen: keine (nichts Verdecktes wird freigelegt; Beine liegen beim Heben hinter dem Haar; geöffnete Flügel bekommen an der Naht zum Helm ihren Umriss (99,99,97) aus der Kontur-Schließung, Regel 16).
+RUNDE 3 (Nutzer: „entsteht teilweise eine große Lücke zwischen Körper und Flügeln“, img3_thebinxan.png): zwei Ursachen, beide behoben —
+  (1) Beim Öffnen wanderten die Federzeilen nach außen, dabei klaffte zwischen Flügelinnenkante und Helm/Mähne (Zeilen 7–20) ein Keil aus Hintergrund. Jetzt wird der Keil fertiggezeichnet: die Flügel setzen sich unter dem Helm fort,
+      die frei werdenden Zellen jeder angeschlossenen Zeile (der Flügel lag im Original an Helm/Haar an) bekommen abwechselnd die beiden innersten Federfarben der Zeile aus dem Original (Federinnenfarben, nie die graue Umrissfarbe (99,99,97) — kein
+      Umriss wird dicker). Die Flügel bleiben so durchgehend am Körper angewachsen, geöffnet sind sie nur oben breiter (Feder fächert auf).
+  (2) Beim Auf und Ab stiegen die Flügel starr mit (−1 px), während die Flügelsäume (weiße Balken, y 21–22) unten blieben: zwischen Flügelspitze (y 20) und Balken klaffte 1 px. Jetzt bekommt der Flügel dieselbe Zeileneinfügung (L.streck_zeile an Zeile 19) wie der Körper:
+      alles oberhalb steigt, die Flügelwurzel bleibt auf dem Saum stehen (keine Lücke).
+Ergänzungen: Keil-Pixel zwischen Flügel und Helm/Haar (siehe oben; nur Federfarben der Quelle) —  (zuvor: keine, nichts Verdecktes wird freigelegt; Beine liegen beim Heben hinter dem Haar; geöffnete Flügel bekommen an der Naht zum Helm ihren Umriss (99,99,97) aus der Kontur-Schließung, Regel 16).
 """
 import math
 import sys
@@ -62,6 +68,60 @@ koerper = rest & ~fuss_l & ~fuss_r
 m_helm = sz.farben_in(sz.rechteck(8, 7, 18, 12), set(HELM_R))
 
 
+def scheren_fuell(a_orig, maske, pivot_y, amp, links):
+    """Wie K.scheren (Flügel um das Gelenk (Zeile pivot_y) neigen, Zeilen bleiben 4-verbunden), aber die Zellen, die zwischen der verschobenen Flügelinnenkante und dem Körper frei würden,
+    werden mit den beiden innersten Federfarben der Original-Zeile fertiggezeichnet (nie Umrissfarbe). a_orig = Ebene des Flügels (Leinwand), maske = Flügelmaske im Sprite (zur Prüfung, ob die Zeile am Körper anliegt)."""
+    out = L.leer(*a_orig.shape[:2])
+    h, w = a_orig.shape[:2]
+    ys = [y for y in range(h) if a_orig[y, :, 3].any()]
+    maxd = max(1, max(abs(y - pivot_y) for y in ys))
+    shift = {}
+    for y in sorted(ys, key=lambda v: abs(v - pivot_y)):
+        sh_ = int(round(amp * abs(y - pivot_y) / maxd))
+        inner = y + (1 if y < pivot_y else -1)
+        if inner in shift:
+            xs = set(np.nonzero(a_orig[y, :, 3])[0] + sh_)
+            xi = set(np.nonzero(a_orig[inner, :, 3])[0] + shift[inner])
+            if not (xs & xi):
+                sh_ = shift[inner]
+        shift[y] = sh_
+    for y in ys:
+        xs = np.nonzero(a_orig[y, :, 3])[0]
+        for x in xs:
+            out[y, x + shift[y]] = a_orig[y, x]
+        # Keil zwischen verschobener Innenkante und Körper
+        xin = xs.max() if links else xs.min()                      # innerste Federspalte (Leinwand)
+        sx = xin - PL                                              # Sprite-Spalte
+        sy = y - PT
+        nachbar = sx + 1 if links else sx - 1
+        if not (0 <= sy < sz.sh and 0 <= nachbar < sz.sw and sz.vor[sy, nachbar] and not maske[sy, nachbar]):
+            continue                                               # Zeile liegt nicht am Körper an (freie Federspitze)
+        d = shift[y]
+        n = -d if links else d                                      # Zahl der frei werdenden Zellen (≥ 0 bei Öffnen)
+        if n <= 0:
+            continue
+        farben = []
+        for k_ in range(0, 4):
+            xk = xin - k_ if links else xin + k_
+            c = tuple(int(v) for v in a_orig[y, xk, :3])
+            if a_orig[y, xk, 3] and c != UMRISS_FED:
+                farben.append(c)
+            if len(farben) == 2:
+                break
+        if not farben:
+            continue
+        for g in range(1, n + 1):
+            xg = xin + d + g if links else xin + d - g             # links: Innenkante wanderte nach links (d < 0)
+            xg = xin + shift[y] + g if links else xin + shift[y] - g
+            if 0 <= xg < w and not out[y, xg, 3]:
+                out[y, xg, :3] = farben[(g - 1) % len(farben)]
+                out[y, xg, 3] = 255
+    return out
+
+
+UMRISS_FED = (99, 99, 97)
+
+
 def frame(i, nur=None):
     ebenen = nur if nur is not None else ('figur', 'glitzer')
     k = sz.ebene(koerper)
@@ -77,12 +137,12 @@ def frame(i, nur=None):
     Hm.zeilen_versatz(k, OFF, K.gefaelle(list(range(0, 6)), d))
     # --- Flügel öffnen/schließen ---
     off = 1.5 * (1 - math.cos(2 * math.pi * i / 24))            # 0 … 3 px an der Spitze
-    wl = K.scheren(sz.ebene(m_fl), PT + 20, -off)
-    wr = K.scheren(sz.ebene(m_fr), PT + 20, off)
+    wl = scheren_fuell(sz.ebene(m_fl), m_fl, PT + 20, -off, True)
+    wr = scheren_fuell(sz.ebene(m_fr), m_fr, PT + 20, off, False)
     # --- Auf und ab: Haarzeile 19 doppelt, Flügel starr mit ---
     brust = Hm.stufe(i, N / 2, 1)
     k = K.bob(k, PT + 19, brust)
-    wl, wr = L.versetze(wl, 0, -brust), L.versetze(wr, 0, -brust)
+    wl, wr = K.bob(wl, PT + 19, brust), K.bob(wr, PT + 19, brust)         # Flügel: dieselbe Zeileneinfügung wie der Körper, die Wurzel bleibt auf dem Saum
     # --- Fußtippen ---
     ul = 1 if K.fenster(i, N, 10, 8) is not None else 0
     ur = 1 if K.fenster(i, N, 34, 8) is not None else 0

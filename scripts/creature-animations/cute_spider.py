@@ -67,7 +67,7 @@ SPINE_L = L.platz(SPINE_L, H, W, PAD_L, PAD_T)
 HERZEN = L.platz(he_src, H, W, PAD_L + HE_OFF[0], PAD_T + HE_OFF[1])
 PIV_L, PIV_R = (7, 14), (13, 14)
 UMRISS = (41, 41, 41)
-UMRISS_FARBEN = F.umriss_farben(fl_src)
+UMRISS_FARBEN = F.umriss_farben(spr)                       # Umrissfarben der ganzen Figur (Außenkanten des Originals)
 RAND_LILA = (153, 102, 255)
 
 # ── Spinne: Körperkern fest, Beine als Pfade ──────────────────────────────────────────────────────────────────────────────────────────────────
@@ -125,8 +125,19 @@ def frame(i, nur=None):
     ebenen = {'fl_l': (wl, 0, 0), 'fl_r': (wr, 0, 0), 'spine': (SPINE_L, 0, dy), 'spinne': (sp_e, 0, dy), 'herzen': (HERZEN, 0, dy)}
     wahl = nur or ('fl_l', 'fl_r', 'spine', 'spinne', 'herzen')
     f = L.zusammen(H, W, [ebenen[n] for n in wahl])
-    # Randpixel-Test (Regel 16): Füllfarbe an einer freien Flügelkante → Umrissfarbe
+    # Randpixel-Test (Regel 16): Füllfarbe an einer freien Flügelkante → Umrissfarbe (der Randpixel selbst wird zum Umriss)
     F.umranden(f, [wl, wr], UMRISS_FARBEN, UMRISS, UMRISS, UMRISS)
+    # Wenn die Flügel weit offen sind, liegen die Herzen (rosa) oben/unten an freiem Hintergrund — im Original grenzen sie dort an die Flügel. Dann kommt ein dunkler Umrisspixel
+    # (41,41,41) AUSSEN um das Herz (das Herz selbst bleibt unverändert); nur an freien Kanten, nur wenn der Randpixel eine Herzfarbe ist.
+    herz_farben = {tuple(int(v) for v in c) for c in he_src.reshape(-1, 4)[:, :3][he_src.reshape(-1, 4)[:, 3] > 0]}
+    m = f[..., 3] > 0
+    for y, x in zip(*np.nonzero(m)):
+        if tuple(int(v) for v in f[y, x, :3]) in herz_farben:
+            for ddy, ddx in ((-1, 0), (1, 0), (0, -1), (0, 1)):
+                y2, x2 = y + ddy, x + ddx
+                if not m[y2, x2] and not f[y2, x2, 3]:
+                    f[y2, x2, :3] = UMRISS
+                    f[y2, x2, 3] = 255
     return f
 
 

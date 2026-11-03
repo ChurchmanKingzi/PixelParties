@@ -22,16 +22,19 @@ Was im Sprite ist (x, y im 26×36-Sprite):
 Metall/Gold im Sprite: Stahlhelm, Schild, goldener Schurz. Nur sie glänzen (Regel 14); Federn, Haut, Haar, Handschuhe nicht. Kein Feuer, kein Dampf, keine Partikel.
 
 Ablauf (48 Frames à 62 ms = 2,98 s, nahtlos) — die Harpyie SCHWEBT (Schatten in der Quelle, Flügel offen), darum darf sie schweben:
-* Flügelschlag (Periode 16 = dreimal pro Schleife): beide Flügel schwenken um die Schulter (L.spalten_welle mit Anschluss am Rumpf): Spitzen +3 px hoch, −2 px nach unten, nach innen auslaufend (Gefälle ≤ 0,4 px je
-  Spalte); der Anschluss am Rumpf bleibt stehen (fuell), die Federn bleiben unverändert (keine Spaltenkopie).
-* Schweben: während des Abschwungs steigt die ganze Figur starr 1 px (Helm, Gesicht, Schild, Beine zusammen), beim Aufschwung sinkt sie zurück. Nichts wird gestreckt.
+* Flügelschlag (RUNDE 3, Nutzer: „die Flügelbewegung sieht noch gar nicht nach Fliegen aus“; vorher nur Spaltenversatz um ±3 px): jetzt ein echter Flügelschlag, viermal pro Schleife (Periode 12 Frames = 744 ms; Abschlag 5 Frames, Aufschlag 7).
+  Jeder Flügel schwingt als Ganzes um den Ansatz hinter der Schulter ((8,5|17) links, (16,5|17) rechts) — von 25° über der Ruhelage (Flügel fast senkrecht, Spitze links über dem Kopfrand) bis 85° darunter (Flügel zeigt schräg nach außen unten, Spannweite wächst von 26 auf ≈ 35 px);
+  Frame 0 liegt auf dem Aufschlag bei 23 % des Hubs und ist die Originalpose. Technik wie beim Lunatic Hawk: Rückwärtsabbildung um die Schulter (F.drehen glatt=True, Nächster-Nachbar, keine Mischfarben, Federtextur bleibt). Der Flügelansatz (Federpixel im Umkreis von
+  3,4 px um das Gelenk) bleibt am Körper stehen; verdeckte Flügelpixel unter Haarsträhnen/Ohrspitzen/Schulter wurden fertiggezeichnet (siehe Ergänzungen), damit beim Schwenken kein Loch im Flügel entsteht; Hintergrundlöcher werden mit der Nachbarfarbe geschlossen.
+* Schweben: die ganze Figur starr (Helm, Gesicht, Schild, Beine zusammen) steigt beim Abschlag bis 2 px und sinkt beim Aufschlag zurück (1,5 Frames nachlaufend, Frame 0 = Original). Nichts wird gestreckt.
 * Helmbusch wiegt (Zeilen 0–5): zwei Wellen (3 s und 1 s) bis ±2 px an der Spitze, nach unten auslaufend (Gefälle ≤ 1 px je Zeile).
 * Beine baumeln (Zeilen 26–29, rechtes Bein): zweimal pro Schleife schwingt es 1 px nach rechts und zurück (Frames 8–15 und 32–39); der Schild bleibt starr.
 * Blinzeln (Frames 19–21 und 41–43): erst der Iris-Pixel, dann auch die weißen/roten Pixel nehmen die Hautfarbe (246,205,139) an (Lid = Haut, schwarze Wimpernpixel bleiben als Lidlinie); kein Augenglanz.
 * Metall glänzt (Regel 14): ein Lichtband läuft über den Helm (Frames 4–11), eines über den Schild (Frames 22–33), eines über den Goldschurz (Frames 36–43); je ein Glitzerstern am Helm (Frames 14–17),
   an der Schildkante rechts oben (Frames 26–29) und am Schurz (Frames 38–41), alle vollständig im Metall.
 Frame 0 = Original (Ruhepose). Kontrolle: anim_humanoide.ruhepose / eckkontakt_typen / Randpixel-Test (Regel 16).
-Ergänzungen: keine (die Flügel verlassen ihre Spalten nicht, die Lücke über dem Rumpf wird durch fuell mit dem untersten Federpixel der Spalte geschlossen — nur Quellfarben).
+Ergänzungen: Flügel-Ebene unter Haarsträhnen/Ohrspitzen/Schulterkante: verdeckte Pixel (Nicht-Feder-Pixel des Sprites links von x 9 (rechts: rechts von x 16) in y 7–19, die in derselben Zeile höchstens 3 px neben einem Federpixel liegen)
+mit der Farbe des nächsten Federpixels derselben Zeile (nach außen) belegt — nur im Flügel-Layer (im Ruhebild verdeckt), nur Federfarben der Quelle.
 """
 import math
 import sys
@@ -41,9 +44,11 @@ import numpy as np
 import anim_humanoide as Hm
 import anim_krieger as K
 import anim_lib as L
+import anim_flieger as F
+import anim_flieger_r3 as R3
 
 N, MS = 48, 62
-sz = K.Szene('harpthenean-war-counselor', (3, 5, 3, 3))      # Flügelhub +3/−2 px, Schweben 1 px, Busch ±2 px
+sz = K.Szene('harpthenean-war-counselor', (12, 6, 12, 4))     # Flügelschlag bis ≈ 10 px neben das Sprite, Schweben 2 px, Busch ±2 px
 spr, OFF, H, W = sz.spr, sz.OFF, sz.H, sz.W
 TEST_EBENEN = ('figur',)
 
@@ -65,19 +70,66 @@ m_rand = sz.farben_in(sz.rechteck(1, 21, 14, 35), set(RAND_R))
 m_silber = sz.farben_in(sz.rechteck(1, 21, 14, 35), set(SILBER_R))
 m_gold = sz.farben_in(sz.rechteck(13, 21, 18, 25), set(GOLD_R))
 
+BEAT, DOWN, UP = 12, 5, 7                                       # Flügelschlag: 4 pro Schleife
+HUB = math.radians(110.0)                                       # Gesamthub: oben +25° über der Ruhelage, unten −85°
+P0 = DOWN + 0.685 * UP                                          # Frame 0 = Aufschlag bei 23 % des Hubs (Originalpose)
+PIV_L, PIV_R = (8.5, 17.0), (16.5, 17.0)                        # Flügelansatz (Sprite)
+R_ANSATZ = 3.4
 
-def flug(i):
-    """(Flügelversatz der Spitze, Rumpfversatz): Periode 16, Aufschwung zuerst."""
-    phi = 2 * math.pi * i / 16
-    s = math.sin(phi)
-    v = -3.2 * s if s > 0 else -2.2 * s                          # negativ = Flügelspitze hoch
-    body = -int(round(1.3 * max(0.0, -s)))                       # Rumpf steigt im Abschwung
-    return v, body
+
+def fluegel_fertig(m, links):
+    """Flügel-Layer (Spritegröße): Federpixel + verdeckte Stellen (Haar/Ohr/Schulter) mit der Farbe des nächsten Federpixels derselben Zeile (nach außen) fertiggezeichnet."""
+    a = np.zeros_like(spr)
+    a[m] = spr[m]
+    xs = range(0, 10) if links else range(16, 26)
+    for y in range(7, 20):
+        for x in xs:
+            if m[y, x] or not sz.vor[y, x]:
+                continue
+            nach_aussen = range(x - 1, -1, -1) if links else range(x + 1, spr.shape[1])
+            for d, xn in enumerate(nach_aussen):
+                if d >= 3:
+                    break
+                if m[y, xn]:
+                    a[y, x] = spr[y, xn]
+                    break
+    return a
+
+
+WING_FERTIG = {'l': fluegel_fertig(m_fl, True), 'r': fluegel_fertig(m_fr, False)}
+ans_l = m_fl & ((sz.xx - PIV_L[0]) ** 2 + (sz.yy - PIV_L[1]) ** 2 <= R_ANSATZ ** 2)
+ans_r = m_fr & ((sz.xx - PIV_R[0]) ** 2 + (sz.yy - PIV_R[1]) ** 2 <= R_ANSATZ ** 2)
+WING_ROT = {}
+for _s, _a, _m in (('l', WING_FERTIG['l'], ans_l), ('r', WING_FERTIG['r'], ans_r)):
+    _b = _a.copy()
+    _b[_m] = 0
+    WING_ROT[_s] = L.platz(_b, H, W, *OFF)
+_m0 = np.zeros((H, W), bool)
+_m0[OFF[1]:OFF[1] + sz.sh, OFF[0]:OFF[0] + sz.sw] = sz.vor
+LOCH0 = R3.eingeschlossen(_m0)
+
+
+def welle(t):
+    """0 = Flügel ganz oben … 1 = ganz unten (Abschlag in DOWN Frames, Aufschlag in UP Frames, Cosinus-weich)."""
+    u = (t + P0) % BEAT
+    if u < DOWN:
+        return 0.5 - 0.5 * math.cos(math.pi * u / DOWN)
+    return 0.5 + 0.5 * math.cos(math.pi * (u - DOWN) / UP)
+
+
+def winkel(t):
+    """Drehwinkel des LINKEN Flügels (rad, negativ = gegen den Uhrzeigersinn = Flügel schlägt nach unten); 0 bei Frame 0."""
+    return -HUB * (welle(t) - welle(0))
+
+
+def hub_koerper(t):
+    """Schweben: Körper steigt beim Abschlag (1,5 Frames nachlaufend) bis 2 px; Frame 0 = 0."""
+    return -int(round(2.0 * (welle(t - 1.5) - welle(-1.5))))
 
 
 def frame(i, nur=None):
     ebenen = nur if nur is not None else ('figur', 'glitzer')
-    k = sz.ebene(rest)
+    k = sz.ebene(rest | ans_l | ans_r)
     # --- Blinzeln ---
     lid = Hm.folge(i, 19, [1, 2, 1], N) or Hm.folge(i, 41, [1, 2, 1], N)
     if lid:
@@ -94,11 +146,13 @@ def frame(i, nur=None):
     sw = 1 if (K.fenster(i, N, 8, 8) is not None or K.fenster(i, N, 32, 8) is not None) else 0
     if sw:
         Hm.bereich_versatz(k, OFF, {26: 0, 27: 1, 28: 1, 29: 1}, 15, 20)
-    # --- Flügel: Schwenk um die Schulter, Anschluss am Rumpf bleibt ---
-    v, body = flug(i)
-    fl = L.spalten_welle(sz.ebene(m_fl), 9 + sz.pl, 0.0, 0.0, bias=v, fuell=k[..., 3] > 0)
-    fr = L.spalten_welle(sz.ebene(m_fr), 16 + sz.pl, 0.0, 0.0, bias=v, fuell=k[..., 3] > 0)
+    # --- Flügel: Schlag um die Schulter (Runde 3) ---
+    ang = winkel(i)
+    body = hub_koerper(i)
+    fl = F.drehen(WING_ROT['l'], OFF[0] + PIV_L[0], OFF[1] + PIV_L[1], ang, glatt=True)
+    fr = F.drehen(WING_ROT['r'], OFF[0] + PIV_R[0], OFF[1] + PIV_R[1], -ang, glatt=True)
     fig = L.zusammen(H, W, [(fl, 0, 0), (fr, 0, 0), (k, 0, 0)])
+    fig = R3.luecken_fuellen(fig, 5, ausser=LOCH0)
     K.kontur(fig, sz.ERLAUBT, lambda c, x, y: (156, 0, 0) if (c[1] == 0 and c[2] == 0 and c[0] > 0) else (0, 0, 0))    # Regel 16
     fig = L.versetze(fig, 0, body)                              # Schweben: ganze Figur starr
     out = fig if 'figur' in ebenen else sz.leer()
