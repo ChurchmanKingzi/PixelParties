@@ -3,7 +3,13 @@
 //
 //  Schalter: `PP_VALUE_NET=leaf` (Gewichte aus `data/cpu-value/` oder `PP_VALUE_NET_DIR`). `_cpu.js` ruft `score()` an den Stellen,
 //  wo die Suche eine Stellung am Ende eines Rollouts bewertet (`leafScore`): Rollout-Ende, die Gates der Aktivierungen und die
-//  Optionswahl. Alle übrigen Aufrufer von `evaluateState` (Eval-Greedy-Auswahl, Handwahl, Kartenskripte) bleiben beim Evaluator.
+//  Optionswahl. Alle übrigen Aufrufer von `evaluateState` (Handwahl, Kartenskripte) bleiben beim Evaluator.
+//
+//  `PP_VALUE_NET=greedy` (Stufe 4) tut dasselbe und nimmt zusätzlich den Ort `greedy`: die Eval-Greedy-Auswahl INNERHALB der Rollouts
+//  (`rankCandidatesEvalGreedy`, rund 4.500 Bewertungen je Partie) bewertet die Stellung nach jedem Kandidaten mit dem Netz.
+//  `PP_VALUE_GREEDY_HEAD=ev` nimmt dafür den Destillationskopf (Evaluator-Wert, Bewertungspunkte) statt des kalibrierten Logits.
+//  `PP_VALUE_GREEDY_PROBE=1` ändert nichts am Spiel (die Auswahl bleibt beim Evaluator), rechnet aber an jeder Greedy-Entscheidung beide
+//  Netz-Köpfe mit und zählt, wie oft sie denselben Zug wählen würden wie der Evaluator (`engine._greedyProbe`, Zeile `greedyProbe`).
 //
 //  Rückgabe: Bewertungspunkte (κ × kalibrierter Logit „mein Sitz gewinnt") — die Suche und ihre Schwellen rechnen in denselben Punkten
 //  wie beim Evaluator. `null` heißt: das Netz ist hier nicht zuständig, der Aufrufer nimmt den Evaluator. Das gilt
@@ -30,7 +36,9 @@ const { ValueNet, DEFAULT_DIR } = require('./_value-net');
 
 let _net = null, _failed = false, _kappa = 1000;
 const _feat = new F.Features();
-const SITES = new Set((process.env.PP_VALUE_LEAF_SITES || 'rollout,gate,pick').split(',').map(s => s.trim()).filter(Boolean));
+const SITES = new Set((process.env.PP_VALUE_LEAF_SITES || (process.env.PP_VALUE_NET === 'greedy' ? 'rollout,gate,pick,greedy' : 'rollout,gate,pick')).split(',').map(s => s.trim()).filter(Boolean));
+const GREEDY_EV = process.env.PP_VALUE_GREEDY_HEAD === 'ev';
+const PROBE = process.env.PP_VALUE_GREEDY_PROBE === '1';
 
 function net() {
   if (_net || _failed) return _net;
@@ -50,7 +58,7 @@ function net() {
 /** Bewertungspunkte für `cpuIdx` oder null (= Evaluator zuständig). Wirft nie. */
 function score(engine, cpuIdx, site) {
   try {
-    if (!SITES.has(site)) return null;
+    if (!SITES.has(site) || (PROBE && site === 'greedy')) return null;
     const side = engine._valueLeafSide;
     if (side != null && side !== cpuIdx) return null;
     if (!engine.gs || engine.gs.result) return null;
@@ -64,8 +72,53 @@ function score(engine, cpuIdx, site) {
     const st = engine._valueLeaf || (engine._valueLeaf = { calls: 0, ms: [0, 0] });
     st.calls++;
     st.ms[cpuIdx === 1 ? 1 : 0] += Number(process.hrtime.bigint() - t0) / 1e6;
-    return _kappa * r.logitCal;
+    return site === 'greedy' && GREEDY_EV ? r.ev : _kappa * r.logitCal;
   } catch { return null; }
+}
+
+/** Beobachtung (PP_VALUE_GREEDY_PROBE=1): beide Köpfe für die aktuelle Stellung in Bewertungspunkten, oder null. Wirft nie. */
+function probeScores(engine, cpuIdx) {
+  try {
+    const side = engine._valueLeafSide;
+    if (side != null && side !== cpuIdx) return null;
+    if (!engine.gs || engine.gs.result) return null;
+    const n = net();
+    if (!n) return null;
+    const S = enc.extractState(engine, 0, null, { top: false });
+    if (!S) return null;
+    _feat.fill(enc.honestView(S, cpuIdx));
+    const r = n.predict(_feat);
+    return { logit: _kappa * r.logitCal, ev: r.ev };
+  } catch { return null; }
+}
+
+/**
+ * `rows` = je Kandidat { ev: Evaluator, logit: Netz-Logit, head: Netz-Evaluator-Kopf } (alles in Punkten, inkl. Aktions-Bonus), nur
+ * Kandidaten mit endlichen Werten. Zählt je Entscheidung, ob das Netz denselben Kandidaten wie der Evaluator vorn hat.
+ */
+function probeDone(engine, rows) {
+  if (rows.length < 2) return;
+  const P = engine._greedyProbe || (engine._greedyProbe = {
+    n: 0, cands: 0, clear: 0,
+    top1: { logit: 0, head: 0, rand: 0 }, near: { logit: 0, head: 0 }, regret: { logit: 0, head: 0, rand: 0 },
+    clearTop1: { logit: 0, head: 0 }, clearNear: { logit: 0, head: 0 }, clearRegret: { logit: 0, head: 0, rand: 0 },
+  });
+  const k = rows.length;
+  let best = -Infinity, second = -Infinity, bi = -1, mean = 0;
+  rows.forEach((r, i) => { mean += r.ev / k; if (r.ev > best) { second = best; best = r.ev; bi = i; } else if (r.ev > second) second = r.ev; });
+  const eps = Math.max(5, Math.abs(best) * 0.015);          // dieselbe Toleranz wie in der Sortierung von rankCandidatesEvalGreedy
+  const clear = best - second > eps;
+  P.n++; P.cands += k; P.top1.rand += 1 / k; P.regret.rand += best - mean;
+  if (clear) { P.clear++; P.clearRegret.rand += best - mean; }
+  for (const key of ['logit', 'head']) {
+    let pi = 0;
+    rows.forEach((r, i) => { if (r[key] > rows[pi][key]) pi = i; });
+    const reg = best - rows[pi].ev;
+    if (pi === bi) P.top1[key]++;
+    if (reg <= eps) P.near[key]++;
+    P.regret[key] += reg;
+    if (clear) { if (pi === bi) P.clearTop1[key]++; if (reg <= eps) P.clearNear[key]++; P.clearRegret[key] += reg; }
+  }
 }
 
 const HORIZON = process.env.PP_VALUE_LEAF_HORIZON != null && process.env.PP_VALUE_LEAF_HORIZON !== '' ? parseInt(process.env.PP_VALUE_LEAF_HORIZON, 10) : null;
@@ -84,4 +137,4 @@ function pullsFor(engine, rootIdx, dflt) {
   return side != null && side !== rootIdx ? dflt : PULLS;
 }
 
-module.exports = { score, horizonFor, pullsFor };
+module.exports = { score, horizonFor, pullsFor, probeScores, probeDone, PROBE };

@@ -11717,9 +11717,10 @@ function brettwertNeuFuer(engine, cpuIdx) {
 // Wertnetz im Schattenmodus (`PP_VALUE_NET=shadow`): rechnet bei jeder Bewertung mit und ändert nichts. Ohne den Schalter wird das Modul nicht geladen.
 const VALUE_SHADOW = process.env.PP_VALUE_NET === 'shadow' ? require('./_value-shadow') : null;
 // Stufe 3 (PP_VALUE_NET=leaf): das Wertnetz bewertet die BLÄTTER der Suche (Rollout-Ende, Gates, Optionswahl). Alle anderen Aufrufer von
-// evaluateState (Eval-Greedy-Auswahl, Handwahl, Karten-Skripte) bleiben beim Evaluator. `score` gibt null zurück, wenn das Netz für diese
-// Stellung/diesen Sitz nicht zuständig ist (Sitz-Maske `engine._valueLeafSide`, Partieende) — dann gilt der Evaluator.
-const VALUE_LEAF = process.env.PP_VALUE_NET === 'leaf' ? require('./_value-leaf') : null;
+// evaluateState (Handwahl, Karten-Skripte) bleiben beim Evaluator. Stufe 4 (PP_VALUE_NET=greedy): zusätzlich die Eval-Greedy-Auswahl in den
+// Rollouts. `score` gibt null zurück, wenn das Netz für diese Stellung/diesen Sitz nicht zuständig ist (Sitz-Maske `engine._valueLeafSide`,
+// Partieende) — dann gilt der Evaluator.
+const VALUE_LEAF = (process.env.PP_VALUE_NET === 'leaf' || process.env.PP_VALUE_NET === 'greedy') ? require('./_value-leaf') : null;
 function leafScore(engine, cpuIdx, site) {
   if (VALUE_LEAF) { const v = VALUE_LEAF.score(engine, cpuIdx, site); if (v !== null) return v; }
   return evaluateState(engine, cpuIdx);
@@ -13946,6 +13947,7 @@ async function mctsGatedActivation(engine, helpers, desc, actionFn, options = {}
 async function rankCandidatesEvalGreedy(engine, helpers, candidates) {
   const cpuIdx = engine._cpuPlayerIdx;
   const scored = [];
+  const probe = VALUE_LEAF && VALUE_LEAF.PROBE ? [] : null;      // Beobachtung der Netz-Köpfe (PP_VALUE_GREEDY_PROBE=1), ändert nichts
   for (const cand of candidates) {
     if (engine._mctsKilledThisTurn) {
       scored.push({ cand, score: -Infinity });
@@ -13965,10 +13967,13 @@ async function rankCandidatesEvalGreedy(engine, helpers, candidates) {
       }
       throw err;
     }
-    let score = -Infinity;
+    let score = -Infinity, pr = null;
     try {
       const applied = await applyActionCandidate(engine, helpers, cand);
-      if (applied) score = evaluateState(engine, cpuIdx);
+      if (applied) {
+        score = leafScore(engine, cpuIdx, 'greedy');
+        if (probe) pr = VALUE_LEAF.probeScores(engine, cpuIdx);
+      }
     } catch {
       // Throwing candidates are scored -Infinity → sorted last.
     } finally {
@@ -13976,9 +13981,14 @@ async function rankCandidatesEvalGreedy(engine, helpers, candidates) {
       resetPromptCycle(engine);
     }
     // Aktions-Cheat-Bonus (Als Auftrag 5.10.) — auch die Rollout-Politik soll diese Effekte bevorzugen.
-    if (Number.isFinite(score)) score += candidateCheatBonus(engine, cand);
+    if (Number.isFinite(score)) {
+      const bonus = candidateCheatBonus(engine, cand);
+      score += bonus;
+      if (pr) probe.push({ ev: score, logit: pr.logit + bonus, head: pr.ev + bonus });
+    }
     scored.push({ cand, score });
   }
+  if (probe) VALUE_LEAF.probeDone(engine, probe);
   // Noise-tolerant Attack tiebreak — same rationale as the main MCTS
   // ranking sort. Single-rollout evals in nested simulations are even
   // noisier than the ~3-rollout outer loop, so the epsilon band is a

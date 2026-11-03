@@ -1370,6 +1370,7 @@ function attachTrainingRecorder(engine, { pinnedIdx, pinnedName, opponentName, f
       if (engine._seatClock) { const c = engine._seatClock; (engine._seatMs || (engine._seatMs = [0, 0]))[c.seat === 1 ? 1 : 0] += Date.now() - c.t0; engine._seatClock = null; }
       if (engine._seatMs) record.seatMs = engine._seatMs.map(v => Math.round(v));
       if (engine._valueLeaf) record.valueLeaf = { calls: engine._valueLeaf.calls, ms: engine._valueLeaf.ms.map(v => +v.toFixed(1)) };
+      if (engine._greedyProbe) record.greedyProbe = engine._greedyProbe;
       // Zustandslog hängt UNSICHTBAR am Record (nicht aufzählbar → nie in der jsonl); der Aufrufer packt ihn nach dem Schreiben der Zeile.
       if (valueLog) Object.defineProperty(record, '_valueLog', { value: valueLog, enumerable: false });
       return record;

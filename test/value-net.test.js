@@ -172,3 +172,32 @@ test('Netz: von der Stellung (honestView) bis zur Ausgabe läuft ohne Fehler und
   assert.deepEqual(r1, r2);
   for (const v of Object.values(r1)) assert.ok(Number.isFinite(v));
 });
+
+test('Blattbewertung: ohne Schalter zuständig ist niemand (null), Horizont und Rollouts bleiben unverändert', () => {
+  const L = require('../cards/effects/_value-leaf');
+  assert.equal(L.score({ gs: {} }, 0, 'greedy'), null, 'Ort „greedy" ist nur im Modus greedy aktiv');
+  assert.equal(L.score({ gs: { result: 1 } }, 0, 'rollout'), null, 'Partieende: der Evaluator liefert die Sieg-/Niederlagenwerte');
+  assert.equal(L.horizonFor({}, 0, 3), 3);
+  assert.equal(L.pullsFor({}, 0, 24), 24);
+});
+
+test('Greedy-Beobachtung: zählt, wie oft die Netz-Köpfe denselben Zug wie der Evaluator wählen', () => {
+  const L = require('../cards/effects/_value-leaf');
+  const eng = {};
+  // Evaluator: Kandidat 0 vorn. Logit wählt Kandidat 1 (Verlust 50 Punkte), der Kopf wählt Kandidat 0.
+  L.probeDone(eng, [{ ev: 100, logit: 90, head: 100 }, { ev: 50, logit: 95, head: 40 }, { ev: 10, logit: 0, head: 5 }]);
+  const P = eng._greedyProbe;
+  assert.equal(P.n, 1); assert.equal(P.cands, 3); assert.equal(P.clear, 1, 'Abstand 50 > Toleranz 5: eindeutige Entscheidung');
+  assert.equal(P.top1.head, 1); assert.equal(P.top1.logit, 0);
+  assert.equal(P.near.head, 1); assert.equal(P.near.logit, 0);
+  assert.equal(P.regret.head, 0); assert.equal(P.regret.logit, 50);
+  assert.equal(P.clearTop1.head, 1); assert.equal(P.clearRegret.logit, 50);
+  assert.ok(Math.abs(P.regret.rand - (100 - 160 / 3)) < 1e-9 && Math.abs(P.top1.rand - 1 / 3) < 1e-9, 'Zufallsmaß: 1/k und mittlerer Abstand zum Besten');
+  // Enge Entscheidung (Abstand innerhalb der Toleranz): zählt, ist aber nicht „eindeutig"
+  L.probeDone(eng, [{ ev: 100, logit: 1, head: 1 }, { ev: 98, logit: 2, head: 2 }]);
+  assert.equal(P.n, 2); assert.equal(P.clear, 1); assert.equal(P.near.logit, 1, 'der Verlust 2 liegt innerhalb der Toleranz');
+  assert.equal(P.top1.logit, 0);
+  // Ein einziger Kandidat ist keine Entscheidung
+  const e2 = {}; L.probeDone(e2, [{ ev: 1, logit: 1, head: 1 }]);
+  assert.equal(e2._greedyProbe, undefined);
+});
