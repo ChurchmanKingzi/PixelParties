@@ -679,6 +679,29 @@ app.use((req, res, next) => {
   next();
 });
 
+// ── Vorgebackene Stylesheets (scripts/hart/build-css.js): `style.hart.css` = style.css mit angewandtem pixel-hart.js. Passt die gebackene Fassung nicht mehr zu den Quellen
+// (jemand hat style.css geändert und nicht neu gebacken), liefern wir die UNGEBACKENE Quelle aus — pixel-hart.js wandelt sie dann zur Laufzeit um (langsamer, aber nie falsch).
+// Umschreibung der Anfrage VOR den Auslieferungsschichten (gzip + express.static), sonst käme die alte gebackene Datei aus dem gzip-Speicher.
+// Der Hash-Vergleich ist gecacht (2 s), weil die Dateien selten wechseln. `npm test` schlägt in dem Fall zusätzlich fehl.
+{
+  const hartCache = new Map();
+  const hartFrisch = (datei) => {
+    const c = hartCache.get(datei), jetzt = Date.now();
+    if (c && jetzt - c.t < 2000) return c.ok;
+    let ok = false;
+    try { const B = require('./scripts/hart/build-css.js'); ok = B.kopfHash(fs.readFileSync(path.join(__dirname, 'public', datei.replace(/\.css$/, '.hart.css')), 'utf8').slice(0, 200)) === B.eingabeHash(datei); } catch (e) { ok = false; }
+    hartCache.set(datei, { t: jetzt, ok });
+    return ok;
+  };
+  app.use((req, res, next) => {
+    if (req.path !== '/style.hart.css' && req.path !== '/style-skilltest.hart.css') return next();
+    res.set('Cache-Control', 'no-cache');
+    const quelle = req.path.replace('.hart.css', '.css').slice(1);
+    if (!hartFrisch(quelle)) req.url = req.url.replace('.hart.css', '.css');
+    next();
+  });
+}
+
 // ───────────────────────────────────────────────────────────────
 //  On-the-fly gzip for compressible static assets (zero-dep).
 //  Compresses .js/.json/.css/.svg/.map from public, /data and
@@ -929,27 +952,6 @@ app.get('/sitemap.xml', (req, res) => {
 // Seitenaufruf der teurere Weg. Wer Kartenkunst tauscht, muss also bis
 // zu 7 Tage einplanen — oder den Dateinamen aendern.
 // Pixel-Emoji-Schrift: der Dateiname traegt einen Inhalts-Hash (`?v=…`, scripts/pixel-emoji/build_font.py) — ein Jahr cachen, ohne Rueckfrage.
-// ── Vorgebackene Stylesheets (scripts/hart/build-css.js): `style.hart.css` = style.css mit angewandtem pixel-hart.js. Passt die gebackene Fassung nicht mehr zu den Quellen
-// (jemand hat style.css geändert und nicht neu gebacken), liefern wir die UNGEBACKENE Quelle aus — pixel-hart.js wandelt sie dann zur Laufzeit um (langsamer, aber nie falsch).
-// Der Hash-Vergleich ist gecacht (2 s), weil die Dateien selten wechseln. `npm test` schlägt in dem Fall zusätzlich fehl.
-{
-  const hartCache = new Map();
-  const hartFrisch = (datei) => {
-    const c = hartCache.get(datei), jetzt = Date.now();
-    if (c && jetzt - c.t < 2000) return c.ok;
-    let ok = false;
-    try { const B = require('./scripts/hart/build-css.js'); ok = B.kopfHash(fs.readFileSync(path.join(__dirname, 'public', datei.replace(/\.css$/, '.hart.css')), 'utf8').slice(0, 200)) === B.eingabeHash(datei); } catch (e) { ok = false; }
-    hartCache.set(datei, { t: jetzt, ok });
-    return ok;
-  };
-  app.get(['/style.hart.css', '/style-skilltest.hart.css'], (req, res, next) => {
-    const quelle = req.path.replace('.hart.css', '.css').slice(1);
-    res.type('text/css');
-    res.set('Cache-Control', 'no-cache');
-    if (hartFrisch(quelle)) return next();
-    res.sendFile(path.join(__dirname, 'public', quelle));
-  });
-}
 app.use('/fonts', express.static(path.join(__dirname, 'public', 'fonts'), { maxAge: '365d', immutable: true }));
 app.use(express.static(path.join(__dirname, 'public'), { maxAge: 0, etag: true }));
 app.use('/data', express.static(path.join(__dirname, 'data')));

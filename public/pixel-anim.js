@@ -50,6 +50,7 @@
     direkt: true,        // Blaetter ohne Kinder animieren `mask-image` selbst statt ueber eine vererbte Variable
     hauptfaden: true,    // W86p: gebackene Animationen mit einer wirkungslosen, nicht kompositierbaren Eigenschaft (scroll-margin-top, wechselt je Bild) auf den Hauptthread zwingen —
                          // Compositor-Animationen malen die Ebene mit festem Raster und skalieren/verschieben sie bilinear: Mischfarben und Halbalpha an jeder Kante (Palettenverstoss)
+    messen: false,       // Messung: Backzeit je Animationsname in `stat.proName` (nur Tests)
     ergebnisCache: true, // Ergebnis-Cache reiner Animationen (s. `reinSchluessel`); false = Messung/Notbremse
     aktiv: true,
   };
@@ -682,7 +683,12 @@
     stat.ms += performance.now() - t0;
     if (weich && !sofort) _verbraucht += performance.now() - t0;
     if (ok) stat.gebacken++;
+    if (KONFIG.messen) messe(v.anim, performance.now() - t0);
     return ok;
+  }
+  function messe(anim, ms) {
+    const n = (anim && anim.animationName) || 'waapi', m = stat.proName || (stat.proName = {}), e = m[n] || (m[n] = { n: 0, ms: 0 });
+    e.n++; e.ms += ms;
   }
   /**
    * ★ Stapel: viele Animationen GEMEINSAM backen. Jede Abtastung (`probe.currentTime` setzen, `getPropertyValue` lesen) erzwingt einen
@@ -717,6 +723,7 @@
       if (ok) { stat.gebacken++; n++; }
     }
     stat.ms += performance.now() - t0;
+    if (KONFIG.messen && ctxs.length) { const je = (performance.now() - t0) / ctxs.length; for (const c of ctxs) messe(c.anim, je); }
     return n;
   }
 
@@ -776,7 +783,7 @@
   const _backCache = new Map(), BACK_CACHE_MAX = 400;
   const REIN_NICHT = /^(opacity|transform|translate|scale|rotate|width|height|min-width|min-height|max-width|max-height|mask.*|-webkit-mask.*|background-image|background-size|background-repeat|background-attachment|content|d)$/;
   const RELATIV = /var\(|%|\b(?:em|rem|ex|ch|vw|vh|vmin|vmax)\b|calc\(|currentcolor|inherit|initial|unset|env\(|attr\(/i;
-  function reinSchluessel(kfs, props, cs, pe, weich, strikt, svgInnen, raster, D2, delay2, zeiten, probeZeiten, W, H) {
+  function reinSchluessel(kfs, props, cs, pe, weich, strikt, svgInnen, raster, D2, delay2, zeiten, probeZeiten, groesse) {
     if (!KONFIG.ergebnisCache) return null;
     for (const p of props) if (REIN_NICHT.test(kebab(p))) return null;
     const erst = kfs[0], letzt = kfs[kfs.length - 1];
@@ -790,15 +797,17 @@
     for (const p of props) if (erst[p] == null || letzt[p] == null) return null;
     for (const z of zeilen) for (const v of z[2]) if (v != null && RELATIV.test(v)) { rel = true; for (const m of v.matchAll(/var\(\s*(--[\w-]+)/g)) vars.push(m[1]); }
     const ctx = [];
-    if (rel) { ctx.push(cs.fontSize, cs.color, W, H, root.innerWidth, root.innerHeight); for (const v of vars) ctx.push(cs.getPropertyValue(v)); }
+    if (rel) { const [W, H] = groesse(); ctx.push(cs.fontSize, cs.color, W, H, root.innerWidth, root.innerHeight); for (const v of vars) ctx.push(cs.getPropertyValue(v)); }
     return JSON.stringify([zeilen, D2, delay2, zeiten.length, zeiten[1] || 0, probeZeiten ? probeZeiten.length : 0, weich, strikt, pe || '', svgInnen, raster, ctx]);
   }
 
   function backenProbeVorbereiten(anim, eff, el, kfs, props, dauer, budget, weich, strikt) {
     const pe = eff.pseudoElement || null;                       // W86u1: Animation auf ::before/::after — gleiche Pipeline, nur ohne Inline-Eingriffe am Wirt
     const cs = pe ? getComputedStyle(el, pe) : getComputedStyle(el);
-    const [W, H] = pe ? pseudoGroesse(cs, el) : groesseVon(el);
-    const raster = rasterVon(cs);
+    // Groesse (Layout!) erst, wenn gebraucht: Treffer im Ergebnis-Cache brauchen sie nur bei relativen Werten — sonst erzwingt jeder Start (Tutorial-Text: je Zeichen) ein Layout.
+    const groesse = () => (pe ? pseudoGroesse(cs, el) : groesseVon(el));
+    // Raster: nur Szenen (Areas) setzen `--pp-raster` (Inline-Stil) — sonst gilt der Standard, ohne den Stil zu lesen (das erzwingt einen Neuaufbau je Start)
+    const raster = el.closest && el.closest('[style*="--pp-raster"]') ? rasterVon(cs) : KONFIG.px;
     const svgInnen = istSvgInnen(el);
     const T = TAKT_MS();
     const delay0 = +t0Timing(eff).delay || 0;
@@ -818,11 +827,12 @@
     }
     if (budget && budget.rest !== undefined) { budget.rest -= zeiten.length + 1; budget.offen = Math.max(1, budget.offen - 1); }
     // ── Ergebnis-Cache: schon gebacken (gleiche Keyframes/Zeiten) → nicht abtasten ──
-    const reinKey = reinSchluessel(kfs, props, cs, pe, weich, strikt, svgInnen, raster, D2, delay2, zeiten, probeZeiten, W, H);
+    const reinKey = reinSchluessel(kfs, props, cs, pe, weich, strikt, svgInnen, raster, D2, delay2, zeiten, probeZeiten, groesse);
     if (reinKey) {
       const hit = _backCache.get(reinKey);
-      if (hit) return { hit, anim, eff, el, props, dauer, weich, strikt, pe, cs, W, H, raster, svgInnen, T, delay0, delay2, D2, zeiten, probeZeiten, probe: null, kProps: [], roh: [] };
+      if (hit) return { hit, anim, eff, el, props, dauer, weich, strikt, pe, cs, W: 0, H: 0, raster, svgInnen, T, delay0, delay2, D2, zeiten, probeZeiten, probe: null, kProps: [], roh: [] };
     }
+    const [W, H] = groesse();
     // ── Probe: gleiche Keyframes als eigene WAAPI-Animation → abtasten ──
     const probeKfs = kfs.map(k => { const o = Object.assign({}, k); o.offset = k.computedOffset != null ? k.computedOffset : k.offset; delete o.computedOffset; return o; });
     let probe;
