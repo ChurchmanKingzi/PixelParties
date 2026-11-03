@@ -132,27 +132,25 @@ def frame(i, nur=None):
     # --- Glanz: Stahl und Gold ---
     C.glanz(k, OFF, i, N, GRAU_M, GRAU, start=2, dauer=16, stufen=1, breite=3.0)
     C.glanz(k, OFF, i, N, GOLD_M, GOLD, start=26, dauer=16, stufen=1, breite=3.0, kern=2)
-    C.funkel(k, OFF, i, 13, 2, 28, [0, 1, 1, 0], J, G, N)
-    C.funkel(k, OFF, i, 14, 17, 33, [0, 1, 1, 0], J, G, N)
-    C.funkel(k, OFF, i, 1, 25, 38, [0, 1, 1, 0], J, G, N)
     # --- Leuchtaugen blinzeln ---
     if Hm.folge(i, 9, [1, 1], N) or Hm.folge(i, 33, [1, 1, 1], N):
         Hm.setze(k, AUGEN, OFF)
-    # --- Stachelpuls: Spitzenpixel fährt kurz ein ---
-    for name, start in (('ol', 12), ('ul', 20), ('or', 36), ('ur', 44)):
-        if Hm.folge(i, start, [1, 1, 1, 1], N):
-            Hm.setze(k, {SPITZEN[name]: None}, OFF)
-    # --- Kronenflattern ---
-    if Hm.folge(i, 4, [1] * 5, N) or Hm.folge(i, 28, [1] * 5, N):
-        k = C._verschieben(k, OFF, KRONE_L, lambda x, y: -1, 'y')
-    if Hm.folge(i, 16, [1] * 5, N) or Hm.folge(i, 40, [1] * 5, N):
-        k = C._verschieben(k, OFF, KRONE_R, lambda x, y: -1, 'y')
-    # --- Kettenspitze schwingt ---
-    sw_ = int(round(np.sin(L.sinus(i, 24))))
-    if sw_:
-        k = C._verschieben(k, OFF, KETTE_SPITZE, lambda x, y: sw_, 'x')
-    # --- Atmen: glatte Brustplattenzeile 23 (Gesicht und Rachen werden nicht gedehnt) ---
-    k = Hm.atmen(k, PAD_T + 23, PAD_T + 23, Hm.stufe(i, N, 2), 0)
+    # --- Räder drehen (Runde 3): Spikes wandern von oben nach unten ---
+    raeder(k, i)
+    # --- Atmen: glatte Brustplattenzeile 23 (Gesicht und Rachen werden nicht gedehnt); Krone, Kopf, Schultern und Kette heben sich starr ---
+    z = PAD_T + 23
+    vorher = k[z].copy()
+    n = Hm.stufe(i, N, 2)
+    k = Hm.atmen(k, z, z, n, 0)
+    if n:                                                                               # die Kette läuft durch die Einfügezeilen: dort pixelgenau kopieren (keine Texturmischung → keine Lücken)
+        for j in range(z - n, z + 1):
+            for x in np.nonzero(KETTE[23] & (vorher[OFF[0]:OFF[0] + sw, 3] > 0))[0]:
+                k[j, OFF[0] + x] = vorher[OFF[0] + x]
+    # --- Glitzersterne (kurz, Gold): Krone, Brustzeichen, Kettenglied rechts — nach dem Atmen, damit sie auf dem gehobenen Objekt sitzen ---
+    dy = n
+    C.funkel(k, (OFF[0], OFF[1] - dy), i, 13, 2, 28, [0, 1, 1, 0], J, G, N)
+    C.funkel(k, (OFF[0], OFF[1] - dy), i, 14, 17, 33, [0, 1, 1, 0], J, G, N)
+    C.funkel(k, (OFF[0], OFF[1] - dy), i, 24, 17, 38, [0, 1, 1, 0], J, G, N)
     return k
 
 

@@ -17,7 +17,10 @@ Was ist was (x/y im Sprite):
 * Körper: darunter Tentakelbart/Rumpf (x 18–57, y 24–51), geteilt in mehrere Tentakel mit hellem Außenrand (49,104,72); unten fransen dünne Tentakelfäden (1 px) bis y 56 aus.
 Fest bleiben: Gesichtsform, Augenform im Ruhebild, Flügelrippen-Muster, Stirnkrone.
 
-Ablauf (48 Frames à 70 ms = 3,36 s; Frame 0 = Original, Blasen ausgenommen):
+RUNDE 3 (Nutzer-Feedback): „unten die Linien unter der harten Schlusskante noch entfernen und seine Bewegungen langsamer machen; er ist riesig und furchteinflößend.“
+  * Die dünnen Tentakelfäden (1 px, Zeilen y 52–56 unter der harten Unterkante y 51) sind aus dem Sprite entfernt (`spr[52:] = 0`); die Unterkante y 51 ist jetzt der Abschluss in jeder Pose.
+  * ALLE Bewegungen sind halb so schnell: 96 Frames à 70 ms = 6,72 s (vorher 48 Frames, 3,36 s); Perioden verdoppelt (Flügel 48, Atmen 48, Tentakel 32/48, Hörner 16 Frames, Blinzelwelle 2 Frames je Schritt, Blasen 96).
+Ablauf (96 Frames à 70 ms = 6,72 s; Frame 0 = Original, Blasen ausgenommen; Angaben im Folgenden für die ALTE Geschwindigkeit, jetzt jeweils doppelt so lange):
 * Flügelschlag: beide Flügel schlagen als Wellen (Periode 24, zweimal pro Schleife; spaltenweise Versatz wächst mit dem Abstand zur Wurzel (x 28/46), bis ±4 px an der Spitze; die Spitze hinkt der Wurzel nach, die Wurzel bleibt am Körper).
 * Atmen in zwei Schritten (Brust zuerst, Kopf hinterher): eine Zeile im Rumpf (y 36) und eine am Hals (y 27) werden eingefügt, Periode 24 mit 3 Frames Nachlauf für den Kopf; die Flügel heben sich mit (bis 2 px).
   Die eingefügten Zeilen sind texturgemischt (`L.streck_zeile`), die Tentakel stehen unten fest.
@@ -39,8 +42,9 @@ import anim_lib as L
 import anim_tiefsee as T
 import anim_untote as U
 
-N, MS = 48, 70
+N, MS = 96, 70                              # Runde 3: doppelt so lang bei gleicher Bildrate → alle Bewegungen halb so schnell (riesig, furchteinflößend)
 spr = L.lade('dark-deepsea-god')
+spr[52:] = 0                                # Runde 3: die dünnen Fäden unter der harten Schlusskante (Zeilen 52–56) entfernt
 S = T.Szene('dark-deepsea-god', 'Dark Deepsea God', spr, N, MS, rand=(8, 8, 8, 8))
 sh, sw, H, W = S.sh, S.sw, S.H, S.W
 xx, yy, vorhanden = S.xx, S.yy, S.vorhanden
@@ -105,10 +109,10 @@ def blinz(a, stufe_je_paar):
 
 # Blinzelwelle: Frame → (Stufe Stirn, außen, Haupt)
 BLINZ = {}
-for k, stufen in enumerate([(1, 0, 0), (2, 1, 0), (1, 2, 1), (0, 1, 2), (0, 0, 1)]):      # von oben nach unten
-    BLINZ[8 + k] = stufen
+for k, stufen in enumerate([(1, 0, 0), (2, 1, 0), (1, 2, 1), (0, 1, 2), (0, 0, 1)]):      # von oben nach unten (2 Frames je Schritt)
+    BLINZ[16 + 2 * k] = BLINZ[17 + 2 * k] = stufen
 for k, stufen in enumerate([(0, 0, 1), (0, 1, 2), (1, 2, 1), (2, 1, 0), (1, 0, 0)]):      # von unten nach oben
-    BLINZ[33 + k] = stufen
+    BLINZ[66 + 2 * k] = BLINZ[67 + 2 * k] = stufen
 
 # --- Teile als Ebenen auf der vollen Leinwand -----------------------------------------------------------
 HORN_L = KOERPER & (yy <= 5) & (xx <= 29)
@@ -117,7 +121,7 @@ FL_L, FL_R, KO = S.teil(FLUEGEL_L), S.teil(FLUEGEL_R), S.teil(KOERPER)
 PIVOT_L, PIVOT_R = GPL + 28, GPL + 46
 
 
-def horn_bump(i, start, dauer=8):
+def horn_bump(i, start, dauer=16):
     return U.buckel(i, start, dauer)
 
 
@@ -125,7 +129,7 @@ def koerper_ebene(i):
     kb = KO.copy()
     kb = blinz(kb, BLINZ.get(i, (0, 0, 0)))
     # Hörner zucken (Zeilengruppen, Spitze bis 2 px nach außen)
-    gl, gr = horn_bump(i, 6), horn_bump(i, 30)
+    gl, gr = horn_bump(i, 12), horn_bump(i, 60)
     gruppen = [(GPT + 0, GPT + 1), (GPT + 2, GPT + 3), (GPT + 4, GPT + 5)]
     # linke Spitze: nur Pixel x ≤ 29; rechte x ≥ 45 (die Stirnkrone in der Mitte bleibt stehen)
     for (maske_x, g, vz) in ((lambda x: x <= GPL + 29, gl, -1), (lambda x: x >= GPL + 45, gr, 1)):
@@ -146,12 +150,12 @@ def koerper_ebene(i):
     unten[:GPT + 30] = 0
     oben = kb.copy()
     oben[GPT + 30:] = 0
-    w1 = T.wehen(unten, GPT + 29, 1.5, i, 16, lag=1.2, potenz=1.3)
-    w2 = T.wehen(w1, GPT + 29, 1.0, i, 24, lag=-0.8, potenz=1.5)
+    w1 = T.wehen(unten, GPT + 29, 1.5, i, 32, lag=1.2, potenz=1.3)
+    w2 = T.wehen(w1, GPT + 29, 1.0, i, 48, lag=-0.8, potenz=1.5)
     kb = L.zusammen(H, W, [(oben, 0, 0), (w2, 0, 0)])
     # Atmen in zwei Schritten: Hals (y 27) mit Nachlauf, Rumpf (y 36) zuerst
-    n_rumpf = U.stufe(i, 24, 1)
-    n_hals = U.stufe(i, 24, 1, versatz=-L.sinus(3, 24))               # Kopf hinkt 3 Frames hinterher
+    n_rumpf = U.stufe(i, 48, 1)
+    n_hals = U.stufe(i, 48, 1, versatz=-L.sinus(6, 48))               # Kopf hinkt 6 Frames hinterher
     if n_hals:
         kb = L.streck_zeile(kb, GPT + 27, n_hals)
     if n_rumpf:
@@ -163,22 +167,22 @@ def koerper_ebene(i):
 P = S.P
 PUFFS = [
     dict(x=P(5, 55)[0], y=P(5, 55)[1], vx=0, vy=-9, off=0, wackeln=0.6),
-    dict(x=P(11, 55)[0], y=P(11, 55)[1], vx=0, vy=-9, off=24, wackeln=0.6),
-    dict(x=P(69, 55)[0], y=P(69, 55)[1], vx=0, vy=-9, off=12, wackeln=0.6),
-    dict(x=P(63, 55)[0], y=P(63, 55)[1], vx=0, vy=-9, off=36, wackeln=0.6),
+    dict(x=P(11, 55)[0], y=P(11, 55)[1], vx=0, vy=-9, off=48, wackeln=0.6),
+    dict(x=P(69, 55)[0], y=P(69, 55)[1], vx=0, vy=-9, off=24, wackeln=0.6),
+    dict(x=P(63, 55)[0], y=P(63, 55)[1], vx=0, vy=-9, off=72, wackeln=0.6),
 ]
 BLASE = {'c': (49, 104, 72), 'r': (27, 58, 41)}
 
 
 def frame_gross(i, nur=None):
     kb, hub = koerper_ebene(i)
-    fl = T.fluegel(FL_L, PIVOT_L, 4.4, i, 24, lag=1.0, potenz=1.15, dy0=-hub)
-    fr = T.fluegel(FL_R, PIVOT_R, 4.4, i, 24, lag=1.0, potenz=1.15, dy0=-hub)
+    fl = T.fluegel(FL_L, PIVOT_L, 4.4, i, 48, lag=1.0, potenz=1.15, dy0=-hub)
+    fr = T.fluegel(FL_R, PIVOT_R, 4.4, i, 48, lag=1.0, potenz=1.15, dy0=-hub)
     f = L.zusammen(H, W, [(fl, 0, 0), (fr, 0, 0), (kb, 0, 0)])
     f = U.kontur_schliessen(f, UMRISS, KONTUR)
     if nur == 'koerper':
         return f
-    blasen = U.wolke_ebene(H, W, i, 48, PUFFS, BLASE)
+    blasen = U.wolke_ebene(H, W, i, N, PUFFS, BLASE)
     return L.zusammen(H, W, [(blasen, 0, 0), (f, 0, 0)])
 
 
