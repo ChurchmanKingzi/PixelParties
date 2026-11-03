@@ -25,7 +25,7 @@ Ablauf (72 Frames à 70 ms = 5,04 s, nahtlos; Frame 0 = Ruhepose = Original):
   bekommen Zeilen), Füße verlassen den Boden, die Ohren hängen noch nach unten (Trägheit), Arme schwingen hoch) → Flug (15–24: parabelförmig bis 13 px Höhe, Körper komplett in der Luft, die Ohren schlagen nach oben (Frames 16–19), nach unten
   (20), wieder nach oben (21–22) und fallen; Arme hoch, beim Fallen strecken sich die Beine) → Landung (25–26: Quetschung um bis zu 4 Zeilen, Ohren kippen träge nach unten) → Nachwippen (27–30, kleiner Überschwinger).
 * KLEINER HÜPFER (Frames 45–55): kurze Hocke, 6 px hoch, Ohren schlagen einmal, Landung mit leichter Quetschung.
-* IDLE zwischendurch: Atmen (1 px, Zeile 17 doppelt), Ohrenschlagen (gegenläufig, Periode 24, Spitze ±2 px), Arme schlackern nach außen (links Periode 24, rechts 18 — beide teilen die Schleifenlänge 72, damit der Loop nahtlos ist), Blinzeln (Frames 4–6 und 38–40), Goldkette glänzt (Lichtband Frames 56–69,
+* IDLE zwischendurch: Atmen (1 px, Zeile 17 doppelt), Ohrenschlagen (gegenläufig, Periode 24, ±18° um den Ruhewinkel), Arme schlackern nach außen (links Periode 24, rechts 18 — beide teilen die Schleifenlänge 72, damit der Loop nahtlos ist), Blinzeln (Frames 4–6 und 38–40), Goldkette glänzt (Lichtband Frames 56–69,
   Glitzerstern Frames 34–37 am Anhänger, nur Gold).
 Technik: Der Körper (Kopf, Kleid, Beine) ist EINE Ebene; Strecken = Zeile 22 (Saum, die Zeilen 21 und 22 sind gleich) bzw. Zeile 25 (Bein) wird eingefügt, Quetschen = bis zu 4 Kleidzeilen (19–22) entfallen, die obere Hälfte rückt nach;
 Ohren und Arme sind eigene Ebenen: sie wandern starr mit der oberen Körperhälfte und werden als Spaltenscherung um den Ansatz (Ohr x 6/19, Schulter x 8/17) nach oben (Betrag in px an der Spitze) bzw. unten geschwenkt.
@@ -177,8 +177,8 @@ def frame(i):
     hub = r + s                                                                   # Verschiebung der oberen Hälfte (+ = hoch)
     # ── Ohren: Kapselzeichnung, der Winkel folgt Sprungplan (w = 0) bzw. dem Idle-Flattern (w = 1) ──
     th_plan = ohr_winkel(ohr)
-    th_l = (1 - w) * th_plan + w * (OHR_RUHE + 25.0 * np.sin(L.sinus(i, 24)))
-    th_r = (1 - w) * th_plan + w * (OHR_RUHE + 25.0 * np.sin(L.sinus(i, 24, np.pi)))
+    th_l = (1 - w) * th_plan + w * (OHR_RUHE + 18.0 * np.sin(L.sinus(i, 24)))
+    th_r = (1 - w) * th_plan + w * (OHR_RUHE + 18.0 * np.sin(L.sinus(i, 24, np.pi)))
     ol, orr = ohr_ebene(th_l, False), ohr_ebene(th_r, True)
     ol, orr = L.versetze(ol, 0, -hub), L.versetze(orr, 0, -hub)
     # ── Arme ──
