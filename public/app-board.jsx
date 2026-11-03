@@ -49478,6 +49478,20 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       }
       // Sandstrahl (`sandStream`): Pixelart-Leinwand statt 314 einzeln CSS-animierter Elemente (Start-Blockade 50–500 ms, app-fx-30.jsx); `null` → alter Pfad.
       if (projectileShape === 'sandStream' && window.ppFx30Sand && window.ppFx30Sand({ sx: sxPx, sy: syPx, tx: txPx, ty: tyPx, dur })) return;
+      // Pixelart-Leinwand für die übrigen Geschosse (Pfeil, Speer, Blase, Sand, Bombe, Kugel, Schädel, Taube, Hammer, Fels, Faust, Waschbär, Herz, Schwert …; app-fx-38.jsx). `null` → alter Pfad.
+      if (window.ppFx38 && window.ppFx38Art) {
+        const art38 = window.ppFx38Art({ emoji, projectileShape, projectileClass });
+        if (art38) {
+          const es = emojiStyle || {};
+          const schweif38 = trailClass === 'rocket-fist-trail' ? 'rakete' : trailClass === 'projectile-raccoon-trail' ? 'braun' : trailClass === 'projectile-love-trail' ? 'rosa' : undefined;
+          const ende38 = window.ppFx38({ s: [{
+            art: art38, fs: art38 === 'blase' ? es.width : es.fontSize, sx: sxPx, sy: syPx, tx: txPx, ty: tyPx, dur,
+            kein: !!noTrail, schweif: schweif38, spiegel: txPx < sxPx,
+            farbe: art38 === 'blase' ? { hi: es['--bubble-hi'], mid: es['--bubble-mid'], lo: es['--bubble-lo'], glow: es['--bubble-glow'] } : (art38 === 'geschoss' ? es.color : (art38 === 'pfeil' && emoji ? 'bogen' : undefined)),
+          }] });
+          if (ende38) return;
+        }
+      }
       // Angle in degrees from src → tgt. CSS `rotate(0deg)` points
       // right; 0° here means a horizontal east-bound projectile, so
       // any projectile whose visual natively faces RIGHT (the SVG
@@ -49539,6 +49553,21 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       const FACING = { '🗡️': -135, '⚔️': 45, '🪓': 45, '🔱': 90 };
       const n = Math.max(10, Math.min(20, count || 14));
       const STEP = 40;
+      // Pixelart: EINE Leinwand für die ganze Salve (app-fx-38.jsx); `null` → alter Pfad (ein Emoji je Waffe)
+      if (window.ppFx38) {
+        const ART38 = { '🗡️': 'dolch', '⚔️': 'schwert', '🪓': 'axt', '🔱': 'dreizack' };
+        const liste = [];
+        for (let i = 0; i < n; i++) {
+          const emoji = WEAPONS[(i * 5 + Math.floor(Math.random() * 3)) % WEAPONS.length];
+          const jitter = (Math.random() - 0.5) * 34;
+          liste.push({ art: ART38[emoji] || 'schwert', fs: 18 + Math.floor(Math.random() * 22), t0: i * STEP, dur: 240 + Math.floor(Math.random() * 80),
+            sx: sxPx + nx * jitter * 0.4, sy: syPx + ny * jitter * 0.4, tx: txPx + nx * jitter, ty: tyPx + ny * jitter, ang: baseAngle + (Math.random() - 0.5) * 8 });
+        }
+        if (window.ppFx38({ s: liste })) {
+          for (let i = 0; i < n; i += 3) setTimeout(() => { if (window.playSFX) window.playSFX('slash', { category: 'effect', rate: 1.2 + Math.random() * 0.5, dedupe: 30 }); }, i * STEP);
+          return;
+        }
+      }
       for (let i = 0; i < n; i++) {
         setTimeout(() => {
           const emoji = WEAPONS[(i * 5 + Math.floor(Math.random() * 3)) % WEAPONS.length];
