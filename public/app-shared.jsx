@@ -11515,8 +11515,10 @@ function atkWowStart(heldSelektor) {
   wurzel.appendChild(zahl);
   document.body.appendChild(wurzel);
   const wertEl = zahl.querySelector('.atk-wow-wert');
+  const c47 = window.ppFx47Wow ? window.ppFx47Wow(cx, cy) : null;      // app-fx-47.jsx: Ringe/Funken/Blitz als EINE Pixelart-Leinwand statt ~75 DOM-Elementen mit eigener Animation
   const FARBEN = ['#fad54a', '#ff9a1a', '#ff491a', '#ffffff', '#f9ecb3'];
   const ring = (verzoegerung, groesse) => {
+    if (c47) { c47.ring(verzoegerung, groesse); return; }
     const e = document.createElement('div');
     e.className = 'atk-wow-ring';
     e.style.animationDelay = verzoegerung + 'ms';
@@ -11524,6 +11526,7 @@ function atkWowStart(heldSelektor) {
     wurzel.appendChild(e);
   };
   const funken = (anzahl, weit) => {
+    if (c47) { c47.funken(anzahl, weit); return; }
     for (let i = 0; i < anzahl; i++) {
       const e = document.createElement('div');
       e.className = 'atk-wow-funke';
@@ -11536,6 +11539,7 @@ function atkWowStart(heldSelektor) {
     }
   };
   const blitz = (stark) => {
+    if (c47) { c47.blitz(stark); return; }
     const b = document.createElement('div');
     b.className = 'atk-wow-blitz' + (stark ? ' atk-wow-blitz-stark' : '');
     document.body.appendChild(b);
@@ -11561,7 +11565,7 @@ function atkWowStart(heldSelektor) {
       }
       // Kurz stehen lassen, dann ausblenden und aufraeumen.
       setTimeout(() => wurzel.classList.add('atk-wow-aus'), 2100);
-      setTimeout(() => wurzel.remove(), 2700);
+      setTimeout(() => { wurzel.remove(); if (c47) c47.stop(); }, 2700);
     },
   };
 }
