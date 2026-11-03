@@ -450,7 +450,9 @@ function mergeFiles(outFile, files, keep) {
   return { games: pick.size };
 }
 
-function enabled() { return process.env.PP_VALUE_NET === 'log'; }
+// `PP_VALUE_NET=log` zeichnet auf (Evaluator spielt); `PP_VALUE_LOG=1` zeichnet zusätzlich bei jedem anderen Schalter auf, z. B. beim
+// Selbstspiel mit dem Netz als Blattbewertung (`PP_VALUE_NET=leaf PP_VALUE_LOG=1`) — die Zustände stammen dann aus netzgeführtem Spiel.
+function enabled() { return process.env.PP_VALUE_NET === 'log' || process.env.PP_VALUE_LOG === '1'; }
 function statesPath(jsonlPath) { return jsonlPath + '.states'; }   // neben die jsonl; Worker-Dateien: `<out>.w<k>.states`
 
 module.exports = {
