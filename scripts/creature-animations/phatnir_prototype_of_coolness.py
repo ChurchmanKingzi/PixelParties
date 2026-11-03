@@ -18,17 +18,22 @@ Was im Sprite ist (x, y im 33×34-Sprite):
 * DÜSEN-KLAUEN (x 3–8 und 25–29, y 22–33): schwarze Schubdüsen/Fäuste (26,26,26)/(51,51,51) mit je zwei goldenen Stacheln (x 0–3 bzw. 29–32, y 25 und 28) — Gold.
 Metall (grauer Stahl) und Gold glänzen (Regel 12/14); keine Edelsteine, kein Feuer.
 
+Runde 3 — Nutzerwunsch: „soll sich nicht das Goldene auf seinem Kopf unabhängig von ihm bewegen! Seine Goldkette hat teilweise Lücken, und die Räder sollen sich genauso drehen wie beim Coreling.“
 Ablauf (48 Frames à 70 ms = 3,36 s, nahtlos; ein schwerer Roboter: ruhig, aber nie starr):
 * ATMEN/SUMMEN (einmal je Schleife): die glatte untere Brustplattenzeile 23 wird 0–2× eingefügt (Texturmischung): Kopf, Krone, Schultern, Brustzeichen und oberer Kettenteil heben sich starr bis 2 px,
-  Kettenspitze, Düsenstacheln und Boden bleiben stehen. (Einfügen an der Schulterzeile 13 hätte den schwarzen Rachen und das Kinn verlängert.)
-* KRONENFLATTERN: die Außenspitzen der goldenen Zacken (links x 11–12, rechts x 20–21) heben sich 1 px (links Frames 4–8 und 28–32, rechts 16–20 und 40–44) — Spalten wandern als Block, 4-verbunden.
+  Kettenspitze, Räder und Boden bleiben stehen. (Einfügen an der Schulterzeile 13 hätte den schwarzen Rachen und das Kinn verlängert.) Die Krone bewegt sich dabei NUR mit dem Kopf (starr).
+  Die Goldkette läuft durch die Einfügezeile: dort wird sie NICHT texturgemischt, sondern pixelgenau kopiert (die Texturmischung hatte Kettenpixel durch Grau ersetzt = Lücken); zusätzlich prüft das Skript in jedem Frame,
+  dass die Kette genauso viele zusammenhängende Teile hat wie im Original.
+* RÄDER DREHEN (wie beim Coreling, Technik aus coreling.py): die schwarzen Räder links (x 3–8) und rechts (x 24–29) haben je zwei goldene Radspikes (Original bei Zeile 25 und 28, drei Zeilen Abstand). Sie wandern zyklisch von oben nach unten am Rad entlang
+  (ein Schritt = 1 Zeile alle 2 Frames, 6 Schritte = 1 Umdrehung = 12 Frames, 4 Umdrehungen je Schleife; beide Räder gleich schnell, beide Spikes eines Rads um 3 Schritte versetzt): oben wachsen sie aus dem Rad heraus (nur der Ansatz),
+  unten tauchen sie wieder ein und verschwinden; oben beginnt der nächste. Die Spikes sind die Originalpixel (obere Form für Zeilen 24–26, untere Form für 27–29); die vom Spike im Original verdeckten Radpixel
+  ((3,25) (3,26) (3,28) (4,28) (4,29) und gespiegelt) sind mit den Radfarben aus den Nachbarzeilen gefüllt, wenn kein Spike dort steht. Ersetzt den früheren „Stachelpuls“.
 * LEUCHTAUGEN-BLINZELN (Frames 9–10 und 33–35): die roten Pixel werden schwarz (Visierfarbe).
-* STACHELPULS: die goldene Spitze der vier Düsenstacheln fährt kurz 1 px ein (oben links 12–15, unten links 20–23, oben rechts 36–39, unten rechts 44–47).
-* KETTENSPITZE: die untersten drei Kettenpixel samt Spitze schwingen 1 px nach links/rechts (Periode 24).
-* GLANZ: Lichtband über den grauen Stahl (Frames 2–17, ohne Außenkante), Lichtband über das Gold (Frames 26–41); Glitzersterne: Krone (13,2) Frames 28–31, Brustzeichen (14,17) Frames 33–36,
-  linker oberer Stachel (1,25) Frames 38–41.
+* GLANZ: Lichtband über den grauen Stahl (Frames 2–17, ohne Außenkante), Lichtband über das Gold (Frames 26–41); kurze Glitzersterne: Krone (13,2) Frames 28–31, Brustzeichen (14,17) Frames 33–36,
+  Kettenglied rechts (24,17) Frames 38–41.
+ENTFALLEN gegenüber Runde 2: das Kronenflattern (die Außenzacken der Krone bewegten sich unabhängig vom Kopf), das Schwingen der Kettenspitze (riss Lücken in die Kette) und der Stachelpuls (durch die drehenden Räder ersetzt).
 Frame 0 = Original (Ruhepose). Alle Bewegungen laufen auf der vollen Leinwand; nur Farben der Quelle.
-Ergänzungen: keine.
+Ergänzungen: nur die Radfüllung (siehe oben) und die pixelgenauen Kettenkopien in den Atem-Einfügezeilen.
 """
 import sys
 
@@ -57,19 +62,68 @@ AUGEN = {(13, 10): SCHWARZ, (19, 10): SCHWARZ}
 J, G = (254, 245, 142), (255, 216, 79)
 FH, FI = (206, 207, 206), (185, 186, 185)
 
-# Kronenzacken-Außenspitzen (Spalten als Block 1 px hoch)
-KRONE_L = np.zeros((sh, sw), bool)
-KRONE_L[1:4, 11:13] = True
-KRONE_L &= C.maske_farben(spr, GOLD, ohne_rand=False)
-KRONE_R = np.zeros((sh, sw), bool)
-KRONE_R[1:4, 20:22] = True
-KRONE_R &= C.maske_farben(spr, GOLD, ohne_rand=False)
-# Düsenstacheln: Spitzenpixel
-SPITZEN = {'ol': (0, 25), 'ul': (1, 28), 'or': (32, 25), 'ur': (31, 28)}
-KETTE_SPITZE = np.zeros((sh, sw), bool)
-KETTE_SPITZE[29, 15:19] = True
-KETTE_SPITZE[30, 17] = True
-KETTE_SPITZE &= C.maske_farben(spr, GOLD, ohne_rand=False)
+# ── Räder (Runde 3): Spikes wandern von oben nach unten, wie beim Coreling ──
+SPIKE_SCHRITT, SPIKE_ZYKLUS = 2, 6
+SPIKE_START = (1, 4)                                                                   # Positionsindex bei Schritt 0 (Zeilen 25 und 28 = Original); Position p = Zeile 24 + p
+SP_UP = {(0, 25), (1, 25), (2, 25), (3, 25), (2, 26), (3, 26)}                          # Originalspike oben (links), obere Zeile 25
+SP_LO = {(1, 28), (2, 28), (3, 28), (4, 28), (3, 29), (4, 29)}                          # Originalspike unten (links), obere Zeile 28
+K_, I_, M_ = (26, 26, 26), (0, 0, 0), (51, 51, 51)
+RAD_FUELL = {(3, 25): K_, (3, 26): I_, (3, 28): I_, (4, 28): K_, (4, 29): I_}           # vom Spike verdeckte Radpixel (links); (x, y) im Sprite
+for _p in SP_UP | SP_LO:
+    assert spr[_p[1], _p[0], 3], _p
+for _p, _c in RAD_FUELL.items():
+    assert _p in SP_UP | SP_LO
+SPX = {(x, y): f(x, y) for (x, y) in SP_UP | SP_LO}
+
+
+def _spiegel(p):
+    return (32 - p[0], p[1])
+
+
+def spike_pixel(y_top):
+    """Pixel (x, y, Farbe) eines linken Spikes mit oberer Zeile y_top (24…29): obere Form (Zeilen ≤ 26), untere Form (≥ 27); oben knospt er (nur der Ansatz), unten taucht er ein."""
+    if y_top <= 26:
+        dy, form, y0 = y_top - 25, SP_UP, 25
+    else:
+        dy, form, y0 = y_top - 28, SP_LO, 28
+    pix = sorted(((x, y + dy, SPX[(x, y)]) for (x, y) in form), key=lambda t: (t[1], t[0]))
+    if y_top == 24:                                                                     # knospt aus dem Rad: nur die zwei innersten Pixel der oberen Zeile
+        row0 = [p for p in pix if p[1] == y_top]
+        return sorted(row0, key=lambda t: -t[0])[:2]
+    if y_top == 29:                                                                     # taucht wieder ein: obere Zeile ohne das äußerste Pixel, untere Zeile bleibt
+        row0 = [p for p in pix if p[1] == y_top]
+        rest = [p for p in pix if p[1] != y_top]
+        return sorted(row0, key=lambda t: t[0])[1:] + rest
+    return pix
+
+
+def raeder(k, i):
+    """Räder mit drehenden Spikes auf die Leinwand k (in Sprite-Koordinaten + OFF) legen: Originalspikes entfernen, verdeckte Radpixel füllen, Spikes an ihren Stellen des Zyklus zeichnen."""
+    s_ = (i // SPIKE_SCHRITT) % SPIKE_ZYKLUS
+    for mir in (False, True):
+        sp = _spiegel if mir else (lambda p: p)
+        for p in SP_UP | SP_LO:
+            q = sp(p)
+            k[q[1] + OFF[1], q[0] + OFF[0]] = 0
+        for p, c in RAD_FUELL.items():
+            q = sp(p)
+            k[q[1] + OFF[1], q[0] + OFF[0], :3] = c
+            k[q[1] + OFF[1], q[0] + OFF[0], 3] = 255
+        for p0 in SPIKE_START:
+            for (x, y, c) in spike_pixel(24 + (p0 + s_) % SPIKE_ZYKLUS):
+                X, Y = (32 - x if mir else x) + OFF[0], y + OFF[1]
+                k[Y, X, :3] = c
+                k[Y, X, 3] = 255
+    return k
+
+
+# ── Goldkette: Maske der Kettenpixel (ohne Krone, Brustzeichen, Spikes) ──
+KETTE = C.maske_farben(spr, [(92, 44, 6), (160, 101, 0), (255, 216, 79), (254, 245, 142)], ohne_rand=False)
+KETTE[:16, :] = False                                                                  # Krone und Helm
+KETTE[:, :6] = False                                                                   # Radspikes links
+KETTE[:, 27:] = False                                                                  # Radspikes rechts
+KETTE[22:, 5:9] &= False                                                               # Spikebasis am Rad
+KETTE[15:21, 12:21] = False                                                            # Brustzeichen
 TEST_EBENEN = None
 
 

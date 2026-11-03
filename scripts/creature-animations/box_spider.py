@@ -96,7 +96,7 @@ for _n, _b in BEINE.items():
         assert not vor[_y, _x], f'Beinoption {_n} {(_x, _y)} liegt auf einem Spritepixel'
         assert max(abs(_x - _b['ansatz'][0]), abs(_y - _b['ansatz'][1])) == 1, f'{_n}: {(_x, _y)} nicht 8-verbunden mit dem Ansatz'
 LAUF = [(8, 20), (24, 36), (40, 48)]                                  # Laufphasen (Frames)
-ZUCKEN = {n: [(s, 3) for s in ((7 * j + 3) % 48, (7 * j + 27) % 48)] for j, n in enumerate(BEINE)}      # Standphase: je Bein zwei Zuckphasen à 3 Frames
+ZUCKEN = {n: [(s, 3) for s in ((7 * j + 3) % 48, (7 * j + 29) % 48)] for j, n in enumerate(BEINE)}      # Standphase: je Bein zwei Zuckphasen à 3 Frames
 BEINMASKE = np.zeros((sh, sw), bool)
 for _b in BEINE.values():
     BEINMASKE[_b['optionen'][0][1], _b['optionen'][0][0]] = True

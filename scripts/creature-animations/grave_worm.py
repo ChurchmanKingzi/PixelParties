@@ -26,6 +26,7 @@ Keine Partikel (graue Erdbrocken wirkten wie Fehlpixel und wurden wieder entfern
 Ruhepose = Original (die Wellen werden bei Frame 0 abgezogen). Alle Bewegungen laufen auf der vollen Leinwand (anim_lib wirft ClipError). Nur ganze Pixel, nur Farben der Quelle.
 Ergänzungen: keine gemalten Pixel.
 """
+import math
 import sys
 
 import numpy as np
@@ -54,13 +55,18 @@ TEST_EBENEN = 'koerper'
 
 
 def offs(i):
-    a = V.wellen_offs(EBENE_Y, 3.0, i, 24, 20.0, 0.0, 1.2)
-    b = V.wellen_offs(EBENE_Y, 1.0, i, 16, 9.0, 1.3, 1.0)
-    res = {y: a[y] + b[y] for y in EBENE_Y}
+    """Runde 3 (Nutzer: „zuckt viel zu sehr, das muss natürlicher aussehen“): EIN langsames, gleichmäßiges Wiegen (Periode 48 = einmal pro Schleife, 3,1 s) statt vieler überlagerter schneller Wellen und des
+    seitlichen Kopfnickens. Der Fuß am Loch bleibt stehen, der Versatz wächst zum Hals hin (Potenz 1,3), der Hals hinkt dem Fuß leicht hinterher (0,5 rad) — wie ein Halm, der sich im Wind biegt. Der Versatz ändert sich
+    nie schneller als 1 px alle ~2,5 Frames und läuft ohne Hin-und-her-Zittern monoton auf und ab; Frame 0 = Original. Der Kopf schwingt starr mit der obersten Körperzeile."""
+    n = len(EBENE_Y)
+    res = {}
+    for k, y in enumerate(EBENE_Y):
+        f = k / float(n - 1)
+        lag = 0.5 * f
+        res[y] = int(round(3.0 * f ** 1.3 * (math.sin(2 * math.pi * i / 48 - lag) - math.sin(-lag))))
     res = V.glatt(res, EBENE_Y)
-    nick = V.hub(i, 16, 1.0, 0.0)                                # Kopf nickt seitlich ±1 px gegen den Hals (starr)
     for y in KOPF_Y:
-        res[y] = res[EBENE_Y[-1]] + nick
+        res[y] = res[EBENE_Y[-1]]
     return res
 
 

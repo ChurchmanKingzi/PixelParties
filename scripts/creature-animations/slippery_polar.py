@@ -18,8 +18,8 @@ I/D/N/K/L Grautöne des Schattenfells, M (51,50,50) Umriss, O (38,35,36)/P (28,2
 * Kein Fell-Glanz, kein Metall im Bild (Regel 14). Keine Partikel.
 
 Ablauf (64 Frames à 66 ms = 4,2 s, nahtlos), alle Bewegungen unabhängig:
-* RUTSCHEN (neu, ersetzt Pfotentreten und Einsacken): der GANZE Bär gleitet ganzzahlig und sanft über das Eis — Frames 0–11 nach rechts bis +3 px (anfahrend und bremsend, Kosinus-Ease), Halt (12–19),
-  dann Frames 20–43 nach links bis −3 px, Halt (44–51), Frames 52–63 zurück zur Mitte. Er bleibt dabei starr (alle Teile verschieben sich gemeinsam), blickt weiter nach links, wird nicht gespiegelt und
+* RUTSCHEN (neu, ersetzt Pfotentreten und Einsacken): der GANZE Bär gleitet ganzzahlig und sanft über das Eis — Frames 0–13 nach rechts bis +3 px (anfahrend und bremsend, Kosinus-Ease), Halt (14–17),
+  dann Frames 18–45 nach links bis −3 px, Halt (46–49), Frames 50–63 zurück zur Mitte. Er bleibt dabei starr (alle Teile verschieben sich gemeinsam), blickt weiter nach links, wird nicht gespiegelt und
   macht keine Gehbewegung; leicht = nur ±3 px (≈ 7 % seiner Länge). Frame 0 = Original.
 * Ohrzucken: die Ohrspitzen (Zeilen 0–1) schnippen 1 px nach hinten (rechts), 3× pro Schleife (Frames 6, 28, 50).
 * Blinzeln (Frames 12–15 und 40–43): das Auge (6–7, 4–5) wird erst oben, dann ganz zur Fellfarbe A (247,240,230) des Kopfes, dann wieder offen.
@@ -54,7 +54,7 @@ AUGE = [(6, 4), (7, 4), (6, 5), (7, 5)]
 TEST_EBENEN = ['koerper', 'ohr']
 
 # Rutschen: 0 → +3, Halt, +3 → −3, Halt, −3 → 0 (kein Spiegeln: der Bär blickt weiter nach links)
-BAHN, _SPIEGEL = R.pfad(N, [('fahrt', 3, 12), ('halt', 8), ('fahrt', -3, 24), ('halt', 8), ('fahrt', 0, 12)])
+BAHN, _SPIEGEL = R.pfad(N, [('fahrt', 3, 14), ('halt', 4), ('fahrt', -3, 28), ('halt', 4), ('fahrt', 0, 14)])
 
 
 def teil(maske):
