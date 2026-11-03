@@ -19,15 +19,16 @@ Was ist was (x/y im Sprite):
 Fest bleiben: Körperform, Beine/Klauen, Hauer, Zunge, Maul, Nüstern.
 
 Ablauf (48 Frames à 65 ms = 3,12 s; Frame 0 = Original, die Flammen sind ausgenommen):
-* Feuer (Regel 15, Modul anim_feuer.py unverändert benutzt): beide Flammen werden NEU gezeichnet — links 5 Zungen (Fuß auf dem Oliv-Balken y 12), rechts 6 Zungen (Fuß auf dem Hinterteil bzw. frei); jede Zunge besteht aus fünf Farbschichten
-  (Rot-Außenhaut, Orange, Gelb, Creme-Kern), hat 12 Posen à 2–3 Frames (Höhe, Breite, Neigung, S-Kurve wechseln, Kerne wandern), die Spitzen laufen spitz zu; die Zungen sind gegeneinander versetzt; abgerissene Spitzen steigen als
-  Funken auf (1 px, Regel 15) und kühlen ab. Die Flammenfüße stehen fest (die Flammen schwingen mit dem Atmen mit).
+* Feuer (Regel 15/40, Modul anim_feuer2.py — Feuer von Hand, Nutzerkorrektur Runde 3): die GEMALTE Pyraga-Flamme der xcf-Ebene (beide Flammen im Sprite, Ebene „Pyraga“ in Motive.xcf = Quelle der Kartenkunst) ist die Vorlage und wird nicht mehr neu erfunden.
+  Linke Flamme (Nacken): drei Zungen (Spitzen (10,0), (12,3), (14,1), Fuß auf dem Oliv-Balken); rechte Flamme (Hinterteil, zeigt nach rechts): fünf waagerechte Zungen auf den Zeilen 10/12/14/16/18 (Spitzen u. a. (52,12), (50,14)).
+  Jede Zunge läuft ihre eigene Folge von 12 handgesetzten Posen (Länge, Neigung, S-Kurve, Kernhub) à 2–3 Frames, zeitversetzt; der Fuß bleibt breit und ruhig, die Spitzen laufen spitz zu und reißen ab (Funken 1 px: gelb → orange → rot).
+  Alle Pixel stammen aus der gemalten Flamme (Rot-Außenhaut (202,44,41), Orange, Gelb, Creme-Kern); die Flammen heben sich beim Atmen mit dem Körper.
 * Atmen zweistufig 0-1-2-1-0 px (Periode 24, zweimal pro Schleife): die Hautzeile y 22 (reine Haut, ohne Nüstern/Augen) wird 1–2× eingefügt (anim_lib.streck_zeile mit Texturmischung); alles darüber (Rücken, Kopf, Flammen) steigt,
   die Beine/Klauen/Hinterlauf bleiben am Boden.
 * Blinzeln beider Augen (Lid = Hautfarbe (195,138,131); Wimpern bleiben): Frame 9–11 und 33–35.
 * Lavapunkte an den Fußsohlen glühen unregelmäßig (jedes Pixel wechselt mit eigener Periode 6–10 Frames zwischen (255,105,0), (255,154,0) und (244,123,34); Farben der Quelle).
 Kein Glanz/Glitzer (Haut/Feuer — Regel 14).
-ERGÄNZUNG: keine gemalten Pixel nötig (die Flammen werden komplett aus Quellfarben neu gezeichnet). Randpixel-Test: anim_untote.kontur_schliessen (Umrissfarben der Quelle); Flammenränder = Umrissfarbe (202,44,41).
+ERGÄNZUNG: keine gemalten Pixel nötig (die Flammen entstehen aus der gemalten Vorlage). Randpixel-Test: anim_untote.kontur_schliessen (Umrissfarben der Quelle); Flammenränder = Umrissfarbe (202,44,41).
 Alle Bewegungen laufen auf der vollen Leinwand (anim_lib wirft ClipError). Nur ganze Pixel, nur Farben der Quelle. Zuschnitt auf die Figur (Funken gehören zum Feuer).
 """
 import math

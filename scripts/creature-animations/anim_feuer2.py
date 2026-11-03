@@ -24,17 +24,28 @@ Schnittstelle
 -------------
     import anim_feuer2 as F2
 
-    vl = F2.Vorlage(rgba_flamme, zungen, richtung='hoch', rand_farbe=(r,g,b), sperre=maske)
-    #  rgba_flamme: Feld h×w×4 NUR mit den Flammenpixeln (Alpha 0/255) auf der Leinwand der Figur; Zungen in denselben Pixeln.
-    #  richtung: wohin die Flamme zeigt ('hoch', 'runter', 'links', 'rechts') — jede Richtung wird intern aufrecht gerechnet.
-    zungen = F2.zungen_finden(rgba_flamme, richtung)               # Gipfel der Silhouette → Zungen (Fuß → Spitze)
-    zungen = F2.zungen_baender(rgba_flamme, richtung, breite=3)    # gleichmäßige Streifen (Mähne, Strahl, Schweif)
-    feuer = F2.Feuer([vl, …], n=48, seed=3, bank='zunge', amp=1.0, welle=None, funken=True)
-    ebene = feuer.ebene(i)            # RGBA-Feld h×w: die Flamme in Frame i (0 ≤ i < n)
-    funken = feuer.funken(i, dy=0)    # RGBA-Feld h×w: abgerissene, aufsteigende Funken (dy: Versatz der Figur beim Abreißen, auch Funktion frame → dy)
+    vl = F2.Vorlage(rgba_flamme, zungen, richtung='hoch', rand_farbe=(r,g,b), sperre=maske, kochen=0, welle=None, bank=None, faden=None, rand_frei=None, puls=None)
+    #  rgba_flamme: Feld h×w×4 NUR mit den Flammenpixeln (Alpha 0/255) auf der Leinwand der Figur (z. B. L.platz(L.trenne(spr, flammenmaske)[0], H, W, ox, oy)); Zungen in denselben Pixeln.
+    #  richtung: wohin die Flamme zeigt ('hoch', 'runter', 'links', 'rechts') — jede Richtung wird intern aufrecht gerechnet (reine Pixelumordnung, keine Drehung mit Abtastung).
+    #  rand_farbe: Randpixel der Flamme bekommen immer diese Umrissfarbe (Regel 16); sperre: Pixel, die schon Festes belegen (zählen nicht als Rand, halten die Flamme zusammen);
+    #  kochen: Hitzeflimmern im Innern (Farbzeichnung wandert um ±kochen px); welle=(lag, jitter): Posen laufen als Welle durch die Zungen (negativ = von rechts nach links);
+    #  bank: Posenbank dieser Vorlage ('zunge', 'ruhig', 'strahl', 'wild'); faden=k: 1-px-Fäden auf k Pixel kürzen; rand_frei: Maske, wo der Rand NICHT eingefärbt wird;
+    #  puls=(tempo, abstand, dicke): Schwallwellen — ein Band (dicke Zeilen) wandert mit dem Strom, seine Pixel sind eine Farbstufe dunkler (Feuerstrahl).
+    z = F2.Zunge(fuss=(x, y), spitze=(x, y), amp=1.0, bank=None, fuss_anteil=0.3, funke=True, s_max=None)   # Fuß = ruhig, Spitze = oberstes Pixel (in Flammenrichtung)
+    zungen = F2.zungen_finden(rgba_flamme, richtung, min_prom=2)  # Gipfel der Silhouette → Zungen (taugt für Flammen mit tiefen Tälern)
+    zungen = F2.zungen_baender(rgba_flamme, richtung, breite=3)   # gleichmäßige Streifen quer zur Flamme (Mähne, Schweif, Kugel: Fuß = Körperkante, Spitze = Ende)
+    art, fuss, spitze = F2.tropfen(hoehe, breite, (rand, orange, gelb, hell), neigung)   # neu von Hand gesetzte Zunge (Tropfenform), zum Ergänzen der Vorlage
+    F2.ascii_sprite(['..r..', '.ror.', …], {'r': (r,g,b), …})     # selbst gezeichnete Flammenteile (ASCII-Pixel) → RGBA
+    feuer = F2.Feuer([vl, …], n=48, seed=3, bank='zunge', amp=1.0, funken=True, funken_farben=None, funken_leben=9, welle=None,
+                     weich=1.5, abriss=1.5, max_funken=None, funken_abstand=3, funken_modus='steigen')
+    #  weich: Weichheit der Zungenränder (px, kleiner = schärfere Nähte); abriss: Mindestfall der Spitze (Zeilen), ab dem sie abreißt; max_funken: nur die größten Abrisse je Schleife behalten;
+    #  funken_modus 'steigen' (Funken steigen auf) oder 'fliessen' (fliegen mit dem Strom weiter, Feuerstrahl); Funken sind 1 px (frisch abgerissen 1×2) in den Flammenfarben.
+    ebene = feuer.ebene(i)            # RGBA-Feld h×w: die Flamme in Frame i (0 ≤ i < n); Lage/Zugabe zum Körper macht der Aufrufer (L.versetze, L.zusammen)
+    funken = feuer.funken(i, dy=0)    # RGBA-Feld h×w: abgerissene, aufsteigende Funken (dy: Versatz der Figur beim Abreißen, auch Funktion frame → dy); Leinwand mit Rand für ~8 px Weg
     F2.zungen_bild(pfad, vl, zoom)    # Kontrollbild der Zungenachsen (Fuß blau → Spitze grün) auf der Vorlage
-    F2.ascii_sprite(['..r..', '.ror.', …], {'r': (r,g,b), …})     # handgezeichnete Flammenteile (ASCII-Pixel) → RGBA, zum Ergänzen der Vorlage
-Frame 0 ist eine Pose wie jede andere (die Folge ist nahtlos); die Ruhepose der Vorlage ist bei s = 1, l = b = c = 0 erreicht.
+Vorlagen: Pyraga (zwei gemalte Flammen: 'hoch' + 'rechts', von Hand gesetzte Zungenachsen), Night Mare (Mähne: Streifen + Welle, Schweif 'links'), Guardian Beast Long (Strahl 'runter', in Zähne geschnitten, puls),
+Chaorc Friendly Fireballer (Kugel + Schweif als 'links'-Streifen, kochen), Rebelliokai Kind Kitsune (drei Schweif-Flammen 'hoch'/'rechts'/'runter').
+Frame 0 ist eine Pose wie jede andere (die Folge ist nahtlos), die Ruhepose der Vorlage ist s = 1, l = b = c = 0; Flammen sind von der „Frame 0 = Original“-Prüfung ausgenommen.
 """
 import math
 import random
@@ -396,7 +407,7 @@ def _komponenten(m):
 
 
 class Feuer:
-    def __init__(self, vorlagen, n=48, seed=1, bank='zunge', amp=1.0, funken=True, funken_farben=None, funken_leben=9, welle=None, schwelle=1.5, max_funken=None, funken_abstand=3, funken_modus='steigen'):
+    def __init__(self, vorlagen, n=48, seed=1, bank='zunge', amp=1.0, funken=True, funken_farben=None, funken_leben=9, welle=None, weich=1.5, abriss=1.5, max_funken=None, funken_abstand=3, funken_modus='steigen'):
         if isinstance(vorlagen, Vorlage):
             vorlagen = [vorlagen]
         self.n, self.amp = n, amp
@@ -406,7 +417,7 @@ class Feuer:
             g = _Gruppe(vl, n, seed, bank, amp, idx, welle)
             idx += len(g.z)
             self.gruppen.append(g)
-        self.funken_an, self.funken_farben, self.funken_leben, self.schwelle = funken, funken_farben, funken_leben, schwelle
+        self.funken_an, self.funken_farben, self.funken_leben, self.weich, self.abriss = funken, funken_farben, funken_leben, weich, abriss
         self.max_funken, self.funken_abstand, self.funken_modus = max_funken, funken_abstand, funken_modus
         self._cache = {}
         self.ereignisse = []                     # (frame, gruppe, x_kanon, y_kanon, drift)
@@ -447,7 +458,7 @@ class Feuer:
                     lo = mid
                 else:
                     hi = mid
-            wgt = _tent(q, lo, hi, self.schwelle)
+            wgt = _tent(q, lo, hi, self.weich)
             wgt = np.where(t_out > 0, wgt, 0.0)
             Dx += wgt * (x_src - xx)
             Dy += wgt * (y_src - yy)
@@ -603,7 +614,7 @@ class Feuer:
                     s1, l1, _, _ = g.pose(j, i)
                     x0, y0, te0 = g.spitze_aus(j, s0, l0)
                     x1, y1, te1 = g.spitze_aus(j, s1, l1)
-                    if te0 >= d['H'] * 0.98 and te0 - te1 >= self.schwelle:
+                    if te0 >= d['H'] * 0.98 and te0 - te1 >= self.abriss:
                         o = self._ebene_gruppe(gi, i - 1)[..., 3] > 0           # tatsächliche Spitze der Vorgängerpose im gerenderten Bild
                         best = None
                         for xx in range(int(x0) - 1, int(x0) + 2):

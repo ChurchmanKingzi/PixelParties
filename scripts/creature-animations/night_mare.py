@@ -16,15 +16,15 @@ Was ist was (x/y im Sprite):
 Fest bleiben: Beine (außer dem anhebbaren Vorderhuf), Körperform.
 
 Ablauf (48 Frames à 65 ms = 3,12 s; Frame 0 = Original, die Flammen sind ausgenommen):
-* Feuer (Regel 15, Modul anim_feuer.py unverändert benutzt): die MÄHNE wird NEU gezeichnet aus 13 Flammenzungen, deren Füße auf der Körperkontur (Rücken, Hals, Kopf) stehen (Höhe 6–14 px, am Hals am höchsten);
-  der SCHWEIF aus 3 Zungen, deren Fuß am Hinterteil steht; weil er nach unten hängt, läuft das Modul dafür auf einer senkrecht gespiegelten Leinwand (wie bei Ifrit/Future Tech Drone). Jede Zunge: fünf Farbschichten
-  (Rot-Außenhaut, Orange, Gelb, Creme-Kern), 12 Posen à 2–3 Frames, gegeneinander versetzt, Spitzen laufen spitz zu und reißen als Funken (1 px, Regel 15) ab, die steigen (Mähne) bzw. fallen (Schweif) und abkühlen.
+* Feuer (Regel 15/40, Modul anim_feuer2.py — Feuer von Hand, Nutzerkorrektur Runde 3): das gemalte Feuer des Standard-Sprites (Mähne und Schweif) ist die Vorlage, jede Zunge wird einzeln animiert statt neu erfunden.
+  MÄHNE (Flamme zeigt nach oben): Streifen von 3 px Breite entlang Rücken, Hals und Kopf (Fuß = Körperkante, Spitze = höchstes Pixel), die Posenfolgen laufen als Welle vom Kopf zum Rücken; SCHWEIF (Zeilen y ≥ 20, zeigt nach links): Streifen von 3 Zeilen,
+  Fuß am Hinterteil. Je Zunge 12 handgesetzte Posen (Länge, Neigung, S-Kurve, Kernhub) à 2–3 Frames, zeitversetzt; Spitzen reißen ab und steigen als Funken auf (Mähne nach oben, Schweif: erst nach links, dann aufwärts).
 * Atmen zweistufig 0-1-2-1-0 px (Periode 24, zweimal pro Schleife): die Bauchzeile y 25 wird 1–2× eingefügt (anim_lib.streck_zeile mit Texturmischung); Rücken, Hals, Kopf, Mähne und Schweifansatz steigen, Beine und Hufe bleiben am Boden.
 * Kopf nickt (je ein Nicken Frame 6–9 und 30–33, +1 px): Hals-/Kopfspalten x ≥ 29 oberhalb y 21 (samt Flamme) sinken 1 px; der Kopf bewegt sich nie seitlich. Keine Ohren im Sprite (von der Mähne verdeckt).
 * Blinzeln (Lid = Kopfgrau (46,46,46)): das rote Auge Frame 14–16 und 38–40.
 * Vorderhuf scharrt (Frame 18–22 und 42–46): das helle Vorderbein (x 26–29) wird 1 px kürzer (Zeile 36 entfällt), der Huf hebt sich; das Bein bleibt an der Brust.
 Kein Glanz (Huf/Fell/Feuer — Regel 14).
-ERGÄNZUNG: keine gemalten Pixel nötig (die Flammen werden neu aus Quellfarben gezeichnet). Randpixel-Test: anim_untote.kontur_schliessen (Umrissfarben der Quelle); Flammenränder = Umrissfarbe (202,44,41).
+ERGÄNZUNG: keine gemalten Pixel nötig (die Flammen entstehen aus der gemalten Vorlage). Randpixel-Test: anim_untote.kontur_schliessen (Umrissfarben der Quelle); Flammenränder = Umrissfarbe (202,44,41).
 Alle Bewegungen laufen auf der vollen Leinwand (anim_lib wirft ClipError). Nur ganze Pixel, nur Farben der Quelle. Zuschnitt auf die Figur (Funken gehören zum Feuer).
 """
 import math

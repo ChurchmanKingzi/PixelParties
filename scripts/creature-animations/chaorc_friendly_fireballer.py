@@ -16,10 +16,9 @@ Was im Sprite ist (x, y im 43×22-Sprite):
 Metall: nichts (der graue Einzelpixel ist unsicher) → KEIN Glanz (Regel 14).
 
 Ablauf (48 Frames à 62 ms = 2,98 s, nahtlos):
-* FEUERBALL (Regel 15/40, Modul anim_feuer2.py — Feuer von Hand): die gemalte Kugel der Quelle (Ebene 102) bleibt als Körper stehen; ihr Inneres flimmert (die Farbzeichnung aus Kern/gelben Sprenkeln wandert leicht), auf ihrer Oberkante und Unterkante
-  sitzen von Hand gesetzte Flammenzungen (Tropfenform in den Farben der Kugel: roter Rand, orange, gelb, heller Kern, nach hinten geneigt), und der Schweif besteht aus fünf von Hand gesetzten, nach links zeigenden Zungen (die dünnen roten Streifen der Quelle
-  waren zu schmal zum Animieren). Jede Zunge läuft ihre eigene Folge von 12 handgesetzten Posen à 2–3 Frames (Länge, Neigung, S-Kurve, Kernhub), zeitversetzt; Spitzen reißen ab und steigen als Funken auf (rot/orange/gelb).
-  Der ganze Ball schwebt ±1 px (Periode 48) — er fliegt. Kein Lichtband, keine Sterne.
+* FEUERBALL (Regel 15/40, Modul anim_feuer2.py — Feuer von Hand, Nutzerkorrektur Runde 3): die GEMALTE Kugel samt Schweif der Quelle (Ebene 102) ist die Vorlage und wird Zunge für Zunge animiert (nicht mehr als Ellipse neu simuliert): die Flamme zeigt nach links (Flugrichtung = rechts),
+  quer dazu laufen 2-Zeilen-Streifen als Zungen (Fuß = rechter Kugelrand, ruhig; Spitze = linkes Ende / Schweif). Der Schweif (Zeilen 7–12) wechselt Länge, Neigung und Kernhub, die Kugel selbst bewegt sich nur ganz leicht; ihr Inneres flimmert (die Farbzeichnung aus Kern und gelben Sprenkeln
+  wandert um ≤ 1 px), Randpixel bleiben der rote Umriss. Je Zunge 12 handgesetzte Posen à 2–3 Frames, zeitversetzt; Spitzen reißen ab und steigen als Funken auf. Der Schweif ragt dem Chaorc nie in die Hand (Längengrenze). Der ganze Ball schwebt ±1 px (Periode 48) — er fliegt. Kein Lichtband, keine Sterne.
 * Atmen des Chaorcs (Periode 24, zweimal pro Schleife): die Gürtelzeile 14 wird einmal doppelt eingefügt (L.streck_zeile, Texturmischung): Kopf und Brust steigen 1 px, die Kiste/Beine bleiben.
 * Ohrzucken: die Spitze des linken Ohrs streckt sich 1 px nach außen (Frames 10–13, 34–37): Spitze (−1,7) + Haut (0,7) + Umriss (0,6)/(0,8), alle Pixel in Umrissfarbe/Hautrot des Sprites.
 * Blinzeln (Frames 20–22 und 41–43): der weiße Augenschlitz nimmt die dunkle Gesichtsfarbe (51,0,0) an (Lid).

@@ -42,7 +42,7 @@ import anim_lib as L
 import anim_rebel as R
 
 N, MS = 60, 70
-PAD_L, PAD_R, PAD_T, PAD_B = 3, 6, 5, 2
+PAD_L, PAD_R, PAD_T, PAD_B = 4, 7, 6, 3
 
 spr = L.lade('rebelliokai-kind-kitsune')
 fuchs = L.lade('rebelliokai-kind-kitsune-fuchs')
@@ -84,7 +84,7 @@ ZT_L = [Zk((5, 22), (5, 31), fuss_anteil=0.12, amp=1.4), Zk((8, 22), (9, 30), fu
 VL_O = FE2.Vorlage(lay0(schweife, t_oben), ZT_O, 'hoch', rand_farbe=UMRISS_SCHWEIF, sperre=FUCHS_M, faden=2)
 VL_R = FE2.Vorlage(lay0(schweife, t_rechts), ZT_R, 'rechts', rand_farbe=UMRISS_SCHWEIF, sperre=FUCHS_M, faden=2)
 VL_L = FE2.Vorlage(lay0(schweife, t_links), ZT_L, 'runter', rand_farbe=UMRISS_SCHWEIF, sperre=FUCHS_M, faden=2)
-FEUER = FE2.Feuer([VL_O, VL_R, VL_L], n=N, seed=41, bank='zunge', amp=1.0, schwelle=1.0, max_funken=7, funken_abstand=5, funken_leben=8)
+FEUER = FE2.Feuer([VL_O, VL_R, VL_L], n=N, seed=41, bank='zunge', amp=1.0, weich=0.8, abriss=1.0, max_funken=7, funken_abstand=5, funken_leben=8)
 
 
 def lay(quelle, maske, dy=0):
@@ -92,7 +92,7 @@ def lay(quelle, maske, dy=0):
     return L.platz(t, H, W, OFF[0], OFF[1] + dy)
 
 
-def frame(i):
+def frame(i, nur=None):
     b = 1 if Hm.takt(i, N / 3, 4, 10) else 0                         # Atem: je 20-Frame-Periode 10 Frames oben (Frame 0 = unten)
     k = lay(fuchs, fox_rest)
     ol = lay(fuchs, ohr_l_spitze)
@@ -113,8 +113,12 @@ def frame(i):
     fig, _br = R.verbinde(fig)                                       # Teile, die nur über eine Pixelecke hängen (dünne Schweifspitzen), werden 4-verbunden
     R.neue_loecher_fuellen(fig, LOCH0, ERLAUBT, max_groesse=4)
     R.kontur_je_teil(fig, etik, ERLAUBT, {'fuchs': UMRISS_FUCHS, 'schweif': UMRISS_SCHWEIF}, standard=UMRISS_SCHWEIF)
+    if nur == 'koerper':
+        return fig
     return L.zusammen(H, W, [(fig, 0, 0), (fk, 0, 0)])
 
+
+TEST_EBENEN = 'koerper'
 
 if __name__ == '__main__':
     frames = [frame(i) for i in range(N)]
