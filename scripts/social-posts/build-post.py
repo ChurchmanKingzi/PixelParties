@@ -567,7 +567,8 @@ def main():
     args_opener = opener
     opener_on = opener in ('heart', 'storm', 'shift', 'wind')
     aliceshow_on = bool(hero_cfg.get('aliceshow'))                            # Alice-Show (alicefx.AliceShow): nutzt dieselbe Schnittstelle wie die Wind-Show
-    windshow_on = bool(hero_cfg.get('windshow')) or aliceshow_on              # Show mit Zeitleiste (windfx.WindShow / alicefx.AliceShow) statt Schleife
+    iceshow_on = bool(hero_cfg.get('iceshow'))                                # Eis-Show (icefx.IceShow, Broghan)
+    windshow_on = bool(hero_cfg.get('windshow')) or aliceshow_on or iceshow_on              # Show mit Zeitleiste (windfx.WindShow / alicefx.AliceShow) statt Schleife
     wind_on = args.wind or bool(hero_cfg.get('wind')) or windshow_on
     horror_on = args.horror or bool(hero_cfg.get('horror'))
     show_on = (args.show or hero_cfg.get('show') or 'none') == 'mini'
@@ -683,7 +684,18 @@ def main():
         import windfx
         lxw, lyw = (W - logo.width) // 2, 40 + oy + (args.logo_dy if args.logo_dy is not None else hero_cfg.get('logoDy', 0))
         wgeom = dict(logo_rect=(lxw, lyw, logo.width, logo.height), logo_img=logo, center=(card_x + CARD_W / 2, card_y + CARD_H * 0.47))
-        if windshow_on:
+        if iceshow_on:
+            import icefx
+            eyes_ = []                                                       # Augenmitte (dunkel-/hellrote Pixel) je Sprite-Frame
+            for i_ in range(spr.n):
+                fr_ = np.asarray(spr.sheet.crop((i_ * spr.fw, 0, (i_ + 1) * spr.fw, spr.fh))).astype(int)
+                ys_, xs_ = np.where((fr_[..., 0] >= 60) & (fr_[..., 1] <= 60) & (fr_[..., 2] <= 60) & (fr_[..., 0] > fr_[..., 1] + 40) & (fr_[..., 3] > 20))
+                eyes_.append((float(xs_.mean()), float(ys_.mean())) if len(xs_) else (31.0, 13.0))
+            ig = dict(logo_rect=wgeom['logo_rect'], logo_img=logo, badge_rect=badge_rect, badge_img=badge_img, plate_rect=(plate_x, plate_y, plate.width, plate.height),
+                      grid=(sx, sy, spr.px), draw_text=draw_text,
+                      eye_fn=lambda t_: (sx + (eyes_[(int(t_ * float(fps)) // per) % spr.n][0] + 0.5) * spr.px, sy + (eyes_[(int(t_ * float(fps)) // per) % spr.n][1] + 0.5) * spr.px))
+            wind = icefx.IceShow(W, H, U, float(fps), loop, ig, loop * WIND_LOOPS / float(fps))
+        elif windshow_on:
             tips = []                                                        # Fingerspitze des ausgestreckten Arms (links) je Sprite-Frame
             for i_ in range(spr.n):
                 fr_ = np.asarray(spr.sheet.crop((i_ * spr.fw, 0, (i_ + 1) * spr.fw, spr.fh)))
@@ -1407,7 +1419,7 @@ def main():
     if first_on:
         for f in range(loop * first_loops):
             render(f, intro_on, punch_on, opener_on).save(fdir / f'i{f:03d}.png')
-    cover = Image.open(fdir / ('i%03d.png' % int((17.4 if show_on else 16.8) * float(fps)))) if (show_on or windshow_on) else Image.open(fdir / ('f%03d.png' % (min(loop - 1, per * 3))) if reel else fdir / 'f000.png')
+    cover = Image.open(fdir / ('i%03d.png' % int((17.4 if show_on else 17.3 if iceshow_on else 16.8) * float(fps)))) if (show_on or windshow_on) else Image.open(fdir / ('f%03d.png' % (min(loop - 1, per * 3))) if reel else fdir / 'f000.png')
     cover_path = out / ('reel-cover.png' if reel else 'post.png')
     cover.save(cover_path)
     print('Standbild', cover_path)

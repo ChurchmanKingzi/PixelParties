@@ -208,6 +208,11 @@ HEROES = {
         "Once per turn, Alice deals 50 damage to a target times the number of Creatures you control that weren't summoned this turn. Her Mr. Jiggles are always watching.",
         "seven stringed puppets with glowing red eyes and thin red lasers",
         "#Puppets #Creepy #Lasers"),
+    "Broghan, the Frozen Guardian of the North": (
+        "One eye. One storm. 500 damage. ❄️🔴",
+        "Broghan cannot be Frozen. Once per turn, he deals 500 damage to a target – reduced by 10 for every card left in your deck, to a minimum of 10. The thinner your deck, the harder he hits.",
+        "red lightning from a single glowing eye, drifting ice clouds, snow and a frozen interface",
+        "#Ice #Storm #Lightning"),
     "???, the Shapeshifter": (
         "Every night, a different face. 🎃👁️",
         "Once per turn, ??? the Shapeshifter can equip a Hero with a different name from your hand, deck or discard pile, and gains its effects and name until the end of your opponent's turn. Each Hero can only be equipped once per game. Happy Halloween!",
@@ -337,6 +342,8 @@ TIKTOK = {
                                    "Discard up to 5 cards and draw that many. Then your opponent must do the same, and that draw can't be prevented."),
     "Alice, the Puppeteer Girl": ("Seven puppets. 350 damage. 🎀🔴",
                                   "Once per turn: 50 damage times the number of Creatures you control that weren't summoned this turn. Alice's Mr. Jiggles do the rest."),
+    "Broghan, the Frozen Guardian of the North": ("One eye. One storm. 500 damage. ❄️🔴",
+                                                  "Once per turn: 500 damage, minus 10 for every card in your deck. Broghan can't be Frozen."),
     "Elana, the Rocky Rebel": ("Hate your hand? Shuffle it away. 🎸",
                                "Once per turn: shuffle your whole hand back into the deck and draw the same number of cards +1."),
     "Reiza, the Chief Tormentor": ("Stun. Poison. Double action. 🦇",
