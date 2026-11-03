@@ -79,8 +79,8 @@ FUCHS_M = np.zeros((H, W), bool)
 FUCHS_M[OFF[1]:OFF[1] + sh, OFF[0]:OFF[0] + sw] = fox
 Zk = lambda f_, s_, **k: FE2.Zunge((f_[0] + OFF[0], f_[1] + OFF[1]), (s_[0] + OFF[0], s_[1] + OFF[1]), **k)
 ZT_O = [Zk((10, 10), (10, 0), fuss_anteil=0.2), Zk((13, 10), (14, 1), fuss_anteil=0.2), Zk((6, 10), (5, 2), fuss_anteil=0.2, amp=0.9), Zk((8, 9), (8, 2), fuss_anteil=0.2, amp=0.7)]
-ZT_R = [Zk((26, 19), (34, 19), fuss_anteil=0.2, amp=0.8), Zk((26, 21), (36, 21), fuss_anteil=0.2), Zk((27, 23), (35, 23), fuss_anteil=0.2, amp=0.9)]
-ZT_L = [Zk((5, 24), (5, 31), fuss_anteil=0.2), Zk((8, 24), (9, 30), fuss_anteil=0.2, amp=0.9), Zk((2, 24), (0, 29), fuss_anteil=0.2, amp=0.8)]
+ZT_R = [Zk((25, 19), (34, 19), fuss_anteil=0.12, amp=1.2), Zk((25, 21), (36, 21), fuss_anteil=0.12, amp=1.4), Zk((26, 23), (35, 23), fuss_anteil=0.12, amp=1.2)]
+ZT_L = [Zk((5, 22), (5, 31), fuss_anteil=0.12, amp=1.4), Zk((8, 22), (9, 30), fuss_anteil=0.12, amp=1.2), Zk((2, 22), (0, 29), fuss_anteil=0.12, amp=1.2)]
 VL_O = FE2.Vorlage(lay0(schweife, t_oben), ZT_O, 'hoch', rand_farbe=UMRISS_SCHWEIF, sperre=FUCHS_M, faden=2)
 VL_R = FE2.Vorlage(lay0(schweife, t_rechts), ZT_R, 'rechts', rand_farbe=UMRISS_SCHWEIF, sperre=FUCHS_M, faden=2)
 VL_L = FE2.Vorlage(lay0(schweife, t_links), ZT_L, 'runter', rand_farbe=UMRISS_SCHWEIF, sperre=FUCHS_M, faden=2)

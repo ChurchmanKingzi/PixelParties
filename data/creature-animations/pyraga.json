@@ -1,15 +1,15 @@
 {
   "creature": "Pyraga",
   "sheet": "pyraga.png",
-  "frameWidth": 69,
+  "frameWidth": 61,
   "frameHeight": 53,
   "frames": 48,
   "frameMs": 65,
   "loop": true,
   "layout": "horizontal",
   "padTop": 1,
-  "padLeft": 8,
+  "padLeft": 4,
   "padRight": 1,
   "padBottom": 7,
-  "faceX": 34.5
+  "faceX": 30.5
 }
