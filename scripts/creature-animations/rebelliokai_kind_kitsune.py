@@ -42,7 +42,7 @@ import anim_lib as L
 import anim_rebel as R
 
 N, MS = 60, 70
-PAD_L, PAD_R, PAD_T, PAD_B = 3, 4, 11, 3
+PAD_L, PAD_R, PAD_T, PAD_B = 3, 6, 5, 2
 
 spr = L.lade('rebelliokai-kind-kitsune')
 fuchs = L.lade('rebelliokai-kind-kitsune-fuchs')
