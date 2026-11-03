@@ -105,6 +105,7 @@ const ENTRIES = [
   'app-fx-34',
   'app-fx-35',
   'app-fx-36',
+  'app-fx-37',
   'app-campaign',
   'app-skilltest',        // Modus „Skill Test" (Lobby, Vorbereitung, Kampfanzeige)
   'app-main',

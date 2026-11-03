@@ -7,11 +7,7 @@
 //    ab 133 ms    Zerfall von unten nach oben (950 ms, die Füße zuerst, der Kopf zuletzt): jedes Sprite-Pixel (bei großen Figuren ein 2×2/3×3-Block) löst sich zu seiner Zeit — Takt `0,6·Höhe + 0,4·Bayer` wie im
 //                 Trailer — und fliegt in seiner eigenen Farbe auseinander (Schwerkraft, kleine Splitter 50/100/150 %), fällt zum Boden und flimmert im letzten Drittel gedithert weg
 //    dazu         vier graue Bodenringe (alle 250 ms, flache Ellipsen), Funken (creme/gelb/orange/rot), Rauch aus grauen Quadraten (grau → Asche → Rauch → dunkel), Wackeln klingt ab
-//    Karte        bleibt hell, bis der Zerfall zu ~60 % durch ist, dann 4 Bilder lang ein Schachbrett-Schleier, dann die „Gefallen“-Verdunklung samt Grabstein wie bisher
-//  ZWEITER STIL „sturz“ (Trailer: Broghan 101,1 s, Kyli 140,6 s, shot01.js ohne `dieStyle:'shatter'`): die Figur zerspringt nicht in Splitter, sondern SINKT gestaucht in den Boden und löst sich dabei
-//  gedithert auf (1300 ms; Breite 1 → 1,3, Höhe 1 − 0,75·u², in Zehnteln gestuft = Stop-Motion; Bayer-Auflösung von unten nach oben in 12 Stufen), dazu wackelt sie (±3, klingt ab), sechs Bodenringe,
-//  Brocken (cremeweiß → grau → Asche → dunkel) fallen aus dem Rest des Körpers, eine Staubwolke aus großen grauen Würfeln steigt am Fuß auf. Welcher Stil für welchen Helden: Alice zerspringt, Broghan/Kyli sinken
-//  (Trailer-Fassung), alle anderen je nach Namenshash fest der eine oder der andere (derselbe Held stirbt immer gleich); `window.__ppFx32Stil` erzwingt einen Stil (Tests).
+//    Karte        bleibt hell, bis der Zerfall zu ~60 % durch ist, dann 4 Bilder lang ein Schachbrett-Schleier, dann die „Gefallen“-Verdunklung; statt des früheren Grabsteins steigen auf der Karte die Funken aus app-fx-37.jsx auf
 //  Verträge: der Ton (`hero_ko`-Protokolleintrag → `hero_death`), die Zeiten des Servers und der Spielzustand sind unberührt — der Server wartet nach dem Tod auf nichts; die
 //  Animation hängt nur am Zustandswechsel „Held liegt“ und läuft über die Wartezeit hinaus (~2,5 s) ohne etwas zu blockieren.
 //
@@ -32,17 +28,6 @@
 const PP_FX32_BILD = 1000 / 30;
 const PP_FX32_HALT = 4 * PP_FX32_BILD;          // Anhalten + Wackeln vor dem Zerfall
 const PP_FX32_DAUER = 950;                      // Zerfall von unten nach oben
-const PP_FX32_DAUER_S = 1300;                   // Stil „sturz“: Einsinken + Auflösen
-const PP_FX32_STIL_FEST = [[/^alice-/, 'shatter'], [/^(broghan|kyli)-/, 'sturz']];
-/** Todesstil eines Helden (`platz._ppSchluessel` = Slug des Heldennamens): fest je Held. */
-function ppFx32Stil(platz) {
-  if (window.__ppFx32Stil) return window.__ppFx32Stil;
-  const k = String(platz._ppSchluessel || '');
-  for (const [re, st] of PP_FX32_STIL_FEST) if (re.test(k)) return st;
-  let h = 7;
-  for (let i = 0; i < k.length; i++) h = (h * 31 + k.charCodeAt(i)) >>> 0;
-  return (h >> 3) & 1 ? 'sturz' : 'shatter';
-}
 const PP_FX32_F = {
   creme: [255, 251, 210], grau: [154, 163, 182], asche: [89, 96, 110], rauch: [62, 62, 81], dunkel: [8, 6, 12],
   orange: [255, 154, 26], gelb: [255, 226, 61], rot: [255, 73, 26],
@@ -50,7 +35,6 @@ const PP_FX32_F = {
 const PP_FX32_PAL = {};
 for (const k of Object.keys(PP_FX32_F)) { const c = PP_FX32_F[k]; PP_FX32_PAL[k] = ((255 << 24) | (c[2] << 16) | (c[1] << 8) | c[0]) >>> 0; }   // ABGR (little endian) für Uint32Array auf ImageData
 const PP_FX32_RAUCH_RAMPE = [PP_FX32_PAL.grau, PP_FX32_PAL.asche, PP_FX32_PAL.rauch, PP_FX32_PAL.dunkel];
-const PP_FX32_BROCKEN_RAMPE = [PP_FX32_PAL.creme, PP_FX32_PAL.grau, PP_FX32_PAL.asche, PP_FX32_PAL.rauch];
 const PP_FX32_FUNKEN_RAMPE = [PP_FX32_PAL.creme, PP_FX32_PAL.gelb, PP_FX32_PAL.orange, PP_FX32_PAL.rot];
 const PP_FX32_BAYER = (() => {
   const bay = (n) => {
@@ -227,10 +211,6 @@ function ppFx32Rect(buf, W, H, x, y, s, col) {
   const x1 = Math.min(W, x + s), y1 = Math.min(H, y + s);
   for (let yy = Math.max(0, y); yy < y1; yy++) { const o = yy * W; for (let xx = Math.max(0, x); xx < x1; xx++) buf[o + xx] = col; }
 }
-function ppFx32RectWH(buf, W, H, x, y, w, h, col) {
-  const x1 = Math.min(W, x + w), y1 = Math.min(H, y + h);
-  for (let yy = Math.max(0, y); yy < y1; yy++) { const o = yy * W; for (let xx = Math.max(0, x); xx < x1; xx++) buf[o + xx] = col; }
-}
 function ppFx32Plus(buf, W, H, x, y, u, col) {
   ppFx32Rect(buf, W, H, x, y, u, col);
   ppFx32Rect(buf, W, H, x - u, y, u, col); ppFx32Rect(buf, W, H, x + u, y, u, col);
@@ -257,14 +237,13 @@ const ppFx32Eased = (u) => { u = Math.max(0, Math.min(1, u)); return 1 - Math.po
  */
 function ppFx32Teilchen(e, D) {
   const g = ppFx32Geo(e, 20), n = D.n, b = D.b, mag = g.mag, sub = g.sub;
-  const SC = new Float32Array(n), VX = new Float32Array(n), VY = new Float32Array(n), TS = new Float32Array(n), LIFE = new Float32Array(n), TL = new Float32Array(n), FLO = new Float32Array(n), SZ = new Uint8Array(n);
+  const VX = new Float32Array(n), VY = new Float32Array(n), TS = new Float32Array(n), LIFE = new Float32Array(n), TL = new Float32Array(n), FLO = new Float32Array(n), SZ = new Uint8Array(n);
   const hoehe = Math.max(1, g.y1 - g.y0), grav = 100 * mag;
   let ende = 0;
   for (let i = 0; i < n; i++) {
     const x = D.x[i], y = D.y[i];
     const hy = Math.max(0, Math.min(1, (y + b / 2 - g.y0) / hoehe));
     const sc = 0.6 * (1 - hy) + 0.4 * PP_FX32_BAYER[((y & 7) << 3) | (x & 7)] / 64;   // wie im Trailer: 0,6·(1 − y/H) + 0,4·Bayer — die Füße zuerst, der Kopf zuletzt
-    SC[i] = sc;
     TS[i] = PP_FX32_HALT + sc * PP_FX32_DAUER;
     VX[i] = ((x + b / 2 - g.mitteX) * 0.25 + (Math.random() - 0.5) * 16) * mag;
     VY[i] = -(6 + Math.random() * 45) * mag;
@@ -277,39 +256,11 @@ function ppFx32Teilchen(e, D) {
     SZ[i] = Math.max(1, Math.round(b * sub * (r < 0.45 ? 0.5 : (r < 0.9 ? 1 : 1.5))));
     if (TS[i] + LIFE[i] > ende) ende = TS[i] + LIFE[i];
   }
-  return { SC, VX, VY, TS, LIFE, TL, FLO, SZ, grav, ende };
+  return { VX, VY, TS, LIFE, TL, FLO, SZ, grav, ende };
 }
 
 /** Rauch und Funken eines Todes anlegen (klein; einmal beim Start). */
-function ppFx32BaueSturz(Z) {
-  const D = Z.D, g = Z.g, sub = g.sub, hoehe = Math.max(1, g.y1 - g.y0), mag = g.mag;
-  const T0 = PP_FX32_HALT, DS = PP_FX32_DAUER_S, grav = 85 * mag, breit = Math.max(8, g.zw * 0.6);
-  let ende = T0 + DS;
-  // Brocken: alle 1/36 s drei Stück aus dem Rest des Körpers (Trailer „Brocken fallen“)
-  const brocken = [];
-  for (let ms = 0; ms < DS + 200; ms += 1000 / 36) {
-    const u = Math.min(1, ms / DS), top = (1 - u) * hoehe * (1 - 0.75 * u * u);
-    for (let k = 0; k < 3; k++) {
-      const x = g.mitteX + (Math.random() - 0.5) * 2 * breit, y0 = g.fussY - (3.5 + Math.random() * Math.max(3.5, top));
-      const vx = (Math.random() - 0.5) * 20 * mag, vy = -(Math.random() * 10) * mag, flo = g.fussY - Math.random() * 1.5;
-      const dis = Math.max(0, vy * vy + 2 * grav * Math.max(0, flo - y0)), tl = (-vy + Math.sqrt(dis)) / grav * 1000;
-      const life = Math.min(600 + Math.random() * 600, tl + 250), t0 = T0 + ms + Math.random() * 20;
-      brocken.push({ t0, life, tl, x, y0, vx, vy, flo, sz: Math.max(1, Math.round(sub * (Math.random() < 0.5 ? 1.5 : 1.2))) });
-      ende = Math.max(ende, t0 + life);
-    }
-  }
-  // Staubwolke: große graue Würfel steigen am Fuß auf (Trailer „Staubwolke“), schrumpfen und flimmern weg
-  const staub = [];
-  for (let ms = 0; ms < DS + 800; ms += 1000 / 24) {
-    const t0 = T0 + ms, life = 900 + Math.random() * 600;
-    staub.push({ t0, life, x: g.mitteX + (Math.random() - 0.5) * 2 * breit * 1.2, y: g.fussY - (1 + Math.random() * 5), vx: (Math.random() - 0.5) * 8, vy: -(3 + Math.random() * 5), sz: Math.max(2, Math.round(sub * (Math.random() < 0.5 ? 2.4 : 2))) });
-    ende = Math.max(ende, t0 + life);
-  }
-  Z.brocken = brocken; Z.staub = staub; Z.rauch = []; Z.funken = [];
-  Z.ende = ende + PP_FX32_BILD;
-}
 function ppFx32Baue(Z) {
-  if (Z.stil === 'sturz') { ppFx32BaueSturz(Z); return; }
   const D = Z.D, g = Z.g, mag = g.mag, sub = g.sub;
   const hoehe = Math.max(1, g.y1 - g.y0);
   let ende = D.P.ende;
@@ -334,63 +285,8 @@ function ppFx32Baue(Z) {
   Z.ende = ende + PP_FX32_BILD;
 }
 
-/** Bodenringe (hinter allem): n Ringe im Abstand von 250 ms ab dem Anhalten. */
-function ppFx32Ringe(Z, t, n) {
-  const g = Z.g, buf = Z.pool.buf, W = g.W, H = g.H, sub = g.sub;
-  const cxm = Math.round((g.mitteX + g.ML) * sub), cyf = Math.round((g.fussY + g.MT) * sub);
-  for (let k = 0; k < n; k++) {
-    const dt = t - (PP_FX32_HALT + k * 250);
-    if (dt < 0 || dt >= 450) continue;
-    const R = (g.zw * (0.8 + 0.06 * k)) * sub;
-    const r1 = Math.round(ppFx32Eased(dt / 450) * R);
-    ppFx32Ring(buf, W, H, cxm, cyf, r1, Math.round(r1 * 0.3), sub, PP_FX32_PAL.grau, false);
-    if (dt > 80) { const r2 = Math.round(ppFx32Eased((dt - 80) / 400) * R * 0.75); ppFx32Ring(buf, W, H, cxm, cyf, r2, Math.round(r2 * 0.3), sub, PP_FX32_PAL.asche, true); }
-  }
-}
-
-/** Stil „sturz“: ein Bild (t in ms seit Beginn). */
-function ppFx32ZeichneSturz(Z, t, f) {
-  const pool = Z.pool, g = Z.g, buf = pool.buf, W = g.W, H = g.H, sub = g.sub, D = Z.D, P = D.P, b = D.b, ML = g.ML, MT = g.MT;
-  buf.fill(0);
-  ppFx32Ringe(Z, t, 6);
-  // Staubwolke
-  for (const r of Z.staub) {
-    const dt = t - r.t0;
-    if (dt < 0 || dt >= r.life) continue;
-    const u = dt / r.life, sz = Math.max(1, Math.round(r.sz * (1 - 0.45 * u)));
-    const px = Math.round((r.x + ML + r.vx * dt / 1000) * sub - sz / 2), py = Math.round((r.y + MT + r.vy * dt / 1000) * sub - sz / 2);
-    if (u > 0.45 && PP_FX32_BAYER[((py & 7) << 3) | (px & 7)] < ((u - 0.45) / 0.55) * 64) continue;      // Dither-Ausblenden statt Alpha
-    ppFx32Rect(buf, W, H, px, py, sz, PP_FX32_RAUCH_RAMPE[Math.min(3, (u * 4) | 0)]);
-  }
-  // Figur: gestaucht (Zehntelstufen), von unten nach oben aufgelöst (Zwölftelstufen)
-  const du = Math.max(0, Math.min(1, (t - PP_FX32_HALT) / PP_FX32_DAUER_S));
-  if (du < 1) {
-    const dq = Math.round(du * 10) / 10, psx = 1 + 0.3 * dq, psy = 1 - 0.75 * dq * dq, thr = Math.round(du * 12) / 12;
-    const ox = t < PP_FX32_HALT ? [1, -1, 2, -2][Math.min(3, f)] * sub : Math.round(PP_FX32_WACKELN[f % 4] * 2.5 * (1 - du) * sub);
-    const blitz = f < 2, bs = b * sub, cb = PP_FX32_PAL.creme;
-    for (let i = 0; i < D.n; i++) {
-      if (P.SC[i] < thr) continue;
-      const X = (g.mitteX + (D.x[i] - g.mitteX) * psx + ML) * sub + ox, Y = (g.fussY + (D.y[i] - g.fussY) * psy + MT) * sub;
-      const x0 = Math.floor(X), y0 = Math.floor(Y);
-      ppFx32RectWH(buf, W, H, x0, y0, Math.max(1, Math.ceil(X + bs * psx) - x0), Math.max(1, Math.ceil(Y + bs * psy) - y0), blitz ? cb : D.c[i]);
-    }
-  }
-  // Brocken (vorn)
-  for (const c of Z.brocken) {
-    const dt = t - c.t0;
-    if (dt < 0 || dt >= c.life) continue;
-    const u = dt / c.life, ds = (dt > c.tl ? c.tl : dt) / 1000;
-    const fx = c.x + c.vx * ds, fy = Math.min(c.flo, c.y0 + c.vy * ds + 0.5 * 85 * g.mag * ds * ds);
-    const px = Math.round((fx + ML) * sub - c.sz / 2), py = Math.round((fy + MT) * sub - c.sz / 2);
-    if (u > 0.62 && PP_FX32_BAYER[((py & 7) << 3) | (px & 7)] < ((u - 0.62) / 0.38) * 64) continue;
-    ppFx32Rect(buf, W, H, px, py, c.sz, PP_FX32_BROCKEN_RAMPE[Math.min(3, (u * 4) | 0)]);
-  }
-  pool.ctx.putImageData(pool.img, 0, 0);
-}
-
 /** Ein Bild des Todes in den Puffer schreiben (t in ms seit Beginn). */
 function ppFx32Zeichne(Z, t, f) {
-  if (Z.stil === 'sturz') { ppFx32ZeichneSturz(Z, t, f); return; }
   const pool = Z.pool, g = Z.g, buf = pool.buf, W = g.W, H = g.H, sub = g.sub, D = Z.D, P = Z.P, b = D.b, ML = g.ML, MT = g.MT;
   buf.fill(0);
   const cxm = Math.round((g.mitteX + ML) * sub), cyf = Math.round((g.fussY + MT) * sub);
@@ -474,7 +370,7 @@ function ppFx32Tod(platz) {
     const pool = ppFx32Pool(platz);
     if (!pool) return false;
     const g = pool.g;
-    const Z = { platz, zone, e, g, D, pool, stil: ppFx32Stil(platz), fertig: false, t0: performance.now(), f: -1, veil: 0, zaehler: 0 };
+    const Z = { platz, zone, e, g, D, pool, fertig: false, t0: performance.now(), f: -1, veil: 0, zaehler: 0 };
     ppFx32Baue(Z);
     // Platz wieder einhängen: alte Kinder per CSS weg, nur die eigene Leinwand zeigen. Fx27-Pool nicht noch anlegen lassen.
     platz._ppFx32Tot = true;
@@ -501,8 +397,7 @@ function ppFx32Tod(platz) {
       const f = Math.floor(t / PP_FX32_BILD);
       if (f !== Z.f) {
         Z.f = f;
-        const dz = Z.stil === 'sturz' ? PP_FX32_DAUER_S : PP_FX32_DAUER;
-        const v = t >= PP_FX32_HALT + dz ? 0 : (t >= PP_FX32_HALT + dz * 0.62 ? 2 : 1);   // Karte: hell → Schachbrett-Schleier → Gefallen-Verdunklung
+        const v = t >= PP_FX32_HALT + PP_FX32_DAUER ? 0 : (t >= PP_FX32_HALT + PP_FX32_DAUER * 0.62 ? 2 : 1);   // Karte: hell → Schachbrett-Schleier → Gefallen-Verdunklung
         if (v !== Z.veil) {
           Z.veil = v;
           if (v === 0) zone.removeAttribute('data-pp-stirbt'); else zone.setAttribute('data-pp-stirbt', String(v));

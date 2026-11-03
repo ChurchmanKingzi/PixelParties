@@ -14485,18 +14485,14 @@ html:not([data-phase-bereit]) .phase-column { visibility: hidden; }
   100% { opacity: 0; }
 }
 
-/* ===== DEAD HERO TOMBSTONE ===== */
+/* ===== TOTER HELD (app-fx-37.jsx): kein Grabstein mehr — Pixel-Funken steigen auf der gefallenen Karte auf ===== */
 .hero-dead-marker {
   position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  font-size: calc(32px * var(--board-scale));
+  inset: 0;
   z-index: 4;
   pointer-events: none;
-  filter: drop-shadow(0 2px 6px rgba(0,0,0,.8));
-  opacity: 0.85;
 }
+.hero-dead-marker > canvas { position: absolute; left: 0; top: 0; width: 100%; height: 100%; display: block; image-rendering: pixelated; }
 
 /* ===== HELDENTOD (app-fx-32.jsx): die Figur zerspringt in Pixel, danach gilt wieder das Gefallen-Aussehen ===== */
 .pp-fx32-steher {

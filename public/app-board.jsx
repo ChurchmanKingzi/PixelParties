@@ -3717,7 +3717,6 @@ function HeroIdleSprite({ cardName, angehalten, versteinert, eingefroren, effekt
     // Die Zone kennt ihre Figur (`ppZonenSquash` quetscht beide gemeinsam).
     zone._ppFigurPlatz = platz;
     platz._ppEintrag = eintrag;   // Sheet + aktueller Frame (`platz._ppFrame`, s. `male`) für die Nachbilder beim Rammen (app-fx-27.jsx)
-    platz._ppSchluessel = key;    // Slug des Helden (Todesstil, app-fx-32.jsx)
     platz._ppZone = zone;         // Heldentod (app-fx-32.jsx): der Beobachter der Sprite-Ebene findet zum entfernten Platz seine Zone
     const ctx = cv.getContext('2d');
     const { meta, img } = eintrag;
@@ -57714,7 +57713,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                     >{lad.remaining}</div>
                   );
                 })()}
-                {isDead && hero?.name && <div className="hero-dead-marker">🪦</div>}
+                {isDead && hero?.name && (window.PpFx37Tote ? <window.PpFx37Tote name={hero.name} /> : <div className="hero-dead-marker" aria-hidden="true" />)}
                 {/* ★ v1450: Idle-Animation lebender Helden über dem oberen
                     Kartendrittel. Tot oder im Rammflug → gar nicht da.
                     Gelähmt (Frozen/Stunned/Webbed) → Frame steht still;
