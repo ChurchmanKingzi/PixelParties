@@ -50,6 +50,7 @@
     direkt: true,        // Blaetter ohne Kinder animieren `mask-image` selbst statt ueber eine vererbte Variable
     hauptfaden: true,    // W86p: gebackene Animationen mit einer wirkungslosen, nicht kompositierbaren Eigenschaft (scroll-margin-top, wechselt je Bild) auf den Hauptthread zwingen —
                          // Compositor-Animationen malen die Ebene mit festem Raster und skalieren/verschieben sie bilinear: Mischfarben und Halbalpha an jeder Kante (Palettenverstoss)
+    ergebnisCache: true, // Ergebnis-Cache reiner Animationen (s. `reinSchluessel`); false = Messung/Notbremse
     aktiv: true,
   };
   const TAKT_MS = () => 1000 / KONFIG.takt;
@@ -707,7 +708,7 @@
       for (const c of ctxs) if (j <= c.zeiten.length) backenProbeSetzen(c, j);
       for (const c of ctxs) if (j <= c.zeiten.length) backenProbeLesen(c, j);
     }
-    for (const c of ctxs) c.probe.cancel();
+    for (const c of ctxs) if (c.probe) c.probe.cancel();
     stat.t_probe += performance.now() - tp0;
     let n = 0;
     for (const c of ctxs) {
@@ -766,6 +767,33 @@
     try { anim.ready.then(tun, () => {}); } catch (e) { /* ohne */ }
   }
 
+  // ── Ergebnis-Cache „reiner“ Animationen ─────────────────────────────────────────────────────────────────────────────────
+  // Viele Animationen starten hundertfach mit denselben Keyframes und Zeiten (Tutorial-Text: `textbox-char-shake` je Zeichen, Hervorhebungs-Pulse je Zone …). Abtasten (Probe + Stil-Neuaufbau je Bild) und
+  // Bauen ergeben dort immer dasselbe — das erste Backen merkt sich die fertigen Keyframes, jeder weitere Start setzt sie nur noch ein. „Rein“ heisst: das Ergebnis haengt nur von Keyframes, Zeiten und Raster ab, nicht von
+  // der Elementgroesse oder -ausstattung: keine Transformation (Skalierung/Quantisierung nach Groesse), keine Deckkraft (Dither-Maske, Flaeche, Kinder), keine Groessen-Eigenschaften (Ringe), kein Hintergrundbild/keine Maske
+  // (Eingriffe am Element); jede Eigenschaft hat an Anfang UND Ende einen eigenen Wert (sonst gaelte der Ausgangswert des Elements); alles Relative (var(), %, em, calc, currentColor …) geht mit seinem aufgeloesten
+  // Kontext in den Schluessel. Gespeichert wird nur nach erfolgreichem Setzen.
+  const _backCache = new Map(), BACK_CACHE_MAX = 400;
+  const REIN_NICHT = /^(opacity|transform|translate|scale|rotate|width|height|min-width|min-height|max-width|max-height|mask.*|-webkit-mask.*|background-image|background-size|background-repeat|background-attachment|content|d)$/;
+  const RELATIV = /var\(|%|\b(?:em|rem|ex|ch|vw|vh|vmin|vmax)\b|calc\(|currentcolor|inherit|initial|unset|env\(|attr\(/i;
+  function reinSchluessel(kfs, props, cs, pe, weich, strikt, svgInnen, raster, D2, delay2, zeiten, probeZeiten, W, H) {
+    if (!KONFIG.ergebnisCache) return null;
+    for (const p of props) if (REIN_NICHT.test(kebab(p))) return null;
+    const erst = kfs[0], letzt = kfs[kfs.length - 1];
+    let rel = false;
+    const vars = [];
+    const zeilen = kfs.map((k) => {
+      if (k.composite && k.composite !== 'replace' && k.composite !== 'auto') rel = null;
+      return [k.computedOffset != null ? k.computedOffset : k.offset, k.easing, props.map((p) => k[p] == null ? null : String(k[p]))];
+    });
+    if (rel === null) return null;
+    for (const p of props) if (erst[p] == null || letzt[p] == null) return null;
+    for (const z of zeilen) for (const v of z[2]) if (v != null && RELATIV.test(v)) { rel = true; for (const m of v.matchAll(/var\(\s*(--[\w-]+)/g)) vars.push(m[1]); }
+    const ctx = [];
+    if (rel) { ctx.push(cs.fontSize, cs.color, W, H, root.innerWidth, root.innerHeight); for (const v of vars) ctx.push(cs.getPropertyValue(v)); }
+    return JSON.stringify([zeilen, D2, delay2, zeiten.length, zeiten[1] || 0, probeZeiten ? probeZeiten.length : 0, weich, strikt, pe || '', svgInnen, raster, ctx]);
+  }
+
   function backenProbeVorbereiten(anim, eff, el, kfs, props, dauer, budget, weich, strikt) {
     const pe = eff.pseudoElement || null;                       // W86u1: Animation auf ::before/::after — gleiche Pipeline, nur ohne Inline-Eingriffe am Wirt
     const cs = pe ? getComputedStyle(el, pe) : getComputedStyle(el);
@@ -789,20 +817,28 @@
       if (sz && (!budget || budget.rest === undefined || sz.grid.length <= Math.max(zeiten.length * 3, budget.rest / 4))) { zeiten = sz.grid; probeZeiten = sz.probe; }
     }
     if (budget && budget.rest !== undefined) { budget.rest -= zeiten.length + 1; budget.offen = Math.max(1, budget.offen - 1); }
+    // ── Ergebnis-Cache: schon gebacken (gleiche Keyframes/Zeiten) → nicht abtasten ──
+    const reinKey = reinSchluessel(kfs, props, cs, pe, weich, strikt, svgInnen, raster, D2, delay2, zeiten, probeZeiten, W, H);
+    if (reinKey) {
+      const hit = _backCache.get(reinKey);
+      if (hit) return { hit, anim, eff, el, props, dauer, weich, strikt, pe, cs, W, H, raster, svgInnen, T, delay0, delay2, D2, zeiten, probeZeiten, probe: null, kProps: [], roh: [] };
+    }
     // ── Probe: gleiche Keyframes als eigene WAAPI-Animation → abtasten ──
     const probeKfs = kfs.map(k => { const o = Object.assign({}, k); o.offset = k.computedOffset != null ? k.computedOffset : k.offset; delete o.computedOffset; return o; });
     let probe;
     try { probe = new Animation(new KeyframeEffect(el, probeKfs, Object.assign({ duration: D2, fill: 'both', easing: 'linear' }, pe ? { pseudoElement: pe } : {})), document.timeline); }
     catch (e) { return false; }
     probe.pause();
-    return { anim, eff, el, props, dauer, weich, strikt, pe, cs, W, H, raster, svgInnen, T, delay0, delay2, D2, zeiten, probeZeiten, probe, kProps: props.map(kebab), roh: [] };
+    return { anim, eff, el, props, dauer, weich, strikt, pe, cs, W, H, raster, svgInnen, T, delay0, delay2, D2, zeiten, probeZeiten, probe, kProps: props.map(kebab), roh: [], reinKey };
   }
   /** Probe auf den j-ten Zeitpunkt stellen. */
   function backenProbeSetzen(c, j) {
+    if (c.hit) return;
     c.probe.currentTime = j < c.zeiten.length ? (c.probeZeiten ? c.probeZeiten[j] : c.zeiten[j]) : c.D2 - 1e-3;
   }
   /** Werte der Probe zum eingestellten Zeitpunkt lesen. */
   function backenProbeLesen(c, j) {
+    if (c.hit) return;
     const w = {};
     for (let q = 0; q < c.kProps.length; q++) w[c.props[q]] = c.cs.getPropertyValue(c.kProps[q]);
     c.roh.push(w);
@@ -812,13 +848,25 @@
     const c = backenProbeVorbereiten(anim, eff, el, kfs, props, dauer, budget, weich, strikt);
     if (!c) return false;
     const tp0 = performance.now();
-    for (let j = 0; j <= c.zeiten.length; j++) { backenProbeSetzen(c, j); backenProbeLesen(c, j); }
-    c.probe.cancel();
+    if (!c.hit) for (let j = 0; j <= c.zeiten.length; j++) { backenProbeSetzen(c, j); backenProbeLesen(c, j); }
+    if (c.probe) c.probe.cancel();
     stat.t_probe += performance.now() - tp0;
     return backenProbeFertig(c);
   }
   /** Aus den gelesenen Rohwerten die gebackenen Keyframes bauen und einsetzen. */
   function backenProbeFertig(c) {
+    if (c.hit) {                                                  // Ergebnis-Cache: fertige Keyframes einsetzen
+      try {
+        c.eff.setKeyframes(c.hit.frames.map((f) => Object.assign({}, f)));
+        const neu = {};
+        if (Math.abs(c.D2 - c.dauer) > 1e-3) neu.duration = c.D2;
+        if (Math.abs(c.delay2 - c.delay0) > 1e-3) neu.delay = c.delay2;
+        if (neu.duration !== undefined || neu.delay !== undefined) c.eff.updateTiming(neu);
+      } catch (e) { return false; }
+      startAusrichten(c.anim);
+      stat.bilder += c.hit.frames.length; stat.cacheTreffer = (stat.cacheTreffer || 0) + 1;
+      return true;
+    }
     const { anim, eff, el, props, weich, pe, cs, W, H, raster, svgInnen, delay0, delay2, D2, zeiten, roh } = c, dauer = c.dauer;
     const tp1 = performance.now();
     // ── Quantisieren ──
@@ -851,6 +899,7 @@
     startAusrichten(anim);
     stat.t_setzen += performance.now() - tp2;
     stat.bilder += frames.length;
+    if (c.reinKey) { if (_backCache.size >= BACK_CACHE_MAX) _backCache.delete(_backCache.keys().next().value); _backCache.set(c.reinKey, { frames: frames.map((f) => Object.assign({}, f)) }); }
     return true;
   }
   const t0Timing = (eff) => eff.getTiming();
