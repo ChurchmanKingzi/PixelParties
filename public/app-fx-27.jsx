@@ -41,6 +41,7 @@ function ppFx27Bez(x1, y1, x2, y2) {
     return sy(t);
   };
 }
+const PP_FX27_D_EIN = ppFx27Bez(0.55, 0, 1, 1), PP_FX27_D_AUS = ppFx27Bez(0, 0, 0.4, 1);   // Durchbruch: beschleunigend zum Ziel / dahinter auslaufend
 const PP_FX27_IO = ppFx27Bez(0.42, 0, 0.58, 1);                  // CSS `ease-in-out` (Standard-Rammen)
 const PP_FX27_J_ZUG = ppFx27Bez(0.4, 0, 0.7, 1), PP_FX27_J_FLUG = ppFx27Bez(0.5, 0, 0.28, 1), PP_FX27_J_RUECK = ppFx27Bez(0.5, 0, 0.35, 1);   // Jetpack-Segmente aus `ramJetCharge`
 
@@ -61,7 +62,7 @@ function ppFx27Spur(ks) {
  * `p` = Weg (0 = auf der Zone, 1 = am Ziel), `spiegel` = Blickrichtung (1 | −1 | dünne Zwischenwerte), `wackeln` = Zittern in Pixeln, `laden` = Aufladen vor dem Start.
  * Die Anteile entsprechen den Keyframes in style.css (`ramCharge` 12 %, `ramJetCharge` 45 %, `ramBackCharge` 26 % Aufprall), der Server verlässt sich darauf.
  */
-function ppFx27Zeitlinie(art, dur) {
+function ppFx27Zeitlinie(art, dur, pZiel, durch) {
   if (art === 'rueck') {
     // Tail Slap: gestuft wie `ramBackCharge` (steps(1)): [Prozent, Weg, Spiegel, Wackeln]; Umdrehen als harter Schnitt über zwei dünne Zwischenbilder
     const T = [[0, 0, 1, 0], [2, 0, 0.3, 0], [3, 0, -0.3, 0], [4, 0, -1, 0], [8, -0.04, -1, 0], [12, -0.09, -1, 0], [16, 0.2, -1, 0], [20, 0.55, -1, 0], [24, 0.88, -1, 0], [26, 1, -1, 0],
@@ -78,6 +79,14 @@ function ppFx27Zeitlinie(art, dur) {
   if (art === 'jet') {
     const f = ppFx27Spur([[0, 0], [dur * 0.04, 0, PP_FX27_J_ZUG], [dur * 0.10, -0.07, PP_FX27_J_FLUG], [dur * 0.45, 1], [dur * 0.60, 1, PP_FX27_J_RUECK], [dur * 0.92, 0]]);
     return { aufprall: dur * 0.45, ende: dur * 0.92 + PP_FX27_BILD, pose(t) { return { p: f(t), spiegel: 1, wackeln: 0, laden: t < dur * 0.04 }; } };
+  }
+  if (durch && art !== 'jet' && art !== 'rueck' && pZiel > 0 && pZiel < 1) {
+    // ANGRIFF (Trailer: Quick Attack, Critical Strike …): der Held rast DURCH das Ziel und hält dahinter. p = 1 ist der Haltepunkt hinter dem Ziel, `pZiel` die Zielmitte — dort ist
+    // der Aufprall (12 %, wie bisher: der Server löst den Schaden zu diesem Zeitpunkt aus). Erst beschleunigend zum Ziel (ease-in), dahinter auslaufend (ease-out), dann zurück.
+    const A = dur * 0.12, leg = Math.min(A, Math.max(dur * 0.07, 4 * PP_FX27_BILD)), s = A - leg;
+    const R0 = dur * 0.22, nach = Math.max(2 * PP_FX27_BILD, Math.min(R0 - A - PP_FX27_BILD, dur * 0.05)), R1 = R0 + Math.max(dur * 0.09, 5 * PP_FX27_BILD);
+    const f = ppFx27Spur([[0, 0], [s, 0, PP_FX27_D_EIN], [A, pZiel, PP_FX27_D_AUS], [A + nach, 1], [R0, 1, PP_FX27_IO], [R1, 0]]);
+    return { aufprall: A, ende: R1 + PP_FX27_BILD, pose(t) { return { p: f(t), spiegel: 1, wackeln: 0, laden: t < s && s >= PP_FX27_BILD }; } };
   }
   // Standard (`ramCharge`): Aufprall bei 12 %, Rückweg 22 → 30 %. Ist die Strecke dabei kürzer als 4 Bilder (kurze Dauer), beginnt der Hinweg früher — der Aufprall bleibt auf 12 %.
   const A = dur * 0.12, leg = Math.min(A, Math.max(dur * 0.07, 4 * PP_FX27_BILD)), s = A - leg;
@@ -135,6 +144,64 @@ function ppFx27Wolke(ebene, x, y, n, farben, opt) {
   schritt();
 }
 
+/**
+ * Nachbild-Leinwände (4 je Figur-Platz) werden EINMAL gebaut, bleiben im Platz (`visibility:hidden` statt Entfernen) und werden schon vorher im Leerlauf „aufgewärmt".
+ * Grund (Messung 3.11.): das ERSTE Zeichnen in eine frisch eingehängte, sichtbare Leinwand kostete 12–20 ms (Ressourcen-Anlage der Compositing-Ebene) — 2–4 Ausreißer je Fahrt.
+ */
+function ppFx27GeisterPool(platz, steher, canvas) {
+  let pool = platz._ppGeisterPool;
+  if (pool && pool.length === 4 && pool.every(G => G.g.isConnected)) {
+    for (const G of pool) {
+      if (G.c.width !== canvas.width || G.c.height !== canvas.height) { G.c.width = canvas.width; G.c.height = canvas.height; G.schluessel = ''; }
+      G.g.style.cssText = steher.style.cssText + ';visibility:hidden';
+      G.c.style.cssText = canvas.style.cssText;
+      G.c.style.imageRendering = 'pixelated'; G.c.style.scale = '';
+    }
+    return pool;
+  }
+  if (pool) for (const G of pool) { try { G.g.remove(); } catch (e) { /* weg */ } }
+  pool = [];
+  for (let i = 0; i < 4; i++) {
+    const g = document.createElement('div');
+    g.className = 'pp-fx27-geist';
+    g.style.cssText = steher.style.cssText + ';visibility:hidden';
+    const c = document.createElement('canvas');
+    c.width = canvas.width; c.height = canvas.height;
+    c.style.cssText = canvas.style.cssText;
+    c.style.imageRendering = 'pixelated';
+    c.style.scale = '';
+    g.appendChild(c);
+    platz.insertBefore(g, platz.firstChild);
+    pool.push({ g, c, ctx: c.getContext('2d'), da: false, schluessel: '' });
+  }
+  platz._ppGeisterPool = pool;
+  return pool;
+}
+/** Leerlauf-Aufwärmen: einmal in jede Nachbild-Leinwand zeichnen, solange sie (unsichtbar) im Platz hängt. */
+function ppFx27Aufwaermen(platz) {
+  try {
+    if (!platz || !platz.isConnected || platz._ppGeisterPool) return;
+    const steher = platz.querySelector('.hero-idle-steher'), canvas = platz.querySelector('canvas.hero-idle-canvas');
+    if (!steher || !canvas || !canvas.width) return;
+    const pool = ppFx27GeisterPool(platz, steher, canvas);
+    for (const G of pool) { G.ctx.clearRect(0, 0, G.c.width, G.c.height); G.ctx.drawImage(canvas, 0, 0, canvas.width, canvas.height, 0, 0, G.c.width, G.c.height); G.ctx.clearRect(0, 0, G.c.width, G.c.height); }
+  } catch (e) { /* weg */ }
+}
+(function ppFx27Beobachter() {
+  const plan = (platz) => {
+    const los = () => ppFx27Aufwaermen(platz);
+    setTimeout(() => (window.requestIdleCallback ? window.requestIdleCallback(los, { timeout: 1500 }) : los()), 900);
+  };
+  const haenge = (ebene) => {
+    if (!ebene || ebene._ppFx27Beob) return;
+    ebene._ppFx27Beob = true;
+    new MutationObserver((ms) => { for (const m of ms) for (const n of m.addedNodes) { if (n.nodeType === 1 && n.classList && n.classList.contains('hero-idle-platz')) plan(n); } }).observe(ebene, { childList: true, subtree: true });
+    ebene.querySelectorAll('.hero-idle-platz').forEach(plan);
+  };
+  const start = () => { if (window.HeroIdleAnims && window.HeroIdleAnims.abonniereEbene) { window.HeroIdleAnims.abonniereEbene(haenge); haenge(window.HeroIdleAnims.ebene()); } else setTimeout(start, 500); };
+  start();
+})();
+
 /** Ist für diese Zone gerade eine Figur da, die fahren darf? (ohne Nebenwirkung) */
 function ppFx27KannFigur(zone) {
   try {
@@ -184,7 +251,8 @@ function ppFx27Figur(srcEl, tgtEl, opt) {
     const dx = (b.x + b.w / 2) - (a.x + a.w / 2), dy = (b.y + b.h / 2) - (a.y + a.h / 2);
     const len = Math.hypot(dx, dy) || 1;
     let k = 1;
-    if (!opt.voll) { const kurz = Math.min(a.w * 0.3, len * 0.4); k = (len - kurz) / len; }
+    if (opt.durch) { const ueber = Math.min(a.h * 0.85, len * 0.6); k = (len + ueber) / len; F.pZiel = len / (len + ueber); }   // Angriff: Haltepunkt HINTER dem Ziel
+    else if (!opt.voll) { const kurz = Math.min(a.w * 0.3, len * 0.4); k = (len - kurz) / len; }
     F.anteil = k;
     return (F.vek = { x: dx * k, y: dy * k, a, len });
   };
@@ -199,21 +267,8 @@ function ppFx27Figur(srcEl, tgtEl, opt) {
     F.canvas = platz.querySelector('canvas.hero-idle-canvas');
     F.steher = platz.querySelector('.hero-idle-steher');
     if (!F.canvas || !F.steher) { F.platz = null; return false; }
-    // Nachbilder: Geschwister des Stehers (stehen aufrecht wie er, malen vor der Figur), jedes mit eigener Leinwand
-    for (let i = 0; i < 4; i++) {
-      const g = document.createElement('div');
-      g.className = 'pp-fx27-geist';
-      g.style.cssText = F.steher.style.cssText;
-      g.style.display = 'none';
-      const c = document.createElement('canvas');
-      c.width = F.canvas.width; c.height = F.canvas.height;
-      c.style.cssText = F.canvas.style.cssText;
-      c.style.imageRendering = 'pixelated';
-      c.style.scale = '';
-      g.appendChild(c);
-      platz.insertBefore(g, platz.firstChild);
-      F.geist.push({ g, c, ctx: c.getContext('2d', { willReadFrequently: true }), da: false, schluessel: '' });
-    }
+    // Nachbilder: Geschwister des Stehers (stehen aufrecht wie er, malen vor der Figur), jedes mit eigener Leinwand — aus dem Pool des Platzes (s. ppFx27GeisterPool)
+    F.geist = ppFx27GeisterPool(platz, F.steher, F.canvas);
     return true;
   };
   F.freigeben = (zurueck) => {
@@ -221,7 +276,7 @@ function ppFx27Figur(srcEl, tgtEl, opt) {
       try { F.platz.style.translate = ''; } catch (e) { /* weg */ }
       if (F.canvas) { try { F.canvas.style.scale = ''; } catch (e) { /* weg */ } }
     }
-    for (const G of F.geist) { try { G.g.remove(); } catch (e) { /* weg */ } }
+    for (const G of F.geist) { try { G.g.style.visibility = 'hidden'; G.da = false; } catch (e) { /* weg */ } }   // bleiben im Platz (Pool)
     F.geist = [];
     F.platz = F.canvas = F.steher = null;
     if (zurueck) F.hist.length = 0;
@@ -276,8 +331,8 @@ function ppFx27Figur(srcEl, tgtEl, opt) {
     for (let i = 0; i < F.geist.length; i++) {
       const G = F.geist[i], h = F.hist[n - 1 - 2 * (i + 1)];
       const sichtbar = !!h && F.seitFahrt <= 3 && Math.hypot(h.x - x, h.y - y) > abstand;
-      if (!sichtbar) { if (G.da) { G.g.style.display = 'none'; G.da = false; } continue; }
-      if (!G.da) { G.g.style.display = ''; G.da = true; }
+      if (!sichtbar) { if (G.da) { G.g.style.visibility = 'hidden'; G.da = false; } continue; }
+      if (!G.da) { G.g.style.visibility = 'visible'; G.da = true; }
       G.g.style.translate = (h.x - x) + 'px ' + (h.y - y) + 'px';
       G.c.style.scale = (sp * PP_FX27_FAHRT[0]) + ' ' + PP_FX27_FAHRT[1];
       // Silhouette aus dem Sheet (nicht aus dem Canvas der Figur: Lesen vom Canvas kostete bis 15 ms), nur neu gemalt, wenn sich Frame oder Farbe ändern
@@ -287,7 +342,7 @@ function ppFx27Figur(srcEl, tgtEl, opt) {
       const c = G.ctx, w = G.c.width, hh = G.c.height, m = e.meta, vert = m.layout === 'vertical';
       c.globalCompositeOperation = 'source-over';
       c.clearRect(0, 0, w, hh);
-      c.drawImage(e.img, vert ? 0 : fr * m.frameWidth, vert ? fr * m.frameHeight : 0, m.frameWidth, m.frameHeight, 0, 0, w, hh);
+      c.drawImage(F.canvas, 0, 0, F.canvas.width, F.canvas.height, 0, 0, w, hh);   // Canvas → Canvas (GPU): das Sheet selbst zu lesen kostete beim ersten Mal je Leinwand 12–20 ms
       c.globalCompositeOperation = 'source-in';
       c.fillStyle = farbe;
       c.fillRect(0, 0, w, hh);
@@ -310,15 +365,31 @@ function ppFx27Figur(srcEl, tgtEl, opt) {
 }
 
 /**
+ * Rast der Held DURCH sein Ziel (Angriff, wie im Trailer) oder fährt er nur BIS zum Ziel (explizites Ramm-Manöver, z. B. Phoenix Tackle)?
+ * Vorrang hat das Feld `durch` im Ereignis (`play_ram_animation`, true/false) — ein Kartenskript kann es also festlegen. Ohne Angabe: Karten vom Typ Attack rasen durch;
+ * Zauber, Artefakte, Heldeneffekte, Jetpack (`trailType:'fire'`) und Rückwärtsrammen (Tail Slap) nicht. Ausnahmen unter den Attacks: Capture und Forceful Revival
+ * (kein Schlag auf das Ziel: Lasso bzw. Wiederbelebung).
+ */
+const PP_FX27_KEIN_DURCH = new Set(['Capture', 'Forceful Revival']);
+function ppFx27Durch(ev) {
+  if (ev.durch != null) return !!ev.durch;
+  if (ev.rueckwaerts || ev.trailType === 'fire') return false;
+  if (PP_FX27_KEIN_DURCH.has(ev.cardName)) return false;
+  try { const c = (typeof CARDS_BY_NAME !== 'undefined') ? CARDS_BY_NAME[ev.cardName] : null; return !!c && c.cardType === 'Attack'; } catch (e) { return false; }
+}
+window.ppFx27Durch = ppFx27Durch;
+
+/**
  * `play_ram_animation` mit der Figur eines Helden. `ev`: { srcEl, tgtEl, dur, trailType, rueckwaerts }. Gibt `null` (kein Figurenpfad — der Aufrufer fährt die Karte) oder
  * `{ anteil, koerperDy }` zurück (Anteil des Wegs, auf dem die Figur landet; Höhe des Körpers über der Zonenmitte in Bildschirmpixeln — für den Jetpack-Schweif).
  */
 function ppFx27RammFigur(ev) {
   const dur = ev.dur || 1600;
   const art = ev.rueckwaerts ? 'rueck' : (ev.trailType === 'fire' ? 'jet' : (ev.trailType === 'fire_stars' ? 'sterne' : 'std'));
-  const fig = ppFx27Figur(ev.srcEl, ev.tgtEl, { art });
+  const durch = ppFx27Durch(ev);
+  const fig = ppFx27Figur(ev.srcEl, ev.tgtEl, { art, durch: durch && art !== 'jet' && art !== 'rueck' });
   if (!fig) return null;
-  const zl = ppFx27Zeitlinie(art, dur);
+  const zl = ppFx27Zeitlinie(art, dur, fig.pZiel, durch);
   const raf = window.ppTaktRaf || window.requestAnimationFrame;
   const t0 = performance.now();
   const schritt = () => {
