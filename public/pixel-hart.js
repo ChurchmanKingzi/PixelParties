@@ -478,10 +478,13 @@
       else if (r.cssRules) regeln(r.cssRules, nurVerlauf);   // @media / @supports / @layer …
     }
   }
+  /** Vorgebackenes Blatt (scripts/hart/build-css.js → `style.hart.css`): die erste Regel ist die Marke — die Umwandlung ist schon im Blatt, nichts mehr zu tun. */
+  function gebacken(rl) { try { const r = rl && rl[0]; return !!(r && r.selectorText === '.pp-hart-gebacken'); } catch (e) { return false; } }
   function blatt(sh) {
     if (!sh || gesehen.has(sh)) return;
     let rl; try { rl = sh.cssRules; } catch (e) { return; }         // fremder Ursprung
     if (!rl) return;
+    if (gebacken(rl)) { gesehen.add(sh); stat.gebacken = (stat.gebacken || 0) + 1; return; }
     gesehen.add(sh); stat.blaetter++;
     const t0 = (root.performance || Date).now();
     try { regeln(rl); } catch (e) { /* bleibt */ }
@@ -495,7 +498,7 @@
     alleBlaetter();
     // Blaetter, die erst spaeter fertig werden (<link>) bzw. neu eingehaengt werden (<style> aus Komponenten)
     document.addEventListener('load', (e) => { const t = e.target; if (t && t.tagName === 'LINK' && t.sheet) blatt(t.sheet); }, true);
-    const verlaufPass = () => { if (_verlaufPass || typeof root.pxHintergrund !== 'function') return; _verlaufPass = true; try { for (const sh of document.styleSheets) { let rl; try { rl = sh.cssRules; } catch (e) { continue; } if (rl) regeln(rl, true); } } catch (e) { /* ohne */ } };
+    const verlaufPass = () => { if (_verlaufPass || typeof root.pxHintergrund !== 'function') return; _verlaufPass = true; try { for (const sh of document.styleSheets) { let rl; try { rl = sh.cssRules; } catch (e) { continue; } if (rl && !gebacken(rl)) regeln(rl, true); } } catch (e) { /* ohne */ } };
     document.addEventListener('DOMContentLoaded', () => { alleBlaetter(); verlaufPass(); });
     root.addEventListener('load', verlaufPass);
     try {

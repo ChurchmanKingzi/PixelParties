@@ -205,5 +205,15 @@ module.exports = { buildAll, watch, ENTRIES, DIST_DIR };
 if (require.main === module) {
   const force = process.argv.includes('--force');
   buildAll({ force });
+  // Vorgebackene Stylesheets (public/style.hart.css) aktuell halten — braucht Playwright; ohne läuft das Spiel trotzdem (der Server liefert dann die ungebackene Quelle aus).
+  try {
+    const hart = require('./hart/build-css.js');
+    const alt = hart.veraltet();
+    if (alt.length) {
+      console.log('[build] style.hart.css veraltet → backen …');
+      const r = require('child_process').spawnSync(process.execPath, [path.join(__dirname, 'hart', 'build-css.js')], { stdio: 'inherit' });
+      if (r.status !== 0) console.warn('[build] WARNUNG: style.hart.css konnte nicht gebacken werden (' + alt.join('; ') + ') — der Server liefert die ungebackene Quelle aus. Auf einem Rechner mit Playwright: node scripts/hart/build-css.js');
+    }
+  } catch (e) { console.warn('[build] style.hart.css-Prüfung übersprungen:', e.message); }
   if (process.argv.includes('--watch')) watch();
 }
