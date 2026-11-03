@@ -11716,6 +11716,14 @@ function brettwertNeuFuer(engine, cpuIdx) {
 
 // Wertnetz im Schattenmodus (`PP_VALUE_NET=shadow`): rechnet bei jeder Bewertung mit und ändert nichts. Ohne den Schalter wird das Modul nicht geladen.
 const VALUE_SHADOW = process.env.PP_VALUE_NET === 'shadow' ? require('./_value-shadow') : null;
+// Stufe 3 (PP_VALUE_NET=leaf): das Wertnetz bewertet die BLÄTTER der Suche (Rollout-Ende, Gates, Optionswahl). Alle anderen Aufrufer von
+// evaluateState (Eval-Greedy-Auswahl, Handwahl, Karten-Skripte) bleiben beim Evaluator. `score` gibt null zurück, wenn das Netz für diese
+// Stellung/diesen Sitz nicht zuständig ist (Sitz-Maske `engine._valueLeafSide`, Partieende) — dann gilt der Evaluator.
+const VALUE_LEAF = process.env.PP_VALUE_NET === 'leaf' ? require('./_value-leaf') : null;
+function leafScore(engine, cpuIdx, site) {
+  if (VALUE_LEAF) { const v = VALUE_LEAF.score(engine, cpuIdx, site); if (v !== null) return v; }
+  return evaluateState(engine, cpuIdx);
+}
 
 function evaluateState(engine, cpuIdx) {
   // Auswertungs-Scope: Die Bewertung ist synchron und schreibt nichts — reine Regelabfragen (Stufenprüfung, Handwerte …) werden
@@ -13069,7 +13077,8 @@ async function rolloutRestOfTurn(engine, helpers) {
   // greedy depending on _rolloutBrain.
   const savedCpuIdx = engine._cpuPlayerIdx;
   try {
-    for (let t = 1; t <= _rolloutHorizon; t++) {
+    const horizon = VALUE_LEAF ? VALUE_LEAF.horizonFor(engine, savedCpuIdx, _rolloutHorizon) : _rolloutHorizon;
+    for (let t = 1; t <= horizon; t++) {
       if (engine.gs.result) break;
       if (engine.gs.currentPhase !== 2) break; // not in Main 1, can't invoke
       engine._cpuPlayerIdx = engine.gs.activePlayer;
@@ -13187,7 +13196,7 @@ async function mctsRunOneRollout(engine, helpers, candidate, { plan = null, reco
     delete engine._mctsTargetPlan;
     if (recordBuf) delete engine._mctsTargetRecord;
     if (applied) await rolloutRestOfTurn(engine, helpers);
-    score = evaluateState(engine, cpuIdx);
+    score = leafScore(engine, cpuIdx, 'rollout');
     completed = true;
   } catch (err) {
     _cpuLogSilent = prevSilent;
@@ -13649,7 +13658,7 @@ async function mctsGatedActivation(engine, helpers, desc, actionFn, options = {}
     _cpuLogSilent = true;
     try {
       try { await rolloutRestOfTurn(engine, helpers); } catch {}
-      skipScore = evaluateState(engine, cpuIdx);
+      skipScore = leafScore(engine, cpuIdx, 'gate');
     } finally {
       _cpuLogSilent = prevSilentSkip;
       engine.exitFastMode();
@@ -13659,7 +13668,7 @@ async function mctsGatedActivation(engine, helpers, desc, actionFn, options = {}
       engine._mctsRolloutStartT = prevRolloutStartTSkip;
     }
   } else {
-    skipScore = evaluateState(engine, cpuIdx);
+    skipScore = leafScore(engine, cpuIdx, 'gate');
   }
 
   // ── Recon rollout ──
@@ -13689,7 +13698,7 @@ async function mctsGatedActivation(engine, helpers, desc, actionFn, options = {}
     if (evaluateThroughTurnEnd) {
       try { await rolloutRestOfTurn(engine, helpers); } catch {}
     }
-    reconScore = evaluateState(engine, cpuIdx);
+    reconScore = leafScore(engine, cpuIdx, 'gate');
     reconCompleted = true;
   } catch (err) {
     // Action threw during recon — treat as unable-to-activate.
@@ -13736,7 +13745,7 @@ async function mctsGatedActivation(engine, helpers, desc, actionFn, options = {}
         if (evaluateThroughTurnEnd) {
           try { await rolloutRestOfTurn(engine, helpers); } catch {}
         }
-        variation.score = evaluateState(engine, cpuIdx);
+        variation.score = leafScore(engine, cpuIdx, 'gate');
       } catch {}
       delete engine._mctsTargetPlan;
       _cpuLogSilent = prevSilent2;
@@ -14591,7 +14600,7 @@ async function mctsPickFromOptions(engine, options, applyFn, opts = {}) {
             const helpers = engine._cpuHelpers || null;
             if (helpers) await rolloutRestOfTurn(engine, helpers);
           } catch { /* swallow — partial state still scores */ }
-          score = evaluateState(engine, cpuIdx);
+          score = leafScore(engine, cpuIdx, 'pick');
         }
       } catch { /* score stays -Infinity */ }
       finally { engine.restore(snap); resetPromptCycle(engine); }
@@ -14671,7 +14680,7 @@ async function areaWhatIf(engine, helpers, cpuIdx, horizon, seed, applyFn) {
       const ok = await applyFn();
       if (ok !== false) {
         await rolloutRestOfTurn(engine, helpers);
-        score = evaluateState(engine, cpuIdx);
+        score = leafScore(engine, cpuIdx, 'pick');
       }
     } finally {
       engine.restore(snap);
