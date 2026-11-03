@@ -14197,7 +14197,9 @@ async function mctsRankCandidates(engine, helpers, candidates, rollouts = MCTS_R
   // where N is the sum of visits across all arms. Unvisited arms get
   // infinite UCB (they'd have been pulled in the min-pulls phase — this
   // is defensive).
-  while (ucb1Lohnt && !budgetExceeded && totalRollouts < MCTS_UCB1_TOTAL_PULLS) {
+  // Wertnetz-Messung (PP_VALUE_LEAF_PULLS): die Seite, die mit dem Netz sucht, darf mehr Rollouts ziehen (die gesparte Rechenzeit).
+  const pullsCap = VALUE_LEAF ? VALUE_LEAF.pullsFor(engine, engine._cpuPlayerIdx, MCTS_UCB1_TOTAL_PULLS) : MCTS_UCB1_TOTAL_PULLS;
+  while (ucb1Lohnt && !budgetExceeded && totalRollouts < pullsCap) {
     if ((Date.now() - t0) >= MCTS_RANK_BUDGET_MS || cpuPastDeadline(engine)) {
       budgetExceeded = true;
       break;

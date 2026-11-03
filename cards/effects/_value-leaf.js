@@ -17,6 +17,9 @@
 //  `PP_VALUE_LEAF_HORIZON` (Zahl): Rollout-Horizont (Folgezüge nach dem eigenen Zug) für Suchen, die das Netz bewertet — der Gewinn an
 //  Rechenzeit entsteht erst, wenn die Suche weniger Folgezüge simuliert (0 = Blatt direkt nach dem eigenen Zug).
 //
+//  `PP_VALUE_LEAF_PULLS` (Zahl): Obergrenze der Rollouts je Entscheidung für die Netz-Seite (sonst PP_MCTS_PULLS) — damit lässt sich die
+//  gesparte Rechenzeit in mehr Rollouts umsetzen.
+//
 //  Je Partie hängt `engine._valueLeaf = { calls, ms: [Sitz0, Sitz1] }` an der Engine (Kosten des Netzes, für die Auswertung).
 // ═══════════════════════════════════════════
 'use strict';
@@ -73,4 +76,12 @@ function horizonFor(engine, rootIdx, dflt) {
   return side != null && side !== rootIdx ? dflt : HORIZON;
 }
 
-module.exports = { score, horizonFor };
+const PULLS = process.env.PP_VALUE_LEAF_PULLS ? parseInt(process.env.PP_VALUE_LEAF_PULLS, 10) : null;
+/** Obergrenze der Rollouts je Entscheidung für den Sitz `rootIdx` (sonst `dflt`). */
+function pullsFor(engine, rootIdx, dflt) {
+  if (PULLS === null || !Number.isInteger(PULLS) || PULLS < 1) return dflt;
+  const side = engine._valueLeafSide;
+  return side != null && side !== rootIdx ? dflt : PULLS;
+}
+
+module.exports = { score, horizonFor, pullsFor };
