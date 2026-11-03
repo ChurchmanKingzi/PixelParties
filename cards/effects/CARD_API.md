@@ -3542,6 +3542,8 @@ verschiebt, muss die andere mitziehen; `JET.arriveAt × duration` ist
 ausserdem mit dem `_delay(...)` der aufrufenden Karte verzahnt, damit
 der Treffer direkt nach dem Aufprall folgt.
 
+**Held mit animierter Figur (Trailer-Look, `public/app-fx-27.jsx`):** Rammt ein HELD (`sourceZoneSlot < 0`) und steht seine Figur auf dem Brett (nicht versteinert/gelaehmt/unsichtbar), faehrt die FIGUR statt der Karte (Streckung, Nachbilder, Federung); die Karte bleibt stehen. Dieselbe Dauer und dieselben Aufprallanteile (12 % / `fire` 45 % / `rueckwaerts` 26 %) — wer sie aendert, aendert `ppFx27Zeitlinie` UND die Keyframes. Kreaturen als Quelle und Helden ohne Figur fahren weiter als Karte.
+
 `ramCharge` selbst ist fuer laengere Dauern gebaut: bei `duration: 600`
 faellt der gesamte Hinflug in 42 ms und die Karte steht danach 420 ms
 still. Wer eine Ram-Animation kurz takten will, braucht eine eigene

@@ -3714,6 +3714,7 @@ function HeroIdleSprite({ cardName, angehalten, versteinert, eingefroren, effekt
     const zone = anker.parentElement;
     // Die Zone kennt ihre Figur (`ppZonenSquash` quetscht beide gemeinsam).
     zone._ppFigurPlatz = platz;
+    platz._ppEintrag = eintrag;   // Sheet + aktueller Frame (`platz._ppFrame`, s. `male`) für die Nachbilder beim Rammen (app-fx-27.jsx)
     const ctx = cv.getContext('2d');
     const { meta, img } = eintrag;
     const fw = meta.frameWidth, fh = meta.frameHeight;
@@ -3786,6 +3787,7 @@ function HeroIdleSprite({ cardName, angehalten, versteinert, eingefroren, effekt
         ctx.restore();
       }
       st.weissGemalt = weiss;
+      platz._ppFrame = st.frame;
       st.gemalt = st.frame;
       st.steinGemalt = st.stein;
       st.effekteGemalt = eff;
@@ -3812,7 +3814,9 @@ function HeroIdleSprite({ cardName, angehalten, versteinert, eingefroren, effekt
       // ★ Touch (Befund: „die eigenen Helden verschwinden in ihren Karten, bis ich irgendwo hintippe"): nach einem Tipp bleibt `:hover` am angetippten
       // Element haengen (Phasenleiste, Heldenkarte) — das Einfahren der Figur gilt nur fuer eine echte Maus.
       const beruehrung = !!(window.matchMedia && window.matchMedia('(pointer: coarse)').matches);
-      const hover = !beruehrung && !!(l && zone.classList.contains('zone-has-card') && zone.matches(':hover')
+      // ★ Rammen mit der Figur (app-fx-27.jsx, `zone._ppRammt`): die fahrende Figur bleibt ausgefahren, auch wenn der Zeiger auf der Zone steht oder eine Zielwahl offen ist.
+      const rammt = !!zone._ppRammt;
+      const hover = !beruehrung && !rammt && !!(l && zone.classList.contains('zone-has-card') && zone.matches(':hover')
         && !l.plane.hasAttribute('data-pp-dragging'));
       // v1463 (Dynamic Heroes): während eines Zielwahl-Dialogs klappt die
       // Figur ein wie beim Hover — aber ohne die Hover-Vergrößerung, die
@@ -3834,7 +3838,7 @@ function HeroIdleSprite({ cardName, angehalten, versteinert, eingefroren, effekt
           }
         }
       }
-      const weg = hover || phasenHover || !!zustand.current.eingeklappt;
+      const weg = !rammt && (hover || phasenHover || !!zustand.current.eingeklappt);
       if (weg !== st.weg) {
         st.weg = weg;
         // ★ v1452 (Als Vorgabe 27.9.): Hovert man die Heldenkarte, zieht
@@ -3985,9 +3989,11 @@ function HeroIdleSprite({ cardName, angehalten, versteinert, eingefroren, effekt
     top: `calc(50% - ${bs(fussY * s)})`,
     transformOrigin: drehpunkt,
   };
+  // Drehpunkt der Streckung beim Rammen (`scale` am Canvas, app-fx-27.jsx): der Fußpunkt, nicht die Bildmitte
   const canvasStil = {
     width: `calc(${bs(fw * s)})`,
     height: `calc(${bs(fh * s)})`,
+    transformOrigin: `calc(${bs(mitteX * s)}) calc(${bs(fussY * s)})`,
   };
   // Eiskruste: deckungsgleich mit dem Sprite-Canvas, aber ringsum um `EIS_RAND` Sprite-Pixel größer (Silhouette verbreitert, Zacken
   // oben, Eis unter der Standlinie ragen über den Rahmen hinaus); Drehpunkt an den Füßen (dort wächst sie beim Einfrieren hoch)
@@ -5269,11 +5275,35 @@ function ppHeldenRammenBahn(R, B) {
 function HeldenRammkarte({ r }) {
   const el = useRef(null);
   const c = r.clash;
+  // Figur statt Karte (app-fx-27.jsx): gleiche gemeinsame Bahn, der Weg `d` wird als Anteil des Zonenabstands in die Brettebene übertragen. Gelingt das nicht (die Figur ist
+  // zwischen Ereignis und Aufbau verschwunden), fährt ausnahmsweise doch die Karte.
+  const [figurFehlt, setFigurFehlt] = useState(false);
   useEffect(() => {
-    let raf = 0;
+    let raf = 0, fig = null;
+    if (r.figur && !figurFehlt && window.ppFx27Figur) {
+      fig = window.ppFx27Figur(c.srcEl, c.tgtEl, { art: 'duell', voll: true });
+      if (!fig) { setFigurFehlt(true); return undefined; }       // neuer Durchlauf (Abhängigkeit) fährt dann die Karte
+    }
     if (!c.ctrl.angelaufen) {                                        // die erste Karte, die steht, startet die gemeinsame Bahn
       c.ctrl.angelaufen = true;
       if (!c.ctrl.bahn.beendet) c.ctrl.bahn.anlauf(performance.now());
+    }
+    if (fig) {
+      const takt = window.ppTaktRaf || window.requestAnimationFrame;
+      const figSchritt = () => {
+        const t = performance.now(), b = c.ctrl.bahn;
+        if (b.beendet && t > b.heimEnde + 30) {
+          if (!c.ctrl.entfernt) { c.ctrl.entfernt = true; c.ctrl.entfernen(); }
+          return;
+        }
+        if (!b.beendet && t > b.letzteZeit() + 10000) b.heim(t);
+        if (!fig.lebt()) { fig.ende(); return; }
+        const z = b.zustand(t);
+        fig.pose({ p: z.d / Math.max(1, c.D), spiegel: 1, wackeln: Math.round(z.w * Math.sign(c.wackeln) * 3), laden: false });
+        raf = takt(figSchritt);
+      };
+      figSchritt();
+      return () => { cancelAnimationFrame(raf); fig.ende(); };
     }
     const schritt = () => {
       const e = el.current;
@@ -5291,7 +5321,8 @@ function HeldenRammkarte({ r }) {
     };
     schritt();
     return () => cancelAnimationFrame(raf);
-  }, []);
+  }, [figurFehlt]);
+  if (r.figur && !figurFehlt) return null;                           // die Figur fährt in der Sprite-Ebene, hier gibt es nichts zu zeigen
   return (
     <div ref={el} className="ram-anim-card ram-clash" style={{ left: r.srcX - c.w / 2, top: r.srcY - c.h / 2, width: c.w, height: c.h }}>
       <BoardCard cardName={r.cardName} noTooltip />
@@ -47170,33 +47201,12 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       if (!srcEl || !tgtEl) return;
       const sr = srcEl.getBoundingClientRect();
       const tr = tgtEl.getBoundingClientRect();
-      const sx = sr.left+sr.width/2, sy = sr.top+sr.height/2;
-      const tx = tr.left+tr.width/2, ty = tr.top+tr.height/2;
-      const dx = tx-sx, dy = ty-sy;
-      const dist = Math.sqrt(dx*dx+dy*dy);
-      const angle = Math.atan2(dy,dx)*180/Math.PI;
-      // Spawn 3 erratic bolts with slight offsets
-      for (let b = 0; b < 3; b++) {
-        const bolt = document.createElement('div');
-        const yOff = (b - 1) * (4 + Math.random() * 4);
-        const h = 5 + Math.random() * 4;
-        const delay = b * 40;
-        bolt.style.cssText = `position:fixed;left:${sx}px;top:${sy-h/2+yOff}px;width:0;height:${h}px;`
-          + `background:linear-gradient(90deg,transparent,#ffe23d,#ffffff,#ffe23d,transparent);`
-          + `border-radius:${h/2}px;transform-origin:0 50%;transform:rotate(${angle + (Math.random()-0.5)*4}deg);`
-          + `pointer-events:none;z-index:10000;`
-          + `box-shadow:0 0 14px #fad54a,0 0 30px #f9ac20,0 0 50px rgba(255,198,28,.4);`
-          + `animation:lightningBolt .35s ${delay}ms ease-out forwards;--bolt-len:${dist}px;`;
-        document.body.appendChild(bolt);
-        setTimeout(() => bolt.remove(), 450 + delay);
-      }
-      // Impact flash on target
-      const flash = document.createElement('div');
-      flash.style.cssText = `position:fixed;left:${tx-20}px;top:${ty-20}px;width:40px;height:40px;border-radius:50%;`
-        + `background:radial-gradient(circle,rgba(248,248,189,.9),rgba(255,226,61,.5),transparent);`
-        + `pointer-events:none;z-index:10001;animation:petrifyFlash .4s 100ms ease-out forwards;`;
-      document.body.appendChild(flash);
-      setTimeout(() => flash.remove(), 550);
+      // Pixelart-Kettenblitz (app-fx-28.jsx): Fensterkoordinaten; Scrollstand/Welt-Huelle regelt die Funktion selbst.
+      if (window.ppFx28Kettenblitz) window.ppFx28Kettenblitz({
+        sx: sr.left + sr.width / 2, sy: sr.top + sr.height / 2, tx: tr.left + tr.width / 2, ty: tr.top + tr.height / 2,
+        step, sw: sr.width, sh: sr.height, tw: tr.width, th: tr.height,
+        sHeld: srcZoneSlot < 0, tHeld: tgtZoneSlot < 0,
+      });
     };
     socket.on('qinglong_lightning', onQinglongLightning);
     const onRedLightningRain = ({ owner, heroIdx, zoneSlot }) => {
@@ -49182,6 +49192,25 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       // ★ v1258 — Weltverankerung: Angreifer und Ziel sind Zonen, die
       // Rammkarte laeuft in der Welt-Huelle; beide Punkte in Feld-Koordinaten.
       const _fo = window.ppFxScrollOffset ? window.ppFxScrollOffset() : { dx: 0, dy: 0 };
+      // ★ Trailer-Look (app-fx-27.jsx): rammt ein HELD mit animierter Figur, fährt die FIGUR (Streckung, Nachbilder, Federung), und die Karte bleibt stehen. Dieselbe Dauer und dieselben
+      // Aufprallanteile wie die Keyframes (`rammeBisKontakt` im Server wartet darauf). Ohne fahrbereite Figur (Kreatur, Held ohne Sheet, versteinert/gelähmt/unsichtbar, tot) → alter Kartenpfad.
+      if (!(sourceZoneSlot != null && sourceZoneSlot >= 0) && window.ppFx27RammFigur) {
+        const fahrt = window.ppFx27RammFigur({ srcEl, tgtEl, dur, trailType, rueckwaerts: !!rueckwaerts });
+        if (fahrt) {
+          // Nur der Jetpack-Schweif (`MoniaJetTrail`) braucht einen Eintrag: auf Körperhöhe der Figur statt an den Füßen, bis dorthin, wo die Figur landet. `figur: true` → die Zone
+          // blendet dabei NICHTS aus (`isRamming` ignoriert diese Einträge).
+          if (trailType === 'fire') {
+            const sx0 = sr.left + sr.width / 2 + _fo.dx, sy0 = sr.top + sr.height / 2 + _fo.dy + fahrt.koerperDy;
+            const tx0 = tr.left + tr.width / 2 + _fo.dx, ty0 = tr.top + tr.height / 2 + _fo.dy + fahrt.koerperDy;
+            setRamAnims(prev => [...prev, {
+              id, cardName, figur: true, srcX: sx0, srcY: sy0, tgtX: sx0 + (tx0 - sx0) * fahrt.anteil, tgtY: sy0 + (ty0 - sy0) * fahrt.anteil,
+              srcOwner: sourceOwner, srcHeroIdx: sourceHeroIdx, srcZoneSlot: -1, dur, angle: 0, trailType, rueckwaerts: false,
+            }]);
+            setTimeout(() => setRamAnims(prev => prev.filter(a => a.id !== id)), dur + JET_TAIL_MS);
+          }
+          return;
+        }
+      }
       setRamAnims(prev => [...prev, {
         id, cardName,
         srcX: sr.left + sr.width / 2 + _fo.dx, srcY: sr.top + sr.height / 2 + _fo.dy,
@@ -49236,14 +49265,17 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       ctrl = { duelId, bahn: ppHeldenRammenBahn(reach, back), entfernt: false };
       ctrl.entfernen = () => setRamAnims(prev => prev.filter(x => !(x.clash && x.clash.ctrl === ctrl)));
       aktivesRammen[key] = ctrl;                // der Anlauf beginnt, sobald die Karten WIRKLICH stehen (`HeldenRammkarte`) — dasselbe Bild, in dem auch der Pixelart-Aufprall einsetzt
-      const bau = (x, r, c, richtung, wackeln, idx) => ({
+      // ★ Trailer-Look (app-fx-27.jsx): hat ein Held eine fahrbereite Figur, rammt die FIGUR (`figur`, Karte bleibt stehen, die Zone blendet nichts aus); sonst wie bisher die Karte.
+      // `D` = Abstand der Zonenmitten auf dem Bildschirm: der Weg `d` der gemeinsamen Bahn wird als Anteil dieses Abstands auf die Strecke in der Brettebene übertragen.
+      const bau = (x, r, c, richtung, wackeln, idx, selbst, gegner) => ({
         id: duelId + idx, cardName: x.cardName,
         srcX: c.x + _fo.dx, srcY: c.y + _fo.dy, tgtX: c.x + richtung * ux * reach + _fo.dx, tgtY: c.y + richtung * uy * reach + _fo.dy,
         srcOwner: x.owner, srcHeroIdx: x.heroIdx, srcZoneSlot: -1,
         dur: 0, angle: Math.atan2(richtung * uy, richtung * ux) * (180 / Math.PI) + 90,
-        clash: { ctrl, ux: richtung * ux, uy: richtung * uy, w: r.width, h: r.height, wackeln },
+        figur: !!(window.ppFx27KannFigur && window.ppFx27KannFigur(selbst)),
+        clash: { ctrl, ux: richtung * ux, uy: richtung * uy, w: r.width, h: r.height, wackeln, srcEl: selbst, tgtEl: gegner, D: d },
       });
-      const neu = [bau(a, ra, ca, 1, 14, 0), bau(b, rb, cb, -1, -14, 0.5)];
+      const neu = [bau(a, ra, ca, 1, 14, 0, elA, elB), bau(b, rb, cb, -1, -14, 0.5, elB, elA)];
       setTimeout(() => setRamAnims(prev => [...prev, ...neu]), M);      // bis dahin bleibt der Held auf seiner Zone
     };
     socket.on('play_hero_clash', onHeroClash);
@@ -57342,7 +57374,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           // Only hero-originated rams hide the hero tile during flight —
           // creature-originated rams (Haressassin etc., `srcZoneSlot >= 0`)
           // animate their own support slot and must leave the hero visible.
-          const isRamming = ramAnims.some(r => r.srcOwner === pi && r.srcHeroIdx === i && (r.srcZoneSlot == null || r.srcZoneSlot < 0));
+          const isRamming = ramAnims.some(r => !r.figur && r.srcOwner === pi && r.srcHeroIdx === i && (r.srcZoneSlot == null || r.srcZoneSlot < 0));
           // ★ v1462 (Als Vorgabe 27.9.): Steht eine animierte Figur auf der
           // Karte, zeigt SIE die Status (Partikel, Tönung, Eis, Stein) — die
           // Status-Overlays der Karte entfallen dann (doppelt und teuer).
@@ -61498,6 +61530,9 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       {ramAnims.map(r => r.clash ? (
         /* Duel (12.10.): zwei Helden rammen einander — Bahn und Richtung kommen aus `onHeroClash` (`HeldenRammkarte`) */
         <HeldenRammkarte key={r.id} r={r} />
+      ) : r.figur ? (
+        /* Rammen mit der Figur (app-fx-27.jsx): die Figur fährt in der Sprite-Ebene, hier liegt nur der Jetpack-Schweif */
+        r.trailType === 'fire' ? <MoniaJetTrail key={r.id} r={r} /> : null
       ) : (
         <React.Fragment key={r.id}>
           {/* v672: Der Schweif darf NICHT im Kartenelement liegen — dort

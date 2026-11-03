@@ -5454,6 +5454,28 @@ body:has(.pz-layout) .pp-bg-particles { display: none; }
   100% { transform: rotate(360deg); }
   100% { opacity: 0.9; transform: scale(1.2); }
 }
+/* ─── Rammen mit der Heldenfigur (app-fx-27.jsx) ──────────────────────
+   Die Figur fährt statt der Karte (Trailer-Look): Nachbilder = flache, im Schachbrett gedithert ausgestanzte Silhouetten, Staub = harte Pixel in Stufen. Beides steht wie die Figur
+   aufrecht in der Sprite-Ebene (gleiche Aufrichtung `--sprite-kipp` / `--sprite-streck`); Bewegung und Streckung laufen per `translate` / `scale` (JS, 30 Hz). */
+.pp-fx27-geist {
+  position: absolute;
+  pointer-events: none;
+  transform: rotateX(calc(-1 * var(--sprite-kipp, 0deg))) scaleY(var(--sprite-streck, 1));
+}
+.pp-fx27-geist > canvas { position: absolute; left: 0; top: 0; display: block; image-rendering: pixelated; }
+.pp-fx27-wolke {
+  position: absolute; width: 0; height: 0;
+  pointer-events: none;
+  transform-origin: 0 0;
+  transform: rotateX(calc(-1 * var(--sprite-kipp, 0deg))) scaleY(var(--sprite-streck, 1));
+}
+.pp-fx27-wolke > i {
+  position: absolute;
+  left: calc(var(--x0) * var(--board-scale, 1)); top: calc(var(--y0) * var(--board-scale, 1));
+  width: calc(var(--g) * var(--board-scale, 1)); height: calc(var(--g) * var(--board-scale, 1));
+  background: var(--c);
+}
+
 /* ─── Duel: zwei Helden rammen einander (12.10.) ──────────────────────
    Die Bewegung kommt NICHT aus Keyframes: `HeldenRammkarte` (app-board.jsx) setzt je Bild `transform` aus der gemeinsamen Bahn `ppHeldenRammenBahn` — erst im Duell steht
    fest, wie viele Hits es werden. Hier nur die Hülle. */
