@@ -18,9 +18,9 @@ Material: Stoff (kein Glanz), Gold (Glanz/Glitzer erlaubt).
 Ablauf (48 Frames à 75 ms = 3,6 s, nahtlos), alle Bewegungen unabhängig — Runde 3: er STEHT einfach (kein Schweben):
 Nutzerkorrektur (wörtlich): „Slime Rancher soll nicht schweben(?), er steht einfach.“ — Angenommene Ursache: der seitlich schwingende Mantelsaum, die abwechselnd angehobenen Fußzipfel („Gewichtsverlagerung“) und das
 Mitwippen der ganzen Gestalt lasen sich als Schweben/Gleiten. Beides ist entfernt: Saum und Füße (Zeilen 19–24) bleiben jetzt STARR auf dem Boden.
-* Atmen (Periode 24, zweimal je Schleife, zweistufig mit Nachlauf): erst hebt sich der Mantel (Zeile 16, eine Mantelfalte, wird einmal doppelt eingefügt, Mischtextur — Brust und Kapuze steigen 1 px), etwa 2 Frames
+* Atmen (Periode 16, dreimal je Schleife, zweistufig mit Nachlauf): erst hebt sich der Mantel (Zeile 16, eine Mantelfalte, wird einmal doppelt eingefügt, Mischtextur — Brust und Kapuze steigen 1 px), etwa 1 Frame
   später folgt die Kapuze (Zeile 4, Stoff ohne Loch, wird einmal doppelt eingefügt — Kapuzenspitze steigt 1 px weiter, insgesamt 2 px). Die Füße/der Saum bleiben am Boden; die Kapuze bewegt sich NICHT seitlich.
-* Schließe glitzert (zweimal je Schleife, 4 Frames): die Brosche wird 1–2 Stufen heller auf der Goldrampe J→H→I, dazu wächst ein kleiner vierzackiger Stern AM Objekt (Mitte + 4 Arme à 1 px) auf und verschwindet.
+* Schließe glitzert (zweimal je Schleife, Frames 17–20 und 41–44, mitten in den Atempausen): die Brosche wird 1–2 Stufen heller auf der Goldrampe J→H→I, dazu wächst ein kleiner vierzackiger Stern AM Objekt (Mitte + 4 Arme à 1 px) auf und verschwindet.
 Ergänzungen: Umrisspixel A (28,23,16) wo nötig (kontur_schliessen); Glitzerstern in Goldfarben der Brosche. Frame 0 = Original.
 """
 import math
@@ -49,7 +49,7 @@ BROSCHE = [(7, 13), (8, 13), (7, 14), (8, 14)]
 def koerper(i):
     k = L.platz(spr, H, W, PAD_L, PAD_T)
     # Schließe glitzert (Gold)
-    st = Hm.folge(i, 10, [1, 2, 2, 1], N) or Hm.folge(i, 34, [1, 2, 2, 1], N)
+    st = Hm.folge(i, 17, [1, 2, 2, 1], N) or Hm.folge(i, 41, [1, 2, 2, 1], N)
     if st:
         for (x, y) in BROSCHE:
             c = tuple(int(v) for v in k[y + OFF[1], x + OFF[0], :3])
@@ -57,8 +57,8 @@ def koerper(i):
         if st == 2:
             Hm.stern4(k, 8, 13, 1, GOLD[2], GOLD[1], off=OFF)
     # Atmen, zweistufig: Mantel (Zeile 16) zuerst, Kapuze (Zeile 4) etwa 2 Frames später; Saum und Füße (Zeilen 19–24) bleiben starr am Boden
-    brust = E.verlauf3(i, 24, 0.0, 1)
-    kopf = E.verlauf3(i, 24, -0.5, 1)
+    brust = E.verlauf3(i, 16, 0.0, 1)
+    kopf = E.verlauf3(i, 16, -0.45, 1)
     if brust:
         k = L.streck_zeile(k, PAD_T + 16, brust)
     if kopf:

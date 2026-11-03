@@ -46,7 +46,7 @@ import anim_humanoide as Hm
 import anim_lib as L
 
 N, MS = 48, 64
-PAD = (3, 3, 3, 30)
+PAD = (3, 3, 3, 19)
 sz = G.Szene('guardian-beast-long', PAD)
 spr, OFF, H, W, f = sz.spr, sz.off, sz.H, sz.W, sz.f
 PL, PT = sz.PL, sz.PT
