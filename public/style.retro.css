@@ -1472,6 +1472,10 @@ body:has(.pz-layout) .pp-bg-particles { display: none; }
 @media (prefers-reduced-motion: reduce) {
   .pp-logo-particle { animation: none; opacity: calc(var(--p-max, .85) * .6); transform: none; }
 }
+/* Perf (3.11.): die Teilchen der Menue-/Titel-Ansichten (Hintergrund, Logo, SC-Glitzer) sind je Schicht EINE Leinwand (app-fx-36.jsx, 30-Hz-Takt) statt
+   150-160 DOM-Animationen. Position/Groesse setzt die Komponente (Logo/Glitzer ragen ueber die Schicht hinaus, Hintergrund = ganze Schicht). Die Regeln, die
+   die Schicht ausblenden (`body:has(.ui-noscale) .pp-bg-particles` u. a.), gelten unveraendert: `display: none` heisst unsichtbar → kein Takt. */
+.pp-fx36-leinwand { position: absolute; display: block; pointer-events: none; image-rendering: pixelated; }
 
 @media (max-width: 900px) {
   .pp-logo-img { height: 61px; }
@@ -3338,6 +3342,9 @@ body.pp-dragging-card.pp-dragging-card.pp-dragging-card * { cursor: url("/cursor
 @media (prefers-reduced-motion: reduce) {
   .board-mote { animation: none; opacity: calc(var(--p-max, .3) * .5); transform: none; }
 }
+/* Perf (3.11.): die Motes von Hand und Brett sind je EINE Leinwand (app-fx-34.jsx, 30-Hz-Takt) statt 136 DOM-Animationen. Position/Groesse setzt die Komponente
+   (Hand: ragt ueber die Leiste hinaus, Brett: ganze .board-ambiance); battle-lite blendet sie wie die alten Spans aus (unten). */
+.pp-fx34-leinwand { position: absolute; display: block; pointer-events: none; image-rendering: pixelated; }
 .board-player-side { flex: 1; display: flex; flex-direction: column; justify-content: center; gap: 3px; min-height: 0; }
 .board-permanents { position: absolute; right: 26px; display: flex; flex-direction: column; gap: 6px; z-index: 50; pointer-events: auto; }
 .board-permanents-opp { bottom: 52%; }
@@ -7776,9 +7783,12 @@ body:has(.textbox-overlay) .tooltip { z-index: 90003 !important; }
 @media (orientation: portrait) and (max-width: 900px) { 
   .screen-full *, .screen-center *, .pp-bg-particles * { animation: none !important; }
  }
-body:has(.rotate-device-overlay.rotate-gate) .screen-full *,
-body:has(.rotate-device-overlay.rotate-gate) .screen-center *,
-body:has(.rotate-device-overlay.rotate-gate) .pp-bg-particles * { animation: none !important; }
+/* Statt `body:has(.rotate-device-overlay.rotate-gate) …`: eine `:has()`-Regel mit `*` als Ziel liess bei JEDEM Einfuegen/Entfernen
+   eines Elements mit Klasse irgendwo im Baum (Effekt-Wolken, Funken, Nachbilder …) den ganzen Body-Teilbaum neu berechnen
+   (~10–25 ms je Ereignis auf dem Brett). Der Schalter ist jetzt ein Attribut, das `RotateOverlay` (app-main.jsx) setzt. */
+body[data-rotate-gate] .screen-full *,
+body[data-rotate-gate] .screen-center *,
+body[data-rotate-gate] .pp-bg-particles * { animation: none !important; }
 
 /* Show overlay + hide ALL screens in portrait on small devices */
 @media (orientation: portrait) and (max-width: 900px) {
@@ -10058,6 +10068,7 @@ body[data-tb-hl] .hero-idle-platz.hero-idle-hover { scale: none; }
          Karte zeigt ihre Seltenheit weiter am Rand. */
   .hand-mote { display: none; }
   .board-mote { display: none; }
+  .pp-fx34-leinwand { display: none; }
   /* Aktivierbare Zonen und Co.: der Schein steht schon statisch in den
      Basisregeln (`box-shadow … !important`), nur der Puls — ein
      `box-shadow`-Verlauf, den der Compositor nicht kann und der selbst

@@ -6705,6 +6705,8 @@ function FoilOverlay({ bands, motes, sparkles, shimmerOffset, foilType, klein, f
   const posn = isDiamond ? DIAMOND_SPARKLE_POSITIONS : SPARKLE_POSITIONS;
   // Brett mit vielen Foil-Karten: nur so viele Funken + Staubkoerner, wie `teilchen` erlaubt (siehe `foilBrettTeilchen`).
   const { funken: nFunken, staub: nStaub } = foilTeilchenAnteil(posn.length, (motes || []).length, teilchen);
+  // app-fx-35: Funken + Staub als EINE Leinwand (statt ~18 DOM-Elemente mit Endlos-Animation); Kleinansicht/Telefon/ohne Pipeline: wie bisher.
+  const cvFoil = !klein && !!window.PpFx35Foil && !!window.ppFx35FoilAn && window.ppFx35FoilAn();
   return (
     <div className={'foil-shine-overlay' + (isDiamond ? ' foil-shine-diamond' : '') + (klein ? ' foil-klein' : '')} data-foil-key={fkey}>
       {/* 1) Die Praegung der Folie. Fuer sich genommen kaum zu sehen —
@@ -6730,6 +6732,7 @@ function FoilOverlay({ bands, motes, sparkles, shimmerOffset, foilType, klein, f
         }} />
       ))}
       {/* 4) Glanzpunkte und Staub. */}
+      {cvFoil ? <window.PpFx35Foil posn={posn} sparkles={sparkles} motes={motes} nFunken={nFunken} nStaub={nStaub} diamond={isDiamond} fkey={fkey} /> : <>
       {posn.map((sp, i) => {
         if (klein && i % FOIL_KLEIN_FUNKEN_JEDER !== 0) return null;   // v1298
         if (!foilBehalten(i, posn.length, nFunken)) return null;
@@ -6755,6 +6758,7 @@ function FoilOverlay({ bands, motes, sparkles, shimmerOffset, foilType, klein, f
           '--mote-o': m.o.toFixed(2),
         }} />
       ))}
+      </>}
     </div>
   );
 }

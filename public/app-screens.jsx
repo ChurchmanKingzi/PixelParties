@@ -1558,7 +1558,9 @@ function MenuPlayerPanel({ top, height }) {
 // herum mehr" — statt eines zweiten, fast gleichen Bausteins bekommt
 // dieser hier Parameter. Der Schriftzug und der Menuehintergrund
 // unterscheiden sich damit nur noch in Anzahl, Groesse und Reichweite.
-function PixelParticles({
+// Perf (3.11.): React.memo + Canvas (app-fx-36.jsx) — die Teilchen sind EINE Leinwand im 30-Hz-Takt statt 150–160 DOM-Animationen je Schicht;
+// die Spans bleiben nur als Rueckfall (`window.__ppFxAlt`, fehlende app-fx-36).
+const PixelParticles = React.memo(function PixelParticles({
   anzahl = 64,
   klasse = 'pp-logo-particles',
   teilchenKlasse = 'pp-logo-particle',
@@ -1612,9 +1614,12 @@ function PixelParticles({
     // Absichtlich einmalig: die Streuung soll sich beim Rendern nicht
     // neu wuerfeln. Die Parameter aendern sich zur Laufzeit nicht.
   }, []);
+  const art = radial ? 'glitzer' : (klasse === 'pp-logo-particles' ? 'logo' : 'hintergrund');
   return (
     <div className={klasse} aria-hidden="true">
-      {particles.map((p, i) => (
+      {window.PpFx36Teilchen && !window.__ppFxAlt
+        ? <window.PpFx36Teilchen art={art} teilchen={particles} />
+        : particles.map((p, i) => (
         <span key={i} className={teilchenKlasse} style={{
           top: p.top + '%', left: p.left + '%',
           '--p-size': p.size + 'px',
@@ -1628,7 +1633,7 @@ function PixelParticles({
       ))}
     </div>
   );
-}
+});
 
 // ── Anzahlen an EINER Stelle (v811) ──────────────────────────────────
 // Al, 5.9.: „erhoehe noch die Anzahl, noch sind sie zu subtil."
@@ -1637,9 +1642,9 @@ const PARTIKEL_LOGO = 150;        // um den Schriftzug, dichter Bereich
 const PARTIKEL_HINTERGRUND = 160; // ganzer Bildschirm, weiter gestreut
 
 /** Um den Schriftzug: dicht gedraengt, kleine Teilchen, kurze Wege. */
-function LogoParticles() {
+const LogoParticles = React.memo(function LogoParticles() {
   return <PixelParticles anzahl={PARTIKEL_LOGO} />;
-}
+});
 
 /**
  * ★ v1264 (Al 22.9.): „das SC-Icon sollte Glitzer-Particles ausstossen."
@@ -1651,8 +1656,7 @@ function LogoParticles() {
  */
 const SC_GLITZER_FARBEN = ['#f7f7ad', '#fad54a', '#ffe469', '#ffffff'];
 // v1289: auch die SC-Plakette im Spielerprofil-Popup glitzert.
-window.ScGlitzer = ScGlitzer;
-function ScGlitzer() {
+const ScGlitzer = React.memo(function ScGlitzer() {
   return <PixelParticles
     anzahl={22}
     klasse="pp-sc-glitzer"
@@ -1667,7 +1671,8 @@ function ScGlitzer() {
     dauerMin={1.1}
     dauerSpanne={1.2}
   />;
-}
+});
+window.ScGlitzer = ScGlitzer;
 
 /**
  * Hinter dem gesamten Menue: weiter gestreut, groessere Teilchen,
@@ -1675,7 +1680,7 @@ function ScGlitzer() {
  * Rauschen. Die Schicht liegt fest im Fenster und wird abgeschaltet,
  * sobald ein Kampffeld im Baum haengt (siehe style.css).
  */
-function MenuBackgroundParticles({ klasse = 'pp-bg-particles' }) {
+const MenuBackgroundParticles = React.memo(function MenuBackgroundParticles({ klasse = 'pp-bg-particles' }) {
   return <PixelParticles
     anzahl={PARTIKEL_HINTERGRUND}
     klasse={klasse}
@@ -1687,7 +1692,7 @@ function MenuBackgroundParticles({ klasse = 'pp-bg-particles' }) {
     dauerMin={5}
     dauerSpanne={9}
   />;
-}
+});
 
 /**
  * v1265: Zoomfaktor eines Elements — gezeichnete Breite durch Layout-

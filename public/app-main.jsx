@@ -3360,6 +3360,12 @@ function RotateOverlay() {
   // getippt wurde — wer das Handy von Hand kippt, kommt NICHT am Tippen vorbei (das Tippen startet Vollbild + Querformat).
   const phoneLike = !!(window.matchMedia && matchMedia('(pointer: coarse)').matches && Math.min(window.screen.width, window.screen.height) <= 700);
   const gate = canAuto && phoneLike && !tapped;
+  // Schalter fuer das CSS (`body[data-rotate-gate]`) — bewusst KEIN `body:has(.rotate-gate)`, siehe style.css.
+  useEffect(() => {
+    if (!gate) return undefined;
+    document.body.setAttribute('data-rotate-gate', '');
+    return () => document.body.removeAttribute('data-rotate-gate');
+  }, [gate]);
   const enter = () => {
     if (!auto) return;
     window._ppTapStarted = true; setTapped(true);

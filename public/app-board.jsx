@@ -5575,7 +5575,9 @@ function FlameStrikeEffect({ x, y, skala = 1 }) {   // W86r1: `skala` vergröße
 // Both layers are pointer-events:none and respect prefers-reduced-motion.
 // The colour comes in as the player's chosen colour.
 const ppAmbGerade = (v) => Math.round(v / 2) * 2;   // gerade Pixel (Pixelart: Teilchen liegen auf dem 2-px-Kunstpixelraster)
-function HandAmbiance({ color }) {
+// Perf (3.11.): React.memo + Canvas (app-fx-34.jsx) — die 80 Motes sind EINE Leinwand im 30-Hz-Takt statt 80 DOM-Animationen;
+// die DOM-Spans bleiben nur als Rueckfall (`window.__ppFxAlt`, fehlende app-fx-34).
+const HandAmbiance = React.memo(function HandAmbiance({ color }) {
   const motes = useMemo(() => {
     const N = 80;   // doubled from 40 — denser pixel rain over the hand
     const arr = [];
@@ -5601,7 +5603,9 @@ function HandAmbiance({ color }) {
       style={{ '--amb-me': color || '#66b6ff' }}>
       <div className="hand-bloom" />
       <div className="hand-particles">
-        {motes.map((p, i) => (
+        {window.PpFx34Ambiente && !window.__ppFxAlt
+          ? <window.PpFx34Ambiente art="hand" motes={motes} farbeMe={color || '#66b6ff'} farbeOpp="#ec2d62" />
+          : motes.map((p, i) => (
           <span key={i} className="hand-mote" style={{
             top: p.top + '%', left: p.left + '%',
             '--p-size': p.size + 'px',
@@ -5618,7 +5622,7 @@ function HandAmbiance({ color }) {
       </div>
     </div>
   );
-}
+});
 
 // Battlefield ambiance — always-on pixel motes drifting upward across the
 // whole battlefield background, mirroring the visual language of
@@ -5633,7 +5637,7 @@ function HandAmbiance({ color }) {
 //   • Dimmer + slower than the hand layer so it never competes with
 //     cards for attention.
 // pointer-events: none, respects prefers-reduced-motion (see .board-mote).
-function BoardAmbiance({ colorMe, colorOpp }) {
+const BoardAmbiance = React.memo(function BoardAmbiance({ colorMe, colorOpp }) {
   const motes = useMemo(() => {
     const N = 56;
     const arr = [];
@@ -5658,7 +5662,9 @@ function BoardAmbiance({ colorMe, colorOpp }) {
   return (
     <div className="board-ambiance" aria-hidden="true"
       style={{ '--amb-board-me': colorMe || '#66b6ff', '--amb-board-opp': colorOpp || '#ec2d62' }}>
-      {motes.map((p, i) => (
+      {window.PpFx34Ambiente && !window.__ppFxAlt
+        ? <window.PpFx34Ambiente art="brett" motes={motes} farbeMe={colorMe || '#66b6ff'} farbeOpp={colorOpp || '#ec2d62'} />
+        : motes.map((p, i) => (
         <span key={i} className="board-mote" style={{
           top: p.top + '%', left: p.left + '%',
           '--p-size': p.size + 'px',
@@ -5674,7 +5680,7 @@ function BoardAmbiance({ colorMe, colorOpp }) {
       ))}
     </div>
   );
-}
+});
 
 
 /**

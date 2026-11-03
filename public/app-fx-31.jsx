@@ -21,7 +21,7 @@
 //  Die beiden Registry-Effekte werden durch Fassungen im Trailer-Look ersetzt (Zeiten/`ende` und Tonhinweise bleiben: Server wartet darauf nicht, die Töne hängen an ZONE_ANIM_SFX):
 //    • Critical Strike: dreifacher Schnitt LÄNGS der Rammbahn (Angreifer → Ziel; Richtung aus `play_ram_animation`, mitgeschrieben im Umhüller um `ppFx27RammFigur`), spitz zulaufende
 //      Linie mit dunkler Kontur (innen creme, außen hellblau), wächst in 3 Bildern, bleibt ~7 Bilder dick, flackert aus; dazu Aufprall-Sternfächer, drei Ringe (creme/hellblau/blau,
-//      die äußeren gedithert), Splitter (Quadrate und Pluszeichen), Blitzscheibe im Schachbrett; „CRITICAL!" in der 3×5-Pixelschrift wie bisher.
+//      die äußeren gedithert), Splitter (Quadrate und Pluszeichen), Blitzscheibe im Schachbrett; ohne Schriftzug (der Trailer zeigt keinen).
 //    • Quick Slash: ein Diagonalschnitt (Trailer: von rechts oben nach links unten durch die Figur) plus ein dünner Zweitschnitt, kleine Ringe, ein paar Splitter.
 //  Alles auf `ppR1Leinwand` (Rasterpixel 3 px, Bayer-Dithering, 30 Hz, `data-pp-px="aus"`), Farben aus der Palette.
 // ═════════════════════════════════════════════════════════════════
@@ -285,19 +285,6 @@ function ppFx31Malen(g, t, sz, teile) {
     if (u > 0.75 && (Math.floor(t / PP_FX31_BILD) & 1)) continue;                       // flackert aus
     if (s.plus) { g.put(x, y, f); g.put(x - 1, y, f); g.put(x + 1, y, f); g.put(x, y - 1, f); g.put(x, y + 1, f); }
     else g.block(x, y, s.gross, s.gross, f);
-  }
-  // „CRITICAL!" (wie bisher), nur beim Critical Strike
-  if (krit && !teile.noLabel) {
-    const u = (t - 180) / 620;
-    if (u >= 0 && u <= 1) {
-      const gr = u < 0.35 ? 0.3 + 0.85 * (u / 0.35) : u < 0.75 ? 1.15 - 0.15 * ((u - 0.35) / 0.4) : 0.95;
-      const dyy = u < 0.35 ? 8 * (1 - u / 0.35) : u < 0.75 ? -2 * ((u - 0.35) / 0.4) : -2 - 12 * ((u - 0.75) / 0.25);
-      const a = u < 0.35 ? u / 0.35 : u < 0.75 ? 1 : 1 - (u - 0.75) / 0.25;
-      const mass = gr < 0.5 ? 1 : 2, text = 'CRITICAL!', breite = text.length * 4 * mass - mass;
-      const x0 = Math.round(cx - breite / 2), y0 = Math.round(sz.cy - 56 / S + dyy / S - 5 * mass / 2 + 4 - teile.hoch / S * 0.35);
-      for (const [ox, oy] of [[-1, 0], [1, 0], [0, -1], [0, 1], [-1, -1], [1, -1], [-1, 1], [1, 1]]) g.txt(text, x0 + ox, y0 + oy, C.dunkelrot, a, mass);
-      g.txt(text, x0, y0, C.gelbcreme, a, mass);
-    }
   }
 }
 
