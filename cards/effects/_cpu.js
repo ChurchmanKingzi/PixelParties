@@ -21,6 +21,7 @@ const { PHASES, getCleansableStatuses, hasCardType, baseCardName } = require('./
 // Learned per-deck profiles (ML-trained via scripts/train-deck-profile.js).
 // No-ops when no profile matches the piloted lineup or when
 // PP_DISABLE_PROFILES=1 (training data collection).
+const _v8Heap = require('v8');   // Heap-Messung je Rollout (siehe mctsRunOneRollout)
 const deckProfile = require('./_deck-profile');
 const KreaturenBilanz = require('./_kreaturen-bilanz');
 
@@ -13130,7 +13131,8 @@ async function mctsRunOneRollout(engine, helpers, candidate, { plan = null, reco
   // reclaim. Steady-state ~0; in a death spiral, accumulates per
   // rollout. Heap-trip diagnostics surface the top offenders so the
   // user can see "Steam Dwarf Brewer leaked 12MB/rollout × 200 calls".
-  const heapBefore = process.memoryUsage().heapUsed;
+  // `used_heap_size` der V8-Statistik ist exakt `process.memoryUsage().heapUsed`, kostet aber kein RSS-Lesen (zwei Aufrufe je Rollout).
+  const heapBefore = _v8Heap.getHeapStatistics().used_heap_size;
   // Capture hook state PRE-rollout. Diffed against the post-rollout state
   // (read just before engine.restore() puts it back) to attribute hook
   // fires to THIS rollout — independent of who the candidate is. When
@@ -13223,7 +13225,7 @@ async function mctsRunOneRollout(engine, helpers, candidate, { plan = null, reco
     // transient. Death-spiral signature: per-rollout deltas in the MB
     // range that accumulate across hundreds of rollouts before V8
     // can keep up. Surfaced via `_describeHeapTripDiagnostics`.
-    const heapAfter = process.memoryUsage().heapUsed;
+    const heapAfter = _v8Heap.getHeapStatistics().used_heap_size;
     const deltaMb = (heapAfter - heapBefore) / 1024 / 1024;
     if (!engine._candidateHeapDelta) engine._candidateHeapDelta = Object.create(null);
     const cur = engine._candidateHeapDelta[candidateName] || { calls: 0, totalMb: 0 };

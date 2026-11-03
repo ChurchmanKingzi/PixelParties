@@ -136,7 +136,10 @@ function heapGuardExceeded(mu) {
   const rssM = Math.round(mu.rss / 1024 / 1024);
   const totM = Math.round(mu.heapTotal / 1024 / 1024);
   const usedM = Math.round(mu.heapUsed / 1024 / 1024);
-  if (usedM * 2 < HEAP_CHECK_USED_MB) {
+  // `heapSample()` liest RSS nur bei jeder 8. Probe neu (`rssFresh`); dazwischen ist `rss` der letzte Wert und gilt weder für die
+  // Grundlast-Nachführung (sonst blähte ein veralteter Wert gegen einen frischen heapTotal die Grundlast auf) noch für den RSS-Vergleich.
+  const rssFresh = mu.rssFresh !== false;
+  if (rssFresh && usedM * 2 < HEAP_CHECK_USED_MB) {
     const gap = Math.max(0, rssM - totM);
     if (gap > _rssNonHeapMB) _rssNonHeapMB = gap;
   }
@@ -152,7 +155,7 @@ function heapGuardExceeded(mu) {
   }
   if (usedM > HEAP_CHECK_USED_MB) return `heapUsed ${usedM} > ${HEAP_CHECK_USED_MB} MB`;
   if (totM > HEAP_CHECK_TOTAL_MB) return `heapTotal ${totM} > ${HEAP_CHECK_TOTAL_MB} MB`;
-  if (rssM > HEAP_CHECK_RSS_MB + _rssNonHeapMB) {
+  if (rssFresh && rssM > HEAP_CHECK_RSS_MB + _rssNonHeapMB) {
     return `rss ${rssM} > ${HEAP_CHECK_RSS_MB} + ${_rssNonHeapMB} MB Grundlast`;
   }
   return null;
@@ -579,6 +582,20 @@ function todesWacheAn() {
 }
 
 const _v8Stat = require('v8');   // billige Heap-Statistik für `_crashProbe` (statt process.memoryUsage())
+/**
+ * Billiger Ersatz für `process.memoryUsage()` in den Heap-Wächtern (Hook-Zähler, Snapshot, Schaden) und im Zugwechsel-Vermerk.
+ * `heapUsed`/`heapTotal` sind dieselben Zahlen (V8-Statistik: `used_heap_size`/`total_heap_size`); teuer ist das Lesen des RSS (im
+ * laufenden Spiel rund 4 % der Rechenzeit der CPU-Suche) — er wird deshalb nur bei jeder 8. Probe neu gelesen, dazwischen gilt der
+ * letzte Wert (`rssFresh: false`, siehe `heapGuardExceeded`). Die Schwellen und die Wächter-Logik bleiben unverändert: ein Runaway,
+ * der den RSS sprengt, wird höchstens acht Proben (einige Millisekunden Spielzeit) später erkannt als vorher.
+ */
+let _heapSampleN = 0, _heapSampleRss = 0;
+function heapSample() {
+  const h = _v8Stat.getHeapStatistics();
+  const fresh = (_heapSampleN++ & 7) === 0;
+  if (fresh) _heapSampleRss = process.memoryUsage.rss();
+  return { rss: _heapSampleRss, rssFresh: fresh, heapTotal: h.total_heap_size, heapUsed: h.used_heap_size };
+}
 // Auswertungs-Scope (siehe `GameEngine._scoped`): Prüfmodus und Karten-Kennungen für Schlüssel.
 const EVAL_SCOPE_CHECK = process.env.PP_EVAL_SCOPE_CHECK === '1';
 const EVAL_SCOPE_MISMATCHES = { count: 0, checked: 0 };
@@ -1378,7 +1395,7 @@ class GameEngine {
     // Trip on whichever metric crosses first; rss is the real proxy for
     // committed memory hitting `--max-old-space-size`.
     if (this._snapshotsTaken % 10 === 0) {
-      const mu = process.memoryUsage();
+      const mu = heapSample();
       const rssM = Math.round(mu.rss / 1024 / 1024);
       const totM = Math.round(mu.heapTotal / 1024 / 1024);
       const usedM = Math.round(mu.heapUsed / 1024 / 1024);
@@ -3475,7 +3492,7 @@ class GameEngine {
     // headroom on the 8GB heap. Normal play stays under 500MB, so 2.5GB
     // means something is allocating badly.
     if (this._hooksFiredThisTurn > 0 && this._hooksFiredThisTurn % 20 === 0) {
-      const mu = process.memoryUsage();
+      const mu = heapSample();
       const rssM = Math.round(mu.rss / 1024 / 1024);
       const totM = Math.round(mu.heapTotal / 1024 / 1024);
       const usedM = Math.round(mu.heapUsed / 1024 / 1024);
@@ -9478,7 +9495,7 @@ class GameEngine {
       throw err;
     }
     if (this._damageCallsTotal % DAMAGE_HEAP_CHECK_EVERY === 0) {
-      const mu = process.memoryUsage();
+      const mu = heapSample();
       const rssM = Math.round(mu.rss / 1024 / 1024);
       const totM = Math.round(mu.heapTotal / 1024 / 1024);
       const usedM = Math.round(mu.heapUsed / 1024 / 1024);
@@ -28233,13 +28250,17 @@ this._deathWatch = (this._deathWatchStack || []).length
     // game without waiting for the heap-trip threshold to fire. If
     // rss climbs steadily turn-over-turn, there's a structural leak
     // if it stays flat, the per-turn GC is keeping up.
-    const mu = process.memoryUsage();
-    const rssM = Math.round(mu.rss / 1024 / 1024);
-    const totM = Math.round(mu.heapTotal / 1024 / 1024);
-    const usedM = Math.round(mu.heapUsed / 1024 / 1024);
-    this._trailWrite('switchTurn', {
-      note: `ending p${this.gs.activePlayer} rss=${rssM}MB heapTotal=${totM}MB heapUsed=${usedM}MB`,
-    });
+    // In der Simulation verwirft `_trailWrite` den Eintrag sofort (nur 'rollout' kommt durch) — das Lesen des RSS dafür war reine Verschwendung
+    // (rund 1 % der Rechenzeit der CPU-Suche, ein Zugwechsel je simuliertem Zug).
+    if (!this._inMctsSim) {
+      const mu = process.memoryUsage();
+      const rssM = Math.round(mu.rss / 1024 / 1024);
+      const totM = Math.round(mu.heapTotal / 1024 / 1024);
+      const usedM = Math.round(mu.heapUsed / 1024 / 1024);
+      this._trailWrite('switchTurn', {
+        note: `ending p${this.gs.activePlayer} rss=${rssM}MB heapTotal=${totM}MB heapUsed=${usedM}MB`,
+      });
+    }
 
     // Fire end-of-turn hooks for the ENDING player FIRST — even in puzzle
     // mode where the puzzle-failure check below would otherwise short-
@@ -56541,7 +56562,7 @@ this._deathWatch = (this._deathWatchStack || []).length
       throw err;
     }
     if (this._damageCallsTotal % DAMAGE_HEAP_CHECK_EVERY === 0) {
-      const mu = process.memoryUsage();
+      const mu = heapSample();
       const rssM = Math.round(mu.rss / 1024 / 1024);
       const totM = Math.round(mu.heapTotal / 1024 / 1024);
       const usedM = Math.round(mu.heapUsed / 1024 / 1024);
@@ -60881,4 +60902,4 @@ for (const _name of Object.getOwnPropertyNames(GameEngine.prototype)) {
   } }[_name];
 }
 
-module.exports = { GameEngine, CardInstance, SPEED, STATUS_EFFECTS, getNegativeStatuses };
+module.exports = { GameEngine, CardInstance, SPEED, STATUS_EFFECTS, getNegativeStatuses, _heapSample: heapSample, _heapGuardExceeded: heapGuardExceeded };   // die beiden letzten nur für test/heap-guard.test.js
