@@ -28,7 +28,7 @@ Identifikation (Sprite-Koordinaten x, y; die Teile werden im Skript per Farbe un
 Ablauf (48 Frames à 65 ms = 3,12 s); Frame 0 = Ruhepose = Original. Sie SITZT im Nest, nichts schwebt (Nutzer-Feedback „spielt Banjo“, Regel 18):
 * Saiten anschlagen (Periode 24 Frames, zwei Schlagfolgen pro Schleife: kräftiger Abschlag – kleinerer Zweitschlag – Pause – kräftiger Abschlag): der linke Flügel pendelt um die Schulter — jede Zeile ab y 16
   wandert waagerecht nach rechts über die Trommel, je weiter unten desto mehr (Spitze bis 4 px, die Federtextur bleibt, nichts wird kopiert); die Schulter (y ≤ 15) bleibt. Dahinter frei werdende
-  Zellen (y ≥ 18) zeigen das Heu (HEU_HINTEN), die Zellen y 16–17 den dunklen Umriss (21,21,4) (UNTER_FL).
+  Zellen zeigen das gezeichnete linke Bein und das Banjo-Ende (BEIN_BANJO, Runde 3), nicht mehr Heu/Hintergrund.
 * Der erhobene rechte Flügel (greift den Hals) und Trommel/Banjo-Hals/Wirbelkasten bleiben fest — keine Flügelschläge mehr.
 * Kopfnicken im Takt: Hut und Gesicht (x ≤ 21, y ≤ 11, ohne Flügelfedern) senken sich beim Abschlag 1 px und kommen zurück (nur Heben/Senken, nie seitlich).
 * Zöpfe schwingen: die unteren Zeilen pendeln ±1 px (links Periode 16, rechts 24 Frames, gegeneinander versetzt); das innere Ende bleibt am Körper.
@@ -38,8 +38,9 @@ Ablauf (48 Frames à 65 ms = 3,12 s); Frame 0 = Ruhepose = Original. Sie SITZT i
 * Fest bleiben: Nest, Füße, Banjo, erhobener Flügel, Gesicht außer Blinzeln.
 
 Ergänzungen: (1) Das Nest fehlt unter und hinter der Harpyie (die Ebene zeigt dort nur die Figur): hinter der Figur (x 6–25, y 18–27) wird das Heu aus der Spalte darunter nach oben fortgesetzt
-(Farben der Heupixel darunter; nur dort, wo die Figur Heu verdeckt, siehe HEU_HINTEN, 104 Pixel) — in Frame 0 bleibt alles verdeckt (Ruhepose = Original). (2) Hinter dem Schlagflügel (y 16–17, die Zellen
-x 10–13 des Flügels) liegt nichts; sie bekommen die Umrissfarbe (21,21,4) (UNTER_FL, 8 Pixel), damit der Flügel beim Schlag keine Lücke in die Figur reißt.
+(Farben der Heupixel darunter; nur dort, wo die Figur Heu verdeckt, siehe HEU_HINTEN, 104 Pixel) — in Frame 0 bleibt alles verdeckt (Ruhepose = Original). (2) Runde 3: Unter dem Schlagflügel (die Zellen, die er beim Schlag freigibt: (10,16) (10,17) (11,17) (11,18) (12,18) (11,19) (12,19) (13,19) (12,20) (13,20) (14,20) (13,21) (14,21) (15,21)) wurde das linke Bein und das
+untere linke Ende der Banjo-Trommel fertiggezeichnet (BEIN_BANJO, 14 Pixel): senkrechter dunkler Umriss (26,13,7)/(49,24,0) bei x 10, orange Wade (230,131,16) bei x 11 (ab Zeile 20 bei x 12) mit gelben Glanzpixeln (255,180,24) (255,222,90), dunkler
+Rand/schwarzes Pixel (0,0,0) der Trommel — spiegelbildlich zum rechten Bein; vorher stand dort Heu/Umriss (Rückmeldung: „unter dem Flügel ist, wenn er sich bewegt, Heu/Hintergrund zu sehen, statt dass dort das Bein und Ende des Banjos gezeichnet wären“).
 Randpixel-Test (Regel 16): `B.umriss_je_ebene` setzt Randpixel in Nicht-Umrissfarbe auf die Umrissfarbe der Ebene.
 Alle Bewegungen laufen auf der vollen Leinwand (anim_lib wirft ClipError, wenn etwas herausragen würde). Nur ganze Pixel, nur Farben der Quelle.
 """

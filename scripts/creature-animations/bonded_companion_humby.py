@@ -32,7 +32,7 @@ Ablauf (48 Frames à 70 ms = 3,4 s), alle Bewegungen unabhängig:
 * Kopf hebt sich (Periode 24, Frames 10–18): Kopf samt Mähne steigt 1 px — in den Spalten x ≥ 9 wird die Mähnenunterkante (Zeile 11) einmal eingefügt (anim_tiere.spalten_hub),
   Beine und Rumpf darunter bleiben stehen, der Schwanz bleibt am Rumpf.
 * Randpixel-Korrektur (Regel 16): anim_tiere.umriss_schliessen.
-* GOLDGLANZ (Runde 3, nur auf den goldenen Fellteilen — Orange (241,131,83)/(244,174,100), Gelb (251,221,110), Creme (248,248,189); NICHT auf braunem Umriss, schwarzer Nase/Auge und roter Zunge):
+* GOLDGLANZ (Runde 3, nur auf den goldenen Fellteilen im Inneren (Randpixel bleiben unverändert) — Orange (241,131,83)/(244,174,100), Gelb (251,221,110), Creme (248,248,189); NICHT auf braunem Umriss, schwarzer Nase/Auge und roter Zunge):
   (a) Lichtband: zweimal je Schleife (Frames 4–15 und 28–39, je 12 Frames) wandert ein 4 px breites diagonales Band (x + y) über das fertig zusammengesetzte Tier (Bildschirmkoordinaten, nimmt also das Wippen/Laufen mit):
       die Fellpixel im Band werden eine Stufe heller auf der Gold-Rampe Orange → Orange hell → Gelb → Creme (Creme bleibt, das ist schon die hellste Quellfarbe).
   (b) Glitzersterne: zwei kurze Sparkles (4 Frames: Mitte → kleines Kreuz → Kreuz → Mitte, dann weg; lange Pausen) an der Mähne (Frames 20–23) und an der Brust (Frames 41–44); das Zentrum wird je Frame auf das nächstgelegene goldene Fellpixel (±1 px)
@@ -125,6 +125,9 @@ def goldglanz(fr, i):
     gold = np.zeros(fr.shape[:2], bool)
     for c in GOLD_FARBEN:
         gold |= (fr[..., :3] == np.array(c)).all(axis=2) & (fr[..., 3] > 0)
+    op = np.pad(fr[..., 3] > 0, 1)
+    rand = (fr[..., 3] > 0) & ~(op[:-2, 1:-1] & op[2:, 1:-1] & op[1:-1, :-2] & op[1:-1, 2:])
+    gold &= ~rand                                                                    # Außenkante (Umriss/Randpixel) glänzt nicht und bleibt unverändert (Regel 16)
     for (s0, dauer) in GLANZ_FENSTER:
         k = (i - s0) % N
         if k < dauer:
