@@ -1,7 +1,8 @@
 # -*- coding: utf-8 -*-
 """Idle-Animation für „Guardian Beast Long“ (Creature, Archetyp Guardian Beasts) — der Drachen-Wächter (Zeichen „Long“ = Drache): grüner Schuppenkopf mit goldenem Geweih, goldene Schulterplatten, Klauen und ein Feuerstrahl aus dem Maul.
 
-Quelle: src/guardian-beast-long.png (26×37 px, 38 Farben) — die Figur ohne Flamme. Die Flamme der Kartenkunst (Ebene 104, 23×48 px, vier Farben) wird NICHT kopiert, sondern mit dem Feuermodul anim_feuer.py neu gezeichnet (Regel 15/29).
+Quelle: src/guardian-beast-long.png (26×37 px, 38 Farben) — die Figur ohne Flamme; src/guardian-beast-long-flamme.png (23×48 px, vier Farben) = die gemalte Feuerstrahl-Ebene 104 der xcf-Datei. Der Körper steht FEST (kein Schweben/Atmen),
+nur das Feuer lebt: die gemalte Flamme wird mit anim_feuer2.py (Feuer von Hand, Zunge für Zunge) animiert, nicht neu erfunden.
 PICK: [["MotiveGuardianBeasts", 105, "Ganze Ebene"], ["MotiveGuardianBeasts", 104, "Flamme (nur Farben/Form als Vorlage)"]]      (Ebene „Long-Kopie“ = Drache mit Geweih und Klauen, Ebene „Long #1“ = Feuerstrahl; die Ebene „Long“ (106) ist eine
 andere Pose desselben Wächters mit geschlossenem Maul und Helm, ohne Geweih; Ebene 102 „Ebene #10“ ist eine Reihe kleiner Flammen, die zu anderen Karten gehört)
 Abgleich mit der Kartenkunst Guardian_Beast_Long.png (76×51): die Karte zeigt Ebene 105 (Geweih, Klauen) mit dem Feuerstrahl (Ebene 104) vom Maul bis zum Kartenrand, die Flamme liegt vor dem Körper. Die Suche fand für diese Karte keinen
@@ -24,37 +25,34 @@ Identifikation (x, y im 26×37-Sprite):
 Gold im Sprite: Schulterplatten und Bauchplatte → nur sie glänzen (Regel 12/14); Geweih, Schuppen, Klauen nicht.
 
 Ablauf (48 Frames à 64 ms = 3,07 s, nahtlos):
-* Feuerstrahl (anim_feuer, unverändert benutzt): fünf Zungen (Mitte hoch bis zum Maul, je zwei Seitenzungen niedriger) mit je 12 Posen à 2–3 Frames, Farbe Creme-Kern → Gelb → Orange → Rotrand; die feste Maulöffnung/Kiefer/Gesicht ist als `sperre`
-  geschützt. Das untere Ende franst aus (Zungenränder, kurze Tropfen) und kleine Funken fallen nach unten (Feuerfunken, Regel 15/25). Der Strahl hebt sich beim Atmen mit dem Kopf.
-* Atmen (Periode 24, zwei Atemzüge): die Bauchplattenzeile 30 wird einmal doppelt eingefügt, Kopf, Geweih, Schultern und Arme steigen 1 px, die Beine bleiben.
-* Geweih zuckt: die äußeren Zackenspitzen (Zeilen 0–2) der linken (Frames 6–13) und später der rechten Seite (Frames 28–35) knicken 1 px zur Seite und zurück (Nähte 4-verbunden).
-* Klauen spielen: die weißen Klauenspitzen der linken Hand (Frames 14–21) und später der rechten Hand (Frames 38–45) rutschen ruckhaft 1 px nach unten und zurück.
-* Blinzeln (Frames 19–21 und 41–43): die weißen und roten Augenpixel nehmen die grüne Gesichtsfarbe an.
-* Gold glänzt (Regel 12/14): Lichtband über Schulterplatten und Bauchplatte (Frames 6–17 und 30–41), Glitzersterne an den Schulterplatten (Frames 20–23 links, 44–47 rechts).
-Frame 0 = Original + Feuerstrahl (Ruhepose der Figur = Original; die Flamme ist neu gezeichnet und deshalb ausgenommen). Kontrolle: anim_humanoide.ruhepose / eckkontakt_typen / Randpixel-Test (Regel 16, nur Körper-Ebenen).
-Alle Bewegungen laufen auf der vollen Leinwand (anim_lib wirft ClipError). Nur ganze Pixel, nur Farben der Quelle bzw. der Flammenvorlage (Ebene 104).
-Ergänzungen: keine für den Körper (nichts Verdecktes wird freigelegt); der Feuerstrahl ist neu gezeichnet.
+* Körper steht fest (Nutzerkorrektur: nicht den ganzen Sprite samt Feuer schweben lassen): kein Atmen, kein Heben. Erhalten bleiben die kleinen Details der früheren Fassung: Blinzeln (Frames 19–21, 41–43), Gold glänzt
+  (Lichtband/Glitzer nur an Schulterplatten und Bauchplatte), Geweihzacken zucken, Klauen spielen — alles ohne dass sich der Körper verschiebt.
+* FEUERSTRAHL (anim_feuer2): die gemalte Flamme (Ebene 104: Kegel mit cremefarbenem Kern, gelbem und orangem Mantel, rotem Rand, Stiel am Maul) bleibt am Maul und im oberen Kegel (Zeilen 0–~12) ruhig stehen. Der untere Kegel besteht
+  aus fünf Zungen (Fächer vom Maul nach unten, Zungenspitzen von Hand als Zähne in den Kegel geschnitten und nach Tiefe gefärbt: roter Rand → orange → gelb → cremefarben), jede Zunge mit eigener Folge handgesetzter Posen (Länge, Neigung,
+  S-Kurve, Kernhub; 12 Posen, je 2–3 Frames), gegeneinander versetzt; die Spitzen reißen ab und fliegen als Funken mit dem Strahl nach unten davon. Alles Pixel der gemalten Ebene (rote Randpixel immer in (202,44,41)).
+Frame 0 = Original (Körper); die Flamme ist ausgenommen (Posenfolge). Kontrolle: Ruhepose/Eckkontakte/Randpixel-Test (nur Körperebenen).
+Alle Bewegungen laufen auf der vollen Leinwand (anim_lib wirft ClipError). Nur ganze Pixel, nur Farben der Quelle bzw. der Flammenvorlage.
+Ergänzungen: Zähne/Zungenspitzen des Strahls (aus dem gemalten Kegel herausgeschnitten, Farben nach Tiefe aus der Flammenrampe); keine für den Körper.
 """
-import random
 import sys
 
+import cv2
 import numpy as np
 from PIL import Image
 
-import anim_feuer as FEU
+import anim_feuer2 as FE2
 import anim_gb as G
 import anim_humanoide as Hm
 import anim_lib as L
 
 N, MS = 48, 64
-PAD = (3, 3, 3, 11)
+PAD = (3, 3, 3, 17)
 sz = G.Szene('guardian-beast-long', PAD)
 spr, OFF, H, W, f = sz.spr, sz.off, sz.H, sz.W, sz.f
 PL, PT = sz.PL, sz.PT
 
 ROT, ORANGE, GELB, CREME = (202, 44, 41), (244, 123, 34), (246, 231, 14), (247, 245, 184)      # Farben der Flammenvorlage (Ebene 104)
 ERLAUBT_FEUER = [ROT, ORANGE, GELB, CREME]
-RAMPE = {'rand': ROT, 'rot': ORANGE, 'orange': GELB, 'gelb': GELB, 'hell': CREME}      # rote Außenhaut, orange Rand, gelber Körper, cremefarbener Kern (am Maul hell, nicht rot)
 
 GRUEN = f(12, 6)                                                 # (84,122,98) Gesichtsgrün
 UMRISS = f(7, 2)                                                 # (15,42,3)
@@ -69,85 +67,47 @@ klauen_r = sz.vorhanden & L.farbmaske(spr, [klauen_farbe]) & (sz.xx >= 17) & (sz
 koerper = sz.vorhanden & ~geweih_l & ~geweih_r & ~klauen_l & ~klauen_r
 m_gold = sz.vorhanden & L.farbmaske(spr, GOLD) & (sz.yy >= 18) & (sz.yy <= 30)
 
-# --- Feuerstrahl ---
-SPERRE = np.zeros((H, W), bool)
-sp = sz.vorhanden & ((sz.yy <= 13) | ((sz.yy <= 18) & ((sz.xx <= 11) | (sz.xx >= 14))) | ((sz.yy >= 14) & (sz.yy <= 29) & ((sz.xx <= 7) | (sz.xx >= 18) | ((sz.yy <= 24) & ((sz.xx == 8) | (sz.xx == 17))))))
-SPERRE[PT:PT + sz.sh, PL:PL + sz.sw] = sp
-BASIS = PT + 38
-ZUNGEN = [FEU.Zunge(12.5 + PL, BASIS, 24.5, 3.0),
-          FEU.Zunge(9.9 + PL, BASIS, 20.0, 2.5), FEU.Zunge(15.1 + PL, BASIS, 20.0, 2.5),
-          FEU.Zunge(7.2 + PL, BASIS, 15.0, 2.2), FEU.Zunge(17.8 + PL, BASIS, 15.0, 2.2),
-          FEU.Zunge(4.8 + PL, BASIS, 9.5, 1.9), FEU.Zunge(20.2 + PL, BASIS, 9.5, 1.9),
-          FEU.Zunge(12.5 + PL, BASIS - 15, 10.0, 1.8)]          # kurze helle Zunge: Kern des Strahls direkt am Maul
-FEUER = FEU.Feuer(H, W, ZUNGEN, RAMPE, n=N, seed=5, posen=12, amplitude=0.55, sperre=SPERRE)
+# --- Feuerstrahl: die gemalte Flamme (Ebene 104) als Vorlage, Zähne von Hand hineingeschnitten ---
+FLAMME = np.array(Image.open(L.os.path.join(L.SRC, 'guardian-beast-long-flamme.png')).convert('RGBA'))
+FX, FY = 0, 13                                                   # Lage der Flammenebene im Sprite (Stiel x 12–13 liegt im Maul, Ebene 105 x0 = Ebene 104 x0)
+ZAEHNE = [(6.0, 29), (9.4, 31), (12.8, 34), (16.2, 31), (19.4, 28)]     # (Zungenmitte x, Spitzenzeile) in Flammenebene — von Hand gesetzt, mittlere Zunge am längsten
+STEIL = 2.1                                                      # Zahnflanke: je Pixel Abstand von der Zungenmitte verliert die Zunge so viele Zeilen
 
 
-def ausfransen(fl, i):
-    """Unteres Ende des Strahls: die Basiszeile franst aus (Lücken je Pose, wechselt alle 2–3 Frames) und kurze Tropfen hängen darunter."""
-    rnd = random.Random(100 + i // 2)
-    ys = np.nonzero(fl[:, :, 3].any(axis=1))[0]
-    if not len(ys):
-        return fl
-    yb = int(ys.max())
-    for dy in (0, 1):
-        y = yb - dy
-        for x in np.nonzero(fl[y, :, 3])[0]:
-            if rnd.random() < (0.45 if dy == 0 else 0.2):
-                fl[y, x] = 0
-    return fl
+def zaehne_schneiden(fl):
+    """Die unteren Zeilen des Kegels in Zungen (Zähne) schneiden und die neuen Kanten nach Tiefe färben (roter Rand → orange → gelb → cremefarbener Kern)."""
+    a = fl.copy()
+    a[40:] = 0                                                   # der dünne Tropfenfaden unterhalb des Kegels entfällt (die Zungen laufen in Spitzen aus)
+    m = a[..., 3] > 0
+    for x in range(a.shape[1]):
+        k = int(np.argmin([abs(x - zx) for (zx, _) in ZAEHNE]))
+        zx, zy = ZAEHNE[k]
+        spitze = zy - STEIL * abs(x - zx)                        # tiefste erlaubte Zeile in dieser Spalte
+        for y in range(a.shape[0]):
+            if y > spitze:
+                a[y, x] = 0
+    m2 = a[..., 3] > 0
+    d = cv2.distanceTransform(np.pad(m2, 1).astype(np.uint8), cv2.DIST_L1, 3)[1:-1, 1:-1]
+    for y, x in zip(*np.nonzero(m2)):
+        if y >= 22 and tuple(a[y, x, :3]) == CREME and d[y, x] <= 3:
+            a[y, x, :3] = (ROT, ORANGE, GELB)[int(d[y, x]) - 1]
+    return a
 
 
-def luecken(fl, fig, sperre, basis):
-    """Lücken im Strahl schließen (alles in Leinwandkoordinaten NACH dem Atemhub):
-    * schmale Lücken (≤ 2 px) zwischen Flammenpixeln derselben Zeile (Farbe des linken Nachbarn, Rot → Gelb), nicht auf geschützten Pixeln,
-    * Körperpixel mitten im Strahl (zwischen dem äußersten linken und rechten Flammenpixel der Zeile) und die Rumpfmitte unten (x 8–17),
-    * einzelne Lücken, die von ≥ 3 Flammenpixeln umgeben sind.
-    Zwischen den Zungen soll kein Körperpixel hindurchscheinen (die Flamme liegt vor dem Körper)."""
-    gelb = np.array([*GELB, 255], np.uint8)
-    for y in range(fl.shape[0]):
-        xs = np.nonzero(fl[y, :, 3])[0]
-        for a, b in zip(xs[:-1], xs[1:]):
-            if 1 < b - a <= 3:
-                for x in range(a + 1, b):
-                    if not sperre[y, x]:
-                        fl[y, x] = fl[y, a] if tuple(fl[y, a, :3]) != ROT else gelb
-    for y in range(PT + 12, basis + 1):
-        xs = np.nonzero(fl[y, :, 3])[0]
-        if len(xs) >= 2:
-            for x in range(int(xs.min()) + 1, int(xs.max())):
-                if not fl[y, x, 3] and fig[y, x, 3] and not sperre[y, x]:
-                    fl[y, x] = gelb
-    for y in range(PT + 24, basis + 1):
-        for x in range(PL + 8, PL + 18):
-            if not fl[y, x, 3] and fig[y, x, 3] and not sperre[y, x]:
-                fl[y, x] = gelb
-    for _ in range(2):
-        m = fl[..., 3] > 0
-        p = np.pad(m, 1)
-        n = p[:-2, 1:-1].astype(int) + p[2:, 1:-1] + p[1:-1, :-2] + p[1:-1, 2:]
-        for y, x in zip(*np.nonzero(~m & (n >= 3) & ~sperre)):
-            if y < basis + 1:
-                fl[y, x] = gelb
-    return fl
+FL_GESCHNITTEN = zaehne_schneiden(FLAMME)
 
 
-EMBER = [(8.0, 3, -1), (12.0, 15, 1), (15.5, 26, -1), (18.5, 37, 1), (10.5, 42, 1)]       # (x im Sprite, Startframe, Drift)
-EMBER_LEBEN = 12
+def flamme_ebene():
+    return L.platz(FL_GESCHNITTEN, H, W, PL + FX, PT + FY)
 
 
-def embers(i, dy):
-    """Funken fallen vom unteren Strahlende (Feuerfunken, Regel 15): 1 px, Farbe cremefarben → gelb → orange → rot, 6 px Weg in 12 Frames."""
-    e = L.leer(H, W)
-    for (x0, start, dr) in EMBER:
-        a = (i - start) % N
-        if a >= EMBER_LEBEN:
-            continue
-        x = int(round(x0 + PL + dr * a / 6.0))
-        y = BASIS + dy + 1 + int(round(0.5 * a))
-        c = [CREME, GELB, ORANGE, ROT][min(3, a * 4 // EMBER_LEBEN)]
-        e[y, x, :3] = c
-        e[y, x, 3] = 255
-    return e
+RGBA_F = flamme_ebene()
+Z = lambda f_, s_, **k: FE2.Zunge((f_[0] + PL + FX, f_[1] + PT + FY), (s_[0] + PL + FX, s_[1] + PT + FY), **k)
+ZUNGEN = [Z((12.5 + (zx - 12.5) * 0.4, 5), (zx, zy), fuss_anteil=0.38) for (zx, zy) in ZAEHNE]
+STIEL = np.zeros((H, W), bool)
+STIEL[PT + FY:PT + FY + 5, PL + FX + 10:PL + FX + 16] = True      # der Stiel am Maul hat keinen roten Rand (er liegt auf dem Maul)
+VL = FE2.Vorlage(RGBA_F, ZUNGEN, 'runter', rand_farbe=ROT, faden=2, rand_frei=STIEL)
+FEUER = FE2.Feuer([VL], n=N, seed=5, bank='zunge', amp=1.0, funken_modus='fliessen', max_funken=7, funken_abstand=4, funken_leben=10)
 
 
 def frame(i, nur=None):
@@ -173,18 +133,11 @@ def frame(i, nur=None):
     dl = 1 if Hm.folge(i, 14, [1, 1, 0, 1, 1, 0, 0, 0], N) else 0
     dr = 1 if Hm.folge(i, 38, [1, 1, 0, 1, 1, 0, 0, 0], N) else 0
     kl_l, kl_r = L.versetze(kl_l, 0, dl), L.versetze(kl_r, 0, dr)
-    # --- Atmen ---
-    brust = Hm.stufe(i, N / 2, 1)
-    k, ge_l, ge_r, kl_l, kl_r = sz.atmen([k, ge_l, ge_r, kl_l, kl_r], 30, brust)
     fig = L.zusammen(H, W, [(kl_l, 0, 0), (kl_r, 0, 0), (ge_l, 0, 0), (ge_r, 0, 0), (k, 0, 0)])
     fig = sz.kontur(fig, UMRISS)
     if nur == 'koerper':
         return fig
-    fl = L.versetze(FEUER.ebene(i), 0, -brust)                   # der Strahl hebt sich mit dem Maul
-    sp_i = L.versetze(np.dstack([SPERRE] * 4).astype(np.uint8), 0, -brust)[..., 0] > 0
-    fl = luecken(fl, fig, sp_i, BASIS - brust)
-    fl = ausfransen(fl, i)
-    return L.zusammen(H, W, [(fig, 0, 0), (fl, 0, 0), (embers(i, -brust), 0, 0)])
+    return L.zusammen(H, W, [(fig, 0, 0), (FEUER.ebene(i), 0, 0), (FEUER.funken(i), 0, 0)])
 
 
 TEST_EBENEN = 'koerper'

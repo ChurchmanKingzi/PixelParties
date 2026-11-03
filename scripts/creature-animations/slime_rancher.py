@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""Idle-Animation für „Slime Rancher“ (Creature) — die Gestalt im braunen Kapuzenmantel mit goldener Schließe.
+"""Idle-Animation für „Slime Rancher“ (Creature) — die Gestalt im braunen Kapuzenmantel mit goldener Schließe. Runde 3: sie steht einfach (kein Schweben).
 
 Quelle: src/slime-rancher.png (14×25 px, 10 Farben, deckend).
 PICK: [["Motive", 474, "ganze Ebene"]]      Ebene 474 trägt in der xcf den Namen „Slime Rancher“ (14×25, Karte Slime_Rancher.png: Mitte, Maßstab 2). creature_show.py findet sie nicht (die Treffer dort
@@ -15,12 +15,13 @@ Was im Sprite ist (x, y im 14×25-Sprite):
 * SCHLIESSE (7–8, 13–14): goldene Brosche H (184,184,41), I (235,235,53), J (147,147,33) — Gold, darf glänzen (Regel 14).
 Material: Stoff (kein Glanz), Gold (Glanz/Glitzer erlaubt).
 
-Ablauf (48 Frames à 75 ms = 3,6 s, nahtlos), alle Bewegungen unabhängig:
-* Atmen (Periode 24, zweimal je Schleife): Zeile 16 (Mantelfalte) wird einmal doppelt eingefügt (Mischtextur) — die Kapuze steigt 1 px, der Saum bleibt am Boden. Die Kapuze bewegt sich NICHT seitlich.
-* Mantelsaum schwingt (Periode 16, Wellenlauf nach unten): die Zeilen 19–24 wandern waagerecht um bis zu ±1 px (unten am stärksten), Zeilenversatz ≤ 1 px je Zeile.
-* Gewichtsverlagerung (Periode 24, abwechselnd 8 Frames): ein Fußzipfel (x 2–5 bzw. 8–11) verliert seine unterste Umrisszeile (Saum hebt sich 1 px), der Umriss darüber wird in Umrissfarbe A geschlossen. Die Zipfel hängen am Mantel (kein Schweben).
-* Schließe glitzert (zweimal je Schleife, 4 Frames): die Brosche wird 1–2 Stufen heller auf der Goldrampe J→H→I, dazu blitzt ein kleiner vierzackiger Stern AM Objekt (Mitte + 4 Arme à 1 px) auf und verschwindet.
-Ergänzungen: Umrisspixel A (28,23,16) in Zeile 23 (x 2–5 / 8–11), wenn ein Zipfel sich hebt; Glitzerstern in Goldfarben der Brosche. Frame 0 = Original.
+Ablauf (48 Frames à 75 ms = 3,6 s, nahtlos), alle Bewegungen unabhängig — Runde 3: er STEHT einfach (kein Schweben):
+Nutzerkorrektur (wörtlich): „Slime Rancher soll nicht schweben(?), er steht einfach.“ — Angenommene Ursache: der seitlich schwingende Mantelsaum, die abwechselnd angehobenen Fußzipfel („Gewichtsverlagerung“) und das
+Mitwippen der ganzen Gestalt lasen sich als Schweben/Gleiten. Beides ist entfernt: Saum und Füße (Zeilen 19–24) bleiben jetzt STARR auf dem Boden.
+* Atmen (Periode 24, zweimal je Schleife, zweistufig mit Nachlauf): erst hebt sich der Mantel (Zeile 16, eine Mantelfalte, wird einmal doppelt eingefügt, Mischtextur — Brust und Kapuze steigen 1 px), etwa 2 Frames
+  später folgt die Kapuze (Zeile 4, Stoff ohne Loch, wird einmal doppelt eingefügt — Kapuzenspitze steigt 1 px weiter, insgesamt 2 px). Die Füße/der Saum bleiben am Boden; die Kapuze bewegt sich NICHT seitlich.
+* Schließe glitzert (zweimal je Schleife, 4 Frames): die Brosche wird 1–2 Stufen heller auf der Goldrampe J→H→I, dazu wächst ein kleiner vierzackiger Stern AM Objekt (Mitte + 4 Arme à 1 px) auf und verschwindet.
+Ergänzungen: Umrisspixel A (28,23,16) wo nötig (kontur_schliessen); Glitzerstern in Goldfarben der Brosche. Frame 0 = Original.
 """
 import math
 import sys
@@ -32,7 +33,7 @@ import anim_humanoide as Hm
 import anim_lib as L
 
 N, MS = 48, 75
-PAD_L, PAD_R, PAD_T, PAD_B = 5, 5, 4, 3
+PAD_L, PAD_R, PAD_T, PAD_B = 4, 4, 4, 2
 TEST_EBENEN = ('koerper',)
 
 spr = L.lade('slime-rancher')
@@ -47,21 +48,7 @@ BROSCHE = [(7, 13), (8, 13), (7, 14), (8, 14)]
 
 def koerper(i):
     k = L.platz(spr, H, W, PAD_L, PAD_T)
-    # Fußzipfel heben sich abwechselnd (Gewichtsverlagerung): die unterste Umrisszeile des Zipfels entfällt (Umriss wird von kontur_schliessen geschlossen)
-    if Hm.takt(i, 24, 2, 8):
-        Hm.setze(k, {(x, 24): None for x in range(2, 6)}, OFF)
-    if Hm.takt(i, 24, 14, 8):
-        Hm.setze(k, {(x, 24): None for x in range(8, 12)}, OFF)
-    # Saum schwingt (Wellenlauf nach unten), Frame 0 = 0
-    dx = {}
-    for y in range(19, 25):
-        f = (y - 18) / 6.0
-        dx[y] = int(round(1.3 * f * (math.sin(L.sinus(i, 16) - 0.5 * f) - math.sin(-0.5 * f)) / 1.0))
-        dx[y] = max(-1, min(1, dx[y]))
-    for y in range(20, 25):                                          # Nachbarzeilen höchstens 1 px auseinander
-        dx[y] = max(dx[y - 1] - 1, min(dx[y - 1] + 1, dx[y]))
-    Hm.zeilen_versatz(k, OFF, dx)
-    # Schließe glitzert
+    # Schließe glitzert (Gold)
     st = Hm.folge(i, 10, [1, 2, 2, 1], N) or Hm.folge(i, 34, [1, 2, 2, 1], N)
     if st:
         for (x, y) in BROSCHE:
@@ -69,7 +56,13 @@ def koerper(i):
             Hm.setze(k, {(x, y): Hm.farbe_stufe(c, GOLD, st)}, OFF)
         if st == 2:
             Hm.stern4(k, 8, 13, 1, GOLD[2], GOLD[1], off=OFF)
-    k = Hm.atmen(k, PAD_T + 16, PAD_T + 10, E.verlauf3(i, 24, 0.0, 1), 0)
+    # Atmen, zweistufig: Mantel (Zeile 16) zuerst, Kapuze (Zeile 4) etwa 2 Frames später; Saum und Füße (Zeilen 19–24) bleiben starr am Boden
+    brust = E.verlauf3(i, 24, 0.0, 1)
+    kopf = E.verlauf3(i, 24, -0.5, 1)
+    if brust:
+        k = L.streck_zeile(k, PAD_T + 16, brust)
+    if kopf:
+        k = L.streck_zeile(k, PAD_T + 4 - brust, kopf)
     Hm.kontur_schliessen(k, ERLAUBT, (28, 23, 16))
     return k
 

@@ -20,14 +20,18 @@ Was im Sprite ist (x, y im 24×26-Sprite):
 * FLÜGEL (x 0–6 links, 17–23 rechts, y 1–21): schwarz-grüne Federn (8,10,9)/(31,40,39)/(19,24,22)/(39,48,47) mit senkrechten Federstreifen; sie sind um den Körper gelegt (nicht ausgebreitet) und enden unten in Spitzen (y 17–21).
 Der Tengu STEHT (Füße am Boden, Flügel angelegt) → er schwebt nicht; kein Metall/Gold/Edelstein → KEIN Glanz; kein Feuer; keine Partikel.
 
-Ablauf (60 Frames à 80 ms = 4,8 s, nahtlos; Frame 0 = Original):
-* FLÜGELSPITZEN WEHEN: die Spitzen beider Flügel (Zeilen 17–21) pendeln nach außen (links nach links, rechts nach rechts, nie zum Körper): jede Zeile wandert waagerecht um bis 2 px, je weiter unten, desto mehr (Gefälle ≤ 0,4 px je Zeile,
-  Nachlauf zur Spitze); links 3, rechts 2 Schwünge je Schleife, gegeneinander versetzt.
-* FEDERSPITZEN FLICKERN: die oberste Flügelzeile (y 1) rückt kurz 1 px nach außen (links Frames 8–13, rechts 34–39, 52–55 usw.), wie ein Aufstellen der Federn.
-* ATMEN (2× je Schleife): die Rockzeile 19 wird einmal doppelt eingefügt (gleichmäßige braune Zeile): Kopf, Kragen, Hände und Flügel steigen 1 px, Beine bleiben stehen.
-* BLINZELN (Frames 22–24 und 46–48): die Iris-/Augenpixel nehmen die Hautfarben der Umgebung an ((87,35,29)/(100,51,46)), die obere Lidzeile wird zu (0,0,0): ein dunkler Strich.
-Fest: Kapuze und Kamm, Nase, Kragen, Rock, Füße. Alle Bewegungen laufen auf der vollen Leinwand (ClipError statt Abschneiden). Nur ganze Pixel, nur Quellfarben.
-Ergänzungen: keine gemalten Pixel.
+RUNDE 3 (Nutzer: „soll mit den Flügeln schlagen und fliegen!“ — Flügel öffnen und schlagen, Figur schwebt/fliegt): die Flügel sind NICHT mehr nur angelegt.
+Ablauf (60 Frames à 80 ms = 4,8 s, nahtlos; Frame 0 = Original, Flügel angelegt):
+* FLÜGELSCHLAG (4 Schläge je Schleife, 15 Frames = 1,2 s je Schlag): die Flügel klappen aus der angelegten Haltung (Frame 0 und kurz danach) in 7 Frames auf — jeder Flügel schwingt als Ganzes um die Schulter ((6|6) links, (17|6) rechts, hinter dem
+  Kopf; Achse zur Flügelspitze 103° bzw. 77°) um 132° bis schräg nach oben außen (ca. 55° über der Waagerechten, Flügelspitze bis ca. 17 px neben/über dem Körper), gehen in 5,5 Frames kräftig wieder nach unten und liegen dann 1,5 Frames angelegt. Die Spitze hinkt der Wurzel um
+  1,5 Frames hinterher und biegt sich dabei durch (anim_flieger_r2.biege = Rückwärtsabbildung um eine gekrümmte Achse, Nächster-Nachbar, keine Mischfarben, Feder-Streifen bleiben Streifen).
+  Der Flügel ist im Sprite teils von Fäusten/Kragen und Wange verdeckt: diese Stellen wurden senkrecht mit der Flügelfarbe der Spalte darüber fertiggezeichnet (Federstreifen laufen senkrecht), damit beim Aufklappen keine Lücken entstehen
+  (siehe Ergänzungen). Die Schulter (Flügelpixel im Umkreis von 4,2 px um das Gelenk) bleibt am Kopf stehen und hebt sich nur mit der Figur; freiliegende Ränder bekommen die Umrissfarbe (8,10,9) (R.kontur_je_teil).
+* SCHWEBEN: die Figur fliegt — beim Aufklappen sinkt sie bis 2 px, beim Abschlag steigt sie wieder (Frame 0 = Original); die Beine/Stiefel (y ≥ 22) hängen nach (1 Frame, bis 1 px seitlich, Periode 30).
+* BLINZELN (Frames 22–24 und 46–48): die Iris-/Augenpixel nehmen die Hautfarben der Umgebung an, die obere Lidzeile wird zu (0,0,0): ein dunkler Strich. (Das alte Atmen und die „Federspitzen flickern“ entfallen — die Flügel bewegen sich jetzt als Ganzes.)
+Fest: Kapuze und Kamm, Nase, Kragen, Hände, Rock. Alle Bewegungen laufen auf der vollen Leinwand (ClipError statt Abschneiden). Nur ganze Pixel, nur Quellfarben.
+Ergänzungen: unter Fäusten/Armen/Wange liegende Flügelpixel (nur im Flügel-Layer, im Ruhebild verdeckt): in jeder Spalte x 0–6 (links) bzw. 17–23 (rechts) die verdeckten Zeilen (y 2–20, wo das Sprite einen Nicht-Flügel-Pixel hat) mit der Farbe des nächsten
+Flügelpixels derselben Spalte darüber (sonst darunter) — es entstehen nur Flügelfarben (8,10,9)/(19,24,22)/(31,40,39)/(39,48,47).
 """
 import math
 import sys
@@ -37,9 +41,12 @@ import numpy as np
 import anim_humanoide as Hm
 import anim_lib as L
 import anim_rebel as R
+import anim_flieger_r2 as R2
+import anim_flieger_r3 as R3
 
 N, MS = 60, 80
-PAD_L, PAD_R, PAD_T, PAD_B = 4, 4, 3, 2
+BEAT = 15                                              # Flügelschlag: 4 pro Schleife
+PAD_L, PAD_R, PAD_T, PAD_B = 14, 14, 12, 5
 
 spr = L.lade('rebelliokai-terror-tengu')
 sh, sw = spr.shape[:2]
@@ -49,42 +56,114 @@ yy, xx = np.mgrid[0:sh, 0:sw]
 vorhanden = L.deckend(spr)
 f = lambda x, y: R.farbe(spr, x, y)
 
+FLUEGEL_FARBEN = [(8, 10, 9), (19, 24, 22), (31, 40, 39), (39, 48, 47)]
+UMRISS_FLUEGEL = (8, 10, 9)
 ERLAUBT = set(Hm.umrissfarben(spr))
-UMRISS_FLUEGEL, UMRISS_KOERPER = f(0, 5), f(8, 25)
 HAUT_AUSSEN, HAUT_MITTE, LID = f(8, 9), f(11, 9), f(10, 8)           # (87,35,29), (100,51,46), schwarz (0,0,0)
+UMRISS_KOERPER = f(8, 25)
+wing_c = L.farbmaske(spr, FLUEGEL_FARBEN)
+
+PIV = {'l': (6.0, 6.0), 'r': (17.0, 6.0)}                # Schultergelenke (Sprite)
+ANG0 = {'l': math.radians(103.0), 'r': math.radians(77.0)}
+LAENGE = 16.0
+SWEEP = math.radians(132.0)
+LAG = 1.5
+R_SCHULTER = 4.2
+
+
+def fluegel_maske(seite):
+    m = wing_c & ((xx <= 11) if seite == 'l' else (xx >= 12))
+    # den Flügel ohne Randausreißer: nur y 1–21
+    m &= (yy >= 1) & (yy <= 21)
+    return m
+
+
+def fluegel_fertig(seite):
+    """Vollständiger Flügel (verdeckte Stellen senkrecht fertiggezeichnet) als Maske + Farbfeld im Sprite-Raster."""
+    m = fluegel_maske(seite)
+    xs = range(0, 7) if seite == 'l' else range(17, 24)
+    a = np.zeros_like(spr)
+    a[m] = spr[m]
+    for x in xs:
+        spalte = np.nonzero(m[:, x])[0]
+        if not len(spalte):
+            continue
+        for y in range(spalte.min(), spalte.max() + 1):
+            if m[y, x] or not vorhanden[y, x]:
+                continue
+            # verdeckt: Farbe des nächsten Flügelpixels derselben Spalte (darüber, sonst darunter)
+            oben = [yy_ for yy_ in range(y - 1, -1, -1) if m[yy_, x]]
+            unten = [yy_ for yy_ in range(y + 1, sh) if m[yy_, x]]
+            q = oben[0] if oben else unten[0]
+            a[y, x] = spr[q, x]
+    return a
+
+
+sch_m = {}
+for seite in 'lr':
+    px_, py_ = PIV[seite]
+    sch_m[seite] = fluegel_maske(seite) & ((xx - px_) ** 2 + (yy - py_) ** 2 <= R_SCHULTER ** 2)
+WING = {s_: fluegel_fertig(s_) for s_ in 'lr'}
+WING_ROT = {}
+for seite in 'lr':
+    a = WING[seite].copy()
+    a[sch_m[seite]] = 0
+    WING_ROT[seite] = L.platz(a, H, W, *OFF)
+koerper_m = vorhanden & ~(wing_c & ((xx <= 11) | (xx >= 12))) | sch_m['l'] | sch_m['r']
+koerper_m &= vorhanden
+KOERPER = R.teil(spr, koerper_m, H, W, OFF)
+BEINE_Y = 22                                            # ab hier hängen Stiefel/Rock nach
+# Ruhepose prüfen: Flügel (unverdreht) unter dem Körper ergibt das Original
+_t = L.zusammen(H, W, [(WING_ROT['l'], 0, 0), (WING_ROT['r'], 0, 0), (KOERPER, 0, 0)])
+assert (_t[PAD_T:PAD_T + sh, PAD_L:PAD_L + sw] == spr).all()
+
 AUGE_L, AUGE_R = [(9, 8), (9, 9), (10, 9)], [(14, 8), (14, 9), (13, 9)]
-schwanz_l = vorhanden & (xx <= 6) & (yy >= 17)
-schwanz_r = vorhanden & (xx >= 18) & (yy >= 17)
-rumpf = vorhanden & ~schwanz_l & ~schwanz_r
-LOCH0 = R.loecher(L.platz(spr, H, W, *OFF))
+
+
+def oeffnung(t):
+    """0 = angelegt … 1 = ganz geöffnet. Aufklappen 7 Frames (u 1–8), kräftiger Abschlag 5,5 Frames (u 8–13,5), danach 1,5 Frames angelegt (und eines davor)."""
+    u = t % BEAT
+    if u < 1.0 or u >= 13.5:
+        return 0.0
+    if u < 8.0:
+        return 0.5 - 0.5 * math.cos(math.pi * (u - 1.0) / 7.0)
+    return 0.5 + 0.5 * math.cos(math.pi * (u - 8.0) / 5.5)
+
+
+def delta(seite, s, t):
+    fl = min(1.0, max(0.0, s / LAENGE))
+    d = SWEEP * oeffnung(t - LAG * fl)
+    return d if seite == 'l' else -d
+
+
+def fluegel(seite, t):
+    px_, py_ = PIV[seite]
+    return R2.biege(WING_ROT[seite], (PAD_L + px_, PAD_T + py_), ANG0[seite], LAENGE, lambda s: delta(seite, s, t), s_min=-8.0)
+
+
+def bob(t):
+    """Beim Aufklappen sinkt die Figur bis 2 px, beim Abschlag steigt sie wieder (1 Frame nachlaufend); Frame 0 = 0."""
+    return int(round(2.0 * oeffnung(t - 1.0)))
 
 
 def frame(i):
-    b = Hm.stufe(i, N / 2, 1)
-    k = R.teil(spr, rumpf, H, W, OFF)
-    tl = R.teil(spr, schwanz_l, H, W, OFF)
-    tr = R.teil(spr, schwanz_r, H, W, OFF)
-    # Flügelspitzen wehen nach außen (nie zum Körper): u ∈ [0, 1], 0 in Frame 0
-    def aus(per1, per2):
-        u1 = 0.5 * (1 - math.cos(L.sinus(i, per1)))
-        u2 = 0.5 * (1 - math.cos(L.sinus(i, per2)))
-        return min(1.0, 0.7 * u1 + 0.3 * u2)
-    tl = R.zeilen_pendel(tl, PAD_T + 16, -2.4 * aus(N / 3, N / 5), math.pi / 2)
-    tr = R.zeilen_pendel(tr, PAD_T + 16, 2.4 * aus(N / 2, N / 7.5), math.pi / 2)
-    # Federspitzen flickern
-    if Hm.folge(i, 8, [1] * 6, N):
-        Hm.bereich_versatz(k, OFF, {1: -1}, 0, 6)
-    if Hm.folge(i, 34, [1] * 6, N) or Hm.folge(i, 52, [1] * 4, N):
-        Hm.bereich_versatz(k, OFF, {1: 1}, 17, 23)
-    # Blinzeln
-    if Hm.folge(i, 22, [1, 1, 1], N) or Hm.folge(i, 46, [1, 1, 1], N):
+    b = bob(i)
+    k = KOERPER.copy()
+    if Hm.folge(i, 22, [1, 1, 1], N) or Hm.folge(i, 46, [1, 1, 1], N):                       # Blinzeln
         Hm.setze(k, {(9, 8): LID, (14, 8): LID, (9, 9): HAUT_AUSSEN, (14, 9): HAUT_AUSSEN, (10, 9): HAUT_MITTE, (13, 9): HAUT_MITTE}, OFF)
-    if b:
-        k, tl, tr = (L.streck_zeile(e, PAD_T + 19, 1) for e in (k, tl, tr))
-    fig, etik = R.schichten(H, W, [(tl, 'fluegel'), (tr, 'fluegel'), (k, 'koerper')])
-    R.neue_loecher_fuellen(fig, LOCH0, ERLAUBT)
-    R.kontur_je_teil(fig, etik, ERLAUBT, {'fluegel': UMRISS_FLUEGEL, 'koerper': UMRISS_KOERPER}, standard=UMRISS_KOERPER)
+    # Beine hängen nach (Zeilen ab BEINE_Y pendeln seitlich, 1 Frame hinterher)
+    oben_, unten_ = k.copy(), k.copy()
+    oben_[PAD_T + BEINE_Y:] = 0
+    unten_[:PAD_T + BEINE_Y] = 0
+    unten_ = R.zeilen_pendel(unten_, PAD_T + BEINE_Y, 1.2, L.sinus(i - 1.0, N / 2.0), lauf=0.5, ruhe0=True)
+    fl_l, fl_r = fluegel('l', i), fluegel('r', i)
+    fig, etik = R.schichten(H, W, [(L.versetze(fl_l, 0, b), 'fluegel'), (L.versetze(fl_r, 0, b), 'fluegel'), (L.versetze(oben_, 0, b), 'koerper'), (L.versetze(unten_, 0, b), 'koerper')])
+    fig = R3.luecken_fuellen(fig, 6, ausser=np.roll(LOCH0, b, axis=0))
+    R.kontur_je_teil(fig, etik, ERLAUBT, {'fluegel': UMRISS_FLUEGEL, 'koerper': UMRISS_FLUEGEL}, standard=UMRISS_FLUEGEL)
     return fig
+
+
+LOCH0 = R3.eingeschlossen(L.platz(spr, H, W, *OFF)[..., 3] > 0)
 
 
 if __name__ == '__main__':
