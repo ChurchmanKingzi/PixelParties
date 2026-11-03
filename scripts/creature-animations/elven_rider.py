@@ -18,15 +18,18 @@ Metall/Edelstein: nichts eindeutig (goldenes Pixelpaar am Pferdekopf = Auge → 
 
 Ablauf (48 Frames à 66 ms = 3,17 s, nahtlos):
 * Atmen des Pferdes (Periode 24, zweimal pro Schleife): die Rumpfzeile 23 von Pferd+Reiterin wird einmal doppelt eingefügt (L.streck_zeile, Texturmischung): Rumpf, Hals, Kopf, Reiterin steigen 1 px, die Beine/Hufe bleiben am Boden.
-* Schweif weht (Periode 24, zweimal pro Schleife): die Schweifsträhnen (nur die dunkelblauen Pixel (18,28,63) bei y ≥ 18, x ≤ 17) laufen als Welle (L.spalten_welle mit Phasenlauf, Gelenk x 17, Ausschlag bis ±3 px am Ende); der Umriss des Schweifs ist
-  die dunkelblaue Strähne selbst, darunter liegt der Pferdekörper unverändert.
-* Mähne weht: der Stirnschopf (x 30–35, y 6–9) und die fliegenden Strähnen rechts (x 35–39, y 6–12) pendeln waagerecht (L.zeilen_welle, Gelenk y 10 bzw. y 12, Ausschlag bis ±1,5 px; Periode 16 bzw. 12), die beiden Sternpixel wandern mit den Strähnen.
+* NEBEL (Nutzerkorrektur Runde 3: „die Mähne bis einschließlich Schweif des Pferds soll fließend animiert sein, als bestünde sie aus dunklem Nebel“): Schweif (die dunkelblauen Strähnen (18,28,63) bei y ≥ 18, x ≤ 17) und Mähne samt Stirnschopf
+  (alle dunklen Nebelpixel (18,28,63)/(30,23,69)/(67,66,119) und die zwei Sternpixel bei x ≥ 28, y ≤ 12) werden NICHT mehr als Spalten-/Zeilenwelle bewegt, sondern von einem glatten 2D-Strömungsfeld verformt (anim_orks.nebel):
+  jedes Pixel wandert mit Quer- und Längsversatz (Welle läuft von der Wurzel zur Spitze, quer zur Strähne phasenverschoben → Wirbel; Quer Periode 24, Längs Periode 48, Schweif bis 3 px quer / 2,2 px längs, Mähne bis 1,7 / 1,3), die Strähnen
+  dehnen und stauchen sich, ohne zu reißen (zwischen den verschobenen Nachbarpixeln wird mit einer Pixellinie verbunden). Wurzeln (am Rumpf bzw. am Pferdekopf) stehen fest bzw. heben sich mit dem Atmen mit. Im Schweif hellen sich zeitweise Strähnenpixel zum
+  Pferde-Umrissblau (26,45,81) auf (Dichtestreifen laufen zur Spitze). Die Mähne liegt hinter dem Pferdekopf (verschobene Pixel verschwinden dahinter); Sterne/helles Violett am Mähnenrand bekommen eine dunkle Umhüllung (30,23,69) bzw. werden dunkel,
+  damit die Außenkontur nie hell wird (Regel 16). Frame 0 = Original. Der Pferdeohr-Rand (31,9) gehört nicht mehr zur Mähne und bleibt fest.
 * Haar der Reiterin weht (Periode 24, einmal pro Schleife je Böe): die unteren Zeilen des Haarvorhangs (y 12–16, nur Haarfarben) wehen bis 2 px nach links vom Umhang weg und zurück; die dadurch frei liegenden Umhangkanten bekommen die Umrissfarbe (Regel 16).
 * Blinzeln der Reiterin (Frames 20–22 und 41–43): die vier Augenpixel nehmen die Hautfarbe (246,205,139) an. Das Pferd blinzelt versetzt (Frames 7–8 und 30–31): die zwei goldenen Augenpixel nehmen die Fellfarbe (110,130,176) an.
 * Hufscharren (Frames 10–13 und 33–36, Hufe versetzt): das vordere linke Bein (x 31–33) bzw. das hintere linke Bein (x 15–17) hebt sich ab Zeile 26 starr um 1 px (Huf kurz angehoben) und setzt wieder auf.
 Frame 0 = Original (Ruhepose); Kontrolle: anim_humanoide.ruhepose. Randpixel-Test (Regel 16): randtest.py.
 Alle Bewegungen laufen auf der vollen Leinwand (anim_lib wirft ClipError). Nur ganze Pixel, nur Farben der Quelle.
-Ergänzungen: keine gemalten Flächen; freigelegte Umhangkanten (x 21–22, y 12–16) werden zu Umrisspixeln (8,18,0) umgefärbt.
+Ergänzungen: keine gemalten Flächen; freigelegte Umhangkanten (x 21–22, y 12–16) werden zu Umrisspixeln (8,18,0) umgefärbt; freigelegte Pferderandpixel im Kopfbereich in (26,45,81); Nebelbrücken (Pixellinien in Nebelfarben) beim Dehnen.
 """
 import math
 import sys

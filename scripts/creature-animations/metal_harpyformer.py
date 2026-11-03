@@ -153,25 +153,67 @@ def arm_dx(a, y_voll, y_null):
     return f
 
 
-def _strang(a, y0, y1, t, periode, phase0):
-    """Strähne schwingt (äußeres Ende = links im Bild von `a`), unten bis 1,4 px; zu schmale Zeilen bleiben stehen."""
-    innen, breite = {}, {}
-    for y in range(y0, y1 + 1):
-        xs_ = np.nonzero(a[y, :, 3])[0]
-        if len(xs_):
-            innen[y] = int(xs_.max()) + 1
-            breite[y] = int(xs_.max() - xs_.min() + 1)
-    ys = sorted(innen)
-    s = math.sin(2 * math.pi * t / periode + phase0) - math.sin(phase0)
+STRANG_Y0, STRANG_Y1 = PAD_T + 37, PAD_T + 44                # Strähnen hängen ab Zeile 37 (Schulter, Flügelunterkante) bis 44
 
-    def dx(y):
-        d = -1.4 * s * ((y - ys[0]) / max(1, ys[-1] - ys[0])) ** 1.2
-        return 0 if breite[y] - int(round(d)) < 2 or breite[y] < 3 else d
-    return B.zeilen_dehnen_aussen(a, ys[0], ys[-1], innen, dx)
+
+def strang_schwingen(a, links, t, periode, amp, lag=2.0):
+    """Haarsträhne schwingt als Pendel nach außen und zurück (Runde 3, Rückmeldung „die Haare zucken seltsam“): jede Zeile wandert STARR um dx nach außen (nichts wird gedehnt, doppelt oder ausgelassen,
+    auch die Haarfransen (Einzelpixel) außen wandern mit ihrer Zeile mit), dx wächst gleichmäßig mit dem Abstand zur Schulter (bis `amp` px unten) und folgt der Bewegung mit etwas Nachlauf (`lag` Frames je Strähnenlänge) —
+    eine ruhige Welle statt Zucken. Nach innen (zum Körper hin) geht es nie über die Ruhelage hinaus. Das so frei werdende Stück zwischen Strähne und Körper wird mit der Farbe des innersten Strähnenpixels der Zeile gefüllt
+    (dunkle Innenschattierung). links=True: Strähne links vom Körper (außen = links), sonst rechts."""
+    out = a.copy()
+    h, w = a.shape[:2]
+    u = lambda tt: 0.5 * (1 - math.cos(2 * math.pi * tt / periode))
+    for y in range(STRANG_Y0 + 1, STRANG_Y1 + 1):
+        xs_ = np.nonzero(a[y, :, 3])[0]
+        if not len(xs_):
+            continue
+        f = (y - STRANG_Y0) / float(STRANG_Y1 - STRANG_Y0)
+        z = max(0.0, u(t - lag * f) - u(-lag * f))                  # bei t = 0 genau 0 (Ruhepose)
+        dx = int(math.floor(amp * (f ** 1.1) * z + 0.5))
+        if dx == 0:
+            continue
+        s = -dx if links else dx
+        if xs_.min() + s < 0 or xs_.max() + s >= w:
+            raise L.ClipError(f'Strähne Zeile {y} würde um {s} px aus der Leinwand geschoben')
+        innen = int(xs_.max()) if links else int(xs_.min())
+        farbe = a[y, innen].copy()
+        out[y, xs_] = 0
+        out[y, xs_ + s] = a[y, xs_]
+        # Lücke zwischen verschobener Strähne und dem Körper (Innenseite) mit der Farbe des innersten Pixels füllen
+        for k in range(1, dx + 1):
+            xk = innen + s + (k if links else -k)
+            out[y, xk] = farbe
+    return out
 
 
 def blinzeln(i):
     return (19 <= i <= 21) or (41 <= i <= 42)
+
+
+# ── Atmen: der Oberkörper hebt sich (Füße bleiben am Boden) ─────────────────────────────────────────────────────────────────────
+ATEM_PER = 24                                              # zwei Atemzüge pro Schleife
+ATEM_Y1, ATEM_Y2 = PAD_T + 39, PAD_T + 41                  # Bauchzeilen mit Textur (unter den Flügeln, nicht Gesicht/Hals): hier wird je eine Zeile eingefügt
+
+
+def atem(i):
+    """(n1, n2): 0/1 eingefügte Zeile an Bauchzeile y 41 (n2, zuerst) und y 39 (n1, mit Nachlauf) → Kopf, Flügel, Gitarre, Feuer heben sich um 0 … 2 px (zweistufig), die Beine bleiben stehen."""
+    u = 0.5 * (1 - math.cos(2 * math.pi * i / ATEM_PER))
+    return (1 if u >= 0.75 else 0), (1 if u >= 0.25 else 0)
+
+
+def atmen_ebene(a, n1, n2):
+    """Anwendung auf eine Ebene: Zeilen oberhalb der Bauchzeilen rücken um n1 + n2 hoch (die Zeilen y 39/41 werden mit Texturmischung `L.streck_zeile` eingefügt), darunter bleibt alles stehen."""
+    if n2:
+        a = L.streck_zeile(a, ATEM_Y2, n2)
+    if n1:
+        a = L.streck_zeile(a, ATEM_Y1 - n2, n1)
+    return a
+
+
+def flügel_links(t):
+    """Linker Flügel schwingt für sich (eigene Periode 24 und 12, nicht an Gitarre oder rechten Flügel gekoppelt), Ausschlag in px (negativ = links); bei t = 0 genau 0."""
+    return 2.6 * math.sin(2 * math.pi * t / 24.0) + 0.8 * math.sin(2 * math.pi * t / 12.0)
 
 
 TEST_EBENEN = ('figur',)                                    # für den Randpixel-Test: ohne Funken
@@ -182,7 +224,8 @@ def frame(i, partikel=True, nur=None):
     if nur is not None:
         partikel = False
     a = schwenk(i)
-    dxg = int(round(a))
+    n1, n2 = atem(i)
+    hub = n1 + n2
     schichten = []
     if 'figur' in ebenen:
         rest = REST
@@ -190,22 +233,25 @@ def frame(i, partikel=True, nur=None):
             rest = rest.copy()
             for (x, y) in AUGEN:
                 rest[PAD_T + y, PAD_L + x, :3] = LID
-        fl_l = HB.zeilen_schub(FL_L, arm_dx(0.9 * (schwenk(i - 1.0) - schwenk(-1.0)), 26, 31))
+        fl_l = HB.zeilen_schub(FL_L, arm_dx(flügel_links(i), 26, 31))
         fl_r = HB.zeilen_schub(FL_R, arm_dx(a, 26, 31))
-        str_l = _strang(STR_L, PAD_T + 38, PAD_T + 41, i, 16.0, 0.6)
-        str_r = _strang(STR_R[:, ::-1].copy(), PAD_T + 38, PAD_T + 40, i, 16.0, 2.6)[:, ::-1].copy()
+        str_l = strang_schwingen(STR_L, True, i, 24.0, 2.0)
+        str_r = strang_schwingen(STR_R, False, i, 16.0, 2.0, lag=1.5)
         feuer = FEUER.ebene(i, wind=wind(i))
         feuer = A.verbinde4(HB.zeilen_schub(feuer, schub_fn(a, kippen(i), 16)))[0]
         gitarre = A.verbinde4(HB.zeilen_schub(GITARRE, schub_fn(a, kippen(i))))[0]
         m_hals = L.farbmaske(gitarre, HALS_FARBEN)
         hals = np.where(m_hals[..., None], gitarre, 0).astype(np.uint8)                 # Hals getrennt: eigene Umrissfarbe beim Randpixel-Test
         gitarre = np.where(m_hals[..., None], 0, gitarre).astype(np.uint8)
-        schichten += [(UNTER_L, 0, 0, 1), (UNTER_R, 0, 0, 2), (fl_l, 0, 0, 1), (fl_r, 0, 0, 2), (str_l, 0, 0, 3), (str_r, 0, 0, 4), (rest, 0, 0, 5),
+        # Atmen: jede Ebene bekommt dieselbe Zeilenabbildung (Oberkörper hebt sich, Beine bleiben)
+        teile = [atmen_ebene(e, n1, n2) for e in (UNTER_L, UNTER_R, fl_l, fl_r, str_l, str_r, rest, gitarre, hals, feuer)]
+        un_l, un_r, fl_l, fl_r, str_l, str_r, rest, gitarre, hals, feuer = teile
+        schichten += [(un_l, 0, 0, 1), (un_r, 0, 0, 2), (fl_l, 0, 0, 1), (fl_r, 0, 0, 2), (str_l, 0, 0, 3), (str_r, 0, 0, 4), (rest, 0, 0, 5),
                       (gitarre, 0, 0, 6), (hals, 0, 0, 8), (feuer, 0, 0, 7)]
     f, karte = B.zusammen_mit_karte(H, W, schichten)
     B.umriss_je_ebene(f, karte, ERLAUBT, UMRISS)
     if partikel:
-        fk = HB.funken_welt(FEUER, ABRISSE, i, lambda fr: (int(round(schwenk(fr) + kippen(fr) * 12)) + int(round(0.8 * wind(fr))), 0), leben=12, steigen=0.5, farben=[GELB, ORANGE, ORANGE, ROT])
+        fk = HB.funken_welt(FEUER, ABRISSE, i, lambda fr: (int(round(schwenk(fr) + kippen(fr) * 12)) + int(round(0.8 * wind(fr))), -sum(atem(fr))), leben=12, steigen=0.5, farben=[GELB, ORANGE, ORANGE, ROT])
         f = L.zusammen(H, W, [(fk, 0, 0), (f, 0, 0)])
     return f
 

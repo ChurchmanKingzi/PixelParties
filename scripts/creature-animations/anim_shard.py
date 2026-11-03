@@ -7,6 +7,7 @@
                                                     gibt (Ebene, y der obersten Quellzeile, Quellzeilen je Ausgabezeile) zurück
     teil_starr(fig, pixel, dx, dy, fuell)           ein Pixelmenge (y, x) starr um (dx, dy) verschieben; freigelegte Felder bekommen die Farbe aus `fuell`
     sinus_stufen(i, n, versatz, schwelle)           Phase → Stufen (-1, 0, +1) für ganzzahlige Pendelbewegungen
+    Glied / GliedArm / GliedKette                   dünne Bänder (Bandagen): Querwelle / Pendel um die Wurzel / Gelenkkette aus starren Abschnitten, die wie schlaffe Arme schlackert
 """
 import math
 

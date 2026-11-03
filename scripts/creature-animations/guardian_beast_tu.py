@@ -1,13 +1,14 @@
 # -*- coding: utf-8 -*-
 """Idle-Animation für „Guardian Beast Tu“ (Creature) — die Hasen-Göttin (Tu): lange rosa Schlappohren, weißes Gesicht mit roten Augen, goldene Kette, fliederfarbenes Kleid.
+Runde 3: Tu SPRINGT wirklich (Hocke → Absprung → Flug mit schlagenden Ohren → Landung), eigene Frames nach der Nutzer-Referenz img5.
 
 Quelle: src/guardian-beast-tu.png (26×27 px, 38 Farben).
 PICK: [["MotiveGuardianBeasts", 109, 1]]      (Ebene „Tu-Kopie“, Figur 1)
 Quelle vollständig: ja für die Figur selbst. NICHT verwendet: Ebene 110 „Tu“ (Schleier/Flügel, 70 % durchsichtig, weich verlaufend, 26×37) und Ebene 111 (Schattenfleck am Boden) — beides sind
-Weichzeichner-/Alpha-Effekte der Kartenkunst und würden gegen die Pixelart-Regel (kein Alpha, keine weichen Verläufe) verstoßen; Rückfrage-Punkt für den Spielgestalter (siehe Bericht).
+Weichzeichner-/Alpha-Effekte der Kartenkunst und würden gegen die Pixelart-Regel (kein Alpha, keine weichen Verläufe) verstoßen.
 
 Aufruf:   python3 guardian_beast_tu.py [--preview <ordner>]
-Ausgabe:  ../../data/creature-animations/guardian-beast-tu.png + .json
+Ausgabe:  ../../data/creature-animations/guardian-beast-tu.png + .json (mit `kern` = Körper in der Ruhepose am Boden, ohne den Sprungraum)
 
 Identifikation (x, y im 26×27-Sprite):
 * OHREN (links x 0–5, rechts x 20–25, y 2–8): lange rosa Schlappohren (225,147,163)/(208,135,150)/(198,127,142) mit dunkelbraunem Umriss (97,57,58), vom Kopf schräg nach außen unten hängend.
@@ -16,17 +17,21 @@ Identifikation (x, y im 26×27-Sprite):
 * SCHULTERN/KRAGEN (x 7–18, y 10–14): graue Schulterrüschen (177,173,183), lila Kragen (122,102,161)/(93,70,114).
 * GOLDKETTE (x 9–16, y 12–15): V-förmige Kette aus Gold (143,130,52)/(191,174,68) mit Anhänger bei (12–13, 13–15) und weißem Glanzpunkt (12,14); darüber/darunter dunkelrote Zierstücke (104,42,47)/(143,61,67).
 * ARME (links x 3–7, rechts x 18–22, y 14–20): rosabraune Arme mit dunklem Umriss, hängen schräg nach außen.
-* KLEID (x 8–17, y 15–25): flieder/weiß (225,209,238)/(203,172,229) mit Falten, dunkler Spalt in der Mitte; BEINE (y 21–26): lila Strümpfe, braune Stiefel (101,80,79).
-Nicht bewegt bleiben: Gesicht (außer Blinzeln), Kleid, Beine.
+* KLEID (x 8–17, y 15–22): flieder/weiß (225,209,238)/(203,172,229) mit Falten, dunkler Spalt in der Mitte (ab y 19); BEINE (y 23–26): lila Strümpfe, braune Stiefel (101,80,79).
+Nicht bewegt bleiben: Gesicht (außer Blinzeln), Kleid-Muster. Kein Feuer, keine Partikel.
 
-Ablauf (48 Frames à 80 ms = 3,84 s, nahtlos):
-* ATMEN: Kopf, Ohren, Schultern und Oberarme heben sich in einer Stufe um 1 px (Kleidzeile 17 wird einmal eingefügt, mit Nachbartextur gemischt); Kleid und Beine bleiben.
-* OHRENSCHLAG: beide Schlappohren schwingen als Ganzes auf und ab (Spaltenversatz um den Ohransatz, Spitze bis ±2 px, Periode 24, die Ohren gegenläufig).
-* ARME SCHLACKERN: die Unterarme (ab Zeile 17, der Oberarm bleibt am Kleid, damit der Kleidumriss geschlossen bleibt) pendeln um den Ellbogen auswärts und zurück (Zeilenversatz mit Gefälle ≤ 1 px, die Hand bis 2 px; links Periode 24, rechts Periode 16).
-* BLINZELN: Frames 30–32 (Lid = Gesichtsfarbe (241,232,215), erst obere Reihe, dann beide).
-* GOLD GLÄNZT (Regel 12): ein Lichtband läuft (Frames 6–19) über die Goldkette (eine Stufe auf der Goldrampe); ein vierzackiger Stern blitzt am Anhänger (12,13) in den Frames 40–44 auf.
-Frame 0 = Ruhepose (Original). Alle Bewegungen laufen auf der vollen Leinwand (anim_lib wirft ClipError). Nur ganze Pixel, nur Farben der Quelle.
-Ergänzungen: keine (die Arme liegen hinter dem Kleid, beim Schwingen wird nichts freigelegt, was nicht schon Körper wäre).
+Ablauf (72 Frames à 70 ms = 5,04 s, nahtlos; Frame 0 = Ruhepose = Original):
+* GROSSER SPRUNG (Frames 10–30): Hocke (10–13: Kleid verliert bis 4 Zeilen, Kopf/Ohren/Arme sinken, Ohren hängen tiefer, Arme nach unten; Füße bleiben am Boden) → Absprung (14: Körper streckt sich um 3 Zeilen (Kleid/Beine
+  bekommen Zeilen), Füße verlassen den Boden, die Ohren hängen noch nach unten (Trägheit), Arme schwingen hoch) → Flug (15–24: parabelförmig bis 13 px Höhe, Körper komplett in der Luft, die Ohren schlagen nach oben (Frames 16–19), nach unten
+  (20), wieder nach oben (21–22) und fallen; Arme hoch, beim Fallen strecken sich die Beine) → Landung (25–26: Quetschung um bis zu 4 Zeilen, Ohren kippen träge nach unten) → Nachwippen (27–30, kleiner Überschwinger).
+* KLEINER HÜPFER (Frames 45–55): kurze Hocke, 6 px hoch, Ohren schlagen einmal, Landung mit leichter Quetschung.
+* IDLE zwischendurch: Atmen (1 px, Zeile 17 doppelt), Ohrenschlagen (gegenläufig, Periode 24, Spitze ±2 px), Arme schlackern nach außen, Blinzeln (Frames 4–6 und 38–40), Goldkette glänzt (Lichtband Frames 56–69,
+  Glitzerstern Frames 34–37 am Anhänger, nur Gold).
+Technik: Der Körper (Kopf, Kleid, Beine) ist EINE Ebene; Strecken = Zeile 22 (Saum, die Zeilen 21 und 22 sind gleich) bzw. Zeile 25 (Bein) wird eingefügt, Quetschen = bis zu 4 Kleidzeilen (19–22) entfallen, die obere Hälfte rückt nach;
+Ohren und Arme sind eigene Ebenen: sie wandern starr mit der oberen Körperhälfte und werden als Spaltenscherung um den Ansatz (Ohr x 6/19, Schulter x 8/17) nach oben (Betrag in px an der Spitze) bzw. unten geschwenkt.
+Danach wird die ganze Figur um die Flughöhe angehoben. Alle Bewegungen laufen auf der vollen Leinwand (anim_lib wirft ClipError); nur ganze Pixel, nur Quellfarben, keine Umrisse dicker als im Original (Spaltenscherung und Zeileneinfügen am Saum
+wiederholen nie Randspalten).
+Ergänzungen: keine Pixel hinzugemalt; fehlende Umrisspixel am Rand schließen `A.verbinde4`/`G.rand_schliessen` (Regel 16).
 """
 import os
 import sys
@@ -38,8 +43,8 @@ import anim_gbb as G
 import anim_humanoide as Hm
 import anim_lib as L
 
-N, MS = 48, 80
-PAD_L, PAD_R, PAD_T, PAD_B = 5, 5, 5, 3
+N, MS = 72, 70
+PAD_L, PAD_R, PAD_T, PAD_B = 5, 5, 21, 3
 
 spr = L.lade('guardian-beast-tu')
 sh, sw = spr.shape[:2]
@@ -66,43 +71,90 @@ arm_l = vorhanden & (((xx <= 7) & (yy >= 14) & (yy <= 17)) | ((xx <= 6) & (yy >=
 arm_r = vorhanden & (((xx >= 18) & (yy >= 14) & (yy <= 17)) | ((xx >= 19) & (yy >= 18) & (yy <= 20)))
 koerper_m = vorhanden & ~ohr_l & ~ohr_r & ~arm_l & ~arm_r
 
+# ── Sprungplan: Frame → (Höhe in der Luft, Streckung s (>0 Zeilen eingefügt, <0 Zeilen entfernt), Ohrenhub (px an der Spitze, + = hoch), Armhub (px an der Spitze, + = hoch))
+FLUG = {}
+SPRUNG_GROSS = [
+    # (Frame, Höhe, s, Ohr, Arm)
+    (10, 0, -1, -1.5, -1), (11, 0, -2, -3, -2), (12, 0, -4, -4, -3), (13, 0, -4, -4, -3),               # Hocke
+    (14, 3, 3, -3, 2),                                                                                # Absprung
+    (15, 7, 3, -1, 4), (16, 10, 2, 3, 6), (17, 12, 1, 6, 7), (18, 13, 0, 8, 7), (19, 13, 0, 5, 7),     # Aufstieg, Scheitel, Ohren schlagen
+    (20, 12, 0, 2, 5), (21, 10, 0, 6, 4), (22, 7, 0, 4, 3), (23, 4, 1, 1, 1), (24, 1, 1, -1, 0),       # Abstieg
+    (25, 0, -3, -4, -3), (26, 0, -4, -4, -3), (27, 0, -2, -2, -1), (28, 0, -1, 1, 0), (29, 0, 0, 1.5, 0), (30, 0, 0, 0.5, 0),   # Landung, Nachwippen
+]
+SPRUNG_KLEIN = [
+    (45, 0, -1, -1, -1), (46, 0, -2, -2, -1),
+    (47, 2, 2, -2, 2), (48, 5, 1, 3, 3), (49, 6, 0, 5, 3), (50, 5, 0, 2, 2), (51, 2, 1, -1, 0),
+    (52, 0, -2, -3, -2), (53, 0, -1, 0, -1), (54, 0, 0, 1, 0), (55, 0, 0, 0.5, 0),
+]
+PLAN = {fr: (h, s, o, a) for fr, h, s, o, a in SPRUNG_GROSS + SPRUNG_KLEIN}
+# Gewicht der Idle-Bewegungen (Atmen, Armschlackern, Ohrenwackeln): 0 mitten im Sprung, 1 sonst, Übergang 0,5
+IDLE_W = [1.0] * N
+for fr in range(11, 30):
+    IDLE_W[fr] = 0.0
+for fr in range(46, 55):
+    IDLE_W[fr] = 0.0
+for fr in (10, 30, 45, 55):
+    IDLE_W[fr] = 0.5
+
 
 def ebene(m, dx=0, dy=0):
     t, _ = L.trenne(spr, m)
     return L.platz(t, H, W, PAD_L + dx, PAD_T + dy)
 
 
+def streck_bein(kp, n):
+    """Beinzeile 25 (aEa..aEa) n-mal einfügen: die Beine werden länger, alles darüber (auch bereits gestreckt) rückt hoch. Wird NACH dem Kleid angewendet (Zeile 25 liegt darunter, bleibt am Platz)."""
+    return L.streck_zeile(kp, PAD_T + 25, n) if n else kp
+
+
 def frame(i):
-    r = int(round(0.5 - 0.5 * np.cos(L.sinus(i, N))))                           # Atemhub 0/1
+    hoehe, s, ohr, arm_h = PLAN.get(i, (0, 0, 0, 0))
+    w = IDLE_W[i]
+    r = int(round(0.5 - 0.5 * np.cos(L.sinus(i, 36)) + 0.0)) if w >= 1.0 else 0     # Atemhub 0/1 (2 Atemzüge je Schleife)
     # ── Körper ──
     kp = ebene(koerper_m)
-    Hm.lichtband(kp, GOLD_M, OFF, i, N, 6, 14, GOLD, stufen=1, breite=3.0, achse=(1.0, 1.0))
-    st = Hm.folge(i, 40, [0, 1, 1, 0], N)
+    Hm.lichtband(kp, GOLD_M, OFF, i, N, 56, 14, GOLD, stufen=1, breite=3.0, achse=(1.0, 1.0))
+    st = Hm.folge(i, 34, [0, 1, 1, 0], N)
     if st is not None:
         Hm.stern4(kp, 12, 13, st, (255, 255, 237), GOLD[1], GOLD[1], OFF)
-    k = Hm.folge(i, 30, [1, 2, 1], N)
+    k = Hm.folge(i, 4, [1, 2, 1], N) or Hm.folge(i, 38, [1, 2, 1], N)
     if k:
         Hm.setze(kp, {p: GESICHT for p in (AUGEN['o'] + (AUGEN['u'] if k == 2 else []))}, OFF)
-    kp = L.streck_zeile(kp, PAD_T + 17, r)
-    # ── Ohren: Spaltenversatz um den Ohransatz ──
-    ol = ebene(ohr_l)
-    orr = ebene(ohr_r)
-    ol = L.spalten_welle(ol, PAD_L + 6, 2.4, L.sinus(i, 24), nur_rechts=False)
-    orr = L.spalten_welle(orr, PAD_L + 19, 2.4, L.sinus(i, 24, np.pi), nur_rechts=True)
-    ol = L.versetze(ol, 0, -r)
-    orr = L.versetze(orr, 0, -r)
-    # ── Arme: Hand schwingt nach außen ──
+    s_k = max(-4, s)                                                              # Kleid: bis 4 Zeilen weniger
+    s_dress = min(s, 2)
+    kp = L.streck_zeile(kp, PAD_T + 17, r)                                        # Atmen
+    if s_k < 0:
+        kp = L.streck_zeile(kp, PAD_T + 22, s_k)
+    elif s_dress > 0:
+        kp = L.streck_zeile(kp, PAD_T + 22, s_dress)
+    if s > 2:
+        kp = streck_bein(kp, s - 2)
+    hub = r + s                                                                   # Verschiebung der oberen Hälfte (+ = hoch)
+    # ── Ohren ──
+    idle_l = 2.4 * np.sin(L.sinus(i, 24)) * w                                     # + = nach unten (spalten_welle-Vorzeichen)
+    idle_r = 2.4 * np.sin(L.sinus(i, 24, np.pi)) * w
+    ol, orr = ebene(ohr_l), ebene(ohr_r)
+    ol = L.spalten_welle(ol, PAD_L + 6, 0.0, 0.0, nur_rechts=False, bias=-ohr * (1 - w) + idle_l)
+    orr = L.spalten_welle(orr, PAD_L + 19, 0.0, 0.0, nur_rechts=True, bias=-ohr * (1 - w) + idle_r)
+    ol, orr = L.versetze(ol, 0, -hub), L.versetze(orr, 0, -hub)
+    # ── Arme ──
     al, ar = ebene(arm_l), ebene(arm_r)
     s_l = 0.5 - 0.5 * np.cos(L.sinus(i, 24))
     s_r = 0.5 - 0.5 * np.cos(L.sinus(i, 16))
     al = L.streck_zeile(al, PAD_T + 17, r)
     ar = L.streck_zeile(ar, PAD_T + 17, r)
-    dl = G.kappe({PAD_T + y: -int(round(2.0 * s_l * (y - 17) / 3.0)) for y in range(17, 21)})
-    dr = G.kappe({PAD_T + y: int(round(2.0 * s_r * (y - 17) / 3.0)) for y in range(17, 21)})
+    dl = G.kappe({PAD_T + y: -int(round(2.0 * w * s_l * (y - 17) / 3.0)) for y in range(17, 21)})
+    dr = G.kappe({PAD_T + y: int(round(2.0 * w * s_r * (y - 17) / 3.0)) for y in range(17, 21)})
     al, ar = G.zeilen_dx(al, dl), G.zeilen_dx(ar, dr)
+    if arm_h:
+        al = L.spalten_welle(al, PAD_L + 8, 0.0, 0.0, nur_rechts=False, bias=-arm_h)
+        ar = L.spalten_welle(ar, PAD_L + 17, 0.0, 0.0, nur_rechts=True, bias=-arm_h)
+    al, ar = L.versetze(al, 0, -s), L.versetze(ar, 0, -s)
     fig = L.zusammen(H, W, [(al, 0, 0), (ar, 0, 0), (ol, 0, 0), (orr, 0, 0), (kp, 0, 0)])
     fig, _ = A.verbinde4(fig)
     G.rand_schliessen(fig, ERLAUBT, UMRISS)
+    if hoehe:
+        fig = L.versetze(fig, 0, -hoehe)
     return fig
 
 
@@ -116,7 +168,8 @@ if __name__ == '__main__':
     e0 = Hm.eckkontakt_typen(frames[0])
     neu = {i: dict(Hm.eckkontakt_typen(g) - e0) for i, g in enumerate(frames) if Hm.eckkontakt_typen(g) - e0}
     print('neue Eckkontakte gegenüber Frame 0:', neu if neu else 'keine')
-    L.speichern('guardian-beast-tu', 'Guardian Beast Tu', frames, MS, prev)
+    L.speichern('guardian-beast-tu', 'Guardian Beast Tu', frames, MS, prev,
+                extra={'kern': {'x': PAD_L, 'y': PAD_T, 'w': sw, 'h': sh}})
     if prev:
         os.makedirs(prev, exist_ok=True)
-        L.streifen(prev + '/guardian-beast-tu-strip.png', frames, spalten=12, scale=5)
+        L.streifen(prev + '/guardian-beast-tu-strip.png', frames, spalten=12, scale=4)

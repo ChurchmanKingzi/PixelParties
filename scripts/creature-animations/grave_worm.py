@@ -17,13 +17,13 @@ Was ist was (x, y im 24×29-Sprite):
 Knochen/Haut: kein Metall → kein Glanz. Kein Feuer.
 
 Ablauf (48 Frames à 65 ms = 3,12 s; Frame 0 = Original):
-* WINDEN (Hauptbewegung, Periode 24 → zwei Wellen je Schleife, die Welle wandert vom Loch zum Hals, Wellenlänge 20 Zeilen): jede Zeile des Körpers (y 9–24) wird waagerecht verschoben, am Loch 0, am Hals bis ±3 px;
-  das Gefälle zwischen benachbarten Zeilen ist ≤ 1 px, so bleibt der Wurm in jeder Pose ein einziger 4-verbundener Körper (für alle 48 Frames geprüft: 4er-Flecken = Original). Das Loch bleibt stehen.
-  Der KOPF (y 0–8) wird dabei NICHT geschert, sondern schwingt starr mit der obersten Körperzeile mit und nickt zusätzlich ±1 px seitlich (Periode 16, Auge und Kopfform bleiben unverändert).
-* ATMEN/Ringe (Periode 12): die hellen Ringzeilen pulsieren nicht (Farben bleiben), stattdessen wandert eine zweite, kleinere Welle (Wellenlänge 9 Zeilen, ±1 px) mit etwas anderer Geschwindigkeit (Periode 16) über den Körper, sodass sich der Wurm unregelmäßig windet.
+* WIEGEN (Runde 3, Nutzer: „zuckt viel zu sehr, das muss natürlicher aussehen“; ersetzt die früheren überlagerten Wellen und das Kopfnicken): EIN langsames, gleichmäßiges Biegen des Wurmes, Periode 48 (einmal pro Schleife, 3,1 s).
+  Jede Zeile des Körpers (y 9–24) wird waagerecht verschoben: am Loch 0, zum Hals hin wachsend (Potenz 1,3, am Hals bis +4 / −2 px), der Hals hinkt dem Fuß 0,5 rad hinterher; der Versatz läuft monoton auf und ab (kein Hin-und-her-Zittern,
+  höchstens 1 px Änderung alle ~2,5 Frames am Hals), das Gefälle zwischen benachbarten Zeilen ist ≤ 1 px, so bleibt der Wurm in jeder Pose ein einziger 4-verbundener Körper (für alle 48 Frames geprüft: 4er-Flecken = Original). Das Loch bleibt stehen.
+  Der KOPF (y 0–8) wird NICHT geschert, sondern schwingt starr mit der obersten Körperzeile mit (kein eigenes Nicken mehr); Auge und Kopfform bleiben unverändert.
 * AUGE blinzelt (Frames 18–20 und 41–43): die Augenpixel nehmen die Kopffarbe (118,118,118) an.
 Keine Partikel (graue Erdbrocken wirkten wie Fehlpixel und wurden wieder entfernt — Regel 25: im Zweifel weglassen).
-Ruhepose = Original (die Wellen werden bei Frame 0 abgezogen). Alle Bewegungen laufen auf der vollen Leinwand (anim_lib wirft ClipError). Nur ganze Pixel, nur Farben der Quelle.
+Ruhepose = Original (das Wiegen wird bei Frame 0 abgezogen). Alle Bewegungen laufen auf der vollen Leinwand (anim_lib wirft ClipError). Nur ganze Pixel, nur Farben der Quelle.
 Ergänzungen: keine gemalten Pixel.
 """
 import math

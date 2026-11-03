@@ -15,16 +15,23 @@ Was im Sprite ist (Koordinaten im Sprite 40×35, x/y ab 0):
   4 = langer rechter Schulterbogen (von (25,23) über den Scheitel (31–33,19) hinunter zu (35,24)), 5 = linker Hängeschwanz (ab (13,28) bis (11,34)), 6 = kleiner rechter Haken (ab (24,26) bis (23,31)).
   Jedes Band hat 1–2 px hellen Kern (E/F/G/K) und 1 px Umriss (12,12,12).
 * Material: Knochen, Stoff, Fell/Schuppen — KEIN Glanz und keine Glitzersterne (Regel 14); kein Feuer (Regel 15). Keine Partikel.
-Fest bleiben: Haubenform, Gesicht, Fänge, Rippenkorb-Umriss.
+Fest bleiben: Haubenform, Gesicht, Fänge, Rippenkorb-Umriss (nur der untere Kiefer „lacht“, s. u.).
 
-Ablauf (48 Frames à 65 ms = 3,12 s, nahtlos):
-* Atmen (Periode 24): unterhalb der Schultern werden im Rippenkorb 1–2 Zeilen eingefügt (Quellzeile 28, in der Spitze zusätzlich 27; nur Rumpf/Haube, die Bänder sind eigene Ebenen; Textur der Nachbarzeile eingemischt) — Kopf,
-  Bänder und Oberkörper heben sich um 1–2 px, der untere Rippenkorb bleibt am Boden.
-* Schlangenbänder: jedes der sechs Bänder bewegt sich als laufende Welle mit eigener Phase, eigener Periode (3×, 2× bzw. 4× je Schleife) und eigener Wellenlänge. Wurzel (am Körper) bleibt fest, die Amplitude wächst bis zur Spitze auf
-  1,6–2,4 px. Der helle Kern wird in Wellenfronten (Breitensuche ab der Wurzel) senkrecht zum Bandverlauf verschoben, Lücken zwischen Nachbarfronten werden mit Kernpixeln geschlossen und der Umriss (4 Nachbarn, wie im Original) neu
-  gezogen → jedes Band bleibt 4-verbunden und lückenlos. In Ruhe (alle Versätze 0, z. B. Frame 0) wird das Original-Band gezeichnet.
+Ablauf (48 Frames à 65 ms = 3,12 s, nahtlos; Frame 0 = Original, Zuschnitt auf die Figur mit 3 px Rand über alle Frames):
+* Atmen (Periode 24): im Rippenkorb werden 1–2 Zeilen eingefügt (Quellzeile 27, in der Spitze zusätzlich 29 — beides helle Rippenzeilen mit Textur der Nachbarzeile; die schwarzen Rippenlücken (Zeilen 22/24/26/28) werden
+  NICHT verdoppelt, sonst würden die Umrisse dicker) — Kopf, Bänder und Oberkörper heben sich um 1–2 px, der untere Rippenkorb bleibt am Boden. Jedes Band sitzt so hoch wie die Körperzeile, an der seine Wurzel hängt.
+* Schlackernde Bänder (Nutzer-Feedback Runde 3: „die Bandagen-Tentakel sollten noch mehr schlackern, wie Arme“): jedes der sechs Bänder ist jetzt eine Gelenkkette aus starren Abschnitten (Oberarm, Unterarm, Hand;
+  Gelenke an den Knicken des Bandes, `GELENKE`). Jeder Abschnitt dreht sich um sein Gelenk, die Drehwinkel addieren sich entlang der Kette, jede Beugung schwingt mit einer Haupt- und einer schnelleren zweiten Schwingung
+  (je Band eigene Periode 2–6 je Schleife und Phase), die Phase hinkt je Gelenk hinterher (Peitscheneffekt). Die Abschnitte behalten ihre Länge und Form (kein Falten/Stauchen wie bei der früheren Querwelle), das Glied
+  knickt nur an den Gelenken. Jedes Kernpixel wird einzeln mitgedreht und auf ganze Pixel gerundet; Lücken schließen Linienpixel, der Umriss (1 px, 4 Nachbarn) wird neu um den Kern gezogen → Umrisse bleiben 1 px dick,
+  jedes Band bleibt 4-verbunden. Ausschläge: Haubenbänder 1/2 etwa ±20–35°, lange Schulterbänder 3/4 ±10–40° über die Kette, Schwanz 5 und Haken 6 schwingen nur nach außen (nach innen auf 15 % gedämpft, damit sie
+  nicht in den Rippenkorb klappen). Die Wurzel am Körper bleibt fest; in Ruhe (Frame 0, alle Winkel 0) wird das Original-Band gezeichnet.
+* Lachen (Nutzer-Feedback Runde 3: „Kannst du ihn außerdem lachen lassen? Das große rote Maul ist bereits offen.“): zwei Lach-Ausbrüche je Schleife (Frames 4–19 und 28–43), je vier „Ha“ à 4 Frames (260 ms). Je „Ha“:
+  Maul offen (Original) → halb zu → fast zu → halb zu. Der untere Kiefer (Zeilen 15–17, Spalten 18–21: kleine Zähne, Rachen, Unterlippe) steigt dabei starr um 0/1/2 px; die obere Öffnung (Zeilen 12–14) schrumpft, die freigewordenen
+  Felder darunter bekommen das Schachbrettmuster F/H der Haubenhaut (wie Zeile 18); bei 2 px wandern die Lippenecken (17/22,15–16) mit. Die Umrisse bleiben 1 px. Der Kopf bebt im Takt (Atemzeilen: 1 px hoch bei offenem Maul,
+  runter bei fast geschlossenem), die Augen kneifen beim „zu“ (obere Augenzeile wird zur Haubenfarbe), und die Bänder schlackern in den Ausbrüchen 55 % stärker (sanft ein-/ausgeblendet).
 * Blinzeln (zweimal je Schleife, Frames 13–15 und 37–39: halb – zu – halb): die roten Augenpixel (je 3) werden zur Haubenfarbe. Lidfarbe = umgebende Körperfarbe.
-Frame: Sprite plus 4 px links/rechts/unten, 4 px oben, Figur zentriert.
+Frame: Zuschnitt der Arbeitsleinwand (Sprite plus 10 px Rand) auf die Figur über alle Frames mit 3 px Abstand.
 Alle Bewegungen laufen auf der vollen Leinwand (anim_lib/anim_amorph werfen ClipError). Nur ganze Pixel, nur Farben der Quelle.
 """
 import math

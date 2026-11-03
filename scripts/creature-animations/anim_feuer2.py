@@ -72,11 +72,12 @@ class Zunge:
 
 
 class Vorlage:
-    def __init__(self, rgba, zungen, richtung='hoch', rand_farbe=None, sperre=None, kochen=0.0, welle=None, bank=None, faden=None, loecher=True):
+    def __init__(self, rgba, zungen, richtung='hoch', rand_farbe=None, sperre=None, kochen=0.0, welle=None, bank=None, faden=None, loecher=True, rand_frei=None):
         self.rgba = rgba.copy()
         self.zungen, self.richtung, self.rand_farbe, self.kochen = list(zungen), richtung, rand_farbe, kochen
         self.welle, self.bank, self.faden, self.loecher = welle, bank, faden, loecher
         h, w = rgba.shape[:2]
+        self.rand_frei = np.zeros((h, w), bool) if rand_frei is None else rand_frei.astype(bool)     # Pixel, deren Randfarbe nicht überschrieben wird
         self.sperre = np.zeros((h, w), bool) if sperre is None else sperre.astype(bool)
 
 
@@ -278,6 +279,7 @@ class _Gruppe:
         self.h0, self.w0 = h, w
         self.a = np.ascontiguousarray(_nach_kanon(vl.rgba, vl.richtung))
         self.sperre = np.ascontiguousarray(_nach_kanon(vl.sperre, vl.richtung))
+        self.rand_frei = np.ascontiguousarray(_nach_kanon(vl.rand_frei, vl.richtung))
         self.h, self.w = self.a.shape[:2]
         zs = []
         for z in vl.zungen:
@@ -346,7 +348,7 @@ def _komponenten(m):
 
 
 class Feuer:
-    def __init__(self, vorlagen, n=48, seed=1, bank='zunge', amp=1.0, funken=True, funken_farben=None, funken_leben=9, welle=None, schwelle=1.5, max_funken=None, funken_abstand=3):
+    def __init__(self, vorlagen, n=48, seed=1, bank='zunge', amp=1.0, funken=True, funken_farben=None, funken_leben=9, welle=None, schwelle=1.5, max_funken=None, funken_abstand=3, funken_modus='steigen'):
         if isinstance(vorlagen, Vorlage):
             vorlagen = [vorlagen]
         self.n, self.amp = n, amp
@@ -357,7 +359,7 @@ class Feuer:
             idx += len(g.z)
             self.gruppen.append(g)
         self.funken_an, self.funken_farben, self.funken_leben, self.schwelle = funken, funken_farben, funken_leben, schwelle
-        self.max_funken, self.funken_abstand = max_funken, funken_abstand
+        self.max_funken, self.funken_abstand, self.funken_modus = max_funken, funken_abstand, funken_modus
         self._cache = {}
         self.ereignisse = []                     # (frame, gruppe, x_kanon, y_kanon, drift)
         if funken:
@@ -462,7 +464,7 @@ class Feuer:
         if g.vl.rand_farbe is not None:
             p = np.pad(m | sp, 1)
             voll = p[:-2, 1:-1] & p[2:, 1:-1] & p[1:-1, :-2] & p[1:-1, 2:]
-            rand = m & ~voll
+            rand = m & ~voll & ~g.rand_frei
             out[rand, :3] = g.vl.rand_farbe
         return out
 
@@ -584,7 +586,10 @@ class Feuer:
                 fl_x, fl_y = {'runter': (0, 1), 'links': (-1, 0), 'rechts': (1, 0)}[g.vl.richtung]
                 k = min(a, 3)
                 px = int(fx0) + fl_x * k + (drift if g.vl.richtung == 'runter' else 0) * (a // 3)
-                py = int(fy0) + fl_y * k - max(0, (a - 1) // 2 + (1 if a > 0 else 0))
+                py = int(fy0) + fl_y * k - (max(0, (a - 1) // 2 + (1 if a > 0 else 0)) if self.funken_modus == 'steigen' else 0)
+                if self.funken_modus == 'fliessen':                      # Funken fliegen mit dem Strom weiter (Feuerstrahl)
+                    mehr = (a if a < 4 else 4 + (a - 3) // 2) - k
+                    px += fl_x * mehr; py += fl_y * mehr
                 sx_, sy_ = -fl_x, -fl_y
             pts = [(px, py, col)]
             if a < 2:

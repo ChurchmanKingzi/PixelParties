@@ -28,7 +28,7 @@ Ablauf (48 Frames à 70 ms = 3,36 s; Frame 0 = Original, Blasen ausgenommen):
 * Ballontraube schwebt zusätzlich 0/1 px höher (Periode 16, dreimal pro Schleife); die unter der Hutkrone verdeckten Ballonzeilen sind mit der Ballonfüllung (57,124,194) fertiggezeichnet (siehe Ergänzungen).
 * Rechter Ballon wippt ±1 px (Periode 16); die Schnur wird Pixel für Pixel neu gezogen (oben am Ballon, unten an der Hand, die mit dem Rumpf atmet), bleibt immer 8-verbunden.
 * Blinzeln beider Kreuz-Augen (Lid = Gesichtsfarbe (21,39,49)): zweimal (Frame 14–17 und 38–41).
-* Geisterfigur: sanftes Schweben ±1 px (Periode 32), Schwanzflosse flattert (Spaltenwelle bis ±2 px, Periode 12, hinkt der Wurzel x 57 nach), die Lampe pulsiert (Schachbrett aus (159,222,211) und (77,137,154), Periode 16),
+* Geisterfigur: sanftes Schweben ±1 px (Periode 32), Schwanzflosse flattert (Spaltenwelle bis ±2 px, Periode 12, hinkt der Wurzel x 57 nach), die Lampe leuchtet gleichmäßig (Runde 3: kein Pulsieren/„Blinzeln“ des Lichts mehr),
   das weiße Auge blinzelt (Lid = (55,98,122)) bei Frame 20–22.
 * Partikel (hinter den Figuren): drei Blasen steigen über der Lampe auf (Kern (159,222,211), Rand (77,137,154)), zwei Blasen links vom Clown (Kern (77,137,154), Rand (51,93,119)); runde Wölkchen 2×2 → 3×3 → 2×2 (`U.wolke_ebene`).
 Kein Glanz (Regel 14: Gummi, Stoff, Haut), kein Feuer (die Lampe ist ein Leuchtorgan wie bei Deepsea Skeleton). Randpixel-Test (Regel 16): `U.kontur_schliessen` in jeder Pose.
@@ -157,11 +157,7 @@ def frame_gross(i, nur=None):
     if stg:
         for (x, y) in AUGE_G:
             gk[GPT + y, GPL + x, :3] = LID_G
-    ph = i % 16
-    lampe_stufe = {0: 0, 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 1, 7: 2, 8: 2, 9: 2, 10: 1, 11: 0}.get(ph, 0)
-    for y, x in zip(*np.nonzero(LAMPE)):
-        if lampe_stufe == 2 or (lampe_stufe == 1 and (x + y) % 2 == 1):
-            gk[GPT + y, GPL + x, :3] = (77, 137, 154)
+    # Runde 3 (Nutzer-Feedback): das Licht der Geisterfigur (Lampe) soll NICHT „blinzeln“ → keine Pulsbewegung mehr, die Lampe leuchtet gleichmäßig (Originalfarben).
     fl = T.fluegel(fl_ebene, GPL + 57, 2.0, i, 12, lag=1.0, potenz=1.0)
     geist = L.zusammen(H, W, [(fl, 0, gdy), (gk, 0, gdy)])
     # Clown-Körper liegt über den Ballons (Hutkrone vor der Traube)

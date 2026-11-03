@@ -1,7 +1,8 @@
 # -*- coding: utf-8 -*-
-"""Idle-Animation für „Land Sharks“ (Creature) — Runde 2: die Flosse ist STARR, die Erde rundherum wird durchgehend aufgewühlt.
+"""Idle-Animation für „Land Sharks“ (Creature) — Runde 3: er GRÄBT AKTIV — der ganze Hai pflügt hin und her (und spiegelt sich dabei), die Erde wird weiter aufgewühlt.
 
-Nutzerkorrektur (wörtlich): „stellt die Rückenflosse eines Hais dar, die soll nicht so gummiartig sein! Stattdessen soll die Erde rundrum durchgehend aufgewühlt werden.“
+Nutzerkorrektur Runde 2 (wörtlich): „stellt die Rückenflosse eines Hais dar, die soll nicht so gummiartig sein! Stattdessen soll die Erde rundrum durchgehend aufgewühlt werden.“
+Nutzerkorrektur Runde 3 (wörtlich): „Land Shark: sollte sich hin und her bewegen, als würde er aktiv graben.“
 
 Quelle: src/land-sharks.png — eine Haifischflosse, die aus einem Erdhügel ragt (21×17 px, 6 Farben) aus Motive.xcf, Ebene 763 „Land Sharks“. Die Ebene enthält drei fast gleiche
 Exemplare (wie auf der Karte), die sich nur in der Form des Erdhügels unterscheiden; verwendet wird das obere Exemplar samt seinen Erdkrümeln.
@@ -18,6 +19,10 @@ Identifikation (Sprite 21×17; Farben A (0,0,0) Umriss, B (43,55,67)/C (58,72,85
 Bleibt fest: die GANZE Flosse (starr, ohne Verbiegen — Nutzerwunsch), die losen Krümel, der Hügelrand am Boden.
 
 Ablauf (48 Frames à 66 ms = 3,2 s), alle Bewegungen unabhängig:
+* PFLÜGEN (neu, Runde 3): Flosse + Erdhügel + Schollen gleiten als STARRES Ganzes ganzzahlig und sanft hin und her, ZWEI Runden je Schleife (Periode 24): Frames 0–5 nach links (bis −3 px, in Flossenrichtung: die
+  Flosse neigt sich nach links, er gräbt sich vorwärts), dann (Frame 7) wird der Sprite horizontal gespiegelt (Flosse neigt sich nach rechts) und er pflügt Frames 7–16 nach rechts (bis +3 px), Rückspiegeln
+  (Frame 18) und Frames 18–23 zurück zur Mitte (links gerichtet); danach dasselbe noch einmal (Frames 24–47). Die Flosse bleibt dabei starr (nicht gummiartig). Frame 0 = Original. Die Leinwand ist links/rechts
+  gleich breit (Spiegeln um die Mitte).
 * Erdströmung: die Erdfarben (E/F-Muster) fließen zeilenweise durch die feste Hügelform — die oberen Zeilen (9–11) nach links, die Zeilen 12–13 nach rechts, 14–15 wieder nach links
   (je genau eine Runde pro Schleife = nahtlos): die Erde wird sichtbar umgewälzt, ohne dass sich die Hügelform verbiegt.
 * Hügeloberfläche wirft Wellen: der Hügelrand außerhalb des Flossenansatzes hebt und senkt sich um 1 px als wandernde Welle (zwei Wellen pro Schleife, läuft nach links);
@@ -36,10 +41,11 @@ import sys
 import numpy as np
 
 import anim_lib as L
+import anim_rutsch as R
 import anim_tiere as T
 
 N, MS = 48, 66
-PAD_L, PAD_R, PAD_T, PAD_B = 4, 4, 3, 3
+PAD_L, PAD_R, PAD_T, PAD_B = 5, 5, 3, 3            # links/rechts gleich (Spiegeln um die Mitte): Pflügeweg ±3 px + Schollen
 
 spr = L.lade('land-sharks')
 sh, sw = spr.shape[:2]
@@ -162,11 +168,16 @@ def klumpen_ebene(i):
     return out
 
 
+# Pflügen: Flosse zeigt nach links (Original) → links 0 → −3, spiegeln, rechts −3 → +3 (Flosse nach rechts), zurückspiegeln, +3 → 0; zweimal je Schleife
+_ZYKLUS = [('fahrt', -3, 6), ('halt', 1), ('flip',), ('fahrt', 3, 10), ('halt', 1), ('flip',), ('fahrt', 0, 6)]     # 24 Frames, zweimal je Schleife
+BAHN, SPIEGEL = R.pfad(N, _ZYKLUS + _ZYKLUS)
+
+
 def frame(i, nur=None):
     ebenen = {'schollen': klumpen_ebene(i), 'flosse': FLOSSE_EBENE, 'erde': erde_ebene(i)}
     wahl = nur or ('schollen', 'flosse', 'erde')
     ganz = L.zusammen(H, W, [(ebenen[n], 0, 0) for n in ('schollen', 'flosse', 'erde') if n in wahl])
-    return ganz
+    return R.verschieben(ganz, BAHN[i], SPIEGEL[i])
 
 
 TEST_EBENEN = ['flosse', 'erde']
@@ -176,6 +187,7 @@ if __name__ == '__main__':
     frames = [frame(i) for i in range(N)]
     n = L.pruefe(frames, quelle=spr, erlaubt=[])
     print('Pixel je Frame:', n)
+    print('Position je Frame:', BAHN, '\nGespiegelt:', [int(x) for x in SPIEGEL])
     prev = sys.argv[sys.argv.index('--preview') + 1] if '--preview' in sys.argv else None
     L.speichern('land-sharks', 'Land Sharks', frames, MS, prev)
     if prev:
