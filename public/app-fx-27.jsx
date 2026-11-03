@@ -108,7 +108,11 @@ function ppFx27Raster(ctx, phase) {
   return PP_FX27_RASTER[phase];
 }
 
-/** Staubwolke aus harten Pixeln: ein Wurzel-Element am Fußpunkt (steht wie die Figur aufrecht in der Sprite-Ebene), die Teilchen laufen in Stufen auseinander. */
+/**
+ * Staubwolke aus harten Pixeln: EIN Element am Fußpunkt (steht wie die Figur aufrecht in der Sprite-Ebene), alle Teilchen sind Einträge EINER `box-shadow`-Liste (Unschärfe 0, Spreizung =
+ * halbe Kantenlänge: harte Quadrate). Die Teilchen laufen in 6 Stufen auseinander — aus JS im 30-Hz-Takt, je Stufe EIN Style-Schreiben. Vorher ein DOM-Knoten je Teilchen (6–12 je Wolke, 4 Wolken
+ * je Fahrt): jeder Knoten und jedes Schreiben kostete einen Teil des ohnehin hohen Style-Neuaufbaus des Bretts (Trace 3.11.: +150–250 ms Style-Neuaufbau über 3 Fahrten, Einzelspitzen bis 27 ms).
+ */
 function ppFx27Wolke(ebene, x, y, n, farben, opt) {
   if (!ebene || !ebene.isConnected) return;
   opt = opt || {};
@@ -116,30 +120,35 @@ function ppFx27Wolke(ebene, x, y, n, farben, opt) {
   w.className = 'pp-fx27-wolke';
   w.style.left = Math.round(x) + 'px'; w.style.top = Math.round(y) + 'px';
   const hoch = opt.hoch || 0, streu = opt.streu || 26, dauer = opt.dauer || 380;
-  // Bewegung in 6 Stufen im 30-Hz-Takt aus JS (keine CSS-Animation: jede startende CSS-Animation wird von pixel-anim.js gebacken — das kostete je Wolke ~15 ms)
   const teile = [];
-  let html = '';
   for (let i = 0; i < n; i++) {
-    const an = Math.random() * Math.PI * 2, r = 0.35 + Math.random() * 0.65;
-    teile.push([Math.round(Math.cos(an) * streu * r), Math.round(Math.sin(an) * streu * r * 0.6 + (opt.auf ? -opt.auf * r : 0)), Math.round(dauer * (0.6 + Math.random() * 0.4))]);
-    html += '<i style="--x0:' + Math.round((Math.random() - 0.5) * (opt.breit || 16)) + 'px;--y0:' + Math.round(-hoch - Math.random() * (opt.tief || 10)) + 'px;--g:' + (Math.random() < 0.3 ? 2 : 1) * (opt.pixel || 3)
-      + 'px;--c:' + farben[Math.floor(Math.random() * farben.length)] + '"></i>';
+    const an = Math.random() * Math.PI * 2, r = 0.35 + Math.random() * 0.65, g = (Math.random() < 0.3 ? 2 : 1) * (opt.pixel || 2);
+    teile.push({
+      x0: Math.round((Math.random() - 0.5) * (opt.breit || 16)), y0: Math.round(-hoch - Math.random() * (opt.tief || 10)), g, c: farben[Math.floor(Math.random() * farben.length)],
+      dx: Math.round(Math.cos(an) * streu * r), dy: Math.round(Math.sin(an) * streu * r * 0.6 + (opt.auf ? -opt.auf * r : 0)), d: Math.round(dauer * (0.6 + Math.random() * 0.4)),
+    });
   }
-  w.innerHTML = html;
+  const k = document.createElement('i');
+  w.appendChild(k);
   ebene.appendChild(w);
-  const kinder = w.children, t0 = performance.now(), raf = window.ppTaktRaf || window.requestAnimationFrame;
+  const sk = 'var(--board-scale, 1)', t0 = performance.now(), raf = window.ppTaktRaf || window.requestAnimationFrame;
+  let letzteStufe = -1;
   const schritt = () => {
     if (!w.isConnected) return;
     const alter = performance.now() - t0;
-    let rest = 0;
-    for (let i = 0; i < kinder.length; i++) {
-      const k = teile[i], u = alter / k[2];
-      if (u >= 1) { if (kinder[i].style.visibility !== 'hidden') kinder[i].style.visibility = 'hidden'; continue; }
+    let rest = 0, stufe = 99;
+    const sh = [];
+    for (let i = 0; i < teile.length; i++) {
+      const t = teile[i], u = alter / t.d;
+      if (u >= 1) continue;
       rest++;
       const st = Math.floor(u * 6) / 5;                             // 6 Stufen
-      kinder[i].style.translate = 'calc(' + Math.round(k[0] * st) + 'px * var(--board-scale, 1)) calc(' + Math.round(k[1] * st) + 'px * var(--board-scale, 1))';
+      sh.push('calc(' + (t.x0 + Math.round(t.dx * st) + t.g / 2) + 'px * ' + sk + ') calc(' + (t.y0 + Math.round(t.dy * st) + t.g / 2) + 'px * ' + sk + ') 0 calc(' + (t.g / 2) + 'px * ' + sk + ') ' + t.c);
+      stufe = Math.min(stufe, Math.floor(u * 6));
     }
-    if (rest) raf(schritt); else w.remove();
+    if (!rest) { w.remove(); return; }
+    if (stufe !== letzteStufe || letzteStufe < 0) { letzteStufe = stufe; k.style.boxShadow = sh.join(','); }   // nur bei Stufenwechsel schreiben
+    raf(schritt);
   };
   schritt();
 }
@@ -244,7 +253,7 @@ function ppFx27Figur(srcEl, tgtEl, opt) {
   // (alle 5 Bilder neu gemessen: Layout lesen kostet nach jedem `translate`-Schreiben einen Neuaufbau; Zonen wandern in 170 ms nicht merklich)
   let vekAlter = 0;
   const vektor = () => {
-    if (F.vek && F.vek.a && ++vekAlter < 5) return F.vek;
+    if (F.vek && F.vek.a) return F.vek;   // EINMAL messen: jedes Layout-Lesen nach einem `translate`-Schreiben erzwang einen Neuaufbau (2–14 ms, Messung 3.11.); die Zonen bewegen sich während einer Fahrt nicht gegeneinander (Scroll/Kamera tragen den Platz mit)
     vekAlter = 0;
     const a = HA.lageInEbene(srcEl), b = HA.lageInEbene(tgtEl);
     if (!a || !b) return F.vek || { x: 0, y: 0, a: ls0 };

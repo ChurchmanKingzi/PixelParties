@@ -610,7 +610,20 @@ function TapBackdropCanvas({ hostRef }) {
       a = fl2(2.9, -0.8, -11, 9, -3); lay('cat_mid', 0.37, 0.3, a[0], a[1], a[2], 1);
       a = fl2(3.0, -1.7, 16, -12, 4); lay('cat_bottom', 0.05, 0.48, a[0], a[1], a[2], 1);
     };
-    const visible = () => { const host = hostRef && hostRef.current; return !!(host && host.offsetParent !== null && !document.hidden); };
+    // Sichtbarkeit OHNE Layout-Lesen: `host.offsetParent` erzwang bei jedem Abfragen (alle 500 ms, solange der Bildschirm verdeckt ist — also während des ganzen Spiels) einen
+    // synchronen Neuaufbau des Layouts, 12–19 ms auf dem Brett (Messung 3.11.2026, Long-Task-Spitzen im Takt). Jetzt meldet ein IntersectionObserver die Sichtbarkeit asynchron;
+    // `offsetParent` wird nur EINMAL beim Einhängen gelesen (Startwert) bzw. wenn es keinen Beobachter gibt.
+    const hostA = hostRef && hostRef.current;
+    let sichtbar = !!(hostA && hostA.offsetParent !== null), beobachter = null;
+    if (hostA && typeof IntersectionObserver !== 'undefined') {
+      beobachter = new IntersectionObserver((es) => { for (const e of es) sichtbar = e.isIntersecting; });
+      beobachter.observe(hostA);
+    }
+    const visible = () => {
+      if (document.hidden) return false;
+      if (beobachter) return sichtbar;
+      const host = hostRef && hostRef.current; return !!(host && host.offsetParent !== null);
+    };
     const tick = (now) => {
       raf = 0;
       if (disposed) return;
@@ -632,7 +645,7 @@ function TapBackdropCanvas({ hostRef }) {
     resize(); raf = (window.ppTaktRaf || requestAnimationFrame)(tick);
     const onResize = () => { resize(); if (imgs) { imgs = null; } };
     window.addEventListener('resize', onResize); window.addEventListener('orientationchange', onResize);
-    return () => { disposed = true; if (raf) cancelAnimationFrame(raf); if (timer) clearTimeout(timer); window.removeEventListener('resize', onResize); window.removeEventListener('orientationchange', onResize); imgs = null; };
+    return () => { disposed = true; if (beobachter) beobachter.disconnect(); if (raf) cancelAnimationFrame(raf); if (timer) clearTimeout(timer); window.removeEventListener('resize', onResize); window.removeEventListener('orientationchange', onResize); imgs = null; };
   }, []);
   return <canvas ref={cvRef} className="tap-backdrop-canvas" aria-hidden="true" />;
 }

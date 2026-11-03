@@ -1902,8 +1902,10 @@ body:has(.pz-layout) .pp-bg-particles { display: none; }
    stiege nach dem Morph noch einmal aus der Karte). Dauer 0 s laesst sie fertig. */
 .hero-idle-aufstieg .hero-idle-canvas,
 .hero-idle-aufstieg .hero-idle-steher { animation-duration: 0s; }
-.hero-idle-aufstieg-alt .hero-idle-holo { animation: heroAufstiegAlt 2s steps(24, end) both; }
-.hero-idle-aufstieg-neu .hero-idle-holo { animation: heroAufstiegNeu 2s steps(24, end) both; }
+.hero-idle-aufstieg-alt:not(.hero-idle-asc33) .hero-idle-holo { animation: heroAufstiegAlt 2s steps(24, end) both; }
+.hero-idle-aufstieg-neu:not(.hero-idle-asc33) .hero-idle-holo { animation: heroAufstiegNeu 2s steps(24, end) both; }
+/* Trailer-Look (app-fx-33): Sichtbarkeit/Streckung/Hub setzt der Sprite stufenweise per JS (ppFx33Pose); die neue Figur bleibt bis zu ihrem ersten Bild unsichtbar. Die Keyframes oben sind nur der Rueckfall. */
+.hero-idle-aufstieg-neu.hero-idle-asc33 .hero-idle-holo { visibility: hidden; }
 @keyframes heroAufstiegAlt {
   0%   { opacity: 1; transform: none; }
   30%  { opacity: 1; transform: scale(1.02); }
@@ -2645,7 +2647,7 @@ body:has(.pz-layout) .pp-bg-particles { display: none; }
 .pp-fx27-geist { position: absolute; pointer-events: none; transform: rotateX(calc(-1 * var(--sprite-kipp, 0deg))) scaleY(var(--sprite-streck, 1)); }
 .pp-fx27-geist > canvas { position: absolute; left: 0; top: 0; display: block; image-rendering: pixelated; }
 .pp-fx27-wolke { position: absolute; width: 0; height: 0; pointer-events: none; transform-origin: 0 0; transform: rotateX(calc(-1 * var(--sprite-kipp, 0deg))) scaleY(var(--sprite-streck, 1)); }
-.pp-fx27-wolke > i { position: absolute; left: calc(var(--x0) * var(--board-scale, 1)); top: calc(var(--y0) * var(--board-scale, 1)); width: calc(var(--g) * var(--board-scale, 1)); height: calc(var(--g) * var(--board-scale, 1)); background: var(--c); }
+.pp-fx27-wolke > i { position: absolute; left: 0; top: 0; width: 0; height: 0; }   /* alle Teilchen als harte box-shadow-Quadrate (Spreizung, keine Unschärfe) */
 
 /* ─── Duel: zwei Helden rammen einander (12.10.) ──────────────────────
    Die Bewegung kommt NICHT aus Keyframes: `HeldenRammkarte` (app-board.jsx) setzt je Bild `transform` aus der gemeinsamen Bahn `ppHeldenRammenBahn` — erst im Duell steht
@@ -6985,6 +6987,16 @@ html:not([data-phase-bereit]) .phase-column { visibility: hidden; }
 
 /* ===== DEAD HERO TOMBSTONE ===== */
 .hero-dead-marker { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: calc(32px * var(--board-scale)); z-index: 4; pointer-events: none; filter: drop-shadow(0 2px 0 #000000); opacity: 0.85; }
+
+/* ===== HELDENTOD (app-fx-32.jsx): die Figur zerspringt in Pixel, danach gilt wieder das Gefallen-Aussehen ===== */
+.pp-fx32-steher { position: absolute; transform: rotateX(calc(-1 * var(--sprite-kipp, 0deg))) scaleY(var(--sprite-streck, 1)); }
+.pp-fx32-steher > canvas { position: absolute; display: block; image-rendering: pixelated; }
+/* der wieder eingehängte Platz zeigt nur die eigene Leinwand (kein neuer Auftritt, keine Animation der alten Kinder) */
+.hero-idle-platz.pp-fx32-tot > :not(.pp-fx32-steher) { display: none !important; }
+/* Zone während des Zerfalls: Karte hell, Grabstein noch nicht da; Stufe 2 = Schachbrett-Schleier (hart, kein Alpha) vor der vollen Verdunklung */
+[data-pp-stirbt] .hero-dead-marker { visibility: hidden; }
+[data-pp-stirbt="1"].board-zone-dead::before { display: none; }
+[data-pp-stirbt="2"].board-zone-dead::before { background: conic-gradient(#08060c 25%, transparent 0 50%, #08060c 0 75%, transparent 0) 0 0 / calc(4px * var(--board-scale, 1)) calc(4px * var(--board-scale, 1)); }
 
 /* ═══════════════════════════════════════════════════════════════
    RULES SCREEN

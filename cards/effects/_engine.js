@@ -33550,6 +33550,7 @@ this._deathWatch = (this._deathWatchStack || []).length
       const proj = schonGezeigt.proj ? null : bilder.projectile;
       if (proj && ziele.length > 0 && (isSeat(this, daten.owner))) {
         const stagger = bilder.stagger ?? 0;
+        const flug = bilder.flightMs ?? Math.max(120, (proj.duration || 500) - 70);
         for (let i = 0; i < ziele.length; i++) {
           const t = ziele[i];
           this._broadcastEvent('play_projectile_animation', {
@@ -33557,11 +33558,11 @@ this._deathWatch = (this._deathWatchStack || []).length
             sourceZoneSlot: daten.zoneSlot,
             targetOwner: t.owner, targetHeroIdx: t.heroIdx,
             targetZoneSlot: t.type === 'hero' ? undefined : t.slotIdx,
+            landMs: flug + (ziele.length - 1 - i) * stagger,   // Client (Feuerball, app-fx-30): so lange bis zum Einschlag — rein visuell, die Wartezeit bleibt `flug`
             ...proj,
           });
           if (stagger > 0 && i < ziele.length - 1) await this._delay(stagger);
         }
-        const flug = bilder.flightMs ?? Math.max(120, (proj.duration || 500) - 70);
         await this._delay(flug);
       }
 

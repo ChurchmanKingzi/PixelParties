@@ -728,9 +728,11 @@ function zonenSelektor(schluessel, myIdx) {
 // Briefly tints a board-zone red to signal that the hero/creature in
 // that slot just took damage. Restarts the animation if the same slot
 // is hit twice in quick succession (e.g. multi-hit attacks).
-function flashDamageOnZone(selector) {
+function flashDamageOnZone(selector, schaden) {
   const el = document.querySelector(selector);
   if (!el) return;
+  // ★ Trailer-Look (app-fx-31.jsx): bei einem Helden mit animierter Figur reagiert die FIGUR (Blitz, Quetschen, Wackeln, nach Schadenshöhe) statt des roten Karten-Schleiers
+  if (schaden > 0 && el.hasAttribute('data-hero-zone') && window.ppFx31Treffer && window.ppFx31Treffer(el, schaden)) return;
   el.classList.remove('damage-flashing');
   // Force reflow so the animation restarts when the class is re-added.
   void el.offsetWidth;
@@ -3715,6 +3717,7 @@ function HeroIdleSprite({ cardName, angehalten, versteinert, eingefroren, effekt
     // Die Zone kennt ihre Figur (`ppZonenSquash` quetscht beide gemeinsam).
     zone._ppFigurPlatz = platz;
     platz._ppEintrag = eintrag;   // Sheet + aktueller Frame (`platz._ppFrame`, s. `male`) für die Nachbilder beim Rammen (app-fx-27.jsx)
+    platz._ppZone = zone;         // Heldentod (app-fx-32.jsx): der Beobachter der Sprite-Ebene findet zum entfernten Platz seine Zone
     const ctx = cv.getContext('2d');
     const { meta, img } = eintrag;
     const fw = meta.frameWidth, fh = meta.frameHeight;
@@ -3782,7 +3785,8 @@ function HeroIdleSprite({ cardName, angehalten, versteinert, eingefroren, effekt
       if (weiss > 0 && !stein) {
         ctx.save();
         ctx.globalCompositeOperation = 'source-atop';
-        ctx.fillStyle = `rgba(255,255,255,${weiss})`;
+        // app-fx-33: `weiss` ist dann ein Blinkfarben-Index (volle Silhouette, kein Alpha); ohne die Datei der alte Weissanteil
+        ctx.fillStyle = zustand.current.ascPose ? window.ppFx33Farbe(weiss) : `rgba(255,255,255,${weiss})`;
         ctx.fillRect(0, 0, fw, fh);
         ctx.restore();
       }
@@ -3909,7 +3913,18 @@ function HeroIdleSprite({ cardName, angehalten, versteinert, eingefroren, effekt
       } else st.puls = 0;
       // Aufstiegs-Morph: Weissanteil nach der Zeit seit dem Ereignis
       const asc = zustand.current.aufstieg;
-      zustand.current.weiss = asc ? ascWeiss(asc.rolle, (performance.now() - asc.t0) / ASC_DAUER_MS) : 0;
+      // app-fx-33 (Trailer-Look): Sichtbarkeit, Streckung, Hub und Blinkfarbe der Figur stufenweise im 30-Hz-Takt (statt CSS-Ueberblendung)
+      const ascPose = asc && window.ppFx33Pose ? window.ppFx33Pose(asc.rolle, performance.now() - asc.t0) : null;
+      zustand.current.ascPose = !!ascPose;
+      zustand.current.weiss = ascPose ? ascPose.flash : (asc ? ascWeiss(asc.rolle, (performance.now() - asc.t0) / ASC_DAUER_MS) : 0);
+      if (holo) {
+        const ak = ascPose ? ascPose.key : null;
+        if (ak !== st.ascKey) {
+          st.ascKey = ak;
+          holo.style.visibility = ascPose ? (ascPose.sicht ? 'visible' : 'hidden') : '';
+          holo.style.transform = ascPose && ascPose.sicht && (ascPose.sx !== 1 || ascPose.sy !== 1 || ascPose.lift) ? `translateY(${(-ascPose.lift * 100).toFixed(1)}%) scale(${ascPose.sx}, ${ascPose.sy})` : '';
+        }
+      }
       if (st.frame !== st.gemalt || st.stein !== st.steinGemalt
         || effNun !== st.effekteGemalt || st.puls !== st.pulsGemalt
         || (zustand.current.weiss || 0) !== (st.weissGemalt || 0)) sicher('Malen', male);
@@ -4020,7 +4035,7 @@ function HeroIdleSprite({ cardName, angehalten, versteinert, eingefroren, effekt
       {anker}
       {ReactDOM.createPortal(
         <div ref={platzRef} data-held={cardName}
-          className={'hero-idle-platz' + (aufstieg ? ' hero-idle-aufstieg hero-idle-aufstieg-' + aufstieg.rolle : '') + (versteinert ? ' hero-idle-stein' : '') + (angehalten ? ' hero-idle-angehalten' : '') + (unsichtbar ? ' hero-idle-unsichtbar' : '') + (abgeblendet ? ' hero-idle-abgeblendet' : '')}>
+          className={'hero-idle-platz' + (aufstieg ? ' hero-idle-aufstieg hero-idle-aufstieg-' + aufstieg.rolle + (window.ppFx33Pose ? ' hero-idle-asc33' : '') : '') + (versteinert ? ' hero-idle-stein' : '') + (angehalten ? ' hero-idle-angehalten' : '') + (unsichtbar ? ' hero-idle-unsichtbar' : '') + (abgeblendet ? ' hero-idle-abgeblendet' : '')}>
           <div className="hero-idle-steher" style={steherStil}>
             <div className="hero-idle-schatten" style={schattenStil} />
             <div className="hero-idle-holo" style={{ transformOrigin: drehpunkt }}>
@@ -4031,7 +4046,7 @@ function HeroIdleSprite({ cardName, angehalten, versteinert, eingefroren, effekt
               )}
             </div>
           </div>
-          {aufstieg && aufstieg.rolle === 'neu' && (
+          {aufstieg && aufstieg.rolle === 'neu' && !window.ppFx33Pose && (
             <div className="hero-idle-fx hero-idle-aufstieg-fx" style={fxStil}>
               <HeroAufstiegLicht />
             </div>
@@ -45239,7 +45254,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         const dmgEntry = { id: Date.now() + Math.random(), amount: damage, ownerLabel, heroIdx };
         setDamageNumbers(prev => [...prev, dmgEntry]);
         setTimeout(() => setDamageNumbers(prev => prev.filter(e => e.id !== dmgEntry.id)), 1800);
-        flashDamageOnZone(`[data-hero-zone][data-hero-owner="${ownerLabel}"][data-hero-idx="${heroIdx}"]`);
+        flashDamageOnZone(`[data-hero-zone][data-hero-owner="${ownerLabel}"][data-hero-idx="${heroIdx}"]`, damage);
       }
       if (heal && heal > 0) {
         const healEntry = { id: Date.now() + Math.random(), amount: heal, ownerLabel, heroIdx };
@@ -45760,7 +45775,27 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         }
         punkte = stuetz.join(' ');
       }
-      setBeamAnims(prev => [...prev, {
+      // Pixelart-Strahl (app-fx-29.jsx): Blitz (`bolt`) laeuft ueber den Kettenblitz-Maler (app-fx-28.jsx), alles andere ueber `ppFx29Strahl`; beide hangen sich selbst in die
+      // Welt-Huelle. Liefern sie null (Animationen aus / Funktion fehlt), zeichnet der alte SVG-Strahl wie bisher.
+      let _pixelStrahl = null;
+      if (bolt && window.ppFx28Kettenblitz && !window.__ppFxAlt) {
+        _pixelStrahl = window.ppFx28Kettenblitz({
+          sx: sr0.left + sr0.width / 2, sy: sr0.top + sr0.height / 2, tx: tr0.left + tr0.width / 2, ty: tr0.top + tr0.height / 2,
+          step: 1, sw: sr0.width, sh: sr0.height, tw: tr0.width, th: tr0.height,
+          sHeld: !srcOverride && !(sourceZoneType === 'ability') && !(sourceZoneSlot != null && sourceZoneSlot >= 0),
+          tHeld: !tgtOverride && !(targetZoneSlot !== undefined && targetZoneSlot >= 0),
+        });
+      } else if (!bolt && window.ppFx29Strahl) {
+        _pixelStrahl = window.ppFx29Strahl({
+          ax: startX, ay: startY, bx: endX, by: endY, color, glow: typeof glow === 'string' ? glow : null,
+          dick: thickness, dauer: dur, miss: !!miss, wucht: impactOpacity,
+          tw: tr.width, th: tr.height, sw: sr.width, sh: sr.height,
+          sHeld: !srcOverride && !(sourceZoneType === 'ability') && !(sourceZoneSlot != null && sourceZoneSlot >= 0),
+          tHeld: !tgtOverride && !(targetZoneSlot !== undefined && targetZoneSlot >= 0),
+          eigenerEinschlag: !impactAnim,
+        });
+      }
+      if (!_pixelStrahl) setBeamAnims(prev => [...prev, {
         id, color: color || '#ff1a1a',
         glow: glow || null,
         thickness: typeof thickness === 'number' && thickness > 0 ? thickness : 1,
@@ -45769,7 +45804,8 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         x2: endX, y2: endY,
         punkte,
       }]);
-      if (!miss) {
+      // Pixelart-Strahl mit eigenem Einschlag (ohne `impactAnim`): kein zusaetzlicher Standard-Einschlag; Blitze bleiben bei `electric_strike` o. ae.
+      if (!miss && !(_pixelStrahl && !bolt && !impactAnim)) {
         // Layered impact: a primary explosion that runs for the FULL
         // beam duration plus a quick secondary burst at the moment the
         // beam connects, so the impact spectacle never dies before the
@@ -45786,7 +45822,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         setTimeout(() => {
           playAnimation(impactType, tgtEl, { duration: Math.max(dur - 200, 600), ...impactOpts });
           setTimeout(() => playAnimation(impactType, tgtEl, { duration: 800, ...impactOpts }), Math.max(dur * 0.45, 350));
-        }, 220);
+        }, _pixelStrahl && !bolt ? 260 : 220);
       }
       setTimeout(() => setBeamAnims(prev => prev.filter(a => a.id !== id)), dur);
     };
@@ -46377,7 +46413,10 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         // Ueberblendung da ist.
         if (oldHero) HeroIdleAnims.hole(HeroIdleAnims.slug(oldHero));
         if (newHero) HeroIdleAnims.hole(HeroIdleAnims.slug(newHero));
-        setAscMorph({ id, ownerLabel, heroIdx, oldHero, newHero, t0: performance.now() });
+        const ascT0 = performance.now();
+        setAscMorph({ id, ownerLabel, heroIdx, oldHero, newHero, t0: ascT0 });
+        // Trailer-Look (app-fx-33): Landungsringe, Energiesammeln, Lichtsaeule, Blitz, Funkenregen als Pixel-Leinwand ueber der Heldenzone
+        try { if (window.ppFx33Aufstieg) { const zr = el.getBoundingClientRect(); window.ppFx33Aufstieg({ key: ownerLabel + ':' + heroIdx, x: zr.left + zr.width / 2, y: zr.top + zr.height / 2, w: zr.width, h: zr.height, t0: ascT0 }); } } catch {}
         // Landung: Verstaerkungs-Cue, wenn die neue Gestalt ihre Farben zurueckbekommt.
         setTimeout(() => { if (window.playSFX) window.playSFX('buff', { dedupe: 0, volume: 0.8 }); }, ASC_DAUER_MS * 0.55);
         setTimeout(() => setAscMorph(cur => (cur && cur.id === id ? null : cur)), ASC_DAUER_MS + 60);
@@ -49392,7 +49431,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       }
     };
     socket.on('play_card_transfer', onCardTransfer);
-    const onProjectileAnimation = ({ sourceOwner, sourceHeroIdx, sourceZoneSlot, targetOwner, targetHeroIdx, targetZoneSlot, targetZoneType, emoji, duration, trailClass, emojiStyle, projectileClass, projectileShape, noTrail, baseAngle, sfx, power }) => {
+    const onProjectileAnimation = ({ sourceOwner, sourceHeroIdx, sourceZoneSlot, targetOwner, targetHeroIdx, targetZoneSlot, targetZoneType, emoji, duration, trailClass, emojiStyle, projectileClass, projectileShape, noTrail, baseAngle, sfx, power, landMs }) => {
       // `sfx` (v613): optionaler Klang statt des Standard-`projectile`
       // (Javelin Throw: Wind). Nur Namen aus dem Katalog.
       if (window.playSFX) window.playSFX(sfx || 'projectile', { category: 'effect' });
@@ -49422,6 +49461,15 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       const syPx = sr.top  + sr.height / 2;
       const txPx = tr.left + tr.width / 2;
       const tyPx = tr.top  + tr.height / 2;
+      // Feuerball (🔥 / 🐦‍🔥 ohne eigene Form): Pixelart-Leinwand im Trailer-Look (app-fx-30.jsx); `landMs` = Landezeit (die Engine schickt die Wartezeit mit), sonst 0,85 · duration.
+      if (((emoji || '🐦‍🔥') === '🔥' || (emoji || '🐦‍🔥') === '🐦‍🔥') && !projectileClass && !projectileShape && !trailClass && window.ppFx30Feuerball) {
+        const ende30 = window.ppFx30Feuerball({
+          sx: sxPx, sy: syPx, tx: txPx, ty: tyPx, sw: sr.width, sh: sr.height, tw: tr.width, th: tr.height,
+          sHeld: !(sourceZoneSlot != null && sourceZoneSlot >= 0), tHeld: targetZoneType !== 'surprise' && !(targetZoneSlot !== undefined && targetZoneSlot >= 0),
+          dur, landMs, groesse: (emoji || '🐦‍🔥') === '🐦‍🔥' ? 1.25 : ((emojiStyle && parseFloat(emojiStyle.fontSize) > 0) ? parseFloat(emojiStyle.fontSize) / 44 : 1),
+        });
+        if (ende30) return;
+      }
       // Angle in degrees from src → tgt. CSS `rotate(0deg)` points
       // right; 0° here means a horizontal east-bound projectile, so
       // any projectile whose visual natively faces RIGHT (the SVG
@@ -55258,7 +55306,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           const [, hiStr] = key.split('-');
           const heroIdx = parseInt(hiStr);
           newDmgNums.push({ id: Date.now() + Math.random(), amount: dmg, ownerLabel: cur.owner, heroIdx });
-          flashDamageOnZone(`[data-hero-zone][data-hero-owner="${cur.owner}"][data-hero-idx="${heroIdx}"]`);
+          flashDamageOnZone(`[data-hero-zone][data-hero-owner="${cur.owner}"][data-hero-idx="${heroIdx}"]`, dmg);
         }
       }
       if (newDmgNums.length > 0) {
@@ -57703,7 +57751,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                   ] : [React.cloneElement(basis, { key: 'haupt' })];
                 })()}
                 {/* Aufstiegs-Morph: weisses Licht ueber der Karte; der Kartenwechsel (Sync) faellt in den Hoehepunkt. */}
-                {aufstiegHier && hero?.name && <div className="hero-aufstieg-karte" />}
+                {aufstiegHier && hero?.name && !window.ppFx33Pose && <div className="hero-aufstieg-karte" />}
                 {/* v1462: mit animierter Figur (`figurDa`) übernimmt die Figur
                     die Darstellung; die Gift-Stapelzahl bleibt als Zahl. */}
                 {hero?.name && !figurDa && isFrozen && <FrozenOverlay />}
