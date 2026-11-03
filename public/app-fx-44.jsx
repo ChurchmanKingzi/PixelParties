@@ -155,14 +155,16 @@ function ppFx44Farbe(c) {
 /**
  * Funken eines Einschlags auf einer Leinwand im Anker `box` (`.zone-land-fx`, Mitte der Zone).
  * `liste`: [{ dx, dy (Endlage in px), dur, delay (ms), ang (Grad), len, dick (px) }]. Gibt true zurück, wenn die Leinwand läuft.
+ * `zusatz` (optional, app-fx-49 `ppFx49Einschlag`): { R (px), ende (ms), malen(put, c0, gw, gh, t) } — Schockringe und Aufleuchten werden VOR den Funken auf dieselbe Leinwand gemalt.
  */
-window.ppFx44Funken = function (box, liste, farbe) {
+window.ppFx44Funken = function (box, liste, farbe, zusatz) {
   try {
     if (!box || !liste || !liste.length || window._playAnimations === false || window.__ppFxAlt) return false;
     const S = PP_FX44_S, TAKT = PP_FX44_TAKT;
     let R = 0, ende = 0;
     for (const f of liste) { R = Math.max(R, Math.abs(f.dx), Math.abs(f.dy), 0); ende = Math.max(ende, f.delay + f.dur); }
     R = Math.ceil((R + 20) / S) * S;
+    if (zusatz) { R = Math.max(R, zusatz.R || 0); ende = Math.max(ende, zusatz.ende || 0); }
     const gw = (R * 2) / S, gh = gw;
     if (gw < 4 || gw > 400) return false;
     const wurzel = document.createElement('div');
@@ -182,6 +184,7 @@ window.ppFx44Funken = function (box, liste, farbe) {
     // Teilwerte: Weg 0 → 12 % → 100 % (Bahn, Größe), Deckkraft 0 → 1 (12 %) → .9 (70 %) → 0
     const malen = (t) => {
       buf.fill(0);
+      if (zusatz) zusatz.malen(put, c0, gw, gh, t);
       for (const f of liste) {
         const age = t - f.delay;
         if (age < 0 || age > f.dur) continue;
@@ -218,7 +221,12 @@ window.ppFx44Funken = function (box, liste, farbe) {
       const t = jetzt - t0;
       if (t >= ende + 40 || !box.isConnected) { stopp(); return; }
       const fr = Math.floor(jetzt / TAKT);
-      if (fr !== letzte) { letzte = fr; malen(Math.max(0, t)); }
+      if (fr !== letzte) {
+        letzte = fr;
+        const mess = window.__ppFx49Messen ? performance.now() : 0;          // Messung (nur Tests), s. app-fx-49
+        malen(Math.max(0, t));
+        if (mess) (window.__ppFx49Zeiten || (window.__ppFx49Zeiten = [])).push([zusatz ? 'einschlag' : 'funken', +(performance.now() - mess).toFixed(3)]);
+      }
       raf = takt(schritt);
     };
     raf = takt(schritt);

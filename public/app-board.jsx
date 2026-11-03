@@ -976,6 +976,15 @@ function FightingAtkNumber({ amount, owner, heroIdx, myIdx }) {
 // Floating card that animates from deck position to hand slot position
 function DrawAnimCard({ cardName, origIdx, startX, startY, dimmed }) {
   const [endPos, setEndPos] = useState(null);
+  const flugRef = useRef(null);
+  // Pixelart-Schweif + Abheb-Funken (app-fx-49): eine Leinwand von der Stapelmitte bis zur Mitte des Handplatzes, sobald die Karte fliegt.
+  useEffect(() => {
+    const el = flugRef.current;
+    if (!endPos || !el || !window.ppFx49Zug) return undefined;
+    const w = el.offsetWidth, h = el.offsetHeight;
+    const stopp = window.ppFx49Zug(el, { von: { x: startX + 32, y: startY + 45 }, nach: { x: endPos.x + w / 2, y: endPos.y + h / 2 }, w, h, dauer: 400 });
+    return () => { if (stopp) stopp(); };
+  }, [endPos]);
 
   useEffect(() => {
     // Wait one frame for the invisible hand slot to be laid out
@@ -1013,7 +1022,7 @@ function DrawAnimCard({ cardName, origIdx, startX, startY, dimmed }) {
   const dy = `calc(${endPos.y - cy}px + var(--hand-card-h) / 2)`;
 
   return (
-    <div className={'draw-anim-card' + (dimmed ? ' hand-card-dimmed' : '')}
+    <div ref={flugRef} className={'draw-anim-card' + (dimmed ? ' hand-card-dimmed' : '')}
       style={{ left, top, '--dx': dx, '--dy': dy, '--fan-rot': endPos.rot || '0deg' }}>
       <BoardCard cardName={cardName} />
     </div>
@@ -1445,6 +1454,15 @@ function BrackleCatapultCard({ sx, sy, mx, my, ex, ey, dx, dy, cardName, loadMs,
 }
 
 function OppDrawAnimCard({ id, startX, startY, endX, endY, cardName, cardbackUrl, fanRot }) {
+  const flugRef = useRef(null);
+  // Pixelart-Schweif + Abheb-Funken (app-fx-49), wie bei DrawAnimCard.
+  useEffect(() => {
+    const el = flugRef.current;
+    if (!el || !window.ppFx49Zug) return undefined;
+    const w = el.offsetWidth, h = el.offsetHeight;
+    const stopp = window.ppFx49Zug(el, { von: { x: startX + 32, y: startY + 45 }, nach: { x: endX + w / 2, y: endY + h / 2 }, w, h, dauer: 400 });
+    return () => { if (stopp) stopp(); };
+  }, []);
   // v1260: Start mittig auf dem Stapel — siehe DrawAnimCard.
   const cx = startX + 32, cy = startY + 45;
   const left = `calc(${cx}px - var(--hand-card-w) / 2)`;
@@ -1452,7 +1470,7 @@ function OppDrawAnimCard({ id, startX, startY, endX, endY, cardName, cardbackUrl
   const dx = `calc(${endX - cx}px + var(--hand-card-w) / 2)`;
   const dy = `calc(${endY - cy}px + var(--hand-card-h) / 2)`;
   return (
-    <div className="draw-anim-card"
+    <div ref={flugRef} className="draw-anim-card"
       style={{
         left, top, '--dx': dx, '--dy': dy,
         // ★ v1233: Landewinkel des Faechers. Der Drehpunkt liegt hier
@@ -3631,12 +3649,23 @@ function HeroStatusPartikel({ effekte, kern, s, mitteX, fw, fh, saat }) {
 // Flug einer Karte zu einer Zone, die ihr Ziel in JEDEM Bild neu misst: bewegt sich das Brett waehrend der 0,6 s (Kamerafahrt, Tutorial-Kamera, Layout-Nachruecken),
 // landet die Karte trotzdem auf dem Helden — vorher war das Ziel einmal beim Start gemessen und die Karte flog auf der Handy-Ansicht daneben.
 // `w0` = Weltanker beim Start (`ppFxWeltAnker`); liegt die Karte in der Welt-Huelle, wird der Scrollversatz jedes Bild neu eingerechnet.
-function ppFlugVerfolgen(fly, sourceEl, destEl, w0, ms, opEnd) {
+function ppFlugVerfolgen(fly, sourceEl, destEl, w0, ms, opEnd, farbe) {
   const sr = sourceEl.getBoundingClientRect();
   const sx = sr.left + sr.width / 2, sy = sr.top + sr.height / 2;
   const raf = window.ppTaktRaf || requestAnimationFrame;
   const t0 = performance.now();
   fly.style.transition = 'none';
+  // Kometenschweif (app-fx-49): Leinwand in derselben Schicht wie die Karte; der Flug meldet jede gemessene Lage (Schicht-Koordinaten), der Schweif zeichnet den gesehenen Weg.
+  let spur = null;
+  try {
+    if (window.ppFx49Schweif) {
+      const d0 = destEl.getBoundingClientRect(), wx = w0 ? w0.dx : 0, wy = w0 ? w0.dy : 0;
+      spur = window.ppFx49Schweif({
+        art: 'komet', folge: true, welt: !!(w0 && w0.welt), von: { x: sx + wx, y: sy + wy }, nach: { x: d0.left + d0.width / 2 + wx, y: d0.top + d0.height / 2 + wy },
+        dauer: ms, w: (sr.width + d0.width) / 2, h: (sr.height + d0.height) / 2, farbe,
+      });
+    }
+  } catch (err) { spur = null; }
   const ease = (q) => 1 - Math.pow(1 - q, 3);
   const schritt = () => {
     if (!fly.isConnected) return;
@@ -3651,6 +3680,7 @@ function ppFlugVerfolgen(fly, sourceEl, destEl, w0, ms, opEnd) {
       const tx = dr.left + dr.width / 2, ty = dr.top + dr.height / 2;
       fly.style.transform = `translate(${(tx - sx) * e - driftX}px, ${(ty - sy) * e - driftY}px) scale(${1 + (dr.width / sr.width - 1) * e})`;
       fly.style.opacity = String(1 - (1 - opEnd) * e);
+      if (spur) spur.punkt(sx + (w0 ? w0.dx : 0) + (tx - sx) * e - driftX, sy + (w0 ? w0.dy : 0) + (ty - sy) * e - driftY);
     }
     if (q < 1) raf(schritt);
   };
@@ -37993,6 +38023,17 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       const name = String(wert).includes('|') ? String(wert).split('|').slice(1).join('|') : wert;
       const stil = window.zoneLandStyle?.(name) || {};
       const einschlag = { selector: sel, key: schluessel, color: stil.color, variant: stil.variant };
+      // ★ Fähigkeits-Stufenaufstieg (app-fx-48.jsx, Trailer „Zug 1“): die Fähigkeitszone wächst von 1 auf 2 bzw. von 2 auf 3 Karten, oberste Karte gleich
+      // geblieben → Einschlag, Kraftstrom zum Helden, Ringe um seine Füße, Lichtsäule, Stapelzahl. Läuft der Effekt, entfällt der Standard-Einschlag dieses Platzes.
+      if (schluessel.charAt(0) === 'a' && window.ppFx48Stufe) {
+        const neuS = String(wert), altS = String(alt.get(schluessel) ?? ''), iN = neuS.indexOf('|'), iA = altS.indexOf('|');
+        const nN = iN > 0 ? Number(neuS.slice(0, iN)) : 0, nA = iA > 0 ? Number(altS.slice(0, iA)) : 0;
+        if (nA >= 1 && nN === nA + 1 && nN <= 3 && neuS.slice(iN + 1) === altS.slice(iA + 1)) {
+          const tk = schluessel.split(':');
+          const heldName = gameState?.players?.[Number(tk[1])]?.heroes?.[Number(tk[2])]?.name;
+          if (window.ppFx48Stufe({ selector: sel, key: 'fx48:' + schluessel, stufe: nN, name, heroName: heldName })) continue;
+        }
+      }
       // ★ v1287 (Als Befund 22.9.: „die Zone, in der Elixir of Immortality
       // landen soll, wird direkt zum Resolve-Zeitpunkt gehighlightet").
       // Ein Permanent, das waehrend einer Colored-Snow-Enthuellung
@@ -45255,7 +45296,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       fly.style.cssText = `position:fixed;left:${sr.left + _w.dx}px;top:${sr.top + _w.dy}px;width:${sr.width}px;height:${sr.height}px;z-index:10150;pointer-events:none;border-radius:4px;overflow:hidden;box-shadow:0 0 20px rgba(255,208,102,.6);transition:transform 600ms cubic-bezier(.22,.8,.3,1),opacity 600ms ease-out;`;
       (_w.welt && window.ppFxWeltSchicht ? window.ppFxWeltSchicht() : document.body).appendChild(fly);
       // Next frame: kick off the transform so the transition plays.
-      ppFlugVerfolgen(fly, sourceEl, destEl, _w, 600, 0.2);
+      ppFlugVerfolgen(fly, sourceEl, destEl, _w, 600, 0.2, (!faceDown && cardName && window.zoneLandStyle) ? window.zoneLandStyle(cardName).color : undefined);
       setTimeout(() => { fly.remove(); }, 700);
     };
     socket.on('hand_to_board_fly', onHandToBoard);
@@ -45374,7 +45415,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       const _w = _wa.welt ? _wa : _ws;
       fly.style.cssText = `position:fixed;left:${sr.left + _w.dx}px;top:${sr.top + _w.dy}px;width:${sr.width}px;height:${sr.height}px;z-index:10150;pointer-events:none;border-radius:4px;overflow:hidden;box-shadow:0 0 24px rgba(244,174,100,.7);transition:transform 600ms cubic-bezier(.22,.8,.3,1),opacity 600ms ease-out;`;
       (_w.welt && window.ppFxWeltSchicht ? window.ppFxWeltSchicht() : document.body).appendChild(fly);
-      ppFlugVerfolgen(fly, sourceEl, destEl, _w, 600, 0.3);
+      ppFlugVerfolgen(fly, sourceEl, destEl, _w, 600, 0.3, (cardName && window.zoneLandStyle) ? window.zoneLandStyle(cardName).color : undefined);
       setTimeout(() => { fly.remove(); }, 700);
     };
     socket.on('attach_hero_fly', onAttachHeroFly);
