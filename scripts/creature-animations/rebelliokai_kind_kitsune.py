@@ -42,7 +42,7 @@ import anim_lib as L
 import anim_rebel as R
 
 N, MS = 60, 70
-PAD_L, PAD_R, PAD_T, PAD_B = 6, 6, 3, 2
+PAD_L, PAD_R, PAD_T, PAD_B = 3, 4, 11, 3
 
 spr = L.lade('rebelliokai-kind-kitsune')
 fuchs = L.lade('rebelliokai-kind-kitsune-fuchs')
@@ -84,7 +84,7 @@ ZT_L = [Zk((5, 24), (5, 31), fuss_anteil=0.2), Zk((8, 24), (9, 30), fuss_anteil=
 VL_O = FE2.Vorlage(lay0(schweife, t_oben), ZT_O, 'hoch', rand_farbe=UMRISS_SCHWEIF, sperre=FUCHS_M, faden=2)
 VL_R = FE2.Vorlage(lay0(schweife, t_rechts), ZT_R, 'rechts', rand_farbe=UMRISS_SCHWEIF, sperre=FUCHS_M, faden=2)
 VL_L = FE2.Vorlage(lay0(schweife, t_links), ZT_L, 'runter', rand_farbe=UMRISS_SCHWEIF, sperre=FUCHS_M, faden=2)
-FEUER = FE2.Feuer([VL_O, VL_R, VL_L], n=N, seed=41, bank='ruhig', amp=1.1, max_funken=6, funken_abstand=5, funken_leben=8)
+FEUER = FE2.Feuer([VL_O, VL_R, VL_L], n=N, seed=41, bank='zunge', amp=1.0, schwelle=1.0, max_funken=7, funken_abstand=5, funken_leben=8)
 
 
 def lay(quelle, maske, dy=0):
