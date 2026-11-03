@@ -153,15 +153,7 @@ function AreaBackgrounds({ areaZones, myIdx, oppIdx, spielstand }) {
         layers.push(
           <div key={`op-${b}-zwei`} style={{ position: 'absolute', inset: 0, pointerEvents: 'none', isolation: 'isolate', clipPath: clipTheirs }}>{szene(b)}</div>,
           <div key={`op-${a}-zwei`} style={{ position: 'absolute', inset: 0, pointerEvents: 'none', isolation: 'isolate', clipPath: clipMine }}>{szene(a)}</div>,
-          <svg key="op-seam" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', pointerEvents: 'none' }}
-            viewBox="0 0 100 100" preserveAspectRatio="none">
-            <polyline points={seam.map(p => `${p.x},${p.y}`).join(' ')} fill="none"
-              stroke="rgba(0,0,0,0.55)" strokeWidth="0.9" strokeLinejoin="round" vectorEffect="non-scaling-stroke"
-              style={{ filter: 'blur(1.2px)' }} />
-            <polyline points={seam.map(p => `${p.x},${p.y}`).join(' ')} fill="none"
-              stroke="rgba(255,248,232,0.35)" strokeWidth="0.25" strokeLinejoin="round"
-              strokeDasharray="1.2 0.7 0.4 0.9" vectorEffect="non-scaling-stroke" />
-          </svg>,
+          <PpFx40Naht key="op-seam" seam={seam} />,   // Pixelart-Leinwand (app-fx-40.jsx): gezackte Pixellinie statt SVG-Polylinie mit Weichzeichner
         );
       } else {
         const only = a || b;

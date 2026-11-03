@@ -9,18 +9,40 @@ const { ALL_CARDS, CARDS_BY_NAME, AVAILABLE_CARDS, AVAILABLE_MAP, SKINS_DB } = w
 const { useAntoniaPresent, setAntoniaPresent, tutorialStartsWithAntonia } = window;
 const { GlanzBand, LotsenGlanz, PpVerlauf } = window;   // v1264: Glanzband + Lotsen-Schein; W86u2: Pixel-Schleier (Dither)
 
-// Eye / eye-off glyphs for the password show/hide toggle.
-const EyeIcon = () => (
-  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z" /><circle cx="12" cy="12" r="3" />
-  </svg>
-);
-const EyeOffIcon = () => (
-  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24" />
-    <line x1="1" y1="1" x2="23" y2="23" />
-  </svg>
-);
+// Eye / eye-off sprites for the password show/hide toggle (PixelIcon sprites `auge` / `augeZu` in app-shared.jsx; 11x7 sprite pixels at 2 px, colour = currentColor).
+const EyeIcon = () => <PixelIcon name="auge" style={{ width: 22, height: 14 }} />;
+const EyeOffIcon = () => <PixelIcon name="augeZu" style={{ width: 22, height: 14 }} />;
+
+// Google-"G" als Pixelsprite (11x11, 2 px je Pixel, nur <rect>, crispEdges) statt des Vektorlogos. Abweichung von der Marke: vereinfachte Rasterform, gleiche vier Markenfarben.
+const GOOGLE_G_ZEILEN = [
+  '...RRRRR...',
+  '..RRRRRRR..',
+  '.RRR...RRR.',
+  'YYY........',
+  'YY.........',
+  'YY...BBBBBB',
+  'YY...BBBBBB',
+  'YYG.....BBB',
+  '.GGG...GBB.',
+  '..GGGGGGG..',
+  '...GGGGG...',
+];
+const GOOGLE_G_FARBEN = { R: '#e92f38', Y: '#ffc61c', G: '#2ca058', B: '#4580f6' };
+const GoogleGSprite = React.memo(function GoogleGSprite() {
+  const rects = [];
+  GOOGLE_G_ZEILEN.forEach((zeile, y) => {
+    for (let x = 0; x < zeile.length;) {
+      const c = zeile[x];
+      if (c === '.') { x++; continue; }
+      let e = x; while (e < zeile.length && zeile[e] === c) e++;
+      rects.push(<rect key={x + ',' + y} x={x} y={y} width={e - x} height="1" fill={GOOGLE_G_FARBEN[c]} />);
+      x = e;
+    }
+  });
+  return (
+    <svg width="22" height="22" viewBox="0 0 11 11" shapeRendering="crispEdges" aria-hidden="true" focusable="false" data-pp-px="aus">{rects}</svg>
+  );
+});
 
 // Text input with an inline show/hide toggle. Reused by the auth screen
 // and the profile password-change form.
@@ -425,18 +447,8 @@ function AnimatedTitleBackdrop() {
             don't wash the lasers. Kept inside the shake group, after every
             character, so they jolt in sync with the scene. */}
         <div className="anim-lightning">
-          <svg className="anim-bolt anim-bolt-a" viewBox="0 0 100 400" preserveAspectRatio="none" aria-hidden="true">
-            <polyline className="anim-bolt-rand" points="52,0 40,70 62,80 38,150 60,165 34,240 58,255 30,340 50,360 42,400" />
-            <polyline points="52,0 40,70 62,80 38,150 60,165 34,240 58,255 30,340 50,360 42,400" />
-          </svg>
-          <svg className="anim-bolt anim-bolt-b" viewBox="0 0 100 400" preserveAspectRatio="none" aria-hidden="true">
-            <polyline className="anim-bolt-rand" points="48,0 62,75 38,88 60,160 36,175 58,250 34,265 56,345 40,375 50,400" />
-            <polyline points="48,0 62,75 38,88 60,160 36,175 58,250 34,265 56,345 40,375 50,400" />
-          </svg>
-          <svg className="anim-bolt anim-bolt-c" viewBox="0 0 100 400" preserveAspectRatio="none" aria-hidden="true">
-            <polyline className="anim-bolt-rand" points="50,0 58,80 40,92 60,175 38,190 56,270 36,285 52,370 46,400" />
-            <polyline points="50,0 58,80 40,92 60,175 38,190 56,270 36,285 52,370 46,400" />
-          </svg>
+          {/* Pixelart-Leinwand (app-fx-40.jsx): drei Zickzack-Blitze auf dem 3-px-Raster, Deckkraft per Dither */}
+          <PpFx40Blitze />
         </div>
         {/* 13 — embers */}
         <div className="anim-embers" style={{ position: 'absolute', inset: 0, pointerEvents: 'none', overflow: 'hidden' }}>
@@ -1014,12 +1026,7 @@ function AuthScreen() {
                     onClick={submitGoogleDesktop}
                     disabled={loading}
                   >
-                    <svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true">
-                      <path fill="#4580f6" d="M17.64 9.2c0-.64-.06-1.25-.16-1.84H9v3.48h4.84a4.14 4.14 0 0 1-1.8 2.72v2.26h2.92c1.7-1.57 2.68-3.88 2.68-6.62z"/>
-                      <path fill="#2ca058" d="M9 18c2.43 0 4.47-.8 5.96-2.18l-2.92-2.26c-.8.54-1.84.86-3.04.86-2.34 0-4.32-1.58-5.03-3.7H.96v2.33A9 9 0 0 0 9 18z"/>
-                      <path fill="#ffc61c" d="M3.97 10.72A5.4 5.4 0 0 1 3.68 9c0-.6.1-1.18.29-1.72V4.95H.96A9 9 0 0 0 0 9c0 1.45.35 2.82.96 4.05l3.01-2.33z"/>
-                      <path fill="#e92f38" d="M9 3.58c1.32 0 2.5.45 3.44 1.35l2.58-2.58C13.47.89 11.43 0 9 0A9 9 0 0 0 .96 4.95l3.01 2.33C4.68 5.16 6.66 3.58 9 3.58z"/>
-                    </svg>
+                    <GoogleGSprite />
                     {/* Wortgleich mit dem Knopf, den Google zeichnet — sonst
                         stehen im Desktop-Gehaeuse und im Browser zwei
                         verschiedene Beschriftungen. */}

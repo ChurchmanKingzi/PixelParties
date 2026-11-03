@@ -7269,6 +7269,24 @@ window.PpLogoBild = PpLogoBild;
 // Gezeichnet als SVG mit `crispEdges` — scharfe Bloecke in jeder Groesse,
 // je Farbe EIN Pfad aus Zeilenlaeufen.
 const PIXEL_ICONS = {
+  auge: [
+    '...#####...',
+    '.##.....##.',
+    '#...###...#',
+    '#..#####..#',
+    '#...###...#',
+    '.##.....##.',
+    '...#####...',
+  ],
+  augeZu: [
+    '#..#####...',
+    '.##.....##.',
+    '#..####...#',
+    '#..#####..#',
+    '#...####..#',
+    '.##.....##.',
+    '...#####..#',
+  ],
   discord: [
     '...##..........##...',
     '..#####......#####..',
@@ -9757,7 +9775,7 @@ function TTIcon({ kind, color, px = 2 }) {
   if (!rows) return null;
   const d = rows.map((row, y) => [...row].map((c, x) => c === 'X' ? `M${x} ${y}h1v1h-1z` : '').join('')).join('');
   return (
-    <svg className="tt-icon" width={rows[0].length * px} height={rows.length * px} viewBox={`0 0 ${rows[0].length} ${rows.length}`} aria-hidden="true">
+    <svg className="tt-icon" width={rows[0].length * px} height={rows.length * px} viewBox={`0 0 ${rows[0].length} ${rows.length}`} shapeRendering="crispEdges" aria-hidden="true">
       <path d={d} fill={color} />
     </svg>
   );

@@ -7045,29 +7045,7 @@ function CreatureDeathEffect({ x, y }) {
   );
 }
 
-// Spider Avalanche — torrential downpour of tiny spiders
-function SpiderAvalancheEffect({ x, y, w, h }) {
-  const spiders = useMemo(() => Array.from({ length: ppFxN(80) }, () => ({
-    startX: -60 + Math.random() * 120,
-    delay: Math.random() * 600,
-    dur: 300 + Math.random() * 400,
-    size: 6 + Math.random() * 8,
-    drift: -15 + Math.random() * 30,
-    char: ['🕷','🕷','🕷','🕷','·','·'][Math.floor(Math.random() * 6)],
-  })), []);
-  return (
-    <div style={{ position: 'fixed', left: x, top: y - 60, pointerEvents: 'none', zIndex: 10100 }}>
-      <div className="anim-spider-flash" />
-      {spiders.map((s, i) => (
-        <div key={i} className="anim-spider-drop" style={{
-          '--startX': s.startX + 'px', '--drift': s.drift + 'px',
-          '--size': s.size + 'px',
-          animationDelay: s.delay + 'ms', animationDuration: s.dur + 'ms',
-        }}>{s.char}</div>
-      ))}
-    </div>
-  );
-}
+// Spider Avalanche — jetzt PpFx43.spider_avalanche (app-fx-43.jsx, Pixelart-Canvas)
 
 function VenomFogEffect({ x, y, w, h }) {
   const particles = useMemo(() => Array.from({ length: ppFxN(20) }, (_, i) => ({
@@ -8580,6 +8558,8 @@ function ppProjektil(cfg) {
   };
   return ppSalve(malen, ENDE + 40, vorbereiten, { extra: cfg.extra || 24 });
 }
+/** Symbol-Animationen als Pixelart (app-fx-43.jsx): Platzhalter fuer die Registry; `window.PpFx43[name]` wird erst beim Zeichnen aufgeloest (app-fx-43 laedt nach app-board). */
+const ppFx43Reg = (n) => function PpFx43Platz(p) { const C = window.PpFx43 && window.PpFx43[n]; return C ? <C {...p} /> : null; };
 /** Kleines Pixelbild zeichnen: `rows` = Zeilen aus Zeichen, `pal` = { Zeichen: [r,g,b] }, Mittelpunkt (cx, cy). */
 function ppSprite(g, cx, cy, rows, pal, deckung) {
   const h = rows.length, w = rows[0].length, x0 = Math.round(cx - w / 2), y0 = Math.round(cy - h / 2);
@@ -14951,129 +14931,12 @@ const ANIM_REGISTRY = {
       );
     };
   })(),
-  // Coolness Stack summon — cyan-and-brass burst with a "🆒" pop and
-  // counter-rotating geometric rings. Distinct from a normal hand
-  // summon so the player sees "this Creature came from the Stack".
-  coolness_summon: (function () {
-    return function CoolnessSummonEffect({ x, y }) {
-      const beams = useMemo(() => Array.from({ length: ppFxN(14) }, (_, i) => ({
-        angle: (i / 14) * 360,
-        delay: Math.random() * 100,
-      })), []);
-      const sparkles = useMemo(() => Array.from({ length: ppFxN(22) }, (_, i) => ({
-        angle: (i / 22) * Math.PI * 2 + Math.random() * 0.3,
-        dist: 50 + Math.random() * 45,
-        size: 3 + Math.random() * 5,
-        delay: Math.random() * 250,
-        cyan: Math.random() < 0.5,
-      })), []);
-      return (
-        <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10110 }}>
-          {/* Cyan halo */}
-          <div style={{
-            position: 'absolute', width: 130, height: 130, left: -65, top: -65,
-            borderRadius: '50%',
-            background: 'radial-gradient(circle, rgba(179,232,249,0.85) 0%, rgba(104,198,253,0.55) 45%, transparent 75%)',
-            boxShadow: '0 0 40px rgba(119,200,238,0.85), 0 0 18px rgba(179,232,249,0.7)',
-            opacity: 0,
-            animation: 'coolness-halo 1200ms ease-out forwards',
-          }} />
-          {/* Counter-rotating brass ring (outer) */}
-          <div style={{
-            position: 'absolute', width: 120, height: 120, left: -60, top: -60,
-            borderRadius: '50%',
-            border: '3px solid rgba(251,225,129,0.85)',
-            boxShadow: '0 0 18px rgba(251,200,106,0.8), inset 0 0 12px rgba(251,200,106,0.4)',
-            opacity: 0,
-            animation: 'coolness-ring-cw 1100ms cubic-bezier(.2,.6,.3,1) forwards',
-          }} />
-          {/* Counter-rotating cyan ring (inner) */}
-          <div style={{
-            position: 'absolute', width: 84, height: 84, left: -42, top: -42,
-            borderRadius: '50%',
-            border: '2px solid rgba(127,223,255,0.95)',
-            boxShadow: '0 0 14px rgba(127,223,255,0.75)',
-            opacity: 0,
-            animation: 'coolness-ring-ccw 1100ms cubic-bezier(.2,.6,.3,1) forwards',
-          }} />
-          {/* Radial cyan beams */}
-          {beams.map((b, i) => (
-            <div key={'cb' + i} style={{
-              position: 'absolute', width: 4, height: 80, left: -2, top: -40,
-              background: 'linear-gradient(to top, transparent 0%, rgba(179,232,249,0.95) 50%, rgba(255,255,255,1) 100%)',
-              borderRadius: 2,
-              transformOrigin: '50% 50%',
-              transform: `rotate(${b.angle}deg) translateY(-32px) scaleY(0)`,
-              opacity: 0,
-              animation: `coolness-beam 1000ms ease-out ${b.delay}ms forwards`,
-            }} />
-          ))}
-          {/* Drifting cyan + gold sparkles */}
-          {sparkles.map((s, i) => (
-            <div key={'cs' + i} style={{
-              position: 'absolute', left: -s.size / 2, top: -s.size / 2,
-              width: s.size + 'px', height: s.size + 'px',
-              borderRadius: '50%',
-              background: s.cyan ? '#b6eff7' : '#f9ecb3',
-              boxShadow: s.cyan
-                ? '0 0 8px #66d9ff, 0 0 16px rgba(104,198,253,0.7)'
-                : '0 0 8px #ffd966, 0 0 16px rgba(255,208,102,0.7)',
-              opacity: 0,
-              animation: `coolness-sparkle 1300ms ease-out ${s.delay}ms forwards`,
-              '--ccx': Math.cos(s.angle) * s.dist + 'px',
-              '--ccy': Math.sin(s.angle) * s.dist + 'px',
-            }} />
-          ))}
-          {/* "🆒" emoji pop — bursts out, scales up, fades */}
-          <div style={{
-            position: 'absolute', left: -22, top: -22,
-            fontSize: 38,
-            filter: 'drop-shadow(0 0 6px rgba(179,232,249,0.95)) drop-shadow(0 0 14px rgba(119,200,238,0.7))',
-            opacity: 0,
-            animation: 'coolness-emoji 1100ms cubic-bezier(.2,.7,.3,1) 80ms forwards',
-          }}>🆒</div>
-          <style>{`
-            @keyframes coolness-halo {
-              0%   { opacity: 0;    transform: scale(0.5); }
-              30%  { opacity: 1;    transform: scale(1.15); }
-              70%  { opacity: 0.85; transform: scale(1.45); }
-              100% { opacity: 0;    transform: scale(1.65); }
-            }
-            @keyframes coolness-ring-cw {
-              0%   { opacity: 0; transform: scale(0.35) rotate(0deg); }
-              30%  { opacity: 1; transform: scale(1.05) rotate(180deg); }
-              100% { opacity: 0; transform: scale(1.55) rotate(420deg); }
-            }
-            @keyframes coolness-ring-ccw {
-              0%   { opacity: 0; transform: scale(0.4)  rotate(0deg); }
-              30%  { opacity: 1; transform: scale(1.0)  rotate(-180deg); }
-              100% { opacity: 0; transform: scale(1.4)  rotate(-420deg); }
-            }
-            @keyframes coolness-beam {
-              0%   { opacity: 0; transform: rotate(var(--ang,0deg)) translateY(-32px) scaleY(0); }
-              30%  { opacity: 1; transform: rotate(var(--ang,0deg)) translateY(-32px) scaleY(1); }
-              100% { opacity: 0; transform: rotate(var(--ang,0deg)) translateY(-32px) scaleY(0.6); }
-            }
-            @keyframes coolness-sparkle {
-              0%   { opacity: 0; transform: translate(0, 0) scale(0.3); }
-              25%  { opacity: 1; transform: translate(calc(var(--ccx) * 0.35), calc(var(--ccy) * 0.35)) scale(1.1); }
-              100% { opacity: 0; transform: translate(var(--ccx), var(--ccy)) scale(0.25); }
-            }
-            @keyframes coolness-emoji {
-              0%   { opacity: 0;    transform: scale(0.2) rotate(-12deg); }
-              25%  { opacity: 1;    transform: scale(1.4) rotate(8deg); }
-              60%  { opacity: 0.95; transform: scale(1.15) rotate(-4deg); }
-              100% { opacity: 0;    transform: scale(1.6) translateY(-20px) rotate(0deg); }
-            }
-          `}</style>
-        </div>
-      );
-    };
-  })(),
+  // Coolness Stack summon — PIXELART (app-fx-43, Canvas-Szene): cyan-messingfarbener Ausbruch mit 🆒-Plakette (Pixelsprite), zwei Ringen, 14 Strahlen, 22 Funken.
+  coolness_summon: ppFx43Reg('coolness_summon'),
   creature_death: CreatureDeathEffect,
   freeze: FreezeEffect,
   ice_encase: IceEncaseEffect,
-  spider_avalanche: SpiderAvalancheEffect,
+  spider_avalanche: ppFx43Reg('spider_avalanche'),   // PIXELART (app-fx-43): Spinnen-Sprites
   electric_strike: ElectricStrikeEffect,
   flame_strike: ppR1FlameStrike,   // Pixelart-Leinwand (statt ~30 CSS-animierter Elemente je Ziel)
   // ★ v1261 (Als Befund 21.9.): die v1215-Salve (`flame_avalanche`,
@@ -17477,31 +17340,8 @@ const ANIM_REGISTRY = {
       );
     };
   })(),
-  biomancy_bloom: (() => {
-    return function BiomancyBloomEffect({ x, y }) {
-      const flowers = useMemo(() => Array.from({ length: ppFxN(16) }, (_, i) => {
-        const angle = (i / 16) * Math.PI * 2;
-        return {
-          dx: Math.cos(angle) * (15 + Math.random() * 25),
-          dy: Math.sin(angle) * (10 + Math.random() * 20),
-          size: 10 + Math.random() * 14,
-          delay: i * 40 + Math.random() * 60,
-          dur: 600 + Math.random() * 400,
-          emoji: ['🌸', '🌺', '🌼', '🍀', '🌿', '☘️'][Math.floor(Math.random() * 6)],
-        };
-      }), []);
-      return (
-        <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10100 }}>
-          {flowers.map((f, i) => (
-            <span key={i} className="anim-biomancy-flower" style={{
-              '--bdx': f.dx + 'px', '--bdy': f.dy + 'px', fontSize: f.size + 'px',
-              animationDelay: f.delay + 'ms', animationDuration: f.dur + 'ms',
-            }}>{f.emoji}</span>
-          ))}
-        </div>
-      );
-    };
-  })(),
+  // Biomancy Bloom / Thicket / Vines / Druid Leaf Storm — PIXELART (app-fx-43, Canvas-Szene): Blumen- und Blattsprites statt Emoji, Drehung nur in Vierteln.
+  biomancy_bloom: ppFx43Reg('biomancy_bloom'),
   // v724 (Thicket, Als Vorgabe 4.9.: „deutlich mehr Pflanzen").
   // Ein DICHTES Dickicht statt eines Rankenkranzes: 34 Blaetter und
   // Halme schlagen aus dem Zonenrand nach innen zusammen, bleiben
@@ -17509,100 +17349,9 @@ const ANIM_REGISTRY = {
   // groessere Spanne und laengerer Halt als `biomancy_vines`, damit
   // man auf einen Blick sieht: da ist etwas VERSTECKT, nicht nur
   // bewachsen. Klang: `elem_biomancy` (ZONE_ANIM_SFX).
-  thicket_cover: (() => {
-    return function ThicketCoverEffect({ x, y }) {
-      const teile = useMemo(() => Array.from({ length: ppFxN(34) }, (_, i) => {
-        // Aus dem Rand nach innen: Startpunkt auf einer Ellipse, Ziel
-        // nahe der Mitte, damit sich das Blattwerk schliesst.
-        const winkel = (i / 34) * Math.PI * 2 + Math.random() * 0.35;
-        const weite = 46 + Math.random() * 26;
-        return {
-          sx: Math.cos(winkel) * weite,
-          sy: Math.sin(winkel) * weite * 0.72,
-          dx: Math.cos(winkel) * (6 + Math.random() * 12),
-          dy: Math.sin(winkel) * (4 + Math.random() * 9) + 6,
-          rot: Math.random() * 360,
-          spin: (Math.random() < 0.5 ? -1 : 1) * (25 + Math.random() * 55),
-          delay: i * 14 + Math.random() * 60,
-          dur: 900 + Math.random() * 500,
-          emoji: ['🌿', '🌱', '☘️', '🍃', '🌾', '🌳', '🍀'][Math.floor(Math.random() * 7)],
-          size: 15 + Math.random() * 16,
-        };
-      }), []);
-      return (
-        <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10100 }}>
-          {teile.map((t, i) => (
-            <span key={i} className="anim-thicket-leaf" style={{
-              '--tsx': t.sx + 'px', '--tsy': t.sy + 'px',
-              '--tdx': t.dx + 'px', '--tdy': t.dy + 'px',
-              '--trot': t.rot + 'deg', '--tspin': (t.rot + t.spin) + 'deg',
-              fontSize: t.size + 'px',
-              animationDelay: t.delay + 'ms', animationDuration: t.dur + 'ms',
-            }}>{t.emoji}</span>
-          ))}
-        </div>
-      );
-    };
-  })(),
-  biomancy_vines: (() => {
-    return function BiomancyVinesEffect({ x, y }) {
-      const vines = useMemo(() => Array.from({ length: ppFxN(12) }, (_, i) => {
-        const angle = (i / 12) * Math.PI * 2;
-        return {
-          dx: Math.cos(angle) * 30,
-          dy: Math.sin(angle) * 20,
-          rot: (angle * 180 / Math.PI) + 90,
-          delay: i * 30 + Math.random() * 50,
-          dur: 500 + Math.random() * 300,
-          emoji: ['🌿', '🌱', '☘️', '🍃', '🌾'][Math.floor(Math.random() * 5)],
-          size: 12 + Math.random() * 10,
-        };
-      }), []);
-      return (
-        <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10100 }}>
-          {vines.map((v, i) => (
-            <span key={i} className="anim-biomancy-vine" style={{
-              '--vdx': v.dx + 'px', '--vdy': v.dy + 'px', '--vrot': v.rot + 'deg', fontSize: v.size + 'px',
-              animationDelay: v.delay + 'ms', animationDuration: v.dur + 'ms',
-            }}>{v.emoji}</span>
-          ))}
-        </div>
-      );
-    };
-  })(),
-  druid_leaf_storm: (() => {
-    return function DruidLeafStormEffect({ x, y }) {
-      // Leaves spawn at (0,0) and fan outwards in all directions — each one
-      // picks a random angle (not evenly spaced, so the burst feels chaotic
-      // rather than geometric) and a random distance. Rotation spins during
-      // flight for the "wind-blown" feel.
-      const leaves = useMemo(() => Array.from({ length: ppFxN(36) }, (_, i) => {
-        const angle = Math.random() * Math.PI * 2;
-        const dist = 70 + Math.random() * 90;
-        const spin = (Math.random() < 0.5 ? -1 : 1) * (180 + Math.random() * 540);
-        return {
-          dx: Math.cos(angle) * dist,
-          dy: Math.sin(angle) * dist * 0.75, // slight vertical squash — airflow shape
-          spin,
-          delay: Math.random() * 220,
-          dur: 750 + Math.random() * 500,
-          emoji: ['🌿', '🌱', '☘️', '🍃', '🌾', '🍀'][Math.floor(Math.random() * 6)],
-          size: 14 + Math.random() * 14,
-        };
-      }), []);
-      return (
-        <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10100 }}>
-          {leaves.map((l, i) => (
-            <span key={i} className="anim-druid-leaf" style={{
-              '--ldx': l.dx + 'px', '--ldy': l.dy + 'px', '--lspin': l.spin + 'deg',
-              fontSize: l.size + 'px',
-              animationDelay: l.delay + 'ms', animationDuration: l.dur + 'ms',
-            }}>{l.emoji}</span>
-          ))}
-        </div>
-      );
-    };
-  })(),
+  thicket_cover: ppFx43Reg('thicket_cover'),
+  biomancy_vines: ppFx43Reg('biomancy_vines'),
+  druid_leaf_storm: ppFx43Reg('druid_leaf_storm'),
   stranglehold_squeeze: (() => {
     return function StrangleholdSqueezeEffect({ x, y, zoneEl }) {
       useEffect(() => {
@@ -20099,61 +19848,7 @@ const ANIM_REGISTRY = {
   // sprout from the creature's slot, along with an ominous red pulse
   // and a few drifting spores that hang in place. Meant to be fired
   // via `playAnimation('deepsea_spores_growth', supportSlotSelector)`.
-  deepsea_spores_growth: (() => {
-    return function DeepseaSporesGrowthEffect({ x, y }) {
-      const tendrils = useMemo(() => Array.from({ length: ppFxN(8) }, (_, i) => ({
-        angle: -70 + (i * 20) + (Math.random() * 10 - 5),
-        len:   28 + Math.random() * 18,
-        delay: Math.random() * 200,
-        dur:   800 + Math.random() * 300,
-        width: 2.5 + Math.random() * 2,
-        shade: (i % 3 === 0) ? '#780014' : (i % 3 === 1 ? '#3b9159' : '#2b457e'),
-      })), []);
-      const fronds = useMemo(() => Array.from({ length: 5 }, () => ({
-        xOff: -18 + Math.random() * 36,
-        delay: 150 + Math.random() * 250,
-        dur: 700 + Math.random() * 200,
-        size: 10 + Math.random() * 8,
-        emoji: Math.random() < 0.5 ? '🌿' : '🪸',
-      })), []);
-      return (
-        <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10110 }}>
-          {/* Ominous red pulse covering the creature card */}
-          <div style={{
-            position: 'absolute', left: -35, top: -48, width: 70, height: 96,
-            background: 'radial-gradient(ellipse at center, rgba(192,20,28,.55) 0%, rgba(120,0,20,.3) 55%, transparent 85%)',
-            boxShadow: '0 0 18px rgba(178,26,41,.7), inset 0 0 12px rgba(91,1,2,.5)',
-            borderRadius: 6,
-            animation: 'deepseaSporeRedPulse 1600ms ease-out forwards',
-            opacity: 0,
-          }} />
-          {/* Tendril bases — thin curved lines growing outward */}
-          {tendrils.map((t, i) => (
-            <div key={'dt'+i} style={{
-              position: 'absolute', left: 0, top: 20,
-              width: t.width, height: t.len,
-              background: `linear-gradient(to top, ${t.shade}, ${t.shade}aa 60%, ${t.shade}44 100%)`,
-              borderRadius: t.width,
-              boxShadow: `0 0 6px ${t.shade}aa`,
-              transform: `rotate(${t.angle}deg) scaleY(0)`,
-              transformOrigin: 'center bottom',
-              animation: `deepseaTendrilGrow ${t.dur}ms cubic-bezier(0.3, 1.4, 0.5, 1) ${t.delay}ms forwards`,
-            }} />
-          ))}
-          {/* Fronds (algae / coral emoji) popping out at the tendril tips */}
-          {fronds.map((f, i) => (
-            <div key={'df'+i} style={{
-              position: 'absolute', left: f.xOff, top: -8,
-              fontSize: f.size,
-              filter: 'drop-shadow(0 0 4px rgba(140,0,20,.8))',
-              animation: `deepseaFrondPop ${f.dur}ms ease-out ${f.delay}ms forwards`,
-              opacity: 0,
-            }}>{f.emoji}</div>
-          ))}
-        </div>
-      );
-    };
-  })(),
+  deepsea_spores_growth: ppFx43Reg('deepsea_spores_growth'),   // PIXELART (app-fx-43): roter Puls, Ranken, Alge/Koralle als Sprites
 
   deep_sea_bubbles: (() => {
     return function DeepSeaBubblesEffect({ x, y }) {
@@ -24011,31 +23706,7 @@ const ANIM_REGISTRY = {
       );
     };
   })(),
-  thought_bubbles: (() => {
-    return function ThoughtBubblesEffect({ x, y }) {
-      const bubbles = useMemo(() => [
-        { emoji: '💭', x: -15, delay: 0, size: 20, rise: -40 },
-        { emoji: '💡', x: 10, delay: 0.2, size: 24, rise: -55 },
-        { emoji: '💭', x: -5, delay: 0.4, size: 16, rise: -35 },
-        { emoji: '✨', x: 15, delay: 0.15, size: 14, rise: -50 },
-        { emoji: '💭', x: -20, delay: 0.35, size: 18, rise: -45 },
-      ], []);
-      return (
-        <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 9999 }}>
-          {bubbles.map((b, i) => (
-            <span key={i} style={{
-              position: 'absolute',
-              left: b.x, top: -10,
-              fontSize: b.size,
-              opacity: 0,
-              animation: `thoughtBubbleFloat 0.9s ease-out ${b.delay}s forwards`,
-              '--thought-rise': `${b.rise}px`,
-            }}>{b.emoji}</span>
-          ))}
-        </div>
-      );
-    };
-  })(),
+  thought_bubbles: ppFx43Reg('thought_bubbles'),   // PIXELART (app-fx-43): Denkblase/Gluehbirne/Funke als Sprites
   // ── Rolling Boulder (v702, Als Vorgabe): ein RIESIGER Fels startet am
   // rechten Bildschirmrand auf 50 % der Spielfeld-Hoehe (Mittellinie
   // zwischen den Haelften), rollt in einem WINKEL geradlinig auf die
@@ -24824,328 +24495,13 @@ const ANIM_REGISTRY = {
       );
     };
   })(),
-  sand_twister: (() => {
-    return function SandTwisterEffect({ x, y }) {
-      const particles = useMemo(() => Array.from({ length: ppFxN(24) }, (_, i) => ({
-        angle: (i / 24) * 360 * 2 + Math.random() * 30,
-        radius: 4 + (i / 24) * 18,
-        size: 3 + Math.random() * 4,
-        delay: i * 20,
-        dur: 600 + Math.random() * 200,
-        rise: 10 + (i / 24) * 30,
-      })), []);
-      return (
-        <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 9999 }}>
-          {particles.map((p, i) => (
-            <span key={i} style={{
-              position: 'absolute', width: p.size, height: p.size, borderRadius: '50%',
-              background: `rgba(${190+Math.random()*40},${160+Math.random()*40},${100+Math.random()*40},${0.6+Math.random()*0.3})`,
-              left: -p.size / 2, top: -p.size / 2, opacity: 0,
-              animation: `sandTwist ${p.dur}ms ease-out ${p.delay}ms forwards`,
-              '--tw-r': `${p.radius}px`, '--tw-rise': `${p.rise}px`,
-              '--tw-a': `${p.angle}deg`,
-              boxShadow: '0 0 3px rgba(178,148,102,0.4)',
-            }} />
-          ))}
-          <span style={{
-            position: 'absolute', fontSize: 18, left: -9, top: -9, opacity: 0,
-            animation: 'twisterEmoji 700ms ease-out 100ms forwards',
-          }}>🌪️</span>
-          <style>{`
-            @keyframes sandTwist {
-              0% { opacity: 0; transform: rotate(var(--tw-a)) translateX(2px) translateY(0); }
-              30% { opacity: 0.9; transform: rotate(calc(var(--tw-a) + 180deg)) translateX(var(--tw-r)) translateY(calc(var(--tw-rise) * -0.3)); }
-              70% { opacity: 0.7; transform: rotate(calc(var(--tw-a) + 360deg)) translateX(var(--tw-r)) translateY(calc(var(--tw-rise) * -0.7)); }
-              100% { opacity: 0; transform: rotate(calc(var(--tw-a) + 540deg)) translateX(calc(var(--tw-r) * 0.5)) translateY(calc(var(--tw-rise) * -1)); }
-            }
-            @keyframes twisterEmoji {
-              0% { opacity: 0; transform: scale(0.3) rotate(0deg); }
-              40% { opacity: 1; transform: scale(1.3) rotate(180deg); }
-              100% { opacity: 0; transform: scale(0.5) rotate(360deg) translateY(-20px); }
-            }
-          `}</style>
-        </div>
-      );
-    };
-  })(),
-  mummy_wrap: (() => {
-    return function MummyWrapEffect({ x, y }) {
-      const strips = useMemo(() => Array.from({ length: ppFxN(12) }, (_, i) => ({
-        angle: (i / 12) * 360 + Math.random() * 30,
-        width: 12 + Math.random() * 16,
-        height: 3 + Math.random() * 2,
-        dist: 6 + Math.random() * 20,
-        delay: i * 30 + Math.random() * 60,
-        dur: 400 + Math.random() * 300,
-        rot: Math.random() * 60 - 30,
-      })), []);
-      return (
-        <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 9999 }}>
-          {strips.map((s, i) => {
-            const rad = (s.angle * Math.PI) / 180;
-            return (
-              <div key={i} style={{
-                position: 'absolute',
-                width: s.width, height: s.height, borderRadius: 1,
-                background: `linear-gradient(90deg, rgba(204,183,153,0.9), rgba(168,147,112,0.7))`,
-                boxShadow: '0 0 3px rgba(168,147,112,0.4)',
-                left: -s.width / 2, top: -s.height / 2,
-                opacity: 0,
-                transform: `rotate(${s.rot}deg)`,
-                animation: `mummyStripWrap ${s.dur}ms ease-in ${s.delay}ms forwards`,
-                '--wrap-sx': `${Math.cos(rad) * 35}px`,
-                '--wrap-sy': `${Math.sin(rad) * 35}px`,
-                '--wrap-ex': `${Math.cos(rad) * s.dist}px`,
-                '--wrap-ey': `${Math.sin(rad) * s.dist}px`,
-              }} />
-            );
-          })}
-          <span style={{
-            position: 'absolute', fontSize: 22, left: -11, top: -11, opacity: 0,
-            animation: 'mummyEmojiPop 600ms ease-out 100ms forwards',
-          }}>👻</span>
-          <style>{`
-            @keyframes mummyStripWrap {
-              0% { opacity: 0; transform: translate(var(--wrap-sx), var(--wrap-sy)) rotate(0deg) scaleX(0.3); }
-              40% { opacity: 0.9; transform: translate(0,0) rotate(180deg) scaleX(1.2); }
-              70% { opacity: 0.8; transform: translate(var(--wrap-ex), var(--wrap-ey)) rotate(300deg) scaleX(1); }
-              100% { opacity: 0; transform: translate(var(--wrap-ex), var(--wrap-ey)) rotate(360deg) scaleX(0.5); }
-            }
-            @keyframes mummyEmojiPop {
-              0% { opacity: 0; transform: scale(0.3); }
-              40% { opacity: 1; transform: scale(1.4); }
-              100% { opacity: 0; transform: scale(0.6) translateY(-15px); }
-            }
-          `}</style>
-        </div>
-      );
-    };
-  })(),
-  fan_blow: (() => {
-    return function FanBlowEffect({ x, y }) {
-      const particles = useMemo(() => [
-        ...Array.from({ length: ppFxN(6) }, (_, i) => ({
-          type: 'fan', x: -12 + Math.random() * 24, y: -5 + Math.random() * 10,
-          delay: i * 40, dur: 500 + Math.random() * 200,
-          size: 14 + Math.random() * 6,
-        })),
-        ...Array.from({ length: ppFxN(14) }, (_, i) => ({
-          type: 'wind', x: -8 + Math.random() * 16, y: -10 + Math.random() * 20,
-          delay: 50 + Math.random() * 200, dur: 400 + Math.random() * 300,
-          size: 8 + Math.random() * 16,
-          angle: -30 + Math.random() * 60,
-        })),
-      ], []);
-      return (
-        <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 9999 }}>
-          {particles.map((p, i) => p.type === 'fan' ? (
-            <span key={i} style={{
-              position: 'absolute', fontSize: p.size,
-              left: p.x, top: p.y, opacity: 0,
-              animation: `fanAppear ${p.dur}ms ease-out ${p.delay}ms forwards`,
-            }}>🪭</span>
-          ) : (
-            <span key={i} style={{
-              position: 'absolute', left: p.x, top: p.y, opacity: 0,
-              width: p.size, height: 2, borderRadius: 2,
-              background: `rgba(${200+Math.random()*55},${180+Math.random()*50},${120+Math.random()*80},0.7)`,
-              transform: `rotate(${p.angle}deg)`,
-              animation: `fanWindLine ${p.dur}ms ease-out ${p.delay}ms forwards`,
-              '--fan-dist': `${40 + Math.random() * 30}px`,
-            }} />
-          ))}
-          <style>{`
-            @keyframes fanAppear {
-              0% { opacity: 0; transform: scale(0.5) rotate(-20deg); }
-              30% { opacity: 1; transform: scale(1.3) rotate(10deg); }
-              60% { opacity: 0.8; transform: scale(1.1) rotate(-5deg); }
-              100% { opacity: 0; transform: scale(0.8) rotate(15deg) translateX(20px); }
-            }
-            @keyframes fanWindLine {
-              0% { opacity: 0; transform: translateX(0) scaleX(0.5); }
-              30% { opacity: 0.8; transform: translateX(10px) scaleX(1.5); }
-              100% { opacity: 0; transform: translateX(var(--fan-dist)) scaleX(0.3); }
-            }
-          `}</style>
-        </div>
-      );
-    };
-  })(),
-  cactus_burst: (() => {
-    return function CactusBurstEffect({ x, y }) {
-      const particles = useMemo(() => Array.from({ length: ppFxN(16) }, (_, i) => ({
-        angle: (i / 16) * 360 + Math.random() * 22,
-        dist: 12 + Math.random() * 22,
-        size: 6 + Math.random() * 8,
-        delay: Math.random() * 100,
-        dur: 400 + Math.random() * 300,
-        drift: -8 - Math.random() * 15,
-        isCactus: Math.random() < 0.4,
-      })), []);
-      return (
-        <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 9999 }}>
-          {particles.map((p, i) => {
-            const rad = (p.angle * Math.PI) / 180;
-            const tx = Math.cos(rad) * p.dist;
-            const ty = Math.sin(rad) * p.dist + p.drift;
-            return p.isCactus ? (
-              <span key={i} style={{
-                position: 'absolute', fontSize: p.size + 4,
-                left: -p.size / 2, top: -p.size / 2, opacity: 0,
-                animation: `cactusPop ${p.dur}ms ease-out ${p.delay}ms forwards`,
-                '--cact-tx': `${tx}px`, '--cact-ty': `${ty}px`,
-              }}>🌵</span>
-            ) : (
-              <span key={i} style={{
-                position: 'absolute', width: p.size, height: p.size, borderRadius: '50%',
-                background: `rgba(${60+Math.random()*40},${140+Math.random()*60},${50+Math.random()*30},0.8)`,
-                left: -p.size / 2, top: -p.size / 2, opacity: 0,
-                animation: `cactusPop ${p.dur}ms ease-out ${p.delay}ms forwards`,
-                '--cact-tx': `${tx}px`, '--cact-ty': `${ty}px`,
-                boxShadow: '0 0 4px rgba(32,172,55,0.5)',
-              }} />
-            );
-          })}
-          <style>{`
-            @keyframes cactusPop {
-              0% { opacity: 0; transform: translate(0,0) scale(0.4); }
-              20% { opacity: 1; transform: translate(calc(var(--cact-tx)*0.3), calc(var(--cact-ty)*0.3)) scale(1.2); }
-              60% { opacity: 0.8; transform: translate(var(--cact-tx), var(--cact-ty)) scale(1); }
-              100% { opacity: 0; transform: translate(calc(var(--cact-tx)*1.3), calc(var(--cact-ty)*1.2)) scale(0.2); }
-            }
-          `}</style>
-        </div>
-      );
-    };
-  })(),
-  mushroom_spore: (() => {
-    return function MushroomSporeEffect({ x, y }) {
-      const particles = useMemo(() => Array.from({ length: ppFxN(20) }, (_, i) => ({
-        angle: Math.random() * 360,
-        dist: 8 + Math.random() * 28,
-        size: 5 + Math.random() * 8,
-        delay: Math.random() * 150,
-        dur: 400 + Math.random() * 300,
-        drift: -15 - Math.random() * 25,
-        emoji: ['🍄', '☁'][Math.random() < 0.35 ? 0 : 1],
-        color: `rgba(${80+Math.random()*60},${120+Math.random()*60},${40+Math.random()*40},${0.6+Math.random()*0.3})`,
-      })), []);
-      return (
-        <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 9999 }}>
-          {particles.map((p, i) => {
-            const rad = (p.angle * Math.PI) / 180;
-            const tx = Math.cos(rad) * p.dist;
-            const ty = Math.sin(rad) * p.dist + p.drift;
-            return p.emoji === '🍄' ? (
-              <span key={i} style={{
-                position: 'absolute', fontSize: p.size + 2,
-                left: -p.size / 2, top: -p.size / 2, opacity: 0,
-                animation: `sporeFloat ${p.dur}ms ease-out ${p.delay}ms forwards`,
-                '--spore-tx': `${tx}px`, '--spore-ty': `${ty}px`,
-              }}>{p.emoji}</span>
-            ) : (
-              <span key={i} style={{
-                position: 'absolute', width: p.size, height: p.size, borderRadius: '50%',
-                background: p.color, filter: 'blur(2px)',
-                left: -p.size / 2, top: -p.size / 2, opacity: 0,
-                animation: `sporeFloat ${p.dur}ms ease-out ${p.delay}ms forwards`,
-                '--spore-tx': `${tx}px`, '--spore-ty': `${ty}px`,
-              }} />
-            );
-          })}
-          <style>{`
-            @keyframes sporeFloat {
-              0% { opacity: 0; transform: translate(0,0) scale(0.5); }
-              25% { opacity: 0.9; transform: translate(calc(var(--spore-tx) * 0.3), calc(var(--spore-ty) * 0.2)) scale(1.1); }
-              70% { opacity: 0.7; transform: translate(var(--spore-tx), calc(var(--spore-ty) * 0.7)) scale(0.9); }
-              100% { opacity: 0; transform: translate(calc(var(--spore-tx) * 1.2), var(--spore-ty)) scale(0.3); }
-            }
-          `}</style>
-        </div>
-      );
-    };
-  })(),
-  dark_swarm: (() => {
-    return function DarkSwarmEffect({ x, y }) {
-      const particles = useMemo(() => Array.from({ length: ppFxN(22) }, (_, i) => ({
-        angle: Math.random() * 360,
-        dist: 5 + Math.random() * 25,
-        size: 4 + Math.random() * 6,
-        delay: Math.random() * 200,
-        dur: 300 + Math.random() * 300,
-        orbit: 15 + Math.random() * 20,
-        orbitSpeed: 0.8 + Math.random() * 1.2,
-      })), []);
-      return (
-        <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 9999 }}>
-          {particles.map((p, i) => {
-            const rad = (p.angle * Math.PI) / 180;
-            const tx = Math.cos(rad) * p.dist;
-            const ty = Math.sin(rad) * p.dist;
-            return (
-              <span key={i} style={{
-                position: 'absolute', width: p.size, height: p.size, borderRadius: '50%',
-                background: `radial-gradient(circle, rgba(${120+Math.random()*40},${20+Math.random()*30},${160+Math.random()*60},0.9), rgba(43,11,71,0.7))`,
-                left: -p.size / 2, top: -p.size / 2,
-                opacity: 0,
-                animation: `darkSwarmFly ${p.dur}ms ease-in-out ${p.delay}ms forwards`,
-                '--swarm-tx': `${tx}px`, '--swarm-ty': `${ty}px`,
-                '--swarm-orbit': `${p.orbit}px`,
-                boxShadow: '0 0 6px 2px rgba(112,45,179,0.6)',
-              }} />
-            );
-          })}
-          <style>{`
-            @keyframes darkSwarmFly {
-              0% { opacity: 0; transform: translate(0,0) scale(0.3); }
-              20% { opacity: 0.95; transform: translate(calc(var(--swarm-tx) * 0.3), calc(var(--swarm-ty) * 0.3)) scale(1.2); }
-              50% { opacity: 1; transform: translate(var(--swarm-tx), var(--swarm-ty)) scale(1); }
-              80% { opacity: 0.8; transform: translate(calc(var(--swarm-tx) * 0.6), calc(var(--swarm-ty) * 1.3)) scale(0.8); }
-              100% { opacity: 0; transform: translate(var(--swarm-tx), calc(var(--swarm-ty) + 10px)) scale(0.2); }
-            }
-          `}</style>
-        </div>
-      );
-    };
-  })(),
-  sand_reset: (() => {
-    return function SandResetEffect({ x, y }) {
-      const particles = useMemo(() => Array.from({ length: ppFxN(18) }, (_, i) => ({
-        angle: (i / 18) * 360 + Math.random() * 20,
-        dist: 10 + Math.random() * 30,
-        size: 3 + Math.random() * 5,
-        delay: Math.random() * 300,
-        dur: 500 + Math.random() * 400,
-        emoji: ['🏜', '✨'][Math.random() < 0.8 ? 0 : 1],
-        drift: -20 - Math.random() * 30,
-      })), []);
-      return (
-        <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 9999 }}>
-          {particles.map((p, i) => {
-            const rad = (p.angle * Math.PI) / 180;
-            const tx = Math.cos(rad) * p.dist;
-            const ty = Math.sin(rad) * p.dist + p.drift;
-            return (
-              <span key={i} style={{
-                position: 'absolute', fontSize: p.size + 4,
-                left: -p.size / 2, top: -p.size / 2,
-                opacity: 0,
-                animation: `sandParticleFly ${p.dur}ms ease-out ${p.delay}ms forwards`,
-                '--sand-tx': `${tx}px`, '--sand-ty': `${ty}px`,
-              }}>{p.emoji}</span>
-            );
-          })}
-          <style>{`
-            @keyframes sandParticleFly {
-              0% { opacity: 0.9; transform: translate(0,0) scale(1); }
-              60% { opacity: 0.7; }
-              100% { opacity: 0; transform: translate(var(--sand-tx), var(--sand-ty)) scale(0.3); }
-            }
-          `}</style>
-        </div>
-      );
-    };
-  })(),
+  sand_twister: ppFx43Reg('sand_twister'),   // PIXELART (app-fx-43): Sandkoerner auf Spiralbahn + Windhosen-Sprite
+  mummy_wrap: ppFx43Reg('mummy_wrap'),   // PIXELART (app-fx-43): Binden-Striche + Geist-Sprite
+  fan_blow: ppFx43Reg('fan_blow'),   // PIXELART (app-fx-43): Faecher-Sprite + Windlinien
+  cactus_burst: ppFx43Reg('cactus_burst'),   // PIXELART (app-fx-43): Kaktus-Sprites + Pixelkugeln
+  mushroom_spore: ppFx43Reg('mushroom_spore'),   // PIXELART (app-fx-43): Pilz-Sprites + Pixelwolken statt Emoji/blur
+  dark_swarm: ppFx43Reg('dark_swarm'),   // PIXELART (app-fx-43): Pixelkugeln statt Verlauf+Schein
+  sand_reset: ppFx43Reg('sand_reset'),   // PIXELART (app-fx-43)
   // Quick Slash — PIXELART (W86r2, Canvas-Szene `ppSzene`): zwei kurze Klingen (-35° und 25°, 180/200 ms), weisser Blitz, aufstiebende Funken.
   quick_slash: (() => {
     const FUNK = ['#ffffff', '#f8f8bd', '#f9ecb3', '#b3d8f9'].map(ppHex);
@@ -25323,62 +24679,7 @@ const ANIM_REGISTRY = {
       );
     };
   })(),
-  poison_pollen_rain: (() => {
-    return function PoisonPollenRainEffect({ x, y }) {
-      const spores = useMemo(() => Array.from({ length: ppFxN(24) }, () => ({
-        xOff: -35 + Math.random() * 70,
-        size: 4 + Math.random() * 7,
-        delay: Math.random() * 300,
-        dur: 500 + Math.random() * 400,
-        color: Math.random() < 0.5
-          ? ['#9544d5','#702db3','#b866ff','#9544d5'][Math.floor(Math.random() * 4)]
-          : ['#e3ce36','#e3ce36','#ffe469','#c79e05'][Math.floor(Math.random() * 4)],
-        wobble: -6 + Math.random() * 12,
-        emoji: Math.random() < 0.2 ? (Math.random() < 0.5 ? '🍄' : '✨') : null,
-      })), []);
-      return (
-        <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10100 }}>
-          <div style={{
-            position: 'absolute', left: -30, top: -30, width: 60, height: 60,
-            background: 'radial-gradient(circle, rgba(149,68,213,.5) 0%, rgba(227,206,54,.3) 40%, transparent 70%)',
-            animation: 'pollenFlash 400ms ease-out forwards',
-          }} />
-          {spores.map((s, i) => (
-            s.emoji ? (
-              <span key={i} style={{
-                position: 'absolute', fontSize: s.size + 4,
-                left: s.xOff - s.size / 2, top: -40, opacity: 0,
-                animation: `pollenFall ${s.dur}ms ease-in ${s.delay}ms forwards`,
-                '--pollen-drift': `${s.wobble}px`,
-              }}>{s.emoji}</span>
-            ) : (
-              <div key={i} style={{
-                position: 'absolute', width: s.size, height: s.size, borderRadius: '50%',
-                background: s.color, filter: 'blur(1px)',
-                boxShadow: `0 0 4px ${s.color}`,
-                left: s.xOff - s.size / 2, top: -40, opacity: 0,
-                animation: `pollenFall ${s.dur}ms ease-in ${s.delay}ms forwards`,
-                '--pollen-drift': `${s.wobble}px`,
-              }} />
-            )
-          ))}
-          <style>{`
-            @keyframes pollenFlash {
-              0% { opacity: 0; transform: scale(0.5); }
-              30% { opacity: 0.8; transform: scale(1.2); }
-              100% { opacity: 0; transform: scale(1.5); }
-            }
-            @keyframes pollenFall {
-              0% { opacity: 0; transform: translate(0, 0) scale(0.5); }
-              15% { opacity: 0.9; transform: translate(calc(var(--pollen-drift) * 0.3), 8px) scale(1); }
-              70% { opacity: 0.7; transform: translate(var(--pollen-drift), 35px) scale(0.9); }
-              100% { opacity: 0; transform: translate(calc(var(--pollen-drift) * 1.3), 55px) scale(0.4); }
-            }
-          `}</style>
-        </div>
-      );
-    };
-  })(),
+  poison_pollen_rain: ppFx43Reg('poison_pollen_rain'),   // PIXELART (app-fx-43)
   // Toxic Fumes — a cloud of sickly purple gas boils out over the target.
   // Used by Toxic Fumes (Spell): thick billowing puffs that expand and
   // dissipate, a green-tinged haze behind, and small skull bubbles rising
@@ -36053,6 +35354,8 @@ function ZielMarkenEbene({ marken, blitze, myIdx }) {
 
   return (
     <div className="ziel-ebene fx-welt-lock" aria-hidden="true">
+      {/* Pixelart-Leinwand (app-fx-41.jsx); der alte SVG-Pfad bleibt nur als Rueckfall, falls die Datei fehlt. */}
+      {window.PpZielPfad && !window.__ppFxAlt ? <window.PpZielPfad segmente={segmente} /> : (
       <svg className="ziel-pfad" width="100%" height="100%">
         <defs>
           <marker id="zielPfadSpitze" viewBox="0 0 10 10" refX="7" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
@@ -36065,7 +35368,7 @@ function ZielMarkenEbene({ marken, blitze, myIdx }) {
             <line x1={sg.ax} y1={sg.ay} x2={sg.bx} y2={sg.by} className="ziel-pfad-linie" markerEnd="url(#zielPfadSpitze)" />
           </g>
         ))}
-      </svg>
+      </svg>)}
       {Object.entries(abzeichen).map(([k, labels]) => {
         const r = rects[k];
         if (!r) return null;
@@ -45659,7 +44962,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         const bogen = (i % 2 === 0 ? 1 : -1) * Math.min(60, len * 0.18) * (0.7 + 0.3 * ((i * 37) % 10) / 10);
         const cx = (start.x + ziel.x) / 2 + nx * bogen;
         const cy = (start.y + ziel.y) / 2 + ny * bogen;
-        faeden.push({ d: `M ${start.x} ${start.y} Q ${cx} ${cy} ${ziel.x} ${ziel.y}`, len: len * 1.15, sx: start.x, sy: start.y });
+        faeden.push({ d: `M ${start.x} ${start.y} Q ${cx} ${cy} ${ziel.x} ${ziel.y}`, len: len * 1.15, sx: start.x, sy: start.y, cx, cy });
         if (window.ppBattleCamFocus) window.ppBattleCamFocus(el);
       });
       if (faeden.length === 0) return;
@@ -46561,23 +45864,8 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         document.body.appendChild(ring);
         setTimeout(() => ring.remove(), ms + i * 180);
       }
-      const syms = up ? ['🧬','✨','⚡','🌀','💠'] : ['🧬','💧','🌀'];
-      const count = up ? 22 : 12;
-      for (let i = 0; i < count; i++) {
-        const q = document.createElement('div');
-        const angle = (i / count) * 360 + Math.random() * 24;
-        const dist = 30 + Math.random() * 70;
-        q.textContent = syms[i % syms.length];
-        q.style.cssText = `
-          position:fixed;left:${cx}px;top:${cy}px;
-          font-size:${12 + Math.random() * 12}px;
-          pointer-events:none;z-index:10000;opacity:0;
-          animation:waflavEvoParticle ${ms}ms ease-out ${Math.random() * 400}ms forwards;
-          --we-x:${Math.cos(angle * Math.PI / 180) * dist}px;
-          --we-y:${Math.sin(angle * Math.PI / 180) * dist - (up ? 60 : -40)}px;`;
-        document.body.appendChild(q);
-        setTimeout(() => q.remove(), ms + 500);
-      }
+      // DNA-Partikel: Pixelsprites auf einer Canvas-Szene (app-fx-43), kein Emoji-Text mit CSS-Drehung
+      if (window.PpFx43) window.PpFx43.evolution({ cx, cy, up, ms });
     };
     socket.on('play_evolution_animation', onEvolutionAnimation);
     const onWillyLeprechaun = ({ owner, heroIdx }) => {
@@ -46588,36 +45876,8 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       const r = el.getBoundingClientRect();
       const cx = r.left + r.width / 2;
       const cy = r.top + r.height / 2;
-      const symbols = ['🍀','🌈','🪙','🫕','☘️','💰','🌈','🍀','🪙','💰','☘️','🫕'];
-      for (let i = 0; i < 24; i++) {
-        const p = document.createElement('div');
-        const sym = symbols[i % symbols.length];
-        const angle = (i / 24) * 360 + Math.random() * 30;
-        const dist = 25 + Math.random() * 60;
-        const rise = 20 + Math.random() * 80;
-        const delay = Math.random() * 500;
-        const size = 12 + Math.random() * 10;
-        p.textContent = sym;
-        p.style.cssText = `
-          position:fixed;left:${cx}px;top:${cy}px;font-size:${size}px;
-          pointer-events:none;z-index:10000;opacity:0;
-          animation:willyParticle 1.6s ease-out ${delay}ms forwards;
-          --wp-x:${Math.cos(angle*Math.PI/180)*dist}px;
-          --wp-y:${-rise}px;
-        `;
-        document.body.appendChild(p);
-        setTimeout(() => p.remove(), 2300);
-      }
-      // Golden glow burst
-      const glow = document.createElement('div');
-      glow.style.cssText = `
-        position:fixed;left:${r.left}px;top:${r.top}px;width:${r.width}px;height:${r.height}px;
-        border-radius:8px;z-index:9999;pointer-events:none;
-        background:radial-gradient(ellipse at center, rgba(250,213,74,.8) 0%, rgba(61,220,87,.4) 40%, transparent 70%);
-        animation:ascensionBurstAnim 1.8s ease-out forwards;
-      `;
-      document.body.appendChild(glow);
-      setTimeout(() => glow.remove(), 2000);
+      // Glueckssymbole + goldgruener Glanz: eine Pixelart-Canvas-Szene (app-fx-43)
+      if (window.PpFx43) window.PpFx43.willy({ rect: r });
     };
     socket.on('willy_leprechaun', onWillyLeprechaun);
     const onAlleriaSpiderRedirect = ({ srcOwner, srcHeroIdx, tgtOwner, tgtHeroIdx, alleriaOwner, alleriaHeroIdx }) => {
@@ -46635,38 +45895,8 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       const dist = Math.sqrt(dx * dx + dy * dy);
       const angle = Math.atan2(dy, dx) * 180 / Math.PI;
 
-      // Spider thread line
-      const thread = document.createElement('div');
-      thread.style.cssText = `
-        position:fixed;left:${sx}px;top:${sy}px;width:0;height:2px;
-        background:linear-gradient(90deg, rgba(185,185,185,.9), rgba(230,230,230,.6));
-        transform-origin:0 50%;transform:rotate(${angle}deg);
-        pointer-events:none;z-index:10000;box-shadow:0 0 4px rgba(185,185,185,.5);
-        animation:spiderThread .4s ease-out forwards;--thread-len:${dist}px;
-      `;
-      document.body.appendChild(thread);
-
-      // Spiders running along the thread
-      const spiderEmoji = '🕷️';
-      for (let s = 0; s < 6; s++) {
-        const spider = document.createElement('div');
-        const delay = 300 + s * 120;
-        spider.textContent = spiderEmoji;
-        spider.style.cssText = `
-          position:fixed;left:${sx}px;top:${sy - 8}px;font-size:14px;
-          pointer-events:none;z-index:10001;opacity:0;
-          animation:spiderRun 0.7s ease-in-out ${delay}ms forwards;
-          --sr-x:${dx}px;--sr-y:${dy}px;
-        `;
-        document.body.appendChild(spider);
-        setTimeout(() => spider.remove(), delay + 900);
-      }
-
-      // Cleanup thread after spiders finish
-      setTimeout(() => {
-        thread.style.animation = 'spiderThreadFade .3s ease-out forwards';
-        setTimeout(() => thread.remove(), 400);
-      }, 1200);
+      // Spinnenfaden + sechs laufende Spinnen: eine Pixelart-Canvas-Szene (app-fx-43)
+      if (window.PpFx43) window.PpFx43.alleria({ sx, sy, tx, ty });
     };
     socket.on('alleria_spider_redirect', onAlleriaSpiderRedirect);
     const onDarkControl = ({ owner, heroIdx, zoneSlot }) => {
@@ -57796,7 +57026,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                   && (hero.statuses?.stunned || !hero.statuses?.webbed)
                   && <div className="status-stunned-overlay"><div className="stun-bolt s1" /><div className="stun-bolt s2" /><div className="stun-bolt s3" /></div>}
                 {/* ★ 26.9.: Crimson Web — statt der Betaeubungsblitze das rote Netz. */}
-                {hero?.name && !figurDa && <CrimsonWebOverlay aktiv={!!hero.statuses?.webbed} />}
+                {hero?.name && !figurDa && (window.PpFx41Netz && !window.__ppFxAlt ? <window.PpFx41Netz aktiv={!!hero.statuses?.webbed} /> : <CrimsonWebOverlay aktiv={!!hero.statuses?.webbed} />)}
                 {hero?.name && !figurDa && (isStunned?._petrified || isStunned?._baihuPetrify) && <div className="baihu-petrify-overlay" />}
                 {hero?.name && !figurDa && isNegated && !isNegated._byWeakeningCrystal && <NegatedOverlay />}
                 {hero?.name && !figurDa && isBurned && <BurnedOverlay ticking={burnTickingHeroes.includes(`${pi}-${i}`)} />}
@@ -60439,7 +59669,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                 }
                 return false;
               });
-              return hasGatheringStorm ? <GatheringStormOverlay /> : null;
+              return hasGatheringStorm ? (window.PpFx41Sturm && !window.__ppFxAlt ? <window.PpFx41Sturm /> : <GatheringStormOverlay />) : null;
             })()}
             {(() => {
               // Prophecy of Tempeste — same shape as Gathering Storm.
@@ -61514,7 +60744,15 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       ))}
 
       {/* v1331: Magische Faeden (mehrere Quellen → ein Ziel) — Welt-Huelle */}
-      {tetherAnims.length > 0 && (
+      {/* Pixelart-Faeden (app-fx-41.jsx, eine Leinwand je Ereignis); die SVG-Fassung darunter bleibt nur als Rueckfall. */}
+      {tetherAnims.length > 0 && window.PpFx41Faeden && !window.__ppFxAlt && (
+        <div className="fx-welt-lock" style={{ zIndex: 10195 }}>
+          {tetherAnims.map(t => (
+            <window.PpFx41Faeden key={t.id} x={t.ziel.x} y={t.ziel.y} faeden={t.faeden} dur={t.dur} color={t.color} glow={t.glow} />
+          ))}
+        </div>
+      )}
+      {tetherAnims.length > 0 && !(window.PpFx41Faeden && !window.__ppFxAlt) && (
         <PixelHuelle className="tether-animation-container fx-welt-lock">
           <svg>
             {tetherAnims.map(t => (
@@ -61664,7 +60902,9 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           flash, splinters, debris chunks) detonates at the target
           right when the horse lands. */}
       <div className="fx-welt-lock" style={{ zIndex: 10130 }}>{/* v1258 Welt-Huelle (Ebene des Pferds) */}
-      {tharxianHorseAnims.map(h => (
+      {tharxianHorseAnims.map(h => (window.PpFx41Pferd && !window.__ppFxAlt) ? (
+        <window.PpFx41Pferd key={h.id} x={h.srcX} y={h.srcY} tx={h.tgtX - h.srcX} ty={h.tgtY - h.srcY} dur={h.dur} nachRechts={h.facingRight} />
+      ) : (
         <React.Fragment key={h.id}>
           {/* The horse + dust trail (translates from src to tgt) */}
           <div className="tharxian-horse-anim" style={{
@@ -61822,7 +61062,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       ) : p.projectileShape === 'darkBlast' ? (
         <DunkelBlastStrahl key={p.id} p={p} />
       ) : p.projectileShape === 'surefire' ? (
-        <WeissPfeil key={p.id} p={p} />
+        (window.PpFx41Surefire && !window.__ppFxAlt) ? <window.PpFx41Surefire key={p.id} x={p.srcX} y={p.srcY} tx={p.tgtX - p.srcX} ty={p.tgtY - p.srcY} dur={p.dur || 170} /> : <WeissPfeil key={p.id} p={p} />
       ) : p.projectileShape === 'pressure' ? (
         <DruckGeschoss key={p.id} p={p} />
       ) : p.projectileShape === 'water' ? (
@@ -61958,14 +61198,14 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       {cameraFlash && (
         <div className="camera-flash-overlay">
           <div className="camera-flash-icon">
-            <svg viewBox="0 0 100 100" width="120" height="120">
+            {window.PpFx41Kamera && !window.__ppFxAlt ? <window.PpFx41Kamera /> : <svg viewBox="0 0 100 100" width="120" height="120">
               <rect x="20" y="30" width="60" height="45" rx="8" fill="#fc69c6" stroke="#fff" strokeWidth="2"/>
               <circle cx="50" cy="52" r="14" fill="#222" stroke="#fff" strokeWidth="2"/>
               <circle cx="50" cy="52" r="8" fill="#1ca9fd"/>
               <rect x="38" y="24" width="24" height="10" rx="3" fill="#fc69c6" stroke="#fff" strokeWidth="1.5"/>
               <ellipse cx="28" cy="22" rx="10" ry="16" fill="none" stroke="#fc69c6" strokeWidth="2" transform="rotate(-30 28 22)"/>
               <ellipse cx="72" cy="22" rx="10" ry="16" fill="none" stroke="#fc69c6" strokeWidth="2" transform="rotate(30 72 22)"/>
-            </svg>
+            </svg>}
           </div>
         </div>
       )}
