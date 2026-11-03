@@ -26603,7 +26603,7 @@ input[type="checkbox"]:focus-visible, input[type="radio"]:focus-visible { outlin
 .board-center.tut-zoom > .hero-sprite-huelle {
   transform-origin: 0 0;
   transform: translate(var(--tz-x, 0px), var(--tz-y, 0px)) scale(var(--tz-s, 1));
-  transition: transform .52s cubic-bezier(.45, 0, .2, 1);
+  /* kein Übergang: die Kamerafahrt läuft als Skript in acht gehaltenen Stufen (`_ppTzFahre`, app-board.jsx) */
 }
 
 /* Gehighlightete Handkarte (Tutorial): ~50 % groesser fuer die Dauer des Highlights (`--tb-hoch` = Versatz nach oben, setzt TextBox in app-shared.jsx). */

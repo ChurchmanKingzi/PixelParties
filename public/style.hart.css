@@ -1,4 +1,4 @@
-/* PP-HART-GEBACKEN ade8aa684aa57c44 — ERZEUGT von scripts/hart/build-css.js aus style.css (pixel-hart.js vorab angewandt) — nicht von Hand ändern. */
+/* PP-HART-GEBACKEN 51a354c3d5e700a6 — ERZEUGT von scripts/hart/build-css.js aus style.css (pixel-hart.js vorab angewandt) — nicht von Hand ändern. */
 .pp-hart-gebacken { --pp-hart: 1; }
 @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Rajdhani:wght@400;500;600;700&family=Orbitron:wght@400;500;600;700;800;900&display=swap');
 
@@ -26351,7 +26351,7 @@ input[type="checkbox"]:focus-visible, input[type="radio"]:focus-visible { outlin
 .board-center.tut-zoom > .hero-sprite-huelle {
   transform-origin: 0 0;
   transform: translate(var(--tz-x, 0px), var(--tz-y, 0px)) scale(var(--tz-s, 1));
-  transition: transform .52s cubic-bezier(.45, 0, .2, 1);
+  /* kein Übergang: die Kamerafahrt läuft als Skript in acht gehaltenen Stufen (`_ppTzFahre`, app-board.jsx) */
 }
 
 /* Gehighlightete Handkarte (Tutorial): ~50 % groesser fuer die Dauer des Highlights (`--tb-hoch` = Versatz nach oben, setzt TextBox in app-shared.jsx). */

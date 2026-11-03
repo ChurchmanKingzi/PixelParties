@@ -2106,13 +2106,61 @@ window.ppTutorialCamFokus = ppTutorialCamFokus;
 // die Sprite-Hülle `.hero-sprite-huelle`, die beide die gleiche Box haben, bekommen dieselbe 2D-Transformation, s. style.css `.tut-zoom`). Der Zoom bringt die Ziele in die Mitte der
 // freien Fläche unter der Textbox. Liegt ein Ziel außerhalb der Brettebene (Phasenleiste, Handkarten, Stapel), bleibt die Ansicht normal. Rückgabe: Promise nach der Fahrt (die Highlight-Klone
 // werden erst danach vermessen) oder null, wenn nichts zu tun ist. `window._ppTz` = aktuelle Verschiebung/Skalierung (nur gültig, solange `.board-center` die Klasse trägt).
+// Kamerafahrt des Tutorial-Zooms als SKRIPT statt CSS-Übergang (Messung 3.11., Tutorial 7, CPU 6× gedrosselt: der Übergang auf den beiden Brett-Ebenen ließ pro Fahrt ~30 ms Hauptfaden-Blockaden und
+// Frame-Lücken bis 167 ms zurück — `pixel-anim.js` backte ihn zur Laufzeit und malte beide Ebenen dann in jedem 30-Hz-Bild neu). Jetzt zehn gehaltene Stufen in 0,52 s (≈ 19 Bilder/s, Stop-Motion
+// wie der Rest des Spiels), Kurve cubic-bezier(.45, 0, .2, 1), nach ZEIT berechnet: ein langsames Gerät überspringt Stufen statt sie aufzustauen. Ohne Bewegung (prefers-reduced-motion): sofort.
+function _ppTzKurve(u) {                                          // cubic-bezier(.45, 0, .2, 1): u (Zeit) → Fortschritt
+  const x1 = 0.45, y1 = 0, x2 = 0.2, y2 = 1;
+  let lo = 0, hi = 1, t = u;
+  for (let i = 0; i < 24; i++) { t = (lo + hi) / 2; const bx = 3 * (1 - t) * (1 - t) * t * x1 + 3 * (1 - t) * t * t * x2 + t * t * t; if (bx < u) lo = t; else hi = t; }
+  return 3 * (1 - t) * (1 - t) * t * y1 + 3 * (1 - t) * t * t * y2 + t * t * t;
+}
+function _ppTzFahre(bc, nach) {
+  const von = window._ppTzAnz || { x: 0, y: 0, s: 1 };
+  const ebenen = () => Array.from(bc.querySelectorAll(':scope > .board-plane-clip, :scope > .hero-sprite-huelle'));
+  // Ruhewert über die Variablen (EINE Neuberechnung am Ende). Zwischenstufen schreiben `transform` direkt an die zwei Ebenen: eine geänderte Custom Property am Brettkasten ließe den ganzen
+  // Teilbaum seinen Stil neu berechnen (jede Stufe ~60 ms bei 6× Drosselung), ein Inline-`transform` fasst nur die beiden Ebenen an.
+  const ruhe = (v) => {
+    for (const e of ebenen()) { e.style.transform = ''; e.style.transition = ''; }
+    bc.style.setProperty('--tz-x', v.x.toFixed(1) + 'px'); bc.style.setProperty('--tz-y', v.y.toFixed(1) + 'px'); bc.style.setProperty('--tz-s', v.s.toFixed(3));
+    window._ppTzAnz = { x: v.x, y: v.y, s: v.s };
+  };
+  const stufe = (v) => {
+    const t = `translate(${v.x.toFixed(1)}px, ${v.y.toFixed(1)}px) scale(${v.s.toFixed(3)})`;
+    for (const e of ebenen()) e.style.transform = t;
+    window._ppTzAnz = { x: v.x, y: v.y, s: v.s };
+  };
+  if (window._ppTzRaf) { try { cancelAnimationFrame(window._ppTzRaf); } catch (e) { /* weg */ } window._ppTzRaf = 0; }
+  let ruhig = false;
+  try { ruhig = !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches); } catch (e) { /* bewegt */ }
+  if (ruhig || window._playAnimations === false) { ruhe(nach); return; }
+  if (window.__ppTzAlt) {                                         // Vergleich/Notbremse: alter CSS-Übergang
+    for (const e of ebenen()) e.style.transition = 'transform .52s cubic-bezier(.45, 0, .2, 1)';
+    ruhe.call(null, nach); for (const e of ebenen()) e.style.transition = 'transform .52s cubic-bezier(.45, 0, .2, 1)';
+    return;
+  }
+  const DAUER = 520, STUFEN = 10, t0 = performance.now(), raf = window.ppTaktRaf || window.requestAnimationFrame;
+  let letzte = 0;
+  const schritt = () => {
+    window._ppTzRaf = 0;
+    const u = Math.min(1, (performance.now() - t0) / DAUER), k = u >= 1 ? STUFEN : Math.floor(u * STUFEN);
+    if (k !== letzte) {
+      letzte = k;
+      if (k >= STUFEN) { ruhe(nach); return; }
+      const f = _ppTzKurve(k / STUFEN);
+      stufe({ x: von.x + (nach.x - von.x) * f, y: von.y + (nach.y - von.y) * f, s: von.s + (nach.s - von.s) * f });
+    }
+    if (u < 1) window._ppTzRaf = raf(schritt);
+  };
+  window._ppTzRaf = raf(schritt);
+}
 function _ppTzStand(bc) { return (bc && bc.classList.contains('tut-zoom') && window._ppTz) ? window._ppTz : { x: 0, y: 0, s: 1 }; }
 function ppTutorialZoomAus() {
   try {
     const bc = document.querySelector('.board-center');
     if (!bc || !bc.classList.contains('tut-zoom') || !window._ppTz) return null;
     window._ppTz = null;
-    bc.style.setProperty('--tz-x', '0px'); bc.style.setProperty('--tz-y', '0px'); bc.style.setProperty('--tz-s', '1');
+    _ppTzFahre(bc, { x: 0, y: 0, s: 1 });
     return new Promise((fertig) => setTimeout(() => { if (!window._ppTz) bc.classList.remove('tut-zoom'); fertig(); }, 560));
   } catch { return null; }
 }
@@ -2160,7 +2208,7 @@ function ppTutorialZoom(elemente) {
     if (Math.abs(tx - cur.x) < 2 && Math.abs(ty - cur.y) < 2 && Math.abs(s - cur.s) < 0.02) return null;
     window._ppTz = { x: tx, y: ty, s };
     bc.classList.add('tut-zoom');
-    bc.style.setProperty('--tz-x', tx.toFixed(1) + 'px'); bc.style.setProperty('--tz-y', ty.toFixed(1) + 'px'); bc.style.setProperty('--tz-s', String(s));
+    _ppTzFahre(bc, { x: tx, y: ty, s });
     return new Promise((fertig) => setTimeout(fertig, 580));
   } catch { return null; }
 }

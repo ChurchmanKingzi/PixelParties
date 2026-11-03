@@ -13623,7 +13623,7 @@ input[type="checkbox"]:focus-visible, input[type="radio"]:focus-visible { outlin
 
 /* ★ Tutorial-Zoom (Desktop): Brettebene und Sprite-Huelle bekommen dieselbe 2D-Verschiebung/Skalierung (Werte setzt `ppTutorialZoom` in app-board.jsx). Ursprung links oben der Box. */
 .board-center.tut-zoom > .board-plane-clip,
-.board-center.tut-zoom > .hero-sprite-huelle { transform-origin: 0 0; transform: translate(var(--tz-x, 0px), var(--tz-y, 0px)) scale(var(--tz-s, 1)); transition: transform .52s steps(12, end); }
+.board-center.tut-zoom > .hero-sprite-huelle { transform-origin: 0 0; transform: translate(var(--tz-x, 0px), var(--tz-y, 0px)) scale(var(--tz-s, 1)); }
 
 /* Gehighlightete Handkarte (Tutorial): ~50 % groesser fuer die Dauer des Highlights (`--tb-hoch` = Versatz nach oben, setzt TextBox in app-shared.jsx). */
 /* Vier gehaltene Stufen (wie `steps(4)`), Größe/Versatz je Stufe rechnet `ppFx44Stufen` (app-fx-44, im Raster der Kunstpixel) vor und legt sie als --tbs1..3 / --tbt1..3 inline ab. Die Schlüsselbilder wechseln nur
