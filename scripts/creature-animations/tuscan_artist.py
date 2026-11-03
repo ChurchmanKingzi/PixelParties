@@ -69,6 +69,25 @@ def teil(m):
 KAPPEN = [(8, 35), (9, 35), (10, 35), (14, 35), (15, 35), (16, 35)]
 
 
+ARM_X0, ARM_Y0, ARM_Y1 = 16, 20, 26                  # rechter Arm unterhalb der Schulterpuffe: Ärmelsaum (Zeile 20) bis Hand/Ärmelzipfel (Zeile 26), x ≥ 16
+
+
+def arm_senken(k):
+    """Den Teil x ≥ ARM_X0, Zeilen ARM_Y0…ARM_Y1 der Körperebene starr 1 px nach unten schieben; die frei werdende Zeile ARM_Y0 wird eine Texturmischung der Zeile darüber
+    (L.misch_kopie mischt jedes zweite Pixel der Nachbarzeile ein)."""
+    out = k.copy()
+    y0, y1, x0 = ARM_Y0 + PAD_T, ARM_Y1 + PAD_T, ARM_X0 + PAD_L
+    for y in range(y1, y0 - 1, -1):
+        out[y + 1, x0:] = k[y, x0:]
+    obere = k[y0 - 1].copy()
+    obere[:x0] = 0
+    nachbar = k[y0].copy()
+    nachbar[:x0] = 0
+    out[y0, x0:] = L.misch_kopie(obere, [nachbar, None], 1)[x0:]
+    # alte Pixel der Zeile y1 + 1 links von x0 bleiben (Körper); die verschobenen Armpixel überschreiben nur x ≥ x0
+    return out
+
+
 def frame(i, nur=None):
     bi = teil(bild)
     k = teil(koerper)
@@ -77,16 +96,15 @@ def frame(i, nur=None):
     if g is not None and not nur:
         x, y = KAPPEN[g]
         Hm.setze(k, {(x, y): Z}, OFF)
-    # --- rechte Hand (leer) zuckt: sie rutscht 1 px nach oben in den Ärmel (Frames 4–9 und 28–33); die Hautpixel liegen dann über dem Ärmelsaum, unten wird nichts freigelegt ---
-    if Hm.folge(i, 4, [1] * 6, N) or Hm.folge(i, 28, [1] * 6, N):
-        ar, rest = L.trenne(k, np.pad(arm_r, ((PAD_T, PAD_B), (PAD_L, PAD_R))))
-        k = L.zusammen(H, W, [(rest, 0, 0), (L.versetze(ar, 0, -1), 0, 0)])
-    # --- Atmen: Körper steigt 1 px (oberste Körperzeile 12 entfällt, Zeile 32 doppelt), das Bild bleibt ---
+    # --- rechter Arm (graue Ärmelspitze samt Hand) senkt sich 1 px (Frames 4–11 und 28–35): der Teil des Arms ab Zeile 20 (x ≥ 16: Ärmelsaum, Ärmelzipfel neben dem Körper, Hand) rutscht starr nach unten, in die
+    # entstehende Zeile 20 kommt eine Texturmischung der Ärmelzeile 19 (keine kopierte Spalte, kein dickerer Umriss); die Hand bewegt sich NICHT für sich allein, sie hängt am Arm ---
+    if Hm.folge(i, 4, [1] * 8, N) or Hm.folge(i, 28, [1] * 8, N):
+        k = arm_senken(k)
+    # --- Atmen: Körper steigt 1 px (Zeile 32 doppelt); Schultern/Kragen schieben sich dabei über die Unterkante des Bildes — das Bild liegt UNTER der Figur und bleibt unverändert ---
     brust = Hm.stufe(i, N / 2, 1)
     if brust:
-        k[PAD_T + 12] = 0
         k = L.streck_zeile(k, PAD_T + 32, brust)
-    fig = L.zusammen(H, W, [(k, 0, 0), (bi, 0, 0)])
+    fig = L.zusammen(H, W, [(bi, 0, 0), (k, 0, 0)])                      # Bild ZUERST (unten), die Figur darüber
     Hm.kontur_schliessen(fig, ERLAUBT, UMRISS)
     return fig
 

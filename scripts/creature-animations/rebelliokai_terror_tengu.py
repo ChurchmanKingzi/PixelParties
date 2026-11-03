@@ -27,7 +27,7 @@ Ablauf (60 Frames à 80 ms = 4,8 s, nahtlos; Frame 0 = Original, Flügel angeleg
   1,5 Frames hinterher und biegt sich dabei durch (anim_flieger_r2.biege = Rückwärtsabbildung um eine gekrümmte Achse, Nächster-Nachbar, keine Mischfarben, Feder-Streifen bleiben Streifen).
   Der Flügel ist im Sprite teils von Fäusten/Kragen und Wange verdeckt: diese Stellen wurden senkrecht mit der Flügelfarbe der Spalte darüber fertiggezeichnet (Federstreifen laufen senkrecht), damit beim Aufklappen keine Lücken entstehen
   (siehe Ergänzungen). Die Schulter (Flügelpixel im Umkreis von 4,2 px um das Gelenk) bleibt am Kopf stehen und hebt sich nur mit der Figur; freiliegende Ränder bekommen die Umrissfarbe (8,10,9) (R.kontur_je_teil).
-* SCHWEBEN: die Figur fliegt — beim Aufklappen sinkt sie bis 2 px, beim Abschlag steigt sie wieder (Frame 0 = Original); die Beine/Stiefel (y ≥ 22) hängen nach (1 Frame, bis 1 px seitlich, Periode 30).
+* SCHWEBEN: die Figur fliegt — beim Aufklappen sinkt sie bis 2 px, beim Abschlag steigt sie wieder (Frame 0 = Original). Die Beine bleiben starr mit dem Körper (ein seitliches Nachschwingen der Stiefel sah zerrissen aus und entfiel).
 * BLINZELN (Frames 22–24 und 46–48): die Iris-/Augenpixel nehmen die Hautfarben der Umgebung an, die obere Lidzeile wird zu (0,0,0): ein dunkler Strich. (Das alte Atmen und die „Federspitzen flickern“ entfallen — die Flügel bewegen sich jetzt als Ganzes.)
 Fest: Kapuze und Kamm, Nase, Kragen, Hände, Rock. Alle Bewegungen laufen auf der vollen Leinwand (ClipError statt Abschneiden). Nur ganze Pixel, nur Quellfarben.
 Ergänzungen: unter Fäusten/Armen/Wange liegende Flügelpixel (nur im Flügel-Layer, im Ruhebild verdeckt): in jeder Spalte x 0–6 (links) bzw. 17–23 (rechts) die verdeckten Zeilen (y 2–20, wo das Sprite einen Nicht-Flügel-Pixel hat) mit der Farbe des nächsten
@@ -112,7 +112,6 @@ for seite in 'lr':
 koerper_m = vorhanden & ~(wing_c & ((xx <= 11) | (xx >= 12))) | sch_m['l'] | sch_m['r']
 koerper_m &= vorhanden
 KOERPER = R.teil(spr, koerper_m, H, W, OFF)
-BEINE_Y = 22                                            # ab hier hängen Stiefel/Rock nach
 # Ruhepose prüfen: Flügel (unverdreht) unter dem Körper ergibt das Original
 _t = L.zusammen(H, W, [(WING_ROT['l'], 0, 0), (WING_ROT['r'], 0, 0), (KOERPER, 0, 0)])
 assert (_t[PAD_T:PAD_T + sh, PAD_L:PAD_L + sw] == spr).all()
@@ -151,13 +150,8 @@ def frame(i):
     k = KOERPER.copy()
     if Hm.folge(i, 22, [1, 1, 1], N) or Hm.folge(i, 46, [1, 1, 1], N):                       # Blinzeln
         Hm.setze(k, {(9, 8): LID, (14, 8): LID, (9, 9): HAUT_AUSSEN, (14, 9): HAUT_AUSSEN, (10, 9): HAUT_MITTE, (13, 9): HAUT_MITTE}, OFF)
-    # Beine hängen nach (Zeilen ab BEINE_Y pendeln seitlich, 1 Frame hinterher)
-    oben_, unten_ = k.copy(), k.copy()
-    oben_[PAD_T + BEINE_Y:] = 0
-    unten_[:PAD_T + BEINE_Y] = 0
-    unten_ = R.zeilen_pendel(unten_, PAD_T + BEINE_Y, 1.2, L.sinus(i - 1.0, N / 2.0), lauf=0.5, ruhe0=True)
     fl_l, fl_r = fluegel('l', i), fluegel('r', i)
-    fig, etik = R.schichten(H, W, [(L.versetze(fl_l, 0, b), 'fluegel'), (L.versetze(fl_r, 0, b), 'fluegel'), (L.versetze(oben_, 0, b), 'koerper'), (L.versetze(unten_, 0, b), 'koerper')])
+    fig, etik = R.schichten(H, W, [(L.versetze(fl_l, 0, b), 'fluegel'), (L.versetze(fl_r, 0, b), 'fluegel'), (L.versetze(k, 0, b), 'koerper')])
     fig = R3.luecken_fuellen(fig, 6, ausser=np.roll(LOCH0, b, axis=0))
     R.kontur_je_teil(fig, etik, ERLAUBT, {'fluegel': UMRISS_FLUEGEL, 'koerper': UMRISS_FLUEGEL}, standard=UMRISS_FLUEGEL)
     return fig

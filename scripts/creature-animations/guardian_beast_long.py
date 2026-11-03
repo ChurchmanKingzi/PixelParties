@@ -46,7 +46,7 @@ import anim_humanoide as Hm
 import anim_lib as L
 
 N, MS = 48, 64
-PAD = (3, 3, 3, 17)
+PAD = (3, 3, 3, 30)
 sz = G.Szene('guardian-beast-long', PAD)
 spr, OFF, H, W, f = sz.spr, sz.off, sz.H, sz.W, sz.f
 PL, PT = sz.PL, sz.PT
@@ -70,7 +70,7 @@ m_gold = sz.vorhanden & L.farbmaske(spr, GOLD) & (sz.yy >= 18) & (sz.yy <= 30)
 # --- Feuerstrahl: die gemalte Flamme (Ebene 104) als Vorlage, Zähne von Hand hineingeschnitten ---
 FLAMME = np.array(Image.open(L.os.path.join(L.SRC, 'guardian-beast-long-flamme.png')).convert('RGBA'))
 FX, FY = 0, 13                                                   # Lage der Flammenebene im Sprite (Stiel x 12–13 liegt im Maul, Ebene 105 x0 = Ebene 104 x0)
-ZAEHNE = [(6.0, 29), (9.4, 31), (12.8, 34), (16.2, 31), (19.4, 28)]     # (Zungenmitte x, Spitzenzeile) in Flammenebene — von Hand gesetzt, mittlere Zunge am längsten
+ZAEHNE = [(6.0, 26), (9.4, 28), (12.8, 31), (16.2, 28), (19.4, 25)]     # (Zungenmitte x, Spitzenzeile) in Flammenebene — von Hand gesetzt, mittlere Zunge am längsten
 STEIL = 2.1                                                      # Zahnflanke: je Pixel Abstand von der Zungenmitte verliert die Zunge so viele Zeilen
 
 

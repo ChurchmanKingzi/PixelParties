@@ -28,7 +28,10 @@ Ablauf (60 Frames à 66 ms = 3,96 s), alle Bewegungen unabhängig:
 * Schwanz schwingt: zweimal pro Schleife (Frames 3–26 und 32–55) schwingt der Schwanz mit der Keule zweimal seitlich hin und her (bis ±3 px an der Keule, wandernde Welle, am Becken fest);
   dazwischen hängt er wie im Original.
 * Kopf hebt sich (Schnüffeln): zweimal pro Schleife (Frames 18–29 und 48–59) hebt sich der ganze Kopf samt Unterkiefer 1 px gegenüber dem Rücken (starre Ebene), dann senkt er sich wieder.
-* Beine treten: hinten (x 9–19) in Frames 10–11 und 40–41; vorn innen (x 33–43) in 18–19 und 48–49; vorn außen (x 47–56) in 27–28 und 57–58 (je eine Fußzeile entfällt kurz, der Fuß rückt 1 px hoch).
+* Beine heben (Runde 3, Nutzerkorrektur wörtlich: „das Heben von Füßen nicht durch das Einziehen seiner Krallen darstellen, sondern wirklich das Bein leicht heben!“): früher fiel beim „Treten“ eine Zeile des FUSSES (der Zehen/Krallen) weg,
+  die Krallen schrumpften. Jetzt wird das ganze Bein samt FUSS starr angehoben: aus dem glatten MITTELTEIL des Beins (nie aus Fuß oder Zehenlinien) entfallen 1–2 Zeilen, alles darunter (Unterschenkel, Fuß, alle Zehenlinien unverändert) rückt um 1–2 px nach oben —
+  wie ein angewinkeltes Bein. Verlauf je Hub 7 Frames: 1-1-2-2-2-1-1 px (schweres Tier: langsam, heben und senken weich). Hinten (x 9–21, Zeilen 29–35, Zeilen 29 und 30 entfallen) in Frames 6–12 und 36–42;
+  vorn innen (x 32–42, ab Zeile 30, Zeilen 31–32 entfallen) in 14–20 und 44–50; vorn außen (x 45–56, ab Zeile 30, Zeilen 30–31 entfallen) in 22–28 und 52–58. Frame 0 = Original.
 Alle Bewegungen laufen auf der vollen Leinwand (anim_lib wirft ClipError). Nur ganze Pixel, nur Farben der Quelle.
 
 Ergänzungen: Randpixel-Korrektur (Regel 16): wo die Schwanzbewegung oder das Kopfheben eine Füllfarbe an den Rand schiebt, wird ein Umrisspixel (Farbe aus dem Original) ergänzt (anim_tiere.umriss_schliessen);
@@ -52,10 +55,14 @@ yy, xx = np.mgrid[0:sh, 0:sw]
 vorhanden = L.deckend(spr)
 
 schwanz = vorhanden & (yy <= 17) & (xx <= 14)
-bein_h = vorhanden & (yy >= 33) & (xx >= 9) & (xx <= 19)
-bein_a = vorhanden & (yy >= 37) & (xx >= 32) & (xx <= 43)
-bein_b = vorhanden & (yy >= 35) & (xx >= 46) & (xx <= 56)
 kopf_m = vorhanden & (xx >= 47) & ((yy <= 27) | ((xx >= 51) & (yy <= 29)))        # Kopf samt Unterkiefer (starr)
+# Beine (Runde 3): das GANZE Bein unterhalb des Körpers (inkl. Fuß mit Zehenlinien) ist ein starres Teil; gehoben wird durch Entfernen glatter Mittelzeilen
+bein_h = vorhanden & (yy >= 29) & (xx >= 9) & (xx <= 21)
+bein_a = vorhanden & (yy >= 30) & (xx >= 32) & (xx <= 42)
+bein_b = vorhanden & (yy >= 30) & (xx >= 45) & (xx <= 57) & ~kopf_m
+BEIN_ZEILE = {'h': 30, 'a': 32, 'b': 31}                                         # Zeile, bis zu der (einschließlich) die k Mittelzeilen entfallen
+HUB = [1, 1, 2, 2, 2, 1, 1]                                                      # Hub in px je Frame (7 Frames)
+HUB_FENSTER = {'h': (6, 36), 'a': (14, 44), 'b': (22, 52)}
 koerper = vorhanden & ~schwanz & ~bein_h & ~bein_a & ~bein_b & ~kopf_m
 
 RAND = T.rand_farben(spr)
@@ -78,12 +85,20 @@ def burst(i, fenster):
     return None
 
 
+def hub(i, bein):
+    """Hub (px) des Beins in Frame i: in den zwei Fenstern je Schleife der Verlauf HUB, sonst 0."""
+    for s in HUB_FENSTER[bein]:
+        if 0 <= i - s < len(HUB):
+            return HUB[i - s]
+    return 0
+
+
 def zustand(i):
     atem = 1 if (i % 30) in range(3, 17) else 0
     u_s = burst(i, FENSTER_SCHWANZ)
     u_k = burst(i, FENSTER_KOPF)
     kopf = 0 if u_k is None else int(round(math.sin(math.pi * u_k) ** 0.6))
-    return atem, u_s, kopf, 1 if i in (10, 11, 40, 41) else 0, 1 if i in (18, 19, 48, 49) else 0, 1 if i in (27, 28, 57, 58) else 0
+    return atem, u_s, kopf, hub(i, 'h'), hub(i, 'a'), hub(i, 'b')
 
 
 def schwanz_schwingen(t, u):
@@ -121,9 +136,9 @@ def frame(i, nur=None):
             for dy in range(d):
                 k[PAD_T + yb - dy, PAD_L + x] = unter
     sw_ = schwanz_schwingen(teil(schwanz), u_s)
-    bh = L.heben_unten(teil(bein_h), PAD_T + 33, tipp_h)
-    ba = L.heben_unten(teil(bein_a), PAD_T + 37, tipp_a)
-    bb = L.heben_unten(teil(bein_b), PAD_T + 35, tipp_b)
+    bh = L.heben_unten(teil(bein_h), PAD_T + BEIN_ZEILE['h'], tipp_h)
+    ba = L.heben_unten(teil(bein_a), PAD_T + BEIN_ZEILE['a'], tipp_a)
+    bb = L.heben_unten(teil(bein_b), PAD_T + BEIN_ZEILE['b'], tipp_b)
     k = L.streck_zeile(k, PAD_T + ZEILE, atem)
     sw_ = L.streck_zeile(sw_, PAD_T + ZEILE, atem)
     ebenen = {'koerper': k, 'schwanz': sw_, 'bein_h': bh, 'bein_a': ba, 'bein_b': bb, 'kopf': kp}

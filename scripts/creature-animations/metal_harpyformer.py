@@ -235,8 +235,8 @@ def frame(i, partikel=True, nur=None):
                 rest[PAD_T + y, PAD_L + x, :3] = LID
         fl_l = HB.zeilen_schub(FL_L, arm_dx(flügel_links(i), 26, 31))
         fl_r = HB.zeilen_schub(FL_R, arm_dx(a, 26, 31))
-        str_l = strang_schwingen(STR_L, True, i, 24.0, 2.0)
-        str_r = strang_schwingen(STR_R, False, i, 16.0, 2.0, lag=1.5)
+        str_l = strang_schwingen(STR_L, True, i, 24.0, 3.0)
+        str_r = strang_schwingen(STR_R, False, i, 16.0, 2.6, lag=1.5)
         feuer = FEUER.ebene(i, wind=wind(i))
         feuer = A.verbinde4(HB.zeilen_schub(feuer, schub_fn(a, kippen(i), 16)))[0]
         gitarre = A.verbinde4(HB.zeilen_schub(GITARRE, schub_fn(a, kippen(i))))[0]

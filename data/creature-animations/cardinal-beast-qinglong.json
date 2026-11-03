@@ -2,7 +2,7 @@
   "creature": "Cardinal Beast Qinglong",
   "sheet": "cardinal-beast-qinglong.png",
   "frameWidth": 84,
-  "frameHeight": 82,
+  "frameHeight": 85,
   "frames": 48,
   "frameMs": 70,
   "loop": true,

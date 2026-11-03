@@ -50,7 +50,7 @@ import anim_lib as L
 import anim_untote as U
 
 N, MS = 48, 70
-GPL, GPR, GPT, GPB = 8, 8, 8, 8
+GPL, GPR, GPT, GPB = 8, 8, 8, 12
 DX, DY = 7, 3                                                                  # Lage des Drachen auf der 80×73-Kartenleinwand
 
 spr = L.lade('cardinal-beast-qinglong')
@@ -100,69 +100,53 @@ AN = {1: {0, 1, 2, 3, 5, 6, 27, 28, 29, 30},
 
 
 # ── Rauschebart (Nutzer-Feedback Runde 3: „Den Bart sollst du nach unten selbstständig weiterzeichnen, ein langer weißer Rauschebart!“) ──
-# Die graue Kinnspitze des Schädels (Sprite-Zeilen 45–51) ist der Bart. Er wird ab Zeile 51 selbst weitergezeichnet: ein langer, zottiger Strang (Sprite-Zeilen 51–72), der unten in drei
-# Locken ausläuft. Farben nur aus dem Schädel (Umriss (128,128,128), Schatten (179,179,179), Fläche (204,204,204), Licht (242,242,242)). Er weht: eine Welle läuft vom Kinn zu den Spitzen
-# (Zeilenversatz, Gefälle ≤ 1 px je Zeile), die drei Locken schwingen zusätzlich einzeln (≤ 1 px, nie dichter als 1 px Abstand → Umrisse werden nie doppelt/dick).
+# Die graue Kinnspitze des Schädels (Sprite-Zeilen 45–51) ist der Bart. Er wird ab Zeile 51 selbst weitergezeichnet: ein langer, zottiger, leicht S-förmig geschwungener Strang
+# (Sprite-Zeilen 51–75, erst breiter, dann zur Spitze auslaufend) mit welligen Strähnenlinien. Farben nur aus dem Schädel (Umriss (128,128,128), Schatten (179,179,179), Fläche (204,204,204),
+# Licht (242,242,242)); Umriss nur außen (1 px, nie doppelt). Er weht: eine Welle läuft vom Kinn zur Spitze (Zeilenversatz, Gefälle ≤ 1 px je Zeile), die Strähnen hängen an den Zeilen.
 BART_J, BART_K, BART_L, BART_I = (128, 128, 128), (179, 179, 179), (204, 204, 204), (242, 242, 242)
-BART_R = 22                                                                     # Zeilen 51 … 72
-# Ruhepose: je Zeile Liste (Locke, xl, xr); Stamm = Locke 0 (r ≤ 11), danach drei Locken 0 (links), 1 (Mitte), 2 (rechts)
-BART_ROHE = {0: [(0, 10, 17)], 1: [(0, 10, 17)], 2: [(0, 9, 18)], 3: [(0, 9, 18)], 4: [(0, 8, 18)], 5: [(0, 8, 19)], 6: [(0, 8, 19)], 7: [(0, 8, 18)], 8: [(0, 8, 19)],
-             9: [(0, 8, 19)], 10: [(0, 8, 19)], 11: [(0, 8, 19)],
-             12: [(0, 8, 10), (1, 12, 15), (2, 17, 19)], 13: [(0, 8, 10), (1, 12, 15), (2, 17, 19)], 14: [(0, 8, 10), (1, 12, 15), (2, 17, 19)],
-             15: [(0, 8, 10), (1, 12, 15), (2, 17, 19)], 16: [(0, 9, 10), (1, 12, 15), (2, 17, 18)], 17: [(0, 9, 10), (1, 13, 15), (2, 17, 18)],
-             18: [(0, 9, 9), (1, 13, 15), (2, 18, 18)], 19: [(0, 9, 9), (1, 13, 14)], 20: [(1, 13, 14)], 21: [(1, 13, 13)]}
+BART_W = [8, 8, 9, 9, 10, 11, 12, 12, 13, 13, 12, 12, 11, 10, 10, 9, 9, 8, 7, 6, 5, 4, 3, 2, 1]        # Breite je Zeile (mit Umriss)
+BART_M = [0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, -1, -1, -1, -1, -1, -1, -1, 0, 0]          # Ruhe-Schwung der Mitte (S-Kurve) gegenüber x = 13,5
+BART_R = len(BART_W)
 
 
-def bart_zeile(r, dx_zeile, extra, i):
-    """Pixel einer Bartzeile r (Liste (x, farbe)) — Stamm/Locken um dx_zeile (+ extra je Locke) verschoben; Strähnen (wellige Schattenlinien, helle Strähnchen) hängen an der Locke."""
-    segs = BART_ROHE[r]
-    xs = []
-    for (k, xl, xr) in segs:
-        e = extra.get((k, r), 0) if len(segs) > 1 else 0
-        xs.append([k, xl + dx_zeile + e, xr + dx_zeile + e, e])
-    for a, b in zip(xs, xs[1:]):                                               # mindestens 1 px Luft zwischen Locken (nie doppelte Umrisse)
-        if b[1] - a[2] < 2:
-            if b[3]:
-                b[1] -= b[3]; b[2] -= b[3]
-            if b[1] - a[2] < 2 and a[3]:
-                a[1] -= a[3]; a[2] -= a[3]
+def bart_zeile(r, dx):
+    """Pixel (x, Farbe) der Bartzeile r, um dx verschoben. Strähnenlinien (Schatten) im Abstand ∝ Breite, daneben links ein Lichtstreifen."""
+    w = BART_W[r]
+    c = 13.5 + BART_M[r] + dx
+    xl = int(math.floor(c - w / 2.0 + 0.5))
     out = []
-    for (k, xl, xr, _) in xs:
-        w = xr - xl + 1
-        for x in range(xl, xr + 1):
-            p = x - xl
-            if w == 1:
-                c = BART_K
-            elif w == 2:
-                c = BART_J if p == 0 else BART_K
-            elif p == 0:
-                c = BART_J
-            elif p == w - 1:
-                c = BART_J if w >= 4 else BART_K
-            else:
-                ph = int(round(1.0 * math.sin(0.55 * r + 1.7 * k)))
-                q = (p + ph) % 3
-                c = BART_K if q == 0 else (BART_I if (q == 1 and (r + p) % 2 == 0) else BART_L)
-            out.append((x, c))
+    for p in range(w):
+        if w == 1:
+            col = BART_K
+        elif w == 2:
+            col = BART_J if p == 0 else BART_K
+        elif p == 0:
+            col = BART_J
+        elif p == w - 1:
+            col = BART_J if w >= 5 else BART_K
+        else:
+            col = BART_L
+            n = 3 if w >= 9 else (2 if w >= 6 else 1)
+            for k in range(n):
+                pos = 1 + int(round((k + 1.0) / (n + 1.0) * (w - 2)))
+                if p == pos:
+                    col = BART_K
+                elif p == pos - 1 and p >= 1 and (r + 2 * k) % 6 < 4 and col != BART_K:
+                    col = BART_I
+        out.append((xl + p, col))
     return out
 
 
 def bart_dx(i):
-    """{r: dx} Welle vom Kinn (r 0) zu den Spitzen: Amplitude wächst mit dem Abstand, die Spitzen hinken nach; Gefälle ≤ 1 px je Zeile."""
+    """{r: dx} Welle vom Kinn (r 0) zur Spitze: Amplitude wächst mit dem Abstand (bis ±3 px), die Spitze hinkt nach; dazu eine zweite, schnellere Welle (Periode 24) in der unteren Hälfte."""
     ph = L.sinus(i, 48)
-    d = {r: int(round(2.6 * ((r + 1) / BART_R) ** 1.3 * math.sin(ph - 0.22 * r))) for r in range(BART_R)}
+    ph2 = L.sinus(i, 24)
+    d = {}
+    for r in range(BART_R):
+        f = (r + 1) / BART_R
+        v = 2.4 * f ** 1.3 * math.sin(ph - 0.20 * r) + 0.9 * max(0.0, f - 0.4) * math.sin(ph2 - 0.45 * r + 1.0)
+        d[r] = int(round(v))
     return G.kappe(d)
-
-
-def bart_extra(i):
-    """{(Locke, r): dx} Eigenschwung der drei Locken (≤ 1 px, wächst zur Spitze): links Periode 24, Mitte 16, rechts 48 — unabhängig voneinander."""
-    ex = {}
-    for k, per, vz in ((0, 24, -1), (1, 16, 1), (2, 48, 1)):
-        sn = math.sin(L.sinus(i, per) + 0.9 * k)
-        for r in range(12, BART_R):
-            fr = (r - 11) / 10.0
-            ex[(k, r)] = int(round(1.15 * fr * sn))
-    return ex
 
 
 def bart_ebene(i):
@@ -170,9 +154,8 @@ def bart_ebene(i):
     a = L.leer(H, W)
     ox, oy = GPL + DX, GPT + DY + BART_Y0
     dxs = bart_dx(i)
-    ex = bart_extra(i)
     for r in range(BART_R):
-        for (x, c) in bart_zeile(r, dxs[r], ex, i):
+        for (x, c) in bart_zeile(r, dxs[r]):
             if not (0 <= oy + r < H and 0 <= ox + x < W):
                 raise L.ClipError(f'Bartpixel ({x},{r}) außerhalb der Leinwand')
             a[oy + r, ox + x, :3] = c
