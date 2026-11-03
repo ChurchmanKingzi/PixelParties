@@ -21,8 +21,9 @@ Ablauf (48 Frames à 70 ms = 3,36 s; Frame 0 = Original, Partikel ausgenommen):
 * Flügelschlag (RUNDE 2, Nutzer: „die Flügel sollen deutlich mehr schlagen“): beide Flügel (links x 0–14, rechts x 31–45, y 2–22: Knochenstreben + Karo-Membran) schlagen jetzt kräftig gleichzeitig: Periode 16 Frames (1,12 s, dreimal pro Schleife; vorher ±3 px, Periode 24).
   Jeder Flügel BIEGT sich entlang seiner waagerechten Mittellinie um die Schulter (x 15 bzw. 30, y 12; anim_flieger_r2.biege = Rückwärtsabbildung um eine gekrümmte Achse: jedes Zielpixel holt sich das Quellpixel an derselben Bogenlänge/Querstelle, Nächster-Nachbar,
   keine Löcher, keine Mischfarben, Knochen und Membran bleiben zusammen, die Schulter bleibt am Rumpf): die Flügelspitze schlägt von der Ruhelage bis ca. 50° nach oben und ca. 20° nach unten (Spitze ca. −9 … +4 px), die Spitze hinkt der Wurzel um 0,5 rad nach. Frame 0 = Original.
-* Brüste wippen (dezent): die beiden Brusthügel (x 19–26, y 15–19) bewegen sich als kleiner Block 1 px — sie hinken dem Körper beim Schweben nach, sinken also 1 px, wenn sich der Körper hebt, und heben sich 1 px beim Zurücksinken (Periode 16). Nichts wird aufgeblasen; die
-  frei werdende Zeile oben bzw. unten wird mit der Nachbarzeile der Haut gefüllt (Quellfarben). Frame 0 = Original.
+* Brüste bouncen (RUNDE 3, Nutzer: „aktuell bewegt sich der komplette Oberkörper hoch und runter, statt dass nur die Brüste bouncen“): das Schweben des ganzen Körpers (±1 px) ist ENTFALLEN — Kopf, Rumpf, Flügelansätze und Füße
+  stehen fest. Nur die beiden Brusthügel (links x 19–22, rechts x 23–26, je y 15–20; Lichtpunkte (21,17)/(25,17) mit Schatten darunter) federn als Blöcke um −2…+2 px (Periode 16 Frames, zwei Harmonische für das Nachschwingen: dy = round(1,5·sin φ + 0,7·sin 2φ));
+  die frei werdenden Zeilen oben/unten werden mit den Hautzeilen darüber/darunter gefüllt (Quellfarben, nichts gestreckt, kein Umriss verdickt). Frame 0 = Original.
 * Füße baumeln: die beiden Fußzeilen (y 26) versetzen sich abwechselnd 1 px zur Seite (Periode 16).
 * Blinzeln (Lid = dunkle Umgebungsfarbe (13,16,49)): NUR das weiße Auge (das einzige Auge) blinzelt — erst die obere Zeile, dann alles; zweimal (Frame 11–13 und 35–37). Das rosa Herz (26–28, 9–11) ist kein Auge und bleibt IMMER offen/unverändert (Nutzer: „das Herz soll nicht blinzeln, sie hat nur ein offenes Auge“).
 * Edelstein im Haar glitzert (Regel 14: nur Edelstein): ein weißer Lichtpunkt läuft diagonal über die 2×2-Fläche, dann die Gegendiagonale; zweimal pro Schleife (Frame 20–22 und 44–46).
@@ -108,23 +109,31 @@ def fluegel(a, fl, ph):
     return R2.biege(a, (GPL + fl['p0'][0], GPT + fl['p0'][1]), fl['ang0'], fl['laenge'], delta)
 
 
-BRUST_X0, BRUST_X1, BRUST_Y0, BRUST_Y1 = 19, 26, 15, 19      # die beiden Brusthügel (Sprite-Koordinaten, einschließlich)
+BRUST_L = (19, 22)                                            # linker Brusthügel (x0, x1 einschließlich; Sprite-Koordinaten): Lichtpunkt (21,17), Schatten darunter (y 18–20)
+BRUST_R = (23, 26)                                            # rechter Brusthügel: Lichtpunkt (25,17)
+BRUST_Y0, BRUST_Y1 = 15, 20
 
 
-def brust(kb, dy):
-    """Brusthügel als Block um dy ∈ {−1, 0, +1} px versetzen; die frei werdende Zeile wird mit der benachbarten Hautzeile (außerhalb des Blocks) gefüllt."""
+def brust(kb, dy, x0_, x1_):
+    """Einen Brusthügel (Block x0_..x1_, y 15–20) als Ganzes um dy ∈ {−2…+2} px versetzen; die frei werdenden Zeilen werden mit den Hautzeilen darüber bzw. darunter gefüllt (Quellfarben, nichts wird gestreckt)."""
     if dy == 0:
         return kb
     out = kb.copy()
-    x0, x1 = GPL + BRUST_X0, GPL + BRUST_X1 + 1
+    x0, x1 = GPL + x0_, GPL + x1_ + 1
     y0, y1 = GPT + BRUST_Y0, GPT + BRUST_Y1 + 1
     block = kb[y0:y1, x0:x1].copy()
     out[y0 + dy:y1 + dy, x0:x1] = block
     if dy > 0:
-        out[y0:y0 + dy, x0:x1] = kb[y0 - dy:y0, x0:x1]            # oben: Zeile über dem Block
+        out[y0:y0 + dy, x0:x1] = kb[y0 - dy:y0, x0:x1]            # oben: Zeilen über dem Block
     else:
-        out[y1 + dy:y1, x0:x1] = kb[y1:y1 - dy, x0:x1]            # unten: Zeile unter dem Block
+        out[y1 + dy:y1, x0:x1] = kb[y1:y1 - dy, x0:x1]            # unten: Zeilen unter dem Block
     return out
+
+
+def brust_dy(i):
+    """Brust-Bounce (RUNDE 3): nur die Brüste federn (Periode 16 Frames, zwei Harmonische → Nachschwingen), Rumpf/Kopf/Flügelansatz bleiben stehen; Frame 0 = 0."""
+    ph = 2 * math.pi * i / FL_PERIODE
+    return int(round(1.5 * math.sin(ph) + 0.7 * math.sin(2 * ph)))
 
 
 def set_px(a, x, y, farbe):
@@ -147,14 +156,12 @@ def frame_gross(i, nur=None):
     # Flügelschlag (Spalte für Spalte)
     fl = fluegel(FL_A, FL_L, ph)
     fr = fluegel(FR_A, FL_R, ph)
-    # Schweben: Körper hebt sich beim Abschlag
-    bob = -int(round(1.0 * math.sin(ph)))
-    sb = math.sin(ph - 0.3)                                      # Brust hinkt dem Körper nach: sinkt 1 px, wenn er sich hebt; hebt sich 1 px beim Zurücksinken
-    kb = brust(kb, 1 if sb > 0.5 else (-1 if sb < -0.5 else 0))
+    # RUNDE 3: kein Schweben des Oberkörpers mehr — nur die Brüste bouncen
+    kb = brust(kb, brust_dy(i), *BRUST_L)
+    kb = brust(kb, brust_dy(i), *BRUST_R)
     fb_l = 1 if (i % 16) in (3, 4, 5) else (-1 if (i % 16) in (11, 12, 13) else 0)
     fb_r = -fb_l
     koerper = L.zusammen(H, W, [(fl, 0, 0), (fr, 0, 0), (kb, 0, 0), (FUSSL_A, fb_l, 0), (FUSSR_A, fb_r, 0)])
-    koerper = L.versetze(koerper, 0, bob) if bob else koerper
     koerper = U.kontur_schliessen(koerper, UMRISS, KONTUR)
     if nur == 'koerper':
         return koerper

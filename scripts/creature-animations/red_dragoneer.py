@@ -19,8 +19,10 @@ Identifikation (x, y im Sprite, symmetrisch um die Mittellinie x = 15,5):
 Bleibt fest: Gesichtszeichnung (außer Blinzeln), Hörner, Schuppenplatten, Krallenpixel (außer Mitbewegung), Zehenkrallen (außer Fußheben).
 
 Ablauf (48 Frames à 70 ms = 3,36 s), alle Bewegungen unabhängig:
-* Flügelschlag (D.fluegel_asym: Spitze hebt sich bis 3 px, senkt sich bis 2 px (Rundung)): viermal pro Schleife (Periode 12); beide Flügel schlagen gleichzeitig, der Versatz wächst mit dem Abstand zur Schulter (Spitze −3 … +2 px), die Spitze hinkt nach (F.fluegel_welle,
-  Spalten bleiben ganz, Zusammenhang erzwungen); die Flügelkrallen schlagen mit (halber Weg). Ruhepose bei Frame 0.
+* Flügelschlag (RUNDE 3, Nutzer: „muss mehr mit den Flügeln schlagen“; vorher nur Spaltenversatz ±3 px): viermal pro Schleife (Periode 12 Frames = 840 ms; Abschlag 4 Frames, Aufschlag 8). Jeder Flügel schwingt jetzt als Ganzes um das Schultergelenk
+  (links (9,5|12), rechts (21,5|12)) — von etwa 25° über der Ruhelage (Spitze fast senkrecht über der Schulter) bis 40° darunter (Spitze zeigt waagerecht nach außen, Spitzenweg ≈ 15 px statt 5 px). Technik wie beim Lunatic Hawk: Rückwärtsabbildung
+  (F.drehen glatt=True, Nächster-Nachbar, keine Mischfarben). Der Flügelansatz (Flügelpixel im Umkreis von 3,3 px um das Gelenk) bleibt am Körper stehen (keine Lücke); Hintergrundlöcher in der Figur werden mit der Nachbarfarbe geschlossen,
+  fehlende Umrisspixel durch T.umriss_schliessen ergänzt. Die weißen Flügelkrallen (Hände) folgen mit einem Viertel des Spitzenwegs. Frame 0 liegt auf dem Aufschlag bei 38 % des Hubs und ist die Originalpose.
 * Schwebe-Bob: beim Abschlag steigt der ganze Drache bis 1 px (Bob hinkt dem Flügel um 0,6 rad hinterher).
 * Atmen (Periode 24, 2× pro Schleife): Zeile 20 (Bauchmitte, Textur) wird eingefügt (L.streck_zeile mit Texturmischung): Kopf, Schultern und Flügelansatz heben sich 1 px, die Füße bleiben.
 * Bauchglut: die orangen Bauchplatten flackern in einer von unten nach oben laufenden Welle um eine Farbstufe (Periode 12).
@@ -39,9 +41,16 @@ import numpy as np
 import anim_lib as L
 import anim_tiere as T
 import anim_drache as D
+import anim_flieger as F
+import anim_flieger_r3 as R3
 
 N, MS = 48, 70
-PAD_L, PAD_R, PAD_T, PAD_B = 3, 3, 6, 3
+PAD_L, PAD_R, PAD_T, PAD_B = 8, 8, 6, 3
+BEAT, DOWN, UP = 12, 4, 8                            # Flügelschlag (4 pro Schleife)
+HUB = math.radians(65.0)                           # Gesamthub: oben +25° (im Uhrzeigersinn, links), unten −40°
+P0 = DOWN + 0.62 * UP                              # Frame 0 = Aufschlag bei 38 % des Hubs (Originalpose)
+PIV_L, PIV_R = (9.5, 12.0), (21.5, 12.0)           # Schultergelenke (Sprite)
+R_WURZEL = 3.3                                     # Flügelansatz am Körper (px um das Gelenk) bleibt stehen
 
 spr = L.lade('red-dragoneer')
 sh, sw = spr.shape[:2]
@@ -59,6 +68,8 @@ fuss_l = vorhanden & (xx <= 12) & (yy >= 22) & ~klauen_l
 fuss_r = vorhanden & (xx >= 19) & (yy >= 22) & ~klauen_r
 koerper = vorhanden & ~flügel_l & ~flügel_r & ~klauen_l & ~klauen_r & ~fuss_l & ~fuss_r
 
+wurzel_l = flügel_l & ((xx - PIV_L[0]) ** 2 + (yy - PIV_L[1]) ** 2 <= R_WURZEL ** 2)
+wurzel_r = flügel_r & ((xx - PIV_R[0]) ** 2 + (yy - PIV_R[1]) ** 2 <= R_WURZEL ** 2)
 RAND = T.rand_farben(spr)
 REGEL = T.umriss_regeln(spr, RAND)[2]
 ZEILE = 20                                         # Bauchmitte: hier wird beim Atmen eine Zeile eingefügt
@@ -76,6 +87,19 @@ for k in list(LID):
 BAUCH = [(189, 57, 8), (213, 98, 16), (230, 131, 16), (246, 164, 24)]       # Rampe dunkel → hell (J, I, G, H)
 bauch_m = np.zeros((H, W), bool)
 bauch_m[PAD_T + 18:PAD_T + 26, PAD_L + 14:PAD_L + 18] = True
+
+
+def welle(t):
+    """0 = Flügel ganz oben … 1 = ganz unten (Abschlag in DOWN Frames, Aufschlag in UP Frames, Cosinus-weich)."""
+    u = (t + P0) % BEAT
+    if u < DOWN:
+        return 0.5 - 0.5 * math.cos(math.pi * u / DOWN)
+    return 0.5 + 0.5 * math.cos(math.pi * (u - DOWN) / UP)
+
+
+def winkel(t):
+    """Drehwinkel des LINKEN Flügels (rad, negativ = gegen den Uhrzeigersinn = Flügel schlägt nach unten); 0 bei Frame 0."""
+    return -HUB * (welle(t) - welle(0))
 
 
 def teil(maske):
@@ -100,7 +124,8 @@ def zustand(i):
 
 def frame(i, nur=None):
     ph, bob, atem, fl_, fr_, blink = zustand(i)
-    k = teil(koerper)
+    bob = -int(round(1.0 * (welle(i - 1.0) - welle(-1.0)) / (1.0 - welle(-1.0))))      # Bob folgt dem Abschlag (Frame 0 = 0)
+    k = teil(koerper | wurzel_l | wurzel_r)
     if blink:
         pix = {p: LID[p] for p in (AUGEN_L + AUGEN_R) if (blink == 2 or p[1] >= 12)}
         for (x, y), c in pix.items():
@@ -110,23 +135,27 @@ def frame(i, nur=None):
     k = L.streck_zeile(k, PAD_T + ZEILE, atem)
     fuss_a = L.heben_unten(teil(fuss_l), PAD_T + FUSS_ZEILE, fl_)
     fuss_b = L.heben_unten(teil(fuss_r), PAD_T + FUSS_ZEILE, fr_)
-    # Flügel (beide Seiten), heben sich mit dem Atmen mit
-    wl = teil(flügel_l)
-    wr = teil(flügel_r)
-    rest = L.platz((koerper | fuss_l | fuss_r).astype(np.uint8)[..., None].repeat(4, 2) * 255, H, W, PAD_L, PAD_T)[..., 3] > 0
-    wl, dys_l = D.fluegel_asym(wl, WAND_L, ph, 3.4, 1.7, lauf=0.5, nur_rechts=False)
-    wr, dys_r = D.fluegel_asym(wr, WAND_R, ph, 3.4, 1.7, lauf=0.5, nur_rechts=True)
-    kl = L.versetze(teil(klauen_l), 0, int(round(0.5 * dys_l.get(PAD_L + 9, 0))) - atem)       # Flügelkrallen schlagen mit (halber Weg, Spalte 9)
-    kr = L.versetze(teil(klauen_r), 0, int(round(0.5 * dys_r.get(PAD_L + 22, 0))) - atem)
+    # Flügel (beide Seiten), schwingen als Ganzes um die Schulter und heben sich mit dem Atmen mit
+    ang = winkel(i)
+    wl = F.drehen(teil(flügel_l & ~wurzel_l), PAD_L + PIV_L[0], PAD_T + PIV_L[1], ang, glatt=True)
+    wr = F.drehen(teil(flügel_r & ~wurzel_r), PAD_L + PIV_R[0], PAD_T + PIV_R[1], -ang, glatt=True)
+    spitze_dy = (PIV_L[1] + (-10.0) * math.cos(ang) + (-8.5) * math.sin(ang)) - (PIV_L[1] - 10.0)      # senkrechter Weg der Flügelspitze (Spitze liegt bei (−8,5|−10) zum Gelenk)
+    kdy = int(round(0.25 * spitze_dy)) - atem
+    kl = L.versetze(teil(klauen_l), 0, kdy)
+    kr = L.versetze(teil(klauen_r), 0, kdy)
     wl = L.versetze(wl, 0, -atem)
     wr = L.versetze(wr, 0, -atem)
     ebenen = {'fuss_l': fuss_a, 'fuss_r': fuss_b, 'koerper': k, 'fluegel_l': wl, 'fluegel_r': wr, 'klauen_l': kl, 'klauen_r': kr}
     wahl = nur or tuple(ebenen)
     ganz = L.zusammen(H, W, [(ebenen[n], 0, bob) for n in wahl])
+    ganz = R3.luecken_fuellen(ganz, 5, ausser=np.roll(ORIG_LOECHER, bob, axis=0))
     return T.umriss_schliessen(ganz, RAND, REGEL)                  # Randpixel-Test (Regel 16)
 
 
 TEST_EBENEN = None
+_m0 = np.zeros((H, W), bool)
+_m0[PAD_T:PAD_T + sh, PAD_L:PAD_L + sw] = vorhanden
+ORIG_LOECHER = R3.eingeschlossen(_m0)
 
 
 if __name__ == '__main__':

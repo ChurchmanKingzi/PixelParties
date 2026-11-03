@@ -22,7 +22,8 @@ Metall im Sprite: der Schild. Nur er glänzt (Regel 14, Lichtband, Rand-Funkeln)
 
 Ablauf (48 Frames à 62 ms = 2,98 s, nahtlos):
 * Auf und ab (Periode 24 = zweimal pro Schleife): die Schildzeile 23 wird einmal doppelt eingefügt: Schlangenkopf, Gesicht, Arme und Schildoberteil steigen 1 px, die Füße bleiben am Boden; der Kopf bleibt dabei starr.
-* Schlangen winden sich (Zeilen 0–8): zwei Böen pro Schleife (Frames 0–24, 24–48) laufen als Welle von oben nach unten durch das Haar — jede Zeile wandert höchstens 1 px (Gefälle ≤ 1 px je Zeile, Umriss wandert mit der Zeile).
+* Schlangen winden sich (Zeilen 0–8) DAUERND (Runde 3: vorher gab es eine lange Pause ohne Haarbewegung): zwei gegenläufige Wellen (3 bzw. 2 Läufe pro Schleife) überlagern sich, jede Zeile wandert
+  höchstens ±2 px, benachbarte Zeilen unterscheiden sich um höchstens 1 px (Umriss wandert mit der Zeile); kein Fenster ohne Haarbewegung.
 * Schlangenaugen blinzeln (je 2 Frames, versetzt: Frames 4, 12, 20, 28, 36, 44 für die sechs gelben Pixel): das gelbe Pixel wird dunkel (0,26,0) — nur ein Lid, kein Farbspiel.
 * Gorgonenaugen blinzeln (Frames 15–17 und 39–41): erst senken sich die Lidpixel (Zeile 11 dunkelgrau), dann schließen sich die Augen (weiß/gelb → Hautgrün (0,122,0)), dann wieder erst Lid; keine Glanzpunkte.
 * Schild glänzt (Regel 14): ein Lichtband läuft einmal diagonal über den Schild (Frames 6–17), später ein Funkeln am rechten Schildrand (Frames 32–35, Stern liegt auf dem Rand).
@@ -40,7 +41,7 @@ import anim_krieger as K
 import anim_lib as L
 
 N, MS = 48, 62
-sz = K.Szene('gorinthian-war-counselor', (3, 4, 3, 2))        # Haarwelle ±1 px, Wippen 1 px, Randabstand ≥ 2
+sz = K.Szene('gorinthian-war-counselor', (4, 4, 4, 2))        # Haarwelle ±2 px, Wippen 1 px, Randabstand ≥ 2
 spr, OFF, H, W = sz.spr, sz.OFF, sz.H, sz.W
 PT = sz.pt
 TEST_EBENEN = ('figur',)
@@ -58,13 +59,23 @@ koerper = sz.vor & ~fuss_l & ~fuss_r
 m_schild = sz.farben_in(sz.rechteck(3, 15, 13, 24), set(SCHILD_R))
 
 
+def _haar_roh(y, i):
+    """Zwei gegenläufige Wellen durch das Schlangenhaar (3 bzw. 2 Läufe pro Schleife) — immer in Bewegung, nie eine Ruhephase."""
+    a = 0.95 * math.sin(2 * math.pi * (y / 6.5 - 3 * i / N))
+    b = 0.75 * math.sin(2 * math.pi * (y / 4.5 + 2 * i / N) + 1.3)
+    return a + b
+
+
 def haar_versatz(i):
-    """{Zeile: dx} für die Schlangen (Zeilen 0–8): zwei Böen, Welle von oben nach unten, nie mehr als 1 px Gefälle."""
-    env = math.sin(2 * math.pi * i / N) ** 2
+    """{Zeile: dx} für die Schlangen (Zeilen 0–8): die Schlangen winden sich dauernd (zwei Wellen mit verschiedener Periode, kein Fenster ohne
+    Bewegung); Frame 0 = Original (Wert bei i = 0 abgezogen), nie mehr als 1 px Gefälle zwischen benachbarten Zeilen, höchstens ±2 px."""
+    roh = {y: int(round(_haar_roh(y, i) - _haar_roh(y, 0))) for y in range(0, 9)}
     out = {}
     for y in range(0, 9):
-        w = env * math.sin(2 * math.pi * (y / 7.0 - 4 * i / N))
-        out[y] = max(-1, min(1, int(round(1.5 * w))))
+        v = max(-2, min(2, roh[y]))
+        if y and abs(v - out[y - 1]) > 1:
+            v = out[y - 1] + (1 if v > out[y - 1] else -1)
+        out[y] = v
     return out
 
 

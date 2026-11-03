@@ -19,8 +19,7 @@ Metall/Edelstein: nichts (die grauen Pixel sind das Hemd) → KEIN Glanz (Regel 
 Ablauf (48 Frames à 66 ms = 3,17 s, nahtlos):
 * Atmen (Periode 24, zweimal pro Schleife): die Gürtelzeile 19 von Körper und Armen wird einmal doppelt eingefügt (L.streck_zeile, Texturmischung): Kopf, Brust und Arme steigen 1 px, Hose und Stiefel bleiben am Boden. Nur senkrecht.
 * Mürrisches Kopfsenken (Frames 14–19 und 38–43): der Kopf sinkt 1 px unter die Ruhelage (die Schulterzeile 11 entfällt einmal) und hebt sich wieder — nur Heben/Senken, kein seitliches Neigen.
-* Arme schlackern (Periode 24, zweimal pro Schleife, links/rechts gegenläufig): jede Zeile unter der Schulter (y 12) wandert waagerecht, je weiter unten (Faust), desto mehr (Faust 1 px nach außen bzw. innen, L.zeilen_welle, Gefälle ≤ 1 px je Zeile);
-  die Arme liegen vor dem Körper, die freigelegten Randpixel bekommen Umrissfarbe (Regel 16).
+* Arme: hängen ruhig am Körper, KEIN Schlackern (Nutzerkorrektur Runde 3) — sie heben und senken sich nur mit dem Atmen des Oberkörpers (Gürtelzeile 19 wie beim Körper doppelt eingefügt).
 * Blinzeln (Frames 20–22 und 43–45): die acht Augenpixel nehmen die Haarfarbe (109,77,48) an (Lid), Wimpern und Nase bleiben.
 Frame 0 = Original (Ruhepose); Kontrolle: anim_humanoide.ruhepose. Randpixel-Test (Regel 16): randtest.py.
 Alle Bewegungen laufen auf der vollen Leinwand (anim_lib wirft ClipError). Nur ganze Pixel, nur Farben der Quelle.
@@ -61,8 +60,7 @@ def frame_gross(i, nur=None):
     k = teil(koerper)
     if Hm.folge(i, 20, [1, 1, 1], N) or Hm.folge(i, 43, [1, 1, 1], N):
         Hm.setze(k, {p: HAAR for p in AUGEN}, OFF)
-    al = L.zeilen_welle(teil(arm_l), GP + 12, -1.4, L.sinus(i, 24))
-    ar = L.zeilen_welle(teil(arm_r), GP + 12, 1.4, L.sinus(i, 24, np.pi))
+    al, ar = teil(arm_l), teil(arm_r)                            # Arme hängen still (Nutzer-Feedback: kein Schlackern); sie atmen nur mit dem Oberkörper
     if Hm.folge(i, 14, [1] * 6, N) or Hm.folge(i, 38, [1] * 6, N):
         k = L.streck_zeile(k, GP + 11, -1)
     b = 1 if Hm.welle01(i, 24) > 0.5 else 0

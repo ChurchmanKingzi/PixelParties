@@ -18,14 +18,15 @@ Metall/Edelstein: nichts → KEIN Glanz (Knochen, Stoff; Regel 14). Kein Feuer, 
 
 Ablauf (48 Frames à 70 ms = 3,36 s, nahtlos; Ebenen: Robe, Schädelgruppe, Wirbel, linkes Knochenstück, Kreuzknochen):
 * Atmen der Robe (Periode 24, zweimal pro Schleife): die Robenzeile 22 wird einmal doppelt eingefügt (L.streck_zeile, Texturmischung): Kopf, Brust und Gürtel steigen 1 px, der Saum (y 23–25) bleibt.
-* Schädelgruppe schwebt (Periode 16, dreimal pro Schleife): beide Schädel samt Kronenknochen steigen starr um 1 px und sinken wieder (Heben/Senken); die frei werdende Zeile 11 unter dem Kiefer wird mit dem dunklen Marineblau der Kapuze (23,16,44) gefüllt, solange die Robe darunter nicht mitgestiegen ist.
-* Wirbel am Kinn von Schädel 2 schwingt (Periode 12, viermal pro Schleife): der dünne Knochen (x 20–24, y 20–23) wandert starr 0 → +1 → 0 → −1 px waagerecht (nur starr, damit der schmale Umriss nicht reißt), er hängt am Schädel und bobbt mit ihm.
+* Knochenhut (beide Schädel samt Krone/Knochenstück, `schaedel`) sitzt starr am Kopf: er hebt und senkt sich EXAKT gleichzeitig mit dem Kopf der Robe (b = 0/1 des Atmens, Hut −b) und hat keine eigene Bewegung mehr
+  (Nutzerkorrektur Runde 3: „der Knochenhut soll sich nicht unabhängig vom Kopf bewegen“). Das frühere Schweben (Periode 16) samt Füllpixeln unter dem Kiefer entfällt.
+* Wirbel am Kinn von Schädel 2 schwingt (Periode 12, viermal pro Schleife): der dünne Knochen (x 20–24, y 20–23) wandert starr 0 → +1 → 0 → −1 px waagerecht (nur starr, damit der schmale Umriss nicht reißt), er hängt am Schädel und hebt sich mit ihm (mit dem Kopf).
 * Linkes Knochenstück an der Robe pendelt (Periode 16 versetzt): Zeilen 24–28 wandern waagerecht (Gelenk Zeile 23, Spitze bis ±2 px), Zeile 23 bleibt an der Robe.
-* Kreuzknochen schweben (Periode 24 versetzt): sie sinken von der Ruhelage 0 → 1 px nach unten (nur nach unten, damit sie sich nicht an die Robe heften) und zurück.
+* Kreuzknochen (der unten liegende Knochen, x 8–16, y 27–32): bewegt sich GAR NICHT (Nutzerkorrektur Runde 3). Annahme: gemeint ist dieser Knochen; das Knochenstück links an der Robe (x 2–6) pendelt weiter an seiner Aufhängung.
 * Blinzeln der drei hellblauen Augenpixel (Frames 21–23 und 41–43): sie nehmen das Marineblau (45,26,70) der Kapuze an (Lid = Umgebungsfarbe).
 Frame 0 = Original (Ruhepose); Kontrolle: anim_humanoide.ruhepose. Randpixel-Test (Regel 16): Kontur in Umrissfarbe, zusätzlich randtest.py.
 Alle Bewegungen laufen auf der vollen Leinwand (anim_lib wirft ClipError). Nur ganze Pixel, nur Farben der Quelle.
-Ergänzungen: Zeile 11, x 7–16 in (23,16,44) während der Schädelhub oben ist und die Robe unten (Kapuze unter dem Kiefer); sonst keine.
+Ergänzungen: keine (Hut und Robe heben sich gleichzeitig, es entsteht keine Lücke mehr).
 """
 import math
 import sys
@@ -90,21 +91,16 @@ def frame_gross(i, nur=None):
     b = 1 if Hm.welle01(i, 24) > 0.5 else 0
     if b:
         r = L.streck_zeile(r, GP + 22, b)
-    # Schädelgruppe schwebt starr 0/−1
-    sk = -1 if Hm.welle01(i, 16, 0.0) > 0.55 else 0
+    # Knochenhut (beide Schädel samt Krone) sitzt am Kopf: er hebt sich EXAKT mit dem Kopf der Robe (kein eigenes Schweben, Nutzerkorrektur Runde 3)
+    sk = -b
     s = L.versetze(teil(schaedel), 0, sk)
-    if sk == -1 and not b:
-        for x in range(7, 17):
-            if not r[GP + 11, GP + x, 3] and not s[GP + 11, GP + x, 3]:
-                r[GP + 11, GP + x, :3] = MARINE
-                r[GP + 11, GP + x, 3] = 255
-    # Wirbel am Kinn von Schädel 2: pendelt, hängt am Schädel
+    # Wirbel am Kinn von Schädel 2: pendelt waagerecht, hängt am Schädel (hebt sich mit ihm)
     sw_ = math.sin(L.sinus(i, 12))
     w = L.versetze(teil(wirbel), 1 if sw_ > 0.5 else (-1 if sw_ < -0.5 else 0), sk)
     # linkes Knochenstück an der Robe: pendelt
     kl = L.zeilen_welle(teil(knochen_l), GP + 23, 1.6, L.sinus(i, 16, 0.0))
-    # Kreuzknochen schweben 0/+1
-    kz = L.versetze(teil(kreuz), 0, 1 if Hm.welle01(i, 24, math.pi * 0.0) > 0.5 else 0)
+    # unten liegender Kreuzknochen: bewegt sich gar nicht (Nutzerkorrektur Runde 3)
+    kz = teil(kreuz)
     fr = L.zusammen(H, W, [(r, 0, 0), (kz, 0, 0), (kl, 0, 0), (s, 0, 0), (w, 0, 0)])
     return Hm.kontur_schliessen(fr, ERLAUBT, UMRISS)
 

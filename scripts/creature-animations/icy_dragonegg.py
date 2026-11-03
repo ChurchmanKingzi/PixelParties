@@ -14,9 +14,13 @@ Was im Sprite ist (Koordinaten im Sprite 34×41, x/y ab 0):
 * Material: Eis — kein Glanz, keine Sterne (Regel 14: bei Eis im Zweifel weglassen), kein Feuer.
 Fest bleiben: das GANZE Ei (Form, Rand, Schuppenraster).
 
-Ablauf (60 Frames à 75 ms = 4,5 s, nahtlos):
-* Risse: acht kleine Risse aus je 3 Pixeln (das Ei ist mit 34×41 px groß; 2 Pixel gingen im Schuppenraster unter) in der dunkelsten Eifarbe D=(25,20,37) (diagonal bzw. senkrecht gezackt) erscheinen zeitversetzt an acht verschiedenen Stellen des Eis (alle 6 Frames einer, 1–3 gleichzeitig):
-  erst 1, dann 2, dann 3 Pixel, steht kurz, schrumpft wieder und verschwindet (Verlauf 1-1-2-2-3-3-3-3-2-2-1-1, 12 Frames = 0,9 s). Sie liegen nur auf hellen Schuppenpixeln (F, G, L, N, P, Q, I), mindestens 2 Pixel vom Rand. Frame 0 = Original (rissfrei).
+Nutzerwunsch (Runde 3): „gerne ein paar mehr Cracks, auch mehr als einen pro Ei zur Zeit. Das gilt für ALLE Eier.“
+Ablauf (72 Frames à 75 ms = 5,4 s, nahtlos):
+* Das Ei bleibt KOMPLETT STATISCH. Risse: 16 Risse (vorher 8) aus je 4 Pixeln in der dunkelsten Eifarbe D=(25,20,37), zackig (diagonal/senkrecht gemischt), erscheinen zeitversetzt über das ganze Ei verteilt:
+  erst 1, dann 2, 3, 4 Pixel, steht 2–5 Frames, schrumpft wieder und verschwindet (16–19 Frames je Riss). Die Starts sind unregelmäßig (Goldener-Schnitt-Folge), sodass fast immer 3–6 Risse gleichzeitig sichtbar sind
+  (mehrere nebeneinander auf dem einen Ei); Frame 0 und die ersten Frames sind rissfrei (= Original).
+* Umrisse werden NIE dicker: Risse liegen nur auf den Schuppenpixeln (nie auf den dunkelvioletten Fugen A/D und nie auf den dunklen Blautönen), mindestens 2 Pixel von der Silhouette entfernt, nie auf dem Rand;
+  zwei Risse berühren sich nie gleichzeitig (das Skript prüft es).
 Ergänzungen: keine. Nur ganze Pixel, nur Quellfarben, kein Alpha.
 Frame: Sprite plus 3 px Rand rundum — Figur zentriert.
 """
@@ -27,7 +31,7 @@ import numpy as np
 import anim_lib as L
 import anim_eier as E
 
-N, MS = 60, 75
+N, MS = 72, 75
 PAD = 3
 
 spr = L.lade('icy-dragonegg')
@@ -35,26 +39,22 @@ sh, sw = spr.shape[:2]
 H, W = sh + 2 * PAD, sw + 2 * PAD
 OPAK = spr[..., 3] > 0
 DUNKEL = (25, 20, 37)
-HELL = [(110, 177, 203), (153, 200, 218), (144, 198, 208), (177, 214, 222), (200, 234, 237), (177, 226, 230), (114, 164, 202)]
 _farben = {tuple(int(v) for v in p[:3]) for p in spr.reshape(-1, 4) if p[3]}
-assert DUNKEL in _farben and all(c in _farben for c in HELL)
+assert DUNKEL in _farben
+SCHUPPE = [c for c in sorted(_farben) if 0.3 * c[0] + 0.59 * c[1] + 0.11 * c[2] >= 100]  # nur helle/mittelhelle Schuppen (Helligkeit >= 100), auf denen ein dunkler Riss gut sichtbar ist
+ERLAUBT = E.sicher(spr, SCHUPPE, sorted(_farben), rand_abstand=2)
 
-# ── Risse (x, y im Sprite; Pixel 1 zuerst, dann 2) — Reihenfolge der Starts so, dass benachbarte Risse nie gleichzeitig laufen ──
-_SITES = [[(16, 18), (15, 19), (16, 20)], [(25, 22), (24, 23), (25, 24)], [(12, 5), (12, 6), (13, 7)], [(15, 25), (16, 26), (17, 27)],
-          [(28, 18), (28, 19), (28, 20)], [(11, 14), (12, 15), (13, 16)], [(22, 10), (21, 11), (22, 12)], [(25, 14), (26, 15), (25, 16)]]
-RISSE = [E.Riss(p, start=2 + 6 * k, profil=E.PROFIL3) for k, p in enumerate(_SITES)]
-_hm = np.zeros((sh, sw), bool)
-for _c in HELL:
-    _hm |= (spr[..., :3] == np.array(_c)).all(axis=2)
-_rand = np.zeros((sh, sw), bool)
-for _y in range(sh):
-    for _x in range(sw):
-        if OPAK[_y, _x] and not OPAK[max(_y - 2, 0):_y + 3, max(_x - 2, 0):_x + 3].all():
-            _rand[_y, _x] = True
-for _r in RISSE:
-    for (_x, _y) in _r.pix:
-        assert _hm[_y, _x] and not _rand[_y, _x], (_x, _y)
-assert all(r.stufe(0, N) == 0 for r in RISSE) and E.gleichzeitig(RISSE, N)[0] <= 3
+# ── Risse (x, y im Sprite; Pixel 1 wächst zuerst) — Stellen mit E.sicher/E.pfade ausgesucht und festgeschrieben ──
+_SITES = [[(10, 11), (11, 11), (12, 12), (12, 13)], [(21, 24), (20, 25), (20, 26), (21, 27)], [(20, 12), (19, 13), (19, 14), (20, 15)], [(16, 6), (17, 6), (18, 7), (18, 8)],
+          [(26, 18), (27, 19), (28, 19), (29, 18)], [(24, 12), (24, 13), (25, 14), (26, 14)], [(12, 21), (12, 20), (13, 19), (14, 19)], [(9, 25), (9, 26), (10, 27), (11, 27)],
+          [(19, 19), (20, 20), (21, 20), (22, 19)], [(26, 26), (27, 26), (28, 27), (28, 28)], [(6, 13), (6, 14), (7, 15), (8, 15)], [(15, 33), (15, 34), (16, 35), (17, 35)],
+          [(16, 25), (15, 26), (15, 27), (16, 28)], [(21, 33), (21, 34), (22, 35), (23, 35)], [(10, 7), (11, 7), (12, 6), (12, 5)], [(22, 6), (22, 7), (23, 8), (24, 8)]]
+_ORD = [0, 8, 3, 12, 6, 14, 1, 10, 4, 15, 9, 2, 13, 5, 11, 7]                              # Reihenfolge der Starts (benachbarte Stellen nicht hintereinander)
+_HALTEN = [3, 5, 2, 4, 3, 2, 5, 4]
+_prof = [E.profil(4, _HALTEN[k % len(_HALTEN)]) for k in range(len(_SITES))]
+_st = E.starts(len(_SITES), N, [len(q) for q in _prof], basis=2, versatz=0.15)
+RISSE = [E.Riss(_SITES[j] if k % 2 == 0 else list(reversed(_SITES[j])), start=_st[k], profil=_prof[k]) for k, j in enumerate(_ORD)]
+E.pruefe_risse(RISSE, N, ERLAUBT)
 
 REF = L.platz(spr, H, W, PAD, PAD)
 
@@ -66,8 +66,8 @@ def frame(i):
 if __name__ == '__main__':
     frames = [frame(i) for i in range(N)]
     prev = sys.argv[sys.argv.index('--preview') + 1] if '--preview' in sys.argv else None
-    mx, leer = E.gleichzeitig(RISSE, N)
-    print('Frame 0 weicht vom Original in', int((frames[0] != REF).any(axis=2).sum()), 'Pixeln ab | höchstens', mx, 'Risse gleichzeitig | Frames ohne Riss:', leer)
+    z = E.zaehle(RISSE, N)
+    print('Frame 0 weicht vom Original in', int((frames[0] != REF).any(axis=2).sum()), 'Pixeln ab |', len(RISSE), 'Risse | gleichzeitig höchstens', z['max'], ', Mittel', z['mittel'], '| Frames ohne Riss:', z['leer'])
     print('Pixel, die sich je Frame vom Original unterscheiden:', [int((f != REF).any(axis=2).sum()) for f in frames])
     n = L.pruefe(frames, quelle=spr)
     L.speichern('icy-dragonegg', 'Icy Dragonegg', frames, MS, prev)

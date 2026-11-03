@@ -152,6 +152,24 @@ def scheren(a, pivot_y, amp):
     return out
 
 
+def arm_schere(a, x_gelenk, x_hand, dy):
+    """Waagerecht abstehenden Arm um sein Schultergelenk heben/senken (Runde 3, Minocrete): die Spalte x wandert senkrecht um round(dy · (x_gelenk − x)/(x_gelenk − x_hand)),
+    an der Hand (x ≤ x_hand) um dy, am Gelenk (x ≥ x_gelenk) um 0 — Gefälle ≤ 1 px je Spalte, Arm bleibt am Rumpf angewachsen. Spalten ganz ohne Pixel bleiben leer."""
+    out = L.leer(*a.shape[:2])
+    h, w = a.shape[:2]
+    for x in range(w):
+        ys = np.nonzero(a[:, x, 3])[0]
+        if not len(ys):
+            continue
+        f = min(1.0, max(0.0, (x_gelenk - x) / float(x_gelenk - x_hand)))
+        d = int(math.floor(dy * f + 0.5))
+        if ys.min() + d < 0 or ys.max() + d >= h:
+            raise L.ClipError(f'Spalte {x} würde um {d} px aus der Leinwand geschoben')
+        for y in ys:
+            out[y + d, x] = a[y, x]
+    return out
+
+
 def kontur(a, erlaubt, wahl):
     """Regel 16: jedes Randpixel (4-Nachbar leer), dessen Farbe keine Umrissfarbe des Originals ist, bekommt die Farbe wahl(farbe, x, y) — so bleibt die Kontur in jeder Pose geschlossen
     und der neue Umriss passt zur Umgebung (roter Federbusch → dunkles Rot, nicht Schwarz)."""

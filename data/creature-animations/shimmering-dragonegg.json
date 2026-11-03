@@ -3,7 +3,7 @@
   "sheet": "shimmering-dragonegg.png",
   "frameWidth": 40,
   "frameHeight": 47,
-  "frames": 48,
+  "frames": 72,
   "frameMs": 65,
   "loop": true,
   "layout": "horizontal",

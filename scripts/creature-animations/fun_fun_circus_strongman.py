@@ -21,8 +21,8 @@ Was im Sprite ist (x, y im 29×29-Sprite):
 Metall: Hantelgewichte und Kette → nur dort Lichtband/Glitzer (Regel 14); Haut, Hose, Stiefel, Maske glänzen nicht. Keine Partikel, kein Feuer.
 
 Ablauf (72 Frames à 62 ms = 4,46 s, nahtlos):
-* HANTEL STEMMEN (Periode 24, drei Hübe je Schleife): Faust + Unterarm + Hantel (starr, Ebenen 20-Faust/22/21 gemeinsam) heben sich bis 2 px und senken sich wieder; die Stange bleibt in der Faust, der Unterarm taucht hinter den Rumpf.
-* ATMEN (Periode 36, bis 2 px): die Hosenzeile 22 wird bis zu 2× eingefügt (Texturmischung); Kopf mit Maske, Brust und der rechte Arm (starr) steigen, Hose/Füße bleiben; die Hantel steigt mit, die obere Kette folgt der Hand.
+* HANTEL STEMMEN (Periode 24, drei Hübe je Schleife): Faust + Unterarm + Hantel (starr, Ebenen 20-Faust/22/21 gemeinsam) heben sich zusätzlich zum Körper (Atmen) um höchstens 1 px relativ zu Kopf und Rumpf (Runde 3: vorher bis 2 px → Lücke zwischen oberem Gewicht und Kopf; bei 1 px wird nur die verdeckte unterste Gewichtszeile frei, das Gewicht berührt den Kopf weiter); die Stange bleibt in der Faust, der Unterarm taucht hinter den Rumpf.
+* ATMEN (Periode 36, bis 2 px): die Hosenzeile 22 wird bis zu 2× eingefügt (Texturmischung); Kopf mit Maske, Brust und der rechte Arm (starr) steigen, Hose/Füße bleiben; die Hantel steigt mit, die Kette am rechten Arm (samt Kettenende bis y 25) folgt dem Arm komplett (Runde 3: die untersten Endpixel blieben zurück).
 * FUSSTIPPEN: linker Stiefel (Frames 14–19) und rechter (Frames 46–51) heben sich je zweimal 1 px hinter die Hose.
 * METALL: ein Lichtband läuft über das obere Hantelgewicht (Frames 6–15) und das untere (Frames 36–45), ein Lichtband über die Kette am Boden (Frames 56–67); je ein Glitzerstern am oberen Gewicht (Frames 22–26) und am unteren (Frames 52–56) — sie sitzen am Eisen und gehen mit der Hantel.
 * Kein Kopfwiegen seitlich (Regel 17), kein Schweben (Regel 18).
@@ -59,7 +59,7 @@ FUSS_L = v20 & (yy >= 26) & (xx <= 14)
 FUSS_R = v20 & (yy >= 26) & (xx >= 15)
 RUMPF = v20 & ~FAUST & ~ARM_R & ~FUSS_L & ~FUSS_R
 v18 = L.deckend(E18)
-KETTE_OBEN = v18 & (yy <= 23) & (xx >= 20)
+KETTE_OBEN = v18 & (xx >= 20) & ((yy <= 23) | (xx >= 24))      # Kettenende am rechten Arm komplett (auch die Pixel y 24–25 am Ende)
 KETTE_REST = v18 & ~KETTE_OBEN
 v21 = L.deckend(E21)
 GEW_OBEN = v21 & (yy <= 4)
@@ -77,7 +77,7 @@ def eb(a, m=None, dx=0, dy=0):
 
 def frame(i, nur=None):
     hub = Hm.stufe(i, 36, 2)
-    pump = Hm.stufe(i, 24, 2)
+    pump = Hm.stufe(i, 24, 1)                     # Hantel steigt höchstens 1 px relativ zum Kopf: die verdeckte unterste Gewichtszeile (y 5) wird frei, es bleibt keine Lücke zum Kopf
     arm_dy = -hub - pump
     # Hantel + Glanz (Eisen: Lichtband, Glitzerstern), starr mit Faust und Unterarm
     db = eb(E21)

@@ -224,6 +224,29 @@ def kontur_je_teil(fig, etik, erlaubt, farben, standard=None):
     return geaendert
 
 
+def luecken_fuellen(fig, etik, links, rechts, maxbreite=3):
+    """Waagerechte Lücken (1–maxbreite leere Zellen) zwischen einem Pixel des Teils `links` und einem Pixel des Teils `rechts` (Etiketten aus `schichten`) mit der Farbe des linken Nachbarn füllen
+    (Runde 3, Tanuki: schwingt der Schwanz vom Körper weg, wird die freigelegte Flanke des Körpers ergänzt statt Hintergrund zu zeigen; keine Umrissverbreiterung). Gibt die gefüllten Pixel zurück."""
+    H, W = fig.shape[:2]
+    gefuellt = []
+    for y in range(H):
+        x = 0
+        while x < W - 1:
+            if fig[y, x, 3] and etik[y, x] == links and not fig[y, x + 1, 3]:
+                x2 = x + 1
+                while x2 < W and not fig[y, x2, 3] and x2 - x <= maxbreite:
+                    x2 += 1
+                if x2 < W and fig[y, x2, 3] and etik[y, x2] == rechts and x2 - x - 1 <= maxbreite:
+                    for xx_ in range(x + 1, x2):
+                        fig[y, xx_] = fig[y, x]
+                        etik[y, xx_] = links
+                        gefuellt.append((xx_, y))
+                x = x2
+            else:
+                x += 1
+    return gefuellt
+
+
 def loecher(frame):
     """Eingeschlossene leere Flächen (nicht über 4-Nachbarn mit dem Leinwandrand verbunden) als Menge von (x, y). Ein Loch, das Frame 0 nicht hat, ist meist ein Fehler
     (Lücke zwischen verschobenem Teil und Körper)."""

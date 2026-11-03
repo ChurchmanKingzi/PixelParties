@@ -10,6 +10,10 @@ Quelle: src/gigantisaur-pteranos.png — der ganze Flugsaurier (73×49 px, 14 Fa
   der Figur gerastet: (25,4,3)/(77,46,43)/(57,27,25)/(111,67,66)/(122,84,73) stammen aus Ebene 239, dazu aus der Kunst die Haut-Lichtfarbe (151,100,81) und die Augenfarben (158,82,80)/(86,14,12) (bei der Prüfung `erlaubt`:
   Farben der Kartenkunst). Danach: Löcher gefüllt (5 px), 3 verstreute Pixel entfernt, die Flügelspitze am Kartenrand mit zwei Umrisspixeln (71–72, 0) geschlossen.
 
+RUNDE 3 (Nutzer: „muss viel stärker mit den Flügeln schlagen, zeichne hier eigene Frames für!“): der Flügelschlag wurde komplett neu aufgebaut (Schlag 16 Frames = 960 ms, 3 Schläge je Schleife, Abschlag 6 Frames, Aufschlag 10, kein Ruhefenster):
+* langer Flügel: schwingt als GANZES um die Schulter (innen 78 %, an der Spitze 100 % des Hubs von 150°, Spitze hinkt 1,6 Frames nach und biegt sich durch) — von fast senkrecht nach oben (≈ 80° über der Waagerechten, Original = 46°)
+  bis weit nach hinten unten (ca. 50° UNTER der Waagerechten; vorher nur bis knapp unter die Waagerechte, weil sich nur die Spitze bog). Frame 0 liegt auf dem Aufschlag bei 23 % des Hubs und ist die Originalpose.
+* Blatt links (zweiter Flügel): schlägt mit, klappt aber nach oben nur wenig (25 %), nach unten/außen um bis zu ca. 115°, damit es nicht über Auge und Horn klappt. Körper hebt sich beim Abschlag bis 3 px.
 RUNDE 2 (Nutzer: „fehlt ein Stück vom Gesicht? Und die Flügelanimation (die nur einen Flügel animiert…) sieht schrecklich aus“):
 * GESICHT: Beim Herauslösen aus der Kartenkunst waren die hellen Schnabelfarben und das Gesichtsbraun am Schnabelansatz durchs Raster gefallen: unter dem Auge fehlte das Stück zwischen Kopf und Schnabel.
   Ergänzt (Pixel aus der Kartenkunst, auf die Figurfarben gerastet; src/gigantisaur-pteranos.png neu): (19,26)(18,27) Kopfbraun (111,67,66); (20,26)(19,27)(17,28)(18,28) Creme (255,240,202);
@@ -53,8 +57,9 @@ import anim_flieger as F
 import anim_flieger_r2 as R2
 
 N, MS = 48, 60
-BEAT, DOWN, UP = 16, 6, 8                                      # Frames je Flügelschlag: Abschlag 6, Aufschlag 8, 2 Frames Ruhe oben (damit Frame 0 trotz Spitzenverzögerung = Original)
-PAD_L, PAD_R, PAD_T, PAD_B = 10, 20, 8, 10                    # Arbeitsleinwand (am Ende zugeschnitten); rechts Platz für den abgesenkten Flügel
+BEAT, DOWN, UP = 16, 6, 10                                     # Frames je Flügelschlag: kräftiger Abschlag 6, Aufschlag 10 (RUNDE 3: kein Ruhefenster mehr)
+P0 = DOWN + 0.68 * UP                                          # Frame 0 liegt auf dem Aufschlag bei 23 % des Hubs (die Originalpose ist nicht der obere Umkehrpunkt, der Flügel hebt sich noch darüber hinaus)
+PAD_L, PAD_R, PAD_T, PAD_B = 12, 22, 16, 40                    # Arbeitsleinwand (am Ende zugeschnitten); rechts Platz für den abgesenkten Flügel
 
 spr = L.lade('gigantisaur-pteranos')
 sh, sw = spr.shape[:2]
@@ -99,27 +104,29 @@ BLINZ = {32, 33, 34}
 
 # ── Flügel biegen: Rückwärtsabbildung um eine gekrümmte Mittellinie ──────────────────────────────────────────────────────────
 #                 Wurzelpunkt (Sprite)  Richtung zur Spitze (rad, y nach unten)   Länge   Drehsinn · Ausschlag   Wurzelzone  Verzögerung der Spitze
-FLUEGEL_R = dict(p0=(42.0, 31.0), ang0=math.atan2(-29.5, 28.5), laenge=41.0, A=math.radians(+60.0), s0=4.0, lag=2.0, versatz=0.0)
-FLUEGEL_L = dict(p0=(17.0, 25.0), ang0=math.atan2(-14.0, -1.0), laenge=15.0, A=math.radians(-95.0), s0=2.0, lag=1.5, versatz=0.5)
+FLUEGEL_R = dict(p0=(42.0, 31.0), ang0=math.atan2(-29.5, 28.5), laenge=41.0, A=math.radians(+150.0), s0=4.0, lag=1.6, versatz=0.0, innen=0.78)
+FLUEGEL_L = dict(p0=(17.0, 25.0), ang0=math.atan2(-14.0, -1.0), laenge=15.0, A=math.radians(-150.0), s0=2.0, lag=1.5, versatz=0.5, innen=0.6, oben=0.25)
 
 
 def welle(t):
     """Schlagphase 0 (Flügel oben = Original) … 1 (unten): Abschlag in DOWN Frames, Aufschlag in UP Frames, danach 2 Frames Ruhe oben; an den Wendepunkten weich."""
-    u = t % BEAT
+    u = (t + P0) % BEAT
     if u < DOWN:
         return 0.5 - 0.5 * math.cos(math.pi * u / DOWN)
-    if u < DOWN + UP:
-        return 0.5 + 0.5 * math.cos(math.pi * (u - DOWN) / UP)
-    return 0.0
+    return 0.5 + 0.5 * math.cos(math.pi * (u - DOWN) / UP)
 
 
 def delta(fl, s, t):
-    """Zusatzwinkel der Mittellinie an der Bogenlänge s (0 an der Wurzel) zum Zeitpunkt t: wächst zur Spitze, die Spitze hinkt nach; bei t = 0 überall 0 (Ruhepose = Original)."""
-    if s <= fl['s0']:
-        return 0.0
-    f = min(1.0, (s - fl['s0']) / (fl['laenge'] - fl['s0']))
+    """Zusatzwinkel der Mittellinie an der Bogenlänge s (0 an der Wurzel) zum Zeitpunkt t. RUNDE 3: der Flügel schwingt als Ganzes um die Schulter (ab der Wurzelzone s0 weich einsetzend, innen
+    55 %/60 % des Hubs, an der Spitze 100 %), die Spitze hinkt nach (Wellenlauf) und biegt sich dabei durch; bei t = 0 überall 0 (Ruhepose = Original)."""
+    f = min(1.0, max(0.0, (s - fl['s0']) / (fl['laenge'] - fl['s0'])))
+    r = min(1.0, max(0.0, (s - 1.0) / (fl['s0'] + 5.0)))
+    r = r * r * (3 - 2 * r)                                    # sanft aus der Schulter heraus
+    g = r * (fl['innen'] + (1.0 - fl['innen']) * f)
     a = welle(t - fl['versatz'] - fl['lag'] * f) - welle(-fl['versatz'] - fl['lag'] * f)
-    return fl['A'] * a * f
+    if a < 0:
+        a *= fl.get('oben', 1.0)                               # Ausschlag über die Originalpose hinaus (beim Blatt klein, damit es nicht über das Gesicht klappt)
+    return fl['A'] * a * g
 
 
 def biege(a, fl, t):
@@ -187,7 +194,7 @@ def verbinde4(f):
 
 def frame(i, partikel=True, effekte=True):
     ph = L.sinus(i, BEAT)
-    bob = -int(round(2.0 * welle(i - 1.5)))                    # 0 → −1 → −2 → −1 → 0 (nur nach oben, zweistufig), hebt sich kurz nach dem Abschlag
+    bob = -int(round(3.0 * (welle(i - 1.5) - welle(-1.5))))      # bis 3 px nach oben (zweistufig), hebt sich kurz nach dem Abschlag; Frame 0 = Original
 
     fl = biege(P_FL, FLUEGEL_R, i)
     blatt = biege(P_BLATT, FLUEGEL_L, i)

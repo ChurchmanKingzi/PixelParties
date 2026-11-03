@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""Idle-Animation für „Skeleton Demon“ (Creature) — Runde 2: er FLIEGT, die schwarzen Streben sind seine Skelettflügel (wie beim Winged Skeleton), aber mit dunkelgrauen Membranen.
+"""Idle-Animation für „Skeleton Demon“ (Creature) — Runde 3: er FLIEGT, die schwarzen Streben sind seine Skelettflügel (wie beim Winged Skeleton); die Flügel bestehen NUR aus Knochen (Nutzer: „die Membran sieht nicht gut aus, entfern die, nur die Knochen sollen bleiben; die Hände an den Flügeln bitte schwarz“).
 
 Nutzer-Korrektur: „soll fliegen, das Schwarze sind seine Skelettflügel. Ähnlich wie Winged Skeleton, aber mit dunkelgrauen Membranen.“
 Vorlage (nicht verändert): winged_skeleton.py — gleicher Körper (die Demon-Ebene ist die umgefärbte „Winged Skele“-Ebene, Silhouette Pixel für Pixel gleich), gleiche Flugbewegung.
@@ -23,8 +23,8 @@ Fest bleiben: Schädelform, Hörner, Rippenmuster, Umrisse.
 Ablauf (48 Frames à 65 ms = 3,12 s; die Figur FLIEGT, Frame 0 ist eine Flugpose):
 * FLÜGEL schlagen durchgehend und gleichmäßig wie beim Winged Skeleton: ein Schlag = 12 Frames (780 ms), 4 Schläge pro Schleife, keine Pause. Abschlag (oben → waagerecht → unten) schnell, etwa 3,5 Frames; Aufschlag/Rückholen
   (Flügel heben sich, ziehen sich ein, Finger krümmen sich, öffnen sich wieder) etwa 8,5 Frames. Dieselben Schlüsselposen (Spline, Finger hinken 0,4 Frames je Finger nach, kleines Flattern der Spitzen; rechter Flügel 0,4 Frames später).
-  Jeder Flügel = Armknochen vom Rücken (hinter dem Schädel) zum Handgelenk (3×3-Nubbel, Kern mauve (145,112,112)) und vier schwarze Fingerknochen mit mauven Krallenspitzen; zwischen Arm, Fingern und Hüfte spannt sich die
-  dunkelgraue MEMBRAN (31,33,33), ihr Hinterrand ist schwarz umrandet und zwischen den Fingerspitzen zum Gelenk hin eingebuchtet. Beim Aufschlag faltet sich die Membran mit den Fingern zusammen.
+  Jeder Flügel = Armknochen vom Rücken (hinter dem Schädel) zum Handgelenk (3×3-Nubbel) und vier Fingerknochen (mit Knick) — alles SCHWARZ (9,9,9), auch die „Hände“ (Gelenkknubbel und Krallenspitzen, vorher mauve).
+  Runde 3: die dunkelgraue Flughaut-Membran und ihr Hinterrand sind entfernt (`anim_skel2.knochen_fluegel`, gleiche Flügelposen wie vorher, nur die Knochenlinien).
 * BOB: die ganze Figur (Schädel, Hörner, Rumpf, Arme, Flügelansatz) hebt und senkt sich im Takt der Schläge (±3 px): am höchsten kurz nach dem Abschlag unten (Beat-Frame 5), am tiefsten kurz vor dem Aufschlag oben (Beat-Frame 11).
   Die Füße baumeln nach (1,5 Frames verzögert, zu 60 %, nie höher als der Körper); die Lücke zwischen Becken und Beinen füllen doppelte Beinzeilen (Zeile 20).
 * ARME (unabhängig von den Flügeln, eigene Perioden): hängen an der Schulter, fliegen mit dem Körper mit und pendeln zusätzlich leicht aus (links Periode 16, rechts 24, Hand bis 2 px nach außen / 1 px nach innen);
@@ -33,7 +33,7 @@ Ablauf (48 Frames à 65 ms = 3,12 s; die Figur FLIEGT, Frame 0 ist eine Flugpose
 * Glutwölkchen (Partikel, hinter der Figur, 6 Stück, Lebensdauer 48 Frames, langsam aufsteigend, 2×2 → 3×3 → 2×2): dunkle Rauchwölkchen (Kern (31,33,33), Rand (9,9,9)) und rote Glutwölkchen (Kern (172,2,3), Rand (114,2,2)) steigen
   neben dem Körper und von den Händen auf; alle Farben aus dem Sprite.
 Kein Glanz (Knochen sind kein Metall), kein Feuer. Randpixel-Test (Regel 16): `B.umriss_schliessen` + schwarze Kontur der Membran in jeder Pose.
-ERGÄNZUNG: alle Flügelposen sind neu gezeichnet (Flughaut-Fläche (31,33,33), Knochen/Rand (9,9,9), Nubbel (145,112,112), Krallenspitzen (176,151,152); alles Farben des Sprites). Die gefalteten Streben des Originals entfallen,
+ERGÄNZUNG: alle Flügelposen sind neu gezeichnet (nur Knochenlinien und Nubbel in (9,9,9), Farbe des Sprites). Die gefalteten Streben des Originals entfallen,
 Frame 0 ist darum nicht mehr das Original (Flugzyklus). Körper und Arme sind das Original ohne Streben; hinter der Hand steht Körperschwarz (9,9,9), soweit der Arm es freilegt.
 Alle Bewegungen laufen auf der vollen Leinwand (anim_lib wirft ClipError, wenn etwas herausragen würde). Nur ganze Pixel, nur Farben der Quelle.
 """
@@ -45,6 +45,7 @@ import numpy as np
 import anim_lib as L
 import anim_flieger_b as B
 import anim_skel as K
+import anim_skel2 as K2
 import anim_untote as U
 
 N, MS = 48, 65
@@ -66,7 +67,7 @@ MAUVE_D, MAUVE_H = (145, 112, 112), (176, 151, 152)
 ROSA, ROT_D, ROT_M = (207, 64, 64), (172, 2, 3), (114, 2, 2)
 assert all(c in _alle for c in (SCHWARZ, GRAU, MAUVE_D, MAUVE_H, ROSA, ROT_D, ROT_M))
 UMRISS = U.umrissfarben(spr) | {SCHWARZ}
-FLUEGEL_FARBEN = dict(haut=GRAU, knochen=SCHWARZ, rand=SCHWARZ, nub=MAUVE_D, kralle=MAUVE_H)
+FLUEGEL_FARBEN = dict(knochen=SCHWARZ, nub=SCHWARZ, kralle=SCHWARZ)          # Runde 3: nur Knochen, keine Membran; „Hände“ (Gelenkknubbel, Krallenspitzen) schwarz
 
 # ── Masken (linke Seite, rechts = gespiegelt): ARM (vorn), Rest = Körper (inkl. Hörner, Schulterstück); die gefalteten Flügelstreben entfallen ──────────
 ARM_PTS = [(3, 10), (3, 11), (3, 12), (2, 11), (2, 12), (1, 13), (2, 13), (3, 13), (1, 14), (2, 14), (3, 14), (2, 18), (3, 18)]
@@ -232,7 +233,7 @@ def fluegel_ebene(t, links, dy_u, n_atem):
     pp = dict(p)
     pp['S'] = (PAD_L + p['S'][0], PAD_T + p['S'][1] + dy_u - n_atem)
     pp['W'] = (PAD_L + p['W'][0], PAD_T + p['W'][1] + dy_u - n_atem)
-    a = K.flughaut_fluegel(H, W, pp, FLUEGEL_FARBEN)
+    a = K2.knochen_fluegel(H, W, pp, FLUEGEL_FARBEN)
     if not links:
         a = B.spiegeln(a)
     return a

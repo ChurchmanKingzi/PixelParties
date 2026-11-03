@@ -14,13 +14,17 @@ Was im Sprite ist (Koordinaten im Sprite 19×25, x/y ab 0):
 * Die Arme (Nutzer: „die von den Armen hängenden Bandagen sollen sich mit den Armen mitbewegen“): links Zeilen 13–16 bei x 1–4 (Umriss A oben, Knochen I/D/K), rechts bei x 15–18; von der Unterkante jedes Arms hängt ein
   schräger Bandagenstreifen herab (links (1–3,17), (0–2,18), (0–1,19); rechts (15–17,17), (16–18,18), (17–18,19); Mitte I bzw. D, Umriss A). Arm + Bandage sind je ein starres Teil (24 Pixel zusammen).
 * Material: Knochen, Stoff, Fell/Schuppen — KEIN Glanz und keine Glitzersterne (Regel 14); kein Feuer (Regel 15). Keine Partikel.
-Fest bleiben: Umriss, Kopfform, Gesicht, Mähne, Zunge/Zähne.
+* Das rote Maul (Nutzer-Feedback Runde 3: „sollte periodisch das rote Maul schließen und öffnen“): zwischen den beiden Reißzähnen (links (8,11)/(8,12), rechts (11,11)/(11,12); Grau O bzw. Weiß R) liegt eine rote 2×2-Öffnung:
+  (9,11)=P (111,0,5) und (10,11)=Q (196,0,9) oben, (9,12)=(10,12)=P unten. Darüber liegt die dunkelbraune Maullinie H (49,24,0) bei (9–10,10), darunter Mähne C (59,11,11).
+Fest bleiben: Umriss, Kopfform, Gesicht, Mähne, Zähne (Zunge/Zähne bleiben starr; nur die rote Öffnung wird dunkel gefüllt).
 
 Ablauf (48 Frames à 65 ms = 3,12 s, nahtlos):
 * Atmen (Periode 24): unterhalb der Arme werden im Umhang/Rippenkorb 1–2 Zeilen eingefügt (Quellzeile 17, in der Spitze zusätzlich 20 — zwei getrennte Zeilen, damit die Bandenstruktur erhalten bleibt; nur im Rumpf, Textur der Nachbarzeile eingemischt) — Kopf, Rumpf UND beide Arme samt
   Bandagen heben sich starr um 1–2 px mit (die Arme bleiben unverformt, die Bandagen werden nicht gestreckt), die Füße bleiben am Boden.
 * Armheben (links Frames 6–11 und 30–35, rechts Frames 18–23 und 42–47; 1 px zusätzlich nach oben): Arm und Bandage wandern als Ganzes; was der Arm freigibt (Umhangkante), bleibt Körper, offene Kanten werden
   mit der Umrissfarbe geschlossen.
+* Maul schließen/öffnen (zweimal je Schleife, Periode 24 Frames, ab Frame 4 bzw. 28): Frame +0 offen (Original), +1 halb zu (untere rote Zeile (9–10,12) wird zur Mähnenfarbe C), +2…+7 geschlossen (obere rote Zeile (9–10,11) wird
+  zur dunkelbraunen Maullinie H, untere Zeile C — die Zähne bleiben stehen), +8 halb auf, +9 offen. Nur Pixel im Gesicht; das Maul bewegt sich mit dem Kopf (Atmen). Nur Quellfarben (C, H).
 * Blinzeln (zweimal je Schleife, Frames 13–14 und 37–38, je 2 Frames zu): die gelben Augenpixel (je 2×1) werden zur Gesichts-/Mähnenfarbe. Lidfarbe = umgebende Körperfarbe.
 Frame: Sprite plus 3 px links/rechts, 4 px oben (Atmen), 2 px unten, Figur zentriert.
 Alle Bewegungen laufen auf der vollen Leinwand (anim_lib/anim_amorph werfen ClipError). Nur ganze Pixel, nur Farben der Quelle.
@@ -78,6 +82,21 @@ for _k, _starts in (('l', (6, 30)), ('r', (18, 42))):
         for _d in range(6):
             HUB[_k][_s0 + _d] = 1
 
+# ── Maul: rote Öffnung (Sprite-Koordinaten (y, x)) ──
+MUND_C, MUND_H = (59, 11, 11), (49, 24, 0)
+MUND_ROT = {(11, 9): (111, 0, 5), (11, 10): (196, 0, 9), (12, 9): (111, 0, 5), (12, 10): (111, 0, 5)}
+for (_y, _x), _c in MUND_ROT.items():
+    assert tuple(int(v) for v in spr[_y, _x, :3]) == _c, (_y, _x)
+assert tuple(int(v) for v in spr[13, 9, :3]) == MUND_C and tuple(int(v) for v in spr[10, 9, :3]) == MUND_H
+MUND_POSE = {1: {(12, 9): MUND_C, (12, 10): MUND_C},                                                    # halb: untere Zeile dunkel
+             2: {(11, 9): MUND_H, (11, 10): MUND_H, (12, 9): MUND_C, (12, 10): MUND_C}}              # zu
+MUND = [0] * N                                                                                          # Frame → Stufe (0 offen, 1 halb, 2 zu)
+for _s0 in (4, 28):
+    MUND[_s0 + 1] = 1
+    for _k in range(2, 8):
+        MUND[_s0 + _k] = 2
+    MUND[_s0 + 8] = 1
+
 # ── Augen und Lidfarben ──
 AUGEN = [(7, 7), (7, 8), (7, 11), (7, 12)]                                                                      # (y, x) der Augenpixel
 LID_AUS = {(255, 255, 12), MAHNE_UMRISS}                                                                   # Farben, die nie als Lidfarbe dienen (Umriss, Augenfarben)
@@ -92,6 +111,8 @@ def figur(i):
             teile[top + y - HUB[k][i], PAD_L + x] = spr[y, x]
     # Arm über dem Umhang (Arm liegt vor der Mähnenkante); Körper darunter
     fig = L.zusammen(H, W, [(ebene, 0, 0), (teile, 0, 0)])
+    for (y, x), c in MUND_POSE.get(MUND[i], {}).items():
+        fig[top + y, PAD_L + x, :3] = c
     if i in BLINK:
         ymin = min(y for (y, x) in AUGEN)
         pix = [(top + y, PAD_L + x) for (y, x) in AUGEN if BLINK[i] == 2 or y == ymin]

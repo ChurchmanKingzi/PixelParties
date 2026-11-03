@@ -13,13 +13,16 @@ Identifikation (Sprite-Koordinaten x, y):
 * Körper (x 4–18, y 2–12): weiß/grau gefiederter Rumpf (Weiß (255,255,255), Hellgrau (219,219,219), (190,190,190), Schatten (166,166,166), Umriss (91,91,91) und (49,50,51)); die Flügel liegen angelegt am Rumpf.
 * Schwanz (x 0–5, y 10–15): schwarz (0,0,0), hängt nach unten links.
 * Hals (x 14–26, y 0–4): langer schwarzer Bogen, der über den Rücken nach vorn greift, und Kopf (x 25–28, y 3–8): weißes Gesicht, roter Scheitel (255,85,85)/(255,0,0), schwarzer Streifen.
-  Darunter der offene Schnabel (x 24–29, y 8–11) in (227,220,165)/(255,248,183): zwei dünne Linien in V-Form (links (25,9) (25,10) (24,11), rechts (28,9) (28,10) (29,11)).
+  Darunter der offene Schnabel (x 24–29, y 8–11) in (227,220,165)/(255,248,183): Ansatz (26,8)(27,8) und zwei dünne Linien in V-Form (links (25,9) (25,10) (24,11), rechts (28,9) (28,10) (29,11)).
   Ein eindeutiges Auge ist nicht zu erkennen → kein Blinzeln.
 * Beine (x 4–14, y 13–20): zwei dünne graue Stelzen (147,150,153), links (8,13)…(4,20), rechts (11,13)…(14,20), die unten im Wasser verschwinden.
 
 Ablauf (48 Frames à 65 ms = 3,12 s) — er steht, späht und pickt. Ein Flügelschlag ist nicht möglich: die Flügel sind im Sprite angelegt, ausgebreitete Flügel gibt die Figur nicht her.
 * Spähen/Picken: der Hals samt Kopf und Schnabel senkt sich alle 24 Frames um 1 px (sanft) und pickt einmal pro Schleife (Frame 28–36): bis 4 px nach unten, der Schnabel
-  klappt dabei auf und wieder zu. Jede Halsspalte wandert als Ganzes senkrecht (der Bogen verformt sich, nichts wird kopiert).
+  schließt sich dabei ganz (siehe unten). Jede Halsspalte wandert als Ganzes senkrecht (der Bogen verformt sich, nichts wird kopiert).
+* Schnabel (RUNDE 3, Nutzer: „soll seinen Schnabel auch richtig zumachen können“): vorher rückten nur die Spitzen 1 px nach innen. Jetzt hat der Schnabel drei Stufen — offen (Original), halb offen, GESCHLOSSEN
+  (spitzer 2-px-Schnabel (26–27, 9–10) + Spitze (26,11), selbst gezeichnet aus den zwei Cremetönen des Sprites): schnappt bei Frame 4–8 zu, klappert bei 15–17 und 19–21 zweimal schnell, und packt beim Picken (Frame 30–38) zu;
+  er hält den Bissen beim Hochkommen geschlossen. Der Schnabel folgt starr dem Kopf (gleiche Senkung wie der Kopf).
 * Atmen: Rumpf hebt sich um 1 px (zweimal pro Schleife; Zeile 11 doppelt, die Beine bleiben).
 * Schwanz wedelt (bis 1 px, Periode 16 Frames).
 * Waten: die Beine heben sich abwechselnd (bis 2 px, Periode 24 Frames, versetzt) — der Fuß taucht in der Zwischenzeit wieder ein.
@@ -52,14 +55,15 @@ vorhanden = L.deckend(spr)
 
 # ── Masken ───────────────────────────────────────────────────────────────────────────────────────────────────────────
 schwanz_m = vorhanden & (xx <= 5) & (yy >= 10) & (yy <= 15)
-spitze_l_m = np.zeros_like(vorhanden); spitze_l_m[11, 24] = True        # Schnabelspitzen (unterste Pixel der V-Linien)
-spitze_r_m = np.zeros_like(vorhanden); spitze_r_m[11, 29] = True
-assert vorhanden[11, 24] and vorhanden[11, 29]
-hals_m = vorhanden & (xx >= 19) & (yy <= 12) & ~spitze_l_m & ~spitze_r_m
+schnabel_m = np.zeros_like(vorhanden)                                   # die beiden Schnabelhälften (V-Linien, 6 Pixel) — bewegen sich eigenständig (öffnen/schließen)
+for (x_, y_) in ((25, 9), (25, 10), (24, 11), (28, 9), (28, 10), (29, 11)):
+    assert vorhanden[y_, x_]
+    schnabel_m[y_, x_] = True
+hals_m = vorhanden & (xx >= 19) & (yy <= 12) & ~schnabel_m
 bein_l_m = vorhanden & (yy >= 13) & (xx <= 9) & ~schwanz_m
 bein_r_m = vorhanden & (yy >= 13) & (xx >= 10)
-koerper_m = vorhanden & ~schwanz_m & ~hals_m & ~spitze_l_m & ~spitze_r_m & ~bein_l_m & ~bein_r_m
-assert int((schwanz_m | hals_m | spitze_l_m | spitze_r_m | bein_l_m | bein_r_m | koerper_m).sum()) == int(vorhanden.sum())
+koerper_m = vorhanden & ~schwanz_m & ~hals_m & ~schnabel_m & ~bein_l_m & ~bein_r_m
+assert int((schwanz_m | hals_m | schnabel_m | bein_l_m | bein_r_m | koerper_m).sum()) == int(vorhanden.sum())
 assert not (hals_m & koerper_m).any()
 
 
@@ -69,7 +73,33 @@ def teil(maske):
 
 
 KOERPER, SCHWANZ, HALS, BEIN_L, BEIN_R = teil(koerper_m), teil(schwanz_m), teil(hals_m), teil(bein_l_m), teil(bein_r_m)
-SPITZE_L, SPITZE_R = teil(spitze_l_m), teil(spitze_r_m)
+
+# ── Schnabel (RUNDE 3, Nutzer: „soll seinen Schnabel auch richtig zumachen können“) ─────────────────────────────────────────
+# Im Original ist der Schnabel weit offen: zwei Hälften in V-Form unter dem Schnabelansatz (26,8)(27,8). Drei Stufen, Farben (255,248,183) hell / (227,220,165) dunkel (beide aus dem Sprite):
+#   Stufe 0 offen = Original · Stufe 1 halb offen (Hälften rücken zusammen) · Stufe 2 GESCHLOSSEN: ein spitzer, 2 px breiter Schnabel (26–27, 9–10) mit Spitze (26,11).
+SCH_H, SCH_D = (255, 248, 183), (227, 220, 165)
+assert tuple(spr[9, 25, :3]) == SCH_H and tuple(spr[10, 25, :3]) == SCH_D and tuple(spr[11, 24, :3]) == SCH_D and tuple(spr[11, 29, :3]) == SCH_H
+SCHNABEL_PIXEL = {
+    0: [(25, 9, SCH_H), (25, 10, SCH_D), (24, 11, SCH_D), (28, 9, SCH_H), (28, 10, SCH_D), (29, 11, SCH_H)],
+    1: [(26, 9, SCH_H), (25, 10, SCH_D), (25, 11, SCH_D), (27, 9, SCH_H), (28, 10, SCH_D), (28, 11, SCH_H)],
+    2: [(26, 9, SCH_H), (27, 9, SCH_H), (26, 10, SCH_D), (27, 10, SCH_D), (26, 11, SCH_D)],
+}
+
+
+def schnabel_ebene(stufe):
+    e = L.leer(H, W)
+    for (x_, y_, c_) in SCHNABEL_PIXEL[stufe]:
+        e[PAD_T + y_, PAD_L + x_, :3] = c_
+        e[PAD_T + y_, PAD_L + x_, 3] = 255
+    return e
+
+
+SCHNABEL = {k: schnabel_ebene(k) for k in SCHNABEL_PIXEL}
+assert (SCHNABEL[0][..., 3] > 0).sum() == int(schnabel_m.sum()) and ((SCHNABEL[0] == teil(schnabel_m)).all())
+SCHNABEL_ZEIT = {4: 1, 5: 2, 6: 2, 7: 2, 8: 1,                                # schnappt zu (kurz)
+                 15: 1, 16: 2, 17: 1,                                          # Klappern: zweimal schnell hintereinander
+                 19: 1, 20: 2, 21: 1,
+                 30: 1, 31: 2, 32: 2, 33: 2, 34: 2, 35: 2, 36: 2, 37: 2, 38: 1}     # packt beim Picken zu und hält den Bissen beim Hochkommen
 
 # ── Farben (alle aus dem Sprite) ───────────────────────────────────────────────────────────────────────────────────
 SCHWARZ, GRAU_UMRISS, BEIN_GRAU = (0, 0, 0), (91, 91, 91), (147, 150, 153)
@@ -93,9 +123,8 @@ def hals_dy(i):
     return int(round(sanft + PECK.get(i, 0)))
 
 
-def schnabel_zu(i):
-    """Schnabel schnappt zu: die beiden Spitzen rücken in den Frames 33–35 je 1 px nach innen (V-Linien werden senkrecht), sonst offen wie im Original."""
-    return i in (33, 34, 35)
+def schnabel_stufe(i):
+    return SCHNABEL_ZEIT.get(i, 0)
 
 
 def atem(i):
@@ -158,8 +187,7 @@ def frame(i, partikel=True, nur=None):
         schichten += [(L.streck_zeile(KOERPER, z, n), 0, 0, 1), (L.streck_zeile(SCHWANZ_W(i), z, n), 0, 0, 1)]
     if 'hals' in ebenen:
         sch = lambda a: B.spalten_schub(a, PAD_L + 18, lambda f: dy * min(1.0, f * 11 / 7.0), 11)   # Hals/Kopf senken: Spalten x 19–25 verformen den Bogen, Kopf und Schnabel (x ≥ 25) wandern starr um dy
-        zu = 1 if schnabel_zu(i) else 0
-        schichten += [(sch(HALS), 0, -n, 2), (sch(SPITZE_L), zu, -n, 2), (sch(SPITZE_R), -zu, -n, 2)]
+        schichten += [(sch(HALS), 0, -n, 2), (sch(SCHNABEL[schnabel_stufe(i)]), 0, -n, 2)]
     f, karte = B.zusammen_mit_karte(H, W, schichten)
     B.umriss_je_ebene(f, karte, ERLAUBT, EBENEN_FARBE)
     if partikel:

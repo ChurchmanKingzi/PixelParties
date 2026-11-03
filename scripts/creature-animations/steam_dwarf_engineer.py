@@ -43,7 +43,7 @@ import anim_humanoide as Hm
 import anim_lib as L
 
 N, MS = 48, 62
-PAD_L, PAD_R, PAD_T, PAD_B = 5, 3, 8, 2          # Dampf links/oben, Rohrzittern ±1 px, Schlüssel ±1 px
+PAD_L, PAD_R, PAD_T, PAD_B = 7, 3, 10, 2         # Dampf links/oben (folgt den Rohren schräg nach links oben), Rohrzittern ±1 px, Schlüssel ±1 px
 
 spr = L.lade('steam-dwarf-engineer')
 sh, sw = spr.shape[:2]
@@ -89,8 +89,22 @@ def rohr_stufe(i, name):
     return 1 if v > 0.55 else (-1 if v < -0.55 else 0)                         # Ruhe bei Frame 0, dazwischen kurze Ausschläge
 
 
-# Dampfquellen (Mitte der Austrittsschlitze im Sprite): A (7.5, 1), B (3.5, 5), C (1.5, 10) — Wölkchen starten 2 px darüber
-QUELLEN = {'A': (8, 0, 0), 'B': (4, 4, 8), 'C': (2, 9, 16)}
+# Dampfquellen (Runde 3, Nutzer: „der Qualm kommt nicht aus den jeweiligen Schloten“): die Wölkchen entstehen exakt über der Rohröffnung (Lücke zwischen den Randpixeln der Öffnung; der schwarze Schlitz liegt
+# jeweils eine Zeile unter dem Rohrrand) und steigen entlang der Rohrachse auf (die drei Rohre laufen schräg: oben links, unten rechts zur Schulter — A fast senkrecht, B und C flacher).
+# (x des linken Pixels der 2×2-Anfangswolke — sie sitzt mit ihrer unteren Zeile HINTER dem Rohrrand und taucht aus der Öffnung auf —, Zeile des oberen Rohrrands, Gesamtweg dx über die Lebensdauer, Phasenversatz in Frames):
+#   A: Öffnung x 7–8, Rand Zeile 0 · B: Öffnung x 3–4, Rand Zeile 4 · C: Öffnung x 1–2, Rand Zeile 9
+QUELLEN = {'A': (7, 0, -1, 0), 'B': (3, 4, -2, 3), 'C': (1, 9, -3, 6)}
+STEIG = -5                                                                      # Weg nach oben über die Lebensdauer (24 Frames)
+
+
+def quelle_von(name):
+    """Ort der Rohröffnung (Leinwandkoordinaten, 2×2-Anfangswolke: untere Zeile hinter dem Rohrrand) im Frame b: folgt Rohrzittern und Auf und ab, damit die Wölkchen immer an ihrem Schlot beginnen."""
+    cx, rand, _, _ = QUELLEN[name]
+
+    def q(b):
+        b %= N
+        return (PAD_L + cx + rohr_stufe(b, name), PAD_T + rand - 1 - Hm.stufe(b, N / 2, 1))
+    return q
 
 
 def frame(i, dampf=True, nur=None):
@@ -133,11 +147,11 @@ def frame(i, dampf=True, nur=None):
     ebenen = []
     if dampf:
         spec = []
-        for name, (cx, cy, off0) in QUELLEN.items():
-            sy0 = PAD_T + cy - 2
-            spec.append(dict(x=PAD_L + cx, y=sy0, vx=0, vy=-4, off=off0, form='m', wackeln=0.5))
-            spec.append(dict(x=PAD_L + cx, y=sy0, vx=0, vy=-4, off=off0 + 12, form='m', wackeln=-0.5))
-        ebenen.append((Dw.puff(H, W, i % 24, 24, spec, {'c': DAMPF_C, 'r': DAMPF_R}), 0, 0))
+        for name, (cx, rand, dxs, off0) in QUELLEN.items():
+            q = quelle_von(name)
+            for k, o in enumerate((0, 8, 16)):                                  # drei Wölkchen je Rohr, 8 Frames versetzt: ein stetiger Dampfstrahl aus der Öffnung
+                spec.append(dict(quelle=q, vx=dxs, vy=STEIG, off=off0 + o, form='m', wackeln=0.4 if k % 2 == 0 else -0.4))
+        ebenen.append((Dw.puff_pfad(H, W, i, 24, spec, {'c': DAMPF_C, 'r': DAMPF_R}), 0, 0))
     ebenen += [(fig, 0, 0), (gl, 0, 0)]
     return L.zusammen(H, W, ebenen)
 

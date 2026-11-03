@@ -20,22 +20,24 @@ Was im Sprite ist (x, y im 22×24-Komposit):
   (M (84,0,0), Y (110,0,0), S (61,0,0), Q (23,0,0), Z (33,0,0), a (52,0,0)), unten ein dunkelbrauner Saum V (32,24,0). Bart, Gesicht, Augen und Hände liegen hinter dem Helm und sind nicht sichtbar.
 Metall im Sprite: Rohre und Helm (Messing, Glas) — nur dort Glanz (Regel 14); Umhang (Stoff) glänzt nicht.
 
-Ablauf (48 Frames à 62 ms = 2,98 s, nahtlos):
-* Auf und ab (Periode 24 = zweimal pro Schleife): die untere Messingband-Zeile 21 wird einmal doppelt eingefügt (L.streck_zeile): Helm, Rohre und obere Umhangpartie steigen um 1 px, die untersten Zeilen 22/23 bleiben am Boden.
-  Helm und Umhangzipfel werden getrennt gestreckt (gleiche Zeile, gleicher Hub), damit der Umriss in jeder Pose geschlossen bleibt.
-* Umhangzipfel wehen (Regel 28/31, eigener Rhythmus je Seite): jeder Zipfel (Maske nach Farbe: schwarzer Umriss + dunkelrot, x ≤ 5 bzw. x ≥ 16, y ≥ 15) hebt sich als Ganzes 1 px (links Frames 6–13 und 30–37, rechts
-  Frames 14–21 und 38–45) und sein unterster Saum (Zeilen 22–23) pendelt dazu ±1 px waagerecht (links Periode 16, rechts Periode 12,
-  gegenphasig) — bleibt über Zeile 21 4-verbunden.
+Ablauf (48 Frames à 62 ms = 2,98 s, nahtlos) — RUNDE 3 (Nutzer: „zwischendurch Hintergrund-Pixel in den Schultern“ und „das Strecken der unteren Helmkante ist nicht schön, einfach lassen“):
+* Der Sprite wird jetzt aus ZWEI Ebenen aufgebaut statt aus dem fertigen Komposit: src/steam-dwarf-diver-zwerg.png (Zwergen-Ebene 424: Kapuze, Bart, Umhangzipfel; ihre zwei Rohrstummel sind entfernt) und
+  src/steam-dwarf-diver-helm.png (Helm + Rohre; zwei im Komposit sichtbare Rohrpixel (16,3) und (15,5) der Zwergen-Ebene sind hierher gewandert). Komposit der beiden == steam-dwarf-diver.png (Ruhepose pixelgleich).
+* Auf und ab (Periode 24 = zweimal pro Schleife): der Helm samt Rohren SINKT als starres Stück um 1 px auf den Zwergen darunter (kein Zeilenstrecken mehr, die untere Helmkante wird nicht gedehnt, jeder Umriss bleibt 1 px
+  dick); die Kapuze des Zwergen ist darunter fertig gezeichnet (Quellebene), so dass beim Senken nichts Hintergrund freilegt. Die Umhangzipfel bleiben dabei am Platz (kein Anheben des ganzen Zipfels mehr — das riss die Löcher
+  in den Schultern).
+* Umhangzipfel wehen (eigener Rhythmus je Seite): der Saum (Zeilen 22–23) pendelt ±1 px waagerecht (links Periode 16, rechts Periode 12, gegenphasig); in den Fenstern links Frames 6–13 und 30–37, rechts 14–21 und 38–45 rückt
+  der Saum um 1 Zeile hoch (die Zeile 21 des Zipfels entfällt — der Zipfel wird kürzer, nichts wird gestreckt oder kopiert) und bleibt über Kante 4-verbunden.
 * Dampfrohre zittern (Dampfdruck): die obersten drei Rohrzeilen (0–2) jedes Rohrs schlagen gemeinsam ±1 px seitlich aus (links Periode 12, rechts Periode 16, gegenphasig), jedes Rohr bleibt 4-verbunden.
 * Dampf: aus beiden Rohrspitzen steigen kleine runde Dampfwölkchen (Form 'm', Wachsen/Schrumpfen 2×2 → 5×3 → 2×2 über anim_dwarf.puff, kein 1-px-Punkt, Farben H/Rohrgrau aus dem Sprite) langsam bis 4 px auf, je Rohr zwei Wölkchen um eine
   halbe Periode versetzt (Periode 24 Frames), hinter der Figur.
-* Metall glänzt (Regel 12/14): ein Lichtband läuft zweimal pro Schleife diagonal von links oben nach rechts unten — zuerst über die Rohre (Frames 2–9 und 26–33), dann über den Helm
+* Metall glänzt (Regel 12/14, unverändert): ein Lichtband läuft zweimal pro Schleife diagonal von links oben nach rechts unten — zuerst über die Rohre (Frames 2–9 und 26–33), dann über den Helm
   (Frames 6–19 und 30–43: Messing und olivfarbener Rahmen 1–2 Stufen heller auf der Rampe des Sprites, das Glas E → I). Nur Innenpixel, Umrisse bleiben. Dazu je ein vierzackiger Glitzer-Stern an einer
-  Messingkante (Kuppel oben links Frames 10–13, rechter Rand Frames 26–29, unterer rechter Rand Frames 40–43).
-* Fensterform, Nieten, Umhangfüllung und Kapuzenumriss bleiben fest (außer Hub).
-Frame 0 = Original (Ruhepose), der Dampf ausgenommen. Kontrolle: anim_humanoide.ruhepose / eckkontakt_typen / Randpixel-Test (Regel 16).
+  Messingkante (Kuppel oben links Frames 10–13, rechter Rand Frames 26–29, unterer rechter Rand Frames 40–43); die Sterne sinken mit dem Helm.
+* Fensterform, Nieten, Umhangfüllung und Kapuzenumriss bleiben fest.
+Frame 0 = Original (Ruhepose), der Dampf ausgenommen. Kontrolle: anim_humanoide.ruhepose / eckkontakt_typen / Randpixel-Test (Regel 16) / $S/../k_dwarf_tools/holes.py (keine neuen Löcher/Kerben).
 Alle Bewegungen laufen auf der vollen Leinwand (anim_lib wirft ClipError). Nur ganze Pixel, nur Farben der Quelle.
-Ergänzungen: keine — die Zipfel verlassen ihre Lage nur als Ganzes (kein Strecken/Spaltenkopieren), freigelegte Stellen bleiben leer (Umriss der Zipfel ist Teil der Zipfelmaske).
+Ergänzungen: keine.
 """
 import math
 import sys
@@ -49,7 +51,9 @@ import anim_lib as L
 N, MS = 48, 62
 PAD_L, PAD_R, PAD_T, PAD_B = 3, 3, 9, 2          # Zipfel-Saum ±1 px seitlich (+2 Rand), Dampf bis 4 px über den Rohren
 
-spr = L.lade('steam-dwarf-diver')
+spr = L.lade('steam-dwarf-diver')                 # Komposit (Referenz für Farben und Ruhepose)
+zwerg = L.lade('steam-dwarf-diver-zwerg')         # Zwergen-Ebene (Kapuze, Bart, Umhangzipfel), ohne Rohrstummel
+helm = L.lade('steam-dwarf-diver-helm')           # Helm + Rohre
 sh, sw = spr.shape[:2]
 H, W = sh + PAD_T + PAD_B, sw + PAD_L + PAD_R
 OFF = (PAD_L, PAD_T)
@@ -82,9 +86,10 @@ def maske(bed):
 
 m_rohr = maske(lambda x, y: y <= 9 and f(x, y) in PIPE_RAMPE and not KANTE0[y, x])
 m_helm = maske(lambda x, y: y >= 7 and not KANTE0[y, x] and (f(x, y) in MESSING or f(x, y) in OLIV or f(x, y) in GLAS))
-# Umhangzipfel: Stofffarben am linken (x ≤ 5) bzw. rechten (x ≥ 16) Rand, ab Zeile 15
-m_zl = maske(lambda x, y: y >= 15 and x <= 5 and f(x, y) in STOFF)
-m_zr = maske(lambda x, y: y >= 15 and x >= sw - 6 and f(x, y) in STOFF)
+# Umhangzipfel (Zwergen-Ebene): Stofffarben am linken (x ≤ 5) bzw. rechten (x ≥ 16) Rand, ab Zeile 15
+zv = L.deckend(zwerg)
+m_zl = np.array([[bool(zv[y, x] and y >= 15 and x <= 5 and tuple(int(v) for v in zwerg[y, x, :3]) in STOFF) for x in range(sw)] for y in range(sh)])
+m_zr = np.array([[bool(zv[y, x] and y >= 15 and x >= sw - 6 and tuple(int(v) for v in zwerg[y, x, :3]) in STOFF) for x in range(sw)] for y in range(sh)])
 
 ROHRE = {'l': (8, 14), 'r': (15, 21)}            # x-Bereich je Rohr für das Zittern (Zeilen 0–2)
 
@@ -98,7 +103,7 @@ def rohr_stufe(i, name):
 
 
 def zipfel_hub(i, seite):
-    """1 = ganzer Zipfel 1 px gehoben, sonst 0. Fenster je Seite versetzt, nahtlos."""
+    """1 = Saum 1 Zeile hochgerückt (Zeile 21 des Zipfels entfällt), sonst 0. Fenster je Seite versetzt, nahtlos."""
     starts = (6, 30) if seite == 'l' else (14, 38)
     return 1 if any(Hm.folge(i, s, [1] * 8, N) for s in starts) else 0
 
@@ -109,50 +114,54 @@ def saum_dx(i, seite):
     return max(-1, min(1, int(round(1.4 * v))))
 
 
+def sinken(i):
+    """Helm + Rohre sinken starr um 1 px (Periode 24 = zweimal je Schleife); Frame 0 = Ruhe (oben)."""
+    return Hm.stufe(i, N / 2, 1)
+
+
 TEST_EBENEN = ('figur',)                                                      # für den Randpixel-Test: Figur ohne Dampf und Glitzer
 
 
 def frame(i, dampf=True, nur=None):
     if nur:
         dampf = False
-    zl, _ = L.trenne(spr, m_zl)
-    zr, _ = L.trenne(spr, m_zr)
-    _, rumpf = L.trenne(spr, m_zl | m_zr)
-    k = L.platz(rumpf, H, W, PAD_L, PAD_T)
+    zl, _ = L.trenne(zwerg, m_zl)
+    zr, _ = L.trenne(zwerg, m_zr)
+    _, kapuze = L.trenne(zwerg, m_zl | m_zr)
+    kap = L.platz(kapuze, H, W, PAD_L, PAD_T)
     wl = L.platz(zl, H, W, PAD_L, PAD_T)
     wr = L.platz(zr, H, W, PAD_L, PAD_T)
+    hl = L.platz(helm, H, W, PAD_L, PAD_T)
     gl = L.leer(H, W)                                                         # Glitzer-Sterne (Effekt über der Figur)
+    sink = sinken(i)
     # --- Glanz (Regel 14): Lichtband über Rohre, dann über den Helm (Messing, Rahmen, Glas); nur Innenpixel ---
     for start in (2, 26):
-        Hm.lichtband(k, m_rohr, OFF, i, N, start, 8, PIPE_RAMPE, stufen=1, breite=3.0, achse=(1.0, 1.0), kern=2)
+        Hm.lichtband(hl, m_rohr, OFF, i, N, start, 8, PIPE_RAMPE, stufen=1, breite=3.0, achse=(1.0, 1.0), kern=2)
     for start in (6, 30):
-        Hm.lichtband(k, m_helm, OFF, i, N, start, 14, MESSING, stufen=1, breite=3.0, achse=(1.0, 1.0), kern=2)
-        Hm.lichtband(k, m_helm, OFF, i, N, start, 14, OLIV, stufen=1, breite=3.0, achse=(1.0, 1.0), kern=2)
-        Hm.lichtband(k, m_helm, OFF, i, N, start, 14, GLAS, stufen=1, breite=3.0, achse=(1.0, 1.0), kern=1)
+        Hm.lichtband(hl, m_helm, OFF, i, N, start, 14, MESSING, stufen=1, breite=3.0, achse=(1.0, 1.0), kern=2)
+        Hm.lichtband(hl, m_helm, OFF, i, N, start, 14, OLIV, stufen=1, breite=3.0, achse=(1.0, 1.0), kern=2)
+        Hm.lichtband(hl, m_helm, OFF, i, N, start, 14, GLAS, stufen=1, breite=3.0, achse=(1.0, 1.0), kern=1)
     # --- Rohrzittern (Zeilen 0–2 gemeinsam ±1 px) ---
     for name, (x0, x1) in ROHRE.items():
         a = rohr_stufe(i, name)
         if a:
-            Hm.bereich_versatz(k, OFF, {y: a for y in (0, 1, 2)}, x0, x1)
-    # --- Auf und ab: Messingband (Zeile 21) wird einmal doppelt eingefügt; Rumpf und Zipfel getrennt, gleicher Hub ---
-    brust = Hm.stufe(i, N / 2, 1)
-    k = Hm.atmen(k, PAD_T + 21, PAD_T + 9, brust, 0)
-    wl = Hm.atmen(wl, PAD_T + 21, PAD_T + 9, brust, 0)
-    wr = Hm.atmen(wr, PAD_T + 21, PAD_T + 9, brust, 0)
-    # --- Zipfel wehen: Saum (Zeilen 22–23) pendelt, ganzer Zipfel hebt sich 1 px ---
+            Hm.bereich_versatz(hl, OFF, {y: a for y in (0, 1, 2)}, x0, x1)
+    # --- Helm + Rohre sinken starr (nichts wird gestreckt) ---
+    if sink:
+        hl = L.versetze(hl, 0, sink)
+    # --- Zipfel wehen: Saum (Zeilen 22–23) pendelt, Zipfel rückt 1 Zeile hoch (Zeile 21 entfällt) ---
     for seite, w in (('l', wl), ('r', wr)):
-        hub = zipfel_hub(i, seite)
         dx = saum_dx(i, seite)
         if dx:
             Hm.bereich_versatz(w, OFF, {22: dx, 23: dx}, 0, sw - 1)
-        if hub:
-            w[:] = L.versetze(w, 0, -1)
-    fig = L.zusammen(H, W, [(wl, 0, 0), (wr, 0, 0), (k, 0, 0)])
+        if zipfel_hub(i, seite):
+            w[:] = L.heben_unten(w, PAD_T + 21, 1)
+    fig = L.zusammen(H, W, [(kap, 0, 0), (wl, 0, 0), (wr, 0, 0), (hl, 0, 0)])
     Hm.kontur_schliessen(fig, ERLAUBT, UMRISS)                                # Regel 16
-    # --- Glitzer-Sterne an Messingkanten (nur Gold/Metall), mit der Brust gehoben ---
+    # --- Glitzer-Sterne an Messingkanten (nur Gold/Metall), sinken mit dem Helm ---
     for (sx, sy, start) in (() if nur else ((8, 8, 10), (16, 12, 26), (15, 19, 40))):
         st = Hm.folge(i, start, [0, 1, 2, 1], N)
-        Hm.stern4(gl, sx, sy - brust, st, KERN, ARM1, ARM2, OFF)
+        Hm.stern4(gl, sx, sy + sink, st, KERN, ARM1, ARM2, OFF)
     ebenen = []
     if dampf:
         py = PAD_T - 2                                                        # Dampf startet knapp über der Rohrspitze und steigt bis 4 px höher

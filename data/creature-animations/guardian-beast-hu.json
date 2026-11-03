@@ -2,7 +2,7 @@
   "creature": "Guardian Beast Hu",
   "sheet": "guardian-beast-hu.png",
   "frameWidth": 25,
-  "frameHeight": 35,
+  "frameHeight": 36,
   "frames": 48,
   "frameMs": 64,
   "loop": true,

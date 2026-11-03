@@ -185,3 +185,105 @@ class Glied:
                     e[r[0] + oy, r[1] + ox, :3] = self.umriss
                     e[r[0] + oy, r[1] + ox, 3] = 255
         return e
+
+
+class GliedArm(Glied):
+    """Glied, das wie ein schlaffer Arm schlackert: jede Wellenfront wird um die Wurzel gedreht (Pendel statt Querwelle), der Drehwinkel wächst zur Spitze hin und
+    läuft mit Verzögerung (Phase − κ·t) durch das Glied — wie ein Arm mit Ellbogen und Handgelenk. Zeichnen und Lückenschluss wie bei `Glied`."""
+
+    def __init__(self, *a, **k):
+        super().__init__(*a, **k)
+        self.mitte = [(sum(p[0] for p in f) / len(f), sum(p[1] for p in f) / len(f)) for f in self.fronten]
+        self.wurzel_yx = self.fronten[0][0]
+
+    def versatz_schwung(self, winkel):
+        """Verschiebung (dy, dx) je Wellenfront bei Drehwinkel winkel[t] (Bogenmaß, positiv = im Uhrzeigersinn auf dem Bild) um die Wurzel."""
+        out = []
+        ry, rx = self.wurzel_yx
+        for t in range(self.nmax + 1):
+            cy, cx = self.mitte[t]
+            y, x = cy - ry, cx - rx
+            c, s_ = math.cos(winkel[t]), math.sin(winkel[t])
+            nx, ny = x * c - y * s_, x * s_ + y * c
+            out.append((int(round(ny - y)), int(round(nx - x))))
+        return out
+
+
+class GliedKette(GliedArm):
+    """Glied als Gelenkkette aus starren Abschnitten (Oberarm, Unterarm, Hand …): ab den Gelenkfronten `gelenke` (aufsteigende Frontnummern, beginnt mit 0 = Wurzel)
+    dreht sich jeder Abschnitt um sein Gelenk; die Drehwinkel addieren sich entlang der Kette. Abschnitte bleiben so lang wie im Original (nichts faltet oder staucht sich),
+    das Glied knickt nur an den Gelenken — wie ein schlaffer Arm."""
+
+    def versatz_kette(self, gelenke, winkel):
+        """winkel[s] = Absolutwinkel (Bogenmaß) des Abschnitts s. Rückgabe: Verschiebung (dy, dx) je Front."""
+        assert gelenke[0] == 0 and len(gelenke) == len(winkel)
+        J = [self.mitte[g] for g in gelenke]
+        P = [J[0]]
+        for k in range(1, len(gelenke)):
+            c, s_ = math.cos(winkel[k - 1]), math.sin(winkel[k - 1])
+            dy, dx = J[k][0] - J[k - 1][0], J[k][1] - J[k - 1][1]
+            P.append((P[k - 1][0] + dx * s_ + dy * c, P[k - 1][1] + dx * c - dy * s_))
+        out = []
+        for t in range(self.nmax + 1):
+            k = max(q for q in range(len(gelenke)) if gelenke[q] <= t)
+            c, s_ = math.cos(winkel[k]), math.sin(winkel[k])
+            y, x = self.mitte[t][0] - J[k][0], self.mitte[t][1] - J[k][1]
+            ny, nx = P[k][0] + x * s_ + y * c, P[k][1] + x * c - y * s_
+            out.append((int(round(ny - self.mitte[t][0])), int(round(nx - self.mitte[t][1]))))
+        return out
+
+    def verschiebung_pixel(self, gelenke, winkel):
+        """Wie `versatz_kette`, aber je Pixel (statt je Front): jedes Kernpixel wird mit seinem Abschnitt um das Gelenk gedreht und auf ganze Pixel gerundet
+        (so dreht sich auch die Pixelanordnung innerhalb einer Front mit, z. B. das Ende eines Bandes). Rückgabe {(y, x): (dy, dx)}."""
+        assert gelenke[0] == 0 and len(gelenke) == len(winkel)
+        J = [self.mitte[g] for g in gelenke]
+        P = [J[0]]
+        for k in range(1, len(gelenke)):
+            c, s_ = math.cos(winkel[k - 1]), math.sin(winkel[k - 1])
+            dy, dx = J[k][0] - J[k - 1][0], J[k][1] - J[k - 1][1]
+            P.append((P[k - 1][0] + dx * s_ + dy * c, P[k - 1][1] + dx * c - dy * s_))
+        out = {}
+        for (y0, x0) in self.kern:
+            t = self.tiefe[(y0, x0)]
+            k = max(q for q in range(len(gelenke)) if gelenke[q] <= t)
+            c, s_ = math.cos(winkel[k]), math.sin(winkel[k])
+            y, x = y0 - J[k][0], x0 - J[k][1]
+            ny, nx = P[k][0] + x * s_ + y * c, P[k][1] + x * c - y * s_
+            out[(y0, x0)] = (int(round(ny - y0)), int(round(nx - x0)))
+        return out
+
+    def zeichne_pixel(self, h, w, oy, ox, verschiebung):
+        """RGBA-Ebene h×w: Kernpixel (y, x) landet bei (y + oy + dy, x + ox + dx) mit (dy, dx) = verschiebung[(y, x)]. Lücken zwischen ursprünglich benachbarten Kernpixeln
+        werden mit Linienpixeln (Farbe des näheren Nachbarn) geschlossen, der Umriss (4 Nachbarn) wird neu um den Kern gezogen. Bei Ruhe das Original."""
+        if all(v == (0, 0) for v in verschiebung.values()):
+            e = L.leer(h, w)
+            for (y, x) in self.pixel:
+                e[y + oy, x + ox] = self.spr[y, x]
+            return e
+        e = L.leer(h, w)
+        neu = {}
+        pos = {p: (p[0] + verschiebung[p][0], p[1] + verschiebung[p][1]) for p in self.kern}
+        for p in sorted(self.kern, key=lambda q: self.tiefe[q]):
+            neu[pos[p]] = tuple(int(v) for v in self.spr[p[0], p[1], :3])
+        for p in self.kern:
+            for dy0 in (-1, 0, 1):
+                for dx0 in (-1, 0, 1):
+                    q = (p[0] + dy0, p[1] + dx0)
+                    if q in self.kern and self.tiefe[q] == self.tiefe[p] + 1:
+                        a, b = pos[p], pos[q]
+                        if max(abs(a[0] - b[0]), abs(a[1] - b[1])) > 1:
+                            lin = _linie(a, b)
+                            for k, r in enumerate(lin):
+                                src = p if k < len(lin) / 2 else q
+                                neu.setdefault(r, tuple(int(v) for v in self.spr[src[0], src[1], :3]))
+        for (y, x), c in neu.items():
+            e[y + oy, x + ox, :3] = c
+            e[y + oy, x + ox, 3] = 255
+        for (y, x) in list(neu):
+            for dy, dx in ((1, 0), (-1, 0), (0, 1), (0, -1)):
+                r = (y + dy, x + dx)
+                if r not in neu:
+                    e[r[0] + oy, r[1] + ox, :3] = self.umriss
+                    e[r[0] + oy, r[1] + ox, 3] = 255
+        return e
+

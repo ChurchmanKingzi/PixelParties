@@ -1,15 +1,15 @@
 {
   "creature": "Red Dragoneer",
   "sheet": "red-dragoneer.png",
-  "frameWidth": 38,
+  "frameWidth": 48,
   "frameHeight": 36,
   "frames": 48,
   "frameMs": 70,
   "loop": true,
   "layout": "horizontal",
-  "padTop": 3,
+  "padTop": 4,
   "padLeft": 3,
   "padRight": 3,
-  "padBottom": 3,
-  "faceX": 19.0
+  "padBottom": 2,
+  "faceX": 24.0
 }

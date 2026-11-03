@@ -60,7 +60,7 @@ GOLD = [(115, 107, 40), (207, 192, 75), (229, 215, 105)]
 GOLD_M = vorhanden & L.farbmaske(spr, GOLD)
 WEISS = (255, 255, 255)
 
-schwanz_m = vorhanden & (xx >= 17) & (yy >= 9)
+schwanz_m = vorhanden & (xx >= 17) & (yy >= 9) & ~((xx == 17) & (yy == 9))        # (17,9) ist Kopfumriss unter dem Ohr: bleibt am Kopf
 ohr_l = vorhanden & ~schwanz_m & (xx <= 5) & (yy <= 8)
 ohr_r = vorhanden & ~schwanz_m & (xx >= 15) & (yy <= 8)
 oben_m = vorhanden & ~schwanz_m & (yy <= 13)                                   # Kopf + Ohren
@@ -80,6 +80,23 @@ def ohr_dx(i, start, vorz):
     """Ohrzucken: 0, 1, 1, 1, 1, 0 … Pixel nach außen (vorz = −1 links, +1 rechts) — Frame-Fenster [start, start+6)."""
     w = Hm.folge(i, start, [0, 1, 1, 1, 1, 0], N)
     return 0 if not w else vorz * w
+
+
+SCHWANZ_AMP, SCHWANZ_N, SCHWANZ_LAG, SCHWANZ_INNEN = 2.8, 24, 0.0, 0.45        # Ausschlag der Spitze (px), Periode, Wellenlauf (rad) von Ansatz zu Spitze (0: Frame 0 = Original), Faktor nach innen (zum Kopf)
+
+
+def schwanz_dx(i):
+    """{Leinwandzeile: dx} des Schwanzes: Zeilenversatz wächst vom Ansatz (y 18) zur Spitze (y 9) hin (Wellenlauf: die Spitze hinkt etwas nach); die Spitze (y 9–11) als Block."""
+    u = lambda y: min(1.0, max(0.0, (18 - y) / 9.0))
+    def wert(y):
+        s = np.sin(L.sinus(i, SCHWANZ_N) - SCHWANZ_LAG * u(y))
+        if s < 0:
+            s *= SCHWANZ_INNEN
+        return SCHWANZ_AMP * u(y) * s
+    roh = {y: wert(y) for y in range(9, 19)}
+    for y in (9, 10, 11):
+        roh[y] = wert(10)
+    return G.kappe({PAD_T + y: int(round(v)) for y, v in roh.items()})
 
 
 def frame(i):
@@ -104,11 +121,9 @@ def frame(i):
     st = Hm.folge(i, 38, [0, 1, 1, 0], N)
     if st is not None:
         Hm.stern4(unten, 8, 17, st, WEISS, GOLD[2], GOLD[2], OFF)
-    # ── Schwanzring: Mitte beult nach außen ──
+    # ── Schwanz: Ansatz unten (y ≥ 18) fest, der Ring schwingt nach oben immer weiter, die Schwanzspitze (y 9–11) am weitesten ──
     sw_ = ebene(schwanz_m)
-    b = 2.0 * np.sin(L.sinus(i, 24))
-    dxs = {PAD_T + y: int(round(b * np.sin(np.pi * (y - 11) / 7.0))) for y in range(12, 18)}
-    sw_ = G.zeilen_dx(sw_, G.kappe(dxs))
+    sw_ = G.zeilen_dx(sw_, schwanz_dx(i))
     fig = L.zusammen(H, W, [(sw_, 0, 0), (unten, 0, 0), (oben, 0, 0)])
     fig, _ = A.verbinde4(fig)
     G.rand_schliessen(fig, ERLAUBT, UMRISS)

@@ -25,10 +25,11 @@ Ablauf (48 Frames à 62 ms = 2,98 s, nahtlos):
 * Auf und ab (Periode 24 = zweimal pro Schleife): die Bartzeile 22 des Zwergs (hinter dem Hammerkasten verborgen) wird einmal doppelt eingefügt (L.streck_zeile): Kapuze, Rohre, Gesicht und die oberen Ärmel steigen 1 px,
   der Hammer bleibt unten (die Ärmelenden am Kasten bleiben, die Arme „strecken“ sich).
 * PRESSLUFTHAMMER RATTERT (Frames 4–15 und 28–39, je 12 Frames): der ganze Hammer samt den beiden Ärmeln (die ihn halten) stößt jeden zweiten Frame 1 px nach unten und wieder zurück (Rüttelbewegung 0 / +1; die Bohrerspitze
-  taucht dabei 1 px tiefer, beim Rückstoß schaut hinter dem Kasten ein Stück Bart hervor — es ist die verdeckte Bartzeile 21 der Ebene 439); der Zwerg selbst (Kapuze, Gesicht, Bart) bleibt stehen. Die vier roten Kontrolllampen
+  taucht dabei 1 px tiefer, beim Rückstoß schaut hinter dem Kasten ein Stück Bart hervor — es ist die verdeckte Bartzeile 21 der Ebene 439); der Zwerg selbst (Kapuze, Gesicht, Bart) und die Rohre bleiben stehen. Die vier roten Kontrolllampen
   am Kasten blinken in den Rattern-Frames abwechselnd links/rechts (Lampe = dieselbe rote Farbe oder die Füllfarbe des Kastens). Zwischen den Rattern (Frames 16–27, 40–3) steht der Hammer still.
-* Dampfrohre zittern (Dampfdruck): die obersten drei Rohrzeilen (0–2) jedes Rohrs schlagen gemeinsam ±1 px seitlich aus (links/rechts Periode 12 gegenphasig, Mitte Periode 16), in den Rattern-Frames zusätzlich schneller
-  (Periode 4); jedes Rohr bleibt 4-verbunden.
+* Dampfrohre (Runde 3, Nutzer: „die Auspuffrohre bewegen sich viel zu stark!“): kein Zittern mehr, auch nicht beim Rattern. Jedes Rohr neigt nur noch seine obersten ZWEI Zeilen 1 px zur Seite, jeweils 7 Frames lang,
+  zweimal je Schleife, bei jedem Rohr zu anderer Zeit (links Frames 9–15 und 33–39 nach rechts, Mitte 17–23 nach rechts / 41–47 nach links, rechts 1–7 und 25–31 nach links); jedes Rohr bleibt 4-verbunden.
+  Übrige Rohrbewegung: nur das 1-px-Auf-und-ab des ganzen Zwergs.
 * Blinzeln (Frames 19–21 und 40–42): beide Augen schließen sich — Iris/Weiß/Rot nehmen die umgebende Hautfarbe an (links (8,16) und (8,17) → Haut (246,205,139), rechts (12,17) → Haut (246,189,123)).
 * Dampf steigt aus allen drei Rohren auf (Partikel): sechs runde Dampfwölkchen (anim_dwarf.puff: wachsen aus 2×2 auf 5×3 bzw. 4×4 und schrumpfen wieder) in Weiß/Hellgrau steigen langsam bis 4 px auf (Periode 24 Frames,
   je Rohr zwei Wölkchen um eine halbe Periode versetzt), hinter der Figur.
@@ -93,14 +94,16 @@ ROHRE = {'l': (0, 6), 'm': (8, 13), 'r': (15, 21)}               # x-Bereich je 
 BURSTS = (4, 28)                                                  # Beginn der Rattern-Fenster (je 12 Frames)
 
 
+# Runde 3 (Nutzer: „die Auspuffrohre bewegen sich viel zu stark!“): die Rohre zittern nicht mehr. Jedes Rohr neigt nur noch die obersten ZWEI Zeilen für kurze Zeit (7 Frames) um 1 px — zweimal je Schleife,
+# bei jedem Rohr zu anderer Zeit, nie beim Hammerrattern. Sonst stehen die Rohre still (außer dem 1-px-Auf-und-ab des ganzen Zwergs).
+ROHR_EREIGNISSE = {'l': ((9, 1), (33, 1)), 'm': ((17, 1), (41, -1)), 'r': ((1, -1), (25, -1))}      # (Start-Frame, Richtung) je 7 Frames
+
+
 def rohr_stufe(i, name):
-    if name == 'l':
-        v = 2.0 * math.sin(L.sinus(i, N / 4))
-    elif name == 'r':
-        v = -2.0 * math.sin(L.sinus(i, N / 4))
-    else:
-        v = 1.5 * math.sin(L.sinus(i, N / 3))
-    return max(-1, min(1, int(round(v))))                          # nur ±1 px
+    for start, richtung in ROHR_EREIGNISSE[name]:
+        if 0 <= (i - start) % N < 7:
+            return richtung
+    return 0
 
 
 def rattern(i):
@@ -134,13 +137,11 @@ def frame(i, dampf=True, nur=None):
         Hm.lichtband(kp, m_rohr, OFF, i, N, start, 14, PIPE_RAMPE, stufen=1, breite=3.0, achse=(1.0, 1.0), kern=2)
     for start in (16, 40):
         Hm.lichtband(ha, m_hammer, (PAD_L + HX, PAD_T + HY), i, N, start, 8, HAMMER_RAMPE, stufen=1, breite=3.0, achse=(1.0, 1.0), kern=2)
-    # --- Dampfrohre zittern (je Rohr eigener Ausschlag, beim Rattern zusätzlich schneller) ---
+    # --- Dampfrohre neigen sich nur leicht (oberste zwei Zeilen ±1 px, selten) ---
     for name, (x0, x1) in ROHRE.items():
         a = rohr_stufe(i, name)
-        if k is not None:
-            a = 1 if (i // 2 + (name == 'm')) % 2 else -1                         # beim Rattern: Ausschlag im Takt (alle 2 Frames wechselnd)
-        if a:
-            Hm.bereich_versatz(kp, OFF, {y: a for y in (0, 1, 2)}, x0, x1)
+        if a and k is None:                                                       # beim Hammerrattern bleiben die Rohre ruhig
+            Hm.bereich_versatz(kp, OFF, {y: a for y in (0, 1)}, x0, x1)
     # --- Auf und ab: Bartzeile 22 (hinter dem Hammer verborgen) wird einmal doppelt eingefügt; Ärmel gleichermaßen ---
     brust = Hm.stufe(i, N / 2, 1)
     if brust:

@@ -15,13 +15,15 @@ Was im Sprite ist (Koordinaten im Sprite 39×33, x/y ab 0):
 * Material: Ei-/Kapselschale — kein Edelstein/Gold/Metall: KEIN Glanz (Regel 14), kein Flammenfeuer (Regel 15).
 
 Nutzerwunsch (Runde 2): „soll anders animiert werden – kleine Risse auf den einzelnen statischen Eiern, die erscheinen und verschwinden“.
-→ Die Eier bleiben KOMPLETT STATISCH (kein Squash & Stretch, kein Wackeln, kein Rucken, kein Dampf mehr). Das Einzige, was sich ändert, sind kleine Risse:
+Nutzerwunsch (Runde 3): „gerne ein paar mehr Cracks, auch mehr als einen pro Ei zur Zeit. Das gilt für ALLE Eier.“
+→ Die Eier bleiben KOMPLETT STATISCH (kein Squash & Stretch, kein Wackeln, kein Rucken, kein Dampf). Das Einzige, was sich ändert, sind Risse:
 
 Ablauf (60 Frames à 75 ms = 4,5 s, nahtlos):
-* Zehn Risse (zwei je Ei, an verschiedenen Stellen der hellen Schale), jeder aus 2 Pixeln in der Umrissfarbe A (schwarz): erst 1 Pixel, dann 2 Pixel (zackig, diagonal bzw. senkrecht),
-  steht kurz, schrumpft wieder auf 1 Pixel, dann ist er weg (Verlauf 1-1-2-2-2-2-2-2-2-2-1-1 Frames, 12 Frames = 0,9 s; ein Riss mit kürzerem Verlauf 1-2-2-2-2-2-1).
-  Die Risse starten reihum zeitversetzt (alle 5 Frames einer, Eier in der Reihenfolge links, oben rechts, unten, Mitte rechts, oben Mitte, dann zweite Runde) — es sind immer 1–3 Risse gleichzeitig sichtbar.
-  Frame 0 ist rissfrei (= Original); die Risse liegen nur auf hellen Schalenpixeln (B/C), nie auf Raute, Umriss oder Rand.
+* 26 Risse (vorher 10) auf allen fünf Eiern, je Ei 4–6 Stellen (Stellen mit wenig Platz kommen ein zweites Mal dran, dann von der anderen Seite her wachsend), jeder aus 2–3 Pixeln in der Umrissfarbe A (schwarz),
+  zackig (diagonal/senkrecht gemischt): erst 1 Pixel, dann 2, dann 3, steht 2–5 Frames, schrumpft wieder und ist weg (12–15 Frames). Die Starts sind je Ei unregelmäßig (Goldener-Schnitt-Folge, je Ei versetzt)
+  verteilt, sodass auf jedem Ei immer wieder ZWEI (zeitweise drei) Risse gleichzeitig sichtbar sind; im ganzen Haufen meist 4–7. Frame 0 und die ersten Frames sind rissfrei (= Original).
+* Umrisse werden NIE dicker: jedes Rissspixel liegt mit allen vier Nachbarn (oben/unten/links/rechts) auf Schalenpixeln (B/C bzw. grauer Schatten F) — nie neben einem schwarzen Umriss, nie neben der roten Raute und
+  mindestens 2 Pixel von der Silhouette; ein Riss berührt höchstens über die Ecke (nie über die Kante) eine Linie, und zwei Risse berühren sich nie (das Skript prüft alles).
 Ergänzungen: keine. Nur ganze Pixel, nur Quellfarben (Risse = Umrissschwarz A des Sprites), kein Alpha.
 Frame: Sprite plus 3 px Rand rundum — Figur zentriert.
 """
@@ -41,23 +43,51 @@ H, W = sh + 2 * PAD, sw + 2 * PAD
 OPAK = spr[..., 3] > 0
 SCHWARZ = (0, 0, 0)
 HELL = [(208, 208, 208), (237, 237, 237)]                                                # Schalenfarben B, C (nur dort liegen Risse)
+GRAU = (129, 129, 129)                                                                   # Schattenstreifen F (darf neben einem Riss liegen)
 
-# ── Risse (x, y im Sprite; Pixel 1 zuerst, dann 2) ──
-RISSE = [
-    E.Riss([(4, 15), (5, 16)], start=2),                    # links
-    E.Riss([(35, 8), (36, 9)], start=7),                    # oben rechts
-    E.Riss([(21, 25), (22, 26)], start=12),                 # unten
-    E.Riss([(30, 18), (31, 19)], start=17),                 # Mitte rechts
-    E.Riss([(20, 10), (21, 11)], start=22),                 # oben Mitte
-    E.Riss([(22, 16), (23, 17)], start=27),                 # Mitte rechts, zweiter Riss
-    E.Riss([(12, 9), (13, 10)], start=32, profil=E.PROFIL_KURZ),   # oben Mitte, zweiter Riss
-    E.Riss([(12, 16), (12, 17)], start=37),                 # links, zweiter Riss
-    E.Riss([(18, 30), (17, 29)], start=42),                 # unten, zweiter Riss
-    E.Riss([(27, 6), (27, 7)], start=47, profil=E.PROFIL_KURZ),    # oben rechts, zweiter Riss
+# ── Risse je Ei (x, y im Sprite; Pixel 1 wächst zuerst) — Stellen mit der Skript-Hilfe E.sicher/E.pfade ausgesucht und hier festgeschrieben ──
+EIER = [
+    # 0 oben rechts
+    [[(29, 5), (30, 4), (31, 4)], [(34, 7), (35, 8), (35, 9)], [(26, 8), (27, 7), (27, 6)], [(33, 11), (34, 11)]],
+    # 1 oben Mitte
+    [[(18, 15), (18, 14), (19, 13)], [(14, 8), (15, 7), (16, 7)], [(19, 10), (20, 11), (21, 11)], [(12, 9), (12, 10)]],
+    # 2 links
+    [[(7, 13), (8, 13), (9, 14)], [(11, 16), (12, 17), (13, 17)], [(3, 17), (3, 18), (4, 19)], [(4, 15), (5, 15)], [(10, 20), (11, 19)]],
+    # 3 Mitte rechts
+    [[(27, 22), (28, 21), (29, 21)], [(22, 16), (23, 16), (24, 15)], [(30, 18), (30, 19), (31, 20)], [(26, 14), (27, 15), (28, 16)], [(24, 22), (25, 23)]],
+    # 4 unten
+    [[(21, 27), (21, 26), (22, 25)], [(12, 26), (12, 25), (13, 24)], [(15, 22), (16, 21), (17, 21)], [(18, 29), (19, 28)], [(13, 28), (14, 28)], [(19, 23), (20, 24)]],
 ]
+HALTEN = [2, 4, 3, 5, 2, 3, 4, 2, 5, 3]
+RISSE, GRUPPEN, STELLE = [], [], []
+for _g, _sites in enumerate(EIER):
+    _ev = [(list(p) if (k % 2 == 0) else list(reversed(p))) for k, p in enumerate(_sites)]
+    _stelle = list(range(len(_ev)))
+    while len(_ev) < 5:                                                                    # Eier mit wenig Platz: erste Stelle ein zweites Mal, von der anderen Seite her
+        _stelle.append(len(_ev) - len(_sites))
+        _ev.append(list(reversed(_sites[len(_ev) - len(_sites)])))
+    _pr = [E.profil(len(p), HALTEN[(_g * 3 + k) % len(HALTEN)]) for k, p in enumerate(_ev)]
+    _st = E.starts(len(_ev), N, [len(q) for q in _pr], basis=1 + _g, versatz=_g * 0.37 + 0.2)
+    GRUPPEN.append(list(range(len(RISSE), len(RISSE) + len(_ev))))
+    STELLE += [(_g, k) for k in _stelle]
+    RISSE += [E.Riss(p, start=st, profil=q) for p, st, q in zip(_ev, _st, _pr)]
+_sich = E.sicher(spr, HELL, [GRAU], rand_abstand=1)
 for _r in RISSE:
     for (_x, _y) in _r.pix:
         assert OPAK[_y, _x] and tuple(int(v) for v in spr[_y, _x, :3]) in HELL, (_x, _y)
+        for (_dx, _dy) in ((1, 0), (-1, 0), (0, 1), (0, -1)):                              # nie über die Kante neben einem Umriss/der Raute
+            _q = spr[_y + _dy, _x + _dx]
+            assert _q[3] and tuple(int(v) for v in _q[:3]) in HELL + [GRAU], ('Riss neben Umriss', _x, _y)
+_pix = [(i, p) for i, r in enumerate(RISSE) for p in r.pix]
+for _a in range(len(_pix)):
+    for _b in range(_a + 1, len(_pix)):
+        (_i, _p), (_j, _q) = _pix[_a], _pix[_b]
+        if STELLE[_i] == STELLE[_j]:                                                       # dieselbe Stelle zweimal: die Zeiträume dürfen sich nicht überlappen
+            if _i != _j:
+                assert not any(RISSE[_i].stufe(f, N) and RISSE[_j].stufe(f, N) for f in range(N)), ('Stelle doppelt belegt', STELLE[_i])
+        else:
+            assert max(abs(_p[0] - _q[0]), abs(_p[1] - _q[1])) > 1, ('Risse berühren sich', _p, _q)
+assert all(r.stufe(0, N) == 0 for r in RISSE) and all(r.start + len(r.profil) <= N for r in RISSE)
 
 REF = L.platz(spr, H, W, PAD, PAD)
 
@@ -69,8 +99,9 @@ def frame(i):
 if __name__ == '__main__':
     frames = [frame(i) for i in range(N)]
     prev = sys.argv[sys.argv.index('--preview') + 1] if '--preview' in sys.argv else None
-    mx, leer = E.gleichzeitig(RISSE, N)
-    print('Frame 0 weicht vom Original in', int((frames[0] != REF).any(axis=2).sum()), 'Pixeln ab | höchstens', mx, 'Risse gleichzeitig | Frames ohne Riss:', leer)
+    z = E.zaehle(RISSE, N, GRUPPEN)
+    print('Frame 0 weicht vom Original in', int((frames[0] != REF).any(axis=2).sum()), 'Pixeln ab |', len(RISSE), 'Risse | gleichzeitig höchstens', z['max'], ', Mittel', z['mittel'], '| Frames ohne Riss:', z['leer'])
+    print('je Ei (höchstens gleichzeitig, Mittel, Frames mit >= 2):', z['gruppen'])
     print('Pixel, die sich je Frame vom Original unterscheiden:', [int((f != REF).any(axis=2).sum()) for f in frames])
     n = L.pruefe(frames, quelle=spr)
     L.speichern('monster-nest', 'Monster Nest', frames, MS, prev)

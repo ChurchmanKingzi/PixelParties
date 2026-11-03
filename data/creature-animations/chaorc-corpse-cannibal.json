@@ -2,7 +2,7 @@
   "creature": "Chaorc Corpse Cannibal",
   "sheet": "chaorc-corpse-cannibal.png",
   "frameWidth": 36,
-  "frameHeight": 34,
+  "frameHeight": 32,
   "frames": 48,
   "frameMs": 70,
   "loop": true,
@@ -10,6 +10,6 @@
   "padTop": 2,
   "padLeft": 2,
   "padRight": 2,
-  "padBottom": 4,
+  "padBottom": 3,
   "faceX": 18.0
 }

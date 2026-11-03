@@ -21,13 +21,14 @@ Was ist was (x/y im Sprite):
 Fest bleiben: Helmform, Stiefel, Beine, Becken, Handschuh unten links.
 
 Ablauf (48 Frames à 65 ms = 3,12 s; Frame 0 = Original, Partikel ausgenommen):
-* Atmen zweistufig 0-1-2-1-0 px (Periode 24): Der ganze Oberkörper des Heilers — Federbusch, Kopf MIT Kinn, Hals, Schultern, Rippen bis y 21, Arme — hebt sich STARR um 0–2 px; die Zeile y 22 (Rippenunterkante, keine
-  Wirbelsäule, keine Kieferpartie) wird 1–2× eingefügt (L.streck_zeile, Texturmischung), Becken, Beine und Stiefel bleiben am Boden. Hals und Kinn werden nicht länger (früher wurde Zeile y 21 mit der weißen
+* Atmen 0-1-0 px (Periode 24; Runde 3, Nutzer: „Healers Brust expandiert beim Squash and Stretch etwas zu sehr“ → vorher 0–2 px, die doppelte dunkle Rippenzeile bildete einen schwarzen Block, jetzt höchstens 1 px):
+  Der ganze Oberkörper des Heilers — Federbusch, Kopf MIT Kinn, Hals, Schultern, Rippen bis y 21, Arme — hebt sich STARR um 0–1 px; die Zeile y 22 (Rippenunterkante, keine
+  Wirbelsäule, keine Kieferpartie) wird höchstens 1× eingefügt (L.streck_zeile, Texturmischung), Becken, Beine und Stiefel bleiben am Boden. Hals und Kinn werden nicht länger (früher wurde Zeile y 21 mit der weißen
   Wirbelsäule gedoppelt: das war das „zu dicke Kinn“).
 * Federbuschspitze (2×2 bei (9–10, 8–9)) wippt seitlich 0/−1/−2 px nach links (Periode 16, hängt an der Buschbasis, wandert mit dem Kopf; nach rechts würde sie unter dem Helm verschwinden).
 * Blinzeln des Heilers (Lidfarbe = umgebendes Knochenweiß (246,255,255)): beide grünen Augen werden 3 Frames weiß, zweimal pro Schleife (Frame 13–15 und 37–39).
 * Erhobene Hand (rechts) winkt/segnet: Handschuh + Handgelenk heben sich 0-1-2-1-0 px (Periode 16, 3× pro Schleife; das Handgelenk wird dabei nur länger, nicht dicker) zusätzlich zum Atmen.
-* Helmkopf B hebt sich starr mit dem Kopf des Heilers (gleiche 0–2 px; ein eigener Hub würde Federbuschpixel unter dem Helmrand freilegen); KEIN seitliches Treiben. Das Blatt wippt (die Spitze (22,0) springt für 4 Frames nach (21,0), Frame 10–13 und 34–37).
+* Helmkopf B hebt sich starr mit dem Kopf des Heilers (gleiche 0–1 px; ein eigener Hub würde Federbuschpixel unter dem Helmrand freilegen); KEIN seitliches Treiben. Das Blatt wippt (die Spitze (22,0) springt für 4 Frames nach (21,0), Frame 10–13 und 34–37).
   B liegt über A; die unter B verdeckten Pixel von A sind aus der Ebene vorhanden (nichts neu gemalt).
 * Heilwölkchen (Partikel, hinter den Figuren, 5 Stück, Lebensdauer 48 Frames, langsam aufsteigend, 2×2 → 3×3 → 2×2): grün (Kern Handschuhgrün (0,135,0), Rand (0,90,0) / (20,130,17)), steigen von der erhobenen Hand,
   vom Handschuh links und neben dem Blatt auf.
@@ -101,7 +102,7 @@ def verschieben_y(a, dy):
 
 
 def frame_gross(i, nur=None):
-    n_a = U.stufe(i, 24, 2)                                      # Heiler atmet 0-1-2-1-0
+    n_a = U.stufe(i, 24, 1)                                      # Heiler atmet 0-1-0 (Runde 3: nur noch 1 px, die Brust expandierte zu stark)
     wink = U.stufe(i - 4, 16, 2)                                 # erhobene Hand winkt 0-1-2-1-0 (Periode 16)
     tip = -U.stufe(i, 16, 2)                                     # Federbuschspitze 0/−1/−2 (nach rechts liegt B davor)
 
@@ -152,7 +153,7 @@ def _wolke(*a, **k):
 
 
 # Zuschnitt auf die Figur: symmetrisch um die Ruhefigur; Wölkchen dürfen den Frame höchstens 2 px über den Figurenrand hinaus vergrößern
-BOX = U.zuschnitt([frame_gross(i) for i in range(N)], [frame_gross(i, 'koerper') for i in range(N)], (GPL, GPT, GPL + sw, GPT + sh))
+BOX = U.zuschnitt([frame_gross(i) for i in range(N)], [frame_gross(i, 'koerper') for i in range(N)], (GPL, GPT, GPL + sw, GPT + sh), rand=2)
 PAD_L, PAD_T = GPL - BOX[0], GPT - BOX[1]
 
 
@@ -163,7 +164,7 @@ def frame(i, nur=None):
 if __name__ == '__main__':
     frames = [frame(i) for i in range(N)]
     prev = sys.argv[sys.argv.index('--preview') + 1] if '--preview' in sys.argv else None
-    L.pruefe(frames, quelle=spr, min_rand=1)
+    L.pruefe(frames, quelle=spr, min_rand=2)
     L.speichern('skeleton-healer', 'Skeleton Healer', frames, MS, prev)
     if prev:
         L.streifen(prev + '/skeleton-healer-strip.png', [frames[k] for k in (0, 6, 12, 18, 24, 30, 36, 42)], spalten=4, scale=6)

@@ -1,15 +1,15 @@
 {
   "creature": "Steam Dwarf Engineer",
   "sheet": "steam-dwarf-engineer.png",
-  "frameWidth": 36,
-  "frameHeight": 38,
+  "frameWidth": 38,
+  "frameHeight": 40,
   "frames": 48,
   "frameMs": 62,
   "loop": true,
   "layout": "horizontal",
-  "padTop": 2,
-  "padLeft": 4,
+  "padTop": 3,
+  "padLeft": 2,
   "padRight": 3,
   "padBottom": 2,
-  "faceX": 18.0
+  "faceX": 19.0
 }

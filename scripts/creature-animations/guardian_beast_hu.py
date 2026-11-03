@@ -21,7 +21,9 @@ Identifikation (x, y im 21×31-Sprite):
 Gold im Sprite: Krone, Stabbänder, Gürtelschloss, Armreife, Stiefelspitzen → nur dort Glanz (Regel 12/14). Kein Feuer, kein Dampf, keine Partikel.
 
 Ablauf (48 Frames à 64 ms = 3,07 s, nahtlos):
-* Atmen (Periode 24, zwei Atemzüge): die texturierte Rockzeile 26 wird einmal doppelt eingefügt (mit Texturmischung), Kopf, Krone, Umhang und Arme steigen 1 px; die Stiefel bleiben am Boden, der Stab (mit Faust) bleibt stehen.
+* Atmen (Periode 24, zwei Atemzüge): die texturierte Rockzeile 26 wird einmal doppelt eingefügt (mit Texturmischung), Kopf, Krone, Umhang und Arme steigen 1 px; die Stiefel bleiben am Boden.
+* STAB MIT HAND (Runde 3, Nutzerwunsch „Stab samt ihn haltender Hand mitbewegen, wenn der zugehörige Arm hochgeht“): der ganze Stab (Knauf, Bänder, Kappe und die Faust-Pixel (17–18,17–19), die in der Stab-Ebene liegen) steigt
+  mit dem Arm genau um denselben Atemhub (0/1 px) und sinkt mit ihm; die Faust-Pixel x = 16 am Arm bewegen sich ohnehin mit, so dass Hand und Stab starr zusammenbleiben. Die Stabkappe hebt dabei 1 px vom Boden ab (der Arm hebt den Stab).
 * Krone federt: beim Einatmen hebt sich der Kopf zuerst, die Krone (Zeilen 2–8) folgt 3–4 Frames später (sie liegt dazwischen 1 px tiefer und überdeckt die Stirn), beim Ausatmen sinkt sie sofort mit.
 * Ohren zucken: das linke Ohr (Frames 6–11) und später das rechte Ohr (Frames 30–35) rutschen ruckhaft 1 px nach unten und wieder hoch, sie bleiben am Kopf.
 * Blinzeln (Frames 19–21 und 41–43): die weißen/hellblauen Augenpixel nehmen die Gesichtsfarbe an; es bleibt der schwarze L-Block als Lidstrich (Lid = umgebende Körperfarbe).
@@ -37,7 +39,7 @@ import anim_humanoide as Hm
 import anim_lib as L
 
 N, MS = 48, 64
-sz = G.Szene('guardian-beast-hu', (2, 2, 2, 2))
+sz = G.Szene('guardian-beast-hu', (2, 2, 3, 2))                 # oben 3 px: der Stab hebt sich beim Atmen 1 px mit dem Arm
 spr, OFF, H, W, f = sz.spr, sz.off, sz.H, sz.W, sz.f
 
 GESICHT = f(7, 11)                                               # (159,31,46) rote Gesichtsfarbe
@@ -85,6 +87,7 @@ def frame(i):
     krone_tief = 1 if (brust and w <= 0.8) else 0
     k, ol, orr, kr = sz.atmen([k, ol, orr, kr], 26, brust)
     kr = L.versetze(kr, 0, krone_tief)
+    sb = L.versetze(sb, 0, -brust)                               # Stab samt Faust folgt dem Arm (Atemhub)
     fig = L.zusammen(H, W, [(ol, 0, 0), (orr, 0, 0), (k, 0, 0), (kr, 0, 0), (sb, 0, 0)])
     return sz.kontur(fig, UMRISS)
 

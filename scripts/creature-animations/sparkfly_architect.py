@@ -52,11 +52,21 @@ vorhanden = L.deckend(spr)
 
 ROT, ROT_D, GRAU, GRAU_D = (212, 18, 18), (134, 12, 10), (58, 63, 60), (42, 46, 40)
 werkzeug = L.farbmaske(spr, [ROT, ROT_D, GRAU, GRAU_D]) & (xx >= 17)
-wing_l = vorhanden & ~werkzeug & (xx <= 6) & (yy <= 9)
-wing_r = vorhanden & ~werkzeug & (xx >= 14) & (xx <= 20) & (yy <= 9)
+# Runde 3 (Nutzerfeedback „dunkelgelbe Pixel über den Beinen, von den Flügelkonturen übrig“): die unteren Flügelspitzen-Konturpixel (4,10),(5,10) bzw. (15,10),(16,10)
+# in (58,56,6) gehören noch zum Flügel (Alpha 179 in der Kunst) und wandern jetzt mit — vorher blieben sie bei gehobenen Flügeln über den Beinen stehen.
+SPITZE_L = (yy == 10) & (xx >= 4) & (xx <= 5)
+SPITZE_R = (yy == 10) & (xx >= 15) & (xx <= 16)
+wing_l = vorhanden & ~werkzeug & (((xx <= 6) & (yy <= 9)) | SPITZE_L)
+wing_r = vorhanden & ~werkzeug & (((xx >= 14) & (xx <= 20) & (yy <= 9)) | SPITZE_R)
 koerper = vorhanden & ~werkzeug & ~wing_l & ~wing_r
 assert int((wing_l | wing_r | koerper | werkzeug).sum()) == int(vorhanden.sum())
 
+# Dieselbe Rückmeldung: vier Körperpixel über den Beinen sind in der Kunst vom Flügel dunkelgelb eingefärbt (Flügel liegt halbtransparent darüber): links (8,10),(7,11), rechts (12,10),(13,11)
+# (Farben (53,47,8)/(55,49,8)). Sie bleiben nur dunkelgelb, solange die Flügelspitze noch über ihnen steht (Flügelkontur bei (4,10)/(5,10) bzw. (15,10)/(16,10) vorhanden);
+# sonst zeigen sie, was darunter liegt — das Schwarz der Beine (0,0,0, Farbe aus dem Sprite). Ruhepose = Original.
+TINT_L = [(8, 10), (7, 11)]
+TINT_R = [(12, 10), (13, 11)]
+SCHWARZ = (0, 0, 0)
 BODY_E, BODY_G = (42, 27, 14), (51, 33, 16)
 AUGEN = [(8, 12), (8, 13), (9, 13), (9, 14), (11, 13), (11, 14), (12, 12), (12, 13)]
 UMRISS = F.umriss_farben(spr)
@@ -79,6 +89,10 @@ def frame(i, partikel=True, effekte=True):
     # Flügelschlag: Spitze etwa −4 … +4 px
     wl = F.fluegel_welle(wl, PAD_L + 6, 4.4, ph, potenz=1.0, nur_rechts=False, lauf=0.12, zusammenhang=True)
     wr = F.fluegel_welle(wr, PAD_L + 14, 4.4, ph, potenz=1.0, nur_rechts=True, lauf=0.12, zusammenhang=True)
+    if not (wl[PAD_T + 10, PAD_L + 4, 3] or wl[PAD_T + 10, PAD_L + 5, 3]):        # Flügelspitze links nicht mehr über dem Bein → Einfärbung weg
+        F.setze(kp, PAD_L, PAD_T, {p: SCHWARZ for p in TINT_L})
+    if not (wr[PAD_T + 10, PAD_L + 15, 3] or wr[PAD_T + 10, PAD_L + 16, 3]):
+        F.setze(kp, PAD_L, PAD_T, {p: SCHWARZ for p in TINT_R})
     wl, wr, kp = (L.versetze(a, 0, bob) for a in (wl, wr, kp))
     # Werkzeug: starr (Drehung zerreißt die dünnen Diagonalen) und fest mit der Biene verbunden: derselbe Versatz wie der Körper (die Hand ist die rechte untere Beinspitze)
     wz = L.versetze(wz, 0, bob)

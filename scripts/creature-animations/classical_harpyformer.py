@@ -35,14 +35,14 @@ Identifikation (Sprite-Koordinaten x, y):
   (32,42); großes Plus (8 px) bei (35,26). Sie schweben um die Geige.
 
 Ablauf (48 Frames à 65 ms = 3,12 s); Frame 0 = Ruhepose = Original. Sie STEHT am Boden, nichts schwebt (Nutzer-Feedback), die Geige bleibt unten stehen und bewegt sich NIE:
-* Bogenstrich (Periode 16 Frames, drei Hin-und-Her-Striche pro Schleife): Bogen UND linke Flügelsichel (der Bogenarm) wandern als starres Paar mit demselben ganzzahligen Versatz (0 … ±3 px waagerecht,
-  ±2 px senkrecht, Richtung quer zu den Saiten); Frame 0 in der Mitte des Strichs. Der Bogenfrosch bleibt so immer hinter dem Griff des Flügels (gleicher Versatz, kein Auseinanderlaufen).
+* Bogenstrich (Runde 3: Periode 24 Frames, zwei Hin-und-Her-Striche pro Schleife; vorher 16 Frames/±3 px/±2 px, Rückmeldung „der Flügel bewegt sich viel zu sehr“): Bogen UND linke Flügelsichel (der Bogenarm) wandern als starres Paar mit demselben
+  ganzzahligen Versatz (0 … ±2 px waagerecht, 0 … ±1 px senkrecht, Richtung quer zu den Saiten); Frame 0 in der Mitte des Strichs. Der Bogenfrosch bleibt so immer hinter dem Griff des Flügels (gleicher Versatz, kein Auseinanderlaufen).
 * Atmen (Periode 24 Frames, zweimal pro Schleife): der Oberkörper (Kopf, Haare, Schal) hebt sich 1 px (eine Zeile des Schals wird mit Texturmischung `L.streck_zeile` eingefügt, Hals/Gesicht nicht gedehnt);
   Füße, Geige, die verdeckten Teile hinter der Geige (rechter Flügelrand, grüner Umhang) bleiben stehen; der Ohrring geht mit dem Kopf.
 * Haare schwingen: die Strähnen links (y 32–40) pendeln mit wachsendem Abstand bis 2 px (Periode 12 Frames); das innere Ende bleibt am Körper (Pixel werden verdoppelt/ausgelassen).
 * Goldkette (Gold) pendelt sanft: Ansatz an der Schnecke fest, die Zeilen darunter wandern waagerecht, je tiefer desto mehr (bis ±2–3 px, Periode 24 Frames), zusätzlich eine kleine Oberschwingung
   (Periode 12) — das Ende „schlenkert“ nach; zweimal pro Schleife läuft ein Lichtband aufwärts über die Kette (Frames 3–20 und 27–44, eine Stufe heller auf der Goldrampe).
-* Saiten (Metall): bei jedem halben Bogenstrich (6 pro Schleife) läuft ein Lichtband über die Saitenpixel des Halses (beige → heller → weiß), abwechselnd abwärts/aufwärts.
+* Saiten (Metall): bei jedem halben Bogenstrich (4 pro Schleife) läuft ein Lichtband über die Saitenpixel des Halses (beige → heller → weiß), abwechselnd abwärts/aufwärts.
 * Blinzeln: Frames 19–21 und 41–42, Lid = Haut-/Wangenfarbe der Nachbarpixel.
 * Ohrring (Gold): zweimal pro Schleife blitzt ein kleiner Glitzerstern auf (Frames 6–8 und 30–32).
 * Funkelsterne: jeder wächst und vergeht in 24 Frames (Raute → X → Plus → X → Raute → aus), zwei Mal pro Schleife, je Stern in eigener Phase; Frame 0 = Stufe der Karte.
@@ -130,8 +130,8 @@ ERLAUBT = {tuple(int(v) for v in spr[y, x, :3]) for y, x in zip(*np.nonzero(_kan
 
 
 # ── Bogenstrich: Bogen + Bogenarm bewegen sich als starres Paar ─────────────────────────────────────────────────────────
-STRICH_PERIODE = 16.0
-STRICH_X, STRICH_Y = 3.2, 1.7                              # Weg des Bogens quer zu den Saiten (Hals läuft schräg nach oben rechts)
+STRICH_PERIODE = 24.0                                      # Runde 3 (Rückmeldung: „der Flügel bewegt sich viel zu sehr“): ruhigerer, kürzerer Strich — zwei Hin-und-Her-Striche pro Schleife (vorher drei, ±3/±2 px)
+STRICH_X, STRICH_Y = 2.0, 1.0                              # Weg des Bogens quer zu den Saiten (Hals läuft schräg nach oben rechts); ganzzahlig 0 … ±2 px waagerecht, 0 … ±1 px senkrecht
 
 
 def strich_versatz(t):
@@ -223,8 +223,8 @@ def frame(i, partikel=True, nur=None):
         ohr = OHRRING.copy()
         # Geige: Saiten bekommen bei jedem halben Bogenstrich ein Lichtband (abwechselnd abwärts/aufwärts)
         geige = GEIGE.copy()
-        for k in range(6):
-            F.lichtband(geige, M_SAITEN, PAD_L, PAD_T, i, N, 8 * k + 1, 7, SAITEN_RAMPE, stufen=1, breite=3.0,
+        for k in range(4):
+            F.lichtband(geige, M_SAITEN, PAD_L, PAD_T, i, N, 12 * k + 1, 10, SAITEN_RAMPE, stufen=1, breite=3.0,
                         achse=(1.0, 2.0) if k % 2 == 0 else (-1.0, -2.0), kern_stufen=2)
         # Goldkette: Lichtband aufwärts, dann als hängende Kette schwingen
         strang = STRANG.copy()

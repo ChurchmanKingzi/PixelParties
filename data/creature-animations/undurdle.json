@@ -1,7 +1,7 @@
 {
   "creature": "Undurdle",
   "sheet": "undurdle.png",
-  "frameWidth": 23,
+  "frameWidth": 27,
   "frameHeight": 17,
   "frames": 48,
   "frameMs": 100,
@@ -11,5 +11,5 @@
   "padLeft": 2,
   "padRight": 2,
   "padBottom": 2,
-  "faceX": 11.5
+  "faceX": 13.5
 }

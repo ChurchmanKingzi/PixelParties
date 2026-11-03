@@ -37,7 +37,7 @@ import numpy as np
 
 import anim_lib as L
 import anim_untote as U
-import anim_feuer as FEU
+import anim_feuer2 as FE2
 import anim_daemon as D
 
 N, MS = 48, 65
@@ -61,14 +61,24 @@ assert all(col(x, y) in {(185, 190, 132), (73, 75, 26)} for (x, y) in AUGEN)
 LAVA = [(x, y) for y in range(35, 38) for x in range(30, 50) if vorhanden[y, x] and col(x, y) in (LAVA_M, LAVA_R)]
 assert len(LAVA) == 15
 
-# --- Feuer ---
+# --- Feuer (anim_feuer2: die gemalte Flamme der Quelle wird Zunge für Zunge animiert) ---
 RAMPE = {'rand': ROT, 'rot': ROT, 'orange': ORANGE, 'gelb': GELB, 'hell': CREME}
 SPERRE = np.zeros((H, W), bool)
 SPERRE[GPT:GPT + sh, GPL:GPL + sw] = koerper
-ZL = [(8.2, 11, 5.5, 1.5), (10.4, 12, 12.0, 1.9), (12.8, 12, 8.5, 1.8), (14.6, 12, 11.0, 1.8), (16.3, 10, 7.0, 1.2)]
-ZR = [(38.5, 17, 7.0, 1.7), (40.8, 19, 10.5, 2.1), (43.3, 19, 11.0, 2.2), (45.8, 18, 10.5, 2.1), (48.3, 16, 7.0, 1.8), (50.5, 14, 4.5, 1.3)]
-FEUER_L = FEU.Feuer(H, W, [FEU.Zunge(GPL + x, GPT + b, h, w) for (x, b, h, w) in ZL], RAMPE, n=N, seed=21, posen=12, amplitude=1.0, sperre=SPERRE)
-FEUER_R = FEU.Feuer(H, W, [FEU.Zunge(GPL + x, GPT + b, h, w) for (x, b, h, w) in ZR], RAMPE, n=N, seed=22, posen=12, amplitude=1.0, sperre=SPERRE)
+
+
+def flamm_vorlage(maske):
+    t, _ = L.trenne(spr, maske)
+    return L.platz(t, H, W, GPL, GPT)
+
+
+Z = lambda f, s, **k: FE2.Zunge((f[0] + GPL, f[1] + GPT), (s[0] + GPL, s[1] + GPT), **k)
+# linke Flamme (Mähne im Nacken): drei Zungen, Fuß auf dem Oliv-Balken (y 12); rechte Flamme (Hinterteil): waagerecht nach rechts, fünf Zungen (Zeilen 10/12/14/16/18)
+ZL = [Z((10, 10), (10, 0)), Z((12.5, 10), (12, 3), amp=0.8), Z((15, 10), (14, 1))]
+ZR = [Z((41, 10), (47, 9), amp=0.8), Z((43, 12), (52, 12)), Z((43, 14), (50, 14)), Z((43, 16), (48, 16), amp=0.8), Z((42, 18), (47, 18), amp=0.7)]
+VL_L = FE2.Vorlage(flamm_vorlage(flamme_alt & (xx < 30)), ZL, 'hoch', rand_farbe=ROT, sperre=SPERRE)
+VL_R = FE2.Vorlage(flamm_vorlage(flamme_alt & (xx >= 34)), ZR, 'rechts', rand_farbe=ROT, sperre=SPERRE)
+FEUER = FE2.Feuer([VL_L, VL_R], n=N, seed=21, bank='zunge', amp=1.0)
 
 
 def teil(maske):
@@ -95,11 +105,11 @@ def frame_gross(i, nur=None):
         kp[GPT + y, GPL + x, :3] = lava_farbe(k, i)
     kp = L.streck_zeile(kp, GPT + 22, n)
     kp = U.kontur_schliessen(kp, UMRISS, KONTUR)
-    fl = L.zusammen(H, W, [(FEUER_L.ebene(i), 0, -n), (FEUER_R.ebene(i), 0, -n)])
+    fl = L.versetze(FEUER.ebene(i), 0, -n)
     f = U.kontur_schliessen(L.zusammen(H, W, [(fl, 0, 0), (kp, 0, 0)]), UMRISS, ROT)
     if nur == 'koerper':
         return f
-    fk = L.zusammen(H, W, [(FEUER_L.funken(i, dy=-n, leben=12), 0, 0), (FEUER_R.funken(i, dy=-n, leben=12), 0, 0)])
+    fk = FEUER.funken(i, dy=lambda f: -U.stufe(f, 24, 2))
     return L.zusammen(H, W, [(fk, 0, 0), (f, 0, 0)])
 
 

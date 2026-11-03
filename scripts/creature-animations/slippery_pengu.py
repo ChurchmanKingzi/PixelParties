@@ -1,5 +1,7 @@
 # -*- coding: utf-8 -*-
-"""Idle-Animation für „Slippery Pengu“ (Creature) — der auf dem Bauch rutschende Pinguin.
+"""Idle-Animation für „Slippery Pengu“ (Creature) — der auf dem Bauch rutschende Pinguin. Runde 3: er RUTSCHT nach links und rechts (und dreht sich dabei um).
+
+Nutzerkorrektur (wörtlich): „Pengu sollte, wie die meisten Slipperies, nach links und rechts sliden.“
 
 Quelle: src/slippery-pengu.png (42×18 px, 125 Farben, deckend) — Ebene „Pengu“ (xcf Motive, 50×21) mit Dithering (4×4-Bayer) statt Halbtransparenz: die Ebene hat hinten (rechts) einen unscharf auslaufenden
 Rutschschweif (Alpha 25–230) und einen halbtransparent verschmierten Flügel; per Regel 22 deckend gemacht: Alpha ≥ 150 → deckend, 70–150 → Schachbrett-Dither nach Alpha, darunter weg
@@ -17,6 +19,9 @@ Was im Sprite ist (x, y im 42×18-Sprite):
 Bleibt fest: Kopf mit Schnabel, Bauchfedern, Halsfleck. Material: Federn — KEIN Glanz (Regel 14).
 
 Ablauf (48 Frames à 62 ms = 2,98 s, nahtlos), alle Bewegungen unabhängig:
+* RUTSCHEN (neu): der GANZE Pinguin samt Flügel, Schweif und Schneestaub gleitet ganzzahlig über das Eis — Frames 0–11 nach links (bis −8 px, sanft anfahrend/bremsend, er blickt nach links = Originalrichtung), kurzer
+  Halt, dann (Frame 13) wird der Sprite horizontal gespiegelt und er gleitet Frames 15–30 nach rechts (bis +8 px; der Schweif/Staub liegt jetzt links, also wieder HINTER ihm), Halt, Rückspiegeln (Frame 33) und
+  Frames 34–47 zurück zur Mitte (links gerichtet). Frame 0 = Original. Die Leinwand ist links/rechts gleich breit (Spiegeln um die Mitte). Keine Gehbewegung, nichts verformt sich dabei.
 * Flügel schlägt (Periode 16): die Flügelspalten (y ≤ 8, x ≥ 21) heben/senken sich bis ±2 px (am Ende am stärksten, Spalten am Körper bleiben), die Lücke zum Rücken wird durch `fuell` gefüllt (Flügel bleibt am Rumpf).
 * Schweif wedelt (Periode 12): die Schweifspalten (x ≥ 31, y ≥ 8) wandern bis ±1 px senkrecht; die Bauchunterkante bleibt am Boden (Zeile 17).
 * Atmen (Periode 24): Zeile 12 des Rumpfs wird einmal doppelt (Mischtextur) — Kopf, Rücken, Flügel steigen 1 px; der Bauch/Boden bleibt (der Pinguin liegt auf dem Eis).
@@ -33,9 +38,10 @@ import numpy as np
 import anim_eis as E
 import anim_humanoide as Hm
 import anim_lib as L
+import anim_rutsch as R
 
 N, MS = 48, 62
-PAD_L, PAD_R, PAD_T, PAD_B = 4, 16, 6, 3
+PAD_L, PAD_R, PAD_T, PAD_B = 18, 18, 6, 3          # links/rechts gleich (Spiegeln um die Mitte): Rutschweg ±8 px + Schneestaub
 TEST_EBENEN = ('koerper',)
 
 spr = L.lade('slippery-pengu')
@@ -80,12 +86,17 @@ STAUB = [dict(x=PAD_L + x, y=PAD_T + 16 + dy, vx=vx, vy=-9, off=o, form=f, wacke
 STAUB_FARBEN = {'c': D_, 'r': C_}
 
 
+# Rutschen: Pinguin blickt nach links (Original); links 0 → −8, Halt, spiegeln, rechts −8 → +8 (blickt nach rechts), Halt, zurückspiegeln, 8 → 0
+BAHN, SPIEGEL = R.pfad(N, [('fahrt', -8, 12), ('halt', 1), ('flip',), ('halt', 2), ('fahrt', 8, 16), ('halt', 2), ('flip',),
+                           ('halt', 1), ('fahrt', 0, 14)])
+
+
 def frame(i, nur=None):
     ebenen = []
     if nur is None or 'dunst' in nur:
         ebenen.append((E.dunst_ebene(H, W, i, N, STAUB, STAUB_FARBEN), 0, 0))
     ebenen.append((koerper(i), 0, 0))
-    return L.zusammen(H, W, ebenen)
+    return R.verschieben(L.zusammen(H, W, ebenen), BAHN[i], SPIEGEL[i])
 
 
 if __name__ == '__main__':
@@ -93,6 +104,7 @@ if __name__ == '__main__':
     prev = sys.argv[sys.argv.index('--preview') + 1] if '--preview' in sys.argv else None
     ohne = [frame(i, nur=('koerper',)) for i in range(N)]
     print('Ruhepose weicht vom Original ab bei:', Hm.ruhepose(ohne[0], spr, OFF) or 'nichts')
+    print('Position je Frame:', BAHN, '\nGespiegelt:', [int(x) for x in SPIEGEL])
     L.pruefe(frames, quelle=spr)
     print('Pixel je Frame (Figur):', [int((f[..., 3] > 0).sum()) for f in ohne])
     L.speichern('slippery-pengu', 'Slippery Pengu', frames, MS, prev)

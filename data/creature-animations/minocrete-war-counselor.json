@@ -2,14 +2,14 @@
   "creature": "Minocrete War Counselor",
   "sheet": "minocrete-war-counselor.png",
   "frameWidth": 58,
-  "frameHeight": 36,
+  "frameHeight": 41,
   "frames": 48,
   "frameMs": 62,
   "loop": true,
   "layout": "horizontal",
-  "padTop": 3,
+  "padTop": 5,
   "padLeft": 3,
   "padRight": 3,
-  "padBottom": 2,
+  "padBottom": 5,
   "faceX": 29.0
 }

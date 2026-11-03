@@ -13,6 +13,7 @@ Ausgabe:  ../../data/creature-animations/guardian-beast-hou.png + .json
 
 Identifikation (x, y im 17×32-Sprite):
 * STAB (x 14–16, y 0–31): dunkelroter Rand (94,0,0), Mitte hellrot (214,30,6)/(207,82,71)/(150,33,13); wird von der rechten Hand gehalten (die Hand liegt hinter dem Stab) und steht am Boden. Lackiertes Holz/Eisen, ohne Glanz.
+  Oben (y 0–1) und unten (y 30–31) läuft er in eine 1 px breite Spitze aus; dazwischen y 2–29 Schaft (Rand | Mitte | Rand).
 * MÜTZE (x 6–10, y 6–11): violette Spitzmütze (103,54,136)/(146,111,169)/(41,20,61); auf ihr ein kleines Abzeichen bei (7–8, 8–9): schwarz (0,0,0), weiß (255,252,240), Gold (215,192,86).
 * STIRNBINDE (y 11–13): rotes V (91,0,3)/(128,16,26)/(179,23,36) mit schwarzen Brauen (0,0,0) bei (5–6,13)/(9–10,13).
 * GESICHT (x 5–10, y 14–19): Haut (250,215,151)/(255,240,189)/(255,250,224); Augen: schwarze 2×2-Blöcke (0,0,0) bei (5–6,15)/(9–10,15) mit Pupille (1,1,3) bei (6,16)/(10,16) und weißem Glanzpunkt (246,255,255) bei (5,16)/(9,16);
@@ -29,6 +30,9 @@ Ablauf (48 Frames à 64 ms = 3,07 s, nahtlos):
 * Blinzeln (Frames 19–21 und 41–43): beide Augen schließen sich — die oberen Augenpixel nehmen die Stirnhaut an, der Glanzpunkt wird schwarz, es bleibt ein dunkler Lidstrich.  Zwinkern (Frames 28–31): nur das rechte Auge schließt sich.
 * Lächeln (Frames 11–16 und 37–41): der rechte Mundwinkel (9,18) wird rot (125,0,0), das Schmunzeln wird zum breiten Lächeln.
 * Fußtippen: der linke Stiefel hebt sich zweimal 1 px (Frames 8–15), später der rechte (Frames 36–43); er verschwindet teilweise hinter der Hose.
+* STAB FÄHRT EIN UND AUS (Runde 3, Nutzerwunsch „der rote Stab soll von oben ein- und ausfahren“, teleskopartig wie ein Zauberstab): das obere Ende wandert nach unten (der Stab wird kürzer, bis zu 16 Zeilen) und wieder nach oben.
+  Der untere Teil bleibt unverändert an seinem Platz (Hand und Boden), nur die oberen Schaftzeilen fallen weg und die 2-px-Spitze sitzt am neuen oberen Ende; die Schaftmuster (Hell/Dunkel-Wechsel) bleiben dabei an ihrer Stelle.
+  Zwei Fahrten je Schleife: tief (Frames 6–22: Einfahren in 4 Stufen, halten, Ausfahren in 5 Stufen) und flach (Frames 34–43, bis 6 Zeilen).
 * Gold funkelt (Regel 12/14, winzig): die Ohrringe blitzen abwechselnd (Frames 14–16 / 33–35), Anhänger und Schnalle blitzen als einzelne Pixel (Frames 22–24 / 44–46); kein Lichtband (nur 6 Goldpixel), keine Sterne.
 Frame 0 = Original (Ruhepose). Kontrolle: anim_humanoide.ruhepose / eckkontakt_typen / Randpixel-Test (Regel 16).
 Alle Bewegungen laufen auf der vollen Leinwand (anim_lib wirft ClipError). Nur ganze Pixel, nur Farben der Quelle.
@@ -53,6 +57,9 @@ UMRISS = f(3, 12)                                                # (49,24,0)
 MUND = f(6, 18)                                                  # (125,0,0) rotes Lächeln
 
 stab = sz.maske(14, 0, 16, 31)
+# Stab teleskopartig: Einfahrtiefe r (Zeilen) je Frame; 0 = ausgefahren (Original)
+EIN_TIEF = {6: 3, 7: 7, 8: 12, 9: 16, 10: 16, 11: 16, 12: 16, 13: 16, 14: 16, 15: 16, 16: 16, 17: 13, 18: 9, 19: 5, 20: 2,
+            34: 2, 35: 5, 36: 6, 37: 6, 38: 6, 39: 6, 40: 4, 41: 2}
 hut = sz.maske(6, 6, 9, 9)
 stiefel_l = sz.maske(0, 29, 6, 31) & ~stab
 stiefel_r = sz.maske(9, 29, 13, 31) & ~stab
@@ -79,8 +86,18 @@ for k, p in enumerate([-1, -2, -2, -1, -2, -1, 0]):                  # Frames 28
     HUT_ABLAUF[28 + k] = p
 
 
+def stab_ebene(r):
+    """Stab mit um r Zeilen eingefahrenem oberen Ende: Schaftzeilen y < r + 2 entfallen, die Spitze (Zeilen 0–1 des Originals, nur Mittelspalte) sitzt auf Zeile r, r + 1."""
+    sb = sz.ebene(stab)
+    if not r:
+        return sb
+    sz.setze(sb, {(x, y): None for x in range(14, 17) for y in range(0, r + 2)})
+    sz.setze(sb, {(15, r): f(15, 0), (15, r + 1): f(15, 1)})
+    return sb
+
+
 def frame(i):
-    k, h, sb = sz.ebene(koerper), sz.ebene(hut), sz.ebene(stab)
+    k, h, sb = sz.ebene(koerper), sz.ebene(hut), stab_ebene(EIN_TIEF.get(i, 0))
     bl, br = sz.ebene(stiefel_l), sz.ebene(stiefel_r)
     # --- Blinzeln / Zwinkern ---
     if Hm.folge(i, 19, [1, 1, 1], N) or Hm.folge(i, 41, [1, 1, 1], N):

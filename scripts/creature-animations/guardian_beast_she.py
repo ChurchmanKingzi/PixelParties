@@ -27,8 +27,10 @@ Ablauf (48 Frames à 80 ms = 3,84 s, nahtlos):
 * KOBRA STEIGT UND SCHWANKT: Haube + Hals heben sich in zwei Stufen um bis zu 2 px (Hals-Zeile 25 wird 1–2× eingefügt; die Hals-Streifen sind senkrechte Verläufe, also keine sichtbare
   Zeilenkopie; Periode 24) und schwanken dabei langsam (Periode 48): die Haube samt Gesicht wandert starr bis ±2 px waagerecht, nur der Hals (y 21–27) biegt sich dabei als S-Kurve
   (Gefälle ≤ 1 px je Zeile, Zusammenhang bleibt, Haubenrand/Saum werden nicht geschert). Das ist eine Schlange, kein Humanoider — sie darf pendeln.
-* SCHWANZ: die Schlinge und der Balken (y 21–33) schwingen als Scherung um die Spirale (Periode 16, drei Wellen je Schleife, oben bis ±3 px, die Schlinge starr als Ganzes mit y 25);
-  hinter dem Stab verlaufende Teile werden nur dort sichtbar, wo der Schwanz wirklich liegt.
+* SCHWANZ + SPEER ALS EINHEIT (Nutzer-Feedback Runde 3: „der Speer soll sich mit der Schwanzspitze mitbewegen“): Schwanzspitze (Schlinge um den Stab), Balken und der ganze Speer
+  (Dreizack, Knoten, Schaft) schwanken gemeinsam um die Spirale (Periode 24, zwei Wellen je Schleife). Der Speer ist starr: der Schaft kippt wie ein Pendel um y 34 (Zeilenversatz
+  = Abstand zum Drehpunkt, Gefälle < 1 px je Zeile; zur Haube hin nur gut ein Drittel so weit, damit der Dreizack nie in die Haube läuft), Dreizack samt Knoten und Spitze wandern als ganzer Block mit (kein Verbiegen), die Schlinge sitzt mit dem Schaft in denselben Zeilen
+  auf demselben Versatz (Schlinge und Stab verschieben sich nie gegeneinander). Dreizack bis +4/−1 px, Schlinge bis +2/−1 px.
 * BLINZELN: Frames 30–32 (Lid = Hellgrau (174,174,174), erst obere Reihe, dann beide).
 * GOLD GLÄNZT (Regel 12): ein Lichtband läuft (Frames 6–19) über das goldene Haubensaum-Paar (eine Stufe auf der Goldrampe); ein vierzackiger Stern blitzt am goldenen Stabknoten (Frames 22–26)
   und an der metallischen Stabspitze (Frames 38–42) auf.
@@ -51,7 +53,7 @@ import anim_humanoide as Hm
 import anim_lib as L
 
 N, MS = 48, 80
-PAD_L, PAD_R, PAD_T, PAD_B = 5, 5, 6, 4
+PAD_L, PAD_R, PAD_T, PAD_B = 6, 8, 6, 4
 
 spr = L.lade('guardian-beast-she')
 sh, sw = spr.shape[:2]
@@ -89,6 +91,26 @@ def ebene(m, dx=0, dy=0):
     return L.platz(t, H, W, PAD_L + dx, PAD_T + dy)
 
 
+SPEER_AMP, SPEER_N, SPEER_LINKS = 6.0, 24, 0.4                                    # Auslenkung des Speers (y 0) in px, Periode in Frames, Faktor für das Pendeln zur Haube hin
+DREH_Y = 34                                                                        # Drehpunkt des Speers (Schaftfuß in der Spirale)
+
+
+def speer_dx(i):
+    """{Leinwandzeile: dx} für Speer + Schwanzspitze: starres Pendel um DREH_Y (Versatz ∝ Abstand, Gefälle < 1 px je Zeile), Dreizack/Knoten/Spitze (y 0–14) als ganzer Block,
+    Schlinge (y 20–25) auf einem Versatz. Zur Haube hin (links) schlägt der Speer nur halb so weit aus, damit er nie in die Haube läuft."""
+    s = np.sin(L.sinus(i, SPEER_N))
+    if s < 0:
+        s *= SPEER_LINKS
+    gerade = lambda y: SPEER_AMP * (DREH_Y - y) / DREH_Y * s
+    roh = {y: gerade(y) for y in range(0, DREH_Y + 1)}
+    for y in range(0, 15):
+        roh[y] = gerade(14)
+    for y in range(20, 26):
+        roh[y] = gerade(22)
+    d = {PAD_T + y: int(round(v)) for y, v in roh.items()}
+    return G.kappe(d)
+
+
 def frame(i):
     # ── Stab: Dreizack + oberer Schaft (hinter dem Schwanz) ──
     stab = ebene(stab_oben)
@@ -105,12 +127,10 @@ def frame(i):
     # ── Schwanz: Scherung um y 34, Schlinge starr ──
     sw_ = ebene(schwanz_m)
     Hm.setze(sw_, ERG_SCHWANZ, OFF)
-    ph = L.sinus(i, 16)
-    ys = range(PAD_T + 21, PAD_T + 34)
-    dxs = G.gefaelle(ys, PAD_T + 34, 3.0, ph, potenz=1.0)
-    for y in range(PAD_T + 21, PAD_T + 25):                                         # Schlinge: starr mit Zeile 25
-        dxs[y] = dxs[PAD_T + 25]
-    sw_ = G.zeilen_dx(sw_, dxs)
+    dxs = speer_dx(i)
+    sw_ = G.zeilen_dx(sw_, {y: d for y, d in dxs.items() if y >= PAD_T + 21})
+    stab = G.zeilen_dx(stab, {y: d for y, d in dxs.items() if y <= PAD_T + 23})
+    vorn = G.zeilen_dx(vorn, {y: d for y, d in dxs.items() if y >= PAD_T + 24})
 
     # ── Kopf: Gold-Lichtband, Blinzeln, Steigen, Schwanken ──
     kopf = ebene(kopf_m)

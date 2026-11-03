@@ -72,6 +72,9 @@ faecher = fl_ol | fl_ul | fl_or | fl_ur
 ohr_l = vorhanden & ~faecher & (xx <= 20) & (yy <= 3)
 ohr_r = vorhanden & ~faecher & (xx >= 27) & (yy <= 3)
 beine_m = vorhanden & ~faecher & (yy >= 26)
+bein_fest = beine_m & (yy <= 28)                                                  # Brustfell-Unterkante / Beinansatz: bleibt stehen
+bein_l = beine_m & (yy >= 29) & (xx <= 23)                                         # linkes Vorderbein samt Krallenstrichen
+bein_r = beine_m & (yy >= 29) & (xx >= 24)
 kopf_m = vorhanden & ~faecher & ~ohr_l & ~ohr_r & (yy <= 25)
 
 
@@ -85,14 +88,35 @@ def ohr_dx(i, start, vorz):
     return 0 if not w else vorz * w
 
 
+FACH_AMP = 1.2                                                                   # Runde 3: Fächer waren „viel zu aufgeregt“ (vorher 1,7 px bei Perioden 12–48) → nur noch die äußere Hälfte, 1 px
+
+
 def fach(m, i, periode, vorz, pivot_x):
-    """Schmuckfächer schlägt: Spalten wandern senkrecht, je weiter außen desto mehr (Kippen um die Wurzel, Spitze bis ±1,7 px); in Frame 0 überall 0."""
+    """Schmuckfächer schwingt sacht: Spalten wandern senkrecht, je weiter außen desto mehr (Kippen um die Wurzel, Spitze höchstens ±1 px); in Frame 0 überall 0."""
     a = ebene(m)
     ph = L.sinus(i, periode)
 
     def dy(fr):
-        return 1.7 * vorz * fr * np.sin(ph)
+        return FACH_AMP * vorz * fr * np.sin(ph)
     return FB.spalten_schub_4verbunden(a, PAD_L + pivot_x, dy)
+
+
+BEIN_AMP = 2.0                                                                    # Wiegen der Beine: Zehen bis ±2 px, Gefälle ≤ 1 px je Zeile
+HEB_L = [1, 2, 2, 2, 2, 2, 2, 2, 2, 1]                                           # Pfote hebt sich (Hub in px je Frame des Fensters)
+HEB_R = HEB_L
+
+
+def bein(m, i, vorz, heb_start):
+    """Vorderbein (Zeilen ab 29): wiegt sich in der Hüfte (Schere: Zeilenversatz wächst zur Pfote hin, die beiden Beine gegenläufig, Periode 24) und hebt zeitweise die Pfote um bis zu 2 px
+    (die Zeilen 31–32 des Beins fallen weg, die Pfote samt Krallenstrichen rückt hoch — nichts wird gedehnt oder doppelt)."""
+    a = ebene(m)
+    sn = np.sin(L.sinus(i, 24) + (0.0 if vorz > 0 else np.pi))
+    dxs = G.kappe({PAD_T + y: int(round(vorz * BEIN_AMP * ((y - 28) / 10.0) * sn)) for y in range(29, 40)})
+    a = G.zeilen_dx(a, dxs)
+    k = Hm.folge(i, heb_start, HEB_L, N)
+    if k:
+        a = L.heben_unten(a, PAD_T + 32, k)
+    return a
 
 
 def frame(i):
@@ -116,12 +140,13 @@ def frame(i):
             lay[:] = G.zeilen_dx(lay, {PAD_T + y: (d if y <= 1 else 0) for y in range(0, 4)})
     ol, orr = L.versetze(ol, 0, -r), L.versetze(orr, 0, -r)
     # ── Schmuckfächer ──
-    a_ol = L.versetze(fach(fl_ol, i, 24, 1, 14), 0, -r)
-    a_ul = L.versetze(fach(fl_ul, i, 16, -1, 14), 0, -r)
-    a_or = L.versetze(fach(fl_or, i, 48, 1, 33), 0, -r)
-    a_ur = L.versetze(fach(fl_ur, i, 12, -1, 33), 0, -r)
-    bn = ebene(beine_m)
-    fig = L.zusammen(H, W, [(a_ol, 0, 0), (a_ul, 0, 0), (a_or, 0, 0), (a_ur, 0, 0), (bn, 0, 0), (kp, 0, 0), (ol, 0, 0), (orr, 0, 0)])
+    a_ol = L.versetze(fach(fl_ol, i, 48, 1, 14), 0, -r)
+    a_ul = L.versetze(fach(fl_ul, i, 24, -1, 14), 0, -r)
+    a_or = L.versetze(fach(fl_or, i, 24, 1, 33), 0, -r)
+    a_ur = L.versetze(fach(fl_ur, i, 48, -1, 33), 0, -r)
+    bn = ebene(bein_fest)
+    bl, br = bein(bein_l, i, -1, 6), bein(bein_r, i, 1, 30)
+    fig = L.zusammen(H, W, [(a_ol, 0, 0), (a_ul, 0, 0), (a_or, 0, 0), (a_ur, 0, 0), (bn, 0, 0), (bl, 0, 0), (br, 0, 0), (kp, 0, 0), (ol, 0, 0), (orr, 0, 0)])
     G.rand_schliessen(fig, ERLAUBT, UMRISS)
     return fig
 

@@ -117,3 +117,36 @@ def fuelle_oben(neu, alt, stuetze):
                 if not out[y, x, 3]:
                     out[y, x] = alt[y0, x]
     return out
+
+
+def schlange_aussen(a, pivot_y, amp, i, n, lauf=1.2, potenz=1.0, ruhe_frame=0):
+    """Hängender Schlangenarm schwingt NUR nach rechts (+x) aus und zurück — gleichmäßig und ohne Zucken (Nutzerkorrektur Runde 3, Serpentous).
+    Zeilen unterhalb von pivot_y: dx(y) = round(amp · f^potenz · max(0, S(i) − S(0)) / (1 − S(0))), f = (y − pivot_y)/maxAbstand, S(t) = sin(2π t/n − lauf · f).
+    Die Welle läuft von der Wurzel zur Spitze (die Spitze hinkt hinterher); Frame 0 ist exakt die Ruhepose. Damit der Arm 4-verbunden bleibt, ändert sich dx von Zeile zu Zeile höchstens um 1
+    (kein Versatz-Sprung zwischen Nachbarzeilen, kein Einfrieren wie bei zeilen_pendel); die Zeilen oberhalb und die Pivotzeile stehen fest."""
+    h, w = a.shape[:2]
+    ys = [y for y in range(h) if a[y, :, 3].any() and y > pivot_y]
+    maxd = max(1, max(ys) - pivot_y) if ys else 1
+    out = L.leer(h, w)
+    dxs = {}
+    prev = 0
+    for y in range(h):
+        if not a[y, :, 3].any():
+            continue
+        if y <= pivot_y:
+            dx = 0
+        else:
+            f = (y - pivot_y) / maxd
+            s0 = math.sin(-lauf * f)
+            s = math.sin(2 * math.pi * (i - ruhe_frame) / n - lauf * f)
+            u = max(0.0, (s - s0) / (1 - s0))
+            dx = int(round(amp * f ** potenz * u))
+            dx = max(prev - 1, min(prev + 1, dx))
+        dxs[y] = dx
+        prev = dx
+        xs_ = np.nonzero(a[y, :, 3])[0]
+        if xs_.max() + dx >= w or xs_.min() + dx < 0:
+            raise L.ClipError(f'Zeile {y} würde um {dx} px aus der Leinwand (Breite {w}) geschoben')
+        for x in xs_:
+            out[y, x + dx] = a[y, x]
+    return out

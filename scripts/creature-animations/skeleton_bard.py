@@ -31,9 +31,11 @@ Ablauf (48 Frames à 65 ms = 3,12 s; Beat = 12 Frames):
 * GRIFFHAND: wechselt „Griffe“ — der Block am Hals rutscht in 3-Frame-Stufen (24-Frame-Zyklus, 2× pro Schleife) von (13,7) über (12,8) nach (11,9) und zurück; einmal zusätzlich (13,8) (Referenzpose 4).
 * Kopfnicken im Takt: Hut + Schädel sinken 1 px für 3 Frames (je Beat bei Frame 3–5). Fußwippen: der rechte Fuß (x 10–14, y 22–24) hebt sich 1 px für 3 Frames (je Beat bei Frame 9–11).
   Federspitze (12–13, 0): die oberste Federzeile pendelt −1/0 px (Periode 24). Kein Atmen (der Gitarrenkorpus wird nicht gedehnt).
-* Klangwölkchen (Partikel, hinter der Figur, 4 Stück, Lebensdauer 48 Frames, langsam aufsteigend, 2×2 → 3×3 → 2×2): hellblau (Kern (100,156,213), Rand (59,115,172)), steigen vom Gitarrenkopf, der Feder und der linken Seite auf.
+* NOTEN statt Klangwölkchen (Runde 3, Nutzer: „die Particles durch Noten ersetzen“; Partikel, hinter der Figur, 4 Stück, Lebensdauer 48 Frames, langsam aufsteigend mit leichtem Schaukeln): kleine Pixel-Noten
+  (Achtelnote 5×7, Doppelnote 6×6, Viertelnote 4×6; `anim_skel2.noten_ebene`) in der Farbe der bisherigen Wölkchen (Kern (100,156,213), dunkler Randton (59,115,172) an den Notenköpfen). Sie bauen sich von unten nach oben auf
+  (Kopf zuerst) und wieder ab (kein Dithering, keine verstreuten Einzelpixel). Quellen: Gitarrenkopf rechts oben, rechts neben dem Korpus, links neben dem Arm, links über dem Hut.
 Kein Glanz (Knochen/Stoff/Holz kein Metall), kein Feuer. Randpixel-Test (Regel 16): `U.kontur_schliessen` in jeder Pose; im Ruhebild nichts.
-ERGÄNZUNG: keine gemalten Pixel außer den oben genannten neun verdeckten Zellen. Zuschnitt: symmetrisch um die Ruhefigur; Wölkchen vergrößern ihn höchstens 2 px, dazu 1 px leerer Rand.
+ERGÄNZUNG: keine gemalten Pixel außer den oben genannten neun verdeckten Zellen. Zuschnitt: symmetrisch um die Ruhefigur; Noten vergrößern ihn höchstens 6 px, dazu 2 px leerer Rand.
 Alle Bewegungen laufen auf der vollen Leinwand (anim_lib wirft ClipError). Nur ganze Pixel, nur Farben der Quelle.
 """
 import math
@@ -43,9 +45,10 @@ import numpy as np
 
 import anim_lib as L
 import anim_untote as U
+import anim_skel2 as K2
 
 N, MS = 48, 65
-GPL, GPR, GPT, GPB = 6, 6, 8, 4
+GPL, GPR, GPT, GPB = 10, 10, 12, 8
 
 spr = L.lade('skeleton-bard')
 sh, sw = spr.shape[:2]
@@ -123,11 +126,11 @@ _alle = {col(x, y) for y in range(sh) for x in range(sw) if spr[y, x, 3]}
 HELLBLAU = {'c': (100, 156, 213), 'r': (59, 115, 172)}
 assert all(v in _alle for v in HELLBLAU.values()) and all(v in _alle for v in FARBE.values())
 P = lambda x, y: (GPL + x, GPT + y)
-PUFFS_BLAU = [
-    dict(x=P(19, 6)[0], y=P(19, 6)[1], vx=1, vy=-7, off=0, wackeln=1),            # vom Gitarrenkopf
-    dict(x=P(0, 20)[0], y=P(0, 20)[1], vx=-1, vy=-8, off=24, wackeln=0),           # links neben dem Arm (bleibt unter der Krempe)
-    dict(x=P(20, 10)[0], y=P(20, 10)[1], vx=0, vy=-6, off=12, wackeln=0),          # am Hals der Gitarre
-    dict(x=P(17, 14)[0], y=P(17, 14)[1], vx=1, vy=-8, off=36, wackeln=1),          # rechts neben dem Korpus
+NOTEN = [                                                                       # Runde 3: statt Klangwölkchen kleine Pixel-Noten, steigen langsam auf und schaukeln leicht
+    dict(x=P(20, 6)[0], y=P(20, 6)[1], vx=0, vy=-10, off=0, wackeln=1.0, form='a'),             # vom Gitarrenkopf
+    dict(x=P(19, 22)[0], y=P(19, 22)[1], vx=0, vy=-9, off=24, wackeln=0.5, ph=0.25, form='b'),  # rechts neben dem Korpus
+    dict(x=P(-4, 20)[0], y=P(-4, 20)[1], vx=-1, vy=-10, off=12, wackeln=0.5, form='a2'),        # links neben dem Arm
+    dict(x=P(-4, 5)[0], y=P(-4, 5)[1], vx=-1, vy=-7, off=34, wackeln=1.0, ph=0.75, form='c'),   # links über dem Hut
 ]
 
 # ── Zeitplan ───────────────────────────────────────────────────────────────────────────────────────────────────────────
@@ -179,7 +182,7 @@ def frame_gross(i, nur=None):
     koerper = U.kontur_schliessen(koerper, UMRISS, SCHWARZ)
     if nur == 'koerper':
         return koerper
-    blau = _wolke(H, W, i, N, PUFFS_BLAU, HELLBLAU)
+    blau = _noten(H, W, i, N, NOTEN, HELLBLAU)
     return L.zusammen(H, W, [(blau, 0, 0), (koerper, 0, 0)])
 
 
@@ -187,13 +190,13 @@ _OHNE_PARTIKEL = [False]
 TEST_EBENEN = 'koerper'
 
 
-def _wolke(*a, **k):
+def _noten(*a, **k):
     if _OHNE_PARTIKEL[0]:
         return L.leer(a[0], a[1])
-    return U.wolke_ebene(*a, **k)
+    return K2.noten_ebene(*a, **k)
 
 
-BOX = U.zuschnitt([frame_gross(i) for i in range(N)], [frame_gross(i, 'koerper') for i in range(N)], (GPL, GPT, GPL + sw, GPT + sh))
+BOX = U.zuschnitt([frame_gross(i) for i in range(N)], [frame_gross(i, 'koerper') for i in range(N)], (GPL, GPT, GPL + sw, GPT + sh), zugabe=6, rand=2)
 PAD_L, PAD_T = GPL - BOX[0], GPT - BOX[1]
 
 
@@ -204,7 +207,7 @@ def frame(i, nur=None):
 if __name__ == '__main__':
     frames = [frame(i) for i in range(N)]
     prev = sys.argv[sys.argv.index('--preview') + 1] if '--preview' in sys.argv else None
-    L.pruefe(frames, quelle=spr, min_rand=1)
+    L.pruefe(frames, quelle=spr, min_rand=2)
     L.speichern('skeleton-bard', 'Skeleton Bard', frames, MS, prev)
     if prev:
         L.streifen(prev + '/skeleton-bard-strip.png', [frames[k] for k in (0, 6, 12, 18, 24, 30, 36, 42)], spalten=4, scale=6)

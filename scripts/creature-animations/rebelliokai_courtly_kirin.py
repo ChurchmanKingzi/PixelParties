@@ -23,7 +23,8 @@ Ablauf (48 Frames à 75 ms = 3,6 s, nahtlos; Frame 0 = Original):
 * BLATTSCHWINGEN FLATTERN: jedes der vier Blätter schwingt um seinen Ansatz am Körper (Spaltenversatz wächst mit dem Abstand, bis 1 px an der Außenkante, Gefälle ≤ 1 px je Spalte, Umriss bleibt als Stapel zusammen);
   obere und untere, linke und rechte Blätter in verschiedenen Perioden (2–3 je Schleife) und Phasen — nie im Gleichschritt.
 * GEWEIH WIEGT: beide Geweihe neigen die Spitzen unabhängig 1–2 px zur Seite (Zeilenversatz wächst von 0 am Ansatz y 7 bis zur Spitze y 0, Gefälle ≤ 1 px je Zeile); links eine Welle je Schleife, rechts zwei.
-* SCHNURRBÄNDER WEHEN: beide Linien werden als Pixelkette neu gezeichnet; die Spitzen schwingen 1–2 px seitlich (Anker am Rumpf fest), die Kette bleibt zusammenhängend (Brückenpixel), Wellenlauf von der Spitze zum Ansatz.
+* SCHNURRBÄNDER WEHEN (Runde 3: „sollten sich die Schnurrbartenden synchron bewegen“): beide Linien werden als Pixelkette neu gezeichnet; die Spitzen schwingen 1–2 px seitlich (Anker am Rumpf fest), die Kette bleibt zusammenhängend (Brückenpixel),
+  Wellenlauf von der Spitze zum Ansatz. Linkes und rechtes Band haben jetzt dieselbe Phase und spiegeln sich: beide Spitzen gehen im selben Frame nach außen bzw. nach innen (vorher 2 rad Phasenversatz).
 Fest: Gesichtszüge, Nasenbahn, Rumpf, Hufe. Alle Bewegungen laufen auf der vollen Leinwand (ClipError statt Abschneiden). Nur ganze Pixel, nur Quellfarben.
 Ergänzungen: keine gemalten Pixel außer den Brückenpixeln der Bänder (Farbe des benachbarten Bandpixels).
 """
@@ -80,14 +81,15 @@ oben = [antler_l, antler_r, blatt_ol, blatt_or, band_l, band_r]
 
 def schnur(a, band, pts, i, per, vers, amp, lauf, aussen):
     """Band neu zeichnen: dx je Punkt = w_k·s·(A_außen bzw. A_innen), s = (sin(φ − lauf·w) − sin(versatz − lauf·w))/2 ∈ [−1, 1], w_k wächst von 0 (Ansatz) zur Spitze auf 1.
-    Nach außen (aussen = −1 links, +1 rechts) bis `amp`·1,6, nach innen höchstens `amp`·0,7 (die Bänder dürfen die Blätter nicht berühren)."""
+    Nach außen (aussen = −1 links, +1 rechts) bis `amp`·1,6, nach innen höchstens `amp`·0,7 (die Bänder dürfen die Blätter nicht berühren).
+    Runde 3: linkes und rechtes Band schwingen SYNCHRON (gleiche Phase, spiegelbildlich: beide Spitzen gehen im selben Frame nach außen bzw. nach innen)."""
     farben = [f(x, y) for (x, y) in pts]
     vs = []
     for k, (x, y) in enumerate(pts):
         w = max(0.0, (FREI - k) / float(FREI)) if k <= FREI else 0.0
         phi = L.sinus(i, per)
         s = (math.sin(phi + vers - lauf * w) - math.sin(vers - lauf * w)) / 2.0
-        dx = w * (s * amp * 1.6 if s * aussen > 0 else s * amp * 0.7 * 1.0)
+        dx = aussen * w * (s * amp * 1.6 if s > 0 else s * amp * 0.7)       # s > 0 = nach außen: beide Bänder bekommen dieselbe Phase und spiegeln sich (synchron)
         vs.append((int(round(dx)), 0))
     pix = R.kette(pts, farben, vs)
     out = L.leer(H, W)
@@ -115,8 +117,8 @@ def frame(i):
     bul = R.spalten_pendel(R.teil(spr, blatt_ul, H, W, OFF), PAD_L + 8, 1.5, L.sinus(i, N / 3), ruhe0=True, versatz=1.3)
     bur = R.spalten_pendel(R.teil(spr, blatt_ur, H, W, OFF), PAD_L + 17, 1.5, L.sinus(i, N / 2), ruhe0=True, versatz=3.0)
     # Bänder
-    bl = schnur(None, band_l, BAND_L, i, N / 2, 0.0, 1.5, 1.6, -1)
-    br = schnur(None, band_r, BAND_R, i, N / 2, 2.0, 1.5, 1.6, +1)
+    bl = schnur(None, band_l, BAND_L, i, N / 2, 0.0, 1.5, 1.6, -1)       # Runde 3: dieselbe Phase wie rechts (vers 0.0), spiegelbildlich
+    br = schnur(None, band_r, BAND_R, i, N / 2, 0.0, 1.5, 1.6, +1)
     # Ansatz der Bänder (feste Pixel) zusätzlich
     for (pts, a_) in ((BAND_L, bl), (BAND_R, br)):
         Hm.setze(a_, {p: f(*p) for p in pts[FREI + 1:]}, OFF)

@@ -15,11 +15,13 @@ Was im Sprite ist (x, y im 32×26-Sprite):
 * LEICHE (x 0–14, y 14–25): Kopf/Oberkörper einer toten Gestalt mit Eisenhelm links (Grautöne (52,52,52)/(74,74,74)/(121,121,121), x 1–4, y 15–23), olivfarbenem Polster (131,123,65)/(82,74,8) und Haut; Blutlache (dunkle Rottöne bis (21,0,0), x 6–17, y 19–25).
 Metall: nur der Eisenhelm der Leiche (Grautöne) glänzt (Regel 14); Haut, Blut, Stoff nicht. Kein Feuer, keine Partikel.
 
-Ablauf (48 Frames à 70 ms = 3,36 s, nahtlos; Chaorc und Leiche liegen auf getrennten Ebenen, nur der Chaorc bewegt sich):
-* Atmen (Periode 24, zweimal pro Schleife; Brust zuerst, Kopf läuft 3 Frames nach): die Armzeile 12 des Chaorcs wird einmal doppelt eingefügt (L.streck_zeile mit Texturmischung) — Schultern und Kopf steigen 1 px,
-  die Beine bleiben; der Kopf hebt sich über die Schulterzeile 11 (dunkler Kinnschatten, wird einmal doppelt eingefügt) um ein weiteres px (Kopf 0 → 1 → 2 → 1 → 0, Brust 0 → 1 → 0). Nur senkrecht.
-* Kauen (Frames 14–21 und 38–45): der Kopf senkt sich im Takt von 4 Frames je 2 Frames um 1 px unter die Ruhelage (die Schulterzeile 11 wird einmal entfernt) und kehrt zurück — der Chaorc kaut/nickt, nur Heben/Senken.
-* Ohrzucken: das rechte Ohr (Frames 6–9, 30–33) bzw. das linke Ohr (Frames 22–25, 44–47) knickt an der Spitze 1 px nach unten (Spitze + Umriss wandern mit, Kontur bleibt in Umrissfarbe geschlossen).
+Ablauf (48 Frames à 70 ms = 3,36 s, nahtlos; Ebenen: Leiche (starr), Chaorc-KÖRPER samt gehaltenem Leichenteil (Zeilen ≥ 7 des Chaorc, starr), Chaorc-KOPF (Zeilen 0–6 samt Ohren)):
+* Nutzerkorrektur Runde 3: Das Leichenteil, das der Chaorc hält und frisst (der blutige Streifen/Bissrest und die Hände davor, Zeilen 7–13), wird NIE gestreckt oder bewegt sich gegen den Körper — nur der Kopf kaut.
+* Kauen (Frames 12–19 und 36–43): NUR der Kopf (Zeilen 0–6 mit Ohren und Augen) taucht im Takt von 4 Frames je 2 Frames um 1 px nach unten (er beißt in das Leichenteil, Kinnzeile überdeckt dessen Oberkante, nur innerhalb von dessen Umriss)
+  und kommt wieder hoch; Körper und Leichenteil bleiben dabei starr. Es wird keine Zeile eingefügt oder entfernt.
+* Atmen (Periode 24, zweimal pro Schleife): der ganze Oberkörper (Kopf + Körper samt Leichenteil + Arme) hebt sich STARR um 1 px; die dadurch entstehende Lücke schließt die Unterarmzeile 13 (einmal doppelt eingefügt, L.streck_zeile mit Texturmischung),
+  die Beine und die Leiche bleiben. Das Leichenteil wandert dabei nur mit, es wird nicht verlängert.
+* Ohrzucken (nie gleichzeitig mit dem Kauen): das rechte Ohr (Frames 6–9, 30–33) bzw. das linke Ohr (Frames 22–25, 44–47) knickt an der Spitze 1 px nach unten (Spitze + Umriss wandern mit, Kontur bleibt in Umrissfarbe geschlossen).
 * Blinzeln (Frames 19–21 und 35–37): die roten Augenstriche nehmen die Hautfarbe (246,189,123) an (Lid = Hautfarbe), ein Augenschlag über zwei Frames.
 * Eisenhelm der Leiche glänzt (Regel 12/14, Metall): zweimal pro Schleife läuft ein diagonales Lichtband (eine bzw. zwei Stufen heller auf der Grau-Rampe (51,51,51) → (74,74,74) → (121,121,121)) über die Grau-Pixel des Helms.
 Frame 0 = Original (Ruhepose); Kontrolle: anim_humanoide.ruhepose. Randpixel-Test (Regel 16): Kontur in jeder Pose in Umrissfarbe (Hm.kontur_schliessen), zusätzlich randtest.py.
@@ -48,6 +50,8 @@ UMRISS = (49, 24, 0)
 HAUT = (246, 189, 123)
 chaorc = vorhanden & (xx >= 14) & (yy <= 19)
 leiche = vorhanden & ~chaorc
+kopf_m = chaorc & (yy <= 6)                      # Kopf samt Ohren (kaut)
+rumpf_m = chaorc & (yy >= 7)                     # Körper samt gehaltenem Leichenteil (Zeilen 7–13) und Beinen (starr)
 
 AUGEN = [(20, 3), (20, 4), (21, 4), (25, 3), (24, 4), (25, 4)]
 # Ohrspitzen: Spitze (Haut + Umriss) rutscht 1 px nach unten
@@ -66,17 +70,9 @@ def teil(maske):
     return L.platz(t, H, W, GP, GP)
 
 
-def kopfhub(i):
-    """(brust, kopf): Brust 0/1 (Periode 24), Kopf 0…2 mit 3 Frames Nachlauf; kopf_extra = Kopfhub über die Brust hinaus (>= 0)."""
-    b = 1 if Hm.welle01(i, 24) > 0.5 else 0
-    w = Hm.welle01(i - 3, 24)
-    k = (1 if w > 0.25 else 0) + (1 if w > 0.75 else 0)
-    return b, max(0, k - b)
-
-
 def kauen(i):
-    """0 oder 1: Kopf 1 px tiefer (nur in den Kau-Fenstern)."""
-    for start in (14, 38):
+    """0 oder 1: Kopf 1 px tiefer (nur in den Kau-Fenstern, Takt 4 Frames)."""
+    for start in (12, 36):
         j = i - start
         if 0 <= j < 8 and (j // 2) % 2 == 0:
             return 1
@@ -84,23 +80,27 @@ def kauen(i):
 
 
 def frame_gross(i, nur=None):
-    c = teil(chaorc)
-    # --- Ohrzucken, Blinzeln (vor den Zeilenoperationen, auf Sprite-Koordinaten) ---
+    kopf = teil(kopf_m)
+    rumpf = teil(rumpf_m)
+    # --- Ohrzucken, Blinzeln (auf dem Kopf, Spritekoordinaten) ---
     if Hm.folge(i, 6, [1] * 4, N) or Hm.folge(i, 30, [1] * 4, N):
-        Hm.setze(c, OHR_R, OFF)
+        Hm.setze(kopf, OHR_R, OFF)
     if Hm.folge(i, 22, [1] * 4, N) or Hm.folge(i, 44, [1] * 4, N):
-        Hm.setze(c, OHR_L, OFF)
+        Hm.setze(kopf, OHR_L, OFF)
     if Hm.folge(i, 19, [1, 1, 1], N) or Hm.folge(i, 35, [1, 1, 1], N):
-        Hm.setze(c, {p: HAUT for p in AUGEN}, OFF)
-    # --- Kopf (Schulterzeile 11) und Brust (Armzeile 12) ---
-    b, extra = kopfhub(i)
-    dk = extra - kauen(i)
-    if dk > 0:
-        c = L.streck_zeile(c, GP + 11, dk)
-    elif dk < 0:
-        c = L.streck_zeile(c, GP + 11, dk)
-    if b:
-        c = L.streck_zeile(c, GP + 12, b)
+        Hm.setze(kopf, {p: HAUT for p in AUGEN}, OFF)
+    # --- Kauen: nur der Kopf senkt sich; er überdeckt die Oberkante des Körpers nur innerhalb von dessen Umriss ---
+    k = kauen(i)
+    if k:
+        kopf = L.versetze(kopf, 0, k)
+        zeile = GP + 7
+        for x in range(W):
+            if kopf[zeile, x, 3] and not rumpf[zeile, x, 3]:
+                kopf[zeile, x] = 0
+    c = L.zusammen(H, W, [(rumpf, 0, 0), (kopf, 0, 0)])
+    # --- Atmen: Oberkörper (Kopf + Körper + Leichenteil) hebt sich starr, die Unterarmzeile 13 schließt die Lücke ---
+    if Hm.welle01(i, 24) > 0.5:
+        c = L.streck_zeile(c, GP + 13, 1)
     c = Hm.kontur_schliessen(c, ERLAUBT, UMRISS)
     # --- Leiche (fest) mit glänzendem Eisenhelm ---
     l = teil(leiche)

@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""Idle-Animation für „Hammer Skeleton“ (Creature) — Runde 2: Skibrille blinzelt nicht mehr, Wiegen deutlich kleiner.
+"""Idle-Animation für „Hammer Skeleton“ (Creature) — Runde 3: KEIN seitliches Schlackern mehr (Nutzer: „soll nicht nach links und rechts schlackern“); stattdessen atmet die Rüstung nur senkrecht.
 
 Quelle: src/hammer-skeleton.png — Ebene „Ebene #40“ (22×34 px, 350 Pixel, 27 Farben) aus MotiveCoolhalla.xcf (Ebene 191, Figur 1, Treffer 1.0; Kunst: eine gepanzerte Gestalt, die mit
 der Spitze im Eis steckt).
@@ -18,12 +18,13 @@ Was ist was (x/y im Sprite):
 Fest bleiben: Risse, Helmform, Rumpfform, Spitze am Boden.
 
 Ablauf (48 Frames à 65 ms = 3,12 s; Frame 0 = Original, Partikel und Glanz ausgenommen):
-* Wackeln (Runde 2: „bewegt sich etwas zu sehr nach links und rechts“ → nur noch ±1 px, ruhiger): die Gestalt wiegt sich um die im Eis steckende Spitze (eine langsame Welle, Periode 48 = einmal pro Schleife,
-  plus 0,35 px schnelle Zugabe mit Periode 24; Zeilenversatz nach rechts/links, oben höchstens ±1 px, wächst linear mit dem Abstand zur Spitze, die untersten Zeilen y ≥ 19 bleiben stehen), die Risse bleiben liegen.
+* ATMEN (Runde 3, ersetzt das Wackeln; nur SENKRECHT, nie seitlich): die Zeile y 16 (Panzerseite mit hellen Kantenstreifen x 5 und 15, 4 px über der Spitze) wird 0–1× zusätzlich eingefügt (L.streck_zeile, Texturmischung),
+  Helm, Brille, Schulterplatten und Brustpanzer heben sich dabei starr um bis zu 1 px (Periode 24, 2× pro Schleife; die Zeile sitzt unter den Schulterplatten und über dem Schlosskasten-Ende, nichts wird breiter);
+  die Spitze (10, 25) im Eis und die Risse bleiben fest. Die Glitzersterne gehen mit dem Oberkörper mit.
 * VISIER = SKIBRILLE (orange Verlauf (204,112,45) → (236,170,118), schwarzer Rahmen, x 6–13, y 6–8): bleibt starr, kein Blinzeln, kein Glühen (Regel 21: Brillen/Visiere blinzeln nicht).
 * Glanz (Metall — Regel 12/14): ein Lichtband läuft diagonal (x + y) über die grauen Metallflächen (Visier und Risse ausgenommen), jede getroffene Farbe zwei Stufen heller auf der Rampe der
   Grautöne des Sprites; zweimal pro Schleife (Start Frame 4 und 28, 15 Frames). Beim Vorbeilaufen blitzen vierzackige Glitzersterne (3 Frames, Arme 1 → 2 → 1 px; Mitte (246,255,255),
-  Arme (213,213,213)) an der hellen Kante links (4,13), am Helm (11,2) und an der hellen Kante rechts (16,13); sie gehen mit dem Wackeln mit.
+  Arme (213,213,213)) an der hellen Kante links (4,13), am Helm (11,2) und an der hellen Kante rechts (16,13); sie gehen mit dem Atmen mit.
 * Frostnebel (Partikel, hinter der Figur, 7 Stück, Lebensdauer 48 Frames, langsam aufsteigend, leichtes Wabern, 2×2 → 3×3 → 2×2): helle Dunstwölkchen (Kern (213,213,213),
   Rand (171,179,174)) steigen aus den Eisrissen neben dem Körper auf. Sie bleiben nah an der Figur (Zuschnitt, s. u.).
 Regel 14: Glanz nur auf Metall; Regel 15 entfällt (Runde 2: Wölkchen nie kleiner als 2×2, Regel 25). Randpixel-Test (Regel 16): `U.kontur_schliessen` (Farbe Schwarz) in jeder Pose; im Ruhebild nichts.
@@ -87,7 +88,7 @@ PUFFS = [
     dict(x=P(19, 22)[0], y=P(19, 22)[1], vx=1, vy=-8, off=33, wackeln=1),
     dict(x=P(10, 30)[0], y=P(10, 30)[1], vx=0, vy=-9, off=21, wackeln=1),
 ]
-PIVOT = 25                                                       # Zeile der im Eis steckenden Spitze
+ZEILE_ATMEN = 16                                                # Zeile, die beim Atmen zusätzlich eingefügt wird (Brustpanzer unter den Schulterplatten)
 
 
 def teil(maske):
@@ -95,17 +96,13 @@ def teil(maske):
     return L.platz(t, H, W, GPL, GPT)                           # sofort auf die volle Leinwand
 
 
-def aus_wackeln(i):
-    return 1.0 * math.sin(2 * math.pi * i / 48) + 0.35 * math.sin(2 * math.pi * i / 24)
-
-
-def schub(y, aus):
-    """Seitenversatz der Sprite-Zeile y beim Wackeln (wie U.haengen: wächst linear mit dem Abstand zur Spitze, Zeile 0 = größter Abstand)."""
-    return int(round(aus * ((PIVOT - y) / float(PIVOT))))
+def atem(i):
+    """0 oder 1 zusätzliche Zeile (Periode 24, 2× pro Schleife), 0 bei i = 0."""
+    return U.stufe(i, 24, 1)
 
 
 def frame_gross(i, nur=None):
-    aus = aus_wackeln(i)
+    n = atem(i)
     fg = teil(figur)
     for start in BAND_START:                                      # Lichtband diagonal über das Metall (ohne Visier, ohne Schwarz)
         j = i - start
@@ -117,7 +114,7 @@ def frame_gross(i, nur=None):
                         c = col(x, y)
                         if c in RAMPE and c not in VISIER_FARBEN:
                             fg[GPT + y, GPL + x, :3] = RAMPE[c]
-    fg = U.haengen(fg, GPT + PIVOT, aus, nach_unten=False)
+    fg = L.streck_zeile(fg, GPT + ZEILE_ATMEN, n)
     ri = teil(risse)
     koerper = L.zusammen(H, W, [(ri, 0, 0), (fg, 0, 0)])
     koerper = U.kontur_schliessen(koerper, UMRISS, SCHWARZ)
@@ -128,8 +125,7 @@ def frame_gross(i, nur=None):
         for start in BAND_START:
             k = i - (start + nach)
             if 0 <= k <= 2:
-                dx = schub(pos[1], aus)
-                L.einsetzen(sterne, U.stern_ebene(H, W, GPL + pos[0] + dx, GPT + pos[1], (2, 3, 2)[k], STERN_MITTE, STERN_ARM))
+                L.einsetzen(sterne, U.stern_ebene(H, W, GPL + pos[0], GPT + pos[1] - n, (2, 3, 2)[k], STERN_MITTE, STERN_ARM))
     frost = _glut(H, W, i, N, PUFFS, FROST)
     return L.zusammen(H, W, [(frost, 0, 0), (koerper, 0, 0), (sterne, 0, 0)])
 
@@ -146,7 +142,7 @@ def _glut(*a, **k):
 
 
 # Zuschnitt auf die Figur: symmetrisch um die Ruhefigur; Partikel und Sterne dürfen den Frame höchstens 2 px über den Figurenrand hinaus vergrößern
-BOX = U.zuschnitt([frame_gross(i) for i in range(N)], [frame_gross(i, 'koerper') for i in range(N)], (GPL, GPT, GPL + sw, GPT + sh))
+BOX = U.zuschnitt([frame_gross(i) for i in range(N)], [frame_gross(i, 'koerper') for i in range(N)], (GPL, GPT, GPL + sw, GPT + sh), rand=2)
 PAD_L, PAD_T = GPL - BOX[0], GPT - BOX[1]
 
 
@@ -157,7 +153,7 @@ def frame(i, nur=None):
 if __name__ == '__main__':
     frames = [frame(i) for i in range(N)]
     prev = sys.argv[sys.argv.index('--preview') + 1] if '--preview' in sys.argv else None
-    L.pruefe(frames, quelle=spr, min_rand=1)
+    L.pruefe(frames, quelle=spr, min_rand=2)
     L.speichern('hammer-skeleton', 'Hammer Skeleton', frames, MS, prev)
     if prev:
         L.streifen(prev + '/hammer-skeleton-strip.png', [frames[k] for k in (0, 6, 12, 18, 24, 30, 36, 42)], spalten=4, scale=6)

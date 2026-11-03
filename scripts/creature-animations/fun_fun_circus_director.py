@@ -1,11 +1,16 @@
 # -*- coding: utf-8 -*-
 """Idle-Animation für „Fun-Fun Circus Director“ (Creature) — der rote Zirkusdirektor-Dämon: Zylinder mit roter Hutband, geschwungene Hörner, rotes Gesicht hinter einer Totenkopfmaske, roter Frack, weiße Fliege, schwarze Hose.
 
-Quelle: src/fun-fun-circus-director.png (16×30 px, 38 Farben; Komposit) und die Einzelebenen src/fun-fun-circus-director-L26/L27/L28/L29.png (gleiches Raster).
+Quelle: src/fun-fun-circus-director.png (16×30 px; Komposit, seit Runde 3 mit KORREKTER Transparenz, siehe unten) und die Einzelebenen src/fun-fun-circus-director-L26/L27/L28/L29.png (gleiches Raster).
 PICK: [["MotiveMoe", 26, 1], ["MotiveMoe", 27, 1], ["MotiveMoe", 28, 1], ["MotiveMoe", 29, 1]]
   Ebenen der Datei MotiveMoe (niedriger Index = oben): 26 „Fun-Fun Director #2“ = Zylinder; 27 „#3“ = schwarzer Schatten der Hutkrempe im Gesicht; 28 „#1“ = Totenkopfmaske; 29 „Fun-Fun Director“ = Körper
   (Hörner, Kopf, Frack, Hose). Nur Ebene 26 kam aus der Treffersuche („Fun-Fun Director #2“, 100 %), die anderen drei aus den Nachbarebenen (Regel 20). Karte: Fun_Fun_Circus_Director.png (Figur bei (30,16), 94,8 % wegen des roten Glühens der Kunst).
   Die übrigen Ebenen (30–33: Bühne/Vorhang/Clown-Porträt/Blutmuster) sind Kulisse.
+
+RUNDE 3 (Nutzer: „Director sieht nicht korrekt aus, da fehlt eine Ebene oder ist eine Ebene zu viel oder eine Transparenz falsch“): Die Ebene 27 „Fun-Fun Director #3“ (Hutschatten im Gesicht) hat in der xcf nur 50 % Deckkraft (op 127), wurde aber
+  bisher voll schwarz eingerechnet (Gesicht/Maske unter der Krempe wirkten schwarz verhangen). Abgleich gegen die Karte Fun_Fun_Circus_Director.png an (30,16): mit 100 % stimmen 94,8 % der Pixel, mit 50 % alle (mittlerer Fehler 4,5). Das Skript setzt den Sprite jetzt selbst
+  aus den vier Ebenen zusammen (`komposit()`): Körper 29, Maske 28, Schatten 27 (schwarz zu 50 % über Maske/Körper, vorgemischt: (unter + schwarz)/2, ganze Pixel, kein Alpha), Zylinder 26; Reihenfolge und Vollständigkeit der Ebenen stimmen mit der Karte überein
+  (keine Ebene fehlt, keine ist zu viel). Neue Mischfarben (32,33,32), (79,79,79), (110,110,110), (128,128,128) = Maskenfarben zu 50 % abgedunkelt. src/fun-fun-circus-director.png wurde mit diesem Komposit neu geschrieben.
 
 Aufruf:   python3 fun_fun_circus_director.py [--preview <ordner>]
 Ausgabe:  ../../data/creature-animations/fun-fun-circus-director.png + .json
@@ -38,18 +43,44 @@ import anim_schach as Sc
 N, MS = 48, 70
 PAD_L, PAD_R, PAD_T, PAD_B = 3, 3, 5, 2
 
-spr = L.lade('fun-fun-circus-director')
-sh, sw = spr.shape[:2]
-H, W = sh + PAD_T + PAD_B, sw + PAD_L + PAD_R
-OFF = (PAD_L, PAD_T)
-yy, xx = np.mgrid[0:sh, 0:sw]
-
-
 def lade_ebene(n):
     return np.array(Image.open(L.SRC + f'/fun-fun-circus-director-L{n}.png').convert('RGBA'))
 
 
-E26, E27, E28, E29 = (lade_ebene(n) for n in (26, 27, 28, 29))
+E26, E27_ROH, E28, E29 = (lade_ebene(n) for n in (26, 27, 28, 29))
+
+
+def schatten_gemischt(unter):
+    """Die Schattenebene (Ebene 27) hat in der xcf nur 50 % Deckkraft (op 127): schwarz zu 50 % über der Maske (Ebene 28) bzw. dem Körper (Ebene 29). Vorgemischt (ganze Pixel,
+    kein Alpha im Sprite): je Schattenpixel (unter + schwarz) / 2. Gegenprobe gegen die Karte Fun_Fun_Circus_Director.png (Figur bei (30,16)): mit 50 % stimmen alle Pixel (mittlerer Fehler 4,5), mit 100 % nur 94,8 %."""
+    out = E27_ROH.copy()
+    for y, x in zip(*np.nonzero(E27_ROH[..., 3])):
+        u = unter[y, x, :3].astype(int)
+        out[y, x, :3] = (u * (255 - 127) + E27_ROH[y, x, :3].astype(int) * 127 + 127) // 255
+    return out
+
+
+def komposit():
+    """Sprite = Körper (29) + Maske (28) + 50-%-Schatten (27, vorgemischt) + Zylinder (26)."""
+    f = np.zeros_like(E29)
+    for a in (E29, E28):
+        m = a[..., 3] > 0
+        f[m] = a[m]
+    unter = f.copy()
+    sch = schatten_gemischt(unter)
+    m = sch[..., 3] > 0
+    f[m] = sch[m]
+    m = E26[..., 3] > 0
+    f[m] = E26[m]
+    return f
+
+
+E27 = schatten_gemischt(np.where((E28[..., 3] > 0)[..., None], E28, E29))
+spr = komposit()
+sh, sw = spr.shape[:2]
+H, W = sh + PAD_T + PAD_B, sw + PAD_L + PAD_R
+OFF = (PAD_L, PAD_T)
+yy, xx = np.mgrid[0:sh, 0:sw]
 v29 = L.deckend(E29)
 ARM_L = v29 & (xx <= 4) & (yy >= 18)
 ARM_R = v29 & (xx >= 11) & (yy >= 18)

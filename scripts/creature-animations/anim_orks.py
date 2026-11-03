@@ -137,3 +137,92 @@ def feuerball(h, w, i, n, mitte, rx, ry, rampe, schweif, dy=0, puls=0.5):
     for y, x in zip(*np.nonzero(frei)):
         u[y, x, :3] = rot
     return u, funken
+
+
+def _linie(p, q):
+    """Bresenham-Pixel von p=(y,x) nach q=(y,x), beide Enden eingeschlossen."""
+    (y0, x0), (y1, x1) = p, q
+    pts = []
+    dx, dy = abs(x1 - x0), -abs(y1 - y0)
+    sx, sy = (1 if x0 < x1 else -1), (1 if y0 < y1 else -1)
+    err = dx + dy
+    while True:
+        pts.append((y0, x0))
+        if (y0, x0) == (y1, x1):
+            break
+        e2 = 2 * err
+        if e2 >= dy:
+            err += dy
+            x0 += sx
+        if e2 <= dx:
+            err += dx
+            y0 += sy
+    return pts
+
+
+def nebel(a, wurzel, achse, laenge, i, n, amp_q=3.0, amp_a=2.0, lauf=2.2, quer=0.25, k1=2, k2=1, potenz=1.0, zusatz=None, phase=0.0, heller=None):
+    """Dunkler Nebel statt starrer Welle (Nutzerkorrektur Runde 3, Elven Rider: Mähne und Schweif „fließend, als bestünden sie aus dunklem Nebel“).
+
+    Jedes Pixel der Ebene `a` (volle Leinwand) wird mit einem glatten, in der Zeit nahtlosen Strömungsfeld VERSCHOBEN (Lagrange-Verformung, keine Spaltenkopie):
+      u = Abstand des Pixels von `wurzel` = (x, y) entlang `achse` (Einheitsrichtung zur Spitze) / `laenge`, auf 0 … 1 begrenzt; Gewicht w = u^potenz (die Wurzel bleibt fest),
+      Querversatz  = amp_q · w · sin(2π·k1·i/n − lauf·u + quer·v + phase)      (v = Abstand quer zur Achse; die Welle läuft von der Wurzel zur Spitze und ist über v phasenverschoben → Wirbel),
+      Längsversatz = amp_a · w · sin(2π·k2·i/n − 0,7·lauf·u + 0,18·v + 1,1 + phase)  (die Strähnen dehnen und stauchen sich, der Nebel „strömt“),
+    beide relativ zu Frame 0 (Frame 0 = Ruhepose). `zusatz(x, y, u)` darf einen zusätzlichen (dx, dy) liefern (z. B. Mitheben mit dem Atmen).
+    Damit dünne Strähnen nicht zerreißen, wird zwischen den verschobenen Positionen zweier im Original benachbarter Pixel (8er-Nachbarschaft) mit einer Pixellinie verbunden
+    (die Strähne wird dort gedehnt, nie gebrochen; die Farbe stammt von den beiden Enden). Alle Farben sind die der Ebene. ClipError, wenn etwas aus der Leinwand ragt.
+    heller = dict(nur=(r,g,b), farbe=(r,g,b), k=2, frq=6.0, quer=0.5, schwelle=1.25): Pixel der Farbe `nur` hellen sich zeitweise zur (Quell-)Farbe `farbe` auf, wenn ein mit der Zeit zur Spitze laufendes
+    Streifenmuster (Dichteunterschiede im Nebel) sie erfasst; in Frame 0 bleibt alles unverändert."""
+    h, w = a.shape[:2]
+    ax, ay = achse
+    nl = math.hypot(ax, ay)
+    ax, ay = ax / nl, ay / nl
+    qx, qy = -ay, ax
+    wx, wy = wurzel
+    ys, xs = np.nonzero(a[..., 3])
+    pos, farbe, uu = {}, {}, {}
+    for y, x in zip(ys.tolist(), xs.tolist()):
+        u = ((x - wx) * ax + (y - wy) * ay) / laenge
+        u = min(1.0, max(0.0, u))
+        v = -(x - wx) * ay + (y - wy) * ax
+        wg = u ** potenz
+
+        def feld(t):
+            q = amp_q * wg * math.sin(2 * math.pi * k1 * t / n - lauf * u + quer * v + phase)
+            l = amp_a * wg * math.sin(2 * math.pi * k2 * t / n - 0.7 * lauf * u + 0.18 * v + 1.1 + phase)
+            return q, l
+        q, l = feld(i)
+        q0, l0 = feld(0)
+        dq, dl = q - q0, l - l0
+        zx, zy = zusatz(x, y, u) if zusatz else (0, 0)
+        tx = x + int(round(dl * ax + dq * qx + zx))
+        ty = y + int(round(dl * ay + dq * qy + zy))
+        pos[(y, x)] = (ty, tx)
+        c0 = a[y, x].copy()
+        if heller and u > 0.15 and tuple(int(vv) for vv in c0[:3]) == tuple(heller['nur']):
+            def strahl(t):
+                return math.sin(2 * math.pi * heller.get('k', 2) * t / n - heller.get('frq', 6.0) * u + heller.get('quer', 0.5) * v + phase)
+            if strahl(i) - strahl(0) > heller.get('schwelle', 1.25):
+                c0[:3] = heller['farbe']
+        farbe[(y, x)] = c0
+        uu[(y, x)] = u
+    out = L.leer(h, w)
+
+    def setze(p, c):
+        ty, tx = p
+        if not (0 <= ty < h and 0 <= tx < w):
+            raise L.ClipError(f'Nebelpixel bei ({tx},{ty}) liegt außerhalb der Leinwand {w}×{h}')
+        out[ty, tx] = c
+    # Brücken zuerst (liegen unter den eigentlichen Pixeln), dann die Pixel von der Wurzel zur Spitze
+    for (y, x), p in pos.items():
+        for (dy, dx) in ((0, 1), (1, 0), (1, 1), (1, -1)):
+            q = (y + dy, x + dx)
+            if q in pos:
+                pq = pos[q]
+                if max(abs(p[0] - pq[0]), abs(p[1] - pq[1])) > 1:
+                    lin = _linie(p, pq)
+                    m = len(lin)
+                    for k, pt in enumerate(lin[1:-1], start=1):
+                        setze(pt, farbe[(y, x)] if k <= m // 2 else farbe[q])
+    for k in sorted(pos, key=lambda t: uu[t]):
+        setze(pos[k], farbe[k])
+    return out

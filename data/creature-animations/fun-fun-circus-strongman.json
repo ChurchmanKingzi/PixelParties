@@ -2,7 +2,7 @@
   "creature": "Fun-Fun Circus Strongman",
   "sheet": "fun-fun-circus-strongman.png",
   "frameWidth": 33,
-  "frameHeight": 37,
+  "frameHeight": 36,
   "frames": 72,
   "frameMs": 62,
   "loop": true,

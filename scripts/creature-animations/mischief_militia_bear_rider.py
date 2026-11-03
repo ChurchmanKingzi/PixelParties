@@ -19,7 +19,7 @@ Material: Fell, Stoff, Schnee, Eisblätter — KEIN Glanz (Regel 14), kein Feuer
 Ablauf (48 Frames à 70 ms = 3,36 s, nahtlos), alle Bewegungen unabhängig:
 * Atmen des Bären (Periode 24, zweimal je Schleife): Zeile 34 des Bärenrumpfs wird einmal doppelt eingefügt (Mischtextur; keine Gesichtsmerkmale in dieser Zeile) — Bärenkopf, Schulterplatten, Klingen und Reiter steigen 1 px, Füße bleiben am Boden.
 * Reiter läuft nach (Periode 24, 3 Frames später): Zeile 16 (Hals des Reiters, dunkles Band) einmal doppelt — der Reiter steigt ein weiteres px (Hut + Dorn).
-* Eisklingen zittern (Perioden 20/28, gegenläufig): die Klingenspitzen (x 0–3 bzw. 34–37, y 25–26) verschieben sich als Ganzes um ±1 px senkrecht; die Wurzel (x 4 bzw. 33) bleibt in der Platte.
+* Die seitlichen Eisklingen/Spikes (x 0–4 und 33–37, y 25–26) stehen FEST (Nutzer-Feedback Runde 3: sie sollen sich nicht „drehen“); sie bewegen sich nur mit dem Atmen des Bären (starr mit der Platte).
 * Bär blinzelt (alle 2,5 s, 3 Frames): gelbe Augen + Pupillen werden zu Fellgrau A (123,125,124); Reiter blinzelt versetzt (2 Frames): braune Augenstriche → Gesichtsfarbe T/R.
 * Bär knurrt (zweimal je Schleife, 5 Frames): (18,32)/(19,32) werden dunkelrot a — das Maul öffnet sich 1 px tiefer.
 * Kalter Dunst: 7 Wölkchen ≥ 2×2 steigen langsam links/rechts der Beine auf.
@@ -62,18 +62,8 @@ REITER_AUGEN = {(16, 10): T_, (16, 11): T_, (21, 10): R_, (21, 11): R_}
 
 
 def koerper(i):
-    rest, _ = L.trenne(spr, ~klingen_maske)             # rest = Klingen allein (trenne: erste = maskierter Teil)
-    klingen = L.platz(rest, H, W, PAD_L, PAD_T)
-    k = L.platz(L.trenne(spr, klingen_maske)[1], H, W, PAD_L, PAD_T)
-    # Klingen zittern
-    dl = E.wippen(i, 20, 0.0, 1.0)
-    dr = E.wippen(i, 28, 0.0, -1.0)
-    kl_l = L.leer(H, W); kr = L.leer(H, W)
-    for (x, y) in KL_L:
-        kl_l[y + PAD_T + dl, x + PAD_L] = spr[y, x]
-    for (x, y) in KL_R:
-        kr[y + PAD_T + dr, x + PAD_L] = spr[y, x]
-    k = L.zusammen(H, W, [(kl_l, 0, 0), (kr, 0, 0), (k, 0, 0)])
+    # Nutzer-Feedback Runde 3: die seitlichen Eisklingen (Spikes) bleiben FEST — sie dürfen sich nicht „drehen“ / zittern.
+    k = L.platz(spr, H, W, PAD_L, PAD_T)
     # Blinzeln / Knurren
     if Hm.folge(i, 22, [1, 1, 1], N):
         Hm.setze(k, {p: GRAU for p in BAER_AUGEN}, OFF)

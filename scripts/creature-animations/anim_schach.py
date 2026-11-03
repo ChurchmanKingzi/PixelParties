@@ -111,8 +111,8 @@ class Ritter:
     rampe          Farbrampe der Klinge (dunkel → hell)."""
     PAD = (3, 3, 4, 2)          # links, rechts, oben, unten
 
-    def __init__(self, spr, n=48, ms=62, brust_per=24, kipp_zyklen=1, kipp_vz=1, blink=(14, 38), band=8, g_plus=(4, 28), g_ring1=12,
-                 g_ring2=(20, 40), tap_l=18, tap_r=36, rampe=()):
+    def __init__(self, spr, n=48, ms=62, brust_per=24, kipp_zyklen=1, kipp_vz=1, blink=(14, 38), band=8, g_plus=(8,), g_ring1=(26,),
+                 g_ring2=(40,), tap_l=18, tap_r=36, rampe=()):
         self.spr, self.N, self.MS = spr, n, ms
         sh, sw = spr.shape[:2]
         self.sh, self.sw = sh, sw
@@ -173,26 +173,18 @@ class Ritter:
         ul = 1 if Hm.folge(i, p['tap_l'], pat, N) else 0
         ur = 1 if Hm.folge(i, p['tap_r'], pat, N) else 0
         fl, fr = self._ebene(self.m_fuss_l, -ul), self._ebene(self.m_fuss_r, -ur)
-        # --- Glitzer (folgt dem Schwert) ---
-        gl = L.leer(self.H, self.W)
-        gx, gy = 2, 11 + dy_spitze + dy_hand
-        f_plus = 'ORIG'
-        for s in p['g_plus']:
-            f = glitzer_folge(i, N, s, ['stern4', None, None, None, None, 'stern4'])
-            if f != 'ORIG':
-                f_plus = f
-        zeichne_form(gl, gx, gy, 'plus' if f_plus == 'ORIG' else f_plus, self.glitzer_farbe, OFF)
+        # --- Sparkle-Partikel (Runde 3): KEINE Dauer-Sterne mehr (die Quelle trägt drei fest eingezeichnete Glitzerformen, die fast die ganze Schleife sichtbar waren) ---
+        # Kurze normale Sparkles am Schwert (Metall): Mitte → kleines Kreuz (→ großes Kreuz) → Mitte → weg; je Stelle höchstens einmal je Schleife, lange Pausen dazwischen.
+        # Sie folgen dem Schwert (Kippen) und dem Oberkörper und werden erst NACH dem Konturschluss gezeichnet.
         dyx = spalten_dy(11, 19, dy_spitze, 3) + dy_hand
-        f1 = glitzer_folge(i, N, p['g_ring1'], ['ring', None, None, 'ring'])
-        zeichne_form(gl, 11, 10 + dyx, 'v' if f1 == 'ORIG' else f1, self.glitzer_farbe, OFF)
-        f2 = 'ORIG'
-        for s in p['g_ring2']:
-            f = glitzer_folge(i, N, s, ['stern4', None, None, 'stern4'])
-            if f != 'ORIG':
-                f2 = f
-        zeichne_form(gl, 11, 17 + dyx, 'ring' if f2 == 'ORIG' else f2, self.glitzer_farbe, OFF)
-        fig = L.zusammen(self.H, self.W, [(fl, 0, 0), (fr, 0, 0), (koerper, 0, 0), (gl, 0, 0), (sw, 0, 0)])
-        return Hm.kontur_schliessen(fig, self.umriss, self.schwarz)
+        fig = L.zusammen(self.H, self.W, [(fl, 0, 0), (fr, 0, 0), (koerper, 0, 0), (sw, 0, 0)])
+        fig = Hm.kontur_schliessen(fig, self.umriss, self.schwarz)
+        for (sx, sy, starts, folge) in ((2, 11 + dy_spitze + dy_hand, p['g_plus'], [0, 1, 2, 1, 0]), (11, 10 + dyx, p['g_ring1'], [0, 1, 0]), (11, 17 + dyx, p['g_ring2'], [0, 1, 1, 0])):
+            for st in (starts if isinstance(starts, (tuple, list)) else (starts,)):
+                stufe = Hm.folge(i, st, folge, N)
+                if stufe is not None:
+                    Hm.stern4(fig, sx, sy, stufe, self.glitzer_farbe, self.glitzer_farbe, self.glitzer_farbe, OFF)
+        return fig
 
 
 def zuschneiden(frames, rand=2):
@@ -319,21 +311,27 @@ class Dame:
 # ══ Turm (Rook of Kings): Turmfigur mit ausgebreiteten Armen und blauen Augen ═════════════════════════════════════════════════════════
 class Turm:
     """Rook-Sprite 22×22 px ([W]/[B]). Bewegungen: Oberkörper samt Kopfblock hebt sich 1 px (texturierte Rumpfzeile 13 wird eingefügt, Sockel bleibt), beide Arme (x ≤ 5 / x ≥ 16) wippen als starre
-    Spalten mit Gefälle ≤ 1 px je Spalte um die Schulter (Spitze bis ±2 px), die Augen blinzeln (Lid = Körperfarbe daneben), die Füße (y 20–21) tippen paarweise."""
-    PAD = (3, 3, 4, 2)
+    Spalten mit Gefälle ≤ 1 px je Spalte um die Schulter (Spitze bis ±2 px), die Augen blinzeln (Lid = Körperfarbe daneben).
+    Runde 3: das Schwarze unten (y 20–21) sind ROLLEN (vier kleine Räder; Innenpixel (26,26,26)/(76,76,76) in y 20) — der ganze Turm rollt ein bis zwei Pixel hin und her (roll_per = Periode in Frames,
+    roll_amp = Weg in px, roll_ph = Phase), die Rollen drehen sich dabei: je Rolle läuft die zyklische Folge [dunkel, hell, hell] durch das zwei Pixel breite Fenster ((d,h) → (h,h) → (h,d) → …), einen Schritt je Pixel Rollweg.
+    Das Fußtippen entfällt."""
+    PAD = (5, 5, 4, 2)
 
-    def __init__(self, spr, n=48, ms=70, hub_per=24, arm_l=(1, 1.0, 2), arm_r=(1, -1.0, 2), blink=(20, 44), tap_l=10, tap_r=34, ruhe_ph=0.0):
+    def __init__(self, spr, n=48, ms=70, hub_per=24, arm_l=(1, 1.0, 2), arm_r=(1, -1.0, 2), blink=(20, 44), roll_per=48, roll_amp=1.6, roll_ph=0.0):
         self.spr, self.N, self.MS = spr, n, ms
+        self.roll_per, self.roll_amp, self.roll_ph = roll_per, roll_amp, roll_ph
         sh, sw = spr.shape[:2]
         self.H, self.W = sh + self.PAD[2] + self.PAD[3], sw + self.PAD[0] + self.PAD[1]
         self.OFF = (self.PAD[0], self.PAD[2])
-        self.hub_per, self.arm_l, self.arm_r, self.blink, self.tap_l, self.tap_r = hub_per, arm_l, arm_r, blink, tap_l, tap_r
+        self.hub_per, self.arm_l, self.arm_r, self.blink = hub_per, arm_l, arm_r, blink
         yy, xx = np.mgrid[0:sh, 0:sw]
         vor = L.deckend(spr)
         self.m_arm_l = vor & (xx <= 5) & (yy >= 7) & (yy <= 12)
         self.m_arm_r = vor & (xx >= 16) & (yy >= 7) & (yy <= 12)
-        self.m_fuss_l = vor & (yy >= 20) & (xx <= 10)
-        self.m_fuss_r = vor & (yy >= 20) & (xx >= 11)
+        # Rollen: Innenpixelpaare (dunkel, hell) in Zeile 20
+        self.dunkel = (26, 26, 26)
+        self.hell = (76, 76, 76)
+        self.rollen = [x for x in range(sw - 1) if spr[20, x, 3] and spr[20, x + 1, 3] and tuple(int(v) for v in spr[20, x, :3]) == self.dunkel and tuple(int(v) for v in spr[20, x + 1, :3]) == self.hell]
         # Augen: blaue Pixel (und im [B]-Sprite der helle Augapfel (204) links daneben) in Zeile 7
         aug = []
         for x in range(sw):
@@ -371,10 +369,10 @@ class Turm:
             out[ys + dy, X] = a[ys, X]
         return out
 
-    def frame(self, i):
+    def frame(self, i, nur=None):
         N, OFF, spr = self.N, self.OFF, self.spr
         vor = L.deckend(spr)
-        rest = vor & ~(self.m_arm_l | self.m_arm_r | self.m_fuss_l | self.m_fuss_r)
+        rest = vor & ~(self.m_arm_l | self.m_arm_r)
         k = self._ebene(rest)
         for s in self.blink:
             if Hm.folge(i, s, [1, 1], N):
@@ -389,9 +387,11 @@ class Turm:
         dr = rund(ampr * vr * math.sin(L.sinus(i, N / cr)))
         al = L.versetze(self._arm(al, True, dl), 0, -hub)
         ar = L.versetze(self._arm(ar, False, dr), 0, -hub)
-        pat = [1, 1, 1, 0, 1, 1]
-        ul = 1 if Hm.folge(i, self.tap_l, pat, N) else 0
-        ur = 1 if Hm.folge(i, self.tap_r, pat, N) else 0
-        fl, fr = self._ebene(self.m_fuss_l, -ul), self._ebene(self.m_fuss_r, -ur)
-        fig = L.zusammen(self.H, self.W, [(fl, 0, 0), (fr, 0, 0), (k, 0, 0), (al, 0, 0), (ar, 0, 0)])
-        return Hm.kontur_schliessen(fig, self.umriss, self.schwarz)
+        fig = L.zusammen(self.H, self.W, [(k, 0, 0), (al, 0, 0), (ar, 0, 0)])
+        fig = Hm.kontur_schliessen(fig, self.umriss, self.schwarz)
+        # Rollen: der ganze Turm rollt hin und her (x), die Rollen drehen sich mit dem Rollweg (ein Muster-Schritt je Pixel)
+        pos = rund(self.roll_amp * math.sin(L.sinus(i, self.roll_per, self.roll_ph)))
+        folge = [self.dunkel, self.hell, self.hell]                    # Ring der Rolle: das helle Stück (Speiche) wandert durch das 2-px-Fenster, bleibt aber immer sichtbar
+        for x in self.rollen:
+            Hm.setze(fig, {(x, 20): folge[pos % 3], (x + 1, 20): folge[(pos + 1) % 3]}, OFF)
+        return L.versetze(fig, pos, 0)

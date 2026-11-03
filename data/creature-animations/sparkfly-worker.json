@@ -1,7 +1,7 @@
 {
   "creature": "Sparkfly Worker",
   "sheet": "sparkfly-worker.png",
-  "frameWidth": 33,
+  "frameWidth": 30,
   "frameHeight": 29,
   "frames": 48,
   "frameMs": 60,
@@ -11,5 +11,5 @@
   "padLeft": 2,
   "padRight": 2,
   "padBottom": 2,
-  "faceX": 16.5
+  "faceX": 15.0
 }

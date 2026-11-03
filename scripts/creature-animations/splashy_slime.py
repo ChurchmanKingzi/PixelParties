@@ -1,10 +1,12 @@
 # -*- coding: utf-8 -*-
-"""Idle-Animation für „Splashy Slime“ (Creature) — Runde 2: mit der unteren Körperhälfte.
+"""Idle-Animation für „Splashy Slime“ (Creature) — Runde 3: er HÜPFT (Hocke → Absprung → Flug → Landung mit Spritzern) statt breiter zu werden.
+
+Nutzerkorrektur (wörtlich): „Splashy [sollte lieber hüpfen statt breiter zu werden]“ — Maßstab: Hardy/Rocky/Infinitely Reproducing Slime.
 
 PICK: [["Motive", 469, 1], ["Motive", 470, 1]]
   Ebene „Splashy Slime“ (Motive.xcf, Ebene 469, 14×9 px: Kopf/Oberkörper, Deckkraft 98 %) UND der größte Teil der Ebene „Ebene #588“ (Ebene 470, bbox (334,118), Deckkraft 60 %): das ist die UNTERE
   KÖRPERHÄLFTE (der breite Wassersockel, x 335–352, y 127–131 der xcf). Sie liegt auf einer eigenen, halbtransparenten Ebene (deshalb erscheint sie auf der Karte durchscheinend). Für die Animation
-  wird sie voll deckend (Alpha 255) mit 469 (liegt darüber) zu EINER Figur vereinigt (Nutzerwunsch, Regel 22) → src/splashy-slime.png (18×14 px, 12 Farben), gebaut mit anim_slime.py
+  wird sie voll deckend (Alpha 255) mit 469 (liegt darüber) zu EINER Figur vereinigt (Regel 22) → src/splashy-slime.png (18×14 px, 12 Farben), gebaut mit anim_slime.py
   (`python3 anim_slime.py splashy-slime`). Die kleinen Wasserspritzer derselben Ebene (sechs Tropfen links/rechts, je 2–4 px) sind keine Körperteile: sie bleiben weg, das Skript zeichnet seine eigenen.
 Gegen die Kartenkunst (data/card-art/native/Splashy_Slime.png) abgeglichen: die Ebene 469 sitzt dort pixelgenau (Treffer 100 %) bei (31,22).
 
@@ -17,18 +19,17 @@ Was im Sprite ist (Koordinaten im Sprite 18×14, x/y ab 0):
 * Mund: das dunkle Band I/J (x 7–12, y 8–11) unter den Augen (liegt im Original so; bleibt fest bis auf die Körperbewegung).
 * Untere Körperhälfte (Zeilen 9–13): ein breiter Wassersockel (Zeile 10 am breitesten, x 0–17) mit hellen Glanzstreifen (H/E) und einer Bodenlinie (Zeile 13, x 7–13).
 * Material: Gel/Wasser — KEIN Glanz und keine Glitzersterne (Regel 14); keine Flammen (Regel 15).
-Fest bleiben: Umriss, Kuppelform, Unterkante (Bodenlinie), Brauen, Glanzlicht in der Stirn (sie wandern nur mit dem Gel).
+Fest bleiben: Umriss, Kuppelform, Brauen, Mund, Glanzlicht in der Stirn (sie wandern nur mit dem Gel); der Sockel (Zeilen 9–13) wird nie verformt.
 
-Ablauf (48 Frames à 65 ms = 3,12 s, nahtlos):
-* Gel-Körper (Squash & Stretch, Periode 24): beim Strecken (Frames 1–11 und 25–35: eine Körperzeile 4 mehr, in der Spitze 4–8 und 28–32 zusätzlich Zeile 2) wird der Schleim 1–2 px höher
-  (die eingefügten Zeilen mischen die Textur der Nachbarzeile, keine 1:1-Kopie); beim Stauchen (Frames 14–22 und 38–46) wird Zeile 2 entfernt und jede Zeile in der Mitte (Sockel am Rand) um 1 Spalte
-  je Seite breiter (die Mittelspalten x 7/10 werden verdoppelt, nie der Umriss) — die Augen rücken dabei auseinander. Die Unterkante sitzt fest am Boden.
-* Sockel schwappt (Periode 16): die Sockelzeilen 10–12 schwanken um bis zu ±1 px (Zeile 12) seitlich, Gefälle ≤ 1 px je Zeile; in Frame 0 steht alles auf dem Original.
-* Blinzeln (zweimal je Schleife, Frames 13–15 und 37–39: halb – zu – halb): Lidfarbe = umgebende Körperfarbe (je Augenpixel häufigste Körperfarbe im Umkreis von 2 px, ohne Umriss/Braue/Auge).
-* Spritzer (Partikel): beim Strecken schnellt je ein Wassertropfen links und rechts neben dem Kopf nach oben und fällt außen am Schleim wieder herab (ganze Pixel, Parabelbahn, 13–15 Frames, 2 pro Periode).
-  Jeder Tropfen ist ein 2×2-Wölkchen (Form „s“: Glanzpunkt E oben links, Körper C), nie ein einzelner Punkt, und berührt den Körper nie.
-Ergänzungen: wo ein Randpixel durch Verbreitern/Schwappen ohne Umriss frei liegt, bekommen die leeren Nachbarfelder den Umriss A (umriss_ergaenzen, Regel 16).
-Frame: Sprite plus 4 px links/rechts (Tropfenbahn), 6 px oben (Strecken + Tropfen), 2 px unten — Figur zentriert.
+Ablauf (48 Frames à 65 ms = 3,12 s, nahtlos; Frame 0 = Original), Hüpfen wie bei Hardy/Rocky/Infinitely Reproducing Slime (anim_hupf.py):
+* Großer Sprung (Frames 3–22, 5 px hoch): Hocke (Zeilen 7 und 2 — Wangen und Stirn, nie Augen/Brauen/Mund — werden entfernt, der Schleim wird 2 Zeilen niedriger, aber NICHT breiter), Absprung (gestreckt:
+  Zeilen 7 und 2 werden mit Texturmischung der Nachbarzeile eingefügt, bis +3 Zeilen), Flug (1–5 px über dem Boden, Parabel, Scheitel 3 Frames), Aufprall (tiefste Hocke), Nachfedern.
+  Kleiner Sprung (Frames 27–38, 3 px hoch). Dazwischen Ruhe mit einem kurzen Einatmen (Wangenzeile 7 einmal doppelt).
+* Spritzer (Partikel): bei jeder Landung (Frame 17 und 35) schleudert der Aufprall je einen 2×2-Wassertropfen links und rechts vom Sockel nach außen und oben, sie fallen außen am Sockel wieder herab
+  (ganze Pixel, Parabelbahn, 7–11 Frames; Glanzpunkt E oben links, Körper C); nie ein einzelner Punkt; die Tropfen berühren den Körper nie.
+* Blinzeln (zweimal je Schleife, Frames 24–26 und 42–44: halb – zu – halb, in der Ruhe am Boden): Lidfarbe = umgebende Körperfarbe (je Augenpixel häufigste Körperfarbe im Umkreis von 2 px, ohne Umriss/Braue/Auge).
+Ergänzungen: wo ein Randpixel durch Stauchen/Strecken ohne Umriss frei liegt, bekommen die leeren Nachbarfelder den Umriss A (umriss_ergaenzen, Regel 16).
+Frame: Sprite plus Platz für Sprung, Streckung und Tropfen (aus dem Ablauf berechnet), ≥ 2 px Rand — Figur zentriert.
 Alle Bewegungen laufen auf der vollen Leinwand (anim_lib/anim_amorph werfen ClipError). Nur ganze Pixel, nur Farben der Quelle.
 """
 import math
@@ -38,15 +39,12 @@ import numpy as np
 
 import anim_lib as L
 import anim_amorph as A
-import anim_slime as SL
+import anim_hupf as Hu
 
 N, MS = 48, 65
-PAD_L, PAD_R, PAD_T, PAD_B = 4, 4, 6, 2
 
 spr = L.lade('splashy-slime')
 sh, sw = spr.shape[:2]
-H, W = sh + PAD_T + PAD_B, sw + PAD_L + PAD_R
-BODEN = PAD_T + sh - 1
 OPAK = spr[..., 3] > 0
 UMRISS = (9, 50, 74)
 RAND_FARBEN = A.umrissfarben(spr)
@@ -73,35 +71,44 @@ _mark = spr.copy()
 for (y, x) in AUGEN:
     _mark[y, x, :3] = (250, 1, y)
 
-PAAR = ((7, 10),)                                                                      # Mittelspalten: werden beim Verbreitern verdoppelt (Umriss, Brauen und Augen bleiben unberührt)
-
-# ── Zeitachsen ──
-S = []
-for _i in range(N):
-    _v = math.sin(2 * math.pi * _i / 24)
-    S.append(2 if _v >= 0.85 else 1 if _v >= 0.3 else -1 if _v <= -0.5 else 0)
-# s → (Zeilen löschen, Zeilen verdoppeln, Spalten p je Seite)
-POSEN = {-1: ({2}, {}, 1), 0: ((), {}, 0), 1: ((), {7: 1}, 0), 2: ((), {2: 1, 7: 1}, 0)}
-assert S[0] == 0
-# Spaltenpaare je Zeile für das Verbreitern: Kopf/Oberkörper in der Mitte, Sockel (Zeilen 9–13) am Rand neben dem Umriss (nie der Umriss der Seitenkante)
+# ── Posen (Zeilen löschen, Zeilen verdoppeln, Spalten p je Seite): nur Zeilen 2 (Stirn) und 7 (Wangen) ändern sich, Breite nie ──
+POSEN = {
+    'R': ((), {}, 0),
+    'D1': ({7}, {}, 0),
+    'D2': ({7, 2}, {}, 0),
+    'D3': ({7, 2}, {}, 0),
+    'T1': ((), {7: 1}, 0),
+    'T2': ((), {7: 1, 2: 1}, 0),
+    'T3': ((), {7: 2, 2: 1}, 0),
+}
+# Spaltenpaare (nur für p ≠ 0 nötig; hier unbenutzt, aber koerper_pose verlangt Angaben): Mittelspalten bzw. Randspalten neben dem Umriss
 PAARE_ZEILE = {y: [(7, 10)] for y in range(9)}
 PAARE_ZEILE.update({9: [(4, 13)], 10: [(3, 14)], 11: [(4, 13)], 12: [(4, 13)], 13: [(9, 11)]})
-SOCKEL_GEW = {10: 0.6, 11: 1.0, 12: 1.4, 13: 1.4}                                      # Schwapp-Amplitude je Quellzeile (Pixel)
+SPERRE = tuple(AUGEN_FARBEN | {(9, 48, 70), (13, 69, 102)})                            # Augen-, Brauen-, Mundfarben: nie in eingefügte Zeilen mischen
+ABLAUF = Hu.ablauf(N, gross=5, klein=3)
+assert ABLAUF[0] == ('R', 0)
+LANDUNG = Hu.landungen(ABLAUF)                                                           # Frames des Aufpralls (Spritzer)
+BLINK = {24: 1, 25: 2, 26: 1, 42: 1, 43: 2, 44: 1}
 
 
-def sockel_dx(i, q):
-    """Seitlicher Versatz der Sockelzeile q (Quellzeile) im Frame i: Periode 16 (3 Zyklen je 48 Frames), in Frame 0 überall 0, Gefälle ≤ 1 px je Zeile."""
-    return int(round(SOCKEL_GEW.get(q, 0.0) * math.sin(2 * math.pi * i / 16)))
+def _zeilen(pose):
+    lo, do, _ = POSEN[pose]
+    return sh - len(lo) + sum(do.values())
 
 
-SPERRE = AUGEN_FARBEN | {(9, 48, 70), (13, 69, 102)}                                   # Augen-, Brauen-, Mundfarben: nie in eingefügte Zeilen mischen
-BLINK = {13: 1, 14: 2, 15: 1, 37: 1, 38: 2, 39: 1}
-
-# ── Spritzer: 2×2-Tropfen, Parabelbahn neben dem Kopf (Sprite-Koordinaten der linken oberen Ecke) ──
+# ── Spritzer: 2×2-Tropfen (Sprite-Koordinaten der linken oberen Ecke), Parabel links/rechts neben dem Sockel ──
 TROPFEN = [
-    dict(x0=1, x1=-1, y0=-2, hoehe=2, ye=6, off=0, flug=14),                          # links
-    dict(x0=15, x1=17, y0=-2, hoehe=2, ye=6, off=2, flug=12),                         # rechts
+    dict(x0=-3, x1=-4, y0=10, hoehe=7, ye=11, flug=11),                                 # links, großer Aufprall
+    dict(x0=19, x1=20, y0=10, hoehe=6, ye=11, flug=10),                                 # rechts, großer Aufprall
+    dict(x0=-3, x1=-4, y0=10, hoehe=4, ye=11, flug=8),                                  # links, kleiner Aufprall
+    dict(x0=19, x1=20, y0=10, hoehe=4, ye=11, flug=7),                                  # rechts, kleiner Aufprall
 ]
+START = {0: LANDUNG[0], 1: LANDUNG[0] + 1, 2: LANDUNG[1], 3: LANDUNG[1] + 1}            # Startframe je Tropfen
+PAD_L, PAD_R = 6, 6
+PAD_T = max(_zeilen(p) + d for p, d in ABLAUF) - sh + 3
+PAD_B = 2
+H, W = sh + PAD_T + PAD_B, sw + PAD_L + PAD_R
+BODEN = PAD_T + sh - 1
 
 
 def _bahn(tr, t):
@@ -114,11 +121,11 @@ def _bahn(tr, t):
 
 def tropfen_ebene(i):
     e = L.leer(H, W)
-    for tr in TROPFEN:
-        k = (i - tr['off']) % 24
-        if k >= tr['flug']:
+    for k, tr in enumerate(TROPFEN):
+        t0 = (i - START[k]) % N
+        if t0 >= tr['flug']:
             continue
-        x, y = _bahn(tr, k / float(tr['flug'] - 1))
+        x, y = _bahn(tr, t0 / float(tr['flug'] - 1))
         cx, cy = PAD_L + int(round(x)), PAD_T + int(round(y))
         for (dx, dy, c) in L.PUFF_FORMEN['s']:
             X, Y = cx + dx, cy + dy
@@ -155,16 +162,10 @@ def _lid(fig, marke, stufe):
 
 
 def figur(i):
-    loeschen, doppeln, p = POSEN[S[i]]
-    koerper = A.zeilen_von(spr, 0, sh - 1, H, W, PAD_L, PAD_T)
-    z, quelle = SL.koerper_pose(koerper, loeschen=loeschen, doppeln=doppeln, p=p, paare_je_zeile=PAARE_ZEILE, x0=PAD_L, sperre=SPERRE)
-    m, _ = SL.koerper_pose(A.zeilen_von(_mark, 0, sh - 1, H, W, PAD_L, PAD_T), loeschen=loeschen, doppeln=doppeln, p=p, paare_je_zeile=PAARE_ZEILE, x0=PAD_L, sperre=SPERRE)
-    dxs = [sockel_dx(i, q) for q in quelle]
-    z = A.verschiebe_ausgabezeilen(z, dxs)
-    m = A.verschiebe_ausgabezeilen(m, dxs)
-    fig, top = A.auf_leinwand(z, H, BODEN, 0)
-    marke, _ = A.auf_leinwand(m, H, BODEN, 0)
-    # die Markierfarben sind keine Quellfarben: Augenpixel aus dem Markierungsbild wieder mit den echten Farben füllen
+    pose, dy = ABLAUF[i]
+    fig, top, quelle = Hu.hupf_figur(spr, pose, dy, POSEN, PAARE_ZEILE, SPERRE, H, W, PAD_L, PAD_T, BODEN)
+    marke, _, _ = Hu.hupf_figur(_mark, pose, dy, POSEN, PAARE_ZEILE, SPERRE, H, W, PAD_L, PAD_T, BODEN)
+    # die Markierfarben sind keine Quellfarben: Augenpixel aus dem Markierungsbild sind in `fig` echte Farben (gleiche Umformung)
     ist_auge = (marke[..., 3] > 0) & (marke[..., 0] == 250) & (marke[..., 1] == 1)
     assert (fig[ist_auge][:, 3] > 0).all()
     if i in BLINK:

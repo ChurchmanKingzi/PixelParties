@@ -63,7 +63,18 @@ def teil(name):
 
 
 P_WL, P_WR, P_KP, P_BEUTELALT = teil('fluegel-l'), teil('fluegel-r'), teil('koerper'), teil('beutel')
-assert (L.zusammen(H, W, [(p, 0, 0) for p in (P_WL, P_WR, P_KP, P_BEUTELALT)])[PAD_T:PAD_T + sh, PAD_L:PAD_L + sw] == spr).all()
+# Runde 3 (Nutzerfeedback „weiterhin einfach Lücken, wenn die Flügel bewegt werden“): Die Flügel drehen sich jetzt um einen Drehpunkt IM Körper (links (7,11), rechts (10,10)) und
+# bekommen dort eine Wurzelscheibe (Radius 2, Farbe (147,151,11)), die im Ruhebild und in jeder Pose HINTER dem Körper steckt: die Wurzel ist damit fest am Rumpf angewachsen, das
+# Blatt wächst immer aus dem Körper heraus, nie von ihm weg.
+PIV_L, PIV_R = (7, 11), (10, 10)
+WURZEL = (147, 151, 11)
+for _p, (_cx, _cy) in ((P_WL, PIV_L), (P_WR, PIV_R)):
+    for _y in range(-3, 4):
+        for _x in range(-3, 4):
+            if _x * _x + _y * _y <= 5 and not _p[PAD_T + _cy + _y, PAD_L + _cx + _x, 3]:
+                _p[PAD_T + _cy + _y, PAD_L + _cx + _x, :3] = WURZEL
+                _p[PAD_T + _cy + _y, PAD_L + _cx + _x, 3] = 255
+assert (L.zusammen(H, W, [(p, 0, 0) for p in (P_WL, P_WR, P_KP, P_BEUTELALT)])[PAD_T:PAD_T + sh, PAD_L:PAD_L + sw] == spr).all()      # Wurzelscheiben sind im Ruhebild vom Körper verdeckt
 yy, xx = np.mgrid[0:H, 0:W]
 beutel_maske = (yy >= PAD_T + 16) | ((yy == PAD_T + 15) & (xx >= PAD_L + 7))      # Beutel: Zeilen ab 16 und (7–9,15) (Oberkante hängt an den Beinen x = 7 und 9)
 P_BEUTEL = np.where(beutel_maske[..., None], P_BEUTELALT, 0).astype(np.uint8)
@@ -83,7 +94,7 @@ THETA_P0 = math.asin(-THETA_C / THETA_A)
 Y_AUFH = PAD_T + 13                                          # Körperunterkante: darunter hängen Beine und Beutel
 
 
-def frame(i, partikel=True, effekte=True, nur_koerper=False):
+def frame(i, partikel=True, effekte=True, nur_koerper=False, teile=None):
     ph = L.sinus(i, N / 8)                                     # Flügelschlag: achtmal pro Schleife (Periode 6)
     u = lambda t: (1 - math.cos(2 * math.pi * t / (N / 4))) / 2     # Bob: Periode 12
     bob = -int(round(2 * u(i)))                                # 0 → −1 → −2 → −1 → 0 (nur nach oben, zweistufig)
@@ -95,8 +106,8 @@ def frame(i, partikel=True, effekte=True, nur_koerper=False):
     # Flügelschlag: jedes Blatt dreht sich um seine Wurzel (Spitze beschreibt einen Bogen): Aufschlag fast senkrecht, Abschlag bis unter die Waagerechte
     ph2 = ph + 0.4 * math.sin(ph)                              # Abschlag schneller als Aufschlag
     theta = THETA_C + THETA_A * math.sin(ph2 + THETA_P0)       # links: im Uhrzeigersinn (+) = Spitze richtet sich auf; Ruhe (Frame 0) = 0
-    wl = F.drehen(wl, PAD_L + 6.5, PAD_T + 12, theta, glatt=True)
-    wr = F.drehen(wr, PAD_L + 9.5, PAD_T + 13, -theta, glatt=True)
+    wl = F.drehen(wl, PAD_L + PIV_L[0], PAD_T + PIV_L[1], theta, glatt=True)
+    wr = F.drehen(wr, PAD_L + PIV_R[0], PAD_T + PIV_R[1], -theta, glatt=True)
     # Beutel: hinkt dem Bob um 0 … 1 px hinterher (die Aufhängebeine wachsen dann um 1 px) und schwingt waagerecht an den Beinen
     bob_b = -int(round(2 * u(i - 1.3)))
     d = max(0, min(1, bob_b - bob))                            # 0 = Beutel hängt direkt am Körper, 1 = 1 px tiefer
@@ -108,9 +119,31 @@ def frame(i, partikel=True, effekte=True, nur_koerper=False):
     bt = L.versetze(bt, 0, d)
 
     wl, wr, kp, bt = (L.versetze(a, 0, bob) for a in (wl, wr, kp, bt))
+    # Reste weg: Einzelne sichtbare Flügelpixel (Wurzelscheibe/Kontur, die unter dem Körper hervorlugt) sind keine Flügelfläche — Komponenten < 3 px entfallen
+    _kor = (kp[..., 3] > 0) | (bt[..., 3] > 0)
+    for _w in (wl, wr):
+        _v = _w.copy()
+        _v[_kor] = 0
+        _n, _gr, _lab = I.komponenten4(_v)
+        for _c in range(1, _n + 1):
+            if (_lab == _c).sum() < 3:
+                _w[_lab == _c] = 0
     f = L.zusammen(H, W, [(kp, 0, 0), (bt, 0, 0)] if nur_koerper else [(wl, 0, 0), (wr, 0, 0), (kp, 0, 0), (bt, 0, 0)])
+    if not nur_koerper:                                        # Lücke fertigzeichnen: waagerechter 1-px-Spalt zwischen Flügel und Körper wird mit der Flügelfarbe geschlossen
+        kor = (kp[..., 3] > 0) | (bt[..., 3] > 0)
+        kor[PAD_T + 14 + bob:] = False                         # nur Kopf/Brust zählen (die dünnen Beine unter dem Flügelrand nicht)
+        fl = ((wl[..., 3] > 0) | (wr[..., 3] > 0)) & ~((kp[..., 3] > 0) | (bt[..., 3] > 0))
+        for y in range(1, H - 1):
+            for x in range(1, W - 1):
+                if f[y, x, 3] == 0:
+                    if fl[y, x - 1] and kor[y, x + 1]:
+                        f[y, x] = f[y, x - 1]
+                    elif kor[y, x - 1] and fl[y, x + 1]:
+                        f[y, x] = f[y, x + 1]
     F.umranden(f, [wl, wr], UMRISS, FLUEGELRAND, FLUEGELRAND, FLUEGELRAND)       # Randpixel-Test (Regel 16)
     F.umranden(f, [bt], UMRISS, BEUTELRAND, BEUTELRAND, BEUTELRAND)
+    if teile is not None:
+        teile.update(wl=wl, wr=wr, kp=kp, bt=bt, bob=bob)
     return f
 
 
@@ -150,6 +183,40 @@ def zusammenhang_test(frames):
     print('ZUSAMMENHANG-Test bestanden: Körper+Beine+Beutel in allen', len(frames), 'Frames verbunden (außer den 2 diagonalen Außenbeinen), alle Körperpixel sichtbar')
 
 
+def anschluss_test(min_kontakt=4):
+    """ANSCHLUSS-Test (Runde 3: „Lücken, wenn die Flügel bewegt werden“): In JEDEM Frame hat jeder Flügel mindestens `min_kontakt` sichtbare Pixel, die waagerecht/senkrecht
+    (4-verbunden) an Körper/Beine grenzen — der Flügel hängt breit am Rumpf, nicht nur über eine Pixelecke —, und es gibt KEIN leeres Pixel, das links und rechts (bzw. oben und unten)
+    zwischen einem Flügel- und einem Körperpixel eingeklemmt ist (waagerechter 1-px-Spalt; Beine unter dem Flügelrand zählen nicht)."""
+    worst = {'l': 99, 'r': 99}
+    for k in range(N):
+        t = {}
+        f = frame(k, False, False, teile=t)
+        kor = (t['kp'][..., 3] > 0) | (t['bt'][..., 3] > 0)
+        kor_oben = kor.copy()
+        kor_oben[PAD_T + 14 + t['bob']:] = False
+        for nm in ('l', 'r'):
+            fl = t['w' + nm][..., 3] > 0
+            sichtbar = fl & ~kor
+            p = np.pad(kor, 1)
+            nachbar = p[:-2, 1:-1] | p[2:, 1:-1] | p[1:-1, :-2] | p[1:-1, 2:]
+            kontakt = int((sichtbar & nachbar).sum())
+            worst[nm] = min(worst[nm], kontakt)
+            assert kontakt >= min_kontakt, f'Frame {k}: Flügel {nm} grenzt nur mit {kontakt} Pixel(n) an den Körper'
+        alle_f = (t['wl'][..., 3] > 0) | (t['wr'][..., 3] > 0) | ((f[..., 3] > 0) & ~kor)
+        leer = ~(alle_f | kor)
+        kor = kor_oben
+        h, w = leer.shape
+        spalte = []
+        for y in range(1, h - 1):
+            for x in range(1, w - 1):
+                if leer[y, x] and ((alle_f[y, x - 1] and kor[y, x + 1]) or (kor[y, x - 1] and alle_f[y, x + 1])):
+                    spalte.append((x - PAD_L, y - PAD_T))
+        if k == 0:
+            basis = len(spalte)                               # Ruhebild = Original: so viele 1-px-Spalte (Flügelunterkante über einem Bein) sind schon in der Kunst
+        assert len(spalte) <= basis, f'Frame {k}: neue 1-px-Spalte zwischen Flügel und Körper {spalte}'
+    print('ANSCHLUSS-Test bestanden: Flügel grenzen in allen', N, 'Frames mit ≥', worst, 'Pixeln an den Körper, kein 1-px-Spalt')
+
+
 def beutel_test(frames):
     """Der Beutel (Zeilen unterhalb der Beine) ist in jedem Frame 4-verbunden mit den Beinen/dem Körper (ohne die Flügel gerechnet)."""
     for k in range(N):
@@ -163,6 +230,7 @@ if __name__ == '__main__':
     koerper_frames = [frame(i, False) for i in range(N)]
     frames = [frame(i) for i in range(N)]
     beutel_test(frames)
+    anschluss_test()
     zusammenhang_test(frames)
     frames = zuschneiden(frames, koerper_frames)
     prev = sys.argv[sys.argv.index('--preview') + 1] if '--preview' in sys.argv else None

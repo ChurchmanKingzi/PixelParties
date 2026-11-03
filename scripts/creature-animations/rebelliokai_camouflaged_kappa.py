@@ -1,19 +1,26 @@
 # -*- coding: utf-8 -*-
 """Idle-Animation für „Rebelliokai Camouflaged Kappa“ (Creature) — der im Wasser getarnte Kappa mit Kopfschale, grünem Gesicht und Schwert.
 
-Quelle: src/rebelliokai-camouflaged-kappa.png (44×16 px, 31 Farben).
-PICK: [["MotiveJapan", 42, 1]]      (Ebene „Kappa“, Figur 1; nur in dieser Karte. Die Ebenen 40/41/45 enthalten dieselben Teile in sauberen Farben — Kopf mit Bauch, Schwert, Schwimmflossen —, die Karte zeigt aber die
-Ebene 42, in der der Körper vom Wasser abgedunkelt ist; die weißen Ebenen 43/44 sind Masken. Das Wasser/der Schilf der Kunst gehört nicht zur Figur.)
-Quelle vollständig: ja für das, was die Karte zeigt (die Beine unter der Wasserlinie sind in der Kunst abgeschnitten; es wird nichts ergänzt).
+Quelle: src/rebelliokai-camouflaged-kappa.png (44×25 px, 31 Farben, 340 Pixel).
+PICK: [["MotiveJapan", 42, 1], ["MotiveJapan", 44, "ganze Ebene „Ebene #92“, 10×5 px, Bauch/Becken, auf Sprite (7,14)"], ["MotiveJapan", 45, "ganze Ebene „Ebene #94“, 16×6 px, Beine/Füße, auf Sprite (4,19)"]]
+(Ebene „Kappa“ 42: Kopf, abgedunkelter Rumpf, Flosse, Hand, Schwert; die Ebenen 40/41 enthalten dieselben Teile in sauberen Farben — Kopf mit Bauch, Schwert —, die Karte zeigt aber die Ebene 42, in der der Körper vom Wasser abgedunkelt ist;
+die weißen Ebenen 43 ist eine Maske. Das Wasser/der Schilf der Kunst gehört nicht zur Figur.)
+RUNDE 3 (Nutzer: „fehlt der Unterkörper – gibt es dafür keine Ebene?“): JA — der Unterkörper liegt in zwei eigenen Ebenen unterhalb der Kappa-Ebene, die in der Karte nur als blasse 50 %/30 %-Spiegelung unter der Wasserlinie erscheinen:
+Ebene #92 (MotiveJapan 44, 10×5, Deckkraft 50 %, im Motiv bei (289,281)) = BAUCH/BECKEN mit hellbraun-gemustertem Bauch zwischen grünen Seiten, und Ebene #94 (MotiveJapan 45, 16×6, Deckkraft 30 %, bei (286,286)) = BEINE mit Schwimmfüßen
+(Schrittbalken oben, zwei Beine mit Schwimmhäuten). Im Motiv liegen beide um +2 px nach rechts gegen den Rumpf versetzt (Wasserbrechung); sie sind hier unter den Rumpf gerückt (Bauch auf Sprite (7,14), Beine auf (4,19)), dann schließen die
+Bauchränder (x 7–8 / 15–16, y 14–15) lückenlos an den Rumpf an (Kontrolle: kein einziges überlappendes Pixel, 0 Konflikte). Die Pixel werden voll deckend übernommen (Regel 22). 94 Pixel dazu (Bauch 36, Beine 58), alles Farben, die der Sprite schon hat
+(31 Farben bleiben 31).
 
 Aufruf:   python3 rebelliokai_camouflaged_kappa.py [--preview <ordner>]
 Ausgabe:  ../../data/creature-animations/rebelliokai-camouflaged-kappa.png + .json
 
-Was im Sprite ist (x, y im 44×16-Sprite):
+Was im Sprite ist (x, y im 44×25-Sprite):
 * KOPFSCHALE (x 6–17, y 0–4): ein brauner/beiger Rand (128,99,82)/(161,148,119) um blaues Wasser (52,102,176)/(113,181,219) mit hellen Spiegelungen (158,228,239)/(209,251,240) — die Schüssel eines Kappa mit Wasser.
 * GESICHT (x 7–16, y 4–7): grüne Haut (80,205,144)/(106,226,145), zwei AUGEN je 2×2 bei (8–9, 6–7) und (14–15, 6–7): grauweißer Punkt (175,181,187)/(203,210,217), rosa-roter Punkt (195,67,92) bzw. dunkelrot (129,11,11),
   dunkelbraune Braue (51,39,33); schwarzer Rand (0,0,0) bei (7,7) und (16,7).
 * KÖRPER (x 7–16, y 8–13): vom Wasser abgedunkelter Rumpf (26,25,24)/(43,42,40)/(80,66,57)/(88,94,60) mit hellbraunem Bauchfleck (180,166,129)/(161,148,119) und unten am Rand Bauch-/Panzerpixel (138,64,40)/(218,181,128)/(243,231,168)/(179,121,77).
+* UNTERKÖRPER (Runde 3, x 4–19, y 14–24): Bauch/Becken (y 14–18: braun-hellbrauner Bauch zwischen grünen Seiten (80,205,144)/(106,226,145)/(23,117,110), Umriss (11,59,68)) und zwei Beine mit Schwimmfüßen
+  (y 19–24: Schrittbalken (11,59,68) bei y 19, Füße links x 4–10, rechts x 13–19).
 * LINKE SCHWIMMFLOSSE/HAND (x 0–7, y 10–15): grün-türkis (23,117,110)/(80,205,144)/(106,226,145) mit dunklem Umriss (11,59,68), hängt unten am Rumpf.
 * RECHTE HAND (x 17–23, y 7–13) hält den GRIFF des Schwerts (dunkelrot (59,15,16)/(81,21,29)/(78,44,45), Parierstange (131,109,112)) bei (20–23, 9–12).
 * SCHWERT (x 24–43, y 10–11): Klinge oben hellgrau (204,204,196), unten grau (122,121,117), Spitze dunkler (42–43, 10). METALL → Glanz erlaubt.
@@ -23,12 +30,14 @@ Ablauf (48 Frames à 70 ms = 3,36 s, nahtlos; Frame 0 = Original):
 * KLINGE PENDELT: das Schwert schwingt mit der Hand (Hand samt Griff starr 0…±1 px, die Klingenspalten wachsen bis ±3 px an der Spitze, Gefälle ≤ 0,15 px je Spalte → die zwei Klingenzeilen bleiben 4-verbunden);
   eine Welle je Schleife plus ein kleines schnelles Zittern (3 je Schleife).
 * LINKE FLOSSE: paddelt (2 Wellen je Schleife): die Spalten wandern mit dem Abstand zur Schulter (x 7) bis 2 px, mit Nachlauf zur Spitze.
+* BEINE (Runde 3): die zwei Beine treten Wasser: jede Zeile unterhalb des Schrittbalkens (y 19) schwingt waagerecht um bis 2 px mit Nachlauf nach unten (R.zeilen_pendel, Gefälle ≤ 1 px je Zeile, Frame 0 = Ruhe),
+  linkes und rechtes Bein mit verschiedener Phase, in dieselbe Richtung (sie berühren sich nie); der Bauch bleibt starr und atmet nur mit dem Rumpf.
 * ATMEN (2× je Schleife): die dunkle Zeile 12 des Rumpfes wird einmal doppelt eingefügt → Kopf und Schale steigen 1 px, Hand und Schwert steigen starr mit, die Flosse mit.
 * BLINZELN (Frames 12–14, 36–38): die Augenpunkte nehmen die Hautfarbe an, die untere Zeile wird zum dunklen Lidstrich (51,39,33).
 * WASSER IN DER SCHALE: ein heller Wellenpunkt (113,181,219) wandert zweimal je Schleife über die blaue Zeile (y 2) der Schale (kein Lichtband, nur das Schwappen des Wassers).
 * KLINGENGLANZ (Regel 12, Metall): zweimal je Schleife läuft ein Lichtband (1 Stufe heller auf der Rampe (122,121,117) → (204,204,196) → (243,231,168)) über die Klinge, danach blitzt an der Spitze ein 4-zackiger Stern auf (wächst/schrumpft, bleibt an der Klinge).
 Keine Partikel, kein Wasserdampf. Alle Bewegungen laufen auf der vollen Leinwand (ClipError statt Abschneiden). Nur ganze Pixel, nur Quellfarben.
-Ergänzungen: keine gemalten Pixel (Frame 0 = Original).
+Ergänzungen: keine gemalten Pixel; der Unterkörper stammt 1:1 aus den Ebenen #92/#94 (siehe RUNDE 3).
 """
 import math
 import sys
@@ -40,7 +49,7 @@ import anim_lib as L
 import anim_rebel as R
 
 N, MS = 48, 70
-PAD_L, PAD_R, PAD_T, PAD_B = 2, 3, 3, 4
+PAD_L, PAD_R, PAD_T, PAD_B = 2, 3, 3, 3
 
 spr = L.lade('rebelliokai-camouflaged-kappa')
 sh, sw = spr.shape[:2]
@@ -61,11 +70,13 @@ WEISS = GLANZ
 UMRISS = f(7, 5)                                                    # (11,59,68) türkis-dunkel (Randfarbe der Haut)
 ERLAUBT |= set(RAMPE)                                               # Klingenglanz-Stufen dürfen am Rand der Klinge stehen
 
-flosse = vorhanden & (xx <= 6) & (yy >= 10)
+flosse = vorhanden & (xx <= 6) & (yy >= 10) & (yy <= 15)
 flosse[11, 7] = flosse[12, 7] = vorhanden[11, 7] and vorhanden[12, 7]
 klinge = vorhanden & (xx >= 24)
 hand = vorhanden & (xx >= 17) & (xx <= 23) & (yy >= 7) & (yy <= 13)
-kern = vorhanden & ~flosse & ~klinge & ~hand
+bein_l = vorhanden & (yy >= 20) & (xx <= 11)                         # Unterkörper (Runde 3): Beine unterhalb des Schrittbalkens (y 19)
+bein_r = vorhanden & (yy >= 20) & (xx >= 12)
+kern = vorhanden & ~flosse & ~klinge & ~hand & ~bein_l & ~bein_r
 AUGEN_HAUT = [(8, 6), (15, 6)]
 AUGEN_LID = [(8, 7), (9, 7), (14, 7), (15, 7)]
 STERN_X, STERN_Y = 41, 10
@@ -107,6 +118,8 @@ def frame(i):
     k = R.teil(spr, kern, H, W, OFF)
     fl = R.teil(spr, flosse, H, W, OFF)
     ha = R.teil(spr, hand, H, W, OFF, dy=hdy)
+    bl = R.zeilen_pendel(R.teil(spr, bein_l, H, W, OFF), PAD_T + 19, 1.8, L.sinus(i, N / 2), lauf=1.3, ruhe0=True)
+    br = R.zeilen_pendel(R.teil(spr, bein_r, H, W, OFF), PAD_T + 19, 1.8, L.sinus(i, N / 2), lauf=1.3, ruhe0=True, versatz=0.9)
     kl = klinge_ebene(i, a)
     # Blinzeln
     if Hm.folge(i, 12, [1, 1, 1], N) or Hm.folge(i, 36, [1, 1, 1], N):
@@ -140,7 +153,7 @@ def frame(i):
         fl = L.streck_zeile(fl, PAD_T + 12, 1)
         ha = L.versetze(ha, 0, -1)
         kl = L.versetze(kl, 0, -1)
-    fig = L.zusammen(H, W, [(fl, 0, 0), (k, 0, 0), (ha, 0, 0), (kl, 0, 0)])
+    fig = L.zusammen(H, W, [(fl, 0, 0), (bl, 0, 0), (br, 0, 0), (k, 0, 0), (ha, 0, 0), (kl, 0, 0)])
     if st is not None:
         stern(fig, STERN_X, STERN_Y, st, int(round(a * (0.3 + 0.7 * (STERN_X - 24) / (sw - 25)))) - b)
     fig, _br = R.verbinde(fig)                                       # Klingenstufe: Eckkontakt → 4-verbunden

@@ -1,5 +1,7 @@
 # -*- coding: utf-8 -*-
-"""Idle-Animation für „Slippery Snobbit“ (Creature) — das Schneehobbit-Gefährt (von oben/vorn gesehen).
+"""Idle-Animation für „Slippery Snobbit“ (Creature) — das Schneehobbit-Gefährt (von oben/vorn gesehen). Runde 3: es RUTSCHT hoch und runter.
+
+Nutzerkorrektur (wörtlich): „Snobbit sollte hoch und runter sliden.“
 
 Quelle: src/slippery-snobbit.png (13×17 px, 17 Farben, deckend).
 PICK: [["Motive", 801, 1]]      Ebene „Snobbit“ (xcf Motive, 13×17, vollständig deckend). Die Nachbarebene 802 „Ebene #359“ (13×64, halbtransparente Fahrspur/Schweif, Alpha < 255) liegt in der Karte
@@ -16,6 +18,8 @@ Was im Sprite ist (x, y im 13×17-Sprite) — die Figur ist nicht eindeutig lesb
 Bleibt fest: Fenster, Schlitz, weißes Pixel, Rahmen. Material: Eis/Stein/Metallrahmen matt — KEIN Glanz (Regel 14).
 
 Ablauf (48 Frames à 66 ms = 3,17 s, nahtlos), alle Bewegungen unabhängig:
+* RUTSCHEN (neu): das GANZE Gefährt samt Säulen und Schneestaub gleitet ganzzahlig senkrecht über das Eis — Frames 0–11 nach unten (bis +5 px, sanft anfahrend/bremsend; in der Kartenkunst fährt es nach
+  unten, die Spur liegt oben), Halt, Frames 15–30 nach oben (bis −5 px), Halt, Frames 34–47 zurück zur Mitte. Frame 0 = Original. Kein Spiegeln (von vorn gesehen), kein Verformen, keine Gehbewegung.
 * Säulen wippen gegenläufig (Periode 16): die linke Säule (x 1–4, y 0–7) wächst um 1 px nach oben (Zeile 5 doppelt, Mischtextur) oder schrumpft um 1 px (Zeile 5 entfällt), die rechte gegenphasig; der Steg bleibt.
 * Kufen wippen (Periode 24, abwechselnd 8 Frames): links (1–2, 16) bzw. rechts (10–11, 16) verliert die unterste Pixelzeile (Umriss darüber wird in Umrissfarbe A geschlossen) — der Rahmen kippt leicht.
 * Schneestaub (5 Wölkchen ≥ 2×2, Farben H/E) stäubt hinten (oben) auf und steigt langsam auf.
@@ -30,9 +34,10 @@ import numpy as np
 import anim_eis as E
 import anim_humanoide as Hm
 import anim_lib as L
+import anim_rutsch as R
 
 N, MS = 48, 66
-PAD_L, PAD_R, PAD_T, PAD_B = 6, 6, 16, 3
+PAD_L, PAD_R, PAD_T, PAD_B = 6, 6, 20, 7            # oben: Schneestaub + 5 px Rutschweg nach oben; unten: 5 px Rutschweg nach unten
 TEST_EBENEN = ('koerper',)
 
 spr = L.lade('slippery-snobbit')
@@ -83,12 +88,16 @@ STAUB = [dict(x=PAD_L + x, y=PAD_T + 0 + dy, vx=vx, vy=-12, off=o, form=f, wacke
 STAUB_FARBEN = {'c': H_, 'r': E_}
 
 
+# Rutschen senkrecht: 0 → +5 (nach unten), Halt, +5 → −5 (nach oben), Halt, −5 → 0
+BAHN, _SPIEGEL = R.pfad(N, [('fahrt', 5, 12), ('halt', 3), ('fahrt', -5, 16), ('halt', 3), ('fahrt', 0, 14)])
+
+
 def frame(i, nur=None):
     ebenen = []
     if nur is None or 'dunst' in nur:
         ebenen.append((E.dunst_ebene(H, W, i, N, STAUB, STAUB_FARBEN), 0, 0))
     ebenen.append((koerper(i), 0, 0))
-    return L.zusammen(H, W, ebenen)
+    return R.verschieben(L.zusammen(H, W, ebenen), BAHN[i], False, achse='y')
 
 
 if __name__ == '__main__':
@@ -96,6 +105,7 @@ if __name__ == '__main__':
     prev = sys.argv[sys.argv.index('--preview') + 1] if '--preview' in sys.argv else None
     ohne = [frame(i, nur=('koerper',)) for i in range(N)]
     print('Ruhepose weicht vom Original ab bei:', Hm.ruhepose(ohne[0], spr, OFF) or 'nichts')
+    print('Versatz (y) je Frame:', BAHN)
     L.pruefe(frames, quelle=spr)
     print('Pixel je Frame (Figur):', [int((f[..., 3] > 0).sum()) for f in ohne])
     import anim_amorph as A

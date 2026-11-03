@@ -22,11 +22,12 @@ Ablauf (48 Frames à 62 ms = 2,98 s, nahtlos):
 * Atmen (Periode 24): die Hüftzeile 16 wird bis zu 2× eingefügt (Texturmischung, anim_lib.streck_zeile): Oberkörper, Kopf und Arm steigen bis 2 px, die Stiefel bleiben am Boden.
 * Schwertwippen (Periode 48): die Schwertspitze hebt/senkt sich bis ±2 px um die Hand (starres Kippen, Spaltenversatz mit Gefälle ≤ 1 px je Spalte); das Schwert steigt mit dem Oberkörper; die Glitzer folgen.
 * Lichtband (Frames 8–21): Metallglanz wandert von der Spitze zur Hand über die Klinge (2 Stufen heller auf der Farbrampe der Klinge).
-* Glitzer: das Kreuz an der Spitze schrumpft zweimal je Schleife (Frames 4 und 28) zum kleinen Kreuz (Mitte + 4 Arme), verschwindet kurz und wächst zurück (nie ein einzelner Punkt); die beiden Rauten funkeln versetzt (Frames 12 / 20 / 40).
+* SPARKLE-PARTIKEL (Runde 3, ersetzen die drei Dauer-Glitzerformen der Quelle — der Nutzer fand sie „viel zu lange sichtbar“): je ein kurzer normaler Sparkle (Mitte → kleines Kreuz → [großes Kreuz] → kleines Kreuz → Mitte → weg) an der Schwertspitze (Frames 8–12, zugleich mit dem Lichtband),
+  über der Klinge (Frames 26–28) und unter der Klinge (Frames 40–43); dazwischen lange Pausen (≥ 11 Frames), nie mehr als einer zugleich. Sie folgen dem Schwert (Kippen) und dem Oberkörper und liegen über der Kontur.
 * Blinzeln (Frames 14–15, 38–39): beide Augenschlitze nehmen die Farbe der Gesichtspixel daneben an (Lid = Körperfarbe).
 * Fußtippen: linker Stiefel (Frames 18–23) und rechter (Frames 36–41) heben sich je zweimal 1 px hinter den Saum.
 * Kein Kopfwiegen seitlich (Regel 17), kein Schweben (Regel 18): die Stiefel stehen fest.
-Frame 0 = Original (Ruhepose). Ergänzungen: keine (Stiefel liegen beim Heben hinter dem Saum, Glitzer sitzen vor leerem Grund).
+Frame 0 = Original ohne die drei Dauer-Glitzerformen. Ergänzungen: keine (Stiefel liegen beim Heben hinter dem Saum, Sparkles sitzen vor leerem Grund).
 """
 import sys
 

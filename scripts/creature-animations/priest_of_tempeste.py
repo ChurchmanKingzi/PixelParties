@@ -1,8 +1,12 @@
 # -*- coding: utf-8 -*-
 """Idle-Animation für „Priest of Tempeste“ (Creature) — der Priester im blauen Spitzhut mit weißem Stirnband, schmalen schwarzen Augenschlitzen, hellblauem Brustjuwel und betend gefalteten Händen.
 
-Quelle: src/priest-of-tempeste.png (16×23 px, 19 Farben, 234 Pixel).
-PICK: [["MotiveJapan", 117, 1]]      (Ebene „Priester“, Figur 1; bei creature_show.py als Kandidat 1 mit 87 % Treffer — die Ebene gehört zur Karte, die Kunst hat dort leicht verrauschte Farben)
+Quelle: src/priest-of-tempeste.png (16×25 px, 20 Farben, 258 Pixel).
+PICK: [["MotiveJapan", 117, 1]]      (Ebene „Priester“, ganze Ebene = eine Figur, 16×25 px; bei creature_show.py als Kandidat 1 mit 87 % Treffer — die Ebene gehört zur Karte, die Kunst hat dort leicht verrauschte Farben)
+RUNDE 3 (Nutzer: „fehlt der Unterkörper; er sollte einen sehr ähnlichen Umriss haben wie Priest of Luna“): Die Ebene 117 hat 25 Zeilen; die untersten drei (y 22–24: Robenrand/Gürtel mit türkiser Schnalle und Saumumriss) liegen in der Quelle
+halbtransparent (Alpha 127, wie bei Priest of Luna die Ebene mit 70 %) und waren deshalb beim ersten Extrahieren weggefallen (nur die 6 braunen Pixel der Zeile 22 blieben). Jetzt (Regel 22) wird die ganze Ebene voll deckend übernommen
+(Alpha 255): 24 Pixel dazu — y 22: (3,22) (4,22) (11,22) (12,22) [Robenrand], y 23: x 3–12 [Robenrand, Gürtelschnalle (21,91,176)/(0,176,234) bei x 6–8], y 24: x 3–12 [Saum (3,17,37)]. Der Umriss gleicht damit dem
+von Priest of Luna (dort 3 Zeilen: Gürtel + Schnalle + Saum, ebenfalls x 3–12). Neue Farbe im Sprite (aus der Ebene selbst): (0,176,234) türkis, Gürtelschnalle (wie bei Priest of Luna).
 Abgleich mit der Kartenkunst Priest_of_Tempeste.png (76×51): der Priester sitzt dort bei (30,5) (Priesterbüste) — direkt darunter hängt die Ebene „Ebene #70“ (MotiveJapan 116, 18×22 px bei (29,28)): ein türkis umrandetes
 Flügelwappen mit einem blauen Hutträger von HINTEN (der Held Tempeste als Rückenfigur mit Aura, Flügeln und Füßchen). Diese Rückenfigur ist ein eigener, von der Büste getrennter Teil der Kartenszene (sie hat eigene Aura,
 eigene Flügel und liegt in der Ebenenreihenfolge davor); sie wurde NICHT als Teil der Creature genommen. Falls der Nutzer die Flügelfigur dazu haben möchte, ist Ebene 116 der Kandidat.
@@ -22,13 +26,14 @@ Edelstein im Sprite: nur das Brustjuwel; Metall: die zwei Krempennieten. Nur sie
 Ablauf (48 Frames à 62 ms = 2,98 s, nahtlos):
 * Auf und ab (Periode 24 = zweimal pro Schleife), zweistufig: erst hebt sich die Brust (die einfarbig blaue Robenzeile 17 wird einmal unverändert wiederholt — Texturmischung würde den Halspixel (7–8,16) hineinziehen: Kopf, Gesicht, Hut, Kragen steigen 1 px; Jewel, Manschetten und Hände bleiben unten),
   3 Frames später läuft der Hut nach (Hutzeile 6 — Stoff, kein Gesicht — wird einmal doppelt eingefügt, der Hut steigt 1 px weiter): Hut 0 → 1 → 2 → 1 → 0 px, Brust 0 → 1 → 0. Gesicht und Hals werden nicht gestreckt.
+* Gürtelschnalle (Runde 3, wie bei Priest of Luna): ein heller Facettenpunkt (246,255,255) wandert in den Frames 27–38 über die drei Schnallenpixel (x 6–8, y 23). Der neue Unterkörper (y 22–24) bleibt beim Atmen unten (Füße-/Saumseite).
 * Hutspitze schwingt (Zeilen 0–3): die herabhängende Spitze pendelt zwei Wellen (3 s und 1 s) bis ±2 px, nach unten auslaufend (Gefälle ≤ 1 px je Zeile); die Spitze bleibt über Zeile 4 verbunden.
 * Krempe flattert: die äußerste Spalte der linken Krempe senkt sich 1 px (Frames 8–15), später die der rechten (Frames 32–39) — Spitze der Krempe, 4-verbunden mit der Nachbarspalte.
 * Brustjuwel funkelt (Regel 14, Edelstein): ein weißer Facettenpunkt (246,255,255) wandert achtmal pro Schleife (je 2 Frames) im Kreis über die vier Juwelpixel (Frames 3–18 und 27–42), und ein vierzackiger
   Glitzerstern liegt in den Frames 20–23 auf dem Juwel (die Arme liegen auf der blauen Robe, innerhalb der Silhouette).
 * Metallnieten blitzen: die graue Niete links wird in den Frames 12–13, die rechte in 36–37 kurz hell (Rampe (189,189,189) → (213,213,213) → (246,255,255) des Sprites).
 Frame 0 = Original (Ruhepose). Kontrolle: anim_humanoide.ruhepose / eckkontakt_typen / Randpixel-Test (Regel 16).
-Ergänzungen: keine (nichts Verdecktes wird freigelegt).
+Ergänzungen: der Unterkörper (siehe RUNDE 3 oben); sonst wird nichts Verdecktes freigelegt.
 """
 import sys
 
@@ -45,6 +50,7 @@ PT = sz.pt
 TEST_EBENEN = ('figur',)
 
 JUWEL = [(7, 18), (8, 18), (8, 19), (7, 19)]
+SCHNALLE = [(6, 23), (7, 23), (8, 23)]
 WEISS, GRAU1, GRAU2 = sz.f(7, 9), sz.f(4, 8), sz.f(5, 9)       # (246,255,255), (189,189,189), (213,213,213)
 HELL1, HELL2 = sz.f(7, 18), sz.f(7, 19)                         # (140,215,246), (101,203,243)
 
@@ -57,6 +63,8 @@ def frame(i, nur=None):
         if a <= i <= b:
             idx = ((i - a) // 2) % 4
             Hm.setze(k, {JUWEL[idx]: WEISS}, OFF)
+    if 27 <= i <= 38:
+        Hm.setze(k, {SCHNALLE[((i - 27) // 4) % 3]: WEISS}, OFF)
     # --- Krempennieten blitzen ---
     for (x, start) in ((4, 12), (11, 36)):
         s = Hm.folge(i, start, [1, 2], N)

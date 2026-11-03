@@ -13,18 +13,21 @@ Was im Sprite ist (Koordinaten im Sprite 34×41, x/y ab 0):
 * Gold → Glanz und Glitzer sind erlaubt: das ganze Ei ist Gold; der Rand (Umriss) glänzt nicht (nur Innenpixel).
 Fest bleiben: das GANZE Ei (Form, Randkranz, Raster) — Nutzerwunsch: „genau wie Monster Nest eher über Risse als über Squash and Stretch animiert“.
 
-Ablauf (48 Frames à 65 ms = 3,12 s, nahtlos):
-* Risse (neu): sechs kleine Risse aus je 3 Pixeln (das Ei ist mit 34×41 px groß; 2 Pixel gingen im Raster unter) in der dunkelsten Eifarbe F=(182,38,0) (diagonal gezackt) erscheinen zeitversetzt an sechs verschiedenen Stellen des Eis (alle ~7 Frames einer, immer 1–2 gleichzeitig):
-  erst 1, dann 2, dann 3 Pixel, steht kurz, schrumpft wieder und verschwindet (Verlauf 1-1-2-2-3-3-3-3-2-2-1-1, 12 Frames). Sie liegen nur auf hellen Rasterpixeln (B/C/E), nie am Rand und nie auf den Armen der Sterne. Frame 0 = Original (rissfrei).
-* Goldschimmer (Regel 14, Gold; bleibt aus der ersten Fassung, das Ei selbst bewegt sich nicht): zweimal pro Schleife (Frames 2–17 und 26–41) läuft ein breites diagonales Lichtband über das Ei (eine Stufe heller auf der Gold-Rampe A→C→B→E, nur Innenpixel);
-  dazu funkeln einzelne Rasterpixel: in jedem Frame schalten acht Gelb-Pixel (C) für 2 Frames auf Weiß (E) (feste Zufallsfolge, nahtlos). Schalter `GLANZ = False` lässt Band, Funkeln und Sterne weg (dann bleiben nur die Risse).
-* Glitzersterne (Gold): vierzackige Sterne (5 Frames Lauf, wachsen/schrumpfen) blitzen an vier Stellen auf dem Ei und an vier Ecken des Sprite-Rechtecks außerhalb des Eis auf (Farben E, B, C des Sprites).
+Nutzerwunsch (Runde 3): „gerne ein paar mehr Cracks, auch mehr als einen pro Ei zur Zeit. Das gilt für ALLE Eier.“ + Gold: Glitzer nur als kurze Sparkle-Partikel.
+Ablauf (72 Frames à 65 ms = 4,7 s, nahtlos):
+* Das Ei bleibt KOMPLETT STATISCH. Risse: 13 Risse (vorher 6) aus je 4 Pixeln in der dunkelsten Eifarbe F=(182,38,0), zackig (diagonal/senkrecht gemischt), erscheinen zeitversetzt über das ganze Ei verteilt:
+  erst 1, dann 2, 3, 4 Pixel, steht 2–5 Frames, schrumpft wieder und verschwindet (16–19 Frames). Die Starts sind unregelmäßig (Goldener-Schnitt-Folge), sodass fast immer 3–5 Risse gleichzeitig sichtbar sind
+  (mehrere nebeneinander auf dem einen Ei); Frame 0 und die ersten Frames sind rissfrei (= Original). Sie liegen nur auf Rasterpixeln, mindestens 3 Pixel vom Rand (kein Umriss wird dicker, nichts berührt den Randkranz)
+  und nie auf den Armen eines Sparkles.
+* Goldschimmer (Regel 12a, Gold): zweimal pro Schleife (Frames 4–19 und 40–55) läuft ein breites diagonales Lichtband über das Ei (eine Stufe heller auf der Gold-Rampe A→C→B→E, nur Innenpixel); das Ei selbst bewegt sich nicht.
+  Das frühere Pixel-Funkeln (acht Gelbpixel je Frame kurz Weiß) ist entfernt: Glitzer gibt es jetzt NUR noch als Sparkle-Partikel.
+* Sparkles (Regel 34, Gold): sieben kurze Sparkles je Schleife (4 Frames: Mitte → kleines Kreuz → großes Kreuz → kleines Kreuz, dann weg), immer nur eines zur Zeit, mit langen Pausen (≥ 5 Frames) dazwischen; vier sitzen auf dem Ei,
+  drei in den freien Ecken des Sprite-Rechtecks (Farben E, B, C des Sprites).
 Ergänzungen: keine (der Rand wird nie verändert).
 Frame: Sprite plus 3 px Rand rundum — Figur zentriert; die Sterne liegen in den freien Ecken innerhalb des Sprite-Rechtecks.
 Nur ganze Pixel, nur Farben der Quelle.
 """
 import math
-import random
 import sys
 
 import numpy as np
@@ -33,7 +36,7 @@ import anim_lib as L
 import anim_amorph as A
 import anim_eier as E
 
-N, MS = 48, 65
+N, MS = 72, 65
 PAD_L, PAD_R, PAD_T, PAD_B = 3, 3, 3, 3
 GLANZ = True
 
@@ -59,53 +62,44 @@ def _maske(*cs):
 
 INNEN = OPAK & ~RAND0
 GOLD = INNEN & _maske(CA, CC, CB)                                                       # Rampe A→C→B→E (Weiß E bleibt)
-GELB = INNEN & _maske(CC)
 HELLER = {CA: CC, CC: CB, CB: CE}
 STERN_FARBEN = {'m': CE, 'a': CB, 's': CC}
-SWEEPS = [2, 26]
+SWEEPS = [4, 40]
 SWEEP_N = 16
 
-# ── Funkeln einzelner Rasterpixel (feste Zufallsfolge, 2 Frames je Pixel) ──
-_rnd = random.Random(5)
-_gelb_pix = [(int(y), int(x)) for y, x in zip(*np.nonzero(GELB))]
-FUNKEL = {}
-for _i in range(N):
-    FUNKEL[_i] = set()
-for _k in range(8 * N // 2):
-    _f = _k * 2 % N
-    _p = _rnd.choice(_gelb_pix)
-    for _d in range(2):
-        FUNKEL[(_f + _d) % N].add(_p)
-# Frame 0 = Original: kein Funkeln
-FUNKEL[0] = set()
-
-# ── Sterne ──
-STERN_LAUF = [0, 1, 2, 1, 0]
-ORTE = {'e1': (10, 12), 'e2': (24, 16), 'e3': (13, 28), 'e4': (22, 31),                    # auf dem Ei (Rasterpixel)
+# ── Sparkles: kurze Sterne (Regel 34), immer nur einer zur Zeit ──
+STERN_LAUF = E.SPARKLE_LAUF
+ORTE = {'e1': (6, 19), 'e2': (13, 37), 'e3': (19, 4), 'e4': (28, 28),                      # auf dem Ei (Rasterpixel; Arme ganz im Inneren, nie auf einem Riss)
         'c1': (4, 4), 'c2': (29, 5), 'c3': (3, 37), 'c4': (30, 37)}                       # in den Ecken (außerhalb des Eis)
 for _k in ('e1', 'e2', 'e3', 'e4'):
-    assert INNEN[ORTE[_k][1], ORTE[_k][0]], _k
+    _x, _y = ORTE[_k]
+    for (_dx, _dy) in [(d, 0) for d in range(-2, 3)] + [(0, d) for d in (-2, -1, 1, 2)]:
+        assert INNEN[_y + _dy, _x + _dx], (_k, _dx, _dy)
 for _k in ('c1', 'c2', 'c3', 'c4'):
     assert not OPAK[ORTE[_k][1], ORTE[_k][0]], _k
-STERNE = [(s, o) for s, o in ((3, 'c1'), (9, 'e1'), (14, 'c2'), (20, 'e2'), (27, 'c3'), (33, 'e3'), (38, 'c4'), (44, 'e4'), (5, 'e3'), (30, 'e1'))]
+STERNE = [(3, 'c1'), (13, 'e1'), (23, 'c2'), (33, 'e3'), (43, 'e4'), (52, 'c3'), (62, 'e2')]
 
 
 def aktive_sterne(i):
     return [(o, STERN_LAUF[(i - s) % N]) for (s, o) in STERNE if (i - s) % N < len(STERN_LAUF)]
 
 
-# ── Risse (drei Pixel, F = dunkelste Eifarbe; nur auf hellen Rasterpixeln B/C/E, mindestens 2 Pixel vom Rand) ──
-RISSE = [E.Riss(p, start=st, profil=E.PROFIL3) for p, st in (
-    ([(24, 27), (25, 28), (26, 29)], 2), ([(13, 4), (14, 5), (15, 6)], 9), ([(2, 21), (3, 22), (3, 23)], 16),
-    ([(11, 35), (12, 36), (13, 37)], 22), ([(25, 9), (24, 10), (23, 11)], 29), ([(16, 18), (16, 19), (17, 20)], 35))]
-_hell = _maske(CB, CC, CE)
+# ── Risse (vier Pixel, F = dunkelste Eifarbe; nur auf Rasterpixeln, mindestens 3 Pixel vom Rand) — Stellen mit E.sicher/E.pfade ausgesucht und festgeschrieben ──
+_SITES = [[(17, 16), (18, 16), (19, 17), (19, 18)], [(11, 28), (11, 29), (12, 30), (13, 30)], [(9, 16), (10, 17), (11, 17), (12, 16)], [(12, 8), (11, 9), (11, 10), (12, 11)],
+          [(23, 30), (24, 31), (24, 32), (23, 33)], [(23, 13), (23, 14), (24, 15), (25, 15)], [(17, 27), (17, 28), (18, 29), (19, 29)], [(18, 7), (19, 8), (19, 9), (18, 10)],
+          [(26, 23), (26, 24), (27, 25), (28, 25)], [(6, 23), (5, 24), (5, 25), (6, 26)], [(17, 33), (18, 34), (18, 35), (17, 36)], [(19, 23), (20, 22), (21, 22), (22, 23)],
+          [(10, 23), (11, 24), (12, 24), (13, 23)]]
+_ORD = [0, 7, 3, 10, 5, 12, 1, 8, 4, 11, 2, 9, 6]                                           # Reihenfolge der Starts (benachbarte Stellen nicht hintereinander)
+_HALTEN = [3, 5, 2, 4, 3, 2, 5, 4]
+_prof = [E.profil(4, _HALTEN[k % len(_HALTEN)]) for k in range(len(_SITES))]
+_st = E.starts(len(_SITES), N, [len(q) for q in _prof], basis=2, versatz=0.45)
+RISSE = [E.Riss(_SITES[j] if k % 2 == 0 else list(reversed(_SITES[j])), start=_st[k], profil=_prof[k]) for k, j in enumerate(_ORD)]
+ERLAUBT = E.sicher(spr, [CA, CB, CC, CD, CE], sorted(_farben), rand_abstand=3)
+E.pruefe_risse(RISSE, N, ERLAUBT)
 for _r in RISSE:
     for (_x, _y) in _r.pix:
-        assert INNEN[_y, _x] and _hell[_y, _x], (_x, _y)
         for _k in ('e1', 'e2', 'e3', 'e4'):
-            assert not ((_x == ORTE[_k][0] and abs(_y - ORTE[_k][1]) <= 2) or (_y == ORTE[_k][1] and abs(_x - ORTE[_k][0]) <= 2)), ('Riss auf einem Sternarm', _x, _y)
-assert E.gleichzeitig(RISSE, N)[0] <= 2 and all(r.stufe(0, N) == 0 for r in RISSE)
-assert not FUNKEL[0]
+            assert not ((_x == ORTE[_k][0] and abs(_y - ORTE[_k][1]) <= 2) or (_y == ORTE[_k][1] and abs(_x - ORTE[_k][0]) <= 2)), ('Riss auf einem Sparkle-Arm', _x, _y)
 REF = L.platz(spr, H, W, PAD_L, PAD_T)
 
 
@@ -116,8 +110,6 @@ def sprite_mit_effekten(i):
             if 0 <= i - s0 < SWEEP_N:
                 t = 5 * (i - s0) - 6
                 sp = A.farb_schritt(sp, HELLER, GOLD & (xx + yy >= t) & (xx + yy < t + 7))
-        for (y, x) in FUNKEL[i]:
-            sp[y, x, :3] = CE
     return sp
 
 
@@ -146,15 +138,17 @@ def frame(i, nur=None):
 
 
 if __name__ == '__main__':
-    print('Farben:', len(_farben), '| Innenpixel:', int(INNEN.sum()), '| Gold-Rampe:', int(GOLD.sum()), '| gelb (Funkeln):', int(GELB.sum()))
+    print('Farben:', len(_farben), '| Innenpixel:', int(INNEN.sum()), '| Gold-Rampe:', int(GOLD.sum()))
     frames = [frame(i) for i in range(N)]
     figs = [figur(i)['fig'] for i in range(N)]
     prev = sys.argv[sys.argv.index('--preview') + 1] if '--preview' in sys.argv else None
-    print('Frame 0 weicht vom Original in', int((figs[0] != REF).any(axis=2).sum()), 'Pixeln ab | höchstens', E.gleichzeitig(RISSE, N)[0], 'Risse gleichzeitig')
+    z = E.zaehle(RISSE, N)
+    print('Frame 0 weicht vom Original in', int((figs[0] != REF).any(axis=2).sum()), 'Pixeln ab |', len(RISSE), 'Risse | gleichzeitig höchstens', z['max'], ', Mittel', z['mittel'], '| Frames ohne Riss:', z['leer'])
+    print('Sparkles gleichzeitig höchstens', max(len(aktive_sterne(i)) for i in range(N)), '| Frames mit Sparkle:', sum(1 for i in range(N) if aktive_sterne(i)), 'von', N)
     n = L.pruefe(frames, quelle=spr)
     print('Pixel je Frame:', n)
     schlecht = A.ausdruck_pruefen(figs, spr, 'shimmering-dragonegg')
     print('Frames mit Befund:', [(k, n_, offen) for (k, n_, offen) in schlecht][:6])
     L.speichern('shimmering-dragonegg', 'Shimmering Dragonegg', frames, MS, prev)
     if prev:
-        L.streifen(prev + '/shimmering-dragonegg-strip.png', frames[::2], spalten=12, scale=4)
+        L.streifen(prev + '/shimmering-dragonegg-strip.png', frames[::3], spalten=12, scale=4)

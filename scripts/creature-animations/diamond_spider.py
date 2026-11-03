@@ -28,17 +28,26 @@ Ablauf (84 Frames à 70 ms = 5,88 s) — Runde 2, Nutzerfeedback „die weißen 
 * Kein Schweben mehr (Regel 18: Bodenwesen, die Spinne stand in Runde 1 beim „Atmen“ 1 px in der Luft): Diamant, Körper und Hälse bleiben fest.
 Alle Bewegungen laufen auf der vollen Leinwand (anim_lib wirft ClipError). Nur ganze Pixel, nur Farben der Quelle. Keine Partikel.
 
-Ergänzungen: keine gemalten Pixel.
+RUNDE 3 (Nutzerfeedback: „darf sich gerne ein bisschen herumbewegen und laufen, die Beine sollten sich dabei etwas mehr bewegen“):
+* Die Spinne läuft kleine Strecken (ganzzahlig, ±2 px waagerecht, 1 px nach oben/unten; Schleife kehrt zur Startlage zurück): Frames 26–35 nach rechts (2 Schritte), 38 ein Schritt „vorwärts“ (oben),
+  40–52 nach links (4 Schritte), 55 zurück nach unten, 58–61 wieder zur Mitte; Frames 12–22 (Glitzerwelle) und der Rest stehen still. Diamant, Körper, Hälse, Kristallfüße und die Sterne wandern als EINE starre Ebene mit.
+* Beine (acht, je mit Pfad Wurzel → Spitze, anim_spinne-Stil: Gelenke verschoben, dazwischen 8er-Linie, Wurzel bleibt am Körper): Tetrapod-Gang — Gruppe A (L1, R2, L3, R4) und B (R1, L2, R3, L4) schwingen
+  gegenphasig; die Spitze schwingt bis ±2 px entlang der Körperachse (L4/R4 ±1) und hebt sich dabei 1–2 px zum Körper hin. Beim Laufen Periode 6 Frames, im Stand langsam (Periode 12, je Bein versetzt) — die Beine sind
+  immer in Bewegung (vorher: ein 1-px-Schnipp alle 28 Frames).
+Ergänzungen: zwei verdeckte Beinwurzeln (3,5) in (31,32,30) und (11,5) in (40,41,39): im Bild liegen dort die Arme der weißen Sterne (die Beine L1/R1 hängen sonst nur diagonal-lückig am Körper, wenn die Sterne
+unsichtbar sind); die Sterne liegen weiter darüber.
 """
+import math
 import sys
 
 import cv2
 import numpy as np
 
 import anim_lib as L
+import anim_spinne as SP
 
 N, MS = 84, 70
-PAD_L, PAD_R, PAD_T, PAD_B = 2, 2, 2, 2
+PAD_L, PAD_R, PAD_T, PAD_B = 7, 7, 7, 7
 
 spr = L.lade('diamond-spider')
 sh, sw = spr.shape[:2]
@@ -47,6 +56,11 @@ vorhanden = L.deckend(spr)
 
 WEISS = (255, 255, 255)
 sterne_maske = vorhanden & L.farbmaske(spr, [WEISS])
+LEGS_MASKE = np.zeros(spr.shape[:2], bool)
+for _p in ({'L1': [(2, 5), (1, 6), (0, 7)], 'L2': [(3, 7), (2, 8), (1, 9)], 'L3': [(3, 10), (2, 11), (1, 12)], 'L4': [(4, 11), (3, 12)],
+            'R1': [(12, 5), (13, 6), (14, 7)], 'R2': [(11, 7), (12, 8), (13, 9)], 'R3': [(11, 10), (12, 11), (13, 12)], 'R4': [(10, 11), (11, 12)]}).values():
+    for _x, _y in _p:
+        LEGS_MASKE[_y, _x] = True
 koerper_maske = vorhanden & ~sterne_maske
 STEIN_RAMPE = {(44, 147, 156): (67, 224, 231), (67, 224, 231): (194, 249, 252), (166, 226, 227): (194, 249, 252), (194, 249, 252): WEISS}   # B→D→E→Weiß, I→E
 STEIN = L.farbmaske(spr, list(STEIN_RAMPE))
@@ -70,11 +84,22 @@ STERN_MUSTER = (1, 2, 1)
 STERN_START = [T0 + int(round((s['mitte'][0] + s['mitte'][1] - 2) / BAND_SCHRITT)) for s in STERNE]
 BAND_FRAMES = 10
 
-# Beine: (Spitze, ausgelenkte Position), Startframes je Bein (dreimal pro Schleife, alle 28 Frames; reihum)
-BEINE = [((0, 7), (0, 6)), ((14, 7), (14, 6)), ((1, 9), (1, 8)), ((13, 9), (13, 8)),
-         ((1, 12), (1, 11)), ((13, 12), (13, 11)), ((3, 12), (3, 11)), ((11, 12), (11, 11))]
-BEIN_START = [[2 + 3 * j + 28 * k for k in range(3)] for j in range(len(BEINE))]
-BEIN_DAUER = 3
+# Beine (Runde 3): Pfade Wurzel → Spitze (Sprite-Koordinaten). Die Wurzeln (3,5) und (11,5) liegen im Original unter den Armen der weißen Sterne (siehe Ergänzungen).
+BEIN_PFADE = {'L1': [(3, 5), (2, 5), (1, 6), (0, 7)], 'L2': [(3, 7), (2, 8), (1, 9)], 'L3': [(3, 10), (2, 11), (1, 12)], 'L4': [(4, 11), (3, 12)],
+              'R1': [(11, 5), (12, 5), (13, 6), (14, 7)], 'R2': [(11, 7), (12, 8), (13, 9)], 'R3': [(11, 10), (12, 11), (13, 12)], 'R4': [(10, 11), (11, 12)]}
+ERGAENZT = {(3, 5): (31, 32, 30), (11, 5): (40, 41, 39)}
+SEITE = {k: (-1 if k[0] == 'L' else 1) for k in BEIN_PFADE}
+ORDNUNG = {'L1': 0, 'L2': 1, 'L3': 2, 'L4': 3, 'R1': 0, 'R2': 1, 'R3': 2, 'R4': 3}                # Reihenfolge von vorn (oben) nach hinten (unten): die Schrittwelle läuft über die Beine
+# Schrittzyklus (Runde 3, überarbeitet): jedes Bein schiebt sich außer der Wurzel um dy (−1 nach vorn/oben, +1 zurück) — als STARRE Kette (Diagonale bleibt Diagonale, kein Verzerren), die Wurzel bleibt am
+# Körper und wird per Linie mit dem verschobenen Rest verbunden; die Fußspitze der drei-/vierteiligen Beine schwingt dabei einen Pixel weiter (ein Knick wie ein Knie).
+SCHRITT = [1, 0, -1, -1, 0, 1]
+STAND = [0, 0, -1, -1, 0, 1, 0]                                                                  # Stand: 7 Posen à 3 Frames (84 = 4 · 21: nahtlos); alle Beine bei i = 0 in Ruhe → Frame 0 = Original
+STAND_START = {'L1': 0, 'L2': 1, 'L3': 4, 'L4': 6, 'R1': 4, 'R2': 0, 'R3': 6, 'R4': 1}                  # Phase je Bein
+
+
+# Laufweg (Körperversatz in Sprite-Pixeln): (Frame, x, y)-Haltepunkte, dazwischen springt der Versatz (ein Schritt = 1 px)
+SCHRITTE = [(26, 1, 0), (29, 2, 0), (33, 2, -1), (40, 1, -1), (43, 0, -1), (46, -1, -1), (49, -2, -1), (53, -2, 0), (57, -1, 0), (60, 0, 0)]
+LAUF_FENSTER = [(23, 33), (37, 51), (51, 62)]                                               # Frames, in denen die Beine laufen (Periode 6)
 
 
 def zustand(i):
@@ -87,39 +112,80 @@ def zustand(i):
         if 0 <= i - start < len(STERN_MUSTER):
             st = STERN_MUSTER[i - start]
         sterne.append(st)
-    beine = [any(0 <= i - s < BEIN_DAUER for s in starts) for starts in BEIN_START]
-    return band, sterne, beine
+    return band, sterne, None
+
+
+def versatz(i):
+    x = y = 0
+    for f, sx, sy in SCHRITTE:
+        if i >= f:
+            x, y = sx, sy
+    return x, y
+
+
+def laeuft(i):
+    return any(a <= i <= b for a, b in LAUF_FENSTER)
+
+
+def bein_zeichnen(ebene, name, i, ox, oy):
+    pfad = BEIN_PFADE[name]
+    n = len(pfad)
+    if laeuft(i):
+        dy = SCHRITT[(i + (3 if name[0] == 'R' else 0)) % len(SCHRITT)]                    # links/rechts gegenphasig, alle Beine einer Seite im Gleichtakt (kein Überkreuzen)
+    else:
+        dy = STAND[(i // 3 + STAND_START[name]) % len(STAND)]
+    pos = []
+    for j, (x, y) in enumerate(pfad):
+        extra = dy if (j == n - 1 and n >= 3 and dy < 0) else 0                         # Fußspitze schwingt nach vorn noch einen Pixel weiter (Knie); nach hinten nicht (sonst verkleben benachbarte Beine)
+        pos.append((x + ox, y + oy + (0 if j == 0 else dy) + extra))
+    for j, (x, y) in enumerate(pfad):
+        c = ERGAENZT.get((x, y)) or tuple(int(v) for v in spr[y, x, :3])
+        pix = [pos[0]] if j == 0 else SP.linie(pos[j - 1], pos[j])[1:]
+        for (px, py) in pix:
+            ebene[PAD_T + py, PAD_L + px, :3] = c
+            ebene[PAD_T + py, PAD_L + px, 3] = 255
+    return ebene
 
 
 def frame(i, nur=None):
-    band, sterne, beine = zustand(i)
-    k, _ = L.trenne(spr, koerper_maske)
+    band, sterne, _ = zustand(i)
+    ox, oy = versatz(i)
+    k, _ = L.trenne(spr, koerper_maske & ~LEGS_MASKE)
     k = L.platz(k, H, W, PAD_L, PAD_T)
     if band is not None and (nur is None or 'glanz' in nur):          # Lichtband = Glanz (Edelstein); beim Randpixel-Test (nur=…) ohne
         for y, x in zip(*np.nonzero(STEIN)):
             if abs(x + y - band) <= BAND_BREITE:
                 c = tuple(int(v) for v in spr[y, x, :3])
                 k[PAD_T + y, PAD_L + x, :3] = STEIN_RAMPE[c]
-    for (tx, ty), (nx, ny) in [b for b, f in zip(BEINE, beine) if f]:
-        k[PAD_T + ny, PAD_L + nx] = k[PAD_T + ty, PAD_L + tx]
-        k[PAD_T + ty, PAD_L + tx] = 0
+    k = L.versetze(k, ox, oy)
+    beine = L.leer(H, W)
+    for nm in BEIN_PFADE:
+        bein_zeichnen(beine, nm, i, ox, oy)
     stern = L.leer(H, W)
     for s, st in zip(STERNE, sterne):
         pix = s['voll'] if st == 2 else (s['innen'] if st == 1 else [])
         for (x, y) in pix:
-            stern[PAD_T + y, PAD_L + x, :3] = WEISS
-            stern[PAD_T + y, PAD_L + x, 3] = 255
-    ebenen = {'koerper': k, 'sterne': stern}
-    wahl = nur or ('koerper', 'sterne')
+            stern[PAD_T + y + oy, PAD_L + x + ox, :3] = WEISS
+            stern[PAD_T + y + oy, PAD_L + x + ox, 3] = 255
+    ebenen = {'beine': beine, 'koerper': k, 'sterne': stern}
+    wahl = nur or ('beine', 'koerper', 'sterne')
     wahl = [n for n in wahl if n != 'glanz']
-    return L.zusammen(H, W, [(ebenen[n], 0, 0) for n in wahl])
+    return L.zusammen(H, W, [(ebenen[n], 0, 0) for n in wahl if n in ebenen])
 
 
-TEST_EBENEN = ['koerper', 'sterne']                                   # ohne Lichtband (der Glanz färbt nur vorhandene Steinpixel heller)
+TEST_EBENEN = ['beine', 'koerper', 'sterne']                                   # ohne Lichtband (der Glanz färbt nur vorhandene Steinpixel heller)
+
+
+def zuschneiden(frames):
+    """Frame auf die Figur zuschneiden: Vereinigung aller Frames + 2 px freier Rand (Regel 27/41)."""
+    a = np.stack([f[..., 3] > 0 for f in frames]).any(axis=0)
+    ys, xs = np.nonzero(a)
+    x0, x1, y0, y1 = int(xs.min()) - 2, int(xs.max()) + 2, int(ys.min()) - 2, int(ys.max()) + 2
+    return [f[y0:y1 + 1, x0:x1 + 1].copy() for f in frames]
 
 
 if __name__ == '__main__':
-    frames = [frame(i) for i in range(N)]
+    frames = zuschneiden([frame(i) for i in range(N)])
     n = L.pruefe(frames, quelle=spr, erlaubt=[])
     print('Pixel je Frame:', n)
     # Sichtbarkeit der weißen Sparkle-Elemente (Nutzerwunsch: 5–10-mal länger unsichtbar als sichtbar)

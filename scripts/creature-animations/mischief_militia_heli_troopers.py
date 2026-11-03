@@ -18,6 +18,7 @@ Ablauf (48 Frames à 62 ms = 2,98 s, nahtlos), alle Bewegungen unabhängig:
 * Rotor dreht (6 Bilder je Blattdurchgang): die Scheibe behält ihre Ellipsenform und ihren Rand; zwei helle Blattschatten wandern um die Ellipse (12 Schritte/Umlauf-Viertel, 4 Umläufe je Schleife).
 * Schweben (Periode 24, zwei Schwünge): der Rotor trägt ihn — der ganze Schneemann hebt/senkt sich um bis zu ±2 px (er FLIEGT, daher kein Bodenkontakt); der Rotor läuft 1 Bild nach.
 * Atmen/Strecken (Periode 16): die Zeile 16 des Schneeballs wird einmal doppelt eingefügt (Mischtextur), Kopf, Rotor und Arme steigen 1 px mit.
+  Runde 3: der Zweigpixel (2,15) über der Atemzeile wird nicht mehr in die Zusatzzeile mitkopiert (kein brauner Pixel unter dem Arm).
 * Blinzeln (alle 2 s, 2 Frames): die braunen Augenstriche werden zu Schneefarbe (Lid in umgebender Körperfarbe).
 * Kalter Dunst: 5 Wölkchen ≥ 2×2 steigen langsam seitlich vom Schneemann auf (Farben E/D).
 Ergänzungen: keine gemalten Pixel außer der Rotorfärbung (Farben des Sprites). Frame 0 = Original (Dunst ausgenommen).
@@ -48,6 +49,8 @@ MITTE = (6, 2)
 AUGEN = {(4, 9): (136, 95, 49), (4, 10): (104, 64, 32), (8, 9): (136, 95, 49), (8, 10): (104, 64, 32)}
 LID = {(4, 9): (214, 213, 244), (4, 10): (214, 213, 244), (8, 9): (214, 213, 244), (8, 10): (214, 213, 244)}
 E_, D_ = (223, 224, 246), (204, 204, 242)
+ZWEIG = (104, 64, 32)
+ARM_UEBER_NAHT = [(2, 15)]        # dritter Pixel des linken Zweigarms, liegt in der Zeile direkt über der Atemzeile 16
 
 
 def koerper(i):
@@ -57,8 +60,16 @@ def koerper(i):
     blink = Hm.folge(i, 30, [1, 1], N)
     if blink:
         Hm.setze(k, LID, OFF)
-    # Atmen: Zeile 16 doppelt
-    k = Hm.atmen(k, PAD_T + 16, PAD_T + 12, E.verlauf3(i, 16, 0.0, 1), 0)
+    # Atmen: Zeile 16 doppelt. Nutzer-Feedback Runde 3: das Zweigpixel (2,15) liegt direkt über der Atemzeile — die Texturmischung der
+    # eingefügten Zeile hat es mitkopiert („brauner Arm-Pixel unter dem Arm“). Deshalb: Pixel vor dem Strecken mit der Körperfarbe der Zeile 16
+    # überdecken und nach dem Strecken an seiner um `brust` gehobenen Stelle wieder in Zweigfarbe setzen.
+    brust = E.verlauf3(i, 16, 0.0, 1)
+    if brust:
+        for (x, y) in ARM_UEBER_NAHT:
+            k[PAD_T + y, PAD_L + x, :3] = k[PAD_T + 16, PAD_L + x, :3]
+    k = Hm.atmen(k, PAD_T + 16, PAD_T + 12, brust, 0)
+    if brust:
+        Hm.setze(k, {(x, y - brust): ZWEIG for (x, y) in ARM_UEBER_NAHT}, OFF)
     # Schweben: ganze Figur
     hub = E.wippen(i, 24, 0.0, 2.0)
     k = L.versetze(k, 0, hub)

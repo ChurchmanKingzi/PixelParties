@@ -34,7 +34,7 @@ import numpy as np
 
 import anim_lib as L
 import anim_untote as U
-import anim_feuer as FEU
+import anim_feuer2 as FE2
 import anim_daemon as D
 
 N, MS = 48, 65
@@ -58,20 +58,23 @@ bein1 = koerper & (xx >= 26) & (xx <= 29) & (yy >= 33)
 bein1[:, :] &= True
 rest = koerper & ~bein1
 
-# --- Feuer ---
-RAMPE = {'rand': ROT, 'rot': ROT, 'orange': ORANGE, 'gelb': GELB, 'hell': CREME}
-fy = lambda y: H - 1 - y
+# --- Feuer (anim_feuer2: die gemalte Flamme der Quelle wird Zunge für Zunge animiert) ---
 fixiert = np.zeros((H, W), bool)
 fixiert[GPT:GPT + sh, GPL:GPL + sw] = koerper
 SPERRE = fixiert.copy()
-SPERRE_F = fixiert[::-1].copy()
-# Mähne: (x, Fußzeile (Körperoberkante), Höhe, Halbbreite)
-MAEHNE = [(8.5, 20, 6.0, 1.6), (11.0, 20, 7.0, 1.7), (13.5, 19, 8.0, 1.8), (16.0, 19, 9.0, 1.9), (18.5, 19, 9.0, 1.9), (21.0, 19, 12.0, 2.0), (23.5, 19, 14.0, 2.1),
-          (26.0, 17, 14.0, 2.1), (28.2, 14, 11.0, 1.9), (30.6, 9, 8.0, 1.8), (33.0, 8, 7.0, 1.8), (35.3, 10, 8.0, 1.8), (37.6, 12, 7.0, 1.7), (39.8, 14, 6.0, 1.5)]
-FEUER_M = FEU.Feuer(H, W, [FEU.Zunge(GPL + x, GPT + b, h, w) for (x, b, h, w) in MAEHNE], RAMPE, n=N, seed=31, posen=12, amplitude=1.0, sperre=SPERRE)
-BASIS_T = fy(GPT + 21)
-SCHWEIF = [(3.2, 11.5, 1.8), (5.8, 17.0, 2.2), (8.6, 12.0, 1.9)]
-FEUER_T = FEU.Feuer(H, W, [FEU.Zunge(GPL + x, BASIS_T, h, w) for (x, h, w) in SCHWEIF], RAMPE, n=N, seed=32, posen=12, amplitude=0.95, sperre=SPERRE_F)
+
+
+def flamm_vorlage(maske):
+    t, _ = L.trenne(spr, maske)
+    return L.platz(t, H, W, GPL, GPT)
+
+
+RGBA_M, RGBA_T = flamm_vorlage(flamme_alt & (yy <= 19)), flamm_vorlage(flamme_alt & (yy >= 20))
+# Mähne: Streifen von 3 px Breite (Fuß = Körperkante, Spitze = höchstes Pixel), die Posen laufen als Welle vom Kopf zum Rücken (negative Verzögerung);
+# Schweif: waagerechte Streifen von 3 Zeilen, die Zungen zeigen vom Hinterteil nach links (Fuß an der Körperkante), zucken auf und ab.
+VL_M = FE2.Vorlage(RGBA_M, FE2.zungen_baender(RGBA_M, 'hoch', breite=3, versatz=0), 'hoch', rand_farbe=ROT, sperre=SPERRE, welle=(-1.3, 1.0), faden=2)
+VL_T = FE2.Vorlage(RGBA_T, FE2.zungen_baender(RGBA_T, 'links', breite=3, versatz=0), 'links', rand_farbe=ROT, sperre=SPERRE, welle=(1.5, 1.0), faden=2)
+FEUER = FE2.Feuer([VL_M, VL_T], n=N, seed=31, bank='zunge', amp=1.0, max_funken=9)
 
 
 def teil(maske):
@@ -112,9 +115,7 @@ def frame_gross(i, nur=None):
     bein = T_BEIN1
     if (18 <= i <= 22) or (42 <= i <= 46):
         bein = L.heben_unten(T_BEIN1, GPT + 36, 1)
-    mae = FEUER_M.ebene(i)
-    sch = D.flip_v(FEUER_T.ebene(i))
-    fl = L.zusammen(H, W, [(sch, 0, -n), (mae, 0, -n)])
+    fl = L.versetze(FEUER.ebene(i), 0, -n)
     f = L.zusammen(H, W, [(bein, 0, 0), (kp, 0, 0)])
     f = L.zusammen(H, W, [(fl, 0, 0), (f, 0, 0)])
     nick = 1 if (6 <= i <= 9 or 30 <= i <= 33) else 0
@@ -122,7 +123,7 @@ def frame_gross(i, nur=None):
     f = U.kontur_schliessen(f, UMRISS, KONTUR)
     if nur == 'koerper':
         return f
-    fk = L.zusammen(H, W, [(FEUER_M.funken(i, dy=-n, leben=12), 0, 0), (D.flip_v(FEUER_T.funken(i, dy=0, leben=10)), 0, -n)])
+    fk = FEUER.funken(i, dy=lambda f: -U.stufe(f, 24, 2))
     return L.zusammen(H, W, [(fk, 0, 0), (f, 0, 0)])
 
 

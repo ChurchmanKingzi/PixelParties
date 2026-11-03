@@ -20,7 +20,9 @@ Ablauf (48 Frames à 70 ms = 3,36 s, nahtlos) — eigene Zeitfenster gegenüber 
 * Heben (Periode 16, drei Atemzüge je Schleife): die texturierte Rumpfzeile 13 wird einmal eingefügt (Texturmischung): Kopfblock und Arme steigen 1 px, Sockel/Füße bleiben.
 * Arme wippen: starre Spaltenverschiebung um die Schulter (Spitze bis ±2 px, Gefälle ≤ 1 px je Spalte, nichts wird breiter): links eine Welle je Schleife, rechts zwei Wellen (je ±1 px) — die Arme laufen nicht im Gleichschritt.
 * Blinzeln (Frames 4–5, 28–29): Augapfel und blaue Pupille nehmen die Körperfarbe daneben an (Lid = Körperfarbe).
-* Fußtippen: linkes Paar (Frames 30–35), rechtes Paar (Frames 6–11) heben sich je zweimal 1 px hinter den Sockel.
+* ROLLEN (Runde 3, Nutzer: „Das Schwarze unten bei den Rooks sind Rollen, sie bitte hin und her rollen lassen“): die vier kleinen Räder unten (Innenpixel (26,26,26)/(76,76,76) in y 20 bei x 5–6, 8–9, 12–13, 15–16; Reifen schwarz) rollen: der GANZE Turm
+  (Körper, Arme, Rollen) fährt ein bis zwei Pixel hin und her (Weg round(1,6·sin), Periode 48 Frames, gegenläufig zu [W]: erst nach links); dabei drehen sich die Rollen: die zyklische Folge [dunkel, hell, hell] läuft durch das 2-px-Fenster jeder Rolle ((d,h) → (h,h) → (h,d) → …),
+  ein Schritt je Pixel Rollweg (Position 0 = Original). Das frühere Fußtippen entfällt. Nur Quellfarben.
 Frame 0 = Original (Ruhepose). Ergänzungen: keine.
 """
 import sys
@@ -31,7 +33,8 @@ import anim_schach as Sc
 
 SLUG, KARTE = 'rook-of-kings-b', 'Rook of Kings [B]'
 spr = L.lade(SLUG)
-A = Sc.Turm(spr, hub_per=16, arm_l=(1, 1.0, 2), arm_r=(2, 1.0, 1), blink=(4, 28), tap_l=30, tap_r=6)
+import math
+A = Sc.Turm(spr, hub_per=16, arm_l=(1, 1.0, 2), arm_r=(2, 1.0, 1), blink=(4, 28), roll_per=48, roll_amp=1.6, roll_ph=math.pi)
 N, MS, OFF = A.N, A.MS, A.OFF
 frame = A.frame
 

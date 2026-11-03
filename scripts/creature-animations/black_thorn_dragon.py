@@ -23,7 +23,10 @@ Identifikation (x, y im Sprite, Achse x = 19):
 Bleibt fest: Beine/Füße (Bodenwesen: der Schatten auf der Karte liegt direkt unter ihm), Zähne, Hornstreifen, Flügelknochen (bewegen sich nur mit dem Flügel).
 
 Ablauf (60 Frames à 70 ms = 4,2 s), alle Bewegungen unabhängig:
-* Flügelschlag: zweimal pro Schleife (Periode 30), langsam und weit: die Flügel heben sich bis 4 px, senken sich bis 2 px (D.fluegel_asym, Spitze hinkt nach, Spalten bleiben ganz, Ruhepose = Frame 0).
+* Flügelschlag (RUNDE 3, Nutzer: „sollte auch mehr mit den Flügeln schlagen“; vorher nur Spaltenversatz +4/−2 px, zweimal pro Schleife): dreimal pro Schleife (Periode 20 Frames = 1,4 s; Abschlag 7, Aufschlag 13 — ein schwerer Drache, kein Flattern).
+  Jeder Flügel schwingt als Ganzes um die Schulter (links (11,5|2,5), rechts (26,5|2,5), also am Ende des oberen Flügelknochens) — von 30° über der Ruhelage (Knochen zeigt schräg nach oben, Spitze −3 px über der Oberkante) bis 50° darunter (Flügel hängt schräg nach unten,
+  die Haut klappt hinter den Rumpf). Technik wie beim Lunatic Hawk: Rückwärtsabbildung (F.drehen glatt=True, Nächster-Nachbar, keine Mischfarben). Der Schulteransatz (Flügelpixel im Umkreis von 3,2 px um das Gelenk) bleibt am Rumpf stehen (keine Lücke);
+  Hintergrundlöcher in der Figur werden mit der Nachbarfarbe geschlossen, fehlende Umrisspixel durch T.umriss_schliessen ergänzt. Die Flügel liegen hinter Rumpf/Arme/Kopf. Frame 0 liegt auf dem Aufschlag bei 38 % des Hubs und ist die Originalpose.
 * Atmen (Periode 30, oben in Frames 8–21 und 38–51, versetzt zum Flügel): Zeile 20 (Bauchmitte, Textur) wird eingefügt (L.streck_zeile, Texturmischung): Rumpf, Schwanzansatz, Arme, Flügel und Kopf heben sich 1 px, die Beine bleiben am Boden.
 * Kopf nickt (Frames 23–33 und 53–59, außerhalb der Atem-Hebung): der ganze Kopf samt Zähnen senkt sich zusätzlich 1 px (starr, als eigene Ebene — die Körperebene darunter ist vollständig gezeichnet, es entsteht keine Lücke).
 * Schwanz schwingt: der Schwanz samt Dornenknochen biegt sich um die Spaltenachse x = 26 (Spitze bis ±3 px, Gefälle höchstens 1 px je Spalte, die Spitze hinkt nach), Periode 20 (3× pro Schleife).
@@ -42,9 +45,17 @@ import anim_lib as L
 import anim_tiere as T
 import anim_amorph as A
 import anim_drache as D
+import anim_flieger as F
+import anim_flieger_r3 as R3
+import math
 
 N, MS = 60, 70
-PAD_L, PAD_R, PAD_T, PAD_B = 3, 3, 4, 3
+PAD_L, PAD_R, PAD_T, PAD_B = 3, 3, 8, 3
+BEAT, DOWN, UP = 20, 7, 13                         # Flügelschlag (3 pro Schleife)
+HUB = math.radians(80.0)                           # Gesamthub: oben +30° (im Uhrzeigersinn, links), unten −50°
+P0 = DOWN + 0.62 * UP                              # Frame 0 = Aufschlag bei 38 % des Hubs (Originalpose)
+PIV_L, PIV_R = (11.5, 2.5), (26.5, 2.5)            # Schultergelenke (Sprite)
+R_WURZEL = 3.2                                     # Schulteransatz bleibt stehen
 
 spr = L.lade('black-thorn-dragon')
 l5, l4, l3 = (L.lade(f'black-thorn-dragon_{k}') for k in ('l5', 'l4', 'l3'))
@@ -60,6 +71,8 @@ for (x, y) in ((15, 5), (22, 5)):
 
 fl_l = v5 & (xx <= 12) & (yy <= 13)
 fl_r = v5 & (xx >= 26) & (yy <= 13)
+wurzel_l = fl_l & ((xx - PIV_L[0]) ** 2 + (yy - PIV_L[1]) ** 2 <= R_WURZEL ** 2)
+wurzel_r = fl_r & ((xx - PIV_R[0]) ** 2 + (yy - PIV_R[1]) ** 2 <= R_WURZEL ** 2)
 tail_m = v5 & (xx >= 26) & (yy >= 14)
 torso_m = v5 & ~fl_l & ~fl_r & ~tail_m
 kopf_m = v3 & (xx <= 26)
@@ -82,6 +95,19 @@ def teil(quelle, maske):
     return L.platz(t, H, W, PAD_L, PAD_T)
 
 
+def welle(t):
+    """0 = Flügel ganz oben … 1 = ganz unten (Abschlag in DOWN Frames, Aufschlag in UP Frames, Cosinus-weich)."""
+    u = (t + P0) % BEAT
+    if u < DOWN:
+        return 0.5 - 0.5 * math.cos(math.pi * u / DOWN)
+    return 0.5 + 0.5 * math.cos(math.pi * (u - DOWN) / UP)
+
+
+def winkel(t):
+    """Drehwinkel des LINKEN Flügels (rad, negativ = gegen den Uhrzeigersinn = Flügel schlägt nach unten); 0 bei Frame 0."""
+    return -HUB * (welle(t) - welle(0))
+
+
 def zustand(i):
     ph = L.sinus(i, N / 2)
     atem = 1 if ((i - 8) % 30) < 14 else 0
@@ -96,9 +122,7 @@ def zustand(i):
 
 def frame(i, nur=None):
     ph, atem, nick, bl, fl_, fr_ = zustand(i)
-    torso = teil(l5, torso_m)
-    wl = teil(l5, fl_l)
-    wr = teil(l5, fl_r)
+    torso = teil(l5, torso_m | wurzel_l | wurzel_r)
     schwanz = L.zusammen(H, W, [(teil(l5, tail_m), 0, 0), (teil(l3, dorn_m), 0, 0)])
     arme = teil(l4, arme_m)
     kopf = teil(l3, kopf_m)
@@ -110,8 +134,9 @@ def frame(i, nur=None):
     schwanz = L.streck_zeile(schwanz, PAD_T + ZEILE, atem)
     # Schwanz biegt sich (Pivot x = 26)
     schwanz = D.schwanz_biegen(schwanz, PAD_L + 26, 3.0, L.sinus(i, N / 3, 0.0), lauf=1.2, richtung=1)
-    wl, _ = D.fluegel_asym(wl, PAD_L + 13, ph, 4.0, 2.0, lauf=0.6, nur_rechts=False)
-    wr, _ = D.fluegel_asym(wr, PAD_L + 25, ph, 4.0, 2.0, lauf=0.6, nur_rechts=True)
+    ang = winkel(i)
+    wl = F.drehen(teil(l5, fl_l & ~wurzel_l), PAD_L + PIV_L[0], PAD_T + PIV_L[1], ang, glatt=True)
+    wr = F.drehen(teil(l5, fl_r & ~wurzel_r), PAD_L + PIV_R[0], PAD_T + PIV_R[1], -ang, glatt=True)
     wl = L.versetze(wl, 0, -atem)
     wr = L.versetze(wr, 0, -atem)
     arme = L.versetze(arme, 0, -atem)
@@ -121,11 +146,15 @@ def frame(i, nur=None):
     ebenen = {'schwanz': schwanz, 'torso': torso, 'fluegel_l': wl, 'fluegel_r': wr, 'bein_l': bl_, 'bein_r': br_, 'arme': arme, 'kopf': kopf}
     wahl = nur or tuple(ebenen)
     ganz = L.zusammen(H, W, [(ebenen[n], 0, 0) for n in wahl])
+    ganz = R3.luecken_fuellen(ganz, 6, ausser=ORIG_LOECHER)
     ganz, _, _ = A.verbinde_luecken8(ganz, max_len=3)            # ein Dorn, der um eine Ecke weggerutscht wäre, wird kurz wieder angehängt (nur 8er-getrennte Teile)
     return T.umriss_schliessen(ganz, RAND, REGEL)                  # Randpixel-Test (Regel 16)
 
 
 TEST_EBENEN = None
+_m0 = np.zeros((H, W), bool)
+_m0[PAD_T:PAD_T + sh, PAD_L:PAD_L + sw] = L.deckend(spr)
+ORIG_LOECHER = R3.eingeschlossen(_m0)
 
 
 if __name__ == '__main__':

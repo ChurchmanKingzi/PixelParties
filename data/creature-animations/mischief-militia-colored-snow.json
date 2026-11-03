@@ -1,15 +1,15 @@
 {
   "creature": "Mischief Militia - Colored Snow",
   "sheet": "mischief-militia-colored-snow.png",
-  "frameWidth": 31,
-  "frameHeight": 31,
+  "frameWidth": 45,
+  "frameHeight": 30,
   "frames": 48,
-  "frameMs": 62,
+  "frameMs": 66,
   "loop": true,
   "layout": "horizontal",
-  "padTop": 3,
-  "padLeft": 2,
-  "padRight": 3,
-  "padBottom": 3,
-  "faceX": 15.5
+  "padTop": 5,
+  "padLeft": 5,
+  "padRight": 8,
+  "padBottom": 4,
+  "faceX": 22.5
 }

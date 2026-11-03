@@ -1,7 +1,7 @@
 {
   "creature": "Gorinthian War Counselor",
   "sheet": "gorinthian-war-counselor.png",
-  "frameWidth": 24,
+  "frameWidth": 26,
   "frameHeight": 34,
   "frames": 48,
   "frameMs": 62,
@@ -11,5 +11,5 @@
   "padLeft": 2,
   "padRight": 2,
   "padBottom": 2,
-  "faceX": 12.0
+  "faceX": 13.0
 }

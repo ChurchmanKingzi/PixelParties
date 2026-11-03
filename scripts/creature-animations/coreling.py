@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""Idle-Animation für „Coreling“ (Creature) — Runde 2: Arme starr, Blitze aus den Armlöchern, Radspikes drehen sich.
+"""Idle-Animation für „Coreling“ (Creature) — Runde 3: Kopf wackelt nicht mehr seitlich, der Mund schließt und öffnet sich periodisch, die Blitze kommen erratisch und teils gleichzeitig.
 
 PICK: [["MotiveGrailWar", 574, 1]]   (Ebene „Coreling“, Sprite 24×27 px, 14 Farben, nur Alpha 0/255, src/coreling.png)
 Nicht im Sprite: die blauen Blitzbögen der Kartenkunst (MotiveGrailWar.xcf, Ebene 572 „Ebene #12“: 154×28 px, nur zwei Farben — Kern Weiß (255,253,254) und Schein Türkis (169,255,234)), die Flammen und der Wald/Boden der Karte
@@ -20,20 +20,23 @@ Was im Sprite ist (Koordinaten im Sprite, x/y ab 0):
 * Material: kaltes Grau in sechs Stufen (F, E, D, B, C und der Umriss A) mit Schwarz für die Räder — gepanzert, also Metall (Regel 14: leichter Stahlglanz erlaubt).
 Fest bleiben: Arme (komplett starr, Nutzerwunsch), Augenform, Zahn, Schlitz, Radkörper und Umriss.
 
+Nutzerwunsch (Runde 3): „nicht den Kopf so hin und her wackeln lassen. Er soll außerdem periodisch den Mund schließen und öffnen und die Blitze sollen erratischer und teilweise gleichzeitig kommen.“
+
 Ablauf (48 Frames à 65 ms = 3,12 s, nahtlos):
-* Blitze (neu): aus den beiden Armlöchern schießen abwechselnd kleine Zickzack-Pixelblitze nach außen (links Frames 3–10 und 23–30, rechts 13–20 und 33–40; je 8 Frames: kurz – länger – voll … – wieder kürzer). Jeder Blitz ist ein 4-verbundener
-  Pfad aus 10–13 Pixeln Länge, dessen Form alle 2 Frames wechselt (sechs handgezeichnete Formen je Seite, flackert), 1 px breit in Weiß (255,253,254) mit türkisem Schein (169,255,234) an den Knicken; er beginnt im Loch (das Loch selbst blitzt dabei Weiß/Türkis auf)
-  und überdeckt dabei die letzten Pixel der Armspitze. Frame 0 = Original (kein Blitz).
-* Radspikes (neu): die Räder „drehen“ sich — die zwei Spikes je Rad wandern zyklisch von oben nach unten am Rad entlang (ein Schritt = 1 Zeile alle 2 Frames, 6 Schritte = 1 Umdrehung = 12 Frames, 4 Umdrehungen je Schleife); oben wachsen sie aus dem Rad heraus
+* Kopf: bleibt jetzt fest an seinem Platz (kein seitliches Wiegen mehr, kein Zeilenversatz). Es bewegen sich nur noch die Augenlider (Blinzeln) und, wie bisher, die beiden Ohren einzeln (1 px nach außen, je 2 Frames).
+* Mund (neu, 24-Frame-Takt, also zweimal je Schleife; Frame 0 = offen = Original): das Mundloch (die Schlitze H bei (12–13, 7–9), darüber die Nase (12–13, 4–5) mit der dunklen Nasenfurche (12–13, 6)) schließt von unten nach oben:
+  Frames 8–9 der Unterkiefer rückt hoch (Zeile 9 wird zur dunklen Kinnlinie L), 10–15 geschlossen (auch Zeile 7 wird zur Oberlippe D, übrig bleibt ein 2 Pixel breiter dunkler Mundstrich in Zeile 8, der Zahn (14, 7–8) steht daneben), 16–17 öffnet er sich wieder,
+  18–23 offen. Die Füllfarben sind Farben des Kopfes (L und D aus dem Sprite). Der Mund bleibt auch in den geschlossenen Frames dunkel genug, um zu lesen.
+* Blitze (erratisch, teils gleichzeitig): aus den beiden Armlöchern schießen sieben Blitzsalven mit unterschiedlicher Dauer (3–8 Frames) und unregelmäßigen Pausen (Frames 0–1, 11–13, 24–27, 36–37, 45–47 sind blitzfrei); fünf von ihnen überschneiden sich
+  (links und rechts feuern zeitweise GLEICHZEITIG). Jeder Blitz ist in jedem Frame ein neues, zufällig (fest gewürfelt, nahtlos) gezacktes Zickzack-Pixelgebilde von 6–13 Pixeln Länge (Knickpunkte wechseln Richtung und Höhe stark), manchmal mit einer kurzen
+  Abzweigung; die Länge schwankt von Frame zu Frame (Anfang und Ende der Salve kurz), 1 px breit in Weiß (255,253,254) mit türkisem Schein (169,255,234) an den Knicken. Das Loch blitzt dabei Weiß/Türkis auf, der Blitz überdeckt die letzten Pixel der Armspitze. Frame 0 = Original (kein Blitz).
+* Radspikes (unverändert): die Räder „drehen“ sich — die zwei Spikes je Rad wandern zyklisch von oben nach unten am Rad entlang (ein Schritt = 1 Zeile alle 2 Frames, 6 Schritte = 1 Umdrehung = 12 Frames, 4 Umdrehungen je Schleife); oben wachsen sie aus dem Rad heraus
   (nur der Ansatz), unten schrumpfen sie wieder (nur der Ansatz) und verschwinden; oben beginnt der nächste. Beide Spikes eines Rads sind um 3 Schritte versetzt, beide Räder laufen gleich schnell. Frame 0 = Original (die Spikes stehen bei den Originalzeilen 19 und 22).
   Die Spike-Pixel sind die des Originals (obere Form bei Zeilen ≤ 20, untere Form bei Zeilen ≥ 21); die Radkante (6,19) bzw. (19,19), die im Original zum oberen Spike gehört, wird ohne Spike mit dem Reifengrau K gefüllt.
-* Kopf: wiegt sich leicht seitlich (Zeilenversatz wächst zu den Ohren, bis ±2 px, Periode 24, Nachlauf); die Ohren zucken dazu einzeln 1 px nach außen
-  (links Frames 10–11 und 34–35, rechts 20–21 und 44–45).
 * Blinzeln: beide Augen (Frames 16–18 und 40–42, das linke einen Frame früher): rot → halb zu → zu; die Lidfarbe ist die umgebende Körperfarbe
   (je Pixel die häufigste Graustufe in 2 px Umkreis außerhalb der Augen). Kein Farbwechsel der Augen sonst.
 * Stahlglanz (Regel 14): zweimal pro Schleife (Frames 4–15 und 28–39) zieht ein schmales diagonales Lichtband über die grauen Panzerflächen (eine Stufe
-  heller auf der Grau-Rampe F→E→D→B→C); Umrisse, Schwarz, Augen, Schlitz und Zahn bleiben. Ist Coreling nach Meinung des Nutzers kein Metall: Schalter `GLANZ = False`.
-Entfallen gegenüber der ersten Fassung: Armwippen (Nutzer: „NICHT die Arme schlackern“), das Hüpfen des ganzen Körpers (Regel 18: Bodenwesen auf Rädern, die sich jetzt drehen) und die 1-px-Funken (isolierte Punkte, Regel 25; die Blitze ersetzen sie).
+  heller auf der Grau-Rampe F→E→D→B→C); Umrisse, Schwarz, Augen, Schlitz und Zahn bleiben.
 Ergänzungen: Kopfversatz/Spikes können Füllpixel frei am Rand legen — sie bekommen den Umriss A (umriss_ergaenzen, Regel 16); schräge Teile, die nur über
 eine Ecke hängen, bekommen Brückenpixel (verbinde4/verbinde_luecken, Regel 11). Beides wird je Frame gezählt (Konsole).
 Frame: Sprite plus 15 px links/rechts (Blitze), 3 px oben/unten — Figur zentriert.
@@ -127,20 +130,17 @@ EAR_R = {20: 1, 21: 1, 44: 1, 45: 1}                                            
 BLINZELN_L = {15: 1, 16: 2, 17: 1, 39: 1, 40: 2, 41: 1}
 BLINZELN_R = {16: 1, 17: 2, 18: 1, 40: 1, 41: 2, 42: 1}
 SWEEPS = [4, 28]
+# Mund (Runde 3): Zustand je Frame (0 offen = Original, 1 Unterkiefer hoch, 2 geschlossen); 24-Frame-Takt
+MUND_ZUSTAND = [0] * 8 + [1, 1] + [2] * 6 + [1, 1] + [0] * 6
+MUND = [MUND_ZUSTAND[i % 24] for i in range(48)]
+MUND_ZEILE9 = [(9, 12), (9, 13)]                                                      # (y, x) Kinn: wird mit L gefüllt (Zustand ≥ 1)
+MUND_ZEILE7 = [(7, 12), (7, 13)]                                                      # Oberlippe: wird mit D gefüllt (Zustand 2)
+for _p in MUND_ZEILE9 + MUND_ZEILE7:
+    assert _c(*_p) == CH, _p
 
-# ── Blitze ──
-# Handgezeichnete Zickzack-Formen: Eckpunkte (u, v); u = Abstand nach außen ab der äußeren Lochspalte (0…12), v = senkrechter Versatz zur Lochzeile. Linien zwischen den Ecken, 8-verbunden.
-BLITZ_FORMEN = [
-    [(0, 0), (2, -3), (3, 1), (6, -3), (7, 2), (10, -2), (12, 1)],
-    [(0, 0), (3, 2), (4, -2), (7, 3), (8, -1), (11, 3), (12, 0)],
-    [(0, 0), (2, 2), (3, -1), (5, -4), (6, 1), (8, 4), (9, 0), (12, -3)],
-    [(0, 0), (3, -2), (4, 2), (6, -1), (8, 3), (9, -2), (12, -4)],
-    [(0, 0), (2, 3), (5, -1), (6, -4), (8, 0), (10, 3), (12, -1)],
-    [(0, 0), (3, -3), (5, 1), (7, -2), (8, 2), (11, -1), (12, 3)],
-]
-# Feuerfolge: (Seite, erster Frame); je 8 Frames: Länge-Anteil je Frame, Form wechselt alle 2 Frames
-BLITZ_FENSTER = [('L', 3), ('R', 13), ('L', 23), ('R', 33)]
-BLITZ_LAENGE = [0.4, 0.75, 1.0, 1.0, 1.0, 1.0, 0.75, 0.4]
+# ── Blitze (Runde 3: erratisch, teils gleichzeitig) ──
+# Salven (Seite, erster Frame, Dauer in Frames); links/rechts überschneiden sich teilweise. Frame 0 und die Frames 45–47 sind blitzfrei (nahtlos).
+BLITZ_SALVEN = [('L', 2, 8), ('R', 5, 6), ('R', 14, 8), ('L', 19, 5), ('L', 28, 8), ('R', 31, 3), ('R', 38, 7), ('L', 40, 3)]
 BLITZ_ZEILE = {'L': 15, 'R': 16}                                                     # Lochzeile, in der der Blitz beginnt
 BLITZ_X0 = {'L': 3, 'R': 22}                                                         # äußere Lochspalte (L: nach links, R: nach rechts)
 
@@ -160,54 +160,82 @@ def _pfad(vs):
     return pts
 
 
-BLITZ_PFADE = [_pfad(v) for v in BLITZ_FORMEN]
-BLITZ_ECKEN = [v[1:-1] for v in BLITZ_FORMEN]
+def _wuerfle_blitz(seite, i):
+    """Zufälliger (aber fest gewürfelter, also reproduzierbarer) Zickzack-Blitz für Frame i: (Pfad, Ecken, Abzweigung); u = Abstand nach außen (0…13), v = senkrechter Versatz (−6…6)."""
+    import random
+    rnd = random.Random((1 if seite == 'L' else 2) * 1000 + i * 7 + 3)
+    umax = rnd.choice([9, 10, 11, 12, 13])
+    ecken, u, v = [(0, 0)], 0, 0
+    while u < umax:
+        u = min(u + rnd.choice([1, 2, 2, 3]), umax)
+        schritt = rnd.choice([-4, -3, -3, -2, 2, 3, 3, 4])
+        if v * schritt > 0 and abs(v + schritt) > 5:                                    # nicht aus der Zone laufen: Richtung wechseln
+            schritt = -schritt
+        v = max(-5, min(5, v + schritt))
+        ecken.append((u, v))
+    pfad = _pfad(ecken)
+    ast = []
+    if rnd.random() < 0.55 and len(ecken) > 3:                                           # kurze Abzweigung ab einer mittleren Ecke
+        k = rnd.randrange(1, len(ecken) - 2)
+        (u0, v0) = ecken[k]
+        d = rnd.choice([-1, 1])
+        ast = _pfad([(u0, v0), (u0 + rnd.choice([1, 2]), v0 + d * rnd.choice([1, 2])), (u0 + rnd.choice([3, 4]), v0 + d * rnd.choice([2, 3]))])
+        ast = [q for q in ast if abs(q[1]) <= 6 and q not in pfad]
+    return pfad, ecken[1:-1], ast
+
+
+BLITZ_FORMEN = {(sd, i): _wuerfle_blitz(sd, i) for sd in ('L', 'R') for i in range(48)}
 
 
 def blitz_aktiv(i):
-    """(Seite, Form, Längenanteil, Frame im Fenster) des gerade feuernden Blitzes oder None."""
-    for (seite, f0) in BLITZ_FENSTER:
+    """Liste (Seite, Längenanteil, Frame in der Salve) aller in Frame i feuernden Blitze (0, 1 oder 2)."""
+    out = []
+    for (seite, f0, dauer) in BLITZ_SALVEN:
         k = (i - f0) % N
-        if k < len(BLITZ_LAENGE):
-            return seite, (k // 2 + (0 if seite == 'L' else 3)) % len(BLITZ_FORMEN), BLITZ_LAENGE[k], k
-    return None
+        if k < dauer:
+            if k == 0 or k == dauer - 1:
+                anteil = 0.45
+            elif k == 1 or k == dauer - 2:
+                anteil = 0.75
+            else:
+                anteil = (1.0, 0.85, 1.0, 0.7, 1.0)[(k + f0) % 5]                         # Länge schwankt von Frame zu Frame
+            out.append((seite, anteil, k))
+    return out
 
 
 def blitz_ebene(i):
-    """Blitz (Weiß mit Türkis-Schein an den Knicken) und Aufleuchten des Lochs. Frames ohne Feuer: leer."""
+    """Blitze (Weiß mit Türkis-Schein an den Knicken) und Aufleuchten der Löcher. Frames ohne Feuer: leer."""
     e = L.leer(H, W)
-    a = blitz_aktiv(i)
-    if a is None:
-        return e
-    seite, form, anteil, k = a
-    sgn = -1 if seite == 'L' else 1
-    x0, y0 = BLITZ_X0[seite], BLITZ_ZEILE[seite]
-    umax = int(round(12 * anteil))
-    core = [(u, v) for (u, v) in BLITZ_PFADE[form] if u <= umax]
-    cset = set(core)
-    schein = set()
-    for (u, v) in BLITZ_ECKEN[form]:
-        if u > umax:
-            continue
-        for (du, dv) in ((1, 0), (0, 1), (0, -1)):
-            q = (u + du, v + dv)
-            if q not in cset and q[0] <= umax:
-                schein.add(q)
+    for (seite, anteil, k) in blitz_aktiv(i):
+        pfad, ecken, ast = BLITZ_FORMEN[(seite, i)]
+        sgn = -1 if seite == 'L' else 1
+        x0, y0 = BLITZ_X0[seite], BLITZ_ZEILE[seite]
+        umax = max(2, int(round(max(u for (u, v) in pfad) * anteil)))
+        core = [(u, v) for (u, v) in pfad if u <= umax] + [q for q in ast if q[0] <= umax]
+        cset = set(core)
+        schein = set()
+        for (u, v) in ecken + ([ast[0]] if ast else []):
+            if u > umax:
+                continue
+            for (du, dv) in ((1, 0), (0, 1), (0, -1)):
+                q = (u + du, v + dv)
+                if q not in cset and q[0] <= umax:
+                    schein.add(q)
 
-    def setze(u, v, c):
-        X, Y = PAD_L + x0 + sgn * u, PAD_T + y0 + v
-        if not (2 <= X < W - 2 and 2 <= Y < H - 2):
-            raise L.ClipError(f'Blitzpixel bei ({X},{Y}) zu nah am Rand des Frames {W}×{H}')
-        e[Y, X, :3] = c
-        e[Y, X, 3] = 255
-    for (u, v) in schein:
-        setze(u, v, BLITZ_SCHEIN)
-    for (u, v) in core:
-        setze(u, v, BLITZ_KERN)
-    # das Loch selbst blitzt auf: Weiß/Türkis im Schachbrett, mit jedem Formwechsel vertauscht
-    for j, (y, x) in enumerate(LOCH[seite]):
-        e[PAD_T + y, PAD_L + x, :3] = BLITZ_KERN if ((j + (k // 2)) % 2 == (1 if j in (1, 2) else 0)) else BLITZ_SCHEIN
-        e[PAD_T + y, PAD_L + x, 3] = 255
+        def setze(u, v, c):
+            X, Y = PAD_L + x0 + sgn * u, PAD_T + y0 + v
+            if not (2 <= X < W - 2 and 2 <= Y < H - 2):
+                raise L.ClipError(f'Blitzpixel bei ({X},{Y}) zu nah am Rand des Frames {W}×{H}')
+            e[Y, X, :3] = c
+            e[Y, X, 3] = 255
+        for (u, v) in schein:
+            setze(u, v, BLITZ_SCHEIN)
+        for (u, v) in core:
+            setze(u, v, BLITZ_KERN)
+        # das Loch selbst blitzt auf: Weiß/Türkis im Schachbrett, wechselt jeden Frame
+        for j, (y, x) in enumerate(LOCH[seite]):
+            e[PAD_T + y, PAD_L + x, :3] = BLITZ_KERN if ((j + i) % 2 == (1 if j in (1, 2) else 0)) else BLITZ_SCHEIN
+            e[PAD_T + y, PAD_L + x, 3] = 255
     return e
 
 
@@ -219,6 +247,12 @@ def sprite_mit_effekten(i):
                 t = 5 * (i - s0) - 3
                 m = OPAK & ~RAND0 & (xx + yy >= t) & (xx + yy < t + 4)
                 sp = A.farb_schritt(sp, HELLER, m)
+    if MUND[i] >= 1:
+        for (y, x) in MUND_ZEILE9:
+            sp[y, x, :3] = CL
+    if MUND[i] >= 2:
+        for (y, x) in MUND_ZEILE7:
+            sp[y, x, :3] = CD
     for k, a in enumerate(AUGEN):
         b = (BLINZELN_L if k == 0 else BLINZELN_R).get(i, 0)
         if b:
@@ -234,7 +268,7 @@ def _platz(sp, maske):
 
 
 def _kopf(sp, i):
-    """Kopf: Zeilenversatz um den Hals (Zeile 12), Frame 0 = Quellform; die Ohren (Zeilen 0–1) zucken zusätzlich."""
+    """Kopf: fest (Runde 3: kein Wiegen mehr); nur die Ohren (Zeilen 0–1) zucken einzeln."""
     layer = _platz(sp, HEAD)
     out = L.leer(H, W)
     piv = PAD_T + 12
@@ -243,11 +277,8 @@ def _kopf(sp, i):
         xs = np.nonzero(layer[y, :, 3])[0]
         if not len(xs):
             continue
-        frac = (piv - y) / float(maxd)
-        ph = 2 * math.pi * i / 24
-        dxk = int(round(1.7 * frac * (math.sin(ph + 0.5 - 0.5 * frac) - math.sin(0.5 - 0.5 * frac))))
         for x in xs:
-            dx = dxk
+            dx = 0                                                                      # Runde 3: kein seitliches Wiegen des Kopfes mehr
             if y - PAD_T <= 1:
                 if x - PAD_L <= 11:
                     dx -= EAR_L.get(i, 0)

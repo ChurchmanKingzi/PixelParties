@@ -22,7 +22,8 @@ Gold/Edelsteine: Halskrause, Handschutz, Stiefel, rote Steine → nur sie glänz
 Ablauf (60 Frames à 70 ms = 4,2 s, nahtlos; bewusst ruhig und würdevoll):
 * Atmen in zwei Stufen (Periode 30, zwei Atemzüge): der Rumpf (ab Zeile 14) steigt zuerst 1 px — die texturierte Gewandzeile 32 wird einmal doppelt eingefügt (mit Texturmischung), die Stiefel bleiben —, der Kopf mit Mähne
   folgt 4 Frames später um 1 px und sinkt wieder zuerst nach Einatmen (er steigt nie ohne den Rumpf, daher entsteht kein Spalt am Hals).
-* Mähnenspitzen wehen: die unteren Haarzeilen 11–13 der linken Strähne (Frames 4–17) und der rechten Strähne (Frames 30–43) schwingen 1–2 px nach außen und zurück (Gefälle ≤ 1 px je Zeile, Nähte 4-verbunden).
+* (Runde 3, Nutzerwunsch „das seitliche Zucken am Kopf sieht wie ein Glitch aus, weg damit!“): das frühere seitliche Wehen der Mähnenspitzen (Zeilen 11–13, ±1–2 px nach außen) ist ENTFERNT — der Kopf
+  bewegt sich nur noch senkrecht mit dem Atmen; keine seitliche Bewegung am Kopf.
 * Rote Edelsteine pulsieren: die zwei oberen Steine (Frames 12–17) und die zwei unteren (Frames 42–47) werden eine Stufe dunkler ((189,40,34) → (140,20,32)) und wieder hell.
 * Gold glänzt (Regel 12/14): Lichtband über Halskrause/Handschutz (Frames 18–29), später über die Stiefel und den Handschutz (Frames 48–59); Glitzersterne an der Halskrause (Frames 6–10), am Handschutz (Frames 36–40).
 Frame 0 = Original (Ruhepose). Kontrolle: anim_humanoide.ruhepose / eckkontakt_typen / Randpixel-Test (Regel 16).
@@ -52,25 +53,8 @@ rumpf &= ~stiefel
 m_gold = sz.vorhanden & L.farbmaske(spr, GOLD) & (sz.yy >= 17)
 
 
-def mane(a, i, links, start, laenge, pos):
-    """Mähnenspitze (Zeilen 11–13) schwingt nach außen; `pos` = Stufenfolge 0…3."""
-    k = (i - start) % N
-    if not 0 <= k < laenge:
-        return a
-    s = pos[k]
-    dd = {0: (0, 0, 0), 1: (0, 0, 1), 2: (0, 1, 1), 3: (1, 1, 2)}[s]
-    sgn = -1 if links else 1
-    x0, x1 = (2, 8) if links else (18, 24)
-    sz.bereich(a, {11 + j: sgn * d for j, d in enumerate(dd)}, x0, x1)
-    return a
-
-
 def frame(i):
     kp, rp, st = sz.ebene(kopf), sz.ebene(rumpf), sz.ebene(stiefel)
-    # --- Mähnenspitzen wehen (vor dem Heben des Kopfes) ---
-    folge = [1, 2, 3, 3, 2, 3, 3, 2, 1, 2, 2, 1, 0, 0]
-    mane(kp, i, True, 4, len(folge), folge)
-    mane(kp, i, False, 30, len(folge), folge)
     # --- Edelsteine pulsieren (eine Stufe dunkler) ---
     if Hm.folge(i, 12, [1, 1, 1, 1, 1, 1], N):
         sz.setze(rp, {p: GEM_DUNKEL for p in GEMS_OBEN})

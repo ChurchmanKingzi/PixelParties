@@ -24,8 +24,10 @@ Metall/Gold im Sprite: Axt, Nasenschutz, goldene Armreife. Nur sie glänzen (Reg
 
 Ablauf (48 Frames à 62 ms = 2,98 s, nahtlos):
 * Auf und ab (Periode 24 = zweimal pro Schleife): die Hosenzeile 25 (Beinansatz) wird einmal doppelt eingefügt (Texturmischung): Rumpf, Kopf, Arme und Helm steigen 1 px, Beine/Hufe bleiben am Boden. Die Axt ist eine
-  eigene Ebene und steigt starr mit der Faust (nichts an ihr wird gestreckt). Der Kopf bleibt starr (kein seitliches Neigen, keine Verlagerung).
-* Axt schwankt: das schwere Blatt neigt sich um die Faust (L.spalten_welle, Gelenk x 27): Blatt ±2 px, Gefälle ≤ 0,1 px je Spalte, Periode 24 und 3 Neigungen pro Schleife; Faust und Arm bleiben stehen.
+  eigene Ebene und steigt starr mit der Faust (nichts an ihr wird gestreckt), ebenso der Arm. Der Kopf bleibt starr (kein seitliches Neigen, keine Verlagerung).
+* Axtarm (Runde 3: „soll auch den Arm bewegen, der die Axt hält“): der Arm (x 26–34, y 12–16, mit goldenem Reif) schwenkt um die Schulter (K.arm_schere, Gelenk x 35): die Faust hebt/senkt sich ±2 px (2 Hübe + kleiner Nachschwinger
+  pro Schleife), Gefälle ≤ 1 px je Spalte, am Gelenk bleibt der Arm am Rumpf; die Axt hängt STARR an der Faust und macht den Hub 1:1 mit.
+* Axt schwankt nur noch leicht (Runde 3: „weniger stark“): das Blatt kippt um die Faust (L.spalten_welle, Gelenk x 27) höchstens 1 px gegen den Stiel (vorher ±2), 3 Neigungen pro Schleife.
 * Helmbusch wiegt (Zeilen 0–3): zwei Wellen bis ±2 px an der Spitze, nach unten auslaufend (Gefälle ≤ 1 px je Zeile); die Zeile 4/5 mit den beiden Hörneransätzen bleibt starr.
 * Blinzeln (Frames 19–21 und 41–43): die vier roten Augenpixel nehmen die dunkle Gesichtsfarbe (49,24,0) an (Lid = umgebende Fellfarbe), kein Glühen, kein Farbspiel.
 * Metall glänzt (Regel 14): ein Lichtband läuft zweimal über das Axtblatt (Frames 3–14 und 27–38, auf der Graurampe des Sprites), ein Lichtband über den Nasenschutz (Frames 16–21) und beide Armreife (Frames 40–45),
@@ -43,7 +45,7 @@ import anim_krieger as K
 import anim_lib as L
 
 N, MS = 48, 62
-sz = K.Szene('minocrete-war-counselor', (3, 4, 3, 2))        # Busch ±2 px, Wippen 1 px, Axtneigung ±2 px
+sz = K.Szene('minocrete-war-counselor', (3, 6, 3, 5))        # Busch ±2 px, Wippen 1 px, Faust ±2 px, Axtneigung ±1 px
 spr, OFF, H, W = sz.spr, sz.OFF, sz.H, sz.W
 PT = sz.pt
 TEST_EBENEN = ('figur',)
@@ -56,18 +58,26 @@ BLINK = {(38, 12): FELL, (43, 12): FELL, (38, 13): FELL, (42, 13): FELL}
 
 m_axt = sz.vor & (sz.xx <= 26) & ~((sz.xx == 26) & (sz.yy == 13))
 rest = sz.vor & ~m_axt
+m_arm = rest & sz.rechteck(26, 12, 34, 16)                       # der Axtarm: Hand mit goldenem Reif, Unterarm bis zur Schulter (Umriss oben y 12/13, unten y 16)
 bein_l = rest & (sz.yy >= 26) & (sz.xx <= 40)
 bein_r = rest & (sz.yy >= 26) & (sz.xx >= 41)
-koerper = rest & ~bein_l & ~bein_r
+koerper = rest & ~bein_l & ~bein_r & ~m_arm
+X_SCHULTER, X_HAND = 33, 29                                       # Gelenk (ab x 33 bleibt der Arm starr am Rumpf: darüber sitzt der Schulterumriss) und Faust samt Armreif (x ≤ 29 starr; die Axt hängt an ihr)
 m_blatt = sz.farben_in(sz.rechteck(0, 7, 15, 23), set(AXT_R))
 m_helm = sz.farben_in(sz.rechteck(38, 6, 43, 10), set(HELM_R))
 m_gold = sz.farben_in(sz.rechteck(27, 12, 51, 24), set(GOLD_R))
+
+
+def hand_dy(i):
+    """Hub der Faust (positiv = nach unten): schwere Axt, langsam gehoben und gesenkt (2 Hübe pro Schleife) plus ein kleiner Nachschwinger (3 pro Schleife); Frame 0 = 0."""
+    return int(np.floor(1.7 * np.sin(2 * np.pi * 2 * i / N) + 0.5 * np.sin(2 * np.pi * 3 * i / N) + 0.5))
 
 
 def frame(i, nur=None):
     ebenen = nur if nur is not None else ('figur', 'glitzer')
     k = sz.ebene(koerper)
     axt = sz.ebene(m_axt)
+    arm = sz.ebene(m_arm)
     # --- Blinzeln ---
     if K.fenster(i, N, 19, 3) is not None or K.fenster(i, N, 41, 3) is not None:
         K.blinzeln(k, OFF, BLINK)
@@ -76,22 +86,27 @@ def frame(i, nur=None):
         Hm.lichtband(axt, m_blatt, OFF, i, N, start, 12, AXT_R, stufen=1, breite=3.4, achse=(1.0, 1.0), kern=2)
     Hm.lichtband(k, m_helm, OFF, i, N, 16, 6, HELM_R, stufen=1, breite=2.4, achse=(1.0, 0.0), kern=2)
     Hm.lichtband(k, m_gold, OFF, i, N, 40, 6, GOLD_R, stufen=1, breite=2.4, achse=(1.0, 1.0), kern=2)
-    Hm.lichtband(axt, m_gold, OFF, i, N, 40, 6, GOLD_R, stufen=1, breite=2.4, achse=(1.0, 1.0), kern=2)
+    Hm.lichtband(arm, m_gold, OFF, i, N, 40, 6, GOLD_R, stufen=1, breite=2.4, achse=(1.0, 1.0), kern=2)
     # --- Helmbusch wiegt (Zeilen 0–3) ---
     d = int(round(1.4 * np.sin(2 * np.pi * i / N) + 0.8 * np.sin(2 * np.pi * 3 * i / N)))
     Hm.zeilen_versatz(k, OFF, K.gefaelle(list(range(0, 4)), d))
-    # --- Axt schwankt um die Faust ---
-    v = 2.4 * np.sin(2 * np.pi * 3 * i / N)
+    # --- Axtarm hebt und senkt die Axt (Runde 3): der Arm schwenkt um die Schulter, die Axt hängt starr an der Faust ---
+    hy = hand_dy(i)
+    arm = K.arm_schere(arm, X_SCHULTER + sz.pl, X_HAND + sz.pl, hy)
+    # --- Axt schwankt nur noch leicht um die Faust: das Blatt kippt höchstens 1 px gegen den Stiel ---
+    v = 1.2 * np.sin(2 * np.pi * 3 * i / N)
     axt = L.spalten_welle(axt, 27 + sz.pl, 0.0, 0.0, bias=float(v))
-    # --- Auf und ab: Hosenzeile 25 doppelt, Axt starr mit ---
+    axt = L.versetze(axt, 0, hy)
+    # --- Auf und ab: Hosenzeile 25 doppelt, Arm und Axt steigen starr mit ---
     brust = Hm.stufe(i, N / 2, 1)
     k = K.bob(k, PT + 25, brust)
     axt = L.versetze(axt, 0, -brust)
+    arm = L.versetze(arm, 0, -brust)
     # --- Hufscharren ---
     ul = 1 if K.fenster(i, N, 10, 8) is not None else 0
     ur = 1 if K.fenster(i, N, 34, 8) is not None else 0
     bl, br = sz.ebene(bein_l, 0, -ul), sz.ebene(bein_r, 0, -ur)
-    fig = L.zusammen(H, W, [(bl, 0, 0), (br, 0, 0), (axt, 0, 0), (k, 0, 0)])
+    fig = L.zusammen(H, W, [(bl, 0, 0), (br, 0, 0), (axt, 0, 0), (k, 0, 0), (arm, 0, 0)])
     K.kontur(fig, sz.ERLAUBT, lambda c, x, y: (156, 0, 0) if (c[1] == 0 and c[2] == 0 and c[0] > 0) else (0, 2, 0) if x < 30 + sz.pl else (49, 24, 0))   # Regel 16
     out = fig if 'figur' in ebenen else sz.leer()
     if 'glitzer' in ebenen:
@@ -99,7 +114,7 @@ def frame(i, nur=None):
         st = Hm.folge(i, 10, [0, 1, 2, 1], N)
         if st is None:
             st = Hm.folge(i, 34, [0, 1, 2, 1], N)
-        dy_star = int(round(v * abs(4 - 27) / 27.0))                 # das Blatt neigt sich: der Stern folgt der Spalte x = 4
+        dy_star = int(round(v * abs(4 - 27) / 27.0)) + hy            # das Blatt neigt sich und hebt sich mit der Faust: der Stern folgt der Spalte x = 4
         Hm.stern4(gl, 4, 10 + dy_star - brust, st, (245, 245, 245), (211, 211, 211), (153, 153, 153), OFF)
         Hm.stern4(gl, 40, 8 - brust, Hm.folge(i, 18, [0, 1, 1, 0], N), (245, 245, 245), (211, 211, 211), (153, 153, 153), OFF)
         out = L.zusammen(H, W, [(out, 0, 0), (gl, 0, 0)])

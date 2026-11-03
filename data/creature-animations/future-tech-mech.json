@@ -3,7 +3,7 @@
   "sheet": "future-tech-mech.png",
   "frameWidth": 20,
   "frameHeight": 25,
-  "frames": 48,
+  "frames": 96,
   "frameMs": 70,
   "loop": true,
   "layout": "horizontal",

@@ -1,15 +1,15 @@
 {
   "creature": "Barkeeper",
   "sheet": "barkeeper.png",
-  "frameWidth": 26,
+  "frameWidth": 24,
   "frameHeight": 31,
   "frames": 48,
   "frameMs": 62,
   "loop": true,
   "layout": "horizontal",
   "padTop": 3,
-  "padLeft": 3,
+  "padLeft": 2,
   "padRight": 3,
   "padBottom": 2,
-  "faceX": 13.0
+  "faceX": 12.0
 }

@@ -15,12 +15,15 @@ Was im Sprite ist (Koordinaten im Sprite 18×21, x/y ab 0):
 * Gold → Glanz und Glitzer sind erlaubt (Regel 14): das ganze Ei ist Gold; der Umriss glänzt nicht (nur Innenpixel). Keine Augen (kein Blinzeln); kein Feuer (Regel 15).
 Fest bleiben: das GANZE Ei (Form, Umriss, Lichtband) — Nutzerwunsch: „gilt dasselbe wie für Monster Nest“ (statische Eier, kleine Risse, die erscheinen und verschwinden).
 
+Nutzerwunsch (Runde 3): „gerne ein paar mehr Cracks, auch mehr als einen pro Ei zur Zeit. Das gilt für ALLE Eier.“ + Gold: Glitzer nur als kurze Sparkle-Partikel.
 Ablauf (48 Frames à 65 ms = 3,12 s, nahtlos):
-* Risse (neu): fünf kleine Risse aus je 2 Pixeln in der Umrissfarbe D=(122,18,0) (senkrecht bzw. diagonal gezackt) erscheinen zeitversetzt an fünf verschiedenen Stellen der Schale (alle 8 Frames einer, 1–2 gleichzeitig):
-  erst 1 Pixel, dann 2 Pixel, steht kurz, schrumpft wieder und verschwindet (Verlauf 1-1-2-2-2-2-2-2-2-2-1-1). Sie liegen nur auf Goldpixeln (A/B/C/H) mindestens 2 Pixel vom Rand, nicht in den Sternzonen. Frame 0 = Original (rissfrei).
-* Goldschimmer (Regel 14; bleibt aus der ersten Fassung, das Ei selbst bewegt sich nicht): zweimal pro Schleife (Frames 2–16 und 26–40) läuft ein breites diagonales Lichtband (x+y, 7 px breit) über das Ei (eine Stufe heller auf der Gold-Rampe C→B→A→H→I, nur Innenpixel).
-* Glitzersterne (Gold): vierzackige Sterne blitzen an drei Stellen auf dem Ei (ganz im Inneren; Lauf 0–1–2–1–0 über 5 Frames, wachsen/schrumpfen) und in den beiden freien oberen Ecken außerhalb des Eis
-  (Lauf 1–2–1 über 3 Frames, nie ein einzelner Punkt) auf (Farben G, K, J des Sprites; die Eck-Sterne berühren das Ei nie — das Skript prüft es in jedem Frame). Schalter `GLANZ = False` lässt Band und Sterne weg.
+* Das Ei bleibt KOMPLETT STATISCH. Risse: 8 Risse (vorher 5) aus je 2–3 Pixeln in der Umrissfarbe D=(122,18,0), zackig, erscheinen zeitversetzt über das ganze Ei verteilt: erst 1, dann 2, dann 3 Pixel, steht 2–5 Frames,
+  schrumpft wieder und verschwindet (12–17 Frames; die zwei 2-Pixel-Risse entsprechend kürzer). Die Starts sind unregelmäßig (Goldener-Schnitt-Folge), sodass fast immer 2–4 Risse gleichzeitig sichtbar sind; Frame 0 und die ersten
+  Frames sind rissfrei (= Original). Sie liegen nur auf Goldpixeln (A/B/C/H), mindestens 3 Pixel vom Rand (kein Umriss wird dicker, nichts berührt den Rand), nie im Lichtband und nie unter einem gerade sichtbaren Sparkle
+  (das Skript prüft es in jedem Frame).
+* Goldschimmer (Regel 12a, Gold; bleibt aus der ersten Fassung, das Ei selbst bewegt sich nicht): zweimal pro Schleife (Frames 2–16 und 26–40) läuft ein breites diagonales Lichtband (x+y, 7 px breit) über das Ei (eine Stufe heller auf der Gold-Rampe C→B→A→H→I, nur Innenpixel).
+* Sparkles (Regel 34, Gold): fünf kurze Sparkles je Schleife (4 Frames: Mitte → kleines Kreuz → großes Kreuz → kleines Kreuz, dann weg), immer nur eines zur Zeit, mit Pausen (≥ 4 Frames) dazwischen; drei sitzen auf dem Ei
+  (ganz im Inneren), zwei in den freien oberen Ecken außerhalb des Eis (Farben G, K, J des Sprites; die Eck-Sparkles berühren das Ei nie — das Skript prüft es in jedem Frame). Schalter `GLANZ = False` lässt Band und Sparkles weg.
 Ergänzungen: keine (der Rand wird nie verändert).
 Frame: Sprite plus 4 px links/rechts, 5 px oben/unten (Eck-Sterne) — Figur zentriert.
 Nur ganze Pixel, nur Farben der Quelle.
@@ -68,8 +71,8 @@ SWEEPS = [2, 26]
 SWEEP_N = 15
 
 # ── Sterne ──
-STERN_LAUF = [0, 1, 2, 1, 0]                                                           # auf dem Ei (Oberflächenfunkeln)
-STERN_LAUF_ECKE = [1, 2, 1]                                                            # in den Ecken: nie ein einzelner Punkt (kleinster Stern = Plus aus 5 Pixeln)
+STERN_LAUF = E.SPARKLE_LAUF                                                            # kurzer Sparkle: Mitte → Kreuz → großes Kreuz → Kreuz, dann weg
+STERN_LAUF_ECKE = E.SPARKLE_LAUF
 ORTE = {'e1': (7, 9), 'e2': (10, 12), 'e3': (5, 15),                                    # auf dem Ei (ganz im Inneren)
         'c1': (0, -1), 'c2': (17, -1)}                                                    # freie obere Ecken (außerhalb des Eis)
 for _k in ('e1', 'e2', 'e3'):
@@ -81,7 +84,7 @@ for _k in ('c1', 'c2'):
     for (_dx, _dy) in [(d, 0) for d in range(-2, 3)] + [(0, d) for d in (-2, -1, 1, 2)]:
         _X, _Y = _x + _dx, _y + _dy
         assert not (0 <= _Y < sh and 0 <= _X < sw and OPAK[_Y, _X]), (_k, _dx, _dy)
-STERNE = [(3, 'c1'), (9, 'e1'), (15, 'c2'), (20, 'e2'), (27, 'c1'), (33, 'e3'), (38, 'c2'), (40, 'e1'), (13, 'e3'), (30, 'e2')]
+STERNE = [(3, 'c1'), (17, 'e1'), (26, 'c2'), (35, 'e2'), (43, 'e3')]
 
 
 def aktive_sterne(i):
@@ -93,19 +96,18 @@ def aktive_sterne(i):
     return out
 
 
-# ── Risse (zwei Pixel in der Umrissfarbe D; nur auf Goldpixeln, ≥ 2 Pixel vom Rand, nicht auf den Armen der Eisterne e1–e3) ──
+# ── Risse (zwei bis drei Pixel in der Umrissfarbe D; nur auf Goldpixeln, ≥ 3 Pixel vom Rand) — Stellen mit E.sicher/E.pfade ausgesucht und festgeschrieben ──
 CD = (122, 18, 0)
 assert CD in _farben
-RISSE = [E.Riss(p, start=st) for p, st in (
-    ([(13, 16), (12, 17)], 2), ([(4, 7), (4, 8)], 10), ([(15, 12), (15, 13)], 18),
-    ([(2, 13), (3, 14)], 26), ([(12, 9), (12, 10)], 34))]
-_gold_alle = _maske(CA, CB, CC, CH)
-for _r in RISSE:
-    for (_x, _y) in _r.pix:
-        assert INNEN[_y, _x] and _gold_alle[_y, _x], (_x, _y)
-        for _k in ('e1', 'e2', 'e3'):
-            assert not ((_x == ORTE[_k][0] and abs(_y - ORTE[_k][1]) <= 2) or (_y == ORTE[_k][1] and abs(_x - ORTE[_k][0]) <= 2)), ('Riss in der Sternzone', _x, _y)
-assert E.gleichzeitig(RISSE, N)[0] <= 2 and all(r.stufe(0, N) == 0 for r in RISSE)
+_SITES = [[(8, 10), (8, 11), (9, 12)], [(4, 10), (5, 9), (5, 8)], [(12, 14), (13, 13), (13, 12)], [(8, 15), (8, 16), (9, 17)], [(10, 7), (11, 8), (11, 9)],
+          [(4, 13), (4, 14), (5, 15)], [(7, 6), (7, 7)], [(6, 12), (7, 13)]]
+_ORD = [0, 4, 2, 6, 5, 1, 7, 3]
+_HALTEN = [3, 5, 2, 4]
+_prof = [E.profil(len(_SITES[j]), _HALTEN[k % len(_HALTEN)]) for k, j in enumerate(_ORD)]
+_st = E.starts(len(_SITES), N, [len(q) for q in _prof], basis=2, versatz=0.1)
+RISSE = [E.Riss(_SITES[j] if k % 2 == 0 else list(reversed(_SITES[j])), start=_st[k], profil=_prof[k]) for k, j in enumerate(_ORD)]
+ERLAUBT = E.sicher(spr, [CA, CB, CC, CH], sorted(_farben), rand_abstand=3)
+E.pruefe_risse(RISSE, N, ERLAUBT)
 REF = L.platz(spr, H, W, PAD_L, PAD_T)
 
 
@@ -147,7 +149,15 @@ if __name__ == '__main__':
     frames = [frame(i) for i in range(N)]
     figs = [figur(i)['fig'] for i in range(N)]
     prev = sys.argv[sys.argv.index('--preview') + 1] if '--preview' in sys.argv else None
-    print('Frame 0 weicht vom Original in', int((figs[0] != REF).any(axis=2).sum()), 'Pixeln ab | höchstens', E.gleichzeitig(RISSE, N)[0], 'Risse gleichzeitig')
+    z = E.zaehle(RISSE, N)
+    print('Frame 0 weicht vom Original in', int((figs[0] != REF).any(axis=2).sum()), 'Pixeln ab |', len(RISSE), 'Risse | gleichzeitig höchstens', z['max'], ', Mittel', z['mittel'], '| Frames ohne Riss:', z['leer'])
+    print('Sparkles gleichzeitig höchstens', max(len(aktive_sterne(i)) for i in range(N)), '| Frames mit Sparkle:', sum(1 for i in range(N) if aktive_sterne(i)), 'von', N)
+    for i in range(N):                                                                     # ein Sparkle darf nie auf einem gerade sichtbaren Riss liegen
+        rm = E.risse_ebene(H, W, i, N, RISSE, CD, PAD_L, PAD_T)[..., 3] > 0
+        e = L.leer(H, W)
+        for ort, stufe in aktive_sterne(i):
+            A.stern(e, PAD_L + ORTE[ort][0], PAD_T + ORTE[ort][1], stufe, STERN_FARBEN)
+        assert not (rm & (e[..., 3] > 0)).any(), ('Sparkle auf Riss in Frame', i)
     # Eck-Sterne dürfen das Ei nie berühren (auch nicht über die Ecke)
     for i in range(N):
         e = L.leer(H, W)

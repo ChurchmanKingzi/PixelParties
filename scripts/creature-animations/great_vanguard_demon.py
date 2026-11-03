@@ -22,7 +22,7 @@ Fest bleiben: Hörner, Gesichtsform, Mund/Hauer (am Kopf), Gürtel.
 Ablauf (48 Frames à 70 ms = 3,36 s; Frame 0 = Original, Funkeln/Staub ausgenommen):
 * Atmen zweistufig 0-1-2-1-0 px (Periode 24, zweimal pro Schleife): die Rippenzeile y 42 des Torsos wird 1–2× eingefügt (anim_lib.streck_zeile mit Texturmischung); Kopf, Arme und Brust steigen, Beine/Stiefel bleiben am Boden.
   Der Kopf folgt der Brust 2 Frames später (nie höher als die Brust, sinkt höchstens 1 px in die Schultern); die Hauer gehören zum Kopf.
-* Arme federn (gegengleich; links Periode 24, rechts Periode 24 um halbe Periode versetzt): jede Spalte des Arms wandert senkrecht, je weiter vom Körper, desto mehr (Spitze bis ±1,6 px), Zusammenhang 4-verbunden
+* Arme federn SYNCHRON (Nutzer-Feedback Runde 3: beide Arme heben und senken sich gleichzeitig, spiegelsymmetrisch; Periode 24): jede Spalte des Arms wandert senkrecht, je weiter vom Körper, desto mehr (Spitze bis ±1,6 px), Zusammenhang 4-verbunden
   (anim_flieger.fluegel_welle); die Armreife wandern als Spalten mit (nichts wird gestreckt oder verbreitert).
 * Blinzeln beider Augen (die hellen Schlitze und das rote Glimmen werden zur dunklen Augenhöhle (38,14,12)) Frame 14–16 und 38–40.
 * Gold glänzt (Regel 12/14): ein Lichtband läuft diagonal über jeden Armreif (links Frame 2–8, rechts Frame 26–32; eine Stufe heller auf der Rampe Dunkelgold → Gold → Pfirsich (244,190,144)), dazu je ein Glitzerstern am oberen Eck
@@ -137,7 +137,7 @@ def frame_gross(i, nur=None):
     ph = L.sinus(i, 24)
     al_dy = lambda f: 1.6 * math.sin(ph) * f
     al = F.fluegel_welle(al, GPL + 10, 1.6, ph, potenz=1.0, nur_rechts=False, lauf=0.0, zusammenhang=True)
-    ar = F.fluegel_welle(ar, GPL + 29, 1.6, ph + math.pi, potenz=1.0, nur_rechts=True, lauf=0.0, zusammenhang=True)
+    ar = F.fluegel_welle(ar, GPL + 29, 1.6, ph, potenz=1.0, nur_rechts=True, lauf=0.0, zusammenhang=True)       # synchron mit dem linken Arm (Nutzer-Feedback Runde 3)
     tr = L.streck_zeile(T_TORSO, GPT + 42, n)
     bl, br = T_BL.copy(), T_BR.copy()
     if 20 <= i <= 25:
@@ -169,7 +169,7 @@ def frame_gross(i, nur=None):
 
 def _arm_dy(i, x, seite):
     """Senkrechter Versatz der Armspalte x (Sprite) im Frame i (wie fluegel_welle: round(amp · sin(phase) · (Abstand/maxAbstand)))."""
-    ph = L.sinus(i, 24) + (0 if seite == 'l' else math.pi)
+    ph = L.sinus(i, 24)                                          # beide Arme synchron
     piv = 10 if seite == 'l' else 29
     maxd = max(abs(xx_ - piv) for xx_ in range(sw) if (arm_l if seite == 'l' else arm_r)[:, xx_].any())
     return int(round(1.6 * math.sin(ph) * abs(x - piv) / maxd))

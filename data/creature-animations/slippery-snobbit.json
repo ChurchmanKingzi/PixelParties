@@ -2,14 +2,14 @@
   "creature": "Slippery Snobbit",
   "sheet": "slippery-snobbit.png",
   "frameWidth": 25,
-  "frameHeight": 36,
+  "frameHeight": 44,
   "frames": 48,
   "frameMs": 66,
   "loop": true,
   "layout": "horizontal",
-  "padTop": 3,
+  "padTop": 4,
   "padLeft": 3,
   "padRight": 5,
-  "padBottom": 3,
+  "padBottom": 2,
   "faceX": 12.5
 }

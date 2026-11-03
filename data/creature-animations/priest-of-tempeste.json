@@ -2,7 +2,7 @@
   "creature": "Priest of Tempeste",
   "sheet": "priest-of-tempeste.png",
   "frameWidth": 24,
-  "frameHeight": 29,
+  "frameHeight": 31,
   "frames": 48,
   "frameMs": 62,
   "loop": true,

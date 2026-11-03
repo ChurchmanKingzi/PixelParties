@@ -2,7 +2,7 @@
   "creature": "Skeleton Priest",
   "sheet": "skeleton-priest.png",
   "frameWidth": 20,
-  "frameHeight": 29,
+  "frameHeight": 38,
   "frames": 48,
   "frameMs": 65,
   "loop": true,

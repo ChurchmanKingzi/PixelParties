@@ -22,7 +22,7 @@ Kein Metall, Gold oder Edelstein im Sprite (Holz, Glas, Stoff glänzen nicht) �
 Ablauf (48 Frames à 62 ms = 2,98 s, nahtlos):
 * KRUG PUTZEN (Hauptbewegung, 3 Hübe je Schleife, Periode 16 Frames; Ablauf je Hub: Frames 0–1 Ruhe (Original), 2–4 Tuch 1 px nach rechts über das Glas, 5–6 zurück, 7–8 1 px nach links, 9–11 2 px nach links, 12 1 px nach links, 13–15 Ruhe):
   das Tuch (graue Streifen + Hand) wandert waagerecht über den Krug und deckt dabei das lavendelfarbene Glas ab bzw. gibt es frei; der Arm mit dem Tuch (linker Ärmel, Zeilen 12–19, x ≤ 5) geht mit nach links hinaus
-  (bis 2 px, so wie in ref6.png der Ärmel nach links ausschlägt) und kommt wieder zurück. Das Tuch liegt als eigene Ebene vor dem Krug; der Krug darunter wird dort, wo das Tuch ihn freigibt, ergänzt
+  — RUNDE 3 (Nutzer: „die Seite bewegt sich zu weit nach links, das sieht seltsam aus“): nur noch HÖCHSTENS 1 px (statt bisher bis 2 px), und zwar solange das Tuch mindestens 1 px nach links steht (Frames 7–8, 9–11, 12 je Hub) — und kommt wieder zurück. Das Tuch liegt als eigene Ebene vor dem Krug; der Krug darunter wird dort, wo das Tuch ihn freigibt, ergänzt
   (siehe Ergänzungen). Der Arm liegt als eigene Ebene (ein Abbild der Ärmelzeilen, verschoben) über dem Körper, der darunter vollständig stehen bleibt — nichts wird aufgerissen.
 * Auf und ab (zweistufig, Periode 24 = zweimal pro Schleife): Brust 1 px (Anzugzeile 20 wird einmal doppelt eingefügt: Rumpf, Arm, Tuch, Krug, Hände und Kopf steigen, Schuhe bleiben). Der Kopf bewegt sich NICHT seitlich (Regel 17).
 * Blinzeln (Frames 19–21 und 41–43): beide Augen schließen sich — Iris und Weiß (6,4), (6,5) und die Iris (10,5) nehmen die umgebende Hautfarbe (247,190,123) an; die Brauen und die braune Wimper (11,5) bleiben.
@@ -40,7 +40,7 @@ import anim_humanoide as Hm
 import anim_lib as L
 
 N, MS = 48, 62
-PAD_L, PAD_R, PAD_T, PAD_B = 5, 3, 4, 2          # Arm schlägt bis 2 px nach links aus (+3 Rand), Kopfhub 1 px oben (+3), Randabstand ≥ 2
+PAD_L, PAD_R, PAD_T, PAD_B = 3, 3, 4, 2          # Arm schlägt höchstens 1 px nach links aus (+2 Rand), Kopfhub 1 px oben (+3), Randabstand ≥ 2
 
 spr = L.lade('barkeeper')
 sh, sw = spr.shape[:2]
@@ -74,7 +74,7 @@ TAKT = [0, 0, 1, 1, 1, 0, 0, -1, -1, -2, -2, -2, -1, 0, 0, 0]
 
 def frame(i, nur=None):
     dx = TAKT[i % 16]
-    a = min(0, dx)                                                   # der Arm geht nur nach links hinaus, wenn das Tuch nach links wandert
+    a = max(-1, min(0, dx))                                          # der Arm geht nur nach links hinaus, wenn das Tuch nach links wandert — Runde 3: höchstens 1 px (Nutzer: „die Seite bewegt sich zu weit nach links“)
     # --- Körper mit Ergänzung unter dem Tuch ---
     base = spr.copy()
     for (x, y), c in UNTER_TUCH.items():

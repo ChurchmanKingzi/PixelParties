@@ -25,6 +25,9 @@ Ablauf (48 Frames à 62 ms = 2,98 s, nahtlos):
 * Haarzacken wehen (Zeilen 0–1): sie biegen sich zweimal pro Schleife 1 px nach rechts (Frames 6–11 und 30–35) bzw. nach links (Frames 18–23 und 42–47), Zeile 2 bleibt starr (die Zacken sind in Zeile 3 verankert).
 * Bartspitze pendelt (Zeilen 21–23, Kern x 7–8): die Spitze schwingt zweimal pro Schleife 1 px nach rechts (Frames 8–15 und 32–39) und dazwischen nach links (Frames 20–27 und 44–47); der freigewordene Hintergrund wird mit der
   Nachbarfarbe (Gürtelgrün) ergänzt (anim_krieger.schieben_fuellen), Frame 0 = Ruhe.
+* Reden (Runde 3: „sollte durchgehend reden“): hinter dem Schnauzer verborgen sitzt der Mund (im Sprite nicht gezeichnet, unter der Nase (7–8, 9–10) und zwischen den grauen Bartsträhnen x 6/9). Er spricht ohne Pause in Silben (Takt 3–6 Frames, nie
+  länger als 1 Frame geschlossen): Stufe 1 = (7–8, 11) werden zum dunklen Mundspalt (49,24,0), Stufe 2 = zusätzlich (7–8, 12), Stufe 0 = Original. Die Silben-Folge (5-4-3-6-4-5-3-4-6-3-5 Frames) ist genau eine Schleife lang.
+  Der Mundspalt ist die Umrissfarbe des Sprites; sonst nichts am Bart wird gestreckt.
 Frame 0 = Original (Ruhepose). Kontrolle: anim_humanoide.ruhepose / eckkontakt_typen / Randpixel-Test (Regel 16).
 Ergänzungen: beim Pendeln der Bartspitze werden die freigelegten Pixel hinter der Spitze mit der Farbe des Nachbarpixels ergänzt (nur Quellfarben, Grünton des Gürtels bzw. Robenbraun).
 """
@@ -43,6 +46,15 @@ PT = sz.pt
 TEST_EBENEN = ('figur',)
 
 
+MUND_FARBE = sz.f(4, 9)                                         # (49,24,0) dunkelbraun (Umriss/Kopfrand)
+SILBEN = ([0, 1, 2, 2, 1], [0, 1, 2, 1], [0, 1, 1], [0, 1, 2, 2, 2, 1])
+FOLGE = [0, 1, 2, 3, 1, 0, 2, 1, 3, 2, 0]                        # Reihenfolge der Silben (Indizes in SILBEN): 5+4+3+6+4+5+3+4+6+3+5 = 48 Frames
+MUND = []
+for _k in FOLGE:
+    MUND += SILBEN[_k]
+assert len(MUND) == N, len(MUND)
+
+
 def frame(i, nur=None):
     ebenen = nur if nur is not None else ('figur',)
     k = sz.ebene(sz.vor)
@@ -51,6 +63,12 @@ def frame(i, nur=None):
         -1 if (K.fenster(i, N, 18, 6) is not None or K.fenster(i, N, 42, 6) is not None) else 0)
     if d:
         Hm.bereich_versatz(k, OFF, {0: d, 1: d}, 0, 10)           # das Pixel (11,1) bleibt: es hängt nur diagonal an (10,2)
+    # --- Reden: Mundspalt öffnet und schließt sich in Silben ---
+    m = MUND[i]
+    if m >= 1:
+        Hm.setze(k, {(7, 11): MUND_FARBE, (8, 11): MUND_FARBE}, OFF)
+    if m >= 2:
+        Hm.setze(k, {(7, 12): MUND_FARBE, (8, 12): MUND_FARBE}, OFF)
     # --- Bartspitze pendelt (Zeilen 21–23, Kern) ---
     b = 1 if (K.fenster(i, N, 8, 8) is not None or K.fenster(i, N, 32, 8) is not None) else (
         -1 if (K.fenster(i, N, 20, 8) is not None or K.fenster(i, N, 44, 4) is not None) else 0)

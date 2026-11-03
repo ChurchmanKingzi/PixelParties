@@ -42,6 +42,7 @@ import cv2
 import numpy as np
 from PIL import Image
 
+import anim_amorph as A
 import anim_flieger_b as FB
 import anim_gbb as G
 import anim_humanoide as Hm
@@ -62,8 +63,10 @@ vorhanden = L.deckend(spr)
 UMRISS = (0, 0, 0)
 ERLAUBT = Hm.umrissfarben(spr)
 
-SCHAEDEL = (vorhanden & L.farbmaske(spr, [(128, 128, 128), (179, 179, 179), (204, 204, 204), (242, 242, 242)]))
-KOERPER = vorhanden & ~SCHAEDEL
+SCHAEDEL_ALT = (vorhanden & L.farbmaske(spr, [(128, 128, 128), (179, 179, 179), (204, 204, 204), (242, 242, 242)]))
+BART_Y0 = 51                                                                   # ab dieser Sprite-Zeile ersetzt der selbstgezeichnete Rauschebart die Kinnspitze (Zeile 51 Abschlussumriss + Stiel (11,52–53))
+SCHAEDEL = SCHAEDEL_ALT & (yy < BART_Y0)
+KOERPER = vorhanden & ~SCHAEDEL_ALT
 HALS_X = 22
 
 
@@ -87,11 +90,115 @@ for k in range(1, n_):
     else:
         grp[comp] = 2
 grp[gelb_m] = 2
-BLITZ_G = {g: L.platz(np.where((grp == g)[..., None], BLITZ, 0).astype(np.uint8), H, W, GPL, GPT) for g in (1, 2, 3, 4)}
+FUNKEN_M = (grp == 2) & ~gelb_m                                                # die kleinen Cyan-Funken um den gelben Blitz (zucken weiter ein/aus)
+BLITZ_G = {g: L.platz(np.where(((grp == g) & ~gelb_m)[..., None], BLITZ, 0).astype(np.uint8), H, W, GPL, GPT) for g in (1, 2, 3, 4)}
+GELB0 = L.platz(np.where(gelb_m[..., None], BLITZ, 0).astype(np.uint8), H, W, GPL, GPT)   # der gelbe Blitz gehört fest zum Sprite (liegt VOR dem Kopf, bleibt immer sichtbar)
 AN = {1: {0, 1, 2, 3, 5, 6, 27, 28, 29, 30},
       2: {0, 1, 2, 4, 5, 31, 32, 33, 34},
       3: {0, 1, 2, 3, 15, 16, 17, 36, 37, 38, 39, 40},
       4: {0, 1, 2, 3, 4, 21, 22, 23, 24, 43, 44, 45, 46}}
+
+
+# ── Rauschebart (Nutzer-Feedback Runde 3: „Den Bart sollst du nach unten selbstständig weiterzeichnen, ein langer weißer Rauschebart!“) ──
+# Die graue Kinnspitze des Schädels (Sprite-Zeilen 45–51) ist der Bart. Er wird ab Zeile 51 selbst weitergezeichnet: ein langer, zottiger Strang (Sprite-Zeilen 51–72), der unten in drei
+# Locken ausläuft. Farben nur aus dem Schädel (Umriss (128,128,128), Schatten (179,179,179), Fläche (204,204,204), Licht (242,242,242)). Er weht: eine Welle läuft vom Kinn zu den Spitzen
+# (Zeilenversatz, Gefälle ≤ 1 px je Zeile), die drei Locken schwingen zusätzlich einzeln (≤ 1 px, nie dichter als 1 px Abstand → Umrisse werden nie doppelt/dick).
+BART_J, BART_K, BART_L, BART_I = (128, 128, 128), (179, 179, 179), (204, 204, 204), (242, 242, 242)
+BART_R = 22                                                                     # Zeilen 51 … 72
+# Ruhepose: je Zeile Liste (Locke, xl, xr); Stamm = Locke 0 (r ≤ 11), danach drei Locken 0 (links), 1 (Mitte), 2 (rechts)
+BART_ROHE = {0: [(0, 10, 17)], 1: [(0, 10, 17)], 2: [(0, 9, 18)], 3: [(0, 9, 18)], 4: [(0, 8, 18)], 5: [(0, 8, 19)], 6: [(0, 8, 19)], 7: [(0, 8, 18)], 8: [(0, 8, 19)],
+             9: [(0, 8, 19)], 10: [(0, 8, 19)], 11: [(0, 8, 19)],
+             12: [(0, 8, 10), (1, 12, 15), (2, 17, 19)], 13: [(0, 8, 10), (1, 12, 15), (2, 17, 19)], 14: [(0, 8, 10), (1, 12, 15), (2, 17, 19)],
+             15: [(0, 8, 10), (1, 12, 15), (2, 17, 19)], 16: [(0, 9, 10), (1, 12, 15), (2, 17, 18)], 17: [(0, 9, 10), (1, 13, 15), (2, 17, 18)],
+             18: [(0, 9, 9), (1, 13, 15), (2, 18, 18)], 19: [(0, 9, 9), (1, 13, 14)], 20: [(1, 13, 14)], 21: [(1, 13, 13)]}
+
+
+def bart_zeile(r, dx_zeile, extra, i):
+    """Pixel einer Bartzeile r (Liste (x, farbe)) — Stamm/Locken um dx_zeile (+ extra je Locke) verschoben; Strähnen (wellige Schattenlinien, helle Strähnchen) hängen an der Locke."""
+    segs = BART_ROHE[r]
+    xs = []
+    for (k, xl, xr) in segs:
+        e = extra.get((k, r), 0) if len(segs) > 1 else 0
+        xs.append([k, xl + dx_zeile + e, xr + dx_zeile + e, e])
+    for a, b in zip(xs, xs[1:]):                                               # mindestens 1 px Luft zwischen Locken (nie doppelte Umrisse)
+        if b[1] - a[2] < 2:
+            if b[3]:
+                b[1] -= b[3]; b[2] -= b[3]
+            if b[1] - a[2] < 2 and a[3]:
+                a[1] -= a[3]; a[2] -= a[3]
+    out = []
+    for (k, xl, xr, _) in xs:
+        w = xr - xl + 1
+        for x in range(xl, xr + 1):
+            p = x - xl
+            if w == 1:
+                c = BART_K
+            elif w == 2:
+                c = BART_J if p == 0 else BART_K
+            elif p == 0:
+                c = BART_J
+            elif p == w - 1:
+                c = BART_J if w >= 4 else BART_K
+            else:
+                ph = int(round(1.0 * math.sin(0.55 * r + 1.7 * k)))
+                q = (p + ph) % 3
+                c = BART_K if q == 0 else (BART_I if (q == 1 and (r + p) % 2 == 0) else BART_L)
+            out.append((x, c))
+    return out
+
+
+def bart_dx(i):
+    """{r: dx} Welle vom Kinn (r 0) zu den Spitzen: Amplitude wächst mit dem Abstand, die Spitzen hinken nach; Gefälle ≤ 1 px je Zeile."""
+    ph = L.sinus(i, 48)
+    d = {r: int(round(2.6 * ((r + 1) / BART_R) ** 1.3 * math.sin(ph - 0.22 * r))) for r in range(BART_R)}
+    return G.kappe(d)
+
+
+def bart_extra(i):
+    """{(Locke, r): dx} Eigenschwung der drei Locken (≤ 1 px, wächst zur Spitze): links Periode 24, Mitte 16, rechts 48 — unabhängig voneinander."""
+    ex = {}
+    for k, per, vz in ((0, 24, -1), (1, 16, 1), (2, 48, 1)):
+        sn = math.sin(L.sinus(i, per) + 0.9 * k)
+        for r in range(12, BART_R):
+            fr = (r - 11) / 10.0
+            ex[(k, r)] = int(round(1.15 * fr * sn))
+    return ex
+
+
+def bart_ebene(i):
+    """Rauschebart als Ebene auf der großen Leinwand (ohne Kopfbewegung `bob`)."""
+    a = L.leer(H, W)
+    ox, oy = GPL + DX, GPT + DY + BART_Y0
+    dxs = bart_dx(i)
+    ex = bart_extra(i)
+    for r in range(BART_R):
+        for (x, c) in bart_zeile(r, dxs[r], ex, i):
+            if not (0 <= oy + r < H and 0 <= ox + x < W):
+                raise L.ClipError(f'Bartpixel ({x},{r}) außerhalb der Leinwand')
+            a[oy + r, ox + x, :3] = c
+            a[oy + r, ox + x, 3] = 255
+    a, _ = A.verbinde4(a)
+    return a
+
+
+# ── Gelber Blitz: fester Bestandteil des Sprites (liegt vor dem Kopf, bleibt dauerhaft sichtbar), ein Puls läuft ihn hinunter ──
+GELB_STUFE = {(237, 187, 92): (255, 221, 128), (255, 221, 128): (254, 255, 218)}     # eine Stufe heller
+
+
+def gelb_ebene(i):
+    a = GELB0.copy()
+    ys = np.nonzero(a[..., 3].any(axis=1))[0]
+    y0, y1 = int(ys.min()), int(ys.max())
+    t = (i % 24) / 12.0                                                         # Puls alle 24 Frames (zweimal je Schleife), läuft in 12 Frames hinab, dann Pause
+    if t < 1.0:
+        yc = y0 + t * (y1 - y0 + 6) - 3
+        for y in range(y0, y1 + 1):
+            if abs(y - yc) <= 2.0:
+                for x in np.nonzero(a[y, :, 3])[0]:
+                    c = tuple(int(v) for v in a[y, x, :3])
+                    if c in GELB_STUFE:
+                        a[y, x, :3] = GELB_STUFE[c]
+    return a
 
 
 def welle_dy(i):
@@ -121,14 +228,14 @@ def drache(i):
 
 def frame_gross(i, nur=None):
     kp, sk, bob = drache(i)
-    dr = L.zusammen(H, W, [(sk, 0, bob), (kp, 0, bob)])
-    G.rand_schliessen(dr, ERLAUBT, UMRISS)                                      # Regel 16: Spaltenstufen legen Füllfarbe an der Kante frei → Umrissschwarz
+    dr = L.zusammen(H, W, [(sk, 0, bob), (bart_ebene(i), 0, bob), (kp, 0, bob)])
+    G.rand_schliessen(dr, ERLAUBT, UMRISS)                                      # Regel 16: Spaltenstufen legen Füllfarbe an der Kante frei → Umrissschwarz (Bart/Schädel: nur Grau-Umrisse)
     ebenen = []
     if not nur:
         for g in (1, 3, 4, 2):
             if i % N in AN[g]:
                 ebenen.append((BLITZ_G[g], 0, 0))
-    return L.zusammen(H, W, ebenen + [(dr, 0, 0)])
+    return L.zusammen(H, W, ebenen + [(dr, 0, 0), (gelb_ebene(i), 0, bob)])
 
 
 def _frames(nur):
@@ -136,7 +243,7 @@ def _frames(nur):
 
 
 TEST_EBENEN = ('drache',)
-BOX = U.zuschnitt(_frames(None), _frames(TEST_EBENEN), (GPL, GPT, GPL + KW, GPT + KH), zugabe=3, rand=2)
+BOX = U.zuschnitt(_frames(None), _frames(TEST_EBENEN), (GPL, GPT, GPL + KW, max(GPT + KH, GPT + DY + BART_Y0 + BART_R)), zugabe=3, rand=2)
 PAD_L, PAD_T = GPL - BOX[0], GPT - BOX[1]
 
 
@@ -152,9 +259,11 @@ if __name__ == '__main__':
     print('Pixel je Frame:', n)
     # Ruhepose = Original (Drache + Schädel + alle Blitze)
     orig = L.leer(H, W)
-    orig = L.zusammen(H, W, [(BLITZ_G[1], 0, 0), (BLITZ_G[3], 0, 0), (BLITZ_G[4], 0, 0), (BLITZ_G[2], 0, 0), (SCHAEDEL0, 0, 0), (KOERPER0, 0, 0)])
+    orig = L.zusammen(H, W, [(BLITZ_G[1], 0, 0), (BLITZ_G[3], 0, 0), (BLITZ_G[4], 0, 0), (BLITZ_G[2], 0, 0), (SCHAEDEL0, 0, 0), (KOERPER0, 0, 0), (GELB0, 0, 0)])
     f0 = frame_gross(0)
-    print('Ruhepose weicht vom Original ab bei', int((np.abs(f0.astype(int) - orig.astype(int)).sum(axis=2) > 0).sum()), 'Pixeln')
+    bart_ab = GPT + DY + BART_Y0
+    dif = (np.abs(f0.astype(int) - orig.astype(int)).sum(axis=2) > 0)
+    print('Ruhepose weicht vom Original ab bei', int(dif[:bart_ab].sum()), 'Pixeln oberhalb des neuen Barts (Sprite-Zeile < %d); darunter: neuer Bart' % BART_Y0)
     L.speichern('cardinal-beast-qinglong', 'Cardinal Beast Qinglong', frames, MS, prev)
     if prev:
         os.makedirs(prev, exist_ok=True)

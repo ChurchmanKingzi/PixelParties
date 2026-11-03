@@ -21,10 +21,11 @@ Fest bleiben: Kopf mit Schnauze, Hauer, Bauch/Bodenlinie.
 Ablauf (48 Frames à 80 ms = 3,84 s, nahtlos):
 * ATMEN (zweistufig): der Rücken (alles rechts von x 16 oberhalb der Bodenzone) hebt sich langsam um bis zu 2 px (Zeile 9 wird 1–2× eingefügt, mit Nachbartextur gemischt, L.streck_zeile) und senkt sich
   wieder; Bauchzone und Kopf bleiben am Boden.
-* OHRZUCKEN: der graue Ohrblock rutscht in den Frames 14–19 und 36–41 um 1 px nach oben (Zeile darunter wird mit Randschwarz gefüllt).
+* HANDZUCKEN (Nutzer-Feedback Runde 3: „Outline der Hand wird teilweise dicker – niemals Outlines dicker machen“): die Hand (grauer Block samt 1 px Umriss) hebt sich in den Frames 14–19 und 36–41 um 1 px;
+  ihr Umriss wandert mit und bleibt überall 1 px dick; was darunter frei wird, wird Fell (Streifenmuster der Nachbarzeile), nur (22,2) bleibt als einzelnes Umrisspixel über dem Fell.
 * HUFTIPPEN: der Hinterhuf (x 41–44) tippt in den Frames 26–29 einmal 1 px nach unten auf die Bodenlinie.
 Frame 0 = Ruhepose (Original). Alle Bewegungen laufen auf der vollen Leinwand (anim_lib wirft ClipError). Nur ganze Pixel, nur Farben der Quelle.
-Ergänzungen: beim Ohrzucken (23,3), (24,3), (25,3) in Randschwarz (26,26,21) — die Zellen unter dem angehobenen Ohrblock; sonst keine.
+Ergänzungen: beim Handzucken (22,2) Umrissschwarz (26,26,21), (23,3) und (24,3) Fell (148,125,71), (25,3) Fell (163,150,88) — die Zellen unter der angehobenen Hand; sonst keine.
 """
 import os
 import sys
@@ -47,6 +48,7 @@ yy, xx = np.mgrid[0:sh, 0:sw]
 vorhanden = L.deckend(spr)
 ERLAUBT = Hm.umrissfarben(spr)
 SCHWARZ = (26, 26, 21)
+FELL_E, FELL_F = (148, 125, 71), (163, 150, 88)                                   # Fellstreifen neben der Hand (siehe Sprite-Zeile 3/4)
 
 
 def f(x, y):
@@ -72,9 +74,10 @@ def frame(i):
     ohr = ebene(ohr_m)
     hoch = 1 if (Hm.folge(i, 14, [1] * 6, N) or Hm.folge(i, 36, [1] * 6, N)) else 0
     if hoch:
-        # Ohrblock (23–24, 1–2) mit Rand um eine Zeile anheben; die freie Zeile unter dem Block wird Randschwarz
+        # Hand (Block 23–24 / 1–2 samt Umriss) um eine Zeile anheben. Der Umriss wandert mit (bleibt 1 px dick, NIE verdoppeln!); die freigelegten Zellen werden zu Fell bzw. bleiben
+        # als einzelnes Umrisspixel an der Fellkante stehen: (22,2) Umriss über dem Fell (22,3); (23,3), (24,3), (25,3) Fell im Streifenmuster der Nachbarzeile (E, E, F).
         ohr = L.versetze(ohr, 0, -1)
-        Hm.setze(ohr, {(23, 3): SCHWARZ, (24, 3): SCHWARZ, (25, 3): SCHWARZ}, (PAD_L, PAD_T))
+        Hm.setze(ohr, {(22, 2): SCHWARZ, (23, 3): FELL_E, (24, 3): FELL_E, (25, 3): FELL_F}, (PAD_L, PAD_T))
     ohr = L.versetze(ohr, 0, -r)
     huf = ebene(huf_m)
     if Hm.folge(i, 26, [1, 1, 1, 1], N):

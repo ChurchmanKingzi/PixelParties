@@ -25,7 +25,8 @@ Ablauf (72 Frames à 70 ms = 5,04 s, nahtlos; schwere Figur → langsam):
 * Ohren schlagen (links Periode 24, rechts Periode 36 — unabhängig): jede Spalte der äußeren Ohrhälfte (x ≤ 9 bzw. x ≥ 38) wandert um round(±2 · Abstand/10) senkrecht (starres Kippen um die Ohrmitte, Gefälle ≤ 1 px je Spalte; der Kopfansatz bleibt), die Blutspuren am Ohr gehen mit.
 * Ballonbündel schwankt (Periode 72): jede Zeile oberhalb von y 18 rückt waagerecht bis ±2 px (oben am meisten, unten bleibt es am Faden), die oberen Fadenstücke gehen mit.
 * Blut tropft: in jeder Tropfenspur (x 5–9, 38–43; y 34 bis zum letzten Tropfen) laufen die Tropfen zyklisch abwärts (eine volle Spurlänge je Schleife, je Spur andere Länge → andere Geschwindigkeit), oben erscheinen sie wieder an der Ohrkante; die Lachen bleiben.
-* Podest: die Streifen der Blende (y 65–68, x 17–29) laufen waagerecht (Periode 4, 3 Umläufe je Schleife).
+* Podest: STATISCH (Runde 3, Nutzer: die Farbe des Podiums soll nicht wie ein Film laufen). Nur einzelne Glühbirnen der Goldkante (Pixel (17,61), (21,61), (26,61), (29,61), (23,60)) blitzen nacheinander je 4 Frames auf
+  (dunkelgold → gold → hellgold → gold → zurück; Farben aus dem Sprite), nie mehr als eine zugleich.
 Frame 0 = Original (Ruhepose). Ergänzungen: keine (nichts Verdecktes wird freigelegt: Ohren/Ballons laufen vor Hintergrund).
 """
 import sys
@@ -73,8 +74,9 @@ for x in range(sw):
         SPUREN[x] = (34, int(ys.max()))
 LAUF = {x: (yb - 34 + 1) for x, (ya, yb) in SPUREN.items()}          # Spurlänge = Schritte je Schleife
 
-# Podest-Streifen (Periode 4): Quelle = das Original
-STREIFEN_Z = [65, 66, 67, 68]
+# Podest: einzelne Glühbirnen (dunkelgoldene Pixel der Goldkante y 60/61) blitzen nacheinander kurz auf; Farben aus dem Sprite
+LICHTER = [((17, 61), 4), ((21, 61), 17), ((26, 61), 30), ((29, 61), 43), ((23, 60), 56)]
+LICHT_FOLGE = [(255, 180, 0), (255, 210, 102), (255, 210, 102), (255, 180, 0)]
 
 
 def ebene(m, dy=0):
@@ -99,10 +101,12 @@ def versetze_ohr(a, links, dy_spitze):
 def frame(i, nur=None):
     import math
     hub = Hm.stufe(i, 36, 2)
-    # Podest: Streifen laufen (3 Umläufe je Schleife → alle 6 Frames ein Pixel weiter)
+    # Podest: STATISCH (Runde 3: die Streifen liefen wie ein Film). Nur einzelne Glühbirnen der Goldkante blitzen kurz auf (1 px, dunkelgold → gold → hellgold → gold → dunkelgold)
     pod = ebene(podest)
-    versatz = (i // 6) % 4
-    Z.ring_streifen(pod, OFF, STREIFEN_Z, 17, 29, 4, versatz, spr)
+    for (lx, ly), start in LICHTER:
+        c = Hm.folge(i, start, LICHT_FOLGE, N)
+        if c is not None:
+            Hm.setze(pod, {(lx, ly): c}, OFF)
     # Blut: Tropfen kreisen in ihrer Spur, die Lachen bleiben
     tr = ebene(tropfen)
     schritt = {x: (i * LAUF[x]) // N for x in SPUREN}

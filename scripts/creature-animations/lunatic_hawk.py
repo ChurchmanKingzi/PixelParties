@@ -30,6 +30,8 @@ Ablauf (48 Frames à 65 ms = 3,12 s) — er FLIEGT; Frame 0 = Originalpose (Flü
 * Kugeln (Edelsteine, Gold): pulsieren — je Pixel eine Stufe heller auf der Kugelrampe, die Hellphase wandert (Facetten); reihum blitzt an jeder Kugel ein kleiner Glitzerstern auf
   (Frame 2–5, 12–15, 21–24, 31–34, 40–43), er folgt der Kugel. Die Federn glänzen nicht.
 * Goldstaub-Partikel (1-px-Punkte) entfernt (Regel 25: keine isolierten 1-px-Punkte; im Zweifel weglassen).
+* RUNDE 3 (Nutzer: „passt, könnte aber noch ein paar Mondlicht-Particles brauchen“): acht blasse Mondlicht-Klekse (2×2 / 4×4 / 5×3, nie kleiner als 2×2; Farben (249,247,224) Kern, (249,243,174) Rand — beide aus dem Sprite),
+  die langsam aufsteigen und dabei leicht hin und her schweben (Lebensdauer = Schleife, wachsen/schrumpfen, nahtlos). Sie liegen HINTER dem Falken (verschwinden hinter Flügeln/Körper). Sonst ist alles unverändert.
 
 Ergänzungen: keine nötig — die Falken-Ebene ist vollständig (auch unter den Kugeln).
 Randpixel-Test (Regel 16): verschobene Federspalten legen an Seitenkanten Innenfarbe frei; solche Randpixel (und Sternarme am Rand) werden in der Umrissfarbe ihrer Ebene gesetzt:
@@ -146,6 +148,37 @@ def kugeln(a, i):
 
 TEST_EBENEN = ('fluegel', 'koerper')                        # für den Randpixel-Test: ohne Partikel
 
+# ── Mondlicht (Runde 3): blasse Klekse, steigen langsam auf ────────────────────────────────────────────────────────────
+MOND = {'c': (249, 247, 224), 'r': (249, 243, 174)}
+MOND_PUFFS = [
+    dict(x=6, y=40, vx=1, vy=-17, off=0, form='o', wackeln=1),
+    dict(x=64, y=38, vx=-1, vy=-16, off=8, form='m', wackeln=1),
+    dict(x=14, y=42, vx=-2, vy=-20, off=16, form='s', wackeln=1),
+    dict(x=58, y=43, vx=2, vy=-22, off=24, form='o', wackeln=1),
+    dict(x=35, y=11, vx=0, vy=-6, off=32, form='s', wackeln=1),
+    dict(x=9, y=26, vx=-1, vy=-14, off=40, form='m', wackeln=1),
+    dict(x=62, y=24, vx=1, vy=-13, off=4, form='s', wackeln=1),
+    dict(x=29, y=44, vx=-2, vy=-12, off=20, form='o', wackeln=1),
+]
+
+
+def mondlicht(i):
+    """Wie L.puff_ebene, aber ohne 1-px-Stufe (Regel 25): unsichtbar → 2×2 → volle Form → 2×2 → unsichtbar."""
+    ebene = L.leer(H, W)
+    for pf in MOND_PUFFS:
+        t = ((i + pf['off']) % N) / N
+        if t < 0.12 or t >= 0.88:
+            continue
+        form = pf['form'] if 0.3 <= t < 0.7 else 's'
+        cx = int(round(pf['x'] + pf['vx'] * t + pf['wackeln'] * math.sin(2 * math.pi * t)))
+        cy = int(round(pf['y'] + pf['vy'] * t))
+        for dx, dy, k in L.PUFF_FORMEN[form]:
+            if not (0 <= cy + dy < H and 0 <= cx + dx < W):
+                raise L.ClipError('Mondlicht außerhalb der Leinwand')
+            ebene[cy + dy, cx + dx, :3] = MOND[k]
+            ebene[cy + dy, cx + dx, 3] = 255
+    return ebene
+
 
 def frame(i, partikel=True, nur=None):
     ebenen = nur if nur is not None else TEST_EBENEN
@@ -177,6 +210,11 @@ def frame(i, partikel=True, nur=None):
             dx, dy = orb_versatz(name, i) if name != 'K' else (0, 0)
             F.stern(f, PAD_L + mx + dx, PAD_T + my + dy + dy_u, st, STERN_KERN, STERN_ARM)
     B.umriss_je_ebene(f, karte, ERLAUBT, EBENEN_FARBE)
+    if partikel and nur is None:                              # Mondlicht HINTER dem Falken
+        hint = mondlicht(i)
+        m = f[..., 3] > 0
+        hint[m] = f[m]
+        f = hint
     return f
 
 

@@ -6,6 +6,8 @@
     zeilen_scherung(a, off, y_unten, amp, y_oben)   Ballonbündel schwankt: jede Zeile über y_unten wird um round(amp · (y_unten − y)/(y_unten − y_oben)) waagerecht verschoben (starr je Zeile, Gefälle ≤ 1 px)
     ring_streifen(a, off, zeilen, x0, x1, muster, versatz)   Laufstreifen (Podest): Muster der Periode 4 läuft waagerecht
     kugel_drehen(a, off, maske, phase)   Kugel „dreht“: je Zeile kreisen die Innenpixel zyklisch (Phase 0…1 = eine volle Umdrehung je Schleife)
+    kugel_drehen_fest(a, off, innen, fest, phase)   wie kugel_drehen, aber die Pixel der Maske `fest` (Fuß/Schatten auf der Kugel) bleiben stehen; die Kugeltextur läuft unter ihnen durch
+    kreisbahn(mx, my, r, winkel)   Ganzzahlige Position eines Balls auf einer Kreisbahn (Jonglieren): Bahnmitte (mx, my), Radius r
     konfetti(...)                         fallendes Konfetti (2×2) mit Schrumpfen am Anfang/Ende
 """
 import math
@@ -79,3 +81,42 @@ def kugel_drehen(a, off, innen, phase):
         for x in range(x0, x1 + 1):
             a[y + off[1], x + off[0]] = seg[x0 + ((x - x0 - s) % w)]
     return a
+
+
+def kugel_drehen_fest(a, off, innen, fest, phase):
+    """Wie kugel_drehen, aber Pixel in `fest` (Spritekoordinaten; z. B. Fußkontur und Schatten, die auf der Kugel stehen) bleiben unverändert: die Kugeltextur wandert
+    unter ihnen hindurch. Die verdeckten Texturstellen werden aus dem nächsten sichtbaren Kugelpixel der Zeile ergänzt (linke Hälfte der Lücke links, rechte Hälfte rechts)."""
+    for y in range(innen.shape[0]):
+        xs = np.nonzero(innen[y])[0]
+        if len(xs) < 2:
+            continue
+        x0, x1 = int(xs.min()), int(xs.max())
+        w = x1 - x0 + 1
+        s = int(math.floor(phase * w + 1e-9)) % w
+        if s == 0:
+            continue
+        frei = [x for x in range(x0, x1 + 1) if not fest[y, x]]
+        if not frei:
+            continue
+        tex = {}
+        for x in range(x0, x1 + 1):
+            if not fest[y, x]:
+                tex[x] = a[y + off[1], x + off[0]].copy()
+            else:
+                links = [f for f in frei if f < x]
+                rechts = [f for f in frei if f > x]
+                if links and rechts:
+                    q = links[-1] if (x - links[-1]) <= (rechts[0] - x) else rechts[0]
+                else:
+                    q = links[-1] if links else rechts[0]
+                tex[x] = a[y + off[1], q + off[0]].copy()
+        for x in range(x0, x1 + 1):
+            if not fest[y, x]:
+                a[y + off[1], x + off[0]] = tex[x0 + ((x - x0 - s) % w)]
+    return a
+
+
+def kreisbahn(mx, my, r, winkel):
+    """Ganzzahlige (x, y) eines Balls (obere linke Ecke des 2×2-Stücks) auf der Kreisbahn um (mx, my) mit Radius r; winkel in Bogenmaß, Bildschirmkoordinaten
+    (y nach unten: 0 = rechts, π/2 = unten, −π/2 = oben). Wachsender Winkel = im Uhrzeigersinn."""
+    return rund(mx + r * math.cos(winkel)), rund(my + r * math.sin(winkel))

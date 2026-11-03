@@ -17,9 +17,11 @@ Identifikation (Sprite 19×11, weißes Schädel-Schildkrötchen auf dunklem Hint
 * Kein Glanz (Knochen, Regel 14), keine Partikel. Die schwarzen Augenhöhlen sind Löcher, kein Blinzeln möglich.
 Bleibt fest: Schädelpanzer, Augenhöhlen.
 
-Ablauf (48 Frames à 66 ms = 3,2 s), alle Bewegungen unabhängig:
+Ablauf (48 Frames à 100 ms = 4,8 s), alle Bewegungen unabhängig:
 * Alles deutlich langsamer (Rückmeldung: zu schnell/hektisch): 100 ms je Frame statt 66, Perioden verdoppelt.
 * Schweben (Periode 24): das ganze Wesen hebt/senkt sich um 1 px.
+* Schwimmen (Runde 3, Rückmeldung „sollte sich auch leicht nach links und rechts bewegen; sie schwimmt unter Wasser“): das ganze Wesen gleitet langsam ±2 px nach links und rechts (Periode 48, einmal pro Schleife,
+  Frame 0 = Ruhelage); mit dem Schweben ergibt das eine liegende Acht. Alle Teile gehen starr mit (kein Dehnen).
 * Kopf nickt (Periode 24, 2× pro Schleife): die Kopfspalten x ≤ 4 wandern senkrecht, je weiter vom Panzer desto mehr (Schnabelspitze bis ±2 px); der Ansatz am Panzer bleibt.
 * Schwanz wippt (Periode 48, 1× pro Schleife): die Schwanzspalten x ≥ 15 wandern senkrecht, je weiter vom Panzer desto mehr (Spitze bis ±1 px); der Panzer bleibt.
 * Beine tippen (Frames 8–15 links, 32–39 rechts): das Bein verkürzt sich um eine Zeile (hebt sich 1 px), das andere bleibt.
@@ -37,7 +39,7 @@ import anim_lib as L
 import anim_tiere as T
 
 N, MS = 48, 100
-PAD_L, PAD_R, PAD_T, PAD_B = 2, 2, 3, 3
+PAD_L, PAD_R, PAD_T, PAD_B = 4, 4, 3, 3                       # links/rechts: Schwimmen ±2 px + Rand 2
 
 spr = L.lade('undurdle')
 sh, sw = spr.shape[:2]
@@ -62,6 +64,12 @@ def teil(maske):
     return L.platz(t, H, W, PAD_L, PAD_T)                         # sofort auf die volle Leinwand
 
 
+def schwimm_dx(i):
+    """Schwimmen: das ganze Wesen gleitet langsam und leicht nach links und rechts (Periode 48 = einmal pro Schleife, ±2 px; Frame 0 = Ruhelage). Zusammen mit dem
+    Schweben (Periode 24) ergibt das eine liegende Acht — sie treibt unter Wasser."""
+    return int(round(2.0 * math.sin(L.sinus(i, 48))))
+
+
 def frame(i, nur=None):
     ph = L.sinus(i, 24)
     dy = int(round(-1.0 * math.sin(ph)))                         # Schweben
@@ -75,7 +83,8 @@ def frame(i, nur=None):
         br = L.heben_unten(br, PAD_T + 9, 1)
     ebenen = {'koerper': k, 'kopf': ko, 'schwanz': sw_, 'bein_l': bl, 'bein_r': br}
     wahl = nur or tuple(ebenen)
-    ganz = L.zusammen(H, W, [(ebenen[n], 0, dy) for n in wahl])
+    dx = schwimm_dx(i)
+    ganz = L.zusammen(H, W, [(ebenen[n], dx, dy) for n in wahl])
     return T.umriss_schliessen(ganz, RAND, REGEL)                  # Randpixel-Test (Regel 16)
 
 

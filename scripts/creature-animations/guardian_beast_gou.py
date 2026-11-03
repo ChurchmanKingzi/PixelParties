@@ -14,7 +14,8 @@ Identifikation (x, y im 20×26-Sprite; die Figur ist fast spiegelsymmetrisch, Li
 * HELM (y 2–10): Blau (130,141,195)/(146,160,209)/(170,179,234) mit dunklem Umriss (34,57,98); goldenes STIRNBAND y 5–8 (117,98,19)/(184,160,72)/(216,204,82)/(242,229,99), Mitte heller.
 * OHRPLATTEN (x 2–5 bzw. 14–17, y 6–9): graugrüne Helmflügel (74,77,64) mit hellen Lichtpixeln (240,244,229)/(194,197,186)/(136,143,125).
 * AUGEN (y 8–9): schwarze Schlitze (17,13,14) bei (7–8,8)/(11–12,8) und (6–10…13,9); darunter je ein weißer Lichtpixel (246,255,255) bei (7,9)/(12,9) und ein rotbrauner Pixel (110,44,12) bei (8,9)/(11,9).
-* SCHNAUZE (x 7–12, y 10–13): zwei weiße Fangzahn-Streifen (240,244,229)/(194,197,186) bei x 7–8 und 11–12 (y 10–12), dazwischen die dunkelrote Nase/der Mund (66,16,16)/(99,23,23)/(44,10,10) bei (9–10, 10–12) — Zähne, bleiben fest.
+* SCHNAUZE (x 7–12, y 10–13): zwei weiße Fangzahn-Streifen (240,244,229)/(194,197,186) bei x 7–8 und 11–12 (y 10–12), dazwischen die dunkle Nase (26,26,26)/(51,51,51) bei (9–10,10) und darunter das
+  OFFENE ROTE MAUL (66,16,16)/(99,23,23)/(44,10,10) bei (9–10, 11–12) — die Fangzähne bleiben fest, nur das Rot öffnet/schließt sich (Runde 3).
 * SCHULTERPLATTEN (x 0–4 bzw. 15–19, y 10–14): große goldene Pauldrons (117,98,19)…(242,229,99) mit Umriss.
 * ARME (y 14–18): hellblaue Panzerärmel (130,141,195)/(170,179,234), Lila Stoff (156,123,180)/(188,158,212), Fäuste (136,143,125)/(240,244,229) vor dem Bauch bei (7–8,16–17)/(11–12,16–17).
 * RUMPF (y 13–18): violetter Brustlatz (39,20,39)/(97,75,124), goldene Gürtelschnalle (242,229,99) bei (9–10,18).
@@ -26,10 +27,12 @@ Ablauf (48 Frames à 64 ms = 3,07 s, nahtlos):
 * Antenne zuckt: der Kamm wird 1 px länger (Frames 6–9 und 30–33); sonst unverändert.
 * Ohrplatten zucken (links Frames 10–15, rechts Frames 34–39): die Platte rutscht 1 px nach unten und wieder hoch (zweimal, ruckhaft); sie bleibt am Helm.
 * Blinzeln (Frames 19–21 und 41–43): die vier hellen Augenpixel (Weiß/Rotbraun) nehmen die Schlitzfarbe (17,13,14) an.
+* MAUL (Runde 3, Nutzerwunsch „das offene rote Maul periodisch schließen und öffnen“): vier Pixel (9–10, 11–12). Zyklus offen (Original) → halb (obere Maulzeile wird Nasenfarbe, nur die untere Zeile bleibt rot) →
+  zu (obere Zeile Nasenfarbe, untere Zeile dunkelstes Rot (44,10,10) = Maulnaht) → halb → offen; zwei Zyklen je Schleife (Frames 9–15 und 33–39), dazwischen jeweils länger offen. Nur Quellfarben, Fangzähne fest.
 * Fußtippen: der linke Stiefel hebt sich zweimal 1 px (Frames 14–21), später der rechte (Frames 38–45); er verschwindet teilweise hinter dem Bein.
 * Gold glänzt (Regel 12/14): ein Lichtband läuft diagonal über Schultern/Stirnband (Frames 6–17 und Frames 30–41), dazu Glitzersterne an der linken Schulterplatte (Frame 20–24), am Stirnband (Frame 38–42)
   und an der rechten Schulterplatte (Frame 44–48 → Schleifenende).
-Frame 0 = Original (Ruhepose). Kontrolle: anim_humanoide.ruhepose / eckkontakt_typen / Randpixel-Test (Regel 16).
+Frame 0 = Original (Ruhepose, Maul offen). Kontrolle: anim_humanoide.ruhepose / eckkontakt_typen / Randpixel-Test (Regel 16).
 Alle Bewegungen laufen auf der vollen Leinwand (anim_lib wirft ClipError). Nur ganze Pixel, nur Farben der Quelle.
 Ergänzungen: keine (nichts Verdecktes wird freigelegt; die Stiefel liegen beim Heben hinter den Beinen, die Ohrplatten hinter Schulter/Kopf).
 """
@@ -51,6 +54,14 @@ GOLD = [(117, 98, 19), (184, 160, 72), (216, 204, 82), (242, 229, 99), (246, 249
 AUGEN_HELL = [(7, 9), (8, 9), (11, 9), (12, 9)]
 WEISS = f(7, 9)                                                  # (246,255,255) Glanzpixel der Quelle (Kern der Glitzersterne)
 
+# Maul (Runde 3): Pixel (9–10, 11–12); Zustände 0 = offen (Original), 1 = halb, 2 = zu
+NASE = (f(9, 10), f(10, 10))                                     # (26,26,26) / (51,51,51)
+MAUL_ZU = f(9, 12)                                               # (44,10,10) dunkelstes Rot
+MAUL = {
+    1: {(9, 11): NASE[0], (10, 11): NASE[1]},
+    2: {(9, 11): NASE[0], (10, 11): NASE[1], (9, 12): MAUL_ZU, (10, 12): MAUL_ZU},
+}
+MAUL_FOLGE = [1, 2, 2, 2, 2, 2, 1]                               # halb, zu ×5, halb
 ohr_l = sz.maske(2, 6, 5, 9)
 ohr_r = sz.maske(14, 6, 17, 9)
 fuss_l = sz.maske(0, 23, 9, 25)
@@ -65,6 +76,12 @@ def frame(i):
     # --- Blinzeln: helle Augenpixel → Schlitzfarbe ---
     if Hm.folge(i, 19, [1, 1, 1], N) or Hm.folge(i, 41, [1, 1, 1], N):
         sz.setze(k, {p: SCHLITZ for p in AUGEN_HELL})
+    # --- Maul schließt und öffnet sich periodisch (zwei Zyklen je Schleife) ---
+    st = Hm.folge(i, 9, MAUL_FOLGE, N)
+    if st is None:
+        st = Hm.folge(i, 33, MAUL_FOLGE, N)
+    if st:
+        sz.setze(k, MAUL[st])
     # --- Gold glänzt: Lichtband + Glitzersterne (nur Gold) ---
     Hm.lichtband(k, m_gold, OFF, i, N, 6, 12, GOLD, stufen=1, breite=2.6, achse=(1.0, 1.0), kern=2)
     Hm.lichtband(k, m_gold, OFF, i, N, 30, 12, GOLD, stufen=1, breite=2.6, achse=(-1.0, 1.0), kern=2)

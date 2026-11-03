@@ -18,7 +18,9 @@ Fest bleiben: Kopf/Gesicht, Beine/Füße.
 
 Ablauf (48 Frames à 65 ms = 3,12 s; Frame 0 = Original):
 * Schlangenwellen: beide Ohren und beide Arme wellen als echte Schlangenleiber — die Zeilen wandern seitlich, bis ±2 px an der Spitze, mit starkem Wellenlauf (die Welle läuft von der Wurzel zur Spitze, S-Kurve);
-  links Periode 24, rechts Periode 16 (gegenläufig), Arme Periode 24 bzw. 16; alle bleiben 4-verbunden (anim_flieger.zeilen_pendel). Wurzeln (Ansatz am Kopf bzw. an der Schulter) stehen fest.
+  Ohren und linker Arm wie bisher (anim_flieger.zeilen_pendel). Wurzeln (Ansatz am Kopf bzw. an der Schulter) stehen fest.
+  RECHTER ARM (Nutzerkorrektur Runde 3: „zuckt sehr seltsam“): die frühere zeilen_pendel-Bewegung (Periode 16) ließ die unteren Zeilen auf einmal um bis zu 2 px springen. Jetzt anim_daemon.schlange_aussen: der Arm schwingt Periode 24 weich nach rechts aus und zurück, die Welle
+  läuft Zeile für Zeile von der Schulter zur Spitze (Spitze bis +2 px, die Zeilen wechseln zeitversetzt, nie springen Nachbarzeilen um mehr als 1 px), 4-verbunden, Frame 0 = Ruhe.
 * Atmen zweistufig 0-1-2-1-0 px (Periode 24, zweimal pro Schleife): die Bauchzeile y 23 des Rumpfs wird 1–2× eingefügt (anim_lib.streck_zeile mit Texturmischung); Kopf samt Ohren und beide Arme steigen,
   Beine/Füße bleiben am Boden. Der Kopf folgt der Brust 2 Frames später (nie höher als die Brust).
 * Füße wippen starr im Wechsel (rechter Frame 5–7 und 29–31, linker Frame 17–19 und 41–43): das Bein wird 1 px kürzer.
@@ -73,7 +75,7 @@ def frame_gross(i, nur=None):
     ol = D.oben_pendel(T_OL, GPT + 9, 2.2, L.sinus(i, 24), potenz=1.0, lauf=3.2)
     orr = D.oben_pendel(T_OR, GPT + 9, 2.2, -L.sinus(i, 16), potenz=1.0, lauf=3.2)
     al = D.unten_pendel(T_AL, GPT + 17, 1.8, L.sinus(i, 24), potenz=1.0, lauf=2.6)
-    ar = D.unten_pendel(T_AR, GPT + 17, 1.8, -L.sinus(i, 16), potenz=1.0, lauf=2.6)
+    ar = D.schlange_aussen(T_AR, GPT + 17, 1.9, i, 24, lauf=2.4, potenz=1.5)      # rechter Arm: gleichmäßige Wellenbewegung nach außen und zurück (kein Zucken)
     rp = L.streck_zeile(T_RUMPF, GPT + 23, n)
     bl = 1 if (i % 24) in (17, 18, 19) else 0
     br = 1 if (i % 24) in (5, 6, 7) else 0
@@ -84,7 +86,7 @@ def frame_gross(i, nur=None):
     return U.kontur_schliessen(f, UMRISS, KONTUR)
 
 
-BOX = U.zuschnitt([frame_gross(i) for i in range(N)], [frame_gross(i) for i in range(N)], (GPL, GPT, GPL + sw, GPT + sh))
+BOX = U.zuschnitt([frame_gross(i) for i in range(N)], [frame_gross(i) for i in range(N)], (GPL, GPT, GPL + sw, GPT + sh), rand=2)
 PAD_L, PAD_T = GPL - BOX[0], GPT - BOX[1]
 
 
@@ -95,7 +97,7 @@ def frame(i, nur=None):
 if __name__ == '__main__':
     frames = [frame(i) for i in range(N)]
     prev = sys.argv[sys.argv.index('--preview') + 1] if '--preview' in sys.argv else None
-    L.pruefe(frames, quelle=spr, min_rand=1)
+    L.pruefe(frames, quelle=spr, min_rand=2)
     L.speichern('serpentous-demon', 'Serpentous Demon', frames, MS, prev)
     if prev:
         L.streifen(prev + '/serpentous-demon-strip.png', [frames[k] for k in (0, 6, 12, 18, 24, 30, 36, 42)], spalten=4, scale=10)

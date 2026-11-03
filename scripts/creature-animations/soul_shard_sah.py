@@ -13,13 +13,13 @@ Was im Sprite ist (Koordinaten im Sprite 21×25, x/y ab 0):
 * Der „Schnabel“/Rüssel (Nutzer: „der lange Schnabel“): ein schmaler Streifen in der Mitte der Kapuze (G dunkelpetrol, K/Q hell, schwarzer Umriss C) von Zeile 8 bis 14, der unter dem Kapuzensaum (Zeile 13)
   weiter auf den Brustkorb herabreicht (Zeilen 13–14 als Gabel C-G-C-G) und in einer schwarzen Spitze (11,15) endet. Er ist ein eigenes Teil — wird er bewegt, dann nur starr als Ganzes (alle Pixel gleich).
 * Material: Knochen, Stoff, Holz — KEIN Glanz und keine Glitzersterne (Regel 14); kein Feuer (Regel 15). Keine Partikel.
-Fest bleiben: Umriss, Kopf-/Kapuzenform, Gesicht (kein seitliches Kopfneigen mehr — Nutzer-Feedback), Gliedmaßen; der Stab steht starr am Boden (er wird nicht gestreckt: die Hand rutscht beim Atmen daran entlang).
+Fest bleiben: Umriss, Kopf-/Kapuzenform, Gesicht (kein seitliches Kopfneigen — Nutzer-Feedback), der Schnabel (Nutzer-Feedback Runde 3: „der Schnabel soll sich nicht bewegen“ — er ist komplett starr, der frühere Pendel entfällt),
+Gliedmaßen.
 
 Ablauf (48 Frames à 65 ms = 3,12 s, nahtlos):
 * Atmen (Periode 24): unterhalb des Kopfes werden im Rippenkorb 1–2 Zeilen eingefügt (Quellzeile 18, in der Spitze zusätzlich 21 — zwei getrennte Zeilen statt zweier aufeinanderfolgender, damit keine hohen Einheitsblöcke
-  entstehen; die eingefügten Zeilen mischen die Textur der Nachbarzeile ein) — Kopf und Rumpf heben sich um 1–2 px, die Füße bleiben fest am Boden. Der Stab (x ≤ 3) ist eine eigene starre Ebene und bleibt stehen.
-* Schnabel-Pendel (Frames 5–10: 1 px nach rechts, Frames 29–34: 1 px nach links): der Schnabel inklusive Gabel und Spitze wird als Ganzes verschoben; das freigelegte Feld bekommt die Farbe der Nachbarzelle
-  (schwarze Gesichtsleere, Kapuzensaum bzw. Rippenfarbe), die Kapuze selbst bewegt sich nicht.
+  entstehen; die eingefügten Zeilen mischen die Textur der Nachbarzeile ein) — Kopf und Rumpf heben sich um 1–2 px, die Füße bleiben fest am Boden. Der Stab (x ≤ 3) ist eine eigene starre Ebene und wird um genau dieselben 0–2 px wie Hand und Arm (Zeilen 12–16, über den Einfügezeilen) angehoben und abgesenkt
+  (Nutzer-Feedback Runde 3: „der Stab soll sich mit dem Arm mitbewegen“) — Stab und Hand bewegen sich immer synchron, die Hand rutscht nicht mehr am Stab entlang. Der Stab wird nicht verformt, nur starr verschoben.
 * Blinzeln (zweimal je Schleife, Frames 19–21 und 43–45: halb – zu – halb): die weißen Augenpixel (je 1×2) werden zur Kapuzenfarbe. Lidfarbe = umgebende Körperfarbe (je Augenpixel häufigste Farbe im Umkreis von
   2–3 px, ohne Umriss und Augenfarbe).
 Frame: Sprite plus 3 px links/rechts, 4 px oben (Atmen), 2 px unten, Figur zentriert.
@@ -71,36 +71,10 @@ AUGEN = [(5, 9), (6, 9), (5, 14), (6, 14)]                                      
 LID_AUS = {(255, 249, 249), UMRISS}                                                                   # Farben, die nie als Lidfarbe dienen (Umriss, Augenfarben)
 BLINK = {19: 1, 20: 2, 21: 1, 43: 1, 44: 2, 45: 1}                                                                      # Frame → Stufe (1: obere Augenzeile, 2: alle)
 
-# ── Schnabel: starr als Ganzes ──
-BK = {8: (11, 12), 9: (11, 12), 10: (11, 12), 11: (11, 12), 12: (10, 13), 13: (10, 13), 14: (10, 13), 15: (11, 11)}      # Zeile → (x von, x bis) in Sprite-Koordinaten
-SCHNABEL = [(y, x) for y, (a, b) in BK.items() for x in range(a, b + 1)]
-SWAY = {i: 1 for i in range(5, 11)}
-SWAY.update({i: -1 for i in range(29, 35)})
-
-
-def _schnabel(fig, top, dx):
-    """Alle Schnabelpixel starr um dx versetzen; das freigelegte Feld auf der Rückseite füllt die Farbe der Zelle dahinter."""
-    out = fig.copy()
-    pix = [(top + y, PAD_L + x) for (y, x) in SCHNABEL]
-    cols = {p: fig[p].copy() for p in pix}
-    # freigelegt: Randzelle auf der Rückseite; Füllfarbe = Zelle unmittelbar dahinter (Original-Frame)
-    for y_s, (a, b) in BK.items():
-        y = top + y_s
-        x_back = PAD_L + (a if dx > 0 else b)
-        x_beyond = x_back - 1 if dx > 0 else x_back + 1
-        out[y, x_back] = fig[y, x_beyond]
-    for (y_s, (a, b)) in BK.items():
-        y = top + y_s
-        for x_s in range(a, b + 1):
-            out[y, PAD_L + x_s + dx] = cols[(y, PAD_L + x_s)]
-    return out
-
-
 def figur(i):
     ebene, top, quelle = SH.ebene_atmung(KOERPER, POSEN[S[i]], H, W, PAD_L, PAD_T, BODEN)
-    fig = L.zusammen(H, W, [(L.platz(STAB, H, W, PAD_L, PAD_T), 0, 0), (ebene, 0, 0)])
-    if i in SWAY:
-        fig = _schnabel(fig, top, SWAY[i])
+    # Stab: starr, um genau so viel angehoben wie Hand/Arm (obere Körperhälfte; top = PAD_T − eingefügte Zeilen)
+    fig = L.zusammen(H, W, [(L.platz(STAB, H, W, PAD_L, top), 0, 0), (ebene, 0, 0)])
     if i in BLINK:
         ymin = min(y for (y, x) in AUGEN)
         pix = [(top + y, PAD_L + x) for (y, x) in AUGEN if BLINK[i] == 2 or y == ymin]

@@ -60,12 +60,12 @@ STERN1, STERN2 = (212, 213, 247), (246, 246, 246)
 HAARF = [(8, 18, 0), (97, 102, 79), (151, 149, 110), (66, 70, 53)]
 
 schweif = L.farbmaske(spr, [NAVY_A]) & (yy >= 18) & (xx <= 17)
-stirn = L.farbmaske(spr, [NAVY_A, NAVY_B]) & (xx >= 30) & (xx <= 35) & (yy >= 6) & (yy <= 9)
-maehne = L.farbmaske(spr, [NAVY_A, NAVY_O, NAVY_Y, STERN1, STERN2]) & (yy <= 12) & (((yy >= 10) & (xx >= 35)) | ((yy <= 9) & (xx >= 36)))
+# Mähne samt Stirnschopf: alle dunklen Nebelpixel oben rechts am Pferdekopf (Marineblau/Violett und die zwei Sternpixel); Ohr und Kopf des Pferdes (Fellfarben, Umriss (26,45,81)) bleiben fest
+maehne = L.farbmaske(spr, [NAVY_A, NAVY_O, NAVY_Y, STERN1, STERN2]) & (xx >= 28) & (yy <= 12)
 haar = L.farbmaske(spr, HAARF) & (xx <= 21) & (yy >= 12) & (yy <= 16)
 bein_v = vorhanden & (xx >= 31) & (xx <= 33) & (yy >= 26)
 bein_h = vorhanden & (xx >= 15) & (xx <= 17) & (yy >= 26) & ~schweif
-teile = [schweif, stirn, maehne, haar, bein_v, bein_h]
+teile = [schweif, maehne, haar, bein_v, bein_h]
 for a_ in range(len(teile)):
     for b_ in range(a_ + 1, len(teile)):
         assert not (teile[a_] & teile[b_]).any(), (a_, b_)
@@ -83,6 +83,41 @@ FELL = (110, 130, 176)
 def teil(maske):
     t, _ = L.trenne(spr, maske)
     return L.platz(t, H, W, GP, GP)
+
+
+def kontur_pferd(a, erlaubt):
+    """Wie Hm.kontur_schliessen, aber am Pferd (x ≥ 26, y ≥ 8 ohne Reiterin) in der Umrissfarbe des Pferds (26,45,81) statt im Dunkelgrün der Reiterin."""
+    kk = Hm.kantenmaske(a)
+    for y, x in zip(*np.nonzero(kk)):
+        c = tuple(int(v) for v in a[y, x, :3])
+        if c in erlaubt:
+            continue
+        a[y, x, :3] = NAVY_B if (x - GP >= 29 or y - GP >= 20) else UMRISS
+    return a
+
+
+def nebel_umhuellen(e, fest):
+    """Die hellen Pixel der Mähne (Sterne, helles Violett) liegen im Original mitten im Nebel. Wandern sie an den Rand, würde die Außenkontur hell (Regel 16): Sterne bekommen dann
+    dunkle Nebelpixel (30,23,69) als Umhüllung in ihre freien 4er-Nachbarfelder (frei = weder Nebel noch Pferd/Reiterin `fest`), helles Violett wird selbst dunkel."""
+    h, w = e.shape[:2]
+    out = e.copy()
+    for y in range(h):
+        for x in range(w):
+            if not e[y, x, 3]:
+                continue
+            c = tuple(int(v) for v in e[y, x, :3])
+            if c not in (STERN1, STERN2, NAVY_Y):
+                continue
+            frei = [(y + dy, x + dx) for dy, dx in ((1, 0), (-1, 0), (0, 1), (0, -1)) if not e[y + dy, x + dx, 3] and not fest[y + dy, x + dx, 3]]
+            if not frei:
+                continue
+            if c == NAVY_Y:
+                out[y, x, :3] = NAVY_O
+            else:
+                for (yy_, xx_) in frei:
+                    out[yy_, xx_, :3] = NAVY_O
+                    out[yy_, xx_, 3] = 255
+    return out
 
 
 def frame_gross(i, nur=None):
@@ -105,12 +140,18 @@ def frame_gross(i, nur=None):
     # Atmen: Rumpf + Reiterin (ohne Beine/Schweif)
     if b:
         r = L.streck_zeile(r, GP + 23, b)
-    # Schweif und Mähne
-    sc = O.spalten_welle0(teil(schweif), GP + 17, 2.8, i, 24, lauf=1.4)
-    st = L.zeilen_welle(teil(stirn), GP + 10, 1.5, L.sinus(i, 16))
-    mh = L.zeilen_welle(teil(maehne), GP + 12, 1.5, L.sinus(i, 12))
-    fr = L.zusammen(H, W, [(sc, 0, 0), (r, 0, 0), (ha, 0, -b), (st, 0, -b), (mh, 0, -b), (bv, 0, 0), (bh, 0, 0)])
-    return Hm.kontur_schliessen(fr, ERLAUBT, UMRISS)
+    # Schweif und Mähne = dunkler Nebel (anim_orks.nebel): Strömungsfeld statt starrer Welle
+    sc = O.nebel(teil(schweif), (GP + 17, GP + 22), (-1.0, 0.1), 17.0, i, N, **SCHWEIF_NEBEL,
+                 zusatz=lambda x, y, u: (0, -b * max(0.0, 1.0 - 1.5 * u) if y < GP + 23 else 0))
+    mh = O.nebel(teil(maehne), (GP + 29, GP + 11), (1.0, -0.5), 10.0, i, N, **MAEHNE_NEBEL, zusatz=lambda x, y, u: (0, -b))
+    mh = nebel_umhuellen(mh, r)
+    fr = L.zusammen(H, W, [(sc, 0, 0), (mh, 0, 0), (r, 0, 0), (ha, 0, -b), (bv, 0, 0), (bh, 0, 0)])
+    return kontur_pferd(fr, ERLAUBT | {c for c in FOG_FARBEN})
+
+
+SCHWEIF_NEBEL = dict(amp_q=3.0, amp_a=2.2, lauf=2.2, quer=0.25, k1=2, k2=1, potenz=1.0, heller=dict(nur=NAVY_A, farbe=NAVY_B, k=2, frq=6.0, quer=0.5, schwelle=1.2))
+MAEHNE_NEBEL = dict(amp_q=1.7, amp_a=1.3, lauf=2.0, quer=0.35, k1=2, k2=1, potenz=1.0, phase=0.6)
+FOG_FARBEN = {NAVY_A, NAVY_O, NAVY_Y, STERN1, STERN2}
 
 
 def _box():
