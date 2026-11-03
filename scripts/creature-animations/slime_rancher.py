@@ -56,7 +56,7 @@ def koerper(i):
             Hm.setze(k, {(x, y): Hm.farbe_stufe(c, GOLD, st)}, OFF)
         if st == 2:
             Hm.stern4(k, 8, 13, 1, GOLD[2], GOLD[1], off=OFF)
-    # Atmen, zweistufig: Mantel (Zeile 16) zuerst, Kapuze (Zeile 4) etwa 2 Frames später; Saum und Füße (Zeilen 19–24) bleiben starr am Boden
+    # Atmen, zweistufig: Mantel (Zeile 16) zuerst, Kapuze (Zeile 4) etwa 1 Frame später; Saum und Füße (Zeilen 19–24) bleiben starr am Boden
     brust = E.verlauf3(i, 16, 0.0, 1)
     kopf = E.verlauf3(i, 16, -0.45, 1)
     if brust:

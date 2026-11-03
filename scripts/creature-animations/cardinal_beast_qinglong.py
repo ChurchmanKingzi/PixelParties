@@ -110,12 +110,24 @@ BART_R = len(BART_W)
 
 
 def bart_zeile(r, dx):
-    """Pixel (x, Farbe) der Bartzeile r, um dx verschoben. Strähnenlinien (Schatten) im Abstand ∝ Breite, daneben links ein Lichtstreifen."""
+    """Pixel (x, Farbe) der Bartzeile r, um dx verschoben. Strähnenlinien (Schatten) laufen an der Mitte entlang und rücken zur Spitze hin zusammen (Abstand ∝ geglättete Breite), daneben links
+    ein Lichtstreifen in Dreier-Blöcken (kein Schachbrett)."""
     w = BART_W[r]
+    ws = sum(BART_W[max(0, min(BART_R - 1, r + d))] for d in (-1, 0, 1)) / 3.0
     c = 13.5 + BART_M[r] + dx
     xl = int(math.floor(c - w / 2.0 + 0.5))
+    if ws >= 9.5:
+        offs = (-0.27 * ws, 0.0, 0.27 * ws)
+    elif ws >= 6.0:
+        offs = (-0.2 * ws, 0.2 * ws)
+    elif ws >= 3.5:
+        offs = (0.0,)
+    else:
+        offs = ()
+    linien = [int(math.floor(c + o + 0.5)) for o in offs]
     out = []
     for p in range(w):
+        x = xl + p
         if w == 1:
             col = BART_K
         elif w == 2:
@@ -126,14 +138,12 @@ def bart_zeile(r, dx):
             col = BART_J if w >= 5 else BART_K
         else:
             col = BART_L
-            n = 3 if w >= 9 else (2 if w >= 6 else 1)
-            for k in range(n):
-                pos = 1 + int(round((k + 1.0) / (n + 1.0) * (w - 2)))
-                if p == pos:
+            for k, lx in enumerate(linien):
+                if x == lx:
                     col = BART_K
-                elif p == pos - 1 and p >= 1 and (r + 2 * k) % 6 < 4 and col != BART_K:
+                elif x == lx - 1 and col != BART_K and ((r // 3) + k) % 2 == 0:
                     col = BART_I
-        out.append((xl + p, col))
+        out.append((x, col))
     return out
 
 

@@ -42,6 +42,13 @@ Ablauf (54 Frames à 66 ms = 3,56 s), alle Bewegungen unabhängig:
   vergehen; sie liegen hinter dem Hund. Der Rahmen ist dafür nur 2 px breiter als der Hund allein (Rand rechts 5 statt 3).
 Alle Bewegungen laufen auf der vollen Leinwand (anim_lib wirft ClipError). Nur ganze Pixel, nur Farben der Quelle.
 
+RUNDE 3 (Nutzerkorrektur wörtlich: „wackelt zu sehr.“) — alle Bewegungen deutlich gedämpft (Annahme: gemeint ist das ruhelose Zittern/Wedeln insgesamt), Standbild und Gesicht bleiben, nichts Neues dazugekommen:
+* Frösteln (der ganze Hund zitterte 2× je Schleife 8 Frames lang im 2-Frame-Takt 1 px links/rechts) ist ENTFALLEN — das war das stärkste Wackeln.
+* Wurst-Schwanz: Ausschlag an der Spitze von ±2,8 auf ±1,4 px halbiert, Welle halb so schnell (Periode 27 statt 18 Frames, 2 Wellen je Schleife statt 3), Laufwelle schwächer (0,6 statt 0,9).
+* Ohrzucken: 2× statt 4× je Schleife (Frames 8 und 35).
+* Pfoten tippen: nur noch zweimal vorn (Frames 10–11 und 38–39) und einmal hinten (24–25) statt fünfmal.
+* Unverändert: Atmen (1 px, 2× je Schleife), Blinzeln, kalter Atem (Wölkchen), alle Ergänzungen.
+
 Ergänzungen: siehe ERGAENZUNG (Umrisspixel am Schwanz, nur sichtbar, wenn das Schalende wegweht).
 """
 import sys
@@ -88,8 +95,8 @@ RAND = T.rand_farben(spr)
 _f, _u, REGEL = T.umriss_regeln(spr, RAND)
 
 ZEILE = 12                                                         # hier wird beim Atmen eine Zeile eingefügt
-PFOTE_V = (7, 8, 33, 34, 52, 53)
-PFOTE_H = (14, 15, 38, 39)
+PFOTE_V = (10, 11, 38, 39)
+PFOTE_H = (24, 25)
 
 
 def ebene(a, maske):
@@ -100,15 +107,12 @@ def ebene(a, maske):
 
 def zustand(i):
     atem = 1 if (i % 27) in range(3, 16) else 0
-    ohr = max(T.huellkurve(i, N, s, 6) for s in (4, 19, 31, 46))
+    ohr = max(T.huellkurve(i, N, s, 6) for s in (8, 35))
     lid = 0
     for s in (10, 37):
         if 0 <= i - s < 4:
             lid = (1, 2, 2, 1)[i - s]
-    zit = 0
-    for s in (21, 44):
-        if 0 <= i - s < 8:
-            zit = (0, 1, 0, -1, 0, 1, 0, -1)[i - s]
+    zit = 0                                                        # Runde 3: kein Frösteln (Ganzkörperzittern) mehr
     return atem, ohr, lid, zit, 1 if i in PFOTE_V else 0, 1 if i in PFOTE_H else 0
 
 
@@ -127,7 +131,7 @@ def frame(i, nur=None):
     # Schalende weht (Spalten links vom Hals), wandernde Welle
     cols0 = np.arange(W)[None, :] + np.zeros((H, 1), int)
     spitze_s, rumpf_s = L.trenne(schal, cols0 <= PAD_L + 4)                  # freier Wurst-Schwanz (x 0–4) / Wurst auf dem Rücken (bleibt liegen)
-    spitze_s = L.spalten_welle(spitze_s, PAD_L + 5, 2.8, 2 * np.pi * i / 18.0 + 0.22, potenz=1.0, nur_rechts=False, lauf=0.9)
+    spitze_s = L.spalten_welle(spitze_s, PAD_L + 5, 1.4, 2 * np.pi * i / 27.0 + 0.6, potenz=1.0, nur_rechts=False, lauf=0.6)
     schal = L.zusammen(H, W, [(rumpf_s, 0, 0), (spitze_s, 0, 0)])   # Frame 0 = Original
     # Atmen: Zeile 12 einfügen, alles darüber steigt
     hund = L.streck_zeile(hund, PAD_T + ZEILE, atem)

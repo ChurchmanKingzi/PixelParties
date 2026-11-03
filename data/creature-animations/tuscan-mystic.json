@@ -1,7 +1,7 @@
 {
   "creature": "Tuscan Mystic",
   "sheet": "tuscan-mystic.png",
-  "frameWidth": 29,
+  "frameWidth": 33,
   "frameHeight": 29,
   "frames": 48,
   "frameMs": 80,
@@ -11,5 +11,5 @@
   "padLeft": 2,
   "padRight": 2,
   "padBottom": 2,
-  "faceX": 14.5
+  "faceX": 16.5
 }

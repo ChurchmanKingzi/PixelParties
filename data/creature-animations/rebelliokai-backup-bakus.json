@@ -1,15 +1,15 @@
 {
   "creature": "Rebelliokai Backup Bakus",
   "sheet": "rebelliokai-backup-bakus.png",
-  "frameWidth": 24,
-  "frameHeight": 26,
+  "frameWidth": 36,
+  "frameHeight": 36,
   "frames": 48,
   "frameMs": 70,
   "loop": true,
   "layout": "horizontal",
-  "padTop": 2,
-  "padLeft": 2,
-  "padRight": 2,
-  "padBottom": 2,
-  "faceX": 12.0
+  "padTop": 9,
+  "padLeft": 8,
+  "padRight": 8,
+  "padBottom": 3,
+  "faceX": 18.0
 }

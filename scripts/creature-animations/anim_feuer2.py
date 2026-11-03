@@ -55,6 +55,10 @@ BAENKE = {
     # ruhigere Flammen (Kerze, Glut, Schweif-Spitzen): kleinere Ausschläge
     'ruhig': [(1.00, 0.0, 0.0, 0), (1.06, 0.5, 0.2, 0), (1.12, 1.0, 0.3, 1), (1.04, 0.8, 0.0, 1), (0.92, 0.3, -0.3, 0),
               (0.84, -0.4, -0.4, -1), (0.88, -1.0, -0.1, 0), (0.98, -1.2, 0.3, 0), (1.08, -0.8, 0.4, 1), (1.04, -0.3, 0.1, 0)],
+    # gerader Strahl (Drachenatem, Fackel): kaum Neigung, dafür Länge und Kernhub; die Zungenspitzen flackern
+    'strahl': [(1.00, 0.0, 0.0, 0), (1.06, 0.3, 0.1, 1), (1.12, 0.6, 0.2, 1), (1.07, 0.5, 0.0, 0), (0.97, 0.2, -0.1, -1),
+               (0.88, 0.0, -0.2, -1), (0.86, -0.3, 0.0, 0), (0.94, -0.6, 0.1, 1), (1.04, -0.6, 0.2, 1), (1.12, -0.4, 0.1, 2),
+               (1.15, -0.2, 0.1, 1), (1.08, 0.0, 0.0, 0)],
     # wilde, flackernde Flammen (Feuerball-Rand, Strahl-Fransen)
     'wild': [(1.00, 0.0, 0.0, 0), (1.12, 1.0, 0.5, 1), (1.24, 2.0, 0.9, 2), (1.10, 1.6, 0.2, 1), (0.88, 0.8, -0.6, 0),
              (0.66, 0.0, -0.9, -1), (0.62, -1.0, -0.5, -1), (0.80, -2.0, 0.2, 0), (1.04, -2.2, 0.9, 1),
@@ -72,10 +76,10 @@ class Zunge:
 
 
 class Vorlage:
-    def __init__(self, rgba, zungen, richtung='hoch', rand_farbe=None, sperre=None, kochen=0.0, welle=None, bank=None, faden=None, loecher=True, rand_frei=None):
+    def __init__(self, rgba, zungen, richtung='hoch', rand_farbe=None, sperre=None, kochen=0.0, welle=None, bank=None, faden=None, loecher=True, rand_frei=None, puls=None):
         self.rgba = rgba.copy()
         self.zungen, self.richtung, self.rand_farbe, self.kochen = list(zungen), richtung, rand_farbe, kochen
-        self.welle, self.bank, self.faden, self.loecher = welle, bank, faden, loecher
+        self.welle, self.bank, self.faden, self.loecher, self.puls = welle, bank, faden, loecher, puls
         h, w = rgba.shape[:2]
         self.rand_frei = np.zeros((h, w), bool) if rand_frei is None else rand_frei.astype(bool)     # Pixel, deren Randfarbe nicht überschrieben wird
         self.sperre = np.zeros((h, w), bool) if sperre is None else sperre.astype(bool)
@@ -429,6 +433,24 @@ class Feuer:
             tief = m & p[1:-3, 2:-2] & p[3:-1, 2:-2] & p[2:-2, 1:-3] & p[2:-2, 3:-1] & p[:-4, 2:-2] & p[4:, 2:-2] & p[2:-2, :-4] & p[2:-2, 4:]
             use = tief & (g.a[ky_, kx, 3] > 0)
             out[use, :3] = g.a[ky_, kx, :3][use]
+        if g.vl.puls:                                                      # Schwallwelle: ein Band wandert mit dem Strom, seine Pixel sind eine Farbstufe dunkler
+            tempo, abstand, dicke = g.vl.puls
+            cs = self._farben_liste(g)
+            idx = np.full((h, w), -1, int)
+            for k, c in enumerate(cs):
+                idx[(out[..., 0] == c[0]) & (out[..., 1] == c[1]) & (out[..., 2] == c[2]) & (out[..., 3] > 0)] = k
+            ys = np.nonzero(g.a[..., 3].any(axis=1))[0]
+            pos = yy - ys.min()
+            periode = self.n * tempo
+            m_ = max(1, int(round(periode / float(abstand))))
+            band = np.zeros((h, w), bool)
+            for k in range(m_):
+                pk = (i * tempo + k * periode / m_) % periode
+                band |= (pos <= pk) & (pos > pk - dicke)
+            dunkler = band & (idx >= 0) & (idx < len(cs) - 1)
+            for k in range(len(cs) - 2, -1, -1):
+                sel = dunkler & (idx == k)
+                out[sel, :3] = cs[k + 1]
         return out, anker
 
     def _aufraeumen(self, out, anker, g):

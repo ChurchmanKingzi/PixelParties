@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""Idle-Animation für „Tuscan Artist“ (Creature) — der Künstler mit dem Gemälde als Kopf. Das BILD bleibt vollkommen STATISCH (kein Heben, kein Farbwechsel, kein Pinsel im Bild); nur die Figur darunter lebt.
+"""Idle-Animation für „Tuscan Artist“ (Creature) — der Künstler mit dem Gemälde als Kopf. Das BILD bleibt vollkommen STATISCH (kein Heben, kein Farbwechsel, kein Pinsel im Bild) und liegt UNTER der Figur; nur die Figur lebt.
 
 Quelle: src/tuscan-artist.png (24×37 px, 27 Farben).
 PICK: [["MotiveGrailWar", 198, 1]]      (Ebene „Tuscan Artist“, Figur 1)
@@ -19,10 +19,15 @@ Was im Sprite ist (x, y im 24×37-Sprite):
 Metall im Sprite: nur die Schuhkappen (Regel 14). Der goldene Rahmen bekommt wegen der Vorgabe „Bild statisch“ KEINEN Glanz.
 
 Ablauf (48 Frames à 62 ms = 2,98 s, nahtlos):
+* RUNDE 3 (Nutzer: „Das Bild soll UNTER der Figur liegen, nicht darüber. Außerdem bewegt er aktuell seinen Stoßzahn statt des (grauen) Arms.“):
+  - Zeichenreihenfolge: das Bild (Zeilen 0–11) wird ZUERST gezeichnet, die Figur liegt darüber. Beim Atmen steigen Schultern und Kragen 1 px und schieben sich dabei über die untere Rahmenkante des (unveränderten, nie bewegten) Bildes —
+    vorher wurde die oberste Körperzeile (Kragen) gelöscht, damit nichts überlappt, und das Bild lag sozusagen vor dem Körper.
+  - Die kleinen braunen Gebilde mit hellem Kern und orangem Ende links und rechts auf Hüfthöhe ((2–5, 21–25) und (18–21, 21–26); der Nutzer liest sie als „Stoßzähne“) bewegen sich NICHT mehr für sich allein.
+    Stattdessen bewegt sich der graue ARM (rechter Ärmel, Frames 4–11 und 28–35): der Teil des Arms ab Zeile 20 (Ärmelsaum, Ärmelzipfel neben dem Körper) rutscht starr 1 px nach unten, der Arm wird dadurch 1 px länger
+    (in die frei werdende Zeile 20 kommt eine Texturmischung der Ärmelzeile 19, `L.misch_kopie`; kein seitliches Verbreitern, kein dickerer Umriss). Das braune Gebilde am Ärmelende hängt am Arm und geht starr mit (Annahme: der
+    „Stoßzahn“ soll nicht für sich zucken, sondern der Arm bewegt sich).
 * Atmen / Schulterheben (Periode 24 = zweimal pro Schleife): der Körper unter dem Bild steigt 1 px (Schultern, Ärmel, Hände mit Pinsel, Overall; die Schuhe bleiben am Boden): die Anzugzeile 32 wird einmal doppelt
-  eingefügt (L.streck_zeile) und die oberste Körperzeile 12 (Halstuch-Oberkante) entfällt — das Halstuch wird dabei 1 px kürzer, das Bild bleibt auf seiner Zeile (Kopf nur senkrecht, hier gar nicht bewegt).
-* Rechte Hand zuckt (leere Hand, Frames 4–9 und 28–33): die Hautpixel der Hand (x ≥ 18, y 21–26: braun (156,105,62), hell (245,203,161), orange (239,161,95)) rutschen starr 1 px nach oben in den Ärmelsaum; unten bleibt
-  ein Pixel der Kontur, nichts wird aufgerissen.
+  eingefügt (L.streck_zeile); die oberste Körperzeile 12 (Halstuch-Oberkante) bleibt erhalten und liegt dann über der untersten Bildzeile 11 (Bild liegt UNTER der Figur).
 * Schuhkappen glänzen (Metall): ein heller Pixel (225,215,217) wandert viermal pro Schleife über die Kappen (Frames 3–8 + je 12k), links x 8–10 und rechts x 14–16.
 Frame 0 = Original (Ruhepose). Kontrolle: anim_humanoide.ruhepose / eckkontakt_typen / Randpixel-Test (Regel 16).
 Alle Bewegungen laufen auf der vollen Leinwand (anim_lib wirft ClipError). Nur ganze Pixel, nur Farben der Quelle.
@@ -120,7 +125,7 @@ if __name__ == '__main__':
     print('Pixel je Frame:', n)
     # Das Bild muss in jedem Frame pixelgleich sein
     b0 = frames[0][PAD_T:PAD_T + 12, PAD_L:PAD_L + sw]
-    print('Bild (Zeilen 0–11) in allen Frames identisch:', all(np.array_equal(fr[PAD_T:PAD_T + 12, PAD_L:PAD_L + sw], b0) for fr in frames))
+    print('Bild (Zeilen 0–10) in allen Frames identisch:', all(np.array_equal(fr[PAD_T:PAD_T + 11, PAD_L:PAD_L + sw], b0[:11]) for fr in frames), '(Zeile 11 wird beim Atmen von den Schultern überdeckt)')
     e0 = Hm.eckkontakt_typen(frames[0])
     neu = {i: dict(Hm.eckkontakt_typen(g) - e0) for i, g in enumerate(frames) if Hm.eckkontakt_typen(g) - e0}
     print('neue Eckkontakte gegenüber Frame 0:', neu if neu else 'keine')

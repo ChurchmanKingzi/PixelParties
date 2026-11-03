@@ -74,19 +74,19 @@ koerper_m = vorhanden & ~ohr_l & ~ohr_r & ~arm_l & ~arm_r
 # ── Sprungplan: Frame → (Höhe in der Luft, Streckung s (>0 Zeilen eingefügt, <0 Zeilen entfernt), Ohrenhub (px an der Spitze, + = hoch), Armhub (px an der Spitze, + = hoch))
 FLUG = {}
 SPRUNG_GROSS = [
-    # (Frame, Höhe, s, Ohr, Arm)
-    (10, 0, -1, -1.5, -1), (11, 0, -2, -3, -2), (12, 0, -4, -4, -3), (13, 0, -4, -4, -3),               # Hocke
-    (14, 3, 3, -3, 2),                                                                                # Absprung
-    (15, 7, 3, -1, 4), (16, 10, 2, 3, 6), (17, 12, 1, 6, 7), (18, 13, 0, 8, 7), (19, 13, 0, 5, 7),     # Aufstieg, Scheitel, Ohren schlagen
-    (20, 12, 0, 2, 5), (21, 10, 0, 6, 4), (22, 7, 0, 4, 3), (23, 4, 1, 1, 1), (24, 1, 1, -1, 0),       # Abstieg
-    (25, 0, -3, -4, -3), (26, 0, -4, -4, -3), (27, 0, -2, -2, -1), (28, 0, -1, 1, 0), (29, 0, 0, 1.5, 0), (30, 0, 0, 0.5, 0),   # Landung, Nachwippen
+    # (Frame, Höhe, s, Ohr, Arm hoch, Arme seitlich aus 0…1)
+    (10, 0, -1, -1.0, 0, 0.25), (11, 0, -2, -2, 0, 0.5), (12, 0, -4, -2, 0, 0.5), (13, 0, -4, -2, 0, 0.5),     # Hocke
+    (14, 3, 3, -2, 2, 0),                                                                                # Absprung
+    (15, 7, 3, -1, 4, 0), (16, 10, 2, 3, 5, 0), (17, 12, 1, 6, 6, 0), (18, 13, 0, 8, 6, 0), (19, 13, 0, 5, 6, 0),   # Aufstieg, Scheitel, Ohren schlagen
+    (20, 12, 0, 2, 5, 0), (21, 10, 0, 6, 4, 0), (22, 7, 0, 4, 3, 0), (23, 4, 1, 1, 1, 0), (24, 1, 1, -1, 0, 0),     # Abstieg
+    (25, 0, -3, -2, 0, 0.5), (26, 0, -4, -2, 0, 0.5), (27, 0, -2, -1, 0, 0.25), (28, 0, -1, 1, 0, 0), (29, 0, 0, 1.5, 0, 0), (30, 0, 0, 0.5, 0, 0),   # Landung, Nachwippen
 ]
 SPRUNG_KLEIN = [
-    (45, 0, -1, -1, -1), (46, 0, -2, -2, -1),
-    (47, 2, 2, -2, 2), (48, 5, 1, 3, 3), (49, 6, 0, 5, 3), (50, 5, 0, 2, 2), (51, 2, 1, -1, 0),
-    (52, 0, -2, -3, -2), (53, 0, -1, 0, -1), (54, 0, 0, 1, 0), (55, 0, 0, 0.5, 0),
+    (45, 0, -1, -1, 0, 0.25), (46, 0, -2, -1.5, 0, 0.5),
+    (47, 2, 2, -1.5, 2, 0), (48, 5, 1, 3, 3, 0), (49, 6, 0, 5, 3, 0), (50, 5, 0, 2, 2, 0), (51, 2, 1, -1, 0, 0),
+    (52, 0, -2, -2, 0, 0.5), (53, 0, -1, 0, 0, 0.25), (54, 0, 0, 1, 0, 0), (55, 0, 0, 0.5, 0, 0),
 ]
-PLAN = {fr: (h, s, o, a) for fr, h, s, o, a in SPRUNG_GROSS + SPRUNG_KLEIN}
+PLAN = {fr: (h, s, o, a, aus) for fr, h, s, o, a, aus in SPRUNG_GROSS + SPRUNG_KLEIN}
 # Gewicht der Idle-Bewegungen (Atmen, Armschlackern, Ohrenwackeln): 0 mitten im Sprung, 1 sonst, Übergang 0,5
 IDLE_W = [1.0] * N
 for fr in range(11, 30):
@@ -108,7 +108,7 @@ def streck_bein(kp, n):
 
 
 def frame(i):
-    hoehe, s, ohr, arm_h = PLAN.get(i, (0, 0, 0, 0))
+    hoehe, s, ohr, arm_h, aus = PLAN.get(i, (0, 0, 0, 0, 0))
     w = IDLE_W[i]
     r = int(round(0.5 - 0.5 * np.cos(L.sinus(i, 36)) + 0.0)) if w >= 1.0 else 0     # Atemhub 0/1 (2 Atemzüge je Schleife)
     # ── Körper ──
@@ -139,12 +139,12 @@ def frame(i):
     ol, orr = L.versetze(ol, 0, -hub), L.versetze(orr, 0, -hub)
     # ── Arme ──
     al, ar = ebene(arm_l), ebene(arm_r)
-    s_l = 0.5 - 0.5 * np.cos(L.sinus(i, 24))
-    s_r = 0.5 - 0.5 * np.cos(L.sinus(i, 16))
+    s_l = w * (0.5 - 0.5 * np.cos(L.sinus(i, 24))) + aus * (1 - w)             # Idle: Schlackern; Hocke/Landung: Arme seitlich aus
+    s_r = w * (0.5 - 0.5 * np.cos(L.sinus(i, 16))) + aus * (1 - w)
     al = L.streck_zeile(al, PAD_T + 17, r)
     ar = L.streck_zeile(ar, PAD_T + 17, r)
-    dl = G.kappe({PAD_T + y: -int(round(2.0 * w * s_l * (y - 17) / 3.0)) for y in range(17, 21)})
-    dr = G.kappe({PAD_T + y: int(round(2.0 * w * s_r * (y - 17) / 3.0)) for y in range(17, 21)})
+    dl = G.kappe({PAD_T + y: -int(round(2.0 * s_l * (y - 17) / 3.0)) for y in range(17, 21)})
+    dr = G.kappe({PAD_T + y: int(round(2.0 * s_r * (y - 17) / 3.0)) for y in range(17, 21)})
     al, ar = G.zeilen_dx(al, dl), G.zeilen_dx(ar, dr)
     if arm_h:
         al = L.spalten_welle(al, PAD_L + 8, 0.0, 0.0, nur_rechts=False, bias=-arm_h)

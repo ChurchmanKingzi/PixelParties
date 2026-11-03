@@ -20,14 +20,20 @@ Identifikation (Sprite-Koordinaten x, y; die Teile trennt das Skript per Farbe u
 * Flügel/Arme: graue Fledermausflügel (Töne (125,125,125) (112,112,112) (89,89,89) (63,63,63) (45,45,45)); sie stehen als hochgereckte Arme: links x 0–9, y 21–37 (Spitze frei bis y 28), rechts x 18–27, y 23–37; die
   rechte Handspitze (x 20–24, y 23–25) hält den Gitarrenhals.
 
-Ablauf (48 Frames à 65 ms = 3,12 s; Frame 0 = Ruhepose bis auf das neu gezeichnete Feuer). Kein Flug, kein Hover-Bob: Körper, Kopf, Füße stehen fest am Boden.
+Ablauf (48 Frames à 65 ms = 3,12 s; Frame 0 = Ruhepose bis auf das neu gezeichnete Feuer). Kein Flug, kein Hover-Bob: die Füße stehen fest am Boden (der Oberkörper atmet).
 * Fackel-Schwenk (3 pro Schleife, Periode 16 Frames = 1,04 s): die Gitarre samt Hand schwingt sinusförmig bis ±3 px nach links/rechts und kippt dabei oberhalb der Hand (Zeilenversatz, Gefälle ≤ 0,11 px je Zeile,
   der Kippwinkel hinkt dem Schwenk 0,7 rad nach → „Peitscheneffekt“); starr geschoben, nichts kopiert, 4er-Zusammenhang über `A.verbinde4`.
-* Rechter Flügel (Hand): schwingt mit der Gitarre (Zeilen bis y 26 voll, bis y 31 abklingend; Schulter y ≥ 29 fest, die Wurzel steht als fester Unterbau darunter). Linker Flügel schwingt mit 90 %, 1 Frame verzögert, mit.
+* Rechter Flügel (Hand): schwingt mit der Gitarre (Zeilen bis y 26 voll, bis y 31 abklingend; Schulter y ≥ 29 fest, die Wurzel steht als fester Unterbau darunter), denn er hält den Gitarrenhals.
+* Linker Flügel (Runde 3, Rückmeldung „sollte ihre Flügel unabhängig voneinander bewegen“): schwingt jetzt FÜR SICH, nicht mehr an Gitarre/rechten Flügel gekoppelt — eigene Perioden 24 und 12 Frames (Gitarre/rechter Flügel: 16),
+  Ausschlag 2,6 + 0,8 px (Zeilenversatz wie beim rechten, Wurzel fest), Frame 0 = Ruhelage.
+* Körper (Runde 3, Rückmeldung „bewegt ihren Körper aktuell gar nicht“): sie atmet — Periode 24 (zwei Atemzüge pro Schleife): an den Bauchzeilen y 39 und y 41 (Textur, unter den Flügeln, weder Gesicht noch Hals) wird je eine Zeile mit
+  Texturmischung (`L.streck_zeile`) eingefügt, zweistufig mit Nachlauf (zuerst unten, dann oben): Kopf, Flügel, Gitarre samt Hand und Feuer heben sich um 0 … 2 px, Beine/Füße bleiben am Boden; die Funken starten an der angehobenen Fackel.
+* Haarsträhnen unten (Runde 3, Rückmeldung „die Haare zucken seltsam“): statt Pixel zu stauchen/verdoppeln (das ließ sie zucken) pendeln sie jetzt ruhig als Ganzes nach außen und zurück (`strang_schwingen`): jede Zeile (Umriss, Füllung und die einzelnen
+  Haarfransen außen) wandert starr um 0 … 2 px, die Auslenkung wächst gleichmäßig zur Spitze und folgt der Bewegung mit Nachlauf (Welle), das innerste Pixel bleibt am Körper, die Lücke füllt die Füllfarbe der Strähne. Links Periode 24,
+  rechts Periode 16 (gegeneinander versetzt), nach innen nie über die Ruhelage hinaus; Änderungen höchstens 1 px je Zeile und alle 2–4 Frames.
 * Feuer (Regel 15, `anim_harpyb.WindFeuer` = anim_feuer.Feuer + Fahrtwind): 7 verschachtelte Zungen mit je 5 Farbschichten, je Zunge eigene Posenfolge (12 Posen à 2–3 Frames); Basis ruhig und breit am Gitarrenkopf, Spitzen
   züngeln; die Flamme neigt sich entgegen der Schwenkrichtung (Fahrtwind ±2,6 px an der Spitze) und folgt dem Kippen der Gitarre. Zungenspitzen reißen ab und steigen als Funken auf (1 px, gelb → orange → rot,
   12 pro Schleife, bleiben beim Aufsteigen in der Luft stehen, während die Fackel weiterzieht).
-* Haarsträhnen unten schwingen ±1 px (Periode 16, gegenläufige Phase); das innere Ende bleibt am Körper.
 * Blinzeln: Frames 19–21 und 41–42, Lid = Hautfarbe (114,63,63) auf Iris und Pupille.
 
 Ergänzungen (Sprite-Koordinaten): Haaransatz unter dem Gitarrenfuß, den die Gitarre sonst verdeckt: (13,25) (14,25) (15,25) = Umrissfarbe (19,10,10), (14,26) = Haarfarbe (168,97,97). Das Feuer wird komplett neu gezeichnet
@@ -157,16 +163,16 @@ STRANG_Y0, STRANG_Y1 = PAD_T + 37, PAD_T + 44                # Strähnen hängen
 
 
 def strang_schwingen(a, links, t, periode, amp, lag=2.0):
-    """Haarsträhne schwingt als Pendel nach außen und zurück (Runde 3, Rückmeldung „die Haare zucken seltsam“): jede Zeile wandert STARR um dx nach außen (nichts wird gedehnt, doppelt oder ausgelassen,
-    auch die Haarfransen (Einzelpixel) außen wandern mit ihrer Zeile mit), dx wächst gleichmäßig mit dem Abstand zur Schulter (bis `amp` px unten) und folgt der Bewegung mit etwas Nachlauf (`lag` Frames je Strähnenlänge) —
-    eine ruhige Welle statt Zucken. Nach innen (zum Körper hin) geht es nie über die Ruhelage hinaus. Das so frei werdende Stück zwischen Strähne und Körper wird mit der Farbe des innersten Strähnenpixels der Zeile gefüllt
-    (dunkle Innenschattierung). links=True: Strähne links vom Körper (außen = links), sonst rechts."""
+    """Haarsträhne schwingt als Pendel nach außen und zurück (Runde 3, Rückmeldung „die Haare zucken seltsam“): in jeder Zeile bleibt das innerste Pixel am Körper stehen, alle anderen Pixel der Zeile (Umriss, Füllung und
+    die einzelnen Haarfransen außen) wandern STARR um dx nach außen (nichts wird neu abgetastet, doppelt oder ausgelassen); die Lücke zwischen verschobenem Teil und innerstem Pixel füllt die Füllfarbe des
+    nächsten Pixels (die Strähne wird dort etwas breiter, kein dunkler Block). dx wächst gleichmäßig mit dem Abstand zur Schulter (bis `amp` px unten) und folgt der Bewegung mit Nachlauf (`lag` Frames je Strähnenlänge) —
+    eine ruhige Welle statt Zucken; bei t = 0 genau die Ruhelage; nach innen geht es nie über die Ruhelage hinaus. links=True: Strähne links vom Körper (außen = links), sonst rechts."""
     out = a.copy()
     h, w = a.shape[:2]
     u = lambda tt: 0.5 * (1 - math.cos(2 * math.pi * tt / periode))
     for y in range(STRANG_Y0 + 1, STRANG_Y1 + 1):
         xs_ = np.nonzero(a[y, :, 3])[0]
-        if not len(xs_):
+        if len(xs_) < 2:
             continue
         f = (y - STRANG_Y0) / float(STRANG_Y1 - STRANG_Y0)
         z = max(0.0, u(t - lag * f) - u(-lag * f))                  # bei t = 0 genau 0 (Ruhepose)
@@ -174,16 +180,18 @@ def strang_schwingen(a, links, t, periode, amp, lag=2.0):
         if dx == 0:
             continue
         s = -dx if links else dx
-        if xs_.min() + s < 0 or xs_.max() + s >= w:
+        bewegt = xs_[:-1] if links else xs_[1:]                     # alles außer dem innersten Pixel
+        innen = int(xs_[-1]) if links else int(xs_[0])
+        naechst = int(bewegt[-1]) if links else int(bewegt[0])      # Pixel direkt außerhalb des innersten
+        if bewegt.min() + s < 0 or bewegt.max() + s >= w:
             raise L.ClipError(f'Strähne Zeile {y} würde um {s} px aus der Leinwand geschoben')
-        innen = int(xs_.max()) if links else int(xs_.min())
-        farbe = a[y, innen].copy()
-        out[y, xs_] = 0
-        out[y, xs_ + s] = a[y, xs_]
-        # Lücke zwischen verschobener Strähne und dem Körper (Innenseite) mit der Farbe des innersten Pixels füllen
+        farbe = a[y, naechst].copy()
+        out[y, bewegt] = 0
+        out[y, bewegt + s] = a[y, bewegt]
         for k in range(1, dx + 1):
-            xk = innen + s + (k if links else -k)
-            out[y, xk] = farbe
+            xk = naechst + s + (k if links else -k)
+            if (links and xk < innen) or (not links and xk > innen):
+                out[y, xk] = farbe
     return out
 
 
@@ -235,8 +243,8 @@ def frame(i, partikel=True, nur=None):
                 rest[PAD_T + y, PAD_L + x, :3] = LID
         fl_l = HB.zeilen_schub(FL_L, arm_dx(flügel_links(i), 26, 31))
         fl_r = HB.zeilen_schub(FL_R, arm_dx(a, 26, 31))
-        str_l = strang_schwingen(STR_L, True, i, 24.0, 3.0)
-        str_r = strang_schwingen(STR_R, False, i, 16.0, 2.6, lag=1.5)
+        str_l = strang_schwingen(STR_L, True, i, 24.0, 2.2)
+        str_r = strang_schwingen(STR_R, False, i, 16.0, 2.0, lag=1.5)
         feuer = FEUER.ebene(i, wind=wind(i))
         feuer = A.verbinde4(HB.zeilen_schub(feuer, schub_fn(a, kippen(i), 16)))[0]
         gitarre = A.verbinde4(HB.zeilen_schub(GITARRE, schub_fn(a, kippen(i))))[0]

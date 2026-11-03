@@ -71,7 +71,7 @@ m_gold = sz.vorhanden & L.farbmaske(spr, GOLD) & (sz.yy >= 18) & (sz.yy <= 30)
 FLAMME = np.array(Image.open(L.os.path.join(L.SRC, 'guardian-beast-long-flamme.png')).convert('RGBA'))
 FX, FY = 0, 13                                                   # Lage der Flammenebene im Sprite (Stiel x 12–13 liegt im Maul, Ebene 105 x0 = Ebene 104 x0)
 ZAEHNE = [(6.0, 26), (9.4, 28), (12.8, 31), (16.2, 28), (19.4, 25)]     # (Zungenmitte x, Spitzenzeile) in Flammenebene — von Hand gesetzt, mittlere Zunge am längsten
-STEIL = 2.1                                                      # Zahnflanke: je Pixel Abstand von der Zungenmitte verliert die Zunge so viele Zeilen
+STEIL = 1.35                                                     # Zahnflanke: je Pixel Abstand von der Zungenmitte verliert die Zunge so viele Zeilen
 
 
 def zaehne_schneiden(fl):
@@ -106,8 +106,8 @@ Z = lambda f_, s_, **k: FE2.Zunge((f_[0] + PL + FX, f_[1] + PT + FY), (s_[0] + P
 ZUNGEN = [Z((12.5 + (zx - 12.5) * 0.4, 5), (zx, zy), fuss_anteil=0.38) for (zx, zy) in ZAEHNE]
 STIEL = np.zeros((H, W), bool)
 STIEL[PT + FY:PT + FY + 5, PL + FX + 10:PL + FX + 16] = True      # der Stiel am Maul hat keinen roten Rand (er liegt auf dem Maul)
-VL = FE2.Vorlage(RGBA_F, ZUNGEN, 'runter', rand_farbe=ROT, faden=2, rand_frei=STIEL)
-FEUER = FE2.Feuer([VL], n=N, seed=5, bank='zunge', amp=1.0, funken_modus='fliessen', max_funken=7, funken_abstand=4, funken_leben=10)
+VL = FE2.Vorlage(RGBA_F, ZUNGEN, 'runter', rand_farbe=ROT, faden=2, rand_frei=STIEL, puls=(1.0, 24, 2))
+FEUER = FE2.Feuer([VL], n=N, seed=5, bank='strahl', amp=1.0, funken_modus='fliessen', max_funken=7, funken_abstand=4, funken_leben=10)
 
 
 def frame(i, nur=None):

@@ -102,13 +102,24 @@ for _x in range(6, 26):
 HEU_HINTEN = L.platz(_hinten, H, W, PAD_L, PAD_T)
 ERGAENZT = int((_hinten[..., 3] > 0).sum())
 
-# Ergänzung (verdeckt): hinter dem Schlagflügel (y 16–17) liegt nichts — dunkler Umriss (21,21,4), damit beim Schlag keine Lücke in der Figur entsteht
+# Ergänzung (verdeckt, Runde 3: „unter dem Flügel ist, wenn er sich bewegt, Heu/Hintergrund zu sehen, statt dass dort das Bein und Ende des Banjos gezeichnet wären“):
+# Unter dem Schlagflügel liegen das linke BEIN (orange Wade (230,131,16) mit gelben Glanzpixeln (255,180,24) (255,222,90) und dunklem Umriss, spiegelbildlich zum rechten Bein x 19–21)
+# und das untere linke ENDE der Banjo-Trommel (schwarze/dunkle Randpixel). Der Flügel gibt beim Schlag genau die Zellen frei, die hier stehen (Sprite-Koordinaten, 14 Pixel, alles Farben des Sprites);
+# im Ruhebild bleiben alle verdeckt. Das Bein läuft von (11, 17) senkrecht nach unten, knickt in Zeile 20 um 1 px nach rechts und geht in den Fuß (12, 21) über — wie das rechte Bein (dort knickt es nach links).
+DUNKEL, E_UMR = (26, 13, 7), (49, 24, 0)
+ORANGE, GELB1, GELB2, SCHWARZ = (230, 131, 16), (255, 180, 24), (255, 222, 90), (0, 0, 0)
+BEIN_BANJO = {(10, 16): DUNKEL, (10, 17): DUNKEL, (11, 17): ORANGE,
+              (11, 18): ORANGE, (12, 18): DUNKEL,
+              (11, 19): ORANGE, (12, 19): GELB1, (13, 19): SCHWARZ,
+              (12, 20): ORANGE, (13, 20): GELB2, (14, 20): DUNKEL,
+              (13, 21): E_UMR, (14, 21): DUNKEL, (15, 21): DUNKEL}
 _unter = np.zeros((sh, sw, 4), np.uint8)
-_unter_m = M_L_FLUEGEL & (yy >= 16) & (yy <= 17)
-_unter[_unter_m, :3] = (21, 21, 4)
-_unter[_unter_m, 3] = 255
+for (_x, _y), _c in BEIN_BANJO.items():
+    assert M_L_FLUEGEL[_y, _x], (_x, _y)                    # nur Zellen, die der Flügel im Ruhebild verdeckt
+    _unter[_y, _x, :3] = _c
+    _unter[_y, _x, 3] = 255
 UNTER_FL = L.platz(_unter, H, W, PAD_L, PAD_T)
-ERGAENZT_UNTER = int(_unter_m.sum())
+ERGAENZT_UNTER = len(BEIN_BANJO)
 
 # ── Farben (alle aus dem Sprite) ───────────────────────────────────────────────────────────────────────────────────
 AUGEN = {(13, 9): (246, 205, 139), (16, 9): (246, 205, 139), (17, 9): (238, 156, 123)}          # Augenpixel → Lid (Hautfarbe der Nachbarpixel)

@@ -1,12 +1,16 @@
 # -*- coding: utf-8 -*-
 """Idle-Animation für „Tuscan Mystic“ (Creature) — die vermummte Gestalt im magentafarbenen Umhang mit schwarzem Gesicht, roten Augen und einem Totenschädel in der Hand.
 
-Quelle: src/tuscan-mystic.png (25×24 px, 27 Farben).
+Quelle: src/tuscan-mystic.png (29×24 px, 27 Farben, 474 Pixel; Runde 3: um die rechte Hand ergänzt).
 PICK: [["MotiveGrailWar", 202, 1]]      (Ebene „Tuscan Mystic“, 78×74 px: sie enthält die Gestalt unten links (x 0–24, y 50–73) UND den cyanfarbenen Blitz rechts daneben (x ≥ 22, Farben (108,255,255)/(255,255,255)/(246,255,255));
       der Blitz ist ein Zauber-Effekt und wurde entfernt: aus den Randpixeln x ≥ 22 sind nur Blitzfarben gelöscht, schwarze Pixel (0,0,0) bei x ≥ 25 gehören zum Blitz und liegen außerhalb des Zuschnitts.
       Der automatische Treffer-Lauf (merged.json) fand keine Figur (nur den Schädel L184 aus MotiveJapan und andere Totenköpfe), weil die Ebene so groß wie die Karte ist; die Figur stammt direkt aus dem Dump.)
 Abgleich mit der Kunst (data/card-art/native/Tuscan_Mystic.png, 76×51): Figur und Schädel dort bei (31,18)…; die zweite Ebene „Ebene #318“ (L201) ist nur ein verschwommener cyanfarbener Schein des Blitzes.
-Quelle vollständig: ja (Kopf, Hände, Schädel, Umhang, Stiefel; nichts verdeckt außer dem entfernten Blitz).
+RUNDE 3 (Nutzer: „Täusche ich mich oder fehlt ihm seine vom Betrachter rechte Hand?“): Du täuschst dich nicht. Die Ebene 202 hat an der rechten Hand keine gezeichnete Hand: der rechte Ärmel läuft über x 24 hinaus (Ärmelfüllung (180,80,137) bei (25,13),(25,14), Umriss (41,22,42) bei (26,14),(25,15),
+schwarze Ärmelöffnung (0,0,0) bei (25,12),(26,13)) und genau dort, wo die Hand sein müsste (x ≥ 25–28, y 11–14), beginnt der cyanfarbene BLITZ — die Hand ist in der Kunst vom Blitz überdeckt (kein anderes Layer/keine andere Karte zeigt die Figur, die rote-Augen-Kombination (236,29,28)/(208,4,4)
+gibt es im ganzen Ebenendump nur in Ebene 202). Mit dem Entfernen des Blitzes blieb der Ärmel an der Schnittkante x = 24 offen und ohne Hand. Die kleinen braunen Pixel (21–22,12), (19,13), (22,13) und das orange (18,14) sind die Fingerknöchel/-spitzen derselben Hand,
+die den grauen Bogen hält, nicht die Hand am Ärmelende. Jetzt fertiggezeichnet (siehe unten „Ergänzungen“).
+Quelle vollständig: ja für alles bis auf die rechte Hand (Kopf, linke Hand, Schädel, Umhang, Stiefel; die rechte Hand war vom entfernten Blitz überdeckt).
 
 Aufruf:   python3 tuscan_mystic.py [--preview <ordner>]
 Ausgabe:  ../../data/creature-animations/tuscan-mystic.png + .json
@@ -15,7 +19,7 @@ Was im Sprite ist (x, y im 25×24-Sprite):
 * KAPUZE (x 2–23, y 0–5): magentafarben (41,22,42)/(107,56,107)/(180,80,137) mit schwarzem Umriss (23,21,22); links und rechts je ein graues, hornartiges Kapuzenstück (124,112,112)/(161,147,144)/(91,82,83) (x 3–8 und 19–24, y 1–5).
 * GESICHT (x 9–17, y 5–12): schwarze Leere (18,16,16)/(24,22,22)/(4,4,4)/(9,8,9); zwei rote AUGEN je ein Pixel: (236,29,28) bei (11,7) und (208,4,4) bei (15,7).
 * SCHÄDEL (x 0–9, y 5–16) in braunem Rahmen (49,24,0): weiß (246,255,255)/(213,213,213)/(189,189,189)/(156,156,156) mit schwarzen Augenhöhlen/Nase/Zähnen (0,0,0); die LINKE HAND hält ihn von unten (orange (156,105,62)/(239,161,95)/(245,203,161), (8–9, 13–15)).
-* RECHTE HAND/ÄRMEL (x 18–24, y 10–16): Ärmel magenta, Hand braun (156,105,62) bei (19–22, 12–13), graue Manschette.
+* RECHTE HAND/ÄRMEL (x 18–28, y 10–16): Ärmel magenta, Fingerknöchel braun (156,105,62) bei (19–22, 12–13), graue Manschette; am Ärmelende die ergänzte rechte Hand (x 25–28, y 11–14, siehe Ergänzungen).
 * GRAUER BOGEN quer vor der Brust (x 12–19, y 13–17; (124,112,112)/(161,147,144)/(91,82,83)) — ich lese ihn als Sichel-/Kragenstück und lasse ihn fest.
 * UMHANG (x 8–19, y 17–23): magenta mit rosa Falte (180,80,137), unten zwei graue Stiefel (124,112,112)/(189,189,189) bei (9–11, 22) und (16–18, 22) und der Saum (23,21,22).
 Kein Metall/Gold/Edelstein sicher erkennbar (die grauen Teile könnten Eisen sein, sind aber nicht eindeutig) → KEIN Glanz (Regel 14, im Zweifel weglassen). Der Blitz fehlt bewusst. Keine Partikel.
@@ -25,8 +29,10 @@ Ablauf (48 Frames à 80 ms = 3,84 s, nahtlos; Frame 0 = Original; Bodenwesen: di
 * SAUM WEHT: die Umhangzeilen 17–21 (x 8–19) pendeln waagerecht, je weiter unten, desto mehr (bis ±1 px), links und rechts gegenläufig; die Stiefel (y 22–23) stehen fest.
 * SCHÄDEL WIPPT: der Schädel samt Hand sinkt zweimal je Schleife für je 3 Frames um 1 px und kommt zurück (die frei werdende Rahmenspalte (9,8–11) wird mit dem Umhangumriss (41,22,42) gefüllt).
 * BLINZELN (Frames 20–22 und 40–42): die roten Augenpixel werden schwarz (24,22,22) und kommen zurück — kein Glühen, kein Farbspiel.
-Fest: Gesicht, Hörner, Bogen, Ärmel, Stiefel. Alle Bewegungen laufen auf der vollen Leinwand (ClipError statt Abschneiden). Nur ganze Pixel, nur Quellfarben.
-Ergänzungen: nur die Rahmenspalte (9,8–11) neben dem Schädel (Umhangumriss (41,22,42)), wenn der Schädel sinkt.
+Fest: Gesicht, Hörner, Bogen, Ärmel, die ergänzte rechte Hand (sie hebt sich beim Atmen mit dem Oberkörper), Stiefel. Alle Bewegungen laufen auf der vollen Leinwand (ClipError statt Abschneiden). Nur ganze Pixel, nur Quellfarben.
+Ergänzungen: (1) die Rahmenspalte (9,8–11) neben dem Schädel (Umhangumriss (41,22,42)), wenn der Schädel sinkt. (2) RUNDE 3, rechte Hand (16 Pixel, nur Quellfarben, Stil der linken Hand): Ärmelende/Umriss (25,10) und (25,15) (41,22,42);
+Handumriss (25–27,11), (28,12), (28,13), (26–27,14) in (23,21,22); Hand (25,12) (156,105,62), (26,12) (245,203,161), (27,12) (239,161,95), (25,13) (156,105,62), (26,13) (156,105,62), (27,13) (239,161,95); (25,14) (41,22,42). Die Hand streckt sich
+aus dem Ärmel nach rechts (dorthin, wo in der Kunst der Blitz beginnt); das Ärmelende ist damit geschlossen.
 """
 import math
 import sys

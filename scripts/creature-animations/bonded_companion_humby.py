@@ -16,7 +16,7 @@ Identifikation (Sprite 23×20, Chibi-Löwe im Profil, schaut nach RECHTS):
 * Körper (x 9–20, Zeilen 11–19): kleiner Rumpf/Brust (15–20, 11–16) unter dem Kopf, vorn zwei Beine (x 9–14, Zeilen 12–19), hinten ein Beinpaar (x 1–6, Zeilen 13–19).
 * Schwanz (x 0–8, Zeilen 0–13): Eingerollt wie ein „C“ — setzt am Rumpf unten links an ((4–9,12) orange E / D), läuft an der linken Seite (x 0–2) hoch, oben im Bogen (3–6, 0–1) nach rechts
   und endet mit einer Quaste/Spitze (7–8, 1–3).
-* Kein Glanz (Fell, Regel 14), keine Partikel. Ohren/Beine nicht eindeutig lesbar → fest. Auge ist schon geschlossen (Lachauge) → kein Blinzeln, kein Blick.
+* Das Fell ist GOLD (Runde 3 Nutzerwunsch: „braucht noch Goldglanz, sonst passt er.“) → Goldglanz, siehe unten. Keine Partikel. Ohren/Beine nicht eindeutig lesbar → fest. Auge ist schon geschlossen (Lachauge) → kein Blinzeln, kein Blick.
 Bleibt fest: Gesicht (Auge, Nase, Zunge), Rumpf unter Zeile 11.
 
 Runde 2 (Nutzerkorrektur wörtlich: „soll seine Beine bewegen.“): Die vier Beinchen sind jetzt EIGENE Ebenen (Zeilen 15–19; die Hüftzeile 15 bleibt am Rumpf) und laufen am Ort im Diagonalgang:
@@ -32,6 +32,11 @@ Ablauf (48 Frames à 70 ms = 3,4 s), alle Bewegungen unabhängig:
 * Kopf hebt sich (Periode 24, Frames 10–18): Kopf samt Mähne steigt 1 px — in den Spalten x ≥ 9 wird die Mähnenunterkante (Zeile 11) einmal eingefügt (anim_tiere.spalten_hub),
   Beine und Rumpf darunter bleiben stehen, der Schwanz bleibt am Rumpf.
 * Randpixel-Korrektur (Regel 16): anim_tiere.umriss_schliessen.
+* GOLDGLANZ (Runde 3, nur auf den goldenen Fellteilen — Orange (241,131,83)/(244,174,100), Gelb (251,221,110), Creme (248,248,189); NICHT auf braunem Umriss, schwarzer Nase/Auge und roter Zunge):
+  (a) Lichtband: zweimal je Schleife (Frames 4–15 und 28–39, je 12 Frames) wandert ein 4 px breites diagonales Band (x + y) über das fertig zusammengesetzte Tier (Bildschirmkoordinaten, nimmt also das Wippen/Laufen mit):
+      die Fellpixel im Band werden eine Stufe heller auf der Gold-Rampe Orange → Orange hell → Gelb → Creme (Creme bleibt, das ist schon die hellste Quellfarbe).
+  (b) Glitzersterne: zwei kurze Sparkles (4 Frames: Mitte → kleines Kreuz → Kreuz → Mitte, dann weg; lange Pausen) an der Mähne (Frames 20–23) und an der Brust (Frames 41–44); das Zentrum wird je Frame auf das nächstgelegene goldene Fellpixel (±1 px)
+      gesetzt, damit der Stern auch beim Wippen am Fell sitzt; Farben: Creme (Mitte und Arme, heben sich vom Gelb/Orange des Fells ab).
 Alle Bewegungen laufen auf der vollen Leinwand (anim_lib wirft ClipError). Nur ganze Pixel, nur Farben der Quelle.
 
 Ergänzungen: Randpixel-Korrektur (Regel 16) und die eingefügte Mähnenzeile beim Kopfheben (Duplikat vorhandener Pixel). Sonst keine gemalten Pixel.
@@ -104,6 +109,58 @@ def bein_ebene(maske, i, versatz):
     return L.heben_unten(t, PAD_T + 17, lift) if lift else t
 
 
+# ── Goldglanz (Runde 3) ──
+GOLD_RAMPE = {(241, 131, 83): (244, 174, 100), (244, 174, 100): (251, 221, 110), (251, 221, 110): (248, 248, 189)}
+GOLD_FARBEN = set(GOLD_RAMPE) | {(248, 248, 189)}
+for _c in GOLD_FARBEN:
+    assert any(tuple(int(v) for v in p[:3]) == _c for p in spr.reshape(-1, 4) if p[3]), _c
+GLANZ_FENSTER = [(4, 12), (28, 12)]
+GLITZER = [(20, (11, 6)), (41, (16, 13))]                          # (Startframe, Sternmitte im Sprite)
+GLITZER_LAUF = [0, 1, 1, 0]
+STERN_KERN, STERN_ARM = (248, 248, 189), (248, 248, 189)
+
+
+def goldglanz(fr, i):
+    """Lichtband + Glitzer auf den goldenen Fellpixeln des fertigen Frames (nur Farben der Quelle)."""
+    gold = np.zeros(fr.shape[:2], bool)
+    for c in GOLD_FARBEN:
+        gold |= (fr[..., :3] == np.array(c)).all(axis=2) & (fr[..., 3] > 0)
+    for (s0, dauer) in GLANZ_FENSTER:
+        k = (i - s0) % N
+        if k < dauer:
+            ys, xs = np.nonzero(fr[..., 3] > 0)
+            u = xs + ys
+            umin, umax = float(u.min()), float(u.max())
+            mitte = umin - 4 + (k + 0.5) / dauer * (umax - umin + 8)
+            for y, x in zip(*np.nonzero(gold)):
+                if abs((x + y) - mitte) <= 2.0:
+                    c = tuple(int(v) for v in fr[y, x, :3])
+                    if c in GOLD_RAMPE:
+                        fr[y, x, :3] = GOLD_RAMPE[c]
+    for (s0, (sx, sy)) in GLITZER:
+        k = (i - s0) % N
+        if k < len(GLITZER_LAUF):
+            stufe = GLITZER_LAUF[k]
+            hub_ = WIPPEN[i % 6]
+            cx, cy = PAD_L + sx, PAD_T + sy - hub_
+            best = None
+            for dy in (0, -1, 1):
+                for dx in (0, -1, 1):
+                    if gold[cy + dy, cx + dx] and best is None:
+                        best = (cx + dx, cy + dy)
+            if best is None:
+                continue
+            cx, cy = best
+            pts = {(cx, cy): STERN_KERN}
+            if stufe >= 1:
+                for (ax, ay) in ((1, 0), (-1, 0), (0, 1), (0, -1)):
+                    if gold[cy + ay, cx + ax]:                                   # Arme nur auf Goldfell (nie über Umriss/Rand hinaus)
+                        pts[(cx + ax, cy + ay)] = STERN_ARM
+            for (x, y), c in pts.items():
+                fr[y, x, :3] = c
+    return fr
+
+
 def frame(i, nur=None):
     hub = WIPPEN[i % 6]
     kopf = KOPF[i % 24]
@@ -114,7 +171,8 @@ def frame(i, nur=None):
               'bein_vn': bein_ebene(bein_vn, i, 0.5), 'bein_vf': bein_ebene(bein_vf, i, 0.0)}
     wahl = nur or tuple(ebenen)
     ganz = L.zusammen(H, W, [(ebenen[n], 0, -hub) for n in wahl])
-    return T.umriss_schliessen(ganz, RAND, REGEL)                  # Randpixel-Test (Regel 16)
+    ganz = T.umriss_schliessen(ganz, RAND, REGEL)                  # Randpixel-Test (Regel 16)
+    return goldglanz(ganz, i) if not nur else ganz
 
 
 if __name__ == '__main__':
