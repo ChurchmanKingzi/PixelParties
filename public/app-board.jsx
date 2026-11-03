@@ -4036,7 +4036,7 @@ function HeroIdleSprite({ cardName, angehalten, versteinert, eingefroren, effekt
   // Laufzeit-Backer je Figur abtasten musste. Vor dem ersten Zeichnen starten (Layout-Effekt), sonst stünde die Figur ein Bild lang fertig da.
   React.useLayoutEffect(() => {
     if (!eintrag || !ebene || !platzRef.current) return;
-    try { if (window.ppHeldAuftritt) window.ppHeldAuftritt(platzRef.current); } catch {}
+    try { if (window.ppHeldAuftritt) window.ppHeldAuftritt(platzRef.current, ankerRef.current && ankerRef.current.parentElement); } catch {}
   }, [eintrag, ebene]);
 
   const anker = <span ref={ankerRef} className="hero-idle-anker" />;
@@ -37895,6 +37895,10 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
   // v1463: Profil-Optionen „Display Heroes" / „Dynamic Heroes" (beide
   // standardmäßig an; ohne Display kein Dynamic).
   const heldenAnzeigen = user?.display_heroes == null ? true : !!user.display_heroes;
+  // Spielstart-Effekt (app-fx-51: Held-Ausbruch + Brettaufbau-Welle, nur Optik): im Render entscheiden, ob er laeuft — die Figuren melden sich schon in ihren Layout-Effekten, die vor dem
+  // Layout-Effekt dieser Komponente laufen. Die Leinwaende entstehen erst im ersten Bild nach dem Einhaengen (kein Mehraufwand beim Mounten); `ppFx51Abbruch` raeumt beim Verlassen auf.
+  useState(() => (window.ppFx51Vorbereiten ? window.ppFx51Vorbereiten(gameState, { figuren: heldenAnzeigen }) : 0));
+  React.useLayoutEffect(() => { try { if (window.ppFx51Anlegen) window.ppFx51Anlegen(); } catch {} return () => { try { if (window.ppFx51Abbruch) window.ppFx51Abbruch(); } catch {} }; }, []);
   const heldenDynamisch = heldenAnzeigen && (user?.dynamic_heroes == null ? true : !!user.dynamic_heroes);
   const isSpectator = gameState.isSpectator || false;
   const myIdx = gameState.myIndex;
@@ -53092,7 +53096,10 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       } else {
         tgtEl = document.querySelector(`[data-hero-zone][data-hero-owner="${tgtLabel}"][data-hero-idx="${targetHeroIdx}"]`);
       }
-      if (phase === 'rise' && srcEl) {
+      // Heilimpuls (app-fx-50): Pixelart-Leinwand statt der CSS-Strahlen (`healBeamRise`/`healBeamStrike`: Verlauf + Schein, vom Laufzeit-Backer abgetastet).
+      // `rise` = die Quelle laedt auf, `strike` = der Impuls fliegt zum Ziel; der Treffer kommt danach als Registry-Animation `heal_sparkle`.
+      const impulsRise = phase === 'rise' && srcEl && window.ppFx50Beam && window.ppFx50Beam('rise', srcEl, tgtEl);
+      if (phase === 'rise' && srcEl && !impulsRise) {
         const sr = srcEl.getBoundingClientRect();
         const beam = document.createElement('div');
         beam.className = 'heal-beam heal-beam-rise';
@@ -53106,6 +53113,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         // `laser` — der Strahl faellt ~350 ms; ohne Sammelkategorie, damit er neben dem Heilklang
         // (`heal_sparkle`, 'effect') und dem Zauberklang nicht verschluckt wird.
         if (window.playSFX) window.playSFX('laser', { category: null, dedupe: 250, rate: 1.2, volume: 0.9 });
+        if (window.ppFx50Beam && window.ppFx50Beam('strike', srcEl, tgtEl)) return;
         const tr = tgtEl.getBoundingClientRect();
         const beam = document.createElement('div');
         beam.className = 'heal-beam heal-beam-strike';

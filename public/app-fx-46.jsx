@@ -11,6 +11,7 @@
 //    • Versatz und Schattenbreite auf ganzen Kunstpixeln (2 px), die Deckkraft des Schattens nur ein/aus (`visibility`; seine Fläche ist < 400 px²);
 //    • geschrieben wird nur, wenn sich das Bild ändert, inline `transform`/`filter` am Canvas und `transform`/`visibility` am Schatten; am Ende wird alles
 //      wieder entfernt (der Beschnitt `heroIdleKlipp` am Steher ist statisches CSS, `steps(1, end)`, gleiche Dauer).
+//  Spielstart (app-fx-51): `ppHeldAuftritt(platz, zone)` meldet die Figur an `ppFx51Held` und beginnt höchstens 0,13 s später, damit der Auftritt im Bild des Held-Ausbruchs startet.
 //  Nicht im Retro-Modus (hat eigenes CSS), nicht bei reduzierter Bewegung, nicht beim Aufstiegs-Morph (`hero-idle-aufstieg`: dort steht die Figur sofort).
 //  Reine Bildfunktion (für Tests/Messung): `PpFx46.heldBild(f, hoehe, breite)` → { y, hell, sx, sichtbar }.
 // ═════════════════════════════════════════════════════════════════
@@ -52,7 +53,7 @@
     return { y, hell: Math.round(hell * 100) / 100, sx: Math.round(sx * 10000) / 10000, sichtbar: e >= 0.40625 };
   }
 
-  function ppHeldAuftritt(platz) {
+  function ppHeldAuftritt(platz, zone) {
     if (!platz || window.PP_RETRO) return;
     try { if (window.PPPixelAnim && window.PPPixelAnim.KONFIG && window.PPPixelAnim.KONFIG.aktiv === false) return; } catch (e) { /* weiter */ }
     try { if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return; } catch (e) { /* weiter */ }
@@ -65,7 +66,10 @@
     const b = sch ? parseFloat(getComputedStyle(sch).width) : 0;
     if (!(h > 0)) return;
     const raf = window.ppTaktRaf || window.requestAnimationFrame;
-    let t0 = performance.now(), letzt = -1, id = 0, fertig = false;
+    // Spielstart (app-fx-51): der Auftritt beginnt im Bild des Ausbruchs (Aufschub höchstens 0,13 s; solange steht die Figur wie im ersten Bild verborgen)
+    let verz = 0;
+    try { if (zone && window.ppFx51Held) verz = window.ppFx51Held(platz, zone) || 0; } catch (e) { verz = 0; }
+    let t0 = performance.now() + verz, letzt = -1, id = 0, fertig = false;
     let cvT = '', cvF = '', schT = '', schV = '';
     const setze = (f) => {
       const bild = heldBild(f, h, b);
@@ -95,7 +99,7 @@
       id = 0;
       if (fertig) return;
       if (!platz.isConnected) { aufraeumen(); return; }
-      const f = Math.floor((now - t0) / TAKT);
+      const f = Math.max(0, Math.floor((now - t0) / TAKT));
       if (f >= BILDER) { aufraeumen(); return; }
       if (f !== letzt) { letzt = f; setze(f); }
       id = raf(schritt);
