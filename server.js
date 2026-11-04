@@ -679,6 +679,29 @@ app.use((req, res, next) => {
   next();
 });
 
+// ── Vorgebackene Stylesheets (scripts/hart/build-css.js): `style.hart.css` = style.css mit angewandtem pixel-hart.js. Passt die gebackene Fassung nicht mehr zu den Quellen
+// (jemand hat style.css geändert und nicht neu gebacken), liefern wir die UNGEBACKENE Quelle aus — pixel-hart.js wandelt sie dann zur Laufzeit um (langsamer, aber nie falsch).
+// Umschreibung der Anfrage VOR den Auslieferungsschichten (gzip + express.static), sonst käme die alte gebackene Datei aus dem gzip-Speicher.
+// Der Hash-Vergleich ist gecacht (2 s), weil die Dateien selten wechseln. `npm test` schlägt in dem Fall zusätzlich fehl.
+{
+  const hartCache = new Map();
+  const hartFrisch = (datei) => {
+    const c = hartCache.get(datei), jetzt = Date.now();
+    if (c && jetzt - c.t < 2000) return c.ok;
+    let ok = false;
+    try { const B = require('./scripts/hart/build-css.js'); ok = B.kopfHash(fs.readFileSync(path.join(__dirname, 'public', datei.replace(/\.css$/, '.hart.css')), 'utf8').slice(0, 200)) === B.eingabeHash(datei); } catch (e) { ok = false; }
+    hartCache.set(datei, { t: jetzt, ok });
+    return ok;
+  };
+  app.use((req, res, next) => {
+    if (req.path !== '/style.hart.css' && req.path !== '/style-skilltest.hart.css') return next();
+    res.set('Cache-Control', 'no-cache');
+    const quelle = req.path.replace('.hart.css', '.css').slice(1);
+    if (!hartFrisch(quelle)) req.url = req.url.replace('.hart.css', '.css');
+    next();
+  });
+}
+
 // ───────────────────────────────────────────────────────────────
 //  On-the-fly gzip for compressible static assets (zero-dep).
 //  Compresses .js/.json/.css/.svg/.map from public, /data and
@@ -1348,6 +1371,27 @@ function getRandomDefaultAvatar() {
   } catch { return null; }
 }
 
+/** Gast-Namen und -Avatare: „Guest <Heldenname>" mit dem zugeschnittenen Kartenbild des Helden (public/avatars/gast/<Name>.png, gebaut von
+ *  scripts/guest-avatars/build.py). Doppelte Namen (gleichzeitig mehrere Gaeste mit demselben Helden) bekommen eine Zahl: „Guest Elana 2". */
+let _gastHelden = null;
+function gastHelden() {
+  if (_gastHelden) return _gastHelden;
+  try { _gastHelden = fs.readdirSync(path.join(__dirname, 'public', 'avatars', 'gast')).filter(f => f.endsWith('.png')).map(f => f.slice(0, -4)); }
+  catch { _gastHelden = []; }
+  return _gastHelden;
+}
+async function neuerGastName(id) {
+  const namen = gastHelden();
+  if (!namen.length) return { username: 'Guest-' + id.slice(0, 8), avatar: getRandomDefaultAvatar() };
+  const held = namen[Math.floor(Math.random() * namen.length)];
+  const avatar = '/avatars/gast/' + encodeURIComponent(held) + '.png';
+  for (let n = 1; n <= 30; n++) {
+    const username = 'Guest ' + held + (n > 1 ? ' ' + n : '');
+    if (!(await db.get('SELECT 1 FROM users WHERE username = ? COLLATE NOCASE', [username]))) return { username, avatar };
+  }
+  return { username: 'Guest-' + id.slice(0, 8), avatar };
+}
+
 /** Pick a random vivid hex color for a brand-new player. The schema's
  *  static `#00f0ff` default made every fresh account share the same
  *  cyan in lobby lists / chat / hero accents — this hand-tuned palette
@@ -2005,13 +2049,13 @@ async function purgeAllGuests() {
 app.post('/api/auth/guest', async (req, res) => {
   try {
     const id = uuidv4();
-    const username = 'Guest-' + id.slice(0, 8);
+    const { username, avatar: gastAvatar } = await neuerGastName(id);
     const passwordHash = unusablePasswordHash(); // nie bekanntes Passwort dahinter: Gaeste koennen sich nicht per Passwort anmelden
     await db.run(
       // Fixed default blue (the login-screen accent, `--accent` in style.css) so the guest UI doesn't flicker a
       // new random colour every session.
       'INSERT INTO users (id, username, password_hash, avatar, color, is_guest) VALUES (?, ?, ?, ?, ?, 1)',
-      [id, username, passwordHash, getRandomDefaultAvatar(), STANDARD_FARBE]
+      [id, username, passwordHash, gastAvatar, STANDARD_FARBE]
     );
     try { await seedInitialOpponents(id); } catch (err) { console.error('[guest] seedInitialOpponents failed:', err.message); }
     // Pin a random Starter Deck as the guest's default so a deck is preselected.
@@ -3842,6 +3886,26 @@ app.get('/api/render-version', (req, res) => {
 // Aufruf je Seitenaufbau, und neue Animationen gelten sofort (siehe
 // die maxAge-Vorgabe bei den statischen Routen).
 const HERO_ANIM_DIR = path.join(__dirname, 'data', 'hero-animations');
+// ===== BETRIEBSKENNZAHLEN (Lasttest / Caddy-Check) =====
+// Verzoegerung der Ereignisschleife: je Millisekunde, die sie ueber ihren Takt hinaus belegt ist, wartet jeder Socket-/HTTP-Aufruf. `?reset=1`
+// setzt die Messung zurueck (zwischen Lasttest-Laeufen). Keine Nutzerdaten, nur Zahlen.
+const { monitorEventLoopDelay } = require('perf_hooks');
+const _elHist = monitorEventLoopDelay({ resolution: 10 }); _elHist.enable();
+app.get('/stats', (req, res) => res.sendFile(path.join(__dirname, 'public', 'stats.html')));   // Statistik-Seite fuer den Betreiber (Token wird im Browser eingegeben)
+app.get('/api/health', (req, res) => {
+  const ms = (ns) => Math.round(ns / 1e4) / 100;
+  const out = {
+    ok: true, uptimeS: Math.round(process.uptime()),
+    loopLagMs: { mean: ms(_elHist.mean), p50: ms(_elHist.percentile(50)), p95: ms(_elHist.percentile(95)), p99: ms(_elHist.percentile(99)), max: ms(_elHist.max) },
+    cpuAktiv: aktiveCpuPartien(), cpuGrenze: MAX_CPU_PARTIEN, budgetFaktor: Math.round(require('./cards/effects/_cpu-last')._debug().faktor * 100) / 100,
+    rooms: rooms.size, cpuRooms: [...rooms.values()].filter(r => r && r.type === 'singleplayer').length,
+    rssMb: Math.round(process.memoryUsage().rss / 1048576), heapMb: Math.round(process.memoryUsage().heapUsed / 1048576),
+  };
+  if (req.query.reset) _elHist.reset();
+  res.setHeader('Cache-Control', 'no-store');
+  res.json(out);
+});
+
 // Alles, was die Tutorial-Missionen an Karten zeigen (Namen aus den Puzzle-Dateien, Helden getrennt). Der Client laedt das im Gast-Menue
 // im Leerlauf vor (Kartenbilder rendern, Heldenfiguren laden), damit der Start einer Mission nicht ruckelt. Einmal berechnet, dann gemerkt.
 let _tutorialAssets = null;
@@ -3927,6 +3991,8 @@ async function unlockCpuSkin(userId, skinName) {
 
 const SHOP_PRICES = { avatar: 50, sleeve: 50, board: 50, skin: 50 };
 const RANDOM_PRICES = { skin: 25, avatar: 25, sleeve: 25 };
+// Nur per Pull (Zufall) erhältlich, nicht gezielt kaufbar.
+const GACHA_ONLY_TYPES = new Set(['skin', 'avatar', 'sleeve']);
 const STRUCTURE_DECK_PRICE = 50;
 const STRUCTURE_DECK_RANDOM_PRICE = 25;
 
@@ -4166,6 +4232,8 @@ app.post('/api/shop/buy', authMiddleware, async (req, res) => {
   if (!itemType || !itemId) return res.status(400).json({ error: 'Missing itemType or itemId' });
   const price = SHOP_PRICES[itemType];
   if (price === undefined) return res.status(400).json({ error: 'Invalid item type' });
+  // Skins, Avatare und Sleeves gibt es nur noch per Zufalls-Pull (/api/shop/buy-random[-skin]) – nicht gezielt.
+  if (GACHA_ONLY_TYPES.has(itemType)) return res.status(403).json({ error: 'Skins, Avatars and Sleeves can only be pulled at random.' });
 
   // Verify item exists
   if (itemType === 'skin') {
@@ -5169,6 +5237,12 @@ function sendGameState(room, playerIdx, extra) {
       // pruefen Gold-Kosten selbst (Kosten 0 moeglich) - der Client darf sie unter der Sperre nicht pauschal ausgrauen (Grau-Liste: `unactivatableArtifacts`).
       goldLockSelfChecked: (ps.goldLocked && pi === playerIdx)
         ? [...new Set((ps.hand || []).filter(n => { const sc = loadCardEffect(n); return !!sc?.manualGoldCost && !sc.goldPerTarget; }))] : [],
+      // X-Kosten-Artefakte (`manualGoldCost`: Dark Gear, Staff of Illusions, Capture Net, Beer, Cool Presents, Book of Doom, Cool Repair):
+      // der Preis in cards.json ist nur der Preis JE EINHEIT (Stufe, Ziel, Karte) - die Gesamtkosten koennen 0 sein (Stufe-0-Kreatur,
+      // kein Ziel). Der Client darf sie deshalb nicht am Grundpreis ausgrauen; ob die Karte spielbar ist, sagen `unactivatableArtifacts`
+      // (`canActivate`/Ziele nach echten Kosten, bei `goldPerTarget` auch die Goldsperre) und der Zielwaehler (`maxTotal`).
+      selfPricedArtifacts: pi === playerIdx
+        ? [...new Set((ps.hand || []).filter(n => !!loadCardEffect(n)?.manualGoldCost))] : [],
       drawLocked: ps.drawLocked || false,
       // v1068: reiner Such-Lock (Cats of the Pharaoh) — Draws bleiben frei.
       // ★ v1123 („The Thing in the Ship", Als Vorgabe 15.9.): der
@@ -7363,6 +7437,15 @@ function makeCpuDriver(room) {
   };
 }
 
+// Laufende CPU-Partien mit verbundenem Spieler (getrennte warten nur im Speicher auf ihren Ablauf und rechnen nicht).
+const MAX_CPU_PARTIEN = parseInt(process.env.PP_MAX_CPU_GAMES || '30', 10);
+function aktiveCpuPartien() {
+  let n = 0;
+  for (const r of rooms.values()) {
+    if (r && r.type === 'singleplayer' && r.gameState && !r.gameState.result && !(r.gameState.players || []).some(p => p && p.disconnected)) n++;
+  }
+  return n;
+}
 function cleanupRoom(roomId) {
   const room = rooms.get(roomId);
   if (!room) return;
@@ -16467,6 +16550,10 @@ io.on('connection', (socket) => {
     doConfirmPotion(room, pi, params).catch(err => console.error('[confirm_potion] error:', err.message)).finally(() => room.engine?._runPostChainActions?.());   // W72a: Trank mit Zielwahl, der Karten aus Deck/Ablage holt (Control Monitors)
   });
 
+  // Pfeilsalve (nur Darstellung): der Client meldet, ob er die Salve spielen kann (Animationen an, kein Retro, keine reduzierte Bewegung …).
+  // Die Engine wartet die Salvendauer nur, wenn mindestens ein Zuschauer/Spieler sie spielt (`pfeilSalveGewuenscht`, cards/effects/_arrows-shared.js).
+  socket.on('client_fx', (d) => { socket.data = socket.data || {}; socket.data.pfeilSalve = !!(d && d.salve); });
+
   // Broadcast targeting selections to opponent
   socket.on('targeting_update', ({ roomId, selectedIds }) => {
     if (!currentUser) return;
@@ -16942,6 +17029,10 @@ io.on('connection', (socket) => {
     // sie brauchen den Riegel eigens — Als Befund 5.8.: waehrend Ambush
     // aufloeste, liess sich per Spam-Klick eine Waflav-Form ascenden.
     if (gs._chainResolvingLock || gs._forceDiscardLock === pi) return;
+    // Ein Aufstieg laeuft bis zum Ende seiner Aufloesung (Bonus-Auswahl, Reaktionsfenster, Trample Sounds …) — ein zweiter Befehl in dieser Zeit
+    // (Doppeltipp, ruckelndes Handy) startete eine ZWEITE Aufloesung: Bonus und Reaktion doppelt, und der Handindex der zweiten Karte zeigte
+    // nach dem ersten Spleiss auf eine andere Handkarte, die verschwand (Tutorial 7: Flame Avalanche).
+    if (gs._aufstiegLaeuft) return;
     // Als Vorgabe 29.9.: `heroOwner` = Spalte des Helden. Ein geliehener
     // Held (Gegnerspalte) darf aufsteigen, solange `pi` ihn kontrolliert;
     // ein eigener Held, den gerade der Gegner kontrolliert, nicht.
@@ -16949,6 +17040,7 @@ io.on('connection', (socket) => {
     const _aufHeld = gs.players[hs]?.heroes?.[heroIdx];
     if (!_aufHeld?.name || room.engine.heroSideOf(hs, _aufHeld) !== pi) return;
     // Perform ascension via engine
+    gs._aufstiegLaeuft = true;
     try {
       const result = await room.engine.performAscension(pi, heroIdx, cardName, handIndex, { fromCreation, heroOwner: hs });
       if (!result.success) return;
@@ -16962,6 +17054,8 @@ io.on('connection', (socket) => {
       }
     } catch (err) {
       console.error('[Engine] ascend_hero error:', err.message, err.stack);
+    } finally {
+      gs._aufstiegLaeuft = false;
     }
     for (let i = 0; i < roomPlayerCount(room); i++) sendGameState(room, i);
     sendSpectatorGameState(room);
@@ -18119,6 +18213,13 @@ io.on('connection', (socket) => {
   async function createCpuBattle({ playerDeckId, cpuDeckId, campaign }) {
     if (!currentUser) { socket.emit('cpu_battle_error', 'Not authenticated'); return; }
     if (activeGames.has(currentUser.userId)) { socket.emit('cpu_battle_error', 'Already in a game'); return; }
+    // Zulassungsgrenze: jede laufende CPU-Partie rechnet im selben Prozess (Lasttest: ab ~10 gleichzeitigen wird der Server traege). Lieber einer
+    // wartet kurz, als dass alle ruckeln. Kampagne und Tutorials (kein MCTS) sind ausgenommen.
+    if (!campaign && aktiveCpuPartien() >= MAX_CPU_PARTIEN) {
+      console.warn(`[createCpuBattle] abgelehnt: ${aktiveCpuPartien()} laufende CPU-Partien (Grenze ${MAX_CPU_PARTIEN})`);
+      socket.emit('cpu_battle_error', 'The server is very busy right now — please try again in a minute.', { busy: true });
+      return;
+    }
 
     // Player deck must be owned (their own custom deck or owned sample).
     // CPU deck can be ANY sample — the CPU playing a structure deck
@@ -20245,12 +20346,9 @@ io.on('connection', (socket) => {
           skillTest.onSeatLeft(room, currentUser, socket, skillTestHost);
           return;
         }
-        // Puzzle rooms: preserve existing immediate cleanup.
-        if (room.type === 'puzzle') {
-          activeGames.delete(currentUser.userId);
-          destroyRoom(activeRoomId);
-          return;
-        }
+        // Puzzle-/Tutorial-Raeume: frueher sofortiger Abbau — auf dem Handy reicht ein kurzer Netz- oder App-Wechsel, und der Raum war weg,
+        // waehrend der Client weiter das Brett zeigte: jede Eingabe ging ins Leere („Action Phase leuchtet, aber nichts passiert").
+        // Jetzt dieselbe Wiederverbindungsfrist wie bei Einzelspieler-Partien (Zweig darunter; der auth-Handler stellt den Raum wieder her).
         // Singleplayer rooms: F5 / browser refresh fires `disconnect`
         // and then re-runs `auth` once the new socket comes up — if we
         // tear the room down immediately, the reconnect grace window
@@ -20261,7 +20359,7 @@ io.on('connection', (socket) => {
         // and restores socketId on return. There's no opponent to
         // declare a winner against, so the only thing that fires on
         // expiry is the room cleanup itself.
-        if (room.type === 'singleplayer') {
+        if (room.type === 'singleplayer' || room.type === 'puzzle') {
           const pi = room.gameState.players.findIndex(ps => ps.userId === currentUser.userId);
           if (pi < 0) { cleanupRoom(activeRoomId); return; }
           // Dual-tab guard: ignore if a newer connection already took
@@ -20269,10 +20367,10 @@ io.on('connection', (socket) => {
           // closing after `superseded`).
           if (room.players[pi]?.socketId !== socket.id) return;
           room.gameState.players[pi].disconnected = true;
-          // Hold onto the room for 5 minutes — plenty for a refresh
+          // Hold onto the room for 3 minutes — plenty for a refresh
           // / brief network blip. Anything longer than that is "the
           // user closed the tab" and we'd rather reclaim resources.
-          const SP_RECONNECT_GRACE_MS = 5 * 60 * 1000;
+          const SP_RECONNECT_GRACE_MS = 3 * 60 * 1000;
           const timer = setTimeout(() => {
             disconnectTimers.delete(currentUser.userId);
             cleanupRoom(activeRoomId);
@@ -22846,6 +22944,21 @@ initDatabase().then(async () => {
   // gar nicht erst in die Map kommen.
   await restoreSessions();
   server.listen(PORT, HOST, () => {
+    // Kartenskripte im Leerlauf vorladen (Profil: ~5 s Ladezeit, sonst beim ersten Spieler nach einem Neustart/Deploy). Kleine Scheiben mit Pausen,
+    // damit Sockets waehrenddessen bedient werden.
+    if (process.env.PP_NO_PRELOAD !== '1') setTimeout(() => {
+      try {
+        const { loadCardEffect } = require('./cards/effects/_loader');
+        const namen = Object.keys(getCardDB()); let i = 0; const t0 = Date.now();
+        const schritt = () => {
+          const t = Date.now();
+          while (i < namen.length && Date.now() - t < 8) { try { loadCardEffect(namen[i]); } catch { /* fehlendes Skript: egal */ } i++; }
+          if (i < namen.length) setTimeout(schritt, 10);
+          else console.log(`[preload] ${namen.length} Kartenskripte geladen (${Date.now() - t0} ms)`);
+        };
+        schritt();
+      } catch (e) { console.error('[preload]', e.message); }
+    }, 3000);
     // ── DIAGNOSE-SCHALTER BEIM START ANZEIGEN ─────────────────────
     // Zum ZWEITEN Mal ist eine Umgebungsvariable still nicht
     // angekommen (erst PP_DEMO_RECORD, jetzt PP_CHAIN_DEBUG /

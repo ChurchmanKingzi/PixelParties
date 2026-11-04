@@ -728,9 +728,11 @@ function zonenSelektor(schluessel, myIdx) {
 // Briefly tints a board-zone red to signal that the hero/creature in
 // that slot just took damage. Restarts the animation if the same slot
 // is hit twice in quick succession (e.g. multi-hit attacks).
-function flashDamageOnZone(selector) {
+function flashDamageOnZone(selector, schaden) {
   const el = document.querySelector(selector);
   if (!el) return;
+  // ★ Trailer-Look (app-fx-31.jsx): bei einem Helden mit animierter Figur reagiert die FIGUR (Blitz, Quetschen, Wackeln, nach Schadenshöhe) statt des roten Karten-Schleiers
+  if (schaden > 0 && el.hasAttribute('data-hero-zone') && window.ppFx31Treffer && window.ppFx31Treffer(el, schaden)) return;
   el.classList.remove('damage-flashing');
   // Force reflow so the animation restarts when the class is re-added.
   void el.offsetWidth;
@@ -974,6 +976,15 @@ function FightingAtkNumber({ amount, owner, heroIdx, myIdx }) {
 // Floating card that animates from deck position to hand slot position
 function DrawAnimCard({ cardName, origIdx, startX, startY, dimmed }) {
   const [endPos, setEndPos] = useState(null);
+  const flugRef = useRef(null);
+  // Pixelart-Schweif + Abheb-Funken (app-fx-49): eine Leinwand von der Stapelmitte bis zur Mitte des Handplatzes, sobald die Karte fliegt.
+  useEffect(() => {
+    const el = flugRef.current;
+    if (!endPos || !el || !window.ppFx49Zug) return undefined;
+    const w = el.offsetWidth, h = el.offsetHeight;
+    const stopp = window.ppFx49Zug(el, { von: { x: startX + 32, y: startY + 45 }, nach: { x: endPos.x + w / 2, y: endPos.y + h / 2 }, w, h, dauer: 400 });
+    return () => { if (stopp) stopp(); };
+  }, [endPos]);
 
   useEffect(() => {
     // Wait one frame for the invisible hand slot to be laid out
@@ -1011,7 +1022,7 @@ function DrawAnimCard({ cardName, origIdx, startX, startY, dimmed }) {
   const dy = `calc(${endPos.y - cy}px + var(--hand-card-h) / 2)`;
 
   return (
-    <div className={'draw-anim-card' + (dimmed ? ' hand-card-dimmed' : '')}
+    <div ref={flugRef} className={'draw-anim-card' + (dimmed ? ' hand-card-dimmed' : '')}
       style={{ left, top, '--dx': dx, '--dy': dy, '--fan-rot': endPos.rot || '0deg' }}>
       <BoardCard cardName={cardName} />
     </div>
@@ -1443,6 +1454,15 @@ function BrackleCatapultCard({ sx, sy, mx, my, ex, ey, dx, dy, cardName, loadMs,
 }
 
 function OppDrawAnimCard({ id, startX, startY, endX, endY, cardName, cardbackUrl, fanRot }) {
+  const flugRef = useRef(null);
+  // Pixelart-Schweif + Abheb-Funken (app-fx-49), wie bei DrawAnimCard.
+  useEffect(() => {
+    const el = flugRef.current;
+    if (!el || !window.ppFx49Zug) return undefined;
+    const w = el.offsetWidth, h = el.offsetHeight;
+    const stopp = window.ppFx49Zug(el, { von: { x: startX + 32, y: startY + 45 }, nach: { x: endX + w / 2, y: endY + h / 2 }, w, h, dauer: 400 });
+    return () => { if (stopp) stopp(); };
+  }, []);
   // v1260: Start mittig auf dem Stapel — siehe DrawAnimCard.
   const cx = startX + 32, cy = startY + 45;
   const left = `calc(${cx}px - var(--hand-card-w) / 2)`;
@@ -1450,7 +1470,7 @@ function OppDrawAnimCard({ id, startX, startY, endX, endY, cardName, cardbackUrl
   const dx = `calc(${endX - cx}px + var(--hand-card-w) / 2)`;
   const dy = `calc(${endY - cy}px + var(--hand-card-h) / 2)`;
   return (
-    <div className="draw-anim-card"
+    <div ref={flugRef} className="draw-anim-card"
       style={{
         left, top, '--dx': dx, '--dy': dy,
         // ★ v1233: Landewinkel des Faechers. Der Drehpunkt liegt hier
@@ -2099,6 +2119,120 @@ function ppTutorialCamFokus(elemente, opts) {
 }
 window.ppTutorialCamFokus = ppTutorialCamFokus;
 
+// ★ TUTORIAL-ZOOM (Desktop, Als Vorgabe: „Kamerafahrten im Tutorial, in Kombination mit Zooms … Wann immer Karten gehighlightet werden, soll die Kamera auch außerhalb von Mobile
+// reinzoomen, sodass die gehighlighteten Karten im Zentrum sind. Am Ende der Erklärung soll sie wieder auf die normale Größe rauszoomen."): Zoom + Schwenk des Bretts (`.board-plane-clip` und
+// die Sprite-Hülle `.hero-sprite-huelle`, die beide die gleiche Box haben, bekommen dieselbe 2D-Transformation, s. style.css `.tut-zoom`). Der Zoom bringt die Ziele in die Mitte der
+// freien Fläche unter der Textbox. Liegt ein Ziel außerhalb der Brettebene (Phasenleiste, Handkarten, Stapel), bleibt die Ansicht normal. Rückgabe: Promise nach der Fahrt (die Highlight-Klone
+// werden erst danach vermessen) oder null, wenn nichts zu tun ist. `window._ppTz` = aktuelle Verschiebung/Skalierung (nur gültig, solange `.board-center` die Klasse trägt).
+// Kamerafahrt des Tutorial-Zooms als SKRIPT statt CSS-Übergang (Messung 3.11., Tutorial 7, CPU 6× gedrosselt: der Übergang auf den beiden Brett-Ebenen ließ pro Fahrt ~30 ms Hauptfaden-Blockaden und
+// Frame-Lücken bis 167 ms zurück — `pixel-anim.js` backte ihn zur Laufzeit und malte beide Ebenen dann in jedem 30-Hz-Bild neu). Jetzt zehn gehaltene Stufen in 0,52 s (≈ 19 Bilder/s, Stop-Motion
+// wie der Rest des Spiels), Kurve cubic-bezier(.45, 0, .2, 1), nach ZEIT berechnet: ein langsames Gerät überspringt Stufen statt sie aufzustauen. Ohne Bewegung (prefers-reduced-motion): sofort.
+function _ppTzKurve(u) {                                          // cubic-bezier(.45, 0, .2, 1): u (Zeit) → Fortschritt
+  const x1 = 0.45, y1 = 0, x2 = 0.2, y2 = 1;
+  let lo = 0, hi = 1, t = u;
+  for (let i = 0; i < 24; i++) { t = (lo + hi) / 2; const bx = 3 * (1 - t) * (1 - t) * t * x1 + 3 * (1 - t) * t * t * x2 + t * t * t; if (bx < u) lo = t; else hi = t; }
+  return 3 * (1 - t) * (1 - t) * t * y1 + 3 * (1 - t) * t * t * y2 + t * t * t;
+}
+function _ppTzFahre(bc, nach) {
+  const von = window._ppTzAnz || { x: 0, y: 0, s: 1 };
+  const ebenen = () => Array.from(bc.querySelectorAll(':scope > .board-plane-clip, :scope > .hero-sprite-huelle'));
+  // Ruhewert über die Variablen (EINE Neuberechnung am Ende). Zwischenstufen schreiben `transform` direkt an die zwei Ebenen: eine geänderte Custom Property am Brettkasten ließe den ganzen
+  // Teilbaum seinen Stil neu berechnen (jede Stufe ~60 ms bei 6× Drosselung), ein Inline-`transform` fasst nur die beiden Ebenen an.
+  const ruhe = (v) => {
+    for (const e of ebenen()) { e.style.transform = ''; e.style.transition = ''; }
+    bc.style.setProperty('--tz-x', v.x.toFixed(1) + 'px'); bc.style.setProperty('--tz-y', v.y.toFixed(1) + 'px'); bc.style.setProperty('--tz-s', v.s.toFixed(3));
+    window._ppTzAnz = { x: v.x, y: v.y, s: v.s };
+  };
+  const stufe = (v) => {
+    const t = `translate(${v.x.toFixed(1)}px, ${v.y.toFixed(1)}px) scale(${v.s.toFixed(3)})`;
+    for (const e of ebenen()) e.style.transform = t;
+    window._ppTzAnz = { x: v.x, y: v.y, s: v.s };
+  };
+  if (window._ppTzRaf) { try { cancelAnimationFrame(window._ppTzRaf); } catch (e) { /* weg */ } window._ppTzRaf = 0; }
+  let ruhig = false;
+  try { ruhig = !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches); } catch (e) { /* bewegt */ }
+  if (ruhig || window._playAnimations === false) { ruhe(nach); return; }
+  if (window.__ppTzAlt) {                                         // Vergleich/Notbremse: alter CSS-Übergang
+    for (const e of ebenen()) e.style.transition = 'transform .52s cubic-bezier(.45, 0, .2, 1)';
+    ruhe.call(null, nach); for (const e of ebenen()) e.style.transition = 'transform .52s cubic-bezier(.45, 0, .2, 1)';
+    return;
+  }
+  const DAUER = 520, STUFEN = 10, t0 = performance.now(), raf = window.ppTaktRaf || window.requestAnimationFrame;
+  let letzte = 0;
+  const schritt = () => {
+    window._ppTzRaf = 0;
+    const u = Math.min(1, (performance.now() - t0) / DAUER), k = u >= 1 ? STUFEN : Math.floor(u * STUFEN);
+    if (k !== letzte) {
+      letzte = k;
+      if (k >= STUFEN) { ruhe(nach); return; }
+      const f = _ppTzKurve(k / STUFEN);
+      stufe({ x: von.x + (nach.x - von.x) * f, y: von.y + (nach.y - von.y) * f, s: von.s + (nach.s - von.s) * f });
+    }
+    if (u < 1) window._ppTzRaf = raf(schritt);
+  };
+  window._ppTzRaf = raf(schritt);
+}
+function _ppTzStand(bc) { return (bc && bc.classList.contains('tut-zoom') && window._ppTz) ? window._ppTz : { x: 0, y: 0, s: 1 }; }
+function ppTutorialZoomAus() {
+  try {
+    const bc = document.querySelector('.board-center');
+    if (!bc || !bc.classList.contains('tut-zoom') || !window._ppTz) return null;
+    window._ppTz = null;
+    _ppTzFahre(bc, { x: 0, y: 0, s: 1 });
+    return new Promise((fertig) => setTimeout(() => { if (!window._ppTz) bc.classList.remove('tut-zoom'); fertig(); }, 560));
+  } catch { return null; }
+}
+function ppTutorialZoom(elemente) {
+  try {
+    if (window.ppIsPhone && window.ppIsPhone()) return null;
+    const bc = document.querySelector('.board-center');
+    const clip = bc && bc.querySelector(':scope > .board-plane-clip');
+    if (!bc || !clip) return null;
+    const alle = Array.from(elemente || []).filter(e => e && e.getBoundingClientRect);
+    // Mischmengen (Brettkarte + Handkarte): gezoomt wird auf die Brettkarten, die Hand steht ohnehin fest unten. Gehoert die Phasenleiste dazu, bleibt die Ansicht normal
+    // (sie liegt ausserhalb der Brettebene und wuerde beim Zoom nicht mitwandern).
+    const liste = alle.filter(e => clip.contains(e));
+    if (!liste.length || alle.some(e => e.closest && e.closest('.phase-column'))) return ppTutorialZoomAus();
+    const cur = _ppTzStand(bc);
+    const bcr = bc.getBoundingClientRect();
+    // Ursprung der (unverzerrten) Clip-Box auf dem Bildschirm — offsetLeft/Top kennen keine Transforms
+    const O = { x: bcr.left + bc.clientLeft + clip.offsetLeft - bc.scrollLeft, y: bcr.top + bc.clientTop + clip.offsetTop - bc.scrollTop };
+    let bl = Infinity, bt = Infinity, br = -Infinity, bb = -Infinity;
+    for (const e of liste) {
+      const r = e.getBoundingClientRect();
+      if (!r.width && !r.height) continue;
+      // zurueck in den unzoomten Zustand: p' = O + T + s·(p − O)
+      const l = O.x + (r.left - O.x - cur.x) / cur.s, t = O.y + (r.top - O.y - cur.y) / cur.s;
+      const rr = O.x + (r.right - O.x - cur.x) / cur.s, b = O.y + (r.bottom - O.y - cur.y) / cur.s;
+      bl = Math.min(bl, l); bt = Math.min(bt, t); br = Math.max(br, rr); bb = Math.max(bb, b);
+    }
+    if (!isFinite(bl)) return null;
+    // freie Fläche: Brettkasten abzüglich der Textbox oben
+    let oben = bcr.top; const unten = bcr.bottom;
+    const tb = document.querySelector('.textbox');
+    if (tb) { const q = tb.getBoundingClientRect(); if (q.height > 0 && q.top + q.height / 2 < window.innerHeight / 2) oben = Math.max(oben, q.bottom + 8); }
+    const Aw = bcr.width, Ah = Math.max(80, unten - oben);
+    const bw = (br - bl) + 28, bh = (bb - bt) + 28;
+    let s = Math.min((Aw * 0.8) / bw, (Ah * 0.8) / bh, 2);
+    if (!(s >= 1.12)) return ppTutorialZoomAus();
+    s = Math.round(s * 20) / 20;
+    const Cx = bcr.left + Aw / 2, Cy = oben + Ah / 2, px = (bl + br) / 2, py = (bt + bb) / 2;
+    let tx = Cx - O.x - s * (px - O.x), ty = Cy - O.y - s * (py - O.y);
+    // das gezoomte Brett soll den Kasten weiter ausfuellen (keine leeren Raender): Kanten begrenzen
+    const W = clip.offsetWidth, H = clip.offsetHeight;
+    const klemme = (v, lo, hi) => (lo <= hi ? Math.min(hi, Math.max(lo, v)) : (lo + hi) / 2);
+    tx = klemme(tx, bcr.right - O.x - s * W, bcr.left - O.x);
+    ty = klemme(ty, bcr.bottom - O.y - s * H, bcr.top - O.y);
+    if (Math.abs(tx - cur.x) < 2 && Math.abs(ty - cur.y) < 2 && Math.abs(s - cur.s) < 0.02) return null;
+    window._ppTz = { x: tx, y: ty, s };
+    bc.classList.add('tut-zoom');
+    _ppTzFahre(bc, { x: tx, y: ty, s });
+    return new Promise((fertig) => setTimeout(fertig, 580));
+  } catch { return null; }
+}
+window.ppTutorialZoom = ppTutorialZoom;
+window.ppTutorialZoomAus = ppTutorialZoomAus;
+
 // ★ AUFMERKSAMKEITSKAMERA (Tutorial, Handy): Nach dem Intro blieb die Kamera auf der Gegnerseite stehen — die eigene Kreaturen-/Support-Reihe
 // liegt dort hinter der Handleiste, der Spieler sah weder die anklickbare Kreatur noch die Zielfelder (Befund Kontrolllauf Tutorial 2/3/6/7).
 // Alle ~450 ms schaut der Beobachter nach markierten, bedienbaren Zielen (aktivierbare Kreaturen/Faehigkeiten/Areas, Zielfelder, waehlbare Helden);
@@ -2135,7 +2269,7 @@ function ppPlatzierungsKamera() {
     if (!sc) return;
     // Support-Zonen-Wahl (Pollution Tokens …) UND „waehle einen Nutzer": sind meine Helden als Ziel markiert (Spell/Attack/Creature per Tipp, mehrere moegliche Wirker),
     // fahren die Kamera zu ihnen.
-    const els = Array.from(sc.querySelectorAll('[data-support-zone].zone-pick-target, [data-support-zone].zone-bounce-place-target, [data-hero-zone].board-zone-play-target, [data-hero-zone].attach-pick-target'));
+    const els = Array.from(sc.querySelectorAll('[data-support-zone].zone-pick-target, [data-support-zone].zone-bounce-place-target, [data-support-zone].zone-drag-valid, [data-hero-zone].board-zone-play-target, [data-hero-zone].attach-pick-target'));   // zone-drag-valid: Handkarte angetippt (Artefakt/Kreatur) — die gueltigen Support-Zonen liegen sonst hinter der Handleiste
     if (!els.length) { _ppPlatzSchluessel = ''; return; }
     if (document.querySelector('.textbox-overlay')) return;   // im Tutorial hat die Textbox-Kamera Vorrang
     if (document.querySelector('.panel-zielwahl')) return;    // das Zielwahl-Fenster steuert die Kamera selbst
@@ -2252,6 +2386,29 @@ const ZW_AKTIV_SEL = ZW_KNOPF_SEL + ', .panel-zielwahl-aktiv, .panel-zielwahl-gr
 // Beschwörungsplätze, Chain-Ziele), die sonst verdeckt blieben.
 const ZW_KARTE_SEL = '.zone-has-card, .board-card, [data-card-name], .zone-pick-target, '
   + '.potion-target-valid, .board-zone-play-target, .chain-pick-valid';
+
+// ★ Drop-Zone eines Helden beim Ziehen einer Handkarte: der Heldenkasten PLUS ein Rand (Als Befund: der Held war als Ablagefläche zu klein, Drops daneben gingen verloren).
+// Genau getroffen zählt immer; sonst zählt der Rand — nie über eine Support-/Ability-/Surprise-/Area-Zone (deren genaue Fläche behält Vorrang: dort legt man gezielt ab) und nie, wenn ein anderer
+// Held näher liegt.
+function _ppAbstandZuRechteck(r, x, y) { return Math.hypot(Math.max(r.left - x, 0, x - r.right), Math.max(r.top - y, 0, y - r.bottom)); }
+function ppHeroTreffer(el, mx, my) {
+  const r = el.getBoundingClientRect();
+  if (!r.width || !r.height) return false;
+  if (mx >= r.left && mx <= r.right && my >= r.top && my <= r.bottom) return true;
+  const rand = Math.max(24, Math.round(Math.min(r.width, r.height) * 0.8));
+  const mein = _ppAbstandZuRechteck(r, mx, my);
+  if (mein > rand) return false;
+  for (const z of document.querySelectorAll('[data-support-zone], [data-ability-zone], [data-surprise-zone], [data-area-zone]')) {
+    const q = z.getBoundingClientRect();
+    if (mx >= q.left && mx <= q.right && my >= q.top && my <= q.bottom) return false;
+  }
+  for (const h of document.querySelectorAll('[data-hero-zone]')) {
+    if (h === el) continue;
+    const q = h.getBoundingClientRect();
+    if (q.width && q.height && _ppAbstandZuRechteck(q, mx, my) < mein) return false;
+  }
+  return true;
+}
 
 // ★ v1489: Liegt unter dem Zielwahl-Panel an (x, y) eine Karte? Geprüft
 // wird das oberste Element, das nicht zum Panel gehört — also genau das,
@@ -3489,6 +3646,57 @@ function HeroStatusPartikel({ effekte, kern, s, mitteX, fw, fh, saat }) {
  * Hat die Zone keine Figur (Held ohne Spritesheet, Kreatur), bleibt es bei
  * der Zonenklasse.
  */
+// Flug einer Karte zu einer Zone, die ihr Ziel in JEDEM Bild neu misst: bewegt sich das Brett waehrend der 0,6 s (Kamerafahrt, Tutorial-Kamera, Layout-Nachruecken),
+// landet die Karte trotzdem auf dem Helden — vorher war das Ziel einmal beim Start gemessen und die Karte flog auf der Handy-Ansicht daneben.
+// `w0` = Weltanker beim Start (`ppFxWeltAnker`); liegt die Karte in der Welt-Huelle, wird der Scrollversatz jedes Bild neu eingerechnet.
+function ppFlugVerfolgen(fly, sourceEl, destEl, w0, ms, opEnd, farbe) {
+  const sr = sourceEl.getBoundingClientRect();
+  const sx = sr.left + sr.width / 2, sy = sr.top + sr.height / 2;
+  const raf = window.ppTaktRaf || requestAnimationFrame;
+  const t0 = performance.now();
+  fly.style.transition = 'none';
+  // Kometenschweif (app-fx-49): Leinwand in derselben Schicht wie die Karte; der Flug meldet jede gemessene Lage (Schicht-Koordinaten), der Schweif zeichnet den gesehenen Weg.
+  let spur = null;
+  try {
+    if (window.ppFx49Schweif) {
+      const d0 = destEl.getBoundingClientRect(), wx = w0 ? w0.dx : 0, wy = w0 ? w0.dy : 0;
+      spur = window.ppFx49Schweif({
+        art: 'komet', folge: true, welt: !!(w0 && w0.welt), von: { x: sx + wx, y: sy + wy }, nach: { x: d0.left + d0.width / 2 + wx, y: d0.top + d0.height / 2 + wy },
+        dauer: ms, w: (sr.width + d0.width) / 2, h: (sr.height + d0.height) / 2, farbe,
+      });
+    }
+  } catch (err) { spur = null; }
+  const ease = (q) => 1 - Math.pow(1 - q, 3);
+  const schritt = () => {
+    if (!fly.isConnected) return;
+    const q = Math.min(1, (performance.now() - t0) / ms), e = ease(q);
+    let dr = null;
+    try { dr = destEl.isConnected ? destEl.getBoundingClientRect() : null; } catch (err) { dr = null; }
+    if (dr && dr.width > 0) {
+      // Liegt die Karte in der Welt-Huelle, wandert ihr Grundpunkt mit dem Scrollstand des Bretts davon (`drift`). Die Karte soll aber bildschirmfest an der Handkarte
+      // starten und erst von dort zum Helden gleiten: Position = Start + e · (Ziel − Start), die Huellenverschiebung wird herausgerechnet.
+      const wJetzt = (w0 && w0.welt && window.ppFxWeltAnker) ? window.ppFxWeltAnker(destEl) : { dx: 0, dy: 0 };
+      const driftX = (w0 && w0.welt) ? (w0.dx - wJetzt.dx) : 0, driftY = (w0 && w0.welt) ? (w0.dy - wJetzt.dy) : 0;
+      const tx = dr.left + dr.width / 2, ty = dr.top + dr.height / 2;
+      fly.style.transform = `translate(${(tx - sx) * e - driftX}px, ${(ty - sy) * e - driftY}px) scale(${1 + (dr.width / sr.width - 1) * e})`;
+      fly.style.opacity = String(1 - (1 - opEnd) * e);
+      if (spur) spur.punkt(sx + (w0 ? w0.dx : 0) + (tx - sx) * e - driftX, sy + (w0 ? w0.dy : 0) + (ty - sy) * e - driftY);
+    }
+    if (q < 1) raf(schritt);
+  };
+  raf(schritt);
+}
+/**
+ * Lage aller Heldenzonen/Support-Zonen im Moment des Aufrufs (Element -> Rechteck). Einschlag-Animationen (Magic Hammer, Keule, Dino …) suchen ihr Ziel
+ * erst nach 300–500 ms; Verschiebt sich das Brett dazwischen (Handy: Kamerafahrt), lag der naechste Treffer ploetzlich ueber einem anderen Helden.
+ */
+// Einschlag-Animationen, die ihre Zielzone selbst quetschen: bekommen das Zonen-Element direkt (`zoneEl`)
+const PP_SQUASH_ANIMS = new Set(['stranglehold_squeeze', 'magic_hammer', 'shattering_strike', 'spiked_club_smash', 'giant_dino_stomp', 'mammoth_stomp', 'ankylo_tail_smash']);
+function ppZonenFrost() {
+  const m = new Map();
+  try { document.querySelectorAll('[data-hero-zone],[data-support-zone]').forEach(el => m.set(el, el.getBoundingClientRect())); } catch (e) { /* ohne Frost: live messen */ }
+  return m;
+}
 function ppZonenSquash(zone, klasse, ms) {
   zone.classList.add(klasse);
   const platz = zone._ppFigurPlatz;
@@ -3545,7 +3753,34 @@ function HeroAufstiegLicht() {
     </>
   );
 }
-function HeroIdleSprite({ cardName, angehalten, versteinert, eingefroren, effekte, unsichtbar, eingeklappt, abgeblendet, aufstieg }) {
+/**
+ * Dauer-Statussymbole NEBEN der animierten Figur (Brand, Gift mit Zaehler „xN“, Blutung): sie sitzen im `.hero-idle-holo` der Figur und machen deshalb jede Bewegung mit (Rammen/Dash
+ * verschiebt den Platz, Treffer-Wackeln/Quetschen, Einfahren bei Hover/Zielwahl, Auftritt, Aufstiegs-Pose); verschwindet die Figur (Tod, ausgeblendet, Figuren aus), verschwinden auch sie.
+ * Statische Bilder (`PpFx52.iconUrl`, ganzzahlig vergroessert), keine Dauer-Animation, zustandsgetrieben aus dem Spielzustand; keine Layout-Lesung im Takt.
+ */
+function HeroStatusSymbole({ st, links, oben, k }) {
+  const P = window.PpFx52;
+  if (!st || !P || !P.iconUrl || window.__ppFx52SymbolAlt) return null;
+  const arten = [];
+  if (st.burn) arten.push('burn');
+  if (st.poison) arten.push('poison');
+  if (st.bleed) arten.push('bleed');
+  if (!arten.length) return null;
+  return (
+    <div className="hero-idle-statussymbole" data-pp-px="aus" style={{ position: 'absolute', left: links, top: oben, display: 'flex', flexDirection: 'column', gap: 1, pointerEvents: 'none', zIndex: 3 }}>
+      {arten.map(a => (
+        <div key={a} style={{ display: 'flex', alignItems: 'center', gap: 1, whiteSpace: 'nowrap' }}>
+          <PpStatusSpr kind={a} k={k} />
+          {a === 'poison' && st.poison > 0 && (
+            <span style={{ fontFamily: 'var(--font-body), sans-serif', fontWeight: 800, fontSize: `${(6 + 3 * k)}px`, lineHeight: 1, color: '#e5f5fa', textShadow: '1px 1px 0 #000, -1px 1px 0 #000, 1px -1px 0 #000, -1px -1px 0 #000' }}>{'x' + st.poison}</span>
+          )}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function HeroIdleSprite({ cardName, angehalten, versteinert, eingefroren, effekte, unsichtbar, eingeklappt, abgeblendet, aufstieg, statusIcons }) {
   const key = HeroIdleAnims.slug(cardName);
   // Eisblock: 'da' solange Frozen, danach kurz 'schmilzt' (zerspringt),
   // dann 'weg'.
@@ -3586,6 +3821,8 @@ function HeroIdleSprite({ cardName, angehalten, versteinert, eingefroren, effekt
     const zone = anker.parentElement;
     // Die Zone kennt ihre Figur (`ppZonenSquash` quetscht beide gemeinsam).
     zone._ppFigurPlatz = platz;
+    platz._ppEintrag = eintrag;   // Sheet + aktueller Frame (`platz._ppFrame`, s. `male`) für die Nachbilder beim Rammen (app-fx-27.jsx)
+    platz._ppZone = zone;         // Heldentod (app-fx-32.jsx): der Beobachter der Sprite-Ebene findet zum entfernten Platz seine Zone
     const ctx = cv.getContext('2d');
     const { meta, img } = eintrag;
     const fw = meta.frameWidth, fh = meta.frameHeight;
@@ -3653,11 +3890,13 @@ function HeroIdleSprite({ cardName, angehalten, versteinert, eingefroren, effekt
       if (weiss > 0 && !stein) {
         ctx.save();
         ctx.globalCompositeOperation = 'source-atop';
-        ctx.fillStyle = `rgba(255,255,255,${weiss})`;
+        // app-fx-33: `weiss` ist dann ein Blinkfarben-Index (volle Silhouette, kein Alpha); ohne die Datei der alte Weissanteil
+        ctx.fillStyle = zustand.current.ascPose ? window.ppFx33Farbe(weiss) : `rgba(255,255,255,${weiss})`;
         ctx.fillRect(0, 0, fw, fh);
         ctx.restore();
       }
       st.weissGemalt = weiss;
+      platz._ppFrame = st.frame;
       st.gemalt = st.frame;
       st.steinGemalt = st.stein;
       st.effekteGemalt = eff;
@@ -3684,7 +3923,9 @@ function HeroIdleSprite({ cardName, angehalten, versteinert, eingefroren, effekt
       // ★ Touch (Befund: „die eigenen Helden verschwinden in ihren Karten, bis ich irgendwo hintippe"): nach einem Tipp bleibt `:hover` am angetippten
       // Element haengen (Phasenleiste, Heldenkarte) — das Einfahren der Figur gilt nur fuer eine echte Maus.
       const beruehrung = !!(window.matchMedia && window.matchMedia('(pointer: coarse)').matches);
-      const hover = !beruehrung && !!(l && zone.classList.contains('zone-has-card') && zone.matches(':hover')
+      // ★ Rammen mit der Figur (app-fx-27.jsx, `zone._ppRammt`): die fahrende Figur bleibt ausgefahren, auch wenn der Zeiger auf der Zone steht oder eine Zielwahl offen ist.
+      const rammt = !!zone._ppRammt;
+      const hover = !beruehrung && !rammt && !!(l && zone.classList.contains('zone-has-card') && zone.matches(':hover')
         && !l.plane.hasAttribute('data-pp-dragging'));
       // v1463 (Dynamic Heroes): während eines Zielwahl-Dialogs klappt die
       // Figur ein wie beim Hover — aber ohne die Hover-Vergrößerung, die
@@ -3706,7 +3947,7 @@ function HeroIdleSprite({ cardName, angehalten, versteinert, eingefroren, effekt
           }
         }
       }
-      const weg = hover || phasenHover || !!zustand.current.eingeklappt;
+      const weg = !rammt && (hover || phasenHover || !!zustand.current.eingeklappt);
       if (weg !== st.weg) {
         st.weg = weg;
         // ★ v1452 (Als Vorgabe 27.9.): Hovert man die Heldenkarte, zieht
@@ -3777,7 +4018,18 @@ function HeroIdleSprite({ cardName, angehalten, versteinert, eingefroren, effekt
       } else st.puls = 0;
       // Aufstiegs-Morph: Weissanteil nach der Zeit seit dem Ereignis
       const asc = zustand.current.aufstieg;
-      zustand.current.weiss = asc ? ascWeiss(asc.rolle, (performance.now() - asc.t0) / ASC_DAUER_MS) : 0;
+      // app-fx-33 (Trailer-Look): Sichtbarkeit, Streckung, Hub und Blinkfarbe der Figur stufenweise im 30-Hz-Takt (statt CSS-Ueberblendung)
+      const ascPose = asc && window.ppFx33Pose ? window.ppFx33Pose(asc.rolle, performance.now() - asc.t0) : null;
+      zustand.current.ascPose = !!ascPose;
+      zustand.current.weiss = ascPose ? ascPose.flash : (asc ? ascWeiss(asc.rolle, (performance.now() - asc.t0) / ASC_DAUER_MS) : 0);
+      if (holo) {
+        const ak = ascPose ? ascPose.key : null;
+        if (ak !== st.ascKey) {
+          st.ascKey = ak;
+          holo.style.visibility = ascPose ? (ascPose.sicht ? 'visible' : 'hidden') : '';
+          holo.style.transform = ascPose && ascPose.sicht && (ascPose.sx !== 1 || ascPose.sy !== 1 || ascPose.lift) ? `translateY(${(-ascPose.lift * 100).toFixed(1)}%) scale(${ascPose.sx}, ${ascPose.sy})` : '';
+        }
+      }
       if (st.frame !== st.gemalt || st.stein !== st.steinGemalt
         || effNun !== st.effekteGemalt || st.puls !== st.pulsGemalt
         || (zustand.current.weiss || 0) !== (st.weissGemalt || 0)) sicher('Malen', male);
@@ -3806,6 +4058,12 @@ function HeroIdleSprite({ cardName, angehalten, versteinert, eingefroren, effekt
       zone.removeEventListener('mouseleave', hoverMelden);
       if (holo) holo.removeEventListener('animationend', auftauchenFertig);
     };
+  }, [eintrag, ebene]);
+  // Auftritt (Aufsteigen aus der Karte, Aufleuchten, Bodenschatten): app-fx-46.jsx treibt ihn im 30-Hz-Takt per Skript — vorher drei CSS-Animationen, die der
+  // Laufzeit-Backer je Figur abtasten musste. Vor dem ersten Zeichnen starten (Layout-Effekt), sonst stünde die Figur ein Bild lang fertig da.
+  React.useLayoutEffect(() => {
+    if (!eintrag || !ebene || !platzRef.current) return;
+    try { if (window.ppHeldAuftritt) window.ppHeldAuftritt(platzRef.current, ankerRef.current && ankerRef.current.parentElement); } catch {}
   }, [eintrag, ebene]);
 
   const anker = <span ref={ankerRef} className="hero-idle-anker" />;
@@ -3857,9 +4115,11 @@ function HeroIdleSprite({ cardName, angehalten, versteinert, eingefroren, effekt
     top: `calc(50% - ${bs(fussY * s)})`,
     transformOrigin: drehpunkt,
   };
+  // Drehpunkt der Streckung beim Rammen (`scale` am Canvas, app-fx-27.jsx): der Fußpunkt, nicht die Bildmitte
   const canvasStil = {
     width: `calc(${bs(fw * s)})`,
     height: `calc(${bs(fh * s)})`,
+    transformOrigin: `calc(${bs(mitteX * s)}) calc(${bs(fussY * s)})`,
   };
   // Eiskruste: deckungsgleich mit dem Sprite-Canvas, aber ringsum um `EIS_RAND` Sprite-Pixel größer (Silhouette verbreitert, Zacken
   // oben, Eis unter der Standlinie ragen über den Rahmen hinaus); Drehpunkt an den Füßen (dort wächst sie beim Einfrieren hoch)
@@ -3886,18 +4146,22 @@ function HeroIdleSprite({ cardName, angehalten, versteinert, eingefroren, effekt
       {anker}
       {ReactDOM.createPortal(
         <div ref={platzRef} data-held={cardName}
-          className={'hero-idle-platz' + (aufstieg ? ' hero-idle-aufstieg hero-idle-aufstieg-' + aufstieg.rolle : '') + (versteinert ? ' hero-idle-stein' : '') + (angehalten ? ' hero-idle-angehalten' : '') + (unsichtbar ? ' hero-idle-unsichtbar' : '') + (abgeblendet ? ' hero-idle-abgeblendet' : '')}>
+          className={'hero-idle-platz' + (aufstieg ? ' hero-idle-aufstieg hero-idle-aufstieg-' + aufstieg.rolle + (window.ppFx33Pose ? ' hero-idle-asc33' : '') : '') + (versteinert ? ' hero-idle-stein' : '') + (angehalten ? ' hero-idle-angehalten' : '') + (unsichtbar ? ' hero-idle-unsichtbar' : '') + (abgeblendet ? ' hero-idle-abgeblendet' : '')}>
           <div className="hero-idle-steher" style={steherStil}>
             <div className="hero-idle-schatten" style={schattenStil} />
             <div className="hero-idle-holo" style={{ transformOrigin: drehpunkt }}>
               <canvas ref={canvasRef} width={fw} height={fh} className="hero-idle-canvas" style={canvasStil} />
+              {statusIcons && (statusIcons.burn || statusIcons.poison || statusIcons.bleed) && (
+                <HeroStatusSymbole st={statusIcons} k={Math.max(1, Math.min(3, Math.round(s * (parseFloat(document.documentElement.style.getPropertyValue('--board-scale')) || 1) / 1.4)))}
+                  links={`calc(${bs(kern.x1 * s + 3)})`} oben={`calc(${bs((kern.y0 + ch * 0.18) * s)})`} />
+              )}
               {eisPhase !== 'weg' && (
                 <HeroEiskruste quelleRef={canvasRef} breite={fw} hoehe={fh} rand={EIS_RAND}
                   stil={eisStil} schmilzt={eisPhase === 'schmilzt'} />
               )}
             </div>
           </div>
-          {aufstieg && aufstieg.rolle === 'neu' && (
+          {aufstieg && aufstieg.rolle === 'neu' && !window.ppFx33Pose && (
             <div className="hero-idle-fx hero-idle-aufstieg-fx" style={fxStil}>
               <HeroAufstiegLicht />
             </div>
@@ -4778,6 +5042,52 @@ window.ppApplauseFlash = function (key) {
   document.querySelectorAll(`[data-applause-key="${key}"]`).forEach(ppApplauseAufleuchten);
 };
 
+// ═══════════════════════════════════════════════════════════════
+//  ★ KLANG BEIM ERHALTEN VON COUNTERS (Als Befund 31.10.: „Cute Hydra braucht einen Sound beim Erhalten von Counters — generell soll
+//  das auf ALLEN Karten klingen")
+//
+//  Zentral über den Zustandsvergleich statt je Karte: Jedes Zähler-Feld an einer Kreatur (`creatureCounters`: headCounter, demonCounter,
+//  skullCounter, bunnyBombCounter, pythiaCounters …) oder einem Helden (`deepseaCounters`, `_timeCounters`, `_divinityCounters`,
+//  `_evolutionCounters`, `_investCounters`, `_luckCounter` …) zählt — das Namensmuster `…Counter(s)` (neue Zähler klingen damit von
+//  selbst) plus die Alt-Namen ohne Endung (`balance`, `preserve`, `luck`). Verglichen wird die SUMME je Zählerart über das ganze Brett:
+//  zieht eine Kreatur um oder wird neu beschworen, ohne dass ein Zähler dazukommt, bleibt die Summe gleich und es klingt nichts.
+//  Ausgenommen sind Zähler mit EIGENEM Klang, damit nichts doppelt klingt: Applause (`applause_gain`), Doom (`doom_tick`),
+//  Change Counter (`cosmic_counter_add`) und die Zähler der Time Bomblebee (`bomblebee_tick`).
+//  Neuer Zähler mit eigener Animation + Klang? Name in `PP_ZAEHLER_EIGENER_KLANG` ergänzen.
+// ═══════════════════════════════════════════════════════════════
+const PP_ZAEHLER_ALTE_NAMEN = new Set(['balance', 'preserve', 'luck']);
+const PP_ZAEHLER_EIGENER_KLANG = /change|^bombCounters$|applause|doom/i;
+const ppIstZaehlerFeld = (k) => !PP_ZAEHLER_EIGENER_KLANG.test(k) && (/Counters?$/.test(k) || PP_ZAEHLER_ALTE_NAMEN.has(k));
+/** Summe je Zählerart über Kreaturen und Helden beider Seiten. */
+function ppZaehlerSummen(gs) {
+  const sum = {};
+  const zaehle = (o) => {
+    if (!o) return;
+    for (const k of Object.keys(o)) {
+      const v = o[k];
+      if (typeof v === 'number' && v > 0 && ppIstZaehlerFeld(k)) sum[k] = (sum[k] || 0) + v;
+    }
+  };
+  const cc = gs && gs.creatureCounters;
+  if (cc) for (const pos of Object.keys(cc)) zaehle(cc[pos]);
+  for (const p of (gs && gs.players) || []) for (const h of (p && p.heroes) || []) zaehle(h);
+  return sum;
+}
+/** Hat sich in `jetzt` gegenüber `vorher` irgendeine Zählerart erhöht? */
+function ppZaehlerGestiegen(vorher, jetzt) {
+  if (!vorher || !jetzt) return false;
+  for (const k of Object.keys(jetzt)) if (jetzt[k] > (vorher[k] || 0)) return true;
+  return false;
+}
+function ppZaehlerKlang() {
+  if (!window.playSFX) return;
+  // zwei kurze, aufsteigende Töne (ein „+1"); ohne Sammelkategorie, damit der Karten-/Zauberklang davor ihn nicht verschluckt
+  window.playSFX('ping', { rate: 1.2, volume: 0.6, dedupe: 120, category: null });
+  window.playSFX('ping', { rate: 1.6, volume: 0.45, delay: 70, dedupe: 120, category: null });
+}
+window.ppZaehlerSummen = ppZaehlerSummen;
+window.ppZaehlerGestiegen = ppZaehlerGestiegen;
+
 function ApplauseBadge({ n, hand, akey }) {
   const ref = React.useRef(null);
   React.useEffect(() => {
@@ -5095,11 +5405,35 @@ function ppHeldenRammenBahn(R, B) {
 function HeldenRammkarte({ r }) {
   const el = useRef(null);
   const c = r.clash;
+  // Figur statt Karte (app-fx-27.jsx): gleiche gemeinsame Bahn, der Weg `d` wird als Anteil des Zonenabstands in die Brettebene übertragen. Gelingt das nicht (die Figur ist
+  // zwischen Ereignis und Aufbau verschwunden), fährt ausnahmsweise doch die Karte.
+  const [figurFehlt, setFigurFehlt] = useState(false);
   useEffect(() => {
-    let raf = 0;
+    let raf = 0, fig = null;
+    if (r.figur && !figurFehlt && window.ppFx27Figur) {
+      fig = window.ppFx27Figur(c.srcEl, c.tgtEl, { art: 'duell', voll: true });
+      if (!fig) { setFigurFehlt(true); return undefined; }       // neuer Durchlauf (Abhängigkeit) fährt dann die Karte
+    }
     if (!c.ctrl.angelaufen) {                                        // die erste Karte, die steht, startet die gemeinsame Bahn
       c.ctrl.angelaufen = true;
       if (!c.ctrl.bahn.beendet) c.ctrl.bahn.anlauf(performance.now());
+    }
+    if (fig) {
+      const takt = window.ppTaktRaf || window.requestAnimationFrame;
+      const figSchritt = () => {
+        const t = performance.now(), b = c.ctrl.bahn;
+        if (b.beendet && t > b.heimEnde + 30) {
+          if (!c.ctrl.entfernt) { c.ctrl.entfernt = true; c.ctrl.entfernen(); }
+          return;
+        }
+        if (!b.beendet && t > b.letzteZeit() + 10000) b.heim(t);
+        if (!fig.lebt()) { fig.ende(); return; }
+        const z = b.zustand(t);
+        fig.pose({ p: z.d / Math.max(1, c.D), spiegel: 1, wackeln: Math.round(z.w * Math.sign(c.wackeln) * 3), laden: false });
+        raf = takt(figSchritt);
+      };
+      figSchritt();
+      return () => { cancelAnimationFrame(raf); fig.ende(); };
     }
     const schritt = () => {
       const e = el.current;
@@ -5117,7 +5451,8 @@ function HeldenRammkarte({ r }) {
     };
     schritt();
     return () => cancelAnimationFrame(raf);
-  }, []);
+  }, [figurFehlt]);
+  if (r.figur && !figurFehlt) return null;                           // die Figur fährt in der Sprite-Ebene, hier gibt es nichts zu zeigen
   return (
     <div ref={el} className="ram-anim-card ram-clash" style={{ left: r.srcX - c.w / 2, top: r.srcY - c.h / 2, width: c.w, height: c.h }}>
       <BoardCard cardName={r.cardName} noTooltip />
@@ -5355,7 +5690,9 @@ function FlameStrikeEffect({ x, y, skala = 1 }) {   // W86r1: `skala` vergröße
 // Both layers are pointer-events:none and respect prefers-reduced-motion.
 // The colour comes in as the player's chosen colour.
 const ppAmbGerade = (v) => Math.round(v / 2) * 2;   // gerade Pixel (Pixelart: Teilchen liegen auf dem 2-px-Kunstpixelraster)
-function HandAmbiance({ color }) {
+// Perf (3.11.): React.memo + Canvas (app-fx-34.jsx) — die 80 Motes sind EINE Leinwand im 30-Hz-Takt statt 80 DOM-Animationen;
+// die DOM-Spans bleiben nur als Rueckfall (`window.__ppFxAlt`, fehlende app-fx-34).
+const HandAmbiance = React.memo(function HandAmbiance({ color }) {
   const motes = useMemo(() => {
     const N = 80;   // doubled from 40 — denser pixel rain over the hand
     const arr = [];
@@ -5381,7 +5718,9 @@ function HandAmbiance({ color }) {
       style={{ '--amb-me': color || '#66b6ff' }}>
       <div className="hand-bloom" />
       <div className="hand-particles">
-        {motes.map((p, i) => (
+        {window.PpFx34Ambiente && !window.__ppFxAlt
+          ? <window.PpFx34Ambiente art="hand" motes={motes} farbeMe={color || '#66b6ff'} farbeOpp="#ec2d62" />
+          : motes.map((p, i) => (
           <span key={i} className="hand-mote" style={{
             top: p.top + '%', left: p.left + '%',
             '--p-size': p.size + 'px',
@@ -5398,7 +5737,7 @@ function HandAmbiance({ color }) {
       </div>
     </div>
   );
-}
+});
 
 // Battlefield ambiance — always-on pixel motes drifting upward across the
 // whole battlefield background, mirroring the visual language of
@@ -5413,7 +5752,7 @@ function HandAmbiance({ color }) {
 //   • Dimmer + slower than the hand layer so it never competes with
 //     cards for attention.
 // pointer-events: none, respects prefers-reduced-motion (see .board-mote).
-function BoardAmbiance({ colorMe, colorOpp }) {
+const BoardAmbiance = React.memo(function BoardAmbiance({ colorMe, colorOpp }) {
   const motes = useMemo(() => {
     const N = 56;
     const arr = [];
@@ -5438,7 +5777,9 @@ function BoardAmbiance({ colorMe, colorOpp }) {
   return (
     <div className="board-ambiance" aria-hidden="true"
       style={{ '--amb-board-me': colorMe || '#66b6ff', '--amb-board-opp': colorOpp || '#ec2d62' }}>
-      {motes.map((p, i) => (
+      {window.PpFx34Ambiente && !window.__ppFxAlt
+        ? <window.PpFx34Ambiente art="brett" motes={motes} farbeMe={colorMe || '#66b6ff'} farbeOpp={colorOpp || '#ec2d62'} />
+        : motes.map((p, i) => (
         <span key={i} className="board-mote" style={{
           top: p.top + '%', left: p.left + '%',
           '--p-size': p.size + 'px',
@@ -5454,7 +5795,7 @@ function BoardAmbiance({ colorMe, colorOpp }) {
       ))}
     </div>
   );
-}
+});
 
 
 /**
@@ -6433,7 +6774,9 @@ function PoisonedOverlay({ stacks, nurZahl, hinweis, karte }) {
       onMouseLeave: () => { hideGameTooltip(); hideBoardTip(); },
     };
   })() : null;
-  const zahl = <div className={'poison-stack-count' + (hover ? ' poison-stack-count-hover' : '')} {...hover}>{stacks}</div>;
+  // Die Stapelzahl steht jetzt im Gift-Abzeichen („x3“, app-fx-52): die Zahl auf der Karte entfaellt, solange die Pixel-Symbole laufen (keine doppelte Anzeige).
+  const neuesSymbol = !!(window.PpFx52 && window.PpFx52.iconUrl && !window.__ppFx52SymbolAlt);
+  const zahl = neuesSymbol ? null : <div className={'poison-stack-count' + (hover ? ' poison-stack-count-hover' : '')} {...hover}>{stacks}</div>;
   // v1462: steht eine animierte Figur auf der Karte, zeigt sie das Gift
   // (Tönung + Schädel) — die Karte behält nur die Stapelzahl.
   const bubbles = useMemo(() => nurZahl ? [] : Array.from({ length: ppFxN(8) }, () => ({
@@ -6444,7 +6787,7 @@ function PoisonedOverlay({ stacks, nurZahl, hinweis, karte }) {
     dur: 0.8 + Math.random() * 0.8,
   })), []);
   if (nurZahl) {
-    return stacks >= 1
+    return (stacks >= 1 && zahl)
       ? <div className="status-poisoned-zahl">{zahl}</div>
       : null;
   }
@@ -6819,29 +7162,7 @@ function CreatureDeathEffect({ x, y }) {
   );
 }
 
-// Spider Avalanche — torrential downpour of tiny spiders
-function SpiderAvalancheEffect({ x, y, w, h }) {
-  const spiders = useMemo(() => Array.from({ length: ppFxN(80) }, () => ({
-    startX: -60 + Math.random() * 120,
-    delay: Math.random() * 600,
-    dur: 300 + Math.random() * 400,
-    size: 6 + Math.random() * 8,
-    drift: -15 + Math.random() * 30,
-    char: ['🕷','🕷','🕷','🕷','·','·'][Math.floor(Math.random() * 6)],
-  })), []);
-  return (
-    <div style={{ position: 'fixed', left: x, top: y - 60, pointerEvents: 'none', zIndex: 10100 }}>
-      <div className="anim-spider-flash" />
-      {spiders.map((s, i) => (
-        <div key={i} className="anim-spider-drop" style={{
-          '--startX': s.startX + 'px', '--drift': s.drift + 'px',
-          '--size': s.size + 'px',
-          animationDelay: s.delay + 'ms', animationDuration: s.dur + 'ms',
-        }}>{s.char}</div>
-      ))}
-    </div>
-  );
-}
+// Spider Avalanche — jetzt PpFx43.spider_avalanche (app-fx-43.jsx, Pixelart-Canvas)
 
 function VenomFogEffect({ x, y, w, h }) {
   const particles = useMemo(() => Array.from({ length: ppFxN(20) }, (_, i) => ({
@@ -8354,6 +8675,8 @@ function ppProjektil(cfg) {
   };
   return ppSalve(malen, ENDE + 40, vorbereiten, { extra: cfg.extra || 24 });
 }
+/** Symbol-Animationen als Pixelart (app-fx-43.jsx): Platzhalter fuer die Registry; `window.PpFx43[name]` wird erst beim Zeichnen aufgeloest (app-fx-43 laedt nach app-board). */
+const ppFx43Reg = (n) => function PpFx43Platz(p) { const C = window.PpFx43 && window.PpFx43[n]; return C ? <C {...p} /> : null; };
 /** Kleines Pixelbild zeichnen: `rows` = Zeilen aus Zeichen, `pal` = { Zeichen: [r,g,b] }, Mittelpunkt (cx, cy). */
 function ppSprite(g, cx, cy, rows, pal, deckung) {
   const h = rows.length, w = rows[0].length, x0 = Math.round(cx - w / 2), y0 = Math.round(cy - h / 2);
@@ -11929,6 +12252,9 @@ function ppR1Pinsel(buf, gw, gh) {
   };
   return g;
 }
+// Welt-Animationen tragen FELD-Koordinaten (Fenster + Scrollstand des Brettes, s. ppFxWeltAnker). Ursprung (`ox`/`oy`) und Ziele (`targetPoints`) kommen als FENSTERpunkte aus dem
+// Brett-Zweig von `onZoneAnim` — ohne diesen Versatz lagen sie bei gescrolltem Brett (Handy) um den Scrollstand daneben (Flame Avalanche startete viel zu hoch).
+function ppR1FeldVersatz(p) { return (p && p.welt && window.ppFxScrollOffset) ? window.ppFxScrollOffset() : { dx: 0, dy: 0 }; }
 function ppR1Leinwand(malen, ende, mass, opt) {
   const o = opt || {}, S = 3, TAKT = 1000 / 30;
   return function R1Effekt(props) {
@@ -12983,10 +13309,11 @@ const ppR1FlameAvalanche = ppR1Leinwand((g, t, sz, teile) => {
   z: 10100,
   vorbereiten: (sz) => {
     const p = sz.props, W = Math.max(p.w || 900, 320), H = Math.max(p.h || 560, 240), links = p.x - W / 2, oben = p.y - H / 2;
-    const oX = (typeof p.ox === 'number' ? p.ox : p.x) - links, oY = (typeof p.oy === 'number' ? p.oy : p.y + H * 0.35) - oben, dauer = p.duration || 1600, flug = 520;
+    const _v = ppR1FeldVersatz(p);
+    const oX = (typeof p.ox === 'number' ? p.ox + _v.dx : p.x) - links, oY = (typeof p.oy === 'number' ? p.oy + _v.dy : p.y + H * 0.35) - oben, dauer = p.duration || 1600, flug = 520;
     let t0 = Math.round(W * 11 + H * 7 + oX * 3 + oY) >>> 0;
     const r = () => { t0 = (t0 * 1664525 + 1013904223) >>> 0; return t0 / 4294967296; };
-    let ziele = Array.isArray(p.targetPoints) && p.targetPoints.length ? p.targetPoints.map(q => ({ zx: q.x - links, zy: q.y - oben })) : null;
+    let ziele = Array.isArray(p.targetPoints) && p.targetPoints.length ? p.targetPoints.map(q => ({ zx: q.x + _v.dx - links, zy: q.y + _v.dy - oben })) : null;
     if (!ziele) { const vor = oY > H / 2 ? -1 : 1; ziele = Array.from({ length: 5 }, (_, i) => ({ zx: W * (0.15 + i * 0.175), zy: oY + vor * H * 0.55 })); }
     const bahnen = [], treffer = [], jeZiel = Math.max(4, Math.min(9, Math.floor(66 / ziele.length)));
     ziele.forEach((z, zi) => {
@@ -13070,7 +13397,8 @@ const R1HoleLeinwand = ppR1Leinwand((g, t, sz, teile) => {
   z: 10100,
   vorbereiten: (sz) => {
     const p = sz.props, W = Math.max(p.w || 900, 320), H = Math.max(p.h || 560, 240), links = p.x - W / 2, oben = p.y - H / 2, mx = W / 2, my = H / 2;
-    const ziele = (Array.isArray(p.targetPoints) ? p.targetPoints : []).map(q => ({ zx: q.x - links, zy: q.y - oben }));
+    const _v = ppR1FeldVersatz(p);
+    const ziele = (Array.isArray(p.targetPoints) ? p.targetPoints : []).map(q => ({ zx: q.x + _v.dx - links, zy: q.y + _v.dy - oben }));
     let s0 = Math.round(W * 13 + H * 5 + ziele.length * 97) >>> 0;
     const r = () => { s0 = (s0 * 1664525 + 1013904223) >>> 0; return s0 / 4294967296; };
     const splitter = [];
@@ -13101,7 +13429,8 @@ function HoleInTheSkyPullEffekt(props) {
   const { x, y, w, h, duration, targetPoints } = props;
   const W = Math.max(w || 900, 320), H = Math.max(h || 560, 240), links = x - W / 2, oben = y - H / 2, mx = W / 2, my = H / 2;
   const dauer = duration || 2400, Z = PP_R1_HOLE_ZUSCHNAPP;
-  const ziele = useMemo(() => (Array.isArray(targetPoints) ? targetPoints : []).map(p => ({ ...p, zx: p.x - links, zy: p.y - oben })), [targetPoints, links, oben]);
+  const _v = ppR1FeldVersatz(props);
+  const ziele = useMemo(() => (Array.isArray(targetPoints) ? targetPoints : []).map(p => ({ ...p, zx: p.x + _v.dx - links, zy: p.y + _v.dy - oben })), [targetPoints, links, oben]);
   // Die eingesogenen Karten: nur Kreaturen (Support-Platz + Name); Helden bleiben stehen. Die Zone wird SOFORT verborgen, der Notnagel gibt sie frei, falls die Rückreise (Engine) ausbleibt.
   const karten = useMemo(() => {
     let s0 = Math.round(W * 7 + H * 3 + ziele.length * 31) >>> 0;
@@ -13306,6 +13635,62 @@ const ppR1CosmicSummon = ppR1Leinwand((g, t, sz, teile) => {
     staub: Array.from({ length: ppFxN(12) }, () => { const w = Math.random() * Math.PI * 2, v = 20 + Math.random() * 50; return { dx: Math.cos(w) * v, dy: Math.sin(w) * v, size: 3 + Math.random() * 5, farbe: ppHex(['#c98aff', '#a040ff', '#d6b3f9', '#ffffff', '#7a2bd0'][Math.floor(Math.random() * 5)]), delay: 350 + Math.random() * 150, dur: 400 + Math.random() * 300 }; }),
   }),
 });
+// ═════════════════════════════════════════════════════════════════
+//  Flame Strike / Flame Engulf (`flame_strike`, `flame_engulf`; Divine Gift of Fire, Flame Strike …) — PIXELART auf EINER Leinwand je Ziel.
+//  Vorher ~30 einzeln CSS-animierte Elemente je Ziel (Flammen-Emojis, Funken, Schein): bei Divine Gift of Fire (jede Kreatur und jeder Held) hunderte Animationen, die die Pixel-Pipeline
+//  einzeln buk — unter Last Sekunden-Ruckler. Ablauf wie zuvor: Flammensplitter fliegen von allen Seiten zur Mitte (200–350 ms, ab 0–180 ms), ab 250 ms der Feuerschein (600 ms: wächst
+//  .3 → 1,5 → 2, dithert aus), ab 300 ms stieben Funken nach außen (300–550 ms). `skala` vergrößert Abstände und Größen (Flame Engulf: 1,4).
+// ═════════════════════════════════════════════════════════════════
+const PP_R1_FLAMMENFARBEN = { o: ppHex('#ff491a'), r: ppHex('#ff8b1a'), Y: ppHex('#fad54a'), W: ppHex('#f9ecb3') };
+const PP_R1_FSCHLAG_BILD = {
+  gross: ['...o...', '..oro..', '..orro.', '.orYro.', '.orYYo.', 'orrYYro', 'orYYWYo', 'orYWWYo', '.orYYo.'],
+  klein: ['..o..', '.orr.', '.orYo', 'orYYo', 'orYWo', '.ooo.'],
+  stern: ['..Y..', '..Y..', 'YYWYY', '..Y..', '..Y..'],
+};
+function ppR1FlammenSchlag(skala) {
+  const S = 3, R = Math.ceil(130 * skala + 30);
+  const FUNKEN = ['#ff491a', '#ff8b1a', '#fad54a', '#ff1a1a', '#f9ac20'].map(ppHex);
+  return ppR1Leinwand((g, t, sz, teile) => {
+    const cx = sz.cx, cy = sz.cy;
+    // Feuerschein (ab 250 ms, 600 ms)
+    const fk = (t - 250) / 600;
+    if (fk >= 0 && fk <= 1) {
+      const sk = fk < 0.5 ? 0.3 + 1.2 * (fk / 0.5) : 1.5 + 0.5 * ((fk - 0.5) / 0.5), a = fk < 0.5 ? 1 - 0.3 * (fk / 0.5) : 0.7 * (1 - (fk - 0.5) / 0.5);
+      const r = 35 * skala * sk * 0.75 / S;
+      g.glow(cx, cy, r, r, [FUNKEN[0], FUNKEN[1], FUNKEN[2]], a * 0.85, 0.9);
+    }
+    // Flammensplitter: von außen zur Mitte
+    for (const f of teile.flammen) {
+      const u = (t - f.delay) / f.dur;
+      if (u < 0 || u > 1) continue;
+      const e = u * u, x = cx + f.sx * (1 - e) / S, y = cy + f.sy * (1 - e) / S, a = u < 0.7 ? 1 : 1 - (u - 0.7) / 0.3;
+      const gr = f.size / S * (1.2 - 0.9 * u);
+      if (f.zeichen === '🔥' && gr >= 3.2) g.spr(PP_R1_FSCHLAG_BILD[gr >= 6 ? 'gross' : 'klein'], PP_R1_FLAMMENFARBEN, x, y, a);
+      else if (f.zeichen === '✦' && gr >= 3) g.spr(PP_R1_FSCHLAG_BILD.stern, PP_R1_FLAMMENFARBEN, x, y, a);
+      else g.block(x - 1, y - 1, gr >= 2 ? 2 : 1, gr >= 2 ? 2 : 1, PP_R1_FLAMMENFARBEN.Y, a);
+    }
+    // Funken: stieben nach außen
+    for (const sp of teile.funken) {
+      const u = (t - sp.delay) / sp.dur;
+      if (u < 0 || u > 1) continue;
+      const e = 1 - (1 - u) * (1 - u), a = u < 0.2 ? 1 : 1 - (u - 0.2) / 0.8, n = Math.max(1, Math.round(sp.size / S * (1.2 - 1.2 * u)));
+      g.block(cx + sp.dx * e / S - n / 2, cy + sp.dy * e / S - n / 2, n, n, sp.farbe, a);
+    }
+  }, 1100, { breite: R * 2, hoehe: R * 2 }, {
+    z: 10100,
+    vorbereiten: () => ({
+      flammen: Array.from({ length: ppFxN(18) }, () => {
+        const w = Math.random() * Math.PI * 2, d = (55 + Math.random() * 45) * skala;
+        return { sx: Math.cos(w) * d, sy: Math.sin(w) * d, size: (10 + Math.random() * 12) * skala, delay: Math.random() * 180, dur: 200 + Math.random() * 150, zeichen: ['🔥', '🔥', '🔥', '✦', '·'][Math.floor(Math.random() * 5)] };
+      }),
+      funken: Array.from({ length: ppFxN(12) }, () => {
+        const w = Math.random() * Math.PI * 2, v = (15 + Math.random() * 30) * skala;
+        return { dx: Math.cos(w) * v, dy: Math.sin(w) * v, size: (2 + Math.random() * 5) * skala, farbe: FUNKEN[Math.floor(Math.random() * FUNKEN.length)], delay: 300 + Math.random() * 150, dur: 300 + Math.random() * 250 };
+      }),
+    }),
+  });
+}
+const ppR1FlameStrike = ppR1FlammenSchlag(1), ppR1FlameEngulf = ppR1FlammenSchlag(1.4);
 // <<W86r1-END>>
 
 const ANIM_REGISTRY = {
@@ -14663,131 +15048,14 @@ const ANIM_REGISTRY = {
       );
     };
   })(),
-  // Coolness Stack summon — cyan-and-brass burst with a "🆒" pop and
-  // counter-rotating geometric rings. Distinct from a normal hand
-  // summon so the player sees "this Creature came from the Stack".
-  coolness_summon: (function () {
-    return function CoolnessSummonEffect({ x, y }) {
-      const beams = useMemo(() => Array.from({ length: ppFxN(14) }, (_, i) => ({
-        angle: (i / 14) * 360,
-        delay: Math.random() * 100,
-      })), []);
-      const sparkles = useMemo(() => Array.from({ length: ppFxN(22) }, (_, i) => ({
-        angle: (i / 22) * Math.PI * 2 + Math.random() * 0.3,
-        dist: 50 + Math.random() * 45,
-        size: 3 + Math.random() * 5,
-        delay: Math.random() * 250,
-        cyan: Math.random() < 0.5,
-      })), []);
-      return (
-        <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10110 }}>
-          {/* Cyan halo */}
-          <div style={{
-            position: 'absolute', width: 130, height: 130, left: -65, top: -65,
-            borderRadius: '50%',
-            background: 'radial-gradient(circle, rgba(179,232,249,0.85) 0%, rgba(104,198,253,0.55) 45%, transparent 75%)',
-            boxShadow: '0 0 40px rgba(119,200,238,0.85), 0 0 18px rgba(179,232,249,0.7)',
-            opacity: 0,
-            animation: 'coolness-halo 1200ms ease-out forwards',
-          }} />
-          {/* Counter-rotating brass ring (outer) */}
-          <div style={{
-            position: 'absolute', width: 120, height: 120, left: -60, top: -60,
-            borderRadius: '50%',
-            border: '3px solid rgba(251,225,129,0.85)',
-            boxShadow: '0 0 18px rgba(251,200,106,0.8), inset 0 0 12px rgba(251,200,106,0.4)',
-            opacity: 0,
-            animation: 'coolness-ring-cw 1100ms cubic-bezier(.2,.6,.3,1) forwards',
-          }} />
-          {/* Counter-rotating cyan ring (inner) */}
-          <div style={{
-            position: 'absolute', width: 84, height: 84, left: -42, top: -42,
-            borderRadius: '50%',
-            border: '2px solid rgba(127,223,255,0.95)',
-            boxShadow: '0 0 14px rgba(127,223,255,0.75)',
-            opacity: 0,
-            animation: 'coolness-ring-ccw 1100ms cubic-bezier(.2,.6,.3,1) forwards',
-          }} />
-          {/* Radial cyan beams */}
-          {beams.map((b, i) => (
-            <div key={'cb' + i} style={{
-              position: 'absolute', width: 4, height: 80, left: -2, top: -40,
-              background: 'linear-gradient(to top, transparent 0%, rgba(179,232,249,0.95) 50%, rgba(255,255,255,1) 100%)',
-              borderRadius: 2,
-              transformOrigin: '50% 50%',
-              transform: `rotate(${b.angle}deg) translateY(-32px) scaleY(0)`,
-              opacity: 0,
-              animation: `coolness-beam 1000ms ease-out ${b.delay}ms forwards`,
-            }} />
-          ))}
-          {/* Drifting cyan + gold sparkles */}
-          {sparkles.map((s, i) => (
-            <div key={'cs' + i} style={{
-              position: 'absolute', left: -s.size / 2, top: -s.size / 2,
-              width: s.size + 'px', height: s.size + 'px',
-              borderRadius: '50%',
-              background: s.cyan ? '#b6eff7' : '#f9ecb3',
-              boxShadow: s.cyan
-                ? '0 0 8px #66d9ff, 0 0 16px rgba(104,198,253,0.7)'
-                : '0 0 8px #ffd966, 0 0 16px rgba(255,208,102,0.7)',
-              opacity: 0,
-              animation: `coolness-sparkle 1300ms ease-out ${s.delay}ms forwards`,
-              '--ccx': Math.cos(s.angle) * s.dist + 'px',
-              '--ccy': Math.sin(s.angle) * s.dist + 'px',
-            }} />
-          ))}
-          {/* "🆒" emoji pop — bursts out, scales up, fades */}
-          <div style={{
-            position: 'absolute', left: -22, top: -22,
-            fontSize: 38,
-            filter: 'drop-shadow(0 0 6px rgba(179,232,249,0.95)) drop-shadow(0 0 14px rgba(119,200,238,0.7))',
-            opacity: 0,
-            animation: 'coolness-emoji 1100ms cubic-bezier(.2,.7,.3,1) 80ms forwards',
-          }}>🆒</div>
-          <style>{`
-            @keyframes coolness-halo {
-              0%   { opacity: 0;    transform: scale(0.5); }
-              30%  { opacity: 1;    transform: scale(1.15); }
-              70%  { opacity: 0.85; transform: scale(1.45); }
-              100% { opacity: 0;    transform: scale(1.65); }
-            }
-            @keyframes coolness-ring-cw {
-              0%   { opacity: 0; transform: scale(0.35) rotate(0deg); }
-              30%  { opacity: 1; transform: scale(1.05) rotate(180deg); }
-              100% { opacity: 0; transform: scale(1.55) rotate(420deg); }
-            }
-            @keyframes coolness-ring-ccw {
-              0%   { opacity: 0; transform: scale(0.4)  rotate(0deg); }
-              30%  { opacity: 1; transform: scale(1.0)  rotate(-180deg); }
-              100% { opacity: 0; transform: scale(1.4)  rotate(-420deg); }
-            }
-            @keyframes coolness-beam {
-              0%   { opacity: 0; transform: rotate(var(--ang,0deg)) translateY(-32px) scaleY(0); }
-              30%  { opacity: 1; transform: rotate(var(--ang,0deg)) translateY(-32px) scaleY(1); }
-              100% { opacity: 0; transform: rotate(var(--ang,0deg)) translateY(-32px) scaleY(0.6); }
-            }
-            @keyframes coolness-sparkle {
-              0%   { opacity: 0; transform: translate(0, 0) scale(0.3); }
-              25%  { opacity: 1; transform: translate(calc(var(--ccx) * 0.35), calc(var(--ccy) * 0.35)) scale(1.1); }
-              100% { opacity: 0; transform: translate(var(--ccx), var(--ccy)) scale(0.25); }
-            }
-            @keyframes coolness-emoji {
-              0%   { opacity: 0;    transform: scale(0.2) rotate(-12deg); }
-              25%  { opacity: 1;    transform: scale(1.4) rotate(8deg); }
-              60%  { opacity: 0.95; transform: scale(1.15) rotate(-4deg); }
-              100% { opacity: 0;    transform: scale(1.6) translateY(-20px) rotate(0deg); }
-            }
-          `}</style>
-        </div>
-      );
-    };
-  })(),
+  // Coolness Stack summon — PIXELART (app-fx-43, Canvas-Szene): cyan-messingfarbener Ausbruch mit 🆒-Plakette (Pixelsprite), zwei Ringen, 14 Strahlen, 22 Funken.
+  coolness_summon: ppFx43Reg('coolness_summon'),
   creature_death: CreatureDeathEffect,
   freeze: FreezeEffect,
   ice_encase: IceEncaseEffect,
-  spider_avalanche: SpiderAvalancheEffect,
+  spider_avalanche: ppFx43Reg('spider_avalanche'),   // PIXELART (app-fx-43): Spinnen-Sprites
   electric_strike: ElectricStrikeEffect,
-  flame_strike: FlameStrikeEffect,
+  flame_strike: ppR1FlameStrike,   // Pixelart-Leinwand (statt ~30 CSS-animierter Elemente je Ziel)
   // ★ v1261 (Als Befund 21.9.): die v1215-Salve (`flame_avalanche`,
   // Geschosse vom Caster zu den Zielen) gehoert NUR der Karte Flame
   // Avalanche. Alle anderen Nutzer (Phoenix Tackle, Victory Phoenix
@@ -14795,7 +15063,7 @@ const ANIM_REGISTRY = {
   // bekommen wieder „Flammen auf dem Ziel selbst": der Flammenschlag,
   // um 1,4 vergroessert. Die Huelle ist fixed am Zielpunkt und skaliert
   // um genau diesen Punkt; der Schlag darin sitzt bei 0/0.
-  flame_engulf: ({ x, y }) => <FlameStrikeEffect x={x} y={y} skala={1.4} />,   // W86r1: vergrößerte Fassung statt skaliertem Wrapper (halbe Pixel)
+  flame_engulf: ppR1FlameEngulf,   // vergrößerte Fassung (skala 1,4)
   black_flame_strike: BlackFlameStrikeEffect,
   demon_fire_pillar: DemonFirePillarEffect,
   cavalry_charge: CavalryChargeEffect,
@@ -17189,31 +17457,8 @@ const ANIM_REGISTRY = {
       );
     };
   })(),
-  biomancy_bloom: (() => {
-    return function BiomancyBloomEffect({ x, y }) {
-      const flowers = useMemo(() => Array.from({ length: ppFxN(16) }, (_, i) => {
-        const angle = (i / 16) * Math.PI * 2;
-        return {
-          dx: Math.cos(angle) * (15 + Math.random() * 25),
-          dy: Math.sin(angle) * (10 + Math.random() * 20),
-          size: 10 + Math.random() * 14,
-          delay: i * 40 + Math.random() * 60,
-          dur: 600 + Math.random() * 400,
-          emoji: ['🌸', '🌺', '🌼', '🍀', '🌿', '☘️'][Math.floor(Math.random() * 6)],
-        };
-      }), []);
-      return (
-        <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10100 }}>
-          {flowers.map((f, i) => (
-            <span key={i} className="anim-biomancy-flower" style={{
-              '--bdx': f.dx + 'px', '--bdy': f.dy + 'px', fontSize: f.size + 'px',
-              animationDelay: f.delay + 'ms', animationDuration: f.dur + 'ms',
-            }}>{f.emoji}</span>
-          ))}
-        </div>
-      );
-    };
-  })(),
+  // Biomancy Bloom / Thicket / Vines / Druid Leaf Storm — PIXELART (app-fx-43, Canvas-Szene): Blumen- und Blattsprites statt Emoji, Drehung nur in Vierteln.
+  biomancy_bloom: ppFx43Reg('biomancy_bloom'),
   // v724 (Thicket, Als Vorgabe 4.9.: „deutlich mehr Pflanzen").
   // Ein DICHTES Dickicht statt eines Rankenkranzes: 34 Blaetter und
   // Halme schlagen aus dem Zonenrand nach innen zusammen, bleiben
@@ -17221,112 +17466,24 @@ const ANIM_REGISTRY = {
   // groessere Spanne und laengerer Halt als `biomancy_vines`, damit
   // man auf einen Blick sieht: da ist etwas VERSTECKT, nicht nur
   // bewachsen. Klang: `elem_biomancy` (ZONE_ANIM_SFX).
-  thicket_cover: (() => {
-    return function ThicketCoverEffect({ x, y }) {
-      const teile = useMemo(() => Array.from({ length: ppFxN(34) }, (_, i) => {
-        // Aus dem Rand nach innen: Startpunkt auf einer Ellipse, Ziel
-        // nahe der Mitte, damit sich das Blattwerk schliesst.
-        const winkel = (i / 34) * Math.PI * 2 + Math.random() * 0.35;
-        const weite = 46 + Math.random() * 26;
-        return {
-          sx: Math.cos(winkel) * weite,
-          sy: Math.sin(winkel) * weite * 0.72,
-          dx: Math.cos(winkel) * (6 + Math.random() * 12),
-          dy: Math.sin(winkel) * (4 + Math.random() * 9) + 6,
-          rot: Math.random() * 360,
-          spin: (Math.random() < 0.5 ? -1 : 1) * (25 + Math.random() * 55),
-          delay: i * 14 + Math.random() * 60,
-          dur: 900 + Math.random() * 500,
-          emoji: ['🌿', '🌱', '☘️', '🍃', '🌾', '🌳', '🍀'][Math.floor(Math.random() * 7)],
-          size: 15 + Math.random() * 16,
-        };
-      }), []);
-      return (
-        <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10100 }}>
-          {teile.map((t, i) => (
-            <span key={i} className="anim-thicket-leaf" style={{
-              '--tsx': t.sx + 'px', '--tsy': t.sy + 'px',
-              '--tdx': t.dx + 'px', '--tdy': t.dy + 'px',
-              '--trot': t.rot + 'deg', '--tspin': (t.rot + t.spin) + 'deg',
-              fontSize: t.size + 'px',
-              animationDelay: t.delay + 'ms', animationDuration: t.dur + 'ms',
-            }}>{t.emoji}</span>
-          ))}
-        </div>
-      );
-    };
-  })(),
-  biomancy_vines: (() => {
-    return function BiomancyVinesEffect({ x, y }) {
-      const vines = useMemo(() => Array.from({ length: ppFxN(12) }, (_, i) => {
-        const angle = (i / 12) * Math.PI * 2;
-        return {
-          dx: Math.cos(angle) * 30,
-          dy: Math.sin(angle) * 20,
-          rot: (angle * 180 / Math.PI) + 90,
-          delay: i * 30 + Math.random() * 50,
-          dur: 500 + Math.random() * 300,
-          emoji: ['🌿', '🌱', '☘️', '🍃', '🌾'][Math.floor(Math.random() * 5)],
-          size: 12 + Math.random() * 10,
-        };
-      }), []);
-      return (
-        <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10100 }}>
-          {vines.map((v, i) => (
-            <span key={i} className="anim-biomancy-vine" style={{
-              '--vdx': v.dx + 'px', '--vdy': v.dy + 'px', '--vrot': v.rot + 'deg', fontSize: v.size + 'px',
-              animationDelay: v.delay + 'ms', animationDuration: v.dur + 'ms',
-            }}>{v.emoji}</span>
-          ))}
-        </div>
-      );
-    };
-  })(),
-  druid_leaf_storm: (() => {
-    return function DruidLeafStormEffect({ x, y }) {
-      // Leaves spawn at (0,0) and fan outwards in all directions — each one
-      // picks a random angle (not evenly spaced, so the burst feels chaotic
-      // rather than geometric) and a random distance. Rotation spins during
-      // flight for the "wind-blown" feel.
-      const leaves = useMemo(() => Array.from({ length: ppFxN(36) }, (_, i) => {
-        const angle = Math.random() * Math.PI * 2;
-        const dist = 70 + Math.random() * 90;
-        const spin = (Math.random() < 0.5 ? -1 : 1) * (180 + Math.random() * 540);
-        return {
-          dx: Math.cos(angle) * dist,
-          dy: Math.sin(angle) * dist * 0.75, // slight vertical squash — airflow shape
-          spin,
-          delay: Math.random() * 220,
-          dur: 750 + Math.random() * 500,
-          emoji: ['🌿', '🌱', '☘️', '🍃', '🌾', '🍀'][Math.floor(Math.random() * 6)],
-          size: 14 + Math.random() * 14,
-        };
-      }), []);
-      return (
-        <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10100 }}>
-          {leaves.map((l, i) => (
-            <span key={i} className="anim-druid-leaf" style={{
-              '--ldx': l.dx + 'px', '--ldy': l.dy + 'px', '--lspin': l.spin + 'deg',
-              fontSize: l.size + 'px',
-              animationDelay: l.delay + 'ms', animationDuration: l.dur + 'ms',
-            }}>{l.emoji}</span>
-          ))}
-        </div>
-      );
-    };
-  })(),
+  thicket_cover: ppFx43Reg('thicket_cover'),
+  biomancy_vines: ppFx43Reg('biomancy_vines'),
+  druid_leaf_storm: ppFx43Reg('druid_leaf_storm'),
   stranglehold_squeeze: (() => {
-    return function StrangleholdSqueezeEffect({ x, y }) {
+    return function StrangleholdSqueezeEffect({ x, y, zoneEl }) {
       useEffect(() => {
+        const _frost = ppZonenFrost();   // Lage der Zonen JETZT merken: bis der Einschlag kommt, kann die Kamera das Brett verschoben haben (Handy) — sonst traf der Squash den falschen Helden
         const timer = setTimeout(() => {
           const els = document.querySelectorAll('[data-hero-zone],[data-support-zone]');
           let best = null, bestDist = Infinity;
           els.forEach(el => {
-            const r = el.getBoundingClientRect();
+            const r = (_frost.get(el) || el.getBoundingClientRect());
             const cx = r.left + r.width / 2, cy = r.top + r.height / 2;
             const d = Math.abs(cx - x) + Math.abs(cy - y);
             if (d < bestDist) { bestDist = d; best = el; }
           });
+          // Das Ziel-Element kommt direkt aus playAnimation: x/y liegen bei Weltverankerung im Welt-Koordinatensystem und passen nach einer Kamerafahrt nicht mehr zu den Bildschirm-Rechtecken (Tutorial 1: der Hammer quetschte die ausfuehrende Ida)
+          if (zoneEl && zoneEl.isConnected) { best = zoneEl; bestDist = 0; }
           if (best && bestDist < 80) {
             best.classList.add('stranglehold-squeezed');
             setTimeout(() => best.classList.remove('stranglehold-squeezed'), 1200);
@@ -17627,16 +17784,21 @@ const ANIM_REGISTRY = {
       if (_maske) return _maske;
       const N = 192, m = new Uint8Array(N * N);
       try {
-        const cv = document.createElement('canvas'); cv.width = cv.height = N;
-        const c = cv.getContext('2d'); c.scale(N / 32, N / 32);
-        const pf = new Path2D(HERZ_D);
-        for (let j = 0; j < N; j++) for (let i = 0; i < N; i++) {
-          const x = i + 0.5, y = j + 0.5;
-          c.lineWidth = 1.1;
-          if (c.isPointInStroke(pf, x, y)) { m[j * N + i] = 1; continue; }
-          if (c.isPointInPath(pf, x, y)) { m[j * N + i] = 2; continue; }
-          c.lineWidth = 3.4;
-          if (c.isPointInStroke(pf, x, y)) m[j * N + i] = 3;
+        // EINMAL je Ebene zeichnen und die Pixel lesen (vorher je Pixel `isPointInPath`/`isPointInStroke`: ~110 000 Geometrietests, ein Hänger von ~300 ms beim ersten Herz).
+        // Rangfolge wie zuvor: Rand (1) vor Fläche (2) vor Schein (3); Deckkraft >= 50 % zählt als „getroffen" (Mittelpunkt-Test).
+        const ebene = (zeichne) => {
+          const cv = document.createElement('canvas'); cv.width = cv.height = N;
+          const c = cv.getContext('2d', { willReadFrequently: true }); c.scale(N / 32, N / 32);
+          c.fillStyle = c.strokeStyle = '#000'; zeichne(c, new Path2D(HERZ_D));
+          return c.getImageData(0, 0, N, N).data;
+        };
+        const rand = ebene((c, pf) => { c.lineWidth = 1.1; c.stroke(pf); });
+        const flaeche = ebene((c, pf) => { c.fill(pf); });
+        const schein = ebene((c, pf) => { c.lineWidth = 3.4; c.stroke(pf); });
+        for (let k = 0; k < N * N; k++) {
+          if (rand[k * 4 + 3] >= 128) m[k] = 1;
+          else if (flaeche[k * 4 + 3] >= 128) m[k] = 2;
+          else if (schein[k * 4 + 3] >= 128) m[k] = 3;
         }
       } catch {}
       _maske = { N, m };
@@ -19803,61 +19965,7 @@ const ANIM_REGISTRY = {
   // sprout from the creature's slot, along with an ominous red pulse
   // and a few drifting spores that hang in place. Meant to be fired
   // via `playAnimation('deepsea_spores_growth', supportSlotSelector)`.
-  deepsea_spores_growth: (() => {
-    return function DeepseaSporesGrowthEffect({ x, y }) {
-      const tendrils = useMemo(() => Array.from({ length: ppFxN(8) }, (_, i) => ({
-        angle: -70 + (i * 20) + (Math.random() * 10 - 5),
-        len:   28 + Math.random() * 18,
-        delay: Math.random() * 200,
-        dur:   800 + Math.random() * 300,
-        width: 2.5 + Math.random() * 2,
-        shade: (i % 3 === 0) ? '#780014' : (i % 3 === 1 ? '#3b9159' : '#2b457e'),
-      })), []);
-      const fronds = useMemo(() => Array.from({ length: 5 }, () => ({
-        xOff: -18 + Math.random() * 36,
-        delay: 150 + Math.random() * 250,
-        dur: 700 + Math.random() * 200,
-        size: 10 + Math.random() * 8,
-        emoji: Math.random() < 0.5 ? '🌿' : '🪸',
-      })), []);
-      return (
-        <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10110 }}>
-          {/* Ominous red pulse covering the creature card */}
-          <div style={{
-            position: 'absolute', left: -35, top: -48, width: 70, height: 96,
-            background: 'radial-gradient(ellipse at center, rgba(192,20,28,.55) 0%, rgba(120,0,20,.3) 55%, transparent 85%)',
-            boxShadow: '0 0 18px rgba(178,26,41,.7), inset 0 0 12px rgba(91,1,2,.5)',
-            borderRadius: 6,
-            animation: 'deepseaSporeRedPulse 1600ms ease-out forwards',
-            opacity: 0,
-          }} />
-          {/* Tendril bases — thin curved lines growing outward */}
-          {tendrils.map((t, i) => (
-            <div key={'dt'+i} style={{
-              position: 'absolute', left: 0, top: 20,
-              width: t.width, height: t.len,
-              background: `linear-gradient(to top, ${t.shade}, ${t.shade}aa 60%, ${t.shade}44 100%)`,
-              borderRadius: t.width,
-              boxShadow: `0 0 6px ${t.shade}aa`,
-              transform: `rotate(${t.angle}deg) scaleY(0)`,
-              transformOrigin: 'center bottom',
-              animation: `deepseaTendrilGrow ${t.dur}ms cubic-bezier(0.3, 1.4, 0.5, 1) ${t.delay}ms forwards`,
-            }} />
-          ))}
-          {/* Fronds (algae / coral emoji) popping out at the tendril tips */}
-          {fronds.map((f, i) => (
-            <div key={'df'+i} style={{
-              position: 'absolute', left: f.xOff, top: -8,
-              fontSize: f.size,
-              filter: 'drop-shadow(0 0 4px rgba(140,0,20,.8))',
-              animation: `deepseaFrondPop ${f.dur}ms ease-out ${f.delay}ms forwards`,
-              opacity: 0,
-            }}>{f.emoji}</div>
-          ))}
-        </div>
-      );
-    };
-  })(),
+  deepsea_spores_growth: ppFx43Reg('deepsea_spores_growth'),   // PIXELART (app-fx-43): roter Puls, Ranken, Alge/Koralle als Sprites
 
   deep_sea_bubbles: (() => {
     return function DeepSeaBubblesEffect({ x, y }) {
@@ -21646,7 +21754,7 @@ const ANIM_REGISTRY = {
   })(),
   coffee_steam: ppR1CoffeeSteam,   // W86r1: Pixelart-Leinwand
   magic_hammer: (() => {
-    return function MagicHammerEffect({ x, y, w, h }) {
+    return function MagicHammerEffect({ x, y, w, h, zoneEl }) {
       const targetW = w || 70;
       const targetH = h || 90;
       const hammerW = 55;
@@ -21666,16 +21774,19 @@ const ANIM_REGISTRY = {
       }), []);
       // Apply squash class to actual target DOM element
       useEffect(() => {
+        const _frost = ppZonenFrost();   // Lage der Zonen JETZT merken (Kamerafahrt vor dem Einschlag darf das Ziel nicht verschieben)
         const timer = setTimeout(() => {
           // Find the hero or support zone element under this animation
           const els = document.querySelectorAll('[data-hero-zone],[data-support-zone]');
           let best = null, bestDist = Infinity;
           els.forEach(el => {
-            const r = el.getBoundingClientRect();
+            const r = (_frost.get(el) || el.getBoundingClientRect());
             const cx = r.left + r.width / 2, cy = r.top + r.height / 2;
             const d = Math.abs(cx - x) + Math.abs(cy - y);
             if (d < bestDist) { bestDist = d; best = el; }
           });
+          // Das Ziel-Element kommt direkt aus playAnimation: x/y liegen bei Weltverankerung im Welt-Koordinatensystem und passen nach einer Kamerafahrt nicht mehr zu den Bildschirm-Rechtecken (Tutorial 1: der Hammer quetschte die ausfuehrende Ida)
+          if (zoneEl && zoneEl.isConnected) { best = zoneEl; bestDist = 0; }
           if (best && bestDist < 80) ppZonenSquash(best, 'magic-hammer-squashed', 650);
         }, 330);
         return () => clearTimeout(timer);
@@ -21750,16 +21861,19 @@ const ANIM_REGISTRY = {
         return { dx: Math.cos(angle) * speed, dy: Math.sin(angle) * speed * 0.35, size: 3 + Math.random() * 5, color: DUST[Math.floor(Math.random() * DUST.length)], delay: 310 + Math.random() * 60, dur: 380 + Math.random() * 220 }; }),
     }), { radius: (p) => [130, (p.h || 90) / 2 + 280], z: 10100 });
     return function ShatteringStrikeEffect(props) {
-      const { x, y } = props;
+      const { x, y, zoneEl } = props;
       useEffect(() => {
+        const _frost = ppZonenFrost();   // Lage der Zonen JETZT merken: bis der Einschlag kommt, kann die Kamera das Brett verschoben haben (Handy) — sonst traf der Squash den falschen Helden
         const timer = setTimeout(() => {
           const els = document.querySelectorAll('[data-hero-zone],[data-support-zone]');
           let best = null, bestDist = Infinity;
           els.forEach(el => {
-            const r = el.getBoundingClientRect();
+            const r = (_frost.get(el) || el.getBoundingClientRect());
             const d = Math.abs(r.left + r.width / 2 - x) + Math.abs(r.top + r.height / 2 - y);
             if (d < bestDist) { bestDist = d; best = el; }
           });
+          // Das Ziel-Element kommt direkt aus playAnimation: x/y liegen bei Weltverankerung im Welt-Koordinatensystem und passen nach einer Kamerafahrt nicht mehr zu den Bildschirm-Rechtecken (Tutorial 1: der Hammer quetschte die ausfuehrende Ida)
+          if (zoneEl && zoneEl.isConnected) { best = zoneEl; bestDist = 0; }
           if (best && bestDist < 80) ppZonenSquash(best, 'magic-hammer-squashed', 550);
         }, 300);
         return () => clearTimeout(timer);
@@ -21777,7 +21891,7 @@ const ANIM_REGISTRY = {
   //  synchron mit dem `_delay(480)` in 3-headed-giant.js, das
   //  die 100 ms Mount-Vorlauf mitrechnet.
   spiked_club_smash: (() => {
-    return function SpikedClubSmashEffect({ x, y, w, h }) {
+    return function SpikedClubSmashEffect({ x, y, w, h, zoneEl }) {
       const targetH = h || 90;
       const clubW = 46;
       const clubH = 132;
@@ -21807,15 +21921,18 @@ const ANIM_REGISTRY = {
       // Ziel-Stauchung auf das echte DOM-Element legen — gleiche
       // Nächster-Nachbar-Suche wie beim magic_hammer.
       useEffect(() => {
+        const _frost = ppZonenFrost();   // Lage der Zonen JETZT merken: bis der Einschlag kommt, kann die Kamera das Brett verschoben haben (Handy) — sonst traf der Squash den falschen Helden
         const timer = setTimeout(() => {
           const els = document.querySelectorAll('[data-hero-zone],[data-support-zone]');
           let best = null, bestDist = Infinity;
           els.forEach(el => {
-            const r = el.getBoundingClientRect();
+            const r = (_frost.get(el) || el.getBoundingClientRect());
             const cx = r.left + r.width / 2, cy = r.top + r.height / 2;
             const d = Math.abs(cx - x) + Math.abs(cy - y);
             if (d < bestDist) { bestDist = d; best = el; }
           });
+          // Das Ziel-Element kommt direkt aus playAnimation: x/y liegen bei Weltverankerung im Welt-Koordinatensystem und passen nach einer Kamerafahrt nicht mehr zu den Bildschirm-Rechtecken (Tutorial 1: der Hammer quetschte die ausfuehrende Ida)
+          if (zoneEl && zoneEl.isConnected) { best = zoneEl; bestDist = 0; }
           if (best && bestDist < 80) {
             best.classList.add('club-smash-squashed');
             setTimeout(() => best.classList.remove('club-smash-squashed'), 700);
@@ -21856,7 +21973,7 @@ const ANIM_REGISTRY = {
   //  from 820px up, and the squash on the target lingers
   //  longer before bouncing back.
   giant_dino_stomp: (() => {
-    return function GiantDinoStompEffect({ x, y, w, h }) {
+    return function GiantDinoStompEffect({ x, y, w, h, zoneEl }) {
       const targetH = h || 90;
       const legW = 120;
       const legH = 250;
@@ -21875,15 +21992,18 @@ const ANIM_REGISTRY = {
       }), []);
       // Apply heavy squash to the actual target element on impact.
       useEffect(() => {
+        const _frost = ppZonenFrost();   // Lage der Zonen JETZT merken: bis der Einschlag kommt, kann die Kamera das Brett verschoben haben (Handy) — sonst traf der Squash den falschen Helden
         const timer = setTimeout(() => {
           const els = document.querySelectorAll('[data-hero-zone],[data-support-zone]');
           let best = null, bestDist = Infinity;
           els.forEach(el => {
-            const r = el.getBoundingClientRect();
+            const r = (_frost.get(el) || el.getBoundingClientRect());
             const cx = r.left + r.width / 2, cy = r.top + r.height / 2;
             const d = Math.abs(cx - x) + Math.abs(cy - y);
             if (d < bestDist) { bestDist = d; best = el; }
           });
+          // Das Ziel-Element kommt direkt aus playAnimation: x/y liegen bei Weltverankerung im Welt-Koordinatensystem und passen nach einer Kamerafahrt nicht mehr zu den Bildschirm-Rechtecken (Tutorial 1: der Hammer quetschte die ausfuehrende Ida)
+          if (zoneEl && zoneEl.isConnected) { best = zoneEl; bestDist = 0; }
           if (best && bestDist < 100) {
             best.classList.add('giant-dino-stomp-squashed');
             setTimeout(() => best.classList.remove('giant-dino-stomp-squashed'), 850);
@@ -21981,18 +22101,21 @@ const ANIM_REGISTRY = {
       return { dx: Math.cos(angle) * speed, dy: -Math.abs(Math.sin(angle) * speed) - 6, size: 4 + Math.random() * 9, color: STAUB[Math.floor(Math.random() * 6)], delay: 360 + Math.random() * 130, dur: 380 + Math.random() * 340 };
     }) }), { radius: (p) => [200, 1200], z: 10100 });
     return function MammothStompEffect(props) {
-      const { x, y } = props;
+      const { x, y, zoneEl } = props;
       // Schwerer Squash des Zielhelden — dieselbe Klasse wie beim Dino-Stampfer; die Stauchung selbst macht die Pipeline im Kunstpixelraster.
       useEffect(() => {
+        const _frost = ppZonenFrost();   // Lage der Zonen JETZT merken: bis der Einschlag kommt, kann die Kamera das Brett verschoben haben (Handy) — sonst traf der Squash den falschen Helden
         const timer = setTimeout(() => {
           const els = document.querySelectorAll('[data-hero-zone],[data-support-zone]');
           let best = null, bestDist = Infinity;
           els.forEach(el => {
-            const r = el.getBoundingClientRect();
+            const r = (_frost.get(el) || el.getBoundingClientRect());
             const cx = r.left + r.width / 2, cy = r.top + r.height / 2;
             const d = Math.abs(cx - x) + Math.abs(cy - y);
             if (d < bestDist) { bestDist = d; best = el; }
           });
+          // Das Ziel-Element kommt direkt aus playAnimation: x/y liegen bei Weltverankerung im Welt-Koordinatensystem und passen nach einer Kamerafahrt nicht mehr zu den Bildschirm-Rechtecken (Tutorial 1: der Hammer quetschte die ausfuehrende Ida)
+          if (zoneEl && zoneEl.isConnected) { best = zoneEl; bestDist = 0; }
           if (best && bestDist < 100) {
             best.classList.add('giant-dino-stomp-squashed');
             setTimeout(() => best.classList.remove('giant-dino-stomp-squashed'), 850);
@@ -22131,7 +22254,7 @@ const ANIM_REGISTRY = {
   //  point (left edge of the assembly) so the heavy club lands
   //  cleanly on the target while the tail trails offscreen.
   ankylo_tail_smash: (() => {
-    return function AnkyloTailSmashEffect({ x, y }) {
+    return function AnkyloTailSmashEffect({ x, y, zoneEl }) {
       const tailLength    = 460;
       const tailThickness = 50;
       const clubSize      = 130;
@@ -22152,15 +22275,18 @@ const ANIM_REGISTRY = {
 
       // Squash the actual target element on impact (~440ms in).
       useEffect(() => {
+        const _frost = ppZonenFrost();   // Lage der Zonen JETZT merken: bis der Einschlag kommt, kann die Kamera das Brett verschoben haben (Handy) — sonst traf der Squash den falschen Helden
         const timer = setTimeout(() => {
           const els = document.querySelectorAll('[data-hero-zone],[data-support-zone]');
           let best = null, bestDist = Infinity;
           els.forEach(el => {
-            const r = el.getBoundingClientRect();
+            const r = (_frost.get(el) || el.getBoundingClientRect());
             const cx = r.left + r.width / 2, cy = r.top + r.height / 2;
             const d = Math.abs(cx - x) + Math.abs(cy - y);
             if (d < bestDist) { bestDist = d; best = el; }
           });
+          // Das Ziel-Element kommt direkt aus playAnimation: x/y liegen bei Weltverankerung im Welt-Koordinatensystem und passen nach einer Kamerafahrt nicht mehr zu den Bildschirm-Rechtecken (Tutorial 1: der Hammer quetschte die ausfuehrende Ida)
+          if (zoneEl && zoneEl.isConnected) { best = zoneEl; bestDist = 0; }
           if (best && bestDist < 100) {
             best.classList.add('giant-dino-stomp-squashed');
             setTimeout(() => best.classList.remove('giant-dino-stomp-squashed'), 850);
@@ -23697,31 +23823,7 @@ const ANIM_REGISTRY = {
       );
     };
   })(),
-  thought_bubbles: (() => {
-    return function ThoughtBubblesEffect({ x, y }) {
-      const bubbles = useMemo(() => [
-        { emoji: '💭', x: -15, delay: 0, size: 20, rise: -40 },
-        { emoji: '💡', x: 10, delay: 0.2, size: 24, rise: -55 },
-        { emoji: '💭', x: -5, delay: 0.4, size: 16, rise: -35 },
-        { emoji: '✨', x: 15, delay: 0.15, size: 14, rise: -50 },
-        { emoji: '💭', x: -20, delay: 0.35, size: 18, rise: -45 },
-      ], []);
-      return (
-        <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 9999 }}>
-          {bubbles.map((b, i) => (
-            <span key={i} style={{
-              position: 'absolute',
-              left: b.x, top: -10,
-              fontSize: b.size,
-              opacity: 0,
-              animation: `thoughtBubbleFloat 0.9s ease-out ${b.delay}s forwards`,
-              '--thought-rise': `${b.rise}px`,
-            }}>{b.emoji}</span>
-          ))}
-        </div>
-      );
-    };
-  })(),
+  thought_bubbles: ppFx43Reg('thought_bubbles'),   // PIXELART (app-fx-43): Denkblase/Gluehbirne/Funke als Sprites
   // ── Rolling Boulder (v702, Als Vorgabe): ein RIESIGER Fels startet am
   // rechten Bildschirmrand auf 50 % der Spielfeld-Hoehe (Mittellinie
   // zwischen den Haelften), rollt in einem WINKEL geradlinig auf die
@@ -24510,328 +24612,13 @@ const ANIM_REGISTRY = {
       );
     };
   })(),
-  sand_twister: (() => {
-    return function SandTwisterEffect({ x, y }) {
-      const particles = useMemo(() => Array.from({ length: ppFxN(24) }, (_, i) => ({
-        angle: (i / 24) * 360 * 2 + Math.random() * 30,
-        radius: 4 + (i / 24) * 18,
-        size: 3 + Math.random() * 4,
-        delay: i * 20,
-        dur: 600 + Math.random() * 200,
-        rise: 10 + (i / 24) * 30,
-      })), []);
-      return (
-        <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 9999 }}>
-          {particles.map((p, i) => (
-            <span key={i} style={{
-              position: 'absolute', width: p.size, height: p.size, borderRadius: '50%',
-              background: `rgba(${190+Math.random()*40},${160+Math.random()*40},${100+Math.random()*40},${0.6+Math.random()*0.3})`,
-              left: -p.size / 2, top: -p.size / 2, opacity: 0,
-              animation: `sandTwist ${p.dur}ms ease-out ${p.delay}ms forwards`,
-              '--tw-r': `${p.radius}px`, '--tw-rise': `${p.rise}px`,
-              '--tw-a': `${p.angle}deg`,
-              boxShadow: '0 0 3px rgba(178,148,102,0.4)',
-            }} />
-          ))}
-          <span style={{
-            position: 'absolute', fontSize: 18, left: -9, top: -9, opacity: 0,
-            animation: 'twisterEmoji 700ms ease-out 100ms forwards',
-          }}>🌪️</span>
-          <style>{`
-            @keyframes sandTwist {
-              0% { opacity: 0; transform: rotate(var(--tw-a)) translateX(2px) translateY(0); }
-              30% { opacity: 0.9; transform: rotate(calc(var(--tw-a) + 180deg)) translateX(var(--tw-r)) translateY(calc(var(--tw-rise) * -0.3)); }
-              70% { opacity: 0.7; transform: rotate(calc(var(--tw-a) + 360deg)) translateX(var(--tw-r)) translateY(calc(var(--tw-rise) * -0.7)); }
-              100% { opacity: 0; transform: rotate(calc(var(--tw-a) + 540deg)) translateX(calc(var(--tw-r) * 0.5)) translateY(calc(var(--tw-rise) * -1)); }
-            }
-            @keyframes twisterEmoji {
-              0% { opacity: 0; transform: scale(0.3) rotate(0deg); }
-              40% { opacity: 1; transform: scale(1.3) rotate(180deg); }
-              100% { opacity: 0; transform: scale(0.5) rotate(360deg) translateY(-20px); }
-            }
-          `}</style>
-        </div>
-      );
-    };
-  })(),
-  mummy_wrap: (() => {
-    return function MummyWrapEffect({ x, y }) {
-      const strips = useMemo(() => Array.from({ length: ppFxN(12) }, (_, i) => ({
-        angle: (i / 12) * 360 + Math.random() * 30,
-        width: 12 + Math.random() * 16,
-        height: 3 + Math.random() * 2,
-        dist: 6 + Math.random() * 20,
-        delay: i * 30 + Math.random() * 60,
-        dur: 400 + Math.random() * 300,
-        rot: Math.random() * 60 - 30,
-      })), []);
-      return (
-        <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 9999 }}>
-          {strips.map((s, i) => {
-            const rad = (s.angle * Math.PI) / 180;
-            return (
-              <div key={i} style={{
-                position: 'absolute',
-                width: s.width, height: s.height, borderRadius: 1,
-                background: `linear-gradient(90deg, rgba(204,183,153,0.9), rgba(168,147,112,0.7))`,
-                boxShadow: '0 0 3px rgba(168,147,112,0.4)',
-                left: -s.width / 2, top: -s.height / 2,
-                opacity: 0,
-                transform: `rotate(${s.rot}deg)`,
-                animation: `mummyStripWrap ${s.dur}ms ease-in ${s.delay}ms forwards`,
-                '--wrap-sx': `${Math.cos(rad) * 35}px`,
-                '--wrap-sy': `${Math.sin(rad) * 35}px`,
-                '--wrap-ex': `${Math.cos(rad) * s.dist}px`,
-                '--wrap-ey': `${Math.sin(rad) * s.dist}px`,
-              }} />
-            );
-          })}
-          <span style={{
-            position: 'absolute', fontSize: 22, left: -11, top: -11, opacity: 0,
-            animation: 'mummyEmojiPop 600ms ease-out 100ms forwards',
-          }}>👻</span>
-          <style>{`
-            @keyframes mummyStripWrap {
-              0% { opacity: 0; transform: translate(var(--wrap-sx), var(--wrap-sy)) rotate(0deg) scaleX(0.3); }
-              40% { opacity: 0.9; transform: translate(0,0) rotate(180deg) scaleX(1.2); }
-              70% { opacity: 0.8; transform: translate(var(--wrap-ex), var(--wrap-ey)) rotate(300deg) scaleX(1); }
-              100% { opacity: 0; transform: translate(var(--wrap-ex), var(--wrap-ey)) rotate(360deg) scaleX(0.5); }
-            }
-            @keyframes mummyEmojiPop {
-              0% { opacity: 0; transform: scale(0.3); }
-              40% { opacity: 1; transform: scale(1.4); }
-              100% { opacity: 0; transform: scale(0.6) translateY(-15px); }
-            }
-          `}</style>
-        </div>
-      );
-    };
-  })(),
-  fan_blow: (() => {
-    return function FanBlowEffect({ x, y }) {
-      const particles = useMemo(() => [
-        ...Array.from({ length: ppFxN(6) }, (_, i) => ({
-          type: 'fan', x: -12 + Math.random() * 24, y: -5 + Math.random() * 10,
-          delay: i * 40, dur: 500 + Math.random() * 200,
-          size: 14 + Math.random() * 6,
-        })),
-        ...Array.from({ length: ppFxN(14) }, (_, i) => ({
-          type: 'wind', x: -8 + Math.random() * 16, y: -10 + Math.random() * 20,
-          delay: 50 + Math.random() * 200, dur: 400 + Math.random() * 300,
-          size: 8 + Math.random() * 16,
-          angle: -30 + Math.random() * 60,
-        })),
-      ], []);
-      return (
-        <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 9999 }}>
-          {particles.map((p, i) => p.type === 'fan' ? (
-            <span key={i} style={{
-              position: 'absolute', fontSize: p.size,
-              left: p.x, top: p.y, opacity: 0,
-              animation: `fanAppear ${p.dur}ms ease-out ${p.delay}ms forwards`,
-            }}>🪭</span>
-          ) : (
-            <span key={i} style={{
-              position: 'absolute', left: p.x, top: p.y, opacity: 0,
-              width: p.size, height: 2, borderRadius: 2,
-              background: `rgba(${200+Math.random()*55},${180+Math.random()*50},${120+Math.random()*80},0.7)`,
-              transform: `rotate(${p.angle}deg)`,
-              animation: `fanWindLine ${p.dur}ms ease-out ${p.delay}ms forwards`,
-              '--fan-dist': `${40 + Math.random() * 30}px`,
-            }} />
-          ))}
-          <style>{`
-            @keyframes fanAppear {
-              0% { opacity: 0; transform: scale(0.5) rotate(-20deg); }
-              30% { opacity: 1; transform: scale(1.3) rotate(10deg); }
-              60% { opacity: 0.8; transform: scale(1.1) rotate(-5deg); }
-              100% { opacity: 0; transform: scale(0.8) rotate(15deg) translateX(20px); }
-            }
-            @keyframes fanWindLine {
-              0% { opacity: 0; transform: translateX(0) scaleX(0.5); }
-              30% { opacity: 0.8; transform: translateX(10px) scaleX(1.5); }
-              100% { opacity: 0; transform: translateX(var(--fan-dist)) scaleX(0.3); }
-            }
-          `}</style>
-        </div>
-      );
-    };
-  })(),
-  cactus_burst: (() => {
-    return function CactusBurstEffect({ x, y }) {
-      const particles = useMemo(() => Array.from({ length: ppFxN(16) }, (_, i) => ({
-        angle: (i / 16) * 360 + Math.random() * 22,
-        dist: 12 + Math.random() * 22,
-        size: 6 + Math.random() * 8,
-        delay: Math.random() * 100,
-        dur: 400 + Math.random() * 300,
-        drift: -8 - Math.random() * 15,
-        isCactus: Math.random() < 0.4,
-      })), []);
-      return (
-        <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 9999 }}>
-          {particles.map((p, i) => {
-            const rad = (p.angle * Math.PI) / 180;
-            const tx = Math.cos(rad) * p.dist;
-            const ty = Math.sin(rad) * p.dist + p.drift;
-            return p.isCactus ? (
-              <span key={i} style={{
-                position: 'absolute', fontSize: p.size + 4,
-                left: -p.size / 2, top: -p.size / 2, opacity: 0,
-                animation: `cactusPop ${p.dur}ms ease-out ${p.delay}ms forwards`,
-                '--cact-tx': `${tx}px`, '--cact-ty': `${ty}px`,
-              }}>🌵</span>
-            ) : (
-              <span key={i} style={{
-                position: 'absolute', width: p.size, height: p.size, borderRadius: '50%',
-                background: `rgba(${60+Math.random()*40},${140+Math.random()*60},${50+Math.random()*30},0.8)`,
-                left: -p.size / 2, top: -p.size / 2, opacity: 0,
-                animation: `cactusPop ${p.dur}ms ease-out ${p.delay}ms forwards`,
-                '--cact-tx': `${tx}px`, '--cact-ty': `${ty}px`,
-                boxShadow: '0 0 4px rgba(32,172,55,0.5)',
-              }} />
-            );
-          })}
-          <style>{`
-            @keyframes cactusPop {
-              0% { opacity: 0; transform: translate(0,0) scale(0.4); }
-              20% { opacity: 1; transform: translate(calc(var(--cact-tx)*0.3), calc(var(--cact-ty)*0.3)) scale(1.2); }
-              60% { opacity: 0.8; transform: translate(var(--cact-tx), var(--cact-ty)) scale(1); }
-              100% { opacity: 0; transform: translate(calc(var(--cact-tx)*1.3), calc(var(--cact-ty)*1.2)) scale(0.2); }
-            }
-          `}</style>
-        </div>
-      );
-    };
-  })(),
-  mushroom_spore: (() => {
-    return function MushroomSporeEffect({ x, y }) {
-      const particles = useMemo(() => Array.from({ length: ppFxN(20) }, (_, i) => ({
-        angle: Math.random() * 360,
-        dist: 8 + Math.random() * 28,
-        size: 5 + Math.random() * 8,
-        delay: Math.random() * 150,
-        dur: 400 + Math.random() * 300,
-        drift: -15 - Math.random() * 25,
-        emoji: ['🍄', '☁'][Math.random() < 0.35 ? 0 : 1],
-        color: `rgba(${80+Math.random()*60},${120+Math.random()*60},${40+Math.random()*40},${0.6+Math.random()*0.3})`,
-      })), []);
-      return (
-        <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 9999 }}>
-          {particles.map((p, i) => {
-            const rad = (p.angle * Math.PI) / 180;
-            const tx = Math.cos(rad) * p.dist;
-            const ty = Math.sin(rad) * p.dist + p.drift;
-            return p.emoji === '🍄' ? (
-              <span key={i} style={{
-                position: 'absolute', fontSize: p.size + 2,
-                left: -p.size / 2, top: -p.size / 2, opacity: 0,
-                animation: `sporeFloat ${p.dur}ms ease-out ${p.delay}ms forwards`,
-                '--spore-tx': `${tx}px`, '--spore-ty': `${ty}px`,
-              }}>{p.emoji}</span>
-            ) : (
-              <span key={i} style={{
-                position: 'absolute', width: p.size, height: p.size, borderRadius: '50%',
-                background: p.color, filter: 'blur(2px)',
-                left: -p.size / 2, top: -p.size / 2, opacity: 0,
-                animation: `sporeFloat ${p.dur}ms ease-out ${p.delay}ms forwards`,
-                '--spore-tx': `${tx}px`, '--spore-ty': `${ty}px`,
-              }} />
-            );
-          })}
-          <style>{`
-            @keyframes sporeFloat {
-              0% { opacity: 0; transform: translate(0,0) scale(0.5); }
-              25% { opacity: 0.9; transform: translate(calc(var(--spore-tx) * 0.3), calc(var(--spore-ty) * 0.2)) scale(1.1); }
-              70% { opacity: 0.7; transform: translate(var(--spore-tx), calc(var(--spore-ty) * 0.7)) scale(0.9); }
-              100% { opacity: 0; transform: translate(calc(var(--spore-tx) * 1.2), var(--spore-ty)) scale(0.3); }
-            }
-          `}</style>
-        </div>
-      );
-    };
-  })(),
-  dark_swarm: (() => {
-    return function DarkSwarmEffect({ x, y }) {
-      const particles = useMemo(() => Array.from({ length: ppFxN(22) }, (_, i) => ({
-        angle: Math.random() * 360,
-        dist: 5 + Math.random() * 25,
-        size: 4 + Math.random() * 6,
-        delay: Math.random() * 200,
-        dur: 300 + Math.random() * 300,
-        orbit: 15 + Math.random() * 20,
-        orbitSpeed: 0.8 + Math.random() * 1.2,
-      })), []);
-      return (
-        <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 9999 }}>
-          {particles.map((p, i) => {
-            const rad = (p.angle * Math.PI) / 180;
-            const tx = Math.cos(rad) * p.dist;
-            const ty = Math.sin(rad) * p.dist;
-            return (
-              <span key={i} style={{
-                position: 'absolute', width: p.size, height: p.size, borderRadius: '50%',
-                background: `radial-gradient(circle, rgba(${120+Math.random()*40},${20+Math.random()*30},${160+Math.random()*60},0.9), rgba(43,11,71,0.7))`,
-                left: -p.size / 2, top: -p.size / 2,
-                opacity: 0,
-                animation: `darkSwarmFly ${p.dur}ms ease-in-out ${p.delay}ms forwards`,
-                '--swarm-tx': `${tx}px`, '--swarm-ty': `${ty}px`,
-                '--swarm-orbit': `${p.orbit}px`,
-                boxShadow: '0 0 6px 2px rgba(112,45,179,0.6)',
-              }} />
-            );
-          })}
-          <style>{`
-            @keyframes darkSwarmFly {
-              0% { opacity: 0; transform: translate(0,0) scale(0.3); }
-              20% { opacity: 0.95; transform: translate(calc(var(--swarm-tx) * 0.3), calc(var(--swarm-ty) * 0.3)) scale(1.2); }
-              50% { opacity: 1; transform: translate(var(--swarm-tx), var(--swarm-ty)) scale(1); }
-              80% { opacity: 0.8; transform: translate(calc(var(--swarm-tx) * 0.6), calc(var(--swarm-ty) * 1.3)) scale(0.8); }
-              100% { opacity: 0; transform: translate(var(--swarm-tx), calc(var(--swarm-ty) + 10px)) scale(0.2); }
-            }
-          `}</style>
-        </div>
-      );
-    };
-  })(),
-  sand_reset: (() => {
-    return function SandResetEffect({ x, y }) {
-      const particles = useMemo(() => Array.from({ length: ppFxN(18) }, (_, i) => ({
-        angle: (i / 18) * 360 + Math.random() * 20,
-        dist: 10 + Math.random() * 30,
-        size: 3 + Math.random() * 5,
-        delay: Math.random() * 300,
-        dur: 500 + Math.random() * 400,
-        emoji: ['🏜', '✨'][Math.random() < 0.8 ? 0 : 1],
-        drift: -20 - Math.random() * 30,
-      })), []);
-      return (
-        <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 9999 }}>
-          {particles.map((p, i) => {
-            const rad = (p.angle * Math.PI) / 180;
-            const tx = Math.cos(rad) * p.dist;
-            const ty = Math.sin(rad) * p.dist + p.drift;
-            return (
-              <span key={i} style={{
-                position: 'absolute', fontSize: p.size + 4,
-                left: -p.size / 2, top: -p.size / 2,
-                opacity: 0,
-                animation: `sandParticleFly ${p.dur}ms ease-out ${p.delay}ms forwards`,
-                '--sand-tx': `${tx}px`, '--sand-ty': `${ty}px`,
-              }}>{p.emoji}</span>
-            );
-          })}
-          <style>{`
-            @keyframes sandParticleFly {
-              0% { opacity: 0.9; transform: translate(0,0) scale(1); }
-              60% { opacity: 0.7; }
-              100% { opacity: 0; transform: translate(var(--sand-tx), var(--sand-ty)) scale(0.3); }
-            }
-          `}</style>
-        </div>
-      );
-    };
-  })(),
+  sand_twister: ppFx43Reg('sand_twister'),   // PIXELART (app-fx-43): Sandkoerner auf Spiralbahn + Windhosen-Sprite
+  mummy_wrap: ppFx43Reg('mummy_wrap'),   // PIXELART (app-fx-43): Binden-Striche + Geist-Sprite
+  fan_blow: ppFx43Reg('fan_blow'),   // PIXELART (app-fx-43): Faecher-Sprite + Windlinien
+  cactus_burst: ppFx43Reg('cactus_burst'),   // PIXELART (app-fx-43): Kaktus-Sprites + Pixelkugeln
+  mushroom_spore: ppFx43Reg('mushroom_spore'),   // PIXELART (app-fx-43): Pilz-Sprites + Pixelwolken statt Emoji/blur
+  dark_swarm: ppFx43Reg('dark_swarm'),   // PIXELART (app-fx-43): Pixelkugeln statt Verlauf+Schein
+  sand_reset: ppFx43Reg('sand_reset'),   // PIXELART (app-fx-43)
   // Quick Slash — PIXELART (W86r2, Canvas-Szene `ppSzene`): zwei kurze Klingen (-35° und 25°, 180/200 ms), weisser Blitz, aufstiebende Funken.
   quick_slash: (() => {
     const FUNK = ['#ffffff', '#f8f8bd', '#f9ecb3', '#b3d8f9'].map(ppHex);
@@ -25009,62 +24796,7 @@ const ANIM_REGISTRY = {
       );
     };
   })(),
-  poison_pollen_rain: (() => {
-    return function PoisonPollenRainEffect({ x, y }) {
-      const spores = useMemo(() => Array.from({ length: ppFxN(24) }, () => ({
-        xOff: -35 + Math.random() * 70,
-        size: 4 + Math.random() * 7,
-        delay: Math.random() * 300,
-        dur: 500 + Math.random() * 400,
-        color: Math.random() < 0.5
-          ? ['#9544d5','#702db3','#b866ff','#9544d5'][Math.floor(Math.random() * 4)]
-          : ['#e3ce36','#e3ce36','#ffe469','#c79e05'][Math.floor(Math.random() * 4)],
-        wobble: -6 + Math.random() * 12,
-        emoji: Math.random() < 0.2 ? (Math.random() < 0.5 ? '🍄' : '✨') : null,
-      })), []);
-      return (
-        <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10100 }}>
-          <div style={{
-            position: 'absolute', left: -30, top: -30, width: 60, height: 60,
-            background: 'radial-gradient(circle, rgba(149,68,213,.5) 0%, rgba(227,206,54,.3) 40%, transparent 70%)',
-            animation: 'pollenFlash 400ms ease-out forwards',
-          }} />
-          {spores.map((s, i) => (
-            s.emoji ? (
-              <span key={i} style={{
-                position: 'absolute', fontSize: s.size + 4,
-                left: s.xOff - s.size / 2, top: -40, opacity: 0,
-                animation: `pollenFall ${s.dur}ms ease-in ${s.delay}ms forwards`,
-                '--pollen-drift': `${s.wobble}px`,
-              }}>{s.emoji}</span>
-            ) : (
-              <div key={i} style={{
-                position: 'absolute', width: s.size, height: s.size, borderRadius: '50%',
-                background: s.color, filter: 'blur(1px)',
-                boxShadow: `0 0 4px ${s.color}`,
-                left: s.xOff - s.size / 2, top: -40, opacity: 0,
-                animation: `pollenFall ${s.dur}ms ease-in ${s.delay}ms forwards`,
-                '--pollen-drift': `${s.wobble}px`,
-              }} />
-            )
-          ))}
-          <style>{`
-            @keyframes pollenFlash {
-              0% { opacity: 0; transform: scale(0.5); }
-              30% { opacity: 0.8; transform: scale(1.2); }
-              100% { opacity: 0; transform: scale(1.5); }
-            }
-            @keyframes pollenFall {
-              0% { opacity: 0; transform: translate(0, 0) scale(0.5); }
-              15% { opacity: 0.9; transform: translate(calc(var(--pollen-drift) * 0.3), 8px) scale(1); }
-              70% { opacity: 0.7; transform: translate(var(--pollen-drift), 35px) scale(0.9); }
-              100% { opacity: 0; transform: translate(calc(var(--pollen-drift) * 1.3), 55px) scale(0.4); }
-            }
-          `}</style>
-        </div>
-      );
-    };
-  })(),
+  poison_pollen_rain: ppFx43Reg('poison_pollen_rain'),   // PIXELART (app-fx-43)
   // Toxic Fumes — a cloud of sickly purple gas boils out over the target.
   // Used by Toxic Fumes (Spell): thick billowing puffs that expand and
   // dissipate, a green-tinged haze behind, and small skull bubbles rising
@@ -35739,6 +35471,8 @@ function ZielMarkenEbene({ marken, blitze, myIdx }) {
 
   return (
     <div className="ziel-ebene fx-welt-lock" aria-hidden="true">
+      {/* Pixelart-Leinwand (app-fx-41.jsx); der alte SVG-Pfad bleibt nur als Rueckfall, falls die Datei fehlt. */}
+      {window.PpZielPfad && !window.__ppFxAlt ? <window.PpZielPfad segmente={segmente} /> : (
       <svg className="ziel-pfad" width="100%" height="100%">
         <defs>
           <marker id="zielPfadSpitze" viewBox="0 0 10 10" refX="7" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
@@ -35751,7 +35485,7 @@ function ZielMarkenEbene({ marken, blitze, myIdx }) {
             <line x1={sg.ax} y1={sg.ay} x2={sg.bx} y2={sg.by} className="ziel-pfad-linie" markerEnd="url(#zielPfadSpitze)" />
           </g>
         ))}
-      </svg>
+      </svg>)}
       {Object.entries(abzeichen).map(([k, labels]) => {
         const r = rects[k];
         if (!r) return null;
@@ -35789,16 +35523,20 @@ function ZielMarkenEbene({ marken, blitze, myIdx }) {
 // Pixelbilder erzeugt (Zwischenspeicher `_ppPxCache`, Schluessel nach Groesse) — bevor ein Kampf, vor allem ein Tutorial, startet.
 // Auf schwachen Handys kostet dieses erste Pixelieren Sekunden; im Menue stoert es niemanden, in Mission 1 verzoegerte es die erste Textbox.
 window._ppAnimWarm = window._ppAnimWarm || {};
-window.ppAnimVorwaermen = function (type, mass) {
+// `extras` (optional): `schluessel` = eigener Merker statt des Typnamens (derselbe Typ in anderer Groesse / mit anderem Bild), `props` = zusaetzliche
+// Animations-Eigenschaften (z. B. `cardbackUrl`), `bewegung: true` = auch die BEWEGUNG backen (gedrehte Sprites in den Zwischenspeicher) — das Vorwaermen
+// ueberspringt sie sonst; fuer kleine Animationen mit Drehung (Mischen) ist genau sie der teure Teil.
+window.ppAnimVorwaermen = function (type, mass, extras) {
   try {
-    if (window._playAnimations === false || window._ppAnimWarm[type] || !ANIM_REGISTRY[type] || !ReactDOM.createRoot) return;
-    window._ppAnimWarm[type] = true;
+    const merker = (extras && extras.schluessel) || type;
+    if (window._playAnimations === false || window._ppAnimWarm[merker] || !ANIM_REGISTRY[type] || !ReactDOM.createRoot) return;
+    window._ppAnimWarm[merker] = true;
     const host = document.createElement('div');
     host.setAttribute('aria-hidden', 'true');
     document.body.appendChild(host);
     const root = ReactDOM.createRoot(host);
     const fertig = () => setTimeout(() => { try { root.unmount(); host.remove(); } catch {} }, 300);
-    root.render(<GameAnimationRenderer type={type} x={window.innerWidth / 2} y={window.innerHeight / 2} w={(mass && mass.w) || 100} h={(mass && mass.h) || 100} welt={false} prewarm _gemountet={fertig} />);
+    root.render(<GameAnimationRenderer type={type} x={window.innerWidth / 2} y={window.innerHeight / 2} w={(mass && mass.w) || 100} h={(mass && mass.h) || 100} welt={false} prewarm prewarmBewegung={!!(extras && extras.bewegung)} _gemountet={fertig} {...((extras && extras.props) || {})} />);
     setTimeout(() => { try { root.unmount(); host.remove(); } catch {} }, 8000);   // Netz
   } catch (e) { /* Vorwaermen ist optional */ }
 };
@@ -35811,7 +35549,7 @@ function PixelHuelle({ className, style, children }) {
   return <div ref={ref} className={className} style={style}>{children}</div>;
 }
 
-function GameAnimationRenderer({ type, x, y, w, h, _gemountet, prewarm, ...rest }) {
+function GameAnimationRenderer({ type, x, y, w, h, _gemountet, prewarm, prewarmBewegung, ...rest }) {
   const Component = ANIM_REGISTRY[type];
   // Lebensdauer-Uhr erst NACH dem Pixelieren starten (s. playAnimation).
   useEffect(() => { if (typeof _gemountet === 'function') _gemountet(); }, []);
@@ -35819,7 +35557,7 @@ function GameAnimationRenderer({ type, x, y, w, h, _gemountet, prewarm, ...rest 
   // die Grafiken der Animation einmal beim Einblenden in Pixelart mit
   // Dithering um, vor dem ersten Bild (useLayoutEffect).
   const huelle = useRef(null);
-  useLayoutEffect(() => window.ppPixeliererAnhaengen ? window.ppPixeliererAnhaengen(huelle.current, { bewegung: !prewarm }) : undefined, []);
+  useLayoutEffect(() => window.ppPixeliererAnhaengen ? window.ppPixeliererAnhaengen(huelle.current, { bewegung: !prewarm || !!prewarmBewegung }) : undefined, []);
   if (!Component) return null;
   // Forward extra props (intensity, custom payload, etc.) so animations
   // that key off broadcast-side parameters can scale themselves. Extras
@@ -37776,6 +37514,7 @@ const FINALE_FEUERWERK_MS = 8500;
 const FINALE_AUSBLENDEN_MS = 3200;
 const FINALE_FARBEN = ['#fad54a', '#fc1c5f', '#4ceb70', '#1ca9fd', '#ff8b1a', '#a952ff', '#1aedff', '#ffffff'];
 function TutorialFinaleFeuerwerk() {
+  const leinwand = useRef(null);
   const salven = useMemo(() => {
     const anzahlSalven = 17;
     return Array.from({ length: anzahlSalven }, (_, i) => {
@@ -37784,7 +37523,7 @@ function TutorialFinaleFeuerwerk() {
       return {
         // Zeitpunkt des Starts (s): gleichmaessig ueber die Dauer, leicht verwackelt.
         zeit: 0.15 + i * ((FINALE_FEUERWERK_MS / 1000 - 2.4) / anzahlSalven) + Math.random() * 0.25,
-        x: 10 + Math.random() * 80, y: 13 + Math.random() * 38,
+        x: 0.1 + Math.random() * 0.8, y: 0.13 + Math.random() * 0.38,
         farbe: FINALE_FARBEN[(i * 3 + Math.floor(Math.random() * 3)) % FINALE_FARBEN.length],
         teile: Array.from({ length: anzahl }, (_, k) => {
           const w = (k / anzahl) * Math.PI * 2 + Math.random() * 0.18;
@@ -37803,21 +37542,69 @@ function TutorialFinaleFeuerwerk() {
     }
     return () => timer.forEach(clearTimeout);
   }, [salven]);
+  // Pixelart auf EINER kleinen Leinwand (Rasterpixel = 3 Bildschirmpixel, ~30 Bilder/s): Raketen als Pixelsaeule, Funken als Bloecke mit kurzem Schweif, Blitz als Pixelring, Ausblenden per Raster
+  // statt Alpha. Ersetzt ~480 einzeln animierte DOM-Funken mit Blur-Schein (ruckelte auf schwachen Rechnern).
+  useEffect(() => {
+    const cv = leinwand.current;
+    if (!cv || window._playAnimations === false) return undefined;
+    const S = 3;
+    const r0 = cv.parentElement.getBoundingClientRect();
+    const W = Math.max(40, Math.ceil(r0.width / S)), H = Math.max(40, Math.ceil(r0.height / S));
+    cv.width = W; cv.height = H;
+    const g = cv.getContext('2d');
+    const BAYER = [0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5];
+    const zeigen = (x, y, a) => a >= 1 || (a > 0 && BAYER[(y & 3) * 4 + (x & 3)] < a * 16);
+    const block = (x, y, n, farbe, a) => {
+      x = Math.round(x); y = Math.round(y);
+      if (a < 1) { g.fillStyle = farbe; for (let j = 0; j < n; j++) for (let i = 0; i < n; i++) if (zeigen(x + i, y + j, a)) g.fillRect(x + i, y + j, 1, 1); return; }
+      g.fillStyle = farbe; g.fillRect(x, y, n, n);
+    };
+    const t0 = performance.now(); let letzt = -1e9, raf = 0, ende = false;
+    const schritt = (jetzt) => {
+      if (ende) return;
+      raf = requestAnimationFrame(schritt);
+      if (jetzt - letzt < 32) return;
+      letzt = jetzt;
+      const t = (jetzt - t0) / 1000;
+      g.clearRect(0, 0, W, H);
+      for (const sv of salven) {
+        const cx = sv.x * W, cy = sv.y * H;
+        // Rakete (0,7 s): steigt von unten zur Platzstelle, Pixelsaeule mit Schweif
+        const fr = (t - sv.zeit) / 0.7;
+        if (fr >= 0 && fr <= 1) {
+          const e = 1 - Math.pow(1 - fr, 2), y = H * 1.02 + (cy - H * 1.02) * e;
+          for (let k = 0; k < 6; k++) block(cx, y + k * 2, 1, k < 2 ? '#ffffff' : k < 4 ? '#f9ecb3' : '#fbc86a', 1 - k / 7);
+        }
+        const fb = (t - sv.zeit - 0.7);
+        if (fb < 0) continue;
+        // Blitz (0,5 s): gedithertes Leuchten (Scheibe, innen weiss) und ein Pixelring, der sich weitet
+        if (fb < 0.5) {
+          const f = fb / 0.5, R = 4 + 16 * f, a = (1 - f) * 0.8, R2 = R * R;
+          for (let y = -Math.ceil(R); y <= R; y++) for (let x = -Math.ceil(R); x <= R; x++) {
+            const d = x * x + y * y; if (d > R2) continue;
+            const px = Math.round(cx) + x, py = Math.round(cy) + y;
+            if (zeigen(px, py, a * (1 - d / R2 * 0.6))) { g.fillStyle = d < R2 * 0.25 && f < 0.6 ? '#ffffff' : sv.farbe; g.fillRect(px, py, 1, 1); }
+          }
+        }
+        // Funken (1,9 s): fliegen auseinander, fallen leicht, werden kleiner und dithern aus
+        if (fb > 1.9) continue;
+        const f = fb / 1.9, e = 1 - Math.pow(1 - f, 3), a = f < 0.6 ? 1 : 1 - (f - 0.6) / 0.4, n = f < 0.22 ? 3 : f < 0.6 ? 2 : 1;
+        sv.teile.forEach((tl, k) => {
+          const x = cx + tl.dx * e / S, y = cy + (tl.dy + 80 * e) / S;
+          for (const [vz, ga] of [[0.1, 0.35], [0.05, 0.6]]) { const e2 = 1 - Math.pow(1 - Math.max(0, f - vz), 3); if (f < 0.55) block(cx + tl.dx * e2 / S, cy + (tl.dy + 80 * e2) / S, Math.max(1, n - 1), sv.farbe, a * ga); }
+          block(x, y, n, sv.farbe, a);
+          if (f > 0.12 && f < 0.6 && ((k + Math.floor(t * 20)) & 3) === 0) block(x, y, n, '#ffffff', 1);   // Glitzern
+        });
+      }
+      if (t > FINALE_FEUERWERK_MS / 1000 + 1) ende = true;
+    };
+    raf = requestAnimationFrame(schritt);
+    return () => { ende = true; cancelAnimationFrame(raf); };
+  }, [salven]);
   if (window._playAnimations === false) return null;
   return (
     <div className="finale-feuerwerk">
-      {salven.map((sv, i) => (
-        <React.Fragment key={i}>
-          <div className="finale-rakete" style={{ left: sv.x + '%', '--fwf-ziel': sv.y + '%', animationDelay: sv.zeit + 's' }} />
-          <div className="finale-blitz" style={{ left: sv.x + '%', top: sv.y + '%', '--fw-color': sv.farbe, animationDelay: (sv.zeit + 0.7) + 's' }} />
-          {sv.teile.map((t, k) => (
-            <div key={k} className="finale-teil" style={{
-              left: sv.x + '%', top: sv.y + '%', '--dx': t.dx + 'px', '--dy': t.dy + 'px',
-              '--fw-color': sv.farbe, animationDelay: (sv.zeit + 0.7) + 's',
-            }} />
-          ))}
-        </React.Fragment>
-      ))}
+      <canvas ref={leinwand} className="finale-leinwand" data-pp-px="aus" />
     </div>
   );
 }
@@ -38113,6 +37900,24 @@ function ppKartenWurf({ mode, cardUrl, A, B, dauer }) {
 // Haengt die Phasenspalte (Handy) per Portal in das scrollende Brett; ohne `host` bleibt sie an ihrer gewohnten Stelle.
 function PhasenHuelle({ host, children }) { return host ? ReactDOM.createPortal(children, host) : children; }
 
+// ★ Startansage (Al 30.10.): hellerer / dunklerer Ton der Textfarbe fuer Shading und Dithering (`.game-announcement-text`),
+// auf die 256-Farben-Palette gerastet. `farbe` ist `var(--...)` oder ein Hex-Wert.
+function ansageToene(farbe) {
+  try {
+    let hex = String(farbe || '').trim();
+    const v = /^var\((--[\w-]+)\)$/.exec(hex);
+    if (v) hex = getComputedStyle(document.documentElement).getPropertyValue(v[1]).trim();
+    const m = /^#([0-9a-f]{6})$/i.exec(hex);
+    if (!m) return {};
+    const c = [0, 2, 4].map(i => parseInt(m[1].slice(i, i + 2), 16));
+    const snap = (r, g, b) => (window.ppSnapRgb ? window.ppSnapRgb(r, g, b) : [r, g, b]);
+    const css = (a) => 'rgb(' + a.join(',') + ')';
+    const hell = snap(...c.map(x => Math.round(x + (255 - x) * 0.45)));
+    const dunkel = snap(...c.map(x => Math.round(x * 0.5)));
+    return { '--ann-hell': css(hell), '--ann-dunkel': css(dunkel) };
+  } catch (e) { return {}; }
+}
+
 function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck, setSelectedDeck, cubeMatchInfo }) {
   useHoverDurchSchleier();   // v1270: Tooltips durch den Dialog-Schleier
   const { user, setUser, notify, setBgmMode } = useContext(AppContext);
@@ -38123,6 +37928,10 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
   // v1463: Profil-Optionen „Display Heroes" / „Dynamic Heroes" (beide
   // standardmäßig an; ohne Display kein Dynamic).
   const heldenAnzeigen = user?.display_heroes == null ? true : !!user.display_heroes;
+  // Spielstart-Effekt (app-fx-51: Held-Ausbruch + Brettaufbau-Welle, nur Optik): im Render entscheiden, ob er laeuft — die Figuren melden sich schon in ihren Layout-Effekten, die vor dem
+  // Layout-Effekt dieser Komponente laufen. Die Leinwaende entstehen erst im ersten Bild nach dem Einhaengen (kein Mehraufwand beim Mounten); `ppFx51Abbruch` raeumt beim Verlassen auf.
+  useState(() => (window.ppFx51Vorbereiten ? window.ppFx51Vorbereiten(gameState, { figuren: heldenAnzeigen }) : 0));
+  React.useLayoutEffect(() => { try { if (window.ppFx51Anlegen) window.ppFx51Anlegen(); } catch {} return () => { try { if (window.ppFx51Abbruch) window.ppFx51Abbruch(); } catch {} }; }, []);
   const heldenDynamisch = heldenAnzeigen && (user?.dynamic_heroes == null ? true : !!user.dynamic_heroes);
   const isSpectator = gameState.isSpectator || false;
   const myIdx = gameState.myIndex;
@@ -38251,6 +38060,17 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       const name = String(wert).includes('|') ? String(wert).split('|').slice(1).join('|') : wert;
       const stil = window.zoneLandStyle?.(name) || {};
       const einschlag = { selector: sel, key: schluessel, color: stil.color, variant: stil.variant };
+      // ★ Fähigkeits-Stufenaufstieg (app-fx-48.jsx, Trailer „Zug 1“): die Fähigkeitszone wächst von 1 auf 2 bzw. von 2 auf 3 Karten, oberste Karte gleich
+      // geblieben → Einschlag, Kraftstrom zum Helden, Ringe um seine Füße, Lichtsäule, Stapelzahl. Läuft der Effekt, entfällt der Standard-Einschlag dieses Platzes.
+      if (schluessel.charAt(0) === 'a' && window.ppFx48Stufe) {
+        const neuS = String(wert), altS = String(alt.get(schluessel) ?? ''), iN = neuS.indexOf('|'), iA = altS.indexOf('|');
+        const nN = iN > 0 ? Number(neuS.slice(0, iN)) : 0, nA = iA > 0 ? Number(altS.slice(0, iA)) : 0;
+        if (nA >= 1 && nN === nA + 1 && nN <= 3 && neuS.slice(iN + 1) === altS.slice(iA + 1)) {
+          const tk = schluessel.split(':');
+          const heldName = gameState?.players?.[Number(tk[1])]?.heroes?.[Number(tk[2])]?.name;
+          if (window.ppFx48Stufe({ selector: sel, key: 'fx48:' + schluessel, stufe: nN, name, heroName: heldName })) continue;
+        }
+      }
       // ★ v1287 (Als Befund 22.9.: „die Zone, in der Elixir of Immortality
       // landen soll, wird direkt zum Resolve-Zeitpunkt gehighlightet").
       // Ein Permanent, das waehrend einer Colored-Snow-Enthuellung
@@ -38284,6 +38104,14 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     }
     if (rid) lastRoomRef.current = rid;
   }, [gameState?.roomId]);
+
+  // Pfeilsalve: dem Server melden, ob dieser Client die Salve spielt (er wartet nur dann; s. `client_fx` in server.js) — beim Start, bei Aenderung der Einstellung und nach Wiederverbindung.
+  useEffect(() => {
+    const melden = () => { try { socket.emit('client_fx', { salve: !!(window.ppFx52KannSalve && window.ppFx52KannSalve()) }); } catch (e) { /* ohne */ } };
+    const t = setTimeout(melden, 0);
+    socket.on('connect', melden);
+    return () => { clearTimeout(t); socket.off('connect', melden); };
+  }, [playAnimations, gameState?.roomId]);
 
   useEffect(() => {
     window._playAnimations = playAnimations;
@@ -38387,6 +38215,8 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
 
   // ── Tutorial outro: show textbox before victory screen ──
   const [tutorialOutroPending, setTutorialOutroPending] = useState(false);
+  // Abschlussmonolog gesprochen? Der Siegerschirm bleibt bis dahin weg — ueber diesen Zustand statt ueber `tutorialOutroPending`: das wird erst im Effekt NACH dem ersten Render mit Ergebnis gesetzt, dazwischen stand der Schirm (je nach Geraet Sekundenbruchteile bis eine halbe Sekunde) da.
+  const [tutorialOutroDone, setTutorialOutroDone] = useState(false);
   const [resultFading, setResultFading] = useState(false);
   const tutorialOutroFiredRef = useRef(null);
   // Synchronous mirror of tutorialOutroPending — written alongside the
@@ -38411,7 +38241,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           speakerName: 'Monia Bot',
           ...(outroPages ? { pages: outroPages } : { text: outroText }),
           ...(script.opts || {}),
-          onDismiss: () => { outroPendingRef.current = false; setTutorialOutroPending(false); },
+          onDismiss: () => { outroPendingRef.current = false; setTutorialOutroPending(false); setTutorialOutroDone(true); },
         });
       }, 300);
     }
@@ -38431,6 +38261,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     tutorialOutroFiredRef.current = null;
     outroPendingRef.current = false;
     setTutorialOutroPending(false);
+    setTutorialOutroDone(false);
   }, [result, lobby?.id]);
 
   // Victory / defeat fanfare — fires exactly once when result first appears.
@@ -38599,12 +38430,28 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
      * misst die aber alle mit und schreibt drei weitere Variablen.
      * Beim Scrollen wird deshalb nur noch die Platte nachgezogen.
      */
+    // Die Leiste bleibt unsichtbar (`html:not([data-phase-bereit]) .phase-column`, style.css), bis ihre Lage zweimal hintereinander gleich gemessen wurde:
+    // beim Brettaufbau rueckt das Layout in 2–3 Schritten zurecht, und die Leiste glitt sonst sichtbar an ihren Platz. Netz: nach 1,5 s erscheint sie in jedem Fall.
+    const wurzel = document.documentElement;
+    wurzel.removeAttribute('data-phase-bereit');
+    let bereitSig = null;
+    const bereitMelden = (col, midY) => {
+      if (wurzel.hasAttribute('data-phase-bereit')) return;
+      const q = col.getBoundingClientRect();
+      const sig = Math.round(midY) + '|' + Math.round(q.left) + '|' + Math.round(q.top) + '|' + Math.round(q.width);
+      if (sig === bereitSig && q.width > 0) wurzel.setAttribute('data-phase-bereit', '1');
+      bereitSig = sig;
+    };
+    const bereitNetz = setTimeout(() => wurzel.setAttribute('data-phase-bereit', '1'), 1500);
     const apply = (nurPlatte = false) => {
       // Waehrend ein Kartenzug laeuft, aendert sich die Brettgeometrie
       // nicht — jede Messung hier waere ein erzwungener Umbruch pro
       // Mausbewegung. Nach dem Loslassen laeuft ohnehin ein Render und
       // der 400-ms-Takt darunter.
       if (document.body.classList.contains('pp-dragging-card')) return;
+      // Tutorial-Zoom (Desktop): die Naht (`.board-area-zones-center`) wird im gezoomten Brett gemessen — die Leiste liefe sonst mit dem Zoom davon und ihr Highlight stuende
+      // an der falschen Stelle. Waehrend des Zooms bleibt die Lage stehen; nach dem Herauszoomen (Klasse faellt) misst der naechste Lauf wieder normal.
+      if (document.querySelector('.board-center.tut-zoom')) return;
       const col = document.querySelector('.phase-column');
       if (!col) return;
       const parent = col.offsetParent || document.documentElement;
@@ -38619,7 +38466,9 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         document.querySelectorAll('[data-hero-zone][data-hero-owner="opp"]').forEach(e => { const r = e.getBoundingClientRect(); if (r.height > 0) oppUnten = Math.max(oppUnten, r.bottom); });
         document.querySelectorAll('[data-hero-zone][data-hero-owner="me"]').forEach(e => { const r = e.getBoundingClientRect(); if (r.height > 0) meOben = Math.min(meOben, r.top); });
         if (isFinite(oppUnten) && isFinite(meOben)) {
-          setzeVar(document.documentElement.style, '--phase-mid-y', ((oppUnten + meOben) / 2 - parent.getBoundingClientRect().top + parent.scrollTop) + 'px');
+          const midY = (oppUnten + meOben) / 2 - parent.getBoundingClientRect().top + parent.scrollTop;
+          setzeVar(document.documentElement.style, '--phase-mid-y', midY + 'px');
+          bereitMelden(col, midY);
           messePlatte(col); return;
         }
       }
@@ -38659,6 +38508,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       }
       if (y == null) return;
       setzeVar(document.documentElement.style, '--phase-mid-y', (y - pr.top) + 'px');
+      bereitMelden(col, y - pr.top);
       // Hoehe NUR der Phasenzeile — das CSS verschiebt die Spalte um die
       // Haelfte davon nach oben, damit genau diese Zeile auf der Linie
       // liegt und die Button-Reihe darunter haengt.
@@ -38730,6 +38580,8 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     };
     if (center) center.addEventListener('scroll', onScroll, { passive: true });
     return () => {
+      clearTimeout(bereitNetz);
+      wurzel.removeAttribute('data-phase-bereit');
       cancelAnimationFrame(raf);
       if (ro) ro.disconnect();
       window.removeEventListener('resize', apply);
@@ -41127,7 +40979,11 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           const baseAfterCrystal = applyCrystalCostMods(me, cardName, card.cost || 0);
           const effCost = Math.max(0, baseAfterCrystal - handReduction);
           // G1: inkl. Goldsperre; Karten mit Stufen-Preis (`goldLockSelfChecked`) prüfen ihre Kosten selbst - dort entscheidet `unactivatableArtifacts`.
-          if (!(me.goldLocked && (me.goldLockSelfChecked || []).includes(card.name)) && !goldKannZahlen(me, card.name, effCost)) return true;
+          // X-Kosten-Artefakte (`selfPricedArtifacts`: Dark Gear, Beer, Staff of Illusions …): der Grundpreis ist nur der Preis JE Stufe/Ziel -
+          // bei Stufe 0 oder ohne Ziel sind die Gesamtkosten 0, die Karte ist also auch ohne das Gold des Grundpreises spielbar.
+          // Ausgegraut wird sie dann nur über `unactivatableArtifacts` (echte Kosten, Goldsperre bei Preis je Ziel).
+          const selbstGerechnet = (me.selfPricedArtifacts || []).includes(card.name);
+          if (!selbstGerechnet && !(me.goldLocked && (me.goldLockSelfChecked || []).includes(card.name)) && !goldKannZahlen(me, card.name, effCost)) return true;
         }
         // Once-per-game artifacts (Smug Coin, etc.)
         if ((me.oncePerGameUsed || []).includes(cardName)) return true;
@@ -41321,7 +41177,11 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
   // (z 1000) and give it a win/loss glow so the "speaker" is highlighted
   // instead of dimmed. The bottom hand already sits at z 10000; the opponent
   // row only has z 2, so it otherwise hides behind the veil.
-  const endGlow = (won) => 'drop-shadow(0 0 10px ' + (won ? 'var(--success)' : 'var(--danger)') + ')';
+  // ★ Kein Weichzeichner-Schein mehr (Als Befund 31.10.: „wenn Gegner sprechen, wird ihr Name umrandet — sieht nicht gut aus"): der
+  // `drop-shadow` lag auf der ganzen Info-Zeile (Portrait UND Name) und umrandete deshalb auch den Namen. Der Sprecher bleibt hervorgehoben —
+  // über den Z-Index-Lift (End-Veil / Blasen-Ebene), den ohnehin leuchtenden Portrait-Rahmen (`avatar-active`) und beim Spielende einen harten
+  // Pixelring in Sieg-/Niederlagenfarbe NUR ums Portrait (`--pp-ring`, `.pp-portraet` in style.css).
+  const endRing = (won) => '0 0 0 11px var(' + (won ? '--success' : '--danger') + '), 0 0 0 13px var(--pp-kontur)';
   // Mid-Game-Bark: solange die Sprechblase steht, leuchtet das Portrait
   // des Sprechers im Bark-Bernstein (#fad54a = Blasenrand). End-Game-
   // Glow hat Vorrang, weil showEndBubbles die Bark-Blase ohnehin
@@ -41339,11 +41199,10 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
   // zusätzlich zu isMyTurn.
   const oppBarking = !showEndBubbles && cpuBark && cpuBark.owner === oppIdx;
   const meBarking = !showEndBubbles && cpuBark && cpuBark.owner !== oppIdx;
-  const barkFilter = 'drop-shadow(0 0 10px #fad54a)';
-  const oppAvatarHighlight = oppBubbleMsg ? { zIndex: 1100, filter: endGlow(endOppWon) }
-    : (oppBarking ? { zIndex: 9650, filter: barkFilter } : undefined);
-  const meAvatarHighlight = meBubbleMsg ? { filter: endGlow(endMeWon) }
-    : (meBarking ? { filter: barkFilter } : undefined);
+  const oppAvatarHighlight = oppBubbleMsg ? { zIndex: 1100 }
+    : (oppBarking ? { zIndex: 9650 } : undefined);
+  const oppPortraetRing = oppBubbleMsg ? endRing(endOppWon) : null;
+  const mePortraetRing = meBubbleMsg ? endRing(endMeWon) : null;
 
   // ── Hand Shuffle & Sort with FLIP animation ──
   const captureHandRects = () => {
@@ -42664,7 +42523,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           const heroEls = document.querySelectorAll('[data-hero-zone]');
           for (const el of heroEls) {
             const r = el.getBoundingClientRect();
-            if (mx >= r.left && mx <= r.right && my >= r.top && my <= r.bottom) {
+            if (ppHeroTreffer(el, mx, my)) {
               if (el.dataset.heroOwner !== 'me') continue;
               const hi = parseInt(el.dataset.heroIdx);
               const hostsForHero = pickHandCardHosts.filter(h => h.heroIdx === hi);
@@ -42708,7 +42567,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           const heroEls = document.querySelectorAll('[data-hero-zone]');
           for (const el of heroEls) {
             const r = el.getBoundingClientRect();
-            if (mx >= r.left && mx <= r.right && my >= r.top && my <= r.bottom) {
+            if (ppHeroTreffer(el, mx, my)) {
               if (el.dataset.heroOwner === 'me') {
                 const hi = parseInt(el.dataset.heroIdx);
                 if (canReceive(hi, cardName)) { targetHero = hi; targetZone = -1; targetOpp = false; }
@@ -43000,7 +42859,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
             const heroEls3 = document.querySelectorAll('[data-hero-zone]');
             for (const el of heroEls3) {
               const r = el.getBoundingClientRect();
-              if (mx >= r.left && mx <= r.right && my >= r.top && my <= r.bottom) {
+              if (ppHeroTreffer(el, mx, my)) {
                 const hi = parseInt(el.dataset.heroIdx);
                 if (el.dataset.heroOwner === 'me') {
                   if (heroActionHeroIdx !== undefined && hi !== heroActionHeroIdx) continue;
@@ -43082,7 +42941,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         const heroEls = document.querySelectorAll('[data-hero-zone]');
         for (const el of heroEls) {
           const r = el.getBoundingClientRect();
-          if (mx >= r.left && mx <= r.right && my >= r.top && my <= r.bottom) {
+          if (ppHeroTreffer(el, mx, my)) {
             const side = sideFor(el.dataset.heroOwner);
             if (side) {
               const hi = parseInt(el.dataset.heroIdx);
@@ -43161,7 +43020,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           const heroEls3 = document.querySelectorAll('[data-hero-zone]');
           for (const el of heroEls3) {
             const r = el.getBoundingClientRect();
-            if (mx >= r.left && mx <= r.right && my >= r.top && my <= r.bottom) {
+            if (ppHeroTreffer(el, mx, my)) {
               if (el.dataset.heroOwner === 'me') {
                 const hi = parseInt(el.dataset.heroIdx);
                 const hero = me.heroes[hi];
@@ -43354,7 +43213,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         if (gameState.heroPlayableCards?.stufen?.[cardName]) {
           for (const el of document.querySelectorAll('[data-hero-zone][data-hero-owner="me"]')) {
             const r = el.getBoundingClientRect();
-            if (mx >= r.left && mx <= r.right && my >= r.top && my <= r.bottom) {
+            if (ppHeroTreffer(el, mx, my)) {
               hoverHero = parseInt(el.dataset.heroIdx);
               hoverHeroRect = { left: r.left, top: r.top, width: r.width, height: r.height };
             }
@@ -43366,7 +43225,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         const heroEls2 = document.querySelectorAll('[data-hero-zone]');
         for (const el of heroEls2) {
           const r = el.getBoundingClientRect();
-          if (mx >= r.left && mx <= r.right && my >= r.top && my <= r.bottom) {
+          if (ppHeroTreffer(el, mx, my)) {
             const hi = parseInt(el.dataset.heroIdx);
             // ★ W78 (Backstab, Al 26.10.): eine Karte OHNE Wirker-Helden lässt sich direkt auf den GEGNERHELDEN ziehen, der die Attack ausführen soll (Liste vom Server: `herolessAngreifer`).
             const _hlAngreifer = (me.herolessAngreifer || {})[cardName];
@@ -43435,7 +43294,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         const heroEls4 = document.querySelectorAll('[data-hero-zone]');
         for (const el of heroEls4) {
           const r = el.getBoundingClientRect();
-          if (mx >= r.left && mx <= r.right && my >= r.top && my <= r.bottom) {
+          if (ppHeroTreffer(el, mx, my)) {
             if (el.dataset.heroOwner === 'me') {
               const hi = parseInt(el.dataset.heroIdx);
               const hero = me.heroes[hi];
@@ -44844,7 +44703,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         const dmgEntry = { id: Date.now() + Math.random(), amount: damage, ownerLabel, heroIdx };
         setDamageNumbers(prev => [...prev, dmgEntry]);
         setTimeout(() => setDamageNumbers(prev => prev.filter(e => e.id !== dmgEntry.id)), 1800);
-        flashDamageOnZone(`[data-hero-zone][data-hero-owner="${ownerLabel}"][data-hero-idx="${heroIdx}"]`);
+        flashDamageOnZone(`[data-hero-zone][data-hero-owner="${ownerLabel}"][data-hero-idx="${heroIdx}"]`, damage);
       }
       if (heal && heal > 0) {
         const healEntry = { id: Date.now() + Math.random(), amount: heal, ownerLabel, heroIdx };
@@ -45243,7 +45102,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         const bogen = (i % 2 === 0 ? 1 : -1) * Math.min(60, len * 0.18) * (0.7 + 0.3 * ((i * 37) % 10) / 10);
         const cx = (start.x + ziel.x) / 2 + nx * bogen;
         const cy = (start.y + ziel.y) / 2 + ny * bogen;
-        faeden.push({ d: `M ${start.x} ${start.y} Q ${cx} ${cy} ${ziel.x} ${ziel.y}`, len: len * 1.15, sx: start.x, sy: start.y });
+        faeden.push({ d: `M ${start.x} ${start.y} Q ${cx} ${cy} ${ziel.x} ${ziel.y}`, len: len * 1.15, sx: start.x, sy: start.y, cx, cy });
         if (window.ppBattleCamFocus) window.ppBattleCamFocus(el);
       });
       if (faeden.length === 0) return;
@@ -45365,7 +45224,27 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         }
         punkte = stuetz.join(' ');
       }
-      setBeamAnims(prev => [...prev, {
+      // Pixelart-Strahl (app-fx-29.jsx): Blitz (`bolt`) laeuft ueber den Kettenblitz-Maler (app-fx-28.jsx), alles andere ueber `ppFx29Strahl`; beide hangen sich selbst in die
+      // Welt-Huelle. Liefern sie null (Animationen aus / Funktion fehlt), zeichnet der alte SVG-Strahl wie bisher.
+      let _pixelStrahl = null;
+      if (bolt && window.ppFx28Kettenblitz && !window.__ppFxAlt) {
+        _pixelStrahl = window.ppFx28Kettenblitz({
+          sx: sr0.left + sr0.width / 2, sy: sr0.top + sr0.height / 2, tx: tr0.left + tr0.width / 2, ty: tr0.top + tr0.height / 2,
+          step: 1, sw: sr0.width, sh: sr0.height, tw: tr0.width, th: tr0.height,
+          sHeld: !srcOverride && !(sourceZoneType === 'ability') && !(sourceZoneSlot != null && sourceZoneSlot >= 0),
+          tHeld: !tgtOverride && !(targetZoneSlot !== undefined && targetZoneSlot >= 0),
+        });
+      } else if (!bolt && window.ppFx29Strahl) {
+        _pixelStrahl = window.ppFx29Strahl({
+          ax: startX, ay: startY, bx: endX, by: endY, color, glow: typeof glow === 'string' ? glow : null,
+          dick: thickness, dauer: dur, miss: !!miss, wucht: impactOpacity,
+          tw: tr.width, th: tr.height, sw: sr.width, sh: sr.height,
+          sHeld: !srcOverride && !(sourceZoneType === 'ability') && !(sourceZoneSlot != null && sourceZoneSlot >= 0),
+          tHeld: !tgtOverride && !(targetZoneSlot !== undefined && targetZoneSlot >= 0),
+          eigenerEinschlag: !impactAnim,
+        });
+      }
+      if (!_pixelStrahl) setBeamAnims(prev => [...prev, {
         id, color: color || '#ff1a1a',
         glow: glow || null,
         thickness: typeof thickness === 'number' && thickness > 0 ? thickness : 1,
@@ -45374,7 +45253,8 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         x2: endX, y2: endY,
         punkte,
       }]);
-      if (!miss) {
+      // Pixelart-Strahl mit eigenem Einschlag (ohne `impactAnim`): kein zusaetzlicher Standard-Einschlag; Blitze bleiben bei `electric_strike` o. ae.
+      if (!miss && !(_pixelStrahl && !bolt && !impactAnim)) {
         // Layered impact: a primary explosion that runs for the FULL
         // beam duration plus a quick secondary burst at the moment the
         // beam connects, so the impact spectacle never dies before the
@@ -45391,7 +45271,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         setTimeout(() => {
           playAnimation(impactType, tgtEl, { duration: Math.max(dur - 200, 600), ...impactOpts });
           setTimeout(() => playAnimation(impactType, tgtEl, { duration: 800, ...impactOpts }), Math.max(dur * 0.45, 350));
-        }, 220);
+        }, _pixelStrahl && !bolt ? 260 : 220);
       }
       setTimeout(() => setBeamAnims(prev => prev.filter(a => a.id !== id)), dur);
     };
@@ -45461,10 +45341,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       fly.style.cssText = `position:fixed;left:${sr.left + _w.dx}px;top:${sr.top + _w.dy}px;width:${sr.width}px;height:${sr.height}px;z-index:10150;pointer-events:none;border-radius:4px;overflow:hidden;box-shadow:0 0 20px rgba(255,208,102,.6);transition:transform 600ms cubic-bezier(.22,.8,.3,1),opacity 600ms ease-out;`;
       (_w.welt && window.ppFxWeltSchicht ? window.ppFxWeltSchicht() : document.body).appendChild(fly);
       // Next frame: kick off the transform so the transition plays.
-      requestAnimationFrame(() => {
-        fly.style.transform = `translate(${dx}px, ${dy}px) scale(${dr.width / sr.width})`;
-        fly.style.opacity = '0.2';
-      });
+      ppFlugVerfolgen(fly, sourceEl, destEl, _w, 600, 0.2, (!faceDown && cardName && window.zoneLandStyle) ? window.zoneLandStyle(cardName).color : undefined);
       setTimeout(() => { fly.remove(); }, 700);
     };
     socket.on('hand_to_board_fly', onHandToBoard);
@@ -45583,10 +45460,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       const _w = _wa.welt ? _wa : _ws;
       fly.style.cssText = `position:fixed;left:${sr.left + _w.dx}px;top:${sr.top + _w.dy}px;width:${sr.width}px;height:${sr.height}px;z-index:10150;pointer-events:none;border-radius:4px;overflow:hidden;box-shadow:0 0 24px rgba(244,174,100,.7);transition:transform 600ms cubic-bezier(.22,.8,.3,1),opacity 600ms ease-out;`;
       (_w.welt && window.ppFxWeltSchicht ? window.ppFxWeltSchicht() : document.body).appendChild(fly);
-      requestAnimationFrame(() => {
-        fly.style.transform = `translate(${dx}px, ${dy}px) scale(${dr.width / sr.width})`;
-        fly.style.opacity = '0.3';
-      });
+      ppFlugVerfolgen(fly, sourceEl, destEl, _w, 600, 0.3, (cardName && window.zoneLandStyle) ? window.zoneLandStyle(cardName).color : undefined);
       setTimeout(() => { fly.remove(); }, 700);
     };
     socket.on('attach_hero_fly', onAttachHeroFly);
@@ -45988,7 +45862,10 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         // Ueberblendung da ist.
         if (oldHero) HeroIdleAnims.hole(HeroIdleAnims.slug(oldHero));
         if (newHero) HeroIdleAnims.hole(HeroIdleAnims.slug(newHero));
-        setAscMorph({ id, ownerLabel, heroIdx, oldHero, newHero, t0: performance.now() });
+        const ascT0 = performance.now();
+        setAscMorph({ id, ownerLabel, heroIdx, oldHero, newHero, t0: ascT0 });
+        // Trailer-Look (app-fx-33): Landungsringe, Energiesammeln, Lichtsaeule, Blitz, Funkenregen als Pixel-Leinwand ueber der Heldenzone
+        try { if (window.ppFx33Aufstieg) { const zr = el.getBoundingClientRect(); window.ppFx33Aufstieg({ key: ownerLabel + ':' + heroIdx, x: zr.left + zr.width / 2, y: zr.top + zr.height / 2, w: zr.width, h: zr.height, t0: ascT0 }); } } catch {}
         // Landung: Verstaerkungs-Cue, wenn die neue Gestalt ihre Farben zurueckbekommt.
         setTimeout(() => { if (window.playSFX) window.playSFX('buff', { dedupe: 0, volume: 0.8 }); }, ASC_DAUER_MS * 0.55);
         setTimeout(() => setAscMorph(cur => (cur && cur.id === id ? null : cur)), ASC_DAUER_MS + 60);
@@ -46127,23 +46004,8 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         document.body.appendChild(ring);
         setTimeout(() => ring.remove(), ms + i * 180);
       }
-      const syms = up ? ['🧬','✨','⚡','🌀','💠'] : ['🧬','💧','🌀'];
-      const count = up ? 22 : 12;
-      for (let i = 0; i < count; i++) {
-        const q = document.createElement('div');
-        const angle = (i / count) * 360 + Math.random() * 24;
-        const dist = 30 + Math.random() * 70;
-        q.textContent = syms[i % syms.length];
-        q.style.cssText = `
-          position:fixed;left:${cx}px;top:${cy}px;
-          font-size:${12 + Math.random() * 12}px;
-          pointer-events:none;z-index:10000;opacity:0;
-          animation:waflavEvoParticle ${ms}ms ease-out ${Math.random() * 400}ms forwards;
-          --we-x:${Math.cos(angle * Math.PI / 180) * dist}px;
-          --we-y:${Math.sin(angle * Math.PI / 180) * dist - (up ? 60 : -40)}px;`;
-        document.body.appendChild(q);
-        setTimeout(() => q.remove(), ms + 500);
-      }
+      // DNA-Partikel: Pixelsprites auf einer Canvas-Szene (app-fx-43), kein Emoji-Text mit CSS-Drehung
+      if (window.PpFx43) window.PpFx43.evolution({ cx, cy, up, ms });
     };
     socket.on('play_evolution_animation', onEvolutionAnimation);
     const onWillyLeprechaun = ({ owner, heroIdx }) => {
@@ -46154,36 +46016,8 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       const r = el.getBoundingClientRect();
       const cx = r.left + r.width / 2;
       const cy = r.top + r.height / 2;
-      const symbols = ['🍀','🌈','🪙','🫕','☘️','💰','🌈','🍀','🪙','💰','☘️','🫕'];
-      for (let i = 0; i < 24; i++) {
-        const p = document.createElement('div');
-        const sym = symbols[i % symbols.length];
-        const angle = (i / 24) * 360 + Math.random() * 30;
-        const dist = 25 + Math.random() * 60;
-        const rise = 20 + Math.random() * 80;
-        const delay = Math.random() * 500;
-        const size = 12 + Math.random() * 10;
-        p.textContent = sym;
-        p.style.cssText = `
-          position:fixed;left:${cx}px;top:${cy}px;font-size:${size}px;
-          pointer-events:none;z-index:10000;opacity:0;
-          animation:willyParticle 1.6s ease-out ${delay}ms forwards;
-          --wp-x:${Math.cos(angle*Math.PI/180)*dist}px;
-          --wp-y:${-rise}px;
-        `;
-        document.body.appendChild(p);
-        setTimeout(() => p.remove(), 2300);
-      }
-      // Golden glow burst
-      const glow = document.createElement('div');
-      glow.style.cssText = `
-        position:fixed;left:${r.left}px;top:${r.top}px;width:${r.width}px;height:${r.height}px;
-        border-radius:8px;z-index:9999;pointer-events:none;
-        background:radial-gradient(ellipse at center, rgba(250,213,74,.8) 0%, rgba(61,220,87,.4) 40%, transparent 70%);
-        animation:ascensionBurstAnim 1.8s ease-out forwards;
-      `;
-      document.body.appendChild(glow);
-      setTimeout(() => glow.remove(), 2000);
+      // Glueckssymbole + goldgruener Glanz: eine Pixelart-Canvas-Szene (app-fx-43)
+      if (window.PpFx43) window.PpFx43.willy({ rect: r });
     };
     socket.on('willy_leprechaun', onWillyLeprechaun);
     const onAlleriaSpiderRedirect = ({ srcOwner, srcHeroIdx, tgtOwner, tgtHeroIdx, alleriaOwner, alleriaHeroIdx }) => {
@@ -46201,38 +46035,8 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       const dist = Math.sqrt(dx * dx + dy * dy);
       const angle = Math.atan2(dy, dx) * 180 / Math.PI;
 
-      // Spider thread line
-      const thread = document.createElement('div');
-      thread.style.cssText = `
-        position:fixed;left:${sx}px;top:${sy}px;width:0;height:2px;
-        background:linear-gradient(90deg, rgba(185,185,185,.9), rgba(230,230,230,.6));
-        transform-origin:0 50%;transform:rotate(${angle}deg);
-        pointer-events:none;z-index:10000;box-shadow:0 0 4px rgba(185,185,185,.5);
-        animation:spiderThread .4s ease-out forwards;--thread-len:${dist}px;
-      `;
-      document.body.appendChild(thread);
-
-      // Spiders running along the thread
-      const spiderEmoji = '🕷️';
-      for (let s = 0; s < 6; s++) {
-        const spider = document.createElement('div');
-        const delay = 300 + s * 120;
-        spider.textContent = spiderEmoji;
-        spider.style.cssText = `
-          position:fixed;left:${sx}px;top:${sy - 8}px;font-size:14px;
-          pointer-events:none;z-index:10001;opacity:0;
-          animation:spiderRun 0.7s ease-in-out ${delay}ms forwards;
-          --sr-x:${dx}px;--sr-y:${dy}px;
-        `;
-        document.body.appendChild(spider);
-        setTimeout(() => spider.remove(), delay + 900);
-      }
-
-      // Cleanup thread after spiders finish
-      setTimeout(() => {
-        thread.style.animation = 'spiderThreadFade .3s ease-out forwards';
-        setTimeout(() => thread.remove(), 400);
-      }, 1200);
+      // Spinnenfaden + sechs laufende Spinnen: eine Pixelart-Canvas-Szene (app-fx-43)
+      if (window.PpFx43) window.PpFx43.alleria({ sx, sy, tx, ty });
     };
     socket.on('alleria_spider_redirect', onAlleriaSpiderRedirect);
     const onDarkControl = ({ owner, heroIdx, zoneSlot }) => {
@@ -46812,33 +46616,12 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       if (!srcEl || !tgtEl) return;
       const sr = srcEl.getBoundingClientRect();
       const tr = tgtEl.getBoundingClientRect();
-      const sx = sr.left+sr.width/2, sy = sr.top+sr.height/2;
-      const tx = tr.left+tr.width/2, ty = tr.top+tr.height/2;
-      const dx = tx-sx, dy = ty-sy;
-      const dist = Math.sqrt(dx*dx+dy*dy);
-      const angle = Math.atan2(dy,dx)*180/Math.PI;
-      // Spawn 3 erratic bolts with slight offsets
-      for (let b = 0; b < 3; b++) {
-        const bolt = document.createElement('div');
-        const yOff = (b - 1) * (4 + Math.random() * 4);
-        const h = 5 + Math.random() * 4;
-        const delay = b * 40;
-        bolt.style.cssText = `position:fixed;left:${sx}px;top:${sy-h/2+yOff}px;width:0;height:${h}px;`
-          + `background:linear-gradient(90deg,transparent,#ffe23d,#ffffff,#ffe23d,transparent);`
-          + `border-radius:${h/2}px;transform-origin:0 50%;transform:rotate(${angle + (Math.random()-0.5)*4}deg);`
-          + `pointer-events:none;z-index:10000;`
-          + `box-shadow:0 0 14px #fad54a,0 0 30px #f9ac20,0 0 50px rgba(255,198,28,.4);`
-          + `animation:lightningBolt .35s ${delay}ms ease-out forwards;--bolt-len:${dist}px;`;
-        document.body.appendChild(bolt);
-        setTimeout(() => bolt.remove(), 450 + delay);
-      }
-      // Impact flash on target
-      const flash = document.createElement('div');
-      flash.style.cssText = `position:fixed;left:${tx-20}px;top:${ty-20}px;width:40px;height:40px;border-radius:50%;`
-        + `background:radial-gradient(circle,rgba(248,248,189,.9),rgba(255,226,61,.5),transparent);`
-        + `pointer-events:none;z-index:10001;animation:petrifyFlash .4s 100ms ease-out forwards;`;
-      document.body.appendChild(flash);
-      setTimeout(() => flash.remove(), 550);
+      // Pixelart-Kettenblitz (app-fx-28.jsx): Fensterkoordinaten; Scrollstand/Welt-Huelle regelt die Funktion selbst.
+      if (window.ppFx28Kettenblitz) window.ppFx28Kettenblitz({
+        sx: sr.left + sr.width / 2, sy: sr.top + sr.height / 2, tx: tr.left + tr.width / 2, ty: tr.top + tr.height / 2,
+        step, sw: sr.width, sh: sr.height, tw: tr.width, th: tr.height,
+        sHeld: srcZoneSlot < 0, tHeld: tgtZoneSlot < 0,
+      });
     };
     socket.on('qinglong_lightning', onQinglongLightning);
     const onRedLightningRain = ({ owner, heroIdx, zoneSlot }) => {
@@ -48777,7 +48560,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       }, 500);
     };
     socket.on('ability_zone_to_discard', onAbilityZoneToDiscard);
-    const onRamAnimation = ({ sourceOwner, sourceHeroIdx, sourceZoneSlot, targetOwner, targetHeroIdx, targetZoneSlot, targetZoneType, targetPermId, cardName, duration, trailType, rueckwaerts }) => {
+    const onRamAnimation = ({ sourceOwner, sourceHeroIdx, sourceZoneSlot, targetOwner, targetHeroIdx, targetZoneSlot, targetZoneType, targetPermId, cardName, duration, trailType, rueckwaerts, durch }) => {
       if (window.playSFX) window.playSFX('attack_ram', { category: 'effect' });
       const srcLabel = ownerLbl(sourceOwner, myIdx);
       const tgtLabel = ownerLbl(targetOwner, myIdx);
@@ -48824,6 +48607,25 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       // ★ v1258 — Weltverankerung: Angreifer und Ziel sind Zonen, die
       // Rammkarte laeuft in der Welt-Huelle; beide Punkte in Feld-Koordinaten.
       const _fo = window.ppFxScrollOffset ? window.ppFxScrollOffset() : { dx: 0, dy: 0 };
+      // ★ Trailer-Look (app-fx-27.jsx): rammt ein HELD mit animierter Figur, fährt die FIGUR (Streckung, Nachbilder, Federung), und die Karte bleibt stehen. Dieselbe Dauer und dieselben
+      // Aufprallanteile wie die Keyframes (`rammeBisKontakt` im Server wartet darauf). Ohne fahrbereite Figur (Kreatur, Held ohne Sheet, versteinert/gelähmt/unsichtbar, tot) → alter Kartenpfad.
+      if (!(sourceZoneSlot != null && sourceZoneSlot >= 0) && window.ppFx27RammFigur) {
+        const fahrt = window.ppFx27RammFigur({ srcEl, tgtEl, dur, trailType, rueckwaerts: !!rueckwaerts, cardName, durch });
+        if (fahrt) {
+          // Nur der Jetpack-Schweif (`MoniaJetTrail`) braucht einen Eintrag: auf Körperhöhe der Figur statt an den Füßen, bis dorthin, wo die Figur landet. `figur: true` → die Zone
+          // blendet dabei NICHTS aus (`isRamming` ignoriert diese Einträge).
+          if (trailType === 'fire') {
+            const sx0 = sr.left + sr.width / 2 + _fo.dx, sy0 = sr.top + sr.height / 2 + _fo.dy + fahrt.koerperDy;
+            const tx0 = tr.left + tr.width / 2 + _fo.dx, ty0 = tr.top + tr.height / 2 + _fo.dy + fahrt.koerperDy;
+            setRamAnims(prev => [...prev, {
+              id, cardName, figur: true, srcX: sx0, srcY: sy0, tgtX: sx0 + (tx0 - sx0) * fahrt.anteil, tgtY: sy0 + (ty0 - sy0) * fahrt.anteil,
+              srcOwner: sourceOwner, srcHeroIdx: sourceHeroIdx, srcZoneSlot: -1, dur, angle: 0, trailType, rueckwaerts: false,
+            }]);
+            setTimeout(() => setRamAnims(prev => prev.filter(a => a.id !== id)), dur + JET_TAIL_MS);
+          }
+          return;
+        }
+      }
       setRamAnims(prev => [...prev, {
         id, cardName,
         srcX: sr.left + sr.width / 2 + _fo.dx, srcY: sr.top + sr.height / 2 + _fo.dy,
@@ -48878,14 +48680,17 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       ctrl = { duelId, bahn: ppHeldenRammenBahn(reach, back), entfernt: false };
       ctrl.entfernen = () => setRamAnims(prev => prev.filter(x => !(x.clash && x.clash.ctrl === ctrl)));
       aktivesRammen[key] = ctrl;                // der Anlauf beginnt, sobald die Karten WIRKLICH stehen (`HeldenRammkarte`) — dasselbe Bild, in dem auch der Pixelart-Aufprall einsetzt
-      const bau = (x, r, c, richtung, wackeln, idx) => ({
+      // ★ Trailer-Look (app-fx-27.jsx): hat ein Held eine fahrbereite Figur, rammt die FIGUR (`figur`, Karte bleibt stehen, die Zone blendet nichts aus); sonst wie bisher die Karte.
+      // `D` = Abstand der Zonenmitten auf dem Bildschirm: der Weg `d` der gemeinsamen Bahn wird als Anteil dieses Abstands auf die Strecke in der Brettebene übertragen.
+      const bau = (x, r, c, richtung, wackeln, idx, selbst, gegner) => ({
         id: duelId + idx, cardName: x.cardName,
         srcX: c.x + _fo.dx, srcY: c.y + _fo.dy, tgtX: c.x + richtung * ux * reach + _fo.dx, tgtY: c.y + richtung * uy * reach + _fo.dy,
         srcOwner: x.owner, srcHeroIdx: x.heroIdx, srcZoneSlot: -1,
         dur: 0, angle: Math.atan2(richtung * uy, richtung * ux) * (180 / Math.PI) + 90,
-        clash: { ctrl, ux: richtung * ux, uy: richtung * uy, w: r.width, h: r.height, wackeln },
+        figur: !!(window.ppFx27KannFigur && window.ppFx27KannFigur(selbst)),
+        clash: { ctrl, ux: richtung * ux, uy: richtung * uy, w: r.width, h: r.height, wackeln, srcEl: selbst, tgtEl: gegner, D: d },
       });
-      const neu = [bau(a, ra, ca, 1, 14, 0), bau(b, rb, cb, -1, -14, 0.5)];
+      const neu = [bau(a, ra, ca, 1, 14, 0, elA, elB), bau(b, rb, cb, -1, -14, 0.5, elB, elA)];
       setTimeout(() => setRamAnims(prev => [...prev, ...neu]), M);      // bis dahin bleibt der Held auf seiner Zone
     };
     socket.on('play_hero_clash', onHeroClash);
@@ -49002,7 +48807,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       }
     };
     socket.on('play_card_transfer', onCardTransfer);
-    const onProjectileAnimation = ({ sourceOwner, sourceHeroIdx, sourceZoneSlot, targetOwner, targetHeroIdx, targetZoneSlot, targetZoneType, emoji, duration, trailClass, emojiStyle, projectileClass, projectileShape, noTrail, baseAngle, sfx, power }) => {
+    const onProjectileAnimation = ({ sourceOwner, sourceHeroIdx, sourceZoneSlot, targetOwner, targetHeroIdx, targetZoneSlot, targetZoneType, emoji, duration, trailClass, emojiStyle, projectileClass, projectileShape, noTrail, baseAngle, sfx, power, landMs }) => {
       // `sfx` (v613): optionaler Klang statt des Standard-`projectile`
       // (Javelin Throw: Wind). Nur Namen aus dem Katalog.
       if (window.playSFX) window.playSFX(sfx || 'projectile', { category: 'effect' });
@@ -49032,6 +48837,31 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       const syPx = sr.top  + sr.height / 2;
       const txPx = tr.left + tr.width / 2;
       const tyPx = tr.top  + tr.height / 2;
+      // Feuerball (🔥 / 🐦‍🔥 ohne eigene Form): Pixelart-Leinwand im Trailer-Look (app-fx-30.jsx); `landMs` = Landezeit (die Engine schickt die Wartezeit mit), sonst 0,85 · duration.
+      if (((emoji || '🐦‍🔥') === '🔥' || (emoji || '🐦‍🔥') === '🐦‍🔥') && !projectileClass && !projectileShape && !trailClass && window.ppFx30Feuerball) {
+        const ende30 = window.ppFx30Feuerball({
+          sx: sxPx, sy: syPx, tx: txPx, ty: tyPx, sw: sr.width, sh: sr.height, tw: tr.width, th: tr.height,
+          sHeld: !(sourceZoneSlot != null && sourceZoneSlot >= 0), tHeld: targetZoneType !== 'surprise' && !(targetZoneSlot !== undefined && targetZoneSlot >= 0),
+          dur, landMs, groesse: (emoji || '🐦‍🔥') === '🐦‍🔥' ? 1.25 : ((emojiStyle && parseFloat(emojiStyle.fontSize) > 0) ? parseFloat(emojiStyle.fontSize) / 44 : 1),
+        });
+        if (ende30) return;
+      }
+      // Sandstrahl (`sandStream`): Pixelart-Leinwand statt 314 einzeln CSS-animierter Elemente (Start-Blockade 50–500 ms, app-fx-30.jsx); `null` → alter Pfad.
+      if (projectileShape === 'sandStream' && window.ppFx30Sand && window.ppFx30Sand({ sx: sxPx, sy: syPx, tx: txPx, ty: tyPx, dur })) return;
+      // Pixelart-Leinwand für die übrigen Geschosse (Pfeil, Speer, Blase, Sand, Bombe, Kugel, Schädel, Taube, Hammer, Fels, Faust, Waschbär, Herz, Schwert …; app-fx-38.jsx). `null` → alter Pfad.
+      if (window.ppFx38 && window.ppFx38Art) {
+        const art38 = window.ppFx38Art({ emoji, projectileShape, projectileClass });
+        if (art38) {
+          const es = emojiStyle || {};
+          const schweif38 = trailClass === 'rocket-fist-trail' ? 'rakete' : trailClass === 'projectile-raccoon-trail' ? 'braun' : trailClass === 'projectile-love-trail' ? 'rosa' : undefined;
+          const ende38 = window.ppFx38({ s: [{
+            art: art38, fs: art38 === 'blase' ? es.width : es.fontSize, sx: sxPx, sy: syPx, tx: txPx, ty: tyPx, dur,
+            kein: !!noTrail, schweif: schweif38, spiegel: txPx < sxPx,
+            farbe: art38 === 'blase' ? { hi: es['--bubble-hi'], mid: es['--bubble-mid'], lo: es['--bubble-lo'], glow: es['--bubble-glow'] } : (art38 === 'geschoss' ? es.color : (art38 === 'pfeil' && emoji ? 'bogen' : undefined)),
+          }] });
+          if (ende38) return;
+        }
+      }
       // Angle in degrees from src → tgt. CSS `rotate(0deg)` points
       // right; 0° here means a horizontal east-bound projectile, so
       // any projectile whose visual natively faces RIGHT (the SVG
@@ -49062,6 +48892,15 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       setTimeout(() => setProjectileAnims(prev => prev.filter(a => a.id !== id)), dur + (projectileShape === 'surefire' ? 700 : projectileShape === 'pressure' ? 800 : projectileShape === 'water' ? 500 : projectileShape === 'magicArrow' ? 600 : 200));
     };
     socket.on('play_projectile_animation', onProjectileAnimation);
+    // ★ PFEILSALVE (app-fx-52.jsx): Angriff mit angeketteten „Arrow"-Artefakten. Die Engine hat die Standard-Animationen der Attack zurueckgehalten und schickt sie als `ersatz` mit;
+    // laeuft die Salve hier nicht (Animationen aus, Retro, reduzierte Bewegung, Zone nicht gefunden), spielt der Client sie selbst ab — sonst entfaellt der Ersatz.
+    const onArrowSalvo = (P) => {
+      let laeuft = false;
+      try { laeuft = !!(window.ppFx52Salve && window.ppFx52Salve(P, { myIdx })); } catch (e) { laeuft = false; }
+      if (laeuft || !P || !Array.isArray(P.ersatz)) return;
+      for (const [ev, data, dt] of P.ersatz) setTimeout(() => { try { (socket.listeners(ev) || []).slice().forEach((fn) => fn(data)); } catch (e) { /* weiter */ } }, Math.min(900, Math.max(0, dt | 0)));
+    };
+    socket.on('play_arrow_salvo', onArrowSalvo);
     // ★ WEAPON STORM (v805, Als Vorgabe): eine Barrage aus 10-20
     // Schwertern, Speeren und Aexten verschiedener Groesse, die in extrem
     // schneller Folge vom Nutzer auf das Ziel schiessen — ein Strahl aus
@@ -49093,6 +48932,21 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       const FACING = { '🗡️': -135, '⚔️': 45, '🪓': 45, '🔱': 90 };
       const n = Math.max(10, Math.min(20, count || 14));
       const STEP = 40;
+      // Pixelart: EINE Leinwand für die ganze Salve (app-fx-38.jsx); `null` → alter Pfad (ein Emoji je Waffe)
+      if (window.ppFx38) {
+        const ART38 = { '🗡️': 'dolch', '⚔️': 'schwert', '🪓': 'axt', '🔱': 'dreizack' };
+        const liste = [];
+        for (let i = 0; i < n; i++) {
+          const emoji = WEAPONS[(i * 5 + Math.floor(Math.random() * 3)) % WEAPONS.length];
+          const jitter = (Math.random() - 0.5) * 34;
+          liste.push({ art: ART38[emoji] || 'schwert', fs: 18 + Math.floor(Math.random() * 22), t0: i * STEP, dur: 240 + Math.floor(Math.random() * 80),
+            sx: sxPx + nx * jitter * 0.4, sy: syPx + ny * jitter * 0.4, tx: txPx + nx * jitter, ty: tyPx + ny * jitter, ang: baseAngle + (Math.random() - 0.5) * 8 });
+        }
+        if (window.ppFx38({ s: liste })) {
+          for (let i = 0; i < n; i += 3) setTimeout(() => { if (window.playSFX) window.playSFX('slash', { category: 'effect', rate: 1.2 + Math.random() * 0.5, dedupe: 30 }); }, i * STEP);
+          return;
+        }
+      }
       for (let i = 0; i < n; i++) {
         setTimeout(() => {
           const emoji = WEAPONS[(i * 5 + Math.floor(Math.random() * 3)) % WEAPONS.length];
@@ -53292,7 +53146,10 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       } else {
         tgtEl = document.querySelector(`[data-hero-zone][data-hero-owner="${tgtLabel}"][data-hero-idx="${targetHeroIdx}"]`);
       }
-      if (phase === 'rise' && srcEl) {
+      // Heilimpuls (app-fx-50): Pixelart-Leinwand statt der CSS-Strahlen (`healBeamRise`/`healBeamStrike`: Verlauf + Schein, vom Laufzeit-Backer abgetastet).
+      // `rise` = die Quelle laedt auf, `strike` = der Impuls fliegt zum Ziel; der Treffer kommt danach als Registry-Animation `heal_sparkle`.
+      const impulsRise = phase === 'rise' && srcEl && window.ppFx50Beam && window.ppFx50Beam('rise', srcEl, tgtEl);
+      if (phase === 'rise' && srcEl && !impulsRise) {
         const sr = srcEl.getBoundingClientRect();
         const beam = document.createElement('div');
         beam.className = 'heal-beam heal-beam-rise';
@@ -53306,6 +53163,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         // `laser` — der Strahl faellt ~350 ms; ohne Sammelkategorie, damit er neben dem Heilklang
         // (`heal_sparkle`, 'effect') und dem Zauberklang nicht verschluckt wird.
         if (window.playSFX) window.playSFX('laser', { category: null, dedupe: 250, rate: 1.2, volume: 0.9 });
+        if (window.ppFx50Beam && window.ppFx50Beam('strike', srcEl, tgtEl)) return;
         const tr = tgtEl.getBoundingClientRect();
         const beam = document.createElement('div');
         beam.className = 'heal-beam heal-beam-strike';
@@ -53673,6 +53531,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       socket.off('play_tharxian_charge', onTharxianCharge);
       socket.off('play_card_transfer', onCardTransfer);
       socket.off('play_projectile_animation', onProjectileAnimation);
+      socket.off('play_arrow_salvo', onArrowSalvo);
       socket.off('play_weapon_barrage', onWeaponBarrage);
       socket.off('butterfly_cloud_animation', onButterflyCloud);
       socket.off('smug_coin_save', onSmugCoinSave);
@@ -54213,7 +54072,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     const entfernen = () => setGameAnims(prev => prev.filter(a => a.id !== id));
     let gestartet = false;
     const _gemountet = () => { if (gestartet) return; gestartet = true; setTimeout(entfernen, dur); };
-    setGameAnims(prev => [...prev, { id, type, x: r.left + r.width / 2 + _wo.dx, y: r.top + r.height / 2 + _wo.dy, w: r.width, h: r.height, welt: _wo.welt, ...options, _gemountet }]);
+    setGameAnims(prev => [...prev, { id, type, x: r.left + r.width / 2 + _wo.dx, y: r.top + r.height / 2 + _wo.dy, w: r.width, h: r.height, welt: _wo.welt, ...(PP_SQUASH_ANIMS.has(type) ? { zoneEl: el } : null), ...options, _gemountet }]);
     setTimeout(() => { if (!gestartet) { gestartet = true; entfernen(); } }, dur + 6000);
   };
 
@@ -54243,6 +54102,28 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       }
     }, vorwaermVerzoegerung);
     return () => clearTimeout(t);
+  }, []);
+  // ★ Mischanimation vorwaermen (Als Befund 2.11.: „Mulligans laggy, der Elana-Effekt ruckelt mittendrin"): das erste `deck_shuffle_fx` (Mulligan, Elana,
+  // Leadership …) backt drei GEDREHTE Kartenrücken in Pixelbilder — am Rechner ~75 ms Hauptthread, auf dem Handy ein Vielfaches, und zwar genau zwischen
+  // Zurücklegen und Ziehen. Einmal unsichtbar mit Bewegung eingehängt (Maß und Rückenbild wie beim echten Mischen), liegen die gedrehten Bilder im
+  // Zwischenspeicher. Nach dem Brettaufbau im Leerlauf, eine Variante nach der anderen (je Maß/Rücken eine).
+  useEffect(() => {
+    if (window._playAnimations === false) return undefined;
+    const timers = [];
+    const t = setTimeout(() => {
+      const fest = new Set(); let n = 0;
+      for (const [sel, url] of [['[data-my-deck]', me.cardback], ['[data-opp-deck]', opp.cardback], ['[data-my-potion-deck]', me.cardback], ['[data-opp-potion-deck]', opp.cardback]]) {
+        const el = document.querySelector(sel); if (!el) continue;
+        const r = el.getBoundingClientRect(); if (!r.width) continue;
+        const bild = url || '/cardback.png';
+        const k = 'deck_shuffle_fx|' + bild + '|' + Math.round(r.width) + 'x' + Math.round(r.height);
+        if (fest.has(k)) continue; fest.add(k);
+        // Leinwand-Fassung (app-fx-44): nur das Rückenbild vorladen (Zellgitter), nichts mehr zu backen
+        const lauf = () => { if (window.ppFx44Vorladen && !window.__ppFxAlt) window.ppFx44Vorladen(bild, r.width, r.height); else if (window.ppAnimVorwaermen) window.ppAnimVorwaermen('deck_shuffle_fx', { w: r.width, h: r.height }, { schluessel: k, bewegung: true, props: { cardbackUrl: bild } }); };
+        timers.push(setTimeout(() => { if (window.requestIdleCallback) requestIdleCallback(lauf, { timeout: 800 }); else lauf(); }, (n++) * 800));
+      }
+    }, vorwaermVerzoegerung + 1500);
+    return () => { clearTimeout(t); timers.forEach(clearTimeout); };
   }, []);
 
   // Listen for potion resolved — trigger explosion animation
@@ -54805,6 +54686,14 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
   const [creatureHealNumbers, setCreatureHealNumbers] = useState([]);
   const [goldGains, setGoldGains] = useState([]);
   const [goldLosses, setGoldLosses] = useState([]);
+  // ★ Klang beim Erhalten von Counters (Baustein `ppZaehlerSummen` oben): Vergleich der Zähler-Summen je Zustand; erster Zustand und Spielwechsel nur merken.
+  const prevZaehlerRef = useRef(null);
+  useEffect(() => {
+    const jetzt = { raum: gameState.roomId, summen: ppZaehlerSummen(gameState) };
+    const vorher = prevZaehlerRef.current;
+    prevZaehlerRef.current = jetzt;
+    if (vorher && vorher.raum === jetzt.raum && ppZaehlerGestiegen(vorher.summen, jetzt.summen)) ppZaehlerKlang();
+  }, [gameState]);
   const prevHpRef = useRef(null);
   const prevCreatureHpRef = useRef(null);
   const prevGoldRef = useRef(null);
@@ -54819,11 +54708,21 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         if (h?.name) currentHp[`${pi}-${hi}`] = { name: h.name, hp: h.hp, owner: ownerLbl(pi, myIdx) };
       }
     }
+    // Allgemeine HP-Anzeige (app-fx-52): bei jeder HP-Aenderung kurz Balken + aktuelle HP am Ziel, zeitgleich mit der Schaden-/Heilzahl.
+    const hpAnz = (kind, pi, hi, si, hp, max) => {
+      if (!window.ppFx52Hp) return;
+      window.ppFx52Hp({ key: kind === 'hero' ? `h:${pi}-${hi}` : `c:${pi}-${hi}-${si}`, kind, owner: pi, heroIdx: hi, zoneSlot: si, hp, max, myIdx });
+    };
     // Compare HP
     if (prevHpRef.current) {
       const newDmgNums = [];
       for (const [key, cur] of Object.entries(currentHp)) {
         const prev = prevHpRef.current[key];
+        if (prev && cur.hp !== prev.hp && prev.name === cur.name) {
+          const [pS, hS] = key.split('-'); hpAnz('hero', +pS, +hS, -1, cur.hp, gameState.players[+pS]?.heroes?.[+hS]?.maxHp);
+          // Heilung: dunkelgruener Blitz auf der Heldenfigur (Schaden: dunkelroter Blitz der Treffer-Reaktion, app-fx-31)
+          if (cur.hp > prev.hp && window.ppFx31Heilung) { try { window.ppFx31Heilung(document.querySelector(`[data-hero-zone][data-hero-owner="${cur.owner}"][data-hero-idx="${+hS}"]`), cur.hp - prev.hp); } catch (e) { /* weg */ } }
+        }
         if (prev && cur.hp < prev.hp) {
           // Skip if this HP decrease was from Toughness removal (not real damage)
           if (toughnessHpSuppressRef.current[key]) {
@@ -54835,11 +54734,13 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           // the bottom of this useEffect so it suppresses BOTH the
           // damage and heal branch this tick, then is cleared.
           if (manualHpSuppressRef.current[key]) continue;
+          // Pfeilsalve: Schadenszahlen und Balken hat die Salve beim Einschlag schon gezeigt (app-fx-52.jsx)
+          if (window.ppFx52Geschluckt && window.ppFx52Geschluckt('h:' + key, 'hp', cur.hp)) continue;
           const dmg = prev.hp - cur.hp;
           const [, hiStr] = key.split('-');
           const heroIdx = parseInt(hiStr);
           newDmgNums.push({ id: Date.now() + Math.random(), amount: dmg, ownerLabel: cur.owner, heroIdx });
-          flashDamageOnZone(`[data-hero-zone][data-hero-owner="${cur.owner}"][data-hero-idx="${heroIdx}"]`);
+          flashDamageOnZone(`[data-hero-zone][data-hero-owner="${cur.owner}"][data-hero-idx="${heroIdx}"]`, dmg);
         }
       }
       if (newDmgNums.length > 0) {
@@ -54913,7 +54814,12 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         // Creature identity changed in this slot — replacement (bounce-
         // place, swap, etc.), not damage. Skip the diff entirely.
         if (prev.name !== cur.name) continue;
+        if (cur.hp !== prev.hp) {
+          const [oS, hS, sS] = key.split('-'), cc = (gameState.creatureCounters || {})[key];
+          hpAnz('creature', +oS, +hS, +sS, cur.hp, cc?.maxHp ?? cc?._cardDataOverride?.hp ?? CARDS_BY_NAME[cur.name]?.hp);
+        }
         if (cur.hp < prev.hp) {
+          if (window.ppFx52Geschluckt && window.ppFx52Geschluckt('c:' + key, 'hp', cur.hp)) continue;   // Pfeilsalve: Zahl schon gezeigt
           const [ownerStr, heroIdxStr, slotStr] = key.split('-');
           const ownerIdx = parseInt(ownerStr);
           const ownerLabel = ownerLbl(ownerIdx, myIdx);
@@ -55057,7 +54963,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           setTimeout(() => playAnimation(animB, selB, { duration: animB === 'bloody_cut' ? 1300 : 900 }), 50);
         }
         // Gained burned → flame strike animation
-        if (cur.burned && !prev.burned) {
+        if (cur.burned && !prev.burned && !(window.ppFx52Geschluckt && window.ppFx52Geschluckt('h:' + key, 'burn'))) {   // Pfeilsalve: der Brand-Einschlag lief schon in der Salve
           const sel = `[data-hero-zone][data-hero-owner="${ownerLabel}"][data-hero-idx="${hi}"]`;
           const animType = cur.burned?.animationType || 'flame_strike';
           setTimeout(() => playAnimation(animType, sel, { duration: 1000 }), 50);
@@ -56955,7 +56861,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           // Only hero-originated rams hide the hero tile during flight —
           // creature-originated rams (Haressassin etc., `srcZoneSlot >= 0`)
           // animate their own support slot and must leave the hero visible.
-          const isRamming = ramAnims.some(r => r.srcOwner === pi && r.srcHeroIdx === i && (r.srcZoneSlot == null || r.srcZoneSlot < 0));
+          const isRamming = ramAnims.some(r => !r.figur && r.srcOwner === pi && r.srcHeroIdx === i && (r.srcZoneSlot == null || r.srcZoneSlot < 0));
           // ★ v1462 (Als Vorgabe 27.9.): Steht eine animierte Figur auf der
           // Karte, zeigt SIE die Status (Partikel, Tönung, Eis, Stein) — die
           // Status-Overlays der Karte entfallen dann (doppelt und teuer).
@@ -57238,7 +57144,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                     >{lad.remaining}</div>
                   );
                 })()}
-                {isDead && hero?.name && <div className="hero-dead-marker">🪦</div>}
+                {isDead && hero?.name && (window.PpFx37Tote ? <window.PpFx37Tote name={hero.name} /> : <div className="hero-dead-marker" aria-hidden="true" />)}
                 {/* ★ v1450: Idle-Animation lebender Helden über dem oberen
                     Kartendrittel. Tot oder im Rammflug → gar nicht da.
                     Gelähmt (Frozen/Stunned/Webbed) → Frame steht still;
@@ -57268,6 +57174,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                       isCursed ? 'cursed' : '',
                       hero.statuses?.charmed ? 'charmed' : '',
                     ].filter(Boolean).join(' ')}
+                    statusIcons={{ burn: !!isBurned, poison: isPoisoned ? (hero.statuses?.poisoned?.stacks || 1) : 0, bleed: !!isBleeding }}
                     versteinert={!!(isStunned?._petrified || isStunned?._baihuPetrify || hatSteinhaut)}
                     unsichtbar={!!isInvisible}
                     // Ausgegraut wie die Heldenzone selbst (Zone traegt `board-zone-dead` bzw. wird bei der Klick-Wahl abgedunkelt):
@@ -57284,7 +57191,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                   ] : [React.cloneElement(basis, { key: 'haupt' })];
                 })()}
                 {/* Aufstiegs-Morph: weisses Licht ueber der Karte; der Kartenwechsel (Sync) faellt in den Hoehepunkt. */}
-                {aufstiegHier && hero?.name && <div className="hero-aufstieg-karte" />}
+                {aufstiegHier && hero?.name && !window.ppFx33Pose && <div className="hero-aufstieg-karte" />}
                 {/* v1462: mit animierter Figur (`figurDa`) übernimmt die Figur
                     die Darstellung; die Gift-Stapelzahl bleibt als Zahl. */}
                 {hero?.name && !figurDa && isFrozen && <FrozenOverlay />}
@@ -57292,7 +57199,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                   && (hero.statuses?.stunned || !hero.statuses?.webbed)
                   && <div className="status-stunned-overlay"><div className="stun-bolt s1" /><div className="stun-bolt s2" /><div className="stun-bolt s3" /></div>}
                 {/* ★ 26.9.: Crimson Web — statt der Betaeubungsblitze das rote Netz. */}
-                {hero?.name && !figurDa && <CrimsonWebOverlay aktiv={!!hero.statuses?.webbed} />}
+                {hero?.name && !figurDa && (window.PpFx41Netz && !window.__ppFxAlt ? <window.PpFx41Netz aktiv={!!hero.statuses?.webbed} /> : <CrimsonWebOverlay aktiv={!!hero.statuses?.webbed} />)}
                 {hero?.name && !figurDa && (isStunned?._petrified || isStunned?._baihuPetrify) && <div className="baihu-petrify-overlay" />}
                 {hero?.name && !figurDa && isNegated && !isNegated._byWeakeningCrystal && <NegatedOverlay />}
                 {hero?.name && !figurDa && isBurned && <BurnedOverlay ticking={burnTickingHeroes.includes(`${pi}-${i}`)} />}
@@ -57308,7 +57215,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                     die Bedingung davor war eine zweite Liste aller Status, die
                     jeder neue Status verfehlen konnte (v1142: „Aged"; nie in
                     ihr standen auch Bleeding und Charmed). */}
-                {hero?.name && <StatusBadges statuses={{ ...(hero.statuses || {}), _extraLife: hero._extraLife, _extraLifeStack: hero._extraLifeStack, _oneShotDmgShields: hero._oneShotDmgShields, _targetBlockers: hero._targetBlockers, _pythiaMark: hero._pythiaMark }} buffs={hero.buffs} isHero={true} player={p} cardName={hero.name} isOpponentSide={isOpp} />}
+                {hero?.name && <StatusBadges statuses={{ ...(hero.statuses || {}), _extraLife: hero._extraLife, _extraLifeStack: hero._extraLifeStack, _oneShotDmgShields: hero._oneShotDmgShields, _targetBlockers: hero._targetBlockers, _pythiaMark: hero._pythiaMark }} buffs={hero.buffs} isHero={true} player={p} cardName={hero.name} isOpponentSide={isOpp} ohneZahl={figurDa} />}
                 {/* ★ v1342: Immune/Shielded sind STATUS — sie stehen jetzt auch beim
                     Helden in der linken Status-Spalte (wie bei Kreaturen), nicht
                     mehr als eigenes Schild oben rechts. */}
@@ -59402,7 +59309,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
             {/* Porträt im verzierten Pixelrahmen in der Farbe des Spielers
                 (`.pp-portraet`, style.css). Im Tutorial: Monia Bot bzw.
                 Antonia mit eigenem Bild und eigener Farbe. */}
-            <span className="pp-portraet" style={{ '--portraet': opp.color || '#ec2d62' }}>
+            <span className="pp-portraet" style={oppPortraetRing ? { '--portraet': opp.color || '#ec2d62', '--pp-ring': oppPortraetRing } : { '--portraet': opp.color || '#ec2d62' }}>
               {/* `result ? '' : …` statt `!result && …`: der &&-Ausdruck liefert bei gesetztem Ergebnis das BOOLEAN false, und `'…-big' + false` haengt woertlich "false" an den Klassennamen. Aus `game-hand-avatar-crop` wurde `game-hand-avatar-cropfalse` — der quadratische Rahmen fiel weg und der HeroArtCrop lief auf seine volle 135px-Breite aus, der Avatar wurde also im End-Screen ploetzlich breiter. */}
               <HandPortraet
                 src={tutorialGegner ? tutorialGegner.avatar : opp.avatar}
@@ -59935,7 +59842,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                 }
                 return false;
               });
-              return hasGatheringStorm ? <GatheringStormOverlay /> : null;
+              return hasGatheringStorm ? (window.PpFx41Sturm && !window.__ppFxAlt ? <window.PpFx41Sturm /> : <GatheringStormOverlay />) : null;
             })()}
             {(() => {
               // Prophecy of Tempeste — same shape as Gathering Storm.
@@ -60434,10 +60341,10 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         {/* My hand (bottom player) — drag to reorder for players, face-down for spectators */}
         <div className="game-hand game-hand-me" ref={isSpectator ? undefined : handRef} style={{ '--hand-accent': me.color || '#66b6ff' }}>
           <HandAmbiance color={me.color} />
-          <div className="game-hand-info" ref={speechMeRef} style={meAvatarHighlight}>
+          <div className="game-hand-info" ref={speechMeRef}>
             {/* Porträt im verzierten Pixelrahmen in der Farbe des Spielers
                 (`.pp-portraet`, style.css). */}
-            <span className="pp-portraet" style={{ '--portraet': me.color || '#66b6ff' }}>
+            <span className="pp-portraet" style={mePortraetRing ? { '--portraet': me.color || '#66b6ff', '--pp-ring': mePortraetRing } : { '--portraet': me.color || '#66b6ff' }}>
               <HandPortraet src={me.avatar} heroName={portraetHeld(me)}
                 zustand={result ? '' : ((isMyTurn || meBarking) ? ' avatar-active' : ' avatar-inactive')} />
               <span className="pp-portraet-zier" aria-hidden="true" />
@@ -61010,7 +60917,15 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       ))}
 
       {/* v1331: Magische Faeden (mehrere Quellen → ein Ziel) — Welt-Huelle */}
-      {tetherAnims.length > 0 && (
+      {/* Pixelart-Faeden (app-fx-41.jsx, eine Leinwand je Ereignis); die SVG-Fassung darunter bleibt nur als Rueckfall. */}
+      {tetherAnims.length > 0 && window.PpFx41Faeden && !window.__ppFxAlt && (
+        <div className="fx-welt-lock" style={{ zIndex: 10195 }}>
+          {tetherAnims.map(t => (
+            <window.PpFx41Faeden key={t.id} x={t.ziel.x} y={t.ziel.y} faeden={t.faeden} dur={t.dur} color={t.color} glow={t.glow} />
+          ))}
+        </div>
+      )}
+      {tetherAnims.length > 0 && !(window.PpFx41Faeden && !window.__ppFxAlt) && (
         <PixelHuelle className="tether-animation-container fx-welt-lock">
           <svg>
             {tetherAnims.map(t => (
@@ -61111,6 +61026,9 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       {ramAnims.map(r => r.clash ? (
         /* Duel (12.10.): zwei Helden rammen einander — Bahn und Richtung kommen aus `onHeroClash` (`HeldenRammkarte`) */
         <HeldenRammkarte key={r.id} r={r} />
+      ) : r.figur ? (
+        /* Rammen mit der Figur (app-fx-27.jsx): die Figur fährt in der Sprite-Ebene, hier liegt nur der Jetpack-Schweif */
+        r.trailType === 'fire' ? <MoniaJetTrail key={r.id} r={r} /> : null
       ) : (
         <React.Fragment key={r.id}>
           {/* v672: Der Schweif darf NICHT im Kartenelement liegen — dort
@@ -61157,7 +61075,9 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           flash, splinters, debris chunks) detonates at the target
           right when the horse lands. */}
       <div className="fx-welt-lock" style={{ zIndex: 10130 }}>{/* v1258 Welt-Huelle (Ebene des Pferds) */}
-      {tharxianHorseAnims.map(h => (
+      {tharxianHorseAnims.map(h => (window.PpFx41Pferd && !window.__ppFxAlt) ? (
+        <window.PpFx41Pferd key={h.id} x={h.srcX} y={h.srcY} tx={h.tgtX - h.srcX} ty={h.tgtY - h.srcY} dur={h.dur} nachRechts={h.facingRight} />
+      ) : (
         <React.Fragment key={h.id}>
           {/* The horse + dust trail (translates from src to tgt) */}
           <div className="tharxian-horse-anim" style={{
@@ -61315,7 +61235,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       ) : p.projectileShape === 'darkBlast' ? (
         <DunkelBlastStrahl key={p.id} p={p} />
       ) : p.projectileShape === 'surefire' ? (
-        <WeissPfeil key={p.id} p={p} />
+        (window.PpFx41Surefire && !window.__ppFxAlt) ? <window.PpFx41Surefire key={p.id} x={p.srcX} y={p.srcY} tx={p.tgtX - p.srcX} ty={p.tgtY - p.srcY} dur={p.dur || 170} /> : <WeissPfeil key={p.id} p={p} />
       ) : p.projectileShape === 'pressure' ? (
         <DruckGeschoss key={p.id} p={p} />
       ) : p.projectileShape === 'water' ? (
@@ -61451,14 +61371,14 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       {cameraFlash && (
         <div className="camera-flash-overlay">
           <div className="camera-flash-icon">
-            <svg viewBox="0 0 100 100" width="120" height="120">
+            {window.PpFx41Kamera && !window.__ppFxAlt ? <window.PpFx41Kamera /> : <svg viewBox="0 0 100 100" width="120" height="120">
               <rect x="20" y="30" width="60" height="45" rx="8" fill="#fc69c6" stroke="#fff" strokeWidth="2"/>
               <circle cx="50" cy="52" r="14" fill="#222" stroke="#fff" strokeWidth="2"/>
               <circle cx="50" cy="52" r="8" fill="#1ca9fd"/>
               <rect x="38" y="24" width="24" height="10" rx="3" fill="#fc69c6" stroke="#fff" strokeWidth="1.5"/>
               <ellipse cx="28" cy="22" rx="10" ry="16" fill="none" stroke="#fc69c6" strokeWidth="2" transform="rotate(-30 28 22)"/>
               <ellipse cx="72" cy="22" rx="10" ry="16" fill="none" stroke="#fc69c6" strokeWidth="2" transform="rotate(30 72 22)"/>
-            </svg>
+            </svg>}
           </div>
         </div>
       )}
@@ -61901,6 +61821,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           showTextBox(null);
           setShowSurrender(false);
           if (window.stopSFX) { window.stopSFX('victory'); window.stopSFX('defeat'); }   // v1146
+          if (gameState.isTutorial) window._ppTutorialRetry = true;   // Neuer Versuch: die Einleitung nicht noch einmal abspielen (app-screens)
           socket.emit('retry_puzzle', { roomId: gameState.roomId });
         };
         return (
@@ -63319,7 +63240,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       {announcement && (
         <div className={'game-announcement' + (announcement.short ? ' game-announcement-short' : '')}
           onClick={() => setAnnouncement(null)} style={{ cursor: 'pointer' }}>
-          <div className="game-announcement-text" style={{ color: announcement.color }}>
+          <div className="game-announcement-text" data-text={announcement.text} style={{ color: announcement.color, ...ansageToene(announcement.color) }}>
             {announcement.text}
           </div>
         </div>
@@ -63449,7 +63370,10 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       )}
 
       {/* ── Puzzle / Tutorial Result Overlay ── */}
-      {result && result.isPuzzle && !tutorialOutroPending && (() => {
+      {/* Siegerschirm erst nach dem Abschlussmonolog (`tutorialOutroDone`) — ohne diese Sperre stand er zwischen Ergebnis und Monolog kurz im Bild. */}
+      {result && result.isPuzzle && !tutorialOutroPending
+        && !(result.isTutorial && result.puzzleResult === 'success' && (window.TUTORIAL_SCRIPTS || {})[window._currentTutorialNum]?.outro && !tutorialOutroDone)
+        && (() => {
         // The final tutorial (script flagged `isFinalTutorial: true`) gets
         // a celebratory upgrade: big multi-colored fireworks + a beefier
         // "TUTORIAL CLEARED!" banner instead of the usual "STAGE CLEARED!".
@@ -63503,7 +63427,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 10, alignItems: 'center' }}>
                 <button className="btn" style={{ padding: '10px 28px', fontSize: 13, width: 220, borderColor: 'var(--accent)', color: 'var(--accent)' }}
-                  onClick={() => { if (window.stopSFX) { window.stopSFX('victory'); window.stopSFX('defeat'); } socket.emit('retry_puzzle', { roomId: gameState.roomId }); }}>
+                  onClick={() => { if (window.stopSFX) { window.stopSFX('victory'); window.stopSFX('defeat'); } if (result?.isTutorial) window._ppTutorialRetry = true; socket.emit('retry_puzzle', { roomId: gameState.roomId }); }}>
                   🔄 Retry
                 </button>
                 <button className="btn btn-danger" style={{ padding: '10px 28px', fontSize: 13, width: 220 }}

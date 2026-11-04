@@ -576,7 +576,8 @@ function PuzzleCreator() {
   });
   // Collapse the filter sidebar to reclaim its width for a wider card
   // grid (3 → 5 columns), mirroring the deck builder's collapsible filters.
-  const [puzzleFiltersCollapsed, setPuzzleFiltersCollapsed] = useState(false);
+  // Handy quer: die Galerie bekommt den Platz der Filter (5 statt 3 Spalten); ▾ FILTERS klappt sie auf (Als Befund 2.11.).
+  const [puzzleFiltersCollapsed, setPuzzleFiltersCollapsed] = useState(() => !!(window.matchMedia && window.matchMedia('(max-height: 500px)').matches));
   // Geometrie des Suchpanels, gespiegelt aus style.css:
   //   .pz-search-panel   width: 580px
   //   .pz-filter-sidebar width: 200px + 1px border-right

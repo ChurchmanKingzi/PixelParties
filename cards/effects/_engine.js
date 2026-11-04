@@ -37,6 +37,7 @@ const ASCENSION_GRANT_TESTFENSTER = false;
 // Sync nach `hero_ascension` aus — der Kartenwechsel faellt in den weissen Hoehepunkt
 // bei ~45 % der Animation.
 const ASCENSION_MORPH_SYNC_MS = 900;
+const ASCENSION_REAKTION_ABLAGE_VORLAUF_MS = 260;   // Trample Sounds fliegt zuerst, der gewählte Zauber folgt nach so vielen ms (Al 30.10.)
 
 const MAX_CHAIN_DEPTH = 10;   // Prevent infinite chain loops
 // Safety caps to terminate runaway trigger fan-out / infinite summons
@@ -6513,7 +6514,14 @@ class GameEngine {
           ? cardInstance.heroOwner
           : (effectiveController ?? cardInstance.owner ?? -1);
         const casterHeroIdx = cardInstance.heroIdx ?? -1;
-        const casterHeroFlag = (flagOwner >= 0 && casterHeroIdx >= 0)
+        // ★ Als Befund 31.10. (Cute Hydra: „die CPU greift trotz mehrerer Head Counters nur EIN Ziel an"): die Ein-Ziel-Flaggen des Helden
+        // (Toras „never more than 1 target with an Attack", Idas Destruction Spells, Friedhelms Aktivierung) gelten fuer seine ATTACKS und
+        // ZAUBER. Der EFFEKT einer Kreatur in seiner Spalte (Hydra: „up to as many different targets as Head Counters") ist keins von beidem —
+        // `cardInstance.heroIdx` einer Kreatur ist nur die Spalte, in der sie liegt. Ein Zauber, den eine Kreatur wirkt (Demon's Gate,
+        // `_creatureCasterForSource`), behaelt die Flagge seines Gastgeber-Helden.
+        const _kreaturenEffekt = !cardInstance._creatureCasterForSource
+          && require('./_hooks').isCreatureSource(engine, cardInstance);
+        const casterHeroFlag = (!_kreaturenEffekt && flagOwner >= 0 && casterHeroIdx >= 0)
           ? engine.heroFlagsLive(flagOwner, casterHeroIdx)
           : null;
         const forceSingleByIda = !!(casterHeroFlag?.forcesSingleTarget
@@ -10505,11 +10513,14 @@ class GameEngine {
     }
 
     const actualAmount = Math.max(0, hookCtx.amount);
+    // Pfeilsalve (nur Darstellung): die Salve zeigt den REELLEN Schaden Pfeil fuer Pfeil (auch die 0 von Hydra Blood Arrow); der HP-Abzug folgt nach ihrer Dauer.
+    const _salveGespielt = (type === 'attack' && target && target.hp !== undefined && target.hp > 0 && !this._inMctsSim && !this._fastMode)
+      ? await require('./_arrows-shared').pfeilSalve(this, source, target, { amount: actualAmount, hpVor: target.hp, maxHp: target.maxHp }) : false;
     // Null-Floater (v690): kam Schaden > 0 herein und geht 0 raus —
     // egal ob Buff, flat Reduktion (Tempeste), Deckel oder
     // Handreaktion —, zeigt der Held eine rote 0. Der HP-Diff-Detektor
     // des Clients feuert bei unveraenderten HP nicht.
-    if (target?.hp !== undefined && _eingangsBetrag > 0 && actualAmount === 0) {
+    if (target?.hp !== undefined && _eingangsBetrag > 0 && actualAmount === 0 && !_salveGespielt) {
       this._flashHeroDamageZero(target);
     }
     const hpBefore = (target && target.hp !== undefined) ? target.hp : actualAmount;
@@ -10751,6 +10762,9 @@ class GameEngine {
         }
       }
 
+      if (_atkBoni && target.hp > 0 && !this._inMctsSim && !this._fastMode) {
+        await require('./_arrows-shared').pfeilSalve(this, source, target, { amount: Math.min(amount, target.hp), hpVor: target.hp, maxHp: target.maxHp });   // Pfeilsalve (nur Darstellung)
+      }
       const hpBefore = target.hp;
       target.hp = Math.max(0, target.hp - amount);
       const dealt = hpBefore - target.hp;
@@ -26217,6 +26231,7 @@ this._deathWatch = (this._deathWatchStack || []).length
         fromZone: 'hand', pool: quelle, poolIndex: handIndex, by: config.title, excludeTargets: config.excludeTargets,
         zusageEintrag: zusage,   // v1303: Auftritt beim BEGINN der Aufloesung
         alsZusatzaktion: true,   // v1352: als ausgefuehrte Aktion melden
+        ...(typeof config.ablageVorspann === 'function' ? { ablageVorspann: config.ablageVorspann } : {}),   // Trample Sounds: legt sich VOR dem Flug dieses Zaubers ab
         ...(_leihSeite != null ? { heroOwner: _leihSeite } : {}),   // Als Vorgabe 29.9.
       });
       if (r.cancelled) { this._zusageAuftrittVerwerfen(zusage); return { retry: true }; }
@@ -26639,6 +26654,9 @@ this._deathWatch = (this._deathWatchStack || []).length
       });
       if (_attaLoescht) ps.deletedPile.push(cardName); else ps.discardPile.push(cardName);
     } else {
+      // ★ Vorlauf (Trample Sounds in the Forest, Al 30.10.): eine Karte, die mit diesem Zauber ablaufen soll, fliegt ZUERST (kurzer Abstand), dann der Zauber.
+      // Vor der Indexbestimmung: ihre Entnahme verschiebt die Handplätze.
+      if (typeof opts.ablageVorspann === 'function') { const _v = opts.ablageVorspann; opts.ablageVorspann = null; await _v(); }
       const _endIdx = (pool[poolIndex] === cardName) ? poolIndex : pool.indexOf(cardName);   // Ancient Guardian Statue: die GEWÄHLTE Kopie verlässt die Hand (Handindex-Felder hängen an der Kopie), nicht die erste gleichen Namens
       if (_endIdx >= 0) {
         // W63c: gestohlene Handkarte (Sofort-Guss: Hu, Coffee, Learning …) → Ablage des permanenten Besitzers; Herkunft VOR dem Splice
@@ -33595,6 +33613,7 @@ this._deathWatch = (this._deathWatchStack || []).length
       const proj = schonGezeigt.proj ? null : bilder.projectile;
       if (proj && ziele.length > 0 && (isSeat(this, daten.owner))) {
         const stagger = bilder.stagger ?? 0;
+        const flug = bilder.flightMs ?? Math.max(120, (proj.duration || 500) - 70);
         for (let i = 0; i < ziele.length; i++) {
           const t = ziele[i];
           this._broadcastEvent('play_projectile_animation', {
@@ -33602,11 +33621,11 @@ this._deathWatch = (this._deathWatchStack || []).length
             sourceZoneSlot: daten.zoneSlot,
             targetOwner: t.owner, targetHeroIdx: t.heroIdx,
             targetZoneSlot: t.type === 'hero' ? undefined : t.slotIdx,
+            landMs: flug + (ziele.length - 1 - i) * stagger,   // Client (Feuerball, app-fx-30): so lange bis zum Einschlag — rein visuell, die Wartezeit bleibt `flug`
             ...proj,
           });
           if (stagger > 0 && i < ziele.length - 1) await this._delay(stagger);
         }
-        const flug = bilder.flightMs ?? Math.max(120, (proj.duration || 500) - 70);
         await this._delay(flug);
       }
 
@@ -43724,8 +43743,10 @@ this._deathWatch = (this._deathWatchStack || []).length
         castingSeite = _plan.casterSeite ?? pi;
       }
 
-      // Consume from hand + pay gold
-      ps.hand.splice(hi, 1);
+      // Pay gold. ★ Die Karte BLEIBT sichtbar in der Hand (Al 30.10.: „bleibt sichtbar auf der Hand, bis ihr gewählter Spell confirmed ist, dann fliegen sie
+      // UND ihr gewählter Spell mit kurzem Delay — erst Trample Sounds, dann der Spell — zum Discard"). Solange sie dort liegt, zählt sie nicht als Handkarte
+      // (`mitZusatzAufloesung`, siehe unten); abgelegt wird sie in `_aszAblegen` — im Vorlauf des Flugs des gewählten Zaubers (`ablageVorspann`) oder, wenn
+      // kein Zauber aus der Hand gewirkt wird (Kreatur, Ability, Abbruch), am Ende der freien Aktion.
       await this._rxPay(ps, cost, { cardName });
       this.notePlayedFromHand(pi);
 
@@ -43735,33 +43756,57 @@ this._deathWatch = (this._deathWatchStack || []).length
 
       this.log('ascension_reaction', { card: cardName, player: ps.username, hero: ascendedName });
 
+      // Ablegen der ausgespielten Karte: Flug Hand → Ablage VOR der Entnahme, dann Entnahme, Ablage und Abgleich in einem Zug (Hausregel wie beim
+      // Sofort-Guss; eine gestohlene Handkarte geht in die Ablage ihres Besitzers). Idempotent. `mitVorlauf`: nach dem Flug kurz warten, damit der
+      // Flug des gewählten Zaubers gleich danach als zweiter folgt.
+      let _aszAbgelegt = false;
+      const _aszAblegen = async (mitVorlauf) => {
+        if (_aszAbgelegt) return;
+        _aszAbgelegt = true;
+        const idx = ps.hand[hi] === cardName ? hi : ps.hand.indexOf(cardName);
+        if (idx < 0) return;   // während der Aktion schon aus der Hand verschwunden (abgeworfen, gestohlen …)
+        const besitzer = this._consumeHandCardOrigin(pi, cardName, idx);   // VOR dem Splice
+        this._broadcastEvent('play_pile_transfer', {
+          owner: pi, cardName, from: 'hand', to: 'discard', fromHandIdx: idx,
+          ...(besitzer !== pi ? { fromOwner: pi, toOwner: besitzer } : {}),
+        });
+        ps.hand.splice(idx, 1);
+        (this.gs.players[besitzer] || ps).discardPile.push(cardName);
+        this.sync();   // sofort abgleichen: die Hand rückt auf, während die Karte fliegt (Wächter `check-hand-flight-sync`)
+        if (mitVorlauf) await this._delay(ASCENSION_REAKTION_ABLAGE_VORLAUF_MS);
+      };
+
       // Wisdom (level-gap coverage) — same contract as post-target
       // reactions. Pay BEFORE resolution so a turn-end fired during
       // the reaction (Flashbang / Terror) can't skip the cost.
-      const wisdomCost = (!isArtifact && castingHeroIdx >= 0)
-        ? this._rxWisdomKosten(pi, castingSeite, castingHeroIdx, cardData)
-        : 0;
-      if (wisdomCost > 0) {
-        await this.actionPromptForceDiscard(pi, wisdomCost, {
-          title: 'Wisdom Cost', source: 'Wisdom', selfInflicted: true,
-        });
-      }
-
-      // Resolve
-      this._inAscensionReactionCheck = true;
-      try {
-        if (script.ascensionReactionResolve) {
-          await script.ascensionReactionResolve(this, pi, castingHeroIdx, ascendedHeroIdx, heroOwner);
+      // Die Karte liegt dabei noch in der Hand: sie ist keine abwerfbare Handkarte (`mitZusatzaufloesung`).
+      await require('./_hand-resolve').mitZusatzAufloesung(ps, cardName, async () => {
+        const wisdomCost = (!isArtifact && castingHeroIdx >= 0)
+          ? this._rxWisdomKosten(pi, castingSeite, castingHeroIdx, cardData)
+          : 0;
+        if (wisdomCost > 0) {
+          await this.actionPromptForceDiscard(pi, wisdomCost, {
+            title: 'Wisdom Cost', source: 'Wisdom', selfInflicted: true,
+          });
         }
-      } finally {
-        this._inAscensionReactionCheck = false;
-      }
+
+        // Resolve
+        this._inAscensionReactionCheck = true;
+        try {
+          if (script.ascensionReactionResolve) {
+            await script.ascensionReactionResolve(this, pi, castingHeroIdx, ascendedHeroIdx, heroOwner, { vorspann: () => _aszAblegen(true) });
+          }
+        } finally {
+          this._inAscensionReactionCheck = false;
+        }
+        await _aszAblegen(false);   // Rückfall: kein Zauber aus der Hand gewirkt (Kreatur, Ability, Abbruch) → jetzt ablegen
+      });
 
       // Parity with post-target reactions: fire afterSpellResolved for
       // Spell-type ascension reactions so hero passives like Zsos'Ssar
       // (Decay-Spell Poison cost), Beato's orb collector, etc., still
       // trigger on this cast. Artifacts don't fire spell hooks.
-      const _aszBuddy = this.reaktionsBuddyTicket(pi, cardName, script, { inDerAblage: false });   // W67a: diese Karte wird erst NACH dem Hook abgelegt
+      const _aszBuddy = this.reaktionsBuddyTicket(pi, cardName, script, { inDerAblage: true });   // W67a: die Karte liegt seit dem Ausspielen in der Ablage (Inyas Buddy nimmt sie von dort)
       if (!isArtifact && (cardData?.cardType === 'Spell' || cardData?.cardType === 'Attack') && castingHeroIdx >= 0) {   // v1154: auch Attacks
         try {
           await this.runHooks('afterSpellResolved', {
@@ -43779,9 +43824,7 @@ this._deathWatch = (this._deathWatchStack || []).length
       // v1157: Handlung des Wirkers („performs an Action")
       await this._rxAufgeloest(ps, cardName, castingHeroIdx, { spellHook: false, heroOwner: castingSeite });
 
-      // Discard the spent card
-      const _aszPs = this.handKartenBesitzerPs(ps, cardName);   // W63c: Ablage des permanenten Besitzers (gestohlene Handkarte)
-      if (!_aszBuddy.token) _aszPs.discardPile.push(cardName);   // W67a: Inyas Fantasy Buddy ersetzt die Ablage
+      // (Die ausgespielte Karte liegt schon in der Ablage — siehe oben; Inyas Fantasy Buddy nimmt sie über `_aszBuddy` von dort.)
       this.sync();
       // (Wisdom discard was paid earlier — see comment above.)
 
@@ -46833,6 +46876,8 @@ this._deathWatch = (this._deathWatchStack || []).length
             this._rxResolvingCard = link.cardName;
             let result;
             const _hoptVorher = link.isInitialCard ? this._hoptAbzug() : null;
+            // Pfeilsalve (nur Darstellung): hat der Angreifer Pfeile an der Kette, haelt das Schild die Standard-Animationen der Attack zurueck (`_arrows-shared.js`).
+            const _pfeilSchild = (link.isInitialCard && link.cardType === 'Attack') ? require('./_arrows-shared').pfeilSchildOeffnen(this, chain, link) : null;
             try {
               result = await link.resolve(chain, i);
               // W16d (A09-09): Nachaufloesung am Glied (Arrow Slit: zweite Aktivierung unmittelbar nach der ersten).
@@ -46840,6 +46885,7 @@ this._deathWatch = (this._deathWatchStack || []).length
             } finally {
               this._rxResolvingOwner = _vorherAufloeser;
               this._rxResolvingCard = _vorherKarte;
+              if (_pfeilSchild) require('./_arrows-shared').pfeilSchildSchliessen(this, _pfeilSchild);
             }
             if (link.isInitialCard) link.resolveResult = this._applyDiscardOutDecline(link.cardName, result, _hoptVorher);
           } catch (err) {
@@ -57194,7 +57240,10 @@ this._deathWatch = (this._deathWatchStack || []).length
         // creature. Heroes already get visible feedback via the
         // 0 hp-delta path being a no-op; creatures didn't, so
         // this is creature-only on purpose.
-        if (!e._nullGezeigt) {
+        // Pfeilsalve (nur Darstellung): die Salve zeigt die 0 selbst (und haelt die Anzeige bis zum Ende zurueck)
+        const _salveKr = (e.type === 'attack' && !this._inMctsSim && !this._fastMode)
+          ? await require('./_arrows-shared').pfeilSalve(this, e.source, e.inst, { amount: 0, hpVor: e.inst.counters.currentHp, maxHp: e.inst.counters.maxHp }) : false;
+        if (!e._nullGezeigt && !_salveKr) {
           this._broadcastEvent('creature_damage_floater', {
             owner: this.physicalSide(e.inst),
             heroIdx: e.inst.heroIdx,
@@ -57315,6 +57364,9 @@ this._deathWatch = (this._deathWatchStack || []).length
         }
       }
 
+      if (e.type === 'attack' && !this._inMctsSim && !this._fastMode) {
+        await require('./_arrows-shared').pfeilSalve(this, e.source, e.inst, { amount: actualAmount, hpVor: e.inst.counters.currentHp, maxHp: e.inst.counters.maxHp });   // Pfeilsalve (nur Darstellung)
+      }
       const creatureHpBefore = e.inst.counters.currentHp;
       e.inst.counters.currentHp -= actualAmount;
       // Generic damage-tracking flag — mirrors the hero path above.
@@ -59296,6 +59348,9 @@ this._deathWatch = (this._deathWatchStack || []).length
   _broadcastEvent(event, data, opts) {
     if (this._aborted) return;
     if (this._fastMode) return; // Silent during MCTS simulations.
+    // Pfeilsalve: die Standard-Animationen einer Attack mit Pfeilen werden zurueckgehalten und reisen mit `play_arrow_salvo` (Fallback fuer Clients ohne Salve).
+    if (event === 'reaction_chain_done' && this._pfeilSchild && !this._pfeilSchild.aktiv && !this._pfeilSchild.fertig) this._pfeilSchild.aktiv = true;   // Pfeilsalve: ab Kettenende scharf
+    if (this._pfeilSchild && this._pfeilSchild.aktiv && require('./_arrows-shared').PFEIL_SCHILD_EVENTE.has(event)) { this._pfeilSchild.puffer.push([event, data, opts, Date.now()]); return; }
     // W6: Tokens fliegen nicht zu einem Stapel, sie zerfallen (`token_disintegrate`, siehe `_tokenZerfallSenden`).
     if (event === 'play_pile_transfer') { data = this._tokenStapelFlug(data); if (!data) return; }
     // 23.10. (Luck, Liquid Luck — „Whenever your opponent plays a card"): die Reaktionsfenster und selbstspielenden Reaction-Karten melden ihren Play nur als Flug mit

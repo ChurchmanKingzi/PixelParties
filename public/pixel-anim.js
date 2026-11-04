@@ -50,6 +50,8 @@
     direkt: true,        // Blaetter ohne Kinder animieren `mask-image` selbst statt ueber eine vererbte Variable
     hauptfaden: true,    // W86p: gebackene Animationen mit einer wirkungslosen, nicht kompositierbaren Eigenschaft (scroll-margin-top, wechselt je Bild) auf den Hauptthread zwingen —
                          // Compositor-Animationen malen die Ebene mit festem Raster und skalieren/verschieben sie bilinear: Mischfarben und Halbalpha an jeder Kante (Palettenverstoss)
+    messen: false,       // Messung: Backzeit je Animationsname in `stat.proName` (nur Tests)
+    ergebnisCache: true, // Ergebnis-Cache reiner Animationen (s. `reinSchluessel`); false = Messung/Notbremse
     aktiv: true,
   };
   const TAKT_MS = () => 1000 / KONFIG.takt;
@@ -441,6 +443,7 @@
           if (Math.abs(z.sx * 2 - Math.round(z.sx * 2)) > 0.02 || Math.abs(z.sy * 2 - Math.round(z.sy * 2)) > 0.02) return false;
           continue;
         }
+        if ((p === 'boxShadow' || p === 'textShadow') && schattenKonform(String(v))) continue;      // harte Ringe (Unschaerfe 0, volle Deckkraft) sind schon Pixelart — nicht neu abtasten
         if (p === 'rotate' || p === 'scale' || p === 'filter' || p === 'boxShadow' || p === 'textShadow' || p === 'backdropFilter') {
           if (String(v) !== 'none' && !(p === 'rotate' && /^(0|90|180|270|-90)deg$/.test(String(v)))) return false;
         }
@@ -462,6 +465,18 @@
     if (!v || v === 'none') return v;
     const rest = v.replace(/drop-shadow\((?:[^()]|\([^()]*\))*\)/g, '').replace(/blur\([^)]*\)/g, '').replace(/\s+/g, ' ').trim();
     return rest || 'none';
+  }
+  /** Besteht der Schatten nur aus harten Anteilen (Unschaerfe 0) mit voller Deckkraft (oder `none`)? Dann gibt es nichts zu backen. */
+  function schattenKonform(v) {
+    if (!v || v === 'none') return true;
+    for (const teil of listeTeilen(v)) {
+      const farbe = /(rgba?\([^)]*\)|#[0-9a-fA-F]{3,8})/.exec(teil);
+      if (!farbe) return false;                                  // Farbname/var(): nicht beurteilbar
+      const nums = (teil.replace(/rgba?\([^)]*\)/g, '').match(/-?[\d.]+(?:px)?/g) || []).map(parseFloat);
+      if (nums.length < 2 || nums.length > 4 || (nums[2] || 0) !== 0) return false;
+      if (/^rgba/.test(farbe[1])) { const a = parseFloat(farbe[1].replace(/^rgba\(|\)$/g, '').split(',')[3]); if (!(a >= 0.97)) return false; }
+    }
+    return true;
   }
   /** `box-shadow`/`text-shadow` mit Unschaerfe → harter Ring (Kunstpixel breit) bzw. weg; Alpha < 0,35 faellt weg. */
   function schattenHart(v, raster) {
@@ -634,30 +649,30 @@
     setTimeout(_arbeiten, 24);                 // ~6 ms Arbeit je ~30 ms: rund ein Fuenftel eines Kerns, Titelbild in ~3 s fertig
   }
 
-  function backen(anim, budget, weich, sofort) {
-    if (!KONFIG.aktiv || (gebacken.has(anim) && !sofort)) return false;
+  function backenPruefen(anim, budget, weich, sofort) {
+    if (!KONFIG.aktiv || (gebacken.has(anim) && !sofort)) return null;
     gebacken.add(anim);
     let eff;
-    try { eff = anim.effect; } catch (e) { return false; }
-    if (!eff || typeof eff.getKeyframes !== 'function' || !eff.target) return false;   // W86u1: ::before/::after (eff.pseudoElement) werden mitgebacken
+    try { eff = anim.effect; } catch (e) { return null; }
+    if (!eff || typeof eff.getKeyframes !== 'function' || !eff.target) return null;   // W86u1: ::before/::after (eff.pseudoElement) werden mitgebacken
     const el = eff.target;
-    if (!(el instanceof Element) || !el.isConnected) return false;
-    if (el.closest('[data-pp-px="aus"]')) { stat.uebersprungen++; return false; }
+    if (!(el instanceof Element) || !el.isConnected) return null;
+    if (el.closest('[data-pp-px="aus"]')) { stat.uebersprungen++; return null; }
     let kfs, t;
-    try { kfs = eff.getKeyframes(); t = eff.getComputedTiming(); } catch (e) { return false; }
+    try { kfs = eff.getKeyframes(); t = eff.getComputedTiming(); } catch (e) { return null; }
     const dauer = +t.duration;
-    if (!(dauer > 0) || !Number.isFinite(dauer) || kfs.length < 2) return false;
-    if (weich && dauer > KONFIG.globalMaxDauer) { stat.uebersprungen++; return false; }
+    if (!(dauer > 0) || !Number.isFinite(dauer) || kfs.length < 2) return null;
+    if (weich && dauer > KONFIG.globalMaxDauer) { stat.uebersprungen++; return null; }
     if (weich && !sofort && Math.min(KONFIG.globalMaxBilder, Math.ceil(dauer / TAKT_MS())) > KONFIG.globalSofort) {
       // W86u1: einmalige Animationen (Schadensblitz, Ringe, Zielmarkierungen …) sofort backen — sie sind vorbei, bevor eine Warteschlange voller Schleifen
       // (Umgebungsteilchen) sie erreicht, und liefen sonst ganz weich. Nur ein Zeitfenster von ~10 ms je Takt; der Rest wartet (einmalige vorn).
       const jetzt = performance.now();
       if (jetzt - _fenster > TAKT_MS()) { _fenster = jetzt; _verbraucht = 0; }
       const schleife = !(+t.iterations <= 1);
-      if (schleife || _verbraucht > KONFIG.sofortMs) { _warte.unshift([anim, weich]); _planen(); return false; }   // zuletzt gestartet = zuerst gebacken (Zielmarkierung vor 100 Umgebungsteilchen)
+      if (schleife || _verbraucht > KONFIG.sofortMs) { _warte.unshift([anim, weich]); _planen(); return null; }   // zuletzt gestartet = zuerst gebacken (Zielmarkierung vor 100 Umgebungsteilchen)
     }
     const props = eigenschaften(kfs);
-    if (!props.length) return false;
+    if (!props.length) return null;
     const strikt = !!(el.closest && el.closest('.pp-pixel-scene'));       // Szenen (Areas): strengere Pruefung, Stufenfolgen exakt (W86a)
     if (istKonform(kfs, props, dauer, strikt)) {
       // Schon gehaltene Bilder: nicht neu abtasten, aber Delay/Start aufs Raster legen (Spriteschleifen mit Dauern wie 200/400/800 ms
@@ -667,15 +682,62 @@
         if (Math.abs(d2 - d0) > 1e-3) eff.updateTiming({ delay: d2 });
         startAusrichten(anim);
       } catch (e) { /* bleibt */ }
-      stat.uebersprungen++; return false;
+      stat.uebersprungen++; return null;
     }
+    return { anim, eff, el, kfs, props, dauer, budget, weich, strikt };
+  }
+  /** Eine Animation backen (Einzelweg: Pruefen, Abtasten, Bauen). Der Stapelweg (`backenAlle`) tastet viele Animationen gemeinsam ab. */
+  function backen(anim, budget, weich, sofort) {
+    const v = backenPruefen(anim, budget, weich, sofort);
+    if (!v) return false;
     const t0 = performance.now();
     let ok = false;
-    try { ok = backenInnen(anim, eff, el, kfs, props, dauer, budget, weich, strikt); } catch (e) { if (KONFIG.debug) console.warn('[PPPixelAnim]', e); }
+    try { ok = backenInnen(v.anim, v.eff, v.el, v.kfs, v.props, v.dauer, v.budget, v.weich, v.strikt); } catch (e) { if (KONFIG.debug) console.warn('[PPPixelAnim]', e); }
     stat.ms += performance.now() - t0;
     if (weich && !sofort) _verbraucht += performance.now() - t0;
     if (ok) stat.gebacken++;
+    if (KONFIG.messen) messe(v.anim, performance.now() - t0);
     return ok;
+  }
+  function messe(anim, ms) {
+    const n = (anim && anim.animationName) || 'waapi', m = stat.proName || (stat.proName = {}), e = m[n] || (m[n] = { n: 0, ms: 0 });
+    e.n++; e.ms += ms;
+  }
+  /**
+   * ★ Stapel: viele Animationen GEMEINSAM backen. Jede Abtastung (`probe.currentTime` setzen, `getPropertyValue` lesen) erzwingt einen
+   * Stil-Neuaufbau; je Animation und Zeitpunkt nacheinander kostet das N x Bilder Neuaufbauten. Hier wird je ZEITPUNKT erst jede Probe gesetzt und
+   * dann gelesen — ein Neuaufbau fuer alle (gemessen: 200 Animationen 730 ms -> 56 ms, gleiche Werte). Auch die Schreibzugriffe des Bauens
+   * (Groessen, Keyframes) kommen erst danach, sie verwerfen die Stile nicht mehr zwischen den Proben.
+   */
+  function backenStapel(liste, budget) {
+    const t0 = performance.now();
+    const ctxs = [];
+    for (const a of liste) {
+      const v = backenPruefen(a, budget, false, false);
+      if (!v) continue;
+      let c = false;
+      try { c = backenProbeVorbereiten(v.anim, v.eff, v.el, v.kfs, v.props, v.dauer, v.budget, v.weich, v.strikt); } catch (e) { if (KONFIG.debug) console.warn('[PPPixelAnim]', e); }
+      if (c) ctxs.push(c);
+    }
+    if (!ctxs.length) return 0;
+    const tp0 = performance.now();
+    let maxN = 0;
+    for (const c of ctxs) if (c.zeiten.length > maxN) maxN = c.zeiten.length;
+    for (let j = 0; j <= maxN; j++) {
+      for (const c of ctxs) if (j <= c.zeiten.length) backenProbeSetzen(c, j);
+      for (const c of ctxs) if (j <= c.zeiten.length) backenProbeLesen(c, j);
+    }
+    for (const c of ctxs) if (c.probe) c.probe.cancel();
+    stat.t_probe += performance.now() - tp0;
+    let n = 0;
+    for (const c of ctxs) {
+      let ok = false;
+      try { ok = backenProbeFertig(c); } catch (e) { if (KONFIG.debug) console.warn('[PPPixelAnim]', e); }
+      if (ok) { stat.gebacken++; n++; }
+    }
+    stat.ms += performance.now() - t0;
+    if (KONFIG.messen && ctxs.length) { const je = (performance.now() - t0) / ctxs.length; for (const c of ctxs) messe(c.anim, je); }
+    return n;
   }
 
   /**
@@ -725,11 +787,40 @@
     try { anim.ready.then(tun, () => {}); } catch (e) { /* ohne */ }
   }
 
-  function backenInnen(anim, eff, el, kfs, props, dauer, budget, weich, strikt) {
+  // ── Ergebnis-Cache „reiner“ Animationen ─────────────────────────────────────────────────────────────────────────────────
+  // Viele Animationen starten hundertfach mit denselben Keyframes und Zeiten (Tutorial-Text: `textbox-char-shake` je Zeichen, Hervorhebungs-Pulse je Zone …). Abtasten (Probe + Stil-Neuaufbau je Bild) und
+  // Bauen ergeben dort immer dasselbe — das erste Backen merkt sich die fertigen Keyframes, jeder weitere Start setzt sie nur noch ein. „Rein“ heisst: das Ergebnis haengt nur von Keyframes, Zeiten und Raster ab, nicht von
+  // der Elementgroesse oder -ausstattung: keine Transformation (Skalierung/Quantisierung nach Groesse), keine Deckkraft (Dither-Maske, Flaeche, Kinder), keine Groessen-Eigenschaften (Ringe), kein Hintergrundbild/keine Maske
+  // (Eingriffe am Element); jede Eigenschaft hat an Anfang UND Ende einen eigenen Wert (sonst gaelte der Ausgangswert des Elements); alles Relative (var(), %, em, calc, currentColor …) geht mit seinem aufgeloesten
+  // Kontext in den Schluessel. Gespeichert wird nur nach erfolgreichem Setzen.
+  const _backCache = new Map(), BACK_CACHE_MAX = 400;
+  const REIN_NICHT = /^(opacity|transform|translate|scale|rotate|width|height|min-width|min-height|max-width|max-height|mask.*|-webkit-mask.*|background-image|background-size|background-repeat|background-attachment|content|d)$/;
+  const RELATIV = /var\(|%|\b(?:em|rem|ex|ch|vw|vh|vmin|vmax)\b|calc\(|currentcolor|inherit|initial|unset|env\(|attr\(/i;
+  function reinSchluessel(kfs, props, cs, pe, weich, strikt, svgInnen, raster, D2, delay2, zeiten, probeZeiten, groesse) {
+    if (!KONFIG.ergebnisCache) return null;
+    for (const p of props) if (REIN_NICHT.test(kebab(p))) return null;
+    const erst = kfs[0], letzt = kfs[kfs.length - 1];
+    let rel = false;
+    const vars = [];
+    const zeilen = kfs.map((k) => {
+      if (k.composite && k.composite !== 'replace' && k.composite !== 'auto') rel = null;
+      return [k.computedOffset != null ? k.computedOffset : k.offset, k.easing, props.map((p) => k[p] == null ? null : String(k[p]))];
+    });
+    if (rel === null) return null;
+    for (const p of props) if (erst[p] == null || letzt[p] == null) return null;
+    for (const z of zeilen) for (const v of z[2]) if (v != null && RELATIV.test(v)) { rel = true; for (const m of v.matchAll(/var\(\s*(--[\w-]+)/g)) vars.push(m[1]); }
+    const ctx = [];
+    if (rel) { const [W, H] = groesse(); ctx.push(cs.fontSize, cs.color, W, H, root.innerWidth, root.innerHeight); for (const v of vars) ctx.push(cs.getPropertyValue(v)); }
+    return JSON.stringify([zeilen, D2, delay2, zeiten.length, zeiten[1] || 0, probeZeiten ? probeZeiten.length : 0, weich, strikt, pe || '', svgInnen, raster, ctx]);
+  }
+
+  function backenProbeVorbereiten(anim, eff, el, kfs, props, dauer, budget, weich, strikt) {
     const pe = eff.pseudoElement || null;                       // W86u1: Animation auf ::before/::after — gleiche Pipeline, nur ohne Inline-Eingriffe am Wirt
     const cs = pe ? getComputedStyle(el, pe) : getComputedStyle(el);
-    const [W, H] = pe ? pseudoGroesse(cs, el) : groesseVon(el);
-    const raster = rasterVon(cs);
+    // Groesse (Layout!) erst, wenn gebraucht: Treffer im Ergebnis-Cache brauchen sie nur bei relativen Werten — sonst erzwingt jeder Start (Tutorial-Text: je Zeichen) ein Layout.
+    const groesse = () => (pe ? pseudoGroesse(cs, el) : groesseVon(el));
+    // Raster: nur Szenen (Areas) setzen `--pp-raster` (Inline-Stil) — sonst gilt der Standard, ohne den Stil zu lesen (das erzwingt einen Neuaufbau je Start)
+    const raster = el.closest && el.closest('[style*="--pp-raster"]') ? rasterVon(cs) : KONFIG.px;
     const svgInnen = istSvgInnen(el);
     const T = TAKT_MS();
     const delay0 = +t0Timing(eff).delay || 0;
@@ -748,23 +839,59 @@
       if (sz && (!budget || budget.rest === undefined || sz.grid.length <= Math.max(zeiten.length * 3, budget.rest / 4))) { zeiten = sz.grid; probeZeiten = sz.probe; }
     }
     if (budget && budget.rest !== undefined) { budget.rest -= zeiten.length + 1; budget.offen = Math.max(1, budget.offen - 1); }
+    // ── Ergebnis-Cache: schon gebacken (gleiche Keyframes/Zeiten) → nicht abtasten ──
+    const reinKey = reinSchluessel(kfs, props, cs, pe, weich, strikt, svgInnen, raster, D2, delay2, zeiten, probeZeiten, groesse);
+    if (reinKey) {
+      const hit = _backCache.get(reinKey);
+      if (hit) return { hit, anim, eff, el, props, dauer, weich, strikt, pe, cs, W: 0, H: 0, raster, svgInnen, T, delay0, delay2, D2, zeiten, probeZeiten, probe: null, kProps: [], roh: [] };
+    }
+    const [W, H] = groesse();
     // ── Probe: gleiche Keyframes als eigene WAAPI-Animation → abtasten ──
     const probeKfs = kfs.map(k => { const o = Object.assign({}, k); o.offset = k.computedOffset != null ? k.computedOffset : k.offset; delete o.computedOffset; return o; });
     let probe;
     try { probe = new Animation(new KeyframeEffect(el, probeKfs, Object.assign({ duration: D2, fill: 'both', easing: 'linear' }, pe ? { pseudoElement: pe } : {})), document.timeline); }
     catch (e) { return false; }
-    const tp0 = performance.now();
     probe.pause();
-    const kProps = props.map(kebab);
-    const roh = [];
-    for (let j = 0; j <= zeiten.length; j++) {
-      probe.currentTime = j < zeiten.length ? (probeZeiten ? probeZeiten[j] : zeiten[j]) : D2 - 1e-3;
-      const w = {};
-      for (let q = 0; q < kProps.length; q++) w[props[q]] = cs.getPropertyValue(kProps[q]);
-      roh.push(w);
+    return { anim, eff, el, props, dauer, weich, strikt, pe, cs, W, H, raster, svgInnen, T, delay0, delay2, D2, zeiten, probeZeiten, probe, kProps: props.map(kebab), roh: [], reinKey };
+  }
+  /** Probe auf den j-ten Zeitpunkt stellen. */
+  function backenProbeSetzen(c, j) {
+    if (c.hit) return;
+    c.probe.currentTime = j < c.zeiten.length ? (c.probeZeiten ? c.probeZeiten[j] : c.zeiten[j]) : c.D2 - 1e-3;
+  }
+  /** Werte der Probe zum eingestellten Zeitpunkt lesen. */
+  function backenProbeLesen(c, j) {
+    if (c.hit) return;
+    const w = {};
+    for (let q = 0; q < c.kProps.length; q++) w[c.props[q]] = c.cs.getPropertyValue(c.kProps[q]);
+    c.roh.push(w);
+  }
+  /** Einzelweg: eine Animation vorbereiten, abtasten, fertig bauen. */
+  function backenInnen(anim, eff, el, kfs, props, dauer, budget, weich, strikt) {
+    const c = backenProbeVorbereiten(anim, eff, el, kfs, props, dauer, budget, weich, strikt);
+    if (!c) return false;
+    const tp0 = performance.now();
+    if (!c.hit) for (let j = 0; j <= c.zeiten.length; j++) { backenProbeSetzen(c, j); backenProbeLesen(c, j); }
+    if (c.probe) c.probe.cancel();
+    stat.t_probe += performance.now() - tp0;
+    return backenProbeFertig(c);
+  }
+  /** Aus den gelesenen Rohwerten die gebackenen Keyframes bauen und einsetzen. */
+  function backenProbeFertig(c) {
+    if (c.hit) {                                                  // Ergebnis-Cache: fertige Keyframes einsetzen
+      try {
+        c.eff.setKeyframes(c.hit.frames.map((f) => Object.assign({}, f)));
+        const neu = {};
+        if (Math.abs(c.D2 - c.dauer) > 1e-3) neu.duration = c.D2;
+        if (Math.abs(c.delay2 - c.delay0) > 1e-3) neu.delay = c.delay2;
+        if (neu.duration !== undefined || neu.delay !== undefined) c.eff.updateTiming(neu);
+      } catch (e) { return false; }
+      startAusrichten(c.anim);
+      stat.bilder += c.hit.frames.length; stat.cacheTreffer = (stat.cacheTreffer || 0) + 1;
+      return true;
     }
-    probe.cancel();
-    const tp1 = performance.now(); stat.t_probe += tp1 - tp0;
+    const { anim, eff, el, props, weich, pe, cs, W, H, raster, svgInnen, delay0, delay2, D2, zeiten, roh } = c, dauer = c.dauer;
+    const tp1 = performance.now();
     // ── Quantisieren ──
     const rahmen = frameBauen(roh, props, el, cs, W, H, raster, svgInnen, weich, anim, pe);
     const tp2 = performance.now(); stat.t_bauen += tp2 - tp1;
@@ -795,6 +922,7 @@
     startAusrichten(anim);
     stat.t_setzen += performance.now() - tp2;
     stat.bilder += frames.length;
+    if (c.reinKey) { if (_backCache.size >= BACK_CACHE_MAX) _backCache.delete(_backCache.keys().next().value); _backCache.set(c.reinKey, { frames: frames.map((f) => Object.assign({}, f)) }); }
     return true;
   }
   const t0Timing = (eff) => eff.getTiming();
@@ -1114,6 +1242,8 @@
     const pos = cs.position;
     if (pos !== 'absolute' && pos !== 'fixed') return false;
     if (cs.display === 'none' || cs.display === 'contents') return false;
+    // `malen` malt nur Hintergruende/Rahmen, nie <img>/<canvas>/<video>-Inhalt — ein Element mit Kartenbild darin (fliegende Karten: Ziehen, Suchen) wuerde zum leeren Sprite und seine echten Kinder verschwaenden.
+    if (el.querySelector('img, canvas, video')) return false;
     return true;
   }
 
@@ -1216,7 +1346,7 @@
     try {
       const alle = animationenUnter(wurzel).filter(a => !gebacken.has(a));
       const budget = { rest: KONFIG.budget, offen: alle.length };
-      for (const a of alle) if (backen(a, budget)) n++;
+      n = backenStapel(alle, budget);
     } catch (e) { if (KONFIG.debug) console.warn('[PPPixelAnim]', e); }
     return n;
   }

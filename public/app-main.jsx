@@ -2629,6 +2629,12 @@ for (const t of Object.values(_bgmTracks)) {
   }
 }
 
+// Musikstueck vorab laden + dekodieren (Web Audio): das erste Umschalten auf ein ungeladenes Stueck dekodiert 1,5 MB Ogg zu ~30 MB PCM — auf Handys ein Ruckler
+// genau in dem Moment, in dem es umschaltet (Tutorial 5: Antonia crasht Monia Bot aus dem Bild). Aufruf vor dem Auftritt, in einer ruhigen Textseite.
+window.ppBgmVorwaermen = (modus) => {
+  try { const t = _bgmTracks[modus]; if (t && typeof t._ensureBuffer === 'function') t._ensureBuffer().catch(() => {}); } catch (e) { /* optional */ }
+};
+
 // Volume control bridge — VolumeControl sets this
 window._ppSetMusicVolume = (vol) => {
   let cur = null;
@@ -3354,6 +3360,12 @@ function RotateOverlay() {
   // getippt wurde — wer das Handy von Hand kippt, kommt NICHT am Tippen vorbei (das Tippen startet Vollbild + Querformat).
   const phoneLike = !!(window.matchMedia && matchMedia('(pointer: coarse)').matches && Math.min(window.screen.width, window.screen.height) <= 700);
   const gate = canAuto && phoneLike && !tapped;
+  // Schalter fuer das CSS (`body[data-rotate-gate]`) — bewusst KEIN `body:has(.rotate-gate)`, siehe style.css.
+  useEffect(() => {
+    if (!gate) return undefined;
+    document.body.setAttribute('data-rotate-gate', '');
+    return () => document.body.removeAttribute('data-rotate-gate');
+  }, [gate]);
   const enter = () => {
     if (!auto) return;
     window._ppTapStarted = true; setTapped(true);
@@ -3558,6 +3570,9 @@ function App() {
       // `challengeStart`: eine angenommene Herausforderung (social.js) schickt beide Spieler aus dem Menü ins Spiel.
       if (state.reconnected || state.challengeStart) {
         // Puzzle games are ephemeral — don't reconnect, just clean up
+        // Ausnahme: ein LAUFENDES Tutorial dieser Seitensitzung (`_currentTutorialNum`) bleibt — ein kurzer Netz-/App-Wechsel am Handy darf es nicht beenden;
+        // der Tutorial-Hook (app-screens) nimmt den frisch gesendeten Zustand selbst entgegen. Nach einem Neuladen (keine Tutorialnummer) wird wie bisher geraeumt.
+        if (state.isPuzzle && state.isTutorial && window._currentTutorialNum && !window._tutorialGaveUp) return;
         if (state.isPuzzle) {
           socket.emit('leave_game', { roomId: state.roomId });
           return;

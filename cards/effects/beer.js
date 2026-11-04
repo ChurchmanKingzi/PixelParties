@@ -40,6 +40,8 @@ module.exports = {
   isTargetingArtifact: true,
 
   canActivate: (gs, pi) => {
+    // X-Kosten (4 je Ziel): mit 0 Zielen kostet die Karte nichts und ist bei jedem Goldstand spielbar - die Hand graut sie darum nicht am
+    // Grundpreis aus (`selfPricedArtifacts`, server.js); der Zielwaehler deckelt die Zielzahl nach Budget (`maxTotal`).
     // Can activate if any own hero or creature has a negative status
     const ps = gs.players[pi];
     for (let hi = 0; hi < (ps.heroes || []).length; hi++) {

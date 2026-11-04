@@ -85,7 +85,8 @@
       } catch (e) { /* ohne Speicher: normaler Modus */ }
       window.PP_RETRO = an;
       if (an) document.documentElement.setAttribute('data-retro', '1');
-      var s = an ? '.retro' : '';
+      // Normalmodus: vorgebackene Fassung (scripts/hart/build-css.js: pixel-hart.js schon angewandt, spart die Umwandlung zur Laufzeit); Retro: eigene Pipeline.
+      var s = an ? '.retro' : '.hart';
       document.write('<link rel="stylesheet" href="/style' + s + '.css"><link rel="stylesheet" href="/style-skilltest' + s + '.css">');
       if (an) document.write('<script src="/retro-core.js"><\/script>');
     })();
@@ -124,17 +125,19 @@
     /* W86u2 (Pixelart): Lade-Anzeige aus acht 6-px-Quadraten (Achteck), das helle Quadrat laeuft im Achtertakt — kein gedrehter Vektorring. */
     #boot-splash .bs-ring {
       width: 6px; height: 6px; margin: 16px 0;
+      box-shadow: var(--bs-sh, 0px -14px 0 0 #1aedff, 10px -10px 0 0 #2d4362, 14px 0px 0 0 #2d4362, 10px 10px 0 0 #2d4362, 0px 14px 0 0 #2d4362, -10px 10px 0 0 #2d4362, -14px 0px 0 0 #405f8c, -10px -10px 0 0 #1788bd);
       animation: bs-spin .8s steps(1, end) infinite;
     }
+    /* Gehaltene Bilder ueber eine Hilfsvariable (`--bs-sh`): der Pixel-Backer (pixel-anim.js) laesst Animationen, die nur Variablen wechseln, in Ruhe — Schatten-Schluesselbilder haette er zur Laufzeit neu gebacken. */
     @keyframes bs-spin {
-      0% { box-shadow: 0px -14px 0 0 #1aedff, 10px -10px 0 0 #2d4362, 14px 0px 0 0 #2d4362, 10px 10px 0 0 #2d4362, 0px 14px 0 0 #2d4362, -10px 10px 0 0 #2d4362, -14px 0px 0 0 #405f8c, -10px -10px 0 0 #1788bd; }
-      12.5% { box-shadow: 0px -14px 0 0 #1788bd, 10px -10px 0 0 #1aedff, 14px 0px 0 0 #2d4362, 10px 10px 0 0 #2d4362, 0px 14px 0 0 #2d4362, -10px 10px 0 0 #2d4362, -14px 0px 0 0 #2d4362, -10px -10px 0 0 #405f8c; }
-      25% { box-shadow: 0px -14px 0 0 #405f8c, 10px -10px 0 0 #1788bd, 14px 0px 0 0 #1aedff, 10px 10px 0 0 #2d4362, 0px 14px 0 0 #2d4362, -10px 10px 0 0 #2d4362, -14px 0px 0 0 #2d4362, -10px -10px 0 0 #2d4362; }
-      37.5% { box-shadow: 0px -14px 0 0 #2d4362, 10px -10px 0 0 #405f8c, 14px 0px 0 0 #1788bd, 10px 10px 0 0 #1aedff, 0px 14px 0 0 #2d4362, -10px 10px 0 0 #2d4362, -14px 0px 0 0 #2d4362, -10px -10px 0 0 #2d4362; }
-      50% { box-shadow: 0px -14px 0 0 #2d4362, 10px -10px 0 0 #2d4362, 14px 0px 0 0 #405f8c, 10px 10px 0 0 #1788bd, 0px 14px 0 0 #1aedff, -10px 10px 0 0 #2d4362, -14px 0px 0 0 #2d4362, -10px -10px 0 0 #2d4362; }
-      62.5% { box-shadow: 0px -14px 0 0 #2d4362, 10px -10px 0 0 #2d4362, 14px 0px 0 0 #2d4362, 10px 10px 0 0 #405f8c, 0px 14px 0 0 #1788bd, -10px 10px 0 0 #1aedff, -14px 0px 0 0 #2d4362, -10px -10px 0 0 #2d4362; }
-      75% { box-shadow: 0px -14px 0 0 #2d4362, 10px -10px 0 0 #2d4362, 14px 0px 0 0 #2d4362, 10px 10px 0 0 #2d4362, 0px 14px 0 0 #405f8c, -10px 10px 0 0 #1788bd, -14px 0px 0 0 #1aedff, -10px -10px 0 0 #2d4362; }
-      87.5% { box-shadow: 0px -14px 0 0 #2d4362, 10px -10px 0 0 #2d4362, 14px 0px 0 0 #2d4362, 10px 10px 0 0 #2d4362, 0px 14px 0 0 #2d4362, -10px 10px 0 0 #405f8c, -14px 0px 0 0 #1788bd, -10px -10px 0 0 #1aedff; }
+      0% { --bs-sh: 0px -14px 0 0 #1aedff, 10px -10px 0 0 #2d4362, 14px 0px 0 0 #2d4362, 10px 10px 0 0 #2d4362, 0px 14px 0 0 #2d4362, -10px 10px 0 0 #2d4362, -14px 0px 0 0 #405f8c, -10px -10px 0 0 #1788bd; }
+      12.5% { --bs-sh: 0px -14px 0 0 #1788bd, 10px -10px 0 0 #1aedff, 14px 0px 0 0 #2d4362, 10px 10px 0 0 #2d4362, 0px 14px 0 0 #2d4362, -10px 10px 0 0 #2d4362, -14px 0px 0 0 #2d4362, -10px -10px 0 0 #405f8c; }
+      25% { --bs-sh: 0px -14px 0 0 #405f8c, 10px -10px 0 0 #1788bd, 14px 0px 0 0 #1aedff, 10px 10px 0 0 #2d4362, 0px 14px 0 0 #2d4362, -10px 10px 0 0 #2d4362, -14px 0px 0 0 #2d4362, -10px -10px 0 0 #2d4362; }
+      37.5% { --bs-sh: 0px -14px 0 0 #2d4362, 10px -10px 0 0 #405f8c, 14px 0px 0 0 #1788bd, 10px 10px 0 0 #1aedff, 0px 14px 0 0 #2d4362, -10px 10px 0 0 #2d4362, -14px 0px 0 0 #2d4362, -10px -10px 0 0 #2d4362; }
+      50% { --bs-sh: 0px -14px 0 0 #2d4362, 10px -10px 0 0 #2d4362, 14px 0px 0 0 #405f8c, 10px 10px 0 0 #1788bd, 0px 14px 0 0 #1aedff, -10px 10px 0 0 #2d4362, -14px 0px 0 0 #2d4362, -10px -10px 0 0 #2d4362; }
+      62.5% { --bs-sh: 0px -14px 0 0 #2d4362, 10px -10px 0 0 #2d4362, 14px 0px 0 0 #2d4362, 10px 10px 0 0 #405f8c, 0px 14px 0 0 #1788bd, -10px 10px 0 0 #1aedff, -14px 0px 0 0 #2d4362, -10px -10px 0 0 #2d4362; }
+      75% { --bs-sh: 0px -14px 0 0 #2d4362, 10px -10px 0 0 #2d4362, 14px 0px 0 0 #2d4362, 10px 10px 0 0 #2d4362, 0px 14px 0 0 #405f8c, -10px 10px 0 0 #1788bd, -14px 0px 0 0 #1aedff, -10px -10px 0 0 #2d4362; }
+      87.5% { --bs-sh: 0px -14px 0 0 #2d4362, 10px -10px 0 0 #2d4362, 14px 0px 0 0 #2d4362, 10px 10px 0 0 #2d4362, 0px 14px 0 0 #2d4362, -10px 10px 0 0 #405f8c, -14px 0px 0 0 #1788bd, -10px -10px 0 0 #1aedff; }
     }
   </style>
 
@@ -182,6 +185,57 @@
   <script defer src="/dist/app-puzzle.js"></script>
   <script defer src="/dist/app-deckbuilder.js"></script>
   <script defer src="/dist/app-board.js"></script>
+  <script defer src="/dist/app-fx-0.js"></script>
+  <script defer src="/dist/app-fx-1.js"></script>
+  <script defer src="/dist/app-fx-2.js"></script>
+  <script defer src="/dist/app-fx-3.js"></script>
+  <script defer src="/dist/app-fx-4.js"></script>
+  <script defer src="/dist/app-fx-5.js"></script>
+  <script defer src="/dist/app-fx-6.js"></script>
+  <script defer src="/dist/app-fx-7.js"></script>
+  <script defer src="/dist/app-fx-8.js"></script>
+  <script defer src="/dist/app-fx-9.js"></script>
+  <script defer src="/dist/app-fx-10.js"></script>
+  <script defer src="/dist/app-fx-11.js"></script>
+  <script defer src="/dist/app-fx-12.js"></script>
+  <script defer src="/dist/app-fx-13.js"></script>
+  <script defer src="/dist/app-fx-14.js"></script>
+  <script defer src="/dist/app-fx-15.js"></script>
+  <script defer src="/dist/app-fx-16.js"></script>
+  <script defer src="/dist/app-fx-17.js"></script>
+  <script defer src="/dist/app-fx-18.js"></script>
+  <script defer src="/dist/app-fx-19.js"></script>
+  <script defer src="/dist/app-fx-20.js"></script>
+  <script defer src="/dist/app-fx-21.js"></script>
+  <script defer src="/dist/app-fx-22.js"></script>
+  <script defer src="/dist/app-fx-23.js"></script>
+  <script defer src="/dist/app-fx-24.js"></script>
+  <script defer src="/dist/app-fx-25.js"></script>
+  <script defer src="/dist/app-fx-26.js"></script>
+  <script defer src="/dist/app-fx-27.js"></script>
+  <script defer src="/dist/app-fx-28.js"></script>
+  <script defer src="/dist/app-fx-29.js"></script>
+  <script defer src="/dist/app-fx-30.js"></script>
+  <script defer src="/dist/app-fx-31.js"></script>
+  <script defer src="/dist/app-fx-32.js"></script>
+  <script defer src="/dist/app-fx-33.js"></script>
+  <script defer src="/dist/app-fx-34.js"></script>
+  <script defer src="/dist/app-fx-35.js"></script>
+  <script defer src="/dist/app-fx-36.js"></script>
+  <script defer src="/dist/app-fx-37.js"></script>
+  <script defer src="/dist/app-fx-38.js"></script>
+  <script defer src="/dist/app-fx-40.js"></script>
+  <script defer src="/dist/app-fx-41.js"></script>
+  <script defer src="/dist/app-fx-43.js"></script>
+  <script defer src="/dist/app-fx-45.js"></script>
+  <script defer src="/dist/app-fx-46.js"></script>
+  <script defer src="/dist/app-fx-44.js"></script>
+  <script defer src="/dist/app-fx-47.js"></script>
+  <script defer src="/dist/app-fx-48.js"></script>
+  <script defer src="/dist/app-fx-49.js"></script>
+  <script defer src="/dist/app-fx-50.js"></script>
+  <script defer src="/dist/app-fx-51.js"></script>
+  <script defer src="/dist/app-fx-52.js"></script>
   <script defer src="/dist/app-campaign.js"></script>
   <script defer src="/skilltest-rules.js"></script>
   <script defer src="/skilltest-art.js"></script>

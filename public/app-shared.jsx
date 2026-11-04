@@ -43,6 +43,27 @@ window.ppZustandVeraltet = ppZustandVeraltet;
    ============================================================ */
 const { useState, useEffect, useLayoutEffect, useRef, useCallback, useMemo, createContext, useContext } = React;
 
+// ★ BILDSCHIRMTASTATUR NICHT VON SELBST AUFKLAPPEN (Als Befund 2.11.: „bei einem Mobile-Nutzer war die On-Screen-Tastatur angesprungen"): auf Touch-Geräten
+// (`pointer: coarse`) klappt jedes PROGRAMMATISCHE `focus()` auf ein Texteingabefeld die Tastatur auf — `autoFocus` (Such-/Filterfelder, Auth, Puzzle-Dialoge …)
+// ebenso wie `ref.current.focus()`. Antippen eines Felds fokussiert nativ und ist davon nicht betroffen. Hier wird das programmatische Fokussieren von Text-
+// feldern unterdrückt, AUSSER das Feld trägt `data-pp-tastatur="an"` (Eingaben, die der Nutzer gerade ausdrücklich gewollt hat: Umbenennen, Texteingabe-Dialog,
+// Chat-Nachricht). Mit Maus (Desktop, auch Touch-Notebooks mit Maus) ändert sich nichts.
+(function () {
+  try {
+    if (!window.matchMedia || !window.matchMedia('(pointer: coarse)').matches) return;
+    const TEXT = new Set(['text', 'search', 'email', 'password', 'number', 'tel', 'url', '']);
+    const bremsen = (Klasse) => {
+      const orig = Klasse.prototype.focus;
+      Klasse.prototype.focus = function () {
+        const art = this instanceof HTMLTextAreaElement ? '' : (this.getAttribute('type') || 'text').toLowerCase();
+        if (TEXT.has(art) && !(this.dataset && this.dataset.ppTastatur === 'an')) return;   // Tastatur bleibt zu
+        return orig.apply(this, arguments);
+      };
+    };
+    bremsen(HTMLInputElement); bremsen(HTMLTextAreaElement);
+  } catch (e) { /* ohne Bremse: altes Verhalten */ }
+})();
+
 // ===== TOUCH DETECTION =====
 window._isTouchDevice = false;
 window.addEventListener('touchstart', function onFirstTouch() {
@@ -1909,7 +1930,7 @@ function ppPixelPartikel(canvas, teile, opt) {
   const bild = g.createImageData(W, H), d = bild.data;
   const schritt = (t) => {
     id = 0; if (aus) return;
-    const dt = letzt ? Math.min(3, (t - letzt) / 16.667) : 1; letzt = t;
+    const dt = (letzt ? Math.min(3, (t - letzt) / 16.667) : 1) * (opt.tempo ? opt.tempo() : 1); letzt = t;   // opt.tempo(): Zeitfaktor (Shop: ×5-Modus)
     d.fill(0);
     let lebt = false;
     for (const p of teile) {
@@ -2065,6 +2086,8 @@ const SFX_NAMES = [
   'summon', 'sunglasses_drop', 'turn_start', 'ui_cancel', 'ui_click',
   'ui_error', 'ui_prompt_open', 'victory',
   'doom_tick',   // v1421: Uhrzeiger-Tick der Doom Clock (synthetisiert)
+  // Shop-Pull-Inszenierung (synthetisiert, scripts/sfx/pull-sounds.py)
+  'pull_circle', 'pull_crack', 'pull_note', 'pull_swell', 'pull_shatter', 'pull_reveal', 'pull_sparkle',
 ];
 
 let _sfxCtx = null;
@@ -4553,8 +4576,23 @@ const ZONE_ANIM_SFX = {
   // sie wird ausgeloescht); `negate` ist der vorhandene „ist weg"-Klang,
   // tiefer gefahren fuer das Gewicht eines Helden.
   tempeluna_erase:         { name: 'negate', opts: { rate: 0.8, volume: 0.95, delay: 120 } },
-  dark_gear_spin_cw:       null,
-  dark_gear_spin_ccw:      null,
+  // Dark Gear (Als Befund 31.10.: „bei Dark Gears Animation fehlen Sounds"). Zwei Zahnrad-Auftritte je 1,5 s: erst am Ziel
+  // (`dark_gear_spin_cw`: das Rad greift in die Kreatur), nach dem Flug in die eigene Zone (`dark_gear_spin_ccw`: es zieht sich
+  // zu und legt die Negation an). Dunkles Brummen als Grundton, metallisches Einrasten (`chain_add`, gleiche Familie wie die Ketten-
+  // Klänge) beim Zugriff, ein dumpfer Abschluss beim Auslaufen. Ohne Sammelkategorie (`category: null`): der Kartenklang des
+  // Artefakts belegt den Slot 'effect' knapp davor; `dedupe` hält Wiederholungen derselben Kreatur auseinander.
+  dark_gear_spin_cw: [
+    { name: 'elem_dark', opts: { rate: 0.7, volume: 0.9, category: null, dedupe: 600 } },
+    { name: 'chain_add', opts: { rate: 0.7, volume: 0.75, delay: 170, category: null, dedupe: 600 } },
+    { name: 'chain_add', opts: { rate: 0.9, volume: 0.55, delay: 330, category: null, dedupe: 600 } },
+    { name: 'debuff',    opts: { rate: 0.7, volume: 0.6, delay: 1050, category: null, dedupe: 600 } },
+  ],
+  dark_gear_spin_ccw: [
+    { name: 'chain_add', opts: { rate: 0.85, volume: 0.8, category: null, dedupe: 600 } },
+    { name: 'elem_dark', opts: { rate: 0.9, volume: 0.8, delay: 110, category: null, dedupe: 600 } },
+    { name: 'chain_add', opts: { rate: 1.1, volume: 0.55, delay: 330, category: null, dedupe: 600 } },
+    { name: 'negate',    opts: { rate: 0.8, volume: 0.8, delay: 1100, category: null, dedupe: 600 } },
+  ],
   cloud_gather:            null,
   cloud_disperse:          null,
   sand_reset:              null,
@@ -4604,7 +4642,7 @@ const ZONE_ANIM_SFX = {
   // Regeln: (1) OHNE Sammelkategorie (`category: null`) — der Aktivierungs-/Zauberklang einer Karte belegt den Slot 'effect' meist
   // ~0-200 ms VOR der Animation und verschluckte sie (Burning Finger, Burning Skeleton); `dedupe` haelt Mehrfachziele davon ab, den
   // Klang zu stapeln. (2) Der Verzug sitzt auf dem Treffer: bei Animationen mit `_delay(N)` in der Karte ist es ~N − 100 (der
-  // Mount-Vorlauf kommt von `playSFXForZoneAnim` dazu). (3) Absichtlich stumm bleiben: Dauerschleifen und Deko (`dark_gear_spin_*`,
+  // Mount-Vorlauf kommt von `playSFXForZoneAnim` dazu). (3) Absichtlich stumm bleiben: Dauerschleifen und Deko (
   // Dampf, Blasen, Wolken, `anger_mark` …: `null`, begruendet oben bei den Eintraegen), die Kleinst-Animation des Weakening Crystal
   // (`crystal_drain`, laeuft zu JEDEM Rundenbeginn), `equip_flash` (begleitet den `card_reveal`-Klang des Ausloesers),
   // `creature_death`/`deck_shuffle_fx` (Klang kommt aus Log bzw. `deck_shuffle`).
@@ -6667,6 +6705,8 @@ function FoilOverlay({ bands, motes, sparkles, shimmerOffset, foilType, klein, f
   const posn = isDiamond ? DIAMOND_SPARKLE_POSITIONS : SPARKLE_POSITIONS;
   // Brett mit vielen Foil-Karten: nur so viele Funken + Staubkoerner, wie `teilchen` erlaubt (siehe `foilBrettTeilchen`).
   const { funken: nFunken, staub: nStaub } = foilTeilchenAnteil(posn.length, (motes || []).length, teilchen);
+  // app-fx-35: Funken + Staub als EINE Leinwand (statt ~18 DOM-Elemente mit Endlos-Animation); Kleinansicht/Telefon/ohne Pipeline: wie bisher.
+  const cvFoil = !klein && !!window.PpFx35Foil && !!window.ppFx35FoilAn && window.ppFx35FoilAn();
   return (
     <div className={'foil-shine-overlay' + (isDiamond ? ' foil-shine-diamond' : '') + (klein ? ' foil-klein' : '')} data-foil-key={fkey}>
       {/* 1) Die Praegung der Folie. Fuer sich genommen kaum zu sehen —
@@ -6692,6 +6732,7 @@ function FoilOverlay({ bands, motes, sparkles, shimmerOffset, foilType, klein, f
         }} />
       ))}
       {/* 4) Glanzpunkte und Staub. */}
+      {cvFoil ? <window.PpFx35Foil posn={posn} sparkles={sparkles} motes={motes} nFunken={nFunken} nStaub={nStaub} diamond={isDiamond} fkey={fkey} /> : <>
       {posn.map((sp, i) => {
         if (klein && i % FOIL_KLEIN_FUNKEN_JEDER !== 0) return null;   // v1298
         if (!foilBehalten(i, posn.length, nFunken)) return null;
@@ -6717,6 +6758,7 @@ function FoilOverlay({ bands, motes, sparkles, shimmerOffset, foilType, klein, f
           '--mote-o': m.o.toFixed(2),
         }} />
       ))}
+      </>}
     </div>
   );
 }
@@ -7227,6 +7269,24 @@ window.PpLogoBild = PpLogoBild;
 // Gezeichnet als SVG mit `crispEdges` — scharfe Bloecke in jeder Groesse,
 // je Farbe EIN Pfad aus Zeilenlaeufen.
 const PIXEL_ICONS = {
+  auge: [
+    '...#####...',
+    '.##.....##.',
+    '#...###...#',
+    '#..#####..#',
+    '#...###...#',
+    '.##.....##.',
+    '...#####...',
+  ],
+  augeZu: [
+    '#..#####...',
+    '.##.....##.',
+    '#..####...#',
+    '#..#####..#',
+    '#...####..#',
+    '.##.....##.',
+    '...#####..#',
+  ],
   discord: [
     '...##..........##...',
     '..#####......#####..',
@@ -7589,8 +7649,11 @@ function spawnZoneLandFx(el, opts) {
   // Funken in alle Richtungen — vom Einschlag UND von der Beschwoerung
   // genutzt (★ v1209, Als Befund: „zu klein, weil sie nicht die ganze
   // Karte highlightet").
+  // Funken-Daten für die Leinwand (app-fx-44, `ppFx44Funken`): ein Einschlag = EINE Leinwand statt 10–15 CSS-animierter Knoten (die der Backer je Start abtasten musste).
+  const funkenDaten = [];
   const funkenHtml = (anzahl) => {
     const out = [];
+    const leinwand = !!window.ppFx44Funken && !window.__ppFxAlt;
     for (let i = 0; i < anzahl; i++) {
       const w = (i / anzahl) * Math.PI * 2 + (Math.random() - 0.5) * 0.7;
       const weite = r.width * (0.45 + Math.random() * 0.45);
@@ -7600,6 +7663,10 @@ function spawnZoneLandFx(el, opts) {
       // eigene Flugbahn — ein runder Punkt allein liest sich bei dieser
       // Groesse als Staubkorn, nicht als Funkenflug.
       const winkelGrad = Math.atan2(dy, dx) * 180 / Math.PI;
+      if (leinwand) {
+        funkenDaten.push({ dx, dy, dur: 560 + Math.random() * 380, delay: Math.random() * 110, ang: winkelGrad, len: 7 + Math.random() * 9, dick: 2 + Math.random() * 2 });
+        continue;
+      }
       out.push(`<i class="zone-land-spark" style="--zdx:${dx.toFixed(0)}px;--zdy:${dy.toFixed(0)}px;`
         + `--zdur:${(560 + Math.random() * 380).toFixed(0)}ms;`
         + `--zdelay:${(Math.random() * 110).toFixed(0)}ms">`
@@ -7686,6 +7753,7 @@ function spawnZoneLandFx(el, opts) {
     teileS.push(...funkenHtml(n));
     oben.innerHTML = teileS.join('');
     schicht().appendChild(oben);
+    if (funkenDaten.length) window.ppFx44Funken(oben, funkenDaten, farbe);
     setTimeout(() => oben.remove(), ZONE_FX_SUMMON_MS + 150);
     return;
   }
@@ -7694,9 +7762,15 @@ function spawnZoneLandFx(el, opts) {
   box.className = 'zone-land-fx';
   box.style.cssText = mitte + masse;
 
-  const teile = ['<i class="zone-land-glow"></i>', '<i class="zone-land-ring"></i>', ...funkenHtml(n)];
+  // Schockringe + Aufleuchten (app-fx-49) laufen auf der Funken-Leinwand; ohne sie (Notbremse `__ppFxAlt`, Animationen aus, Modul fehlt) bleiben Ring und Schein als CSS-Knoten.
+  const zusatz = (!!window.ppFx49Einschlag && !!window.ppFx44Funken && !window.__ppFxAlt) ? window.ppFx49Einschlag(r.width, r.height, farbe) : null;
+  const teile = zusatz ? funkenHtml(n) : ['<i class="zone-land-glow"></i>', '<i class="zone-land-ring"></i>', ...funkenHtml(n)];
   box.innerHTML = teile.join('');
   schicht().appendChild(box);
+  if (funkenDaten.length) {
+    const lauft = window.ppFx44Funken(box, funkenDaten, farbe, zusatz);
+    if (zusatz && !lauft && window._playAnimations !== false) box.insertAdjacentHTML('afterbegin', '<i class="zone-land-glow"></i><i class="zone-land-ring"></i>');
+  }
   setTimeout(() => box.remove(), ZONE_FX_MS + 150);
 }
 
@@ -8426,6 +8500,55 @@ function CardMini({ card, onClick, onRightClick, count, maxCount, dimmed, style,
  * Mausrad-Scrollen (`.card-tooltip-info`, App-weiter Wheel-Handler in
  * app-main) greifen damit automatisch fuer beide.
  */
+/**
+ * ★ Breiter, mit dem Finger greifbarer Bildlaufstreifen für Galerien auf Touch-Geräten (Als Befund 2.11.: „die Scrollbar für Kartengalerien auf Mobile ist zu
+ * schmal und schwer zu scrollen"). Die nativen Leisten sind auf dem Handy ein dünner, kurz sichtbarer Strich. Der Streifen liegt absolut rechts im
+ * Elternelement (das `position: relative` sein muss), folgt `scrollRef.current` (Scrollen, Größe, Inhalt) und lässt sich am Griff ziehen oder durch Tippen
+ * auf die Spur setzen. Pointer-Ereignisse mit Capture; `touch-action: none` hält die Seite still. Stil: `.pp-bildlauf-spur` / `.pp-bildlauf-griff` (style.css).
+ */
+function TouchScrollbar({ scrollRef }) {
+  const spur = useRef(null), griff = useRef(null), zug = useRef(null);
+  const nachziehen = useCallback(() => {
+    const el = scrollRef.current, sp = spur.current, gr = griff.current;
+    if (!el || !sp || !gr) return;
+    if (!(el.clientHeight > 0 && el.scrollHeight > el.clientHeight + 1)) { sp.style.display = 'none'; return; }
+    sp.style.display = '';
+    const h = sp.clientHeight, gh = Math.max(56, Math.min(h, h * el.clientHeight / el.scrollHeight));
+    const pos = el.scrollTop / Math.max(1, el.scrollHeight - el.clientHeight);
+    gr.style.height = gh + 'px'; gr.style.top = Math.round(pos * (h - gh)) + 'px';
+  }, [scrollRef]);
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el) return undefined;
+    el.addEventListener('scroll', nachziehen, { passive: true });
+    const ro = new ResizeObserver(nachziehen); ro.observe(el);
+    const mo = new MutationObserver(nachziehen); mo.observe(el, { childList: true, subtree: true });   // Seitenwechsel, Filter: der Inhalt wird länger/kürzer
+    nachziehen();
+    return () => { el.removeEventListener('scroll', nachziehen); ro.disconnect(); mo.disconnect(); };
+  }, [scrollRef, nachziehen]);
+  const zuSpurPosition = (clientY) => {
+    const el = scrollRef.current, sp = spur.current, gr = griff.current;
+    if (!el || !sp || !gr) return;
+    const r = sp.getBoundingClientRect(), gh = gr.clientHeight;
+    const anteil = Math.min(1, Math.max(0, (clientY - r.top - gh / 2) / Math.max(1, r.height - gh)));
+    el.scrollTop = anteil * (el.scrollHeight - el.clientHeight);
+  };
+  const runter = (e) => {
+    e.stopPropagation();
+    try { e.currentTarget.setPointerCapture(e.pointerId); } catch (_) { /* ohne Capture */ }
+    zug.current = true;
+    zuSpurPosition(e.clientY);
+  };
+  const bewegt = (e) => { if (zug.current) { e.stopPropagation(); zuSpurPosition(e.clientY); } };
+  const hoch = (e) => { zug.current = false; try { e.currentTarget.releasePointerCapture(e.pointerId); } catch (_) { /* ok */ } };
+  return (
+    <div ref={spur} className="pp-bildlauf-spur" onPointerDown={runter} onPointerMove={bewegt} onPointerUp={hoch} onPointerCancel={hoch}>
+      <div ref={griff} className="pp-bildlauf-griff" />
+    </div>
+  );
+}
+window.TouchScrollbar = TouchScrollbar;
+
 function CardSideTooltip({ card, imgUrl, inGallery }) {
   if (!card) return null;
   const foilType = card.foil;
@@ -8910,7 +9033,23 @@ function poisonTooltipText(stacks, perStack, isUnhealable, deadly) {
 }
 window.poisonTooltipText = poisonTooltipText;
 
-function StatusBadges({ statuses, counters, buffs, isHero, player, cardName, isOpponentSide }) {
+/**
+ * Dauer-Anzeige von Brand, Gift und Blutung: Pixel-Symbole (app-fx-52, `PpFx52.iconUrl`) statt Emoji im Abzeichen. Ein statisches Bild je Abzeichen (keine Dauer-Animation),
+ * ganzzahlig vergroessert (Brettmassstab >= 1,6 -> doppelt); auf dem Handy ohne Kontur (das 12-px-Abzeichen liefert den Rahmen).
+ */
+function PpStatusSpr({ kind, fallback, k: kFest }) {
+  const P = window.PpFx52;
+  let ic = null;
+  try { ic = (P && P.iconUrl && !window.__ppFx52SymbolAlt) ? P.iconUrl(kind, !(window.ppIsPhone && window.ppIsPhone())) : null; } catch (e) { ic = null; }
+  if (!ic) return <PxIcon z={fallback} />;
+  let k = kFest || 1;
+  if (!kFest) { try { k = (parseFloat(document.documentElement.style.getPropertyValue('--board-scale')) || 1) >= 1.6 ? 2 : 1; } catch (e) { k = 1; } }
+  return <img src={ic.url} alt="" draggable={false} data-pp-px="aus" className="pp-px pp-px-icon"
+    style={{ width: ic.w * k, height: ic.h * k, imageRendering: 'pixelated', objectFit: 'fill' }} />;
+}
+window.PpStatusSpr = PpStatusSpr;
+
+function StatusBadges({ statuses, counters, buffs, isHero, player, cardName, isOpponentSide, ohneZahl }) {
   const badges = [];
   // Spielername zu einem Sitz-Index (das Brett stellt `window._ppPlayerNames` bereit); `null`, wenn unbekannt.
   const spielerName = (idx) => {
@@ -9029,13 +9168,13 @@ function StatusBadges({ statuses, counters, buffs, isHero, player, cardName, isO
   if (isHero && b.blessed_skill?.locked) badges.push({ key: 'skill_locked', icon: '🚫',
     tooltip: 'Action-locked (Divine Gift of Skill): This Hero cannot perform any more Actions this turn, including additional Actions — unless the Hero that cast Divine Gift of Skill (\"the user\") has at least Magic Arts 1.' });
   if (c._baihuStunned) badges.push({ key: 'petrified', icon: '🪨', tooltip: `Petrified: Stunned and immune to all damage. Lasts for ${c._baihuStunned.duration || 1} of its owner's turns.` });
-  if (s.burned || c.burned) badges.push({ key: 'burned', icon: '🔥', tooltip: 'Burned: Takes 60 damage at the start of each of its owner\'s turns.' });
-  if (s.bleeding || c.bleeding) badges.push({ key: 'bleeding', icon: '🩸', tooltip: 'Bleeding: takes 50 damage after each of its own actions or active effects. Permanent until cleansed.' });
+  if (s.burned || c.burned) badges.push({ key: 'burned', icon: '🔥', px: 'burn', tooltip: 'Burned: Takes 60 damage at the start of each of its owner\'s turns.' });
+  if (s.bleeding || c.bleeding) badges.push({ key: 'bleeding', icon: '🩸', px: 'bleed', tooltip: 'Bleeding: takes 50 damage after each of its own actions or active effects. Permanent until cleansed.' });
   if (s.poisoned || c.poisoned) {
     const stacks = s.poisoned?.stacks || c.poisonStacks || c.poisoned || 1;
     const perStack = player?.poisonDamagePerStack || 30;
     const isUnhealable = s.poisoned?.unhealable || c.poisonedUnhealable;
-    badges.push({ key: 'poisoned', icon: isUnhealable ? '💀' : '☠️', tooltip: poisonTooltipText(stacks, perStack, isUnhealable, !!s.poisoned?.deadly), className: isUnhealable ? 'status-unhealable' : '' });
+    badges.push({ key: 'poisoned', icon: isUnhealable ? '💀' : '☠️', px: isUnhealable ? undefined : 'poison', zaehler: isUnhealable ? undefined : 'x' + stacks, tooltip: poisonTooltipText(stacks, perStack, isUnhealable, !!s.poisoned?.deadly), className: isUnhealable ? 'status-unhealable' : '' });
   }
   if (s.negated || c.negated) {
     // Skeleton Death Knight applies negated with a `_dkSilenced`
@@ -9399,7 +9538,8 @@ function StatusBadges({ statuses, counters, buffs, isHero, player, cardName, isO
         <div key={b.key} className={'status-badge' + (b.className ? ' ' + b.className : '')}
           onMouseEnter={e => { showGameTooltip(e, b.tooltip); showBoardTip(); }}
           onMouseLeave={() => { hideGameTooltip(); hideBoardTip(); }}>
-          <PxIcon z={b.icon} />
+          {b.px ? <PpStatusSpr kind={b.px} fallback={b.icon} /> : <PxIcon z={b.icon} />}
+          {b.zaehler != null && !ohneZahl && <span className="status-badge-duration">{b.zaehler}</span>}   {/* steht die Figur da, zeigt sie die Zahl (HeroStatusSymbole) */}
           {b.duration != null && <span className="status-badge-duration">{b.duration >= STATUS_FOREVER ? '∞' : b.duration}</span>}
         </div>
       ))}
@@ -9666,7 +9806,7 @@ function TTIcon({ kind, color, px = 2 }) {
   if (!rows) return null;
   const d = rows.map((row, y) => [...row].map((c, x) => c === 'X' ? `M${x} ${y}h1v1h-1z` : '').join('')).join('');
   return (
-    <svg className="tt-icon" width={rows[0].length * px} height={rows.length * px} viewBox={`0 0 ${rows[0].length} ${rows.length}`} aria-hidden="true">
+    <svg className="tt-icon" width={rows[0].length * px} height={rows.length * px} viewBox={`0 0 ${rows[0].length} ${rows.length}`} shapeRendering="crispEdges" aria-hidden="true">
       <path d={d} fill={color} />
     </svg>
   );
@@ -10613,10 +10753,22 @@ function measureHighlight(el) {
   }
   // Transform kurz aus -> beide Rects sind jetzt Layout-Koordinaten.
   clip.classList.add(TB_FLAT_CLASS);
-  const cr = clip.getBoundingClientRect();
-  const pr = plane.getBoundingClientRect();
+  let cr = clip.getBoundingClientRect();
+  let pr = plane.getBoundingClientRect();
   let er = el.getBoundingClientRect();
   clip.classList.remove(TB_FLAT_CLASS);
+  // Tutorial-Zoom (Desktop, `.tut-zoom` am Brettkasten): Clip, Ebene und Ziel sind um `kz` skaliert gemessen. Die Kette wird in Layoutmassen nachgebaut und als Ganzes um `kz`
+  // vergroessert (Ursprung links oben) — wie die echte Ebene unter der Zoom-Transformation.
+  let kz = 1;
+  { const bcz = clip.parentElement; if (bcz && bcz.classList && bcz.classList.contains('tut-zoom') && clip.offsetWidth > 0) { const q = cr.width / clip.offsetWidth; if (Number.isFinite(q) && q > 0.2) kz = q; } }
+  if (kz !== 1) {
+    const N = (b) => ({ left: b.left, top: b.top, width: b.width / kz, height: b.height / kz });
+    const cr0 = cr, pr0 = pr, er0 = er;
+    cr = { left: cr0.left, top: cr0.top, width: cr0.width / kz, height: cr0.height / kz };
+    pr = { left: cr0.left + (pr0.left - cr0.left) / kz, top: cr0.top + (pr0.top - cr0.top) / kz, width: pr0.width / kz, height: pr0.height / kz };
+    er = { left: cr0.left + (er0.left - cr0.left) / kz, top: cr0.top + (er0.top - cr0.top) / kz, width: er0.width / kz, height: er0.height / kz };
+    void N;
+  }
   // ★ Hovert der Zeiger gerade ueber der Zone, ist sie hochgezoomt (`scale`,
   // `--board-hover-scale`, mit Uebergang) — das Highlight bekam diese Hover-
   // Groesse, das geklonte Kartenbild aber blieb in Ruhegroesse: der Rahmen
@@ -10644,6 +10796,7 @@ function measureHighlight(el) {
   // andere Projektion als die Karte darunter.
   return {
     flat: false,
+    kz,
     clip: { left: cr.left, top: cr.top, width: cr.width, height: cr.height },
     plane: { left: pr.left - cr.left, top: pr.top - cr.top, width: pr.width, height: pr.height },
     local: { left: er.left - pr.left, top: er.top - pr.top, width: er.width, height: er.height },
@@ -10827,6 +10980,13 @@ function TextBox() {
     return () => { clearInterval(timerRef.current); if (vorT) clearTimeout(vorT); vorlaufRef.current = false; };
   }, [pages, pageIdx]);
 
+  // Seiten mit Tackle-Szene: Antonias Musik schon vorher dekodieren (siehe `ppBgmVorwaermen`), nicht erst im Augenblick ihres Auftritts.
+  useEffect(() => {
+    if (!pages.some(p => p && p.tackle) || !window.ppBgmVorwaermen) return undefined;
+    const t = setTimeout(() => window.ppBgmVorwaermen('tutorialAntonia'), 800);
+    return () => clearTimeout(t);
+  }, [pages]);
+
   // ── Tackle-Szene (Tutorial 5, Epilog) ────────────────────────────
   // „Antonia fliegt von rechts ueber die Textbox, rammt Monia Bot und wirft
   // sie aus dem Bild; Antonia steht danach links, wo Monia stand."
@@ -10854,7 +11014,7 @@ function TextBox() {
     const mx = r.left + r.width / 2, my = r.top + r.height / 2;
     const flieger = document.createElement('img');
     flieger.src = ANTONIA_PORTRAIT; flieger.draggable = false;
-    fest(flieger, { width: '104px', height: '104px', imageRendering: 'pixelated', filter: 'drop-shadow(3px 3px 0 rgba(0,0,0,.55))' });
+    fest(flieger, { width: '104px', height: '104px', imageRendering: 'pixelated' });   // ohne `filter`: ein Filter auf einem bewegten Bild wird jedes Bild neu gerastert
     // Die Textbox sitzt am oberen Bildrand — der Flug bleibt auf Hoehe des Portraets.
     const startX = window.innerWidth + 60, zielX = mx - 52, y0 = my - 52 - 8, y1 = my - 52;
     if (window.playSFX) window.playSFX('attack_ram', { dedupe: 100 });
@@ -10922,10 +11082,10 @@ function TextBox() {
 
   // Highlights
   useEffect(() => {
-    if (!pages.length) { setHighlightRects([]); return; }
+    if (!pages.length) { setHighlightRects([]); if (window.ppTutorialZoomAus) window.ppTutorialZoomAus(); return; }   // Textbox zu: aus dem Zoom wieder heraus
     const page = pages[pageIdx];
     const hl = page?.highlights;
-    if (!hl || !hl.length) { setHighlightRects([]); return; }
+    if (!hl || !hl.length) { setHighlightRects([]); if (window.ppTutorialZoomAus) window.ppTutorialZoomAus(); return; }
     const rects = [];
     const aufraeumen = [];
     let abgebrochen = false;
@@ -10979,7 +11139,9 @@ function TextBox() {
             an.forEach(a => kopie.querySelectorAll(a).forEach(n => n.setAttribute('data-tb-an', '1')));
             html = kopie.outerHTML;
           }
-          const basis = { pulse, vars, handkarte: el !== treffer, stapel: Number.isFinite(z) ? z : 0, html, ziel: el };
+          // Phasenleiste (nicht auf dem Handy — dort ist sie schon so gross wie moeglich): waehrend des Highlights groesser dargestellt
+          const phasenleiste = !(window.ppIsPhone && window.ppIsPhone()) && !!(el.closest && (el.matches('.phase-column') || el.closest('.phase-column')));
+          const basis = { pulse, vars, handkarte: el !== treffer, phasenleiste, stapel: Number.isFinite(z) ? z : 0, html, ziel: el };
           rects.push({ ...m, ...basis });
           // ── Hover auf einer gehighlighteten HANDKARTE ──
           // Hebt sich die echte Karte unter dem Zeiger, soll die Highlight-
@@ -11021,6 +11183,7 @@ function TextBox() {
         if (sel) document.querySelectorAll(sel).forEach(tr => { if (!tr.closest('.textbox-overlay')) ziele.push(tr); });
       }
       fahrt = window.ppTutorialCamFokus(ziele);
+      if (!fahrt && window.ppTutorialZoom) fahrt = window.ppTutorialZoom(ziele);   // Desktop: hineinzoomen, Ziele in die Mitte (Handy: Kamerafahrt oben)
     }
     if (fahrt) { setHighlightRects([]); fahrt.then(() => { if (!abgebrochen) messen(); }); }
     else messen();
@@ -11081,6 +11244,10 @@ function TextBox() {
         setTutorialFigurenGesperrt(false);
       }
       // Fade out then dismiss
+      // Die Erklaerung ist zu Ende: Highlights und Zoom enden JETZT — die Figuren steigen schon waehrend des Ausblendens aus den Karten (s. oben) und wuerden sonst von den
+      // noch stehenden Highlight-Klonen auf den Heldenkarten ueberdeckt (Befund Ende Status-Tutorial).
+      setHighlightRects([]);
+      if (window.ppTutorialZoomAus) window.ppTutorialZoomAus();
       setFading(true);
       const cb = opts.onDismiss;
       setTimeout(() => {
@@ -11218,14 +11385,16 @@ function TextBox() {
       {highlightRects.map((h, i) => {
         const gedreht = h.flat && (h.drehung != null || h.handkarte);
         const inner = (
-          <div className={'textbox-highlight' + (h.pulse ? ' textbox-highlight-pulse' : '') + (h.handkarte ? ' textbox-highlight-hand' : '')}
-            style={gedreht
+          <div className={'textbox-highlight' + (h.pulse ? ' textbox-highlight-pulse' : '') + (h.handkarte ? ' textbox-highlight-hand' : '') + (h.phasenleiste ? ' textbox-highlight-phase' : '')}
+            style={{ ...(gedreht
               ? { position: 'absolute', left: 0, top: 0, width: '100%', height: '100%', pointerEvents: 'none' }
               : h.flat
               ? { position: 'fixed', left: h.rect.left, top: h.rect.top,
                   width: h.rect.width, height: h.rect.height, pointerEvents: 'none' }
               : { position: 'absolute', left: h.local.left, top: h.local.top,
-                  width: h.local.width, height: h.local.height, pointerEvents: 'none' }}>
+                  width: h.local.width, height: h.local.height, pointerEvents: 'none' }),
+              // Phasenleiste: gestufte Größen des Wachsens (`tbPhaseGross`, app-fx-44) — im Raster der Kunstpixel
+              ...(h.phasenleiste && window.ppFx44Stufen ? window.ppFx44Stufen(h.flat ? h.rect.width : h.local.width, 0) : null) }}>
             <div className="textbox-highlight-clone" style={h.vars} dangerouslySetInnerHTML={{ __html: h.html }} />
           </div>
         );
@@ -11239,7 +11408,14 @@ function TextBox() {
             left: h.rect.left, top: h.rect.top,
             width: h.rect.width, height: h.rect.height,
             transform: `rotate(${h.drehung || 0}deg) scale(${h.skala || 1})`,
-            pointerEvents: 'none', zIndex: 90001 + h.stapel + (h.hover ? 1000 : 0),
+            // Gehighlightete HANDKARTE: waehrend des Highlights ~50 % groesser (eigene Eigenschaften `scale`/`translate`, damit Faecherdrehung und Hover-Massstab darunter bleiben);
+            // nach oben versetzt, damit die Karte nicht unten aus dem Bild waechst. Gestuft statt stufenlos (Pixelart).
+            ...(h.handkarte ? { '--tb-hoch': `${Math.round(Math.min(0, window.innerHeight - 8 - (h.rect.top + h.rect.height * 1.25)))}px`,   // unterer Rand nach dem Wachsen (Mitte + 0,75·Hoehe) bleibt im Bild
+             // Größen/Versatz je Stufe vorgerechnet (app-fx-44): die Schlüsselbilder wechseln nur Hilfsvariablen, gebacken wird zur Laufzeit nichts
+             ...(window.ppFx44Stufen ? window.ppFx44Stufen(h.rect.width, Math.round(Math.min(0, window.innerHeight - 8 - (h.rect.top + h.rect.height * 1.25)))) : null),
+             scale: 'var(--tbs, 1)', translate: '0 var(--tbt, 0px)',
+             animation: 'tbHandGross .24s steps(1, end) both' } : null),
+            pointerEvents: 'none', zIndex: 90001 + h.stapel + (h.hover ? 1000 : 0) + (h.handkarte ? 500 : 0),
           }}>{inner}</div>
         );
         if (h.flat) return <div key={i} style={{ display: 'contents' }}>{inner}</div>;
@@ -11253,6 +11429,7 @@ function TextBox() {
             left: h.clip.left, top: h.clip.top,
             width: h.clip.width, height: h.clip.height,
             perspective: h.perspective, perspectiveOrigin: h.perspectiveOrigin,
+            ...(h.kz && h.kz !== 1 ? { transform: `scale(${h.kz})`, transformOrigin: '0 0' } : null),
             pointerEvents: 'none', zIndex: 90001,
           }}>
             <div style={{
@@ -11272,7 +11449,6 @@ function TextBox() {
           <div className={'textbox-portrait textbox-portrait-left' + (hasRight && activeSide !== 'left' ? ' textbox-portrait-inactive' : '') + (leftExiting ? ' textbox-portrait-exit-left' : '')}>
             <div className={'textbox-portrait-frame' + (page?.tackle && tackleAus ? ' textbox-portrait-ankunft' : '')}>
               <img src={linksPortrait} alt={leftName || ''} draggable={false} />
-              {[...Array(8)].map((_, i) => <span key={i} className="textbox-sparkle" style={{ animationDelay: (i * 0.35) + 's', top: [10,60,5,50,30,65,15,45][i] + '%', left: [5,70,55,10,80,35,90,60][i] + '%' }} />)}
             </div>
             {leftName && <span className="textbox-speaker-name">{leftName}</span>}
           </div>
@@ -11296,7 +11472,6 @@ function TextBox() {
           <div className={'textbox-portrait textbox-portrait-right' + (activeSide !== 'right' ? ' textbox-portrait-inactive' : '') + (rightExiting ? ' textbox-portrait-exit' : '')}>
             <div className="textbox-portrait-frame">
               <img src={opts.rightSpeaker} alt={opts.rightSpeakerName || ''} draggable={false} />
-              {[...Array(8)].map((_, i) => <span key={i} className="textbox-sparkle" style={{ animationDelay: (i * 0.25 + 0.1) + 's', top: [15,55,8,48,35,62,20,42][i] + '%', left: [8,65,50,15,75,30,85,55][i] + '%' }} />)}
             </div>
             {rightName && <span className="textbox-speaker-name">{rightName}</span>}
           </div>
@@ -11362,8 +11537,10 @@ function atkWowStart(heldSelektor) {
   wurzel.appendChild(zahl);
   document.body.appendChild(wurzel);
   const wertEl = zahl.querySelector('.atk-wow-wert');
+  const c47 = window.ppFx47Wow ? window.ppFx47Wow(cx, cy) : null;      // app-fx-47.jsx: Ringe/Funken/Blitz als EINE Pixelart-Leinwand statt ~75 DOM-Elementen mit eigener Animation
   const FARBEN = ['#fad54a', '#ff9a1a', '#ff491a', '#ffffff', '#f9ecb3'];
   const ring = (verzoegerung, groesse) => {
+    if (c47) { c47.ring(verzoegerung, groesse); return; }
     const e = document.createElement('div');
     e.className = 'atk-wow-ring';
     e.style.animationDelay = verzoegerung + 'ms';
@@ -11371,6 +11548,7 @@ function atkWowStart(heldSelektor) {
     wurzel.appendChild(e);
   };
   const funken = (anzahl, weit) => {
+    if (c47) { c47.funken(anzahl, weit); return; }
     for (let i = 0; i < anzahl; i++) {
       const e = document.createElement('div');
       e.className = 'atk-wow-funke';
@@ -11383,6 +11561,7 @@ function atkWowStart(heldSelektor) {
     }
   };
   const blitz = (stark) => {
+    if (c47) { c47.blitz(stark); return; }
     const b = document.createElement('div');
     b.className = 'atk-wow-blitz' + (stark ? ' atk-wow-blitz-stark' : '');
     document.body.appendChild(b);
@@ -11408,7 +11587,7 @@ function atkWowStart(heldSelektor) {
       }
       // Kurz stehen lassen, dann ausblenden und aufraeumen.
       setTimeout(() => wurzel.classList.add('atk-wow-aus'), 2100);
-      setTimeout(() => wurzel.remove(), 2700);
+      setTimeout(() => { wurzel.remove(); if (c47) c47.stop(); }, 2700);
     },
   };
 }
@@ -12008,10 +12187,10 @@ function PPDialogBox({ text, eingabe, vorgabe, okText, abbruchText, gefahr, fert
     <div style={{ position: 'fixed', inset: 0, zIndex: 100002, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(8,6,12,.8)' }} onClick={nein}>
       <div onClick={(e) => e.stopPropagation()} style={{ minWidth: 260, maxWidth: 'min(92vw, 420px)', padding: '16px 18px', background: 'var(--bg2)', border: '3px solid ' + (gefahr ? 'var(--danger)' : 'var(--accent)'), textAlign: 'center' }}>
         <div style={{ fontSize: 13, color: 'var(--text)', lineHeight: 1.5, marginBottom: 12, whiteSpace: 'pre-wrap' }}>{text}</div>
-        {eingabe && <input ref={eingabeRef} className="input" value={wert} onChange={(e) => setWert(e.target.value)} style={{ width: '100%', boxSizing: 'border-box', marginBottom: 12, fontSize: 13 }} />}
+        {eingabe && <input ref={eingabeRef} data-pp-tastatur="an" className="input" value={wert} onChange={(e) => setWert(e.target.value)} style={{ width: '100%', boxSizing: 'border-box', marginBottom: 12, fontSize: 13 }} />}
         <div style={{ display: 'flex', gap: 10, justifyContent: 'center' }}>
           <button className={'btn' + (gefahr ? ' btn-danger' : ' btn-success')} style={{ padding: '8px 22px', fontSize: 12 }} onClick={ok}>{okText || 'OK'}</button>
-          <button className="btn" style={{ padding: '8px 22px', fontSize: 12 }} onClick={nein}>{abbruchText || 'Cancel'}</button>
+          {abbruchText !== false && <button className="btn" style={{ padding: '8px 22px', fontSize: 12 }} onClick={nein}>{abbruchText || 'Cancel'}</button>}
         </div>
       </div>
     </div>
@@ -12028,6 +12207,8 @@ function _ppDialogOeffnen(props) {
   });
 }
 window.ppConfirm = (text, opts) => _ppDialogOeffnen({ text, ...(opts || {}) });
+// Hinweis mit nur einem OK-Knopf (z. B. „Server ist voll“).
+window.ppHinweis = (text, opts) => _ppDialogOeffnen({ text, abbruchText: false, ...(opts || {}) });
 // ── KARTEN VORWAERMEN (tropfenweise, siehe CardImageShim.warmDrip) ───────────────────────────────────────────────────────────────────────
 // Tutorial-Karten: einmal pro Sitzung holen (Server rechnet die Liste aus den Missionen) und im Leerlauf nach und nach bereitlegen.
 let _ppTutorialWarm = false;
