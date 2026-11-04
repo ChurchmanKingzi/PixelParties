@@ -8681,9 +8681,15 @@ function cpuGenericChoice(engine, promptData, promptedPlayerIdx) {
     const maxSelect = promptData.maxSelect || 1;
     const minSelect = promptData.minSelect != null ? promptData.minSelect : 1;
     const cardDB = engine._getCardDB();
+    // Erzwungen (genau eine wählbare Karte, mindestens eine ist zu wählen): kein Wert fließt ins Ergebnis, die Bewertung entfällt.
+    if (eligible.length === 1 && minSelect >= 1 && maxSelect >= 1) {
+      return { selectedCards: [{ cardName: ps.hand[eligible[0]], handIndex: eligible[0] }] };
+    }
     const baseScore = (() => {
       try { return evaluateState(engine, cpuIdx); } catch { return 0; }
     })();
+    // Gleiche Namen ergeben denselben Verlust (der Evaluator zählt die Handkarten als Menge) — je Name nur einmal rechnen.
+    const verlustJeName = new Map();
     const scored = eligible.map(idx => {
       const name = ps.hand[idx];
       const cd = cardDB[name];
@@ -8693,12 +8699,17 @@ function cpuGenericChoice(engine, promptData, promptedPlayerIdx) {
       if (copiesLeft === 1) value += 100;
       else if (copiesLeft === 2) value += 25;
       if (cd?.cardType === 'Ascended Hero') value += 200;
-      const removed = ps.hand[idx];
-      ps.hand.splice(idx, 1);
-      let scoreWithout = baseScore;
-      try { scoreWithout = evaluateState(engine, cpuIdx); } catch {}
-      ps.hand.splice(idx, 0, removed);
-      value += Math.max(0, baseScore - scoreWithout);
+      let verlust = verlustJeName.get(name);
+      if (verlust === undefined) {
+        const removed = ps.hand[idx];
+        ps.hand.splice(idx, 1);
+        let scoreWithout = baseScore;
+        try { scoreWithout = evaluateState(engine, cpuIdx); } catch {}
+        ps.hand.splice(idx, 0, removed);
+        verlust = Math.max(0, baseScore - scoreWithout);
+        verlustJeName.set(name, verlust);
+      }
+      value += verlust;
       return { idx, name, value };
     });
     scored.sort((a, b) => a.value - b.value);
@@ -8795,10 +8806,16 @@ function cpuGenericChoice(engine, promptData, promptedPlayerIdx) {
     }
     if (!eligible.length) return null;
     const cardDB = engine._getCardDB();
-    const baseScore = (() => {
-      try { return evaluateState(engine, cpuIdx); } catch { return 0; }
-    })();
-    const scored = eligible.map(idx => {
+    // ★ Abwurfwahl in drei Schritten, Ergebnis wie vorher Karte für Karte durchgerechnet (Bewertung je Handkarte = ein voller Evaluator-Lauf,
+    //   in der Netz-Suche rund 10 Prozent der Spielzeit):
+    //   (1) Statischer Teil je Karte (Seltenheit, Aufgestiegener Held, Behalte-Hinweis) — kostet nichts.
+    //   (2) Der Evaluator-Verlust beim Abwurf ist >= 0, der Wert einer Karte also >= ihr statischer Teil. Wer schon über dem besten
+    //       bisher berechneten Wert liegt, kann nicht mehr gewinnen und wird nicht bewertet; bei Gleichstand gewinnt die frühere
+    //       Position (stabile Sortierung wie bisher).
+    //   (3) Gleiche Namen ergeben denselben Verlust (der Evaluator zählt die Handkarten als Menge), die späteren Kopien fallen
+    //       durch (2) heraus: gleicher Wert, spätere Position.
+    //   Ist die Wahl erzwungen (eine Karte, der Wert fließt nirgends ein), entfällt die Bewertung ganz.
+    const cand = eligible.map((idx, pos) => {
       const name = ps.hand[idx];
       const cd = cardDB[name];
       let value = 0;
@@ -8809,6 +8826,17 @@ function cpuGenericChoice(engine, promptData, promptedPlayerIdx) {
       else if (copiesLeft === 2) value += 25;
       // Ascended Hero cards are critical win-condition pieces
       if (cd?.cardType === 'Ascended Hero') value += 200;
+      // ★ 25.10. (Explosion Toss): eine Hand-Reaktion, die genau auf den Effekt wartet, dessen KOSTE dieser Abwurf ist (Hot Skull Potato → Explosion Toss), nicht als Kosten verheizen.
+      // `cpuMeta.keepOnDiscardFor`: Namen der Quellen, bei denen die Karte auf der Hand bleiben soll.
+      let keep = 0;
+      try {
+        const keepFor = loadCardEffect(name)?.cpuMeta?.keepOnDiscardFor;
+        const quelle = promptData.costFor || promptData.source;
+        if (Array.isArray(keepFor) && quelle && keepFor.includes(quelle)) keep = 150;
+      } catch { /* Beiwerk */ }
+      return { idx, name, pos, stat: value, keep, lb: value + keep };
+    });
+    const wertEinerKarte = (c, baseScore) => {
       // Evaluator delta — tentatively MOVE the card from hand to
       // discard pile and re-score. Pushing to discardPile (not just
       // splicing out of hand) lets the evaluator see post-discard
@@ -8818,25 +8846,44 @@ function cpuGenericChoice(engine, promptData, promptedPlayerIdx) {
       // so the brain prefers to feed Phoenix when armed instead of
       // burning Spells. Mirror the move via splice + push, then
       // restore both halves afterwards.
-      const removed = ps.hand[idx];
-      ps.hand.splice(idx, 1);
+      const removed = ps.hand[c.idx];
+      ps.hand.splice(c.idx, 1);
       ps.discardPile.push(removed);
       let scoreWithout = baseScore;
       try { scoreWithout = evaluateState(engine, cpuIdx); } catch {}
       ps.discardPile.pop();
-      ps.hand.splice(idx, 0, removed);
-      value += Math.max(0, baseScore - scoreWithout);
-      // ★ 25.10. (Explosion Toss): eine Hand-Reaktion, die genau auf den Effekt wartet, dessen KOSTE dieser Abwurf ist (Hot Skull Potato → Explosion Toss), nicht als Kosten verheizen.
-      // `cpuMeta.keepOnDiscardFor`: Namen der Quellen, bei denen die Karte auf der Hand bleiben soll.
-      try {
-        const keepFor = loadCardEffect(name)?.cpuMeta?.keepOnDiscardFor;
-        const quelle = promptData.costFor || promptData.source;
-        if (Array.isArray(keepFor) && quelle && keepFor.includes(quelle)) value += 150;
-      } catch { /* Beiwerk */ }
-      return { idx, name, value };
-    });
-    scored.sort((a, b) => a.value - b.value);
-    const pick = scored[0];
+      ps.hand.splice(c.idx, 0, removed);
+      return (c.stat + Math.max(0, baseScore - scoreWithout)) + c.keep;
+    };
+    let pick;
+    if (cand.length === 1 && (type === 'forceDiscard' || promptData.costFor)) {
+      pick = { idx: cand[0].idx, name: cand[0].name, value: NaN };   // erzwungen; der Wert wird unten nicht gelesen
+    } else {
+      const baseScore = (() => {
+        try { return evaluateState(engine, cpuIdx); } catch { return 0; }
+      })();
+      const order = cand.slice().sort((a, b) => (a.lb - b.lb) || (a.pos - b.pos));
+      const vomNamen = new Map();
+      let best = null, ungueltig = false;
+      for (const c of order) {
+        if (best) {
+          if (c.lb > best.value) break;
+          if (c.lb === best.value && c.pos > best.pos) continue;
+          if (vomNamen.has(c.name)) continue;
+        }
+        const v = wertEinerKarte(c, baseScore);
+        vomNamen.set(c.name, v);
+        if (!Number.isFinite(v)) { ungueltig = true; break; }
+        if (!best || v < best.value || (v === best.value && c.pos < best.pos)) best = { idx: c.idx, name: c.name, pos: c.pos, value: v };
+      }
+      if (ungueltig) {
+        // Nicht endliche Bewertung (sollte nie vorkommen): alles wie vorher durchrechnen und sortieren.
+        const scored = cand.map(c => ({ idx: c.idx, name: c.name, value: wertEinerKarte(c, baseScore) }));
+        scored.sort((a, b) => a.value - b.value);
+        best = scored[0];
+      }
+      pick = best;
+    }
     // For forceDiscardCancellable ("discard a card OR take the effect"),
     // refuse the discard if the least-bad card is still too precious to
     // lose. Threshold 150 ≈ "this card is more valuable than ~150 HP
