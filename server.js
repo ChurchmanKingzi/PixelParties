@@ -8709,6 +8709,15 @@ async function doPlaySpell(room, pi, { cardName, handIndex, heroIdx, charmedOwne
     chainResult = _kostenAbbruch ? { negated: false, chainFormed: true, fizzled: false } : await room.engine.executeCardWithChain({
       cardName, owner: pi, cardType: cardData.cardType, goldCost: 0, heroIdx: heroIdxPub,
       resolve: null,
+      // Handkarte des Initialglieds: fliegt beim AUFLOESEN des Glieds (nicht erst nach der ganzen Aufloesung). Nur eigene Karten aus der Hand (keine Creation-Karte, keine fremde Herkunft).
+      handFlug: (() => {
+        if (fromCreation) return null;
+        const _hi = getResolvingHandIndex(ps);
+        if (!(_hi >= 0)) return null;
+        const _o = room.engine._handOriginAt ? room.engine._handOriginAt(ps, _hi) : null;
+        if (_o != null && _o !== pi) return null;
+        return { handIdx: _hi, to: ((script && script.deleteOnUse) || _attaLoescht) ? 'deleted' : 'discard', toOwner: pi };
+      })(),
       // W74b (Flesh-Eating Swarm Trap): ein Attachment waehlt seinen Helden beim Spielen.
       chosenHero: (attachHeroIdx != null && attachHeroIdx >= 0) ? { owner: isSeat(gs, attachOwner) ? attachOwner : pi, heroIdx: attachHeroIdx } : null,
       // ★ v1328: Wirker-Seite (bezauberter Held) fuer die Handlungs-
@@ -9153,7 +9162,7 @@ async function doPlaySpell(room, pi, { cardName, handIndex, heroIdx, charmedOwne
     // Herkunft schon verbraucht — nicht ein zweites Mal ziehen.
     const spellPileOwner = resolveHi >= 0 ? room.engine._consumeHandCardOrigin(pi, cardName, fromCreation ? undefined : resolveHi) : pi;
     const _buddyToken = _buddyTicket?.token || null;   // W67a: Inya hat die Karte als Fantasy Buddy aufs Brett gestellt — statt Ablage, nie beides
-    if (resolveHi >= 0 && !gs._spellPlacedOnBoard && !gs._spellReturnToHand && !_buddyToken) {
+    if (resolveHi >= 0 && !gs._spellPlacedOnBoard && !gs._spellReturnToHand && !_buddyToken && !(chainResult && chainResult.initialFlug)) {   // initialFlug: der Flug ging schon beim Aufloesen des Kettenglieds raus
       room.engine._broadcastEvent('play_pile_transfer', {
         fromOwner: pi, toOwner: spellPileOwner, cardName,
         from: fromCreation ? 'creation' : 'hand',

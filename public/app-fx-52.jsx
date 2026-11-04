@@ -799,6 +799,17 @@
         }
       };
       const stopp = () => { if (aus) return; aus = true; try { cancelAnimationFrame(raf); } catch (e) { /* weg */ } wurzel.remove(); };
+      /** Ein Bild zur Effektzeit t (s) zeichnen und hochladen (Schmutzrechteck). */
+      const bildBei = (t) => {
+        const d = m.d, buf = img.data;
+        if (vor) { for (let jj = vor.y0; jj < vor.y1; jj++) buf.fill(0, (jj * gw + vor.x0) * 4, (jj * gw + vor.x1) * 4); }
+        d.x0 = gw; d.y0 = gh; d.x1 = 0; d.y1 = 0;
+        malen(Math.max(0, t));
+        const ux0 = Math.min(vor ? vor.x0 : gw, d.x0), uy0 = Math.min(vor ? vor.y0 : gh, d.y0), ux1 = Math.max(vor ? vor.x1 : 0, d.x1), uy1 = Math.max(vor ? vor.y1 : 0, d.y1);
+        if (ux1 > ux0 && uy1 > uy0) g2.putImageData(img, 0, 0, ux0, uy0, ux1 - ux0, uy1 - uy0);
+        vor = d.x1 > d.x0 ? { x0: d.x0, y0: d.y0, x1: d.x1, y1: d.y1 } : null;
+      };
+      if (o && o.manuell) { (welt ? window.ppFxWeltSchicht() : document.body).appendChild(wurzel); return { bildBei, stopp, plan, ende: einzel ? plan.tLast + 0.95 : Math.max(plan.tEnd, tHud + 0.25), sfx: einzel ? [[0.04, 'projectile'], [plan.tLast, 'damage']] : null }; }   // Testhaken: Bilder einzeln zeichnen (Frame-genaue Aufnahme)
       const takt = window.ppTaktRaf || window.requestAnimationFrame;
       const schritt = (jetzt) => {
         if (aus) return;
@@ -809,13 +820,8 @@
         if (fr !== letzte) {
           letzte = fr;
           const mess = window.__ppFx52Messen ? performance.now() : 0;
-          const d = m.d, buf = img.data;
-          if (vor) { for (let jj = vor.y0; jj < vor.y1; jj++) buf.fill(0, (jj * gw + vor.x0) * 4, (jj * gw + vor.x1) * 4); }
-          d.x0 = gw; d.y0 = gh; d.x1 = 0; d.y1 = 0;
-          malen(Math.max(0, t));
-          const ux0 = Math.min(vor ? vor.x0 : gw, d.x0), uy0 = Math.min(vor ? vor.y0 : gh, d.y0), ux1 = Math.max(vor ? vor.x1 : 0, d.x1), uy1 = Math.max(vor ? vor.y1 : 0, d.y1);
-          if (ux1 > ux0 && uy1 > uy0) g2.putImageData(img, 0, 0, ux0, uy0, ux1 - ux0, uy1 - uy0);
-          vor = d.x1 > d.x0 ? { x0: d.x0, y0: d.y0, x1: d.x1, y1: d.y1 } : null;
+          if (mess && einzel) (window.__ppFx52Takte || (window.__ppFx52Takte = [])).push([+jetzt.toFixed(2), fr, +(jetzt - t0).toFixed(1)]);   // Messung: Zeitpunkt jedes gezeichneten Takts (Archer-Pfeil)
+          bildBei(t);
           if (mess) (window.__ppFx52Zeiten || (window.__ppFx52Zeiten = [])).push(+(performance.now() - mess).toFixed(3));
         }
         raf = takt(schritt);

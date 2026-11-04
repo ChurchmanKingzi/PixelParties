@@ -35680,7 +35680,7 @@ function AttachableCreatureCard({ creatureName, attachedHero, mimicCreature, sha
 //  Der Titel steht mittig ueber den Karten (CSS: `align-items: center`). Ohne Deck-Spalte (Sonderansichten) bleibt der
 //  Abstand aus dem CSS.
 // ═══════════════════════════════════════════
-function ReactionChainOverlay({ chain, myIdx }) {
+function ReactionChainOverlay({ chain, myIdx, fx }) {
   const ref = useRef(null);
   const [rechts, setRechts] = useState(null);   // Abstand zur rechten Bildschirmseite in px; null = der aus dem CSS
   const versuche = useRef(0);
@@ -35705,22 +35705,22 @@ function ReactionChainOverlay({ chain, myIdx }) {
     return () => { if (ro) ro.disconnect(); window.removeEventListener('resize', neu); };
   }, [messen]);
   return (
-    <div className="reaction-chain-overlay" ref={ref} style={rechts != null ? { right: rechts } : undefined}>
+    <div className={'reaction-chain-overlay' + (fx ? ' rc53' : '')} ref={ref} style={rechts != null ? { right: rechts } : undefined}>
       <div className="reaction-chain-label orbit-font">Chain</div>
       <div className="reaction-chain-cards">
-        {chain.map((link, i) => (
+        {chain.map((link, i) => link.status === 'gone' ? null : (
           <div key={link.id}
             data-chain-idx={i}
             data-chain-card={link.cardName}
             className={
             'reaction-chain-card'
-            + (link.status === 'resolving' ? ' chain-glow' : '')
-            + (link.status === 'negated' ? ' chain-negated' : '')
-            + (link.status === 'resolved' ? ' chain-resolved' : '')
+            + (!fx && link.status === 'resolving' ? ' chain-glow' : '')
+            + (!fx && link.status === 'negated' ? ' chain-negated' : '')
+            + (!fx && link.status === 'resolved' ? ' chain-resolved' : '')
           }>
             <BoardCard cardName={link.cardName} style={{ width: 80, height: 112, borderRadius: 4 }} />
             {link.isInitialCard && <div className="chain-badge chain-badge-initial">INITIAL</div>}
-            {link.status === 'negated' && <div className="chain-negate-symbol">🚫</div>}
+            {!fx && link.status === 'negated' && <div className="chain-negate-symbol">🚫</div>}
             {link.status === 'negated' && link.negationStyle === 'thief' && (
               /* Key, the Cursed Thief (v691): ein Griff ins Glied —
                  Schluesselchen kreisen, ein Schleier faellt ueber die
@@ -44543,6 +44543,9 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
   // kennt sie nicht). `[{ id, cardName, owner, fromHandIdx }]`; `id` = Kettenglied. Weg ist der Geist, sobald das Glied seine Karte wegfliegen laesst
   // (`play_pile_transfer` mit `chainLinkId`), sonst spaetestens beim Aufloesen/Kettenende. `geisterFreiRef` merkt freigegebene Glieder, damit ein spaeteres
   // Kettenupdate sie nicht wiederbelebt; `geisterElRef` hat das Ziel/Quell-Element je Geist (Flugquelle).
+  const [chainFx, setChainFx] = useState(false);   // Pixelart-Leiste (app-fx-53) für die laufende Kette
+  const chainFxRef = useRef(false);
+  const chainVorlaufRef = useRef(false);   // die Kette trägt ein Anzeige-Glied vorn (DOM-Indizes +1)
   const [handGeister, setHandGeister] = useState([]);
   const geisterFreiRef = useRef(new Set());
   const geisterKettenRef = useRef([]);   // Glieder der laufenden Kette (Index → id), fuer `link_resolved`
@@ -44699,27 +44702,47 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     const onChainUpdate = ({ links, vorlauf, geister }) => {
       const vor = vorlauf ? [{ id: 'vorlauf', cardName: vorlauf.cardName, owner: vorlauf.owner, cardType: vorlauf.cardType, isInitialCard: true, _vorlauf: true, status: 'resolved' }] : [];
       geisterKettenRef.current = links.map(l => l.id);
+      chainVorlaufRef.current = !!vorlauf;
       if (geister) geisterSetzen(geister);
+      // Pixelart-Leiste (app-fx-53): beim ersten Update der Kette festlegen, ob sie läuft (sonst die schlichte Darstellung von heute)
+      if (!chainFxRef.current && links.length >= 2) { const an = !!(window.ppFx53 && window.ppFx53.aktiv()); chainFxRef.current = an; setChainFx(an); }
+      if (chainFxRef.current && window.ppFx53) window.ppFx53.vorladen(links.map(l => l.cardName));
       setReactionChain([...vor, ...links.map(l => ({ ...l, isInitialCard: vorlauf ? false : l.isInitialCard, status: l.negated ? 'negated' : 'pending' }))]);
     };
     const chainIdx = (prev, i) => i + (prev?.[0]?._vorlauf ? 1 : 0);
-    const onChainResolvingStart = () => { geisterTtlNeu(); }; // Chain is about to resolve
+    const fxDomIdx = (linkIndex) => linkIndex + (chainVorlaufRef.current ? 1 : 0);
+    const onChainResolvingStart = ({ takt, n } = {}) => {   // Chain is about to resolve
+      geisterTtlNeu();
+      if (chainFxRef.current && window.ppFx53) {
+        const ok = window.ppFx53.start({ takt, n, onGone: (idx) => setReactionChain(prev => prev?.map((l, i) => i === idx ? { ...l, status: 'gone' } : l)) });
+        if (!ok) { chainFxRef.current = false; setChainFx(false); }
+      }
+    };
     const onChainLinkResolving = ({ linkIndex }) => {
-      if (window.playSFX) window.playSFX('spell_cast', { dedupe: 400 });   // ohne Slot 'effect' (s. `spell_played` in app-shared.jsx)
+      if (chainFxRef.current && window.ppFx53) window.ppFx53.link(fxDomIdx(linkIndex), 'resolving', { initial: linkIndex === 0 });
+      else if (window.playSFX) window.playSFX('spell_cast', { dedupe: 400 });   // ohne Slot 'effect' (s. `spell_played` in app-shared.jsx)
       setReactionChain(prev => prev?.map((l, i) => i === chainIdx(prev, linkIndex) ? { ...l, status: 'resolving' } : l));
       geisterTtlNeu();
     };
     const onChainLinkResolved = ({ linkIndex }) => {
+      if (chainFxRef.current && window.ppFx53) window.ppFx53.link(fxDomIdx(linkIndex), 'resolved');
       setReactionChain(prev => prev?.map((l, i) => i === chainIdx(prev, linkIndex) ? { ...l, status: 'resolved' } : l));
       // Fliegt die Karte des Glieds nicht ueber `play_pile_transfer` weg (Reaktions-Creature setzt sich aufs Brett, ...), geht der Geist hier.
       geisterFreigeben(geisterKettenRef.current[linkIndex]);
     };
     const onChainLinkNegated = ({ linkIndex, negationStyle }) => {
+      if (chainFxRef.current && window.ppFx53) {
+        const idx = fxDomIdx(linkIndex);
+        window.ppFx53.link(idx, 'negated', { initial: linkIndex === 0 });
+        setTimeout(() => { if (window.ppFx53 && window.ppFx53.laeuft()) window.ppFx53.link(idx, 'resolved'); }, 12 * 33.4);   // Zerbröseln nach 12 Bildern (wie `_kettenTakt`: Negation + 8)
+      }
       setReactionChain(prev => prev?.map((l, i) => i === chainIdx(prev, linkIndex) ? { ...l, status: 'negated', negated: true, negationStyle: negationStyle || null } : l));
       geisterTtlNeu();
     };
     const onChainDone = () => {
-      setTimeout(() => setReactionChain(null), 800);
+      if (chainFxRef.current && window.ppFx53 && window.ppFx53.laeuft()) {
+        window.ppFx53.fertig(() => { setReactionChain(null); chainFxRef.current = false; setChainFx(false); });
+      } else { setTimeout(() => setReactionChain(null), 800); chainFxRef.current = false; setChainFx(false); }
       clearTimeout(geisterTtlRef.current);
       setHandGeister([]); geisterFreiRef.current = new Set(); geisterKettenRef.current = [];
     };
@@ -50124,7 +50147,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     // Generic pile-to-pile flying card animation. Used for moves the
     // automatic hand → pile detector can't see — specifically
     // discard → deleted (Mass Multiplication's consumed source card).
-    const onPileTransfer = ({ owner, cardName, from, to, fromOwner, toOwner, fromHeroIdx, fromSlotIdx, fromHandIdx, fromPermId, toHandIdx, toHeroIdx, toSlotIdx, finalHandSize, zielLayout, flightStyle, faceDown, sfx, landSfx, chainLinkId }) => {
+    const onPileTransfer = ({ owner, cardName, from, to, fromOwner, toOwner, fromHeroIdx, fromSlotIdx, fromHandIdx, fromPermId, toHandIdx, toHeroIdx, toSlotIdx, finalHandSize, zielLayout, flightStyle, faceDown, sfx, landSfx, chainLinkId, flugMs, halten }) => {
       // ★ v1122 (Al 15.9.: „fuer die 4 Karten, die vom Discard ins Deck
       // fliegen, fehlt jeweils ein Woosh-Sound-Effect (wie beim Ziehen
       // von Karten)"). Ein Flug konnte bisher keinen Klang mitbringen —
@@ -50544,7 +50567,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
             if (!prev.has(handHideKey)) return prev;
             const n = new Set(prev); n.delete(handHideKey); return n;
           });
-        }, 4000);
+        }, halten ? 60000 : 4000);   // halten: Initialkarte der Kette — bleibt im Zustand, bis der Zauber fertig ist (die Verdeckung faellt mit der Handgroesse weg)
       }
 
       // ★ v1366 (Als Befund, Bluff): dasselbe fuer die SURPRISE ZONE. Die
@@ -50787,7 +50810,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         : isWindstorm
           ? 'pileTransferWindstorm'
           : (isToHand || isToSupport ? 'pileTransferToHand' : 'pileTransfer');
-      const durationMs = _ausDemSog ? SOG_FLUG_MS : (isZickzack ? ZICKZACK_FLUG_MS : isSchleuder ? SCHLEUDER_FLUG_MS : (isWindstorm ? 1200 : 700));
+      const durationMs = _ausDemSog ? SOG_FLUG_MS : (isZickzack ? ZICKZACK_FLUG_MS : isSchleuder ? SCHLEUDER_FLUG_MS : (isWindstorm ? 1200 : (flugMs > 0 ? flugMs : 700)));   // flugMs: kurzer Kettenflug (Server `_kettenTakt`)
       const easing = _ausDemSog ? 'cubic-bezier(.25,.6,.35,1)'
         : (isWindstorm ? 'cubic-bezier(.45,.05,.55,.95)' : 'ease-in-out');
 
@@ -61420,7 +61443,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       )}
 
       {/* ── Reaction Chain Visualization ── */}
-      {reactionChain && reactionChain.length >= 2 && <ReactionChainOverlay chain={reactionChain} myIdx={myIdx} />}
+      {reactionChain && reactionChain.length >= 2 && <ReactionChainOverlay chain={reactionChain} myIdx={myIdx} fx={chainFx} />}
 
       {/* ── Guardian Beast Zhu skip-turn (Boar zodiac, sloth themed) ──
            Fullscreen gray-out fade with floating "Zzz" glyphs and a

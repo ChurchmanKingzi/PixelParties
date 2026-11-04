@@ -7124,7 +7124,7 @@ body.pp-dragging-card.pp-dragging-card.pp-dragging-card * {
 
 /* ── HANDGEIST (Reaktion in der Kette) ─────────────────────────────
    Die Engine nimmt eine Reaktionskarte beim Anketten aus der Hand, ihr Flug in die Ablage passiert erst beim Aufloesen des Glieds. Bis dahin steht die Karte als
-   „Geist" an ihrem Platz: Bayer-Raster (2x2-Kachel, 3 von 4 Punkten, in 3-px-Einheiten) statt Alpha-Schleier, dazu ein Ketten-Sprite (18x11, crispEdges). Nur Anzeige — kein Hover,
+   „Geist" an ihrem Platz: Bayer-Raster (2x2-Kachel, 3 von 4 Punkten, in 3-px-Einheiten) statt Alpha-Schleier, sonst nichts. Nur Anzeige — kein Hover,
    kein Ziehen, kein Tooltip. */
 .hand-slot.hand-geist { pointer-events: none; cursor: default !important; }
 .hand-slot.hand-geist > .board-card,
@@ -7133,15 +7133,6 @@ body.pp-dragging-card.pp-dragging-card.pp-dragging-card * {
 .board-card.hand-card.hand-geist::before {
   content: ''; position: absolute; inset: 0; z-index: 3; pointer-events: none;
   background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 2 2' width='2' height='2' shape-rendering='crispEdges'%3E%3Crect x='0' y='0' width='1' height='1' fill='%2308060c'/%3E%3Crect x='1' y='1' width='1' height='1' fill='%2308060c'/%3E%3Crect x='1' y='0' width='1' height='1' fill='%2308060c'/%3E%3C/svg%3E") 0 0 / 6px 6px repeat;
-  image-rendering: pixelated;
-}
-.hand-slot.hand-geist > .board-card::after,
-.board-card.hand-card.hand-geist::after {
-  content: ''; position: absolute; z-index: 5; pointer-events: none;
-  left: 50%; top: 50%;
-  width: calc(var(--hand-card-w) * 0.62); height: calc(var(--hand-card-w) * 0.62 * 11 / 18);
-  margin-left: calc(var(--hand-card-w) * -0.31); margin-top: calc(var(--hand-card-w) * -0.19);
-  background: url("data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 18 11%22 width=%2218%22 height=%2211%22 shape-rendering=%22crispEdges%22%3E%3Crect x=%220%22 y=%221%22 width=%2218%22 height=%221%22 fill=%22%2308060c%22/%3E%3Crect x=%220%22 y=%222%22 width=%221%22 height=%221%22 fill=%22%2308060c%22/%3E%3Crect x=%221%22 y=%222%22 width=%2216%22 height=%221%22 fill=%22%23d2d2db%22/%3E%3Crect x=%2217%22 y=%222%22 width=%221%22 height=%221%22 fill=%22%2308060c%22/%3E%3Crect x=%220%22 y=%223%22 width=%221%22 height=%221%22 fill=%22%2308060c%22/%3E%3Crect x=%221%22 y=%223%22 width=%221%22 height=%221%22 fill=%22%23d2d2db%22/%3E%3Crect x=%222%22 y=%223%22 width=%227%22 height=%221%22 fill=%22%23808898%22/%3E%3Crect x=%229%22 y=%223%22 width=%221%22 height=%221%22 fill=%22%2359606e%22/%3E%3Crect x=%2210%22 y=%223%22 width=%226%22 height=%221%22 fill=%22%23808898%22/%3E%3Crect x=%2216%22 y=%223%22 width=%221%22 height=%221%22 fill=%22%2359606e%22/%3E%3Crect x=%2217%22 y=%223%22 width=%221%22 height=%221%22 fill=%22%2308060c%22/%3E%3Crect x=%220%22 y=%224%22 width=%221%22 height=%221%22 fill=%22%2308060c%22/%3E%3Crect x=%221%22 y=%224%22 width=%221%22 height=%221%22 fill=%22%23d2d2db%22/%3E%3Crect x=%222%22 y=%224%22 width=%221%22 height=%221%22 fill=%22%23808898%22/%3E%3Crect x=%223%22 y=%224%22 width=%225%22 height=%221%22 fill=%22%2308060c%22/%3E%3Crect x=%228%22 y=%224%22 width=%221%22 height=%221%22 fill=%22%23808898%22/%3E%3Crect x=%229%22 y=%224%22 width=%221%22 height=%221%22 fill=%22%2359606e%22/%3E%3Crect x=%2210%22 y=%224%22 width=%225%22 height=%221%22 fill=%22%2308060c%22/%3E%3Crect x=%2215%22 y=%224%22 width=%221%22 height=%221%22 fill=%22%23808898%22/%3E%3Crect x=%2216%22 y=%224%22 width=%221%22 height=%221%22 fill=%22%2359606e%22/%3E%3Crect x=%2217%22 y=%224%22 width=%221%22 height=%221%22 fill=%22%2308060c%22/%3E%3Crect x=%220%22 y=%225%22 width=%221%22 height=%221%22 fill=%22%2308060c%22/%3E%3Crect x=%221%22 y=%225%22 width=%221%22 height=%221%22 fill=%22%23d2d2db%22/%3E%3Crect x=%222%22 y=%225%22 width=%221%22 height=%221%22 fill=%22%23808898%22/%3E%3Crect x=%223%22 y=%225%22 width=%225%22 height=%221%22 fill=%22%2308060c%22/%3E%3Crect x=%228%22 y=%225%22 width=%222%22 height=%221%22 fill=%22%23d2d2db%22/%3E%3Crect x=%2210%22 y=%225%22 width=%225%22 height=%221%22 fill=%22%2308060c%22/%3E%3Crect x=%2215%22 y=%225%22 width=%221%22 height=%221%22 fill=%22%23808898%22/%3E%3Crect x=%2216%22 y=%225%22 width=%221%22 height=%221%22 fill=%22%2359606e%22/%3E%3Crect x=%2217%22 y=%225%22 width=%221%22 height=%221%22 fill=%22%2308060c%22/%3E%3Crect x=%220%22 y=%226%22 width=%221%22 height=%221%22 fill=%22%2308060c%22/%3E%3Crect x=%221%22 y=%226%22 width=%221%22 height=%221%22 fill=%22%23d2d2db%22/%3E%3Crect x=%222%22 y=%226%22 width=%221%22 height=%221%22 fill=%22%23808898%22/%3E%3Crect x=%223%22 y=%226%22 width=%225%22 height=%221%22 fill=%22%2308060c%22/%3E%3Crect x=%228%22 y=%226%22 width=%221%22 height=%221%22 fill=%22%23d2d2db%22/%3E%3Crect x=%229%22 y=%226%22 width=%221%22 height=%221%22 fill=%22%23808898%22/%3E%3Crect x=%2210%22 y=%226%22 width=%225%22 height=%221%22 fill=%22%2308060c%22/%3E%3Crect x=%2215%22 y=%226%22 width=%221%22 height=%221%22 fill=%22%23808898%22/%3E%3Crect x=%2216%22 y=%226%22 width=%221%22 height=%221%22 fill=%22%2359606e%22/%3E%3Crect x=%2217%22 y=%226%22 width=%221%22 height=%221%22 fill=%22%2308060c%22/%3E%3Crect x=%220%22 y=%227%22 width=%221%22 height=%221%22 fill=%22%2308060c%22/%3E%3Crect x=%221%22 y=%227%22 width=%221%22 height=%221%22 fill=%22%23d2d2db%22/%3E%3Crect x=%222%22 y=%227%22 width=%226%22 height=%221%22 fill=%22%23808898%22/%3E%3Crect x=%228%22 y=%227%22 width=%221%22 height=%221%22 fill=%22%23d2d2db%22/%3E%3Crect x=%229%22 y=%227%22 width=%227%22 height=%221%22 fill=%22%23808898%22/%3E%3Crect x=%2216%22 y=%227%22 width=%221%22 height=%221%22 fill=%22%2359606e%22/%3E%3Crect x=%2217%22 y=%227%22 width=%221%22 height=%221%22 fill=%22%2308060c%22/%3E%3Crect x=%220%22 y=%228%22 width=%221%22 height=%221%22 fill=%22%2308060c%22/%3E%3Crect x=%221%22 y=%228%22 width=%221%22 height=%221%22 fill=%22%23d2d2db%22/%3E%3Crect x=%222%22 y=%228%22 width=%226%22 height=%221%22 fill=%22%2359606e%22/%3E%3Crect x=%228%22 y=%228%22 width=%221%22 height=%221%22 fill=%22%23d2d2db%22/%3E%3Crect x=%229%22 y=%228%22 width=%228%22 height=%221%22 fill=%22%2359606e%22/%3E%3Crect x=%2217%22 y=%228%22 width=%221%22 height=%221%22 fill=%22%2308060c%22/%3E%3Crect x=%220%22 y=%229%22 width=%2218%22 height=%221%22 fill=%22%2308060c%22/%3E%3C/svg%3E") 0 0 / 100% 100% no-repeat;
   image-rendering: pixelated;
 }
 
@@ -8451,6 +8442,31 @@ body.pp-dragging-card.pp-dragging-card.pp-dragging-card * {
   0% { filter: brightness(2.5) saturate(1.5); box-shadow: 0 0 0 6px #ffffff; }
   40% { filter: brightness(1.8) saturate(1); box-shadow: 0 0 0 4px #a89370; }
   100% { opacity: 0.15; filter: brightness(1.5) saturate(0); box-shadow: none; }
+}
+
+/* ── REACTION-BAR, Pixelart-Fassung (app-fx-53; Klasse `.rc53` setzt ReactionChainOverlay, solange die Leinwand-Animation läuft) ──
+   Harte Rahmenringe statt Weichzeichner/Alpha, Stufenanimationen (`steps()`, ~30 Hz) statt weicher Übergänge. Glühen, Blitz, Zerbröseln und Wisch zeichnet die Leinwand. */
+.reaction-chain-overlay.rc53 .reaction-chain-cards {
+  background: #1a1a2e; border: 0; border-radius: 0; backdrop-filter: none;
+  box-shadow: 0 0 0 2px #59606e, 0 0 0 4px #08060c;
+}
+.reaction-chain-overlay.rc53 .reaction-chain-label { text-shadow: none; }
+.reaction-chain-overlay.rc53 .reaction-chain-card { animation: rc53Rein .13s steps(1, end) backwards; transition: none; }
+@keyframes rc53Rein {
+  0% { transform: translateY(-36px); } 25% { transform: translateY(-24px); } 50% { transform: translateY(-12px); } 75% { transform: translateY(-4px); } 100% { transform: translateY(0); }
+}
+.reaction-chain-overlay.rc53 .reaction-chain-card.rc53-pop { animation: rc53Pop .17s steps(1, end) forwards; }
+@keyframes rc53Pop {
+  0% { transform: translateX(-4px); } 20% { transform: translateX(-8px); } 40% { transform: translateX(-10px); } 60% { transform: translateX(-8px); } 80% { transform: translateX(-6px); } 100% { transform: translateX(-6px); }
+}
+.reaction-chain-overlay.rc53 .reaction-chain-card.rc53-neg { animation: rc53Neg .4s steps(1, end) forwards; }
+@keyframes rc53Neg {
+  0% { transform: translateX(-8px); } 8% { transform: translateX(4px); } 16% { transform: translateX(-6px); } 24% { transform: translateX(6px); } 32% { transform: translateX(-4px); }
+  40% { transform: translateX(4px); } 50% { transform: translateX(-4px); } 60% { transform: translateX(2px); } 100% { transform: translateX(0); }
+}
+.reaction-chain-overlay.rc53 .reaction-chain-card.rc53-weg { animation: rc53Weg .1s steps(3, end) forwards; overflow: hidden; }
+@keyframes rc53Weg {
+  from { height: 112px; margin-bottom: 0; } to { height: 0; margin-bottom: -8px; }
 }
 
 /* Ice negation overlay (Tool Freezer) */

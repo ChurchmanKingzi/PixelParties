@@ -19,7 +19,7 @@ const AUSLOESER_HOOKS = new Set([
   HOOKS.ON_CARD_ADDED_FROM_DISCARD_TO_HAND, HOOKS.BEFORE_CREATURE_DAMAGE_BATCH,
 ]);
 const { handSizeWithoutResolving, handIndicesWithoutResolving } = require('./_hand-resolve');   // v1288 (+ Z4: Handindizes ohne aufloesende Karte)
-const { loadCardEffect } = require('./_loader');
+const { loadCardEffect, nameToFile } = require('./_loader');
 const { isSeat, opponentOfGs, opponentsOfGs, playerCountGs } = require('./_opp');   // N-Spieler-Umbau
 const { gainedNames, heroScriptsOf, heroScriptOf, eigenesHeldenSkript } = require('./_gained-effects-shared');
 const { charges: ladungenLesen } = require('./_charges');
@@ -45447,6 +45447,7 @@ this._deathWatch = (this._deathWatchStack || []).length
       // verlangen (Shamanic Curse: der Zauber müsste in den Ablagestapel gehen), schließen solche Glieder aus.
       zaehltAlsArt: cardInfo.zaehltAlsArt || null,
       goldCost: goldCost || 0,
+      handFlug: cardInfo.handFlug || null,   // Handkarte des Initialglieds: { handIdx, to, toOwner } — Flug beim Aufloesen des Glieds (`_resolveReactionChain`)
       isInitialCard: true,
       negated: false,
       chainClosed: false,
@@ -45492,6 +45493,7 @@ this._deathWatch = (this._deathWatchStack || []).length
           fizzled: !initialLink.negated && !!initialLink.fizzled,
           fizzleReason: initialLink.fizzleReason || null,
           chainFormed: true,
+          initialFlug: !!initialLink._flugFrueh,   // die Handkarte ist beim Aufloesen schon geflogen (Aufrufer schickt den Flug nicht noch einmal)
           resolveResult: initialLink.resolveResult || null,
           // Lunar Eclipse flags a negated card for deletion instead of
           // discard — server play paths route via routeNegatedInitialCard.
@@ -46729,6 +46731,33 @@ this._deathWatch = (this._deathWatchStack || []).length
     return this.wirkerHandlungsunfaehig(link.casterOwner ?? link.owner, hi);
   }
 
+  /**
+   * ★ KETTEN-TEMPO (Nutzer 4.11.): Takt der Kettenaufloesung in Bildern (30 Hz) — passend zur Pixelart-Leiste (`app-fx-53.jsx`, gleiche Zahlen dort).
+   * Je Glied P Bilder (10 bis 4 Glieder, darueber `max(6, round(40/n))`), aufgeteilt in Gluehen G, Flug-Wartezeit Fl (Landung der Karte) und Nachlauf R.
+   * Start 4, Ende 8 Bilder, Negation +8 Bilder. Fruehere Werte: Start 500, Gluehen 400, Vorlauf 250, Flug 650, Nachlauf 300, Negation 600, Ende 400 ms
+   * (= 1600 ms je Reaktions-Glied). In `_fastMode` (KI-Simulationen) gibt `_delay` weiterhin sofort zurueck.
+   */
+  _kettenTakt(n) {
+    const F = 1000 / 30, P = n <= 4 ? 10 : Math.max(6, Math.round(40 / n));
+    const G = Math.round(P * 0.3), R = Math.max(1, Math.round(P * 0.2)), Fl = Math.max(3, P - G - R);
+    return { P, start: 4 * F, G: G * F, Fl: Fl * F, R: R * F, neg: 4 * F, negRest: (P + 8 - 4) * F - Fl * F, ende: 8 * F, flugMs: Math.round(Fl * F * 1.25) };
+  }
+
+  /** Darf die Handkarte des Initialglieds beim Aufloesen SOFORT in die Ablage fliegen? Nein, wenn ihr Skript (oder ein Held des Wirkers) sie auf das Brett / zurueck in die Hand legen koennte. */
+  _initialFlugSicher(pi, cardName) {
+    const cache = this._flugQuellCache || (this._flugQuellCache = new Map());
+    const unsicher = (n) => {
+      if (!n) return false;
+      if (cache.has(n)) return cache.get(n);
+      let r = true;
+      try { r = /_spellReturnToHand|_spellPlacedOnBoard|aufloesenderSpellInDieAblage|_spellKeepInstance|_buddyTicket|neuesBuddyTicket/.test(require('fs').readFileSync(require('path').join(__dirname, nameToFile(n) + '.js'), 'utf8')); } catch (e) { r = false; }
+      cache.set(n, r); return r;
+    };
+    if (unsicher(cardName)) return false;
+    for (const h of (this.gs.players[pi]?.heroes || [])) if (h?.name && unsicher(h.name)) return false;
+    return true;
+  }
+
   async _resolveReactionChain(chain) {
     // ── HAND-SPERRE WAEHREND DER GANZEN KETTE (Als Befund 5.8.) ──────
     // Die Abwurf-Sperre aus v203 deckte nur die Stapelabfrage selbst
@@ -46741,10 +46770,11 @@ this._deathWatch = (this._deathWatchStack || []).length
     const prevChainLock = this.gs._chainResolvingLock;
     this.gs._chainResolvingLock = true;
     try {
-    this._broadcastEvent('reaction_chain_resolving_start', {});
+    const TK = this._kettenTakt(chain.length);
+    this._broadcastEvent('reaction_chain_resolving_start', { takt: TK.P, n: chain.length });
     // SC (v1382, Chain Reaction): Laenge der Kette, die jetzt aufloest.
     if (this.gs._scTracking) ScTracking.kette(this.gs._scTracking, chain);
-    await this._delay(500);
+    await this._delay(TK.start);
 
     for (let i = chain.length - 1; i >= 0; i--) {
       const link = chain[i];
@@ -46791,7 +46821,8 @@ this._deathWatch = (this._deathWatchStack || []).length
           try { link._equipRefund(); }
           catch (err) { console.error(`[Engine] equipReactionRefund for ${link.cardName} failed:`, err.message); }
         }
-        await this._delay(600);
+        await this._delay(TK.neg);
+        let _fl = false;
 
         // Negated non-initial cards go to discard — or the deleted
         // pile when the negator flagged deletion (Lunar Eclipse).
@@ -46826,7 +46857,7 @@ this._deathWatch = (this._deathWatchStack || []).length
           });
           this.log('negated_card_stolen', { card: link.cardName, from: oppPs?.username, to: diebPs.username });
           this.sync();
-          await this._delay(650);
+          _fl = true; await this._delay(TK.Fl);
         } else if (!link.isInitialCard
             && !loadCardEffect(link.cardName)?.skipPostResolveDiscard) {
           const ps = this.gs.players[link.owner];
@@ -46847,15 +46878,17 @@ this._deathWatch = (this._deathWatchStack || []).length
               owner: link.owner, cardName: link.cardName,
               from: link.fromDeck ? 'deck' : 'hand', to: toDeleted ? 'deleted' : 'discard',
               ...(Number.isInteger(link.fromHandIdx) ? { fromHandIdx: link.fromHandIdx, chainLinkId: link.id } : {}),
+              flugMs: TK.flugMs,
             });
             // 3. Landung ERST NACH der Animation.
-            await this._delay(650);
+            _fl = true; await this._delay(TK.Fl);
             const _kettenPs = link.fromDeck ? ps : this.handKartenBesitzerPs(ps, link.cardName);   // W63c: Stapel des permanenten Besitzers
             if (!_kettenPs[pile]) _kettenPs[pile] = [];
             _kettenPs[pile].push(link.cardName);
             this.sync();
           }
         }
+        await this._delay(_fl ? TK.negRest : TK.negRest + TK.Fl);   // Rest des Negations-Takts (die Leiste zerbroeselt das Glied, siehe app-fx-53)
         // „Whenever you negate an opponent's card or effect" (Natas).
         if (link.negated) {
           await this._meldeNegation({
@@ -46868,7 +46901,7 @@ this._deathWatch = (this._deathWatchStack || []).length
         this._broadcastEvent('reaction_chain_link_resolving', {
           linkIndex: i, cardName: link.cardName, owner: link.owner,
         });
-        await this._delay(400);
+        await this._delay(TK.G);
 
         if (link.resolve) {
           try {
@@ -46966,7 +46999,6 @@ this._deathWatch = (this._deathWatchStack || []).length
           const spellPlaced = this.gs._spellPlacedOnBoard === true || !!_kettenBuddy?.token;   // W67a: Inyas Token ersetzt die Ablage
           if (this.gs._spellPlacedOnBoard) delete this.gs._spellPlacedOnBoard;
           if (!linkScript?.skipPostResolveDiscard && !spellPlaced) {
-            await this._delay(250);
             const ps = this.gs.players[link.owner];
             // ★ v1327: „Delete this card" (`deleteOnUse`) — bisher kannte
             // nur jedes HAND-Reaktionsfenster das Feld, die Kette legte
@@ -46982,12 +47014,13 @@ this._deathWatch = (this._deathWatchStack || []).length
                 owner: link.owner, cardName: link.cardName,
                 from: link.fromDeck ? 'deck' : 'hand', to: zumLoeschen ? 'deleted' : 'discard',
                 ...(Number.isInteger(link.fromHandIdx) ? { fromHandIdx: link.fromHandIdx, chainLinkId: link.id } : {}),
+                flugMs: TK.flugMs,
               });
               // Push ERST NACH dem Flug: es gibt clientseitig kein
               // "Karte im Stapel verstecken, bis sie landet", also
               // erschiene sie sonst schon beim START der Animation.
               // Gleiche Reihenfolge wie routeNegatedInitialCard.
-              await this._delay(650);
+              await this._delay(TK.Fl);
               const _kettenPs = link.fromDeck ? ps : this.handKartenBesitzerPs(ps, link.cardName);   // W63c: Stapel des permanenten Besitzers
               if (zumLoeschen) { if (!_kettenPs.deletedPile) _kettenPs.deletedPile = []; _kettenPs.deletedPile.push(link.cardName); }
               else _kettenPs.discardPile.push(link.cardName);
@@ -46996,17 +47029,27 @@ this._deathWatch = (this._deathWatchStack || []).length
           }
         }
 
+        // ★ Initialkarte (Attack/Spell aus der Hand): ihre Handkarte fliegt, sobald das Glied aufloest (in der Leiste zerbroeselt) — nicht erst nach der ganzen Aufloesung.
+        // `handFlug` kommt vom Aufrufer (server.js `doPlaySpell`); die Karte bleibt im Zustand, bis der Zauber fertig ist (nur der FLUG wird vorgezogen, `chainResult.initialFlug`
+        // sagt dem Aufrufer, dass er ihn nicht zweimal schickt). Nur wenn das Ziel sicher feststeht (`_initialFlugSicher`).
+        if (link.isInitialCard && link.handFlug && !this._inMctsSim && this._initialFlugSicher(link.owner, link.cardName)) {
+          this._broadcastEvent('play_pile_transfer', {
+            fromOwner: link.owner, toOwner: link.handFlug.toOwner, cardName: link.cardName, from: 'hand', to: link.handFlug.to,
+            fromHandIdx: link.handFlug.handIdx, flugMs: TK.flugMs, halten: true,
+          });
+          link._flugFrueh = true;
+        }
         this._broadcastEvent('reaction_chain_link_resolved', {
           linkIndex: i, cardName: link.cardName, owner: link.owner,
         });
-        await this._delay(300);
+        await this._delay(TK.R);
       }
 
       this.sync();
     }
 
     this._broadcastEvent('reaction_chain_done', {});
-    await this._delay(400);
+    await this._delay(TK.ende);
 
     // Surprise reactions (Lunar Eclipse) stayed face-up in their
     // Surprise Zone for the entire chain. NOW — after the negated
