@@ -33,44 +33,19 @@ def ease_out(x):
     return 1 - (1 - x) ** 3
 
 
-BARK_HL, BARK_MID, BARK_LOW, BARK_DK, BARK_OUT = (140, 140, 140), (99, 99, 99), (62, 62, 62), (32, 32, 32), (14, 14, 14)    # Palette von Kylis Sprite
+BARK_HL, BARK_MID, BARK_LOW, BARK_DK, BARK_OUT = (120, 120, 120), (78, 78, 78), (46, 46, 46), (24, 24, 24), (14, 14, 14)    # Palette des Root-Sprites
 EYE_R, EYE_HL, EYE_DK = (176, 22, 38), (240, 70, 70), (40, 0, 10)
 TOOTH = (244, 244, 236)
 LIME, LIME_DK = (222, 255, 74), (158, 181, 53)
 FLESH = (44, 0, 14)
 
-# Opfer als Pixelbild (Buchstaben → Farben); gleiche Pixelgröße wie der Sprite
-PAL = {'R': (214, 40, 52), 'W': (244, 244, 236), 'C': (240, 222, 180), 'S': (176, 150, 110), 'K': (30, 20, 30), 'P': (240, 150, 170),
-       'Y': (255, 214, 70), 'O': (255, 140, 40), 'G': (200, 200, 216), 'L': LIME}
-VICTIMS = {
-    'mush': ["..RRRRR..",
-             ".RRWRRWR.",
-             "RRWWRRRRR",
-             "RRRRRWWRR",
-             "SSSSSSSSS",
-             ".CCCCCCC.",
-             ".CKCCCKC.",
-             ".CCCCCCC.",
-             "..SS.SS.."],
-    'chick': ["..YYYY..",
-              ".YYYYYY.",
-              ".YKYYKY.",
-              ".YYOOYY.",
-              ".YYYYYY.",
-              "YYYYYYYY",
-              ".YYYYYY.",
-              "..O..O.."],
-    'bunny': [".WW..WW.",
-              ".WP..PW.",
-              ".WP..PW.",
-              ".WWWWWW.",
-              "WWKWWKWW",
-              "WWWPPWWW",
-              ".WWWWWW.",
-              "WWWWWWWG",
-              ".WWWWWG.",
-              ".WW..WW."],
-}
+def load_arr(path):
+    return np.asarray(Image.open(path).convert('RGBA')).copy()
+
+
+def crop_alpha(a):
+    ys, xs = np.where(a[..., 3] > 20)
+    return a[ys.min():ys.max() + 1, xs.min():xs.max() + 1].copy()
 
 
 class RootShow:
@@ -80,7 +55,6 @@ class RootShow:
     TENSION_SHAKES = [(7.0, 10), (17.0, 30)]
     # (Auftritt, Gefressen) je Opfer
     VICT = [(2.3, 7.0), (2.8, 8.4), (3.3, 9.6), (3.8, 10.6), (4.3, 11.5), (4.8, 12.3), (6.2, 13.0), (7.5, 13.7), (8.8, 14.3), (10.0, 14.9), (11.0, 15.4), (12.0, 15.9)]
-    FACE_H = 19                                                                        # Höhe des Gesichts in Zellen über dem Boden
 
     def __init__(self, W, H, U, fps, loop, geom, D, seed=5):
         self.W, self.H, self.U, self.fps, self.loop, self.D = W, H, U, fps, loop, D
@@ -96,16 +70,22 @@ class RootShow:
         yy, xx = np.mgrid[0:H, 0:W]
         rr = np.hypot((xx - W / 2) / (W * 0.62), (yy - H * 0.5) / (H * 0.55))
         self.vig = np.clip((rr - 0.45) / 0.8, 0, 1).astype(np.float32) ** 1.3
-        self.hw = {}
-        ph = rng.uniform(0, 6.28)
-        for y in range(-4, self.FACE_H + 1):
-            base = 13.5 - 0.34 * y + 1.1 * math.sin(y * 0.9 + ph) + rng.uniform(-0.5, 0.5)
-            if y < 4:
-                base += (4 - y) * 1.6                                                    # Wurzelansatz verbreitert sich
-            self.hw[y] = max(4.5, base)
-        self.kinds = [('mush', 'chick', 'bunny')[k % 3] for k in range(len(self.VICT))]
+        self.root = load_arr(geom['root_path'])                                           # Sprite „The Root of all Evil“ (32 × 60) aus PixelPartiesSprites
+        self.R_COL = self.c0 - 16                                                         # Spalte der linken Sprite-Kante (Mund liegt bei Sprite-Spalte 16)
+        self.R_ROW = self.gr - 59                                                         # Zeile der Sprite-Oberkante (Fußzeile = Boden)
+        self.R_SPLIT = 39                                                                 # ab dieser Sprite-Zeile steht der Root vor den Opfern/Labels, darüber dahinter
+        self._rcache = {}
+        self.vfr = {}
+        cat = load_arr(geom['cat_idle_path'])
+        n = cat.shape[1] // 31
+        cf = [cat[:, i * 31:(i + 1) * 31].copy() for i in range(n)]
+        ys_, xs_ = np.where(np.any([f_[..., 3] > 0 for f_ in cf], axis=0))
+        self.vfr['cat'] = dict(walk=[f_[ys_.min():ys_.max() + 1, xs_.min():xs_.max() + 1].copy() for f_ in cf], flail=None, dt=0.07, hop=True, face_right=False)
+        self.vfr['monkey'] = dict(walk=[crop_alpha(load_arr(geom['monkey'][0])), crop_alpha(load_arr(geom['monkey'][1]))],
+                                  flail=[crop_alpha(load_arr(geom['monkey'][2])), crop_alpha(load_arr(geom['monkey'][3]))], dt=0.25, hop=True, face_right=False)
+        self.vfr['dog'] = dict(walk=[crop_alpha(load_arr(geom['dog'][0])), crop_alpha(load_arr(geom['dog'][1]))], flail=None, dt=0.14, hop=False, face_right=True)
+        self.kinds = [('cat', 'monkey', 'dog')[k % 3] for k in range(len(self.VICT))]
         self.sides = [-1 if k % 2 == 0 else 1 for k in range(len(self.VICT))]
-        self._build_limbs()
         self._build_overgrowth()
         self.hook = [dict(x=rng.choice([0.0, 1.0]), y=rng.uniform(0.15, 1.0), th=rng.uniform(-0.5, 0.5), ph=rng.uniform(0, 6.3)) for _ in range(11)]
         self.puff = [dict(dx=rng.uniform(-110, 110), v=rng.uniform(170, 330), t0=rng.uniform(0, 0.7), r=int(rng.integers(2, 4))) for _ in range(11)]
@@ -126,76 +106,6 @@ class RootShow:
     def eyes(self, t):
         dx = self.sprite_dx(int(t * self.fps))
         return [(e[0] + dx, e[1]) for e in self.eyes_fn(t)]
-
-    @staticmethod
-    def shade(mask):
-        """Rinde nach Zellmaske: Licht von oben rechts, Schatten unten links, dunkler Rand."""
-        out = {}
-        for (i, j) in mask:
-            up, dn, lf, rt = (i, j - 1) in mask, (i, j + 1) in mask, (i - 1, j) in mask, (i + 1, j) in mask
-            if not (up and dn and lf and rt):
-                top, bot = (not up or not rt), (not dn or not lf)
-                col = BARK_HL if (top and not bot) else BARK_LOW if (bot and not top) else BARK_MID
-            elif (i * 3 + j * 5) % 11 == 0:
-                col = BARK_LOW
-            elif (i + j * 2) % 9 == 0:
-                col = BARK_HL
-            else:
-                col = BARK_MID
-            out[(i, j)] = col
-        return out
-
-    # ───────── Äste (hinter der Karte, ranken die Ränder hoch) ─────────
-    def _build_limbs(self):
-        rng = np.random.default_rng(21)
-        paths = [
-            [(400, 1880), (250, 1840), (120, 1760), (60, 1500), (120, 1250), (40, 980), (110, 720), (40, 470), (110, 250)],
-            [(680, 1880), (830, 1850), (970, 1760), (1030, 1510), (950, 1260), (1040, 1000), (960, 730), (1040, 480), (960, 250)],
-        ]
-        self.limbs = []
-        for pi, P in enumerate(paths):
-            pts = np.array(P, dtype=float)
-            ts = np.linspace(0, len(P) - 1, 200)
-            seg = np.minimum(ts.astype(int), len(P) - 2)
-            u = ts - seg
-            p0, p1 = pts[np.maximum(seg - 1, 0)], pts[seg]
-            p2, p3 = pts[seg + 1], pts[np.minimum(seg + 2, len(P) - 1)]
-            u = u[:, None]
-            cr = 0.5 * ((2 * p1) + (-p0 + p2) * u + (2 * p0 - 5 * p1 + 4 * p2 - p3) * u ** 2 + (-p0 + 3 * p1 - 3 * p2 + p3) * u ** 3)
-            cr += np.stack([np.sin(np.arange(200) * 0.21 + pi) * 18, np.cos(np.arange(200) * 0.17 + pi) * 10], axis=1)
-            cells = {}                                                                   # Zelle → Wachstumsindex
-            order = []
-            for k in range(200):
-                c = self.cell(*cr[k])
-                r = 2.2 * (1 - k / 200.0) + 0.6
-                for dj in range(-3, 4):
-                    for di in range(-3, 4):
-                        if di * di + dj * dj <= r * r:
-                            cc = (c[0] + di, c[1] + dj)
-                            if cc not in cells or cells[cc] > k:
-                                cells[cc] = k
-                order.append(c)
-            for k in range(8, 196, 9):                                                    # Zweige
-                c = order[k]
-                sgn = 1 if (k // 9) % 2 else -1
-                L = int(rng.integers(4, 8))
-                dx, dy = sgn * 1.0, -0.8
-                for s in range(1, L + 1):
-                    cc = (c[0] + int(round(dx * s)), c[1] + int(round(dy * s + 0.25 * s * s * 0.1)))
-                    if cc not in cells:
-                        cells[cc] = k + s * 2
-            eyes = [order[int(200 * f)] for f in (0.22, 0.5, 0.78)]
-            self.limbs.append(dict(cells=cells, shade=self.shade(set(cells)), eyes=eyes, order=order))
-
-    def grow(self, t):
-        """Wuchs der Äste 0…1: wächst mit der Zeit und mit jedem gefressenen Opfer, zieht sich nach dem Schluck zurück."""
-        if t < 5.0:
-            return 0.0
-        eaten = sum(1 for _, te in self.VICT if t >= te)
-        g = 0.12 * smooth((t - 5.0) / 2.0) + 0.07 * eaten
-        if t >= 17.0:
-            g = g * (1.0 - smooth((t - 17.6) / 2.2))
-        return min(1.0, g)
 
     # ───────── Überwucherung des Interface (Banner, Link-Schild, Kartenrahmen) ─────────
     def _build_overgrowth(self):
@@ -356,53 +266,98 @@ class RootShow:
 
     # ───────── Opfer ─────────
     def victim_state(self, k, t):
-        """(x_px, Zeile_Fuß_px, hüpft, verzaubert, im Griff) oder None."""
+        """(x_px, hüpft, im Griff, löst sich auf) oder None. Sie lassen sich zuerst am Bildrand anlocken (warten) und gehen erst kurz vor dem Fressen zum Root."""
         ts, te = self.VICT[k]
-        if t < ts or t >= te + 0.1:
+        if t < ts or t >= te:
             return None
         side = self.sides[k]
         W = self.W
-        xs = -150 if side < 0 else W + 150
-        xg = W / 2 + side * (200 + 40 * (k % 3))                                          # Greifpunkt vor dem Schlund
+        xs = -260 if side < 0 else W + 260
+        xw = (40 + 90 * ((k // 2) % 3)) if side < 0 else W - (40 + 90 * ((k // 2) % 3))        # Warteplatz am Rand
+        xg = W / 2 + side * (250 + 30 * (k % 3))                                          # Greifpunkt neben dem Root
+        t_wait = ts + 1.0
+        t_go = max(t_wait, te - 1.6)
         t_arr = te - 0.7
+        if t < t_wait:
+            return xs + (xw - xs) * ((t - ts) / 1.0), int((t - ts) * 4) % 2 == 0, False, False
+        if t < t_go:
+            return xw, False, False, False
         if t < t_arr:
-            u = (t - ts) / (t_arr - ts)
-            x = xs + (xg - xs) * u
-            hop = int((t - ts) * 4) % 2 == 0
-            return x, 0.0, hop, True, False
-        if t < te - 0.45:
-            return xg, 0.0, False, True, True
-        u = ease_in((t - (te - 0.45)) / 0.45)
-        return xg + (W / 2 - xg) * u, -2.0 * math.sin(math.pi * min(1.0, u)), False, True, True
+            return xw + (xg - xw) * ((t - t_go) / (t_arr - t_go)), int((t - t_go) * 4) % 2 == 0, False, False
+        return xg, False, True, t >= te - 0.35
 
-    def _draw_victim(self, d, k, t):
+    def _victim_arr(self, k, t, grip):
+        """Aktuelles Bild des Opfers (aus den Sprites): Laufen = Bildwechsel bzw. Idle-Zyklus, im Griff zappelt es."""
+        kd = self.vfr[self.kinds[k]]
+        if grip and kd['flail']:
+            idx, fr, lst = int(t / 0.1 + k) % 2, None, 'flail'
+        else:
+            dt = kd['dt'] / (3.0 if grip else 1.0)
+            idx, lst = int(t / dt + k * 3) % len(kd['walk']), 'walk'
+        fr = kd[lst][idx]
+        mir = self.sides[k] > 0
+        self._vkey = (self.kinds[k], lst, idx, mir)
+        return fr[:, ::-1] if mir else fr
+
+    def _stamp(self, arr, key):
+        if key not in self._rcache:
+            im = Image.fromarray(np.ascontiguousarray(arr), 'RGBA')
+            self._rcache[key] = im.resize((im.width * self.gp, im.height * self.gp), Image.NEAREST)
+        return self._rcache[key]
+
+    def _victim_origin(self, k, t, arr, hop):
+        st = self.victim_state(k, t)
+        h, w = arr.shape[:2]
+        ci = self.cell(st[0], 0)[0] - w // 2
+        cj = self.gr + 1 - h - (1 if (hop and self.vfr[self.kinds[k]]['hop']) else 0)
+        return ci, cj
+
+    def _draw_victim(self, canvas, d, k, t):
         st = self.victim_state(k, t)
         if st is None:
             return
-        x, lift, hop, ent, grip = st
-        rows = VICTIMS[self.kinds[k]]
-        h, w = len(rows), len(rows[0])
-        ci = self.cell(x, 0)[0] - w // 2
-        cj = self.gr + 1 - h + int(round(lift)) - (1 if hop else 0)
-        wob = (1 if int(t * 12) % 2 else 0) if grip else 0                                 # im Griff: zappeln
-        for j, row in enumerate(rows):
-            for i, ch in enumerate(row):
-                if ch == '.':
-                    continue
-                col = LIME if (ch == 'K' and ent) else PAL[ch]
-                self.rect(d, ci + i + wob, cj + j, col)
+        x, hop, grip, dissolve = st
+        ts, te = self.VICT[k]
+        if not dissolve:
+            arr = self._victim_arr(k, t, grip)
+            ci, cj = self._victim_origin(k, t, arr, hop)
+            wob = (1 if int(t * 14) % 2 else 0) if grip else 0
+            im = self._stamp(arr, ('v',) + self._vkey)
+            px_, py_ = self.cpos(ci + wob, cj)
+            canvas.paste(im, (px_, py_), im)
+            if not grip and int(t * 8 + k) % 2:                                            # verzaubert: kleine Lockfunken über dem Kopf
+                self.rect(d, ci + arr.shape[1] // 2, cj - 2, LIME)
+                self.rect(d, ci + arr.shape[1] // 2 + 2, cj - 3, LIME_DK)
+            return
+        # sie lösen sich Pixel für Pixel auf und werden in den Schlund gesaugt
+        tf = te - 0.35
+        arr = self._victim_arr(k, tf, True)
+        ci, cj = self._victim_origin(k, t, arr, False)
+        mc, mr = self.c0, self.gr - 8
+        ys, xs = np.where(arr[..., 3] > 20)
+        dist = np.hypot(xs + ci - mc, ys + cj - mr)
+        order = np.argsort(np.argsort(dist))
+        for n in range(len(xs)):
+            u = (t - tf - 0.22 * order[n] / float(len(xs))) / 0.3
+            if u >= 1.0:
+                continue
+            u = max(0.0, u)
+            oi, oj = ci + int(xs[n]), cj + int(ys[n])
+            ni = oi + (mc - oi) * ease_in(u)
+            nj = oj + (mr - oj) * ease_in(u) - 5 * math.sin(math.pi * u)
+            r_, g_, b_ = arr[ys[n], xs[n], :3]
+            self.rect(d, int(round(ni)), int(round(nj)), (int(r_), int(g_), int(b_)))
 
     def _draw_tendrils(self, d, k, t):
         ts, te = self.VICT[k]
-        if not (te - 0.7 <= t < te + 0.05):
+        if not (te - 0.7 <= t < te - 0.1):
             return
         st = self.victim_state(k, t)
         if st is None:
             return
-        x = st[0]
         grow = smooth((t - (te - 0.7)) / 0.25)
-        cx = self.cell(x, 0)[0]
-        for sgn, off in ((-1, -3), (1, 3)):
+        cx = self.cell(st[0], 0)[0]
+        for sgn, off in ((-1, -4), (1, 4)):
             Hh = int(1 + 6 * grow)
             for r in range(Hh):
                 ci = cx + off + int(round(1.5 * math.sin(r * 0.9 + t * 8 + sgn)))
@@ -410,100 +365,78 @@ class RootShow:
                 self.rect(d, ci + 1, self.gr - r, BARK_LOW)
             self.rect(d, cx + off, self.gr - Hh, BARK_OUT)
 
-    # ───────── Gesicht des Root ─────────
-    def _draw_face_body(self, d, t):
-        c0, gr = self.c0, self.gr
-        mask = set()
-        for y, hw in self.hw.items():
-            for dx in range(-int(hw), int(hw) + 1):
-                mask.add((c0 + dx, gr - y))
-        cols = self.shade(mask)
-        for (i, j), col in cols.items():
-            self.rect(d, i, j, col)
-        # Augen
+    # ───────── Der Root (Originalsprite, Augen und Schlund werden animiert) ─────────
+    def _root_arr(self, eye_lv, mouth_lv):
+        a = self.root.copy()
+        al = a[..., 3] > 20
+        for (r0, r1, c0_, c1_, mid) in ((21, 25, 9, 15, ('row', 23)), (36, 42, 15, 19, ('col', 17))):               # Augen: oberes Auge, senkrechtes Schlitzauge
+            sub = a[r0:r1 + 1, c0_:c1_ + 1]
+            eye = (sub[..., 3] > 20) & (sub[..., 0] > sub[..., 1] + 15)
+            ys, xs = np.where(eye)
+            for y, x in zip(ys.tolist(), xs.tolist()):
+                yy, xx = r0 + y, c0_ + x
+                center = (yy == mid[1]) if mid[0] == 'row' else (xx == mid[1])
+                if eye_lv == 0 or (eye_lv == 1 and not center):
+                    a[yy, xx, :3] = BARK_DK if center else (66, 66, 66)
+                elif eye_lv == 3:
+                    r_, g_, b_ = a[yy, xx, :3]
+                    a[yy, xx, :3] = (255, 170, 170) if g_ > 90 else (225, 24, 34) if r_ > 100 else (150, 0, 18)
+        if mouth_lv > 0:                                                                  # Schlund klafft auf (nur innerhalb der Silhouette)
+            hw, hh = 4.0 + 0.9 * mouth_lv, 1.3 + 1.0 * mouth_lv
+            for yy in range(40, 60):
+                for xx in range(32):
+                    if not al[yy, xx]:
+                        continue
+                    e = ((xx - 15.5) / hw) ** 2 + ((yy - 51) / hh) ** 2
+                    if e <= 1.0:
+                        edge = e > 0.62
+                        top = yy < 51
+                        if edge and abs(yy - 51) >= hh * 0.55 and (xx % 2 == 0):
+                            a[yy, xx, :3] = (255, 255, 255)
+                        else:
+                            a[yy, xx, :3] = (54, 0, 0) if (xx + yy) % 5 == 0 else (23, 0, 0)
+                    elif e <= 1.5:
+                        a[yy, xx, :3] = BARK_DK
+        return a
+
+    def _eye_lv(self, t):
         e = self.eye_open(t)
-        looks = 0
-        for sgn in (-1, 1):
-            cx, cy = c0 + sgn * 6, gr - 13
-            hh_ = e * 2.4
-            for dx in range(-3, 4):
-                half = int(round(hh_ * (1 - (abs(dx) / 3.6) ** 2)))
-                for dy in range(-half, half + 1):
-                    col = EYE_HL if (dx >= 1 and dy <= -half + 0 and half >= 1) else EYE_R
-                    self.rect(d, cx + dx, cy + dy, col)
-                if half == 0 and e < 0.15:
-                    self.rect(d, cx + dx, cy, EYE_DK)
-            if e >= 0.3:
-                for dy in (-1, 0, 1):
-                    self.rect(d, cx + looks, cy + dy, EYE_DK)                                # Schlitzpupille
-            for dx in range(-4, 5):                                                          # Lidrand
-                self.rect(d, cx + dx, cy - int(round(hh_)) - 1, BARK_OUT)
-                self.rect(d, cx + dx, cy + int(round(hh_)) + 1, BARK_OUT)
-        if e >= 0.45:                                                                         # senkrechtes Stirnauge
-            for dy in range(0, 1 + int(3 * e)):
-                self.rect(d, c0, gr - 16 - dy, EYE_HL if dy == 0 else EYE_R)
+        return 0 if e < 0.15 else 1 if e < 0.5 else 2 if e < 0.85 else 3
 
-    def _mouth_geom(self, t):
-        o = self.mouth_open(t)
-        mh = 1 + int(round(8 * o))
-        return o, mh
+    def _root_part(self, t, part):
+        eye_lv, mouth_lv = self._eye_lv(t), int(round(self.mouth_open(t) * 4))
+        key = ('root', eye_lv, mouth_lv)
+        if key not in self._rcache:
+            self._rcache[key] = self._root_arr(eye_lv, mouth_lv)
+        a = self._rcache[key]
+        r0, r1 = (0, self.R_SPLIT) if part == 'back' else (self.R_SPLIT, 60)
+        return self._stamp(a[r0:r1], ('rp', eye_lv, mouth_lv, part)), r0
 
-    def _mouth_cells(self, mh):
-        cells = set()
-        for yy in range(0, mh):
-            mw = 9 - max(0, yy - 4) - (1 if yy == 0 else 0)
-            for dx in range(-mw, mw + 1):
-                cells.add((dx, yy))
-        return cells
+    def _paste_root(self, canvas, t, part):
+        im, r0 = self._root_part(t, part)
+        x, y = self.cpos(self.R_COL, self.R_ROW + r0)
+        canvas.paste(im, (x, y), im)
 
-    def _draw_mouth_back(self, d, t):
-        o, mh = self._mouth_geom(t)
-        c0, gr = self.c0, self.gr
-        cells = self._mouth_cells(mh)
-        for (dx, yy) in cells:
-            self.rect(d, c0 + dx, gr - yy, FLESH if (dx + yy) % 7 else (70, 0, 20))
-        top = mh - 1
-        for dx in range(-8, 9):
-            if (dx, top) in cells and dx % 2 == 0:
-                self.rect(d, c0 + dx, gr - top, TOOTH)
-                if o > 0.5 and dx % 4 == 0 and (dx, top - 1) in cells:
-                    self.rect(d, c0 + dx, gr - top + 1, TOOTH)
-        if o > 0.5:
-            for dx in range(-5, 6):
-                self.rect(d, c0 + dx, gr - 1, (170, 30, 50))                                  # Zunge
-
-    def _draw_mouth_front(self, d, t):
-        o, mh = self._mouth_geom(t)
-        c0, gr = self.c0, self.gr
-        cells = self._mouth_cells(mh)
-        for dx in range(-8, 9):                                                                # untere Zähne (vor den Opfern)
-            if (dx, 0) in cells and dx % 2 != 0:
-                self.rect(d, c0 + dx, gr, TOOTH)
-                if o > 0.4 and dx % 4 == 1 and (dx, 1) in cells:
-                    self.rect(d, c0 + dx, gr - 1, TOOTH)
-        for (dx, yy) in cells:                                                                 # Lippenrand
-            for (a, b) in ((1, 0), (-1, 0), (0, 1)):
-                if (dx + a, yy + b) not in cells:
-                    self.rect(d, c0 + dx + a, gr - yy - b, BARK_OUT)
+    def root_eye_cells(self):
+        return [(self.R_COL + 17, self.R_ROW + 39)]                                   # nur das Schlitzauge glüht vor dem Interface (das obere Auge liegt hinter dem Namen)
 
     # ───────── Zeichnen ─────────
     def draw_behind(self, canvas, f):
         t = f / float(self.fps)
-        d = ImageDraw.Draw(canvas)
-        g = self.grow(t)
-        if g <= 0:
-            return
-        for li, L in enumerate(self.limbs):
-            K = int(g * 200)
-            for cc, k in L['cells'].items():
-                if k <= K:
-                    self.rect(d, cc[0], cc[1], L['shade'][cc])
-            if t >= 8.0:                                                                       # kleine Augen an den Ästen
-                for ei, ec in enumerate(L['eyes']):
-                    if L['order'].index(ec) <= K and not (int(t * 2.3 + ei * 3 + li) % 9 == 0):
-                        for (a, b) in ((0, 0), (1, 0)):
-                            self.rect(d, ec[0] + a, ec[1] + b, EYE_R)
-                        self.rect(d, ec[0] + 1, ec[1], EYE_HL)
+        a = 0.18 + 0.5 * self.eye_open(t)                                                 # dunkelroter Schein hinter dem Root (hebt ihn vom Hintergrund ab)
+        layer = Image.new('RGBA', (self.W, self.H), (0, 0, 0, 0))
+        d = ImageDraw.Draw(layer)
+        cx, cy = self.R_COL + 16, self.R_ROW + 46
+        for dj in range(-16, 17):
+            for di in range(-14, 15):
+                r = math.hypot(di / 14.0, dj / 16.0)
+                if r > 1.0:
+                    continue
+                al = int(255 * a * (0.5 if r > 0.66 else 0.8 if r > 0.33 else 1.0) * 0.32)
+                x, y = self.cpos(cx + di, cy + dj)
+                d.rectangle([x, y, x + self.gp - 1, y + self.gp - 1], fill=(110, 10, 30, al))
+        canvas.alpha_composite(layer)
+        self._paste_root(canvas, t, 'back')
 
     def draw_logo(self, canvas, f):
         lx, ly, lw, lh = self.g['logo_rect']
@@ -559,14 +492,17 @@ class RootShow:
             self.rect(d, ci, cj + 2, LIME_DK)
 
     def _glow_eyes(self, canvas, t):
-        g = self.kyli_glow(t)
+        self._glow_at(canvas, [self.cpos(c[0], c[1]) for c in self.root_eye_cells()], self.eye_open(t) ** 1.5 * 0.9, centers_are_cells=True)
+        self._glow_at(canvas, self.eyes(t), self.kyli_glow(t))
+
+    def _glow_at(self, canvas, pts, g, centers_are_cells=False):
         if g <= 0.03:
             return
         layer = Image.new('RGBA', (self.W, self.H), (0, 0, 0, 0))
         d = ImageDraw.Draw(layer)
         R = int(1.5 + 4 * g)
-        for (ex, ey) in self.eyes(t):
-            c0, r0 = self.cell(ex, ey)
+        for (ex, ey) in pts:
+            c0, r0 = self.cell(ex + (self.gp / 2 if centers_are_cells else 0), ey + (self.gp / 2 if centers_are_cells else 0))
             for dj in range(-R, R + 1):
                 for di in range(-R, R + 1):
                     r = math.hypot(di, dj)
@@ -617,12 +553,11 @@ class RootShow:
             for (ci, cj, tc, tr, col) in self.over:
                 if tc <= t < tr:
                     self.rect(d, ci, cj, col)
-        # Gesicht des Root mit Opfern
-        self._draw_face_body(d, t)
-        self._draw_mouth_back(d, t)
+        # Opfer, davor der untere Teil des Root, davor die Wurzeln, die sie packen
         for k in range(len(self.VICT)):
-            self._draw_victim(d, k, t)
-        self._draw_mouth_front(d, t)
+            self._draw_victim(canvas, d, k, t)
+        self._paste_root(canvas, t, 'front')
+        d = ImageDraw.Draw(canvas)
         for k in range(len(self.VICT)):
             self._draw_tendrils(d, k, t)
         for k in range(len(self.VICT)):                                                       # Bissfunken (Krümel)
@@ -630,10 +565,7 @@ class RootShow:
             if te <= t < te + 0.5:
                 tau = t - te
                 for (a, b) in self.crumbs[k]:
-                    self.rect(d, self.c0 + int(a * 8 + a * tau * 14), self.gr - 6 - int(b * 14 * tau - 28 * tau * tau * 0.6), LIME if b > 0.65 else BARK_HL)
-        if 5.6 <= t < 17.0:                                                                    # Name des Root
-            if int(t * 12) % 7 != 0 or t > 6.5:
-                self.draw_text(canvas, 'THE ROOT OF ALL EVIL', 3, (W / 2, 1592), color=(255, 150, 150), outline=None, shadow=(60, 0, 10))
+                    self.rect(d, self.c0 + int(a * 8 + a * tau * 14), self.gr - 8 - int(b * 14 * tau - 28 * tau * tau * 0.6), LIME if b > 0.65 else BARK_HL)
         # Lockkugeln
         for k in range(len(self.VICT)):
             self._draw_orb(d, canvas, k, t)
