@@ -1384,8 +1384,10 @@
   "rootshow": true,
   "opener": "wind",
   "px": 14,
-  "accent": "#9eb535",
+  "accent": "#241016",
   "music": "scripts/social-posts/music/bgm_kyli.ogg",
-  "musicHit": 6.65
+  "musicHit": 6.65,
+  "uiText": "#e01c34",
+  "blood": true
  }
 }

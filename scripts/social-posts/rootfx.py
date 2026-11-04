@@ -37,6 +37,7 @@ BARK_HL, BARK_MID, BARK_LOW, BARK_DK, BARK_OUT = (120, 120, 120), (78, 78, 78), 
 EYE_R, EYE_HL, EYE_DK = (176, 22, 38), (240, 70, 70), (40, 0, 10)
 TOOTH = (244, 244, 236)
 LIME, LIME_DK = (222, 255, 74), (158, 181, 53)
+BLOOD, BLOOD_HL, BLOOD_DK = (150, 0, 16), (222, 26, 44), (86, 0, 10)
 FLESH = (44, 0, 14)
 
 def load_arr(path):
@@ -89,7 +90,7 @@ class RootShow:
         self._build_overgrowth()
         self.hook = [dict(x=rng.choice([0.0, 1.0]), y=rng.uniform(0.15, 1.0), th=rng.uniform(-0.5, 0.5), ph=rng.uniform(0, 6.3)) for _ in range(11)]
         self.puff = [dict(dx=rng.uniform(-110, 110), v=rng.uniform(170, 330), t0=rng.uniform(0, 0.7), r=int(rng.integers(2, 4))) for _ in range(11)]
-        self.crumbs = [[(rng.uniform(-1, 1), rng.uniform(0.3, 1.0)) for _ in range(7)] for _ in self.VICT]
+        self.crumbs = [[(rng.uniform(-1, 1), rng.uniform(0.3, 1.0)) for _ in range(16)] for _ in self.VICT]
 
     # ───────── Raster ─────────
     def cell(self, x, y):
@@ -129,6 +130,7 @@ class RootShow:
                 xa, ya, xb, yb = int(max(0, x - lx)), int(max(0, y - ly)), int(min(lw, x + gp - lx)), int(min(lh, y + gp - ly))
                 if xb > xa and yb > ya and a[ya:yb, xa:xb].mean() >= 0.5:
                     cov.add((ci, cj))
+        self._banner_cov = cov
         mid = (ci0 + ci1) / 2.0
         half = max(1.0, (ci1 - ci0) / 2.0)
         for (ci, cj) in cov:                                                              # Wurzelstränge um den Rand des Banners
@@ -147,6 +149,7 @@ class RootShow:
         bx, by, bw, bh = self.g['badge_rect']                                             # Link-Schild: Ring und zwei Kreuzranken
         ci0, cj0 = self.cell(bx, by)
         ci1, cj1 = self.cell(bx + bw - 1, by + bh - 1)
+        self._badge_box = (ci0, cj0, ci1, cj1)
         for ci in range(ci0 - 1, ci1 + 2):
             for cj in (cj0 - 1, cj1 + 1):
                 add(ci, cj, (ci - ci0) / float(ci1 - ci0 + 1), 'badge', BARK_MID if (ci + cj) % 3 else BARK_HL)
@@ -161,6 +164,7 @@ class RootShow:
         px, py, pw, ph = self.g['plate_rect']                                             # Kartenrahmen: Ranken wachsen von den unteren Ecken nach oben
         ci0, cj0 = self.cell(px, py)
         ci1, cj1 = self.cell(px + pw - 1, py + ph - 1)
+        self._plate_box = (ci0, cj0, ci1, cj1)
         corners = [(ci0, cj1), (ci1, cj1)]
         dmax = math.hypot(ci1 - ci0, cj1 - cj0)
         for cj in range(cj0, cj1 + 1):
@@ -185,6 +189,62 @@ class RootShow:
             tc = t0 + dur * o
             tr = 17.6 + 2.0 * (1.0 - o) * 0.9 + 0.1 * hh(ci, cj, 11)                      # zuletzt Gewachsenes verschwindet zuerst
             self.over.append((ci, cj, tc, tr, col))
+        self._build_blood()
+
+    # ───────── Blut: Tropfen am Interface, Spritzer, Lache ─────────
+    def _build_blood(self):
+        self.drops = []                                                                    # (Spalte, Startzeile, Startzeit, Periode)
+        if not self.g.get('blood'):
+            return
+        rng = np.random.default_rng(77)
+        cov = self._banner_cov
+        banner_bottom = sorted((ci, cj) for (ci, cj) in cov if (ci, cj + 1) not in cov)
+        bi0, bj0, bi1, bj1 = self._badge_box
+        pi0, pj0, pi1, pj1 = self._plate_box
+        plate_bottom = [(ci, pj1 + 1) for ci in range(pi0 + 2, pi1 - 1)]
+        badge_bottom = [(ci, bj1 + 2) for ci in range(bi0, bi1 + 1)]
+        T_END = 17.6
+
+        def drip(cell, t0, L, tr):
+            ci, cj = cell
+            for r in range(1, L + 1):
+                col = BLOOD_HL if r == L else (BLOOD if r % 2 else BLOOD_DK)
+                tc = t0 + 0.09 * r
+                self.over.append((ci, cj + r, tc, tr, col))
+                if r < L:
+                    self.over.append((ci + 1, cj + r, tc, tr, BLOOD_DK)) if r <= 2 and L >= 4 else None
+            if L >= 4:
+                self.drops.append((ci, cj + L + 1, t0 + 0.09 * L + 0.2, 1.5 + rng.uniform(0, 0.6), tr))
+        for k, (ts, te) in enumerate(self.VICT):
+            tr = T_END + rng.uniform(0.1, 1.8)
+            for src, n in ((banner_bottom, 2), (plate_bottom, 1), (badge_bottom, 1 if k % 2 == 0 else 0)):
+                for _ in range(n):
+                    c = src[int(rng.integers(len(src)))]
+                    L0 = int(rng.integers(2, 6))
+                    drip(c, te + 0.15, L0, tr)
+                    if rng.uniform() < 0.6:                                                 # läuft später noch ein Stück weiter
+                        for r in range(L0 + 1, L0 + 4):
+                            self.over.append((c[0], c[1] + r, te + 1.8 + 0.12 * (r - L0), tr, BLOOD_HL if r == L0 + 3 else BLOOD))
+            for _ in range(2):                                                              # Spritzer an den Rändern und auf dem Rahmen
+                if rng.uniform() < 0.5:
+                    x = rng.uniform(30, 230) if rng.uniform() < 0.5 else rng.uniform(850, 1040)
+                    y = rng.uniform(560, 1350)
+                else:
+                    x, y = rng.uniform(250, 830), rng.choice([rng.uniform(450, 500), rng.uniform(1270, 1330)])
+                cx, cy = self.cell(x, y)
+                tsp = te + 0.05 + rng.uniform(0, 0.15)
+                trs = T_END + rng.uniform(0.1, 1.8)
+                for dj in range(-1, 2):
+                    for di in range(-1, 2):
+                        if abs(di) + abs(dj) < 3:
+                            self.over.append((cx + di, cy + dj, tsp, trs, BLOOD_HL if (di > 0 and dj < 0) else BLOOD if (di + dj) % 2 else BLOOD_DK))
+                for _ in range(6):
+                    a = rng.uniform(0, 6.28)
+                    r = rng.uniform(2.5, 5.0)
+                    self.over.append((cx + int(round(math.cos(a) * r)), cy + int(round(math.sin(a) * r)), tsp + 0.04, trs, BLOOD if rng.uniform() < 0.6 else BLOOD_HL))
+                for r in range(2, 2 + int(rng.integers(2, 6))):                              # Rinnsal nach unten
+                    self.over.append((cx, cy + r, tsp + 0.1 * r, trs, BLOOD if r % 2 else BLOOD_DK))
+        self.over.sort(key=lambda e: e[2])
 
     # ───────── Zeitleisten ─────────
     def tension(self, t):
@@ -436,6 +496,20 @@ class RootShow:
                 x, y = self.cpos(cx + di, cy + dj)
                 d.rectangle([x, y, x + self.gp - 1, y + self.gp - 1], fill=(110, 10, 30, al))
         canvas.alpha_composite(layer)
+        if self.g.get('blood'):                                                            # Blutlache am Boden wächst mit jedem Opfer
+            e = sum(1 for _, te in self.VICT if t >= te + 0.1)
+            shrink = 1.0 - smooth((t - 17.6) / 2.0)
+            hw = int((3 + 3.0 * e) * shrink)
+            if hw > 0:
+                d2 = ImageDraw.Draw(canvas)
+                for di in range(-hw, hw + 1):
+                    edge = abs(di) / float(hw)
+                    for dj, lim in ((0, 1.0), (-1, 0.62)):
+                        if edge <= lim:
+                            col = BLOOD_HL if ((di * 7 + dj * 3) % 11 == 0) else BLOOD if (di + dj) % 3 else BLOOD_DK
+                            self.rect(d2, self.c0 + di, self.gr + dj, col)
+                    if edge < 0.3 and (di % 5 == 0):
+                        self.rect(d2, self.c0 + di, self.gr - 2, BLOOD_HL if int(t * 6 + di) % 2 else BLOOD)
         self._paste_root(canvas, t, 'back')
 
     def draw_logo(self, canvas, f):
@@ -549,10 +623,15 @@ class RootShow:
         W, H, gp = self.W, self.H, self.gp
         d = ImageDraw.Draw(canvas)
         # Überwucherung (über Banner, Link-Schild, Kartenrahmen)
-        if 9.0 <= t < 20.0:
+        if 7.0 <= t < 20.0:
             for (ci, cj, tc, tr, col) in self.over:
                 if tc <= t < tr:
                     self.rect(d, ci, cj, col)
+            for (ci, cj, t0, per, tr) in self.drops:                                        # fallende Tropfen
+                if t0 <= t < tr:
+                    tau = (t - t0) % per
+                    if tau < 0.8:
+                        self.rect(d, ci, cj + int(26 * tau * tau), BLOOD_HL)
         # Opfer, davor der untere Teil des Root, davor die Wurzeln, die sie packen
         for k in range(len(self.VICT)):
             self._draw_victim(canvas, d, k, t)
@@ -565,7 +644,7 @@ class RootShow:
             if te <= t < te + 0.5:
                 tau = t - te
                 for (a, b) in self.crumbs[k]:
-                    self.rect(d, self.c0 + int(a * 8 + a * tau * 14), self.gr - 8 - int(b * 14 * tau - 28 * tau * tau * 0.6), LIME if b > 0.65 else BARK_HL)
+                    self.rect(d, self.c0 + int(a * 8 + a * tau * 14), self.gr - 8 - int(b * 14 * tau - 28 * tau * tau * 0.6), (BLOOD_HL if b > 0.65 else BLOOD if b > 0.45 else BLOOD_DK) if self.g.get('blood') else (LIME if b > 0.65 else BARK_HL))
         # Lockkugeln
         for k in range(len(self.VICT)):
             self._draw_orb(d, canvas, k, t)

@@ -156,10 +156,12 @@ class Background:
     """Dithering-Verlauf mit Spotlight und langsam rotierendem Strahlenkranz (Loop = ein Strahlenpaar)."""
     RAYS = 8                      # Strahlenpaare (hell+dunkel) rund um den Mittelpunkt
 
-    def __init__(self, accent, center):
+    def __init__(self, accent, center, blood=False):
         h, sat, val = colorsys.rgb_to_hsv(*[c / 255 for c in accent])
         deep = tuple(int(c * 255) for c in colorsys.hsv_to_rgb(h, 0.78, 0.66))
         self.ramp = [mix(NAVY, deep, t) for t in (0.03, 0.14, 0.27, 0.42, 0.58, 0.78)]
+        if blood:                                                         # Blut-Look: fast schwarz bis dunkles Blutrot
+            self.ramp = [mix((7, 2, 4), (146, 6, 26), t) for t in (0.03, 0.14, 0.27, 0.42, 0.58, 0.78)]
         ch, cw = -(-H // U), -(-W // U)          # aufgerundet, danach auf W×H beschnitten
         ys = (np.arange(ch) * U + U / 2).astype(np.float32)
         xs = (np.arange(cw) * U + U / 2).astype(np.float32)
@@ -235,13 +237,17 @@ def bevel_frame(size, accent, thick=32):
 LOGO_PX_DEFAULT = 3        # „Pixel Parties“-Banner: 3 px je Logo-Pixel (1017 px breit im Reel), seit dem Bakhm-Short der Standard für alle Posts/Reels
 
 
-def tinted_logo(accent, px_per=LOGO_PX_DEFAULT):
+def tinted_logo(accent, px_per=LOGO_PX_DEFAULT, letters=None):
     logo = Image.open(ROOT / 'data' / 'logo.png').convert('RGBA')
     mask = Image.open(ROOT / 'data' / 'logo-tint-mask.png').convert('RGBA').split()[3]
     rgb = np.asarray(logo.convert('RGB'), dtype=np.float32)
     m = (np.asarray(mask, dtype=np.float32) / 255.0)[..., None]
     col = np.array(accent, dtype=np.float32) / 255.0
     out = rgb * (1 - m) + rgb * col * m
+    if letters is not None:                                              # Schrift (reines Weiß, nicht im Lichtstreifen) umfärben, z. B. rote Buchstaben auf schwarzem Banner
+        licht = np.asarray(Image.open(ROOT / 'data' / 'logo-licht-mask.png').convert('RGBA').split()[3]) > 0
+        white = (rgb >= 250).all(axis=2) & ~licht
+        out[white] = np.array(letters, dtype=np.float32)
     res = Image.fromarray(out.clip(0, 255).astype(np.uint8), 'RGB').convert('RGBA')
     res.putalpha(logo.split()[3])
     # Original: 4 px je Logo-Pixel → standardmäßig 2 px je Logo-Pixel (px_per = 3 → 3 px usw.)
@@ -606,7 +612,7 @@ def main():
     card_y = 48 * U + oy                 # 336 px (Post)
     plate = bevel_frame((CARD_W + 2 * plate_pad, CARD_H + 2 * plate_pad), accent, plate_pad)
     plate_x, plate_y = card_x - plate_pad, card_y - plate_pad
-    bg = Background(accent, (W // 2, card_y + CARD_H // 2))
+    bg = Background(accent, (W // 2, card_y + CARD_H // 2), bool(hero_cfg.get('blood')))
 
     # Zwei Ebenen, damit sie beim Einblenden nacheinander erscheinen können:
     # A = Platte, Karte, Schnörkel, Logo; B = Name, Beiname, Trennlinien, Link-Schild
@@ -617,7 +623,8 @@ def main():
     mid_a.alpha_composite(orn)
     lum = 0.3 * accent[0] + 0.59 * accent[1] + 0.11 * accent[2]
     ui_accent = accent if lum >= 110 else mix(accent, WHITE, 0.4)       # sehr dunkle Akzente (z. B. Horror-Rot): Beiname und Link-Schild aufhellen, damit sie lesbar bleiben
-    logo = tinted_logo(accent, args.logo_px or hero_cfg.get('logoPx', LOGO_PX_DEFAULT))
+    ui_text = hexcol(hero_cfg['uiText']) if hero_cfg.get('uiText') else None            # abweichende Schriftfarbe des Interface (z. B. Rot auf Schwarz)
+    logo = tinted_logo(accent, args.logo_px or hero_cfg.get('logoPx', LOGO_PX_DEFAULT), ui_text)
     name_front = bool(hero_cfg.get('nameFront'))            # Name/Beiname/Link-Schild vor dem Sprite (bei sehr großen, tiefen Sprites)
     logo_front = bool(hero_cfg.get('logoFront'))            # Logo vor dem Sprite (bei Helden, die es überragen)
     logo_layer = Image.new('RGBA', (W, H), (0, 0, 0, 0))
@@ -630,13 +637,13 @@ def main():
     sub = hero_cfg.get('title', parts[1].strip() if len(parts) > 1 else '').upper()
     name_y, sub_y = (1238 + oy, 1295 + oy) if sub else (1252 + oy, 0)
     scale = next((sc for sc in (8, 7, 6, 5, 4) if pixel_text_mask(short).width * sc <= 640), 4)   # lange Namen kleiner setzen
-    nx, ny, nw, nh = draw_text(mid_b, short, scale, (W // 2, name_y), color=WHITE, outline=None, shadow=mix(accent, INK, 0.45))
+    nx, ny, nw, nh = draw_text(mid_b, short, scale, (W // 2, name_y), color=ui_text or WHITE, outline=None, shadow=mix(accent, INK, 0.45))
     dl = max(4, min(16, (nx - 2 * U - 4 * U - 5 * U) // U))
     ornaments.place_divider(mid_b, accent, nx - 2 * U, name_y - U, dl, -1)
     ornaments.place_divider(mid_b, accent, nx + nw + 2 * U, name_y - U, dl, 1)
     if sub:
         sub_scale = 3 if pixel_text_mask(sub).width * 3 <= 640 else 2
-        sx_, sy_, sw_, sh_ = draw_text(mid_b, sub, sub_scale, (W // 2, sub_y), color=ui_accent, outline=None, shadow=INK)
+        sx_, sy_, sw_, sh_ = draw_text(mid_b, sub, sub_scale, (W // 2, sub_y), color=ui_text or ui_accent, outline=None, shadow=INK)
         ornaments.place_divider(mid_b, accent, sx_ - 2 * U, sub_y - U // 2, 9, -1, thick=1, gem_r=1)
         ornaments.place_divider(mid_b, accent, sx_ + sw_ + 2 * U, sub_y - U // 2, 9, 1, thick=1, gem_r=1)
     if reel:                                  # Link-Schild unter dem Beinamen (im sicheren Bereich)
@@ -649,8 +656,8 @@ def main():
         dr = ImageDraw.Draw(badge_target)
         dr.rectangle([px0 + U, py0, px0 + pw - U - 1, py0 + ph - 1], fill=INK)
         dr.rectangle([px0, py0 + U, px0 + pw - 1, py0 + ph - U - 1], fill=INK)
-        dr.rectangle([px0 + U, py0 + U, px0 + pw - U - 1, py0 + ph - U - 1], fill=ui_accent)
-        draw_text(badge_target, url, us, (W // 2, py0 + ph // 2), color=INK, outline=None, anchor='mm')
+        dr.rectangle([px0 + U, py0 + U, px0 + pw - U - 1, py0 + ph - U - 1], fill=accent if ui_text else ui_accent)
+        draw_text(badge_target, url, us, (W // 2, py0 + ph // 2), color=ui_text or INK, outline=None, anchor='mm')
         badge_rect = (px0, py0, pw, ph)
         badge_img = badge_target.crop((px0, py0, px0 + pw, py0 + ph))
 
@@ -697,7 +704,7 @@ def main():
                     pair.append((float(xs_[sel_].mean()), float(ys_[sel_].mean())) if sel_.any() else dflt)
                 eyes2_.append(pair)
             rg = dict(logo_rect=wgeom['logo_rect'], logo_img=logo, badge_rect=badge_rect, badge_img=badge_img, plate_rect=(plate_x, plate_y, plate.width, plate.height),
-                      grid=(sx, sy, spr.px), draw_text=draw_text, lure_from=(sx + spr.center_x * spr.px, sy + 27 * spr.px),
+                      blood=bool(hero_cfg.get('blood')), grid=(sx, sy, spr.px), draw_text=draw_text, lure_from=(sx + spr.center_x * spr.px, sy + 27 * spr.px),
                       root_path=str(HERE / 'assets' / 'kyli' / 'root-of-all-evil.png'), students_dir=str(HERE / 'assets' / 'kyli' / 'students'),
                       eyes_fn=lambda t_: [(sx + (e_[0] + 0.5) * spr.px, sy + (e_[1] + 0.5) * spr.px) for e_ in eyes2_[(int(t_ * float(fps)) // per) % spr.n]])
             wind = rootfx.RootShow(W, H, U, float(fps), loop, rg, loop * WIND_LOOPS / float(fps))
