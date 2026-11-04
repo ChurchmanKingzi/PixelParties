@@ -698,9 +698,7 @@ def main():
                 eyes2_.append(pair)
             rg = dict(logo_rect=wgeom['logo_rect'], logo_img=logo, badge_rect=badge_rect, badge_img=badge_img, plate_rect=(plate_x, plate_y, plate.width, plate.height),
                       grid=(sx, sy, spr.px), draw_text=draw_text, lure_from=(sx + spr.center_x * spr.px, sy + 27 * spr.px),
-                      root_path=str(HERE / 'assets' / 'kyli' / 'root-of-all-evil.png'), cat_idle_path=str(HERE / 'assets' / 'cute-cat-idle.png'),
-                      monkey=[str(HERE / 'assets' / 'kyli' / n_) for n_ in ('monkey-walk-a.png', 'monkey-walk-b.png', 'monkey-flail-a.png', 'monkey-flail-b.png')],
-                      dog=[str(HERE / 'assets' / 'kyli' / n_) for n_ in ('dog-a.png', 'dog-b.png')],
+                      root_path=str(HERE / 'assets' / 'kyli' / 'root-of-all-evil.png'), students_dir=str(HERE / 'assets' / 'kyli' / 'students'),
                       eyes_fn=lambda t_: [(sx + (e_[0] + 0.5) * spr.px, sy + (e_[1] + 0.5) * spr.px) for e_ in eyes2_[(int(t_ * float(fps)) // per) % spr.n]])
             wind = rootfx.RootShow(W, H, U, float(fps), loop, rg, loop * WIND_LOOPS / float(fps))
         elif iceshow_on:

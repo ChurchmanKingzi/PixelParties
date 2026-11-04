@@ -2,7 +2,7 @@
 Unten im Bild wächst das Gesicht des Root (zwei rote Augen, Schlund mit Zähnen), seine Äste ranken am Kartenrand hoch. Spannungsbogen:
 
    0.0 –  1.3  HOOK      Wurzeln schießen von den Rändern ins Bild, der Schlund brüllt auf, Kylis Augen flammen rot
-   1.3 –  5.0  KÖDER     Kyli schickt leuchtende Lockkugeln zum Boden; harmlose Waldwesen (Pilz, Küken, Hase) wandern verzaubert herbei
+   1.3 –  5.0  KÖDER     Kyli schickt leuchtende Lockkugeln zum Boden; die Schüler aus MotiveArcanum wandern verzaubert herbei
    5.0 –  7.0  ERWACHEN  die Augen des Root öffnen sich, „THE ROOT OF ALL EVIL“, Herzschlag, die Äste wachsen
    7.0 – 15.9  FRASS     Wurzeln packen ein Opfer nach dem anderen und ziehen es in den Schlund (Biss, Beben); der Root wächst mit jedem Opfer,
                          Banner, Kartenrahmen und Link-Schild werden von Wurzeln überwuchert; der Takt der Bisse wird dichter
@@ -76,15 +76,15 @@ class RootShow:
         self.R_SPLIT = 39                                                                 # ab dieser Sprite-Zeile steht der Root vor den Opfern/Labels, darüber dahinter
         self._rcache = {}
         self.vfr = {}
-        cat = load_arr(geom['cat_idle_path'])
-        n = cat.shape[1] // 31
-        cf = [cat[:, i * 31:(i + 1) * 31].copy() for i in range(n)]
-        ys_, xs_ = np.where(np.any([f_[..., 3] > 0 for f_ in cf], axis=0))
-        self.vfr['cat'] = dict(walk=[f_[ys_.min():ys_.max() + 1, xs_.min():xs_.max() + 1].copy() for f_ in cf], flail=None, dt=0.07, hop=True, face_right=False)
-        self.vfr['monkey'] = dict(walk=[crop_alpha(load_arr(geom['monkey'][0])), crop_alpha(load_arr(geom['monkey'][1]))],
-                                  flail=[crop_alpha(load_arr(geom['monkey'][2])), crop_alpha(load_arr(geom['monkey'][3]))], dt=0.25, hop=True, face_right=False)
-        self.vfr['dog'] = dict(walk=[crop_alpha(load_arr(geom['dog'][0])), crop_alpha(load_arr(geom['dog'][1]))], flail=None, dt=0.14, hop=False, face_right=True)
-        self.kinds = [('cat', 'monkey', 'dog')[k % 3] for k in range(len(self.VICT))]
+        base = geom['students_dir']                                                       # die Schüler aus MotiveArcanum (PixelPartiesSprites), je Figur 1–2 Lauf- und Zappel-Bilder
+        def fr(n):
+            return crop_alpha(load_arr('%s/%s.png' % (base, n)))
+        self.vfr['blonde'] = dict(walk=[fr('blonde-walk-a'), fr('blonde-walk-b')], flail=[fr('blonde-flail-a'), fr('blonde-flail-b')], dt=0.25, hop=True)
+        self.vfr['black'] = dict(walk=[fr('black-walk-a'), fr('black-walk-b')], flail=[fr('black-flail-a'), fr('black-flail-b')], dt=0.25, hop=True)
+        self.vfr['alice'] = dict(walk=[fr('alice-walk-a')], flail=[fr('alice-flail-a'), fr('alice-flail-b')], dt=0.25, hop=True)
+        self.vfr['orange'] = dict(walk=[fr('orange-walk-a'), fr('orange-walk-b')], flail=None, dt=0.25, hop=True)
+        self.vfr['wendy'] = dict(walk=[fr('wendy-walk-a')], flail=None, dt=0.25, hop=True)
+        self.kinds = [('blonde', 'black', 'alice', 'orange', 'wendy')[k % 5] for k in range(len(self.VICT))]
         self.sides = [-1 if k % 2 == 0 else 1 for k in range(len(self.VICT))]
         self._build_overgrowth()
         self.hook = [dict(x=rng.choice([0.0, 1.0]), y=rng.uniform(0.15, 1.0), th=rng.uniform(-0.5, 0.5), ph=rng.uniform(0, 6.3)) for _ in range(11)]
