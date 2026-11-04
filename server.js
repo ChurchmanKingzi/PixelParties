@@ -7359,6 +7359,13 @@ function makeCpuDriver(room) {
       phase: engine.gs?.currentPhase,
     };
     if (_vorher) engine._cpuTurnMark = null;
+    // Denkzeit je Sitz: die Uhr gehört dem Sitz, dessen Zug zuletzt begann. Der CPU-Zug ruft über das Zugende den nächsten Treiber im
+    // selben Aufruf auf, eine Stoppuhr um runCpuTurn würde also die ganze Restpartie dem ersten Sitz anrechnen.
+    if (_vorher) {
+      const jetzt = Date.now(), c = engine._seatClock;
+      if (c) (engine._seatMs || (engine._seatMs = [0, 0]))[c.seat === 1 ? 1 : 0] += jetzt - c.t0;
+      engine._seatClock = { seat: engine.gs?.activePlayer === 1 ? 1 : 0, t0: jetzt };
+    }
     try {
       await runCpuTurn(engine, {
         room,
@@ -20767,6 +20774,10 @@ async function runHeadlessTrainingGame(pinnedDeck, oppDeck, pinnedIdx, gameOpts 
       if (gameOpts.profileAllowedSide != null) {
         engine._profileAllowedSide = gameOpts.profileAllowedSide;
       }
+      // Wertnetz als Blattbewertung (PP_VALUE_NET=leaf): PP_VALUE_LEAF_SIDE=pinned|other lässt nur die gepinnte bzw. die andere Seite
+      // mit dem Netz suchen (Spiegel-A/B, die Gegenseite bleibt beim Evaluator); ohne Angabe gilt das Netz für beide Seiten.
+      if (process.env.PP_VALUE_LEAF_SIDE === 'pinned') engine._valueLeafSide = pinnedIdx;
+      else if (process.env.PP_VALUE_LEAF_SIDE === 'other') engine._valueLeafSide = 1 - pinnedIdx;
       // ── GEPAARTES MESSEN (PP_PROFILE_DIR_A / _B) ──────────────────
       // Beide Seiten laden Profile, aber aus VERSCHIEDENEN
       // Verzeichnissen: Seite A das neue Set, Seite B das alte. Damit
