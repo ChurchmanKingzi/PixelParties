@@ -48851,6 +48851,15 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       setTimeout(() => setProjectileAnims(prev => prev.filter(a => a.id !== id)), dur + (projectileShape === 'surefire' ? 700 : projectileShape === 'pressure' ? 800 : projectileShape === 'water' ? 500 : projectileShape === 'magicArrow' ? 600 : 200));
     };
     socket.on('play_projectile_animation', onProjectileAnimation);
+    // ★ PFEILSALVE (app-fx-52.jsx): Angriff mit angeketteten „Arrow"-Artefakten. Die Engine hat die Standard-Animationen der Attack zurueckgehalten und schickt sie als `ersatz` mit;
+    // laeuft die Salve hier nicht (Animationen aus, Retro, reduzierte Bewegung, Zone nicht gefunden), spielt der Client sie selbst ab — sonst entfaellt der Ersatz.
+    const onArrowSalvo = (P) => {
+      let laeuft = false;
+      try { laeuft = !!(window.ppFx52Salve && window.ppFx52Salve(P, { myIdx })); } catch (e) { laeuft = false; }
+      if (laeuft || !P || !Array.isArray(P.ersatz)) return;
+      for (const [ev, data, dt] of P.ersatz) setTimeout(() => { try { (socket.listeners(ev) || []).slice().forEach((fn) => fn(data)); } catch (e) { /* weiter */ } }, Math.min(900, Math.max(0, dt | 0)));
+    };
+    socket.on('play_arrow_salvo', onArrowSalvo);
     // ★ WEAPON STORM (v805, Als Vorgabe): eine Barrage aus 10-20
     // Schwertern, Speeren und Aexten verschiedener Groesse, die in extrem
     // schneller Folge vom Nutzer auf das Ziel schiessen — ein Strahl aus
@@ -53481,6 +53490,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       socket.off('play_tharxian_charge', onTharxianCharge);
       socket.off('play_card_transfer', onCardTransfer);
       socket.off('play_projectile_animation', onProjectileAnimation);
+      socket.off('play_arrow_salvo', onArrowSalvo);
       socket.off('play_weapon_barrage', onWeaponBarrage);
       socket.off('butterfly_cloud_animation', onButterflyCloud);
       socket.off('smug_coin_save', onSmugCoinSave);
@@ -54673,6 +54683,8 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           // the bottom of this useEffect so it suppresses BOTH the
           // damage and heal branch this tick, then is cleared.
           if (manualHpSuppressRef.current[key]) continue;
+          // Pfeilsalve: Schadenszahlen und Balken hat die Salve beim Einschlag schon gezeigt (app-fx-52.jsx)
+          if (window.ppFx52Geschluckt && window.ppFx52Geschluckt('h:' + key, 'hp', cur.hp)) continue;
           const dmg = prev.hp - cur.hp;
           const [, hiStr] = key.split('-');
           const heroIdx = parseInt(hiStr);
@@ -54752,6 +54764,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         // place, swap, etc.), not damage. Skip the diff entirely.
         if (prev.name !== cur.name) continue;
         if (cur.hp < prev.hp) {
+          if (window.ppFx52Geschluckt && window.ppFx52Geschluckt('c:' + key, 'hp', cur.hp)) continue;   // Pfeilsalve: Zahl schon gezeigt
           const [ownerStr, heroIdxStr, slotStr] = key.split('-');
           const ownerIdx = parseInt(ownerStr);
           const ownerLabel = ownerLbl(ownerIdx, myIdx);
@@ -54895,7 +54908,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           setTimeout(() => playAnimation(animB, selB, { duration: animB === 'bloody_cut' ? 1300 : 900 }), 50);
         }
         // Gained burned → flame strike animation
-        if (cur.burned && !prev.burned) {
+        if (cur.burned && !prev.burned && !(window.ppFx52Geschluckt && window.ppFx52Geschluckt('h:' + key, 'burn'))) {   // Pfeilsalve: der Brand-Einschlag lief schon in der Salve
           const sel = `[data-hero-zone][data-hero-owner="${ownerLabel}"][data-hero-idx="${hi}"]`;
           const animType = cur.burned?.animationType || 'flame_strike';
           setTimeout(() => playAnimation(animType, sel, { duration: 1000 }), 50);

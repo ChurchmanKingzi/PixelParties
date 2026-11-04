@@ -10460,11 +10460,14 @@ class GameEngine {
     }
 
     const actualAmount = Math.max(0, hookCtx.amount);
+    // Pfeilsalve (nur Darstellung): die Salve zeigt den REELLEN Schaden Pfeil fuer Pfeil (auch die 0 von Hydra Blood Arrow); der HP-Abzug folgt nach ihrer Dauer.
+    const _salveGespielt = (type === 'attack' && target && target.hp !== undefined && target.hp > 0 && !this._inMctsSim && !this._fastMode)
+      ? await require('./_arrows-shared').pfeilSalve(this, source, target, { amount: actualAmount, hpVor: target.hp, maxHp: target.maxHp }) : false;
     // Null-Floater (v690): kam Schaden > 0 herein und geht 0 raus —
     // egal ob Buff, flat Reduktion (Tempeste), Deckel oder
     // Handreaktion —, zeigt der Held eine rote 0. Der HP-Diff-Detektor
     // des Clients feuert bei unveraenderten HP nicht.
-    if (target?.hp !== undefined && _eingangsBetrag > 0 && actualAmount === 0) {
+    if (target?.hp !== undefined && _eingangsBetrag > 0 && actualAmount === 0 && !_salveGespielt) {
       this._flashHeroDamageZero(target);
     }
     const hpBefore = (target && target.hp !== undefined) ? target.hp : actualAmount;
@@ -10706,6 +10709,9 @@ class GameEngine {
         }
       }
 
+      if (_atkBoni && target.hp > 0 && !this._inMctsSim && !this._fastMode) {
+        await require('./_arrows-shared').pfeilSalve(this, source, target, { amount: Math.min(amount, target.hp), hpVor: target.hp, maxHp: target.maxHp });   // Pfeilsalve (nur Darstellung)
+      }
       const hpBefore = target.hp;
       target.hp = Math.max(0, target.hp - amount);
       const dealt = hpBefore - target.hp;
@@ -46813,6 +46819,8 @@ this._deathWatch = (this._deathWatchStack || []).length
             this._rxResolvingCard = link.cardName;
             let result;
             const _hoptVorher = link.isInitialCard ? this._hoptAbzug() : null;
+            // Pfeilsalve (nur Darstellung): hat der Angreifer Pfeile an der Kette, haelt das Schild die Standard-Animationen der Attack zurueck (`_arrows-shared.js`).
+            const _pfeilSchild = (link.isInitialCard && link.cardType === 'Attack') ? require('./_arrows-shared').pfeilSchildOeffnen(this, chain, link) : null;
             try {
               result = await link.resolve(chain, i);
               // W16d (A09-09): Nachaufloesung am Glied (Arrow Slit: zweite Aktivierung unmittelbar nach der ersten).
@@ -46820,6 +46828,7 @@ this._deathWatch = (this._deathWatchStack || []).length
             } finally {
               this._rxResolvingOwner = _vorherAufloeser;
               this._rxResolvingCard = _vorherKarte;
+              if (_pfeilSchild) require('./_arrows-shared').pfeilSchildSchliessen(this, _pfeilSchild);
             }
             if (link.isInitialCard) link.resolveResult = this._applyDiscardOutDecline(link.cardName, result, _hoptVorher);
           } catch (err) {
@@ -57174,7 +57183,10 @@ this._deathWatch = (this._deathWatchStack || []).length
         // creature. Heroes already get visible feedback via the
         // 0 hp-delta path being a no-op; creatures didn't, so
         // this is creature-only on purpose.
-        if (!e._nullGezeigt) {
+        // Pfeilsalve (nur Darstellung): die Salve zeigt die 0 selbst (und haelt die Anzeige bis zum Ende zurueck)
+        const _salveKr = (e.type === 'attack' && !this._inMctsSim && !this._fastMode)
+          ? await require('./_arrows-shared').pfeilSalve(this, e.source, e.inst, { amount: 0, hpVor: e.inst.counters.currentHp, maxHp: e.inst.counters.maxHp }) : false;
+        if (!e._nullGezeigt && !_salveKr) {
           this._broadcastEvent('creature_damage_floater', {
             owner: this.physicalSide(e.inst),
             heroIdx: e.inst.heroIdx,
@@ -57295,6 +57307,9 @@ this._deathWatch = (this._deathWatchStack || []).length
         }
       }
 
+      if (e.type === 'attack' && !this._inMctsSim && !this._fastMode) {
+        await require('./_arrows-shared').pfeilSalve(this, e.source, e.inst, { amount: actualAmount, hpVor: e.inst.counters.currentHp, maxHp: e.inst.counters.maxHp });   // Pfeilsalve (nur Darstellung)
+      }
       const creatureHpBefore = e.inst.counters.currentHp;
       e.inst.counters.currentHp -= actualAmount;
       // Generic damage-tracking flag — mirrors the hero path above.
@@ -59276,6 +59291,9 @@ this._deathWatch = (this._deathWatchStack || []).length
   _broadcastEvent(event, data, opts) {
     if (this._aborted) return;
     if (this._fastMode) return; // Silent during MCTS simulations.
+    // Pfeilsalve: die Standard-Animationen einer Attack mit Pfeilen werden zurueckgehalten und reisen mit `play_arrow_salvo` (Fallback fuer Clients ohne Salve).
+    if (event === 'reaction_chain_done' && this._pfeilSchild && !this._pfeilSchild.aktiv && !this._pfeilSchild.fertig) this._pfeilSchild.aktiv = true;   // Pfeilsalve: ab Kettenende scharf
+    if (this._pfeilSchild && this._pfeilSchild.aktiv && require('./_arrows-shared').PFEIL_SCHILD_EVENTE.has(event)) { this._pfeilSchild.puffer.push([event, data, opts, Date.now()]); return; }
     // W6: Tokens fliegen nicht zu einem Stapel, sie zerfallen (`token_disintegrate`, siehe `_tokenZerfallSenden`).
     if (event === 'play_pile_transfer') { data = this._tokenStapelFlug(data); if (!data) return; }
     // 23.10. (Luck, Liquid Luck — „Whenever your opponent plays a card"): die Reaktionsfenster und selbstspielenden Reaction-Karten melden ihren Play nur als Flug mit
