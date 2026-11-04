@@ -52,7 +52,7 @@
     gold: '#ffb91a', goldH: '#ffe469', goldD: '#a87c00', goldM: '#f8ca21',
     bombe: '#222222', bombeH: '#535353', glutG: '#ffeb1a', glutD: '#c79e05',
     rbR: '#ef2929', rbO: '#ff8b1a', rbY: '#ffeb1a', rbG: '#20ac37', rbC: '#08d3ef', rbB: '#4580f6', rbP: '#702db3',
-    zahl: '#ff1a1a', zahlD: '#8b0d0d', blau: '#3866f0', rosa: '#f8b4df',
+    zahl: '#ff1a1a', zahlD: '#8b0d0d', bluD: '#780000', bluR: '#c80000', bluH: '#fe5154', blau: '#3866f0', rosa: '#f8b4df',
   };
   const LET = { // Buchstaben der Sprite-Zeilen → Farbname
     K: 'tinte', k: 'dunkelgrau', g: 'mittel', l: 'hell', w: 'creme', W: 'weiss', D: 'holzD', S: 'holz', s: 'holzH',
@@ -515,15 +515,34 @@
   const ICON = {
     burn: ['...r...', '..rro..', '..roo..', '.rooyo.', '.rooyo.', 'rooyyyo', 'rooycyo', '.ooyyo.', '..rooo.'],
     poison: ['...e...', '...E...', '..EEe..', '.EEEEe.', 'EEHEEee', 'EEHEEee', 'EEEEeee', '.EEEee.', '..eee..'],
+    // Blutung: ein Blutstropfen mit zweitem, fallendem Tropfen (Form und Farbe unterscheiden sich von Gift/Brand)
+    bleed: ['..d.......', '.dRd......', '.dRd......', 'dRhRd.....', 'dRRRd..d..', 'dRRRd.dRd.', '.dRd..dRd.', '..d....d..'],
   };
-  const ICOL = { r: 'rotD', o: 'org', y: 'gelb', c: 'creme', e: 'gruenM', E: 'gruen', H: 'gruenH' };
+  const ICOL = { r: 'rotD', o: 'org', y: 'gelb', c: 'creme', e: 'gruenM', E: 'gruen', H: 'gruenH', d: 'bluD', R: 'bluR', h: 'bluH' };
+  const iconBreite = (kind) => Math.max(...ICON[kind].map((r) => r.length));
   FX.statusIcon = (m, kind, x, y, pop) => {
-    const rows = ICON[kind], sc = 1 + (pop ? 1 : 0) * 0;
-    rows.forEach((row, j) => [...row].forEach((ch, i) => { if (ch === '.') return; for (let oy = 0; oy < 1; oy++) m.px(x + i, y + j, snap(CN[ICOL[ch]])); }));
+    const rows = ICON[kind], W = iconBreite(kind);
+    rows.forEach((row, j) => [...row].forEach((ch, i) => { if (ch === '.') return; m.px(x + i, y + j, snap(CN[ICOL[ch]])); }));
     // dunkle Kontur
     const filled = (i, j) => rows[j] && rows[j][i] && rows[j][i] !== '.';
-    for (let j = -1; j <= rows.length; j++) for (let i = -1; i <= 7; i++) if (!filled(i, j) && (filled(i + 1, j) || filled(i - 1, j) || filled(i, j + 1) || filled(i, j - 1))) m.px(x + i, y + j, C.tinte);
-    void sc;
+    for (let j = -1; j <= rows.length; j++) for (let i = -1; i <= W; i++) if (!filled(i, j) && (filled(i + 1, j) || filled(i - 1, j) || filled(i, j + 1) || filled(i, j - 1))) m.px(x + i, y + j, C.tinte);
+    void pop;
+  };
+  FX.statusIconBreite = (kind) => iconBreite(kind) + 2;
+  /** Dauer-Anzeige: das Symbol als kleines Bild (data-URL, 1 Zelle = 1 Bildpunkt; im Abzeichen ganzzahlig vergrößert), mit oder ohne dunkle Kontur. Zwischengespeichert. */
+  const iconUrls = new Map();
+  FX.iconUrl = (kind, outline) => {
+    const key = kind + (outline ? '+' : '-');
+    if (iconUrls.has(key)) return iconUrls.get(key);
+    if (!ICON[kind]) return null;
+    FX.init();
+    const W = iconBreite(kind), H = ICON[kind].length, o = outline ? 1 : 0, gw = W + 2 * o, gh = H + 2 * o;
+    const cv = document.createElement('canvas'); cv.width = gw; cv.height = gh;
+    const g = cv.getContext('2d'), img = g.createImageData(gw, gh), m = maler(img.data, gw, gh);
+    if (outline) FX.statusIcon(m, kind, 1, 1); else ICON[kind].forEach((row, j) => [...row].forEach((ch, i) => { if (ch !== '.') m.px(i, j, snap(CN[ICOL[ch]])); }));
+    g.putImageData(img, 0, 0);
+    const r = { url: cv.toDataURL('image/png'), w: gw, h: gh };
+    iconUrls.set(key, r); return r;
   };
   FX.hpBar = (m, cx, y, w, frac, num, flash, label) => {
     const x = cx - Math.floor(w / 2), h = 5;
@@ -577,6 +596,15 @@
     return false;
   };
 
+  /** Kann dieser Client die Salve spielen? (ohne Tab-Sichtbarkeit) — wird dem Server gemeldet (`client_fx`), damit er nur dann wartet. */
+  window.ppFx52KannSalve = function () {
+    try {
+      if (window.PP_RETRO || window._playAnimations === false || window.__ppFxAlt || window.__ppFx52Aus || typeof ppFx30Maler !== 'function') return false;
+      if (window.PPPixelAnim && window.PPPixelAnim.KONFIG && window.PPPixelAnim.KONFIG.aktiv === false) return false;
+      if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return false;
+      return true;
+    } catch (e) { return false; }
+  };
   function erlaubt() {
     try {
       if (window.PP_RETRO || window._playAnimations === false || window.__ppFxAlt || window.__ppFx52Aus || typeof ppFx30Maler !== 'function') return false;
@@ -672,6 +700,7 @@
       const zielKey = P.tgt.kind === 'creature' ? `c:${P.tgt.owner}-${P.tgt.heroIdx}-${P.tgt.zoneSlot}` : `h:${P.tgt.owner}-${P.tgt.heroIdx}`;
       const hatBrand = arrows.some((a) => a.burn);
       window.ppFx52Schlucken(zielKey, P.hpNach, hatBrand && !P.vorBurn);
+      window.ppFx52SalveAktiv(zielKey, performance.now() + (Math.max(plan.tEnd, Math.max(plan.tLast + 0.45, 1.7)) + 0.9) * 1000);   // die allgemeine HP-Anzeige schweigt für dieses Ziel (kein Doppelbild)
       const tHud = Math.max(plan.tLast + 0.45, 1.7);                          // Balken/Status bleiben, bis der echte Zustand da ist
       const ctx = { m, plan, proj, flat: 0.72, lod, G: S, numSc, numLift: 9 };
 
@@ -723,11 +752,121 @@
     } catch (e) { try { console.warn('ppFx52Salve', e); } catch (e2) { /* still */ } return false; }
   };
 
+  // ═════════ Allgemeine HP-Anzeige: bei JEDER HP-Änderung (Schaden, Heilung, jede Quelle) kurz am Ziel ═════════
+  //  Der Zustandsvergleich des Bretts (app-board.jsx, dort wo die Schaden-/Heilzahlen entstehen) ruft `ppFx52Hp`; die Anzeige erscheint also zeitgleich mit der Zahl. Je Ziel EIN Eintrag
+  //  (Balken + aktuelle HP-Zahl, wie in der Salve), weitere Änderungen aktualisieren ihn und verlängern die Anzeige (HP_LEBEN); höchstens HP_MAX gleichzeitig (Handy weniger).
+  //  TECHNIK (Kosten): je Eintrag eine eigene KLEINE Leinwand (nur Balken + Zahl), die Bitmaps (weiß blitzend / normal) je (HP, Max, Breite, Zelle) werden einmalig gezeichnet und gecacht;
+  //  in der Haltephase wird NICHTS gezeichnet oder hochgeladen (nur Zeitprüfung), beim Ausblinken schaltet nur `visibility`. Die Lage der Zone wird einmal beim Start des Eintrags gelesen
+  //  (alle neuen Einträge eines Bildes zusammen: ein einziges erzwungenes Layout). Die Schleife (`ppTaktRaf`) läuft nur, solange Einträge laufen. Die native HP-Anzeige der Karte bleibt unberührt;
+  //  der Balken liegt über der Oberkante der Zone. Läuft gerade die Salve für dasselbe Ziel, zeigt nur sie (kein Doppelbild).
+  const HP_LEBEN = 1250, HP_FLASH = 3, HP_BLINK = 260;
+  const hpMap = new Map(), salveBis = new Map(), hpCache = new Map(), hpPool = [];
+  let hpRaf = 0, hpLetzte = -1, hpS = 0;
+  const hpMax = () => { try { return (window.ppIsPhone && window.ppIsPhone()) ? 4 : 8; } catch (e) { return 8; } };
+  window.ppFx52SalveAktiv = (key, bis) => { salveBis.set(key, bis); const e = hpMap.get(key); if (e) { hpFrei(e); hpMap.delete(key); } };
+  const hpMessen = (name, ms) => { if (window.__ppFx52Messen) (window[name] || (window[name] = [])).push(+ms.toFixed(3)); };
+  /** Bitmap (ImageData, auf den Inhalt beschnitten) des Balkens: { id, w, h, ox, oy } mit ox/oy = Versatz der Bitmap zur Balkenmitte/-oberkante (Zellen). */
+  function hpBitmap(hp, max, bw, flash) {
+    const key = hp + '|' + max + '|' + bw + '|' + (flash ? 1 : 0), hit = hpCache.get(key);
+    if (hit) return hit;
+    const W = Math.max(bw, 30) + 10, H = 24, buf = new Uint8ClampedArray(W * H * 4), m = PF.maler(buf, W, H), cx = rd(W / 2), by = 14;
+    PF.hpBar(m, cx, by, bw, hp / max, hp, flash);
+    const d = m.d, w = Math.max(1, d.x1 - d.x0), h = Math.max(1, d.y1 - d.y0), out = new ImageData(w, h);
+    for (let j = 0; j < h; j++) out.data.set(buf.subarray(((d.y0 + j) * W + d.x0) * 4, ((d.y0 + j) * W + d.x0 + w) * 4), j * w * 4);
+    const r = { id: out, w, h, ox: d.x0 - cx, oy: d.y0 - by };
+    if (hpCache.size > 80) hpCache.clear();
+    hpCache.set(key, r); return r;
+  }
+  function hpFrei(e) { if (e.cv) { e.cv.remove(); hpPool.push({ cv: e.cv, g: e.g }); e.cv = null; e.g = null; e.bw = e.bh = 0; } }
+  function hpStop() { if (hpRaf) { try { cancelAnimationFrame(hpRaf); } catch (e) { /* weg */ } hpRaf = 0; } hpLetzte = -1; }
+  function hpNeueLeinwand() {
+    const cv = document.createElement('canvas');
+    cv.setAttribute('aria-hidden', 'true'); cv.setAttribute('data-pp-px', 'aus');
+    cv.style.cssText = 'position:fixed;pointer-events:none;z-index:10139;image-rendering:pixelated;display:block;';
+    return { cv, g: cv.getContext('2d') };
+  }
+  /** Warmlauf im Leerlauf: Leinwände vorbereiten, den Bitmap-Zeichner einmal heiß laufen lassen (kein erstes kaltes Bild beim ersten Treffer). */
+  window.ppFx52HpWarm = function () { try { PF.init(); while (hpPool.length < 8) hpPool.push(hpNeueLeinwand()); for (const [hp, mx, bw] of [[700, 800, 24], [64, 400, 20], [1234, 2000, 24], [0, 90, 16], [9, 10, 22]]) { hpBitmap(hp, mx, bw, true); hpBitmap(hp, mx, bw, false); } hpCache.clear(); } catch (e) { /* weg */ } };
+  /** Bitmap in die Leinwand des Eintrags schreiben (Größe nur bei Änderung neu setzen: das löscht die Fläche). */
+  function hpMalen(e, flash) {
+    const t0 = window.__ppFx52Messen ? performance.now() : 0;
+    const bmp = hpBitmap(e.hp, e.max, e.rc.bw, flash);
+    if (!e.cv) {
+      const pe = hpPool.pop() || hpNeueLeinwand();
+      (window.ppFxWeltSchicht ? window.ppFxWeltSchicht() : document.body).appendChild(pe.cv);
+      e.cv = pe.cv; e.g = pe.g; e.aus = null;
+    }
+    const S = e.rc.S;
+    if (e.bw !== bmp.w || e.bh !== bmp.h) { e.cv.width = bmp.w; e.cv.height = bmp.h; e.cv.style.width = bmp.w * S + 'px'; e.cv.style.height = bmp.h * S + 'px'; e.bw = bmp.w; e.bh = bmp.h; }
+    e.g.putImageData(bmp.id, 0, 0);
+    e.cv.style.left = e.rc.x + bmp.ox * S + 'px'; e.cv.style.top = e.rc.y + bmp.oy * S + 'px';
+    e.flashAn = flash;
+    if (t0) hpMessen('__ppFx52HpMalen', performance.now() - t0);
+  }
+  function hpSchritt(jetzt) {
+    hpRaf = 0;
+    if (!hpMap.size) { hpStop(); return; }
+    if (typeof jetzt !== 'number') jetzt = performance.now();
+    const fr = Math.floor(jetzt / (1000 / 30)), t0 = window.__ppFx52Messen ? performance.now() : 0;
+    if (fr !== hpLetzte) {
+      hpLetzte = fr;
+      let pending = false; for (const e of hpMap.values()) if (!e.rc) { pending = true; break; }
+      if (pending) {                                                        // Lage neuer Einträge: einmal lesen (ein erzwungenes Layout für alle)
+        const tr0 = t0 ? performance.now() : 0;
+        const fo = window.ppFxScrollOffset ? window.ppFxScrollOffset() : { dx: 0, dy: 0 };
+        let S = hpS; if (!S) { const he = document.querySelector('[data-hero-zone]'), hh = he ? he.getBoundingClientRect().height : 60; S = hpS = kl(rd(Math.max(hh, 40) / ZELLEN_JE_KARTE), 2, 6); }
+        for (const [key, e] of hpMap) {
+          if (e.rc) continue;
+          const el = zone({ kind: e.kind, owner: e.owner, heroIdx: e.heroIdx, zoneSlot: e.zoneSlot }, e.myIdx), r = el && el.getBoundingClientRect();
+          if (!r || !(r.width > 8 && r.height > 8)) { hpMap.delete(key); continue; }
+          let top = r.top - 11 * S; if (top < 13 * S) top = 13 * S;
+          e.rc = { S, bw: Math.max(16, rd(r.width / S)), x: rd(r.left + r.width / 2 + fo.dx), y: rd(top + fo.dy) };
+          e.t = performance.now();                                          // Lebensdauer ab dem ersten sichtbaren Bild
+        }
+        if (t0) hpMessen('__ppFx52HpRect', performance.now() - tr0);
+        if (t0) hpMessen('__ppFx52HpZeiten', performance.now() - t0);
+        hpRaf = (window.ppTaktRaf || window.requestAnimationFrame)(hpSchritt);   // Lage lesen und Malen auf getrennte Bilder legen (kein Spitzenbild aus Layout + Zeichnen)
+        return;
+      }
+      const jetztP = performance.now();
+      let gemalt = 0;                                                       // höchstens 2 Bitmaps je Bild (8 neue Ziele verteilen sich über 4 Bilder statt ein Bild zu sprengen)
+      for (const [key, e] of hpMap) {
+        if (!e.rc) continue;
+        const alt = jetztP - e.t;
+        if (alt > HP_LEBEN) { hpFrei(e); hpMap.delete(key); continue; }
+        const flash = alt < HP_FLASH * (1000 / 30);
+        if ((e.neu || e.flashAn !== flash) && gemalt < 2) { hpMalen(e, flash); e.neu = false; gemalt++; }   // nur bei neuem Wert oder beim Ende des Blitzes
+        if (e.cv) { const aus = alt > HP_LEBEN - HP_BLINK && (fr & 1); if (e.aus !== aus) { e.cv.style.visibility = aus ? 'hidden' : 'visible'; e.aus = aus; } }
+      }
+      if (t0) hpMessen('__ppFx52HpZeiten', performance.now() - t0);
+    }
+    if (!hpMap.size) { hpStop(); return; }
+    hpRaf = (window.ppTaktRaf || window.requestAnimationFrame)(hpSchritt);
+  }
+  /**
+   * o = { key ('h:<Sitz>-<Held>' | 'c:<Sitz>-<Held>-<Platz>'), kind: 'hero'|'creature', owner (Sitz), heroIdx, zoneSlot, hp (neu), max, myIdx }.
+   * Aufrufer: Zustandsvergleich des Bretts (Schaden UND Heilung, jede Quelle). Nicht im Retro-Modus / bei ausgeschalteten Animationen (dort nur der Zustand).
+   */
+  window.ppFx52Hp = function (o) {
+    try {
+      if (!o || !(o.max > 0) || !window.ppFx52KannSalve || !window.ppFx52KannSalve() || document.hidden) return false;
+      const sb = salveBis.get(o.key); if (sb && performance.now() < sb) return false;
+      PF.init();
+      const alt = hpMap.get(o.key);
+      if (!alt && hpMap.size >= hpMax()) { let ae = null, ak = null; for (const [k, v] of hpMap) if (ae == null || v.t < ae) { ae = v.t; ak = k; } if (ak != null) { hpFrei(hpMap.get(ak)); hpMap.delete(ak); } }
+      const hp = Math.max(0, o.hp | 0), max = Math.max(1, o.max | 0);
+      if (alt && alt.rc) { alt.hp = hp; alt.max = max; alt.t = performance.now(); alt.neu = true; alt.myIdx = o.myIdx; }   // Lage bleibt (die Zone ändert sich in 1,25 s nicht)
+      else hpMap.set(o.key, { kind: o.kind, owner: o.owner, heroIdx: o.heroIdx, zoneSlot: o.zoneSlot, hp, max, myIdx: o.myIdx, t: performance.now(), neu: true, rc: null });
+      if (!hpRaf) { hpLetzte = -1; hpRaf = (window.ppTaktRaf || window.requestAnimationFrame)(hpSchritt); }
+      return true;
+    } catch (e) { return false; }
+  };
+
   // Aufwärmen im Leerlauf: Sprites (8 Arten × 32 Ausrichtungen) einmalig bauen, den Zeichner einmal kalt durchlaufen
   (function aufwaermen() {
     const los = () => {
       try {
-        PF.init();
+        PF.init(); window.ppFx52HpWarm();
         const gw = 220, gh = 140, buf = new Uint8ClampedArray(gw * gh * 4), m = PF.maler(buf, gw, gh);
         const kinds = PF.KINDS, plan = PF.plan({ kinds, total: 200, seed: 3, A: { x: 20, y: 90, z: 58 }, B: { x: 180, y: 70, z: 50, rx: 40, ry: 10, zr: 30, zTop: 120 }, perArrow: kinds.map(() => 25) });
         const ctx = { m, plan, proj: (x, y, z) => [x * 0.25, (y - z) * 0.25], flat: 0.72, lod: 0, numSc: 1, numLift: 9 };

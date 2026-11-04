@@ -6743,7 +6743,9 @@ function PoisonedOverlay({ stacks, nurZahl, hinweis, karte }) {
       onMouseLeave: () => { hideGameTooltip(); hideBoardTip(); },
     };
   })() : null;
-  const zahl = <div className={'poison-stack-count' + (hover ? ' poison-stack-count-hover' : '')} {...hover}>{stacks}</div>;
+  // Die Stapelzahl steht jetzt im Gift-Abzeichen („x3“, app-fx-52): die Zahl auf der Karte entfaellt, solange die Pixel-Symbole laufen (keine doppelte Anzeige).
+  const neuesSymbol = !!(window.PpFx52 && window.PpFx52.iconUrl && !window.__ppFx52SymbolAlt);
+  const zahl = neuesSymbol ? null : <div className={'poison-stack-count' + (hover ? ' poison-stack-count-hover' : '')} {...hover}>{stacks}</div>;
   // v1462: steht eine animierte Figur auf der Karte, zeigt sie das Gift
   // (Tönung + Schädel) — die Karte behält nur die Stapelzahl.
   const bubbles = useMemo(() => nurZahl ? [] : Array.from({ length: ppFxN(8) }, () => ({
@@ -6754,7 +6756,7 @@ function PoisonedOverlay({ stacks, nurZahl, hinweis, karte }) {
     dur: 0.8 + Math.random() * 0.8,
   })), []);
   if (nurZahl) {
-    return stacks >= 1
+    return (stacks >= 1 && zahl)
       ? <div className="status-poisoned-zahl">{zahl}</div>
       : null;
   }
@@ -38072,6 +38074,14 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     if (rid) lastRoomRef.current = rid;
   }, [gameState?.roomId]);
 
+  // Pfeilsalve: dem Server melden, ob dieser Client die Salve spielt (er wartet nur dann; s. `client_fx` in server.js) — beim Start, bei Aenderung der Einstellung und nach Wiederverbindung.
+  useEffect(() => {
+    const melden = () => { try { socket.emit('client_fx', { salve: !!(window.ppFx52KannSalve && window.ppFx52KannSalve()) }); } catch (e) { /* ohne */ } };
+    const t = setTimeout(melden, 0);
+    socket.on('connect', melden);
+    return () => { clearTimeout(t); socket.off('connect', melden); };
+  }, [playAnimations, gameState?.roomId]);
+
   useEffect(() => {
     window._playAnimations = playAnimations;
     if (playAnimations) {
@@ -54667,11 +54677,17 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         if (h?.name) currentHp[`${pi}-${hi}`] = { name: h.name, hp: h.hp, owner: ownerLbl(pi, myIdx) };
       }
     }
+    // Allgemeine HP-Anzeige (app-fx-52): bei jeder HP-Aenderung kurz Balken + aktuelle HP am Ziel, zeitgleich mit der Schaden-/Heilzahl.
+    const hpAnz = (kind, pi, hi, si, hp, max) => {
+      if (!window.ppFx52Hp) return;
+      window.ppFx52Hp({ key: kind === 'hero' ? `h:${pi}-${hi}` : `c:${pi}-${hi}-${si}`, kind, owner: pi, heroIdx: hi, zoneSlot: si, hp, max, myIdx });
+    };
     // Compare HP
     if (prevHpRef.current) {
       const newDmgNums = [];
       for (const [key, cur] of Object.entries(currentHp)) {
         const prev = prevHpRef.current[key];
+        if (prev && cur.hp !== prev.hp && prev.name === cur.name) { const [pS, hS] = key.split('-'); hpAnz('hero', +pS, +hS, -1, cur.hp, gameState.players[+pS]?.heroes?.[+hS]?.maxHp); }
         if (prev && cur.hp < prev.hp) {
           // Skip if this HP decrease was from Toughness removal (not real damage)
           if (toughnessHpSuppressRef.current[key]) {
@@ -54763,6 +54779,10 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         // Creature identity changed in this slot — replacement (bounce-
         // place, swap, etc.), not damage. Skip the diff entirely.
         if (prev.name !== cur.name) continue;
+        if (cur.hp !== prev.hp) {
+          const [oS, hS, sS] = key.split('-'), cc = (gameState.creatureCounters || {})[key];
+          hpAnz('creature', +oS, +hS, +sS, cur.hp, cc?.maxHp ?? cc?._cardDataOverride?.hp ?? CARDS_BY_NAME[cur.name]?.hp);
+        }
         if (cur.hp < prev.hp) {
           if (window.ppFx52Geschluckt && window.ppFx52Geschluckt('c:' + key, 'hp', cur.hp)) continue;   // Pfeilsalve: Zahl schon gezeigt
           const [ownerStr, heroIdxStr, slotStr] = key.split('-');

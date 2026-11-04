@@ -9033,6 +9033,22 @@ function poisonTooltipText(stacks, perStack, isUnhealable, deadly) {
 }
 window.poisonTooltipText = poisonTooltipText;
 
+/**
+ * Dauer-Anzeige von Brand, Gift und Blutung: Pixel-Symbole (app-fx-52, `PpFx52.iconUrl`) statt Emoji im Abzeichen. Ein statisches Bild je Abzeichen (keine Dauer-Animation),
+ * ganzzahlig vergroessert (Brettmassstab >= 1,6 -> doppelt); auf dem Handy ohne Kontur (das 12-px-Abzeichen liefert den Rahmen).
+ */
+function PpStatusSpr({ kind, fallback }) {
+  const P = window.PpFx52;
+  let ic = null;
+  try { ic = (P && P.iconUrl && !window.__ppFx52SymbolAlt) ? P.iconUrl(kind, !(window.ppIsPhone && window.ppIsPhone())) : null; } catch (e) { ic = null; }
+  if (!ic) return <PxIcon z={fallback} />;
+  let k = 1;
+  try { k = (parseFloat(document.documentElement.style.getPropertyValue('--board-scale')) || 1) >= 1.6 ? 2 : 1; } catch (e) { k = 1; }
+  return <img src={ic.url} alt="" draggable={false} data-pp-px="aus" className="pp-px pp-px-icon"
+    style={{ width: ic.w * k, height: ic.h * k, imageRendering: 'pixelated', objectFit: 'fill' }} />;
+}
+window.PpStatusSpr = PpStatusSpr;
+
 function StatusBadges({ statuses, counters, buffs, isHero, player, cardName, isOpponentSide }) {
   const badges = [];
   // Spielername zu einem Sitz-Index (das Brett stellt `window._ppPlayerNames` bereit); `null`, wenn unbekannt.
@@ -9152,13 +9168,13 @@ function StatusBadges({ statuses, counters, buffs, isHero, player, cardName, isO
   if (isHero && b.blessed_skill?.locked) badges.push({ key: 'skill_locked', icon: '🚫',
     tooltip: 'Action-locked (Divine Gift of Skill): This Hero cannot perform any more Actions this turn, including additional Actions — unless the Hero that cast Divine Gift of Skill (\"the user\") has at least Magic Arts 1.' });
   if (c._baihuStunned) badges.push({ key: 'petrified', icon: '🪨', tooltip: `Petrified: Stunned and immune to all damage. Lasts for ${c._baihuStunned.duration || 1} of its owner's turns.` });
-  if (s.burned || c.burned) badges.push({ key: 'burned', icon: '🔥', tooltip: 'Burned: Takes 60 damage at the start of each of its owner\'s turns.' });
-  if (s.bleeding || c.bleeding) badges.push({ key: 'bleeding', icon: '🩸', tooltip: 'Bleeding: takes 50 damage after each of its own actions or active effects. Permanent until cleansed.' });
+  if (s.burned || c.burned) badges.push({ key: 'burned', icon: '🔥', px: 'burn', tooltip: 'Burned: Takes 60 damage at the start of each of its owner\'s turns.' });
+  if (s.bleeding || c.bleeding) badges.push({ key: 'bleeding', icon: '🩸', px: 'bleed', tooltip: 'Bleeding: takes 50 damage after each of its own actions or active effects. Permanent until cleansed.' });
   if (s.poisoned || c.poisoned) {
     const stacks = s.poisoned?.stacks || c.poisonStacks || c.poisoned || 1;
     const perStack = player?.poisonDamagePerStack || 30;
     const isUnhealable = s.poisoned?.unhealable || c.poisonedUnhealable;
-    badges.push({ key: 'poisoned', icon: isUnhealable ? '💀' : '☠️', tooltip: poisonTooltipText(stacks, perStack, isUnhealable, !!s.poisoned?.deadly), className: isUnhealable ? 'status-unhealable' : '' });
+    badges.push({ key: 'poisoned', icon: isUnhealable ? '💀' : '☠️', px: isUnhealable ? undefined : 'poison', zaehler: isUnhealable ? undefined : 'x' + stacks, tooltip: poisonTooltipText(stacks, perStack, isUnhealable, !!s.poisoned?.deadly), className: isUnhealable ? 'status-unhealable' : '' });
   }
   if (s.negated || c.negated) {
     // Skeleton Death Knight applies negated with a `_dkSilenced`
@@ -9522,7 +9538,8 @@ function StatusBadges({ statuses, counters, buffs, isHero, player, cardName, isO
         <div key={b.key} className={'status-badge' + (b.className ? ' ' + b.className : '')}
           onMouseEnter={e => { showGameTooltip(e, b.tooltip); showBoardTip(); }}
           onMouseLeave={() => { hideGameTooltip(); hideBoardTip(); }}>
-          <PxIcon z={b.icon} />
+          {b.px ? <PpStatusSpr kind={b.px} fallback={b.icon} /> : <PxIcon z={b.icon} />}
+          {b.zaehler != null && <span className="status-badge-duration">{b.zaehler}</span>}
           {b.duration != null && <span className="status-badge-duration">{b.duration >= STATUS_FOREVER ? '∞' : b.duration}</span>}
         </div>
       ))}

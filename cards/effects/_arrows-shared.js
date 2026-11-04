@@ -203,7 +203,7 @@ function armAttackerWithArrow(engine, pi, chain, modifier) {
   hero._arrowsChainedCount = _countArrowLinks(chain);
   if (Array.isArray(chain)) _KETTEN.set(hero, chain);   // Pfeilsalve: die Kette bleibt (Verweis, kein Zustand) und wird beim Treffer fuer die Anzeige gelesen
   // Pfeilsalve: Schild bereitstellen; scharf wird es mit dem Ende der Kette (`reaction_chain_done`, siehe `_broadcastEvent`) — die Attack loest in aller Regel NACH der Kette auf (Zielwahl, Animation, Schaden).
-  if (Array.isArray(chain) && !engine._pfeilSchild && !engine._fastMode && !engine._inMctsSim && engine.room) engine._pfeilSchild = { puffer: [], aktiv: false, davor: null };
+  if (Array.isArray(chain) && !engine._pfeilSchild && !engine._fastMode && !engine._inMctsSim && engine.room && pfeilSalveGewuenscht(engine)) engine._pfeilSchild = { puffer: [], aktiv: false, davor: null };
   return true;
 }
 
@@ -435,6 +435,21 @@ const _KETTEN = new WeakMap();   // Held -> Kettenfeld der Pfeile (Verweis; die 
 const PFEIL_SALVE_MS = 1550;     // Dauer der Salve (Wartezeit vor dem HP-Abzug); der letzte Einschlag liegt bei <= 1,41 s
 const PFEIL_SCHILD_EVENTE = new Set(['play_zone_animation', 'play_projectile_animation', 'play_ram_animation', 'play_beam_animation', 'play_weapon_barrage', 'play_screen_shake', 'punch_impact', 'play_pusher_fling', 'play_card_throw']);
 
+/**
+ * Spielt irgendein Teilnehmer (Spieler mit Verbindung, Zuschauer) die Salve? Jeder Client meldet es per `client_fx` ({ salve }); ohne Meldung gilt „ja".
+ * Spielt niemand sie (alle Animationen aus / Retro / reduzierte Bewegung), entfallen Wartezeit und Schild: die normalen Attack-Animationen laufen, HP/Status gelten sofort.
+ */
+function pfeilSalveGewuenscht(engine) {
+  try {
+    const room = engine.room, sockets = engine.io && engine.io.sockets && engine.io.sockets.sockets;
+    if (!room || !sockets || typeof sockets.get !== 'function') return true;
+    const ids = [...(room.players || []).map((p) => p && p.socketId), ...(room.spectators || []).map((p) => p && p.socketId)].filter(Boolean);
+    let gesehen = false;
+    for (const id of ids) { const so = sockets.get(id); if (!so) continue; gesehen = true; if (!so.data || so.data.pfeilSalve !== false) return true; }
+    return !gesehen;
+  } catch (e) { return true; }
+}
+
 /** Namen der tatsaechlich geschossenen Pfeile in Kettenreihenfolge (nicht negiert, `isArrow` UND „Arrow" im Namen: Magic Topaz zaehlt nicht); Arrow Slit schiesst einen Pfeil ein zweites Mal (Mehrfach-Eintrag in `_armedArrows`). */
 function pfeilNamen(chain, hero) {
   const { loadCardEffect } = require('./_loader');
@@ -454,7 +469,7 @@ function pfeilNamen(chain, hero) {
 /** Oeffnet das Schild um die Aufloesung der Attack, falls ihr Held Pfeile an der Kette hat. Rueckgabe: Schild (zum Schliessen) oder null. */
 function pfeilSchildOeffnen(engine, chain, link) {
   try {
-    if (engine._fastMode || engine._inMctsSim || engine._aborted || !engine.room) return null;
+    if (engine._fastMode || engine._inMctsSim || engine._aborted || !engine.room || !pfeilSalveGewuenscht(engine)) return null;
     const hero = _findAttackerHero(engine, link.owner, chain, true);
     const kette = hero && _KETTEN.get(hero);
     if (!kette || !pfeilNamen(kette, hero).length) return null;
@@ -485,6 +500,7 @@ async function pfeilSalve(engine, source, target, info) {
     if (!kette) return false;
     const namen = pfeilNamen(kette, hero);
     if (!namen.length) return false;
+    if (!pfeilSalveGewuenscht(engine)) { if (engine._pfeilSchild) pfeilSchildSchliessen(engine, engine._pfeilSchild); return false; }   // niemand spielt die Salve: keine Wartezeit, normale Animationen, sofortiger Abzug
     const loc = resolveTargetLocation(engine, target);
     if (!loc) return false;
     const frei = (hero._armedArrows || []).slice();
@@ -637,6 +653,7 @@ module.exports = {
   applyArrowsAfterDamage,
   clearArmedArrows,
   pfeilNamen,
+  pfeilSalveGewuenscht,
   pfeilSchildOeffnen,
   pfeilSchildSchliessen,
   pfeilSalve,

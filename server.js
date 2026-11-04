@@ -16543,6 +16543,10 @@ io.on('connection', (socket) => {
     doConfirmPotion(room, pi, params).catch(err => console.error('[confirm_potion] error:', err.message)).finally(() => room.engine?._runPostChainActions?.());   // W72a: Trank mit Zielwahl, der Karten aus Deck/Ablage holt (Control Monitors)
   });
 
+  // Pfeilsalve (nur Darstellung): der Client meldet, ob er die Salve spielen kann (Animationen an, kein Retro, keine reduzierte Bewegung …).
+  // Die Engine wartet die Salvendauer nur, wenn mindestens ein Zuschauer/Spieler sie spielt (`pfeilSalveGewuenscht`, cards/effects/_arrows-shared.js).
+  socket.on('client_fx', (d) => { socket.data = socket.data || {}; socket.data.pfeilSalve = !!(d && d.salve); });
+
   // Broadcast targeting selections to opponent
   socket.on('targeting_update', ({ roomId, selectedIds }) => {
     if (!currentUser) return;
