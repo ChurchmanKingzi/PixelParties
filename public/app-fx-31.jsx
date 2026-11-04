@@ -26,7 +26,11 @@
 //  Alles auf `ppR1Leinwand` (Rasterpixel 3 px, Bayer-Dithering, 30 Hz, `data-pp-px="aus"`), Farben aus der Palette.
 // ═════════════════════════════════════════════════════════════════
 const PP_FX31_BILD = 1000 / 30;
-const PP_FX31_C = { creme: '#fffbd2', tinte: '#12101f', hblau: '#b3d8f9', blau: '#4580f6', rot: '#fe5154', gelb: '#ffe23d', orange: '#ff9a1a' };
+const PP_FX31_C = { creme: '#fffbd2', tinte: '#12101f', hblau: '#b3d8f9', blau: '#4580f6', rot: '#fe5154', gelb: '#ffe23d', orange: '#ff9a1a', dunkelrot: '#c80000', dunkelrot2: '#8f0000', dunkelgruen: '#167927', dunkelgruen2: '#29663f' };
+// Blitzfarben der Figur: Schaden DUNKELROT (Art 1 hell, Art 2 dunkler, Art 3 gedithert), Heilung DUNKELGRÜN (Art 1/2/3 entsprechend)
+const PP_FX31_BLITZ = { schaden: { 1: 'dunkelrot', 2: 'dunkelrot2', 3: 'dunkelrot' }, heilung: { 1: 'dunkelgruen', 2: 'dunkelgruen2', 3: 'dunkelgruen' } };
+// Heilung: nur Blitz, kein Quetschen/Hüpfen (Bild = [Blitz, sx, sy, Hüpfer, Wackeln])
+const PP_FX31_HEILUNG = [[1, 1, 1, 0, 0], [1, 1, 1, 0, 0], [2, 1, 1, 0, 0], [2, 1, 1, 0, 0], [3, 1, 1, 0, 0], [0, 1, 1, 0, 0], [3, 1, 1, 0, 0], [0, 1, 1, 0, 0]];
 
 // ───────────────────────── 1. Treffer-Reaktion ─────────────────────────
 // Bild = [Blitz (0 keiner | 1 creme | 2 rot | 3 creme gedithert), Streckung x, Streckung y, Hüpfer in px nach oben, Wackeln in px nach rechts] — die ersten acht Zeilen der mittleren Stufe
@@ -112,13 +116,13 @@ function ppFx31KannTreffer(zone) {
 /**
  * Figur der Zone reagiert auf `schaden` (> 0). Gibt `true`, wenn die Reaktion läuft (der alte rote Karten-Schleier entfällt dann), sonst `false`.
  */
-function ppFx31Treffer(zone, schaden) {
+function ppFx31Treffer(zone, schaden, heilung) {
   if (!(schaden > 0) || window._playAnimations === false || !ppFx31KannTreffer(zone)) return false;
   const platz = zone._ppFigurPlatz, holo = platz.querySelector('.hero-idle-holo');
   const B = ppFx31Blitz(platz);
   if (!B) return false;
   if (zone._ppFx31) { try { zone._ppFx31.ende(); } catch (e) { /* weg */ } }
-  const tab = PP_FX31_TREFFER[ppFx31Stufe(schaden)];
+  const tab = heilung ? PP_FX31_HEILUNG : PP_FX31_TREFFER[ppFx31Stufe(schaden)], farben = PP_FX31_BLITZ[heilung ? 'heilung' : 'schaden'];
   const raf = window.ppTaktRaf || window.requestAnimationFrame;
   const R = { beendet: false, i: -1, t0: performance.now(), gesetzt: false };
   zone._ppFx31 = R;
@@ -131,7 +135,7 @@ function ppFx31Treffer(zone, schaden) {
     if (zone._ppFx31 === R) zone._ppFx31 = null;
   };
   const zeichne = (art) => {
-    const fr = platz._ppFrame | 0, schluessel = art + '|' + fr;
+    const fr = platz._ppFrame | 0, schluessel = (heilung ? 'h' : 's') + art + '|' + fr;
     if (!B.da) { B.c.style.visibility = 'visible'; B.da = true; }
     if (schluessel === B.schluessel) return;
     B.schluessel = schluessel;
@@ -140,7 +144,7 @@ function ppFx31Treffer(zone, schaden) {
     c.clearRect(0, 0, w, h);
     c.drawImage(B.cv, 0, 0, B.cv.width, B.cv.height, 0, 0, w, h);                      // Canvas → Canvas (GPU), kein Lesen von Pixeln
     c.globalCompositeOperation = 'source-in';
-    c.fillStyle = art === 2 ? PP_FX31_C.rot : PP_FX31_C.creme;
+    c.fillStyle = PP_FX31_C[farben[art] || 'dunkelrot'];
     c.fillRect(0, 0, w, h);
     if (art === 3) { c.globalCompositeOperation = 'destination-out'; c.fillStyle = ppFx31Raster(c); c.fillRect(0, 0, w, h); }
     c.globalCompositeOperation = 'source-over';
@@ -170,6 +174,8 @@ function ppFx31Treffer(zone, schaden) {
   return true;
 }
 window.ppFx31Treffer = ppFx31Treffer;
+/** Heilung: dunkelgrüner Blitz auf der Silhouette der Figur (gleicher Zeichenpfad wie der Treffer-Blitz, kein Quetschen). `true`, wenn er läuft. */
+window.ppFx31Heilung = function (zone, betrag) { return ppFx31Treffer(zone, betrag > 0 ? betrag : 1, true); };
 
 // ───────────────────────── 2. Schnitt / Aufprall ─────────────────────────
 // Letzte Rammbahn (Angreifer → Ziel) mitschreiben: der Schnitt des Critical Strike liegt längs dieser Bahn (Trailer). Die Richtung wird erst beim Einhängen des Schnitts gemessen.

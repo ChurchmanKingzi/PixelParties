@@ -3753,7 +3753,34 @@ function HeroAufstiegLicht() {
     </>
   );
 }
-function HeroIdleSprite({ cardName, angehalten, versteinert, eingefroren, effekte, unsichtbar, eingeklappt, abgeblendet, aufstieg }) {
+/**
+ * Dauer-Statussymbole NEBEN der animierten Figur (Brand, Gift mit Zaehler „xN“, Blutung): sie sitzen im `.hero-idle-holo` der Figur und machen deshalb jede Bewegung mit (Rammen/Dash
+ * verschiebt den Platz, Treffer-Wackeln/Quetschen, Einfahren bei Hover/Zielwahl, Auftritt, Aufstiegs-Pose); verschwindet die Figur (Tod, ausgeblendet, Figuren aus), verschwinden auch sie.
+ * Statische Bilder (`PpFx52.iconUrl`, ganzzahlig vergroessert), keine Dauer-Animation, zustandsgetrieben aus dem Spielzustand; keine Layout-Lesung im Takt.
+ */
+function HeroStatusSymbole({ st, links, oben, k }) {
+  const P = window.PpFx52;
+  if (!st || !P || !P.iconUrl || window.__ppFx52SymbolAlt) return null;
+  const arten = [];
+  if (st.burn) arten.push('burn');
+  if (st.poison) arten.push('poison');
+  if (st.bleed) arten.push('bleed');
+  if (!arten.length) return null;
+  return (
+    <div className="hero-idle-statussymbole" data-pp-px="aus" style={{ position: 'absolute', left: links, top: oben, display: 'flex', flexDirection: 'column', gap: 1, pointerEvents: 'none', zIndex: 3 }}>
+      {arten.map(a => (
+        <div key={a} style={{ display: 'flex', alignItems: 'center', gap: 1, whiteSpace: 'nowrap' }}>
+          <PpStatusSpr kind={a} k={k} />
+          {a === 'poison' && st.poison > 0 && (
+            <span style={{ fontFamily: 'var(--font-body), sans-serif', fontWeight: 800, fontSize: `${(6 + 3 * k)}px`, lineHeight: 1, color: '#e5f5fa', textShadow: '1px 1px 0 #000, -1px 1px 0 #000, 1px -1px 0 #000, -1px -1px 0 #000' }}>{'x' + st.poison}</span>
+          )}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function HeroIdleSprite({ cardName, angehalten, versteinert, eingefroren, effekte, unsichtbar, eingeklappt, abgeblendet, aufstieg, statusIcons }) {
   const key = HeroIdleAnims.slug(cardName);
   // Eisblock: 'da' solange Frozen, danach kurz 'schmilzt' (zerspringt),
   // dann 'weg'.
@@ -4124,6 +4151,10 @@ function HeroIdleSprite({ cardName, angehalten, versteinert, eingefroren, effekt
             <div className="hero-idle-schatten" style={schattenStil} />
             <div className="hero-idle-holo" style={{ transformOrigin: drehpunkt }}>
               <canvas ref={canvasRef} width={fw} height={fh} className="hero-idle-canvas" style={canvasStil} />
+              {statusIcons && (statusIcons.burn || statusIcons.poison || statusIcons.bleed) && (
+                <HeroStatusSymbole st={statusIcons} k={Math.max(1, Math.min(3, Math.round(s * (parseFloat(document.documentElement.style.getPropertyValue('--board-scale')) || 1) / 1.4)))}
+                  links={`calc(${bs(kern.x1 * s + 3)})`} oben={`calc(${bs((kern.y0 + ch * 0.18) * s)})`} />
+              )}
               {eisPhase !== 'weg' && (
                 <HeroEiskruste quelleRef={canvasRef} breite={fw} hoehe={fh} rand={EIS_RAND}
                   stil={eisStil} schmilzt={eisPhase === 'schmilzt'} />
@@ -54687,7 +54718,11 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       const newDmgNums = [];
       for (const [key, cur] of Object.entries(currentHp)) {
         const prev = prevHpRef.current[key];
-        if (prev && cur.hp !== prev.hp && prev.name === cur.name) { const [pS, hS] = key.split('-'); hpAnz('hero', +pS, +hS, -1, cur.hp, gameState.players[+pS]?.heroes?.[+hS]?.maxHp); }
+        if (prev && cur.hp !== prev.hp && prev.name === cur.name) {
+          const [pS, hS] = key.split('-'); hpAnz('hero', +pS, +hS, -1, cur.hp, gameState.players[+pS]?.heroes?.[+hS]?.maxHp);
+          // Heilung: dunkelgruener Blitz auf der Heldenfigur (Schaden: dunkelroter Blitz der Treffer-Reaktion, app-fx-31)
+          if (cur.hp > prev.hp && window.ppFx31Heilung) { try { window.ppFx31Heilung(document.querySelector(`[data-hero-zone][data-hero-owner="${cur.owner}"][data-hero-idx="${+hS}"]`), cur.hp - prev.hp); } catch (e) { /* weg */ } }
+        }
         if (prev && cur.hp < prev.hp) {
           // Skip if this HP decrease was from Toughness removal (not real damage)
           if (toughnessHpSuppressRef.current[key]) {
@@ -57139,6 +57174,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                       isCursed ? 'cursed' : '',
                       hero.statuses?.charmed ? 'charmed' : '',
                     ].filter(Boolean).join(' ')}
+                    statusIcons={{ burn: !!isBurned, poison: isPoisoned ? (hero.statuses?.poisoned?.stacks || 1) : 0, bleed: !!isBleeding }}
                     versteinert={!!(isStunned?._petrified || isStunned?._baihuPetrify || hatSteinhaut)}
                     unsichtbar={!!isInvisible}
                     // Ausgegraut wie die Heldenzone selbst (Zone traegt `board-zone-dead` bzw. wird bei der Klick-Wahl abgedunkelt):
@@ -57179,7 +57215,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                     die Bedingung davor war eine zweite Liste aller Status, die
                     jeder neue Status verfehlen konnte (v1142: „Aged"; nie in
                     ihr standen auch Bleeding und Charmed). */}
-                {hero?.name && <StatusBadges statuses={{ ...(hero.statuses || {}), _extraLife: hero._extraLife, _extraLifeStack: hero._extraLifeStack, _oneShotDmgShields: hero._oneShotDmgShields, _targetBlockers: hero._targetBlockers, _pythiaMark: hero._pythiaMark }} buffs={hero.buffs} isHero={true} player={p} cardName={hero.name} isOpponentSide={isOpp} />}
+                {hero?.name && <StatusBadges statuses={{ ...(hero.statuses || {}), _extraLife: hero._extraLife, _extraLifeStack: hero._extraLifeStack, _oneShotDmgShields: hero._oneShotDmgShields, _targetBlockers: hero._targetBlockers, _pythiaMark: hero._pythiaMark }} buffs={hero.buffs} isHero={true} player={p} cardName={hero.name} isOpponentSide={isOpp} ohneZahl={figurDa} />}
                 {/* ★ v1342: Immune/Shielded sind STATUS — sie stehen jetzt auch beim
                     Helden in der linken Status-Spalte (wie bei Kreaturen), nicht
                     mehr als eigenes Schild oben rechts. */}

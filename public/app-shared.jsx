@@ -9037,19 +9037,19 @@ window.poisonTooltipText = poisonTooltipText;
  * Dauer-Anzeige von Brand, Gift und Blutung: Pixel-Symbole (app-fx-52, `PpFx52.iconUrl`) statt Emoji im Abzeichen. Ein statisches Bild je Abzeichen (keine Dauer-Animation),
  * ganzzahlig vergroessert (Brettmassstab >= 1,6 -> doppelt); auf dem Handy ohne Kontur (das 12-px-Abzeichen liefert den Rahmen).
  */
-function PpStatusSpr({ kind, fallback }) {
+function PpStatusSpr({ kind, fallback, k: kFest }) {
   const P = window.PpFx52;
   let ic = null;
   try { ic = (P && P.iconUrl && !window.__ppFx52SymbolAlt) ? P.iconUrl(kind, !(window.ppIsPhone && window.ppIsPhone())) : null; } catch (e) { ic = null; }
   if (!ic) return <PxIcon z={fallback} />;
-  let k = 1;
-  try { k = (parseFloat(document.documentElement.style.getPropertyValue('--board-scale')) || 1) >= 1.6 ? 2 : 1; } catch (e) { k = 1; }
+  let k = kFest || 1;
+  if (!kFest) { try { k = (parseFloat(document.documentElement.style.getPropertyValue('--board-scale')) || 1) >= 1.6 ? 2 : 1; } catch (e) { k = 1; } }
   return <img src={ic.url} alt="" draggable={false} data-pp-px="aus" className="pp-px pp-px-icon"
     style={{ width: ic.w * k, height: ic.h * k, imageRendering: 'pixelated', objectFit: 'fill' }} />;
 }
 window.PpStatusSpr = PpStatusSpr;
 
-function StatusBadges({ statuses, counters, buffs, isHero, player, cardName, isOpponentSide }) {
+function StatusBadges({ statuses, counters, buffs, isHero, player, cardName, isOpponentSide, ohneZahl }) {
   const badges = [];
   // Spielername zu einem Sitz-Index (das Brett stellt `window._ppPlayerNames` bereit); `null`, wenn unbekannt.
   const spielerName = (idx) => {
@@ -9539,7 +9539,7 @@ function StatusBadges({ statuses, counters, buffs, isHero, player, cardName, isO
           onMouseEnter={e => { showGameTooltip(e, b.tooltip); showBoardTip(); }}
           onMouseLeave={() => { hideGameTooltip(); hideBoardTip(); }}>
           {b.px ? <PpStatusSpr kind={b.px} fallback={b.icon} /> : <PxIcon z={b.icon} />}
-          {b.zaehler != null && <span className="status-badge-duration">{b.zaehler}</span>}
+          {b.zaehler != null && !ohneZahl && <span className="status-badge-duration">{b.zaehler}</span>}   {/* steht die Figur da, zeigt sie die Zahl (HeroStatusSymbole) */}
           {b.duration != null && <span className="status-badge-duration">{b.duration >= STATUS_FOREVER ? '∞' : b.duration}</span>}
         </div>
       ))}

@@ -621,6 +621,22 @@
     return document.querySelector(`[data-hero-zone][data-hero-owner="${l}"][data-hero-idx="${t.heroIdx}"]`);
   }
 
+  /** Fensterkoordinate der Oberkante des KOPFES der animierten Heldenfigur dieser Zone (Bezug für HP-Balken/Zahlen: über dem Kopf, nicht an der Zonenkante); null ohne sichtbare Figur. */
+  function kopfOben(el) {
+    try {
+      const platz = el && el._ppFigurPlatz;
+      if (!platz || !platz.isConnected || platz.style.display === 'none') return null;
+      const cl = platz.classList;
+      if (cl.contains('hero-idle-weg') || cl.contains('hero-idle-unsichtbar')) return null;
+      const cv = platz.querySelector('canvas.hero-idle-canvas'), e = platz._ppEintrag;
+      if (!cv || !e || !e.kern || !e.meta) return null;
+      const r = cv.getBoundingClientRect();
+      if (!(r.height > 0)) return null;
+      return r.top + e.kern.y0 * (r.height / e.meta.frameHeight);
+    } catch (err) { return null; }
+  }
+  window.ppFx52KopfOben = kopfOben;
+
   /** Verteilung des reellen Schadens: je Pfeil round(reell / n), der LETZTE Pfeil trägt den Rest (Summe exakt). Wäre der Rest negativ (aufgerundete Teilbeträge), wird abgerundet. */
   function verteilung(total, n) {
     total = Math.max(0, Math.round(total || 0));
@@ -652,7 +668,7 @@
       const fo = window.ppFxScrollOffset ? window.ppFxScrollOffset() : { dx: 0, dy: 0 };
       const welt = !!window.ppFxWeltSchicht;
       const sx0 = sr.left + fo.dx, sy0 = sr.top + fo.dy, tx0 = tr.left + fo.dx, ty0 = tr.top + fo.dy;
-      const M = rd(1.9 * zoneH);                                               // Rand: Bögen steigen bis ≈ 1,5 Kartenhöhen, Zahlen/Balken über dem Ziel
+      const M = rd(2.6 * zoneH);                                               // Rand: Bögen steigen bis ≈ 1,5 Kartenhöhen, Zahlen/Balken über dem Ziel
       const L = Math.min(sx0, tx0) - M, T = Math.min(sy0, ty0) - M, R = Math.max(sx0 + sr.width, tx0 + tr.width) + M, Bt = Math.max(sy0 + sr.height, ty0 + tr.height) + M * 0.5;
       const lx = Math.floor(L / S) * S, ly = Math.floor(T / S) * S;
       const gw = Math.min(1000, Math.ceil((R - lx) / S)), gh = Math.min(800, Math.ceil((Bt - ly) / S));
@@ -668,6 +684,8 @@
       const numSc = n <= 5 ? 2 : 1;
       const blockZellen = zeilen * (8 * numSc + 3) + 8 * numSc + 9 + 14;
       let zTop = 0.74 * hzU;
+      { const kt = isHero ? kopfOben(tgtEl) : null;                           // über dem Kopf der Figur (Bezug: Kopfpunkt des Sprites, nicht Zonenkante)
+        if (kt != null) { const barTopWin = Math.min(kt, tr.top) - 11 * S; zTop = bcy + feet - 12 - (barTopWin + fo.dy - ly) / u; } }
       const topScreenPx = tr.top + tr.height / 2 + (feet - zTop - 12) * u;                  // Fensterkoordinate der Balkenkante
       const brauchtPx = blockZellen * S + 6;
       if (topScreenPx - brauchtPx < 2) zTop = Math.max(0.2 * hzU, zTop - (brauchtPx - topScreenPx + 2) / u);
@@ -745,6 +763,8 @@
       (welt ? window.ppFxWeltSchicht() : document.body).appendChild(wurzel);
       raf = takt(schritt);
       setTimeout(stopp, (Math.max(plan.tEnd, tHud) + 2.5) * 1000);          // Notnagel (Tab im Hintergrund: rAF ruht)
+      // Heldenfigur: bei jedem Einschlag ein kurzer dunkelroter Blitz (Treffer-Reaktion der Figur, app-fx-31), zeitgleich mit dem Pfeil
+      if (isHero && window.ppFx31Treffer) for (const h of hits) if (h.dmg > 0) setTimeout(() => { try { window.ppFx31Treffer(tgtEl, h.dmg); } catch (e) { /* weg */ } }, Math.max(0, rd(h.tHit * 1000)));
       // Klang zeitgenau zum Einschlag (Lautstärke wurzelskaliert mit der Pfeilzahl)
       if (window.playSFX) for (const [t, name, op] of PF.sfxPlan(plan)) window.playSFX(name, Object.assign({ dedupe: 0, category: null, delay: Math.max(0, rd(t * 1000)) }, op));
       window.__ppFx52Letzte = { plan, S, u, gw, gh, per, zielKey };
@@ -819,7 +839,8 @@
           if (e.rc) continue;
           const el = zone({ kind: e.kind, owner: e.owner, heroIdx: e.heroIdx, zoneSlot: e.zoneSlot }, e.myIdx), r = el && el.getBoundingClientRect();
           if (!r || !(r.width > 8 && r.height > 8)) { hpMap.delete(key); continue; }
-          let top = r.top - 11 * S; if (top < 13 * S) top = 13 * S;
+          const kt = e.kind === 'hero' ? kopfOben(el) : null;                // Balken über dem Kopf der Figur (sonst über der Zone)
+          let top = (kt != null ? Math.min(kt, r.top) : r.top) - 11 * S; if (top < 13 * S) top = 13 * S;
           e.rc = { S, bw: Math.max(16, rd(r.width / S)), x: rd(r.left + r.width / 2 + fo.dx), y: rd(top + fo.dy) };
           e.t = performance.now();                                          // Lebensdauer ab dem ersten sichtbaren Bild
         }
