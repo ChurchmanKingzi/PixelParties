@@ -22,6 +22,12 @@ const { PHASES, getCleansableStatuses, hasCardType, baseCardName } = require('./
 // No-ops when no profile matches the piloted lineup or when
 // PP_DISABLE_PROFILES=1 (training data collection).
 const _v8Heap = require('v8');   // Heap-Messung je Rollout (siehe mctsRunOneRollout)
+// Ab welchem `heapUsed` der erzwungene Vollaufräumlauf in mctsRunOneRollout läuft (Vorgabe: ein Viertel des V8-Limits; PP_GC_FORCE_MB=0 = immer).
+const GC_ERZWINGEN_AB_BYTES = (() => {
+  const mb = parseInt(process.env.PP_GC_FORCE_MB || '', 10);
+  if (Number.isFinite(mb) && mb >= 0) return mb * 1048576;
+  try { return _v8Heap.getHeapStatistics().heap_size_limit * 0.25; } catch { return 0; }
+})();
 const deckProfile = require('./_deck-profile');
 const KreaturenBilanz = require('./_kreaturen-bilanz');
 
@@ -13173,7 +13179,13 @@ async function mctsRunOneRollout(engine, helpers, candidate, { plan = null, reco
   // ~10-50ms per call, so amortized ~0.5ms per rollout. If self-play
   // is launched WITHOUT --expose-gc this is a no-op and the heap
   // pressure is managed by the per-turn snapshot cap and heap checks.
-  if (typeof global.gc === 'function' && (engine._snapshotsTaken || 0) % 100 === 0) {
+  //
+  // ★ NUR BEI SPEICHERDRUCK (gemessen, 4.11.): Der Aufruf kostete im Trainingsspiel ~36 ms je Lauf bei ~45 MB lebendem Heap — 92 Läufe in
+  // einer 53-s-Partie = 6,3 % der Rechenzeit, obwohl der Heap weit unter jeder Schwelle lag (die übliche Aufräumarbeit erledigen die
+  // Scavenges). Jetzt nur noch, wenn `heapUsed` über `GC_ERZWINGEN_AB_BYTES` liegt (Vorgabe ein Viertel des V8-Limits, also weit unter der
+  // Wächter-Schwelle bei 60 %); dort wirkt er wie bisher. `PP_GC_FORCE_MB=0` stellt „immer alle 100 Schnappschüsse" wieder her.
+  if (typeof global.gc === 'function' && (engine._snapshotsTaken || 0) % 100 === 0
+      && _v8Heap.getHeapStatistics().used_heap_size >= GC_ERZWINGEN_AB_BYTES) {
     try { global.gc(); } catch {}
   }
   // Per-candidate heap-delta tracking. Sample heapUsed BEFORE snapshot
@@ -14128,8 +14140,9 @@ async function mctsRankCandidates(engine, helpers, candidates, rollouts = MCTS_R
   // collecting between top-level candidates lets V8 reclaim transient
   // rollout allocation that its incremental GC otherwise lets pile up
   // until Mark-Compact thrashes. A big help on heavy-allocation decks.
+  // ★ Wie in mctsRunOneRollout nur noch bei Speicherdruck (`GC_ERZWINGEN_AB_BYTES`): sonst ein 36-ms-Vollaufräumlauf vor JEDEM Kandidaten.
   const gcBetweenCandidates = () => {
-    if (typeof global.gc === 'function') {
+    if (typeof global.gc === 'function' && _v8Heap.getHeapStatistics().used_heap_size >= GC_ERZWINGEN_AB_BYTES) {
       try { global.gc(); } catch {}
     }
   };

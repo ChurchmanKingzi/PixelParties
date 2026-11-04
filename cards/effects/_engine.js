@@ -440,8 +440,10 @@ const SCHADENSBERECHNUNGS_HOOKS = new Set([HOOKS.BEFORE_DAMAGE, HOOKS.BEFORE_CRE
 // ═══════════════════════════════════════════
 
 class CardInstance {
-  constructor(name, owner, zone, heroIdx = -1, zoneSlot = -1) {
-    this.id = uuidv4().substring(0, 12);
+  constructor(name, owner, zone, heroIdx = -1, zoneSlot = -1, id = undefined) {
+    // `id` nur beim Zurückspielen eines Schnappschusses (`restore`): dort wird die alte Kennung ohnehin gleich wieder eingesetzt, die
+    // frische UUID (~0,6 µs × ~135 Karten je Zurückspielen) wäre verschenkt.
+    this.id = id || uuidv4().substring(0, 12);
     this.name = name;
     this.owner = owner;       // Player index (0 or 1)
     this.originalOwner = owner; // Original owner — never changes (for discard pile routing)
@@ -595,6 +597,48 @@ function heapSample() {
   const fresh = (_heapSampleN++ & 7) === 0;
   if (fresh) _heapSampleRss = process.memoryUsage.rss();
   return { rss: _heapSampleRss, rssFresh: fresh, heapTotal: h.total_heap_size, heapUsed: h.used_heap_size };
+}
+/**
+ * Erste Stufe von `snapshot()`/`restore()`: nimmt `structuredClone` die Fälle ab, in denen es nichts zu klonen gibt. Jede Kartenkopie hat
+ * rund 14 Felder, fast alle Zahlen/Zeichenketten/Wahrheitswerte, dazu zwei meist leere Objekte (`statuses`, `counters`); bei ~135
+ * Karten sind das ~1.500 `structuredClone`-Aufrufe je Schnappschuss UND je Zurückspielen, jeder mit festem Aufwand (Puffer anlegen,
+ * serialisieren, lesen) und Müll. Gemessen an einem echten Zwischenstand: Instanz-Kopie 1,1 ms → 0,3 ms.
+ * Ergebnis ist in jedem Fall dasselbe wie vom bisherigen `structuredClone` — Primitive sind ihr eigener Klon (Funktionen/Symbole bleiben
+ * `undefined`, wie bisher); ein Objekt/Array ohne aufzählbaren Schlüssel und ohne Länge wird zum frischen `{}`/`[]`, alles andere geht
+ * unverändert an `structuredClone`. Gibt `NICHT_SCHNELL` zurück, wenn der Aufrufer selbst klonen soll.
+ */
+const KLON_NICHT_SCHNELL = Symbol('klon-nicht-schnell');
+function klonSchnell(v) {
+  if (v === undefined || v === null) return v;
+  const t = typeof v;
+  if (t !== 'object') return (t === 'function' || t === 'symbol') ? undefined : v;
+  const proto = Object.getPrototypeOf(v);
+  if (proto === Object.prototype) { for (const _k in v) return KLON_NICHT_SCHNELL; return {}; }
+  if (proto === Array.prototype && v.length === 0) { for (const _k in v) return KLON_NICHT_SCHNELL; return []; }
+  return KLON_NICHT_SCHNELL;
+}
+/**
+ * Setzt die aufzählbaren Eigenschaften von `ziel` auf die von `quelle` (Zweck: `restore`, das `gs` und die Spielerobjekte an ihrem Platz
+ * behalten muss). `bleibt` ist ein Schlüssel, der unangetastet bleibt (`gs.players`).
+ *
+ * Altverhalten: alle Schlüssel löschen, dann in Quell-Reihenfolge neu anlegen. Das wirft das Objekt in V8 in den Dictionary-Modus
+ * (Löschen eines nicht zuletzt angelegten Schlüssels, danach mehr als ~12 neu angelegte) — und dort bleibt es: `gs` und die Spielerobjekte
+ * sind die am häufigsten gelesenen Objekte der Simulation, jeder `ps.hand`/`gs.turn` wird zur Hash-Suche statt zum Inline-Cache-Treffer.
+ * Neu: bleiben Schlüssel und Reihenfolge dieselben (Normalfall: ein Rollout ändert Werte, legt keine Schlüssel an), werden die Werte nur
+ * überschrieben; Schlüssel, die der Rollout dazugelegt hat, werden gelöscht, fehlende hinten angehängt. Ergibt das nicht dieselbe
+ * Reihenfolge der Schlüssel wie die Quelle, läuft das Altverhalten unverändert. Einzige Abweichung davon: die STELLE des Schlüssels
+ * `bleibt` (`gs.players`) in der Schlüsselliste — das Altverhalten schob ihn beim ersten Zurückspielen nach vorn, jetzt bleibt er stehen;
+ * sonst käme `gs` nie in den schnellen Weg. Reihenfolge der Schlüssel von `gs` wird nirgends ausgewertet.
+ */
+function eigenschaftenUeberschreiben(ziel, quelle, bleibt) {
+  const kz = Object.keys(ziel).filter(k => k !== bleibt), kq = Object.keys(quelle).filter(k => k !== bleibt);
+  const imZiel = new Set(kz), imQuelle = new Set(kq);
+  const ort = kz.filter(k => imQuelle.has(k));
+  for (const k of kq) if (!imZiel.has(k)) ort.push(k);
+  let gleich = ort.length === kq.length;
+  for (let i = 0; gleich && i < ort.length; i++) if (ort[i] !== kq[i]) gleich = false;
+  for (const k of kz) if (!gleich || !imQuelle.has(k)) delete ziel[k];
+  for (const k of kq) ziel[k] = quelle[k];
 }
 // Auswertungs-Scope (siehe `GameEngine._scoped`): Prüfmodus und Karten-Kennungen für Schlüssel.
 const EVAL_SCOPE_CHECK = process.env.PP_EVAL_SCOPE_CHECK === '1';
@@ -1411,11 +1455,11 @@ class GameEngine {
       }
     }
     const _clone = (v) => {
-      if (v === undefined || v === null) return v;
-      // Functions / symbols can't be cloned or JSONified — drop them. A card
+      // Functions / symbols can't be cloned or JSONified — drop them (`klonSchnell` gibt dafür `undefined`). A card
       // that needs a function-valued field to survive snapshot/restore must
       // use the same detach/reattach dance as `_deferredSurprises` below.
-      if (typeof v === 'function' || typeof v === 'symbol') return undefined;
+      const _schnell = klonSchnell(v);
+      if (_schnell !== KLON_NICHT_SCHNELL) return _schnell;
       try { return structuredClone(v); }
       catch {
         // ── JSON-RÜCKFALLPFAD, JETZT GEDECKELT (31.7.) ────────────────
@@ -1627,8 +1671,8 @@ class GameEngine {
 
   restore(snap) {
     const _clone = (v) => {
-      if (v === undefined || v === null) return v;
-      if (typeof v === 'function' || typeof v === 'symbol') return undefined;
+      const _schnell = klonSchnell(v);
+      if (_schnell !== KLON_NICHT_SCHNELL) return _schnell;
       try { return structuredClone(v); }
       catch {
         // Match snapshot()'s Set/Map preservation — same rationale.
@@ -1668,8 +1712,7 @@ class GameEngine {
       const newPs = newPlayers[i];
       const origPs = origPlayers[i];
       if (newPs && origPs) {
-        for (const k of Object.keys(origPs)) delete origPs[k];
-        for (const k of Object.keys(newPs)) origPs[k] = newPs[k];
+        eigenschaftenUeberschreiben(origPs, newPs);
       } else if (newPs && !origPs) {
         origPlayers[i] = newPs;
       }
@@ -1678,14 +1721,7 @@ class GameEngine {
     origPlayers.length = newPlayers.length;
     // Preserve gs object identity: copy top-level gs props in place, skipping
     // the players slot (already handled above).
-    for (const k of Object.keys(origGs)) {
-      if (k === 'players') continue;
-      delete origGs[k];
-    }
-    for (const k of Object.keys(newGs)) {
-      if (k === 'players') continue;
-      origGs[k] = newGs[k];
-    }
+    eigenschaftenUeberschreiben(origGs, newGs, 'players');
     // this.gs retains its original identity. Make sure room.gameState
     // still points at the same object (it always has, but belt-and-braces).
     if (this.room) this.room.gameState = this.gs;
@@ -1718,7 +1754,7 @@ class GameEngine {
     // und die Abholung (`_loeschAbholungAnmelden`) meldet sich beim naechsten Entleeren bzw. der naechsten Loeschung selbst neu an.
     this._loeschWarteschlange = Array.isArray(snap.loeschQ) ? snap.loeschQ.map(e => ({ ...e })) : [];
     this.cardInstances = snap.cardInstances.map(data => {
-      const inst = new CardInstance(data.name, data.owner, data.zone, data.heroIdx ?? -1, data.zoneSlot ?? -1);
+      const inst = new CardInstance(data.name, data.owner, data.zone, data.heroIdx ?? -1, data.zoneSlot ?? -1, data.id);
       for (const key of Object.keys(data)) {
         inst[key] = _clone(data[key]);
       }
