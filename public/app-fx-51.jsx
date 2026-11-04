@@ -31,12 +31,13 @@
 //  Messung (nur Tests): `window.__ppFx51Messen = true` → `window.__ppFx51Zeiten` = [[art, ms], …] (Zeichnen + Upload je Bild; art 'v' Schleier, 'b' Ausbruch).
 // ═════════════════════════════════════════════════════════════════
 const PP_FX51_TAKT = 1000 / 30;
-const PP_FX51_CH_MIN = 0.10;           // kürzestes Aufladen (s)
-const PP_FX51_CAP = 0.85;              // längstes Aufladen ohne Figur (s)
-const PP_FX51_WELLE0 = 0.06;           // Wellenstart nach dem Ausbruch
-const PP_FX51_SPREAD = 0.42;           // Ausbreitung der Welle von der Mitte bis in die Ecke
-const PP_FX51_DAUER = 0.16;            // Aufbau einer Zelle
-const PP_FX51_NACH = 0.75;             // Ende nach dem Ausbruch
+const PP_FX51_ZD = 1.4;               // Zeitdehnung von Ausbruch und Schockwelle (1 = so schnell wie zuerst; Rückmeldung: etwas zu schnell)
+const PP_FX51_CH_MIN = 0.22;           // kürzestes Aufladen (s)
+const PP_FX51_CAP = 1.0;               // längstes Aufladen ohne Figur (s)
+const PP_FX51_WELLE0 = 0.10;           // Wellenstart nach dem Ausbruch
+const PP_FX51_SPREAD = 0.60;           // Ausbreitung der Welle von der Mitte bis in die Ecke
+const PP_FX51_DAUER = 0.22;            // Aufbau einer Zelle
+const PP_FX51_NACH = 1.05;             // Ende nach dem Ausbruch
 const PP_FX51_NOT = 2000;              // Notbremse (Echtzeit, ms): spätestens dann ist alles aufgedeckt und aufgeräumt
 const PP_FX51_MAXDT = 100;             // höchster Zeitfortschritt je Takt (ms)
 const PP_FX51_BURST_BILDER = [0, 2, 1, 3, 2, 4];
@@ -209,7 +210,7 @@ function ppFx51Malen(m, sz, t) {
   // — Ausbruch je Held —
   for (const h of hel) {
     if (h.tb == null) continue;
-    const dt = t - h.tb;
+    const dt = (t - h.tb) / PP_FX51_ZD;
     if (dt < 0 || dt > 0.62) continue;
     const k = h.k, c0 = h.c[0], c1 = h.c[1], c2 = h.c[2], dk = Math.max(0.55, Math.min(1, k * 1.1));
     if (dt <= 0.46) {
@@ -247,7 +248,7 @@ function ppFx51Malen(m, sz, t) {
   // — Schockwelle über das ganze Brett, Wellenfront, Funkenregen —
   const tB = sz.tB;
   if (tB != null) {
-    const dtB = t - tB, B = sz.box;
+    const dtB = (t - tB) / PP_FX51_ZD, B = sz.box;
     if (!phone && dtB >= 0 && dtB < 0.40) {                   // Ellipse mit den Halbachsen des Bretts: erreicht alle Ränder zugleich, wird nicht an der Leinwandkante abgeschnitten
       const e = ppFx51Eo(dtB / 0.40) * 1.25, ell = (cx, cy, rx, ry, th, c) => {
         const n = ppFx51Kl(rd(Math.PI * 2 * Math.max(rx, ry) * 1.2), 24, 900);
@@ -301,7 +302,7 @@ function ppFx51Plan(s, hk) {
   }
   if (s.tb[hk.key] == null) s.tb[hk.key] = Math.max(tNow, s.tB) + PP_FX51_BURST_BILDER[hk.i % 6] / 30;
   if (s.modus === 'tut') s.tEnde = Math.max(s.tEnde || 0, s.tb[hk.key] + 0.7);
-  return Math.round(ppFx51Kl(s.tb[hk.key] - tNow, 0, 0.13) * 1000);
+  return Math.round(ppFx51Kl(s.tb[hk.key] - tNow, 0, 0.25) * 1000);
 }
 
 function ppFx51Erlaubt() {
@@ -499,6 +500,7 @@ function ppFx51Tick(s, jetzt) {
     if (s.modus === 'spiel') for (const h of s.helden) if (s.tb[h.key] == null) s.tb[h.key] = s.tB + PP_FX51_BURST_BILDER[h.i % 6] / 30;
     if (s.tEnde == null) s.tEnde = s.tB + PP_FX51_NACH;
   }
+  ppFx51Ton(s);
   const t = s.t, fr = ppFx51Bild(t);
   if (fr !== s.letztesBild) {
     s.letztesBild = fr;
@@ -522,6 +524,19 @@ function ppFx51Tick(s, jetzt) {
   }
   if (s.tEnde != null && t >= s.tEnde) ppFx51Ende(s);
   if (mess) (window.__ppFx51Zeiten || (window.__ppFx51Zeiten = [])).push(['t', +(performance.now() - mess).toFixed(3)]);
+}
+
+/** Klänge zur Zeitleiste (wie im Trailer: Aufladen → Wucht + Aufstieg beim Ausbruch → Zauberklang je Held → „reveal“ beim Aufdecken). Jeder höchstens einmal; Lautstärke/Stumm regelt playSFX. */
+function ppFx51Ton(s) {
+  if (!window.playSFX) return;
+  const z = s.ton || (s.ton = {}), t = s.t, ton = (id, name, vol) => { if (z[id]) return; z[id] = 1; try { window.playSFX(name, { volume: vol, dedupe: 0 }); } catch (e) { /* stumm */ } };
+  if (s.modus === 'spiel' && s.tB == null) ton('lade', 'match_start', 0.55);
+  if (s.tB == null) return;
+  const tut = s.modus === 'tut';
+  if (t >= s.tB) ton('wumms', 'heavy_impact', tut ? 0.7 : 0.9);
+  if (t >= s.tB + 0.05) ton('auf', 'ascension', tut ? 0.3 : 0.4);
+  for (const h of s.helden) if (h.i % 2 === 0 && s.tb[h.key] != null && t >= s.tb[h.key]) ton('h' + h.key, 'spell_cast', 0.35);   // drei statt sechs, sonst wird es ein Klangbrei
+  if (!tut && s.tW0 != null && t >= s.tW0) ton('welle', 'reveal', 0.5);
 }
 
 function ppFx51Ende(s) {
