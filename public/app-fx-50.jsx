@@ -159,19 +159,20 @@ const PP_FX50_SCHRUMPF = [1, 0.75, 0.5, 0.25];
 
 /**
  * RISE: g { CX, YB, HW, rc } — Mitte, Fußzeile (Boden der Quelle), Halbbreite, Maßstab. → malen(t).
- * Die Spitze schießt in 0,26 s nach oben, ab 0,2 s löst sich der Fuß und steigt hinterher (wie `translateY(-100vh)` der CSS-Fassung); um 0,5 s ist die Säule oben.
+ * Die Spitze wächst in 0,38 s gleichmäßig aus der Quelle nach oben (kein Aufpoppen in voller Höhe), ab 0,16 s löst sich der Fuß und steigt hinterher; um 0,5 s ist die Säule oben.
  */
 function ppFx50RiseZeichner(g, m, salt) {
   const C = PP_FX50_C, rd = Math.round, H = ppFx30H, ease = ppFx30Ease, fl = ppFx30Fl;
   const { CX, YB, HW, rc } = g, L = Math.max(4, YB);                  // bis zur Oberkante der Leinwand (liegt über dem sichtbaren Bereich)
   const th = (w) => Math.max(1, rd(w * rc)), v = (w) => w / 4.8 * rc;
   const cols = [C.g3, C.g4, C.creme, C.g2];
-  const tip = (t) => YB - L * ease(t / 0.26);
-  const foot = (t) => (t < 0.2 ? YB : YB - L * Math.pow(ppFx50Kl((t - 0.2) / 0.3, 0, 1), 2));
+  // Abgefeuerter Strahl: die Spitze wächst gleichmäßig (leicht beschleunigend) aus der Quelle nach oben und erreicht die Oberkante erst bei 0,38 s; der Fuß löst sich ab 0,16 s und folgt
+  const tip = (t) => YB - L * Math.pow(ppFx50Kl(t / 0.38, 0, 1), 1.15);
+  const foot = (t) => (t < 0.16 ? YB : YB - L * Math.pow(ppFx50Kl((t - 0.16) / 0.34, 0, 1), 2));
   const T = [];
   let id = 0; const R = (k) => H(salt + 11, id * 13 + k);
   for (let t2 = 0, n = 0; t2 < 0.42; t2 += 1 / 40, id++, n++) {                                    // Kreuze und Quadrate an den Kanten, steigen mit
-    const t0 = t2, lo = Math.max(0, YB - L * ease(t0 / 0.26)), seite = R(1) < 0.5 ? -1 : 1, sk = R(9);
+    const t0 = t2, lo = Math.max(0, tip(t0)), seite = R(1) < 0.5 ? -1 : 1, sk = R(9);
     const f = R(2), yy = YB - f * (YB - lo);
     T.push({ t0, life: 0.22 + R(3) * 0.2, x: CX + seite * (HW + 2 + R(4) * 3), y: yy, vx: seite * v(R(5) * 40), vy: -v(60 + R(6) * 160), ax: 0, ay: 0, kind: sk < 0.45 ? 1 : (sk < 0.6 ? 3 : 0), sz: 1, c: cols[Math.floor(R(7) * cols.length)] });
   }
