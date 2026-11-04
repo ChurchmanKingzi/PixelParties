@@ -1,30 +1,32 @@
-// app-fx-50: Heilimpuls im Trailer-Look — Aufladen, Flug und Heil-Burst als Pixelart-Leinwand
+// app-fx-50: Heilimpuls im Trailer-Look — Heal-Säulen (grün) und Heil-Burst als Pixelart-Leinwand
 //
 // ═════════════════════════════════════════════════════════════════
-//  Vorlage: Trailer (shot01.js, „Life Serum“ → Heilimpuls zu Monia): die Quelle lädt auf (Ringe, rosa/grüne Funken, Pluskreuze, kleine Herzen, wachsende Kugel mit drei kreisenden Herzen), ein
-//  Impuls-Projektil (Kugel mit Herz-/Kugelschweif) fliegt im Bogen zum Ziel, beim Treffer: Schockringe (Creme, Rosa hell, Rosa), Pluskreuze und Quadrate wie ein Splitterkranz, aufsteigende
-//  Herzen und sechs kreisende Herzen. Die HP-Zahl bleibt die des Spiels (`HealNumber`) — Zeitpunkt und Wert der HP-Änderung sind unverändert.
-//
-//  Drei Zeichner, alles auf Rasterzellen (Zelle = 2–4 Bildschirmpixel, nach Zonenhöhe wie app-fx-48; Karte ≈ 35 Zellen), 30 Bilder/s auf `ppTaktRaf`, Schmutzrechteck-Upload (`ppFx30Maler`),
-//  feste Palettenfarben, kein Alpha (Ausklang = Blinken im Zweiertakt, Ringe teils gedithert), kein Weichzeichner, nichts gedreht:
-//   • TREFFER  — Registry-Animationen `heal_sparkle` (Heal, Cure, Skeleton Healer, Tarleinn, Johanna …) und `healing_hearts` (Healing Potion, Life Serum, Future Tech Doping …): ersetzen die
-//                Leinwand-Fassungen aus app-fx-13. Dauer 0,92 s (die Registry entfernt nach 1,0 s). Mitte = Mitte der Zielzone (Held oder Kreatur); `healing_hearts` mit mehr Herzen, `heal_sparkle`
-//                mit mehr Splittern.
-//   • LADEN    — `play_heal_beam` Phase `rise` (Heal, Skeleton Healer): statt des CSS-Strahls (`healBeamRise`, Verlauf + Schein, vom Laufzeit-Backer abgetastet) lädt über der Quelle die Kugel auf (0,5 s).
-//   • FLUG     — `play_heal_beam` Phase `strike`: der Impuls fliegt im Bogen von der Quelle zum Ziel (0,42 s; die Registry-Animation `heal_sparkle` folgt ~0,45 s später und übernimmt den Treffer).
-//  Aufruf des Strahls: `window.ppFx50Beam(phase, srcEl, tgtEl)` → true, wenn gezeichnet wird (der Aufrufer lässt dann den CSS-Strahl weg), sonst false.
-//  Rückfall: `window.__ppFxAlt` (Registry-Einträge bleiben, Strahl → false) und `window._playAnimations === false`.
-//  Kosten: eine Leinwand je Phase (≈ 100 × 100 Zellen), rein zeitabhängige Teilchen ohne Zustand, ≤ ~70 Teilchen und drei Ringe je Bild, Leinwand lebt < 1 s; Aufwärmen im Leerlauf.
+//  Vorlage: Trailer (shot01.js, „Life Serum“ → Heilimpuls zu Monia): Ringe, Funken, Pluskreuze, Schockringe, Splitterkranz. Das Kartenbild von „Heal“ (data/card-art/native/Heal.png) zeigt ZWEI dicke grüne
+//  Lichtsäulen, die von OBEN ins Bild kommen (eine an der Heilerin, eine am Ziel; hellgrün, dunkelgrüne Kontur). Der Ablauf des CSS-Originals (`heal-beam-rise` / `-strike`) bleibt, nur als Pixelart:
+//   • RISE   (`play_heal_beam` Phase `rise`, 0,5 s): an der Quelle (Heldenzone der Heilerin bzw. Zone des Skeleton Healer) schießt eine Säule senkrecht nach OBEN aus dem Bild und steigt ab,
+//            Bodenring (Ellipse, Creme + Grün), Plus-Kreuze und Quadrate an den Kanten.
+//   • STRIKE (Phase `strike`, 0,42 s): eine gleiche Säule fällt von der OBERKANTE des sichtbaren Bereichs senkrecht auf die Zielzone (Spitze beschleunigt, steht dann kurz, schrumpft), Einschlag mit
+//            Bodenringen und Spritzern. Quelle = Ziel (Selbstheilung): beide Säulen am selben Ort nacheinander.
+//   • TREFFER — Registry-Animationen `heal_sparkle` (Heal, Skeleton Healer, Cure, Healing Melody, Tarleinn, Johanna … — ursprünglich grün, bleibt grün) und `healing_hearts` (Healing Potion, Life Serum,
+//            Future Tech Doping …, rosa Herzen wie im Trailer): ersetzen die Canvas-Fassungen aus app-fx-13. Dauer 0,92 s (die Registry entfernt nach 1,0 s). Mitte = Mitte der Zielzone. `heal_sparkle`:
+//            Creme- und Grünringe, Plus-Kreuze und Quadrate (Creme, Hell- und Mittelgrün), kreisende Kreuze; `healing_hearts`: Ringe Creme/Rosa, Herzen und Sterne.
+//  Die HP-Zahl bleibt die des Spiels (`HealNumber`) — Zeitpunkt und Wert der HP-Änderung sind unverändert (Server: rise 500 ms, strike 350 ms, dann Treffer).
+//  Technik: Rasterzellen (2–4 Bildschirmpixel nach Zonenhöhe wie app-fx-48; Karte ≈ 35 Zellen), 30 Bilder/s auf `ppTaktRaf`, Schmutzrechteck-Upload (`ppFx30Maler`), feste Palettenfarben, kein Alpha
+//  (Ränder Bayer-gedithert, Ausklang = Blinken/Schrumpfen in Stufen), kein Weichzeichner, nichts gedreht. Die Säulen laufen in der Welt-Schicht (`ppFxWeltSchicht`, Feldkoordinaten) und reichen bis zur
+//  Oberkante des sichtbaren Bereichs (Fenster-Oberkante + Feldversatz, plus Reserve für eine laufende Kamerafahrt). Eine schmale, hohe Leinwand je Phase.
+//  Aufruf: `window.ppFx50Beam(phase, srcEl, tgtEl)` → true, wenn gezeichnet wird (der Aufrufer lässt dann den CSS-Strahl weg), sonst false.
+//  Rückfall: `window.__ppFxAlt` (Registry-Einträge und Strahl bleiben alt) und `window._playAnimations === false`.
 //  Messung (nur Tests): `window.__ppFx50Zeiten` sammelt [Art, ms] je Bild (Zeichnen + Hochladen).
 // ═════════════════════════════════════════════════════════════════
 const PP_FX50_BILD = 1000 / 30;
 const PP_FX50_C = {
   hpk: ppHex('#fe6794'), hpk2: ppHex('#f8b4c8'), creme: ppHex('#fffbd2'), gruen: ppHex('#66ff71'), tinte: ppHex('#12101f'),
+  g0: ppHex('#167927'), g1: ppHex('#00cc50'), g2: ppHex('#4ceb70'), g3: ppHex('#75f091'), g4: ppHex('#b3f9b8'),    // Grün: Kontur, Rand, Körper, hell, Kern
 };
 const PP_FX50_TREFFER_ENDE = 0.92;     // s; die Registry entfernt eine Zonen-Animation nach 1000 ms
-const PP_FX50_LADEN_ENDE = 0.62;       // s; die Kugel steht bis 0,58 s (der Flug beginnt nach 0,5 s und übernimmt am selben Ort)
-const PP_FX50_FLUG_DAUER = 0.42;       // s; Strahl-Phase `strike` → Registry-Animation `heal_sparkle` ≈ 350 ms + 100 ms Einhänge-Verzug
-const PP_FX50_FLUG_ENDE = 0.5;
+const PP_FX50_RISE_ENDE = 0.5;         // s; Server: `strike` folgt nach 500 ms
+const PP_FX50_STRIKE_DAUER = 0.42;     // s; Strahl-Phase `strike` → Registry-Animation `heal_sparkle` ≈ 350 ms + 100 ms Einhänge-Verzug
+const PP_FX50_STRIKE_ENDE = 0.5;
 
 const ppFx50Kl = (v, a, b) => Math.max(a, Math.min(b, v));
 
@@ -60,22 +62,17 @@ function ppFx50Teilchen(m, T, t, fl) {
   }
 }
 
-/** Kugel wie im Trailer: Tinte (r+1), Rosa (r), Hellrosa (r−1), Creme-Glanz oben links. */
-function ppFx50Kugel(m, X, Y, r) {
-  const C = PP_FX50_C;
-  m.disc(X, Y, r + 1, C.tinte); m.disc(X, Y, r, C.hpk); m.disc(X, Y, Math.max(1, r - 1), C.hpk2);
-  m.disc(X - (r >> 2), Y - (r >> 2), Math.max(1, r >> 1), C.creme);
-}
-
 // ───────────────────────── Treffer ─────────────────────────
-/** g: { CX, CY, rc, zx0, zy0, zx1, zy1 } in Zellen; profil: 'herz' | 'funke'. → malen(t Sekunden, ganze Bilder). */
+/** g: { CX, CY, rc, zx0, zy0, zx1, zy1 } in Zellen; profil: 'herz' (rosa Herzen) | 'gruen' (Heal: grün/creme, Kreuze). → malen(t Sekunden, ganze Bilder). */
 function ppFx50TrefferZeichner(g, m, salt, profil) {
   const C = PP_FX50_C, rd = Math.round, H = ppFx30H, ease = ppFx30Ease, fl = ppFx30Fl;
   const { CX, CY, rc, zx0, zy0, zx1, zy1 } = g;
   const th = (v) => Math.max(1, rd(v * rc));
   const v = (w) => w / 4.8 * rc;
-  const cols = [C.hpk, C.hpk2, C.creme, C.gruen];
-  const pr = profil === 'herz' ? { splitter: 30, herzen: 22, spirale: 6 } : { splitter: 46, herzen: 12, spirale: 5 };
+  const gr = profil === 'gruen';
+  const cols = gr ? [C.g3, C.g4, C.creme, C.g2] : [C.hpk, C.hpk2, C.creme, C.gruen];
+  const ringe = gr ? [C.creme, C.g2, C.g1] : [C.creme, C.hpk2, C.hpk];
+  const pr = profil === 'herz' ? { splitter: 30, herzen: 22, spirale: 6 } : { splitter: 46, herzen: 14, spirale: 5 };
   const T = [];
   let id = 0; const R = (k) => H(salt + 7, id * 13 + k);
   // Splitterkranz: Kreuze und Quadrate fliegen aus, bremsen ab (a = −1,4 · v)
@@ -87,7 +84,7 @@ function ppFx50TrefferZeichner(g, m, salt, profil) {
   // aufsteigende Herzen und Sterne (Lebensdauer so, dass alles vor 0,92 s endet)
   for (let k = 0, n = ppFxN(pr.herzen); k < n; k++, id++) {
     T.push({ t0: R(1) * 0.2, life: 0.5 + R(2) * 0.2, x: CX + (R(3) - 0.5) * v(90), y: CY + (R(4) - 0.5) * v(70) + v(10), vx: v((R(5) - 0.5) * 70), vy: -v(60 + R(6) * 120), ax: 0, ay: 0,
-      kind: R(7) < 0.25 ? 2 : 4, sz: 1, c: R(7) < 0.25 ? C.creme : (k % 2 ? C.hpk : C.hpk2) });
+      kind: gr ? (R(7) < 0.2 ? 2 : (R(7) < 0.7 ? 1 : 0)) : (R(7) < 0.25 ? 2 : 4), sz: 1, c: gr ? cols[Math.floor(R(9) * cols.length)] : (R(7) < 0.25 ? C.creme : (k % 2 ? C.hpk : C.hpk2)) });
   }
   const sp = pr.spirale;
 
@@ -95,93 +92,140 @@ function ppFx50TrefferZeichner(g, m, salt, profil) {
     const q = fl(t);
     // 1) Aufleuchten der Zielzone: zwei Bilder Creme-Dither (50 % / 25 %; im Trailer 70 / 45 — die Zahl und die Karte sollen lesbar bleiben)
     if (q < 2) { const lv = q === 0 ? 0.5 : 0.25; for (let y = zy0; y < zy1; y++) for (let x = zx0; x < zx1; x++) if (ppBayer(x, y) < lv) m.rect(x, y, 1, 1, C.creme); }
-    // 2) Schockringe: Creme (erste 0,1 s dick), Hellrosa, Rosa (gedithert)
-    if (t <= 0.4) m.ring(CX, CY, Math.max(1, rd(ease(t / 0.4) * 24 * rc)), t < 0.1 ? th(2) : th(1), C.creme, false);
-    if (t > 0.05 && t <= 0.55) m.ring(CX, CY, Math.max(1, rd(ease((t - 0.05) / 0.5) * 34 * rc)), th(2), C.hpk2, true);
-    if (t > 0.1 && t <= 0.7) m.ring(CX, CY, Math.max(1, rd(ease((t - 0.1) / 0.6) * 44 * rc)), th(2), C.hpk, true);
+    // 2) Schockringe: Creme (erste 0,1 s dick), dann Hell- und Mittelton (gedithert)
+    if (t <= 0.4) m.ring(CX, CY, Math.max(1, rd(ease(t / 0.4) * 24 * rc)), t < 0.1 ? th(2) : th(1), ringe[0], false);
+    if (t > 0.05 && t <= 0.55) m.ring(CX, CY, Math.max(1, rd(ease((t - 0.05) / 0.5) * 34 * rc)), th(2), ringe[1], true);
+    if (t > 0.1 && t <= 0.7) m.ring(CX, CY, Math.max(1, rd(ease((t - 0.1) / 0.6) * 44 * rc)), th(2), ringe[2], true);
     // 3) Teilchen
     ppFx50Teilchen(m, T, t, fl);
-    // 4) kreisende Herzen, steigen mit
+    // 4) kreisende Herzen (Heal: Kreuze), steigen mit
     if (t < 0.8) {
       for (let k = 0; k < sp; k++) {
         if (t > 0.55 && q % 2) break;
         const a = k * (Math.PI * 2 / sp) + t * 3, rr = (8 + t * 36) * rc;
-        ppFx50Herz(m, rd(CX + Math.cos(a) * rr), rd(CY - t * 22 * rc + Math.sin(a) * rr * 0.6), 1, k % 2 ? C.hpk : C.hpk2, C.creme);
+        const hx = rd(CX + Math.cos(a) * rr), hy = rd(CY - t * 22 * rc + Math.sin(a) * rr * 0.6);
+        if (gr) { const c = k % 2 ? C.g3 : C.g4; m.rect(hx - 1, hy, 3, 1, c); m.rect(hx, hy - 1, 1, 3, c); m.rect(hx, hy, 1, 1, C.creme); }
+        else ppFx50Herz(m, hx, hy, 1, k % 2 ? C.hpk : C.hpk2, C.creme);
       }
     }
   };
 }
 
-// ───────────────────────── Laden ─────────────────────────
-/** g: { CX, CY, rc } (Mitte der Quelle in Zellen). → malen(t). */
-function ppFx50LadenZeichner(g, m, salt) {
+// ───────────────────────── Säulen ─────────────────────────
+/** Ellipsenring (Bodenring): Mitte (cx, cy), Halbachsen rx, ry, Dicke th (Zellen); `dith` = jede zweite Zelle. */
+function ppFx50Ellipse(m, cx, cy, rx, ry, th, c, dith) {
+  if (rx < 1) return;
+  const n = Math.ceil(Math.PI * 2 * Math.max(rx, ry) * 1.1);
+  let lx = null, ly = null, k = 0;
+  for (let i = 0; i < n; i++) {
+    const a = i / n * Math.PI * 2, x = Math.round(cx + Math.cos(a) * rx), y = Math.round(cy + Math.sin(a) * ry);
+    if (x === lx && y === ly) continue;
+    lx = x; ly = y; k++;
+    if (!dith || (k & 1)) m.rect(x, y, th, th, c);
+  }
+}
+
+/**
+ * Lichtsäule (senkrecht, wie auf dem Kartenbild von „Heal“): Mitte cx, Zeilen y0 (oben) … y1 (unten, exklusiv), Halbbreite hw (Zellen), Bild fr (für den Lauf im Kern), `kopf` 'unten' | 'oben' = helle Spitze.
+ * Schichten von außen: Kontur (dunkelgrün, 1 Zelle), Rand (Mittelgrün, nach innen gedithert), Körper, Hellgrün, Kern (Creme/Hellgrün im Vierzeilen-Lauf nach oben).
+ */
+function ppFx50Saeule(m, cx, y0, y1, hw, fr, kopf) {
+  if (y1 <= y0 || hw < 1) return;
+  const C = PP_FX50_C, hgt = y1 - y0, eb = Math.max(1, Math.round(hw * 0.32)), hl = Math.max(1, Math.round(hw * 0.62)), kw = Math.max(1, Math.round(hw * 0.3));
+  m.rect(cx - hw - 1, y0, 1, hgt, C.g0); m.rect(cx + hw + 1, y0, 1, hgt, C.g0);                    // Kontur
+  m.rect(cx - hw, y0, 2 * hw + 1, hgt, C.g2);                                                     // Körper
+  m.rect(cx - hw, y0, 1, hgt, C.g1); m.rect(cx + hw, y0, 1, hgt, C.g1);                           // Rand, äußerste Zelle
+  for (let e = 1; e < eb; e++) for (let y = y0; y < y1; y++) {                                    // Rand nach innen gedithert
+    if (ppBayer(cx + e, y) < 0.5 + 0.15 * (eb - e)) { m.rect(cx - hw + e, y, 1, 1, C.g1); }
+    if (ppBayer(cx - e, y) < 0.5 + 0.15 * (eb - e)) { m.rect(cx + hw - e, y, 1, 1, C.g1); }
+  }
+  m.rect(cx - hl, y0, 2 * hl + 1, hgt, C.g3);                                                     // hell
+  for (let y = y0; y < y1; y++) {                                                                  // Übergang Körper → hell gedithert (je eine Zelle)
+    if (ppBayer(cx + hl + 1, y) < 0.5) m.rect(cx + hl + 1, y, 1, 1, C.g3);
+    if (ppBayer(cx - hl - 1, y) < 0.5) m.rect(cx - hl - 1, y, 1, 1, C.g3);
+  }
+  let y = y0;                                                                                      // Kern: Bänder zu 4 Zeilen laufen nach oben
+  while (y < y1) {
+    const kk = Math.floor((y + fr * 2) / 4), ny = Math.min(y1, (kk + 1) * 4 - fr * 2);
+    m.rect(cx - kw, y, 2 * kw + 1, ny - y, kk & 1 ? C.g3 : C.g4);
+    y = ny;
+  }
+  if (kopf && hgt >= 3) {                                                                          // helle Spitze (3 Zeilen)
+    const oben = kopf === 'oben', ya = oben ? y0 : y1 - 3, z = oben ? [C.creme, C.g4, C.g3] : [C.g3, C.g4, C.creme];
+    for (let i = 0; i < 3; i++) m.rect(cx - hw, ya + i, 2 * hw + 1, 1, z[i]);
+  }
+}
+const PP_FX50_SCHRUMPF = [1, 0.75, 0.5, 0.25];
+
+/**
+ * RISE: g { CX, YB, HW, rc } — Mitte, Fußzeile (Boden der Quelle), Halbbreite, Maßstab. → malen(t).
+ * Die Spitze schießt in 0,26 s nach oben, ab 0,2 s löst sich der Fuß und steigt hinterher (wie `translateY(-100vh)` der CSS-Fassung); um 0,5 s ist die Säule oben.
+ */
+function ppFx50RiseZeichner(g, m, salt) {
   const C = PP_FX50_C, rd = Math.round, H = ppFx30H, ease = ppFx30Ease, fl = ppFx30Fl;
-  const { CX, CY, rc } = g;
-  const th = (w) => Math.max(1, rd(w * rc));
-  const v = (w) => w / 4.8 * rc;
-  const cols = [C.hpk, C.hpk2, C.creme, C.gruen];
-  const OY = CY - rd(5 * rc);                                   // die Kugel schwebt etwas über der Kartenmitte
+  const { CX, YB, HW, rc } = g, L = Math.max(4, YB);                  // bis zur Oberkante der Leinwand (liegt über dem sichtbaren Bereich)
+  const th = (w) => Math.max(1, rd(w * rc)), v = (w) => w / 4.8 * rc;
+  const cols = [C.g3, C.g4, C.creme, C.g2];
+  const tip = (t) => YB - L * ease(t / 0.26);
+  const foot = (t) => (t < 0.2 ? YB : YB - L * Math.pow(ppFx50Kl((t - 0.2) / 0.3, 0, 1), 2));
   const T = [];
   let id = 0; const R = (k) => H(salt + 11, id * 13 + k);
-  // Funkenstrom um die Quelle (Trailer: 22/s, Herzen 30 %, sonst Funken; hier Kreuze und Quadrate)
-  for (let t2 = 0, n = 0; t2 < 0.5; t2 += 1 / 30, id++, n++) {
-    for (let j = 0; j < (n % 3 === 2 ? 2 : 1); j++) {
-      const sk = R(9 + j);
-      T.push({ t0: t2, life: 0.3 + R(2) * 0.3, x: CX + (R(3) - 0.5) * v(110), y: OY + (R(4) - 0.5) * v(110) + v(10), vx: v((R(5) - 0.5) * 30), vy: -v(40 + R(6) * 100), ax: 0, ay: 0,
-        kind: sk < 0.3 ? 4 : (sk < 0.6 ? 3 : 1), sz: 1, c: cols[Math.floor(R(7) * cols.length)] });
-    }
+  for (let t2 = 0, n = 0; t2 < 0.42; t2 += 1 / 40, id++, n++) {                                    // Kreuze und Quadrate an den Kanten, steigen mit
+    const t0 = t2, lo = Math.max(0, YB - L * ease(t0 / 0.26)), seite = R(1) < 0.5 ? -1 : 1, sk = R(9);
+    const f = R(2), yy = YB - f * (YB - lo);
+    T.push({ t0, life: 0.22 + R(3) * 0.2, x: CX + seite * (HW + 2 + R(4) * 3), y: yy, vx: seite * v(R(5) * 40), vy: -v(60 + R(6) * 160), ax: 0, ay: 0, kind: sk < 0.45 ? 1 : (sk < 0.6 ? 3 : 0), sz: 1, c: cols[Math.floor(R(7) * cols.length)] });
   }
-  for (let k = 0, n = ppFxN(26); k < n; k++, id++) {            // Splitter beim Start (Trailer: Token entsteht)
-    const an = R(1) * Math.PI * 2, sp = v(130 + R(2) * 420);
-    T.push({ t0: 0, life: 0.25 + R(5) * 0.25, x: CX, y: OY, vx: Math.cos(an) * sp, vy: Math.sin(an) * sp, ax: -Math.cos(an) * sp * 1.4, ay: -Math.sin(an) * sp * 1.4,
-      kind: R(6) < 0.3 ? 1 : 0, sz: R(3) < 0.4 ? 2 : 1, c: cols[Math.floor(R(7) * cols.length)] });
+  for (let k = 0, n = ppFxN(22); k < n; k++, id++) {                                                // Spritzer am Boden
+    const an = -Math.PI * (0.1 + R(1) * 0.8), sp = v(90 + R(2) * 260);
+    T.push({ t0: 0, life: 0.2 + R(5) * 0.2, x: CX + (R(3) - 0.5) * 2 * HW, y: YB, vx: Math.cos(an) * sp, vy: Math.sin(an) * sp, ax: -Math.cos(an) * sp * 1.4, ay: -Math.sin(an) * sp * 1.4 + v(160),
+      kind: R(6) < 0.35 ? 1 : 0, sz: R(3) < 0.4 ? 2 : 1, c: cols[Math.floor(R(7) * cols.length)] });
   }
-
   return (t) => {
-    // 1) Ringe beim Start: Creme (erste 0,1 s dick) und Rosa (gedithert)
-    if (t <= 0.4) m.ring(CX, OY, Math.max(1, rd(ease(t / 0.4) * 18 * rc)), t < 0.1 ? th(2) : th(1), C.creme, false);
-    if (t > 0.05 && t <= 0.5) m.ring(CX, OY, Math.max(1, rd(ease((t - 0.05) / 0.45) * 28 * rc)), th(2), C.hpk, true);
-    // 2) Funken
+    const q = fl(t);
+    // 1) Bodenring (Ellipse): Creme (erste 0,1 s dick) und Grün (gedithert)
+    if (t <= 0.4) ppFx50Ellipse(m, CX, YB, Math.max(1, rd(ease(t / 0.4) * 24 * rc)), Math.max(1, rd(ease(t / 0.4) * 10 * rc)), t < 0.1 ? th(2) : th(1), C.creme, false);
+    if (t > 0.05 && t <= 0.5) ppFx50Ellipse(m, CX, YB, Math.max(1, rd(ease((t - 0.05) / 0.45) * 34 * rc)), Math.max(1, rd(ease((t - 0.05) / 0.45) * 14 * rc)), th(2), C.g2, true);
+    // 2) Säule: Spitze schießt nach oben, der Fuß folgt; die letzten Bilder schrumpft sie in Stufen
+    const y0 = Math.max(0, rd(tip(t))), y1 = rd(foot(t)) + 1, ende = ppFx50Kl((t - 0.4) / 0.1, 0, 1), hw = Math.max(1, rd(HW * PP_FX50_SCHRUMPF[Math.min(3, Math.floor(ende * 4))]));
+    if (y1 > y0 && t < 0.5) ppFx50Saeule(m, CX, y0, Math.min(y1, YB + 1), hw, q, tip(t) > 0 ? 'oben' : null);
+    // 3) Teilchen
     ppFx50Teilchen(m, T, t, fl);
-    // 3) die Kugel wächst, drei Herzen kreisen
-    if (t < 0.58) {
-      const u = ppFx50Kl(t / 0.5, 0, 1), r = 2 + rd(u * 3 * rc);
-      ppFx50Kugel(m, CX, OY, r);
-      for (let k = 0; k < 3; k++) { const a = t * 6 + k * 2.1; ppFx50Herz(m, rd(CX + Math.cos(a) * (r + 4 * rc + 3)), rd(OY + Math.sin(a) * (r + 3 * rc + 2)), 1, k % 2 ? C.hpk : C.hpk2, null); }
-    }
   };
 }
 
-// ───────────────────────── Flug ─────────────────────────
-/** g: { AX, AY, BX, BY, rc } (Zellen). → malen(t). */
-function ppFx50FlugZeichner(g, m, salt) {
-  const C = PP_FX50_C, rd = Math.round, H = ppFx30H, fl = ppFx30Fl;
-  const { AX, AY, BX, BY, rc } = g;
-  const dist = Math.hypot(BX - AX, BY - AY), arc = Math.min(0.3 * dist, 26 * rc), T = PP_FX50_FLUG_DAUER;
-  const r0 = 2 + rd(3 * rc);
-  const pos = (tt) => {
-    const u = ppFx50Kl(tt / T, 0, 1), e = Math.pow(u, 1.6);
-    return [AX + (BX - AX) * e, AY + (BY - AY) * e - arc * Math.sin(Math.PI * e)];
-  };
+/**
+ * STRIKE: g { CX, YT, YB, HW, rc } — Mitte, Zeile der Oberkante der Leinwand (über dem sichtbaren Bereich), Zeile des Einschlags (Füße der Zielzone), Halbbreite, Maßstab. → malen(t).
+ * Die Spitze fällt in 0,16 s (beschleunigt) von oben auf das Ziel, die Säule steht bis 0,33 s und schrumpft dann in Stufen; ab dem Einschlag Bodenringe und Spritzer.
+ */
+function ppFx50StrikeZeichner(g, m, salt) {
+  const C = PP_FX50_C, rd = Math.round, H = ppFx30H, ease = ppFx30Ease, fl = ppFx30Fl;
+  const { CX, YT, YB, HW, rc } = g, TI = 0.16;
+  const th = (w) => Math.max(1, rd(w * rc)), v = (w) => w / 4.8 * rc;
+  const cols = [C.g3, C.g4, C.creme, C.g2];
+  const T = [];
+  let id = 0; const R = (k) => H(salt + 13, id * 13 + k);
+  for (let k = 0, n = ppFxN(40); k < n; k++, id++) {                                                // Einschlag: Splitter, die nach oben/außen spritzen
+    const an = -Math.PI * (0.02 + R(1) * 0.96), sp = v(140 + R(2) * 420);
+    T.push({ t0: TI + R(8) * 0.03, life: 0.18 + R(5) * 0.22, x: CX + (R(3) - 0.5) * HW, y: YB, vx: Math.cos(an) * sp, vy: Math.sin(an) * sp * 0.9, ax: -Math.cos(an) * sp * 1.2, ay: v(220),
+      kind: R(6) < 0.3 ? 1 : 0, sz: R(3) < 0.4 ? 2 : 1, c: cols[Math.floor(R(7) * cols.length)] });
+  }
+  for (let t2 = 0.04, n = 0; t2 < 0.34; t2 += 1 / 40, id++, n++) {                                  // Kreuze und Quadrate an den Kanten der Säule
+    const t0 = t2, seite = R(1) < 0.5 ? -1 : 1, tipY = YT + (YB - YT) * Math.pow(ppFx50Kl(t0 / TI, 0, 1), 2), sk = R(9);
+    T.push({ t0, life: 0.2 + R(3) * 0.15, x: CX + seite * (HW + 2 + R(4) * 3), y: YT + R(2) * Math.max(1, tipY - YT), vx: seite * v(R(5) * 30), vy: v(20 + R(6) * 60), ax: 0, ay: 0, kind: sk < 0.45 ? 1 : (sk < 0.6 ? 3 : 0), sz: 1, c: cols[Math.floor(R(7) * cols.length)] });
+  }
   return (t) => {
     const q = fl(t);
-    if (t >= T + 0.02) return;
-    // Funken, die der Impuls hinterlässt (je Bild eine Gruppe, 0,28 s sichtbar)
-    for (let j = Math.max(0, q - 9); j <= q; j++) {
-      const tj = j / 30, alter = t - tj; if (tj > T || alter >= 0.28) continue;
-      if (alter > 0.2 && (q - j) % 2) continue;
-      const [px, py] = pos(tj), a = H(j + salt, 3) * Math.PI * 2, d = (3 + H(j + salt, 4) * 5) * rc;
-      const x = rd(px + Math.cos(a) * d), y = rd(py + Math.sin(a) * d + alter * 20 * rc), c = H(j + salt, 5) < 0.4 ? C.hpk2 : (H(j + salt, 5) < 0.7 ? C.creme : C.gruen);
-      if (j % 2) { m.rect(x - 1, y, 3, 1, c); m.rect(x, y - 1, 1, 3, c); } else m.rect(x, y, 1, 1, c);
+    // 1) Säule von oben: Spitze beschleunigt, dann steht sie und schrumpft in Stufen
+    if (t < 0.42) {
+      const tip = rd(YT + (YB - YT) * Math.pow(ppFx50Kl(t / TI, 0, 1), 2)), ende = ppFx50Kl((t - 0.3) / 0.12, 0, 1), hw = Math.max(1, rd(HW * PP_FX50_SCHRUMPF[Math.min(3, Math.floor(ende * 4))]));
+      ppFx50Saeule(m, CX, YT, tip + 1, hw, q, 'unten');
     }
-    // Schweif: Herzen und Kugeln im Wechsel, 8 Stufen im Abstand von zwei Bildern
-    for (let k = 8; k >= 1; k--) {
-      const tt = t - k * 2 / 30; if (tt < 0) continue;
-      const [px, py] = pos(tt), X = rd(px), Y = rd(py + k);
-      if (k % 2) ppFx50Herz(m, X, Y, 1, k % 4 === 1 ? C.hpk : C.hpk2, null);
-      else m.disc(X, Y, Math.max(1, rd((5 - (k >> 1)) * 0.8 * rc)), C.hpk);
-    }
-    if (t <= T) { const [gx, gy] = pos(t); ppFx50Kugel(m, rd(gx), rd(gy), r0); }
+    // 2) Einschlag: Bodenringe (Creme dick, dann Grün gedithert)
+    const dt = t - TI;
+    if (dt >= 0 && dt <= 0.3) ppFx50Ellipse(m, CX, YB, Math.max(1, rd(ease(dt / 0.26) * 26 * rc)), Math.max(1, rd(ease(dt / 0.26) * 11 * rc)), dt < 0.08 ? th(2) : th(1), C.creme, false);
+    if (dt > 0.04 && dt <= 0.3) ppFx50Ellipse(m, CX, YB, Math.max(1, rd(ease((dt - 0.04) / 0.26) * 36 * rc)), Math.max(1, rd(ease((dt - 0.04) / 0.26) * 15 * rc)), th(2), C.g2, true);
+    // 3) Teilchen
+    ppFx50Teilchen(m, T, t, fl);
   };
 }
 
@@ -242,16 +286,16 @@ function ppFx50TrefferKomponente(profil) {
     );
   };
 }
-ppFxUeberschreiben('heal_sparkle', ppFx50TrefferKomponente('funke'));
+ppFxUeberschreiben('heal_sparkle', ppFx50TrefferKomponente('gruen'));
 ppFxUeberschreiben('healing_hearts', ppFx50TrefferKomponente('herz'));
 
-// ───────────────────────── Strahl: Laden + Flug ─────────────────────────
-/** Mitte eines Elements in Koordinaten der Schicht (Fenster + Feldversatz, wenn im Feld). */
+// ───────────────────────── Strahl: Rise + Strike ─────────────────────────
+/** Mitte eines Elements in Koordinaten der Schicht (Fenster + Feldversatz, wenn im Feld); `top` = Oberkante des sichtbaren Bereichs in denselben Koordinaten. */
 function ppFx50Mitte(el) {
   const r = el.getBoundingClientRect();
   if (!(r.width > 0) || !(r.height > 0)) return null;
   const wa = window.ppFxWeltAnker ? window.ppFxWeltAnker(el) : { welt: false, dx: 0, dy: 0 };
-  return { x: r.left + r.width / 2 + wa.dx, y: r.top + r.height / 2 + wa.dy, h: r.height, welt: !!wa.welt, dx: wa.dx, dy: wa.dy };
+  return { x: r.left + r.width / 2 + wa.dx, y: r.top + r.height / 2 + wa.dy, w: r.width, h: r.height, welt: !!wa.welt, dx: wa.dx, dy: wa.dy, top: wa.dy };
 }
 
 function ppFx50Haengen(lx, ly, gw, gh, S, welt) {
@@ -266,6 +310,15 @@ function ppFx50Haengen(lx, ly, gw, gh, S, welt) {
   return { wurzel, cv };
 }
 
+/** Maße einer Säulen-Leinwand: Mitte (x, y_boden) in Schichtkoordinaten; Oberkante `top` des sichtbaren Bereichs minus Reserve (Kamerafahrt), unten eine Reserve für Ringe. */
+function ppFx50SaeulenFlaeche(a, boden, S, rc, hw) {
+  const reserve = Math.min(160, Math.round(window.innerHeight * 0.2)), rand = Math.ceil(36 * rc) + 2;
+  const lx = Math.floor((a.x - (hw + rand) * S) / S) * S, ly = Math.floor((a.top - reserve) / S) * S;
+  const gw = (hw + rand) * 2 + 1, gh = Math.min(700, Math.ceil((boden + 14 * rc * S - ly) / S));
+  const cx = Math.round((a.x - lx) / S), yb = Math.round((boden - ly) / S), oben = Math.max(0, Math.round((a.top - ly) / S));
+  return { lx, ly, gw, gh, cx, yb, oben };
+}
+
 function ppFx50Beam(phase, srcEl, tgtEl) {
   try {
     if (window._playAnimations === false || window.__ppFxAlt || typeof ppFx30Maler !== 'function') return false;
@@ -273,26 +326,21 @@ function ppFx50Beam(phase, srcEl, tgtEl) {
     if (phase === 'rise') {
       const a = srcEl && ppFx50Mitte(srcEl);
       if (!a) return false;
-      const { S, rc } = ppFx50Mass(a.h), Rz = Math.ceil(46 * rc) + 4;
-      const lx = Math.floor((a.x - Rz * S) / S) * S, ly = Math.floor((a.y - Rz * S) / S) * S, gw = Rz * 2, gh = Rz * 2;
-      const CX = Math.round((a.x - lx) / S), CY = Math.round((a.y - ly) / S);
-      const { wurzel, cv } = ppFx50Haengen(lx, ly, gw, gh, S, a.welt);
-      ppFx50Schleife(cv, gw, gh, 'laden', (m) => ppFx50LadenZeichner({ CX, CY, rc }, m, salt), PP_FX50_LADEN_ENDE * 1000, 0, () => wurzel.remove());
+      const { S, rc } = ppFx50Mass(a.h), hw = Math.max(3, Math.round(a.w / S * 0.3));
+      const f = ppFx50SaeulenFlaeche(a, a.y + a.h * 0.35, S, rc, hw);
+      if (f.gh < 12 || f.yb - f.oben < 8) return false;
+      const { wurzel, cv } = ppFx50Haengen(f.lx, f.ly, f.gw, f.gh, S, a.welt);
+      ppFx50Schleife(cv, f.gw, f.gh, 'rise', (m) => ppFx50RiseZeichner({ CX: f.cx, YB: f.yb, HW: hw, rc }, m, salt), PP_FX50_RISE_ENDE * 1000 + 60, 0, () => wurzel.remove());
       return true;
     }
     if (phase === 'strike') {
       const b = tgtEl && ppFx50Mitte(tgtEl);
       if (!b) return false;
-      let a = srcEl && ppFx50Mitte(srcEl);
-      const { S, rc } = ppFx50Mass(b.h);
-      if (!a || Math.hypot(a.x - b.x, a.y - b.y) < 6 * S) a = { x: b.x, y: b.y - b.h * 1.2 };       // Quelle fehlt (oder = Ziel): der Impuls fällt von oben ein
-      const arc = Math.min(0.3 * Math.hypot(b.x - a.x, b.y - a.y) / S, 26 * rc), M = Math.ceil(16 * rc) + 6;
-      const lx = Math.floor((Math.min(a.x, b.x) - M * S) / S) * S, ly = Math.floor((Math.min(a.y, b.y) - (M + arc) * S) / S) * S;
-      const gw = Math.min(900, Math.ceil((Math.max(a.x, b.x) + M * S - lx) / S)), gh = Math.min(700, Math.ceil((Math.max(a.y, b.y) + M * S - ly) / S));
-      if (gw < 8 || gh < 8) return false;
-      const g = { AX: Math.round((a.x - lx) / S), AY: Math.round((a.y - ly) / S) - Math.round(5 * rc), BX: Math.round((b.x - lx) / S), BY: Math.round((b.y - ly) / S), rc };
-      const { wurzel, cv } = ppFx50Haengen(lx, ly, gw, gh, S, b.welt);
-      ppFx50Schleife(cv, gw, gh, 'flug', (m) => ppFx50FlugZeichner(g, m, salt), PP_FX50_FLUG_ENDE * 1000, 0, () => wurzel.remove());
+      const { S, rc } = ppFx50Mass(b.h), hw = Math.max(3, Math.round(b.w / S * 0.3));
+      const f = ppFx50SaeulenFlaeche(b, b.y + b.h * 0.35, S, rc, hw);
+      if (f.gh < 12 || f.yb - f.oben < 8) return false;
+      const { wurzel, cv } = ppFx50Haengen(f.lx, f.ly, f.gw, f.gh, S, b.welt);
+      ppFx50Schleife(cv, f.gw, f.gh, 'strike', (m) => ppFx50StrikeZeichner({ CX: f.cx, YT: 0, YB: f.yb, HW: hw, rc }, m, salt), PP_FX50_STRIKE_ENDE * 1000, 0, () => wurzel.remove());
       return true;
     }
   } catch (e) { try { console.warn('ppFx50Beam', e); } catch (er) { /* still */ } }
@@ -308,9 +356,9 @@ window.ppFx50Beam = ppFx50Beam;
       const gw = 150, gh = 150, buf = new Uint8ClampedArray(gw * gh * 4), m = ppFx30Maler(buf, gw, gh);
       const progs = [
         [ppFx50TrefferZeichner({ CX: 75, CY: 75, rc: 1, zx0: 60, zy0: 55, zx1: 90, zy1: 95 }, m, 7, 'herz'), [0.01, 0.06, 0.15, 0.3, 0.5, 0.8]],
-        [ppFx50TrefferZeichner({ CX: 75, CY: 75, rc: 1, zx0: 60, zy0: 55, zx1: 90, zy1: 95 }, m, 9, 'funke'), [0.03, 0.2, 0.6]],
-        [ppFx50LadenZeichner({ CX: 75, CY: 75, rc: 1 }, m, 5), [0.01, 0.1, 0.3, 0.55]],
-        [ppFx50FlugZeichner({ AX: 20, AY: 120, BX: 130, BY: 40, rc: 1 }, m, 3), [0.02, 0.1, 0.25, 0.4]],
+        [ppFx50TrefferZeichner({ CX: 75, CY: 75, rc: 1, zx0: 60, zy0: 55, zx1: 90, zy1: 95 }, m, 9, 'gruen'), [0.01, 0.06, 0.15, 0.3, 0.5, 0.8]],
+        [ppFx50RiseZeichner({ CX: 75, YB: 140, HW: 7, rc: 1 }, m, 5), [0.01, 0.1, 0.25, 0.4, 0.47]],
+        [ppFx50StrikeZeichner({ CX: 75, YT: 0, YB: 120, HW: 7, rc: 1 }, m, 3), [0.02, 0.1, 0.2, 0.3, 0.4]],
       ];
       const schritte = [];
       for (const [fn, ts] of progs) for (const t of ts) schritte.push(() => { buf.fill(0); m.d.x0 = gw; m.d.y0 = gh; m.d.x1 = 0; m.d.y1 = 0; fn(t); });
