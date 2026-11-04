@@ -26,6 +26,8 @@
 //  `PP_VALUE_LEAF_PULLS` (Zahl): Obergrenze der Rollouts je Entscheidung für die Netz-Seite (sonst PP_MCTS_PULLS) — damit lässt sich die
 //  gesparte Rechenzeit in mehr Rollouts umsetzen.
 //
+//  `PP_VALUE_BLEND` (Zahl in (0,1)): Gewicht des Netzes im Blattwert, der Rest kommt vom Evaluator (Messschalter, Standard: nur Netz).
+//
 //  Je Partie hängt `engine._valueLeaf = { calls, ms: [Sitz0, Sitz1] }` an der Engine (Kosten des Netzes, für die Auswertung).
 // ═══════════════════════════════════════════
 'use strict';
@@ -137,4 +139,9 @@ function pullsFor(engine, rootIdx, dflt) {
   return side != null && side !== rootIdx ? dflt : PULLS;
 }
 
-module.exports = { score, horizonFor, pullsFor, probeScores, probeDone, PROBE };
+// `PP_VALUE_BLEND` (Zahl zwischen 0 und 1, Messschalter): Gewicht des Netzes im Blattwert, der Rest kommt vom Evaluator
+// (blend * Netz + (1 - blend) * Evaluator). Ohne den Schalter (oder bei 0 und 1) bewertet das Netz allein.
+const _bl = parseFloat(process.env.PP_VALUE_BLEND);
+const BLEND = Number.isFinite(_bl) && _bl > 0 && _bl < 1 ? _bl : 1;
+
+module.exports = { score, horizonFor, pullsFor, probeScores, probeDone, PROBE, BLEND };

@@ -11770,7 +11770,10 @@ const VALUE_SHADOW = process.env.PP_VALUE_NET === 'shadow' ? require('./_value-s
 // Partieende) — dann gilt der Evaluator.
 const VALUE_LEAF = (process.env.PP_VALUE_NET === 'leaf' || process.env.PP_VALUE_NET === 'greedy') ? require('./_value-leaf') : null;
 function leafScore(engine, cpuIdx, site) {
-  if (VALUE_LEAF) { const v = VALUE_LEAF.score(engine, cpuIdx, site); if (v !== null) return v; }
+  if (VALUE_LEAF) {
+    const v = VALUE_LEAF.score(engine, cpuIdx, site);
+    if (v !== null) return VALUE_LEAF.BLEND < 1 ? VALUE_LEAF.BLEND * v + (1 - VALUE_LEAF.BLEND) * evaluateState(engine, cpuIdx) : v;
+  }
   return evaluateState(engine, cpuIdx);
 }
 
