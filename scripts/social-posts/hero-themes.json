@@ -1379,5 +1379,13 @@
   "accent": "#6fa8f0",
   "music": "scripts/social-posts/music/bgm_broghan.ogg",
   "musicHit": 6.2
+ },
+ "Kyli, the Deceptive Sapling": {
+  "rootshow": true,
+  "opener": "wind",
+  "px": 14,
+  "accent": "#9eb535",
+  "music": "scripts/social-posts/music/bgm_kyli.ogg",
+  "musicHit": 6.65
  }
 }

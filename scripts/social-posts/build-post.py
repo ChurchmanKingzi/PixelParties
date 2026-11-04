@@ -567,8 +567,9 @@ def main():
     args_opener = opener
     opener_on = opener in ('heart', 'storm', 'shift', 'wind')
     aliceshow_on = bool(hero_cfg.get('aliceshow'))                            # Alice-Show (alicefx.AliceShow): nutzt dieselbe Schnittstelle wie die Wind-Show
+    rootshow_on = bool(hero_cfg.get('rootshow'))                              # Wurzel-Show (rootfx.RootShow, Kyli)
     iceshow_on = bool(hero_cfg.get('iceshow'))                                # Eis-Show (icefx.IceShow, Broghan)
-    windshow_on = bool(hero_cfg.get('windshow')) or aliceshow_on or iceshow_on              # Show mit Zeitleiste (windfx.WindShow / alicefx.AliceShow) statt Schleife
+    windshow_on = bool(hero_cfg.get('windshow')) or aliceshow_on or iceshow_on or rootshow_on              # Show mit Zeitleiste (windfx.WindShow / alicefx.AliceShow) statt Schleife
     wind_on = args.wind or bool(hero_cfg.get('wind')) or windshow_on
     horror_on = args.horror or bool(hero_cfg.get('horror'))
     show_on = (args.show or hero_cfg.get('show') or 'none') == 'mini'
@@ -684,7 +685,22 @@ def main():
         import windfx
         lxw, lyw = (W - logo.width) // 2, 40 + oy + (args.logo_dy if args.logo_dy is not None else hero_cfg.get('logoDy', 0))
         wgeom = dict(logo_rect=(lxw, lyw, logo.width, logo.height), logo_img=logo, center=(card_x + CARD_W / 2, card_y + CARD_H * 0.47))
-        if iceshow_on:
+        if rootshow_on:
+            import rootfx
+            eyes2_ = []                                                      # beide Augen (rote Pixel) je Sprite-Frame
+            for i_ in range(spr.n):
+                fr_ = np.asarray(spr.sheet.crop((i_ * spr.fw, 0, (i_ + 1) * spr.fw, spr.fh))).astype(int)
+                ys_, xs_ = np.where((fr_[..., 0] >= 170) & (fr_[..., 1] <= 140) & (fr_[..., 2] <= 140) & (fr_[..., 0] - fr_[..., 1] >= 60) & (fr_[..., 3] > 20))
+                pair = []
+                for lo_, hi_, dflt in ((0, spr.fw / 2.0, (12.5, 21.7)), (spr.fw / 2.0, spr.fw, (16.5, 21.7))):
+                    sel_ = (xs_ >= lo_) & (xs_ < hi_)
+                    pair.append((float(xs_[sel_].mean()), float(ys_[sel_].mean())) if sel_.any() else dflt)
+                eyes2_.append(pair)
+            rg = dict(logo_rect=wgeom['logo_rect'], logo_img=logo, badge_rect=badge_rect, badge_img=badge_img, plate_rect=(plate_x, plate_y, plate.width, plate.height),
+                      grid=(sx, sy, spr.px), draw_text=draw_text, lure_from=(sx + spr.center_x * spr.px, sy + 27 * spr.px),
+                      eyes_fn=lambda t_: [(sx + (e_[0] + 0.5) * spr.px, sy + (e_[1] + 0.5) * spr.px) for e_ in eyes2_[(int(t_ * float(fps)) // per) % spr.n]])
+            wind = rootfx.RootShow(W, H, U, float(fps), loop, rg, loop * WIND_LOOPS / float(fps))
+        elif iceshow_on:
             import icefx
             eyes_ = []                                                       # Augenmitte (dunkel-/hellrote Pixel) je Sprite-Frame
             for i_ in range(spr.n):
@@ -1419,7 +1435,7 @@ def main():
     if first_on:
         for f in range(loop * first_loops):
             render(f, intro_on, punch_on, opener_on).save(fdir / f'i{f:03d}.png')
-    cover = Image.open(fdir / ('i%03d.png' % int((17.4 if show_on else 17.3 if iceshow_on else 16.8) * float(fps)))) if (show_on or windshow_on) else Image.open(fdir / ('f%03d.png' % (min(loop - 1, per * 3))) if reel else fdir / 'f000.png')
+    cover = Image.open(fdir / ('i%03d.png' % int((17.4 if show_on else 17.3 if iceshow_on else 14.6 if rootshow_on else 16.8) * float(fps)))) if (show_on or windshow_on) else Image.open(fdir / ('f%03d.png' % (min(loop - 1, per * 3))) if reel else fdir / 'f000.png')
     cover_path = out / ('reel-cover.png' if reel else 'post.png')
     cover.save(cover_path)
     print('Standbild', cover_path)
