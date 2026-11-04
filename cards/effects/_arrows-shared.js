@@ -542,6 +542,29 @@ async function pfeilSalve(engine, source, target, info) {
   } catch (e) { try { console.error('[Pfeilsalve]', e.message); } catch (e2) { /* still */ } return false; }
 }
 
+/**
+ * Archer (Kreatur): EIN Pfeil von der Zone des Archers zum Ziel statt des Blitzes (nur Darstellung). Wartet den Flug ab (`ARCHER_PFEIL_MS`), BEVOR der Aufrufer den Schaden anwendet:
+ * Schadenszahl, HP-Anzeige und Treffer-Blitz kommen danach wie gewohnt aus dem Zustandsvergleich des Clients und liegen damit genau auf dem Einschlag (die Zahl ist der echte Schaden).
+ * Rueckgabe `true`, wenn die Animation lief (der Aufrufer spielt den alten Blitz dann nicht). Spielt niemand sie, `false`: alter Blitz mit kurzer Wartezeit.
+ * ★ VERMERK: Creatures sind noch nicht animiert — die Quelle ist die Support-Zone des Archers; sobald es animierte Creature-Sprites gibt, auf deren Sprite umstellen (Client: `app-fx-52.jsx`, `P.srcKind: 'creature'`).
+ * `ziel` = { type: 'hero' | 'equip', owner, heroIdx, slotIdx }, `ersatz` = Standardanimation fuer Clients ohne Pfeil.
+ */
+const ARCHER_PFEIL_MS = 780;
+async function archerPfeil(engine, srcInst, ziel, ersatz) {
+  try {
+    if (!srcInst || !ziel || engine._fastMode || engine._inMctsSim || engine._aborted || !engine.room || !pfeilSalveGewuenscht(engine)) return false;
+    const seite = engine.physicalSide ? engine.physicalSide(srcInst) : srcInst.owner;
+    engine._broadcastEvent('play_arrow_salvo', {
+      einzel: true, srcKind: 'creature', srcOwner: seite, srcHeroIdx: srcInst.heroIdx, srcZoneSlot: srcInst.zoneSlot,
+      tgt: ziel.type === 'hero' ? { kind: 'hero', owner: ziel.owner, heroIdx: ziel.heroIdx } : { kind: 'creature', owner: ziel.owner, heroIdx: ziel.heroIdx, zoneSlot: ziel.slotIdx },
+      arrows: [{ n: 'Archer Arrow' }], total: 0, hpVor: 0, hpNach: 0, maxHp: 1, seed: ((engine.gs?.turn || 1) * 53 + (engine._damageCallsTotal || 0) * 7) & 0xffff,
+      ...(ersatz ? { ersatz: [ersatz] } : {}),
+    });
+    await engine._delay(ARCHER_PFEIL_MS);
+    return true;
+  } catch (e) { return false; }
+}
+
 // ───────────── internals ─────────────
 
 /** Resolve the Hero object from an attack damage source. */
@@ -657,6 +680,7 @@ module.exports = {
   pfeilSchildOeffnen,
   pfeilSchildSchliessen,
   pfeilSalve,
+  archerPfeil,
   PFEIL_SCHILD_EVENTE,
   PFEIL_SALVE_MS,
   pickLastUntriggeredArrowLink,

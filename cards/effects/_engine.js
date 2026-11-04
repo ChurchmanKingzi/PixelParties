@@ -46662,7 +46662,11 @@ this._deathWatch = (this._deathWatchStack || []).length
       };
 
       chain.push(link);
+      // Handgeist (nur Darstellung): die Karte hat die Hand verlassen, fliegt aber erst beim Aufloesen weg. Der Client haelt sie bis dahin ausgegraut
+      // an ihrem Platz (`fromHandIdx`). Der Zustand MIT der kleineren Hand geht VOR dem Kettenupdate raus, damit der Client die Karte nie doppelt zeigt.
+      this.sync();
       if (chain.length >= 2) this._broadcastChainUpdate(chain);
+      else this._broadcastEvent('reaction_chain_geister', { geister: this._kettenGeister(chain) });
 
       // Fire onReactionActivated hook (for board passives)
       await this.runHooks('onReactionActivated', {
@@ -46818,6 +46822,7 @@ this._deathWatch = (this._deathWatchStack || []).length
             cardName: link.cardName, from: 'hand', to: 'hand',
             fromOwner: link.owner, toOwner: dieb,
             toHandIdx: zielIdx, finalHandSize: diebPs.hand.length,
+            ...(Number.isInteger(link.fromHandIdx) ? { fromHandIdx: link.fromHandIdx, chainLinkId: link.id } : {}),
           });
           this.log('negated_card_stolen', { card: link.cardName, from: oppPs?.username, to: diebPs.username });
           this.sync();
@@ -46841,7 +46846,7 @@ this._deathWatch = (this._deathWatchStack || []).length
             this._broadcastEvent('play_pile_transfer', {
               owner: link.owner, cardName: link.cardName,
               from: link.fromDeck ? 'deck' : 'hand', to: toDeleted ? 'deleted' : 'discard',
-              ...(Number.isInteger(link.fromHandIdx) ? { fromHandIdx: link.fromHandIdx } : {}),
+              ...(Number.isInteger(link.fromHandIdx) ? { fromHandIdx: link.fromHandIdx, chainLinkId: link.id } : {}),
             });
             // 3. Landung ERST NACH der Animation.
             await this._delay(650);
@@ -46976,7 +46981,7 @@ this._deathWatch = (this._deathWatchStack || []).length
               this._broadcastEvent('play_pile_transfer', {
                 owner: link.owner, cardName: link.cardName,
                 from: link.fromDeck ? 'deck' : 'hand', to: zumLoeschen ? 'deleted' : 'discard',
-                ...(Number.isInteger(link.fromHandIdx) ? { fromHandIdx: link.fromHandIdx } : {}),
+                ...(Number.isInteger(link.fromHandIdx) ? { fromHandIdx: link.fromHandIdx, chainLinkId: link.id } : {}),
               });
               // Push ERST NACH dem Flug: es gibt clientseitig kein
               // "Karte im Stapel verstecken, bis sie landet", also
@@ -47428,9 +47433,17 @@ this._deathWatch = (this._deathWatchStack || []).length
   }
 
   /** Broadcast chain state to both clients */
+  /** Handgeister (nur Darstellung): Reaktionsglieder, deren Karte die Hand schon verlassen hat, aber erst beim Aufloesen wegfliegt. */
+  _kettenGeister(chain) {
+    return chain
+      .filter(l => !l.isInitialCard && Number.isInteger(l.fromHandIdx) && !l.fromHero && !l.fromCreature && !l.fromDeck && !l.fromSurprise)
+      .map(l => ({ id: l.id, cardName: l.cardName, owner: l.owner, fromHandIdx: l.fromHandIdx }));
+  }
+
   _broadcastChainUpdate(chain) {
     this._broadcastEvent('reaction_chain_update', {
       vorlauf: this._chainVorlauf || null,
+      geister: this._kettenGeister(chain),
       links: chain.map(l => ({
         id: l.id, cardName: l.cardName, owner: l.owner,
         cardType: l.cardType, isInitialCard: l.isInitialCard,

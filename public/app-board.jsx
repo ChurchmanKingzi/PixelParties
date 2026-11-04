@@ -392,6 +392,26 @@ function applyCrystalCostMods(me, cardName, baseCost) {
   return baseCost * 2;
 }
 
+/**
+ * Zahl der Karte (HP) mit Zaehl-Animation: bei einer Aenderung zaehlt sie in 9 Stufen im 30-Hz-Takt (ca. 0,3 s) von ALT auf NEU, im Gleichtakt mit der Rampe der HP-Anzeige (app-fx-52).
+ * Nur beim Wechsel aktiv (keine Dauer-Animation); ohne Animationen/Retro/Tab im Hintergrund springt sie wie bisher. Der Text wird direkt gesetzt (kein Re-Render je Stufe).
+ */
+function ZaehlZahl({ wert }) {
+  const ref = useRef(null), vor = useRef(wert);
+  React.useLayoutEffect(() => {
+    const von = vor.current, el = ref.current; vor.current = wert;
+    if (!el) return undefined;
+    if (von === wert || typeof von !== 'number' || typeof wert !== 'number' || window._playAnimations === false || window.PP_RETRO || document.hidden) { el.textContent = wert; return undefined; }
+    const t0 = performance.now(), raf = window.ppTaktRaf || window.requestAnimationFrame;
+    let id = 0, lebt = true;
+    const schritt = () => { if (!lebt) return; const k = Math.min(9, Math.floor((performance.now() - t0) / (1000 / 30)) + 1); el.textContent = Math.round(von + (wert - von) * k / 9); if (k < 9) id = raf(schritt); };
+    schritt();
+    return () => { lebt = false; try { cancelAnimationFrame(id); } catch (e) { /* weg */ } el.textContent = wert; };
+  }, [wert]);
+  return <span ref={ref} />;
+}
+window.ZaehlZahl = ZaehlZahl;
+
 function BoardCard({ cardName, faceDown, flipped, label, hp, maxHp, atk, hpPosition, style, noTooltip, skins, tooltipCardOverride, tooltipDarunter, tooltipDarunterTitel, inheritedEffects, copiedHeroes, revealTooltipWhenFaceDown, abilities, orbs, effectiveLevel, stampBonus, showLevelBadge, handLevel, handCost, handNotes, abilityLevel, children }) {
   const card = faceDown ? null : CARDS_BY_NAME[cardName];
   const imgUrl = card ? cardImageUrl(card.name, skins) : null;
@@ -543,7 +563,7 @@ function BoardCard({ cardName, faceDown, flipped, label, hp, maxHp, atk, hpPosit
             {hp != null && (
               <div className="board-card-hp-num"
                 style={maxHp != null && hp > maxHp ? { color: '#4ceb70' } : undefined}>
-                {hp}
+                <ZaehlZahl wert={hp} />
               </div>
             )}
             {atk != null && (
@@ -555,7 +575,7 @@ function BoardCard({ cardName, faceDown, flipped, label, hp, maxHp, atk, hpPosit
         hp != null && hpPosition && (
           <div className={'board-card-hp board-card-hp-' + hpPosition}
             style={maxHp != null && hp > maxHp ? { color: '#4ceb70' } : undefined}>
-            {hp}
+            <ZaehlZahl wert={hp} />
           </div>
         )
       )}
@@ -38101,6 +38121,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     const rid = gameState?.roomId || null;
     if (rid && lastRoomRef.current && rid !== lastRoomRef.current) {
       setReactionChain(null);
+      setHandGeister([]); geisterFreiRef.current = new Set();
     }
     if (rid) lastRoomRef.current = rid;
   }, [gameState?.roomId]);
@@ -41206,7 +41227,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
 
   // ── Hand Shuffle & Sort with FLIP animation ──
   const captureHandRects = () => {
-    const slots = handRef.current?.querySelectorAll('.hand-slot');
+    const slots = handRef.current?.querySelectorAll('.hand-slot:not(.hand-geist)');
     if (!slots) return [];
     const rects = [];
     slots.forEach((el, i) => rects[i] = el.getBoundingClientRect());
@@ -41253,7 +41274,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     if (!handAnimDataRef.current) return;
     const { oldRects, indexMap } = handAnimDataRef.current;
     handAnimDataRef.current = null;
-    const slots = handRef.current?.querySelectorAll('.hand-slot');
+    const slots = handRef.current?.querySelectorAll('.hand-slot:not(.hand-geist)');
     if (!slots || slots.length === 0) return;
     slots.forEach((el, newIdx) => {
       const oldIdx = indexMap[newIdx];
@@ -44160,7 +44181,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
   // Nur die Handplaetze; der Vorrat traegt eine eigene Klasse
   // (`creation-slot`), damit er hier nicht mitgezaehlt wird.
   const calcDropIdx = (mouseX) => window.handDropIndex?.(handRef.current, mouseX, {
-    slots: '.game-hand-cards .hand-slot', skip: '.hand-dragging',
+    slots: '.game-hand-cards .hand-slot:not(.hand-geist)', skip: '.hand-dragging',
   }) ?? 0;
 
   /** Tropfindex im Vorrat — gleiche Rechnung wie `calcDropIdx`, nur
@@ -44517,6 +44538,29 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
   const [levelChanges, setLevelChanges] = useState([]); // [{id, delta, owner, heroIdx, zoneSlot}]
   const deckSearchPendingRef = useRef([]); // Card names queued before sync triggers opp draw anim
   const [reactionChain, setReactionChain] = useState(null); // [{id, cardName, owner, cardType, isInitialCard, negated, status}]
+  // ★ HANDGEISTER (Reaktionen in der Kette): Die Engine nimmt eine Reaktionskarte beim ANKETTEN aus der Hand, ihr Flug in die Ablage passiert aber erst beim
+  // AUFLOESEN des Glieds. Bis dahin bleibt sie hier als ausgegrauter „Geist" mit Kettensymbol an ihrem Platz in der Hand stehen (rein visuell, der Spielzustand
+  // kennt sie nicht). `[{ id, cardName, owner, fromHandIdx }]`; `id` = Kettenglied. Weg ist der Geist, sobald das Glied seine Karte wegfliegen laesst
+  // (`play_pile_transfer` mit `chainLinkId`), sonst spaetestens beim Aufloesen/Kettenende. `geisterFreiRef` merkt freigegebene Glieder, damit ein spaeteres
+  // Kettenupdate sie nicht wiederbelebt; `geisterElRef` hat das Ziel/Quell-Element je Geist (Flugquelle).
+  const [handGeister, setHandGeister] = useState([]);
+  const geisterFreiRef = useRef(new Set());
+  const geisterKettenRef = useRef([]);   // Glieder der laufenden Kette (Index → id), fuer `link_resolved`
+  const geisterTtlRef = useRef(null);
+  // Anzeige der Hand MIT Geistern: die Geister stehen wieder an dem Platz, den ihre Karte beim Anketten hatte. Zurueckgerechnet wird in UMGEKEHRTER Anketten-Reihenfolge
+  // (der Platz des spaeteren Glieds galt in der Hand OHNE die frueheren), der Index wird auf die Laenge begrenzt (Hand zwischendurch kleiner/groesser geworden).
+  const geisterEinfuegen = (items, owner) => {
+    const eigene = handGeister.filter(g => g.owner === owner);
+    if (!eigene.length) return items;
+    const aus = items.slice();
+    for (let k = eigene.length - 1; k >= 0; k--) {
+      const g = eigene[k];
+      aus.splice(Math.max(0, Math.min(g.fromHandIdx, aus.length)), 0, { isGeist: true, geist: g, card: g.cardName, origIdx: -1, isGap: false });
+    }
+    return aus;
+  };
+  const anzeigeHand = useMemo(() => geisterEinfuegen(displayHand, myIdx), [displayHand, handGeister, myIdx]);
+  const anzeigeOpp = useMemo(() => geisterEinfuegen(Array.from({ length: opp.handCount || 0 }, (_, i) => ({ i })), oppIdx), [opp.handCount, handGeister, oppIdx]);
   const [cameraFlash, setCameraFlash] = useState(false);
   // Guardian Beast Zhu skip-turn overlay. Set when the engine
   // broadcasts `zhu_skip_turn_animation` (own-screen and opp-screen
@@ -44635,24 +44679,49 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     };
     // Reaction chain events
     // `vorlauf`: das Ereignis, auf das die Kette antwortet (z. B. die ausgeruestete Karte bei Crash Landing) — nur Anzeige, steht vorn, schiebt die Glied-Indizes um 1.
-    const onChainUpdate = ({ links, vorlauf }) => {
+    // Handgeister: Liste der Geister der laufenden Kette uebernehmen (ohne bereits freigegebene Glieder). Ein Sicherheitsnetz raeumt sie nach 90 s Stille weg
+    // (Kette abgebrochen, Verbindung weg), ein neues Kettenereignis verlaengert die Frist.
+    const geisterSetzen = (geister) => {
+      const frei = geisterFreiRef.current;
+      setHandGeister((Array.isArray(geister) ? geister : []).filter(g => g && !frei.has(g.id)));
+      geisterTtlNeu();
+    };
+    const geisterTtlNeu = () => {
+      clearTimeout(geisterTtlRef.current);
+      geisterTtlRef.current = setTimeout(() => { setHandGeister([]); geisterFreiRef.current = new Set(); }, 90000);
+    };
+    const geisterFreigeben = (id) => {
+      if (!id) return;
+      geisterFreiRef.current.add(id);
+      setHandGeister(prev => prev.some(g => g.id === id) ? prev.filter(g => g.id !== id) : prev);
+    };
+    const onChainGeister = ({ geister }) => geisterSetzen(geister);
+    const onChainUpdate = ({ links, vorlauf, geister }) => {
       const vor = vorlauf ? [{ id: 'vorlauf', cardName: vorlauf.cardName, owner: vorlauf.owner, cardType: vorlauf.cardType, isInitialCard: true, _vorlauf: true, status: 'resolved' }] : [];
+      geisterKettenRef.current = links.map(l => l.id);
+      if (geister) geisterSetzen(geister);
       setReactionChain([...vor, ...links.map(l => ({ ...l, isInitialCard: vorlauf ? false : l.isInitialCard, status: l.negated ? 'negated' : 'pending' }))]);
     };
     const chainIdx = (prev, i) => i + (prev?.[0]?._vorlauf ? 1 : 0);
-    const onChainResolvingStart = () => {}; // Chain is about to resolve
+    const onChainResolvingStart = () => { geisterTtlNeu(); }; // Chain is about to resolve
     const onChainLinkResolving = ({ linkIndex }) => {
       if (window.playSFX) window.playSFX('spell_cast', { dedupe: 400 });   // ohne Slot 'effect' (s. `spell_played` in app-shared.jsx)
       setReactionChain(prev => prev?.map((l, i) => i === chainIdx(prev, linkIndex) ? { ...l, status: 'resolving' } : l));
+      geisterTtlNeu();
     };
     const onChainLinkResolved = ({ linkIndex }) => {
       setReactionChain(prev => prev?.map((l, i) => i === chainIdx(prev, linkIndex) ? { ...l, status: 'resolved' } : l));
+      // Fliegt die Karte des Glieds nicht ueber `play_pile_transfer` weg (Reaktions-Creature setzt sich aufs Brett, ...), geht der Geist hier.
+      geisterFreigeben(geisterKettenRef.current[linkIndex]);
     };
     const onChainLinkNegated = ({ linkIndex, negationStyle }) => {
       setReactionChain(prev => prev?.map((l, i) => i === chainIdx(prev, linkIndex) ? { ...l, status: 'negated', negated: true, negationStyle: negationStyle || null } : l));
+      geisterTtlNeu();
     };
     const onChainDone = () => {
       setTimeout(() => setReactionChain(null), 800);
+      clearTimeout(geisterTtlRef.current);
+      setHandGeister([]); geisterFreiRef.current = new Set(); geisterKettenRef.current = [];
     };
     // Guardian Beast Zhu skip-turn overlay. Two-phase:
     //   • 'fell_asleep'   — fires when Zhu's effect resolves (right
@@ -45725,6 +45794,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     socket.on('play_type_declaration', onTypeDeclaration);
     socket.on('deck_search_add', onDeckSearchAdd);
     socket.on('reaction_chain_update', onChainUpdate);
+    socket.on('reaction_chain_geister', onChainGeister);
     socket.on('reaction_chain_resolving_start', onChainResolvingStart);
     socket.on('reaction_chain_link_resolving', onChainLinkResolving);
     socket.on('reaction_chain_link_resolved', onChainLinkResolved);
@@ -50054,7 +50124,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     // Generic pile-to-pile flying card animation. Used for moves the
     // automatic hand → pile detector can't see — specifically
     // discard → deleted (Mass Multiplication's consumed source card).
-    const onPileTransfer = ({ owner, cardName, from, to, fromOwner, toOwner, fromHeroIdx, fromSlotIdx, fromHandIdx, fromPermId, toHandIdx, toHeroIdx, toSlotIdx, finalHandSize, zielLayout, flightStyle, faceDown, sfx, landSfx }) => {
+    const onPileTransfer = ({ owner, cardName, from, to, fromOwner, toOwner, fromHeroIdx, fromSlotIdx, fromHandIdx, fromPermId, toHandIdx, toHeroIdx, toSlotIdx, finalHandSize, zielLayout, flightStyle, faceDown, sfx, landSfx, chainLinkId }) => {
       // ★ v1122 (Al 15.9.: „fuer die 4 Karten, die vom Discard ins Deck
       // fliegen, fehlt jeweils ein Woosh-Sound-Effect (wie beim Ziehen
       // von Karten)"). Ein Flug konnte bisher keinen Klang mitbringen —
@@ -50294,8 +50364,11 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           }, 1200);
         }
       }
-      const srcEl = elementFor(from, srcIsMe, { heroIdx: fromHeroIdx, slotIdx: fromSlotIdx, handIdx: fromHandIdx, permId: fromPermId });
+      // Handgeist (Reaktion in der Kette): die Karte steht noch ausgegraut in der Hand und fliegt von DORT los (Platz und Groesse stimmen, auch bei mehreren Geistern).
+      const geistEl = (chainLinkId && from === 'hand') ? document.querySelector(`[data-hand-geist="${chainLinkId}"]`) : null;
+      const srcEl = geistEl || elementFor(from, srcIsMe, { heroIdx: fromHeroIdx, slotIdx: fromSlotIdx, handIdx: fromHandIdx, permId: fromPermId });
       const tgtEl = elementFor(to,   tgtIsMe, { handIdx: toHandIdx, finalHandSize, zielLayout, heroIdx: toHeroIdx, slotIdx: toSlotIdx });
+      if (chainLinkId && (!srcEl || !tgtEl)) geisterFreigeben(chainLinkId);
       if (!srcEl || !tgtEl) return;
 
       // Hide the landing hand slot until the flying card arrives so both
@@ -50399,7 +50472,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       //   der Flugdauer: danach hat der Sync die Karte ohnehin entfernt,
       //   und ein stehengebliebener Schluessel wuerde nach dem
       //   Nachruecken die FALSCHE Handkarte verdecken.
-      if (from === 'hand' && fromHandIdx != null && fromHandIdx >= 0) {
+      if (!geistEl && from === 'hand' && fromHandIdx != null && fromHandIdx >= 0) {
         // ★ v1063 (Als Befund 14.9.: „die nachrueckende Karte wird
         // kurzzeitig unsichtbar"). Der Schluessel war rein POSITIONELL
         // und wurde 700 ms lang gehalten. Der Sync entfernt die
@@ -50523,6 +50596,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       }
       const sr = srcEl.getBoundingClientRect();
       const tr = tgtEl.getBoundingClientRect();
+      if (chainLinkId) geisterFreigeben(chainLinkId);   // Maße sind genommen: der Geist darf aus der Hand (die Kopie fliegt von seinem Platz los)
       // ★ v1262 — Weltverankerung auch fuer DIESEN Flug (v1258 hatte nur
       // hand_to_board_fly und seine Schwester erfasst): liegt ein Ende im
       // Feld, startet die Kopie in Feld-Koordinaten und haengt in der
@@ -53466,7 +53540,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       socket.off('effect_source_glow', onEffectGlow); socket.off('card_reveal', onReveal); socket.off('play_type_declaration', onTypeDeclaration); socket.off('deck_search_add', onDeckSearchAdd);
       socket.off('hand_to_board_fly', onHandToBoard);
       socket.off('attach_hero_fly', onAttachHeroFly);
-      socket.off('reaction_chain_update', onChainUpdate); socket.off('reaction_chain_resolving_start', onChainResolvingStart);
+      socket.off('reaction_chain_update', onChainUpdate); socket.off('reaction_chain_geister', onChainGeister); socket.off('reaction_chain_resolving_start', onChainResolvingStart);
       socket.off('reaction_chain_link_resolving', onChainLinkResolving); socket.off('reaction_chain_link_resolved', onChainLinkResolved);
       socket.off('reaction_chain_link_negated', onChainLinkNegated); socket.off('reaction_chain_done', onChainDone);
       socket.off('camera_flash', onCameraFlash); socket.off('toughness_hp_change', onToughnessHp); socket.off('kiai_hp_split', onKiaiHpSplit); socket.off('creature_zone_move', onCreatureZoneMove); socket.off('fighting_atk_change', onFightingAtk); socket.off('zhu_skip_turn_animation', onZhuSkipTurn);
@@ -54709,9 +54783,9 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       }
     }
     // Allgemeine HP-Anzeige (app-fx-52): bei jeder HP-Aenderung kurz Balken + aktuelle HP am Ziel, zeitgleich mit der Schaden-/Heilzahl.
-    const hpAnz = (kind, pi, hi, si, hp, max) => {
+    const hpAnz = (kind, pi, hi, si, hp, max, prev) => {
       if (!window.ppFx52Hp) return;
-      window.ppFx52Hp({ key: kind === 'hero' ? `h:${pi}-${hi}` : `c:${pi}-${hi}-${si}`, kind, owner: pi, heroIdx: hi, zoneSlot: si, hp, max, myIdx });
+      window.ppFx52Hp({ key: kind === 'hero' ? `h:${pi}-${hi}` : `c:${pi}-${hi}-${si}`, kind, owner: pi, heroIdx: hi, zoneSlot: si, hp, max, prev, myIdx });
     };
     // Compare HP
     if (prevHpRef.current) {
@@ -54719,7 +54793,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       for (const [key, cur] of Object.entries(currentHp)) {
         const prev = prevHpRef.current[key];
         if (prev && cur.hp !== prev.hp && prev.name === cur.name) {
-          const [pS, hS] = key.split('-'); hpAnz('hero', +pS, +hS, -1, cur.hp, gameState.players[+pS]?.heroes?.[+hS]?.maxHp);
+          const [pS, hS] = key.split('-'); hpAnz('hero', +pS, +hS, -1, cur.hp, gameState.players[+pS]?.heroes?.[+hS]?.maxHp, prev.hp);
           // Heilung: dunkelgruener Blitz auf der Heldenfigur (Schaden: dunkelroter Blitz der Treffer-Reaktion, app-fx-31)
           if (cur.hp > prev.hp && window.ppFx31Heilung) { try { window.ppFx31Heilung(document.querySelector(`[data-hero-zone][data-hero-owner="${cur.owner}"][data-hero-idx="${+hS}"]`), cur.hp - prev.hp); } catch (e) { /* weg */ } }
         }
@@ -54816,7 +54890,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         if (prev.name !== cur.name) continue;
         if (cur.hp !== prev.hp) {
           const [oS, hS, sS] = key.split('-'), cc = (gameState.creatureCounters || {})[key];
-          hpAnz('creature', +oS, +hS, +sS, cur.hp, cc?.maxHp ?? cc?._cardDataOverride?.hp ?? CARDS_BY_NAME[cur.name]?.hp);
+          hpAnz('creature', +oS, +hS, +sS, cur.hp, cc?.maxHp ?? cc?._cardDataOverride?.hp ?? CARDS_BY_NAME[cur.name]?.hp, prev.hp);
         }
         if (cur.hp < prev.hp) {
           if (window.ppFx52Geschluckt && window.ppFx52Geschluckt('c:' + key, 'hp', cur.hp)) continue;   // Pfeilsalve: Zahl schon gezeigt
@@ -59339,8 +59413,17 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           <div className={"game-hand-cards"
             + (gameState.effectPrompt?.type === 'blindHandPick' && gameState.effectPrompt?.ownerIdx === myIdx ? ' blind-pick-active' : '')
             + (gameState.effectPrompt?.type === 'pickFromOppHand' && gameState.effectPrompt?.ownerIdx === myIdx ? ' blind-pick-active' : '')}
-            style={{ '--hand-max-lift': window.handFanMaxLift?.(opp.handCount || 0, { seite: 'opp' }) ?? 0 }}>
-            {Array.from({ length: opp.handCount || 0 }).map((_, i) => {
+            style={{ '--hand-max-lift': window.handFanMaxLift?.(anzeigeOpp.length, { seite: 'opp' }) ?? 0 }}>
+            {anzeigeOpp.map((oppItem, oppDi) => {
+              // Handgeist des Gegners: seine Reaktionskarte liegt in der Kette — verdeckt, ausgegraut, mit Kettensymbol, bis sie beim Aufloesen wegfliegt.
+              if (oppItem.isGeist) return (
+                <div key={'og-' + oppItem.geist.id} className="board-card hand-card revealed-hand-card hand-geist hand-card-dimmed" data-hand-geist={oppItem.geist.id}
+                  style={{ ...(window.handFanStyle?.(oppDi, anzeigeOpp.length, { seite: 'opp' })) }}>
+                  {/* offen: die Reaktionskarte wurde beim Anketten aufgedeckt (sie steht auch in der Ketten-Leiste) */}
+                  <img src={cardImageUrl(oppItem.geist.cardName) || opp.cardback || "/cardback.png"} style={{ width: '100%', height: '100%', objectFit: 'cover' }} draggable={false} />
+                </div>
+              );
+              const i = oppItem.i;
               const isBlindPick = gameState.effectPrompt?.type === 'blindHandPick' && gameState.effectPrompt?.ownerIdx === myIdx;
               const isSelected = isBlindPick && blindPickSelected.has(i);
               const maxSelect = isBlindPick ? (gameState.effectPrompt.maxSelect || 2) : 0;
@@ -59425,7 +59508,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                     // ★ v1233: Hier gibt es keine Platz-Huelle — Bogen
                     // UND Winkel sitzen auf der Karte, gespiegelt zur
                     // eigenen Hand (sie haengt oben am Bild).
-                    ...(window.handFanStyle?.(i, opp.handCount || 0, { seite: 'opp' })),
+                    ...(window.handFanStyle?.(oppDi, anzeigeOpp.length, { seite: 'opp' })),
                     ...((oppDrawHidden.has(i) || stealQuelleVerdeckt(stealHiddenOpp, stealExpectedOppCountRef.current, opp.handCount || 0, i) || bounceReturnHidden.has(`${oppIdx}-${i}`)
                     || bounceReturnHidden.has(`${oppIdx}-${i}#${opp.handCount || 0}`)) ? { visibility: 'hidden' } : (((isBlindPick && !blindGesperrt) || pickEligible || isTreacherousClickable) ? { cursor: 'pointer' } : null)),
                     ...(ankunftLeer.has(`${oppIdx}-${i}`) ? { display: 'none' } : null),
@@ -60372,9 +60455,16 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
               /* ★ v1241: wie hoch der Faecher dieser Handgroesse steigt —
                  style.css senkt die Reihe um ein Drittel dessen ab, was
                  damit oben aus der Leiste ausbricht. */
-              style={{ '--hand-max-lift': window.handFanMaxLift?.(displayHand.length) ?? 0 }}>
-              {displayHand.map((item, i) => {
+              style={{ '--hand-max-lift': window.handFanMaxLift?.(anzeigeHand.length) ?? 0 }}>
+              {anzeigeHand.map((item, i) => {
                 if (item.isGap) return <div key="gap" className="hand-drop-gap" />;
+                // Handgeist: Reaktionskarte in der Kette — ausgegraut mit Kettensymbol, ohne Hover/Ziehen, bis sie beim Aufloesen wegfliegt.
+                if (item.isGeist) return (
+                  <div key={'g-' + item.geist.id} className="hand-slot hand-geist hand-card-dimmed" data-hand-geist={item.geist.id} data-card-name={item.card}
+                    style={{ ...(window.handFanStyle?.(i, anzeigeHand.length, { seite: 'me' })) }}>
+                    <BoardCard cardName={item.card} noTooltip skins={gameSkins} />
+                  </div>
+                );
                 // ★ 28.8., Als Befund: „wird immer in der Main-Hand
                 // unsichtbar". Ein Zug aus Crestinas Vorrat traegt
                 // einen VORRATS-Index — der darf hier keine Handkarte
@@ -60607,7 +60697,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                       // `displayHand.length` zaehlt die Zieh-Luecke mit,
                       // und das ist richtig so: sie ist waehrend des
                       // Zuges ein sichtbarer Platz in der Reihe.
-                      ...(window.handFanStyle?.(i, displayHand.length, { seite: 'me' })),
+                      ...(window.handFanStyle?.(i, anzeigeHand.length, { seite: 'me' })),
                       ...((isDrawAnim || isPendingPlay || isStealHidden
                         || bounceReturnHidden.has(`${myIdx}-${item.origIdx}`)
                         // v1063: abfliegende Handkarte — nur solange die Hand

@@ -1445,6 +1445,15 @@ Schwäche in die Oberfläche zu tragen, die heute sauber läuft — und der
 Editor zieht mehr als Hände (Galerie → Brett, Zone → Zone), er bekäme
 also zwei Mechaniken statt einer.
 
+## ★ HANDGEIST: REAKTIONSKARTEN BLEIBEN IN DER HAND, BIS SIE WEGFLIEGEN (Kette)
+
+Die Engine nimmt eine Hand-Reaktion beim ANKETTEN aus `ps.hand` (Regelreihenfolge unverändert); ihr Flug in die Ablage passiert erst beim AUFLÖSEN.
+Damit sie bis dahin nicht verschwindet, zeigt der Client einen rein visuellen **Handgeist** (ausgegraut im Bayer-Raster, Ketten-Sprite, kein
+Hover/Ziehen) an ihrem alten Platz. Vertrag: `reaction_chain_update` / `reaction_chain_geister` tragen `geister: [{ id, cardName, owner, fromHandIdx }]`
+(`_kettenGeister`); der Flug des Glieds trägt `chainLinkId` (= Glied-`id`) und startet am Geist, der Geist geht in genau diesem Moment. Glieder ohne Flug
+(`skipPostResolveDiscard`: Reaktions-Creature, Magic Topaz …) geben den Geist spätestens bei `reaction_chain_link_resolved` frei; `reaction_chain_done`
+räumt alles. Wer neue Hand-Wege ins Kettenglied baut, setzt `fromHandIdx` am Glied und schickt beim Wegfliegen `chainLinkId` mit.
+
 ## ★ NACH DEM HAND-FLUG SOFORT ABGLEICHEN (v1221)
 
 Als Befund (18.9.): „Wenn man Dive Down benutzt, erscheint die Karte
@@ -26682,3 +26691,5 @@ Hängen an der Attack eines Helden ein oder mehr Pfeile (`isArrow: true` UND „
 * **Dauer-Statusanzeige:** Burn/Poison/Bleed stehen im Status-Abzeichen (`StatusBadges`, `PpStatusSpr` in `app-shared.jsx`) als Pixel-Symbole aus `PpFx52.iconUrl` (statisches Bild, Gift mit Zähler „xN", Blutung `bleeding` = boolescher Status wie Burn). Die Stapelzahl-Anzeige auf der Karte (`poison-stack-count`) entfällt, solange die Symbole laufen. Unheilbares Gift bleibt Emoji (💀).
 * **Allgemeine HP-Anzeige:** der Zustandsvergleich in `app-board.jsx` ruft bei JEDER HP-Änderung eines Helden/einer Kreatur `ppFx52Hp` (Balken + aktuelle HP über der Zone, ca. 1,25 s, höchstens 8 gleichzeitig, Handy 4; Leinwand nur solange Einträge laufen). Für ein Ziel mit laufender Salve schweigt sie.
 
+* **Archer-Pfeil:** Der Archer-Schuss spielt statt des Blitzes (`electric_strike`) einen einzelnen Holzpfeil (`archerPfeil` in `_arrows-shared.js`, Event `play_arrow_salvo` mit `einzel: true`, Sprite `holz` in `app-fx-52.jsx`). Der Server wartet den Flug (780 ms) und wendet danach den Schaden an; Schadenszahl, HP-Anzeige und Treffer-Blitz kommen wie immer aus dem Zustandsvergleich beim Einschlag. Clients ohne Pfeil bekommen den alten Blitz als `ersatz`. **Creatures sind noch nicht animiert:** der Pfeil startet von der Support-Zone des Archers (`srcKind: 'creature'`); sobald es animierte Creature-Sprites gibt, die Quelle auf deren Sprite umstellen (Vermerk an `archer.js` und `ppFx52Salve`).
+* **Animierter HP-Balken:** `PF.hpAnim` (reine Funktion der Zeit) + `PF.hpBar2`: Schaden = Balken schrumpft in 9 Stufen (300 ms), dunkelroter Verlustteil bleibt 250 ms stehen und rutscht dann in 8 Stufen nach; Heilung = dunkelgrüner Zuwachs, Zahl zählt mit. Gilt für die allgemeine HP-Anzeige (`ppFx52Hp`, `prev` = alter Wert) und je Pfeil-Einschlag in der Salve. Die Zahl der Karte (`ZaehlZahl` in `app-board.jsx`) zählt im selben Takt von ALT auf NEU (nur beim Wechsel, ohne Animationen/Retro springt sie).
