@@ -44546,6 +44546,9 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
   const [chainFx, setChainFx] = useState(false);   // Pixelart-Leiste (app-fx-53) für die laufende Kette
   const chainFxRef = useRef(false);
   const chainVorlaufRef = useRef(false);   // die Kette trägt ein Anzeige-Glied vorn (DOM-Indizes +1)
+  // Initialkarte der Kette, die beim Aufloesen ihres Glieds schon in die Ablage geflogen ist (`halten`), aber im Zustand noch bis zum Ende des Zaubers in der Hand liegt: ihr Platz faellt aus dem
+  // Hand-Layout (kein unsichtbarer Platzhalter). `[{ owner, idx, card, len }]`, gueltig nur solange die Handgroesse `len` stimmt (danach hat der Zustand die Karte entfernt).
+  const [handFrueh, setHandFrueh] = useState([]);
   const [handGeister, setHandGeister] = useState([]);
   const geisterFreiRef = useRef(new Set());
   const geisterKettenRef = useRef([]);   // Glieder der laufenden Kette (Index → id), fuer `link_resolved`
@@ -44562,8 +44565,38 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     }
     return aus;
   };
-  const anzeigeHand = useMemo(() => geisterEinfuegen(displayHand, myIdx), [displayHand, handGeister, myIdx]);
-  const anzeigeOpp = useMemo(() => geisterEinfuegen(Array.from({ length: opp.handCount || 0 }, (_, i) => ({ i })), oppIdx), [opp.handCount, handGeister, oppIdx]);
+  const anzeigeHand = useMemo(() => {
+    const frueh = handFrueh.filter(r => r.owner === myIdx && r.len === hand.length);
+    const basis = frueh.length ? displayHand.filter(it => it.isGap || !frueh.some(r => r.idx === it.origIdx && r.card === it.card)) : displayHand;
+    return geisterEinfuegen(basis, myIdx);
+  }, [displayHand, handGeister, myIdx, handFrueh, hand.length]);
+  const anzeigeOpp = useMemo(() => {
+    const frueh = handFrueh.filter(r => r.owner === oppIdx && r.len === (opp.handCount || 0));
+    const basis = Array.from({ length: opp.handCount || 0 }, (_, i) => ({ i })).filter(it => !frueh.some(r => r.idx === it.i));
+    return geisterEinfuegen(basis, oppIdx);
+  }, [opp.handCount, handGeister, oppIdx, handFrueh]);
+  // Zusammenruecken der Hand (PIXELART): faellt ein Platz weg (Geist/Initialkarte fliegt ab), springen die Nachbarn nicht, sondern rutschen in 3 ganzen Schritten (je ~33 ms) an ihren neuen Platz.
+  const handLayoutAltRef = useRef({ sigs: [], lefts: [] });
+  const handFlipRef = useRef(0);   // Zeitpunkt, zu dem ein Geist/eine Initialkarte die Hand verlassen hat (nur dann rueckt die Hand animiert zusammen)
+  React.useLayoutEffect(() => {
+    try {
+      const reihe = handRef.current && handRef.current.querySelector('.game-hand-cards');
+      if (!reihe || isSpectator) return;
+      const els = Array.from(reihe.querySelectorAll(':scope > .hand-slot'));
+      const sigs = anzeigeHand.filter(it => !it.isGap).map(it => (it.isGeist ? 'g' + it.geist.id : 'c' + it.card));
+      const lefts = els.map(e => e.getBoundingClientRect().left);
+      const alt = handLayoutAltRef.current;
+      handLayoutAltRef.current = { sigs, lefts };
+      if (performance.now() - handFlipRef.current > 250) return;
+      if (handZieh || els.length !== sigs.length || alt.sigs.length !== sigs.length + 1 || window._playAnimations === false) return;
+      let r = 0; while (r < sigs.length && alt.sigs[r] === sigs[r]) r++;
+      const sprung = [];
+      els.forEach((e, j) => { const dx = alt.lefts[j < r ? j : j + 1] - lefts[j]; if (Math.abs(dx) >= 2) sprung.push([e, dx]); });
+      if (!sprung.length) return;
+      for (const [e, dx] of sprung) e.style.translate = `${Math.round(dx)}px 0`;
+      [1, 2, 3].forEach((k) => setTimeout(() => { for (const [e, dx] of sprung) e.style.translate = k === 3 ? '' : `${Math.round(dx * (3 - k) / 3)}px 0`; }, k * 33));
+    } catch (e) { /* ohne Animation */ }
+  }, [anzeigeHand]);
   const [cameraFlash, setCameraFlash] = useState(false);
   // Guardian Beast Zhu skip-turn overlay. Set when the engine
   // broadcasts `zhu_skip_turn_animation` (own-screen and opp-screen
@@ -44695,6 +44728,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     };
     const geisterFreigeben = (id) => {
       if (!id) return;
+      handFlipRef.current = performance.now();
       geisterFreiRef.current.add(id);
       setHandGeister(prev => prev.some(g => g.id === id) ? prev.filter(g => g.id !== id) : prev);
     };
@@ -50619,6 +50653,16 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       }
       const sr = srcEl.getBoundingClientRect();
       const tr = tgtEl.getBoundingClientRect();
+      if (halten && from === 'hand' && fromHandIdx != null && fromHandIdx >= 0) {
+        const _lp = spielerLiveRef.current?.[srcOwner];
+        const _len = srcIsMe ? (_lp?.hand?.length ?? null) : (_lp?.handCount ?? null);
+        if (_len != null) {
+          const rec = { owner: srcOwner, idx: fromHandIdx, card: cardName, len: _len };
+          handFlipRef.current = performance.now();
+          setHandFrueh(prev => [...prev, rec]);
+          setTimeout(() => setHandFrueh(prev => prev.filter(r => r !== rec)), 60000);
+        }
+      }
       if (chainLinkId) geisterFreigeben(chainLinkId);   // Maße sind genommen: der Geist darf aus der Hand (die Kopie fliegt von seinem Platz los)
       // ★ v1262 — Weltverankerung auch fuer DIESEN Flug (v1258 hatte nur
       // hand_to_board_fly und seine Schwester erfasst): liegt ein Ende im
