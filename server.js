@@ -20958,7 +20958,9 @@ async function collectTrainingSharded({ jobs, count, outPath }) {
     let legacy = 0;
     const take = (file, isMain) => {
       let txt = '';
-      try { txt = fs.readFileSync(file, { encoding: 'utf-8' }); } catch { return; }
+      // Nur „Datei fehlt" ist harmlos. Jeder andere Lesefehler (zu große Datei: ERR_STRING_TOO_LONG ab ~512 MB) muss laut abbrechen —
+      // sonst gälte die Datei als leer, und `writeMerged` überschriebe sie am Ende mit den Spielen dieser einen Runde.
+      try { txt = fs.readFileSync(file, { encoding: 'utf-8' }); } catch (err) { if (err && err.code === 'ENOENT') return; throw err; }
       for (const line of txt.split('\n')) {
         if (!line.trim()) continue;
         let idx = idxOf(line);
@@ -21142,6 +21144,22 @@ async function runTrainingBatch() {
   const outPath = process.env.PP_TRAIN_OUT
     || path.join(outDir, `${norm(pinned.name)}-${abMode ? 'AB-' : evalMode ? 'EVAL-' : ''}${stamp}.jsonl`);
   console.log(`[train] ${abMode ? 'A/B MODE (Profil vs Baseline im Spiegel)' : evalMode ? 'EVAL MODE (profiles ON)' : 'data collection (profiles OFF)'} — writing → ${outPath}`);
+  // Ausgabedateien werden an mehreren Stellen als EINE Zeichenkette gelesen (Wiederaufnahme, Zusammenführen der Worker, Auswertung);
+  // Node erlaubt höchstens ~512 MB. Lieber vorher laut aufhören als mittendrin Daten zu verlieren: große Sammlungen gehören in Segmente
+  // (`scripts/train-all-decks.js --segment`, je ~1.000 Spiele; dort `PP_TRAIN_GAME_OFFSET`).
+  try {
+    const grenzeMb = parseInt(process.env.PP_TRAIN_MAX_FILE_MB || '400', 10) || 400;
+    const mb = fs.statSync(outPath).size / 1048576;
+    if (mb > grenzeMb) {
+      console.error(`[train] Ausgabedatei ${outPath} ist ${mb.toFixed(0)} MB groß (Grenze ${grenzeMb} MB, Node liest höchstens ~512 MB als Zeichenkette). `
+        + 'Große Sammlungen in Segmenten ablegen: node scripts/train-all-decks.js --games N --segment 1000');
+      process.exit(3);
+    }
+  } catch { /* Datei existiert noch nicht */ }
+  // Segment-Versatz: Spiel i dieser Datei ist das Spiel `gameOffset + i` der Gesamtsammlung — Gegner (`% Gegnerzahl`) und Sitz (`% 2`) laufen
+  // über alle Segmente hinweg exakt so durch, wie bei einer einzigen Datei.
+  const gameOffset = Math.max(0, parseInt(process.env.PP_TRAIN_GAME_OFFSET || '0', 10) || 0);
+  if (gameOffset > 0 && !process.env.PP_TRAIN_WORKER) console.log(`[train] Segment-Versatz: Spiel 1 dieser Datei = Gesamtspiel ${gameOffset + 1}`);
   // Zustandslog fürs Wertnetz (PP_VALUE_NET=log): Binärdatei neben der jsonl, ein Block je Partie, Schlüssel gameIdx. Ein beim Absturz
   // abgeschnittener letzter Block wird vor dem Weiterschreiben entfernt, sonst läge der nächste hinter Müll.
   const statesFile = valueEnc.enabled() ? valueEnc.statesPath(outPath) : null;
@@ -21237,8 +21255,9 @@ async function runTrainingBatch() {
     // Round-robin opponents so every archetype contributes equally;
     // alternate the pinned deck's seat so first-player advantage and
     // seat-dependent quirks average out.
-    const opp = opponents[i % opponents.length];
-    const pinnedIdx = i % 2;
+    const gi = i + gameOffset;                 // Index in der Gesamtsammlung (ohne Segmente: gleich i)
+    const opp = opponents[gi % opponents.length];
+    const pinnedIdx = gi % 2;
     // ── ABSTURZ-ATTRIBUTION (31.7.) ──────────────────────────────────
     // Ein OOM tötet den PROZESS — kein catch, kein finally, kein Log
     // darüber, welches Match gerade lief. Die Konsole zeigt dann nur
@@ -21292,6 +21311,8 @@ async function runTrainingBatch() {
     // Sicht der Profil-Seite gelabelt (pinnedIdx = profiledIdx).
     if (abMode) { record.abMode = true; record.profiledIdx = pinnedIdx; }
     if (oppProfiles) record.oppProfiles = true;
+    record.valueNet = process.env.PP_VALUE_NET || 'off';   // mit welchem System gespielt wurde (Herkunft der Daten, Rückweg über --net 0)
+    record.gameNo = gi;                                    // Nummer in der Gesamtsammlung (ohne Segmente = gameIdx)
     record.gameIdx = i;   // Spielindex als LETZTES Feld (Orchestrator: collectTrainingSharded liest ihn vom Zeilenende)
     fs.appendFileSync(outPath, JSON.stringify(record) + '\n', { encoding: 'utf-8' });
     // Zustandslog NACH der Zeile: ein Absturz dazwischen lässt ein Spiel ohne Zustände (nur schlechter nutzbar), nie Zustände ohne Spiel.
