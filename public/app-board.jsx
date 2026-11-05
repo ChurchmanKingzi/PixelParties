@@ -38528,16 +38528,25 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         }
       }
       if (y == null) return;
-      setzeVar(document.documentElement.style, '--phase-mid-y', (y - pr.top) + 'px');
-      bereitMelden(col, y - pr.top);
-      // Hoehe NUR der Phasenzeile — das CSS verschiebt die Spalte um die
-      // Haelfte davon nach oben, damit genau diese Zeile auf der Linie
-      // liegt und die Button-Reihe darunter haengt.
+      // Auf ganze Pixel gerundet (Pixelart): die Spalte haengt mit `top` an `midInt`, und `--phase-fuge` gleicht den Rundungsrest aus, sodass die Fuge am Ende
+      // hoechstens ein halbes Pixel neben der Naht liegt.
+      const midRel = y - pr.top, midInt = Math.round(midRel);
+      setzeVar(document.documentElement.style, '--phase-mid-y', midInt + 'px');
+      // FUGE statt Phasenzeile (Befund 5.11.: „die Mitte zwischen den Phasen und Next Phase & Co. soll genau auf der Mittellinie liegen"): das CSS verschiebt die Spalte um
+      // `--phase-fuge` nach oben = Abstand von ihrer Oberkante bis zur MITTE zwischen Unterkante der Phasenzeile und Oberkante der Knopfzeile. Beide Zeilen sind
+      // unterschiedlich hoch und haengen mit Abstand untereinander, deshalb wird das Mass aus den echten Kaesten gemessen (Bildschirmraum; die Spalte steht ausserhalb
+      // der Brettebene und traegt keinen Massstab). Ohne Knopfzeile (Zuschauer) bleibt es die halbe Phasenzeile.
       const tracker = col.querySelector('.board-phase-tracker');
+      const reihe = col.querySelector('.phase-buttons-row');
       if (tracker) {
-        const th = tracker.getBoundingClientRect().height;
-        if (th > 0) setzeVar(document.documentElement.style, '--phase-tracker-h', th + 'px');
+        const tq = tracker.getBoundingClientRect();
+        if (tq.height > 0) {
+          const rq = reihe ? reihe.getBoundingClientRect() : null;
+          const off = (rq && rq.height > 0) ? ((tq.bottom + rq.top) / 2 - tq.top) : tq.height / 2;
+          setzeVar(document.documentElement.style, '--phase-fuge', Math.round(off + midInt - midRel) + 'px');
+        }
       }
+      bereitMelden(col, midInt);
 
       // ── UNTERLAGE DER PHASENSPALTE (v792, Als Vorgabe 5.9.) ────────
       // Die Platte muss HINTER den Karten und VOR den Area-Hintergruenden
@@ -38611,7 +38620,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       clearInterval(poll);
       const st = document.documentElement.style;
       st.removeProperty('--phase-mid-y');
-      st.removeProperty('--phase-tracker-h');
+      st.removeProperty('--phase-fuge');
       st.removeProperty('--phase-col-x');
       // Die Platten-Variablen liegen auf der Ebene selbst (v799) und
       // verschwinden mit ihr — hier ist nichts abzuraeumen.

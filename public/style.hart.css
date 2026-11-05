@@ -1,4 +1,4 @@
-/* PP-HART-GEBACKEN fffcf84beb296e2b — ERZEUGT von scripts/hart/build-css.js aus style.css (pixel-hart.js vorab angewandt) — nicht von Hand ändern. */
+/* PP-HART-GEBACKEN 90c95474936b3594 — ERZEUGT von scripts/hart/build-css.js aus style.css (pixel-hart.js vorab angewandt) — nicht von Hand ändern. */
 .pp-hart-gebacken { --pp-hart: 1; }
 @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Rajdhani:wght@400;500;600;700&family=Orbitron:wght@400;500;600;700;800;900&display=swap');
 
@@ -14074,9 +14074,9 @@ body:has(.modal-overlay) { --pz-tooltip-z: 10086; }
      genau unter den Knoepfen und nicht unter der ganzen Phasenliste.
 
      Auf die senkrechte Ausrichtung wirkt sie NICHT: das CSS haengt die
-     Spalte an `--phase-tracker-h`, und das misst allein die Hoehe von
-     `.board-phase-tracker`. Die Phasenzeile bleibt auf der Faltlinie,
-     egal wie hoch die Knopfzeile darunter wird. */
+     Spalte an `--phase-fuge`, und das misst aus den echten Kaesten die
+     Mitte der Fuge zwischen Phasenzeile und Knopfzeile (die Fuge liegt
+     auf der Faltlinie, egal wie hoch die Zeilen werden). */
   padding: calc(6px * var(--board-scale)) calc(9px * var(--board-scale));
 }
 
@@ -14242,14 +14242,11 @@ html:not([data-phase-bereit]) .phase-column { visibility: hidden; }
      positionierten Vorfahren; GameBoard schreibt sie zur Laufzeit. Der
      50%-Fallback erhaelt das alte Verhalten, falls die Messung ausfaellt. */
   top: var(--phase-mid-y, 50%);
-  /* Verschoben wird um die halbe Hoehe der PHASENZEILE, nicht um die
-     halbe Hoehe der ganzen Spalte (Als Praezisierung): die Spalte
-     enthaelt unter den Phasennamen noch die Button-Reihe, und ein
-     `translateY(-50%)` haette das GESAMTMODUL auf die Mittellinie
-     zentriert — die Phasennamen saessen dann darueber. Mit der halben
-     Zeilenhoehe liegt die Phasenzeile selbst mittig auf der Linie und die
-     Buttons haengen darunter. `--phase-tracker-h` misst GameBoard. */
-  transform: translateY(calc(var(--phase-tracker-h, 0px) / -2));
+  /* 5.11. (Befund: „die Mitte zwischen den Phasen und Next Phase & Co. soll genau auf der Mittellinie liegen, nicht die Phasen-Chips"): verschoben wird um
+     `--phase-fuge` = Abstand von der Oberkante der Spalte bis zur MITTE der Fuge zwischen Phasenzeile (unten) und Knopfzeile (oben). GameBoard misst das aus den
+     echten Kaesten (ganze Pixel, app-board.jsx), weil beide Zeilen verschieden hoch sind und mit Abstand untereinander haengen. Vorher: halbe Phasenzeile —
+     die Chips sassen auf der Linie, die Fuge ~10 px darunter. (Handy: eigene Regel weiter unten, dort liegt die Leiste einzeilig.) */
+  transform: translateY(calc(var(--phase-fuge, 0px) * -1));
   display: flex;
   flex-direction: column;
   align-items: flex-start;
@@ -26324,6 +26321,13 @@ input[type="checkbox"]:focus-visible, input[type="radio"]:focus-visible { outlin
 @media (max-height: 600px) {
   .top-bar > h2.titel-links { position: static; left: auto; transform: none; transform-origin: center; margin: 0 8px; flex: 1 1 0; min-width: 0; text-align: center; white-space: nowrap; }
   .top-bar > .top-bar-abstand { display: none; }
+}
+
+/* ★ Niedriges Desktop-Fenster (< 500 px Hoehe, Maus): die Kompaktregel oben (`zoom: .9`, `top: 50% !important`) ist fuers Handy gedacht und liess die Leiste hier neben der
+   Naht stehen (und `zoom` skaliert `top`/`translate`, die gemessenen Bildschirmpixel stimmten nicht mehr). Mit Maus: kein `zoom`, dieselbe Verkleinerung ueber den Massstab der Spalte
+   (.85 · .9), und die Lage kommt wie sonst aus der Messung (`--phase-mid-y`/`--phase-fuge`, app-board.jsx) — die Fuge zwischen den Zeilen liegt auf der Naht. */
+@media (max-height: 500px) and (pointer: fine) {
+  .phase-column { zoom: 1 !important; --phase-scale-factor: .765; top: var(--phase-mid-y, 50%) !important; }
 }
 
 /* ★ HANDY: Phasenleiste EINZEILIG in einem Abstand zwischen den beiden Spielerseiten.

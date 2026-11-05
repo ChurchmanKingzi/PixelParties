@@ -6939,7 +6939,7 @@ body:has(.modal-overlay) { --pz-tooltip-z: 10086; }
 .phase-end-check input { width: calc(12px * var(--board-scale)); height: calc(12px * var(--board-scale)); accent-color: var(--accent); cursor: pointer; }
 /* Beim Brettaufbau unsichtbar, bis die Lage der Leiste feststeht (app-board.jsx, `bereitMelden`): kein Hineingleiten */
 html:not([data-phase-bereit]) .phase-column { visibility: hidden; }
-.phase-column { --phase-scale-factor: .85; --board-scale: calc(var(--board-scale-live, 1) * var(--phase-scale-factor)); position: absolute; left: var(--phase-col-x, var(--sidebar-w)); top: var(--phase-mid-y, 50%); transform: translateY(calc(var(--phase-tracker-h, 0px) / -2)); display: flex; flex-direction: column; align-items: flex-start; z-index: 50; }
+.phase-column { --phase-scale-factor: .85; --board-scale: calc(var(--board-scale-live, 1) * var(--phase-scale-factor)); position: absolute; left: var(--phase-col-x, var(--sidebar-w)); top: var(--phase-mid-y, 50%); transform: translateY(calc(var(--phase-fuge, 0px) * -1)); display: flex; flex-direction: column; align-items: flex-start; z-index: 50; }
 .phase-debuffs { position: absolute; top: 4px; left: var(--sidebar-w); display: flex; flex-direction: column; gap: 2px; max-width: calc(280px * var(--board-scale)); z-index: 100; pointer-events: none; }
 /* Handy: die Hinweise lagen links oben ueber dem Gegnernamen/-Avatar in der oberen Handleiste und bei Textboxen darunter — jetzt unter die Leiste
    und rechts neben die Turnzahl-/Phasenspalte, so verdecken sie weder Name noch Avatar. */
@@ -13599,6 +13599,13 @@ input[type="checkbox"]:focus-visible, input[type="radio"]:focus-visible { outlin
 @media (max-height: 600px) {
   .top-bar > h2.titel-links { position: static; left: auto; transform: none; transform-origin: center; margin: 0 8px; flex: 1 1 0; min-width: 0; text-align: center; white-space: nowrap; }
   .top-bar > .top-bar-abstand { display: none; }
+}
+
+/* ★ Niedriges Desktop-Fenster (< 500 px Hoehe, Maus): die Kompaktregel oben (`zoom: .9`, `top: 50% !important`) ist fuers Handy gedacht und liess die Leiste hier neben der
+   Naht stehen (und `zoom` skaliert `top`/`translate`, die gemessenen Bildschirmpixel stimmten nicht mehr). Mit Maus: kein `zoom`, dieselbe Verkleinerung ueber den Massstab der Spalte
+   (.85 · .9), und die Lage kommt wie sonst aus der Messung (`--phase-mid-y`/`--phase-fuge`, app-board.jsx) — die Fuge zwischen den Zeilen liegt auf der Naht. */
+@media (max-height: 500px) and (pointer: fine) {
+  .phase-column { zoom: 1 !important; --phase-scale-factor: .765; top: var(--phase-mid-y, 50%) !important; }
 }
 
 /* ★ HANDY: Phasenleiste EINZEILIG in einem Abstand zwischen den beiden Spielerseiten.
