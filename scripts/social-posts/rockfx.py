@@ -266,7 +266,7 @@ class ConcertShow:
         for side, xc in ((0, 105), (1, 975)):
             im = self.pyro[(v + side) % 2]
             vis = max(1, int(im.height * h))
-            sub = im.crop((0, im.height - vis, im.width, im.height))
+            sub = im.crop((0, 0, im.width, vis))                                         # die Fontäne steigt aus dem Boden: die Spitze bleibt immer ganz, unten wird am Boden abgeschnitten
             s = self.stamp(sub, ('pyro', (v + side) % 2, vis), mirror=bool(side))
             ci = self.cell(xc, 0)[0] - im.width // 2
             cj = self.cell(0, 1604)[1] - vis
