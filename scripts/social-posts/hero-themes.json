@@ -1281,7 +1281,11 @@
     "leafgreen",
     26
    ]
-  ]
+  ],
+  "rockshow": true,
+  "opener": "wind",
+  "musicHit": 61.28,
+  "showLoops": 8
  },
  "???, the Shapeshifter": {
   "accent": "#b3121f",

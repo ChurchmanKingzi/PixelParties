@@ -199,20 +199,10 @@ HEROES = {
         "bats, blood drops and dark mist",
         "#Vampire #DarkFantasy"),
     "Elana, the Rocky Rebel": (
-        "Hate your hand? Shuffle it away. 🎸",
-        "Once per turn, Elana shuffles your entire hand back into your deck, then you draw the same number of cards +1. A fresh start, with a bonus card, every single turn.",
-        "floating music notes, green sparkles and golden glints",
-        "#Rockstar #Guitar"),
-    "Alice, the Puppeteer Girl": (
-        "Seven puppets. 350 damage. 🎀🔴",
-        "Once per turn, Alice deals 50 damage to a target times the number of Creatures you control that weren't summoned this turn. Her Mr. Jiggles are always watching.",
-        "seven stringed puppets with glowing red eyes and thin red lasers",
-        "#Puppets #Creepy #Lasers"),
-    "Broghan, the Frozen Guardian of the North": (
-        "One eye. One storm. 500 damage. ❄️🔴",
-        "Broghan cannot be Frozen. Once per turn, he deals 500 damage to a target – reduced by 10 for every card left in your deck, to a minimum of 10. The thinner your deck, the harder he hits.",
-        "red lightning from a single glowing eye, drifting ice clouds, snow and a frozen interface",
-        "#Ice #Storm #Lightning"),
+        "One chord. Fresh hand. +1 card. 🎸🔥",
+        "Elana is the rock star of the Pixel Parties world, and her gigs are a draw engine: once per turn she shuffles your entire hand back into your deck, then you draw the same number of cards +1. Every turn, a bigger hand.",
+        "a pixel rock star with a red guitar, fire fountains and a cheering medieval crowd, while a hand of cards is shuffled into the deck and one more card is drawn",
+        "#Rockstar #Guitar #Concert"),
     "Kyli, the Deceptive Sapling": (
         "She looks so sweet. Don't follow her. 🩸🌱",
         "Kyli is a creature of wood, made by The Root of all Evil and sent out as its avatar to lure victims in – so it can eat them. Once per turn, when you sacrifice a Creature, she can bring up to 3 of your deleted Potions back into her free Support Zones.",
