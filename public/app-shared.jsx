@@ -1970,11 +1970,15 @@ window.ppPixelPartikel = ppPixelPartikel;
 //                     cardImageUrl(held, skins) hängt ihn selbst an, wenn dem Skin-Objekt Ränge zugeordnet sind (ppSkinRanksSet / ppSkinMerge)
 /** Karten-URL ohne `?rahmen=N` (Tooltips zeigen den Rang-Rahmen nie). */
 function ppOhneRahmen(url) { return url ? url.replace(/[?&]rahmen=\d+/, '') : url; }
-/** Id eines Shop-Bildes aus seiner URL (/data/shop/<subdir>/<id>.png), sonst null (Gegenstück zu shopIdOfUrl im Server). */
+/** Item-Id eines Avatars/Sleeves aus seiner URL (wie frame-ids.js im Server): Shop-Item → Id, Standard-Avatar → 'std:<Name>', Standard-Sleeve → 'default'. */
 function ppShopIdOfUrl(url, subdir) {
-  const m = new RegExp('^/data/shop/' + subdir + '/([^/]+)\\.[a-z]+$', 'i').exec(String(url || ''));
-  if (!m) return null;
-  try { return decodeURIComponent(m[1]); } catch { return m[1]; }
+  const u = String(url || '').split('?')[0];
+  const dec = (x) => { try { return decodeURIComponent(x); } catch { return x; } };
+  let m = new RegExp('^/data/shop/' + subdir + '/([^/]+)\\.[a-z]+$', 'i').exec(u);
+  if (m) return dec(m[1]);
+  if (subdir === 'avatars') { m = /^\/avatars\/([^/]+)\.[a-z]+$/i.exec(u); if (m) return 'std:' + dec(m[1]); }
+  if (subdir === 'sleeves' && (!u || u === '/cardback.png')) return 'default';
+  return null;
 }
 function ppFrameRank(dupes) { return window.ppRankFrames ? window.ppRankFrames.rankOf(dupes) : null; }
 const _ppSkinRanks = new WeakMap();           // Skin-Zuordnung { Held: Skin } → { Held: Kopien }
