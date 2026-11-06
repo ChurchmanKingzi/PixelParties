@@ -1,4 +1,4 @@
-/* PP-HART-GEBACKEN e9abd7af22d2a574 — ERZEUGT von scripts/hart/build-css.js aus style.css (pixel-hart.js vorab angewandt) — nicht von Hand ändern. */
+/* PP-HART-GEBACKEN 368810d82ea8b734 — ERZEUGT von scripts/hart/build-css.js aus style.css (pixel-hart.js vorab angewandt) — nicht von Hand ändern. */
 .pp-hart-gebacken { --pp-hart: 1; }
 @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Rajdhani:wght@400;500;600;700&family=Orbitron:wght@400;500;600;700;800;900&display=swap');
 
@@ -26738,3 +26738,24 @@ input[type="checkbox"]:focus-visible, input[type="radio"]:focus-visible { outlin
 .pull-fx-hud-btn { cursor: pointer; }
 .pull-fx-hud-key { color: #a5b0c0; }
 .pull-fx-hud-on { background: #fad54a; color: #08060c; }
+
+/* ═══ SHOP: RANG-RAHMEN-GALERIE (Reiter „Frames“) ═══════════════════════
+   Acht Ränge (Silber … Obsidian), je Rang Karte, Sleeve und Avatar mit ihrem Rahmen. Die Rahmen selbst zeichnet
+   public/rank-frames.js (Pixelart-Canvas, <RankFrame> in app-shared.jsx) — hier nur das Layout. Der Zierrat ragt bis
+   ~70 px über die Bildkante hinaus, deshalb die großen Abstände. */
+.shop-frames { max-width: 900px; margin: 0 auto; padding: 0 0 40px; }
+.shop-frames-intro { text-align: center; padding: 6px 20px 24px; }
+.shop-frames-title { font-family: var(--font-display), sans-serif; font-size: 22px; letter-spacing: 3px; color: #fad54a; text-shadow: 3px 3px 0 #000; }
+.shop-frames-text { margin: 12px auto 4px; max-width: 620px; font-size: 13px; line-height: 1.6; color: var(--text); }
+.shop-frames-note { font-size: 11px; color: var(--text2); }
+.shop-frames-ladder { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; margin-top: 16px; }
+.shop-frames-chip { font-family: var(--font-display), sans-serif; font-size: 11px; letter-spacing: 1px; padding: 5px 10px; background: var(--bg3); box-shadow: 0 0 0 2px var(--pp-kontur), 0 0 0 4px var(--bg4); }
+.shop-frames-rank { margin: 0 0 6px; padding: 14px 0 6px; border-top: 3px solid var(--bg4); }
+.shop-frames-head { display: flex; align-items: baseline; justify-content: center; gap: 14px; font-family: var(--font-display), sans-serif; text-shadow: 2px 2px 0 #000; }
+.shop-frames-no { font-size: 11px; letter-spacing: 2px; opacity: .8; }
+.shop-frames-name { font-size: 20px; letter-spacing: 3px; }
+.shop-frames-copies { font-size: 11px; letter-spacing: 1px; opacity: .8; }
+.shop-frames-row { display: flex; justify-content: center; align-items: flex-end; gap: 150px; padding: 84px 40px 110px; }
+.shop-frames-item { position: relative; display: flex; flex-direction: column; align-items: center; }
+.shop-frames-kind { position: absolute; top: calc(100% + 80px); font-size: 10px; letter-spacing: 2px; color: var(--text2); white-space: nowrap; }
+@media (max-width: 860px) { .shop-frames-row { gap: 90px; padding: 84px 10px 110px; } }
