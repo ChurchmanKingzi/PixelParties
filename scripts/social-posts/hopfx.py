@@ -614,7 +614,7 @@ class HopShow:
         'ox':      [('attack_ram', -5)],
         'snake':   [('poison', -7)],
         'tiger':   [('slash', -5)],
-        'hop':     [('elem_wind', -19, 0.0, 1.45, 0.2)],                                # leises Sprung-Geräusch bei jedem Absprung (kurzes, hohes Wuschen)
+        'hop':     [('projectile', -11, 0.0, 1.3, 0.25)],                               # Sprung-Geräusch bei jedem Absprung (kurzes Vorbeiwuschen; `elem_wind` baut erst langsam auf und war nicht zu hören)
         'bonus':   [('buff', -9)],                                                      # Bonus-Aktion
         'num':     [('ping', -10)],                                                     # eine Zahl der Kombo leuchtet
         'turn':    [('turn_start', -8)],
