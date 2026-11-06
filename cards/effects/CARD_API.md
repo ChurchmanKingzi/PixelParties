@@ -711,6 +711,13 @@ Die Zuordnung ist zentral — kein Karten-Code ruft `playSFX` selbst auf:
   auf das gesendete `play_zone_animation`.
 
 
+* **Hammer-Animationen** (`public/app-fx-57.jsx`; Pixelart-Leinwand, eine geschwungene Waffe treibt das Ziel mit EINEM Schlag wie einen Nagel in die Bodenlinie = untere Zonenkante):
+  `magic_hammer` (Magic Hammer, Heftigkeit 1,0, Schaden nach ca. 1450 ms) · `heavy_hit_smash` (Heavy Hit, 0,6, `animDuration: 1200`) · `hammer_skeleton_smash` (Hammer Skeleton, 0,35, `_delay(1000)`,
+  Ziel: Support-Slot oder Area). Alle drei erwarten das Zonen-Element des Ziels (`PP_SQUASH_ANIMS` in app-board.jsx reicht `zoneEl`) und kommen mit `play_zone_animation`-Standardfeldern (`owner`, `heroIdx`, `zoneSlot`,
+  `zoneType`) aus; ein `h`-/Größen-Kniff ist nicht nötig. Der Schaden folgt erst NACH dem Hit-Stop (`_delay`/`animDuration` wie oben, Vorlauf des Mountens ≈ 110 ms eingerechnet); `PP_ANIM_MINDAUER`
+  (app-board.jsx) hält die Animation länger am Leben als ein kürzeres `animDuration`. Negiert: `spellVisual.impact` mit dem passenden Typ und `impactMs` (1100 / 930 / 800). Die Pixelgröße der Effekt-Zelle
+  folgt der Hero-Pixelgröße des Ziels (Regel in der Kopfzeile von app-fx-57.jsx). Kamera-Shake nur am Desktop; Rückfall auf den alten Hammer bei Retro / `__ppFxAlt` / reduzierter Bewegung.
+
 ## ★ SCHADENSTYPEN — DAS VOLLSTÄNDIGE VOKABULAR
 
 Der `type`-Parameter jedes Schadensaufrufs. **Es gibt keine

@@ -4287,7 +4287,38 @@ const ZONE_ANIM_SFX = {
   // zum Animationsstart (ZONE_ANIM_MOUNT_DELAY_MS) rechnet
   // `playSFXForZoneAnim` selbst dazu, damit die beiden Zahlen nicht
   // auseinanderlaufen koennen.
-  magic_hammer:            { name: 'heavy_impact', opts: { delay: 340 } },
+  // Hammer-Animationen (app-fx-57): geschwungene Waffe, EIN Schlag; die Zeiten sind die Bilder der Animation (30 Hz) ab Mount — Treffer MH bei Bild 33 (1100 ms), HH bei Bild 28 (933 ms), HS bei Bild 24 (800 ms).
+  // Heftigkeit: Magic Hammer 1,0 (tief gepitcht, mehrfach geschichtet) · Heavy Hit 0,6 · Hammer Skeleton 0,35 (hoch, leise). Der Schaden-Klang (`damage`) kommt wie bisher mit dem Zustandsvergleich.
+  magic_hammer: [
+    { name: 'booster_card_whoosh', opts: { volume: 0.5, rate: 0.5, delay: 1 } },
+    { name: 'booster_card_whoosh', opts: { volume: 0.65, rate: 0.55, delay: 967 } },
+    { name: 'booster_card_whoosh', opts: { volume: 0.85, rate: 0.5, delay: 1033 } },
+    { name: 'heavy_impact', opts: { volume: 1.0, rate: 0.6, delay: 1100 } },
+    { name: 'heavy_impact', opts: { volume: 0.6, rate: 0.85, delay: 1100 } },
+    { name: 'attack_ram', opts: { volume: 0.75, rate: 0.6, delay: 1100 } },
+    { name: 'pull_crack', opts: { volume: 0.9, rate: 0.7, delay: 1133 } },
+    { name: 'heavy_impact', opts: { volume: 0.5, rate: 0.45, delay: 1200 } },
+    { name: 'booster_card_whoosh', opts: { volume: 0.5, rate: 0.6, delay: 1500 } },
+    { name: 'booster_card_land', opts: { volume: 0.5, rate: 0.5, delay: 1433 } },
+    { name: 'booster_card_land', opts: { volume: 0.35, rate: 0.45, delay: 1533 } },
+  ],
+  heavy_hit_smash: [
+    { name: 'booster_card_whoosh', opts: { volume: 0.55, rate: 0.65, delay: 800 } },
+    { name: 'booster_card_whoosh', opts: { volume: 0.7, rate: 0.6, delay: 867 } },
+    { name: 'heavy_impact', opts: { volume: 0.75, rate: 0.95, delay: 933 } },
+    { name: 'attack_ram', opts: { volume: 0.45, rate: 1.0, delay: 933 } },
+    { name: 'pull_crack', opts: { volume: 0.5, rate: 1.0, delay: 967 } },
+    { name: 'booster_card_land', opts: { volume: 0.35, rate: 0.6, delay: 1133 } },
+    { name: 'booster_card_whoosh', opts: { volume: 0.4, rate: 0.7, delay: 1200 } },
+  ],
+  hammer_skeleton_smash: [
+    { name: 'booster_card_whoosh', opts: { volume: 0.35, rate: 0.85, delay: 700 } },
+    { name: 'booster_card_whoosh', opts: { volume: 0.4, rate: 0.8, delay: 767 } },
+    { name: 'heavy_impact', opts: { volume: 0.45, rate: 1.25, delay: 800 } },
+    { name: 'pull_crack', opts: { volume: 0.4, rate: 1.3, delay: 833 } },
+    { name: 'booster_card_land', opts: { volume: 0.3, rate: 0.9, delay: 933 } },
+    { name: 'booster_card_whoosh', opts: { volume: 0.25, rate: 0.9, delay: 967 } },
+  ],
   // Shattering Strike (v814): kleinerer Hammer, dumpferer Einschlag mit Erde.
   shattering_strike:       { name: 'heavy_impact', opts: { rate: 1.15, volume: 0.85, delay: 300 } },
   tiger_impact:            { name: 'heavy_impact' },
@@ -5106,6 +5137,8 @@ const ZONE_ANIM_NONEFFECT = new Set([
   // belegt und der Thud fiel komplett aus; der erste Klang NACH dem
   // sichtbaren Aufprall war dann der `damage`-Cue bei ~900ms.
   'magic_hammer',
+  'heavy_hit_smash',
+  'hammer_skeleton_smash',
   // v1422 (Als Befund 25.9.: „den Sound hoere ich im Spiel nicht"): der
   // Doom-Tick kommt fast immer im selben Augenblick wie andere Effekt-
   // Klaenge (Rundenende, Besiegung) und wurde von der 'effect'-Sperre
@@ -8430,7 +8463,8 @@ function zoneLandStyle(cardName) {
   if (!c) return { color: '#fbe181', variant: null };
   const t = c.cardType || '';
   const istKreatur = t.includes('Creature') || (t === 'Token' && c.hp != null);
-  return { color: typeColor(t), variant: istKreatur ? 'summon' : null };
+  // ★ Ability = BLAU (Zonenfarbe der Fähigkeiten, wie Hero lila / Surprise rot / Support gelb): Landung, Kartenflug und Stufenaufstieg zeigen dieses Blau (app-fx-49/48); alle anderen Typen unverändert.
+  return { color: t === 'Ability' ? '#4580f6' : typeColor(t), variant: istKreatur ? 'summon' : null };
 }
 
 // Gallery panel dimensions

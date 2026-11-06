@@ -75,22 +75,28 @@ module.exports = {
     const tgtZoneSlot = target.type === 'hero' ? undefined : target.slotIdx;
     const impactSlot  = target.type === 'hero' ? -1 : target.slotIdx;
 
-    // Arrow projectile from Archer's slot to the target
-    engine._broadcastEvent('play_projectile_animation', {
+    // Gleiche Pfeil-Animation wie "Archer" (app-fx-52, `archerPfeil`): ein Holzpfeil fliegt von der Zone des Elven Archers zum Ziel, der Einschlag ist Teil der Animation;
+    // der Schaden folgt nach dem Flug. Clients ohne Pfeil (Animationen aus, Retro) bekommen die alte Emoji-Flugbahn als `ersatz`; spielt niemand den Pfeil, laeuft sie mit kurzer Wartezeit.
+    const alt = ['play_projectile_animation', {
       sourceOwner, sourceHeroIdx: heroIdx, sourceZoneSlot: ctx.card.zoneSlot,
       targetOwner: tgtOwner, targetHeroIdx: tgtHeroIdx,
       targetZoneSlot: tgtZoneSlot,
       emoji: '🏹',
       emojiStyle: { fontSize: 28 },
       duration: 550,
-    });
-    await engine._delay(450);
-
-    // Impact flash
-    engine._broadcastEvent('play_zone_animation', {
-      type: 'strike', owner: tgtOwner, heroIdx: tgtHeroIdx, zoneSlot: impactSlot,
-    });
-    await engine._delay(200);
+    }, 0];
+    const pfeilGespielt = await require('./_arrows-shared').archerPfeil(engine, ctx.card, {
+      type: target.type === 'hero' ? 'hero' : 'equip', owner: tgtOwner, heroIdx: tgtHeroIdx, slotIdx: target.slotIdx,
+    }, alt);
+    if (!pfeilGespielt) {
+      engine._broadcastEvent(alt[0], alt[1]);
+      await engine._delay(450);
+      // Einschlag-Blitz
+      engine._broadcastEvent('play_zone_animation', {
+        type: 'strike', owner: tgtOwner, heroIdx: tgtHeroIdx, zoneSlot: impactSlot,
+      });
+      await engine._delay(200);
+    }
 
     if (target.type === 'hero') {
       const tgtHero = gs.players[tgtOwner]?.heroes?.[tgtHeroIdx];

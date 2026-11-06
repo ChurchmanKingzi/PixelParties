@@ -2,7 +2,7 @@
 //  CARD EFFECT: "Magic Hammer"
 //  Spell (Destruction Magic Lv3)
 //  Choose a target and deal 300 damage to it.
-//  Uses the magic_hammer zone animation.
+//  Uses the magic_hammer zone animation (app-fx-57: geschwungener Stahlhammer, Heftigkeit 1,0; Schaden nach 1450 ms).
 // ═══════════════════════════════════════════
 
 module.exports = {
@@ -13,7 +13,7 @@ module.exports = {
   // laeuft ihr Effekt-Rumpf nie — die Engine spielt dann diese Bilder.
   // Im normalen Weg bleibt es bei den Broadcasts im Effekt selbst.
   spellVisual: {
-    impact: { type: 'magic_hammer' }, impactMs: 260,
+    impact: { type: 'magic_hammer' }, impactMs: 1100,   // Treffer des geschwungenen Hammers (app-fx-57: Bild 33 bei 30 Hz)
   },
 
   requiresTarget: true,
@@ -46,7 +46,7 @@ module.exports = {
           type: 'magic_hammer', owner: target.owner,
           heroIdx: target.heroIdx, zoneSlot: -1,
         });
-        await engine._delay(900);
+        await engine._delay(1450);   // Schaden nach dem Hit-Stop des Hammers (app-fx-57: Treffer 1,1 s + 7 Bilder Hit-Stop + Vorlauf des Mountens)
         const hero = gs.players[target.owner].heroes[target.heroIdx];
         if (hero && hero.hp > 0) {
           await ctx.dealDamage(hero, 300, 'destruction_spell');
@@ -56,7 +56,7 @@ module.exports = {
           type: 'magic_hammer', owner: target.owner,
           heroIdx: target.heroIdx, zoneSlot: target.slotIdx,
         });
-        await engine._delay(900);
+        await engine._delay(1450);   // Schaden nach dem Hit-Stop des Hammers (app-fx-57: Treffer 1,1 s + 7 Bilder Hit-Stop + Vorlauf des Mountens)
         const inst = target.cardInstance || engine.cardInstances.find(c =>
           c.owner === target.owner && c.zone === 'support' &&
           c.heroIdx === target.heroIdx && c.zoneSlot === target.slotIdx

@@ -19,6 +19,9 @@
 //  Kosten: eine Leinwand je Effekt, rein zeitabhängige Teilchen (keine Zustände, ≤ 24 Rechtecke je Bild), Leinwand lebt < 1 s; Aufwärmen im Leerlauf wie bei den Projektilen.
 // ═════════════════════════════════════════════════════════════════
 const PP_FX49_C = { creme: ppHex('#fffbd2'), grau: ppHex('#9aa3b6'), weiss: ppHex('#ffffff') };
+// ★ Ability-Blau: Landet/fliegt eine Fähigkeit (Kartenfarbe #4580f6, `zoneLandStyle` in app-shared.jsx), werden Creme und Grau der Ringe/Schweife zu hellem Blau (Palette), sonst unverändert.
+const PP_FX49_ABIL = { creme: ppHex('#b4cff8'), grau: ppHex('#6d9bf8') };
+const ppFx49IstAbility = (farbe) => /#4580f6/i.test(String(farbe || ''));
 const PP_FX49_S = 3;                                   // Bildschirmpixel je Rasterzelle
 const PP_FX49_TAKT = 1000 / 30;
 const ppFx49Kl = (v, a, b) => Math.max(a, Math.min(b, v));
@@ -60,14 +63,14 @@ function ppFx49Schweif(o) {
     if (!o || window._playAnimations === false || window.__ppFxAlt) return null;
     const von = o.von, nach = o.nach;
     if (!von || !nach || ![von.x, von.y, nach.x, nach.y].every(isFinite)) return null;
-    const S = PP_FX49_S, TAKT = PP_FX49_TAKT, C = PP_FX49_C, rd = Math.round, H = ppFx30H;
+    const S = PP_FX49_S, TAKT = PP_FX49_TAKT, rd = Math.round, H = ppFx30H;
     const art = o.art === 'komet' ? 'komet' : 'zug';
     const dauer = Math.max(120, o.dauer > 0 ? o.dauer : 400), verzug = o.verzug > 0 ? o.verzug : 0;
     const bw = o.w > 0 ? o.w : 64, bh = o.h > 0 ? o.h : 90;
     const f = ppFx49Kl(bw / 120, 0.3, 1.25), fz = Math.max(f, 0.55);   // Trailer-Karte: 120 px breit; alle Maße darauf bezogen (fz: Mindestmaß für Streuung kleiner Karten)
     const bogen = o.bogen || 0, folge = !!o.folge, funken = o.funken !== false && art === 'zug';
     const ease = typeof o.ease === 'function' ? o.ease : (PP_FX49_EASE[o.ease] || (art === 'komet' ? PP_FX49_EASE.komet : PP_FX49_EASE.aus));
-    const akzent = ppFx49Farbe(o.farbe);
+    const akzent = ppFx49Farbe(o.farbe), C = ppFx49IstAbility(o.farbe) ? { ...PP_FX49_C, ...PP_FX49_ABIL } : PP_FX49_C;
     const salz = Math.floor(Math.random() * 1e6) % 9973;
     const ende = verzug + (art === 'komet' ? dauer + 420 : Math.max(dauer * 0.8 + 420, 520));
 
@@ -219,7 +222,7 @@ window.ppFx49Zug = function (el, o) {
 /** Zusatz für `ppFx44Funken(box, liste, farbe, zusatz)`: { R (px, halbe Leinwand), ende (ms), malen(put, c0, gw, gh, t ms) }. */
 window.ppFx49Einschlag = function (w, h, farbe) {
   try {
-    const S = PP_FX49_S, C = PP_FX49_C;
+    const S = PP_FX49_S, C = ppFx49IstAbility(farbe) ? { ...PP_FX49_C, ...PP_FX49_ABIL } : PP_FX49_C;
     if (!(w > 0) || !(h > 0)) return null;
     const kern = ppFx49Farbe(farbe);
     const wz = w / S, hz = h / S, k = ppFx49Kl(wz / 40, 0.45, 1.8);   // Trailer: Radien 26 und 18 Zellen bei 40 Zellen Kartenbreite
