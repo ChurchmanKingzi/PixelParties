@@ -5182,6 +5182,15 @@ function ShopScreen() {
                 </div>
               ))}
             </div>
+            {/* Kompakte Stufe in Duell-Größe: so erscheinen Karten, Sleeves und Avatare im laufenden Spiel */}
+            <div className="shop-frames-game">
+              <span className="shop-frames-game-label">IN DUELS</span>
+              {[['card', 86, 120], ['sleeve', 86, 120], ['avatar', 70, 70]].map(([kind, w, h]) => (
+                <RankFrame key={kind} rank={i} kind={kind} width={w} height={h} px={2} compact>
+                  <img src={imgs[kind]} alt="" draggable={false} style={{ width: '100%', height: '100%', display: 'block', objectFit: 'cover', imageRendering: 'pixelated' }} />
+                </RankFrame>
+              ))}
+            </div>
           </div>
         ))}
       </div>

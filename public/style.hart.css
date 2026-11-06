@@ -1,4 +1,4 @@
-/* PP-HART-GEBACKEN 368810d82ea8b734 — ERZEUGT von scripts/hart/build-css.js aus style.css (pixel-hart.js vorab angewandt) — nicht von Hand ändern. */
+/* PP-HART-GEBACKEN b4b036f459f618c5 — ERZEUGT von scripts/hart/build-css.js aus style.css (pixel-hart.js vorab angewandt) — nicht von Hand ändern. */
 .pp-hart-gebacken { --pp-hart: 1; }
 @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Rajdhani:wght@400;500;600;700&family=Orbitron:wght@400;500;600;700;800;900&display=swap');
 
@@ -26759,3 +26759,5 @@ input[type="checkbox"]:focus-visible, input[type="radio"]:focus-visible { outlin
 .shop-frames-item { position: relative; display: flex; flex-direction: column; align-items: center; }
 .shop-frames-kind { position: absolute; top: calc(100% + 80px); font-size: 10px; letter-spacing: 2px; color: var(--text2); white-space: nowrap; }
 @media (max-width: 860px) { .shop-frames-row { gap: 90px; padding: 84px 10px 110px; } }
+.shop-frames-game { display: flex; align-items: center; justify-content: center; gap: 30px; padding: 18px 0 30px; }
+.shop-frames-game-label { font-family: var(--font-display), sans-serif; font-size: 10px; letter-spacing: 2px; color: var(--text2); margin-right: 10px; }

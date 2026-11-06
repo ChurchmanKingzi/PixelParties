@@ -18,27 +18,31 @@
 //  API (window.ppRankFrames):
 //     RANKS                                Liste { id, name, copies, B, … }
 //     M                                    Rand der Leinwand um das Bild (Kunstpixel)
-//     create(rankIndex, kind, iw, ih)  →   { w, h, M, rank, draw(ctx, t, still) }      kind: 'card' | 'sleeve' | 'avatar'
+//     create(rankIndex, kind, iw, ih, opts)  →   { w, h, M, rank, draw(ctx, t, still) }      kind: 'card' | 'sleeve' | 'avatar'
+//        opts.compact: KOMPAKTE Stufe für das laufende Spiel (Duell, Hand, Deckbau): das Band sitzt INNEN auf der Kartenkante, nichts ragt
+//        weiter als 3 Kunstpixel heraus, Zierrat nur an Ecken und Seitenmitten. Ohne opts: die große Stufe (Galerie, Profil, Vorschau).
+//        M = Rand der Leinwand um den Inhalt (der Inhalt ist iw × ih, die Leinwand w × h).
 //  Alle Farben stehen in der Spiel-Palette (data/palette.json).
 // ═══════════════════════════════════════════════════════════════════════════════════════════════
 (function (root) {
   'use strict';
 
-  const M = 24;                       // Rand um das Bild für Zierrat (Kunstpixel)
+  const MFULL = 24;                   // Rand um das Bild für Zierrat bei der GROSSEN Stufe (Kunstpixel)
+  const CM = 3;                       // Rand der KOMPAKTEN Stufe: so weit darf Zierrat höchstens über die Kartenkante ragen
 
   // ── Rang-Tabelle ───────────────────────────────────────────────────────────────────────────
   // ramp: Farbleiter des Materials (Kontur · dunkel · mittel · hell · Glanz). trim: Gold-Einfassung (gleiche Leiter).
   // gem: Edelstein (dunkel, mittel, hell, weiß). rows: Bandprofil von außen nach innen (Zahl = Leiterstufe, 't…' = Trim-Stufe).
   const GOLD = ['#332300', '#8b5b04', '#f9ac20', '#fad54a', '#f7f7ad'];
   const RANKS = [
-    { id: 'silver',   name: 'Silver',   copies: 1, B: 3, ramp: ['#282834', '#59606e', '#9aa3b6', '#d2d2db', '#ffffff'], gem: ['#4e82cb', '#89abdc', '#bddcef', '#ffffff'], rows: [0, 4, 1] },
-    { id: 'gold',     name: 'Gold',     copies: 2, B: 4, ramp: GOLD, gem: ['#8f0000', '#f03232', '#f9b3b3', '#ffffff'], rows: [0, 4, 2, 1] },
-    { id: 'platinum', name: 'Platinum', copies: 3, B: 4, ramp: ['#223962', '#7e7d9b', '#b4cff8', '#e5edfa', '#ffffff'], gem: ['#702db3', '#b278ed', '#d9c0ec', '#ffffff'], rows: [0, 4, 3, 1] },
-    { id: 'diamond',  name: 'Diamond',  copies: 4, B: 5, ramp: ['#14285a', '#4e82cb', '#7fdfff', '#e5f5fa', '#ffffff'], gem: ['#399edf', '#66d9ff', '#e5f5fa', '#ffffff'], rows: [0, 4, 3, 2, 1] },
-    { id: 'ruby',     name: 'Ruby',     copies: 5, B: 5, ramp: ['#2a0404', '#710122', '#b21a29', '#ff6666', '#f0bfbc'], trim: GOLD, gem: ['#780014', '#fc1c5f', '#f8b4c8', '#ffffff'], rows: ['t0', 't3', 3, 2, 't1'] },
-    { id: 'sapphire', name: 'Sapphire', copies: 6, B: 6, ramp: ['#14285a', '#02398c', '#4580f6', '#66b6ff', '#e5edfa'], trim: GOLD, gem: ['#02398c', '#3866f0', '#b4cff8', '#ffffff'], rows: ['t0', 't3', 3, 2, 1, 't1'] },
-    { id: 'emerald',  name: 'Emerald',  copies: 7, B: 6, ramp: ['#0f2412', '#29663f', '#4bcd7c', '#75f091', '#e5fae7'], trim: GOLD, gem: ['#29663f', '#4bcd7c', '#b3f9cf', '#ffffff'], rows: ['t0', 't3', 3, 2, 1, 't1'] },
-    { id: 'obsidian', name: 'Obsidian', copies: 8, B: 7, ramp: ['#08060c', '#291f3d', '#401a66', '#b278ed', '#d6bbf1'], trim: ['#08060c', '#401a66', '#b278ed', '#d6bbf1', '#ffffff'], gem: ['#5a023a', '#fb1ea9', '#f8b4df', '#ffffff'], glow: ['#5a023a', '#fb1ea9', '#f87420', '#ffd066'], rows: [0, 3, 2, 1, 2, 1, 0] },
+    { id: 'silver',   name: 'Silver',   copies: 1, B: 3, ramp: ['#282834', '#59606e', '#9aa3b6', '#d2d2db', '#ffffff'], gem: ['#4e82cb', '#89abdc', '#bddcef', '#ffffff'], rows: [0, 4, 1], cB: 2, cRows: [4, 1] },
+    { id: 'gold',     name: 'Gold',     copies: 2, B: 4, ramp: GOLD, gem: ['#8f0000', '#f03232', '#f9b3b3', '#ffffff'], rows: [0, 4, 2, 1], cB: 2, cRows: [4, 2] },
+    { id: 'platinum', name: 'Platinum', copies: 3, B: 4, ramp: ['#223962', '#7e7d9b', '#b4cff8', '#e5edfa', '#ffffff'], gem: ['#702db3', '#b278ed', '#d9c0ec', '#ffffff'], rows: [0, 4, 3, 1], cB: 3, cRows: [4, 3, 1] },
+    { id: 'diamond',  name: 'Diamond',  copies: 4, B: 5, ramp: ['#14285a', '#4e82cb', '#7fdfff', '#e5f5fa', '#ffffff'], gem: ['#399edf', '#66d9ff', '#e5f5fa', '#ffffff'], rows: [0, 4, 3, 2, 1], cB: 3, cRows: [4, 3, 1] },
+    { id: 'ruby',     name: 'Ruby',     copies: 5, B: 5, ramp: ['#2a0404', '#710122', '#b21a29', '#ff6666', '#f0bfbc'], trim: GOLD, gem: ['#780014', '#fc1c5f', '#f8b4c8', '#ffffff'], rows: ['t0', 't3', 3, 2, 't1'], cB: 3, cRows: ['t3', 2, 't1'] },
+    { id: 'sapphire', name: 'Sapphire', copies: 6, B: 6, ramp: ['#14285a', '#02398c', '#4580f6', '#66b6ff', '#e5edfa'], trim: GOLD, gem: ['#02398c', '#3866f0', '#b4cff8', '#ffffff'], rows: ['t0', 't3', 3, 2, 1, 't1'], cB: 3, cRows: ['t3', 3, 't1'] },
+    { id: 'emerald',  name: 'Emerald',  copies: 7, B: 6, ramp: ['#0f2412', '#29663f', '#4bcd7c', '#75f091', '#e5fae7'], trim: GOLD, gem: ['#29663f', '#4bcd7c', '#b3f9cf', '#ffffff'], rows: ['t0', 't3', 3, 2, 1, 't1'], cB: 3, cRows: ['t3', 3, 't1'] },
+    { id: 'obsidian', name: 'Obsidian', copies: 8, B: 7, ramp: ['#08060c', '#291f3d', '#401a66', '#b278ed', '#d6bbf1'], trim: ['#08060c', '#401a66', '#b278ed', '#d6bbf1', '#ffffff'], gem: ['#5a023a', '#fb1ea9', '#f8b4df', '#ffffff'], glow: ['#5a023a', '#fb1ea9', '#f87420', '#ffd066'], rows: [0, 3, 2, 1, 2, 1, 0], cB: 4, cRows: [3, 2, 1, 0] },
   ];
 
   const c32 = (hex) => {
@@ -50,8 +54,12 @@
   const putBuf = (buf, W, H, x, y, c) => { x = Math.round(x); y = Math.round(y); if (x < 0 || y < 0 || x >= W || y >= H) return; buf[y * W + x] = c; };
 
   // ═══ Ein Rahmen ═══════════════════════════════════════════════════════════════════════════════
-  function create(rankIdx, kind, iw, ih) {
-    const R = RANKS[rankIdx], B = R.B;
+  function create(rankIdx, kind, iw0, ih0, opts) {
+    const compact = !!(opts && opts.compact);
+    const R = RANKS[rankIdx], B = compact ? R.cB : R.B;
+    // Kompakt: das Band liegt INNEN auf dem Inhalt; der „Bildbereich“ der Rezepte ist der Inhalt abzüglich Band, der Rand dahinter = Band + CM
+    const iw = compact ? iw0 - 2 * B : iw0, ih = compact ? ih0 - 2 * B : ih0;
+    const M = compact ? CM + B : MFULL;
     const W = iw + 2 * M, Hh = ih + 2 * M;
     const ramp = R.ramp.map(h => c32(snap(h)));
     const trimC = (R.trim || R.ramp).map(h => c32(snap(h)));
@@ -181,13 +189,13 @@
     };
 
     // ── Band: Ring um das Bild mit Bevel, Gehrung (Avatar: abgeschrägt) und Textur ──────────────────
-    const rows = R.rows;                                         // außen → innen
+    const rows = compact ? R.cRows : R.rows;                     // außen → innen
     const rowK = (d, lit) => {                                    // d: 1 = am Bild … B = außen
       const r = rows[B - d];
       if (typeof r === 'string') return { trim: true, k: parseInt(r.slice(1), 10) - (lit ? 0 : 1) };
       return { trim: false, k: r === 0 ? 0 : r - (lit ? 0 : 1) };
     };
-    const tex = BAND_TEX[R.id];
+    const tex = (compact ? COMPACT_TEX : BAND_TEX)[R.id];
     for (let y = 0; y < Hh; y++) for (let x = 0; x < W; x++) {
       const dx = Math.max(M - x, x - (M + iw - 1), 0), dy = Math.max(M - y, y - (M + ih - 1), 0);
       if (dx === 0 && dy === 0) continue;
@@ -211,17 +219,17 @@
     }
 
     // ── Zierrat des Ranges ────────────────────────────────────────────────────────────────────────
-    const A = { forCorners, forSides, halfSpan, edgesOf, gem, plate, shard, dshard, leaf, scallop, setK, setT, setG, setC, kind, iw, ih, B, W, H: Hh, M, glints, glows, sparks, motes, ramp, trimC, gemC, glowC, R, cx0, cy0, sideCtx, cornerCtx, hasTrim: !!R.trim };
-    if (RANK_ART[R.id]) RANK_ART[R.id](A);
+    const A = { forCorners, forSides, halfSpan, edgesOf, gem, plate, shard, dshard, leaf, scallop, setK, setT, setG, setC, kind, iw, ih, B, W, H: Hh, M, compact, glints, glows, sparks, motes, ramp, trimC, gemC, glowC, R, cx0, cy0, sideCtx, cornerCtx, hasTrim: !!R.trim };
+    if ((compact ? COMPACT_ART : RANK_ART)[R.id]) (compact ? COMPACT_ART : RANK_ART)[R.id](A);
 
     // ── Bewegung ──────────────────────────────────────────────────────────────────────────────────
     const metal = [];
     for (let i = 0; i < base.length; i++) if (rcls[i]) metal.push(i);
     const buf = new Uint32Array(W * Hh);
     const ST = { W, H: Hh, M, iw, ih, R, ramp, trimC, gemC, glowC, glows, sparks, motes, glints, aura: A.aura, base, buf, rkey, rcls, metal, put: (x, y, c) => putBuf(buf, W, Hh, x, y, c) };
-    const sweepPeriod = 3.4 + (7 - rankIdx) * 0.3, sweepW = 3 + rankIdx * 0.4;
+    const sweepPeriod = 3.4 + (7 - rankIdx) * 0.3, sweepW = compact ? 1.5 + rankIdx * 0.12 : 3 + rankIdx * 0.4;
     return {
-      w: W, h: Hh, M, rank: R,
+      w: W, h: Hh, M: compact ? CM : M, rank: R, compact,
       /** Zeichnet das Bild zur Zeit t (Sekunden) in ctx (Leinwand W × H). still = ohne Bewegung. */
       draw(ctx, t, still) {
         buf.set(base);
@@ -233,9 +241,10 @@
           }
           for (let gi = 0; gi < glints.length; gi++) {                                   // Funkeln: Kreuz, zeitversetzt
             const g = glints[gi], ph = (t * 0.55 + gi * 0.37) % 1;
-            if (ph < 0.16) { const len = ph < 0.08 ? 2 : 3; for (let s = -len; s <= len; s++) { if (s) { ST.put(g.x + s, g.y, gemC[3]); ST.put(g.x, g.y + s, gemC[3]); } } ST.put(g.x, g.y, gemC[3]); }
+            if (ph < 0.16) { const len = compact ? 1 : (ph < 0.08 ? 2 : 3); for (let s = -len; s <= len; s++) { if (s) { ST.put(g.x + s, g.y, gemC[3]); ST.put(g.x, g.y + s, gemC[3]); } } ST.put(g.x, g.y, gemC[3]); }
           }
-          if (RANK_ANIM[R.id]) RANK_ANIM[R.id](ST, t);
+          const an = (compact ? COMPACT_ANIM : RANK_ANIM)[R.id];
+          if (an) an(ST, t);
         }
         const img = ctx.createImageData(W, Hh);
         new Uint32Array(img.data.buffer).set(buf);
@@ -324,7 +333,7 @@ BAND_TEX.platinum = (d, t, lit, trim, k) => (d === 3 ? { k: (t % 8 < 2 ? 4 : 1) 
       A.shard(c, 0, A.B + 1, 0, 1, 11, 5); A.shard(c, -6, A.B + 1, 0, 1, 7, 3); A.shard(c, 6, A.B + 1, 0, 1, 7, 3);
       A.gem(c, 0, 3, 2, { noGlint: false });
     });
-    for (const [x, y, ph] of [[M + 6, M - 4, 0], [M + A.iw - 7, M - 6, .3], [M - 5, M + A.ih - 8, .6], [M + A.iw + 6, M + A.ih - 5, .15], [M + (A.iw >> 1) + 8, M + A.ih + 6, .45], [M - 7, M + (A.ih >> 1), .75]]) spark(A, x, y, 1.9, ph, 3);
+    { const M = A.M; for (const [x, y, ph] of [[M + 6, M - 4, 0], [M + A.iw - 7, M - 6, .3], [M - 5, M + A.ih - 8, .6], [M + A.iw + 6, M + A.ih - 5, .15], [M + (A.iw >> 1) + 8, M + A.ih + 6, .45], [M - 7, M + (A.ih >> 1), .75]]) spark(A, x, y, 1.9, ph, 3); }
   };
   RANK_ANIM.diamond = (S, t) => sparkle(S, t, S.gemC[3], S.ramp[3]);
 
@@ -391,7 +400,7 @@ BAND_TEX.platinum = (d, t, lit, trim, k) => (d === 3 ? { k: (t % 8 < 2 ? 4 : 1) 
       A.leaf(c, 0, A.B + 8, 0, 1, 6, 4);
       for (const o of [-3, 3]) { c.t(o, A.B + 6, 4); c.t(o, A.B + 7, 3); }
     });
-    for (const [x, y, ph] of [[M + 8, M - 7, 0], [M + A.iw - 8, M + A.ih + 7, .5], [M - 7, M + (A.ih >> 1) + 5, .25], [M + A.iw + 7, M + (A.ih >> 1) - 5, .75]]) spark(A, x, y, 2.3, ph, 3);
+    { const M = A.M; for (const [x, y, ph] of [[M + 8, M - 7, 0], [M + A.iw - 8, M + A.ih + 7, .5], [M - 7, M + (A.ih >> 1) + 5, .25], [M + A.iw + 7, M + (A.ih >> 1) - 5, .75]]) spark(A, x, y, 2.3, ph, 3); }
   };
   RANK_ANIM.emerald = (S, t) => { runeGlow(S, t); drift(S, t, S.gemC[2], S.gemC[1], 6); sparkle(S, t, S.gemC[3], S.gemC[2]); gemBreath(S, t); };
 
@@ -420,7 +429,7 @@ BAND_TEX.platinum = (d, t, lit, trim, k) => (d === 3 ? { k: (t % 8 < 2 ? 4 : 1) 
     // Aura: zwei Reihen gedithertes Glühen außen am Band
     A.aura = [];
     for (let y = 0; y < A.H; y++) for (let x = 0; x < A.W; x++) {
-      const dx = Math.max(M - x, x - (M + A.iw - 1), 0), dy = Math.max(M - y, y - (M + A.ih - 1), 0), d = Math.max(dx, dy);
+      const dx = Math.max(A.M - x, x - (A.M + A.iw - 1), 0), dy = Math.max(A.M - y, y - (A.M + A.ih - 1), 0), d = Math.max(dx, dy);
       if (d === A.B + 1 && ((x + y) & 1) === 0) A.aura.push(y * A.W + x);
       if (d === A.B + 2 && (x & 1) === 0 && (y & 1) === 0) A.aura.push(-(y * A.W + x) - 1);   // zweite Reihe (dünner), negativ kodiert
     }
@@ -482,5 +491,82 @@ BAND_TEX.platinum = (d, t, lit, trim, k) => (d === 3 ? { k: (t % 8 < 2 ? 4 : 1) 
     S.glints.forEach((g) => { if (g.r >= 4) for (let dv = -2; dv <= 2; dv++) for (let du = -3; du <= 3; du++) if (Math.abs(dv) >= 1) S.put(g.x + du, g.y + dv, S.ramp[1]); });
   }
 
-  root.ppRankFrames = { RANKS, M, create };
+
+  // ═══ KOMPAKTE STUFE (Duell, Hand, Deckbau) ═══════════════════════════════════════════════════════
+  // Ecken-Koordinaten (u, v): 0 = Bildecke des geschrumpften Bildbereichs; die Kartenkante liegt bei u = B bzw. v = B, Zierrat darf bis B + CM ragen.
+  // Alles klein und flach: Ecken-Plättchen (4–8 Kunstpixel), ein Stein in der Mitte jeder geschmückten Seite, wenige Dorne.
+  const COMPACT_ART = {};
+  const COMPACT_TEX = {};
+  COMPACT_TEX.diamond = (d, t, lit, trim, k) => (d === 2 ? { k: clamp(k + ((t & 3) < 2 ? 1 : -1), 1, 4) } : null);
+  COMPACT_TEX.emerald = (d, t, lit, trim, k) => (!trim && t % 6 === 3 ? { k: 4 } : null);
+  COMPACT_TEX.obsidian = (d, t, lit, trim, k) => (d === 2 && (t % 7) < 4 ? { k: 3 } : null);
+
+  COMPACT_ART.silver = (A) => {                                                   // Niete in der Ecke
+    const B = A.B;
+    A.forCorners((c) => { A.plate(c, B - 3, B - 3, B, B, 1); c.k(B - 1, B - 1, 4); });
+  };
+  COMPACT_ART.gold = (A) => {                                                     // Plättchen mit Rubin
+    const B = A.B;
+    A.forCorners((c) => { A.plate(c, B - 4, B - 4, B, B, 2); A.gem(c, B - 2, B - 2, 1, { noGlint: false }); });
+  };
+  COMPACT_ART.platinum = (A) => {                                                 // Platte, Veilchen-Stein, kleine Spitzen
+    const B = A.B;
+    A.forCorners((c) => {
+      A.plate(c, B - 5, B - 5, B, B, 2); A.gem(c, B - 2, B - 2, 1);
+      A.shard(c, B + 1, B - 3, 1, 0, 2, 2); A.shard(c, B - 3, B + 1, 0, 1, 2, 2);
+    });
+    A.forSides((c) => { A.gem(c, 0, B - 1, 1, { noGlint: true }); });
+  };
+  COMPACT_ART.diamond = (A) => {                                                  // Kristallspitze aus der Ecke, Eisstein
+    const B = A.B;
+    A.forCorners((c) => {
+      A.plate(c, B - 5, B - 5, B, B, 2); A.gem(c, B - 2, B - 2, 1);
+      A.dshard(c, B + 1, B + 1, 1, 1, 3, 2); A.shard(c, B + 1, B - 2, 1, 0, 3, 2); A.shard(c, B - 2, B + 1, 0, 1, 3, 2);
+    });
+    A.forSides((c) => { A.shard(c, 0, B + 1, 0, 1, 3, 3); A.gem(c, 0, B - 1, 1, { noGlint: true }); });
+    A.sparks.push({ x: A.M + 4, y: A.M + 4, period: 2.1, phase: 0, size: 2 }, { x: A.M + A.iw - 5, y: A.M + A.ih - 5, period: 2.1, phase: .5, size: 2 });
+  };
+  COMPACT_ART.ruby = (A) => {                                                     // Goldplatte mit Rubin, Flammenspitzen
+    const B = A.B;
+    A.forCorners((c) => {
+      A.plate(c, B - 6, B - 6, B, B, 3, true); A.gem(c, B - 3, B - 3, 2, { claws: false });
+      A.dshard(c, B + 1, B + 1, 1, 1, 3, 2, true); A.shard(c, B + 1, B - 2, 1, 0, 3, 2, true); A.shard(c, B - 2, B + 1, 0, 1, 3, 2, true);
+    });
+    A.forSides((c) => { A.gem(c, 0, B - 1, 1, { noGlint: false }); A.shard(c, 3, B, 1, 0, 3, 2, true); A.shard(c, -3, B, -1, 0, 3, 2, true); });
+  };
+  COMPACT_ART.sapphire = (A) => {                                                 // Gold-gerahmte Platte, Saphir, Federfransen
+    const B = A.B;
+    A.forCorners((c) => {
+      A.plate(c, B - 6, B - 6, B, B, 3, false, true); A.gem(c, B - 3, B - 3, 2, { claws: false });
+      for (const e of A.edgesOf(c)) for (let s = 9; s < 17; s += 3) A.shard(e, s, B + 1, 0, 1, 3, 2);
+    });
+    A.forSides((c) => { A.gem(c, 0, B - 1, 1, { noGlint: false }); A.shard(c, 3, B, 1, 0, 4, 2); A.shard(c, -3, B, -1, 0, 4, 2); });
+  };
+  COMPACT_ART.emerald = (A) => {                                                  // Gold-gerahmte Platte, Smaragd, Blätter
+    const B = A.B;
+    A.forCorners((c) => {
+      A.plate(c, B - 6, B - 6, B, B, 3, false, true); A.gem(c, B - 3, B - 3, 2, { claws: false });
+      for (const e of A.edgesOf(c)) for (let s = 9; s < 17; s += 4) A.leaf(e, s, B + 1, 0, 1, 3, 3);
+    });
+    A.forSides((c) => { A.gem(c, 0, B - 1, 1, { noGlint: false }); A.leaf(c, 3, B, 1, 0, 4, 3); A.leaf(c, -3, B, -1, 0, 4, 3); });
+  };
+  COMPACT_ART.obsidian = (A) => {                                                 // schwarze Platte mit Auge, Dornen, glühende Risse
+    const B = A.B;
+    const glow = (ctx, p, q, ph) => { ctx.c(p, q, A.glowC[1]); const [gx, gy] = ctx.tr(p, q); A.glows.push({ x: gx, y: gy, ph }); };
+    A.forCorners((c) => {
+      A.plate(c, B - 7, B - 7, B, B, 3); A.gem(c, B - 3, B - 3, 2, { eye: true });
+      A.dshard(c, B + 1, B + 1, 1, 1, 3, 3); A.shard(c, B + 1, B - 3, 1, 0, 3, 3); A.shard(c, B - 3, B + 1, 0, 1, 3, 3);
+      glow(c, B - 6, B - 6, 1);
+      for (const e of A.edgesOf(c)) { for (let s = 11; s < e.span - 1; s += 5) A.shard(e, s, B + 1, 0, 1, 3, 3); for (let s = 10; s < e.span - 1; s++) if ((s * 5) % 11 < 6) glow(e, s, 2, s); }
+    });
+    A.forSides((c) => { A.gem(c, 0, B - 1, 2, { eye: true }); A.shard(c, 3, B, 1, 0, 4, 3); A.shard(c, -3, B, -1, 0, 4, 3); });
+  };
+  const COMPACT_ANIM = {};
+  COMPACT_ANIM.diamond = (S, t) => sparkle(S, t, S.gemC[3], S.ramp[3]);
+  COMPACT_ANIM.ruby = (S, t) => gemBreath(S, t);
+  COMPACT_ANIM.sapphire = (S, t) => gemBreath(S, t);
+  COMPACT_ANIM.emerald = (S, t) => { runeGlow(S, t); gemBreath(S, t); };
+  COMPACT_ANIM.obsidian = (S, t) => { crackGlow(S, t); eyeBlink(S, t); };
+
+  root.ppRankFrames = { RANKS, M: MFULL, CM, create };
 })(typeof window !== 'undefined' ? window : globalThis);
