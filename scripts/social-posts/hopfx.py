@@ -44,15 +44,22 @@ def load_img(p):
 
 class HopShow:
     SPOTS = {'L': (335, 1790), 'R': (745, 1790), 'M': (540, 1790), 'L2': (430, 1790), 'R2': (650, 1790), 'L3': (270, 1790), 'R3': (810, 1790)}
-    @staticmethod
-    def _keys():
+    # Reihenfolge der Angriffe je Runde (0 = Ochse, 1 = Schlange, 2 = Tiger): jede Runde anders, der Ochse nie als dritter
+    ORDERS = [(0, 1, 2), (2, 0, 1), (1, 0, 2), (0, 2, 1), (2, 0, 1), (1, 0, 2), (2, 0, 1), (0, 1, 2), (0, 2, 1)]
+    STARTS = ['L', 'L', 'R', 'L', 'R', 'R', 'R', 'L', 'R']                              # Puppe des ersten Treffers (danach wechselt er: X, Y, X)
+    HAND0 = {'L': 12, 'R': 5}                                                           # Handkarten der Puppen zu Beginn
+
+    @classmethod
+    def _keys(cls):
         """(Zeit in Takten, Ort, Trefferzahl). Ein Sprung = ein Halbtakt; 9 Runden à 3 Treffer + 1 Mittelsprung, danach im Viertelakt wie von Sinnen."""
         k = [(2, 'H', None), (2.5, 'M', None), (3, 'L', None), (3.5, 'R', None)]
         n = 0
         for i in range(9):
             base = 4 + 2 * i
+            first = cls.STARTS[i]
+            other = 'R' if first == 'L' else 'L'
             for j in range(3):
-                k.append((base + 0.5 * j, 'L' if n % 2 == 0 else 'R', n))
+                k.append((base + 0.5 * j, first if j % 2 == 0 else other, n))
                 n += 1
             k.append((base + 1.5, 'M', None))
         t0 = 4 + 2 * 9
@@ -82,6 +89,12 @@ class HopShow:
             self.spirits.append(im_.resize((im_.width // f_, im_.height // f_), Image.NEAREST))
         self.dummy = np.asarray(load_img('%s/dummy.png' % base)).copy()
         self.bones = [load_img('%s/bone-%d.png' % (base, i)) for i in (0, 3, 4, 5)]
+        from PIL import ImageEnhance
+        cb = Image.open(geom['cardback_path']).convert('RGB').resize((6, 9), Image.BOX)
+        cb = ImageEnhance.Color(ImageEnhance.Contrast(cb).enhance(1.35)).enhance(1.5).convert('RGBA')
+        card = Image.new('RGBA', (8, 11), (255, 150, 40, 255))
+        card.paste(cb, (1, 1))
+        self.mini = card                                                                 # Handkarte der Puppen (Kartenrücken auf dem Layout-Raster U)
         self._cache = {}
         rng = np.random.default_rng(seed)
         yy, xx = np.mgrid[0:H, 0:W]
@@ -89,13 +102,42 @@ class HopShow:
         self.vig = np.clip((rr - 0.45) / 0.8, 0, 1).astype(np.float32) ** 1.3
         self.kf = [(b * BEAT, spot, hit) for (b, spot, hit) in self._keys()]
         self.hits = []                                                                   # (Zeit, Seite, Angriff, laufende Nr.)
-        for i, (t, spot, hit) in enumerate(self.kf):
-            if hit is not None:
-                self.hits.append((t, 'L' if spot == 'L' else 'R', hit % 3, hit))
+        self.att, self.eff = {}, {}
+        stun_prev = {'L': False, 'R': False}
+        for i in range(9):
+            stun_now = {'L': False, 'R': False}
+            for j in range(3):
+                k_ = 3 * i + j
+                t_, spot_, _h = [q for q in self.kf if q[2] == k_][0]
+                side = 'L' if spot_ == 'L' else 'R'
+                a_ = self.ORDERS[i][j]
+                e = dict(a=a_, pos=j, turn=i, side=side)
+                if a_ == 0:                                                              # Ochse: Gegner verliert 1 Handkarte, als zweiter Angriff 2
+                    e['cards'] = 1 if j == 0 else 2
+                elif a_ == 1:                                                            # Schlange: 1 / 2 / 3 Gift-Stapel je nach Platz
+                    e['stacks'] = j + 1
+                else:                                                                    # Tiger: als zweiter heilt er Ghuanjun, sonst Betäubung für die Runde
+                    if j == 1:
+                        e['heal'] = True
+                    elif j == 0 and stun_prev[side]:
+                        e['immune'] = True                                               # war die Puppe schon letzte Runde betäubt, wirkt der erste Tiger nicht
+                    else:
+                        e['stun'] = True
+                        stun_now[side] = True
+                self.att[k_] = a_
+                self.eff[k_] = e
+                self.hits.append((t_, side, a_, k_))
+            stun_prev = stun_now
+        self.turn_starts = [self.hits[3 * i][0] for i in range(9)]
+        self.stuns = []                                                                  # (Seite, von, bis): bis zum Ende der Runde
+        for k_, e in self.eff.items():
+            if e.get('stun'):
+                th = self.hits[k_][0]
+                nxt = self.turn_starts[e['turn'] + 1] if e['turn'] + 1 < 9 else th + 1.4
+                self.stuns.append((e['side'], th, nxt))
         self.sh_bones = [[dict(a=rng.uniform(-2.6, -0.5), v=rng.uniform(350, 800), k=int(rng.integers(len(self.bones)))) for _ in range(6)] for _ in self.hits]
         self.t_in = {'L': 1.65, 'R': 1.95}                                                # Puppen fallen herein
         self.t_burst = (4 + 2 * 9) * BEAT                                               # Puppen zerplatzen, wenn die letzte Runde vorbei ist
-        self.turn_starts = [self.hits[3 * i][0] for i in range(9)]
         self.dust = []
         for i, (t, spot, hit) in enumerate(self.kf[1:], 1):
             self.dust.append((t, self._spot(spot)[0]))
@@ -115,13 +157,15 @@ class HopShow:
         if -self.gp < x < self.W and -self.gp < y < self.H:
             d.rectangle([x, y, x + self.gp - 1, y + self.gp - 1], fill=tuple(col) + ((255,) if len(col) == 3 else ()))
 
-    def stamp(self, im, key, scale=None, alpha=None, white=0.0):
-        k = (key, scale or self.gp, alpha, white)
+    def stamp(self, im, key, scale=None, alpha=None, white=0.0, tint=None, tamt=0.0):
+        k = (key, scale or self.gp, alpha, white, tint, round(tamt, 2))
         if k not in self._cache:
             s = scale or self.gp
             a = np.asarray(im).astype(np.float32).copy()
             if white:
                 a[..., :3] = a[..., :3] * (1 - white) + 255 * white
+            if tint is not None and tamt:
+                a[..., :3] = a[..., :3] * (1 - tamt) + np.array(tint, dtype=np.float32) * tamt
             if alpha is not None:
                 a[..., 3] *= alpha
             out = Image.fromarray(a.astype(np.uint8), 'RGBA')
@@ -159,9 +203,9 @@ class HopShow:
                 x = p0[0] + (p1[0] - p0[0]) * u
                 y = p0[1] + (p1[1] - p0[1]) * u - arc * math.sin(math.pi * u)
                 if h1 is not None and t >= t1 - 0.26:
-                    return x, y, 'pose', h1 % 3, s1.startswith('R')
+                    return x, y, 'pose', self.att[h1], s1.startswith('R')
                 if h0 is not None and t < t0 + 0.2:
-                    return x, y, 'pose', h0 % 3, s0.startswith('R')
+                    return x, y, 'pose', self.att[h0], s0.startswith('R')
                 return x, y, 'idle', int(t * self.fps / 2) % 24, False
         return None
 
@@ -169,6 +213,15 @@ class HopShow:
     def hp(self, side, t):
         n = sum(1 for (th, sd, a, k) in self.hits if sd == side and t >= th)
         return max(1, self.HP0 - self.DMG * n), n
+
+    def stacks(self, side, t):
+        return sum(e['stacks'] for k, e in self.eff.items() if e['side'] == side and 'stacks' in e and t >= self.hits[k][0])
+
+    def hand(self, side, t):
+        return self.HAND0[side] - sum(e['cards'] for k, e in self.eff.items() if e['side'] == side and 'cards' in e and t >= self.hits[k][0] + 0.1)
+
+    def stunned(self, side, t):
+        return any(sd == side and a <= t < b for (sd, a, b) in self.stuns)
 
     def _dummy_arr(self, hp):
         key = ('dummy', hp)
@@ -215,7 +268,8 @@ class HopShow:
                 self._burst_dummy(d, side, t, arr)
             return
         im = Image.fromarray(arr, 'RGBA')
-        s = self.stamp(im, ('dm', hp), white=flash) if flash == 0 else self.stamp(im, ('dmf', hp), white=flash)
+        amt = min(0.5, self.stacks(side, t) * 0.035)                                     # Gift färbt die Puppe grün
+        s = self.stamp(im, ('dm', hp), white=flash, tint=(90, 220, 80), tamt=amt) if flash == 0 else self.stamp(im, ('dmf', hp), white=flash, tint=(90, 220, 80), tamt=amt)
         ci = self.cell(x, 0)[0] - im.width // 2 + shake
         cj = self.cell(0, y)[1] - h + 1
         px_, py_ = self.cpos(ci, cj)
@@ -293,6 +347,44 @@ class HopShow:
             sc = 1.0 + 0.5 * (1 - ease_out(tau / 0.12)) if tau < 0.12 else 1.0
             canvas.paste(s, (int(x - s.width / 2), int(y - s.height / 2)), s)
 
+    def _effect_text(self, e):
+        if 'cards' in e:
+            return ('-%d CARD%s' % (e['cards'], 'S' if e['cards'] > 1 else ''), (255, 120, 120))
+        if 'stacks' in e:
+            return ('+%d POISON' % e['stacks'], (110, 230, 90))
+        if e.get('stun'):
+            return ('STUN', (255, 230, 80))
+        if e.get('immune'):
+            return ('STUN IMMUNE', (150, 190, 255))
+        return (None, None)
+
+    def _draw_status(self, canvas, d, t):
+        """Über jeder Puppe: Handkarten, Gift-Stapel, Betäubung (Sterne)."""
+        for side in ('L', 'R'):
+            y = self._dummy_y(side, t)
+            if y is None or y < self.DUMMY_BASE:
+                continue
+            x = self.DUMMY_X[side]
+            self.draw_text(canvas, 'HAND %d' % self.hand(side, t), 3, (x, 1236), color=(255, 255, 255), outline=None, shadow=(20, 10, 30))
+            st = self.stacks(side, t)
+            if st:
+                self.draw_text(canvas, 'POISON %d' % st, 3, (x, 1263), color=(120, 240, 100), outline=None, shadow=(10, 40, 10))
+                for i in range(min(st, 10)):                                              # Giftblasen steigen von der Puppe auf
+                    ph = (t * 0.8 + i * 0.37) % 1.0
+                    bi, bj = self.cell(x + math.sin(i * 2.7 + 3) * 95, 1750 - 460 * ph)
+                    self.rect(d, bi, bj, (110, 230, 90))
+                    if i % 2:
+                        self.rect(d, bi + 1, bj, (190, 255, 170))
+            if self.stunned(side, t):
+                cx, cy = x, 1268 - 34
+                for i in range(3):
+                    a = t * 9 + i * 2.094
+                    ci, cj = self.cell(cx + math.cos(a) * 70, cy + math.sin(a) * 16)
+                    for (da, db) in ((0, 0), (1, 0), (-1, 0), (0, 1), (0, -1)):
+                        self.rect(d, ci + da, cj + db, (255, 230, 80) if (da, db) != (0, 0) else (255, 255, 200))
+                if int(t * 6) % 2 == 0:
+                    self.draw_text(canvas, 'STUN', 3, (x, 1209), color=(255, 230, 80), outline=None, shadow=(60, 40, 0))
+
     def _draw_hit_fx(self, canvas, d, t):
         for n, (th, sd, a, k) in enumerate(self.hits):
             tau = t - th
@@ -318,9 +410,28 @@ class HopShow:
             if tau < 0.9:                                                                # Schadenszahl
                 u = tau / 0.9
                 self.draw_text(canvas, str(self.DMG), 8, (x + (110 if sd == 'L' else -110), 1250 - 130 * smooth(u)), color=(255, 244, 220), outline=(210, 20, 40), shadow=None)
-                name = ATTACKS[a][0]
-                if tau < 0.7:
-                    self.draw_text(canvas, name, 3, (x + (150 if sd == 'L' else -150), 1180 - 60 * smooth(u)), color=ATTACKS[a][1], outline=None, shadow=(20, 10, 10))
+                txt, col = self._effect_text(self.eff[k])
+                if txt and tau < 0.8:
+                    self.draw_text(canvas, txt, 3, (x + (150 if sd == 'L' else -150), 1180 - 60 * smooth(u)), color=col, outline=None, shadow=(20, 10, 10))
+            e = self.eff[k]
+            if 'cards' in e and tau < 1.0:                                               # Ochse: die Puppe verliert Handkarten
+                for c in range(e['cards']):
+                    dirx = 1 if sd == 'L' else -1
+                    vx, vy = dirx * (260 + 140 * c), -560 - 90 * c
+                    cx_, cy_ = x + vx * tau, 1330 + vy * tau + 0.5 * 1500 * tau * tau
+                    sm = self.stamp(self.mini, ('mini',), scale=self.U)
+                    canvas.paste(sm, (int(cx_ - sm.width / 2), int(cy_ - sm.height / 2)), sm)
+            if e.get('heal') and tau < 1.0:                                              # Tiger (zweiter Angriff): Ghuanjun wird geheilt
+                st_ = self.actor_state(t)
+                if st_ is not None:
+                    ax, ay = st_[0], st_[1] - 230
+                    for i in range(9):
+                        ph = (tau * 1.3 + i * 0.11) % 1.0
+                        hx, hy = ax + math.sin(i * 2.3) * 120, ay - 40 + 150 * (1 - ph) - 90 * tau
+                        ci, cj = self.cell(hx, hy)
+                        for (da, db) in ((0, 0), (1, 0), (-1, 0), (0, 1), (0, -1)):
+                            self.rect(d, ci + da, cj + db, (90, 255, 120) if (da, db) != (0, 0) else (230, 255, 230))
+                    self.draw_text(canvas, 'HEAL', 4, (ax, ay - 110 - 40 * tau), color=(110, 255, 140), outline=None, shadow=(10, 60, 20))
         for sd in ('L', 'R'):                                                            # HP bleibt bei 1
             hit_t = None
             for (th, s2, a, k) in self.hits:
@@ -351,13 +462,18 @@ class HopShow:
             turn_txt = 'READY'
         if t >= self.hits[-1][0] + 0.3:
             lit = [True, True, True]
-        labels = ('ACTION', 'BONUS', 'BONUS')
+        order = (0, 1, 2) if t < BEAT * 2 else self.ORDERS[max(0, min(turn, 9) - 1)]
+        names = ('OX', 'SNAKE', 'TIGER')
         for i in range(3):
             x = 360 + 180 * i
             col = GOLD if lit[i] else (110, 100, 120)
             sh = (60, 30, 0) if lit[i] else (30, 25, 35)
-            self.draw_text(canvas, str(i + 1), 9, (x, 112), color=col, outline=None, shadow=sh)
-            self.draw_text(canvas, labels[i], 3, (x, 178), color=(255, 120, 100) if (lit[i] and i > 0) else (200, 200, 210) if lit[i] else (110, 100, 120), outline=None, shadow=(20, 10, 20))
+            self.draw_text(canvas, str(i + 1), 9, (x, 108), color=col, outline=None, shadow=sh)
+            if lit[i]:
+                self.draw_text(canvas, names[order[i]], 3, (x, 166), color=ATTACKS[order[i]][1], outline=None, shadow=(20, 10, 20))
+                self.draw_text(canvas, 'ACTION' if i == 0 else 'BONUS', 2, (x, 192), color=(200, 200, 210) if i == 0 else (255, 120, 100), outline=None, shadow=(20, 10, 20))
+            else:
+                self.draw_text(canvas, 'ACTION' if i == 0 else 'BONUS', 3, (x, 172), color=(110, 100, 120), outline=None, shadow=(20, 10, 20))
         if turn_txt:
             self.draw_text(canvas, turn_txt, 4, (125, 90), color=(255, 120, 100), outline=None, shadow=(30, 10, 20))
         n_hits = sum(1 for h in self.hits if t >= h[0])
@@ -381,6 +497,7 @@ class HopShow:
                     r = 2 + 6 * ease_out(tau / 0.35)
                     ci, cj = self.cell(xl + 90 * math.cos(ang) * (1 if j % 2 else -1) * 0.3, 1796)
                     self.rect(d, ci + int(round(math.cos(ang) * r * (1 if j % 2 else -1))), cj - int(round(math.sin(ang) * r * 0.6)), (200, 190, 170))
+        self._draw_status(canvas, d, t)
         self._draw_hit_fx(canvas, d, t)
         self._draw_hud(canvas, t)
 
@@ -433,6 +550,10 @@ class HopShow:
         'clamp':   [('negate', -6)],                                                    # LP bleiben bei 1
         'drop':    [('placement', -8)],
         'burst':   [('creature_destroyed', -6)],
+        'discard': [('discard', -6)],                                                   # die Puppe verliert Handkarten
+        'heal':    [('heal', -6)],                                                      # Ghuanjun wird geheilt
+        'stun':    [('debuff', -7)],                                                    # Betäubung
+        'resist':  [('negate', -9)],                                                    # Betäubung wirkt nicht
     }
 
     def sfx_events(self):
@@ -450,10 +571,19 @@ class HopShow:
             add(t, 'hop')
         for n, (th, sd, a, k) in enumerate(self.hits):
             add(th, ('ox', 'snake', 'tiger')[a]); add(th + 0.04, 'hit')
-            if k % 3 > 0:
+            e = self.eff[k]
+            if e['pos'] > 0:
                 add(th + 0.1, 'bonus')
+            if 'cards' in e:
+                add(th + 0.12, 'discard')
+            if e.get('heal'):
+                add(th + 0.12, 'heal')
+            if e.get('stun'):
+                add(th + 0.12, 'stun')
+            if e.get('immune'):
+                add(th + 0.12, 'resist')
             ev.append((th + 0.05, 'ping', -10))
-            if k % 3 == 0:
+            if self.eff[k]['pos'] == 0:
                 add(th - 0.3, 'turn')
             if self.HP0 - self.DMG * sum(1 for h in self.hits if h[1] == sd and h[0] <= th) <= 0:
                 add(th + 0.12, 'clamp')

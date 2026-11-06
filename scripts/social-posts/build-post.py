@@ -716,7 +716,7 @@ def main():
                 im_, pad_ = _ac[key_]
                 return im_, pad_, spr.center_x, spr.foot
             hg = dict(logo_rect=wgeom['logo_rect'], logo_img=logo, badge_rect=badge_rect, badge_img=badge_img, plate_rect=(plate_x, plate_y, plate.width, plate.height),
-                      grid=(sx, sy, spr.px), draw_text=draw_text, home=(sx + spr.center_x * spr.px, sy + spr.foot * spr.px), actor_fn=actor_fn, assets_dir=str(AD))
+                      grid=(sx, sy, spr.px), draw_text=draw_text, home=(sx + spr.center_x * spr.px, sy + spr.foot * spr.px), actor_fn=actor_fn, assets_dir=str(AD), cardback_path=str(ROOT / 'public' / 'cardback.png'))
             wind = hopfx.HopShow(W, H, U, float(fps), loop, hg, loop * WIND_LOOPS / float(fps))
         elif rockshow_on:
             import rockfx
