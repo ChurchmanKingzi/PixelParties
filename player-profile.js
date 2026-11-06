@@ -25,6 +25,7 @@
 //  eigene Trio-Gruppe. Neue Runden sind damit exakt, alte bestmöglich.
 // ═══════════════════════════════════════════════════════════════
 'use strict';
+const { itemIdOfUrl } = require('./frame-ids');
 
 // Glättung wie bei den Top-Heroes (`HERO_RANK_PRIOR_*` in server.js):
 // jedes Deck startet mit 5 Phantom-Spielen à 50 %, damit ein 1-0-Deck
@@ -247,11 +248,7 @@ async function buildPlayerProfile(deps, username, viewerId) {
     const rows = await db.all('SELECT item_type, item_id, dupes FROM user_shop_items WHERE user_id = ? AND dupes > 0', [user.id]);
     for (const r of rows) if (dupes[r.item_type]) dupes[r.item_type][r.item_id] = Math.min(8, Number(r.dupes) || 0);
   } catch {}
-  const shopId = (url, dir) => {
-    const m = new RegExp('^/data/shop/' + dir + '/([^/]+)\\.[a-z]+$', 'i').exec(String(url || ''));
-    if (!m) return null;
-    try { return decodeURIComponent(m[1]); } catch { return m[1]; }
-  };
+  const shopId = (url, dir) => itemIdOfUrl(url, dir);
 
   return {
     username: user.username,

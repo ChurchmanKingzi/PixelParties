@@ -3489,7 +3489,7 @@ function ProfileScreen() {
                     {/* Default sleeve */}
                     <div className={'profile-cb-gallery-item' + (!cardback ? ' active' : '')} role="button" tabIndex={0} onClick={() => quickSaveSleeve(null)}>
                       <div className="profile-cb-gallery-card">
-                        <img src="/cardback.png" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                        <FramedImg src="/cardback.png" kind="sleeve" dupes={frameDupes.sleeve.default} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                       </div>
                       <div className="profile-cb-gallery-label">Default</div>
                     </div>
@@ -3540,7 +3540,7 @@ function ProfileScreen() {
                         <div key={file} className={'profile-avatar-gallery-item' + (avatar === url ? ' active' : '')} role="button" tabIndex={0}
                           onClick={() => quickSaveAvatar(url)} {...avatarTipProps(ppCamelSpaces(file.replace(/\.[^.]+$/, '')))}>
                           <div className="profile-avatar-gallery-img">
-                            <img src={url} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                            <FramedImg src={url} kind="avatar" dupes={frameDupes.avatar['std:' + file.replace(/\.[^.]+$/, '')]} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                           </div>
                         </div>
                       );
@@ -4552,6 +4552,8 @@ function ShopScreen() {
   const [owned, setOwned] = useState({ avatar: [], sleeve: [], board: [], skin: [] });
   // Kopien über das Original hinaus = Rang des Rahmens (1 Silber … maxDupes Obsidian), je Item; Duplikate beim Ziehen steigern ihn
   const [dupes, setDupes] = useState({ avatar: {}, sleeve: {}, skin: {} });
+  // Besessene Items außerhalb des Shop-Pools (Standard-/Gegner-Avatare, Standard-/Gegner-Sleeves, exklusive Skins): nur als Kopie ziehbar
+  const [extras, setExtras] = useState({ avatar: [], sleeve: [], skin: [] });
   const [maxDupes, setMaxDupes] = useState(8);
   const [structureCatalog, setStructureCatalog] = useState(null); // { decks, price, randomPrice, defaultDeckId }
   // Gegner-Sleeves (cpu-sleeves.js): nicht käuflich, fünf Siege gegen die CPU schalten sie frei.
@@ -4606,6 +4608,7 @@ function ShopScreen() {
         setOwned(ownData.owned);
         setDupes({ avatar: {}, sleeve: {}, skin: {}, ...(ownData.dupes || {}) });
         if (ownData.maxDupes) setMaxDupes(ownData.maxDupes);
+        setExtras({ avatar: [], sleeve: [], skin: [], ...(ownData.extras || {}) });
         setStructureCatalog(structData);
         if (cpuData) setCpuSleeves(cpuData);
         if (cpuAvData) setCpuAvatars(cpuAvData);
@@ -4843,8 +4846,9 @@ function ShopScreen() {
       const subdir = itemType === 'avatar' ? 'avatars' : 'sleeves';
       const noun = itemType === 'avatar' ? 'Avatar' : 'Sleeve';
       setRandomReveal({
-        imgUrl: '/data/shop/' + subdir + '/' + encodeURIComponent(data.itemId) + '.png',
-        label: itemType === 'sleeve' ? ((catalog.sleeves || []).find(s => s.id === data.itemId)?.name || null) : null,
+        // Start-/Gegner-Items kommen mit ihrer eigenen Bild-URL und ihrem Namen vom Server (`data.extra`)
+        imgUrl: data.extra && data.extra.src ? data.extra.src : '/data/shop/' + subdir + '/' + encodeURIComponent(data.itemId) + '.png',
+        label: data.extra && data.extra.name ? data.extra.name : (itemType === 'sleeve' ? ((catalog.sleeves || []).find(s => s.id === data.itemId)?.name || null) : null),
         subtitle: data.isNew ? 'New ' + noun + '!' : frameName(data.dupes) + '! (' + data.dupes + '/' + maxDupes + ')',
         kind, isNew: data.isNew, dupes: data.dupes, frameKind: itemType,        // Rahmen wird beim Anzeigen eingebacken (useFramedSrc)
       });
@@ -4926,12 +4930,13 @@ function ShopScreen() {
             const equipped = isOwned && isEquipped('sleeve', item.id);
             const hidden = !isOwned && !item.opponentKnown;
             return (
-              <div key={item.id} className={'shop-item shop-cpu-sleeve' + (isOwned ? ' shop-owned' : ' shop-unowned-skin') + (equipped ? ' shop-equipped' : '') + (hidden ? ' shop-cpu-sleeve-hidden' : '')}
+              <div key={item.id} className={'shop-item shop-cpu-sleeve' + (isOwned && dupes.sleeve[item.id] > 0 ? ' shop-item-ranked' : '') + (isOwned ? ' shop-owned' : ' shop-unowned-skin') + (equipped ? ' shop-equipped' : '') + (hidden ? ' shop-cpu-sleeve-hidden' : '')}
                 onClick={() => isOwned && !equipped && equipItem('sleeve', item.id)}>
                 <span className="shop-item-zier" aria-hidden="true" />
                 <div className="shop-item-img-wrap">
-                  <img src={'/data/shop/sleeves/' + encodeURIComponent(item.file)} draggable={false}
-                    className={isOwned ? '' : 'shop-skin-locked'} />
+                  {isOwned && dupes.sleeve[item.id] > 0
+                    ? <FramedImg src={'/data/shop/sleeves/' + encodeURIComponent(item.file)} kind="sleeve" dupes={dupes.sleeve[item.id]} draggable={false} title={frameName(dupes.sleeve[item.id])} />
+                    : <img src={'/data/shop/sleeves/' + encodeURIComponent(item.file)} draggable={false} className={isOwned ? '' : 'shop-skin-locked'} />}
                   {equipped ? <div className="shop-owned-badge shop-equipped-badge">EQUIPPED</div>
                     : isOwned ? <div className="shop-owned-badge">OWNED</div> : (
                       <div className="shop-lock-overlay">
@@ -4972,12 +4977,13 @@ function ShopScreen() {
             const equipped = isOwned && isEquipped('avatar', item.id);
             const hidden = !isOwned && !item.opponentKnown;
             return (
-              <div key={item.id} className={'shop-item shop-avatar-item shop-sq-item shop-cpu-sleeve' + (isOwned ? ' shop-owned' : ' shop-unowned-skin') + (equipped ? ' shop-equipped' : '') + (hidden ? ' shop-cpu-sleeve-hidden' : '')}
+              <div key={item.id} className={'shop-item shop-avatar-item shop-sq-item shop-cpu-sleeve' + (isOwned && dupes.avatar[item.id] > 0 ? ' shop-item-ranked' : '') + (isOwned ? ' shop-owned' : ' shop-unowned-skin') + (equipped ? ' shop-equipped' : '') + (hidden ? ' shop-cpu-sleeve-hidden' : '')}
                 onClick={() => isOwned && !equipped && equipItem('avatar', item.id)}>
                 <span className="shop-item-zier" aria-hidden="true" />
                 <div className="shop-item-img-wrap">
-                  <img src={'/data/shop/avatars/' + encodeURIComponent(item.file)} draggable={false}
-                    className={isOwned ? '' : 'shop-skin-locked'} />
+                  {isOwned && dupes.avatar[item.id] > 0
+                    ? <FramedImg src={'/data/shop/avatars/' + encodeURIComponent(item.file)} kind="avatar" dupes={dupes.avatar[item.id]} draggable={false} title={frameName(dupes.avatar[item.id])} />
+                    : <img src={'/data/shop/avatars/' + encodeURIComponent(item.file)} draggable={false} className={isOwned ? '' : 'shop-skin-locked'} />}
                   {equipped ? <div className="shop-owned-badge shop-equipped-badge">EQUIPPED</div>
                     : isOwned ? <div className="shop-owned-badge">OWNED</div> : (
                       <div className="shop-lock-overlay">
@@ -5042,7 +5048,10 @@ function ShopScreen() {
     const ownedN = items.length - missing.length;
     const pct = Math.round(100 * ownedN / items.length);
     const dp = dupes[type] || {};
-    const eligible = items.filter(it => (dp[it.id] || 0) < maxDupes);          // alles, was noch nicht auf dem Maximum-Rang ist
+    // Pool = Katalog + schon besessene Extras (Start-/Gegner-Items, exklusive Skins); Extras sind nur als Kopie ziehbar
+    const extraItems = (extras[type] || []).map(x => ({ id: x.id, name: x.name, sub: x.heroName, heroName: x.heroName, extra: true,
+      src: x.src || ('/cards/skins/' + encodeURIComponent(x.id) + '.png') }));
+    const eligible = [...items, ...extraItems].filter(it => (dp[it.id] || 0) < maxDupes);          // alles, was noch nicht auf dem Maximum-Rang ist
     const canPull = !buying && eligible.length > 0 && (user.sc || 0) >= price;
     const pull = (e) => (type === 'skin' ? buyRandomSkin(e) : buyRandom(type, e));
     const pullLabel = (

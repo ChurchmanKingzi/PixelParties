@@ -4222,7 +4222,9 @@ app.get('/api/shop/owned', authMiddleware, async (req, res) => {
     sleeve: Object.fromEntries(owned.sleeve.map(id => [id, cpuSleeves.nameOf(id) || sleeveDisplayName(id)])),
     avatar: Object.fromEntries(owned.avatar.map(id => [id, cpuAvatars.nameOf(id) || avatarDisplayName(id)])),
   };
-  res.json({ owned, names, dupes, maxDupes: MAX_DUPES });
+  // Besessene Items außerhalb des Shop-Pools (Standard-/Gegner-Avatare, Standard-/Gegner-Sleeves, exklusive Skins): als Kopie ziehbar
+  const extras = { avatar: await extraPullItems(req.user.userId, 'avatar'), sleeve: await extraPullItems(req.user.userId, 'sleeve'), skin: await extraPullItems(req.user.userId, 'skin') };
+  res.json({ owned, names, dupes, maxDupes: MAX_DUPES, extras });
 });
 
 // GET /api/shop/cpu-sleeves — Gegner-Sleeves mit Fortschritt (cpu-sleeves.js)
@@ -4295,10 +4297,44 @@ app.post('/api/shop/buy', authMiddleware, async (req, res) => {
 const MAX_DUPES = 8;
 
 /** Id eines Shop-Bildes aus seiner URL (/data/shop/<subdir>/<id>.png), sonst null. */
-function shopIdOfUrl(url, subdir) {
-  const m = new RegExp('^/data/shop/' + subdir + '/([^/]+)\\.[a-z]+$', 'i').exec(String(url || ''));
-  if (!m) return null;
-  try { return decodeURIComponent(m[1]); } catch { return m[1]; }
+const { itemIdOfUrl } = require('./frame-ids');
+function shopIdOfUrl(url, subdir) { return itemIdOfUrl(url, subdir); }
+
+/**
+ * Items, die man schon besitzt, aber nicht im Shop-Pool stehen: sie kommen als DUPLIKATE in den Gacha-Pool (Rahmen-Rang).
+ *   Avatare  Standard-Avatare von Anfang an ('std:<Name>'), freigeschaltete Gegner-Avatare
+ *   Sleeves  Standard-Sleeve ('default'), freigeschaltete Gegner-Sleeves
+ *   Skins    freischaltbare/exklusive Skins, sobald man sie besitzt (die erste Kopie)
+ * Liefert [{ id, src?, name, heroName? }]; `src` fehlt bei Skins (der Client baut die Karten-URL selbst).
+ */
+async function extraPullItems(userId, itemType) {
+  const out = [];
+  if (!userId) return out;
+  if (itemType === 'avatar') {
+    try {
+      for (const f of fs.readdirSync(path.join(__dirname, 'public', 'avatars'), { withFileTypes: true })) {
+        if (!f.isFile() || !IMAGE_EXTS.has(path.extname(f.name).toLowerCase())) continue;
+        const stem = path.basename(f.name, path.extname(f.name));
+        out.push({ id: 'std:' + stem, src: '/avatars/' + encodeURIComponent(f.name), name: stem });
+      }
+    } catch {}
+    for (const id of await cpuAvatars.ownedIds(userId)) {
+      if (shopIds('avatars').has(id)) out.push({ id, src: '/data/shop/avatars/' + encodeURIComponent(id) + '.png', name: cpuAvatars.nameOf(id) || avatarDisplayName(id) });
+    }
+  } else if (itemType === 'sleeve') {
+    out.push({ id: 'default', src: '/cardback.png', name: 'Default Sleeve' });
+    for (const id of await cpuSleeves.ownedIds(userId)) {
+      if (shopIds('sleeves').has(id)) out.push({ id, src: '/data/shop/sleeves/' + encodeURIComponent(id) + '.png', name: cpuSleeves.nameOf(id) || sleeveDisplayName(id) });
+    }
+  } else if (itemType === 'skin') {
+    const rows = await db.all("SELECT item_id FROM user_shop_items WHERE user_id = ? AND item_type = 'skin'", [userId]);
+    for (const r of rows) {
+      if (!isUnlockableSkin(r.item_id)) continue;
+      const heroName = heroOfSkin(r.item_id);
+      if (heroName) out.push({ id: r.item_id, name: r.item_id, heroName });
+    }
+  }
+  return out;
 }
 
 /** Kopien-Zähler des Spielers je Typ: { avatar: {id: n}, sleeve: {...}, skin: {...} } (nur Items mit n > 0). */
@@ -4326,12 +4362,19 @@ async function framesForPlayer(userId, usr, deckSkins) {
  * Zieht ein zufälliges Item aus `pool` (Ids): der ganze Pool, außer was schon das Maximum erreicht hat. Besitzt der Spieler es schon,
  * steigt `dupes` um 1 (Upgrade), sonst wird es neu eingetragen. Liefert { id, isNew, dupes } oder null, wenn alles auf dem Maximum ist.
  */
-async function pullFromPool(userId, itemType, pool) {
+async function pullFromPool(userId, itemType, pool, preowned = []) {
   const rows = await db.all('SELECT item_id, dupes FROM user_shop_items WHERE user_id = ? AND item_type = ?', [userId, itemType]);
   const have = new Map(rows.map(r => [r.item_id, r.dupes || 0]));
-  const eligible = pool.filter(id => !have.has(id) || have.get(id) < MAX_DUPES);
+  // `preowned`: schon besessene Items außerhalb des Shop-Pools (Standard-/Gegner-Avatare und -Sleeves, exklusive Skins) –
+  // sie sind NUR als Duplikat ziehbar; ohne eigene Zeile zählt der erste Treffer als erste Kopie (Rang 1).
+  const extra = preowned.filter(id => !pool.includes(id));
+  const eligible = [...pool, ...extra].filter(id => !have.has(id) || have.get(id) < MAX_DUPES);
   if (!eligible.length) return null;
   const id = eligible[Math.floor(Math.random() * eligible.length)];
+  if (!have.has(id) && extra.includes(id)) {
+    await db.run('INSERT INTO user_shop_items (id, user_id, item_type, item_id, dupes) VALUES (?, ?, ?, ?, 1)', [uuidv4(), userId, itemType, id]);
+    return { id, isNew: false, dupes: 1 };
+  }
   if (have.has(id)) {
     const dupes = have.get(id) + 1;
     await db.run('UPDATE user_shop_items SET dupes = ? WHERE user_id = ? AND item_type = ? AND item_id = ?', [dupes, userId, itemType, id]);
@@ -4347,7 +4390,9 @@ app.post('/api/shop/buy-random-skin', authMiddleware, async (req, res) => {
   if ((user.sc || 0) < RANDOM_PRICES.skin) return res.status(400).json({ error: 'Not enough SC' });
 
   const heroOf = new Map(getAvailableSkins().map(s => [s.skinName, s.heroName]));
-  const got = await pullFromPool(req.user.userId, 'skin', [...heroOf.keys()]);
+  const extras = await extraPullItems(req.user.userId, 'skin');           // exklusive Skins, die man schon besitzt: ab jetzt als Kopie ziehbar
+  for (const x of extras) heroOf.set(x.id, x.heroName);
+  const got = await pullFromPool(req.user.userId, 'skin', getAvailableSkins().map(s => s.skinName), extras.map(x => x.id));
   if (!got) return res.status(400).json({ error: 'All skins are at maximum rank!' });
   await db.run('UPDATE users SET sc = sc - ? WHERE id = ?', [RANDOM_PRICES.skin, req.user.userId]);
 
@@ -4369,12 +4414,14 @@ app.post('/api/shop/buy-random', authMiddleware, async (req, res) => {
   const allItems = scanShopDir(subdir).map(f => path.basename(f, path.extname(f)))
     .filter(id => itemType !== 'sleeve' || !cpuSleeves.isCpuSleeve(id))
     .filter(id => itemType !== 'avatar' || !cpuAvatars.isCpuAvatar(id));
-  const got = await pullFromPool(req.user.userId, itemType, allItems);
+  const extras = await extraPullItems(req.user.userId, itemType);         // Start-/Gegner-Items: nur als Kopie ziehbar
+  const got = await pullFromPool(req.user.userId, itemType, allItems, extras.map(x => x.id));
   if (!got) return res.status(400).json({ error: 'All ' + subdir + ' are at maximum rank!' });
+  const extra = extras.find(x => x.id === got.id) || null;
   await db.run('UPDATE users SET sc = sc - ? WHERE id = ?', [price, req.user.userId]);
 
   const updated = await db.get('SELECT * FROM users WHERE id = ?', [req.user.userId]);
-  res.json({ ok: true, sc: updated.sc, itemId: got.id, itemType, isNew: got.isNew, dupes: got.dupes });
+  res.json({ ok: true, sc: updated.sc, itemId: got.id, itemType, isNew: got.isNew, dupes: got.dupes, extra: extra ? { src: extra.src, name: extra.name } : null });
 });
 
 // ───── Structure decks (shop-gated sample decks) ─────
