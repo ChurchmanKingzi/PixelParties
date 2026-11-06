@@ -56,16 +56,16 @@ Datei: `elana-the-rocky-rebel.mp4`
 
 **Caption**
 
-> Hate your hand? Shuffle it away. 🎸
+> One chord. Fresh hand. +1 card. 🎸🔥
 >
-> Once per turn, Elana shuffles your entire hand back into your deck, then you draw the same number of cards +1. A fresh start, with a bonus card, every single turn.
+> Elana is the rock star of the Pixel Parties world, and her gigs are a draw engine: once per turn she shuffles your entire hand back into your deck, then you draw the same number of cards +1. Every turn, a bigger hand.
 >
 > Pixel Parties is a free online TCG about assembling your party of Heroes and annihilating your opponent's party!
 > 👉 Play for free: pixelpartiestcg.com (link in bio)
 >
-> #PixelParties #TCG #CardGame #PixelArt #IndieGame #TradingCardGame #FreeToPlay #Rockstar #Guitar
+> #PixelParties #TCG #CardGame #PixelArt #IndieGame #TradingCardGame #FreeToPlay #Rockstar #Guitar #Concert
 
-**Alt-Text**: Animated pixel art trading card of Elana, the Rocky Rebel, with floating music notes, green sparkles and golden glints around the hero.
+**Alt-Text**: Animated pixel art trading card of Elana, the Rocky Rebel, with a pixel rock star with a red guitar, fire fountains and a cheering medieval crowd, while a hand of cards is shuffled into the deck and one more card is drawn around the hero.
 
 ---
 
