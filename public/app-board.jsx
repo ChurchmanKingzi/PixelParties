@@ -2908,13 +2908,34 @@ const HeroIdleAnims = (() => {
       // sie sich bewegt. Höchstens 400, fest verwürfelt.
       const frames = Math.max(1, meta.frames | 0);
       const zaehler = new Uint16Array(fw * fh);
+      const belegt = new Uint8Array(frames * fh * fw);   // je Bild und Zeile: deckende Pixel (für die Kopf-Rechtskante der Status-Symbole)
       for (let y = 0; y < h; y++) {
         for (let x = 0; x < w; x++) {
           if (d[(y * w + x) * 4 + 3] < 160) continue;
           const lx = vertikal ? x : x % fw, ly = vertikal ? y % fh : y;
           zaehler[ly * fw + lx]++;
+          const fi = vertikal ? Math.floor(y / fh) : Math.floor(x / fw);
+          if (fi < frames) belegt[(fi * fh + ly) * fw + lx] = 1;
         }
       }
+      // Rechte Kante des KOPFES (nicht der ganzen Figur): in den obersten ~30 % der Figur je Bild und Zeile der waagrechte Pixelstreifen, der an der Kopfmitte (`kopfX`) hängt;
+      // das Maximum über alle Bilder. Ragt ein Detail (Andras' Flammenarme, Flügel, Waffen) weit nach rechts, sitzt die Statusanzeige trotzdem am Kopf, nicht am Detail.
+      const kopfMitte = Math.round(n ? summe / n : (x0 + x1) / 2), bandBis = y0 + Math.max(2, Math.round((y1 - y0) * 0.3));
+      let kopfX1 = 0;
+      for (let fi = 0; fi < frames; fi++) {
+        for (let ly = y0; ly < Math.min(fh, bandBis); ly++) {
+          const basis = (fi * fh + ly) * fw;
+          let start = -1;
+          for (let dx = 0; dx <= 4 && start < 0; dx++) {
+            if (kopfMitte + dx < fw && belegt[basis + kopfMitte + dx]) start = kopfMitte + dx;
+            else if (kopfMitte - dx >= 0 && belegt[basis + kopfMitte - dx]) start = kopfMitte - dx;
+          }
+          if (start < 0) continue;
+          let r = start; while (r + 1 < fw && belegt[basis + r + 1]) r++;
+          if (r + 1 > kopfX1) kopfX1 = r + 1;
+        }
+      }
+      kopfX1 = kopfX1 ? Math.min(kopfX1, Math.round(kopfMitte + (x1 - x0) * 0.4)) : Math.round(kopfMitte + (x1 - x0) * 0.2);
       let punkte = [];
       const schwelle = Math.max(1, Math.round(frames * 0.6));
       for (let i = 0; i < zaehler.length; i++) if (zaehler[i] >= schwelle) punkte.push([i % fw, Math.floor(i / fw)]);
@@ -2925,7 +2946,7 @@ const HeroIdleAnims = (() => {
         const t = punkte[i]; punkte[i] = punkte[j]; punkte[j] = t;
       }
       punkte = punkte.slice(0, 400);
-      return { x0, y0, x1, y1, kopfX: n ? summe / n : (x0 + x1) / 2, punkte };
+      return { x0, y0, x1, y1, kopfX: n ? summe / n : (x0 + x1) / 2, kopfX1, punkte };
     } catch { return rueckfall; }
   }
 
@@ -4173,7 +4194,7 @@ function HeroIdleSprite({ cardName, angehalten, versteinert, eingefroren, effekt
               <canvas ref={canvasRef} width={fw} height={fh} className="hero-idle-canvas" style={canvasStil} />
               {statusIcons && (statusIcons.burn || statusIcons.poison || statusIcons.bleed) && (
                 <HeroStatusSymbole st={statusIcons} k={Math.max(1, Math.min(3, Math.round(s * (parseFloat(document.documentElement.style.getPropertyValue('--board-scale')) || 1) / 1.4)))}
-                  links={`calc(${bs(kern.x1 * s + 3)})`} oben={`calc(${bs((kern.y0 + ch * 0.18) * s)})`} />
+                  links={`calc(${bs((kern.kopfX1 || kern.x1) * s + 3)})`} oben={`calc(${bs((kern.y0 + ch * 0.18) * s)})`} />
               )}
               {eisPhase !== 'weg' && (
                 <HeroEiskruste quelleRef={canvasRef} breite={fw} hoehe={fh} rand={EIS_RAND}
