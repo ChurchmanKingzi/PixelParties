@@ -614,7 +614,7 @@ class HopShow:
         'ox':      [('attack_ram', -5)],
         'snake':   [('poison', -7)],
         'tiger':   [('slash', -5)],
-        'hop':     [('placement', -19)],                                                # jede Landung
+        'hop':     [('elem_wind', -19, 0.0, 1.45, 0.2)],                                # leises Sprung-Geräusch bei jedem Absprung (kurzes, hohes Wuschen)
         'bonus':   [('buff', -9)],                                                      # Bonus-Aktion
         'num':     [('ping', -10)],                                                     # eine Zahl der Kombo leuchtet
         'turn':    [('turn_start', -8)],
@@ -634,12 +634,12 @@ class HopShow:
 
         def add(t, kind):
             for item in self.SND[kind]:
-                ev.append((t + (item[2] if len(item) > 2 else 0.0), item[0], item[1]))
+                ev.append((t + (item[2] if len(item) > 2 else 0.0), item[0], item[1]) + tuple(item[3:]))
         add(0.0, 'explode')
         for i, th in enumerate((0.0, 0.36, 0.72)):                                      # Hook: 1-2-3
             add(th, ('ox', 'snake', 'tiger')[i]); add(th + 0.02, 'num')
         add(self.t_in['L'] + 0.4, 'drop'); add(self.t_in['R'] + 0.4, 'drop')
-        for (t, spot, hit) in self.kf[1:]:
+        for (t, spot, hit) in self.kf[:-1]:                                              # Absprung = Beginn jedes Sprungs
             add(t, 'hop')
         for n, (th, sd, a, k) in enumerate(self.hits):
             add(th, ('ox', 'snake', 'tiger')[a]); add(th + 0.04, 'hit')
