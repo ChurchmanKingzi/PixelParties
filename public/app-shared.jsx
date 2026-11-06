@@ -1964,6 +1964,14 @@ window.ppPixelPartikel = ppPixelPartikel;
 //   Avatar / Sleeve   ppRankFrames.bakeUrl(url, kind, rank) → data-URL;  Hook useFramedSrc / <FramedImg>;  im Duell useFramedPlayer(p)
 //   Skin-Karten       `?rahmen=<Kopien>` an der Karten-URL (card-image-shim.js backt ihn beim Zeichnen der Karte ein);
 //                     cardImageUrl(held, skins) hängt ihn selbst an, wenn dem Skin-Objekt Ränge zugeordnet sind (ppSkinRanksSet / ppSkinMerge)
+/** Karten-URL ohne `?rahmen=N` (Tooltips zeigen den Rang-Rahmen nie). */
+function ppOhneRahmen(url) { return url ? url.replace(/[?&]rahmen=\d+/, '') : url; }
+/** Id eines Shop-Bildes aus seiner URL (/data/shop/<subdir>/<id>.png), sonst null (Gegenstück zu shopIdOfUrl im Server). */
+function ppShopIdOfUrl(url, subdir) {
+  const m = new RegExp('^/data/shop/' + subdir + '/([^/]+)\\.[a-z]+$', 'i').exec(String(url || ''));
+  if (!m) return null;
+  try { return decodeURIComponent(m[1]); } catch { return m[1]; }
+}
 function ppFrameRank(dupes) { return window.ppRankFrames ? window.ppRankFrames.rankOf(dupes) : null; }
 const _ppSkinRanks = new WeakMap();           // Skin-Zuordnung { Held: Skin } → { Held: Kopien }
 /** Ordnet einer Skin-Zuordnung (Held → Skin) die Ränge zu (`ranksBySkin`: Skin → Kopien, so schickt sie der Server). Liefert dieselbe Zuordnung zurück. */
@@ -2014,7 +2022,7 @@ function useFramedPlayer(p) {
     return { ...p, avatar: (aR != null && av) || p.avatar, cardback: (cR != null && cb) || p.cardback };
   }, [p, av, cb, aR, cR]);
 }
-window.ppFrameRank = ppFrameRank; window.ppSkinRanksSet = ppSkinRanksSet; window.ppSkinMerge = ppSkinMerge;
+window.ppOhneRahmen = ppOhneRahmen; window.ppShopIdOfUrl = ppShopIdOfUrl; window.ppFrameRank = ppFrameRank; window.ppSkinRanksSet = ppSkinRanksSet; window.ppSkinMerge = ppSkinMerge;
 window.useFramedSrc = useFramedSrc; window.FramedImg = FramedImg; window.useFramedPlayer = useFramedPlayer;
 
 window.PxZeichen = PxZeichen;
@@ -8610,8 +8618,9 @@ function TouchScrollbar({ scrollRef }) {
 }
 window.TouchScrollbar = TouchScrollbar;
 
-function CardSideTooltip({ card, imgUrl, inGallery }) {
+function CardSideTooltip({ card, imgUrl: imgUrl0, inGallery }) {
   if (!card) return null;
+  const imgUrl = ppOhneRahmen(imgUrl0);   // Tooltips zeigen nie den Rang-Rahmen (er würde Werte/Text der Karte verdecken)
   const foilType = card.foil;
   const bonus = ascensionBonusText(card);
   const effectText = ttEffectText(card.effect, bonus);
@@ -10207,7 +10216,8 @@ function CardTooltipContent({ card, children, imageUrl }) {
   // imageUrl prop forces a specific asset (used by the shop to show a
   // skin portrait in the hover preview while still listing the base
   // hero's stats).
-  const imgUrl = imageUrl || card._skinUrl || cardImageUrl(card.name);
+  // Rang-Rahmen (`?rahmen=N`) gehören nicht in den Tooltip: dort würden sie Werte und Details der Karte verdecken.
+  const imgUrl = ppOhneRahmen(imageUrl || card._skinUrl || cardImageUrl(card.name));
   const foilType = card.foil || null;
   const displayName = card.displayName || card.name;
   // Die HP AUF DER KARTE zeigen die aktuelle max. HP, sobald sie von der

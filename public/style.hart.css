@@ -1,4 +1,4 @@
-/* PP-HART-GEBACKEN b3e303e01297423d — ERZEUGT von scripts/hart/build-css.js aus style.css (pixel-hart.js vorab angewandt) — nicht von Hand ändern. */
+/* PP-HART-GEBACKEN 41f125fa1b63caf2 — ERZEUGT von scripts/hart/build-css.js aus style.css (pixel-hart.js vorab angewandt) — nicht von Hand ändern. */
 .pp-hart-gebacken { --pp-hart: 1; }
 @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Rajdhani:wght@400;500;600;700&family=Orbitron:wght@400;500;600;700;800;900&display=swap');
 
@@ -22301,6 +22301,15 @@ body[data-tb-hl] .hero-idle-platz.hero-idle-hover { scale: none; }
 }
 .ppf-empty { color: var(--text2); font-size: 12px; text-align: center; padding: 14px 6px; }
 .ppf-loading { animation: menu-live-pulse 1.4s ease-in-out infinite; }
+
+/* Vitrine: Avatar und Sleeve mit Rang-Rahmen, ganzzahlig vergrößert */
+.ppf-vitrine { display: flex; justify-content: center; align-items: flex-end; gap: 28px; padding: 6px 0 4px; }
+.ppf-vitrine-item { display: flex; flex-direction: column; align-items: center; gap: 6px; }
+.ppf-vitrine-item img { display: block; image-rendering: pixelated; }
+.ppf-vitrine-item.is-avatar img { width: 140px; height: 140px; }
+.ppf-vitrine-item.is-sleeve img { width: 100px; height: 140px; }
+.ppf-vitrine-label { font-size: 11px; color: var(--text2); letter-spacing: .5px; text-transform: uppercase; }
+.ppf-vitrine-label b { color: var(--ppf-color); }
 
 /* Top-Decks */
 .ppf-decks { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }

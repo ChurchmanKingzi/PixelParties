@@ -2763,6 +2763,7 @@ function ProfileScreen() {
   const [uploadedCardbacks, setUploadedCardbacks] = useState([]);
   const [ownedSleeves, setOwnedSleeves] = useState([]);
   const [sleeveNames, setSleeveNames] = useState({});
+  const [frameDupes, setFrameDupes] = useState({ avatar: {}, sleeve: {}, skin: {} });   // Rang-Rahmen (Duplikate) je Item
 
   // Battle-Track: gewählter Kampf-Track (der Gegner hört ihn). Allgemeine
   // Tracks stehen offen, CPU-Themen werden nach 10 Siegen gegen die CPU frei.
@@ -2877,6 +2878,7 @@ function ProfileScreen() {
       setSleeveNames(d.names?.sleeve || {});
       setOwnedBoards(d.owned?.board || []);
       setOwnedSkinIds(d.owned?.skin || []);
+      setFrameDupes({ avatar: {}, sleeve: {}, skin: {}, ...(d.dupes || {}) });
     }).catch(() => {});
   }, []);
   const selectHeroSkin = async (hero, skin) => {
@@ -3096,6 +3098,11 @@ function ProfileScreen() {
     return '/cards/' + AVAILABLE_MAP[cardName];
   };
 
+  // Rang-Rahmen (Duplikate aus dem Gacha) der gewählten Items; FramedImg backt den Rahmen ins Bild
+  const avatarDupes = (url) => frameDupes.avatar[window.ppShopIdOfUrl(url, 'avatars')] || 0;
+  const sleeveDupes = (url) => frameDupes.sleeve[window.ppShopIdOfUrl(url, 'sleeves')] || 0;
+  window.ppSkinRanksSet(user.heroSkins, frameDupes.skin);   // Top-Helden: Skin-Karten mit Rahmen
+
   // Display URL for current cardback (show default if none selected)
   const displayCardback = cardback || '/cardback.png';
 
@@ -3123,7 +3130,7 @@ function ProfileScreen() {
                 onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setShowAvatarGallery(true); } }}>
                 <div className="profile-avatar-inner">
                   {avatar
-                    ? <img src={avatar} style={{ width: '100%', height: '100%', objectFit: 'cover', imageRendering: 'pixelated' }} />
+                    ? <FramedImg src={avatar} kind="avatar" dupes={avatarDupes(avatar)} style={{ width: '100%', height: '100%', objectFit: 'cover', imageRendering: 'pixelated' }} />
                     : <span style={{ fontSize: 56, opacity: 0.5 }}>👤</span>}
                 </div>
                 <div className="profile-avatar-upload-overlay">
@@ -3256,7 +3263,7 @@ function ProfileScreen() {
               {/* Sleeve — large preview */}
               <div className="profile-sleeve-col">
                 <div className="profile-cardback-preview profile-cardback-xl profile-cardback-clickable" role="button" tabIndex={0} onClick={() => setShowSleeveGallery(true)}>
-                  <img src={displayCardback} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                  <FramedImg src={displayCardback} kind="sleeve" dupes={sleeveDupes(cardback)} style={{ width: '100%', height: '100%', objectFit: 'cover', imageRendering: 'pixelated' }} />
                   <div className="profile-cardback-hover-overlay">CHANGE</div>
                 </div>
                 <button className="btn" style={{ padding: '6px 16px', fontSize: 11, width: '100%' }}
@@ -3360,7 +3367,7 @@ function ProfileScreen() {
                 ) : (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 10, flex: 1 }}>
                     {topHeroes.map((h, i) => {
-                      const heroImg = (user.heroSkins && user.heroSkins[h.name]) ? skinImageUrl(user.heroSkins[h.name]) : getCardImage(h.name);
+                      const heroImg = (user.heroSkins && user.heroSkins[h.name]) ? cardImageUrl(h.name, user.heroSkins) : getCardImage(h.name);
                       const medal = ['🥇', '🥈', '🥉'][i];
                       return (
                         <div key={h.name} className="profile-top-hero"
@@ -3490,7 +3497,7 @@ function ProfileScreen() {
                       <div key={sleeveId} className={'profile-cb-gallery-item' + (cardback === '/data/shop/sleeves/' + sleeveId + '.png' ? ' active' : '')} role="button" tabIndex={0}
                         onClick={() => quickSaveSleeve('/data/shop/sleeves/' + sleeveId + '.png')}>
                         <div className="profile-cb-gallery-card">
-                          <img src={'/data/shop/sleeves/' + encodeURIComponent(sleeveId) + '.png'} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                          <FramedImg src={'/data/shop/sleeves/' + encodeURIComponent(sleeveId) + '.png'} kind="sleeve" dupes={frameDupes.sleeve[sleeveId]} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                         </div>
                         <div className="profile-cb-gallery-label">{sleeveNames[sleeveId] || sleeveId}</div>
                       </div>
@@ -3544,7 +3551,7 @@ function ProfileScreen() {
                         <div key={avatarId} className={'profile-avatar-gallery-item' + (avatar === url ? ' active' : '')} role="button" tabIndex={0}
                           onClick={() => quickSaveAvatar(url)} {...avatarTipProps(avatarNames[avatarId] || ppCamelSpaces(avatarId))}>
                           <div className="profile-avatar-gallery-img">
-                            <img src={url} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                            <FramedImg src={url} kind="avatar" dupes={frameDupes.avatar[avatarId]} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                           </div>
                         </div>
                       );
