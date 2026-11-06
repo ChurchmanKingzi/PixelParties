@@ -59853,9 +59853,12 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
             {/* Ambient pixel motes — FIRST child on purpose: paints behind
                 every zone, card and area overlay (see BoardAmbiance). */}
             {/* Kampffeld (app-fx-55): Boden in der Perspektive der Plane, vor der Ambiance und unter allem; eine Area-Szene (deckend) ersetzt es komplett. */}
-            {window.PpFx55Feld && <window.PpFx55Feld roomId={gameState.roomId} tutorial={!!gameState.isTutorial} verdeckt={(gameState.areaZones || []).some(z => (z || []).length > 0)} />}
+            {/* Skill Test: Heimbasen (app-fx-56, je Sitz eine Boden-Hälfte); sonst das Kampffeld (app-fx-55). */}
+            {gameState.skillTest && window.PpFx56Basen
+              ? <window.PpFx56Basen roomId={gameState.roomId} sitze={gameState.players.length} myIdx={myIdx} oppIdx={oppIdx} />
+              : (window.PpFx55Feld && <window.PpFx55Feld roomId={gameState.roomId} tutorial={!!gameState.isTutorial} />)}
             <BoardAmbiance colorMe={me.color} colorOpp={opp.color} />
-            <AreaBackgrounds areaZones={gameState.areaZones} myIdx={myIdx} oppIdx={oppIdx} spielstand={{ doomCounters: gameState.doomCounters }} />
+            <AreaBackgrounds areaZones={gameState.areaZones} myIdx={myIdx} oppIdx={oppIdx} spielstand={{ doomCounters: gameState.doomCounters }} halbiert={!!gameState.skillTest} />
             {(() => {
               // Gathering Storm is an Attachment Spell — it lives in a
               // hero's Support Zone rather than an Area Zone, so walk
