@@ -454,7 +454,8 @@ class HopShow:
                     for da in range(sz):
                         for db in range(sz):
                             self.rect(d, bi + da, bj + db, col)
-            self.draw_text(canvas, str(dm), 7, (x + (150 if sd == 'L' else -150), 1560 - 100 * smooth(tau / 0.9)), color=(201, 138, 255), outline=(60, 10, 110), shadow=None)
+            if tau < 0.9:                                                               # Giftschaden grün, oben bei den normalen Schadenszahlen
+                self.draw_text(canvas, str(dm), 8, (x + (110 if sd == 'L' else -110), 1175 - 110 * smooth(tau / 0.9)), color=(26, 255, 115), outline=(22, 121, 39), shadow=None)
 
     def _draw_hit_fx(self, canvas, d, t):
         for n, (th, sd, a, k) in enumerate(self.hits):
