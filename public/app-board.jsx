@@ -37104,8 +37104,14 @@ function stRewards(res, seat) {
   return out;
 }
 function StRanking({ res, players, myIdx }) {
-  const rows = players.map((p, i) => ({ i, p, place: res.placements?.[i] ?? players.length, sc: res.sc?.[i] || 0 }))
+  const alle = players.map((p, i) => ({ i, p, place: res.placements?.[i] ?? players.length, sc: res.sc?.[i] || 0 }))
     .sort((a, b) => a.place - b.place || a.i - b.i);
+  // Handy (844×390): mehr als 4 Zeilen passen nicht sicher unter die Belohnungen (Zeilen 6–8 waren abgeschnitten, auch die eigene) — dort die ersten drei plus die eigene Zeile (mit ihrer echten Platznummer)
+  let rows = alle;
+  if (alle.length > 4 && typeof window.ppIsPhone === 'function' && window.ppIsPhone()) {
+    const ich = alle.find(r => r.i === myIdx), top = alle.slice(0, 3);
+    rows = (ich && !top.includes(ich)) ? [...top, ich] : alle.slice(0, 4);
+  }
   return (
     <div className="st-ranking">
       {rows.map(r => (
@@ -63448,7 +63454,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       {result && !result.isPuzzle && !showFirstChoice && (result.setOver || !result.format || result.format === 1) && !(result.format > 1) && (
         <ResultCeremony
           won={!!iWon} spectator={!!isSpectator}
-          title={isSpectator ? `${result.winnerName} WINS!` : (iWon ? 'VICTORY' : (stRes ? stPlaceTitle(stRes.placements?.[myIdx]) : 'DEFEAT'))}
+          title={isSpectator ? `${result.winnerName || gameState.players?.[result.winnerIdx]?.username || '?'} WINS!` : (iWon ? 'VICTORY' : (stRes ? stPlaceTitle(stRes.placements?.[myIdx]) : 'DEFEAT'))}
           subtitle={stRes ? `${stRes.rounds} round${stRes.rounds === 1 ? '' : 's'} played` : (() => { const r = result; const w = iWon; return (
             isSpectator ? (
               r.reason === 'disconnect_timeout' ? `${r.loserName} timed out` :

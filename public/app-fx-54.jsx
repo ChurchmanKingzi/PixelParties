@@ -667,7 +667,9 @@
       }
     }, []);
     React.useEffect(() => { try { window.ppFx54Vorbacken && window.ppFx54Vorbacken(title); } catch (e) { /* Vorbacken ist nur Komfort */ } }, []);
-    const bandText = (r) => bandArt(r) === 'daily' ? (r.limit === 'daily' || r.limit === 'daily_key' ? 'Daily!' : (oppName ? `Daily vs ${oppName}!` : 'Daily per Foe!')) : 'Once!';
+    // Gegnername im Band höchstens 14 Zeichen: die Titelzeile ist einzeilig (Ellipse) — ein längerer Name (z. B. „Guest Baaliel 10“) hat in der 2-Spalten-Liste das ganze Band samt Titel abgeschnitten
+    const kurzName = (s) => { s = String(s); return s.length > 14 ? s.slice(0, 13) + '…' : s; };
+    const bandText = (r) => bandArt(r) === 'daily' ? (r.limit === 'daily' || r.limit === 'daily_key' ? 'Daily!' : (oppName ? `Daily vs ${kurzName(oppName)}!` : 'Daily per Foe!')) : 'Once!';
     const vis = (an) => (an ? '' : ' pp-cer-aus');
     return (
       <div ref={wurzel} className={'pp-cer' + (won ? ' pp-cer-win' : ' pp-cer-lose') + (klasse ? ' ' + klasse : '')} data-pp-px="aus" onClick={ueberspringen}>
