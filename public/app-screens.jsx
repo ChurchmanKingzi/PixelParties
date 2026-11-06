@@ -3912,6 +3912,48 @@ function shopSealedArt() {
 }
 
 // Mosaik-Auflösung: das Avatar-Bild setzt sich aus groben Blöcken zu voller Schärfe zusammen (Pixelart-typisch, in harten Stufen).
+// Rang-Aufstieg: das alte Bild (alter Rahmen) wird Zelle für Zelle durch das neue ersetzt — Dither + Diagonale wie ein Scanner, die Kante
+// blitzt golden/weiß. Reine Pixelzellen auf der virtuellen Uhr der Inszenierung (`vt`), kein Alpha, kein Weichzeichnen.
+function ShopRankSwap({ oldSrc, newSrc, t0Ref, vt, dur, sq }) {
+  const ref = useRef(null);
+  useEffect(() => {
+    const cv = ref.current; if (!cv || !oldSrc || !newSrc) return undefined;
+    let dead = false, timer = 0;
+    const A = new Image(), B = new Image();
+    let loaded = 0;
+    const go = () => {
+      if (dead || ++loaded < 2) return;
+      const w = A.naturalWidth || 200, h = A.naturalHeight || 200;
+      cv.width = w; cv.height = h;
+      const g = cv.getContext('2d'); g.imageSmoothingEnabled = false;
+      g.drawImage(A, 0, 0, w, h);
+      const cs = Math.max(2, Math.round(w / 40)), nx = Math.ceil(w / cs), ny = Math.ceil(h / cs);
+      const thr = new Float32Array(nx * ny), st = new Uint8Array(nx * ny);
+      const bayer = (x, y) => SHOP_BAYER[(y & 3) * 4 + (x & 3)] / 16;
+      for (let y = 0; y < ny; y++) for (let x = 0; x < nx; x++) thr[y * nx + x] = 0.72 * ((x / nx + y / ny) / 2) + 0.28 * bayer(x, y) * 0.94;
+      const edge = ['#ffffff', '#fad54a', '#f7f7ad'].map(c => (window.ppSnap ? window.ppSnap(c) : c));
+      const tick = () => {
+        if (dead) return;
+        const t0 = t0Ref.current;
+        const p = t0 == null ? 0 : Math.max(0, Math.min(1, (vt.current - t0) / dur));
+        if (p > 0) {
+          for (let i = 0; i < thr.length; i++) {
+            if (st[i] === 2) continue;
+            const x = (i % nx) * cs, y = ((i / nx) | 0) * cs;
+            if (p >= 1 || thr[i] <= p) { g.drawImage(B, x * B.naturalWidth / w, y * B.naturalHeight / h, cs * B.naturalWidth / w, cs * B.naturalHeight / h, x, y, cs, cs); st[i] = 2; }
+            else if (thr[i] <= p + 0.07 && st[i] === 0) { g.fillStyle = edge[(i + ((i / nx) | 0)) % edge.length]; g.fillRect(x, y, cs, cs); st[i] = 1; }
+          }
+        }
+        if (p < 1) timer = setTimeout(tick, 33);
+      };
+      tick();
+    };
+    A.onload = go; B.onload = go; A.src = oldSrc; B.src = newSrc;
+    return () => { dead = true; clearTimeout(timer); };
+  }, [oldSrc, newSrc]);
+  return <canvas ref={ref} className={'pull-fx-swap' + (sq ? ' pull-fx-swap-sq' : '')} />;
+}
+
 function ShopMosaic({ src, fast }) {
   const ref = useRef(null);
   useEffect(() => {
@@ -3954,6 +3996,15 @@ function ShopPullReveal({ reveal, onClose, fast, onToggleFast }) {
   const AV = (reveal && reveal.kind) === 'avatar';
   // Bei einem Duplikat trägt das Bild schon den neuen Rahmen (Avatar/Sleeve: useFramedSrc; Skin-Karten: `?rahmen=N` in der URL)
   const frontSrc = useFramedSrc(reveal && !reveal.pending ? reveal.imgUrl : null, (reveal && reveal.frameKind) || 'card', reveal && reveal.frameKind ? reveal.dupes : 0);
+  // Rang-Aufstieg (Kopie): erst das Bild mit dem ALTEN Rahmen, dann wird der Rahmen mit Funken und Partikeln aufgewertet (ShopRankSwap)
+  const rankUp = !!(reveal && reveal.isNew === false);
+  const oldDupes = rankUp ? Math.max(0, (reveal.dupes || 1) - 1) : 0;
+  const oldFramed = useFramedSrc(rankUp && !reveal.pending && reveal.frameKind ? reveal.imgUrl : null, (reveal && reveal.frameKind) || 'card', reveal && reveal.frameKind ? oldDupes : 0);
+  const oldSrc = (!rankUp || reveal.pending) ? null
+    : (reveal.frameKind ? oldFramed : String(reveal.imgUrl || '').replace(/\?rahmen=\d+/, oldDupes > 0 ? '?rahmen=' + oldDupes : ''));
+  const swapT0 = useRef(null);                     // virtuelle Zeit, zu der der Rahmentausch beginnt (null: noch nicht)
+  const SWAP_DUR = 900;
+  const [upDone, setUpDone] = useState(false);
   const reduced = useMemo(() => { try { return window.matchMedia('(prefers-reduced-motion: reduce)').matches; } catch { return false; } }, []);
   const [phase, setPhase] = useState('charge');   // 'charge' | 'shatter' | 'reveal'
   const [overload, setOverload] = useState(false); // letzte Stufe vor dem Einschlag: das Siegel zittert dauernd
@@ -3992,6 +4043,7 @@ function ShopPullReveal({ reveal, onClose, fast, onToggleFast }) {
   }), []);
   const sealedUrl = useMemo(() => (AV ? shopSealedArt() : null), []);
   const backUrl = AV ? sealedUrl : '/cardback.png';
+  const rankUpRef = useRef(rankUp); rankUpRef.current = rankUp;
   const later = (fn, ms) => { ev.current.push({ at: vt.current + ms, fn }); };
   const clearLater = () => { ev.current = []; };
 
@@ -4002,6 +4054,21 @@ function ShopPullReveal({ reveal, onClose, fast, onToggleFast }) {
     for (let i = 0; i < a.length; i++) if (a[i].life > 0) a[w++] = a[i];
     a.length = w;
     for (const p of list) a.push(p);
+  };
+
+  // Funken entlang des Kartenrands (Rahmen-Upgrade): sprühen nach außen, ganze Pixel in Palettenfarben
+  const rimSparks = (n, sp) => {
+    const el = slotRef.current; if (!el) return;
+    const r = el.getBoundingClientRect(), cols = ['#ffffff', '#f7f7ad', '#fad54a', '#1aedff', '#f9ac20'], out = [];
+    for (let i = 0; i < n; i++) {
+      const t = Math.random() * 4, side = Math.floor(t) % 4, f = t - Math.floor(t);
+      const x = side === 0 ? r.left + r.width * f : side === 2 ? r.right - r.width * f : side === 1 ? r.right : r.left;
+      const y = side === 1 ? r.top + r.height * f : side === 3 ? r.bottom - r.height * f : side === 0 ? r.top : r.bottom;
+      const nxv = side === 1 ? 1 : side === 3 ? -1 : 0, nyv = side === 0 ? -1 : side === 2 ? 1 : 0, k = (1 + Math.random() * 3) * sp;
+      out.push({ x, y, vx: nxv * k + (Math.random() - 0.5) * 1.5, vy: nyv * k + (Math.random() - 0.5) * 1.5 - 0.4, size: 4 + Math.random() * 8,
+        color: cols[i % cols.length], shape: Math.random() < 0.5 ? 'star' : 'spark', life: 1, decay: 0.016 + Math.random() * 0.02, rotation: 0, rotSpeed: 0, gravity: 0.03 });
+    }
+    emit(out);
   };
 
   // cue = Klang + Bild. c: { sound | sounds: [[name, opts], …], stage, lit, crack, overload, ripple, blast, tremor, quake (true | 2 = stark),
@@ -4041,7 +4108,15 @@ function ShopPullReveal({ reveal, onClose, fast, onToggleFast }) {
     later(() => cue({ sound: 'pull_sparkle', stars: 28, sheen: true }), 200);                          // Sternenring + Lichtstreifen über dem Banner
     later(() => cue({ sound: 'gold_gain', coins: 90, burst: [0.3, 0.5, 100, 0.9] }), 520);              // Münzregen
     later(() => emit(shopBurstParticles(window.innerWidth * 0.7, window.innerHeight * 0.5, 100, 0.9)), 530);
-    later(() => setCanClose(true), 1000);
+    if (!rankUpRef.current) { later(() => setCanClose(true), 1000); return; }
+    if (abortRef.current) { swapT0.current = -1e9; setUpDone(true); later(() => setCanClose(true), 1000); return; }   // Escape: gleich das neue Bild
+    // Rahmen-Upgrade: das alte Bild steht kurz da, dann tauscht ein Scan den Rahmen aus (Klang steigt, Funken laufen am Rand entlang)
+    const T = 1500;
+    later(() => { swapT0.current = vt.current; cue({ sounds: [['pull_swell', { rate: 1.1 }], ['pull_crack', { rate: 1.25 }]], quake: true, burst: [0.5, 0.5, 70, 0.8] }); rimSparks(46, 0.7); }, T);
+    [[0, 250], [7, 500], [12, 750]].forEach(([semis, dt], k) => later(() => { cue({ sound: 'pull_note', opt: { rate: Math.pow(2, semis / 12), volume: 0.75 }, burst: [0.5, 0.5, 26 + k * 10, 0.7 + k * 0.15] }); rimSparks(22, 0.8 + k * 0.2); }, T + dt));
+    later(() => { cue({ sounds: [['ascension'], ['pull_sparkle']], quake: 2, stars: 32, sheen: true, burst: [0.5, 0.5, 240, 1.5] }); rimSparks(90, 1.3); setUpDone(true); }, T + SWAP_DUR);
+    later(() => emit(shopBurstParticles(window.innerWidth * 0.5, window.innerHeight * 0.5, 120, 1.1)), T + SWAP_DUR + 250);
+    later(() => setCanClose(true), T + SWAP_DUR + 600);
   };
 
   // Höhepunkt: wartet, bis die Antwort des Servers da ist; dann bricht es frei — eine Explosion.
@@ -4405,7 +4480,9 @@ function ShopPullReveal({ reveal, onClose, fast, onToggleFast }) {
           )}
           {phase === 'reveal' && (
             <React.Fragment>
-              {AV
+              {rankUp && oldSrc
+                ? <div className={'pull-fx-front' + (AV ? ' pull-fx-front-sq' : '')}><ShopRankSwap oldSrc={oldSrc} newSrc={frontSrc} t0Ref={swapT0} vt={vt} dur={SWAP_DUR} sq={AV} /></div>
+                : AV
                 ? <div className="pull-fx-front pull-fx-front-sq"><ShopMosaic src={frontSrc} fast={fast} /></div>
                 : <div className="pull-fx-front"><img src={frontSrc} draggable={false} /></div>}
               {STARS.map((s, i) => (
@@ -4417,7 +4494,7 @@ function ShopPullReveal({ reveal, onClose, fast, onToggleFast }) {
         {phase === 'reveal' && (
           <React.Fragment>
             {reveal.label && <div className="pull-fx-label">{reveal.label}</div>}
-            {reveal.subtitle && <div className="pull-fx-subtitle">{reveal.subtitle}</div>}
+            {reveal.subtitle && (!rankUp || upDone) && <div className="pull-fx-subtitle">{reveal.subtitle}</div>}
             <button className={'btn pull-fx-btn' + (canClose ? ' pull-fx-btn-on' : '')} disabled={!canClose}
               onClick={(e) => { e.stopPropagation(); onClose(); }}>NICE!</button>
           </React.Fragment>

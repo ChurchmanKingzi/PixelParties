@@ -1,4 +1,4 @@
-/* PP-HART-GEBACKEN 51e043283cd1c78e — ERZEUGT von scripts/hart/build-css.js aus style.css (pixel-hart.js vorab angewandt) — nicht von Hand ändern. */
+/* PP-HART-GEBACKEN f8f56ad563097f68 — ERZEUGT von scripts/hart/build-css.js aus style.css (pixel-hart.js vorab angewandt) — nicht von Hand ändern. */
 .pp-hart-gebacken { --pp-hart: 1; }
 @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Rajdhani:wght@400;500;600;700&family=Orbitron:wght@400;500;600;700;800;900&display=swap');
 
@@ -26757,3 +26757,7 @@ input[type="checkbox"]:focus-visible, input[type="radio"]:focus-visible { outlin
 
 /* Kachel mit Rang-Rahmen (Duplikate): der eingebackene Rahmen ist der Schmuck — kein Zier-Overlay darüber, das ihn verdecken würde */
 .shop-item.shop-item-ranked .shop-item-zier { display: none; }
+
+/* Rang-Aufstieg im Pull-Reveal: Zellen-Scan zwischen altem und neuem Rahmen (Canvas, ganze Pixelzellen) */
+.pull-fx-swap { display: block; width: 100%; aspect-ratio: 5 / 7; object-fit: cover; image-rendering: pixelated; }
+.pull-fx-swap.pull-fx-swap-sq { aspect-ratio: 1; }
