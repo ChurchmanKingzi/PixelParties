@@ -1507,8 +1507,8 @@ function PlayScreen() {
     const onPlayerJoined = (data) => setPlayerJoined(data.username);
     // Ein Cube-Match (Kindraum) darf den Turnierraum nicht als `lobby` ablösen — sonst fällt
     // der Spieler nach dem Match in eine tote Lobby statt zurück ins Bracket.
-    const onGameStarted = (r) => { setLobby(prev => (prev?.cubeDraft && prev.id !== r?.id) ? prev : r); if (window.playSFX) window.playSFX('match_found'); };
-    const onGameState = (state) => { if (window.ppZustandVeraltet?.(state)) return; setGameState(state); };
+    const onGameStarted = (r) => { setLobby(prev => (prev?.cubeDraft && prev.id !== r?.id) ? prev : r); if (window.playSFX) window.playSFX('match_found'); if (r?.id && window.ppBfVorladen) window.ppBfVorladen(r.id, false); };   // Kampffeld (app-fx-55) schon vor dem Brett laden
+    const onGameState = (state) => { if (window.ppZustandVeraltet?.(state)) return; if (state?.roomId && window.ppBfVorladen) window.ppBfVorladen(state.roomId, !!state.isTutorial); setGameState(state); };
     const onCubeDraftState = (state) => { setCubeDraftState(state); };
     const onCubeBuildState = (state) => { setCubeBuildState(state); };
     const onCubeTournamentState = (state) => { setCubeTournamentStateLocal(state); };

@@ -37099,185 +37099,11 @@ function StRanking({ res, players, myIdx }) {
   );
 }
 
-function ResultCeremony({ won, spectator, title, subtitle, rewards, total, eloChanges, myName, oppName, extra, cpuProgress, children }) {
-  const n = rewards.length;
-  const ENDE = n + 1;
-  const [stufe, setStufe] = useState(0);
-  const [zaehler, setZaehler] = useState(0);
-  const fertig = stufe >= ENDE;
-  const phone = !!(window.ppIsPhone && window.ppIsPhone());
-  // Staffelung
-  useEffect(() => {
-    if (fertig) return;
-    const wartezeit = stufe === 0 ? 1400 : 720;
-    const t = setTimeout(() => setStufe(s => s + 1), wartezeit);
-    return () => clearTimeout(t);
-  }, [stufe, fertig]);
-  // Klang + Zaehler pro Reward
-  useEffect(() => {
-    if (stufe < 1 || stufe > n) return;
-    if (window.playSFX) window.playSFX('gold_gain', { dedupe: 40 });
-    const ziel = rewards.slice(0, stufe).reduce((a, r) => a + (r.amount || 0), 0);
-    let lauf = zaehler;
-    const iv = setInterval(() => {
-      lauf += 1;
-      if (lauf >= ziel) { lauf = ziel; clearInterval(iv); }
-      setZaehler(lauf);
-    }, 45);
-    return () => clearInterval(iv);
-  }, [stufe]);
-  useEffect(() => {
-    if (fertig && n > 0) {
-      setZaehler(total);
-      if (window.playSFX) window.playSFX('shop_purchase', { dedupe: 300 });
-    }
-  }, [fertig]);
-  const ueberspringen = () => { if (!fertig) setStufe(ENDE); };
-  const anzahlFrei = (cpuProgress && cpuProgress.unlocks) ? cpuProgress.unlocks.length : 0;
-  useEffect(() => {
-    if (fertig && anzahlFrei > 0 && window.playSFX) window.playSFX('ascension', { dedupe: 300 });
-  }, [fertig, anzahlFrei]);
-  const farbe = spectator ? '#fad54a' : (won ? '#fad54a' : '#ec2d62');
-  // ★ v1263 (Al 21.9.): „Player-Namen und Avatare UEBER dem Background,
-  // genau wie die Sprechblasen." Die echten Cluster sitzen in den
-  // Handzeilen (Ebenen 400 / 10000) und koennen ihre Stapelkontexte nicht
-  // verlassen — deshalb werden sie beim Aufgehen der Zeremonie geklont
-  // und an exakt derselben Fensterposition ueber den Hintergrund gelegt.
-  // Die End-Sprechblasen (10090) ankern an denselben Rechtecken.
-  const klonRef = useRef(null);
-  useEffect(() => {
-    const wirt = klonRef.current;
-    if (!wirt) return;
-    wirt.innerHTML = '';
-    for (const sel of ['.game-hand-opp .game-hand-info', '.game-hand-me .game-hand-info']) {
-      const el = document.querySelector(sel);
-      if (!el) continue;
-      const r = el.getBoundingClientRect();
-      const klon = el.cloneNode(true);
-      klon.removeAttribute('id');
-      klon.style.cssText = `position:fixed;left:${r.left}px;top:${r.top}px;width:${r.width}px;height:${r.height}px;transform:none;margin:0;pointer-events:none;display:flex;align-items:center;`;
-      wirt.appendChild(klon);
-    }
-  }, []);
-  // ★ v1400 (Al 25.9.): Münzregen im Sieg-Bildschirm — SC-Sprites fallen,
-  // drehen sich und funkeln. Einmal ausgewürfelt (useMemo), sonst sprängen
-  // die Münzen bei jedem Zählerschritt an neue Plätze.
-  const muenzen = useMemo(() => Array.from({ length: ppFxN(phone ? 14 : 34) }).map(() => ({
-    left: Math.random() * 100,
-    delay: Math.random() * 6,
-    dur: 4.2 + Math.random() * 3.6,
-    size: 18 + Math.round(Math.random() * 3) * 6,
-    spin: 0.7 + Math.random() * 1.1,
-    glanz: Math.random() * 2.4,
-    drift: (Math.random() * 2 - 1) * 60,
-  })), []);
-  // v1400: begrenzte Boni gekennzeichnet (Farbe + schräges Band).
-  const bonusArt = (r) => /^daily/.test(r?.limit || '') ? 'daily' : /^once/.test(r?.limit || '') ? 'once' : null;
-  return (
-    <div className={'pp-cer' + (won ? ' pp-cer-win' : ' pp-cer-lose')} onClick={ueberspringen}>
-      <div className="pp-cer-streifen" />
-      <div className="pp-cer-vignette" />
-      <div className="pp-cer-klone" ref={klonRef} aria-hidden="true" />
-      {won && !phone && (
-        <div className="pp-cer-sterne">
-          {Array.from({ length: ppFxN(28) }).map((_, i) => (
-            <i key={i} style={{ left: (Math.random() * 100) + '%', top: (Math.random() * 100) + '%',
-              animationDelay: (Math.random() * 4) + 's', animationDuration: (2.5 + Math.random() * 3) + 's' }} />
-          ))}
-        </div>
-      )}
-      {won && (
-        <div className="pp-cer-regen" aria-hidden="true">
-          {muenzen.map((m, i) => (
-            <i key={i} style={{ left: m.left + '%', width: m.size, height: m.size,
-              animationDelay: m.delay + 's', animationDuration: m.dur + 's', '--drift': m.drift + 'px' }}>
-              <b style={{ animationDuration: m.spin + 's', animationDelay: m.delay + 's' }} />
-              <u style={{ animationDelay: (m.delay + m.glanz) + 's' }} />
-            </i>
-          ))}
-        </div>
-      )}
-      {/* Der Titel steht OHNE Umbruch und ohne Beschneidung über der Spalte: er darf breiter werden als der Inhalt (max. 640 px) darunter. */}
-      <div className="pp-cer-spalte">
-        <div className="pp-cer-titel pixel-font" style={{ color: farbe, '--cer-n': Math.max(1, [...String(title)].length) }}>
-          {[...String(title)].map((b, i) => (
-            <span key={i} className="pp-cer-buchstabe" style={{ animationDelay: (i * 55) + 'ms' }}>{b === ' ' ? '\u00a0' : b}</span>
-          ))}
-        </div>
-      <div className="pp-cer-inhalt" onClick={e => e.stopPropagation()}>
-        {subtitle && <div className={'pp-cer-unter' + (/^(💀|☠️)/.test(subtitle) ? ' pp-cer-unter-grund' : '')}>{subtitle}</div>}
-        {cpuProgress && cpuProgress.wins > 0 && (
-          <div className="pp-cer-sieg">
-            <div className="pp-cer-sieg-zahl">🏆 {ppOrdinal(cpuProgress.wins)} victory{oppName ? ' against ' + oppName : ''}!</div>
-            {cpuProgress.sleeve && (
-              <div className="pp-cer-sieg-theme">🃏 {cpuProgress.sleeve.name}: {cpuProgress.sleeve.wins} / {cpuProgress.sleeve.need} wins to unlock</div>
-            )}
-            {cpuProgress.theme && (
-              <div className="pp-cer-sieg-theme">🎵 {cpuProgress.theme.hero ? heroDisplayName(cpuProgress.theme.hero) + "'s Theme" : cpuProgress.theme.name}: {cpuProgress.theme.wins} / {cpuProgress.theme.need} wins to unlock</div>
-            )}
-          </div>
-        )}
-        {n > 0 && (
-          <div className="pp-cer-rewards">
-            {rewards.map((r, i) => (
-              <div key={r.id || i} className={'pp-cer-reward' + (bonusArt(r) ? ' pp-cer-reward-' + bonusArt(r) : '') + (stufe > i ? ' pp-cer-reward-da' : '')}>
-                {/* ★ v1471 (Als Befund 28.9.: „‚Play a Game (Daily)' zweimal bekommen … die Badge sagt nur ‚Daily'
-                    — verwirrend"): „Daily!" nur noch für echte Tageslimits. Was je Gegner und Tag zählt
-                    (`daily_per_opponent`, jede CPU ist ein eigener Gegner), nennt den Gegner: „Daily vs Siphem!". */}
-                {bonusArt(r) && <div className="pp-cer-band">{bonusArt(r) === 'daily' ? (r.limit === 'daily' || r.limit === 'daily_key' ? 'Daily!' : (oppName ? `Daily vs ${oppName}!` : 'Daily per Foe!')) : 'Once!'}</div>}
-                {stufe > i && !phone && (
-                  <div className="pp-cer-burst" aria-hidden="true">
-                    {Array.from({ length: ppFxN(12) }).map((_, k) => (
-                      <i key={k} style={{ '--bw': (k * 30) + 'deg' }} />
-                    ))}
-                  </div>
-                )}
-                <div className="pp-cer-reward-titel">{r.title}</div>
-                <div className="pp-cer-reward-text">{r.description || ''}</div>
-                <div className="pp-cer-reward-betrag">+{r.amount} <img src="/data/sc.png" alt="SC" /></div>
-              </div>
-            ))}
-          </div>
-        )}
-        {n > 0 && stufe >= 1 && (
-          <div className="pp-cer-summe">
-            <span className="pp-cer-summe-zahl">{zaehler}</span>
-            <img src="/data/sc.png" alt="SC" />
-            <span className="pp-cer-summe-text">earned</span>
-          </div>
-        )}
-        {extra}
-        {fertig && cpuProgress && cpuProgress.unlocks && cpuProgress.unlocks.length > 0 && (
-          <div className="pp-cer-freischaltungen pp-cer-fade">
-            {cpuProgress.unlocks.map((u, i) => (
-              <div key={(u.kind || '') + (u.id || u.name) + i} className={'pp-cer-freischaltung pp-cer-frei-' + (u.kind || 'unlock')}>
-                {u.image
-                  ? <img className="pp-cer-frei-bild" src={u.image} alt="" />
-                  : <span className="pp-cer-frei-icon">{PP_UNLOCK_ICON[u.kind] || '🎁'}</span>}
-                <div>
-                  <div className="pp-cer-frei-titel">{PP_UNLOCK_TEXT[u.kind] || 'Unlocked!'}</div>
-                  <div className="pp-cer-frei-name">{(u.kind === 'music' && u.hero) ? heroDisplayName(u.hero) + "'s Theme" : u.name}</div>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-        {fertig && eloChanges && (
-          <div className="pp-cer-elo pp-cer-fade">
-            {eloChanges.map(ec => (
-              <div key={ec.username} style={{ color: ec.username === myName ? 'var(--text)' : 'var(--text2)' }}>
-                {ec.username}: {ec.oldElo} → <span style={{ color: ec.newElo > ec.oldElo ? 'var(--success)' : 'var(--danger)', fontWeight: 700 }}>{ec.newElo}</span>
-                {' '}({ec.newElo > ec.oldElo ? '+' : ''}{ec.newElo - ec.oldElo})
-              </div>
-            ))}
-          </div>
-        )}
-        {fertig && <div className="pp-cer-fade">{children}</div>}
-        {!fertig && <div className="pp-cer-hinweis">click to skip</div>}
-      </div>
-      </div>
-    </div>
-  );
+// ★ Ergebnis-Zeremonie: Optik, Zeitplan und Inhalt liegen jetzt in app-fx-54.jsx (`PpFx54Zeremonie`; Pixel Intv, Raster-Kulisse, Banner, Belohnungsliste). Gleiche Props wie bisher
+// (+ `helden`: Namen der eigenen Helden, `klasse`/`vorn`: Rätsel-Overlay).
+function ResultCeremony(props) {
+  const Z = window.PpFx54Zeremonie;
+  return Z ? <Z {...props} /> : null;
 }
 
 // ═══════════════════════════════════════════════════════════════════
@@ -38239,6 +38065,11 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
   // Abschlussmonolog gesprochen? Der Siegerschirm bleibt bis dahin weg — ueber diesen Zustand statt ueber `tutorialOutroPending`: das wird erst im Effekt NACH dem ersten Render mit Ergebnis gesetzt, dazwischen stand der Schirm (je nach Geraet Sekundenbruchteile bis eine halbe Sekunde) da.
   const [tutorialOutroDone, setTutorialOutroDone] = useState(false);
   const [resultFading, setResultFading] = useState(false);
+  // Ergebnis-Zeremonie (app-fx-54): Schrift-Glyphen und Banner-Sprites schon waehrend der Partie im Leerlauf backen, damit das erste Ergebnisbild keinen Ausreisser hat.
+  useEffect(() => {
+    const t = setTimeout(() => { try { if (window.ppFx54Vorbacken) window.ppFx54Vorbacken(); } catch (e) { /* nur Komfort */ } }, 3000);
+    return () => clearTimeout(t);
+  }, []);
   const tutorialOutroFiredRef = useRef(null);
   // Synchronous mirror of tutorialOutroPending — written alongside the
   // setState call so other effects running in the same commit can see the
@@ -59986,6 +59817,8 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                 .board-center exactly as before. */}
             {/* Ambient pixel motes — FIRST child on purpose: paints behind
                 every zone, card and area overlay (see BoardAmbiance). */}
+            {/* Kampffeld (app-fx-55): Boden in der Perspektive der Plane, vor der Ambiance und unter allem; eine Area-Szene (deckend) ersetzt es komplett. */}
+            {window.PpFx55Feld && <window.PpFx55Feld roomId={gameState.roomId} tutorial={!!gameState.isTutorial} verdeckt={(gameState.areaZones || []).some(z => (z || []).length > 0)} />}
             <BoardAmbiance colorMe={me.color} colorOpp={opp.color} />
             <AreaBackgrounds areaZones={gameState.areaZones} myIdx={myIdx} oppIdx={oppIdx} spielstand={{ doomCounters: gameState.doomCounters }} />
             {(() => {
@@ -63474,7 +63307,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
             <div style={{ fontSize: 13, color: 'var(--text2)', marginBottom: 16 }}>
               {result.reason === 'disconnect_timeout' ? `${result.loserName} timed out` :
                result.reason === 'surrender' ? `${result.loserName} surrendered` :
-               result.reason === 'all_heroes_dead' ? `All of ${result.loserName}'s heroes defeated!` :
+               result.reason === 'all_heroes_dead' ? `All of ${result.loserName}'s Heroes defeated!` :
                ppGameOverText(result.reason, isSpectator ? null : (iWon ? 'win' : 'lose'), result.loserName, result.winnerName)}
             </div>
             {result.eloChanges && (
@@ -63549,43 +63382,21 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           result.isTutorial
           && result.puzzleResult === 'success'
           && !!(window.TUTORIAL_SCRIPTS || {})[window._currentTutorialNum]?.isFinalTutorial;
+        const geschafft = result.puzzleResult === 'success';
+        // Rätsel-/Tutorial-Ergebnis: dieselbe Hülle wie die Partie-Zeremonie (app-fx-54), ohne Belohnungen; Texte und Knöpfe wie bisher.
         return (
-        <div className={'modal-overlay result-overlay-fade' + (resultFading ? ' result-overlay-fading' : '')}
-          style={{ background: 'rgba(0,0,0,.85)' }}>
-          {finalTutorialCleared && <TutorialFinaleFeuerwerk />}
-          {finaleSchwarz && <div className="finale-schwarz" />}
-          <div className="animate-in" style={{ textAlign: 'center', position: 'relative', zIndex: 2 }}>
-            {result.puzzleResult === 'success' ? (
-              <>
-                <div className="pixel-font" style={{
-                  fontSize: finalTutorialCleared ? 56 : 42,
-                  marginBottom: 12, color: '#fad54a',
-                  textShadow: finalTutorialCleared
-                    ? '0 0 60px rgba(250,213,74,.85), 0 0 100px rgba(250,213,74,.45)'
-                    : '0 0 40px rgba(250,213,74,.6)'
-                }}>
-                  {finalTutorialCleared
-                    ? '🎉 TUTORIAL CLEARED! 🎉'
-                    : result.isTutorial ? '📖 STAGE CLEARED! 📖' : '🧩 PUZZLE CLEARED! 🧩'}
-                </div>
-                <div style={{ fontSize: finalTutorialCleared ? 16 : 14, color: 'var(--text2)', marginBottom: 24 }}>
-                  {finalTutorialCleared
-                    ? 'You have completed every tutorial — go forth and battle!'
-                    : result.isTutorial ? 'Great job!' : 'All enemy heroes defeated in one turn!'}
-                </div>
-              </>
-            ) : (
-              <>
-                <div className="pixel-font" style={{ fontSize: 36, marginBottom: 12, color: 'var(--danger)', textShadow: '0 0 30px rgba(252,28,95,.5)' }}>
-                  {result.isTutorial ? 'STAGE FAILED' : 'PUZZLE FAILED'}
-                </div>
-                <div style={{ fontSize: 14, color: 'var(--text2)', marginBottom: 24 }}>
-                  {result.reason === 'puzzle_failed' ? 'Your turn ended without defeating all enemy heroes.' :
-                   result.reason === 'all_heroes_dead' && result.winnerIdx !== 0 ? 'All your heroes were defeated!' :
-                   result.reason === 'surrender' ? 'You gave up.' : 'Better luck next time!'}
-                </div>
-              </>
-            )}
+          <ResultCeremony
+            won={geschafft} spectator={false}
+            title={geschafft ? (finalTutorialCleared ? 'TUTORIAL CLEARED!' : result.isTutorial ? 'STAGE CLEARED!' : 'PUZZLE CLEARED!') : (result.isTutorial ? 'STAGE FAILED' : 'PUZZLE FAILED')}
+            subtitle={geschafft
+              ? (finalTutorialCleared ? 'You have completed every tutorial — go forth and battle!' : result.isTutorial ? 'Great job!' : 'All enemy Heroes defeated in one turn!')
+              : (result.reason === 'puzzle_failed' ? 'Your turn ended without defeating all enemy Heroes.' :
+                 result.reason === 'all_heroes_dead' && result.winnerIdx !== 0 ? 'All your Heroes were defeated!' :
+                 result.reason === 'surrender' ? 'You gave up.' : 'Better luck next time!')}
+            rewards={[]} total={0} eloChanges={null} myName={user?.username} oppName={null} extra={null} cpuProgress={null}
+            helden={(gameState.players?.[0]?.heroes || []).map(h => h && h.name).filter(Boolean)}
+            klasse={'result-overlay-fade' + (resultFading ? ' result-overlay-fading' : '')}
+            vorn={<>{finalTutorialCleared && <TutorialFinaleFeuerwerk />}{finaleSchwarz && <div className="finale-schwarz" />}</>}>
             {result.puzzleResult === 'success' ? (
               <button className="btn" style={{ padding: '12px 32px', fontSize: 14, borderColor: '#fad54a', color: '#fad54a' }} onClick={handleResultLeave}>
                 {finalTutorialCleared ? '→ CONTINUE' : result.isTutorial ? '← RETURN TO TUTORIAL' : '← RETURN TO PUZZLE'}
@@ -63602,8 +63413,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                 </button>
               </div>
             )}
-          </div>
-        </div>
+          </ResultCeremony>
         );
       })()}
 
@@ -63622,13 +63432,13 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
             isSpectator ? (
               r.reason === 'disconnect_timeout' ? `${r.loserName} timed out` :
               r.reason === 'surrender' ? `${r.loserName} surrendered` :
-              r.reason === 'all_heroes_dead' ? `All of ${r.loserName}'s heroes defeated!` :
+              r.reason === 'all_heroes_dead' ? `All of ${r.loserName}'s Heroes defeated!` :
               ppGameOverText(r.reason, null, r.loserName, r.winnerName)
             ) : (
               r.reason === 'disconnect_timeout' ? 'Opponent timed out' :
               r.reason === 'opponent_left' ? 'Opponent left the game' :
               r.reason === 'surrender' ? (w ? 'Opponent surrendered' : 'You surrendered') :
-              r.reason === 'all_heroes_dead' ? (w ? 'All enemy heroes defeated!' : 'All your heroes were defeated') :
+              r.reason === 'all_heroes_dead' ? (w ? 'All enemy Heroes defeated!' : 'All your Heroes were defeated') :
               ppGameOverText(r.reason, w ? 'win' : 'lose', r.loserName, r.winnerName)
             )); })()}
           rewards={stRes ? ((isSpectator || user?.isGuest) ? [] : stRewards(stRes, myIdx)) : ((!isSpectator && scEarned && !user?.isGuest) ? (scEarned.rewards || []) : [])}
@@ -63642,16 +63452,19 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
               ? heroDisplayName(opp.heroes?.[1]?.name || opp.heroes?.find(h => h?.name)?.name || opp.username)
               : opp?.username}
           extra={(isSpectator || user?.isGuest) ? renderSCEarned() : null}
+          // Ergebnis-Zeremonie (app-fx-54): Namen der eigenen Helden fuer die Siegerfiguren am Rand (nur wenn Platz ist)
+          helden={isSpectator ? [] : (gameState.players?.[myIdx]?.heroes || []).map(h => h && h.name).filter(Boolean)}
+          eigenerCluster={!!meBubbleMsg}
           cpuProgress={(!isSpectator && iWon && result.cpuProgress) ? result.cpuProgress : null}>
             {stRes && <StRanking res={stRes} players={gameState.players} myIdx={myIdx} />}
             {!stRes && !isSpectator && ((decks && decks.length > 0) || (sampleDecks || []).some(d => isDeckLegal(d).legal)) && (
-              <div style={{ marginBottom: 14, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10 }}>
-                <label style={{ fontSize: 14, color: 'var(--text2)', fontWeight: 600 }}>🃏 Deck:</label>
+              <div className="pp-cer-deck">
+                <label>🃏 Deck:</label>
                 {/* Eigenes Dropdown statt `<select>` (Android: das System-Auswahlfenster holt im Vollbild die Systemleiste; Pixel-Emoji). */}
                 <PPDropdown value={selectedDeck || ''} onChange={id => {
                   setSelectedDeck(id);
                   socket.emit('change_deck', { roomId: gameState.roomId, deckId: id });
-                }} style={{ fontSize: 14, minWidth: 240, padding: '8px 14px', borderColor: 'var(--accent)', color: 'var(--text)' }}
+                }} style={{ borderColor: 'var(--accent)', color: 'var(--text)' }}
                   options={[
                     ...(decks || []).map(d => ({ value: d.id, label: d.name })),
                     ...((sampleDecks || []).filter(d => isDeckLegal(d).legal).length > 0 ? [{ value: '__sample_kopf', disabled: true, label: '── Sample Decks ──' }] : []),

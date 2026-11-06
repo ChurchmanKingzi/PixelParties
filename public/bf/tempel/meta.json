@@ -1,0 +1,1 @@
+{"dim": {"rand": 0.14}, "ew": 30, "tile": 192, "overlays": ["runes-lit", "runes-half"], "anim": [{"t": "pulse", "src": "runes", "period": 4200}, {"t": "dust", "n": 14, "phone": 0, "y0": 6, "y1": 94, "speed": 0.6, "dir": 1, "cols": ["#59606e", "#74b8b8", "#91e6e6"]}, {"t": "glint", "n": 5, "phone": 0, "y0": 4, "y1": 96, "cols": ["#91e6e6", "#ffffff"]}], "lum": 35.7}

@@ -1,4 +1,4 @@
-/* PP-HART-GEBACKEN 90c95474936b3594 — ERZEUGT von scripts/hart/build-css.js aus style.css (pixel-hart.js vorab angewandt) — nicht von Hand ändern. */
+/* PP-HART-GEBACKEN e9abd7af22d2a574 — ERZEUGT von scripts/hart/build-css.js aus style.css (pixel-hart.js vorab angewandt) — nicht von Hand ändern. */
 .pp-hart-gebacken { --pp-hart: 1; }
 @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Rajdhani:wght@400;500;600;700&family=Orbitron:wght@400;500;600;700;800;900&display=swap');
 
@@ -10098,6 +10098,27 @@ body.pp-dragging-card.pp-dragging-card.pp-dragging-card * {
 .board-zone-deleted { border-color: rgba(104,51,42,.4); background: rgba(104,51,42,.08); background-color: rgb(8, 6, 12); }
 .board-zone-deck { border-color: rgba(107,74,42,.5); background: rgba(107,74,42,.08); background-color: rgb(8, 6, 12); }
 .board-zone-potion { border-color: rgba(59,145,89,.5); background: rgba(59,145,89,.08); background-color: rgb(20, 20, 20); }
+
+/* ── KAMPFFELD (app-fx-55): Zonenrahmen in Zonenfarben ─────────────────────────────────────────────────────────────
+   Solange ein Feld den Boden stellt (`data-bf="<id>"` an `.game-board`, gesetzt von PpFx55Feld), tragen die Zonen ihren Rahmen deckend (2 px) in ihrer Zonenfarbe — die Farben der
+   Regeln oben, auf den dunklen Feldern in helleren Palettentönen derselben Farbe (Kontrast zum Boden ≥ 3). Ohne Feld bleibt das Brett wie es war. Eine Variable je Zonenart;
+   Targeting-/Highlight-Zustände gewinnen weiter (`.board-zone-play-target` mit !important, Box-Shadows, `.attach-pick-target`). Das Dojo (hell, Tutorial) bekommt eine harte
+   1-px-Außenkontur in #08060c. Island-Zonen setzen ihren Rahmen selbst mit !important, deshalb dort ebenso. */
+.game-board[data-bf] {
+  --zr-hero: #b278ed; --zr-ability: #6d9bf8; --zr-support: #e3ce36; --zr-surprise: #fe5154; --zr-island: #3ddc57;
+  --zr-area: #20ac37; --zr-discard: #a8a8a8; --zr-deleted: #ec7f79; --zr-deck: #a89370; --zr-potion: #5bbd7e;
+}
+.game-board[data-bf] .board-zone-hero { border-color: var(--zr-hero); }
+.game-board[data-bf] .board-zone-ability { border-color: var(--zr-ability); }
+.game-board[data-bf] .board-zone-support:not(.board-zone-island) { border-color: var(--zr-support); }
+.game-board[data-bf] .board-zone-surprise { border-color: var(--zr-surprise); }
+.game-board[data-bf] .board-zone-island { border-color: var(--zr-island) !important; }
+.game-board[data-bf] .board-zone-area { border-color: var(--zr-area); }
+.game-board[data-bf] .board-zone-discard { border-color: var(--zr-discard); }
+.game-board[data-bf] .board-zone-deleted { border-color: var(--zr-deleted); }
+.game-board[data-bf] .board-zone-deck { border-color: var(--zr-deck); }
+.game-board[data-bf] .board-zone-potion { border-color: var(--zr-potion); }
+.game-board[data-bf="dojo"] .board-zone:not(.attach-pick-target) { outline: 1px solid #08060c; }
 
 /* ── STAPEL IM HANDMASS (v1235, Als Vorgabe 19.9.) ─────────────────
    Deck, Potion-Deck, Ablage und Gelöscht-Stapel tragen dieselbe
@@ -21654,209 +21675,84 @@ body[data-tb-hl] .hero-idle-platz.hero-idle-hover { scale: none; }
   50%      { filter: brightness(1.22); }
 }
 
-/* ═══ ★★ v1262 — RESULT CEREMONY (Sieg/Niederlage, Als Vorgabe 21.9.) ═══
-   Opaker Vollbild-Hintergrund in der Ergebnisfarbe, Titel mit
-   Buchstaben-Drop, Rewards einzeln mit Pop + Funkenburst, Zaehler,
-   zum Schluss die Knoepfe. Ebene 10080 wie die frueheren Ergebnis-
-   Overlays; die End-Sprechblasen (10090) bleiben darueber. */
+/* ═══ ★★ ERGEBNIS-ZEREMONIE (Sieg/Niederlage/Rätsel-Ergebnis) — Hülle für app-fx-54.jsx ═══
+   Hintergrund, Banner und Teilchen zeichnet `PpFx54Zeremonie` (zwei Rasterleinwände, 30 Hz); hier steht nur das DOM davor: Untertitel, Fortschritt, Belohnungsliste, Summe, Freischaltungen, Elo, Deck, Knöpfe.
+   SCHRIFT: ausschließlich Pixel Intv in ganzzahligen Stufen — 1 Schrift-Einheit = 1/10,24 em; bei 10,24 px × n ist jede Einheit genau n Bildschirmpixel breit: T1 = 10,24 px, T2 = 20,48 px, T3 = 30,72 px,
+   Zeilenhöhen ganzzahlig, keine Glättung, kein Schatten. Gilt nur hier (`.pp-cer`), die übrige Oberfläche bleibt unverändert. Alle Farben sind Palettenfarben. Ebene 10080 wie die früheren Ergebnis-Overlays; die End-Sprechblasen (10090) bleiben darüber. */
 .pp-cer {
-  position: fixed; inset: 0; z-index: 10080;
+  position: fixed; inset: 0; z-index: 10080; overflow: hidden; background: #08060c; cursor: pointer;
   display: flex; align-items: center; justify-content: center;
-  overflow: hidden;
-  animation: ppCerAuf .55s ease-out both;
-  cursor: pointer;
 }
-/* v1263 (Al 21.9.): nicht ganz opak — „dahinter noch ein bisschen was
-   vom Spielfeld zu sehen, waere cool". Alpha .9 innen, .96 am Rand. */
-.pp-cer-win  { background: radial-gradient(ellipse at 50% 35%, #27180c 0 25%, #1f0f04 25% 75%, #08060c 75%); }
-.pp-cer-lose { background: radial-gradient(ellipse at 50% 35%, #2a0404 0 25%, #08060c 25%); }
-.pp-cer-klone { position: absolute; inset: 0; pointer-events: none; z-index: 1; }
+.pp-cer, .pp-cer * { font-family: var(--font-display), monospace; letter-spacing: 0; text-shadow: none; text-rendering: optimizeSpeed; -webkit-font-smoothing: none; box-sizing: border-box; }
+.pp-cer-bg, .pp-cer-fg { position: absolute; left: 0; top: 0; width: 100%; height: 100%; display: block; image-rendering: pixelated; pointer-events: none; }
+.pp-cer-cam { position: absolute; inset: 0; z-index: 1; pointer-events: none; }
+.pp-cer-klone { position: absolute; inset: 0; pointer-events: none; z-index: 4; }
 .pp-cer-klone .game-hand-info { position: fixed !important; }
-@keyframes ppCerAuf { from { opacity: 0; } to { opacity: 1; } }
-.pp-cer-streifen {
-  position: absolute; inset: -50%;
-  background: repeating-linear-gradient(115deg, transparent 0 34px, rgba(255,255,255,.035) 34px 40px);
-  animation: ppCerStreifen 14s linear infinite;
-  pointer-events: none;
-}
-.pp-cer-lose .pp-cer-streifen { animation-duration: 28s; opacity: .6; }
-@keyframes ppCerStreifen { from { transform: translateX(0); } to { transform: translateX(120px); } }
-.pp-cer-vignette {
-  position: absolute; inset: 0; pointer-events: none;
-  background: radial-gradient(ellipse at center, transparent 0 55%, rgba(0,0,0,.4) 55% 78%, rgba(0,0,0,.75) 78%);
-}
-.pp-cer-sterne { position: absolute; inset: 0; pointer-events: none; }
-.pp-cer-sterne i {
-  position: absolute; width: 4px; height: 4px; background: #f9ecb3;
-  box-shadow: rgb(114, 84, 29) 0px 0px 0px 2px; opacity: 0;
-  animation: ppCerStern 3s ease-in-out infinite;
-}
-@keyframes ppCerStern { 0%, 100% { opacity: 0; transform: scale(.4); } 50% { opacity: .9; transform: scale(1.2); } }
-.pp-cer-inhalt {
-  position: relative; z-index: 2; text-align: center; cursor: url("/cursor-arrow.png?v=4") 2 2, default;
-  max-width: min(92vw, 640px); min-height: 0; flex: 0 1 auto; overflow-y: auto; padding: 0 12px 18px;
-}
-/* Titel (Al 7.10.: „keinen Umbruch, sondern über die Constraints hinaus overflowen"): eine Zeile, nie umgebrochen, nie beschnitten —
-   er sitzt in `.pp-cer-spalte` über dem Inhalt (der Inhalt scrollt, hat max. 640 px, und würde ihn sonst beschneiden) und darf breiter sein.
-   Press Start 2P ist 1em je Zeichen breit (+ letter-spacing 4px); nur wenn er sonst über den BILDSCHIRM hinausginge, schrumpft er
-   (`--cer-n` = Zeichen, gesetzt in ResultCeremony). */
-.pp-cer-spalte {
-  position: relative; z-index: 2; display: flex; flex-direction: column; align-items: center;
-  max-width: 100vw; max-height: 100dvh; min-height: 0; padding-top: 18px; box-sizing: border-box;
-}
-.pp-cer-titel {
-  font-size: min(clamp(34px, 8vw, 72px), calc((100vw - 32px) / var(--cer-n, 8) - 4px));
-  letter-spacing: 4px; margin-bottom: 10px; flex: none;
-  text-shadow: color-mix(in srgb, currentcolor 45%, rgb(0, 0, 0) 55%) -2px 0px 0px, color-mix(in srgb, currentcolor 45%, rgb(0, 0, 0) 55%) 2px 0px 0px, color-mix(in srgb, currentcolor 45%, rgb(0, 0, 0) 55%) 0px -2px 0px, color-mix(in srgb, currentcolor 45%, rgb(0, 0, 0) 55%) 0px 2px 0px, color-mix(in srgb, currentcolor 45%, rgb(0, 0, 0) 55%) -2px -2px 0px, color-mix(in srgb, currentcolor 45%, rgb(0, 0, 0) 55%) 2px -2px 0px, color-mix(in srgb, currentcolor 45%, rgb(0, 0, 0) 55%) -2px 2px 0px, color-mix(in srgb, currentcolor 45%, rgb(0, 0, 0) 55%) 2px 2px 0px, rgba(0, 0, 0, 0.6) 0px 6px 0px;
-  white-space: nowrap; line-height: 1.25;
-}
-.pp-cer-buchstabe { display: inline-block; animation: ppCerBuchstabe .55s cubic-bezier(.2,1.4,.4,1) both; }
-@keyframes ppCerBuchstabe {
-  0%   { transform: translateY(-80px) scale(1.6); opacity: 0; }
-  60%  { transform: translateY(8px) scale(.96); opacity: 1; }
-  100% { transform: translateY(0) scale(1); opacity: 1; }
-}
-.pp-cer-unter { font-size: 15px; color: var(--text2); margin-bottom: 18px; animation: ppCerFade .6s .5s both; }
-/* Besondere Spielende-Gruende (Deck-Out, Doom Clock): gross und unuebersehbar. */
-.pp-cer-unter-grund { font-size: 20px; font-weight: 700; color: #f0bfbc; text-shadow: rgb(85, 1, 26) -2px 0px 0px, rgb(85, 1, 26) 2px 0px 0px, rgb(85, 1, 26) 0px -2px 0px, rgb(85, 1, 26) 0px 2px 0px, rgb(85, 1, 26) -2px -2px 0px, rgb(85, 1, 26) 2px -2px 0px, rgb(85, 1, 26) -2px 2px 0px, rgb(85, 1, 26) 2px 2px 0px, rgba(0, 0, 0, 0.6) 2px 2px 0px; }
-.pp-cer-win .pp-cer-unter-grund { color: #f9ecb3; text-shadow: rgb(90, 60, 20) -2px 0px 0px, rgb(90, 60, 20) 2px 0px 0px, rgb(90, 60, 20) 0px -2px 0px, rgb(90, 60, 20) 0px 2px 0px, rgb(90, 60, 20) -2px -2px 0px, rgb(90, 60, 20) 2px -2px 0px, rgb(90, 60, 20) -2px 2px 0px, rgb(90, 60, 20) 2px 2px 0px, rgba(0, 0, 0, 0.6) 2px 2px 0px; }
-.pp-cer-sieg { margin: -8px 0 34px; animation: ppCerFade .6s .7s both; }
-.pp-cer-sieg-zahl { font-size: 18px; font-weight: 700; color: #fad54a; text-shadow: 2px 2px 0 rgba(0,0,0,.6); }
-.pp-cer-sieg-theme { margin-top: 4px; font-size: 12px; color: var(--text2); }
-.pp-cer-freischaltungen { display: flex; flex-direction: column; align-items: center; gap: 8px; margin: 6px 0 14px; }
-.pp-cer-freischaltung {
-  display: flex; align-items: center; gap: 12px; min-width: 260px; max-width: 92vw; padding: 10px 16px; text-align: left;
-  background: rgba(250,213,74,.10); border: 2px solid #fad54a;
-  box-shadow: rgba(0, 0, 0, 0.5) 4px 4px 0px, rgb(114, 84, 29) 0px 0px 0px 4px;
-}
-.pp-cer-frei-icon { font-size: 30px; line-height: 1; }
-.pp-cer-frei-bild { height: 54px; width: auto; border-radius: 3px; box-shadow: 2px 2px 0 rgba(0,0,0,.5); }
-.pp-cer-frei-titel { font-size: 11px; letter-spacing: 1px; text-transform: uppercase; color: #fad54a; }
-.pp-cer-frei-name { font-size: 16px; font-weight: 700; color: var(--text); }
-.pp-cer-rewards { display: flex; flex-wrap: wrap; justify-content: center; gap: 18px 10px; margin: 18px 0 12px; }
-.pp-cer-reward {
-  position: relative; width: 168px; min-height: 84px; padding: 10px 12px 12px;
-  background: rgba(255,255,255,.06); border: 2px solid rgba(250,213,74,.55);
-  box-shadow: rgba(0, 0, 0, 0.5) 4px 4px 0px;
-  opacity: 0; transform: scale(.4); pointer-events: none;
-}
-.pp-cer-lose .pp-cer-reward { border-color: rgba(254,103,148,.5); }
-.pp-cer-reward-da { animation: ppCerPop .5s cubic-bezier(.2,1.5,.4,1) both; }
-@keyframes ppCerPop {
-  0%   { opacity: 0; transform: scale(.4) rotate(-6deg); } /* pp-ok: drehung */
-  70%  { opacity: 1; transform: scale(1.08) rotate(1deg); } /* pp-ok: drehung */
-  100% { opacity: 1; transform: scale(1) rotate(0); }
-}
-.pp-cer-reward-titel { font-family: var(--font-display), sans-serif; font-size: 13px; color: #fad54a; letter-spacing: 1px; margin-bottom: 4px; }
-.pp-cer-reward-text { font-size: 11px; color: var(--text2); line-height: 1.35; min-height: 28px; }
-/* ★ v1471 (Als Befund 28.9.: „Im Reward-Screen sollten alle Rewards in einer
-   Zeile ihre Münzen auf derselben Höhe darstellen"). Die Kacheln einer Zeile
-   sind (Flex-Zeile, stretch) schon gleich hoch, der Betrag hing aber direkt
-   unter dem Text — ein längerer Text schob ihn tiefer. Jetzt ist die Kachel
-   eine Flex-Spalte und der Betrag sitzt unten (margin-top: auto). */
-.pp-cer-reward { display: flex; flex-direction: column; }
-.pp-cer-reward-betrag {
-  margin-top: auto; padding-top: 6px; font-family: var(--font-display), sans-serif; font-size: 18px; color: #fad54a;
-  display: flex; align-items: center; justify-content: center; gap: 5px;
-}
-.pp-cer-reward-betrag img, .pp-cer-summe img { width: 18px; height: 18px; image-rendering: pixelated; }
-/* ── v1400: begrenzte Boni (Al 25.9.) — Farbe + schräges Band ── */
-.pp-cer .pp-cer-reward-daily {
-  border-color: rgba(102,217,255,.85);
-  box-shadow: rgba(0, 0, 0, 0.5) 4px 4px 0px;
-}
-.pp-cer .pp-cer-reward-daily .pp-cer-reward-titel { color: #7fdfff; }
-.pp-cer .pp-cer-reward-once {
-  border-color: rgba(201,138,255,.9);
-  box-shadow: rgba(0, 0, 0, 0.5) 4px 4px 0px;
-}
-.pp-cer .pp-cer-reward-once .pp-cer-reward-titel { color: #d6b3f9; }
-.pp-cer-band {
-  position: absolute; top: -11px; left: -12px; z-index: 1;
-  padding: 2px 10px 3px; transform: rotate(-11deg);
-  font-family: var(--font-display), sans-serif; font-size: 11px; letter-spacing: 1px;
-  color: #12101f; box-shadow: 2px 2px 0 rgba(0,0,0,.55);
-  pointer-events: none; white-space: nowrap;
-}
-.pp-cer-reward-daily .pp-cer-band { background: linear-gradient(180deg, #b6eff7 0 50%, #66d9ff 50%); }
-.pp-cer-reward-once .pp-cer-band { background: linear-gradient(180deg, #d6bbf1 0 50%, #ba74ff 50%); }
-.pp-cer-reward-da .pp-cer-band { animation: ppCerBand .45s .15s cubic-bezier(.2,1.6,.4,1) both; }
-@keyframes ppCerBand {
-  0%   { transform: rotate(-11deg) scale(0); } /* pp-ok: drehung */
-  100% { transform: rotate(-11deg) scale(1); } /* pp-ok: drehung */
-}
-
-/* ── v1400: Münzregen im Sieg-Bildschirm (Al 25.9.) ── */
-/* Die Karten decken den Regen ab — sonst schimmern Münzen durch die
-   fast durchsichtigen Belohnungskarten. */
-.pp-cer-win .pp-cer-reward { background: rgba(18,16,31,.92); }
-.pp-cer-regen { position: absolute; inset: 0; overflow: hidden; pointer-events: none; z-index: 1; }
-.pp-cer-regen i {
-  position: absolute; top: -60px; display: block;
-  animation: ppCerRegen 6s linear infinite; opacity: 0;
-}
-.pp-cer-regen b {
-  position: absolute; inset: 0; display: block;
-  background: url(/data/sc.png) center / contain no-repeat; image-rendering: pixelated;
-  filter: drop-shadow(2px 0 0 #72541d) drop-shadow(-2px 0 0 #72541d) drop-shadow(0 2px 0 #72541d) drop-shadow(0 -2px 0 #72541d);
-  animation: ppCerDreh 1s ease-in-out infinite;
-}
-/* Glanz: ein kleiner Vierstern, der kurz aufblitzt */
-.pp-cer-regen u {
-  position: absolute; left: 60%; top: 10%; width: 12px; height: 12px; display: block;
-  background:
-    linear-gradient(90deg, transparent 42%, #fff 50%, transparent 58%),
-    linear-gradient(0deg, transparent 42%, #fff 50%, transparent 58%);
-  filter: drop-shadow(rgb(255, 255, 255) 2px 0px 0px) drop-shadow(rgb(255, 255, 255) -2px 0px 0px) drop-shadow(rgb(255, 255, 255) 0px 2px 0px) drop-shadow(rgb(255, 255, 255) 0px -2px 0px) drop-shadow(rgb(250, 213, 74) 2px 0px 0px) drop-shadow(rgb(250, 213, 74) -2px 0px 0px) drop-shadow(rgb(250, 213, 74) 0px 2px 0px) drop-shadow(rgb(250, 213, 74) 0px -2px 0px);
-  opacity: 0; transform: scale(.2) rotate(0deg);
-  animation: ppCerGlanz 2.6s ease-out infinite;
-}
-@keyframes ppCerRegen {
-  0%   { transform: translate(0, 0); opacity: 0; }
-  8%   { opacity: .8; }
-  88%  { opacity: .8; }
-  100% { transform: translate(var(--drift, 0px), calc(100dvh + 120px)); opacity: 0; }
-}
-@keyframes ppCerDreh {
-  0%, 100% { transform: scaleX(1); }
-  50%      { transform: scaleX(.12); filter: drop-shadow(4px 0 0 #f7f7ad) drop-shadow(-4px 0 0 #f7f7ad) drop-shadow(0 4px 0 #f7f7ad) drop-shadow(0 -4px 0 #f7f7ad) brightness(1.35); }
-}
-@keyframes ppCerGlanz {
-  0%, 62%, 100% { opacity: 0; transform: scale(.2) rotate(0deg); }
-  72%           { opacity: 1; transform: scale(1.15) rotate(45deg); } /* pp-ok: drehung */
-  84%           { opacity: 0; transform: scale(.4) rotate(90deg); }
-}
-@media (prefers-reduced-motion: reduce) {
-  .pp-cer-regen { display: none; }
-}
-.pp-cer-burst { position: absolute; left: 50%; top: 50%; width: 0; height: 0; pointer-events: none; }
-.pp-cer-burst i {
-  position: absolute; left: -3px; top: -3px; width: 6px; height: 6px; background: #fad54a;
-  box-shadow: rgb(114, 84, 29) 0px 0px 0px 2px; transform: rotate(var(--bw)) translateY(0);
-  animation: ppCerFunke .7s ease-out forwards;
-}
-@keyframes ppCerFunke {
-  0%   { transform: rotate(var(--bw)) translateY(0) scale(1); opacity: 1; } /* pp-ok: drehung */
-  100% { transform: rotate(var(--bw)) translateY(-90px) scale(.2); opacity: 0; } /* pp-ok: drehung */
-}
-.pp-cer-summe {
-  display: flex; align-items: center; justify-content: center; gap: 8px;
-  margin: 4px 0 14px; color: #fad54a; font-family: var(--font-display), sans-serif; font-size: 22px;
-  text-shadow: rgb(90, 60, 20) -2px 0px 0px, rgb(90, 60, 20) 2px 0px 0px, rgb(90, 60, 20) 0px -2px 0px, rgb(90, 60, 20) 0px 2px 0px, rgb(90, 60, 20) -2px -2px 0px, rgb(90, 60, 20) 2px -2px 0px, rgb(90, 60, 20) -2px 2px 0px, rgb(90, 60, 20) 2px 2px 0px;
-}
-.pp-cer-summe-zahl { font-size: 34px; min-width: 2ch; text-align: right; }
-.pp-cer-summe-text { font-size: 13px; color: var(--text2); }
-.pp-cer-elo { margin: 4px 0 14px; font-size: 13px; display: flex; flex-direction: column; gap: 3px; }
-.pp-cer-fade { animation: ppCerFade .5s ease-out both; }
-@keyframes ppCerFade { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
-.pp-cer-hinweis { margin-top: 14px; font-size: 11px; color: rgba(255,255,255,.35); letter-spacing: 2px; animation: ppCerStern 2.4s ease-in-out infinite; }
-/* Telefon quer: kompakter, keine Streifenanimation (Lite) */
+.pp-cer-spalte { position: relative; z-index: 3; display: flex; flex-direction: column; align-items: center; justify-content: safe center; height: 100%; max-height: 100dvh; min-height: 0; max-width: 100vw; padding: 0 12px; }
+/* Platzhalter des Banners (die Leinwand zeichnet ihn; Größe setzt app-fx-54 nach der Titelbreite); der Titel bleibt als unsichtbarer Text im DOM */
+.pp-cer-platz { flex: none; position: relative; height: 148px; width: 400px; }
+.pp-cer-titel { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+.pp-cer-inhalt { position: relative; flex: 0 1 auto; display: flex; flex-direction: column; align-items: center; text-align: center; max-width: min(96vw, 660px); min-height: 0; overflow-y: auto; overflow-x: hidden; padding: 0 6px 12px; cursor: url("/cursor-arrow.png?v=4") 2 2, default; }
+.pp-cer-inhalt > * { flex: none; }
+.pp-cer-aus { visibility: hidden; }
+.pp-cer-unter { font-size: 20.48px; line-height: 28px; color: #d2d2db; margin-bottom: 6px; max-width: 640px; }
+.pp-cer-unter-grund { color: #f9ecb3; }
+.pp-cer-lose .pp-cer-unter-grund { color: #f8b4c8; }
+.pp-cer-sieg { margin: 0 0 8px; text-align: center; }
+.pp-cer-sieg-zahl { font-size: 20.48px; line-height: 28px; color: #fad54a; }
+.pp-cer-sieg-theme { margin-top: 2px; font-size: 10.24px; line-height: 14px; color: #9aa3b6; }
+/* Belohnungsliste: eine Zeile je Eintrag (Titel + Band, Beschreibung, Betrag + Münze); 1 Spalte bis 3 Einträge, sonst 2; scrollt in der Spalte, wenn sie nicht ganz passt (Summe und Knöpfe bleiben stehen) */
+.pp-cer-liste { display: grid; grid-template-columns: repeat(2, 300px); gap: 6px 8px; justify-content: center; margin: 0 0 8px; max-height: 46dvh; overflow-y: auto; overflow-x: hidden; }
+.pp-cer-liste-1 { grid-template-columns: 380px; }
+.pp-cer-zeile { display: flex; align-items: center; justify-content: space-between; gap: 6px; min-height: 40px; padding: 3px 8px; background: #12101f; border: 2px solid #72541d; text-align: left; visibility: hidden; }
+.pp-cer-zeile-da { visibility: visible; animation: ppCerPop .13s steps(4) both; }
+.pp-cer-zeile-text { min-width: 0; flex: 1 1 auto; }
+.pp-cer-zeile-titel { display: block; font-size: 10.24px; line-height: 14px; color: #fad54a; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pp-cer-zeile-beschr { display: block; font-size: 10.24px; line-height: 14px; color: #9aa3b6; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pp-cer-zeile-betrag { display: flex; align-items: center; gap: 4px; flex: none; font-size: 20.48px; line-height: 28px; color: #fad54a; }
+.pp-cer-zeile-betrag img, .pp-cer-summe img { width: 24px; height: 24px; image-rendering: pixelated; }
+.pp-cer-band { display: inline-block; margin-left: 6px; padding: 0 4px; font-size: 10.24px; line-height: 12px; color: #12101f; background: #66d9ff; vertical-align: top; }
+.pp-cer-zeile-daily { border-color: #66d9ff; } .pp-cer-zeile-daily .pp-cer-zeile-titel { color: #b6eff7; }
+.pp-cer-zeile-once { border-color: #ba74ff; } .pp-cer-zeile-once .pp-cer-zeile-titel { color: #d6bbf1; } .pp-cer-zeile-once .pp-cer-band { background: #ba74ff; }
+.pp-cer-lose .pp-cer-zeile { border-color: #5a023a; } .pp-cer-lose .pp-cer-zeile-daily { border-color: #66d9ff; } .pp-cer-lose .pp-cer-zeile-once { border-color: #ba74ff; }
+.pp-cer-summe { display: flex; align-items: center; justify-content: center; gap: 8px; margin: 0 0 8px; color: #fad54a; }
+.pp-cer-summe-zahl { min-width: 4ch; text-align: right; font-size: 30.72px; line-height: 40px; }
+.pp-cer-summe-text { font-size: 10.24px; line-height: 14px; color: #9aa3b6; }
+.pp-cer-freischaltungen { display: flex; flex-direction: column; align-items: center; gap: 8px; margin: 0 0 10px; }
+.pp-cer-freischaltung { display: flex; align-items: center; gap: 12px; min-width: 300px; max-width: 92vw; padding: 6px 12px; text-align: left; background: #12101f; border: 2px solid #fad54a; }
+.pp-cer-frei-icon { font-size: 30.72px; line-height: 40px; }
+.pp-cer-frei-bild { height: 54px; width: auto; image-rendering: pixelated; }
+.pp-cer-frei-titel { font-size: 10.24px; line-height: 14px; text-transform: uppercase; color: #fad54a; }
+.pp-cer-frei-name { font-size: 20.48px; line-height: 28px; color: #ffffff; }
+.pp-cer-elo { margin: 0 0 10px; font-size: 10.24px; line-height: 14px; display: flex; flex-direction: column; gap: 3px; }
+.pp-cer-pop { animation: ppCerPop .13s steps(4) both; }
+.pp-cer-hinweis { margin-top: 4px; font-size: 10.24px; line-height: 14px; color: #686868; }
+/* Knöpfe, Deck-Auswahl: Stufe T2 (die Inline-Größen aus app-board.jsx weichen) */
+.pp-cer .btn { font-size: 20.48px !important; line-height: 28px !important; }
+.pp-cer-deck { display: flex; align-items: center; justify-content: center; gap: 10px; margin-bottom: 10px; }
+.pp-cer-deck label { font-size: 10.24px; line-height: 14px; color: #9aa3b6; }
+.pp-cer-deck .select { font-size: 20.48px !important; line-height: 28px !important; padding: 4px 14px !important; min-width: 320px; }
+@keyframes ppCerPop { from { transform: translateY(8px); } to { transform: none; } }
+@media (prefers-reduced-motion: reduce) { .pp-cer-pop, .pp-cer-zeile-da { animation: none; } }
+/* Handy quer (battle-lite): kleiner Banner-Platz, Liste in zwei kompakten Spalten ohne Beschreibung (scrollt in der Spalte), Deck und Knöpfe in einer Zeile */
 @media (pointer: coarse) and (max-height: 600px) {
-  .pp-cer-streifen { animation: none; }
-  .pp-cer-titel { font-size: min(clamp(26px, 7vw, 44px), calc((100vw - 32px) / var(--cer-n, 8) - 4px)); margin-bottom: 4px; }
-  .pp-cer-reward { width: 140px; min-height: 70px; padding: 6px 8px 8px; }
-  .pp-cer-reward-text { display: none; }
-  .pp-cer-inhalt { padding: 8px 10px; }
+  .pp-cer-platz { height: 84px; width: 200px; }
+  .pp-cer-unter { font-size: 10.24px; line-height: 14px; margin-bottom: 2px; }
+  .pp-cer-sieg { margin-bottom: 4px; } .pp-cer-sieg-zahl { font-size: 10.24px; line-height: 14px; }
+  .pp-cer-inhalt { padding: 2px 6px 4px; }
+  .pp-cer-liste { grid-template-columns: repeat(2, 296px); gap: 4px 6px; margin-bottom: 4px; max-height: 36dvh; }
+  .pp-cer-liste-1 { grid-template-columns: 296px; }
+  .pp-cer-zeile { min-height: 28px; padding: 2px 6px; } .pp-cer-zeile-beschr { display: none; }
+  .pp-cer-summe { margin-bottom: 4px; } .pp-cer-summe-zahl { font-size: 20.48px; line-height: 28px; }
+  .pp-cer .ergebnis-knoepfe { --ergebnis-knopf-h: 36px; }
+  .pp-cer-pop { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 4px 10px; }
+  .pp-cer-deck { margin-bottom: 0; } .pp-cer-deck .select { min-width: 140px; } .pp-cer-deck label { display: none; }
+  .pp-cer-hinweis { display: none; }
+  .pp-cer-freischaltungen { flex-direction: row; flex-wrap: wrap; justify-content: center; gap: 4px 6px; margin: 0 0 4px; }
+  .pp-cer-freischaltung { min-width: 0; padding: 2px 8px; gap: 8px; }
+  .pp-cer-frei-titel { display: none; } .pp-cer-frei-name { font-size: 10.24px; line-height: 14px; }
+  .pp-cer-frei-icon { font-size: 20.48px; line-height: 28px; } .pp-cer-frei-bild { height: 28px; }
+  .pp-cer-elo { margin: 0 0 4px; }
 }
 
 /* ═══ GLANZBAND + LOTSE (v1264) ════════════════════════════════════════
