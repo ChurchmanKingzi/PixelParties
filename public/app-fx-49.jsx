@@ -22,8 +22,10 @@ const PP_FX49_C = { creme: ppHex('#fffbd2'), grau: ppHex('#9aa3b6'), weiss: ppHe
 // ★ Ability-Blau: Landet/fliegt eine Fähigkeit (Kartenfarbe #4580f6, `zoneLandStyle` in app-shared.jsx), werden Creme und Grau der Ringe/Schweife zu hellem Blau (Palette), sonst unverändert.
 const PP_FX49_ABIL = { creme: ppHex('#b4cff8'), grau: ppHex('#6d9bf8') };
 const ppFx49IstAbility = (farbe) => /#4580f6/i.test(String(farbe || ''));
-const PP_FX49_S = 3;                                   // Bildschirmpixel je Rasterzelle
+const PP_FX49_S = 3;                                   // Rückfall der Rasterzelle (Bildschirmpixel); gilt nur ohne `ppFxZelle` — sonst Zelle = Hero-Pixel (app-board.jsx)
 const PP_FX49_TAKT = 1000 / 30;
+/** Rasterzelle = Hero-Pixel (app-board.jsx `ppFxZelle`); ohne die Funktion der alte feste Wert. */
+const ppFxZelleSafe = (z) => { try { return typeof ppFxZelle === 'function' ? ppFxZelle(z) : PP_FX49_S; } catch (e) { return PP_FX49_S; } };
 const ppFx49Kl = (v, a, b) => Math.max(a, Math.min(b, v));
 const ppFx49EaseOutCubic = (u) => 1 - Math.pow(1 - ppFx49Kl(u, 0, 1), 3);
 
@@ -63,7 +65,7 @@ function ppFx49Schweif(o) {
     if (!o || window._playAnimations === false || window.__ppFxAlt) return null;
     const von = o.von, nach = o.nach;
     if (!von || !nach || ![von.x, von.y, nach.x, nach.y].every(isFinite)) return null;
-    const S = PP_FX49_S, TAKT = PP_FX49_TAKT, rd = Math.round, H = ppFx30H;
+    const S = (o.trocken ? ppFxZelleSafe(null) : ppFxZelleSafe({ x: nach.x, y: nach.y })), TAKT = PP_FX49_TAKT, rd = Math.round, H = ppFx30H;   // Zelle = Hero-Pixel des Ziels
     const art = o.art === 'komet' ? 'komet' : 'zug';
     const dauer = Math.max(120, o.dauer > 0 ? o.dauer : 400), verzug = o.verzug > 0 ? o.verzug : 0;
     const bw = o.w > 0 ? o.w : 64, bh = o.h > 0 ? o.h : 90;
@@ -220,9 +222,9 @@ window.ppFx49Zug = function (el, o) {
 
 // ───────────────────────── 2. Einschlag: Schockringe + Aufleuchten ─────────────────────────
 /** Zusatz für `ppFx44Funken(box, liste, farbe, zusatz)`: { R (px, halbe Leinwand), ende (ms), malen(put, c0, gw, gh, t ms) }. */
-window.ppFx49Einschlag = function (w, h, farbe) {
+window.ppFx49Einschlag = function (w, h, farbe, zelle) {
   try {
-    const S = PP_FX49_S, C = ppFx49IstAbility(farbe) ? { ...PP_FX49_C, ...PP_FX49_ABIL } : PP_FX49_C;
+    const S = zelle > 0 ? zelle : ppFxZelleSafe(null), C = ppFx49IstAbility(farbe) ? { ...PP_FX49_C, ...PP_FX49_ABIL } : PP_FX49_C;
     if (!(w > 0) || !(h > 0)) return null;
     const kern = ppFx49Farbe(farbe);
     const wz = w / S, hz = h / S, k = ppFx49Kl(wz / 40, 0.45, 1.8);   // Trailer: Radien 26 und 18 Zellen bei 40 Zellen Kartenbreite
@@ -239,7 +241,7 @@ window.ppFx49Einschlag = function (w, h, farbe) {
       }
     };
     return {
-      R, ende: 680,
+      S, R, ende: 680,
       malen: (put, c0, gw, gh, t) => {
         const u = t / 620;
         if (u > 0 && u < 1) {                                          // Aufleuchten (vorher radialer Verlauf): gedithertes Oval, innen dichter, Maß .35 → 1,05, Spitze bei 18 %

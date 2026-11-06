@@ -185,7 +185,7 @@ function ppFx48Geometrie(el, heroEl) {
   const r = el.getBoundingClientRect(), hr = heroEl.getBoundingClientRect();
   if (!r.width || !r.height || !hr.width || !hr.height) return null;
   const fo = window.ppFxScrollOffset ? window.ppFxScrollOffset() : { dx: 0, dy: 0 };
-  const Hz = r.height, S = Math.max(2, Math.min(4, Math.round(Hz / 35)));
+  const Hz = r.height, S = (typeof ppFxZelle === 'function') ? ppFxZelle(el) : Math.max(2, Math.min(4, Math.round(Hz / 35)));   // Rasterzelle = Hero-Pixel (ppFxZelle)
   const rc = Hz / (35 * S), rch = hr.height / (35 * S);
   const cardX = r.left + r.width / 2 + fo.dx, cardY = r.top + r.height / 2 + fo.dy, heroX = hr.left + hr.width / 2 + fo.dx, feetY = hr.top + hr.height / 2 + fo.dy;
   const p = Math.max(1, Math.round(2 * rc)), M = Math.max(40, Math.ceil(95 * Math.max(rc, rch))), up = Math.max(M, 56 * p + 4);

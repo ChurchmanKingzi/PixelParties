@@ -7910,7 +7910,7 @@ function spawnZoneLandFx(el, opts) {
   box.style.cssText = mitte + masse;
 
   // Schockringe + Aufleuchten (app-fx-49) laufen auf der Funken-Leinwand; ohne sie (Notbremse `__ppFxAlt`, Animationen aus, Modul fehlt) bleiben Ring und Schein als CSS-Knoten.
-  const zusatz = (!!window.ppFx49Einschlag && !!window.ppFx44Funken && !window.__ppFxAlt) ? window.ppFx49Einschlag(r.width, r.height, farbe) : null;
+  const zusatz = (!!window.ppFx49Einschlag && !!window.ppFx44Funken && !window.__ppFxAlt) ? window.ppFx49Einschlag(r.width, r.height, farbe, window.ppFxZelle ? window.ppFxZelle(el) : 0) : null;
   const teile = zusatz ? funkenHtml(n) : ['<i class="zone-land-glow"></i>', '<i class="zone-land-ring"></i>', ...funkenHtml(n)];
   box.innerHTML = teile.join('');
   schicht().appendChild(box);

@@ -80,7 +80,7 @@ function ppFx30Feuerball(o) {
   try {
     if (!o || window._playAnimations === false) return null;
     if (!isFinite(o.sx) || !isFinite(o.sy) || !isFinite(o.tx) || !isFinite(o.ty)) return null;
-    const S = 3, TAKT = 1000 / 30, C = PP_FX30_C, H = ppFx30H;
+    const S = ppFxZelleFuer({ x: o.tx, y: o.ty }), TAKT = 1000 / 30, C = PP_FX30_C, H = ppFx30H;   // Rasterzelle = Hero-Pixel des Ziels (app-board.jsx `ppFxZelle`)
     const fo = (o.w === false || !window.ppFxScrollOffset) ? { dx: 0, dy: 0 } : window.ppFxScrollOffset();
     const welt = o.w !== false && !!window.ppFxWeltSchicht;
     const tw = o.tw > 0 ? o.tw : 64, thh = o.th > 0 ? o.th : 90, sw = o.sw > 0 ? o.sw : 64, shh = o.sh > 0 ? o.sh : 90;
@@ -279,7 +279,7 @@ function ppFx30Sand(o) {
   try {
     if (!o || window._playAnimations === false) return null;
     if (!isFinite(o.sx) || !isFinite(o.sy) || !isFinite(o.tx) || !isFinite(o.ty)) return null;
-    const S = 2, TAKT = 1000 / 30, H = ppFx30H, rd = Math.round;
+    const S = ppFxZelleFuer({ x: o.tx, y: o.ty }), TAKT = 1000 / 30, H = ppFx30H, rd = Math.round;   // Rasterzelle = Hero-Pixel des Ziels
     const fo = window.ppFxScrollOffset ? window.ppFxScrollOffset() : { dx: 0, dy: 0 };
     const welt = !!window.ppFxWeltSchicht;
     const ax = o.sx + fo.dx, ay = o.sy + fo.dy, bx = o.tx + fo.dx, by = o.ty + fo.dy;

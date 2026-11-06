@@ -411,23 +411,8 @@ function ppFx57SheetPixel(eintrag) {
   } catch (e) { return null; }
 }
 
-/** Pixelgröße des Ziels (CSS-Pixel je Sprite-Pixel der Helden in seiner Reihe): Canvas der Figur / Frame-Breite. Ohne eigene Figur (Kreatur, Area): die Figur der Nähe (Held, dessen Zonenmitte vertikal am nächsten liegt),
- *  sonst aus der Zonenbreite (2,8125 / 68 · Breite, geneigtes Brett · 0,975). */
-function ppFx57HeldPixel(zoneEl, w) {
-  const aus = (z) => { const platz = z && z._ppFigurPlatz, cv = platz && platz.querySelector('canvas'); if (cv && cv.width > 0) { const r = cv.getBoundingClientRect(); if (r.width > 0) return { px: r.width / cv.width, cv, platz, eintrag: platz._ppEintrag }; } return null; };
-  try {
-    const eigen = aus(zoneEl); if (eigen) return eigen;
-    // nächste Heldenfigur (nur das Pixelmaß wird übernommen, nicht die Figur)
-    if (zoneEl && zoneEl.getBoundingClientRect) {
-      const zr = zoneEl.getBoundingClientRect(), zy = zr.top + zr.height / 2; let best = null, bd = 1e9;
-      document.querySelectorAll('[data-hero-zone]').forEach((z) => { const h = aus(z); if (!h) return; const r = z.getBoundingClientRect(), d = Math.abs(r.top + r.height / 2 - zy); if (d < bd) { bd = d; best = h.px; } });
-      if (best) return { px: best };
-    }
-  } catch (e) { /* ohne Figur */ }
-  let geneigt = false;
-  try { const pl = document.querySelector('.board-plane'); geneigt = !!pl && getComputedStyle(pl).transform !== 'none'; } catch (e) { /* flach */ }
-  return { px: (2.8125 / 68) * (Math.min(w || 66, 68 * 1.2)) * (geneigt ? 0.975 : 1) };
-}
+/** Hero-Pixel des Ziels: zentrale Fassung `ppFxHeldPixel` (app-board.jsx, mit Zwischenspeicher und Plausibilitätsprüfung); der Name bleibt für app-fx-58 und diese Datei. */
+function ppFx57HeldPixel(zoneEl, w) { return ppFxHeldPixel(zoneEl, w); }
 
 const PP_FX57_MINDAUER = { MH: 2000, HH: 1700, HS: 1450 };   // Länge + Vorlauf (≈ 110 ms) + Reserve; spiegelt `PP_ANIM_MINDAUER` in app-board.jsx
 

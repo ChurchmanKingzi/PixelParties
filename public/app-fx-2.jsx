@@ -99,7 +99,7 @@ function ppFx2Spr(g, zeilen, pal, cx, cy, m, a) {
 }
 /** Symbol in Wunschhöhe `px` (Bildschirmpixel): winzig → Punkt, sonst Sprite 1× oder 2×. */
 function ppFx2Glyphe(g, zeilen, pal, cx, cy, px, a, punkt) {
-  const r = px / (zeilen.length * 3);
+  const r = px / (zeilen.length * (g.S || 3));
   if (r < 0.4) { if (px >= 4 && punkt) g.block(Math.round(cx) - 1, Math.round(cy) - 1, 2, 2, punkt, a); return; }
   ppFx2Spr(g, zeilen, pal, cx, cy, r < 1.6 ? 1 : 2, a);
 }
@@ -138,9 +138,10 @@ function ppFx2Herz(g, cx, cy, w, a) {
 /** Wie ppR1Leinwand (app-board.jsx), reicht aber den Bildpuffer (RGBA-Bytes) als 5. Argument an `malen` weiter: Vollbild-Ebenen (Vignette, Feuerball, Weißblitz) schreiben darin direkt statt über
  *  100 000 g.put-Aufrufe je Bild (das waren sonst ~100 ms je Bild). Die Wurzel ist dieselbe (`data-pp-px="aus"`, 30 Bilder/s auf dem globalen Raster, pixelated). */
 function ppFx2Leinwand(malen, ende, mass, opt) {
-  const o = opt || {}, S = 3, TAKT = 1000 / 30;
+  const o = opt || {}, TAKT = 1000 / 30;
   return function Fx2Effekt(props) {
     const cvs = React.useRef(null);
+    const S = React.useMemo(() => ppFxZelleFuer(props), []);   // Rasterzelle = Hero-Pixel (ppFxZelle, app-board.jsx)
     const m = React.useMemo(() => {
       const q = typeof mass === 'function' ? mass(props) : mass;
       const breite = Math.ceil(q.breite / S) * S, hoehe = Math.ceil(q.hoehe / S) * S;
@@ -156,7 +157,7 @@ function ppFx2Leinwand(malen, ende, mass, opt) {
       if (!el || window._playAnimations === false) return undefined;
       const ctx = el.getContext('2d');
       const img = ctx.createImageData(sz.gw, sz.gh);
-      const g = ppR1Pinsel(img.data, sz.gw, sz.gh);
+      const g = ppR1Pinsel(img.data, sz.gw, sz.gh, S);
       const t0 = performance.now();
       let raf = 0, letzte = -1;
       const takt = window.ppTaktRaf || window.requestAnimationFrame;

@@ -8367,14 +8367,98 @@ function ppSchleuderFlug(card, { dx, dy, dauer, start }) {
 // ═══════════════════════════════════════════════════════════════════
 // (Bayer-Matrix: `ppBayer(x, y)` aus app-shared.jsx)
 const ppHex = (h) => [parseInt(h.slice(1, 3), 16), parseInt(h.slice(3, 5), 16), parseInt(h.slice(5, 7), 16)];
+// ══════════════════════════════════════════════════════════════
+//  PIXELGRÖSSE DER EFFEKTE = PIXELGRÖSSE DER HELDEN (CLAUDE.md: „Jede Animation hat die Standard-Pixelgröße der Heroes")
+//  Hero-Pixel = Breite des Figuren-Canvas (`.hero-idle-canvas`) / Frame-Breite des Sheets, in CSS-Pixeln: 2,8125 · `--board-scale` · Brett-Projektion (Reihe!) · Tutorial-Zoom.
+//  Gemessen (Tutorial 1): 1920×1080: 2,67 (Gegnerreihe) / 3,02 (eigene Reihe) · 1280×720: 1,99 / 2,16 · Handy 844×390 (flaches Brett): 1,66.
+//    ppFxZelle(ziel?)    → ganzzahlige Rasterzelle S = clamp(round(Hero-Pixel), 2, 6) für eine Effekt-Leinwand. `ziel`: Zonen-Element | { x, y } (Fensterpunkt; ab der Fenstermitte „eigene" Reihe) | leer (eigene Reihe).
+//    ppFxHeldPixel(ziel) → { px, cv?, platz?, eintrag? } Hero-Pixel als Kommazahl (+ die Figur, wenn das Ziel selbst eine trägt)
+//  Ergebnisse je (Reihe, Fenstergröße, `--board-scale`) gemerkt: das Brett wird nur beim ersten Aufruf je Schlüssel gemessen (ein Rechteck lesen), danach reines Nachschlagen; Tutorial-Zoom misst live.
+//  Gelesen wird NUR beim Start einer Animation, nie im Takt. Invalidiert bei `resize` (und `window.ppFxZelleLeeren()`).
+//  Abweichung der ganzzahligen Zelle vom Hero-Pixel: 1080p ≤ 12 % (S=3), 720p ≤ 7 % (S=2), Handy 20 % (S=2; S=1 wäre exakt, kostet aber ~4× so viele Zellen).
+// ══════════════════════════════════════════════════════════════
+const PP_ZELLE_MIN = 2, PP_ZELLE_MAX = 6;
+const _ppZelleCache = new Map();
+function ppFxZelleLeeren() { _ppZelleCache.clear(); }
+window.ppFxZelleLeeren = ppFxZelleLeeren;
+try { window.addEventListener('resize', ppFxZelleLeeren); } catch (e) { /* ohne Fenster */ }
+function _ppZelleSig() {
+  let bs = '';
+  try { bs = document.documentElement.style.getPropertyValue('--board-scale'); } catch (e) { /* ohne */ }
+  return window.innerWidth + 'x' + window.innerHeight + '|' + bs;
+}
+/** Figur der Zone (falls vorhanden): { px, cv, platz, eintrag }. */
+function _ppZelleFigur(z) {
+  const platz = z && z._ppFigurPlatz, cv = platz && platz.querySelector && platz.querySelector('canvas');
+  if (!cv || !(cv.width > 0)) return null;
+  const r = cv.getBoundingClientRect();
+  return r.width > 0 ? { px: r.width / cv.width, cv, platz, eintrag: platz._ppEintrag } : null;
+}
+function _ppZelleLabel(ziel) {
+  try {
+    if (ziel && ziel.getAttribute) {
+      const e = ziel.closest ? ziel.closest('[data-hero-owner],[data-support-owner],[data-ability-owner],[data-area-owner],[data-surprise-owner]') : null;
+      const l = e && (e.getAttribute('data-hero-owner') || e.getAttribute('data-support-owner') || e.getAttribute('data-ability-owner') || e.getAttribute('data-area-owner') || e.getAttribute('data-surprise-owner'));
+      if (l) return l;
+    }
+    if (ziel && typeof ziel.y === 'number') return ziel.y < (window.innerHeight || 0) * 0.5 ? 'opp' : 'me';
+  } catch (e) { /* eigene Reihe */ }
+  return 'me';
+}
+function ppFxHeldPixel(ziel, w) {
+  try {
+    const zoom = !!document.querySelector('.board-center.tut-zoom');
+    // Plausibilität: Hero-Pixel / (2,8125 · `--board-scale`) liegt je Reihe und Gerät bei 1,0–1,15 (Projektion). Ein Messwert außerhalb (Figur gerade eingefahren/hervorgehoben/im Auftritt)
+    // wird verworfen — sonst bliebe ein flüchtiger Wert im Zwischenspeicher hängen. Im Tutorial-Zoom skaliert der Zoom zusätzlich: dort keine Prüfung, kein Zwischenspeicher.
+    const bsz0 = parseFloat((document.documentElement.style.getPropertyValue('--board-scale')) || '');
+    const stimmt = (v) => !(bsz0 > 0) || zoom || (v / (2.8125 * bsz0) >= 0.93 && v / (2.8125 * bsz0) <= 1.3);
+    const eigen = ziel && ziel.getAttribute ? _ppZelleFigur(ziel) : null;
+    if (eigen && stimmt(eigen.px)) return eigen;
+    const label = _ppZelleLabel(ziel), key = label + '|' + _ppZelleSig();
+    if (!zoom && _ppZelleCache.has(key)) return { px: _ppZelleCache.get(key) };
+    const suche = (l) => {
+      const zs = document.querySelectorAll('[data-hero-zone][data-hero-owner="' + l + '"]');
+      let beste = null;
+      for (const z of zs) { const f = _ppZelleFigur(z); if (!f || !stimmt(f.px)) continue; if (z.getAttribute('data-hero-idx') === '1') return f.px; if (!beste) beste = f.px; }
+      return beste;
+    };
+    const px = suche(label) || suche(label === 'me' ? 'opp' : 'me') || 0;
+    if (px > 0) { if (!zoom) _ppZelleCache.set(key, px); return { px }; }
+  } catch (e) { /* Rückfall */ }
+  // ohne (plausible) Figur im Brett (vor dem Laden der Sheets, Menü): aus `--board-scale` bzw. der Zonenbreite (Heldenzone 68 px breit bei Skala 1), geneigtes Brett · 1,08 bzw. 0,975
+  let geneigt = false;
+  try { const pl = document.querySelector('.board-plane'); geneigt = !!pl && getComputedStyle(pl).transform !== 'none'; } catch (e) { /* flach */ }
+  const bsz = parseFloat((document.documentElement.style.getPropertyValue('--board-scale')) || '');
+  if (bsz > 0) return { px: 2.8125 * bsz * (geneigt ? 1.08 : 1) };
+  return { px: (2.8125 / 68) * Math.min(w || 66, 68 * 1.2) * (geneigt ? 0.975 : 1) };
+}
+function ppFxZelle(ziel, w) {
+  if (window.__ppFxZelleFest > 0) return window.__ppFxZelleFest;   // Test/Notbremse: feste Zelle (3 = altes Verhalten)
+  const px = ppFxHeldPixel(ziel, w).px;
+  return Math.max(PP_ZELLE_MIN, Math.min(PP_ZELLE_MAX, Math.round(px)));
+}
+/** Für Effekt-Hüllen: Zelle zu den Props einer Animation (`zelleS` aus playAnimation, sonst Zone/Punkt). */
+function ppFxZelleFuer(props, fallbackS) {
+  try {
+    if (window.__ppFxZelleFest > 0) return window.__ppFxZelleFest;
+    if (props && props.zelleS > 0) return props.zelleS;
+    if (props && props.zoneEl) return ppFxZelle(props.zoneEl, props.w);
+    if (props && typeof props.x === 'number' && typeof props.y === 'number') return ppFxZelle({ x: props.x, y: props.y }, props.w);
+    return ppFxZelle(null);
+  } catch (e) { return fallbackS || 3; }
+}
+window.ppFxZelle = ppFxZelle; window.ppFxHeldPixel = ppFxHeldPixel; window.ppFxZelleFuer = ppFxZelleFuer;
+window.ppFxZelleFuer = ppFxZelleFuer;
+
 function ppSalve(malen, ende, vorbereiten, opts) {
   // `opts.extra` (Als Befund 10.10., Sky Shaman: „die Animation ist auf die Karte begrenzt und abgeschnitten"): zusaetzlicher Rand in Bildschirmpixeln um
   // Ursprung und Ziele. Der Canvas misst sich von den MITTEN der Ziele aus — alles, was weiter als ~10 px ueber die Kartenkante hinausragt (Federn, Strahl, ein
   // von oben fallender Schild), wurde sonst an der Canvaskante abgeschnitten.
   // `opts.z` (12.10., Duel): Ebene des Canvas (Standard 10110, unter den Rammkarten auf 10120) — der Aufprall zweier Heldenkarten muss UEBER ihnen liegen.
-  const S = 3, PAD = 60 + ((opts && opts.extra) || 0), TAKT = 33;
-  return function PixelSalveEffekt({ ox, oy, targetPoints, welt, regionBox, runde, wucht, mode }) {
+  const PAD = 60 + ((opts && opts.extra) || 0), TAKT = 33;
+  return function PixelSalveEffekt({ ox, oy, targetPoints, welt, regionBox, runde, wucht, mode, zelleS }) {
     const cvs = useRef(null);
+    const S = useMemo(() => ppFxZelleFuer({ x: ox, y: oy, zelleS }), []);   // Rasterzelle = Hero-Pixel (ppFxZelle)
     const sz = useMemo(() => {
       if (typeof ox !== 'number' || typeof oy !== 'number' || !Array.isArray(targetPoints) || targetPoints.length === 0) return null;
       // Welt-Effekte tragen FELD-Koordinaten (Fenster + Scrollstand des Feldes), s. ppFxWeltAnker; Ursprung und Ziele
@@ -8398,7 +8482,7 @@ function ppSalve(malen, ende, vorbereiten, opts) {
         return { x: q.x, y: q.y, w: p.w / S, h: p.h / S, len, selbst: len < 6,
           dx: len > 0.01 ? (q.x - o.x) / len : 0, dy: len > 0.01 ? (q.y - o.y) / len : -1 };
       });
-      return { links, oben, gw, gh, O: o, ziele, region, runde: runde || 1, wucht: Math.max(1, Math.min(3, Number(wucht) || 1)), mode: mode || null };
+      return { S, links, oben, gw, gh, O: o, ziele, region, runde: runde || 1, wucht: Math.max(1, Math.min(3, Number(wucht) || 1)), mode: mode || null };
     }, []);
     const teile = useMemo(() => (sz && vorbereiten ? vorbereiten(sz) : null), [sz]);
     useEffect(() => {
@@ -8415,6 +8499,7 @@ function ppSalve(malen, ende, vorbereiten, opts) {
         buf[i] = c[0]; buf[i + 1] = c[1]; buf[i + 2] = c[2]; buf[i + 3] = 255;
       };
       const g = {
+        S,   // Rasterzelle in Bildschirmpixeln
         put,
         block(px, py, w, h, c, a = 1) { for (let j = 0; j < h; j++) for (let i = 0; i < w; i++) put(px + i, py + j, c, a); },
         ring(cx, cy, rx, ry, c, a = 1) {
@@ -8521,9 +8606,10 @@ function ppKf(u, stops, ease) {                 // ease: weggelassen = ease-out 
   return stops[stops.length - 1][1];
 }
 function ppSzene(malen, ende, vorbereiten, opts) {
-  const S = (opts && opts.S) || 3, TAKT = 33;
+  const TAKT = 33;
   return function PixelSzeneEffekt(props) {
     const { x, y, w, h } = props;
+    const S = useMemo(() => (opts && opts.S) || ppFxZelleFuer(props), []);   // Rasterzelle = Hero-Pixel (ppFxZelle); `opts.S` erzwingt eine feste Zelle
     const cvs = useRef(null);
     const sz = useMemo(() => {
       if (typeof x !== 'number' || typeof y !== 'number') return null;
@@ -8548,6 +8634,7 @@ function ppSzene(malen, ende, vorbereiten, opts) {
         buf[i] = c[0]; buf[i + 1] = c[1]; buf[i + 2] = c[2]; buf[i + 3] = 255;
       };
       const g = {
+        S,   // Rasterzelle in Bildschirmpixeln
         put,
         block(px, py, bw, bh, c, a = 1) { for (let j = 0; j < bh; j++) for (let i = 0; i < bw; i++) put(px + i, py + j, c, a); },
         rect(px, py, bw, bh, c, a = 1) { px = Math.round(px); py = Math.round(py); for (let j = 0; j < bh; j++) for (let i = 0; i < bw; i++) put(px + i, py + j, c, a); },
@@ -8825,12 +8912,13 @@ function ppFluegel(g, sx, sy, dir, haltung, deckung) {
 //      malen(g, t, sz, teile): Pinsel `g` wie bei `ppSalve` (put/block); `sz` { gw, gh, cx, cy, hw, hh, phase } in RASTERkoordinaten (cx/cy = Kartenmitte, hw/hh = halbe Karte; `phase` = Feld `phase` des Ereignisses oder null)
 // ═══════════════════════════════════════════════════════════════════
 function ppPunktBild(malen, ende, breite, hoehe, vorbereiten) {
-  const S = 3, TAKT = 33;
-  return function PunktBildEffekt({ x, y, w, h, phase }) {
+  const TAKT = 33;
+  return function PunktBildEffekt({ x, y, w, h, phase, zelleS }) {
     const cvs = useRef(null);
+    const S = useMemo(() => ppFxZelleFuer({ x, y, w, zelleS }), []);   // Rasterzelle = Hero-Pixel (ppFxZelle)
     const sz = useMemo(() => {
       const gw = Math.ceil(breite / S), gh = Math.ceil(hoehe / S);
-      return { gw, gh, cx: gw / 2, cy: gh / 2, hw: ((w || 64) / S) / 2, hh: ((h || 90) / S) / 2, phase: phase || null };
+      return { S, gw, gh, cx: gw / 2, cy: gh / 2, hw: ((w || 64) / S) / 2, hh: ((h || 90) / S) / 2, phase: phase || null };
     }, []);
     const teile = useMemo(() => (vorbereiten ? vorbereiten(sz) : null), []);
     useEffect(() => {
@@ -8846,7 +8934,7 @@ function ppPunktBild(malen, ende, breite, hoehe, vorbereiten) {
         const i = (Y * gw + X) * 4;
         buf[i] = c[0]; buf[i + 1] = c[1]; buf[i + 2] = c[2]; buf[i + 3] = 255;
       };
-      const g = { put, block(px, py, bw, bh, c, a = 1) { for (let j = 0; j < bh; j++) for (let i = 0; i < bw; i++) put(px + i, py + j, c, a); } };
+      const g = { S, put, block(px, py, bw, bh, c, a = 1) { for (let j = 0; j < bh; j++) for (let i = 0; i < bw; i++) put(px + i, py + j, c, a); } };
       const t0 = performance.now();
       let raf = 0, letzte = -1;
       const schritt = (jetzt) => {
@@ -12229,7 +12317,7 @@ const PP_R1_SCHRIFT = {   // 3×5-Pixelschrift (Großbuchstaben, Ziffern, + − 
   6: '111100111101111', 7: '111001001010010', 8: '111101111101111', 9: '111101111001111',
   '+': '000010111010000', '-': '000000111000000', '!': '010010010000010', '?': '111001011000010', ' ': '000000000000000',
 };
-function ppR1Pinsel(buf, gw, gh) {
+function ppR1Pinsel(buf, gw, gh, S) {
   const put = (px, py, c, a = 1) => {
     const X = Math.round(px), Y = Math.round(py);
     if (X < 0 || Y < 0 || X >= gw || Y >= gh || a <= 0) return;
@@ -12238,6 +12326,7 @@ function ppR1Pinsel(buf, gw, gh) {
     buf[i] = c[0]; buf[i + 1] = c[1]; buf[i + 2] = c[2]; buf[i + 3] = 255;
   };
   const g = {
+    S: S || 3,   // Rasterzelle in Bildschirmpixeln (Helfer rechnen Pixelmaße damit in Zellen um)
     put,
     block(px, py, w, h, c, a = 1) { px = Math.round(px); py = Math.round(py); for (let j = 0; j < h; j++) for (let i = 0; i < w; i++) put(px + i, py + j, c, a); },
     disc(cx, cy, r, c, a = 1) {
@@ -12304,9 +12393,10 @@ function ppR1Pinsel(buf, gw, gh) {
 // Brett-Zweig von `onZoneAnim` — ohne diesen Versatz lagen sie bei gescrolltem Brett (Handy) um den Scrollstand daneben (Flame Avalanche startete viel zu hoch).
 function ppR1FeldVersatz(p) { return (p && p.welt && window.ppFxScrollOffset) ? window.ppFxScrollOffset() : { dx: 0, dy: 0 }; }
 function ppR1Leinwand(malen, ende, mass, opt) {
-  const o = opt || {}, S = 3, TAKT = 1000 / 30;
+  const o = opt || {}, TAKT = 1000 / 30;
   return function R1Effekt(props) {
     const cvs = useRef(null);
+    const S = useMemo(() => ppFxZelleFuer(props), []);   // Rasterzelle = Hero-Pixel (ppFxZelle); vorher fest 3
     const m = useMemo(() => {
       const q = typeof mass === 'function' ? mass(props) : mass;
       const breite = Math.ceil(q.breite / S) * S, hoehe = Math.ceil(q.hoehe / S) * S;
@@ -12325,7 +12415,7 @@ function ppR1Leinwand(malen, ende, mass, opt) {
       if (!el || window._playAnimations === false) return undefined;
       const ctx = el.getContext('2d');
       const img = ctx.createImageData(sz.gw, sz.gh);
-      const g = ppR1Pinsel(img.data, sz.gw, sz.gh);
+      const g = ppR1Pinsel(img.data, sz.gw, sz.gh, S);
       const t0 = performance.now();
       let raf = 0, letzte = -1;
       const takt = window.ppTaktRaf || window.requestAnimationFrame;
@@ -54105,7 +54195,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     const entfernen = () => setGameAnims(prev => prev.filter(a => a.id !== id));
     let gestartet = false;
     const _gemountet = () => { if (gestartet) return; gestartet = true; setTimeout(entfernen, dur); };
-    setGameAnims(prev => [...prev, { id, type, x: r.left + r.width / 2 + _wo.dx, y: r.top + r.height / 2 + _wo.dy, w: r.width, h: r.height, welt: _wo.welt, ...(PP_SQUASH_ANIMS.has(type) ? { zoneEl: el } : null), ...options, _gemountet }]);
+    setGameAnims(prev => [...prev, { id, type, x: r.left + r.width / 2 + _wo.dx, y: r.top + r.height / 2 + _wo.dy, w: r.width, h: r.height, welt: _wo.welt, zelleS: ppFxZelle(el, r.width), ...(PP_SQUASH_ANIMS.has(type) ? { zoneEl: el } : null), ...options, _gemountet }]);
     setTimeout(() => { if (!gestartet) { gestartet = true; entfernen(); } }, dur + 6000);
   };
 

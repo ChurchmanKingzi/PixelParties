@@ -84,7 +84,7 @@ const ppFx28Fl = (x) => Math.floor(x * 30 + 1e-4);
 function ppFx28Kettenblitz(o) {
   try {
     if (!o || window._playAnimations === false) return null;
-    const S = 3, TAKT = 1000 / 30, C = PP_FX28_C;
+    const S = ppFxZelleFuer({ x: o.tx, y: o.ty }), TAKT = 1000 / 30, C = PP_FX28_C;   // Rasterzelle = Hero-Pixel des Ziels (ppFxZelle)
     const fo = (o.w === false || !window.ppFxScrollOffset) ? { dx: 0, dy: 0 } : window.ppFxScrollOffset();
     const welt = o.w !== false && !!window.ppFxWeltSchicht;
     if (!isFinite(o.tx) || !isFinite(o.ty)) return null;

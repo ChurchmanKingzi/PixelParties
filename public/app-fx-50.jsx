@@ -31,8 +31,9 @@ const PP_FX50_STRIKE_ENDE = 0.5;
 const ppFx50Kl = (v, a, b) => Math.max(a, Math.min(b, v));
 
 /** Zellgröße und Maßstab (Trailer-Karte = 35 Zellen hoch) aus der Zonenhöhe in Bildschirmpixeln. */
-function ppFx50Mass(hoehe) {
-  const h = hoehe > 8 ? hoehe : 100, S = ppFx50Kl(Math.round(h / 35), 2, 4);
+function ppFx50Mass(hoehe, ziel, zelleS) {
+  // Rasterzelle = Hero-Pixel (`ppFxZelle`, app-board.jsx); `rc` rechnet die Trailer-Maße (Karte 35 Zellen hoch) auf die Kartenhöhe um — die Größe des Effekts bleibt, nur das Raster passt zum Helden
+  const h = hoehe > 8 ? hoehe : 100, S = zelleS > 0 ? zelleS : (typeof ppFxZelle === 'function') ? ppFxZelle(ziel) : ppFx50Kl(Math.round(h / 35), 2, 4);
   return { S, rc: h / (35 * S) };
 }
 
@@ -270,7 +271,7 @@ function ppFx50TrefferKomponente(profil) {
   return function Fx50Treffer(props) {
     const cvs = useRef(null);
     const geo = useMemo(() => {
-      const w = props.w > 0 ? props.w : 64, h = props.h > 0 ? props.h : 90, { S, rc } = ppFx50Mass(h);
+      const w = props.w > 0 ? props.w : 64, h = props.h > 0 ? props.h : 90, { S, rc } = ppFx50Mass(h, { x: props.x, y: props.y }, props.zelleS);
       const Rz = Math.ceil(50 * rc) + 3, lx = Math.floor((props.x - Rz * S) / S) * S, ly = Math.floor((props.y - Rz * S) / S) * S;
       const CX = Math.round((props.x - lx) / S), CY = Math.round((props.y - ly) / S), hw = Math.max(2, Math.round(w / S / 2)), hh = Math.max(2, Math.round(h / S / 2));
       return { S, lx, ly, gw: Rz * 2, gh: Rz * 2, g: { CX, CY, rc, zx0: CX - hw, zy0: CY - hh, zx1: CX + hw, zy1: CY + hh }, salt: Math.floor(Math.random() * 1e6) };
@@ -327,7 +328,7 @@ function ppFx50Beam(phase, srcEl, tgtEl) {
     if (phase === 'rise') {
       const a = srcEl && ppFx50Mitte(srcEl);
       if (!a) return false;
-      const { S, rc } = ppFx50Mass(a.h), hw = Math.max(3, Math.round(a.w / S * 0.3));
+      const { S, rc } = ppFx50Mass(a.h, srcEl), hw = Math.max(3, Math.round(a.w / S * 0.3));
       const f = ppFx50SaeulenFlaeche(a, a.y + a.h * 0.35, S, rc, hw);
       if (f.gh < 12 || f.yb - f.oben < 8) return false;
       const { wurzel, cv } = ppFx50Haengen(f.lx, f.ly, f.gw, f.gh, S, a.welt);
@@ -337,7 +338,7 @@ function ppFx50Beam(phase, srcEl, tgtEl) {
     if (phase === 'strike') {
       const b = tgtEl && ppFx50Mitte(tgtEl);
       if (!b) return false;
-      const { S, rc } = ppFx50Mass(b.h), hw = Math.max(3, Math.round(b.w / S * 0.3));
+      const { S, rc } = ppFx50Mass(b.h, tgtEl), hw = Math.max(3, Math.round(b.w / S * 0.3));
       const f = ppFx50SaeulenFlaeche(b, b.y + b.h * 0.35, S, rc, hw);
       if (f.gh < 12 || f.yb - f.oben < 8) return false;
       const { wurzel, cv } = ppFx50Haengen(f.lx, f.ly, f.gw, f.gh, S, b.welt);

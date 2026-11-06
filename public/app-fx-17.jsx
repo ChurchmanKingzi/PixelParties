@@ -21,7 +21,7 @@ function ppFx17Fit(verzug, dauer, ende) {
 }
 /** Runder Punkt mit Durchmesser `px` (Bildschirmpixel) um (x, y): 1 Rasterpixel, 2×2 oder Scheibe; Deckung `a` wird gedithert. */
 function ppFx17Korn(g, x, y, px, c, a) {
-  const d = px / 3;
+  const d = px / (g.S || 3);
   if (d < 0.55 || a <= 0.02) return;
   if (d < 1.5) g.put(x, y, c, a);
   else if (d < 2.5) g.block(x - 1, y - 1, 2, 2, c, a);
