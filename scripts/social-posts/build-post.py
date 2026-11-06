@@ -573,10 +573,11 @@ def main():
     args_opener = opener
     opener_on = opener in ('heart', 'storm', 'shift', 'wind')
     aliceshow_on = bool(hero_cfg.get('aliceshow'))                            # Alice-Show (alicefx.AliceShow): nutzt dieselbe Schnittstelle wie die Wind-Show
+    hopshow_on = bool(hero_cfg.get('hopshow'))                                # Hüpf-Show (hopfx.HopShow, Ghuanjun)
     rockshow_on = bool(hero_cfg.get('rockshow'))                              # Konzert-Show (rockfx.ConcertShow, Elana)
     rootshow_on = bool(hero_cfg.get('rootshow'))                              # Wurzel-Show (rootfx.RootShow, Kyli)
     iceshow_on = bool(hero_cfg.get('iceshow'))                                # Eis-Show (icefx.IceShow, Broghan)
-    windshow_on = bool(hero_cfg.get('windshow')) or aliceshow_on or iceshow_on or rootshow_on or rockshow_on              # Show mit Zeitleiste (windfx.WindShow / alicefx.AliceShow) statt Schleife
+    windshow_on = bool(hero_cfg.get('windshow')) or aliceshow_on or iceshow_on or rootshow_on or rockshow_on or hopshow_on              # Show mit Zeitleiste (windfx.WindShow / alicefx.AliceShow) statt Schleife
     wind_on = args.wind or bool(hero_cfg.get('wind')) or windshow_on
     horror_on = args.horror or bool(hero_cfg.get('horror'))
     show_on = (args.show or hero_cfg.get('show') or 'none') == 'mini'
@@ -693,7 +694,31 @@ def main():
         import windfx
         lxw, lyw = (W - logo.width) // 2, 40 + oy + (args.logo_dy if args.logo_dy is not None else hero_cfg.get('logoDy', 0))
         wgeom = dict(logo_rect=(lxw, lyw, logo.width, logo.height), logo_img=logo, center=(card_x + CARD_W / 2, card_y + CARD_H * 0.47))
-        if rockshow_on:
+        if hopshow_on:
+            import hopfx, copy
+            AD = HERE / 'assets' / 'ghuanjun'
+            pose_spr = copy.copy(spr)                                         # Angriffsposen (Ochse, Schlange, Tiger) als eigenes Sheet im Rahmen des Sprites
+            pw_ = Image.new('RGBA', (spr.fw * 3, spr.fh), (0, 0, 0, 0))
+            for i_, n_ in enumerate(('pose-ox', 'pose-snake', 'pose-tiger')):
+                pim_ = Image.open(AD / (n_ + '.png')).convert('RGBA')
+                pw_.paste(pim_, (i_ * spr.fw + int(round(spr.center_x - pim_.width / 2.0)), spr.bottom - pim_.height), pim_)
+            pose_spr.sheet, pose_spr.n, pose_spr._cache = pw_, 3, {}
+            _ac = {}
+            def actor_fn(art, idx):
+                key_ = (art, idx)
+                if key_ not in _ac:
+                    s_ = spr if art == 'idle' else pose_spr
+                    od_, ol_, sp_, pad_ = s_.layers(idx % s_.n, stick_col, INK)
+                    im_ = Image.new('RGBA', od_.size, (0, 0, 0, 0))
+                    for l_ in (od_, ol_, sp_):
+                        im_.alpha_composite(l_)
+                    _ac[key_] = (im_, pad_)
+                im_, pad_ = _ac[key_]
+                return im_, pad_, spr.center_x, spr.foot
+            hg = dict(logo_rect=wgeom['logo_rect'], logo_img=logo, badge_rect=badge_rect, badge_img=badge_img, plate_rect=(plate_x, plate_y, plate.width, plate.height),
+                      grid=(sx, sy, spr.px), draw_text=draw_text, home=(sx + spr.center_x * spr.px, sy + spr.foot * spr.px), actor_fn=actor_fn, assets_dir=str(AD))
+            wind = hopfx.HopShow(W, H, U, float(fps), loop, hg, loop * WIND_LOOPS / float(fps))
+        elif rockshow_on:
             import rockfx
             rg = dict(logo_rect=wgeom['logo_rect'], logo_img=logo, badge_rect=badge_rect, badge_img=badge_img, plate_rect=(plate_x, plate_y, plate.width, plate.height),
                       grid=(sx, sy, spr.px), draw_text=draw_text, center=(sx + spr.center_x * spr.px, sy + 14 * spr.px),
@@ -1386,10 +1411,11 @@ def main():
         else:
             o_dark, o_light, sp, pad_px = spr.layers(f // per, stick_col, INK)
             sx_d, sy_d = sx + (wind.sprite_dx(f) if windshow_on else 0), sy
-        if not hero_cfg.get('noShadow'):
+        hide_spr = windshow_on and hasattr(wind, 'hide_sprite') and wind.hide_sprite(f)          # z. B. Ghuanjun springt durchs Bild
+        if not hero_cfg.get('noShadow') and not hide_spr:
             canvas.alpha_composite(shadow, (card_x + CARD_W // 2 - shadow.width // 2, feet_y - U + hero_cfg.get('shadowDy', 0)))      # shadowDy: Schatten tiefer setzen (schwebende Sprites)
         flash = intro and ts < T_SPR + T_FLASH
-        for im in (o_dark, o_light, sp):
+        for im in () if hide_spr else (o_dark, o_light, sp):
             if flash:                          # beim Auftauchen als weiße Silhouette
                 white = Image.new('RGBA', im.size, WHITE + (255,))
                 white.putalpha(im.split()[3])
@@ -1450,7 +1476,7 @@ def main():
     if first_on:
         for f in range(loop * first_loops):
             render(f, intro_on, punch_on, opener_on).save(fdir / f'i{f:03d}.png')
-    cover = Image.open(fdir / ('i%03d.png' % int((17.4 if show_on else 17.3 if iceshow_on else 14.6 if rootshow_on else 15.0 if rockshow_on else 16.8) * float(fps)))) if (show_on or windshow_on) else Image.open(fdir / ('f%03d.png' % (min(loop - 1, per * 3))) if reel else fdir / 'f000.png')
+    cover = Image.open(fdir / ('i%03d.png' % int((17.4 if show_on else 17.3 if iceshow_on else 14.6 if rootshow_on else 15.0 if rockshow_on else 11.0 if hopshow_on else 16.8) * float(fps)))) if (show_on or windshow_on) else Image.open(fdir / ('f%03d.png' % (min(loop - 1, per * 3))) if reel else fdir / 'f000.png')
     cover_path = out / ('reel-cover.png' if reel else 'post.png')
     cover.save(cover_path)
     print('Standbild', cover_path)

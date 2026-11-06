@@ -114,10 +114,10 @@ HEROES = {
         "embers, ash and smoke",
         "#Prophet #FireMagic"),
     "Ghuanjun, the Undead Martial Artist": (
-        "Two attacks in one turn. 🥋",
-        "Ghuanjun can perform up to 2 Attacks as additional Actions, but then none of your other Heroes can act this turn. Targets he hits can't drop below 1 HP until the end of the turn.",
-        "floating skulls, grave crosses and green ghostly mist",
-        "#MartialArts #Undead"),
+        "1-2-3. Never stops hopping. 🧟🥋",
+        "Ghuanjun is a jiang shi, an undead kung fu master who never stops hopping. During your Action Phase he can perform up to 2 Attacks as additional Actions. Each hit is weak (his base Attack), but a 1-2-3 combo adds up – and his targets can't drop below 1 HP until the end of the turn. The catch: no other Hero can act that turn.",
+        "an undead kung fu hero hopping nonstop between two training dummies, spirit ox, snake and tiger heads flashing with every hit",
+        "#KungFu #Undead #MartialArts"),
     "Null, the Mage Slayer": (
         "Negate everything it hits. 🚫",
         "Null's Attacks negate the effects of every target they hit for 2 turns. It counts as a status effect, and he brings 100 Attack to the fight.",
@@ -349,6 +349,8 @@ TIKTOK = {
                                   "Once per turn: 50 damage times the number of Creatures you control that weren't summoned this turn. Alice's Mr. Jiggles do the rest."),
     "Broghan, the Frozen Guardian of the North": ("One eye. One storm. 500 damage. ❄️🔴",
                                                   "Once per turn: 500 damage, minus 10 for every card in your deck. Broghan can't be Frozen."),
+    "Ghuanjun, the Undead Martial Artist": ("1-2-3. Never stops hopping. 🧟🥋",
+                                            "Up to 2 extra Attacks per turn, enemies can't drop below 1 HP, and no other Hero can act. Ghuanjun never gets tired."),
     "Kyli, the Deceptive Sapling": ("She looks so sweet. Don't follow her. 🩸🌱",
                                     "Kyli lures victims to The Root of all Evil, which eats them. Her sacrifices bring deleted Potions back."),
     "Elana, the Rocky Rebel": ("Hate your hand? Shuffle it away. 🎸",

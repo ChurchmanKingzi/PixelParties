@@ -455,16 +455,16 @@ Datei: `ghuanjun-the-undead-martial-artist.mp4`
 
 **Caption**
 
-> Two attacks in one turn. 🥋
+> 1-2-3. Never stops hopping. 🧟🥋
 >
-> Ghuanjun can perform up to 2 Attacks as additional Actions, but then none of your other Heroes can act this turn. Targets he hits can't drop below 1 HP until the end of the turn.
+> Ghuanjun is a jiang shi, an undead kung fu master who never stops hopping. During your Action Phase he can perform up to 2 Attacks as additional Actions. Each hit is weak (his base Attack), but a 1-2-3 combo adds up – and his targets can't drop below 1 HP until the end of the turn. The catch: no other Hero can act that turn.
 >
 > Assemble your party of Heroes, then annihilate your opponent's! Pixel Parties is a free online TCG with almost 200 animated pixel Heroes.
 > 👉 pixelpartiestcg.com (link in bio)
 >
-> #PixelParties #TCG #CardGame #PixelArt #IndieGame #TradingCardGame #FreeToPlay #MartialArts #Undead
+> #PixelParties #TCG #CardGame #PixelArt #IndieGame #TradingCardGame #FreeToPlay #KungFu #Undead #MartialArts
 
-**Alt-Text**: Animated pixel art trading card of Ghuanjun, the Undead Martial Artist, with floating skulls, grave crosses and green ghostly mist around the hero.
+**Alt-Text**: Animated pixel art trading card of Ghuanjun, the Undead Martial Artist, with an undead kung fu hero hopping nonstop between two training dummies, spirit ox, snake and tiger heads flashing with every hit around the hero.
 
 ---
 

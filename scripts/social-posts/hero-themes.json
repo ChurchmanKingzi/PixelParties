@@ -388,7 +388,11 @@
     "ecto",
     4
    ]
-  ]
+  ],
+  "hopshow": true,
+  "opener": "wind",
+  "musicHit": 4.3,
+  "showLoops": 12
  },
  "Null, the Mage Slayer": {
   "particles": [
