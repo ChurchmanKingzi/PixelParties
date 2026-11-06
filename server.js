@@ -3991,6 +3991,23 @@ async function unlockCpuSkin(userId, skinName) {
   return true;
 }
 
+/**
+ * Skin aus einem CPU-Skin-Spiel: neu freischalten – oder, wenn man ihn schon hat, den Rahmen-Rang erhöhen (Kopie, wie beim Gacha-Pull).
+ * Liefert { isNew, dupes } oder null, wenn der Skin schon das Maximum (MAX_DUPES Kopien) erreicht hat.
+ */
+async function rankUpCpuSkin(userId, skinName) {
+  if (!userId || !skinName) return null;
+  const row = await db.get("SELECT dupes FROM user_shop_items WHERE user_id = ? AND item_type = 'skin' AND item_id = ?", [userId, skinName]);
+  if (!row) {
+    await db.run('INSERT INTO user_shop_items (id, user_id, item_type, item_id, dupes) VALUES (?, ?, ?, ?, 0)', [uuidv4(), userId, 'skin', skinName]);
+    return { isNew: true, dupes: 0 };
+  }
+  const have = Number(row.dupes) || 0;
+  if (have >= MAX_DUPES) return null;
+  await db.run("UPDATE user_shop_items SET dupes = ? WHERE user_id = ? AND item_type = 'skin' AND item_id = ?", [have + 1, userId, skinName]);
+  return { isNew: false, dupes: have + 1 };
+}
+
 const SHOP_PRICES = { avatar: 50, sleeve: 50, board: 50, skin: 50 };
 const RANDOM_PRICES = { skin: 25, avatar: 25, sleeve: 25 };
 // Nur per Pull (Zufall) erhältlich, nicht gezielt kaufbar.
@@ -7188,12 +7205,13 @@ function endCpuBattle(room, winnerIdx, reason) {
             io.to(humanSid).emit('opponents_unlocked', { opponents: newlyUnlocked });
           }
         }
-        // Skin-Game gewonnen → Skin des mittleren Gegner-Helden freischalten (falls noch nicht im
-        // Besitz). Das Popup kommt wie bei neuen Gegnern als eigenes Socket-Ereignis.
+        // Skin-Game gewonnen → Skin des mittleren Gegner-Helden freischalten; besitzt man ihn schon, steigt sein
+        // Rahmen-Rang um eine Stufe (Kopie, bis MAX_DUPES). Das Popup kommt wie bei neuen Gegnern als eigenes Socket-Ereignis.
         if (humanWon && room._cpuSkin) {
           try {
-            if (await unlockCpuSkin(humanUserId, room._cpuSkin.skinName) && humanSid) {
-              io.to(humanSid).emit('skin_unlocked', { skinName: room._cpuSkin.skinName, heroName: room._cpuSkin.heroName });
+            const got = await rankUpCpuSkin(humanUserId, room._cpuSkin.skinName);
+            if (got && humanSid) {
+              io.to(humanSid).emit('skin_unlocked', { skinName: room._cpuSkin.skinName, heroName: room._cpuSkin.heroName, isNew: got.isNew, dupes: got.dupes });
             }
           } catch (err) { console.error('[CPU battle] Skin-Freischaltung fehlgeschlagen:', err.message); }
         }
