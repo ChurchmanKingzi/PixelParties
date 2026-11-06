@@ -2,12 +2,11 @@
 und trifft mit 1-2-3-Kombos zwei Trainingspuppen: schwache Treffer (je 80), dafür viele Bonus-Aktionen – und die Puppen sinken nie unter 1 LP.
 
    0.0 –  1.4  HOOK     drei Geisterschläge hintereinander: Ochse, Schlange, Tiger („1-2-3“), Ghuanjun steht noch auf der Karte
-   1.4 –  4.3  AUFWÄRMEN Ghuanjun hüpft von der Karte in die Arena, die Puppen (mit „400“) fallen links und rechts herein
-   4.3 – 14.4  RUNDEN 1–3 je Runde eine Kombo: Ochsen-Kopfstoß (Aktion), Giftschlangen-Hieb (Bonus-Aktion), Tigeraxttritt (Bonus-Aktion);
-                        die Treffer wechseln zwischen den Puppen, zwischen den Runden hüpft er in die Mitte; die Anzeigen der Puppen zählen 400 → 80
-  14.4 – 15.8  RUNDE 4  die letzten Treffer: die 6. Treffer jeder Puppe müssten sie zerstören – ihre LP bleiben bei 1
-  15.8 – 18.0  RAUSCH   Ghuanjun hüpft im Halbtakt wie von Sinnen, „NEVER STOPS!“, die Puppen zerplatzen
-  18.0 –   D   RÜCKKEHR er landet wieder auf der Karte (Sprite der Karte übernimmt) → nahtlos in den Hook
+   1.4 –  2.9  AUFWÄRMEN Ghuanjun hüpft von der Karte in die Arena, die Puppen (mit „999“) fallen links und rechts herein
+   2.9 – 15.8  RUNDEN 1–9 je Runde eine Kombo im Halbtakt (0,36 s je Sprung): Ochsen-Kopfstoß (Aktion), Giftschlangen-Hieb (Bonus-Aktion), Tigeraxttritt
+                        (Bonus-Aktion), dann ein Sprung in die Mitte; die Treffer wechseln zwischen den Puppen, die Anzeigen zählen 999 → 39
+  ab 14.4              die 13. Treffer jeder Puppe müssten sie zerstören – ihre LP bleiben bei 1
+  15.8 – 18.4  RAUSCH   Ghuanjun hüpft im Viertelakt wie von Sinnen, die Puppen zerplatzen, er landet wieder auf der Karte (Sprite der Karte übernimmt) → Loop
 
 Alle Sprites (Puppen, Geisterköpfe, Posen, Knochen) stammen aus PixelPartiesSprites bzw. dem Spiel; alles auf dem Pixelraster von Ghuanjuns Sprite (die Geisterköpfe halb so groß)."""
 import math
@@ -16,6 +15,7 @@ import numpy as np
 from PIL import Image, ImageDraw
 
 BEAT = 0.72
+HB = BEAT / 2.0                                                                   # Halbtakt: ein Sprung = 0,36 s
 
 
 def smooth(x):
@@ -44,13 +44,28 @@ def load_img(p):
 
 class HopShow:
     SPOTS = {'L': (335, 1790), 'R': (745, 1790), 'M': (540, 1790), 'L2': (430, 1790), 'R2': (650, 1790), 'L3': (270, 1790), 'R3': (810, 1790)}
-    KEYS = [(2, 'H', None), (3, 'M', None), (4, 'L', None), (5, 'R', None), (6, 'L', 0), (7, 'R', 1), (8, 'L', 2), (9, 'M', None),
-            (10, 'R', 3), (11, 'L', 4), (12, 'R', 5), (13, 'M', None), (14, 'L', 6), (15, 'R', 7), (16, 'L', 8), (17, 'M', None),
-            (18, 'R', 9), (19, 'L', 10), (20, 'R', 11), (21, 'M', None), (21.5, 'L2', None), (22, 'R2', None), (22.5, 'M', None),
-            (23, 'L3', None), (23.5, 'R3', None), (24, 'M', None), (25, 'H', None)]
+    @staticmethod
+    def _keys():
+        """(Zeit in Takten, Ort, Trefferzahl). Ein Sprung = ein Halbtakt; 9 Runden à 3 Treffer + 1 Mittelsprung, danach im Viertelakt wie von Sinnen."""
+        k = [(2, 'H', None), (2.5, 'M', None), (3, 'L', None), (3.5, 'R', None)]
+        n = 0
+        for i in range(9):
+            base = 4 + 2 * i
+            for j in range(3):
+                k.append((base + 0.5 * j, 'L' if n % 2 == 0 else 'R', n))
+                n += 1
+            k.append((base + 1.5, 'M', None))
+        t0 = 4 + 2 * 9
+        for j, spot in enumerate(('L2', 'R2', 'M', 'L3', 'R3', 'L2', 'R2', 'M')):
+            k.append((t0 + 0.25 * (j + 1), spot, None))
+        k.append((t0 + 2.5, 'M', None))
+        k.append((t0 + 3.5, 'H', None))
+        return k
+
+    KEYS = None
     DUMMY_X = {'L': 125, 'R': 955}
     DUMMY_BASE = 1800
-    HP0, DMG = 400, 80
+    HP0, DMG = 999, 80
 
     def __init__(self, W, H, U, fps, loop, geom, D, seed=4):
         self.W, self.H, self.U, self.fps, self.loop, self.D = W, H, U, fps, loop, D
@@ -72,21 +87,20 @@ class HopShow:
         yy, xx = np.mgrid[0:H, 0:W]
         rr = np.hypot((xx - W / 2) / (W * 0.62), (yy - H * 0.5) / (H * 0.55))
         self.vig = np.clip((rr - 0.45) / 0.8, 0, 1).astype(np.float32) ** 1.3
-        self.kf = [(b * BEAT, spot, hit) for (b, spot, hit) in self.KEYS]
+        self.kf = [(b * BEAT, spot, hit) for (b, spot, hit) in self._keys()]
         self.hits = []                                                                   # (Zeit, Seite, Angriff, laufende Nr.)
         for i, (t, spot, hit) in enumerate(self.kf):
             if hit is not None:
                 self.hits.append((t, 'L' if spot == 'L' else 'R', hit % 3, hit))
         self.sh_bones = [[dict(a=rng.uniform(-2.6, -0.5), v=rng.uniform(350, 800), k=int(rng.integers(len(self.bones)))) for _ in range(6)] for _ in self.hits]
-        self.t_in = {'L': 1.9, 'R': 2.2}                                                # Puppen fallen herein
-        self.t_out = 18.0 - 1.2                                                         # Puppen zerplatzen (15.8 → 16.8)
-        self.t_burst = 15.9
-        self.turn_starts = [self.hits[i][0] for i in (0, 3, 6, 9)]
+        self.t_in = {'L': 1.65, 'R': 1.95}                                                # Puppen fallen herein
+        self.t_burst = (4 + 2 * 9) * BEAT                                               # Puppen zerplatzen, wenn die letzte Runde vorbei ist
+        self.turn_starts = [self.hits[3 * i][0] for i in range(9)]
         self.dust = []
         for i, (t, spot, hit) in enumerate(self.kf[1:], 1):
             self.dust.append((t, self._spot(spot)[0]))
-        self.SHOCKS = tuple([0.0] + [self.hits[i][0] for i in (0, 3, 6, 9, 11)])
-        self.TENSION_SHAKES = [(0.0, 8)] + [(h[0], 7) for h in self.hits]
+        self.SHOCKS = tuple([0.0] + [self.hits[i][0] for i in (0, 6, 12, 18, 24)])
+        self.TENSION_SHAKES = [(0.0, 8)] + [(h[0], 5) for h in self.hits]
         self.T_GUST = 0.0
 
     # ───────── Raster ─────────
@@ -123,7 +137,7 @@ class HopShow:
     def hide_sprite(self, f):
         """Der Kartensprite verschwindet, solange der Springer unterwegs ist."""
         t = f / float(self.fps)
-        return BEAT * 2 <= t < BEAT * 25
+        return self.kf[0][0] <= t < self.kf[-1][0]
 
     def actor_state(self, t):
         """(x Mitte, y Fuß, Art, Index, gespiegelt) oder None, solange er auf der Karte steht."""
@@ -137,7 +151,7 @@ class HopShow:
                 u = (t - t0) / (t1 - t0)
                 p0, p1 = self._spot(s0), self._spot(s1)
                 dt = t1 - t0
-                arc = 250 if dt >= 0.7 else 120
+                arc = 250 if dt >= 0.7 else 120 if dt >= 0.3 else 70
                 if s1 == 'H':
                     arc = 380
                 if s0 == 'H':
@@ -331,13 +345,11 @@ class HopShow:
         elif turn:
             ts = self.turn_starts[turn - 1]
             for i in range(3):
-                lit[i] = t >= ts + i * BEAT
+                lit[i] = t >= ts + i * HB
             turn_txt = 'TURN %d' % turn
-            if t >= ts + 2 * BEAT + 1.6 and turn < 4:
-                lit = [False, False, False]
         else:
             turn_txt = 'READY'
-        if t >= BEAT * 20 + 1.2:
+        if t >= self.hits[-1][0] + 0.3:
             lit = [True, True, True]
         labels = ('ACTION', 'BONUS', 'BONUS')
         for i in range(3):
@@ -371,9 +383,6 @@ class HopShow:
                     self.rect(d, ci + int(round(math.cos(ang) * r * (1 if j % 2 else -1))), cj - int(round(math.sin(ang) * r * 0.6)), (200, 190, 170))
         self._draw_hit_fx(canvas, d, t)
         self._draw_hud(canvas, t)
-        if BEAT * 21 <= t < BEAT * 25 - 0.2:
-            if int(t * 12) % 2 == 0:
-                self.draw_text(canvas, 'NEVER STOPS!', 10, (self.W / 2, 1100), color=(255, 255, 255), outline=(255, 90, 90), shadow=(40, 0, 10))
 
     # ───────── Bild-Nachbearbeitung ─────────
     def plate_dx(self, f):
@@ -417,7 +426,7 @@ class HopShow:
         'ox':      [('attack_ram', -5)],
         'snake':   [('poison', -7)],
         'tiger':   [('slash', -5)],
-        'hop':     [('placement', -16)],                                                # jede Landung
+        'hop':     [('placement', -19)],                                                # jede Landung
         'bonus':   [('buff', -9)],                                                      # Bonus-Aktion
         'num':     [('ping', -10)],                                                     # eine Zahl der Kombo leuchtet
         'turn':    [('turn_start', -8)],
