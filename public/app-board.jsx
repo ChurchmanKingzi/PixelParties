@@ -37307,14 +37307,14 @@ const ChatPanel = React.memo(function ChatPanel({ roomId, participants: particip
           <div className="chat-body">
             {participants.players.map(p => (
               <div key={p.username} className="player-list-entry" onClick={() => p.username !== myUsername && setChatView('private:' + p.username)}>
-                {p.avatar && <img className="player-list-avatar" src={p.avatar} alt="" />}
+                {p.avatar && <window.PlayerAvatar className="player-list-avatar" name={p.username} src={p.avatar} alt="" />}
                 <span className="player-list-name" style={{ color: p.color }}>{p.username}{p.username === myUsername ? ' (you)' : ''}</span>
                 <span className="player-list-badge">PLAYER</span>
               </div>
             ))}
             {participants.spectators.map(s => (
               <div key={s.username} className="player-list-entry" onClick={() => s.username !== myUsername && setChatView('private:' + s.username)}>
-                {s.avatar && <img className="player-list-avatar" src={s.avatar} alt="" />}
+                {s.avatar && <window.PlayerAvatar className="player-list-avatar" name={s.username} src={s.avatar} alt="" />}
                 <span className="player-list-name" style={{ color: '#7f7f7f' }}>{s.username}{s.username === myUsername ? ' (you)' : ''}</span>
                 <span className="player-list-badge">SPECTATOR</span>
               </div>
@@ -37324,7 +37324,7 @@ const ChatPanel = React.memo(function ChatPanel({ roomId, participants: particip
           <div className="chat-body" ref={chatBodyRef}>
             {(isPrivate ? privateMsgs : chatMessages).map(msg => (
               <div key={msg.id} className={'chat-msg' + (msg.isSpectator ? ' spectator-msg' : '')}>
-                {msg.avatar && <img className="chat-msg-avatar" src={msg.avatar} alt="" />}
+                {msg.avatar && <window.PlayerAvatar className="chat-msg-avatar" name={msg.from || msg.username} src={msg.avatar} alt="" />}
                 <span className="chat-msg-name"
                   style={{ color: msg.isSpectator ? '#7f7f7f' : (msg.color || '#fff') }}
                   onClick={() => (msg.from || msg.username) !== myUsername && setChatView('private:' + (msg.from || msg.username))}
@@ -62060,7 +62060,9 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                     const tg = !isMe && tutorialGegner ? tutorialGegner : null;
                     const bild = tg ? tg.avatar : p.avatar;
                     const held = portraetHeld(p);
-                    if (bild) return <img src={bild} alt="" style={{ width: 32, height: 32, borderRadius: '50%', objectFit: 'cover' }} />;
+                    if (bild) return (isMe || tg || !window.PlayerAvatar)
+                      ? <img src={bild} alt="" style={{ width: 32, height: 32, borderRadius: '50%', objectFit: 'cover' }} />
+                      : <window.PlayerAvatar name={p.username} src={bild} rank={p.avatarRank || 0} alt="" style={{ width: 32, height: 32, borderRadius: p.avatarRank ? 0 : '50%', objectFit: 'cover' }} />;
                     if (held && HeroArtCrop) return <HeroArtCrop heroName={held} width={56} />;
                     return null;
                   })()}

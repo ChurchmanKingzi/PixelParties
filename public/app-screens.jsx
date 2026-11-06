@@ -2148,7 +2148,7 @@ function MainMenu() {
             boxShadow: '0 0 18px ' + (user.color || 'var(--accent)') + '55',
           }}>
           {user.avatar
-            ? <img src={user.avatar} style={{ width: '100%', height: '100%', objectFit: 'cover', imageRendering: 'pixelated' }} />
+            ? <window.PlayerAvatar name={user.username} src={user.avatar} style={{ width: '100%', height: '100%', objectFit: 'cover', imageRendering: 'pixelated' }} />
             : <span className="menu-profile-avatar-fallback">👤</span>}
         </div>
       </div>
@@ -3031,6 +3031,7 @@ function ProfileScreen() {
         color: user.color || '#66b6ff', avatar: newAvatar, cardback: user.cardback, bio: user.bio || ''
       })});
       setUser(data.user);
+      window.ppAvatarRankForget(user.username);   // neuer Avatar → sein Rang-Rahmen im Menü/Chat
     } catch (e) { notify(e.message, 'error'); }
   };
 
@@ -4672,6 +4673,7 @@ function ShopScreen() {
         color: user.color || '#66b6ff', avatar, cardback, bio: user.bio || '', board,
       })});
       setUser(data.user);
+      if (type === 'avatar') window.ppAvatarRankForget(user.username);
       if (window.playSFX) window.playSFX('ui_click');
     } catch (e) { notify(e.message, 'error'); }
   };
@@ -4753,6 +4755,7 @@ function ShopScreen() {
       const data = await api('/shop/buy-random', { method: 'POST', body: JSON.stringify({ itemType }) });
       if (data.isNew) setOwned(prev => ({ ...prev, [itemType]: [...prev[itemType], data.itemId] }));
       else setDupes(prev => ({ ...prev, [itemType]: { ...prev[itemType], [data.itemId]: data.dupes } }));
+      if (itemType === 'avatar') window.ppAvatarRankForget(user.username);   // Rang des getragenen Avatars kann gestiegen sein
       setUser(u => ({ ...u, sc: data.sc }));
       triggerPurchaseFanfare(pos, { pull: true });
       const subdir = itemType === 'avatar' ? 'avatars' : 'sleeves';

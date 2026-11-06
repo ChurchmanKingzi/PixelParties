@@ -27002,3 +27002,7 @@ input[type="checkbox"]:focus-visible, input[type="radio"]:focus-visible { outlin
 
 /* Avatare sind quadratisch: Kachel und Vorschau zeigen sie unbeschnitten (Rahmen-Raster 35 × 35). */
 .shop-sq-item .shop-item-img-wrap img { aspect-ratio: 1 / 1; }
+
+/* Spieler-Avatar mit Rang-Rahmen (Chat, Spielerlisten): quadratisch statt Pixel-Kreis und groß genug, dass der Rahmen lesbar bleibt */
+.chat-msg-avatar.pp-av-ranked { width: 24px; height: 24px; -webkit-mask: none; mask: none; image-rendering: pixelated; }
+.player-list-avatar.pp-av-ranked { width: 28px; height: 28px; -webkit-mask: none; mask: none; image-rendering: pixelated; }
