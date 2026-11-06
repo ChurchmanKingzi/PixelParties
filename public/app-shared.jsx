@@ -2022,6 +2022,51 @@ function useFramedPlayer(p) {
     return { ...p, avatar: (aR != null && av) || p.avatar, cardback: (cR != null && cb) || p.cardback };
   }, [p, av, cb, aR, cR]);
 }
+// ── Avatar-Rahmen für Spieler überall (Menü, Chat, Spielerlisten …) ──
+// Der Rang hängt am Spieler (Name): bekannt aus dem Spielzustand (explizit übergeben) oder per Sammelabfrage /players/avatar-ranks.
+const _ppAv = { ranks: new Map(), asked: new Map(), pending: new Set(), subs: new Set(), timer: null };
+const PP_AV_TTL = 90000;
+function _ppAvNotify() { _ppAv.subs.forEach(f => { try { f(); } catch {} }); }
+function ppAvatarRankSet(name, dupes) {
+  if (!name) return;
+  _ppAv.ranks.set(name, dupes || 0); _ppAv.asked.set(name, Date.now()); _ppAvNotify();
+}
+function _ppAvFlush() {
+  _ppAv.timer = null;
+  const names = [..._ppAv.pending]; _ppAv.pending.clear();
+  if (!names.length) return;
+  fetch('/api/players/avatar-ranks?' + names.map(n => 'n=' + encodeURIComponent(n)).join('&'))
+    .then(r => r.json()).catch(() => ({ ranks: {} }))
+    .then(j => { for (const n of names) { _ppAv.ranks.set(n, (j.ranks && j.ranks[n]) || 0); _ppAv.asked.set(n, Date.now()); } _ppAvNotify(); });
+}
+function _ppAvAsk(name) {
+  const t = _ppAv.asked.get(name);
+  if ((t && Date.now() - t < PP_AV_TTL) || _ppAv.pending.has(name)) return;
+  _ppAv.pending.add(name);
+  if (!_ppAv.timer) _ppAv.timer = setTimeout(_ppAvFlush, 40);
+}
+/** Avatar oder Rang eines Spielers hat sich geändert (Pull, Avatarwechsel): beim nächsten Zeichnen neu erfragen. */
+function ppAvatarRankForget(name) {
+  if (!name) return;
+  _ppAv.asked.delete(name); _ppAv.pending.add(name);
+  if (!_ppAv.timer) _ppAv.timer = setTimeout(_ppAvFlush, 40);
+}
+function usePlayerAvatarRank(name, explicit) {
+  const [, bump] = useState(0);
+  useEffect(() => {
+    const f = () => bump(n => n + 1);
+    _ppAv.subs.add(f);
+    return () => { _ppAv.subs.delete(f); };
+  }, []);
+  useEffect(() => { if (explicit == null && name) _ppAvAsk(name); }, [name, explicit]);
+  return explicit != null ? explicit : (_ppAv.ranks.get(name) || 0);
+}
+/** Spieler-Avatar mit Rang-Rahmen. `rank` (Kopien) ist optional: ohne ihn wird er über den Namen erfragt. */
+function PlayerAvatar({ name, src, rank, className, ...rest }) {
+  const d = usePlayerAvatarRank(name, rank);
+  return <FramedImg src={src} kind="avatar" dupes={d} className={(className || '') + (d > 0 ? ' pp-av-ranked' : '')} {...rest} />;
+}
+window.ppAvatarRankSet = ppAvatarRankSet; window.ppAvatarRankForget = ppAvatarRankForget; window.usePlayerAvatarRank = usePlayerAvatarRank; window.PlayerAvatar = PlayerAvatar;
 window.ppOhneRahmen = ppOhneRahmen; window.ppShopIdOfUrl = ppShopIdOfUrl; window.ppFrameRank = ppFrameRank; window.ppSkinRanksSet = ppSkinRanksSet; window.ppSkinMerge = ppSkinMerge;
 window.useFramedSrc = useFramedSrc; window.FramedImg = FramedImg; window.useFramedPlayer = useFramedPlayer;
 

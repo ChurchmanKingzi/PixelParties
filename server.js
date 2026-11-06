@@ -4767,6 +4767,24 @@ app.get('/api/stats/live', (req, res) => {
 });
 
 // ===== PLAYER PROFILE (v1289) =====
+// Rang-Rahmen (Duplikate) der Spieler-Avatare für Listen, Chat und Menü: GET /api/players/avatar-ranks?n=Name&n=Name (öffentlich wie das Profil).
+// Antwort: { ranks: { Name: Kopien } } – nur Spieler, deren getragener Avatar einen Rahmen hat.
+app.get('/api/players/avatar-ranks', async (req, res) => {
+  try {
+    const raw = [].concat(req.query.n || []).map(x => String(x).trim()).filter(Boolean);
+    const names = [...new Set(raw)].slice(0, 60);
+    const ranks = {};
+    for (const n of names) {
+      const u = await db.get('SELECT id, avatar FROM users WHERE username = ?', [n]);
+      if (!u) continue;
+      const d = await shopDupes(u.id);
+      const r = d.avatar[shopIdOfUrl(u.avatar, 'avatars')];
+      if (r) ranks[n] = r;
+    }
+    res.json({ ranks });
+  } catch (err) { console.error('[avatar-ranks]', err.message); res.json({ ranks: {} }); }
+});
+
 // Oeffentliches Profil fuer das Top-Players-Popup — Logik in
 // player-profile.js. Hier nur die Anbindung an Laufzeitdaten des
 // Servers (Sitzungen, laufende Partien), deshalb neben `activeGames`.
