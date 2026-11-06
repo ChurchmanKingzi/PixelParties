@@ -34,6 +34,7 @@
 //  including Invader in its picker.
 // ═══════════════════════════════════════════
 
+const { hatName, hatNameIn, namenIn } = require('./_alias-name');   // Shroomasaur: Zusatzname zählt
 const { hasCardType } = require('./_hooks');
 
 // ─── ARCHETYPE NAMES ────────────────────────
@@ -103,6 +104,23 @@ function canSummonInvaderViaSource(targetName, sourceCardName) {
 }
 
 /**
+ * Das Ein-Invader-Limit („You can only control 1 Invader … at a time")
+ * VOR der Auswahl: Placer wie Argos / Life-Searcher bieten einen zweiten
+ * Invader gar nicht erst an — `Invader.beforeSummon` würde ihn erst NACH
+ * dem Herausnehmen aus Hand/Deck ablehnen (Karte und Kosten wären weg).
+ * Gleiche Zählweise wie `countOwnInvaders` im Invader-Skript.
+ */
+function invaderLimitAllows(engine, pi, targetName) {
+  if (targetName !== INVADER_NAME) return true;
+  for (const inst of engine.cardInstances) {
+    if (inst.zone !== 'support' || inst.faceDown) continue;
+    if ((inst.controller ?? inst.owner) !== pi) continue;
+    if (hatName(inst, INVADER_NAME)) return false;
+  }
+  return true;
+}
+
+/**
  * Live, non-face-down Cosmic Depths Creature instances controlled by pi.
  */
 function ownCosmicCreatures(engine, pi) {
@@ -112,7 +130,7 @@ function ownCosmicCreatures(engine, pi) {
     if (inst.faceDown) continue;
     const owner = inst.controller ?? inst.owner;
     if (owner !== pi) continue;
-    if (!COSMIC_DEPTHS_CREATURES.has(inst.name)) continue;
+    if (!hatNameIn(inst, COSMIC_DEPTHS_CREATURES)) continue;   // Shroomasaur: Zusatzname zählt
     out.push(inst);
   }
   return out;
@@ -288,9 +306,12 @@ function allChangeCounterTargets(engine) {
   return out;
 }
 
-/** All cards on `pi`'s side that currently hold any Change Counters. */
+/** All cards `pi` CONTROLS that currently hold any Change Counters.
+ *  ★ Welle 9 (Al, 15.10.2026, A02-deepsea-12): „cards you control" zählt nach KONTROLLE, nicht nach Brettseite — eine per Succubus
+ *  geliehene Kreatur zählt für ihren Kontrolleur (Invader-Token-Strafe entfällt, Life-Searcher/Gatherer sehen ihre Counter);
+ *  eine verliehene eigene Kreatur zählt nicht mehr. Helden: unverändert nach Spalte. */
 function changeCounterCardsOnSide(engine, pi) {
-  return allChangeCounterTargets(engine).filter(t => t.owner === pi);
+  return allChangeCounterTargets(engine).filter(t => (t.kind === 'creature' ? (t.ref.controller ?? t.ref.owner) : t.owner) === pi);
 }
 
 /**
@@ -339,7 +360,33 @@ function targetToPromptEntry(t) {
   };
 }
 
+/**
+ * ★ W64a (Al, 23.10.2026: Creature-Tokens gleichen Namens teilen bei aktiver Alice-Teilung eine Zone): BELEGTE Zonen beider Seiten, in die ein weiterer
+ * Invader Token dazustossen darf (`canShareInto`: dort liegen nur gleichnamige Kreaturen/Creature-Tokens und die Brettseite — der Token gehoert ihr — teilt).
+ * Gleiche Form wie die freien Eintraege von `allFreeSupportSlotsBothSides`, dazu `shared: true`, `stackDepth`.
+ */
+function geteilteSlotsBeiderSeiten(engine, tokenName = INVADER_TOKEN_NAME) {
+  const { canShareInto } = require('./_alice-shared');
+  const out = [];
+  for (let pi = 0; pi < engine.playerCount(); pi++) {
+    const ps = engine.gs.players[pi];
+    if (!ps) continue;
+    for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
+      const h = ps.heroes[hi];
+      if (!h?.name) continue;
+      const zones = ps.supportZones?.[hi] || [[], [], []];
+      for (let zi = 0; zi < 3; zi++) {
+        if ((zones[zi] || []).length > 0 && canShareInto(engine, pi, hi, zi, tokenName, pi)) {
+          out.push({ owner: pi, heroIdx: hi, slotIdx: zi, heroName: h.name, shared: true, stackDepth: zones[zi].length });
+        }
+      }
+    }
+  }
+  return out;
+}
+
 module.exports = {
+  geteilteSlotsBeiderSeiten,
   COSMIC_DEPTHS_CREATURES,
   COSMIC_DEPTHS_ANY,
   SELF_COUNTERING_CARDS,
@@ -347,6 +394,7 @@ module.exports = {
   INVADER_TOKEN_NAME,
   isCosmicCard,
   canSummonInvaderViaSource,
+  invaderLimitAllows,
   ownCosmicCreatures,
   getChangeCounters,
   setChangeCounters,

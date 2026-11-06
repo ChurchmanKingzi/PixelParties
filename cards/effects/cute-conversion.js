@@ -38,6 +38,7 @@
 
 const { opponentOfGs } = require('./_opp');
 const { hasCardType } = require('./_hooks');
+const { isCuteCreatureCard, isCuteCreatureInst } = require('./_cute-shared');
 const CARD_NAME = 'Cute Conversion';
 
 /** Kreaturen des Gegners, die man sich holen kann. */
@@ -64,7 +65,7 @@ function cuteKreaturen(engine, pi) {
     if ((inst.controller ?? inst.owner) !== pi) continue;
     const cd = engine.getEffectiveCardData(inst);
     if (!cd || cd.cardType !== 'Creature') continue;
-    if (cd.archetype === 'Cute') n++;
+    if (isCuteCreatureCard(cd) || isCuteCreatureInst(engine, inst)) n++;   // Name zaehlt (Al, Welle 9, Q24); N5-05: auch Kreaturen im Cute-Wings-Helden (Board-Lesart)
   }
   return n;
 }
@@ -111,6 +112,16 @@ module.exports = {
 
       await engine.showTriggeredEffect(CARD_NAME, { playerIdx: pi });
 
+      // ★ W16a (Al, Welle 16 Frage 1: „Ja"): Hand-Reaktionen (Post-Target) über ALLE Kreaturen, die der Zauber übernehmen würde: Divine Gift of Rain,
+      // MOE Shield, Storm Ring (ab 2 Zielen) negieren ihn, Golden Wings schützt eine gewählte Kreatur (`_cardinalImmune` → der Diebstahl prallt ab).
+      // Heldenreaktionen (Anti Magic Shield, Barrier of Faith, Test Flight …) bleiben zu: es wird kein Held getroffen.
+      {
+        const sr = await engine.statusHitSurpriseWindow(ctx.card, [], 'magic_arts_spell', {
+          ziele: beute.map(inst => ({ type: 'creature', owner: engine.physicalSide(inst), heroIdx: inst.heroIdx, slotIdx: inst.zoneSlot, cardName: inst.name })),
+        });
+        if (sr?.effectNegated) return;
+      }
+
       // ★ Erst die Herzen auf ALLE Ziele, dann die Uebernahme — so
       //   sieht man, wen es erwischt, bevor sich die Seiten aendern.
       for (const inst of beute) {
@@ -123,7 +134,7 @@ module.exports = {
       let geholt = 0;
       for (const inst of beute) {
         if (inst.zone !== 'support') continue;
-        const ok = engine.actionStealCreature(pi, inst, {
+        const ok = await engine.actionStealCreatureGefragt(pi, inst, {   // W71b: mit Schutzfenster ('control')
           sourceName: CARD_NAME,
           damageImmune: true,
           omniImmune: true,          // ★ „unaffected by all cards and effects"

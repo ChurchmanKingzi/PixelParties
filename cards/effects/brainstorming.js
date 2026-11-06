@@ -42,6 +42,10 @@ function namensGruppen(ps) {
 }
 
 module.exports = {
+  // R02-10: mischt 4 Karten aus der Ablage ins Deck — Erkennung fuer „No Retreat!"
+  // und Distracting Crystal.
+  shufflesFromHandOrDiscardIntoDeck: true,
+
   // ★ Reine Such-Karte im Sinne der Sperre (Al 15.9.).
   blockedBySearchLock: true,
 

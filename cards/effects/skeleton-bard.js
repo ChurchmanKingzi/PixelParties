@@ -21,6 +21,7 @@
 //  picking nothing leaves the slot free to retry.
 // ═══════════════════════════════════════════
 
+const { anyName } = require('./_alias-name');   // Shroomasaur: Zusatzname zählt für Namensfamilien
 const { loadCardEffect } = require('./_loader');
 const { isSkeletonCreature } = require('./_skeleton-shared');
 
@@ -46,11 +47,19 @@ function eligibleTargets(engine, pi, selfId) {
     if ((inst.controller ?? inst.owner) !== pi) continue;
     if (inst.id === selfId) continue;
     if (inst.faceDown) continue;
-    if (!isSkeletonCreature(inst.name, engine, inst)) continue;
+    if (!anyName(inst, (n) => isSkeletonCreature(n, engine, inst))) continue;
     const effectName = inst.counters?._effectOverride || inst.name;
+    // Ein anderer Bard ist nie ein sinnvolles Encore-Ziel: Beim Feuern steht die Spieler-HOPT (siehe oben) schon, sein Effekt
+    // bricht sofort ab. Vor allem aber prüft die Probe unten dessen `canActivateCreatureEffect`, das wieder `eligibleTargets`
+    // aufruft und den ersten Bard als Ziel findet — bei zwei Bards rekursierte das bis zum Stack-Überlauf (das `catch` schluckte
+    // ihn) und baute je Check tausende Kontexte; in CPU-Partien war das ein Viertel der Rechenzeit.
+    if (effectName === CARD_NAME) continue;
     const script = loadCardEffect(effectName);
     if (!script?.creatureEffect) continue;
     if (typeof script.onCreatureEffect !== 'function') continue;
+    if (engine.isCreatureActiveEffectLocked(inst)) continue;   // W14b (Q152): Unwanted Audience sperrt den aktiven Effekt
+    // W16c (A05-19): negierte/eingefrorene/betaeubte Kreaturen haben keinen nutzbaren Effekt - auch keine "zusaetzliche" Nutzung.
+    if (engine.isCreatureEffectSuppressed(inst)) continue;
     if (typeof script.canActivateCreatureEffect === 'function') {
       let activatable = false;
       try {

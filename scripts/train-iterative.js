@@ -18,6 +18,8 @@
 //  Optional per Env durchgereicht (Defaults in Klammern):
 //    PP_TRAIN_HORIZON (2), PP_MCTS_BUDGET_MS (4000), PP_MCTS_PULLS (24),
 //    PP_GAME_TIMEOUT_MS (600000), PP_TRAIN_OPP (Rotation über alle Decks)
+//    PP_TRAIN_JOBS (automatisch aus Kernen/Speicher, siehe scripts/train-jobs.js; 1 = ein Prozess):
+//    so viele Worker-Prozesse teilen sich die Spiele einer Sammelrunde. Rotation von Gegner und Sitz bleibt exakt wie sequentiell.
 // ═══════════════════════════════════════════
 
 'use strict';
@@ -25,6 +27,7 @@
 const { spawnSync } = require('child_process');
 const fs = require('fs');
 const path = require('path');
+const { autoJobs } = require('./train-jobs');
 
 const [, , deckName, arg3, arg4, arg5] = process.argv;
 if (!deckName) {
@@ -104,7 +107,9 @@ for (let it = 1; it <= iterations; it++) {
     PP_MCTS_BUDGET_MS: process.env.PP_MCTS_BUDGET_MS || '4000',
     PP_MCTS_PULLS: process.env.PP_MCTS_PULLS || '24',
     PP_GAME_TIMEOUT_MS: process.env.PP_GAME_TIMEOUT_MS || '600000',
+    PP_TRAIN_JOBS: String(autoJobs()),
   };
+  if (it === 1) console.log(`  Parallele Sammlung: ${env.PP_TRAIN_JOBS} Worker (PP_TRAIN_JOBS=1 schaltet ab)`);
   if (withProfile) env.PP_TRAIN_EVAL = '1';
   else delete env.PP_TRAIN_EVAL;
   // Neues Schema: exakte Rotations-Vielfache via server.js-MULT-Modus.

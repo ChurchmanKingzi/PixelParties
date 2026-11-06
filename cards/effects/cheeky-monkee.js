@@ -100,7 +100,7 @@ module.exports = {
       if (counters._cheekyMonkeeTurn === gs.turn) return;
 
       // "pay that Gold" — ohne Deckung gar nicht erst fragen.
-      if ((ps.gold || 0) < betrag) return;
+      if ((ps.gold || 0) < betrag || engine.goldSpendBlocked(pi)) return;   // G1 (A09-11): Goldsperre - "pay N Gold"
 
       const bestaetigt = await engine.promptGeneric(pi, {
         type: 'confirm',
@@ -171,7 +171,7 @@ module.exports = {
   canActivateCreatureEffect(ctx) {
     const engine = ctx._engine;
     if (ctx.card?.zone !== 'support') return false;
-    if (investHoptUsed(engine.gs, ctx.card)) return false;
+    if (!ctx._borrowedUse && investHoptUsed(engine.gs, ctx.card)) return false;   // W12 (Q5): geliehene Verwendung ignoriert das eigene Einmal-Limit
     if (heroesWithInvest(engine.gs.players[ctx.cardOwner], 4).length === 0) return false;
     return true;
   },
@@ -180,7 +180,7 @@ module.exports = {
     const engine = ctx._engine;
     const pi = ctx.cardOwner;
     if (ctx.card?.zone !== 'support') return false;
-    if (investHoptUsed(engine.gs, ctx.card)) return false;
+    if (!ctx._borrowedUse && investHoptUsed(engine.gs, ctx.card)) return false;   // W12 (Q5): geliehene Verwendung ignoriert das eigene Einmal-Limit
     // v346: Zielwahl VOR der Zahlung und abbrechbar — wie bei Resilient
     // Monkee. Wer abbricht, hat nichts ausgegeben und seine
     // Einmal-pro-Zug-Nutzung noch.
@@ -190,6 +190,9 @@ module.exports = {
       title: CARD_NAME,
       description: 'Choose a target for 80 damage.',
       confirmLabel: '💥 80 Damage!',
+      // Als Ruling (Al 26.10.): Cheeky Monkee ist eine Kreatur → 'creature' mit Vorschau 80 (wie die Gold-Zielwahl oben).
+      damageType: 'creature',
+      baseDamage: DAMAGE,
       cancellable: true,
       selectCount: 1,
       minSelect: 1,
@@ -200,7 +203,7 @@ module.exports = {
     if (!ziel) return false;
 
     if (!await payInvestCounters(engine, pi, 4, CARD_NAME)) return false;
-    markInvestHopt(engine.gs, ctx.card);
+    if (!ctx._borrowedUse) markInvestHopt(engine.gs, ctx.card);   // W13 (Al, Rueckfrage 9): geliehene Verwendung verbraucht den Stempel NICHT
     // v349 (Als Vorgabe, Muster Book of Doom): der Karten-Auftritt kommt
     // ERST jetzt — Ziel steht, Kosten sind bezahlt. Der Server hat ihn
     // nur angemeldet; wir loesen ihn aus, bevor die Bananen fallen.

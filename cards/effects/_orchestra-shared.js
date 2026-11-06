@@ -40,6 +40,9 @@ function equipDestinations(engine, pi, cardName, opts = {}) {
   const out = [];
   const platz = (side, hi) => {
     const ps = engine.gs.players[side];
+    // Darion: bei einem Helden mit Equip-Stapel ist der Stapel der einzige Platz fuer ein Equip.
+    const pflicht = engine.equipPflichtPlatz ? engine.equipPflichtPlatz(side, hi, cardName) : -1;
+    if (pflicht >= 0) { out.push({ side, heroIdx: hi, slotIdx: pflicht }); return; }
     for (let si = 0; si < 3; si++) {
       if (((ps.supportZones[hi] || [])[si] || []).length === 0) out.push({ side, heroIdx: hi, slotIdx: si });
     }
@@ -49,6 +52,9 @@ function equipDestinations(engine, pi, cardName, opts = {}) {
     for (let hi = 0; hi < (ps?.heroes || []).length; hi++) {
       const hero = ps.heroes[hi];
       if (!hero?.name || hero.hp <= 0) continue;
+      // W28a (Al, 21.10.2026: „'you control' = aktuelle Kontrolle, nicht Besitzer"): in der Form „a Hero you control" (nur die eigene Seite gefragt) ist ein an den
+      // Gegner abgegebener eigener Held (Charme-Marke / dauerhafte Uebernahme) KEIN Ziel; die Orchester-Form („Heroes on the board", mehrere Seiten) bleibt.
+      if (sides.length === 1 && side === pi && opts.uebernommene !== false && engine.heroSideOf && engine.heroSideOf(side, hero) !== pi) continue;
       // Als Vorgabe 29.9.: tot/Frozen/Uebernahme ohne `ausruesten` (Charme) sperrt.
       if (!heroCanBeEquipped(hero)) continue;
       if (!engine.canEquipCardToHero(cardName, side, hi)) continue;
@@ -75,7 +81,15 @@ async function equipArtifactToHero(engine, pi, cardName, ownerOfHero, heroIdx, s
   const pool = from === 'deck' ? ps.mainDeck : from === 'discard' ? ps.discardPile : ps.hand;
   const idx = (pool || []).indexOf(cardName);
   if (idx < 0) return null;
-  if (((hps.supportZones[heroIdx] || [])[slotIdx] || []).length > 0) return null;
+  // ★ Darion: Pflicht-Platz im Equip-Stapel des Helden (statt eines freien Platzes).
+  const _stapelPlatz = engine.equipPflichtPlatz ? engine.equipPflichtPlatz(ownerOfHero, heroIdx, cardName) : -1;
+  if (_stapelPlatz >= 0) slotIdx = _stapelPlatz;
+  else if (((hps.supportZones[heroIdx] || [])[slotIdx] || []).length > 0) return null;
+  // ★ Welle 14 (Al, Q5 aus W13b): Resistance blockt auch EIGENE Effekte auf den Träger — „Ausrüsten per Effekt" (dieser Helfer: Orchester, Lolek, Deepsea Treasure,
+  // Free-Artifact-Karten) ist ein Nicht-Schaden-Effekt auf den Helden. Das normale Ausspielen einer Ausrüstung von der Hand (Standard-Spielaktion) läuft nicht hier.
+  // Vor jeder Kartenbewegung gefragt: bei `true` bleibt die Karte, wo sie war (Aufrufer lesen `null` als "nicht ausgerüstet").
+  // ★ W16a (Al, Frage 3): `opts.blockiert` = von Resistance abgefangen (Einmal-Einsatz des Aufrufers zählt als gewirkt, siehe `_lolek-shared.chooseAndEquip`).
+  if (!opts.resistanzGeprueft && await engine.heroNonDamageEffectBlocked(ownerOfHero, heroIdx, 'equip', { sourceOwner: pi, source: opts.source })) { opts.blockiert = true; return null; }
   if (from === 'discard' && !(await engine._discardOutAllowed(pi, opts))) return null;
   pool.splice(idx, 1);
   if (from === 'deck') engine._broadcastEvent('deck_search_add', { cardName, playerIdx: pi });
@@ -101,7 +115,10 @@ async function equipArtifactToHero(engine, pi, cardName, ownerOfHero, heroIdx, s
   await engine.runHooks('onPlay', {
     _onlyCard: inst, playedCard: inst, cardName, zone: 'support', heroIdx, zoneSlot: slotIdx,
   });
-  await engine.runHooks('onCardEnterZone', { enteringCard: inst, toZone: 'support', toHeroIdx: heroIdx });
+  // W51c (Al): AUSRUESTENDER ist `pi` (wer die Karte aus Hand/Deck/Ablage ausspielt), NICHT der Kontrolleur der Zone: liegt die Karte bei einem fremden Helden (Orchester: „Heroes on the
+  // board"), ist `inst.controller` der Gastgeber — ohne `_equipAnleger` galt dann dieser als Anlegender (Afflicted Pests/LOCUST des Orchester-Spielers feuerten auf die EIGENE Aktion,
+  // die des Gegners nicht).
+  await engine.runHooks('onCardEnterZone', { enteringCard: inst, toZone: 'support', toHeroIdx: heroIdx, _isEffectEquip: true, _equipAnleger: pi });   // W16e (F03-21): per Effekt angelegt
   engine.sync();
   return inst;
 }

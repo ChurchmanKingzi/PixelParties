@@ -69,6 +69,9 @@ function collectOpponentCreatures(engine, oppIdx) {
 }
 
 module.exports = {
+  // ★ Welle 12 (B-06, Al: „Eine Karte, deren Effekt komplett nutzlos wäre, ist nicht spielbar."): trifft NUR den Gegner — gegen den durch die
+  // Erste-Runden-Immunität geschützten Spieler unspielbar (Karte bleibt auf der Hand, keine Aktion/Kosten; `engine.ersterZugGeschuetzt`).
+  blockedByFirstTurnProtection: true,
   // ★★ v1181 — ENTKOPPELTE ZAUBERBILDER (Al 17.9.): Wird der Zauber
   // NEGIERT, laeuft sein Effekt-Rumpf nie — die Engine spielt dann diese
   // Bilder, damit der abgewehrte Zauber trotzdem zu sehen ist. Im
@@ -97,7 +100,22 @@ module.exports = {
       // of whether the wipe hits anything (the Trial was still played).
       stampTrialLock(gs, pi);
 
-      const creatures = collectOpponentCreatures(engine, oppIdx);
+      let creatures = collectOpponentCreatures(engine, oppIdx);
+
+      // W5b-B5 (Al, Welle 5; wie die übrigen Destruction-Flächenzauber unter Ida): Idas Held
+      // „can never hit more than 1 target with a Destruction Spell" – aus dem Flächenschlag wird
+      // ein Einzelschlag auf EINE gewählte gegnerische Kreatur (Pflichtwahl wie bei Cataclysm/Armageddon).
+      const idaEinzel = !!ctx._engine.heroFlagsLive(ctx.cardHeroOwner ?? pi, ctx.cardHeroIdx)?.forcesSingleTarget;
+      if (idaEinzel && creatures.length > 1) {
+        const ids = await engine.promptEffectTarget(pi, creatures.map(i => engine.kreaturZiel(i)), {
+          title: CARD_NAME,
+          description: 'Choose 1 Creature your opponent controls: defeat it and delete it.',
+          confirmLabel: '💀 Defeat!', confirmClass: 'btn-danger',
+          cancellable: false, maxTotal: 1, minRequired: 1,   // pflichtwahl: Idas Einzelziel-Wahl ist Pflicht (wie Cataclysm/Armageddon)
+        });
+        const gewaehlt = creatures.find(i => engine.kreaturZiel(i).id === (ids && ids[0]));
+        creatures = [gewaehlt || creatures[0]];
+      }
 
       if (creatures.length === 0) {
         engine.log('trial_of_dominance', {
@@ -125,7 +143,7 @@ module.exports = {
       const source = { name: CARD_NAME, owner: pi, heroIdx: ctx.cardHeroIdx, controller: pi, heroOwner: ctx.cardHeroOwner ?? pi };   // Als Befund 29.9.: Brettseite des Angreifers
       let defeated = 0;
       // ★ v1057 („Enhanced Guard Dog"): Zerstoerungs-Klammer.
-      engine.beginDestroyScope(creatures.length);
+      engine.beginDestroyScope(creatures.length, creatures);   // W78: die Opfer sind todgeweiht (Infallible Oracle Pythia darf keines opfern)
       try {
         for (const inst of creatures) {
           // Still a live support Creature? (an earlier death-trigger in

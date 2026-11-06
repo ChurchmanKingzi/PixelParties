@@ -58,14 +58,18 @@
 
 const CARD_NAME = 'Jenny, the Class Fairy';
 
-/** Live own (non-charmed) heroes. "Permanently control" excludes charmed. */
-function permanentlyControlledHeroIndices(ps) {
+/**
+ * Live heroes `pi` PERMANENTLY controls: own (not charmed away) plus heroes taken permanently from the other side
+ * (Paraseed Control, `permaControlBy`). W16f (H02-09): Ruling 4.9. — ein dauerhaft übernommener Held zählt wie ein von Anfang an
+ * beherrschter; seine Abilities liegen in der Spalte des Vorbesitzers (`physOwner`). Charme (temporär) zählt nicht.
+ * @returns {Array<{physOwner:number, heroIdx:number}>}
+ */
+function permanentlyControlledHeroIndices(engine, pi) {
   const out = [];
-  for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
-    const h = ps.heroes[hi];
+  for (const { physOwner, heroIdx, hero: h } of engine.heroesControlledBy(pi, { permanentOnly: true })) {
     if (!h?.name || h.hp <= 0) continue;
-    if (h.charmedBy != null) continue;
-    out.push(hi);
+    if (h.charmedBy != null && h.permaControlBy !== pi) continue;
+    out.push({ physOwner, heroIdx });
   }
   return out;
 }
@@ -74,27 +78,41 @@ function permanentlyControlledHeroIndices(ps) {
 function buildAbilityTargets(engine, pi) {
   const ps = engine.gs.players[pi];
   if (!ps) return [];
-  const heroIdxs = permanentlyControlledHeroIndices(ps);
+  const heroIdxs = permanentlyControlledHeroIndices(engine, pi);
   const targets = [];
-  for (const hi of heroIdxs) {
+  for (const { physOwner, heroIdx: hi } of heroIdxs) {
     // Support-Zonen-Karten, die dort als Ability zaehlen (Cloak of Edge)
-    // — zentral ueber den Sammler (Als Ruling 5.8.).
-    for (const t of (engine.collectSupportZoneAbilities?.(pi, hi) || [])) {
+    // — zentral ueber den Sammler (Als Ruling 5.8.). Nur an eigenen Helden
+    // (W16f: ein übernommener Held der Gegenspalte bietet nur seine Ability Zones an;
+    // `actionMoveCard` brächte die Karte in die Hand des Besitzers).
+    if (physOwner === pi) for (const t of (engine.collectSupportZoneAbilities?.(pi, hi) || [])) {
+      const id = `equip-${pi}-${hi}-${t.slotIdx}`;
+      // Darion: in einem Equip-Stapel zaehlen nur die Karten als Ability, die dort so gelten (Cloak of Edge) — ein Ziel je Platz, dahinter genau diese Karten
+      // (`_erlaubteInstanzen`); die Rueckfrage der Engine waehlt die Karte, `gewaehlteInstanzen` liest sie. (Echte Ability-Stapel wie Xalibur: unveraendert.)
+      if (!t.istEchteAbility && t.inst) {
+        const schon = targets.find(x => x.id === id && x._erlaubteInstanzen);
+        if (schon) { schon._erlaubteInstanzen.push(t.inst.id); continue; }
+        targets.push({
+          id, type: 'equip', owner: pi, heroIdx: hi, slotIdx: t.slotIdx,
+          cardName: t.cardName, level: 1, cardInstance: t.inst, _erlaubteInstanzen: [t.inst.id],
+        });
+        continue;
+      }
       targets.push({
-        id: `equip-${pi}-${hi}-${t.slotIdx}`, type: 'equip',
+        id, type: 'equip',
         owner: pi, heroIdx: hi, slotIdx: t.slotIdx,
         cardName: t.cardName, level: 1,
       });
     }
-    const abZones = ps.abilityZones?.[hi] || [];
+    const abZones = engine.gs.players[physOwner]?.abilityZones?.[hi] || [];
     for (let si = 0; si < abZones.length; si++) {
       const slot = abZones[si] || [];
       if (slot.length === 0) continue;
       const baseName = slot[0];
       targets.push({
-        id: `ability-${pi}-${hi}-${si}`,
+        id: `ability-${physOwner}-${hi}-${si}`,
         type: 'ability',
-        owner: pi,
+        owner: physOwner,
         heroIdx: hi,
         slotIdx: si,
         cardName: baseName,
@@ -123,18 +141,19 @@ function supportSlotInsts(engine, pi, heroIdx, slotIdx) {
  *   3. Splice, untrack, add to hand (fresh hand inst + sync).
  * @returns {boolean} whether a copy was recalled.
  */
-async function recallAbilityCopy(engine, pi, heroIdx, slotIdx) {
-  const ps = engine.gs.players[pi];
-  const slot = ps?.abilityZones?.[heroIdx]?.[slotIdx];
+async function recallAbilityCopy(engine, pi, heroIdx, slotIdx, physOwner = pi) {
+  const ps = engine.gs.players[pi];                         // Hand: Kontrolleur
+  const slotPs = engine.gs.players[physOwner];              // Ability Zones: Spalte des Helden (W16f, H02-09)
+  const slot = slotPs?.abilityZones?.[heroIdx]?.[slotIdx];
   if (!Array.isArray(slot) || slot.length === 0) return false;
   const name = slot[slot.length - 1];
   const inst = engine.cardInstances
-    .filter(c => c.zone === 'ability' && c.owner === pi && c.name === name
+    .filter(c => c.zone === 'ability' && c.owner === physOwner && c.name === name
                  && c.heroIdx === heroIdx && c.zoneSlot === slotIdx)
     .pop() || null;
 
   engine._broadcastEvent('play_pile_transfer', {
-    fromOwner: pi, toOwner: pi, cardName: name,
+    fromOwner: physOwner, toOwner: pi, cardName: name,
     from: 'ability', to: 'hand',
     fromHeroIdx: heroIdx, fromSlotIdx: slotIdx,
     toHandIdx: ps.hand.length, finalHandSize: ps.hand.length + 1,
@@ -144,19 +163,20 @@ async function recallAbilityCopy(engine, pi, heroIdx, slotIdx) {
     await engine.runHooks('onCardLeaveZone', {
       card: inst, leavingCard: inst,
       fromZone: 'ability', fromHeroIdx: heroIdx, fromZoneSlot: slotIdx,
-      fromOwner: pi, toZone: 'hand',
+      fromOwner: physOwner, toZone: 'hand',
       source: CARD_NAME, sourceOwner: pi,
     });
   }
 
   // Re-read the slot: a hook may have touched it in the meantime.
-  const live = ps.abilityZones?.[heroIdx]?.[slotIdx];
+  const live = slotPs.abilityZones?.[heroIdx]?.[slotIdx];
   if (Array.isArray(live)) {
     const idx = live.lastIndexOf(name);
     if (idx >= 0) live.splice(idx, 1);
   }
   if (inst) engine._untrackCard(inst.id);
-  engine.handZugangSync(ps, name, { von: 'brett', source: CARD_NAME });
+  // Karte des Vorbesitzers: bei Abwurf/Spiel zurück in dessen Ablage (Konvention „gestohlene Karten gehen zu ihrem Besitzer").
+  engine.handZugangSync(ps, name, { von: 'brett', source: CARD_NAME, ...(physOwner !== pi ? { originalOwner: physOwner } : {}) });
   return true;
 }
 
@@ -173,6 +193,15 @@ async function recallSupportCopy(engine, pi, heroIdx, slotIdx) {
   const top = names[names.length - 1];
   const inst = [...insts].reverse().find(c => c.name === top) || insts[insts.length - 1];
   await engine.actionMoveCard(inst, 'hand', -1, -1, { source: CARD_NAME, sourceOwner: pi });
+  if (inst.zone !== 'hand') return false; // Move blocked (immovable etc.).
+  engine.sync();
+  return true;
+}
+
+/** Darion: genau diese Karte aus dem Equip-Stapel zurueck auf die Hand (statt der obersten des Platzes). */
+async function recallSupportInst(engine, inst) {
+  if (!inst || inst.zone !== 'support') return false;
+  await engine.actionMoveCard(inst, 'hand', -1, -1, { source: CARD_NAME, sourceOwner: inst.owner });
   if (inst.zone !== 'hand') return false; // Move blocked (immovable etc.).
   engine.sync();
   return true;
@@ -218,7 +247,7 @@ module.exports = {
       cancellable: true,
       exclusiveTypes: false,
       maxPerType: { ability: targets.length },
-      maxTotal: targets.length,
+      maxTotal: targets.length + targets.reduce((n, x) => n + (x._erlaubteInstanzen ? x._erlaubteInstanzen.length - 1 : 0), 0),   // Darion: mehrere Karten aus einem Stapel
       minRequired: 0,
     });
     if (!selectedIds || selectedIds.length === 0) return false;
@@ -232,13 +261,19 @@ module.exports = {
       const t = targets.find(x => x.id === sid);
       if (!t) continue;
       const zone = t.type === 'equip' ? 'support' : 'ability';
+      // Darion: die gewaehlten Karten stehen fest (Rueckfrage der Engine) — kein „wie viele Kopien", jede Karte ist eine eigene Ability.
+      if (t._erlaubteInstanzen) {
+        const gewaehlt = engine.gewaehlteInstanzen(t).filter(i => i.zone === 'support');
+        if (gewaehlt.length) slotPlans.push({ zone, heroIdx: t.heroIdx, slotIdx: t.slotIdx, ability: t.cardName, count: gewaehlt.length, physOwner: t.owner, insts: gewaehlt });
+        continue;
+      }
       const stackSize = zone === 'ability'
-        ? (ps.abilityZones?.[t.heroIdx]?.[t.slotIdx] || []).length
+        ? (gs.players[t.owner]?.abilityZones?.[t.heroIdx]?.[t.slotIdx] || []).length
         : supportSlotInsts(engine, pi, t.heroIdx, t.slotIdx).length;
       if (stackSize === 0) continue;
       let count = stackSize;
       if (stackSize > 1) {
-        const heroName = ps.heroes?.[t.heroIdx]?.name || `Hero ${t.heroIdx + 1}`;
+        const heroName = gs.players[t.owner]?.heroes?.[t.heroIdx]?.name || `Hero ${t.heroIdx + 1}`;
         const options = [];
         for (let n = 1; n <= stackSize; n++) {
           options.push({
@@ -257,7 +292,7 @@ module.exports = {
         if (Number.isInteger(parsed) && parsed >= 1 && parsed <= stackSize) count = parsed;
         else count = 1; // Defensive default if the picker dismissed unexpectedly.
       }
-      slotPlans.push({ zone, heroIdx: t.heroIdx, slotIdx: t.slotIdx, ability: t.cardName, count });
+      slotPlans.push({ zone, heroIdx: t.heroIdx, slotIdx: t.slotIdx, ability: t.cardName, count, physOwner: t.owner });
     }
 
     // ── Recall picked stacks back to hand — one copy at a time ────
@@ -271,8 +306,8 @@ module.exports = {
       for (let n = 0; n < plan.count; n++) {
         if (totalRecalled > 0) await engine._delay(STAGGER_MS);
         const ok = plan.zone === 'support'
-          ? await recallSupportCopy(engine, pi, plan.heroIdx, plan.slotIdx)
-          : await recallAbilityCopy(engine, pi, plan.heroIdx, plan.slotIdx);
+          ? (plan.insts ? await recallSupportInst(engine, plan.insts[n]) : await recallSupportCopy(engine, pi, plan.heroIdx, plan.slotIdx))
+          : await recallAbilityCopy(engine, pi, plan.heroIdx, plan.slotIdx, plan.physOwner);
         if (!ok) break; // Slot emptied mid-resolve (defensive).
         recalled++;
         totalRecalled++;
@@ -308,7 +343,10 @@ module.exports = {
     // ToHand`) gate on `if (ps.handLocked) return [...]` and silently
     // no-op. Matches the user's spec exactly: "You cannot draw or add
     // cards from your deck to your hand for the rest of the turn".
-    ps.handLocked = true;
+    // Z6 (H02-10): der Text sperrt nur "draw or add cards FROM YOUR DECK" - also Zieh-Sperre + (schwache) Such-Sperre,
+    // die den Ablagestapel offen laesst; die volle Hand-Sperre (`handLocked`, Kazena) waere breiter als der Text.
+    ps.drawLocked = true;
+    ps.searchLocked = true;
     engine.log('hand_locked', { player: ps.username, by: CARD_NAME });
     engine.sync();
     return true;

@@ -9,6 +9,8 @@
 //  and add up to 3 copies of it from your deck to
 //  your hand.
 //
+//  Als Ruling (Al 26.10.): die Zahl der Kopien wählt der Spieler (0 bis höchstens 3, soweit im Deck) — nicht automatisch das Maximum.
+//
 //  The chosen card is sent to the Deleted pile
 //  (permanent) — it's not recoverable afterwards.
 //
@@ -28,7 +30,7 @@
 //      each arrival is individually visible.
 // ═══════════════════════════════════════════
 
-const { placePollutionTokens, hasFreeZone } = require('./_pollution-shared');
+const { placePollutionTokens, hasFreeZone, payTokenCost, kostenSchonBezahlt } = require('./_pollution-shared');
 const { HOOKS } = require('./_hooks');
 
 const MAX_COPIES = 3;
@@ -50,6 +52,10 @@ module.exports = {
   // validateActionPlay rejects the cast entirely when this is set and the
   // caster's hand is locked, matching the gray-out state.
   blockedByHandLock: true,
+  // Z6 (A01-35): die Kopien kommen aus dem DECK auf die Hand - das ist der ganze Ertrag (Gruppe A, Al 14.9.):
+  // unter der Such-Sperre und unter der Stapel-Sperre (Knight of Kings [B]) nicht spielbar.
+  blockedBySearchLock: true,
+  blockedByPileLock: true,
 
   spellPlayCondition(gs, pi) {
     const ps = gs.players[pi];
@@ -73,16 +79,30 @@ module.exports = {
     return false;
   },
 
+  // ★ W4b (Al, Welle 4): der Token ist Kostenpunkt („… to play this card") und wird VOR dem Reaktionsfenster bezahlt;
+  // bei Ganz-Negierung bleibt er liegen. Danach ist die Kartenwahl nicht mehr abbrechbar (die Kosten sind gezahlt).
+  async payActivationCost(ctx) {
+    await payTokenCost(ctx, 1, 'Mass Multiplication');
+  },
+
+  // CPU: bei der Mengenwahl so viele Kopien wie möglich (die Optionen sind aufsteigend sortiert — die letzte ist das Maximum).
+  cpuResponse(engine, kind, promptData) {
+    if (kind !== 'generic' || promptData?.type !== 'optionPicker' || promptData?.title !== 'Mass Multiplication') return undefined;
+    const opts = promptData.options || [];
+    return opts.length ? { optionId: opts[opts.length - 1].id } : undefined;
+  },
+
   hooks: {
     onPlay: async (ctx) => {
       const engine = ctx._engine;
       const gs = ctx.gameState;
       const pi = ctx.cardOwner;
       const ps = gs.players[pi];
+      const _vorab = kostenSchonBezahlt(ctx);   // W4b: Token schon vor dem Fenster gelegt?
       if (!ps) return;
 
-      // ── Pay cost: 1 Pollution Token FIRST ──
-      await placePollutionTokens(engine, pi, 1, 'Mass Multiplication', { promptCtx: ctx });
+      // ── Pay cost: 1 Pollution Token FIRST ── (Normalweg: schon in `payActivationCost` bezahlt; sonst Fallback)
+      if (!_vorab) await placePollutionTokens(engine, pi, 1, 'Mass Multiplication', { promptCtx: ctx });
 
       // ── Build the gallery ──
       // Include a hand/discard card only if it has at least one copy still
@@ -123,10 +143,10 @@ module.exports = {
         cards: gallery,
         title: 'Mass Multiplication',
         description: 'Delete a card from your hand or discard pile. Up to 3 copies will be pulled from your deck.',
-        cancellable: true,
+        cancellable: !_vorab,
       });
       if (!picked || picked.cancelled) {
-        gs._spellCancelled = true;
+        if (!_vorab) gs._spellCancelled = true;   // Kosten bezahlt: Karte ist verbraucht
         return;
       }
 
@@ -147,6 +167,29 @@ module.exports = {
           player: ps.username, reason: 'chosen_card_missing',
         });
         return;
+      }
+
+      // ── Wie viele Kopien? ──
+      // Als Ruling (Al 26.10.): „up to 3 copies" — der Spieler WÄHLT die Zahl (0 bis zum Maximum: höchstens 3, soweit im Deck vorhanden), es wird nicht
+      // automatisch das Maximum genommen. Die Wahl liegt VOR den ersten Zustandsänderungen (Karte löschen / Kopien holen); ein Abbruch ist nur im Fallbackweg
+      // möglich (Kosten noch nicht bezahlt, `!_vorab`) — sonst ist die Wahl Pflicht (die Kosten sind gezahlt).
+      const maxKopien = Math.min(MAX_COPIES, deckCounts[chosenName] || 0);
+      let gewuenscht = maxKopien;
+      if (maxKopien > 0) {
+        const optionen = [];
+        for (let n = 0; n <= maxKopien; n++) {
+          optionen.push({ id: `n-${n}`, label: n === 0 ? 'No copies' : `${n} cop${n === 1 ? 'y' : 'ies'}` });
+        }
+        const anzahlWahl = await engine.promptGeneric(pi, {
+          type: 'optionPicker',
+          title: 'Mass Multiplication',
+          description: `Add how many copies of ${chosenName} from your deck to your hand? (up to ${maxKopien})`,
+          options: optionen,
+          cancellable: !_vorab,
+        });
+        if (anzahlWahl?.cancelled && !_vorab) { gs._spellCancelled = true; return; }
+        const treffer = String(anzahlWahl?.optionId || '').match(/^n-(\d+)$/);
+        if (treffer && Number(treffer[1]) <= maxKopien) gewuenscht = Number(treffer[1]);
       }
 
       // ══════════════════════════════════════════════════════════════
@@ -172,7 +215,7 @@ module.exports = {
       if (selfIdx >= 0) {
         engine.takeFromPileSync(ps, 'hand', selfIdx);
         engine.notePlayedFromHand(pi);
-        ps.discardPile.push(ctx.cardName);
+        engine.handKartenBesitzerPs(ps, ctx.cardName).discardPile.push(ctx.cardName);   // W3/W5a: Stapel des permanenten Besitzers
         engine._untrackCard(ctx.card.id);
       }
       ps._resolvingCard = null;
@@ -184,6 +227,7 @@ module.exports = {
       // auto-animation picks this up (hand shrank, deleted grew).
       // Discard-sourced: fire the custom pile-to-pile animation first
       // since the client can't infer discard→deleted from state diff.
+      let delPs = ps;
       if (actualSource === 'discard') {
         engine._broadcastEvent('play_pile_transfer', {
           owner: pi, cardName: chosenName, from: 'discard', to: 'deleted',
@@ -191,10 +235,10 @@ module.exports = {
         await engine.takeFromPile(ps, 'discard', chosenName, { source: 'Mass Multiplication' });   // v820: Stapel-Schicht
       } else {
         const idx = ps.hand.indexOf(chosenName);
-        if (idx >= 0) engine.takeFromPileSync(ps, 'hand', idx);
+        if (idx >= 0) { engine.takeFromPileSync(ps, 'hand', idx); delPs = engine.handKartenBesitzerPs(ps, chosenName); }   // W3/W5a: Stapel des permanenten Besitzers (gestohlene Handkarte)
       }
-      if (!ps.deletedPile) ps.deletedPile = [];
-      ps.deletedPile.push(chosenName);
+      if (!delPs.deletedPile) delPs.deletedPile = [];
+      delPs.deletedPile.push(chosenName);
 
       engine.log('mass_multiplication_delete', {
         player: ps.username, card: chosenName, from: actualSource,
@@ -208,10 +252,10 @@ module.exports = {
       // so we re-check per-iteration before each add. Matches the engine's
       // own actionDrawCards treatment of handLocked as a hard stop.
       const deck = ps.mainDeck || [];
-      const targetCount = Math.min(MAX_COPIES, deckCounts[chosenName] || 0);
+      const targetCount = Math.min(gewuenscht, deckCounts[chosenName] || 0);
       let added = 0;
       for (let k = 0; k < targetCount; k++) {
-        if (ps.handLocked) {
+        if (ps.handLocked || engine._isSearchBlocked(pi, {}, 'deck') || !engine.pileOutAllowed(pi, 'deck', { sourceOwner: pi })) {   // Z6 (A01-35): Such-/Stapel-Sperre
           engine.log('mass_multiplication_handlock', { player: ps.username, remaining: targetCount - k });
           break;
         }
@@ -222,6 +266,7 @@ module.exports = {
 
         deck.splice(copyIdx, 1);
         engine.handZugangSync(ps, chosenName, { ohneInstanz: true });
+        engine.noteHandZugangAusStapel(pi, chosenName, { pile: 'deck', source: 'Mass Multiplication' });   // W72a: Control Monitors
         added++;
 
         // Deck-search reveal animation for THIS copy, then yield so each

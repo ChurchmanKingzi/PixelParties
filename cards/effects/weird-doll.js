@@ -43,15 +43,29 @@ module.exports = {
   },
 
   getValidTargets(gs, pi, engine) {
-    return _enumerateControlledAbilities(gs, pi, engine).map(ab => ({
-      id: `ability-${ab.zoneOwner}-${ab.heroIdx}-${ab.slotIdx}`,
-      type: 'ability',
-      owner: ab.zoneOwner,
-      heroIdx: ab.heroIdx,
-      slotIdx: ab.slotIdx,
-      cardName: ab.cardName,
-      level: ab.level,
-    }));
+    const out = [];
+    for (const ab of _enumerateControlledAbilities(gs, pi, engine)) {
+      // Eine Ability in einer SUPPORT-Zone (Xalibur, Cloak of Edge) bekommt Zonen-Typ und eigene ID — sonst
+      // kollidiert sie mit der Ability-Zone gleicher Nummer und der Client hebt den falschen Slot hervor (F03-03).
+      const id = `${ab.fromSupport ? 'equip' : 'ability'}-${ab.zoneOwner}-${ab.heroIdx}-${ab.slotIdx}`;
+      if (ab.fromSupport && out.some(t => t.id === id)) continue;   // Darion: zwei Cloaks im selben Equip-Stapel sind EIN Ziel-Platz (die Wahl trifft die Rückfrage)
+      const t = {
+        id,
+        type: ab.fromSupport ? 'equip' : 'ability',
+        fromSupport: !!ab.fromSupport,
+        owner: ab.zoneOwner,
+        heroIdx: ab.heroIdx,
+        slotIdx: ab.slotIdx,
+        cardName: ab.cardName,
+        level: ab.level,
+      };
+      // Darion: im Equip-Stapel liegen auch Karten, die KEINE Ability sind — die Rückfrage „welches Equip?" darf nur die Ability-Karten anbieten (Cloak of Edge).
+      if (ab.fromSupport && engine?.collectSupportZoneAbilities) {
+        t._erlaubteInstanzen = engine.collectSupportZoneAbilities(ab.zoneOwner, ab.heroIdx).filter(e => e.slotIdx === ab.slotIdx && e.inst).map(e => e.inst.id);
+      }
+      out.push(t);
+    }
+    return out;
   },
 
   targetingConfig: {
@@ -60,7 +74,7 @@ module.exports = {
     confirmClass: 'btn-danger',
     cancellable: true,
     exclusiveTypes: true,
-    maxPerType: { ability: 1 },
+    maxPerType: { ability: 1, equip: 1 },
   },
 
   validateSelection(selectedIds /*, validTargets */) {
@@ -70,16 +84,42 @@ module.exports = {
   async resolve(engine, pi, selectedIds, validTargets) {
     if (!selectedIds || selectedIds.length === 0) return { cancelled: true };
     const target = validTargets.find(t => t.id === selectedIds[0]);
-    if (!target || target.type !== 'ability') return { cancelled: true };
+    if (!target || (target.type !== 'ability' && target.type !== 'equip')) return { cancelled: true };
 
     // Re-validate at resolve time — control / immunity could have
     // shifted between target selection and resolution.
     const stillValid = _enumerateControlledAbilities(engine.gs, pi, engine).some(ab =>
       ab.zoneOwner === target.owner &&
       ab.heroIdx   === target.heroIdx &&
-      ab.slotIdx   === target.slotIdx
+      ab.slotIdx   === target.slotIdx &&
+      !!ab.fromSupport === !!target.fromSupport
     );
     if (!stillValid) return { cancelled: true };
+
+    // ── Ability in einer Support Zone: die Karte (bei einem Stapel die oberste Kopie) wandert über den
+    // EINEN Brett→Ablage-Weg; die Ability-Zonen bleiben unberührt (F03-03).
+    if (target.fromSupport) {
+      const eintraege = (engine.collectSupportZoneAbilities?.(target.owner, target.heroIdx) || []).filter(e => e.slotIdx === target.slotIdx);
+      // Darion: im Equip-Stapel zaehlt die in der Rückfrage gewählte Ability-Karte (zwei Cloaks), sonst die erste am Platz.
+      const gewaehlt = target.cardInstance && eintraege.find(e => e.inst === target.cardInstance);
+      const eintrag = gewaehlt || eintraege[0];
+      if (!eintrag?.inst || eintrag.inst.zone !== 'support') return { cancelled: true };
+      engine._broadcastEvent('play_zone_animation', {
+        type: 'weird_doll_grow', owner: target.owner, heroIdx: target.heroIdx, zoneSlot: -1,
+      });
+      await engine._delay(700);
+      const ok = await engine.sendBoardCardToDiscard(eintrag.inst, { source: { name: CARD_NAME, owner: pi } });
+      if (!ok) return { cancelled: true };
+      engine.log('weird_doll', {
+        player:     engine.gs.players[pi]?.username,
+        ability:    target.cardName,
+        heroOwner:  target.owner,
+        heroIdx:    target.heroIdx,
+        slot:       target.slotIdx,
+      });
+      engine.sync();
+      return true;
+    }
 
     const zonePs = engine.gs.players[target.owner];
     const zone = (zonePs?.abilityZones?.[target.heroIdx] || [])[target.slotIdx] || [];

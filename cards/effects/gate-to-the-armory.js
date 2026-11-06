@@ -53,8 +53,13 @@ function _getEligibleArtifacts(engine, pi) {
   const cardDB = engine._getCardDB();
   const seen = new Set();
   const out = [];
+  // Z6 (S02-22): die Karte kommt AUF DIE HAND - Hand-/Such-Sperre und Stapel-Sperren (Knight of Kings [B], Stab-Sperre) schliessen
+  // die jeweilige Quelle aus; ist keine mehr frei, ist die Karte nicht spielbar (`spellPlayCondition`).
+  const deckFrei = !engine._isSearchBlocked(pi, {}, 'deck') && engine.pileOutAllowed(pi, 'deck', { sourceOwner: pi });
+  const ablageFrei = !engine._isSearchBlocked(pi, {}, 'discard') && engine.pileOutAllowed(pi, 'discard', { sourceOwner: pi })
+    && !engine.isDiscardOutHardLocked(pi);
   // Deck first — entries the picker shows as `source: 'deck'`.
-  for (const cardName of (ps.mainDeck || [])) {
+  for (const cardName of (deckFrei ? (ps.mainDeck || []) : [])) {
     if (seen.has(cardName)) continue;
     const cd = cardDB[cardName];
     if (!cd || !hasCardType(cd, 'Artifact')) continue;
@@ -62,7 +67,7 @@ function _getEligibleArtifacts(engine, pi) {
     out.push({ name: cardName, source: 'deck' });
   }
   // Discard
-  for (const cardName of (ps.discardPile || [])) {
+  for (const cardName of (ablageFrei ? (ps.discardPile || []) : [])) {
     if (seen.has(cardName)) continue;
     const cd = cardDB[cardName];
     if (!cd || !hasCardType(cd, 'Artifact')) continue;
@@ -80,6 +85,13 @@ function _firstFreeSlot(ps, heroIdx) {
     if (((zones[si] || []).length === 0)) return si;
   }
   return -1;
+}
+
+/** Darion: der Platz fuer `cardName` beim Nutzer — der Equip-Stapel (Pflicht, braucht keine freie Zone), sonst die erste freie Zone; -1 = keiner. */
+function _zielPlatz(engine, seite, heroIdx, cardName) {
+  const pflicht = engine.equipPflichtPlatz(seite, heroIdx, cardName);
+  if (pflicht >= 0) return pflicht;
+  return _firstFreeSlot(engine.gs.players[seite], heroIdx);
 }
 
 module.exports = {
@@ -182,6 +194,8 @@ module.exports = {
         confirmLabel: '🗝️ Take!',
         confirmClass: 'btn-success',
         cancellable: true,
+        // Z6 (S02-22): Hand-Suche kennzeichnen (Such-Template). Die Liste enthaelt nur freie Quellen; gibt es Deck-Eintraege, gilt 'deck', sonst 'discard'.
+        searchToHand: true, searchPile: eligible.some(e => e.source === 'deck') ? 'deck' : 'discard',
       });
       if (!picked || !picked.cardName) { gs._spellCancelled = true; return; }
       const pickedName = picked.cardName;
@@ -218,7 +232,7 @@ module.exports = {
         // Als Vorgabe 29.9.: bezaubert sperrt nur ohne Recht `ausruesten`.
         if (userSeite !== pi ? !engine.darfFremdAusruesten(pi, userSeite, heroIdx) : !heroCanBeEquipped(userHero)) return false;
         // Free slot required to host the Equipment.
-        if (_firstFreeSlot(ups, heroIdx) < 0) return false;
+        if (_zielPlatz(engine, userSeite, heroIdx, pickedName) < 0) return false;   // Darion: der Equip-Stapel nimmt auch ohne freie Zone auf
 
         const equipScript = loadCardEffect(pickedName);
         // Stack-only Equips (Modnir, Swellpnir) carry `neverPlayable`
@@ -262,12 +276,15 @@ module.exports = {
         }));
       }
 
+      // ★ W15a (Al, R3 und Regel W14a Q5): das Direkt-Ausrüsten ist ein Effekt auf den Nutzer — Resistance fängt ihn ab; die Karte geht dann auf die Hand (Tutor-Teil bleibt).
+      if (direkt && await engine.heroNonDamageEffectBlocked(userSeite, heroIdx, 'equip', { sourceOwner: pi, source: CARD_NAME })) direkt = false;
+
       if (!kratesUmgebaut) {
       // Remove the chosen copy from its source pile.
-      const sourcePile = pickedEntry.source === 'deck' ? ps.mainDeck : ps.discardPile;
-      const idx = sourcePile.indexOf(pickedName);
-      if (idx < 0) { gs._spellCancelled = true; return; }
-      sourcePile.splice(idx, 1);
+      // Z6 (S02-22): ueber die Stapel-Schicht (Stapel-/Stab-/Eye-/Such-Sperre) statt eigenem Splice.
+      // (Ziel ist die HAND, keine Creature aufs Feld - der Name des Stapels steht in einer Variable, nicht als Literal.)
+      const _quellStapel = pickedEntry.source === 'deck' ? 'deck' : 'discard';
+      if (!(await engine.takeFromPile(ps, _quellStapel, pickedName, { source: CARD_NAME, toHand: true }))) { gs._spellCancelled = true; return; }
 
       // Reshuffle the deck after a deck-tutor (standard convention so
       // the opponent doesn't gain free knowledge of the deck order).
@@ -288,7 +305,7 @@ module.exports = {
         player: ps.username, card: pickedName, source: pickedEntry.source,
       });
 
-      const freeSlot = direkt ? _firstFreeSlot(ups, heroIdx) : -1;
+      const freeSlot = direkt ? _zielPlatz(engine, userSeite, heroIdx, pickedName) : -1;
       let placed = null;
       if (direkt && freeSlot >= 0) {
         engine._broadcastEvent('play_zone_animation', {
@@ -316,6 +333,7 @@ module.exports = {
         await engine.runHooks('onCardEnterZone', {
           enteringCard: placed.inst, toZone: 'support',
           toHeroIdx: heroIdx, _skipReactionCheck: true,
+          _anhaengselAnleger: pi,   // W49a: das Direkt-Ausruesten ist „equips a card into a Hero's Support Zone" — oeffnet das Equip-Fenster (Afflicted Pests, LOCUST)
         });
 
         const equipScript = loadCardEffect(pickedName);
@@ -358,8 +376,10 @@ module.exports = {
       // replacement-Action prompt.
       if (wasInherent) {
         engine.log('gate_to_armory_end_turn', { player: ps.username });
+        const zugDerKarte = gs.turn;
         engine.queuePostChainAction(async () => {
           if (gs.result) return; // game already over
+          if (gs.turn !== zugDerKarte || gs.activePlayer !== pi) return;   // veraltet: gilt nur dem Zug, in dem Gate gespielt wurde
           const cur = gs.currentPhase;
           if (cur >= 2 && cur <= 4) {
             await engine.advanceToPhase(pi, 5);

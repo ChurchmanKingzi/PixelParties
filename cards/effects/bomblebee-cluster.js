@@ -24,10 +24,11 @@ const { isSeat } = require('./_opp');   // N-Spieler: gültiger Sitzindex
 //  so this dedicated post-summon window is the
 //  only path that catches all summon types.
 //
-//  "Different names" — the two re-summons must each
-//  have a name that differs both from the trigger
-//  Bomblebee AND from the other re-summon. The
-//  picker omits names already used.
+//  "Different names" — Al, Welle 10 (Q28): bezieht sich NUR auf
+//  die bis zu 2 gewaehlten Re-Summons untereinander. Ein Name
+//  gleich dem der ausloesenden Bomblebee ist erlaubt (der Text
+//  verlangt keine Abweichung zur ausloesenden Karte). Der Picker
+//  laesst nur Namen weg, die der erste Re-Summon schon belegt.
 //
 //  "Same Hero" — the two re-summons land on the
 //  trigger Bomblebee's host hero. If that hero has
@@ -92,7 +93,9 @@ module.exports = {
     const feld = (isSeat(gs, triggerInst.owner)) ? triggerInst.owner : pi;
     const fps = gs.players[feld];
     const host = fps?.heroes?.[hostHeroIdx];
-    if (!host?.name || host.hp <= 0) {
+    // Welle 11 (Al, R5): „Summon … with the same Hero" — der Beschwörer muss aktionsfähig sein (nicht Frozen/Stunned/Webbed/Bound; Welle 12: Negated nur
+    // noch als Stufe-0-Grenze bei negierten Abilities, siehe `blanked` unten).
+    if (!host?.name || host.hp <= 0 || !require('./_summon-eligibility').heroAgiert(host, engine, pi))   /* W20c: nur der Kontrolleur beschwoert */ {
       // Host hero died between the summon firing and this reaction
       // resolving — nothing to do, but still apply the summon-lock
       // because text says "afterwards" unconditionally.
@@ -102,8 +105,9 @@ module.exports = {
       return;
     }
 
-    // "Different names" tracker — start by excluding the trigger's name.
-    const usedNames = new Set([triggerInst.name]);
+    // "Different names" tracker — Welle 10 (Q28): nur die gewaehlten Re-Summons
+    // untereinander; der Name der ausloesenden Bomblebee ist NICHT gesperrt.
+    const usedNames = new Set();
 
     // Cluster animation on the host hero's row — three cascading bursts.
     engine._broadcastEvent('play_zone_animation', {
@@ -113,11 +117,19 @@ module.exports = {
 
     let summoned = 0;
     for (let i = 0; i < MAX_RESUMMONS; i++) {
-      const candidates = bomblebeeNamesInHand(ps, usedNames);
+      // Welle 12 (Al): bei negierten ABILITIES des Wirts (harte Form) nur Stufe-0-Bomblebees („Summoning Magic weg").
+      const blanked = engine.heroAbilityLevelsBlanked(feld, hostHeroIdx);
+      const candidates = bomblebeeNamesInHand(ps, usedNames)
+        .filter(n => !blanked || require('./_summon-eligibility').beschwoerStufeOk(engine, feld, hostHeroIdx, engine._getCardDB()[n]))
+        // W16c (A05-05): "Summon ..." (nicht "place") - die Stufe des Helden gilt weiter (Al, Q25); nur die AKTION entfaellt.
+        .filter(n => { const cd = engine._getCardDB()[n]; return !cd || engine.heroMeetsLevelReq(feld, hostHeroIdx, cd, { levelSourcePi: pi }); });
       if (candidates.length === 0) break;
 
-      const slot = findFreeSupportSlot(fps, hostHeroIdx);
-      if (slot < 0) {
+      // W63a (Al, 22.10.2026: Alices Effekt gilt fuer ALLE Beschwoerungs-Effekte; „erst die geteilte Zone, DANN die erste leere"): die Zone je Bomblebee —
+      // frei oder, mit Alice-Teilung, die Zone einer GLEICHNAMIGEN Bomblebee (geteilte zuerst; `engine.ersteBeschwoerZone`).
+      const zoneFuer = (n) => { const si = require('./_alice-shared').ersterPlatzAufHeld(engine, feld, hostHeroIdx, n, pi); return si < 0 ? null : { slotIdx: si }; };
+      for (let ci = candidates.length - 1; ci >= 0; ci--) if (!zoneFuer(candidates[ci])) candidates.splice(ci, 1);
+      if (candidates.length === 0) {
         engine.log('bomblebee_cluster_no_slot', {
           player: ps.username, hero: host.name, summoned,
         });
@@ -141,6 +153,7 @@ module.exports = {
       const chosenName = result.cardName;
       const handIdx = ps.hand.indexOf(chosenName);
       if (handIdx < 0) break;
+      const slot = zoneFuer(chosenName).slotIdx;
 
       // Remove from hand, then summon via summonCreatureWithHooks so the
       // chosen Bomblebee gets its onPlay / onCardEnterZone hooks. The
@@ -165,7 +178,7 @@ module.exports = {
       if (!summonRes) {
         // Fizzle (zone occupied / beforeSummon refused) — discard the
         // ripped card so we don't lose it silently.
-        ps.discardPile.push(chosenName);
+        engine.handKartenBesitzerPs(ps, chosenName).discardPile.push(chosenName);   // W63c: Ablage des permanenten Besitzers
         engine.log('bomblebee_cluster_fizzle', {
           player: ps.username, card: chosenName,
         });

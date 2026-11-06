@@ -6,6 +6,9 @@
 //  Magic Spell from your discard pile to have this Creature use that
 //  Spell as an additional Action as if it had Destruction Magic 1.
 //
+//  Als Ruling (Al 26.10.): „as if it had Destruction Magic 1" = die Stufe des Zaubers ist beim Priester FEST 1 (`gs._castSchoolOverride`,
+//  Destruction Magic), egal welche Schulen/Stufen der Wirtsheld hat.
+//
 //  Implementation
 //  ──────────────
 //  • The Priest IS the caster — animations originate from its
@@ -101,6 +104,11 @@ module.exports = {
       heroIdx: priestInst.heroIdx,
       zoneSlot: priestInst.zoneSlot,
     };
+    // Als Ruling (Al 26.10.): „as if it had Destruction Magic 1" — der geliehene Zauber wird IMMER als Destruction Magic 1 gewirkt (Stufe fest 1,
+    // wie beim Demon's Gate „as if Lv3"), unabhängig von den echten Schulen des Wirtshelden: Burning Finger wirkt mit dem Stufe-1-Wert, auch wenn
+    // der Held Destruction 3 hat (oder keine). Nur für diesen Guss (unten zurückgesetzt); `effectiveSchoolLevelForCaster` liest den Override.
+    const prevSchoolOverride = gs._castSchoolOverride;
+    gs._castSchoolOverride = { ...(prevSchoolOverride || {}), 'Destruction Magic': 1 };
 
     // Track a temporary inst for the spell so its onPlay sees a
     // typical-shaped ctx. `heroIdx` matches Priest's host hero so
@@ -173,6 +181,8 @@ module.exports = {
     // to whatever outer flow invoked us.
     gs._spellCancelled = prevCancelled;
     delete gs._spellCasterOverride;
+    if (prevSchoolOverride === undefined) delete gs._castSchoolOverride;
+    else gs._castSchoolOverride = prevSchoolOverride;
     engine._untrackCard(spellInst.id);
 
     // Pay the cost only on commit. Cancellations leave the spell

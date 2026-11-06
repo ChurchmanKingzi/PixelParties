@@ -74,6 +74,7 @@
 
 const { hasCardType, heroAbilityLevel } = require('./_hooks');
 const { loadCardEffect } = require('./_loader');
+const { waehleMehrere } = require('./_equip-stack-shared');
 
 const CARD_NAME = 'Overcharge';
 const MIN_AUFSCHLAG = 1;
@@ -93,11 +94,9 @@ function istAusruestbar(engine, pi, heroIdx, cardName) {
   if (!cd || !hasCardType(cd, 'Artifact') || cd.subtype !== 'Equipment') return false;
   const script = loadCardEffect(cardName);
   if (script?.neverPlayable) return false;
-  if (typeof script?.canEquipToHero === 'function') {
-    try {
-      if (!script.canEquipToHero(engine.gs, pi, heroIdx, engine)) return false;
-    } catch { return false; }
-  }
+  // W16g (S03-17): EINE Stelle fuer „darf diese Karte an diesen Helden“ (`canEquipCardToHero`): `canEquipToHero` UND Q153 (Al: „Control Device
+  // soll NUR an gegnerische Heroes anlegbar sein“, `placesOnOpponentBoard`) — Overcharge rüstet immer den EIGENEN Helden aus.
+  if (!engine.canEquipCardToHero(cardName, pi, heroIdx)) return false;
   if (script?.oncePerGame) {
     const key = script.oncePerGameKey || cardName;
     if (engine.gs.players[pi]?._oncePerGameUsed?.has(key)) return false;
@@ -113,6 +112,8 @@ function istAusruestbar(engine, pi, heroIdx, cardName) {
 function aufwertungenImDeck(engine, pi, heroIdx, altKosten) {
   const ps = engine.gs.players[pi];
   if (!ps) return [];
+  // Z6 (S03-16): Stapel-Sperre (Knight of Kings [B]) - ohne Deck-Ausgang gibt es keinen Nachfolger, das Equip waere kein Ziel.
+  if (!engine.pileOutAllowed(pi, 'deck', { sourceOwner: pi })) return [];
   const cardDB = engine._getCardDB();
   const min = altKosten + MIN_AUFSCHLAG;
   const max = altKosten + MAX_AUFSCHLAG;
@@ -143,23 +144,28 @@ function zulaessigeZiele(engine, pi) {
   for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
     const hero = ps.heroes[hi];
     if (!hero?.name || hero.hp <= 0) continue;
+    // W28a (Al, 21.10.2026: „'you control' = aktuelle Kontrolle, nicht Besitzer"): ein an den Gegner abgegebener eigener Held (Charme-Marke / dauerhafte Uebernahme)
+    // ist kein „Hero you control". (Ein uebernommener Gegnerheld bleibt ausgenommen: der Tausch legt die neue Ausruestung ueber `safePlaceInSupport(pi, …)` in die
+    // EIGENE Spalte — gemeldet, nicht umgebaut.)
+    if (engine.heroSideOf(pi, hero) !== pi) continue;
     // Eingefrorene oder bezauberte Helden nehmen keine neue Ausruestung
     // an — dieselbe Schranke wie im Server-Ausruestpfad.
     if (hero.statuses?.frozen || hero.statuses?.charmed) continue;
     const zonen = ps.supportZones?.[hi] || [];
     for (let si = 0; si < zonen.length; si++) {
-      const name = (zonen[si] || [])[0];
-      if (!name) continue;
-      const cd = cardDB[name];
-      if (!cd || !hasCardType(cd, 'Artifact') || cd.subtype !== 'Equipment') continue;
-      const inst = engine.cardInstances.find(c =>
-        c.zone === 'support' && c.name === name
-        && c.heroIdx === hi && c.zoneSlot === si
-        && (c.controller ?? c.owner) === pi);
-      if (!inst) continue;
-      const kandidaten = aufwertungenImDeck(engine, pi, hi, kosten(cd));
-      if (kandidaten.length === 0) continue;     // ★ Als Vorgabe
-      out.push({ heroIdx: hi, slotIdx: si, cardName: name, inst, hero, kandidaten });
+      // ★ Darion: ein Platz kann MEHRERE Equips halten (ein Name je Karte) — jede Karte des Platzes ist ein eigenes Ziel (frueher zaehlte nur `zonen[si][0]`).
+      for (const name of new Set(zonen[si] || [])) {
+        const cd = cardDB[name];
+        if (!cd || !hasCardType(cd, 'Artifact') || cd.subtype !== 'Equipment') continue;
+        for (const inst of engine.cardInstances.filter(c =>
+          c.zone === 'support' && c.name === name
+          && c.heroIdx === hi && c.zoneSlot === si
+          && (c.controller ?? c.owner) === pi)) {
+          const kandidaten = aufwertungenImDeck(engine, pi, hi, kosten(cd));
+          if (kandidaten.length === 0) continue;     // ★ Als Vorgabe
+          out.push({ heroIdx: hi, slotIdx: si, cardName: name, inst, hero, kandidaten });
+        }
+      }
     }
   }
   return out;
@@ -214,12 +220,18 @@ module.exports = {
       try {
         // ── 1) Ausruestung waehlen, die weichen soll ────────────────
         let gewaehlt = ziele[0];
-        if (ziele.length > 1) {
-          const zonen = ziele.map(z => ({
-            heroIdx: z.heroIdx,
-            slotIdx: z.slotIdx,
-            label: `${z.hero.name} — ${z.cardName} (Slot ${z.slotIdx + 1})`,
-          }));
+        // Darion: mehrere Ziele koennen im SELBEN Platz liegen (Equip-Stapel) — die Zonenwahl zaehlt Plaetze, danach fragt `waehleMehrere` nach der Karte.
+        const plaetze = [...new Set(ziele.map(z => `${z.heroIdx}:${z.slotIdx}`))];
+        if (plaetze.length > 1) {
+          const zonen = plaetze.map(k => {
+            const imPlatz = ziele.filter(z => `${z.heroIdx}:${z.slotIdx}` === k);
+            const z = imPlatz[0];
+            return {
+              heroIdx: z.heroIdx,
+              slotIdx: z.slotIdx,
+              label: `${z.hero.name} — ${[...new Set(imPlatz.map(x => x.cardName))].join(' / ')} (Slot ${z.slotIdx + 1})`,
+            };
+          });
           const picked = await ctx.promptZonePick(zonen, {
             title: CARD_NAME,
             description: 'Choose an equipped Artifact to overcharge. Only Artifacts with a valid upgrade in your deck are shown.',
@@ -231,6 +243,14 @@ module.exports = {
           });
           if (!picked) return abbrechen();
           gewaehlt = ziele.find(z => z.heroIdx === picked.heroIdx && z.slotIdx === picked.slotIdx);
+          if (!gewaehlt) return abbrechen();
+        }
+        const imGewaehltenPlatz = ziele.filter(z => z.heroIdx === gewaehlt.heroIdx && z.slotIdx === gewaehlt.slotIdx);
+        if (imGewaehltenPlatz.length > 1) {
+          const [karte] = await waehleMehrere(engine, pi, imGewaehltenPlatz.map(z => z.inst), {
+            title: CARD_NAME, description: 'These Artifacts share one Support Zone — choose the one to overcharge.', mindestens: 1, hoechstens: 1,
+          });
+          gewaehlt = imGewaehltenPlatz.find(z => z.inst === karte) || null;
           if (!gewaehlt) return abbrechen();
         }
 
@@ -274,7 +294,7 @@ module.exports = {
         engine.sync();
 
         // ── 3b) Neue Ausruestung aus dem Deck in denselben Platz ───
-        if (!(await engine.takeFromPile(ps, 'deck', deckIdx, { source: CARD_NAME }))) return;   // v820: Stapel-Schicht
+        if (!(await engine.takeFromPile(ps, 'deck', neuName, { source: CARD_NAME }))) return;   // v820: Stapel-Schicht; per NAME, nicht per Index — Ablege-Ausloeser (Rain Viola) koennen das Deck davor umbauen (S03-18)
         engine._broadcastEvent('play_card_transfer', {
           cardName: neuName,
           sourceOwner: pi, sourceZoneKind: 'deck', sourceHeroIdx: heroIdx, sourceZoneSlot: -1,
@@ -307,6 +327,7 @@ module.exports = {
         await engine.runHooks('onCardEnterZone', {
           enteringCard: placed.inst, toZone: 'support',
           toHeroIdx: heroIdx, _skipReactionCheck: true,
+          _anhaengselAnleger: pi,   // W49a: das Ausruesten des Nachfolgers oeffnet das Equip-Fenster (Afflicted Pests, LOCUST)
         });
 
         const neuScript = loadCardEffect(neuName);

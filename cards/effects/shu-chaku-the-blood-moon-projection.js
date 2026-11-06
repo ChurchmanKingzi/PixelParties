@@ -65,28 +65,36 @@ module.exports = {
     if (artifacts.length === 0) return false;
 
     // Direct click-to-select on-board — highlight each own artifact's
-    // support slot so the player clicks them individually. Targets are
-    // keyed by instance-ID in the target id so duplicates pick the
-    // exact instance. Confirm button returns once 1+ are chosen.
-    const targets = artifacts.map(inst => ({
-      id: `equip-${pi}-${inst.heroIdx}-${inst.zoneSlot}`,
-      type: 'equip', owner: pi,
-      heroIdx: inst.heroIdx, slotIdx: inst.zoneSlot,
-      cardName: inst.name, cardInstance: inst,
-    }));
+    // support slot so the player clicks them individually. Confirm
+    // button returns once 1+ are chosen.
+    // Darion: ein Equip-Stapel ist EIN Platz (alle Karten teilen die Ziel-ID) — ein Ziel je Platz, dahinter alle seine Artefakte (`_erlaubteInstanzen`); die Rueckfrage der
+    // Engine („welches?", bei „any number" Karte fuer Karte) setzt `cardInstance` und `_zusatzInstanzen` (`engine.gewaehlteInstanzen`). Gelesen wurde vorher nur EINE Karte je Platz.
+    const targets = [];
+    for (const inst of artifacts) {
+      const id = `equip-${pi}-${inst.heroIdx}-${inst.zoneSlot}`;
+      const schon = targets.find(t => t.id === id);
+      if (schon) { schon._erlaubteInstanzen.push(inst.id); continue; }
+      targets.push({
+        id, type: 'equip', owner: pi,
+        heroIdx: inst.heroIdx, slotIdx: inst.zoneSlot,
+        cardName: inst.name, cardInstance: inst, _erlaubteInstanzen: [inst.id],
+      });
+    }
     const selectedIds = await engine.promptEffectTarget(pi, targets, {
       title: CARD_NAME,
       description: 'Click your Artifacts on the board to return them to hand. Their combined Cost discounts your next Artifact this turn.',
       confirmLabel: '🌙 Recall!',
       confirmClass: 'btn-success',
       cancellable: true,
-      maxTotal: targets.length,
+      maxTotal: artifacts.length,
       minRequired: 1,
     });
     if (!selectedIds || selectedIds.length === 0) return false;
-    const chosenInsts = selectedIds
-      .map(id => targets.find(t => t.id === id)?.cardInstance)
-      .filter(Boolean);
+    const chosenInsts = [];
+    for (const id of selectedIds) {
+      const ziel = targets.find(t => t.id === id);
+      for (const inst of engine.gewaehlteInstanzen(ziel)) if (!chosenInsts.includes(inst)) chosenInsts.push(inst);
+    }
     if (chosenInsts.length === 0) return false;
 
     let totalCost = 0;

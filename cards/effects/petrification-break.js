@@ -129,7 +129,7 @@ module.exports = {
 
       await engine.runHooks('onCardEnterZone', {
         enteringCard: inst, toZone: 'support', toHeroIdx: res.host.heroIdx,
-        _skipReactionCheck: true,
+        _skipReactionCheck: true, _anhaengselAnleger: pi,
       });
       engine.log('petrification_break', { player: ps.username, hero: user.name });
       engine.sync();
@@ -141,7 +141,7 @@ module.exports = {
       const host = ctx.attachedHero;
       if (!host || ctx.target !== host) return;
       if (!(ctx.amount > 0)) return;
-      ctx.setAmount(Math.ceil(ctx.amount / 2));
+      ctx.setAmount(Math.ceil(ctx.amount / 2), { kette: { mul: 0.5 } });   // W50a: Halbieren = Senkung (Ricochet-Kettenbetrag)
     },
   },
 };

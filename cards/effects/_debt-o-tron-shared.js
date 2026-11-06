@@ -222,9 +222,10 @@ function modelBase(cardName, opts = {}) {
  * @param {object} ctx        der Hook-Kontext
  * @param {number} maxPerTurn wie oft je Zug (1 oder 3)
  * @param {string} cardName
+ * @param {{ohneStufen?: boolean}} [opts] `ohneStufen`: Scrap Plow — keine 10er-Schwelle (jede Überziehung nach einer Ausgabe)
  * @returns {{steps:number, excess:number}|null} null = kein Ausloeser
  */
-function debtTriggerCheck(ctx, maxPerTurn, cardName) {
+function debtTriggerCheck(ctx, maxPerTurn, cardName, opts = {}) {
   const engine = ctx._engine;
   const gs = engine?.gs;
   const pi = ctx.cardOwner;
@@ -240,7 +241,10 @@ function debtTriggerCheck(ctx, maxPerTurn, cardName) {
   const amount = ctx.amount || 0;
   const goldBefore = (ps.gold || 0) + amount;
   const steps = excessSteps(amount, goldBefore);
-  if (steps <= 0) return null;
+  // `opts.ohneStufen` (Scrap Plow, Als Ruling Al 26.10.): „when you have negative Gold after spending Gold" ohne „for every 10 Gold"-Klausel —
+  // JEDE Ausgabe (Betrag > 0), nach der das Gold negativ ist, löst aus (nicht erst ab 10 Gold Überziehung).
+  if (opts.ohneStufen) { if (amount <= 0) return null; }
+  else if (steps <= 0) return null;
 
   // ── NUR PRUEFEN, NICHT VERBUCHEN (Als Report 16.8.) ────────────────
   // Hier wurde die Ladung frueher SOFORT abgezogen — noch bevor das

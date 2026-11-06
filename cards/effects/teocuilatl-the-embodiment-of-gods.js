@@ -72,11 +72,18 @@ function heldenZiele(engine, pi, selbst) {
   // Kontrolle statt Seite (Styx 28.9.): „a Hero you control" — alle
   // kontrollierten Helden beider Spalten, physisch adressiert. „Except
   // this one" ueber das Heldenobjekt (uebernommen liegt es beim Gegner).
-  return engine.heroesControlledBy(pi)
+  const helden = engine.heroesControlledBy(pi)
     .filter(({ hero }) => hero?.name && hero.hp > 0 && hero !== selbst)
     .map(({ physOwner, heroIdx, hero }) => ({
       id: `hero-${physOwner}-${heroIdx}`, type: 'hero', owner: physOwner, heroIdx, cardName: hero.name,
     }));
+  // W79 (White Sacrificial Bull): eine Kreatur, die auch als Hero zaehlt, ist hier ein HELD (30 Gold, Zugende, 1 je Partie) - sie steht im Waehler NUR
+  // als Held, nicht zusaetzlich als Kreatur (`kreaturSpec` filtert sie, solange der Helden-Weg offen ist).
+  const bullen = (engine.heldKreaturen?.(pi) || []).map(b => {
+    const seite = engine.physicalSide(b);
+    return { id: `equip-${seite}-${b.heroIdx}-${b.zoneSlot}`, type: 'equip', owner: seite, heroIdx: b.heroIdx, slotIdx: b.zoneSlot, cardName: b.name, cardInstance: b };
+  });
+  return [...helden, ...bullen];
 }
 
 /** Teocuilatl selbst (Styx 28.9.: Brettseite, nicht Kontrolleur). */
@@ -88,6 +95,7 @@ function selbstVon(ctx) {
 /** Opfer-Vorgabe fuer den Kreatur-Weg; die Helden haengen als Fremdziele dran. */
 function kreaturSpec(engine, extra) {
   const turn = engine.gs.turn;
+  const bullAlsHeld = !!(extra && extra.some(e => e.cardInstance));   // Bull steht dann als Held im Waehler
   return {
     minCount: 1, maxCount: 1,
     title: CARD_NAME,
@@ -97,7 +105,7 @@ function kreaturSpec(engine, extra) {
     confirmLabel: '🗡️ Sacrifice!',
     confirmClass: 'btn-danger',
     cancellable: true,
-    filter: (c) => c.inst.turnPlayed !== turn,
+    filter: (c) => c.inst.turnPlayed !== turn && !(bullAlsHeld && engine.zaehltAlsHeld?.(c.inst)),
     extraTargets: extra || [],
   };
 }
@@ -149,12 +157,13 @@ module.exports = {
     if (ergebnis && ergebnis.extraPicked) {
       const ziel = ergebnis.extraPicked;
       const zielOwner = ziel.owner ?? pi;   // physische Spalte (Kontrolle statt Seite)
-      const opfer = gs.players[zielOwner]?.heroes?.[ziel.heroIdx];
-      if (!opfer?.name || opfer.hp <= 0) return false;
+      const bull = ziel.cardInstance && engine.cardInstances.find(c => c.id === ziel.cardInstance.id);   // W79: White Sacrificial Bull
+      const opfer = bull ? null : gs.players[zielOwner]?.heroes?.[ziel.heroIdx];
+      if (bull ? !engine.zaehltAlsHeld(bull) : (!opfer?.name || opfer.hp <= 0)) return false;
 
       await engine.showTriggeredEffect(CARD_NAME, { playerIdx: pi });
       engine._broadcastEvent('play_zone_animation', {
-        type: 'knife_sacrifice', owner: zielOwner, heroIdx: ziel.heroIdx, zoneSlot: -1,
+        type: 'knife_sacrifice', owner: zielOwner, heroIdx: ziel.heroIdx, zoneSlot: ziel.cardInstance ? ziel.slotIdx : -1,
       });
       await engine._delay(500);
 
@@ -162,15 +171,19 @@ module.exports = {
       // die daran haengt, den Weg nicht ein zweites Mal sieht.
       ps._teocuilatlHeroSacrificed = true;
 
-      await engine.actionDefeatHero(
-        { name: CARD_NAME, owner: pi },
-        opfer,
-        { reason: CARD_NAME, respectFirstTurnProtection: false, isSacrifice: true },
-      );
+      if (bull) {
+        await engine.opfereKreatur(bull, { name: CARD_NAME, owner: pi, heroIdx: -1 }, { animation: false });
+      } else {
+        await engine.actionDefeatHero(
+          { name: CARD_NAME, owner: pi },
+          opfer,
+          { reason: CARD_NAME, respectFirstTurnProtection: false, isSacrifice: true },
+        );
+      }
 
       await ctx.gainGold(GOLD_HERO);
       engine.log('teocuilatl_offering', {
-        player: ps.username, kind: 'hero', hero: opfer.name, gold: GOLD_HERO,
+        player: ps.username, kind: 'hero', hero: bull ? bull.name : opfer.name, gold: GOLD_HERO,
       });
 
       if (!gs.result) {

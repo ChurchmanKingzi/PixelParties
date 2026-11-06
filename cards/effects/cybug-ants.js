@@ -184,7 +184,7 @@ module.exports = {
     // aber es gibt WEDER Schaden NOCH Animation NOCH Logeintrag.
     // Faellt nur bei CPU-Steuerung auf — ein Mensch klickt selbst.
     const toetbar = ziele.filter(z => z.type !== 'hero'
-      && (z.cardInstance?.counters?.currentHp ?? Infinity) <= schaden);
+      && (z.cardInstance ? engine.creatureCurrentHp(z.cardInstance) : Infinity) <= schaden);   // Z5: unversehrt = gedruckte HP
     if (toetbar.length > 0) return [toetbar[0].id];
 
     const helden = ziele.filter(z => z.type === 'hero');

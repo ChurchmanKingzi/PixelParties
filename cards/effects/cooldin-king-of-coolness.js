@@ -49,6 +49,7 @@ function collectAreasFromSource(names, cardDB, source, engine, pi) {
     // Erster fast richtig (Spell + Attack), aber ohne Creature und ohne
     // den Level-Riegel.
     if (!isTutorableArea(cd, engine, pi)) continue;
+    if (!engine.canPlaceAnotherArea(pi, name)) continue;   // W16c (A04-21): Limit/Dopplung wie der normale Area-Spielweg
     out.push({ name, source, sourceIdx: i });
   }
   return out;
@@ -90,6 +91,7 @@ async function playCooldinArea(engine, pi, heroIdx, cardName, fromDeck) {
       reveal: false,
       shuffle: true,
       _bypassHandLock: true,
+      ohneZugangsFenster: true,   // W72a: Zwischenschritt Deck → Hand → Brett in einem Zug, kein „add to hand" (Control Monitors)
     });
     if (!ok) return false;
   }
@@ -117,7 +119,7 @@ async function playCooldinArea(engine, pi, heroIdx, cardName, fromDeck) {
   // derselbe Ausgang wie eine Negation; die Logzeile schreibt die Engine.
   if (chainResult.negated || chainResult.fizzled) {
     engine.takeFromPileSync(ps, 'hand', handIndex);
-    ps.discardPile.push(cardName);
+    engine.handKartenBesitzerPs(ps, cardName).discardPile.push(cardName);   // W3/W5a: Stapel des permanenten Besitzers
     if (chainResult.negated) engine.log('cooldin_area_negated', { player: ps.username, card: cardName });
     return true;
   }
@@ -139,6 +141,7 @@ async function playCooldinArea(engine, pi, heroIdx, cardName, fromDeck) {
   });
   engine.takeFromPileSync(ps, 'hand', handIndex);
   const inst = engine._trackCard(cardName, pi, 'hand', heroIdx, -1);
+  { const _hk = fromDeck ? pi : engine._consumeHandCardOrigin(pi, cardName); if (_hk !== pi) inst.originalOwner = _hk; }   // W63c: gestohlene Handkarte — die Area gehoert ihrem Besitzer
   // ★★ v1222: Abgleich SOFORT nach dem Hand-Abgang — sonst taucht die
   // abgeflogene Karte nach dem Flug wieder in der Hand auf (Als
   // Befund 18.9. zu „Dive Down").
@@ -176,7 +179,7 @@ async function playCooldinArea(engine, pi, heroIdx, cardName, fromDeck) {
     || inst.zone === 'area'
     || (gs.areaZones?.[pi] || []).includes(cardName);
   if (!placedOnBoard) {
-    ps.discardPile.push(cardName);
+    (engine.gs.players[engine.kartenBesitzerVon(inst)] || ps).discardPile.push(cardName);   // W63c: Ablage des permanenten Besitzers
     engine._untrackCard(inst.id);
     engine.log('cooldin_area_fizzle', { player: ps.username, card: cardName });
   }
@@ -212,9 +215,10 @@ module.exports = {
     // Can only cast an Area if the caster's own Area zone is empty
     // (generic Area rule, enforced by validateActionPlay). We enforce it
     // here too so Cooldin's button grays out when the zone is occupied.
-    if ((gs.areaZones?.[pi] || []).length > 0) return false;
-    // Reality Crack's turn-long area lock also blocks Cooldin.
-    if (ps._cantPlayAreaThisTurn === gs.turn) return false;
+    // W16c (A04-21): Limit statt "Zone leer": mit Spatial Crevice (bis zu 3 verschiedene Areas) ist noch Platz.
+    if (!engine.canPlaceAnotherArea(pi)) return false;
+    // Reality Crack's turn-long area lock (und W82 Shipwrecked: „you cannot … play Areas") also blocks Cooldin — Als Ruling (Al 27.10.): EINE Frage `areaSpielGesperrt`.
+    if (engine.areaSpielGesperrt(pi)) return false;
 
     const cardDB = engine._getCardDB();
     const fromHand = collectAreasFromSource(ps.hand || [], cardDB, 'hand', engine, pi);

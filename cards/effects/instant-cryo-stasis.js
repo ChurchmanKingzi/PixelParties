@@ -32,8 +32,7 @@ module.exports = {
   /** „At least Decay Magic 2" beim Wirker → zusaetzliche Aktion. */
   inherentAction(gs, pi, heroIdx, engine) {
     if (!engine) return false;
-    const zonen = gs.players[pi]?.abilityZones?.[heroIdx] || [];
-    return engine.countAbilitiesForSchool('Decay Magic', zonen) >= 2;
+    return engine.effectiveSchoolLevelForCaster('Decay Magic', pi, heroIdx, pi) >= 2;   // W4a: harte Negierung -> Stufe 0; W16g (S02-18): + Xals Support-Zonen-Stapel
   },
 
   /** Grau, solange keine einfrierbare gegnerische Creature steht. */

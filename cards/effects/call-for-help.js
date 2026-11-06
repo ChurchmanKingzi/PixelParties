@@ -55,11 +55,24 @@ module.exports = {
       if (!hero?.name || hero.hp <= 0) return;
       const db = engine._getCardDB();
 
+      const kannWirken = engine.canHeroPerformAction(pi, heroIdx) && !engine.areActionsBlocked(pi);
       const eligible = (name) => {
         const cd = db[name];
         if (!cd || !hasCardType(cd, 'Spell') || name === CARD_NAME) return false;
         if ((cd.subtype || 'Normal').toLowerCase() !== 'normal') return false;
         if ((cd.level || 0) > MAX_LEVEL) return false;
+        // „Only 1 per game" (Divine Gift …): der Sofort-Guss prueft das nicht selbst (S01-11)
+        const sc = loadCardEffect(name);
+        if ((sc?.oncePerGame || sc?.oncePerGameKey) && ps._oncePerGameUsed?.has(sc.oncePerGameKey || name)) return false;
+        // W16g (S01-12): nur anbieten, was nach der Wahl auch wirklich gewirkt werden kann — dieselben Sperren, die sonst erst NACH
+        // der Wahl still zum Abbruch fuehrten (Call for Help verpuffte, Zauber blieb im Deck): Wirker/Aktionssperre, Friendship-
+        // Support-Lock, `spellPlayCondition`/`canPlayWithHero` des Zaubers (Level/Schule bleiben „regardless of its level“ frei).
+        if (!kannWirken) return false;
+        if (ps.supportSpellLocked && hasSpellSchool(cd, 'Support Magic')) return false;
+        try {
+          if (sc?.spellPlayCondition && !sc.spellPlayCondition(gs, pi, engine)) return false;
+          if (sc?.canPlayWithHero && !sc.canPlayWithHero(gs, pi, heroIdx, cd, engine)) return false;
+        } catch { return false; }
         return gs.hoptUsed?.[usedKey(pi, name)] !== gs.turn;
       };
       const cards = [];
@@ -68,7 +81,7 @@ module.exports = {
       if (cards.length === 0) { engine.log('call_for_help_none', { player: ps.username }); return; }
       cards.sort((a, b) => a.name.localeCompare(b.name) || a.source.localeCompare(b.source));
 
-      const picked = await engine.promptGeneric(pi, {
+      const picked = await engine.promptSpellAuswahl(pi, {   // W48a: Zeitfenster der Spell-Auswahl (keine Surprise aktivierbar)
         type: 'cardGallery', cards, title: CARD_NAME,
         description: `Choose a level ${MAX_LEVEL} or lower Spell from your hand or deck and play it immediately as an additional Action, regardless of its level.`,
         confirmLabel: '📣 Call it!', confirmClass: 'btn-success', cancellable: false,

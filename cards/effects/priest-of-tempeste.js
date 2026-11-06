@@ -87,7 +87,8 @@ module.exports = {
       const pi = ctx.cardOwner;
       if (!inst || inst.zone !== 'support' || inst.faceDown || !ctx.entries) return;
       if (genutzt(gs, inst) || !kannBezahlen(engine, pi, KOSTEN)) return;
-      const treffer = ctx.entries.filter(e => e && !e.cancelled && !e.isStatusDamage && e.inst
+      // Welle 11 (Al, Q62: „Ja sollte zählen, bei allen."): Gift-/Brand-Ticks zählen wie bei Helden als „would take damage" (kein isStatusDamage-Filter).
+      const treffer = ctx.entries.filter(e => e && !e.cancelled && e.inst
         && e.amount > 0 && e.inst.name !== CARD_NAME
         && (e.inst.controller ?? e.inst.owner) === pi
         && e.canBeNegated !== false && !e.cannotBeReduced && !e.cannotBeNegated);

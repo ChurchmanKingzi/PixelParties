@@ -9,8 +9,18 @@ const { hasCardType } = require('./_hooks');
 const { kettenblitz } = require('./_kettenblitz-shared');   // v1333
 
 module.exports = {
+  // ★ Welle 12 (B-06, Al: „Eine Karte, deren Effekt komplett nutzlos wäre, ist nicht spielbar."): trifft NUR den Gegner — gegen den durch die
+  // Erste-Runden-Immunität geschützten Spieler unspielbar (Karte bleibt auf der Hand, keine Aktion/Kosten; `engine.ersterZugGeschuetzt`).
+  blockedByFirstTurnProtection: true,
+  // ★ Als Ruling (Al 26.10., Flame Avalanche: „Am besten gleich die Karten ganz sperren statt den Schaden fizzeln zu lassen"): die Karte richtet NUR Schaden an Zielen des Gegners an —
+  // unter der Schadenssperre (`ps.damageLocked`) unspielbar (Karte bleibt auf der Hand, keine Aktion/Kosten; Sperr-Stutzen `engine._cardBlockedBySearchLock`).
+  blockedByDamageLock: true,
   requiresTarget: true,
   // ^ Tagged for Blinded gating — see cards/effects/_hooks.js (blinded status).
+  // ★ W75b (Al: „Nein, Bartas darf mit Chain Lightning keine Extra-Ziele treffen."): die Zahl der Ziele legt der Kartentext fest („3 targets … consecutively, or as many as possible"),
+  // auch wenn der Gegner nur 1 Ziel hat und deshalb nur 1 getroffen wird. Bartas bietet daher keinen Zweitwurf an (generisches Merkmal `fixedTargetCount`, kein Namens-Sonderfall).
+  // NICHT `neverMultiTarget`: die Karte trifft bis zu 3 Ziele, nur eben nie mehr als vom Text vorgegeben.
+  fixedTargetCount: true,
   // Turn-1 shielded opponent makes every bolt fizzle (opponent picks the
   // targets and they're all immune). The CPU has no `getValidTargets` to
   // reason about, so flag it explicitly here.
@@ -28,9 +38,8 @@ module.exports = {
       const cardDB = engine._getCardDB();
       const damages = [200, 150, 100];
 
-      // Stream card to opponent
-      const oppSid = gs.players[oppIdx]?.socketId;
-      if (oppSid) engine.io.to(oppSid).emit('card_reveal', { cardName: 'Chain Lightning' });
+      // Stream card to opponent (W64b: zentral über den Auftritts-Puffer — das eigene card_reveal zeigte die Karte doppelt)
+      engine.commitAppearance();
       await engine._delay(200);
 
       // Build all opponent targets
@@ -58,7 +67,7 @@ module.exports = {
       // we must read the opp-side flag, not the caster's same-slot
       // Hero. cardHeroOwner falls back to cardOwner for normal
       // casts, so this stays correct outside Love Shot too.
-      const heroFlags = gs.heroFlags?.[`${ctx.cardHeroOwner}-${heroIdx}`];
+      const heroFlags = ctx._engine.heroFlagsLive(ctx.cardHeroOwner, heroIdx);
       if (heroFlags?.forcesSingleTarget) {
         // Opponent picks only 1 target, only the first hit (200) applies
         const selected = await engine.promptEffectTarget(oppIdx, targets, {

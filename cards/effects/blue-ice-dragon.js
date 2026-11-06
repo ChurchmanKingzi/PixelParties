@@ -130,15 +130,16 @@ function heroCanSummonHere(engine, pi, heroIdx, heroOwner = pi) {
 
 /**
  * Opfer-Spec fuer einen Wurf auf einen belegten Platz des Helden
- * (`heroOwner`, `heroIdx`): mindestens ein Opfer von DIESEM Helden.
- * Styx 28.9.: `mustIncludeFromHeroOwner` = Seite des
- * Helden (geliehene Helden der Gegenspalte).
+ * (`heroOwner`, `heroIdx`, `slotIdx`).
+ * ★ W19a (Al, 19.10.2026): „Es ist jede Zone ein Ziel, die durch Opfern für die Beschwörung leer wird. Wählt man eine Zone mit 2 Creatures
+ * darin, müssen beide geopfert werden, bei mehr Creatures als benötigten Opfern ist eine Zone nicht viable." Alle Insassen der Zielzone sind
+ * Pflicht-Opfer (`requiredInstIds`, `engine.zoneInsassen`); die übrigen Opfer sind frei. Löst die W17a-Regel „Alice-Stapel kein Ziel" ab
+ * (vorher: „mindestens ein Opfer von diesem Helden", Stapel-Insassen zählten nicht).
  */
-function fullDropSpec(engine, pi, heroIdx, heroOwner = pi) {
+function fullDropSpec(engine, pi, heroIdx, heroOwner = pi, slotIdx = null) {
   const base = makeSacrificeSpec(engine);
-  // `mustIncludeFromHeroOwner` = Seite des Helden (Styx 28.9.): nur ein
-  // Opfer aus DIESER Spalte schafft dort Platz; weitere Opfer bleiben frei.
-  return { ...base, mustIncludeFromHeroIdx: heroIdx, mustIncludeFromHeroOwner: heroOwner };
+  const ids = slotIdx != null ? engine.zoneInsassen(heroOwner, heroIdx, slotIdx).map(c => c.id) : [];
+  return ids.length > 0 ? { ...base, requiredInstIds: ids } : base;
 }
 
 /**
@@ -170,11 +171,10 @@ function occupiedDropSlots(gs, pi, engine) {
     const slots = [0, 1, 2];
     if (slots.some(z => (zones[z] || []).length === 0)) continue;   // hat noch Platz
     if (!heroCanSummonHere(engine, pi, hi, physOwner)) continue;
-    // Genau der Spec, den `beforeSummon` gleich benutzt: mindestens ein
-    // Opfer muss BEI DIESEM HELDEN stehen, sonst wird dort kein Platz frei.
-    if (!engine.canSatisfySacrifice(pi, fullDropSpec(engine, pi, hi, physOwner))) continue;
     for (const z of slots) {
       if ((zones[z] || []).length === 0) continue;
+      // W19a (Al, 19.10.2026): die Zone ist ein Ziel, wenn die 2 Opfer sie ganz leeren koennen (Insassen <= 2, alle opferbar).
+      if (!engine.zoneLeerbarDurchOpfer(pi, physOwner, hi, z, makeSacrificeSpec(engine))) continue;
       out.push(physOwner !== pi ? { heroIdx: hi, slotIdx: z, owner: physOwner } : { heroIdx: hi, slotIdx: z });
     }
   }
@@ -190,6 +190,27 @@ function targetIsFrozen(engine, target) {
   }
   const inst = target.cardInstance;
   return !!inst?.counters?.frozen;
+}
+
+/**
+ * KOSTEN: die Opfer (bei einem Wurf auf einen belegten Platz mindestens eines vom Beschwörer-Helden). `false` = abgebrochen.
+ * Eine Stelle für `paySummonCost` (vor dem Reaktionsfenster) und den Fallback in `beforeSummon`.
+ */
+async function zahleOpfer(ctx, allFullDrop, req = null) {
+  const engine = ctx._engine;
+  const gs = engine.gs;
+  const pi = ctx.cardOwner;
+  const heroIdx = ctx.cardHeroIdx;
+  const heroOwner = (isSeat(gs, ctx.cardHeroOwner)) ? ctx.cardHeroOwner : pi;
+  const base = makeSacrificeSpec(engine);
+  const slotIdx = (req || gs.players[pi]?._requestedBouncePlaceSlot)?.slotIdx ?? null;
+  const spec = allFullDrop
+    ? {
+        ...fullDropSpec(engine, pi, heroIdx, heroOwner, slotIdx),
+        description: `${base.description} The Creature(s) in the targeted Support Zone must be among them.`,
+      }
+    : base;
+  return !!(await engine.resolveSacrificeCost(ctx, spec));
 }
 
 module.exports = {
@@ -247,6 +268,17 @@ module.exports = {
    * Opferwahl ab, ist die Beschwörung ganz vom Tisch und es kann kein
    * Umschaltmerker zurückbleiben.
    */
+  // ★ W4b (Al, Welle 4): die Opfer sind KOSTEN der Beschwörung und werden VOR dem Reaktionsfenster bezahlt
+  // (`paySummonCost`, Engine `_payCreatureSummonCost`); wird die Beschwörung danach komplett negiert (Off Duty …),
+  // bleiben sie geopfert. `beforeSummon` klärt danach nur noch Beschwörungsart und Platzierung (`ctx._summonKosten`);
+  // ohne `paySummonCost` (Effekt-Beschwörungen u. ä.) zahlt es wie früher selbst.
+  async paySummonCost(ctx) {
+    const ps = ctx._engine.gs.players[ctx.cardOwner];
+    const allFullDrop = !!ps?._requestedBouncePlaceSlot;   // bleibt gesetzt: `beforeSummon` liest es aus den Kosten-Daten
+    const req = ps?._requestedBouncePlaceSlot || null;
+    return (await zahleOpfer(ctx, allFullDrop, req)) ? { allFullDrop, req } : false;
+  },
+
   async beforeSummon(ctx) {
     const engine = ctx._engine;
     const gs = engine.gs;
@@ -259,19 +291,12 @@ module.exports = {
 
     // Wurf auf einen belegten Platz -> mind. ein Opfer muss von diesem
     // Helden kommen, sonst wird dort kein Platz frei.
-    const allFullDrop = !!ps?._requestedBouncePlaceSlot;
+    const pre = ctx._summonKosten;   // W4b: Opfer schon vor dem Reaktionsfenster bezahlt
+    const allFullDrop = pre ? !!pre.allFullDrop : !!ps?._requestedBouncePlaceSlot;
+    const reqSlot = (pre ? pre.req : ps?._requestedBouncePlaceSlot) || null;   // W19a: die gewaehlte Zielzone
     if (ps?._requestedBouncePlaceSlot) delete ps._requestedBouncePlaceSlot;
 
-    const base = makeSacrificeSpec(engine);
-    const spec = allFullDrop
-      ? {
-          ...fullDropSpec(engine, pi, heroIdx, heroOwner),
-          description: `${base.description} At least one of them must come from the summoning Hero's Support Zones.`,
-        }
-      : base;
-
-    const ok = await engine.resolveSacrificeCost(ctx, spec);
-    if (!ok) return false;
+    if (!pre && !(await zahleOpfer(ctx, allFullDrop, reqSlot))) return false;
 
     // ── Beschwörungsart ──
     // `ctx.isInherentAction` ist bereits true, wenn der Gratisweg
@@ -305,7 +330,9 @@ module.exports = {
 
     if (allFullDrop) {
       const supZones = gs.players[heroOwner]?.supportZones?.[heroIdx] || [];
-      const freedSlot = [0, 1, 2].find(z => (supZones[z] || []).length === 0);
+      // W19a: die gewaehlte Zielzone ist durch die Pflicht-Opfer leer - dort landet die Karte (sonst der erste freie Platz).
+      const freedSlot = (reqSlot && (supZones[reqSlot.slotIdx] || []).length === 0)
+        ? reqSlot.slotIdx : [0, 1, 2].find(z => (supZones[z] || []).length === 0);
       if (freedSlot == null) return false;
       await engine.actionPlaceCreature(CARD_NAME, pi, heroIdx, freedSlot, {
         source: 'external', sourceName: CARD_NAME, fireHooks: true,

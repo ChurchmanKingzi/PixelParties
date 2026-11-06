@@ -172,8 +172,9 @@ module.exports = {
           title: `${CARD_NAME} — ${target.cardName} (${ti + 1}/${selectedTargets.length})`,
           description: `Choose status effects to remove from ${target.cardName}.`,
           confirmLabel: ti === selectedTargets.length - 1 ? '✨ Cleanse!' : 'Next →',
-          cancellable: false,
+          cancellable: true,   // W16g (S02-16): Regel 23.9 — vor dem Entfernen ist nichts passiert; Abbruch = ganze Karte zurueck auf die Hand
         });
+        if (!result || result.cancelled) { gs._spellCancelled = true; return; }
         cleanseActions.push({ target, statuses: result?.selectedStatuses || [] });
       }
 
@@ -201,7 +202,7 @@ module.exports = {
             && c.heroIdx === target.heroIdx && c.zoneSlot === target.slotIdx
           );
           if (!inst) continue;
-          const removed = engine.cleanseCreatureStatuses(inst, statuses, CARD_NAME);
+          const removed = await engine.cleanseCreatureStatusesGefragt(inst, statuses, CARD_NAME);
           totalRemoved += (removed || []).length;
           engine._broadcastEvent('play_zone_animation', {
             type: 'super_saiyan_aura',

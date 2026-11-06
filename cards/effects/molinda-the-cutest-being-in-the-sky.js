@@ -38,7 +38,8 @@ function stealableTargets(engine, pi) {
     if ((c.controller ?? c.owner) !== opp || c.zone !== 'support' || c.stolenBy != null || c.faceDown) continue;
     const cd = engine.getEffectiveCardData?.(c) || engine._getCardDB()[c.name];
     if (!cd || !engine.isChoosableAsCreature(c, cd)) continue;   // Tokens/Artifact Creatures sind Ziele (Als Sweep 9.10.)
-    if (engine.isOmniImmune?.(c)) continue;
+    if (engine.isOmniImmune?.(c, pi)) continue;
+    if (engine.controlIsLocked(c)) continue;   // Als Ruling (Al 26.10.): „Control of this Creature cannot change" (Creepy Villager) — kein uebernehmbares Ziel
     n++;
   }
   return n;
@@ -78,6 +79,9 @@ module.exports = {
       confirmLabel: '💖 Charm!',
       confirmClass: 'btn-success',
       cancellable: true,
+      // Als Ruling (Al 26.10., Dark Gear × Creepy Villager): eine Kreatur, deren Kontrolle sich nicht aendern kann, ist ausgegraut (nicht waehlbar).
+      condition: (t) => !t.cardInstance || !engine.controlIsLocked(t.cardInstance),
+      dimUnmetCondition: true,
     });
     if (!target) return false;
 
@@ -103,7 +107,7 @@ module.exports = {
     if (target.type === 'hero') {
       ok = engine.actionStealHero(pi, target.owner, target.heroIdx, { sourceName: CARD_NAME });
     } else if (target.cardInstance) {
-      ok = engine.actionStealCreature(pi, target.cardInstance, { sourceName: CARD_NAME });
+      ok = await engine.actionStealCreatureGefragt(pi, target.cardInstance, { sourceName: CARD_NAME });   // W71b: mit Schutzfenster ('control')
     }
     if (!ok) return false;
     engine.log('molinda_charm', { player: ps.username, target: target.cardName || target.name || null });

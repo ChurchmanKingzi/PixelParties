@@ -43,8 +43,16 @@
 //          own departure (the slot's ATK becomes moot on death/
 //          ascension anyway; the engine resets `hero.atk` on
 //          ascension and dead Heroes don't act).
+//        - W51b: UMHAENGEN (Slippery Fridge / Inheritance Ceremony /
+//          `actionTransferAttachment`) sendet Enter/Leave nur an die
+//          bewegte Karte selbst — Taio sah es nie, der Bonus blieb am
+//          Quellhelden stehen und fehlte am Zielhelden. `hooks` laeuft
+//          deshalb durch `equipZustandHooks` (_hooks.js): derselbe
+//          Leave-Handler hoert auf `onEquipLost`, derselbe Enter-Handler
+//          auf `onEquipGained` (nur `isMove`).
 // ═══════════════════════════════════════════
 
+const { equipZustandHooks } = require('./_hooks');   // W51b: Umhaengen (Fridge/Ceremony) als Verlassen+Betreten sehen
 const CARD_NAME = 'Taio, the Sun Fencer';
 const COST_THRESHOLD = 10;
 const ATK_PER_ARTIFACT = 20;
@@ -88,7 +96,9 @@ module.exports = {
     return engine.countAbilitiesForSchool('Fighting', abZones);
   },
 
-  hooks: {
+  hooks: equipZustandHooks({
+    // W51b: `equipZustandHooks` — Umhaengen (Slippery Fridge / Inheritance Ceremony) sendet Enter/Leave nur an die bewegte Karte; dieser Zustandslauscher bekommt es ueber
+    // `onEquipLost` / `onEquipGained` (isMove) mit denselben Handlern (siehe _hooks.js).
     /**
      * Starting-hero entry. Walk Taio's Support Zone and grant the
      * +20 ATK per Artifact already in play. No-op on the typical
@@ -134,6 +144,21 @@ module.exports = {
     },
 
     /**
+     * Geliehen (??? the Shapeshifter): alle gestempelten +20 ATK gehen mit
+     * der Gestalt zurueck — danach ist das Skript nicht mehr Taios und
+     * `onCardLeaveZone` fuer die abfallenden Ausruestungen laeuft nicht
+     * mehr (H01-heroes-14).
+     */
+    onIdentityLost: async (ctx) => {
+      const engine = ctx._engine;
+      for (const inst of engine.cardInstances) {
+        if (inst.zone !== 'support' || inst.heroIdx !== ctx.cardHeroIdx) continue;
+        if (engine.physicalSide(inst) !== (ctx.cardHeroOwner ?? ctx.cardOwner)) continue;
+        if (inst.counters?._taioAtkGranted) _revokeAura(ctx, inst);
+      }
+    },
+
+    /**
      * Revoke +20 when an Equipment leaves Taio's slot. Ignore
      * Taio's own departure (his ATK is moot on death / ascension —
      * the engine clears or replaces `hero.atk` on those paths).
@@ -144,10 +169,36 @@ module.exports = {
       if (leaving.id === ctx.card.id) return;
       if (ctx.fromZone !== 'support') return;
       if (ctx.fromHeroIdx !== ctx.cardHeroIdx) return;
+      // W51b: nur die Brettseite meines Helden — in der Spiegelpartie (Taio gegen Taio, gleicher Heldenplatz) sahen beide Taios jeden Abgang und der
+      // falsche buchte seinen Bonus ab. Zusaetzlich traegt der Stempel unten, WER ihn vergeben hat (`_taioAtkGrantedBy`).
+      if (ctx.fromOwner != null && ctx.fromOwner !== (ctx.cardHeroOwner ?? ctx.cardOwner)) return;
       if (leaving.counters?._taioAtkGranted) _revokeAura(ctx, leaving);
       // The Sun Sword leaving is one half of the ascension gate —
       // refresh so `ascensionReady` clears when the Sword is gone.
       if (leaving.name === SUN_SWORD) _refreshAscension(ctx);
+    },
+
+    /**
+     * Wiederbelebung (H04-03): Beim Heldentod wirft die Engine die Ausruestung ab, ohne
+     * `onCardLeaveZone` an Taio zu melden — ihre +20 blieben in `hero.atk` stehen. Hier
+     * die Summe der Boni abziehen, die zu keiner noch liegenden Ausruestung mehr gehoeren.
+     */
+    onHeroRevive: async (ctx) => {
+      const hero = ctx.attachedHero;
+      if (!hero || ctx.hero !== hero) return;
+      const engine = ctx._engine;
+      const seite = ctx.cardHeroOwner ?? ctx.cardOwner;
+      let bleibt = 0;
+      for (const inst of engine.cardInstances) {
+        if (inst.zone !== 'support' || inst.heroIdx !== ctx.cardHeroIdx) continue;
+        if (engine.physicalSide(inst) !== seite) continue;
+        bleibt += inst.counters?._taioAtkGranted || 0;
+      }
+      const verwaist = (ctx.card.counters._taioAtkTotal || 0) - bleibt;
+      if (verwaist <= 0) return;
+      engine._applyHeroAtkDelta(hero, seite, ctx.cardHeroIdx, -verwaist);
+      ctx.card.counters._taioAtkTotal = bleibt;
+      engine.sync();
     },
 
     /**
@@ -179,7 +230,9 @@ module.exports = {
       if (src.heroIdx !== ctx.cardHeroIdx) return;
       const cd = engine._getCardDB()[src.name];
       if (!cd) return;
-      const isAttack = cd.cardType === 'Attack';
+      // W32a (Al, 22.10.2026): auch ein Effekt, der als Attack dieses Helden ZÄHLT (Bamboo Staff/Sacrificial Dagger am Träger, Javelin Throw, Sword in a Bottle,
+      // Infected Greatmaw-Treffer) ist „eine Attack".
+      const isAttack = cd.cardType === 'Attack' || engine._heldenEffektStufe?.(src.name, 'attack', src) != null;
       const isDMSpell = cd.cardType === 'Spell'
         && (cd.spellSchool1 === 'Destruction Magic'
             || cd.spellSchool2 === 'Destruction Magic');
@@ -190,7 +243,7 @@ module.exports = {
       });
       _refreshAscension(ctx);
     },
-  },
+  }),
 };
 
 // ═══════════════════════════════════════════
@@ -251,6 +304,10 @@ function _grantAura(ctx, equipInst) {
   engine._applyHeroAtkDelta(hero, ctx.cardHeroOwner ?? ctx.cardOwner, ctx.cardHeroIdx, ATK_PER_ARTIFACT);   // Styx 28.9.
   if (!equipInst.counters) equipInst.counters = {};
   equipInst.counters._taioAtkGranted = ATK_PER_ARTIFACT;
+  if (ctx.card?.id) equipInst.counters._taioAtkGrantedBy = ctx.card.id;   // W51b: wer hat den Bonus vergeben (Spiegelpartie)
+  // Summe aller gewaehrten Boni auf Taios Instanz: beim Heldentod gehen die Stempel
+  // mit der abgeworfenen Ausruestung verloren (H04-03, `onHeroRevive`).
+  if (ctx.card?.counters) ctx.card.counters._taioAtkTotal = (ctx.card.counters._taioAtkTotal || 0) + ATK_PER_ARTIFACT;
   engine.log('taio_aura_grant', {
     hero: hero.name, equipment: equipInst.name, amount: ATK_PER_ARTIFACT,
   });
@@ -264,8 +321,13 @@ function _revokeAura(ctx, equipInst) {
   const engine = ctx._engine;
   const amount = equipInst.counters._taioAtkGranted || 0;
   if (amount <= 0) return;
+  // W51b: nur der Taio bucht ab, der den Bonus vergeben hat (zwei Taios sehen dasselbe Ereignis).
+  const geber = equipInst.counters._taioAtkGrantedBy;
+  if (geber && ctx.card?.id && geber !== ctx.card.id) return;
   engine._applyHeroAtkDelta(hero, ctx.cardHeroOwner ?? ctx.cardOwner, ctx.cardHeroIdx, -amount);   // Styx 28.9.
   delete equipInst.counters._taioAtkGranted;
+  delete equipInst.counters._taioAtkGrantedBy;
+  if (ctx.card?.counters) ctx.card.counters._taioAtkTotal = Math.max(0, (ctx.card.counters._taioAtkTotal || 0) - amount);
   engine.log('taio_aura_revoke', {
     hero: hero.name, equipment: equipInst.name, amount,
   });

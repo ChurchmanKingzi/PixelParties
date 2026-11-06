@@ -60,8 +60,7 @@ module.exports = {
   activeIn: ['hand'],
   // KEIN `isReaction` — sonst meldet sie sich im generischen Kettenfenster.
   isBoardSentToDiscardReaction: true,
-  // Als Vorgabe 29.9.: auch ein geliehener Held (jede Uebernahme) wirkt sie.
-  fremdeWirker: 'alle',
+  // Als Vorgabe 29.9.: auch ein geliehener Held (jede Uebernahme) wirkt sie — seit W20c (Al 20.10.) gilt das fuer ALLE Reaktionen (kein Schalter noetig).
 
   // ★★ ENTKOPPELTE BILDER (CARD_API).
   spellVisual: { impact: { type: 'furious_anger' }, impactMs: 500 },

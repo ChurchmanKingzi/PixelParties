@@ -52,7 +52,7 @@ module.exports = {
   canActivate: () => false,
 
   reactionCondition: (gs, pi, engine, chainCtx) => {
-    if (!arrowTriggerCondition(gs, pi, engine, chainCtx)) return false;
+    if (!arrowTriggerCondition(gs, pi, engine, chainCtx, { effektOhneAngriffsschaden: true })) return false;   // Als Ruling (Al 28.10.): der Rückholteil hängt nicht am Attack-Schaden
     // Also need at least one bounceable opponent Creature — otherwise
     // the reaction has literally nothing to do.
     return opponentCreatureTargets(engine, pi).length > 0;
@@ -74,12 +74,14 @@ module.exports = {
       cancellable: false, // Discard already paid (artifact consumed on reaction-add).
       exclusiveTypes: true,
       maxPerType: { equip: 1 },
+      types: ['creature'],   // W16d (A09-03): Kreatur-only -> „unaffected by effects that can't affect Heroes" (Bonded Companion) fällt heraus
     });
     if (!picked || picked.length === 0) return false;
     const target = targets.find(t => t.id === picked[0]);
     if (!target?.cardInstance) return false;
 
-    await returnSupportCreatureToHand(engine, target.cardInstance, CARD_NAME);
+    // W64c: Kartentext "original OWNER's hand" - ausdruecklich die Hand des Besitzers (der allgemeine Bounce geht seit Al 23.10.2026 an den Kontrolleur).
+    await returnSupportCreatureToHand(engine, target.cardInstance, CARD_NAME, { sourceOwner: pi, toPlayer: engine.kartenBesitzerVon(target.cardInstance) });
     engine.log('racket_arrow_bounce', {
       player: engine.gs.players[pi]?.username, target: target.cardName,
     });

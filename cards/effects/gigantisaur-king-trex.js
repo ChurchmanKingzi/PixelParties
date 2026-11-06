@@ -40,16 +40,26 @@
 //    tear down the entries WE wrote (no clobbering
 //    Sol Rym / Fiedel-style overrides).
 //
-//  Negation note: if a King Trex is negated while
-//  in play, its hooks stop firing — the override
-//  CAN go stale until the negated copy leaves play
-//  (death / bounce will fire onCardLeaveZone and
-//  trigger cleanup). Accepted edge case.
+//  ★ W7a (A07-20, Al 14.10.2026: „Freeze, Stun und
+//  Negated unterbrechen alle laufenden passiven
+//  Effekte"): der Stempel ist ein laufender Passiv.
+//  Er bleibt als Eintrag stehen, GILT aber nur,
+//  solange mindestens ein Trex der Seite wirksam ist
+//  (nicht gefroren/betäubt/negiert/Aura-negiert):
+//  die Engine liest die Stufen-Stempel über
+//  `_heroLevelOverride` und fragt dafür `stempelWirkt`
+//  (unten). Eine Abfrage statt Auf-/Abräumen bei jedem
+//  Zustandswechsel — gilt damit sofort und für
+//  jeden Weg (auch Clown-Aura, die kein Status ist).
 // ═══════════════════════════════════════════
 
+const { anyName, hatName } = require('./_alias-name');   // Shroomasaur: Zusatzname zählt für Namensfamilien
 const {
   isGigantisaurCreature,
 } = require('./_gigantisaurs-shared');
+
+const T = require('./_teocuilatl-shared');   // W17a: Landung im frei gewordenen Platz (`placeAfterSacrificeSwap`), Held-Prüfung
+const { isSeat } = require('./_opp');
 
 const CARD_NAME = 'Gigantisaur King Trex';
 
@@ -61,10 +71,33 @@ const CARD_NAME = 'Gigantisaur King Trex';
 function _trexSacrificeCandidates(engine, pi, selfId) {
   const cs = engine.getSacrificableCreatures(pi);
   return cs.filter(c =>
-    isGigantisaurCreature(c.cardName, engine)
-    && c.cardName !== CARD_NAME
+    anyName(c.inst || { name: c.cardName }, (n) => isGigantisaurCreature(n, engine))
+    && !hatName(c.inst || { name: c.cardName }, CARD_NAME)
     && (!selfId || c.inst.id !== selfId)
   );
+}
+
+// ── W17a (Al, 19.10.2026): Ersetzen bei vollem Brett ─────────────────────────────────────────────────────────────
+// „Das ist eine generelle Regel für ALLE Creatures, die andere Karten in Support Zonen ersetzen": Trex opfert einen Gigantisaur und darf
+// dessen Platz einnehmen (Wurf auf den Gigantisaur), auch wenn das Brett sonst voll ist - NUR in Zonen mit exakt EINER Karte
+// (`engine.zoneFreiNachKostenzahlung`; Alice, the Transfer Student kann mehrere Karten in eine Zone legen).
+/** Opferbarer Gigantisaur im Platz (`heroOwner` = Brettseite, `heroIdx`, `slotIdx`), dessen Zone danach frei ist - sonst null. */
+function _tributImPlatz(engine, pi, heroIdx, slotIdx, heroOwner = pi) {
+  if (!engine.zoneFreiNachKostenzahlung(heroOwner, heroIdx, slotIdx)) return null;
+  if (!T.heroCanSummon(engine, pi, heroIdx, CARD_NAME, heroOwner)) return null;
+  const c = _trexSacrificeCandidates(engine, pi, null).find(x => x.inst.zone === 'support'
+    && (x.inst.owner ?? pi) === heroOwner && x.inst.heroIdx === heroIdx && x.inst.zoneSlot === slotIdx);
+  return c || null;
+}
+/** Alle Wurfziele (Platz eines opferbaren Gigantisaurs). `owner` = Brettseite, nur gesetzt, wenn != pi. */
+function _wurfZiele(engine, pi) {
+  const out = [];
+  for (const c of _trexSacrificeCandidates(engine, pi, null)) {
+    const seite = c.inst.owner ?? pi;
+    if (c.inst.zone !== 'support' || !_tributImPlatz(engine, pi, c.inst.heroIdx, c.inst.zoneSlot, seite)) continue;
+    out.push(seite !== pi ? { heroIdx: c.inst.heroIdx, slotIdx: c.inst.zoneSlot, owner: seite } : { heroIdx: c.inst.heroIdx, slotIdx: c.inst.zoneSlot });
+  }
+  return out;
 }
 
 /**
@@ -72,14 +105,17 @@ function _trexSacrificeCandidates(engine, pi, selfId) {
  * controls. Used to know whether the "I just left, clean up" cleanup
  * should fire (only the LAST King Trex leaving triggers a sweep).
  */
-function _activeKingTrexCount(engine, pi, excludeInstId = null) {
+function _activeKingTrexCount(engine, pi, excludeInstId = null, nurWirksame = false) {
   let n = 0;
   for (const c of engine.cardInstances) {
     if (c.zone !== 'support') continue;
     if ((c.controller ?? c.owner) !== pi) continue;
     if (c.name !== CARD_NAME) continue;
     if (excludeInstId && c.id === excludeInstId) continue;
-    if (c.counters?.negated || c.counters?.nulled) continue;
+    // W7a: `nurWirksame` — wirksam = nicht gefroren/betäubt/negiert/genullt/Aura-negiert (`isCreatureEffectSuppressed`, wie der
+    // Hook-Verteiler). Ohne das Flag (Aufräumen beim Abgang) zählt wie bisher jede nicht negierte/genullte Kopie.
+    if (nurWirksame && engine.isCreatureEffectSuppressed(c, { honorNegStatusImmune: false })) continue;
+    if (!nurWirksame && (c.counters?.negated || c.counters?.nulled)) continue;
     n++;
   }
   return n;
@@ -165,6 +201,50 @@ function _clearOverrides(engine, pi) {
   delete ps._kingTrexOverrideRegistry;
 }
 
+/**
+ * Den Tribut ohne Rueckfrage opfern (Messer-Bild, `onCreatureSacrificed`, Zerstoerung mit Todes-Signalen). `true` = bezahlt.
+ * Ausgelagert aus `paySummonCost` (W17a), damit der Wurf auf den Gigantisaur-Platz denselben Ablauf nutzt.
+ */
+async function _opfereTribut(engine, pi, heroIdx, onHero) {
+  const tribute = onHero.inst;
+  const tributeName = onHero.cardName;
+  const source = { name: CARD_NAME, owner: pi, heroIdx };
+  // ON_CREATURE_SACRIFICED before destroy — same ordering
+  // `resolveSacrificeCost` uses so listeners see the live inst.
+  try {
+    // Flavor: Trex chomps its tribute — same `dino_bite` animation
+    // Spinor uses, scaled to a moderate-strong bite.
+    engine._broadcastEvent('play_zone_animation', {
+      type: 'dino_bite',
+      owner: tribute.owner,
+      heroIdx: tribute.heroIdx,
+      zoneSlot: tribute.zoneSlot,
+      damage: 300,
+    });
+    await engine._delay(550);
+    await engine.runHooks('onCreatureSacrificed', {
+      creature: tribute,
+      cardName: tributeName,
+      owner: tribute.owner,
+      heroIdx: tribute.heroIdx,
+      zoneSlot: tribute.zoneSlot,
+      source,
+      _skipReactionCheck: true,
+    });
+    await engine.actionDestroyCard(source, tribute, {
+      fireCreatureDeath: true,
+    });
+  } catch (err) {
+    console.error(`[${CARD_NAME}] auto-tribute failed:`, err.message);
+    return false;
+  }
+  engine.log('king_trex_auto_tribute', {
+    player: engine.gs.players[pi]?.username,
+    tribute: tributeName, heroIdx,
+  });
+  return true;
+}
+
 module.exports = {
   // ★★ v1182 — ENTKOPPELTE BILDER (CARD_API): wird die Karte NEGIERT,
   // laeuft ihr Effekt-Rumpf nie — die Engine spielt dann diese Bilder.
@@ -174,6 +254,10 @@ module.exports = {
   },
 
   activeIn: ['support'],
+  /**
+   * W7a: gelten die Stufen-Stempel dieser Seite gerade? (Engine `_heroLevelOverride`) — ja, solange ein Trex wirksam ist.
+   */
+  stempelWirkt: (engine, pi) => _activeKingTrexCount(engine, pi, null, true) > 0,
   // Free additional Action — the play itself doesn't consume the
   // host Hero's action slot. Same pattern as 500 Piranhas.
   inherentAction: true,
@@ -222,7 +306,7 @@ module.exports = {
         if ((c.controller ?? c.owner) !== pi) continue;
         if (c.heroIdx !== hi) continue;
         if (selfId && c.id === selfId) continue;
-        if (isGigantisaurCreature(c.name, engine)) return true;
+        if (anyName(c, (n) => isGigantisaurCreature(n, engine))) return true;
       }
       return false;
     };
@@ -259,7 +343,10 @@ module.exports = {
    *   • Otherwise, run the standard pick-from-anywhere prompt.
    *   • Cancel or no valid candidate → refuse the summon.
    */
-  beforeSummon: async (ctx) => {
+  // ★ W4b (Al, Welle 4): das Opfer des Gigantisaurs ist ein KOSTENPUNKT der Beschwörung und wird VOR dem Reaktionsfenster bezahlt (`paySummonCost`,
+  // Engine `_payCreatureSummonCost`); wird die Beschwörung danach komplett negiert (Off Duty …), bleibt er bezahlt.
+  // `beforeSummon` zahlt nur noch, wenn `paySummonCost` nicht lief (Effekt-Beschwörungen u. ä.; `ctx._summonKosten` fehlt).
+  paySummonCost: async (ctx) => {
     const engine = ctx._engine;
     const pi = ctx.cardOwner;
     const heroIdx = ctx.cardHeroIdx;
@@ -267,47 +354,23 @@ module.exports = {
     const candidates = _trexSacrificeCandidates(engine, pi, selfId);
     if (candidates.length === 0) return false;
 
+    // W17a: Wurf auf den Platz eines Gigantisaurs (Ersetzen bei vollem Brett) - genau DIESEN opfern und seinen Platz einnehmen. Die Marke
+    // bleibt gesetzt (`beforeSummon` räumt sie ab); der Platz ist bis zur Landung gehalten (kein Todes-Trigger schnappt ihn weg).
+    const req = engine.gs.players[pi]?._requestedBouncePlaceSlot;
+    if (req) {
+      const heroOwner = isSeat(engine.gs, req.heroOwner) ? req.heroOwner : pi;
+      const occ = _tributImPlatz(engine, pi, req.heroIdx, req.slotIdx, heroOwner);
+      if (!occ) return false;
+      engine.haltePlatzFuerTausch(heroOwner, req.heroIdx, req.slotIdx);
+      if (!(await _opfereTribut(engine, pi, req.heroIdx, occ))) return false;
+      return { kind: 'swap', heroIdx: req.heroIdx, slotIdx: req.slotIdx, heroOwner, occName: occ.cardName };
+    }
+
     // Auto-sacrifice path: a sacrificable Gigantisaur sits ON the
     // target Hero. Pick it without prompting.
     const onHero = candidates.find(c => c.inst.heroIdx === heroIdx);
     if (onHero) {
-      const tribute = onHero.inst;
-      const tributeName = onHero.cardName;
-      const source = { name: CARD_NAME, owner: pi, heroIdx };
-      // ON_CREATURE_SACRIFICED before destroy — same ordering
-      // `resolveSacrificeCost` uses so listeners see the live inst.
-      try {
-        // Flavor: Trex chomps its tribute — same `dino_bite` animation
-        // Spinor uses, scaled to a moderate-strong bite.
-        engine._broadcastEvent('play_zone_animation', {
-          type: 'dino_bite',
-          owner: tribute.owner,
-          heroIdx: tribute.heroIdx,
-          zoneSlot: tribute.zoneSlot,
-          damage: 300,
-        });
-        await engine._delay(550);
-        await engine.runHooks('onCreatureSacrificed', {
-          creature: tribute,
-          cardName: tributeName,
-          owner: tribute.owner,
-          heroIdx: tribute.heroIdx,
-          zoneSlot: tribute.zoneSlot,
-          source,
-          _skipReactionCheck: true,
-        });
-        await engine.actionDestroyCard(source, tribute, {
-          fireCreatureDeath: true,
-        });
-      } catch (err) {
-        console.error(`[${CARD_NAME}] auto-tribute failed:`, err.message);
-        return false;
-      }
-      engine.log('king_trex_auto_tribute', {
-        player: engine.gs.players[pi]?.username,
-        tribute: tributeName, heroIdx,
-      });
-      return true;
+      return (await _opfereTribut(engine, pi, heroIdx, onHero)) ? { kind: 'none' } : false;
     }
 
     // Standard prompt path — Hero has no Gigantisaur, pick one from
@@ -318,8 +381,8 @@ module.exports = {
       minCount: 1,
       maxCount: 1,
       // Re-narrow inside resolveSacrificeCost — defense in depth.
-      filter: (c) => isGigantisaurCreature(c.cardName, engine)
-        && c.cardName !== CARD_NAME
+      filter: (c) => anyName(c.inst || { name: c.cardName }, (n) => isGigantisaurCreature(n, engine))
+        && !hatName(c.inst || { name: c.cardName }, CARD_NAME)
         && (!selfId || c.inst.id !== selfId),
       title: `${CARD_NAME} — Tribute`,
       description: 'Sacrifice 1 of your Gigantisaur Creatures (other than Gigantisaur King Trex) to summon Gigantisaur King Trex.',
@@ -330,7 +393,36 @@ module.exports = {
       sacrificeAnimationDelay: 550,
       sacrificeAnimationExtras: { damage: 300 },
     });
-    return !!sacrificed;
+    return sacrificed ? { kind: 'none' } : false;
+  },
+
+  async beforeSummon(ctx) {
+    const engine = ctx._engine;
+    const pi = ctx.cardOwner;
+    const ps = engine.gs.players[pi];
+    // W4b: Kosten schon vor dem Reaktionsfenster bezahlt -> nur noch landen (W17a: bei einem Tausch im Platz des Gigantisaurs).
+    const pre = ctx._summonKosten;
+    if (pre) {
+      if (ps?._requestedBouncePlaceSlot) delete ps._requestedBouncePlaceSlot;
+      if (ps?._requestedNormalSummonSlot) delete ps._requestedNormalSummonSlot;
+      return pre.kind === 'swap' ? await T.placeAfterSacrificeSwap(engine, pi, pre, CARD_NAME) : true;
+    }
+    // Ohne `paySummonCost`-Lauf (Effekt-Beschwörung o. ä.): wie früher selbst zahlen; eine Wurf-Marke gilt dort nicht.
+    if (ps?._requestedBouncePlaceSlot) delete ps._requestedBouncePlaceSlot;
+    return (await module.exports.paySummonCost(ctx)) !== false;
+  },
+
+  // W17a (Al, 19.10.2026): Ersetzen-Vertrag (Muster Teocuilatl-Trio): Trex darf bei vollem Brett den Platz des geopferten Gigantisaurs
+  // einnehmen - nur in Zonen mit exakt einer Karte. Die Opferung ist eine Handlung des Helden (gefroren/betäubt/negiert: nein).
+  requiresActiveCaster: true,
+  canBypassFreeZoneRequirement(gs, pi, heroIdx, cardData, engine) {
+    return _wurfZiele(engine, pi).some(s => s.heroIdx === heroIdx && (s.owner ?? pi) === pi);
+  },
+  canPlaceOnOccupiedSlot(gs, pi, heroIdx, slotIdx, engine, heroOwner = pi) {
+    return !!_tributImPlatz(engine, pi, heroIdx, slotIdx, heroOwner);
+  },
+  getBouncePlacementTargets(gs, pi, engine) {
+    return _wurfZiele(engine, pi);
   },
 
   hooks: {
@@ -352,7 +444,6 @@ module.exports = {
       const engine = ctx._engine;
       const inst = ctx.card;
       if (!inst || inst.zone !== 'support') return;
-      if (inst.counters?.negated || inst.counters?.nulled) return;
       _applyOverrides(engine, ctx.cardOwner);
     },
 
@@ -364,7 +455,10 @@ module.exports = {
     onCardLeaveZone: (ctx) => {
       const engine = ctx._engine;
       const inst = ctx.card;
-      const leaving = ctx.leavingCard;
+      // `actionTransferCreature` (dauerhafte Uebernahme) feuert den Hook ohne
+      // `leavingCard`, nur mit `_onlyCard: inst` — auch das ist ein Abgang
+      // aus der Kontrolle des bisherigen Kontrolleurs (A07-11).
+      const leaving = ctx.leavingCard || (ctx._onlyCard && ctx._onlyCard.id === ctx.card?.id ? ctx.card : null);
       if (!inst || !leaving) return;
       if (leaving.id !== inst.id) return;
       if (ctx.fromZone !== 'support') return;

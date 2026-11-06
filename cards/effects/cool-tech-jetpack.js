@@ -28,6 +28,10 @@
 const CARD_NAME = 'Cool Tech Jetpack';
 
 module.exports = {
+  // ★ Z7b: „Negate that Spell/Attack/effect" = die gewirkte Karte löst NIE auf → ihre Einmal-Stempel werden zurückgegeben
+  // (Engine: `_merkeGanzeNegation`). Teil-Negierungen („… on that Hero", Schaden) tragen das Flag nicht.
+  negatesWholeCard: true,
+
   activeIn: ['support'],
 
   isEquippedPostTargetReaction: true,
@@ -38,6 +42,9 @@ module.exports = {
     if (heroIdx == null || heroIdx < 0) return false;
     const hoptKey = `cool-tech-jetpack:${inst?.id || `${pi}-${heroIdx}`}`;
     if (gs.hoptUsed?.[hoptKey] === gs.turn) return false;
+    // W16e (F01-26): „is CHOSEN by a card or effect" — ein Flaechenschlag waehlt niemanden (CARD_API „Ein Flaechenschlag WAEHLT niemanden";
+    // die Engine stempelt `_isAoeCheck` auf die Quelle): kein Angebot, nichts wird negiert.
+    if (sourceCard?._isAoeCheck) return false;
     const sourceOwner = sourceCard?.controller ?? sourceCard?.owner ?? -1;
     if (sourceOwner === pi) return false;
     const ps = gs.players[pi];
@@ -47,6 +54,15 @@ module.exports = {
     return (targetedHeroes || []).some(t => t.owner === seite && t.type === 'hero' && t.heroIdx === heroIdx);
   },
 
+  // ★ Al 14.10.2026 (F01-12): „The FIRST time every turn …, you may …" — schon das Angebot ist das
+  // „erste Mal"; auch ein abgelehntes Angebot verbraucht es (Engine ruft das bei „Nein").
+  consumeOnDecline(gs, pi, engine, opts) {
+    const inst = opts?.inst;
+    const heroIdx = opts?.heroIdx ?? inst?.heroIdx;
+    if (!gs.hoptUsed) gs.hoptUsed = {};
+    gs.hoptUsed[`cool-tech-jetpack:${inst?.id || `${pi}-${heroIdx}`}`] = gs.turn;
+  },
+
   async postTargetResolve(engine, pi, targetedHeroes, sourceCard, opts) {
     const gs = engine.gs;
     const ps = gs.players[pi];
@@ -54,11 +70,13 @@ module.exports = {
     const heroIdx = opts?.heroIdx ?? inst?.heroIdx;
     const seite = opts?.heroOwner ?? pi;   // Brettseite des Traegers (Styx 28.9.)
     if (!ps || (ps.hand || []).length < 1) return {};
-    const vorher = ps.hand.length;
-    await engine.actionPromptForceDiscard(pi, 1, {
-      title: CARD_NAME, source: CARD_NAME, selfInflicted: true,
+    if (!gs.hoptUsed) gs.hoptUsed = {};
+    gs.hoptUsed[`cool-tech-jetpack:${inst?.id || `${pi}-${heroIdx}`}`] = gs.turn;   // Angebot angenommen = „erstes Mal" verbraucht
+    // ★ W74c: von Boris erlassene Kosten gelten als bezahlt — die Negation gilt trotzdem.
+    const kosten = await engine.zahleAbwurfKosten(pi, 1, {
+      title: CARD_NAME, source: CARD_NAME,
     });
-    if (ps.hand.length >= vorher) return {};          // nichts abgeworfen → keine Negation
+    if (!kosten.bezahlt) return {};                   // nichts abgeworfen → keine Negation
     if (!gs.hoptUsed) gs.hoptUsed = {};
     gs.hoptUsed[`cool-tech-jetpack:${inst?.id || `${pi}-${heroIdx}`}`] = gs.turn;
     engine._broadcastEvent('play_zone_animation', {

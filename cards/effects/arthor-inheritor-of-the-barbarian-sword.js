@@ -1,7 +1,8 @@
 // ═══════════════════════════════════════════
 //  CARD EFFECT: "Arthor, Inheritor of the Barbarian Sword"
 //  Ascended Hero — 550 HP, 80 ATK — BANNED
-//  Starting abilities: Fighting 3, Summoning Magic 3
+//  Ascension bonus: Fighting 3 OR Summoning Magic 3 (W71a, Al: ODER, nicht UND -
+//  `performAscensionBonus` laesst den Spieler EINE Alternative waehlen)
 //
 //  Ascension condition (base Arthor + both equips):
 //  "Legendary Sword of a Barbarian King" AND
@@ -28,6 +29,9 @@ const FAKE_ATTACK_DATA = {
 };
 
 module.exports = {
+  // W26a (Al, Welle 26): als Attack geltender Heldeneffekt ohne Karte — Stufen-Bedingungen ("level X or lower": Glass Wall, Test Flight, Future Tech Escape Device …) lesen die Quellstufe.
+  // W32a (Al, 22.10.2026): „Zählt als Attack/Spell eines Helden = Ability-Level dieses Helden": die Quellstufe ist das FIGHTING-LEVEL Arthors (nicht mehr fix 0) — Engine: `_heldenEffektStufe`.
+  treatedAsAttack: { ability: 'Fighting' },
   requiresTarget: true,
   // ^ Tagged for Blinded gating — see cards/effects/_hooks.js (blinded status).
   activeIn: ['hero'],
@@ -43,10 +47,13 @@ module.exports = {
   },
 
   canActivateHeroEffect(ctx) {
+    // ★ W34a (Al, 22.10.2026): ein Effekt, der als Attack zählt, unterliegt den Attack-Zählern und -Sperren (Berserk-Limit, Knife Throw, Rioting Village, Mirjam, Muras …) — `heroKannAngreifen`.
+    if (!ctx._engine.heroKannAngreifen(ctx.cardHeroOwner ?? ctx.cardOwner, ctx.cardHeroIdx, ctx.cardOwner, { name: 'Arthor, Inheritor of the Barbarian Sword' })) return false;
     return true; // HOPT handled by engine; hero must be alive (engine checks)
   },
 
-  async onHeroEffect(ctx) {
+  // W40a (Al, 22.10.2026): `wdh` = Wiederholung durch Idej Sword - Kunagi ("perform that Attack again"): derselbe Schlag, neues Ziel, ohne Einmal-Stempel.
+  async onHeroEffect(ctx, wdh) {
     const engine  = ctx._engine;
     const gs      = engine.gs;
     const pi      = ctx.cardOwner;
@@ -63,7 +70,8 @@ module.exports = {
     gs._spellDamageLog = [];
 
     // Prompt for any target
-    const target = await ctx.promptDamageTarget({
+    // ★ W36a (Al, 22.10.2026): „Negierter Treffer: ja, definitiv" — wird der Treffer im Zielfenster NEGIERT (Invisibility Cloak, Schutzkarten …), ist der Effekt für die Runde verbraucht (Einmal-Stempel bleibt, Rückgabe `true`) und zählt als gespielte Attack (Muster Alice); ein Abbruch des Spielers bleibt ein Abbruch.
+    const { target, negiert } = await engine.heldenEffektZielwahl(ctx, {
       side: 'any',
       types: ['hero', 'creature'],
       damageType: 'attack',
@@ -75,6 +83,12 @@ module.exports = {
       cancellable: true,
     });
 
+    if (negiert) {
+      delete gs._spellDamageLog;
+      await engine.zaehleAlsArt('attack', { pi, heroIdx, heroOwner: feld, name: CARD_NAME });
+      engine.sync();
+      return true;
+    }
     if (!target) {
       delete gs._spellDamageLog;
       return false;
@@ -95,6 +109,8 @@ module.exports = {
     // BEFORE damage applies — Arrows can join, arm the attacker, and
     // the existing `applyArrowsBeforeDamage` / `applyArrowsAfterDamage`
     // pipeline kicks in for the actual hit.
+    // ★ W34a (Al, 22.10.2026, Punkt 3): ein Treffer-Ereignis = ein Zählschritt der Attack-Zähler (wie `alsAttackKette`, das Arthor mit eigener Kette ersetzt).
+    await engine.zaehleAlsArt('attack', { pi, heroIdx, heroOwner: feld, name: CARD_NAME });
     const attackResult = await engine.executeCardWithChain({
       cardName: CARD_NAME,
       owner: pi,
@@ -102,6 +118,7 @@ module.exports = {
       heroIdx,
       casterOwner: feld,   // Styx 28.9.: Seite des Wirkers
       fromBoard: true,
+      zaehltAlsArt: 'attack',
       resolve: async () => {
         engine._broadcastEvent('red_lightning_rain', {
           owner: tgtOwner, heroIdx: tgtHeroIdx, zoneSlot: tgtSlot,
@@ -129,7 +146,7 @@ module.exports = {
     // ★ v1328: auch gefizzelt (Arthor waehrend der Kette handlungsunfaehig).
     if (attackResult?.negated || attackResult?.fizzled) {
       delete gs._spellDamageLog;
-      clearArmedArrows(engine, pi);
+      await clearArmedArrows(engine, pi);
       return true;
     }
 
@@ -143,22 +160,14 @@ module.exports = {
 
     // Fire afterSpellResolved as an Attack so reactive equips trigger
     // (Vampiric Sword's lifesteal, Legendary Sword's summon grant, …).
-    await engine.runHooks('afterSpellResolved', {
-      spellName: CARD_NAME,
-      spellCardData: FAKE_ATTACK_DATA,
-      heroIdx,
-      heroOwner: feld,   // Styx 28.9.: Brettseite (wie der Server)
-      casterIdx: pi,
-      damageTargets: uniqueTargets,
-      isSecondCast: false,
-      _skipReactionCheck: true,
-    });
+    // W39a: derselbe Abschluss wie bei allen Effekten, die als Attack zählen (`alsAttackKette`): Stufe = Fighting-Level, `_alsEffekt` (kein gewirkter Spell), `heroOwner` = Brettseite.
+    if (!attackResult?.negated && !attackResult?.fizzled) await engine.meldeAttackAufgeloest({ name: CARD_NAME, pi, heroIdx, heroOwner: feld, ziele: uniqueTargets, wiederhole: () => module.exports.onHeroEffect(ctx, true) });
 
     // Drop any arrows armed for this attack — server.js auto-clears
     // for normal Spell/Attack plays via doPlaySpell, but the hero-
     // effect path doesn't go through there, so we clean up manually.
     // Idempotent: no-op if no arrows were armed.
-    clearArmedArrows(engine, pi);
+    await clearArmedArrows(engine, pi);
 
     engine.log('arthor_ascended_strike', {
       player: ps.username, target: target.cardName, damage: DAMAGE,

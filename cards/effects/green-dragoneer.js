@@ -257,7 +257,9 @@ module.exports = {
       // widerspricht dem Wortlaut und ist raus.
       const heroIdx = death.heroIdx;
       const slot = death.zoneSlot;
-      if (((fps?.supportZones?.[heroIdx]?.[slot]) || []).length !== 0) {
+      // W62a: bleibt in der Zone eine GLEICHNAMIGE Creature (zweiter Green Dragoneer im Stapel, Alice-Teilung), teilt sich der neue die Zone.
+      if (((fps?.supportZones?.[heroIdx]?.[slot]) || []).length !== 0
+          && !require('./_alice-shared').canShareInto(engine, pi, heroIdx, slot, CARD_NAME, feld)) {
         engine.log('green_dragoneer_fizzle', { player: ps.username, reason: 'zone_taken' });
         return;
       }

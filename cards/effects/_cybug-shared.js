@@ -50,6 +50,7 @@ async function deleteCybugFuel(engine, pi, fuelCardName) {
       fromHandIdx: handIdx,
     });
     engine.takeFromPileSync(ps, 'hand', handIdx);
+    const _loeschPs = engine.handKartenBesitzerPs(ps, fuelCardName);   // W63c: Loeschstapel des permanenten Besitzers (gestohlene Handkarte)
     // Untrack the hand inst so its tracked id doesn't leak into a
     // future state read. Find any matching hand inst for `pi` —
     // engine guarantees one inst per hand slot, so the first match
@@ -59,8 +60,8 @@ async function deleteCybugFuel(engine, pi, fuelCardName) {
       c.owner === pi && c.zone === ZONES.HAND && c.name === fuelCardName
     );
     if (inst) engine._untrackCard(inst.id);
-    if (!ps.deletedPile) ps.deletedPile = [];
-    ps.deletedPile.push(fuelCardName);
+    if (!_loeschPs.deletedPile) _loeschPs.deletedPile = [];
+    _loeschPs.deletedPile.push(fuelCardName);
     engine.log('cybug_fuel_delete', {
       player: ps.username, card: fuelCardName, from: 'hand',
     });

@@ -28,7 +28,7 @@ const CARD_NAME = 'Dark Deal';
 
 // „Chooses a target": das Kennzeichen `requiresTarget` fehlt bei etlichen Skripten, die trotzdem ein Ziel waehlen
 // lassen — deshalb zusaetzlich der Quelltext (Zielwahl-Aufrufe), je Name gemerkt.
-const ZIELWAHL = /prompt(Damage|Effect)?Target\s*\(|promptTarget\s*\(|promptZonePick|zonePick/;
+const ZIELWAHL = /prompt(Damage|Effect|Multi)?Target\s*\(|promptTarget\s*\(|promptZonePick|zonePick/;
 const _zielCache = new Map();
 function waehltZiel(name, script) {
   if (script?.requiresTarget) return true;
@@ -78,7 +78,8 @@ module.exports = {
     });
     await engine._delay(1100);
     // Ab jetzt gehoert die Aktivierung mir: Zielwahl, „du" und „Gegner" des Effekts sind meine Seite.
-    inst._darkDealVorher = inst.stolenBy ?? null;
+    // W24a (N1-03): zweite Kopie in derselben Kette — das "Vorher" der ersten Aufloesung gilt, nicht das von ihr schon gesetzte `stolenBy`.
+    if (inst._darkDealVon == null) inst._darkDealVorher = inst.stolenBy ?? null;
     inst._darkDealVon = pi;
     inst.stolenBy = pi;
     engine.log('dark_deal', { player: gs.players[pi]?.username, creature: inst.name });

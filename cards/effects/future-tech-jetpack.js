@@ -7,8 +7,9 @@
 //   number of \"Future Tech Jetpack\" cards in your discard pile."
 //
 //  ── Der Ausweicher ──
-//  Mit leerer Ablage schützt sie gegen NICHTS (Stufe ≤ 0 trifft nur
-//  stufenlose Angriffe), mit drei Kopien gegen fast jeden Angriff. Nur
+//  Mit leerer Ablage schützt sie gegen Stufe-0-Attacken (0 ≤ 0; Al,
+//  Welle 9, Q18: gleiche Zählweise wie Escape Device), mit drei Kopien
+//  gegen fast jeden Angriff. Nur
 //  gegen ATTACKEN — Zauber und Karteneffekte kommen weiter durch, das
 //  ist der Preis gegenüber Escape Device.
 //
@@ -52,12 +53,17 @@ module.exports = {
     // NUR Attacken. Der Kartentyp entscheidet; ohne Katalogeintrag gibt
     // es keine Stufe und damit keine Entscheidung (Lehre aus Escape
     // Device, 21.8.).
+    // W27a (Al, 21.10.2026): als Attack geltende Heldeneffekte (Broghan & Co.) und Gegenstandseffekte (Bamboo Staff, Crusader's …) sind IMMER Level 0.
+    if (info?.treatedAsLevel != null && info.damageType === 'attack') {   // nur Attacks (Alice = Spell, `destruction_spell`, bleibt außen vor)
+      return info.treatedAsLevel <= zaehleInAblage(gs, info.heroOwner, CARD_NAME);
+    }
     const src = info?.sourceData;
     if (!src || src.cardType !== 'Attack') return false;
 
     // Der Schutz gehoert dem Besitzer der Jetpack — das ist der Held,
     // an dem sie haengt.
     const kopien = zaehleInAblage(gs, info.heroOwner, CARD_NAME);
-    return (src.level || 0) <= kopien && kopien > 0;
+    // Al, Welle 9 (Q18): auch bei 0 Kopien gilt „Stufe ≤ Anzahl“ (0 ≤ 0).
+    return (src.level || 0) <= kopien;
   },
 };

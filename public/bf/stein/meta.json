@@ -1,0 +1,1 @@
+{"dim": {"rand": 0.14}, "ew": 30, "edge": true, "tile": 192, "anim": [{"t": "flameE", "x": 9, "y": 10}, {"t": "sparksE", "n": 4, "x": 9, "y": 7, "rise": 20}, {"t": "dust", "n": 12, "phone": 0, "y0": 4, "y1": 96, "speed": 1.0, "dir": 1, "cols": ["#535353", "#686868"]}], "lum": 45.7}

@@ -50,7 +50,6 @@ module.exports = {
   hooks: {
     onPlay: async (ctx) => {
       if (ctx.playedCard?.id !== ctx.card.id || ctx.card.zone !== 'support') return;
-      if (ctx.card.counters?.isPlacement) return;
       const gs = ctx._engine.gs;
       if (!gs.hoptUsed) gs.hoptUsed = {};
       gs.hoptUsed[summonedKey(ctx.cardOwner)] = gs.turn;

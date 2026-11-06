@@ -19,7 +19,7 @@
 //     Effekte (Silent Water Mizune, Spider-Kosten) ziehen nichts.
 //     Gezogen wird vom Besitzer der Karte.
 // ═══════════════════════════════════════════
-const { hasCardType } = require('./_hooks');
+const { hasCardType, zaehltAlsAttackOderSpell } = require('./_hooks');
 
 const CARD_NAME = 'Bluff';
 const ZIEHEN_AKTIV = 3;
@@ -43,8 +43,9 @@ module.exports = {
     const cd = sourceInfo.cardInstance
       ? (engine.getEffectiveCardData?.(sourceInfo.cardInstance) || engine._getCardDB()[sourceInfo.cardName])
       : engine._getCardDB()[sourceInfo.cardName];
-    if (!cd) return false;
-    return hasCardType(cd, 'Attack') || hasCardType(cd, 'Spell');
+    // W30a (Al, 21.10.2026): auch Effekte, die als Attack/Spell ZÄHLEN (Broghan & Co., Alice, Gegenstandseffekte, Greatmaw-Treffer) — wie Flooding.
+    if (cd && (hasCardType(cd, 'Attack') || hasCardType(cd, 'Spell'))) return true;
+    return zaehltAlsAttackOderSpell(engine, sourceInfo);
   },
 
   onSurpriseActivate: async (ctx) => {

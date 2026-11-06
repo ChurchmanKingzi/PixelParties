@@ -16,13 +16,15 @@
 //    mimic, Sekhem strikes, Shut self-mills, Ba
 //    grants a second Action, Ib heals).
 //  • The "not sent there this turn" rule is gated
-//    via `ps._discardNamesAtTurnStart` (set in
-//    _engine.js startTurn). A Shard's name is
-//    eligible iff it was already in the snapshot
-//    AND a copy is currently in the discard. Set-
-//    based — multi-copy nuance is approximated by
-//    name presence; the rare revive-then-redie
-//    case rounds in the player's favour.
+//    EXACTLY per discard entry (Welle 13, Al Rueckfrage 6:
+//    „Ja, unbedingt auf Instanz umstellen" — wie die
+//    Teal Fishing Rod): `engine.ablageAlteEintraege(pi)`
+//    liefert je Ablage-Eintrag, ob er zu Zugbeginn schon
+//    dort lag und seither nicht herausgenommen und neu
+//    hineingelegt wurde. Nur solche Eintraege sind
+//    waehlbar; gleichnamige, in diesem Zug abgelegte
+//    Kopien zaehlen nicht. Gelegt wird genau ein alter
+//    Eintrag (Index), nicht "die erste Kopie".
 //  • The Shard's per-name 1/turn cap (shared
 //    `canSummonSoulShard`) STILL applies — Thep's
 //    placement is still a summon, so Necromancy /
@@ -35,6 +37,11 @@ const {
 } = require('./_soul-shards-shared');
 
 const CARD_NAME = 'Thep, the Court Scribe';
+
+/** W63a: Zonen von Thep fuer `name` — freie, und mit Alice-Teilung die Zone einer GLEICHNAMIGEN Soul Shard (geteilte zuerst; `engine.beschwoerZonenFuer`). */
+function zonenFuer(engine, pi, feld, heroIdx, name) {
+  return engine.beschwoerZonenFuer(pi, name, { seite: feld, heroIdx, nurBasis: true, namedHeroesOnly: true });
+}
 
 module.exports = {
   activeIn: ['hero'],
@@ -58,25 +65,19 @@ module.exports = {
     // Kontrolle statt Seite (Styx 28.9.): physische Seite des Helden
     const feld = ctx.cardHeroOwner ?? pi;
 
-    // Need at least one free Support Zone on Thep.
-    const zones = gs.players[feld]?.supportZones?.[heroIdx] || [];
-    let hasFreeSlot = false;
-    for (let z = 0; z < 3; z++) {
-      if ((zones[z] || []).length === 0) { hasFreeSlot = true; break; }
-    }
-    if (!hasFreeSlot) return false;
-
+    // Need at least one free Support Zone on Thep — W63a (Al, 22.10.2026): oder, mit Alice-Teilung, die Zone einer GLEICHNAMIGEN Soul Shard (je Name geprueft).
     // Need at least one Soul Shard in own discard whose name was
     // already there at turn start (i.e. not sent there THIS turn).
-    const startSet = ps._discardNamesAtTurnStart || new Set();
-    for (const name of (ps.discardPile || [])) {
+    const alt = engine.ablageAlteEintraege(pi);   // W13 (Al, Rueckfrage 6): exakt je Ablage-Instanz
+    for (const [i, name] of (ps.discardPile || []).entries()) {
       if (!isSoulShard(name)) continue;
-      if (!startSet.has(name)) continue;
+      if (!alt[i]) continue;
       // Per-name 1/turn cap — Thep's placement still goes through
       // canSummonSoulShard, so re-summoning a Shard already played
       // this turn would fizzle. Filter here so the picker never
       // surfaces a fizzling option.
       if (ps._soulShardSummonedThisTurn?.[name]) continue;
+      if (zonenFuer(engine, pi, feld, heroIdx, name).length === 0) continue;
       return true;
     }
     return false;
@@ -93,24 +94,18 @@ module.exports = {
     const hero = gs.players[feld]?.heroes?.[heroIdx];
     if (!ps || !hero?.name) return false;
 
-    // Thep's free Support Zones — placement target.
-    const zones = gs.players[feld]?.supportZones?.[heroIdx] || [];
-    const freeSlots = [];
-    for (let z = 0; z < 3; z++) {
-      if ((zones[z] || []).length === 0) freeSlots.push(z);
-    }
-    if (freeSlots.length === 0) return false;
-
+    // Thep's free Support Zones — placement target (W63a: je Karte, frei oder — Alice-Teilung — geteilt).
     // Build a deduped gallery of eligible Soul Shard names from the
     // own discard pile. "Eligible" = was already in the discard at
     // turn start AND not blocked by the per-name 1/turn cap.
-    const startSet = ps._discardNamesAtTurnStart || new Set();
+    const alt = engine.ablageAlteEintraege(pi);   // W13 (Al, Rueckfrage 6): exakt je Ablage-Instanz
     const summonedThisTurn = ps._soulShardSummonedThisTurn || {};
     const counts = {};
-    for (const name of ps.discardPile) {
+    for (const [i, name] of ps.discardPile.entries()) {
       if (!isSoulShard(name)) continue;
-      if (!startSet.has(name)) continue;
+      if (!alt[i]) continue;
       if (summonedThisTurn[name]) continue;
+      if (zonenFuer(engine, pi, feld, heroIdx, name).length === 0) continue;
       counts[name] = (counts[name] || 0) + 1;
     }
     const gallery = Object.entries(counts)
@@ -131,19 +126,24 @@ module.exports = {
     // Re-validate against the live state (the prompt could have
     // resolved after another effect changed the discard contents).
     if (!isSoulShard(chosenName)) return false;
-    if (!startSet.has(chosenName)) return false;
     if (summonedThisTurn[chosenName]) return false;
-    if (ps.discardPile.indexOf(chosenName) < 0) return false;
+    const altJetzt = engine.ablageAlteEintraege(pi);
+    const ablageIdx = ps.discardPile.findIndex((n, i) => n === chosenName && altJetzt[i]);
+    if (ablageIdx < 0) return false;
 
     // Pick a free slot on Thep. Auto-resolves if only one is open.
+    // W63a (Al, 22.10.2026): erst die geteilte Zone (gleichnamige Soul Shard, Alice), DANN die freien; bei mehreren waehlt der Spieler.
+    const freeSlots = zonenFuer(engine, pi, feld, heroIdx, chosenName);
+    if (freeSlots.length === 0) return false;
     let chosenSlot;
     if (freeSlots.length === 1) {
-      chosenSlot = freeSlots[0];
+      chosenSlot = freeSlots[0].slotIdx;
     } else {
       const zoneOptions = freeSlots.map(z => ({
-        heroIdx, slotIdx: z,
+        heroIdx, slotIdx: z.slotIdx,
         ...(feld !== pi ? { owner: feld, ownerIdx: feld } : {}),   // Kontrolle statt Seite (Styx 28.9.)
-        label: `${hero.name} — Support ${z + 1}`,
+        label: `${hero.name} — Support ${z.slotIdx + 1}${z.shared ? ` (×${z.stackDepth})` : ''}`,
+        ...(z.shared ? { shared: true, stackDepth: z.stackDepth } : {}),
       }));
       const zp = await ctx.promptZonePick(zoneOptions, {
         title: CARD_NAME,
@@ -161,13 +161,17 @@ module.exports = {
     // Shard reads in its onPlay gate.
     // v1389: über die EINE Ablage-Stelle — Platzieren gilt als
     // „summoned from discard" (Als Ruling 25.9.), die Soul Shards lösen aus.
-    const placeRes = await engine.summonFromDiscard(pi, pi, chosenName, heroIdx, chosenSlot, {
+    const placeRes = await engine.summonFromDiscard(pi, pi, ablageIdx, heroIdx, chosenSlot, {   // W13: genau dieser alte Eintrag
       source: CARD_NAME, flug: false,
       summonOpts: { isPlacement: true },
       hookExtras: { _isNormalSummon: false },
       ...(feld !== pi ? { heldSeite: feld } : {}),   // Kontrolle statt Seite (Styx 28.9.)
     });
-    if (!placeRes) return false;
+    if (!placeRes) {
+      // W13: scheiterte das Legen, geht die Karte an ihren Platz zurueck — dann bleibt sie ein ALTER Eintrag (sonst stempelt der Rueckweg „in diesem Zug").
+      if (ps.discardPile[ablageIdx] === chosenName && Array.isArray(ps._ablageStamps) && ps._ablageStamps.length === ps.discardPile.length) ps._ablageStamps[ablageIdx] = -1;
+      return false;
+    }
 
     // Standard summon glow on the placement zone.
     engine._broadcastEvent('summon_effect', {

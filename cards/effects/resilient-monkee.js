@@ -60,6 +60,7 @@ module.exports = {
   // anderen drei nicht: die Zweitfaehigkeiten aus v343 waren deshalb
   // unausloesbar.
   creatureEffect: true,
+  requiresTarget: true,   // Zielwahl-Effekt („choose a Monkee Creature"): Blinded sperrt ihn (siehe _hooks.js / getActivatableCreatures)
 
   hooks: {
     afterResourceGain: async (ctx) => {
@@ -83,7 +84,7 @@ module.exports = {
       // Beschwoerung erlaubt ist.
       if (gs[RESOLVING]?.[pi]) return;
       if (!(ps.discardPile || []).includes(CARD_NAME)) return;
-      if ((ps.gold || 0) < betrag) return;
+      if ((ps.gold || 0) < betrag || engine.goldSpendBlocked(pi)) return;   // G1 (A09-11): Goldsperre - "pay N Gold"
 
       if (eligibleSummonZones(engine, pi, CARD_NAME, { nachKontrolle: true }).length === 0) return;   // Kontrolle statt Seite (Styx 28.9.)
 
@@ -172,7 +173,7 @@ module.exports = {
   canActivateCreatureEffect(ctx) {
     const engine = ctx._engine;
     if (ctx.card?.zone !== 'support') return false;
-    if (investHoptUsed(engine.gs, ctx.card)) return false;
+    if (!ctx._borrowedUse && investHoptUsed(engine.gs, ctx.card)) return false;   // W12 (Q5): geliehene Verwendung ignoriert das eigene Einmal-Limit
     if (heroesWithInvest(engine.gs.players[ctx.cardOwner], 10).length === 0) return false;
     if (eigeneMonkeeKreaturen(engine, ctx.cardOwner).length === 0) return false;
     return true;
@@ -182,7 +183,7 @@ module.exports = {
     const engine = ctx._engine;
     const pi = ctx.cardOwner;
     if (ctx.card?.zone !== 'support') return false;
-    if (investHoptUsed(engine.gs, ctx.card)) return false;
+    if (!ctx._borrowedUse && investHoptUsed(engine.gs, ctx.card)) return false;   // W12 (Q5): geliehene Verwendung ignoriert das eigene Einmal-Limit
     const kandidaten = eigeneMonkeeKreaturen(engine, pi);
     if (kandidaten.length === 0) return false;
 
@@ -218,7 +219,7 @@ module.exports = {
     if (!ziel) return false;
 
     if (!await payInvestCounters(engine, pi, 10, CARD_NAME)) return false;
-    markInvestHopt(engine.gs, ctx.card);
+    if (!ctx._borrowedUse) markInvestHopt(engine.gs, ctx.card);   // W13 (Al, Rueckfrage 9)
     // v349: Auftritt erst nach bestaetigter Zielwahl (Muster Book of Doom).
     engine.announceActiveEffect();
     if (!ziel.counters) ziel.counters = {};

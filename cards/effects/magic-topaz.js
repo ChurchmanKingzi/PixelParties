@@ -63,7 +63,7 @@ module.exports = {
       engine.handZugangSync(ps, CARD_NAME, { source: CARD_NAME, ohneInstanz: true });
       engine.log('magic_topaz_kept_in_hand', { player: ps.username });
     } else {
-      ps.discardPile.push(CARD_NAME);
+      engine.handKartenBesitzerPs(ps, CARD_NAME).discardPile.push(CARD_NAME);   // W64c: Ablage des permanenten Besitzers (gestohlene Handkarte)
     }
     engine.sync();
   },

@@ -130,11 +130,15 @@ module.exports = {
     }
 
     // ── Step 3: search → hand (handles splice + reveal + shuffle) ──
-    const searched = await engine.searchDeckForNamedCard(pi, chosen, CARD_NAME, {});
+    const _out = {};   // W85c: `geloescht` = Atta hat die aufgedeckte Karte gelöscht, sie kam nie auf die Hand
+    const searched = await engine.searchDeckForNamedCard(pi, chosen, CARD_NAME, { out: _out });
     if (!searched) {
       engine.log('lunatic_new_moon_search_failed', { player: ps.username, card: chosen });
       return true;
     }
+
+    // Control Monitors: 1 Karte aus dem Deck auf die Hand, bezahlt mit 1 Abwurf. Wurde sie geloescht, entfaellt die Kostensenkung.
+    await engine.meldeHandZugangAusStapel(pi, { source: CARD_NAME });
 
     // ── Step 4: that card's Cost becomes 4 for the rest of the turn ──
     // Per-turn field (wiped at the next turn start) that follows the
@@ -142,7 +146,7 @@ module.exports = {
     // hand-indexed-field remap.
     const cardDB = engine._getCardDB();
     const baseCost = cardDB[chosen]?.cost || 0;
-    const reduction = Math.max(0, baseCost - 4);
+    const reduction = _out.geloescht ? 0 : Math.max(0, baseCost - 4);   // gelöscht: keine Kopie auf der Hand, die verbilligt werden könnte
     if (reduction > 0) {
       const idx = ps.hand.lastIndexOf(chosen); // the freshly-added copy
       if (idx >= 0) {

@@ -48,6 +48,7 @@ module.exports = makeCrusaderArtifact({
     await engine.addHeroStatus(target.owner, target.heroIdx, 'negated', {
       appliedBy: pi,
       source: CARD_NAME,
+      effectOnly: true,   // W4a (Al): Text sagt nur "its effect is negated" -> leichte Form, Abilities laufen weiter
     });
     engine.log('crusader_hookshot_negate', {
       player: engine.gs.players[pi]?.username,

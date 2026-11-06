@@ -177,5 +177,25 @@ module.exports = {
         bonus,
       });
     },
+
+    // ★ W39a (Al, 22.10.2026: alle Attack-Leser): „Any direct damage this Hero deals with Attacks and Spells against a single target" gilt auch für Kreaturen als Ziel
+    // (bisher nur der Heldenpfad `beforeDamage`).
+    beforeCreatureDamageBatch: async (ctx) => {
+      const engine = ctx._engine;
+      const gs = engine.gs;
+      const entries = ctx.entries || [];
+      if (entries.length !== 1) return;
+      const log = gs._spellDamageLog;
+      if (!log || log.length !== 1) return;
+      const skipTypes = new Set(['burn', 'poison', 'recoil', 'status', 'other', 'hero']);
+      const e = entries[0];
+      if (e.cancelled || e.isStatusDamage || skipTypes.has(e.type)) return;
+      const source = e.source;
+      if (!source || (source.heroOwner ?? source.owner) !== (ctx.cardHeroOwner ?? ctx.cardOwner) || source.heroIdx !== ctx.cardHeroIdx) return;
+      const poisonedCount = countPoisonedTargets(gs, engine);
+      if (poisonedCount <= 0) return;
+      e.modifyAmount(40 * poisonedCount);
+      engine.log('zsos_ssar_boost', { hero: ctx.attachedHero?.name, poisonedCount, bonus: 40 * poisonedCount });
+    },
   },
 };

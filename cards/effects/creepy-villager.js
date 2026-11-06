@@ -67,6 +67,8 @@ module.exports = {
     const pi = inst.controller ?? inst.owner;
     // „that was not summoned this turn"
     if ((inst.turnPlayed || 0) === (engine.gs.turn || 0)) return false;
+    // W20b (Al, 20.10.2026: Opfer-Zonen-Regel gilt für jede Opfer-Beschwörung): der Gott kommt in die Zone des Villagers - nur wenn dessen Rückgabe sie leert (kein Alice-Stapel; sonst überschriebe er den Mitbewohner).
+    if (!engine.zoneFreiNachKostenzahlung(engine.physicalSide(inst), inst.heroIdx, inst.zoneSlot, inst)) return false;
     return gottAufDerHand(engine, pi) >= 0;
   },
 
@@ -90,7 +92,7 @@ module.exports = {
     await engine.showTriggeredEffect(CARD_NAME, { playerIdx: pi });
 
     // ── ① Der Villager geht zurueck auf die Hand ────────────────
-    const zurueck = await returnSupportCreatureToHand(engine, inst, CARD_NAME);
+    const zurueck = await returnSupportCreatureToHand(engine, inst, CARD_NAME, { sourceOwner: pi, selbst: true });   // W71b: eigener Text, kein Monia-Fenster
     if (!zurueck?.returned) return false;
 
     // ── ② Der Gott steigt aus SEINER Zone auf ───────────────────

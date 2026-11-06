@@ -40,19 +40,26 @@ const { baseCardName } = require('./_hooks');
 const CARD_NAME = 'Cool Presents';
 
 module.exports = {
+  // ★ Welle 11 (Q66, Al: „Karte schenken“ gegen den Erste-Runden-geschützten Spieler uneinsetzbar): Geben ist der einzige Effekt.
+  blockedByFirstTurnProtection: true,
   isTargetingArtifact: true,
   manualGoldCost: true,
+  goldPerTarget: true,   // G1 (A09-11): Grundpreis gilt je Uebergabe - unter der Goldsperre nur bei Preis 0 aktivierbar (server.js doUseArtifactEffect)
 
   /**
-   * Optimistic gate — need ≥1 hand card (besides the resolving copy),
-   * ≥4 gold (one transfer minimum), and a hand that isn't locked.
+   * Optimistic gate — need ≥1 hand card (besides the resolving copy)
+   * and a hand that isn't locked. No gold gate: 0 transfers cost 0.
    * The opponent's hand-lock is re-checked at resolve time.
    */
-  canActivate(gs, pi) {
+  canActivate(gs, pi, engine) {
     const ps = gs.players?.[pi];
     if (!ps) return false;
     if (ps.handLocked) return false;
-    if ((ps.gold || 0) < 4) return false;
+    // W5b-B6 (Al, Welle 5): Geben ist der EINZIGE Effekt – ist die Gegnerhand gesperrt (Hand-/Such-Sperre:
+    // „cannot search or add cards to the hand"), würde er versagen, also ist die Karte gar nicht aktivierbar.
+    if (engine && engine._isSearchBlocked(engine.opponentOf(pi), {}, 'deck')) return false;
+    // Kein Gold-Tor: "any number" schliesst 0 ein - ohne Uebergabe kostet die Karte nichts (Beer-Prinzip, `alwaysConfirmable`). Wie viele Karten
+    // man geben kann, deckelt der Zielwaehler nach Budget (`maxTotal`), die Goldsperre `goldPerTarget` (Preis je Karte > 0) sperrt der Server.
     // At least 2 cards in hand (Cool Presents + one to give) — though
     // sibling-copy plays can technically count the OTHER copy too, so
     // 2 cards is the floor either way.
@@ -108,7 +115,7 @@ module.exports = {
     const oi = engine.opponentOf(pi);
     const ops = gs.players[oi];
     if (!ps || !ops) return { cancelled: true };
-    if (ops.handLocked) return { cancelled: true };
+    if (engine._isSearchBlocked(oi, {}, 'deck')) return { cancelled: true };   // W5b-B6: auch Such-Sperre (kein Verbrauch)
 
     // 0-selection branch — legal, Artifact still resolves and discards
     // for free, no transfers, no gold spent. Matches "any number" → 0.
@@ -119,7 +126,11 @@ module.exports = {
       return;
     }
 
-    const baseCost = engine._getCardDB()[CARD_NAME]?.cost || 4;
+    // Preis je Karte wie im Zielwaehler angezeigt: Rusting Crystal,
+    // Rabatte & Co. stecken in `artifactPlayCost` (A08-02).
+    const baseCost = engine.artifactPlayCost(
+      pi, CARD_NAME, require('./_hand-resolve').getResolvingHandIndex(ps),
+    ).cost;
     const targets = selectedIds.map(id => (validTargets || []).find(t => t.id === id))
       .filter(t => t && t.type === 'hand' && t.owner === pi);
     if (targets.length === 0) {
@@ -146,9 +157,18 @@ module.exports = {
     // engine's standard post-resolve cleanup uses `getResolvingHandIndex`
     // (name lookup), so the artifact's discard still lands correctly.
     const sorted = [...targets].sort((a, b) => b.handIndex - a.handIndex);
+    // W16d (A08-31): EIN Hand-Interaktionsfenster (Ambush the Scout) für das ganze Geben, wie Live Show – ein Effekt, eine Frage.
+    // Wird er negiert, ist der Preis bezahlt und nichts wird verschenkt.
+    if (await engine.checkHandInteractionReaction(oi, 'insert',
+          { byPi: pi, count: sorted.length, sourceName: CARD_NAME })) {
+      engine.log('cool_presents_resolve', { player: ps.username, gifted: 0, cost: totalCost, negated: true });
+      engine.sync();
+      return;
+    }
     for (const t of sorted) {
       const ok = await engine.actionTransferCardToOppHand(pi, t.handIndex, {
         source: CARD_NAME,
+        windowChecked: true,
       });
       if (!ok) break; // opp.handLocked mid-loop — bail.
       await engine._delay(150);

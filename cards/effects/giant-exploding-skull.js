@@ -240,7 +240,7 @@ module.exports = {
       });
 
       // ★ Zerstoerungs-Klammer: hier faellt nie nur eine Karte.
-      engine.beginDestroyScope(opfer.length);
+      engine.beginDestroyScope(opfer.length, opfer);   // W78: die Opfer sind todgeweiht (Infallible Oracle Pythia darf keines opfern)
       try {
         for (const ziel of opfer) {
           if (ziel.zone !== 'support') continue;   // schon weg

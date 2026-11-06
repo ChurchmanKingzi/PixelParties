@@ -29,6 +29,7 @@
 // ═══════════════════════════════════════════
 
 const { boardTotal, istCircus, moveApplause, zaehler } = require('./_applause-shared');
+const { anyName } = require('./_alias-name');
 
 const CARD_NAME = 'Fun-Fun Circus Director';
 
@@ -57,6 +58,8 @@ async function abwurfWaehlen(engine, pi, beschreibung, ausser = -1) {
 
 /** Wirft die gewaehlte Karte ab (`opts`: `_noGlow`/`_noPace` fuer die zweite). */
 async function abwerfen(engine, pi, wahl, opts = {}) {
+  // ★ W74c: Boris darf diese Abwurf-KOSTEN ignorieren (je Stufe ein eigener Abwurf; sein „einmal pro Zug" gilt ohnehin nur für eine) — die Karte bleibt, die Stufe gilt als bezahlt.
+  if (await engine.borisVerzicht(pi, 1, { source: CARD_NAME })) return true;
   return !!(await engine.actionDiscardHandCard(pi, wahl.cardName, wahl.handIndex, { source: CARD_NAME, ...opts }));
 }
 
@@ -83,7 +86,7 @@ module.exports = {
       const tot = ctx.creature;
       if (!tot || tot.instId === director.id) return;
       if ((tot.controller ?? tot.owner) !== pi) return;        // nur MEINE
-      if (!istCircus(engine, tot.name)) return;
+      if (!anyName(tot, (n) => istCircus(engine, n))) return;   // Todesdatensatz trägt `zusatzName`
 
       const toteInst = engine.cardInstances.find(c => c.id === tot.instId);
       if (!toteInst || toteInst._deathClaim) return;           // Anspruch schon vergeben

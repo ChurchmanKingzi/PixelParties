@@ -24,6 +24,15 @@
 //    `attackerSourceOverride` makes the reaction windows AND the
 //    damage attribute the hit to the CHOSEN Hero, so retaliation
 //    (Booby Trap, Fireshield, …) punishes that Hero, not Infected.
+//  • ★ W29a (Al, 21.10.2026): der Treffer zaehlt als Attack des gewaehlten
+//    Helden, und seine STUFE ist gleich dessen FIGHTING-LEVEL (ohne
+//    Fighting = Level 0): „Lv gleich dem Fighting-Level des Heroes". Die
+//    Quellobjekte (`attackerSourceOverride` fuer Zielwahl und Reaktions-
+//    fenster, `source` fuer den Treffer) tragen den Stempel
+//    `treatedAsAttack: { level }` — dynamisch (Getter), also immer das
+//    aktuelle Fighting-Level; Leser: Stealth, Jetpack, Glass Wall, Test
+//    Flight, Escape Device, Alliance, Dive Down ueber
+//    `engine._heldenEffektStufe` bzw. `info.treatedAsLevel`.
 // ═══════════════════════════════════════════
 
 const { buildGreatmawSacSpec } = require('./_greatmaw-shared');
@@ -35,7 +44,14 @@ const CARD_NAME = 'Infected Greatmaw';
 function livingHeroes(engine, pi) {
   return engine.heroesControlledBy(pi)
     .filter(e => e.hero.hp > 0)
+    // W32a (Al, 22.10.2026): „treated as that Hero hitting the target with an Attack" — nur Helden, die ANGREIFEN können (nicht Frozen/Stunned/Webbed/Negated/gesperrt).
+    .filter(e => engine.heroKannAngreifen(e.physOwner, e.heroIdx, pi))
     .map(e => ({ physOwner: e.physOwner, heroIdx: e.heroIdx, hero: e.hero }));
+}
+
+/** W29a: Stempel „zaehlt als Attack dieses Helden" mit Level = aktuelles Fighting-Level (inkl. Fighting in Support Zones; negiert = 0). */
+function attackStempel(engine, owner, heroIdx) {
+  return { get level() { return engine.effectiveSchoolLevelForCaster('Fighting', owner, heroIdx, owner) || 0; } };
 }
 
 module.exports = {
@@ -79,7 +95,9 @@ module.exports = {
     return engine.canSatisfySacrifice(pi, spec, ctx.card?.id);
   },
 
-  async onCreatureEffect(ctx) {
+  // W40a (Al, 22.10.2026, Punkt 3): `wdh` = Wiederholung durch Idej Sword - Kunagi („perform that Attack again") — derselbe Held schlägt erneut; die KOSTEN fallen erneut an (ein weiteres Opfer:
+  // ohne zahlbares Opfer findet die Wiederholung nicht statt und kostet nichts); der Einmal-pro-Zug-Stempel der Engine bleibt unberührt.
+  async onCreatureEffect(ctx, wdh) {
     const engine = ctx._engine;
     const gs = engine.gs;
     const pi = ctx.cardOwner;
@@ -91,7 +109,10 @@ module.exports = {
     if (heroes.length === 0) return false;
 
     let attacker;
-    if (heroes.length === 1) {
+    if (wdh) {
+      attacker = heroes.find(h => h.physOwner === wdh.physOwner && h.heroIdx === wdh.heroIdx);
+      if (!attacker) return false;
+    } else if (heroes.length === 1) {
       attacker = heroes[0];
     } else {
       const targets = heroes.map(h => ({
@@ -128,9 +149,11 @@ module.exports = {
     // picked, BEFORE the reaction windows. `attackerSourceOverride`
     // makes redirect / surprise / post-target reactions (and the
     // retaliation they drive) see the chosen Hero as the attacker.
+    if (wdh && !engine.canSatisfySacrifice(pi, spec, ctx.card?.id)) return false;   // W40a: kein weiteres Opfer → keine Wiederholung, nichts bezahlt
     let paid = false;
     const atkPreview = Math.max(0, attacker.hero.atk || 0);
-    const target = await ctx.promptDamageTarget({
+    // ★ R-12 (Al 26.10.): `heldenEffektZielwahl` trennt Negierung im Zielfenster (Surprise, Hand-Reaktion, Schutz-/Redirect-Fenster) vom Abbruch des Spielers (W36a, wie Broghan & Co.).
+    const { target, negiert } = await engine.heldenEffektZielwahl(ctx, {
       side: 'any',
       types: ['hero', 'creature'],
       damageType: 'attack',
@@ -144,6 +167,7 @@ module.exports = {
       attackerSourceOverride: {
         name: attacker.hero.name, owner: pi, controller: pi,
         heroIdx: attackerHeroIdx, zone: 'hand', _heroAttackSource: true,
+        treatedAsAttack: attackStempel(engine, attackerOwner, attackerHeroIdx),   // W29a: Stufe = Fighting-Level des Helden
         // Uebernommener Held: physische Seite wie beim Charme-Angriff.
         ...(attackerOwner !== pi ? { heroOwner: attackerOwner } : {}),
       },
@@ -160,6 +184,8 @@ module.exports = {
       // post-sacrifice reaction (Booby Trap killed the attacker, etc.).
       // If the sacrifice was already paid, the use IS spent (claim HOPT
       // by returning true); a pre-sacrifice cancel returns false.
+      // R-12 (Al 26.10.): ein NEGIERTER Treffer (Opfer bezahlt) zählt als gespielte Attack des gewählten Helden (W36a, wie Broghan & Co.).
+      if (negiert && paid) await engine.zaehleAlsArt('attack', { pi, heroIdx: attackerHeroIdx, heroOwner: attackerOwner, name: CARD_NAME });
       return paid;
     }
 
@@ -178,7 +204,7 @@ module.exports = {
     // "Treated as that Hero hitting the target with an Attack" — the
     // damage source is the Hero, type 'attack', so afterDamage-style
     // retaliation (Fireshield) routes to the Hero, not Infected.
-    const source = { name: hero.name, owner: pi, heroIdx: attackerHeroIdx };
+    const source = { name: hero.name, owner: pi, heroIdx: attackerHeroIdx, treatedAsAttack: attackStempel(engine, attackerOwner, attackerHeroIdx) };   // W29a: Stufe = Fighting-Level
     // Uebernommener Held: `heroOwner` = physische Seite (Konvention
     // der Charme-Angriffe in der Engine), `owner` bleibt der Spieler.
     if (attackerOwner !== pi) { source.controller = pi; source.heroOwner = attackerOwner; }
@@ -218,6 +244,8 @@ module.exports = {
     await engine._delay(200);
 
     // Damage, dealt as that Hero's Attack.
+    // W32a (Al, 22.10.2026): der Treffer zählt als Attack des gewählten Helden — Attack-Reaktionen (Magic Topaz, Arrows …) über die virtuelle Attack-Kette.
+    await engine.alsAttackKette({ name: CARD_NAME, pi, heroIdx: attackerHeroIdx, heroOwner: attackerOwner, ziele: [target], wiederhole: () => module.exports.onCreatureEffect(ctx, { physOwner: attackerOwner, heroIdx: attackerHeroIdx }), resolve: async () => {
     if (tHero) {
       await engine.actionDealDamage(source, tHero, damage, 'attack');
     } else if (tInst) {
@@ -226,6 +254,8 @@ module.exports = {
         { sourceOwner: pi, canBeNegated: true },
       );
     }
+    return true;
+    } });
 
     engine.log('infected_greatmaw', {
       player: ps.username, hero: hero.name, damage,

@@ -52,7 +52,7 @@ function wirkenderHeld(gs, pi, engine) {
   for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
     const h = ps.heroes[hi];
     if (!h?.name || h.hp <= 0) continue;
-    if (h.statuses?.frozen || h.statuses?.stunned || h.statuses?.negated) continue;
+    if (h.statuses?.frozen || h.statuses?.stunned) continue;   // W13 (Al, A2): `negated` sperrt die Reaktion nicht mehr
     if (engine.heroMeetsLevelReq(pi, hi, cd)) return hi;
   }
   return -1;
@@ -77,7 +77,7 @@ module.exports = {
     const letzte = chainCtx.chain[chainCtx.chain.length - 1];
     // „a player" — eigene UND gegnerische Artefakte.
     if (letzte.cardType !== 'Artifact') return false;
-    return wirkenderHeld(gs, pi, engine) >= 0;
+    return wirkenderHeld(gs, pi, engine) >= 0 || !!engine.fremderHeldKannStufe(pi, CARD_NAME);   // W20c: auch ein uebernommener Held wirkt
   },
 
   resolve: async (engine, pi, selectedIds, validTargets, chain, myIndex) => {

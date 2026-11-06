@@ -22,7 +22,11 @@
 //  Potion den vorgefundenen Stun in Verwahrung:
 //    `stunned._ppFremd = { obj: <alter Stun>, seit: <gs.turn> }`
 //  Beim Heilen wird er mit der Restdauer wiederhergestellt, die er ohne
-//  die Potion noch haette (eine Runde des Besitzers = zwei `gs.turn`).
+//  die Potion noch haette: eine Runde des Besitzers, die seit dem Auflegen
+//  TATSAECHLICH zu Ende gespielt wurde (W69a: `engine.echteEigeneZuegeBis`;
+//  ein uebersprungener Zug laesst ihn nicht ticken). Heute ist dieser Zweig
+//  nur ueber die Engine-Sperre „keine Erneuerung eines laufenden Stuns"
+//  (`_statusErneuerungGesperrt`) abgeschnitten.
 //  Kommt spaeter ein FREMDER Stun dazu, ersetzt er unseren — dann ist
 //  nichts mehr „by this effect" gestunnt, und die Klick-Option
 //  verschwindet mit dem Marker. Genau so soll es sein.
@@ -141,7 +145,9 @@ module.exports = {
 
     // Fremder Stun, der VOR der Potion lag: mit seiner Restdauer zurueck.
     if (fremd?.obj) {
-      const vergangen = Math.floor(Math.max(0, gs.turn - (fremd.seit ?? gs.turn)) / 2);
+      // W69a (Al, 23.10.2026: nur 'echte' Zuege zaehlen): der fremde Stun tickt am Ende jedes TATSAECHLICH gespielten Zuges seines Traegers
+      // (`processStatusExpiry('END')`) — verstrichen sind genau die echten Zuege des Traegers seit dem Auflegen, die schon zu Ende sind.
+      const vergangen = fremd.seit == null ? 0 : engine.echteEigeneZuegeBis(heroOwner, gs.turn - 1, fremd.seit);
       const rest = (fremd.obj.duration || 1) - vergangen;
       if (rest > 0) {
         hero.statuses.stunned = { ...fremd.obj, duration: rest, appliedTurn: gs.turn };

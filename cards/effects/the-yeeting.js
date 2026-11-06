@@ -12,7 +12,7 @@
 
 module.exports = {
   isTargetingArtifact: true,
-  deferBroadcast: true,
+  // W64b: kein `deferBroadcast` mehr — der Auftritt kommt zentral (Auftritts-Puffer) VOR dem ersten Effektschritt, nach der letzten abbrechbaren Wahl.
 
   // ── CPU prompt routing (fast heuristic, NO nested MCTS) ───────────
   // Previous implementation routed both prompts through nested MCTS
@@ -46,7 +46,7 @@ module.exports = {
     const cpuIdx = engine._cpuPlayerIdx;
     if (cpuIdx < 0) return undefined;
 
-    const hasNonHero = validTargets.some(t => t.type && t.type !== 'hero');
+    const hasNonHero = validTargets.some(t => t.type && t.type !== 'hero' && !engine.zaehltAlsHeld?.(t.cardInstance));   // W79: ein Bull (zählt als Hero) gehört zur ersten Wahl
 
     // ── Prompt 1: yeeter pick (own Hero takes 150 self-damage) ───────
     if (!hasNonHero) {
@@ -113,7 +113,19 @@ module.exports = {
     return _hasNonHeroCards(gs);
   },
 
-  getValidTargets(gs, pi) {
+  // W28a (Al, 21.10.2026: „'you control' = aktuelle Kontrolle, nicht Besitzer"): „a Hero you control" = `getControlledHeroTargets` (abgegebener eigener Held nein,
+  // uebernommener Gegnerheld ja; ID/`owner` = Brettseite des Helden).
+  getValidTargets(gs, pi, engine) {
+    // W31a (Al, 22.10.2026: „temporäre Heroes sind mögliche Ziele, auch wenn der Schaden verpufft"): auch ein temporär übernommener (Charme-)Gegnerheld ist Ziel/Kostenträger;
+    // der Schaden verpufft dort (Charme Lv3), die Kosten sind bezahlt.
+    if (engine) {
+      // W79 (White Sacrificial Bull): eine Kreatur, die auch als Hero zählt, ist ein „Hero you control" (150 Schaden).
+      const bullen = (engine.heldKreaturen?.(pi) || []).map(b => {
+        const seite = engine.physicalSide(b);
+        return { id: `equip-${seite}-${b.heroIdx}-${b.zoneSlot}`, type: 'equip', owner: seite, heroIdx: b.heroIdx, slotIdx: b.zoneSlot, cardName: b.name, cardInstance: b };
+      });
+      return [...engine.getControlledHeroTargets(pi), ...bullen];
+    }
     const ps = gs.players[pi];
     const targets = [];
     for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
@@ -151,10 +163,18 @@ module.exports = {
 
     // Parse selected hero
     const match = (selectedIds[0] || '').match(/^hero-(\d+)-(\d+)$/);
-    if (!match) return { cancelled: true };
-    const heroIdx = parseInt(match[2]);
-    const hero = ps.heroes[heroIdx];
+    // W79 (White Sacrificial Bull): die „Hero you control" darf auch eine Kreatur sein, die als Hero zählt (`equip-<Seite>-<Held>-<Platz>`).
+    const bullMatch = !match ? (selectedIds[0] || '').match(/^equip-(\d+)-(\d+)-(\d+)$/) : null;
+    let bullInst = null;
+    if (bullMatch) {
+      bullInst = engine.heldKreaturen(pi).find(b => engine.physicalSide(b) === parseInt(bullMatch[1]) && b.heroIdx === parseInt(bullMatch[2]) && b.zoneSlot === parseInt(bullMatch[3])) || null;
+      if (!bullInst) return { cancelled: true };
+    } else if (!match) return { cancelled: true };
+    const heroIdx = bullInst ? bullInst.heroIdx : parseInt(match[2]);
+    const heroSeite = bullInst ? engine.physicalSide(bullInst) : parseInt(match[1]);   // W28a: Brettseite des gewaehlten (kontrollierten) Helden
+    const hero = bullInst ? { name: bullInst.name, hp: 1 } : gs.players[heroSeite]?.heroes?.[heroIdx];
     if (!hero?.name || hero.hp <= 0) return { cancelled: true };
+    if (!bullInst && engine.heroSideOf(heroSeite, hero) !== pi) return { cancelled: true };   // „a Hero you control": nur der aktuelle Kontrolleur
 
     // ── Select non-Hero card from board (click-to-target) ──
     const boardTargets = _collectBoardTargets(gs, engine);
@@ -206,7 +226,7 @@ module.exports = {
     const tgtZoneType = targetInst.zone; // 'support', 'ability', 'permanent', etc.
 
     const ramEvent = {
-      sourceOwner: pi, sourceHeroIdx: heroIdx,
+      sourceOwner: heroSeite, sourceHeroIdx: heroIdx,
       targetOwner: tgtOwner, targetHeroIdx: tgtHeroIdx >= 0 ? tgtHeroIdx : 0,
       cardName: hero.name, duration: 1200,
     };
@@ -257,7 +277,7 @@ module.exports = {
     engine._broadcastEvent('play_zone_animation', explEvent);
     await engine._delay(200);
 
-    const dmgSource = { name: 'The Yeeting', owner: pi, heroIdx };
+    const dmgSource = { name: 'The Yeeting', owner: pi, heroIdx, ...(heroSeite !== pi ? { heroOwner: heroSeite } : {}) };
 
     // ── Zerstoerungs-Reaktion ZUERST (v1057, Als Regel 14.9.) ────────
     // „Negate that card or effect — die ganze Karte, ausser was schon
@@ -285,7 +305,8 @@ module.exports = {
     }
 
     // ── Deal 150 artifact damage to the Hero ──
-    await engine.actionDealDamage(dmgSource, hero, 150, 'artifact', { festesZiel: true });   // Selbstkosten des gewaehlten eigenen Helden (Als Ruling 9.10.)
+    if (bullInst) await engine.actionDealCreatureDamage(dmgSource, bullInst, 150, 'artifact', { sourceOwner: pi, festesZiel: true });   // W79: der Bull zahlt die 150 Schaden
+    else await engine.actionDealDamage(dmgSource, hero, 150, 'artifact', { festesZiel: true });   // Selbstkosten des gewaehlten eigenen Helden (Als Ruling 9.10.)
     engine.sync();
     await engine._delay(400);
 
@@ -374,21 +395,23 @@ function _scoreEnemyCard(engine, target) {
   // Abilities — REDUNDANCY GATE: if another living enemy Hero already
   // has the same Ability at equal-or-higher level, removing this copy
   // is wasted (the team's effective level is unchanged). Skip entirely.
-  if (target.type === 'ability') {
+  // 25.10.2026 (Xal-Runde 5): ein Ability-Stapel in einer Support Zone (`istAbilityStapel`) ist eine Ability — gleiche Bewertung, Stufe = Stapelhöhe,
+  // und die Redundanzprüfung liest die Stapel beider Zonenarten (`abilityStapelListe`).
+  if (target.type === 'ability' || target.istAbilityStapel) {
     const heroIdx = inst.heroIdx;
     const slotIdx = inst.zoneSlot;
-    const slot = opp.abilityZones?.[heroIdx]?.[slotIdx] || [];
-    const level = slot.length;
+    const level = target.istAbilityStapel
+      ? (target.level || 0)
+      : (opp.abilityZones?.[heroIdx]?.[slotIdx] || []).length;
     if (level <= 0) return 0;
     const abilityName = inst.name;
     for (let h = 0; h < (opp.heroes || []).length; h++) {
       if (h === heroIdx) continue;
       const otherHero = opp.heroes[h];
       if (!otherHero?.name || otherHero.hp <= 0) continue;
-      const otherZones = opp.abilityZones?.[h] || [];
-      for (const otherSlot of otherZones) {
-        if ((otherSlot || [])[0] !== abilityName) continue;
-        if ((otherSlot.length || 0) >= level) return 0; // redundant copy
+      for (const e of engine.abilityStapelListe(oppIdx, h)) {
+        if ((e.namen || [])[0] !== abilityName) continue;
+        if ((e.namen.length || 0) >= level) return 0; // redundant copy
       }
     }
     return level * 100;
@@ -444,6 +467,7 @@ function _hasNonHeroCards(gs) {
     for (let hi = 0; hi < 3; hi++) {
       if ((ps.surpriseZones?.[hi] || []).length > 0) return true;
     }
+    if ((ps.coolnessStack || []).length > 0) return true;   // W19a: die Stack-Spitze ist ein gültiges Ziel (_targeting-shared.coolnessSpitzeZiel)
   }
   if (gs.areaZones) {
     for (let p = 0; p < gs.players.length; p++) {

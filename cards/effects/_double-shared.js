@@ -29,7 +29,7 @@ const doppelSpellName = (engine, name) => istDoppelSpell(engine._getCardDB()[nam
 /** Kontrolliert `pi` bereits eine offene Kopie von `name` auf dem Brett? */
 function kontrolliert(engine, pi, name) {
   return (engine.cardInstances || []).some(c =>
-    c.name === name && c.zone === 'support' && !c.faceDown && (c.controller ?? c.owner) === pi);
+    (engine.instHatName ? engine.instHatName(c, name) : c.name === name) && c.zone === 'support' && !c.faceDown && (c.controller ?? c.owner) === pi);   // W73c: auch ein Zusatzname (Shroomasaur) zählt
 }
 
 module.exports = { istDoppel, istDoppelSpell, istDoppelKreatur, doppelSpellName, kontrolliert, sofortAusHandBeschwoeren };

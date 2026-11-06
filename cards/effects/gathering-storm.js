@@ -49,6 +49,9 @@ function hostHasWhiteEye(engine, ownerIdx, heroIdx) {
 }
 
 module.exports = {
+  // Legt sich an „the user" (den wirkenden HELDEN) an: Demon's Gate (Kreatur als Wirker) darf diesen Spell nicht wirken (Ruling Al, QA-Welle 1 Nr. 34).
+  attachesToUser: true,
+
   // ★★ v1182 — ENTKOPPELTE BILDER (CARD_API): wird die Karte NEGIERT,
   // laeuft ihr Effekt-Rumpf nie — die Engine spielt dann diese Bilder.
   // Im normalen Weg bleibt es bei den Broadcasts im Effekt selbst.
@@ -210,10 +213,11 @@ module.exports = {
       // Only fires when the opponent is the active player (their turn start).
       if (gs.activePlayer !== oppIdx) return;
 
-      // Host must still be alive + functional (frozen/stunned/negated kill the trigger).
+      // Host must still be alive.
+      // ★ W25b (N2-06, Al: „Spell-Anhängsel liegen an gefrorenem/betäubtem/negiertem Träger NICHT still"): die frühere
+      // Prüfung frozen/stunned/negated entfällt — der Sturm tickt auch bei gestatusem Träger (Anhänge sind eigene Karten).
       const host = ctx.attachedHero;
       if (!host?.name || host.hp <= 0) return;
-      if (host.statuses?.frozen || host.statuses?.stunned || host.statuses?.negated) return;
 
       const oppPs = gs.players[oppIdx];
       if (!oppPs) return;
@@ -307,6 +311,7 @@ module.exports = {
             c.owner === t.owner && c.zone === 'support' &&
             c.heroIdx === t.heroIdx && c.zoneSlot === t.slotIdx))
           .filter(Boolean),
+        heroes: chosen.filter(t => t.type === 'hero'),   // W78 (Pythia): Helden, die dieser Schlag faellt, sind todgeweiht
         source, amount: dmg, type: 'destruction_spell', sourceOwner: ownerIdx,
       });
       try {
@@ -335,6 +340,10 @@ module.exports = {
           }
         }
       } finally { await engine.endMultiHit(); }
+
+      // W24b N2-13: ein Tick ist kein gewirkter Spell (`afterSpellResolved` feuert nie) — eine dabei verbrauchte Energy Aura sofort abraeumen
+      // (Ablage + 2 Karten), damit sie nicht bis zum Zugende liegt und den naechsten Tick (anderer Gathering Storm) abwehrt.
+      await engine.raeumeVerbrauchteSpellSchilde();
 
       engine.log('gathering_storm_tick', {
         player: gs.players[ownerIdx]?.username,

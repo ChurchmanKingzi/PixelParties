@@ -87,7 +87,7 @@ async function detachCrimsonWeb(engine, inst, reason) {
     // is preserved on inst.owner from the attach step; controller
     // points at the locked player so the card renders on their side
     // until detached.
-    const sourceOwner = inst.owner;
+    const sourceOwner = engine.kartenBesitzerVon(inst);   // W64c: permanenter Besitzer (eine gestohlene Handkarte gehoert nicht dem Leger)
     engine._broadcastEvent('play_pile_transfer', {
       owner: sourceOwner, cardName: CARD_NAME,
       fromOwner: lockedOwner, toOwner: sourceOwner,
@@ -120,6 +120,10 @@ async function detachCrimsonWeb(engine, inst, reason) {
 }
 
 module.exports = {
+  // ★ Z7b: „Negate that Spell/Attack/effect" = die gewirkte Karte löst NIE auf → ihre Einmal-Stempel werden zurückgegeben
+  // (Engine: `_merkeGanzeNegation`). Teil-Negierungen („… on that Hero", Schaden) tragen das Flag nicht.
+  negatesWholeCard: true,
+
   isSurprise: true,
   activeIn: ['support'],
 
@@ -149,8 +153,11 @@ module.exports = {
     // opp source only (Als Vorgabe 29.9.: handelnder Spieler, nicht Seite)
     if ((sourceInfo.controller ?? sourceInfo.owner) === ownerIdx) return false;
     if (sourceInfo.heroIdx == null || sourceInfo.heroIdx < 0) return false;
+    // W16c (A05-25): wirkt eine KREATUR den Zauber (Skeleton Priest/Wizard, Demon's Gate: `_creatureCasterForSource`), ist der Angreifer
+    // die Kreatur, nicht der Wirtsheld - das Netz negiert, kann aber an keinen Helden angehaengt werden ("if possible").
+    const kreaturWirkt = require('./_hooks').isCreatureSource(engine, sourceInfo);
     const attacker = gs.players[sourceInfo.owner]?.heroes?.[sourceInfo.heroIdx];
-    if (!attacker || attacker.hp <= 0) return false;
+    if (!kreaturWirkt && (!attacker || attacker.hp <= 0)) return false;
     // Source must be a Spell or Attack CARD. Demon's Gate-style
     // creature-caster annotation preserves the source name in cardDB
     // so we still read the actual cardType.
@@ -158,9 +165,10 @@ module.exports = {
     const srcName = sourceInfo.cardName || sourceInfo.cardInstance?.name;
     const srcData = srcName ? cardDB[srcName] : null;
     if (!srcData) return false;
-    if (srcData.cardType !== 'Spell' && srcData.cardType !== 'Attack') return false;
+    // W30a (Al, 21.10.2026): auch Effekte, die als Attack/Spell ZÄHLEN (Broghan & Co., Alice, Gegenstandseffekte, Greatmaw-Treffer) — wie Flooding.
+    if (srcData.cardType !== 'Spell' && srcData.cardType !== 'Attack' && !require('./_hooks').zaehltAlsAttackOderSpell(engine, sourceInfo)) return false;
     // Free Support Zone on the attacker for the attach.
-    if (findFreeSupportSlot(gs.players[sourceInfo.owner], sourceInfo.heroIdx) < 0) return false;
+    if (!kreaturWirkt && findFreeSupportSlot(gs.players[sourceInfo.owner], sourceInfo.heroIdx) < 0) return false;
     return true;
   },
 
@@ -189,6 +197,27 @@ module.exports = {
 
     const attackerPs = gs.players[attackerOwner];
     const attackerHero = attackerPs?.heroes?.[attackerHi];
+    // W16c (A05-25): Kreatur als Wirker -> negieren, aber nichts anhaengen (kein Held als Angreifer); die Karte geht in die Ablage.
+    if (require('./_hooks').isCreatureSource(engine, sourceInfo)) {
+      const ownerPs0 = gs.players[zonenSeite];
+      const inst0 = ctx.card;
+      engine._broadcastEvent('play_zone_animation', {
+        type: 'crimson_web', owner: attackerOwner, heroIdx: attackerHi, zoneSlot: -1,
+        von: { owner: zonenSeite, heroIdx: ownerHi, zoneType: 'surprise' },
+        bleibt: false, duration: 2100,
+      });
+      await engine._delay(1100);
+      const sz0 = ownerPs0?.surpriseZones?.[ownerHi];
+      if (sz0) {
+        const idx0 = sz0.indexOf(CARD_NAME);
+        if (idx0 >= 0) sz0.splice(idx0, 1);
+      }
+      gs.players[ctx.cardOriginalOwner ?? zonenSeite]?.discardPile?.push(CARD_NAME);
+      if (inst0) engine._untrackCard(inst0.id);
+      engine.log('crimson_web_no_attach', { reason: 'attacker_is_creature', player: ownerPs0?.username });
+      engine.sync();
+      return { effectNegated: true };
+    }
     if (!attackerHero || attackerHero.hp <= 0) return null;
 
     const freeSlot = findFreeSupportSlot(attackerPs, attackerHi);
@@ -390,6 +419,10 @@ module.exports = {
       const inst = ctx.card;
       if (!inst) return;
       if (ctx.fromZone !== 'support') return;
+      // Nur der Abgang des Netzes SELBST: `ctx.card` ist die lauschende Karte, die gehende steht in `leavingCard` / `_onlyCard`
+      // (sonst hob jede Karte, die irgendeine Support Zone verlaesst — auch ein Equip aus Darions Stapel —, den Status auf).
+      const gehend = ctx.leavingCard || ctx._onlyCard;
+      if (gehend && gehend.id !== inst.id) return;
       const lockedOwner = inst.counters?._crimsonWebLockedOwner;
       const lockedHeroIdx = inst.counters?._crimsonWebLockedHeroIdx;
       if (lockedOwner == null || lockedHeroIdx == null) return;

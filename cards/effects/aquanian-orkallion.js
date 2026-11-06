@@ -114,20 +114,26 @@ module.exports = {
       const ps = gs.players[pi];
       if (!ps) return;
 
-      // Eine Area je Spieler — dasselbe Tor wie beim Ausspielen aus der
-      // Hand. Wer schon eine kontrolliert, bekommt keine Suche.
-      if ((gs.areaZones?.[pi] || []).length > 0) return;
+      // Dasselbe Tor wie beim Ausspielen aus der Hand: Area-Fassungsvermoegen (`canPlaceAnotherArea`: Limit 1, mit Spatial Crevice 3 VERSCHIEDENE Areas).
+      // Wer keinen Platz mehr hat, bekommt keine Suche. Als Fix (Al 27.10.): vorher blockte hier jede liegende Area (`length > 0`) — auch mit Spatial Crevice und Platz.
+      if (!engine.canPlaceAnotherArea(pi)) return ctx._engine.summonEffektFizzelt(ctx.card, ctx.cardName, { stumm: true });   // W11/R4: wirkt nicht → Blob stumm
+      // Als Ruling (Al 27.10.): Reality Crack („You cannot play another Area for the rest of the turn") sperrt auch „bring it into play" — keine Suche; die Beschwoerung selbst bleibt gueltig.
+      if (engine.areaSpielGesperrt(pi, { direkt: true })) return ctx._engine.summonEffektFizzelt(ctx.card, ctx.cardName, { stumm: true });
+
+      // W82 (Shipwrecked):: keine Area ins Spiel bringen
+      if (engine.spielerIstVonAreasAusgenommen(pi)) return ctx._engine.summonEffektFizzelt(ctx.card, ctx.cardName, { stumm: true });
 
       const cardDB = engine._getCardDB();
       const gezaehlt = {};
       for (const n of (ps.mainDeck || [])) {
         if (!isTutorableArea(cardDB[n], engine, pi, { maxLevel: Infinity })) continue;
+        if (!engine.canPlaceAnotherArea(pi, n)) continue;   // Als Fix (Al 27.10.): dieselbe Area liegt schon (Spatial Crevice: nur VERSCHIEDENE) — nicht waehlbar
         gezaehlt[n] = (gezaehlt[n] || 0) + 1;
       }
       const galerie = Object.entries(gezaehlt)
         .map(([name, count]) => ({ name, source: 'deck', count, level: cardDB[name]?.level || 0 }))
         .sort((a, b) => (a.level - b.level) || a.name.localeCompare(b.name));
-      if (galerie.length === 0) return;
+      if (galerie.length === 0) return ctx._engine.summonEffektFizzelt(ctx.card, ctx.cardName, { stumm: true });   // W11/R4: wirkt nicht → Blob stumm
 
       const wahl = await engine.promptGeneric(pi, {
         type: 'cardGallery',
@@ -136,10 +142,10 @@ module.exports = {
         description: 'You may bring an Area from your deck into play, regardless of its level.',
         cancellable: true,
       });
-      if (!wahl || wahl.cancelled || !wahl.cardName) return;   // „you may" — abgelehnt
+      if (!wahl || wahl.cancelled || !wahl.cardName) return ctx._engine.summonEffektFizzelt(ctx.card, ctx.cardName, { stumm: true });   // W11/R4: wirkt nicht → Blob stumm
 
       const name = wahl.cardName;
-      if (!(await engine.takeFromPile(ps, 'deck', name, { source: CARD_NAME }))) return;
+      if (!(await engine.takeFromPile(ps, 'deck', name, { source: CARD_NAME }))) return ctx._engine.summonEffektFizzelt(ctx.card, ctx.cardName, { stumm: true });   // W11/R4: wirkt nicht → Blob stumm
       engine.shuffleDeck?.(pi, 'main');
 
       // ★ Auftritt erst NACH der bindenden Wahl (CARD_API): die Galerie

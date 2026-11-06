@@ -14,6 +14,41 @@
 const { hasCardType } = require('./_hooks');
 const { getCardDB: _getCardDB } = require('./_card-db');
 
+/** KOSTEN: 1 Stack Poison auf den gewählten eigenen Helden. `false` = ungültige Wahl (nichts bezahlt). */
+async function zahleKosten(engine, pi, selectedIds, validTargets) {
+  const target = (validTargets || []).find(t => t.id === (selectedIds || [])[0]);
+  if (!target || target.type !== 'hero') return false;
+  const hero = engine.gs.players[target.owner ?? pi]?.heroes?.[target.heroIdx];   // W28a: Brettseite des (kontrollierten) Helden
+  if (!hero?.name || hero.hp <= 0) return false;
+  await engine.addHeroStatus(target.owner ?? pi, target.heroIdx, 'poisoned', {
+    addStacks: 1, appliedBy: pi,
+  });
+  engine.log('poison_applied', {
+    target: hero.name, stacks: 1, by: 'Sickly Cheese',
+  });
+  engine.sync();
+  await engine._delay(400);
+  return true;
+}
+
+/**
+ * Eigene lebende Helden als Kostenziel. W7b (F03-12): ein Held, der den Giftstapel nicht annehmen wuerde (giftimmun,
+ * `negative_status_immune`, Johanna/Light-Ball-Schutz, Shielded …), ist `ineligible` (ausgegraut, serverseitig nicht waehlbar).
+ */
+function getValidTargets(gs, pi, engine) {
+  // W28a (Al, 21.10.2026: „'you control' = aktuelle Kontrolle, nicht Besitzer"): „a Hero you control" = `getControlledHeroTargets` (abgegebener eigener Held nein,
+  // uebernommener Gegnerheld ja; `owner` = Brettseite).
+  const targets = engine ? engine.getControlledHeroTargets(pi) : (gs.players[pi].heroes || []).map((hero, hi) => ({ id: `hero-${pi}-${hi}`, type: 'hero', owner: pi, heroIdx: hi, cardName: hero?.name })).filter(t => t.cardName && gs.players[pi].heroes[t.heroIdx].hp > 0);
+  for (const t of targets) {
+    // W33a (Al, 22.10.2026, ersetzt die W31a-Ausnahme `ohneCharme`): „Sickly Cheese kann spezifisch NUR aktiviert werden, wenn das Ziel vergiftbar ist, also in beiden Fällen
+    // unspielbar." Ein Ziel, das den Giftstapel (die Kosten) nicht annähme, ist `ineligible`: echte Giftimmunität (W7b) UND der Charme-Schutz eines temporär übernommenen Helden
+    // (`heroBlocksStatusNow` ohne `ohneCharme`). Gilt NUR für diese Karte; Torchure, The Yeeting, Mana Absorbing Crystal, Experimental Potion, Angry Cheese bieten den
+    // temporär übernommenen Helden weiter an (W31a). Ist kein Ziel vergiftbar, ist die Karte unspielbar (`canActivate`).
+    if (engine && engine.heroBlocksStatusNow(t.owner, t.heroIdx, 'poisoned', { appliedBy: pi })) t.ineligible = true;
+  }
+  return targets;
+}
+
 module.exports = {
   // ★ v1070 (Als Befund 14.9.: „Wieso drei Cheese-Karten? Davon gibt es
   // sechs!"). Die Autoerkennung liess diese Karte als spielbar durch,
@@ -24,14 +59,19 @@ module.exports = {
   // unterscheiden kann; das manuelle Flag gewinnt im Loader.
   blockedBySearchLock: true,
   isTargetingArtifact: true,
+  // Die Heldenwahl ist hier nur der KOSTENPUNKT ("… to it" vor der Suche); der Effekt selbst wählt keinen Helden → Flesh-Eating Swarm Trap & Co. dürfen nicht darauf reagieren.
+  heroChoiceIsCost: true,
   // Tutors a Decay Magic Spell into hand — blocked while hand-locked.
   blockedByHandLock: true,
 
-  canActivate(gs, pi) {
+  canActivate(gs, pi, engine) {
     // Must have at least 1 living hero under control
     const ps = gs.players[pi];
-    const hasHero = (ps.heroes || []).some(h => h?.name && h.hp > 0);
+    const hasHero = engine ? engine.getControlledHeroTargets(pi).length > 0 : (ps.heroes || []).some(h => h?.name && h.hp > 0);   // W28a: kontrollierte Helden
     if (!hasHero) return false;
+    // ★ W7b (F03-12, Al 14.10.): „Giftimmun macht ein Ziel ineligible" - die Karte ist nur gesperrt, wenn es GAR KEIN
+    // waehlbares Ziel gibt, d. h. kein lebender Held, der den Giftstapel (die Kosten) annehmen wuerde.
+    if (engine && !getValidTargets(gs, pi, engine).some(t => !t.ineligible)) return false;
 
     // Must have at least 1 Decay Magic Spell in deck
     const cardDB = _getCardDB();
@@ -42,21 +82,8 @@ module.exports = {
     });
   },
 
-  getValidTargets(gs, pi) {
-    const ps = gs.players[pi];
-    const targets = [];
-    for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
-      const hero = ps.heroes[hi];
-      if (!hero?.name || hero.hp <= 0) continue;
-      targets.push({
-        id: `hero-${pi}-${hi}`,
-        type: 'hero',
-        owner: pi,
-        heroIdx: hi,
-        cardName: hero.name,
-      });
-    }
-    return targets;
+  getValidTargets(gs, pi, engine) {
+    return getValidTargets(gs, pi, engine);
   },
 
   targetingConfig: {
@@ -81,24 +108,19 @@ module.exports = {
 
   animationType: 'poison_vial',
 
-  async resolve(engine, pi, selectedIds, validTargets) {
+  // ★ W4b (Al, Welle 4): der Giftstapel am eigenen Helden („… to play this card“) ist der KOSTENPUNKT und läuft VOR dem Reaktionsfenster (`payArtifactCost`,
+  // Engine `_payArtifactCost`); wird die Karte danach komplett negiert (Rusty Touch, Silence …), bleibt der Preis bezahlt
+  // und es wird nichts gesucht. `false` = ungültige Wahl → nichts bezahlt. Normalweg: `resolve` bekommt `kosten`.
+  async payArtifactCost(engine, pi, selectedIds, validTargets) {
+    return (await zahleKosten(engine, pi, selectedIds, validTargets)) ? {} : false;
+  },
+
+  async resolve(engine, pi, selectedIds, validTargets, kosten) {
     if (!selectedIds || selectedIds.length === 0) return;
-    const target = validTargets.find(t => t.id === selectedIds[0]);
-    if (!target || target.type !== 'hero') return;
+    // Step 1: 1 Stack Poison auf den gewählten eigenen Helden (cost) — Normalweg schon vor dem Fenster bezahlt (`kosten`).
+    if (!kosten && !(await zahleKosten(engine, pi, selectedIds, validTargets))) return;
 
     const ps = engine.gs.players[pi];
-    const hero = ps.heroes?.[target.heroIdx];
-    if (!hero?.name || hero.hp <= 0) return;
-
-    // Step 1: Inflict 1 stack of Poison to the chosen hero
-    await engine.addHeroStatus(pi, target.heroIdx, 'poisoned', {
-      addStacks: 1, appliedBy: pi,
-    });
-    engine.log('poison_applied', {
-      target: hero.name, stacks: 1, by: 'Sickly Cheese',
-    });
-    engine.sync();
-    await engine._delay(400);
 
     // Step 2: Deck search for Decay Magic Spells
     const cardDB = engine._getCardDB();

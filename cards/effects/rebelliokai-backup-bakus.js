@@ -219,7 +219,15 @@ module.exports = {
       // manual splice — also stay. The state-based discardPile check
       // at the top of this hook makes them harmless: they fire, see
       // no Bakus in discard, and bail.
-      if (ctx.card?.id != null) engine._untrackCard(ctx.card.id);
+      // W24d (N4-08): `ctx.card` ist der ZUERST gefundene Hoerer – bei `activeIn` ueber hand/support/… kann
+      // das die Hand-/Brett-Kopie sein. Abgeraeumt wird nur die Instanz der ABLAGE-Kopie (die zurueckkehrt);
+      // gibt es keine, bleibt jede Instanz stehen (die Hand-Instanz legt `addCardFromDiscardToHand` neu an).
+      {
+        const weg = (ctx.card?.zone === 'discard') ? ctx.card
+          : engine.cardInstances.find(c => c.name === CARD_NAME && c.zone === 'discard'
+              && (c.originalOwner ?? c.owner) === ctx.cardOwner);
+        if (weg?.id != null) engine._untrackCard(weg.id);
+      }
 
       // Explicit pile-transfer animation for Bakus's discard → hand
       // leg. Without this, the client's hand-grew auto-detector would

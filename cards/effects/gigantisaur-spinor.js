@@ -27,6 +27,7 @@ module.exports = {
   canSummon: gigantisaursCanSummon,
 
   creatureEffect: true,
+  requiresTarget: true,   // Zielwahl-Effekt: Blinded sperrt ihn (siehe _hooks.js / getActivatableCreatures)
 
   canActivateCreatureEffect(ctx) {
     const engine = ctx._engine;
@@ -58,6 +59,15 @@ module.exports = {
       cancellable: true,
     });
     if (!target) return false;
+
+    // ★ W74c: Boris darf den Abwurf ignorieren — einmal gefragt (vor dem ersten Abwurf), die Antwort gilt für den ganzen Stapel. Die Wirkung hängt an der
+    // ANZAHL der abgeworfenen Karten ("that many", "the same number"): bei Verzicht 0, der Effekt endet ohne Wirkung.
+    // Der Effekt ist damit aktiviert (Sperre gestempelt), richtet aber keinen Schaden an („50 times the number of cards discarded" = 0).
+    if (handCount > 0 && await engine.borisVerzicht(pi, handCount, { source: CARD_NAME, skipVoidsEffect: true })) {
+      engine.log('spinor_boris_skipped', { player: ps.username });
+      engine.sync();
+      return true;
+    }
 
     // Discard the entire hand. Walk left-to-right and use
     // `actionDiscardHandCard` so onDiscard hooks fire normally

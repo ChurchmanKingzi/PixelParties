@@ -123,8 +123,12 @@ function aufstiegsziele(engine, pi, heroIdx) {
 
 /** Die Heldeninstanz dieses Slots (`seite` = Brettseite). */
 function heldeninstanz(engine, seite, heroIdx) {
-  return engine.cardInstances.find(c =>
-    c.owner === seite && c.zone === 'hero' && c.heroIdx === heroIdx) || null;
+  // Waehrend der Aktivierung eines UEBERNOMMENEN Helden traegt die Instanz den
+  // Kontrolleur als `owner` und die Brettseite als `heroOwner`
+  // (`resolveHeroEffectActivation`) — H01-heroes-13.
+  const slot = engine.cardInstances.filter(c => c.zone === 'hero' && c.heroIdx === heroIdx);
+  return slot.find(c => c.heroOwner === seite)
+    || slot.find(c => c.owner === seite && c.heroOwner == null) || null;
 }
 
 // ─── MODULE EXPORTS ──────────────────────
@@ -319,6 +323,8 @@ module.exports = {
     if (heldInst) {
       heldInst.counters = heldInst.counters || {};
       heldInst.counters._identityExpiresTurn = gs.turn + 1;
+      // W67a/W68a (Al): ein ÜBERSPRUNGENER Gegnerzug (Guardian Beast Zhu, Hand of Death) zählt nicht als „your opponent's next turn" — der Abstieg wartet auf das
+      // Ende des nächsten tatsächlich gespielten Gegnerzuges (der Skip schiebt `_identityExpiresTurn` um 2 weiter: `_zug-fristen.js`).
       // Als Vorgabe 29.9.: die Form stammt vom Kontrolleur — beim Abstieg
       // geht sie in SEINE Ablage, auch wenn die Uebernahme dann vorbei ist.
       if (feld !== pi) heldInst.counters._identityFormOwner = pi;

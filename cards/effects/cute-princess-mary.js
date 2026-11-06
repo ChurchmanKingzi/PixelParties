@@ -29,6 +29,7 @@
 //  any other Creature pool.
 // ═══════════════════════════════════════════
 
+const { anyName } = require('./_alias-name');   // Shroomasaur: Zusatzname zählt für Namensfamilien
 const { hasCuteInName, heroHasCuteWings } = require('./_cute-shared');
 
 module.exports = {
@@ -46,7 +47,7 @@ module.exports = {
    */
   canPlayCard(gs, playerIdx, heroIdx, cardData, engine) {
     if (cardData.cardType !== 'Creature') return true;
-    return hasCuteInName(cardData.name) || heroHasCuteWings(engine, playerIdx, heroIdx);
+    return anyName(cardData, (n) => hasCuteInName(n)) || heroHasCuteWings(engine, playerIdx, heroIdx);
   },
 
   /**
@@ -59,6 +60,6 @@ module.exports = {
    */
   canBypassLevelReqForCard(gs, playerIdx, heroIdx, cardData, engine) {
     if (cardData.cardType !== 'Creature') return false;
-    return hasCuteInName(cardData.name) || heroHasCuteWings(engine, playerIdx, heroIdx);
+    return anyName(cardData, (n) => hasCuteInName(n)) || heroHasCuteWings(engine, playerIdx, heroIdx);
   },
 };

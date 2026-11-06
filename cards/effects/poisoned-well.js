@@ -12,6 +12,9 @@
 const { hasCardType } = require('./_hooks');
 
 module.exports = {
+  // ★ Welle 12 (B-06, Al: „Eine Karte, deren Effekt komplett nutzlos wäre, ist nicht spielbar."): trifft NUR den Gegner — gegen den durch die
+  // Erste-Runden-Immunität geschützten Spieler unspielbar (Karte bleibt auf der Hand, keine Aktion/Kosten; `engine.ersterZugGeschuetzt`).
+  blockedByFirstTurnProtection: true,
   // ★★ v1186 (Als Regel 18.9.): AoE OHNE SCHADEN. Die
   // Autoerkennung des Loaders haengt an der Schadensklammer —
   // diese Karte teilt keinen Schaden aus (Gift auf ALLE gegnerischen Ziele), waere
@@ -59,6 +62,10 @@ module.exports = {
       }
 
       if (targets.length === 0) return;
+
+      // ★ W14b (Q156, Al: „Jeder Treffer zählt, auch reines Status-Zufügen"): „hit by"-Surprises (Booby Trap, Toxic Trap) öffnen auch hier.
+      const sr = await engine.statusHitSurpriseWindow(ctx.card, targets.filter(t => t.type === 'hero'), 'decay_spell', { ziele: targets });   // W15a (R01-10): + Hand-Reaktionen (Post-Target)
+      if (sr?.effectNegated) return;
 
       // Play purple water animation on all targets simultaneously
       for (const t of targets) {

@@ -21,12 +21,30 @@ const CARD_NAME = 'Archer of Teocuilatl';
 const GOLD_GAIN = 4;
 const DAMAGE = 50;
 
+/** KOSTEN (inhärent, freier Platz): ein Opfer, nicht in diesem Zug beschworen. `true` = bezahlt. */
+async function zahleOpfer(ctx) {
+  const engine = ctx._engine;
+  const turn = engine.gs.turn;
+  const paid = await engine.resolveSacrificeCost(ctx, {
+    minCount: 1, maxCount: 1,
+    title: `${CARD_NAME} — Sacrifice`,
+    description: 'Sacrifice 1 of your Creatures (not summoned this turn) to summon Archer of Teocuilatl as an additional Action.',
+    confirmLabel: '🗡️ Sacrifice!',
+    confirmClass: 'btn-danger',
+    cancellable: true,
+    filter: (c) => c.inst.turnPlayed !== turn,
+  });
+  return !!paid;
+}
+
 module.exports = {
   activeIn: ['hand', 'support'],
   requiresTarget: true,
 
+  // Als Ruling (Al 26.10.): „Ja, natürlich nur, wenn reguläre Beschwörung via Action verfügbar ist" — Special (Opfer, Zusatzaktion) ODER Normal (Aktion, ohne Opfer):
+  // wahr nur dort, wo Special der EINZIGE Weg ist (Main Phase / keine freie Aktion); sonst wählt der Spieler in `paySummonCost` (Muster Blue-Ice Dragon).
   inherentAction(gs, pi, heroIdx, engine) {
-    return T.hasTribute(engine, pi);
+    return T.specialErzwungen(engine, pi, heroIdx, CARD_NAME, engine ? T.hasTribute(engine, pi) : false);
   },
   // ★ v1167: Die Ersetzung KOSTET ein Opfer — das ist eine Handlung des
   // Helden. Ein eingefrorener, betaeubter oder negierter Held darf sie
@@ -47,10 +65,43 @@ module.exports = {
     return T.bounceTargets(engine, pi, CARD_NAME);
   },
 
+  // ★ W4b (Al, Welle 4): das Opfer ist KOSTE der Beschwörung und wird VOR dem Reaktionsfenster bezahlt (`paySummonCost`,
+  // Engine `_payCreatureSummonCost`); wird die Beschwörung danach komplett negiert (Off Duty …), bleibt es bezahlt.
+  // Tausch (Wurf auf einen belegten Platz): `T.paySacrificeSwap` opfert den Bewohner und hält den Platz, `beforeSummon`
+  // setzt die neue Kreatur danach hinein (`T.placeAfterSacrificeSwap`). Ohne `paySummonCost`-Lauf (Effekt-Beschwörung o. ä.)
+  // zahlt `beforeSummon` wie früher selbst (`ctx._summonKosten` fehlt).
+  async paySummonCost(ctx) {
+    const engine = ctx._engine;
+    const pi = ctx.cardOwner;
+    const ps = engine.gs.players[pi];
+    if (ps?._requestedBouncePlaceSlot) {   // Marke bleibt gesetzt: `beforeSummon` räumt sie ab
+      const d = await T.paySacrificeSwap(engine, pi, ps._requestedBouncePlaceSlot, CARD_NAME);
+      return d ? { kind: 'swap', special: true, ...d } : false;   // der Tausch geht nur per Opfer = Special
+    }
+    if (ctx._alsZusatzaktion) return { kind: 'none' };   // fremder Effekt beschwört „as an additional Action" (Ushabti …): kein eigenes Opfer
+    // Special/Normal-Wahl (Als Ruling Al 26.10.): nur im Spieler-Weg, mit Opfer-Möglichkeit UND freier regulärer Beschwörung; sonst zwangsweise Special (`inherentAction`).
+    let special = !!ctx.isInherentAction;
+    if (!special && ctx._isNormalSummon === true && T.hasTribute(engine, pi)) {
+      special = await T.frageSpecial(engine, pi, CARD_NAME, '🗡️ Special (sacrifice a Creature, free Action)');
+    }
+    if (!special) return { kind: 'none' };
+    return (await zahleOpfer(ctx)) ? { kind: 'sac', special: true } : false;
+  },
+
   async beforeSummon(ctx) {
     const engine = ctx._engine;
     const pi = ctx.cardOwner;
     const ps = engine.gs.players[pi];
+    // W4b: Kosten schon vor dem Reaktionsfenster bezahlt → nur noch landen.
+    const pre = ctx._summonKosten;
+    if (pre) {
+      if (ps?._requestedBouncePlaceSlot) delete ps._requestedBouncePlaceSlot;
+      if (ps?._requestedNormalSummonSlot) delete ps._requestedNormalSummonSlot;
+      const gelandet = pre.kind === 'swap' ? await T.placeAfterSacrificeSwap(engine, pi, pre, CARD_NAME) : true;
+      // Special bei schon eingezogener Aktion: server.js erstattet sie (Muster Blue-Ice Dragon).
+      if (gelandet && pre.special && !ctx.isInherentAction) engine.gs._summonModeUpgradedToInherent = pi;
+      return gelandet;
+    }
     if (ps?._requestedBouncePlaceSlot) {
       const req = ps._requestedBouncePlaceSlot;
       delete ps._requestedBouncePlaceSlot;
@@ -59,17 +110,7 @@ module.exports = {
     if (ps?._requestedNormalSummonSlot) delete ps._requestedNormalSummonSlot;
     if (!ctx.isInherentAction) return true;
 
-    const turn = engine.gs.turn;
-    const paid = await engine.resolveSacrificeCost(ctx, {
-      minCount: 1, maxCount: 1,
-      title: `${CARD_NAME} — Sacrifice`,
-      description: 'Sacrifice 1 of your Creatures (not summoned this turn) to summon Archer of Teocuilatl as an additional Action.',
-      confirmLabel: '🗡️ Sacrifice!',
-      confirmClass: 'btn-danger',
-      cancellable: true,
-      filter: (c) => c.inst.turnPlayed !== turn,
-    });
-    return !!paid;
+    return await zahleOpfer(ctx);
   },
 
   cpuResponse(engine, kind, promptData) {

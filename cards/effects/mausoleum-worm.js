@@ -24,6 +24,13 @@ const { isSeat } = require('./_opp');   // N-Spieler: gültiger Sitzindex
 //  • „1 per turn": je Spieler und Zug ein Mal (`gs.hoptUsed`, gestempelt bei
 //    gelungener Platzierung). Mehrere Kopien in der Ablage fragen je Held-KO nur
 //    ein Mal.
+//  • ★ Welle 11 (Al, 15.10.2026, Q80: „Für alle Wege kombiniert."): „play 1 per
+//    turn" gilt fuer ALLE Wege aufs Brett zusammen - Handspiel UND Platzierung
+//    aus der Ablage. Der Stempel (`mausoleum-worm:<Kontrolleur>`) wird beim
+//    EINTRITT jeder Kopie gesetzt (`hooks.onPlay`, auch Platzierungen); gesperrt
+//    sind danach das Handspiel (`canSummon`) und das Ablage-Angebot (Haken unten).
+//    Nicht gesperrt (kein „play"): andere Effekte, die einen Wurm platzieren
+//    (The Master's Key, Pinta …) - sie setzen aber den Stempel.
 // ═══════════════════════════════════════════
 
 const CARD_NAME = 'Mausoleum Worm';
@@ -38,7 +45,25 @@ module.exports = {
     return undefined;
   },
 
-  hooks: {},   // der Lader ignoriert Skripte ohne `hooks`
+  // Welle 12 (Al, Rueckfrage 12): „auch Place-Effekte sind davon limitiert/zählen ins Limit" — Engine-Vertrag `playLimitKey`: jeder Eintritt aufs
+  // Brett (Hand, Ablage, Platzieren durch The Master's Key & Co.) stempelt (`_stempelEintrittsLimit`), `actionPlaceCreature` verweigert danach.
+  playLimitKey: HOPT_KEY,
+
+  /** Q80/Welle 12: ein zweiter Mausoleum Worm ist im selben Zug weder spielbar (Hand) noch platzierbar/waehlbar, wenn schon einer eingetreten ist. */
+  canSummon(ctx) {
+    return !ctx._engine._eintrittsLimitErreicht(CARD_NAME, ctx.cardOwner);
+  },
+
+  hooks: {
+    /** Q80: jeder Eintritt aufs Brett (Hand, Ablage, Effekt) verbraucht das „1 per turn" des Kontrolleurs. */
+    onPlay: async (ctx) => {
+      if (ctx.playedCard?.id !== ctx.card.id) return;
+      if (ctx.cardZone !== 'support') return;
+      const gs = ctx._engine.gs;
+      if (!gs.hoptUsed) gs.hoptUsed = {};
+      gs.hoptUsed[`${HOPT_KEY}:${ctx.cardOwner}`] = gs.turn;
+    },
+  },
 
   // Ablage-Lauscher OHNE Instanz (`engine._runDiscardHooks`): Puzzle-Vorgaben, Mills & Co.
   // legen Karten ohne verfolgte Instanz in die Ablage — ein instanzgebundener Haken sah sie nie.
@@ -53,7 +78,7 @@ module.exports = {
       const gefallen = ctx.hero;
       if (!gefallen?.name || gefallen.hp > 0) return;   // gerettet? dann feuert dieser Haken gar nicht
       if ((ps.discardPile || []).indexOf(CARD_NAME) < 0) return;      // nur aus MEINER Ablage
-      if (gs.hoptUsed?.[`${HOPT_KEY}:${pi}`] === gs.turn) return;
+      if (engine._eintrittsLimitErreicht(CARD_NAME, pi)) return;
 
       // Physische Position des gefallenen Helden + Kontrolle.
       let seite = -1, heroIdx = -1;
@@ -76,12 +101,10 @@ module.exports = {
       if (gs._mausoleumAngebot === stempel) return;
 
       // Freie Plaetze des gefallenen Helden.
-      const zonen = [];
-      for (let z = 0; z < 3; z++) {
-        if (engine.supportSlotBelegt(seite, heroIdx, z)) continue;
-        if (engine.isSupportZoneLocked(seite, heroIdx, { source: CARD_NAME, cardName: CARD_NAME, via: 'place' })) continue;
-        zonen.push({ heroIdx, slotIdx: z, label: `${gefallen.name} — Slot ${z + 1}`, owner: seite });
-      }
+      // W63a (Al, 22.10.2026: Alices Effekt gilt fuer ALLE Platzierungs-Effekte; „erst die geteilte Zone, DANN die erste leere"): `engine.beschwoerZonenFuer` —
+      // freie Plaetze des gefallenen Helden und, mit Alice-Teilung, die Zone eines weiteren Mausoleum Worm; geteilte zuerst.
+      const zonen = engine.beschwoerZonenFuer(pi, CARD_NAME, { seite, heroIdx, nurBasis: true, namedHeroesOnly: true, source: CARD_NAME })
+        .map(z => ({ heroIdx, slotIdx: z.slotIdx, label: z.label, owner: seite, ...(z.shared ? { shared: true, stackDepth: z.stackDepth } : {}) }));
       if (zonen.length === 0) return;
       gs._mausoleumAngebot = stempel;
 

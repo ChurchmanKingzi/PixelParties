@@ -1,6 +1,7 @@
 // ═══════════════════════════════════════════
 //  CARD EFFECT: "Divine Gift of the Guardian"
-//  Spell (Reaction, Magic Arts Lv0)
+//  Spell (Reaction, Summoning Magic Lv1 laut Kartendaten)
+//  ★ W21a (Al, 20.10.2026): braucht einen Wirker-Helden mit dieser Schule/Stufe (eigener oder uebernommener).
 //  Once per game (Divine Gift key).
 //
 //  Triggers from hand when 1+ of the player's
@@ -65,6 +66,9 @@ module.exports = {
       // Once per game check
       if (ps._oncePerGameUsed?.has('divineGift')) return;
 
+      // ★ W21a (Al, 20.10.2026: „ja"): Wirker-Held mit Summoning Magic 1 (laut Kartendaten; eigener oder uebernommener) noetig.
+      if (!engine.hookReaktionWirkerVorhanden(pi, 'Divine Gift of the Guardian')) return;
+
       // Prompt the player to play this card
       const confirmed = await engine.promptGeneric(pi, {
         type: 'confirm',
@@ -77,6 +81,11 @@ module.exports = {
       });
 
       if (!confirmed || confirmed.cancelled) return;
+
+      // ★ W21a: Wirker waehlen (2+ Wirker: Picker; Abbruch = nichts passiert), vor Stempel und Entnahme.
+      const wirkerPlan = await engine.hookReaktionWirkerWaehlen(pi, 'Divine Gift of the Guardian');
+      if (!wirkerPlan) return;
+      if (ps._oncePerGameUsed?.has('divineGift')) return;
 
       // Mark once per game
       if (!ps._oncePerGameUsed) ps._oncePerGameUsed = new Set();
@@ -109,8 +118,9 @@ module.exports = {
         // nach dem Flug wieder auf (Als Befund 18.9. zu „Dive Down").
         engine.sync();
         engine.notePlayedFromHand(pi);
-        ps.discardPile.push('Divine Gift of the Guardian');
+        engine.handKartenBesitzerPs(ps, 'Divine Gift of the Guardian').discardPile.push('Divine Gift of the Guardian');   // W3/W5a: Stapel des permanenten Besitzers
       }
+      await engine._rxPayWisdom(ps, wirkerPlan);   // W21a: Wisdom-Abwurf des Wirkers (Karte ist schon aus der Hand)
 
       // Untrack hand instance
       const handInst = engine.cardInstances.find(c =>
@@ -130,7 +140,11 @@ module.exports = {
       }
 
       // Apply guardian immunity to ALL player's creatures
-      const expiresAtTurn = gs.turn + (gs.activePlayer === pi ? 2 : 1);
+      // ★ W25b (N2-05, Al: „alle, die zum Zeitpunkt eines möglichen Effekts gerade kontrolliert werden"): der Schutz ist eine
+      // ZEITRAUM-Marke am Spieler (`ps._guardianShield`, bis zum Beginn seines naechsten Zuges) und gilt laufend fuer jede Kreatur,
+      // die er gerade kontrolliert — auch spaeter beschworene/erbeutete, nicht mehr gestohlene. Die Marken an den Kreaturen
+      // (`_guardianImmune`, `buffs.guardian`) sind nur der Anzeige-Spiegel (Engine `_syncGuardianImmunity`).
+      engine._guardianSchutzSetzen(pi);
       const cardDB = engine._getCardDB();
 
       for (const inst of engine.cardInstances) {
@@ -140,26 +154,7 @@ module.exports = {
         const cd = engine.getEffectiveCardData(inst) || cardDB[inst.name];   // wirksame Daten: Tokens/Artifact Creatures auf dem Brett (Als Sweep 9.10.)
         if (!cd || !hasCardType(cd, 'Creature')) continue;
 
-        // Set immunity counter
-        inst.counters._guardianImmune = true;
-
-        // Add buff with timed expiry (after status damage, like cloudy)
-        if (!inst.counters.buffs) inst.counters.buffs = {};
-        inst.counters.buffs.guardian = {
-          expiresAtTurn,
-          expiresForPlayer: pi,
-          // "…until the BEGINNING of your next turn" — der Schutz endet
-          // AM Rundenbeginn, der Giftschaden dort geht also durch.
-          // Ohne dieses Flag lief der Buff im ZWEITEN Ablauf-Durchgang
-          // (`_processBuffExpiry({ beforeStatusDamage: false })`) und
-          // damit NACH dem Statusschaden — Als Mitschnitt zeigt genau
-          // das: `creature_immune_block … by Poison` in Zug 8, und erst
-          // danach `buff_remove guardian`. Der frühe Durchgang läuft vor
-          // dem Statusschaden (dieselbe Stelle, die Immortal nutzt).
-          expiresBeforeStatusDamage: true,
-          clearCountersOnExpire: ['_guardianImmune'],
-          source: 'Divine Gift of the Guardian',
-        };
+        engine._syncGuardianImmunity(inst, pi);   // Anzeige-Spiegel (Zaehler + Buff-Eintrag)
 
         // Red shield animation on each creature
         engine._broadcastEvent('play_zone_animation', {

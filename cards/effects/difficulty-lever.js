@@ -64,6 +64,7 @@
 // ═══════════════════════════════════════════
 
 const { SPELL_SCHOOL_ABILITIES, spellSchoolAbilitiesOn } = require('./_hooks');
+const { loadCardEffect } = require('./_loader');
 
 const CARD_NAME = 'Difficulty Lever';
 const MAX_LEVEL = 3;
@@ -74,6 +75,7 @@ function schulenDerPartei(engine, pi) {
   // kontrollierten Helden; ihre Ability-Zonen liegen in der physischen Spalte.
   const raus = new Set();
   for (const { physOwner, heroIdx: hi } of engine.heroesControlledBy(pi)) {
+    if (engine.heroAbilityLevelsBlanked(physOwner, hi)) continue;   // W4a (Al): negierte Abilities zaehlen nicht als "hat die Schule"
     const zonen = engine.gs.players[physOwner]?.abilityZones?.[hi];
     for (const s of spellSchoolAbilitiesOn(zonen, SPELL_SCHOOL_ABILITIES)) raus.add(s);
   }
@@ -93,10 +95,19 @@ function passendeZauber(engine, pi) {
     if (gesehen.has(name)) continue;
     const cd = cardDB[name];
     if (!cd || cd.cardType !== 'Spell') continue;
+    if (engine.areaKarteGesperrt(cd, pi, { kapazitaet: true })) continue;     // Als Ruling (Al 27.10.): Reality Crack („cannot play another Area") / Shipwrecked — eine Area ist nicht spielbar; Als Fix (Al 27.10.): auch ohne Platz in der Area Zone (Limit 1, Spatial Crevice 3 VERSCHIEDENE) bzw. als Dublette nicht
     if ((cd.level || 0) > MAX_LEVEL) continue;          // GEDRUCKTES Level
     const schulen = [cd.spellSchool1, cd.spellSchool2].filter(Boolean);
     if (schulen.length === 0) continue;                 // ohne Schule kein Kandidat
     if (!schulen.some(s => !vorhanden.has(s))) continue;
+    // Aufgehoben wird die STUFE, nicht die Spielbedingung („Eine Karte, deren Effekt nicht wirken kann, ist nicht spielbar"): ein Zauber, dessen
+    // `spellPlayCondition` jetzt scheitert (Sacrifice to Divinity ohne opferbare Kreatur …), steht nicht zur Wahl — sonst bricht der Wurf ab und die Galerie öffnet sich neu.
+    const skript = loadCardEffect(name);
+    if (typeof skript?.spellPlayCondition === 'function') {
+      let ok = true;
+      try { ok = !!skript.spellPlayCondition(engine.gs, pi, engine); } catch { ok = true; }
+      if (!ok) continue;
+    }
     gesehen.add(name);
     out.push({ name, source: 'hand', level: cd.level || 0 });
   }
@@ -194,7 +205,7 @@ module.exports = {
 
     while (true) {
       if (schritt === 'spell') {
-        const wahl = await engine.promptGeneric(pi, {
+        const wahl = await engine.promptSpellAuswahl(pi, {   // W48a: Zeitfenster der Spell-Auswahl (keine Surprise aktivierbar)
           type: 'cardGallery',
           cards: kandidaten.map(k => ({ name: k.name, source: 'hand', level: k.level })),
           title: CARD_NAME,
@@ -261,7 +272,11 @@ module.exports = {
       } finally {
         delete engine._promptCancelLabel;
       }
-      if (cast?.cancelled) { schritt = heldenZahl > 1 ? 'hero' : 'spell'; continue; }
+      if (cast?.cancelled) {
+        // CPU/Simulation: kein „Back" — dieselbe Antwort würde die Galerie endlos neu öffnen (MAX_HOOKS_PER_TURN). Der Mensch behält den Rückweg.
+        if (engine.isCpuPlayer(pi) || engine._inMctsSim || engine._fastMode) return { cancelled: true };
+        schritt = heldenZahl > 1 ? 'hero' : 'spell'; continue;
+      }
       break;
     }
 

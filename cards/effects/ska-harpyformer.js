@@ -11,6 +11,10 @@
 //  ③ Once per turn: discard a Performance Ability
 //    from hand to attach any Ability from your
 //    deck to a Hero you control.
+//    Als Ruling (Al 26.10.): die Ability geht DIREKT
+//    vom Deck in die Ability Zone (kein Hand-Zwischen-
+//    schritt: gegnerische Analyzer/Gatherer und
+//    Reaktionen sehen keinen Handzugang).
 // ═══════════════════════════════════════════
 
 const { harpyformerInherentAction, harpyformerDiscardCost } = require('./_harpyformer-shared');
@@ -189,14 +193,14 @@ module.exports = {
       const hero = gs.players[ctx.cardHeroOwner ?? pi]?.heroes?.[heroIdx];   // Styx 28.9.: Brettseite
       if (!ps || !hero?.name || hero.hp <= 0) return;
 
-      if (!(ps.mainDeck || []).includes(ABILITY_NAME)) return;
+      if (!(ps.mainDeck || []).includes(ABILITY_NAME)) return ctx._engine.summonEffektFizzelt(ctx.card, ctx.cardName, { stumm: true });   // W11/R4 (Al): kein Treffer → wirkt nicht → Blob stumm
 
       // Offer the 50-damage trade
       const confirm = await ctx.promptConfirmEffect({
         title: CARD_NAME,
         message: `Deal 50 damage to ${hero.name} to search your deck for a "${ABILITY_NAME}" Ability?`,
       });
-      if (!confirm) return;
+      if (!confirm) return ctx._engine.summonEffektFizzelt(ctx.card, ctx.cardName, { stumm: true });   // W11/R4 (Al): abgelehntes „you may" → Blob stumm
 
       // Deal 50 to the hosting hero
       engine._broadcastEvent('play_zone_animation', {
@@ -230,6 +234,7 @@ module.exports = {
     const pi = ctx.cardOwner;
     const db = engine._getCardDB();
     return (ps.heroes || []).some((h, hi) => h?.name && h.hp > 0
+      && engine.heroSideOf(pi, h) === pi   // W25a (N1-11, Al: „nach aktueller Kontrolle"): „a Hero you control" — kein abgegebener Held
       && engine.kannAbilityAnlegen(pi, hi)
       && (ps.mainDeck || []).some(cn => db[cn] && hasCardType(db[cn], 'Ability') && engine.canAttachAbilityToHero(pi, cn, hi)));
   },
@@ -257,6 +262,7 @@ module.exports = {
     for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
       const h = ps.heroes[hi];
       if (!h?.name || h.hp <= 0) continue;
+      if (engine.heroSideOf(pi, h) !== pi) continue;   // W25a (N1-11): „a Hero you control" = aktuelle Kontrolle
       // v1356 (Als Befund): Ska legt NICHT „additionally" an — das Anlegen
       // kostet das eine Anlegen des Ziel-Helden fuer diesen Zug. Ein Held,
       // der es schon verbraucht hat (und keinen Bonus-Platz hat), ist kein Ziel.
@@ -321,28 +327,28 @@ module.exports = {
 
     const chosenAbility = abilityPick.cardName;
 
-    // Verify still in deck, move to hand temporarily, then attach via
-    // engine. Route through the canonical helper so the brief hand-add
-    // fires ON_CARD_ADDED_TO_HAND (Cosmic Depths Analyzer / Gatherer
-    // key off this hook for any opponent search effect, including
-    // Ska's tutor-then-attach flow). Helper covers deck-search anim,
-    // tracking, log, hook, and opponent reveal.
-    if (ps.mainDeck.indexOf(chosenAbility) < 0) return true;
-    await engine.actionAddCardFromDeckToHand(pi, chosenAbility, {
-      source: CARD_NAME,
-      reveal: true,
-    });
-
-    // v1356: KEIN `skipAbilityGivenCheck` — verbraucht das Anlegen des Helden.
-    const attachResult = await engine.attachAbilityFromHand(pi, chosenAbility, targetHeroIdx, {});
-
-    if (!attachResult?.success) {
-      // Attachment failed — card stays in hand (player keeps it).
+    // Als Ruling (Al 26.10.): „Ja" — die Ability kommt DIREKT vom Deck in die Ability Zone des Helden (Muster Muscle Training), nicht über die
+    // Hand: kein Hand-Zwischenschritt, den gegnerische Analyzer/Gatherer („adds cards to their hand via an effect") oder Such-Reveals sehen.
+    // Das Anlegen verbraucht wie bisher das Anlegen des Helden (v1356, kein „additional"); eine Such-/Hand-Sperre betrifft die Karte nie (W5b-B11).
+    const deckIdx = ps.mainDeck.indexOf(chosenAbility);
+    if (deckIdx < 0) return true;
+    const ort = engine.abilityZielOrt(pi, targetHeroIdx, chosenAbility);
+    if (!ort) {
       engine.log('ska_attach_failed', { player: ps.username, card: chosenAbility });
-    } else {
-      engine.log('ska_attach', { player: ps.username, ability: chosenAbility, hero: heroName });
-      engine.shuffleDeck(pi);
+      engine.sync();
+      return true;
     }
+    if (!(await engine.takeFromPile(ps, 'deck', deckIdx, { source: CARD_NAME }))) { engine.sync(); return true; }   // Stapel-Schicht (Knight-[B]-Sperre …)
+    engine.verbraucheAbilityAnlegen(pi, targetHeroIdx);   // v1356: KEIN „additional" — verbraucht das Anlegen des Helden
+    const inst = engine.abilityOrtBelegen(pi, targetHeroIdx, chosenAbility, ort);
+    engine._broadcastEvent('deck_search_add', { cardName: chosenAbility, playerIdx: pi });
+    await engine.abilityOrtHooks(inst, ort, { _skipReactionCheck: true });
+    engine._broadcastEvent('ability_activated', {
+      owner: pi, heroIdx: targetHeroIdx, zoneIdx: ort.slot, zoneKind: ort.art, abilityName: chosenAbility,
+    });
+    engine.log('ability_attached', { player: ps.username, card: chosenAbility, hero: heroName });
+    engine.log('ska_attach', { player: ps.username, ability: chosenAbility, hero: heroName });
+    engine.shuffleDeck(pi);
 
     engine.sync();
     return true;

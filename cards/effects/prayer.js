@@ -124,6 +124,9 @@ module.exports = {
       if (!res || res.cancelled) return false;              // Sperre nicht verbraucht
       picked = (res.selectedCards || []).slice().sort((a, b) => b.handIndex - a.handIndex);
     }
+    // ★ W74c: Boris darf den Abwurf (Kosten, „any number") ignorieren — einmal nach der Wahl, vor dem ersten Abwurf. „Draw the same number" hängt an den
+    // tatsächlich abgeworfenen Karten: bei Verzicht 0 (keine Karte wird abgeworfen, keine gezogen).
+    if (picked.length > 0 && await engine.borisVerzicht(pi, picked.length, { source: CARD_NAME, skipVoidsEffect: true })) picked = [];
     for (const c of picked) {
       await engine.actionDiscardHandCard(pi, c.cardName, c.handIndex, { source: CARD_NAME, selfInflicted: true });
     }

@@ -19,8 +19,12 @@
 //       discard pile, you may delete it instead and draw 1 card.
 //       Implemented via the generic `_redirectToDeleted` flag on the
 //       leaving instance + a draw at `onCardLeaveZone` time.
+//       ★ D1 (Baustein-Phase): der SCHADENSTOD (Schaden, Brand, Gift) laeuft nicht ueber `actionMoveCard`, sondern durch den Schadens-Batch der
+//       Engine — der meldet vor dem Ablegen `onCreatureWouldBeDiscarded` (gleiche Felder wie das Leave-Ereignis, `toZone: 'discard'`); dort gilt
+//       dieselbe Klausel (gleicher Handler). Gefragt wird nur, was wirklich in die Ablage kaeme (nicht bei Ghazma/Ankhota/Root/Vacarn-Loeschung).
 // ═══════════════════════════════════════════
 
+const { anyName } = require('./_alias-name');   // Shroomasaur: Zusatzname zählt für Namensfamilien
 const { isSkeletonCreature, findSkeletonsInDiscard } = require('./_skeleton-shared');
 
 const CARD_NAME = 'The Bonegrinder';
@@ -104,6 +108,11 @@ module.exports = {
       const ps = gs.players[pi];
       if (!ps) return;
 
+      // „Directly into play" durch eine ANDERE Karte (Planet in a Bottle, Reality Crack …): The Bonegrinder wird nicht GESPIELT, es gibt keine
+      // Aktion, die sie zur Zusatzaktion machen koennte - also auch keinen Skelett-Abwurf (Pflicht-Kosten der Haupt-Phase). Nur platzieren.
+      const _loest = ps._resolvingCard;
+      if (_loest && _loest.name && _loest.name !== CARD_NAME) { await engine.placeArea(pi, ctx.card); return; }
+
       // Decide which path this cast took:
       //   • Main Phase + Skeleton(s) in discard → INHERENT branch.
       //     server.js's `doPlaySpell` consulted `inherentAction()` and
@@ -185,6 +194,9 @@ module.exports = {
       await engine.placeArea(pi, ctx.card);
     },
 
+    // D1: Schadenstod (Engine-Batch) — derselbe Handler wie fuer die Zerstoerungs-/Opfer-Wege (`onCardLeaveZone`, `toZone: 'discard'`).
+    onCreatureWouldBeDiscarded: (ctx) => module.exports.hooks.onCardLeaveZone(ctx),
+
     /**
      * Reactive draw — up to 5/turn, when an own Skeleton would be sent
      * to own discard, may delete it instead and draw 1.
@@ -198,6 +210,7 @@ module.exports = {
      * keeps the redirect path symmetrical with Vacarn's hero hook.
      */
     onCardLeaveZone: async (ctx) => {
+      if (ctx.cardZone !== 'area') return;   // W16c (A05-16): Dauereffekt der AUSLIEGENDEN Area - die Handkopie reagiert nicht
       // Filter:
       //   • leaving from support → discard.
       //   • leaving creature is owned by Bonegrinder's controller.
@@ -209,10 +222,13 @@ module.exports = {
       if (!leaving) return;
       if (leaving._redirectToDeleted) return;
       const myController = ctx.cardController ?? ctx.cardOwner;
-      const targetController = leaving.controller ?? leaving.owner;
-      if (targetController !== myController) return;
       const engine = ctx._engine;
-      if (!isSkeletonCreature(leaving.name, engine)) return;
+      if (engine.spielerIstVonAreasAusgenommen(myController)) return;   // W82 (Shipwrecked): Area-Effekte aktivieren ist gesperrt
+      // W16c (A05-17): "YOUR discard pile" - gemeint ist die Ablage, in die das Skelett geht: die seines (permanenten) BESITZERS
+      // (Ruling "Gestohlene Karten gehen in die Ablage ihres Besitzers"), nicht die seines Kontrolleurs.
+      const targetController = engine.kartenBesitzerVon(leaving);
+      if (targetController !== myController) return;
+      if (!anyName(leaving, (n) => isSkeletonCreature(n, engine))) return;
 
       // Per-turn cap on this Bonegrinder instance.
       const inst = ctx.card;
@@ -267,13 +283,17 @@ module.exports = {
      * pile arrays ourselves.
      */
     onDiscard: async (ctx) => {
+      if (ctx.cardZone !== 'area') return;   // W16c (A05-16): nur die ausliegende Area, nicht die Handkopie
       const engine = ctx._engine;
       const myController = ctx.cardController ?? ctx.cardOwner;
+      if (engine.spielerIstVonAreasAusgenommen(myController)) return;   // W82 (Shipwrecked): Area-Effekte aktivieren ist gesperrt
       // Only react when the discard happened on the SAME side as
       // this Bonegrinder. Cross-player discards (a future opp-
       // induced discard) don't qualify.
       if (ctx.playerIdx !== myController) return;
-      const cardName = ctx.cardName || ctx.discardedCardName;
+      // `ctx.cardName` ist im Listener-Kontext der Name der LAUSCHENDEN Karte (The Bonegrinder), nicht der der abgelegten -
+      // `discardedCardName` zuerst (sonst war die Hand-Ablage-Klausel nie ein Skelett und griff nie).
+      const cardName = ctx.discardedCardName || ctx.cardName;
       if (!cardName) return;
       if (!isSkeletonCreature(cardName, engine)) return;
 
@@ -354,10 +374,12 @@ module.exports = {
      * sent to your discard pile") doesn't apply.
      */
     onMill: async (ctx) => {
+      if (ctx.cardZone !== 'area') return;   // W16c (A05-16): nur die ausliegende Area, nicht die Handkopie
       if (ctx.deleteMode) return;
       const engine = ctx._engine;
       const myController = ctx.cardController ?? ctx.cardOwner;
       if (ctx.playerIdx !== myController) return;
+      if (engine.spielerIstVonAreasAusgenommen(myController)) return;   // W82 (Shipwrecked): Area-Effekte aktivieren ist gesperrt
 
       const milled = Array.isArray(ctx.milledCards) ? ctx.milledCards : [];
       if (milled.length === 0) return;

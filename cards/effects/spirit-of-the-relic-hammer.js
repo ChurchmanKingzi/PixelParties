@@ -15,7 +15,9 @@
 //  ② AURA: „the FIRST Creature EACH PLAYER summons during EACH OF THEIR
 //    turns\" — je Spieler und je Zug genau eine. Gezaehlt wird der Zug
 //    der Beschwoerung, nicht der eigene: beschwoert der Gegner in
-//    seinem Zug, greift es bei ihm. Die Marke ist `counters._hasHaste`,
+//    seinem Zug, greift es bei ihm — auch wenn nur der ANDERE Spieler
+//    einen Hammer-Spirit hat (W18a, Al 19.10.2026: „Auch der Gegner ohne
+//    Hammer-Spirit bekommt den Buff einmal pro Runde."). Die Marke ist `counters._hasHaste`,
 //    dieselbe, die Server und Client fuer die Beschwoerungsstarre
 //    lesen.
 //    Der Stempel `ps._relicHammerTurn` haelt fest, dass die Freikarte
@@ -45,11 +47,10 @@ function hatHammer(engine, pi, heroIdx) {
     && !c.faceDown && (c.counters?._effectOverride || c.name) === HAMMER);
 }
 
-/** Steht irgendwo ein wirksamer Hammer-Spirit dieses Spielers? */
-function spiritSteht(engine, pi) {
+/** Steht irgendwo ein wirksamer Hammer-Spirit — egal wessen? (W18a, Al: „each player", auch der Gegner ohne eigenen Spirit.) */
+function spiritSteht(engine) {
   return (engine.cardInstances || []).some(c =>
     c.zone === 'support' && !c.faceDown && c.name === CARD_NAME
-    && (c.controller ?? c.owner) === pi
     && !c.counters?.negated && !c.counters?.nulled);
 }
 
@@ -70,8 +71,7 @@ module.exports = {
   /** ③ „If the user has Summoning Magic 3, … additional Action.\" */
   inherentAction(gs, pi, heroIdx, engine) {
     if (!engine) return false;
-    const abZones = gs.players[heldSeite(gs, pi, heroIdx)]?.abilityZones?.[heroIdx] || [];
-    return engine.countAbilitiesForSchool('Summoning Magic', abZones) >= SM_SCHWELLE;
+    return engine.heroSchoolLevel('Summoning Magic', heldSeite(gs, pi, heroIdx), heroIdx) >= SM_SCHWELLE;   // W4a: harte Negierung -> Stufe 0
   },
 
   hooks: {
@@ -93,7 +93,15 @@ module.exports = {
       // also weder fuer sich noch verbraucht er sie — sonst waere die
       // Karte in ihrem eigenen Zug wirkungslos. Gilt fuer jede Kopie,
       // egal an welcher Stelle der Beschwoerungsreihe sie kommt.
-      if (rein.name === CARD_NAME) return;
+      if (rein.name === CARD_NAME) {
+        // N3-19 (W24): Eintritte von Hammer-Spirits dieses Zuges merken (Zugzaehler `_creaturesSummonedThisTurn` zaehlt sie mit, s. u.).
+        const sp = gs.players[rein.controller ?? rein.owner];
+        if (sp) {
+          if (!sp._relicSpiritEintritte || sp._relicSpiritEintritte.turn !== gs.turn) sp._relicSpiritEintritte = { turn: gs.turn, ids: [] };
+          if (!sp._relicSpiritEintritte.ids.includes(rein.id)) sp._relicSpiritEintritte.ids.push(rein.id);
+        }
+        return;
+      }
 
       // Nur eine BESCHWOERUNG in diesem Zug, kein Umzug einer laengst
       // stehenden Kreatur (die traegt ihr altes `turnPlayed`).
@@ -103,13 +111,20 @@ module.exports = {
       const besitzer = rein.controller ?? rein.owner;
       if (besitzer !== gs.activePlayer) return;
 
-      // Die Aura muss aus Sicht dieses Spielers wirken: sie kommt von
-      // MEINEM Spirit. Steht bei ihm keiner, hilft ihm auch keiner.
-      if (!spiritSteht(engine, besitzer)) return;
+      // W18a (C04-05, Al: „Auch der Gegner ohne Hammer-Spirit bekommt den
+      // Buff einmal pro Runde."): Es genügt IRGENDEIN wirksamer Spirit auf
+      // dem Brett — wessen, ist gleich. Je Spieler bleibt es bei einer
+      // Freikarte pro eigenem Zug (Stempel `ps._relicHammerTurn`).
+      if (!spiritSteht(engine)) return;
 
       const ps = gs.players[besitzer];
       if (!ps) return;
       if (ps._relicHammerTurn === gs.turn) return;      // Freikarte vergeben
+      // N3-19 (W24): „The FIRST Creature each player summons during each of their turns" — die erste Kreatur des ZUGES (Zugzaehler, Q47), nicht die
+      // erste NACH dem Spirit: wurde schon eine andere Kreatur beschworen (auch VOR dem Spirit), ist diese hier nicht die erste. Die Spirits selbst
+      // zaehlen nicht mit (Ruling 5.9.), die einlaufende Kreatur ist im Zaehler schon enthalten.
+      const spirits = ps._relicSpiritEintritte?.turn === gs.turn ? ps._relicSpiritEintritte.ids.length : 0;
+      if ((ps._creaturesSummonedThisTurn || 0) - spirits > 1) return;
       ps._relicHammerTurn = gs.turn;
 
       if (!rein.counters) rein.counters = {};

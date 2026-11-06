@@ -151,7 +151,8 @@ module.exports = {
       // now (Mode B needs ≥2 opp targets; Mode C needs ≥1 opp hand
       // card). If no modes are available, skip the trigger entirely —
       // no creature reveal, no log line, just a silent no-op.
-      const modeAFree = !_hoptUsed(gs, pi, HOPT_A);
+      // Z6 (H02-32): Modus A legt die Karte aus dem Deck auf die Hand - unter Hand-/Such-Sperre nicht waehlbar.
+      const modeAFree = !_hoptUsed(gs, pi, HOPT_A) && !engine._isSearchBlocked(pi, {}, 'deck');
       const oppTgts = _collectOppTargets(engine, oppPi);
       const modeBFree = !_hoptUsed(gs, pi, HOPT_B) && oppTgts.length >= MODE_B_TARGET_COUNT;
       const modeCFree = !_hoptUsed(gs, pi, HOPT_C) && (ops.hand?.length || 0) > 0;
@@ -269,12 +270,14 @@ module.exports = {
       //     Per the user's spec: discarding only happens with the
       //     damage and discard modes; a pure cancel does NOT dump
       //     the Creature.
+      if (chosenMode === 'A' && !modeAFree) chosenMode = null;   // Z6 (H02-32): nicht angebotener Modus (gesperrt) zaehlt als Abbruch
       if (chosenMode === 'A') {
         // Add the revealed Creature to hand. Routes through the
         // engine's canonical "card enters hand" path so fire-on-add
         // hooks (any future "when X enters your hand" listener)
         // compose correctly.
         engine.handZugangSync(ps, revealedName, { source: CARD_NAME, ohneInstanz: true });
+        engine.noteHandZugangAusStapel(pi, revealedName, { pile: 'deck', source: CARD_NAME });   // W72a: die aufgedeckte Karte kommt aus dem Deck (Control Monitors)
         engine._trackCard(revealedName, pi, 'hand', -1, -1);
         await engine.runHooks('onCardAddedToHand', {
           playerIdx: pi, cardName: revealedName, _skipReactionCheck: true,
@@ -388,6 +391,7 @@ async function _runModeB(engine, pi, oppPi, kitHeroIdx, kitSeite = pi) {
       .map(id => tgts.find(x => x.id === id))
       .filter(t => t && t.type !== 'hero')
       .map(t => t.cardInstance).filter(Boolean),
+    heroes: picked.map(id => tgts.find(x => x.id === id)).filter(t => t && t.type === 'hero'),   // W78 (Pythia): Helden, die dieser Schlag faellt, sind todgeweiht
     source, amount: MODE_B_DAMAGE, type: 'other', sourceOwner: pi,
   });
   try {
@@ -428,12 +432,15 @@ async function _runModeC(engine, pi, oppPi) {
     return;
   }
 
-  // v1324: Boris darf den erzwungenen Abwurf ignorieren.
-  if (await engine.borisVerzicht(oppPi, 1, { source: 'Kit, the Shark Researcher', sourceOwner: pi })) return;
+  // v1324: Boris darf den erzwungenen Abwurf ignorieren. ★ W74c: Reihenfolge ERST Ambush the Scout, DANN Boris (`fremdAbwurfEntfaellt`; vorher fragte
+  // Boris zuerst und das Ambush-Fenster folgte erst beim Abwurf).
+  if (await engine.fremdAbwurfEntfaellt(oppPi, 1, { source: 'Kit, the Shark Researcher', sourceOwner: pi })) return;
   const randomIdx = Math.floor(Math.random() * ops.hand.length);
   const discardedName = ops.hand[randomIdx];
   await engine.actionDiscardHandCard(oppPi, discardedName, randomIdx, {
     source: CARD_NAME,
+    sourceOwner: pi,   // W16f (H02-29): fremde Quelle — Erstrunden-Schutz und Hand-Interaktions-Fenster greifen nur mit sourceOwner
+    _skipHandInteractionCheck: true,   // W74c: das Fenster lief schon in `fremdAbwurfEntfaellt`
   });
 
   engine.log('kit_mode_c', {

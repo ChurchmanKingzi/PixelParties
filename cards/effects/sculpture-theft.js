@@ -65,10 +65,9 @@ module.exports = {
       if (engine.heroMeetsLevelReq(pi, hi, cardData)
           && (ps.heroes[hi]?.hp > 0)
           && !ps.heroes[hi].statuses?.frozen
-          && !ps.heroes[hi].statuses?.stunned
-          && !ps.heroes[hi].statuses?.negated) return true;
+          && !ps.heroes[hi].statuses?.stunned) return true;   // W13 (Al, A2): `negated` sperrt die Reaktion nicht mehr
     }
-    return false;
+    return !!engine.fremderHeldKannStufe(pi, CARD_NAME);   // W20c: auch ein uebernommener Held wirkt
   },
 
   resolve: async (engine, pi, _selectedIds, _validTargets, _chain, _myIdx) => {
@@ -77,10 +76,24 @@ module.exports = {
     // einen wirksamen Boris, faellt SEINE Seite als Quelle weg — die
     // eigene bleibt waehlbar.
     const nurEigene = engine.borisHidesOpponentSide?.(pi) === true;
+    // W16c (A06-01): "Choose one of THOSE Creatures" - nur die durch das ausloesende Ereignis eingefrorenen Kreaturen (Fenster-Kontext
+    // `reactionWindowEvent`: `hookCtx.targets` bei Massen-Freeze, sonst `hookCtx.target`); fruehere Gefrorene zaehlen nicht.
+    // Ohne Fensterkontext (z. B. Aufruf von aussen) bleibt es bei allen gefrorenen Kreaturen.
+    let ausloeser = null;
+    try {
+      const hc = engine.reactionWindowEvent?.()?.hookCtx;
+      if (hc) {
+        const liste = (Array.isArray(hc.targets) && hc.targets.length)
+          ? hc.targets.filter(en => en.onCreature).map(en => en.target)
+          : (hc._onCreature && hc.target ? [hc.target] : []);
+        if (liste.length) ausloeser = new Set(liste.filter(Boolean).map(i => i.id));
+      }
+    } catch { ausloeser = null; }
     for (const inst of engine.cardInstances) {
       if (inst.zone !== 'support') continue;
       if (inst.faceDown) continue;
       if (!inst.counters?.frozen) continue;
+      if (ausloeser && !ausloeser.has(inst.id)) continue;
       if (nurEigene && inst.owner !== pi) continue;
       candidates.push({
         id: `equip-${inst.owner}-${inst.heroIdx}-${inst.zoneSlot}`,
@@ -168,8 +181,15 @@ module.exports = {
     // Hand-add to the SCULPTURE THEFT CASTER's pile, regardless of who
     // originally owned the Creature — per updated card text the Theft
     // always adds the Creature to the user's hand.
-    if (casterPs) {
-      engine.handZugangSync(casterPs, inst.name, { source: CARD_NAME, ohneInstanz: true });
+    // W5a (Al 14.10.2026): ein Token ist ein legales Ziel, verschwindet aber vollstaendig (kommt nie auf die Hand); eine
+    // echte Karte darunter (Biomancy-/Boulder-Token) wird gelöscht. W3: sonst bleibt die Karte Eigentum ihres permanenten Besitzers.
+    if (casterPs && !engine.tokenAbgang(inst)) {
+      const _besitzer = engine.kartenBesitzerVon(inst);
+      // Ankhota: „Delete all Creatures that are moved from the board to anywhere else" — dieser Sonderweg umgeht den zentralen Move: gelöscht statt auf die Hand (Stapel des Besitzers).
+      if (!engine.ankhotaLoeschtSonderweg(inst, _besitzer, { source: CARD_NAME })) {
+        engine.handZugangSync(casterPs, inst.name, { source: CARD_NAME, ohneInstanz: true });
+        if (_besitzer !== pi) engine._tagHandCardOrigin(pi, inst.name, _besitzer);
+      }
     }
     engine._untrackCard(inst.id);
     engine.log('sculpture_theft', {

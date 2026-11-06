@@ -4,8 +4,9 @@
 //
 //  Signature Deepsea bounce-placement.
 //  On-summon: opponent must target this
-//  Creature with all Attacks and Spells they
-//  play during their next turn, if possible.
+//  Creature with all Attacks, Spells and
+//  Creature effects they use during their next
+//  turn, if possible (W44a: `tauntNurAttackSpellKreatur`).
 //
 //  Implementation: sets generic forcesTargeting
 //  counters on its instance. The engine's
@@ -38,6 +39,10 @@ const {
 const CARD_NAME = 'Deepsea Horror Clown';
 
 module.exports = {
+  // ★ W44a (Al, 22.10.2026): wie Hardy Slime — der Taunt gilt nur für Attacks, Spells und Creature effects, die der Gegner benutzt (`engine.tauntGiltFuerQuelle`),
+  // und nur, wenn der Clown selbst ein mögliches Ziel ist („if possible").
+  tauntNurAttackSpellKreatur: true,
+
   // ★★ v1182 — ENTKOPPELTE BILDER (CARD_API): wird die Karte NEGIERT,
   // laeuft ihr Effekt-Rumpf nie — die Engine spielt dann diese Bilder.
   // Im normalen Weg bleibt es bei den Broadcasts im Effekt selbst.

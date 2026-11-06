@@ -44,7 +44,7 @@
 //    haengt am einzelnen Kartenzug, eine Buendelung gibt es dort nicht.
 // ═══════════════════════════════════════════
 
-const { hasCardType } = require('./_hooks');
+const { hasCardType, heldSeite } = require('./_hooks');
 
 const CARD_NAME = 'Spirit of the Shattered Trident';
 const TRIDENT = 'Shattered Trident, Treasure of the Deepsea';
@@ -81,13 +81,14 @@ function spiritSteht(engine, pi) {
 
 module.exports = {
   activeIn: ['support'],
+  seesEquipLeaveOnHeroDeath: true,   // N3-12 (W24): auch der Abgang der Ausruestung mit dem Heldentod (`handleHeroDeathCleanup`) wird gemeldet
 
   cpuMeta: { dealsDamage: false, castTriggersDraw: true },
 
   /** ① „can only be summoned by a Hero equipped with …\" */
   canPlayWithHero(gs, pi, heroIdx, cardData, engine) {
     if (!engine) return true;
-    return hatDreizack(engine, pi, heroIdx);
+    return hatDreizack(engine, heldSeite(gs, pi, heroIdx), heroIdx);   // N3-03 (W24): Brettseite des uebernommenen Helden
   },
 
   /** ② Die Zusatzaktion steht nur, wenn die Kosten zahlbar sind. */
@@ -124,8 +125,12 @@ module.exports = {
     if (kandidaten.length === 0) return true;        // sollte `inherentAction` verhindern
 
     // Stand diesem Helden noch eine regulaere Aktion offen?
+    // W16e (C04-04): die Aktionsphase kennt EINE Aktion je Spieler (nicht je Held) — hat ein anderer Held
+    // sie verbraucht, ist die Loeschung PFLICHT (Bauform Potion Juggler `aktionFrei`; Bonus-Aktion zaehlt als frei).
+    const bonusFrei = (ps.bonusActions?.heroIdx === heroIdx && (ps.bonusActions.heroOwner ?? pi) === pi && ps.bonusActions.remaining > 0)
+      || ((ps._bonusMainActions || 0) > 0);
     const hatteAktion = gs.currentPhase === 3
-      && !(ps.heroesActedThisTurn || []).includes(heroIdx);
+      && ((ps.heroesActedThisTurn || []).length === 0 || bonusFrei);
 
     if (hatteAktion) {
       const ja = await engine.promptGeneric(pi, {
@@ -149,7 +154,13 @@ module.exports = {
     }
 
     let opfer = kandidaten[0];
-    if (kandidaten.length > 1) {
+    if (kandidaten.length > 1 && new Set(kandidaten.map(i => i.zoneSlot)).size < kandidaten.length) {
+      // Darion: mehrere Artefakte teilen EINEN Platz (auch gleichnamige) — die Galerie wuerde nur den Namen liefern und immer die erste Kopie treffen; gefragt wird je Karte (Bild-Galerie `instancePick`).
+      const gew = await require('./_equip-stack-shared').waehleMehrere(engine, pi, kandidaten, {
+        title: CARD_NAME, description: 'Choose the Artifact to delete.', mindestens: 1, hoechstens: 1,
+      });
+      opfer = gew[0] || kandidaten[0];
+    } else if (kandidaten.length > 1) {
       const wahl = await engine.promptGeneric(pi, {
         type: 'cardGallery', title: CARD_NAME,
         description: "Choose the Artifact to delete.",
@@ -215,13 +226,13 @@ module.exports = {
       });
       if (!engine._confirmSaidYes(ja)) return;
 
-      const handVorher = (ps.hand || []).length;
-      await engine.actionPromptForceDiscard(pi, 1, {
-        title: CARD_NAME, source: CARD_NAME, selfInflicted: true,
+      // ★ W74c: von Boris erlassene Kosten gelten als bezahlt (`zahleAbwurfKosten`).
+      const kosten = await engine.zahleAbwurfKosten(pi, 1, {
+        title: CARD_NAME, source: CARD_NAME,
         cancellable: true,
         description: `Discard 1 card to reclaim ${weg.name}.`,
       });
-      if ((ps.hand || []).length === handVorher) return;   // abgebrochen
+      if (!kosten.bezahlt) return;   // abgebrochen
 
       // Ab hier laeuft es: Umleitung setzen und Gold gutschreiben.
       weg._returnToHand = true;

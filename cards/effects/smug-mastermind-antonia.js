@@ -1,4 +1,4 @@
-const { areaTargetId } = require('./_targeting-shared');
+const { areaTargetId, coolnessSpitzeZiel, supportAbilityZiel } = require('./_targeting-shared');
 // ═══════════════════════════════════════════
 //  CARD EFFECT: "Smug Mastermind Antonia"
 //  Creature (Summoning Magic Lv 0, 50 HP)
@@ -81,6 +81,9 @@ function collectNonHeroBoardTargets(gs, engine) {
     seen.add(inst.id);
 
     if (inst.zone === 'support') {
+      if (engine.zaehltAlsHeld && engine.zaehltAlsHeld(inst)) continue;   // W79 (White Sacrificial Bull): zählt auch als Hero → kein „Nicht-Held"-Ziel
+      const sa = supportAbilityZiel(engine, inst);   // 25.10.: Ability in einer Support Zone = Ability-Stapel (ein Ziel, oberste Kopie)
+      if (sa !== undefined) { if (sa) targets.push(sa); continue; }
       targets.push({
         // ★ 26.9. (Als Befund, Crimson Web): ID und `owner` nennen die Seite, auf
         // der die Zone LIEGT — sonst findet der Client sie nicht. Eine an
@@ -93,8 +96,12 @@ function collectNonHeroBoardTargets(gs, engine) {
     } else if (inst.zone === 'ability') {
       const slot = gs.players[inst.owner]?.abilityZones?.[inst.heroIdx]?.[inst.zoneSlot] || [];
       if (slot.length > 0 && slot[slot.length - 1] !== inst.name) continue;
+      // Ein Stapel gleichnamiger Karten (Ability Lv 2/3) hat mehrere Instanzen im selben Platz: EIN Ziel je Stapel (eindeutige ID), und zwar die letzte (= oberste) Kopie — wie `supportAbilitySpitze`.
+      const _abId = `ability-${inst.owner}-${inst.heroIdx}-${inst.zoneSlot}`;
+      const _abErst = targets.find(x => x.id === _abId);
+      if (_abErst) { _abErst._cardInstance = inst; continue; }
       targets.push({
-        id: `ability-${inst.owner}-${inst.heroIdx}-${inst.zoneSlot}`,
+        id: _abId,
         type: 'ability', owner: inst.owner, heroIdx: inst.heroIdx, slotIdx: inst.zoneSlot,
         cardName: inst.name, _cardInstance: inst,
       });
@@ -120,10 +127,15 @@ function collectNonHeroBoardTargets(gs, engine) {
       });
     } else if (inst.zone === 'surprise') {
       targets.push({
-        id: `equip-${inst.owner}-${inst.heroIdx}-surprise`,
-        type: 'equip', owner: inst.owner, heroIdx: inst.heroIdx,
+        // W16d (A07-24): Client-ID einer Surprise-Zone (wie _targeting-shared v706) – die alte `equip-…-surprise`-ID war unklickbar.
+        id: `surprise-${inst.owner}-${inst.heroIdx}`,
+        type: 'surprise', owner: inst.owner, heroIdx: inst.heroIdx,
         cardName: inst.name, _cardInstance: inst,
       });
+    } else if (inst.zone === 'coolnessStack') {
+      // W19a (Al, 19.10.2026): „any card on the board that is not a Hero" bietet auch die oberste Karte der Coolness Stacks an.
+      const spitze = coolnessSpitzeZiel(engine, inst);
+      if (spitze) targets.push(spitze);
     }
   }
 
@@ -160,7 +172,7 @@ async function runAntoniaEffect(ctx) {
     confirmClass: 'btn-danger',
     cancellable: true,
     exclusiveTypes: true,
-    maxPerType: { equip: 1, ability: 1, perm: 1, area: 1, surprise: 1 },
+    maxPerType: { equip: 1, ability: 1, perm: 1, area: 1, surprise: 1, coolnessStackTop: 1 },
   });
   if (!pick || pick.length === 0) return false;
 
@@ -198,6 +210,8 @@ async function runAntoniaEffect(ctx) {
 
 const { usesLeft, spendUse, refundUse, charges } = require('./_charges');
 const USE_KEY = 'antonia';
+const { heldFolgtAbgang } = require('./_dream-lander-shared');   // A07-05
+
 module.exports = {
   // Ladungsanzeige oben rechts (Als Vorgabe 16.8.). SONDERFALL: den
   // Effekt gibt es ueberhaupt erst, wenn „Cool Rescuer Monia" unter
@@ -238,6 +252,9 @@ module.exports = {
   cpuMeta: { alwaysCommit: true },
 
   hooks: {
+    // A07-05: der angelegte Held folgt der Kreatur in die Ablage, wenn sie ohne Schadens-Tod geht.
+    onCardLeaveZone: heldFolgtAbgang,
+
     // Ruecksetzung entfaellt (v417) — der gemeinsame Zaehler stempelt
     // die Runde mit. Der alte Hook loeschte bei JEDEM Rundenbeginn und
     // traf damit zufaellig schon die richtige Regel; jetzt steht sie

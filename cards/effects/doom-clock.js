@@ -58,6 +58,7 @@ module.exports = {
       if (uhren[0]?.id !== ctx.card?.id) return;   // nur einmal je Zug
 
       const zugspieler = engine.gs.activePlayer;
+      if (engine.spielerIstVonAreasAusgenommen(zugspieler)) return;   // W82 (Shipwrecked): der Zugspieler ist von Areas ausgenommen — kein Counter
       for (const uhr of uhren) {
         const ende = await D.placeCounter(engine, uhr, zugspieler, {
           sourceName: `${CARD_NAME} (Zugende)`,
@@ -67,9 +68,11 @@ module.exports = {
     },
 
     /**
-     * Besiegungen. `onTargetsDefeated` liefert die in EINEM Ereignis
-     * besiegten Ziele; die ersten vier solcher Ereignisse pro Zug
-     * legen je einen Counter auf jede Uhr.
+     * Besiegungen. `onTargetsDefeated` (Sammel-Hook, W16b: Kreaturen UND
+     * Helden — „targets", A01-pollution-06; Vorläufer `onCreaturesDefeated`
+     * kannte nur Kreaturen) liefert die in EINEM
+     * Vorgang besiegten Ziele EINMAL; die ersten vier solcher Ereignisse
+     * pro Zug legen je einen Counter auf jede Uhr.
      *
      * "their controller" = der Kontrolleur der besiegten Ziele. Fallen
      * Ziele BEIDER Spieler in einem Ereignis, ist es laut Ruling
@@ -77,30 +80,35 @@ module.exports = {
      * der die meisten Ziele verloren hat; bei Gleichstand der
      * Zugspieler.
      */
-    onCreatureDeath: async (ctx) => {
+    onTargetsDefeated: async (ctx) => {
       const engine = ctx._engine;
       const gs = engine.gs;
       const uhren = D.getDoomClocks(engine);
       if (uhren[0]?.id !== ctx.card?.id) return;   // nur einmal je Ereignis
 
-      // EIN Ereignis = EINE Ausloesung, auch wenn mehrere Ziele
-      // gleichzeitig fallen (Als Ruling). `onCreatureDeath` feuert aber
-      // je Creature. Deshalb ein Riegel fuer den laufenden synchronen
-      // Block: alle Tode desselben Stapels zaehlen einmal, der Riegel
-      // faellt im naechsten Tick von selbst.
-      if (gs._doomDefeatTick) return;
-      gs._doomDefeatTick = true;
-      Promise.resolve().then(() => { delete gs._doomDefeatTick; });
+      const defeated = ctx.defeated || [];
+      if (defeated.length === 0) return;
+      // Ist die Partie schon entschieden (z. B. letzter Held eines Archer-Schusses, Welle 9), legt die Uhr nichts mehr.
+      if (gs.result || gs._endGameLaeuft) return;
 
       const bisher = gs._doomDefeatTriggers || 0;
       if (bisher >= D.DEFEAT_TRIGGERS_PER_TURN) return;
       gs._doomDefeatTriggers = bisher + 1;
 
-      // "their controller" = wer das besiegte Ziel kontrollierte.
-      const verlierer = ctx.creature?.controller
-        ?? ctx.creature?.owner
-        ?? gs.activePlayer;
+      // "their controller" = wer die besiegten Ziele kontrollierte; bei
+      // Verlusten beider Seiten die meisten, bei Gleichstand der Zugspieler.
+      const verluste = {};
+      for (const d of defeated) {
+        const k = d.controller ?? d.owner ?? gs.activePlayer;
+        verluste[k] = (verluste[k] || 0) + 1;
+      }
+      let verlierer = gs.activePlayer;
+      let meiste = verluste[verlierer] || 0;
+      for (const k of Object.keys(verluste)) {
+        if (verluste[k] > meiste) { verlierer = Number(k); meiste = verluste[k]; }
+      }
 
+      if (engine.spielerIstVonAreasAusgenommen(verlierer)) return;   // W82 (Shipwrecked): dessen Kontrolleur ist von Areas ausgenommen — kein Counter
       for (const uhr of uhren) {
         const ende = await D.placeCounter(engine, uhr, verlierer, {
           sourceName: `${CARD_NAME} (Besiegung ${gs._doomDefeatTriggers}/${D.DEFEAT_TRIGGERS_PER_TURN})`,

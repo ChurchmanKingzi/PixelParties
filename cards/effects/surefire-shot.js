@@ -32,6 +32,11 @@ const FLUG_MS = 170;       // Flugzeit des Pfeils
 const EINSCHLAG_MS = 90;   // Nachlauf bis der Blitz sitzt, dann fällt der Schaden
 
 module.exports = {
+  // ★ Als Ruling (Al 26.10., Flame Avalanche: „Wenn du andere Schadenskarten unspielbar machst, müssen das Vial und Rockfall auch sein!"): die Karte richtet NUR Schaden an Zielen an —
+  // unter der Schadenssperre (`ps.damageLocked`) unspielbar (Karte bleibt auf der Hand, keine Aktion/Kosten; Sperr-Stutzen `engine._cardBlockedBySearchLock`).
+  blockedByDamageLock: true,
+  // ★ Als Ruling (Al 26.10.): True Damage kann Hydra Blood Arrow nicht aktivieren — der Schaden ist unreduzierbar (`engine._attackSchadenUnreduzierbar`, Arrows-Fenster).
+  attackDamageCannotBeReduced: true,
   requiresTarget: true,
   ignoresTargetingRestrictions: true,
   opponentCannotReact: true,
@@ -81,9 +86,9 @@ module.exports = {
         let dealt = 0;
         if (target.type === 'hero') {
           const ziel = gs.players[target.owner]?.heroes?.[target.heroIdx];
-          if (ziel && ziel.hp > 0) ({ dealt } = await engine.actionDealTrueDamage(source, ziel, betrag, { type: 'attack' }));
+          if (ziel && ziel.hp > 0) ({ dealt } = await engine.actionDealTrueDamage(source, ziel, betrag, { type: 'attack', angriffsBoni: true }));   // Pfeile/Elixir/Darge erhöhen auch True Damage (Engine: `angriffsBoni`)
         } else if (target.cardInstance) {
-          ({ dealt } = await engine.actionDealTrueDamage(source, target.cardInstance, betrag, { type: 'attack' }));
+          ({ dealt } = await engine.actionDealTrueDamage(source, target.cardInstance, betrag, { type: 'attack', angriffsBoni: true }));
         }
         engine.log('surefire_shot', {
           player: gs.players[pi]?.username, target: target.cardName, damage: betrag, dealt,

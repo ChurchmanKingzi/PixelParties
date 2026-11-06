@@ -12,6 +12,9 @@
 //    node scripts/export-demo-games.js --id demo-…     # eine bestimmte
 //    node scripts/export-demo-games.js --mode pvp      # nur PvP
 //    node scripts/export-demo-games.js --min-turns 10  # nur längere
+//    node scripts/export-demo-games.js --since-hours 12 --all   # alle der letzten 12 Stunden entpacken
+//    node scripts/export-demo-games.js --since-hours 12 --list 500   # … nur auflisten
+//    node scripts/export-demo-games.js --player Klaus  # nur Partien, in denen der Name vorkommt
 //
 //  Zielordner: data/demo-games/ (wird angelegt), Dateiname = id + .json
 //
@@ -44,6 +47,10 @@ function arg(name, fallback = null) {
   if (id) { where.push('id = ?'); args.push(id); }
   if (mode) { where.push('mode = ?'); args.push(mode); }
   if (minTurns) { where.push('turns >= ?'); args.push(minTurns); }
+  const sinceHours = parseFloat(arg('--since-hours', '0')) || 0;
+  if (sinceHours > 0) { where.push('created_at >= ?'); args.push(Math.floor(Date.now() / 1000 - sinceHours * 3600)); }
+  const player = arg('--player');
+  if (player && player !== true) { where.push('players LIKE ?'); args.push('%' + player + '%'); }
   const sql = `SELECT id, created_at, mode, players, heroes, winner_idx, reason,
                       turns, events, bytes${wantAll || id ? ', payload' : ''}
                FROM demo_games

@@ -46,14 +46,14 @@ module.exports = {
 
       // Check if any Navigation Ability exists in deck
       const hasCopy = (ps.mainDeck || []).includes(ABILITY_NAME);
-      if (!hasCopy) return;
+      if (!hasCopy) return ctx._engine.summonEffektFizzelt(ctx.card, ctx.cardName, { stumm: true });   // W11/R4 (Al)
 
       // Ask if the player wants to search
       const confirm = await ctx.promptConfirmEffect({
         title: CARD_NAME,
         message: `Search your deck for a "${ABILITY_NAME}" Ability and add it to your hand?`,
       });
-      if (!confirm) return;
+      if (!confirm) return ctx._engine.summonEffektFizzelt(ctx.card, ctx.cardName, { stumm: true });   // W11/R4 (Al): abgelehntes „you may" → Blob stumm
 
       await engine.searchDeckForNamedCard(pi, ABILITY_NAME, CARD_NAME);
     },
@@ -65,7 +65,11 @@ module.exports = {
   /** Gray out the button while no Navigation Ability is in hand. */
   canActivateCreatureEffect(ctx) {
     const ps = ctx.players[ctx.cardOwner];
-    return (ps?.hand || []).includes(ABILITY_NAME);
+    // Z6 (A07-23): die Kopie kommt aus dem DECK auf die Hand - unter Hand-/Such-Sperre bliebe nur der Abwurf.
+    if (ctx._engine._isSearchBlocked(ctx.cardOwner, {}, 'deck')) return false;
+    // W5b-Z6 (Al, Welle 5: "Shanty braucht die zweite Karte unbedingt"): nach dem Abwurf der Navigation muss noch mindestens
+    // eine Handkarte zum Aufdecken da sein - sonst nicht aktivierbar, nichts verbraucht.
+    return (ps?.hand || []).includes(ABILITY_NAME) && (ps.hand || []).length >= 2;
   },
 
   async onCreatureEffect(ctx) {
@@ -122,6 +126,8 @@ module.exports = {
 
     // Broadcast the reveal to the opponent
     engine._broadcastEvent('deck_search_add', { cardName: revealedName, playerIdx: pi });
+    // W85c (Atta, Al 29.10.): ZWEI getrennte Aufdeck-Ereignisse in Textreihenfolge: (1) die aufgedeckte Handkarte, (2) die gesuchte Kopie (`searchDeckForNamedCard`, VOR dem Verschieben).
+    await engine.aufdeckEreignis(pi, [revealedName], { zone: 'hand', source: CARD_NAME });
     engine.sync();
     await engine._delay(400);
 

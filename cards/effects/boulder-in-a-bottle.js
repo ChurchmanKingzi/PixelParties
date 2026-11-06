@@ -104,6 +104,9 @@ function boulderCounters(potionData) {
 }
 
 module.exports = {
+  // ★ Welle 12 (B-06/M01-25, Al: „Eine Karte, deren Effekt komplett nutzlos wäre, ist nicht spielbar."): platziert NUR beim Gegner — gegen den durch die
+  // Erste-Runden-Immunität geschützten Spieler unspielbar (Karte bleibt auf der Hand, keine Aktion/Kosten; `engine.ersterZugGeschuetzt`).
+  blockedByFirstTurnProtection: true,
   isPotion: true,
   // Hooks feuern vom Brett aus (Zonen halten, Zonen freigeben) UND aus
   // der Hand heraus braucht die Karte nichts — `afterPotionUsed` laeuft
@@ -155,6 +158,7 @@ module.exports = {
 
     const gs = engine.gs;
     const oi = ziel.owner;
+    delete gs._boulderSelbstPlatziert;                    // Marke dieses Spielvorgangs frisch setzen
     if (!hatFreieZone(gs, oi, ziel.heroIdx)) return;      // Brett hat sich geaendert
 
     // ── Felsen auf ALLE freien Zonen (Als Vorgabe 12.9.) ───────────
@@ -175,6 +179,12 @@ module.exports = {
     const platz = engine.safePlaceInSupport(CARD_NAME, oi, ziel.heroIdx, landeplatz(gs, oi, ziel.heroIdx));
     if (!platz?.inst) return;
     const inst = platz.inst;
+    // Besitzer-Regel: die Karte ist MEIN Potion — beim Abgang (Löschen) in MEINEN Stapel, nicht in den des Gegners, auf dessen Brett sie liegt
+    // (wie Cool Repair / Wise Village Elder: seitenfremd gelegte Karte trägt `originalOwner`).
+    if (oi !== pi) inst.originalOwner = pi;
+    // M01-07: Biomancy (älteres `afterPotionUsed` als der Fels) darf die Potion nicht
+    // ein zweites Mal auf das Brett legen — sie liegt schon, als Fels.
+    gs._boulderSelbstPlatziert = inst.id;
 
     // Kartendaten-Override: ab jetzt ist die Potion auf dem Brett eine
     // Kreatur mit 150 HP und Stufe 3.

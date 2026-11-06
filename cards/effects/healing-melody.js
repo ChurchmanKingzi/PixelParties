@@ -77,8 +77,7 @@ module.exports = {
       if (!hero?.name || hero.hp <= 0) return;
 
       // Calculate Support Magic level on the caster hero's ability zones
-      const abZones = heroPs.abilityZones[heroIdx] || [[], [], []];
-      const smLevel = engine.countAbilitiesForSchool('Support Magic', abZones);
+      const smLevel = engine.effectiveSchoolLevelForCaster('Support Magic', pi, heroIdx, heroOwner);   // W4a: harte Negierung -> Stufe 0; W16g (S02-18): + Xals Support-Zonen-Stapel
       const healAmount = smLevel >= 3 ? 200 : smLevel >= 2 ? 150 : 100;
 
       // Confirm prompt (no targeting, just confirm/cancel)
@@ -97,34 +96,21 @@ module.exports = {
       }
 
       // ── Collect all friendly targets (heroes + creatures) ──
-      // "Friendly" = own heroes + charmed opponent heroes
+      // "Targets you control" = KONTROLLE statt Besitz (S02-01): uebernommene Helden/Kreaturen
+      // des Gegners zaehlen, eigene unter Gegnerkontrolle nicht. `ownerIdx` = Brettseite (Animation).
       const ps = gs.players[pi];
       const allTargets = [];
-      for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
-        const h = ps.heroes[hi];
+      for (const { physOwner, heroIdx: hi, hero: h } of engine.heroesControlledBy(pi)) {
         if (!h?.name || h.hp <= 0) continue;
-        allTargets.push({ type: 'hero', heroIdx: hi, zoneSlot: -1, ownerIdx: pi });
-
-        for (let si = 0; si < (ps.supportZones[hi] || []).length; si++) {
-          const slot = (ps.supportZones[hi] || [])[si] || [];
-          if (slot.length === 0) continue;
-          const inst = engine.cardInstances.find(c =>
-            c.owner === pi && c.zone === 'support' && c.heroIdx === hi && c.zoneSlot === si
-          );
-          if (!inst) continue;
-          const cd = engine.getEffectiveCardData(inst) || engine._getCardDB()[inst.name];   // wirksame Daten: Tokens/Artifact Creatures auf dem Brett (Als Sweep 9.10.)
-          if (!cd || !engine.isChoosableAsCreature(inst, cd)) continue;
-          allTargets.push({ type: 'creature', heroIdx: hi, zoneSlot: si, inst, ownerIdx: pi });
-        }
+        allTargets.push({ type: 'hero', heroIdx: hi, zoneSlot: -1, ownerIdx: physOwner });
       }
-
-      // Also include charmed opponent heroes (and their creatures)
-      const oi = engine.opponentOf(pi);
-      const ops = gs.players[oi];
-      for (let hi = 0; hi < (ops.heroes || []).length; hi++) {
-        const h = ops.heroes[hi];
-        if (!h?.name || h.hp <= 0 || h.charmedBy !== pi) continue;
-        allTargets.push({ type: 'hero', heroIdx: hi, zoneSlot: -1, ownerIdx: oi });
+      for (const inst of engine.cardInstances) {
+        if ((inst.controller ?? inst.owner) !== pi || inst.zone !== 'support') continue;
+        const seite = engine.physicalSide(inst);
+        if (!(gs.players[seite]?.heroes?.[inst.heroIdx]?.hp > 0)) continue;   // Kreaturen eines toten Helden wie bisher nicht
+        const cd = engine.getEffectiveCardData(inst) || engine._getCardDB()[inst.name];   // wirksame Daten: Tokens/Artifact Creatures auf dem Brett (Als Sweep 9.10.)
+        if (!cd || !engine.isChoosableAsCreature(inst, cd)) continue;
+        allTargets.push({ type: 'creature', heroIdx: inst.heroIdx, zoneSlot: inst.zoneSlot, inst, ownerIdx: seite });
       }
 
       // ── Phase 1: Music notes on ALL friendly targets (staggered) ──

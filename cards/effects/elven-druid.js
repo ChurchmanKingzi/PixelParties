@@ -44,7 +44,7 @@ function heroCanHostDruidTutor(engine, pi, heroIdx, cardData, feld = pi) {
   const hero = engine.gs.players[feld]?.heroes?.[heroIdx];
   if (!hero?.name) return false;
   if (hero.hp <= 0) return false;
-  if (hero.statuses?.frozen || hero.statuses?.stunned) return false;
+  if (!require('./_summon-eligibility').heroAgiert(hero, engine, pi)) return false;   // W20c (Al 20.10.): nur der aktuelle Kontrolleur beschwoert mit dem Helden   // Welle 11 (Al, R5): „summon" erfordert einen aktionsfähigen Beschwörer (nicht Frozen/Stunned/Webbed/Bound/Negated) — `heroAgiert`.
   if (ps?.summonLocked) return false;
   return feld === pi
     ? engine.heroMeetsLevelReq(pi, heroIdx, cardData)
@@ -79,9 +79,9 @@ module.exports = {
     // Must have at least one support slot free on Druid's hero —
     // otherwise the summon cannot land.
     const heroIdx = ctx.cardHeroIdx;
-    const zones   = engine.gs.players[feld]?.supportZones?.[heroIdx] || [[], [], []];
-    const hasFreeSlot = zones.some(slot => (slot || []).length === 0);
-    if (!hasFreeSlot) return false;
+    // W63a (Al, 22.10.2026: Alices Effekt gilt fuer ALLE Beschwoerungs-Effekte; „erst die geteilte Zone, DANN die erste leere"): freie Zone ODER — mit Alice-Teilung —
+    // die Zone einer GLEICHNAMIGEN Elven-Creature (`engine.ersteBeschwoerZone`, je Karte).
+    const zoneFuer = (n) => engine.ersteBeschwoerZone(ctx.cardOwner, n, { seite: feld, heroIdx, nurBasis: true, namedHeroesOnly: true });
 
     const cardDB = engine._getCardDB();
     for (const name of (ps.mainDeck || [])) {
@@ -89,6 +89,7 @@ module.exports = {
       const cd = cardDB[name];
       if (!isElvenCreature(cd)) continue;
       if (!heroCanHostDruidTutor(engine, ctx.cardOwner, heroIdx, cd, feld)) continue;
+      if (!zoneFuer(name)) continue;
       return true;
     }
     return false;
@@ -116,6 +117,7 @@ module.exports = {
       const cd = cardDB[name];
       if (!isElvenCreature(cd)) continue;
       if (!heroCanHostDruidTutor(engine, pi, heroIdx, cd, feld)) continue;
+      if (!engine.ersteBeschwoerZone(pi, name, { seite: feld, heroIdx, nurBasis: true, namedHeroesOnly: true })) continue;   // W63a: frei oder (Alice) geteilt
       counts[name] = (counts[name] || 0) + 1;
     }
     const gallery = Object.entries(counts)
@@ -143,8 +145,7 @@ module.exports = {
     engine._broadcastEvent('deck_search_add', { cardName: chosenName, playerIdx: pi });
 
     // ── Verify a support slot is still free on Druid's hero ──
-    const zones = gs.players[feld]?.supportZones?.[heroIdx] || [[], [], []];
-    const freeSlot = zones.findIndex(slot => (slot || []).length === 0);
+    const freeSlot = engine.ersteBeschwoerZone(pi, chosenName, { seite: feld, heroIdx, nurBasis: true, namedHeroesOnly: true })?.slotIdx ?? -1;   // W63a: geteilte Zone (Alice) zuerst, dann die erste freie
     if (freeSlot < 0) {
       // Hero's support zone filled up between the pre-check and now
       // (highly unlikely mid-HOPT, but safest to handle). Return the

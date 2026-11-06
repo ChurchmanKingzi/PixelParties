@@ -28,3 +28,11 @@ test('.env.example lädt als „alles aus“: keine Kanal-ID und kein Token wird
   config._loadEnvFile(path.join(__dirname, '..', '.env.example'));
   for (const k of keys) assert.equal(process.env[k] || '', '', k);
 });
+
+test('Kanal für neue Karten ist fest 774670375303905291 — eine NEW_CARDS_CHANNEL_ID in der .env/Umgebung ändert nichts', () => {
+  const { execFileSync } = require('child_process');
+  const lauf = env => execFileSync(process.execPath, ['-e', "console.log(require('./config').channels.newCards)"], { cwd: path.join(__dirname, '..'), env: { ...process.env, ...env }, encoding: 'utf8' }).trim().split('\n').pop();
+  assert.equal(lauf({ NEW_CARDS_CHANNEL_ID: '' }), '774670375303905291');
+  assert.equal(lauf({ NEW_CARDS_CHANNEL_ID: '123456789' }), '774670375303905291');
+  assert.equal(lauf({ NEW_CARDS_CHANNEL_ID: '0' }), '774670375303905291');
+});

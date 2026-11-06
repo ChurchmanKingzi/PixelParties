@@ -64,12 +64,23 @@ function spielbareDeckkarten(engine, pi, heroIdx, feld = pi) {
     if (!cd) continue;
     if (cd.cardType !== 'Attack' && cd.cardType !== 'Spell') continue;
     if (gesperrt.has(name)) continue;
+    // Als Fix (Al 27.10.): „as if you played it from your hand" gilt auch fuers Area-Limit — ohne Platz in der Area Zone (Limit 1, Spatial Crevice 3 VERSCHIEDENE) bzw. als Dublette ist eine Area
+    // aus dem Deck nicht waehlbar (der Sofort-Guss raeumt nichts ab).
+    if (engine.areaKarteGesperrt(cd, pi, { kapazitaet: true })) continue;
     const skript = loadCardEffect(name);
     // Karten mit Pro-Kopie-Gate (canPlayFromHandIdx) sind nur von der Hand spielbar.
     if (typeof skript?.canPlayFromHandIdx === 'function') continue;
     // Karten, die aus der Hand nichts bewirken (`neverPlayable`: Reaction-/Coolness-Karten, Startblatt-Zauber wie
     // Grasp the Future) lassen sich auch aus dem Deck nicht „spielen".
     if (skript?.neverPlayable) continue;
+    // Z6 (H02-14): "as if you played it from your hand" in der Action Phase - Surprises (nur Main Phase) und Reaction-Spells ohne
+    // `proactivePlay` sind aus der Hand dort nicht spielbar, und das Helden-Tor der Karte (`canPlayWithHero`, z. B. Waffe noetig) gilt auch.
+    const unterarten = (cd.subtype || '').toLowerCase().split('/').map(t => t.trim());
+    if (unterarten.includes('surprise')) continue;
+    if (unterarten.includes('reaction') && !skript?.proactivePlay) continue;
+    if (typeof skript?.canPlayWithHero === 'function') {
+      try { if (!skript.canPlayWithHero(gs, pi, heroIdx, cd, engine)) continue; } catch { /* kaputtes Tor sperrt nicht */ }
+    }
     // Schul- und Stufenpruefung wie beim Handspiel. Ohne sie bietet die
     // Karte Zuege an, die `validateActionPlay` danach ablehnt — und die
     // Karte waere aus dem Deck heraus und die Aktion weg.
@@ -164,6 +175,12 @@ module.exports = {
       const hero = ctx._engine?.gs?.players?.[ctx.cardOriginalOwner]?.heroes?.[ctx.cardHeroIdx];
       if (hero) hero._maxActionsPerTurn = 1;
     },
+    // Geliehen (??? the Shapeshifter): die Aktionsgrenze geht mit der Gestalt
+    // (H02-heroes-19).
+    onIdentityLost: (ctx) => {
+      const hero = ctx._engine?.gs?.players?.[ctx.cardOriginalOwner]?.heroes?.[ctx.cardHeroIdx];
+      if (hero?._maxActionsPerTurn === 1) delete hero._maxActionsPerTurn;
+    },
   },
 
   async onHeroEffect(ctx) {
@@ -179,13 +196,13 @@ module.exports = {
     if (kandidaten.length === 0) return false;
 
     // Die Galerie haengt am ctx (`_createContext`), nicht an der Engine.
-    const wahl = await ctx.promptCardGallery(kandidaten, {
+    const wahl = await engine._mitSpellAuswahl(() => ctx.promptCardGallery(kandidaten, {   // W48a: Zeitfenster der Spell-Auswahl (keine Surprise aktivierbar)
       title: CARD_NAME,
       source: CARD_NAME,
       description: 'Choose an Attack or Spell from your deck to use with this Hero.',
       confirmLabel: '⚔️ Use it!',
       cancellable: true,
-    });
+    }));
     const name = wahl?.cardName || (typeof wahl === 'string' ? wahl : null);
     if (!name || !kandidaten.some(k => k.name === name)) return false;
 

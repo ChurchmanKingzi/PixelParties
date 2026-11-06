@@ -26,6 +26,8 @@ function frostDauer(casterIdx, targetOwnerIdx) {
   return targetOwnerIdx === casterIdx ? 2 : 1;
 }
 
+const { slimeLevelUpHook } = require('./_slime-shared');
+
 module.exports = {
   // ★★ v1182 — ENTKOPPELTE BILDER (CARD_API): wird die Karte NEGIERT,
   // laeuft ihr Effekt-Rumpf nie — die Engine spielt dann diese Bilder.
@@ -65,7 +67,7 @@ module.exports = {
         },
       });
 
-      if (selected.length === 0) return;
+      if (selected.length === 0) return ctx._engine.summonEffektFizzelt(ctx.card, ctx.cardName, { stumm: true });   // W11/R4: wirkt nicht → Blob stumm
       const target = selected[0];
 
       if (target.type === 'hero') {
@@ -91,9 +93,7 @@ module.exports = {
       engine.log('freeze', { target: target.cardName, by: 'Icy Slime', type: target.type });
     },
 
-    onTurnStart: async (ctx) => {
-      if (!ctx.isMyTurn) return;
-      await ctx.changeLevel(1);
-    },
+    // Als Ruling (Al 26.10.): „you may increase this Creature's level by 1" = Ja/Nein-Frage (Nein/Abbruch: Stufe bleibt) — `_slime-shared`.
+    onTurnStart: slimeLevelUpHook('Icy Slime'),
   },
 };

@@ -102,9 +102,11 @@ module.exports = {
       const fps = gs.players[feld];
       const { canHeroSummon } = require('./_summon-eligibility');
       const heldDarf = () => (feld === pi
-        ? engine._canHeroActivateSurprise(pi, heroIdx, CARD_NAME)
+        ? (engine._canHeroActivateSurprise(pi, heroIdx, CARD_NAME)
+          && canHeroSummon(engine, pi, heroIdx, engine._getCardDB()[CARD_NAME], { physOwner: feld, alsAktion: true }))   // Z6 (A06-34): Beschwoerungs-/Aktionssperre
         : canHeroSummon(engine, pi, heroIdx, engine._getCardDB()[CARD_NAME], { physOwner: feld, alsAktion: true }));
       if (((fps.supportZones?.[heroIdx] || [])[slot] || []).length !== 0) return;
+      if (engine.isSwapSlotHeld(feld, heroIdx, slot)) return;   // W4b: Platz gehoert einer Tausch-Beschwoerung (Teocuilatl/Suspicious Monster)
       if (!heldDarf()) return;
 
       const confirmed = await engine.promptGeneric(pi, {

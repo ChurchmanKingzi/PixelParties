@@ -91,11 +91,12 @@ async function doLadderSearch(engine, pi, sacLevel) {
   if (!ps) return;
   const maxLevel = (sacLevel || 0) + 1;
 
-  const gallery = buildLadderGallery(engine, pi, maxLevel);
   // Free Support Zone under any living Hero you control.
   // Kontrolle statt Seite (Styx 28.9.): jede Zone traegt `owner` (physische Seite).
-  const freeZones = engine.getFreeSupportZones(pi, { nachKontrolle: true, livingHeroesOnly: true, source: CARD_NAME });
-  if (gallery.length === 0 || freeZones.length === 0) return;
+  // W62a: je Karte — mit Alice-Teilung zaehlt auch die Zone einer GLEICHNAMIGEN Creature (`beschwoerZonenFuer`).
+  const zonenOpts = { nachKontrolle: true, livingHeroesOnly: true, source: CARD_NAME };
+  const gallery = buildLadderGallery(engine, pi, maxLevel).filter(e => engine.hatBeschwoerZone(pi, e.name, zonenOpts));
+  if (gallery.length === 0) return;
 
   // "you MAY search" — optional.
   const pick = await engine.promptGeneric(pi, {
@@ -111,7 +112,7 @@ async function doLadderSearch(engine, pi, sacLevel) {
   if ((ps.mainDeck || []).indexOf(chosenName) < 0) return;
 
   // Zones where this Creature is actually summonable (per-Hero canSummon).
-  const placeable = freeZones.filter(z => engine.isCreatureSummonable(chosenName, z.owner, z.heroIdx));
+  const placeable = engine.beschwoerZonenFuer(pi, chosenName, zonenOpts).filter(z => engine.isCreatureSummonable(chosenName, z.owner, z.heroIdx));
   if (placeable.length === 0) return;
 
   let dest = placeable[0];
@@ -164,9 +165,30 @@ async function doLadderSearch(engine, pi, sacLevel) {
   engine.sync();
 }
 
+/**
+ * KOSTEN: genau eine Kreatur opfern (nicht in diesem Zug beschworen, mit passendem Deck-Ersatz).
+ * Rückgabe: Level des Opfers, `null` = abgebrochen / gerettet (nichts bezahlt).
+ */
+async function zahleOpfer(engine, pi) {
+  let sacLevel = 0;
+  const shimCtx = { cardOwner: pi, card: { id: null }, cardName: CARD_NAME, cardHeroIdx: -1 };
+  const paid = await engine.resolveSacrificeCost(shimCtx, {
+    minCount: 1,
+    maxCount: 1,
+    title: `${CARD_NAME} — Sacrifice`,
+    description: 'Sacrifice 1 of your Creatures (not summoned this turn, with an eligible deck replacement) to play Ladder to the Sky.',
+    confirmLabel: '🗡️ Sacrifice!',
+    confirmClass: 'btn-danger',
+    cancellable: true,
+    filter: ladderSacrificeFilter(engine, pi),
+    onResolved: (_ctx, picked) => { sacLevel = picked?.[0]?._meta?.level ?? 0; },
+  });
+  return paid ? sacLevel : null;
+}
+
 module.exports = {
-  // Tracked in the discard pile so the delayed onTurnStart fires.
-  activeIn: ['discard'],
+  // ★ W66a: KEIN Ablage-Träger mehr. Der verzögerte Teil ("At the beginning of your next turn …") hängt am SPIELER (`ps._ladderPending`), nicht an der Artefakt-Instanz in der Ablage —
+  // verließ die Karte die Ablage vor dem nächsten Zug (Meditation, Magic Sapphire …), ging die Suche verloren. Die Engine ruft `nachholen` nach den Zugbeginn-Hooks (Bug-Klasse, Hand-of-Death-Audit).
 
   // Playable only while a Creature not summoned this turn has an eligible
   // deck replacement (Gold is gated by the handler).
@@ -175,28 +197,26 @@ module.exports = {
     return engine.getSacrificableCreatures(pi).some(c => filt(c));
   },
 
-  async resolve(engine, pi /*, selectedIds, validTargets */) {
+  // ★ W4b (Al, Welle 4): das Opfer ist der KOSTENPUNKT („… to play this card") und läuft VOR dem Reaktionsfenster
+  // (`payArtifactCost`, Engine `_payArtifactCost`); wird das Artefakt danach komplett negiert (Rusty Touch, Silence …),
+  // bleibt die Kreatur geopfert und es wird nichts scharfgestellt. `false` = Opferwahl abgebrochen (nichts bezahlt):
+  // die Karte bleibt auf der Hand, kein Gold.
+  async payArtifactCost(engine, pi) {
+    const sacLevel = await zahleOpfer(engine, pi);
+    return sacLevel == null ? false : { sacLevel };
+  },
+
+  async resolve(engine, pi, selectedIds, validTargets, kosten) {
     const gs = engine.gs;
     const ps = gs.players[pi];
     if (!ps) return { cancelled: true };
 
     // ── Pay the sacrifice cost; record the tribute's level. Only
     //    Creatures that have an eligible deck replacement are offered. ──
-    let sacLevel = 0;
-    const shimCtx = { cardOwner: pi, card: { id: null }, cardName: CARD_NAME, cardHeroIdx: -1 };
-    const paid = await engine.resolveSacrificeCost(shimCtx, {
-      minCount: 1,
-      maxCount: 1,
-      title: `${CARD_NAME} — Sacrifice`,
-      description: 'Sacrifice 1 of your Creatures (not summoned this turn, with an eligible deck replacement) to play Ladder to the Sky.',
-      confirmLabel: '🗡️ Sacrifice!',
-      confirmClass: 'btn-danger',
-      cancellable: true,
-      filter: ladderSacrificeFilter(engine, pi),
-      onResolved: (_ctx, picked) => { sacLevel = picked?.[0]?._meta?.level ?? 0; },
-    });
+    // (Normalweg: schon vor dem Fenster bezahlt, `kosten`; sonst — z. B. Gratis-Spiel durch Sky Archeologist — jetzt.)
+    const sacLevel = kosten ? kosten.sacLevel : await zahleOpfer(engine, pi);
     // Cancel → card stays in hand, no Gold spent.
-    if (!paid) return { cancelled: true };
+    if (sacLevel == null) return { cancelled: true };
 
     engine.log('ladder_to_sky_played', { player: ps.username, sacrificedLevel: sacLevel });
 
@@ -208,36 +228,30 @@ module.exports = {
       return;
     }
 
-    // ── Keep this card tracked in the discard pile to fire its delayed
-    //    next-turn effect. The server pushes the name to discard + splices
-    //    the hand entry; we only re-zone the instance + arm it. ──
-    const inst = engine.findCards({ owner: pi, zone: 'hand', name: CARD_NAME })[0];
-    if (inst) {
-      inst.zone = 'discard'; inst.heroIdx = -1; inst.zoneSlot = -1;
-      inst.counters = inst.counters || {};
-      inst.counters._ladderLevel = sacLevel;
-      inst.counters._ladderArmedTurn = gs.turn;
-    }
+    // ── W66a: den verzögerten Auftrag am SPIELER merken (die Karte geht ganz normal in die Ablage; ihre Instanz ist für die Wirkung unwichtig). ──
+    if (!Array.isArray(ps._ladderPending)) ps._ladderPending = [];
+    ps._ladderPending.push({ level: sacLevel, armedTurn: gs.turn });
     engine.sync();
   },
 
-  hooks: {
-    onTurnStart: async (ctx) => {
-      if (ctx.cardZone !== 'discard') return;
-      const inst = ctx.card;
-      const armed = inst.counters?._ladderArmedTurn;
-      if (armed == null) return;
-      const engine = ctx._engine;
-      const gs = engine.gs;
-      const pi = ctx.cardOwner;
-      // Start of the CONTROLLER's NEXT turn (a later turn than armed).
-      if (gs.activePlayer !== pi) return;
-      if (gs.turn <= armed) return;
-
-      delete inst.counters._ladderArmedTurn; // one-shot
-      const sacLevel = inst.counters?._ladderLevel ?? 0;
-      await doLadderSearch(engine, pi, sacLevel);
-      engine._untrackCard(inst.id); // spent — the name stays in discard
-    },
+  /**
+   * Von der Engine nach den Zugbeginn-Hooks gerufen: jeder fällige Auftrag des AKTIVEN Spielers (Beginn SEINES nächsten Zuges, also ein späterer Zug als der des Spielens)
+   * läuft genau einmal — unabhängig davon, wo die Karte liegt (Ablage, Hand, Deck, gelöscht).
+   */
+  async nachholen(engine) {
+    const gs = engine.gs;
+    for (let pi = 0; pi < engine.playerCount(); pi++) {
+      const ps = gs.players[pi];
+      if (!ps || !Array.isArray(ps._ladderPending) || ps._ladderPending.length === 0) continue;
+      if (gs.activePlayer !== pi) continue;
+      const faellig = ps._ladderPending.filter(a => gs.turn > a.armedTurn);
+      if (faellig.length === 0) continue;
+      ps._ladderPending = ps._ladderPending.filter(a => !(gs.turn > a.armedTurn));      // zuerst verbrauchen (kein Doppelfeuer)
+      if (ps._ladderPending.length === 0) delete ps._ladderPending;
+      for (const a of faellig) {
+        if (gs.result) return;
+        await doLadderSearch(engine, pi, a.level ?? 0);
+      }
+    }
   },
 };

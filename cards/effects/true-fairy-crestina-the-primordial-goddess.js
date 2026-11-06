@@ -230,7 +230,7 @@ module.exports = {
       // VOR der Abfrage, sonst zahlt der Spieler eine Karte umsonst
       // (Lehre aus Idej Projection).
       if (ctx.cannotBeNegated || ctx.cannotBeReduced) return;
-      if (engine._wouldHeroDamageBeVoided?.(ctx.target, ctx.source)) return;
+      if (engine._wouldHeroDamageBeVoided?.(ctx.target, ctx.source, ctx.type)) return;
 
       const vorrat = ps.creationZone || [];
       if (vorrat.length === 0) return;

@@ -23,6 +23,7 @@
 //     Zone die toetende Karte liegt (Spielvokabular 8.8.).
 // ═══════════════════════════════════════════
 
+const { anyName } = require('./_alias-name');   // Shroomasaur: Zusatzname zählt für Namensfamilien
 const { hasCardType, ZONES } = require('./_hooks');
 
 const PARASEED_TOKEN = 'Paraseed';
@@ -57,10 +58,15 @@ function paraseedsOnHero(engine, physOwner, heroIdx, ignoreInstId) {
     // Gegenspalte gewanderte Paraseed vergiftet den Helden, unter dem
     // sie liegt, nicht den ihres Kontrolleurs.
     if (inst.owner !== physOwner) continue;
-    if (!isParaseedCreature(inst.name, engine)) continue;
+    if (!anyName(inst, (n) => isParaseedCreature(n, engine))) continue;
     out.push(inst);
   }
   return out;
+}
+
+/** W7a: wirkt diese Paraseed gerade (nicht gefroren/betäubt/negiert/genullt/Aura)? Wie der Hook-Verteiler. */
+function paraseedWirkt(engine, inst) {
+  return !engine.isCreatureEffectSuppressed(inst, { honorNegStatusImmune: false });
 }
 
 /** Zaehlung fuer die beiden Bloom-Auren. */
@@ -89,7 +95,10 @@ async function syncParaseedPoison(engine, physOwner, heroIdx, ignoreInstId) {
   // `ignoreInstId`: der Verlass-Hook feuert, BEVOR die Karte aus der
   // Zone ausgebucht ist — die abgehende Instanz wird deshalb beim
   // Zaehlen uebergangen.
-  const liegende = paraseedsOnHero(engine, physOwner, heroIdx, ignoreInstId);
+  // ★ W7a (A08-23, Al 14.10.2026: „Freeze, Stun und Negated unterbrechen alle laufenden passiven Effekte"): „While this
+  // Creature is in a Hero's Support Zone, that Hero is Poisoned" ist ein laufender Passiv — eine gefrorene, betäubte oder
+  // negierte Paraseed (oder eine unter der Clown-Aura) vergiftet nicht; das Gift fällt, bis sie wieder wirksam ist.
+  const liegende = paraseedsOnHero(engine, physOwner, heroIdx, ignoreInstId).filter(i => paraseedWirkt(engine, i));
   const traegt = liegende.length > 0;
   const gift = hero.statuses?.poisoned;
 
@@ -173,8 +182,17 @@ function killerHeroOf(engine, source) {
   return { owner, heroIdx };
 }
 
-/** Erste freie Support Zone dieses Helden (place: Heldenzustand egal). */
-function freeSlotOnHero(engine, physOwner, heroIdx) {
+/**
+ * Erste freie Support Zone dieses Helden (place: Heldenzustand egal).
+ * ★ W63a (Al, 22.10.2026: Alices Effekt gilt fuer ALLE Platzierungs-Effekte; „erst die geteilte Zone, DANN die erste leere"): mit `name` zaehlt — bei
+ * Alice-Teilung des Kontrolleurs des Helden (`sharer`, Standard: `heroSideOf`) — auch die Zone einer GLEICHNAMIGEN Creature, und sie kommt zuerst.
+ */
+function freeSlotOnHero(engine, physOwner, heroIdx, name = null, sharer = null) {
+  if (name) {
+    const hero = engine.gs.players[physOwner]?.heroes?.[heroIdx];
+    const wer = sharer ?? (hero?.name ? engine.heroSideOf(physOwner, hero) : physOwner);
+    return require('./_alice-shared').ersterPlatzAufHeld(engine, physOwner, heroIdx, name, wer);
+  }
   const slots = engine.gs.players[physOwner]?.supportZones?.[heroIdx] || [];
   const anzahl = Math.max(3, slots.length);
   for (let si = 0; si < anzahl; si++) {
@@ -185,7 +203,7 @@ function freeSlotOnHero(engine, physOwner, heroIdx) {
 
 module.exports = {
   PARASEED_TOKEN, BLOOM, BLOOM_ASCENDED,
-  isParaseedCreature, paraseedsOnHero, countParaseedsOnHero, heroHasParaseed,
+  isParaseedCreature, paraseedsOnHero, countParaseedsOnHero, heroHasParaseed, paraseedWirkt,
   syncParaseedPoison, syncAllParaseedPoison,
   killerHeroOf, freeSlotOnHero,
 };

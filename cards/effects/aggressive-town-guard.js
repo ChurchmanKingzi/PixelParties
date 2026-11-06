@@ -33,7 +33,7 @@ module.exports = {
     const target = await ctx.promptDamageTarget({
       side: 'any',
       types: ['hero', 'creature'],
-      damageType: 'normal',
+      damageType: 'creature',
       baseDamage: 50,
       title: 'Aggressive Town Guard',
       description: 'Deal 50 damage to a target.',

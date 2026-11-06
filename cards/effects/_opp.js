@@ -87,6 +87,8 @@ function isSeat(gsOrEngine, x) {
  */
 function emitToOpponentsGs(gs, io, pi, event, payload) {
   if (gs && gs._stSimulating) return;                // Skill Test: Lookahead-Simulation sendet nichts an Clients
+  // ★ W63d: AUFTRITTS-PUFFER — solange die Karte des Senders noch nicht committed ist, geht nichts zum Gegner (Engine: `_auftrittHaelt`).
+  if (gs && gs._pendingCardReveal && gs._engineRef && gs._engineRef._auftrittHaelt(pi, event, payload, 'gegner')) return;
   for (const oi of (gs && gs.skillTest) ? opponentsOfGs(gs, pi) : [opponentOfGs(gs, pi)]) {
     const sid = gs.players[oi]?.socketId;
     if (sid) io.to(sid).emit(event, payload);

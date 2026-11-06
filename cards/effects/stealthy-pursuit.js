@@ -74,10 +74,15 @@ function handelndeHelden(gs, pi, engine, chainCtx) {
     if (!glied || glied.owner !== pi || glied.fromHero) continue;
     if (glied.cardName === CARD_NAME) continue;                 // „a different …"
     const cd = db[glied.cardName];
-    if (!cd || !(hasCardType(cd, 'Attack') || hasCardType(cd, 'Spell'))) continue;
     const hi = glied.isInitialCard ? glied.heroIdx : (glied.casterHeroIdx ?? glied.heroIdx);
-    if (!Number.isInteger(hi) || hi < 0) continue;
     const seite = Number.isInteger(glied.casterOwner) ? glied.casterOwner : pi;
+    // W32a (Al, 22.10.2026): auch die virtuelle Attack-Kette eines Effekts, der als Attack ZÄHLT (Broghan & Co., Gegenstandseffekte; `engine.alsAttackKette`) ist „eine Attack".
+    const zaehltAlsAttack = glied.cardType === 'Attack' && glied.fromBoard && !!engine._heldenEffektStufe
+      && engine._heldenEffektStufe(glied.cardName, 'attack', { name: glied.cardName, owner: seite, heroIdx: hi }) != null;
+    // W34a (Al, 22.10.2026): ebenso die virtuelle Spell-Kette eines Effekts, der als Spell ZÄHLT (Alice; `engine.alsSpellKette`).
+    const zaehltAlsSpell = glied.cardType === 'Spell' && glied.fromBoard && glied.zaehltAlsArt === 'spell';
+    if (!zaehltAlsAttack && !zaehltAlsSpell && (!cd || !(hasCardType(cd, 'Attack') || hasCardType(cd, 'Spell')))) continue;
+    if (!Number.isInteger(hi) || hi < 0) continue;
     const held = gs.players?.[seite]?.heroes?.[hi];
     if (!held?.name || held.hp <= 0) continue;
     out.add(`${seite}:${hi}`);
@@ -132,8 +137,7 @@ module.exports = {
 
   isReaction: true,
   deleteOnUse: true,                       // „Delete this card."
-  // Als Vorgabe 29.9. (Runde 3): nur dauerhaft uebernommene Helden (Paraseed).
-  fremdeWirker: 'dauerhaft',
+  // W20c (Al 20.10.): uebernommene Helden (dauerhaft oder temporaer) wirken fuer ALLE Reaktionen — kein Karten-Schalter mehr noetig.
 
   // Nie proaktiv — nur als Glied einer Kette.
   canActivate: () => false,

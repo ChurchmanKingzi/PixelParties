@@ -45,8 +45,12 @@ function heroHasDiverHelmet(engine, playerIdx, heroIdx) {
   return false;
 }
 
-/** Alias — "is this Hero unaffected by Areas?" */
+/**
+ * Is this Hero unaffected by Areas? Diver Helmet ODER (W82, Shipwrecked) der Kontrolleur des Helden ist von Areas ausgenommen
+ * ("you and all targets you control are unaffected by Areas"). Zentral: `engine.heldIstVonAreasAusgenommen`.
+ */
 function isAreaImmuneHero(engine, playerIdx, heroIdx) {
+  if (engine && typeof engine.heldIstVonAreasAusgenommen === 'function') return engine.heldIstVonAreasAusgenommen(playerIdx, heroIdx);
   return heroHasDiverHelmet(engine, playerIdx, heroIdx);
 }
 
@@ -56,17 +60,18 @@ function isAreaImmuneHero(engine, playerIdx, heroIdx) {
  * it sits in carry a Diver Helmet? Uses the instance's PHYSICAL side
  * (owner) because Support Zones are physical; a charmed Creature still
  * sits in its owner's zone.
+ * ★ W82 (Shipwrecked): ausserdem ist die Karte ausgenommen, wenn ihr KONTROLLEUR Shipwrecked traegt ("all targets you control").
  */
 function isAreaImmuneInst(engine, inst) {
   if (!inst) return false;
-  if (inst.heroIdx == null || inst.heroIdx < 0) return false;
-  return heroHasDiverHelmet(engine, inst.owner, inst.heroIdx);
+  if (inst.heroIdx != null && inst.heroIdx >= 0 && heroHasDiverHelmet(engine, inst.owner, inst.heroIdx)) return true;
+  return !!engine?.spielerIstVonAreasAusgenommen?.(inst.controller ?? inst.owner);
 }
 
 /**
  * Is this hero OBJECT unaffected by Areas? Resolves the hero's
  * (playerIdx, heroIdx) by reference search, then defers to
- * `heroHasDiverHelmet`. Convenient for engine damage/heal sites that
+ * `isAreaImmuneHero` (Diver Helmet oder Shipwrecked des Kontrolleurs). Convenient for engine damage/heal sites that
  * only hold the hero object.
  */
 function isAreaImmuneHeroObject(engine, heroObj) {
@@ -74,7 +79,7 @@ function isAreaImmuneHeroObject(engine, heroObj) {
   for (let pi = 0; pi < engine.gs.players.length; pi++) {
     const heroes = engine.gs.players[pi]?.heroes || [];
     const hi = heroes.indexOf(heroObj);
-    if (hi >= 0) return heroHasDiverHelmet(engine, pi, hi);
+    if (hi >= 0) return isAreaImmuneHero(engine, pi, hi);
   }
   return false;
 }

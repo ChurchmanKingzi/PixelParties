@@ -58,6 +58,7 @@ function liveOwnHeroes(gs, pi, engine) {
 function heroCanBeBurned(hero, engine = null, quelle = null) {
   if (!hero?.name || hero.hp <= 0) return false;
   if (hero.statuses?.burned) return false;
+  if (engine?.statusSchutzAufgehoben?.('burned', hero)) return true;   // 23.10. Tearing Mountain: kein Schutz verhindert Burn
   if (hero.statuses?.immune) return false;
   // Charme schuetzt nur in seiner Auspraegung (Charme Lv3: alles, Golden
   // Apple: nur gegen den Kontrolleur, Styx: gar nicht) — `_charmBlocksFrom`.
@@ -197,6 +198,12 @@ module.exports = {
       if (heroIdx < 0) return;
       if (engine.heroSideOf(physOwner, target) !== ctx.cardOwner) return;
 
+      // ★ Welle 14 (Al, Q7 aus W13b): „Ja, die prallen auch ab." — der Max-HP-Gewinn ist ein Nicht-Schaden-Effekt auf den Helden; Resistance
+      // fängt ihn ab (der Brandschaden selbst bleibt, nur der +60-Gewinn entfällt; das Heil-Popup entfällt dann auch).
+      const _gewinnBlockiert = await engine.heroNonDamageEffectBlocked(physOwner, heroIdx, 'max_hp', {
+        sourceOwner: ctx.cardOwner, source: 'Luna Kiai', amount: HP_PER_BURN_TICK,
+      });
+
       // ── Explicit damage + heal popups ──────────────────────────
       // The auto HP-delta detector on the client compares the
       // pre-sync and post-sync hp values. Burn -X cancelled by
@@ -212,15 +219,16 @@ module.exports = {
       if (!ctx._kiaiHpPopupEmitted && burnAmount > 0) {
         engine._broadcastEvent('kiai_hp_split', {
           owner: physOwner, heroIdx,
-          damage: burnAmount, heal: HP_PER_BURN_TICK,
+          damage: burnAmount, heal: _gewinnBlockiert ? 0 : HP_PER_BURN_TICK,
         });
         ctx._kiaiHpPopupEmitted = true;
-      } else {
+      } else if (!_gewinnBlockiert) {
         engine._broadcastEvent('kiai_hp_split', {
           owner: physOwner, heroIdx,
           heal: HP_PER_BURN_TICK,
         });
       }
+      if (_gewinnBlockiert) return;
 
       // Bump max HP AND heal current HP by the same amount — the
       // 60-HP "buffer" is a real cushion against the next tick, not

@@ -6,9 +6,22 @@
 //  Ability's activation and discard the top copy
 //  of that Ability from the Hero that activated
 //  it.
+//
+//  Als Ruling (Al 26.10.): „Negate that Ability until the
+//  end of the turn" gilt fuer die Ability AUF DEM AKTIVIEREN-
+//  DEN HELDEN: bis zum Ende des Zuges keine erneute Aktivierung
+//  (auch nicht, wenn die Kopien abgelegt wurden und eine neue
+//  angelegt wird); dieselbe Ability auf ANDEREN Helden bleibt
+//  nutzbar. Die oberste Kopie wird wie bisher abgelegt. Die
+//  Sperre liegt als `gs.players[pi]._abilityHeroLocks` (Held +
+//  Basisname -> Zug) und wird vom einen Praedikat
+//  `engine._abilityNegatedOnHero` aller Aktivierungswege
+//  gelesen. Annahme: negiert sind die AKTIVEN Effekte (wie bei
+//  Uncool Malfunction/Charme-Negation); passive Wirkungen der
+//  Ability laufen weiter.
 // ═══════════════════════════════════════════
 
-const { SPEED } = require('./_hooks');
+const { SPEED, baseCardName } = require('./_hooks');
 
 const CARD_NAME = 'Ragnarock';
 
@@ -37,7 +50,8 @@ module.exports = {
     if (initial.cardType !== 'Ability') return false;
     if (initial.fromBoard !== true) return false;
     if (initial.owner === pi) return false;
-    return engine.hasCoolnessStack(pi);
+    // Als Ruling (Al 26.10.): `hasCoolnessStack` ist bei liegender Wowhalla auch fuer einen LEEREN Stack wahr — die Kosten (oberste Karte loeschen) brauchen eine Karte.
+    return engine.getCoolnessStackSize(pi) > 0;
   },
 
   // Reaction-only — never proactively activatable.
@@ -61,6 +75,18 @@ module.exports = {
 
     // ── Effect 1: negate the activated Ability ──
     engine.negateChainLink(chain, 0);
+
+    // ── Effect 1b: „until the end of the turn" ──
+    // Als Ruling (Al 26.10.): die Ability ist auf dem aktivierenden Helden bis zum Ende dieses Zuges negiert — keine erneute Aktivierung im
+    // selben Zug (auch nicht nach Kopien-Verlust: die Sperre haengt an Held + Namen, nicht an der abgelegten Kopie). Dieselbe Ability auf
+    // ANDEREN Helden bleibt nutzbar. Gelesen von `engine._abilityNegatedOnHero` (Listen, CPU, Server-Tore).
+    if (initialLink.owner != null && initialLink.owner >= 0 && initialLink.heroIdx != null && initialLink.heroIdx >= 0 && initialLink.cardName) {
+      const lockPs = engine.gs.players[initialLink.owner];
+      if (lockPs) {
+        if (!lockPs._abilityHeroLocks) lockPs._abilityHeroLocks = {};
+        lockPs._abilityHeroLocks[`${initialLink.heroIdx}:${baseCardName(initialLink.cardName)}`] = engine.gs.turn;
+      }
+    }
 
     // ── Effect 2: discard the top copy of that Ability from the
     // Hero that activated it. Abilities stack as repeats of the same

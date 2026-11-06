@@ -273,7 +273,7 @@ async function bonusOppDiscards2(ctx, engine, pi) {
 async function bonusDeal50x3(ctx, engine, pi) {
   const target = await ctx.promptDamageTarget({
     side: 'any', types: ['hero', 'creature'],
-    damageType: 'destruction_spell', baseDamage: 50,
+    damageType: 'creature', baseDamage: 50,   // W16d (A09-08): Kreatureneffekt, kein Zauber (Dark Ocean blockt ihn)
     title: 'Infernous Demon',
     description: 'Deal 50 damage to a target 3 times.',
     confirmLabel: '🔥 Burn! (50×3)', confirmClass: 'btn-danger', cancellable: true,
@@ -296,19 +296,16 @@ async function bonusDeal50x3(ctx, engine, pi) {
         type: 'explosion', owner: target.owner, heroIdx: target.heroIdx, zoneSlot: -1,
       });
       await engine._delay(300);
-      await engine.actionDealDamage(sourceMeta, hero, 50, 'destruction_spell');
+      await engine.actionDealDamage(sourceMeta, hero, 50, 'creature');
     } else {
-      const inst = target.cardInstance || engine.cardInstances.find(c =>
-        (c.owner === target.owner || c.controller === target.owner)
-        && c.zone === 'support' && c.heroIdx === target.heroIdx
-        && c.zoneSlot === target.slotIdx);
+      const inst = target.cardInstance || engine.kreaturAnBrett(target.owner, target.heroIdx, target.slotIdx);   // Z1: Brettseite
       if (!inst || inst.zone !== 'support') break;
       engine._broadcastEvent('play_zone_animation', {
         type: 'explosion', owner: inst.owner, heroIdx: inst.heroIdx, zoneSlot: inst.zoneSlot,
       });
       await engine._delay(300);
       await engine.processCreatureDamageBatch([{
-        inst, amount: 50, type: 'destruction_spell', source: ctx.card, sourceOwner: pi,
+        inst, amount: 50, type: 'creature', source: ctx.card, sourceOwner: pi,
       }]);
     }
     // Render THIS hit's -50 before pacing into the next explosion.
@@ -377,7 +374,7 @@ function buildDemonHooks(cardName) {
 
         markDemonSummoned(engine.gs, pi, cardName);
 
-        if (ctx._summonedByDemon !== def.predecessor) return;
+        if (ctx._summonedByDemon !== def.predecessor) return engine.summonEffektFizzelt(ctx.card, ctx.cardName, { stumm: true });   // W11/R4 (Al): „when you summon … with the effect of <Vorgänger>" trifft nicht zu → Blob stumm
         const bonus = BONUS[cardName];
         if (bonus) await bonus(ctx, engine, pi);
       },
@@ -395,6 +392,13 @@ function buildDemonHooks(cardName) {
         const pi = death.controller ?? death.owner ?? ctx.cardOwner;
         const ps = gs.players[pi];
         if (!ps) return;
+        // Z1 (A09-15) / W4 (Al 14.10.2026: „Falls der temporary owner ein geeignetes Ziel zum Beschwoeren hat, darf er es
+        // seitenfremd beschwoeren."): „the Support Zone this Creature occupied" liegt auf der BRETTSEITE; ein gestohlener
+        // Demon stand beim Besitzer — der Kontrolleur sucht in SEINEM Deck und platziert den Nachfolger seitenfremd in
+        // genau diese Zone (nicht in die gleich indizierte Zone der eigenen Seite).
+        const seite = death.seite ?? death.owner ?? pi;
+        const sps = gs.players[seite];
+        if (!sps) return;
 
         const successor = def.successor;
 
@@ -409,7 +413,7 @@ function buildDemonHooks(cardName) {
         if (deckIdx < 0) return;
 
         // The vacated slot must still be free.
-        const sup = ps.supportZones?.[death.heroIdx] || [];
+        const sup = sps.supportZones?.[death.heroIdx] || [];
         if ((sup[death.zoneSlot] || []).length !== 0) return;
 
         // "You may."
@@ -425,7 +429,7 @@ function buildDemonHooks(cardName) {
         const deckIdx2 = (ps.mainDeck || []).indexOf(successor);
         if (deckIdx2 < 0) return;
         if (wasDemonSummonedThisTurn(gs, pi, successor)) return;
-        const sup2 = ps.supportZones?.[death.heroIdx] || [];
+        const sup2 = sps.supportZones?.[death.heroIdx] || [];
         if ((sup2[death.zoneSlot] || []).length !== 0) return;
 
         // Pull from deck, then PLACE (not summon) into the vacated slot.
@@ -445,15 +449,17 @@ function buildDemonHooks(cardName) {
           owner: pi, cardName: successor,
           from: 'deck', to: 'support',
           toHeroIdx: death.heroIdx, toSlotIdx: death.zoneSlot,
+          ...(seite !== pi ? { toOwner: seite } : {}),
           sfx: 'placement',
         });
         await engine._delay(520);                 // Flug ankommen lassen
         if (!(await engine.deckEntnahme(ps, deckIdx2, { source: cardName, shuffle: true }))) return;   // v1393   // v820: Stapel-Schicht
         const placed = await engine.summonCreatureWithHooks(
-          successor, pi, death.heroIdx, death.zoneSlot,
+          successor, seite, death.heroIdx, death.zoneSlot,
           {
             source: cardName,
             isPlacement: true,
+            ...(seite !== pi ? { controller: pi } : {}),
             hookExtras: engine.deckHookExtras({ _summonedByDemon: cardName, _placedByCyclingDemon: true }),   // v1393
           },
         );

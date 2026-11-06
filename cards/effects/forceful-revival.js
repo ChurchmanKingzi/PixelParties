@@ -34,8 +34,7 @@ const { isSummonablePileCreature, hasCardType } = require('./_hooks');
 const CARD_NAME = 'Forceful Revival';
 
 function _fightingLevel(engine, ps, heroIdx) {
-  const abZones = ps?.abilityZones?.[heroIdx] || [[], [], []];
-  return engine.countAbilitiesForSchool('Fighting', abZones);
+  return engine.heroSchoolLevel('Fighting', engine.gs.players.indexOf(ps), heroIdx);   // W4a: harte Negierung -> Stufe 0
 }
 
 function _eligibleCreatureNames(engine, ps, maxLevel, pi) {
@@ -68,7 +67,28 @@ function _userHasFreeSupportSlot(ps, heroIdx) {
   return sup.some(slot => (slot || []).length === 0);
 }
 
+/**
+ * ★ W62a: Platz des Nutzers fuer `name` — erste FREIE Zone, sonst (Alice-Teilung des Kontrolleurs `pi`) die Zone einer GLEICHNAMIGEN
+ * Creature; -1 = keiner. Ohne `name` nur die freie Zone (Vorpruefung ohne Kartenwahl: `_userHasFreeSupportSlot` oder irgendein Kandidat teilt).
+ */
+function _userSlotFor(engine, ps, pi, hs, heroIdx, name) {
+  const sup = ps?.supportZones?.[heroIdx] || [];
+  // W63a (Al, 22.10.2026: „erst die geteilte Zone, sofern Alices Effekt aktiv ist, DANN die erste leere"): die Zone bestimmt der Zauber selbst —
+  // zuerst die geteilte Zone einer gleichnamigen Creature, sonst die erste freie.
+  if (name) {
+    const { canShareInto } = require('./_alice-shared');
+    for (let s = 0; s < 3; s++) if (canShareInto(engine, pi, heroIdx, s, name, hs)) return s;
+  }
+  return sup.findIndex(sl => (sl || []).length === 0);
+}
+function _userHasSlotFor(engine, ps, pi, hs, heroIdx, namen) {
+  return _userHasFreeSupportSlot(ps, heroIdx) || namen.some(n => _userSlotFor(engine, ps, pi, hs, heroIdx, n) >= 0);
+}
+
 module.exports = {
+  // Als Ruling (Al 28.10.): diese Attack richtet nie Schaden an (der Eigenschaden an den Nutzer ist kein Treffer der Attack — ein Pfeil würde ihn nur erhöhen) — Schadens-Pfeile und Magic Topaz sind an ihr nicht ankettbar (`_arrows-shared`: `arrowTriggerCondition`).
+  dealsNoAttackDamage: true,
+
   // Effective max-revivable-level scales with the caster's Fighting
   // count — flag for the CPU's ability-stacking scoring so a deck with
   // Forceful Revival keeps Fighting worth stacking past Lv1.
@@ -81,12 +101,14 @@ module.exports = {
     if (!ps) return false;
     // Need at least one alive own hero with a free support slot AND a
     // candidate creature in discard at that hero's Fighting level.
-    for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
-      const h = ps.heroes[hi];
+    // Z1 (M01-26): auch geliehene Helden (Charme, Love Shot ...) sind "Nutzer" - Zonen/Fighting auf ihrer Brettseite.
+    for (const { physOwner, heroIdx: hi, hero: h } of engine.heroesControlledBy(pi)) {
       if (!h?.name || h.hp <= 0) continue;
-      if (!_userHasFreeSupportSlot(ps, hi)) continue;
-      const lvl = _fightingLevel(engine, ps, hi);
-      if (_eligibleCreatureNames(engine, ps, lvl, pi).length > 0) return true;
+      const hps = gs.players[physOwner] || ps;
+      const lvl = _fightingLevel(engine, hps, hi);
+      const namen = _eligibleCreatureNames(engine, ps, lvl, pi).map(c => c.name);
+      if (!_userHasSlotFor(engine, hps, pi, physOwner, hi, namen)) continue;   // W62a: frei oder geteilt (Alice)
+      if (namen.length > 0) return true;
     }
     return false;
   },
@@ -96,9 +118,11 @@ module.exports = {
   canPlayWithHero(gs, pi, heroIdx, cardData, engine) {
     const ps = gs.players[pi];
     if (!ps) return false;
-    if (!_userHasFreeSupportSlot(ps, heroIdx)) return false;
-    const lvl = _fightingLevel(engine, ps, heroIdx);
-    return _eligibleCreatureNames(engine, ps, lvl, pi).length > 0;
+    // Z1 (M01-26): Zonen und Fighting-Stufe des NUTZERS = Brettseite (geliehener Held); Ablage bleibt beim Kontrolleur.
+    const hps = gs.players[engine.heldSeiteFuer(pi, heroIdx)] || ps;
+    const lvl = _fightingLevel(engine, hps, heroIdx);
+    const namen = _eligibleCreatureNames(engine, ps, lvl, pi).map(c => c.name);
+    return namen.length > 0 && _userHasSlotFor(engine, hps, pi, engine.heldSeiteFuer(pi, heroIdx), heroIdx, namen);   // W62a: frei oder geteilt (Alice)
   },
 
   hooks: {
@@ -117,9 +141,8 @@ module.exports = {
       }
 
       const lvl = _fightingLevel(engine, hps, heroIdx);   // Als Befund 29.9.: Brettseite des Nutzers
-      const gallery = _eligibleCreatureNames(engine, ps, lvl, pi);
-      if (gallery.length === 0) { gs._spellCancelled = true; return; }
-      if (!_userHasFreeSupportSlot(hps, heroIdx)) { gs._spellCancelled = true; return; }   // Als Befund 29.9.: Brettseite des Nutzers
+      const gallery = _eligibleCreatureNames(engine, ps, lvl, pi).filter(g => _userSlotFor(engine, hps, pi, hs, heroIdx, g.name) >= 0);   // W62a: nur Karten mit Platz (frei oder geteilt)
+      if (gallery.length === 0) { gs._spellCancelled = true; return; }   // Als Befund 29.9.: Brettseite des Nutzers; W62a: + geteilte Zone (Alice)
 
       // ── Pick a creature from the discard gallery ─────────────────
       const picked = await engine.promptGeneric(pi, {
@@ -146,7 +169,7 @@ module.exports = {
       }
       const dpIdx = (ps.discardPile || []).indexOf(chosenName);
       if (dpIdx < 0) { gs._spellCancelled = true; return; }
-      if (!_userHasFreeSupportSlot(hps, heroIdx)) { gs._spellCancelled = true; return; }   // Als Befund 29.9.: Brettseite des Nutzers
+      if (_userSlotFor(engine, hps, pi, hs, heroIdx, chosenName) < 0) { gs._spellCancelled = true; return; }   // Als Befund 29.9.: Brettseite des Nutzers; W62a: frei oder geteilt (Alice)
 
       // ── Pop from discard and summon onto the user hero ───────────
       // v1389: Ablage → Feld über die EINE Stelle (Sperre, Lethe-Stempel,
@@ -157,25 +180,31 @@ module.exports = {
       // ist der Schaden am Helden. Dafuer muss der Zielplatz VOR dem
       // Anlauf feststehen; die Kreatur fliegt nicht aus der Ablage heran,
       // sie ERSCHEINT mit dem Aufprall.
-      const freiSlot = (hps.supportZones?.[heroIdx] || []).findIndex(sl => (sl || []).length === 0);   // Als Befund 29.9.: Brettseite des Nutzers
+      const freiSlot = _userSlotFor(engine, hps, pi, hs, heroIdx, chosenName);   // Als Befund 29.9.: Brettseite des Nutzers; W62a: erste freie, sonst geteilte Zone (Alice)
       if (freiSlot < 0) { gs._spellCancelled = true; return; }
-      engine._broadcastEvent('play_ram_animation', {
-        sourceOwner: hs, sourceHeroIdx: heroIdx,   // Als Befund 29.9.: Brettseite des Nutzers
-        targetOwner: hs, targetHeroIdx: heroIdx, targetZoneSlot: freiSlot,
-        cardName: userHero.name, duration: 1600,
-      });
-      // Aufprall bei 12 % des Anlaufs (≈190 ms); Zonen-Animationen haben
-      // 100 ms Einhaengeverzug — also 90 ms vorher senden.
-      await engine._delay(90);
-      engine._broadcastEvent('play_zone_animation', {
-        type: 'gewaltsame_erweckung', owner: hs, heroIdx, zoneSlot: freiSlot, duration: 900,   // Als Befund 29.9.: Brettseite des Nutzers
-      });
-      await engine._delay(100);
+      // ★ W64a (Orchestrator/Al, 23.10.2026: „Auftritt erst nach dem Commit"): hat die wiederbelebte Karte eine abbrechbare Beschwoerungsfrage
+      // (Opfer-/Tribut-Wahl: Archer, Warrior/Guardian of Teocuilatl, 500 Piranhas …), laeuft der Anlauf erst NACH dieser Frage — `summonFromDiscard`
+      // fragt zuerst und ruft dann `nachKostenAnim`. Bricht der Spieler ab, hat der Gegner nichts gesehen (die Karte liegt wieder in der Ablage).
+      const rammen = async () => {
+        engine._broadcastEvent('play_ram_animation', {
+          sourceOwner: hs, sourceHeroIdx: heroIdx,   // Als Befund 29.9.: Brettseite des Nutzers
+          targetOwner: hs, targetHeroIdx: heroIdx, targetZoneSlot: freiSlot,
+          cardName: userHero.name, duration: 1600,
+        });
+        // Aufprall bei 12 % des Anlaufs (≈190 ms); Zonen-Animationen haben
+        // 100 ms Einhaengeverzug — also 90 ms vorher senden.
+        await engine._delay(90);
+        engine._broadcastEvent('play_zone_animation', {
+          type: 'gewaltsame_erweckung', owner: hs, heroIdx, zoneSlot: freiSlot, duration: 900,   // Als Befund 29.9.: Brettseite des Nutzers
+        });
+        await engine._delay(100);
+      };
 
       const summonRes = await engine.summonFromDiscard(pi, pi, dpIdx, heroIdx, freiSlot, {
         source: CARD_NAME, flug: false, heldSeite: hs,   // Als Befund 29.9.: Brettseite des Nutzers
         summonOpts: { playSummonAnim: false },   // die Landung zeigt die eigene Animation
         hookExtras: { _isForcefulRevival: true },
+        nachKostenAnim: rammen,
       });
       if (!summonRes?.inst) {
         gs._spellCancelled = true;

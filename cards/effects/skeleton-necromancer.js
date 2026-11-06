@@ -16,8 +16,9 @@ const CARD_NAME = 'Skeleton Necromancer';
 
 /** Freie Zonen „of any Hero you control" — Kontrolle statt Seite (Styx 28.9.);
  *  jede Zone traegt `owner` (physische Seite). */
-function zielZonen(engine, pi) {
-  return engine.getFreeSupportZones(pi, { nachKontrolle: true, source: CARD_NAME });
+function zielZonen(engine, pi, cardName) {
+  // W62a: mit Alice-Teilung zaehlt auch die Zone einer GLEICHNAMIGEN Creature (`beschwoerZonenFuer`, je Karte).
+  return engine.beschwoerZonenFuer(pi, cardName, { nachKontrolle: true, source: CARD_NAME });
 }
 
 /** Discard-pile Skeletons, excluding self-name. */
@@ -44,9 +45,8 @@ module.exports = {
     // Must have a card to discard, an eligible Skeleton in discard,
     // and a free Support Zone on some living Hero.
     if ((ps.hand || []).length === 0) return false;
-    if (eligibleTutorTargets(ps, engine).length === 0) return false;
-    if (zielZonen(engine, pi).length === 0) return false;   // Kontrolle statt Seite (Styx 28.9.)
-    return true;
+    // Kontrolle statt Seite (Styx 28.9.); W62a: Zone je Karte.
+    return eligibleTutorTargets(ps, engine).some(c => zielZonen(engine, pi, c.name).length > 0);
   },
 
   async onCreatureEffect(ctx) {
@@ -57,7 +57,7 @@ module.exports = {
     if (!ps) return false;
 
     // Step 1: pick the Skeleton from discard (cancellable — pre-cost).
-    const candidates = eligibleTutorTargets(ps, engine);
+    const candidates = eligibleTutorTargets(ps, engine).filter(c => zielZonen(engine, pi, c.name).length > 0);
     if (candidates.length === 0) return false;
     const gallery = candidates.map(c => ({ name: c.name, source: 'discard', count: c.count }));
     const picked = await engine.promptGeneric(pi, {
@@ -72,7 +72,7 @@ module.exports = {
     if (!candidates.some(c => c.name === chosenName)) return false;
 
     // Step 2: pick the destination free zone on any of own Heroes.
-    let zones = zielZonen(engine, pi);   // Kontrolle statt Seite (Styx 28.9.)
+    let zones = zielZonen(engine, pi, chosenName);   // Kontrolle statt Seite (Styx 28.9.)
     if (zones.length === 0) return false;
     let chosenZone;
     if (zones.length === 1) {

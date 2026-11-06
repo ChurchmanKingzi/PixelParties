@@ -87,8 +87,7 @@ async function zahleKosten(engine, pi) {
     : (wahl.source === 'hand' && ps.hand.includes(name)) ? 'hand'
     : ps.hand.includes(name) ? 'hand' : ps.discardPile.includes(name) ? 'discard' : null;
   if (!quelle || !hasCardType(engine._getCardDB()[name], 'Potion')) return false;
-  // Boris darf auch Löschkosten ignorieren (`borisVerzicht`, wie bei Abwurfkosten) — der Effekt läuft dann ohne Löschen.
-  if (await engine.borisVerzicht(pi, 1, { source: CARD_NAME })) return true;
+  // W74a (Al): Löschen ist kein Abwurf — Boris greift hier NICHT (kein `borisVerzicht`); die Löschkosten werden immer bezahlt.
   return await engine.deleteFromPile(pi, quelle, name, { source: CARD_NAME, sourceOwner: pi });
 }
 

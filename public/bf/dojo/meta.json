@@ -1,0 +1,1 @@
+{"dim": {"rand": 0.12}, "ew": 30, "tile": 192, "tutorial": true, "anim": [{"t": "flameE", "x": 10, "y": 27, "small": true}, {"t": "dust", "n": 7, "phone": 0, "y0": 4, "y1": 96, "speed": 0.6, "dir": 1, "cols": ["#a89370", "#c5b7a0"]}, {"t": "glintAt", "pts": [[57, 22], [135, 22], [57, 78], [135, 78], [96, 50]], "cols": ["#ffffff", "#e2d8cb"]}], "lum": 86.2}

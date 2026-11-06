@@ -78,8 +78,10 @@ const CARD_NAME = 'Garius, the Great Reformer';
 function _eligibleSacrificeCandidates(engine, pi) {
   const turn = engine.gs.turn || 0;
   // Die Stufe des Opfers zaehlt — Artifact Creatures haben keine (Als Ruling 9.10.).
+  // W20b (Al, 20.10.2026: Opfer-Zonen-Regel gilt für jede Opfer-Beschwörung): das Ersatz-Wesen kommt in die Zone des Opfers - nur Zonen, die das EINE Opfer leert (kein Alice-Stapel).
   return engine.getSacrificableCreatures(pi).filter(c =>
-    c.inst.turnPlayed !== turn && c.hasLevel,
+    c.inst.turnPlayed !== turn && c.hasLevel
+    && engine.zoneFreiNachKostenzahlung(engine.physicalSide(c.inst), c.inst.heroIdx, c.inst.zoneSlot, c.inst),
   );
 }
 

@@ -56,13 +56,37 @@ function portalKandidaten(engine, pi, loadCardEffect) {
   return out;
 }
 
-/** Ist die Quelle eine Attack- oder Spell-KARTE? */
-function istAttackOderSpell(engine, quelle, hasCardType) {
+/** Ist die Quelle eine Attack- oder Spell-KARTE — oder ein Effekt, der als Attack/Spell ZÄHLT (W30a, Al 21.10.2026: Broghan & Co., Alice, Gegenstandseffekte, Greatmaw-Treffer; `damageType` des Fensters nötig)? */
+function istAttackOderSpell(engine, quelle, hasCardType, damageType) {
   const name = quelle?.name || quelle?.cardName;
   const cd = quelle?.cardInstance
     ? (engine.getEffectiveCardData?.(quelle.cardInstance) || engine._getCardDB()[name])
     : engine._getCardDB()[name];
-  return !!cd && (hasCardType(cd, 'Attack') || hasCardType(cd, 'Spell'));
+  if (cd && (hasCardType(cd, 'Attack') || hasCardType(cd, 'Spell'))) return true;
+  return !!name && damageType != null && typeof engine._heldenEffektStufe === 'function' && engine._heldenEffektStufe(name, damageType, quelle) != null;
 }
 
-module.exports = { traeger, zielVon, istTraegerZiel, portalKandidaten, istAttackOderSpell };
+/**
+ * `onCardLeaveZone` eines Dream Landers: verlaesst er das Brett OHNE Schadens-Tod
+ * (Zerstoerung per Effekt, Opfer, Zurueckmischen, auf die Hand), folgt der
+ * angelegte Held in die Ablage des urspruenglichen Besitzers (Engine-Vertrag
+ * `actionAttachHeroToCreature`). Sonst verschwaende er aus dem Spiel (A07-05).
+ * Der Schadens-Tod feuert den Hook ohne `toZone` und raeumt in der Engine
+ * selbst auf — dort tut dieser Helfer nichts (kein Doppeleintrag).
+ */
+function heldFolgtAbgang(ctx) {
+  const inst = ctx.card;
+  if (!inst || ctx.leavingCard?.id !== inst.id) return;
+  if (ctx.fromZone !== 'support' || ctx.toZone == null || ctx.toZone === 'support') return;
+  const held = inst.counters?.attachedHero;
+  if (!held) return;
+  const engine = ctx._engine;
+  const ps = engine.gs.players[inst.counters.attachedHeroOwner] || engine.gs.players[inst.originalOwner ?? inst.owner];   // W64c: Besitzer der Helden-Karte
+  if (!ps) return;
+  if (!ps.discardPile) ps.discardPile = [];
+  ps.discardPile.push(held);
+  delete inst.counters.attachedHero;
+  engine.log('attached_hero_discarded', { hero: held, creature: inst.name, player: ps.username });
+}
+
+module.exports = { traeger, zielVon, istTraegerZiel, portalKandidaten, istAttackOderSpell, heldFolgtAbgang };

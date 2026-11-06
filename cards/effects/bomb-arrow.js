@@ -18,7 +18,7 @@
 // ═══════════════════════════════════════════
 
 const { hasCardType } = require('./_hooks');
-const { arrowTriggerCondition, armAttackerWithArrow } = require('./_arrows-shared');
+const { arrowTriggerCondition, armAttackerWithArrow, attackDealsNoDamage } = require('./_arrows-shared');
 
 const CARD_NAME = 'Bomb Arrow';
 const BOMB_DAMAGE = 100;
@@ -50,8 +50,11 @@ module.exports = {
   isArrow: true,
   canActivate: () => false,
 
+  // Als Ruling (Al 28.10.): an einer Attack OHNE Schaden (Alliance) taugt nur der 100-Schaden-Teil — dann muss es eine Gegnerkreatur als Ziel geben (wie bei Racket Arrow),
+  // sonst hätte die Karte nichts zu tun und ist nicht ankettbar.
   reactionCondition: (gs, pi, engine, chainCtx) =>
-    arrowTriggerCondition(gs, pi, engine, chainCtx),
+    arrowTriggerCondition(gs, pi, engine, chainCtx, { effektOhneAngriffsschaden: true })
+    && (!attackDealsNoDamage(chainCtx) || opponentCreatureTargets(engine, pi).length > 0),
 
   resolve: async (engine, pi, _sel, _val, chain, _idx) => {
     armAttackerWithArrow(engine, pi, chain, {
@@ -74,6 +77,7 @@ module.exports = {
       cancellable: true,
       exclusiveTypes: true,
       maxPerType: { equip: 1 },
+      types: ['creature'],   // W16d (A09-03): Kreatur-only -> „unaffected by effects that can't affect Heroes" (Bonded Companion) fällt heraus
     });
     if (!picked || picked.length === 0) { engine.sync(); return; }
     const target = targets.find(t => t.id === picked[0]);
@@ -86,7 +90,7 @@ module.exports = {
 
     await engine.actionDealCreatureDamage(
       { name: CARD_NAME, owner: pi, heroIdx: -1 },
-      target.cardInstance, BOMB_DAMAGE, 'destruction_spell',
+      target.cardInstance, BOMB_DAMAGE, 'artifact',   // W16d (A09-08): Artefaktschaden, kein Zauber – Dark Ocean (Ruling 5.8.: nur attack/destruction_spell) blockt ihn
       { sourceOwner: pi, canBeNegated: true },
     );
     engine.log('bomb_arrow_creature_hit', {

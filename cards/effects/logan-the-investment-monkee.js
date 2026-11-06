@@ -111,6 +111,7 @@ function pruefePleite(engine, pi) {
   if ((ps.gold || 0) !== 0) return;
   let etwasVerfallen = false;
   for (const { hero, heroIdx, physOwner } of ownLogans(engine, pi)) {
+    if (engine.isHeroPassiveDormant?.(physOwner, heroIdx)) continue;   // W8: ein gefrorener/betäubter/negierter Logan verliert seine Counter nicht
     const hatte = getInvest(hero);
     if (hatte <= 0) continue;
     setInvest(hero, 0);
@@ -176,6 +177,7 @@ module.exports = {
   canActivateHeroEffect(ctx) {
     const engine = ctx._engine;
     const pi = ctx.cardOwner;
+    if (engine?.goldSpendBlocked?.(pi)) return false;   // G1 (A09-11): Goldsperre - Einzahlen = Gold ausgeben
     return (engine?.gs?.players?.[pi]?.gold || 0) > 0;
   },
 
@@ -192,7 +194,7 @@ module.exports = {
     if (!hero || hero.name !== CARD_NAME) return false;
 
     const gold = ps.gold || 0;
-    if (gold <= 0) return false;
+    if (gold <= 0 || engine.goldSpendBlocked(pi)) return false;   // G1 (A09-11)
 
     // Betrag frei waehlbar von 1 bis Gold. `renderAs: 'slider'` gibt dem
     // Client einen Schieberegler mit Zahlenfeld (Als Vorgabe) — die
@@ -313,6 +315,9 @@ module.exports = {
         title: CARD_NAME,
         description: `Choose a target for ${schaden} damage.`,
         confirmLabel: `💥 ${schaden} Damage!`,
+        // Als Ruling (Al 26.10.): Logan ist ein HELD — seine Schadens-Wege (Zielwahl, Helden- UND Kreaturenzweig) laufen als 'hero' mit Vorschau 5 × Invest Counter.
+        damageType: 'hero',
+        baseDamage: schaden,
         cancellable: true,
         // v338 (Als Befund): der Client liest `selectCount`, NICHT
         // `maxSelect`. Mit dem falschen Feld fiel er auf seinen Standard
@@ -349,7 +354,7 @@ module.exports = {
         }
       } else if (ziel.cardInstance) {
         await engine.actionDealCreatureDamage(
-          quelle, ziel.cardInstance, schaden, 'creature',
+          quelle, ziel.cardInstance, schaden, 'hero',   // Als Ruling (Al 26.10.): Heldeneffekt → 'hero' auch am Kreaturenziel
           { sourceOwner: pi, canBeNegated: true },
         );
       }

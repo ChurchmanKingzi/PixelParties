@@ -43,10 +43,10 @@ const BILD_MS = 1000;        // Länge der Animation (deckt sich mit `surprising
 const FLUG_PAUSE_MS = 380;   // Abstand zwischen zwei fliegenden Karten
 
 /** Darf diese Brettkarte überhaupt in die Hand genommen werden? (Karte, sichtbar, beweglich) */
-function nimmbar(engine, inst) {
+function nimmbar(engine, inst, pi) {
   if (!inst || inst.zone !== 'support' || inst.faceDown) return false;
   const c = inst.counters || {};
-  if (c.immovable || c._gainedEffectOnly || c._cardinalImmune) return false;
+  if (c.immovable || c._gainedEffectOnly || c._cardinalImmune || engine.kreaturGegnerEffektImmun(inst, pi)) return false;   // W17b: Golden Wings nur gegen den Gegner
   if (isCardinalBeastByName(inst.name)) return false;
   const roh = engine._getCardDB()[inst.name];
   const cd = engine.getEffectiveCardData(inst) || roh;
@@ -59,7 +59,7 @@ function nimmbar(engine, inst) {
 
 /** Wählbar für den Wirker `pi`? (zusätzlich: kein „cannot be chosen"-Schutz) */
 function waehlbar(engine, pi, inst) {
-  if (!nimmbar(engine, inst)) return false;
+  if (!nimmbar(engine, inst, pi)) return false;
   if (inst.counters?.untargetable_all) return false;
   const ktrl = inst.controller ?? inst.owner;
   if (ktrl !== pi && typeof engine._isSideNondamageShielded === 'function' && engine._isSideNondamageShielded(ktrl)) return false;
@@ -93,14 +93,14 @@ async function waehle(engine, pi, info, liste) {
   if (maschine) {
     return [...liste].sort((a, b) => kartenWert(engine, pi, b) - kartenWert(engine, pi, a)).slice(0, MAX_KARTEN);
   }
-  const ziele = liste.map(inst => {
+  // Ein Ziel je PLATZ (Darion: ein Equip-Stapel ist ein Platz; welche seiner Karten gemeint sind, fragt die Engine nach — bei „up to 2" auch zwei aus demselben Stapel).
+  const ziele = [];
+  for (const inst of liste) {
     const seite = engine.physicalSide(inst);
-    return {
-      id: `equip-${seite}-${inst.heroIdx}-${inst.zoneSlot}`,
-      type: 'equip', owner: seite, heroIdx: inst.heroIdx, slotIdx: inst.zoneSlot,
-      cardName: inst.name, cardInstance: inst,
-    };
-  });
+    const id = `equip-${seite}-${inst.heroIdx}-${inst.zoneSlot}`;
+    if (ziele.some(z => z.id === id)) continue;
+    ziele.push({ id, type: 'equip', owner: seite, heroIdx: inst.heroIdx, slotIdx: inst.zoneSlot, cardName: inst.name, cardInstance: inst });
+  }
   const ids = await engine.promptEffectTarget(pi, ziele, {
     title: CARD_NAME,
     description: `Click up to ${MAX_KARTEN} cards in ${info.hero?.name || 'the Hero'}'s Support Zones to add them to your hand.`,
@@ -109,7 +109,7 @@ async function waehle(engine, pi, info, liste) {
     cancellable: true,                 // up to 2: auch null Karten sind erlaubt
     cancelLabel: 'Take nothing',
     goldSelect: true,
-    maxTotal: Math.min(MAX_KARTEN, ziele.length),
+    maxTotal: MAX_KARTEN,
     minRequired: 1,
     previewCardName: CARD_NAME,
   });
@@ -117,7 +117,7 @@ async function waehle(engine, pi, info, liste) {
   const gewaehlt = [];
   for (const id of ids) {
     const z = ziele.find(t => t.id === id);
-    if (z?.cardInstance && !gewaehlt.includes(z.cardInstance)) gewaehlt.push(z.cardInstance);
+    for (const inst of engine.gewaehlteInstanzen(z)) if (!gewaehlt.includes(inst)) gewaehlt.push(inst);
   }
   return gewaehlt.slice(0, MAX_KARTEN);
 }

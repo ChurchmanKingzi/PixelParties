@@ -12,14 +12,20 @@
 //
 //  The dead Hero's original zone is orphaned:
 //  - Hero slot cleared (name, HP, stats removed)
-//  - All Ability-type cards in its Ability AND
-//    Support Zones → discard
+//  - All cards in its Ability Zones → DELETED (W16e, Text "deleting");
+//    Ability-type cards in its Support Zones (Xal, Xalibur) → ALSO DELETED
+//    (24.10.2026, Al: "Alle Abilities des Helden werden gelöscht, egal aus welcher Zone")
 //  - Creatures/other cards stay
 //
 //  Revival cannot target heroes with empty slots.
 // ═══════════════════════════════════════════
 
 // ─── HELPERS ─────────────────────────────
+
+// W28a (Al, 21.10.2026: „'you control' = aktuelle Kontrolle, nicht Besitzer"): ein an den Gegner abgegebener eigener Held (Charme-Marke / dauerhafte Uebernahme —
+// Spiegel von `engine.heroSideOf`) ist KEIN „Hero you control". Ein uebernommener Gegnerheld bleibt hier ausgenommen: das Ankleben des Helden als „Artifact" in die
+// Support Zone eines anderen Helden und das Loeschen seiner Zonen arbeitet ueber die EIGENE Spalte (gemeldet, nicht umgebaut).
+const kontrolliertVon = (hero, pi) => (hero.charmedBy ?? hero.permaControlBy ?? pi) === pi;
 
 /** Get dead heroes NOT killed this turn. */
 function getDeadHeroes(gs, pi) {
@@ -28,6 +34,7 @@ function getDeadHeroes(gs, pi) {
   for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
     const hero = ps.heroes[hi];
     if (!hero?.name) continue;       // Empty slot
+    if (!kontrolliertVon(hero, pi)) continue;   // W28a: abgegeben
     if (hero.hp > 0) continue;       // Alive
     if (hero.diedOnTurn === gs.turn) continue; // Died this turn
     result.push({ heroIdx: hi, heroName: hero.name });
@@ -35,18 +42,29 @@ function getDeadHeroes(gs, pi) {
   return result;
 }
 
-/** Get living heroes with at least 1 free base Support Zone. */
-function getLivingHeroesWithFreeZone(ps) {
+/**
+ * Die Plaetze, in die der Gefallene `deadName` bei Held `hi` angelegt werden kann: freie Basis-Zonen — bei einem Held mit Equip-Stapel (Darion: „All Artifacts equipped
+ * to this Hero share 1 Support Zone") ausschliesslich der Stapel (der angelegte Held ist ein Equip-Artifact, braucht dort keine freie Zone).
+ */
+function freieZonen(ps, hi, engine, pi, deadName) {
+  const pflicht = engine && deadName ? engine.equipPflichtPlatz(pi, hi, deadName) : -1;
+  if (pflicht >= 0) return [pflicht];
+  const out = [];
+  for (let si = 0; si < 3; si++) {
+    if (((ps.supportZones[hi] || [])[si] || []).length === 0) out.push(si);
+  }
+  return out;
+}
+
+/** Get living heroes with at least 1 free base Support Zone (Darion: oder einem Equip-Stapel). */
+function getLivingHeroesWithFreeZone(ps, pi, engine = null, deadName = null) {
   const result = [];
   for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
     const hero = ps.heroes[hi];
     if (!hero?.name || hero.hp <= 0) continue;
-    for (let si = 0; si < 3; si++) {
-      if (((ps.supportZones[hi] || [])[si] || []).length === 0) {
-        result.push({ heroIdx: hi, heroName: hero.name, freeSlot: si });
-        break;
-      }
-    }
+    if (pi != null && !kontrolliertVon(hero, pi)) continue;   // W28a: abgegeben
+    const frei = freieZonen(ps, hi, engine, pi, deadName);
+    if (frei.length > 0) result.push({ heroIdx: hi, heroName: hero.name, freeSlot: frei[0] });
   }
   return result;
 }
@@ -58,9 +76,11 @@ const { hasCardType } = require('./_hooks');
 module.exports = {
   isTargetingArtifact: true,
 
-  canActivate(gs, pi) {
-    if (getDeadHeroes(gs, pi).length === 0) return false;
-    return getLivingHeroesWithFreeZone(gs.players[pi]).length > 0;
+  canActivate(gs, pi, engine) {
+    const dead = getDeadHeroes(gs, pi);
+    if (dead.length === 0) return false;
+    const eng = engine || gs._engineRef || null;
+    return getLivingHeroesWithFreeZone(gs.players[pi], pi, eng, dead[0].heroName).length > 0;
   },
 
   getValidTargets(gs, pi) {
@@ -102,7 +122,7 @@ module.exports = {
     const deadHeroName = deadHero.name;
 
     // ── Select living hero with free zone ──
-    const livingOptions = getLivingHeroesWithFreeZone(ps);
+    const livingOptions = getLivingHeroesWithFreeZone(ps, pi, engine, deadHeroName);
     if (livingOptions.length === 0) return { aborted: true };
 
     let livingHeroIdx, targetSlot;
@@ -113,14 +133,13 @@ module.exports = {
       // Build both hero and zone targets (like Gift of Coolness)
       const targets2 = [];
       for (const opt of livingOptions) {
-        for (let si = 0; si < 3; si++) {
-          if (((ps.supportZones[opt.heroIdx] || [])[si] || []).length === 0) {
-            targets2.push({
-              id: `equip-${pi}-${opt.heroIdx}-${si}`,
-              type: 'equip', owner: pi,
-              heroIdx: opt.heroIdx, slotIdx: si, cardName: '',
-            });
-          }
+        for (const si of freieZonen(ps, opt.heroIdx, engine, pi, deadHeroName)) {   // Darion: nur der Equip-Stapel
+          targets2.push({
+            id: `equip-${pi}-${opt.heroIdx}-${si}`,
+            type: 'equip', owner: pi,
+            heroIdx: opt.heroIdx, slotIdx: si, cardName: '',
+            _eigeneStapelWahl: true,   // Darion: Zielplatz (auch der Equip-Stapel) — keine Rueckfrage „welches Equip?"
+          });
         }
         targets2.push({
           id: `hero-${pi}-${opt.heroIdx}`,
@@ -158,6 +177,14 @@ module.exports = {
     const livingHero = ps.heroes[livingHeroIdx];
     if (!livingHero?.name || livingHero.hp <= 0 || targetSlot === undefined) return { aborted: true };
 
+    // ★ W15a (Al, R3 und Regel W14a Q5): das Anlegen des gefallenen Helden ist ein Effekt auf den lebenden Helden — Resistance fängt ihn ab (vor jeder Kartenbewegung;
+    // der Gefallene bleibt, wo er ist, seine Ability Zones werden nicht geleert). Der Artefakt-Einsatz ist gespielt.
+    if (await engine.heroNonDamageEffectBlocked(pi, livingHeroIdx, 'equip', { sourceOwner: pi, source: 'Initiation Ritual' })) {
+      engine.log('initiation_ritual_blocked', { player: ps.username, hero: livingHero.name, equipped: deadHeroName });
+      engine.sync();
+      return true;
+    }
+
     // ── Animation: card transfer from dead hero zone to support zone ──
     engine._broadcastEvent('play_card_transfer', {
       sourceOwner: pi, sourceHeroIdx: deadHeroIdx, sourceZoneSlot: -1,
@@ -181,13 +208,17 @@ module.exports = {
         const inst = engine.cardInstances.find(c =>
           c.owner === pi && c.zone === 'ability' && c.heroIdx === deadHeroIdx && c.zoneSlot === zi && c.name === cardName
         );
+        // W16e (F02-17): Text "DELETING all cards in its Ability Zones" - in den Geloescht-Stapel des Kartenbesitzers, nicht in die Ablage.
         const irDiscardPs = gs.players[inst?.originalOwner ?? pi];
-        if (irDiscardPs) irDiscardPs.discardPile.push(cardName);
+        if (irDiscardPs) {
+          if (!irDiscardPs.deletedPile) irDiscardPs.deletedPile = [];
+          irDiscardPs.deletedPile.push(cardName);
+        }
         if (inst) {
           await engine.runHooks('onCardLeaveZone', { _onlyCard: inst, card: inst, fromZone: 'ability', fromHeroIdx: deadHeroIdx, _skipReactionCheck: true });
           engine._untrackCard(inst.id);
         }
-        engine.log('discard', { card: cardName, by: 'Initiation Ritual', reason: 'zone_orphaned' });
+        engine.log('card_deleted', { card: cardName, by: 'Initiation Ritual', from: 'ability', reason: 'zone_orphaned' });
       }
     }
     ps.abilityZones[deadHeroIdx] = [[], [], []];
@@ -204,13 +235,18 @@ module.exports = {
         const inst = engine.cardInstances.find(c =>
           c.owner === pi && c.zone === 'support' && c.heroIdx === deadHeroIdx && c.zoneSlot === zi && c.name === cardName
         );
-        const irSupDiscardPs = gs.players[inst?.originalOwner ?? pi];
-        if (irSupDiscardPs) irSupDiscardPs.discardPile.push(cardName);
+        // 24.10.: eine Ability in einer Support Zone ist eine Ability wie jede andere — „deleting all cards in its Ability Zones" gilt für sie genauso:
+        // in den Gelöscht-Stapel des Kartenbesitzers, nicht in die Ablage.
+        const irSupDeletePs = gs.players[inst?.originalOwner ?? pi];
+        if (irSupDeletePs) {
+          if (!irSupDeletePs.deletedPile) irSupDeletePs.deletedPile = [];
+          irSupDeletePs.deletedPile.push(cardName);
+        }
         if (inst) {
           await engine.runHooks('onCardLeaveZone', { _onlyCard: inst, card: inst, fromZone: 'support', fromHeroIdx: deadHeroIdx, _skipReactionCheck: true });
           engine._untrackCard(inst.id);
         }
-        engine.log('discard', { card: cardName, by: 'Initiation Ritual', reason: 'zone_orphaned' });
+        engine.log('card_deleted', { card: cardName, by: 'Initiation Ritual', from: 'support', reason: 'zone_orphaned' });
       }
     }
 
@@ -252,7 +288,12 @@ module.exports = {
     await engine.runHooks('onCardEnterZone', {
       enteringCard: equippedInst, toZone: 'support', toHeroIdx: livingHeroIdx,
       _skipReactionCheck: true,
+      _anhaengselAnleger: pi,   // W49a: „equip it to another Hero" oeffnet das Equip-Fenster (Afflicted Pests, LOCUST, Hook `onEquipGained` -> Anti Magic Enchantment W52a)
     });
+    // ★ W52a (Al, 22.10.2026): der angelegte Held „is treated as an equippable Artifact" — wie jedes Equip beobachten ihn ALLE Equip-Beobachter. Das Equip-Fenster
+    // (Pests, LOCUST, Anti Magic Enchantment) hat der Eintritt oben schon geoeffnet (`_anhaengselAnleger`); das PLATZIERUNGS-Fenster (Cybug RHINOCEROS: „places a card into an
+    // Area or Support Zone") ruft der Handweg nur ohne `_skipReactionCheck` auf — hier explizit, damit der Held nicht daran vorbeigelegt wird.
+    if (equippedInst.zone === 'support') await engine._checkSurpriseOnPlacement(pi, equippedInst, 'support');
 
     engine.log('initiation_ritual', {
       player: ps.username,

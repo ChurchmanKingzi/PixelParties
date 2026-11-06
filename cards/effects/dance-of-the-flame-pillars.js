@@ -62,17 +62,17 @@ function countAllValidTargets(engine) {
     for (const h of (ps.heroes || [])) {
       if (h?.name && h.hp > 0) n++;
     }
-    for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
-      for (let z = 0; z < 3; z++) {
-        const slot = ps.supportZones?.[hi]?.[z] || [];
-        if (slot.length > 0) n++;
-      }
-    }
+    // W16g (S01-06): „Ziele“ = Helden + KREATUREN (nicht jede belegte Support Zone — Ausruestung/Anhaenge sind keine Ziele);
+    // dieselbe Menge, aus der die Zielwahl danach waehlt (`getCreatureTargets` = die Kreaturen, die `pi` kontrolliert).
+    n += engine.getCreatureTargets(pi).length;
   }
   return n;
 }
 
 module.exports = {
+  // ★ Als Ruling (Al 26.10., Flame Avalanche: „Wenn du andere Schadenskarten unspielbar machst, müssen das Vial und Rockfall auch sein!"): die Karte richtet NUR Schaden an Zielen an —
+  // unter der Schadenssperre (`ps.damageLocked`) unspielbar (Karte bleibt auf der Hand, keine Aktion/Kosten; Sperr-Stutzen `engine._cardBlockedBySearchLock`).
+  blockedByDamageLock: true,
   // ★★ v1181 — ENTKOPPELTE ZAUBERBILDER (Al 17.9.): Wird der Zauber
   // NEGIERT, laeuft sein Effekt-Rumpf nie — die Engine spielt dann diese
   // Bilder, damit der abgewehrte Zauber trotzdem zu sehen ist. Im
@@ -98,7 +98,10 @@ module.exports = {
       const ps     = gs.players[pi];
       if (!ps) { gs._spellCancelled = true; return; }
 
-      const N = distinctDMSpellsInDiscard(engine, ps);
+      // ★ W76a (Al: „Falls Dance exakt ein Ziel trifft, greift Bartas, sonst nicht"): Bartas' Zweitwurf ist ein Einzelziel-Zweitschlag auf EIN weiteres Ziel — die Zahl der
+      // Ziele ist dort 1 (nicht neu aus der Ablage gezählt: das zweite Ziel ist ein EINZELziel) und nie die Vollfläche (die träfe das erste Ziel nochmal).
+      const zweitwurf = !!gs._zweitzielWurf;
+      const N = zweitwurf ? 1 : distinctDMSpellsInDiscard(engine, ps);
       if (N <= 0) { gs._spellCancelled = true; return; }
 
       const totalTargets = countAllValidTargets(engine);
@@ -106,7 +109,7 @@ module.exports = {
       // strict inequality. With distinct === total, we still go for
       // the multi-target mode (the spec wording is "if there are
       // MORE different…").
-      const fullBoardMode = N > totalTargets;
+      const fullBoardMode = !zweitwurf && N > totalTargets;
 
       const dmgSource = { name: CARD_NAME, owner: pi, heroIdx, heroOwner: ctx.cardHeroOwner ?? pi };   // Als Befund 29.9.: Brettseite des Wirkers
 
@@ -115,7 +118,7 @@ module.exports = {
         await ctx.aoeHit({
           damage: FULL_BOARD_DAMAGE,
           damageType: 'destruction_spell',
-          side: 'any',
+          side: 'both',   // `aoeTargetPlayers` kennt 'own'/'both'/'enemy' — 'any' fiel auf die Gegnerseite zurueck (S01-05)
           types: ['hero', 'creature'],
           animationType: 'flame_pillars',
           sourceName: CARD_NAME,
@@ -133,12 +136,16 @@ module.exports = {
       // Ziele auf dem Brett als Zahlen in der Ablage" ist oben schon
       // abgefangen — dort schlaegt die Karte flaechendeckend zu; hier
       // unten stehen also immer mindestens N Ziele zur Verfuegung.
+      // Unter Ida (Einzelziel-Deckel, H02-heroes-05) kappt die Engine auf 1 Ziel —
+      // dann kann `min` nicht N sein.
+      const idaEinzel = !!ctx._engine.heroFlagsLive(ctx.cardHeroOwner ?? pi, heroIdx)?.forcesSingleTarget;
       const selected = await ctx.promptMultiTarget({
         side: 'any',
         types: ['hero', 'creature'],
-        min: N,
+        min: idaEinzel ? 1 : N,
         max: N,
         baseDamage: PER_TARGET_DAMAGE,
+        damageType: 'destruction_spell',
         title: CARD_NAME,
         description: `Choose ${N} different target${N > 1 ? 's' : ''}. Deal ${PER_TARGET_DAMAGE} damage to each.`,
         confirmLabel: `🔥 Strike! (${PER_TARGET_DAMAGE} ×N)`,
@@ -156,6 +163,7 @@ module.exports = {
       // Saeulen fallen weiter nacheinander.
       await engine.beginAoeStrike(selected.length, {
         creatures: selected.filter(t => t.type !== 'hero').map(t => t.cardInstance).filter(Boolean),
+        heroes: selected.filter(t => t.type === 'hero'),   // W78 (Pythia): Helden, die dieser Schlag faellt, sind todgeweiht
         source: dmgSource, amount: PER_TARGET_DAMAGE,
         type: 'destruction_spell', sourceOwner: pi,
       });

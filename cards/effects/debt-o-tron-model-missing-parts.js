@@ -68,7 +68,7 @@ module.exports = {
     const engine = ctx._engine;
     const gs = engine.gs;
     const pi = ctx.cardOwner;
-    if (gs.hoptUsed?.[HOPT_KEY(pi)] === gs.turn) return false;
+    if (!ctx._borrowedUse && gs.hoptUsed?.[HOPT_KEY(pi)] === gs.turn) return false;   // W12 (Q5): geliehene Verwendung ignoriert das Einmal-Limit
     return debt(gs.players[pi]) > 0;
   },
 
@@ -78,7 +78,7 @@ module.exports = {
     const pi = ctx.cardOwner;
     const ps = gs.players[pi];
     if (!ps) return;
-    if (gs.hoptUsed?.[HOPT_KEY(pi)] === gs.turn) return false;
+    if (!ctx._borrowedUse && gs.hoptUsed?.[HOPT_KEY(pi)] === gs.turn) return false;   // W12 (Q5): geliehene Verwendung ignoriert das Einmal-Limit
 
     const schaden = debt(ps) * PER_GOLD;
     if (schaden <= 0) return false;
@@ -90,6 +90,9 @@ module.exports = {
       title: CARD_NAME,
       description: `Deal ${schaden} damage to any target. (${debt(ps)} debt × ${PER_GOLD})`,
       confirmLabel: `💥 ${schaden} Damage!`,
+      // Als Ruling (Al 26.10.): Missing Parts ist eine Artifact Creature (Subtyp Creature) → Schadensart 'creature', Vorschau 10 × Schulden.
+      damageType: 'creature',
+      baseDamage: schaden,
       cancellable: true,
       // `selectCount`, nicht `maxSelect` — der Client faellt sonst auf
       // seinen Standard von DREI zurueck (v338, Als Befund an Logan).
@@ -107,8 +110,10 @@ module.exports = {
     const ziel = ziele.find(t => t.id === id);
     if (!ziel) return false;
 
-    if (!gs.hoptUsed) gs.hoptUsed = {};
-    gs.hoptUsed[HOPT_KEY(pi)] = gs.turn;
+    if (!ctx._borrowedUse) {   // W13 (Al, Rueckfrage 9): geliehene Verwendung verbraucht den Stempel NICHT
+      if (!gs.hoptUsed) gs.hoptUsed = {};
+      gs.hoptUsed[HOPT_KEY(pi)] = gs.turn;
+    }
 
     // Auftritt erst NACH bestaetigtem Ziel (Muster Book of Doom / Logan).
     engine.announceActiveEffect();

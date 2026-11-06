@@ -97,6 +97,8 @@ module.exports = {
       // ── Hat DIESER Held die Creature besiegt? ────────────────────
       const quelle = ctx.source;
       if (!quelle || !engine.quelleIstHeld(quelle, feld, hi)) return;
+      // Kreatureneffekte zaehlen nicht als „dieser Held besiegt" (s. Kopfkommentar) — auch wenn sie ihre Quelle mit dem `heroIdx` der Spalte bauen (Haressassin, Mr. Jiggles, 3-Headed Giant …).
+      if (require('./_hooks').isCreatureSource(engine, quelle)) return;
 
       // ── War es eine GEGNERISCHE Creature? ────────────────────────
       // Ueber den Controller, damit eine per Cross-Side-Platzierung
@@ -108,7 +110,7 @@ module.exports = {
       const stapel = engine.cardInstances.filter(c =>
         (feld === pi ? (c.controller ?? c.owner) === pi : c.owner === feld)   // Styx 28.9.
         && c.heroIdx === hi
-        && c.zone === 'ability'
+        && engine.istWirksameAbility(c)   // 24.10.: auch in einer Support Zone (Xal)
         && c.name === CARD_NAME
         && !c.faceDown);
       if (stapel.length === 0) return;
@@ -136,6 +138,8 @@ module.exports = {
 
       // ── Stufe 1: in die Hand statt in die Ablage ─────────────────
       if (stufe === 1) {
+        // Z5 (M01-05) / W5a: ein Token ist keine Karte — er geht nie auf die Hand, sondern verschwindet vollständig (Al 14.10.2026).
+        if (engine.isTokenCard(inst)) return;
         const ja = await engine.promptGeneric(pi, {
           type: 'confirm', title: CARD_NAME,
           message: `Add ${tot.name} to your hand instead of sending it to the discard pile?`,
@@ -160,8 +164,12 @@ module.exports = {
       // ── Stufe 2/3: Uebernahme in die eigene Support Zone ─────────
       // Styx 28.9.: „this Hero's Support Zone" liegt auf der Brettseite
       // (`feld`); die Kreatur gehoert trotzdem `pi` (seitenfremd).
-      const zone = ersteFreieZone(gs.players[feld], hi);
+      // W63a (Al, 22.10.2026: Alices Effekt gilt fuer ALLE Platzierungs-Effekte; „erst die geteilte Zone, DANN die erste leere"): mit Alice-Teilung des
+      // Jaegers `pi` zaehlt auch die Zone einer GLEICHNAMIGEN Creature (die Beute teilt sich die Zone) — `engine.ersteBeschwoerZone`, geteilte zuerst.
+      const zone = engine.ersteBeschwoerZone(pi, tot.name, { seite: feld, heroIdx: hi, namedHeroesOnly: true })?.slotIdx ?? -1;
       if (zone < 0) return;                       // Als Ruling ③
+      // Als Ruling (Al 26.10., Dark Gear × Creepy Villager): „Control of this Creature cannot change" — keine Uebernahme anbieten (die Kreatur stirbt ganz normal).
+      if (engine.controlIsLocked(inst)) return;
 
       const negiert = stufe === 2;
       const ja = await engine.promptGeneric(pi, {

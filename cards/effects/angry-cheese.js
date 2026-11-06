@@ -18,6 +18,22 @@
 const { hasCardType } = require('./_hooks');
 const { getCardDB: _getCardDB } = require('./_card-db');
 
+/**
+ * KOSTEN: 100 Schaden an dem gewählten eigenen Helden. `false` = ungültige Wahl (nichts bezahlt).
+ * v845: Quelle MIT Besitzer. Ein nacktes `{ name }` hat keinen `owner`, und Tazunes „Schaden durch eigene
+ * Karten"-Schild sah darin eine besitzerlose Quelle und liess die 100 durch.
+ */
+async function zahleKosten(engine, pi, selectedIds, validTargets) {
+  const target = (validTargets || []).find(t => t.id === (selectedIds || [])[0]);
+  if (!target || target.type !== 'hero') return false;
+  const hero = engine.gs.players[target.owner ?? pi]?.heroes?.[target.heroIdx];   // W16e (F01-11): Brettseite des kontrollierten Helden
+  if (!hero?.name || hero.hp <= 0) return false;
+  await engine.actionDealDamage({ name: 'Angry Cheese', owner: pi, controller: pi }, hero, 100, 'other', { festesZiel: true });   // Selbstkosten (Als Ruling 9.10.)
+  engine.sync();
+  await engine._delay(400);
+  return true;
+}
+
 module.exports = {
   // ★ v1070 (Als Befund 14.9.: „Wieso drei Cheese-Karten? Davon gibt es
   // sechs!"). Die Autoerkennung liess diese Karte als spielbar durch,
@@ -28,13 +44,17 @@ module.exports = {
   // unterscheiden kann; das manuelle Flag gewinnt im Loader.
   blockedBySearchLock: true,
   isTargetingArtifact: true,
+  // Die Heldenwahl ist hier nur der KOSTENPUNKT ("… to it" vor der Suche); der Effekt selbst wählt keinen Helden → Flesh-Eating Swarm Trap & Co. dürfen nicht darauf reagieren.
+  heroChoiceIsCost: true,
   blockedByHandLock: true,
 
-  canActivate(gs, pi) {
+  canActivate(gs, pi, engine) {
     const ps = gs.players[pi];
     if (!ps) return false;
     // Need at least 1 living hero to take the damage cost
-    const hasHero = (ps.heroes || []).some(h => h?.name && h.hp > 0);
+    const hasHero = engine?.heroesControlledBy
+      ? engine.heroesControlledBy(pi).some(({ hero: h }) => h?.name && h.hp > 0)
+      : (ps.heroes || []).some(h => h?.name && h.hp > 0);
     if (!hasHero) return false;
     // Must have at least 1 Destruction Magic Spell left in deck
     const cardDB = _getCardDB();
@@ -45,15 +65,17 @@ module.exports = {
     });
   },
 
-  getValidTargets(gs, pi) {
-    const ps = gs.players[pi];
+  // W16e (F01-11): „a Hero you control" = Kontrolle (`heroesControlledBy`), IDs/`owner` = Brettseite.
+  getValidTargets(gs, pi, engine) {
     const targets = [];
-    for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
-      const hero = ps.heroes[hi];
+    const helden = engine?.heroesControlledBy
+      ? engine.heroesControlledBy(pi)
+      : (gs.players[pi].heroes || []).map((hero, heroIdx) => ({ physOwner: pi, heroIdx, hero }));
+    for (const { physOwner, heroIdx: hi, hero } of helden) {
       if (!hero?.name || hero.hp <= 0) continue;
       targets.push({
-        id: `hero-${pi}-${hi}`,
-        type: 'hero', owner: pi, heroIdx: hi,
+        id: `hero-${physOwner}-${hi}`,
+        type: 'hero', owner: physOwner, heroIdx: hi,
         cardName: hero.name,
       });
     }
@@ -75,24 +97,19 @@ module.exports = {
 
   animationType: 'explosion',
 
-  async resolve(engine, pi, selectedIds, validTargets) {
+  // ★ W4b (Al, Welle 4): die 100 Schaden am eigenen Helden („… to activate this card“) sind der KOSTENPUNKT und läuft VOR dem Reaktionsfenster (`payArtifactCost`,
+  // Engine `_payArtifactCost`); wird die Karte danach komplett negiert (Rusty Touch, Silence …), bleibt der Preis bezahlt
+  // und es wird nichts gesucht. `false` = ungültige Wahl → nichts bezahlt. Normalweg: `resolve` bekommt `kosten`.
+  async payArtifactCost(engine, pi, selectedIds, validTargets) {
+    return (await zahleKosten(engine, pi, selectedIds, validTargets)) ? {} : false;
+  },
+
+  async resolve(engine, pi, selectedIds, validTargets, kosten) {
     if (!selectedIds || selectedIds.length === 0) return;
-    const target = validTargets.find(t => t.id === selectedIds[0]);
-    if (!target || target.type !== 'hero') return;
+    // Step 1: 100 damage to the chosen own Hero (cost) — Normalweg schon vor dem Fenster bezahlt (`kosten`).
+    if (!kosten && !(await zahleKosten(engine, pi, selectedIds, validTargets))) return;
 
     const ps = engine.gs.players[pi];
-    const hero = ps?.heroes?.[target.heroIdx];
-    if (!hero?.name || hero.hp <= 0) return;
-
-    // Step 1: Deal 100 damage to the chosen own Hero (cost)
-    // v845: Quelle MIT Besitzer. Ein nacktes `{ name }` hat keinen `owner`,
-    // und Tazunes „Schaden durch eigene Karten"-Schild (wie jeder Hook,
-    // der die Quelle einem Spieler zuordnet) sah darin eine besitzerlose
-    // Quelle und liess die 100 durch — die CPU hat sich damit einen
-    // Tazune bei 60 HP selbst getoetet.
-    await engine.actionDealDamage({ name: 'Angry Cheese', owner: pi, controller: pi }, hero, 100, 'other', { festesZiel: true });   // Selbstkosten (Als Ruling 9.10.)
-    engine.sync();
-    await engine._delay(400);
 
     // Step 2: Deck search for a Destruction Magic Spell
     const cardDB = engine._getCardDB();

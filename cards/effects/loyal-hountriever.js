@@ -17,6 +17,7 @@
 //  text.
 // ═══════════════════════════════════════════
 
+const { anyName } = require('./_alias-name');   // Shroomasaur: Zusatzname zählt für Namensfamilien
 const { isLoyalCreature } = require('./_loyal-shared');
 
 const CARD_NAME    = 'Loyal Hountriever';
@@ -58,7 +59,7 @@ module.exports = {
       // (per card text "except Loyal Hountriever").
       if (entering.name === CARD_NAME) return;
       // Loyal-only.
-      if (!isLoyalCreature(entering.name, ctx._engine)) return;
+      if (!anyName(entering, (n) => isLoyalCreature(n, ctx._engine))) return;
 
       // Dreifach-HOPT je Instanz ueber den gemeinsamen Rundenzaehler
       // (v417). `spendUse` prueft und verbucht in einem — faellt es

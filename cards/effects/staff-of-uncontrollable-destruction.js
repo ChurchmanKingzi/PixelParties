@@ -38,12 +38,15 @@ module.exports = {
   // Hand-lock greys-out: with no +1 draw landing, the player has paid
   // their entire hand for nothing. Tagging opts into the standard 🚫
   // overlay (see Staff of the Teleporter for the full rationale).
-  blockedByHandLock: true,
+  // D1 (Antwort von Al): Mischeffekt (Abwerfen ist eigenstaendig) - unter Zieh-/Hand-Sperre BLEIBT der Stab aktivierbar, nur der
+  // Nachzug entfaellt. `blockedByHandLock: false` schlaegt den Auto-Tagger des Loaders.
+  blockedByHandLock: false,
+  // KI: wie bisher "immer spielen" (frueher ueber das Flag), aber nicht unter der Sperre, wo der Nachzug entfaellt.
+  cpuMeta: { alwaysCommit: (engine, pi) => !(engine.gs.players[pi]?.handLocked || engine.gs.players[pi]?.drawLocked) },
 
   canActivate(gs, pi) {
     const ps = gs.players[pi];
     if (!ps) return false;
-    if (ps.handLocked) return false; // Lock prevents the +1 draw — fizzles silently.
     return true;
   },
 
@@ -51,6 +54,10 @@ module.exports = {
     const gs = engine.gs;
     const ps = gs.players[pi];
     if (!ps) return { cancelled: true };
+
+    // Welle 12 (Q92, Al): Item-Lock-Kosten (falls vorgemerkt) VOR dem Abwurf der Hand — dieses Skript hat keinen Abbruchpunkt, die Kosten
+    // kommen also hier, bevor die Handindizes unten gebildet werden.
+    await engine.itemLockFordern(pi);
 
     // Find the resolving copy of the staff so we don't include it in the
     // "rest of hand" we discard. _resolvingCard.nth is the 1-based index
@@ -84,13 +91,18 @@ module.exports = {
     // discard reactors (Glass of Marbles, Skull Necklace, …) wait
     // until every card has hit the pile before resolving — matches
     // the engine-wide "discards first, reactors after" ordering.
-    await engine.withDiscardBatch(pi, { source: CARD_NAME }, async () => {
-      for (const { idx, name } of toDiscard) {
-        await engine.actionDiscardHandCard(pi, name, idx, { source: CARD_NAME });
-      }
-    });
+    // ★ W74c: Boris darf den Abwurf der ganzen Hand ignorieren (einmal für den Stapel, vor dem ersten Abwurf). Ziehen: „the same number of cards +1" —
+    // die Anzahl ist die der ABGEWORFENEN Karten (0 bei Verzicht), das „+1" bleibt.
+    const borisVerzicht = count > 0 && await engine.borisVerzicht(pi, count, { source: CARD_NAME });
+    if (!borisVerzicht) {
+      await engine.withDiscardBatch(pi, { source: CARD_NAME }, async () => {
+        for (const { idx, name } of toDiscard) {
+          await engine.actionDiscardHandCard(pi, name, idx, { source: CARD_NAME });
+        }
+      });
+    }
 
-    const drawCount = count + 1;
+    const drawCount = (borisVerzicht ? 0 : count) + 1;
     if (drawCount > 0) {
       await engine.actionDrawCards(pi, drawCount, { source: CARD_NAME });
     }
@@ -98,8 +110,11 @@ module.exports = {
     // Apply the rest-of-turn locks. Order: AFTER the draw so this
     // staff's own +1 lands; BEFORE engine.sync() so the next render
     // reflects the lock state.
-    ps.handLocked = true;
+    // W16e (F03-18, Al Welle 3: "Staebe sperren nur das Ziehen"): reiner Zieh-Lock wie The Sacred Jewel (Suchen/Hinzufuegen bleibt erlaubt);
+    // das Verbot, Karten aus der Ablage zu bewegen, tragen `_discardLockedTurn`/`_discardLockHard`.
+    ps.drawLocked = true;
     ps._discardLockedTurn = gs.turn;
+    ps._discardLockHard = gs.turn;   // Z6 (F03-10): harte Sperre - der Freikauf des Eye of Ren gilt hier nicht
 
     engine.log('staff_of_uncontrollable_destruction', {
       player: ps.username, discarded: count, drawn: drawCount,

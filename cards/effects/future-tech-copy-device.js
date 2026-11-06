@@ -106,7 +106,7 @@ function rustingVerdopplung(engine, pi, name, grundpreis) {
   try {
     const helfer = require('./_crystals-shared').applyRustingCrystalCostMultiplier;
     if (typeof helfer !== 'function') throw new Error('Helfer fehlt');
-    return helfer(engine.gs, pi, name, grundpreis, engine);
+    return helfer(engine.gs, pi, name, grundpreis, engine, { fremdeKarte: true });
   } catch (err) {
     if (!_rustingGewarnt) {
       _rustingGewarnt = true;
@@ -197,6 +197,9 @@ function equipPlaetze(engine, pi, name, sk) {
         if (!sk.canEquipToHero(gs, pi, hi, engine)) continue;
       } catch { continue; }
     }
+    // Darion: ein Held mit Equip-Stapel nimmt die kopierte Ausruestung NUR im Stapel auf (kein weiterer Platz, keine freie Zone noetig).
+    const stapel = engine.equipPflichtPlatz(seite, hi, name);
+    if (stapel >= 0) { out.push({ owner: seite, heroIdx: hi, slotIdx: stapel }); continue; }
     for (let zi = 0; zi < 3; zi++) {
       if (((ps.supportZones?.[hi] || [])[zi] || []).length === 0) {
         out.push({ owner: seite, heroIdx: hi, slotIdx: zi });
@@ -337,7 +340,14 @@ async function legeAlsAusruestungAn(engine, pi, name, sk) {
     }
   }
 
-  const platziert = engine.safePlaceInSupport(CARD_NAME, ziel.owner, ziel.heroIdx, ziel.slotIdx);
+  // Darion: Zielplatz ist der Equip-Stapel — die Copy-Device-Karte trägt noch ihren eigenen Namen (keine Ausrüstung nach Namen), also legt sie sich selbst oben auf den Stapel.
+  let platziert;
+  if (engine.equipPflichtPlatz(ziel.owner, ziel.heroIdx, name) === ziel.slotIdx) {
+    gs.players[ziel.owner].supportZones[ziel.heroIdx][ziel.slotIdx].push(CARD_NAME);
+    platziert = { inst: engine._trackCard(CARD_NAME, ziel.owner, 'support', ziel.heroIdx, ziel.slotIdx), actualSlot: ziel.slotIdx };
+  } else {
+    platziert = engine.safePlaceInSupport(CARD_NAME, ziel.owner, ziel.heroIdx, ziel.slotIdx);
+  }
   if (!platziert?.inst) return null;
   const { inst, actualSlot } = platziert;
 
@@ -548,13 +558,11 @@ module.exports = {
 
     // ── Als Vorgabe: „War es ein Equip, fällt es sofort ab und geht
     //    zum Discard (visuell sichtbar!)" ──
-    // Die Identität zuerst abnehmen, DANN ablegen: sonst liefe der
-    // Abgang noch über die Hooks der kopierten Karte.
-    delete inst.counters._effectOverride;
-    delete inst.counters._cardDataOverride;
-    delete inst.counters._ftCopyOf;
-    delete inst.counters.treatAsEquip;
-
+    // ★ A03-futuretech-01: erst ABLEGEN, dann die Identität abnehmen. Der Abgang
+    // muss noch über die Hooks der kopierten Karte laufen — ihr `onCardLeaveZone`
+    // nimmt den Attack-Zuschlag zurück (Laser Cannon +100, Gun +40 je Gun in der
+    // Ablage). Wie bei einer Zerstörung mitten im Zug. Zuvor wurde das Override
+    // vor dem Ablegen gelöscht, der Held behielt den Bonus dauerhaft.
     engine.log('ft_copy_device_expire', {
       player: gs.players[besitzer]?.username, copied: kopiertVon, wasEquipped: true,
     });
@@ -562,5 +570,9 @@ module.exports = {
       { name: CARD_NAME, owner: besitzer, heroIdx: inst.heroIdx }, inst,
       { toOwnerDiscard: true },
     );
+    delete inst.counters._effectOverride;
+    delete inst.counters._cardDataOverride;
+    delete inst.counters._ftCopyOf;
+    delete inst.counters.treatAsEquip;
   },
 };

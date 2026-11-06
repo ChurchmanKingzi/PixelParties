@@ -79,14 +79,15 @@ module.exports = {
       const selbst = ctx.attachedHero
         || engine.gs.players[ctx.cardHeroOwner ?? ctx.cardOriginalOwner]?.heroes?.[hi];
       if (ziel === selbst) return;
-      if (!(ctx.amount > 0)) return;
       // Ob die Reduktion greift, entscheidet allein die Sperre.
       if (ctx.cannotBeReduced) return;                       // z.B. zweite Tempeste, Ida, True Damage
-      // `ctx.amount` ist die LIVE-Projektion (Punkt vor Strich) — also
-      // VOR der Aenderung lesen, danach noch einmal.
+      // ★ Als Fix (Al 28.10.: „80 ATK + Arrow +10 gegen Tempeste: 90 − 100 = kein Schaden — real kamen 10 durch"): der Abzug wird UNGEKÜRZT gesammelt (wie Stoneskin) — die Projektion
+      // (`max(0, Basis × Mult + Summe)`) klemmt erst am Ende bei 0. Vorher stand hier `-min(100, aktueller Betrag)`: bei 80 nur −80, und der Pfeil-Bonus (kommt NACH der Hook-Runde in
+      // die Basis, +10) oder ein später laufender Warhorse hob den Rest über 0. Gilt jetzt unabhängig von der Hook-Reihenfolge („Punkt vor Strich").
+      // `ctx.amount` ist die LIVE-Projektion — VOR der Änderung lesen, danach noch einmal.
       const vorher = ctx.amount;
-      ctx.modifyAmount(-Math.min(REDUKTION, vorher));
-      engine.log('tempeste_reduction', {
+      ctx.modifyAmount(-REDUKTION);
+      if (vorher > 0) engine.log('tempeste_reduction', {
         target: ziel.name, from: vorher, to: ctx.amount, source: ctx.source?.name,
       });
     },

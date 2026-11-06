@@ -5,7 +5,7 @@
 //  You may once per turn choose a target your opponent controls.
 //  That target cannot perform an Action, or, if it is a Creature,
 //  its effects are negated until the end of your opponent's next
-//  turn. This counts as a status effect.
+//  turn. This counts as a negative status effect.
 //
 //  Flavor: presented to the player as a "Silence" — the confirm
 //  label, the badge tooltip, and the dark-green diagonal-cut
@@ -146,10 +146,19 @@ module.exports = {
         && c.heroIdx === target.heroIdx && c.zoneSlot === target.slotIdx,
       );
       if (inst) {
+        // W16c (A05-20): Schutzkarten (Winged Skeleton: "chosen by an opponent's card") lesen `beforeCreatureAffected` (wie Grunge Harpyformer).
+        const hookCtx = {
+          creature: inst, effectType: 'status', statusName: 'negated',
+          source: { name: CARD_NAME, owner: pi, heroIdx: ctx.cardHeroIdx },
+          cancelled: false, _skipReactionCheck: true,
+        };
+        await engine.runHooks('beforeCreatureAffected', hookCtx);
+        if (hookCtx.cancelled) { engine.sync(); return true; }
         await engine.actionNegateCreature(inst, CARD_NAME, {
+          gwSourceOwner: pi,   // W17b: eigene Kosten – Golden Wings schützt nur gegen den Gegner
           expiresAtTurn: gs.turn + 2,
           expiresForPlayer: pi,
-          cleansable: true,   // „This counts as a status effect."
+          cleansable: true,   // „This counts as a negative status effect."
         });
         // Stamp the "Silenced" cosmetic marker. The StatusBadges
         // renderer checks for `c._dkSilenced` and renders the

@@ -15,6 +15,7 @@ const {
   gigantisaursCanSummon, isGigantisaurCreature,
 } = require('./_gigantisaurs-shared');
 
+const { drawWouldBeBlocked } = require('./_draw-block-shared');
 const CARD_NAME = 'Gigantisaur Pteranos';
 
 /** Distinct Gigantisaur Creature names currently in the player's hand. */
@@ -31,13 +32,19 @@ module.exports = {
   canSummon: gigantisaursCanSummon,
 
   creatureEffect: true,
+  // D1: nur die KI - unter Hand-/Zieh-Sperre wirft sie nicht fuer nichts ab (Menschen duerfen, Regel von Al; Engine-Pfad unberuehrt).
+  cpuMeta: { shouldActivateNow: (engine, pi) => !(engine.gs.players[pi]?.handLocked || engine.gs.players[pi]?.drawLocked) },
 
   canActivateCreatureEffect(ctx) {
     const engine = ctx._engine;
     const ps = engine.gs.players[ctx.cardOwner];
     if (!ps) return false;
-    if (ps.handLocked) return false; // draw payout pointless
-    return distinctGigantisaurNamesInHand(ps, engine).length >= 1;
+    // D1 (A07-21, Regel von Al): Abwurf + Zug ist ein Mischeffekt (der Abwurf ist eigenstaendig): unter Hand-/Zieh-Sperre bleibt die
+    // Aktivierung moeglich, man wirft dann nur ab (frueher: handLocked sperrte).
+    // Z6 (A07-19): Tuscan Artist - der Zug ist der einzige Nutzen (Ruling 16.8.). Mit nur einem waehlbaren Namen ist der Zug genau 2.
+    const namen = distinctGigantisaurNamesInHand(ps, engine);
+    if (namen.length <= 1 && drawWouldBeBlocked(engine, ctx.cardOwner, 2)) return false;
+    return namen.length >= 1;
   },
 
   async onCreatureEffect(ctx) {
@@ -61,9 +68,11 @@ module.exports = {
     // until every Gigantisaur the player picked is in the pile
     // before resolving — and Cute Bunny sees an N-card batch event
     // rather than N independent 1-card events.
+    let borisVerzichtet = false;
     const discarded = await engine.withDiscardBatch(pi, { source: CARD_NAME }, async () => {
       const discardedNames = new Set();
       let n = 0;
+      const borisGate = engine.borisStapel(pi, { source: CARD_NAME, skipVoidsEffect: true });   // ★ W74c
       while (true) {
         const eligibleIndices = [];
         for (let i = 0; i < (ps.hand || []).length; i++) {
@@ -94,6 +103,9 @@ module.exports = {
           if (isFirst) return 0; // mandatory pick declined → fizzle
           break;
         }
+        // ★ W74c: Boris darf den Abwurf ignorieren — einmal gefragt (vor dem ersten Abwurf), die Antwort gilt für den ganzen Stapel. Die Wirkung hängt an der
+        // ANZAHL der abgeworfenen Karten ("that many", "the same number"): bei Verzicht 0, der Effekt endet ohne Wirkung.
+        if (await borisGate(1)) { borisVerzichtet = true; if (isFirst) return 0; break; }
         const ok = await engine.actionDiscardHandCard(pi, result.cardName, result.handIndex, {
           source: CARD_NAME,
         });
@@ -107,7 +119,7 @@ module.exports = {
       return n;
     });
 
-    if (discarded === 0) return false;
+    if (discarded === 0) return borisVerzichtet;   // W74c: bei Boris-Verzicht ist der Effekt aktiviert (mit 0 Karten)
 
     // Brief beat so the discard syncs commit before the draws fire —
     // same "post-discard / pre-draw" timing fix used for Heinz /

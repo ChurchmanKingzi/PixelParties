@@ -73,6 +73,7 @@ module.exports = {
   },
 
   creatureEffect: true,
+  requiresTarget: true,   // Zielwahl-Effekt: Blinded sperrt ihn (siehe _hooks.js / getActivatableCreatures)
 
   canActivateCreatureEffect(ctx) {
     // Immer aktivierbar: die Zielzahl faellt nie unter 1 (Als
@@ -86,7 +87,10 @@ module.exports = {
     const gs = engine.gs;
     const pi = ctx.cardOwner;
     const heroIdx = ctx.cardHeroIdx;
-    const max = zielzahl(engine, pi, heroIdx);
+    // Z1 (C03-03): „the corresponding Hero" = Wirtsheld auf der BRETTSEITE (`cardHeroOwner`), nicht
+    // der gleich indizierte Held des Kontrolleurs (gestohlene Haie).
+    const hSeite = ctx.cardHeroOwner ?? pi;
+    const max = zielzahl(engine, hSeite, heroIdx);
 
     const targets = await ctx.promptMultiTarget({
       types: ['hero', 'creature'],
@@ -95,7 +99,7 @@ module.exports = {
       min: 1,
       baseDamage: DAMAGE,
       title: CARD_NAME,
-      description: `Deal ${DAMAGE} damage to up to ${max} target${max === 1 ? '' : 's'} on the board (${SCHULE} ${heroAbilityLevel(engine, pi, heroIdx, SCHULE)}).`,
+      description: `Deal ${DAMAGE} damage to up to ${max} target${max === 1 ? '' : 's'} on the board (${SCHULE} ${heroAbilityLevel(engine, hSeite, heroIdx, SCHULE)}).`,
       confirmLabel: `🦈 ${DAMAGE} each!`,
       confirmClass: 'btn-danger',
       cancellable: true,
@@ -127,6 +131,7 @@ module.exports = {
     // Ziele, 100 Schaden auf jedes" ist ein Schlag auf mehrere Ziele.
     await engine.beginAoeStrike(targets.length, {
       creatures: targets.filter(t => t.type !== 'hero').map(t => t.cardInstance).filter(Boolean),
+      heroes: targets.filter(t => t.type === 'hero'),   // W78 (Pythia): Helden, die dieser Schlag faellt, sind todgeweiht
       source: { name: CARD_NAME, owner: pi, heroIdx },
       amount: DAMAGE, type: 'creature', sourceOwner: pi,
     });

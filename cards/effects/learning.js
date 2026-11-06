@@ -84,9 +84,9 @@ const CARD_NAME = 'Learning';
  * ability slot it lives in. Performance copies stack into the same slot
  * as their base, so slot.length naturally counts them too.
  */
-function learningLevelOf(ps, heroIdx, zoneSlot) {
-  const slot = (ps.abilityZones?.[heroIdx] || [])[zoneSlot] || [];
-  return slot.length || 0;
+function learningLevelOf(engine, inst) {
+  // 24.10.: der Stapel der Instanz — echte Ability Zone ODER Support Zone (Xal).
+  return engine.abilityStapelVon(inst).length || 0;
 }
 
 function isMagicArts(cd) {
@@ -159,6 +159,7 @@ function isNameEligibleForLearning(engine, ps, pi, heroIdx, name, requireMagicAr
 
   const script = loadCardEffect(name);
   if (!isProactivelyCastable(cd, script)) return false;
+  if (engine.areaKarteGesperrt(cd, pi, { kapazitaet: true })) return false;   // Als Ruling (Al 27.10.): Reality Crack („cannot play another Area") / Shipwrecked — eine Area ist als Nachguss nicht waehlbar; Als Fix (Al 27.10.): auch ohne Platz in der Area Zone (Limit 1, Spatial Crevice 3 VERSCHIEDENE) bzw. als Dublette nicht
 
   if (!engine.heroMeetsLevelReq(hs, heroIdx, cd, hs !== pi ? { levelSourcePi: pi } : {})) return false;
 
@@ -168,6 +169,7 @@ function isNameEligibleForLearning(engine, ps, pi, heroIdx, name, requireMagicAr
   // Hero-level play restriction (e.g. Archibald's per-name dupe ban,
   // Bartas' attack restriction, …).
   if (heroScript?.canPlayCard
+      && !engine.isHeroPassiveDormant(hs, heroIdx)   // W8: Heldenbeschränkung ruht bei Frost/Betäubung/Negation
       && !heroScript.canPlayCard(engine.gs, hs, heroIdx, cd, engine)) return false;
 
   // Spell-side custom play condition (Flame Avalanche needs targets,
@@ -255,7 +257,7 @@ function wisdomPayableIndices(ps, triggeringName) {
  * the triggering Spell's hand index excluded so it can't be siphoned
  * away from the outer handler that owns its lifecycle.
  */
-async function castLearningSpell(engine, pi, heroIdx, hero, cardName, abilityZoneSlot, triggeringName, hs = pi) {
+async function castLearningSpell(engine, pi, heroIdx, hero, cardName, abilityZoneSlot, triggeringName, hs = pi, abilityZoneKind = 'ability') {
   const gs = engine.gs;
   const ps = gs.players[pi];
   const cardDB = engine._getCardDB();
@@ -288,6 +290,7 @@ async function castLearningSpell(engine, pi, heroIdx, hero, cardName, abilityZon
   // Done AFTER the hand-locate succeeds: same commit timing as the
   // server (post-hero-cost, pre-chain) — once we've claimed the card
   // the cast is committed and counts even if the reaction chain negates.
+  const _zaehlerVorher = { n: ps._actionsPlayedThisPhase, bonus: ps._bonusMainActions };   // W13 (Q129): bei Abbruch zurückgeben
   if (gs.currentPhase === 3) {
     ps._actionsPlayedThisPhase = (ps._actionsPlayedThisPhase || 0) + 1;
     if (ps._actionsPlayedThisPhase === 2 && (ps._bonusMainActions || 0) > 0) {
@@ -310,6 +313,9 @@ async function castLearningSpell(engine, pi, heroIdx, hero, cardName, abilityZon
       break;
     }
   }
+  // Als Fix (Al 27.10.): fehlt die getrackte Hand-Instanz (kein Zugang ueber `handZugang`, Rollout-Zustand), ein Ersatz anlegen — sonst liefe `runHooks('onPlay', { _onlyCard: null })` ungefiltert und feuerte
+  // den onPlay JEDER Hand-Karte (eine Spatial Crevice auf der Hand legte sich dabei selbst aufs Brett), waehrend der gewaehlte Zauber selbst nie wirkte.
+  if (!handInst) handInst = engine._trackCard(cardName, pi, 'hand', heroIdx, -1);
   // Anchor the chosen copy to the casting hero. Without this, Spells
   // that read `ctx.cardHeroIdx` short-circuit on
   // `ps.heroes[-1] = undefined` and silently fizzle while still
@@ -319,7 +325,7 @@ async function castLearningSpell(engine, pi, heroIdx, hero, cardName, abilityZon
 
   // ── Flash on Learning's slot before resolution. ──
   engine._broadcastEvent('ability_activated', {
-    owner: hs, heroIdx, zoneIdx: abilityZoneSlot,
+    owner: hs, heroIdx, zoneIdx: abilityZoneSlot, zoneKind: abilityZoneKind,
   });
 
   // ── Step 2: reaction window (spell still in hand — Anti Magic
@@ -367,7 +373,7 @@ async function castLearningSpell(engine, pi, heroIdx, hero, cardName, abilityZon
   if (chainResult.negated || chainResult.fizzled) {
     const i = findChosenInHand();
     if (i >= 0) engine.takeFromPileSync(ps, 'hand', i);
-    ps.discardPile.push(cardName);
+    engine.handKartenBesitzerPs(ps, cardName).discardPile.push(cardName);   // W3/W5a: Stapel des permanenten Besitzers
     if (handInst) engine._untrackCard(handInst.id);
     // v1323: negierte Aktivierung → keine Wisdom-Kosten.
     if (chainResult.negated) {
@@ -383,6 +389,7 @@ async function castLearningSpell(engine, pi, heroIdx, hero, cardName, abilityZon
   // instance located above is the synth instance the hooks operate on. ──
   gs._immediateActionContext = true;
   gs._learningCasting = pi;
+  gs._spellCancelled = false;   // W13 (Q129): eigener Abbruchmerker für diesen Zusatz-Guss
   // Als Befund 29.9.: Wirker-Seite fuer Stufen-/Seitenabfragen des Nachgusses.
   const _wirkerVorher = gs._wirkerSeite;
   if (hs !== pi) gs._wirkerSeite = { pi, heroIdx, heroOwner: hs };
@@ -402,7 +409,7 @@ async function castLearningSpell(engine, pi, heroIdx, hero, cardName, abilityZon
       _skipReactionCheck: true,
     }));
 
-    if (!gs._spellNegatedByEffect) {
+    if (!gs._spellNegatedByEffect && !gs._spellCancelled) {   // W13 (Q129): ein abgebrochener Guss löst nichts aus
       const uniqueTargets = [];
       const seenIds = new Set();
       for (const t of (gs._spellDamageLog || [])) {
@@ -431,9 +438,25 @@ async function castLearningSpell(engine, pi, heroIdx, hero, cardName, abilityZon
 
   // ── Step 4: splice + discard (or keep on board), then pay Wisdom. ──
   const cancelled = !!gs._spellCancelled;
-  const placed = !!gs._spellPlacedOnBoard;
+  // Als Fix (Al 27.10.): legt sich eine AREA aus dem Nachguss aufs Brett, setzt `placeArea` `_spellPlacedOnBoard` nur für die gerade AUFLÖSENDE Karte (hier: der äußere Zauber, der Learning
+  // auslöst) — der Stempel fehlte, die Area galt als „nicht platziert", ihre Instanz wurde ausgetragen (Geisterkarte: Name in `areaZones` ohne Instanz) und die Karte zusätzlich in die Ablage
+  // gelegt. Zusätzlich zählt deshalb: die Instanz der gewählten Karte hat die Hand verlassen (`zone` ≠ 'hand', z. B. 'area') — sie gehört dann dem Brett.
+  const selbstPlatziert = !!handInst && handInst.zone !== 'hand';
+  const placed = !!gs._spellPlacedOnBoard || selbstPlatziert;
   delete gs._spellCancelled;
   delete gs._spellPlacedOnBoard;
+
+  // ★ Welle 13 (Al, Q129 – allgemeine Regel für „automatische" Zusatzaktionen): „Bricht man die Zielwahl ab, soll die Karte gar nicht erst
+  // konsumiert werden … Und once per turn/game wird natürlich auch erst dann konsumiert." Abbruch in der Zielwahl des Nachgusses: die Karte
+  // bleibt auf der Hand, der Einmal-pro-Zug-Stempel dieses Slots wird frei, keine Wisdom-Kosten (bisher: „gilt als verpufft", Karte in die Ablage).
+  // Ein Abbruch schon im Auswahlfenster (vor der Karte) lässt den Stempel bewusst stehen (siehe Hook: ein Abbruch ist dort endgültig).
+  if (cancelled && !placed) {
+    if (gs.hoptUsed) delete gs.hoptUsed[`learning:${pi}:${heroIdx}:${abilityZoneSlot}`];
+    ps._actionsPlayedThisPhase = _zaehlerVorher.n; ps._bonusMainActions = _zaehlerVorher.bonus;   // die Aktion wurde nicht verbraucht
+    engine.log('learning_cast_cancelled', { player: ps.username, spell: cardName, hero: hero.name, heroIdx });
+    engine.sync();
+    return true;
+  }
 
   const ix = findChosenInHand();
   if (ix >= 0) engine.takeFromPileSync(ps, 'hand', ix);
@@ -442,16 +465,17 @@ async function castLearningSpell(engine, pi, heroIdx, hero, cardName, abilityZon
     // Spell placed itself (Areas, Forbidden Zone, …). Whatever zone it
     // moved to owns the instance now — leave it tracked. The hand copy
     // is gone; the placed instance was retracked by the spell's own
-    // onPlay handler.
-    if (handInst) engine._untrackCard(handInst.id);
+    // onPlay handler. Hat sich DIESE Instanz selbst platziert (Area: `placeArea` setzt sie in die
+    // Area-Zone), bleibt sie getrackt — nur eine unbewegte Hand-Instanz wird ausgetragen.
+    if (handInst && !selbstPlatziert) engine._untrackCard(handInst.id);
   } else if (!cancelled) {
-    ps.discardPile.push(cardName);
+    engine.handKartenBesitzerPs(ps, cardName).discardPile.push(cardName);   // W3/W5a: Stapel des permanenten Besitzers
     if (handInst) engine._untrackCard(handInst.id);
   } else {
     // Cancelled mid-prompt — Archibald-style: HOPT was already claimed
     // when the gallery confirmed, treat it as a fizzled cast and send
     // the chosen Spell to discard so the play isn't refunded.
-    ps.discardPile.push(cardName);
+    engine.handKartenBesitzerPs(ps, cardName).discardPile.push(cardName);   // W63c: Ablage des permanenten Besitzers
     if (handInst) engine._untrackCard(handInst.id);
   }
 
@@ -523,7 +547,8 @@ module.exports = {
       if (hero.statuses?.frozen || hero.statuses?.stunned || hero.statuses?.negated) return;
 
       const abilityZoneSlot = ctx.card.zoneSlot;
-      const level = learningLevelOf(gs.players[ctx.cardHeroOwner ?? pi] || ps, heroIdx, abilityZoneSlot);   // Als Befund 29.9.: Ability-Zone auf der Brettseite des Helden
+      const abilityZoneKind = engine.abilityStapelArt(ctx.card) || 'ability';
+      const level = learningLevelOf(engine, ctx.card);   // Als Befund 29.9.: Ability-Zone auf der Brettseite des Helden
       if (level <= 0) return;
 
       // Trigger predicate: Lv1/Lv2 require the trigger Spell to be
@@ -551,7 +576,7 @@ module.exports = {
       // and clickable; everything else is dimmed. Cancel button is the
       // opt-out. No modal gallery / single-Spell confirm — the player
       // picks straight from their actual hand.
-      const result = await engine.promptGeneric(pi, {
+      const result = await engine.promptSpellAuswahl(pi, {   // W48a: Zeitfenster der Spell-Auswahl (keine Surprise aktivierbar)
         type: 'pickHandCard',
         title: CARD_NAME,
         description: `Choose a Spell from your hand to cast as an additional Action with ${hero.name}.`,
@@ -573,7 +598,7 @@ module.exports = {
       const stillEligible = liveEligible.some(i => ps.hand[i] === pickedName);
       if (!stillEligible) return;
 
-      await castLearningSpell(engine, pi, heroIdx, hero, pickedName, abilityZoneSlot, triggeringName, hs);
+      await castLearningSpell(engine, pi, heroIdx, hero, pickedName, abilityZoneSlot, triggeringName, hs, abilityZoneKind);
     },
   },
 };

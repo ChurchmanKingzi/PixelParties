@@ -40,6 +40,8 @@ module.exports = {
   isTargetingArtifact: true,
 
   canActivate: (gs, pi) => {
+    // X-Kosten (4 je Ziel): mit 0 Zielen kostet die Karte nichts und ist bei jedem Goldstand spielbar - die Hand graut sie darum nicht am
+    // Grundpreis aus (`selfPricedArtifacts`, server.js); der Zielwaehler deckelt die Zielzahl nach Budget (`maxTotal`).
     // Can activate if any own hero or creature has a negative status
     const ps = gs.players[pi];
     for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
@@ -90,12 +92,17 @@ module.exports = {
 
   // Resolve handles gold deduction manually
   manualGoldCost: true,
+  goldPerTarget: true,   // G1 (A09-11): Grundpreis gilt je Ziel - unter der Goldsperre nicht aktivierbar (server.js doUseArtifactEffect)
   animationType: 'beer_bubbles',
 
   resolve: async (engine, pi, selectedIds, validTargets) => {
     if (!selectedIds || selectedIds.length === 0) return; // 0 targets — nothing happens
 
-    const baseCost = engine._getCardDB()['Beer']?.cost || 4;
+    // Preis je Ziel wie im Zielwaehler angezeigt: Rusting Crystal, Rabatte
+    // & Co. stecken in `artifactPlayCost` (A08-26).
+    const baseCost = engine.artifactPlayCost(
+      pi, CARD_NAME, require('./_hand-resolve').getResolvingHandIndex(engine.gs.players[pi]),
+    ).cost;
     const totalCost = baseCost * selectedIds.length;
     const ps = engine.gs.players[pi];
 
@@ -173,7 +180,7 @@ module.exports = {
           c.heroIdx === target.heroIdx && c.zoneSlot === target.slotIdx
         );
         if (inst) {
-          engine.cleanseCreatureStatuses(inst, statuses, 'Beer');
+          await engine.cleanseCreatureStatusesGefragt(inst, statuses, 'Beer');
         }
         engine._broadcastEvent('play_zone_animation', { type: 'beer_bubbles', owner: target.owner, heroIdx: target.heroIdx, zoneSlot: target.slotIdx });
       }

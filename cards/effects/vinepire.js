@@ -206,6 +206,8 @@ module.exports = {
       const engine = ctx._engine;
       const gs     = engine?.gs;
       if (!gs) return;
+      // W39a: Auflösung eines FREMDEN Helden (Duel: der zweite Duellant meldet seine Attack zuerst) räumt den Puffer des Wirts nicht ab.
+      if (ctx.casterIdx !== inst.owner || ctx.heroIdx !== inst.heroIdx) return;
       const pendingHeal = inst.counters._vinepirePendingHeal || 0;
       // Always clear the buffer + spell-ref so a follow-up spell starts
       // clean even if this resolution doesn't qualify for a heal.

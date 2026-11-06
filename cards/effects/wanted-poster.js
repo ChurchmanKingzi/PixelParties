@@ -33,6 +33,8 @@ const DRAW_COUNT = 2;
  * Swamp Witch / Ghuanjun.
  */
 function _isHeroSource(ctx) {
+  // Welle 12 (Q101, Al): ein Knife-Kill zählt als Kill des Helden (`heldQuelle` = Angriffs-Quelle des Helden).
+  if (ctx.heldQuelle && ctx._engine.quelleIstHeld(ctx.heldQuelle, ctx.cardHeroOwner ?? ctx.cardOwner, ctx.cardHeroIdx)) return true;
   const src = ctx.source;
   if (!src) return false;
   // Styx 28.9.: „dieser Held" = Brettseite + Index (geliehener Held).

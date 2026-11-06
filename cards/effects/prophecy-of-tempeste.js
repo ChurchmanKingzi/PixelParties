@@ -90,6 +90,8 @@ function bereitsImSpiel(ps) {
 }
 
 module.exports = {
+  // W16g (R02-04): Engine-Marke — Schaden an den Traeger kann nicht verringert/negiert werden (`_isHeroDamageUnstoppable`).
+  attachmentDamageCannotBeReducedOrNegated: true,
   activeIn: ['hand', 'support'],
 
   /**
@@ -178,7 +180,7 @@ module.exports = {
 
       await engine.runHooks('onCardEnterZone', {
         enteringCard: inst, toZone: 'support', toHeroIdx: destHero,
-        _skipReactionCheck: true,
+        _skipReactionCheck: true, _anhaengselAnleger: pi,
       });
       engine.sync();
     },
@@ -215,7 +217,8 @@ module.exports = {
       // Host must still be alive + functional.
       const host = ctx.attachedHero;
       if (!host?.name || host.hp <= 0) return;
-      if (host.statuses?.frozen || host.statuses?.stunned || host.statuses?.negated) return;
+      // ★ W7a (R02-23, Al): „Damage this Hero would take cannot exceed 100" ist ein Dauerdeckel des ANHANGS — Anhänge sind
+      // eigene Karten und ruhen nicht, nur weil der Träger gefroren/betäubt/negiert ist. W27a: das gilt jetzt auch für die Umleitung.
 
       // ★ v1280 (Als Befund 22.9.: „Prophecy of Tempeste cappt eingehenden
       // Schaden gegen den Hero noch nicht bei 100 — sollte ALLER Schaden an
@@ -232,8 +235,14 @@ module.exports = {
           original: ctx.amount, capped: DAMAGE_CAP,
           source: ctx.source?.name || undefined,
         });
+        // W16g (R02-04): der Deckel ist Tempestes EIGENE Regel und von „cannot be reduced" ausgenommen — die Engine klammert
+        // Schaden an den Traeger (`_isHeroDamageUnstoppable`), `setAmount` wuerde den Deckel sonst abweisen.
+        ctx.setFlag('cannotBeReduced', false);
         ctx.setAmount(DAMAGE_CAP);
+        ctx.setFlag('cannotBeReduced', true);
       }
+      // ★ W27a (Al, 21.10.2026): „Attachments liegen bei Frozen/Stunned nicht still" — das Welle-8-Ruling (Umleitung ruht bei
+      // Frost/Betäubung/Negation des Wirts) ist ZURÜCKGENOMMEN. Die Umleitung läuft wie der Deckel unabhängig vom Zustand des Wirts.
 
       // Target must be a hero on the SAME side, NOT the host itself.
       const target = ctx.target;
@@ -329,7 +338,7 @@ module.exports = {
 
       const host = ctx.attachedHero;
       if (!host?.name || host.hp <= 0) return;
-      if (host.statuses?.frozen || host.statuses?.stunned || host.statuses?.negated) return;
+      // W27a: kein Ruhe-Prüfer mehr — Anhänge liegen bei Frost/Betäubung/Negation des Wirts nicht still (s. beforeDamage).
 
       const hoptKey = `tempeste_redirect:${ctx.card.id}`;
       if (gs.hoptUsed?.[hoptKey] === gs.turn) return;

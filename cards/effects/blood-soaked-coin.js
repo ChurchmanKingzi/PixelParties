@@ -10,9 +10,9 @@
 //  the rest of the turn (same `_artifactLockTurn`
 //  flag Boomerang installs).
 //
-//  "Permanently control" = own + still controlled
-//  by us (no charm/steal currently routing
-//  control to the opponent). The filter excludes:
+//  "Permanently control" = W12 (Al, Q89): dauerhaft KONTROLLIERT —
+//  eigene Karten, dazu per Dark Gear/Paraseed Control dauerhaft
+//  uebernommene (kein Besitz noetig). Der Filter schliesst aus:
 //    • Heroes whose `charmedBy` points at the
 //      opponent (Charme Lv3 / Compulsory Body
 //      Swap).
@@ -48,31 +48,33 @@ const CARD_NAME = 'Blood-Soaked Coin';
 const MAX_DAMAGE = 300;
 const STEP = 10;
 
-function permanentlyOwnedHero(hero, pi) {
+// ★ W12 (Al, Q89/F01-09): „Ja, dauerhafte Kontrolle via z.B. Dark Gear oder Paraseed Control zählt!" — „permanently control" heisst
+// DAUERHAFT KONTROLLIEREN, nicht dauerhaft besitzen. Eigene Karten zaehlen weiter (solange nicht vorübergehend abgegeben/gestohlen);
+// dazu kommen dauerhaft uebernommene Ziele: Kreaturen per Dark Gear/Diplomacy/Molinda (Kontrolle gewechselt, kein `stolenBy`) und
+// Helden per Paraseed Control (`permaControlBy === pi`, stehen in der Gegnerspalte). Nicht: Charme/Controlled Attack (voruebergehend),
+// Deepsea-Succubus-Diebstahl (`stolenBy`).
+function permanentlyOwnedHero(hero, pi, physOwner = pi) {
   if (!hero?.name || hero.hp <= 0) return false;
+  if (hero.permaControlBy != null) return hero.permaControlBy === pi;          // dauerhaft uebernommen (oder eigener Held dauerhaft verloren)
+  if (physOwner !== pi) return false;                                           // fremde Spalte nur bei dauerhafter Uebernahme
   if (hero.charmedBy != null && hero.charmedBy !== pi) return false;
+  if (hero.controlledBy != null && hero.controlledBy !== pi) return false;
   return true;
 }
 
 function permanentlyOwnedCreature(engine, inst, pi) {
   if (!inst || inst.zone !== 'support' || inst.faceDown) return false;
-  // BSC requires BOTH axes of ownership to match the user:
-  //   • DECK-SIDE ("permanently owned") — `inst.originalOwner === pi`
-  //     so a Creature Diplomacy'd / Dark-Gear'd / Molinda'd off the
-  //     opponent (whose `inst.owner` now points at the stealer because
-  //     the card physically moved) is correctly excluded — opp still
-  //     owns the card in deck/discard terms.
-  //   • GAMEPLAY-SIDE ("currently owned") — `(inst.controller ??
-  //     inst.owner) === pi` so a Creature you originally own but
-  //     someone else currently controls (temp steal like Deepsea
-  //     Succubus, or your own Chilly Wizard given away cross-side) is
-  //     correctly excluded too.
-  if ((inst.originalOwner ?? inst.owner) !== pi) return false;
+  // Kontrolle: der Kontrolleur ist `pi` und der Wechsel ist DAUERHAFT (kein voruebergehender Diebstahl: `stolenBy`).
+  // Die alte Regel verlangte zusaetzlich `originalOwner === pi` und schloss damit Dark-Gear-Kreaturen aus (Q89).
   if ((inst.controller ?? inst.owner) !== pi) return false;
-  const host = engine.gs.players[pi]?.heroes?.[inst.heroIdx];
+  if (inst.stolenBy != null) return false;
+  // Der Wirtsheld: auf der eigenen Brettseite ein lebender, nicht fremd kontrollierter Held (wie bisher);
+  // auf der Gegenseite (ueber einen geliehenen Helden beschworen) nur, wenn er DAUERHAFT meiner ist.
+  const seite = engine.physicalSide(inst);
+  const host = engine.gs.players[seite]?.heroes?.[inst.heroIdx];
   if (!host?.name || host.hp <= 0) return false;
-  if (host.charmedBy != null && host.charmedBy !== pi) return false;
-  return true;
+  if (seite === pi) return !(host.charmedBy != null && host.charmedBy !== pi);
+  return host.permaControlBy === pi;
 }
 
 function getCreatureHp(engine, inst) {
@@ -91,8 +93,8 @@ module.exports = {
     // setting Artifact has resolved this turn.
     if (ps._artifactLockTurn === gs.turn) return false;
 
-    for (const h of (ps.heroes || [])) {
-      if (permanentlyOwnedHero(h, pi)) return true;
+    for (const { physOwner, hero } of (engine ? engine.heroesControlledBy(pi) : (ps.heroes || []).map(h => ({ physOwner: pi, hero: h })))) {
+      if (permanentlyOwnedHero(hero, pi, physOwner)) return true;
     }
     if (engine) {
       const cardDB = engine._getCardDB();
@@ -111,12 +113,13 @@ module.exports = {
     const targets = [];
     if (!ps) return targets;
 
-    for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
-      const h = ps.heroes[hi];
-      if (!permanentlyOwnedHero(h, pi)) continue;
+    // Q89: auch dauerhaft uebernommene Helden der Gegnerspalte (`heroesControlledBy` liefert Brettseite + Index).
+    const kontrolliert = engine ? engine.heroesControlledBy(pi) : (ps.heroes || []).map((h, hi) => ({ physOwner: pi, heroIdx: hi, hero: h }));
+    for (const { physOwner, heroIdx: hi, hero: h } of kontrolliert) {
+      if (!permanentlyOwnedHero(h, pi, physOwner)) continue;
       targets.push({
-        id: `hero-${pi}-${hi}`,
-        type: 'hero', owner: pi, heroIdx: hi,
+        id: `hero-${physOwner}-${hi}`,
+        type: 'hero', owner: physOwner, heroIdx: hi,
         cardName: h.name, ownSupport: true,
       });
     }

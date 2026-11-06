@@ -19,10 +19,15 @@
 //  Damage-lock edge case: if the caster's own
 //  state carries `damageLocked` (Flame Avalanche's
 //  rest-of-turn debuff), the damage branch is
-//  suppressed. Burns still apply to the non-
+//  suppressed — Welle 14 (Q170, Al: „Nur Schaden
+//  an Gegnerzielen, eigene kann man noch normal
+//  treffen"): NUR fuer Ziele, die der GEGNER
+//  kontrolliert; eigene vorverbrannte Ziele nehmen
+//  weiter 150. Burns still apply to the non-
 //  already-burned, non-immune targets. The card
 //  is still CAST (spell-school cost paid, HOPT
-//  consumed) — it just skips the damage leg.
+//  consumed) — it just skips the damage leg an
+//  Gegnerzielen.
 //
 //  Play-time usability:
 //    • Normal: usable if at least one non-caster
@@ -30,7 +35,9 @@
 //      OR take damage because it's already Burned).
 //    • Damage-locked: usable only if at least one
 //      non-caster target can still be Burned
-//      (i.e. not already Burned AND not immune).
+//      (i.e. not already Burned AND not immune) OR
+//      an own already-Burned target would still
+//      take damage (Q170).
 //      Matches the user spec: "Heat Wave is still
 //      usable unless ALL possible targets are
 //      already Burned or immune to being Burned".
@@ -46,6 +53,8 @@ const { hasCardType } = require('./_hooks');
 
 const CARD_NAME = 'Heat Wave';
 const DAMAGE    = 150;
+/** CPU-Bilanz: Wert eines neu angebrannten Helden (Brettskala; die Brettbewertung rechnet einen Brand-Stapel mit 15, hier etwas mehr: der Brand ist dauerhaft). */
+const HELD_BRAND_WERT = 20;
 
 /**
  * Is a resolved target currently Burned?
@@ -72,6 +81,7 @@ function targetCanBeBurned(engine, t, quelle = null) {
     const hero = engine.gs.players[t.owner]?.heroes?.[t.heroIdx];
     if (!hero?.name || hero.hp <= 0) return false;
     if (hero.statuses?.burned) return false; // Already — not "can-be-newly".
+    if (engine.statusSchutzAufgehoben?.('burned', hero)) return true;   // 23.10. Tearing Mountain: kein Schutz verhindert Burn
     if (hero.statuses?.immune) return false;
     // Charme schuetzt nur in seiner Auspraegung (Styx: gar nicht).
     if (hero.statuses?.charmed && engine._charmBlocksFrom(hero, quelle)) return false;
@@ -122,6 +132,16 @@ function collectTargets(engine, pi, casterHeroIdx) {
   return targets;
 }
 
+/**
+ * Welle 14 (Q170): Kontrolliert der GEGNER dieses Ziel? Nur dort greift die Schadenssperre
+ * (`ps.damageLocked`, Flame Avalanche / Last Resort: „… to targets your opponent controls").
+ * Kreatur: Kontrolleur; Held: Kontrolleur der Spalte (`kontrolleurVonHeld`, Uebernahme).
+ */
+function gegnerKontrolliert(engine, t, pi) {
+  if (t.type === 'hero') return engine.kontrolleurVonHeld(t.owner, t.heroIdx) !== pi;
+  return (t.inst?.controller ?? t.inst?.owner) !== pi;
+}
+
 /** Brettweite Heat-Wave-Animation (Client: `heat_wave`); wartet, bis die Schwaden das Brett erfasst haben. */
 async function heissWindBild(engine, owner) {
   engine._broadcastEvent('play_zone_animation', {
@@ -138,6 +158,53 @@ module.exports = {
   async spellVisual(engine, info) {
     if (info.schonGezeigt?.zone?.has('heat_wave')) return;   // der Effekt hat es schon gespielt
     await heissWindBild(engine, info.heroOwner ?? info.owner ?? 0);
+  },
+
+  /**
+   * CPU (W82b, Al 27.10.2026 — ersetzt die Schwelle von W80a): Heat Wave brennt AUCH die eigenen Ziele an (alle ausser dem Wirker). Gespielt wird genau dann, wenn
+   *   Gewinn = Σ Wert der gegnerischen Kreaturen, die an den 150 Schaden (nur schon Brennende) WIRKLICH sterben und NICHT geschuetzt sind
+   *            + Heldenwirkung des Kartentextes (gegnerische Helden: 150 Schaden an schon Brennenden, Tod = 500 + HP, neuer Brand 20 je Held)
+   *   > Verbrauch = Σ Wert der verbrauchten Ressourcen (diese Karte, die Hauptaktion — nicht als Zusatzaktion) + Σ Wert der EIGENEN Kreaturen, die sterben und nicht geschuetzt sind
+   *            + Heldenwirkung auf die eigene Seite (eigene Helden ausser dem Wirker, wie oben).
+   * Neu angebrannte Kreaturen und Teilschaden an Ueberlebenden zaehlen NICHT (nur Toetungen). Geschuetzt/Burn-Immune/Schadenssperre wie im Effekt; Erste-Runden-Geschuetzter unantastbar
+   * (`_kreaturen-bilanz.js` `flaechenEntscheidung`, `engine.kreaturGeschuetztVor`).
+   */
+  cpuPlayVeto(engine, pi, heroIdx, opts) {
+    try {
+      const KB = require('./_kreaturen-bilanz');
+      const gs = engine.gs, ps = gs.players[pi];
+      if (!ps) return false;
+      const damageLocked = !!ps.damageLocked;
+      const targets = collectTargets(engine, pi, Number.isInteger(heroIdx) ? heroIdx : -1);
+      const ziele = [];
+      let heldenGewinn = 0, heldenVerlust = 0;
+      const prot = gs.firstTurnProtectedPlayer;
+      for (const t of targets) {
+        const gegner = gegnerKontrolliert(engine, t, pi);
+        const vorBrand = targetIsBurned(engine, t);
+        const schaden = vorBrand && !(damageLocked && gegner);
+        if (t.type === 'creature') {
+          if (t.inst && schaden) ziele.push({ inst: t.inst, art: 'damage', amount: DAMAGE });   // nur Schaden kann toeten; ein neuer Brand zaehlt nicht
+          continue;
+        }
+        const h = gs.players[t.owner]?.heroes?.[t.heroIdx];
+        if (!h?.name || h.hp <= 0) continue;
+        if (prot != null && t.owner === prot && pi !== prot) continue;   // Erste-Runden-Immunitaet: unantastbar
+        let v = 0;
+        if (schaden && !h.statuses?.shielded) v = DAMAGE >= h.hp ? 500 + h.hp : DAMAGE;
+        else if (!vorBrand && targetCanBeBurned(engine, t, pi)) v = HELD_BRAND_WERT;
+        if (v <= 0) continue;
+        if (gegner) heldenGewinn += v; else heldenVerlust += v;
+      }
+      const r = KB.flaechenEntscheidung(engine, pi, {
+        kartenName: CARD_NAME, quelle: { name: CARD_NAME, owner: pi, controller: pi, heroIdx: Number.isInteger(heroIdx) ? heroIdx : -1 },
+        additional: KB.alsZusatzaktion(engine, module.exports, pi, heroIdx, opts),
+        ziele, damageType: 'destruction_spell', heldenGewinn, heldenVerlust,
+      });
+      return !r.spielen;
+    } catch {
+      return false;   // die Heuristik darf nie einen legalen Play verhindern
+    }
   },
 
   /**
@@ -159,8 +226,9 @@ module.exports = {
       const burned = targetIsBurned(engine, t);
       const canBurn = targetCanBeBurned(engine, t, playerIdx);
       if (damageLocked) {
-        // Only the burn leg is live. Need a non-burned, non-immune target.
+        // Burn leg live (non-burned, non-immune target) — oder (Q170) ein EIGENES vorverbranntes Ziel nimmt noch Schaden.
         if (canBurn) return true;
+        if (burned && !gegnerKontrolliert(engine, t, playerIdx)) return true;
       } else {
         // Either a new burn or a damage-the-already-burned hit counts.
         if (canBurn || burned) return true;
@@ -201,7 +269,7 @@ module.exports = {
       // Schaden, die anderen bekommen Burned — das läuft in `wirkung`, VOR den Toden.
       const quelle = { name: CARD_NAME, owner: pi, heroIdx, heroOwner: ctx.cardHeroOwner ?? pi };   // Als Befund 29.9.: Brettseite des Wirkers
       const ziele = targets.map((t, i) => {
-        const amount = (preBurned[i] && !damageLocked) ? DAMAGE : 0;
+        const amount = (preBurned[i] && !(damageLocked && gegnerKontrolliert(engine, t, pi))) ? DAMAGE : 0;   // Q170: Sperre nur fuer Gegnerziele
         return t.type === 'hero'
           ? { type: 'hero', owner: t.owner, heroIdx: t.heroIdx, amount }
           : { type: 'creature', inst: engine.cardInstances.find(c => c.id === t.inst.id), amount };

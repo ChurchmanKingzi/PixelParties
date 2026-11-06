@@ -2,6 +2,13 @@
 //  CARD EFFECT: "Silence"
 //  Spell (Reaction) — Decay Magic Lv2
 //
+//  ★ W34a (Al, 22.10.2026): reagiert auch auf Effekte, die als Spell ZÄHLEN
+//  (Alice, the Puppeteer Girl: virtuelle Spell-Kette `alsSpellKette`) —
+//  negiert den Effekt, sperrt Spells für den Rest des Zuges und gewährt den
+//  einen Bonus-Spell wie beim echten Spell. Kartentext: „… plays a Spell."
+//  (das Relikt „that is not a Creature" ist gestrichen — Creatures sind
+//  keine Spells, die Unterscheidung läuft über `cardType`).
+//
 //  When the opponent plays a Spell, negate it.
 //  The opponent may immediately play ONE more
 //  Spell as an additional Action (doesn't cost
@@ -22,6 +29,8 @@
 //      first successful validation — from that
 //      point the lock is absolute.
 //    • Once per game.
+//
+//  ★ W48a: der Bonus-Spell wird SOFORT angeboten (Post-Chain-Fenster, siehe `resolve`), nicht mehr für den Rest des Zuges bereitgehalten.
 // ═══════════════════════════════════════════
 
 module.exports = {
@@ -51,10 +60,10 @@ module.exports = {
     for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
       const hero = ps.heroes[hi];
       if (!hero?.name || hero.hp <= 0) continue;
-      if (hero.statuses?.frozen || hero.statuses?.stunned || hero.statuses?.negated) continue;
+      if (hero.statuses?.frozen || hero.statuses?.stunned) continue;   // W13 (Al, A2): `negated` sperrt die Reaktion nicht mehr
       if (engine.heroMeetsLevelReq(pi, hi, cardData)) return true;
     }
-    return false;
+    return !!engine.fremderHeldKannStufe(pi, 'Silence');   // W20c: auch ein uebernommener Held wirkt
   },
 
   resolve: async (engine, pi, selectedIds, validTargets, chain, myIndex) => {
@@ -87,6 +96,23 @@ module.exports = {
     if (oppPs) {
       oppPs._spellLockTurn = gs.turn;
       oppPs._silenceBonusSpell = gs.turn;
+      // ★ W48a (Al, 22.10.2026, Punkt 3: „Silence soll den Gegner SOFORT einen zusätzlichen Spell ausführen lassen, wie beispielsweise Victory Phoenix Cannon"):
+      // der Bonus-Spell ist ein SOFORT-Fenster (wie The Master's Plan / Shamanic Curse nach der ganzen Kette angeboten, abbrechbar), kein Zeitstempel für den Rest
+      // des Zuges: wird er nicht gewählt, ist er verfallen (Token wird nach dem Fenster geleert). Im Fenster der Spell-Auswahl ist keine Surprise aktivierbar
+      // (`promptSpellAuswahl`), und eine aktivierte Spell-Surprise verbraucht den Bonus nie (`zaehleAlsArt` mit `surprise: true`).
+      engine.queuePostChainAction(async () => {
+        try {
+          await engine.performImmediateActionAnyHero(oppIdx, {
+            title: 'Silence',
+            allowedCardTypes: ['Spell'],
+            description: 'Your Spell was negated by Silence. You may immediately use another Spell as an additional Action — or skip.',
+            cancellable: true,
+          });
+        } finally {
+          if (oppPs._silenceBonusSpell === gs.turn) oppPs._silenceBonusSpell = -1;   // verfallen (gewirkt: schon am Anfang des Sofort-Gusses verbraucht)
+        }
+        engine.sync();
+      });
     }
 
     engine.log('silence_negate', {

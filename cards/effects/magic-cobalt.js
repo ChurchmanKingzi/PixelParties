@@ -16,38 +16,29 @@ const { canPlayMagicGem, maybeKeepGemInHand } = require('./_magic-gem-shared');
 const CARD_NAME = 'Magic Cobalt';
 const HEAL_AMOUNT = 50;
 
-function _getInjuredOwnHeroes(gs, pi) {
-  const ps = gs.players[pi];
-  const out = [];
-  for (let hi = 0; hi < (ps?.heroes || []).length; hi++) {
-    const h = ps.heroes[hi];
-    if (!h?.name || h.hp <= 0) continue;
-    if ((h.hp || 0) >= (h.maxHp || 0)) continue; // already full
-    out.push(hi);
-  }
-  return out;
-}
-
 module.exports = {
   isTargetingArtifact: true,
   activeIn: ['hand'],
 
-  canActivate(gs, pi) {
+  // W16e (F02-08): „a Hero you control" = Kontrolle (`heroesControlledBy`: eigene Spalte ohne abgegebene + uebernommene), IDs = Brettseite.
+  canActivate(gs, pi, engine) {
     if (!canPlayMagicGem(gs, pi, CARD_NAME)) return false;
     // At least one of your own heroes must be alive — the heal target
     // doesn't have to be injured (overheal-style cards are valid in
     // this game), but a fully dead board has no legal target.
+    if (engine?.heroesControlledBy) return engine.heroesControlledBy(pi).some(({ hero: h }) => h?.name && h.hp > 0);
     const ps = gs.players[pi];
     return (ps?.heroes || []).some(h => h?.name && h.hp > 0);
   },
 
-  getValidTargets(gs, pi) {
-    const ps = gs.players[pi];
+  getValidTargets(gs, pi, engine) {
     const out = [];
-    for (let hi = 0; hi < (ps?.heroes || []).length; hi++) {
-      const h = ps.heroes[hi];
+    const helden = engine?.heroesControlledBy
+      ? engine.heroesControlledBy(pi)
+      : (gs.players[pi]?.heroes || []).map((hero, heroIdx) => ({ physOwner: pi, heroIdx, hero }));
+    for (const { physOwner, heroIdx: hi, hero: h } of helden) {
       if (!h?.name || h.hp <= 0) continue;
-      out.push({ id: `hero-${pi}-${hi}`, type: 'hero', owner: pi, heroIdx: hi, cardName: h.name });
+      out.push({ id: `hero-${physOwner}-${hi}`, type: 'hero', owner: physOwner, heroIdx: hi, cardName: h.name });
     }
     return out;
   },
@@ -68,10 +59,10 @@ module.exports = {
     if (!m) return { keepInHand: false };
     const tpi = parseInt(m[1]);
     const hi = parseInt(m[2]);
-    if (tpi !== pi) return { keepInHand: false };
 
-    const hero = engine.gs.players[pi]?.heroes?.[hi];
+    const hero = engine.gs.players[tpi]?.heroes?.[hi];
     if (!hero?.name || hero.hp <= 0) return { keepInHand: false };
+    if (engine.heroSideOf(tpi, hero) !== pi) return { keepInHand: false };   // W16e: nur ein Held, den ICH kontrolliere
 
     // Heal sparkle on the target hero — same animation Cure / Charme /
     // Ballad Harpyformer / Deepsea Succubus use for any "this card heals
@@ -79,7 +70,7 @@ module.exports = {
     // explosion so the player gets clear visual confirmation that the
     // heal landed on THIS hero, not just that Cobalt resolved.
     engine._broadcastEvent('play_zone_animation', {
-      type: 'heal_sparkle', owner: pi, heroIdx: hi, zoneSlot: -1,
+      type: 'heal_sparkle', owner: tpi, heroIdx: hi, zoneSlot: -1,
     });
 
     const cobaltSource = { name: CARD_NAME, owner: pi };

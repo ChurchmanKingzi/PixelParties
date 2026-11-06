@@ -14,7 +14,7 @@
 //  the routing never diverges between cards.
 // ═══════════════════════════════════════════
 
-const { resolveSourceCreature, isCreatureSource } = require('./_hooks');
+const { resolveSourceCreature, isCreatureSource, isAttackSpellOrCreatureSource } = require('./_hooks');
 
 module.exports = {
   isAfterDamageReaction: true,
@@ -42,6 +42,9 @@ module.exports = {
     }
 
     // Hero source (Spell / Attack): need a living attacker Hero.
+    // W24b N2-02: „Attack, Spell or Creature effect" — ein gewoehnlicher Heldeneffekt (Siphem, Schadenstyp 'hero') loest NICHT aus;
+    // als Attack/Spell geltende Heldeneffekte (Broghan 'attack', Alice '*_spell') schon (Helfer `isAttackSpellOrCreatureSource`, wie Frost Rune).
+    if (!isAttackSpellOrCreatureSource(engine, { ...source, cardName: source.name, damageType: type })) return false;
     const srcHeroIdx = source.heroIdx ?? -1;
     if (srcHeroIdx < 0) return false;
     const srcHero = srcPs.heroes?.[srcHeroIdx];
@@ -54,21 +57,14 @@ module.exports = {
     const ps = gs.players[pi];
 
     // Count Destruction Magic level on the damaged hero (with Performance)
-    const abZones = ps.abilityZones[targetHeroIdx] || [];
-    let dmLevel = 0;
-    for (const slot of abZones) {
-      if (!slot || slot.length === 0) continue;
-      const base = slot[0];
-      for (const ab of slot) {
-        if (ab === 'Destruction Magic') dmLevel++;
-        else if (ab === 'Performance' && base === 'Destruction Magic') dmLevel++;
-      }
-    }
+    // W20c: ein uebernommener Zielheld der Gegenspalte steht auf der Brettseite `seite` (Schulen aus SEINEN Ability Zones).
+    const seite = engine._findHeroOwner(target);
+    const dmLevel = engine.heroSchoolLevel('Destruction Magic', seite, targetHeroIdx);   // W4a: harte Negierung -> Stufe 0
 
     const recoil = dmLevel >= 3 ? amount : Math.ceil(amount / 2);
 
     // Fire corona animation on the Fireshield user
-    engine._broadcastEvent('fireshield_corona', { owner: pi, heroIdx: targetHeroIdx });
+    engine._broadcastEvent('fireshield_corona', { owner: seite, heroIdx: targetHeroIdx });
     await engine._delay(600);
 
     if (isCreatureSource(engine, source)) {
@@ -78,7 +74,7 @@ module.exports = {
       const rc = resolveSourceCreature(engine, source);
       if (rc) {
         await engine.actionDealCreatureDamage(
-          { name: 'Fireshield', owner: pi, heroIdx: targetHeroIdx },
+          { name: 'Fireshield', owner: pi, heroIdx: targetHeroIdx, ...(seite !== pi ? { heroOwner: seite } : {}) },
           rc, recoil, 'other',
           { sourceOwner: pi, canBeNegated: false },
         );
@@ -93,7 +89,7 @@ module.exports = {
       const srcHero = gs.players[source.owner]?.heroes?.[source.heroIdx];
       if (srcHero && srcHero.hp > 0) {
         await engine.actionDealDamage(
-          { name: 'Fireshield', owner: pi, heroIdx: targetHeroIdx },
+          { name: 'Fireshield', owner: pi, heroIdx: targetHeroIdx, ...(seite !== pi ? { heroOwner: seite } : {}) },
           srcHero, recoil, 'other',
           { festesZiel: true },   // Rueckstoss trifft immer den Angreifer
         );

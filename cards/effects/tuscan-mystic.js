@@ -68,6 +68,11 @@ module.exports = {
       const engine = ctx._engine;
       const ps = engine.gs.players[pi];
 
+      // W16d (A09-14): „Whenever you would draw A card" – der Effekt ersetzt genau EINEN Zug (wie Philosopher's Stone).
+      // Zieht ein Effekt mehrere Karten, wird je Zug erneut gefragt; lehnt der Spieler ab (oder geht es nicht mehr),
+      // werden die übrigen Karten normal gezogen.
+      let verbleibend = ctx.amount;
+      while (verbleibend > 0) {
       // ★ SIND MEINE POTIONS UEBERHAUPT AKTIVIERBAR? (Als Befund 17.8.)
       // Der Effekt loest eine Potion SOFORT aus — das ist eine
       // Aktivierung. Ist die gesperrt, waere das Angebot eine Falle:
@@ -79,11 +84,11 @@ module.exports = {
       // Dieselbe Abfrage faengt auch `potionLockAfterN` mit ab: wer
       // diese Runde schon sein Potion-Limit erreicht hat, darf ueber
       // Mystic keine weitere nachschieben.
-      if (engine.arePotionsLockedFor(pi)) return;
+      if (engine.arePotionsLockedFor(pi)) break;
 
       const deck = ps?.potionDeck || [];
       // Weniger als 2 Karten ⇒ gar nicht anbieten (Als Ruling).
-      if (deck.length < AUFDECKEN) return;
+      if (deck.length < AUFDECKEN) break;
 
       const oben = deck.slice(0, AUFDECKEN);
 
@@ -97,7 +102,7 @@ module.exports = {
         cancelLabel: 'Just draw',
         cancellable: true,
       });
-      if (!willIch) return;
+      if (!willIch) break;
 
       // Aufdecken — beide Karten sind ab jetzt offen.
       engine._broadcastEvent('card_reveal', { cardName: oben[0], playerIdx: pi });
@@ -149,9 +154,11 @@ module.exports = {
         revealed: oben, resolved: gewaehlt, fizzled: !hatGewirkt,
       });
 
-      // Der regulaere Zug entfaellt — "instead".
-      ctx.setAmount(0);
+      // Dieser Zug entfaellt — "instead". Die uebrigen Zuege laufen weiter.
+      verbleibend--;
       engine.sync();
+      }
+      if (verbleibend !== ctx.amount) ctx.setAmount(verbleibend);
     },
   },
 };

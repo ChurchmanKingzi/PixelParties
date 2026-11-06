@@ -22,6 +22,12 @@
 //      the 2 Pollution Tokens are placed too; if
 //      you can't fit creature + 2 tokens, this
 //      mode is unavailable.
+//      ★ W63a (Al, 22.10.2026: „2 freie + geteilte bei Alice-Effekt, oder
+//      3 freie"): mit Alice-Teilung des Wirkers reichen 2 freie Zonen (fuer
+//      die Pollution Tokens), wenn die Creature in eine GETEILTE Zone
+//      passt — eine Zone, in der schon nur gleichnamige Creatures liegen.
+//      Die geteilte Zone steht in der Zonenwahl vorn (Al: erst die geteilte
+//      Zone, DANN die erste leere).
 //
 //  If exactly one mode is available the spell
 //  enters it automatically. If BOTH are available,
@@ -31,7 +37,7 @@
 //  out in hand.
 // ═══════════════════════════════════════════
 
-const { placePollutionTokens, countFreeZones, getFreeZones } = require('./_pollution-shared');
+const { placePollutionTokens, countFreeZones, getFreeZones, payTokenCost, kostenSchonBezahlt } = require('./_pollution-shared');
 const { hasCardType, isSummonablePileCreature } = require('./_hooks');
 const { canReviveHero } = require('./_revive-shared');
 
@@ -48,11 +54,16 @@ const MAX_CREATURE_LEVEL = 4;
 // Die 2 Pollution Tokens bleiben auf der eigenen Seite; eine eigene Zone
 // fuer die Kreatur braucht deshalb 3 freie eigene Zonen, eine Zone eines
 // uebernommenen Gegnerhelden nur die 2 fuer die Tokens.
-function getCreatureZones(engine, gs, pi) {
+function getCreatureZones(engine, gs, pi, bezahlt, name = null) {
   const ownFree = countFreeZones(gs, pi);
+  // W4b: sind die 2 Tokens schon bezahlt (vor dem Reaktionsfenster), zaehlt nur noch, was FREI geblieben ist.
+  // W63a: mit `name` kommt die Alice-Teilung dazu (`engine.beschwoerZonenFuer`): die Zone einer GLEICHNAMIGEN Creature braucht keine freie Zone —
+  // vor dem Bezahlen genuegen die 2 freien Zonen fuer die Tokens; geteilte Zonen stehen vorn.
+  const opts = { nachKontrolle: true, livingHeroesOnly: true };
+  const alle = () => (name ? engine.beschwoerZonenFuer(pi, name, opts) : engine.getFreeSupportZones(pi, opts));
+  if (bezahlt) return alle();
   if (ownFree < FREE_ZONES_FOR_REVIVE) return [];
-  return engine.getFreeSupportZones(pi, { nachKontrolle: true, livingHeroesOnly: true })
-    .filter(z => z.owner !== pi || (z.slotIdx < 3 ? ownFree >= FREE_ZONES_FOR_RESTORE : true));
+  return alle().filter(z => z.shared || z.owner !== pi || (z.slotIdx < 3 ? ownFree >= FREE_ZONES_FOR_RESTORE : true));
 }
 
 /** Caster's defeated heroes that Reincarnation hasn't already revived. */
@@ -140,9 +151,8 @@ module.exports = {
     let canRestore;
     if (engine) {
       const cardDB = engine._getCardDB();
-      canRestore =
-        getCreatureZones(engine, gs, pi).length > 0 &&   // Kontrolle statt Seite (Styx 28.9.)
-        Object.keys(getRestoreCandidates(ps, cardDB, engine, pi)).length > 0;
+      canRestore =   // Kontrolle statt Seite (Styx 28.9.); W63a: je Karte — 3 freie Zonen ODER (Alice) 2 freie + geteilte Zone
+        Object.keys(getRestoreCandidates(ps, cardDB, engine, pi)).some(n => getCreatureZones(engine, gs, pi, false, n).length > 0);
     } else {
       canRestore =
         freeZones >= FREE_ZONES_FOR_RESTORE &&
@@ -152,6 +162,13 @@ module.exports = {
     return canRevive || canRestore;
   },
 
+  // ★ W4b (Al, Welle 4): die 2 Tokens sind Kostenpunkt („… to use this Spell") und werden VOR dem Reaktionsfenster
+  // bezahlt; bei Ganz-Negierung bleiben sie liegen. Danach sind Modus-, Helden- und Kreaturwahl nicht mehr abbrechbar
+  // (`vorab`); ohne `payActivationCost` (anderer Spielweg) gilt der alte Ablauf (Wahl abbrechbar, Tokens zum Schluss).
+  async payActivationCost(ctx) {
+    await payTokenCost(ctx, 2, 'Reincarnation');
+  },
+
   hooks: {
     onPlay: async (ctx) => {
       const engine = ctx._engine;
@@ -159,18 +176,21 @@ module.exports = {
       const pi = ctx.cardOwner;
       const ps = gs.players[pi];
       const cardDB = engine._getCardDB();
+      const vorab = kostenSchonBezahlt(ctx);   // W4b: Tokens schon vor dem Fenster gelegt?
+      const abbruch = () => { if (!vorab) gs._spellCancelled = true; };   // Kosten bezahlt: Karte ist verbraucht
       const freeZones = countFreeZones(gs, pi);
 
       const reviveTargets  = getReviveTargets(gs, pi, engine);
       const restoreCounts  = getRestoreCandidates(ps, cardDB, engine, pi);
-      const restoreNames   = Object.keys(restoreCounts);
+      // W63a: nur Karten mit Zone (3 freie Zonen oder — Alice-Teilung — 2 freie + geteilte Zone)
+      const restoreNames   = Object.keys(restoreCounts).filter(n => getCreatureZones(engine, gs, pi, vorab, n).length > 0);
 
-      const canRevive  = freeZones >= FREE_ZONES_FOR_REVIVE  && reviveTargets.length > 0;
-      const canRestore = getCreatureZones(engine, gs, pi).length > 0 && restoreNames.length > 0;   // Kontrolle statt Seite (Styx 28.9.)
+      const canRevive  = (vorab || freeZones >= FREE_ZONES_FOR_REVIVE) && reviveTargets.length > 0;
+      const canRestore = restoreNames.length > 0;   // Kontrolle statt Seite (Styx 28.9.)
 
       // spellPlayCondition should have blocked this already, but guard anyway.
       if (!canRevive && !canRestore) {
-        gs._spellCancelled = true;
+        abbruch();
         return;
       }
 
@@ -183,12 +203,12 @@ module.exports = {
           description: 'Place 2 Pollution Tokens, then choose how to reincarnate.',
           options: [
             { id: 'revive',  label: '👼 Revive Hero',     description: 'Bring one of your defeated Heroes back at full HP.' },
-            { id: 'restore', label: '🔮 Revive Creature', description: 'Return a Lv≤4 Creature from your discard pile.' },
+            { id: 'restore', label: '🔮 Revive Creature', description: 'Return a Level 4 or lower Creature from your discard pile.' },
           ],
-          cancellable: true,
+          cancellable: !vorab,
           gerrymanderEligible: true, // Hero revive vs Creature restore are distinct effects.
         });
-        if (!pick || pick.cancelled) { gs._spellCancelled = true; return; }
+        if (!pick || pick.cancelled) { abbruch(); return; }
         mode = pick.optionId;
       } else if (canRevive) {
         mode = 'revive';
@@ -213,24 +233,24 @@ module.exports = {
           description: 'Click one of your defeated Heroes to revive them at full HP.',
           confirmLabel: '👼 Revive!',
           confirmClass: 'btn-success',
-          cancellable: true,
+          cancellable: !vorab,
           maxTotal: 1,
         });
         if (!selectedIds || selectedIds.length === 0) {
-          gs._spellCancelled = true;
+          abbruch();
           return;
         }
         const chosen = validTargets.find(t => t.id === selectedIds[0]);
-        if (!chosen) { gs._spellCancelled = true; return; }
+        if (!chosen) { abbruch(); return; }
         const targetHero = ps.heroes[chosen.heroIdx];
         if (!targetHero || targetHero.hp > 0 || targetHero.reincarnationRevived) {
           // Raced or blocked; bail without cost (commitment wasn't complete).
-          gs._spellCancelled = true;
+          abbruch();
           return;
         }
 
         // Pay cost, then mark + revive.
-        await placePollutionTokens(engine, pi, 2, 'Reincarnation', { promptCtx: ctx });
+        if (!vorab) await placePollutionTokens(engine, pi, 2, 'Reincarnation', { promptCtx: ctx });
         targetHero.reincarnationRevived = true;
 
         engine._broadcastEvent('play_zone_animation', {
@@ -259,21 +279,21 @@ module.exports = {
         cards: gallery,
         title: 'Reincarnation — Revive Creature',
         description: 'Choose a level-4-or-lower Creature from your discard pile.',
-        cancellable: true,
+        cancellable: !vorab,
       });
-      if (!picked || picked.cancelled) { gs._spellCancelled = true; return; }
+      if (!picked || picked.cancelled) { abbruch(); return; }
       const creatureName = picked.cardName;
 
       // Pick placement zone BEFORE paying the Pollution cost, so the player
       // picks from their full set of free zones (matches the user-facing
       // "click any of your free Support Zones" UX). The 2 Pollution Tokens
       // are auto-placed in whatever's left afterward.
-      const placementZones = getCreatureZones(engine, gs, pi);   // Kontrolle statt Seite (Styx 28.9.)
+      const placementZones = getCreatureZones(engine, gs, pi, vorab, creatureName);   // Kontrolle statt Seite (Styx 28.9.); W63a: + geteilte Zone (Alice), vorn
       let destZone;
       if (placementZones.length === 0) {
         // Pre-check guaranteed 3+ zones; nothing should have consumed one
         // between the pre-check and here, but guard anyway.
-        gs._spellCancelled = true;
+        abbruch();
         return;
       } else if (placementZones.length === 1) {
         destZone = placementZones[0];
@@ -295,8 +315,8 @@ module.exports = {
         heldSeite: destZone.owner,   // Kontrolle statt Seite (Styx 28.9.)
       });
 
-      // Now pay the Pollution cost into the remaining free zones.
-      await placePollutionTokens(engine, pi, 2, 'Reincarnation', { promptCtx: ctx });
+      // Now pay the Pollution cost into the remaining free zones. (W4b: Normalweg — schon vor dem Fenster bezahlt.)
+      if (!vorab) await placePollutionTokens(engine, pi, 2, 'Reincarnation', { promptCtx: ctx });
 
       engine.log('reincarnation_restore', {
         player: ps.username, creature: creatureName,

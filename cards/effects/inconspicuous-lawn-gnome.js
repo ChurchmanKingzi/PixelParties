@@ -3,7 +3,20 @@
 //  Creature (Summoning Magic Lv 0, 50 HP, PP MBS1)
 //
 //  „You may once per turn change this card's level in your hand or on
-//   your side of the board to any level from 0 to 3."
+//   the board while you control it to any level from 0 to 3."
+//   (Kartentext seit Welle 11; vorher „… on your side of the board".)
+//
+//  ★ Welle 11 (Al, 15.10.2026, Q75/Q79):
+//   • Q75: Der Kontrolleur (Dieb/Leiher) aktiviert den Effekt ganz normal und
+//     waehlt die Stufe SELBST (Prompt an ihn, `ctx.cardOwner` = Kontrolleur).
+//   • Q79: „Nur einmal pro Runde insgesamt!" - Hand UND Brett teilen sich EINE
+//     Nutzung je Zug und Karte. Die Handaenderung steht im Handindex-Feld
+//     `_handStufenWechsel` (Wert = Zug) und wandert beim Beschwoeren als
+//     `counters._stufeGeaendertZug` aufs Brett; `canActivateCreatureEffect`
+//     sperrt dort im selben Zug. Umgekehrt sperrt die Hand-Nutzung sich selbst
+//     (`_revealedThisTurn`). Welle 12 (Al, Rueckfrage 14: "Ja"): auch
+//     Brettaenderung und Rueckkehr auf die Hand im selben Zug bleibt EINE Aenderung (`beimRueckgangInHand`,
+//     Engine `handZugangSync(..., { vonInst })`; abgedeckt: die Deepsea-/Bounce-Wege in `_deepsea-shared`).
 //
 //  BAUART
 //  ──────
@@ -77,12 +90,30 @@ module.exports = {
     return !!gs.players[pi];
   },
 
+  /** Welle 12 (Al, Rueckfrage 14): diese Kopie hat ihre Stufe in DIESEM Zug schon geaendert (Hand -> Brett -> Hand mitgerechnet). */
+  canHandActivateAt(gs, pi, handIndex) {
+    return gs.players[pi]?._handStufenWechsel?.[handIndex] !== (gs.turn || 1);
+  },
+
+  /**
+   * Welle 12 (Al, Rueckfrage 14: „Ja"): die Einmal-Grenze gilt auch, wenn der Gnom im selben Zug vom Brett zurueck auf die Hand geht - die Sperre
+   * wandert mit der Karte. Hat die Kopie auf dem Brett ihre Stufe in diesem Zug geaendert (`counters._stufeGeaendertZug`), traegt die neue
+   * Handkopie dieselbe Sperre (Handindex-Feld `_handStufenWechsel`). Gerufen von `handZugangSync` mit `opts.vonInst`.
+   */
+  beimRueckgangInHand(engine, ps, handIdx, inst) {
+    const zug = inst?.counters?._stufeGeaendertZug;
+    if (!zug || zug !== (engine.gs.turn || 1)) return;
+    if (!ps._handStufenWechsel) ps._handStufenWechsel = {};
+    ps._handStufenWechsel[handIdx] = zug;
+  },
+
   async onHandActivate(ctx) {
     const engine = ctx._engine;
     const pi = ctx.cardOwner;
     const handIndex = ctx.handIndex;
     const inst = engine._findHandInstanceAt?.(pi, handIndex);
     if (!inst) return false;
+    if (engine.gs.players[pi]?._handStufenWechsel?.[handIndex] === (engine.gs.turn || 1)) return false;   // Welle 12: schon geaendert (Brett -> Hand)
 
     const cd = engine._getCardDB()[CARD_NAME];
     const aktuell = typeof inst.counters?.levelSet === 'number'
@@ -101,6 +132,12 @@ module.exports = {
 
     inst.counters = inst.counters || {};
     inst.counters.levelSet = stufe;
+    // Q79: die Nutzung dieses Zuges folgt der Kopie aufs Brett (Handindex-Feld, s. Kopf).
+    const ps = engine.gs.players[pi];
+    if (ps && handIndex >= 0 && inst.zone === 'hand') {   // nicht fuer Crestinas Vorrat (anderer Index-Raum)
+      if (!ps._handStufenWechsel) ps._handStufenWechsel = {};
+      ps._handStufenWechsel[handIndex] = engine.gs.turn || 1;
+    }
     engine.log('gnome_level', {
       player: engine.gs.players[pi]?.username, level: stufe, where: 'hand',
     });
@@ -111,10 +148,17 @@ module.exports = {
     return true;
   },
 
+  /** Q79: im selben Zug schon in der Hand umgestellt -> keine zweite Aenderung auf dem Brett. */
+  canActivateCreatureEffect(ctx) {
+    const gs = ctx._engine.gs;
+    return ctx.card?.counters?._stufeGeaendertZug !== (gs.turn || 1);
+  },
+
   async onCreatureEffect(ctx) {
     const engine = ctx._engine;
     const ich = ctx.card;
-    const pi = engine.physicalSide(ich) ?? ctx.cardOwner;
+    const pi = ctx.cardOwner;                    // Z1 (C03-02): fragen/entscheiden darf der KONTROLLEUR (bei Diebstahl nicht der Besitzer)
+    const seite = engine.physicalSide(ich) ?? pi;   // Bild auf die BRETTSEITE
     const cd = engine.getEffectiveCardData(ich) || engine._getCardDB()[CARD_NAME];
     const aktuell = cd?.level || 0;
 
@@ -136,11 +180,12 @@ module.exports = {
       ...(ich.counters._cardDataOverride || basis || {}),
       level: stufe,
     };
+    ich.counters._stufeGeaendertZug = engine.gs.turn || 1;   // Welle 12: die Sperre wandert bei der Rueckkehr auf die Hand mit (`beimRueckgangInHand`)
     engine.log('gnome_level', {
       player: engine.gs.players[pi]?.username, level: stufe, where: 'board',
     });
     engine._broadcastEvent('play_zone_animation', {
-      type: 'modifier_sparkle', owner: pi, heroIdx: ich.heroIdx, zoneSlot: ich.zoneSlot,
+      type: 'modifier_sparkle', owner: seite, heroIdx: ich.heroIdx, zoneSlot: ich.zoneSlot,
     });
     engine.sync();
     return true;

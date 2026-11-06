@@ -14,6 +14,9 @@ const { areaTargetId } = require('./_targeting-shared');
 //    may remove any number of Areas from the
 //    board.
 //
+//  ★ W4b (Al, Welle 4): ÜBERHOLT — die Kosten werden jetzt VOR dem Reaktionsfenster bezahlt (`payActivationCost`, siehe unten)
+//  und bleiben bei Ganz-Negierung bezahlt; die Zielwahl danach ist nicht mehr abbrechbar. Der Rest dieses Absatzes beschreibt den alten Ablauf.
+//
 //  House clarifications (per user spec):
 //    • Cost (delete Camouflaged Kappa) is paid
 //      AFTER the player picks the damage target,
@@ -98,9 +101,26 @@ module.exports = {
     return countDifferentRebelliokaiInDiscard(ps, engine);
   },
 
-  spellPlayCondition(gs, pi /*, engine */) {
+  spellPlayCondition(gs, pi, engine) {
     const ps = gs.players[pi];
+    // „Delete … from your discard pile": unter Knight of Kings [B] nicht zahlbar (A06-08).
+    if (engine && !engine.pileOutAllowed(pi, 'discard', { sourceOwner: pi })) return false;
     return (ps?.discardPile || []).indexOf(COST_NAME) >= 0;
+  },
+
+  // ★ W4b (Al, Welle 4): die Kosten („Delete 1 … from your discard pile to play this card") werden VOR dem Reaktionsfenster
+  // bezahlt (`payActivationCost`) und bleiben bei Ganz-Negierung bezahlt (Silence, The Master's Plan …). Das ersetzt die
+  // frühere Hausregel „Kosten nach der ersten Zielwahl": die Zielwahl läuft unverändert in `onPlay` (gleiche Reihenfolge der
+  // Ziele), ist aber NICHT mehr abbrechbar, weil die Karte schon verbraucht ist (CARD_API.md, „Zielende Karten sind immer
+  // abbrechbar": Ausnahme nach dem Zusagepunkt). `false` = Kosten nicht zahlbar (Stapel-Sperre, Karte fehlt) → Karte bleibt auf der Hand.
+  // Fallback: lief `payActivationCost` nicht (Sofort-Guss von Attacks, anderer Weg), zahlt `onPlay` wie früher selbst.
+  async payActivationCost(ctx) {
+    const engine = ctx._engine;
+    const pi = ctx.cardOwner;
+    const ps = engine.gs.players[pi];
+    if (!ps || (ps.discardPile || []).indexOf(COST_NAME) < 0) return false;
+    if (!(await payRebelliokaiCost(engine, pi, COST_NAME, { source: CARD_NAME }))) return false;
+    if (ctx.card) ctx.card._kostenBezahlt = true;
   },
 
   hooks: {
@@ -110,6 +130,8 @@ module.exports = {
       const pi     = ctx.cardOwner;
       const ps     = gs.players[pi];
       if (!ps) return;
+      const vorab = !!ctx.card?._kostenBezahlt;   // W4b: Kosten schon vor dem Reaktionsfenster bezahlt?
+      if (ctx.card) delete ctx.card._kostenBezahlt;
 
       // ── Step 1: damage target (commitment point) ──
       // Cancellable — if the player backs out here, the cost has not
@@ -123,10 +145,10 @@ module.exports = {
         description: `Deal ${SLASH_DMG} damage to a target.`,
         confirmLabel: `⚔️ Slash! (${SLASH_DMG})`,
         confirmClass: 'btn-danger',
-        cancellable: true,
+        cancellable: !vorab,   // W4b: Kosten schon gezahlt → nicht mehr abbrechbar
       });
       if (!target) {
-        gs._spellCancelled = true;
+        if (!vorab) gs._spellCancelled = true;   // Kosten bezahlt: Karte ist verbraucht (negiert / kein Ziel)
         return;
       }
 
@@ -134,8 +156,11 @@ module.exports = {
       // Re-check the cost is still in discard (defensive — a parallel
       // reaction during the prompt could have shifted the pile). If
       // missing, the Attack still resolves but no cost was paid.
-      if ((ps.discardPile || []).indexOf(COST_NAME) >= 0) {
-        await payRebelliokaiCost(engine, pi, COST_NAME, { source: CARD_NAME });
+      if (!vorab && (ps.discardPile || []).indexOf(COST_NAME) >= 0) {
+        if (!(await payRebelliokaiCost(engine, pi, COST_NAME, { source: CARD_NAME }))) {
+          gs._spellCancelled = true;   // Kosten nicht zahlbar (Stapel-Sperre) → nichts passiert (A06-08)
+          return;
+        }
       }
 
       // Pre-resolution hook (Doq's guess, future "when this Hero

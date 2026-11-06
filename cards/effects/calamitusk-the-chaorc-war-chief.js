@@ -60,7 +60,9 @@ function replacements(engine, pi, calaHi, excludeName, feld = pi) {
     if (cn === excludeName || byName.has(cn)) continue;
     if (canSummonReduced(engine, feld, calaHi, cn)) byName.set(cn, { name: cn, source: 'hand' });
   }
-  for (const cn of (ps?.mainDeck || [])) {
+  // Z6 (A06-09): Stapel-Sperre (Knight of Kings [B]) - aus einem gesperrten Deck gibt es keine Ersatzkreatur.
+  const deckFrei = engine.pileOutAllowed(pi, 'deck', { sourceOwner: pi });
+  for (const cn of (deckFrei ? (ps?.mainDeck || []) : [])) {
     if (cn === excludeName || byName.has(cn)) continue;
     if (canSummonReduced(engine, feld, calaHi, cn)) byName.set(cn, { name: cn, source: 'deck' });
   }
@@ -75,7 +77,9 @@ function tributeViable(engine, pi, calaHi, c, feld = pi) {
   // Kontrolle statt Seite (Styx 28.9.): physische Seite des Helden — ein
   // Tribut macht nur dann Platz, wenn er in Calamitusks Spalte steht.
   return firstFreeSupportSlot(engine, feld, calaHi) >= 0
-    || (c.inst.heroIdx === calaHi && (c.inst.owner ?? pi) === feld);
+    || (c.inst.heroIdx === calaHi && (c.inst.owner ?? pi) === feld)
+    // W63a (Al): oder, mit Alice-Teilung, die Zone einer GLEICHNAMIGEN Creature fuer eine der Ersatzkreaturen
+    || replacements(engine, pi, calaHi, c.cardName, feld).some(o => firstFreeSupportSlot(engine, feld, calaHi, o.name, pi) >= 0);
 }
 
 module.exports = {
@@ -114,10 +118,9 @@ module.exports = {
         const sacName = picked?.[0]?.cardName;
         // The tribute is gone — recompute the (now-free) slot in
         // Calamitusk's column.
-        const slot = firstFreeSupportSlot(engine, feld, calaHi);
-        if (slot < 0) { engine.sync(); return; }
-
-        const opts = replacements(engine, pi, calaHi, sacName, feld);
+        // W63a: nur Ersatzkreaturen mit Zone (frei oder — Alice-Teilung — geteilt)
+        const opts = replacements(engine, pi, calaHi, sacName, feld)
+          .filter(o => firstFreeSupportSlot(engine, feld, calaHi, o.name, pi) >= 0);
         if (opts.length === 0) { engine.sync(); return; }
 
         let chosen = opts[0];
@@ -133,11 +136,21 @@ module.exports = {
           chosen = opts.find(o => o.name === res?.cardName) || opts[0];
         }
 
+        const slot = firstFreeSupportSlot(engine, feld, calaHi, chosen.name, pi);   // W63a: geteilte Zone (Alice) zuerst, dann die erste leere
+        if (slot < 0) { engine.sync(); return; }
         const pile = chosen.source === 'deck' ? ps.mainDeck : ps.hand;
         const idx = pile.indexOf(chosen.name);
         if (idx < 0) { engine.sync(); return; }
-        pile.splice(idx, 1);
-        if (chosen.source === 'deck') engine.shuffleDeck(pi);
+        // Z6 (A06-09): Stapel-Schicht statt Splice - Deck ueber die Deck-Bausteine (`deckEntnahme`: Stapel-Sperre, `deckHookExtras`),
+        // Hand wie bisher.
+        let _deckAb = null;
+        if (chosen.source === 'deck') {
+          _deckAb = await engine.deckEntnahme(pi, chosen.name, { source: CARD_NAME });
+          if (!_deckAb) { engine.sync(); return; }
+          engine.shuffleDeck(pi);
+        } else {
+          pile.splice(idx, 1);
+        }
 
         // Diese Beschwoerung wurde mit einem Opfer bezahlt (Als Ruling
         // 8.8.) — `hookExtras._tributePaid` meldet das an Trigger wie
@@ -146,12 +159,11 @@ module.exports = {
         // DIESEM Effekt, nicht in den Kosten der beschworenen Karte.
         const summon = await engine.summonCreatureWithHooks(
           chosen.name, feld, calaHi, slot,   // Kontrolle statt Seite (Styx 28.9.): physische Seite des Helden
-          { source: CARD_NAME, ...(feld !== pi ? { controller: pi } : {}), hookExtras: { _tributePaid: true } },
+          { source: CARD_NAME, ...(feld !== pi ? { controller: pi } : {}), hookExtras: chosen.source === 'deck' ? engine.deckHookExtras({ _tributePaid: true }) : { _tributePaid: true } },
         );
         if (!summon?.inst) {
           // Placement fizzled — refund the fetched card.
-          pile.push(chosen.name);
-          if (chosen.source === 'deck') engine.shuffleDeck(pi);
+          if (_deckAb) engine.deckRueckgabe(_deckAb); else pile.push(chosen.name);
           engine.sync();
           return;
         }

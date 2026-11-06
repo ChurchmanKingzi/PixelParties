@@ -72,8 +72,9 @@ module.exports = {
     for (let hi = 0; hi < (cpuPs.heroes || []).length; hi++) {
       const h = cpuPs.heroes[hi];
       if (!h?.name || h.hp <= 0) continue;
-      const zones = cpuPs.abilityZones?.[hi] || [];
-      for (const slot of zones) {
+      // 24.10.: auch die Stapel in Support Zonen (Xal, Xalibur).
+      for (const e of engine.abilityStapelListe(cpuIdx, hi)) {
+        const slot = e.namen;
         if (!slot?.length) continue;
         const abName = slot[0];
         const prev = ownLevels.get(abName) || 0;
@@ -87,10 +88,12 @@ module.exports = {
       // Borrow level == opp slot length. The target id encodes
       // `ability-{owner}-{heroIdx}-{slotIdx}` — re-read the slot
       // off the live state instead of trusting a stale level.
-      const m = (t.id || '').match(/^ability-(\d+)-(\d+)-(\d+)$/);
+      const m = (t.id || '').match(/^(ability|equip)-(\d+)-(\d+)-(\d+)$/);
       if (!m) return true;
-      const oi = +m[1], hi = +m[2], zi = +m[3];
-      const opSlot = engine.gs.players[oi]?.abilityZones?.[hi]?.[zi] || [];
+      const oi = +m[2], hi = +m[3], zi = +m[4];
+      const opSlot = (m[1] === 'equip'
+        ? engine.gs.players[oi]?.supportZones?.[hi]?.[zi]   // 24.10.: Ability in der Support Zone des Gegners (Xal)
+        : engine.gs.players[oi]?.abilityZones?.[hi]?.[zi]) || [];
       const borrowLv = opSlot.length;
       const ownLv = ownLevels.get(cardName) || 0;
       // Borrow only when it strictly upgrades the CPU's access to
@@ -110,10 +113,12 @@ module.exports = {
     // first-found.
     let best = null, bestSwing = -Infinity;
     for (const t of viable) {
-      const m = (t.id || '').match(/^ability-(\d+)-(\d+)-(\d+)$/);
+      const m = (t.id || '').match(/^(ability|equip)-(\d+)-(\d+)-(\d+)$/);
       if (!m) continue;
-      const oi = +m[1], hi = +m[2], zi = +m[3];
-      const opSlot = engine.gs.players[oi]?.abilityZones?.[hi]?.[zi] || [];
+      const oi = +m[2], hi = +m[3], zi = +m[4];
+      const opSlot = (m[1] === 'equip'
+        ? engine.gs.players[oi]?.supportZones?.[hi]?.[zi]
+        : engine.gs.players[oi]?.abilityZones?.[hi]?.[zi]) || [];
       const borrowLv = opSlot.length;
       const ownLv = ownLevels.get(t.cardName) || 0;
       const swing = borrowLv - ownLv;
@@ -161,7 +166,7 @@ module.exports = {
       // Lv1: opponent must have activatable abilities
       // During Main Phase: free-activation abilities
       // During Action Phase: action-cost abilities
-      const abilities = _getOpponentActivatableAbilities(gs, pi, engine);
+      const abilities = _getOpponentActivatableAbilities(gs, pi, engine, { heroIdx, heroOwner: feld });
       if (isMainPhase) return abilities.some(a => a.isFree);
       if (isActionPhase) return abilities.some(a => !a.isFree);
       return false;
@@ -194,7 +199,7 @@ module.exports = {
 //  LEVEL 1: Copy-activate opponent's ability
 // ═══════════════════════════════════════════
 
-function _getOpponentActivatableAbilities(gs, pi, engine) {
+function _getOpponentActivatableAbilities(gs, pi, engine, host = null) {
   const oi = opponentOfGs(gs, pi);
   const ops = gs.players[oi];
   const results = [];
@@ -224,8 +229,11 @@ function _getOpponentActivatableAbilities(gs, pi, engine) {
   for (let hi = 0; hi < (ops.heroes || []).length; hi++) {
     const h = ops.heroes[hi];
     if (!h?.name || h.hp <= 0) continue;
-    for (let zi = 0; zi < (ops.abilityZones[hi] || []).length; zi++) {
-      const slot = (ops.abilityZones[hi] || [])[zi] || [];
+    // 24.10.: auch die Stapel in den Support Zonen des Gegners (Xal, Xalibur) — „as if they were Ability Zones".
+    for (const _e of engine._aktivierungsStapel(oi, hi)) {
+      const zi = _e.zi;
+      const slot = _e.slot || [];
+      const inSupport = _e.zoneKind === 'support';
       if (slot.length === 0) continue;
       const abName = slot[0];
       const script = loadCardEffect(abName);
@@ -271,19 +279,22 @@ function _getOpponentActivatableAbilities(gs, pi, engine) {
             // Prüfung still abgeschaltet — genau die Falle, die in
             // dieser Sitzung mehrfach zugeschlagen hat.
             cardName: abName,
+            // W16f (M01-15): Gate-Kontext des Ausleihers - die geliehene Ability gilt als an DIESEM Helden liegend; Gates, die den
+            // Helden lesen (Infiltration, Necromancy, ...), fanden sonst keinen und verneinten immer.
+            ...(host ? { cardHeroIdx: host.heroIdx, cardHeroOwner: host.heroOwner } : {}),
           };
           erlaubt = gate.call(script, ctx, slot.length) !== false;
         } catch { erlaubt = true; }
         if (!erlaubt) continue;
       }
-      results.push({ abName, abLevel: slot.length, ownerHeroIdx: hi, zoneIdx: zi, heroName: h.name, script, isFree });
+      results.push({ abName, abLevel: slot.length, ownerHeroIdx: hi, zoneIdx: zi, heroName: h.name, script, isFree, ...(inSupport ? { inSupportZone: true } : {}) });
     }
   }
   return results;
 }
 
 async function _activateLv1(engine, gs, pi, heroIdx, hero, oi, ops, feld = pi) {
-  const allAbilities = _getOpponentActivatableAbilities(gs, pi, engine);
+  const allAbilities = _getOpponentActivatableAbilities(gs, pi, engine, { heroIdx, heroOwner: feld });
   const isActionPhase = gs.currentPhase === 3;
   // During Action Phase: only action-cost abilities; during Main Phase: only free abilities
   const abilities = isActionPhase
@@ -309,15 +320,18 @@ async function _activateLv1(engine, gs, pi, heroIdx, hero, oi, ops, feld = pi) {
   // `resolved === false` and clears them as part of its standard
   // free-activate rollback (HOPT released, no animation, no opponent
   // reveal).
+  // 24.10.: Abilities in Support Zonen (Xal, Xalibur) tragen wie Cloak of Edge die Zonenart `equip` — der Client hebt sie dann in der Support Zone hervor.
+  const imSupport = (ab) => !!(ab.fromSupport || ab.inSupportZone);
+  const targetId = (ab) => imSupport(ab)
+    ? `equip-${oi}-${ab.ownerHeroIdx}-${ab.zoneIdx}`
+    : `ability-${oi}-${ab.ownerHeroIdx}-${ab.zoneIdx}`;
   const targets = abilities.map(ab => ({
-    id: ab.fromSupport
-      ? `equip-${oi}-${ab.ownerHeroIdx}-${ab.zoneIdx}`
-      : `ability-${oi}-${ab.ownerHeroIdx}-${ab.zoneIdx}`,
+    id: targetId(ab),
     // `type` MUSS der ZONE folgen, nicht dem Regeltyp — der Client
     // hebt Ability-Slots und Support-Slots ueber verschiedene Wege
     // hervor. Mit `type: 'ability'` fand der Picker die Cloak in der
     // Support-Zone nicht (Als Befund 5.8.).
-    type: ab.fromSupport ? 'equip' : 'ability',
+    type: imSupport(ab) ? 'equip' : 'ability',
     owner: oi,
     heroIdx: ab.ownerHeroIdx,
     slotIdx: ab.zoneIdx,
@@ -355,12 +369,7 @@ async function _activateLv1(engine, gs, pi, heroIdx, hero, oi, ops, feld = pi) {
   }
 
   if (!selectedIds || selectedIds.length === 0) return false;
-  const targetId = selectedIds[0];
-  const selectedAb = abilities.find(ab =>
-    (ab.fromSupport
-      ? `equip-${oi}-${ab.ownerHeroIdx}-${ab.zoneIdx}`
-      : `ability-${oi}-${ab.ownerHeroIdx}-${ab.zoneIdx}`) === targetId
-  );
+  const selectedAb = abilities.find(ab => targetId(ab) === selectedIds[0]);
   if (!selectedAb) return false;
 
   const script = selectedAb.script;
@@ -368,6 +377,30 @@ async function _activateLv1(engine, gs, pi, heroIdx, hero, oi, ops, feld = pi) {
     ? script.onEquipEffect
     : (script.onFreeActivate || script.onActivate);
   if (!activateFn) return false;
+
+  // ★ W82 (Sinister Idol, Al): die geliehene Ability wird AKTIVIERT — dabei geht ein Kettenfenster auf (Idol und andere Reaktionen auf Ability-Aktivierungen, dann das Surprise-Fenster
+  // `_checkSurpriseOnAbilityActivation`), wie bei `doActivateFreeAbility`/`doActivateAbility`. Identität: die geliehene Ability mit der Stufe IHRES Stapels (`abLevel`, „use it as if it was
+  // attached to this Hero" ändert die Stufe nicht); der Stapel (Brettseite `oi`, Held, Zone) steht in `abilityZone`, „the user" einer Idol-Wirkung ist der Held, auf dem die Kopie liegt.
+  // Die Kette trägt als `heroIdx` den Charme-Held (Aktivierer). Wird die Aktivierung negiert, hat Charme trotzdem gewirkt (Sperre bleibt), die geliehene Ability nicht (kein Stempel).
+  const stapelArt = (selectedAb.fromSupport || selectedAb.inSupportZone) ? 'support' : 'ability';
+  const kette = await engine.executeCardWithChain({
+    cardName: selectedAb.abName, owner: pi, heroIdx, cardType: 'Ability', goldCost: 0, resolve: null, fromBoard: true,
+    abilityZone: { heroOwner: oi, heroIdx: selectedAb.ownerHeroIdx, zoneIdx: selectedAb.zoneIdx, zoneKind: stapelArt, level: selectedAb.abLevel },
+  });
+  const surpriseNeg = kette.negated ? null
+    : await engine._checkSurpriseOnAbilityActivation(pi, selectedAb.ownerHeroIdx, selectedAb.zoneIdx, selectedAb.abName, oi, stapelArt);
+  if (kette.negated || surpriseNeg?.negateEffect) {
+    engine.log('charme_copy_negated', { player: gs.players[pi].username, ability: selectedAb.abName });
+    engine.sync();
+    return true;
+  }
+  // Stufe NACH der Kette (Idol nimmt die oberste Kopie weg): die Wirkung folgt der gesenkten Stufe, die Kosten bleiben die der Stufe beim Aktivieren (`ctx.kostenStufe`).
+  let abLevel = selectedAb.abLevel;
+  if (!selectedAb.fromSupport) {
+    const st = engine.abilityStapelAn(oi, selectedAb.ownerHeroIdx, stapelArt, selectedAb.zoneIdx);
+    if (st && st.length > 0 && st[0] === selectedAb.abName) abLevel = st.length;
+  }
+  const idolPflicht = abLevel < selectedAb.abLevel;   // gesenkte Auflösung = Pflicht, kein Abbrechen (Al)
 
   // Create a fake context as if the ability were on this Hero
   const fakeInst = {
@@ -386,6 +419,7 @@ async function _activateLv1(engine, gs, pi, heroIdx, hero, oi, ops, feld = pi) {
   };
 
   const fakeCtx = engine._createContext(fakeInst, {});
+  fakeCtx.kostenStufe = selectedAb.abLevel;   // W82: Kosten bleiben die der Stufe beim Aktivieren
 
   engine.log('charme_copy', {
     player: gs.players[pi].username, hero: hero.name,
@@ -401,7 +435,9 @@ async function _activateLv1(engine, gs, pi, heroIdx, hero, oi, ops, feld = pi) {
   // Charme), no `ability_activated` flash on Charme's slot. Anything
   // truthy / undefined / void counts as "Charme committed" — matches
   // the server's `resolved !== false` convention.
-  const result = await activateFn(fakeCtx, selectedAb.abLevel);
+  let result = await engine.mitPflichtAufloesung(pi, idolPflicht, () => activateFn(fakeCtx, abLevel));
+  // W82: bei einer durch Idol gesenkten Pflicht-Auflösung bleibt die Aktivierung verbraucht, auch wenn die Ability nichts tut („no" / keine Wahl möglich).
+  if (result === false && idolPflicht) { result = true; engine.log('sinister_idol_declined', { player: gs.players[pi].username, ability: selectedAb.abName }); }
 
   // On commit, stamp the BORROWER's HOPT key for this ability name.
   // Charme's borrow runs the script function directly — it never goes
@@ -520,12 +556,21 @@ async function _activateLv2(engine, gs, pi, heroIdx, hero, oi, ops) {
 
     // Now apply the state mutation — clone has landed; the sync
     // that follows just swaps the clone for the real card.
+    // W63c: der BESITZER der Karte, nicht automatisch der Gegner — war sie selbst gestohlen (Charme in die Gegenrichtung, Diebstahl,
+    // Geschenk), bleibt ihr Besitzer derselbe; kommt sie zu ihm zurueck, ist sie wieder eine ganz normale Handkarte.
+    const _besitzer = engine._handCardPileOwner(oi, cardName, stealHandIdx);
+    const _instVor = engine._findHandInstanceAt(oi, stealHandIdx);
     engine.takeFromPileSync(ops, 'hand', stealHandIdx);
     engine.handZugangSync(gs.players[pi], cardName, { ohneInstanz: true });
     // Instanz mitziehen (siehe _moveHandInstanceOwner): `owner` folgt
     // dem physischen Besitz, `originalOwner` bleibt — damit geht die
     // Karte beim Abwerfen/Löschen zurück in die richtige Ablage.
-    engine._moveHandInstanceOwner(oi, pi, cardName);
+    const _gestInst = engine._moveHandInstanceOwner(oi, pi, cardName, _instVor);
+    // Herkunft markieren (Regel v692/v693, wie Infiltration): beim Abwerfen/Spielen/Rückmischen
+    // kehrt die Karte zum Besitzer zurück. `originalOwner` kurz auf den Halter, damit
+    // `_tagHandCardOrigin` DIESE Instanz markiert statt eine zweite anzulegen.
+    if (_gestInst) _gestInst.originalOwner = pi;
+    if (_besitzer !== pi) engine._tagHandCardOrigin(pi, cardName, _besitzer, (gs.players[pi].hand.length || 1) - 1);
     const charmerSid = gs.players[pi]?.socketId;
     if (charmerSid && engine.io) {
       engine.io.to(charmerSid).emit('card_reveal', { cardName });

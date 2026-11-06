@@ -24,15 +24,32 @@
 
 const { isSummonablePileCreature, hasCardType, baseCardName, isArtifactCreature } = require('./_hooks');
 const { returnSupportCreatureToHand } = require('./_deepsea-shared');
+const { canSummonInvaderViaSource, invaderLimitAllows } = require('./_cosmic-shared');
+
+// ★ W16b (A02-deepsea-19): die Ersatz-Kreatur wird zwar „platziert", das ist aber eine Unterform der Beschwörung (Al, Welle 9 Q10) —
+// die Beschwörungsbeschränkungen des Invaders gelten: nur durch den Effekt einer „Cosmic"-Karte (Encounter ist keine) und höchstens
+// 1 kontrollierter Invader. Dieselben Helfer nutzen Argos und Life-Searcher.
+function _platzierbar(engine, pi, name) {
+  return canSummonInvaderViaSource(name, CARD_NAME) && invaderLimitAllows(engine, pi, name);
+}
 
 const CARD_NAME = 'Deepsea Encounter';
 
 function _isCreatureTarget(t, engine) {
   if (!(t?.type === 'equip' && t.cardInstance)) return false;
+  // Zweite Encounter im selben Zielfenster: der Hub reicht nach der ersten Umlenkung noch das ALTE Ziel weiter (die schon zurückgegebene Kreatur).
+  // Ohne diese Prüfung gäbe die zweite Karte dieselbe Kreatur ein zweites Mal auf die Hand (Karte doppelt).
+  if (t.cardInstance.zone !== 'support' || !engine?.cardInstances?.includes?.(t.cardInstance)) return false;
   // „level up to 1 higher than the returned Creature's": Artifact Creatures
   // haben kein Level (Als Ruling 9.10.) — sie sind hier kein Ziel.
   const cd = engine?.getEffectiveCardData?.(t.cardInstance) || engine?._getCardDB?.()[t.cardInstance.name];
   return !isArtifactCreature(cd);
+}
+
+/** W20b: leert die Rückgabe dieser Kreatur ihre Zone ganz (kein Alice-Stapel)? */
+function _zoneLeerNachRueckgabe(engine, t) {
+  const i = t.cardInstance;
+  return !!i && engine.zoneFreiNachKostenzahlung(engine.physicalSide(i), i.heroIdx, i.zoneSlot, i);
 }
 
 module.exports = {
@@ -61,7 +78,7 @@ module.exports = {
     if (!srcData) return false;
     const isAttack = hasCardType(srcData, 'Attack');
     const isSpell = hasCardType(srcData, 'Spell');
-    const isCreatureEffect = hasCardType(srcData, 'Creature') && sourceCard?.zone === 'support';
+    const isCreatureEffect = hasCardType(srcData, 'Creature') && (sourceCard?.zone === 'support' || sourceCard?.zone === 'surprise');   // W46a: auch die auflösende Creature-Surprise (Zone 'surprise') ist ein Creature effect
     const dmgType = opts?.damageType;
     const dmgTypeMatches = dmgType === 'attack'
       || /_spell$/.test(dmgType || '')
@@ -69,8 +86,10 @@ module.exports = {
     if (!isAttack && !isSpell && !isCreatureEffect && !dmgTypeMatches) return false;
 
     // At least one target must be a Creature in one of OUR Support Zones.
+    // W20b (Al, 20.10.2026: Opfer-Zonen-Regel für jede Beschwörung/Platzierung, die über das Entfernen EINER Karte eine Zone freimacht):
+    // der Ersatz kommt in die Zone der Kreatur - nur Zonen, die ihre Rückgabe leert (kein Alice-Stapel).
     const ownCreatureTargets = targetedHeroes.filter(t =>
-      _isCreatureTarget(t, engine) && t.owner === pi
+      _isCreatureTarget(t, engine) && t.owner === pi && _zoneLeerNachRueckgabe(engine, t)
     );
     if (ownCreatureTargets.length === 0) return false;
 
@@ -89,6 +108,7 @@ module.exports = {
         if (name === CARD_NAME) continue;
         const cd = cardDB[name];
         if (!cd || !isSummonablePileCreature(cd)) continue;
+        if (!_platzierbar(engine, pi, name)) continue;
         // Effective level honours hand-active reducers (Whoolmoth, …).
         if (engine.effectiveCardLevel(cd, pi) > maxLevel) continue;
         return true;
@@ -104,7 +124,7 @@ module.exports = {
     const cardDB = engine._getCardDB();
 
     // Pick the first own creature-target from the list.
-    const tgt = targetedHeroes.find(t => _isCreatureTarget(t, engine) && t.owner === pi);
+    const tgt = targetedHeroes.find(t => _isCreatureTarget(t, engine) && t.owner === pi && _zoneLeerNachRueckgabe(engine, t));
     if (!tgt) return null;
     const bouncedInst = tgt.cardInstance;
     const bouncedName = bouncedInst.name;
@@ -128,6 +148,7 @@ module.exports = {
       if (n === CARD_NAME) continue;
       const cd = cardDB[n];
       if (!cd || !isSummonablePileCreature(cd)) continue;
+      if (!_platzierbar(engine, pi, n)) continue;
       const lvl = engine.effectiveCardLevel(cd, pi);
       if (lvl > maxLevel) continue;
       seen.add(n);
@@ -136,7 +157,8 @@ module.exports = {
     if (replacements.length === 0) return null;
 
     // Bounce the target.
-    await returnSupportCreatureToHand(engine, bouncedInst, CARD_NAME);
+    const bounceRes = await returnSupportCreatureToHand(engine, bouncedInst, CARD_NAME, { sourceOwner: pi });
+    if (!bounceRes?.returned) return null;   // W71b: ein Schutzfenster (Cool Rescuer Monia & Co.) hat das Zurücknehmen negiert — die Kreatur bleibt, es wird nichts platziert
 
     // v1360 (Audit „same Support Zone"): Austritts-Listener (Rider Warg →
     // „als geopfert" → Corpse Cannibal) koennen den Platz sofort fuellen.
@@ -147,7 +169,7 @@ module.exports = {
     // Prompt replacement.
     const picked = await promptCtx.promptCardGallery(replacements, {
       title: CARD_NAME,
-      description: `Pick a different-named Creature with level ≤ ${maxLevel} to place.`,
+      description: `Pick a different-named Creature with level ${maxLevel} or lower to place.`,
       cancellable: false,
     });
     if (!picked?.cardName) return null;
@@ -157,7 +179,7 @@ module.exports = {
     engine.takeFromPileSync(ps, 'hand', handIdx);
 
     if (engine.supportSlotBelegt(pi, bouncedHeroIdx, bouncedSlotIdx)) {   // v1360
-      engine.handZugangSync(ps, newName, { von: 'brett', source: CARD_NAME, ohneInstanz: true });
+      engine.handZugangRueckgabe(ps, newName, { von: 'brett', source: CARD_NAME, ohneInstanz: true });   // W64c: unverrichtet zurück — Herkunft einer gestohlenen Handkarte bleibt
       await engine.zeigeFizzle(CARD_NAME, { playerIdx: pi, grund: 'zone_taken' });
       return null;
     }

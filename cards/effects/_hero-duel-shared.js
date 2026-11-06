@@ -5,7 +5,8 @@
 //
 //  Kartenneutral — der Kartenname, die Animation und die Rundenzahl kommen vom Aufrufer; hier steht nur die Mechanik:
 //
-//    duell(engine, { name, a, b, maxRunden, animation, erstMs, folgeMs, heimMs })
+//    duell(engine, { name, a, b, maxRunden, animation, erstMs, folgeMs, heimMs, alsHeldenAngriff })
+//      alsHeldenAngriff (W30a): true für Karten, deren Schläge „als Attack des Helden" zählen (Clash of Champions): Quellstufe = Fighting-Level des schlagenden Helden, nicht die Kartenstufe
 //      a / b  { controller, side, heroIdx }   `controller` = wer den Helden kontrolliert (Angreifer im Sinne der Karte), `side` = Brettspalte des Helden
 //      → { runden, aGefallen, bGefallen, unentschieden }
 //
@@ -34,13 +35,18 @@ const FOLGE_MS = 240;    // Hit 2, 3 …: 100 ms Versatz (der Rückprall der Kar
 const HEIM_MS = 440;     // nach dem letzten Hit: die Helden gehen heim (380 ms) + Puffer
 const BILD_MS = 960;     // Lebensdauer der Pixelart-Animation je Hit (Aufprall + Nachglühen); NICHT die Wartezeit der Engine — `playAnimation` räumt sie danach ab
 
+const { clearArmedArrows } = require('./_arrows-shared');
+
 const held = (engine, x) => engine.gs.players[x.side]?.heroes?.[x.heroIdx] || null;
 const lebt = (h) => !!h && !!h.name && (h.hp || 0) > 0;
 
-/** Quellobjekt eines Angriffs mit Heldenwert (wie `executeAttack` es baut). */
-function angriffsQuelle(name, x) {
+/** Quellobjekt eines Angriffs mit Heldenwert (wie `executeAttack` es baut).
+ *  W30a (Al, 21.10.2026): mit `engine` + `alsHeldenAngriff` (Clash of Champions: „treated as them performing an Attack") trägt der Schlag den Stempel
+ *  `treatedAsAttack` = Fighting-Level DIESES Helden statt der gedruckten Kartenstufe (Leser: Stealth, Jetpack, Glass Wall, Test Flight, Escape Device …). */
+function angriffsQuelle(name, x, engine, alsHeldenAngriff) {
   const q = { name, owner: x.controller, controller: x.controller, heroIdx: x.heroIdx, usesHeroAtk: true };
   if (x.side !== x.controller) q.heroOwner = x.side;
+  if (alsHeldenAngriff && engine && typeof engine.heldenAngriffStempel === 'function') q.treatedAsAttack = engine.heldenAngriffStempel(x.side, x.heroIdx);
   return q;
 }
 
@@ -53,6 +59,22 @@ async function duell(engine, cfg) {
   const heimMs = cfg.heimMs ?? HEIM_MS;
   let runden = 0;
   let geramm = false;                          // `play_hero_clash` lief → am Ende `ende` senden
+  // ★ W39a (Al, 22.10.2026: alle Attack-Leser): jeder Duellant „performs a normal Attack" und trifft GENAU EIN Ziel — den Gegner-Duellanten. Für die Leser, die eine Attack über das Schadensprotokoll /
+  // `afterSpellResolved` lesen (Frostbringer, Warhorse, Master's Sword, Nieht, Reiza, Vinepire, Zsos'Ssar …): (a) der Gegner von A steht vor den Schlägen im Schadensprotokoll der Karte (die Karte
+  // meldet `afterSpellResolved` für A selbst); (b) für B (`cfg.meldeAttacken`, nur Duel) zählt und meldet das Duell NACH den Schlägen einmal eine Attack des Helden B (wie der gezwungene Held von Alluring Light).
+  if (cfg.meldeAttacken && Array.isArray(gs._spellDamageLog)) gs._spellDamageLog.push({ id: `hero-${b.side}-${b.heroIdx}`, type: 'hero', owner: b.side, heroIdx: b.heroIdx, cardName: held(engine, b)?.name });
+  let bHatGeschlagen = false;
+  // ★ W40a (Al, 22.10.2026): Arrows & Co. werden an den Helden gehängt, der die Karte SPIELT; der Duellant `a` kann ein anderer Held des Spielers sein — der Pfeil-Bonus gehört der ersten Attack
+  // des Duellanten (sonst ginge er an einem Helden verloren, der gar nicht schlägt).
+  {
+    const A0 = held(engine, a);
+    for (const { hero: h } of engine.heroesControlledBy(a.controller)) {
+      if (!A0 || h === A0 || !h?._armedArrows?.length) continue;
+      A0._armedArrows = [...(A0._armedArrows || []), ...h._armedArrows];
+      if (h._arrowsChainedCount != null) A0._arrowsChainedCount = h._arrowsChainedCount;
+      delete h._armedArrows; delete h._arrowsChainedCount;
+    }
+  }
   const clashEvent = (phase, extra = {}) => ({
     a: { owner: a.side, heroIdx: a.heroIdx, cardName: held(engine, a)?.name }, b: { owner: b.side, heroIdx: b.heroIdx, cardName: held(engine, b)?.name }, phase, ...extra,
   });
@@ -65,7 +87,7 @@ async function duell(engine, cfg) {
       runden = r;
 
       // ── 2. Angriffswerte lesen, Angriffsfenster ──
-      const quelleA = angriffsQuelle(name, a), quelleB = angriffsQuelle(name, b);
+      const quelleA = angriffsQuelle(name, a, engine, cfg.alsHeldenAngriff), quelleB = angriffsQuelle(name, b, engine, cfg.alsHeldenAngriff);
       const zielA = { type: 'hero', owner: b.side, heroIdx: b.heroIdx };     // A trifft B
       const zielB = { type: 'hero', owner: a.side, heroIdx: a.heroIdx };     // B trifft A
       const atkA = await engine._fireAttackDeclare(quelleA, zielA, Math.max(0, A.atk || 0));
@@ -87,10 +109,14 @@ async function duell(engine, cfg) {
       try {
         const opts = { damageType: 'attack', sourceName: name, hitDelay: 0 };
         if (lebt(held(engine, b))) await engine.dealDamageToTargets(quelleA, [zielA], { ...opts, damage: atkA });
-        if (lebt(held(engine, a))) await engine.dealDamageToTargets(quelleB, [zielB], { ...opts, damage: atkB });
+        if (lebt(held(engine, a))) { await engine.dealDamageToTargets(quelleB, [zielB], { ...opts, damage: atkB }); bHatGeschlagen = true; }
       } finally {
         await engine.endMultiHit();
       }
+      // ★ W40a (Al, 22.10.2026, Punkt 2: „Jeder Schlag gilt als eigene Attack, ja. Aber Arrows boosten nur EINE Attack, also würde ein Pfeil-Bonus nur den ersten Schlag buffen und dann enden."):
+      // ein aktiver Pfeil-Bonus (Arrows, Magic Topaz, Bow Sniper Darge: „that Attack") gilt nur für die ERSTE Attack — nach dem ersten Schlag ist er verbraucht (Golden Arrow zahlt jetzt aus, Brand/Gift
+      // sind am ersten Ziel angekommen); die weiteren Schläge bekommen ihn nicht. Idempotent; der Abschluss der Karte räumt nichts mehr ab.
+      if (r === 1) await clearArmedArrows(engine, a.controller);
 
       const A2 = held(engine, a), B2 = held(engine, b);
       engine.log('duel_round', {
@@ -107,6 +133,13 @@ async function duell(engine, cfg) {
       engine._broadcastEvent('play_hero_clash', clashEvent('ende'));
       await engine._delay(heimMs);
     }
+  }
+
+  if (cfg.meldeAttacken && bHatGeschlagen) {
+    const Bh = held(engine, b), Ah = held(engine, a);
+    await engine.zaehleAlsArt('attack', { pi: b.controller, heroIdx: b.heroIdx, heroOwner: b.side, name: Bh?.name });
+    await engine.meldeAttackAufgeloest({ name, wirkName: Bh?.name || name, pi: b.controller, heroIdx: b.heroIdx, heroOwner: b.side,
+      ziele: Ah ? [{ id: `hero-${a.side}-${a.heroIdx}`, type: 'hero', owner: a.side, heroIdx: a.heroIdx, cardName: Ah.name }] : [] });
   }
 
   const A = held(engine, a), B = held(engine, b);

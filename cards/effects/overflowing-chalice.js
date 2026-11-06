@@ -29,12 +29,16 @@
 
 const CARD_NAME = 'Overflowing Chalice';
 
-/** Alle lebenden Helden des Besitzers — die Wahlmenge des Gegners. */
-function lebendeHelden(ps) {
+/**
+ * Alle lebenden Helden, die `pi` KONTROLLIERT — die Wahlmenge des Gegners.
+ * Welle 13 (Q147, Al: „Ja, nach aktueller Kontrolle"): `heroesControlledBy`
+ * statt physischer Heldenreihe. Ein vom Gegner gecharmter eigener Held steht
+ * nicht zur Wahl, ein von mir gecharmter Gegnerheld schon (`phys` = Brettseite).
+ */
+function lebendeHelden(engine, pi) {
   const out = [];
-  for (let i = 0; i < (ps?.heroes || []).length; i++) {
-    const h = ps.heroes[i];
-    if (h?.name && (h.hp || 0) > 0) out.push({ idx: i, name: h.name });
+  for (const { physOwner, heroIdx, hero } of engine.heroesControlledBy(pi)) {
+    if (hero?.name && (hero.hp || 0) > 0) out.push({ phys: physOwner, idx: heroIdx, name: hero.name });
   }
   return out;
 }
@@ -73,7 +77,7 @@ module.exports = {
     const gs = engine.gs;
     const oi = engine.opponentOf(pi);
     const ps = gs.players[pi];
-    const helden = lebendeHelden(ps);
+    const helden = lebendeHelden(engine, pi);
 
     // Kein lebender Held → nichts zu waehlen. Der Nachteil greift
     // trotzdem: der Text knuepft ihn nicht an das Gelingen.
@@ -86,16 +90,19 @@ module.exports = {
         menuSource: CARD_NAME,
         gerrymanderEligible: true,
         cancellable: false,
-        options: helden.map(h => ({ id: String(h.idx), label: h.name })),
+        options: helden.map(h => ({ id: `${h.phys}:${h.idx}`, label: h.name })),
       });
 
-      let heroIdx = helden[0].idx;
-      const gewaehlt = parseInt(wahl?.optionId, 10);
-      if (Number.isInteger(gewaehlt) && helden.some(h => h.idx === gewaehlt)) heroIdx = gewaehlt;
+      let gewaehlterHeld = helden[0];
+      const [wp, wi] = String(wahl?.optionId ?? '').split(':').map(x => parseInt(x, 10));
+      const treffer = helden.find(h => h.phys === wp && h.idx === wi);
+      if (treffer) gewaehlterHeld = treffer;
+      const heroIdx = gewaehlterHeld.idx;
+      const heldName = engine.gs.players[gewaehlterHeld.phys]?.heroes?.[heroIdx]?.name;
 
       engine.log('overflowing_chalice_pick', {
         player: ps.username, chooser: gs.players[oi]?.username,
-        hero: ps.heroes[heroIdx]?.name,
+        hero: heldName,
       });
 
       // Zusatzaktion. `performImmediateAction` traegt das "may" selbst:
@@ -105,7 +112,9 @@ module.exports = {
       await engine.performImmediateAction(pi, heroIdx, {
         title: CARD_NAME,
         description: `${gs.players[oi]?.username || 'Your opponent'} chose `
-          + `${ps.heroes[heroIdx]?.name || 'this Hero'}. You may perform an additional Action.`,
+          + `${heldName || 'this Hero'}. You may perform an additional Action.`,
+        // Geliehener Held auf der Gegnerseite: Brettseite mitgeben (Styx-Vertrag).
+        ...(gewaehlterHeld.phys !== pi ? { heroOwner: gewaehlterHeld.phys } : {}),
       });
     }
 

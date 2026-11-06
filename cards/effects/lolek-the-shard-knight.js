@@ -24,6 +24,7 @@
 //  steht in `_lolek-shared.js`.
 // ═══════════════════════════════════════════
 
+const { equipZustandHooks } = require('./_hooks');   // W51b: Umhaengen (Fridge/Ceremony) als Verlassen+Betreten sehen
 const {
   BASE_LOLEK, TRIDENT_NAME, HELMET_NAME, halfCost, equippableEntries,
   hasDestination, chooseAndEquip, checkLolekAscension, hasEquipped,
@@ -38,7 +39,7 @@ function discardEntries(engine, pi) {
 
 function equipEntries(engine, pi) {
   return equippableEntries(engine, pi, ['discard'], (name, cd) =>
-    engine.canAffordGold(pi, halfCost(cd), name) && hasDestination(engine, pi, name));
+    engine.canAffordGold(pi, halfCost(cd, engine, pi), name) && hasDestination(engine, pi, name));
 }
 
 module.exports = {
@@ -121,7 +122,10 @@ module.exports = {
       if (entry.source === 'hand') {
         const handIdx = ps.hand.indexOf(entry.name);
         if (handIdx < 0) return false;
-        await engine.actionDiscardHandCard(pi, entry.name, handIdx, { source: CARD_NAME, selfInflicted: true, _noGlow: true });
+        // ★ W74c: Boris darf diese Kosten („send … from your hand to your discard pile") ignorieren — die Karte bleibt, der Effekt (ziehen) läuft weiter.
+        if (!(await engine.borisVerzicht(pi, 1, { source: CARD_NAME }))) {
+          await engine.actionDiscardHandCard(pi, entry.name, handIdx, { source: CARD_NAME, selfInflicted: true, _noGlow: true });
+        }
       } else {
         if (!ps.mainDeck.includes(entry.name)) return false;
         await engine.actionMillCards(pi, 1, { targetCardName: entry.name, source: CARD_NAME, selfInflicted: true });
@@ -136,13 +140,15 @@ module.exports = {
       title: CARD_NAME,
       source: `${CARD_NAME}:equip`,
       description: 'Equip an equippable Artifact from your discard pile to a Hero you control. You pay half its Cost.',
-      costOf: (_name, cd) => halfCost(cd),
+      costOf: (_name, cd) => halfCost(cd, engine, pi),
     });
     if (ok) engine.sync();
     return ok;
   },
 
-  hooks: {
+  hooks: equipZustandHooks({
+    // W51b: `equipZustandHooks` — Umhaengen (Slippery Fridge / Inheritance Ceremony) sendet Enter/Leave nur an die bewegte Karte; dieser Zustandslauscher bekommt es ueber
+    // `onEquipLost` / `onEquipGained` (isMove) mit denselben Handlern (siehe _hooks.js).
     // Styx 28.9.: Pruefung auf der Brettseite des Helden (`cardHeroOwner`).
     onGameStart: (ctx) => {
       checkLolekAscension(ctx._engine, ctx.cardHeroOwner ?? ctx.cardOwner, ctx.cardHeroIdx, null);
@@ -160,5 +166,5 @@ module.exports = {
       // `ctx.card` ist der Lauscher, die gehende Karte `ctx.leavingCard`.
       checkLolekAscension(ctx._engine, ctx.cardHeroOwner ?? ctx.cardOwner, ctx.cardHeroIdx, ctx.leavingCard?.id);
     },
-  },
+  }),
 };

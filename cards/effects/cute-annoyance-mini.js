@@ -37,9 +37,9 @@
 // ═══════════════════════════════════════════
 
 const { hasCardType, isOwnSideSummonableCreature } = require('./_hooks');
+const { isCuteCreatureCard } = require('./_cute-shared');
 
 const CARD_NAME = 'Cute Annoyance Mini';
-const CUTE_ARCHETYPE = 'Cute';
 
 /**
  * Enumerate unique Cute Creature names still in the player's main
@@ -55,7 +55,7 @@ function getCuteCreaturesInDeck(engine, ps) {
   for (const [name, count] of Object.entries(counts)) {
     const cd = cardDB[name];
     if (!cd) continue;
-    if (cd.archetype !== CUTE_ARCHETYPE) continue;
+    if (!isCuteCreatureCard(cd)) continue;   // Name zaehlt (Al, Welle 9, Q24)
     if (!isOwnSideSummonableCreature(cd, name)) continue;
     out.push({ name, count });
   }
@@ -78,15 +78,15 @@ function eligibleSummonSlots(engine, pi, miniHeroIdx, creatureCd, feld = pi) {
   const fs = engine.gs.players[feld];
   const hero = fs?.heroes?.[miniHeroIdx];
   if (!hero?.name || hero.hp <= 0) return [];
+  if (feld === pi && engine.heroSideOf(feld, hero) !== pi) return [];   // W20c (Al, 20.10.): nur der aktuelle Kontrolleur beschwoert mit dem Helden (abgegebener eigener Held faellt heraus)
   // Mini herself must still meet the level req for the chosen
   // creature (the summon is "with this Hero", so Mini is the host).
   if (!engine.heroMeetsLevelReq(feld, miniHeroIdx, creatureCd)) return [];
-  const zones = fs.supportZones?.[miniHeroIdx] || [[], [], []];
+  // W63a (Al, 22.10.2026: Alices Effekt gilt fuer ALLE Beschwoerungs-Effekte; „erst die geteilte Zone, DANN die erste leere"): Minis freie Zonen UND — mit
+  // Alice-Teilung des Beschwoerers — die Zone einer GLEICHNAMIGEN Creature (`engine.beschwoerZonenFuer`).
   const out = [];
-  for (let z = 0; z < 3; z++) {
-    if ((zones[z] || []).length === 0) {
-      out.push({ heroIdx: miniHeroIdx, slotIdx: z, ...(feld !== pi ? { owner: feld } : {}) });
-    }
+  for (const zz of engine.beschwoerZonenFuer(pi, creatureCd.name, { seite: feld, heroIdx: miniHeroIdx, nurBasis: true, namedHeroesOnly: true })) {
+    out.push({ heroIdx: miniHeroIdx, slotIdx: zz.slotIdx, ...(feld !== pi ? { owner: feld } : {}), ...(zz.shared ? { shared: true, stackDepth: zz.stackDepth } : {}) });
   }
   return out;
 }
@@ -193,6 +193,10 @@ module.exports = {
       cancellable: false,
     });
 
+    // Control Monitors: 1 Karte aus dem Deck auf die Hand, bezahlt mit 1 Abwurf. Wurde sie geloescht, entfaellt der Beschwoerungs-Zusatz.
+    await engine.meldeHandZugangAusStapel(pi, { source: CARD_NAME });
+    if (!ps.hand.includes(chosenName)) { engine.sync(); return true; }
+
     // ── Step 4: optional rider — discard 1 more → summon now ──
     // Skip the prompt entirely if the rider can't actually fire:
     //   • hand has < 1 card to spend (the just-tutored card is the
@@ -207,7 +211,9 @@ module.exports = {
       if (i === tutoredHandIdx) return acc;
       return acc + 1;
     }, 0);
-    if (spendable < 1 || hostSlots.length === 0) {
+    // "You can only control 1 ..." (Phoenix, Familiar): die Beschwoerung wuerde
+    // verweigert - den Zusatz nicht anbieten, sonst Abwurfkosten fuer nichts (A04-cute-10).
+    if (spendable < 1 || hostSlots.length === 0 || engine.nurEinerSchonKontrolliert(pi, chosenName)) {
       engine.sync();
       return true;
     }
@@ -273,7 +279,8 @@ module.exports = {
       const zones = hostSlots.map(h => ({
         heroIdx: h.heroIdx, slotIdx: h.slotIdx,
         ...(h.owner != null ? { owner: h.owner } : {}),   // Kontrolle statt Seite (Styx 28.9.)
-        label: `Support ${h.slotIdx + 1}`,
+        label: `Support ${h.slotIdx + 1}${h.shared ? ` (×${h.stackDepth})` : ''}`,
+        ...(h.shared ? { shared: true, stackDepth: h.stackDepth } : {}),   // W63a: geteilte Zone (Alice) vorn, mit Kennzeichen
       }));
       const zp = await engine.promptGeneric(pi, {
         type: 'zonePick',
@@ -289,6 +296,7 @@ module.exports = {
       chosenName, feld, slot.heroIdx, slot.slotIdx,   // Kontrolle statt Seite (Styx 28.9.): physische Seite des Helden
       {
         source: CARD_NAME,
+        alsZusatzaktion: true,   // "as an additional Action" ist eine Aktion (A04-cute-24)
         ...(feld !== pi ? { controller: pi } : {}),
         hookExtras: {
           _summonedBy: CARD_NAME,

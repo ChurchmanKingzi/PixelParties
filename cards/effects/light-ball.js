@@ -138,7 +138,7 @@ module.exports = {
 
       await engine.runHooks('onCardEnterZone', {
         enteringCard: inst, toZone: 'support', toHeroIdx: destHero,
-        _skipReactionCheck: true,
+        _skipReactionCheck: true, _anhaengselAnleger: pi,
       });
 
       // ── On-attach cleanse ──
@@ -180,7 +180,7 @@ module.exports = {
         // creature-status convention).
         const keys = engine.getCleansableCreatureStatusKeys(allyInst);
         if (keys.length === 0) continue;
-        const removed = engine.cleanseCreatureStatuses(
+        const removed = await engine.cleanseCreatureStatusesGefragt(
           allyInst, keys, CARD_NAME,
         );
         if ((removed || []).length === 0) continue;

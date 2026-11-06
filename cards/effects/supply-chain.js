@@ -6,7 +6,19 @@
 //  Can only be used while player has <7 cards.
 // ═══════════════════════════════════════════
 
+const { drawWouldBeBlocked } = require('./_draw-block-shared');
+
 module.exports = {
+  // Z6 (S03-24): der Zug ist der EINZIGE Nutzen - unter Hand-/Zieh-Sperre nicht spielbar (Praezedenz Brilliant Idea)
+  // und, wie bei Haste/Wheels, gesperrt, wenn Tuscan Artist genau diesen 2er-/3er-Zug negieren wuerde.
+  blockedByHandLock: true,
+  blockedByDrawLock: true,
+  canPlayWithHero(gs, pi, heroIdx, cardData, engine) {
+    const hand = gs.players[pi]?.hand || [];
+    const drawCount = 7 - (hand.length - (hand.includes('Supply Chain') ? 1 : 0));
+    return !drawWouldBeBlocked(engine, pi, drawCount);
+  },
+
   // ★ v1288: spielbar nur, wenn danach wirklich gezogen wird. Liegt eine
   // Supply Chain in der Hand, zaehlt sie dort mit (daher < 8). Liegt KEINE
   // in der Hand, kann sie nur aus der Creation Zone kommen (True Fairy

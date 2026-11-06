@@ -63,7 +63,7 @@ function kandidaten(engine, pi, maxLevel) {
 function maxLevelFuer(engine, ctxOrPi, heroIdx, feld) {
   const gs = engine.gs;
   const ps = gs.players[feld];
-  const stufe = engine.countAbilitiesForSchool('Magic Arts', ps?.abilityZones?.[heroIdx] || []);
+  const stufe = engine.heroSchoolLevel('Magic Arts', feld, heroIdx);   // W4a: harte Negierung -> Stufe 0
   return Math.max(1, Math.min(stufe, 3));
 }
 

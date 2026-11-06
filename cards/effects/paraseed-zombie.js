@@ -67,26 +67,32 @@ module.exports = {
     // „by an opponent's card or effect\" — die Quelle muss der
     // Gegenseite gehoeren. Eigener Rueckstoss und eigenes Gift
     // zaehlen nicht.
-    const quellSeite = source?.owner ?? source?.controller;
+    const quellSeite = source?.controller ?? source?.owner;   // Z1 (A08-21): Kontrolle, nicht Besitzer/Brettseite (gestohlene Kreatur)
     if (!Number.isInteger(quellSeite) || quellSeite === ownerIdx) return false;
 
     // „a Hero you control\" — nach Kontrolle, nicht nach Spalte.
     if (engine.heroSideOf(ownerIdx, target) !== ownerIdx) return false;
 
     // Wirkbarkeit (Decay Magic Lv1) am betroffenen Helden.
+    // W20c (Al 20.10.): ein uebernommener Zielheld der Gegenspalte (Brettseite `seite` ≠ Kontrolleur `ownerIdx`) wirkt mit SEINEN Schulen/Stufen;
+    // die Paraseed landet in SEINER Zone — das setzt das Beschwoerungsrecht der Uebernahme voraus (`kontrollRechte`).
     const cd = engine._getCardDB()[CARD_NAME];
-    if (!cd || !engine.heroMeetsLevelReq(ownerIdx, heroIdx, cd)) return false;
+    const seite = engine._findHeroOwner(target);
+    if (!cd || !engine.heroMeetsLevelReq(seite, heroIdx, cd, seite !== ownerIdx ? { levelSourcePi: ownerIdx } : undefined)) return false;
+    if (seite !== ownerIdx && !engine.kontrollRechte(seite, heroIdx).beschwoeren) return false;
 
     // „and if you do\": ohne Paraseed und ohne freie Zone kein Effekt.
-    if (!findeParaseed(engine, ownerIdx)) return false;
-    if (freeSlotOnHero(engine, ownerIdx, heroIdx) < 0) return false;
+    const _fundPruef = findeParaseed(engine, ownerIdx);
+    if (!_fundPruef) return false;
+    if (freeSlotOnHero(engine, seite, heroIdx, _fundPruef.name, ownerIdx) < 0) return false;   // W63a: frei oder (Alice-Teilung) die Zone einer gleichnamigen Paraseed
     return true;
   },
 
   async preDamageResolve(engine, ownerIdx, target, heroIdx /*, source, amount, type */) {
     const ps = engine.gs.players[ownerIdx];
     const fund = findeParaseed(engine, ownerIdx);
-    const slot = freeSlotOnHero(engine, ownerIdx, heroIdx);
+    const seite = engine._findHeroOwner(target);    // W20c: Brettseite des Nutzers (uebernommener Held der Gegenspalte moeglich)
+    const slot = fund ? freeSlotOnHero(engine, seite, heroIdx, fund.name, ownerIdx) : -1;   // W63a: geteilte Zone (Alice) zuerst, dann die erste freie
     if (!fund || slot < 0) return null;             // Bedingung war erfuellt, Brett hat sich gedreht
 
     if (fund.from === 'deck') {
@@ -98,6 +104,7 @@ module.exports = {
         owner: ownerIdx, cardName: fund.name,
         from: 'deck', to: 'support',
         toHeroIdx: heroIdx, toSlotIdx: slot,
+        ...(seite !== ownerIdx ? { toOwner: seite } : {}),
       });
       engine.sync();
       await engine._delay(520);
@@ -107,6 +114,7 @@ module.exports = {
       source: fund.from === 'hand' ? 'hand' : 'deck',
       sourceName: CARD_NAME,
       animationType: 'poison_splash',
+      ...(seite !== ownerIdx ? { heldSeite: seite } : {}),
       ...(fund.from === 'deck' ? { hookExtras: engine.deckHookExtras() } : {}),   // v1393
     });
     if (fund.from === 'deck') engine.shuffleDeck(ownerIdx, 'main');
@@ -114,7 +122,7 @@ module.exports = {
     // Das Gift der frisch gelegten Paraseed (der Eintritts-Hook legt
     // es bereits auf; der Abgleich ist die Sicherung fuer den Fall,
     // dass die Platzierung ohne Hooks lief).
-    await syncParaseedPoison(engine, ownerIdx, heroIdx);
+    await syncParaseedPoison(engine, seite, heroIdx);
 
     // „that Hero's HP drop to 1 instead\" — Ersetzung, kein Deckel.
     target.hp = 1;

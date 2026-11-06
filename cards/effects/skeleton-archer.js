@@ -19,6 +19,7 @@
 //  effect.
 // ═══════════════════════════════════════════
 
+const { istHeldOderKreatur } = require('./_targeting-shared');
 const CARD_NAME = 'Skeleton Archer';
 const DAMAGE = 50;
 
@@ -59,6 +60,7 @@ function collectArcherTargets(engine) {
   for (const inst of engine.cardInstances) {
     if (inst.counters?.immovable) continue;
     if (inst.zone === 'support' && !inst.faceDown) {
+      if (!istHeldOderKreatur(engine, inst)) continue;   // „a target": Held oder Kreatur (Al, 25.10.) - keine Ausruestung, kein Anhaengsel
       targets.push({
         id: `equip-${inst.owner}-${inst.heroIdx}-${inst.zoneSlot}`,
         type: 'equip',

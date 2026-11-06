@@ -18,6 +18,7 @@
 //  as a Skeleton automatically.
 // ═══════════════════════════════════════════
 
+const { anyName } = require('./_alias-name');   // Shroomasaur: Zusatzname zählt für Namensfamilien
 const LOYAL_ARCHETYPE = 'Loyals';
 
 /**
@@ -50,7 +51,7 @@ function countLoyalCreatures(engine, playerIdx) {
     if ((inst.controller ?? inst.owner) !== playerIdx) continue;
     if (inst.zone !== 'support') continue;
     if (inst.faceDown) continue;
-    if (!isLoyalCreature(inst.name, engine, inst)) continue;
+    if (!anyName(inst, (n) => isLoyalCreature(n, engine, inst))) continue;
     n++;
   }
   return n;

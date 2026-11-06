@@ -112,7 +112,7 @@ module.exports = {
     const heroIdx = promptData._hostHeroIdx ?? -1;
     if (heroIdx < 0) return { confirmed: true };
     const ziele = creaturesUnderHero(engine, oppIdx, heroIdx);
-    const kills = ziele.filter(z => (z.counters?.currentHp ?? 0) <= AOE_DAMAGE).length;
+    const kills = ziele.filter(z => engine.creatureCurrentHp(z) <= AOE_DAMAGE).length;   // Z5: unversehrt = gedruckte HP (A02-29)
     return { confirmed: kills >= 1 || ziele.length >= 2 };
   },
 

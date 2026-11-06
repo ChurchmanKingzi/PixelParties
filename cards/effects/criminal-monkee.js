@@ -78,6 +78,15 @@ function wirtKannAusgeruestetWerden(ps, heroIdx) {
   return heroCanBeEquipped(ps?.heroes?.[heroIdx]);
 }
 
+/**
+ * Platz fuer das Non-Fungible Monkee beim Wirtshelden (Brettseite `feld`): bei einem Helden mit Equip-Stapel (Darion) NUR der Stapel — dort braucht es
+ * keine freie Zone —, sonst die erste freie Zone. -1 = kein Platz.
+ */
+function ausruestPlatz(engine, feld, heroIdx) {
+  const stapel = engine.equipPflichtPlatz(feld, heroIdx, NFM);
+  return stapel >= 0 ? stapel : freeSlotOn(engine.gs.players[feld], heroIdx);
+}
+
 module.exports = {
   activeIn: ['hand', 'support'],
   creatureEffect: true,
@@ -100,10 +109,10 @@ module.exports = {
     if (!wirtKannAusgeruestetWerden(hps, ctx.cardHeroIdx)) return false;
     // v343 (Als Auftrag): die zweite Faehigkeit kostet 4 INVEST COUNTER
     // statt 4 Gold. Der Beschwoerungs-Trigger unten bleibt bei Gold.
-    if (investHoptUsed(engine.gs, ctx.card)) return false;
+    if (!ctx._borrowedUse && investHoptUsed(engine.gs, ctx.card)) return false;   // W12 (Q5): geliehene Verwendung ignoriert das eigene Einmal-Limit
     if (heroesWithInvest(ps, INVEST_COST).length === 0) return false;
     if (!nfmImDeck(ps)) return false;
-    return freeSlotOn(hps, ctx.cardHeroIdx) >= 0;
+    return ausruestPlatz(engine, ctx.cardHeroOwner ?? ctx.cardOwner, ctx.cardHeroIdx) >= 0;
   },
 
   async onCreatureEffect(ctx) {
@@ -121,10 +130,10 @@ module.exports = {
     // nur das Angebot, ein manipulierter Client koennte die Aktivierung
     // trotzdem schicken.
     if (!wirtKannAusgeruestetWerden(hps, heroIdx)) return false;
-    if (investHoptUsed(gs, ctx.card)) return false;
+    if (!ctx._borrowedUse && investHoptUsed(gs, ctx.card)) return false;
     if (heroesWithInvest(ps, INVEST_COST).length === 0) return false;
     if (!nfmImDeck(ps)) return false;
-    if (freeSlotOn(hps, heroIdx) < 0) return false;
+    if (ausruestPlatz(engine, feld, heroIdx) < 0) return false;
 
     const bestaetigt = await engine.promptGeneric(pi, {
       type: 'confirm',
@@ -140,7 +149,7 @@ module.exports = {
     if (!bestaetigt || bestaetigt.cancelled) return false;
 
     const bezahlt = await payInvestCounters(engine, pi, INVEST_COST, CARD_NAME);
-    if (bezahlt) markInvestHopt(gs, ctx.card);
+    if (bezahlt && !ctx._borrowedUse) markInvestHopt(gs, ctx.card);   // W13 (Al, Rueckfrage 9)
     if (!bezahlt) return false;
 
     // Zustand nach der Zahlung neu pruefen — `afterResourceSpend` kann
@@ -150,7 +159,7 @@ module.exports = {
       engine.log('criminal_monkee_fizzle', { player: ps.username, reason: 'no_nfm_in_deck' });
       return true;                                    // bezahlt ist bezahlt
     }
-    const slot = freeSlotOn(hps, heroIdx);
+    const slot = ausruestPlatz(engine, feld, heroIdx);
     if (slot < 0) {
       engine.log('criminal_monkee_fizzle', { player: ps.username, reason: 'no_free_zone' });
       return true;
@@ -170,7 +179,7 @@ module.exports = {
     // selbst (Ablage) dem Spieler, aus dessen Deck sie kam.
     const platz = engine.safePlaceInSupport(NFM, feld, heroIdx, slot);
     if (!platz?.inst) {
-      ps.discardPile.push(NFM);
+      engine.handKartenBesitzerPs(ps, NFM).discardPile.push(NFM);   // W63c: Ablage des permanenten Besitzers
       engine.log('criminal_monkee_fizzle', { player: ps.username, reason: 'place_refused' });
       return true;
     }
@@ -206,7 +215,7 @@ module.exports = {
       if (gs.hoptUsed?.[HOPT_KEY(pi)] === gs.turn) return;
       if (gs[RESOLVING]?.[pi]) return;
       if (!(ps.hand || []).includes(CARD_NAME)) return;
-      if ((ps.gold || 0) < PRICE) return;
+      if ((ps.gold || 0) < PRICE || engine.goldSpendBlocked(pi)) return;   // G1 (A09-11): Goldsperre - "pay N Gold"
       // Kontrolle statt Seite (Styx 28.9.): auch uebernommene Helden.
       if (eligibleSummonZones(engine, pi, CARD_NAME, { nachKontrolle: true }).length === 0) return;
 

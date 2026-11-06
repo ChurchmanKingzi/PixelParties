@@ -7,7 +7,17 @@
 //  the controller's discard pile from anywhere.
 //  Adds those cards to hand instead.
 //
-//  Triggering paths covered:
+//  ★ W14b (Q150, Al: „Gift of Time soll auf **alles** reagieren
+//  können, was den Discard erreicht, inklusive zerstörter
+//  Equips/Attachments oder genutzter Surprises!"): die ENGINE meldet
+//  jede Karte, die in die Ablage des Spielers gelangt (`push`/`unshift`
+//  des Ablagestapels → `engine._ablageMeldung` → `onCardsSentToDiscard`
+//  unten), also auch gewirkte Zauber, zerstörte Ausrüstung/Attachments,
+//  ausgelöste Surprises, Tränke, Artefakte. Die drei Hooks unten bleiben
+//  als Netz (Stapel ersetzt, Hook-Kontext); doppelt Gemeldetes zählt
+//  einmal (`dedupeBatch`).
+//
+//  Triggering paths covered (historisch, jetzt Teilmenge):
 //    • Mill (deck → discard) — `onMill` hook,
 //      delivered as a batch from `actionMillCards`
 //      so multi-card mills coalesce naturally.
@@ -30,6 +40,9 @@
 //  cards; on confirm, the entire batch is spliced
 //  out of discard and pushed to hand.
 //
+//  ★ W21a (Al, 20.10.2026: ja): wie jede Hand-Reaktion braucht Time einen Wirker-Helden mit Magic Arts 2
+//  (eigener oder uebernommener; Schule/Stufe von ihm, Hand/Wisdom vom Kontrolleur).
+//
 //  Time has no proactive hand-play path —
 //  `spellPlayCondition` refuses normal hand plays
 //  so the player never spends an Action playing it
@@ -45,17 +58,20 @@ const CARD_NAME = 'Divine Gift of Time';
  * multiple cards into the discard pile (mill batch, multi-discard,
  * mass kill) gets one consolidated prompt at task end.
  */
-function queueTimeRescue(engine, ps, pi, names) {
+function queueTimeRescue(engine, ps, pi, names, viaPush) {
   if (!ps) return;
   if (ps._oncePerGameUsed?.has('divineGift')) return;
   // Time must still be in hand to spend.
   if ((ps.hand || []).indexOf(CARD_NAME) < 0) return;
+  // ★ W21a (Al, 20.10.2026: „ja"): ohne einen Wirker-Helden mit Magic Arts 2 (eigener oder uebernommener) wird die Karte nicht angeboten.
+  if (!engine.hookReaktionWirkerVorhanden(pi, CARD_NAME)) return;
   // Defensive — bail if there are no rescuable names.
   const cleaned = (names || []).filter(n => n && n !== CARD_NAME);
   if (cleaned.length === 0) return;
 
-  if (!ps._timeRescueQueue) ps._timeRescueQueue = [];
-  for (const n of cleaned) ps._timeRescueQueue.push(n);
+  const qKey = viaPush ? '_timeRescuePushQueue' : '_timeRescueQueue';
+  if (!ps[qKey]) ps[qKey] = [];
+  for (const n of cleaned) ps[qKey].push(n);
 
   if (ps._timeRescueScheduled) return;
   // Don't queue from inside MCTS rollouts — the macrotask fires AFTER
@@ -68,8 +84,9 @@ function queueTimeRescue(engine, ps, pi, names) {
   // task — the discard-loop / mill batch / death cleanup completes
   // first, then the queued names are processed as one batch.
   setTimeout(async () => {
-    const batch = ps._timeRescueQueue || [];
+    const batch = dedupeBatch(ps._timeRescuePushQueue || [], ps._timeRescueQueue || []);
     ps._timeRescueQueue = [];
+    ps._timeRescuePushQueue = [];
     ps._timeRescueScheduled = false;
     if (batch.length === 0) return;
     try {
@@ -80,11 +97,27 @@ function queueTimeRescue(engine, ps, pi, names) {
   }, 0);
 }
 
+/**
+ * Zentrale Meldung (push) plus Hook-Meldungen: was beide melden, zählt einmal. Je Name zählt die Hook-Menge nur über die
+ * Push-Menge hinaus (Hook ohne Push = Stapel wurde ersetzt / Weg ohne push).
+ */
+function dedupeBatch(pushed, hooked) {
+  const out = pushed.slice();
+  const cnt = new Map();
+  for (const n of pushed) cnt.set(n, (cnt.get(n) || 0) + 1);
+  for (const n of hooked) {
+    if ((cnt.get(n) || 0) > 0) cnt.set(n, cnt.get(n) - 1);
+    else out.push(n);
+  }
+  return out;
+}
+
 async function tryTimeRescue(engine, pi, ps, names) {
   // Re-validate each guard before the prompt — board could have
   // shifted since the events that filled the queue.
   if (ps._oncePerGameUsed?.has('divineGift')) return;
   if ((ps.hand || []).indexOf(CARD_NAME) < 0) return;
+  if (!engine.hookReaktionWirkerVorhanden(pi, CARD_NAME)) return;   // W21a: Wirker-Held mit passender Schule/Stufe (Board kann sich verschoben haben)
 
   // Only names actually still in discard are rescuable. A name might
   // have landed in discard and then been moved out again by another
@@ -116,9 +149,17 @@ async function tryTimeRescue(engine, pi, ps, names) {
   const timeHandIdx = (ps.hand || []).indexOf(CARD_NAME);
   if (timeHandIdx < 0) return;
 
+  // ★ W21a: Wirker waehlen (2+ Wirker: Picker; Abbruch = nichts passiert), vor jeder Zahlung.
+  const _wirkerPlan = await engine.hookReaktionWirkerWaehlen(pi, CARD_NAME);
+  if (!_wirkerPlan) return;
+  if (ps._oncePerGameUsed?.has('divineGift')) return;
+  if ((ps.hand || []).indexOf(CARD_NAME) < 0) return;
+
   // Mark Divine Gift used now to block re-entry.
   if (!ps._oncePerGameUsed) ps._oncePerGameUsed = new Set();
   ps._oncePerGameUsed.add('divineGift');
+  // ★ W21a: Wisdom-Abwurf des Wirkers (Hand des Kontrolleurs), solange Time selbst noch auf der Hand liegt (zaehlt nicht als Abwurf).
+  await engine.hookReaktionWisdomZahlen(pi, CARD_NAME, _wirkerPlan);
 
   // Screen-wide clock-rewinding burst — fires once per activation,
   // regardless of batch size. Plays in parallel with the per-card
@@ -184,7 +225,7 @@ async function tryTimeRescue(engine, pi, ps, names) {
       fromHandIdx: ti, asPlay: 'sole',
     });
     engine.takeFromPileSync(ps, 'hand', ti);
-    ps.discardPile.push(CARD_NAME);
+    engine.handKartenBesitzerPs(ps, CARD_NAME).discardPile.push(CARD_NAME);   // W3/W5a: Stapel des permanenten Besitzers
     // ★★ v1222: Abgleich SOFORT nach dem Hand-Abgang. Der Client verdeckt den
     // Startplatz der abfliegenden Karte nur, solange die Hand noch so
     // gross ist wie beim Abflug — bleibt der `sync` aus, taucht sie
@@ -221,6 +262,10 @@ module.exports = {
     if (promptData?.type === 'confirm') return { confirmed: true };
     return undefined;
   },
+  // ★ W14b (Q150): Meldung der Engine für JEDE Karte, die in die Ablage von `pi` gelangt (`engine._ablageMeldung`).
+  onCardsSentToDiscard(engine, pi, names) {
+    queueTimeRescue(engine, engine.gs.players[pi], pi, names, true);
+  },
   oncePerGame: true,
   oncePerGameKey: 'divineGift',
   activeIn: ['hand'],
@@ -251,7 +296,8 @@ module.exports = {
      */
     onDiscard: async (ctx) => {
       if (ctx.playerIdx !== ctx.cardOwner) return;
-      const name = ctx.cardName || ctx.discardedCardName;
+      // `ctx.cardName` ist im Listener der Name der LAUSCHENDEN Karte (Time selbst, wird unten ausgefiltert) — der abgeworfene steht in `discardedCardName`.
+      const name = ctx.discardedCardName || ctx.cardName;
       if (!name) return;
       queueTimeRescue(ctx._engine, ctx.players[ctx.cardOwner], ctx.cardOwner, [name]);
     },
@@ -265,6 +311,9 @@ module.exports = {
     onCreatureDeath: async (ctx) => {
       const c = ctx.creature;
       if (!c) return;
+      // D1 (Baustein-Phase): wird der Kadaver GELOESCHT (Ghazma, Ankhota, Root, Vacarn, Bonegrinder …), beansprucht oder gerettet, kommt er nie in die Ablage —
+      // `ziel` nennt, wohin die Karte ging (fehlt es, wie bisher annehmen: Ablage). Sonst bot Time eine aeltere gleichnamige Karte aus der Ablage an.
+      if (c.ziel !== undefined && c.ziel !== 'discard') return;
       const corpseOwner = c.originalOwner ?? c.owner;
       if (corpseOwner !== ctx.cardOwner) return;
       const name = c.name || c.cardName;

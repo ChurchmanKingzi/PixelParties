@@ -85,7 +85,10 @@ async function loeschen(engine, inst, grund) {
   await engine.anhaengselAbraeumen(inst, { name: grund });
 }
 
-const geteilt = anhaengselStatusHooks(CARD_NAME, 'negated', { heilenWirftAb: true });
+// S1 (C05-10): „effect AND Abilities are negated" = harte Form. Die Marke `abilitiesNegated` am Status
+// (Leser: `engine.heroAbilitiesNegated`) blendet die Abilities des Wirts aus — heilbar bleibt er wie jeder Status.
+const HARTE_NEGIERUNG = { abilitiesNegated: true };
+const geteilt = anhaengselStatusHooks(CARD_NAME, 'negated', { heilenWirftAb: true, statusExtras: HARTE_NEGIERUNG });
 
 module.exports = {
   playOnAnyHeroSide: true,
@@ -95,6 +98,7 @@ module.exports = {
   attachmentStatus: 'negated',
   countsAsNegativeStatus: true,
   deleteOnCleanse: true,
+  negatesAllHostAbilities: true,   // S1: Abilities des Wirts zaehlen nicht (Puzzle-Start/Tea-Umzug lesen den Vertrag)
   unaffectedByOthers: true,   // Puzzle-Start setzt `_cardinalImmune` (server.js)
   negativeStatusLabel: 'Negated (Stowaway)',
   negativeStatusIcon: '🧳',
@@ -172,7 +176,7 @@ module.exports = {
       inst.counters._cardinalImmune = true;
 
       // Der Held dieser Zone wird negiert (echter, heilbarer Status).
-      const ok = setzeAnhaengselStatus(engine, inst.owner, inst.heroIdx, CARD_NAME, 'negated');
+      const ok = setzeAnhaengselStatus(engine, inst.owner, inst.heroIdx, CARD_NAME, 'negated', HARTE_NEGIERUNG);
       if (!ok) { await loeschen(engine, inst, 'no_host'); return; }   // Hero Zone ohne lebenden Helden: nichts zu negieren
       engine._broadcastEvent('play_zone_animation', { type: 'stowaway_tentacles', owner: inst.owner, heroIdx: inst.heroIdx, zoneSlot: -1, duration: 4300 });   // rosa Tentakel umklammern den Wirt
       engine.log('stowaway_negates', {

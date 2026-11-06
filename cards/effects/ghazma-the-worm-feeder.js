@@ -51,7 +51,7 @@ module.exports = {
       const indizes = [];
       (ps.deletedPile || []).forEach((n, k) => {
         const cd = db[n];
-        if (cd && hasCardType(cd, 'Creature') && zuege[k] < gs.turn) indizes.push(k);
+        if (cd && hasCardType(cd, 'Creature') && !hasCardType(cd, 'Token') && zuege[k] < gs.turn) indizes.push(k);   // Z5 (H02-15): Tokens sind keine Karten, sie bleiben gelöscht
       });
       const zurueck = [];
       for (let k = indizes.length - 1; k >= 0; k--) {

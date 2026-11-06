@@ -46,6 +46,7 @@
  * Module lesen ihren Schluessel von hier, damit das nicht auseinander
  * laufen kann.
  */
+const { anyName } = require('./_alias-name');   // Shroomasaur: Zusatzname zählt für Namensfamilien
 const TRIAL_KEYS = {
   'Trial of Annoyance': 'trialOfAnnoyance',
   'Trial of Coolness': 'trialOfCoolness',
@@ -79,7 +80,7 @@ function isTrialOfName(cardName) {
 
 /** „Trial of"-Karte UND Spell? (Knowledge zaehlt nur Spells.) */
 function isTrialOfSpell(cardData) {
-  return !!cardData && cardData.cardType === 'Spell' && isTrialOfName(cardData.name);
+  return !!cardData && cardData.cardType === 'Spell' && anyName(cardData, (n) => isTrialOfName(n));
 }
 
 /**

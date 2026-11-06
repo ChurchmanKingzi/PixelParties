@@ -38,7 +38,7 @@ module.exports = {
    */
   canActivateCreatureEffect(ctx) {
     // Soft once-per-turn (per Swagdri instance).
-    if (ctx.card?.counters?.[HOPT_KEY] === ctx._engine.gs.turn) return false;
+    if (!ctx._borrowedUse && ctx.card?.counters?.[HOPT_KEY] === ctx._engine.gs.turn) return false;   // W12 (Q5): geliehene Verwendung ignoriert den Stempel
     const engine = ctx._engine;
     const gs = engine.gs;
     const pi = ctx.cardOwner;
@@ -59,8 +59,11 @@ module.exports = {
         const hero = ps.heroes[hi];
         if (!hero?.name || hero.hp <= 0) continue;
         if (hero.statuses?.frozen) continue;
+        // W16c (A04-04): „as if it was part of your hand" — nur die KOSTEN entfallen, die Spielbedingung der Ausrüstung
+        // (`canEquipToHero`, z. B. Crescent Moon: mind. 1 New Moon auf dem Brett) gilt weiter.
+        if (!engine.canEquipCardToHero(top, pi, hi)) continue;
         const slots = ps.supportZones?.[hi] || [];
-        if (slots.some(s => !s || s.length === 0)) return true;
+        if (slots.some(s => !s || s.length === 0) || engine.equipPflichtPlatz(pi, hi, top) >= 0) return true;   // Darion: der Equip-Stapel zaehlt als Platz
       }
       return false;
     }
@@ -96,14 +99,18 @@ module.exports = {
   async onCreatureEffect(ctx) {
     const engine = ctx._engine;
     const pi = ctx.cardOwner;
-    if (ctx.card?.counters?.[HOPT_KEY] === engine.gs.turn) return false;
+    if (!ctx._borrowedUse && ctx.card?.counters?.[HOPT_KEY] === engine.gs.turn) return false;
     const top = engine.getCoolnessStackTop(pi);
     if (!top) return false;
     const cardDB = engine._getCardDB();
     const cd = cardDB[top];
     if (cd?.cardType !== 'Artifact') return false;
     if (!ctx.card.counters) ctx.card.counters = {};
-    ctx.card.counters[HOPT_KEY] = engine.gs.turn;
+    if (!ctx._borrowedUse) ctx.card.counters[HOPT_KEY] = engine.gs.turn;   // W13 (Al, Rueckfrage 9): geliehen = Stempel bleibt (und Abbruch loescht keinen fremden Stempel)
+    // ★ Z7 (A04-05): Abbruch/Fehlschlag VOR der Zusage verbraucht die Einmal-Nutzung NICHT (Regel 23.9) —
+    // der Zählerstempel geht zurück, und `false` hält auch die Engine-Rundensperre offen (ein blankes
+    // `return;` gilt dort als Erfolg).
+    const abbruch = () => { if (!ctx._borrowedUse) delete ctx.card.counters[HOPT_KEY]; return false; };
 
     const ps = engine.gs.players[pi];
 
@@ -115,15 +122,18 @@ module.exports = {
         if (!hero?.name || hero.hp <= 0) continue;
         // Frozen Heroes can't accept new equipment.
         if (hero.statuses?.frozen) continue;
+        if (!engine.canEquipCardToHero(top, pi, hi)) continue;   // W16c (A04-04): Spielbedingung bleibt (nur Kosten entfallen)
         const slots = ps.supportZones?.[hi] || [];
         let leftmostFree = -1;
+        const _stapel = engine.equipPflichtPlatz(pi, hi, top);   // Darion: der Equip-Stapel ist der einzige Platz
         for (let si = 0; si < slots.length; si++) {
-          if (!slots[si] || slots[si].length === 0) {
+          if (_stapel >= 0 ? si === _stapel : (!slots[si] || slots[si].length === 0)) {
             if (leftmostFree < 0) leftmostFree = si;
             targets.push({
               id: `equip-${pi}-${hi}-${si}`,
               type: 'equip',
               owner: pi, heroIdx: hi, slotIdx: si, cardName: '',
+              ...(_stapel >= 0 ? { _eigeneStapelWahl: true } : {}),   // Darion: Platzwahl, keine Kartenwahl — keine Rueckfrage „welches Equip?"
             });
           }
         }
@@ -136,7 +146,7 @@ module.exports = {
           });
         }
       }
-      if (targets.length === 0) return;
+      if (targets.length === 0) return abbruch();
       const pick = await engine.promptEffectTarget(pi, targets, {
         maxTotal: 1,   // Einfachauswahl: ein Klick TAUSCHT das Ziel
         title: CARD_NAME,
@@ -147,9 +157,9 @@ module.exports = {
         exclusiveTypes: true,
         maxPerType: { hero: 1, equip: 1 },
       });
-      if (!pick || pick.length === 0) return;
+      if (!pick || pick.length === 0) return abbruch();
       const sel = targets.find(t => t.id === pick[0]);
-      if (!sel) return;
+      if (!sel) return abbruch();
       const heroIdx = sel.heroIdx;
       const slotIdx = sel.type === 'hero' ? sel._autoSlot : sel.slotIdx;
 
@@ -162,7 +172,7 @@ module.exports = {
       await engine._delay(620);
 
       const popped = await ctx.popCoolnessStackTo(pi, 'board', { source: CARD_NAME });
-      if (!popped) return;
+      if (!popped) return abbruch();
       const placed = engine.safePlaceInSupport(top, pi, heroIdx, slotIdx);
       if (!placed?.inst) return;
       placed.inst.zone = 'support';
@@ -193,21 +203,11 @@ module.exports = {
     // (Cute Cheese-style self-effects). Strategy: load the artifact's
     // own resolution path and invoke it for free.
     //
-    // Cost bypass — Swagdri's text says "without paying its Cost", and
-    // for `manualGoldCost` artifacts (Book of Doom's per-target scaling)
-    // the resolve does its own gold deduction. We can't intercept that
-    // cleanly, so we bump the player's gold by a generous headroom
-    // before resolving and restore the original value afterwards. Net
-    // effect: any deduction made by the resolve is undone, leaving the
-    // player at their pre-Swagdri gold total. Headroom is the artifact's
-    // base cost × the targeting maxTotal (capped at 99 per the
-    // `manualGoldCost` convention) so even an "all-in" Book of Doom on
-    // 99 targets fits.
+    // Cost bypass — Swagdri's text says "without paying its Cost":
+    // siehe Gratis-Scope weiter unten.
     const { loadCardEffect } = require('./_loader');
     const script = loadCardEffect(top);
-    if (!script) return;
-
-    const baseCost = cd?.cost || 0;
+    if (!script) return abbruch();
 
     // Build validTargets + config for targeting artifacts.
     const isTargetingArtifact = !!(script.getValidTargets && script.targetingConfig);
@@ -232,15 +232,15 @@ module.exports = {
       // board targets, just deck searches) declare `alwaysConfirmable`
       // so the confirm fires with 0 selections. Don't bail on empty
       // validTargets in that case.
-      if (validTargets.length === 0 && !config.alwaysConfirmable) return;
+      if (validTargets.length === 0 && !config.alwaysConfirmable) return abbruch();
 
       const pick = await engine.promptEffectTarget(pi, validTargets, config);
-      if (pick == null) return; // null/undefined = cancel
+      if (pick == null) return abbruch(); // null/undefined = cancel
       // Empty `pick` is OK iff alwaysConfirmable (the user confirmed
       // with no selections — Magnetic Glove's deck-search flow).
-      if (pick.length === 0 && !config.alwaysConfirmable) return;
+      if (pick.length === 0 && !config.alwaysConfirmable) return abbruch();
       if (pick.length > 0 && script.validateSelection
-          && !script.validateSelection(pick, validTargets)) return;
+          && !script.validateSelection(pick, validTargets)) return abbruch();
       selectedIds = pick;
     }
 
@@ -249,29 +249,23 @@ module.exports = {
     // mode='pop' dest='board' so the client unmasks the new Stack top
     // synchronously when the next sync arrives.
     const popped = await ctx.popCoolnessStackTo(pi, 'board', { source: CARD_NAME });
-    if (!popped) return;
+    if (!popped) return abbruch();
     engine.sync();
 
-    // Cost bypass via gold save/restore.
-    // `_goldFreeze` masks the inflated value in sendGameState so the
-    // client's diff-detector never sees the +headroom bump or the
-    // -headroom restore. Without this freeze the player would see
-    // a -999 (or larger) red floater above the gold counter.
-    const origGold = ps.gold || 0;
-    const headroom = Math.max(baseCost * 99, 999);
-    ps._goldFreeze = origGold;
-    ps.gold = origGold + headroom;
+    // Kosten umgehen ueber den Gratis-Scope (`engine.kostenlosSpielen`):
+    // fuer `pi` ist `canAffordGold` wahr und `_payCardCost` bucht nichts
+    // ab – auch Artifacts mit eigener Kostenrechnung (manualGoldCost)
+    // zahlen nichts. Frueher: Gold sichern/zuruecksetzen, das jeden
+    // Gold-GEWINN des Artifacts mit verwarf (A04-cute-03, Golden Bananas).
     try {
       if (script.resolve) {
-        await script.resolve(engine, pi, selectedIds, validTargets);
+        await engine.kostenlosSpielen(pi, async () => {
+          await script.resolve(engine, pi, selectedIds, validTargets);
+        });
       }
     } catch (err) {
       console.error('[Swagdri] artifact resolve error:', err?.message);
     }
-    // Restore gold and clear the freeze so subsequent gold changes
-    // (gains/losses outside the Swagdri play) animate normally.
-    ps.gold = origGold;
-    delete ps._goldFreeze;
 
     // Route the artifact to deletedPile (per Swagdri's text). The
     // synthetic flow never put it in hand, so there's no hand splice

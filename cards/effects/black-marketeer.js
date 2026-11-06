@@ -54,16 +54,12 @@ function markiereBeschworen(ctx) {
   ps._marketeerSummoned = true;
 }
 
-/** Eindeutige Namensliste der eigenen Ablage als Galerie. */
+/**
+ * Die eigene Ablage als Galerie - W16d (C01-04): JEDE Karte ist ein eigener Eintrag (kein Entdoppeln), denn „up to 5 cards"
+ * zählt Karten, nicht Namen: fünf gleiche Karten sind fünf Wahlen (Muster der Guardian-Beast-Ablagewahl).
+ */
 function ablageGalerie(ps) {
-  const gesehen = new Set();
-  const galerie = [];
-  for (const n of (ps?.discardPile || [])) {
-    if (gesehen.has(n)) continue;
-    gesehen.add(n);
-    galerie.push({ name: n, source: 'discard' });
-  }
-  return galerie;
+  return (ps?.discardPile || []).map(n => ({ name: n, source: 'discard' }));
 }
 
 /** Gemeinsamer Ablauf: Karten waehlen, mischen, Gold gutschreiben. */
@@ -82,7 +78,7 @@ async function recycleUndGold(ctx, maxPicks, titelZusatz) {
     cancellable: true,
     menuSource: CARD_NAME,
   });
-  const gewaehlt = wahl?.selectedCards || [];
+  const gewaehlt = (wahl?.selectedCards || []).slice(0, maxPicks);   // W16d: nie mehr als erlaubt, auch wenn mehr zurückkommen
   if (!gewaehlt.length) return 0;
 
   const recycelt = await engine.actionRecycleCards(pi, gewaehlt, {
@@ -120,6 +116,23 @@ module.exports = {
   },
 
   /**
+   * W16d (C01-03): Klausel 3 auch am Beschwörungstor (Muster Crum/Albrecht): Effekte, die die Karte aus Ablage/Deck beschwören
+   * (Forceful Revival, Necromancy …), laufen durch `beforeSummon` und werden abgewiesen, ohne `canSummon` zu fragen.
+   */
+  async beforeSummon(ctx) {
+    return !schonBeschworen(ctx?._engine?.gs, ctx?.cardOwner);
+  },
+
+  /**
+   * W16d (C01-03): dieselbe Klausel für Platzierungen durch Effekte (Forceful Revival …) – Vorgabe 25.8.: „zählt JEDE Beschwoerung
+   * von ueberall, auch durch Effekte" (Welle 10, Q47: „place" ist eine Subform von „summon"). `actionPlaceCreature` fragt
+   * `_eintrittsLimitErreicht` vor jeder Entnahme.
+   */
+  eintrittsLimitErreicht(engine, pi) {
+    return schonBeschworen(engine?.gs, pi);
+  },
+
+  /**
    * Klausel 2: einmal je Zug eine Karte recyceln.
    * Die Einmal-je-Zug-Sperre setzt die ENGINE selbst
    * (`hoptUsed['creature-effect:<id>']`), sobald wir `true`
@@ -149,11 +162,15 @@ module.exports = {
 
       const engine = ctx._engine;
       const ps = engine.gs.players[ctx.cardOwner];
-      if (!ps || !(ps.discardPile || []).length) return;
+      if (!ps || !(ps.discardPile || []).length) return ctx._engine.summonEffektFizzelt(ctx.card, ctx.cardName, { stumm: true });   // W11/R4: wirkt nicht → Blob stumm
+      // Al, Welle 10 (Q54): Distracting Crystal auf der Hand sperrt auch den
+      // Einsatz-Effekt (Ablage ins Deck) — nicht angeboten, die Beschwoerung gilt.
+      if (require('./_crystals-shared').shuffleIntoDeckBlocked(engine, ctx.cardOwner)) return engine.summonEffektFizzelt(ctx.card, ctx.cardName, { stumm: true });   // W11/R4
 
-      await recycleUndGold(ctx, MAX_PICKS,
+      const _recycelt = await recycleUndGold(ctx, MAX_PICKS,
         `Shuffle up to ${MAX_PICKS} cards from your discard pile back into your deck `
         + `and gain ${GOLD_JE} Gold each.`);
+      if (!_recycelt) await engine.summonEffektFizzelt(ctx.card, ctx.cardName, { stumm: true });   // W11/R4: nichts gewählt/recycelt → Blob stumm
     },
   },
 

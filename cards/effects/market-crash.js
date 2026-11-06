@@ -101,6 +101,9 @@ function flushPending(engine, pi, fired) {
 }
 
 module.exports = {
+  // ★ Welle 11 (Q66, Al): trifft den Gegner nur mit Nicht-Schadens-Effekten (Gold zurücksetzen) — gegen den durch die Erste-Runden-Immunität
+  // geschützten Spieler unspielbar (`engine.ersterZugGeschuetzt`, Sperr-Stutzen `_cardBlockedBySearchLock`).
+  blockedByFirstTurnProtection: true,
   // BEWUSST KEIN `activeIn`. Kein einziger Normal-Spell im Bestand
   // deklariert eins (Quick Attack, Cool Rescue, Voice in your Head,
   // Graveyard Gathering, Gigantisaur Stomp — alle ohne), und mit

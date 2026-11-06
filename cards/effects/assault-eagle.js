@@ -70,6 +70,7 @@ async function schlagen(ctx, targets, amount, source) {
   const pi = ctx.cardOwner;
   await engine.beginAoeStrike(targets.length, {
     creatures: targets.filter(t => t.type !== 'hero').map(t => t.cardInstance).filter(Boolean),
+    heroes: targets.filter(t => t.type === 'hero'),   // W78 (Pythia): Helden, die dieser Schlag faellt, sind todgeweiht
     source, amount, type: 'creature', sourceOwner: pi,
   });
   try {
@@ -111,7 +112,18 @@ module.exports = {
     return [...helden, ...creatures].slice(0, config?.maxTotal ?? MAX_TARGETS).map(t => t.id);
   },
 
+  // ★ Welle 11 (Q71, Al): beide Salven (auch die Antwort-Salve des Gegners) zaehlen fuer Angler Angel als EIN gleichzeitiger Effekt —
+  // jeder Treffer +50. Die Gruppe haengt am Engine-Feld `_anglerGruppe` (gelesen von angler-angel.js `darfErhoehen`).
   async onCreatureEffect(ctx) {
+    const engine = ctx._engine;
+    const gruppe = {};
+    const vorher = engine._anglerGruppe;
+    engine._anglerGruppe = gruppe;
+    try { return await module.exports._wirke(ctx); }
+    finally { engine._anglerGruppe = vorher || null; }
+  },
+
+  async _wirke(ctx) {
     const engine = ctx._engine;
     const gs = engine.gs;
     const pi = ctx.cardOwner;                 // Kontrolleur (Charme/Dark Deal eingerechnet)

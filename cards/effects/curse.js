@@ -55,7 +55,7 @@
 //  host's ATK and discards every Curse copy.
 // ═══════════════════════════════════════════
 
-const { getCleansableStatuses } = require('./_hooks');
+const { getNegativeStatuses } = require('./_hooks');
 const { candidateHosts, pickAttachmentHost, placeAttachment } = require('./_attachment-shared');
 const { opponentOfGs } = require('./_opp');
 
@@ -79,8 +79,10 @@ const STATUS_NAME = 'cursed';
  */
 function _heroQualifiesForCurse(engine, hero, ownerIdx, heroIdx) {
   if (!hero?.name || hero.hp <= 0) return false;
-  const cleansable = getCleansableStatuses();
-  const hasStatus = cleansable.some(k => hero.statuses?.[k]);
+  // W24a (N1-10): „afflicted by at least 1 status effect" = JEDER negative Status — auch die nicht heilbaren (`nulled`: Null Zone „counts as a
+  // status effect"; `soul_transmitted`). Vorher nur die heilbaren (`getCleansableStatuses`).
+  const negativ = getNegativeStatuses();
+  const hasStatus = negativ.some(k => hero.statuses?.[k]);
   if (!hasStatus) return false;
   // Walk the Support Zones once: a) require at least one empty slot,
   // b) reject if any slot's top card is a Spell (Curse can't stack
@@ -134,11 +136,15 @@ function _countCursesOnHero(engine, ownerIdx, heroIdx, excludeInstId = null) {
 async function fluchAnlegen(engine, appliedBy, owner, heroIdx) {
   const targetHero = engine.gs.players[owner]?.heroes?.[heroIdx];
   if (!targetHero?.name || targetHero.hp <= 0 || targetHero.statuses?.cursed) return false;
+  // Wehrt der Wirt den Status ab (Light Ball, Immunität …), bleibt seine ATK unberührt — wie bei Polymorph/Shrink. Sonst stünde er ohne Status (nichts zum Heilen) auf ATK 0.
+  if (engine.heroBlocksStatusNow?.(owner, heroIdx, STATUS_NAME, { appliedBy, festesZiel: true })) return false;
   // Snapshot the live ATK so the cleanse path can restore it.
   // Subsequent grant/revoke/temp-atk while cursed will accumulate
   // into this same slot (see _isHeroAtkSuppressed in _engine.js).
-  targetHero._cursedAtkSuppressed = targetHero.atk || 0;
-  const dropAmount = targetHero.atk || 0;
+  // (Hält Doomed Pirate den Helden schon fest, steht der Gesamtwert bereits im Zwischenspeicher und die sichtbare ATK ist 0: nichts überschreiben.)
+  const schonGesperrt = targetHero._cursedAtkSuppressed !== undefined;
+  if (!schonGesperrt) targetHero._cursedAtkSuppressed = targetHero.atk || 0;
+  const dropAmount = schonGesperrt ? 0 : (targetHero.atk || 0);
   // ★ v1087: das ABSENKEN laeuft bewusst weiter direkt — zu
   // diesem Zeitpunkt ist `cursed` noch NICHT gesetzt, der Trichter
   // wuerde den Abzug also sichtbar buchen statt in den
@@ -149,7 +155,16 @@ async function fluchAnlegen(engine, appliedBy, owner, heroIdx) {
   if (dropAmount > 0) {
     engine._broadcastEvent('fighting_atk_change', { owner, heroIdx, amount: -dropAmount });
   }
-  await engine.addHeroStatus(owner, heroIdx, STATUS_NAME, { appliedBy, source: CARD_NAME, animationType: 'dark_swarm' });
+  // `festesZiel`: „the Hero this Spell is attached to" — der Wirt wurde schon gewählt (Als Ruling 9.10., wie Polymorph/Shrink/Berserk). Ohne die Option
+  // schluckt Submerged („Jump in the River") den Status, obwohl die ATK schon auf 0 steht.
+  await engine.addHeroStatus(owner, heroIdx, STATUS_NAME, { appliedBy, source: CARD_NAME, animationType: 'dark_swarm', festesZiel: true });
+  if (!targetHero.statuses?.[STATUS_NAME] && !schonGesperrt && targetHero._cursedAtkSuppressed !== undefined) {
+    // Der Status wurde doch abgewehrt (z. B. Effekt-Immunität): die gesicherte ATK zurückgeben (ohne `cursed` bucht der Trichter sichtbar).
+    const zurueck = targetHero._cursedAtkSuppressed;
+    delete targetHero._cursedAtkSuppressed;
+    engine._applyHeroAtkDelta(targetHero, owner, heroIdx, zurueck);
+    return false;
+  }
   return true;
 }
 
@@ -301,7 +316,7 @@ module.exports = {
       // Fire enter-zone hook so listeners observe the new support card.
       await engine.runHooks('onCardEnterZone', {
         enteringCard: inst, toZone: 'support', toHeroIdx: targetHeroIdx,
-        _skipReactionCheck: true,
+        _skipReactionCheck: true, _anhaengselAnleger: pi,
       });
 
       engine.log('curse_attached', {
@@ -407,10 +422,14 @@ module.exports = {
       // Restore ATK + clear status. Both must fire even if the
       // status was already missing (defensive sync); the
       // accumulator key only exists while cursed.
-      if (hero.statuses?.cursed) {
-        delete hero.statuses.cursed;
-        const restored = hero._cursedAtkSuppressed || 0;
-        delete hero._cursedAtkSuppressed;
+      // ★ W24a (N1-01): beim Heldentod leert `handleHeroDeathCleanup` ZUERST `hero.statuses` und feuert danach erst diesen Austritt — der
+      // Status ist dann schon weg, der Zwischenspeicher (`_cursedAtkSuppressed`) aber noch da. Auch dann die ATK zurueckgeben.
+      const statusNochDa = !!hero.statuses?.cursed;
+      if (statusNochDa || hero._cursedAtkSuppressed !== undefined) {
+        if (statusNochDa) delete hero.statuses.cursed;
+        // Doomed Pirate hält die ATK weiter fest: Zwischenspeicher bleibt, die Rückgabe übernimmt die Kreatur beim Abgang.
+        const restored = engine._isHeroAtkSuppressed(hero) ? 0 : (hero._cursedAtkSuppressed || 0);
+        if (!engine._isHeroAtkSuppressed(hero)) delete hero._cursedAtkSuppressed;
         if (restored > 0) {
           // ★ v1087: ueber den kanonischen Trichter, damit ATK-Auren
           // („Rioting Village") die Rueckgabe sehen. `cursed` ist eine
@@ -418,11 +437,13 @@ module.exports = {
           // — gleiches Ergebnis wie das fruehere `hero.atk = restored`.
           engine._applyHeroAtkDelta(hero, hostOwner, hostHeroIdx, restored);
         }
-        await engine.runHooks('onStatusRemoved', {
-          target: hero, status: STATUS_NAME,
-          heroOwner: hostOwner, heroIdx: hostHeroIdx,
-          _viaCleanse: false, _skipReactionCheck: true,
-        });
+        if (statusNochDa) {
+          await engine.runHooks('onStatusRemoved', {
+            target: hero, status: STATUS_NAME,
+            heroOwner: hostOwner, heroIdx: hostHeroIdx,
+            _viaCleanse: false, _skipReactionCheck: true,
+          });
+        }
         engine.sync();
       }
     },

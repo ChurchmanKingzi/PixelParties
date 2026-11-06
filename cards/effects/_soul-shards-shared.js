@@ -44,6 +44,7 @@
 //  never loaded as a card.
 // ═══════════════════════════════════════════
 
+const { anyName } = require('./_alias-name');   // Shroomasaur: Zusatzname zählt für Namensfamilien
 const { isPileCreature } = require('./_hooks');
 
 const ARCHETYPE = 'Soul Shards';
@@ -127,7 +128,7 @@ function distinctSoulShardsOnBoard(engine, ownerIdx) {
   for (const inst of engine.cardInstances) {
     if (inst.zone !== 'support') continue;
     if (inst.faceDown) continue;
-    if (!isSoulShard(inst.name)) continue;
+    if (!anyName(inst, (n) => isSoulShard(n))) continue;
     if (ownerIdx != null && (inst.controller ?? inst.owner) !== ownerIdx) continue;
     seen.add(inst.name);
   }

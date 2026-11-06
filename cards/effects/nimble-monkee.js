@@ -25,7 +25,7 @@
 // Als Ruling 16.8. ("Tuscan Artist"): ist der 2er-/3er-Zug der EINZIGE
 // Nutzen dieser Karte, wird sie gesperrt statt wirkungslos zu feuern.
 // Die Auslegung steht in `_draw-block-shared.js`.
-const { drawWouldBeBlocked } = require('./_draw-block-shared');
+const { drawBlockedFor } = require('./_draw-block-shared');
 
 const { monkeeGoldTrigger, eligibleSummonZones, goldSourceVerbraucht, verbraucheGoldSource,
   investHoptUsed, markInvestHopt, payInvestCounters, heroesWithInvest,
@@ -68,7 +68,7 @@ module.exports = {
       // Beschwoerung erlaubt ist.
       if (gs[RESOLVING]?.[pi]) return;
       if (!(ps.hand || []).includes(CARD_NAME)) return;
-      if ((ps.gold || 0) < betrag) return;
+      if ((ps.gold || 0) < betrag || engine.goldSpendBlocked(pi)) return;   // G1 (A09-11): Goldsperre - "pay N Gold"
 
       // Kontrolle statt Seite (Styx 28.9.): auch ueber uebernommene Helden.
       if (eligibleSummonZones(engine, pi, CARD_NAME, { nachKontrolle: true }).length === 0) return;
@@ -157,10 +157,10 @@ module.exports = {
     // Ohne den 2er-Zug blieben nur der Verlust von 8 Invest Countern uebrig — Als Ruling:
     // dann ist der Effekt nicht aktivierbar und verbraucht auch sein
     // Once-per-turn nicht.
-    if (drawWouldBeBlocked(ctx._engine, ctx.cardOwner, 2)) return false;
+    if (drawBlockedFor(ctx._engine, ctx.cardOwner, 2)) return false;   // D1: auch Hand-/Zieh-Sperre (Regel von Al)
     const engine = ctx._engine;
     if (ctx.card?.zone !== 'support') return false;
-    if (investHoptUsed(engine.gs, ctx.card)) return false;
+    if (!ctx._borrowedUse && investHoptUsed(engine.gs, ctx.card)) return false;   // W12 (Q5): geliehene Verwendung ignoriert das eigene Einmal-Limit
     if (heroesWithInvest(engine.gs.players[ctx.cardOwner], 8).length === 0) return false;
     return true;
   },
@@ -169,9 +169,9 @@ module.exports = {
     const engine = ctx._engine;
     const pi = ctx.cardOwner;
     if (ctx.card?.zone !== 'support') return false;
-    if (investHoptUsed(engine.gs, ctx.card)) return false;
+    if (!ctx._borrowedUse && investHoptUsed(engine.gs, ctx.card)) return false;   // W12 (Q5): geliehene Verwendung ignoriert das eigene Einmal-Limit
     if (!await payInvestCounters(engine, pi, 8, CARD_NAME)) return false;
-    markInvestHopt(engine.gs, ctx.card);
+    if (!ctx._borrowedUse) markInvestHopt(engine.gs, ctx.card);   // W13 (Al, Rueckfrage 9)
     await engine.actionDrawCards(pi, 2, { source: CARD_NAME });
     engine.log('nimble_monkee_invest_draw', {
       player: engine.gs.players[pi]?.username, cards: 2,

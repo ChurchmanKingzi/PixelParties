@@ -44,7 +44,9 @@ module.exports = {
       cancellable: true,
       condition: (t) => {
         // Disallow self-target — "different" target per card text.
-        if (t.type === 'equip' && t.owner === pi
+        // W24d (N4-05): Ziel-IDs tragen die BRETTSEITE – gegen `cardHeroOwner` vergleichen, nicht gegen
+        // den handelnden Spieler `pi` (Kontrolleur; bei gestohlen/seitenfremd verschieden).
+        if (t.type === 'equip' && t.owner === (ctx.cardHeroOwner ?? ctx.card.owner)
             && t.heroIdx === heroIdx && t.slotIdx === zoneSlot) return false;
         return true;
       },

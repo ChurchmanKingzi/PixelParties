@@ -207,11 +207,11 @@ async function fireSkullDamage(ctx, deleted) {
   if (target.type === 'hero') {
     const h = gs.players[target.owner]?.heroes?.[target.heroIdx];
     if (h && h.hp > 0) {
-      await engine.actionDealDamage(dmgSource, h, damage, 'other');
+      await engine.actionDealDamage(dmgSource, h, damage, 'artifact');   // Schadenstyp Artefakt (CARD_API „Schadenstypen"), nicht 'other' (= Selbstkosten)
     }
   } else if (target.cardInstance) {
     await engine.actionDealCreatureDamage(
-      dmgSource, target.cardInstance, damage, 'other',
+      dmgSource, target.cardInstance, damage, 'artifact',
       { sourceOwner: ownerIdx, canBeNegated: true },
     );
   }

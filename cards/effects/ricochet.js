@@ -18,8 +18,14 @@
 //  Ein Ziel kann nur EINMAL gewaehlt werden, ueber beide Seiten hinweg.
 //  Schluss ist, sobald der naechste Waehler kein neues Ziel mehr hat.
 //
-//  Die Wahl ist NICHT abbrechbar — „take turns choosing … until a
-//  player CANNOT choose" kennt kein Aussteigen, nur „keine Ziele mehr".
+//  ★ Ruling Al (Welle 2): Die ERSTE Zielwahl des Spielers ist abbrechbar
+//  (Abbruch = Karte bleibt auf der Hand, nichts verbraucht, kein Auftritt);
+//  der Auftritt (card_reveal) kommt erst NACH der Bestätigung dieser ersten
+//  Wahl (`engine.commitAppearance()`), vor der Zielmarke und der Wahl des
+//  Gegners. Ab der bestätigten ersten Wahl gibt es keinen Rückweg mehr:
+//  Folgewahlen des Spielers und die Wahlen des Gegners sind NICHT abbrechbar —
+//  „take turns choosing … until a player CANNOT choose" kennt kein Aussteigen,
+//  nur „keine Ziele mehr".
 //
 //  ── ERST ALLES WAEHLEN, DANN SCHIESSEN ────────────────────────────
 //  Der Kartentext listet die Zielwahl vollstaendig auf, bevor er vom
@@ -36,6 +42,21 @@
 //  Ziel zu Ziel, ist aber EINE Quelle ueber die ganze Kette"), also
 //  geklammert — „Interference" schuetzt dagegen. Bei genau EINEM Ziel
 //  bleibt es ein Einzeltreffer und der Schutz greift korrekt nicht.
+//
+//  ── SCHADEN DER FOLGETREFFER (W49a, Al 22.10.2026) ────────────────
+//  „half as much damage as the previous one": die aufgerundete Haelfte
+//  des VOLLEN Schadens des Vorgaengers, also inklusive aller Erhoehungen
+//  des Kopftreffers (Elixir of Strength +150, Pfeile/Magic Topaz, Niu,
+//  erhoehende Hook-Boni). Die Quellen-Boni kommen bei Folgetreffern
+//  nicht noch einmal obendrauf (`kettenFolge`): der Betrag steht fest.
+//  W50a (Al 22.10.2026, Antwort auf die Rueckfrage): SENKUNGEN des
+//  Vorgaengers (Cloudy, Reduktions-Hooks, Prozent-/Flat-Abzuege)
+//  geben sich weiter, HP-Deckel/Boeden/Zusatz-HP und Negation nicht
+//  (Basis = Schaden nach den Senkungen). W51a (Al): auch jeder Effekt,
+//  der den Schaden selbst verringert, ist eine Senkung — Aquatic Shield
+//  (Surprise UND Rider), Harpyformer Choir, Cloud in a Bottle (Held und
+//  Kreatur), Dichotomy, Johanna. Tabelle in CARD_API „Welle 51 / W51a".
+//  Engine: `opts.vollOut` / `opts.kettenFolge`.
 //
 //  ── ANIMATION ────────────────────────────────────────────────────
 //  Al 14.9.: das Projektil von „Crusader's Flintlock", das von Ziel zu
@@ -79,6 +100,9 @@ function zieleAuf(engine, seite) {
 }
 
 module.exports = {
+  // ★ Als Ruling (Al 26.10., Flame Avalanche: „Wenn du andere Schadenskarten unspielbar machst, müssen das Vial und Rockfall auch sein!"): die Karte richtet NUR Schaden an Zielen an —
+  // unter der Schadenssperre (`ps.damageLocked`) unspielbar (Karte bleibt auf der Hand, keine Aktion/Kosten; Sperr-Stutzen `engine._cardBlockedBySearchLock`).
+  blockedByDamageLock: true,
   // ★★ v1181 — ENTKOPPELTE ZAUBERBILDER (siehe CARD_API): bei einer
   // Negation spielt die Engine diese Bilder, damit der abgewehrte
   // Zauber sichtbar bleibt.
@@ -125,6 +149,8 @@ module.exports = {
       // gerade gewaehlte Ziel leuchtet rot auf.
       const gewaehlt = new Set();
       const kette = [];
+      // Toras: „This Hero can never hit more than 1 target with an Attack" — die Kette bricht nach dem ersten Ziel ab (heroFlags.singleTargetAttack, wie Whirlwind Strike).
+      const nurEinZiel = !!engine.heroFlagsLive(ctx.cardHeroOwner ?? pi, heroIdx)?.singleTargetAttack;
       let waehler = pi;                       // „You choose first."
       try {
         // Obergrenze nur als Gurt: jede Runde verbraucht ein Ziel, die
@@ -136,6 +162,7 @@ module.exports = {
           if (frei.length === 0) break;       // „cannot choose a new target"
 
           const nummer = kette.length + 1;
+          const erstesMal = kette.length === 0;   // „You choose first": die erste Wahl gehört dem Spieler selbst
           // ★★ v1151 (Al 17.9.): die CPU zielt bei JEDER Wahl wie bei einem
           // normalen Einzelziel-Angriff mit der AKTUELLEN Staerke dieser
           // Position. `baseDamage` + `damageType` schalten im Piloten
@@ -150,14 +177,16 @@ module.exports = {
             description: `Choose target #${nummer} for ${CARD_NAME} (${schadenHier} damage). Targets already chosen are marked with their number.`,
             confirmLabel: `🎯 #${nummer}`,
             maxSelect: 1, maxTotal: 1,
-            cancellable: false,
+            cancellable: erstesMal,            // nur die allererste Wahl des Spielers (s. Kopfkommentar)
             baseDamage: schadenHier,
             damageType: 'attack',
           });
           const zielId = Array.isArray(wahl) ? wahl[0] : wahl;
           const idText = (zielId && typeof zielId === 'object') ? zielId.id : zielId;
           const ziel = frei.find(t => t.id === idText);
-          if (!ziel) break;                    // keine gueltige Antwort
+          if (!ziel) break;                    // keine gueltige Antwort / Abbruch der ersten Wahl (kette leer → `_spellCancelled`)
+          // Auftritt erst HINTER der letzten Abbruchstelle: die erste Wahl ist bestätigt.
+          if (erstesMal) engine.commitAppearance();
 
           gewaehlt.add(zielSchluessel(ziel));
           kette.push(ziel);
@@ -171,6 +200,7 @@ module.exports = {
           if (engine.isCpuPlayer(waehler) && !engine._inMctsSim && !engine._fastMode) {
             await engine._delay(1100);   // v1151: laenger, passend zur deutlicheren Animation
           }
+          if (nurEinZiel) break;               // Toras: nur ein Ziel
           waehler = gegenseite;                // der Getroffene ist als Naechster dran
         }
       } catch (err) {
@@ -188,6 +218,13 @@ module.exports = {
       let vonHeroIdx = heroIdx;
       let vonSlot = -1;
       let schaden = atk;
+      // ★ W49a/W50a (Al, 22.10.2026): „takes half as much damage as the PREVIOUS one" — die aufgerundete Haelfte des ECHTEN Schadens des
+      // Vorgaengers: inklusive aller Erhoehungen (Elixir of Strength, Pfeile/Magic Topaz, Niu, erhoehende Hook-Boni) und NACH allen
+      // SENKUNGEN (Cloudy, Reduktions-Hooks, Prozent-/Flat-Abzuege), aber VOR Schilden/Blocks/Negation/Deckeln. `voll` = dieser
+      // „Kettenbetrag" des letzten Treffers (die Engine meldet ihn ueber `opts.vollOut`); null = noch kein Treffer hat die
+      // Schadensrechnung erreicht (Kopf der Kette, rechnet mit dem Nennwert). Der Folgetreffer bekommt die Quellen-Boni nicht noch
+      // einmal (`kettenFolge`). Zuordnung Senkung/Schild: CARD_API „Welle 50 / W50a".
+      let voll = null;
 
       // ★★ v1185: Klammer meldet zusaetzlich die Kreaturen der Kette an
       // das Anti-AoE-Fenster (Deepsea Idol).
@@ -198,7 +235,10 @@ module.exports = {
             c.owner === z.owner && c.zone === 'support'
             && c.heroIdx === z.heroIdx && c.zoneSlot === z.slotIdx))
           .filter(Boolean),
+        // W78 (Pythia): Helden der Kette, die der Kopf (Betrag `atk`) faellt, sind todgeweiht; die Folgeglieder (halbierter Betrag) zaehlen erst, wenn sie dran sind
+        heroes: kette.slice(0, 1).filter(z => z.type === 'hero'),
         source: attackSource, amount: atk, type: 'attack', sourceOwner: pi,
+        ersterTrefferEinzel: true,   // Welle 13 (Q138): Elixir of Strength feuert am ersten Treffer (initial genau ein Ziel)
       });
       try {
         for (const ziel of kette) {
@@ -219,10 +259,14 @@ module.exports = {
             type: 'arrow_impact', owner: ziel.owner, heroIdx: ziel.heroIdx, zoneSlot: zielSlot,
           });
 
+          const folge = voll !== null;
+          if (folge) schaden = Math.ceil(voll / 2);
+          const vollOut = {};
+          const trefferOpts = { kettenFolge: folge, vollOut };
           if (ziel.type === 'hero') {
             const h = gs.players[ziel.owner]?.heroes?.[ziel.heroIdx];
             if (h && h.hp > 0) {
-              await engine.actionDealDamage(attackSource, h, schaden, 'attack');
+              await engine.actionDealDamage(attackSource, h, schaden, 'attack', trefferOpts);
             }
           } else {
             const inst = ziel.cardInstance || engine.cardInstances.find(c =>
@@ -231,17 +275,25 @@ module.exports = {
             if (inst && inst.zone === 'support') {
               await engine.actionDealCreatureDamage(
                 attackSource, inst, schaden, 'attack',
-                { sourceOwner: pi, canBeNegated: true },
+                { sourceOwner: pi, canBeNegated: true, ...trefferOpts },
               );
             }
           }
+          // W50a (Al 22.10.2026): JEDER Treffer meldet seinen Kettenbetrag (Schaden nach allen SENKUNGEN, vor Schilden/Blocks/Negation) — der
+          // naechste Treffer ist dessen aufgerundete Haelfte. Meldet ein Treffer nichts (Ziel weg, vor dem Haltepunkt negiert), laeuft die
+          // Kette mit dem Betrag weiter, der an diesem Treffer ankam (Ist-Zustand, offene Frage an Al).
+          if (typeof vollOut.wert === 'number') voll = vollOut.wert;
+          else if (folge) voll = schaden;
 
           // Der Einschlag ist der Ausgangspunkt des naechsten Sprungs.
           vonOwner = ziel.owner;
           vonHeroIdx = ziel.heroIdx;
           vonSlot = zielSlot;
           // „half as much as the PREVIOUS one (rounded up)" — an die
-          // Position gebunden, nicht an den Erfolg des Vorgaengers.
+          // Position gebunden, nicht an den Erfolg des Vorgaengers. Ab dem
+          // Kopf rechnet der naechste Treffer vom VOLLEN Schaden (`voll`,
+          // s. oben); dieser Nennwert greift nur, solange noch kein Treffer
+          // die Schadensrechnung erreicht hat (Ziel verschwunden/abgebrochen).
           schaden = Math.ceil(schaden / 2);
         }
       } finally {

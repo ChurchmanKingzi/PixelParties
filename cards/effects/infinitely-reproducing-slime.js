@@ -82,10 +82,9 @@ const CARD_NAME = 'Infinitely Reproducing Slime';
 function placementZones(engine, pi) {
   // Kontrolle statt Seite (Styx 28.9.): „any Hero you control" — auch
   // uebernommene Helden der Gegenspalte; jede Zone traegt `owner`.
-  return engine.getFreeSupportZones(pi, {
-    shareableFor: CARD_NAME,
-    nachKontrolle: true,
-  });
+  // ★ W62a: die EINE Zonenfrage der Engine (`beschwoerZonenFuer`): freie Zonen, dahinter — mit Alice-Teilung — die Zonen gleichnamiger Slimes;
+  // geteilt wird jetzt auch ueber uebernommene Helden hinweg nach KONTROLLE (vorher fragte der Zusatz fuer die Brettseite).
+  return engine.beschwoerZonenFuer(pi, CARD_NAME, { nachKontrolle: true });
 }
 
 module.exports = {
@@ -151,7 +150,7 @@ module.exports = {
       if (zones.length > 1) {
         const zonePick = await engine.promptGeneric(pi, {
           type: 'zonePick',
-          zones: zones.map(z => ({ heroIdx: z.heroIdx, slotIdx: z.slotIdx, owner: z.owner, ownerIdx: z.owner })),   // Kontrolle statt Seite (Styx 28.9.)
+          zones: zones.map(z => ({ heroIdx: z.heroIdx, slotIdx: z.slotIdx, owner: z.owner, ownerIdx: z.owner, ...(z.shared ? { shared: true, stackDepth: z.stackDepth, label: z.label } : {}) })),   // Kontrolle statt Seite (Styx 28.9.); W63a: geteilte Zonen stehen vorn und tragen `shared`
           title: CARD_NAME,
           description: 'Choose a free Support Zone for the new Slime.',
           cancellable: true,
@@ -199,6 +198,7 @@ module.exports = {
       await engine.actionNegateCreature(inst, CARD_NAME, {
         expiresAtTurn: gs.turn + 2,
         expiresForPlayer: pi,
+        fristBeginn: true,   // W68a: „until the beginning of your next turn"
         selfInflicted: true,
       });
 

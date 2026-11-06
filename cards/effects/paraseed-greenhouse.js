@@ -33,10 +33,11 @@
 //    „Defending the Gate\" mitbringt.
 // ═══════════════════════════════════════════
 
+const { anyName } = require('./_alias-name');   // Shroomasaur: Zusatzname zählt für Namensfamilien
 const {
   isParaseedCreature, heroHasParaseed, syncParaseedPoison,
 } = require('./_paraseed-shared');
-const { heroHasDiverHelmet, isAreaImmuneInst } = require('./_diver-helmet-shared');
+const { isAreaImmuneHero, isAreaImmuneInst } = require('./_diver-helmet-shared');   // Diver Helmet + W82 Shipwrecked
 
 const CARD_NAME = 'Paraseed Greenhouse';
 
@@ -58,7 +59,7 @@ function pflanzZiele(engine, pi) {
   // uebernommene Helden der Gegenspalte; `owner` = physische Seite.
   for (const { physOwner, heroIdx: hi, hero } of engine.heroesControlledBy(pi)) {
     if (!hero?.name) continue;
-    if (heroHasDiverHelmet(engine, physOwner, hi)) continue;
+    if (isAreaImmuneHero(engine, physOwner, hi)) continue;
     if (heroHasParaseed(engine, physOwner, hi)) continue;
     for (const si of freieZonen(engine, physOwner, hi)) {
       ziele.push({
@@ -75,7 +76,7 @@ function alleParaseeds(engine) {
   const out = [];
   for (const inst of (engine.cardInstances || [])) {
     if (inst.zone !== 'support') continue;
-    if (!isParaseedCreature(inst.name, engine)) continue;
+    if (!anyName(inst, (n) => isParaseedCreature(n, engine))) continue;
     if (isAreaImmuneInst(engine, inst)) continue;
     out.push(inst);
   }
@@ -83,20 +84,33 @@ function alleParaseeds(engine) {
 }
 
 /** Freie Zonen aller Helden auf dem Brett, ausser denen des Wirts. */
-function umzugsZiele(engine, ausserHost) {
+function umzugsZiele(engine, ausserHost, inst = null) {
   const ziele = [];
+  const { canShareInto } = require('./_alice-shared');
   for (let pi = 0; pi < (engine.gs.players || []).length; pi++) {
     const ps = engine.gs.players[pi];
     for (let hi = 0; hi < (ps?.heroes || []).length; hi++) {
       const hero = ps.heroes[hi];
       if (!hero?.name) continue;
       if (ausserHost && ausserHost.owner === pi && ausserHost.heroIdx === hi) continue;
-      if (heroHasDiverHelmet(engine, pi, hi)) continue;
+      if (isAreaImmuneHero(engine, pi, hi)) continue;
       for (const si of freieZonen(engine, pi, hi)) {
         ziele.push({
           owner: pi, heroIdx: hi, slotIdx: si,
           label: `${engine.gs.players[pi]?.username || 'P' + pi} — ${hero.name}`,
         });
+      }
+      // ★ W63a (Al, 22.10.2026: „Solange der Effekt aktiv ist, kann eine Creature in eine geteilte Zone bewegt werden"): mit Alice-Teilung des Zielspielers
+      // (bei der Landung wird er Kontrolleur) auch die Zone einer GLEICHNAMIGEN Paraseed — geteilte Zonen stehen vorn.
+      if (inst) {
+        for (let si = 0; si < 3; si++) {
+          if (!canShareInto(engine, pi, hi, si, inst, pi)) continue;
+          const tiefe = (ps.supportZones[hi][si] || []).length;
+          ziele.unshift({
+            owner: pi, heroIdx: hi, slotIdx: si, shared: true, stackDepth: tiefe,
+            label: `${engine.gs.players[pi]?.username || 'P' + pi} — ${hero.name} (×${tiefe})`,
+          });
+        }
       }
     }
   }
@@ -111,7 +125,7 @@ function kannPflanzen(engine, pi) {
 
 function kannUmziehen(engine) {
   return alleParaseeds(engine)
-    .some(inst => umzugsZiele(engine, { owner: inst.owner, heroIdx: inst.heroIdx }).length > 0);
+    .some(inst => umzugsZiele(engine, { owner: inst.owner, heroIdx: inst.heroIdx }, inst).length > 0);
 }
 
 // ─── Die beiden Modi ─────────────────────────────────────────────
@@ -176,7 +190,7 @@ async function umziehen(engine, pi) {
   for (;;) {
     const beweglich = alleParaseeds(engine).filter(inst =>
       !schonBewegt.has(inst.id)
-      && umzugsZiele(engine, { owner: inst.owner, heroIdx: inst.heroIdx }).length > 0);
+      && umzugsZiele(engine, { owner: inst.owner, heroIdx: inst.heroIdx }, inst).length > 0);
     if (beweglich.length === 0) break;
 
     // ── Schritt 1: EINE Paraseed anklicken ────────────────────────
@@ -211,7 +225,7 @@ async function umziehen(engine, pi) {
     const vonOwner = inst.owner;
     const vonHero = inst.heroIdx;
     const wirt = engine.gs.players[vonOwner]?.heroes?.[vonHero]?.name || '—';
-    const zonen = umzugsZiele(engine, { owner: vonOwner, heroIdx: vonHero });
+    const zonen = umzugsZiele(engine, { owner: vonOwner, heroIdx: vonHero }, inst);   // W63a: + geteilte Zone (Alice)
     if (zonen.length === 0) break;
 
     const ziel = zonen.length === 1 ? zonen[0]
@@ -259,6 +273,9 @@ module.exports = {
     if (!ps) return false;
     if ((ps.hand || []).length === 0) return false;        // Abwurf ist Pflichtkosten
     if (ps.handLocked) return false;
+    // Z6 (A08-24): Stapel-Sperre (Knight of Kings [B]) - das Deck darf nicht verlassen werden, dann waere der Abwurf reine Kosten.
+    // (Die Such-Sperre meint nur Karten AUF DIE HAND - Paraseed kommt ins Spiel, Gruppe Garius, Al 14.9.: nicht betroffen.)
+    if (!engine.pileOutAllowed(pi, 'deck', { sourceOwner: pi })) return false;
     return kannPflanzen(engine, pi) || kannUmziehen(engine);
   },
 
@@ -290,17 +307,17 @@ module.exports = {
 
     // Kosten. Ein Abbruch hier beendet den Effekt, ohne ihn zu
     // verbrauchen — Standard fuer Abwurf-Kosten ab v718.
-    const handVorher = (ps.hand || []).length;
-    await engine.actionPromptForceDiscard(pi, 1, {
+    // ★ W74c: von Boris erlassene Kosten gelten als bezahlt (`zahleAbwurfKosten`).
+    const kosten = await engine.zahleAbwurfKosten(pi, 1, {
       costFor: CARD_NAME,          // ★ v1041: Kosten-Abwurf-Lernkanal
       costKind: 'tutor',
-      title: CARD_NAME, source: CARD_NAME, selfInflicted: true,
+      title: CARD_NAME, source: CARD_NAME,
       cancellable: true,
       description: modus === 'plant'
         ? 'Discard 1 card to search your deck for a "Paraseed".'
         : 'Discard 1 card to move "Paraseeds" to other Heroes.',
     });
-    if ((ps.hand || []).length === handVorher) return false;   // abgebrochen
+    if (!kosten.bezahlt) return false;   // abgebrochen
 
     return modus === 'move' ? umziehen(engine, pi) : pflanzen(engine, pi);
   },

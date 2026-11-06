@@ -201,11 +201,27 @@ module.exports = {
       // splice/reassign so we don't perturb the splice interceptor
       // (length is unchanged). Tracked card instances are keyed by
       // name not slot, so they continue to resolve correctly.
+      // (Der Kartentext nennt das Mischen nicht; Verhalten bleibt, die Index-Marken folgen jetzt.)
       if ((ops.hand?.length || 0) > 1) {
         const arr = ops.hand;
+        // W16d (A08-03): die handindizierten Marken (Aufdecken, Kostenabzüge, Herkunft …) wandern mit ihrer Karte –
+        // gleiche Umrechnung wie `reorder_hand` (server.js): `idxMap[neu] = alt`. Gleiche Zufallsfolge wie zuvor.
+        const idxMap = arr.map((_, i) => i);
         for (let i = arr.length - 1; i > 0; i--) {
           const j = Math.floor(Math.random() * (i + 1));
-          [arr[i], arr[j]] = [arr[j], arr[i]];
+          [idxMap[i], idxMap[j]] = [idxMap[j], idxMap[i]];
+        }
+        const alt = arr.slice();
+        for (let neu = 0; neu < arr.length; neu++) arr[neu] = alt[idxMap[neu]];
+        for (const [fieldName] of (engine._handIndexedFields || [])) {
+          const oldMap = ops[fieldName];
+          if (!oldMap) continue;
+          const out = {};
+          for (let neu = 0; neu < arr.length; neu++) {
+            const v = oldMap[idxMap[neu]];
+            if (v != null && v !== 0 && v !== false) out[neu] = v;
+          }
+          ops[fieldName] = out;
         }
         engine.log('letter_shuffle', { opponent: ops.username });
       }

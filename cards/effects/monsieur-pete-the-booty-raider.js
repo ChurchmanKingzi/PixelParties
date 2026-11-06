@@ -1,4 +1,5 @@
 const { isSeat } = require('./_opp');   // N-Spieler: gültiger Sitzindex
+const { hatEffekt } = require('./_gained-effects-shared');
 // ═══════════════════════════════════════════
 //  CARD EFFECT: "Monsieur Pete, the Booty Raider"
 //  Hero · 450 HP · 100 ATK · Starting Abilities: Navigation, Thieving
@@ -37,7 +38,10 @@ module.exports = {
       const ps = engine.gs.players[pi];
       const ziel = ctx.target;
       if (!ps || !ziel || ziel.hp === undefined) return;          // nur Helden
-      if (ziel.name !== CARD_NAME) return;                         // „this Hero"
+      // „this Hero" — W16f (H03-02): auch der Träger eines GEWONNENEN Effekts (Pseudonia): `hatEffekt` statt Namensvergleich, und
+      // der Träger-Held muss das Ziel sein (sonst feuerte Petes echte Instanz auch für Pseudonia).
+      if (!hatEffekt(ziel, CARD_NAME)) return;
+      if (ctx.attachedHero && ctx.attachedHero !== ziel) return;
       if (!engine.heroesControlledBy(pi).some(e => e.hero === ziel)) return;
       if (!((ctx.realDealt ?? ctx.amount) > 0)) return;            // „takes damage"
 

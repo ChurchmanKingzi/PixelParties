@@ -50,7 +50,7 @@ function getMaxCreatureLevel(level) {
  * doesn't care which specific Hero hosts the stolen Creature
  * (Creatures are independent of their Hero).
  */
-function getFreeZones(ps) {
+function getFreeZones(ps, engine = null, pi = null, name = null) {
   const zones = [];
   for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
     const hero = ps.heroes[hi];
@@ -63,6 +63,11 @@ function getFreeZones(ps) {
         zones.push({ heroIdx: hi, slotIdx: si, label: `${heroLabel} — Slot ${si + 1}` });
       }
     }
+  }
+  // ★ W63a (Al, 22.10.2026: Alices Effekt gilt fuer ALLE Platzierungs-Effekte; „erst die geteilte Zone, DANN die erste leere"): mit Alice-Teilung des Spielers
+  // zaehlt auch die Zone einer GLEICHNAMIGEN Creature als „free" fuer die uebernommene Kreatur (`name`) — geteilte zuerst.
+  if (engine && name) {
+    return require('./_alice-shared').mitGeteilten(engine, pi, name, zones, { nachKontrolle: false, livingHeroesOnly: false, nurBasis: true });
   }
   return zones;
 }
@@ -85,6 +90,8 @@ function getEligibleCreatures(engine, pi, maxCreatureLevel) {
     if (inst.controller !== oppIdx || inst.zone !== 'support') continue;
     if (engine.isCreatureImmune(inst, 'targeting_immune')) continue;
     if (engine.isCreatureImmune(inst, 'control_immune')) continue;
+    if (engine.controlIsLocked(inst)) continue;   // Als Ruling (Al 26.10.): „Control of this Creature cannot change" (Creepy Villager) — nicht waehlbar, kein Verbrauch
+    if (engine.mehrzonenPlatzFehlt(inst, pi)) continue;   // Mehrzonen-Kreatur (Land Sharks, Turtle): ohne Held mit genug freien Zonen nicht uebernehmbar — nicht waehlbar, kein Verbrauch
     const cd = inst.counters?._cardDataOverride || cardDB[inst.name]; // token-override-aware (Biomancy Token — Als AoE-Report)
     if (!cd || !hasCardType(cd, 'Creature')) continue;
     if (!hasNumericCreatureLevel(cd)) continue;   // Artifact Creatures haben kein Level (Als Ruling 9.10.)
@@ -130,11 +137,14 @@ module.exports = {
 
     const cost = getCost(level);
     if ((ps.gold || 0) < cost) return false;
-
-    if (getFreeZones(ps).length === 0) return false;
+    if (cost > 0 && engine.goldSpendBlocked(pi)) return false;   // G1 (A09-11): Goldsperre - "Spend N Gold"
 
     const maxLv = getMaxCreatureLevel(level);
-    return getEligibleCreatures(engine, pi, maxLv).length > 0;
+    const ziele = getEligibleCreatures(engine, pi, maxLv);
+    if (ziele.length === 0) return false;
+    if (getFreeZones(ps).length > 0) return true;
+    // W63a: keine freie Zone — mit Alice-Teilung reicht die Zone einer GLEICHNAMIGEN Creature fuer ein Ziel
+    return ziele.some(t => getFreeZones(ps, engine, pi, t.cardName).length > 0);
   },
 
   /**
@@ -150,16 +160,16 @@ module.exports = {
     const ps = gs.players[pi];
     const oppIdx = engine.opponentOf(pi);
 
-    const cost = getCost(level);
+    const cost = getCost(ctx.kostenStufe ?? level);   // W82 (Sinister Idol, Al): die Kosten bleiben die der Stufe beim Aktivieren; die Wirkung (Zielstufe) folgt der gesenkten Stufe
     const maxLv = getMaxCreatureLevel(level);
 
     // Build eligible targets
     const eligible = getEligibleCreatures(engine, pi, maxLv);
     if (eligible.length === 0) return false;
 
-    // Check free zones
+    // Check free zones (W63a: oder, mit Alice-Teilung, eine geteilte — je Ziel unten)
     const freeZones = getFreeZones(ps);
-    if (freeZones.length === 0) return false;
+    if (freeZones.length === 0 && !eligible.some(t => getFreeZones(ps, engine, pi, t.cardName).length > 0)) return false;
 
     // Step 1: Select an opponent's creature
     const selectedIds = await ctx.promptTarget(eligible, {
@@ -177,7 +187,8 @@ module.exports = {
     if (!target) return false;
 
     // Step 2: Select a free support zone
-    const currentFreeZones = getFreeZones(ps);
+    const currentFreeZones = getFreeZones(ps, engine, pi, target.cardName)   // W63a: + Zone einer gleichnamigen Creature (Alice), geteilte zuerst
+      .filter(z => !engine.mehrzonenPlatzFehlt(target.cardInstance, pi, pi, z.heroIdx));   // Mehrzonen-Kreatur: nur Helden mit genug freien Zonen
     if (currentFreeZones.length === 0) return false;
 
     let chosenZone;
@@ -196,11 +207,12 @@ module.exports = {
     // ── Effect resolves ──
 
     // Final gold check
-    if ((ps.gold || 0) < cost) return false;
+    if ((ps.gold || 0) < cost || (cost > 0 && engine.goldSpendBlocked(pi))) return false;
 
     // Flash the Diplomacy ability zone
     engine._broadcastEvent('ability_activated', {
       owner: ctx.cardHeroOwner ?? ctx.cardOriginalOwner, heroIdx, zoneIdx: ctx.card.zoneSlot,   // Styx 28.9.: Brettseite
+      zoneKind: engine.abilityStapelArt(ctx.card) === 'support' ? 'support' : 'ability',   // W73a: in einer Support Zone (Xal) leuchtet diese, nicht die gleichnummerierte Ability Zone
     });
 
     // Play dove projectiles from Diplomacy hero to target creature (staggered)

@@ -39,6 +39,9 @@ const MAX_AUFDECKEN = 3;
 const GLINT_MS = 760;        // Länge des Funkelns bis zur ersten Karte (deckt sich mit `finding_glint` im Client; +100 ms Einbau-Versatz)
 
 module.exports = {
+  // Als Ruling (Al 28.10.): diese Attack richtet nie Schaden an — Schadens-Pfeile und Magic Topaz sind an ihr nicht ankettbar (`_arrows-shared`: `arrowTriggerCondition`).
+  dealsNoAttackDamage: true,
+
   // „If this is the first Attack you use this turn, this counts as an additional Action."
   inherentAction: (gs, playerIdx) => {
     const ps = gs.players[playerIdx];

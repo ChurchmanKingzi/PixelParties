@@ -106,9 +106,14 @@ module.exports = {
    * controls. The engine's `_checkSurpriseOnTurnEnd` calls this with
    * `info.endingPlayer` set to the player whose turn just ended.
    */
-  surpriseTurnEndTrigger(gs, ownerIdx, heroIdx, info /*, engine */) {
+  surpriseTurnEndTrigger(gs, ownerIdx, heroIdx, info, engine, seite) {
     // Only fires on the OPPONENT's turn end.
     if (info.endingPlayer === ownerIdx) return false;
+    // W24d (N4-01): eine schon OFFEN liegende Bridge wurde ausgeloest — sie ist kein Kandidat
+    // dieses Fensters mehr (nur das Ziehen zu Beginn des eigenen Zuges + Austritt bei Gegnerschaden).
+    const zSeite = seite ?? ownerIdx;
+    if (engine?.cardInstances?.some(c => c.zone === 'surprise' && c.name === CARD_NAME
+        && c.owner === zSeite && c.heroIdx === heroIdx && c.faceDown === false)) return false;
     // Opp must NOT have dealt damage to this player's targets this turn.
     // The engine's `dealtDamageToOpponent` flag is set on a player when
     // they damage opp's heroes / creatures, and cleared at turn start.

@@ -21,6 +21,12 @@ let _pendingGameState = null;
 //  server via `cube_draft_pick`; once your pick lands the pack grays
 //  out and you wait for the rest of the table.
 // ═══════════════════════════════════════════
+/** Laufende Nummer des Picks im ganzen Draft (1…totalPicks). `pickInRound` zaehlt nur innerhalb des Packs (0…15). */
+function cubeDraftOverallPick(draft) {
+  const perRound = draft.totalPicks / Math.max(1, draft.totalRounds);
+  return draft.round * perRound + draft.pickInRound + 1;
+}
+
 function CubeDraftScreen({ lobby, draft, leaveRoom, notify }) {
   // Eigene Draft-Musik, solange der Screen steht (Deck-Bau danach bekommt wieder die Menümusik).
   const { setBgmMode } = useContext(AppContext);
@@ -90,6 +96,9 @@ function CubeDraftScreen({ lobby, draft, leaveRoom, notify }) {
       if (!d.active) {
         if (Math.hypot(e.clientX - d.startX, e.clientY - d.startY) < 6) return;
         d.active = true;
+        // Waehrend des Ziehens zeigen die Karten unter dem Zeiger KEINEN Tooltip (CardMini.show prueft das, wie im
+        // Deck-Editor) — sonst bliebe nach dem Umsortieren der Tooltip einer Nachbarkarte haengen.
+        window.deckDragState = { section: 'draftPool', fromIdx: d.idx };
         setDragSrc(d.idx);
       }
       d.insert = insertFromPoint(e.clientX, e.clientY);
@@ -99,6 +108,7 @@ function CubeDraftScreen({ lobby, draft, leaveRoom, notify }) {
     const up = () => {
       const d = dragRef.current;
       dragRef.current = null;
+      window.deckDragState = null;
       if (!d) return;
       if (d.active) {
         const from = d.idx, ins = d.insert;
@@ -124,6 +134,7 @@ function CubeDraftScreen({ lobby, draft, leaveRoom, notify }) {
       window.removeEventListener('pointermove', move);
       window.removeEventListener('pointerup', up);
       window.removeEventListener('pointercancel', up);
+      window.deckDragState = null;
     };
   }, []);
 
@@ -136,7 +147,7 @@ function CubeDraftScreen({ lobby, draft, leaveRoom, notify }) {
     return () => clearInterval(t);
   }, [draft?.suspended, draft?.myPicked, draft?.round, draft?.pickInRound]);
 
-  // Hooks muessen VOR den fruehen Returns stehen (sonst React #310, sobald
+  // Hooks muessen VOR den fruehen Returns stehen (sonst React #311402, sobald
   // `draft` von null auf gesetzt wechselt).
   const startedAt = useRef(Date.now());
   useEffect(() => { startedAt.current = Date.now(); }, [draft?.round, draft?.pickInRound, draft?.suspended]);
@@ -184,7 +195,7 @@ function CubeDraftScreen({ lobby, draft, leaveRoom, notify }) {
         <div className="top-bar">
           <button className="btn btn-danger" onClick={leaveRoom}>LEAVE</button>
           <h2 className="orbit-font" style={{ fontSize: 14, color: 'var(--accent)' }}>🧊 CUBE DRAFT — SPECTATING</h2>
-          <span className="badge" style={{ background: 'rgba(154,216,255,.14)', color: '#9ad8ff' }}>Pack {draft.round + 1}/{draft.totalRounds} · Pick {draft.pickInRound + 1}/{draft.totalPicks}</span>
+          <span className="badge" style={{ background: 'rgba(179,216,249,.14)', color: '#b3d8f9' }}>Pack {draft.round + 1}/{draft.totalRounds} · Pick {cubeDraftOverallPick(draft)}/{draft.totalPicks}</span>
           <VolumeControl />
         </div>
         <div className="screen-center" style={{ flexDirection: 'column', gap: 16 }}>
@@ -220,7 +231,7 @@ function CubeDraftScreen({ lobby, draft, leaveRoom, notify }) {
   // Filter pool by name search.
   const visiblePool = poolOrder
     .map((e, i) => ({ name: e.name, gray: e.gray, id: e.id, idx: i }))
-    .filter(e => !filter || e.name.toLowerCase().includes(filter.toLowerCase()));
+    .filter(e => !filter || window.namePasst(e.name, filter));
 
   // Player ring shown top-left. Always rooted at "me" so the local seat
   // is at index 0; subsequent entries follow the snake direction so the
@@ -249,16 +260,16 @@ function CubeDraftScreen({ lobby, draft, leaveRoom, notify }) {
         <button className="btn btn-danger" onClick={leaveRoom}>LEAVE</button>
         <h2 className="orbit-font" style={{ fontSize: 14, color: 'var(--accent)' }}>🧊 CUBE DRAFT</h2>
         <div style={{ flex: 1 }} />
-        <span className="badge" style={{ background: 'rgba(154,216,255,.14)', color: '#9ad8ff', fontSize: 13, padding: '5px 14px', fontWeight: 700 }}>
-          Pack {draft.round + 1}/{draft.totalRounds} · Pick {draft.pickInRound + 1}/{draft.totalPicks}
+        <span className="badge" style={{ background: 'rgba(179,216,249,.14)', color: '#b3d8f9', fontSize: 13, padding: '5px 14px', fontWeight: 700 }}>
+          Pack {draft.round + 1}/{draft.totalRounds} · Pick {cubeDraftOverallPick(draft)}/{draft.totalPicks}
         </span>
         {draft.timerDisabled ? (
-          <span className="badge" style={{ background: 'rgba(0,240,255,.08)', color: 'var(--text2)', fontSize: 12, padding: '5px 14px', fontWeight: 600 }}>
+          <span className="badge" style={{ background: 'rgba(102,182,255,.08)', color: 'var(--text2)', fontSize: 12, padding: '5px 14px', fontWeight: 600 }}>
             ⏱ Untimed
           </span>
         ) : (
           <span className="badge" style={{
-            background: timerWarn ? 'rgba(255,80,80,.18)' : 'rgba(0,240,255,.10)',
+            background: timerWarn ? 'rgba(254,81,84,.18)' : 'rgba(102,182,255,.10)',
             color: timerWarn ? '#ff6666' : 'var(--accent)',
             fontSize: 13, padding: '5px 14px', fontWeight: 700,
             animation: timerWarn ? 'pulse 1s infinite' : undefined,
@@ -283,7 +294,7 @@ function CubeDraftScreen({ lobby, draft, leaveRoom, notify }) {
         // Fallback: any seat that's the kick target.
         const kickTarget = draft.voteKick?.targetSeat;
         return (
-          <div style={{ background: 'rgba(255,170,0,.15)', border: '1px solid #ffaa33', padding: '8px 16px', textAlign: 'center', color: '#ffcc44', fontWeight: 600 }}>
+          <div style={{ background: 'rgba(249,172,32,.15)', border: '1px solid #f9ac20', padding: '8px 16px', textAlign: 'center', color: '#fad54a', fontWeight: 600 }}>
             ⏸ Draft suspended — {draft.suspendReason || 'a player has disconnected'}.
             {draft.voteKick ? (
               <>
@@ -323,7 +334,7 @@ function CubeDraftScreen({ lobby, draft, leaveRoom, notify }) {
             <React.Fragment key={r.seatIdx}>
               <div style={{
                 padding: '8px 10px',
-                background: r.isMe ? 'rgba(0,240,255,.10)' : 'transparent',
+                background: r.isMe ? 'rgba(102,182,255,.10)' : 'transparent',
                 borderLeft: r.isMe ? '3px solid var(--accent)' : '3px solid transparent',
                 marginBottom: 2,
                 display: 'flex', alignItems: 'center', gap: 6,
@@ -365,8 +376,6 @@ function CubeDraftScreen({ lobby, draft, leaveRoom, notify }) {
             gridTemplateColumns: `repeat(${COLS}, ${cardW}px)`,
             gridAutoRows: `${Math.round(cardW * 7 / 5)}px`,
             gap: GAP,
-            opacity: draft.myPicked ? 0.45 : 1,
-            transition: 'opacity .25s',
             visibility: packBox.w ? 'visible' : 'hidden',
           }}>
             {shownPack.map((cardName, idx) => (
@@ -384,7 +393,11 @@ function CubeDraftScreen({ lobby, draft, leaveRoom, notify }) {
                 }}
                 onMouseEnter={() => setHoveredCard(cardName)}
                 onMouseLeave={() => setHoveredCard(null)}>
-                <CardMini card={window.CARDS_BY_NAME?.[cardName]} onClick={() => {}} style={{ width: '100%', height: '100%' }} />
+                {/* Abdunkeln an der Karte selbst, NICHT am Raster: `opacity` < 1 an einem Vorfahren macht einen eigenen
+                    Stapelkontext auf, und der fixe Tooltip (z-index 9999) landete dann UNTER dem Vorschau-Beschriftungsfeld
+                    der rechten Spalte ("CARD PREVIEW — hover a card"). */}
+                <CardMini card={window.CARDS_BY_NAME?.[cardName]} onClick={() => {}}
+                  style={{ width: '100%', height: '100%', opacity: draft.myPicked ? 0.45 : 1, transition: 'opacity .25s' }} />
               </div>
             ))}
           </div>
@@ -418,14 +431,13 @@ function CubeDraftScreen({ lobby, draft, leaveRoom, notify }) {
                 style={{
                   aspectRatio: '5 / 7', cursor: dragSrc != null ? 'grabbing' : 'grab',
                   userSelect: 'none', touchAction: 'none', position: 'relative',
-                  opacity: dragSrc === idx ? .35 : 1,
                   boxShadow: dragInsert === idx ? '-3px 0 0 0 var(--accent)'
                     : (dragInsert === poolOrder.length && idx === poolOrder.length - 1 ? '3px 0 0 0 var(--accent)' : 'none'),
                   borderRadius: 4,
                 }}>
                 {/* Filter an der Karte selbst, nicht an einem Vorfahren (sonst haengt der fixe Tooltip im gefilterten Kasten). */}
                 <CardMini card={window.CARDS_BY_NAME?.[name]} onClick={() => {}}
-                  style={{ width: '100%', height: '100%', filter: gray ? 'grayscale(1) brightness(.5)' : 'none', opacity: gray ? .6 : 1, transition: 'filter .15s, opacity .15s' }} />
+                  style={{ width: '100%', height: '100%', filter: gray ? 'grayscale(1) brightness(.5)' : 'none', opacity: dragSrc === idx ? .35 : (gray ? .6 : 1), transition: 'filter .15s, opacity .15s' }} />
               </div>
             ))}
             {poolOrder.length === 0 && (
@@ -484,7 +496,7 @@ function CubeDraftBuildScreen({ lobby, build, leaveRoom, notify, user }) {
     : null;
 
   // Pool counts (incl. assigned hero, which the server pushed into pool).
-  const poolCounts = useMemo(() => {
+  const basisCounts = useMemo(() => {
     const c = {};
     for (const n of (build?.pool || [])) c[n] = (c[n] || 0) + 1;
     return c;
@@ -512,6 +524,31 @@ function CubeDraftBuildScreen({ lobby, build, leaveRoom, notify, user }) {
   const [potionDeck, setPotionDeck] = useState([]);
   const [sideDeck, setSideDeck] = useState([]);
   const [filter, setFilter] = useState('');
+
+  // ★ W77 — Cuberto, Supreme Lord of Edges: als Starthelden darf er bis zu 5 gedraftete Karten gegen beliebige andere tauschen (verschiedene Namen). `swaps` = [{ from, to }];
+  // `swapHeroes` (Server, aus dem Skript-Kennzeichen `cubeDraftSwap`) nennt die tauschfähigen Helden im Pool mit ihrer Höchstzahl. Der EFFEKTIVE Pool = Pool − from + to.
+  const [swaps, setSwaps] = useState([]);
+  const [swapOffen, setSwapOffen] = useState(false);
+  const [swapVon, setSwapVon] = useState(null);
+  const [swapFilter, setSwapFilter] = useState('');
+  const swapHeroes = build?.swapHeroes || {};
+  const tauschMax = heroes.reduce((m, h) => Math.max(m, (h?.hero && swapHeroes[h.hero]) || 0), 0);
+  const poolCounts = useMemo(() => {
+    const c = { ...basisCounts };
+    for (const sw of swaps) { c[sw.from] = (c[sw.from] || 0) - 1; c[sw.to] = (c[sw.to] || 0) + 1; }
+    return c;
+  }, [basisCounts, swaps]);
+  // Eingetauschte Karten im Deck wieder zu ihren Ursprungskarten machen (je Tausch die erste Kopie).
+  const tauschRueckgaengig = (liste) => {
+    const ersetze = (arr) => { const out = [...arr]; for (const sw of liste) { const i = out.indexOf(sw.to); if (i >= 0) out[i] = sw.from; } return out; };
+    setMainDeck(ersetze); setPotionDeck(ersetze); setSideDeck(ersetze);
+  };
+  // Cuberto ist kein Starthelden mehr: alle Tausche verfallen, die eingetauschten Karten werden wieder zu ihren Ursprungskarten.
+  useEffect(() => {
+    if (tauschMax > 0 || swaps.length === 0) return;
+    tauschRueckgaengig(swaps);
+    setSwaps([]); setSwapOffen(false); setSwapVon(null);
+  }, [tauschMax]);
 
   // One-time bootstrap: seed deck name and auto-fill hero slots from
   // the drafted heroes (so the player isn't staring at empty slots).
@@ -568,7 +605,7 @@ function CubeDraftBuildScreen({ lobby, build, leaveRoom, notify, user }) {
     const list = [];
     const seen = new Set();
     for (const name of Object.keys(poolCounts)) {
-      if (seen.has(name)) continue;
+      if (seen.has(name) || (poolCounts[name] || 0) <= 0) continue;
       seen.add(name);
       list.push({ name, count: poolCounts[name], free: false });
     }
@@ -589,7 +626,7 @@ function CubeDraftBuildScreen({ lobby, build, leaveRoom, notify, user }) {
   }, [poolCounts, allCards, cardDB]);
 
   const visibleList = filter
-    ? availableList.filter(e => e.name.toLowerCase().includes(filter.toLowerCase()))
+    ? availableList.filter(e => window.namePasst(e.name, filter))
     : availableList;
 
   // Klaenge wie im normalen Deckbauer: Hinzufuegen = draw, Entfernen = discard.
@@ -703,6 +740,7 @@ function CubeDraftBuildScreen({ lobby, build, leaveRoom, notify, user }) {
         mainDeck,
         potionDeck,
         sideDeck,
+        ...(tauschMax > 0 && swaps.length > 0 ? { cubertoSwaps: swaps } : {}),
       },
     });
   };
@@ -767,7 +805,7 @@ function CubeDraftBuildScreen({ lobby, build, leaveRoom, notify, user }) {
       <div className="top-bar">
         <button className="btn btn-danger" onClick={leaveRoom}>LEAVE</button>
         <h2 className="orbit-font" style={{ fontSize: 14, color: 'var(--accent)' }}>🧊 BUILD YOUR DECK</h2>
-        <span className="badge" style={{ background: 'rgba(154,216,255,.14)', color: '#9ad8ff' }}>{build.cubeName}</span>
+        <span className="badge" style={{ background: 'rgba(179,216,249,.14)', color: '#b3d8f9' }}>{build.cubeName}</span>
         <input className="input" placeholder="Deck name…" value={deckName} onChange={e => setDeckName(e.target.value)}
           style={{ width: 240, fontSize: 12, padding: '4px 8px' }} />
         <div style={{ flex: 1 }} />
@@ -784,12 +822,12 @@ function CubeDraftBuildScreen({ lobby, build, leaveRoom, notify, user }) {
       </div>
 
       {build.assignedHero && (
-        <div style={{ background: 'rgba(255,170,0,.12)', borderBottom: '1px solid #ffaa33', padding: '6px 16px', fontSize: 11, textAlign: 'center', color: '#ffcc44' }}>
+        <div style={{ background: 'rgba(249,172,32,.12)', borderBottom: '1px solid #f9ac20', padding: '6px 16px', fontSize: 11, textAlign: 'center', color: '#fad54a' }}>
           🎲 You drafted no Heroes. The system assigned <strong>{build.assignedHero}</strong> to you.
         </div>
       )}
       {buildTimerMsLeft == null && build.buildTimerTotalMs === 0 && (
-        <div style={{ background: 'rgba(0,240,255,.06)', borderBottom: '1px solid var(--bg4)', padding: '4px 16px', fontSize: 11, textAlign: 'center', color: 'var(--text2)' }}>
+        <div style={{ background: 'rgba(102,182,255,.06)', borderBottom: '1px solid var(--bg4)', padding: '4px 16px', fontSize: 11, textAlign: 'center', color: 'var(--text2)' }}>
           ⏱ Deck building timer is off — the tournament starts once everyone is ready.
         </div>
       )}
@@ -799,10 +837,10 @@ function CubeDraftBuildScreen({ lobby, build, leaveRoom, notify, user }) {
         const warn = buildTimerMsLeft <= 60_000;
         return (
           <div style={{
-            background: warn ? 'rgba(255,80,80,.16)' : 'rgba(0,240,255,.10)',
+            background: warn ? 'rgba(254,81,84,.16)' : 'rgba(102,182,255,.10)',
             borderBottom: '1px solid ' + (warn ? '#ff6666' : 'var(--accent)'),
             padding: '6px 16px', fontSize: 12, textAlign: 'center',
-            color: warn ? '#ff8888' : 'var(--accent)',
+            color: warn ? '#ec7f79' : 'var(--accent)',
             fontWeight: 700, letterSpacing: 1,
             animation: warn ? 'pulse 1s infinite' : undefined,
           }}>
@@ -906,6 +944,30 @@ function CubeDraftBuildScreen({ lobby, build, leaveRoom, notify, user }) {
           <div style={{ fontSize: 9, color: 'var(--text2)', marginBottom: 6 }}>Click: add · Shift+click: Potion Deck · Ctrl+click: Main Deck (Heroes too) · Right-click: Side Deck</div>
           <input className="input" placeholder="🔍 Filter by name..." value={filter} onChange={e => setFilter(e.target.value)}
             style={{ marginBottom: 8, fontSize: 11, padding: '4px 8px' }} />
+          {Object.keys(swapHeroes).length > 0 && (
+            <div style={{ border: '1px solid ' + (tauschMax > 0 ? '#b3d8f9' : 'var(--bg4)'), borderRadius: 4, padding: 6, marginBottom: 8, background: 'rgba(179,216,249,.07)' }}>
+              <div className="orbit-font" style={{ fontSize: 10, fontWeight: 700, letterSpacing: 1, color: tauschMax > 0 ? '#b3d8f9' : 'var(--text2)', marginBottom: 4 }}>
+                🧊 {Object.keys(swapHeroes)[0].split(',')[0].toUpperCase()} — SWAP {swaps.length}/{tauschMax || Math.max(...Object.values(swapHeroes))}
+              </div>
+              {tauschMax === 0 ? (
+                <div style={{ fontSize: 10, color: 'var(--text2)' }}>Make {Object.keys(swapHeroes)[0]} one of your Starting Heroes to swap up to {Math.max(...Object.values(swapHeroes))} drafted cards for any other cards (different names).</div>
+              ) : (
+                <>
+                  {swaps.map((sw, i) => (
+                    <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 10, marginBottom: 2 }}>
+                      <span style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{sw.from} → <strong>{sw.to}</strong></span>
+                      <button className="btn btn-danger" style={{ padding: '0 6px', fontSize: 10 }} title="Undo this swap"
+                        onClick={() => { tauschRueckgaengig([sw]); setSwaps(prev => prev.filter((_, k) => k !== i)); }}>✕</button>
+                    </div>
+                  ))}
+                  <button className="btn" disabled={swaps.length >= tauschMax} style={{ width: '100%', fontSize: 10, padding: '3px 6px' }}
+                    onClick={() => { setSwapOffen(true); setSwapVon(null); setSwapFilter(''); }}>
+                    ＋ Swap a drafted card{swaps.length >= tauschMax ? ' (limit reached)' : ''}
+                  </button>
+                </>
+              )}
+            </div>
+          )}
           <div style={{ flex: 1, overflowY: 'auto' }}>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 4 }}>
               {visibleList.map(({ name, count, free }) => {
@@ -925,14 +987,14 @@ function CubeDraftBuildScreen({ lobby, build, leaveRoom, notify, user }) {
                     <CardMini card={cardDB[name]} onClick={() => {}} style={{ width: '100%', height: '100%', filter: dimmed ? 'grayscale(.8) brightness(.6)' : 'none' }} />
                     {isNonStartingHero(name) && (
                       <div style={{
-                        position: 'absolute', top: 2, left: 2, background: 'rgba(255,170,0,.9)', color: '#2a1a00',
+                        position: 'absolute', top: 2, left: 2, background: 'rgba(249,172,32,.9)', color: '#27180c',
                         borderRadius: 4, padding: '1px 5px', fontSize: 8, fontWeight: 800, lineHeight: 1.2, pointerEvents: 'none',
                       }} title="Cannot be a Starting Hero — play it in the Main Deck">MAIN ONLY</div>
                     )}
                     <div style={{
                       position: 'absolute', bottom: 2, right: 2,
-                      background: free ? 'rgba(154,216,255,.85)' : 'rgba(0,0,0,.85)',
-                      color: free ? '#001a33' : '#fff',
+                      background: free ? 'rgba(179,216,249,.85)' : 'rgba(0,0,0,.85)',
+                      color: free ? '#00213f' : '#fff',
                       borderRadius: 4, padding: '1px 5px',
                       fontSize: 10, fontWeight: 700, lineHeight: 1.2,
                       pointerEvents: 'none',
@@ -954,6 +1016,47 @@ function CubeDraftBuildScreen({ lobby, build, leaveRoom, notify, user }) {
         {/* Platz fuer den grossen Karten-Tooltip (rechte Leiste), damit er keine Karten ueberdeckt */}
         <div className="cube-draft-tt-gutter" style={{ flexShrink: 0 }} />
       </div>
+
+      {swapOffen && (() => {
+        const eingetauscht = new Set(swaps.map(x => x.to));
+        const istFrei = (n) => cardDB[n]?.cardType === 'Ability' && n !== 'Performance';
+        // 1) Karte aus dem Pool, die wegkommt: eine UNGENUTZTE Kopie, kein Held, keine freie Ability, keine eingetauschte Karte
+        const vonListe = Object.keys(poolCounts).filter(n => cardDB[n] && cardDB[n].cardType !== 'Hero' && !istFrei(n) && !eingetauscht.has(n) && remainingFor(n) > 0)
+          .sort((a, b) => a.localeCompare(b));
+        // 2) neue Karte: beliebig, aber kein Held/Token/freie Ability, nicht dieselbe, und die eingetauschten Karten haben verschiedene Namen
+        const q = swapFilter.trim().toLowerCase();
+        const zuListe = swapVon ? allCards.filter(c => c && c.name && c.name !== swapVon && c.cardType !== 'Hero' && c.cardType !== 'Token' && !istFrei(c.name) && !eingetauscht.has(c.name)
+          && (!q || window.namePasst(c.name, q))).slice(0, 60) : [];
+        return (
+          <div style={{ position: 'fixed', inset: 0, zIndex: 9000, background: '#08060c', display: 'flex', flexDirection: 'column', padding: 16, gap: 10 }} data-pp-px="aus">
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+              <h3 className="orbit-font" style={{ fontSize: 14, color: '#b3d8f9', margin: 0 }}>🧊 SWAP A DRAFTED CARD</h3>
+              <span style={{ fontSize: 11, color: 'var(--text2)' }}>{swapVon ? `Replace "${swapVon}" with…` : '1. Choose the drafted card that goes away'}</span>
+              <div style={{ flex: 1 }} />
+              {swapVon && <button className="btn" onClick={() => setSwapVon(null)}>← Back</button>}
+              <button className="btn btn-danger" onClick={() => setSwapOffen(false)}>Cancel</button>
+            </div>
+            {swapVon && (
+              <input className="input" autoFocus placeholder="🔍 Search any card by name…" value={swapFilter} onChange={e => setSwapFilter(e.target.value)} style={{ fontSize: 12, padding: '4px 8px' }} />
+            )}
+            <div style={{ flex: 1, overflowY: 'auto', display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(96px, 1fr))', gap: 6, alignContent: 'start' }}>
+              {!swapVon && vonListe.map(n => (
+                <div key={n} style={{ aspectRatio: '5 / 7', cursor: 'pointer' }} onClick={() => { setSwapVon(n); setSwapFilter(''); }} title={n}>
+                  <CardMini card={cardDB[n]} onClick={() => {}} style={{ width: '100%', height: '100%' }} />
+                </div>
+              ))}
+              {swapVon && zuListe.map(c => (
+                <div key={c.name} style={{ aspectRatio: '5 / 7', cursor: 'pointer' }} title={c.name}
+                  onClick={() => { setSwaps(prev => [...prev, { from: swapVon, to: c.name }]); setSwapOffen(false); setSwapVon(null); sfx('draw'); }}>
+                  <CardMini card={cardDB[c.name]} onClick={() => {}} style={{ width: '100%', height: '100%' }} />
+                </div>
+              ))}
+              {!swapVon && vonListe.length === 0 && <div style={{ gridColumn: '1/-1', color: 'var(--text2)', fontSize: 12, fontStyle: 'italic' }}>No unused drafted cards to swap — take cards out of your deck first.</div>}
+              {swapVon && zuListe.length === 0 && <div style={{ gridColumn: '1/-1', color: 'var(--text2)', fontSize: 12, fontStyle: 'italic' }}>No cards match.</div>}
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 }
@@ -993,7 +1096,7 @@ function CubeDraftTournamentScreen({ lobby, tournament, gameState, leaveRoom, no
       <div className="top-bar">
         <button className="btn btn-danger" onClick={leaveRoom}>LEAVE</button>
         <h2 className="orbit-font" style={{ fontSize: 14, color: 'var(--accent)' }}>🧊 CUBE TOURNAMENT</h2>
-        <span className="badge" style={{ background: 'rgba(154,216,255,.14)', color: '#9ad8ff' }}>{tournament.cubeName}</span>
+        <span className="badge" style={{ background: 'rgba(179,216,249,.14)', color: '#b3d8f9' }}>{tournament.cubeName}</span>
         <span className="badge" style={{ background: 'rgba(255,255,255,.06)', color: 'var(--text)' }}>
           Round {tournament.currentRoundIdx + 1}/{Math.log2(tournament.bracketSize)}
         </span>
@@ -1001,7 +1104,7 @@ function CubeDraftTournamentScreen({ lobby, tournament, gameState, leaveRoom, no
           Bo{tournament.currentRoundIdx === Math.log2(tournament.bracketSize) - 1 ? tournament.finaleBo : tournament.prelimsBo}
         </span>
         <div style={{ flex: 1 }} />
-        <span className="badge" style={{ background: tournament.flow === 'simultaneous' ? 'rgba(0,240,255,.10)' : 'rgba(255,170,0,.10)', color: tournament.flow === 'simultaneous' ? 'var(--accent)' : '#ffaa33' }}>
+        <span className="badge" style={{ background: tournament.flow === 'simultaneous' ? 'rgba(102,182,255,.10)' : 'rgba(249,172,32,.10)', color: tournament.flow === 'simultaneous' ? 'var(--accent)' : '#f9ac20' }}>
           {tournament.flow === 'simultaneous' ? 'SIMULTANEOUS' : 'CONSECUTIVE'}
         </span>
         <VolumeControl />
@@ -1092,7 +1195,7 @@ function CubeDraftMatchCard({ match, mySeat, currentRound }) {
   const slot = (label, seat, name, isWinner) => (
     <div style={{
       padding: '6px 10px',
-      background: isWinner ? 'rgba(51,255,136,.10)' : (seat === mySeat ? 'rgba(0,240,255,.08)' : 'transparent'),
+      background: isWinner ? 'rgba(76,235,112,.10)' : (seat === mySeat ? 'rgba(102,182,255,.08)' : 'transparent'),
       borderLeft: '3px solid ' + (isWinner ? 'var(--success)' : (seat === mySeat ? 'var(--accent)' : 'var(--bg4)')),
       fontSize: 12,
       color: isWinner ? 'var(--success)' : (seat === mySeat ? 'var(--accent)' : 'var(--text)'),
@@ -1110,7 +1213,7 @@ function CubeDraftMatchCard({ match, mySeat, currentRound }) {
       position: 'relative',
     }}>
       {match.thirdPlace && (
-        <div className="orbit-font" style={{ padding: '3px 10px', fontSize: 9, fontWeight: 700, letterSpacing: 1, color: '#cd8b4a', background: 'rgba(205,139,74,.12)' }}>🥉 3RD PLACE</div>
+        <div className="orbit-font" style={{ padding: '3px 10px', fontSize: 9, fontWeight: 700, letterSpacing: 1, color: '#ca874e', background: 'rgba(202,135,78,.12)' }}>🥉 3RD PLACE</div>
       )}
       {live && (
         <div style={{ position: 'absolute', top: 4, right: 6, fontSize: 9, color: 'var(--accent3)', fontWeight: 700, animation: 'pulse 1.2s infinite' }}>
@@ -1138,9 +1241,8 @@ function CubeDraftFinalStandings({ lobby, tournament, leaveRoom }) {
     left: Math.round(Math.random() * 100),
     delay: (Math.random() * 3).toFixed(2),
     dur: (3.2 + Math.random() * 2.6).toFixed(2),
-    size: 6 + Math.round(Math.random() * 7),
-    color: ['#ffd700', '#ff6b9d', '#00f0ff', '#9aff6b', '#c58bff', '#ffffff'][i % 6],
-    rot: Math.round(Math.random() * 360),
+    size: Math.round((6 + Math.random() * 7) / 2) * 2,   // W86u2: gerade px (ganze Kunstpixel)
+    color: ['#fad54a', '#fe6794', '#1aedff', '#66ff71', '#c98aff', '#ffffff'][i % 6],
   })), []);
   useEffect(() => {
     const play = (n, o) => { if (window.playSFX) window.playSFX(n, o); };
@@ -1164,24 +1266,28 @@ function CubeDraftFinalStandings({ lobby, tournament, leaveRoom }) {
           <div className="orbit-font" style={{ fontSize: place === 1 ? 17 : 13, fontWeight: 800, color, wordBreak: 'break-word' }}>{e.username}</div>
           {me && <div style={{ fontSize: 10, color: 'var(--accent)', fontWeight: 700 }}>★ YOU</div>}
         </div>
-        <div className="podium-block" style={{ height, background: `linear-gradient(180deg, ${color}55, ${color}18)`, borderTop: `3px solid ${color}`, boxShadow: shown ? `0 0 22px ${color}66` : 'none' }}>
+        <div className="podium-block" style={{ height, background: `color-mix(in srgb, ${color} 24%, #08060c)`, borderTop: `4px solid ${color}`, boxShadow: shown ? `0 0 0 4px color-mix(in srgb, ${color} 45%, #08060c)` : 'none' }}>
           <div className="orbit-font" style={{ fontSize: 26, fontWeight: 800, color }}>{label}</div>
         </div>
       </div>
     );
   };
   return (
-    <div className="screen-full" style={{ background: 'radial-gradient(ellipse at 50% 30%, rgba(255,215,0,.16) 0%, var(--bg) 70%)', position: 'relative', overflow: 'hidden' }}>
+    <div className="screen-full" style={{ background: 'var(--bg)', position: 'relative', overflow: 'hidden', isolation: 'isolate' }}>
+      {/* ★ W86u2 (Pixelart): goldener Schein hinter dem Podest als Dither-Pixelbild statt Radialverlauf mit Alpha */}
+      <PpVerlauf px={4} style={{ position: 'absolute', inset: 0, pointerEvents: 'none', zIndex: -1 }}
+        gradient="radial-gradient(ellipse at 50% 30%, rgba(250,213,74,.16) 0%, transparent 70%)"
+        retroGradient="radial-gradient(ellipse at 50% 30%, rgba(250,213,74,.16) 0%, var(--bg) 70%)" />
       <div className="top-bar">
         <button className="btn" onClick={leaveRoom}>← LEAVE</button>
-        <h2 className="orbit-font" style={{ fontSize: 14, color: '#ffd700' }}>🏆 TOURNAMENT COMPLETE</h2>
+        <h2 className="orbit-font" style={{ fontSize: 14, color: '#fad54a' }}>🏆 TOURNAMENT COMPLETE</h2>
         <VolumeControl />
       </div>
       {stage >= 4 && (
         <div className="podium-confetti" aria-hidden="true">
           {confetti.map((c, i) => (
-            <span key={i} style={{ left: c.left + '%', width: c.size, height: Math.round(c.size * 1.6), background: c.color,
-              animationDelay: c.delay + 's', animationDuration: c.dur + 's', transform: `rotate(${c.rot}deg)` }} />
+            <span key={i} style={{ left: c.left + '%', width: c.size, height: Math.round(c.size * 1.6 / 2) * 2, background: c.color,
+              animationDelay: c.delay + 's', animationDuration: c.dur + 's' }} />
           ))}
         </div>
       )}
@@ -1192,9 +1298,9 @@ function CubeDraftFinalStandings({ lobby, tournament, leaveRoom }) {
           </div>
         )}
         <div className="podium-stage">
-          {step(2, '2', 104, '#cfd4dc', '🥈')}
-          {step(1, '1', 148, '#ffd700', '🥇')}
-          {step(3, '3', 72, '#cd7f32', '🥉')}
+          {step(2, '2', 104, '#d2d2db', '🥈')}
+          {step(1, '1', 148, '#fad54a', '🥇')}
+          {step(3, '3', 72, '#be680e', '🥉')}
         </div>
         <div className="panel" style={{ width: '100%', maxWidth: 720, padding: 20, marginTop: 22, opacity: stage >= 4 ? 1 : 0, transform: stage >= 4 ? 'none' : 'translateY(16px)', transition: 'opacity .6s, transform .6s' }}>
           <div className="orbit-font" style={{ fontSize: 14, color: 'var(--accent)', marginBottom: 16, textAlign: 'center', fontWeight: 700, letterSpacing: 1 }}>
@@ -1204,11 +1310,11 @@ function CubeDraftFinalStandings({ lobby, tournament, leaveRoom }) {
             <div key={s.seat} style={{
               display: 'flex', alignItems: 'center', gap: 12,
               padding: '10px 12px',
-              background: i === 0 ? 'rgba(255,215,0,.08)' : (i === 1 ? 'rgba(170,170,170,.08)' : (i === 2 ? 'rgba(205,127,50,.08)' : 'transparent')),
-              borderLeft: '4px solid ' + (i === 0 ? '#ffd700' : i === 1 ? '#aaaaaa' : i === 2 ? '#cd7f32' : 'var(--bg4)'),
+              background: i === 0 ? 'rgba(250,213,74,.08)' : (i === 1 ? 'rgba(168,168,168,.08)' : (i === 2 ? 'rgba(190,104,14,.08)' : 'transparent')),
+              borderLeft: '4px solid ' + (i === 0 ? '#fad54a' : i === 1 ? '#a8a8a8' : i === 2 ? '#be680e' : 'var(--bg4)'),
               marginBottom: 4, borderRadius: 4,
             }}>
-              <div style={{ fontSize: 24, width: 40, textAlign: 'center', fontWeight: 800, color: i === 0 ? '#ffd700' : i === 1 ? '#cccccc' : i === 2 ? '#cd7f32' : 'var(--text2)' }}>
+              <div style={{ fontSize: 24, width: 40, textAlign: 'center', fontWeight: 800, color: i === 0 ? '#fad54a' : i === 1 ? '#d2d2db' : i === 2 ? '#be680e' : 'var(--text2)' }}>
                 #{s.placement}
               </div>
               <div style={{ flex: 1 }}>
@@ -1401,8 +1507,8 @@ function PlayScreen() {
     const onPlayerJoined = (data) => setPlayerJoined(data.username);
     // Ein Cube-Match (Kindraum) darf den Turnierraum nicht als `lobby` ablösen — sonst fällt
     // der Spieler nach dem Match in eine tote Lobby statt zurück ins Bracket.
-    const onGameStarted = (r) => { setLobby(prev => (prev?.cubeDraft && prev.id !== r?.id) ? prev : r); if (window.playSFX) window.playSFX('match_found'); };
-    const onGameState = (state) => { if (window.ppZustandVeraltet?.(state)) return; setGameState(state); };
+    const onGameStarted = (r) => { setLobby(prev => (prev?.cubeDraft && prev.id !== r?.id) ? prev : r); if (window.playSFX) window.playSFX('match_found'); if (r?.id && window.ppBfVorladen) window.ppBfVorladen(r.id, false); };   // Kampffeld (app-fx-55) schon vor dem Brett laden
+    const onGameState = (state) => { if (window.ppZustandVeraltet?.(state)) return; if (state?.roomId && window.ppBfVorladen) window.ppBfVorladen(state.roomId, !!state.isTutorial); setGameState(state); };
     const onCubeDraftState = (state) => { setCubeDraftState(state); };
     const onCubeBuildState = (state) => { setCubeBuildState(state); };
     const onCubeTournamentState = (state) => { setCubeTournamentStateLocal(state); };
@@ -1549,6 +1655,17 @@ function PlayScreen() {
     joinRoom({ id: inv.roomId, hasPlayerPw: false, skillTest: inv.kind === 'skilltest' ? {} : null, cubeDraft: inv.kind === 'draft' ? {} : null }, false);
   }, [currentDeckObj]);
 
+  // ── Zuschauen aus der Who's-Online-Liste (Hauptmenü): `window._ppPendingSpectate` = { roomId, hasSpecPw, name } ──
+  // Das Hauptmenü wechselt hierher und hinterlässt die Angabe; der Beitritt als Zuschauer läuft wie über die Raumliste
+  // (Zuschauer-Passwort wird bei Bedarf abgefragt).
+  useEffect(() => {
+    const sp = window._ppPendingSpectate;
+    if (!sp) return;
+    window._ppPendingSpectate = null;
+    joinRoom({ id: sp.roomId, hasSpecPw: sp.hasSpecPw }, true);
+  }, []);
+  const spectateFromList = (info) => joinRoom({ id: info.roomId, hasSpecPw: info.hasSpecPw }, true);
+
   const leaveRoom = () => {
     if (lobby) socket.emit('leave_room', { roomId: lobby.id });
     setLobby(null);
@@ -1636,10 +1753,10 @@ function PlayScreen() {
             {isHost ? 'CLOSE ROOM' : 'LEAVE'}
           </button>
           <h2 className="orbit-font" style={{ fontSize: 14, color: 'var(--accent)' }}>🧊 CUBE DRAFT LOBBY</h2>
-          <span className="badge" style={{ background: 'rgba(154,216,255,.14)', color: '#9ad8ff' }}>
+          <span className="badge" style={{ background: 'rgba(179,216,249,.14)', color: '#b3d8f9' }}>
             {lobby.cubeDraft.cubeName}
           </span>
-          <span className="badge" style={{ background: lobby.type === 'ranked' ? 'rgba(255,170,0,.12)' : 'rgba(0,240,255,.12)', color: lobby.type === 'ranked' ? 'var(--accent4)' : 'var(--accent)' }}>
+          <span className="badge" style={{ background: lobby.type === 'ranked' ? 'rgba(249,172,32,.12)' : 'rgba(102,182,255,.12)', color: lobby.type === 'ranked' ? 'var(--accent4)' : 'var(--accent)' }}>
             {lobby.type.toUpperCase()}
           </span>
           <VolumeControl />
@@ -1669,7 +1786,7 @@ function PlayScreen() {
                     borderStyle: occupied ? 'solid' : 'dashed',
                     borderRadius: 8,
                     padding: '12px 8px',
-                    background: occupied ? 'rgba(0,240,255,.04)' : 'transparent',
+                    background: occupied ? 'rgba(102,182,255,.04)' : 'transparent',
                     textAlign: 'center',
                     opacity: occupied ? 1 : .5,
                     cursor: promotable ? 'pointer' : 'default',
@@ -1773,7 +1890,7 @@ function PlayScreen() {
             {isHost ? 'CLOSE ROOM' : 'LEAVE'}
           </button>
           <h2 className="orbit-font" style={{ fontSize: 22, fontWeight: 800, color: 'var(--player-color)' }}>GAME LOBBY</h2>
-          <span className="badge" style={{ background: lobby.type === 'ranked' ? 'rgba(255,170,0,.12)' : 'rgba(0,240,255,.12)', color: lobby.type === 'ranked' ? 'var(--accent4)' : 'var(--accent)' }}>
+          <span className="badge" style={{ background: lobby.type === 'ranked' ? 'rgba(249,172,32,.12)' : 'rgba(102,182,255,.12)', color: lobby.type === 'ranked' ? 'var(--accent4)' : 'var(--accent)' }}>
             {lobby.type.toUpperCase()}
           </span>
           <VolumeControl />
@@ -1868,10 +1985,9 @@ function PlayScreen() {
         <button className="btn" onClick={() => setScreen('menu')}>← BACK</button>
         <h2 className="orbit-font" style={{ fontSize: 22, fontWeight: 800, color: 'var(--player-color)' }}>ONLINE LOBBY</h2>
         <div style={{ flex: 1 }} />
-        <label style={{ fontSize: 12, color: 'var(--text)', display: 'flex', alignItems: 'center', gap: 8, fontWeight: 600 }}>
+        <div style={{ fontSize: 12, color: 'var(--text)', display: 'flex', alignItems: 'center', gap: 8, fontWeight: 600 }}>
           🃏 Deck:
-          <select className="select" value={selectedDeck} onChange={async e => {
-              const id = e.target.value;
+          <PPDropdown value={selectedDeck} onChange={async id => {
               setSelectedDeck(id);
               // Auto-save as default deck. Custom decks use the per-deck
               // endpoint; starter / structure decks use the sample-default
@@ -1889,19 +2005,20 @@ function PlayScreen() {
                   setUser(u => u ? { ...u, defaultSampleDeckId: id } : u);
                 }
               } catch (err) { notify('Could not save your default deck: ' + (err?.message || 'unknown error'), 'error'); }
-            }} style={{ fontSize: 12, minWidth: 180, padding: '4px 8px', borderColor: 'var(--accent)', color: 'var(--text)' }}>
-            {decks.filter(d => !isCubeDeck(d) && d.mode !== 'drafted').map(d => <option key={d.id} value={d.id}>{d.name} {isDeckLegal(d).legal ? '✓' : '✗'}{d.isDefault ? ' ★' : ''}</option>)}
-            {sampleDecks.filter(d => isDeckLegal(d).legal).length > 0 && <option disabled>── Sample Decks ──</option>}
-            {sampleDecks.filter(d => isDeckLegal(d).legal).map(d => <option key={d.id} value={d.id}>📋 {d.name}{user?.defaultSampleDeckId === d.id ? ' ★' : ''}</option>)}
-          </select>
-        </label>
+            }} style={{ fontSize: 12, minWidth: 180, padding: '4px 8px', borderColor: 'var(--accent)', color: 'var(--text)' }}
+            options={[
+              ...decks.filter(d => !isCubeDeck(d) && d.mode !== 'drafted').map(d => ({ value: d.id, label: `${d.name} ${isDeckLegal(d).legal ? '✓' : '✗'}${d.isDefault ? ' ★' : ''}` })),
+              ...(sampleDecks.filter(d => isDeckLegal(d).legal).length > 0 ? [{ value: '__sample_kopf', disabled: true, label: '── Sample Decks ──' }] : []),
+              ...sampleDecks.filter(d => isDeckLegal(d).legal).map(d => ({ value: d.id, label: `📋 ${d.name}${user?.defaultSampleDeckId === d.id ? ' ★' : ''}` })),
+            ]} />
+        </div>
         <button className="btn" onClick={() => setCreating(true)} style={{ borderColor: 'var(--player-color)', color: 'var(--player-color)', background: 'color-mix(in srgb, var(--player-color) 8%, transparent)' }}>+ CREATE GAME</button>
         <VolumeControl />
       </div>
 
       <div style={{ flex: 1, display: 'flex', overflow: 'hidden' }} className="lobby-content animate-in">
         {/* Who's Online + Chats + Herausforderungen — dasselbe Interface wie im Hauptmenü (app-social.jsx) */}
-        {user && !user.isGuest && <SocialSidePanel meId={user.id} />}
+        {user && !user.isGuest && <SocialSidePanel meId={user.id} onSpectate={spectateFromList} />}
 
         {/* Open Games */}
         <div className="lobby-spalte ornate-frame pp-menuekasten" style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
@@ -1917,14 +2034,14 @@ function PlayScreen() {
                 <div key={r.id} className="room-card" onClick={() => joinRoom(r, false)}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <span style={{ fontWeight: 700 }}>
-                      {isDraft && <span style={{ color: '#9ad8ff', marginRight: 4 }}>🧊</span>}
+                      {isDraft && <span style={{ color: '#b3d8f9', marginRight: 4 }}>🧊</span>}
                       {r.host}
                     </span>
                     <div style={{ display: 'flex', gap: 6 }}>
-                      {isDraft && <span className="badge" style={{ background: 'rgba(154,216,255,.14)', color: '#9ad8ff', fontSize: 11, fontWeight: 800, padding: '3px 10px', border: '1px solid rgba(154,216,255,.3)', letterSpacing: 1 }}>CUBE DRAFT</span>}
-                      {r.skillTest && <span className="badge" style={{ background: 'rgba(255,200,80,.14)', color: '#ffc850', fontSize: 11, fontWeight: 800, padding: '3px 10px', border: '1px solid rgba(255,200,80,.3)', letterSpacing: 1 }}>🎯 SKILL TEST</span>}
+                      {isDraft && <span className="badge" style={{ background: 'rgba(179,216,249,.14)', color: '#b3d8f9', fontSize: 11, fontWeight: 800, padding: '3px 10px', border: '1px solid rgba(179,216,249,.3)', letterSpacing: 1 }}>CUBE DRAFT</span>}
+                      {r.skillTest && <span className="badge" style={{ background: 'rgba(255,208,102,.14)', color: '#ffd066', fontSize: 11, fontWeight: 800, padding: '3px 10px', border: '1px solid rgba(255,208,102,.3)', letterSpacing: 1 }}>🎯 SKILL TEST</span>}
                       {!isDraft && !r.skillTest && r.format > 1 && <span className="badge" style={{ background: 'rgba(255,255,255,.1)', color: '#fff', fontSize: 12, fontWeight: 800, padding: '3px 10px', border: '1px solid rgba(255,255,255,.2)', letterSpacing: 1 }}>Bo{r.format}</span>}
-                      <span className="badge" style={{ background: r.type === 'ranked' ? 'rgba(255,170,0,.18)' : 'rgba(0,240,255,.15)', color: r.type === 'ranked' ? '#ffbb33' : '#00f0ff', fontSize: 11, fontWeight: 800, padding: '3px 10px', border: r.type === 'ranked' ? '1px solid rgba(255,170,0,.35)' : '1px solid rgba(0,240,255,.3)', textTransform: 'uppercase', letterSpacing: 1 }}>
+                      <span className="badge" style={{ background: r.type === 'ranked' ? 'rgba(249,172,32,.18)' : 'rgba(102,182,255,.15)', color: r.type === 'ranked' ? '#ffb91a' : '#1aedff', fontSize: 11, fontWeight: 800, padding: '3px 10px', border: r.type === 'ranked' ? '1px solid rgba(249,172,32,.35)' : '1px solid rgba(102,182,255,.3)', textTransform: 'uppercase', letterSpacing: 1 }}>
                         {r.type}
                       </span>
                       {!isDraft && !r.skillTest && r.format <= 1 && <span className="badge" style={{ background: 'rgba(255,255,255,.06)', color: 'var(--text2)', fontSize: 11, padding: '3px 10px' }}>Bo1</span>}
@@ -1932,7 +2049,7 @@ function PlayScreen() {
                   </div>
                   <div style={{ fontSize: 10, color: 'var(--text2)', marginTop: 2 }}>
                     {r.hasPlayerPw ? '🔒 Password' : '🔓 Open'} · {r.playerCount}/{cap} players
-                    {isDraft && r.cubeDraft && <span style={{ marginLeft: 8 }}>· Cube: <span style={{ color: '#9ad8ff' }}>{r.cubeDraft.cubeName}</span> · Bo{r.cubeDraft.prelimsBo} prelims / Bo{r.cubeDraft.finaleBo} finale</span>}
+                    {isDraft && r.cubeDraft && <span style={{ marginLeft: 8 }}>· Cube: <span style={{ color: '#b3d8f9' }}>{r.cubeDraft.cubeName}</span> · Bo{r.cubeDraft.prelimsBo} prelims / Bo{r.cubeDraft.finaleBo} finale</span>}
                   </div>
                 </div>
               );
@@ -1954,7 +2071,7 @@ function PlayScreen() {
                   <div style={{ display: 'flex', gap: 6 }}>
                     {r.format > 1 && <span className="badge" style={{ background: 'rgba(255,255,255,.1)', color: '#fff', fontSize: 12, fontWeight: 800, padding: '3px 10px', border: '1px solid rgba(255,255,255,.2)', letterSpacing: 1 }}>Bo{r.format}</span>}
                     {r.format <= 1 && <span className="badge" style={{ background: 'rgba(255,255,255,.06)', color: 'var(--text2)', fontSize: 11, padding: '3px 10px' }}>Bo1</span>}
-                    <span className="badge" style={{ background: 'rgba(255,0,170,.12)', color: 'var(--accent2)' }}>LIVE</span>
+                    <span className="badge" style={{ background: 'rgba(251,30,169,.12)', color: 'var(--accent2)' }}>LIVE</span>
                   </div>
                 </div>
                 <div style={{ fontSize: 10, color: 'var(--text2)', marginTop: 2 }}>
@@ -1988,10 +2105,10 @@ function PlayScreen() {
               // personal even outside the medal tier.
               const tier = p.rank === 1 ? 'gold' : p.rank === 2 ? 'silver' : p.rank === 3 ? 'bronze' : null;
               const nameColor =
-                tier === 'gold'   ? '#ffd24a' :
-                tier === 'silver' ? '#d8d8e6' :
-                tier === 'bronze' ? '#cd7f32' :
-                p.color || '#00f0ff';
+                tier === 'gold'   ? '#fad54a' :
+                tier === 'silver' ? '#d2d2db' :
+                tier === 'bronze' ? '#be680e' :
+                p.color || '#66b6ff';
               const crown = tier === 'gold' ? '👑' : tier === 'silver' ? '🥈' : tier === 'bronze' ? '🥉' : null;
               return (
                 // v1289: Klick/Enter oeffnet das Spielerprofil (app-player-profile.jsx).
@@ -2060,13 +2177,13 @@ function PlayScreen() {
                   <div>
                     <div style={{ fontSize: 11, color: 'var(--text2)', marginBottom: 4 }}>Cube</div>
                     {legalCubes.length === 0 ? (
-                      <div style={{ fontSize: 11, color: 'var(--danger)', padding: '6px 8px', border: '1px solid var(--danger)', borderRadius: 4, background: 'rgba(255,80,80,.06)' }}>
+                      <div style={{ fontSize: 11, color: 'var(--danger)', padding: '6px 8px', border: '1px solid var(--danger)', borderRadius: 4, background: 'rgba(254,81,84,.06)' }}>
                         You have no legal Cube (exactly 512 cards). Build one in the Deck Editor before hosting a draft.
                       </div>
                     ) : (
-                      <select className="input" value={draftCubeId} onChange={e => setDraftCubeId(e.target.value)} style={{ width: '100%' }}>
+                      <PPSelect className="input" value={draftCubeId} onChange={e => setDraftCubeId(e.target.value)} style={{ width: '100%' }}>
                         {legalCubes.map(c => <option key={c.id} value={c.id}>🧊 {c.name}</option>)}
-                      </select>
+                      </PPSelect>
                     )}
                   </div>
                   <div style={{ display: 'flex', gap: 8 }}>
@@ -2512,6 +2629,12 @@ for (const t of Object.values(_bgmTracks)) {
   }
 }
 
+// Musikstueck vorab laden + dekodieren (Web Audio): das erste Umschalten auf ein ungeladenes Stueck dekodiert 1,5 MB Ogg zu ~30 MB PCM — auf Handys ein Ruckler
+// genau in dem Moment, in dem es umschaltet (Tutorial 5: Antonia crasht Monia Bot aus dem Bild). Aufruf vor dem Auftritt, in einer ruhigen Textseite.
+window.ppBgmVorwaermen = (modus) => {
+  try { const t = _bgmTracks[modus]; if (t && typeof t._ensureBuffer === 'function') t._ensureBuffer().catch(() => {}); } catch (e) { /* optional */ }
+};
+
 // Volume control bridge — VolumeControl sets this
 window._ppSetMusicVolume = (vol) => {
   let cur = null;
@@ -2746,12 +2869,12 @@ class GameErrorBoundary extends React.Component {
     const e = this.state.err;
     const text = `${e?.message || e}\n\n${e?.stack || ''}\n\nKomponenten-Stack:${this.state.info?.componentStack || ''}`;
     return (
-      <div style={{ position: 'fixed', inset: 0, zIndex: 99999, background: 'rgba(10,10,16,.96)',
-        color: '#ffd7d7', padding: '24px', overflow: 'auto', fontFamily: 'monospace', fontSize: 13 }}>
-        <div style={{ fontSize: 18, marginBottom: 10, color: '#ff8080' }}>
+      <div style={{ position: 'fixed', inset: 0, zIndex: 99999, background: 'rgba(8,6,12,.96)',
+        color: '#fae5eb', padding: '24px', overflow: 'auto', fontFamily: 'monospace', fontSize: 13 }}>
+        <div style={{ fontSize: 18, marginBottom: 10, color: '#fe7476' }}>
           Das Spielfeld ist auf einen Fehler gelaufen.
         </div>
-        <div style={{ marginBottom: 14, color: '#ccc', fontFamily: 'inherit' }}>
+        <div style={{ marginBottom: 14, color: '#d2d2db', fontFamily: 'inherit' }}>
           Die Partie läuft auf dem Server weiter — Neuladen bringt dich zurück hinein.
           Bitte den Text unten mitschicken.
         </div>
@@ -2887,21 +3010,33 @@ function MusicManager({ bgmMode }) {
 
   // Unlock audio on first user interaction
   // Chromium/Opera require a direct user gesture to unlock each Audio element.
-  // We "touch" every track (play → immediate pause) to unlock them, then start the real track.
+  // ★ Mit Web Audio (GaplessBgm) entsperrt ein einziger laufender Kontext alles: app-shared.jsx horcht auf echte Gesten (click / touchend /
+  // pointerup / keydown — NICHT touchstart, das zaehlt auf Android nicht) und meldet `pp-audio-running`. Erst dann startet die Musik; so
+  // kommt sie auf dem Handy schon auf Tap-Screen und Login. Die Zielmusik wird ueber einen Ref nachgefuehrt (der Modus kann sich bis zur
+  // ersten Geste mehrfach aendern).
+  const bgmRef = useRef(bgmMode);
+  bgmRef.current = bgmMode;
   useEffect(() => {
     if (unlocked.current) return;
+    const AC = window.AudioContext || window.webkitAudioContext;
+    if (AC) {
+      const start = () => {
+        if (unlocked.current) return;
+        unlocked.current = true;
+        for (const audio of Object.values(_bgmTracks)) { if (audio && typeof audio.unlock === 'function') audio.unlock(); }
+        switchTrack(bgmRef.current || 'menu');
+      };
+      window.addEventListener('pp-audio-running', start);
+      if (window.ppAudioLaeuft && window.ppAudioLaeuft()) start();
+      return () => window.removeEventListener('pp-audio-running', start);
+    }
+    // Rueckfall ohne AudioContext: <audio>-Elemente per Play/Pause entsperren (alter Weg).
     const unlock = () => {
       if (unlocked.current) return;
       unlocked.current = true;
       const touchAndUnlock = async () => {
         for (const audio of Object.values(_bgmTracks)) {
           if (!audio) continue;
-          // ★ v1257: Der Web-Audio-Looper braucht keinen Play/Pause-
-          // Tastendruck je Element — EIN ctx.resume() entsperrt den
-          // Kontext fuer alle. (audio.play() wuerde hier ausserdem
-          // 13 Fetch+Decodes anstossen — genau das soll die
-          // Lazy-Ladung ja vermeiden.)
-          if (typeof audio.unlock === 'function') { audio.unlock(); continue; }
           try {
             audio.volume = 0;
             await audio.play();
@@ -2909,22 +3044,22 @@ function MusicManager({ bgmMode }) {
             audio.currentTime = 0;
           } catch {}
         }
-        switchTrack(bgmMode || 'menu');
+        switchTrack(bgmRef.current || 'menu');
       };
       touchAndUnlock();
       window.removeEventListener('click', unlock);
       window.removeEventListener('keydown', unlock);
-      window.removeEventListener('touchstart', unlock);
+      window.removeEventListener('touchend', unlock);
     };
     window.addEventListener('click', unlock);
     window.addEventListener('keydown', unlock);
-    window.addEventListener('touchstart', unlock);
+    window.addEventListener('touchend', unlock);
     return () => {
       window.removeEventListener('click', unlock);
       window.removeEventListener('keydown', unlock);
-      window.removeEventListener('touchstart', unlock);
+      window.removeEventListener('touchend', unlock);
     };
-  }, [bgmMode]);
+  }, []);
 
   // Switch tracks when bgmMode changes
   useEffect(() => {
@@ -2963,12 +3098,33 @@ function MusicManager({ bgmMode }) {
 //  each newly-unlocked opponent in turn. Queues multiple unlocks so they
 //  display one after another.
 // ═══════════════════════════════════════════
+/**
+ * ★ W86u2 (Pixelart): der drehende Strahlenring hinter dem Unlock-Dialog als Pixelbild — drei goldene Keulen (Winkelverlauf wie vorher
+ * der `conic-gradient`), Bayer-gedithert, deckend; 310 × 310 Kunstpixel (= 620 px bei 2 px je Pixel), `PPPixelAnim` dreht das Sprite in
+ * Winkelstufen. Ersetzt `conic-gradient` + `filter: blur(6px)` + stufenlose Drehung.
+ */
+function ppUnlockRingUrl() {
+  const N = 310, M = N / 2;
+  return ppPxBild('unlock-ring:' + N, N, N, (setze) => {
+    for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) {
+      const dx = x + 0.5 - M, dy = y + 0.5 - M, r = Math.hypot(dx, dy);
+      if (r > M) continue;
+      const grad = ((Math.atan2(dy, dx) * 180 / Math.PI) + 450) % 360;          // 0° = oben, im Uhrzeigersinn (wie CSS conic-gradient)
+      const keule = 1 - Math.abs((grad % 120) - 60) / 60;                         // 0 an den Kanten, 1 in der Mitte jeder Keule
+      const rand = r > M * 0.8 ? Math.max(0, 1 - (r - M * 0.8) / (M * 0.2)) : 1;  // zum Rand hin auslaufen (ersetzt den Weichzeichner)
+      const a = 0.32 * keule * rand;
+      if (Math.pow(a, 0.62) > ppBayer(x + 2, y + 1)) setze(x, y, [255, 217, 102, 1]);
+    }
+  }, 1);
+}
+
 function OpponentUnlockPopup() {
   const [queue, setQueue] = useState([]);
 
   useEffect(() => {
     const onUnlocked = (data) => {
       const list = (data && data.opponents) || [];
+      list.forEach(o => o && window.ppDeckVorwaermen && window.ppDeckVorwaermen(o.warm, true));
       if (list.length) setQueue(q => [...q, ...list]);
     };
     // Skin-Game gewonnen: derselbe Popup-Rahmen, nur mit Skin-Bild und -Text.
@@ -2987,6 +3143,7 @@ function OpponentUnlockPopup() {
   useEffect(() => {
     if (!current) return;
     if (window.playSFX) window.playSFX('ascension');
+    if (current.deckAdded && window.playSFX) window.playSFX('shop_purchase', { delay: 650, dedupe: 0 });   // Deck-Geschenk: zweiter Klang hinterher
     const onKey = (e) => { if (e.key === 'Enter' || e.key === 'Escape') { e.preventDefault(); dismiss(); } };
     window.addEventListener('keydown', onKey, true);
     return () => window.removeEventListener('keydown', onKey, true);
@@ -3001,11 +3158,13 @@ function OpponentUnlockPopup() {
       style={{
         position: 'fixed', inset: 0, zIndex: 100000,
         display: 'flex', alignItems: 'center', justifyContent: 'center',
-        background: 'radial-gradient(circle at 50% 45%, rgba(40,28,5,.55), rgba(5,3,12,.9))',
-        backdropFilter: 'blur(3px)',
         animation: 'ppUnlockFade .3s ease both',
       }}
     >
+      {/* ★ W86u2 (Pixelart): Abdunklung als Dither-Pixelbild statt Radialverlauf mit Alpha + Hintergrund-Weichzeichner */}
+      <PpVerlauf px={4} style={{ position: 'absolute', inset: 0 }}
+        gradient="radial-gradient(circle at 50% 45%, rgba(39,24,12,.42), rgba(8,6,12,.84))"
+        retroGradient="radial-gradient(circle at 50% 45%, rgba(39,24,12,.55), rgba(8,6,12,.9))" />
       <style>{`
         @keyframes ppUnlockFade { from { opacity: 0; } to { opacity: 1; } }
         @keyframes ppUnlockPop {
@@ -3015,82 +3174,115 @@ function OpponentUnlockPopup() {
         }
         @keyframes ppUnlockSpin { to { transform: rotate(360deg); } }
         @keyframes ppUnlockGlow {
-          0%,100% { box-shadow: 0 0 28px rgba(255,200,60,.55), 0 0 70px rgba(255,160,20,.35), inset 0 0 24px rgba(255,200,60,.18); }
-          50% { box-shadow: 0 0 44px rgba(255,225,120,.85), 0 0 110px rgba(255,170,30,.55), inset 0 0 34px rgba(255,210,90,.3); }
+          0%,100% { box-shadow: 0 0 0 4px #8b5b04, 0 0 0 8px #5a3c14, 0 0 0 12px #27180c; }
+          50% { box-shadow: 0 0 0 4px #fbe181, 0 0 0 8px #a87c00, 0 0 0 12px #72541d, 0 0 0 16px #332300; }
+        }
+        @keyframes ppUnlockKonfetti { from { transform: translateY(-24px); } to { transform: translateY(calc(100vh + 24px)); } }
+        /* Handy quer (niedrige Hoehe): Bild links, Text rechts — sonst sprengt der Dialog den Bildschirm */
+        @media (max-height: 600px) {
+          .pp-unlock-rahmen { display: grid !important; grid-template-columns: auto 1fr; column-gap: 16px; align-items: center; width: min(94vw, 620px) !important; padding: 12px 18px 12px !important; }
+          .pp-unlock-rahmen > .pp-unlock-titel { grid-column: 1 / -1; margin-bottom: 8px !important; font-size: 12px !important; letter-spacing: 2px !important; }
+          .pp-unlock-rahmen > .pp-unlock-bild { grid-row: 2 / span 3; margin-bottom: 0 !important; }
+          .pp-unlock-rahmen > .pp-unlock-satz { font-size: 13px !important; margin-bottom: 8px !important; text-align: left; }
+          .pp-unlock-rahmen > .pp-unlock-deck { margin: 0 0 8px !important; font-size: 11px !important; text-align: left; padding: 6px 8px !important; }
+          .pp-unlock-rahmen > .pp-unlock-deck > div { font-size: 11px !important; }
+          .pp-unlock-rahmen > .pp-unlock-weiter { justify-self: start; padding: 6px 22px !important; font-size: 12px !important; }
+          .pp-unlock-ring { width: min(620px, 92vh) !important; height: min(620px, 92vh) !important; }
         }
         @keyframes ppUnlockTitle {
-          0%,100% { text-shadow: 0 0 10px rgba(255,210,90,.8), 0 0 22px rgba(255,160,20,.5); }
-          50% { text-shadow: 0 0 18px rgba(255,235,150,1), 0 0 40px rgba(255,180,40,.8); }
+          0%,100% { text-shadow: 2px 0 0 #72541d, -2px 0 0 #72541d, 0 2px 0 #72541d, 0 -2px 0 #72541d; }
+          50% { text-shadow: 2px 0 0 #a87c00, -2px 0 0 #a87c00, 0 2px 0 #a87c00, 0 -2px 0 #a87c00; }
         }
       `}</style>
+
+      {/* Tam-Tam: Pixel-Konfetti (harte Quadrate, ganze Pixel pro Schritt) fuer freigeschaltete Gegner — fest verteilt, damit nichts neu gewuerfelt wird */}
+      {current.kind !== 'skin' && (
+        <div style={{ position: 'absolute', inset: 0, overflow: 'hidden', pointerEvents: 'none' }}>
+          {Array.from({ length: 36 }, (_, i) => {
+            const farben = ['#fad54a', '#fc1c5f', '#4ceb70', '#1ca9fd', '#ff8b1a', '#a952ff'];
+            const gr = 4 + (i % 3) * 2;
+            return <div key={i} style={{
+              position: 'absolute', top: 0, left: ((i * 37 + 11) % 100) + '%', width: gr, height: gr, background: farben[i % farben.length],
+              animation: `ppUnlockKonfetti ${2.6 + (i % 5) * 0.45}s steps(${24 + (i % 4) * 6}) ${(i % 9) * 0.22}s infinite`,
+            }} />;
+          })}
+        </div>
+      )}
 
       {/* Rotating shimmer ring behind the card */}
       <div style={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
            onClick={e => e.stopPropagation()}>
-        <div style={{
-          position: 'absolute', width: 620, height: 620, borderRadius: '50%',
-          background: 'conic-gradient(from 0deg, rgba(255,200,60,0) 0deg, rgba(255,210,90,.32) 60deg, rgba(255,200,60,0) 120deg, rgba(255,210,90,.32) 180deg, rgba(255,200,60,0) 240deg, rgba(255,210,90,.32) 300deg, rgba(255,200,60,0) 360deg)',
-          filter: 'blur(6px)', animation: 'ppUnlockSpin 14s linear infinite', pointerEvents: 'none',
+        <div className="pp-unlock-ring" style={{
+          position: 'absolute', width: 620, height: 620,
+          ...(window.PP_RETRO ? { borderRadius: '50%', background: 'conic-gradient(from 0deg, rgba(255,198,28,0) 0deg, rgba(255,217,102,.32) 60deg, rgba(255,198,28,0) 120deg, rgba(255,217,102,.32) 180deg, rgba(255,198,28,0) 240deg, rgba(255,217,102,.32) 300deg, rgba(255,198,28,0) 360deg)', filter: 'blur(6px)' }
+            : { backgroundImage: `url(${ppUnlockRingUrl()})`, backgroundSize: '100% 100%', imageRendering: 'pixelated' }),
+          animation: 'ppUnlockSpin 14s linear infinite', pointerEvents: 'none',
         }} />
 
         {/* Ornate frame */}
-        <div style={{
+        <div className="pp-unlock-rahmen" style={{
           position: 'relative',
           width: 'min(90vw, 460px)',
           padding: '34px 36px 30px',
           textAlign: 'center',
-          borderRadius: 18,
-          border: '3px solid #ffcf52',
-          outline: '1px solid rgba(255,225,140,.6)',
-          outlineOffset: 6,
-          background: 'linear-gradient(160deg, #241a36 0%, #15101f 55%, #1d1330 100%)',
+          border: '4px solid #fad54a',
+          outline: '2px solid #72541d',
+          outlineOffset: 8,
+          background: '#12101f',
           animation: 'ppUnlockPop .5s cubic-bezier(.18,.9,.3,1.2) both, ppUnlockGlow 2.6s ease-in-out infinite',
         }}>
           {/* Ornamental corner flourishes */}
           {[['top','left'],['top','right'],['bottom','left'],['bottom','right']].map(([v,h]) => (
             <div key={v+h} style={{
-              position: 'absolute', [v]: 6, [h]: 10, color: '#ffd76a',
-              fontSize: 20, lineHeight: 1, textShadow: '0 0 8px rgba(255,180,40,.8)', pointerEvents: 'none',
+              position: 'absolute', [v]: 6, [h]: 10, color: '#ffd966',
+              fontSize: 20, lineHeight: 1, pointerEvents: 'none',
             }}>✦</div>
           ))}
 
-          <div className="orbit-font" style={{
-            fontSize: 15, fontWeight: 800, letterSpacing: 3, color: '#ffd76a',
+          <div className="orbit-font pp-unlock-titel" style={{
+            fontSize: 15, fontWeight: 800, letterSpacing: 3, color: '#ffd966',
             marginBottom: 18, animation: 'ppUnlockTitle 2.2s ease-in-out infinite',
           }}>{current.kind === 'skin' ? '✦ NEW SKIN UNLOCKED ✦' : '✦ NEW OPPONENT UNLOCKED ✦'}</div>
 
           {/* Hero portrait in a gold frame */}
-          <div style={{
-            display: 'inline-block', padding: 4, borderRadius: 10,
-            border: '2px solid #ffcf52', background: '#0a0a12',
-            boxShadow: '0 0 18px rgba(255,190,50,.5)', marginBottom: 18,
+          <div className="pp-unlock-bild" style={{
+            display: 'inline-block', padding: 4,
+            border: '2px solid #fad54a', background: '#08060c',
+            boxShadow: '0 0 0 4px #72541d', marginBottom: 18,
           }}>
             {heroArt
-              ? <HeroArtCrop heroName={current.kind === 'skin' ? current.heroName : current.middleHero} skinName={current.kind === 'skin' ? current.skinName : null} width={300} />
-              : <div style={{ width: 300, height: 200, background: '#1a1a28' }} />}
+              ? <HeroArtCrop heroName={current.kind === 'skin' ? current.heroName : current.middleHero} skinName={current.kind === 'skin' ? current.skinName : null} width={(window.ppIsPhone && window.ppIsPhone()) ? 190 : 300} />
+              : <div style={{ width: 300, height: 200, background: '#1a1a2e' }} />}
           </div>
 
-          <div style={{ fontSize: 16, color: 'var(--text)', lineHeight: 1.5, marginBottom: 22 }}>
+          <div className="pp-unlock-satz" style={{ fontSize: 16, color: 'var(--text)', lineHeight: 1.5, marginBottom: 22 }}>
             You unlocked{' '}
             <span className="orbit-font" style={{
-              color: '#ffe08a', fontWeight: 800, fontSize: 20,
-              textShadow: '0 0 12px rgba(255,190,50,.7)',
+              color: '#fbe181', fontWeight: 800, fontSize: 20,
+              textShadow: '2px 2px 0 #72541d',
             }}>{current.kind === 'skin' ? current.skinName : (current.middleHero || current.name)}</span>{' '}
             {current.kind === 'skin' ? <>as a new skin for <b>{current.heroName}</b>!</> : 'as a new opponent!'}
           </div>
 
+          {current.deckAdded && (
+            <div className="pp-unlock-deck" style={{ margin: '-8px 0 22px', padding: '10px 12px', border: '2px solid #4ceb70', background: '#08060c', color: '#4ceb70', fontSize: 14, lineHeight: 1.5 }}>
+              <div className="orbit-font" style={{ fontSize: 13, fontWeight: 800, letterSpacing: 2, marginBottom: 4 }}>🃏 DECK ADDED TO YOUR DECKS!</div>
+              <span style={{ color: 'var(--text)' }}>You can now play the <b>{current.name}</b> deck yourself — find it in your deck list.{current.guest ? ' Register to keep it!' : ''}</span>
+            </div>
+          )}
+
           <button
             onClick={dismiss}
-            className="orbit-font"
+            className="orbit-font pp-unlock-weiter"
             style={{
               padding: '10px 34px', fontSize: 14, fontWeight: 800, letterSpacing: 2,
-              color: '#3a2600', cursor: 'pointer', borderRadius: 8, border: 'none',
-              background: 'linear-gradient(180deg, #ffe27a 0%, #ffc23a 60%, #f0a51c 100%)',
-              boxShadow: '0 0 16px rgba(255,190,50,.7), 0 3px 0 #b9791a',
+              color: '#332300', cursor: 'pointer', border: 'none',
+              background: '#ffb91a',
+              boxShadow: 'inset 0 4px 0 #fbe181, inset 0 -4px 0 #f9ac20, 0 4px 0 #c68206',
               transition: 'transform .12s ease, box-shadow .12s ease',
             }}
-            onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = '0 0 26px rgba(255,210,90,.9), 0 5px 0 #b9791a'; }}
-            onMouseLeave={e => { e.currentTarget.style.transform = ''; e.currentTarget.style.boxShadow = '0 0 16px rgba(255,190,50,.7), 0 3px 0 #b9791a'; }}
+            onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = 'inset 0 4px 0 #f9ecb3, inset 0 -4px 0 #f9ac20, 0 6px 0 #c68206'; }}
+            onMouseLeave={e => { e.currentTarget.style.transform = ''; e.currentTarget.style.boxShadow = 'inset 0 4px 0 #fbe181, inset 0 -4px 0 #f9ac20, 0 4px 0 #c68206'; }}
           >CONTINUE</button>
         </div>
       </div>
@@ -3152,6 +3344,156 @@ function applyPixelHoverCursor(hex) {
   if (_cursorImg.complete && _cursorImg.naturalWidth) _drawHoverCursor();
 }
 
+// Hochkant-Sperre: das Spiel laeuft nur quer. Wer ueber einen Social-Link (TikTok/Instagram/Shorts) aufs Handy kommt, sieht
+// zuerst diesen Bildschirm — deshalb mit Titelbild, Logo, einem Handy-Sprite, das sich quer legt, und einem Hinweis zum
+// Weitergeben des Links (am PC/Tablet spielen). Sichtbar nur im Hochformat (CSS `.rotate-device-overlay`).
+function RotateOverlay() {
+  const [copied, setCopied] = useState(false);
+  // Standard (Android/Chrome u. a.): ein Antippen irgendwo startet Vollbild + Querformat-Sperre, das Geraet dreht sich von
+  // selbst — der Bildschirm sagt nur „Tap to play". Wo das nicht geht (iPhone-Safari, Sperre verweigert): die Dreh-Anweisung.
+  const [failed, setFailed] = useState(false);
+  const [tapped, setTapped] = useState(!!window._ppTapStarted);
+  const camRef = useRef(null);
+  const canAuto = !!(window._ppFullscreenSupported && window._ppLandscapeLockSupported);
+  const auto = canAuto && !failed;
+  // Tap-Schranke: auf Telefonen (grober Zeiger, kurze Seite <= 700 px) bleibt der Bildschirm in JEDER Ausrichtung stehen, bis
+  // getippt wurde — wer das Handy von Hand kippt, kommt NICHT am Tippen vorbei (das Tippen startet Vollbild + Querformat).
+  const phoneLike = !!(window.matchMedia && matchMedia('(pointer: coarse)').matches && Math.min(window.screen.width, window.screen.height) <= 700);
+  const gate = canAuto && phoneLike && !tapped;
+  // Schalter fuer das CSS (`body[data-rotate-gate]`) — bewusst KEIN `body:has(.rotate-gate)`, siehe style.css.
+  useEffect(() => {
+    if (!gate) return undefined;
+    document.body.setAttribute('data-rotate-gate', '');
+    return () => document.body.removeAttribute('data-rotate-gate');
+  }, [gate]);
+  const enter = () => {
+    if (!auto) return;
+    window._ppTapStarted = true; setTapped(true);
+    window._ppRequestFullscreen(true).then(r => { if (!r.locked) setFailed(true); });
+  };
+
+  const copyLink = () => {
+    const url = window.location.origin;
+    const done = () => { setCopied(true); setTimeout(() => setCopied(false), 2200); };
+    try {
+      if (navigator.clipboard && navigator.clipboard.writeText) { navigator.clipboard.writeText(url).then(done, done); return; }
+    } catch (e) { /* weiter mit dem Notweg */ }
+    try {
+      const ta = document.createElement('textarea'); ta.value = url; ta.style.position = 'fixed'; ta.style.opacity = '0';
+      document.body.appendChild(ta); ta.select(); document.execCommand('copy'); document.body.removeChild(ta);
+    } catch (e) { /* nichts zu tun */ }
+    done();
+  };
+  return (
+    <div className={'rotate-device-overlay' + (gate ? ' rotate-gate' : '')} id="rotate-overlay" onClick={enter}>
+      <div className="rotate-cam" ref={camRef} aria-hidden="true"><TapBackdropCanvas hostRef={camRef} /></div>
+      <div className="rotate-content">
+        <div className="pp-logo-stack rotate-logo">
+          <PpLogoBild />
+        </div>
+        {auto ? (
+          <div className="rotate-play" aria-hidden="true">
+            <svg viewBox="0 0 14 14" shapeRendering="crispEdges">
+              <rect x="0" y="0" width="14" height="14" className="pl-edge" />
+              <rect x="1" y="1" width="12" height="12" className="pl-body" />
+              <rect x="4" y="3" width="2" height="8" className="pl-tri" />
+              <rect x="6" y="4" width="2" height="6" className="pl-tri" />
+              <rect x="8" y="5" width="2" height="4" className="pl-tri" />
+              <rect x="10" y="6" width="1" height="2" className="pl-tri" />
+            </svg>
+          </div>
+        ) : (
+          <div className="rotate-phone" aria-hidden="true">
+            <svg className="rot-phone-p" viewBox="0 0 14 22" shapeRendering="crispEdges">
+              <rect x="0" y="0" width="14" height="22" className="ph-edge" />
+              <rect x="1" y="1" width="12" height="20" className="ph-body" />
+              <rect x="2" y="3" width="10" height="15" className="ph-screen" />
+              <rect x="5" y="1" width="4" height="1" className="ph-edge" />
+              <rect x="6" y="19" width="2" height="1" className="ph-edge" />
+              <rect x="4" y="6" width="2" height="2" className="ph-spark" />
+              <rect x="8" y="11" width="2" height="2" className="ph-spark" />
+              <rect x="5" y="14" width="1" height="1" className="ph-spark" />
+            </svg>
+            <svg className="rot-phone-l" viewBox="0 0 22 14" shapeRendering="crispEdges">
+              <rect x="0" y="0" width="22" height="14" className="ph-edge" />
+              <rect x="1" y="1" width="20" height="12" className="ph-body" />
+              <rect x="3" y="2" width="15" height="10" className="ph-screen" />
+              <rect x="20" y="5" width="1" height="4" className="ph-edge" />
+              <rect x="1" y="6" width="1" height="2" className="ph-edge" />
+              <rect x="6" y="4" width="2" height="2" className="ph-spark" />
+              <rect x="11" y="8" width="2" height="2" className="ph-spark" />
+              <rect x="14" y="5" width="1" height="1" className="ph-spark" />
+            </svg>
+          </div>
+        )}
+        {auto ? (
+          <div className="rotate-panel rotate-panel-tap">
+            <div className="rotate-text rotate-tap-text">TAP TO PLAY</div>
+            <div className="rotate-sub">Tap anywhere to start the battle.</div>
+          </div>
+        ) : (
+          <div className="rotate-panel">
+            <div className="rotate-text">Turn your phone sideways!</div>
+            <div className="rotate-sub">Pixel Parties is played in landscape. Rotate your device and the battle begins.</div>
+            {window._ppFsLast && window._ppFsLast.err && <div className="rotate-diag">Auto-rotate failed: {String(window._ppFsLast.err)}</div>}
+          </div>
+        )}
+        <div className="rotate-panel rotate-panel-pc" onClick={(e) => e.stopPropagation()}>
+          <div className="rotate-sub">Rather play on a PC or tablet? It is free in your browser:</div>
+          <div className="rotate-url">pixelpartiestcg.com</div>
+          <div className="rotate-actions">
+            <button type="button" className="rotate-copy" onClick={(e) => { e.stopPropagation(); copyLink(); }}>{copied ? 'COPIED!' : 'COPY LINK'}</button>
+            <DiscordButton size={22} label="Discord" />
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// iPhone/iPad-Safari kennen kein Vollbild fuer Webseiten (keine Fullscreen-API) — die Browserleiste bleibt. Einziger Weg:
+// „Zum Home-Bildschirm" (manifest.json: display fullscreen, orientation landscape). Ein einmaliger, wegklickbarer Hinweis.
+function IosFullscreenHint() {
+  const KEY = 'pp_ios_fs_hint';
+  const [hidden, setHidden] = useState(() => { try { return !!localStorage.getItem(KEY); } catch { return false; } });
+  const ios = /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  const standalone = window.navigator.standalone === true || (window.matchMedia && (matchMedia('(display-mode: standalone)').matches || matchMedia('(display-mode: fullscreen)').matches));
+  const hide = () => { setHidden(true); try { localStorage.setItem(KEY, '1'); } catch {} };
+  useEffect(() => { if (!ios || standalone || hidden) return; const t = setTimeout(hide, 20000); return () => clearTimeout(t); }, [ios, standalone, hidden]);
+  if (!ios || standalone || hidden) return null;
+  return (
+    <div className="ios-fs-hint" role="status">
+      <div className="ios-fs-text">Want true fullscreen? Tap Share, then Add to Home Screen.</div>
+      <button type="button" className="rotate-copy" onClick={hide}>OK</button>
+    </div>
+  );
+}
+
+/**
+ * ★ W86u2 (Pixelart): der Seitenhintergrund (`body`, Diagonalverlauf Schwarz → Dunkelviolett → Grau) als Dither-Pixelbild (4-px-Punkte, Bayer
+ * zwischen den Farbstopps) statt stufenlosem Verlauf. Wird bei Groessenaenderung neu gemalt (Groesse grob gerastert, Bilder werden gemerkt).
+ * Retro-Modus: bleibt der CSS-Verlauf.
+ */
+function PpSeitenGrund() {
+  useEffect(() => {
+    if (window.PP_RETRO || !window.ppPxVerlaufUrl) return undefined;
+    const verlauf = 'linear-gradient(135deg, #08060c 0%, #19062d 50%, #141414 100%)';
+    const setzen = () => {
+      const q = (v) => Math.max(64, Math.round(v / 64) * 64);
+      const url = ppPxVerlaufUrl(verlauf, q(window.innerWidth), q(window.innerHeight), 4);
+      if (!url) return;
+      const st = document.body.style;
+      st.backgroundImage = `url(${url})`; st.backgroundSize = '100% 100%'; st.backgroundRepeat = 'no-repeat'; st.imageRendering = 'pixelated';
+    };
+    setzen();
+    let t = 0;
+    const spaeter = () => { clearTimeout(t); t = setTimeout(setzen, 200); };
+    window.addEventListener('resize', spaeter);
+    return () => { clearTimeout(t); window.removeEventListener('resize', spaeter); document.body.style.backgroundImage = ''; };
+  }, []);
+  return null;
+}
+
 function App() {
   const [user, setUser] = useState(null);
   const [screen, setScreen] = useState('menu');
@@ -3171,7 +3513,7 @@ function App() {
   // Expose the player's chosen colour as a global CSS variable so every
   // screen/submenu (titles, etc.) can theme off it via var(--player-color).
   useEffect(() => {
-    const col = (user && user.color) || '#00f0ff';
+    const col = (user && user.color) || '#66b6ff';
     document.documentElement.style.setProperty('--player-color', col);
     // Recolour the hover/clickable cursor to a shining tone of this colour.
     applyPixelHoverCursor(col);
@@ -3228,6 +3570,9 @@ function App() {
       // `challengeStart`: eine angenommene Herausforderung (social.js) schickt beide Spieler aus dem Menü ins Spiel.
       if (state.reconnected || state.challengeStart) {
         // Puzzle games are ephemeral — don't reconnect, just clean up
+        // Ausnahme: ein LAUFENDES Tutorial dieser Seitensitzung (`_currentTutorialNum`) bleibt — ein kurzer Netz-/App-Wechsel am Handy darf es nicht beenden;
+        // der Tutorial-Hook (app-screens) nimmt den frisch gesendeten Zustand selbst entgegen. Nach einem Neuladen (keine Tutorialnummer) wird wie bisher geraeumt.
+        if (state.isPuzzle && state.isTutorial && window._currentTutorialNum && !window._tutorialGaveUp) return;
         if (state.isPuzzle) {
           socket.emit('leave_game', { roomId: state.roomId });
           return;
@@ -3254,7 +3599,7 @@ function App() {
 
   // Sync accent color to user's profile color
   useEffect(() => {
-    document.documentElement.style.setProperty('--accent', user && user.color ? user.color : '#00f0ff');
+    document.documentElement.style.setProperty('--accent', user && user.color ? user.color : '#66b6ff');
   }, [user?.color]);
 
   // ── App-wide tooltip wheel-scroll redirect ──
@@ -3354,11 +3699,8 @@ function App() {
   return (
     <AppContext.Provider value={ctx}>
       {/* Global portrait rotation lock — all screens need landscape */}
-      <div className="rotate-device-overlay" id="rotate-overlay">
-        <div className="rotate-icon">📱</div>
-        <div className="rotate-text">Please rotate your device</div>
-        <div className="rotate-sub">Pixel Parties requires landscape orientation for the best experience</div>
-      </div>
+      <RotateOverlay />
+      <IosFullscreenHint />
       <MusicManager bgmMode={user ? bgmMode : 'login'} />
       <TextBox />
       <OpponentUnlockPopup />
@@ -3374,6 +3716,7 @@ function App() {
           Sobald ein Kampffeld im Baum haengt, blendet CSS die Schicht
           aus — dort deckt das Brett sie ohnehin ab, und laufende
           Animationen waehrend einer Partie kosten nur Bildrate. */}
+      <PpSeitenGrund />
       <MenuBackgroundParticles />
       <GameErrorBoundary>
         {!user ? <AuthScreen /> :

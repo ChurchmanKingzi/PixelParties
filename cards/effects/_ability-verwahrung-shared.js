@@ -346,6 +346,11 @@ async function _landung(engine, e, slotIdx) {
   if (e.stapelBesitzer !== e.seite) inst.originalOwner = e.stapelBesitzer;
   engine.log('verwahrung_zurueck', { player: ps.username, card: e.name, hero: hero.name });
   engine.sync();
+  if (e.zoneKind === 'support') {
+    // 24.10.: eine Ability in einer Support Zone (Xal) bekommt dieselben Anlege-Hooks wie in einer echten Zone.
+    await engine.abilityImSupportBetreten(inst, { _skipReactionCheck: true, _bypassDeadHeroFilter: true, _verwahrungRueckkehr: true });
+    return;
+  }
   await engine.runHooks('onPlay', {
     _onlyCard: inst, playedCard: inst, cardName: e.name,
     zone: e.zoneKind, heroIdx: e.heroIdx, zoneSlot: slotIdx,

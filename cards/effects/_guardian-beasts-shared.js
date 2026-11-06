@@ -203,6 +203,9 @@ async function deleteSelectedDiscardCards(engine, picks, sourceName) {
     if (p?.owner != null && p?.idx != null) byOwner[p.owner].push(p);
   }
   const deletedNames = [];
+  // W7b (A07-13/A07-18): woher die geloeschten Karten kamen (Besitzer + Platz), damit eine Kostenzahlung, deren Wirkung
+  // nicht stattfindet, zurueckgegeben werden kann (`ruecklegenGeloeschteAblagekarten`). Haengt als Eigenschaft am Ergebnis-Array.
+  const herkunft = [];
   // Per-pile name buckets so we can fire one batch animation per
   // owner after the splices. Animation order matches splice order.
   const animByOwner = [[], []];
@@ -231,6 +234,7 @@ async function deleteSelectedDiscardCards(engine, picks, sourceName) {
         card: cardName, player: ps.username, source: sourceName || ARCHETYPE,
       });
       deletedNames.push(cardName);
+      herkunft.push({ owner: pi, idx: p.idx, cardName });
       animByOwner[pi].push(cardName);
     }
   }
@@ -247,7 +251,37 @@ async function deleteSelectedDiscardCards(engine, picks, sourceName) {
     });
   }
   if (deletedNames.length > 0) engine.sync();
+  deletedNames.herkunft = herkunft;
   return deletedNames;
+}
+
+/**
+ * W7b (A07-13 Hu, A07-18 Mao; Al 14.10.): gibt Karten zurueck, die als Kosten aus den Ablagen geloescht wurden (Ergebnis von
+ * `promptAndDeleteFromBothDiscards`), wenn die bezahlte Wirkung nicht stattfindet (Aktionswahl abgebrochen, Effekt kann nicht
+ * feuern). Jede Karte verlaesst den Geloescht-Stapel ihres Besitzers wieder und kehrt an ihren alten Platz in der Ablage zurueck
+ * (aufsteigend einsortiert, damit die Reihenfolge stimmt). Rettungen (`_tryBeforeDelete`) fehlen in `herkunft` und bleiben, wo sie sind.
+ */
+function ruecklegenGeloeschteAblagekarten(engine, geloescht) {
+  const herkunft = geloescht && geloescht.herkunft;
+  if (!engine || !Array.isArray(herkunft) || herkunft.length === 0) return 0;
+  // W66b: die Rückabwicklung ist Buchführung im Kosten-Vorlauf (committet den Auftritt nicht, Ereignisse verfallen mit dem Puffer)
+  engine._auftrittSchrittAus = (engine._auftrittSchrittAus || 0) + 1;
+  try {
+    let n = 0;
+    const sortiert = herkunft.slice().sort((a, b) => a.idx - b.idx);
+    for (const h of sortiert) {
+      if (!engine.gs?.players?.[h.owner]) continue;
+      // Stapel-Schicht statt eigener Splice: die Karte verlaesst den Geloescht-Stapel (Rueckabwicklung, keine Verwahrungs-Sperre)
+      // und kehrt mit `returnToPile` an ihren alten Platz zurueck.
+      const k = engine.takeFromPileSync(h.owner, 'deleted', h.cardName, { last: true, _verwahrungFreigabe: true, source: 'cost_refund' });
+      if (!k) continue;
+      engine.returnToPile(h.owner, 'discard', h.cardName, Math.min(h.idx, (engine.gs.players[h.owner].discardPile || []).length));
+      engine.log('card_restored_to_discard', { card: h.cardName, player: engine.gs.players[h.owner].username, reason: 'cost_refunded' });
+      n++;
+    }
+    if (n > 0) engine.sync();
+    return n;
+  } finally { engine._auftrittSchrittAus = Math.max(0, (engine._auftrittSchrittAus || 1) - 1); }
 }
 
 /**
@@ -360,6 +394,24 @@ async function promptAndDeleteFromBothDiscards(ctx, opts = {}) {
   // anything.
   if (!achievable.includes(picks.length)) return null;
 
+  // W7b (A07-18, Al 15.10.): optionale Pruefung der gewaehlten Karten VOR dem Loeschen (`opts.validatePicks(picks)`, Mao: die Bestie muss
+  // nach der Zahlung noch feuern koennen). Ungueltige Wahl → Neu-Abfrage (abbrechbar), nach 3 Fehlversuchen gilt es als Abbruch.
+  if (typeof opts.validatePicks === 'function') {
+    let ok = false;
+    try { ok = !!opts.validatePicks(picks); } catch { ok = false; }
+    if (!ok) {
+      const versuch = (opts._versuch || 0) + 1;
+      if (versuch >= 3) return null;
+      return promptAndDeleteFromBothDiscards(ctx, { ...opts, _versuch: versuch,
+        description: (opts.description || '') + ' (That selection would leave the Creature unable to activate - choose again.)' });
+    }
+  }
+
+  // ★ W66b (Al, 23.10.2026): `opts.vorlauf` — die Löschkosten werden vor einer späteren ABBRECHBAREN Stufe bezahlt (Guardian Beast Hu: Aktionswahl). Sie laufen im Kosten-Vorlauf der Engine:
+  // nichts davon committet den Auftritt der Karte, der Gegner sieht erst etwas, wenn die Folgestufe committed ist; bei einem Abbruch verfällt alles (`ruecklegenGeloeschteAblagekarten`).
+  if (opts.vorlauf && typeof engine.imKostenVorlauf === 'function') {
+    return engine.imKostenVorlauf(() => deleteSelectedDiscardCards(engine, picks, opts.sourceName || ARCHETYPE));
+  }
   return deleteSelectedDiscardCards(engine, picks, opts.sourceName || ARCHETYPE);
 }
 
@@ -485,6 +537,9 @@ function buildAllBoardTargets(engine, opts = {}) {
     if (!cd) continue;
     if (opts.excludeInstId === inst.id) continue;
     if (typeof opts.excludeName === 'string' && inst.name === opts.excludeName) continue;
+    // W16d (A07-10): „targets on the board" = Helden und KREATUREN (Konvention wie Kohta, CARD_API) – Ausrüstung,
+    // Anhängsel & Co. in den Support Zones sind keine Ziele (Artifact Creatures zählen als Kreatur).
+    if (!engine.isChoosableAsCreature(inst, cd)) continue;
     if (typeof opts.creaturesOnly === 'function' && !opts.creaturesOnly(inst, cd)) continue;
     out.push({
       id: `equip-${inst.owner}-${inst.heroIdx}-${inst.zoneSlot}`, type: 'equip',
@@ -509,6 +564,7 @@ module.exports = {
   buildDiscardGallery,
   deleteSelectedDiscardCards,
   promptAndDeleteFromBothDiscards,
+  ruecklegenGeloeschteAblagekarten,
   rangeValidCounts,
   multiplesOfK,
   deleteTopOfOwnDiscard,

@@ -47,7 +47,7 @@ function getCapturableCreatures(engine, pi) {
   const oppIdx = engine.opponentOf(pi);
   const ps = engine.gs.players[pi];
   if (!ps) return [];
-  const gold = ps.gold || 0;
+  const gold = engine.goldSpendBlocked(pi) ? 0 : (ps.gold || 0);   // G1 (A09-11): Goldsperre - nur Kosten 0 (Level 0) zahlbar
   const cardDB = engine._getCardDB();
   const oppShielded = engine._isSideNondamageShielded(oppIdx);
   const out = [];
@@ -90,6 +90,7 @@ module.exports = {
   stealsFromEitherSide: true,
 
   isTargetingArtifact: true,
+  blockedByHandLock: true,   // Z6 (F01-21): Ausgrau-Liste/Server-Tor; nur die HAND-Sperre (Such-Sperre: Gruppe D, nicht betroffen)
   // cards.json cost (4) is the BASE — real cost is level × 4, so the
   // engine must not auto-deduct; resolve() deducts manually.
   manualGoldCost: true,
@@ -100,6 +101,7 @@ module.exports = {
     const eng = engine || gs._engineRef;
     if (!eng) return false;
     if (hoptUsed(eng, pi)) return false;
+    if (eng.handZugangGesperrt?.(pi)) return false;   // Z6 (F01-21): einziger Nutzen = Karte auf die Hand
     return getCapturableCreatures(eng, pi).length > 0;
   },
 
@@ -117,6 +119,9 @@ module.exports = {
     cancellable: true,
     exclusiveTypes: true,
     maxPerType: { equip: 1 },
+    // Genau EIN Ziel (siehe Dark Gear): ohne eigenes `maxTotal` waere der Standard-Deckel floor(Gold / 4) = 0 unter 4 Gold, obwohl eine
+    // Stufe-0-Kreatur nichts kostet.
+    maxTotal: 1,
   },
 
   validateSelection: (selectedIds) => !!selectedIds && selectedIds.length === 1,
@@ -132,6 +137,7 @@ module.exports = {
 
     // Defensive HOPT recheck.
     if (hoptUsed(engine, pi)) return { aborted: true };
+    if (engine.handZugangGesperrt?.(pi)) return { aborted: true };   // Z6 (F01-21): vor der Zahlung
 
     // Re-resolve the live Creature instance.
     const inst = (target.cardInstance && engine.cardInstances.find(c => c.id === target.cardInstance.id))
@@ -168,7 +174,7 @@ module.exports = {
 
     // ── Animation phase 1: the net plummets onto the Creature ──
     engine._broadcastEvent('play_zone_animation', {
-      type: 'capture_net', owner: inst.owner,
+      type: 'capture_net', owner: engine.physicalSide(inst),   // W66d: Brettseite der Zone (Plant Golem: nicht der Beschwoerer)
       heroIdx: inst.heroIdx, zoneSlot: inst.zoneSlot,
       duration: 1900,
     });

@@ -10,8 +10,8 @@
 //     summoned by a Hero capable of summoning it
 //     normally (alive, sufficient ability levels
 //     for the Creature's level / schools, not
-//     Frozen / Stunned / Negated / Bound for
-//     Lv > 0 Creatures, with a free Support
+//     Frozen / Stunned / Negated / Bound (all
+//     levels, Welle 10), with a free Support
 //     Zone). Per user spec, the total number of
 //     Creatures selectable is the MAX BIPARTITE
 //     MATCHING between MM Creatures in hand and
@@ -38,6 +38,7 @@ const {
   applyFreezeToTarget,
 } = require('./_mischief-militia-shared');
 
+const { heroActionLocked } = require('./_summon-eligibility');
 const CARD_NAME = 'Mischief Invasion';
 
 // ─── Helpers ─────────────────────────────────
@@ -50,18 +51,27 @@ function _isMmCreature(cd) {
  * Can hero `heroIdx` legally host this card right now?
  * Mirrors the standard summoning gate:
  *   • Hero alive.
- *   • For Lv > 0 Creatures: hero not Frozen / Stunned / Negated / Bound.
+ *   • Hero not Frozen / Stunned / Negated / Bound / Webbed (alle Stufen, Welle 10 / Q44).
  *   • Spell-school requirement met via `heroMeetsLevelReq` (handles
  *     Performance, Mana Mining, Crystal multipliers, etc.).
  * Slot-level free-ness is checked separately when building slot list.
  */
-function _heroCanHostCreature(engine, pi, heroIdx, cd) {
+function _heroCanHostCreature(engine, pi, heroIdx, cd, ctrl = pi) {
   const ps = engine.gs.players[pi];
   const hero = ps?.heroes?.[heroIdx];
   if (!hero?.name || hero.hp <= 0) return false;
-  if ((cd.level || 0) > 0) {
+  // W20c (Al, 20.10.): nur der aktuelle Kontrolleur beschwoert mit dem Helden (ein abgegebener eigener Held faellt heraus).
+  if (pi === ctrl && engine.heroSideOf(pi, hero) !== ctrl) return false;
+  // Z6 (A06-27): "summon ... as additional Actions" ist eine echte Beschwoerung - Beschwoerungssperre des Kontrolleurs `ctrl`
+  // und die Aktionssperren des Hosts gelten (Ruling 8.8./28.8., `_summon-eligibility`).
+  if (engine.gs.players[ctrl]?.summonLocked) return false;
+  if (heroActionLocked(engine, ctrl, heroIdx, pi)) return false;
+  // Welle 10 (Al, Q44 / A06-rebelliokai-27): „'summon' erfordert grundsätzlich, dass der Beschwörer agieren kann, also nicht Frozen/Stunned ist" —
+  // das Status-Tor gilt für ALLE Stufen (der frühere Lv-0-Sonderfall entfällt).
+  {
     const s = hero.statuses || {};
-    if (s.frozen || s.stunned || s.negated || s.bound) return false;
+    // Welle 12 (Al): Negated sperrt nicht (nur Frozen/Stunned/Bound/Webbed); die harte Form begrenzt ueber `heroMeetsLevelReq` auf Stufe 0.
+    if (s.frozen || s.stunned || s.bound || s.webbed) return false;
   }
   if (!engine.heroMeetsLevelReq(pi, heroIdx, cd)) return false;
   return true;
@@ -94,7 +104,16 @@ function _enumerateFreeOwnSlots(engine, pi) {
  */
 function _enumerateHostSlotsForCreature(engine, pi, cd) {
   const slots = _enumerateFreeOwnSlots(engine, pi);
-  return slots.filter(s => _heroCanHostCreature(engine, s.owner, s.heroIdx, cd));
+  // ★ W63a (Al, 22.10.2026: Alices Effekt gilt fuer ALLE Beschwoerungs-Effekte; „erst die geteilte Zone, DANN die erste leere"): mit Alice-Teilung des Beschwoerers
+  // zaehlt auch die Zone einer GLEICHNAMIGEN Mischief-Militia-Creature — geteilte Zonen vorn (`_alice-shared.mitGeteilten`).
+  return require('./_alice-shared').mitGeteilten(engine, pi, cd.name,
+    slots.filter(s => _heroCanHostCreature(engine, s.owner, s.heroIdx, cd, pi)), {},
+    z => _heroCanHostCreature(engine, z.owner, z.heroIdx, cd, pi));
+}
+
+/** W63a: gibt es fuer `cd` mindestens eine GETEILTE Zone (Alice) bei einem Helden, der sie beschwoeren darf? */
+function _hatGeteilteZone(engine, pi, cd) {
+  return _enumerateHostSlotsForCreature(engine, pi, cd).some(z => z.shared);
 }
 
 /**
@@ -114,10 +133,12 @@ function _buildHandCopies(engine, pi, slots) {
     if (!_isMmCreature(cd)) continue;
     const eligibleSlotIdxs = [];
     for (let s = 0; s < slots.length; s++) {
-      if (_heroCanHostCreature(engine, slots[s].owner, slots[s].heroIdx, cd)) {
+      if (_heroCanHostCreature(engine, slots[s].owner, slots[s].heroIdx, cd, pi)) {
         eligibleSlotIdxs.push(s);
       }
     }
+    // W63a: eine GETEILTE Zone (Alice) braucht keinen freien Platz — ein privater Zusatzknoten je Kopie im Matching (Index ab `slots.length`).
+    if (_hatGeteilteZone(engine, pi, cd)) eligibleSlotIdxs.push(slots.length + copies.length);
     if (eligibleSlotIdxs.length === 0) continue; // un-summonable copy — drop
     copies.push({ name, cd, handIdx, eligibleSlotIdxs });
   }
@@ -175,6 +196,10 @@ function _pickSelectedCopies(selectedEntries, allCopies) {
 // ─── Card module ─────────────────────────────
 
 module.exports = {
+  // ★ Z7b: FIZZELT die Karte (Wirker beim Auflösen handlungsunfähig, v1328), war sie GESPIELT → Stempel (Engine: `_noteFizzledPlay`).
+  // Eine ganz NEGIERTE Karte stempelt nicht (Als Entscheidung, Welle 3).
+  onFizzledPlay: ({ engine, gs, pi }) => { gs.players[pi]._mischiefInvasionUsedTurn = gs.turn; },
+
   /**
    * Eligibility gate: need at least 1 Frozen target (cap > 0), at least
    * one MM Creature in hand whose level/school can be hosted by SOME own
@@ -188,7 +213,7 @@ module.exports = {
     if (ps._mischiefInvasionUsedTurn === gs.turn) return false;
     if (countFrozenTargets(engine) < 1) return false;
     const slots = _enumerateFreeOwnSlots(engine, pi);
-    if (slots.length === 0) return false;
+    // W63a: auch ohne freie Zone spielbar, wenn eine Kopie in eine geteilte Zone (Alice) passt (`_buildHandCopies` prueft beides)
     // At least one MM Creature in hand must be summonable somewhere.
     return _buildHandCopies(engine, pi, slots).length > 0;
   },
@@ -207,12 +232,8 @@ module.exports = {
       }
 
       const slots = _enumerateFreeOwnSlots(engine, pi);
-      if (slots.length === 0) {
-        engine.gs._spellCancelled = true;
-        return;
-      }
 
-      const copies = _buildHandCopies(engine, pi, slots);
+      const copies = _buildHandCopies(engine, pi, slots);   // W63a: ohne freie Zone nur Kopien mit geteilter Zone (Alice)
       if (copies.length === 0) {
         engine.gs._spellCancelled = true;
         return;
@@ -221,7 +242,7 @@ module.exports = {
       // ── Max matching across ALL summonable copies in hand. ──
       // The picker's cap is the matching size — bigger picks would
       // necessarily leave some Creature un-summonable.
-      const fullMatch = _maxMatching(copies, slots.length);
+      const fullMatch = _maxMatching(copies, slots.length + copies.length);   // W63a: + je ein privater Knoten fuer geteilte Zonen
       const cap = Math.min(frozenCount, fullMatch.count);
       if (cap < 1) {
         engine.gs._spellCancelled = true;
@@ -362,7 +383,8 @@ module.exports = {
           const zones = hosts.map(h => ({
             owner: h.owner,   // Kontrolle statt Seite (Styx 28.9.)
             heroIdx: h.heroIdx, slotIdx: h.slotIdx,
-            label: `${engine.gs.players[h.owner]?.heroes?.[h.heroIdx]?.name || 'Hero ' + (h.heroIdx + 1)} — Support ${h.slotIdx + 1}`,
+            label: `${engine.gs.players[h.owner]?.heroes?.[h.heroIdx]?.name || 'Hero ' + (h.heroIdx + 1)} — Support ${h.slotIdx + 1}${h.shared ? ` (×${h.stackDepth})` : ''}`,
+            ...(h.shared ? { shared: true, stackDepth: h.stackDepth } : {}),   // W63a: geteilte Zone (Alice) vorn, mit Kennzeichen
           }));
           const zp = await engine.promptGeneric(pi, {
             type: 'zonePick',
@@ -463,6 +485,7 @@ module.exports = {
       // got summoned, or as many as possible").
       const freezePick = await engine.promptEffectTarget(pi, freezeCandidates, {
         title: CARD_NAME,
+        sourceCard: ctx.card,   // Quelle -> Post-Target-Fenster (Castling, Invisibility Cloak) oeffnet (A06-33)
         description: `Choose ${freezeMax} target(s) to Freeze for 1 turn.`,
         confirmLabel: '❄️ Freeze!',
         confirmClass: 'btn-info',

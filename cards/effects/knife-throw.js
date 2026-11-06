@@ -34,9 +34,17 @@
 //  Der Wurf hat seit v727 eine eigene Animation `knife_throw_fly`:
 //  das Messer kommt flach und schnell aus dem Bildrand geflogen,
 //  schlaegt ein und spritzt Blut entgegen der Flugrichtung.
+//
+//  ★ Z7c (Als Entscheidung, Welle 3): die KOSTEN („… to play this card")
+//  werden in `payActivationCost` VOR dem Reaktionsfenster bezahlt — wird
+//  der Angriff danach komplett negiert, bleibt das Artefakt in der
+//  Ablage. Fehlt beim Zahlen die Ausruestung, gilt das wie ein Abbruch
+//  (`false`: Karte bleibt auf der Hand). Fallback: lief `payActivationCost`
+//  nicht (Sofort-Guss, anderer Weg), zahlt `onPlay` wie frueher selbst.
 // ═══════════════════════════════════════════
 
 const { hasCardType } = require('./_hooks');
+const ES = require('./_equip-stack-shared');
 
 const CARD_NAME = 'Knife Throw';
 const ATK_MULT = 2;
@@ -56,7 +64,49 @@ function ausruestungAm(engine, pi, heroIdx) {
   return out;
 }
 
+/**
+ * KOSTEN: ein ausgeruestetes Artefakt des Nutzers in die Ablage. Rueckgabe `true` = bezahlt,
+ * `false` = nicht zahlbar (nichts passiert). Eine Stelle fuer `payActivationCost` und den Fallback in `onPlay`.
+ */
+async function zahleKosten(ctx) {
+  const engine = ctx._engine;
+  const pi = ctx.cardOwner;
+  const heroIdx = ctx.cardHeroIdx;
+  const ps = engine.gs.players[pi];
+  const hero = ctx.attachedHero || ps?.heroes?.[heroIdx];   // v1364: geliehener Held (Love Shot, Charme) — physische Seite
+  if (!hero?.name || hero.hp <= 0) return false;
+  const ausruestung = ausruestungAm(engine, ctx.cardHeroOwner ?? pi, heroIdx);   // Als Befund 29.9.: Ausruestung des Nutzers auf seiner Brettseite
+  if (ausruestung.length === 0) return false;
+
+  let opfer = ausruestung[0];
+  // Darion: liegen mehrere Artefakte in EINEM Platz (gleiche Namen moeglich, eigene Counter), waehlt der Spieler die Karte per `instancePick` statt ueber den Namen.
+  const imStapel = ausruestung.some(i => ES.equipsAt(engine, engine.physicalSide(i), i.heroIdx, i.zoneSlot).length > 1);
+  if (ausruestung.length > 1 && imStapel) {
+    const [gewaehlt] = await ES.waehleMehrere(engine, pi, ausruestung, {
+      title: CARD_NAME, description: `Send one of ${hero.name}'s Artifacts to the discard pile to throw it.`, mindestens: 1, hoechstens: 1,
+    });
+    opfer = gewaehlt || ausruestung[0];
+  } else if (ausruestung.length > 1) {
+    const wahl = await engine.promptGeneric(pi, {
+      type: 'cardGallery', title: CARD_NAME,
+      description: `Send one of ${hero.name}'s Artifacts to the discard pile to throw it.`,
+      cards: ausruestung.map(i => ({ name: i.name, source: 'board' })),
+      cancellable: false,
+    });
+    opfer = ausruestung.find(i => i.name === wahl?.cardName) || ausruestung[0];
+  }
+  await engine.actionMoveCard(opfer, 'discard', -1, -1, {
+    source: ctx.card, sourceName: CARD_NAME,
+  });
+  engine.sync();
+  await engine._delay(200);
+  return true;
+}
+
 module.exports = {
+  // ★ Als Ruling (Al 26.10., Flame Avalanche: „Wenn du andere Schadenskarten unspielbar machst, müssen das Vial und Rockfall auch sein!"): die Karte richtet NUR Schaden an Zielen an (das Ablegen des Artefakts ist nur Kostenpunkt) —
+  // unter der Schadenssperre (`ps.damageLocked`) unspielbar (Karte bleibt auf der Hand, keine Aktion/Kosten; Sperr-Stutzen `engine._cardBlockedBySearchLock`).
+  blockedByDamageLock: true,
   // ★★ v1181 — ENTKOPPELTE ZAUBERBILDER (Al 17.9.): Wird der Zauber
   // NEGIERT, laeuft sein Effekt-Rumpf nie — die Engine spielt dann diese
   // Bilder, damit der abgewehrte Zauber trotzdem zu sehen ist. Im
@@ -77,7 +127,8 @@ module.exports = {
     if (!ps) return false;
     if ((ps.attacksPlayedThisTurn || 0) > 0) return false;   // „the only Attack\"
     if (ps._soleAttackTurn === gs.turn) return false;
-    return ausruestungAm(engine, pi, heroIdx).length > 0;
+    // Z1 (M01-26): "equipped to the user" - Brettseite des Nutzers (geliehener Held), nicht der gleich indizierte eigene.
+    return ausruestungAm(engine, engine.heldSeiteFuer(pi, heroIdx), heroIdx).length > 0;
   },
 
   cpuMeta: {
@@ -85,6 +136,12 @@ module.exports = {
     // Der Pilot soll wissen, dass diese Karte den Zug fuer weitere
     // Attacks schliesst — sie ist kein Auftakt, sondern der Schlusspunkt.
     endsAttackSequence: true,
+  },
+
+  /** ★ Z7c: Kosten („to play this card") vor dem Reaktionsfenster; `false` = nicht zahlbar → Abbruch ohne Verlust. */
+  async payActivationCost(ctx) {
+    if (!(await zahleKosten(ctx))) return false;
+    if (ctx.card) ctx.card._kostenBezahlt = true;
   },
 
   hooks: {
@@ -98,24 +155,9 @@ module.exports = {
       if (!hero?.name || hero.hp <= 0) { gs._spellCancelled = true; return; }
 
       // ── ① Kosten: ein ausgeruestetes Artefakt in die Ablage ──────
-      const ausruestung = ausruestungAm(engine, ctx.cardHeroOwner ?? pi, heroIdx);   // Als Befund 29.9.: Ausruestung des Nutzers auf seiner Brettseite
-      if (ausruestung.length === 0) { gs._spellCancelled = true; return; }
-
-      let opfer = ausruestung[0];
-      if (ausruestung.length > 1) {
-        const wahl = await engine.promptGeneric(pi, {
-          type: 'cardGallery', title: CARD_NAME,
-          description: `Send one of ${hero.name}'s Artifacts to the discard pile to throw it.`,
-          cards: ausruestung.map(i => ({ name: i.name, source: 'board' })),
-          cancellable: false,
-        });
-        opfer = ausruestung.find(i => i.name === wahl?.cardName) || ausruestung[0];
-      }
-      await engine.actionMoveCard(opfer, 'discard', -1, -1, {
-        source: ctx.card, sourceName: CARD_NAME,
-      });
-      engine.sync();
-      await engine._delay(200);
+      // Z7c: Normalweg — `payActivationCost` hat sie vor der Kette bezahlt; sonst (Fallback) jetzt.
+      if (ctx.card?._kostenBezahlt) delete ctx.card._kostenBezahlt;
+      else if (!(await zahleKosten(ctx))) { gs._spellCancelled = true; return; }
 
       // ── ② Ziel und Schaden ───────────────────────────────────────
       const damage = (hero.atk || 0) * ATK_MULT;

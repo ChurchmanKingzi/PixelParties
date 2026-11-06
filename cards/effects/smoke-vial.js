@@ -80,6 +80,9 @@ function blindImpact(engine, pi, helpers) {
 }
 
 module.exports = {
+  // ★ Welle 12 (B-06, Al: „Eine Karte, deren Effekt komplett nutzlos wäre, ist nicht spielbar."): trifft NUR den Gegner — gegen den durch die
+  // Erste-Runden-Immunität geschützten Spieler unspielbar (Karte bleibt auf der Hand, keine Aktion/Kosten; `engine.ersterZugGeschuetzt`).
+  blockedByFirstTurnProtection: true,
   // ★★ v1186 (Als Regel 18.9.): AoE OHNE SCHADEN. Die
   // Autoerkennung des Loaders haengt an der Schadensklammer —
   // diese Karte teilt keinen Schaden aus (Blinded auf ALLE gegnerischen Helden), waere
@@ -141,6 +144,22 @@ module.exports = {
       });
     }
     await engine._delay(450);
+
+    // ★ W16a (Al, Welle 16 Frage 1: „Ja"): auch der Trank öffnet die Hand-Reaktionsfenster (Post-Target wie bei den Flächenzaubern aus W15a):
+    // Divine Gift of Rain und Barrier of Faith ("card or effect") reagieren; Spell-/Attack-Reaktionen (Anti Magic Shield, Storm Ring,
+    // MOE Shield, Test Flight, Escape Device, Weathercock) lehnen den Trank selbst ab, "chosen"-Reaktionen bleiben zu (nichts wird gewählt).
+    // Keine "hit by"-Surprises (nur Attack/Spell/Creature effect) → Heldenliste leer. Quelle = schlichtes Objekt (Muster Bottled Lightning).
+    {
+      const ziele = [];
+      for (const { physOwner, heroIdx: hi, hero } of engine.heroesControlledBy(oi)) {
+        if (!hero?.name || hero.hp <= 0) continue;
+        ziele.push({ type: 'hero', owner: physOwner, heroIdx: hi, cardName: hero.name });
+      }
+      const sr = ziele.length
+        ? await engine.statusHitSurpriseWindow({ name: 'Smoke Vial', owner: pi, heroIdx: -1 }, [], 'other', { ziele })
+        : null;
+      if (sr?.effectNegated) { engine.sync(); return; }
+    }
 
     let landed = 0;
     // Kontrolle statt Seite (Styx 28.9.): „All Heroes your opponent controls".

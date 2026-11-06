@@ -7,7 +7,7 @@
 //                   Sieger 20 SC (−2 für jeden falschen Tipp, den ER für diese Karte schon abgegeben hat).
 //   !mystery skip   (Admin) Rätsel überspringen: Lösung zeigen, nächstes starten
 //
-//  • nur im Rätsel-Kanal (MYSTERY_CHANNEL_ID, voreingestellt auf den Kanal des Servers)
+//  • nur im Minigames-Kanal (MINIGAMES_CHANNEL_ID, voreingestellt auf den Kanal des Servers)
 //  • Rätsel entstehen unbegrenzt — aber nur das ERSTE neu erzeugte Rätsel jeder vollen Stunde ist SC wert (alle weiteren sind Übung)
 //  • SC gibt es nur mit verknüpftem Konto (!link); alle anderen dürfen mitspielen und gewinnen, bekommen aber keine SC
 //  • Tipps, die keiner Karte ähneln, oder die schon einmal getippt wurden, zählen nicht
@@ -22,7 +22,7 @@ const GUESS_COOLDOWN_MS = 1500;
 module.exports = function register(ctx) {
   const { client, config, db, game, helpers } = ctx;
   const GameApiError = game.GameApiError;
-  const channelId = () => config.channels.mystery;
+  const channelId = () => config.channels.minigames;
 
   // Alles, was den Spielstand ändert, nacheinander: zwei gleichzeitige richtige Tipps dürfen nicht beide gewinnen.
   let chain = Promise.resolve();
@@ -57,12 +57,15 @@ module.exports = function register(ctx) {
     return null;
   }
 
-  /** Der Ausschnitt des Rätsels in seiner aktuellen Größe: Start klein, +1 Bildpunkt je falschem Tipp (egal von wem). */
-  async function rectFor(puzzle) {
+  /**
+   * Der Ausschnitt des Rätsels nach `wrong` falschen Tipps (Standard: bisherige): Start klein, +1 Bildpunkt je falschem Tipp (egal von wem) —
+   * aber nie mit Stellen, die auf der fertigen Karte verdeckt sind (Textfelder von Vollbild-Karten, Symbole): dort wächst er nicht weiter.
+   */
+  async function rectFor(puzzle, wrong = puzzle.tried.length) {
     const art = await renderer.artSize(puzzle.card);
     if (!art) return null;
     const center = puzzle.center || { x: puzzle.crop.x + puzzle.crop.w / 2, y: puzzle.crop.y + puzzle.crop.h / 2 };   // Rätsel aus der Vorversion
-    return mystery.cropRect(art.w, art.h, center, mystery.cropSize(art.w, art.h, puzzle.tried.length));
+    return renderer.visibleCropRect(puzzle.card, center, mystery.cropSize(art.w, art.h, wrong));
   }
 
   // Rätsel aus der Vorversion (ohne scWorth) galten alle als SC wert.
@@ -75,7 +78,7 @@ module.exports = function register(ctx) {
   async function puzzleMessage(puzzle, { intro } = {}) {
     const rect = await rectFor(puzzle);
     const png = await ctx.renderQueue(() => renderer.renderArtCrop(puzzle.card, rect));
-    const tried = puzzle.tried.length ? `\nAlready guessed: ${puzzle.tried.slice(-12).map(n => `*${n}*`).join(', ')}` : '';
+    const tried = puzzle.tried.length ? `\nAlready guessed: ${puzzle.tried.slice(-12).map(n => `*${n}*`).join('; ')}` : '';
     return {
       content: `${intro ? intro + '\n\n' : ''}🕵️ **Mystery card** — which card is this?\n` +
         `Guess with \`${config.prefix}guess <card name>\`. ${rewardText(puzzle)}\n` +
@@ -151,9 +154,11 @@ module.exports = function register(ctx) {
       const next = worthSc(cur) ? mystery.reward(config.mysteryReward, config.mysteryPenalty, n) : 0;
       const outlook = worthSc(cur) ? `a win would pay ${next} SC` : 'no SC on this puzzle';
       // Das Bild wird mit jedem falschen Tipp etwas größer — gleich das neue zeigen, sonst sieht es niemand.
-      const rect = await rectFor(cur);
+      const before = await rectFor(cur, cur.tried.length - 1), rect = await rectFor(cur);
+      const grew = before && rect && rect.w > before.w;
       const png = await ctx.renderQueue(() => renderer.renderArtCrop(cur.card, rect));
-      return msg.reply({ content: `❌ Not **${guessed}**. (Your wrong guesses on this card: ${n} → ${outlook}.)\n🔍 The picture just zoomed out a bit:`,
+      return msg.reply({ content: `❌ Not **${guessed}**. (Your wrong guesses on this card: ${n} → ${outlook}.)\n` +
+        (grew ? '🔍 The picture just zoomed out a bit:' : '🔍 The picture can’t zoom out any further — the rest of this card’s art is covered by its text boxes:'),
         files: png ? [attach(png, 'mystery.png')] : [], allowedMentions: { parse: [] } });
     }
 

@@ -20,8 +20,15 @@ module.exports = {
       const oppIdx = engine.opponentOf(pi);
 
       // Prompt to choose an opponent's hero
+      // N5-08: „Choose a Hero your opponent controls" = Kontrolle, nicht Spalte (W22; wie Magic Ruby): auch ein vom Gegner kontrollierter Held der
+      // EIGENEN Spalte (Charme, Paraseed Control) ist wählbar, ein vom Wirker kontrollierter Gegnerheld nicht. Der Picker kennt für 'enemy' nur die
+      // Gegenspalte - darum beide Spalten ('any') und der Kontroll-Filter.
       const target = await ctx.promptDamageTarget({
-        side: 'enemy',
+        side: 'any',
+        condition: (t, eng) => {
+          const h = gs.players[t.owner]?.heroes?.[t.heroIdx];
+          return !!h && eng.heroSideOf(t.owner, h) === oppIdx;
+        },
         types: ['hero'],
         damageType: null,
         dealsDamage: false, // control only — no damage; don't wake damage-mitigation Reactions (Spectral Armor)

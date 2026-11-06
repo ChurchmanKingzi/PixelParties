@@ -26,7 +26,7 @@
 // ═══════════════════════════════════════════
 
 const { hasCardType } = require('./_hooks');
-const { heroHasDiverHelmet, isAreaImmuneInst } = require('./_diver-helmet-shared');
+const { isAreaImmuneHero, isAreaImmuneInst } = require('./_diver-helmet-shared');   // Diver Helmet + W82 Shipwrecked
 
 /** Player index with strictly more discard-pile cards, or -1 on tie. */
 function playerWithMoreDiscard(gs) {
@@ -70,7 +70,7 @@ module.exports = {
       if (engine.heroSideOf(targetOwner, target) !== losingPi) return;
       // Diver Helmet: equipped Hero is unaffected by Areas — no +50.
       const tgtHi = (engine.gs.players[targetOwner]?.heroes || []).indexOf(target);
-      if (tgtHi >= 0 && heroHasDiverHelmet(engine, targetOwner, tgtHi)) return;
+      if (tgtHi >= 0 && isAreaImmuneHero(engine, targetOwner, tgtHi)) return;
       ctx.modifyAmount(50);   // flat (Punkt vor Strich)
     },
 

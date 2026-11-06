@@ -103,7 +103,7 @@ function canHeroSummonCd(engine, pi, heroIdx, cd) {
   const hero = ps?.heroes?.[heroIdx];
   if (!hero?.name) return false;
   if (hero.hp <= 0) return false;
-  if (hero.statuses?.frozen || hero.statuses?.stunned || hero.statuses?.bound) return false;
+  if (!require('./_summon-eligibility').heroAgiert(hero)) return false;   // Welle 11 (Al, R5): „summon" erfordert einen aktionsfähigen Beschwörer (nicht Frozen/Stunned/Webbed/Bound/Negated) — `heroAgiert`.
   return engine.heroMeetsLevelReq(pi, heroIdx, cd);
 }
 
@@ -115,9 +115,10 @@ function eligibleOwnSlotsFor(engine, pi, cd) {
   if (!engine.gs.players[pi]) return [];
   // Kontrolle statt Seite (Styx 28.9.): „a Hero you control" — auch
   // uebernommene Helden der Gegenspalte; jede Zone traegt `owner`.
-  return engine.getFreeSupportZones(pi, { nachKontrolle: true })
+  // W62a: + Zone einer GLEICHNAMIGEN Creature (Alice-Teilung) — `beschwoerZonenFuer`.
+  return engine.beschwoerZonenFuer(pi, cd.name, { nachKontrolle: true })
     .filter(z => canHeroSummonCd(engine, z.owner, z.heroIdx, cd))
-    .map(z => ({ owner: z.owner, heroIdx: z.heroIdx, slotIdx: z.slotIdx }));
+    .map(z => ({ owner: z.owner, heroIdx: z.heroIdx, slotIdx: z.slotIdx, ...(z.shared ? { shared: true, stackDepth: z.stackDepth } : {}) }));   // W63a: geteilte Zone (Alice) vorn
 }
 
 /**
@@ -189,6 +190,10 @@ function oppFreeSlots(engine, oppIdx) {
 }
 
 module.exports = {
+  // ★ Z7b: FIZZELT die Karte (Wirker beim Auflösen handlungsunfähig, v1328), war sie GESPIELT → Stempel (Engine: `_noteFizzledPlay`).
+  // Eine ganz NEGIERTE Karte stempelt nicht (Als Entscheidung, Welle 3).
+  onFizzledPlay: ({ engine, gs, pi }) => { stampHopt(gs, pi); },
+
   inherentAction: true, // Treated as a free additional Action when cast.
 
   // CPU eval declaration — Arrival's second-half summon comes
@@ -380,7 +385,8 @@ module.exports = {
       const ownZones = ownSlots.map(s => ({
         owner: s.owner,   // Kontrolle statt Seite (Styx 28.9.)
         heroIdx: s.heroIdx, slotIdx: s.slotIdx,
-        label: `${gs.players[s.owner]?.heroes?.[s.heroIdx]?.name || 'Hero'} — Slot ${s.slotIdx + 1}`,
+        label: `${gs.players[s.owner]?.heroes?.[s.heroIdx]?.name || 'Hero'} — Slot ${s.slotIdx + 1}${s.shared ? ` (×${s.stackDepth})` : ''}`,
+        ...(s.shared ? { shared: true, stackDepth: s.stackDepth } : {}),   // W63a: geteilte Zone (Alice) vorn, mit Kennzeichen
       }));
       const ownPick = await promptCtx.promptZonePick(ownZones, {
         title: CARD_NAME,

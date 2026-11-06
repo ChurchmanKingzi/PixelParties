@@ -154,6 +154,10 @@ async function _bounceCreatureToHand(engine, inst, trapperIdx) {
   const fromHeroIdx = inst.heroIdx;
   const fromSlot    = inst.zoneSlot;
   const cardName    = inst.name;
+  // W5a (Al 14.10.2026): ein Token ist ein legales Ziel, verschwindet aber vollstaendig (kommt nie auf die Hand);
+  // eine echte Karte darunter (Biomancy-/Boulder-Token) wird gelöscht. Der Effekt gilt als ausgefuehrt.
+  const istToken    = engine.isTokenCard(inst);
+  const besitzer    = engine.kartenBesitzerVon(inst);
 
   // Fire onCardLeaveZone BEFORE the splice — Toughness / Fighting
   // and similar ability-side bonuses revoke their grants in
@@ -186,9 +190,9 @@ async function _bounceCreatureToHand(engine, inst, trapperIdx) {
   engine._broadcastEvent('play_pile_transfer', {
     cardName,
     from:        'support',
-    to:          'hand',
+    to:          istToken ? 'deleted' : 'hand',
     fromOwner,
-    toOwner:     trapperIdx,
+    toOwner:     istToken ? besitzer : trapperIdx,
     fromHeroIdx,
     fromSlotIdx: fromSlot,
     toHandIdx,
@@ -208,6 +212,9 @@ async function _bounceCreatureToHand(engine, inst, trapperIdx) {
     if (idx >= 0) supSlot.splice(idx, 1);
   }
 
+  // Ankhota: „Delete all Creatures that are moved from the board to anywhere else" — dieser Sonderweg umgeht den zentralen Move; vor dem Enttracken auswerten (Ankhota selbst zählt mit).
+  const ankhotaVorab = engine.ankhotaLoeschtVomBrett(inst);
+
   // Untrack the inst — board state is gone; if the trapper plays the
   // card back from hand it'll be tracked as a fresh instance.
   engine._untrackCard(inst.id);
@@ -215,5 +222,9 @@ async function _bounceCreatureToHand(engine, inst, trapperIdx) {
   // Land in the trapper's hand (this calls engine.sync(), pushing the
   // new state to clients — the pile-transfer flight is already in
   // motion and lands as React commits the new hand entry).
+  if (istToken) { engine.tokenAbgang(inst); engine.sync(); return; }
+  if (engine.ankhotaLoeschtSonderweg(inst, besitzer, { source: CARD_NAME, vorab: ankhotaVorab })) { engine.sync(); return; }   // Ankhota: gelöscht statt auf die Hand
   engine.actionAddCardToHand(trapperIdx, cardName, CARD_NAME);
+  // W5a (Al 14.10.2026, W3): die Karte bleibt Eigentum ihres permanenten Besitzers — spaeter in DESSEN Ablage/Deck/Gelöscht-Stapel.
+  if (besitzer !== trapperIdx) engine._tagHandCardOrigin(trapperIdx, cardName, besitzer);
 }

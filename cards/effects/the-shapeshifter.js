@@ -170,10 +170,17 @@ function waehlbareGestalten(engine, pi, hero) {
   return raus;
 }
 
-/** Die Heldeninstanz dieses Slots (Traeger der Identitaet). */
+/**
+ * Die Heldeninstanz dieses Slots (Traeger der Identitaet). `pi` = Brettseite.
+ * Waehrend der Aktivierung eines UEBERNOMMENEN Helden traegt die Instanz den
+ * Kontrolleur als `owner` und die Brettseite als `heroOwner`
+ * (`resolveHeroEffectActivation`) — sonst fand die Suche sie nicht, der
+ * Ablaufstempel (H01-heroes-12) blieb aus.
+ */
 function heldeninstanz(engine, pi, heroIdx) {
-  return engine.cardInstances.find(c =>
-    c.owner === pi && c.zone === 'hero' && c.heroIdx === heroIdx) || null;
+  const slot = engine.cardInstances.filter(c => c.zone === 'hero' && c.heroIdx === heroIdx);
+  return slot.find(c => c.heroOwner === pi)
+    || slot.find(c => c.owner === pi && c.heroOwner == null) || null;
 }
 
 /**
@@ -344,6 +351,14 @@ module.exports = {
 
     const gestaltName = gewaehlt.cardName;
     const quelle = gewaehlt.source;
+
+    // ★ W15a (Al, R3 und Regel W14a Q5): das Anlegen des Helden ist ein Effekt auf den Träger — Resistance fängt es ab (vor jeder Kartenbewegung; die Karte bleibt in
+    // Hand/Deck/Ablage, kein Mischen). Der Einsatz zählt als genutzt.
+    if (await engine.heroNonDamageEffectBlocked(hs, heroIdx, 'equip', { sourceOwner: pi, source: CARD_NAME })) {
+      engine.log('shapeshifter_blocked', { player: ps.username, equip: gestaltName });
+      engine.sync();
+      return true;
+    }
 
     // ── Karte aus ihrer Quelle nehmen ─────────────────────────────
     // Der Index wird HIER frisch gesucht, nicht oben gemerkt: zwischen

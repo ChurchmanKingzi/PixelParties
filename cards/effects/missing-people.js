@@ -104,9 +104,7 @@ module.exports = {
       });
       if (!ziel || ziel.type !== 'equip') return;
 
-      const inst = ziel.cardInstance || engine.cardInstances.find(c =>
-        c.zone === 'support' && c.heroIdx === ziel.heroIdx && c.zoneSlot === ziel.slotIdx
-        && (c.controller ?? c.owner) === ziel.owner);
+      const inst = ziel.cardInstance || engine.kreaturAnBrett(ziel.owner, ziel.heroIdx, ziel.slotIdx);   // Z1/W5a: Ziel-IDs nennen die BRETTSEITE
       if (!inst) return;
 
       // „Defending the Gate" schuetzt die Support Zones des Gegners.
@@ -114,6 +112,8 @@ module.exports = {
         engine.log('destroy_blocked', { card: inst.name, reason: 'Defending the Gate' });
         return;
       }
+      // W71b (Al, 25.10.2026): das Wegnehmen vom Brett ist ein Effekt auf die Kreatur — Schutzfenster (Cool Rescuer Monia & Co.), NACH dem Tor, VOR der ersten Änderung.
+      if (!(await engine.kreaturBetroffen(inst, 'move', { name: CARD_NAME, owner: pi }, { sourceOwner: pi, detail: 'to_deck' }))) return;
 
       // ── Blende: die KARTE wird transparent (Als Vorgabe) ──────────
       engine._broadcastEvent('zone_fade', {
@@ -124,14 +124,15 @@ module.exports = {
       await engine._delay(BLENDE_MS);
 
       // ── Ans Deckende — ins Deck des BESITZERS ─────────────────────
-      const besitzer = inst.owner;                 // „their deck"
-      const seite = inst.controller ?? inst.owner;  // wo die Karte liegt
+      const besitzer = engine.kartenBesitzerVon(inst);   // „their deck" — permanenter Besitzer (W3, Al 14.10.2026), nie der Kontrolleur
+      const seite = engine.physicalSide(inst);      // wo die Karte liegt: Brettseite (eine gestohlene Kreatur bleibt in der Zone des Besitzers, S03-04)
       const bPs = gs.players[besitzer];
       const sPs = gs.players[seite];
 
+      const istToken = engine.isTokenCard(inst);   // W5a (S03-05, Al 14.10.2026): ein Token ist ein legales Ziel, verschwindet aber vollstaendig (echte Karte darunter wird gelöscht)
       engine._broadcastEvent('play_pile_transfer', {
         owner: seite, toOwner: besitzer, cardName: inst.name,
-        from: 'support', to: 'deck',
+        from: 'support', to: istToken ? 'deleted' : 'deck',
         fromHeroIdx: inst.heroIdx, fromSlotIdx: inst.zoneSlot,
       });
 
@@ -150,7 +151,17 @@ module.exports = {
         if (idx >= 0) slot.splice(idx, 1);
       }
       // ANS ENDE — „at the bottom of their deck".
-      bPs.mainDeck.push(inst.name);
+      if (istToken) {
+        engine.tokenAbgang(inst);
+      } else if (engine.ankhotaLoeschtVomBrett(inst)) {
+        // Ankhota: „Delete all Creatures that are moved from the board to anywhere else" — dieser Sonderweg umgeht den zentralen Move, also hier selbst
+        // in den Gelöscht-Stapel des Besitzers (meldet die Löschung über den Stapel-Wächter, Ankhotas Zuwachs).
+        inst._ankhotaGeloescht = true;
+        bPs.deletedPile.push(inst.name);
+        engine.log('ankhota_delete', { player: bPs.username, card: inst.name, by: CARD_NAME });
+      } else {
+        bPs.mainDeck.push(inst.name);
+      }
       engine._untrackCard(inst.id);
 
       engine.log('missing_people', {

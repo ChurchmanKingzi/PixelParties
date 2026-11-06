@@ -39,6 +39,8 @@
 
 const { isPileCreature, isArtifactCreature, ZONES } = require('./_hooks');
 const nest = require('./_nest-shared');
+const { loadCardEffect } = require('./_loader');
+const multizone = require('./_multizone-shared');
 
 const CARD_NAME = 'Monster Nest';
 const MAX_LEVEL = 3;
@@ -57,7 +59,7 @@ const MAX_LEVEL = 3;
  * Riegel in `summonCreatureWithHooks` wuerde sie ohnehin abweisen —
  * die Galerie soll aber gar nicht erst luegen.
  */
-function eligibleFromDeck(engine, pi) {
+function eligibleFromDeck(engine, pi, nestInst = null) {
   const ps = engine.gs.players[pi];
   if (!ps) return [];
   const cardDB = engine._getCardDB();
@@ -68,6 +70,16 @@ function eligibleFromDeck(engine, pi) {
     if (!isPileCreature(cd)) continue;
     if (isArtifactCreature(cd)) continue;
     if (engine.effectiveCardLevel(cd, pi) > MAX_LEVEL) continue;
+    const skript = loadCardEffect(cn);
+    // W16d (C03-11): „cannot be summoned from anywhere, except your hand" (Ifrit) - das Nest beschwört aus dem Deck.
+    if (skript?.summonOnlyFromHand) continue;
+    // W16d (C03-19): eine Mehrzonen-Kreatur (Land Sharks: „occupies 3 Support Zones") braucht ihre weiteren Zonen FREI - der
+    // eigene Platz (hier das Nest) zählt mit, die Nachbarn nicht, wenn sie belegt sind.
+    if (skript?.multiZone && nestInst) {
+      const seite = engine.physicalSide(nestInst);
+      const frei = multizone.freieZonen(engine, seite, nestInst.heroIdx, cn, null).length;
+      if (frei + 1 < skript.multiZone) continue;
+    }
     zaehler.set(cn, (zaehler.get(cn) || 0) + 1);
   }
   return [...zaehler.entries()]
@@ -94,7 +106,7 @@ module.exports = {
     // (`reactivateCreatureEffect`, v752).
     if (inst.zone !== 'support') return false;
     if (inst.counters?._nestCoverId) return false;
-    return eligibleFromDeck(engine, ctx.cardOwner).length > 0;
+    return eligibleFromDeck(engine, ctx.cardOwner, inst).length > 0;
   },
 
   async onCreatureEffect(ctx) {
@@ -104,7 +116,7 @@ module.exports = {
     const ps = engine.gs.players[pi];
     if (!ps || inst.zone !== 'support') return false;
 
-    const gallery = eligibleFromDeck(engine, pi);
+    const gallery = eligibleFromDeck(engine, pi, inst);
     if (gallery.length === 0) return false;
 
     const picked = await engine.promptGeneric(pi, {
@@ -125,15 +137,42 @@ module.exports = {
     const heroIdx = inst.heroIdx;
     const zoneSlot = inst.zoneSlot;
 
-    if (!(await engine.deckEntnahme(ps,  deckIdx, { source: CARD_NAME }))) return false;   // v820: Stapel-Schicht
+    if (!(await engine.deckEntnahme(ps,  deckIdx, { source: CARD_NAME, _kostenVorlauf: true }))) return false;   // v820: Stapel-Schicht
+
+    // ★ W65a (Al, 23.10.2026: „der Gegner sieht NICHTS, solange der Spieler die Opfer-/Tribut-Wahl noch abbrechen kann"): die Beschwoerungskosten der gewaehlten
+    // Kreatur (Opfer-/Tribut-Wahl, abbrechbar: Archer, Warrior/Guardian of Teocuilatl, 500 Piranhas …) werden VOR dem sichtbaren Flug gefragt — frueher flog die Karte
+    // schon, und ein Abbruch hatte Aktivierung und Karte verraten. Das Nest sinkt (rein logisch, ohne Anzeige) schon vor der Kostenfrage: es kann so nicht selbst
+    // als Opfer angeboten werden. Abbruch/Sperre → Nest wieder oben, Karte zurueck ins Deck, nichts gezeigt.
+    if (nest.sink(engine, inst) < 0) {
+      engine.returnToPile(ps, 'deck', chosen, deckIdx);   // W66b (Al): Abbruch = Deck EXAKT wie vorher (an seiner Stelle, nicht gemischt)
+      return false;
+    }
+    const kernOpts = {
+      source: CARD_NAME,
+      controller: pi,
+      // Ueberbaut die verdeckte Karte, statt den Platz zu ueberschreiben.
+      coverNested: true,
+      hookExtras: { _summonedBy: CARD_NAME, ...engine.deckHookExtras() },
+    };
+    // Die Kreatur liegt auf der BRETTSEITE des Nests (bei einem geliehenen Nest die des Besitzers), gehört aber dem
+    // Aktivierenden (`controller`) — sie kam aus dessen Deck (C03-04).
+    const feld = engine.physicalSide(inst);
+    if (!(await engine._beschwoerungKostenVorAuftritt(chosen, feld, heroIdx, zoneSlot, kernOpts))) {
+      nest.surface(engine, inst, { by: 'summon_failed', skipSync: true });
+      engine.returnToPile(ps, 'deck', chosen, deckIdx);   // W66b (Al): Abbruch = Deck EXAKT wie vorher (an seiner Stelle, nicht gemischt)
+      engine.sync();
+      return false;
+    }
+    kernOpts._sperrenGeprueft = true; kernOpts._kostenGezahlt = true;
+    inst.zone = ZONES.SUPPORT;   // Kosten bezahlt: fuer den Flug ist das Nest wieder eine ganz normale Karte im Platz (v776), unten sinkt es erneut
 
     // ── SICHTBARE WANDERUNG VOM DECK IN DIE ZONE (v776) ─────────────
     // Als Vorgabe 5.9.: die Kreatur soll vom Deckstapel in die Support
     // Zone fliegen, WAEHREND das Nest dort liegen bleibt. Deshalb laeuft
-    // der Flug VOR `sink` und vor der Beschwoerung — in dieser Zeit ist
-    // das Nest noch eine ganz normale Karte im Platz (samt richtiger
-    // HP-Anzeige), und die Kreatur wandert sichtbar darauf zu.
-    // `play_card_transfer` bringt seinen Klang mit; es entsteht KEINE
+    // der Flug VOR dem endgueltigen `sink` und vor der Beschwoerung — in
+    // dieser Zeit ist das Nest noch eine ganz normale Karte im Platz
+    // (samt richtiger HP-Anzeige), und die Kreatur wandert sichtbar darauf
+    // zu. `play_card_transfer` bringt seinen Klang mit; es entsteht KEINE
     // neue Animation.
     const FLUG_MS = 700;
     engine._broadcastEvent('play_card_transfer', {
@@ -148,23 +187,17 @@ module.exports = {
     // Das Nest sinkt LOGISCH unter die Karte, die gleich kommt — sein
     // Name bleibt dabei im Platz stehen (siehe `_nest-shared.sink`).
     if (nest.sink(engine, inst) < 0) {
-      engine.returnToPile(ps, 'deck', chosen);   // v1393 (mischt)
+      engine.returnToPile(ps, 'deck', chosen, deckIdx);   // W66b: exakt an seine Stelle zurück
       return false;
     }
-
-    const res = await engine.summonCreatureWithHooks(chosen, pi, heroIdx, zoneSlot, {
-      source: CARD_NAME,
-      // Ueberbaut die verdeckte Karte, statt den Platz zu ueberschreiben.
-      coverNested: true,
-      hookExtras: { _summonedBy: CARD_NAME, ...engine.deckHookExtras() },
-    });
+    const res = await engine.summonCreatureWithHooks(chosen, feld, heroIdx, zoneSlot, kernOpts);
 
     if (!res?.inst) {
       // Beschwoerung abgelehnt (eigene Bedingung, unbezahlbarer Tribut,
       // gesperrte Zone …) — vollstaendig zuruecknehmen: Karte zurueck
       // ins Deck, Nest wieder hoch. Der Effekt gilt als nicht benutzt.
       nest.surface(engine, inst, { by: 'summon_failed' });
-      engine.returnToPile(ps, 'deck', chosen);   // v1393 (mischt)
+      engine.returnToPile(ps, 'deck', chosen, deckIdx);   // W66b: exakt an seine Stelle zurück
       engine.sync();
       return false;
     }

@@ -32,7 +32,14 @@ module.exports = {
   // ^ Tagged for Blinded gating — see cards/effects/_hooks.js (blinded status).
 
   // Kosten: ein eigener, lebender, nicht vergifteter Held muss da sein.
-  spellPlayCondition(gs, pi) {
+  // W28a (Al, 21.10.2026: „'you control' = aktuelle Kontrolle, nicht Besitzer"): „a Hero you control" = `heroesControlledBy` (abgegebener eigener Held nein,
+  // uebernommener Gegnerheld ja; Gift, Animation und Statusziel laufen ueber die BRETTSEITE `target.owner`).
+  spellPlayCondition(gs, pi, engine) {
+    if (engine) {
+      // W31a (Al, 22.10.2026: „temporäre Heroes sind mögliche Ziele, auch wenn der Schaden verpufft"): ein temporär übernommener (Charme-)Gegnerheld IST ein gültiges
+      // Kostenziel — das Gift verpufft dort (Charme-Schutz), die Kosten sind bezahlt (W28a hatte ihn ausgeschlossen).
+      return engine.heroesControlledBy(pi).some(({ hero: h }) => h?.name && h.hp > 0 && !h.statuses?.poisoned);
+    }
     const ps = gs.players[pi];
     return (ps.heroes || []).some(h => h?.name && h.hp > 0 && !h.statuses?.poisoned);
   },
@@ -50,6 +57,7 @@ module.exports = {
         side: 'my',
         types: ['hero'],
         damageType: 'status',
+        heroChoiceIsCost: true, // „… to play this card“: die Heldenwahl ist der KOSTENPUNKT, nicht das Ziel einer Wirkung (Flesh-Eating Swarm Trap reagiert nicht)
         dealsDamage: false, // Poison only — no damage; don't wake damage-mitigation Reactions (Spectral Armor)
         title: 'Torchure',
         // Statusangabe fuer den LERNKANAL (Als Vorgabe 9.8.): diese Karte
@@ -64,6 +72,7 @@ module.exports = {
         cancellable: true,
         condition: (t) => {
           const h = gs.players[t.owner]?.heroes?.[t.heroIdx];
+          // W31a: kein Ausschluss mehr fuer einen temporaer uebernommenen (Charme-)Gegnerheld — gueltiges Ziel, das Gift verpufft dort (Kosten bezahlt).
           return h && !h.statuses?.poisoned;
         },
       });
@@ -75,13 +84,13 @@ module.exports = {
 
       // Torch + Torture: erst die Szene, dann das Gift.
       engine._broadcastEvent('play_zone_animation', {
-        type: 'torchure', owner: pi, heroIdx: target.heroIdx, zoneSlot: -1,
+        type: 'torchure', owner: target.owner, heroIdx: target.heroIdx, zoneSlot: -1,
         duration: 2000,
       });
       await engine._delay(1250);
 
       // 4 Stacks, dauerhaft; die Marke reitet am Gift-Status mit.
-      await engine.addHeroStatus(pi, target.heroIdx, 'poisoned', {
+      await engine.addHeroStatus(target.owner, target.heroIdx, 'poisoned', {
         stacks: POISON_STACKS,
         permanent: true,
         _torchure: { owner: pi, turn: gs.turn },
@@ -91,7 +100,7 @@ module.exports = {
 
       engine.log('torchure_poison', {
         player: ps.username,
-        hero: ps.heroes[target.heroIdx]?.name,
+        hero: gs.players[target.owner]?.heroes?.[target.heroIdx]?.name,
       });
     },
   },

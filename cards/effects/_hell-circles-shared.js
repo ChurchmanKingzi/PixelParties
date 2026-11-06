@@ -34,6 +34,16 @@ const { hasCardType } = require('./_hooks');
 
 const HELL_AREA_COMMON = 'delete_play';
 
+/**
+ * W84a: sichtbare Rueckmeldung statt stillem Nichts, wenn eine gerade geloeschte Circle ihr Angebot NICHT machen darf, weil die Einmal-pro-Zug-Sperre schon verbraucht ist
+ * (not played a deleted Area yet this turn / Third: only once per turn). Zeigt die Karte als FIZZLED (wie jeder Effekt, der nach dem Ausloesen nichts tun kann) mit Logzeile;
+ * kein Dialog, kein Warten auf eine Antwort. Nicht bei Loeschungen, die ein anderes Circle-Angebot selbst ausgeloest hat (Kreis A loescht Kreis B) - das waere Rauschen.
+ */
+async function sperreHinweis(engine, pi, name, grund) {
+  if (engine._laufenderEintrag?.folge) return;
+  await engine.zeigeFizzle?.(name, { playerIdx: pi, grund, log: true });
+}
+
 /** Verlaesst GENAU DIESE Karte gerade ihre Area-Zone? */
 function verlaesstBrett(ctx) {
   if (ctx.fromZone !== 'area') return null;
@@ -64,7 +74,7 @@ function moeglicheWirker(engine, pi, name) {
     for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
       const h = ps.heroes[hi];
       if (!h?.name || h.hp <= 0) continue;
-      if (engine.getHeroEligibleActionCards(pi, hi).includes(name)) {
+      if (engine.getHeroEligibleActionCards(pi, hi, null, { ohneAreaKapazitaet: true }).includes(name)) {   // Als Fix (Al 27.10.): die Circles loeschen ihre Areas erst NACH der Wirkerwahl — kein Fassungsvermoegen-Tor davor
         out.push({ id: `hero-${pi}-${hi}`, type: 'hero', owner: pi, heroIdx: hi, cardName: h.name });
       }
     }
@@ -104,13 +114,16 @@ async function loeschenUndSpielen(engine, pi, name, opts = {}) {
   const gs = engine.gs;
   const ps = gs.players[pi];
   if (!ps) return false;
-  if (ps._deletedAreaPlayedTurn === gs.turn) return false;
+  if (ps._deletedAreaPlayedTurn === gs.turn) { await sperreHinweis(engine, pi, name, 'deleted_area_already_played_this_turn'); return false; }
   if (!(ps.deletedPile || []).includes(name)) return false;          // inzwischen weg (z. B. zurueckgeholt)
   let wirker = moeglicheWirker(engine, pi, name);
   if (wirker.length === 0) return false;                             // kein Wirker → Angebot entfaellt still
+  // Als Fix (Al 27.10.): haelt eine UNENTFERNBARE eigene Area (Gigalopolis) die Zone auch nach dem Loeschen besetzt, kann der Sofort-Guss (Area-Fassungsvermoegen) den Kreis nicht legen — dann gar nicht erst
+  // anbieten (sonst waeren die anderen Areas schon geloescht und der Replay scheiterte). Ohne unentfernbare Area ist nach dem Loeschen immer Platz.
+  if (!engine.areaPlatzNachAbraeumen(pi, name)) return false;
 
   await engine.showTriggeredEffect?.(name, { playerIdx: pi });
-  const antwort = await engine.promptGeneric(pi, {
+  const antwort = await engine.promptSpellAuswahl(pi, {   // W48a: Zeitfenster der Spell-Auswahl (keine Surprise aktivierbar)
     type: 'confirm',
     title: name,
     message: `"${name}" was deleted! Delete all Areas you control and play it as an additional Action?`,
@@ -180,6 +193,6 @@ const cpuBejahen = {
 };
 
 module.exports = {
-  HELL_AREA_COMMON, verlaesstBrett, alleEigenenAreasLoeschen,
+  HELL_AREA_COMMON, verlaesstBrett, alleEigenenAreasLoeschen, sperreHinweis,
   loeschenUndSpielen, moeglicheWirker, ausGeloeschtEntnehmen, inGeloeschtZurueck, cpuBejahen, hasCardType,
 };

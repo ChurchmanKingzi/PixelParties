@@ -5,6 +5,10 @@
 //  Inherent unconditional additional Action.
 //  Once per game (Divine Gift restriction).
 //
+//  Als Ruling (Al 26.10.): Wortlaut „Attach this card to a Hero you
+//  control" — der Wirt ist nur ein EIGENER (kontrollierter) Held; der
+//  Kartentext in `data/cards.json` ist angepasst.
+//
 //  Places itself in a Hero's free Support Zone.
 //  Player can click a Hero (first free zone)
 //  or directly click an empty zone.
@@ -24,6 +28,9 @@ const { attachmentHostsFor, attachToHero } = require('./_attachment-shared');
 const CARD_NAME = 'Divine Gift of Coolness';
 
 module.exports = {
+  // Als Ruling (Al 28.10.): diese Attack richtet nie Schaden an — Schadens-Pfeile und Magic Topaz sind an ihr nicht ankettbar (`_arrows-shared`: `arrowTriggerCondition`).
+  dealsNoAttackDamage: true,
+
   // ★★ v1181 — ENTKOPPELTE ZAUBERBILDER (Al 17.9.): Wird der Zauber
   // NEGIERT, laeuft sein Effekt-Rumpf nie — die Engine spielt dann diese
   // Bilder, damit der abgewehrte Zauber trotzdem zu sehen ist. Im
@@ -82,7 +89,7 @@ module.exports = {
       // Fire zone enter hook
       await engine.runHooks('onCardEnterZone', {
         enteringCard: inst, toZone: 'support', toHeroIdx: targetHeroIdx,
-        _skipReactionCheck: true,
+        _skipReactionCheck: true, _anhaengselAnleger: pi,
       });
 
       engine.log('divine_gift_coolness', {

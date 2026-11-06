@@ -29,6 +29,9 @@ function ablageKreaturen(engine, pi, ausser = []) {
 
 /** Gibt es `n` Creatures mit verschiedenen Namen in der Ablage? */
 function kannBezahlen(engine, pi, n) {
+  // Z6 (A09-06, A08-09): das Zurueckmischen ist die Kostenzahlung - Hatusbal (gegnerischer Held) und Distracting Crystal (auf der
+  // eigenen Hand; Ablage-Herkunft) sperren es, dann ist die Zahlung nicht moeglich.
+  if (engine.shuffleBackIntoOwnDeckBlocked?.(pi, { fromHandOrDiscard: true })) return false;
   return ablageKreaturen(engine, pi).length >= n;
 }
 
@@ -55,6 +58,7 @@ async function waehleKosten(engine, pi, n, titel) {
 
 /** Die gewaehlten Creatures ins Deck mischen (Kosten bezahlen). true bei Erfolg. */
 async function mischeZurueck(engine, pi, namen, titel) {
+  if (engine.shuffleBackIntoOwnDeckBlocked?.(pi, { fromHandOrDiscard: true })) return false;   // Z6 (A09-06, A08-09)
   if (!(await engine._discardOutAllowed(pi, { source: titel }))) return false;
   const bewegt = await engine.actionRecycleCards(pi, namen, { source: titel });
   return bewegt.length === namen.length;
@@ -76,6 +80,10 @@ function zusatzWegGilt(gs, pi) {
  */
 function zusatzBeschwoerung(CARD_NAME) {
   return {
+    // W5b-Z1b (Al, Welle 5): No Retreat! erkennt die Zusatzbeschwörung (Kosten = Zurückmischen), BEVOR `beforeSummon` zahlt.
+    shufflesIntoDeckIf(gs, pi, engine, link) {
+      return !!(link && link.isInherentAction && link.cardType === 'Creature');
+    },
     inherentAction(gs, pi, heroIdx, engine) {
       if (!engine) return false;
       if (!zusatzWegGilt(gs, pi)) return false;

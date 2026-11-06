@@ -62,6 +62,7 @@ const { isSeat } = require('./_opp');   // N-Spieler: gültiger Sitzindex
 //  die Gegnerseite ausloescht", nicht „auch wenn es die Partie kostet".
 // ═══════════════════════════════════════════
 
+const { hatName, hatNameIn, namenIn } = require('./_alias-name');   // Shroomasaur: Zusatzname zählt
 const { loadCardEffect } = require('./_loader');
 const { hasCardType } = require('./_hooks');
 const { IFRIT, ARMAGEDDON, ifritsOf, damusEffektWirkt, damusPlatzierungOffen } = require('./_apocalypse-shared');
@@ -78,7 +79,8 @@ function schaden(engine) {
   let summe = GRUNDSCHADEN;
   for (let pi = 0; pi < engine.playerCount(); pi++) {
     for (const inst of ifritsOf(engine, pi)) {
-      summe += loadCardEffect(inst.name)?.armageddonBonus || 0;
+      if (engine.isCardPassiveDormant?.(inst)) continue;   // ★ W7a (C03-12, Al): gefroren/betäubt/negiert -> kein Aufschlag
+      summe += loadCardEffect(IFRIT)?.armageddonBonus || 0;   // Bonus je Ifrit (auch eine Karte mit dem Zusatznamen Ifrit)
     }
   }
   return summe;
@@ -201,7 +203,8 @@ function kreaturenNachSchlag(engine, p, dmg) {
       if (((inst ? (inst.controller ?? inst.owner) : seite)) !== p) return;
       // Verdeckte Karten trifft Armageddon nicht (siehe onPlay).
       const gefeit = !!inst?.faceDown
-        || (loadCardEffect(name)?.immuneToSourceNames || []).some(x => ARMAGEDDON.includes(x) || x.includes(ARMAGEDDON));
+        || (!(inst && engine.isCardPassiveDormant?.(inst))   // ★ W7a: stillgelegte Ifrit ist nicht mehr gefeit
+          && (loadCardEffect(name)?.immuneToSourceNames || []).some(x => ARMAGEDDON.includes(x) || x.includes(ARMAGEDDON)));
       const hp = (inst ? engine.getEffectiveCardData(inst)?.hp : null) ?? basis.hp ?? Infinity;
       const rest = hp - (inst?.counters?.damageTaken || 0);
       if (gefeit || rest > dmg) n++;
@@ -422,7 +425,25 @@ module.exports = {
       const quelle = { name: CARD_NAME, owner: pi, controller: pi, heroIdx: ctx.cardHeroIdx };
 
       // ── ① Alles einsammeln, BEVOR etwas faellt ───────────────────
-      const { helden, kreaturen, ziele } = sammleZiele(engine);
+      let { helden, kreaturen, ziele } = sammleZiele(engine);
+
+      // Ida („never hit more than 1 target with a Destruction Spell"): aus dem Flaechenschlag
+      // wird ein Einzelschlag auf EIN gewaehltes Ziel (H02-heroes-05). Die Wahl oeffnet die
+      // Reaktionsfenster selbst (wie `actionAoeHit` im Einzelmodus); Damus hinter seiner Ifrit
+      // bleibt nicht waehlbar. Der Rest (Siegregel, Schadenssperre, Zugende) bleibt unveraendert.
+      const idaEinzel = !!ctx._engine.heroFlagsLive(ctx.cardHeroOwner ?? pi, ctx.cardHeroIdx)?.forcesSingleTarget;
+      if (idaEinzel) {
+        const t = await ctx.promptDamageTarget({
+          side: 'any', types: ['hero', 'creature'], damageType: 'destruction_spell', baseDamage: dmg,
+          title: CARD_NAME, description: `Deal ${dmg} damage to a single target.`,
+          confirmLabel: `💥 ${dmg} Damage!`, confirmClass: 'btn-danger', cancellable: false,   // pflichtwahl: Idas Einzelziel-Wahl ist Pflicht, wie in `actionAoeHit`
+          condition: (x) => !(x.type === 'hero' && heldGefeit(engine, x.owner, x.heroIdx)),
+        });
+        if (!t) return;
+        helden = t.type === 'hero' ? [{ hero: gs.players[t.owner]?.heroes?.[t.heroIdx], p: t.owner, hi: t.heroIdx }] : [];
+        kreaturen = t.type === 'hero' ? [] : [t.cardInstance];
+        ziele = [t.type === 'hero' ? { type: 'hero', owner: t.owner, heroIdx: t.heroIdx } : { type: 'creature', inst: t.cardInstance }];
+      }
 
       // ★★ v1146 (Al 17.9.): eigene Animation — Feuerball vom Wirker,
       // der das ganze Brett einhuellt, Flammen und Feuerregen. Staerke
@@ -482,7 +503,8 @@ module.exports = {
         await feuerwelle();   // Feuerwelle VOR dem Reaktionsfenster, genau einmal
         res = await engine.dealDamageToTargets({ ...quelle, cardInstance: ctx.card }, ziele, {
           damage: dmg, damageType: 'destruction_spell', sourceName: CARD_NAME,
-          istFlaeche: true, hitDelay: 0,
+          istFlaeche: !idaEinzel, hitDelay: 0,
+          ...(idaEinzel ? { surpriseCheck: false, postTargetCheck: false } : {}),
           bilderGespielt: true,
         });
       } finally {

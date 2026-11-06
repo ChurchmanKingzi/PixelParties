@@ -172,6 +172,8 @@ module.exports = {
   // the script only handles the ATK grant + the triggered effect, and
   // listens from the Support Zone it's equipped into.
   activeIn: ['support'],
+  // W16e (F01-23): „Equip this card to a Hero you control." — Seitenbindung (CARD_API `equipOwnSideOnly`).
+  equipOwnSideOnly: true,
 
   hooks: {
     // ── ① +10 ATK while equipped ──

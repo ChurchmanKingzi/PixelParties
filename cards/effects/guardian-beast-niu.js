@@ -4,20 +4,25 @@
 //  Archetype: Guardian Beasts.
 //
 //  EFFECT (once/turn): delete up to 5 cards from
-//    the discard piles → choose one of YOUR
-//    Heroes. That Hero gains a "Niu-Enhanced"
-//    buff carrying +50 damage per card deleted.
-//    The buff is consumed by the Hero's next
-//    Attack damage event (engine handles this
-//    in `actionDealDamage` / `processCreatureDamage
-//    Batch`) and otherwise expires at the start
-//    of the opponent's next turn (= functional
-//    "end of this turn"). Multiple Niu activations
-//    on the same Hero stack: the buff's
-//    `totalDamage` and `stacks` accumulate.
+//    the discard piles → the NEXT Attack that ANY of
+//    YOUR Heroes performs this turn deals +50 damage
+//    per card deleted.
+//    Als Ruling (Al 26.10.): „Ja, Niu stärkt die nächste
+//    Attack, egal, wer angreift" — der Bonus hängt NICHT
+//    an einem vorab gewählten Helden; es gibt keine
+//    Heldenwahl mehr. Technisch tragen alle eigenen,
+//    lebenden Helden denselben „Niu-Enhanced"-Buff
+//    (`totalDamage`/`stacks`); die Engine löst ihn bei der
+//    ersten Attack-Schadensrechnung irgendeines dieser
+//    Helden ein und räumt ihn bei ALLEN eigenen Helden ab
+//    (`_niuBonusEinloesen` in `actionDealDamage` /
+//    `processCreatureDamageBatch`). Er verfällt zu Beginn
+//    des nächsten Gegnerzugs (= funktional „Ende dieses
+//    Zugs"). Mehrfach-Aktivierungen im selben Zug stapeln
+//    (`totalDamage`/`stacks` addieren sich).
 //
 //  Niu does NOT need to remain on the board —
-//  the buff lives on the chosen Hero, not on
+//  the buff lives on the Heroes, not on
 //  Niu's instance, so Niu dying mid-turn doesn't
 //  cancel the bonus.
 //
@@ -74,73 +79,53 @@ module.exports = {
     const cap = Math.min(MAX_DELETE, total);
     if (cap <= 0) return false;
 
-    // Step 1 — pick which of your alive Heroes gets the buff.
+    // Step 1 — Als Ruling (Al 26.10.): KEINE Heldenwahl — der Bonus gilt für die nächste Attack
+    // irgendeines eigenen Helden. Alle eigenen, lebenden Helden bekommen den Buff (Anzeige am Helden).
     // Kontrolle statt Seite (Styx 28.9.): IDs/Zugriffe physisch.
-    const heroTargets = [];
+    const buffHeroes = [];
     for (const { physOwner, heroIdx: hi, hero: h } of engine.heroesControlledBy(pi)) {
       if (h.hp <= 0) continue;
-      heroTargets.push({
-        id: `hero-${physOwner}-${hi}`, type: 'hero',
-        owner: physOwner, heroIdx: hi, cardName: h.name,
-      });
+      buffHeroes.push({ hero: h, owner: physOwner, heroIdx: hi });
     }
-    if (heroTargets.length === 0) return false;
-    let buffHeroIdx;
-    let buffOwner;
-    if (heroTargets.length === 1) {
-      buffHeroIdx = heroTargets[0].heroIdx;
-      buffOwner = heroTargets[0].owner;
-    } else {
-      const pickIds = await engine.promptEffectTarget(pi, heroTargets, {
-        title: CARD_NAME,
-        description: `Choose which of your Heroes receives the Niu-Enhanced buff (+${DAMAGE_PER_CARD} per deleted card on its next Attack).`,
-        confirmLabel: '🐃 Enhance',
-        confirmClass: 'btn-info',
-        cancellable: true,
-        maxTotal: 1, minSelect: 1,
-        exclusiveTypes: false,
-      });
-      if (!pickIds || pickIds.length === 0) return false;
-      const picked = heroTargets.find(t => t.id === pickIds[0]);
-      if (!picked) return false;
-      buffHeroIdx = picked.heroIdx;
-      buffOwner = picked.owner;
-    }
-    const buffHero = gs.players[buffOwner]?.heroes?.[buffHeroIdx];
-    if (!buffHero) return false;
+    if (buffHeroes.length === 0) return false;
 
     // Step 2 — pay the cost. Click 1-cap cards directly in the gallery.
     const deleted = await promptAndDeleteFromBothDiscards(ctx, {
       validCounts: rangeValidCounts(cap),
       title: CARD_NAME,
-      description: `Pick 1-${cap} cards from the discard piles to delete. ${buffHero.name} will gain +${DAMAGE_PER_CARD} damage per deleted card on its next Attack.`,
+      description: `Pick 1-${cap} cards from the discard piles to delete. The next Attack one of your Heroes performs this turn deals +${DAMAGE_PER_CARD} damage per deleted card.`,
       sourceName: CARD_NAME,
       cancellable: true,
     });
     if (!deleted || deleted.length === 0) return false;
     const earned = deleted.length * DAMAGE_PER_CARD;
 
-    // Step 3 — apply the buff. Stacking: read existing data and merge
+    // Step 3 — apply the buff to ALL own alive Heroes. Stacking: read existing data and merge
     // before calling actionAddBuff (which overwrites the whole entry).
-    const existing = buffHero.buffs?.[BUFF_NAME];
-    const newTotal = (existing?.totalDamage || 0) + earned;
-    const newStacks = (existing?.stacks || 0) + 1;
     // Expire at the START of the opponent's next turn (= functional
     // "end of THIS turn" — buff doesn't survive into a fresh own turn).
     const oi = engine.opponentOf(pi);
-    await engine.actionAddBuff(buffHero, buffOwner, buffHeroIdx, BUFF_NAME, {
-      sourceOwner: pi,   // v1067: Quelle ist Pflicht (siehe _affected-shared)
-      totalDamage: newTotal,
-      stacks: newStacks,
-      perCardBonus: DAMAGE_PER_CARD,
-      source: CARD_NAME,
-      expiresAtTurn: gs.turn + 1,
-      expiresForPlayer: oi,
-      addAnim: 'niu_powerup',
-    });
+    let newTotal = 0, newStacks = 0;
+    for (const { hero: bh, owner: bo, heroIdx: bi } of buffHeroes) {
+      const existing = bh.buffs?.[BUFF_NAME];
+      const total = (existing?.totalDamage || 0) + earned;
+      const stacks = (existing?.stacks || 0) + 1;
+      newTotal = Math.max(newTotal, total);
+      newStacks = Math.max(newStacks, stacks);
+      await engine.actionAddBuff(bh, bo, bi, BUFF_NAME, {
+        sourceOwner: pi,   // v1067: Quelle ist Pflicht (siehe _affected-shared)
+        totalDamage: total,
+        stacks,
+        perCardBonus: DAMAGE_PER_CARD,
+        source: CARD_NAME,
+        expiresAtTurn: gs.turn + 1,
+        expiresForPlayer: oi,
+        addAnim: 'niu_powerup',
+      });
+    }
 
     engine.log('guardian_beast_niu_buff', {
-      player: ps.username, hero: buffHero.name,
+      player: ps.username, hero: buffHeroes.map(b => b.hero.name).join(', '),
       deleted: deleted.length, addedBonus: earned,
       totalBonus: newTotal, stacks: newStacks,
     });

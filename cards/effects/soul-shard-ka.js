@@ -47,8 +47,7 @@ const CARD_NAME = 'Soul Shard Ka';
  * keeps the gate well-defined regardless).
  */
 function levelCapForHost(engine, ps, heroIdx) {
-  const abZones = ps.abilityZones?.[heroIdx] || [];
-  const summoningLevel = engine.countAbilitiesForSchool('Summoning Magic', abZones);
+  const summoningLevel = engine.heroSchoolLevel('Summoning Magic', engine.gs.players.indexOf(ps), heroIdx);   // W4a: harte Negierung -> Stufe 0
   return Math.max(0, summoningLevel - 1);
 }
 
@@ -71,17 +70,16 @@ function eligibleHostSlots(engine, pi, creatureCardData) {
   // Pruefungen und Zonen ueber die physische Adresse, `owner` = Seite.
   for (const { physOwner, heroIdx: hi, hero: h } of engine.heroesControlledBy(pi)) {
     if (!h?.name || h.hp <= 0) continue;
-    if (h.statuses?.frozen || h.statuses?.stunned) continue;
+    if (!require('./_summon-eligibility').heroAgiert(h)) continue;   // Welle 11 (Al, R5): „summon" erfordert einen aktionsfähigen Beschwörer (nicht Frozen/Stunned/Webbed/Bound/Negated) — `heroAgiert`.
     if (!engine.heroMeetsLevelReq(physOwner, hi, creatureCardData)) continue;
     if (!engine.isCreatureSummonable(creatureCardData.name, physOwner, hi, { _bypassBeforeSummon: true })) continue;
-    const zones = engine.gs.players[physOwner].supportZones?.[hi] || [[], [], []];
-    for (let z = 0; z < 3; z++) {
-      if ((zones[z] || []).length === 0) {
-        out.push({ owner: physOwner, heroIdx: hi, slotIdx: z, heroName: h.name });
-      }
+    // W63a (Al, 22.10.2026: Alices Effekt gilt fuer ALLE Beschwoerungs-Effekte; „erst die geteilte Zone, DANN die erste leere"): freie Zonen UND — mit
+    // Alice-Teilung des Beschwoerers — die Zone einer GLEICHNAMIGEN Creature (`engine.beschwoerZonenFuer`).
+    for (const zz of engine.beschwoerZonenFuer(pi, creatureCardData.name, { seite: physOwner, heroIdx: hi, nurBasis: true, namedHeroesOnly: true })) {
+      out.push({ owner: physOwner, heroIdx: hi, slotIdx: zz.slotIdx, heroName: h.name, ...(zz.shared ? { shared: true, stackDepth: zz.stackDepth } : {}) });
     }
   }
-  return out;
+  return require('./_alice-shared').geteiltZuerst(out);
 }
 
 module.exports = {
@@ -165,7 +163,8 @@ module.exports = {
         const zones = hosts.map(h => ({
           owner: h.owner,   // Kontrolle statt Seite (Styx 28.9.)
           heroIdx: h.heroIdx, slotIdx: h.slotIdx,
-          label: `${h.heroName} — Support ${h.slotIdx + 1}`,
+          label: `${h.heroName} — Support ${h.slotIdx + 1}${h.shared ? ` (×${h.stackDepth})` : ''}`,
+          ...(h.shared ? { shared: true, stackDepth: h.stackDepth } : {}),
         }));
         const zp = await ctx.promptZonePick(zones, {
           title: CARD_NAME,
@@ -192,6 +191,15 @@ module.exports = {
             _summonedBySoulShard: true,
             _isNormalSummon: false,
           },
+          // ★ W16b (A01-pollution-22, Text „… but negate its effects until the end of the turn"; Muster Necromancy): die Negation steht VOR
+          // dem Einsatz-Effekt der gesuchten Kreatur — `runHooks` überspringt negierte Kreaturen, ihr `onPlay` (Archer: 4 Gold,
+          // Sleeping Beauty: Verknüpfung …) unterbleibt.
+          _vorHooks: (placed) => engine.actionNegateCreature(placed, CARD_NAME, {
+            expiresAtTurn: gs.turn + 1,
+            expiresForPlayer: engine.opponentOf(pi),
+            buffKey: 'soul_shard_ka_negated',
+            selfInflicted: true,
+          }),
         },
       );
       if (!placeRes) {
@@ -214,15 +222,8 @@ module.exports = {
         zoneSlot: placeRes.actualSlot, cardName: chosenName,
       });
 
-      // Negate the placed Creature's effects until end of THIS turn —
-      // expires when opp's next turn starts.
+      // (Negation: siehe `_vorHooks` oben — sie steht jetzt VOR dem Einsatz-Effekt.)
       const oi = engine.opponentOf(pi);
-      await engine.actionNegateCreature(placeRes.inst, CARD_NAME, {
-        expiresAtTurn: gs.turn + 1,
-        expiresForPlayer: oi,
-        buffKey: 'soul_shard_ka_negated',
-        selfInflicted: true,
-      });
 
       await engine.runHooks('onActionUsed', {
         actionType: 'creature', source: CARD_NAME, playerIdx: pi,

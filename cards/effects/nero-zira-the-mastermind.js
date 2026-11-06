@@ -78,7 +78,7 @@ module.exports = {
       // the Curse suppression accumulator catches it when the host
       // is cursed — `actionGrantAtk` isn't appropriate here because
       // the boost never expires (no per-instance revoke counter).
-      engine._applyHeroAtkDelta(hero, feld, heroIdx, ATK_BOOST);
+      engine.actionPermAtk(hero, feld, heroIdx, ATK_BOOST, CARD_NAME);   // W54a: DAUERHAFT — gebucht in hero.permAtkDelta, ueberlebt Aufstieg/Abstieg
       engine.log('atk_grant', {
         hero: hero.name, amount: ATK_BOOST, source: CARD_NAME,
       });

@@ -7,6 +7,12 @@ const { hasCardType, baseCardName } = require('./_hooks');
 
 const CARD_NAME = 'Ghuanjun, the Undead Martial Artist';
 
+/** Aktuelle Grund-ATK des Helden (W5b-B7): `baseAtk`; unter Curse („Attack stat is always 0") ist sie 0. */
+function grundAtkJetzt(engine, hero) {
+  if (engine?._isHeroAtkSuppressed?.(hero)) return 0;
+  return hero.baseAtk || 0;
+}
+
 /**
  * Styx 28.9.: Brettseite von `(sideOrCtrl, heroIdx)`. Die Engine ruft
  * `canPlayCard` teils mit der Seite (Aktionsliste), teils mit dem
@@ -181,6 +187,19 @@ module.exports = {
       engine.sync();
     },
 
+    // ★ W35a (Al, 22.10.2026, Frage 4, gleichartige Lücke wie Mirjam): „never more than 1 copy of the same Attack per turn" hing an `onActionUsed`/`onAdditionalActionUsed` —
+    // beide feuern nicht für inhärente Zusatzaktionen (Quick Attack), Berserk-Attack und Sofort-Güsse (Hu, Coffee …). `onEffectCountedAsArt` (`karte`) meldet JEDE gespielte
+    // Attack-KARTE; Effekte ohne Karte (`karte` falsch) haben keinen Attack-Namen und zählen hier nicht (W34a: Ghuanjun ist namensbasiert).
+    onEffectCountedAsArt: (ctx) => {
+      if (ctx.art !== 'attack' || !ctx.karte || !ctx.effectName) return;
+      if (ctx.heroIdx !== ctx.cardHeroIdx || ctx.playerIdx !== ctx.cardOwner) return;
+      if ((ctx.heroOwner ?? ctx.playerIdx) !== (ctx.cardHeroOwner ?? ctx.cardOriginalOwner)) return;
+      const hero = ctx.attachedHero ?? ctx.players?.[ctx.cardOriginalOwner]?.heroes?.[ctx.cardHeroIdx];
+      if (!hero) return;
+      if (!hero.ghuanjunAttacksUsed) hero.ghuanjunAttacksUsed = [];
+      if (!hero.ghuanjunAttacksUsed.includes(ctx.effectName)) hero.ghuanjunAttacksUsed.push(ctx.effectName);
+    },
+
     onAdditionalActionUsed: (ctx) => {
       if (ctx.heroIdx !== ctx.cardHeroIdx || ctx.playerIdx !== ctx.cardOwner || ctx.actionType !== 'attack') return;
       if ((ctx.heroOwner ?? ctx.playerIdx) !== (ctx.cardHeroOwner ?? ctx.cardOriginalOwner)) return;   // Styx 28.9.
@@ -190,11 +209,28 @@ module.exports = {
       if (!hero.ghuanjunAttacksUsed.includes(ctx.playedCardName)) hero.ghuanjunAttacksUsed.push(ctx.playedCardName);
     },
 
+    // W5b-B7 (Al, Welle 5; Hero-Text: "This Hero's Attacks deal damage equal to this Hero's base Attack stat"):
+    // Al: "Base Attack ist ein eigener Stat. Critical Strike und Co aendern *nicht* die base atk, also kein hoeherer
+    // Schaden." => PAUSCHAL: jede Attack dieses Helden verursacht GENAU seine AKTUELLE Grund-ATK (`grundAtkJetzt`:
+    // `baseAtk` mit allen Effekten, die die Basis aendern; unter Curse 0). Die eigene Formel der Attack entfaellt
+    // (Critical Strike 2x, Massacre +50 je Kreatur, Quick Attack ...); Effekte, die nur die normale ATK aendern, aendern
+    // den Schaden nicht. Nebenwirkungen der Karte (Status, Zusatzaktion, Zielmuster) und Flaechenattacken (jedes Ziel
+    // erhaelt die Grund-ATK) bleiben unberuehrt. Gesetzt wird im Angriffsfenster (`onAttackDeclare`, vor Animation und
+    // Schaden; greift auch bei "cannot be reduced" wie Surefire Shot) - nur bei Betrag > 0 (Attacks ohne Schaden bleiben ohne).
+    onAttackDeclare: (ctx) => {
+      const q = ctx.source;
+      if (!q || q.heroIdx !== ctx.cardHeroIdx) return;
+      const sourceOwner = q.heroOwner ?? q.owner ?? q.controller ?? -1;
+      if (sourceOwner !== (ctx.cardHeroOwner ?? ctx.cardOwner)) return;
+      const hero = ctx.attachedHero ?? ctx.players?.[ctx.cardOriginalOwner]?.heroes?.[ctx.cardHeroIdx];
+      if (!hero || hero.baseAtk === undefined) return;
+      if (!(ctx.amount > 0)) return;
+      const diff = grundAtkJetzt(ctx._engine, hero) - ctx.amount;
+      if (diff) ctx.modifyAmount(diff);
+    },
+
     // Flag Ghuanjun's Attacks to cap damage at target HP - 1 (prevents kills)
     // Uses setFlag so the cap applies AFTER all other modifiers (Sacred Hammer, etc.)
-    // Also enforces base ATK damage: only corrects Attacks that declare usesHeroAtk
-    // (i.e. attacks that deal hero.atk damage). Attacks that already use baseAtk
-    // (Strong Ox, Tiger Kick, Venom Snake) don't set the flag and are left alone.
     beforeDamage: (ctx) => {
       if (ctx.type !== 'attack') return;
       if (ctx.sourceHeroIdx !== ctx.cardHeroIdx) return;
@@ -202,16 +238,6 @@ module.exports = {
       const sourceOwner = ctx.source?.heroOwner ?? ctx.source?.owner ?? ctx.source?.controller ?? -1;
       if (sourceOwner !== (ctx.cardHeroOwner ?? ctx.cardOwner)) return;
       ctx.setFlag('capAtHPMinus1', true);
-
-      if (ctx.source?.usesHeroAtk) {
-        const hero = ctx.players?.[ctx.cardOriginalOwner]?.heroes?.[ctx.cardHeroIdx];
-        if (hero && hero.baseAtk !== undefined) {
-          const diff = (hero.atk || 0) - (hero.baseAtk || 0);
-          if (diff !== 0) {
-            ctx.modifyAmount(-diff);
-          }
-        }
-      }
     },
 
     // After Attack damage to hero: apply Immortal buff with auto-expiry
@@ -239,23 +265,15 @@ module.exports = {
       engine.sync();
     },
 
-    // Flag creature damage from Ghuanjun Attacks for HP-1 cap + base ATK enforcement
+    // Flag creature damage from Ghuanjun Attacks for HP-1 cap
     beforeCreatureDamageBatch: (ctx) => {
       if (!ctx.entries) return;
       const heroIdx = ctx.cardHeroIdx;
       const feld = ctx.cardHeroOwner ?? ctx.cardOwner;   // Styx 28.9.: Brettseite
-      const hero = ctx.players?.[ctx.cardOriginalOwner]?.heroes?.[heroIdx];
       for (const e of ctx.entries) {
         if (e.type !== 'attack' || e.cancelled) continue;
         if ((e.source?.heroIdx ?? -1) !== heroIdx || (e.source?.heroOwner ?? e.source?.owner ?? -1) !== feld) continue;
         e.capAtHPMinus1 = true;
-        // Only correct attacks that use hero.atk for damage
-        if (e.source?.usesHeroAtk && hero) {
-          const diff = (hero.atk || 0) - (hero.baseAtk || 0);
-          if (diff !== 0) {
-            e.modifyAmount(-Math.min(diff, e.amount));   // flat (Punkt vor Strich)
-          }
-        }
       }
     },
 

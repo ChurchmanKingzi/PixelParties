@@ -42,6 +42,8 @@ const {
   WC,
   isWarCounselorCreatureName,
   makeSingletonCanSummon,
+  waehlbareKreaturen,
+  zahleGatheringGebuehr,
 } = require('./_war-counselor-shared');
 
 const { loadCardEffect } = require('./_loader');
@@ -100,6 +102,24 @@ module.exports = {
     return false;
   },
 
+  // Welle 10 (Al, Q46): Angebote ausserhalb der normalen Aktivierung (War Council Gathering Place) nur mit einem WÄHLBAREN Ziel, das diesen Zug schon
+  // Schaden genommen hat (Helden sind immer wählbar; Kreaturen unter den harten Wahl-Schutzfiltern nicht).
+  hasLegalTargetForOffer(ctx) {
+    const engine = ctx._engine;
+    const pi = ctx.cardOwner;
+    for (const p of engine.gs.players) {
+      for (const hero of (p.heroes || [])) {
+        if (hero?.name && hero.hp > 0 && engine.damageTakenThisTurn(hero) > 0) return true;
+      }
+    }
+    for (let o = 0; o < engine.playerCount(); o++) {
+      for (const t of waehlbareKreaturen(engine, pi, o)) {
+        if (engine.damageTakenThisTurn(t.cardInstance.counters) > 0) return true;
+      }
+    }
+    return false;
+  },
+
   async onCreatureEffect(ctx) {
     const engine = ctx._engine;
     const gs = engine.gs;
@@ -117,6 +137,8 @@ module.exports = {
       cancellable: true,
     });
     if (!target) return false;
+    // Welle 11 (Al, R3): War Council Gathering Place — die 8 Gold werden erst jetzt (Ziel bestätigt, vor der Auflösung) abgezogen.
+    if (!(await zahleGatheringGebuehr(engine, inst))) return false;
 
     let bag = null;
     let hero = null;

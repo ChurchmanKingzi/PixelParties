@@ -12,9 +12,10 @@
 //    • Is negated until the start of your next
 //      turn (actionNegateCreature with timed buff,
 //      expiresAtTurn = gs.turn + 2 — turn counter ticks per player)
-//    • Its on-summon hooks (onPlay / onCardEnterZone)
-//      are suppressed (skipHooks: true) because
-//      negation is applied BEFORE placement
+//    • Its OWN on-summon effects are silent (negation is
+//      applied BEFORE placement); fremde „Creature placed"-
+//      Trigger (Nero Zira, Maya, Pes'zet, …) feuern aber
+//      ueber `onCardEnterZone` (Welle 13, Q122, Al: „Ja!")
 //
 //  Per-name once-per-game gate: each Omikron
 //  Hero tracks the names it has already summoned
@@ -43,7 +44,13 @@ module.exports = {
     // Styx 28.9.: Zonen auf Omikrons Brettseite.
     const ps = ctx.players[ctx.cardHeroOwner ?? pi];
     // Need at least one free support zone on this hero
-    return (ps?.supportZones?.[heroIdx] || []).some(slot => (slot || []).length === 0);
+    if ((ps?.supportZones?.[heroIdx] || []).some(slot => (slot || []).length === 0)) return true;
+    // W62a: oder (Alice-Teilung) eine Zone, in der schon Kreaturen GLEICHEN Namens liegen — die Illusion einer gleichnamigen Karte teilt sie.
+    const engine = ctx._engine;
+    return !!engine && [0, 1, 2].some(si => {
+      const nm = ((ps?.supportZones?.[heroIdx] || [])[si] || [])[0];
+      return !!nm && require('./_alice-shared').canShareInto(engine, pi, heroIdx, si, nm, ctx.cardHeroOwner ?? pi);
+    });
   },
 
   async onHeroEffect(ctx) {
@@ -80,6 +87,8 @@ module.exports = {
       .filter(cd => hasCardType(cd, 'Creature') && !isArtifactCreature(cd) && isOwnSideSummonableCreature(cd, cd.name) && !hasCardType(cd, 'Token') && cd.subtype !== 'Token' && !!loadCardEffect(cd.name))
       .filter(cd => !usedNames.has(cd.name))
       .filter(cd => engine.isCreatureSummonable(cd.name, feld, heroIdx, { _bypassBeforeSummon: true, beschwoerer: pi }))
+      // W62a: ohne freie Zone nur Namen, deren Zone (Alice-Teilung) die Illusion aufnimmt
+      .filter(cd => engine.beschwoerZonenFuer(pi, cd.name, { seite: feld, heroIdx, namedHeroesOnly: true }).length > 0)
       .sort((a, b) => a.name.localeCompare(b.name))
       .map(cd => ({ name: cd.name, source: 'omikron' }));
 
@@ -105,12 +114,14 @@ module.exports = {
     // ── Step 2: find a free slot on this hero ────────────────────────────
 
     if (!fs.supportZones[heroIdx]) fs.supportZones[heroIdx] = [[], [], []];
-    const destSlot = fs.supportZones[heroIdx].findIndex(slot => (slot || []).length === 0);
+    // W62a: erste freie Zone, sonst (Alice-Teilung) die Zone einer gleichnamigen Creature
+    const zonenFuer = engine.beschwoerZonenFuer(pi, chosenName, { seite: feld, heroIdx, namedHeroesOnly: true });
+    const destSlot = zonenFuer.length ? zonenFuer[0].slotIdx : -1;
     if (destSlot < 0) return false;
 
     // ── Step 3: place the illusion ───────────────────────────────────────
 
-    fs.supportZones[heroIdx][destSlot] = [chosenName];
+    engine.zoneEintragen(feld, heroIdx, destSlot, chosenName, pi);
     const inst = engine._trackCard(chosenName, feld, 'support', heroIdx, destSlot);
     if (feld !== pi) engine.markiereSeitenfremd(inst, pi);   // Styx 28.9.
     inst.turnPlayed = gs.turn; // Summoning sickness
@@ -129,6 +140,7 @@ module.exports = {
     await engine.actionNegateCreature(inst, CARD_NAME, {
       expiresAtTurn:    gs.activePlayer === pi ? gs.turn + 2 : gs.turn + 1,
       expiresForPlayer: pi,
+      fristBeginn:      true,   // W68a: „until the start of your next turn"
       buffKey:          'omikron_negated',
       selfInflicted:    true,
     });
@@ -152,10 +164,17 @@ module.exports = {
       hero: hero.name,
     });
 
-    // Hooks are intentionally SKIPPED — the creature is negated before placement,
-    // so none of its on-summon effects (nor external triggers like Ingo/Maya/Layn)
-    // should fire. This matches the "effects negated" wording.
-    // (No runHooks('onCardEnterZone') call here.)
+    // Welle 13 (Q122, Al: „Ja, sollen sie!"): Das Platzieren ist ein Ereignis fuer
+    // FREMDE Beobachter (Nero Zira, Maya, Pes'zet, Madame Guillotine, Layn …) —
+    // wie bei Create Illusion / Staff of Illusions. Negiert sind nur die EIGENEN
+    // Effekte der Illusion (sie ist oben schon negiert, ihre eigenen Hooks bleiben
+    // deshalb ueber den zentralen Filter stumm). Platzier-Form wie Staff of Illusions.
+    await engine.runHooks('onCardEnterZone', {
+      enteringCard: inst, toZone: 'support', toHeroIdx: heroIdx,
+      _skipReactionCheck: true,
+      _bypassDeadHeroFilter: true,
+      _isPlacement: true,
+    });
 
     engine.sync();
     return true;

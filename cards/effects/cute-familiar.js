@@ -33,6 +33,9 @@
 //     stamp, and acting on `onTurnEnd` once.
 // ═══════════════════════════════════════════
 
+const { kontrolliert } = require('./_double-shared');
+const { schoolLevelMitSupport } = require('./_cute-shared');   // W16c (A04-29)
+
 const CARD_NAME = 'Cute Familiar';
 const REQUIRED_CHARME = 2;
 
@@ -66,13 +69,14 @@ function eligibleCharmeHeroes(engine, pi) {
   const ps = gs.players[pi];
   if (!ps) return [];
   const out = [];
-  for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
-    const h = ps.heroes[hi];
+  // W33a (Al, 22.10.2026: „Hero you control" = aktuelle Kontrolle): alle Helden, die `pi` kontrolliert — ein abgegebener eigener Held fällt heraus, ein übernommener
+  // Gegnerheld zählt (Schulen aus SEINEN Ability Zones). Eintrag: Index in der eigenen Spalte (Zahl, wie bisher) bzw. { owner, heroIdx } für einen übernommenen Helden.
+  for (const { physOwner, heroIdx: hi, hero: h } of engine.heroesControlledBy(pi)) {
     if (!h?.name || h.hp <= 0) continue;
     if (h.statuses?.frozen || h.statuses?.stunned || h.statuses?.bound) continue;
     if (h._actionLockedTurn === gs.turn) continue;
-    if (countCharme(ps, hi) < REQUIRED_CHARME) continue;
-    out.push(hi);
+    if (schoolLevelMitSupport(engine, 'Charme', physOwner, hi) < REQUIRED_CHARME) continue;   // W4a: harte Negierung -> Stufe 0
+    out.push({ owner: physOwner, heroIdx: hi });
   }
   return out;
 }
@@ -90,7 +94,7 @@ function eligibleReviveHosts(engine, pi) {
   for (const { physOwner, heroIdx: hi, hero: h } of engine.heroesControlledBy(pi)) {
     if (!h?.name || h.hp <= 0) continue;
     const hps = engine.gs.players[physOwner];
-    if (countCharme(hps, hi) < REQUIRED_CHARME) continue;
+    if (schoolLevelMitSupport(engine, 'Charme', physOwner, hi) < REQUIRED_CHARME) continue;   // W4a: harte Negierung -> Stufe 0
     const sup = hps.supportZones?.[hi] || [];
     if (!sup.some(slot => (slot || []).length === 0)) continue;
     out.push({ owner: physOwner, heroIdx: hi });
@@ -116,7 +120,7 @@ function getDiscardSummonHosts(engine, pi) {
   // — auch uebernommene der Gegenspalte. Eintrag: { owner, heroIdx }.
   for (const { physOwner, heroIdx: hi, hero: h } of engine.heroesControlledBy(pi)) {
     if (!h?.name || h.hp <= 0) continue;
-    if (h.statuses?.frozen || h.statuses?.stunned) continue;
+    if (!require('./_summon-eligibility').heroAgiert(h)) continue;   // Welle 11 (Al, R5): „summon" erfordert einen aktionsfähigen Beschwörer (nicht Frozen/Stunned/Webbed/Bound/Negated)
     const sup = engine.gs.players[physOwner]?.supportZones?.[hi] || [];
     if (!sup.some(slot => (slot || []).length === 0)) continue;
     if (!engine.heroMeetsLevelReq(physOwner, hi, cd)) continue;
@@ -135,6 +139,13 @@ module.exports = {
   activeIn: ['support', 'discard'],
 
   // ── 1. UNIQUENESS ──────────────────────────────────────────────
+  // „You can only control 1" gilt auch fuer jede Beschwoerung, die nicht
+  // ueber die Hand laeuft (Cute Bird, Annoyance Mini, ...): `beforeSummon`
+  // laeuft vor JEDER Beschwoerung dieser Karte (A04-cute-10).
+  async beforeSummon(ctx) {
+    return !kontrolliert(ctx._engine, ctx.cardOwner, CARD_NAME);
+  },
+
   canSummon(ctx) {
     const engine = ctx._engine;
     const pi = ctx.cardOwner;
@@ -150,6 +161,8 @@ module.exports = {
 
   // ── 3. HOPT ADDITIONAL ACTION ──────────────────────────────────
   creatureEffect: true,
+  // Als Ruling (Al 26.10., Blinded): der aktive Effekt wählt einen eigenen Helden (Charme 2) — ein geblendeter Träger/Wirtsheld kann ihn nicht aktivieren.
+  requiresTarget: true,
 
   canActivateCreatureEffect(ctx) {
     return eligibleCharmeHeroes(ctx._engine, ctx.cardOwner).length > 0;
@@ -166,13 +179,13 @@ module.exports = {
 
     // Pick which Charme-2+ Hero gets the extra Action. Auto-select
     // when only one is eligible.
-    let targetHi;
+    let target;
     if (heroes.length === 1) {
-      targetHi = heroes[0];
+      target = heroes[0];
     } else {
-      const zones = heroes.map(hi => ({
-        heroIdx: hi, slotIdx: -1,
-        label: `${ps.heroes[hi].name} (Charme ${countCharme(ps, hi)})`,
+      const zones = heroes.map(e => ({
+        heroIdx: e.heroIdx, slotIdx: -1, ...(e.owner !== pi ? { owner: e.owner } : {}),
+        label: `${engine.gs.players[e.owner].heroes[e.heroIdx].name} (Charme ${schoolLevelMitSupport(engine, 'Charme', e.owner, e.heroIdx)})`,
       }));
       const picked = await engine.promptGeneric(pi, {
         type: 'zonePick',
@@ -182,11 +195,13 @@ module.exports = {
         cancellable: true,
       });
       if (!picked || picked.cancelled) return false;
-      targetHi = typeof picked.heroIdx === 'number' ? picked.heroIdx : heroes[0];
-      if (!heroes.includes(targetHi)) targetHi = heroes[0];
+      target = typeof picked.heroIdx === 'number'
+        ? heroes.find(e => e.heroIdx === picked.heroIdx && e.owner === (picked.owner ?? pi))
+        : null;
+      if (!target) target = heroes[0];
     }
-
-    const targetHero = ps.heroes?.[targetHi];
+    const targetHi = target.heroIdx;
+    const targetHero = engine.gs.players[target.owner]?.heroes?.[targetHi];
     if (!targetHero?.name || targetHero.hp <= 0) return false;
 
     // Grant the bonus Action via the canonical helper. Returns
@@ -196,6 +211,7 @@ module.exports = {
     const result = await engine.performImmediateAction(pi, targetHi, {
       title: CARD_NAME,
       description: `${targetHero.name} may perform an additional Action — but cannot perform any other Actions this turn.`,
+      ...(target.owner !== pi ? { heroOwner: target.owner } : {}),   // W33a: übernommener Gegnerheld (Brettseite)
     });
     if (!result?.played) return false;
 
@@ -204,6 +220,7 @@ module.exports = {
     // plays AND ability activations for the rest of this turn,
     // cleared automatically at turn-start.
     targetHero._actionLockedTurn = engine.gs.turn;
+    targetHero._actionLockedFremd = engine.gs.turn;   // W8: Fremdsperre (Lethes Selbstabgleich löst nur die eigene)
 
     engine.log('cute_familiar_extra_action', {
       player: ps.username,
@@ -284,6 +301,7 @@ module.exports = {
       const oldInst = ctx.card;
       const res = await engine.summonFromDiscard(pi, pi, CARD_NAME, chosen.heroIdx, chosen.slotIdx, {
         source: CARD_NAME, flug: false,
+        summonOpts: { alsZusatzaktion: true },   // "as an additional Action" ist eine Aktion (A04-cute-24)
         ...(chosen.owner !== pi ? { heldSeite: chosen.owner } : {}),   // Kontrolle statt Seite (Styx 28.9.)
       });
       if (oldInst && oldInst.zone === 'discard') {
@@ -383,7 +401,22 @@ module.exports = {
       // Pop from discard pile array (the dead Familiar) and untrack
       // the parker before placing.
       // v1389: Bausteine der EINEN Ablage-Stelle (eigene Inszenierung).
-      const ab = await engine.ablageEntnahme(pi, pi, CARD_NAME, { source: CARD_NAME });
+      let ab = await engine.ablageEntnahme(pi, pi, CARD_NAME, { source: CARD_NAME });
+      // W16c (A04-18): Hat Wildur die Leiche auf den Coolness Stack umgeleitet (sie war nie in der Ablage), ist die
+      // obenauf liegende Kadaver-Kopie die Karte, die zurueckkehrt (wie bei der Phoenix-Wiederbelebung, A04-17).
+      let vomStack = false;
+      if (!ab) {
+        // Der Kadaver liegt nicht zwingend oben (Wowhalla legt am Zugende noch eine Karte darauf) - wie Thrysh:
+        // eine beliebige Kopie des Namens aus dem Stapel nehmen, die Kadaver-Instanz abraeumen.
+        const kadaver = engine.findCards({ owner: pi, zone: 'coolnessStack', name: CARD_NAME }).find(c => c._wildurKadaver);
+        const si = ps.coolnessStack.lastIndexOf(CARD_NAME);
+        if (kadaver && si >= 0) {
+          ps.coolnessStack.splice(si, 1);
+          engine._untrackCard(kadaver.id);
+          engine._broadcastEvent('coolness_stack_change', { owner: pi, mode: 'pop', card: CARD_NAME, dest: 'board' });
+          ab = { name: CARD_NAME, pileOwner: pi, idx: -1, lethe: 0 }; vomStack = true;
+        }
+      }
       engine._untrackCard(ctx.card.id);
       if (!ab) return;
 
@@ -393,9 +426,13 @@ module.exports = {
       // Kontrolle statt Seite (Styx 28.9.): Feldseite = Held, Kontrolle = `pi`.
       const placeRes = engine.safePlaceInSupport(CARD_NAME, chosen.owner, chosen.heroIdx, chosen.slotIdx,
         chosen.owner !== pi ? { controller: pi } : {});
-      if (!placeRes) { engine.ablageRueckgabe(ab); return; }
+      if (!placeRes) {
+        if (vomStack) { ps.coolnessStack.push(CARD_NAME); engine._trackCard(CARD_NAME, pi, 'coolnessStack'); engine.sync(); }
+        else engine.ablageRueckgabe(ab);
+        return;
+      }
       const { inst, actualSlot } = placeRes;
-      const ablageExtras = engine.ablageLandung(inst, ab, 'place');
+      const ablageExtras = vomStack ? {} : engine.ablageLandung(inst, ab, 'place');
 
       engine._broadcastEvent('summon_effect', {
         owner: chosen.owner, heroIdx: chosen.heroIdx, zoneSlot: actualSlot, cardName: CARD_NAME,

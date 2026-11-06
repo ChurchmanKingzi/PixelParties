@@ -8,7 +8,7 @@
 // Als Ruling 16.8. ("Tuscan Artist"): ist der 2er-/3er-Zug der EINZIGE
 // Nutzen dieser Karte, wird sie gesperrt statt wirkungslos zu feuern.
 // Die Auslegung steht in `_draw-block-shared.js`.
-const { drawWouldBeBlocked } = require('./_draw-block-shared');
+const { drawBlockedFor } = require('./_draw-block-shared');
 
 const CARD_NAME = 'Skeleton Mage';
 
@@ -21,13 +21,12 @@ module.exports = {
     // Ohne den 2er-Zug blieben nur der Abwurf von 1 Karte uebrig — Als Ruling:
     // dann ist der Effekt nicht aktivierbar und verbraucht auch sein
     // Once-per-turn nicht.
-    if (drawWouldBeBlocked(ctx._engine, ctx.cardOwner, 2)) return false;
+    // D1 (Regel von Al): auch die Hand-/Zieh-Sperre - der Zug ist der Nutzen, "discard 1 afterwards" nur sein Nachteil.
+    if (drawBlockedFor(ctx._engine, ctx.cardOwner, 2)) return false;
     const ps = ctx._engine.gs.players[ctx.cardOwner];
     if (!ps) return false;
-    // Hand-lock kills the draw side of this effect — gating here
-    // keeps the activation UI honest. Empty deck is fine; engine's
-    // actionDrawCards just no-ops on an empty deck.
-    return !ps.handLocked;
+    // Empty deck is fine; engine's actionDrawCards just no-ops on an empty deck.
+    return true;
   },
 
   async onCreatureEffect(ctx) {

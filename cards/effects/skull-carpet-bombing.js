@@ -52,6 +52,7 @@ const { isSeat } = require('./_opp');   // N-Spieler: gültiger Sitzindex
 //  `destruction_spell` — Interference, Ida & Co. greifen damit von selbst.
 // ═══════════════════════════════════════════
 
+const KB = require('./_kreaturen-bilanz');
 const CARD_NAME = 'Skull Carpet Bombing';
 const SCHADEN = 100;
 const ANIM = 'skull_carpet_bombing';
@@ -77,16 +78,25 @@ function gegnerFaellt(engine, pi) {
   return tot >= lebend;
 }
 
-/** Grober Wert eines Flaechentreffers fuer die CPU (Schaden + Toetungen). */
+/**
+ * Grober Wert eines Flaechentreffers fuer die CPU (Schaden + Toetungen).
+ * ★ W83a (Al 27.10.2026): HELDEN wie bisher (Schaden auf HP gedeckelt, +250 Heldentod); KREATUREN ueber die gemeinsame AoE-Rechnung (`_kreaturen-bilanz.js` `aoeWert`, Brettskala):
+ * sicher Geschuetzte zaehlen nicht, weich Geschuetzte (bereite Monia des Gegners …) anteilig, Ueberlebende mit 0,7 × Anteil an der Rest-HP × Wert, Toedliches voll.
+ */
 function trefferWert(engine, pi, seite) {
   let wert = 0, heldTot = 0;
-  for (const t of engine.projectAoeTargets(pi, { side: seite, types: ['hero', 'creature'] })) {
+  for (const t of engine.projectAoeTargets(pi, { side: seite, types: ['hero'] })) {
     const hp = Math.max(0, t.hp || 0);
     wert += Math.min(SCHADEN, hp);
-    if (hp > 0 && hp <= SCHADEN) {
-      if (t.kind === 'hero') { wert += 250; heldTot++; } else wert += 40;
-    }
+    if (hp > 0 && hp <= SCHADEN) { wert += 250; heldTot++; }
   }
+  try {
+    const sitze = engine.aoeTargetPlayers(pi, { side: seite });
+    const liste = engine.collectAoeCreatureTargets(sitze, { side: seite }, ['creature'])
+      .map(({ inst }) => ({ inst, art: 'damage', amount: SCHADEN, type: 'destruction_spell' }));
+    const r = KB.aoeWert(engine, { name: CARD_NAME, owner: pi, controller: pi, heroIdx: -1 }, liste, { wirker: pi, damageType: 'destruction_spell' });
+    wert += (seite === 'enemy' ? r.gewinn : r.verlust) * KB.BRETT_FAKTOR;
+  } catch { /* ohne Kreaturenwert: nur die Helden */ }
   return { wert, heldTot };
 }
 
@@ -95,6 +105,10 @@ module.exports = {
   spellVisual: { impact: { type: ANIM }, impactMs: 450 },
 
   isSurprise: true,
+
+  // ★ W75b: „You can only activate 1 "Skull Carpet Bombing" per turn." als Merkmal der Engine (`surpriseHartOPT`, Schluessel = `hoptUsed['skull_carpet_bombing:<Spieler>']`, wie bisher):
+  // `engine.surpriseAktivierbarJetzt` kennt die Sperre damit fuer ALLE Wege — Telekinesis, Baby Spider, Cute Spider, Sabrina aktivieren eine in diesem Zug gesperrte Kopie nicht mehr.
+  surpriseHartOPT: 'skull_carpet_bombing',
 
   surpriseTurnEndTrigger(gs, ownerIdx, heroIdx, info /*, engine */) {
     if (info.endingPlayer !== ownerIdx) return false;                  // „at the end of YOUR turn"

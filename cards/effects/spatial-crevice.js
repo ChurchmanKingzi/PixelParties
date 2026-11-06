@@ -61,6 +61,10 @@ module.exports = {
 
   hooks: {
     onPlay: async (ctx) => {
+      // Als Fix (Al 27.10.): wie bei jeder anderen Area nur, wenn DIESE Instanz gespielt wird — bubbelt der onPlay einer anderen Karte durch (z. B. ein Nachguss ohne `_onlyCard`), darf sich eine
+      // Spatial Crevice auf der Hand nicht von selbst legen.
+      if (ctx.cardZone !== 'hand') return;
+      if (ctx.playedCard?.id !== ctx.card.id) return;
       // Areas landen NICHT von selbst in der Zone — ohne `placeArea`
       // greift in jedem Spielpfad die Standard-Entsorgung Hand → Ablage
       // (Lehre aus dem Cottage-Fall v186).
@@ -86,7 +90,8 @@ module.exports = {
       const pi = engine.gs.activePlayer;
       const ps = engine.gs.players[pi];
       if (!ps) return;
-      if (ps.handLocked) return;
+      if (engine.spielerIstVonAreasAusgenommen(pi)) return;   // W82 (Shipwrecked): Area-Effekte aktivieren ist gesperrt
+      if (engine._isSearchBlocked(pi, {}, 'deck')) return;   // Z6 (R02-14): Hand-, Such-Sperre und Siege - gar nicht erst fragen
 
       const cardDB = engine._getCardDB();
       const anzahl = {};
@@ -110,6 +115,7 @@ module.exports = {
         message: 'Search your deck for an Area and add it to your hand?',
         confirmLabel: '🔍 Search', cancelLabel: 'No thanks',
         cancellable: true,
+        searchToHand: true, searchPile: 'deck',   // Z6 (R02-14): wie die Galerie dahinter gekennzeichnet
       });
       if (!ja) return;
 

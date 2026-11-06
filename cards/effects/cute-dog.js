@@ -22,9 +22,8 @@
 //      `ctx.card.zone === 'discard'` so only the
 //      just-discarded copy prompts — copies in
 //      support don't double-fire. Per-turn cap
-//      is taken on prompt-SHOW (matches "may"
-//      semantics: declining still spends the
-//      offer). Visual flow (Als Ruling): the Dog
+//      is taken only once the summon is actually going to happen (W5b-B12: a declined offer never spends it; "may"
+//      semantics). Visual flow (Als Ruling): the Dog
 //      first lands VISIBLY in the discard pile
 //      (sync + settle before the prompt), then
 //      flies discard → chosen Support Zone via
@@ -119,8 +118,8 @@ function getHostHeroes(engine, pi) {
   for (const { physOwner, heroIdx: hi, hero: h } of engine.heroesControlledBy(pi)) {
     if (!h?.name || h.hp <= 0) continue;
     if (h.statuses?.frozen || h.statuses?.stunned) continue;
-    const supZones = engine.gs.players[physOwner]?.supportZones?.[hi] || [];
-    if (!supZones.some(slot => (slot || []).length === 0)) continue;
+    // W63a (Al, 22.10.2026: Alices Effekt gilt fuer ALLE Beschwoerungs-Effekte): freie Zone ODER — mit Alice-Teilung — die Zone eines gleichnamigen Cute Dog.
+    if (!engine.hatBeschwoerZone(pi, CARD_NAME, { seite: physOwner, heroIdx: hi, nurBasis: true, namedHeroesOnly: true })) continue;
     if (!engine.heroMeetsLevelReq(physOwner, hi, cd)) continue;
     out.push({ owner: physOwner, heroIdx: hi });
   }
@@ -167,6 +166,10 @@ module.exports = {
     // factoring in distinct deck names + hand size — so "Done" never
     // appears when a 2nd discard wouldn't actually help.
     let discarded = 0;
+    const borisGate = engine.borisStapel(pi, { source: CARD_NAME, skipVoidsEffect: true });   // ★ W74c
+    let borisVerzichtet = false;
+    // W16c (A04-16): die Klick-Abwuerfe sind EIN Batch, damit Cute Bunny ("2 or more ... through an effect") reagiert.
+    await engine.withDiscardBatch(pi, { source: CARD_NAME }, async () => {
     while (discarded < maxN && (ps.hand || []).length > 0) {
       // Re-check distinct names after the first discard — an onDiscard
       // hook from the just-discarded card could in theory mill / move
@@ -188,6 +191,9 @@ module.exports = {
 
       if (result?.cancelled) break;
       if (!result || result.cardName == null) break;
+      // ★ W74c: Boris darf den Abwurf ignorieren — einmal gefragt (vor dem ersten Abwurf), die Antwort gilt für den ganzen Stapel. Die Wirkung hängt an der
+      // ANZAHL der abgeworfenen Karten ("that many", "the same number"): bei Verzicht 0, der Effekt endet ohne Wirkung.
+      if (await borisGate(maxN)) { borisVerzichtet = true; break; }
 
       // Commit via the engine helper — see actionDiscardHandCard for
       // the load-bearing inst.zone update that lets discard-summon
@@ -200,8 +206,9 @@ module.exports = {
       discarded++;
       engine.sync();
     }
+    });   // end withDiscardBatch
 
-    if (discarded === 0) return false; // mandatory first iteration didn't resolve
+    if (discarded === 0) return borisVerzichtet; // mandatory first iteration didn't resolve (W74c: bei Boris-Verzicht ist der Effekt aktiviert — mit 0 Karten)
 
     // ── Step 2: build & show the gallery (cost is paid; commit) ──
     // Re-read state — onDiscard hooks may have shifted the deck.
@@ -233,12 +240,15 @@ module.exports = {
     // returning. `await`ing each call serialises the flow — card 1
     // flies in + reveals + opponent confirms, THEN card 2 flies in +
     // reveals — so it reads the same way Wheels' staggered draws do.
+    // W85c (Atta, Al 29.10.): die gewählten Karten sind EIN Aufdeck-Ereignis VOR dem Verschieben; eine von Atta gelöschte Karte kommt nie auf die Hand.
+    const _ereignis = await engine.aufdeckTutorEreignis(pi, picked.selectedCards, CARD_NAME);
     const tutored = [];
     for (const name of picked.selectedCards) {
+      if (_ereignis.geloescht.includes(name)) continue;
       const ok = await engine.actionAddCardFromDeckToHand(pi, name, {
         source: CARD_NAME,
         _noKrates: true,   // Mehrfach-Tutor: Krates greift nur bei Ein-Karten-Suchen
-        reveal: true,
+        reveal: !_ereignis.fensterGezeigt,
       });
       if (ok) tutored.push(name);
     }
@@ -251,6 +261,8 @@ module.exports = {
       tutored,
     });
     engine.sync();
+    // Control Monitors: N Karten aus dem Deck auf die Hand, bezahlt mit N abgeworfenen Handkarten (ein Fenster fuer den ganzen Effekt).
+    await engine.meldeHandZugangAusStapel(pi, { source: CARD_NAME });
     return true;
   },
 
@@ -321,22 +333,20 @@ module.exports = {
         cancellable: true,
         gerrymanderEligible: true, // True "you may" — opt-in summon.
       });
-      // Stamp regardless of accept/decline — the offer counts as the
-      // turn's use of this effect.
-      ps._cuteDogDiscardSummonUsed = true;
+      // W5b-B12 (Al, Welle 5): „abgelehnte Angebote verbrauchen NIE eine Once-per-Turn-Aktivierung" – gezählt wird
+      // nach Wortlaut das Beschwören; der Stempel sitzt erst vor der tatsächlichen Beschwörung (unten).
       if (!confirmed) return;
 
       // ── Pick destination zone ──
-      const zones = [];
+      let zones = [];
       for (const { owner, heroIdx: hi } of hosts) {   // Kontrolle statt Seite (Styx 28.9.)
         const hps = engine.gs.players[owner];
-        const sup = hps?.supportZones?.[hi] || [];
-        for (let s = 0; s < 3; s++) {
-          if ((sup[s] || []).length === 0) {
-            zones.push({ owner, heroIdx: hi, slotIdx: s, label: `${hps.heroes[hi].name} — Support ${s + 1}` });
-          }
+        // W63a: freie Zonen UND (Alice-Teilung) die Zone eines gleichnamigen Cute Dog — `engine.beschwoerZonenFuer`
+        for (const zz of engine.beschwoerZonenFuer(pi, CARD_NAME, { seite: owner, heroIdx: hi, nurBasis: true, namedHeroesOnly: true })) {
+          zones.push({ owner, heroIdx: hi, slotIdx: zz.slotIdx, label: `${hps.heroes[hi].name} — Support ${zz.slotIdx + 1}${zz.shared ? ` (×${zz.stackDepth})` : ''}`, ...(zz.shared ? { shared: true, stackDepth: zz.stackDepth } : {}) });
         }
       }
+      zones = require('./_alice-shared').geteiltZuerst(zones);   // W63a (Al): erst die geteilte Zone, DANN die erste leere
       if (zones.length === 0) return;
 
       let chosen;
@@ -360,13 +370,15 @@ module.exports = {
       // (`engine.summonFromDiscard`: Sperre, Signal, Flug mit 650 ms
       // Landezeit wie zuvor, Rückgabe bei Fehlschlag.)
       const oldInst = ctx.card;
+      ps._cuteDogDiscardSummonUsed = true;   // W5b-B12: vor der Beschwörung (Nachfolge-Listener derselben Charge), bei Fehlschlag zurück
       const res = await engine.summonFromDiscard(pi, pi, CARD_NAME, chosen.heroIdx, chosen.slotIdx, {
         source: CARD_NAME, flug: 650,
+        summonOpts: { alsZusatzaktion: true },   // "as an additional Action" ist eine Aktion (A04-cute-24)
         ...(chosen.owner !== pi ? { heldSeite: chosen.owner } : {}),   // Kontrolle statt Seite (Styx 28.9.)
       });
       // Den Listener-Klon in der Ablage abräumen (sonst verwaist er).
       if (oldInst && oldInst.zone === 'discard') engine._untrackCard(oldInst.id);
-      if (!res) return;
+      if (!res) { ps._cuteDogDiscardSummonUsed = false; return; }
 
       engine.log('cute_dog_discard_summon', {
         player: ps.username,

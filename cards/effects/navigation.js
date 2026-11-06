@@ -18,6 +18,7 @@ module.exports = {
   activeIn: ['ability'],
   freeActivation: true,
   blockedByHandLock: true,
+  blockedBySearchLock: true,   // Z6 (M02-23): sucht nur im Deck - unter der Such-Sperre nicht aktivierbar (Kosten waeren umsonst)
 
   canFreeActivate(ctx, level) {
     const ps = ctx.players[ctx.cardOwner];
@@ -86,6 +87,10 @@ module.exports = {
         eligibleIndices,
         cancellable: false,
       });
+
+      // ★ W74c: Boris darf den Abwurf (Kosten, „discard N copies") ignorieren — gefragt wird einmal, nach der ersten Wahl, vor dem ersten Abwurf. Die Kosten
+      // sind fest: Verzicht = alle Kopien bleiben auf der Hand, die Suche (und die Hand-Sperre) laufen wie sonst.
+      if (i === 0 && await engine.borisVerzicht(pi, requiredCopies, { source: 'Navigation' })) break;
 
       if (!result || result.cardName == null) {
         // Safety fallback — pick first eligible
@@ -165,6 +170,8 @@ module.exports = {
       source: 'Navigation',
       reveal: true,
     });
+    // Control Monitors (Al, Welle 75): Navigation fuegt eine Karte hinzu, bezahlt mit dem Abwurf der Kopien → Reaktionsfenster.
+    await engine.meldeHandZugangAusStapel(pi, { source: 'Navigation' });
 
     // ── Step 4: Lock hand if Lv1 or Lv2 ──
 

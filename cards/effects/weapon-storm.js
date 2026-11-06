@@ -2,9 +2,10 @@
 //  CARD EFFECT: "Weapon Storm"
 //  Attack (Normal, Lv2, Fighting)
 //
-//  „Send any number of Artifacts equipped and Abilities attached to
-//   the user to the discard pile. Then, choose a target and deal
-//   damage equal to 40/50/60 times the number of cards sent to it."
+//  „Choose any number of Artifacts equipped and Abilities attached to
+//   the user and send them to the discard pile. Then, choose a target
+//   and deal damage equal to 40/50/60 times the number of cards chosen
+//   to it."
 //
 //  Als Ruling (6.9.): das Fighting-Level des Nutzers NACH dem Senden
 //  bestimmt den Schaden je Karte — Lv1 40, Lv2 50, Lv3+ 60. Wer sein
@@ -37,6 +38,9 @@ function hasSendable(engine, pi, heroIdx) {
 }
 
 module.exports = {
+  // ★ Als Ruling (Al 26.10., Flame Avalanche: „Wenn du andere Schadenskarten unspielbar machst, müssen das Vial und Rockfall auch sein!"): die Karte richtet NUR Schaden an Zielen an (das Ablegen ist nur Kostenpunkt) —
+  // unter der Schadenssperre (`ps.damageLocked`) unspielbar (Karte bleibt auf der Hand, keine Aktion/Kosten; Sperr-Stutzen `engine._cardBlockedBySearchLock`).
+  blockedByDamageLock: true,
   // ★★ v1181 — ENTKOPPELTE ZAUBERBILDER (Al 17.9.): Wird der Zauber
   // NEGIERT, laeuft sein Effekt-Rumpf nie — die Engine spielt dann diese
   // Bilder, damit der abgewehrte Zauber trotzdem zu sehen ist. Im
@@ -65,12 +69,15 @@ module.exports = {
       // 1) Senden — mindestens eine Karte, beliebig viele.
       const res = await sendCardsLoop(engine, pi, heroIdx, {
         cardName: CARD_NAME, kinds: ['ability', 'equip'], min: 1, amount: 0, heroOwner: ctx.cardHeroOwner ?? pi,   // Als Befund 29.9.: Brettseite des Wirkers
+        // Welle 13 (Q143, Al: „Ja, sollte abbrechbar sein"): wie Breaking Strike abbrechbar,
+        // SOLANGE nichts abgelegt ist — die Karte loest dann nicht auf und bleibt auf der Hand.
+        cancelAtZero: true,
         confirmLabel: '🌪️ Send',
         describe: (sent) => sent === 0
           ? `Click an Artifact equipped or an Ability attached to ${hero.name} to send it to the discard pile — each card adds ${rateFor(engine, pi, heroIdx)} damage.`
           : `Sent ${sent} — currently ${sent * rateFor(engine, pi, heroIdx)} damage (${rateFor(engine, pi, heroIdx)} per card at Fighting ${fightingLevel(engine, pi, heroIdx)}). Click the next card, or stop here.`,
       });
-      if (res.aborted || res.sent === 0) return;
+      if (res.aborted || res.sent === 0) { gs._spellCancelled = true; return; }   // Q143: Abbruch = nichts verbraucht
 
       // 2) Schaden nach dem Level NACH dem Senden.
       const rate = rateFor(engine, pi, heroIdx);

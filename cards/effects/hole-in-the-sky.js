@@ -59,21 +59,10 @@ function kreaturenVon(engine, p) {
   return n;
 }
 
-/** Grober Wert einer Seite fuer die CPU (Baseline von `mctsEnemyCreatureValue`). */
-function seitenWert(engine, p) {
-  const db = engine._getCardDB();
-  let wert = 0;
-  for (const inst of (engine.cardInstances || [])) {
-    if (inst.zone !== 'support' || inst.faceDown) continue;
-    if ((inst.controller ?? inst.owner) !== p) continue;
-    const cd = engine.getEffectiveCardData?.(inst) || db[inst.name];
-    if (!cd || !hasCardType(cd, 'Creature')) continue;
-    wert += 1 + (cd.level || 0) * 0.4;
-  }
-  return wert;
-}
-
 module.exports = {
+  // ★ Als Ruling (Al 26.10., Flame Avalanche: „Wenn du andere Schadenskarten unspielbar machst, müssen das Vial und Rockfall auch sein!"): die Karte richtet NUR Schaden an Zielen an (alle Kreaturen beider Seiten) —
+  // unter der Schadenssperre (`ps.damageLocked`) unspielbar (Karte bleibt auf der Hand, keine Aktion/Kosten; Sperr-Stutzen `engine._cardBlockedBySearchLock`).
+  blockedByDamageLock: true,
   // Negierter Guss: ein kleiner Riss auf jedem Ziel statt des ganzen Himmels.
   spellVisual: {
     impact: { type: 'sky_crack' }, impactMs: 420,
@@ -86,16 +75,22 @@ module.exports = {
   },
 
   /**
-   * CPU: der Wipe trifft die EIGENE Seite mit. Nur spielen, wenn auf der
-   * Gegenseite mehr (und angreifbarer) Wert liegt als auf der eigenen.
-   * In der Erst-Runden-Immunitaet zaehlt die Gegenseite nicht.
+   * CPU (W82b, Al 27.10.2026 — ersetzt die Schwelle von W80a): „Wert aller zu tötenden Gegner-Creatures höher als Wert der verbrauchten Ressourcen inklusive eigener Creatures,
+   * aber NUR die zählen, die nicht geschützt sind." Gespielt wird genau dann, wenn
+   *   Σ Wert der gegnerischen Kreaturen, die durch die 999 Schaden TATSAECHLICH sterben UND NICHT geschuetzt sind
+   *   > Σ Wert der verbrauchten Ressourcen (diese Karte als Handkarte, die Hauptaktion — nicht wenn sie als Zusatzaktion laeuft) + Σ Wert der EIGENEN Kreaturen, die sterben UND NICHT geschuetzt sind.
+   * Geschuetzt = `engine.kreaturGeschuetztVor` (Erstrunden-Schutz, Unaffected-/Schadensimmunitaet, Damage Immune, Anti Magic …, bereite Reaktionen des Gegners wie Cool Rescuer Monia mit zwei
+   * Handkarten). Alle Posten in Punkten der Brettbewertung (`_kreaturen-bilanz.js` `flaechenEntscheidung`/`ressourcenWert`). Die Karte trifft nur Kreaturen: keine Heldenwirkung.
    */
-  cpuPlayVeto(engine, pi) {
+  cpuPlayVeto(engine, pi, heroIdx, opts) {
     try {
-      const opp = engine.opponentOf(pi);
-      const gegner = engine.gs?.firstTurnProtectedPlayer === opp ? 0 : seitenWert(engine, opp);
-      const eigen = seitenWert(engine, pi);
-      return gegner <= 0 || gegner <= eigen;
+      const KB = require('./_kreaturen-bilanz');
+      const r = KB.flaechenEntscheidung(engine, pi, {
+        kartenName: CARD_NAME, quelle: { name: CARD_NAME, owner: pi, controller: pi, heroIdx: Number.isInteger(heroIdx) ? heroIdx : -1 },
+        additional: KB.alsZusatzaktion(engine, module.exports, pi, heroIdx, opts),
+        art: 'damage', amount: SCHADEN, damageType: 'destruction_spell',
+      });
+      return !r.spielen;
     } catch {
       return false;   // die Heuristik darf nie einen legalen Play verhindern
     }

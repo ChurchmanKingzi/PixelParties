@@ -101,12 +101,13 @@ module.exports = {
           controller: ziel.owner, zone: 'support', heroIdx: ziel.heroIdx,
         }).find(c => c.zoneSlot === ziel.slotIdx);
         if (!inst) return;
-        vorher = inst.counters?.currentHp ?? 0;
+        // Nie getroffene Kreatur: noch kein `currentHp` — Rueckfall auf die gedruckten HP (S03-22)
+        vorher = inst.counters?.currentHp ?? (engine.getEffectiveCardData(inst) || engine._getCardDB()[inst.name])?.hp ?? 0;
         if (vorher <= 0) return;
         opferName = inst.name;
       }
 
-      const gesenkt = Math.max(0, vorher - 1);
+      let gesenkt = Math.max(0, vorher - 1);
 
       // Eigene Animation (v960, Als Vorgabe): ein Schwarm Phoenixe mit
       // Feuerschweif kracht ins Ziel, jeder Vogel mit eigener Explosion.
@@ -124,7 +125,12 @@ module.exports = {
         const inst = ziel.cardInstance || engine.findCards({
           controller: ziel.owner, zone: 'support', heroIdx: ziel.heroIdx,
         }).find(c => c.zoneSlot === ziel.slotIdx);
-        if (inst) inst.counters.currentHp = 1;
+        // W71b (Al, 25.10.2026): die Senkung auf einer Kreatur ist ein Effekt auf sie — Schutzfenster (Cool Rescuer Monia & Co.) VOR dem Schreiben. Negiert: die Kreatur behält ihre HP,
+        // es wurde nichts gesenkt (kein Rückstoß, `gesenkt` = 0); „Immediately end your turn" betrifft keine Kreatur und bleibt.
+        if (inst) {
+          if (await engine.kreaturBetroffen(inst, 'stats', { name: CARD_NAME, owner: pi }, { sourceOwner: pi, detail: 'hp_to_1' })) inst.counters.currentHp = 1;
+          else gesenkt = 0;
+        }
       }
       engine.sync();
 

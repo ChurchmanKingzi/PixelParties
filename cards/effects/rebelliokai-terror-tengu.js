@@ -34,6 +34,15 @@
 //      of whether any chain-summon actually
 //      landed (the rule's "Immediately end your
 //      turn afterwards" reads as unconditional).
+//
+//  Als Ruling (Al 26.10.): „Nicht korrekt, auch bei 0
+//  endet der Zug" — „end your turn" hängt NICHT an
+//  der Anzahl der beschworenen Karten: wählt der
+//  Spieler 0 Karten (oder bricht die Galerie ab,
+//  oder keine Karte ist beschwörbar, oder nichts
+//  landet), endet der Zug trotzdem. Er endet immer,
+//  sobald der Effekt der Tengu ausgelöst wurde
+//  (nicht negiert).
 // ═══════════════════════════════════════════
 
 const {
@@ -55,10 +64,12 @@ const MAX_SUMMONS = 3;
 function _heroCanSummon(hero) {
   if (!hero?.name || hero.hp <= 0) return false;
   const s = hero.statuses || {};
-  if (s.frozen || s.stunned || s.negated || s.bound) return false;
+  // Welle 12 (Al): ein bloss Effekt-negierter Held beschwoert normal; harte Form (Abilities negiert) -> nur Stufe 0 ueber `heroMeetsLevelReq`.
+  if (s.frozen || s.stunned || s.bound) return false;
   return true;
 }
 
+const { canHeroSummon } = require('./_summon-eligibility');   // Z6 (A06-34)
 /**
  * Build the list of (heroIdx, slotIdx) destinations on `pi`'s side
  * where `cardName` can be NORMALLY summoned right now. A destination
@@ -82,14 +93,15 @@ function _eligibleDestinations(engine, pi, cardName) {
   for (const { physOwner, heroIdx: hi, hero: h } of engine.heroesControlledBy(pi)) {
     if (!_heroCanSummon(h)) continue;
     if (!engine.heroMeetsLevelReq(physOwner, hi, cd)) continue;
-    const zones = engine.gs.players[physOwner].supportZones?.[hi] || [[], [], []];
-    for (let zi = 0; zi < 3; zi++) {
-      if ((zones[zi] || []).length === 0) {
-        out.push({ owner: physOwner, heroIdx: hi, slotIdx: zi });
-      }
+    // Z6 (A06-34): "as additional Actions" - Beschwoerungssperre und Aktionssperre des Helden gelten (`_summon-eligibility`).
+    if (!canHeroSummon(engine, pi, hi, cd, { alsAktion: true, physOwner })) continue;
+    // W63a (Al, 22.10.2026: Alices Effekt gilt fuer ALLE Beschwoerungs-Effekte; „erst die geteilte Zone, DANN die erste leere"): freie Zonen UND — mit
+    // Alice-Teilung des Beschwoerers — die Zone einer GLEICHNAMIGEN Creature (`engine.beschwoerZonenFuer`).
+    for (const zz of engine.beschwoerZonenFuer(pi, cardName, { seite: physOwner, heroIdx: hi, nurBasis: true, namedHeroesOnly: true })) {
+      out.push({ owner: physOwner, heroIdx: hi, slotIdx: zz.slotIdx, ...(zz.shared ? { shared: true, stackDepth: zz.stackDepth } : {}) });
     }
   }
-  return out;
+  return require('./_alice-shared').geteiltZuerst(out);
 }
 
 /**
@@ -120,12 +132,19 @@ function _totalUsableSummonZones(engine, pi, eligibleNames) {
     if (!_heroCanSummon(h)) continue;
     const heroCanHostSomething = eligibleNames.some(name => {
       const cd = cardDB[name];
-      return cd && engine.heroMeetsLevelReq(physOwner, hi, cd);
+      return cd && engine.heroMeetsLevelReq(physOwner, hi, cd)
+        && canHeroSummon(engine, pi, hi, cd, { alsAktion: true, physOwner });   // Z6 (A06-34)
     });
     if (!heroCanHostSomething) continue;
     const zones = engine.gs.players[physOwner].supportZones?.[hi] || [[], [], []];
     for (let zi = 0; zi < 3; zi++) {
       if ((zones[zi] || []).length === 0) n++;
+    }
+    // W63a: mit Alice-Teilung nimmt eine Zone mit gleichnamiger Creature die Karte desselben Namens zusaetzlich auf (obere Schranke).
+    for (const name of eligibleNames) {
+      const cd = cardDB[name];
+      if (!cd || !engine.heroMeetsLevelReq(physOwner, hi, cd) || !canHeroSummon(engine, pi, hi, cd, { alsAktion: true, physOwner })) continue;
+      if (engine.beschwoerZonenFuer(pi, name, { seite: physOwner, heroIdx: hi, nurBasis: true, namedHeroesOnly: true }).some(z => z.shared)) n++;
     }
   }
   return n;
@@ -170,13 +189,11 @@ module.exports = {
       const allDiscardNames = getDifferentRebelliokaiInDiscard(ps, engine);
       const discardNames = allDiscardNames.filter(n => _eligibleDestinations(engine, pi, n).length > 0);
       if (discardNames.length === 0) {
-        // No eligible summons — the chain-summon clause fizzles
-        // entirely. Per the rules text, the "Immediately end your
-        // turn afterwards" clause only triggers off the chain-summon
-        // happening. Skip the turn-end and just log the fizzle.
+        // No eligible summons. Als Ruling (Al 26.10.): „auch bei 0 endet der Zug" — der Zug endet trotzdem.
         engine.log('rebelliokai_terror_tengu_fizzle', {
           player: ps.username, reason: 'no_eligible_discard_summons',
         });
+        await engine.advanceToPhase(pi, PHASES.END);
         return;
       }
 
@@ -194,6 +211,7 @@ module.exports = {
         engine.log('rebelliokai_terror_tengu_fizzle', {
           player: ps.username, reason: 'no_free_summon_zones',
         });
+        await engine.advanceToPhase(pi, PHASES.END);   // Als Ruling (Al 26.10.): auch ohne Beschwörung endet der Zug
         return;
       }
 
@@ -254,7 +272,8 @@ module.exports = {
             owner:   d.owner,   // Kontrolle statt Seite (Styx 28.9.)
             heroIdx: d.heroIdx,
             slotIdx: d.slotIdx,
-            label:   `${engine.gs.players[d.owner]?.heroes?.[d.heroIdx]?.name || 'Hero'} — Support ${d.slotIdx + 1}`,
+            label:   `${engine.gs.players[d.owner]?.heroes?.[d.heroIdx]?.name || 'Hero'} — Support ${d.slotIdx + 1}${d.shared ? ` (×${d.stackDepth})` : ''}`,
+            ...(d.shared ? { shared: true, stackDepth: d.stackDepth } : {}),   // W63a: geteilte Zone (Alice) vorn, mit Kennzeichen
           }));
           const picked = await engine.promptGeneric(pi, {
             type:        'zonePick',
@@ -288,17 +307,12 @@ module.exports = {
         player:     ps.username,
         summoned:   chosen,
         landed:     summonsLanded,
-        endingTurn: summonsLanded > 0,
+        endingTurn: true,
       });
 
-      // Conditional turn-end. The "Immediately end your turn
-      // afterwards" clause only triggers off a chain-summon actually
-      // happening — if the player cancelled the gallery, picked zero
-      // creatures, or every chosen summon failed mid-flight (board
-      // filled up, etc.), the turn proceeds normally.
-      if (summonsLanded > 0) {
-        await engine.advanceToPhase(pi, PHASES.END);
-      }
+      // Turn-end — UNBEDINGT. Als Ruling (Al 26.10.): „Nicht korrekt, auch bei 0 endet der Zug" — auch wenn der Spieler die Galerie abbrach,
+      // 0 Karten wählte oder jede gewählte Beschwörung scheiterte (Brett voll …), endet der Zug.
+      await engine.advanceToPhase(pi, PHASES.END);
     },
   },
 };

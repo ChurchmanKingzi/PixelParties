@@ -109,7 +109,10 @@ module.exports = {
     await engine._delay(SCHAU_MS);
 
     if (treffer) {
-      await engine.actionAddCardFromDeckToHand(pi, oben, {
+      // W85c (Atta, Al 29.10.): Treffer = die Karte kommt auf die Hand → das Aufdecken ist ein Ereignis VOR dem Verschieben; löscht Atta sie, kommt sie nie auf die Hand (die 2 Karten
+      // werden trotzdem gezogen). Beim Fehlschlag entsorgt der Effekt die Karte selbst — dort greift Atta nicht.
+      const _ereignis = await engine.aufdeckEreignis(pi, [oben], { source: CARD_NAME, zone: 'deck' });
+      if (!_ereignis.geloescht.includes(oben)) await engine.actionAddCardFromDeckToHand(pi, oben, {
         source: CARD_NAME, reveal: false, _skipFlight: true,
       });
       engine.sync();
@@ -119,6 +122,11 @@ module.exports = {
       ps.deletedPile.push(oben);
       engine._trackCard(oben, pi, 'deleted');
       engine.log('card_deleted', { player: ps.username, card: oben, from: 'deck', by: CARD_NAME });
+      // W16e (F02-09): „deleted from your DECK" ist ein Mill in den Geloescht-Stapel — `onMill` melden (Mystery Box zieht 2; Jean & Co.),
+      // wie `actionMillCards` mit `deleteMode`.
+      await engine.runHooks('onMill', {
+        playerIdx: pi, milledCards: [oben], count: 1, source: CARD_NAME, deleteMode: true, _skipReactionCheck: true,
+      });
     }
     engine.sync();
     return true;

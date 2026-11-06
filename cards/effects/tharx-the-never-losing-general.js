@@ -9,6 +9,7 @@
 
 const { hasCardType } = require('./_hooks');
 
+const { drawBlockedFor } = require('./_draw-block-shared');
 module.exports = {
   // CPU: confirm this Hero's activated-effect "you may" prompt — the default
   // brain declines cancellable confirms raised outside a card-cast (Hero
@@ -35,6 +36,8 @@ module.exports = {
     const engine = ctx._engine;
     const pi = ctx.cardOwner;
     const creatureCount = _countCreatures(engine, pi);
+    // Z6 (H04-16): der Zug ist der einzige Nutzen - unter Hand-/Zieh-Sperre oder Tuscan Artist (genau 2/3) nicht aktivierbar.
+    if (drawBlockedFor(engine, pi, creatureCount)) return false;
     return creatureCount > 0;
   },
 

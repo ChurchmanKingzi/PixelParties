@@ -57,8 +57,22 @@ module.exports = {
   canPlayCard(gs, pi, heroIdx, cardData, engine, herkunft) {
     const typ = cardData?.cardType;
     if (typ !== 'Attack' && typ !== 'Spell') return true;
-    const ps = gs.players[pi];
+    // Z1 (H03-22): „the player" = KONTROLLEUR. Die Engine ruft mit der BRETTSEITE (`pi`) oder dem
+    // Kontrolleur; die Hand gehoert immer dem Kontrolleur des Helden (Muster Saint Nicolas `heldUndHand`).
+    let hero = gs.players[pi]?.heroes?.[heroIdx];
+    if (hero?.name !== CARD_NAME) {
+      const fremd = (gs.players || []).map(p => p?.heroes?.[heroIdx])
+        .find(h => h?.name === CARD_NAME && h.charmedBy === pi);
+      if (fremd) hero = fremd;
+    }
+    const ps = gs.players[hero?.charmedBy ?? hero?.permaControlBy ?? pi];
     if (!ps) return true;
+    // Z6 (H03-13): ein NEGIERTER Santa wirkt nicht - sein "must"-Preis entfaellt (der Hook ist stillgelegt), also darf auch die
+    // Spielbarkeits-Sperre nicht greifen (Saint Nicolas macht es ebenso).
+    if (ps.heroes?.[heroIdx]?.statuses?.negated) return true;
+    // W7b (H03-14, Al 14.10.): kann die Gegenseite die Pflicht-Karten nicht annehmen (Hand-/Such-Sperre), wuerde der „must"-Preis
+    // nie faellig - die Aktion waere gratis. Dann gesperrt (wie Saint Nicolas, Cool Presents).
+    if (engine?._isSearchBlocked && engine._isSearchBlocked(engine.opponentOf(gs.players.indexOf(ps)), {}, 'deck')) return false;
     // Kommt die Karte von der Hand, liegt sie zum Pruefzeitpunkt noch
     // dort und zaehlt nicht als Reserve. Ohne Herkunftsangabe (alte
     // Aufrufer) wird der Hand-Fall angenommen — das ist die sichere
@@ -90,8 +104,9 @@ module.exports = {
       // weniger auf der Hand (ein Effekt hat sie waehrend der
       // Aufloesung geleert), wird gegeben, was da ist.
       for (let n = 0; n < PREIS; n++) {
-        const eligibleIndices = [];
-        for (let i = 0; i < (ps.hand || []).length; i++) eligibleIndices.push(i);
+        // ★ Z4 (H03-12): der soeben gewirkte Zauber liegt noch in der Hand, ist aber keine Geschenkkarte
+        // (`canPlayCard` rechnet ihn ebenfalls nicht als Reserve).
+        const eligibleIndices = engine._handIndizesOhneAufloesende(ps);
         if (eligibleIndices.length === 0) break;
 
         let handIndex = eligibleIndices[0];

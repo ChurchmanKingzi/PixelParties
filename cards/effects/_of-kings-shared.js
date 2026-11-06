@@ -1,4 +1,5 @@
 'use strict';
+const { anyName, zusatz } = require('./_alias-name');   // Shroomasaur: Zusatzname zählt für Namensfamilien
 const { isSeat } = require('./_opp');   // N-Spieler: gültiger Sitzindex
 // ═══════════════════════════════════════════════════════════════════
 //  GETEILT: der „of Kings"-Archetyp (Schach) — v818
@@ -56,11 +57,11 @@ function isOfKingsName(name) {
 /** Karte, deren NAME oder EFFEKTTEXT „of Kings" enthaelt (Knight [W]). */
 function mentionsOfKings(cd) {
   if (!cd) return false;
-  return isOfKingsName(cd.name) || String(cd.effect || '').includes(OF_KINGS);
+  return anyName(cd, (n) => isOfKingsName(n)) || String(cd.effect || '').includes(OF_KINGS);
 }
 
 function isOfKingsCreatureData(cd) {
-  return !!cd && hasCardType(cd, 'Creature') && isOfKingsName(cd.name);
+  return !!cd && hasCardType(cd, 'Creature') && anyName(cd, (n) => isOfKingsName(n));
 }
 
 function boardOfKingsOnBoard(engine) {
@@ -92,7 +93,7 @@ function controlledCreatures(engine, pi) {
 }
 
 function ofKingsCreatures(engine, pi) {
-  return controlledCreatures(engine, pi).filter(i => isOfKingsName(i.name));
+  return controlledCreatures(engine, pi).filter(i => anyName(i, (n) => isOfKingsName(n)));
 }
 
 /**
@@ -103,6 +104,9 @@ function ofKingsCreatures(engine, pi) {
 function instCountsAsName(engine, inst, baseName) {
   if (!inst?.name) return false;
   if (inst.name.includes(baseName)) return true;
+  // W73c (Shroomasaur): ein ZUSATZNAME zählt als Name (die Queen-Sonderregel ist die WIRKUNG der Queen — der Zusatzname gibt sie nicht).
+  const zn = zusatz(inst);
+  if (zn && zn.includes(baseName)) return true;
   if (!inst.name.startsWith(QUEEN)) return false;
   if (![KNIGHT, BISHOP, ROOK].includes(baseName)) return false;
   if (inst.zone !== 'support') return false;
@@ -163,8 +167,9 @@ function sourceOwnerOf(source, engine) {
  * Effekt-Immunitaet.
  */
 function protectorAffectable(engine, inst, source) {
-  if (engine.isOmniImmune?.(inst)) return false;
+  if (engine.isOmniImmune?.(inst, source)) return false;   // W17b: Golden Wings quellenbewusst
   const so = sourceOwnerOf(source, engine);
+  if (inst.name === 'Sparkfly Queen' || inst.counters?._sparkflyAttendantAura) require('./_sparkfly-shared').refreshAttendantAura(engine, inst.controller ?? inst.owner);   // W5b-Z3
   if (inst.counters?._oppEffectImmune && so != null && so !== (inst.controller ?? inst.owner)) return false;
   if (inst.counters?.untargetable_by_opponent && so != null
       && inst.counters.untargetable_by_opponent_pi === so) return false;
@@ -187,6 +192,7 @@ function coveredByBoardOfKings(engine, inst, sourceOwner, source) {
   const controller = inst.controller ?? inst.owner;
   if (sourceOwner == null || sourceOwner === controller) return false;
   if (!boardOfKingsOnBoard(engine)) return false;
+  if (engine.karteIstVonAreasAusgenommen?.(inst)) return false;   // W82 (Shipwrecked): ein von Areas ausgenommenes Ziel bekommt die Deckung der Area nicht
   // „a lower level": Artifact Creatures haben kein Level (Als Ruling 9.10.) — weder
   // koennen sie geschuetzt sein noch als Schuetzer mit niedrigerer Stufe dienen.
   if (isArtifactCreature(_cd(engine, inst))) return false;
@@ -228,10 +234,18 @@ function summonedThisTurn(engine, inst) {
   return inst?.turnPlayed === (engine.gs.turn || 0);
 }
 
-function freeZonesOfHero(engine, pi, heroIdx) {
+function freeZonesOfHero(engine, pi, heroIdx, cardName = null, sharer = pi) {
   const out = [];
   // v1349: versiegelte Plaetze (Madame Guillotine) zaehlen als belegt.
   for (let z = 0; z < 3; z++) if (!engine.supportSlotBelegt(pi, heroIdx, z)) out.push(z);
+  // ★ W62a: mit `cardName` zaehlt — bei Alice-Teilung des Beschwoerers `sharer` — auch die Zone einer GLEICHNAMIGEN Creature.
+  // ★ W63a (Al, 22.10.2026: „erst die geteilte Zone, DANN die erste leere"): die geteilten Zonen stehen VOR den freien.
+  if (cardName) {
+    const { canShareInto } = require('./_alice-shared');
+    const geteilt = [];
+    for (let z = 0; z < 3; z++) if (!out.includes(z) && canShareInto(engine, sharer, heroIdx, z, cardName, pi)) geteilt.push(z);
+    return [...geteilt, ...out];
+  }
   return out;
 }
 
@@ -335,11 +349,27 @@ function summonZonesFor(engine, pi, cd, opts = {}) {
   const heroes = engine.gs.players[seite]?.heroes || [];
   for (let hi = 0; hi < heroes.length; hi++) {
     if (!canHeroSummon(engine, pi, hi, cd, opts)) continue;
-    for (const z of freeZonesOfHero(engine, seite, hi)) {
+    for (const z of freeZonesOfHero(engine, seite, hi, cd?.name, pi)) {   // W62a: + geteilte Zone (Alice)
       out.push(seite !== pi ? { heroIdx: hi, slotIdx: z, owner: seite } : { heroIdx: hi, slotIdx: z });
     }
   }
-  return out;
+  return geteiltVorn(engine, pi, out, cd?.name, seite);
+}
+
+/**
+ * ★ W63a (Al, 22.10.2026: „erst die geteilte Zone, sofern Alices Effekt aktiv ist, DANN die erste leere"): stellt in einer Zonenliste
+ * `[{ heroIdx, slotIdx, owner? }]` die GETEILTEN Zonen (belegt, nur gleichnamige Creatures, `canShareInto` fuer `pi`) nach vorn und markiert
+ * sie mit `shared: true`; sonst bleibt die Reihenfolge. `seite` = Brettseite, wenn der Eintrag kein `owner` traegt.
+ */
+function geteiltVorn(engine, pi, zones, cardName, seite = pi) {
+  if (!cardName || !zones.length) return zones;
+  const { canShareInto } = require('./_alice-shared');
+  const markiert = zones.map(z => {
+    const feld = z.owner ?? seite;
+    const belegt = (engine.gs.players[feld]?.supportZones?.[z.heroIdx]?.[z.slotIdx] || []).length > 0;
+    return belegt && canShareInto(engine, pi, z.heroIdx, z.slotIdx, cardName, feld) ? { ...z, shared: true } : z;
+  });
+  return markiert.some(z => z.shared) ? [...markiert.filter(z => z.shared), ...markiert.filter(z => !z.shared)] : markiert;
 }
 
 async function pickZone(engine, pi, zones, title, description) {
@@ -411,6 +441,6 @@ module.exports = {
   protectorAffectable, coveredByBoardOfKings,
   reduceLevelByOfKingsFactory, summonedThisTurn,
   freeZonesOfHero, freeZonesAll, collectHandAndDeck, takeFromPile, returnToPile,
-  pickFromHandOrDeck, placeFromHandOrDeck, summonFromHandOrDeck, summonZonesFor, pickZone,
+  pickFromHandOrDeck, placeFromHandOrDeck, summonFromHandOrDeck, summonZonesFor, geteiltVorn, pickZone,
   mainActionSlotFree, ofKingsCpuAnswer,
 };

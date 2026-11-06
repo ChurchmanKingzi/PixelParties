@@ -29,6 +29,9 @@ module.exports = {
       const engine = ctx._engine;
       const pi = ctx.cardOwner;
       if (engine.gs._spellCasterOverride) return;
+      // W16c (A04-14): "to a single target" - gleiche Auslegung wie Frog Race Boat (Al): ein Schlag auf 2+ Ziele
+      // (Mehrziel-Klammer) ist kein Einzelziel - Helden- und Kreaturenzweig einheitlich.
+      if ((engine._multiHitScope?.total || 0) >= 2) return;
       const stackSize = engine.getCoolnessStackSize(pi);
       if (stackSize === 0) return;
       // Filter by source: must be Thorad himself.
@@ -58,6 +61,7 @@ module.exports = {
       const pi = ctx.cardOwner;
       // Same creature-cast skip as the hero-damage branch above.
       if (engine.gs._spellCasterOverride) return;
+      if ((engine._multiHitScope?.total || 0) >= 2) return;   // W16c (A04-14): Mehrziel-Schlag = kein Einzelziel
       const stackSize = engine.getCoolnessStackSize(pi);
       if (stackSize === 0) return;
       const entries = ctx.entries || [];

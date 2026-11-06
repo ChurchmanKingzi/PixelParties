@@ -20,6 +20,7 @@
 
 const { ZONES } = require('./_hooks');
 const { trefferHooks } = require('./_affected-shared');
+const { drawBlockedFor } = require('./_draw-block-shared');   // D1: Regel von Al - reine Zieh-Aktivierungen unter Zieh-/Hand-Sperre gesperrt
 
 const CARD_NAME = 'Charm of Balance';
 const HAND_LIMIT = 7;
@@ -55,7 +56,9 @@ async function _maybeSelfDiscard(ctx) {
   const pi = ctx.cardOwner;
   const ps = engine.gs.players[pi];
   if (!ps) return;
-  if ((ps.hand || []).length <= HAND_LIMIT) return;
+  // ★ Z4 (F01-06): die gerade aufloesende Karte (Boomerang, Capture Net, Cool/Cute Cheese …) liegt noch in `ps.hand`,
+  // ist aber keine Handkarte mehr — „more than 7 cards in your hand" zaehlt sie nicht.
+  if (engine.handSizeWithoutResolving(pi) <= HAND_LIMIT) return;
 
   // actionMoveCard with `fireCreatureDeath: false` is the right
   // primitive — Charm isn't a Creature, so no death hooks should run,
@@ -99,6 +102,8 @@ module.exports = {
   // No-op when the counter is zero — keeps the equip from being clicked
   // in error before it has accumulated anything.
   canActivateEquipEffect(ctx) {
+    // D1 (Regel von Al): der Zug ist der einzige Nutzen - unter Hand-/Zieh-Sperre nicht aktivierbar.
+    if (drawBlockedFor(ctx._engine, ctx.cardOwner ?? (ctx.card.controller ?? ctx.card.owner), ctx.card.counters?.balance || 0)) return false;
     return (ctx.card.counters?.balance || 0) > 0;
   },
 
@@ -169,6 +174,12 @@ module.exports = {
       await _maybeSelfDiscard(ctx);
     },
     onCardAddedFromDiscardToHand: async (ctx) => {
+      if (ctx.playerIdx !== ctx.cardOwner) return;
+      await _maybeSelfDiscard(ctx);
+    },
+    // ★ Z4 (F01-06 b): Handzugaenge OHNE Such-/Zieh-Hook (Geschenk-Karten wie Birthday Present, Rueckgaben/Bounces ueber
+    // `handZugang`) melden sich ueber den allgemeinen Hook `onHandGrew` (Kontext: { playerIdx }).
+    onHandGrew: async (ctx) => {
       if (ctx.playerIdx !== ctx.cardOwner) return;
       await _maybeSelfDiscard(ctx);
     },

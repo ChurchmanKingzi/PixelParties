@@ -44,6 +44,7 @@
 //  a Deepsea for summon purposes.
 // ═══════════════════════════════════════════
 
+const { anyName } = require('./_alias-name');   // Shroomasaur: Zusatzname zählt für Namensfamilien
 const { loadCardEffect } = require('./_loader');
 const { isSummonablePileCreature, hasCardType } = require('./_hooks');
 
@@ -185,6 +186,16 @@ function clearSwapInheritedStatus(inst) {
  * @param {string} [opts.excludeInstId] - Skip this instance (self-exclude when
  *   deciding if the card being placed qualifies as a bounce target).
  */
+/**
+ * ★ W21a (Al, 20.10.2026, Frage 2 aus W20c): darf `pi` in die Zonen des Helden (`side`, `hi`) PLATZIEREN (Deepsea-Tausch)? Der Kontrolleur ja; der BESITZER eines
+ * abgegebenen Helden bei temporaerer Kontrolle weiter ja, bei dauerhafter nicht (`engine.zonenRechtAmHeld`). Eine fremde Spalte ohne Kontrolle: nein (wie bisher).
+ */
+function _darfHierPlatzieren(engine, pi, side, hi) {
+  const hero = engine.gs.players[side]?.heroes?.[hi];
+  if (engine.heroSideOf(side, hero) === pi) return true;
+  return side === pi && engine.zonenRechtAmHeld(pi, side, hi);
+}
+
 function getBounceableDeepseaCreatures(engine, playerIdx, opts = {}) {
   const gs = engine.gs;
   const ps = gs.players[playerIdx];
@@ -198,7 +209,7 @@ function getBounceableDeepseaCreatures(engine, playerIdx, opts = {}) {
     const sps = gs.players[side];
     if (!sps) continue;
     for (let hi = 0; hi < (sps.heroes || []).length; hi++) {
-      if (engine.heroSideOf(side, sps.heroes[hi]) !== playerIdx) continue;
+      if (!_darfHierPlatzieren(engine, playerIdx, side, hi)) continue;
       for (let si = 0; si < 3; si++) {
         const inst = _bounceableAt(engine, playerIdx, side, hi, si);
         if (!inst) continue;
@@ -221,6 +232,8 @@ function _bounceableAt(engine, pi, side, hi, si) {
   const gs = engine.gs;
   const slot = (gs.players[side]?.supportZones?.[hi] || [])[si] || [];
   if (slot.length === 0) return null;
+  // W17a (Al, 19.10.2026): Ersetzen nur in Zonen mit exakt EINER Karte (Alice-Stapel: die Zone wird durch eine Rueckgabe nicht frei).
+  if (!engine.zoneFreiNachKostenzahlung(side, hi, si)) return null;
   const inst = engine.cardInstances.find(c =>
     c.owner === side &&
     (c.controller ?? c.owner) === pi &&
@@ -229,7 +242,7 @@ function _bounceableAt(engine, pi, side, hi, si) {
     c.zoneSlot === si
   );
   if (!inst) return null;
-  if (!isDeepseaCreature(inst.name, engine, inst)) return null;
+  if (!anyName(inst, (n) => isDeepseaCreature(n, engine, inst))) return null;
   // "Not summoned this turn" — strictly less than current turn.
   // Ausnahme per KARTEN-VERTRAG (`isDeepseaBounceableSameTurn`,
   // aktuell Infected Squirrel): darf noch in der Beschwörungsrunde
@@ -269,7 +282,7 @@ function hasBounceableDeepsea(gs, playerIdx) {
  * placed, a fresh instance is created.
  *
  * @param {object} [opts] - { animationType } ueberschreibt das Bild
- *   der Ruecknahme (Standard: `deep_sea_bubbles`).
+ *   der Ruecknahme (Standard: `deep_sea_bubbles`); `flugStil` setzt den Client-Flugstil des Rueckflugs.
  * @returns {Promise<{ returned: boolean }>}
  */
 async function returnSupportCreatureToHand(engine, inst, sourceName, opts = {}) {
@@ -279,8 +292,15 @@ async function returnSupportCreatureToHand(engine, inst, sourceName, opts = {}) 
   // uebernommenen Helden beschworene Kreatur steht physisch auf
   // `inst.owner`, gehoert aber ihrem Beschwoerer (`crossSideControlled`)
   // — die Hand ist seine, das Brett bleibt `seite`. Ohne Marke wie bisher.
-  const seite = inst.owner;
-  const ownerIdx = inst.counters?.crossSideControlled ?? inst.owner; // Hand-return ALWAYS goes to original owner.
+  // W66d: Brettseite über `physicalSide` (Plant Golem: `owner` = Beschwörer, liegt aber auf dem Brett des Gegners = `controller`; `inst.owner` zeigte hier auf
+  // das falsche Brett → der Name blieb als Geister-Eintrag in der Support Zone des Gegners stehen).
+  const seite = engine.physicalSide(inst);
+  // W64c (Al 23.10.2026: „Bounce geht an den AKTUELLEN KONTROLLEUR“): eine Kreatur, die vom Brett auf die Hand zurückgeht, landet in der HAND ihres
+  // Kontrolleurs (`kontrolleurVon`) — auch eine gestohlene/übernommene (Charme, Hunting, Dark Gear, Diplomacy …). Die HERKUNFT bleibt: die Karte trägt
+  // weiter ihren permanenten Besitzer (Platzmarke, unten `originalOwner`), ihr späterer Austritt aus der Hand (Abwerfen, Löschen, Spielen, Mischen,
+  // Mulligan) geht in die STAPEL des Besitzers. `opts.toPlayer` bleibt für Texte mit ausdrücklichem Empfänger („… to YOUR hand" an einen anderen Spieler).
+  // (W63c hatte hier „Hand des Besitzers" eingeführt — durch die Entscheidung vom 23.10. zurückgenommen.)
+  const ownerIdx = Number.isInteger(opts.toPlayer) ? opts.toPlayer : engine.kontrolleurVon(inst);
   const ps = gs.players[ownerIdx];
   if (!ps) return { returned: false };
   const bps = gs.players[seite] || ps;
@@ -311,11 +331,32 @@ async function returnSupportCreatureToHand(engine, inst, sourceName, opts = {}) 
   // engine's damage-path check) catches summon paths where the
   // counter stamp got skipped.
   const { isCardinalBeastByName } = require('./_cardinal-shared');
-  if (inst.counters?._cardinalImmune || isCardinalBeastByName(inst.name)) {
+  // W17b: Golden Wings trägt jetzt `_gwImmune` (nur gegen Quellen anderer Spieler; `opts.sourceOwner`, ohne = geschützt).
+  if (inst.counters?._cardinalImmune || engine.kreaturGegnerEffektImmun(inst, opts.sourceOwner) || isCardinalBeastByName(inst.name)) {
     engine.log('cardinal_immune_block', {
       card: inst.name, by: sourceName, action: 'return_to_hand',
     });
     return { returned: false };
+  }
+
+  // ★ W71b (Al, 25.10.2026 — Cool Rescuer Monia reagiert auf JEDEN Effekt auf Kreaturen): „Zurück auf die Hand" durch eine Karte (Racket Arrow, Chasing the Legend, Deepsea
+  // Encounter, Divine Gift of the Deepsea …) ist ein Effekt auf die Kreatur → Schutzfenster `beforeCreatureAffected` ('move', Feinart 'bounce'), NACH der Immunität, VOR der
+  // ersten Änderung. Kein Fenster: das eigene Opfer/Tribut als Kosten (`opts.kosten` / `isSacrifice`, z. B. Dark Deepsea God) und Rückgabe der Kreatur durch ihren eigenen Text
+  // (`opts.selbst`, Wendy, Moonlight Butterfly, Creepy Villager). Wird der Effekt negiert, bleibt die Kreatur stehen (`{ returned: false, negated: true }`).
+  // B2/E9: Cosmic Malfunction — „moved from your side of the board to anywhere else by an opponent's card or effect" gilt auch fürs Zurücknehmen auf die Hand (Racket Arrow, Bounce Trap, Deepsea-Karten …).
+  // Wie im Zerstörungsweg (`actionDestroyCard`) vor dem Schutzfenster darunter; der Helfer prüft Cosmic-Depths-Kreatur, Fremdquelle und Erste-Runden-Schutz selbst. Nicht bei Kosten/Opfer/eigenem Text.
+  if (typeof opts.sourceOwner === 'number' && !opts.kosten && !opts.isSacrifice && !opts.selbst
+      && await engine._checkCdMovementHandReactions(inst, { name: sourceName, owner: opts.sourceOwner }, 'move')) {
+    engine.log('bounce_blocked', { card: inst.name, by: sourceName, reason: 'cosmic-malfunction' });
+    return { returned: false, negated: true };
+  }
+  if (!opts.kosten && !opts.isSacrifice && !opts.selbst && !opts._skipAffectedWindow) {
+    const _erlaubt = await engine.kreaturBetroffen(inst, 'move', { name: sourceName || '', ...(typeof opts.sourceOwner === 'number' ? { owner: opts.sourceOwner } : {}) },
+      { sourceOwner: opts.sourceOwner, detail: 'bounce' });
+    if (!_erlaubt) {
+      engine.log('bounce_blocked', { card: inst.name, by: sourceName, reason: 'creature protection' });
+      return { returned: false, negated: true };
+    }
   }
 
   // Pile-transfer animation needs the SOURCE slot coordinates (to anchor
@@ -328,6 +369,7 @@ async function returnSupportCreatureToHand(engine, inst, sourceName, opts = {}) 
     ...(seite !== ownerIdx ? { fromOwner: seite, toOwner: ownerIdx } : {}),   // Styx 28.9.
     fromHeroIdx: heroIdx, fromSlotIdx: slotIdx,
     toHandIdx,
+    ...(opts.flugStil ? { flightStyle: opts.flugStil } : {}),   // Bounce Trap: Flugstil 'schleuder'
   });
 
   // Remove name from support slot.
@@ -339,7 +381,11 @@ async function returnSupportCreatureToHand(engine, inst, sourceName, opts = {}) 
 
   // Add to hand.
   if (!ps.hand) ps.hand = [];
-  engine.handZugangSync(ps, cardName, { ohneInstanz: true });
+  if (!engine.tokenAbgang(inst)) {   // W5a: Token verschwindet (echte Karte darunter wird gelöscht), kommt nie auf die Hand
+    const _besitzer = engine.kartenBesitzerVon(inst);
+    // Welle 12: Handindex-Sperren (Lawn Gnome) wandern mit · W64c: bleibt Eigentum des Besitzers (Platzmarke), auch wenn der Kontrolleur nicht der Besitzer ist
+    engine.handZugangSync(ps, cardName, { ohneInstanz: true, vonInst: inst, ...(_besitzer !== ownerIdx ? { originalOwner: _besitzer } : {}) });
+  }
 
   engine.log('deepsea_return_to_hand', {
     player: ps.username, card: cardName, by: sourceName,
@@ -354,6 +400,15 @@ async function returnSupportCreatureToHand(engine, inst, sourceName, opts = {}) 
     toZone: 'hand', toOwner: ownerIdx,
     _skipReactionCheck: true,
   });
+
+  // ★ Welle 10 (Al, R3 / A02-deepsea-16): „1 or more cards" ist EIN Ereignis. Gibt ein Effekt mehrere Kreaturen auf einmal zurück
+  // (Dark Deepsea God), sammelt der Aufrufer sie über `opts.batch` und feuert den Hook EINMAL mit `fireReturnedBatch`.
+  if (Array.isArray(opts.batch)) {
+    opts.batch.push({ ownerIdx, cardName, inst, heroIdx, slotIdx, seite });
+    engine.sync();
+    await engine._delay(250);
+    return { returned: true };
+  }
 
   // Custom hook fired specifically for "cards returned to hand from board"
   // events. Teppes draws a card per firing (up to 5/turn); Siphem adds a
@@ -378,6 +433,26 @@ async function returnSupportCreatureToHand(engine, inst, sourceName, opts = {}) 
   engine.sync();
   await engine._delay(250);
   return { returned: true };
+}
+
+/**
+ * ★ Welle 10 (R3): feuert `onCardsReturnedToHand` EINMAL je Hand-Besitzer für die über `returnSupportCreatureToHand(…, { batch })`
+ * gesammelten Rückgaben (parallele Herkunfts-Arrays wie im Einzelweg) und entfernt die Instanzen aus der Verfolgung.
+ */
+async function fireReturnedBatch(engine, batch, sourceName) {
+  if (!Array.isArray(batch) || batch.length === 0) return;
+  const owners = [...new Set(batch.map(e => e.ownerIdx))];
+  for (const ownerIdx of owners) {
+    const es = batch.filter(e => e.ownerIdx === ownerIdx);
+    const fromOwners = es.map(e => e.seite);
+    await engine.runHooks('onCardsReturnedToHand', {
+      ownerIdx, returnedCards: es.map(e => e.cardName), returnedInsts: es.map(e => e.inst),
+      fromHeroIdxs: es.map(e => e.heroIdx), fromZoneSlots: es.map(e => e.slotIdx),
+      ...(fromOwners.some(o => o !== ownerIdx) ? { fromOwners } : {}),
+      by: sourceName, _skipReactionCheck: true,
+    });
+  }
+  for (const e of batch) engine._untrackCard(e.inst.id);
 }
 
 /**
@@ -439,6 +514,14 @@ async function tryBouncePlace(ctx) {
   // top of the swap's own bounced target. Returning true lets the
   // swap's atomicSwap proceed to place this Creature directly.
   if (ctx._isSwap) return true;
+
+  // ★ W4b: die Rueckgabe des Bewohners ist schon VOR dem Kettenfenster erfolgt (`payBouncePlace` als `paySummonCost`) —
+  // jetzt nur noch landen (oder, ohne Tausch, normal beschwoeren).
+  if (ctx._summonKosten) {
+    delete ps._requestedBouncePlaceSlot;
+    delete ps._requestedNormalSummonSlot;
+    return ctx._summonKosten.kind === 'swap' ? await landeNachBounce(ctx, ctx._summonKosten) : true;
+  }
 
   // Capture & clear any explicit occupied-slot bounce request UP-FRONT
   // (the server sets ps._requestedBouncePlaceSlot when the player drops /
@@ -584,6 +667,7 @@ async function tryBouncePlace(ctx) {
   // mit `heldSeite`).
   if (seite !== pi) engine.markiereSeitenfremd(newInst, pi);
   newInst.counters.isPlacement = 1;
+  engine.zaehleBeschwoerung(pi);   // Welle 10 (Q47): Platzierung zaehlt als Beschwoerung
   newInst.turnPlayed = gs.turn || 0;
   newInst.counters._bouncedFromName = bouncedName;
   newInst.counters._bouncedFromLevel = bouncedLevel;
@@ -623,7 +707,7 @@ async function tryBouncePlace(ctx) {
   // (D) Push the bounced Creature's NAME onto the hand.
   if (!ps.hand) ps.hand = [];
   const toHandIdx = ps.hand.length;
-  engine.handZugangSync(ps, bouncedName, { von: 'brett', ohneInstanz: true });
+  if (!engine.tokenAbgang(bouncedInst)) engine.handZugangSync(ps, bouncedName, { von: 'brett', ohneInstanz: true, vonInst: bouncedInst, ...(engine.kartenBesitzerVon(bouncedInst) !== pi ? { originalOwner: engine.kartenBesitzerVon(bouncedInst) } : {}) });   // W64c: Hand des Kontrolleurs, Herkunft (Besitzer) bleibt   // W5a: Token verschwindet (echte Karte darunter wird gelöscht), kommt nie auf die Hand
 
   // (E) Broadcast BOTH pile-transfer animations BEFORE the first sync
   //     so the client sees the "flying cards" events and the new state
@@ -738,6 +822,205 @@ async function tryBouncePlace(ctx) {
   return false;
 }
 
+// ─── W4b: Tausch-Kosten vor dem Reaktionsfenster ─────────
+
+/**
+ * ★ W4b (Al, Welle 4): DIE RUECKGABE DES BEWOHNERS IST DER KOSTENPUNKT des Deepsea-Tausches („You may add a Deepsea Creature …
+ * to your hand to place this Creature into the same Support Zone"). Als `paySummonCost` (`tryBouncePlace.paySummonCost`, die
+ * Engine findet den Haken an der `beforeSummon`-Funktion) laeuft sie VOR dem Kettenfenster: Wahl des Bewohners, Rueckgabe auf
+ * die Hand, `onCardLeaveZone`/`onCardsReturnedToHand`; der frei gewordene Platz bleibt gehalten (`haltePlatzFuerTausch`).
+ * Wird die Beschwoerung danach komplett negiert (Off Duty …), landet der urspruengliche Bewohner auf der Hand und die neue
+ * Kreatur ist negiert (Al: „das urspruengliche auf der Hand landen und das neue negiert"). `tryBouncePlace` (nach dem Fenster)
+ * ruft dann `landeNachBounce`. Rueckgabe: `{ kind: 'none' }` (normale Beschwoerung, kein Tausch), `{ kind: 'swap', … }` oder
+ * `false` (abgebrochen / Tausch angefordert, aber unmoeglich: nichts bezahlt, Karte bleibt auf der Hand).
+ */
+async function payBouncePlace(ctx) {
+  const engine = ctx._engine;
+  const gs = engine.gs;
+  const pi = ctx.cardOwner;
+  const ps = gs.players[pi];
+  const cardName = ctx.cardName;
+  if (ctx._monstrosityCopy || ctx._isSwap) return { kind: 'none' };
+
+  // Marken bleiben stehen: `tryBouncePlace` raeumt sie nach dem Fenster ab.
+  const bounceReq = ps._requestedBouncePlaceSlot || null;
+  if (ps._requestedNormalSummonSlot && !bounceReq) return { kind: 'none' };
+
+  const bounceable = getBounceableDeepseaCreatures(engine, pi);
+  if (bounceable.length === 0) return bounceReq ? false : { kind: 'none' };
+
+  let chosen = null;
+  if (bounceReq) {
+    const reqSeite = bounceReq.heroOwner ?? pi;
+    chosen = bounceable.find(b => b.heroIdx === bounceReq.heroIdx && b.slotIdx === bounceReq.slotIdx
+      && b.heroOwner === reqSeite) || null;
+  }
+  if (!chosen) {
+    const zones = bounceable.map(b => {
+      const hero = gs.players[b.heroOwner]?.heroes?.[b.heroIdx];
+      return {
+        heroIdx: b.heroIdx,
+        slotIdx: b.slotIdx,
+        ...(b.heroOwner !== pi ? { owner: b.heroOwner } : {}),
+        label: `${hero?.name || 'Hero'} — ${b.cardName} (Slot ${b.slotIdx + 1})`,
+      };
+    });
+    const picked = await ctx.promptZonePick(zones, {
+      title: cardName,
+      description: `Bounce a Deepsea Creature to place ${cardName} into its Support Zone?`,
+      confirmLabel: '🌊 Bounce & Place',
+      cancellable: true,
+      heroShortcut: false,
+    });
+    if (!picked) return false;
+    chosen = bounceable.find(b => b.heroIdx === picked.heroIdx && b.slotIdx === picked.slotIdx
+      && b.heroOwner === (picked.owner ?? pi));
+    if (!chosen) return false;
+  }
+
+  const bouncedName = chosen.cardName;
+  const bouncedInst = chosen.inst;
+  const heroIdx = chosen.heroIdx;
+  const slotIdx = chosen.slotIdx;
+  const seite = chosen.heroOwner ?? pi;
+  const fps = gs.players[seite];
+  const bouncedLevel = engine._getCardDB()[bouncedName]?.level || 0;
+  const lockSummonsAfter =
+    !!loadCardEffect(bouncedName)?.locksSummonsWhenBouncedSameTurn &&
+    (bouncedInst.turnPlayed || 0) >= (gs.turn || 0);
+  engine.haltePlatzFuerTausch(seite, heroIdx, slotIdx);
+
+  // (A) Bewohner aus dem Platz, (D) seinen Namen auf die Hand.
+  const slotArr = fps.supportZones?.[heroIdx]?.[slotIdx];
+  if (Array.isArray(slotArr)) {
+    const idx = slotArr.indexOf(bouncedName);
+    if (idx >= 0) slotArr.splice(idx, 1);
+  }
+  if (!ps.hand) ps.hand = [];
+  const toHandIdx = ps.hand.length;
+  if (!engine.tokenAbgang(bouncedInst)) engine.handZugangSync(ps, bouncedName, { von: 'brett', ohneInstanz: true, vonInst: bouncedInst, ...(engine.kartenBesitzerVon(bouncedInst) !== pi ? { originalOwner: engine.kartenBesitzerVon(bouncedInst) } : {}) });   // W64c: Hand des Kontrolleurs, Herkunft (Besitzer) bleibt   // W5a: Token verschwindet (echte Karte darunter wird gelöscht), kommt nie auf die Hand
+  engine._broadcastEvent('play_pile_transfer', {
+    owner: pi, cardName: bouncedName, from: 'support', to: 'hand',
+    ...(seite !== pi ? { fromOwner: seite, toOwner: pi } : {}),
+    fromHeroIdx: heroIdx, fromSlotIdx: slotIdx,
+    toHandIdx,
+  });
+  engine._broadcastEvent('play_zone_animation', {
+    type: 'deep_sea_bubbles', owner: seite, heroIdx, zoneSlot: slotIdx,
+  });
+  engine.log('deepsea_return_to_hand', {
+    player: ps.username, card: bouncedName, by: `${cardName} (Bounce-Place)`,
+    heroIdx, slotIdx,
+  });
+  engine.sync();
+
+  bouncedInst.zone = 'hand';
+  bouncedInst.heroIdx = -1;
+  bouncedInst.zoneSlot = -1;
+  await engine.runHooks('onCardLeaveZone', {
+    card: bouncedInst, fromZone: 'support',
+    fromOwner: seite, fromHeroIdx: heroIdx, fromZoneSlot: slotIdx,
+    toZone: 'hand', toOwner: pi,
+    _skipReactionCheck: true,
+  });
+  await engine.runHooks('onCardsReturnedToHand', {
+    ownerIdx: pi, returnedCards: [bouncedName], returnedInsts: [bouncedInst],
+    fromHeroIdxs: [heroIdx], fromZoneSlots: [slotIdx],
+    ...(seite !== pi ? { fromOwners: [seite] } : {}),
+    by: `${cardName} (Bounce-Place)`, _skipReactionCheck: true,
+  });
+  engine._untrackCard(bouncedInst.id);
+  return { kind: 'swap', heroIdx, slotIdx, seite, bouncedName, bouncedLevel, lockSummonsAfter };
+}
+
+/** W4b: Landung der neuen Deepsea-Kreatur nach dem Kettenfenster in den (gehaltenen) Platz des zurueckgegebenen Bewohners. `false` = Abbruch (die Rueckgabe bleibt bezahlt, die Karte bleibt auf der Hand). */
+async function landeNachBounce(ctx, data) {
+  const engine = ctx._engine;
+  const gs = engine.gs;
+  const pi = ctx.cardOwner;
+  const ps = gs.players[pi];
+  const cardName = ctx.cardName;
+  const { heroIdx, seite, bouncedName, bouncedLevel, lockSummonsAfter } = data;
+  const fps = gs.players[seite];
+  let slotIdx = data.slotIdx;
+  if (((fps.supportZones?.[heroIdx] || [])[slotIdx] || []).length > 0) {
+    // Im Fenster belegt worden: anderer freier Platz desselben Helden, sonst Abbruch.
+    const frei = [0, 1, 2].find(z => ((fps.supportZones?.[heroIdx] || [])[z] || []).length === 0);
+    if (frei == null) return false;
+    slotIdx = frei;
+  }
+
+  // (B) neue Kreatur in den Platz, frische Instanz.
+  if (!fps.supportZones[heroIdx]) fps.supportZones[heroIdx] = [[], [], []];
+  fps.supportZones[heroIdx][slotIdx] = [cardName];
+  const newInst = engine._trackCard(cardName, seite, 'support', heroIdx, slotIdx);
+  newInst.counters = newInst.counters || {};
+  if (seite !== pi) engine.markiereSeitenfremd(newInst, pi);
+  newInst.counters.isPlacement = 1;
+  engine.zaehleBeschwoerung(pi);   // Welle 10 (Q47): Platzierung zaehlt als Beschwoerung
+  newInst.turnPlayed = gs.turn || 0;
+  newInst.counters._bouncedFromName = bouncedName;
+  newInst.counters._bouncedFromLevel = bouncedLevel;
+  clearSwapInheritedStatus(newInst);
+
+  // (C) Entnahme der gespielten Kopie aus der Hand (`_resolvingCard`, nth-Treffer; die zurueckgegebene Karte liegt am Ende).
+  let newCardFromHandIdx = -1;
+  if (ps._resolvingCard) {
+    const { name, nth } = ps._resolvingCard;
+    let seen = 0, handRemoveIdx = -1;
+    for (let i = 0; i < ps.hand.length; i++) {
+      if (ps.hand[i] === name) { seen++; if (seen === nth) { handRemoveIdx = i; break; } }
+    }
+    if (handRemoveIdx >= 0) {
+      newCardFromHandIdx = handRemoveIdx;
+      engine.takeFromPileSync(ps, 'hand', handRemoveIdx);
+      engine.notePlayedFromHand(pi);
+    }
+    ps._resolvingCard = null;
+  }
+  engine._broadcastEvent('play_pile_transfer', {
+    owner: pi, cardName, from: 'hand', to: 'support',
+    fromHandIdx: newCardFromHandIdx,
+    toHeroIdx: heroIdx, toSlotIdx: slotIdx,
+    ...(seite !== pi ? { fromOwner: pi, toOwner: seite } : {}),
+  });
+  engine._broadcastEvent('play_zone_animation', {
+    type: 'deep_sea_bubbles', owner: seite, heroIdx, zoneSlot: slotIdx,
+  });
+  engine._broadcastEvent('summon_effect', {
+    owner: seite, heroIdx, zoneSlot: slotIdx, cardName,
+  });
+  ps._placementConsumedByCard = cardName;
+  engine.log('placement', {
+    card: cardName, by: `${cardName} (Bounce-Place)`, from: 'external',
+    heroIdx, zoneSlot: slotIdx,
+  });
+  engine.sync();
+
+  const bouncedHero = gs.players[seite]?.heroes?.[heroIdx];
+  const landedOnDeadHero = !bouncedHero?.name || bouncedHero.hp <= 0;
+  await engine.runHooks('onPlay', {
+    _onlyCard: newInst, playedCard: newInst, cardName,
+    zone: 'support', heroIdx, zoneSlot: slotIdx,
+    _skipReactionCheck: true,
+    _bypassDeadHeroFilter: landedOnDeadHero,
+    _viaBouncePlace: true,
+  });
+  await engine.runHooks('onCardEnterZone', {
+    enteringCard: newInst, toZone: 'support', toHeroIdx: heroIdx,
+    _skipReactionCheck: true,
+    _bypassDeadHeroFilter: landedOnDeadHero,
+  });
+  if (lockSummonsAfter) {
+    ps.summonLocked = true;
+    engine.log('infected_squirrel_lock', {
+      player: ps.username, by: cardName, bouncedFrom: bouncedName,
+    });
+  }
+  engine.sync();
+  return false;   // wie der alte Tausch: Platzierung ist erledigt (`_placementConsumedByCard`), der Server platziert nicht selbst
+}
+
 // ─── Deepsea Counters (Siphem) ──────────────
 
 /** Add N Deepsea Counters to a hero (stored directly on the hero object). */
@@ -800,8 +1083,7 @@ function canPlaceOnOccupiedSlotIfBounceable(gs, pi, heroIdx, slotIdx, engine, he
   if (!engine) return false;
   // Styx 28.9.: geliehene Helden der Gegenspalte. `heroOwner` = physische
   // Seite des Zielplatzes; der Held dort muss von `pi` kontrolliert werden.
-  const hero = gs.players[heroOwner]?.heroes?.[heroIdx];
-  if (engine.heroSideOf(heroOwner, hero) !== pi) return false;
+  if (!_darfHierPlatzieren(engine, pi, heroOwner, heroIdx)) return false;   // W21a: Besitzer bei temporaerer Kontrolle ja, dauerhaft nein
   // "Not summoned this turn" / Infected-Squirrel-Ausnahme / Kontrolle —
   // alles in `_bounceableAt` (dieselbe Pruefung wie die Aufzaehlung).
   return !!_bounceableAt(engine, pi, heroOwner, heroIdx, slotIdx);
@@ -873,7 +1155,11 @@ function resetPerTurnSummons(ps) {
  *   es dann gar nicht erst gestellt.
  */
 async function promptOptionalOnSummon(ctx, title, message, opts = {}) {
-  return !!(await ctx.promptConfirmEffect({ title, message, ...opts }));
+  const ja = !!(await ctx.promptConfirmEffect({ title, message, ...opts }));
+  // Welle 11 (Al, R4: „Nur ein wirklich feuernder Effekt löst Sandy Blob aus!"): ein abgelehntes „you may" ist kein feuernder Effekt.
+  // (Nicht bei der Monstrosity-Kopie: ihr Bounce hat schon gewirkt.)
+  if (!ja && !ctx._monstrosityCopy) await ctx._engine.summonEffektFizzelt(ctx.card, title, { stumm: true });
+  return ja;
 }
 
 // ─── Generic creature atomic swap ────────────
@@ -888,7 +1174,10 @@ async function promptOptionalOnSummon(ctx, title, message, opts = {}) {
 /** All own Creatures in support zones (any archetype, any turn-played).
  *  `opts.needsLevel`: der Aufrufer rechnet mit der STUFE der Creature (Deepsea
  *  Castle, Shapeshift: „level <= that Creature's") — Artifact Creatures haben
- *  keine (Als Ruling 9.10.) und bleiben dann draussen. */
+ *  keine (Als Ruling 9.10.) und bleiben dann draussen.
+ *  `opts.ohneLeihgabe`: per Succubus & Co. GELIEHENE Kreaturen (`stolenBy`) bleiben draussen —
+ *  sie stehen in der Zone eines GEGNERISCHEN Helden, Castle/Shapeshift sprechen aber von
+ *  „Kreatur in einer Zone deiner/ihrer Helden" und schicken die Karte auf die Hand. */
 function ownSupportCreatures(engine, pi, opts = {}) {
   const { hasCardType, isArtifactCreature } = require('./_hooks');
   const cardDB = engine._getCardDB();
@@ -897,9 +1186,15 @@ function ownSupportCreatures(engine, pi, opts = {}) {
     if (inst.zone !== 'support') continue;
     if ((inst.controller ?? inst.owner) !== pi) continue;
     if (inst.faceDown) continue;
+    if (opts.ohneLeihgabe && inst.stolenBy != null) continue;
     const cd = inst.counters?._cardDataOverride || cardDB[inst.name]; // token-override-aware (Biomancy Token — Als AoE-Report)
     if (!cd || !hasCardType(cd, 'Creature')) continue;
     if (opts.needsLevel && isArtifactCreature(cd)) continue;
+    // W20b (Al, 20.10.2026: Opfer-Zonen-Regel für jede Beschwörung/Platzierung, die über das Entfernen EINER Karte eine Zone freimacht):
+    // `zoneLeerNachRueckgabe` = nur Kreaturen, deren Rückgabe ihre Zone ganz leert (kein Alice-Stapel; `atomicSwap` überschriebe sonst den Mitbewohner).
+    if (opts.zoneLeerNachRueckgabe && !engine.zoneFreiNachKostenzahlung(engine.physicalSide(inst), inst.heroIdx, inst.zoneSlot, inst)) continue;
+    // W21a (Al, 20.10.2026): Tausch (Platzieren) in die Zone eines DAUERHAFT abgegebenen eigenen Helden gibt es nicht (temporaer weiter).
+    if (!engine.zonenRechtAmHeld(pi, engine.physicalSide(inst), inst.heroIdx)) continue;
     out.push(inst);
   }
   return out;
@@ -934,6 +1229,10 @@ function eligibleSwapReplacements(engine, pi, excludeName, maxLevel) {
     // defines canSummon, so plain Creatures pass through untouched.
     if (typeof engine.isCreatureSummonable === 'function'
         && !engine.isCreatureSummonable(n, pi)) continue;
+    // Z6 (A02-24): Teil-Beschwoerungssperren (Greatmaw Remora „except Greatmaw", Grinning Cat)
+    // sperren auch den Tausch - dasselbe Handkarten-Gate wie beim Ausspielen.
+    if (typeof engine.getSummonBlocked === 'function'
+        && engine.getSummonBlocked(pi).includes(n)) continue;
     seen.add(n);
     out.push({ name: n, source: 'hand', cost: lvl });
   }
@@ -961,6 +1260,13 @@ async function atomicSwap(engine, pi, bouncedInst, newCardName, sourceName) {
   if (ps.summonLocked) {
     engine.log('swap_blocked', {
       card: newCardName, by: sourceName || 'Swap', reason: 'summonLocked',
+    });
+    return null;
+  }
+  // Z6 (A02-24): Teil-Sperre (Remora „except Greatmaw", Grinning Cat) ebenso.
+  if (engine.getSummonBlocked?.(pi).includes(newCardName)) {
+    engine.log('swap_blocked', {
+      card: newCardName, by: sourceName || 'Swap', reason: 'summonBlocked',
     });
     return null;
   }
@@ -1010,6 +1316,7 @@ async function atomicSwap(engine, pi, bouncedInst, newCardName, sourceName) {
   newInst.counters = newInst.counters || {};
   if (seite !== pi) engine.markiereSeitenfremd(newInst, pi);   // Styx 28.9.: steht beim Gegner, gehoert `pi`
   newInst.counters.isPlacement = 1;
+  engine.zaehleBeschwoerung(pi);   // Welle 10 (Q47): Platzierung zaehlt als Beschwoerung
   newInst.turnPlayed = gs.turn || 0;
   // See clearSwapInheritedStatus's docstring — the swapped-in Creature
   // does not inherit negation/freeze/stun/null from its predecessor.
@@ -1024,7 +1331,7 @@ async function atomicSwap(engine, pi, bouncedInst, newCardName, sourceName) {
   // (D) Push the bounced creature to hand.
   if (!ps.hand) ps.hand = [];
   const toHandIdx = ps.hand.length;
-  engine.handZugangSync(ps, bouncedName, { von: 'brett', ohneInstanz: true });
+  if (!engine.tokenAbgang(bouncedInst)) engine.handZugangSync(ps, bouncedName, { von: 'brett', ohneInstanz: true, vonInst: bouncedInst, ...(engine.kartenBesitzerVon(bouncedInst) !== pi ? { originalOwner: engine.kartenBesitzerVon(bouncedInst) } : {}) });   // W64c: Hand des Kontrolleurs, Herkunft (Besitzer) bleibt   // W5a: Token verschwindet (echte Karte darunter wird gelöscht), kommt nie auf die Hand
 
   // (E) Broadcast BOTH pile-transfers so the two creatures visually
   //     cross mid-flight — bounced support→hand, new hand→support.
@@ -1174,6 +1481,9 @@ function deepseaAbilityPriorFloor(abilityName, targetLevel) {
   return null;
 }
 
+// W4b: die Engine sucht `paySummonCost` auch an der `beforeSummon`-Funktion (alle Deepsea-Kreaturen teilen `tryBouncePlace`).
+tryBouncePlace.paySummonCost = payBouncePlace;
+
 module.exports = {
   deepseaIgnitionMulliganAdvice,
   deepseaAbilityPriorFloor,
@@ -1184,6 +1494,7 @@ module.exports = {
   hasBounceableDeepsea,
   returnSupportCreatureToHand,
   fireReturnBatchHook,
+  fireReturnedBatch,
   tryBouncePlace,
   addDeepseaCounters,
   clearDeepseaCounters,

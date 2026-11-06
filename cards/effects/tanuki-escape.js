@@ -10,9 +10,15 @@
 //    have "Rebelliokai" Creatures with different
 //    names in your discard pile back into your
 //    deck (max 3). Then, search your deck for up
-//    to that many cards with different names,
-//    reveal them and add them to your hand.
+//    to that many cards with different names from
+//    each other and from the cards shuffled back
+//    this way (Al, Welle 10, Q40: Text praezisiert,
+//    Ausschliessung der zurueckgemischten Namen
+//    bleibt), reveal them and add them to your hand.
 //    Immediately end your turn afterwards.
+//
+//  ★ W4b (Al, Welle 4): ÜBERHOLT — die Kosten werden jetzt VOR dem Reaktionsfenster bezahlt (`payActivationCost`, siehe unten)
+//  und bleiben bei Ganz-Negierung bezahlt. Der Rest dieses Absatzes beschreibt den alten Ablauf.
 //
 //  House clarifications (per user spec):
 //    • Cost (delete Timid Tanuki) is paid AT THE
@@ -104,6 +110,8 @@ module.exports = {
     // whole effect — the deck-search step is core, mulligan-style
     // shuffle-back also implies hand contents). Grey out in hand.
     if (ps.handLocked) return false;
+    // „Delete … from your discard pile": unter Knight of Kings [B] nicht zahlbar (A06-08).
+    if (engine && !engine.pileOutAllowed(pi, 'discard', { sourceOwner: pi })) return false;
 
     const ds = ps.discardPile || [];
     // Cost: at least 1 Tanuki must be in discard to delete.
@@ -122,6 +130,21 @@ module.exports = {
     return ds.some(n => n !== COST_NAME && isRebelliokaiCreature(n, engine));
   },
 
+  // ★ W4b (Al, Welle 4): die Kosten („Delete 1 … from your discard pile to play this card") werden VOR dem Reaktionsfenster
+  // bezahlt (`payActivationCost`) und bleiben bei Ganz-Negierung bezahlt (Silence, The Master's Plan …). Das ersetzt die
+  // frühere Hausregel „Kosten nach der ersten Zielwahl": die Zielwahl läuft unverändert in `onPlay` (gleiche Reihenfolge der
+  // Ziele), ist aber NICHT mehr abbrechbar, weil die Karte schon verbraucht ist (CARD_API.md, „Zielende Karten sind immer
+  // abbrechbar": Ausnahme nach dem Zusagepunkt). `false` = Kosten nicht zahlbar (Stapel-Sperre, Karte fehlt) → Karte bleibt auf der Hand.
+  // Fallback: lief `payActivationCost` nicht (Sofort-Guss von Attacks, anderer Weg), zahlt `onPlay` wie früher selbst.
+  async payActivationCost(ctx) {
+    const engine = ctx._engine;
+    const pi = ctx.cardOwner;
+    const ps = engine.gs.players[pi];
+    if (!ps || (ps.discardPile || []).indexOf(COST_NAME) < 0) return false;
+    if (!(await payRebelliokaiCost(engine, pi, COST_NAME, { source: CARD_NAME }))) return false;
+    if (ctx.card) ctx.card._kostenBezahlt = true;
+  },
+
   hooks: {
     onPlay: async (ctx) => {
       const engine = ctx._engine;
@@ -129,6 +152,8 @@ module.exports = {
       const pi     = ctx.cardOwner;
       const ps     = gs.players[pi];
       if (!ps) return;
+      const vorab = !!ctx.card?._kostenBezahlt;   // W4b: Kosten schon vor dem Reaktionsfenster bezahlt?
+      if (ctx.card) delete ctx.card._kostenBezahlt;
 
       // ── Step 0: pay the cost upfront ──
       // No target step exists for Tanuki Escape, so the chain-reaction
@@ -136,11 +161,16 @@ module.exports = {
       // Spell is committed — pay the cost before any further prompts.
       // Defensive re-check: a parallel reaction during chain resolution
       // could have shifted the discard pile.
-      if ((ps.discardPile || []).indexOf(COST_NAME) < 0) {
-        gs._spellCancelled = true;
-        return;
+      if (!vorab) {
+        if ((ps.discardPile || []).indexOf(COST_NAME) < 0) {
+          gs._spellCancelled = true;
+          return;
+        }
+        if (!(await payRebelliokaiCost(engine, pi, COST_NAME, { source: CARD_NAME }))) {
+          gs._spellCancelled = true;   // Kosten nicht zahlbar (Stapel-Sperre) → nichts passiert (A06-08)
+          return;
+        }
       }
-      await payRebelliokaiCost(engine, pi, COST_NAME, { source: CARD_NAME });
 
       // Snap budget AFTER cost was paid — the deleted Tanuki doesn't
       // count toward its own bounce total.
@@ -162,12 +192,13 @@ module.exports = {
       let shuffledNames = [];
       let shuffledPlaetze;
       if (budget > 0 && (ps.hand || []).length > 0) {
-        const cap = Math.min(budget, ps.hand.length);
-        const waehlbar = new Set(engine.shuffleBackEligibleHandSlots(pi));
+        const waehlbar = new Set(engine.shuffleBackEligibleHandSlots(pi));   // ohne die aufloesende Tanuki Escape (Z4, A06-15)
         const eligibleIndices = ps.hand
           .map((_, i) => i)
           .filter(i => waehlbar.has(i));
-        const handPick = await engine.promptGeneric(pi, {
+        const cap = Math.min(budget, eligibleIndices.length);
+        // Nur die aufloesende Karte in der Hand: nichts zu mischen (kein Prompt mit leerer Auswahl).
+        const handPick = eligibleIndices.length === 0 ? null : await engine.promptGeneric(pi, {
           type:           'handPick',
           title:          CARD_NAME,
           description:    `Click 1 to ${cap} card${cap === 1 ? '' : 's'} in your hand to shuffle back into your deck.`,
@@ -182,7 +213,8 @@ module.exports = {
           // descending handIndex so any name-based splices in the
           // mulligan helper still resolve to the right slot if duplicate
           // names exist (peel right-to-left).
-          const sortiert = [...handPick.selectedCards].sort((a, b) => b.handIndex - a.handIndex);
+          // Z4 (A06-15): nur Plaetze aus der Auswahl (die aufloesende Tanuki Escape ist keine Handkarte).
+          const sortiert = handPick.selectedCards.filter(s => eligibleIndices.includes(s.handIndex)).sort((a, b) => b.handIndex - a.handIndex);
           shuffledNames = sortiert.map(s => s.cardName);
           shuffledPlaetze = sortiert.map(s => s.handIndex);
         }
@@ -238,11 +270,15 @@ module.exports = {
             cancellable:  false,
           });
           if (pickDeck && Array.isArray(pickDeck.selectedCards)) {
+            // W85c (Atta, Al 29.10.): „reveal them" ist EIN Aufdeck-Ereignis VOR dem Verschieben (gleichzeitig aufgedeckt → „exactly 1" gilt für die ganze Wahl).
+            const gewaehlt = pickDeck.selectedCards.slice(0, cap).filter(n => (ps.mainDeck || []).includes(n));
+            const _ereignis = await engine.aufdeckTutorEreignis(pi, gewaehlt, CARD_NAME);
             for (const name of pickDeck.selectedCards.slice(0, cap)) {
+              if (_ereignis.geloescht.includes(name)) continue;
               await engine.actionAddCardFromDeckToHand(pi, name, {
                 source: CARD_NAME,
                 _noKrates: true,   // Mehrfach-Tutor: Krates greift nur bei Ein-Karten-Suchen
-                reveal: true,
+                reveal: !_ereignis.fensterGezeigt,   // das Fenster lief schon im Ereignis
               });
             }
             engine.shuffleDeck(pi, 'main');

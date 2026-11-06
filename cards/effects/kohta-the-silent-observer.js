@@ -40,6 +40,7 @@
 //  Geschenk, kein zweiter Zug.
 // ═══════════════════════════════════════════
 
+const { equipZustandHooks } = require('./_hooks');   // W51b: Umhaengen (Fridge/Ceremony) als Verlassen+Betreten sehen
 const CARD_NAME = 'Kohta, the Silent Observer';
 const HOPT_KEY = 'kohta-silent-observer';
 const MAX_LEVEL = 2;
@@ -103,7 +104,9 @@ module.exports = {
     dealsDamage: true,
   },
 
-  hooks: {
+  hooks: equipZustandHooks({
+    // W51b: `equipZustandHooks` — Umhaengen (Slippery Fridge / Inheritance Ceremony) sendet Enter/Leave nur an die bewegte Karte; dieser Zustandslauscher bekommt es ueber
+    // `onEquipLost` / `onEquipGained` (isMove) mit denselben Handlern (siehe _hooks.js).
     // Bereitschaft bei jedem Wechsel in den eigenen Support Zones neu
     // bewerten (v910, Riffel-Muster).
     // Styx 28.9.: Pruefung auf der Brettseite des Helden (`cardHeroOwner`).
@@ -182,11 +185,11 @@ module.exports = {
       // Kohta wiederholte endlos (im Test bis zum Hook-Deckel bei
       // 10 000). Also erst sperren, dann laufen lassen.
       engine.claimHOPT(HOPT_KEY, pi);
-      const gefeuert = await engine.reactivateCreatureEffect(inst, pi);
+      const gefeuert = await engine.reactivateCreatureEffect(inst, pi, { borrowed: true });   // W12 (Al, Q5): auch bei erschoepftem EIGENEM Limit
       // Steigt das Skript aus eigenem Antrieb aus (`return false`),
       // etwa weil das Brett kein legales Ziel mehr hergibt, wird die
       // Sperre zurueckgegeben — dann hat Kohta nichts verbraucht.
       if (!gefeuert && gs.hoptUsed) delete gs.hoptUsed[`${HOPT_KEY}:${pi}`];
     },
-  },
+  }),
 };

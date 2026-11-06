@@ -1,7 +1,7 @@
 'use strict';
 // ═══════════════════════════════════════════
 //  CARD EFFECT: "Gather Intel"
-//  Spell (Decay Magic + Magic Arts Lv0, Normal)
+//  Spell (Decay Magic + Magic Arts Lv2, Normal)
 //
 //  „Look at your opponent's hand and choose a card from it. Your opponent must either add that card to your hand or allow you to draw 2 cards (their choice).
 //   You may make this count as an additional Action, but if you do, you cannot perform other Actions for the rest of the turn afterwards."

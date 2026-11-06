@@ -32,6 +32,7 @@
 //     same shape Bamboo Staff uses.
 // ═══════════════════════════════════════════
 
+const { anyName } = require('./_alias-name');   // Shroomasaur: Zusatzname zählt für Namensfamilien
 const { isLoyalCreature } = require('./_loyal-shared');
 
 const CARD_NAME = 'Loyal Terrier';
@@ -73,7 +74,7 @@ module.exports = {
         // NOT pay out a Terrier's chain.
         if (tributeInst.name === CARD_NAME) return false;
         const { isLoyalCreature } = require('./_loyal-shared');
-        return isLoyalCreature(tributeInst.name, engine);
+        return anyName(tributeInst, (n) => isLoyalCreature(n, engine));
       },
       valuePerTrigger: FOLLOW_DMG,
     },
@@ -121,7 +122,7 @@ module.exports = {
       // every Terrier in a multi-Terrier wipe paid out a 50-damage
       // shot off every sibling Terrier's death.
       if (death.name === CARD_NAME) return;
-      if (!isLoyalCreature(death.name, engine)) return;
+      if (!anyName(death, (n) => isLoyalCreature(n, engine))) return;
 
       // Need at least one opp target. No prompt if there's nothing
       // to hit (matches the UX from Bamboo Staff / Bone Dog).

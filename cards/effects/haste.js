@@ -10,6 +10,9 @@ const { heldSeite } = require('./_hooks');   // Als Befund 29.9.: Brettseite gel
 
 module.exports = {
   cpuMeta: { scalesWithSchool: 'Support Magic' },
+  // Z6 (S02-21): der Zug ist der einzige Nutzen - unter Hand-/Zieh-Sperre gar nicht spielbar (Praezedenz Brilliant Idea).
+  blockedByHandLock: true,
+  blockedByDrawLock: true,
 
   // ── Tuscan Artist (Als Ruling 16.8.) ──
   // Haste zieht 2/3/4 je nach Support-Magic-Level des CASTERS. Der Zug
@@ -19,9 +22,7 @@ module.exports = {
   // graut ueber `cardGateBlockedCards` erst aus, wenn KEIN eigener Held
   // sie mehr spielen kann.
   canPlayWithHero(gs, pi, heroIdx, cardData, engine) {
-    const ps = gs.players[heldSeite(gs, pi, heroIdx)];
-    const abZones = ps?.abilityZones?.[heroIdx] || [[], [], []];
-    const smLevel = engine.countAbilitiesForSchool('Support Magic', abZones);
+    const smLevel = engine.effectiveSchoolLevelForCaster('Support Magic', pi, heroIdx, heldSeite(gs, pi, heroIdx));   // W16g (S02-18): + Xals Support-Zonen-Stapel   // W4a: harte Negierung -> Stufe 0
     const drawCount = smLevel >= 3 ? 4 : smLevel >= 2 ? 3 : 2;
     return !drawWouldBeBlocked(engine, pi, drawCount);
   },
@@ -36,8 +37,7 @@ module.exports = {
       if (!hero?.name || hero.hp <= 0) return;
 
       // Calculate Support Magic level
-      const abZones = (gs.players[ctx.cardHeroOwner ?? pi] || ps).abilityZones[heroIdx] || [[], [], []];   // Als Befund 29.9.: Zonen des Wirkers auf seiner Brettseite
-      const smLevel = engine.countAbilitiesForSchool('Support Magic', abZones);
+      const smLevel = engine.effectiveSchoolLevelForCaster('Support Magic', pi, heroIdx, ctx.cardHeroOwner ?? pi);   // W16g (S02-18): + Xals Support-Zonen-Stapel   // Als Befund 29.9.: Zonen des Wirkers auf seiner Brettseite; W4a: harte Negierung -> Stufe 0
       const drawCount = smLevel >= 3 ? 4 : smLevel >= 2 ? 3 : 2;
 
       // Confirm

@@ -103,6 +103,10 @@ async function waehle(engine, chooser, liste, beschreibung, markierung) {
 }
 
 module.exports = {
+  // ★ W76a: die Zahl der Beteiligten legt der Kartentext fest („Both players choose a Hero …", ein Zweikampf zweier Duellanten) — Zusatzziel-Helden (Andras mit Fighting 4) bieten keinen
+  // Zweitschlag an: eine Wiederholung ließe dieselben Duellanten ein zweites Mal gegeneinander antreten (statt „ein zweites Ziel zu treffen").
+  fixedTargetCount: true,
+
   // Ohne zwei Duellanten und bei Erstrunden-Schutz des Gegners ausgegraut.
   spellPlayCondition(gs, pi, engine) {
     if (!engine) return true;
@@ -148,7 +152,8 @@ module.exports = {
       gs._drawLoserIdx = oi;                          // wird zugleich jede Seite ausgelöscht, gewinnt auch dort der Spieler
       let ergebnis;
       try {
-        ergebnis = await duell(engine, { name: CARD_NAME, a, b, maxRunden: MAX_RUNDEN, animation: 'duel_clash' });
+        // ★ W32a (Al, 22.10.2026: „Duel auch Fighting-Level!"): „perform a normal Attack" → jeder Schlag zählt mit dem FIGHTING-LEVEL des schlagenden Helden (Stempel), nicht mit der gedruckten Stufe 3.
+        ergebnis = await duell(engine, { name: CARD_NAME, a, b, maxRunden: MAX_RUNDEN, animation: 'duel_clash', alsHeldenAngriff: true, meldeAttacken: true });
       } finally {
         gs._deferGameOverCheck = Math.max(0, (gs._deferGameOverCheck || 1) - 1);
       }

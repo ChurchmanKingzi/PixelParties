@@ -83,7 +83,7 @@ module.exports = {
       for (let m = 0; m < matches; m++) {
         const target = await ctx.promptDamageTarget({
           side: 'any', types: ['hero', 'creature'],
-          damageType: 'creature',
+          damageType: 'artifact',
           baseDamage: 50,
           title: CARD_NAME,
           description: 'Deal 50 damage to a target.',
@@ -107,11 +107,11 @@ module.exports = {
         if (target.type === 'hero') {
           const tHero = engine.gs.players[target.owner]?.heroes?.[target.heroIdx];
           if (tHero?.name && tHero.hp > 0) {
-            await ctx.dealDamage(tHero, 50, 'creature');
+            await ctx.dealDamage(tHero, 50, 'artifact');
           }
         } else if (target.cardInstance) {
           await engine.actionDealCreatureDamage(
-            selfInst, target.cardInstance, 50, 'creature',
+            selfInst, target.cardInstance, 50, 'artifact',
             { sourceOwner: selfInst.owner, canBeNegated: true },
           );
         }

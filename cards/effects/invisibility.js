@@ -26,6 +26,15 @@
 //    the protection collapses and all are
 //    choosable).
 //  • Anti Magic gate at cast time (Lv 1 Spell).
+//  • Als Ruling (Al 26.10.): auch ein Zauber, der als
+//    ANHÄNGSEL an einen gegnerischen Helden gelegt wird
+//    (Curse, Polymorph, Overheal Shock …), zählt als
+//    „chooses a target your opponent controls with a
+//    Spell" — wirkt der unsichtbare Held ihn, endet
+//    Invisibility. `pickAttachmentHost` trägt den
+//    gewählten Wirt ins Zielprotokoll des Zaubers
+//    (`gs._spellDamageLog`) ein, Trigger (2) liest es.
+//    Zauber eines ANDEREN eigenen Helden lassen sie liegen.
 //  • Self-discard triggers:
 //      (1) `onAttackDeclare` — Invisibility-Hero
 //          attacks any opp target.
@@ -57,6 +66,7 @@
 // ═══════════════════════════════════════════
 
 const { attachmentHostsFor, attachToHero } = require('./_attachment-shared');
+const { isCreatureSource } = require('./_hooks');
 const CARD_NAME = 'Invisibility';
 
 /** Free Support Zone slot index on `heroIdx` of `ps`, or -1. */
@@ -195,7 +205,7 @@ module.exports = {
 
       await engine.runHooks('onCardEnterZone', {
         enteringCard: inst, toZone: 'support', toHeroIdx: destHero,
-        _skipReactionCheck: true,
+        _skipReactionCheck: true, _anhaengselAnleger: pi,
       });
 
       engine.log('invisibility_attached', {
@@ -256,6 +266,8 @@ module.exports = {
     afterDamage: async (ctx) => {
       if (ctx.card.zone !== 'support') return;
       if (ctx.sourceHeroIdx !== ctx.cardHeroIdx) return;
+      // W24b N2-01: „the Hero chooses" — der Effekt einer Kreatur im Support des Trägers ist ihr eigener, nicht der des Helden.
+      if (isCreatureSource(ctx._engine, ctx.source)) return;
       // Styx 28.9.: „dieser Held" = Brettseite + Index (geliehener Held).
       if (!ctx._engine.quelleIstHeld(ctx.source, ctx.cardHeroOwner ?? ctx.cardOwner, ctx.cardHeroIdx)) return;
       if ((ctx.amount || 0) <= 0) return;
@@ -280,6 +292,7 @@ module.exports = {
       for (const e of (ctx.entries || [])) {
         if (!e || e.cancelled) continue;
         if ((e.amount || 0) <= 0) continue;
+        if (isCreatureSource(ctx._engine, e.source)) continue;   // W24b N2-01: Kreatureneffekt ≠ Effekt des Helden
         const srcHeroIdx = e.source?.heroIdx;
         if (srcHeroIdx !== ctx.cardHeroIdx) continue;
         const srcOwner = e.source?.heroOwner ?? e.source?.owner ?? e.sourceOwner;

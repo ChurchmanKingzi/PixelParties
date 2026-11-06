@@ -41,9 +41,18 @@
 //
 //  Hard once-per-turn so Reincarnation /
 //  Necromancy re-summons can't re-fire.
+//
+//  Als Ruling (Al 26.10.): „Rocky Slime reduziert nur das Level einer
+//  einzelnen Kopie!" — der Abzug hängt am Handindex GENAU der gewählten
+//  Kopie und gilt nur für sie. Hat man zwei Kopien derselben Kreatur auf
+//  der Hand, darf nur die gesenkte die niedrigere Stufe nutzen (Heldenstufen-
+//  Tor, Wisdom-/Divinity-Deckung und Zusatzaktion je Kopie: `engine._kopieNurIndex`);
+//  die ungesenkte Kopie braucht ihre eigene (höhere) Stufe.
 // ═══════════════════════════════════════════
 
 const { isPileCreature, hasCardType, hasNumericCreatureLevel } = require('./_hooks');
+
+const { slimeLevelUpHook } = require('./_slime-shared');
 
 module.exports = {
   requiresTarget: true,
@@ -109,7 +118,7 @@ module.exports = {
         });
       }
 
-      if (validTargets.length === 0) return; // No legal targets, fizzle silently.
+      if (validTargets.length === 0) return ctx._engine.summonEffektFizzelt(ctx.card, ctx.cardName, { stumm: true });   // W11/R4: wirkt nicht → Blob stumm
 
       const picked = await engine.promptEffectTarget(pi, validTargets, {
         title: 'Rocky Slime',
@@ -120,10 +129,10 @@ module.exports = {
         maxTotal: 1,
         autoConfirm: true,
       });
-      if (!picked || picked.length === 0) return;
+      if (!picked || picked.length === 0) return ctx._engine.summonEffektFizzelt(ctx.card, ctx.cardName, { stumm: true });   // W11/R4: wirkt nicht → Blob stumm
 
       const target = validTargets.find(t => t.id === picked[0]);
-      if (!target) return;
+      if (!target) return ctx._engine.summonEffektFizzelt(ctx.card, ctx.cardName, { stumm: true });   // W11/R4: wirkt nicht → Blob stumm
 
       if (target.type === 'hand') {
         // Validate the hand index still holds the expected card name —
@@ -154,9 +163,7 @@ module.exports = {
       }
     },
 
-    onTurnStart: async (ctx) => {
-      if (!ctx.isMyTurn) return;
-      await ctx.changeLevel(1);
-    },
+    // Als Ruling (Al 26.10.): „you may increase this Creature's level by 1" = Ja/Nein-Frage (Nein/Abbruch: Stufe bleibt) — `_slime-shared`.
+    onTurnStart: slimeLevelUpHook('Rocky Slime'),
   },
 };

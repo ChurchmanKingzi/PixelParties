@@ -62,7 +62,7 @@ const FLUGZEIT = 520;
  */
 function lebt(engine, ich) {
   if (!ich || ich.zone !== 'support') return false;
-  if ((ich.counters?.currentHp ?? 0) <= 0) return false;
+  if (engine.creatureCurrentHp(ich) <= 0) return false;   // Z5: unversehrt = gedruckte HP
   return engine.cardInstances.includes(ich);
 }
 

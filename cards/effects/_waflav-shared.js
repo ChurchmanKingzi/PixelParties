@@ -39,6 +39,7 @@
 // ═══════════════════════════════════════════
 
 const { loadCardEffect } = require('./_loader');
+const { hasCardType } = require('./_hooks');
 
 const BASE_FORM = 'Waflav, the Metamorphing Monstrosity';
 const ARCHETYPE = 'Waflav';
@@ -439,6 +440,11 @@ function collectBoardTargets(engine) {
   }
   for (const inst of engine.cardInstances) {
     if (inst.zone !== 'support' || inst.faceDown) continue;
+    // Al, Welle 10 (Q55): „any target on the board" = nur Helden und Creatures
+    // (inkl. Artifact Creatures) — Ausruestung und Nicht-Creature-Tokens
+    // (Pollution/Puppet) sind keine Ziele. Token mit Untertyp Creature zaehlen mit.
+    const _cd = engine.getEffectiveCardData?.(inst) || engine._getCardDB()[inst.name];
+    if (!hasCardType(_cd, 'Creature')) continue;
     targets.push({
       id: `equip-${inst.owner}-${inst.heroIdx}-${inst.zoneSlot}`,
       type: 'equip', owner: inst.owner,
@@ -488,15 +494,20 @@ async function applyStatusOnAscension(engine, pi, cardName, statusName, opts = {
     appliedBy: pi,
     source: cardName,
     ...(opts.duration ? { duration: opts.duration } : {}),
-    ...(opts.stacks ? { stacks: opts.stacks } : {}),
+    ...(opts.stacks && !opts.addStacks ? { stacks: opts.stacks } : {}),
     ...(opts.animationType ? { animationType: opts.animationType } : {}),
   };
 
+  // Al, Welle 10 (Q55): „apply 1 Stack of Poison" ADDIERT einen Stapel (auch auf ein
+  // schon vergiftetes Ziel); ohne `addStacks` setzte der Held-Pfad den Stapel auf 1
+  // zurueck und der Kreaturen-Pfad lehnte ein schon vergiftetes Ziel ab.
   if (sel.type === 'hero') {
-    await engine.addHeroStatus(sel.owner, sel.heroIdx, statusName, statusOpts);
+    await engine.addHeroStatus(sel.owner, sel.heroIdx, statusName,
+      opts.addStacks ? { ...statusOpts, addStacks: opts.stacks || 1 } : statusOpts);
   } else if (sel.cardInstance) {
     await engine.applyCreatureStatus(sel.cardInstance, statusName, {
       ...statusOpts, sourceOwner: pi,
+      ...(opts.addStacks ? { addStacks: true, stacks: opts.stacks || 1 } : {}),
     });
   }
   engine.log('waflav_on_ascension_status', {
@@ -539,13 +550,16 @@ async function tutorAscendedHeroes(engine, pi, cardName, { from, max = 1 } = {})
         : `Add an Ascended Hero from your ${label} to your hand.`,
       cards: names.map(n => ({ name: n, source: from })),
       cancellable: max > 1,          // "up to N" darf abgebrochen werden
+      searchToHand: true, searchPile: from === 'discard' ? 'discard' : 'deck',   // Z6 (A08-14): Suche AUF DIE HAND kennzeichnen (Such-Template)
     });
     const picked = choice?.cardName;
     if (!picked) break;
     const pile = pileOf();
     const idx = pile.indexOf(picked);
     if (idx < 0) break;
-    pile.splice(idx, 1);
+    // Z6 (A08-14): ueber die Stapel-Schicht statt eigenem Splice - sie fragt Knight of Kings [B] (`pileOutAllowed`), die
+    // Stab-/Eye-Sperre (`_discardOutAllowed`) und die Such-Sperre (`toHand`); gesperrt = null = nichts geholt.
+    if (!(await engine.takeFromPile(ps, from === 'discard' ? 'discard' : 'deck', picked, { source: cardName, toHand: true }))) break;
     engine.handZugangSync(ps, picked, {  });
     taken++;
     engine.log('waflav_tutor', { player: ps.username, hero: cardName, card: picked, from });
@@ -686,6 +700,8 @@ async function discardFromHand(engine, pi, cardName, handIndex, source) {
   const idx = (typeof handIndex === 'number' && ps.hand[handIndex] === cardName)
     ? handIndex : ps.hand.indexOf(cardName);
   if (idx < 0) return false;
+  // ★ W74c: Boris darf diese Abwurf-KOSTEN ignorieren — die Karte bleibt auf der Hand, der Effekt läuft weiter (Rückgabe true = bezahlt/erlassen).
+  if (await engine.borisVerzicht(pi, 1, { source: source || cardName })) return true;
   await engine.actionDiscardHandCard(pi, cardName, idx, { source: source || cardName });
   return true;
 }

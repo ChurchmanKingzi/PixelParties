@@ -9,6 +9,13 @@
 //   Attack, your opponent must choose up to 2 Abilities attached to
 //   that Hero and add them back to their hand."
 //
+//  Als Ruling (Al 26.10.): „Onima feuert nur, wenn exakt ein Hero *und kein
+//  anderes Ziel* getroffen wird." Trifft die Attack zusätzlich Kreaturen
+//  (Whirlwind Strike auf einen Helden mit Kreaturen in dessen Support Zones)
+//  oder mehrere Ziele, feuert er NICHT — Held + Kreaturen zählt nicht als
+//  „exactly 1 Hero". Die Zielzahl eines Flächenschlags liefert die
+//  Mehrziel-Klammer (`gs._spellDamageLog._mehrziel`, `engine.beginMultiHit`).
+//
 //  • Cost-0-on-Todugawin: Idej Lord Todugawin's `equipCostReduction`.
 //  • The Ability-strip: `afterSpellResolved` — when the equipped Hero
 //    resolves an Attack whose damage list is exactly one Hero, the
@@ -48,6 +55,9 @@ module.exports = {
       const dmg = Array.isArray(ctx.damageTargets) ? ctx.damageTargets : [];
       const heroHits = dmg.filter(t => t && t.type === 'hero');
       if (heroHits.length !== 1 || dmg.length !== 1) return;
+      // Als Ruling (Al 26.10.): auch KEIN weiteres (ungewähltes) Ziel — ein Flächenschlag mit 2+ Zielen (Whirlwind Strike: Held + Kreaturen
+      // seiner Support Zones) feuert nicht. `damageTargets` kennt nur die gewählten Ziele; die Zielzahl steht in der Mehrziel-Klammer des Gusses.
+      if ((engine.gs._spellDamageLog?._mehrziel || 0) >= 2) return;
 
       const hit = heroHits[0];
       const oppIdx = hit.owner;

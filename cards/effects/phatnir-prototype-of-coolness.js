@@ -36,13 +36,13 @@ module.exports = {
     // Soft once-per-turn (per Phatnir instance) — two Phatnirs each
     // get their own activation. Stored on the inst's counters so it
     // travels with the specific instance.
-    return ctx.card?.counters?.[HOPT_KEY] !== ctx._engine.gs.turn;
+    return !!ctx._borrowedUse || ctx.card?.counters?.[HOPT_KEY] !== ctx._engine.gs.turn;   // W12 (Q5): geliehene Verwendung ignoriert den Stempel
   },
 
   async onCreatureEffect(ctx) {
     const engine = ctx._engine;
     const pi = ctx.cardOwner;
-    if (ctx.card?.counters?.[HOPT_KEY] === engine.gs.turn) return false;
+    if (!ctx._borrowedUse && ctx.card?.counters?.[HOPT_KEY] === engine.gs.turn) return false;
 
     const target = await ctx.promptDamageTarget({
       side: 'any',
@@ -57,7 +57,7 @@ module.exports = {
     // Soft HOPT — stamp the inst, not the player. Each Phatnir gets
     // its own per-turn slot.
     if (!ctx.card.counters) ctx.card.counters = {};
-    ctx.card.counters[HOPT_KEY] = engine.gs.turn;
+    if (!ctx._borrowedUse) ctx.card.counters[HOPT_KEY] = engine.gs.turn;   // W13 (Al, Rueckfrage 9): geliehen = Stempel bleibt
 
     // Giant red laser from Phatnir's support slot to the target.
     // Uses the existing beam infrastructure with a thickness multiplier

@@ -1,4 +1,5 @@
 const { isSeat } = require('./_opp');   // N-Spieler: gültiger Sitzindex
+const { erzwungen } = require('./_extra-summon-shared');   // W11b (Q70): Main Phase / keine freie Aktion
 // ═══════════════════════════════════════════
 //  CARD EFFECT: "Candlestick Squire"
 //  Creature (Summoning Magic Lv 1, 30 HP, Banned)
@@ -40,6 +41,7 @@ const { isSeat } = require('./_opp');   // N-Spieler: gültiger Sitzindex
 // ═══════════════════════════════════════════
 
 const CARD_NAME = 'Candlestick Squire';
+const { drawWouldBeBlocked } = require('./_draw-block-shared');
 const HOPT_DRAW_CAP = 4;
 const ANIM_HOLD_MS  = 500;
 
@@ -89,6 +91,7 @@ function buildBurnedTargets(engine) {
 }
 
 // ─── CARD MODULE ─────────────────────────
+const { drawBlockedFor } = require('./_draw-block-shared');
 
 module.exports = {
   // ★★ v1182 — ENTKOPPELTE BILDER (CARD_API): wird die Karte NEGIERT,
@@ -105,8 +108,19 @@ module.exports = {
   // Inherent additional Action whenever a Burned target is on the
   // board — engine stamps `ctx.isInherentAction = true` on the summon
   // path and `beforeSummon` charges the cleanse cost.
+  // ★ Welle 11 (Q70, Al: „Normale Beschwörung sollte möglich sein!"): wie bei den anderen „may … as an additional Action"-Kreaturen
+  // (Regel 10.10., `_extra-summon-shared.js`) ist die Heilung nur dort ZWANG, wo die Zusatzaktion der einzige Weg ist (Main Phase /
+  // Action Phase ohne freie Aktion). In der Action Phase MIT freier Aktion und einem Brand auf dem Brett fragt `beforeSummon`
+  // „Special (heilen, Aktion zurück)" oder „Normal (Aktion des Helden, keine Heilung)".
   inherentAction(gs, pi, heroIdx, engine) {
-    return countBurnedTargets(engine) > 0;
+    return countBurnedTargets(engine) > 0 && erzwungen(gs, pi, heroIdx);
+  },
+
+  /** CPU: „Special" (Brand heilen, Aktion sparen) wie bisher auf dem inhärenten Weg. */
+  cpuResponse(engine, kind, payload) {
+    if (kind !== 'generic' || !payload) return undefined;
+    if (payload.type === 'confirm' && payload.title === CARD_NAME && /Choose how to summon/.test(payload.message || '')) return { confirmed: true };
+    return undefined;
   },
 
   // Custom host pick — same flag Waitress uses. The client reads this
@@ -146,10 +160,27 @@ module.exports = {
    * placement is skipped — same path Waitress uses.
    */
   async beforeSummon(ctx) {
-    if (!ctx.isInherentAction) return true; // standard summon path
     const engine = ctx._engine;
     const pi     = ctx.cardOwner;
     const ps     = engine.gs.players[pi];
+    // Q70: freie Aktion UND ein Brand auf dem Brett → beide Wege; „Normal" (oder Effekt-Beschwörung, kein Brand) = Standardweg.
+    let alsSpecial = false;
+    if (!ctx.isInherentAction) {
+      if (ctx._isNormalSummon !== true || !ps || countBurnedTargets(engine) === 0) return true;   // standard summon path
+      const wahl = await engine.promptGeneric(pi, {
+        type: 'confirm',
+        title: CARD_NAME,
+        message: `Choose how to summon ${CARD_NAME}:`,
+        showCard: CARD_NAME,
+        confirmLabel: '🔥 Special (heal a Burn, free Action)',
+        cancelLabel: '⚔️ Normal (use the Hero\'s Action)',
+        cancellable: true,
+        equalButtons: true,
+        gerrymanderEligible: false,
+      });
+      if (!wahl) return true;          // Normal: die Engine hat die Aktion schon eingezogen, keine Heilung
+      alsSpecial = true;
+    }
     if (!ps) return false;
 
     // ── Step 1: pick the HOST Hero + slot ───────────────────────
@@ -168,16 +199,17 @@ module.exports = {
       // Styx 28.9.: geliehene Helden der Gegenspalte — Ermaessigungen aus
       // der Hand von `pi` (fuer eigene Helden identisch zu vorher).
       if (cd && !engine.heroMeetsLevelReq(physOwner, hi, cd, { levelSourcePi: pi })) continue;
-      const sup = engine.gs.players[physOwner]?.supportZones?.[hi] || [[], [], []];
-      for (let z = 0; z < 3; z++) {
-        if ((sup[z] || []).length === 0) {
-          hostZones.push({
-            owner: physOwner, heroIdx: hi, slotIdx: z,
-            label: `${h.name} — Support ${z + 1}`,
-          });
-        }
+      // W63a (Al, 22.10.2026: Alices Effekt gilt fuer ALLE Beschwoerungs-Effekte; „erst die geteilte Zone, DANN die erste leere"): freie Zonen UND — mit
+      // Alice-Teilung — die Zone eines gleichnamigen Candlestick Squire (`engine.beschwoerZonenFuer`).
+      for (const zz of engine.beschwoerZonenFuer(pi, CARD_NAME, { seite: physOwner, heroIdx: hi, nurBasis: true, namedHeroesOnly: true })) {
+        hostZones.push({
+          owner: physOwner, heroIdx: hi, slotIdx: zz.slotIdx,
+          label: `${h.name} — Support ${zz.slotIdx + 1}${zz.shared ? ` (×${zz.stackDepth})` : ''}`,
+          ...(zz.shared ? { shared: true, stackDepth: zz.stackDepth } : {}),
+        });
       }
     }
+    hostZones.splice(0, hostZones.length, ...require('./_alice-shared').geteiltZuerst(hostZones));
     if (hostZones.length === 0) return false; // no valid host
 
     // Styx 28.9.: geliehene Helden der Gegenspalte — physische Seite des
@@ -260,7 +292,7 @@ module.exports = {
         engine.cleanseHeroStatuses(hero, target.owner, target.heroIdx, ['burned'], CARD_NAME);
       }
     } else if (target.cardInstance) {
-      engine.cleanseCreatureStatuses(target.cardInstance, ['burned'], CARD_NAME);
+      await engine.cleanseCreatureStatusesGefragt(target.cardInstance, ['burned'], CARD_NAME);
     }
 
     // ── Step 4: redirect placement if host/slot differs from drop ──
@@ -285,6 +317,7 @@ module.exports = {
       host: engine.gs.players[hostSeite]?.heroes?.[hostHeroIdx]?.name,
       target: target.cardName,
     });
+    if (alsSpecial) engine.gs._summonModeUpgradedToInherent = pi;   // Q70: server.js erstattet die Aktion (Zusatzaktion)
     engine.sync();
     return true;
   },
@@ -293,6 +326,9 @@ module.exports = {
   creatureEffect: true,
 
   canActivateCreatureEffect(ctx) {
+    // Z6 (C01-15): der Zug ist der einzige Nutzen - Hand-/Zieh-Sperre und Tuscan Artist (genau 2/3) sperren ihn (Ruling 16.8.).
+    const n = Math.min(HOPT_DRAW_CAP, countBurnedTargets(ctx._engine));
+    if (drawBlockedFor(ctx._engine, ctx.cardOwner, n)) return false;
     return countBurnedTargets(ctx._engine) > 0;
   },
 
@@ -300,6 +336,7 @@ module.exports = {
     const engine = ctx._engine;
     const n = Math.min(HOPT_DRAW_CAP, countBurnedTargets(engine));
     if (n <= 0) return false;
+    if (drawWouldBeBlocked(engine, ctx.cardOwner, n)) return false;   // ★ Z7: negiertes Ziehen stempelt nicht
     await ctx.drawCards(ctx.cardOwner, n);
     engine.log('candlestick_squire_draw', {
       player: engine.gs.players[ctx.cardOwner]?.username,

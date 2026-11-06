@@ -70,10 +70,12 @@ module.exports = {
 
     /**
      * Triggered draw on heal. Fires on hero heals (afterHeal hook).
-     * Creature heals don't fire afterHeal in the engine, so this card
-     * effectively triggers off hero heals — matching the "target a
-     * player controls" wording for hero healing.
+     * Creature heals fire `afterCreatureHeal` (W16g), same handler.
      */
+    // W16g (R02-17): `afterCreatureHeal` (Engine: actionHealCreature) — Heilung einer KREATUR, die der Spieler kontrolliert,
+    // loest dieselbe Frage aus; `afterHeal` bleibt der Held-Haken.
+    afterCreatureHeal: (ctx) => module.exports.hooks.afterHeal(ctx),
+
     afterHeal: async (ctx) => {
       if (ctx.cardZone !== 'area') return;
       const engine = ctx._engine;
@@ -88,6 +90,7 @@ module.exports = {
       const healed = ctx.healedAmount || 0;
       if (!target || targetOwner == null || targetOwner < 0) return;
       if (healed <= 0) return;
+      if (engine.spielerIstVonAreasAusgenommen(targetOwner)) return;   // W82 (Shipwrecked): er darf Area-Effekte nicht aktivieren (und ist von Areas ausgenommen)
 
       // Ensure target is alive (it is, we just healed it — defensive)
       if (target.hp !== undefined && target.hp <= 0) return;

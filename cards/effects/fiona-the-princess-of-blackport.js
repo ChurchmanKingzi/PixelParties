@@ -21,7 +21,7 @@
 //  (Initiation Ritual, Shapeshifter, …).
 // ═══════════════════════════════════════════
 
-const { STATUS_EFFECTS } = require('./_hooks');
+const { STATUS_EFFECTS, equipZustandHooks } = require('./_hooks');
 const { checkFionaAscension, hasGrimoire, equippedHeroCount, GRIMOIRE_NAME, BASE_FIONA } = require('./_fiona-shared');
 
 module.exports = {
@@ -89,7 +89,9 @@ module.exports = {
     return Math.round(40 * factor);
   },
 
-  hooks: {
+  hooks: equipZustandHooks({
+    // W51b: `equipZustandHooks` — Umhaengen (Slippery Fridge / Inheritance Ceremony) sendet Enter/Leave nur an die bewegte Karte; dieser Zustandslauscher bekommt es ueber
+    // `onEquipLost` / `onEquipGained` (isMove) mit denselben Handlern (siehe _hooks.js).
     // ── Ascension-Bereitschaft ──────────────────────────────────────
     // Spielstart (auch Puzzle-Aufstellung: server.js feuert onGameStart)
     // und Zugstart als Netz fuer Pfade ohne Zonen-Hooks (Charm-Flips,
@@ -151,5 +153,5 @@ module.exports = {
         player: engine.gs.players[heroOwner]?.username,
       });
     },
-  },
+  }),
 };

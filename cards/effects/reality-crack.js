@@ -11,6 +11,15 @@
 //  is higher than the user's Magic Arts level.
 //  This counts as an additional Action. You cannot
 //  play another Area for the rest of this turn.
+//
+//  Als Ruling (Al 26.10.): die Area-Wahl nach dem Abräumen ist Pflichtwahl (Galerie nicht abbrechbar), sobald mindestens eine passende Area
+//  in Hand oder Deck liegt.
+//
+//  Als Ruling (Al 27.10.): „You cannot play another Area for the rest of the turn" gilt für JEDEN Weg, auf dem der Nutzer eine Area spielt oder ins Spiel bringt —
+//  Handspiel, Zusatzaktionen (Circles-of-Hell-Wiederholung, Third Circle, Learning, Rubin, Taio, Time Distortion, Cleansing of the Land …), Cooldin, Dante, Planet in a Bottle,
+//  Orkallion, Spirit of the Barbarian Sword, Doom Prophecy. EINE Frage: `engine.areaSpielGesperrt(pi)` / `areaKarteGesperrt(cd, pi)` (Stempel `ps._cantPlayAreaThisTurn` = Zug).
+//  Der Stempel steht VOR dem Abräumen (Abgangs-Effekte der abgeräumten Areas laufen schon unter der Sperre); die EINE Area dieser Karte bringt Reality Crack selbst ins Spiel
+//  (kein „play" über die Spielwege — „another" = alle weiteren). Auch ohne passende Area (leere Galerie) steht die Sperre.
 // ═══════════════════════════════════════════
 
 const { placePollutionTokens } = require('./_pollution-shared');
@@ -50,6 +59,10 @@ module.exports = {
 
       const cardDB = engine._getCardDB();
 
+      // Als Ruling (Al 27.10.): die Sperre gilt ab hier (Karte ist gespielt, kein Abbruch mehr) — VOR dem Abräumen, damit auch Abgangs-Effekte der abgeräumten
+      // Areas (Circles of Hell …) keine weitere Area spielen können. Die Area dieser Karte kommt unten über `runHooks('onPlay')` ins Spiel, nicht über einen Spielweg.
+      ps._cantPlayAreaThisTurn = gs.turn;
+
       // ── Step 1: wipe all Areas currently on the board ──
       const wipedCount = await engine.removeAllAreas(-2, 'Reality Crack');
       engine.log('reality_crack_wipe', {
@@ -70,10 +83,12 @@ module.exports = {
       for (const n of (ps.hand || [])) {
         if (n === ctx.cardName) continue; // Exclude the Reality Crack being played
         if (!isTutorableArea(cardDB[n], engine, pi)) continue;
+        if (!engine.canPlaceAnotherArea(pi, n)) continue;   // Als Fix (Al 27.10.): bleibt nach dem Abraeumen eine Area liegen (Gigalopolis, unentfernbar), ist dort kein Platz — nicht waehlbar
         areaFromHand[n] = (areaFromHand[n] || 0) + 1;
       }
       for (const n of (ps.mainDeck || [])) {
         if (!isTutorableArea(cardDB[n], engine, pi)) continue;
+        if (!engine.canPlaceAnotherArea(pi, n)) continue;   // Als Fix (Al 27.10.): s. o.
         areaFromDeck[n] = (areaFromDeck[n] || 0) + 1;
       }
 
@@ -86,8 +101,9 @@ module.exports = {
       }
       gallery.sort((a, b) => (a.level - b.level) || a.name.localeCompare(b.name));
 
-      // Lock further Area plays this turn (takes effect immediately)
-      ps._cantPlayAreaThisTurn = gs.turn;
+      // (Die Sperre für weitere Area-Plays steht schon oben, vor dem Abräumen.)
+      // W82 (Shipwrecked): der Ausgenommene darf keine Area ins Spiel bringen — die Areas sind schon abgeraeumt (Schritt 1), es gibt nichts zu waehlen (kein Pollution-Teil).
+      if (engine.spielerIstVonAreasAusgenommen(pi)) gallery.length = 0;
 
       // Even with no eligible Area, the spell still consumes (wiped all areas)
       if (gallery.length === 0) {
@@ -101,16 +117,17 @@ module.exports = {
       }
 
       // ── Step 3: pick the Area ──
+      // Als Ruling (Al 26.10.): „Pflichtwahl" — die Areas sind schon abgeräumt (Schritt 1), der Text sagt „choose": gibt es mindestens eine passende Area,
+      // ist die Galerie NICHT abbrechbar (kein Ablehnen der neuen Area). Ohne passende Area gibt es gar keine Frage (s. o.).
       const picked = await engine.promptGeneric(pi, {
         type: 'cardGallery',
         cards: gallery,
         title: 'Reality Crack',
         description: 'Choose a level 3 or lower Area from your hand or deck to bring into play.',
-        cancellable: true,
+        cancellable: false,
       });
-      if (!picked || picked.cancelled) {
-        // The wipe already happened; the player can still decline the bring-
-        // in. Additional Action still applies.
+      if (!picked || picked.cancelled || !picked.cardName) {
+        // Sicherheitsnetz (der Client kann nicht abbrechen; CPU/Zeitüberschreitung ohne Antwort): die Areas sind weg, die Zusatzaktion bleibt.
         gs._spellFreeAction = true;
         engine.sync();
         return;
@@ -162,8 +179,7 @@ module.exports = {
       }
 
       // ── Step 6: calculate excess level and place Pollution Tokens ──
-      const abZones = ps.abilityZones?.[userHeroIdx] || [];
-      const magicArtsLevel = engine.countAbilitiesForSchool('Magic Arts', abZones);
+      const magicArtsLevel = engine.heroSchoolLevel('Magic Arts', pi, userHeroIdx);   // W4a: harte Negierung -> Stufe 0
       const excess = Math.max(0, chosenLevel - magicArtsLevel);
       let tokensPlaced = 0;
       if (excess > 0) {

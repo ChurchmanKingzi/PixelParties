@@ -42,7 +42,7 @@ module.exports = {
     const engine = ctx._engine;
     const gs = engine.gs;
     const pi = ctx.cardOwner;
-    if (gs.hoptUsed?.[HOPT_KEY(pi)] === gs.turn) return false;
+    if (!ctx._borrowedUse && gs.hoptUsed?.[HOPT_KEY(pi)] === gs.turn) return false;   // W12 (Q5): geliehene Verwendung ignoriert das Einmal-Limit
     // Auf 0 setzen lohnt nur, wenn man nicht schon dort steht.
     return (gs.players[pi]?.gold || 0) !== 0;
   },
@@ -53,7 +53,7 @@ module.exports = {
     const pi = ctx.cardOwner;
     const ps = gs.players[pi];
     if (!ps) return;
-    if (gs.hoptUsed?.[HOPT_KEY(pi)] === gs.turn) return;
+    if (!ctx._borrowedUse && gs.hoptUsed?.[HOPT_KEY(pi)] === gs.turn) return;
 
     const vorher = ps.gold || 0;
     // `ctx.promptConfirmEffect` liefert einen BOOLEAN, kein Objekt —
@@ -68,8 +68,10 @@ module.exports = {
     });
     if (!bestaetigt) return false;
 
-    if (!gs.hoptUsed) gs.hoptUsed = {};
-    gs.hoptUsed[HOPT_KEY(pi)] = gs.turn;
+    if (!ctx._borrowedUse) {   // W13 (Al, Rueckfrage 9): geliehene Verwendung verbraucht den Stempel NICHT
+      if (!gs.hoptUsed) gs.hoptUsed = {};
+      gs.hoptUsed[HOPT_KEY(pi)] = gs.turn;
+    }
 
     // Zaehl-Animation wie bei Market Crash, aber GRUEN und von −X auf 0
     // (Als Vorgabe 16.8.). `to` haelt den Gegner auf seinem Wert fest —

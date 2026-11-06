@@ -24,17 +24,25 @@ function heroCanUseMartyry(engine, pi, heroIdx) {
   return engine._canHeroActivateSurprise(pi, heroIdx, 'Martyry', { spellInHand: true });
 }
 
+// W20c (Al 20.10.: alle Reactions ueber jeden kontrollierten Helden): `{ seite, hi }` — `seite` = Brettseite des Helden (eigene Spalte
+// oder uebernommener Held der Gegenspalte); der Held ist zugleich der Wirker UND das neue Ziel.
 function getEligibleRedirectHeroes(gs, pi, selected, validTargets, engine) {
   const ps = gs.players[pi];
   const eligible = [];
-  for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
-    if (!heroCanUseMartyry(engine, pi, hi)) continue;
-    if (selected.type === 'hero' && selected.owner === pi && selected.heroIdx === hi) continue;
+  const kandidaten = [];
+  for (let hi = 0; hi < (ps.heroes || []).length; hi++) kandidaten.push({ seite: pi, hi });
+  for (const f of (engine?.fremdeReaktionsWirker ? engine.fremdeReaktionsWirker(pi, module.exports) : [])) kandidaten.push({ seite: f.seite, hi: f.heroIdx });
+  for (const { seite, hi } of kandidaten) {
+    const darf = seite === pi
+      ? heroCanUseMartyry(engine, pi, hi)
+      : engine._canHeroActivateSurprise(seite, hi, 'Martyry', { spellInHand: true, reaktor: pi });
+    if (!darf) continue;
+    if (selected.type === 'hero' && selected.owner === seite && selected.heroIdx === hi) continue;
     const isValidTarget = validTargets.some(t =>
-      t.type === 'hero' && t.owner === pi && t.heroIdx === hi
+      t.type === 'hero' && t.owner === seite && t.heroIdx === hi
     );
     if (!isValidTarget) continue;
-    eligible.push(hi);
+    eligible.push({ seite, hi });
   }
   return eligible;
 }
@@ -74,15 +82,16 @@ module.exports = {
 
     // ── Select Hero to take the hit ──
     let selectedHeroIdx;
+    let heroSeite = pi;   // W20c: Brettseite des Martyry-Helden
     if (eligible.length === 1) {
-      selectedHeroIdx = eligible[0];
+      ({ hi: selectedHeroIdx, seite: heroSeite } = eligible[0]);
     } else {
-      const heroTargets = eligible.map(hi => ({
-        id: `hero-${pi}-${hi}`,
+      const heroTargets = eligible.map(({ seite, hi }) => ({
+        id: `hero-${seite}-${hi}`,
         type: 'hero',
-        owner: pi,
+        owner: seite,
         heroIdx: hi,
-        cardName: ps.heroes[hi].name,
+        cardName: gs.players[seite].heroes[hi].name,
       }));
 
       const picked = await engine.promptEffectTarget(pi, heroTargets, {
@@ -101,9 +110,10 @@ module.exports = {
       const target = heroTargets.find(t => t.id === picked[0]);
       if (!target) return null;
       selectedHeroIdx = target.heroIdx;
+      heroSeite = target.owner;
     }
 
-    const martyrHero = ps.heroes[selectedHeroIdx];
+    const martyrHero = gs.players[heroSeite]?.heroes?.[selectedHeroIdx];
     if (!martyrHero?.name) return null;
 
     // ── Chain visualization ──
@@ -146,7 +156,7 @@ module.exports = {
     // umgeleitete Wirkung setzt im Moment der Beruehrung ein, der
     // Rueckflug laeuft im Client weiter.
     await engine.rammeBisKontakt({
-      sourceOwner: pi, sourceHeroIdx: selectedHeroIdx,
+      sourceOwner: heroSeite, sourceHeroIdx: selectedHeroIdx,
       targetOwner: originalOwner, targetHeroIdx: originalHeroIdx,
       targetZoneSlot: originalZoneSlot,
       cardName: martyrHero.name, duration: 1200,
@@ -160,7 +170,7 @@ module.exports = {
 
     // ── Build the redirect target ──
     const redirectTarget = validTargets.find(t =>
-      t.type === 'hero' && t.owner === pi && t.heroIdx === selectedHeroIdx
+      t.type === 'hero' && t.owner === heroSeite && t.heroIdx === selectedHeroIdx
     );
 
     if (!redirectTarget) return null;

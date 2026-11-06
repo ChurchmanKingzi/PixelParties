@@ -43,7 +43,9 @@ const AUSNAHMEN = [
   // IDENTITÄTSWECHSEL (Aufstieg, Gestaltwechsel): kein Delta, sondern
   // ein neuer Grundwert. Der Trichter passt nicht — stattdessen meldet
   // die Stelle `_signalHeroAtkReset`, damit Auren neu abgleichen.
-  { datei: '_engine.js', muster: /hero\.atk = newCardData\.atk \|\| hero\.atk;/ },
+  // (W54a: `_atkNachFormwechsel` — neuer gedruckter Grundwert + ALLE fortbestehenden Buchungen; verfluchter Held: sichtbar 0, Gesamtwert im Zwischenspeicher.)
+  { datei: '_engine.js', muster: /hero\.atk = formwechselZiel;/ },
+  { datei: '_engine.js', muster: /^hero\.atk = 0;$/ },
   // HELDENPLATZ LEEREN (gestorbener/entfernter Held): der ganze Held
   // wird auf null gesetzt, nicht seine ATK verändert. Eine Aura, die
   // nur lebende Helden zählt, ist davon nicht betroffen.

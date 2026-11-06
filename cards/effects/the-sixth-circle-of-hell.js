@@ -39,7 +39,8 @@ module.exports = {
       const pi = ctx.cardOwner;
       const oi = engine.opponentOf(pi);
       if (gs.firstTurnProtectedPlayer === oi) return;
-      const kandidaten = uebernehmbareHelden(gs, oi);
+      if (engine.spielerIstVonAreasAusgenommen(pi)) return;   // W82 (Shipwrecked): Area-Effekte aktivieren ist gesperrt
+      const kandidaten = uebernehmbareHelden(gs, oi).filter(h => !engine.heldIstVonAreasAusgenommen(oi, h.heroIdx));   // W82 (Shipwrecked): Helden des Gegners, die von Areas ausgenommen sind, sind kein Ziel
       if (kandidaten.length === 0) return;
 
       await engine.showTriggeredEffect(CARD_NAME, { playerIdx: pi });

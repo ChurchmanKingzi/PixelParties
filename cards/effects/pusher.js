@@ -39,6 +39,9 @@ function anyCreatureOnBoard(engine) {
 }
 
 module.exports = {
+  // ★ Als Ruling (Al 26.10., Flame Avalanche: „Wenn du andere Schadenskarten unspielbar machst, müssen das Vial und Rockfall auch sein!"): die Karte richtet NUR Schaden an Zielen an (die Abwurf-Folge hängt nur am Besiegen durch diesen Schaden) —
+  // unter der Schadenssperre (`ps.damageLocked`) unspielbar (Karte bleibt auf der Hand, keine Aktion/Kosten; Sperr-Stutzen `engine._cardBlockedBySearchLock`).
+  blockedByDamageLock: true,
   requiresTarget: true,
   // ^ Tagged for Blinded gating — see cards/effects/_hooks.js.
 
@@ -135,14 +138,15 @@ module.exports = {
       // ── Hand copies → discard (zone-anchored flight before the
       //    splice + the hook-firing discard helper). ──
       let guard = 0;
-      // v1324: Boris darf den erzwungenen Abwurf aus der Hand ignorieren.
+      // v1324: Boris darf den erzwungenen Abwurf aus der Hand ignorieren. ★ W74c: Reihenfolge wie bei jedem fremden Zwangsabwurf — Erstrunden-Schutz,
+      // ERST das Ambush-Fenster („interact with your hand"), DANN Boris (`fremdAbwurfEntfaellt`); die Deck-Kopien unten sind davon unberührt.
       const _anzahl = (oppPs.hand || []).filter(n => n === name).length;
-      if (_anzahl > 0 && await engine.borisVerzicht(oppIdx, _anzahl, { source: CARD_NAME, sourceOwner: pi })) guard = 99;
+      if (_anzahl > 0 && await engine.fremdAbwurfEntfaellt(oppIdx, _anzahl, { source: CARD_NAME, sourceOwner: pi })) guard = 99;
       while (guard++ < 40) {
         const idx = (oppPs.hand || []).indexOf(name);
         if (idx < 0) break;
         // v696: Flug und Takt (0,5 s je Karte) kommen aus dem Helfer.
-        await engine.actionDiscardHandCard(oppIdx, name, idx, { source: CARD_NAME });
+        await engine.actionDiscardHandCard(oppIdx, name, idx, { source: CARD_NAME, sourceOwner: pi, _skipHandInteractionCheck: true });
         sent++;
       }
 

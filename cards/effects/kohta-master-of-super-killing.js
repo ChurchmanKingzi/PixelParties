@@ -53,6 +53,9 @@ function eigenerHeld(engine, pi, heroIdx) {
 }
 
 module.exports = {
+  // W26a (Al, Welle 26): als Attack geltender Heldeneffekt ohne Karte — Stufen-Bedingungen ("level X or lower": Glass Wall, Test Flight, Future Tech Escape Device …) lesen die Quellstufe.
+  // W32a (Al, 22.10.2026): „Zählt als Attack/Spell eines Helden = Ability-Level dieses Helden": die Quellstufe ist das FIGHTING-LEVEL Kohtas (nicht mehr fix 0) — Engine: `_heldenEffektStufe`.
+  treatedAsAttack: { ability: 'Fighting' },
   activeIn: ['hero'],
   heroEffect: true,
 
@@ -82,6 +85,8 @@ module.exports = {
    * der Spieler haette seine Aktion verplant.
    */
   canActivateHeroEffect(ctx) {
+    // ★ W34a (Al, 22.10.2026): ein Effekt, der als Attack zählt, unterliegt den Attack-Zählern und -Sperren (Berserk-Limit, Knife Throw, Rioting Village, Mirjam, Muras …) — `heroKannAngreifen`.
+    if (!ctx._engine.heroKannAngreifen(ctx.cardHeroOwner ?? ctx.cardOwner, ctx.cardHeroIdx, ctx.cardOwner, { name: 'Kohta, Master of Super-Killing' })) return false;
     return !hartGesperrt(ctx._engine, ctx.cardOwner);
   },
 
@@ -121,14 +126,17 @@ module.exports = {
         wert = 1000 + (h?.hp || 0) + (h?.atk || 0);
       } else {
         const inst = t.cardInstance;
-        wert = (inst?.counters?.currentHp || 0) + (inst?.counters?.maxHp || 0) / 2;
+        wert = engine.creatureCurrentHp(inst) + (inst?.counters?.maxHp || 0) / 2;   // Z5: unversehrt = gedruckte HP
       }
       if (wert > bestwert) { bestwert = wert; bestes = t; }
     }
     return [bestes.id];
   },
 
-  async onHeroEffect(ctx) {
+  // W40a (Al, 22.10.2026): `wdh` = Wiederholung durch Idej Sword - Kunagi ("perform that Attack again"): derselbe Schlag, neues Ziel; weder die harte Sperre noch die Aktion werden erneut verbraucht oder geprüft.
+  // ★ W42a (Al, 22.10.2026, Punkt 1: „Nein, verbraucht es nicht, ebenso wenig, wie normale Attacks mit Karten Zusatzaktionen mit Kunagi kosten. Die Aktion des ersten Schlags reicht."): die Wiederholung kostet KEINE weitere
+  // (Zusatz-)Aktion (W41a zurückgenommen) — die Aktion bzw. das Ausspielen wird bei der Wiederholung nie erneut bezahlt.
+  async onHeroEffect(ctx, wdh) {
     const engine = ctx._engine;
     const gs = engine.gs;
     const pi = ctx.cardOwner;
@@ -136,9 +144,10 @@ module.exports = {
 
     // Erst PRUEFEN, nicht beanspruchen. Wer hier ankommt, ohne dass der
     // Engine-Weg gelaufen ist (Sleeping Beauty & Co.), faellt hier raus.
-    if (hartGesperrt(engine, pi)) return false;
+    if (!wdh && hartGesperrt(engine, pi)) return false;
 
-    const ziel = await ctx.promptDamageTarget({
+    // ★ W36a (Al, 22.10.2026): „Negierter Treffer: ja, definitiv" — wird der Treffer im Zielfenster NEGIERT (Invisibility Cloak, Schutzkarten …), ist der Effekt für die Runde verbraucht (Einmal-Stempel bleibt, Rückgabe `true`) und zählt als gespielte Attack (Muster Alice); ein Abbruch des Spielers bleibt ein Abbruch.
+    const { target: ziel, negiert } = await engine.heldenEffektZielwahl(ctx, {
       side: 'any',                       // „any target on the board" — auch eigene
       types: ['hero', 'creature'],
       damageType: 'attack',              // gilt als Angriff dieses Helden
@@ -159,10 +168,17 @@ module.exports = {
       maxTotal: 1,
       minRequired: 1,
     });
+    if (negiert) {
+      // Negiert: der Effekt ist verbraucht (harte Sperre gesetzt) und zählt als Attack dieses Helden.
+      if (!wdh && !engine.claimHOPT(HOPT_KEY, pi)) return false;
+      await engine.zaehleAlsArt('attack', { pi, heroIdx, heroOwner: ctx.cardHeroOwner ?? pi, name: CARD_NAME });
+      engine.sync();
+      return true;
+    }
     if (!ziel) return false;
 
     // ── Punkt ohne Rueckkehr: jetzt die harte Sperre beanspruchen ────
-    if (!engine.claimHOPT(HOPT_KEY, pi)) return false;
+    if (!wdh && !engine.claimHOPT(HOPT_KEY, pi)) return false;
 
     // Styx 28.9.: „this Hero" steht auf der Brettseite `feld` — Quelle
     // traegt sie als `heroOwner`, der Held kommt als Objekt.
@@ -178,6 +194,8 @@ module.exports = {
     // `setAmount(0)`). Dann IST der Angriff erklaert worden, er verpufft
     // nur: kein Kill, aber Aktion und Sperre bleiben verbraucht.
     const basis = Math.max(1, held?.atk || 1);
+    // W32a (Al, 22.10.2026): der Treffer zählt als Attack — Attack-Reaktionen (Magic Topaz, Arrows …) über die virtuelle Attack-Kette um Angriffsfenster und Kill.
+    await engine.alsAttackKette({ name: CARD_NAME, pi, heroIdx, heroOwner: feld, ziele: [ziel], wiederhole: () => module.exports.onHeroEffect(ctx, true), resolve: async () => {
     const nachFenster = await engine._fireAttackDeclare(quelle, ziel, basis);
     if (!(nachFenster > 0)) {
       engine.log('kohta_super_kill_negated', {
@@ -196,13 +214,18 @@ module.exports = {
     if (ziel.type === 'hero') {
       const opfer = engine?.gs?.players?.[ziel.owner]?.heroes?.[ziel.heroIdx];
       if (!opfer?.name || opfer.hp <= 0) { engine.sync(); return true; }
-      await engine.actionDefeatHero(quelle, opfer, { sourceName: CARD_NAME });
+      // W39a: „besiegt mit einer Attack" (Death-Leser: Future Tech Bazooka) und Treffer ohne Schaden an die Schadens-Leser (Explosivo's Sword, Don Quisto, Wavilion, Skullmael's Greatsword,
+      // Heart of Ice …) — `meldeTreffer` feuert ihn NACH hp = 0, VOR den KO-Hooks (wie der Schadenspfad).
+      // W66a (Al, 23.10.2026: Effekt-Schutz gegen JEDE Form von „defeat"): Zielschutz „or HIT", Charmed, Submerged, Versteinerung, Quellen-Immunität … (`wirkungsSchutz`),
+      // Schadens-Schutz gilt nicht (kein Schaden). Typ `attack`: Anti Magic (Spell-Schutz) greift hier nicht, Attack-Schutz („cannot be hit by Attacks") schon.
+      await engine.actionDefeat(quelle, opfer, { sourceName: CARD_NAME, type: 'attack', meldeTreffer: true, damageType: 'attack', wirkungsSchutz: true });
     } else {
       const opfer = ziel.cardInstance
         || engine.findCards({ controller: ziel.owner, zone: 'support', heroIdx: ziel.heroIdx })
              .find(c => c.zoneSlot === ziel.slotIdx);
       if (!opfer) { engine.sync(); return true; }
-      await engine.actionDestroyCard(quelle, opfer, { sourceName: CARD_NAME });
+      await engine.actionDestroyCard(quelle, opfer, { sourceName: CARD_NAME, heldQuelle: quelle });   // W39a: der Held besiegt das Ziel mit einer Attack (Death-Leser: Skullmael's Greatsword, Wanted Poster, Future Tech Bazooka, Xiong)
+      await engine.meldeAttackTrefferOhneSchaden(quelle, opfer, pi);
     }
 
     engine.log('kohta_super_kill', {
@@ -211,6 +234,8 @@ module.exports = {
       targetType: ziel.type,
     });
     engine.sync();
+    return true;
+    } });
     return true;
   },
 };

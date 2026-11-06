@@ -166,7 +166,8 @@ async function payRebelliokaiCost(engine, playerIdx, cardName, opts = {}) {
   if (orphan) engine._untrackCard(orphan.id);
 
   // Phase 1 — vanish from discard pile.
-  if (!engine.takeFromPileSync(ps, 'discard', idx, { source: opts.source || 'Rebelliokai' })) return;   // v820: Stapel-Schicht
+  // Gesperrte Entnahme (Knight of Kings [B]): Kosten NICHT bezahlt → false (A06-08).
+  if (!engine.takeFromPileSync(ps, 'discard', idx, { source: opts.source || 'Rebelliokai' })) return false;   // v820: Stapel-Schicht
   engine.sync();
 
   // Phase 2 — broadcast the chained flight animation. The client pre-
@@ -239,6 +240,9 @@ async function promptDiscardRebelliokaiFromHand(engine, playerIdx, opts = {}) {
   if (!result || result.cancelled || !result.cardName) return null;
   if (!isRebelliokaiCreature(result.cardName, engine)) return null;
   if ((ps.hand || []).indexOf(result.cardName) < 0) return null;
+
+  // ★ W74c: Boris darf diese Abwurf-KOSTEN ignorieren — die Karte bleibt auf der Hand, die Zahlung gilt als erfolgt.
+  if (await engine.borisVerzicht(playerIdx, 1, { source: opts.source || 'Rebelliokai' })) return result.cardName;
 
   const ok = await engine.actionDiscardHandCard(
     playerIdx,

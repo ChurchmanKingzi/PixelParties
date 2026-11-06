@@ -41,22 +41,28 @@ function istAttachment(engine, name) {
 }
 
 /** Attachments, die dieser Held JETZT als Zusatzaktion wirken koennte. */
-function wirkbareAttachments(engine, pi, hi) {
-  const hero = engine.gs.players[pi]?.heroes?.[hi];
+// W28a (Al, 21.10.2026: „'you control' = aktuelle Kontrolle, nicht Besitzer"): `hs` = Brettseite des Helden (Standard: die eigene Spalte); ein uebernommener
+// Gegnerheld wirkt fuer den Kontrolleur (Hand/Kosten bei `pi`, Stufe/Zonen am Helden — wie `performImmediateAction` mit `heroOwner`).
+function wirkbareAttachments(engine, pi, hi, hs = pi) {
+  const hero = engine.gs.players[hs]?.heroes?.[hi];
   if (!hero?.name || hero.hp <= 0) return [];
-  if (engine.isHeroIncapacitated(pi, hi)) return [];
-  return engine.getHeroEligibleActionCards(pi, hi).filter(n => istAttachment(engine, n));
+  if (engine.isHeroIncapacitated(hs, hi)) return [];
+  return engine.getHeroEligibleActionCards(pi, hi, hs !== pi ? hs : null).filter(n => istAttachment(engine, n));
 }
 
 function heldenZiele(gs, pi, engine) {
-  const ps = gs.players[pi];
   const out = [];
-  (ps?.heroes || []).forEach((h, hi) => {
-    if (!h?.name || h.hp <= 0) return;
-    const t = { id: `hero-${pi}-${hi}`, type: 'hero', owner: pi, heroIdx: hi, cardName: h.name };
-    if (!engine || wirkbareAttachments(engine, pi, hi).length === 0) t.ineligible = true;
+  if (!engine) {   // ohne Engine (alte Aufrufer): nur die eigene Spalte, alles ausgegraut
+    (gs.players[pi]?.heroes || []).forEach((h, hi) => {
+      if (!h?.name || h.hp <= 0) return;
+      out.push({ id: `hero-${pi}-${hi}`, type: 'hero', owner: pi, heroIdx: hi, cardName: h.name, ineligible: true });
+    });
+    return out;
+  }
+  for (const t of engine.getControlledHeroTargets(pi)) {   // abgegebener eigener Held nein, uebernommener Gegnerheld ja
+    if (wirkbareAttachments(engine, pi, t.heroIdx, t.owner).length === 0) t.ineligible = true;
     out.push(t);
-  });
+  }
   return out;
 }
 
@@ -94,8 +100,10 @@ module.exports = {
     const ziel = (validTargets || []).find(t => t.id === selectedIds?.[0]);
     if (!ziel || ziel.type !== 'hero' || ziel.ineligible) return { aborted: true };
     const hi = ziel.heroIdx;
-    const hero = gs.players[pi]?.heroes?.[hi];
-    if (wirkbareAttachments(engine, pi, hi).length === 0) return { aborted: true };
+    const hs = ziel.owner ?? pi;   // W28a: Brettseite des (kontrollierten) Helden
+    const hero = gs.players[hs]?.heroes?.[hi];
+    if (!hero?.name || engine.heroSideOf(hs, hero) !== pi) return { aborted: true };
+    if (wirkbareAttachments(engine, pi, hi, hs).length === 0) return { aborted: true };
 
     // Alte Drop-Hinweise raus — sie stammen aus einem frueheren Zug der
     // Hand und wuerden `pickAttachmentHost` sonst den Wirt vorgeben.
@@ -105,6 +113,7 @@ module.exports = {
     let res;
     try {
       res = await engine.performImmediateAction(pi, hi, {
+        ...(hs !== pi ? { heroOwner: hs } : {}),
         title: CARD_NAME,
         description: `${hero.name} immediately uses an Attachment Attack/Spell from your hand!`,
         allowedCardTypes: ['Spell', 'Attack'],
@@ -113,7 +122,7 @@ module.exports = {
         // Gegner Sticky Wand sehen, und der Glibber klebt am Helden.
         zusageAuftritt: () => {
           delete gs._holdCardReveal;
-          engine._broadcastEvent('play_zone_animation', { type: 'hydra_goo', owner: pi, heroIdx: hi, zoneSlot: -1 });
+          engine._broadcastEvent('play_zone_animation', { type: 'hydra_goo', owner: hs, heroIdx: hi, zoneSlot: -1 });
           engine._firePendingCardReveal();
         },
       });

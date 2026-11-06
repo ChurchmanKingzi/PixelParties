@@ -45,7 +45,7 @@ module.exports = {
       // cardHeroOwner. Diverges from cardOwner only under Love
       // Shot, where the caster casts through an opp-side Hero;
       // cardHeroOwner falls back to cardOwner for normal casts.
-      const heroFlags = gs.heroFlags?.[`${ctx.cardHeroOwner}-${heroIdx}`];
+      const heroFlags = ctx._engine.heroFlagsLive(ctx.cardHeroOwner, heroIdx);
       if (heroFlags?.forcesSingleTarget) {
         // ── Ida mode: single-target burn via aoeHit ──
         const result = await ctx.aoeHit({

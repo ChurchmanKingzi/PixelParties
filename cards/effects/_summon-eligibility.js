@@ -5,8 +5,10 @@
 //  eine ganz normale Beschwoerung** — sie kostet nur keine Aktion und
 //  laeuft reaktiv. Ein tauglicher Caster ist also weiterhin Pflicht.
 //
-//  Geprueft wird: lebendig, nicht Frozen / Stunned / Webbed / Bound /
-//  Negated, und die Level- bzw. Schulanforderung der Karte.
+//  Geprueft wird: lebendig, nicht Frozen / Stunned / Webbed / Bound, und
+//  die Level- bzw. Schulanforderung der Karte. Welle 12 (Al): ein bloss
+//  „Effekt negierter" Held beschwoert normal; sind seine Abilities
+//  negiert (harte Form), bleiben nur Stufe-0-Kreaturen (Summoning Magic weg).
 //  `heroMeetsLevelReq` deckt Abilities, Ascension-Bypaesse und Wisdom
 //  bereits mit ab.
 //
@@ -43,7 +45,7 @@ function heroActionLocked(engine, pi, heroIdx, physOwner = pi) {
   const hero = engine?.gs?.players?.[physOwner]?.heroes?.[heroIdx];
   if (!hero) return true;
   if (engine.isHeroSkillLocked?.(physOwner, heroIdx)) return true;
-  if (hero._maxActionsPerTurn && (hero._actionsThisTurn || 0) >= hero._maxActionsPerTurn) return true;
+  if (engine.heroActionCapReached?.(physOwner, heroIdx)) return true;   // W8: ruht bei Frost/Betäubung/Negation
   if (hero._actionLockedTurn === engine.gs.turn) return true;
   if (engine.areActionsBlocked?.(pi)) return true;
   return false;
@@ -69,7 +71,11 @@ function canHeroSummon(engine, pi, heroIdx, cd, opts = {}) {
   if (engine.kontrollRechte && !engine.kontrollRechte(physOwner, heroIdx).beschwoeren) return false;
   if (ps?.summonLocked) return false;
   const st = hero.statuses || {};
-  if (st.frozen || st.stunned || st.webbed || st.bound || st.negated) return false;
+  // Welle 12 (Al, Rueckfrage 2): ein NEGIERTER Held kann „ganz normal Aktionen ausfuehren und also beschwoeren" — `negated` sperrt hier nicht mehr.
+  // Sind seine ABILITIES negiert (harte Form), faellt die Summoning Magic weg: `heroMeetsLevelReq` laesst dann nur noch Stufe-0-Kreaturen zu.
+  if (st.frozen || st.stunned || st.webbed || st.bound) return false;
+  // W24a (N1-02): Berserk — "cannot … summon Creatures" gilt auch fuer Effekt-Beschwoerungen (`validateActionPlay` sperrt nur den Handweg).
+  if (st.berserked) return false;
   if (!cd) return false;
   if (opts.alsAktion && heroActionLocked(engine, pi, heroIdx, physOwner)) return false;
   return engine.heroMeetsLevelReq(physOwner, heroIdx, cd);
@@ -101,6 +107,13 @@ function eligibleSummonZones(engine, pi, cardName, opts = {}) {
   const helden = opts.nachKontrolle && engine.heroesControlledBy
     ? engine.heroesControlledBy(pi)
     : (ps.heroes || []).map((hero, heroIdx) => ({ physOwner: pi, heroIdx, hero }));
+  // ★ W62a (Al: „Pintas Effekt erkennt Zonen mit bereits liegenden gleichnamigen Creatures nicht"): mit „Alice, the Transfer Student"
+  // (Alice-Teilung des Beschwoerers) ist auch eine BELEGTE Zone ein Landeplatz, in der schon nur Kreaturen GLEICHEN Namens liegen —
+  // wie beim Hand-Weg (`validateActionPlay` + `canShareInto`). ★ W63a (Al, 22.10.2026: „erst die geteilte Zone, sofern Alices Effekt aktiv ist,
+  // DANN die erste leere"): die geteilten Zonen (`shared: true`) stehen VORN, die freien dahinter (wer `[0]` nimmt, nimmt die geteilte);
+  // `opts.geteilt === false` schaltet das ab (Aufrufer, die ausdruecklich einen LEEREN Platz brauchen).
+  const { canShareInto } = require('./_alice-shared');
+  const geteilt = [];
   for (const { physOwner, heroIdx: hi, hero } of helden) {
     if (!canHeroSummon(engine, pi, hi, cd, { ...pruef, physOwner })) continue;
     const zones = engine.gs.players[physOwner]?.supportZones?.[hi] || [];
@@ -112,10 +125,44 @@ function eligibleSummonZones(engine, pi, cardName, opts = {}) {
           label: `${hero.name} — Slot ${zi + 1}`,
           ...(opts.nachKontrolle ? { owner: physOwner } : {}),
         });
+      } else if (opts.geteilt !== false && canShareInto(engine, pi, hi, zi, cardName, physOwner)) {
+        const tiefe = (zones[zi] || []).length;
+        geteilt.push({
+          heroIdx: hi, slotIdx: zi,
+          label: `${hero.name} — Slot ${zi + 1} (×${tiefe})`,
+          shared: true, stackDepth: tiefe,
+          ...(opts.nachKontrolle ? { owner: physOwner } : {}),
+        });
       }
     }
   }
-  return out;
+  return geteilt.length ? [...geteilt, ...out] : out;
+}
+
+/**
+ * Als Ruling (Al 26.10.): „Rocky Slime reduziert nur das Level einer einzelnen Kopie!" — die Handkopie von `name`, die der Held der Zone `ziel` (`{ heroIdx, owner? }`) wirklich
+ * spielen darf, und zwar die GÜNSTIGSTE (niedrigste Handstufe, bei Gleichstand die erste). Das Heldenstufen-Tor der Zonenliste (`canHeroSummon`) fragt namensweit („irgendeine
+ * Kopie genügt"); wer danach eine Kopie aus der Hand nimmt, nimmt diese und nicht die erste nach Namen.
+ * @returns {number} Handindex oder -1 (höchstens eine Kopie / keine besteht das Tor → der Aufrufer nimmt die erste Kopie wie bisher)
+ */
+function kopieFuerHeld(engine, pi, name, ziel) {
+  const ps = engine?.gs?.players?.[pi];
+  const cd = engine?._getCardDB?.()?.[name];
+  if (!ps || !cd || !ziel) return -1;
+  const idxs = [];
+  (ps.hand || []).forEach((n, i) => { if (n === name) idxs.push(i); });
+  if (idxs.length < 2) return -1;
+  const feld = ziel.owner ?? pi;
+  let beste = -1, besteStufe = Infinity;
+  for (const i of idxs) {
+    let ok = false;
+    try { ok = !!engine.heroMeetsLevelReq(feld, ziel.heroIdx, cd, { handIdx: i, ...(feld !== pi ? { levelSourcePi: pi } : {}) }); } catch { ok = false; }
+    if (!ok) continue;
+    let stufe = 0;
+    try { stufe = engine.effectiveCardLevel(cd, pi, { heroIdx: ziel.heroIdx, handIdx: i }); } catch { stufe = 0; }
+    if (stufe < besteStufe) { beste = i; besteStufe = stufe; }
+  }
+  return beste;
 }
 
 /**
@@ -154,12 +201,110 @@ async function sofortAusHandBeschwoeren(engine, pi, name, opts = {}) {
     if (!ziel) return false;
   }
   if (typeof nachZonenwahl === 'function') await nachZonenwahl(ziel);
+  // Als Ruling (Al 26.10.): „Rocky Slime reduziert nur das Level einer einzelnen Kopie!" — `eligibleSummonZones` fragt namensweit („irgendeine Kopie genügt"), BESCHWOREN wird aber GENAU EINE Kopie:
+  // die günstigste (niedrigste Handstufe), die der gewählte Held wirklich spielen darf — nicht die erste nach Namen (sonst käme eine ungesenkte Kopie durch das Tor der gesenkten).
+  const _kopie = kopieFuerHeld(engine, pi, name, ziel);
   const inst = await engine.summonFromPile(pi, 'hand', name, ziel.heroIdx, ziel.slotIdx, {
     source: source || name, hookExtras: { _isNormalSummon: false },
+    ...(_kopie >= 0 ? { handIdx: _kopie } : {}),
     alsZusatzaktion: true,   // v1349: „as an additional Action" ist eine Aktion
     ...((ziel.owner ?? pi) !== pi ? { heldSeite: ziel.owner } : {}),
   });
   return !!inst;
 }
 
-module.exports = { canHeroSummon, eligibleSummonZones, heroActionLocked, sofortAusHandBeschwoeren };
+/**
+ * ★ W20c: ist `hero` (Objekt oder Adresse `(feld, heroIdx)`) ein von `pi` ABGEGEBENER eigener Held — er steht in der Spalte von `pi`, wird aber von einem anderen
+ * kontrolliert (`heroSideOf`: Charme-Marke > dauerhafte Uebernahme > Brettseite)? Dann beschwoert `pi` mit ihm nichts. `controlledBy` (Controlled Attack)
+ * zaehlt nicht: dort bleibt der Held beim Besitzer.
+ * ★ W22a (Al, 20.10.2026: „Das Ruling vom 14. [gilt]“): die W21a-Verallgemeinerung auf JEDE Spalte ist ZURÜCKGENOMMEN — der Held der Zone einer gestohlenen Kreatur in der
+ * Gegenspalte bleibt zulaessig (A09-15, seitenfremde Beschwoerung durch den Kontrolleur der gestorbenen Kreatur); nur ein abgegebener EIGENER Held sperrt.
+ */
+function heroAbgegeben(engine, pi, heroOrFeld, heroIdx) {
+  if (!engine?.heroSideOf) return false;
+  const hero = (typeof heroOrFeld === 'number') ? engine.gs?.players?.[heroOrFeld]?.heroes?.[heroIdx] : heroOrFeld;
+  if (!hero?.name) return false;
+  const feld = (typeof heroOrFeld === 'number') ? heroOrFeld : engine._findHeroOwner?.(hero);
+  if (feld !== pi) return false;
+  return engine.heroSideOf(feld, hero) !== pi;
+}
+
+/**
+ * ★ Welle 11 (Al, R5): „… Reaction-Creatures können, sofern sie nichts anderes spezifizieren (der Term 'place' beinhaltet z.B., dass kein
+ * aktionsfähiger Hero notwendig ist) NUR von Heroes beschworen werden, die aktionsfähig sind, dasselbe für Effekte, die spezifisch 'summon' sagen."
+ * EINE Statusfrage für jedes „summon" eines Helden-Beschwörers: nicht Frozen / Stunned / Webbed / Bound (seit Welle 12 ohne Negated) — gleiche Menge wie
+ * `canHeroSummon`, für Skripte mit eigener Zonen-/Helden-Auswahl. Bei „place" (Monster Nest, Garius, Steam Dwarf Engineer …) NICHT benutzen.
+ */
+function heroAgiert(hero, engine = null, pi = null) {
+  if (!hero?.name || hero.hp <= 0) return false;
+  // ★ W20c (Al, 20.10.2026: „nur der aktuelle Kontrolleur darf mit einem Hero Creatures beschwören"): nennt der Aufrufer den beschwoerenden Spieler `pi`
+  // (und die Engine), beschwoert ein an den Gegner ABGEGEBENER EIGENER Held (steht in der Spalte von `pi`, `heroSideOf` ≠ `pi`) fuer `pi` nichts.
+  // Helden der Gegenspalte bleiben unberuehrt (uebernommene gelten ohnehin; der Held der Zone einer gestohlenen Kreatur — A09-15, Al 14.10.: seitenfremd
+  // beschwoeren — ist weiter zulaessig). Ohne `engine`/`pi` (alte Aufrufer) bleibt die Pruefung rein statusbezogen.
+  if (engine && Number.isInteger(pi) && heroAbgegeben(engine, pi, hero)) return false;
+  const st = hero.statuses || {};
+  // Welle 12 (Al, Rueckfrage 2): „Nein, ein effekt-negierter Held kann ganz normal Aktionen ausführen und also beschwören." — `negated` gehoert nicht
+  // mehr zu den sperrenden Status (Frozen / Stunned / Webbed / Bound bleiben). Die harte Form („Abilities negiert") begrenzt nur die STUFE
+  // (`beschwoerStufeOk` bzw. `heroMeetsLevelReq`).
+  return !(st.frozen || st.stunned || st.webbed || st.bound);
+}
+
+/**
+ * ★ Welle 12 (Al, Rueckfrage 2): „Anders sieht es aus, wenn seine *Abilities* negiert sind - dann kann er nur noch Lv-0-Creatures beschwören, weil ja
+ * seine Summoning Magic weg ist." Fuer Skripte mit eigener Held-/Zonenwahl, die KEIN `heroMeetsLevelReq` rufen (Elven Rider, Bomblebee Cluster):
+ * ist der Held in der harten Form negiert (`heroAbilityLevelsBlanked`: Standard-`negated`, Stowaway), geht nur Stufe 0.
+ * @param {number} physOwner Brettseite des Helden · @param {object} cd Kartendaten der Kreatur
+ */
+function beschwoerStufeOk(engine, physOwner, heroIdx, cd) {
+  if (!cd || (cd.level || 0) <= 0) return true;
+  return !engine.heroAbilityLevelsBlanked(physOwner, heroIdx);
+}
+
+/**
+ * ★ Welle 12 (Al, Rueckfrage 1 / Sandy Blob): „Nein, nur explizit On-Summon-Effekte triggern Blob." Hat der KARTENTEXT einer Kreatur einen
+ * On-Summon-Effekt? Wortlaut: „When you summon/play this Creature …", „When this Creature is summoned/played …" (auch „… from your discard pile",
+ * „… via an effect", „… with the effect of X"). Ein technischer `onPlay`-/`beforeSummon`-Haken im Skript ohne solchen Text (Kosten, Zusatzaktion,
+ * Aktiv-Effekt, Surprise-Aktivierung) ist KEIN On-Summon-Effekt. Der Text ist die Quelle: `engine._getCardDB()[name].effect`.
+ */
+// ★ Welle 13 (Al, A1): Kreatur-Surprises („Activate this Surprise …") lösen den Blob nicht aus, AUSSER ihr Kartentext enthält
+// ausdrücklich einen On-Summon-/On-Place-Satz („When this Creature is summoned/placed, …"). Darum zählt auch „place/placed".
+const ON_SUMMON_TEXT = /\b(?:when|whenever)\b[^.:]*\b(?:you (?:summon|play|place) this (?:creature|card)|this (?:creature|card) (?:is|gets|was) (?:summoned|played|placed))/i;
+function hatOnSummonText(cd) {
+  return !!(cd && typeof cd.effect === 'string' && ON_SUMMON_TEXT.test(cd.effect.replace(/\s+/g, ' ')));
+}
+
+/**
+ * ★ Welle 49 (Al, 22.10.2026, Surprise Party): Kreaturen, die laut ihrem Kartentext „NUR unter bestimmten Voraussetzungen" beschworen/gespielt
+ * werden koennen (Foresta, Blue-Ice Dragon, Guardian Beasts, Spirits …), sind KEINE legalen Ziele eines Effekts, der „eine Creature findet und
+ * platziert" (Surprise Party). Zentrales Praedikat, textgetrieben (Quelle: `cd.effect`), damit neue Karten ohne Nachpflege mitlaufen:
+ *  - „(You) can only summon/play this Creature …", „… can only be summoned/played …" (Opfer, Held mit Ascension/Ausruestung, leere Ablage …)
+ *  - „cannot be summoned …" / „cannot summon|play this Creature …" (Ifrit, Sparkfly Queen, Elven Rider, Rebelliokai Oblivious Oni)
+ *  - Pflichtkosten ohne „may": „Sacrifice … to summon this Creature." (Egg of God), „… defeat it to play this card." (500 Piranhas),
+ *    „You must … to summon this Creature." (Pollution Piranha)
+ *  - reine Gegnerseiten-Karten: „Summon this card into a free Support Zone of a Hero your opponent controls." (Plant Golem, Elusive Hind)
+ * KEIN Treffer: Limits („You can only summon 1 "X" per turn"), Alternativ-Wege mit „may" („You may sacrifice … to summon this Creature as an
+ * additional Action"), Reaktions-Beschwoerungen („Immediately summon this Creature … when …"), Zusatzaktions-Klauseln — die Karte bleibt auch normal
+ * beschwoerbar. Zusaetzlich zaehlen die Skript-Vertraege `summonOnlyFromHand`, `summonOnlyViaOwnEffect`, `placesOnOpponentBoard`; ein Skript kann
+ * das Ergebnis mit `summonOnlyUnderCondition: true|false` ausdruecklich setzen.
+ * @param {object} cd Kartendaten · @param {string} [cardName] fuer die Skript-Flags (Standard `cd.name`)
+ */
+const NUR_UNTER_BEDINGUNG_TEXT = [
+  /\bcan only (?:summon|play|place) this (?:creature|card)\b/i,
+  /\bcan only be (?:summoned|played|placed)\b/i,
+  /\bcannot be (?:summoned|played|placed)\b/i,
+  /\bcannot (?:summon|play) this (?:creature|card)\b/i,
+  /(?:^|[.!?]\s+)(?:Sacrifice|Discard|Delete|Return|Send|Choose)\b[^.]*?\b(?:to|and) (?:summon|play) this (?:creature|card)\b/i,
+  /\bYou must\b[^.]*?\bto (?:summon|play) this (?:creature|card)\b/i,
+  /(?:^|[.!?]\s+)Summon this (?:card|creature) into (?:a|the|any) free Support Zone of (?:a|any) Hero your opponent controls/i,
+];
+function nurUnterBedingungBeschwoerbar(cd, cardName) {
+  if (!cd) return false;
+  let script = null;
+  try { script = require('./_loader').loadCardEffect(cardName || cd.name); } catch { /* ohne Loader nur der Text */ }
+  if (typeof script?.summonOnlyUnderCondition === 'boolean') return script.summonOnlyUnderCondition;
+  if (script?.summonOnlyFromHand || script?.summonOnlyViaOwnEffect || script?.placesOnOpponentBoard) return true;
+  const text = String(cd.effect || '').replace(/\s+/g, ' ');
+  return NUR_UNTER_BEDINGUNG_TEXT.some(r => r.test(text));
+}
+
+module.exports = { nurUnterBedingungBeschwoerbar, hatOnSummonText, canHeroSummon, eligibleSummonZones, heroActionLocked, sofortAusHandBeschwoeren, kopieFuerHeld, heroAgiert, heroAbgegeben, beschwoerStufeOk };

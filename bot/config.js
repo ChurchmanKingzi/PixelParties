@@ -48,6 +48,12 @@ const num = (k, d) => { const n = Number(env(k)); return Number.isFinite(n) && e
 const list = (k, d = []) => (env(k) ? env(k).split(',').map(s => s.trim()).filter(Boolean) : d);
 const flag = (k, d = false) => (env(k) === '' ? d : /^(1|true|yes|on)$/i.test(env(k)));
 
+// Kanal „new-cards“. Fest im Code; eine Variable NEW_CARDS_CHANNEL_ID in der .env wird ignoriert (und beim Start gemeldet, wenn sie abweicht).
+const NEW_CARDS_CHANNEL_ID = '774670375303905291';
+if (process.env.NEW_CARDS_CHANNEL_ID && process.env.NEW_CARDS_CHANNEL_ID !== NEW_CARDS_CHANNEL_ID) {
+  console.warn(`[config] NEW_CARDS_CHANNEL_ID=${process.env.NEW_CARDS_CHANNEL_ID} in der .env wird ignoriert — der Kanal für neue Karten ist fest ${NEW_CARDS_CHANNEL_ID}.`);
+}
+
 const config = {
   token: env('DISCORD_TOKEN'),
   clientId: env('DISCORD_CLIENT_ID', '765902004160692245'),
@@ -67,12 +73,16 @@ const config = {
   channels: {
     welcome: env('WELCOME_CHANNEL_ID'),          // leer: Systemkanal des Servers
     modlog: env('MODLOG_CHANNEL_ID'),
-    newCards: env('NEW_CARDS_CHANNEL_ID'),
+    // Neue Karten als Bilder: FEST eingetragen, bewusst NICHT per .env überschreibbar (ein alter oder falscher Eintrag NEW_CARDS_CHANNEL_ID in der .env hatte den Feed ins Leere geschickt).
+    newCards: NEW_CARDS_CHANNEL_ID,
     patchnotes: env('PATCHNOTES_CHANNEL_ID'),
     leaderboard: env('LEADERBOARD_CHANNEL_ID'),
     cardOfDay: env('CARD_OF_DAY_CHANNEL_ID'),
     bugs: env('BUG_CHANNEL_ID'),
-    mystery: env('MYSTERY_CHANNEL_ID', '1561796630762623036'),   // einziger Kanal für !mystery / !guess (ohne .env-Eintrag gilt dieser)
+    bugfixes: env('BUGFIXES_CHANNEL_ID', '1562197315437989889'),   // Bugfixes an Karten/Wechselwirkungen mit Kartenbildern (ohne .env-Eintrag gilt dieser)
+    // Kanal der Minispiele (!mystery, !guess, !pixle). Ohne .env-Eintrag gilt dieser; die ältere Variable MYSTERY_CHANNEL_ID bleibt als Rückfall gültig.
+    matchmaking: env('MATCHMAKING_CHANNEL_ID', '733828766794645504'),   // 💥-matchmaking: hier landen alle !duel-Herausforderungen (ohne .env-Eintrag gilt dieser)
+    minigames: env('MINIGAMES_CHANNEL_ID', env('MYSTERY_CHANNEL_ID', '1561796630762623036')),
   },
 
   // Moderation
@@ -98,6 +108,14 @@ const config = {
   // Mystery-Spiel (!mystery / !guess): unbegrenzt viele Rätsel, aber nur das erste neu erzeugte jeder vollen Stunde ist SC wert
   mysteryReward: num('MYSTERY_REWARD', 20),       // SC für den Gewinner …
   mysteryPenalty: num('MYSTERY_PENALTY', 2),      // … minus so viele je falschem Tipp, den er für diese Karte schon abgegeben hat
+
+  // Pixle (!pixle): tägliche geheime Karte, höchstens so viele Tipps je Person; SC nur für das Lösen (einmal pro Tag)
+  pixleMaxGuesses: num('PIXLE_MAX_GUESSES', 10),
+  pixleReward: num('PIXLE_REWARD', 30),            // SC fürs Lösen …
+  pixlePenalty: num('PIXLE_PENALTY', 3),           // … minus so viel je falschem Tipp davor (mindestens 3 SC)
+
+  // Bugfix-Feed: ab so vielen betroffenen Karten gilt ein gemeinsamer Baustein als „breit“ (dann nur Name und Anzahl, keine Bilder)
+  bugfixMaxShared: num('BUGFIX_MAX_SHARED', 12),
 
   // Feeds
   feedPollMinutes: num('FEED_POLL_MINUTES', 5),

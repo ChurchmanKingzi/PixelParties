@@ -9,6 +9,18 @@
 const { hasCardType } = require('./_hooks');
 
 module.exports = {
+  // W80a (Al 26.10.2026: "Ja"): die CPU-Heldenwahl rechnet die mitgetroffenen Kreaturen in den Support Zones des Helden in die Bilanz ein (`_cpu.js` `pickEnemyTargets`,
+  // `_kreaturen-bilanz.js` `heldKreaturenWirkung`: Wert der getroffenen gegnerischen minus eigener Kreaturen nach Level, HP, Rest-HP). Die Wahl `side: 'enemy'` laesst nur
+  // gegnerische Helden zu — eigene Treffer sind nur moeglich, wenn eine uebernommene eigene Kreatur in der Zone des gegnerischen Helden steht.
+  cpuMeta: { trifftKreaturenAmHelden: true },
+  // ★ Welle 12 (B-06, Al: „Eine Karte, deren Effekt komplett nutzlos wäre, ist nicht spielbar."): trifft NUR den Gegner — gegen den durch die
+  // Erste-Runden-Immunität geschützten Spieler unspielbar (Karte bleibt auf der Hand, keine Aktion/Kosten/Einmal-Stempel; `engine.ersterZugGeschuetzt`).
+  blockedByFirstTurnProtection: true,
+  // ★ Als Ruling (Al 26.10., Flame Avalanche: „Am besten gleich die Karten ganz sperren statt den Schaden fizzeln zu lassen"): die Karte richtet NUR Schaden an Zielen des Gegners an —
+  // unter der Schadenssperre (`ps.damageLocked`) unspielbar (Karte bleibt auf der Hand, keine Aktion/Kosten; Sperr-Stutzen `engine._cardBlockedBySearchLock`).
+  blockedByDamageLock: true,
+  requiresTarget: true,
+  // ^ W16f (M02-04): Blinded-Sperre (wie Quick Attack) - die Karte wählt Ziele ("Choose a target" / "Choose up to 2 Heroes").
   // ★★ v1182 — ENTKOPPELTE BILDER (CARD_API): wird die Karte NEGIERT,
   // laeuft ihr Effekt-Rumpf nie — die Engine spielt dann diese Bilder.
   // Im normalen Weg bleibt es bei den Broadcasts im Effekt selbst.
@@ -63,7 +75,7 @@ module.exports = {
       // Toras (and any hero with singleTargetAttack) restricts Attacks to 1 target total.
       // The engine already capped hero selection to 1, but Whirlwind's secondary creature
       // hits count as additional targets — skip them when the restriction is active.
-      const heroFlag = gs.heroFlags?.[`${ctx.cardHeroOwner ?? pi}-${heroIdx}`];   // Als Befund 29.9.: Brettseite des Angreifers
+      const heroFlag = ctx._engine.heroFlagsLive(ctx.cardHeroOwner ?? pi, heroIdx);   // Als Befund 29.9.: Brettseite des Angreifers
       const singleTargetOnly = !!heroFlag?.singleTargetAttack;
 
       const attackSource = { name: 'Whirlwind Strike', owner: pi, heroIdx, controller: pi, heroOwner: ctx.cardHeroOwner ?? pi, usesHeroAtk: true };   // Als Befund 29.9.: Brettseite des Angreifers
@@ -115,6 +127,15 @@ module.exports = {
         }
       }
 
+      // ★ W76a: die Kreaturen in den Support Zones der gewählten Helden sind TREFFER dieser Attack (der Toras-Deckel oben zählt sie ebenso als zusätzliche Ziele). Sie kommen deshalb ins
+      // Wurfprotokoll, damit „hits exactly 1 target"-Leser (Andras, Nieht, Reiza …) die wahre Zahl der Ziele sehen — Held MIT Kreaturen = mehrere Ziele, kein Zweitschlag-Angebot.
+      if (Array.isArray(gs._spellDamageLog)) {
+        for (const e of allCreatureEntries) {
+          const z = engine.kreaturZiel(e.inst);
+          if (!gs._spellDamageLog.some(t => t.id === z.id)) gs._spellDamageLog.push({ ...z });
+        }
+      }
+
       // Pre-damage post-target hand-reaction window — ONE consolidated
       // prompt per source covering selected Heroes + all Creatures
       // they're hitting. Built BEFORE damage flows so reactions
@@ -146,6 +167,7 @@ module.exports = {
       // roher Klammer — öffnet auch das Idol-Fenster für die Kreaturen.
       await engine.beginAoeStrike(heroDamageTargets.length + allCreatureEntries.length, {
         creatures: allCreatureEntries, source: attackSource, type: 'attack', sourceOwner: ctx.cardOwner,
+        heroes: heroDamageTargets.map(({ hero: h }) => ({ hero: h, amount: finalAtk })),   // W78 (Pythia): Helden, die dieser Schlag faellt, sind todgeweiht
       });
       try {
       // ── NACHEINANDER: je Held erst er selbst (Surprise-Fenster an GENAU diesem Treffer), dann ──

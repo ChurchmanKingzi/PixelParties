@@ -17,13 +17,19 @@
 //  no summoning. The Creature is picked up from
 //  one slot and dropped into a free adjacent one.
 //
+//  Als Ruling (Al 26.10.): „So viele wie möglich!" — der Effekt bewegt ALLE bewegbaren eigenen Kreaturen; nach der ersten Bewegung
+//  gibt es kein Abbrechen/Stoppen mehr (die Quellwahl ist dann nicht abbrechbar), er endet erst, wenn keine noch unbewegte Kreatur
+//  mehr ein freies Ziel hat. Die Reihenfolge und die Zielzone wählt der Spieler (eine Zielwahl darf zurück zur Quellwahl gehen).
+//  Die Zonensperre (Tri Fecta/Tri Ad, Bonded Companion) gilt: gesperrte Spalten sind kein Ziel (`destinationsFor`).
+//
 //  Flow, per activation:
 //    1. Loop:
 //       a. Collect every (creature → adjacent free
 //          zone) pair the controller currently has.
 //          If none, exit.
 //       b. Prompt "Pick a Creature to move" over
-//          every eligible source. Cancel stops.
+//          every eligible source. Cancel stops
+//          (nur VOR der ersten Bewegung).
 //       c. Prompt "Pick a destination" over that
 //          Creature's adjacent free zones. Cancel
 //          rewinds to the source prompt.
@@ -52,7 +58,7 @@
 
 const { ownSupportCreatures } = require('./_deepsea-shared');
 const { isAreaImmuneInst } = require('./_diver-helmet-shared');
-const { _runMctsSlipperyLoop } = require('./_slippery-shared');
+const { _runMctsSlipperyLoop, teilbarZiel } = require('./_slippery-shared');
 
 const CARD_NAME = 'Slippery Ice';
 
@@ -77,17 +83,32 @@ function destinationsFor(engine, pi, inst) {
   for (const hi of adjacentHeroIndices(inst.heroIdx)) {
     const hero = ps.heroes?.[hi];
     if (!hero?.name) continue;
+    // Zonensperre der Spalte (Tri Fecta/Tri Ad, Bonded Companion): dorthin darf nichts gelegt werden — sonst bietet Slippery Ice den Platz an und die Engine
+    // nimmt die Kreatur danach (`_enforceSupportZoneLock`) auf die Hand zurueck.
+    if (engine.isSupportZoneLocked?.(pi, hi, { source: CARD_NAME, cardName: inst.name, via: 'move', instId: inst.id })) continue;
     const zones = ps.supportZones?.[hi] || [[], [], []];
     for (let zi = 0; zi < 3; zi++) {
       if ((zones[zi] || []).length === 0) out.push({ heroIdx: hi, slotIdx: zi });
+      // ★ W63a (Al, 22.10.2026: „Solange der Effekt aktiv ist, kann eine Creature in eine geteilte Zone bewegt werden"): mit Alice-Teilung des Kontrolleurs auch die
+      // Zone einer GLEICHNAMIGEN Creature (die Creatures teilen sich die Zone).
+      else if (teilbarZiel(engine, inst, hi, zi)) out.push({ heroIdx: hi, slotIdx: zi, shared: true, stackDepth: zones[zi].length });
     }
   }
-  return out;
+  return out.some(z => z.shared) ? [...out.filter(z => z.shared), ...out.filter(z => !z.shared)] : out;   // Al: erst die geteilte Zone, DANN die erste leere
+}
+
+/**
+ * Z1 (A02-07): „Creatures they control" UND „adjacent Heroes they also control" — eine geliehene
+ * Kreatur (Succubus & Co.) steht in der Zone eines GEGNERISCHEN Helden; ihre Nachbarn gehoeren
+ * nicht dem Aktivierenden. Es zaehlen nur Kreaturen auf der eigenen BRETTSEITE.
+ */
+function beweglicheKreaturen(engine, pi) {
+  return ownSupportCreatures(engine, pi).filter(inst => engine.physicalSide(inst) === pi);
 }
 
 /** True when at least one own Creature has at least one legal destination. */
 function hasAnyLegalMove(engine, pi) {
-  for (const inst of ownSupportCreatures(engine, pi)) {
+  for (const inst of beweglicheKreaturen(engine, pi)) {
     // Diver Helmet: Creatures in the equipped Hero's Support Zones are
     // unaffected by Areas — Slippery Ice can't move them.
     if (isAreaImmuneInst(engine, inst)) continue;
@@ -110,6 +131,8 @@ async function moveCreature(engine, pi, inst, destHeroIdx, destSlot) {
   const srcZone = (ps.supportZones?.[srcHeroIdx] || [])[srcSlot] || [];
   const idxInSlot = srcZone.indexOf(inst.name);
   if (idxInSlot < 0) return false;
+  // W71b (Al, 25.10.2026): Verschieben durch eine Karte ist ein Effekt auf die Kreatur — Schutzfenster (Cool Rescuer Monia & Co.), VOR der ersten Änderung; negiert = Kreatur bleibt stehen.
+  if (!(await engine.kreaturBetroffen(inst, 'move', { name: 'Slippery Ice', owner: pi }, { sourceOwner: pi, detail: 'slide' }))) return false;
 
   // Suppress stray damage-number overlays on the source slot while it's
   // about to visually empty out.
@@ -208,7 +231,7 @@ module.exports = {
     if (engine.isCpuPlayer(activator)) {
       const collectIce = () => {
         const out = [];
-        for (const inst of ownSupportCreatures(engine, activator)) {
+        for (const inst of beweglicheKreaturen(engine, activator)) {
           if (movedInstIds.has(inst.id)) continue;
           if (isAreaImmuneInst(engine, inst)) continue;
           const dests = destinationsFor(engine, activator, inst);
@@ -222,7 +245,7 @@ module.exports = {
         // auto-slide has already locked in this turn's archetype
         // moves), so stamping `_slipperyMovedTurn` here is a no-op —
         // skip it for parity with the existing Slippery Ice mover.
-        moveOpts: { skipSlipperyMovedMark: true },
+        moveOpts: { skipSlipperyMovedMark: true, fremd: true, fremdName: CARD_NAME },   // W71b: Slippery Ice versetzt Kreaturen = Effekt auf sie (Schutzfenster)
         onLiveMove: (inst) => { movedInstIds.add(inst.id); moved++; },
       });
       if (moved === 0) return false;
@@ -232,7 +255,7 @@ module.exports = {
 
     while (true) {
       // Re-collect each iteration — previous moves change the board.
-      const candidates = ownSupportCreatures(engine, activator).filter(inst => {
+      const candidates = beweglicheKreaturen(engine, activator).filter(inst => {
         if (movedInstIds.has(inst.id)) return false;
         // Diver Helmet: protected Creatures are unaffected by Areas.
         if (isAreaImmuneInst(engine, inst)) return false;
@@ -251,9 +274,11 @@ module.exports = {
       const src = await promptCtx.promptZonePick(sourceZones, {
         title: CARD_NAME,
         description: moved > 0
-          ? `Pick another Creature to move, or cancel to stop (${moved} moved so far).`
+          ? `Pick another Creature to move — as many as possible (${moved} moved so far).`
           : 'Pick a Creature to move onto an adjacent Hero.',
-        cancellable: true,
+        // Als Ruling (Al 26.10.): „So viele wie möglich!" — vor der ersten Bewegung ist die Aktivierung abbrechbar (nichts passiert, Einmal-Sperre frei);
+        // danach NICHT mehr: der Effekt bewegt alle Kreaturen, die sich noch bewegen lassen (kein Stoppen nach jeder Bewegung).
+        cancellable: moved === 0,
         // Es wird eine KARTE gewaehlt, nicht ein Platz: ein Klick auf den Helden
         // darf nicht stillschweigend dessen linkeste waehlen (s. promptZonePick).
         heroShortcut: false,
@@ -269,7 +294,8 @@ module.exports = {
         const hero = ps.heroes?.[z.heroIdx];
         return {
           heroIdx: z.heroIdx, slotIdx: z.slotIdx,
-          label: `${hero?.name || 'Hero'} — Slot ${z.slotIdx + 1}`,
+          label: `${hero?.name || 'Hero'} — Slot ${z.slotIdx + 1}${z.shared ? ` (×${z.stackDepth})` : ''}`,
+          ...(z.shared ? { shared: true, stackDepth: z.stackDepth } : {}),
         };
       });
       if (destZones.length === 0) {
@@ -296,7 +322,7 @@ module.exports = {
           || stillThere.zoneSlot !== chosenInst.zoneSlot) {
         continue;
       }
-      if (((ps.supportZones[dst.heroIdx] || [])[dst.slotIdx] || []).length > 0) continue;
+      if (((ps.supportZones[dst.heroIdx] || [])[dst.slotIdx] || []).length > 0 && !teilbarZiel(engine, stillThere, dst.heroIdx, dst.slotIdx)) continue;   // W63a: belegt nur ok, wenn geteilt (Alice)
 
       const ok = await moveCreature(engine, activator, stillThere, dst.heroIdx, dst.slotIdx);
       if (ok) {

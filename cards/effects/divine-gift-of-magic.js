@@ -21,10 +21,19 @@
 //  card greys out instead of activating into a
 //  no-op.
 //
-//  Storage: a per-turn `_magicLevelReductions`
-//  array on the player state. The engine's generic
-//  `_applyCardLevelReductions` reads this list and
-//  the turn-start cleanup clears it.
+//  Storage (Al 16.10.2026, Welle 14, Q165: „Nur die
+//  eine Kopie"): die Senkung gilt NUR fuer die eine
+//  offenbarte Kopie, nicht namensweit. Sie steht als
+//  Handindex-Rabatt `ps._handLevelOffsetsTransient`
+//  (wandert bei Hand-Splices mit der Kopie, faellt
+//  weg, sobald sie die Hand verlaesst) plus
+//  Verfallsstempel `_handLevelOffsetsExpireTurn`,
+//  den der Zugbeginn abraeumt = „until the end of this
+//  turn" (Muster Fiona, the Empty Vessel).
+//  ★ Welle 15 (Al, C2: „Der Rabatt soll exakt die geklickte/
+//  ausgewaehlte Karte treffen"): der Rabatt gilt NUR, wenn genau
+//  diese Kopie gespielt wird; eine andere Kopie gleichen Namens
+//  bekommt keinen (Stufenpruefung je Handindex, `_kopieNurIndex`).
 //
 //  Animation: a screen-wide arcane burst —
 //  concentric shockwaves, a rotating star glyph,
@@ -117,11 +126,19 @@ module.exports = {
 
       // Reveal to opponent.
       engine._broadcastEvent('card_reveal', { cardName: chosenName, playerIdx: pi });
+      await engine.aufdeckEreignis(pi, [chosenName], { zone: 'hand', source: CARD_NAME });   // W85c (Atta, Al 29.10.): aufgedeckt = EIN Ereignis, sofort (in Textreihenfolge); ein Zuhörer (Atta) darf die Karte löschen
       await engine._delay(400);
 
-      // Stash the per-turn reduction. Cleared at turn start by the engine.
-      if (!ps._magicLevelReductions) ps._magicLevelReductions = [];
-      ps._magicLevelReductions.push({ cardName: chosenName, amount: 3 });
+      // Welle 14 (Q165, Al): Rabatt nur fuer die EINE offenbarte Kopie (Handindex),
+      // nicht namensweit. Fehlt der Index (Altclient), bleibt die erste Kopie des Namens.
+      let handIdx = Number.isInteger(handPick.handIndex) ? handPick.handIndex : -1;
+      if (handIdx < 0 || ps.hand[handIdx] !== chosenName) handIdx = ps.hand.indexOf(chosenName);
+      if (handIdx >= 0) {
+        if (!ps._handLevelOffsetsTransient) ps._handLevelOffsetsTransient = {};
+        if (!ps._handLevelOffsetsExpireTurn) ps._handLevelOffsetsExpireTurn = {};
+        ps._handLevelOffsetsTransient[handIdx] = Math.min(ps._handLevelOffsetsTransient[handIdx] || 0, -3);
+        ps._handLevelOffsetsExpireTurn[handIdx] = gs.turn;
+      }
 
       engine.log('divine_gift_magic', {
         player: ps.username,

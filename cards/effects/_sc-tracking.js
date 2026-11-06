@@ -63,7 +63,42 @@ function neu() {
     gegnerTodeNachErstem: 0,  //   … danach gefallene gegnerische Helden (jede Ursache)
     schadenGesamt: 0,         // Went Down Swinging — aller verursachte Schaden
     mitgenommen: false,       // Took One With Me — Gegnerheld fiel, während man selbst nur 1 hatte
+    // ── Card of the Day! ──
+    cardsUsed: [],            // Namen aller Karten, die dieser Spieler benutzt hat (Array statt Set — Snapshot/JSON-sicher)
   };
+}
+
+/**
+ * Card of the Day!: diese Karte gilt als „benutzt". Gezählt wird, was auf dem Brett liegt oder gespielt wird — von der Hand,
+ * aus dem Deck oder der Ablage, per Effekt, als Held oder Fähigkeit zu Spielbeginn, als Aszendierung. Nicht gezählt: bloß
+ * gezogen, abgeworfen oder aus dem Deck gemillt.
+ */
+function kartenName(t, name) {
+  if (!t || typeof name !== 'string' || !name) return;
+  if (!Array.isArray(t.cardsUsed)) t.cardsUsed = [];
+  if (!t.cardsUsed.includes(name)) t.cardsUsed.push(name);
+}
+
+/** Kartenname einer Instanz — Wirkungs-Überschreibungen (Kopien) zählen unter dem Namen, den die Instanz trägt. */
+function kartenInstanz(tracking, inst) {
+  if (!inst) return;
+  const wer = inst.controller ?? inst.owner;
+  if (wer === 0 || wer === 1) kartenName(tracking?.[wer], inst.name);
+}
+
+/** Spielbeginn: Helden und Fähigkeiten, mit denen man startet. */
+function startKarten(tracking, players) {
+  for (let pi = 0; pi < 2; pi++) {
+    const t = tracking?.[pi];
+    const ps = players?.[pi];
+    if (!t || !ps) continue;
+    for (const h of (ps.heroes || [])) kartenName(t, h?.name);
+    // Was beim Start schon auf dem Brett liegt (im normalen Spiel nur Helden und Fähigkeiten; Puzzles/Skill Test haben mehr).
+    for (const zonen of (ps.supportZones || [])) for (const stapel of (zonen || [])) for (const n of (Array.isArray(stapel) ? stapel : [stapel])) kartenName(t, n);
+    for (const zonen of (ps.abilityZones || [])) {
+      for (const stapel of (zonen || [])) for (const n of (stapel || [])) kartenName(t, n);
+    }
+  }
 }
 
 /** Spielbeginn: HP-Summe (Overhealed) und Heldennamen (Mirror Match). */
@@ -266,6 +301,16 @@ function beiHook(tracking, hookName, ctx, env = {}) {
   if (!tracking || !ctx) return;
   const cardDB = env.cardDB;
   switch (hookName) {
+    case 'onPlay':
+      // Jeder Spielweg (Hand, Deck, Ablage, Effekt, Fähigkeit) meldet sich hier — auch Karten ganz ohne eigenes Skript.
+      kartenInstanz(tracking, ctx.playedCard);
+      return;
+    case 'onCardEnterZone': {
+      // Betritt eine Karte das Brett (Held, Fähigkeit, Support/Creature, Area), gilt sie als benutzt. Hand/Deck/Ablage nicht.
+      const zone = ctx.toZone;
+      if (zone === 'hero' || zone === 'ability' || zone === 'support' || zone === 'area' || zone === 'surprise') kartenInstanz(tracking, ctx.enteringCard);
+      return;
+    }
     case 'onAnyActionResolved':
       aktion(tracking, ctx, env);
       return;
@@ -286,6 +331,7 @@ function beiHook(tracking, hookName, ctx, env = {}) {
       // Scholar: nur Karten vom Typ Spell (Attacks laufen durch denselben
       // Hook). Double Spells decken beide Schulen ab.
       const t = tracking[ctx.casterIdx];
+      if (t) kartenName(t, ctx.spellName);   // Card of the Day!: auch ein per Effekt gewirkter Spell/Attack
       const cd = ctx.spellCardData || cardDB?.[ctx.spellName];
       if (!t || !hasCardType(cd, 'Spell')) return;
       if (!Array.isArray(t.spellSchools)) t.spellSchools = [];
@@ -305,6 +351,7 @@ function beiHook(tracking, hookName, ctx, env = {}) {
       // Feuert nur für aufgelöste (nicht negierte) Tränke.
       const t = tracking[ctx.potionOwner];
       if (t) t.potionsUsed = (t.potionsUsed || 0) + 1;
+      if (t) kartenName(t, ctx.potionName);   // Card of the Day!
       return;
     }
     case 'onCreatureDeath': {
@@ -368,6 +415,6 @@ function heldVerlor(tracking, owner, hero, amount, heroes, opts = {}) {
 }
 
 /** Hook-Namen, die `beiHook` auswertet — Vorfilter für `runHooks`. */
-const HOOKS_MIT_ZAEHLER = new Set(['onAnyActionResolved', 'onHeroRevive', 'afterResourceSpend', 'afterSpellResolved', 'onSurpriseActivated', 'afterPotionUsed', 'onCreatureDeath']);
+const HOOKS_MIT_ZAEHLER = new Set(['onPlay', 'onCardEnterZone', 'onAnyActionResolved', 'onHeroRevive', 'afterResourceSpend', 'afterSpellResolved', 'onSurpriseActivated', 'afterPotionUsed', 'onCreatureDeath']);
 
-module.exports = { HOOKS_MIT_ZAEHLER, heldTod, fastBesiegtPruefen, neu, startHp, zustand, plagenAnHeld, ablageBeschwoerung, hpSumme, schaden, aktion, zusatzaktion, treffer, heldVerlor, heldBesiegt, heilung, kette, beiHook, taeterVon };
+module.exports = { kartenName, kartenInstanz, startKarten, HOOKS_MIT_ZAEHLER, heldTod, fastBesiegtPruefen, neu, startHp, zustand, plagenAnHeld, ablageBeschwoerung, hpSumme, schaden, aktion, zusatzaktion, treffer, heldVerlor, heldBesiegt, heilung, kette, beiHook, taeterVon };

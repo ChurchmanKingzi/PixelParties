@@ -30,7 +30,13 @@ function heroHasSpellSchoolAbility(ps, heroIdx) {
   return false;
 }
 
-function getDeadOwnedTargetsNoSchool(gs, pi) {
+// W28a (Al, 21.10.2026: „'you control' = aktuelle Kontrolle, nicht Besitzer"): „a defeated Hero you control" = `engine.getControlledHeroTargets(pi, { defeated: true })`
+// (ein besiegter, an den Gegner abgegebener Held nein; ein besiegter uebernommener Gegnerheld ja; `owner` = Brettseite, dort liegen seine Ability Zones).
+function getDeadOwnedTargetsNoSchool(gs, pi, engine) {
+  if (engine) {
+    return engine.getControlledHeroTargets(pi, { defeated: true })
+      .filter(t => !heroHasSpellSchoolAbility(gs.players[t.owner], t.heroIdx));
+  }
   const ps = gs.players[pi];
   const targets = [];
   for (let hi = 0; hi < (ps?.heroes || []).length; hi++) {
@@ -96,7 +102,7 @@ module.exports = {
   cpuMeta: { reviveCard: true },
 
   spellPlayCondition(gs, pi, engine) {
-    if (getDeadOwnedTargetsNoSchool(gs, pi).length === 0) return false;
+    if (getDeadOwnedTargetsNoSchool(gs, pi, engine).length === 0) return false;
     return buildAnyTargetList(engine).length > 0;
   },
 
@@ -109,7 +115,7 @@ module.exports = {
       if (!ps) return;
 
       // Step 1: pick own dead hero with no Spell School abilities.
-      const reviveTargets = getDeadOwnedTargetsNoSchool(gs, pi);
+      const reviveTargets = getDeadOwnedTargetsNoSchool(gs, pi, engine);
       if (reviveTargets.length === 0) {
         gs._spellCancelled = true;
         return;
@@ -144,7 +150,7 @@ module.exports = {
         description: 'Choose any target on the board. Its HP will be halved (rounded up), and your Hero revives with the leftover HP.',
         confirmLabel: '⚖️ Halve!',
         confirmClass: 'btn-info',
-        cancellable: false,
+        cancellable: true,   // W16g (S01-25): noch nichts verbraucht (Halbieren/Wiederbeleben folgt erst) -> abbrechbar
         exclusiveTypes: true,
         maxPerType: { hero: 1, equip: 1 },
         maxTotal: 1,
@@ -213,7 +219,10 @@ module.exports = {
           type: 'gold_sparkle', owner: secondT.owner, heroIdx: secondT.heroIdx, zoneSlot: secondT.slotIdx,
         });
         await engine._delay(500);
-        inst.counters.currentHp = leftover;
+        // W71b (Al, 25.10.2026): das Halbieren ist ein Effekt auf die Kreatur — Schutzfenster (Cool Rescuer Monia & Co.) VOR dem Schreiben. Negiert: die Kreatur behält ihre HP, die
+        // „HP, die das Ziel übrig hat" sind dann ihre aktuellen HP; die Wiederbelebung des Helden (kein Effekt auf eine Kreatur) läuft weiter.
+        if (await engine.kreaturBetroffen(inst, 'stats', { name: 'Divine Gift of Equality', owner: pi }, { sourceOwner: pi, detail: 'halve_hp' })) inst.counters.currentHp = leftover;
+        else leftover = currentHp;
       }
 
       engine.log('divine_gift_equality_halve', {
@@ -226,7 +235,7 @@ module.exports = {
       // future increases to that ceiling — matches the Resuscitation /
       // Death pattern. The revive HP is also leftover.
       if (leftover > 0) {
-        await engine.actionReviveHero(pi, reviveT.heroIdx, leftover, {
+        await engine.actionReviveHero(reviveT.owner ?? pi, reviveT.heroIdx, leftover, {
           maxHpCap: leftover,
           source: 'Divine Gift of Equality',
         });

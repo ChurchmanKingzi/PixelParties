@@ -97,6 +97,13 @@ module.exports = companion({
     onSacrificeBatch: async (ctx) => {
       await schlagAnbieten(ctx, ctx.playerIdx);
     },
+    // Welle 11 (Al, Q61: „Auch Heroes"): auch das Opfer eines HELDEN (Teocuilatl, Divine Gift of Sacrifice, Pharaoh, Foresta-Kosten) ist
+    // „sacrifice a target" — Hook `onHeroSacrificed` (engine.actionDefeatHero, nach dem Todesablauf). Opferer = `source.owner`.
+    onHeroSacrificed: async (ctx) => {
+      const inst = ctx.card;
+      if (!inst || inst.zone !== 'support') return;   // war der Companion-Held selbst das Opfer, ging Thuly mit
+      await schlagAnbieten(ctx, ctx.source?.owner ?? ctx.source?.controller);
+    },
     onCreatureSacrificed: async (ctx) => {
       if (ctx._inSacrificeBatch) return;              // Batch hat schon gefragt
       const ausloeser = ctx.source?.owner

@@ -84,6 +84,9 @@ function kandidaten(engine, pi) {
     if (eigene.has(basis)) continue;                       // „different name"
     if (schon?.has(basis)) continue;                       // einmal je Partie
     if (!hatEffekt(hero.name)) continue;
+    // W16g (S01-17): Erste-Runden-Immunitaet — „Choose a Hero your opponent controls“ waehlt aus; geschuetzte Helden sind kein Ziel
+    // (wie Compulsory Body Swap). Ohne waehlbaren Held ist die Karte nicht spielbar.
+    if (engine.ersterZugGeschuetzt(physOwner, pi)) continue;
     out.push({ id: `hero-${physOwner}-${hi}`, type: 'hero', owner: physOwner, heroIdx: hi, cardName: hero.name });
   }
   return out;
@@ -137,8 +140,10 @@ module.exports = {
       const ziele = kandidaten(engine, pi);
       if (ziele.length === 0) { gs._spellCancelled = true; return false; }
 
+      // W16g (S01-17): auch EIN Kandidat geht durch `promptEffectTarget` — die Abkuerzung „einziger Kandidat wird automatisch
+      // gewaehlt“ umging die zentralen Zielschutz-Pruefungen (Erstrunden-Gate, Wahlschutz, „is chosen“-Fenster).
       let ziel = ziele[0];
-      if (ziele.length > 1) {
+      if (ziele.length >= 1) {
         const pick = await engine.promptEffectTarget(pi, ziele, {
           title: CARD_NAME,
           description: `${user.name} permanently gains the chosen Hero's effects in addition to its own.`,

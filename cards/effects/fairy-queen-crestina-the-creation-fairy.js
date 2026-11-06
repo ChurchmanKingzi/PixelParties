@@ -36,7 +36,7 @@
 const { loadCardEffect } = require('./_loader');
 
 // v875: Namensvergleiche ueber den BASISNAMEN (siehe CARD_API).
-const { baseCardName } = require('./_hooks');
+const { baseCardName, hasCardType } = require('./_hooks');
 const CARD_NAME = 'Fairy Queen Crestina, the Creation Fairy';
 const PICKS = 3;
 
@@ -98,6 +98,7 @@ module.exports = {
         if (name === CARD_NAME) continue;
         if (locked.has(baseCardName(name))) continue;
         if (!loadCardEffect(name)) continue;
+        if (hasCardType(cardDB[name], 'Token')) continue;   // Z5 (H02-18): Tokens sind keine Karten, nie auf der Hand
         candidates.push(name);
       }
       if (candidates.length < PICKS) return;

@@ -21,6 +21,9 @@ const CARD_NAME = 'Potion of Greed';
 
 module.exports = {
   isPotion: true,
+  // D1 (Regel von Al): Zug + Nachteil (Aktionsphase ueberspringen) - der Zug ist der ganze Nutzen; unter der Zieh-Sperre
+  // (drawLocked) nicht spielbar (unter handLocked prueft `canActivate` unten schon).
+  blockedByDrawLock: true,
 
   // No targeting — Potion of Greed always resolves on activation.
   // Main Phase 1 ONLY (PHASES.MAIN1 === 2): the Action-Phase skip is
@@ -37,6 +40,10 @@ module.exports = {
     const ps = gs.players[pi];
     if (!ps) return false;
     if (ps.handLocked) return false;
+    // N5-07: Potion-Deck-Zieh-Verbot (Chaos-Diamond/Pinta: "never draw from the Potion Deck") - dann bliebe nur der Nachteil (wie Potion Juggler).
+    if (ps.potionDrawBanned) return false;
+    // W26a (Al, Welle 26): auch bei LEEREM Potion Deck nicht spielbar (nichts zu ziehen = nur der Nachteil, Konvention D1). Mit mindestens 1 Karte spielbar (zieht, was da ist).
+    if (engine?.deckLeer?.(pi, 'potion')) return false;
     if (gs.currentPhase !== 2) return false;
     return true;
   },

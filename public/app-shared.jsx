@@ -29,7 +29,7 @@ function ppZustandVeraltet(state) {
   if (state.stateSeq < _ppLetzteSeq.n) {
     if (window.PP_ZONE_WATCH) {
       console.log('%c[ZUSTAND] veraltet verworfen: #' + state.stateSeq
-        + ' (aktuell #' + _ppLetzteSeq.n + ')', 'color:#fff;background:#7a5c00;padding:2px 6px');
+        + ' (aktuell #' + _ppLetzteSeq.n + ')', 'color:#fff;background:#8b5b04;padding:2px 6px');
     }
     return true;
   }
@@ -42,6 +42,27 @@ window.ppZustandVeraltet = ppZustandVeraltet;
    PIXEL PARTIES TCG — Frontend Application
    ============================================================ */
 const { useState, useEffect, useLayoutEffect, useRef, useCallback, useMemo, createContext, useContext } = React;
+
+// ★ BILDSCHIRMTASTATUR NICHT VON SELBST AUFKLAPPEN (Als Befund 2.11.: „bei einem Mobile-Nutzer war die On-Screen-Tastatur angesprungen"): auf Touch-Geräten
+// (`pointer: coarse`) klappt jedes PROGRAMMATISCHE `focus()` auf ein Texteingabefeld die Tastatur auf — `autoFocus` (Such-/Filterfelder, Auth, Puzzle-Dialoge …)
+// ebenso wie `ref.current.focus()`. Antippen eines Felds fokussiert nativ und ist davon nicht betroffen. Hier wird das programmatische Fokussieren von Text-
+// feldern unterdrückt, AUSSER das Feld trägt `data-pp-tastatur="an"` (Eingaben, die der Nutzer gerade ausdrücklich gewollt hat: Umbenennen, Texteingabe-Dialog,
+// Chat-Nachricht). Mit Maus (Desktop, auch Touch-Notebooks mit Maus) ändert sich nichts.
+(function () {
+  try {
+    if (!window.matchMedia || !window.matchMedia('(pointer: coarse)').matches) return;
+    const TEXT = new Set(['text', 'search', 'email', 'password', 'number', 'tel', 'url', '']);
+    const bremsen = (Klasse) => {
+      const orig = Klasse.prototype.focus;
+      Klasse.prototype.focus = function () {
+        const art = this instanceof HTMLTextAreaElement ? '' : (this.getAttribute('type') || 'text').toLowerCase();
+        if (TEXT.has(art) && !(this.dataset && this.dataset.ppTastatur === 'an')) return;   // Tastatur bleibt zu
+        return orig.apply(this, arguments);
+      };
+    };
+    bremsen(HTMLInputElement); bremsen(HTMLTextAreaElement);
+  } catch (e) { /* ohne Bremse: altes Verhalten */ }
+})();
 
 // ===== TOUCH DETECTION =====
 window._isTouchDevice = false;
@@ -69,34 +90,56 @@ window.addEventListener('touchstart', function onFirstTouch() {
 // Geste), scharft sich der Griff nach 1,5 s wieder: die naechste
 // Beruehrung holt es zurueck. Das ist das uebliche Verhalten von
 // Browserspielen im Querformat.
-function _ppRequestFullscreen() {
+// Ergebnis: Promise<{ fs, locked }> — fs: Vollbild aktiv, locked: Querformat gesperrt (Android/Chrome). Gleichzeitige Aufrufe
+// (globaler Tipp-Griff + Klick auf dem Dreh-Bildschirm) teilen sich dieselbe Anfrage.
+let _ppFsPending = null;
+function _ppLockSupported() { try { return !!(screen.orientation && typeof screen.orientation.lock === 'function'); } catch { return false; } }
+function _ppRequestFullscreen(force) {
   const el = document.documentElement;
-  if (document.fullscreenElement || !el.requestFullscreen) return;
-  if (window.innerWidth <= window.innerHeight) return;
+  const req = el.requestFullscreen || el.webkitRequestFullscreen;
+  const isFs = () => !!(document.fullscreenElement || document.webkitFullscreenElement);
+  if (_ppFsPending) return _ppFsPending;
+  if (isFs() || !req) return Promise.resolve({ fs: isFs(), locked: false });
+  if (!force && window.innerWidth <= window.innerHeight) return Promise.resolve({ fs: false, locked: false });   // nur im Querformat (force: Antippen auf dem Hochformat-Bildschirm)
+  const lock = () => {
+    try { return screen.orientation.lock('landscape').then(() => true, () => false); } catch { return Promise.resolve(false); }
+  };
   try {
-    const p = el.requestFullscreen({ navigationUI: 'hide' });
-    if (p && p.then) p.then(() => {
-      try {
-        const o = screen.orientation;
-        if (o && o.lock) o.lock('landscape').catch(() => {});
-      } catch {}
-    }).catch(() => {});
-  } catch {}
+    const r = req.call(el, { navigationUI: 'hide' });
+    window._ppFsLast = null;
+    _ppFsPending = Promise.resolve(r).then(() => lock()).then(
+      locked => { window._ppFsLast = { fs: isFs(), locked, err: locked ? null : 'orientation.lock refused' }; return { fs: isFs(), locked }; },
+      err => { window._ppFsLast = { fs: false, locked: false, err: (err && (err.name || err.message)) || 'rejected' }; return { fs: false, locked: false }; });
+  } catch { return Promise.resolve({ fs: false, locked: false }); }
+  _ppFsPending.then(() => { _ppFsPending = null; });
+  return _ppFsPending;
 }
 window._ppRequestFullscreen = _ppRequestFullscreen;
-function _ppArmFullscreenOnTouch() {
-  window.addEventListener('touchend', function onTouch() {
-    window._isTouchDevice = true;
-    window.removeEventListener('touchend', onTouch);
-    _ppRequestFullscreen();
-  }, { passive: true });
+window._ppFullscreenSupported = !!(document.documentElement.requestFullscreen || document.documentElement.webkitRequestFullscreen);
+window._ppLandscapeLockSupported = _ppLockSupported();
+// Ausloeser ist `click`, NICHT touchend/pointerup: nur `click` (und tastatur/maus) gilt auf Android-Browsern zuverlaessig als
+// Nutzeraktivierung fuer requestFullscreen — der Knopf-Klick des Vorgaengers (React onClick) hat auf dem Samsung-Handy Vollbild
+// + Querformat geschafft, der Griff auf touchend/pointerup dagegen nicht.
+// Jedes Antippen holt das Vollbild, solange es nicht aktiv ist — im Querformat direkt, im Hochformat samt
+// Querformat-Sperre (das Geraet dreht sich dann von selbst; nur wo `screen.orientation.lock` existiert). Dauerhaft angehaengt:
+// frueher war der Griff einmalig — eine erste Beruehrung im Hochformat verbrauchte ihn, danach kam das Vollbild nie
+// mehr von allein. Nach einem Verlassen (Zurueck-Geste) ruht er 1,5 s.
+let _ppFsCooldownUntil = 0;
+function _ppFullscreenOnTap(e) {
+  if (!window.matchMedia || !window.matchMedia('(pointer: coarse)').matches) return;   // Touch-Notebooks/Maus: kein Zwangs-Vollbild
+  window._isTouchDevice = true;
+  if (e.target && e.target.closest && e.target.closest('.rotate-panel-pc')) return;   // Link kopieren / Discord auf dem Hochformat-Bildschirm
+  if (Date.now() < _ppFsCooldownUntil) return;
+  const portrait = window.innerWidth <= window.innerHeight;
+  if (portrait && !(window._ppFullscreenSupported && window._ppLandscapeLockSupported)) return;   // ohne Sperre hilft Vollbild im Hochformat nicht
+  _ppRequestFullscreen(portrait);
 }
-_ppArmFullscreenOnTouch();
-document.addEventListener('fullscreenchange', () => {
-  if (!document.fullscreenElement && window._isTouchDevice) setTimeout(_ppArmFullscreenOnTouch, 1500);
-});
+window.addEventListener('click', _ppFullscreenOnTap, { capture: true });
+const _ppOnFullscreenChange = () => { if (!document.fullscreenElement && !document.webkitFullscreenElement) _ppFsCooldownUntil = Date.now() + 1500; };
+document.addEventListener('fullscreenchange', _ppOnFullscreenChange);
+document.addEventListener('webkitfullscreenchange', _ppOnFullscreenChange);
 
-// Re-request fullscreen when rotating to landscape (if previously granted)
+// Beim Drehen ins Querformat gleich versuchen (klappt, solange die letzte Beruehrung noch zaehlt)
 window.addEventListener('orientationchange', () => {
   if (!window._isTouchDevice) return;
   setTimeout(_ppRequestFullscreen, 300);
@@ -118,14 +161,39 @@ function setTapTooltip(cardName) {
 }
 function clearTapTooltip() { setTapTooltip(null); }
 
-// Dismiss tooltip on any touch end (after long-press)
+// Zeitpunkt der letzten Beruehrung: ein Tooltip, der kurz danach erscheint (auch ueber die nachgeschobenen Maus-Ereignisse eines Tipps), gilt als
+// per Touch geoeffnet und bleibt (`_ppTipTouch`) — Maus-Verlassen-Ereignisse und der Sicherheits-Takt raeumen ihn dann nicht mehr ab.
+document.addEventListener('touchstart', () => { window._ppTouchAt = performance.now(); }, { capture: true, passive: true });
+document.addEventListener('touchend', () => { window._ppTouchAt = performance.now(); }, { capture: true, passive: true });
+// Tooltip schliessen, auch wenn er per Touch festgehalten wird.
+window._ppTipSchliessen = () => {
+  window._ppTipTouch = false;
+  window._ppTipForce = true;
+  try { if (window._boardTooltipSetter) window._boardTooltipSetter(null); } finally { window._ppTipForce = false; }
+};
+// Tipp-Waechter: ein TIPP (kaum Bewegung) auf eine Stelle, die weder Karte noch Tooltip ist, schliesst den festgehaltenen Tooltip.
+(function () {
+  const BEHALTEN = '.board-tooltip, .board-card, .card-mini, .hand-slot, .hand-card, .status-badge, .buff-icon, .card-reveal-entry, [data-card-name]';
+  let d = null;
+  document.addEventListener('touchstart', (e) => {
+    const t = e.touches && e.touches[0];
+    d = (t && e.touches.length === 1) ? { x: t.clientX, y: t.clientY, aussen: !(e.target && e.target.closest && e.target.closest(BEHALTEN)) } : null;
+  }, { capture: true, passive: true });
+  document.addEventListener('touchmove', (e) => {
+    const t = e.touches && e.touches[0];
+    if (d && t && Math.abs(t.clientX - d.x) + Math.abs(t.clientY - d.y) > 12) d = null;
+  }, { capture: true, passive: true });
+  document.addEventListener('touchend', () => {
+    const s0 = d; d = null;
+    if (s0 && s0.aussen && window._ppTipTouch) window._ppTipSchliessen();
+  }, { capture: true, passive: true });
+})();
+
+// ★ Mobil: Der Karten-Tooltip BLEIBT nach dem Loslassen stehen (sonst laesst sich ein langer Tooltip nie scrollen) und verschwindet erst, wenn man
+// ins Leere tippt (siehe `_ppTipSchliessen` / der Tipp-Waechter unten). Frueher raeumte das Loslassen nach einem Langdruck ihn nach 50 ms weg.
 document.addEventListener('touchend', () => {
   clearTimeout(window._longPressTimer);
-  if (window._longPressFired) {
-    // Small delay so the tooltip is visible before dismissing
-    setTimeout(clearTapTooltip, 50);
-    window._longPressFired = false;
-  }
+  window._longPressFired = false;
 }, { passive: true });
 document.addEventListener('touchmove', () => {
   // Cancel long-press if finger moves
@@ -225,6 +293,9 @@ const PP_BAYER4 = [[0, 8, 2, 10], [12, 4, 14, 6], [3, 11, 1, 9], [15, 7, 13, 5]]
 function ppBayer(x, y) { return (PP_BAYER4[y & 3][x & 3] + 0.5) / 16; }
 window.ppBayer = ppBayer;   // Pixelart-Animationen in app-board.jsx (ppSalve) dithern damit
 
+/** ★ W86z: laeuft die Pixelart-Bewegungs-Pipeline (public/pixel-anim.js)? Im Retro-Modus nicht — dort bleibt alles wie es war. */
+const ppPixelAnimAktiv = () => !!(window.PPPixelAnim && window.PPPixelAnim.KONFIG && window.PPPixelAnim.KONFIG.aktiv);
+
 const _ppPxCache = new Map();
 const PP_PX_CACHE_MAX = 800;
 /**
@@ -260,6 +331,13 @@ function ppPxBild(key, w, h, male, faktor = 4) {
       d[i + 2] = mix(f[2] | 0, d[i + 2]);
       d[i + 3] = Math.round(oa * 255);
     });
+    // ★ W86z: Pixelart-Abschluss — Alpha dazwischen wird Bayer-Dither (deckend oder leer), jede Farbe rastet auf die 256er-Palette ein.
+    if (ppPixelAnimAktiv()) for (let i = 0, p = 0; i < d.length; i += 4, p++) {
+      const a = d[i + 3];
+      if (!a) continue;
+      if (a < 255) { if (a / 255 > ppBayer(p % w, (p / w) | 0)) d[i + 3] = 255; else { d[i + 3] = 0; continue; } }
+      if (window.ppSnapRgb) { const q = window.ppSnapRgb(d[i], d[i + 1], d[i + 2]); d[i] = q[0]; d[i + 1] = q[1]; d[i + 2] = q[2]; }
+    }
     kctx.putImageData(bild, 0, 0);
     const c = document.createElement('canvas');
     c.width = w * faktor; c.height = h * faktor;
@@ -267,6 +345,8 @@ function ppPxBild(key, w, h, male, faktor = 4) {
     ctx.imageSmoothingEnabled = false;
     ctx.drawImage(klein, 0, 0, c.width, c.height);
     url = c.toDataURL('image/png');
+    // Das kleine Kunstpixel-Bild merken: `PPPixelAnim.drehen` samplet gedrehte Sprites daraus (kein Dekodieren der data-URL).
+    if (url && ppPixelAnimAktiv()) window.PPPixelAnim.bildRegistrieren(url, klein);
   } catch { url = ''; }
   if (_ppPxCache.size >= PP_PX_CACHE_MAX) _ppPxCache.delete(_ppPxCache.keys().next().value);
   _ppPxCache.set(key, url);
@@ -332,17 +412,19 @@ function ppVerlaufLesen(g) {
   const m = String(g || '').match(/radial-gradient\((.*)\)\s*$/s);
   if (!m) return null;
   const teile = _ppTeile(m[1]);
-  let kreis = false, cx = 0.5, cy = 0.5;
+  let kreis = false, cx = 0.5, cy = 0.5, rxp = null, ryp = null;
   const istForm = (t) => /^(circle|ellipse|closest|farthest|at\s)/.test(t) || /\sat\s/.test(' ' + t);
   if (teile.length && istForm(teile[0])) {
     const kopf = teile.shift();
     kreis = /circle/.test(kopf);
+    const rr = kopf.match(/ellipse\s+(-?[\d.]+)%\s+(-?[\d.]+)%/);            // ★ W86u2: explizite Ellipsenradien (in % der Breite/Hoehe)
+    if (rr) { rxp = parseFloat(rr[1]) / 100; ryp = parseFloat(rr[2]) / 100; }
     const at = kopf.match(/at\s+(-?[\d.]+)%\s+(-?[\d.]+)%/);
     if (at) { cx = parseFloat(at[1]) / 100; cy = parseFloat(at[2]) / 100; }
     else if (/at\s+center/.test(kopf)) { cx = 0.5; cy = 0.5; }
   }
   const stopps = _ppStopps(teile);
-  return stopps ? { kreis, cx, cy, stopps } : null;
+  return stopps ? { kreis, cx, cy, stopps, rxp, ryp } : null;
 }
 
 /** Farbstopps lesen und ohne Lage gleichmaessig verteilen (CSS-Regel, vereinfacht). */
@@ -404,19 +486,21 @@ function _ppAufloesung(v, laengePx) {
  * (Elementgroesse) halten die Pixel quadratisch und ~2 px gross; ohne
  * Angabe wird ein Quadrat angenommen.
  */
-function ppPxVerlaufUrl(gradient, breitePx = 0, hoehePx = 0) {
+function ppPxVerlaufUrl(gradient, breitePx = 0, hoehePx = 0, pxGroesse = 0) {
   const v = ppVerlaufLesen(gradient);
   if (!v) return '';
   const W = breitePx > 0 ? breitePx : (hoehePx > 0 ? hoehePx : 1);
   const H = hoehePx > 0 ? hoehePx : W;
   const q = (x) => Math.max(1, Math.round(x / 4) * 4);           // Merk-Schluessel groeber
-  const nx = _ppAufloesung(v, breitePx > 0 ? q(W) : 0);
+  // ★ W86u2: `pxGroesse` (Kunstpixel in CSS-px, z. B. 4) — Bildschirmgrosse Schleier/Scheine (Titelkulisse) bekommen ein festes Raster
+  // statt der 160-Pixel-Obergrenze; die Pixel bleiben quadratisch und ganzzahlig gross.
+  const nx = pxGroesse > 0 ? Math.max(2, Math.min(720, Math.round(W / pxGroesse))) : _ppAufloesung(v, breitePx > 0 ? q(W) : 0);
   const ny = breitePx > 0 || hoehePx > 0 ? Math.max(2, Math.round(nx * H / W)) : nx;
   return ppPxBild('vl:' + nx + 'x' + ny + ':' + gradient, nx, ny, (setze) => {
     const cx = v.linear ? 0.5 : v.cx, cy = v.linear ? 0.5 : v.cy;
     const fx = Math.max(cx, 1 - cx) * W, fy = Math.max(cy, 1 - cy) * H;
     const rk = Math.hypot(fx, fy);                                  // Kreis: fernste Ecke
-    const rx = Math.SQRT2 * fx, ry = Math.SQRT2 * fy;               // Ellipse: fernste Ecke
+    const rx = v.rxp != null ? v.rxp * W : Math.SQRT2 * fx, ry = v.ryp != null ? v.ryp * H : Math.SQRT2 * fy;   // Ellipse: fernste Ecke bzw. die angegebenen Radien
     // Linear: CSS-Winkel (0deg = nach oben, 90deg = nach rechts); die
     // Verlaufslinie ist |W sin| + |H cos| lang.
     const wr = (v.winkel || 0) * Math.PI / 180, sn = Math.sin(wr), cs = Math.cos(wr);
@@ -493,44 +577,44 @@ function ppPxSchattenUrl() {
 // Farbig: eigene Palette. Einfarbig (`mono`): '#' voll, '+' halb — die
 // Farbe kommt aus `color` des Elements (wie bei der Glyphe vorher).
 const PP_PX_SPRITES = {
-  flamme: { pal: { W: '#fff6c8', Y: '#ffd23e', O: '#ff8a1e', R: '#e03a12', D: '#9c1e0a' }, z: [
+  flamme: { pal: { W: '#fffbd2', Y: '#fad54a', O: '#ff8b1a', R: '#cc2b00', D: '#8f0000' }, z: [
     '....R....', '...ROR...', '...ROR..R', '..ROYOR.R', '..ROYYORR', '.ROYWYYOR',
     '.ROYWWYOR', 'ROYYWWYOR', 'ROYWWWYOR', 'DROYYYORD', '.DRROORD.'] },
-  schaedel: { pal: { W: '#f4f1e6', G: '#bdb6a2', K: '#1a1414' }, z: [
+  schaedel: { pal: { W: '#fff8e8', G: '#c5b7a0', K: '#141414' }, z: [
     '..WWWWW..', '.WWWWWWW.', 'WWWWWWWWG', 'WKKWWWKKG', 'WKKWWWKKG', 'WWWWKWWWG',
     '.WWWWWWG.', '..WKWKWG.', '..WGWGWG.'] },
-  knall: { pal: { W: '#ffffff', Y: '#ffe36b', O: '#ff8a1e', R: '#e03a12' }, z: [
+  knall: { pal: { W: '#ffffff', Y: '#ffe469', O: '#ff8b1a', R: '#cc2b00' }, z: [
     'R...R...R', '.R.RYR.R.', '..RYOYR..', '.RYOWOYR.', 'RYOWWWOYR', '.RYOWOYR.',
     '..RYOYR..', '.R.RYR.R.', 'R...R...R'] },
-  herz: { pal: { R: '#e8324a', D: '#a01a30', P: '#ff9aa8' }, z: [
+  herz: { pal: { R: '#e73b41', D: '#a60f39', P: '#e58092' }, z: [
     '.RR...RR.', 'RPPR.RRRR', 'RPRRRRRRD', 'RRRRRRRRD', '.RRRRRRD.', '..RRRRD..',
     '...RRD...', '....D....'] },
-  blatt: { pal: { G: '#5fbf3a', D: '#2e7d22', L: '#a8e070' }, z: [
+  blatt: { pal: { G: '#20ac37', D: '#167927', L: '#80bf59' }, z: [
     '......DG', '....DGGG', '..DGLGGG', '.DGLGGGD', 'DGLGGGD.', 'DGGGGD..', '.DGDD...', 'D.......'] },
-  spinne: { pal: { K: '#1a1016', R: '#c0283c' }, z: [
+  spinne: { pal: { K: '#08060c', R: '#b21a29' }, z: [
     'K.K...K.K', '.K.KKK.K.', '..KKKKK..', 'KKKRKRKKK', '..KKKKK..', '.K.KKK.K.', 'K.K...K.K'] },
-  knochen: { pal: { W: '#f4f1e6', G: '#bdb6a2' }, z: [
+  knochen: { pal: { W: '#fff8e8', G: '#c5b7a0' }, z: [
     'WW.....WW', 'WWWWWWWWG', '.WWWWWWG.', 'WWWWWWWWG', 'GG.....GG'] },
-  wolke: { pal: { W: '#ffffff', G: '#cfd8e6', S: '#9aa8bc' }, z: [
+  wolke: { pal: { W: '#ffffff', G: '#d2d2db', S: '#9aa3b6' }, z: [
     '...WWW....', '.WWWWWWW..', 'WWWWWWWWWW', 'WWWWWWWWWG', 'GWWWWWWWGS', '.GGSGGSGS.'] },
-  geist: { pal: { W: '#f4f6ff', G: '#b8c0d8', K: '#1a1a2a' }, z: [
+  geist: { pal: { W: '#e5edfa', G: '#a5b0c0', K: '#1a1a2e' }, z: [
     '..WWWW..', '.WWWWWW.', 'WWKWWKWW', 'WWKWWKWW', 'WWWWWWWG', 'WWWKKWWG', 'WWWWWWWG', 'WWWWWWGG', 'W.WW.WG.'] },
-  blitz: { pal: { W: '#ffffff', Y: '#ffe36b', O: '#f0a000' }, z: [
+  blitz: { pal: { W: '#ffffff', Y: '#ffe469', O: '#f9ac20' }, z: [
     '....YY.', '...YY..', '..YYW..', '.YYW...', 'YYYYYYO', '..YWYO.', '..YYO..', '.YYO...', '.YO....', 'YO.....', 'O......'] },
   blitz_mono: { mono: true, z: [
     '....##.', '...##..', '..##+..', '.##+...', '#######', '..#+#..', '..##...', '.##....', '.#.....', '##.....', '#......'] },
-  flamme_schwarz: { pal: { W: '#8a3ab0', Y: '#5a1a7a', O: '#34104a', R: '#180424', D: '#000000' }, z: [
+  flamme_schwarz: { pal: { W: '#7e41ba', Y: '#58238c', O: '#2b0b47', R: '#170b28', D: '#000000' }, z: [
     '....R....', '...ROR...', '...ROR..R', '..ROYOR.R', '..ROYYORR', '.ROYWYYOR',
     '.ROYWWYOR', 'ROYYWWYOR', 'ROYWWWYOR', 'DROYYYORD', '.DRROORD.'] },
-  herz_gruen: { pal: { R: '#3fbf5a', D: '#1f7a34', P: '#a8f0b4' }, z: [
+  herz_gruen: { pal: { R: '#20ac37', D: '#167927', P: '#b3f9b8' }, z: [
     '.RR...RR.', 'RPPR.RRRR', 'RPRRRRRRD', 'RRRRRRRRD', '.RRRRRRD.', '..RRRRD..',
     '...RRD...', '....D....'] },
-  herz_rosa: { pal: { R: '#ff6fa8', D: '#c83a78', P: '#ffd0e4' }, z: [
+  herz_rosa: { pal: { R: '#f174ab', D: '#ea2f80', P: '#f3bad3' }, z: [
     '.RR...RR.', 'RPPR.RRRR', 'RPRRRRRRD', 'RRRRRRRRD', '.RRRRRRD.', '..RRRRD..',
     '...RRD...', '....D....'] },
-  wut: { pal: { R: '#e8243a', D: '#9a1020' }, z: [
+  wut: { pal: { R: '#e92f38', D: '#8c0014' }, z: [
     '.RR...RR.', 'RRD...DRR', 'RD.....DR', '.........', '.........', 'RD.....DR', 'RRD...DRR', '.RR...RR.'] },
-  tropfen: { pal: { W: '#e8f6ff', B: '#4aa8ff', D: '#1f5fb8' }, z: [
+  tropfen: { pal: { W: '#e5f5fa', B: '#1ca9fd', D: '#2f539d' }, z: [
     '...B...', '...B...', '..BBB..', '.BWBBB.', 'BWBBBBD', 'BBBBBBD', '.BBBBD.', '..DDD..'] },
   kreuz: { mono: true, z: ['..###..', '..#+#..', '###+###', '#++++##', '###+###', '..#+#..', '..###..'] },
   funke4: { mono: true, z: ['...#...', '...#...', '..###..', '#######', '..###..', '...#...', '...#...'] },
@@ -563,127 +647,127 @@ const PP_PX_ZEICHEN = {
 // fuer die farbigen Plaketten. Eigener Namensraum `ab_…` in PP_PX_SPRITES,
 // damit die Animations-Sprites gleichen Namens unberuehrt bleiben.
 const PP_PX_ABZEICHEN_SPRITES = {
-  flamme: { pal: { K: '#3a0a04', D: '#b8200c', R: '#e8461a', O: '#ff8a1e', Y: '#ffd23e', W: '#fff6c8' }, z: [
+  flamme: { pal: { K: '#3a0000', D: '#b62600', R: '#cc2b00', O: '#ff8b1a', Y: '#fad54a', W: '#fffbd2' }, z: [
     '.......K........', '......KRK.......', '......KRK....K..', '.....KROK...KRK.',
     '.....KROOK..KRK.', '....KROYOK.KROK.', '...KRROYYOKKROK.', '..KRROYYYOORROK.',
     '..KROOYWWYOOROK.', '.KRROYWWWYYOORK.', '.KROYYWWWWYYORK.', '.KROYWWWWWWYORK.',
     '.KDROYWWWWYYORK.', '..KDROYYYYOORDK.', '...KDDRRRRRDDK..', '....KKKKKKKKK...',
   ] },
-  schild: { pal: { K: '#141a2a', S: '#c8ccd8', G: '#8a90a0', B: '#4a7ad0', L: '#8ab4ff', D: '#2a4a90', W: '#ffffff' }, z: [
+  schild: { pal: { K: '#1a1a2e', S: '#d2d2db', G: '#808898', B: '#4e77ca', L: '#66b6ff', D: '#2f539d', W: '#ffffff' }, z: [
     '................', '.KKKKKKKKKKKKKK.', '.KSSSSSSSSSSSGK.', '.KSLLLBBBBBBBGK.',
     '.KSLWLBBBBBBDGK.', '.KSLLBBBBBBBDGK.', '.KSLBBBBBBBBDGK.', '.KSBBBBBBBBBDGK.',
     '.KSBBBBBBBBBDGK.', '..KSBBBBBBBDGK..', '..KSBBBBBBBDGK..', '...KSBBBBBDGK...',
     '....KSBBBDGK....', '.....KSBDGK.....', '......KGGK......', '.......KK.......',
   ] },
-  eis: { pal: { K: '#0c1a3a', D: '#3a6cc0', B: '#78b4f0', L: '#c4ecff', W: '#ffffff' }, z: [
+  eis: { pal: { K: '#00213f', D: '#4e77ca', B: '#66b6ff', L: '#b3e8f9', W: '#ffffff' }, z: [
     '.......K........', '.....KKWKK......', '...KKWKWKLKK....', '.KKWKKWLLKKLKK..',
     'KWWWK.KLK.KBBBK.', '.KKWWKKLKKBBKK..', '.KWKKLLLLBKKBK..', '..K..KLWBK..K...',
     '.KLKKLLBBBKKDK..', '.KKLLKKBKKBDKK..', 'KLLLK.KBK.KDDDK.', '.KKLKKBBBKKDKK..',
     '...KKBKBKDKK....', '.....KKDKK......', '.......K........', '................',
   ] },
-  blitz: { pal: { K: '#3a1a04', O: '#f08a10', Y: '#ffdc2a', W: '#fff8c0' }, z: [
+  blitz: { pal: { K: '#311402', O: '#ff8b1a', Y: '#fad54a', W: '#f8f8bd' }, z: [
     '.........KKKKKK.', '........KWYYYOK.', '.......KWYYYOK..', '......KWYYYOK...',
     '.....KWYYYOK....', '....KWYYYOK.....', '...KWYYYYYKKKK..', '..KWYYYYYYYYYOK.',
     '..KKKOOOWYYYOK..', '.......KWYYOK...', '......KWYYOK....', '.....KWYYOK.....',
     '....KWYOOK......', '...KWYOK........', '..KYOK..........', '..KKK...........',
   ] },
-  moai: { pal: { K: '#16161a', W: '#e0dcd4', L: '#b4b0a8', M: '#88847c', D: '#5c5852', E: '#383632' }, z: [
+  moai: { pal: { K: '#141414', W: '#e2d8cb', L: '#a8a8a8', M: '#7f7f7f', D: '#535353', E: '#323232' }, z: [
     '...KKKKKKKKKK...', '..KLLLLLLLLLMK..', '..KLWLLLLLLMMK..', '..KLLLLLLLLMDK..',
     '.KLLLLLLLLLLMDK.', '.KEEEEELLEEEEDK.', 'KMKMMMMLLDMMMKDK', 'KMKMMMMLLDMMMKDK',
     'KMKMMMMLLDMMMKDK', 'KMKMMMLLLLDMMKDK', 'KMKMMMLDDDDMMKDK', '.KKMMMMMMMMMDKK.',
     '..KMEEEEEEEEDK..', '..KMMMMMMMMMDK..', '..KKMMMMMMMDDK..', '...KKKKKKKKKK...',
   ] },
-  verbot: { pal: { K: '#3a0606', R: '#e42424', L: '#ff6a5a', D: '#a40c10', W: '#ffd8d0' }, z: [
+  verbot: { pal: { K: '#3a0000', R: '#ef2929', L: '#ff6666', D: '#b5171c', W: '#f0bfbc' }, z: [
     '....KKLLLKK.....', '..KKLLLLRRRKK...', '.KLLLLLRRRRRRK..', '.KLWLKKKKKRRRK..',
     'KLLLLLK...KRRRK.', 'KLLKLLRK...KRRK.', 'LLLKKRRRK..KRRDK', 'LLRK.KRRRK.KRDDK',
     'LRRK..KRRRKKDDDK', 'KRRK...KRDDKDDK.', 'KRRRK...KDDDDDK.', '.KRRRKKKKKDDDK..',
     '.KRRRRRRDDDDDK..', '..KKRRRDDDDKK...', '....KKDDDKK.....', '......KKK.......',
   ] },
-  fels: { pal: { K: '#18181c', W: '#f2f2f4', L: '#c4c4ca', M: '#94949c', D: '#686870', E: '#46464e' }, z: [
+  fels: { pal: { K: '#141414', W: '#e6e6e6', L: '#b9b9b9', M: '#929292', D: '#686868', E: '#535353' }, z: [
     '................', '................', '.....KKKKKKK....', '...KKLLLLLLLKK..',
     '..KLWWLLLLLLLMK.', '.KLWLLLLLLLLMMDK', '.KLLLLLLLLLLMMDK', 'KMMLLLLLLLLMMDDK',
     'KMMMMMLLLLMMDDDK', 'KMMMMMMMLMDDDDDK', 'KMMMMMMMMDDDDDEK', 'KMMMMMMMMDDDDDEK',
     'KDMMMMMMMDDDDEEK', '.KDDMMMMMDDDEEK.', '..KKEEEEEEEEKK..', '....KKKKKKKK....',
   ] },
-  blut: { pal: { K: '#2a0408', R: '#d8182a', L: '#ff5a64', D: '#8c0c1c', W: '#ffe0e0' }, z: [
+  blut: { pal: { K: '#2a0404', R: '#e92f38', L: '#ff6666', D: '#8c0014', W: '#fae5eb' }, z: [
     '.......K........', '......KLK.......', '......KLK.......', '......KLK.......',
     '.....KLLRK......', '....KLLRRRK.....', '...KLLRRRRRK....', '..KLLLRRRRRRK...',
     '..KLLWRRRRRDK...', '.KLLWWRRRRRDDK..', '.KLLWRRRRRDDDK..', '..KRRRRRRDDDK...',
     '..KRRRRRRDDDK...', '...KDDDDDDDK....', '....KDDDDDK.....', '.....KKKKK......',
   ] },
-  schaedel_gift: { pal: { K: '#0e1e0c', W: '#eaffe2', B: '#b4dca0', S: '#6e9e5c' }, z: [
+  schaedel_gift: { pal: { K: '#0a1a04', W: '#e5fae7', B: '#92d3a9', S: '#3b9159' }, z: [
     '..KK........KK..', '.KWBKKKKKKKKWBK.', 'KWBKWWBBBBBBKBBK', 'KBKWWBBBBBBBSKSK',
     '.KKWBBBBBBBBSKK.', '..KBKKKBBKKKSK..', '..KBKKKBBKKKSK..', '..KBBBBKKBBBSK..',
     '...KSBBBBBBSK...', '....KBKBKBSK....', '...KKKKKKKKKK...', '.KKWBSK..KBBBKK.',
     'KWWBSK....KBBWBK', 'KBBSK......KWBSK', '.KBSK......KBSK.', '..KK........KK..',
   ] },
-  schaedel: { pal: { K: '#1c1410', W: '#ffffff', B: '#ece4d2', S: '#b0a488' }, z: [
+  schaedel: { pal: { K: '#1f0f04', W: '#ffffff', B: '#e2d8cb', S: '#c5b7a0' }, z: [
     '................', '....KKKKKKKK....', '...KWWBBBBBBK...', '..KWWBBBBBBBBK..',
     '.KWBBBBBBBBBBSK.', '.KWBBBBBBBBBBSK.', '.KBKKKBBBBKKKSK.', '.KBKKKKBBKKKKSK.',
     '.KBKKKKBBKKKKSK.', '.KBBKKBBBBKKBSK.', '..KBBBBKKBBBSK..', '...KSBBKKBBSK...',
     '...KBKBKBKBSK...', '...KBKBKBKBSK...', '....KSSSSSSK....', '.....KKKKKK.....',
   ] },
-  mund_zu: { pal: { K: '#3a1c04', L: '#ffe46a', Y: '#ffc42a', O: '#e08810', W: '#fff8d0', S: '#dcdce4', G: '#8a8a96' }, z: [
+  mund_zu: { pal: { K: '#311402', L: '#ffe469', Y: '#ffc61c', O: '#c68206', W: '#fffbd2', S: '#d2d2db', G: '#808898' }, z: [
     '....KKKLKKK.....', '...KLLLLLLLK....', '..KLWWYYYYYYK...', '.KLLLYYYYYYYYK..',
     'KLLLYKYYYYKYYOK.', 'KLLYYKYYYYKYYOK.', 'KLYYYYYYYYYYYOK.', 'LLYYYYYYYYYYYOOK',
     'KLYKKKKKKKKKKOK.', 'KLYKSGSGSGSGSKK.', 'KLYKKKKKKKKKKSK.', '.KYYYYYYYYOOKK..',
     '..KYYYYYYOOOK...', '...KOOOOOOOK....', '....KKKOKKK.....', '.......K........',
   ] },
-  stumm: { pal: { K: '#141420', W: '#ffffff', L: '#d4d4e0', M: '#9a9aae', D: '#606078', R: '#e82222', P: '#ff7a6a', Q: '#a00c10' }, z: [
+  stumm: { pal: { K: '#12101f', W: '#ffffff', L: '#d2d2db', M: '#9aa3b6', D: '#59606e', R: '#ef2929', P: '#ff8566', Q: '#8f0000' }, z: [
     '.......K........', '......KLK.......', '.....KLLK.......', '....KLLLK.......',
     '.KKKLLLLKKK..KK.', 'KWWLLLLLKPPKKRRK', 'KWLLLLLLKKPRRRK.', 'KLLLLLLMK.KRRK..',
     'KLLLLLMMK.KRRK..', 'KLLLLMMMKKRRRQK.', 'KMMMMMMMKRRKKQQK', '.KKKMMMDKKK..KK.',
     '....KMDDK.......', '.....KDDK.......', '......KDK.......', '.......K........',
   ] },
-  glocke_aus: { pal: { K: '#2a1604', Y: '#ffc42a', L: '#ffe680', O: '#d8860e', D: '#8e5006', R: '#e82020', W: '#fffbe0' }, z: [
+  glocke_aus: { pal: { K: '#27180c', Y: '#ffc61c', L: '#fbe181', O: '#c68206', D: '#8b5b04', R: '#ef2929', W: '#fff8e8' }, z: [
     'KKK...KKKK......', 'KRRK.KYYYYK.....', '.KRRKYWYYYYK....', '..KRRKYYYYYOK...',
     '...KRRKYYYYOK...', '..KLKRRKYYYOOK..', '..KLLKRRKYYOOK..', '..KLLYKRRKYOOK..',
     '..KLLYYKRRKOOK..', '.KLLLYYYKRRKOOK.', 'KLLLLYYYYKRRKOOK', 'KOOOOOOOOOKRRKDK',
     '.KKKKKOOOOKKRRK.', '......KOOK..KRRK', '.......KK....KRK', '.............KKK',
   ] },
-  schreck: { pal: { K: '#2a1606', L: '#ffe46a', Y: '#ffc42a', O: '#e08810', W: '#ffffff', C: '#5aa8f0', N: '#2a64c0', D: '#6a1a10' }, z: [
+  schreck: { pal: { K: '#27180c', L: '#ffe469', Y: '#ffc61c', O: '#c68206', W: '#ffffff', C: '#66b6ff', N: '#4e77ca', D: '#6a1c14' }, z: [
     '.....KKKKKK.....', '...KKCCCCCCKK...', '..KCWCCCCCCCNK..', '.KCCCCCCCCCCCNK.',
     '.KCCCCCCCCCCNNK.', 'KYYYWWYYYYWWYYOK', 'KYYWKKWYYWKKWYOK', 'KYYYWWYYYYWWYYOK',
     'KYYYYYYKKYYYYYOK', 'KKKYYYKDDKYYYKKK', 'KLYKYKDDDDKYKLOK', 'KLYKYKDDDDKYKLOK',
     'KLYKYKDDDDKYKLOK', 'KLYKYYKDDKYYKLOK', 'KLOKKYYKKYYOKLOK', '.KKK.KKKKKK.KKK.',
   ] },
-  wut_gesicht: { pal: { K: '#2a0404', L: '#ff7a5a', R: '#e8342a', D: '#a8141a' }, z: [
+  wut_gesicht: { pal: { K: '#2a0404', L: '#ff8566', R: '#f03232', D: '#b5171c' }, z: [
     '....KKKLKKK.....', '...KLLLLLLLK....', '..KLLLRRRRRRK...', '.KLKKRRRRRRKKK..',
     'KLLLKKKRRKKKRDK.', 'KLLRRRKRRKRRRDK.', 'KLRRRKKRRKKRRDK.', 'LLRRRKKRRKKRRDDK',
     'KLRRRRRRRRRRRDK.', 'KLRRRRRRRRRRDDK.', 'KLRRRKKKKKKDDDK.', '.KRRKKRRRRKKDK..',
     '..KRRRRRRDDDK...', '...KDDDDDDDK....', '....KKKDKKK.....', '.......K........',
   ] },
-  nazar: { pal: { K: '#070a1e', D: '#0e1e70', B: '#1e40b4', L: '#4a7ae8', W: '#ffffff', S: '#c4d4e8', C: '#60c4f4' }, z: [
+  nazar: { pal: { K: '#12101f', D: '#02398c', B: '#0351c9', L: '#4580f6', W: '#ffffff', S: '#bddcef', C: '#68c6fd' }, z: [
     '....KKLLBKK.....', '..KKLLLBBBBKK...', '.KLLWLBBBBBBBK..', '.KLWLWWWWWBBBK..',
     'KLLLWWCCCWWBBBK.', 'KLLWWCCCCCWWBBK.', 'LLBWCCWKKCCWBBDK', 'LBBWCCKKKCCSBDDK',
     'BBBWCCKKKCCSDDDK', 'KBBWWCCCCCSSDDK.', 'KBBBWWCCCSSDDDK.', '.KBBBWWSSSDDDK..',
     '.KBBBBBBDDDDDK..', '..KKBBBDDDDKK...', '....KKDDDKK.....', '......KKK.......',
   ] },
-  kerze: { pal: { K: '#1e1410', W: '#ffffff', C: '#e4ded2', S: '#aea493', Y: '#ffe04a', O: '#ff8a1e' }, z: [
+  kerze: { pal: { K: '#1f0f04', W: '#ffffff', C: '#e2d8cb', S: '#c5b7a0', Y: '#ffe23d', O: '#ff8b1a' }, z: [
     '.......K........', '......KOK.......', '......KOOK......', '.....KOYYOK.....',
     '.....KOYWOK.....', '.....KOYYOK.....', '....KKKKKKKK....', '...KWWWWCCCSK...',
     '...KWWCCCCCSK...', '...KWCCCCCSSK...', '...KWCCCCCSSK...', '...KWCCCCCSSK...',
     '...KWCCCCCSSK...', '...KWCCCCCSSK...', '...KSSSSSSSSK...', '....KKKKKKKK....',
   ] },
-  sanduhr: { pal: { K: '#1e1008', H: '#d08a4a', B: '#8a4e22', G: '#cfe8f4', W: '#ffffff', S: '#f4c64c', O: '#c8861e' }, z: [
+  sanduhr: { pal: { K: '#1f0f04', H: '#ca874e', B: '#9d612f', G: '#bddcef', W: '#ffffff', S: '#ffd066', O: '#c68206' }, z: [
     'KKKKKKKKKKKKKKKK', 'KHHHHHHHHHHHHHHK', 'KBBBBBBBBBBBBBBK', 'KHK.KGGGGGGK.KBK',
     'KHK.KWGGGGGK.KBK', 'KHK.KSSSSSOK.KBK', 'KHK..KSSSOK..KBK', 'KHK...KSOK...KBK',
     'KHK...KGSK...KBK', 'KHK..KGGSGK..KBK', 'KHK.KGGGSGGK.KBK', 'KHK.KGGSSSGK.KBK',
     'KHK.KSSSSSOK.KBK', 'KHHHHHHHHHHHHHHK', 'KBBBBBBBBBBBBBBK', 'KKKKKKKKKKKKKKKK',
   ] },
-  kette: { pal: { K: '#14161e', W: '#ffffff', L: '#dde2ec', M: '#aab2c2', S: '#7a8292', D: '#4c5464' }, z: [
+  kette: { pal: { K: '#12101f', W: '#ffffff', L: '#e5edfa', M: '#a5b0c0', S: '#808898', D: '#59606e' }, z: [
     '...........KK...', '.........KKWLK..', '........KWMSSSK.', '.......KWMDKKSDK',
     '......KWMDK.KMDK', '......KMDK.KLSK.', '....KKWSK.KLSDK.', '...KWKLSSKLSDK..',
     '..KWMDKKSDKDK...', '.KWMDK.KMDKK....', '.KMDK.KLSK......', 'KWSK.KLSDK......',
     'KLSKKLSDK.......', '.KSSMSDK........', '..KDDKK.........', '...KK...........',
   ] },
-  auge: { pal: { K: '#141018', W: '#ffffff', E: '#dcdce8', G: '#a0a0b8', B: '#3a8ae0', D: '#1e4ea0', L: '#8ac8ff' }, z: [
+  auge: { pal: { K: '#08060c', W: '#ffffff', E: '#d2d2db', G: '#9aa3b6', B: '#4e82cb', D: '#2f539d', L: '#68c6fd' }, z: [
     '................', '................', '................', '.....KKKKKK.....',
     '...KKWDDDDEKK...', '..KWWDLLBBDEEK..', '.KWWDLWKKBBDEEK.', 'KWWWDBKKKKBDEEEK',
     'KEWWDBKKKKBDEGGK', '.KEEDBBKKBDDGGK.', '..KEEDBBDDDGGK..', '...KKEDDDDGKK...',
     '.....KKKKKK.....', '................', '................', '................',
   ] },
-  nebel: { pal: { K: '#1c2230', W: '#ffffff', L: '#dde3ec', M: '#b0bac8', S: '#7e8898' }, z: [
+  nebel: { pal: { K: '#282834', W: '#ffffff', L: '#e5edfa', M: '#a5b0c0', S: '#808898' }, z: [
     '........KK......', '...K..KKWWKK....', '..KWKKWWMMWWKK..', '.KWMWWMMKKMMWMK.',
     '..KKMMKK..KKMK..', '....KK..KK..K...', '.KKK..KKLLKK..K.', 'KLLLKKLLMMLLKKMK',
     '.KMMLLMMKKMMLLK.', '..KKMMKK..KKMMK.', '....KK..KK..KK..', '......KKLLKK....',
@@ -695,241 +779,241 @@ const PP_PX_ABZEICHEN_SPRITES = {
     '..###++.........', '..##............', '..##............', '..##............',
     '..##............', '..##............', '..##............', '.####...........',
   ] },
-  blasen: { pal: { K: '#0c2238', W: '#ffffff', L: '#bfeaff', B: '#6cc4f0', D: '#2e7fbf' }, z: [
+  blasen: { pal: { K: '#00213f', W: '#ffffff', L: '#b3e8f9', B: '#77c8ee', D: '#4e82cb' }, z: [
     '..KKK...........', '.KWLBK....KKKK..', '.KLBDK...KLLBBK.', '.KBDDK..KLWLBBBK',
     '..KKK...KWLBBBDK', '........KLBBBBDK', '...KKKK.KBBBBDDK', '.KKLLBBKKKBDDDK.',
     '.KLWLBBBK.KKKK..', 'KLWBBBBBDK......', 'KLBBBBBBDK......', 'KBBBBBBBDK..KK..',
     'KBBBBBBDDK.KWBK.', '.KBBBBDDK..KBDK.', '.KKDDDDKK...KK..', '...KKKK.........',
   ] },
-  zweig: { pal: { K: '#0e2410', D: '#1f6b2a', G: '#3fa044', L: '#8ad85a', H: '#d8ffb0' }, z: [
+  zweig: { pal: { K: '#0f2412', D: '#167927', G: '#2ca058', L: '#80bf59', H: '#b3f9b8' }, z: [
     '......KKK...KKKK', '.....KHLGK.KHLGK', '.....KLLGKKHLGDK', '...K.KLLGDKLGDK.',
     '..KLKKGGGDKDDK..', '.KLLGKKGDDKKK...', '.KLLGDKDDKHLLKK.', '.KLLGDKKKLLLLGGK',
     '..KGGDKGDKGGGGDK', '..KGGDKKKKKDDDDK', '...KDKHLLLKKKKK.', '....KKLLLLGK....',
     '...KGKGGGGGDK...', '...KDKKDDDDDK...', '..KGDK.KKKKK....', '..KKK...........',
   ] },
-  geist: { pal: { K: '#1a1428', W: '#ffffff', L: '#e4e4f2', S: '#b4b4cc', D: '#8484a4' }, z: [
+  geist: { pal: { K: '#1a1a2e', W: '#ffffff', L: '#e5edfa', S: '#a5b0c0', D: '#7e7d9b' }, z: [
     '.....KKKKKK.....', '...KKWWWWLLKK...', '..KWWWWWWWWLSK..', '.KWWWWWWWWWWLSK.',
     '.KWWWWWWWWWWLSK.', '.KWWWKKWWKKWLSK.', '.KWWWKKWWKKWLSK.', 'KLWWWKKWWKKWLSSK',
     'KSWWWWWWWWWLLSDK', '.KLWWWWKKWWLSSK.', '.KLWWWWKKWLLSSK.', '.KLWWWWWLLLSSDK.',
     '.KSLLLLLLSSSDDK.', '.KSSDKKSDKKSDDK.', '..KKK..KK..KKK..', '................',
   ] },
-  welle: { pal: { K: '#061a30', D: '#1a5ab0', B: '#2a8ae0', L: '#6ac4ff', F: '#cfeeff', W: '#ffffff' }, z: [
+  welle: { pal: { K: '#1a1a2e', D: '#2f539d', B: '#4e82cb', L: '#68c6fd', F: '#bddcef', W: '#ffffff' }, z: [
     '................', '.......KKKK.....', '.....KKWWWWKK...', '....KWWFFFLBBK..',
     '...KWFLBBBBBBDK.', '...KWLBDKKKDBBDK', '..KWLBDK...KBBDK', '..KWBDK....KBBDK',
     '..KWBDK.KK.KBBDK', '..KFBBKKWFKKBBDK', '.KKFBBBWFKKKBBDK', 'KFWWFWBBBBBBBBDK',
     'KLBBBBBBBBBBBBDK', 'KDBBBBBBBBBBBDDK', '.KDDDDDDDDDDDDK.', '..KKKKKKKKKKKK..',
   ] },
-  herz: { pal: { K: '#3a0a18', D: '#b01848', R: '#f0386a', L: '#ff90b0', W: '#ffffff', Y: '#ffe070' }, z: [
+  herz: { pal: { K: '#4b1021', D: '#ae264c', R: '#ec2d62', L: '#e58092', W: '#ffffff', Y: '#ffd966' }, z: [
     '................', '.............K..', '............KYK.', '...........KYWYK',
     '..KKK...KKK.KYK.', '.KLLLK.KLLRK.K..', 'KLWLRRKRRRRDK...', 'KLWRRRRRRRRDK...',
     'KLRRRRRRRRRDK...', 'KRRRRRRRRRDDK...', '.KRRRRRRRRDK.K..', '..KRRRRRRDK.KYK.',
     '...KRRRRDK.KYWYK', '....KRRDK...KYK.', '.....KDK.....K..', '......K.........',
   ] },
-  herz_rosa: { pal: { K: '#3a0a24', D: '#c0287a', P: '#ff5aa8', L: '#ffa8d4', W: '#ffffff', A: '#ffd05a', B: '#b07a1a' }, z: [
+  herz_rosa: { pal: { K: '#4b1021', D: '#c80480', P: '#fc69c6', L: '#f8b4df', W: '#ffffff', A: '#ffd966', B: '#a87c00' }, z: [
     '...........KKKKK', '...........KAAAK', '....KKK...KKKABK', '...KLLLK.KLLAKBK',
     '..KLWLPPKPPAKDK.', '..KLWPPPPPAKPDK.', '..KLPPPPPAKPPDK.', '..KPPPPPAKPPDDK.',
     '...KPPPAKPPPDK..', '....KPAKPPPDK...', '....KAKPPPDK....', '...KAKKPPDK.....',
     '.KLAK..KDK......', 'KLALK...K.......', 'KALK............', '.KK.............',
   ] },
-  note: { pal: { K: '#1a0a2a', D: '#5a2a9a', V: '#9050e0', L: '#c8a0ff', W: '#ffffff' }, z: [
+  note: { pal: { K: '#170b28', D: '#58238c', V: '#a159e9', L: '#ac87de', W: '#ffffff' }, z: [
     '.............KK.', '..........KKKLLK', '.......KKKLLLVVK', '.....KKLLLVVVVDK',
     '....KLLVVVDDDVDK', '....KVVDDDKKKVDK', '....KVDKKK..KVDK', '....KVDK....KVDK',
     '....KVDK..KKKVDK', '....KVDK.KLWVVDK', '..KKKVDKKLVVVVDK', '.KLWVVDKKVVVDDDK',
     'KLVVVVDK.KDDDDK.', 'KVVVDDDK..KKKK..', '.KDDDDK.........', '..KKKK..........',
   ] },
-  glanz: { pal: { K: '#3a2404', D: '#c07a10', Y: '#ffc21e', L: '#ffe680', W: '#ffffff' }, z: [
+  glanz: { pal: { K: '#332300', D: '#c68206', Y: '#ffc61c', L: '#fbe181', W: '#ffffff' }, z: [
     '............K...', '...........KYK..', '..........KKLKK.', '......K..KLLWYDK',
     '.....KLK..KKDKK.', '.....KLK...KDK..', '....KLLYK...K...', '...KKLLYKK......',
     '.KKLLLWYYDKK....', 'KLLLLWWYYYDDK...', '.KKYYYYDDDKKK...', '...KKYYDKK.KYK..',
     '....KYDDK.KYWDK.', '.....KDK...KDK..', '.....KDK....K...', '......K.........',
   ] },
-  falter: { pal: { K: '#0a1428', D: '#1a4ab0', B: '#3a8af0', L: '#8ad0ff', W: '#ffffff', G: '#7a6a90', H: '#3a2a50' }, z: [
+  falter: { pal: { K: '#1a1a2e', D: '#0351c9', B: '#6d9bf8', L: '#7bbeea', W: '#ffffff', G: '#7e7d9b', H: '#291f3d' }, z: [
     '................', '..KK.H....H.KK..', '.KDDKKHKKHKKDDK.', 'KDWBDDKGHKDDBWDK',
     'KDBLLBBGHBBLLBDK', 'KWBLBBBGHBBBLBWK', '.KDBBBBGHBBBBDK.', '..KDBBDGHDBBDK..',
     '...KDDDGHDDDK...', '..KDBBDGHDBBDK..', '.KDLBBDGHDBBLDK.', '.KWBBBDGHDBBBWK.',
     '.KDBBDKGHKDBBDK.', '..KDWDKGHKDWDK..', '...KKK.KK.KKK...', '................',
   ] },
-  hut: { pal: { K: '#08080e', E: '#a8a8c8', M: '#565670', D: '#2c2c3c', W: '#e4e4f4', Y: '#ffc81e', O: '#b07a10' }, z: [
+  hut: { pal: { K: '#08060c', E: '#9ba3ca', M: '#59606e', D: '#282834', W: '#e5edfa', Y: '#ffc61c', O: '#a87c00' }, z: [
     '................', '.......KK.......', '.....KKEEKK.....', '...KKEEMMEEKK...',
     '.KKEEMMWYMMEEKK.', 'KEEMMMMYOYYYYYEK', '.KKDMMMMMMMMDYK.', '...KKDMMMMDKKYK.',
     '...KKKKDDKKKKYK.', '...KMMDDDDDDKYK.', '...KMDDDDDDDKYYK', '...KEEEEEEEEKYOK',
     '....KKKKKKKKKOOK', '.............KK.', '................', '................',
   ] },
-  wolke: { pal: { K: '#1a2030', W: '#ffffff', G: '#d4dae6', S: '#9aa6ba' }, z: [
+  wolke: { pal: { K: '#1a1a2e', W: '#ffffff', G: '#d2d2db', S: '#9aa3b6' }, z: [
     '................', '................', '................', '.....KKK........',
     '....KWWWK.KK....', '...KWWWWWKWWK...', '..KWWWWWWWWWGK..', '.KKWWWWWWWWWWGK.',
     'KWWKWWWWWWWWGGK.', 'KWWWWWWWWWWWWGGK', 'KWWWWWWWWWWWGGSK', 'KGWWWGGWWWWGGGSK',
     '.KGGGGGGGGGGGSK.', '..KSSSSSSSSSSK..', '...KKKKKKKKKK...', '................',
   ] },
-  zahnrad: { pal: { K: '#1a1a24', W: '#ffffff', L: '#dce0e8', M: '#a4aab6', D: '#666c7a' }, z: [
+  zahnrad: { pal: { K: '#12101f', W: '#ffffff', L: '#e6e6e6', M: '#a5b0c0', D: '#59606e' }, z: [
     '......KKKK......', '..KK..KLLK..KK..', '.KLLKKLLLMKKMDK.', '.KLWLLLLLMMMMDK.',
     '..KLLLLMMMMMDK..', '..KLLMKKKKMMDK..', 'KKKLLK....KMDKKK', 'KLLLLK....KMMMDK',
     'KLLMMK....KMDDDK', 'KKKMMK....KDDKKK', '..KMMMKKKKDDDK..', '..KMMMMMMDDDDK..',
     '.KMMMMMMDDDDDDK.', '.KMDKKMDDDKKDDK.', '..KK..KDDK..KK..', '......KKKK......',
   ] },
-  taube: { pal: { K: '#1a1c2a', W: '#ffffff', L: '#e2e6ee', G: '#a8b0c2', Y: '#f0a020', O: '#7ac040', N: '#3a7a22' }, z: [
+  taube: { pal: { K: '#1a1a2e', W: '#ffffff', L: '#e5edfa', G: '#a5b0c0', Y: '#f9ac20', O: '#80bf59', N: '#167927' }, z: [
     '.............KK.', '...........KKWLK', '.........KKWWLGK', '........KWWLLLGK',
     '..KKK..KWWLLLGK.', '.KWWWK.KWLLLGGK.', 'KWWKWLKWLLLGGK..', 'YKWWLLKWLLGGK...',
     'YYKWLLLKLGGKKK..', '.KKWLLLLKKKLLLKK', '.N.KWLLLLLLLLLGK', 'NON.KGLLLLLLGGK.',
     '.ONO.KKGGGGGKGGK', '..N...KKKKKK.KKK', '................', '................',
   ] },
-  katze: { pal: { K: '#2a1408', L: '#ffc070', O: '#f08a2a', D: '#b8561a', P: '#ff8aa0', W: '#ffffff', G: '#58c040' }, z: [
+  katze: { pal: { K: '#27180c', L: '#f4ae64', O: '#ff9b3a', D: '#aa5300', P: '#e58092', W: '#ffffff', G: '#20ac37' }, z: [
     '.KK..........KK.', '.KLK........KOK.', '.KLPK......KPDK.', '.KLPPKKKKKKPPDK.',
     'KLLOOODOODOOOODK', 'KLOOOOODDOOOOODK', 'KLOOOOOOOOOOOODK', 'KLOGKOOOOOOKGODK',
     'KOOGKOOOOOOKGODK', 'KOOOOOOPPOOOOODK', 'KWWOOOOKKOOOOWWK', 'KOOWWOKOOKOWWODK',
     '.KOOOOOOOOOOODK.', '..KDOOOOOOOODK..', '...KKDDDDDDKK...', '.....KKKKKK.....',
   ] },
-  schloss: { pal: { K: '#20140a', Y: '#ffd23e', G: '#e8a020', B: '#a8640c', S: '#dde0e8', M: '#8a90a0', W: '#ffffff' }, z: [
+  schloss: { pal: { K: '#1f0f04', Y: '#fad54a', G: '#f9ac20', B: '#ad6100', S: '#e6e6e6', M: '#808898', W: '#ffffff' }, z: [
     '....KKKKKKKK....', '...KSWSSSSSMK...', '..KSSKKKKKKSMK..', '..KSSK....KSMK..',
     '..KSSK....KSMK..', '..KSMK....KSMK..', '.KKKKKKKKKKKKKK.', '.KYYYYYYYYYYYGK.',
     '.KYWYYYYYYYYGBK.', '.KYYYYYKKYYYGBK.', '.KYYYYKKKKGGGBK.', '.KYYYYYKKGGGGBK.',
     '.KGYYYYKKGGGGBK.', '.KGGGGGGGGGGBBK.', '.KBBBBBBBBBBBBK.', '.KKKKKKKKKKKKKK.',
   ] },
-  sonnenbrille: { pal: { K: '#2a1a08', Y: '#ffd23e', L: '#fff08a', O: '#e89a20', B: '#5a6a8a', W: '#ffffff' }, z: [
+  sonnenbrille: { pal: { K: '#27180c', Y: '#fad54a', L: '#fff196', O: '#f9ac20', B: '#405f8c', W: '#ffffff' }, z: [
     '.....KKKKKK.....', '...KKLLYYYYKK...', '..KLWLYYYYYYOK..', '.KLLYYYYYYYYYOK.',
     '.KLYYYYYYYYYYOK.', 'KKKKKKKKKKKKKKKK', 'KKBBKKKYYKBBKKKK', 'KKBKKKKYYKBKKKKK',
     'KYKKKKYYYYKKKKOK', 'KYYYYYYYYYYYYYOK', 'KYYKYYYYYYYYKYOK', '.KYYKWWWWWWKYOK.',
     '.KOYYKKKKKKYYOK.', '..KOYYYYYYYYOK..', '...KKOOOOOOKK...', '.....KKKKKK.....',
   ] },
-  fluegel: { pal: { K: '#3a2204', W: '#ffffff', L: '#fff0a0', Y: '#ffd23e', G: '#e8a020', B: '#a8640c' }, z: [
+  fluegel: { pal: { K: '#332300', W: '#ffffff', L: '#fff196', Y: '#fad54a', G: '#f9ac20', B: '#ad6100' }, z: [
     '..........KKKK..', '.......KKKLLLLKK', '.....KKLLLYYYYK.', '....KLWYYYYGGK..',
     '...KLYYYGGKKKKK.', '..KLYYGKKKLLYYYK', '..KLYGKLLYYYGGK.', '.KLYGKLYYGGKKK..',
     '.KLYGKYYGKKKKKK.', '.KLYKLYGKLYYYYGK', 'KLYGKYGKLYYGGKK.', 'KLYGKYGKYGGKK...',
     'KLYYKGKYGKK.....', 'KLYYGKKGKK......', '.KGGGBBK........', '..KKKKK.........',
   ] },
-  zielscheibe: { pal: { K: '#200a0a', R: '#e82828', L: '#ff6a5a', D: '#a01414', W: '#ffffff', G: '#d0ccd8', A: '#7a4a1a', F: '#ffd23e' }, z: [
+  zielscheibe: { pal: { K: '#270d0c', R: '#ef2929', L: '#ff6666', D: '#8f0000', W: '#ffffff', G: '#d2d2db', A: '#6e4421', F: '#fad54a' }, z: [
     '......KKKK..KFK.', '....KKLRRRKKFFFK', '..KKLRRWWRRRAKKK', '..KRRWWWWWWAKK..',
     '.KLRWWWRRWAKRRK.', '.KRWWRRRRAKWWRK.', 'KLRWWRRWAKRWWRDK', 'KRWWRRWRRWRRGGDK',
     'KRWWRRWRRWRRGGDK', 'KRRWWRRWWRRGGDDK', '.KRWWRRRRRRGGDK.', '.KRRWWWRRGGGDDK.',
     '..KRRWWGGGGDDK..', '..KKRRRGGDDDKK..', '....KKDDDDKK....', '......KKKK......',
   ] },
-  bueffel: { pal: { K: '#101014', G: '#6a6e7a', L: '#9aa0ac', D: '#3e4048', H: '#e8dcc0', N: '#a8987a', W: '#ffffff' }, z: [
+  bueffel: { pal: { K: '#141414', G: '#59606e', L: '#9aa3b6', D: '#3e3e51', H: '#ebdcc1', N: '#a89370', W: '#ffffff' }, z: [
     'K..............K', 'KK............KK', 'KHK..........KNK', 'KHHK........KNNK',
     '.KHHKK....KKNNK.', '..KHHHKKKKHNNK..', '...KKHHHHNNKK...', 'KKKKLGGGGGGGDKKK',
     'KLGKLGGGGGGGDKDK', '.KKKLWGGGGWGDKK.', '...KLKGGGGKGDK..', '...KLGGGGGGDK...',
     '...KLLLLLLLGK...', '...KLKLLLLKGK...', '...KGLLLLLGDK...', '....KKKKKKKK....',
   ] },
-  hund: { pal: { K: '#2a1408', D: '#6a3e16', B: '#b87838', L: '#e0a868', C: '#f6dcb0', T: '#ff6a88', W: '#ffffff' }, z: [
+  hund: { pal: { K: '#27180c', D: '#6e4421', B: '#ca874e', L: '#f4ae64', C: '#f7e0b5', T: '#fe6794', W: '#ffffff' }, z: [
     '....KKKKKKKK....', '..KKLLLLBBBBKK..', '.KDKLWLBBBBBKDK.', 'KDDKLLLBBBBBKDDK',
     'KDDKLLBBBBBBKDDK', 'KDDKLWKBBWKBKDDK', 'KDDKLKKBBKKBKDDK', 'KDDKBBBBBBBBKDDK',
     'KDDKBCCKKCCBKDDK', 'KDDKCCKKKKCCKDDK', '.KDKCCCKKCCCKDK.', '.KKKCCKCCKCCKKK.',
     '...KCCKTTKCCK...', '....KCKTTKCK....', '.....KKTTKK.....', '......KKKK......',
   ] },
-  neumond: { pal: { K: '#0a0a14', M: '#5a5a74', D: '#3a3a4c', S: '#24242e', C: '#f0e6b0', Y: '#c8b870' }, z: [
+  neumond: { pal: { K: '#08060c', M: '#59606e', D: '#3e3e51', S: '#282834', C: '#f9ecb3', Y: '#e0c085' }, z: [
     '......KKKK......', '....KKMMDCKK....', '..KKMMMDDDDCKK..', '..KMMMDDDDDDCK..',
     '.KMMMSSDDDDDCCK.', '.KMMSSMDDSDDDCK.', 'KMMDDMDDDDMDDCCK', 'KMDDDDDDDDDDDCCK',
     'KDDDDDDDDDDDSCCK', 'KDDDDDDDSSDSSCCK', '.KDDDDDSSMSSSCK.', '.KDDDDDDMSSSCCK.',
     '..KDDDDDSSSSCK..', '..KKDDDSSSSCKK..', '....KKSSSCKK....', '......KKKK......',
   ] },
-  arm: { pal: { K: '#3a1a08', Y: '#ffc83a', L: '#ffe48a', O: '#e0902a', W: '#ffffff' }, z: [
+  arm: { pal: { K: '#311402', Y: '#ffc61c', L: '#fbe181', O: '#c68206', W: '#ffffff' }, z: [
     '.....KKKKKK.....', '....KLLLLYYKK...', '...KLWLLYYYYOK..', '...KKKKKKYYYOK..',
     '...KLLYYKYYYOOK.', '...KKKKKKYYYYOK.', '....KLYYKYYYYOK.', '.....KKKKLYYYOK.',
     '..KKKK..KLYYYOK.', '.KLLLLK.KLYYOOK.', 'KLLWLYYKKLYYOOK.', 'KLYYYYYYKYYYOOK.',
     'KYYYYYYYYYYYOOK.', 'KOYYYYYYYYYOOK..', 'KOOOOOOOOOOOK...', '.KKKKKKKKKKKK...',
   ] },
-  geodreieck: { pal: { K: '#2a1a0a', Y: '#ffe07a', G: '#f0b830', B: '#b87a18', T: '#6a4210', W: '#ffffff' }, z: [
+  geodreieck: { pal: { K: '#27180c', Y: '#fbe181', G: '#ffb91a', B: '#c68206', T: '#6e4421', W: '#ffffff' }, z: [
     'KK..............', 'KWK.............', 'KYYK............', 'KTYYK...........',
     'KYYYYK..........', 'KTYKYYK.........', 'KYYKKYYK........', 'KTYK.KYYK.......',
     'KYYK..KYYK......', 'KTYK...KYYK.....', 'KYYK....KYYK....', 'KTYKKKKKKKYYK...',
     'KYYGGGGGGGGGGK..', 'KGGTGTGTGTGTGGK.', 'KBBBBBBBBBBBBBBK', 'KKKKKKKKKKKKKKKK',
   ] },
-  feder: { pal: { K: '#2a1808', L: '#fff4dc', Y: '#e8c890', B: '#b8844c', D: '#7a5228', Q: '#fffaf0' }, z: [
+  feder: { pal: { K: '#27180c', L: '#fff8e8', Y: '#e0c085', B: '#ca874e', D: '#6e4421', Q: '#fff8e8' }, z: [
     '............KKK.', '..........KKLLK.', '.........KLLLYK.', '........KLLLQBK.',
     '........KLLQYBK.', '......KLLYQYBK..', '.....KLLYQYBBK..', '....KLLYQYBK....',
     '...KLYYQYBBDK...', '...KLYQYBBDK....', '..KYYQBBDDK.....', '..KYQBDDKK......',
     '.KKQKKKK........', '.KQK............', 'KQK.............', 'KK..............',
   ] },
-  kaefer: { pal: { K: '#0a1a10', G: '#34b04a', L: '#8ae86a', D: '#16663a', T: '#2aa8b0', H: '#2e4a3a', W: '#ffffff' }, z: [
+  kaefer: { pal: { K: '#0a1a04', G: '#20ac37', L: '#4ceb70', D: '#29663f', T: '#07aec5', H: '#1a4128', W: '#ffffff' }, z: [
     '..K..........K..', '...K........K...', '....K.KKKK.K....', '.....KHWHHK.....',
     '.K..KKKKKKKK..K.', '..KKKLLGGGDKKK..', '...KKKKKKKKKK...', '...KLWLKKGGDK...',
     '...KLLGKKLGDK...', '.KKKLGGKKGGDKKK.', 'K..KGGTKKGTDK..K', '...KGTGKKTGDK...',
     '..KKGGGKKGDDKK..', '.K..KGGKKDDK..K.', 'K....KDKKDK....K', '......KKKK......',
   ] },
-  raute_blau: { pal: { K: '#0a1430', B: '#3a8ae8', L: '#8ac8ff', D: '#1a4aa8', C: '#d0ecff', W: '#ffffff' }, z: [
+  raute_blau: { pal: { K: '#170b28', B: '#6d9bf8', L: '#68c6fd', D: '#02398c', C: '#bddcef', W: '#ffffff' }, z: [
     '.......KK.......', '......KLBK......', '.....KLLBBK.....', '....KLLCCBBK....',
     '...KLLCCCCBBK...', '..KLLLLCCBBBBK..', '.KLLCLLLBBBCBBK.', 'KLLCCCLWWBCCCBBK',
     'KBBCCCBWWDCCCDDK', '.KBBCBBBDDDCDDK.', '..KBBBBCCDDDDK..', '...KBBCCCCDDK...',
     '....KBBCCDDK....', '.....KBBDDK.....', '......KBDK......', '.......KK.......',
   ] },
-  radioaktiv: { pal: { K: '#1a1408', Y: '#ffd23e', L: '#fff08a', O: '#e89a20', W: '#ffffff' }, z: [
+  radioaktiv: { pal: { K: '#1f0f04', Y: '#fad54a', L: '#fff196', O: '#f9ac20', W: '#ffffff' }, z: [
     '......KKKK......', '....KKLYYYKK....', '..KKLWYYYYYYKK..', '..KLLYYYYYYYYK..',
     '.KLLKKYYYYKKYYK.', '.KLKKKKYYKKKKYK.', 'KLYKKKKYYKKKKYYK', 'KYKKKKYKKYKKKKYK',
     'KYYYYYYKKYYYYYOK', 'KYYYYYYYYYYYYOOK', '.KYYYYYKKYYYOOK.', '.KYYYYKKKKYOOOK.',
     '..KYYKKKKKKOOK..', '..KKYYYKKYOOKK..', '....KKYYOOKK....', '......KKKK......',
   ] },
-  buch: { pal: { K: '#0e1430', B: '#2f6ae0', D: '#1c3a90', L: '#7eacff', G: '#ffd040', O: '#b8800c', P: '#f6f2e4', Q: '#b8b0a0' }, z: [
+  buch: { pal: { K: '#170b28', B: '#4580f6', D: '#02398c', L: '#6d9bf8', G: '#fad54a', O: '#a87c00', P: '#fff8e8', Q: '#c5b7a0' }, z: [
     '.KKKKKKKKKKKKK..', 'KBDLLLLLLLLLLK..', 'KBDLBBBBBBBBBKK.', 'KBDLBBBBBBBBBKPK',
     'KBDLBKKKKKKKBKPK', 'KBDLBKGGGGGKBKPK', 'KBDLBKGOOOGKBKPK', 'KBDLBKGGGGOKBKPK',
     'KBDLBKKKKKKKBKPK', 'KBDLBBBBBBBBBKPK', 'KBDBBBBBBBBBBKPK', 'KBDBBBBBBBBBBKPK',
     'KBDBBBBBBBBBDKPK', 'KBDDDDDDDDDDDKQK', 'KKPPPPPPPPPPPPQK', '.KKKKKKKKKKKKKK.',
   ] },
-  halt: { pal: { K: '#2a0606', R: '#e02828', L: '#ff6a5a', D: '#a01010', W: '#ffffff', G: '#d0d0dc' }, z: [
+  halt: { pal: { K: '#2a0404', R: '#f03232', L: '#ff6666', D: '#8f0000', W: '#ffffff', G: '#d2d2db' }, z: [
     '.....KKKKKK.....', '...KKLLLRRRKK...', '..KLLRRRRRRRRK..', '.KLLRRRRRRRRRDK.',
     '.KLRRRRRRRRRRDK.', 'KLRRRRRRRRRRRRDK', 'KLRWWWWWWWWWWRDK', 'KRRWWWWWWWWWWRDK',
     'KRRWWWWWWWWWWRDK', 'KRRGGGGGGGGGGRDK', 'KRRRRRRRRRRRRDDK', '.KRRRRRRRRRRRDK.',
     '.KRRRRRRRRRRDDK.', '..KDRRRRRRRDDK..', '...KKDDDDDDKK...', '.....KKKKKK.....',
   ] },
-  klee: { pal: { K: '#0c2410', L: '#8ee86a', G: '#46b83a', D: '#1f7a2a', S: '#3a9a30' }, z: [
+  klee: { pal: { K: '#0f2412', L: '#75f091', G: '#20ac37', D: '#167927', S: '#20ac37' }, z: [
     '.....KK.KK......', '....KLLKLLK.....', '...KLGGLGGDK....', '..KKLGGGGGDKK...',
     '.KLLKLGGGDKLLK..', 'KLGGLKLGDKLGGDK.', 'KLGGGGKDKGGGGDK.', '.KLGGGDDDGGGDK..',
     'KLGGGGKDKSGGGDK.', 'KLGGDKLGDKSGGDK.', '.KLDKLGGGDKSDK..', '..KKLGGGGGDKSK..',
     '...KLGGGGGDKSK..', '....KLDKLDKKSK..', '.....KK.KK..KSK.', '.............K..',
   ] },
-  ninja: { pal: { K: '#0a0a14', N: '#262636', H: '#4a4a64', S: '#f2c490', T: '#c88a5a', R: '#e02828', D: '#8a1010', W: '#ffffff' }, z: [
+  ninja: { pal: { K: '#08060c', N: '#282834', H: '#3e3e51', S: '#e0c085', T: '#c7855b', R: '#f03232', D: '#8b0d0d', W: '#ffffff' }, z: [
     '...KKKKKK.......', '.KKHHHHNNKK.....', '.KHHHNNNNNK.....', 'KHHNNNNNNNNK.KK.',
     'KRRRRRRRRRRRKRRK', 'KRRRRRRRRRRRRRDK', 'KDDDDDDDDDDRRKK.', 'KNSSSSSSSSNKRDK.',
     'KNSWKSSWKSNKKRDK', 'KNSKKSSKKSNK.KDK', 'KNTTTTTTTTNK..KK', 'KHNNNNNNNNNK....',
     'KHNNNNNNNNNK....', '.KNNNNNNNNK.....', '.KKNNNNNNKK.....', '...KKKKKK.......',
   ] },
-  haende: { pal: { K: '#1a1010', B: '#3a6ee0', N: '#1e3a8a', R: '#e03030', D: '#8a1414', S: '#f6c48a', T: '#c88450', L: '#ffe4bc' }, z: [
+  haende: { pal: { K: '#141414', B: '#4580f6', N: '#02398c', R: '#e92f38', D: '#8b0d0d', S: '#e0c085', T: '#ca874e', L: '#f7e0b5' }, z: [
     '................', '................', '.....KKK........', '....KLLSK.KKKKKK',
     'KKKKLSSSKKLLLRRK', 'KBBBSSSKLLSSSRRK', 'KBBBSSKSSSSSTRRK', 'KBBBSKKKKKKSTRRK',
     'KNNNKLLLLLTKTDDK', 'KNNNKSSSSSTKTDDK', 'KNNNKKKKKKKSTKKK', 'KKKKKLLLLLTTK...',
     '....KSSSSSTK....', '....KKKKKKK.....', '................', '................',
   ] },
-  klavier: { pal: { K: '#0c0c14', N: '#2a2a3a', H: '#55556e', W: '#ffffff', S: '#c4c8d6', G: '#8a90a4' }, z: [
+  klavier: { pal: { K: '#08060c', N: '#282834', H: '#59606e', W: '#ffffff', S: '#d2d2db', G: '#808898' }, z: [
     '................', 'KKKKKKKKKKKKKKKK', 'KHHHHHHHHHHHHHNK', 'KHNNNNNNNNNNNNNK',
     'KKKKKKKKKKKKKKKK', 'KWKWKWSWKWKWKWSK', 'KWKWKWSWKWKWKWSK', 'KWKWKWSWKWKWKWSK',
     'KWKWKWSWKWKWKWSK', 'KWKWKWSWKWKWKWSK', 'KWSWSWSWSWSWSWSK', 'KWSWSWSWSWSWSWSK',
     'KWSWSWSWSWSWSWSK', 'KGSGSGSGSGSGSGSK', 'KKKKKKKKKKKKKKKK', '................',
   ] },
-  stuhl: { pal: { K: '#2a1408', L: '#eaa866', M: '#c07a3a', D: '#8a4a1e' }, z: [
+  stuhl: { pal: { K: '#27180c', L: '#f4ae64', M: '#ca874e', D: '#7d3911' }, z: [
     '.......KKKKKKK..', '......KLLLLLLMK.', '......KMMMMMMDK.', '......KKKKKKKKK.',
     '......KLK...KMK.', '......KLKKKKKMK.', '......KLLLLLLMK.', '......KMMMMMMDK.',
     '....KKKKKKKKKMK.', '...KLLLLLLLLLKK.', '..KLMMMMMMMMLDK.', '.KLMMMMMMMMMDDK.',
     '.KDDDDDDDDDDDKK.', '.KMKKKKKKKKKMKDK', '.KMK.....KMK.KDK', '.KKK.....KKK..K.',
   ] },
-  zombie: { pal: { K: '#102010', L: '#a8e070', G: '#6cb840', D: '#3a7a28', H: '#5a2a3a', J: '#8a4050', W: '#f0f0d0' }, z: [
+  zombie: { pal: { K: '#0f2412', L: '#80bf59', G: '#80bf59', D: '#167927', H: '#4b1021', J: '#784437', W: '#fffbd2' }, z: [
     '...K.KK.K.KK....', '..KHKHHKHKHHKK..', '.KHJJHHHJJHHHHK.', '.KHJHHHHHHHHHHK.',
     'KHHGGHHHGGHHGHHK', 'KHGLLGGGGGGGGDHK', 'KGLLLGGGGGGGGGDK', 'KGLDDDGGGDDDGGDK',
     'KGLDKDGGGDKDGGDK', 'KGGDDDGGGDDDGGDK', 'KGGGGGGGGGGGGGDK', 'KGGGGKKKGGGGGDDK',
     '.KGGKWKWKKKGGDK.', '.KDGGGGGGGKKDDK.', '..KKDDDDDDDDKK..', '....KKKKKKKK....',
   ] },
-  ankh: { pal: { K: '#3a2404', L: '#fff080', G: '#ffc830', O: '#c0800c', W: '#ffffff' }, z: [
+  ankh: { pal: { K: '#332300', L: '#f0f075', G: '#ffc61c', O: '#c68206', W: '#ffffff' }, z: [
     '.....KKKKKK.....', '....KLLLLGGK....', '...KLLKKKKGOK...', '...KLGK..KGOK...',
     '...KLGK..KGOK...', '...KLGK..KGOK...', '...KLGK..KGOK...', '....KLGKKGOK....',
     '.KKKKLGGGGOKKKK.', 'KLLLLLLGGGGGGGOK', 'KGGGGGGGGGGGOOOK', '.KKKKKLGGOKKKKK.',
     '.....KLGGOK.....', '.....KLGGOK.....', '....KLLGGOOK....', '....KKKKKKKK....',
   ] },
-  zahn: { pal: { K: '#1a2030', W: '#ffffff', L: '#eef2fa', M: '#c0cadb', D: '#8490a8' }, z: [
+  zahn: { pal: { K: '#1a1a2e', W: '#ffffff', L: '#e5edfa', M: '#d2d2db', D: '#808898' }, z: [
     '..KKKKK..KKKKK..', '.KWWWWWKKWWWWMK.', 'KWWLLLLLLLLLLMMK', 'KWLLLLLLLLLLLMDK',
     'KWLLLLLLLLLLLMDK', 'KLLLLLLLLLLLMMDK', 'KLLLLLLLLLLLMMDK', 'KLLLLLLLLLLMMMDK',
     '.KLLLLLLLLLMMDK.', '.KLLLLLLLLMMMDK.', '.KLLLMKKKKMMMDK.', '.KLLMK....KMDDK.',
     '.KLLMK....KMDK..', '..KLMK....KMDK..', '..KLK......KDK..', '...K.......KK...',
   ] },
-  dna: { pal: { K: '#12102a', Q: '#ff9ad8', P: '#e8409c', C: '#8ad0ff', B: '#2a7ae8', Y: '#ffd040', G: '#50d070' }, z: [
+  dna: { pal: { K: '#170b28', Q: '#f8b4df', P: '#c80480', C: '#7bbeea', B: '#4580f6', Y: '#fad54a', G: '#4bcd7c' }, z: [
     'KQPKKKKKKKKKCBK.', '.KQPYYYGGGGCBK..', '..KQPKKKKKCBK...', '...KKQPKCBKK....',
     '....KKCQPKK.....', '..KKCBKKKQPKK...', '.KCBYYYGGGGQPK..', '.KCBK.....KQPK..',
     '.KCBK.....KQPK..', '.KCBYYYGGGGQPK..', '..KKCBKKKQPKK...', '....KKCBPKK.....',
     '...KKQPKCBKK....', '..KQPKKKKKCBK...', '.KQPYYYGGGGCBK..', 'KQPKKKKKKKKKCBK.',
   ] },
-  muenze: { pal: { K: '#3a2404', W: '#ffffff', L: '#ffe680', Y: '#ffc21e', O: '#c07a0a' }, z: [
+  muenze: { pal: { K: '#332300', W: '#ffffff', L: '#fbe181', Y: '#ffc61c', O: '#c68206' }, z: [
     '....KKKKKKKK....', '...KLLLLLLLYK...', '..KLWLOOOOYYYK..', '.KLLOOYYYYYYYYK.',
     'KLLOYYYYYYYYYYYK', 'KLLOYYYLYYYYYYOK', 'KLOYYYLLLYYYYLOK', 'KLOYLLLLLLLYYLOK',
     'KLOYYLLLLLOOYLOK', 'KLOYYLLOLLOYYLOK', 'KLYYYLOOYLOYLOOK', 'KYYYYYOYYYOYLOOK',
     '.KYYYYYYYYLLOOK.', '..KYYYLLLLOOOK..', '...KYOOOOOOOK...', '....KKKKKKKK....',
   ] },
-  galaxie: { pal: { K: '#08061a', N: '#1c1648', M: '#2a2266', V: '#8a4ad8', L: '#d0a0ff', P: '#ffd8ff', W: '#ffffff' }, z: [
+  galaxie: { pal: { K: '#12101f', N: '#1a0a3a', M: '#401a66', V: '#9544d5', L: '#ac87de', P: '#d9c0ec', W: '#ffffff' }, z: [
     '....KKKMMKKK....', '...KMMNNNNMMK...', '..KMNNNNNNWNMK..', '.KMNLLLVVVVVNMK.',
     'KMNLLLVNNNNNNNMK', 'KMVLLVNNNNNWNNMK', 'KNVLLNPPPPLVNNNK', 'MNVLLPPWWPPLVNNM',
     'MNNVLPPWWPPLLVNM', 'KNNNVLPPPPNLLVNK', 'KMNWNNNNNNVLLVMK', 'KMNNNNNNNVLLLNMK',
@@ -940,6 +1024,12 @@ const PP_PX_ABZEICHEN_SPRITES = {
     '.....+####+.....', '....+######+....', '..++########++..', '################',
     '################', '..++########++..', '....+######+....', '.....+####+.....',
     '......####......', '......+##+......', '.......##.......', '.......##.......',
+  ] },
+  drachenkopf: { pal: { K: '#08060c', N: '#282834', H: '#3e3e51', G: '#59606e', S: '#d2d2db', R: '#f03232', D: '#8b0d0d', W: '#ffffff' }, z: [
+    '..........K..K..', '.........KSK.KSK', '........KSK..KSK', '.....KKKKSKKKKK.',
+    '...KKHHHNNKKNNK.', '..KHHGHNNNNNNNNK', '.KHHNNNNNNNNNNNK', 'KHNNKRRKNNNNNNNK',
+    'KNNNKRWKNNNNNNK.', 'KNNNNNNNNNNNNK..', 'KNKNNNNNNNNNNK..', 'KSKSKNNNNNNNK...',
+    'KDSDSKNNNNNNK...', '.KKKKKKKKNNK....', '...........KK...', '................',
   ] },
 };
 
@@ -958,6 +1048,8 @@ const PP_PX_ICONS = {
   '☢': 'ab_radioaktiv', '📘': 'ab_buch', '⛔': 'ab_halt', '🍀': 'ab_klee', '🥷': 'ab_ninja', '🤝': 'ab_haende',
   '🎹': 'ab_klavier', '🪑': 'ab_stuhl', '🧟': 'ab_zombie', '☥': 'ab_ankh', '🦷': 'ab_zahn', '🧬': 'ab_dna',
   '🪙': 'ab_muenze', '🌌': 'ab_galaxie', '✦': 'ab_funke',
+  // Eigenes Zeichen (Privatbereich, keine Unicode-Entsprechung): schwarzer Drachenkopf (Black-Thorn Dragon, Zauber-Immunität). Dasselbe Raster steht in scripts/pixel-emoji/handarbeit.json.
+  '\uE900': 'ab_drachenkopf',
 };
 for (const [n, s] of Object.entries(PP_PX_ABZEICHEN_SPRITES)) PP_PX_SPRITES['ab_' + n] = s;
 // Die Animationen (Pixelierer, PxZeichen) bekommen die neuen Zeichen mit,
@@ -1174,12 +1266,12 @@ const PP_PX_KLASSEN = {
   // Einzelregeln, wo ein entfernter Filter mehr tat als weichzeichnen.
   extra: [
     // Black Flame: `brightness(0)` faerbte auch die Glyphen schwarz.
-    '.anim-black-flame-shard{color:#3a0a52;}',
+    '.anim-black-flame-shard{color:#2e0a51;}',
   ],
   // Umrisse aus `border` + weichem Schein → Pixelring (eigener Verlauf).
   ersatz: [
-    { sel: '.anim-shield-bubble-rim', breite: 110, verlauf: 'radial-gradient(ellipse, transparent 64%, rgba(255,255,255,.95) 66%, rgba(255,255,255,.95) 69%, rgba(200,230,255,.5) 71%, transparent 73%)' },
-    { sel: '.torchure-ring', breite: 72, verlauf: 'radial-gradient(circle, transparent 58%, rgba(120,220,90,.55) 61%, #be5aff 63%, #be5aff 67%, rgba(160,60,230,.5) 69%, transparent 71%)' },
+    { sel: '.anim-shield-bubble-rim', breite: 110, verlauf: 'radial-gradient(ellipse, transparent 64%, rgba(255,255,255,.95) 66%, rgba(255,255,255,.95) 69%, rgba(189,220,239,.5) 71%, transparent 73%)' },
+    { sel: '.torchure-ring', breite: 72, verlauf: 'radial-gradient(circle, transparent 58%, rgba(61,220,87,.55) 61%, #b866ff 63%, #b866ff 67%, rgba(144,58,230,.5) 69%, transparent 71%)' },
   ],
   // Paket 3 (v1448): runde Abzeichen → Pixel-Plakette. `klassen` ist die
   // Klassenliste fuer die Probe (Flaeche und Rand werden aus style.css
@@ -1198,8 +1290,8 @@ const PP_PX_KLASSEN = {
   // 1-Pixel-Umriss in der Scheinfarbe.
   abzeichenExtra: [
     '.status-immune-icon{filter:drop-shadow(1px 1px 0 rgba(0,0,0,.8));}',
-    '.status-immune-icon.status-shielded-icon{filter:drop-shadow(1px 0 0 #ffd84a) drop-shadow(-1px 0 0 #ffd84a) drop-shadow(0 1px 0 #ffd84a) drop-shadow(0 -1px 0 #ffd84a) drop-shadow(1px 1px 0 rgba(0,0,0,.8))!important;}',
-    '.status-immune-icon.vena-bounty-badge{box-shadow:none;filter:drop-shadow(1px 0 0 #ff5060) drop-shadow(-1px 0 0 #ff5060) drop-shadow(0 1px 0 #ff5060) drop-shadow(0 -1px 0 #ff5060);}',
+    '.status-immune-icon.status-shielded-icon{filter:drop-shadow(1px 0 0 #fad54a) drop-shadow(-1px 0 0 #fad54a) drop-shadow(0 1px 0 #fad54a) drop-shadow(0 -1px 0 #fad54a) drop-shadow(1px 1px 0 rgba(0,0,0,.8))!important;}',
+    '.status-immune-icon.vena-bounty-badge{box-shadow:none;filter:drop-shadow(1px 0 0 #fe5154) drop-shadow(-1px 0 0 #fe5154) drop-shadow(0 1px 0 #fe5154) drop-shadow(0 -1px 0 #fe5154);}',
     '.mummified-icon{filter:drop-shadow(1px 1px 0 rgba(0,0,0,.8))!important;}',
     // Buff-Puls: statt weichem Schein ein gestufter Helligkeitswechsel.
     '.buff-icon{animation:ppPxBuffPuls 2s steps(2,jump-none) infinite;}',
@@ -1476,12 +1568,14 @@ function ppPixelieren(wurzel) {
     a.radius = radProzent ? Math.min(a.w, a.h) * parseFloat(cs.borderTopLeftRadius) / 100 : rad;
     if (!a.verlauf && (!bg || bg === 'none') && bgf[3] > 0.05 && rundGross && a.w > 0 && a.w <= 40) a.partikel = cs.backgroundColor;
     const bw = parseFloat(cs.borderTopWidth) || 0;
+    a.bl = parseFloat(cs.borderLeftWidth) || 0; a.bt = bw;      // ★ W86z: absolut positionierte Kinder (Halo) beziehen sich auf die Innenkante — Halo mittig auf die AUSSENkante setzen
     if (bw > 0 && cs.borderTopStyle === 'solid' && ppFarbe(cs.borderTopColor)[3] > 0.05
         && !_ppKeyframesAendernGroesse(cs.animationName)) {
       a.rahmen = { farbe: cs.borderTopColor, dicke: bw };
     }
     const scheine = _ppScheine(cs.boxShadow).concat(_ppScheine((cs.filter || '').match(/drop-shadow\(.*\)/)?.[0] || ''));
     if (scheine.length) a.schein = scheine.sort((p, q) => q.blur - p.blur)[0];
+    a.position = cs.position;                  // (immer lesen: Halo + Glyph-Kasten brauchen es) — schon HIER lesen: ein Lesen nach den Schreibzugriffen (s. unten) erzwang je Element eine volle Stilberechnung (Layout-Thrashing, ~95 % der Pixelierzeit)
     if (cs.boxShadow && cs.boxShadow !== 'none') a.ohneSchatten = true;
     if (/drop-shadow|blur\(/.test(cs.filter || '')) a.filter = _ppFilterOhneSchein(cs.filter);
     // Emoji/Glyphe: genau ein Textkind, das eine Sprite-Entsprechung hat.
@@ -1489,7 +1583,7 @@ function ppPixelieren(wurzel) {
     if (kinder.length === 1 && kinder[0].nodeType === 3) {
       const z = kinder[0].nodeValue.trim();
       if (PP_PX_ZEICHEN[z]) { a.zeichen = z; a.farbe = cs.color; a.schrift = parseFloat(cs.fontSize) || 16; }
-      else if (PP_EMOJI_MUSTER.test(z)) { a.emoji = z; a.schrift = parseFloat(cs.fontSize) || 16; }
+      else if (PP_EMOJI_MUSTER.test(z) || ppPxSchriftSymbol(z)) { a.emoji = z; a.farbe = cs.color; a.schrift = parseFloat(cs.fontSize) || 16; }
       else if (z.length > 1 && /\S/.test(z) && cs.textShadow && cs.textShadow !== 'none') {
         a.text = { schatten: cs.textShadow, groesse: parseFloat(cs.fontSize) || 16 };
       }
@@ -1531,14 +1625,20 @@ function ppPixelieren(wurzel) {
         st.backgroundSize = '1em 1em'; st.backgroundRepeat = 'no-repeat'; st.backgroundPosition = 'center';
         st.color = 'transparent'; st.textShadow = 'none';
         st.imageRendering = 'pixelated';
+        // ★ W86z: frei stehende Glyphen bekommen einen festen Kasten (1em x 1em) statt der Textbreite — sonst haengt die Boxgroesse (und damit
+        // Skalierung, Drehpunkt, Sprite) davon ab, ob die Schrift beim Einblenden schon geladen ist.
+        if (ppPixelAnimAktiv() && (a.position === 'absolute' || a.position === 'fixed')) { const k = Math.max(4, Math.round(a.schrift / 4) * 4) + 'px'; st.width = k; st.height = k; st.lineHeight = k; st.backgroundSize = k + ' ' + k; }
       }
     }
     if (a.emoji) {
-      const u = ppPxEmojiUrl(a.emoji, a.schrift);
+      const fu = ppPxSchriftBildUrl(a.emoji, a.farbe);            // ★ W86p: das Zeichen der Pixel-Emoji-Schrift selbst (1 em, ohne Rand) statt eines Systememojis
+      const u = fu || ppPxEmojiUrl(a.emoji, a.schrift);
+      const gr = fu ? 1 : 1.1;
       if (u) {
         st.backgroundImage = `url(${u})`;
-        st.backgroundSize = '1.1em 1.1em'; st.backgroundRepeat = 'no-repeat'; st.backgroundPosition = 'center';
+        st.backgroundSize = `${gr}em ${gr}em`; st.backgroundRepeat = 'no-repeat'; st.backgroundPosition = 'center';
         st.color = 'transparent'; st.textShadow = 'none'; st.imageRendering = 'pixelated';
+        if (ppPixelAnimAktiv() && (a.position === 'absolute' || a.position === 'fixed')) { const k = Math.max(4, Math.round(a.schrift * gr / 4) * 4) + 'px'; st.width = k; st.height = k; st.lineHeight = k; st.backgroundSize = k + ' ' + k; }
       }
     }
     if (ebenen.length) {
@@ -1562,16 +1662,18 @@ function ppPixelieren(wurzel) {
     if (a.filter !== undefined) st.filter = a.filter;
     if (a.schein && a.w > 0 && a.h > 0) {
       // Halo als erstes Kind, hinter dem Inhalt.
-      const rand = Math.min(40, Math.max(3, Math.round(a.schein.blur * 0.8)));
+      const pa = ppPixelAnimAktiv();
+      // ★ W86z: gerade Randbreite (Halo-Kanten bleiben beim Skalieren auf ganzen Pixeln); Retro-Modus: wie bisher
+      const rand = pa ? Math.min(40, Math.max(4, Math.round(a.schein.blur * 0.4) * 2)) : Math.min(40, Math.max(3, Math.round(a.schein.blur * 0.8)));
       const u = ppPxHaloUrl(a.schein.farbe, a.w, a.h, rand, a.rund || !!a.zeichen || !!a.emoji);
       if (u) {
         const halo = document.createElement('i');
         halo.setAttribute('aria-hidden', 'true');
         halo.className = 'pp-px-halo';
-        halo.style.cssText = `position:absolute;left:${-rand}px;top:${-rand}px;width:${a.w + 2 * rand}px;height:${a.h + 2 * rand}px;`
+        halo.style.cssText = `position:absolute;left:${pa ? -rand - a.bl : -rand}px;top:${pa ? -rand - a.bt : -rand}px;width:${a.w + 2 * rand}px;height:${a.h + 2 * rand}px;`
           + `background:url(${u}) center/100% 100% no-repeat;image-rendering:pixelated;pointer-events:none;z-index:-1;`;
         _ppPxErledigt.add(halo);
-        if (getComputedStyle(el).position === 'static') st.position = 'relative';
+        if (a.position === 'static') st.position = 'relative';
         el.insertBefore(halo, el.firstChild);
       }
     }
@@ -1585,7 +1687,78 @@ function ppPixelieren(wurzel) {
  * vergroessert. Rueckfall fuer alle Zeichen ohne eigenes Sprite.
  */
 const PP_EMOJI_SCHRIFT = '"Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji","Twemoji Mozilla",sans-serif';
+
+/**
+ * ★ W86p: Zeichen aus der Pixel-Emoji-Schrift (`PP Pixel Emoji`, Raster 16 x 16, jede Zelle ein Rechteck) als Pixelbild.
+ * Die Schrift zeichnet ihre Zellen als Vektorrechtecke: bei Schriftgroessen, die kein Vielfaches von 16 sind, malt der Browser jede Zellkante
+ * mit Teildeckkraft (Mischfarben ausserhalb der 256er-Palette). Hier wird das Zeichen EINMAL mit 16 px (Zelle = genau 1 Bildpunkt) auf ein
+ * Canvas gemalt und das Bild danach hart (`image-rendering: pixelated`) auf die Zielgroesse gestreckt — Palettenfarben bleiben Palettenfarben.
+ * `farbe`: Vordergrundfarbe fuer einfarbige Zeichen (Pfeile, Sterne …). '' = Schrift noch nicht geladen / Zeichen nicht in der Schrift.
+ */
+function ppPxSchriftBildUrl(z, farbe) {
+  if (!ppPixelAnimAktiv() || !z) return '';
+  try {
+    if (!document.fonts || !document.fonts.check('16px "PP Pixel Emoji"', z)) {
+      if (document.fonts && document.fonts.load) document.fonts.load('16px "PP Pixel Emoji"', z).catch(() => {});
+      return '';
+    }
+  } catch { return ''; }
+  const f = ppFarbe(farbe || '#ffffff');
+  const q = window.ppSnapRgb ? window.ppSnapRgb(f[0] | 0, f[1] | 0, f[2] | 0) : [f[0] | 0, f[1] | 0, f[2] | 0];
+  const key = 'fg:' + z + ':' + q.join(',');
+  if (_ppSchriftLeer.has(key)) return '';
+  let leer = true;
+  const url = ppPxBild(key, 16, 16, (setze) => {
+    const c = document.createElement('canvas');
+    c.width = 16; c.height = 16;
+    const ctx = c.getContext('2d', { willReadFrequently: true });
+    ctx.font = '16px "PP Pixel Emoji"';
+    ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic';
+    ctx.fillStyle = `rgb(${q[0]},${q[1]},${q[2]})`;
+    ctx.fillText(z, 0, 14);                                   // Aufstieg 896/1024 em = 14 px: Oberkante des Rasters liegt bei y = 0
+    const d = ctx.getImageData(0, 0, 16, 16).data;
+    for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) {
+      const i = (y * 16 + x) * 4;
+      if (d[i + 3] >= 128) { setze(x, y, [d[i], d[i + 1], d[i + 2], 1]); leer = false; }
+    }
+    if (leer) _ppSchriftLeer.add(key);
+  }, 2);
+  return _ppSchriftLeer.has(key) ? '' : url;
+}
+const _ppSchriftLeer = new Set();      // Zeichen, die die Schrift nicht zeichnet (leeres Bild): nicht noch einmal versuchen
+let _ppSchriftBereiche = null;
+/** Codepunkt-Bereiche der Pixel-Emoji-Schrift (aus ihrer `@font-face`-Regel in style.css). */
+function ppPxSchriftBereiche() {
+  if (_ppSchriftBereiche) return _ppSchriftBereiche;
+  const lst = [];
+  try {
+    for (const blatt of Array.from(document.styleSheets)) {
+      let regeln; try { regeln = blatt.cssRules; } catch { continue; }
+      for (const r of Array.from(regeln || [])) {
+        if (r.type !== 5 || !/PP Pixel Emoji/.test(r.style.getPropertyValue('font-family'))) continue;
+        r.style.getPropertyValue('unicode-range').split(',').forEach((t) => {
+          const m = /U\+([0-9A-F]+)(?:-([0-9A-F]+))?/i.exec(t.trim());
+          if (m) lst.push([parseInt(m[1], 16), parseInt(m[2] || m[1], 16)]);
+        });
+        break;
+      }
+      if (lst.length) break;
+    }
+  } catch {}
+  if (lst.length) _ppSchriftBereiche = lst;
+  return lst;
+}
+/** Einzelnes Symbol ausserhalb von Latin (Pfeile, Sterne, Dingbats …), das die Pixel-Emoji-Schrift zeichnet? */
+function ppPxSchriftSymbol(z) {
+  const cps = [...String(z).replace(/\uFE0F/g, '')];
+  if (cps.length !== 1) return false;
+  const c = cps[0].codePointAt(0);
+  return c >= 0x2000 && ppPxSchriftBereiche().some(([a, b]) => c >= a && c <= b);
+}
+
 function ppPxEmojiUrl(z, groessePx) {
+  const fu = ppPxSchriftBildUrl(z, '#ffffff');
+  if (fu) return fu;
   const n = Math.max(10, Math.min(28, Math.round((groessePx || 16) / 2.4)));
   return ppPxBild('em:' + n + ':' + z, n + 2, n + 2, (setze) => {
     const c = document.createElement('canvas');
@@ -1634,9 +1807,14 @@ function ppPxSpriteGefaerbtUrl(name, farbe, stufe = 0) {
  * jeden spaeter eingehaengten Knoten (Phasen, die erst nach Zeit
  * erscheinen). Gibt die Abmeldung zurueck.
  */
-function ppPixeliererAnhaengen(wurzel) {
+function ppPixeliererAnhaengen(wurzel, opt) {
   if (!wurzel) return () => {};
+  const bewegung = !(opt && opt.bewegung === false);       // false (Vorwaermen): nur Pixelbilder erzeugen, nichts backen
+  try { if (bewegung && window.PPPixelAnim) window.PPPixelAnim.geometrieRunden(wurzel); } catch (err) { console.warn('[PixelAnim]', err?.message); }
   try { ppPixelieren(wurzel); } catch (err) { console.warn('[Pixelierer]', err?.message); }
+  // ★ W86z: danach Statisches (halbe Deckkraft, Alpha-Hintergruende, Drehung) und die Bewegung — Takt, Dither-Fade, Kunstpixel-Skalierung
+  // (public/pixel-anim.js).
+  try { if (bewegung && window.PPPixelAnim) { window.PPPixelAnim.statisch(wurzel); window.PPPixelAnim.backenAlle(wurzel); } } catch (err) { console.warn('[PixelAnim]', err?.message); }
   let wartend = null;
   const neue = new Set();
   const beobachter = new MutationObserver((liste) => {
@@ -1645,13 +1823,139 @@ function ppPixeliererAnhaengen(wurzel) {
     wartend = requestAnimationFrame(() => {
       wartend = null;
       const jetzt = Array.from(neue); neue.clear();
-      for (const n of jetzt) { try { ppPixelieren(n); } catch {} }
+      for (const n of jetzt) {
+        try { if (bewegung && window.PPPixelAnim) window.PPPixelAnim.geometrieRunden(n); } catch {}
+        try { ppPixelieren(n); } catch {}
+        try { if (bewegung && window.PPPixelAnim && n.isConnected) { window.PPPixelAnim.statisch(n); window.PPPixelAnim.backenAlle(n); } } catch {}
+      }
     });
   });
   beobachter.observe(wurzel, { childList: true, subtree: true });
   return () => { beobachter.disconnect(); if (wartend) cancelAnimationFrame(wartend); };
 }
 window.ppPixeliererAnhaengen = ppPixeliererAnhaengen;
+
+/**
+ * ★ W86z — Randabdunklung (Vignette) der Area-Szenen als Pixelart: Bayer-gedithertes Schwarz (deckend) statt Radialverlauf mit Alpha.
+ * Gleiche Form wie vorher (`radial-gradient(ellipse 75% 70%, 0 bei 55 %, 30 % Schwarz am Rand)`), aber jede Kachel ist ein Kunstpixel
+ * (`nx` x `ny` Pixel, vom Aufrufer auf die Szenenpixel gelegt). Wird je Groesse gemerkt.
+ */
+function ppRandDimUrl(nx, ny) {
+  nx = Math.max(8, Math.min(1024, Math.round(nx))); ny = Math.max(8, Math.min(1024, Math.round(ny)));
+  return ppPxBild('rd:' + nx + 'x' + ny, nx, ny, (setze) => {
+    for (let y = 0; y < ny; y++) {
+      for (let x = 0; x < nx; x++) {
+        const t = Math.hypot(((x + 0.5) / nx - 0.5) / 0.75, ((y + 0.5) / ny - 0.5) / 0.70);   // 1 = Ellipsenrand
+        const a = 0.3 * Math.max(0, Math.min(1, (t - 0.55) / 0.45));
+        if (a > 0 && a > ppBayer(x, y)) setze(x, y, [0, 0, 0, 1]);
+      }
+    }
+  }, 1);
+}
+window.ppRandDimUrl = ppRandDimUrl;
+
+/**
+ * ★ W86u2 — Schein/Schleier als Pixelbild in Elementgroesse (Titelkulisse, Menuehintergrund): `gradient` ist ein `radial-gradient(...)`/
+ * `linear-gradient(...)` wie in CSS; zwischen den Farbstopps wird gedithert (Bayer), Alpha wird deckend/leer (`ppPxVerlaufUrl`), jede Farbe rastet
+ * auf die Palette. `px` = Kunstpixel in CSS-px (Standard 4). Das Element behaelt Groesse/Lage/Animation aus CSS (Klasse); nur der Hintergrund kommt
+ * von hier und wird bei Groessenaenderung neu gemalt. Retro-Modus: der Verlauf bleibt, wie er war.
+ */
+function PpVerlauf({ gradient, px = 4, className, style, retroBlend, retroGradient }) {
+  const ref = useRef(null);
+  const retro = !!window.PP_RETRO;
+  useLayoutEffect(() => {
+    const el = ref.current; if (!el || retro) return undefined;
+    const zeichnen = () => {
+      const W = el.offsetWidth, H = el.offsetHeight;
+      if (!W || !H) return;
+      const raster = px * 8;                                          // Groesse grob gerastert: wenige verschiedene Bilder beim Skalieren
+      const url = ppPxVerlaufUrl(gradient, Math.max(raster, Math.round(W / raster) * raster), Math.max(raster, Math.round(H / raster) * raster), px);
+      if (url) el.style.backgroundImage = `url(${url})`;
+    };
+    zeichnen();
+    const ro = window.ResizeObserver ? new ResizeObserver(zeichnen) : null;
+    if (ro) ro.observe(el);
+    return () => { if (ro) ro.disconnect(); };
+  }, [gradient, px, retro]);
+  return retro
+    ? <div className={className} style={{ ...style, background: retroGradient || gradient, ...(retroBlend ? { mixBlendMode: retroBlend } : {}) }} />
+    : <div ref={ref} className={className} data-pp-px="aus" style={{ ...style, backgroundSize: '100% 100%', backgroundRepeat: 'no-repeat', imageRendering: 'pixelated' }} />;
+}
+window.PpVerlauf = PpVerlauf;
+
+/**
+ * ★ W86u2 — Pixel-Partikelmaschine fuer Konfetti/Funken (Canvas): alles in ganzen Kunstpixeln (Zelle `px` CSS-px), 30 Hz (`ppTaktRaf`),
+ * keine Drehung, kein `shadowBlur`, keine `globalAlpha`-Mischung — Ausblenden per Bayer-Dither, Formen als Pixelsprites (Kreis, Raute,
+ * Stern, Funke), Farben auf die Palette gerastet. Das Canvas wird in Zellaufloesung gemalt und per `image-rendering: pixelated` vergroessert.
+ *
+ *   const stopp = ppPixelPartikel(canvas, teile, { px: 2, onFertig, maxMs })
+ *   teile: [{ x, y, vx, vy, gravity, size, color, shape: 'circle'|'diamond'|'star'|'spark', life: 1, decay }]  (x/y/vx/vy in CSS-px, vx/vy je 60-Hz-Bild)
+ */
+const _ppPtSprites = new Map();
+function _ppPtSprite(form, r) {
+  const key = form + r;
+  let l = _ppPtSprites.get(key); if (l) return l;
+  l = [];
+  for (let dy = -r; dy <= r; dy++) for (let dx = -r; dx <= r; dx++) {
+    let an;
+    if (form === 'circle') an = dx * dx + dy * dy <= r * r + r * 0.6;
+    else if (form === 'diamond') an = Math.abs(dx) + Math.abs(dy) <= r;
+    else if (form === 'star') an = (dx === 0 || dy === 0) || (Math.abs(dx) === 1 && Math.abs(dy) === 1 && r >= 2);
+    else an = dx === 0 || dy === 0;                                   // 'spark': duenne Kreuzarme
+    if (an) l.push(dx, dy);
+  }
+  _ppPtSprites.set(key, l);
+  return l;
+}
+function ppPixelPartikel(canvas, teile, opt) {
+  opt = opt || {};
+  const px = opt.px || 2;
+  const W = Math.max(8, Math.ceil(window.innerWidth / px)), H = Math.max(8, Math.ceil(window.innerHeight / px));
+  canvas.width = W; canvas.height = H;
+  canvas.style.imageRendering = 'pixelated';
+  const g = canvas.getContext('2d');
+  g.imageSmoothingEnabled = false;
+  const farbe = {};
+  const rgb = (hex) => {
+    if (farbe[hex]) return farbe[hex];
+    const sn = window.ppSnap ? window.ppSnap(hex) : hex;
+    const m = /^#?([0-9a-f]{6})$/i.exec(sn) || /^#?([0-9a-f]{6})$/i.exec('#ffffff');
+    const n = parseInt(m[1], 16);
+    return (farbe[hex] = [(n >> 16) & 255, (n >> 8) & 255, n & 255]);
+  };
+  const raf = window.ppTaktRaf || window.requestAnimationFrame;
+  const caf = window.cancelAnimationFrame;
+  let id = 0, letzt = 0, aus = false;
+  const t0 = performance.now();
+  const bild = g.createImageData(W, H), d = bild.data;
+  const schritt = (t) => {
+    id = 0; if (aus) return;
+    const dt = (letzt ? Math.min(3, (t - letzt) / 16.667) : 1) * (opt.tempo ? opt.tempo() : 1); letzt = t;   // opt.tempo(): Zeitfaktor (Shop: ×5-Modus)
+    d.fill(0);
+    let lebt = false;
+    for (const p of teile) {
+      if (p.life <= 0) continue;
+      lebt = true;
+      p.x += p.vx * dt; p.y += p.vy * dt; p.vy += (p.gravity || 0) * dt; p.life -= p.decay * dt;
+      if (p.life <= 0) continue;
+      const r = Math.max(1, Math.round(p.size * (0.5 + Math.min(1, p.life) * 0.5) / (px * 2)));
+      const sp = _ppPtSprite(p.shape || 'circle', r), c = rgb(p.color);
+      const cx = Math.floor(p.x / px), cy = Math.floor(p.y / px), voll = p.life >= 1 ? 1 : p.life * 1.2;
+      for (let i = 0; i < sp.length; i += 2) {
+        const x = cx + sp[i], y = cy + sp[i + 1];
+        if (x < 0 || y < 0 || x >= W || y >= H) continue;
+        if (voll < 1 && voll <= ppBayer(x, y)) continue;
+        const o = (y * W + x) * 4; d[o] = c[0]; d[o + 1] = c[1]; d[o + 2] = c[2]; d[o + 3] = 255;
+      }
+    }
+    g.putImageData(bild, 0, 0);
+    if (lebt && (!opt.maxMs || t - t0 < opt.maxMs + 500)) id = raf(schritt);
+    else if (opt.onFertig) opt.onFertig();
+  };
+  id = raf(schritt);
+  return () => { aus = true; if (id) caf(id); };
+}
+window.ppPixelPartikel = ppPixelPartikel;
 
 window.PxZeichen = PxZeichen;
 window.PxIcon = PxIcon;
@@ -1782,6 +2086,8 @@ const SFX_NAMES = [
   'summon', 'sunglasses_drop', 'turn_start', 'ui_cancel', 'ui_click',
   'ui_error', 'ui_prompt_open', 'victory',
   'doom_tick',   // v1421: Uhrzeiger-Tick der Doom Clock (synthetisiert)
+  // Shop-Pull-Inszenierung (synthetisiert, scripts/sfx/pull-sounds.py)
+  'pull_circle', 'pull_crack', 'pull_note', 'pull_swell', 'pull_shatter', 'pull_reveal', 'pull_sparkle',
 ];
 
 let _sfxCtx = null;
@@ -1971,6 +2277,9 @@ function playSFX(name, opts = {}) {
     return;
   }
   const now = performance.now();
+  // Zeitpunkt des letzten `draw` (auch eines abgewiesenen Aufrufs): der Puzzle-Editor spielt beim Loslassen einer gezogenen Karte den Klang der
+  // Handkarten (`draw`) — hat die Ablage (Hand, Stapel, Umsortieren) waehrenddessen schon eines gespielt, entfaellt er (sonst zweimal).
+  if (name === 'draw') window._ppDrawT = now;
   // Apply an auto-dedupe default for known UI sounds when the caller
   // didn't pass an explicit `dedupe`. Explicit `dedupe: 0` from a
   // caller still wins (treated as "I really do want every call to
@@ -2067,22 +2376,53 @@ function _playBuffer(ctx, buf, opts, intrinsic, delaySec) {
   try { src.start(delaySec > 0 ? ctx.currentTime + delaySec : 0); } catch {}
 }
 
-// Resume AudioContext on first user gesture (Chrome/Safari autoplay policy).
-// Also kick off decoding of any SFX bytes fetched before the context existed.
+// ═══ AUDIO ENTSPERREN (Mobil-Befund: Tap-Screen und Login ohne Musik, Textbox-Klang verzoegert) ═══════
+// Chrome/Samsung Internet/Safari lassen einen AudioContext nur aus einer ECHTEN Aktivierungsgeste heraus laufen: `click`, `pointerup`,
+// `touchend`, `keydown`. `touchstart` zaehlt NICHT. Der alte Entsperrer hing an `touchstart`, rief dort `resume()` (wirkungslos) und
+// entfernte sich danach selbst — der Kontext blieb auf dem Handy `suspended`, bis irgendein spaeterer Klick zufaellig ein `playSFX` ausloeste.
+// Folge: Tap-Screen und Login ohne Musik, erste Klaenge verspaetet. Jetzt: die Entsperr-Horcher bleiben, bis der Kontext TATSAECHLICH laeuft
+// (und kommen zurueck, wenn er wieder haengt, z.B. nach Tab-Wechsel / Anruf), und melden den Lauf per `pp-audio-running`.
+// Ausserdem haelt ein unhoerbarer Dauerton den Audio-Ausgang des Handys wach (sonst braucht der erste Klang nach Stille spuerbar laenger).
 if (typeof window !== 'undefined') {
-  const _unlockSfx = () => {
-    const ctx = _getSfxCtx();
-    if (ctx && ctx.state === 'suspended') { try { ctx.resume(); } catch {} }
-    for (const name of SFX_NAMES) {
-      if (_sfxBytes[name] && !_sfxBuffers[name]) _decodeSfxBytes(name);
-    }
-    window.removeEventListener('click', _unlockSfx);
-    window.removeEventListener('keydown', _unlockSfx);
-    window.removeEventListener('touchstart', _unlockSfx);
+  const GESTEN = ['pointerup', 'touchend', 'click', 'keydown', 'mousedown'];
+  let _wach = false;
+  const _haltWach = (ctx) => {
+    if (_wach) return; _wach = true;
+    try {
+      const buf = ctx.createBuffer(1, ctx.sampleRate, ctx.sampleRate);   // 1 s, kaum messbares Rauschen (-90 dB), laeuft in Schleife
+      const d = buf.getChannelData(0); for (let i = 0; i < d.length; i++) d[i] = (Math.random() - 0.5) * 6e-5;
+      const q = ctx.createBufferSource(); q.buffer = buf; q.loop = true; q.connect(ctx.destination); q.start(0);
+    } catch {}
   };
-  window.addEventListener('click', _unlockSfx);
-  window.addEventListener('keydown', _unlockSfx);
-  window.addEventListener('touchstart', _unlockSfx);
+  const _laeuft = () => { const c = _sfxCtx; return !!(c && c.state === 'running'); };
+  const _gemeldet = () => {
+    const ctx = _sfxCtx; if (!ctx || ctx.state !== 'running') return;
+    for (const name of SFX_NAMES) { if (_sfxBytes[name] && !_sfxBuffers[name]) _decodeSfxBytes(name); }
+    _haltWach(ctx);
+    GESTEN.forEach(t => window.removeEventListener(t, _entsperren, true));
+    try { window.dispatchEvent(new Event('pp-audio-running')); } catch {}
+  };
+  const _scharf = () => GESTEN.forEach(t => window.addEventListener(t, _entsperren, { capture: true, passive: true }));
+  function _entsperren() {
+    const ctx = _getSfxCtx();
+    if (!ctx) return;
+    if (ctx.state === 'running') { _gemeldet(); return; }
+    let p; try { p = ctx.resume(); } catch {}
+    Promise.resolve(p).then(_gemeldet, () => {});
+  }
+  window.ppAudioEntsperren = _entsperren;
+  window.ppAudioLaeuft = _laeuft;
+  _scharf();
+  // Sofortversuch beim Laden: Browser, die Ton ohne Geste erlauben (hohes Medien-Engagement, Seiteneinstellung „Ton zulassen“), starten die Musik
+  // gleich; alle anderen lassen `resume()` offen, bis die erste Geste kommt (die Horcher oben).
+  try { _entsperren(); } catch {}
+  // Kontext schon beim Laden anlegen (startet suspendiert, ohne Warnung): so kann `statechange` beobachtet werden, und der erste Tipp
+  // muss nur noch `resume()` rufen. Faellt der Kontext spaeter zurueck (iOS „interrupted", Tab-Wechsel), werden die Horcher neu gescharft.
+  try {
+    const c = _getSfxCtx();
+    if (c) c.addEventListener('statechange', () => { if (c.state === 'running') _gemeldet(); else _scharf(); });
+  } catch {}
+  document.addEventListener('visibilitychange', () => { if (!document.hidden && !_laeuft()) _scharf(); });
   _initSoundManager();
 }
 
@@ -2212,6 +2552,12 @@ function playSFXForLog(entry) {
     case 'inventing_discard_draw':
       playSFX('discard', { dedupe: 40 });
       return;
+    // Elixir of Immortality & Co. („Place openly"-Potions): der Klang haengt NICHT mehr allein an der Permanent-Animation (die ihn wegen der
+    // 400-ms-Effekt-Sperre schlucken konnte — Befund: Elixir stumm). Das Log liefert ihn zusaetzlich; die gemeinsame Dedupe-Zeit (900 ms auf
+    // `revive`) verhindert doppelte Wiedergabe.
+    case 'potion_placed_open':
+      playSFX('revive', { dedupe: 900, category: null });
+      return;
     case 'shuffle_back':
       playSFX('shuffle');
       return;
@@ -2234,6 +2580,11 @@ function playSFXForLog(entry) {
     case 'creature_stolen':
     case 'ability_attached':
     case 'surprise_set':
+    // ★ 20.10. (Als Befund: „Eine Surprise-Creature mit dem eigenen Effekt wieder verdeckt zu setzen, spielt noch keinen Sound
+    // ab"): `surpriseCreatureReset` (Pure Advantage Camel, Afflicted Vermin/Pests, Cactus Creature, Noble Mummy Guards, Mummy
+    // Maker Machine) loggt `surprise_reset`. Die Sand-Animation (`sand_reset`) bleibt bewusst stumm — der Klang kommt wie beim
+    // Setzen aus dem Log.
+    case 'surprise_reset':
     case 'artifact_equipped':
     case 'artifact_creature_placed':
       playSFX('placement');
@@ -2345,6 +2696,14 @@ function playSFXForLog(entry) {
     // ── Ascension / special ───────────────────
     case 'hero_ascension':
       playSFX('ascension');
+      return;
+    // True Form / Open Invitation / Tri Ad: eine Form wird nur GELEGT (kein Aufstieg) bzw. wieder abgelegt — der Morph braucht trotzdem Klang.
+    case 'hero_form_placed':
+      playSFX('ascension');
+      return;
+    case 'hero_form_returned':
+      playSFX('debuff');
+      setTimeout(() => playSFX('status_remove', { dedupe: 0 }), 260);
       return;
     case 'reaction_activated':
       playSFX('chain_add');
@@ -2722,6 +3081,61 @@ const ZONE_ANIM_SFX = {
   battery_charge:          { name: 'elem_lightning', opts: { rate: 1.5, volume: 0.45 } },
   modifier_sparkle:        { name: 'buff', opts: { rate: 1.25, volume: 0.5 } },
   level_down:              { name: 'debuff', opts: { rate: 0.9, volume: 0.7 } },   // Looming Threat: Stufe sinkt
+  hand_level_down:         { name: 'debuff', opts: { rate: 1.0, volume: 0.6 } },   // Great Vanguard Demon: Stufe sinkt (Pixelart, die Karte bleibt sichtbar)
+  // Ancient Guardian Statue — Magiefaden von der Statue zur aufgedeckten Handkarte; `mode` 'reveal' | 'tick' (Senkung) | 'free' (Stufe 0: kräftiger Beat).
+  statue_magic: (p) => {
+    // Zeiten animationsrelativ (Einbau-Versatz legt `playSFXForZoneAnim` selbst dazu): Faden schießt los (0), trifft die Karte (560), alte Zahl bricht (~830), neue Zahl klickt ein (~1010).
+    const ph = p && (p.mode || p.phase);
+    const tail = { category: null, dedupe: 0 };
+    if (ph === 'free') return [
+      { name: 'spell_cast', opts: { rate: 1.3, volume: 0.5 } },
+      { name: 'ping',   opts: { rate: 1.5, volume: 0.45, delay: 560, ...tail } },
+      { name: 'debuff', opts: { rate: 1.4, volume: 0.3, delay: 830, ...tail } },
+      { name: 'buff',   opts: { rate: 1.0, volume: 0.85, delay: 1000, ...tail } },
+      { name: 'ping',   opts: { rate: 2.2, volume: 0.45, delay: 1010, ...tail } },
+      { name: 'ping',   opts: { rate: 2.7, volume: 0.35, delay: 1250, ...tail } },
+    ];
+    if (ph === 'tick') return [
+      { name: 'spell_cast', opts: { rate: 1.3, volume: 0.45 } },
+      { name: 'ping',   opts: { rate: 1.5, volume: 0.45, delay: 560, ...tail } },
+      { name: 'debuff', opts: { rate: 1.4, volume: 0.35, delay: 830, ...tail } },
+      { name: 'ping',   opts: { rate: 2.0, volume: 0.35, delay: 1010, ...tail } },
+    ];
+    return [
+      { name: 'spell_cast', opts: { rate: 1.15, volume: 0.45 } },
+      { name: 'reveal', opts: { rate: 0.9, volume: 0.5, delay: 560, ...tail } },
+      { name: 'ping',   opts: { rate: 1.6, volume: 0.35, delay: 800, ...tail } },
+    ];
+  },
+  mind_control_hex:        { name: 'elem_dark', opts: { rate: 0.8, volume: 0.6 } },   // Mind Control: Hypnose-Spirale über dem übernommenen Helden (Pixelart)
+  // Infallible Oracle Pythia (W78) — grüne Flammen. `mark`: Aufflackern (Aufdeck-Ton + leises Zischen); `tick`: ein Flämmchen auf Pythia (Ping); `doom`: die Flammen lodern
+  // auf (Feuerrauschen, tiefes Brummen) und schlagen über dem Ziel zusammen (~1100 ms, Schlag); `burn`: das Opfer verbrennt; `save`: Pythia wird von den Flammen geheilt (Heil-Ton).
+  pythia_flames: (p) => {
+    const ph = p && p.phase;
+    if (ph === 'tick') return [{ name: 'ping', opts: { rate: 1.5, volume: 0.4 } }];
+    if (ph === 'save') return [
+      { name: 'elem_fire', opts: { rate: 1.3, volume: 0.45 } },
+      { name: 'heal',      opts: { rate: 1.1, volume: 0.6, delay: 380, category: null, dedupe: 0 } },
+    ];
+    if (ph === 'burn') return [
+      { name: 'elem_fire', opts: { rate: 0.9, volume: 0.7 } },
+      { name: 'elem_dark', opts: { rate: 0.8, volume: 0.45, delay: 500, category: null, dedupe: 0 } },
+    ];
+    if (ph === 'doom') return [
+      { name: 'elem_fire',    opts: { rate: 0.8, volume: 0.7 } },
+      { name: 'elem_dark',    opts: { rate: 0.7, volume: 0.5, delay: 250, category: null, dedupe: 0 } },
+      { name: 'heavy_impact', opts: { rate: 0.7, volume: 0.6, delay: 1050, category: null, dedupe: 0 } },
+    ];
+    return [
+      { name: 'reveal',    opts: { rate: 0.9, volume: 0.45 } },
+      { name: 'elem_fire', opts: { rate: 1.6, volume: 0.3, delay: 150, category: null, dedupe: 0 } },
+    ];
+  },
+  // Spy in the Enemy's Camp (23.10.) — das Auge öffnet sich (Aufdeck-Ton, 0 ms), beim Blinzeln ein Ping (~560 ms). Nur der erste Teil übernimmt die Sammelkategorie 'effect'.
+  spy_mark: [
+    { name: 'reveal', opts: { rate: 1.4, volume: 0.45 } },
+    { name: 'ping',   opts: { rate: 2.0, volume: 0.3, delay: 560, category: null, dedupe: 0 } },
+  ],
   loom_swell:              { name: 'elem_dark', opts: { rate: 0.6, volume: 0.9 } },   // Looming Threat: Karte schwillt an
   // Gangster Angel — Schusssalve (`gunshot_barrage`). `projectile` ist
   // der vorhandene Geschossklang; schneller abgespielt wird daraus ein
@@ -2801,6 +3215,82 @@ const ZONE_ANIM_SFX = {
     { name: 'elem_wind',    opts: { rate: 1.9,  volume: 0.35, delay: 450, category: null, dedupe: 0 } },
     { name: 'negate',       opts: { rate: 0.9,  volume: 0.6, delay: 520, category: null, dedupe: 0 } },
   ],
+  // Control Monitors (24.10.) — die Monitore flackern an (Blitzknistern, 0 / ~120 ms), dumpfes Summen (~420 ms), der weiße Streifen löscht die Schirme (~800 ms: Abwurf-Klang
+  // und Verneinungs-Ton). Nur der erste Teil uebernimmt die Sammelkategorie 'effect'.
+  control_monitors: [
+    { name: 'elem_lightning', opts: { rate: 1.9, volume: 0.3 } },
+    { name: 'elem_lightning', opts: { rate: 2.4, volume: 0.3, delay: 120, category: null, dedupe: 0 } },
+    { name: 'debuff',         opts: { rate: 0.9, volume: 0.4, delay: 420, category: null, dedupe: 0 } },
+    { name: 'discard',        opts: { rate: 0.8, volume: 0.7, delay: 800, category: null, dedupe: 0 } },
+    { name: 'negate',         opts: { rate: 1.2, volume: 0.5, delay: 830, category: null, dedupe: 0 } },
+  ],
+  // Celia, the Class Clown (24.10.) — die Kerzenflammen fliegen los (Zauberton und Feuerhauch, 0 / ~200 ms), die Kerzen setzen sich (hohe Pings, ~450 ms), die vierte
+  // zündet (~790 ms: Buff-Klang, heller Ping). Nur der erste Teil uebernimmt die Sammelkategorie 'effect'.
+  celia_candles: [
+    { name: 'spell_cast', opts: { rate: 1.4, volume: 0.4 } },
+    { name: 'elem_fire',  opts: { rate: 1.8, volume: 0.35, delay: 200, category: null, dedupe: 0 } },
+    { name: 'ping',       opts: { rate: 1.6, volume: 0.45, delay: 450, category: null, dedupe: 0 } },
+    { name: 'ping',       opts: { rate: 1.9, volume: 0.4, delay: 540, category: null, dedupe: 0 } },
+    { name: 'buff',       opts: { rate: 1.2, volume: 0.6, delay: 760, category: null, dedupe: 0 } },
+    { name: 'ping',       opts: { rate: 2.4, volume: 0.5, delay: 800, category: null, dedupe: 0 } },
+  ],
+  // Ghostly Warning (24.10.) — der Geist erscheint (dunkles Raunen, 0 ms), die Wolke wird eingesogen (Windsog ab ~380 ms), das Blinken verschluckt sie (~820 ms: Verneinungs-Ton).
+  // `phase: 'return'`: Raunen, Hand öffnet sich (~300 ms Schlag mit Feuerrauschen), Verpuffen (Wind ~650 ms).
+  ghostly_warning: (p) => (p && p.phase === 'return') ? [
+    { name: 'elem_dark',    opts: { rate: 0.9, volume: 0.6 } },
+    { name: 'heavy_impact', opts: { rate: 0.8, volume: 0.5, delay: 320, category: null, dedupe: 0 } },
+    { name: 'elem_fire',    opts: { rate: 0.7, volume: 0.8, delay: 330, category: null, dedupe: 0 } },
+    { name: 'elem_wind',    opts: { rate: 1.3, volume: 0.45, delay: 660, category: null, dedupe: 0 } },
+  ] : [
+    { name: 'elem_dark', opts: { rate: 0.8, volume: 0.6 } },
+    { name: 'elem_wind', opts: { rate: 1.6, volume: 0.5, delay: 380, category: null, dedupe: 0 } },
+    { name: 'negate',    opts: { rate: 0.9, volume: 0.7, delay: 820, category: null, dedupe: 0 } },
+  ],
+  // Atta, Speaker of Desires (24.10.) — die Bücher rauschen heran (Wind, 0 ms), klappen zu (~600 ms: Schlag, Funkensog), Bildschirmende dunkles Brummen; `phase: 'return'`: Bücher
+  // fliegen herbei (Wind), schlagen auf (~440–560 ms: Ping, Papier), blitzen (~640 ms: Buff-Klang).
+  atta_books: (p) => (p && p.phase === 'return') ? [
+    { name: 'elem_wind', opts: { rate: 1.5, volume: 0.5 } },
+    { name: 'placement', opts: { rate: 1.6, volume: 0.5, delay: 440, category: null, dedupe: 0 } },
+    { name: 'placement', opts: { rate: 1.9, volume: 0.4, delay: 520, category: null, dedupe: 0 } },
+    { name: 'ping',      opts: { rate: 1.8, volume: 0.5, delay: 640, category: null, dedupe: 0 } },
+    { name: 'buff',      opts: { rate: 1.1, volume: 0.6, delay: 650, category: null, dedupe: 0 } },
+  ] : [
+    { name: 'elem_wind', opts: { rate: 1.3, volume: 0.45 } },
+    { name: 'debuff',    opts: { rate: 1.2, volume: 0.4, delay: 480, category: null, dedupe: 0 } },
+    { name: 'placement', opts: { rate: 0.8, volume: 0.9, delay: 600, category: null, dedupe: 0 } },
+    { name: 'elem_dark', opts: { rate: 1.1, volume: 0.5, delay: 620, category: null, dedupe: 0 } },
+  ],
+  // Sinister Idol (W82) — Siegel und Nebel (dunkles Raunen, 0 ms), der Götze erscheint (Wind, ~160 ms), Runen zucken (hohe Pings, ~560 ms), die Ranken wachsen (Schwächungs-Klang, ~430 ms),
+  // Beat (~880 ms: Schlag, Verneinungs-Ton, Abwurf-Klang), Aufprall auf dem Ablagestapel (~1400 ms: Schlag, Platzieren). Nur der erste Teil uebernimmt die Sammelkategorie 'effect'.
+  sinister_idol: [
+    { name: 'elem_dark',    opts: { rate: 0.7, volume: 0.6 } },
+    { name: 'elem_wind',    opts: { rate: 0.8, volume: 0.35, delay: 160, category: null, dedupe: 0 } },
+    { name: 'debuff',       opts: { rate: 0.8, volume: 0.5, delay: 430, category: null, dedupe: 0 } },
+    { name: 'ping',         opts: { rate: 0.7, volume: 0.4, delay: 560, category: null, dedupe: 0 } },
+    { name: 'ping',         opts: { rate: 0.9, volume: 0.35, delay: 700, category: null, dedupe: 0 } },
+    { name: 'heavy_impact', opts: { rate: 0.7, volume: 0.6, delay: 880, category: null, dedupe: 0 } },
+    { name: 'negate',       opts: { rate: 1.1, volume: 0.6, delay: 890, category: null, dedupe: 0 } },
+    { name: 'discard',      opts: { rate: 0.8, volume: 0.6, delay: 920, category: null, dedupe: 0 } },
+    { name: 'placement',    opts: { rate: 0.7, volume: 0.6, delay: 1400, category: null, dedupe: 0 } },
+  ],
+  // Darion, the Blood-Crazy Groundskeeper (24.10.) — Kettensäge: Hieb (Schnitt, 0 und ~110 ms), Blutspritzer (Schlag ~140 ms), das Equip rastet ein (~420 ms: Schlag, heller Ping).
+  // Nur der erste Teil uebernimmt die Sammelkategorie 'effect'.
+  darion_equip: [
+    { name: 'slash',        opts: { rate: 0.8, volume: 0.7 } },
+    { name: 'slash',        opts: { rate: 1.1, volume: 0.6, delay: 110, category: null, dedupe: 0 } },
+    { name: 'heavy_impact', opts: { rate: 1.3, volume: 0.45, delay: 150, category: null, dedupe: 0 } },
+    { name: 'placement',    opts: { rate: 1.0, volume: 0.9, delay: 420, category: null, dedupe: 0 } },
+    { name: 'ping',         opts: { rate: 1.7, volume: 0.5, delay: 430, category: null, dedupe: 0 } },
+  ],
+  // Shipwrecked (W82) — die Dünung rollt heran (Wasser, 0 ms), die vordere Welle bricht (Wasser + Gischt ~220 ms), Planken und Fass schlagen an (~560 ms: Holz-Plätschern), die Welle zieht ab (Wasser ~950 ms).
+  // Nur der erste Teil uebernimmt die Sammelkategorie 'effect'.
+  shipwrecked_attach: [
+    { name: 'elem_water', opts: { rate: 0.8, volume: 0.6 } },
+    { name: 'elem_water', opts: { rate: 1.1, volume: 0.5, delay: 220, category: null, dedupe: 0 } },
+    { name: 'placement',  opts: { rate: 0.7, volume: 0.5, delay: 560, category: null, dedupe: 0 } },
+    { name: 'elem_water', opts: { rate: 1.3, volume: 0.35, delay: 600, category: null, dedupe: 0 } },
+    { name: 'elem_water', opts: { rate: 0.7, volume: 0.4, delay: 950, category: null, dedupe: 0 } },
+  ],
   // Cute Crown (10.10.) — die Flügel schlagen (Wind, 0 / ~110 / ~220 ms), das Juwel klingt hell (~300 ms), Herzen steigen auf (~520 ms). Nur der erste Teil uebernimmt die
   // Sammelkategorie 'effect'.
   crown_flutter: [
@@ -2818,6 +3308,238 @@ const ZONE_ANIM_SFX = {
     { name: 'negate',             opts: { rate: 1.4, volume: 0.55, delay: 420, category: null, dedupe: 0 } },
     { name: 'creature_destroyed', opts: { rate: 1.5, volume: 0.5,  delay: 480, category: null, dedupe: 0 } },
   ],
+  // Time Distortion (24.10.) — das Zifferblatt erscheint (Zauberton, 0 ms), der Zeiger rast (tickende Pings), bei ~650 ms bricht es auf (Glitzern). Nur der erste Teil uebernimmt die Sammelkategorie 'effect'.
+  time_distortion: [
+    { name: 'spell_cast', opts: { rate: 0.8, volume: 0.5 } },
+    { name: 'ping',       opts: { rate: 1.6, volume: 0.3, delay: 120, category: null, dedupe: 0 } },
+    { name: 'ping',       opts: { rate: 1.8, volume: 0.3, delay: 260, category: null, dedupe: 0 } },
+    { name: 'ping',       opts: { rate: 2.0, volume: 0.3, delay: 400, category: null, dedupe: 0 } },
+    { name: 'ping',       opts: { rate: 2.2, volume: 0.3, delay: 520, category: null, dedupe: 0 } },
+    { name: 'ping',       opts: { rate: 2.8, volume: 0.45, delay: 650, category: null, dedupe: 0 } },
+  ],
+  // Redirecting Aura (24.10.) — der Wirbel zieht sich zusammen (Zauberton, 0 ms), der Komet saust los (~260 ms, Wind), Einschlag bei ~700 ms (Ping und dumpfer Schlag). Nur der erste Teil uebernimmt die
+  // Sammelkategorie 'effect'.
+  redirect_aura: [
+    { name: 'spell_cast', opts: { rate: 1.5, volume: 0.45 } },
+    { name: 'elem_wind',  opts: { rate: 1.5, volume: 0.4,  delay: 260, category: null, dedupe: 0 } },
+    { name: 'ping',       opts: { rate: 2.2, volume: 0.5,  delay: 700, category: null, dedupe: 0 } },
+    { name: 'debuff',     opts: { rate: 1.7, volume: 0.35, delay: 720, category: null, dedupe: 0 } },
+  ],
+  // Reflection (26.10.) — der Spiegel erscheint (Zauberton, 0 ms), die Wirbel werden hineingezogen (Wind ~140 ms), bei ~470 ms der Blitz im Glas (Ping), der Strahl faehrt ab (~520 ms, Zischen) und
+  // zerplatzt bei ~780 ms (Klirren, Schwaechungston). Nur der erste Teil uebernimmt die Sammelkategorie 'effect'.
+  reflection_mirror: [
+    { name: 'spell_cast',         opts: { rate: 1.4, volume: 0.45 } },
+    { name: 'elem_wind',          opts: { rate: 1.3, volume: 0.35, delay: 140, category: null, dedupe: 0 } },
+    { name: 'ping',               opts: { rate: 2.6, volume: 0.45, delay: 470, category: null, dedupe: 0 } },
+    { name: 'slash',              opts: { rate: 2.0, volume: 0.35, delay: 520, category: null, dedupe: 0 } },
+    { name: 'creature_destroyed', opts: { rate: 1.9, volume: 0.4,  delay: 780, category: null, dedupe: 0 } },
+    { name: 'debuff',             opts: { rate: 1.3, volume: 0.4,  delay: 800, category: null, dedupe: 0 } },
+  ],
+  // Man-Eater Birds (26.10.) — der Schwarm fliegt an (Wind, 0 ms), ab ~700 ms Hacken und Schnitte (Schlag, Schnitt), die Creature wird gefressen (Zerstoerung ~1250 ms). Nur der erste Teil uebernimmt
+  // die Sammelkategorie 'effect'.
+  man_eater_swarm: [
+    { name: 'elem_wind',          opts: { rate: 1.9, volume: 0.4 } },
+    { name: 'elem_wind',          opts: { rate: 2.3, volume: 0.3,  delay: 280, category: null, dedupe: 0 } },
+    { name: 'slash',              opts: { rate: 1.5, volume: 0.4,  delay: 720, category: null, dedupe: 0 } },
+    { name: 'slash',              opts: { rate: 1.8, volume: 0.35, delay: 880, category: null, dedupe: 0 } },
+    { name: 'heavy_impact',       opts: { rate: 1.1, volume: 0.45, delay: 1000, category: null, dedupe: 0 } },
+    { name: 'creature_destroyed', opts: { rate: 0.9, volume: 0.5,  delay: 1250, category: null, dedupe: 0 } },
+  ],
+  // Man-Eater Birds, Zugende (26.10.) — der Schwarm kreist (Wind), drei Bisse bei ~650/850/1050 ms (Schnitt, dumpfer Treffer).
+  man_eater_bite: [
+    { name: 'elem_wind',    opts: { rate: 1.9, volume: 0.4 } },
+    { name: 'slash',        opts: { rate: 1.6, volume: 0.4,  delay: 650,  category: null, dedupe: 0 } },
+    { name: 'heavy_impact', opts: { rate: 1.3, volume: 0.35, delay: 670,  category: null, dedupe: 0 } },
+    { name: 'slash',        opts: { rate: 1.8, volume: 0.4,  delay: 850,  category: null, dedupe: 0 } },
+    { name: 'slash',        opts: { rate: 2.0, volume: 0.4,  delay: 1050, category: null, dedupe: 0 } },
+    { name: 'heavy_impact', opts: { rate: 1.1, volume: 0.4,  delay: 1070, category: null, dedupe: 0 } },
+  ],
+  // Great Immortal Hydra, Selbstheilung (26.10.) — der Tod wird abgewendet: dunkles Flackern (Biomantie-Ton, 0 ms), die Ringe ziehen sich zusammen (Wind ~150 ms), Blitz bei ~560 ms (Wiederbelebung, Heilton),
+  // die Koepfe wachsen (Aufwertung ~640 ms, Biomantie ~700 ms). Nur der erste Teil uebernimmt die Sammelkategorie 'effect'.
+  hydra_regrow: [
+    { name: 'elem_biomancy', opts: { rate: 0.8, volume: 0.45 } },
+    { name: 'elem_wind',     opts: { rate: 1.4, volume: 0.3,  delay: 150, category: null, dedupe: 0 } },
+    { name: 'revive',        opts: { rate: 1.0, volume: 0.5,  delay: 560, category: null, dedupe: 0 } },
+    { name: 'heal',          opts: { rate: 0.9, volume: 0.55, delay: 580, category: null, dedupe: 0 } },
+    { name: 'buff',          opts: { rate: 0.8, volume: 0.45, delay: 660, category: null, dedupe: 0 } },
+    { name: 'elem_biomancy', opts: { rate: 1.2, volume: 0.35, delay: 740, category: null, dedupe: 0 } },
+  ],
+  // Great Immortal Hydra, Zugende (26.10.) — das Gift sickert in den Helden (Gift, 0 ms), der Schleier pulsiert (Schwaechung ~330 ms), der Verlust faellt bei ~650 ms.
+  hydra_drain: [
+    { name: 'poison',        opts: { rate: 0.9, volume: 0.45 } },
+    { name: 'debuff',        opts: { rate: 0.8, volume: 0.4,  delay: 330, category: null, dedupe: 0 } },
+    { name: 'damage',        opts: { rate: 0.9, volume: 0.4,  delay: 650, category: null, dedupe: 0 } },
+  ],
+  // Exorcism (24.10.) — das Licht faellt (Zauberton, 0 ms), dunkle Schwaden steigen (Wind), bei ~560 ms der Schlag (Heilton, Glitzern). Nur der erste Teil uebernimmt die Sammelkategorie 'effect'.
+  exorcism_light: [
+    { name: 'spell_cast',    opts: { rate: 0.9, volume: 0.5 } },
+    { name: 'elem_wind',     opts: { rate: 0.8, volume: 0.35, delay: 200, category: null, dedupe: 0 } },
+    { name: 'status_remove', opts: { rate: 1.0, volume: 0.8,  delay: 560, category: null, dedupe: 0 } },
+    { name: 'heal',          opts: { rate: 1.2, volume: 0.45, delay: 600, category: null, dedupe: 0 } },
+    { name: 'ping',          opts: { rate: 2.4, volume: 0.35, delay: 760, category: null, dedupe: 0 } },
+  ],
+  // Polymorph (24.10.) — der Zauberring spannt sich (Zauberton, 0 ms), bei ~520 ms die Verwandlung (Blitz, Glitzern), Rauch zischt davon. Nur der erste Teil uebernimmt die Sammelkategorie 'effect'.
+  polymorph_poof: [
+    { name: 'spell_cast', opts: { rate: 1.3, volume: 0.5 } },
+    { name: 'debuff',     opts: { rate: 0.9, volume: 0.5, delay: 400, category: null, dedupe: 0 } },
+    { name: 'ping',       opts: { rate: 2.0, volume: 0.45, delay: 520, category: null, dedupe: 0 } },
+    { name: 'ping',       opts: { rate: 2.6, volume: 0.35, delay: 640, category: null, dedupe: 0 } },
+    { name: 'elem_wind',  opts: { rate: 1.2, volume: 0.35, delay: 600, category: null, dedupe: 0 } },
+  ],
+  // Overheat (24.10.) — das Artefakt heizt sich auf (Feuerrauschen, 0 ms), Risse knistern (~200 ms), es platzt bei ~500 ms (Schlag, Splittern) und die Splitter zischen nach
+  // (~620 ms). Nur der erste Teil uebernimmt die Sammelkategorie 'effect'.
+  overheat: [
+    { name: 'elem_fire',          opts: { rate: 1.1, volume: 0.7 } },
+    { name: 'debuff',             opts: { rate: 1.6, volume: 0.35, delay: 200, category: null, dedupe: 0 } },
+    { name: 'heavy_impact',       opts: { rate: 1.1, volume: 0.65, delay: 500, category: null, dedupe: 0 } },
+    { name: 'creature_destroyed', opts: { rate: 1.4, volume: 0.5,  delay: 540, category: null, dedupe: 0 } },
+    { name: 'elem_water',         opts: { rate: 1.5, volume: 0.35, delay: 640, category: null, dedupe: 0 } },
+  ],
+  // Doomed Pirate (24.10.) — der dunkle Ring wirbelt (0 ms), der Totenkopf fliegt (Wind, ~200 ms), Aufprall bei ~600 ms (Schlag, Fluch), die Pfeile sinken. Nur der erste Teil uebernimmt die
+  // Sammelkategorie 'effect'.
+  doomed_pirate_curse: [
+    { name: 'elem_dark',    opts: { rate: 0.8, volume: 0.55 } },
+    { name: 'elem_wind',    opts: { rate: 0.9, volume: 0.35, delay: 200, category: null, dedupe: 0 } },
+    { name: 'heavy_impact', opts: { rate: 0.9, volume: 0.55, delay: 600, category: null, dedupe: 0 } },
+    { name: 'debuff',       opts: { rate: 0.7, volume: 0.6,  delay: 640, category: null, dedupe: 0 } },
+  ],
+  // Welle 4 (24.10.) — Pinaxolotl: Blasen steigen (Wasser, 0 ms) und zerplatzen (Ping, ~400 ms). Nur der erste Teil übernimmt die Sammelkategorie 'effect'.
+  pinaxolotl_bubbles: [
+    { name: 'elem_water', opts: { rate: 1.6, volume: 0.4 } },
+    { name: 'ping',       opts: { rate: 2.2, volume: 0.25, delay: 380, category: null, dedupe: 0 } },
+    { name: 'ping',       opts: { rate: 2.8, volume: 0.2,  delay: 520, category: null, dedupe: 0 } },
+  ],
+  // Lamenting Knight: heilende Tränen — Tränen quellen (Wasser, 0 ms) und tropfen (Pings), fliegen (~470 ms), der Regen setzt ein, Heilklang beim Einschlag (~940 ms) mit nachtropfenden Pings.
+  // Nur der erste Teil übernimmt die Sammelkategorie 'effect'. `lament_rain` (nur der Regen, entkoppeltes Bild einer negierten Karte) tropft und heilt leise.
+  lament_tears: [
+    { name: 'elem_water', opts: { rate: 1.9, volume: 0.35 } },
+    { name: 'ping',       opts: { rate: 2.4, volume: 0.2,  delay: 300,  category: null, dedupe: 0 } },
+    { name: 'elem_water', opts: { rate: 1.3, volume: 0.4,  delay: 470,  category: null, dedupe: 0 } },
+    { name: 'heal',       opts: { rate: 1.15, volume: 0.6, delay: 940,  category: null, dedupe: 0 } },
+    { name: 'ping',       opts: { rate: 2.6, volume: 0.18, delay: 1060, category: null, dedupe: 0 } },
+    { name: 'ping',       opts: { rate: 3.0, volume: 0.15, delay: 1200, category: null, dedupe: 0 } },
+  ],
+  lament_rain: [
+    { name: 'elem_water', opts: { rate: 1.5, volume: 0.35 } },
+    { name: 'heal',       opts: { rate: 1.15, volume: 0.45, delay: 120, category: null, dedupe: 0 } },
+    { name: 'ping',       opts: { rate: 2.6, volume: 0.18, delay: 420, category: null, dedupe: 0 } },
+  ],
+  // Motharch Squire: goldener Mottenstaub rieselt (weicher Zauberklang, 0 ms), Funkeln (~300 ms).
+  moth_dust: [
+    { name: 'buff', opts: { rate: 1.5, volume: 0.45 } },
+    { name: 'ping', opts: { rate: 2.6, volume: 0.22, delay: 300, category: null, dedupe: 0 } },
+  ],
+  // Hulijing (Held als Kreatur): Verwandlung — dunkler Zauberklang, Wind (Fuchsfeuer, ~150 ms), Ping beim Blitz (~650 ms); Löschen am Zugende — kurzes Verpuffen.
+  hero_creature_on: [
+    { name: 'elem_dark', opts: { rate: 1.1, volume: 0.45 } },
+    { name: 'elem_wind', opts: { rate: 1.3, volume: 0.3, delay: 150, category: null, dedupe: 0 } },
+    { name: 'ping',      opts: { rate: 1.8, volume: 0.3, delay: 650, category: null, dedupe: 0 } },
+  ],
+  hero_creature_off: [
+    { name: 'elem_wind', opts: { rate: 1.6, volume: 0.35 } },
+    { name: 'ping',      opts: { rate: 1.2, volume: 0.2, delay: 120, category: null, dedupe: 0 } },
+  ],
+  // Arnold: Muskelspiel — Stärkung (0 ms), heller Heilklang (~120 ms) für die zusätzlichen HP.
+  arnold_flex: [
+    { name: 'buff', opts: { rate: 0.9, volume: 0.7 } },
+    { name: 'heal', opts: { rate: 1.4, volume: 0.35, delay: 120, category: null, dedupe: 0 } },
+  ],
+  // Zira Racer (24.10.) — der AUFPRALL des Rammens klingt nach seiner Wucht (`wucht` 1..3 = Level der abgeworfenen Karte): ein kurzer Schlag und Ping bei Lv1, ab Lv2 dazu der harte Treffer,
+  // bei Lv3 zusätzlich tiefes Poltern der Brocken. Das Anrasen selbst vertont `attack_ram` (Ramm-Animation). Delays > 0 laufen mit dem Einbau der Animation (= Berührung); nur der erste
+  // Teil übernimmt die Sammelkategorie 'effect'.
+  zira_impact: ({ wucht }) => {
+    const w = Math.max(1, Math.min(3, Number(wucht) || 1));
+    const teile = [
+      { name: 'heavy_impact', opts: { rate: 1.45 - w * 0.2, volume: 0.42 + w * 0.17, delay: 1 } },
+      { name: 'ping',         opts: { rate: 2.5 - w * 0.3, volume: 0.3, delay: 40, category: null, dedupe: 0 } },
+    ];
+    if (w >= 2) teile.push({ name: 'critical_strike', opts: { rate: 1.15 - w * 0.12, volume: 0.35 + w * 0.12, delay: 60, category: null, dedupe: 0 } });
+    if (w >= 3) {
+      teile.push({ name: 'heavy_impact',      opts: { rate: 0.6, volume: 0.9, delay: 110, category: null, dedupe: 0 } });
+      teile.push({ name: 'creature_destroyed', opts: { rate: 0.8, volume: 0.45, delay: 260, category: null, dedupe: 0 } });
+    }
+    return teile;
+  },
+  // Glasowt (24.10.) — der Feuerball faucht los (Feuerrauschen, 0 ms), Wind im Flug (~140 ms), Einschlag bei ~500 ms (Schlag, Feuerstoss), die Flammen lodern auf (~560 ms). Nur der erste Teil uebernimmt die
+  // Sammelkategorie 'effect'.
+  glasowt_fireball: [
+    { name: 'elem_fire',    opts: { rate: 1.3, volume: 0.55 } },
+    { name: 'elem_wind',    opts: { rate: 1.1, volume: 0.3,  delay: 140, category: null, dedupe: 0 } },
+    { name: 'heavy_impact', opts: { rate: 1.1, volume: 0.6,  delay: 500, category: null, dedupe: 0 } },
+    { name: 'elem_fire',    opts: { rate: 0.8, volume: 0.75, delay: 540, category: null, dedupe: 0 } },
+    { name: 'burn',         opts: { rate: 1.0, volume: 0.4,  delay: 600, category: null, dedupe: 0 } },
+  ],
+  // Buttap (24.10.) — die Kugeln sirren los (Zauberton, 0 ms; Pings im Takt der Umlaeufe), Einschlag bei ~480 ms (Schlag, Glitzern). Nur der erste Teil uebernimmt die Sammelkategorie 'effect'.
+  buttap_orbs: [
+    { name: 'spell_cast',   opts: { rate: 1.4, volume: 0.4 } },
+    { name: 'ping',         opts: { rate: 1.8, volume: 0.3,  delay: 200, category: null, dedupe: 0 } },
+    { name: 'ping',         opts: { rate: 2.2, volume: 0.3,  delay: 320, category: null, dedupe: 0 } },
+    { name: 'heavy_impact', opts: { rate: 1.2, volume: 0.5,  delay: 480, category: null, dedupe: 0 } },
+    { name: 'ping',         opts: { rate: 2.8, volume: 0.4,  delay: 520, category: null, dedupe: 0 } },
+  ],
+  // Mean Cute Cat (25.10.) — die Fledermäuse steigen flatternd auf (Wind, 0 ms), stürzen auf das Ziel (Schnitt ~300 ms), verschlucken den Schlag (Dunkelheit ~600 ms), tragen ihn davon (Wind ~780 ms) und
+  // schlagen bei der Kreatur ein (~1020 ms: Schlag, Kratzer, Pings). Nur der erste Teil übernimmt die Sammelkategorie 'effect'.
+  mean_cat_bats: [
+    { name: 'elem_wind',    opts: { rate: 1.9, volume: 0.3 } },
+    { name: 'slash',        opts: { rate: 1.7, volume: 0.32, delay: 300,  category: null, dedupe: 0 } },
+    { name: 'elem_dark',    opts: { rate: 0.8, volume: 0.45, delay: 600,  category: null, dedupe: 0 } },
+    { name: 'elem_wind',    opts: { rate: 2.3, volume: 0.28, delay: 780,  category: null, dedupe: 0 } },
+    { name: 'heavy_impact', opts: { rate: 1.15, volume: 0.55, delay: 1020, category: null, dedupe: 0 } },
+    { name: 'slash',        opts: { rate: 1.3, volume: 0.35, delay: 1040, category: null, dedupe: 0 } },
+    { name: 'ping',         opts: { rate: 2.6, volume: 0.28, delay: 1120, category: null, dedupe: 0 } },
+  ],
+  // Winged Haressassin (27.10.) — Umleitung: die Federn stieben auf (Wind, 0 ms), flattern zur Kreatur (Wind ~260 ms), Ankunft mit hellen Pings (~520/600 ms), Flügelschlag (Wind ~560 ms). Nur der erste
+  // Teil übernimmt die Sammelkategorie 'effect'.
+  winged_haress_feathers: [
+    { name: 'elem_wind', opts: { rate: 2.2, volume: 0.3 } },
+    { name: 'elem_wind', opts: { rate: 2.6, volume: 0.25, delay: 260, category: null, dedupe: 0 } },
+    { name: 'ping',      opts: { rate: 2.4, volume: 0.3,  delay: 520, category: null, dedupe: 0 } },
+    { name: 'elem_wind', opts: { rate: 1.8, volume: 0.25, delay: 560, category: null, dedupe: 0 } },
+    { name: 'ping',      opts: { rate: 2.9, volume: 0.28, delay: 600, category: null, dedupe: 0 } },
+  ],
+  // Winged Haressassin (27.10.) — 150 Schaden: Flügelschlag (Wind, 0 ms), der Schnitt zischt (~200 ms), Einschlag bei ~330 ms (zweiter Schnitt, heller Ping), Federn gleiten nach (Wind ~560 ms). Nur der erste
+  // Teil übernimmt die Sammelkategorie 'effect'.
+  winged_haress_slash: [
+    { name: 'elem_wind', opts: { rate: 2.0, volume: 0.3 } },
+    { name: 'slash',     opts: { rate: 2.2, volume: 0.45, delay: 200, category: null, dedupe: 0 } },
+    { name: 'slash',     opts: { rate: 1.6, volume: 0.3,  delay: 330, category: null, dedupe: 0 } },
+    { name: 'ping',      opts: { rate: 2.8, volume: 0.25, delay: 360, category: null, dedupe: 0 } },
+    { name: 'elem_wind', opts: { rate: 2.6, volume: 0.2,  delay: 560, category: null, dedupe: 0 } },
+  ],
+  // Patty (25.10.) — je Wurfstern ein Zischen beim Abwurf (alle 70 ms, die Tonhoehe wandert leicht) und ein heller Einschlag nach 280 ms Flug (`runde` = Zahl der Sterne; hoert nach 8 Sternen auf, damit
+  // der Klang nicht zum Rauschen wird). Nur der erste Teil uebernimmt die Sammelkategorie 'effect'.
+  patty_shuriken: ({ runde }) => {
+    const n = Math.max(1, Math.min(8, Math.round(Number(runde)) || 1));
+    const teile = [];
+    for (let i = 0; i < n; i++) {
+      teile.push({ name: 'slash', opts: { rate: 1.7 + (i % 3) * 0.18, volume: 0.3, delay: 80 + i * 70, ...(i === 0 ? {} : { category: null, dedupe: 0 }) } });
+      teile.push({ name: i === n - 1 ? 'heavy_impact' : 'ping', opts: { rate: i === n - 1 ? 1.5 : 2.4 + (i % 2) * 0.3, volume: i === n - 1 ? 0.5 : 0.28, delay: 80 + i * 70 + 280, category: null, dedupe: 0 } });
+    }
+    return teile;
+  },
+  // Vengeful Attack (25.10.) — der dunkle Doppelschnitt: tiefer Schnitt (0 ms), dumpfer Treffer (~90 ms), Dunkelheit sickert (~140 ms), der zweite Schnitt (~250 ms). Nur der erste Teil übernimmt die
+  // Sammelkategorie 'effect'.
+  vengeful_slash: [
+    { name: 'slash',        opts: { rate: 0.7, volume: 0.7 } },
+    { name: 'heavy_impact', opts: { rate: 0.8, volume: 0.55, delay: 90,  category: null, dedupe: 0 } },
+    { name: 'elem_dark',    opts: { rate: 0.6, volume: 0.5,  delay: 140, category: null, dedupe: 0 } },
+    { name: 'slash',        opts: { rate: 0.85, volume: 0.6, delay: 250, category: null, dedupe: 0 } },
+  ],
+  // Wise Village Elder (25.10.) — drei Sprechblasen poppen auf (je ein helles Ping, die Tonhöhe steigt), zum Schluss ein weiches Stärkungsklingen. Nur der erste Teil übernimmt die Sammelkategorie 'effect'.
+  elder_teaching: [
+    { name: 'ping', opts: { rate: 1.6, volume: 0.32 } },
+    { name: 'ping', opts: { rate: 1.9, volume: 0.32, delay: 330, category: null, dedupe: 0 } },
+    { name: 'ping', opts: { rate: 2.3, volume: 0.32, delay: 660, category: null, dedupe: 0 } },
+    { name: 'buff', opts: { rate: 1.3, volume: 0.3,  delay: 900, category: null, dedupe: 0 } },
+  ],
+  // You are the Chosen One!!! (25.10.) — die goldene Aura lädt sich auf (Stärkung 0 ms, heiliges Summen ~120 ms), flammt bei ~300 ms auf (Aufstieg) und knistert bei ~700 ms (kritischer Treffer).
+  // Nur der erste Teil uebernimmt die Sammelkategorie 'effect'.
+  chosen_one_aura: [
+    { name: 'buff',            opts: { rate: 0.8, volume: 0.6 } },
+    { name: 'elem_holy',       opts: { rate: 0.7, volume: 0.45, delay: 120, category: null, dedupe: 0 } },
+    { name: 'ascension',       opts: { rate: 1.0, volume: 0.35, delay: 300, category: null, dedupe: 0 } },
+    { name: 'critical_strike', opts: { rate: 0.9, volume: 0.4,  delay: 700, category: null, dedupe: 0 } },
+  ],
   // Breakthrough (11.10.) — Risse knistern (Schnitt, 0 ms), die Scheibe birst bei ~460 ms (Schlag), Scherben klirren (~500 ms). Nur der erste Teil uebernimmt die Sammelkategorie 'effect'.
   breakthrough_shatter: [
     { name: 'slash',              opts: { rate: 1.5, volume: 0.45 } },
@@ -2825,12 +3547,52 @@ const ZONE_ANIM_SFX = {
     { name: 'creature_destroyed', opts: { rate: 1.6, volume: 0.5,  delay: 500, category: null, dedupe: 0 } },
     { name: 'ping',               opts: { rate: 2.4, volume: 0.35, delay: 560, category: null, dedupe: 0 } },
   ],
+  // Trap Sabotage (23.10.) — der Feuerball faucht heran (0 ms), die Flammen schlagen hoch (~300 ms), die Kohle bricht (~1130 ms: Schlag, Splittern), Asche weht davon (Wind). Nur der erste
+  // Teil uebernimmt die Sammelkategorie 'effect'.
+  trap_burn: [
+    { name: 'elem_fire',          opts: { rate: 1.3,  volume: 0.55 } },
+    { name: 'elem_fire',          opts: { rate: 0.8,  volume: 0.8,  delay: 300,  category: null, dedupe: 0 } },
+    { name: 'elem_fire',          opts: { rate: 0.7,  volume: 0.6,  delay: 760,  category: null, dedupe: 0 } },
+    { name: 'heavy_impact',       opts: { rate: 1.1,  volume: 0.5,  delay: 1130, category: null, dedupe: 0 } },
+    { name: 'creature_destroyed', opts: { rate: 1.3,  volume: 0.45, delay: 1150, category: null, dedupe: 0 } },
+    { name: 'elem_wind',          opts: { rate: 1.6,  volume: 0.35, delay: 1200, category: null, dedupe: 0 } },
+  ],
+  // Voodoo Curse (23.10.) — die Nadeln stechen zu (Zauberton + dumpfer Fluch, 0 / ~340 ms), die Kugeln wandern (Ping, ~480 ms), bei der Ankunft klingt es zweimal hell (~1020 / ~1070 ms).
+  // Nur der erste Teil uebernimmt die Sammelkategorie 'effect'.
+  voodoo_swap: [
+    { name: 'spell_cast', opts: { rate: 0.9,  volume: 0.45 } },
+    { name: 'debuff',     opts: { rate: 0.8,  volume: 0.5,  delay: 340,  category: null, dedupe: 0 } },
+    { name: 'ping',       opts: { rate: 1.5,  volume: 0.3,  delay: 500,  category: null, dedupe: 0 } },
+    { name: 'ping',       opts: { rate: 1.9,  volume: 0.3,  delay: 760,  category: null, dedupe: 0 } },
+    { name: 'reveal',     opts: { rate: 1.1,  volume: 0.5,  delay: 1020, category: null, dedupe: 0 } },
+    { name: 'ping',       opts: { rate: 2.4,  volume: 0.4,  delay: 1070, category: null, dedupe: 0 } },
+  ],
+  // See through the Ruse (23.10.) — das Auge oeffnet sich (Aufdeck-Ton, 0 ms), die Abtastzeile faehrt ueber die Karte (leises Surren), beim Schliessen ein Ping (~800 ms). Nur der erste Teil uebernimmt die Sammelkategorie 'effect'.
+  ruse_peek: [
+    { name: 'reveal', opts: { rate: 1.3, volume: 0.5 } },
+    { name: 'ping',   opts: { rate: 1.6, volume: 0.3, delay: 300, category: null, dedupe: 0 } },
+    { name: 'ping',   opts: { rate: 2.4, volume: 0.35, delay: 800, category: null, dedupe: 0 } },
+  ],
   // Amazing Finding (11.10.) — das Fragezeichen funkelt auf (hoher Ping, 0 ms), platzt bei ~520 ms zum Stern (Aufdeck-Ton + Ping). Nur der erste Teil uebernimmt die Sammelkategorie 'effect'.
   finding_glint: [
     { name: 'ping',   opts: { rate: 1.7, volume: 0.4 } },
     { name: 'reveal', opts: { rate: 1.2, volume: 0.5, delay: 520, category: null, dedupe: 0 } },
     { name: 'ping',   opts: { rate: 2.5, volume: 0.45, delay: 560, category: null, dedupe: 0 } },
   ],
+  // Cell Escape (W78) — das Gitter faellt (Metallschleifen 0 ms, dumpfer Schlag beim Aufsetzen ~330 ms), das Schloss klickt (~760 ms, helles Klirren), die Staebe schwingen hoch (Wind, ~800 ms),
+  // beim Oeffnen ein Aufdeck-Ton. Zweiter Durchgang (`mode: 'more'`): zusaetzlich der Frost-Knack. Nur der erste Teil uebernimmt die Sammelkategorie 'effect'.
+  cell_escape: (p) => {
+    const mehr = !!(p && p.mode === 'more');
+    const teile = [
+      { name: 'slash',        opts: { rate: 0.6, volume: 0.3 } },
+      { name: 'heavy_impact', opts: { rate: 1.3, volume: 0.55, delay: 330, category: null, dedupe: 0 } },
+      { name: 'ping',         opts: { rate: 1.8, volume: 0.4,  delay: 760, category: null, dedupe: 0 } },
+      { name: 'elem_wind',    opts: { rate: 1.4, volume: 0.3,  delay: 800, category: null, dedupe: 0 } },
+      { name: 'reveal',       opts: { rate: 1.0, volume: 0.4,  delay: 860, category: null, dedupe: 0 } },
+    ];
+    if (mehr) teile.push({ name: 'elem_ice', opts: { rate: 1.3, volume: 0.45, delay: 120, category: null, dedupe: 0 } });
+    return teile;
+  },
   // Duel (12.10.) — die Helden rammen einander, Schlag auf Schlag; eine Animation je HIT (alle Zeiten sind animationsrelativ, `playSFXForZoneAnim` legt den Einbau-Versatz von 100 ms selbst dazu).
   // Hit 1 (`runde` 1): Ausholen und Anlauf (Schnitt ~80 / ~140 ms), Aufprall bei ~260 ms (Schlag, tiefer Schnitt, heller Klirr). Jeder weitere Hit: der Rückprall der Karten (leiser Schnitt, 0 ms),
   // Aufprall bei ~120 ms (Schlag, tiefer Schnitt, Klirr — etwas höher je Runde). Nur der erste Teil uebernimmt die Sammelkategorie 'effect'.
@@ -2909,6 +3671,16 @@ const ZONE_ANIM_SFX = {
     { name: 'ping',   opts: { rate: 2.8, volume: 0.25, delay: 760, category: null, dedupe: 0 } },
     { name: 'ping',   opts: { rate: 3.1, volume: 0.25, delay: 900, category: null, dedupe: 0 } },
     { name: 'reveal', opts: { rate: 1.3, volume: 0.45, delay: 1000, category: null, dedupe: 0 } },
+  ],
+  // Kidnapping (23.10.) — der Sack faellt (Zieh-Ton, 0 ms), klatscht auf die Karte (tiefer Platzierungston, ~380 ms), der Strick zieht sich zu (Zieh-Ton hoch, ~560 ms), zwei dumpfe Stoesse
+  // beim Zappeln (~800 / ~940 ms), der Sack loest sich auf (Aufdeck-Ton, ~1120 ms). Nur der erste Teil uebernimmt die Sammelkategorie 'effect'.
+  kidnap_sack: [
+    { name: 'draw',          opts: { rate: 0.7, volume: 0.4 } },
+    { name: 'placement',     opts: { rate: 0.5, volume: 0.55, delay: 380, category: null, dedupe: 0 } },
+    { name: 'draw',          opts: { rate: 1.5, volume: 0.35, delay: 560, category: null, dedupe: 0 } },
+    { name: 'heavy_impact',  opts: { rate: 1.5, volume: 0.25, delay: 800, category: null, dedupe: 0 } },
+    { name: 'heavy_impact',  opts: { rate: 1.3, volume: 0.25, delay: 940, category: null, dedupe: 0 } },
+    { name: 'reveal',        opts: { rate: 1.6, volume: 0.4,  delay: 1120, category: null, dedupe: 0 } },
   ],
   // Gather Intel (12.10.) — die Lupe huscht los (Zieh-Ton, 0 ms), tastet die Hand ab (leise Pings im Takt der Funkelkreuze, ~460 / ~620 / ~780 ms), der Blick sitzt (Aufdeck-Ton,
   // ~1000 ms). Nur der erste Teil uebernimmt die Sammelkategorie 'effect'.
@@ -3204,6 +3976,29 @@ const ZONE_ANIM_SFX = {
     { name: 'projectile', opts: { rate: 1.25, volume: 0.9 } },
     { name: 'slash', opts: { rate: 1.05, volume: 1, delay: 180 } },
   ],
+  // Backstab (25.10.) — der Stich: leises Schwertzischen beim Ausholen (~260 ms), Schnitt beim Vorstoßen (~300 ms), dumpfer Einschlag mit hellem Ping bei 330 ms. Nur der erste Teil
+  // übernimmt die Sammelkategorie 'effect'.
+  backstab_stab: [
+    { name: 'projectile',   opts: { rate: 1.7, volume: 0.4,  delay: 255 } },
+    { name: 'slash',        opts: { rate: 0.85, volume: 0.9, delay: 315, category: null, dedupe: 0 } },
+    { name: 'heavy_impact', opts: { rate: 1.3, volume: 0.45, delay: 335, category: null, dedupe: 0 } },
+    { name: 'ping',         opts: { rate: 2.4, volume: 0.3,  delay: 345, category: null, dedupe: 0 } },
+  ],
+  // Animal Training (W82) — Peitsche: leises Zischen beim Ausholen (~120 ms), heller Knall beim Vorschnellen (~290 ms, hoher `slash`), harter Einschlag mit Ping bei 330 ms, Rückzug ~430 ms.
+  animal_training_whip: [
+    { name: 'projectile',   opts: { rate: 2.0, volume: 0.35, delay: 110 } },
+    { name: 'slash',        opts: { rate: 1.9, volume: 0.8,  delay: 285, category: null, dedupe: 0 } },
+    { name: 'heavy_impact', opts: { rate: 1.5, volume: 0.5,  delay: 335, category: null, dedupe: 0 } },
+    { name: 'ping',         opts: { rate: 2.8, volume: 0.3,  delay: 345, category: null, dedupe: 0 } },
+    { name: 'slash',        opts: { rate: 1.3, volume: 0.35, delay: 440, category: null, dedupe: 0 } },
+  ],
+  // Animal Training: die Schlinge der Zähmung — Zug und Zuschnappen, dann ein heller Bestätigungston je Blinken.
+  animal_training_tame: [
+    { name: 'projectile',   opts: { rate: 0.9, volume: 0.4,  delay: 40 } },
+    { name: 'placement',    opts: { rate: 1.1, volume: 0.7,  delay: 220, category: null, dedupe: 0 } },
+    { name: 'ping',         opts: { rate: 1.8, volume: 0.35, delay: 310, category: null, dedupe: 0 } },
+    { name: 'ping',         opts: { rate: 2.2, volume: 0.3,  delay: 430, category: null, dedupe: 0 } },
+  ],
   // v724 (Thicket): dasselbe Pflanzen-Timbre, etwas tiefer und laenger
   // gefahren — das Dickicht ist dichter als der Rankenkranz.
   thicket_cover:           { name: 'elem_biomancy', opts: { rate: 0.85, volume: 1, delay: 120 } },
@@ -3421,6 +4216,254 @@ const ZONE_ANIM_SFX = {
   field_standard_rally:    { name: 'buff' },
   // Silent — redundant with a log or purely decorative
   gold_sparkle:            null,
+  // Alliance (28.10.): Bündnisvertrag — Seil zischt von Held zu Held (~0–520 ms), Pergament rollt sich aus (~300 ms), Band zieht sich zu (~560 ms), beim Stempeln (~760 ms)
+  // dumpfer Schlag + heller Siegel-Ton, danach goldener Dreiklang. Nur der erste Teil übernimmt die Sammelkategorie 'effect'.
+  alliance_pact: [
+    { name: 'spell_cast',   opts: { rate: 1.35, volume: 0.55 } },
+    { name: 'elem_wind',    opts: { rate: 1.7,  volume: 0.45, delay: 90,  category: null, dedupe: 0 } },
+    { name: 'shuffle',      opts: { rate: 1.8,  volume: 0.5,  delay: 300, category: null, dedupe: 0 } },
+    { name: 'placement',    opts: { rate: 1.5,  volume: 0.55, delay: 570, category: null, dedupe: 0 } },
+    { name: 'heavy_impact', opts: { rate: 1.15, volume: 0.85, delay: 770, category: null, dedupe: 0 } },
+    { name: 'buff',         opts: { rate: 1.0,  volume: 0.7,  delay: 790, category: null, dedupe: 0 } },
+    { name: 'ping',         opts: { rate: 1.5,  volume: 0.55, delay: 840, category: null, dedupe: 0 } },
+    { name: 'ping',         opts: { rate: 1.9,  volume: 0.5,  delay: 960, category: null, dedupe: 0 } },
+    { name: 'ping',         opts: { rate: 2.4,  volume: 0.45, delay: 1080, category: null, dedupe: 0 } },
+  ],
+  // Shimmering Dragonegg (23.10.): Kreuzfunkel blitzen um das goldene Ei — helle Pings, versetzt; Liquid Luck: der Regenbogen wächst (Buff-Klang), Goldmünzen klingeln.
+  dragonegg_shimmer: [
+    { name: 'ping', opts: { rate: 1.5, volume: 0.5, category: null, dedupe: 0 } },
+    { name: 'ping', opts: { rate: 1.9, volume: 0.4, delay: 170, category: null, dedupe: 0 } },
+    { name: 'ping', opts: { rate: 2.2, volume: 0.3, delay: 330, category: null, dedupe: 0 } },
+  ],
+  // Spell Shackle (24.10.): blaue Ketten legen sich klirrend um den Helden — Kettenklirren (Glied für Glied), dunkles Brummen, beim Zuziehen ein Schlag.
+  spell_shackle_chains: [
+    { name: 'chain_add', opts: { rate: 0.8, volume: 0.9 } },
+    { name: 'chain_add', opts: { rate: 1.0, volume: 0.7, delay: 150, category: null, dedupe: 0 } },
+    { name: 'chain_add', opts: { rate: 1.2, volume: 0.6, delay: 300, category: null, dedupe: 0 } },
+    { name: 'elem_dark', opts: { rate: 0.7, volume: 0.6, delay: 80, category: null, dedupe: 0 } },
+    { name: 'debuff',    opts: { rate: 0.9, volume: 0.8, delay: 560, category: null, dedupe: 0 } },
+    { name: 'heavy_impact', opts: { rate: 1.3, volume: 0.5, delay: 600, category: null, dedupe: 0 } },
+  ],
+  // Shrink (24.10.): der Rahmen presst sich zusammen — Wind nach innen (Zauberton, 0 ms), Ticken der Stufen, beim Einrasten (~560 ms) ein dumpfer Schlag und Abwertungston.
+  shrink_squeeze: [
+    { name: 'spell_cast', opts: { rate: 1.4, volume: 0.5 } },
+    { name: 'elem_wind',  opts: { rate: 1.6, volume: 0.35, delay: 80, category: null, dedupe: 0 } },
+    { name: 'ping',       opts: { rate: 1.6, volume: 0.3, delay: 220, category: null, dedupe: 0 } },
+    { name: 'ping',       opts: { rate: 2.0, volume: 0.3, delay: 380, category: null, dedupe: 0 } },
+    { name: 'debuff',     opts: { rate: 1.3, volume: 0.6, delay: 560, category: null, dedupe: 0 } },
+    { name: 'heavy_impact', opts: { rate: 1.6, volume: 0.4, delay: 580, category: null, dedupe: 0 } },
+  ],
+  // Welle 73 (24.10.): Ankhota (Sandwirbel steigt auf: Wind, dumpfer Ton, Funkeln), Shroomasaur (Pilze poppen auf: Ploppen in Staffeln), Leafagami (Laubrauschen), Fruit Bat (Biss, Saugen, Ankunft).
+  ankhota_sandstorm: [
+    { name: 'elem_wind',  opts: { rate: 0.9, volume: 0.45 } },
+    { name: 'buff',       opts: { rate: 0.7, volume: 0.45, delay: 380, category: null, dedupe: 0 } },
+    { name: 'ping',       opts: { rate: 1.6, volume: 0.3, delay: 640, category: null, dedupe: 0 } },
+  ],
+  shroomasaur_spores: [
+    { name: 'buff',       opts: { rate: 1.5, volume: 0.4 } },
+    { name: 'ping',       opts: { rate: 2.0, volume: 0.25, delay: 110, category: null, dedupe: 0 } },
+    { name: 'ping',       opts: { rate: 2.4, volume: 0.25, delay: 230, category: null, dedupe: 0 } },
+    { name: 'ping',       opts: { rate: 1.8, volume: 0.25, delay: 340, category: null, dedupe: 0 } },
+    { name: 'ping',       opts: { rate: 2.6, volume: 0.2, delay: 470, category: null, dedupe: 0 } },
+  ],
+  // Welle 74 (24.10.): Flesh-Eating Swarm Trap — Summen des Schwarms (hoher Wind), Bisse in drei Schlägen.
+  flesh_swarm: [
+    { name: 'elem_wind',  opts: { rate: 2.4, volume: 0.35 } },
+    { name: 'debuff',     opts: { rate: 1.4, volume: 0.3, delay: 380, category: null, dedupe: 0 } },
+    { name: 'slash',      opts: { rate: 2.1, volume: 0.3, delay: 700, category: null, dedupe: 0 } },
+    { name: 'slash',      opts: { rate: 1.8, volume: 0.3, delay: 880, category: null, dedupe: 0 } },
+    { name: 'slash',      opts: { rate: 2.3, volume: 0.3, delay: 1060, category: null, dedupe: 0 } },
+  ],
+  // Hot Skull Potato: der Knall sitzt auf dem Blitz (Animationsstart, `delay: 1` = animationsrelativ, +Mount-Vorlauf), danach Druckwelle, Knistern und Splitter.
+  hot_potato_blast: [
+    { name: 'heavy_impact', opts: { rate: 0.7, volume: 0.65, delay: 1, category: null, dedupe: 0 } },
+    { name: 'heavy_impact', opts: { rate: 1.1, volume: 0.4, delay: 1, category: null, dedupe: 0 } },
+    { name: 'elem_wind',    opts: { rate: 0.8, volume: 0.45, delay: 60, category: null, dedupe: 0 } },
+    { name: 'debuff',       opts: { rate: 1.6, volume: 0.3, delay: 220, category: null, dedupe: 0 } },
+    { name: 'ping',         opts: { rate: 2.6, volume: 0.25, delay: 320, category: null, dedupe: 0 } },
+    { name: 'ping',         opts: { rate: 2.0, volume: 0.2, delay: 460, category: null, dedupe: 0 } },
+  ],
+  // Hot Skull Potato: Wurf in die andere Zone — Zischen und Pfeifen im Flug, dumpfer Aufprall.
+  hot_potato_throw: [
+    { name: 'debuff',       opts: { rate: 1.9, volume: 0.3 } },
+    { name: 'elem_wind',    opts: { rate: 1.7, volume: 0.35, delay: 60, category: null, dedupe: 0 } },
+    { name: 'heavy_impact', opts: { rate: 1.3, volume: 0.35, delay: 730, category: null, dedupe: 0 } },
+    { name: 'ping',         opts: { rate: 2.4, volume: 0.2, delay: 780, category: null, dedupe: 0 } },
+  ],
+  // Welle 75 (24.10.): Unreasonable Anger — zischender Dampf, Pfiff, Zornader pocht.
+  unreasonable_steam: [
+    { name: 'elem_wind',    opts: { rate: 2.4, volume: 0.3, delay: 1, category: null, dedupe: 0 } },
+    { name: 'buff',         opts: { rate: 0.7, volume: 0.3, delay: 160, category: null, dedupe: 0 } },
+    { name: 'ping',         opts: { rate: 1.6, volume: 0.22, delay: 220, category: null, dedupe: 0 } },
+    { name: 'ping',         opts: { rate: 2.1, volume: 0.22, delay: 520, category: null, dedupe: 0 } },
+    { name: 'elem_wind',    opts: { rate: 2.0, volume: 0.25, delay: 560, category: null, dedupe: 0 } },
+  ],
+  // Nasty Prank — der Eimer saust herab, scheppert auf dem Kopf, das Wasser platscht.
+  prank_bucket: [
+    { name: 'elem_wind',    opts: { rate: 1.6, volume: 0.25, delay: 1, category: null, dedupe: 0 } },
+    { name: 'heavy_impact', opts: { rate: 1.6, volume: 0.5, delay: 690, category: null, dedupe: 0 } },
+    { name: 'ping',         opts: { rate: 0.9, volume: 0.35, delay: 700, category: null, dedupe: 0 } },
+    { name: 'elem_water',   opts: { rate: 1.0, volume: 0.5, delay: 780, category: null, dedupe: 0 } },
+    { name: 'elem_water',   opts: { rate: 1.35, volume: 0.35, delay: 980, category: null, dedupe: 0 } },
+    { name: 'ping',         opts: { rate: 1.2, volume: 0.25, delay: 1180, category: null, dedupe: 0 } },
+  ],
+  // The Golden Gate (25.10.): Goldregen — Münzklang (0 ms), zwei helle Pings zum Aufsteigen der Münzen.
+  golden_gate_gold: [
+    { name: 'gold_gain',  opts: { rate: 1.3, volume: 0.7, delay: 1, category: null, dedupe: 0 } },
+    { name: 'ping',       opts: { rate: 2.4, volume: 0.25, delay: 200, category: null, dedupe: 0 } },
+    { name: 'ping',       opts: { rate: 2.8, volume: 0.2, delay: 380, category: null, dedupe: 0 } },
+  ],
+  golden_gate_sparkle: [
+    { name: 'spell_cast', opts: { rate: 1.3, volume: 0.4, delay: 1, category: null, dedupe: 0 } },
+    { name: 'buff',       opts: { rate: 1.5, volume: 0.4, delay: 120, category: null, dedupe: 0 } },
+    { name: 'ping',       opts: { rate: 2.4, volume: 0.25, delay: 260, category: null, dedupe: 0 } },
+    { name: 'ping',       opts: { rate: 2.9, volume: 0.2, delay: 420, category: null, dedupe: 0 } },
+  ],
+  // Tail Slap (25.10.): der Schwanz peitscht (Wind, 40 ms), der Schlag sitzt bei ~90 ms, Staub und Sterne danach.
+  tail_slap_hit: [
+    { name: 'elem_wind',    opts: { rate: 1.5, volume: 0.45, delay: 1, category: null, dedupe: 0 } },
+    { name: 'slash',        opts: { rate: 0.7, volume: 0.5, delay: 50, category: null, dedupe: 0 } },
+    { name: 'heavy_impact', opts: { rate: 0.95, volume: 0.65, delay: 90, category: null, dedupe: 0 } },
+    { name: 'ping',         opts: { rate: 2.4, volume: 0.25, delay: 260, category: null, dedupe: 0 } },
+  ],
+  // Ultimate Destroyer Punch (25.10.): der kräftige Einschlag — Doppelschlag tief (0 ms), Knacken, Staubrauschen; die Landung auf dem Helden dumpf.
+  udp_impact: [
+    { name: 'heavy_impact',     opts: { rate: 0.45, volume: 0.95, delay: 1, category: null, dedupe: 0 } },
+    { name: 'heavy_impact',     opts: { rate: 0.8, volume: 0.6, delay: 1, category: null, dedupe: 0 } },
+    { name: 'critical_strike',  opts: { rate: 0.8, volume: 0.5, delay: 30, category: null, dedupe: 0 } },
+    { name: 'elem_wind',        opts: { rate: 0.6, volume: 0.4, delay: 90, category: null, dedupe: 0 } },
+    { name: 'debuff',           opts: { rate: 0.8, volume: 0.35, delay: 220, category: null, dedupe: 0 } },
+    { name: 'ping',             opts: { rate: 1.6, volume: 0.25, delay: 320, category: null, dedupe: 0 } },
+  ],
+  udp_land: [
+    { name: 'heavy_impact', opts: { rate: 0.6, volume: 0.8, delay: 1, category: null, dedupe: 0 } },
+    { name: 'elem_wind',    opts: { rate: 0.9, volume: 0.3, delay: 60, category: null, dedupe: 0 } },
+    { name: 'ping',         opts: { rate: 1.8, volume: 0.25, delay: 140, category: null, dedupe: 0 } },
+  ],
+  // Uncool Malfunction (25.10.): Kurzschluss-Knistern (Funken) und dumpfes Quellen des schwarzen Qualms.
+  uncool_smoke: [
+    { name: 'elem_lightning', opts: { rate: 1.9, volume: 0.25, delay: 1, category: null, dedupe: 0 } },
+    { name: 'elem_dark',      opts: { rate: 0.7, volume: 0.7, delay: 40, category: null, dedupe: 0 } },
+    { name: 'debuff',         opts: { rate: 0.6, volume: 0.45, delay: 160, category: null, dedupe: 0 } },
+    { name: 'elem_lightning', opts: { rate: 2.2, volume: 0.2, delay: 250, category: null, dedupe: 0 } },
+  ],
+  // REVENGE!!! (25.10.): ein wütender Schrei — tiefes Grollen, krachender Einschlag, Feuerfauchen, dann zornige Stöße.
+  revenge_rage: [
+    { name: 'heavy_impact',     opts: { rate: 0.4, volume: 0.9, delay: 1, category: null, dedupe: 0 } },
+    { name: 'critical_strike',  opts: { rate: 0.6, volume: 0.6, delay: 1, category: null, dedupe: 0 } },
+    { name: 'elem_fire',        opts: { rate: 0.7, volume: 0.6, delay: 80, category: null, dedupe: 0 } },
+    { name: 'elem_dark',        opts: { rate: 0.5, volume: 0.6, delay: 140, category: null, dedupe: 0 } },
+    { name: 'heavy_impact',     opts: { rate: 0.7, volume: 0.6, delay: 420, category: null, dedupe: 0 } },
+    { name: 'critical_strike',  opts: { rate: 0.9, volume: 0.45, delay: 700, category: null, dedupe: 0 } },
+    { name: 'elem_fire',        opts: { rate: 0.9, volume: 0.4, delay: 900, category: null, dedupe: 0 } },
+  ],
+  // Bounce Trap (25.10.): Feder wird gespannt (dumpf), schnellt mit hellem „Boing" los, schwingt aus; die Rückkehr kommt mit Windstoß und Knall.
+  bounce_spring: [
+    { name: 'ping',         opts: { rate: 0.5, volume: 0.5, delay: 1, category: null, dedupe: 0 } },
+    { name: 'elem_wind',    opts: { rate: 2.0, volume: 0.5, delay: 190, category: null, dedupe: 0 } },
+    { name: 'ping',         opts: { rate: 2.1, volume: 0.8, delay: 200, category: null, dedupe: 0 } },
+    { name: 'ping',         opts: { rate: 1.7, volume: 0.5, delay: 300, category: null, dedupe: 0 } },
+    { name: 'ping',         opts: { rate: 1.4, volume: 0.35, delay: 400, category: null, dedupe: 0 } },
+  ],
+  bounce_burst: [
+    { name: 'heavy_impact', opts: { rate: 1.5, volume: 0.55, delay: 1, category: null, dedupe: 0 } },
+    { name: 'elem_wind',    opts: { rate: 1.6, volume: 0.4, delay: 20, category: null, dedupe: 0 } },
+  ],
+  // Cosmic Exploding Skull (25.10.): dunkles Raunen, Dimensionsknall, das Loch schließt sich.
+  cosmic_explosion: [
+    { name: 'elem_dark',        opts: { rate: 0.5, volume: 1.0, delay: 1, category: null, dedupe: 0 } },
+    { name: 'heavy_impact',     opts: { rate: 0.45, volume: 1.4, delay: 120, category: null, dedupe: 0 } },
+    { name: 'critical_strike',  opts: { rate: 0.6, volume: 0.6, delay: 180, category: null, dedupe: 0 } },
+    { name: 'elem_dark',        opts: { rate: 0.3, volume: 0.9, delay: 420, category: null, dedupe: 0 } },
+    { name: 'ping',             opts: { rate: 0.4, volume: 0.5, delay: 700, category: null, dedupe: 0 } },
+  ],
+  // Night Mare (26.10.): dunkles Raunen, die schwarzen Flammen fauchen, dumpfer Schlag beim Treffer.
+  black_flames: [
+    { name: 'elem_dark', opts: { rate: 0.55, volume: 1.0, delay: 1, category: null, dedupe: 0 } },
+    { name: 'burn',      opts: { rate: 0.7, volume: 0.7, delay: 120, category: null, dedupe: 0 } },
+    { name: 'heavy_impact', opts: { rate: 0.6, volume: 0.8, delay: 640, category: null, dedupe: 0 } },
+  ],
+  // Little Lyta (26.10.): zarte Glöckchen, Heilton, Funkeln — die Herzen steigen auf.
+  pink_hearts: [
+    { name: 'ping', opts: { rate: 1.6, volume: 0.55, delay: 1, category: null, dedupe: 0 } },
+    { name: 'heal', opts: { rate: 1.3, volume: 0.45, delay: 120, category: null, dedupe: 0 } },
+    { name: 'ping', opts: { rate: 2.2, volume: 0.35, delay: 420, category: null, dedupe: 0 } },
+    { name: 'ping', opts: { rate: 2.6, volume: 0.3, delay: 760, category: null, dedupe: 0 } },
+  ],
+  // Feral (25.10.): Wasserexplosion — Platschen und dumpfer Schlag.
+  water_burst: [
+    { name: 'elem_water',   opts: { rate: 0.9, volume: 1.3, delay: 1, category: null, dedupe: 0 } },
+    { name: 'heavy_impact', opts: { rate: 1.6, volume: 0.6, delay: 10, category: null, dedupe: 0 } },
+    { name: 'elem_water',   opts: { rate: 1.3, volume: 0.6, delay: 150, category: null, dedupe: 0 } },
+  ],
+  // Grand Feast (25.10.): Tellerklirren, Köstlichkeit zischt, sanfte Heilung.
+  grand_feast: [
+    { name: 'ping',      opts: { rate: 1.4, volume: 0.35, delay: 1, category: null, dedupe: 0 } },
+    { name: 'draw',      opts: { rate: 1.0, volume: 0.45, delay: 90, category: null, dedupe: 0 } },
+    { name: 'heal',      opts: { rate: 1.1, volume: 0.4, delay: 380, category: null, dedupe: 0 } },
+    { name: 'ping',      opts: { rate: 2.2, volume: 0.25, delay: 560, category: null, dedupe: 0 } },
+  ],
+  // Reverse Trap — der 1-Tonnen-Klotz pfeift herab und schlägt dumpf auf.
+  reverse_trap_ton: [
+    { name: 'elem_wind',    opts: { rate: 0.6, volume: 0.4, delay: 1, category: null, dedupe: 0 } },
+    { name: 'heavy_impact', opts: { rate: 0.5, volume: 0.85, delay: 610, category: null, dedupe: 0 } },
+    { name: 'ping',         opts: { rate: 0.6, volume: 0.3, delay: 615, category: null, dedupe: 0 } },
+    { name: 'negate',       opts: { rate: 1.0, volume: 0.3, delay: 700, category: null, dedupe: 0 } },
+  ],
+  // Explosion Toss — dieselbe große Explosion wie die Kartoffel: der Knall sitzt auf dem Blitz.
+  explosion_toss_blast: [
+    { name: 'heavy_impact', opts: { rate: 0.7, volume: 0.65, delay: 1, category: null, dedupe: 0 } },
+    { name: 'heavy_impact', opts: { rate: 1.1, volume: 0.4, delay: 1, category: null, dedupe: 0 } },
+    { name: 'elem_wind',    opts: { rate: 0.8, volume: 0.45, delay: 60, category: null, dedupe: 0 } },
+    { name: 'debuff',       opts: { rate: 1.6, volume: 0.3, delay: 220, category: null, dedupe: 0 } },
+    { name: 'ping',         opts: { rate: 2.6, volume: 0.25, delay: 320, category: null, dedupe: 0 } },
+    { name: 'ping',         opts: { rate: 2.0, volume: 0.2, delay: 460, category: null, dedupe: 0 } },
+  ],
+  // „Deadly Poison" — Giftschwaden blubbern, dann kippt es in sanfte Heilung.
+  deadly_poison_heal: [
+    { name: 'poison',       opts: { rate: 1.0, volume: 0.4, delay: 1, category: null, dedupe: 0 } },
+    { name: 'elem_dark',    opts: { rate: 1.2, volume: 0.25, delay: 120, category: null, dedupe: 0 } },
+    { name: 'heal',         opts: { rate: 1.1, volume: 0.45, delay: 620, category: null, dedupe: 0 } },
+    { name: 'ping',         opts: { rate: 2.4, volume: 0.2, delay: 950, category: null, dedupe: 0 } },
+  ],
+  leafagami_leaves: [
+    { name: 'elem_wind',  opts: { rate: 1.4, volume: 0.35 } },
+    { name: 'ping',       opts: { rate: 2.2, volume: 0.25, delay: 140, category: null, dedupe: 0 } },
+    { name: 'buff',       opts: { rate: 1.6, volume: 0.3, delay: 300, category: null, dedupe: 0 } },
+  ],
+  bat_bite_drain: [
+    { name: 'slash',      opts: { rate: 1.9, volume: 0.45 } },
+    { name: 'debuff',     opts: { rate: 1.0, volume: 0.5, delay: 300, category: null, dedupe: 0 } },
+    { name: 'heal',       opts: { rate: 1.3, volume: 0.45, delay: 760, category: null, dedupe: 0 } },
+    { name: 'ping',       opts: { rate: 1.4, volume: 0.3, delay: 880, category: null, dedupe: 0 } },
+  ],
+  // Arcane Eyes (24.10.): die Augen öffnen sich (leises Knarren, 0 ms), der Strahl streicht über die Zone (~620 ms, Wind + Ping), ein kurzes Schimmern zum Schluss.
+  arcane_eyes_open: [
+    { name: 'buff',       opts: { rate: 0.7, volume: 0.5 } },
+    { name: 'ping',       opts: { rate: 1.2, volume: 0.3, delay: 200, category: null, dedupe: 0 } },
+    { name: 'elem_wind',  opts: { rate: 1.3, volume: 0.3, delay: 620, category: null, dedupe: 0 } },
+    { name: 'ping',       opts: { rate: 2.4, volume: 0.35, delay: 800, category: null, dedupe: 0 } },
+  ],
+  // Hockey Genie (24.10.): der Puck schlägt ein (Schlag bei ~330 ms), Eis splittert, der Wunschrauch steigt auf.
+  hockey_wish: [
+    { name: 'elem_wind',  opts: { rate: 1.5, volume: 0.4 } },
+    { name: 'heavy_impact', opts: { rate: 1.4, volume: 0.45, delay: 330, category: null, dedupe: 0 } },
+    { name: 'elem_water', opts: { rate: 1.7, volume: 0.35, delay: 350, category: null, dedupe: 0 } },
+    { name: 'spell_cast', opts: { rate: 1.1, volume: 0.4, delay: 420, category: null, dedupe: 0 } },
+    { name: 'ping',       opts: { rate: 2.2, volume: 0.3, delay: 600, category: null, dedupe: 0 } },
+  ],
+  // Regeneration (24.10.): sanftes Aufblühen — Heilton (0 ms), Glitzern der aufsteigenden Kreuze, ein heller Ping zum Schluss. Nur der erste Teil uebernimmt die Sammelkategorie.
+  regeneration_bloom: [
+    { name: 'heal',       opts: { rate: 1.0, volume: 0.6 } },
+    { name: 'ping',       opts: { rate: 2.2, volume: 0.3, delay: 160, category: null, dedupe: 0 } },
+    { name: 'ping',       opts: { rate: 2.6, volume: 0.25, delay: 330, category: null, dedupe: 0 } },
+    { name: 'buff',       opts: { rate: 1.3, volume: 0.35, delay: 420, category: null, dedupe: 0 } },
+  ],
+  liquid_rainbow: [
+    { name: 'buff', opts: { rate: 1.2, volume: 0.7 } },
+    { name: 'ping', opts: { rate: 1.7, volume: 0.5, delay: 520, category: null, dedupe: 0 } },
+    { name: 'ping', opts: { rate: 2.1, volume: 0.4, delay: 700, category: null, dedupe: 0 } },
+  ],
   // Circles of Hell: Hoellen-Charme (Sixth), Lavafontaene (Seventh), Flammenmeer der Gegnerseite (Fifth), Goldrausch (Fourth).
   hell_charm: [
     { name: 'elem_dark', opts: { rate: 0.65, volume: 1.0 } },
@@ -3533,8 +4576,23 @@ const ZONE_ANIM_SFX = {
   // sie wird ausgeloescht); `negate` ist der vorhandene „ist weg"-Klang,
   // tiefer gefahren fuer das Gewicht eines Helden.
   tempeluna_erase:         { name: 'negate', opts: { rate: 0.8, volume: 0.95, delay: 120 } },
-  dark_gear_spin_cw:       null,
-  dark_gear_spin_ccw:      null,
+  // Dark Gear (Als Befund 31.10.: „bei Dark Gears Animation fehlen Sounds"). Zwei Zahnrad-Auftritte je 1,5 s: erst am Ziel
+  // (`dark_gear_spin_cw`: das Rad greift in die Kreatur), nach dem Flug in die eigene Zone (`dark_gear_spin_ccw`: es zieht sich
+  // zu und legt die Negation an). Dunkles Brummen als Grundton, metallisches Einrasten (`chain_add`, gleiche Familie wie die Ketten-
+  // Klänge) beim Zugriff, ein dumpfer Abschluss beim Auslaufen. Ohne Sammelkategorie (`category: null`): der Kartenklang des
+  // Artefakts belegt den Slot 'effect' knapp davor; `dedupe` hält Wiederholungen derselben Kreatur auseinander.
+  dark_gear_spin_cw: [
+    { name: 'elem_dark', opts: { rate: 0.7, volume: 0.9, category: null, dedupe: 600 } },
+    { name: 'chain_add', opts: { rate: 0.7, volume: 0.75, delay: 170, category: null, dedupe: 600 } },
+    { name: 'chain_add', opts: { rate: 0.9, volume: 0.55, delay: 330, category: null, dedupe: 600 } },
+    { name: 'debuff',    opts: { rate: 0.7, volume: 0.6, delay: 1050, category: null, dedupe: 600 } },
+  ],
+  dark_gear_spin_ccw: [
+    { name: 'chain_add', opts: { rate: 0.85, volume: 0.8, category: null, dedupe: 600 } },
+    { name: 'elem_dark', opts: { rate: 0.9, volume: 0.8, delay: 110, category: null, dedupe: 600 } },
+    { name: 'chain_add', opts: { rate: 1.1, volume: 0.55, delay: 330, category: null, dedupe: 600 } },
+    { name: 'negate',    opts: { rate: 0.8, volume: 0.8, delay: 1100, category: null, dedupe: 600 } },
+  ],
   cloud_gather:            null,
   cloud_disperse:          null,
   sand_reset:              null,
@@ -3584,7 +4642,7 @@ const ZONE_ANIM_SFX = {
   // Regeln: (1) OHNE Sammelkategorie (`category: null`) — der Aktivierungs-/Zauberklang einer Karte belegt den Slot 'effect' meist
   // ~0-200 ms VOR der Animation und verschluckte sie (Burning Finger, Burning Skeleton); `dedupe` haelt Mehrfachziele davon ab, den
   // Klang zu stapeln. (2) Der Verzug sitzt auf dem Treffer: bei Animationen mit `_delay(N)` in der Karte ist es ~N − 100 (der
-  // Mount-Vorlauf kommt von `playSFXForZoneAnim` dazu). (3) Absichtlich stumm bleiben: Dauerschleifen und Deko (`dark_gear_spin_*`,
+  // Mount-Vorlauf kommt von `playSFXForZoneAnim` dazu). (3) Absichtlich stumm bleiben: Dauerschleifen und Deko (
   // Dampf, Blasen, Wolken, `anger_mark` …: `null`, begruendet oben bei den Eintraegen), die Kleinst-Animation des Weakening Crystal
   // (`crystal_drain`, laeuft zu JEDEM Rundenbeginn), `equip_flash` (begleitet den `card_reveal`-Klang des Ausloesers),
   // `creature_death`/`deck_shuffle_fx` (Klang kommt aus Log bzw. `deck_shuffle`).
@@ -3761,6 +4819,12 @@ const ZONE_ANIM_SFX = {
     { name: 'gold_gain', opts: { rate: 1.25, volume: 0.8, delay: 0, category: null, dedupe: 0 } },
     { name: 'gold_gain', opts: { rate: 1.0, volume: 0.65, delay: 520, category: null, dedupe: 0 } },
   ],
+  // ★ Betrayal (25.10., Welle 78; `betrayal_coins`, Münzen von deiner Gold-Anzeige über die Kreatur zur Gold-Anzeige des Empfängers): ein Münzklang je Abflug (alle 130 ms)
+  //   und einer je Landung (Abflug + 960 ms) — die Zeiten decken sich mit `betrayal.js` (STEP_MS 130, LEG_MS 360, DWELL_MS 100). `category: null`: kein Verschlucken durch den Effektklang.
+  ev_betrayal_coins: [
+    ...[0, 1, 2, 3, 4].map(i => ({ name: 'gold_gain', opts: { rate: 1.3 - i * 0.04, volume: 0.6, delay: i * 130, category: null, dedupe: 0 } })),
+    ...[0, 1, 2, 3, 4].map(i => ({ name: 'gold_gain', opts: { rate: 0.95 + i * 0.05, volume: 0.55, delay: 820 + i * 130, category: null, dedupe: 0 } })),
+  ],
   // Willy: Klee, Regenbogen, Muenzen um den Helden
   ev_willy_leprechaun: [
     { name: 'buff', opts: { rate: 1.4, volume: 0.7, delay: 0, category: null, dedupe: 250 } },
@@ -3770,6 +4834,26 @@ const ZONE_ANIM_SFX = {
   ev_alleria_spider_redirect: [
     { name: 'projectile', opts: { rate: 0.9, volume: 0.7, delay: 0, category: null, dedupe: 250 } },
     { name: 'elem_biomancy', opts: { rate: 1.1, volume: 0.6, delay: 250, category: null, dedupe: 250 } },
+  ],
+  // Kartenwurf (25.10., `play_card_throw`): Ultimate Destroyer Punch wirft die Creature auf den Helden (Aufschlag nach ~760 ms) / Crash Landing lässt die Ausrüstung in die Ablage stürzen (~860 ms).
+  ev_card_throw: [
+    { name: 'elem_wind',    opts: { rate: 1.1, volume: 0.6, delay: 1, category: null, dedupe: 0 } },
+    { name: 'heavy_impact', opts: { rate: 0.7, volume: 0.8, delay: 760, category: null, dedupe: 0 } },
+  ],
+  ev_card_crash: [
+    { name: 'debuff',       opts: { rate: 1.4, volume: 0.4, delay: 1, category: null, dedupe: 0 } },
+    { name: 'elem_wind',    opts: { rate: 0.9, volume: 0.5, delay: 220, category: null, dedupe: 0 } },
+    { name: 'heavy_impact', opts: { rate: 0.9, volume: 0.6, delay: 860, category: null, dedupe: 0 } },
+    { name: 'discard',      opts: { rate: 0.8, volume: 0.6, delay: 880, category: null, dedupe: 0 } },
+  ],
+  // Fake Legendary Sword (25.10.): die Karte reißt, zerspringt in Splitter, die klirrend davonfliegen.
+  ev_card_shatter: [
+    { name: 'debuff',          opts: { rate: 1.6, volume: 0.35, delay: 1, category: null, dedupe: 0 } },
+    { name: 'critical_strike', opts: { rate: 1.2, volume: 0.6, delay: 330, category: null, dedupe: 0 } },
+    { name: 'ping',            opts: { rate: 2.6, volume: 0.3, delay: 340, category: null, dedupe: 0 } },
+    { name: 'ping',            opts: { rate: 3.1, volume: 0.25, delay: 400, category: null, dedupe: 0 } },
+    { name: 'ping',            opts: { rate: 2.2, volume: 0.25, delay: 470, category: null, dedupe: 0 } },
+    { name: 'discard',         opts: { rate: 0.8, volume: 0.5, delay: 900, category: null, dedupe: 0 } },
   ],
   // Pusher schleudert die Karte nach oben
   ev_pusher_fling: [
@@ -3994,9 +5078,11 @@ if (typeof document !== 'undefined') {
     // Up hin und her zu klicken, macht noch kein Geraeusch"). Reiter sind
     // `<div>`s ohne Rolle und fielen deshalb durch — dasselbe gilt fuer
     // jeden kuenftigen Reiter, nicht nur fuer die beiden im Login.
-    const btn = e.target.closest('button, [role="button"], .tab');
+    // `[role="switch"]`: die Schalter im Profil (`ProfilSchalter`) sind <div>s mit dieser Rolle und waren stumm. Gesperrte Schalter klingen als Fehler.
+    const btn = e.target.closest('button, [role="button"], [role="switch"], .tab');
     if (!btn) return;
     if (btn.closest('.volume-control, .volume-slider-popup')) return;
+    if (btn.getAttribute('role') === 'switch' && btn.getAttribute('aria-disabled') === 'true') { playSFX('ui_error', { dedupe: 250 }); return; }
     // Don't double-fire on buttons that have data-sfx="none".
     if (btn.dataset && btn.dataset.sfx === 'none') return;
     // Cancel-style buttons get ui_cancel instead of ui_click.
@@ -4234,8 +5320,45 @@ window.addDragListeners = addDragListeners;
 // ===== API HELPER =====
 window.AUTH_TOKEN = null;
 
+// ===== SPIELER-TRICHTER (anonyme Zaehler, siehe funnel.js) =====
+// KEINE Besucher-ID, kein Cookie, nichts Eindeutiges. Nur zwei grobe Etiketten liegen in sessionStorage (Tab-Sitzung) und gehen als
+// Header mit: Quelle (utm_source oder Referrer-Host) und Geraeteklasse (phone | tablet | desktop). Aus: ?nostats=1 (merkt sich der
+// Browser als Einstellung, ?nostats=0 hebt auf), Do-Not-Track, Global Privacy Control. Dann geht nur `x-pp-off: 1` raus.
+const ppFunnel = (() => {
+  const OFF = 'pp_nostats';
+  try { localStorage.removeItem('pp_vid'); } catch {}   // Rest aus einem frueheren Stand dieser Statistik (Besucher-ID): entfernen
+  try { const q = new URLSearchParams(location.search).get('nostats'); if (q === '1') localStorage.setItem(OFF, '1'); else if (q === '0') localStorage.removeItem(OFF); } catch {}
+  const off = () => { try { if (localStorage.getItem(OFF) === '1') return true; } catch {} return navigator.doNotTrack === '1' || window.doNotTrack === '1' || navigator.globalPrivacyControl === true; };
+  const label = (v) => String(v || '').toLowerCase().replace(/[^a-z0-9._-]/g, '').slice(0, 24);
+  const labels = () => {
+    try {
+      let src = sessionStorage.getItem('pp_src'), dev = sessionStorage.getItem('pp_dev');
+      if (src === null || dev === null) {
+        const q = new URLSearchParams(location.search); let ref = '';
+        try { const h = document.referrer ? new URL(document.referrer).hostname.replace(/^www\./, '') : ''; ref = h && h !== location.hostname ? h : ''; } catch {}
+        src = label(q.get('utm_source')) || label(ref) || '(direkt)';
+        const coarse = matchMedia('(pointer: coarse)').matches, small = Math.min(screen.width, screen.height) <= 700;
+        dev = coarse && small ? 'phone' : coarse ? 'tablet' : 'desktop';
+        sessionStorage.setItem('pp_src', src); sessionStorage.setItem('pp_dev', dev);
+      }
+      return { src, dev };
+    } catch { return { src: '(direkt)', dev: 'desktop' }; }
+  };
+  function headers() { if (off()) return { 'x-pp-off': '1' }; const l = labels(); return { 'x-pp-src': l.src, 'x-pp-dev': l.dev }; }
+  function hit() {
+    try {
+      if (off() || sessionStorage.getItem('pp_hit')) return; sessionStorage.setItem('pp_hit', '1');
+      const l = labels();
+      fetch('/api/funnel/hit', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ src: l.src, device: l.dev }), keepalive: true }).catch(() => {});
+    } catch {}
+  }
+  return { headers, hit };
+})();
+window.ppFunnel = ppFunnel;
+ppFunnel.hit();
+
 async function api(path, opts = {}) {
-  const headers = { 'Content-Type': 'application/json' };
+  const headers = { 'Content-Type': 'application/json', ...ppFunnel.headers() };
   if (window.AUTH_TOKEN) headers['x-auth-token'] = window.AUTH_TOKEN;
   const res = await fetch('/api' + path, { ...opts, headers: { ...headers, ...opts.headers } });
   const data = await res.json();
@@ -4283,7 +5406,7 @@ document.addEventListener('visibilitychange', () => { if (!document.hidden && wi
 
 // Handle session superseded by another tab
 socket.on('superseded', ({ reason }) => {
-  document.body.innerHTML = `<div style="display:flex;align-items:center;justify-content:center;height:100vh;background:#1a1a2e;color:#fff;font-family:sans-serif;text-align:center;padding:20px"><div><h2 style="color:#ff6644">⚠️ Session Taken Over</h2><p style="color:#aaa;max-width:400px">${reason || 'This session was opened in another tab.'}</p><button onclick="location.reload()" style="margin-top:16px;padding:10px 24px;background:#4488ff;color:#fff;border:none;border-radius:8px;cursor:pointer;font-size:16px">Reload</button></div></div>`;
+  document.body.innerHTML = `<div style="display:flex;align-items:center;justify-content:center;height:100vh;background:#1a1a2e;color:#fff;font-family:sans-serif;text-align:center;padding:20px"><div><h2 style="color:#e92f38">⚠️ Session Taken Over</h2><p style="color:#a8a8a8;max-width:400px">${reason || 'This session was opened in another tab.'}</p><button onclick="location.reload()" style="margin-top:16px;padding:10px 24px;background:#4580f6;color:#fff;border:none;border-radius:8px;cursor:pointer;font-size:16px">Reload</button></div></div>`;
 });
 
 // ===== CARD DB =====
@@ -5318,9 +6441,9 @@ function trimOverLimitCopies(deck) {
 }
 
 function typeColor(ct) {
-  const m = { Hero:'#aa44ff', 'Ascended Hero':'#6622aa', Creature:'#44dd44', Spell:'#ff4444',
-    Attack:'#ff4444', Artifact:'#ffd700', Potion:'#a0703c', Ability:'#44aaff', Token:'#888' };
-  return m[ct] || '#888';
+  const m = { Hero:'#a040ff', 'Ascended Hero':'#702db3', Creature:'#3ddc57', Spell:'#f03232',
+    Attack:'#f03232', Artifact:'#fad54a', Potion:'#9d612f', Ability:'#1ca9fd', Token:'#7f7f7f' };
+  return m[ct] || '#7f7f7f';
 }
 
 function typeClass(ct) {
@@ -5363,12 +6486,12 @@ window.activeDragData = null; // shared drag tracker (cross-file)
 
 // Shine band gradient palettes
 const BAND_GRADIENTS = [
-  'linear-gradient(to right, transparent 0%, rgba(255,255,255,.06) 8%, rgba(255,80,200,.4) 18%, rgba(80,160,255,.5) 28%, rgba(255,255,60,.4) 38%, rgba(60,255,160,.5) 48%, rgba(200,80,255,.45) 58%, rgba(255,160,60,.35) 68%, rgba(255,255,255,.06) 82%, transparent 100%)',
-  'linear-gradient(to right, transparent 0%, rgba(255,255,255,.04) 10%, rgba(255,120,60,.35) 25%, rgba(255,60,180,.4) 40%, rgba(255,200,60,.35) 55%, rgba(255,80,80,.3) 70%, rgba(255,255,255,.04) 85%, transparent 100%)',
-  'linear-gradient(to right, transparent 0%, rgba(255,255,255,.05) 12%, rgba(60,200,255,.35) 25%, rgba(60,255,200,.35) 40%, rgba(160,80,255,.3) 55%, rgba(80,180,255,.3) 70%, rgba(255,255,255,.05) 85%, transparent 100%)',
+  'linear-gradient(to right, transparent 0%, rgba(255,255,255,.06) 8%, rgba(252,105,198,.4) 18%, rgba(109,155,248,.5) 28%, rgba(255,235,26,.4) 38%, rgba(102,255,162,.5) 48%, rgba(169,82,255,.45) 58%, rgba(255,155,58,.35) 68%, rgba(255,255,255,.06) 82%, transparent 100%)',
+  'linear-gradient(to right, transparent 0%, rgba(255,255,255,.04) 10%, rgba(248,116,32,.35) 25%, rgba(251,30,169,.4) 40%, rgba(255,198,28,.35) 55%, rgba(254,81,84,.3) 70%, rgba(255,255,255,.04) 85%, transparent 100%)',
+  'linear-gradient(to right, transparent 0%, rgba(255,255,255,.05) 12%, rgba(26,198,255,.35) 25%, rgba(104,253,193,.35) 40%, rgba(169,82,255,.3) 55%, rgba(102,182,255,.3) 70%, rgba(255,255,255,.05) 85%, transparent 100%)',
   'linear-gradient(to right, transparent 0%, transparent 20%, rgba(255,255,255,.5) 45%, rgba(255,255,255,.65) 50%, rgba(255,255,255,.5) 55%, transparent 80%, transparent 100%)',
-  'linear-gradient(to right, transparent 0%, rgba(255,200,100,.05) 10%, rgba(255,215,0,.35) 25%, rgba(255,180,60,.4) 40%, rgba(255,255,100,.3) 55%, rgba(255,200,60,.25) 70%, rgba(255,200,100,.05) 85%, transparent 100%)',
-  'linear-gradient(to right, transparent 0%, rgba(200,100,255,.05) 10%, rgba(160,60,255,.3) 25%, rgba(255,60,255,.35) 40%, rgba(100,60,255,.3) 55%, rgba(180,100,255,.25) 70%, rgba(200,100,255,.05) 85%, transparent 100%)',
+  'linear-gradient(to right, transparent 0%, rgba(251,200,106,.05) 10%, rgba(250,213,74,.35) 25%, rgba(249,172,32,.4) 40%, rgba(254,255,102,.3) 55%, rgba(255,198,28,.25) 70%, rgba(251,200,106,.05) 85%, transparent 100%)',
+  'linear-gradient(to right, transparent 0%, rgba(184,102,255,.05) 10%, rgba(160,64,255,.3) 25%, rgba(248,33,227,.35) 40%, rgba(117,31,249,.3) 55%, rgba(184,102,255,.25) 70%, rgba(184,102,255,.05) 85%, transparent 100%)',
 ];
 
 // ★ v1205 — Bandpalette der Diamond Rares (Als Vorgabe 18.9.:
@@ -5376,9 +6499,9 @@ const BAND_GRADIENTS = [
 // der Secret Rare: Diamond bleibt in Tuerkis/Aqua/Tiefblau mit weissem
 // Glanz, sonst sind die beiden Seltenheiten nicht auseinanderzuhalten.
 const DIAMOND_BAND_GRADIENTS = [
-  'linear-gradient(to right, transparent 0%, rgba(255,255,255,.05) 10%, rgba(64,224,208,.42) 26%, rgba(150,255,245,.5) 40%, rgba(60,190,230,.42) 56%, rgba(40,150,225,.3) 72%, rgba(255,255,255,.05) 86%, transparent 100%)',
-  'linear-gradient(to right, transparent 0%, transparent 22%, rgba(200,255,250,.5) 44%, rgba(255,255,255,.7) 50%, rgba(200,255,250,.5) 56%, transparent 78%, transparent 100%)',
-  'linear-gradient(to right, transparent 0%, rgba(120,235,245,.06) 12%, rgba(45,175,205,.36) 28%, rgba(120,250,235,.44) 44%, rgba(80,200,255,.36) 60%, rgba(140,245,230,.26) 74%, transparent 100%)',
+  'linear-gradient(to right, transparent 0%, rgba(255,255,255,.05) 10%, rgba(58,223,203,.42) 26%, rgba(124,233,220,.5) 40%, rgba(119,200,238,.42) 56%, rgba(57,158,223,.3) 72%, rgba(255,255,255,.05) 86%, transparent 100%)',
+  'linear-gradient(to right, transparent 0%, transparent 22%, rgba(178,238,238,.5) 44%, rgba(255,255,255,.7) 50%, rgba(178,238,238,.5) 56%, transparent 78%, transparent 100%)',
+  'linear-gradient(to right, transparent 0%, rgba(107,233,250,.06) 12%, rgba(7,174,197,.36) 28%, rgba(124,233,220,.44) 44%, rgba(104,198,253,.36) 60%, rgba(124,233,220,.26) 74%, transparent 100%)',
 ];
 
 // ═══════════════════════════════════════════════════════════════
@@ -5420,6 +6543,10 @@ const foilVersatz = key => foilSamen('uhr|' + key) % FOIL_VERSATZ_MS;
  * sucht jedes Mal alle Animationen des Dokuments = 365 ms zusammen), EIN `document.getAnimations()` rund 30 ms, das Schreiben
  * aller 982 Startzeiten 2 ms. Darum: einmal alles holen und nach Huelle filtern, erst danach schreiben (ein Schreiben macht die
  * Animation fuer die naechste Lesung "schmutzig" — Lesen und Schreiben im Wechsel wird quadratisch).
+ * Im Kampf-Stresstest (28.10., Brett mit ~1 500 Animationen) steht `foilUhrStellen` bei jedem Hover ueber eine Foil-Karte mit ~25 ms im
+ * Profil — das ist aber der erzwungene Stilabgleich, den `getAnimations()` anstoesst und der im selben Bild ohnehin faellig waere; die
+ * Suche selbst kostet bei sauberem Stil ~3 ms (gemessen). Der Weg ueber einzelne Huellen ist ab zwei Huellen LANGSAMER (je Aufruf
+ * wieder ~3 ms) und wurde deshalb wieder verworfen.
  */
 function foilUhrStellen(huellen) {
   const versatz = new Map(), liste = [];
@@ -5469,33 +6596,33 @@ if (typeof CSSAnimation !== 'undefined' && typeof document.getAnimations === 'fu
 
 // Sparkle positions — secret rare (warm)
 const SPARKLE_POSITIONS = [
-  { x: 15, y: 20, color: '#ffe080', dur: 2.2, delay: 0 },
-  { x: 75, y: 12, color: '#80d0ff', dur: 2.5, delay: 0.4 },
-  { x: 45, y: 65, color: '#ff80d0', dur: 2.0, delay: 0.9 },
-  { x: 85, y: 50, color: '#80ffb0', dur: 2.7, delay: 1.3 },
-  { x: 25, y: 80, color: '#d080ff', dur: 2.3, delay: 1.7 },
+  { x: 15, y: 20, color: '#fbe181', dur: 2.2, delay: 0 },
+  { x: 75, y: 12, color: '#77c8ee', dur: 2.5, delay: 0.4 },
+  { x: 45, y: 65, color: '#fc69c6', dur: 2.0, delay: 0.9 },
+  { x: 85, y: 50, color: '#66ffa2', dur: 2.7, delay: 1.3 },
+  { x: 25, y: 80, color: '#c98aff', dur: 2.3, delay: 1.7 },
   { x: 60, y: 35, color: '#ffffff', dur: 1.9, delay: 0.6 },
-  { x: 10, y: 50, color: '#ffb060', dur: 2.6, delay: 2.0 },
-  { x: 90, y: 85, color: '#60d0ff', dur: 2.1, delay: 1.1 },
-  { x: 50, y: 10, color: '#ff60a0', dur: 2.4, delay: 0.2 },
-  { x: 35, y: 90, color: '#a0ff60', dur: 2.8, delay: 1.5 },
+  { x: 10, y: 50, color: '#f4ae64', dur: 2.6, delay: 2.0 },
+  { x: 90, y: 85, color: '#66d9ff', dur: 2.1, delay: 1.1 },
+  { x: 50, y: 10, color: '#fe6794', dur: 2.4, delay: 0.2 },
+  { x: 35, y: 90, color: '#cbff66', dur: 2.8, delay: 1.5 },
   { x: 70, y: 70, color: '#ffffff', dur: 2.0, delay: 0.8 },
-  { x: 20, y: 40, color: '#ffe0a0', dur: 2.3, delay: 1.9 },
+  { x: 20, y: 40, color: '#f9ecb3', dur: 2.3, delay: 1.9 },
 ];
 
 // Sparkle positions — diamond rare. ★ v1205: durchgehend tuerkis-blau,
 // weisse Glanzpunkte nur noch als Akzent dazwischen.
 const DIAMOND_SPARKLE_POSITIONS = [
   { x: 15, y: 10, color: '#ffffff', dur: 1.5, delay: 0.0 },
-  { x: 80, y: 8,  color: '#40e0d0', dur: 1.7, delay: 0.4 },
-  { x: 45, y: 28, color: '#8ff8ea', dur: 1.4, delay: 0.9 },
-  { x: 8,  y: 45, color: '#5ad7e8', dur: 1.6, delay: 0.2 },
+  { x: 80, y: 8,  color: '#3adfcb', dur: 1.7, delay: 0.4 },
+  { x: 45, y: 28, color: '#7ce9dc', dur: 1.4, delay: 0.9 },
+  { x: 8,  y: 45, color: '#6be9fa', dur: 1.6, delay: 0.2 },
   { x: 70, y: 42, color: '#ffffff', dur: 1.3, delay: 1.1 },
-  { x: 35, y: 55, color: '#48c8f0', dur: 1.8, delay: 0.6 },
-  { x: 88, y: 58, color: '#a8fff2', dur: 1.5, delay: 1.4 },
-  { x: 20, y: 75, color: '#40e0d0', dur: 1.4, delay: 0.3 },
+  { x: 35, y: 55, color: '#66d9ff', dur: 1.8, delay: 0.6 },
+  { x: 88, y: 58, color: '#7ce9dc', dur: 1.5, delay: 1.4 },
+  { x: 20, y: 75, color: '#3adfcb', dur: 1.4, delay: 0.3 },
   { x: 60, y: 72, color: '#ffffff', dur: 1.7, delay: 1.0 },
-  { x: 50, y: 90, color: '#6ae8dc', dur: 1.6, delay: 0.7 },
+  { x: 50, y: 90, color: '#7ce9dc', dur: 1.6, delay: 0.7 },
 ];
 
 // ═══════════════════════════════════════════════════════════════
@@ -5562,7 +6689,7 @@ function makeFoilMotes(isDiamond, rnd = Math.random) {
   return Array.from({ length: FOIL_MOTE_COUNT }, (_, i) => ({
     x: 5 + rnd() * 90,
     y: 30 + rnd() * 65,                      // starten unten
-    color: isDiamond ? (i % 2 ? '#8ff3e4' : '#7fd8f5') : (i % 2 ? '#ffe6a8' : '#ffd0f0'),
+    color: isDiamond ? (i % 2 ? '#7ce9dc' : '#7fdfff') : (i % 2 ? '#f9ecb3' : '#f3bad3'),
     size: 1.5 + rnd() * 1.5,
     dur: 4.5 + rnd() * 4.5,
     delay: -rnd() * 9,
@@ -5573,9 +6700,13 @@ function makeFoilMotes(isDiamond, rnd = Math.random) {
 }
 
 /** Reiner Zeichner — bekommt alles Gewuerfelte von CardFoil gereicht. */
-function FoilOverlay({ bands, motes, sparkles, shimmerOffset, foilType, klein, fkey }) {
+function FoilOverlay({ bands, motes, sparkles, shimmerOffset, foilType, klein, fkey, teilchen }) {
   const isDiamond = foilType === 'diamond_rare';
   const posn = isDiamond ? DIAMOND_SPARKLE_POSITIONS : SPARKLE_POSITIONS;
+  // Brett mit vielen Foil-Karten: nur so viele Funken + Staubkoerner, wie `teilchen` erlaubt (siehe `foilBrettTeilchen`).
+  const { funken: nFunken, staub: nStaub } = foilTeilchenAnteil(posn.length, (motes || []).length, teilchen);
+  // app-fx-35: Funken + Staub als EINE Leinwand (statt ~18 DOM-Elemente mit Endlos-Animation); Kleinansicht/Telefon/ohne Pipeline: wie bisher.
+  const cvFoil = !klein && !!window.PpFx35Foil && !!window.ppFx35FoilAn && window.ppFx35FoilAn();
   return (
     <div className={'foil-shine-overlay' + (isDiamond ? ' foil-shine-diamond' : '') + (klein ? ' foil-klein' : '')} data-foil-key={fkey}>
       {/* 1) Die Praegung der Folie. Fuer sich genommen kaum zu sehen —
@@ -5601,8 +6732,10 @@ function FoilOverlay({ bands, motes, sparkles, shimmerOffset, foilType, klein, f
         }} />
       ))}
       {/* 4) Glanzpunkte und Staub. */}
+      {cvFoil ? <window.PpFx35Foil posn={posn} sparkles={sparkles} motes={motes} nFunken={nFunken} nStaub={nStaub} diamond={isDiamond} fkey={fkey} /> : <>
       {posn.map((sp, i) => {
         if (klein && i % FOIL_KLEIN_FUNKEN_JEDER !== 0) return null;   // v1298
+        if (!foilBehalten(i, posn.length, nFunken)) return null;
         const f = (sparkles && sparkles[i]) || null;
         return (
           <div key={'s' + i} className="foil-sparkle"
@@ -5614,7 +6747,7 @@ function FoilOverlay({ bands, motes, sparkles, shimmerOffset, foilType, klein, f
             }} />
         );
       })}
-      {(motes || []).map((m, i) => (
+      {(motes || []).map((m, i) => i >= nStaub ? null : (
         <div key={'m' + i} className="foil-mote" style={{
           left: m.x + '%', top: m.y + '%', color: m.color,
           '--mote-size': m.size.toFixed(1) + 'px',
@@ -5625,6 +6758,7 @@ function FoilOverlay({ bands, motes, sparkles, shimmerOffset, foilType, klein, f
           '--mote-o': m.o.toFixed(2),
         }} />
       ))}
+      </>}
     </div>
   );
 }
@@ -5659,6 +6793,51 @@ function FoilOverlay({ bands, motes, sparkles, shimmerOffset, foilType, klein, f
 // dann eine leichte Foil-Schicht: 2 Baender (Diamond 1), ein Drittel der
 // Funken, kein Staub, und nur Animationen, die der Compositor allein
 // schafft (transform/opacity). Die grosse Ansicht (Tooltip) bleibt voll.
+// ═══════════════════════════════════════════════════════════════
+//  ★ FOIL-DICHTE AUF DEM BRETT (Kampf-Stresstest 28.10.: „das ganze Board voller Foil-Karten")
+//
+//  Jede Foil-Karte traegt ~22 laufende CSS-Animationen (Funken, Staub, Schimmer, Rahmen-Ringe); mit 36 Foil-Karten auf dem Brett sind das
+//  rund 800 — und jeder Hauptthread-Frame wertet ALLE erneut aus. Statt einer harten Schwelle teilen sich die Foil-Karten AUF DEM BRETT
+//  ein festes Teilchen-Budget (`FOIL_BRETT_BUDGET` Funken + Staubkoerner zusammen): bis ~16 Karten bleibt alles wie es ist, danach bekommt
+//  jede Karte stetig etwas weniger Teilchen (mindestens `FOIL_BRETT_MIN`). Schimmer, Rahmen-Ringe und alles Uebrige bleiben unberuehrt.
+//  Nur Karten im `FoilBrettContext` (Kampfbrett-Ebene, Editor-Brett) zaehlen und werden ausgeduennt; Tooltip, Hand und Galerien nie.
+// ═══════════════════════════════════════════════════════════════
+const FoilBrettContext = React.createContext(false);
+window.FoilBrettContext = FoilBrettContext;
+const FOIL_BRETT_BUDGET = 300;
+const FOIL_BRETT_MIN = 5;
+const foilBrettKarten = new Set();
+const foilBrettHoerer = new Set();
+/** Erlaubte Teilchen je Karte bei `n` Foil-Karten auf dem Brett (Infinity = alles). */
+function foilBrettTeilchen(n) {
+  return n > 0 ? Math.max(FOIL_BRETT_MIN, Math.floor(FOIL_BRETT_BUDGET / n)) : Infinity;
+}
+const foilBrettAbo = (f) => { foilBrettHoerer.add(f); return () => { foilBrettHoerer.delete(f); }; };
+const foilBrettStand = () => foilBrettTeilchen(foilBrettKarten.size);
+/** Melden sich Karten an/ab, wird nur neu gezeichnet, wenn sich die erlaubte Teilchenzahl wirklich aendert (Schnappschuss = Zahl). */
+function useFoilBrettTeilchen(aktiv) {
+  const ich = useRef(null);
+  if (!ich.current) ich.current = {};
+  useEffect(() => {
+    if (!aktiv) return undefined;
+    const marke = ich.current;
+    foilBrettKarten.add(marke);
+    foilBrettHoerer.forEach(f => f());
+    return () => { foilBrettKarten.delete(marke); foilBrettHoerer.forEach(f => f()); };
+  }, [aktiv]);
+  const erlaubt = React.useSyncExternalStore(foilBrettAbo, foilBrettStand, () => Infinity);
+  return aktiv ? erlaubt : undefined;
+}
+/** Wie viele Funken / Staubkoerner von `funken` + `staub` bei `max` Teilchen bleiben (im Verhaeltnis, Funken mindestens 1). */
+function foilTeilchenAnteil(funken, staub, max) {
+  const gesamt = funken + staub;
+  if (max === undefined || max >= gesamt) return { funken, staub };
+  const f = Math.min(funken, Math.max(1, Math.round(max * funken / gesamt)));
+  return { funken: f, staub: Math.max(0, Math.min(staub, max - f)) };
+}
+/** Gleichmaessig verteilte Auswahl: bleibt Element `i` von `gesamt`, wenn nur `k` bleiben? */
+const foilBehalten = (i, gesamt, k) => k >= gesamt || Math.floor((i + 1) * k / gesamt) > Math.floor(i * k / gesamt);
+
 const FoilKleinContext = React.createContext(false);
 window.FoilKleinContext = FoilKleinContext;
 const FOIL_KLEIN_BAENDER = { secret: 2, diamond: 1 };
@@ -5698,6 +6877,7 @@ function HintergrundPause() {
   return null;
 }
 window.HintergrundPause = HintergrundPause;
+
 const FOIL_KLEIN_FUNKEN_JEDER = 3;   // jeder dritte Funke bleibt
 
 // ═══════════════════════════════════════════════════════════════
@@ -5803,19 +6983,23 @@ window.SkinHolo = SkinHolo;
  * Skin-Karten (`.skin-holo-name`), ohne Bild-Foil; in Grossansichten (>= 240 px) zusaetzlich als zweite Schicht der Glanz
  * auf allem uebrigen Text (`.skin-holo-text`). In Kleinansichten entfaellt sie — dort ist der Name nicht lesbar.
  */
-function FoilName({ card, tone, fkey }) {
+function FoilName({ card, tone, fkey, werte }) {
   const [ref, breit] = useEffektHuelle(ppEffektMin());
-  const [daten, setDaten] = useState(() => (card && window.CardRender && window.CardRender.nameCached(card)) || null);
+  // `werte`: Zahlen, die statt der gedruckten aufs Kartenbild kommen ({ hp, lv, kost, noHp, noAtk }) — die Maske des Glanzes bekommt dieselben,
+  // sonst glänzt die Schraffur auf dem gedruckten Wert statt auf dem sichtbaren.
+  const wk = werte ? JSON.stringify(werte) : '';
+  const [daten, setDaten] = useState(() => (card && window.CardRender && window.CardRender.nameCached(card, werte)) || null);
   useEffect(() => {
     let lebt = true;
     if (!card || !breit) return undefined;
-    const fertig = window.CardRender.nameCached(card);
+    const fertig = window.CardRender.nameCached(card, werte);
     if (fertig) { setDaten(fertig); return undefined; }
+    setDaten(null);
     window.CardImageShim.boot()
-      .then(() => window.CardRender.nameShimmerFor(card))
+      .then(() => window.CardRender.nameShimmerFor(card, werte))
       .then(d => { if (lebt) setDaten(d || null); });
     return () => { lebt = false; };
-  }, [card?.name, breit]);
+  }, [card?.name, breit, wk]);
   fkey = fkey || 'card:' + (card?.name || '');
   const phase = usePhase(fkey);
   // Auch der ÜBRIGE Text der Karte (Fähigkeitsfelder, Werte, Regeltext) bekommt den Glanz (Als Vorgabe 12.10.). Eigene Hülle mit
@@ -5837,7 +7021,7 @@ function FoilName({ card, tone, fkey }) {
   return (
     <>
       <div ref={ref} className={'skin-holo skin-holo-nur-name foil-name-' + tone} data-foil-key={fkey} style={daten ? { ...daten.vars, '--sh-phase': phase } : undefined} aria-hidden="true">
-        {daten && breit && <div className="skin-holo-name"><i className="sh-rb" /><i className="sh-gl" /></div>}
+        {daten && breit && <div className="skin-holo-name"><i className="sh-rb" /><div className="sh-ht"><i /></div><i className="sh-gl" /></div>}
       </div>
       {textAn && (
         <div ref={refT} className={'skin-holo skin-holo-nur-name foil-name-' + tone} data-foil-key={fkey + '|text'} style={datenT ? { ...datenT.vars, '--sh-phase': phase } : undefined} aria-hidden="true">
@@ -5902,15 +7086,17 @@ function FoilRim({ rim, fkey }) {
   const phase = usePhase(fkey);
   return (
     <div ref={ref} className={'skin-holo skin-holo-nur-rahmen foil-rim-' + rim.tone} data-foil-key={fkey} style={daten ? { ...daten.vars, '--sh-phase': phase } : undefined} aria-hidden="true">
-      {daten && breit && <div className="skin-holo-rim"><i /></div>}
+      {daten && breit && <div className="skin-holo-rim"><i /><u /></div>}
     </div>
   );
 }
 
-function CardFoil({ card, foilType, skin }) {
+function CardFoil({ card, foilType, skin, werte }) {
   const type = foilType || card?.foil || null;
   const isFoil = type === 'secret_rare' || type === 'diamond_rare';
   const klein = useContext(FoilKleinContext);
+  const aufDemBrett = useContext(FoilBrettContext);
+  const teilchen = useFoilBrettTeilchen(aufDemBrett && isFoil && !klein);
   // Je KARTE (nicht je Kopie) gewuerfelt: Baender, Staub, Schimmerphase und der Versatz der Funken kommen aus einem Zufallsstrom,
   // der vom Schluessel der Karte abhaengt — alle Exemplare derselben Karte (Hand, Deck-Editor, Tooltip ...) sehen gleich aus und
   // laufen auf der gemeinsamen Foil-Uhr (siehe `foilUhrStellen`); verschiedene Karten unterscheiden sich weiterhin. `klein` aendert
@@ -5962,9 +7148,9 @@ function CardFoil({ card, foilType, skin }) {
       )}
       {foilSchicht && (
         <FoilOverlay foilType={type} bands={meta.bands} motes={meta.motes}
-          sparkles={meta.sparkles} shimmerOffset={meta.shimmerOffset} klein={klein} fkey={fkey} />
+          sparkles={meta.sparkles} shimmerOffset={meta.shimmerOffset} klein={klein} fkey={fkey} teilchen={teilchen} />
       )}
-      {foilSchicht && !klein && skinHoloAktiv() && <FoilName card={card} tone={type === 'diamond_rare' ? 'diamond' : 'gold'} fkey={fkey} />}
+      {foilSchicht && !klein && skinHoloAktiv() && <FoilName card={card} tone={type === 'diamond_rare' ? 'diamond' : 'gold'} fkey={fkey} werte={werte} />}
       {holoSkin && <SkinHolo skin={skin} fkey={fkey} />}
       {schraffur && <FoilHatch card={card} fkey={fkey} />}
       {rahmen && <FoilRim rim={rahmen} fkey={fkey} />}
@@ -5991,6 +7177,88 @@ function ppUmrissFarbe(farbe) {
 }
 window.ppUmrissFarbe = ppUmrissFarbe;
 
+// ── LOGO IN SPIELERFARBE ALS EIN FERTIGES PIXELBILD (W86u2) ─────────────────────────
+// Bisher: graustufiges `logo.png` + drei Deckschichten (`.pp-logo-tint` mit `mix-blend-mode: multiply`, `-licht`, `-umriss`). Die Farbmischung
+// mit dem Hintergrund ist nie Pixelart — und faellt mit abgeschaltetem Mischmodus auseinander (die Tint-Flaeche deckt das Bild dann flach zu).
+// Jetzt wird dasselbe Ergebnis EINMAL pro Farbe in ein Canvas gerechnet: Tint = Bild × Spielerfarbe innerhalb der Maske, Licht = aufgehellte
+// Spielerfarbe, Umriss = `--pp-umriss`; jede Farbe rastet auf die 256er-Palette. Ergebnis: eine Bild-URL, ohne Blend-Modus, ohne Schichten.
+let _ppLogoQuellen = null;
+const _ppLogoBilder = new Map();
+function _ppLogoLaden() {
+  if (_ppLogoQuellen) return _ppLogoQuellen;
+  const laden = (url) => new Promise((ok, fehl) => { const im = new Image(); im.onload = () => ok(im); im.onerror = fehl; im.src = url; });
+  const daten = (im) => { const c = document.createElement('canvas'); c.width = im.naturalWidth; c.height = im.naturalHeight; const g = c.getContext('2d'); g.drawImage(im, 0, 0); return g.getImageData(0, 0, c.width, c.height); };
+  _ppLogoQuellen = Promise.all(['/data/logo.png', '/data/logo-tint-mask.png', '/data/logo-licht-mask.png', '/data/logo-umriss-mask.png'].map(u => laden(u).then(daten)))
+    .catch((e) => { _ppLogoQuellen = null; throw e; });
+  return _ppLogoQuellen;
+}
+/** → Promise<data-URL> des Logos in `farbe` (CSS) mit Umrissfarbe `umriss`; bei Fehlern wird abgelehnt (Aufrufer faellt auf die Deckschichten zurueck). */
+function ppLogoUrl(farbe, umriss) {
+  const f = ppFarbe(farbe), u = ppFarbe(umriss || '#000');
+  const key = [f[0] | 0, f[1] | 0, f[2] | 0, u[0] | 0, u[1] | 0, u[2] | 0].join(',');
+  if (_ppLogoBilder.has(key)) return _ppLogoBilder.get(key);
+  const p = _ppLogoLaden().then(([logo, tint, licht, umr]) => {
+    const w = logo.width, h = logo.height, c = document.createElement('canvas'); c.width = w; c.height = h;
+    const g = c.getContext('2d'), out = g.createImageData(w, h), d = out.data, L = logo.data, T = tint.data, H = licht.data, U = umr.data;
+    const hell = [0, 1, 2].map(i => f[i] * 0.45 + 255 * 0.55);
+    const snapCache = new Map();
+    const snap = (r, gg, b) => {
+      const k = (r << 16) | (gg << 8) | b; let v = snapCache.get(k);
+      if (!v) { v = window.ppSnapRgb ? window.ppSnapRgb(r, gg, b) : [r, gg, b]; snapCache.set(k, v); }
+      return v;
+    };
+    for (let i = 0; i < w * h; i++) {
+      const o = i * 4;
+      let r = L[o], gg = L[o + 1], b = L[o + 2], a = L[o + 3];
+      if (T[o + 3] > 127) { if (a > 0) { r = r * f[0] / 255; gg = gg * f[1] / 255; b = b * f[2] / 255; } else { r = f[0]; gg = f[1]; b = f[2]; } a = 255; }   // multiply
+      if (H[o + 3] > 127) { r = hell[0]; gg = hell[1]; b = hell[2]; a = 255; }
+      if (U[o + 3] > 127) { r = u[0]; gg = u[1]; b = u[2]; a = 255; }
+      if (a > 127) { const q = snap(Math.round(r), Math.round(gg), Math.round(b)); d[o] = q[0]; d[o + 1] = q[1]; d[o + 2] = q[2]; d[o + 3] = 255; }
+    }
+    g.putImageData(out, 0, 0);
+    return c.toDataURL('image/png');
+  });
+  _ppLogoBilder.set(key, p);
+  p.catch(() => _ppLogoBilder.delete(key));
+  return p;
+}
+window.ppLogoUrl = ppLogoUrl;
+
+/**
+ * Das Logo im Pixelart-Stil: `<img>` mit dem fertig gerechneten Bild (siehe oben); der Elternknoten liefert `--player-color` / `--pp-umriss`.
+ * Retro-Modus und Fehlerfall: das alte graue Bild samt Deckschichten (CSS `.pp-logo-tint` & Co.).
+ */
+function PpLogoBild() {
+  const ref = useRef(null);
+  const retro = !!window.PP_RETRO;
+  const [url, setUrl] = useState(null);
+  const [fehler, setFehler] = useState(false);
+  useEffect(() => {
+    if (retro) return undefined;
+    let tot = false;
+    const lesen = () => {
+      const el = ref.current; if (!el) return;
+      const cs = getComputedStyle(el);
+      const farbe = cs.getPropertyValue('--player-color').trim() || '#66b6ff', umr = cs.getPropertyValue('--pp-umriss').trim() || '#000';
+      ppLogoUrl(farbe, umr).then(u => { if (!tot) setUrl(u); }, () => { if (!tot) setFehler(true); });
+    };
+    lesen();
+    // Spielerfarbe aendert sich im Profil → beim Zurueckkehren ins Menue wird das Logo neu eingehaengt; zusaetzlich bei Farbwechsel waehrend der Anzeige.
+    const iv = setInterval(lesen, 2000);
+    return () => { tot = true; clearInterval(iv); };
+  }, [retro]);
+  if (retro || fehler) return (
+    <>
+      <img src="/data/logo.png" alt="Pixel Parties" className="pp-logo-img" />
+      <div className="pp-logo-tint" aria-hidden="true"></div>
+      <div className="pp-logo-licht" aria-hidden="true"></div>
+      <div className="pp-logo-umriss" aria-hidden="true"></div>
+    </>
+  );
+  return <img ref={ref} src={url || undefined} alt="Pixel Parties" className="pp-logo-img" style={url ? undefined : { visibility: 'hidden' }} />;
+}
+window.PpLogoBild = PpLogoBild;
+
 // ── PIXEL-ICONS ─────────────────────────────────────────────────────────
 // Kleine handgesetzte Sinnbilder: Ueberschriften der Menue-Seitenkaesten,
 // Hover-Pfeil der Menueknoepfe (die Knoepfe selbst tragen bewusst keine
@@ -6001,6 +7269,24 @@ window.ppUmrissFarbe = ppUmrissFarbe;
 // Gezeichnet als SVG mit `crispEdges` — scharfe Bloecke in jeder Groesse,
 // je Farbe EIN Pfad aus Zeilenlaeufen.
 const PIXEL_ICONS = {
+  auge: [
+    '...#####...',
+    '.##.....##.',
+    '#...###...#',
+    '#..#####..#',
+    '#...###...#',
+    '.##.....##.',
+    '...#####...',
+  ],
+  augeZu: [
+    '#..#####...',
+    '.##.....##.',
+    '#..####...#',
+    '#..#####..#',
+    '#...####..#',
+    '.##.....##.',
+    '...#####..#',
+  ],
   discord: [
     '...##..........##...',
     '..#####......#####..',
@@ -6143,7 +7429,7 @@ const PIXEL_ICONS = {
   ],
 };
 // '-' = Hauptfarbe gedimmt (inaktive Lautsprecher-Wellen).
-const PIXEL_ICON_FARBEN = { '#': 'currentColor', '+': '#ffffff', 'o': '#0b0712', '-': 'currentColor' };
+const PIXEL_ICON_FARBEN = { '#': 'currentColor', '+': '#ffffff', 'o': '#08060c', '-': 'currentColor' };
 const PIXEL_ICON_DECKUNG = { '-': 0.28 };
 const PIXEL_ICON_PFADE = {};
 function pixelIconPfade(rows) {
@@ -6355,7 +7641,7 @@ function spawnZoneLandFx(el, opts) {
   // Lite-Modus in style.css.
   const sparsam = window.matchMedia
     && window.matchMedia('(pointer: coarse) and (max-height: 600px)').matches;
-  const farbe = opts.color || '#ffd77a';
+  const farbe = opts.color || '#fbe181';
   // Grosse Zonen bekommen etwas mehr Funken als kleine, damit der
   // Einschlag auf einer 64-px-Karte nicht zur Konfettikanone wird.
   const n = Math.round((sparsam ? 5 : 10) * Math.min(1.5, Math.max(.7, r.width / 70)));
@@ -6363,8 +7649,11 @@ function spawnZoneLandFx(el, opts) {
   // Funken in alle Richtungen — vom Einschlag UND von der Beschwoerung
   // genutzt (★ v1209, Als Befund: „zu klein, weil sie nicht die ganze
   // Karte highlightet").
+  // Funken-Daten für die Leinwand (app-fx-44, `ppFx44Funken`): ein Einschlag = EINE Leinwand statt 10–15 CSS-animierter Knoten (die der Backer je Start abtasten musste).
+  const funkenDaten = [];
   const funkenHtml = (anzahl) => {
     const out = [];
+    const leinwand = !!window.ppFx44Funken && !window.__ppFxAlt;
     for (let i = 0; i < anzahl; i++) {
       const w = (i / anzahl) * Math.PI * 2 + (Math.random() - 0.5) * 0.7;
       const weite = r.width * (0.45 + Math.random() * 0.45);
@@ -6374,6 +7663,10 @@ function spawnZoneLandFx(el, opts) {
       // eigene Flugbahn — ein runder Punkt allein liest sich bei dieser
       // Groesse als Staubkorn, nicht als Funkenflug.
       const winkelGrad = Math.atan2(dy, dx) * 180 / Math.PI;
+      if (leinwand) {
+        funkenDaten.push({ dx, dy, dur: 560 + Math.random() * 380, delay: Math.random() * 110, ang: winkelGrad, len: 7 + Math.random() * 9, dick: 2 + Math.random() * 2 });
+        continue;
+      }
       out.push(`<i class="zone-land-spark" style="--zdx:${dx.toFixed(0)}px;--zdy:${dy.toFixed(0)}px;`
         + `--zdur:${(560 + Math.random() * 380).toFixed(0)}ms;`
         + `--zdelay:${(Math.random() * 110).toFixed(0)}ms">`
@@ -6460,6 +7753,7 @@ function spawnZoneLandFx(el, opts) {
     teileS.push(...funkenHtml(n));
     oben.innerHTML = teileS.join('');
     schicht().appendChild(oben);
+    if (funkenDaten.length) window.ppFx44Funken(oben, funkenDaten, farbe);
     setTimeout(() => oben.remove(), ZONE_FX_SUMMON_MS + 150);
     return;
   }
@@ -6468,9 +7762,15 @@ function spawnZoneLandFx(el, opts) {
   box.className = 'zone-land-fx';
   box.style.cssText = mitte + masse;
 
-  const teile = ['<i class="zone-land-glow"></i>', '<i class="zone-land-ring"></i>', ...funkenHtml(n)];
+  // Schockringe + Aufleuchten (app-fx-49) laufen auf der Funken-Leinwand; ohne sie (Notbremse `__ppFxAlt`, Animationen aus, Modul fehlt) bleiben Ring und Schein als CSS-Knoten.
+  const zusatz = (!!window.ppFx49Einschlag && !!window.ppFx44Funken && !window.__ppFxAlt) ? window.ppFx49Einschlag(r.width, r.height, farbe) : null;
+  const teile = zusatz ? funkenHtml(n) : ['<i class="zone-land-glow"></i>', '<i class="zone-land-ring"></i>', ...funkenHtml(n)];
   box.innerHTML = teile.join('');
   schicht().appendChild(box);
+  if (funkenDaten.length) {
+    const lauft = window.ppFx44Funken(box, funkenDaten, farbe, zusatz);
+    if (zusatz && !lauft && window._playAnimations !== false) box.insertAdjacentHTML('afterbegin', '<i class="zone-land-glow"></i><i class="zone-land-ring"></i>');
+  }
   setTimeout(() => box.remove(), ZONE_FX_MS + 150);
 }
 
@@ -6967,7 +8267,8 @@ function handFanCardBox(el) {
 const CARD_DRAG_SFX = {
   // ★ v1213: `pickup` ENTFAELLT (Als Befund 18.9.) — siehe onMove
   // im Kampfbrett. Kein toter Eintrag hier, damit ihn niemand
-  // versehentlich wieder anschliesst.
+  // versehentlich wieder anschliesst. (27.10.: auch im Puzzle-Editor
+  // wieder gestrichen — „der Sound beim Aufnehmen ist lästig".)
   reorder: { name: 'draw',      opts: { volume: 1.1, rate: 1.12, dedupe: 50 } },  // → .363
   release: { name: 'ui_click',  opts: { volume: 1.6, rate: 1.30, dedupe: 50 } },  // → .264
   cancel:  { name: 'ui_cancel', opts: { volume: 1.0, dedupe: 60 } },              // → .330
@@ -7012,7 +8313,7 @@ function spawnZoneLandFxBatch(liste) {
  */
 function zoneLandStyle(cardName) {
   const c = cardName ? window.CARDS_BY_NAME[cardName] : null;
-  if (!c) return { color: '#ffd77a', variant: null };
+  if (!c) return { color: '#fbe181', variant: null };
   const t = c.cardType || '';
   const istKreatur = t.includes('Creature') || (t === 'Token' && c.hp != null);
   return { color: typeColor(t), variant: istKreatur ? 'summon' : null };
@@ -7080,6 +8381,20 @@ function CardMini({ card, onClick, onRightClick, count, maxCount, dimmed, style,
       setTT(false);
     }
   };
+  // Sicherheitsnetz fuer den Inline-Tooltip (Maus): kommt `mouseleave` nie an — etwa weil React die Karte beim
+  // Umsortieren (Draft-Sammlung per Drag) im DOM versetzt, waehrend der Zeiger darauf steht —, bliebe er
+  // haengen, bis man genau diese Karte erneut betritt und verlaesst. Solange er offen ist, schliesst ihn die
+  // naechste Zeigerbewegung ausserhalb der Karte.
+  const cardElRef = useRef(null);
+  useEffect(() => {
+    if (!tt || useSharedTooltip || window._isTouchDevice) return;
+    const onMove = (e) => {
+      const el = cardElRef.current;
+      if (el && !el.contains(e.target)) setTT(false);
+    };
+    document.addEventListener('pointermove', onMove, true);
+    return () => document.removeEventListener('pointermove', onMove, true);
+  }, [tt, useSharedTooltip]);
   // Touch: long-press to show tooltip, quick tap for action
   const handleClick = (e) => {
     if (window._isTouchDevice && window._longPressFired) {
@@ -7133,7 +8448,7 @@ function CardMini({ card, onClick, onRightClick, count, maxCount, dimmed, style,
   const onDragEnd = () => { window.activeDragData = null; };
   return (
     <>
-      <div className={'card-mini ' + typeClass(card.cardType) + (dimmed ? ' dimmed' : '') + (foilClass ? ' ' + foilClass : '') + (isCover ? ' card-mini-cover' : '')}
+      <div ref={cardElRef} className={'card-mini ' + typeClass(card.cardType) + (dimmed ? ' dimmed' : '') + (foilClass ? ' ' + foilClass : '') + (isCover ? ' card-mini-cover' : '')}
         style={style}
         draggable={!!dragData}
         onDragStart={onDragStart}
@@ -7159,8 +8474,8 @@ function CardMini({ card, onClick, onRightClick, count, maxCount, dimmed, style,
             <div className="card-stats">
               {card.level != null && <span>Lv{card.level}</span>}
               {card.hp != null && <span style={{ color: '#ff6666' }}>♥{card.hp}</span>}
-              {card.atk != null && <span style={{ color: '#ffaa44' }}>⚔{card.atk}</span>}
-              {card.cost != null && <span style={{ color: '#44aaff' }}>◆{cardCostText(card)}</span>}
+              {card.atk != null && <span style={{ color: '#ff9b3a' }}>⚔{card.atk}</span>}
+              {card.cost != null && <span style={{ color: '#1ca9fd' }}>◆{cardCostText(card)}</span>}
             </div>
           </>
         )}
@@ -7185,12 +8500,61 @@ function CardMini({ card, onClick, onRightClick, count, maxCount, dimmed, style,
  * Mausrad-Scrollen (`.card-tooltip-info`, App-weiter Wheel-Handler in
  * app-main) greifen damit automatisch fuer beide.
  */
+/**
+ * ★ Breiter, mit dem Finger greifbarer Bildlaufstreifen für Galerien auf Touch-Geräten (Als Befund 2.11.: „die Scrollbar für Kartengalerien auf Mobile ist zu
+ * schmal und schwer zu scrollen"). Die nativen Leisten sind auf dem Handy ein dünner, kurz sichtbarer Strich. Der Streifen liegt absolut rechts im
+ * Elternelement (das `position: relative` sein muss), folgt `scrollRef.current` (Scrollen, Größe, Inhalt) und lässt sich am Griff ziehen oder durch Tippen
+ * auf die Spur setzen. Pointer-Ereignisse mit Capture; `touch-action: none` hält die Seite still. Stil: `.pp-bildlauf-spur` / `.pp-bildlauf-griff` (style.css).
+ */
+function TouchScrollbar({ scrollRef }) {
+  const spur = useRef(null), griff = useRef(null), zug = useRef(null);
+  const nachziehen = useCallback(() => {
+    const el = scrollRef.current, sp = spur.current, gr = griff.current;
+    if (!el || !sp || !gr) return;
+    if (!(el.clientHeight > 0 && el.scrollHeight > el.clientHeight + 1)) { sp.style.display = 'none'; return; }
+    sp.style.display = '';
+    const h = sp.clientHeight, gh = Math.max(56, Math.min(h, h * el.clientHeight / el.scrollHeight));
+    const pos = el.scrollTop / Math.max(1, el.scrollHeight - el.clientHeight);
+    gr.style.height = gh + 'px'; gr.style.top = Math.round(pos * (h - gh)) + 'px';
+  }, [scrollRef]);
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el) return undefined;
+    el.addEventListener('scroll', nachziehen, { passive: true });
+    const ro = new ResizeObserver(nachziehen); ro.observe(el);
+    const mo = new MutationObserver(nachziehen); mo.observe(el, { childList: true, subtree: true });   // Seitenwechsel, Filter: der Inhalt wird länger/kürzer
+    nachziehen();
+    return () => { el.removeEventListener('scroll', nachziehen); ro.disconnect(); mo.disconnect(); };
+  }, [scrollRef, nachziehen]);
+  const zuSpurPosition = (clientY) => {
+    const el = scrollRef.current, sp = spur.current, gr = griff.current;
+    if (!el || !sp || !gr) return;
+    const r = sp.getBoundingClientRect(), gh = gr.clientHeight;
+    const anteil = Math.min(1, Math.max(0, (clientY - r.top - gh / 2) / Math.max(1, r.height - gh)));
+    el.scrollTop = anteil * (el.scrollHeight - el.clientHeight);
+  };
+  const runter = (e) => {
+    e.stopPropagation();
+    try { e.currentTarget.setPointerCapture(e.pointerId); } catch (_) { /* ohne Capture */ }
+    zug.current = true;
+    zuSpurPosition(e.clientY);
+  };
+  const bewegt = (e) => { if (zug.current) { e.stopPropagation(); zuSpurPosition(e.clientY); } };
+  const hoch = (e) => { zug.current = false; try { e.currentTarget.releasePointerCapture(e.pointerId); } catch (_) { /* ok */ } };
+  return (
+    <div ref={spur} className="pp-bildlauf-spur" onPointerDown={runter} onPointerMove={bewegt} onPointerUp={hoch} onPointerCancel={hoch}>
+      <div ref={griff} className="pp-bildlauf-griff" />
+    </div>
+  );
+}
+window.TouchScrollbar = TouchScrollbar;
+
 function CardSideTooltip({ card, imgUrl, inGallery }) {
   if (!card) return null;
   const foilType = card.foil;
   const bonus = ascensionBonusText(card);
   const effectText = ttEffectText(card.effect, bonus);
-  const ttBorderColor = foilType === 'diamond_rare' ? '2px solid rgba(120,200,255,.6)' : foilType === 'secret_rare' ? '2px solid rgba(255,215,0,.5)' : '1px solid var(--bg4)';
+  const ttBorderColor = foilType === 'diamond_rare' ? '2px solid rgba(104,198,253,.6)' : foilType === 'secret_rare' ? '2px solid rgba(250,213,74,.5)' : '1px solid var(--bg4)';
   // v1298: der grosse Tooltip zeigt IMMER die volle Foil-Schicht, auch
   // wenn er aus einer Kleinansicht (PileGrid) heraus aufgeht.
   return (
@@ -7223,6 +8587,8 @@ function CardSideTooltip({ card, imgUrl, inGallery }) {
           {/* Heroes zeigen KEINE Abilities im Tooltip (Als Vorgabe 12.10.); bei Ascended Heroes steht der Ascension Bonus als Satz. */}
           {bonus && <TTCallout color={TT_ASCENDED_COLOR}>{bonus}</TTCallout>}
           <TTEffectBox card={card} text={effectText} />
+          {/* Genannte Tokens (Bild + Effekt) ganz unten (Als Vorgabe 20.10.) */}
+          <TTTokenSektion card={card} />
         </div>
       </div>
     </div>
@@ -7506,11 +8872,34 @@ function GameTooltip() {
     // Gleichstand entscheidet der Stapelkontext, also mal so, mal so.
     // Jetzt eindeutig darueber, aber weiterhin unter den Animationen
     // (ab 10150) und dem Entfernen-Knopf des Editors.
-    <div className="game-tooltip" ref={boxRef} style={{ position: 'fixed', width: 'max-content', left: pos.x, top: pos.y, transform, zIndex: 10020, pointerEvents: 'none' }}>
+    // 24.10.: über die Variable — solange ein Dialog-Schleier offen ist (Puzzle-Editor: „Edit Creature Stats", im Kampf die Wahl-Dialoge, Schleier bei 10085), steigt der Tooltip knapp
+    // darüber (`--pz-tooltip-z: 10086`, style.css); sonst lag er UNTER dem Dialog, in dem er gerade aufgerufen wurde.
+    <div className="game-tooltip" ref={boxRef} style={{ position: 'fixed', width: 'max-content', left: pos.x, top: pos.y, transform, zIndex: 'var(--pz-tooltip-z, 10020)', pointerEvents: 'none' }}>
       {tip.text}
     </div>
   );
 }
+
+// ── EFFEKTTEXT-SUCHE (Deckbau, Puzzle-Creator, Kartensammlung) ─────────────
+// 24.10. (Al): „Play this card" sucht nicht mehr den exakten Text, sondern Karten, deren Effekt JEDES der Wörter („play", „this", „card") enthält — nicht unbedingt zusammen
+// und nicht in dieser Reihenfolge. Groß-/Kleinschreibung egal, Teilwörter zählen („damage" findet „damages"). Leere Eingabe = alles.
+function effektTextPasst(card, suche) {
+  const woerter = String(suche == null ? '' : suche).toLowerCase().split(/\s+/).filter(Boolean);
+  if (woerter.length === 0) return true;
+  const text = card && typeof card.effect === 'string' ? card.effect.toLowerCase() : '';
+  if (!text) return false;
+  return woerter.every(w => text.includes(w));
+}
+window.effektTextPasst = effektTextPasst;
+
+// Dasselbe für die Namenszeile: jedes eingegebene Wort muss im Kartennamen vorkommen (beliebige Reihenfolge, Teilwörter, Groß-/Kleinschreibung egal).
+function namePasst(name, suche) {
+  const woerter = String(suche == null ? '' : suche).toLowerCase().split(/\s+/).filter(Boolean);
+  if (woerter.length === 0) return true;
+  const text = String(name == null ? '' : name).toLowerCase();
+  return woerter.every(w => text.includes(w));
+}
+window.namePasst = namePasst;
 
 // ★★ v1166 — DOPPELSCHULEN-FILTER (Al 17.9.)
 //
@@ -7562,6 +8951,13 @@ const TARGET_BLOCKER_BADGES = {
     tooltip: 'Stealthy Pursuit: Cannot be chosen by the opponent\'s cards or effects '
       + 'while its controller has another Hero that can be chosen by them. Can still be hit '
       + 'by effects that do not choose. Until the end of its controller\'s next turn.',
+  },
+  // Perfect Disguise (Hero): Zielschutz als Eintrag am Helden (Regel im Skript, `blocksTargeting`)
+  'Perfect Disguise': {
+    icon: '🎭',
+    tooltip: 'Disguised: Cannot be chosen by the opponent\'s cards or effects during their next turn, '
+      + 'unless it is the only legal target of that card or effect on this side. Can still be hit '
+      + 'by effects that do not choose.',
   },
 };
 
@@ -7630,13 +9026,36 @@ window.ppStatusHover = ppStatusHover;
 
 /** Tooltip-Text des Poison-Abzeichens. Auch die Stapelzahl auf der Karte
  *  (`PoisonedOverlay` in app-board) zeigt genau diesen Text beim Hover. */
-function poisonTooltipText(stacks, perStack, isUnhealable) {
+function poisonTooltipText(stacks, perStack, isUnhealable, deadly) {
+  // „Deadly Poison": das Gift HEILT statt zu schaden, bis das Gift entfernt wird; zählt weiter als negativer Status.
+  if (deadly) return `${isUnhealable ? 'Unhealable ' : ''}Poisoned ("Deadly Poison"): Heals ${perStack * stacks} HP instead of dealing damage at the start of each of its owner's turns, until the Poison is removed. Still counts as a negative status effect.${isUnhealable ? ' Cannot be removed.' : ''}`;
   return `${isUnhealable ? 'Unhealable ' : ''}Poisoned: Takes ${perStack * stacks} damage at the start of each of its owner's turns.${isUnhealable ? ' Cannot be removed.' : ''}`;
 }
 window.poisonTooltipText = poisonTooltipText;
 
-function StatusBadges({ statuses, counters, buffs, isHero, player, cardName, isOpponentSide }) {
+/**
+ * Dauer-Anzeige von Brand, Gift und Blutung: Pixel-Symbole (app-fx-52, `PpFx52.iconUrl`) statt Emoji im Abzeichen. Ein statisches Bild je Abzeichen (keine Dauer-Animation),
+ * ganzzahlig vergroessert (Brettmassstab >= 1,6 -> doppelt); auf dem Handy ohne Kontur (das 12-px-Abzeichen liefert den Rahmen).
+ */
+function PpStatusSpr({ kind, fallback, k: kFest }) {
+  const P = window.PpFx52;
+  let ic = null;
+  try { ic = (P && P.iconUrl && !window.__ppFx52SymbolAlt) ? P.iconUrl(kind, !(window.ppIsPhone && window.ppIsPhone())) : null; } catch (e) { ic = null; }
+  if (!ic) return <PxIcon z={fallback} />;
+  let k = kFest || 1;
+  if (!kFest) { try { k = (parseFloat(document.documentElement.style.getPropertyValue('--board-scale')) || 1) >= 1.6 ? 2 : 1; } catch (e) { k = 1; } }
+  return <img src={ic.url} alt="" draggable={false} data-pp-px="aus" className="pp-px pp-px-icon"
+    style={{ width: ic.w * k, height: ic.h * k, imageRendering: 'pixelated', objectFit: 'fill' }} />;
+}
+window.PpStatusSpr = PpStatusSpr;
+
+function StatusBadges({ statuses, counters, buffs, isHero, player, cardName, isOpponentSide, ohneZahl }) {
   const badges = [];
+  // Spielername zu einem Sitz-Index (das Brett stellt `window._ppPlayerNames` bereit); `null`, wenn unbekannt.
+  const spielerName = (idx) => {
+    const namen = (typeof window !== 'undefined') ? window._ppPlayerNames : null;
+    return (typeof idx === 'number' && namen && namen[idx]) || null;
+  };
   const s = statuses || {};
   const c = counters || {};
   // Buffs live on the hero/creature separately from statuses/counters. For
@@ -7745,16 +9164,17 @@ function StatusBadges({ statuses, counters, buffs, isHero, player, cardName, isO
   // gewaehlten HELDEN fuer den Rest des Zuges — als Debuff direkt am
   // Helden, wie Stunned oder Negated (nicht als Spieler-Debuff: die
   // anderen Helden duerfen weiter handeln).
+  // W19a (Al, 19.10.2026: „The user ist der Zauberwirker"): die Sperre entfaellt, wenn der WIRKER (nicht der gesperrte Held) Magic Arts 1 hat.
   if (isHero && b.blessed_skill?.locked) badges.push({ key: 'skill_locked', icon: '🚫',
-    tooltip: 'Action-locked (Divine Gift of Skill): This Hero cannot perform any more Actions this turn, including additional Actions — unless it has at least Magic Arts 1.' });
+    tooltip: 'Action-locked (Divine Gift of Skill): This Hero cannot perform any more Actions this turn, including additional Actions — unless the Hero that cast Divine Gift of Skill (\"the user\") has at least Magic Arts 1.' });
   if (c._baihuStunned) badges.push({ key: 'petrified', icon: '🪨', tooltip: `Petrified: Stunned and immune to all damage. Lasts for ${c._baihuStunned.duration || 1} of its owner's turns.` });
-  if (s.burned || c.burned) badges.push({ key: 'burned', icon: '🔥', tooltip: 'Burned: Takes 60 damage at the start of each of its owner\'s turns.' });
-  if (s.bleeding || c.bleeding) badges.push({ key: 'bleeding', icon: '🩸', tooltip: 'Bleeding: takes 50 damage after each of its own actions or active effects. Permanent until cleansed.' });
+  if (s.burned || c.burned) badges.push({ key: 'burned', icon: '🔥', px: 'burn', tooltip: 'Burned: Takes 60 damage at the start of each of its owner\'s turns.' });
+  if (s.bleeding || c.bleeding) badges.push({ key: 'bleeding', icon: '🩸', px: 'bleed', tooltip: 'Bleeding: takes 50 damage after each of its own actions or active effects. Permanent until cleansed.' });
   if (s.poisoned || c.poisoned) {
     const stacks = s.poisoned?.stacks || c.poisonStacks || c.poisoned || 1;
     const perStack = player?.poisonDamagePerStack || 30;
     const isUnhealable = s.poisoned?.unhealable || c.poisonedUnhealable;
-    badges.push({ key: 'poisoned', icon: isUnhealable ? '💀' : '☠️', tooltip: poisonTooltipText(stacks, perStack, isUnhealable), className: isUnhealable ? 'status-unhealable' : '' });
+    badges.push({ key: 'poisoned', icon: isUnhealable ? '💀' : '☠️', px: isUnhealable ? undefined : 'poison', zaehler: isUnhealable ? undefined : 'x' + stacks, tooltip: poisonTooltipText(stacks, perStack, isUnhealable, !!s.poisoned?.deadly), className: isUnhealable ? 'status-unhealable' : '' });
   }
   if (s.negated || c.negated) {
     // Skeleton Death Knight applies negated with a `_dkSilenced`
@@ -7808,14 +9228,15 @@ function StatusBadges({ statuses, counters, buffs, isHero, player, cardName, isO
         badges.push({
           key: 'negated', icon: '🚫',
           tooltip: `Negated (${kartenQuelle}): Has its effect negated. `
-            + `Abilities still work. Lasts as long as ${kartenQuelle} remains ${wo}.`,
+            + (s.negated?.abilitiesNegated ? 'Its Abilities are negated as well. ' : 'Abilities still work. ')
+            + `Lasts as long as ${kartenQuelle} remains ${wo}.`,
         });
       } else {
       const quelle = s.negated?.sourceBound ? s.negated.source : c.negatedSourceBound;
       if (quelle) {
         badges.push({
           key: 'negated', icon: '🚫',
-          tooltip: (isHero ? 'Negated: Has its effects and Abilities negated.' : 'Negated: Has its effects negated.')
+          tooltip: (isHero ? (s.negated?.effectOnly ? 'Negated: Has its effect negated. Abilities still work.' : 'Negated: Has its effects and Abilities negated.') : 'Negated: Has its effects negated.')   // W4a: effectOnly = leichte Form
             + ` Lasts while ${quelle} remains on the board.`,
         });
       } else {
@@ -7824,7 +9245,7 @@ function StatusBadges({ statuses, counters, buffs, isHero, player, cardName, isO
         const ng = s.negated || c.negated;
         badges.push({
           key: 'negated', icon: '🚫',
-          tooltip: (isHero ? 'Negated: Has its effects and Abilities negated.' : 'Negated: Has its effects negated.')
+          tooltip: (isHero ? (ng?.effectOnly ? 'Negated: Has its effect negated. Abilities still work.' : 'Negated: Has its effects and Abilities negated.') : 'Negated: Has its effects negated.')   // W4a: effectOnly = leichte Form
             + dur(ng, 'negated'),
           duration: restrundenFuer('negated', ng),
         });
@@ -7851,6 +9272,14 @@ function StatusBadges({ statuses, counters, buffs, isHero, player, cardName, isO
       duration: (() => { const r = restrundenFuer('magic_silenced', s.magic_silenced || c.magic_silenced); return r > 1 ? r : null; })(),   // v1163
     });
   }
+  // W14b (Q152, Unwanted Audience): nur der AKTIVE Effekt der Kreatur ist gesperrt, Passive laufen weiter.
+  if (c.active_locked) {
+    badges.push({
+      key: 'active_locked', icon: '🎭',
+      tooltip: 'Active Effects Locked: Cannot activate its active effects. Passive effects still work.' + dur(c.active_locked, 'active_locked'),
+      duration: (() => { const r = restrundenFuer('active_locked', c.active_locked); return r > 1 ? r : null; })(),
+    });
+  }
   // v879 (Howling in the Night): eigener Status, eigenes Abzeichen.
   // Gleiche Wirkung wie Magic Silenced, aber andere Quelle und Dauer —
   // im Spiel soll man beide auseinanderhalten koennen.
@@ -7870,6 +9299,38 @@ function StatusBadges({ statuses, counters, buffs, isHero, player, cardName, isO
       tooltip: 'Berserked: Cannot cast Spells or summon Creatures. Gets one free additional Attack per turn, but never more than 2 Attacks per turn total.',
     });
   }
+  if (s.ordered) {
+    const anhaenger = spielerName(typeof s.ordered === 'object' ? s.ordered.appliedBy : null) || 'The opponent';   // wer „The Master's Orders“ gespielt hat
+    badges.push({
+      key: 'ordered', icon: '📜',
+      tooltip: `Under Orders (The Master's Orders): ${anhaenger} may perform Actions with this Hero as if they controlled it, but they cannot make it choose itself as a target for an Attack or Spell.`,
+    });
+  }
+  if (s.shrunk) {
+    badges.push({
+      key: 'shrunk', icon: '🤏',
+      tooltip: 'Shrunk (Shrink): All damage this Hero deals with Attacks becomes 1, and all damage it receives from Attacks is doubled.',
+    });
+  }
+  if (s.polymorphed) {
+    badges.push({
+      key: 'polymorphed', icon: '🐱',
+      tooltip: 'Polymorphed (Polymorph): Cannot use any Spells, but its Attack stat is increased by 100.',
+    });
+  }
+  if (s.pranked && s.pranked.names) {
+    // „Pranked": je gesperrtem Namen ein Satz; Dauer je Name aus dem Ablaufzug (`expiresAtTurn`, Spielername aus `expiresForPlayer` — der Streich-Spieler ist der Gegner des Trägers)
+    const jetzt = (typeof window !== 'undefined') ? window._ppTurn : null;
+    const zeilen = Object.entries(s.pranked.names).map(([name, e]) => {
+      if (e.permanent) return `This Hero cannot use ${name} for the rest of the game.`;
+      const wer = spielerName(typeof e.opponent === 'number' ? e.opponent : null);
+      const wessen = wer ? `${wer}'s` : "its opponent's";
+      // Der Zug, an dessen Ende die Sperre fällt, ist `expiresAtTurn - 1`; liegt er hinter dem laufenden Zug, ist es der „nächste" Zug des Gegners.
+      const laeuft = (jetzt != null && typeof e.expiresAtTurn === 'number' && e.expiresAtTurn - 1 === jetzt);
+      return `This Hero cannot use ${name} until the end of ${wessen} ${laeuft ? '' : 'next '}turn.`;
+    });
+    badges.push({ key: 'pranked', icon: '🤡', tooltip: 'Pranked: ' + zeilen.join(' ') });
+  }
   if (s.cursed) {
     badges.push({
       key: 'cursed', icon: '🧿',
@@ -7884,6 +9345,34 @@ function StatusBadges({ statuses, counters, buffs, isHero, player, cardName, isO
       key: 'soul_transmitted', icon: '🕯️',
       tooltip: 'Soul Transmitted: The next time this Hero is defeated, it is deleted together with '
         + 'all cards in its Ability and Support Zones, except Creatures. Cannot be removed.',
+    });
+  }
+  // 23.10. („Spy in the Enemy's Camp"): Marke an der Kreatur — KEIN Status (Heilen entfernt sie nicht); sie gilt, bis die Kreatur das Brett verlässt.
+  if (c._spyMask) {
+    badges.push({
+      key: 'spy_marked', icon: '👁️',
+      tooltip: "Spying (Spy in the Enemy's Camp): this Creature is a spy — the player who played the Spy may activate its active effect during their own turn as if they controlled it. "
+        + 'This is not a status effect and cannot be healed. It lasts until the Creature leaves the board.',
+    });
+  }
+  // W78 („Infallible Oracle Pythia"): vorgemerkter Tod — Marke am Helden (`_pythiaMark`, per Spread durchgereicht) bzw. an der Kreatur (`counters._pythiaMark`); KEIN Status.
+  {
+    const pm = s._pythiaMark || c._pythiaMark;
+    if (pm) {
+      const n = pm.n || 1;
+      badges.push({
+        key: 'pythia_foreseen', icon: '🔮',
+        tooltip: `Death Foreseen by Pythia: ${n > 1 ? `${n} Infallible Oracle Pythias have` : 'Infallible Oracle Pythia has'} chosen this target. When the third Pythia Counter is placed on ${n > 1 ? 'one of them' : 'her'} (now ${pm.counters || 0} of 3), `
+          + `this ${isHero ? 'Hero' : 'Creature'} is immediately defeated. This is not a status effect and cannot be healed. It ends if ${n > 1 ? 'that Pythia' : 'Pythia'} or this target leaves the board.`,
+      });
+    }
+  }
+  // 23.10. („Mind Control"): der Wirtsheld gehört dem Besitzer der Karte, solange sie angelegt ist.
+  if (s.mind_controlled) {
+    badges.push({
+      key: 'mind_controlled', icon: '🧠',
+      tooltip: 'Mind Controlled: Another player has permanent control of this Hero while Mind Control remains attached to it. '
+        + 'Counts as a negative status effect — curing it discards the card and returns control.',
     });
   }
   if (s.aged) {
@@ -8020,13 +9509,14 @@ function StatusBadges({ statuses, counters, buffs, isHero, player, cardName, isO
   // 28.9.) — der Tooltip nennt deshalb die jeweilige Auspraegung.
   if (s.charmed) {
     const ch = typeof s.charmed === 'object' ? s.charmed : {};
+    const ktrl = spielerName(ch.controller) || 'the opponent';   // der KONTROLLEUR beim Namen, nicht „its owner's opponent“
     const tip = ch.ohneSchutz
-      ? `Controlled by its owner's opponent${ch.quelle ? ` (${ch.quelle})` : ''} until it is defeated or the turn ends.`
+      ? `Controlled by ${ktrl}${ch.quelle ? ` (${ch.quelle})` : ''} until it is defeated or the turn ends.`
       : ch.onlyFromController
-        ? 'Charmed: Under opponent control for the rest of the turn. Unaffected by the controlling player\'s other cards and effects.'
+        ? `Charmed: Controlled by ${ktrl} for the rest of the turn. Unaffected by ${ktrl}'s other cards and effects.`
         : ch._loveShot
-          ? 'Charmed: Under opponent control for the rest of the turn. Immune to negative status effects, but takes damage normally.'
-          : 'Charmed: Under opponent control and immune to all effects.';
+          ? `Charmed: Controlled by ${ktrl} for the rest of the turn. Immune to negative status effects, but takes damage normally.`
+          : `Charmed: Controlled by ${ktrl} and immune to all effects.`;
     badges.push({ key: 'charmed', icon: '💘', tooltip: tip });
   }
   if (s.sirenLinked || c.sirenLinked) {
@@ -8048,7 +9538,8 @@ function StatusBadges({ statuses, counters, buffs, isHero, player, cardName, isO
         <div key={b.key} className={'status-badge' + (b.className ? ' ' + b.className : '')}
           onMouseEnter={e => { showGameTooltip(e, b.tooltip); showBoardTip(); }}
           onMouseLeave={() => { hideGameTooltip(); hideBoardTip(); }}>
-          <PxIcon z={b.icon} />
+          {b.px ? <PpStatusSpr kind={b.px} fallback={b.icon} /> : <PxIcon z={b.icon} />}
+          {b.zaehler != null && !ohneZahl && <span className="status-badge-duration">{b.zaehler}</span>}   {/* steht die Figur da, zeigt sie die Zahl (HeroStatusSymbole) */}
           {b.duration != null && <span className="status-badge-duration">{b.duration >= STATUS_FOREVER ? '∞' : b.duration}</span>}
         </div>
       ))}
@@ -8067,6 +9558,14 @@ function BuffColumn({ buffs, cardName, statuses }) {
   // v1364: Butterfly Clouds Schutz — ein Buff, keine Status.
   // Truthy statt `=== true`: der Puzzle-Start normalisiert `true` zu
   // `{ appliedTurn: 0 }` (Als Befund v1365: Badge fehlte zu Puzzle-Beginn).
+  // 24.10.: „unaffected by all Spells" (Black-Thorn Dragon: Kreatur UND zugehöriger Held) — vom Server abgeleitet (`_spellImmune`), kein Zähler/Status
+  if (st._spellImmune) statusBuffs.push(['spell_immune', { icon: '\uE900', tooltip: 'Unaffected by all Spells: Spells have no effect on this target — damage, healing, status effects, buffs and more. It can still be targeted, and Attacks and Creature effects work normally.' }]);
+  // 24.10.: Stoneskin (Anhängsel) — vom Brett abgeleitet (`_stoneskin`), kein Zähler
+  if (st._stoneskin) statusBuffs.push(['stoneskin', { icon: '🪨', tooltip: 'Stoneskin: Attacks deal 100 less damage to this Hero, and it cannot be Poisoned, Burned or Stunned.' }]);
+  // 24.10.: Regeneration (Anhängsel) — vom Brett abgeleitet (`_regeneration` = Anzahl der Karten), kein Zähler; die Menge steht auf der Karte (60/120/180 je nach Support Magic des Wirkers).
+  if (st._regeneration) statusBuffs.push(['regeneration', { icon: '🌱', tooltip: 'Regeneration: This Hero is healed at the start of each of its owner\'s turns (60/120/180 HP, depending on the caster\'s Support Magic level when the Spell was used).' + (st._regeneration > 1 ? ` (${st._regeneration}× attached)` : '') }]);
+  // W82: Shipwrecked (Anhängsel) — vom Brett abgeleitet (`_shipwrecked`), kein Zähler. Wirkt für den KONTROLLEUR des Helden (auch wenn ein Gegner die Karte angelegt hat).
+  if (st._shipwrecked) statusBuffs.push(['shipwrecked', { icon: '🌊', tooltip: 'Shipwrecked: This Hero\'s controller and all targets they control are unaffected by Areas, and they cannot activate the effects of or play Areas.' }]);
   if (st.untargetable) statusBuffs.push(['untargetable', { icon: '🦋', tooltip: 'Untargetable: Your opponent can\'t choose this Hero with Attacks, Spells or Creature effects while you control other Heroes that can be chosen. Wears off at the start of its owner\'s turn.' }]);
   if ((!buffs || Object.keys(buffs).length === 0) && statusBuffs.length === 0) return null;
   buffs = buffs || {};
@@ -8078,7 +9577,7 @@ function BuffColumn({ buffs, cardName, statuses }) {
     let txt = `Blessed: This Hero can have up to ${remaining} more additional Abilities attached to it this turn!`;
     if (data?.locked) txt += ' But it cannot act this turn.';
     return txt;
-  } }, cloudy: { icon: '☁️', tooltip: 'Takes half damage from all sources!' }, dark_gear_negated: { icon: '⚙️', tooltip: 'Effects negated by Dark Gear!' }, diplomacy_negated: { icon: '🕊️', tooltip: 'Effects negated due to Diplomacy!' }, necromancy_negated: { icon: '💀', tooltip: 'Effects negated due to Necromancy!' }, mao_negated: { icon: '🐈', tooltip: 'Mao-negated: This Creature\'s effects were re-fired by Mao and are now suppressed until the start of the activator\'s next turn.' }, freeze_immune: { icon: '🔥', tooltip: 'Cannot be Frozen!' }, immortal: { icon: '✨', tooltip: 'Cannot have its HP dropped below 1.' }, combo_locked: { icon: '🔒', tooltip: 'Cannot perform Actions this turn.' }, submerged: { icon: '🌊', tooltip: 'Unaffected by all cards and effects while other possible targets exist!' }, negative_status_immune: { icon: '😎', tooltip: 'Immune to all negative status effects!' }, charmed: { icon: '💕', tooltip: 'Charmed! Under opponent control and immune to all effects.' }, golden_wings: { icon: '🪽', tooltip: 'Golden Wings: Fully immune to opponent effects until end of this turn.' }, anti_magic_enchanted: { icon: '🛡️', tooltip: 'Anti Magic Enchantment: Once per turn, the controlling player may negate a Spell that hits this Artifact\'s equipped Hero.' }, forcesTargeting: { icon: '🎯', tooltip: 'Taunt: The opponent must target this with Attacks, Spells, and Creature effects if possible. When multiple targets have Taunt, the opponent may pick any.' }, forcesTargeting_creaturesOnly: { icon: '🛡️', tooltip: "Guarding: Your opponent cannot choose your other Creatures while this Creature stands. Your Heroes can still be chosen." }, niu_enhanced: { icon: '🐃', tooltip: (data) => `This Hero's next Attack will deal ${data?.totalDamage || 0} additional damage.` }, gou_protected: { icon: '🐕', tooltip: (data) => `Protected by Guardian Beast Gou — takes no damage from any source until the start of the activator's next turn.${(data?.grants?.length || 0) > 1 ? ` (${data.grants.length}× layered)` : ''}` }, calm: { icon: '🌙', tooltip: 'Calm: Next turn, this Hero may perform a second Action during its controller\'s Action Phase (counts as an additional Action). Stays even if the Hero is defeated.' }, calm_ready: { icon: '🕊️', tooltip: 'Calm: This Hero may perform a second Action during THIS Action Phase (counts as an additional Action). Fades at the end of the Action Phase if unused — even if the Hero is defeated.' }, second_action_grant: { icon: '🌑', tooltip: 'Second Action: This Hero may perform a second Action during the Action Phase this turn. The bonus is wasted if a different Hero performs the second Action first.' }, cold_strike: { icon: '❄️', tooltip: "Cold Strike: This Hero's Attacks and Spells Freeze each target they hit for 1 turn. Wears off at the end of this turn." }, empowered_strike: { icon: '💪', tooltip: "Empowered Strike: The next time this Hero hits exactly 1 target with an Attack, that Attack's damage is increased by 100 and cannot be reduced or negated." }, sparkfly_gift_architect: { icon: '📐', tooltip: "Architect's Gift: You may once per turn draw cards until you have the same number of cards in your hand as your opponent." }, sparkfly_gift_attendant: { icon: '🪶', tooltip: "Attendant's Gift: This Creature is unaffected by your opponent's cards and effects, except damage." }, sparkfly_gift_worker: { icon: '🪲', tooltip: "Worker's Gift: You may once per turn make your opponent choose any card on their side of the board that is not a Hero and add it to your hand." }, damage_immune: { icon: '💠', tooltip: 'Takes no damage from any sources.' }, disrupted: { icon: '☢️', tooltip: 'Disrupted: Takes double damage from all sources.' }, magic_immune: { icon: '🛡️', tooltip: (data) => `The Hero is immune to Spells up to level ${data?.level ?? '?'}.` }, // v886 (Summoning Instructions): zeigt das beim Ausruesten gewaehlte X.
+  } }, cloudy: { icon: '☁️', tooltip: 'Takes half damage from all sources!' }, doomed: { icon: '☠️', tooltip: 'Doomed: This Hero\'s Attack stat is 0 and cannot be increased in any way (Doomed Pirate).' }, dark_gear_negated: { icon: '⚙️', tooltip: 'Effects negated by Dark Gear!' }, diplomacy_negated: { icon: '🕊️', tooltip: 'Effects negated due to Diplomacy!' }, necromancy_negated: { icon: '💀', tooltip: 'Effects negated due to Necromancy!' }, animal_training_negated: { icon: '🪢', tooltip: 'Effects negated due to Animal Training until the end of the turn!' }, mao_negated: { icon: '🐈', tooltip: 'Mao-negated: This Creature\'s effects were re-fired by Mao and are now suppressed until the start of the activator\'s next turn.' }, freeze_immune: { icon: '🔥', tooltip: 'Cannot be Frozen!' }, immortal: { icon: '✨', tooltip: 'Cannot have its HP dropped below 1.' }, combo_locked: { icon: '🔒', tooltip: 'Cannot perform Actions this turn.' }, submerged: { icon: '🌊', tooltip: 'Unaffected by all cards and effects while other possible targets exist!' }, negative_status_immune: { icon: '😎', tooltip: 'Immune to all negative status effects!' }, charmed: { icon: '💕', tooltip: 'Charmed! Under opponent control and immune to all effects.' }, golden_wings: { icon: '🪽', tooltip: 'Golden Wings: Fully immune to opponent effects until end of this turn.' }, anti_magic_enchanted: { icon: '🛡️', tooltip: 'Anti Magic Enchantment: Once per turn, the controlling player may negate a Spell that hits this Artifact\'s equipped Hero.' }, forcesTargeting: { icon: '🎯', tooltip: 'Taunt: The opponent must target this with Attacks, Spells, and Creature effects if possible. When multiple targets have Taunt, the opponent may pick any.' }, forcesTargeting_creaturesOnly: { icon: '🛡️', tooltip: "Guarding: Your opponent cannot choose your other Creatures while this Creature stands. Your Heroes can still be chosen." }, niu_enhanced: { icon: '🐃', tooltip: (data) => `This Hero's next Attack will deal ${data?.totalDamage || 0} additional damage.` }, gou_protected: { icon: '🐕', tooltip: (data) => `Protected by Guardian Beast Gou — takes no damage from any source until the start of the activator's next turn.${(data?.grants?.length || 0) > 1 ? ` (${data.grants.length}× layered)` : ''}` }, calm: { icon: '🌙', tooltip: 'Calm: Next turn, this Hero may perform a second Action during its controller\'s Action Phase (counts as an additional Action). Stays even if the Hero is defeated.' }, calm_ready: { icon: '🕊️', tooltip: 'Calm: This Hero may perform a second Action during THIS Action Phase (counts as an additional Action). Fades at the end of the Action Phase if unused — even if the Hero is defeated.' }, second_action_grant: { icon: '🌑', tooltip: 'Second Action: This Hero may perform a second Action during the Action Phase this turn. The bonus is wasted if a different Hero performs the second Action first.' }, cold_strike: { icon: '❄️', tooltip: "Cold Strike: This Hero's Attacks and Spells Freeze each target they hit for 1 turn. Wears off at the end of this turn." }, empowered_strike: { icon: '💪', tooltip: "Empowered Strike: The next time this Hero hits exactly 1 target with an Attack, that Attack's damage is increased by 150 and cannot be reduced or negated." }, unreasonable_anger: { icon: '💢', tooltip: 'Unreasonable Anger: Any damage this Hero deals to single targets is increased by 100. Lasts until the end of its controller\'s next turn.' }, sparkfly_gift_architect: { icon: '📐', tooltip: "Architect's Gift: You may once per turn draw cards until you have the same number of cards in your hand as your opponent." }, sparkfly_gift_attendant: { icon: '🪶', tooltip: "Attendant's Gift: This Creature is unaffected by your opponent's cards and effects, except damage." }, sparkfly_gift_worker: { icon: '🪲', tooltip: "Worker's Gift: You may once per turn make your opponent choose any card on their side of the board that is not a Hero and add it to your hand." }, damage_immune: { icon: '💠', tooltip: 'Takes no damage from any sources.' }, disrupted: { icon: '☢️', tooltip: 'Disrupted: Takes double damage from all sources.' }, magic_immune: { icon: '🛡️', tooltip: (data) => `The Hero is immune to Spells up to level ${data?.level ?? '?'}.` }, // v886 (Summoning Instructions): zeigt das beim Ausruesten gewaehlte X.
   summoningInstructionsX: { icon: '📘', tooltip: (data) => `Summoning Instructions: X = ${data?.level ?? '?'} — the equipped Hero may summon Creatures up to ${data?.level ?? '?'} levels above its Summoning Magic level (level 3 Creatures at most).` } };
   // medusa_petrified is surfaced through the Stunned status badge (as the
   // "Petrified" variant), so don't also render it as a separate buff icon —
@@ -8148,7 +9647,7 @@ function BuffColumn({ buffs, cardName, statuses }) {
   // unbekannte „…_negated"/„…_locked"-Schluessel zaehlen automatisch mit.
   const BUFF_NEGATIV = new Set([
     'dark_gear_negated', 'diplomacy_negated', 'necromancy_negated', 'mao_negated',
-    'combo_locked', 'disrupted', 'charmed',
+    'combo_locked', 'disrupted', 'charmed', 'doomed',
   ]);
   const istDebuff = (k) => BUFF_NEGATIV.has(k) || /_negated$|_locked$/.test(k);
   const eintraege = Object.entries(buffs).filter(([key]) => !BUFF_HIDDEN.has(key));
@@ -8202,14 +9701,14 @@ window.cardCostText = cardCostText;
 // HP gruen, ATK rot, Kosten (Artifacts) golden. Helle Toene, weil der
 // Tooltip auf dunklem Grund (`--bg2`) steht. Der Kartentyp traegt die
 // Farbe seiner Kartenart (`typeColor`) — AUSSER dem Ascended Hero: dessen
-// `typeColor` (#6622aa) ist fuer Karten-Rahmen gedacht und auf dem
+// `typeColor` (#702db3) ist fuer Karten-Rahmen gedacht und auf dem
 // dunklen Tooltip kaum zu lesen. Er bekommt ein helleres Violett, das sich
-// zugleich vom Lila des normalen Helden (#aa44ff) abhebt. Gilt fuer den
+// zugleich vom Lila des normalen Helden (#a040ff) abhebt. Gilt fuer den
 // Namen UND die Typzeile.
-const TT_HP_COLOR = '#4ade80';
-const TT_ATK_COLOR = '#ff5555';
-const TT_COST_COLOR = '#ffd700';
-const TT_ASCENDED_COLOR = '#c88dff';
+const TT_HP_COLOR = '#75f091';
+const TT_ATK_COLOR = '#fe5154';
+const TT_COST_COLOR = '#fad54a';
+const TT_ASCENDED_COLOR = '#c98aff';
 function tooltipTypeColor(cardType) {
   return cardType === 'Ascended Hero' ? TT_ASCENDED_COLOR : typeColor(cardType);
 }
@@ -8220,17 +9719,17 @@ function tooltipTypeColor(cardType) {
 // Kartennamen in Anfuehrungszeichen hervorgehoben) und die Zusatzfelder (Orbs, geerbte Effekte). Alles im Pixel-Stil der
 // Karten und Menuefenster (CSS: „KARTEN-TOOLTIP IM PIXEL-STIL" in style.css). Beide Tooltips (Spielbrett und Menues/Galerie)
 // bauen sich aus denselben Stuecken, damit sie nicht auseinanderlaufen.
-const TT_QUOTE_COLOR = '#9ecbff';
-const TT_GOLD_NOTE = '#ffcc44';
-const TT_NEUTRAL = '#8a8aa8';
+const TT_QUOTE_COLOR = '#b4cff8';
+const TT_GOLD_NOTE = '#fad54a';
+const TT_NEUTRAL = '#7e7d9b';
 const TT_SCHOOL_COLORS = {   // wie die Orbs von Beato (cards/effects/beato-the-butterfly-witch.js)
-  'Destruction Magic': '#ff4444', 'Decay Magic': '#aa44ff', 'Magic Arts': '#4488ff',
-  'Support Magic': '#ffdd44', 'Summoning Magic': '#44ff88',
+  'Destruction Magic': '#f03232', 'Decay Magic': '#a040ff', 'Magic Arts': '#4580f6',
+  'Support Magic': '#ffe23d', 'Summoning Magic': '#4ceb70',
 };
 
 /** "#rgb" / "#rrggbb" -> [r, g, b] */
 function ttRgb(hex) {
-  let h = String(hex || '#888888').replace('#', '');
+  let h = String(hex || '#7f7f7f').replace('#', '');
   if (h.length === 3) h = h.split('').map(c => c + c).join('');
   const n = parseInt(h, 16) || 0;
   return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
@@ -8248,7 +9747,7 @@ function ttFrame(color) {
   const key = String(color);
   let url = _ttFrames.get(key);
   if (url) return url;
-  const K = '#05040a', lit = ttMix(key, '#ffffff', .45), mid = key, dark = ttMix(key, '#000000', .5);
+  const K = '#08060c', lit = ttMix(key, '#ffffff', .45), mid = key, dark = ttMix(key, '#000000', .5);
   const r = (x, y, c) => `<rect x='${x}' y='${y}' width='1' height='1' fill='${c}'/>`;
   const svg = `<svg xmlns='http://www.w3.org/2000/svg' width='5' height='5' shape-rendering='crispEdges'>` + [
     r(1, 0, K), r(0, 1, K), r(1, 1, lit),                 // oben links (Ecke abgeschnitten)
@@ -8283,12 +9782,12 @@ function TTHeader({ card, name, level, levelBonus }) {
   const schools = card.cardType !== 'Creature' ? [card.spellSchool1, card.spellSchool2].filter(Boolean) : [];
   return (
     <div className="tt-kopf" style={{ '--zier': color }}>
-      <div className="tt-name" style={{ color }}>{name}</div>
+      <div className="tt-name" style={{ color }}>{name}{card.extraName ? <span style={{ color: '#3ddc57' }}> / {card.extraName}</span> : null}</div>
       <div className="tt-chips">
         <TTChip color={color}>{card.cardType}</TTChip>
         {card.subtype && <TTChip>{card.subtype}</TTChip>}
         {card.archetype && <TTChip>{card.archetype}</TTChip>}
-        {level != null && <TTChip color={levelBonus > 0 ? '#c4a8ff' : undefined}>Lv {level}{levelBonus > 0 ? ` (+${levelBonus})` : ''}</TTChip>}
+        {level != null && <TTChip color={levelBonus > 0 ? '#d6b3f9' : undefined}>Lv {level}{levelBonus > 0 ? ` (+${levelBonus})` : ''}</TTChip>}
         {schools.map(sc => <TTChip key={sc} color={TT_SCHOOL_COLORS[sc]}>{sc}</TTChip>)}
       </div>
     </div>
@@ -8307,7 +9806,7 @@ function TTIcon({ kind, color, px = 2 }) {
   if (!rows) return null;
   const d = rows.map((row, y) => [...row].map((c, x) => c === 'X' ? `M${x} ${y}h1v1h-1z` : '').join('')).join('');
   return (
-    <svg className="tt-icon" width={rows[0].length * px} height={rows.length * px} viewBox={`0 0 ${rows[0].length} ${rows.length}`} aria-hidden="true">
+    <svg className="tt-icon" width={rows[0].length * px} height={rows.length * px} viewBox={`0 0 ${rows[0].length} ${rows.length}`} shapeRendering="crispEdges" aria-hidden="true">
       <path d={d} fill={color} />
     </svg>
   );
@@ -8345,10 +9844,142 @@ function TTCallout({ color, title, children }) {
   );
 }
 
-/** Text mit Kartennamen in Anfuehrungszeichen hervorgehoben. */
-function ttQuoted(text) {
-  return String(text).split(/("[^"]*")/).map((t, i) => (i % 2 ? <span key={i} style={{ color: TT_QUOTE_COLOR }}>{t}</span> : t));
+// ── Statuseffekte im Effekttext (Als Vorgabe 20.10.) ──
+// Poison lila, Burn orange, Stun gelb, Negate grau, Bleed rot, Freeze eisblau, Blind mint — fett und farbig, wie auf der Karte; Erkennung
+// und Farben kommen aus dem Kartenrenderer (`CardRender.STATUS_TERMS` / `statusMatches`), damit Bild und Tooltip nie auseinanderlaufen.
+// NUR im Effekttext, nie in Namen: Kartennamen im Text stehen in Anfuehrungszeichen und bleiben unberuehrt.
+// Darunter steht fuer jeden erwaehnten Status ein Remindertext (`TTStatusReminders`).
+const TT_STATUS_BOX = '#9aa3b6';
+// Die Remindertexte sind die Definitionen aus den Regeln des Spiels (`RulesScreen`, Abschnitt „Status Effects“ in app-screens.jsx), Wort
+// fuer Wort — `scripts/check-status-terms.js` haelt sie gleich. Negate hat dort keinen eigenen Eintrag; der Text steht nur hier.
+const TT_STATUS_REMINDER = {
+  poison: 'The target takes 30 damage during each of its owner\'s Start Phases. Poisoning effects usually revolve around stacking multiple instances, increasing its damage.',
+  burn:   'The target takes 60 damage during each of its owner\'s Start Phases.',
+  stun:   'The target cannot perform Actions. Its effects and Abilities (if it is a Hero) are negated.',
+  negate: 'To negate an Attack, Spell, summoning or effect is to cancel it: it has no effect. A target whose effects are negated cannot use or trigger them; if it is a Hero, its Abilities are negated as well.',
+  bleed:  'The target takes 50 damage whenever it performs an Action, activates its active effect or activates the active effect of one of its Abilities.',
+  freeze: 'The target cannot perform Actions. Its effects and Abilities (if it is a Hero) are negated. Additionally, it cannot be equipped with Artifacts.',
+  blind:  'The target cannot choose anything the opponent controls as a target for Attacks, Spells, or effects.',
+};
+// Regel unter der Statusliste: gilt fuer alles, was Aktionen oder Effekte verhindert (hier: Stun, Freeze, Blind)
+const TT_STATUS_RECOVERY = 'After recovering from a Freeze, Stun, Blind or any other status effect that includes negating a target\'s effect or preventing it from performing Actions, that target becomes completely immune to the opponent\'s incapacitating effects for 1 turn (until the beginning of its owner\'s next turn)!';
+const TT_STATUS_INCAPACITATING = ['stun', 'freeze', 'blind'];
+
+/** Statusbegriffe in `text` (ausserhalb von Anfuehrungszeichen): [{ start, end, key }] — leer, wenn der Renderer fehlt. */
+function ttStatusMatches(text) {
+  const CR = window.CardRender;
+  return CR && typeof CR.statusMatches === 'function' ? CR.statusMatches(text) : [];
 }
+function ttStatusTerm(key) {
+  const CR = window.CardRender;
+  return (CR && CR.STATUS_TERMS && CR.STATUS_TERMS.find(t => t.key === key)) || null;
+}
+/** Ein Text ohne Anfuehrungszeichen, die Statusbegriffe darin fett und farbig. */
+function ttMarkStatus(text, basis) {
+  const ms = ttStatusMatches(text);
+  if (!ms.length) return text;
+  const teile = []; let pos = 0;
+  ms.forEach((m, i) => {
+    const term = ttStatusTerm(m.key);
+    if (m.start > pos) teile.push(text.slice(pos, m.start));
+    teile.push(<b key={basis + '-' + i} className="tt-status" style={{ color: term ? term.hell : undefined }}>{text.slice(m.start, m.end)}</b>);
+    pos = m.end;
+  });
+  if (pos < text.length) teile.push(text.slice(pos));
+  return <React.Fragment key={basis}>{teile}</React.Fragment>;
+}
+
+/** Text mit Kartennamen in Anfuehrungszeichen hervorgehoben; Statusbegriffe ausserhalb davon fett und farbig. */
+function ttQuoted(text) {
+  return String(text).split(/("[^"]*")/).map((t, i) => (i % 2 ? <span key={i} style={{ color: TT_QUOTE_COLOR }}>{t}</span> : ttMarkStatus(t, i)));
+}
+
+/** Rubrik unter dem Effekttext: ein Remindertext je erwähntem Statuseffekt (Reihenfolge des ersten Auftretens); ohne Treffer: nichts. */
+function TTStatusReminders({ text }) {
+  const keys = [];
+  for (const m of ttStatusMatches(String(text || ''))) if (!keys.includes(m.key)) keys.push(m.key);
+  if (!keys.length) return null;
+  return (
+    <TTCallout color={TT_STATUS_BOX} title="Status Effects">
+      {keys.map((k, i) => {
+        const term = ttStatusTerm(k);
+        return (
+          <div key={k} className="tt-reminder" style={{ marginTop: i ? 7 : 0 }}>
+            <b className="tt-status" style={{ color: term ? term.hell : undefined }}>{term ? term.label : k}</b>
+            <span style={{ opacity: .92 }}> — {TT_STATUS_REMINDER[k]}</span>
+          </div>
+        );
+      })}
+      {keys.some(k => TT_STATUS_INCAPACITATING.includes(k)) && (
+        <div className="tt-reminder" style={{ marginTop: 9, paddingTop: 7, borderTop: '1px solid rgba(255,255,255,.12)', opacity: .85 }}>{TT_STATUS_RECOVERY}</div>
+      )}
+    </TTCallout>
+  );
+}
+
+// ── Tokens am Ende des Karten-Tooltips (Als Vorgabe 20.10.) ──
+// Nennt der Effekttext einer Karte einen Token („Pollution Tokens", „Mummy Token"), steht ganz unten im Tooltip dieser Karte das Bild des Tokens,
+// gefolgt von seinem Effekt — in JEDEM Menue und Modus (Spielbrett, Puzzle-Editor, Deckeditor, Galerien, Regeln). Frueher oeffnete das Brett dafuer
+// einen zweiten, angeschnittenen Tooltip links neben dem Karten-Tooltip, nur im Spiel und nur fuer Pollution/Mummy. Tokens nennen keine weiteren
+// Tokens (die Puppen verweisen aufeinander): kein Nest. Erkannt wird der Kartenname im Text, auch im Plural; die Token-Karten kommen aus
+// `CARDS_BY_NAME` (Kartentyp „Token" bzw. „Creature/Token").
+function ttIstToken(card) { return !!card && (card.cardType === 'Token' || card.cardType === 'Creature/Token'); }
+const _ttTokenListe = { n: -1, liste: [] };
+function ttTokenKarten() {
+  const by = window.CARDS_BY_NAME || {};
+  const namen = Object.keys(by);
+  if (_ttTokenListe.n !== namen.length) { _ttTokenListe.liste = namen.map(k => by[k]).filter(ttIstToken); _ttTokenListe.n = namen.length; }
+  return _ttTokenListe.liste;
+}
+/** Die Token-Karten, die der Effekttext von `card` nennt, in der Reihenfolge ihres ersten Auftretens; Tokens selbst: keine. */
+function ttRelatedTokens(card) {
+  const text = String((card && card.effect) || '');
+  if (!text || ttIstToken(card)) return [];
+  const treffer = [];
+  for (const t of ttTokenKarten()) {
+    if (t.name === card.name) continue;
+    const m = new RegExp('\\b' + t.name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + 's?\\b').exec(text);
+    if (m) treffer.push([m.index, t]);
+  }
+  return treffer.sort((x, y) => x[0] - y[0]).map(x => x[1]);
+}
+/** Ein Token: Name, Bild, (Werte,) Effekt. */
+function TTTokenBox({ token }) {
+  const color = tooltipTypeColor(token.cardType);
+  const url = cardImageUrl(token.name);
+  return (
+    <TTBox color={color} className="tt-token">
+      <div className="tt-token-kopf">
+        <span className="tt-token-marke">Token</span>
+        <span className="tt-token-name" style={{ color }}>{token.name}</span>
+      </div>
+      {url && <img className="tt-token-bild" src={url} alt="" />}
+      <TTStats hp={token.hp} atk={token.atk} cost={null} />
+      <TTText text={token.effect} />
+    </TTBox>
+  );
+}
+/**
+ * Zweite Karte unter dem Tooltip der ersten (`card._darunterKarte`): der Tooltip der Karte, die zugleich gilt — z. B. Hulijing, the Foxdemon als Held, solange sie eine Kreatur ist
+ * („Hero treated as a Creature"). Oben steht die Kreatur (was das Brett zeigt), darunter der volle Tooltip des Helden mit seinen Live-Werten. Die zweite Karte hat keine eigene zweite.
+ */
+function TTZweiteKarte({ card, titel }) {
+  const color = tooltipTypeColor(card.cardType);
+  return (
+    <TTBox color={color} className="tt-zweite">
+      {titel && <div className="tt-token-kopf"><span className="tt-token-marke">{titel}</span></div>}
+      <div className="tt-zweite-inhalt"><CardTooltipContent card={{ ...card, _darunterKarte: null }} /></div>
+    </TTBox>
+  );
+}
+
+/** Rubrik am Ende des Tooltips: je genanntem Token ein Kasten; ohne Token nichts. */
+function TTTokenSektion({ card }) {
+  const tokens = ttRelatedTokens(card);
+  if (!tokens.length) return null;
+  return <>{tokens.map(t => <TTTokenBox key={t.name} token={t} />)}</>;
+}
+window.TTTokenSektion = TTTokenSektion;
 
 /**
  * Regeltext als Absaetze. Wie im Kartenrenderer ist ein Zeilenumbruch hinter einem Leerzeichen nur ein weicher Umbruch der
@@ -8380,7 +10011,12 @@ function TTText({ text, aktiv }) {
 /** Die Textbox des Effekttexts: Pixel-Box in der Kartenfarbe, darin die Absaetze (ohne Text: nichts). */
 function TTEffectBox({ card, text, aktiv }) {
   if (!String(text || '').trim()) return null;
-  return <TTBox color={tooltipTypeColor(card.cardType)} className="tt-textbox"><TTText text={text} aktiv={aktiv} /></TTBox>;
+  return (
+    <>
+      <TTBox color={tooltipTypeColor(card.cardType)} className="tt-textbox"><TTText text={text} aktiv={aktiv} /></TTBox>
+      <TTStatusReminders text={text} />
+    </>
+  );
 }
 
 /** Der Effekttext, ohne den Satz, den der Ascension-Bonus-Hinweis schon sagt (Beato steht der Bonus auch im Effekt). */
@@ -8428,10 +10064,8 @@ function ascensionBonusText(card) {
   if (abilities.length > 0) {
     const quelle = 'from your deck, hand and/or discard pile to this Hero.';
     if (abilities.length === 1) return `Attach up to ${abilities[0].n} copies of ${abilities[0].name} ${quelle}`;
-    // Mehrere Abilities: jede einzeln bis zu N (die Engine fragt je Ability getrennt).
-    if (abilities.every(a => a.n === abilities[0].n))
-      return `Attach up to ${abilities[0].n} copies each of ${abilities.map(a => a.name).join(' and ')} ${quelle}`;
-    return `Attach ${abilities.map(a => `up to ${a.n} copies of ${a.name}`).join(' and ')} ${quelle}`;
+    // Mehrere Abilities: ODER, nicht UND (Al, W71a) - die Engine laesst den Spieler EINE waehlen ("Choose one").
+    return `Attach ${abilities.map(a => `up to ${a.n} copies of ${a.name}`).join(' or ')} ${quelle}`;
   }
   // Unbekannte Form: das Stichwort der Karte als Satz stehen lassen.
   const text = felder.join(' ');
@@ -8448,7 +10082,18 @@ function ascensionBonusText(card) {
 // Hovern nicht neu zeichnet.
 const _ttHpKarten = new Map();   // "Name|Skin|HP" -> blob:-URL (LRU, klein)
 const TT_HP_KARTEN_MAX = 24;
-function TooltipCardImage({ card, src, hp, stufe, style }) {
+function TooltipCardImage(props) {
+  // Ability auf dem Brett (nur Stufe, ohne HP-Aufdruck): dieselbe Variante `?stufe=N` wie das Bild auf dem Brett — der Bild-Shim hat sie
+  // dort schon gezeichnet (und die anderen Stufen vorgewaermt), der Tooltip zeigt sie also SOFORT. Vorher kam zuerst die Karte ohne
+  // Hervorhebung und erst nach einer eigenen Zeichnung die richtige Stufe (Als Befund 23.10.). Eigene Komponente je Fall, damit die Hooks
+  // der HP-Fassung nie bedingt aufgerufen werden.
+  const { src, hp, stufe, style } = props;
+  if (stufe != null && hp == null && typeof src === 'string' && src) {
+    return <img src={src + (src.includes('?') ? '&' : '?') + 'stufe=' + stufe} style={style} />;
+  }
+  return <TooltipCardImageHp {...props} />;
+}
+function TooltipCardImageHp({ card, src, hp, stufe, style }) {
   const skin = skinOfUrl(src);
   // `hp`: aktuelle max. HP; `stufe`: aktuelle Stufe einer Ability auf dem Brett (ihre Box ist hervorgehoben, die anderen grau)
   const key = (hp != null || stufe != null) ? `${card.name}|${skin || ''}|${hp ?? ''}|${stufe ?? ''}` : null;
@@ -8518,10 +10163,10 @@ function CardTooltipContent({ card, children, imageUrl }) {
         <div style={{ position: 'relative', width: '100%', flexShrink: 0 }}>
           <TooltipCardImage card={card} src={imgUrl} hp={bildHp} stufe={stufe} style={{
             width: '100%', aspectRatio: '750/1050', objectFit: 'cover', display: 'block',
-            border: foilType === 'diamond_rare' ? '2px solid rgba(120,200,255,.6)'
-                 : foilType === 'secret_rare' ? '2px solid rgba(255,215,0,.5)' : 'none'
+            border: foilType === 'diamond_rare' ? '2px solid rgba(104,198,253,.6)'
+                 : foilType === 'secret_rare' ? '2px solid rgba(250,213,74,.5)' : 'none'
           }} />
-          <CardFoil card={card} skin={skinOfUrl(imgUrl)} />
+          <CardFoil card={card} skin={skinOfUrl(imgUrl)} werte={bildHp != null ? { hp: bildHp } : null} />
         </div>
       )}
       <div>
@@ -8579,6 +10224,10 @@ function CardTooltipContent({ card, children, imageUrl }) {
             </TTCallout>
           )}
           {children}
+          {/* Genannte Tokens (Bild + Effekt) ganz unten — in jedem Menue und Modus (Als Vorgabe 20.10.) */}
+          <TTTokenSektion card={card} />
+          {/* Zweite Karte, die zugleich gilt (verwandelte Hulijing: oben die Kreatur, darunter der Held) */}
+          {card._darunterKarte && <TTZweiteKarte card={card._darunterKarte} titel={card._darunterTitel} />}
         </div>
       </div>
     </>
@@ -8679,16 +10328,20 @@ function useCardTooltip(opts) {
   // Wire global setter so BoardCard / CardMini components trigger this tooltip
   useEffect(() => {
     window._boardTooltipSetter = (card) => {
+      // Per Touch geoeffnet → festhalten: Verlassen-Ereignisse (Maus-Emulation) schliessen ihn nicht, nur `_ppTipSchliessen`.
+      if (!card && window._isTouchDevice && window._ppTipTouch && !window._ppTipForce) return;
+      if (card && window._isTouchDevice && performance.now() - (window._ppTouchAt || 0) < 900) window._ppTipTouch = true;
+      if (!card) window._ppTipTouch = false;
       setTooltipCard(card || null);
       if (card) setTooltipSide(defaultSide); // BoardCard hover → always use defaultSide
     };
-    return () => { window._boardTooltipSetter = null; };
+    return () => { window._boardTooltipSetter = null; window._ppTipTouch = false; };
   }, [defaultSide]);
 
   // Touch: sync with global tap-tooltip state
   useEffect(() => {
     if (!window._isTouchDevice) return;
-    const sync = (activeCard) => { if (!activeCard) setTooltipCard(null); };
+    const sync = (activeCard) => { if (!activeCard && !window._ppTipTouch) setTooltipCard(null); };
     if (window._tapTooltipSetters) window._tapTooltipSetters.add(sync);
     return () => { if (window._tapTooltipSetters) window._tapTooltipSetters.delete(sync); };
   }, []);
@@ -8914,11 +10567,11 @@ function tutorialStartsWithAntonia(num) {
 // Wie `_antoniaPresent` ein sequenzuebergreifender Zustand
 // mit Mini-Abo, weil Textbox (app-shared) und Brett (app-board) ihn
 // getrennt lesen und schreiben.
-// Beide tragen die Gegnerfarbe (`NICHT_MENSCH_FARBE` im Server, #ff4444):
+// Beide tragen die Gegnerfarbe (`NICHT_MENSCH_FARBE` im Server, #f03232):
 // die Textbox soll in der Farbe der Gegnerseite stehen, nicht in Cyan.
 const TUTORIAL_GEGNER = {
-  monia:   { key: 'monia',   name: 'Monia Bot', avatar: '/MoniaBot.png', color: '#ff4444' },
-  antonia: { key: 'antonia', name: 'Antonia',   avatar: ANTONIA_PORTRAIT, color: '#ff4444' },
+  monia:   { key: 'monia',   name: 'Monia Bot', avatar: '/MoniaBot.png', color: '#f03232' },
+  antonia: { key: 'antonia', name: 'Antonia',   avatar: ANTONIA_PORTRAIT, color: '#f03232' },
 };
 const MONIA_PORTRAIT = '/MoniaBot.png';
 
@@ -9100,10 +10753,22 @@ function measureHighlight(el) {
   }
   // Transform kurz aus -> beide Rects sind jetzt Layout-Koordinaten.
   clip.classList.add(TB_FLAT_CLASS);
-  const cr = clip.getBoundingClientRect();
-  const pr = plane.getBoundingClientRect();
+  let cr = clip.getBoundingClientRect();
+  let pr = plane.getBoundingClientRect();
   let er = el.getBoundingClientRect();
   clip.classList.remove(TB_FLAT_CLASS);
+  // Tutorial-Zoom (Desktop, `.tut-zoom` am Brettkasten): Clip, Ebene und Ziel sind um `kz` skaliert gemessen. Die Kette wird in Layoutmassen nachgebaut und als Ganzes um `kz`
+  // vergroessert (Ursprung links oben) — wie die echte Ebene unter der Zoom-Transformation.
+  let kz = 1;
+  { const bcz = clip.parentElement; if (bcz && bcz.classList && bcz.classList.contains('tut-zoom') && clip.offsetWidth > 0) { const q = cr.width / clip.offsetWidth; if (Number.isFinite(q) && q > 0.2) kz = q; } }
+  if (kz !== 1) {
+    const N = (b) => ({ left: b.left, top: b.top, width: b.width / kz, height: b.height / kz });
+    const cr0 = cr, pr0 = pr, er0 = er;
+    cr = { left: cr0.left, top: cr0.top, width: cr0.width / kz, height: cr0.height / kz };
+    pr = { left: cr0.left + (pr0.left - cr0.left) / kz, top: cr0.top + (pr0.top - cr0.top) / kz, width: pr0.width / kz, height: pr0.height / kz };
+    er = { left: cr0.left + (er0.left - cr0.left) / kz, top: cr0.top + (er0.top - cr0.top) / kz, width: er0.width / kz, height: er0.height / kz };
+    void N;
+  }
   // ★ Hovert der Zeiger gerade ueber der Zone, ist sie hochgezoomt (`scale`,
   // `--board-hover-scale`, mit Uebergang) — das Highlight bekam diese Hover-
   // Groesse, das geklonte Kartenbild aber blieb in Ruhegroesse: der Rahmen
@@ -9131,6 +10796,7 @@ function measureHighlight(el) {
   // andere Projektion als die Karte darunter.
   return {
     flat: false,
+    kz,
     clip: { left: cr.left, top: cr.top, width: cr.width, height: cr.height },
     plane: { left: pr.left - cr.left, top: pr.top - cr.top, width: pr.width, height: pr.height },
     local: { left: er.left - pr.left, top: er.top - pr.top, width: er.width, height: er.height },
@@ -9145,6 +10811,42 @@ function measureHighlight(el) {
 // der Text der Seite zu tippen beginnt.
 const TACKLE_FLUG_MS = 700;
 const TACKLE_VORLAUF_MS = 1300;
+
+// ★ Tipp auf eine KARTE waehrend einer Textbox (Mobil): zeigt ihren Tooltip und blaettert die Textbox NICHT weiter. Die Karten legen ihre
+// Tooltip-Daten am Element ab (`el._ppTip`, app-board.jsx: BoardCard und aufgedeckte Gegnerhandkarten). Die gesperrten Brettbereiche der
+// Tutorials schlucken die Beruehrung (touchstart/touchend, preventDefault) — der Tooltip wird deshalb hier gesetzt, nicht von der Karte.
+// Gilt nur fuer Beruehrungen; Mausklicks blaettern wie bisher (am Desktop gibt es den Hover-Tooltip).
+const _tbKarte = { tip: null, x: 0, y: 0 };
+function _tbKartenTipp(t) {
+  const k = t && t.closest && t.closest('.board-card, .hand-slot, .hand-card');
+  if (!k) return null;
+  const el = k.matches('.hand-slot') ? k.querySelector(':scope > .board-card') : k;
+  return (el && el._ppTip) || null;
+}
+function _tbKarteHinweisWeg() {
+  if (window._tbTipAn) { window._tbTipAn = false; if (window._boardTooltipSetter) window._boardTooltipSetter(null); }
+}
+/** true = die Beruehrung gehoert einer Karte (kein Weiterblaettern). */
+function tbKartenTippEreignis(e) {
+  if (e.type === 'touchstart') {
+    const tip = _tbKartenTipp(e.target);
+    if (!tip) { _tbKarte.tip = null; return false; }
+    const t = e.touches && e.touches[0];
+    _tbKarte.tip = tip; _tbKarte.x = t ? t.clientX : 0; _tbKarte.y = t ? t.clientY : 0;
+    window._ppTbTouchAt = Date.now();
+    return true;
+  }
+  if (e.type === 'touchend') {
+    const tip = _tbKarte.tip;
+    if (!tip) return false;
+    _tbKarte.tip = null;
+    const t = e.changedTouches && e.changedTouches[0];
+    if (t && Math.abs(t.clientX - _tbKarte.x) + Math.abs(t.clientY - _tbKarte.y) > 12) return true;   // Wisch: nichts zeigen
+    if (window._boardTooltipSetter) { window._boardTooltipSetter(tip); window._tbTipAn = true; }
+    return true;
+  }
+  return false;
+}
 
 function TextBox() {
   const [opts, setOpts] = useState(null);
@@ -9278,6 +10980,13 @@ function TextBox() {
     return () => { clearInterval(timerRef.current); if (vorT) clearTimeout(vorT); vorlaufRef.current = false; };
   }, [pages, pageIdx]);
 
+  // Seiten mit Tackle-Szene: Antonias Musik schon vorher dekodieren (siehe `ppBgmVorwaermen`), nicht erst im Augenblick ihres Auftritts.
+  useEffect(() => {
+    if (!pages.some(p => p && p.tackle) || !window.ppBgmVorwaermen) return undefined;
+    const t = setTimeout(() => window.ppBgmVorwaermen('tutorialAntonia'), 800);
+    return () => clearTimeout(t);
+  }, [pages]);
+
   // ── Tackle-Szene (Tutorial 5, Epilog) ────────────────────────────
   // „Antonia fliegt von rechts ueber die Textbox, rammt Monia Bot und wirft
   // sie aus dem Bild; Antonia steht danach links, wo Monia stand."
@@ -9305,7 +11014,7 @@ function TextBox() {
     const mx = r.left + r.width / 2, my = r.top + r.height / 2;
     const flieger = document.createElement('img');
     flieger.src = ANTONIA_PORTRAIT; flieger.draggable = false;
-    fest(flieger, { width: '104px', height: '104px', imageRendering: 'pixelated', filter: 'drop-shadow(3px 3px 0 rgba(0,0,0,.55))' });
+    fest(flieger, { width: '104px', height: '104px', imageRendering: 'pixelated' });   // ohne `filter`: ein Filter auf einem bewegten Bild wird jedes Bild neu gerastert
     // Die Textbox sitzt am oberen Bildrand — der Flug bleibt auf Hoehe des Portraets.
     const startX = window.innerWidth + 60, zielX = mx - 52, y0 = my - 52 - 8, y1 = my - 52;
     if (window.playSFX) window.playSFX('attack_ram', { dedupe: 100 });
@@ -9323,7 +11032,7 @@ function TextBox() {
       if (window._currentTutorialNum) setTutorialGegner('antonia');
       // Monias Portraetrahmen fliegt aus dem Bild (nach oben links).
       const wurf = frame.cloneNode(true);
-      wurf.style.setProperty('--tb-seite', getComputedStyle(frame).getPropertyValue('--tb-seite') || '#ff4444');
+      wurf.style.setProperty('--tb-seite', getComputedStyle(frame).getPropertyValue('--tb-seite') || '#f03232');
       fest(wurf, { left: r.left + 'px', top: r.top + 'px', width: r.width + 'px', height: r.height + 'px', margin: '0' });
       wurf.animate([
         { transform: 'translate(0,0) rotate(0deg) scale(1)', opacity: 1 },
@@ -9332,7 +11041,7 @@ function TextBox() {
       // Blitz am Einschlagpunkt
       const blitz = document.createElement('div');
       fest(blitz, { left: (mx - 90) + 'px', top: (my - 90) + 'px', width: '180px', height: '180px', borderRadius: '50%',
-        background: 'radial-gradient(circle, rgba(255,255,255,.95) 0%, rgba(255,210,120,.7) 35%, rgba(255,120,60,0) 70%)' });
+        background: 'radial-gradient(circle, rgba(255,255,255,.95) 0%, rgba(251,200,106,.7) 35%, rgba(248,116,32,0) 70%)' });
       blitz.animate([{ transform: 'scale(.2)', opacity: 1 }, { transform: 'scale(1.7)', opacity: 0 }], { duration: 380, easing: 'ease-out', fill: 'forwards' });
       // Die Box wackelt.
       if (box) box.animate([
@@ -9373,97 +11082,118 @@ function TextBox() {
 
   // Highlights
   useEffect(() => {
-    if (!pages.length) { setHighlightRects([]); return; }
+    if (!pages.length) { setHighlightRects([]); if (window.ppTutorialZoomAus) window.ppTutorialZoomAus(); return; }   // Textbox zu: aus dem Zoom wieder heraus
     const page = pages[pageIdx];
     const hl = page?.highlights;
-    if (!hl || !hl.length) { setHighlightRects([]); return; }
-    // Solange ein Highlight steht, zoomt die echte Zone unter dem Schleier nicht
-    // mehr beim Hovern (CSS `body[data-tb-hl]`): das Highlight ist ein Klon in
-    // Ruhegroesse, ein daneben hochgezoomtes Original waere ein Doppelbild.
-    // VOR dem Messen setzen, damit ein laufender Hover-Zoom schon abklingt.
-    document.body.setAttribute('data-tb-hl', '1');
+    if (!hl || !hl.length) { setHighlightRects([]); if (window.ppTutorialZoomAus) window.ppTutorialZoomAus(); return; }
     const rects = [];
     const aufraeumen = [];
-    for (const h of hl) {
-      const sel = typeof h === 'string' ? h : h.selector;
-      // Gehighlightete Karten pulsieren immer leicht; `pulse: false` schaltet das ab.
-      const pulse = typeof h === 'object' ? h.pulse !== false : true;
-      if (!sel) continue;
-      document.querySelectorAll(sel).forEach(treffer => {
-        // Die Klone der Vorseite tragen dieselben data-Attribute und stehen
-        // noch im Overlay, wenn die neue Seite misst — ohne diesen Filter
-        // sammelten sich bei gleichem Selektor auf Folgeseiten immer mehr
-        // Highlights an (Seite 6: 3 statt 2, Seite 10: 5 statt 2).
-        if (treffer.closest('.textbox-overlay')) return;
-        const el = highlightZiel(treffer);
-        const m = measureHighlight(el);
-        const box = m.flat ? m.rect : m.local;
-        // Handkarten: die Stapelfolge des Faechers (linke Karte ueber der
-        // rechten, `--fan-z`) gilt auch fuer ihre Highlights.
-        const z = parseInt(getComputedStyle(el).zIndex, 10);
-        // Massstab des Originals mitnehmen. Der Klon steht im Overlay, nicht
-        // mehr in seinem Umfeld: Die Phasenspalte setzt ein eigenes
-        // `--board-scale` (.85 des Brettmassstabs), im Overlay gilt das
-        // globale — der Klon der Phasenleiste bekam dadurch groessere
-        // Schrift und Abstaende als sein Original und lag verzerrt darueber.
-        // Nur abweichende Werte werden gesetzt, alles andere bleibt wie es war.
-        const vars = {};
-        const ovStil = getComputedStyle(document.querySelector('.textbox-overlay') || document.body);
-        const elStil = getComputedStyle(el);
-        for (const n of ['--board-scale', '--board-font']) {
-          const eigen = elStil.getPropertyValue(n).trim();
-          if (eigen && eigen !== ovStil.getPropertyValue(n).trim()) vars[n] = eigen;
-        }
-        if (!(box.width > 0 && box.height > 0)) return;
-        // `an: [Selektoren]`: Teile INNERHALB des Ziels, die im Klon „an" bleiben
-        // (`data-tb-an`, CSS) — der Rest wird ausgegraut. So liegt die ganze
-        // Phasenleiste ueber dem Schleier und nur die genannten Kaesten leuchten.
-        let html = el.outerHTML;
-        const an = typeof h === 'object' && Array.isArray(h.an) ? h.an : null;
-        if (an && an.length) {
-          const kopie = el.cloneNode(true);
-          an.forEach(a => kopie.querySelectorAll(a).forEach(n => n.setAttribute('data-tb-an', '1')));
-          html = kopie.outerHTML;
-        }
-        const basis = { pulse, vars, handkarte: el !== treffer, stapel: Number.isFinite(z) ? z : 0, html, ziel: el };
-        rects.push({ ...m, ...basis });
-        // ── Hover auf einer gehighlighteten HANDKARTE ──
-        // Hebt sich die echte Karte unter dem Zeiger, soll die Highlight-
-        // Version selbst gross werden — nicht darunter noch eine zweite,
-        // normal vergroesserte Karte auftauchen. Die echte Karte bleibt
-        // deshalb beim Hover unsichtbar (`data-tb-hover`, CSS) und der
-        // Klon folgt ihrer Lage und Groesse Bild fuer Bild, auch im
-        // Uebergang beim Heben und Absenken.
-        if (basis.handkarte) {
-          let raf = 0, drauf = false, bis = 0;
-          const folgen = () => {
-            raf = 0;
-            const m2 = measureHighlight(el);
-            setHighlightRects(prev => prev.map(r => (r.ziel === el ? { ...m2, ...basis, hover: drauf } : r)));
-            if (drauf || performance.now() < bis) raf = requestAnimationFrame(folgen);
-            else el.removeAttribute('data-tb-hover');
-          };
-          const rein = () => { drauf = true; el.setAttribute('data-tb-hover', '1'); if (!raf) raf = requestAnimationFrame(folgen); };
-          // Nach dem Verlassen noch kurz nachfuehren (Absenk-Uebergang .16 s).
-          const raus = () => { drauf = false; bis = performance.now() + 300; if (!raf) raf = requestAnimationFrame(folgen); };
-          el.addEventListener('mouseenter', rein);
-          el.addEventListener('mouseleave', raus);
-          aufraeumen.push(() => {
-            el.removeEventListener('mouseenter', rein);
-            el.removeEventListener('mouseleave', raus);
-            if (raf) cancelAnimationFrame(raf);
-            el.removeAttribute('data-tb-hover');
-          });
-        }
-      });
+    let abgebrochen = false;
+    // ★ Tutorial auf dem Handy: gehighlightete Karten, die das Brett nicht im Ausschnitt hat, holt die Kamera erst ins Bild
+    // (app-board.jsx, ppTutorialCamFokus); die Highlight-Klone werden erst NACH der Fahrt vermessen. Waehrenddessen stehen keine
+    // Klone der Vorseite mehr da (sie wuerden an alter Stelle haengen). Ohne Fahrt (Desktop, schon sichtbar) misst es sofort wie bisher.
+    const messen = () => {
+      // Solange ein Highlight steht, zoomt die echte Zone unter dem Schleier nicht
+      // mehr beim Hovern (CSS `body[data-tb-hl]`): das Highlight ist ein Klon in
+      // Ruhegroesse, ein daneben hochgezoomtes Original waere ein Doppelbild.
+      // VOR dem Messen setzen, damit ein laufender Hover-Zoom schon abklingt.
+      document.body.setAttribute('data-tb-hl', '1');
+      for (const h of hl) {
+        const sel = typeof h === 'string' ? h : h.selector;
+        // Gehighlightete Karten pulsieren immer leicht; `pulse: false` schaltet das ab.
+        const pulse = typeof h === 'object' ? h.pulse !== false : true;
+        if (!sel) continue;
+        document.querySelectorAll(sel).forEach(treffer => {
+          // Die Klone der Vorseite tragen dieselben data-Attribute und stehen
+          // noch im Overlay, wenn die neue Seite misst — ohne diesen Filter
+          // sammelten sich bei gleichem Selektor auf Folgeseiten immer mehr
+          // Highlights an (Seite 6: 3 statt 2, Seite 10: 5 statt 2).
+          if (treffer.closest('.textbox-overlay')) return;
+          const el = highlightZiel(treffer);
+          const m = measureHighlight(el);
+          const box = m.flat ? m.rect : m.local;
+          // Handkarten: die Stapelfolge des Faechers (linke Karte ueber der
+          // rechten, `--fan-z`) gilt auch fuer ihre Highlights.
+          const z = parseInt(getComputedStyle(el).zIndex, 10);
+          // Massstab des Originals mitnehmen. Der Klon steht im Overlay, nicht
+          // mehr in seinem Umfeld: Die Phasenspalte setzt ein eigenes
+          // `--board-scale` (.85 des Brettmassstabs), im Overlay gilt das
+          // globale — der Klon der Phasenleiste bekam dadurch groessere
+          // Schrift und Abstaende als sein Original und lag verzerrt darueber.
+          // Nur abweichende Werte werden gesetzt, alles andere bleibt wie es war.
+          const vars = {};
+          const ovStil = getComputedStyle(document.querySelector('.textbox-overlay') || document.body);
+          const elStil = getComputedStyle(el);
+          for (const n of ['--board-scale', '--board-font']) {
+            const eigen = elStil.getPropertyValue(n).trim();
+            if (eigen && eigen !== ovStil.getPropertyValue(n).trim()) vars[n] = eigen;
+          }
+          if (!(box.width > 0 && box.height > 0)) return;
+          // `an: [Selektoren]`: Teile INNERHALB des Ziels, die im Klon „an" bleiben
+          // (`data-tb-an`, CSS) — der Rest wird ausgegraut. So liegt die ganze
+          // Phasenleiste ueber dem Schleier und nur die genannten Kaesten leuchten.
+          let html = el.outerHTML;
+          const an = typeof h === 'object' && Array.isArray(h.an) ? h.an : null;
+          if (an && an.length) {
+            const kopie = el.cloneNode(true);
+            an.forEach(a => kopie.querySelectorAll(a).forEach(n => n.setAttribute('data-tb-an', '1')));
+            html = kopie.outerHTML;
+          }
+          // Phasenleiste (nicht auf dem Handy — dort ist sie schon so gross wie moeglich): waehrend des Highlights groesser dargestellt
+          const phasenleiste = !(window.ppIsPhone && window.ppIsPhone()) && !!(el.closest && (el.matches('.phase-column') || el.closest('.phase-column')));
+          const basis = { pulse, vars, handkarte: el !== treffer, phasenleiste, stapel: Number.isFinite(z) ? z : 0, html, ziel: el };
+          rects.push({ ...m, ...basis });
+          // ── Hover auf einer gehighlighteten HANDKARTE ──
+          // Hebt sich die echte Karte unter dem Zeiger, soll die Highlight-
+          // Version selbst gross werden — nicht darunter noch eine zweite,
+          // normal vergroesserte Karte auftauchen. Die echte Karte bleibt
+          // deshalb beim Hover unsichtbar (`data-tb-hover`, CSS) und der
+          // Klon folgt ihrer Lage und Groesse Bild fuer Bild, auch im
+          // Uebergang beim Heben und Absenken.
+          if (basis.handkarte) {
+            let raf = 0, drauf = false, bis = 0;
+            const folgen = () => {
+              raf = 0;
+              const m2 = measureHighlight(el);
+              setHighlightRects(prev => prev.map(r => (r.ziel === el ? { ...m2, ...basis, hover: drauf } : r)));
+              if (drauf || performance.now() < bis) raf = requestAnimationFrame(folgen);
+              else el.removeAttribute('data-tb-hover');
+            };
+            const rein = () => { drauf = true; el.setAttribute('data-tb-hover', '1'); if (!raf) raf = requestAnimationFrame(folgen); };
+            // Nach dem Verlassen noch kurz nachfuehren (Absenk-Uebergang .16 s).
+            const raus = () => { drauf = false; bis = performance.now() + 300; if (!raf) raf = requestAnimationFrame(folgen); };
+            el.addEventListener('mouseenter', rein);
+            el.addEventListener('mouseleave', raus);
+            aufraeumen.push(() => {
+              el.removeEventListener('mouseenter', rein);
+              el.removeEventListener('mouseleave', raus);
+              if (raf) cancelAnimationFrame(raf);
+              el.removeAttribute('data-tb-hover');
+            });
+          }
+        });
+      }
+      setHighlightRects(rects);
+    };
+    let fahrt = null;
+    if (window._currentTutorialNum && window.ppTutorialCamFokus) {
+      const ziele = [];
+      for (const h of hl) {
+        const sel = typeof h === 'string' ? h : h.selector;
+        if (sel) document.querySelectorAll(sel).forEach(tr => { if (!tr.closest('.textbox-overlay')) ziele.push(tr); });
+      }
+      fahrt = window.ppTutorialCamFokus(ziele);
+      if (!fahrt && window.ppTutorialZoom) fahrt = window.ppTutorialZoom(ziele);   // Desktop: hineinzoomen, Ziele in die Mitte (Handy: Kamerafahrt oben)
     }
-    setHighlightRects(rects);
-    return () => { aufraeumen.forEach(f => f()); document.body.removeAttribute('data-tb-hl'); };
+    if (fahrt) { setHighlightRects([]); fahrt.then(() => { if (!abgebrochen) messen(); }); }
+    else messen();
+    return () => { abgebrochen = true; aufraeumen.forEach(f => f()); document.body.removeAttribute('data-tb-hl'); };
   }, [pages, pageIdx]);
 
   const handleAdvance = useCallback(() => {
     if (!opts || fading || vorlaufRef.current) return;
     if (window.playSFX) window.playSFX('ui_click', { dedupe: 80, volume: 0.5 });
+    _tbKarteHinweisWeg();
     if (!done) {
       clearInterval(timerRef.current);
       setCharCount(parsedRef.current.plainText.length);
@@ -9514,6 +11244,10 @@ function TextBox() {
         setTutorialFigurenGesperrt(false);
       }
       // Fade out then dismiss
+      // Die Erklaerung ist zu Ende: Highlights und Zoom enden JETZT — die Figuren steigen schon waehrend des Ausblendens aus den Karten (s. oben) und wuerden sonst von den
+      // noch stehenden Highlight-Klonen auf den Heldenkarten ueberdeckt (Befund Ende Status-Tutorial).
+      setHighlightRects([]);
+      if (window.ppTutorialZoomAus) window.ppTutorialZoomAus();
       setFading(true);
       const cb = opts.onDismiss;
       setTimeout(() => {
@@ -9567,7 +11301,10 @@ function TextBox() {
       e.stopPropagation();
       if (e.stopImmediatePropagation) e.stopImmediatePropagation();
       if (e.cancelable) e.preventDefault();
-      if (e.type === 'mousedown' || e.type === 'touchstart') handleAdvance();
+      if (e.type === 'touchstart' || e.type === 'touchend') { if (tbKartenTippEreignis(e)) return; }   // Tipp auf eine Karte: Tooltip, kein Weiterblaettern
+      if (e.type === 'touchstart') window._ppTbTouchAt = Date.now();
+      // Ein Fingertipp erzeugt `touchstart` UND danach ein nachgeschobenes `mousedown` (Kompatibilitaets-Ereignis): nur das erste blaettert
+      if (e.type === 'touchstart' || (e.type === 'mousedown' && Date.now() - (window._ppTbTouchAt || 0) > 1000)) handleAdvance();
     };
     const TYPEN = ['mousedown', 'mouseup', 'click', 'dblclick', 'pointerdown', 'pointerup', 'touchstart', 'touchend', 'dragstart', 'contextmenu'];
     TYPEN.forEach(t => window.addEventListener(t, sperren, { capture: true, passive: false }));
@@ -9577,13 +11314,18 @@ function TextBox() {
   useEffect(() => {
     if (!opts) return;
     const onClick = (e) => {
+      if ((e.type === 'touchstart' || e.type === 'touchend') && tbKartenTippEreignis(e)) return;   // Tipp auf eine Karte: Tooltip, kein Weiterblaettern
+      if (e.type === 'touchend') return;
+      if (e.type === 'touchstart') window._ppTbTouchAt = Date.now();
+      else if (Date.now() - (window._ppTbTouchAt || 0) < 1000) return;   // nachgeschobenes mousedown eines Fingertipps: schon behandelt
       if (e.target.closest('.textbox-back')) return;
       if (fensterDarueber()) return;
       handleAdvance();
     };
     window.addEventListener('mousedown', onClick);
     window.addEventListener('touchstart', onClick, { passive: true });
-    return () => { window.removeEventListener('mousedown', onClick); window.removeEventListener('touchstart', onClick); };
+    window.addEventListener('touchend', onClick, { passive: true });
+    return () => { window.removeEventListener('mousedown', onClick); window.removeEventListener('touchstart', onClick); window.removeEventListener('touchend', onClick); _tbKarteHinweisWeg(); };
   }, [opts, handleAdvance]);
 
   if (!opts) return null;
@@ -9639,18 +11381,20 @@ function TextBox() {
   if (rechtsFarbe) farbStil['--tb-rechts'] = rechtsFarbe;
 
   return (
-    <div className={'textbox-overlay' + (fading ? ' textbox-fading' : '')}>
+    <div className={'textbox-overlay' + (fading ? ' textbox-fading' : '') + (highlightRects.some(h => h.pulse) ? ' textbox-puls' : '')}>
       {highlightRects.map((h, i) => {
         const gedreht = h.flat && (h.drehung != null || h.handkarte);
         const inner = (
-          <div className={'textbox-highlight' + (h.pulse ? ' textbox-highlight-pulse' : '') + (h.handkarte ? ' textbox-highlight-hand' : '')}
-            style={gedreht
+          <div className={'textbox-highlight' + (h.pulse ? ' textbox-highlight-pulse' : '') + (h.handkarte ? ' textbox-highlight-hand' : '') + (h.phasenleiste ? ' textbox-highlight-phase' : '')}
+            style={{ ...(gedreht
               ? { position: 'absolute', left: 0, top: 0, width: '100%', height: '100%', pointerEvents: 'none' }
               : h.flat
               ? { position: 'fixed', left: h.rect.left, top: h.rect.top,
                   width: h.rect.width, height: h.rect.height, pointerEvents: 'none' }
               : { position: 'absolute', left: h.local.left, top: h.local.top,
-                  width: h.local.width, height: h.local.height, pointerEvents: 'none' }}>
+                  width: h.local.width, height: h.local.height, pointerEvents: 'none' }),
+              // Phasenleiste: gestufte Größen des Wachsens (`tbPhaseGross`, app-fx-44) — im Raster der Kunstpixel
+              ...(h.phasenleiste && window.ppFx44Stufen ? window.ppFx44Stufen(h.flat ? h.rect.width : h.local.width, 0) : null) }}>
             <div className="textbox-highlight-clone" style={h.vars} dangerouslySetInnerHTML={{ __html: h.html }} />
           </div>
         );
@@ -9664,7 +11408,14 @@ function TextBox() {
             left: h.rect.left, top: h.rect.top,
             width: h.rect.width, height: h.rect.height,
             transform: `rotate(${h.drehung || 0}deg) scale(${h.skala || 1})`,
-            pointerEvents: 'none', zIndex: 90001 + h.stapel + (h.hover ? 1000 : 0),
+            // Gehighlightete HANDKARTE: waehrend des Highlights ~50 % groesser (eigene Eigenschaften `scale`/`translate`, damit Faecherdrehung und Hover-Massstab darunter bleiben);
+            // nach oben versetzt, damit die Karte nicht unten aus dem Bild waechst. Gestuft statt stufenlos (Pixelart).
+            ...(h.handkarte ? { '--tb-hoch': `${Math.round(Math.min(0, window.innerHeight - 8 - (h.rect.top + h.rect.height * 1.25)))}px`,   // unterer Rand nach dem Wachsen (Mitte + 0,75·Hoehe) bleibt im Bild
+             // Größen/Versatz je Stufe vorgerechnet (app-fx-44): die Schlüsselbilder wechseln nur Hilfsvariablen, gebacken wird zur Laufzeit nichts
+             ...(window.ppFx44Stufen ? window.ppFx44Stufen(h.rect.width, Math.round(Math.min(0, window.innerHeight - 8 - (h.rect.top + h.rect.height * 1.25)))) : null),
+             scale: 'var(--tbs, 1)', translate: '0 var(--tbt, 0px)',
+             animation: 'tbHandGross .24s steps(1, end) both' } : null),
+            pointerEvents: 'none', zIndex: 90001 + h.stapel + (h.hover ? 1000 : 0) + (h.handkarte ? 500 : 0),
           }}>{inner}</div>
         );
         if (h.flat) return <div key={i} style={{ display: 'contents' }}>{inner}</div>;
@@ -9678,6 +11429,7 @@ function TextBox() {
             left: h.clip.left, top: h.clip.top,
             width: h.clip.width, height: h.clip.height,
             perspective: h.perspective, perspectiveOrigin: h.perspectiveOrigin,
+            ...(h.kz && h.kz !== 1 ? { transform: `scale(${h.kz})`, transformOrigin: '0 0' } : null),
             pointerEvents: 'none', zIndex: 90001,
           }}>
             <div style={{
@@ -9697,7 +11449,6 @@ function TextBox() {
           <div className={'textbox-portrait textbox-portrait-left' + (hasRight && activeSide !== 'left' ? ' textbox-portrait-inactive' : '') + (leftExiting ? ' textbox-portrait-exit-left' : '')}>
             <div className={'textbox-portrait-frame' + (page?.tackle && tackleAus ? ' textbox-portrait-ankunft' : '')}>
               <img src={linksPortrait} alt={leftName || ''} draggable={false} />
-              {[...Array(8)].map((_, i) => <span key={i} className="textbox-sparkle" style={{ animationDelay: (i * 0.35) + 's', top: [10,60,5,50,30,65,15,45][i] + '%', left: [5,70,55,10,80,35,90,60][i] + '%' }} />)}
             </div>
             {leftName && <span className="textbox-speaker-name">{leftName}</span>}
           </div>
@@ -9721,7 +11472,6 @@ function TextBox() {
           <div className={'textbox-portrait textbox-portrait-right' + (activeSide !== 'right' ? ' textbox-portrait-inactive' : '') + (rightExiting ? ' textbox-portrait-exit' : '')}>
             <div className="textbox-portrait-frame">
               <img src={opts.rightSpeaker} alt={opts.rightSpeakerName || ''} draggable={false} />
-              {[...Array(8)].map((_, i) => <span key={i} className="textbox-sparkle" style={{ animationDelay: (i * 0.25 + 0.1) + 's', top: [15,55,8,48,35,62,20,42][i] + '%', left: [8,65,50,15,75,30,85,55][i] + '%' }} />)}
             </div>
             {rightName && <span className="textbox-speaker-name">{rightName}</span>}
           </div>
@@ -9787,8 +11537,10 @@ function atkWowStart(heldSelektor) {
   wurzel.appendChild(zahl);
   document.body.appendChild(wurzel);
   const wertEl = zahl.querySelector('.atk-wow-wert');
-  const FARBEN = ['#ffd34d', '#ff9a00', '#ff5a1f', '#ffffff', '#ffe9a0'];
+  const c47 = window.ppFx47Wow ? window.ppFx47Wow(cx, cy) : null;      // app-fx-47.jsx: Ringe/Funken/Blitz als EINE Pixelart-Leinwand statt ~75 DOM-Elementen mit eigener Animation
+  const FARBEN = ['#fad54a', '#ff9a1a', '#ff491a', '#ffffff', '#f9ecb3'];
   const ring = (verzoegerung, groesse) => {
+    if (c47) { c47.ring(verzoegerung, groesse); return; }
     const e = document.createElement('div');
     e.className = 'atk-wow-ring';
     e.style.animationDelay = verzoegerung + 'ms';
@@ -9796,6 +11548,7 @@ function atkWowStart(heldSelektor) {
     wurzel.appendChild(e);
   };
   const funken = (anzahl, weit) => {
+    if (c47) { c47.funken(anzahl, weit); return; }
     for (let i = 0; i < anzahl; i++) {
       const e = document.createElement('div');
       e.className = 'atk-wow-funke';
@@ -9808,6 +11561,7 @@ function atkWowStart(heldSelektor) {
     }
   };
   const blitz = (stark) => {
+    if (c47) { c47.blitz(stark); return; }
     const b = document.createElement('div');
     b.className = 'atk-wow-blitz' + (stark ? ' atk-wow-blitz-stark' : '');
     document.body.appendChild(b);
@@ -9833,7 +11587,7 @@ function atkWowStart(heldSelektor) {
       }
       // Kurz stehen lassen, dann ausblenden und aufraeumen.
       setTimeout(() => wurzel.classList.add('atk-wow-aus'), 2100);
-      setTimeout(() => wurzel.remove(), 2700);
+      setTimeout(() => { wurzel.remove(); if (c47) c47.stop(); }, 2700);
     },
   };
 }
@@ -9883,7 +11637,7 @@ const TUTORIAL_SCRIPTS = {
         highlights: [
           '.game-hand-me [data-card-name="Magic Hammer"]',
         ] },
-      { text: 'And see your Ida? She has {#88ccee:**Destruction Magic**}, so she CAN use **Destruction Spells** like Magic Hammer - but her Ability is only at level 2. She only has 2 copies of it attached to her.',
+      { text: 'And see your Ida? She has {#77c8ee:**Destruction Magic**}, so she CAN use **Destruction Spells** like Magic Hammer - but her Ability is only at level 2. She only has 2 copies of it attached to her.',
         highlights: [
           '.game-hand-me [data-card-name="Magic Hammer"]',
           '[data-ability-owner="me"][data-card-name="Destruction Magic"]',
@@ -9954,7 +11708,7 @@ const TUTORIAL_SCRIPTS = {
   3: (() => {
     // Antonia (rechts): als „Jetpack Raccoon" gefuehrt, bis sie sich in
     // Tutorial 5 vorstellt; ALLE ihre Texte wackeln (`shakeText`).
-    const A = (text, extra) => ({ text, side: 'right', speakerName: 'Jetpack Raccoon', nameColor: '#ff4444', shakeText: true, ...extra });
+    const A = (text, extra) => ({ text, side: 'right', speakerName: 'Jetpack Raccoon', nameColor: '#f03232', shakeText: true, ...extra });
     // Monia im Epilog: ausgebremst, daher Silber statt Rot.
     const M = (text) => ({ text, speakerName: 'Monia Bot', nameColor: 'silver' });
     return {
@@ -10040,7 +11794,7 @@ const TUTORIAL_SCRIPTS = {
       // ── Highlight: Reiza ──
       { text: 'Your Hero {purple:**Reiza**} applies {purple:**Poison**} and {yellow:**Stun**} to whatever she hits.',
         highlights: [REIZA] },
-      { text: "Stun, as well as {#88ddff:**Freeze**}, prevents a target from taking Actions and negates its effects and Abilities. You can use it to control your opponent's options.",
+      { text: "Stun, as well as {#7fdfff:**Freeze**}, prevents a target from taking Actions and negates its effects and Abilities. You can use it to control your opponent's options.",
         highlights: [REIZA] },
       { text: 'And Poison is 30 bonus damage every turn - dealt at the **start of the poisoned player\'s turn**.',
         highlights: [REIZA] },
@@ -10073,7 +11827,7 @@ const TUTORIAL_SCRIPTS = {
     ],
     outro: [
       { text: 'Perfect, beep-boop!' },
-      { text: 'You can use {yellow:**Stun**}, {#88ddff:**Freeze**} and other inhibiting status effects to slow your opponent down, while {purple:**Poison**} and {orange:**Burn**} whittle them down!' },
+      { text: 'You can use {yellow:**Stun**}, {#7fdfff:**Freeze**} and other inhibiting status effects to slow your opponent down, while {purple:**Poison**} and {orange:**Burn**} whittle them down!' },
       { text: 'With one caveat:\nAfter an inhibiting status effect runs out on a target, it becomes **immune** to further non-damaging status effects for 1 turn!' },
       { text: 'You have to time your status effects properly if you want to truly control the flow of the battle!' },
       { text: 'You got that?\nNice!' },
@@ -10092,10 +11846,10 @@ const TUTORIAL_SCRIPTS = {
     const ALLE_KARTEN = ['.zone-has-card', '.game-hand-me [data-card-name]'];
     // Antonia (rechts), alle Texte wackeln. Bis zu ihrer Vorstellung heisst
     // sie „Jetpack Raccoon", danach „Antonia".
-    const A = (text, extra) => ({ text, side: 'right', speakerName: 'Antonia', nameColor: '#ff4444', shakeText: true, ...extra });
+    const A = (text, extra) => ({ text, side: 'right', speakerName: 'Antonia', nameColor: '#f03232', shakeText: true, ...extra });
     const AJ = (text, extra) => A(text, { speakerName: 'Jetpack Raccoon', ...extra });
     // Antonia im Epilog: LINKS, an Monias Stelle, nachdem sie sie umgerannt hat.
-    const AL = (text, extra) => ({ text, portrait: ANTONIA_PORTRAIT, speakerName: 'Antonia', nameColor: '#ff4444', shakeText: true, ...extra });
+    const AL = (text, extra) => ({ text, portrait: ANTONIA_PORTRAIT, speakerName: 'Antonia', nameColor: '#f03232', shakeText: true, ...extra });
     return {
     opts: { rightSpeaker: '/Antonia.png', rightSpeakerName: 'Antonia' },
     // Kein `nurActionPhase`: das Raetsel handelt vom Gold-Einkommen — das
@@ -10106,7 +11860,7 @@ const TUTORIAL_SCRIPTS = {
       { text: 'Heya!\nWelcome back!' },
       { text: "So far, we've looked at different ways for your Heroes to deal damage or summon Creatures to do that for you." },
       // ── Highlight: Book of Doom und Lifeforce Howitzer ──
-      { text: 'However, there are also other ways.\n{#ffd700:**Artifacts**} are cards that you play by spending **Gold**...',
+      { text: 'However, there are also other ways.\n{#fad54a:**Artifacts**} are cards that you play by spending **Gold**...',
         highlights: [BOOK, HOWITZER] },
       // ── Antonia tritt rechts auf, die Musik wechselt, alle Highlights aus ──
       AJ("**GOLDS???**\nWhere's de Gold?\nI wants itttt!", { enterRight: true }),
@@ -10146,7 +11900,7 @@ const TUTORIAL_SCRIPTS = {
         { highlights: [BOOK, HOWITZER, ALCHEMY] }),
       // ── Tipp (Tester: das Raetsel verlangt drei Abilities, die man noch nie brauchte) ──
       // ── Highlight: Alchemy, Adventurousness UND beide Main Phases in der Phasenleiste ──
-      A("Want a lil' hint...? Khehehe! Some {#4488ff:**Abilities**} can be activated during da **Main Phase** or even da **Action Phase**!",
+      A("Want a lil' hint...? Khehehe! Some {#4580f6:**Abilities**} can be activated during da **Main Phase** or even da **Action Phase**!",
         { highlights: [
           ALCHEMY, ADVENTUROUSNESS,
           { selector: '.board-phase-tracker', an: ['[data-phase-name="Main Phase 1"]', '[data-phase-name="Main Phase 2"]'] },
@@ -10172,7 +11926,7 @@ const TUTORIAL_SCRIPTS = {
       { text: 'So!\nYou did it! Great job, beep-boop!' },
       { text: 'As you can see, **Gold** can be an excellent way to apply damage, along with many other things! It can even be worth inflicting your own Hero with Poison to get access to more of it.' },
       // ── Highlight: Alchemy ──
-      { text: 'And **Alchemy** and the {#a0703c:**Potions**} it provides can be incredibly valuable cards as well!',
+      { text: 'And **Alchemy** and the {#9d612f:**Potions**} it provides can be incredibly valuable cards as well!',
         highlights: [ALCHEMY] },
       { text: "I feel like you're really starting to get a hang of things!\nNext time-",
         highlights: [ALCHEMY] },
@@ -10191,7 +11945,7 @@ const TUTORIAL_SCRIPTS = {
     // Antonia ist die einzige Sprecherin und steht durchgehend LINKS — kein
     // Auftritt, kein Abgang, kein Monia Bot. Name und Farbe stehen an jeder
     // Seite (der Namenslauf liest sie von den Seiten), alle Texte wackeln.
-    const A = (text, extra) => ({ text, speakerName: 'Antonia', nameColor: '#ff4444', shakeText: true, ...extra });
+    const A = (text, extra) => ({ text, speakerName: 'Antonia', nameColor: '#f03232', shakeText: true, ...extra });
     // Ab „Now - look-see ..." bis zum Ende der Einleitung: Deepsea Castle.
     const AC = (text) => A(text, { highlights: [CASTLE] });
     return {
@@ -10232,7 +11986,7 @@ const TUTORIAL_SCRIPTS = {
     const BEATO = '[data-hero-zone][data-hero-owner="me"][data-hero-name^="Beato"]';
     const DECK = '[data-my-deck="1"]';
     // Antonia steht wieder allein links, durchgehend. Alle Texte wackeln.
-    const A = (text, extra) => ({ text, speakerName: 'Antonia', nameColor: '#ff4444', shakeText: true, ...extra });
+    const A = (text, extra) => ({ text, speakerName: 'Antonia', nameColor: '#f03232', shakeText: true, ...extra });
     return {
     opts: { speaker: '/Antonia.png', speakerName: 'Antonia' },
     // Letztes Tutorial: nach dem Epilog Feuerwerk und langsames Ausblenden
@@ -10254,7 +12008,7 @@ const TUTORIAL_SCRIPTS = {
     outro: [
       A("Daaaat's it, dat's a good lil' minion!"),
       A("Alrighty - as promised, ya're now my *official* minion!"),
-      A("Dat means ya're now **allowed** to use my Golds in games, earn **delicious, delicious** {#ffd700:**Smug Coins**} with games, and bring 'em to me in my {#ffd700:**Shop**}!"),
+      A("Dat means ya're now **allowed** to use my Golds in games, earn **delicious, delicious** {#fad54a:**Smug Coins**} with games, and bring 'em to me in my {#fad54a:**Shop**}!"),
       A("And don't worry about de Golds - it aaaaaall finds its way back to the GRRRRREAT Antonia again anyway, khehehehehe!"),
     ],
     };
@@ -10297,6 +12051,185 @@ window.handFanCardBox = handFanCardBox;
 window.playCardDragSFX = playCardDragSFX;
 window.zoneLandStyle = zoneLandStyle;
 window.VolumeControl = VolumeControl;
+
+// Eigenes Dropdown statt `<select>`: das native Auswahlfenster malt das Betriebssystem — auf Android holt es im Vollbild die Systemleiste
+// („Programme anzeigen / Zurueck") nach oben, und seine Eintraege nutzen nicht die Pixel-Emoji-Schrift (📋 blieb System-Emoji).
+// `options`: [{ value, label, disabled? }] (disabled = Trennzeile), `onChange(value)`.
+function PPDropdown({ value, options, onChange, style, className = 'select', minWidth, disabled, title }) {
+  const [offen, setOffen] = useState(false);
+  const [pos, setPos] = useState(null);
+  const knopf = useRef(null);
+  const liste = useRef(null);
+  const aktuell = (options || []).find(o => o.value === value);
+  useEffect(() => {
+    if (!offen) return;
+    const zu = (e) => { if (knopf.current && knopf.current.contains(e.target)) return; if (liste.current && liste.current.contains(e.target)) return; setOffen(false); };
+    const esc = (e) => { if (e.key === 'Escape') setOffen(false); };
+    document.addEventListener('pointerdown', zu, true); window.addEventListener('keydown', esc, true); window.addEventListener('resize', () => setOffen(false), { once: true });
+    return () => { document.removeEventListener('pointerdown', zu, true); window.removeEventListener('keydown', esc, true); };
+  }, [offen]);
+  const auf = () => {
+    if (disabled) return;
+    if (offen) { setOffen(false); return; }
+    const r = knopf.current.getBoundingClientRect();
+    const platzUnten = window.innerHeight - r.bottom - 8;
+    const hoch = Math.max(120, Math.min(window.innerHeight - 16, 320));
+    const nachUnten = platzUnten >= Math.min(hoch, 200) || r.top < platzUnten;
+    const rechts = r.left > window.innerWidth / 2;
+    setPos({ left: rechts ? undefined : Math.max(4, r.left), right: rechts ? Math.max(4, window.innerWidth - r.right) : undefined, width: r.width, top: nachUnten ? r.bottom + 2 : undefined, bottom: nachUnten ? undefined : window.innerHeight - r.top + 2, maxHeight: Math.max(100, (nachUnten ? platzUnten : r.top - 8)) });
+    setOffen(true);
+  };
+  return (
+    <>
+      <button type="button" ref={knopf} className={className} onClick={auf} aria-haspopup="listbox" aria-expanded={offen} disabled={disabled} title={title}
+        style={{ textAlign: 'left', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', minWidth, ...style }}>
+        {aktuell ? aktuell.label : ''}
+      </button>
+      {offen && pos && ReactDOM.createPortal(
+        <div ref={liste} role="listbox" style={{ position: 'fixed', left: pos.left, right: pos.right, top: pos.top, bottom: pos.bottom, minWidth: Math.max(pos.width, 160), maxHeight: pos.maxHeight, overflowY: 'auto', zIndex: 100001, background: 'var(--bg2)', border: '2px solid var(--player-color)', boxSizing: 'border-box' }}>
+          {(options || []).map((o, i) => o.disabled
+            ? <div key={'t' + i} style={{ padding: '4px 10px', fontSize: 11, color: 'var(--text2)', whiteSpace: 'nowrap' }}>{o.label}</div>
+            : <button type="button" key={o.value} role="option" aria-selected={o.value === value} onClick={() => { setOffen(false); if (o.value !== value) onChange(o.value); }}
+                style={{ display: 'block', width: '100%', textAlign: 'left', padding: '8px 10px', fontSize: 12, whiteSpace: 'nowrap', border: 'none', borderBottom: '1px solid var(--bg4)', background: o.value === value ? 'var(--bg4)' : 'transparent', color: o.value === value ? 'var(--player-color)' : 'var(--text)', cursor: 'pointer', fontFamily: 'inherit' }}>
+                {o.label}
+              </button>)}
+        </div>, document.body)}
+    </>
+  );
+}
+window.PPDropdown = PPDropdown;
+
+// Drop-in-Ersatz fuer `<select>` MIT `<option>`-Kindern (und `<optgroup>`): gleiche Props (`value`, `onChange(e)` mit `e.target.value`, `className`, `style`,
+// `disabled`, `title`), aber das eigene Pixel-Auswahlfenster statt des nativen — kein Android-Systemfenster im Vollbild, Pixel-Emoji in den Eintraegen.
+function _ppSelectText(n) {
+  if (n == null || n === false || n === true) return '';
+  if (Array.isArray(n)) return n.map(_ppSelectText).join('');
+  if (typeof n === 'object' && n.props) return _ppSelectText(n.props.children);
+  return String(n);
+}
+function _ppSelectOptionen(children, aus) {
+  React.Children.forEach(children, (c) => {
+    if (!c || typeof c !== 'object') return;
+    if (c.type === React.Fragment) { _ppSelectOptionen(c.props.children, aus); return; }
+    if (c.type === 'optgroup') { aus.push({ value: '__gruppe' + aus.length, disabled: true, label: c.props.label || '' }); _ppSelectOptionen(c.props.children, aus); return; }
+    if (c.type === 'option') {
+      const label = _ppSelectText(c.props.children);
+      aus.push({ value: String(c.props.value != null ? c.props.value : label), disabled: !!c.props.disabled, label });
+    }
+  });
+  return aus;
+}
+function PPSelect({ value, onChange, children, className, style, disabled, title }) {
+  const options = _ppSelectOptionen(children, []);
+  return (
+    <PPDropdown value={value == null ? '' : String(value)} options={options} className={className} style={style} disabled={disabled} title={title}
+      onChange={(v) => { if (onChange) onChange({ target: { value: v }, currentTarget: { value: v } }); }} />
+  );
+}
+window.PPSelect = PPSelect;
+
+// Farbwahl aus der Spielpalette statt `<input type="color">` (das System-Farbfenster: auf Android ausserhalb des Spiels, nicht Pixelart, freie Farben).
+// Es gibt nur die 256 Palettenfarben — genau die, auf die das Profil die Namensfarbe ohnehin einrastet (`ppSnap`).
+function PPColorPicker({ value, onChange, style }) {
+  const [offen, setOffen] = useState(false);
+  const [pos, setPos] = useState(null);
+  const knopf = useRef(null);
+  const feld = useRef(null);
+  const palette = window.PP_PALETTE || [];
+  const aktuell = String(value || '').toLowerCase();
+  useEffect(() => {
+    if (!offen) return undefined;
+    const zu = (e) => { if (knopf.current && knopf.current.contains(e.target)) return; if (feld.current && feld.current.contains(e.target)) return; setOffen(false); };
+    const esc = (e) => { if (e.key === 'Escape') setOffen(false); };
+    document.addEventListener('pointerdown', zu, true); window.addEventListener('keydown', esc, true);
+    return () => { document.removeEventListener('pointerdown', zu, true); window.removeEventListener('keydown', esc, true); };
+  }, [offen]);
+  const auf = () => {
+    if (offen) { setOffen(false); return; }
+    const r = knopf.current.getBoundingClientRect();
+    const untenPlatz = window.innerHeight - r.bottom - 8;
+    const nachUnten = untenPlatz >= 260 || r.top < untenPlatz;
+    setPos({ left: Math.max(4, Math.min(r.left, window.innerWidth - 300)), top: nachUnten ? r.bottom + 2 : undefined, bottom: nachUnten ? undefined : window.innerHeight - r.top + 2, maxHeight: Math.max(120, nachUnten ? untenPlatz : r.top - 8) });
+    setOffen(true);
+  };
+  return (
+    <>
+      <button type="button" ref={knopf} onClick={auf} aria-haspopup="dialog" aria-expanded={offen} title="Pick a colour"
+        style={{ width: 44, height: 34, border: '2px solid var(--bg4)', padding: 3, cursor: 'pointer', background: 'var(--bg)', ...style }}>
+        <span style={{ display: 'block', width: '100%', height: '100%', background: value || '#000000' }} />
+      </button>
+      {offen && pos && ReactDOM.createPortal(
+        <div ref={feld} role="dialog" style={{ position: 'fixed', left: pos.left, top: pos.top, bottom: pos.bottom, maxHeight: pos.maxHeight, overflowY: 'auto', zIndex: 100001, background: 'var(--bg2)', border: '2px solid var(--player-color)', padding: 6, boxSizing: 'border-box', display: 'grid', gridTemplateColumns: 'repeat(16, 18px)', gap: 2 }}>
+          {palette.map((c) => (
+            <button type="button" key={c} onClick={() => { setOffen(false); if (c.toLowerCase() !== aktuell && onChange) onChange(c); }} title={c}
+              style={{ width: 18, height: 18, padding: 0, cursor: 'pointer', background: c, border: 'none', boxShadow: c.toLowerCase() === aktuell ? '0 0 0 2px #ffffff, 0 0 0 4px #000000' : 'none', position: 'relative', zIndex: c.toLowerCase() === aktuell ? 1 : 0 }} />
+          ))}
+        </div>, document.body)}
+    </>
+  );
+}
+window.PPColorPicker = PPColorPicker;
+
+// Eigene Rueckfrage-/Eingabefenster statt `window.confirm` / `window.prompt` (System-Dialoge verlassen auf Android das Vollbild). Beide liefern ein Promise:
+// `ppConfirm(text, opts)` → true/false, `ppPrompt(text, vorgabe, opts)` → Text oder null (Abbrechen).
+function PPDialogBox({ text, eingabe, vorgabe, okText, abbruchText, gefahr, fertig }) {
+  const [wert, setWert] = useState(vorgabe || '');
+  const eingabeRef = useRef(null);
+  useEffect(() => { if (eingabe && eingabeRef.current) { eingabeRef.current.focus(); eingabeRef.current.select(); } }, [eingabe]);
+  const ok = () => fertig(eingabe ? wert : true);
+  const nein = () => fertig(eingabe ? null : false);
+  useEffect(() => {
+    const k = (e) => { if (e.key === 'Escape') { e.preventDefault(); nein(); } else if (e.key === 'Enter') { e.preventDefault(); ok(); } };
+    window.addEventListener('keydown', k, true);
+    return () => window.removeEventListener('keydown', k, true);
+  });
+  return (
+    <div style={{ position: 'fixed', inset: 0, zIndex: 100002, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(8,6,12,.8)' }} onClick={nein}>
+      <div onClick={(e) => e.stopPropagation()} style={{ minWidth: 260, maxWidth: 'min(92vw, 420px)', padding: '16px 18px', background: 'var(--bg2)', border: '3px solid ' + (gefahr ? 'var(--danger)' : 'var(--accent)'), textAlign: 'center' }}>
+        <div style={{ fontSize: 13, color: 'var(--text)', lineHeight: 1.5, marginBottom: 12, whiteSpace: 'pre-wrap' }}>{text}</div>
+        {eingabe && <input ref={eingabeRef} data-pp-tastatur="an" className="input" value={wert} onChange={(e) => setWert(e.target.value)} style={{ width: '100%', boxSizing: 'border-box', marginBottom: 12, fontSize: 13 }} />}
+        <div style={{ display: 'flex', gap: 10, justifyContent: 'center' }}>
+          <button className={'btn' + (gefahr ? ' btn-danger' : ' btn-success')} style={{ padding: '8px 22px', fontSize: 12 }} onClick={ok}>{okText || 'OK'}</button>
+          {abbruchText !== false && <button className="btn" style={{ padding: '8px 22px', fontSize: 12 }} onClick={nein}>{abbruchText || 'Cancel'}</button>}
+        </div>
+      </div>
+    </div>
+  );
+}
+function _ppDialogOeffnen(props) {
+  return new Promise((aufloesen) => {
+    const host = document.createElement('div');
+    document.body.appendChild(host);
+    let root = null;
+    const zu = (v) => { try { if (root && root.unmount) root.unmount(); else ReactDOM.unmountComponentAtNode(host); } catch (e) {} host.remove(); aufloesen(v); };
+    const el = React.createElement(PPDialogBox, { ...props, fertig: zu });
+    if (ReactDOM.createRoot) { root = ReactDOM.createRoot(host); root.render(el); } else ReactDOM.render(el, host);
+  });
+}
+window.ppConfirm = (text, opts) => _ppDialogOeffnen({ text, ...(opts || {}) });
+// Hinweis mit nur einem OK-Knopf (z. B. „Server ist voll“).
+window.ppHinweis = (text, opts) => _ppDialogOeffnen({ text, abbruchText: false, ...(opts || {}) });
+// ── KARTEN VORWAERMEN (tropfenweise, siehe CardImageShim.warmDrip) ───────────────────────────────────────────────────────────────────────
+// Tutorial-Karten: einmal pro Sitzung holen (Server rechnet die Liste aus den Missionen) und im Leerlauf nach und nach bereitlegen.
+let _ppTutorialWarm = false;
+window.ppTutorialVorwaermen = async () => {
+  if (_ppTutorialWarm) return null;
+  _ppTutorialWarm = true;
+  try {
+    const r = await fetch('/api/tutorial-assets', { headers: window.AUTH_TOKEN ? { 'x-auth-token': window.AUTH_TOKEN } : {} });
+    if (!r.ok) { _ppTutorialWarm = false; return null; }
+    const a = await r.json();
+    if (window.CardImageShim && window.CardImageShim.warmDrip) window.CardImageShim.warmDrip(a.cards, { heroes: a.heroes, abilities: a.abilities, delay: 1200 });
+    return a;
+  } catch (e) { _ppTutorialWarm = false; return null; }
+};
+// Kartenliste eines Gegner-/Beispiel-Decks (`{cards, heroes, abilities}` vom Server, Feld `warm`): `keep` falsch = nur zeichnen und merken.
+window.ppDeckVorwaermen = (w, keep) => {
+  if (!w || !Array.isArray(w.cards) || !(window.CardImageShim && window.CardImageShim.warmDrip)) return;
+  window.CardImageShim.warmDrip(w.cards, { heroes: w.heroes, abilities: w.abilities, keep: keep !== false, delay: 1500, front: true });
+};
+
+window.ppPrompt = (text, vorgabe, opts) => _ppDialogOeffnen({ text, eingabe: true, vorgabe, ...(opts || {}) });
 window.CardTooltipContent = CardTooltipContent;
 window.useCardTooltip = useCardTooltip;
 window.useStickyHoverFlag = useStickyHoverFlag;

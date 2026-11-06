@@ -34,11 +34,11 @@ module.exports = {
     // Count all targets the player controls
     const targetPositions = []; // For animation
 
-    // Own living heroes
-    for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
-      const hero = ps.heroes[hi];
+    // Living heroes I CONTROL (W16f, M02-16: Kontrolle statt Spalte - ein vom Gegner gecharmter eigener Held zählt nicht, ein von mir
+    // gecharmter/übernommener Gegnerheld schon; Adresse = Brettseite).
+    for (const { physOwner, heroIdx: hi, hero } of engine.heroesControlledBy(pi)) {
       if (hero?.name && hero.hp > 0) {
-        targetPositions.push({ owner: pi, heroIdx: hi, zoneSlot: -1 });
+        targetPositions.push({ owner: physOwner, heroIdx: hi, zoneSlot: -1 });
       }
     }
 
@@ -52,16 +52,6 @@ module.exports = {
       const hp = inst.counters?.currentHp ?? cd.hp ?? 0;
       if (hp <= 0) continue;
       targetPositions.push({ owner: inst.owner, heroIdx: inst.heroIdx, zoneSlot: inst.zoneSlot });
-    }
-
-    // Charmed opponent heroes (controlled by this player)
-    if (oppPs) {
-      for (let hi = 0; hi < (oppPs.heroes || []).length; hi++) {
-        const hero = oppPs.heroes[hi];
-        if (hero?.name && hero.hp > 0 && hero.charmedBy === pi) {
-          targetPositions.push({ owner: oppIdx, heroIdx: hi, zoneSlot: -1 });
-        }
-      }
     }
 
     const targetCount = targetPositions.length;

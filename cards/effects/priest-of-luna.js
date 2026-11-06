@@ -113,7 +113,8 @@ module.exports = {
     afterCreatureDamageBatch: async (ctx) => {
       if (!ctx.entries) return;
       for (const e of ctx.entries) {
-        if (!e || e.cancelled || e.isStatusDamage || !e.inst) continue;
+        // Welle 11 (Al, Q62: „Ja sollte zählen, bei allen."): Gift-/Brand-Ticks zählen als „takes damage" (kein isStatusDamage-Filter).
+        if (!e || e.cancelled || !e.inst) continue;
         if (!((e.realDealt ?? e.amount) > 0)) continue;
         if ((e.inst.controller ?? e.inst.owner) !== ctx.cardOwner) continue;
         if (e.inst.name === CARD_NAME) continue;               // „except Priest of Luna"

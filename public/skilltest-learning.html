@@ -6,8 +6,8 @@
 <title>Skill Test — Bot Learning</title>
 <style>
   :root {
-    --bg: #0b0e1a; --panel: #131830; --panel2: #1a2040; --line: #2a3260; --text: #e8ecff; --dim: #8c95c4;
-    --accent: #00f0ff; --good: #33ff88; --bad: #ff5577; --warn: #ffd34e;
+    --bg: #12101f; --panel: #1a1a2e; --panel2: #291f3d; --line: #14285a; --text: #e5edfa; --dim: #9ba3ca;
+    --accent: #1aedff; --good: #4ceb70; --bad: #ec2d62; --warn: #fad54a;
   }
   * { box-sizing: border-box; }
   body { margin: 0; background: var(--bg); color: var(--text); font: 14px/1.45 "Rajdhani", "Segoe UI", system-ui, sans-serif; }
@@ -15,7 +15,7 @@
   h1 { margin: 0; font-size: 22px; letter-spacing: 1px; color: var(--accent); }
   .sub { color: var(--dim); }
   .live { margin-left: auto; display: flex; gap: 8px; align-items: center; color: var(--dim); }
-  .dot { width: 9px; height: 9px; border-radius: 50%; background: #555; }
+  .dot { width: 9px; height: 9px; border-radius: 50%; background: #535353; }
   .dot.on { background: var(--good); box-shadow: 0 0 8px var(--good); }
   main { padding: 6px 20px 40px; display: grid; gap: 18px; max-width: 1400px; margin: 0 auto; }
   section { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px; }
@@ -29,7 +29,7 @@
   .legend { display: flex; gap: 16px; color: var(--dim); font-size: 12.5px; margin-top: 6px; flex-wrap: wrap; }
   .legend i { display: inline-block; width: 18px; height: 3px; vertical-align: middle; margin-right: 5px; border-radius: 2px; }
   table { width: 100%; border-collapse: collapse; }
-  th, td { padding: 5px 8px; text-align: left; border-bottom: 1px solid #20274c; white-space: nowrap; }
+  th, td { padding: 5px 8px; text-align: left; border-bottom: 1px solid #291f3d; white-space: nowrap; }
   th { color: var(--dim); font-weight: 600; cursor: pointer; user-select: none; position: sticky; top: 0; background: var(--panel); }
   th.sorted::after { content: " ▾"; color: var(--accent); }
   th.sorted.asc::after { content: " ▴"; }
@@ -38,13 +38,13 @@
   .bar { display: inline-block; height: 8px; border-radius: 4px; vertical-align: middle; margin-right: 6px; }
   .tools { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 10px; }
   .tools input, .tools select { background: var(--panel2); color: var(--text); border: 1px solid var(--line); border-radius: 6px; padding: 6px 9px; font: inherit; }
-  .scroll { max-height: 640px; overflow: auto; border: 1px solid #20274c; border-radius: 8px; }
+  .scroll { max-height: 640px; overflow: auto; border: 1px solid #291f3d; border-radius: 8px; }
   .tag { font-size: 11.5px; color: var(--dim); border: 1px solid var(--line); border-radius: 4px; padding: 0 5px; }
   .spark { vertical-align: middle; }
   details summary { cursor: pointer; color: var(--dim); }
   .games { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px; }
-  .g { font-size: 11.5px; padding: 1px 6px; border-radius: 4px; background: #1b2347; }
-  .g.w { background: #14502e; color: #b5ffd0; }
+  .g { font-size: 11.5px; padding: 1px 6px; border-radius: 4px; background: #291f3d; }
+  .g.w { background: #29663f; color: #b3f9cf; }
   .empty { color: var(--dim); padding: 16px 0; }
 </style>
 </head>
@@ -107,7 +107,7 @@
     const n = series.length, vs = pts.map(p => p[1]), lo = Math.min(...vs), hi = Math.max(...vs), r = hi - lo || 1;
     const d = pts.map(p => `${(p[0] / (n - 1)) * w},${h - ((p[1] - lo) / r) * h}`).join(' ');
     const up = vs[vs.length - 1] >= vs[0];
-    return `<svg class="spark" viewBox="0 0 ${w} ${h}" style="width:${w}px;height:${h}px;border:0;background:none"><polyline points="${d}" fill="none" stroke="${up ? '#33ff88' : '#ff5577'}" stroke-width="1.5"/></svg>`;
+    return `<svg class="spark" viewBox="0 0 ${w} ${h}" style="width:${w}px;height:${h}px;border:0;background:none"><polyline points="${d}" fill="none" stroke="${up ? '#4ceb70' : '#ec2d62'}" stroke-width="1.5"/></svg>`;
   }
 
   function drawBench() {
@@ -134,13 +134,13 @@
     const maxY = Math.max(0.6, ...recs.map(r => r.total.winRate + 0.05)), Y = (v) => H - B - (v / maxY) * (H - T - B);
     const Y2 = (v) => H - B - ((v + 1) / 2) * (H - T - B);
     let g = '';
-    for (let t = 0; t <= 4; t++) { const v = (maxY * t) / 4; g += `<line x1="${L}" x2="${W - R}" y1="${Y(v)}" y2="${Y(v)}" stroke="#2a3260" stroke-width=".6"/><text x="${L - 6}" y="${Y(v) + 4}" fill="#8c95c4" font-size="11" text-anchor="end">${Math.round(v * 100)}%</text>`; }
+    for (let t = 0; t <= 4; t++) { const v = (maxY * t) / 4; g += `<line x1="${L}" x2="${W - R}" y1="${Y(v)}" y2="${Y(v)}" stroke="#14285a" stroke-width=".6"/><text x="${L - 6}" y="${Y(v) + 4}" fill="#9ba3ca" font-size="11" text-anchor="end">${Math.round(v * 100)}%</text>`; }
     const poly = (f, c, extra = '') => `<polyline fill="none" stroke="${c}" stroke-width="2" ${extra} points="${recs.map(r => X(r.trainedGames) + ',' + f(r)).join(' ')}"/>`;
-    g += poly(r => Y(r.total.expectedWinRate), '#8c95c4', 'stroke-dasharray="5 4"');
-    g += poly(r => Y2(r.total.meanPlaceScore), '#ffd34e', 'stroke-opacity=".7" stroke-width="1.5"');
-    g += poly(r => Y(r.total.winRate), '#33ff88');
-    g += recs.map(r => `<circle cx="${X(r.trainedGames)}" cy="${Y(r.total.winRate)}" r="3.2" fill="#33ff88"><title>${r.trainedGames} games: ${pct(r.total.winRate)} (${r.total.wins}/${r.total.games})</title></circle>`).join('');
-    g += `<text x="${L}" y="${H - 6}" fill="#8c95c4" font-size="11">${xmin}</text><text x="${W - R}" y="${H - 6}" fill="#8c95c4" font-size="11" text-anchor="end">${xmax} training games</text>`;
+    g += poly(r => Y(r.total.expectedWinRate), '#9ba3ca', 'stroke-dasharray="5 4"');
+    g += poly(r => Y2(r.total.meanPlaceScore), '#fad54a', 'stroke-opacity=".7" stroke-width="1.5"');
+    g += poly(r => Y(r.total.winRate), '#4ceb70');
+    g += recs.map(r => `<circle cx="${X(r.trainedGames)}" cy="${Y(r.total.winRate)}" r="3.2" fill="#4ceb70"><title>${r.trainedGames} games: ${pct(r.total.winRate)} (${r.total.wins}/${r.total.games})</title></circle>`).join('');
+    g += `<text x="${L}" y="${H - 6}" fill="#9ba3ca" font-size="11">${xmin}</text><text x="${W - R}" y="${H - 6}" fill="#9ba3ca" font-size="11" text-anchor="end">${xmax} training games</text>`;
     svg.innerHTML = g;
     // table (newest first)
     tbl.innerHTML = '<tr><th class="num">Training games</th><th class="num">Test games</th><th class="num">Win rate</th><th class="num">Expected</th><th class="num">Edge</th><th class="num">z</th><th class="num">Placement</th><th>By table size (wins/games)</th></tr>' +
@@ -164,7 +164,7 @@
     const th = (k, label, num) => `<th data-k="${k}" class="${num ? 'num ' : ''}${sortKey === k ? 'sorted' + (sortAsc ? ' asc' : '') : ''}">${label}</th>`;
     $('cards').innerHTML = '<tr>' + th('rank', '#', 1) + th('name', 'Card') + th('type', 'Type') + th('value', 'Value', 1) + th('valueN', 'Dealt (n)', 1) + th('baseValue', 'Built', 1) + th('playValue', 'Play', 1) + th('lift', 'vs. type', 1) + th('keepEdge', 'Keep − recycle', 1) + th('delta', 'Δ', 1) + '<th>Trend</th></tr>' +
       rows.slice(0, 1500).map(r => `<tr><td class="num">${r.rank}</td><td>${esc(r.name)}</td><td><span class="tag">${esc(r.type)}</span></td>
-        <td class="num ${cls(r.value)}"><span class="bar" style="width:${Math.round(Math.abs(r.value) / maxAbs * 70)}px;background:${r.value >= 0 ? '#33ff88' : '#ff5577'}"></span>${sgn(r.value)}</td>
+        <td class="num ${cls(r.value)}"><span class="bar" style="width:${Math.round(Math.abs(r.value) / maxAbs * 70)}px;background:${r.value >= 0 ? '#4ceb70' : '#ec2d62'}"></span>${sgn(r.value)}</td>
         <td class="num">${r.valueN}</td><td class="num ${r.baseN ? cls(r.baseValue) : 'zero'}">${r.baseN ? sgn(r.baseValue) : '–'}</td>
         <td class="num ${r.playValue == null ? 'zero' : cls(r.playValue)}">${r.playValue == null ? '–' : sgn(r.playValue, 2)}</td>
         <td class="num ${cls(r.lift)}">${sgn(r.lift)}</td><td class="num ${r.keepEdge == null ? 'zero' : cls(r.keepEdge)}" title="${r.keepN} observations">${r.keepEdge == null ? '–' : sgn(r.keepEdge)}</td><td class="num ${r.delta == null ? 'zero' : cls(r.delta)}">${r.delta == null ? '' : sgn(r.delta)}</td><td>${spark(r.trend)}</td></tr>`).join('');

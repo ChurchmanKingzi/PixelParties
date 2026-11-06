@@ -7,20 +7,42 @@ const { api, socket, AppContext, CardMini, cardImageUrl,
         typeColor, skinImageUrl, CardTooltipContent, isDeckLegal } = window;
 const { ALL_CARDS, CARDS_BY_NAME, AVAILABLE_CARDS, AVAILABLE_MAP, SKINS_DB } = window;
 const { useAntoniaPresent, setAntoniaPresent, tutorialStartsWithAntonia } = window;
-const { GlanzBand, LotsenGlanz } = window;   // v1264: Glanzband + Lotsen-Schein
+const { GlanzBand, LotsenGlanz, PpVerlauf } = window;   // v1264: Glanzband + Lotsen-Schein; W86u2: Pixel-Schleier (Dither)
 
-// Eye / eye-off glyphs for the password show/hide toggle.
-const EyeIcon = () => (
-  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z" /><circle cx="12" cy="12" r="3" />
-  </svg>
-);
-const EyeOffIcon = () => (
-  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24" />
-    <line x1="1" y1="1" x2="23" y2="23" />
-  </svg>
-);
+// Eye / eye-off sprites for the password show/hide toggle (PixelIcon sprites `auge` / `augeZu` in app-shared.jsx; 11x7 sprite pixels at 2 px, colour = currentColor).
+const EyeIcon = () => <PixelIcon name="auge" style={{ width: 22, height: 14 }} />;
+const EyeOffIcon = () => <PixelIcon name="augeZu" style={{ width: 22, height: 14 }} />;
+
+// Google-"G" als Pixelsprite (11x11, 2 px je Pixel, nur <rect>, crispEdges) statt des Vektorlogos. Abweichung von der Marke: vereinfachte Rasterform, gleiche vier Markenfarben.
+const GOOGLE_G_ZEILEN = [
+  '...RRRRR...',
+  '..RRRRRRR..',
+  '.RRR...RRR.',
+  'YYY........',
+  'YY.........',
+  'YY...BBBBBB',
+  'YY...BBBBBB',
+  'YYG.....BBB',
+  '.GGG...GBB.',
+  '..GGGGGGG..',
+  '...GGGGG...',
+];
+const GOOGLE_G_FARBEN = { R: '#e92f38', Y: '#ffc61c', G: '#2ca058', B: '#4580f6' };
+const GoogleGSprite = React.memo(function GoogleGSprite() {
+  const rects = [];
+  GOOGLE_G_ZEILEN.forEach((zeile, y) => {
+    for (let x = 0; x < zeile.length;) {
+      const c = zeile[x];
+      if (c === '.') { x++; continue; }
+      let e = x; while (e < zeile.length && zeile[e] === c) e++;
+      rects.push(<rect key={x + ',' + y} x={x} y={y} width={e - x} height="1" fill={GOOGLE_G_FARBEN[c]} />);
+      x = e;
+    }
+  });
+  return (
+    <svg width="22" height="22" viewBox="0 0 11 11" shapeRendering="crispEdges" aria-hidden="true" focusable="false" data-pp-px="aus">{rects}</svg>
+  );
+});
 
 // Text input with an inline show/hide toggle. Reused by the auth screen
 // and the profile password-change form.
@@ -28,7 +50,7 @@ function PasswordInput({ value, onChange, placeholder, onEnter, autoFocus, autoC
   const [show, setShow] = useState(false);
   return (
     <div className="pw-field">
-      <input
+      <input data-pp-tastatur="an"
         className="input" type={show ? 'text' : 'password'} placeholder={placeholder}
         value={value} autoFocus={autoFocus} autoComplete={autoComplete || 'current-password'}
         onChange={e => onChange(e.target.value)}
@@ -95,12 +117,31 @@ function useTutorialFlow(open) {
   // Receive the board state for a running tutorial attempt.
   useEffect(() => {
     if (!open) return;
+    // Verbindungswaechter: nach einem Wiederverbinden muss der Server binnen 5 s den Tutorial-Zustand neu senden (Raum bleibt 3 min erhalten).
+    // Kommt nichts (Raum weg, z. B. Server neu gestartet), wuerde das Brett weiter stehen und jede Eingabe ins Leere gehen — dann klar abbrechen.
+    let waechter = 0;
+    const onConnect = () => {
+      if (!tutorialAttemptRoom.current) return;
+      clearTimeout(waechter);
+      waechter = setTimeout(() => {
+        if (!tutorialAttemptRoom.current) return;
+        notify('Connection lost — the tutorial ended. Please start it again.', 'error');
+        setTutorialAttemptState(null);
+        tutorialAttemptRoom.current = null;
+        tutorialIntroShownRef.current = null;
+        window._currentTutorialNum = null;
+        if (window.setTutorialFigurenGesperrt) window.setTutorialFigurenGesperrt(false);
+        socket.emit('get_tutorials');
+      }, 5000);
+    };
     const onGameState = (state) => {
+      clearTimeout(waechter);
       if (state.isPuzzle && state.isTutorial && !window._tutorialGaveUp) {
         tutorialAttemptRoom.current = state.roomId;
         setTutorialAttemptState(state);
       }
     };
+    socket.on('connect', onConnect);
     const onError = (msg) => {
       // Der Start ist gescheitert: die Figuren-Sperre (s. startTutorialAttempt)
       // darf nicht auf ein Gespraech warten, das nie kommt.
@@ -109,7 +150,7 @@ function useTutorialFlow(open) {
     };
     socket.on('game_state', onGameState);
     socket.on('puzzle_error', onError);
-    return () => { socket.off('game_state', onGameState); socket.off('puzzle_error', onError); };
+    return () => { clearTimeout(waechter); socket.off('connect', onConnect); socket.off('game_state', onGameState); socket.off('puzzle_error', onError); };
   }, [open, notify]);
 
   // Show the Monia-Bot intro textbox when a stage's board first loads (and
@@ -128,13 +169,17 @@ function useTutorialFlow(open) {
     if (tutorialAttemptState.roomId !== tutorialRoomIdRef.current) {
       tutorialRoomIdRef.current = tutorialAttemptState.roomId;
       tutorialIntroShownRef.current = null;
+      // Retry: derselbe Versuch von vorn, aber OHNE die Einleitung noch einmal abzuspielen (Marke setzt der Retry-Knopf im Kampffeld).
+      const retry = !!window._ppTutorialRetry;
+      window._ppTutorialRetry = false;
+      if (retry && window._currentTutorialNum) tutorialIntroShownRef.current = window._currentTutorialNum;
       // Neuer Durchgang (auch ein Retry): Gegner ist, wer zuerst spricht.
       if (window.setTutorialGegner && window.tutorialErsterSprecher) {
         window.setTutorialGegner(window.tutorialErsterSprecher(window._currentTutorialNum));
       }
       // ... und die Helden-Figuren warten wieder auf das Ende der Einleitung.
       if (window.setTutorialFigurenGesperrt) {
-        window.setTutorialFigurenGesperrt(!!(window.TUTORIAL_SCRIPTS || {})[window._currentTutorialNum]?.intro);
+        window.setTutorialFigurenGesperrt(!retry && !!(window.TUTORIAL_SCRIPTS || {})[window._currentTutorialNum]?.intro);
       }
     }
     const num = window._currentTutorialNum;
@@ -196,12 +241,12 @@ function TutorialBrowserModal({ onClose, tutorialList, onStart, onViewRules }) {
   return (
     <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.85)', zIndex: 9000, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
       onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
-      <div className="menu-popup-dither pp-fenster" style={{ background: 'var(--bg2)', width: 420, maxHeight: '80vh', display: 'flex', flexDirection: 'column' }}>
-        <div className="pp-fenster-kopf" style={{ padding: '14px 20px', display: 'flex', alignItems: 'center', justifyContent: 'flex-end', position: 'relative' }}>
+      <div className="menu-popup-dither pp-fenster" style={{ background: 'var(--bg2)', width: 'min(440px, calc(94 * var(--vw)))', maxHeight: 'calc(94 * var(--vh))', display: 'flex', flexDirection: 'column' }}>
+        <div className="pp-fenster-kopf" style={{ padding: '10px 20px', display: 'flex', alignItems: 'center', justifyContent: 'flex-end', position: 'relative', flexShrink: 0 }}>
           <h3 className="orbit-font title-outline" style={{ fontSize: 22, fontWeight: 800, color: 'var(--player-color)', margin: 0, whiteSpace: 'nowrap', position: 'absolute', left: '50%', transform: 'translateX(-50%)' }}>HOW TO PLAY</h3>
           <button className="btn" onClick={onClose} style={{ padding: '2px 10px', fontSize: 10 }}>✕</button>
         </div>
-        <div style={{ flex: 1, overflowY: 'auto', padding: '10px 20px 20px' }}>
+        <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: '10px 20px 18px' }}>
           {tutorialList === null ? (
             <div style={{ color: 'var(--text2)', textAlign: 'center', padding: 30, fontSize: 13 }}>Loading tutorials...</div>
           ) : tutorialList.length === 0 ? (
@@ -210,11 +255,11 @@ function TutorialBrowserModal({ onClose, tutorialList, onStart, onViewRules }) {
             tutorialList.map((t) => (
               <button key={t.tutorialId} className="btn" disabled={t.locked}
                 onClick={() => { if (!t.locked) onStart(t); }}
-                style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%', padding: '8px 12px', fontSize: 13, marginBottom: 4, borderColor: 'rgba(255,68,204,.25)', color: t.locked ? 'var(--text2)' : 'var(--text1)', textAlign: 'left', justifyContent: 'flex-start', opacity: t.locked ? 0.55 : 1, cursor: t.locked ? 'not-allowed' : 'pointer' }}>
-                <span style={{ color: t.locked ? 'var(--text2)' : (t.completed ? '#33ff88' : 'var(--bg4)'), fontSize: 16, width: 20, textAlign: 'center' }}>
+                style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%', padding: '6px 12px', fontSize: 13, marginBottom: 3, borderColor: 'rgba(251,30,169,.25)', color: t.locked ? 'var(--text2)' : 'var(--text1)', textAlign: 'left', justifyContent: 'flex-start', opacity: t.locked ? 0.55 : 1, cursor: t.locked ? 'not-allowed' : 'pointer' }}>
+                <span style={{ color: t.locked ? 'var(--text2)' : (t.completed ? '#4ceb70' : 'var(--bg4)'), fontSize: 16, width: 20, textAlign: 'center' }}>
                   {t.locked ? '🔒' : (t.completed ? '✓' : '○')}
                 </span>
-                <span style={{ color: t.locked ? 'var(--text2)' : '#ff44cc', fontSize: 11, width: 24, flexShrink: 0 }}>{t.num}.</span>
+                <span style={{ color: t.locked ? 'var(--text2)' : '#fb1ea9', fontSize: 11, width: 24, flexShrink: 0 }}>{t.num}.</span>
                 <span style={{ flex: 1 }}>{t.name}</span>
                 {t.locked
                   ? <span style={{ fontSize: 9, color: 'var(--text2)' }}>LOCKED</span>
@@ -224,8 +269,8 @@ function TutorialBrowserModal({ onClose, tutorialList, onStart, onViewRules }) {
           )}
           {/* Always-available rules entry — bottom-most, never locked. */}
           <button className="btn" onClick={onViewRules}
-            style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%', padding: '8px 12px', fontSize: 13, marginTop: 10, borderColor: 'rgba(255,68,204,.45)', color: 'var(--text1)', textAlign: 'left', justifyContent: 'flex-start', cursor: 'pointer' }}>
-            <span style={{ color: '#ff44cc', fontSize: 16, width: 20, textAlign: 'center' }}>📜</span>
+            style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%', padding: '6px 12px', fontSize: 13, marginTop: 8, borderColor: 'rgba(251,30,169,.45)', color: 'var(--text1)', textAlign: 'left', justifyContent: 'flex-start', cursor: 'pointer' }}>
+            <span style={{ color: '#fb1ea9', fontSize: 16, width: 20, textAlign: 'center' }}>📜</span>
             <span style={{ flex: 1, fontWeight: 700 }}>View Rules</span>
           </button>
         </div>
@@ -244,7 +289,7 @@ function TutorialBrowserModal({ onClose, tutorialList, onStart, onViewRules }) {
 //  served from /data/animated_screen/layers2/. Purely cosmetic; sits behind
 //  the auth panel and is pointer-events:none.
 // ═══════════════════════════════════════════
-const ANIM_LAYERS_DIR = '/data/animated_screen/layers2/';
+const ANIM_LAYERS_DIR = window.PP_RETRO ? '/data/animated_screen/layers2-retro/' : '/data/animated_screen/layers2/';
 
 // ── ZUSCHNITT DER KULISSEN-EBENEN (v1265, Al 22.9.: „der Login-Screen
 // ruckelt") ─────────────────────────────────────────────────────────────
@@ -267,7 +312,6 @@ const ANIM_LAYERS_DIR = '/data/animated_screen/layers2/';
 // (Alpha-Huellkasten, z.B. `PIL.Image.open(f).split()[-1].getbbox()`).
 // Fehlt ein Eintrag, faellt die Ebene auf das alte Vollbild zurueck —
 // richtig, nur teurer.
-const ANIM_BUEHNE_B = 1920, ANIM_BUEHNE_H = 1080;
 const ANIM_SPRITE_RAHMEN = {
   'angel.png':      [0, 0, 788, 603],
   'blonde.png':     [92, 283, 689, 1080],
@@ -281,65 +325,10 @@ const ANIM_SPRITE_RAHMEN = {
   'ninja.png':      [0, 303, 828, 1033],
   'rabbit.png':     [403, 479, 752, 803],
 };
-/**
- * Stil einer Kulissen-Ebene: auf den sichtbaren Rahmen zugeschnitten,
- * sonst identisch zur alten Vollbild-Ebene. `extra` wie bisher (Animation,
- * Bewegungsvariablen, `transformOrigin` in BUEHNEN-Prozent); `versatzX`
- * verschiebt die ganze Ebene waagerecht (vorher per `inset`).
- */
-function animEbene(file, extra = {}, { versatzX } = {}) {
-  const url = "url('" + ANIM_LAYERS_DIR + file + "')";
-  const r = ANIM_SPRITE_RAHMEN[file];
-  const { transformOrigin, ...rest } = extra;
-  if (!r) {
-    return { position: 'absolute', inset: 0, willChange: 'transform',
-      background: url + ' center / 100% 100% no-repeat',
-      ...(transformOrigin ? { transformOrigin } : {}), ...rest,
-      ...(versatzX ? { left: versatzX, right: `calc(-1 * ${versatzX})` } : {}) };
-  }
-  const RAND = 2;   // Buehnenpixel Luft um den Alpha-Kasten (Kantenglaettung)
-  const x0 = Math.max(0, r[0] - RAND), y0 = Math.max(0, r[1] - RAND);
-  const x1 = Math.min(ANIM_BUEHNE_B, r[2] + RAND), y1 = Math.min(ANIM_BUEHNE_H, r[3] + RAND);
-  const l = x0 / ANIM_BUEHNE_B, t = y0 / ANIM_BUEHNE_H;
-  const w = (x1 - x0) / ANIM_BUEHNE_B, h = (y1 - y0) / ANIM_BUEHNE_H;
-  const pct = (v) => (v * 100).toFixed(4) + '%';
-  const [ox, oy] = (transformOrigin || '50% 50%').split(/\s+/).map(v => parseFloat(v) / 100);
-  return {
-    position: 'absolute',
-    left: versatzX ? `calc(${pct(l)} + ${versatzX})` : pct(l),
-    top: pct(t), width: pct(w), height: pct(h),
-    willChange: 'transform',
-    backgroundImage: url,
-    backgroundRepeat: 'no-repeat',
-    backgroundSize: `${pct(1 / w)} ${pct(1 / h)}`,
-    // Prozent-Position: Punkt p des Bildes liegt auf Punkt p des Kastens —
-    // fuer den Versatz −l·Buehne gilt p = l / (1 − w).
-    backgroundPosition: `${w < 1 ? pct(l / (1 - w)) : '0%'} ${h < 1 ? pct(t / (1 - h)) : '0%'}`,
-    transformOrigin: `${pct((ox - l) / w)} ${pct((oy - t) / h)}`,
-    ...rest,
-  };
-}
 function AnimatedTitleBackdrop() {
-  // 46 randomized rising embers, generated once (see README §7).
-  const embers = useMemo(() => {
-    const colors = ['#ffd36b', '#ff8a3d', '#ff5a4d', '#ffe9a8', '#ffffff'];
-    return Array.from({ length: 46 }, () => {
-      const size = 2 + Math.random() * 5;
-      return {
-        size,
-        dur: 7 + Math.random() * 9,
-        delay: -Math.random() * 16,
-        left: Math.random() * 100,
-        // Horizontal drift as a % of screen width (±50px on the 1920 stage).
-        drift: +((Math.random() * 2 - 1) * 2.604).toFixed(3),
-        color: colors[Math.floor(Math.random() * colors.length)],
-      };
-    });
-  }, []);
-  // Ebenen: `animEbene` (oben) — zugeschnitten, sonst wie die alten
-  // Vollbild-Ebenen (Streckung `100% 100%`, auf Nicht-16:9-Fenstern
-  // gestaucht statt beschnitten).
-  const layer = animEbene;
+  // Figuren, Explosionskern und Glut sind Pixelart-Leinwaende (app-fx-45.jsx, PpFx45Szene): vorher ~9 DOM-Ebenen mit CSS-Dauerlaeufen
+  // (ab-floaty / ab-*Tether) und 46 Glut-Quadrate (ab-emberrise), die bei jedem Start zur Laufzeit gebacken wurden.
+  const szene = { dir: ANIM_LAYERS_DIR, rahmen: ANIM_SPRITE_RAHMEN };
   return (
     <div className="anim-backdrop" aria-hidden="true">
       <div className="anim-shake">
@@ -352,47 +341,26 @@ function AnimatedTitleBackdrop() {
             panel and gets no flash either — so the whole laser reads as one uniform
             piece. (The jagged bolts render ABOVE the characters — see below.) */}
         <div className="anim-lightning">
-          <div className="anim-lflash anim-lflash-impact" />
-          <div className="anim-lflash anim-lflash-ambient" />
+          <PpVerlauf className="anim-lflash anim-lflash-impact" retroBlend="screen" gradient="radial-gradient(circle at 46% 26%, rgba(189,220,239,.95), rgba(102,182,255,.35) 42%, transparent 72%)" />
+          <PpVerlauf className="anim-lflash anim-lflash-ambient" retroBlend="screen" gradient="radial-gradient(circle at 62% 22%, rgba(179,216,249,.9), rgba(102,182,255,.3) 40%, transparent 70%)" />
         </div>
-        <div className="anim-flash" />
+        <PpVerlauf className="anim-flash" retroBlend="screen" gradient="radial-gradient(circle at 56% 41%, #fff, rgba(255,251,210,.55) 30%, transparent 58%)" />
         {/* Vignette also renders BELOW the characters, for the same reason as the
             flash: it's a full-screen dark radial, and golem is pinned to the right
             edge where the vignette is darkest — so above the characters it would
             dim golem's beam while the central burst (in the panel, above the
             vignette) stays bright, breaking the seam. Below the characters it
             frames only the background and leaves every sprite at its true colour. */}
-        <div className="anim-vignette" />
-        {/* 1 — hammer girl */}
-        <div style={layer('hammer.png', { transformOrigin: '72% 28%', '--mx': '0.469vw', '--my': '-1.389vh', '--mr': '2deg', animation: 'ab-floaty 4.2s ease-in-out -0.6s infinite' })} />
-        {/* 2 — Explosionskern. ★ v1266 (Al 22.9.: „das Login-Menue ist
-            nicht schoen"): wieder HIER, in der Kulisse, statt im Kasten ueber
-            dessen Flaeche. Dort lag der gelb-rote Kern direkt hinter den
-            Eingabefeldern und zwang jeden Text in Pixel-Umrisse. Jetzt liegt
-            der Kasten davor; sichtbar bleibt der Kern im Kunstfenster oben
-            (hinter dem Logo) und seitlich um den Kasten herum. Ebene,
-            Drehpunkt und Takt wie zuvor. */}
-        <div className="anim-explosion" style={layer('explosion.png', { transformOrigin: '52% 42%', animation: 'ab-coreTether 4.8s ease-in-out infinite' })} />
+        <PpVerlauf className="anim-vignette" px={2} gradient="radial-gradient(circle at 50% 44%, transparent 48%, rgba(8,6,12,.2) 82%, rgba(8,6,12,.36) 100%)" />
+        {/* 1 — hammer girl, 2 — Explosionskern. ★ v1266 (Al 22.9.: „das Login-Menue ist nicht schoen"): der Kern liegt in der Kulisse, nicht im
+            Kasten (dort lag der gelb-rote Kern direkt hinter den Eingabefeldern und zwang jeden Text in Pixel-Umrisse); sichtbar bleibt er im Kunstfenster
+            oben (hinter dem Logo) und seitlich um den Kasten herum. */}
+        <PpFx45Szene ebenen={['hammer', 'explosion']} {...szene} />
         {/* 3 — central bloom */}
-        <div className="anim-bloom" />
-        {/* 4 — Broghan (right shooter), nudged flush to the right edge */}
-        <div style={{ position: 'absolute', inset: 0, transform: 'translate(5.781vw, 0.278vh)' }}>
-          <div style={layer('golem.png', { animation: 'ab-broghanTether 4.8s ease-in-out infinite' })} />
-        </div>
-        {/* 5 — Kyli (tree girl), shifted down */}
-        <div style={{ position: 'absolute', inset: 0, transform: 'translateY(14.907vh)' }}>
-          <div style={layer('horned.png', { transformOrigin: '80% 100%', '--mx': '-0.573vw', '--my': '-1.389vh', '--mr': '2.6deg', animation: 'ab-floaty 6s ease-in-out -2s infinite' })} />
-        </div>
-        {/* 6 — angel girl */}
-        <div style={layer('angel.png', { transformOrigin: '20% 30%', '--mx': '0vw', '--my': '-1.111vh', '--mr': '-1.4deg', animation: 'ab-floaty 5s ease-in-out infinite' })} />
-        {/* 7 — blonde girl */}
-        <div style={layer('blonde.png', { transformOrigin: '20% 50%', '--mx': '0.208vw', '--my': '-0.833vh', '--mr': '1deg', animation: 'ab-floaty 6.5s ease-in-out -1.5s infinite' })} />
-        {/* 8 — Jiggles (left shooter) */}
-        <div style={layer('rabbit.png', { animation: 'ab-jiggleTether 4.8s ease-in-out infinite' })} />
-        {/* 9 — Champion (swordsman), shifted down */}
-        <div style={{ position: 'absolute', inset: 0, transform: 'translateY(19.907vh)' }}>
-          <div style={layer('ninja.png', { transformOrigin: '16% 80%', '--mx': '0.417vw', '--my': '-1.296vh', '--mr': '-2deg', animation: 'ab-floaty 5.5s ease-in-out -2.5s infinite' })} />
-        </div>
+        <PpVerlauf className="anim-bloom" retroBlend="screen" gradient="radial-gradient(circle, rgba(255,241,150,.4), rgba(255,155,58,.12) 24%, transparent 46%)" />
+        {/* 4 — Broghan (right shooter, an den rechten Rand gerueckt), 5 — Kyli (tree girl, nach unten), 6 — angel girl, 7 — blonde girl,
+            8 — Jiggles (left shooter), 9 — Champion (swordsman, nach unten), 13 — rising embers (alles auf EINER Leinwand, von hinten nach vorn) */}
+        <PpFx45Szene ebenen={['golem', 'horned', 'angel', 'blonde', 'rabbit', 'ninja']} glut {...szene} />
         {/* 10-12 — flying cats live in <AnimatedTitleCatsOverlay/> instead, so
             they render ABOVE the login panel (can't rise above it from inside
             this z-index:0 stacking context). */}
@@ -401,27 +369,8 @@ function AnimatedTitleBackdrop() {
             don't wash the lasers. Kept inside the shake group, after every
             character, so they jolt in sync with the scene. */}
         <div className="anim-lightning">
-          <svg className="anim-bolt anim-bolt-a" viewBox="0 0 100 400" preserveAspectRatio="none" aria-hidden="true">
-            <polyline points="52,0 40,70 62,80 38,150 60,165 34,240 58,255 30,340 50,360 42,400" />
-          </svg>
-          <svg className="anim-bolt anim-bolt-b" viewBox="0 0 100 400" preserveAspectRatio="none" aria-hidden="true">
-            <polyline points="48,0 62,75 38,88 60,160 36,175 58,250 34,265 56,345 40,375 50,400" />
-          </svg>
-          <svg className="anim-bolt anim-bolt-c" viewBox="0 0 100 400" preserveAspectRatio="none" aria-hidden="true">
-            <polyline points="50,0 58,80 40,92 60,175 38,190 56,270 36,285 52,370 46,400" />
-          </svg>
-        </div>
-        {/* 13 — embers */}
-        <div className="anim-embers" style={{ position: 'absolute', inset: 0, pointerEvents: 'none', overflow: 'hidden' }}>
-          {embers.map((e, i) => (
-            <span key={i} style={{
-              position: 'absolute', bottom: '-1.296vh', left: e.left.toFixed(2) + '%',
-              width: e.size.toFixed(1) + 'px', height: e.size.toFixed(1) + 'px', borderRadius: '50%',
-              background: e.color, boxShadow: '0 0 ' + (e.size * 2.4).toFixed(1) + 'px ' + e.color,
-              opacity: 0, animation: 'ab-emberrise ' + e.dur.toFixed(1) + 's linear ' + e.delay.toFixed(1) + 's infinite',
-              '--drift': e.drift + 'vw',
-            }} />
-          ))}
+          {/* Pixelart-Leinwand (app-fx-40.jsx): drei Zickzack-Blitze auf dem 3-px-Raster, Deckkraft per Dither */}
+          <PpFx40Blitze />
         </div>
       </div>
     </div>
@@ -433,39 +382,178 @@ function AnimatedTitleBackdrop() {
 // stacking context). Same independent floats + screen-shake as the main scene
 // — in sync because both mount together. pointer-events:none so clicks still
 // reach the form beneath.
-// Wie weit `cat_mid` nach links rueckt, damit sie den Login-Kasten
-// freigibt. 8vw sind bei 1900px Breite gut 150px — der Kasten ist mit
-// dem v466-Zoom rund 460px breit und beginnt damit bei etwa 38 %.
-const KATZE_LINKS = '8vw';
-
 function AnimatedTitleCatsOverlay() {
-  const layer = animEbene;   // v1265: zugeschnittene Ebenen, siehe oben
+  // Drei Katzen auf EINER Pixelart-Leinwand (app-fx-45.jsx). cat_mid sass mit ihrem Bildmittelpunkt bei 37 % genau auf der linken Kante des
+  // Login-Kastens und lag als Vordergrundebene darueber — seit dem groesseren Zoom (v466) zu dominant (Al: „muss weiter links platziert werden").
+  // Der Versatz (KATZE_LINKS = 8 vw nach links, `wx` von cat_mid in PP_FX45_EBENEN) ist die einzige Stellschraube: groesser = weiter weg vom Kasten.
   return (
     <div className="anim-cats-front" aria-hidden="true">
       <div className="anim-shake">
-        <div style={layer('cat_top.png', { transformOrigin: '23% 5%', '--mx': '0.729vw', '--my': '-0.833vh', '--mr': '3deg', animation: 'ab-floaty 3.4s ease-in-out -0.5s infinite' })} />
-        {/* cat_mid sass mit ihrem Bildmittelpunkt bei 37 % genau auf der
-            linken Kante des Login-Kastens und lag als Vordergrundebene
-            darueber — seit dem groesseren Zoom (v466) zu dominant.
-            Al: „muss weiter links platziert werden."
-
-            (v1265: jetzt `versatzX` in `animEbene` — ueber `left`.)
-            Verschoben ueber `inset` statt ueber `transform`: die Ebene
-            traegt eine laufende `ab-floaty`-Animation, und die
-            ueberschreibt jedes inline gesetzte `transform`. `inset` ist
-            davon unberuehrt. Links und rechts um denselben Betrag
-            versetzt, damit die Ebene GENAUSO BREIT bleibt — sonst
-            zieht das `100% 100%`-Hintergrundbild die Katze in die
-            Laenge.
-
-            KATZE_LINKS ist die einzige Stellschraube: groesser =
-            weiter weg vom Kasten. */}
-        <div style={layer('cat_mid.png', { transformOrigin: '37% 30%', '--mx': '-0.573vw', '--my': '0.833vh', '--mr': '-3deg', animation: 'ab-floaty 2.9s ease-in-out -0.8s infinite' }, { versatzX: `-${KATZE_LINKS}` })} />
-        <div style={layer('cat_bottom.png', { transformOrigin: '5% 48%', '--mx': '0.833vw', '--my': '-1.111vh', '--mr': '4deg', animation: 'ab-floaty 3.0s ease-in-out -1.7s infinite' })} />
+        <PpFx45Szene ebenen={['cat_top', 'cat_mid', 'cat_bottom']} dir={ANIM_LAYERS_DIR} rahmen={ANIM_SPRITE_RAHMEN} />
       </div>
     </div>
   );
 }
+
+// ═══ KULISSE FUER DEN TAP-BILDSCHIRM (Handy): ein einziges Canvas statt ~25 gestapelter, animierter DOM-Ebenen ═══
+// Die DOM-Kulisse (AnimatedTitleBackdrop) legt 1920x1080-Ebenen mit Blend-Modi, Filtern und Dutzenden CSS-Animationen
+// uebereinander; auf Handys ruckelte das im Hochformat deutlich. Hier werden dieselben Ebenen (data/animated_screen/layers2)
+// einmal auf Handy-Groesse vorskaliert und pro Bild in EIN Canvas gezeichnet (mit der Bildwiederholrate des Geraets, Dithering-frei, ohne Blend-Modi):
+// Schweben, Klammer-Rigs, Beben, Blitze, Glut und die langsame Kamerafahrt wie im Titelbildschirm. Laeuft nur, solange der
+// Bildschirm sichtbar ist, und gibt die Bilder nach 5 s Unsichtbarkeit wieder frei.
+function TapBackdropCanvas({ hostRef }) {
+  const cvRef = useRef(null);
+  useEffect(() => {
+    const cv = cvRef.current; if (!cv) return;
+    const DIR = ANIM_LAYERS_DIR, NAMES = ['background', 'hammer', 'explosion', 'golem', 'horned', 'angel', 'blonde', 'rabbit', 'ninja', 'cat_top', 'cat_mid', 'cat_bottom'];
+    const FRAME = 1000 / 60;
+    let imgs = null, loading = false, disposed = false, raf = 0, timer = 0, hiddenSince = 0, lastDraw = 0, W = 0, H = 0, S = 0, q = 1, ema = 0, frameGap = FRAME, lastAdapt = 0;
+    const lerp = (a, b, u) => a + (b - a) * u;
+    const kfLin = (pts, x) => { for (let i = 0; i + 1 < pts.length; i++) if (x >= pts[i][0] && x <= pts[i + 1][0]) { const u = (x - pts[i][0]) / ((pts[i + 1][0] - pts[i][0]) || 1); return lerp(pts[i][1], pts[i + 1][1], u); } return 0; };
+    const KF_STRIKE = [[0, 0], [0.6, 0], [1, 1], [1.8, 0.12], [2.6, 0.85], [4, 0], [49.5, 0], [50, 1], [50.8, 0.18], [51.6, 0.8], [53, 0], [100, 0]];
+    const KF_AMB = [[0, 0], [29.6, 0], [30, 0.9], [30.7, 0.12], [31.5, 0.72], [32.6, 0], [70.8, 0], [71.2, 0.68], [72.2, 0], [100, 0]];
+    const KF_SHAKE = [[0, 0, 0], [1, -0.417, 0.463], [2, 0.365, -0.556], [3, -0.26, 0.37], [4, 0.156, -0.278], [6, 0, 0], [49, 0, 0], [50, 0.469, -0.556], [51, -0.417, 0.556], [52, 0.313, -0.37], [53, -0.208, 0.278], [54, 0.104, -0.185], [56, 0, 0]];
+    const shakeAt = pc => { let v = [0, 0]; for (const k of KF_SHAKE) if (pc >= k[0]) v = [k[1] * 19.2, k[2] * 10.8]; return v; };
+    const floaty = (tau, dur, delay) => { const c = (((tau - delay) / dur) % 1 + 1) % 1, u = c < 0.5 ? c * 2 : (1 - c) * 2; return u * u * (3 - 2 * u); };
+    const rnd = (n) => { let a = 5000 + n * 7919; a = (a ^ 61) ^ (a >>> 16); a = (a + (a << 3)) | 0; a ^= a >>> 4; a = Math.imul(a, 0x27d4eb2d); a ^= a >>> 15; return (a >>> 0) / 4294967296; };
+    const EMB = Array.from({ length: 46 }, (_, i) => ({ size: 2 + rnd(i * 6) * 5, dur: 7 + rnd(i * 6 + 1) * 9, delay: -rnd(i * 6 + 2) * 16, left: rnd(i * 6 + 3) * 1920, drift: (rnd(i * 6 + 4) * 2 - 1) * 50, col: ['#ffd066', '#e37435', '#fe5154', '#f9ecb3', '#ffffff'][Math.floor(rnd(i * 6 + 5) * 5)] }));
+    const BOLTS = [[288, 173, 'S', [[52, 0], [40, 70], [62, 80], [38, 150], [60, 165], [34, 240], [58, 255], [30, 340], [50, 360], [42, 400]]], [1402, 154, 'S', [[48, 0], [62, 75], [38, 88], [60, 160], [36, 175], [58, 250], [34, 265], [56, 345], [40, 375], [50, 400]]], [1018, 154, 'A', [[50, 0], [58, 80], [40, 92], [60, 175], [38, 190], [56, 270], [36, 285], [52, 370], [46, 400]]]];
+    const load = () => {
+      if (loading || imgs || disposed) return; loading = true;
+      Promise.all(NAMES.map(n => new Promise(res => { const im = new Image(); im.onload = () => res(im); im.onerror = () => res(null); im.src = DIR + n + '.png'; }))).then(list => {
+        loading = false; if (disposed || list.some(x => !x)) return;
+        // vorskalieren: Bildschirmmass der Buehne (S = Pixel je Buehnenpixel), spart jedem Bild das Herunterrechnen von 1920x1080
+        const sc = Math.min(1, S); imgs = {};   // ★ W86u2: genau Bildschirmmass (1 : 1 auf die Kunstpixel-Leinwand), keine Zwischenverkleinerung
+        list.forEach((im, i) => {
+          const n = NAMES[i], rf = ANIM_SPRITE_RAHMEN[n + '.png'];
+          // Figuren auf ihren sichtbaren Kasten zuschneiden (wie die DOM-Kulisse): nur dieser Teil wird pro Bild gezeichnet
+          const x0 = rf ? Math.max(0, rf[0] - 2) : 0, y0 = rf ? Math.max(0, rf[1] - 2) : 0, x1 = rf ? Math.min(1920, rf[2] + 2) : 1920, y1 = rf ? Math.min(1080, rf[3] + 2) : 1080;
+          const c = document.createElement('canvas'); c.width = Math.max(1, Math.round((x1 - x0) * sc)); c.height = Math.max(1, Math.round((y1 - y0) * sc));
+          const g = c.getContext('2d'); g.imageSmoothingEnabled = true; g.imageSmoothingQuality = 'high'; g.drawImage(im, x0, y0, x1 - x0, y1 - y0, 0, 0, c.width, c.height);   // Vorskalieren GEGLAETTET: 1920 px auf Handybreite per Naechster-Nachbar zerreisst das Motiv (Tap-Bildschirm sah kaputt aus)
+          imgs[n] = { c, x0, y0, w: x1 - x0, h: y1 - y0 };
+        });
+        imgs._sc = sc;
+      });
+    };
+    // ★ W86u2 (Pixelart): die Kulisse wird in KUNSTPIXEL-Aufloesung gemalt (1 Canvas-Pixel = 2 CSS-px, per `image-rendering: pixelated` vergroessert):
+    // keine Glaettung (`imageSmoothingEnabled = false`), Versatz nur in ganzen Pixeln, keine Drehung, Schein als Dither-Muster statt Radialverlauf
+    // mit Alpha, Blitze als Pixellinien, Glut als Quadrate mit Dither-Ausblendung. (Vorher: weiche Verlaeufe, `globalAlpha`, gedrehte Ebenen.)
+    const KP = 1;   // 1 Leinwandpixel = 1 CSS-px (auf 2x-Displays 2x2 Geraetepixel, scharf): bei 2 CSS-px waren die Motive zu grob
+    const resize = () => {
+      const w = window.innerWidth, h = window.innerHeight;
+      W = Math.max(1, Math.round(w / KP * q)); H = Math.max(1, Math.round(h / KP * q)); cv.width = W; cv.height = H; S = Math.max(W / 1920, H / 1080);
+      cv.style.imageRendering = 'pixelated';
+      const g = cv.getContext('2d'); g.imageSmoothingEnabled = false;
+    };
+    // Dither-Kachel (4x4) in Farbe `col`, Stufe 0..16 → CanvasPattern (gemerkt)
+    const muster = (() => {
+      const cache = new Map();
+      return (g, col, stufe) => {
+        const k = col + stufe; let m = cache.get(k); if (m) return m;
+        const t = document.createElement('canvas'); t.width = 4; t.height = 4; const c = t.getContext('2d'); c.fillStyle = col;
+        for (let y = 0; y < 4; y++) for (let x = 0; x < 4; x++) if (window.ppBayer(x, y) < stufe / 16) c.fillRect(x, y, 1, 1);
+        m = g.createPattern(t, 'repeat'); cache.set(k, m); return m;
+      };
+    })();
+    // Pixelkreis aus Zeilenbalken (kein Vektorrand): Muster `stufe` fuellt alle Pixel innerhalb `r`
+    const scheibe = (g, cx, cy, r, mus) => {
+      g.fillStyle = mus; cx = Math.round(cx); cy = Math.round(cy); r = Math.round(r);
+      for (let y = -r; y <= r; y++) { const hw = Math.floor(Math.sqrt(r * r - y * y)); g.fillRect(cx - hw, cy + y, 2 * hw + 1, 1); }
+    };
+    const pixelLinie = (g, x0, y0, x1, y1, dick) => {
+      x0 = Math.round(x0); y0 = Math.round(y0); x1 = Math.round(x1); y1 = Math.round(y1);
+      const dx = Math.abs(x1 - x0), dy = -Math.abs(y1 - y0), sx = x0 < x1 ? 1 : -1, sy = y0 < y1 ? 1 : -1; let err = dx + dy;
+      for (;;) { g.fillRect(x0 - (dick >> 1), y0 - (dick >> 1), dick, dick); if (x0 === x1 && y0 === y1) break; const e2 = 2 * err; if (e2 >= dy) { err += dy; x0 += sx; } if (e2 <= dx) { err += dx; y0 += sy; } }
+    };
+    const draw = (now) => {
+      if (!imgs) return; const g = cv.getContext('2d'), t = now / 1000, tau = t + 0.1, pc = (tau % 10) / 10 * 100, sc = imgs._sc, k = S / sc;
+      g.imageSmoothingEnabled = false;
+      // Kamera: 80 s Hin- und Rueckfahrt, leichter Zoom
+      const ph = (t % 80) / 80, e = 0.5 - 0.5 * Math.cos(ph * Math.PI * 2), zoom = 1;   // fester Zoom (★ W86u2: 1 — ein Zoom ≠ 1 vergroessert die Kunstpixel ungleichmaessig); ein sich aenderndes Mass wuerde jede Ebene in jedem Bild neu skalieren (Flimmern)
+      const viewW = W / S, ramp = Math.max(0, (1920 - viewW / zoom) / 2 - 10), camX = lerp(ramp, -ramp, e), camY = lerp(-14, 14, e), sh = shakeAt(pc);
+      g.setTransform(1, 0, 0, 1, 0, 0); g.fillStyle = '#12101f'; g.fillRect(0, 0, W, H);
+      // Versatz der ganzen Buehne nur in ganzen Pixeln
+      g.setTransform(S * zoom, 0, 0, S * zoom, Math.round(W / 2 - 960 * S * zoom + camX * S * zoom + sh[0] * S * zoom), Math.round(H / 2 - 540 * S * zoom + camY * S * zoom + sh[1] * S * zoom));
+      g.drawImage(imgs.background.c, -38.4, -21.6, 1996.8, 1123.2);
+      const aI = kfLin(KF_STRIKE, pc), aA = kfLin(KF_AMB, ((tau % 13) / 13) * 100);
+      // Schein: fuenf Pixelringe, Dichte nach aussen abnehmend (Bayer-Dither) — Bildschirmpixel, daher ohne Buehnen-Transformation
+      const glow = (cx, cy, R, a, col) => {
+        if (a < 0.04) return; const m = g.getTransform(); g.setTransform(1, 0, 0, 1, 0, 0);
+        const px = m.a * cx + m.e, py = m.d * cy + m.f, pr = R * m.a, G = [0.9, 0.55, 0.3, 0.14, 0.05];
+        for (let i = 4; i >= 0; i--) { const stufe = Math.round(Math.min(1, a * G[i]) * 16); if (stufe > 0) scheibe(g, px, py, pr * (i + 1) / 5, muster(g, col, stufe)); }
+        g.setTransform(m);
+      };
+      glow(883, 281, 900, aI * 0.7, '#66b6ff'); glow(1190, 238, 900, aA * 0.6, '#66b6ff');
+      if ((pc >= 1 && pc < 5) || (pc >= 50 && pc < 54)) glow(1075, 443, 700, pc < 5 ? 0.45 : 0.4, '#fffbd2');
+      const fl2 = (dur, delay, mx, my, mr) => { const f = floaty(tau, dur, delay); return [mx * f, my * f, mr * f]; }, tp = floaty(tau, 4.8, 0);
+      // Ebene: nur Versatz (ganze Bildschirmpixel), keine Drehung/Skalierung — die Schwebebewegung bleibt, die Neigung (+-4 Grad) entfaellt
+      const lay = (name, ox, oy, tx, ty, rot, sca, wx, wy) => { g.save(); const m = g.getTransform(); const X = ox * 1920 + tx + (wx || 0), Y = oy * 1080 + ty + (wy || 0);
+        g.setTransform(m.a, 0, 0, m.d, Math.round(m.a * X + m.e), Math.round(m.d * Y + m.f)); const I = imgs[name]; g.drawImage(I.c, I.x0 - ox * 1920, I.y0 - oy * 1080, I.w, I.h); g.restore(); };
+      let a = fl2(4.2, -0.6, 9, -15, 2); lay('hammer', 0.72, 0.28, a[0], a[1], a[2], 1);
+      lay('explosion', 0.52, 0.42, 0, 4 * tp, 0, 1);
+      lay('golem', 0.5, 0.5, -9 * tp, 4 * tp, 0, 1, 111, 3);
+      a = fl2(6, -2, -11, -15, 2.6); lay('horned', 0.8, 1, a[0], a[1], a[2], 1, 0, 161);
+      a = fl2(5, 0, 0, -12, -1.4); lay('angel', 0.2, 0.3, a[0], a[1], a[2], 1);
+      a = fl2(6.5, -1.5, 4, -9, 1); lay('blonde', 0.2, 0.5, a[0], a[1], a[2], 1);
+      lay('rabbit', 0.5, 0.5, 9 * tp, 4 * tp, 0, 1);
+      a = fl2(5.5, -2.5, 8, -14, -2); lay('ninja', 0.16, 0.8, a[0], a[1], a[2], 1, 0, 215);
+      // Blitze: Pixellinien (Bresenham) in drei Lagen — aussen blau, Mitte hell, Kern weiss
+      { const m = g.getTransform(); g.setTransform(1, 0, 0, 1, 0, 0);
+        for (const [bx, bw, kind, pts] of BOLTS) { const al = kind === 'S' ? aI : aA; if (al < 0.1) continue; const P = pts.map(([px, py]) => [m.a * (bx + px / 100 * bw) + m.e, m.d * (-21.6 + py / 400 * 670) + m.f]);
+          for (const [col, dk] of al > 0.5 ? [['#66b6ff', 4], ['#bddcef', 2], ['#e5f5fa', 1]] : [['#66b6ff', 2], ['#e5f5fa', 1]]) { g.fillStyle = col; for (let i = 0; i + 1 < P.length; i++) pixelLinie(g, P[i][0], P[i][1], P[i + 1][0], P[i + 1][1], dk * 2); } }
+        g.setTransform(m); }
+      // Glut: Quadrate, Ausblenden per Dither-Muster statt Alpha
+      { const m = g.getTransform(); g.setTransform(1, 0, 0, 1, 0, 0);
+        for (const em of EMB) { const c = (((tau - em.delay) / em.dur) % 1 + 1) % 1, y = 1080 + 14 - em.size + lerp(20, -1210, c), x = em.left + em.drift * c, op = c < 0.08 ? 0.95 * c / 0.08 : (c < 0.78 ? lerp(0.95, 0.7, (c - 0.08) / 0.7) : lerp(0.7, 0, (c - 0.78) / 0.22)); if (y < -12 || y > 1090 || op < 0.05) continue;
+          const z = Math.max(2, Math.round(em.size * S * zoom)); g.fillStyle = muster(g, em.col, Math.max(1, Math.round(op * 16))); g.fillRect(Math.round(m.a * x + m.e), Math.round(m.d * y + m.f), z, z); }
+        g.setTransform(m); }
+      a = fl2(3.4, -0.5, 14, -9, 3); lay('cat_top', 0.23, 0.05, a[0], a[1], a[2], 1);
+      a = fl2(2.9, -0.8, -11, 9, -3); lay('cat_mid', 0.37, 0.3, a[0], a[1], a[2], 1);
+      a = fl2(3.0, -1.7, 16, -12, 4); lay('cat_bottom', 0.05, 0.48, a[0], a[1], a[2], 1);
+    };
+    // Sichtbarkeit OHNE Layout-Lesen: `host.offsetParent` erzwang bei jedem Abfragen (alle 500 ms, solange der Bildschirm verdeckt ist — also während des ganzen Spiels) einen
+    // synchronen Neuaufbau des Layouts, 12–19 ms auf dem Brett (Messung 3.11.2026, Long-Task-Spitzen im Takt). Jetzt meldet ein IntersectionObserver die Sichtbarkeit asynchron;
+    // `offsetParent` wird nur EINMAL beim Einhängen gelesen (Startwert) bzw. wenn es keinen Beobachter gibt.
+    const hostA = hostRef && hostRef.current;
+    let sichtbar = !!(hostA && hostA.offsetParent !== null), beobachter = null;
+    if (hostA && typeof IntersectionObserver !== 'undefined') {
+      beobachter = new IntersectionObserver((es) => { for (const e of es) sichtbar = e.isIntersecting; });
+      beobachter.observe(hostA);
+    }
+    const visible = () => {
+      if (document.hidden) return false;
+      if (beobachter) return sichtbar;
+      const host = hostRef && hostRef.current; return !!(host && host.offsetParent !== null);
+    };
+    const tick = (now) => {
+      raf = 0;
+      if (disposed) return;
+      if (!visible()) {
+        if (!hiddenSince) hiddenSince = now;
+        if (imgs && now - hiddenSince > 5000) imgs = null;   // Speicher zurueckgeben
+        timer = setTimeout(() => { timer = 0; raf = (window.ppTaktRaf || requestAnimationFrame)(tick); }, 500); return;
+      }
+      hiddenSince = 0; if (!imgs) { resize(); load(); }
+      if (frameGap <= FRAME + 1 || now - lastDraw >= frameGap - 4) {
+        lastDraw = now; const t0 = performance.now(); draw(now); const dt = performance.now() - t0; ema = ema ? ema * 0.9 + dt * 0.1 : dt;
+        // Adaptive Qualitaet: ist ein Bild teurer als ein Drittel des Bildabstands, erst Aufloesung senken (bis 0,5x), dann auf 20/15 Bilder/s gehen
+        if (now - lastAdapt > 1200 && ema > 7) { lastAdapt = now; ema = 0;
+          if (q > 0.55) { q = Math.max(0.5, q - 0.25); imgs = null; resize(); }
+          else if (frameGap < 30) frameGap = 1000 / 30; }
+      }
+      raf = (window.ppTaktRaf || requestAnimationFrame)(tick);      // ★ W86u2: 30 Hz im globalen Takt (Pixelart-Pipeline)
+    };
+    resize(); raf = (window.ppTaktRaf || requestAnimationFrame)(tick);
+    const onResize = () => { resize(); if (imgs) { imgs = null; } };
+    window.addEventListener('resize', onResize); window.addEventListener('orientationchange', onResize);
+    return () => { disposed = true; if (beobachter) beobachter.disconnect(); if (raf) cancelAnimationFrame(raf); if (timer) clearTimeout(timer); window.removeEventListener('resize', onResize); window.removeEventListener('orientationchange', onResize); imgs = null; };
+  }, []);
+  return <canvas ref={cvRef} className="tap-backdrop-canvas" aria-hidden="true" />;
+}
+window.TapBackdropCanvas = TapBackdropCanvas;
+
+window.AnimatedTitleBackdrop = AnimatedTitleBackdrop;
+window.AnimatedTitleCatsOverlay = AnimatedTitleCatsOverlay;
 
 function AuthScreen() {
   const { setUser } = useContext(AppContext);
@@ -715,15 +803,15 @@ function AuthScreen() {
   // erreichbar.
   const Header = (
     <div className="auth-header">
+      {/* ★ W86u2 (Pixelart): die Glut hinter dem Logo als Dither-Pixelbild statt Radialverlauf mit Alpha (Ebene hinter dem Inhalt, `.auth-header` ist ein Stapelkontext) */}
+      <PpVerlauf className="auth-header-glut" px={4} gradient="radial-gradient(ellipse 46% 58% at 50% 46%, rgba(251,200,106,.5), rgba(227,116,53,.2) 38%, rgba(240,50,50,.06) 64%, transparent 92%)"
+        style={{ position: 'absolute', inset: 0, zIndex: -1, pointerEvents: 'none' }} />
       {/* Same wordmark logo as the main menu (data/logo.png), tinted + haloed
           with drifting particles. Scoped .auth-logo just fits it to the panel
           width (the menu sizes it for a full-width header). */}
       <div className="pp-logo-stack auth-logo">
         <LogoParticles />
-        <img src="/data/logo.png" alt="Pixel Parties" className="pp-logo-img" />
-        <div className="pp-logo-tint" aria-hidden="true"></div>
-        <div className="pp-logo-licht" aria-hidden="true"></div>
-        <div className="pp-logo-umriss" aria-hidden="true"></div>
+        <PpLogoBild />
       </div>
       <div className="orbit-font auth-subtitle">
         TRADING CARD GAME
@@ -739,7 +827,7 @@ function AuthScreen() {
   );
 
   const codeField = (
-    <input className="input auth-code" inputMode="numeric" autoComplete="one-time-code"
+    <input data-pp-tastatur="an" className="input auth-code" inputMode="numeric" autoComplete="one-time-code"
       placeholder="6-digit code" maxLength={6} value={code} autoFocus
       onChange={e => setCode(e.target.value.replace(/\D/g, ''))}
       onKeyDown={e => e.key === 'Enter' && (mode === 'verify' ? submitVerify() : submitReset())} />
@@ -776,17 +864,17 @@ function AuthScreen() {
         <div className="auth-form-main">
           {mode === 'login' ? (
             <>
-              <input className="input" placeholder="Username or Email" value={identifier} autoComplete="username"
+              <input data-pp-tastatur="an" className="input" placeholder="Username or Email" value={identifier} autoComplete="username"
                 onChange={e => setIdentifier(e.target.value)} onKeyDown={e => e.key === 'Enter' && submitLogin()} />
             </>
           ) : (
             <>
-              <input className="input" placeholder="Username" value={username} autoComplete="username" maxLength={10}
+              <input data-pp-tastatur="an" className="input" placeholder="Username" value={username} autoComplete="username" maxLength={10}
                 onChange={e => setUsername(e.target.value)} onKeyDown={e => e.key === 'Enter' && submitSignup()} />
               {/* v1266: der Hinweis auf den Bestaetigungscode steht im
                   Platzhalter (vorher eine eigene, zweizeilige Fusszeile);
                   der naechste Schritt sagt ohnehin, wohin der Code ging. */}
-              <input className="input" type="email" placeholder="Email — we'll send you a code" value={email} autoComplete="email"
+              <input data-pp-tastatur="an" className="input" type="email" placeholder="Email — we'll send you a code" value={email} autoComplete="email"
                 onChange={e => setEmail(e.target.value)} onKeyDown={e => e.key === 'Enter' && submitSignup()} />
             </>
           )}
@@ -827,12 +915,7 @@ function AuthScreen() {
                     onClick={submitGoogleDesktop}
                     disabled={loading}
                   >
-                    <svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true">
-                      <path fill="#4285F4" d="M17.64 9.2c0-.64-.06-1.25-.16-1.84H9v3.48h4.84a4.14 4.14 0 0 1-1.8 2.72v2.26h2.92c1.7-1.57 2.68-3.88 2.68-6.62z"/>
-                      <path fill="#34A853" d="M9 18c2.43 0 4.47-.8 5.96-2.18l-2.92-2.26c-.8.54-1.84.86-3.04.86-2.34 0-4.32-1.58-5.03-3.7H.96v2.33A9 9 0 0 0 9 18z"/>
-                      <path fill="#FBBC05" d="M3.97 10.72A5.4 5.4 0 0 1 3.68 9c0-.6.1-1.18.29-1.72V4.95H.96A9 9 0 0 0 0 9c0 1.45.35 2.82.96 4.05l3.01-2.33z"/>
-                      <path fill="#EA4335" d="M9 3.58c1.32 0 2.5.45 3.44 1.35l2.58-2.58C13.47.89 11.43 0 9 0A9 9 0 0 0 .96 4.95l3.01 2.33C4.68 5.16 6.66 3.58 9 3.58z"/>
-                    </svg>
+                    <GoogleGSprite />
                     {/* Wortgleich mit dem Knopf, den Google zeichnet — sonst
                         stehen im Desktop-Gehaeuse und im Browser zwei
                         verschiedene Beschriftungen. */}
@@ -876,7 +959,7 @@ function AuthScreen() {
       <div className="auth-form auth-form--single">
         <div className="auth-step-title">Reset your password</div>
         <div className="auth-fine">Enter your account email and we'll send you a reset code.</div>
-        <input className="input" type="email" placeholder="Email" value={email} autoFocus autoComplete="email"
+        <input data-pp-tastatur="an" className="input" type="email" placeholder="Email" value={email} autoFocus autoComplete="email"
           onChange={e => setEmail(e.target.value)} onKeyDown={e => e.key === 'Enter' && submitForgot()} />
         {Msgs}
         <button className="btn btn-big" onClick={submitForgot} disabled={loading}>{loading ? '...' : 'SEND CODE'}</button>
@@ -1087,6 +1170,13 @@ function MenuCardBackground() {
 
   // Constant scroll speed: ~5s per row regardless of tile height.
   const duration = rows * 5;
+  // ★ W86u2 (Pixelart): die Kartenwand laeuft in 2-px-Schritten (steps) statt stufenlos — eine stufenlose Verschiebung malt jedes Bild auf
+  // Zwischenpixeln (Mischfarben); ausserdem backt die Pipeline Animationen > 8 s nicht. Schrittzahl = Kachelhoehe / 2 px.
+  const ppWandSchritte = (el) => {
+    if (!el || window.PP_RETRO) return;
+    const h = el.offsetHeight / 2;
+    if (h > 8) el.style.animationTimingFunction = 'steps(' + Math.max(2, Math.round(h / 2)) + ', end)';
+  };
   const tile = (
     <div className="menu-card-bg-tile">
       {grid.map((row, r) =>
@@ -1101,11 +1191,12 @@ function MenuCardBackground() {
 
   return (
     <div ref={rootRef} className="menu-card-bg" aria-hidden="true">
-      <div className="menu-card-bg-scroller" style={{ animationDuration: duration + 's' }}>
+      <div className="menu-card-bg-scroller" ref={ppWandSchritte} style={{ animationDuration: duration + 's' }}>
         {tile}
         {tile}
       </div>
-      <div className="menu-card-bg-veil" />
+      {/* ★ 2.11. (Al: Dither auf der Wand zu stark): im Pixel-Modus KEIN Dither-Schleier mehr — abgedunkelt wird ueber die Bilder (`filter` in .menu-card-bg-cell img); der Schleier bleibt nur im Retro-Modus */}
+      {window.PP_RETRO && <PpVerlauf className="menu-card-bg-veil" px={4} retroGradient="radial-gradient(ellipse at center, rgba(8,6,12,.58) 0%, rgba(8,6,12,.78) 70%, rgba(8,6,12,.9) 100%)" gradient="radial-gradient(ellipse at center, rgba(8,6,12,.58) 0%, rgba(8,6,12,.78) 70%, rgba(8,6,12,.9) 100%)" />}
     </div>
   );
 }
@@ -1138,7 +1229,7 @@ function MenuCardThumb({ name, skin, w = 42, onClick }) {
 
 // ── Left: live leaderboard ──
 function MenuLeaderboardPanel({ top, height }) {
-  const { user } = useContext(AppContext);
+  const { user, setScreen } = useContext(AppContext);
   const [players, setPlayers] = useState(null);
   const [live, setLive] = useState(null);
   // Der Kasten teilt sich zwei Ansichten: Top Players und Who's Online (social.js / app-social.jsx).
@@ -1182,7 +1273,8 @@ function MenuLeaderboardPanel({ top, height }) {
         </div>
         {tab === 'online' ? (
           <div className="menu-side-scroll">
-            <WhosOnlineList meId={user.id} onOpen={socialOpenChat} />
+            <WhosOnlineList meId={user.id} onOpen={socialOpenChat}
+                            onSpectate={(info) => { window._ppPendingSpectate = info; setScreen('play'); }} />
           </div>
         ) : (
         <div className="menu-side-scroll">
@@ -1199,7 +1291,7 @@ function MenuLeaderboardPanel({ top, height }) {
                     + (p.rank <= 3 ? ' menu-lb-medal rank-' + p.rank : '')
                     + (p.username === user.username ? ' is-me' : '')}>
                   <span className={'menu-lb-rank' + (p.rank <= 3 ? ' top' : '')}>{p.rank}</span>
-                  <span className="menu-lb-name" style={{ color: p.color || 'var(--accent)', '--pp-umriss': ppUmrissFarbe(p.color || '#00f0ff') }}>{p.username}</span>
+                  <span className="menu-lb-name" style={{ color: p.color || 'var(--accent)', '--pp-umriss': ppUmrissFarbe(p.color || '#66b6ff') }}>{p.username}</span>
                   <span className="menu-lb-elo">{p.elo}</span>
                 </li>
               ))}
@@ -1362,7 +1454,9 @@ function MenuPlayerPanel({ top, height }) {
 // herum mehr" — statt eines zweiten, fast gleichen Bausteins bekommt
 // dieser hier Parameter. Der Schriftzug und der Menuehintergrund
 // unterscheiden sich damit nur noch in Anzahl, Groesse und Reichweite.
-function PixelParticles({
+// Perf (3.11.): React.memo + Canvas (app-fx-36.jsx) — die Teilchen sind EINE Leinwand im 30-Hz-Takt statt 150–160 DOM-Animationen je Schicht;
+// die Spans bleiben nur als Rueckfall (`window.__ppFxAlt`, fehlende app-fx-36).
+const PixelParticles = React.memo(function PixelParticles({
   anzahl = 64,
   klasse = 'pp-logo-particles',
   teilchenKlasse = 'pp-logo-particle',
@@ -1378,6 +1472,7 @@ function PixelParticles({
   // Ohne beide Angaben verhaelt sich die Komponente exakt wie bisher.
   radial = false,
   farben = null,
+  gerade = true,      // ★ W86u2: Groesse auf gerade px runden (ganze Kunstpixel, 2 px) — auch fuer Quadrate; `false` = alte Zufallsgroesse
 }) {
   const particles = useMemo(() => {
     const arr = [];
@@ -1399,7 +1494,8 @@ function PixelParticles({
       }
       arr.push({
         top, left,
-        size:  minGroesse + Math.floor(Math.random() * (maxGroesse - minGroesse)),
+        size:  gerade ? Math.max(2, Math.round((minGroesse + Math.random() * (maxGroesse - minGroesse)) / 2) * 2)
+                      : minGroesse + Math.floor(Math.random() * (maxGroesse - minGroesse)),
         dur,
         delay: -Math.random() * dur,                     // negativ → mitten im Zyklus starten
         dx, dy,
@@ -1407,16 +1503,19 @@ function PixelParticles({
         // Ueberwiegend Spielerfarbe, ein Drittel weiss fuer den Funkeleffekt.
         color: farben
           ? farben[Math.floor(Math.random() * farben.length)]
-          : (Math.random() < 0.34 ? '#ffffff' : 'var(--player-color, #00f0ff)'),
+          : (Math.random() < 0.34 ? '#ffffff' : 'var(--player-color, #66b6ff)'),
       });
     }
     return arr;
     // Absichtlich einmalig: die Streuung soll sich beim Rendern nicht
     // neu wuerfeln. Die Parameter aendern sich zur Laufzeit nicht.
   }, []);
+  const art = radial ? 'glitzer' : (klasse === 'pp-logo-particles' ? 'logo' : 'hintergrund');
   return (
     <div className={klasse} aria-hidden="true">
-      {particles.map((p, i) => (
+      {window.PpFx36Teilchen && !window.__ppFxAlt
+        ? <window.PpFx36Teilchen art={art} teilchen={particles} />
+        : particles.map((p, i) => (
         <span key={i} className={teilchenKlasse} style={{
           top: p.top + '%', left: p.left + '%',
           '--p-size': p.size + 'px',
@@ -1430,7 +1529,7 @@ function PixelParticles({
       ))}
     </div>
   );
-}
+});
 
 // ── Anzahlen an EINER Stelle (v811) ──────────────────────────────────
 // Al, 5.9.: „erhoehe noch die Anzahl, noch sind sie zu subtil."
@@ -1439,9 +1538,9 @@ const PARTIKEL_LOGO = 150;        // um den Schriftzug, dichter Bereich
 const PARTIKEL_HINTERGRUND = 160; // ganzer Bildschirm, weiter gestreut
 
 /** Um den Schriftzug: dicht gedraengt, kleine Teilchen, kurze Wege. */
-function LogoParticles() {
+const LogoParticles = React.memo(function LogoParticles() {
   return <PixelParticles anzahl={PARTIKEL_LOGO} />;
-}
+});
 
 /**
  * ★ v1264 (Al 22.9.): „das SC-Icon sollte Glitzer-Particles ausstossen."
@@ -1451,14 +1550,14 @@ function LogoParticles() {
  * Die Form (Pixel-Kreuz) und der Takt stehen in style.css
  * (`.pp-sc-glitzer-teil`).
  */
-const SC_GLITZER_FARBEN = ['#fff6b0', '#ffd700', '#ffe766', '#ffffff'];
+const SC_GLITZER_FARBEN = ['#f7f7ad', '#fad54a', '#ffe469', '#ffffff'];
 // v1289: auch die SC-Plakette im Spielerprofil-Popup glitzert.
-window.ScGlitzer = ScGlitzer;
-function ScGlitzer() {
+const ScGlitzer = React.memo(function ScGlitzer() {
   return <PixelParticles
     anzahl={22}
     klasse="pp-sc-glitzer"
     teilchenKlasse="pp-sc-glitzer-teil"
+    gerade
     radial
     farben={SC_GLITZER_FARBEN}
     minGroesse={4}
@@ -1468,7 +1567,8 @@ function ScGlitzer() {
     dauerMin={1.1}
     dauerSpanne={1.2}
   />;
-}
+});
+window.ScGlitzer = ScGlitzer;
 
 /**
  * Hinter dem gesamten Menue: weiter gestreut, groessere Teilchen,
@@ -1476,7 +1576,7 @@ function ScGlitzer() {
  * Rauschen. Die Schicht liegt fest im Fenster und wird abgeschaltet,
  * sobald ein Kampffeld im Baum haengt (siehe style.css).
  */
-function MenuBackgroundParticles({ klasse = 'pp-bg-particles' }) {
+const MenuBackgroundParticles = React.memo(function MenuBackgroundParticles({ klasse = 'pp-bg-particles' }) {
   return <PixelParticles
     anzahl={PARTIKEL_HINTERGRUND}
     klasse={klasse}
@@ -1488,7 +1588,7 @@ function MenuBackgroundParticles({ klasse = 'pp-bg-particles' }) {
     dauerMin={5}
     dauerSpanne={9}
   />;
-}
+});
 
 /**
  * v1265: Zoomfaktor eines Elements — gezeichnete Breite durch Layout-
@@ -1724,6 +1824,8 @@ function MainMenu() {
   // Tutorial state — the flow itself lives in the shared useTutorialFlow hook.
   const [tutorialBrowserOpen, setTutorialBrowserOpen] = useState(false);
   const { tutorialList, tutorialAttemptState, startTutorialAttempt, onTutorialAttemptLeave } = useTutorialFlow(tutorialBrowserOpen);
+  // Tutorial-Karten schon im Hauptmenue tropfenweise bereitlegen (der Start einer Mission soll nicht ruckeln).
+  useEffect(() => { const t = setTimeout(() => { if (window.ppTutorialVorwaermen) window.ppTutorialVorwaermen(); }, 3000); return () => clearTimeout(t); }, []);
 
   // Singleplayer lives in its own screen now (see SingleplayerScreen).
   // MainMenu just routes to it via setScreen('singleplayer').
@@ -1971,10 +2073,10 @@ function MainMenu() {
            // The player's own colour, exposed as a custom property so the
            // ornate frames on the menu strip + side panels can all pick it
            // up via inheritance.
-           '--player-color': user.color || '#00f0ff',
+           '--player-color': user.color || '#66b6ff',
            // Konturfarbe fuer Spielername und Logo-Aussenkante: schwarz,
            // bei sehr dunkler Spielerfarbe weiss (ppUmrissFarbe).
-           '--pp-umriss': ppUmrissFarbe(user.color || '#00f0ff'),
+           '--pp-umriss': ppUmrissFarbe(user.color || '#66b6ff'),
            // Once the collapsed-state top is captured, anchor it via
            // `padding-top` + `flex-start` so submenu toggles only
            // grow the menu downward.
@@ -1999,10 +2101,7 @@ function MainMenu() {
       <div className="pp-logo-wrap" style={{ position: 'absolute', top: 0, left: 0, right: 0, height: panelTop != null ? panelTop : 160, display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 5, pointerEvents: 'none' }}>
         <div className="pp-logo-stack">
           <LogoParticles />
-          <img src="/data/logo.png" alt="Pixel Parties" className="pp-logo-img" />
-          <div className="pp-logo-tint" aria-hidden="true"></div>
-          <div className="pp-logo-licht" aria-hidden="true"></div>
-          <div className="pp-logo-umriss" aria-hidden="true"></div>
+          <PpLogoBild />
           {/* ★ v1264 (Al 22.9.): wandernder Foil-Glanz ueber dem
               Schriftzug, auf die Buchstaben maskiert (style.css,
               `.pp-glanz--logo`). */}
@@ -2027,10 +2126,10 @@ function MainMenu() {
               Beschriftung, Glanz und Schlagschatten (CSS .menu-stat-badge). */}
           {/* v1264 (Al 22.9.): dieselben inneren Pixel-Ecken wie die grossen
               Menuekaesten (`pp-eckzier`, eine Definition fuer beide). */}
-          <span className="badge menu-stat-badge pp-eckzier" style={{ background: 'color-mix(in srgb, var(--player-color, #00f0ff) 14%, var(--menu-surface))', color: 'var(--player-color, #00f0ff)' }}>
+          <span className="badge menu-stat-badge pp-eckzier" style={{ background: 'color-mix(in srgb, var(--player-color, #66b6ff) 14%, var(--menu-surface))', color: 'var(--player-color, #66b6ff)' }}>
             <span className="menu-stat-label">⚔ ELO</span><span className="menu-stat-value">{user.elo}</span>
           </span>
-          <span className="badge menu-stat-badge menu-stat-badge--sc pp-eckzier" style={{ background: 'color-mix(in srgb, #ffd700 12%, var(--menu-surface))', color: '#ffd700' }}>
+          <span className="badge menu-stat-badge menu-stat-badge--sc pp-eckzier" style={{ background: 'color-mix(in srgb, #fad54a 12%, var(--menu-surface))', color: '#fad54a' }}>
             <span className="menu-stat-coin-wrap"><img src="/data/sc.png" className="menu-stat-coin" /><ScGlitzer /></span><span className="menu-stat-label">SC</span><span className="menu-stat-value">{user.sc || 0}</span>
           </span>
         </div>
@@ -2182,11 +2281,11 @@ function MainMenu() {
                     const s = remainSec % 60;
                     const tStr = (h > 0 ? `${h}h ` : '') + `${m}m ${String(s).padStart(2, '0')}s`;
                     // Player colour normally; red once under an hour remains.
-                    const timerColor = remainSec < 3600 ? '#ff4444' : 'var(--player-color)';
+                    const timerColor = remainSec < 3600 ? '#f03232' : 'var(--player-color)';
                     return (
                       <div style={{ textAlign: 'center', fontSize: 12, color: 'var(--text2)' }}>
                         {daily.claimedBig ? (
-                          <div style={{ color: '#33ff88', marginBottom: 6 }}>
+                          <div style={{ color: '#4ceb70', marginBottom: 6 }}>
                             ✓ Big bonus claimed (+{daily.claimedBig} <CoinIcon size={12} />) — extra wins with 2+ Heroes now give <b>+{daily?.betraege?.wiederholung ?? 5} <CoinIcon size={12} /></b> each.
                           </div>
                         ) : (
@@ -2231,7 +2330,7 @@ function MainMenu() {
                 ['easy', 'medium', 'hard', 'impossible'].map(diff => {
                   const puzzles = puzzleList.filter(p => p.difficulty === diff);
                   if (puzzles.length === 0) return null;
-                  const diffColors = { easy: '#33ff88', medium: '#ffaa00', hard: '#ff4444', impossible: '#c455ff' };
+                  const diffColors = { easy: '#4ceb70', medium: '#f9ac20', hard: '#f03232', impossible: '#a952ff' };
                   // v1402: Betrag kommt vom Server (Anzeige = Auszahlung).
                   const scReward = { [diff]: puzzles[0]?.scBetrag ?? 0 };
                   return (
@@ -2242,8 +2341,8 @@ function MainMenu() {
                       </div>
                       {puzzles.map(p => (
                         <button key={p.puzzleId} className="btn" onClick={() => startPuzzleAttempt(p)}
-                          style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%', padding: '8px 12px', fontSize: 13, marginBottom: 4, borderColor: diffColors[diff] + '44', color: 'var(--text1)', textAlign: 'left', justifyContent: 'flex-start' }}>
-                          <span style={{ color: p.completed ? '#33ff88' : 'var(--bg4)', fontSize: 16, width: 20, textAlign: 'center' }}>{p.completed ? '✓' : '○'}</span>
+                          style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%', padding: '6px 12px', fontSize: 13, marginBottom: 3, borderColor: diffColors[diff] + '44', color: 'var(--text1)', textAlign: 'left', justifyContent: 'flex-start' }}>
+                          <span style={{ color: p.completed ? '#4ceb70' : 'var(--bg4)', fontSize: 16, width: 20, textAlign: 'center' }}>{p.completed ? '✓' : '○'}</span>
                           <span style={{ flex: 1 }}>{p.name}</span>
                           {p.completed && <span style={{ fontSize: 9, color: 'var(--text2)' }}>CLEARED</span>}
                         </button>
@@ -2275,13 +2374,13 @@ function MainMenu() {
 // ═══════════════════════════════════════════
 
 const RANK_TIERS = [
-  { name: 'BRONZE',       min: 0,    color: '#cd7f32', glow: 'rgba(205,127,50,.5)',  icon: '⬡' },
-  { name: 'SILVER',       min: 1200, color: '#c0c0c0', glow: 'rgba(192,192,192,.5)', icon: '⬡' },
-  { name: 'GOLD',         min: 1400, color: '#ffd700', glow: 'rgba(255,215,0,.5)',    icon: '⬡' },
-  { name: 'PLATINUM',     min: 1600, color: '#a8e8f0', glow: 'rgba(168,232,240,.5)', icon: '◈' },
-  { name: 'DIAMOND',      min: 1800, color: '#b9f2ff', glow: 'rgba(185,242,255,.6)', icon: '◆' },
-  { name: 'MASTER',       min: 2000, color: '#ff44cc', glow: 'rgba(255,68,204,.5)',   icon: '✦' },
-  { name: 'GRANDMASTER',  min: 2200, color: '#ff8800', glow: 'rgba(255,136,0,.6)',    icon: '♛' },
+  { name: 'BRONZE',       min: 0,    color: '#be680e', glow: 'rgba(190,104,14,.5)',  icon: '⬡' },
+  { name: 'SILVER',       min: 1200, color: '#b9b9b9', glow: 'rgba(185,185,185,.5)', icon: '⬡' },
+  { name: 'GOLD',         min: 1400, color: '#fad54a', glow: 'rgba(250,213,74,.5)',    icon: '⬡' },
+  { name: 'PLATINUM',     min: 1600, color: '#b6eff7', glow: 'rgba(182,239,247,.5)', icon: '◈' },
+  { name: 'DIAMOND',      min: 1800, color: '#b6eff7', glow: 'rgba(182,239,247,.6)', icon: '◆' },
+  { name: 'MASTER',       min: 2000, color: '#fb1ea9', glow: 'rgba(251,30,169,.5)',   icon: '✦' },
+  { name: 'GRANDMASTER',  min: 2200, color: '#ff8b1a', glow: 'rgba(255,139,26,.6)',    icon: '♛' },
 ];
 
 function getRank(elo) {
@@ -2294,6 +2393,18 @@ function getRank(elo) {
 // v1464: Schalter in der Optik von „Play Animations" (Pille mit Knopf),
 // für alle Einstellungen im Profil. `gesperrt`: ausgegraut, nicht bedienbar
 // (Dynamic Heroes ohne Display Heroes). Erklärung als Hover-Tooltip.
+// Pixelart-Schalter: eingekerbter Block mit eckigem Knopf, der in ganzen Schritten springt; ON/OFF steht als Pixelschrift auf der freien Seite.
+function PixelSchalter({ an }) {
+  return (
+    <span className={'pp-schalter' + (an ? ' pp-schalter-an' : '')} aria-hidden="true">
+      <span className="pp-schalter-bahn">
+        <span className="pp-schalter-text">{an ? 'ON' : 'OFF'}</span>
+        <span className="pp-schalter-knopf" />
+      </span>
+    </span>
+  );
+}
+
 function ProfilSchalter({ an, gesperrt, onToggle, label, tipp, zeigeTipp, versteckeTipp }) {
   const klick = () => { if (!gesperrt) onToggle(); };
   return (
@@ -2301,16 +2412,7 @@ function ProfilSchalter({ an, gesperrt, onToggle, label, tipp, zeigeTipp, verste
       onMouseEnter={e => tipp && zeigeTipp && zeigeTipp(e, tipp)}
       onMouseLeave={() => versteckeTipp && versteckeTipp()}
       onClick={klick} role="switch" aria-checked={!!an} aria-disabled={!!gesperrt}>
-      <div style={{
-        width: 40, height: 22, borderRadius: 11, background: an ? 'var(--accent)' : 'var(--bg4)',
-        position: 'relative', transition: 'background 0.2s', flexShrink: 0,
-      }}>
-        <div style={{
-          width: 18, height: 18, borderRadius: '50%', background: '#fff',
-          position: 'absolute', top: 2, left: an ? 20 : 2,
-          transition: 'left 0.2s', boxShadow: '0 1px 3px rgba(0,0,0,.4)',
-        }} />
-      </div>
+      <PixelSchalter an={!!an} />
       <span>{label}</span>
     </div>
   );
@@ -2599,14 +2701,14 @@ function DiscordLinkRow({ isGuest }) {
           <button className="btn" style={{ padding: '6px 14px', fontSize: 10, marginLeft: 'auto', whiteSpace: 'nowrap' }} onClick={makeCode} disabled={busy}>LINK DISCORD</button>
         </div>
       )}
-      {error && <div style={{ fontSize: 10, color: 'var(--danger, #e55)', marginTop: 6 }}>{error}</div>}
+      {error && <div style={{ fontSize: 10, color: 'var(--danger, #e94e53)', marginTop: 6 }}>{error}</div>}
     </div>
   );
 }
 
 function ProfileScreen() {
   const { user, setUser, setScreen, notify, setBgmMode } = useContext(AppContext);
-  const [color, setColor] = useState(user.color || '#00f0ff');
+  const [color, setColor] = useState(user.color || '#66b6ff');
   const [avatar, setAvatar] = useState(user.avatar);
   const [cardback, setCardback] = useState(user.cardback);
   const [victoryMsg, setVictoryMsg] = useState(user.victoryMsg || '');
@@ -2743,7 +2845,7 @@ function ProfileScreen() {
     (user.display_heroes == null ? true : !!user.display_heroes) && (user.dynamic_heroes == null ? true : !!user.dynamic_heroes));
 
   // Dirty tracking — compare against original user values
-  const isDirty = color !== (user.color || '#00f0ff')
+  const isDirty = color !== (user.color || '#66b6ff')
     || avatar !== user.avatar
     || cardback !== user.cardback
     || victoryMsg !== (user.victoryMsg || '')
@@ -2923,7 +3025,7 @@ function ProfileScreen() {
     setShowAvatarGallery(false);
     try {
       const data = await api('/profile', { method: 'PUT', body: JSON.stringify({
-        color: user.color || '#00f0ff', avatar: newAvatar, cardback: user.cardback, bio: user.bio || ''
+        color: user.color || '#66b6ff', avatar: newAvatar, cardback: user.cardback, bio: user.bio || ''
       })});
       setUser(data.user);
     } catch (e) { notify(e.message, 'error'); }
@@ -2935,7 +3037,7 @@ function ProfileScreen() {
     setShowSleeveGallery(false);
     try {
       const data = await api('/profile', { method: 'PUT', body: JSON.stringify({
-        color: user.color || '#00f0ff', avatar: user.avatar, cardback: newSleeve, bio: user.bio || ''
+        color: user.color || '#66b6ff', avatar: user.avatar, cardback: newSleeve, bio: user.bio || ''
       })});
       setUser(data.user);
     } catch (e) { notify(e.message, 'error'); }
@@ -2946,7 +3048,7 @@ function ProfileScreen() {
     setShowBoardGallery(false);
     try {
       const data = await api('/profile', { method: 'PUT', body: JSON.stringify({
-        color: user.color || '#00f0ff', avatar: user.avatar, cardback: user.cardback, bio: user.bio || '', board: newBoard
+        color: user.color || '#66b6ff', avatar: user.avatar, cardback: user.cardback, bio: user.bio || '', board: newBoard
       })});
       setUser(data.user);
     } catch (e) { notify(e.message, 'error'); }
@@ -2997,7 +3099,7 @@ function ProfileScreen() {
   const displayCardback = cardback || '/cardback.png';
 
   return (
-    <div className="screen-full" style={{ background: 'linear-gradient(180deg, #0a0a12 0%, #12101f 40%, #0a0a12 100%)' }}>
+    <div className="screen-full" style={{ background: 'linear-gradient(180deg, #08060c 0%, #12101f 40%, #08060c 100%)' }}>
       <div className="top-bar">
         <button className="btn" onClick={() => setScreen('menu')}>← BACK</button>
         <h2 className="orbit-font" style={{ fontSize: 22, fontWeight: 800, color: 'var(--player-color)' }}>PLAYER PROFILE</h2>
@@ -3052,7 +3154,7 @@ function ProfileScreen() {
                 : obj.available ? 'var(--success)' : 'var(--danger)';
               return (
                 <div style={{ marginTop: 10, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 7 }}>
-                  <input className="input" value={nameInput} maxLength={10} autoFocus
+                  <input data-pp-tastatur="an" className="input" value={nameInput} maxLength={10} autoFocus
                     onChange={(e) => setNameInput(e.target.value)}
                     onKeyDown={(e) => { if (e.key === 'Enter') saveName(); else if (e.key === 'Escape') cancelNameEdit(); }}
                     style={{ textAlign: 'center', fontSize: 22, fontWeight: 800, width: 260, color, borderColor: tone, boxShadow: `0 0 10px ${tone}33` }} />
@@ -3084,7 +3186,7 @@ function ProfileScreen() {
                     <img src="/data/sc.png" style={{ width: 96, height: 96, imageRendering: 'pixelated' }} />
                   </div>
                 </div>
-                <span className="orbit-font" style={{ fontSize: 20, fontWeight: 700, color: '#ffd700' }}>{user.sc || 0}</span>
+                <span className="orbit-font" style={{ fontSize: 20, fontWeight: 700, color: '#fad54a' }}>{user.sc || 0}</span>
               </div>
             </div>
 
@@ -3096,7 +3198,7 @@ function ProfileScreen() {
                   <span>{nextRank.name} ({nextMin})</span>
                 </div>
                 <div className="profile-elo-bar">
-                  <div className="profile-elo-fill" style={{ width: eloProgress + '%', background: `linear-gradient(90deg, ${rank.color}, ${nextRank.color})` }} />
+                  <div className="profile-elo-fill" style={{ width: eloProgress + '%', ...pxHintergrund(`linear-gradient(90deg, ${rank.color}, ${nextRank.color})`, 200, 6) }} />   {/* W86u2: Dither statt stufenlosem Rangverlauf */}
                 </div>
               </div>
             )}
@@ -3187,8 +3289,7 @@ function ProfileScreen() {
                 <div style={{ paddingTop: 9, paddingBottom: 9, borderBottom: '1px solid var(--bg4)' }}>
                   <div className="profile-section-label">NAME COLOR</div>
                   <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
-                    <input type="color" value={color} onChange={e => setColor(e.target.value)}
-                      style={{ width: 44, height: 34, border: '1px solid var(--bg4)', cursor: 'pointer', background: 'none', padding: 0 }} />
+                    <PPColorPicker value={window.ppSnap ? window.ppSnap(color) : color} onChange={c => setColor(window.ppSnap ? window.ppSnap(c) : c)} />
                     <span style={{ color, fontWeight: 700, fontSize: 18 }}>{user.username}</span>
                     <span style={{ fontSize: 11, color: 'var(--text2)', marginLeft: 4 }}>Preview</span>
                   </div>
@@ -3306,8 +3407,8 @@ function ProfileScreen() {
               return (
               <div key={id || 'default'} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '7px 10px',
                 border: '1px solid ' + (playing ? 'var(--accent)' : (sel === id ? 'var(--text2)' : 'var(--bg4)')), borderRadius: 4,
-                background: playing ? 'rgba(0,240,255,.16)' : (sel === id ? 'rgba(255,255,255,.05)' : 'transparent'),
-                boxShadow: playing ? '0 0 12px rgba(0,240,255,.45), inset 3px 0 0 var(--accent)' : 'none',
+                background: playing ? 'rgba(102,182,255,.16)' : (sel === id ? 'rgba(255,255,255,.05)' : 'transparent'),
+                boxShadow: playing ? '0 0 12px rgba(102,182,255,.45), inset 3px 0 0 var(--accent)' : 'none',
                 opacity: locked ? 0.75 : 1, transition: 'background .15s, box-shadow .15s' }}>
                 <button className="btn" style={{ padding: '4px 10px', fontSize: 11, minWidth: 34 }}
                   title={playing ? 'Stop preview' : 'Preview'}
@@ -3609,89 +3710,734 @@ function PurchaseCelebration({ cx, cy, onDone }) {
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
-    const ctx = canvas.getContext('2d');
-    canvas.width = window.innerWidth;
-    canvas.height = window.innerHeight;
-    const ox = cx ?? canvas.width / 2;
-    const oy = cy ?? canvas.height / 2;
-    const particles = [];
-    const colors = ['#ffd700', '#ffaa00', '#fff8b0', '#ff00aa', '#00f0ff', '#aaff00', '#ff6600', '#ffffff'];
-    const shapes = ['star', 'circle', 'diamond', 'spark'];
-    // Burst from item position
-    for (let i = 0; i < 120; i++) {
-      const angle = (Math.PI * 2 * i / 120) + (Math.random() - 0.5) * 0.5;
-      const speed = 3 + Math.random() * 9;
-      particles.push({
-        x: ox, y: oy,
-        vx: Math.cos(angle) * speed, vy: Math.sin(angle) * speed - 2,
-        size: 3 + Math.random() * 8, color: colors[Math.floor(Math.random() * colors.length)],
-        shape: shapes[Math.floor(Math.random() * shapes.length)],
-        life: 1, decay: 0.008 + Math.random() * 0.012,
-        rotation: Math.random() * Math.PI * 2, rotSpeed: (Math.random() - 0.5) * 0.2,
-        gravity: 0.06 + Math.random() * 0.04,
-      });
-    }
-    // Sparkle ring around item
-    for (let i = 0; i < 40; i++) {
-      const angle = (Math.PI * 2 * i / 40);
-      const dist = 50 + Math.random() * 30;
-      particles.push({
-        x: ox + Math.cos(angle) * dist, y: oy + Math.sin(angle) * dist,
-        vx: Math.cos(angle) * 1.5, vy: Math.sin(angle) * 1.5,
-        size: 2 + Math.random() * 4, color: '#ffd700',
-        shape: 'spark', life: 1, decay: 0.015 + Math.random() * 0.01,
-        rotation: 0, rotSpeed: 0, gravity: 0,
-      });
-    }
-    let frame;
-    const draw = () => {
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-      let alive = false;
-      for (const p of particles) {
-        if (p.life <= 0) continue;
-        alive = true;
-        p.x += p.vx; p.y += p.vy; p.vy += p.gravity;
-        p.life -= p.decay; p.rotation += p.rotSpeed;
-        ctx.save();
-        ctx.translate(p.x, p.y);
-        ctx.rotate(p.rotation);
-        ctx.globalAlpha = Math.max(0, p.life);
-        ctx.fillStyle = p.color;
-        ctx.shadowColor = p.color;
-        ctx.shadowBlur = 8;
-        const s = p.size * (0.5 + p.life * 0.5);
-        if (p.shape === 'circle') {
-          ctx.beginPath(); ctx.arc(0, 0, s, 0, Math.PI * 2); ctx.fill();
-        } else if (p.shape === 'diamond') {
-          ctx.beginPath(); ctx.moveTo(0, -s); ctx.lineTo(s * 0.6, 0); ctx.lineTo(0, s); ctx.lineTo(-s * 0.6, 0); ctx.closePath(); ctx.fill();
-        } else if (p.shape === 'star') {
-          ctx.beginPath();
-          for (let j = 0; j < 5; j++) {
-            const a = (j * Math.PI * 2 / 5) - Math.PI / 2;
-            const r = j % 2 === 0 ? s : s * 0.4;
-            j === 0 ? ctx.moveTo(Math.cos(a) * r, Math.sin(a) * r) : ctx.lineTo(Math.cos(a) * r, Math.sin(a) * r);
-            const a2 = ((j + 0.5) * Math.PI * 2 / 5) - Math.PI / 2;
-            ctx.lineTo(Math.cos(a2) * s * 0.4, Math.sin(a2) * s * 0.4);
-          }
-          ctx.closePath(); ctx.fill();
-        } else {
-          ctx.fillRect(-s, -1, s * 2, 2);
-          ctx.fillRect(-1, -s, 2, s * 2);
-        }
-        ctx.restore();
-      }
-      if (alive) frame = requestAnimationFrame(draw);
-      else onDone();
-    };
-    frame = requestAnimationFrame(draw);
+    const ox = cx ?? window.innerWidth / 2;
+    const oy = cy ?? window.innerHeight / 2;
+    // ★ W86u2 (Pixelart): gezeichnet von `ppPixelPartikel` (app-shared.jsx) — ganze Kunstpixel, 30 Hz, Dither statt Alpha, keine Drehung/Weichzeichner.
+    const stopp = window.ppPixelPartikel(canvas, shopBurstParticles(ox, oy, 260, 1.2), { px: 2, onFertig: onDone, maxMs: 2500 });
     const timer = setTimeout(onDone, 2500);
-    return () => { cancelAnimationFrame(frame); clearTimeout(timer); };
+    return () => { stopp(); clearTimeout(timer); };
   }, []);
   return (
     <div style={{ position: 'fixed', inset: 0, zIndex: 99999, pointerEvents: 'none' }}>
       <canvas ref={canvasRef} style={{ width: '100%', height: '100%' }} />
       <div className="shop-purchase-text" style={{ top: Math.max(40, (cy ?? window.innerHeight / 2) - 60), left: cx ?? '50%' }}>PURCHASED!</div>
     </div>
+  );
+}
+
+// „Mögliche Pulls“: ein Streifen mit Beispielen aus dem Pool (nur, was der Spieler noch NICHT besitzt —
+// genau das kann der nächste Pull ergeben). Wechselt alle paar Sekunden hart (kein Überblenden: Pixelart).
+function ShopPullPreview({ pool, type, count = 4, onHover }) {
+  const sig = pool.map(p => p.id).join('|');
+  const order = useMemo(() => {
+    const a = pool.slice();
+    for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; }
+    return a;
+  }, [sig]);
+  const [start, setStart] = useState(0);
+  useEffect(() => {
+    setStart(0);
+    if (order.length <= count) return undefined;
+    const t = setInterval(() => setStart(s => (s + count) % order.length), 3500);
+    return () => clearInterval(t);
+  }, [order, count]);
+  const shown = Array.from({ length: Math.min(count, order.length) }, (_, i) => order[(start + i) % order.length]);
+  return (
+    <div className="shop-pull-strip">
+      {shown.map(it => (
+        <div key={it.id} className="shop-item shop-unowned-skin shop-pull-tile"
+          onMouseEnter={() => onHover && onHover(it)} onMouseLeave={() => onHover && onHover(null)}>
+          <span className="shop-item-zier" aria-hidden="true" />
+          <div className="shop-item-img-wrap">
+            <img src={it.src} draggable={false} />
+          </div>
+          {it.name && <div className="shop-item-name" title={it.name}>{it.name}</div>}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+
+// Gemeinsame Partikel-Salve für Shop-Effekte (Kauf-Fanfare und Pull-Reveal): bunte Pixelsprites in Palettenfarben
+// plus ein Funkenring. Gezeichnet von `ppPixelPartikel` (app-shared.jsx): ganze Kunstpixel, Dither statt Alpha.
+function shopBurstParticles(ox, oy, n, speedMul) {
+  const colors = ['#fad54a', '#f9ac20', '#f7f7ad', '#fb1ea9', '#1aedff', '#b1ff1a', '#f87420', '#ffffff'];
+  const shapes = ['star', 'circle', 'diamond', 'spark'];
+  const sm = speedMul || 1;
+  const particles = [];
+  for (let i = 0; i < n; i++) {
+    const angle = (Math.PI * 2 * i / n) + (Math.random() - 0.5) * 0.5;
+    const speed = (3 + Math.random() * 9) * sm;
+    particles.push({
+      x: ox, y: oy,
+      vx: Math.cos(angle) * speed, vy: Math.sin(angle) * speed - 2,
+      size: 3 + Math.random() * 9, color: colors[Math.floor(Math.random() * colors.length)],
+      shape: shapes[Math.floor(Math.random() * shapes.length)],
+      life: 1, decay: 0.007 + Math.random() * 0.011,
+      rotation: 0, rotSpeed: 0,
+      gravity: 0.06 + Math.random() * 0.04,
+    });
+  }
+  const ring = Math.round(n / 3);
+  for (let i = 0; i < ring; i++) {
+    const angle = (Math.PI * 2 * i / ring);
+    const dist = 50 + Math.random() * 30;
+    particles.push({
+      x: ox + Math.cos(angle) * dist, y: oy + Math.sin(angle) * dist,
+      vx: Math.cos(angle) * 1.5 * sm, vy: Math.sin(angle) * 1.5 * sm,
+      size: 2 + Math.random() * 4, color: '#fad54a',
+      shape: 'spark', life: 1, decay: 0.015 + Math.random() * 0.01,
+      rotation: 0, rotSpeed: 0, gravity: 0,
+    });
+  }
+  return particles;
+}
+
+// Weitere Partikelformen für die Pull-Inszenierung (Palettenfarben, ganze Kunstpixel — Zeichnen übernimmt ppPixelPartikel).
+// Münzregen: Gold fällt von oben über die ganze Breite.
+function shopCoinParticles(n) {
+  const cols = ['#fad54a', '#f9ac20', '#f7f7ad', '#fad54a'], out = [];
+  for (let i = 0; i < n; i++) {
+    out.push({ x: Math.random() * window.innerWidth, y: -20 - Math.random() * 260, vx: (Math.random() - 0.5) * 1.5, vy: 2 + Math.random() * 3,
+      size: 8 + Math.random() * 6, color: cols[i % cols.length], shape: Math.random() < 0.6 ? 'circle' : 'diamond',
+      life: 1, decay: 0.006 + Math.random() * 0.004, rotation: 0, rotSpeed: 0, gravity: 0.09 });
+  }
+  return out;
+}
+// Sternenring: große Kreuz-Sterne fliegen nach außen.
+function shopStarParticles(ox, oy, n) {
+  const cols = ['#ffffff', '#f7f7ad', '#fad54a', '#1aedff'], out = [];
+  for (let i = 0; i < n; i++) {
+    const a = (Math.PI * 2 * i / n), v = 5 + (i % 3) * 2;
+    out.push({ x: ox, y: oy, vx: Math.cos(a) * v, vy: Math.sin(a) * v, size: 14 + (i % 2) * 6, color: cols[i % cols.length], shape: 'star',
+      life: 1, decay: 0.014, rotation: 0, rotSpeed: 0, gravity: 0 });
+  }
+  return out;
+}
+
+const SHOP_BAYER = [0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5];
+// Raster der Risse über dem Kartenrücken (Karte 5:7) bzw. dem Avatar-Siegel (quadratisch).
+const SHOP_CRACK_GRID = { card: { w: 50, h: 70 }, avatar: { w: 56, h: 56 } };
+
+// Die Risse EINES Klicks: zwei Hauptbrüche in entgegengesetzte Richtungen, die gezielt bis an den Rand laufen (so überziehen
+// die fünf Klicks zusammen die ganze Fläche), mit Seitenästen zwischen den Strahlen und einem gezackten Ring (Spinnennetz).
+// Liefert die Rasterpunkte nach Abstand vom Zentrum sortiert (der Bruch wächst von innen nach außen) und die Hauptrichtungen.
+function shopMakeCracks(W, H, base, webR) {
+  const cx = W / 2, cy = H / 2, seen = new Set(), pts = [];
+  const put = (x, y) => {
+    x = Math.round(x); y = Math.round(y);
+    if (x < 0 || y < 0 || x >= W || y >= H) return false;
+    const k = y * W + x;
+    if (!seen.has(k)) { seen.add(k); pts.push({ x, y, r: Math.hypot(x - cx, y - cy) }); }
+    return true;
+  };
+  const seg = (x0, y0, x1, y1) => {
+    const n = Math.max(1, Math.ceil(Math.max(Math.abs(x1 - x0), Math.abs(y1 - y0))));
+    for (let i = 0; i <= n; i++) if (!put(x0 + (x1 - x0) * i / n, y0 + (y1 - y0) * i / n)) return false;
+    return true;
+  };
+  // Schnittpunkt eines Strahls von (x, y) in Richtung a mit dem Rand, mal Anteil `share` (1 = bis zum Rand)
+  const toEdge = (x, y, a, share) => {
+    const dx = Math.cos(a), dy = Math.sin(a);
+    const tx = dx > 1e-6 ? (W - 1 - x) / dx : dx < -1e-6 ? (0 - x) / dx : Infinity;
+    const ty = dy > 1e-6 ? (H - 1 - y) / dy : dy < -1e-6 ? (0 - y) / dy : Infinity;
+    const t = Math.max(0, Math.min(tx, ty)) * share;
+    return [x + dx * t, y + dy * t];
+  };
+  const crack = (x, y, tgt, depth) => {
+    for (let guard = 0; guard < 60; guard++) {
+      const dist = Math.hypot(tgt[0] - x, tgt[1] - y);
+      if (dist < 2) return;
+      const toT = Math.atan2(tgt[1] - y, tgt[0] - x), ang = toT + (Math.random() - 0.5) * 1.0;   // scharfe Knicke um die Zielrichtung
+      const len = Math.min(dist, 3 + Math.random() * 3.5);
+      const nx = x + Math.cos(ang) * len, ny = y + Math.sin(ang) * len;
+      if (!seg(x, y, nx, ny)) return;
+      x = nx; y = ny;
+      if (depth < 2 && dist > 10 && Math.random() < 0.12) {
+        const ba = toT + (Math.random() < 0.5 ? -1 : 1) * (0.6 + Math.random() * 0.5);
+        crack(x, y, toEdge(x, y, ba, 0.55 + Math.random() * 0.4), depth + 1);
+      }
+    }
+  };
+  const a1 = base, a2 = base + Math.PI + (Math.random() - 0.5) * 0.5;
+  crack(cx, cy, toEdge(cx, cy, a1, 1), 0);
+  crack(cx, cy, toEdge(cx, cy, a2, 1), 0);
+  if (webR > 0) {                                                       // gezackter Ring um die Mitte
+    let t = Math.random() * 6.28, px = null, py = null;
+    const sweep = 0.9 + Math.random() * 0.7, ry = webR * H / W;
+    for (const end = t + sweep; t < end; t += 0.18 + Math.random() * 0.12) {
+      const j = (Math.random() - 0.5) * 1.6, x = cx + Math.cos(t) * (webR + j), y = cy + Math.sin(t) * (ry + j);
+      if (px !== null) seg(px, py, x, y);
+      px = x; py = y;
+    }
+  }
+  pts.sort((p, q) => p.r - q.r);
+  return { pts, dirs: [a1, a2] };
+}
+
+// Das versiegelte Avatar-Tile (60×60 Pixel): dunkle Dither-Fläche, Rahmen aus Gold, Dunkel und Cyan, Eckstifte, Fragezeichen.
+// Als Bild erzeugt, damit es sich wie der Kartenrücken in Splitter zerlegen lässt.
+function shopSealedArt() {
+  const c = document.createElement('canvas'); c.width = c.height = 60;
+  const g = c.getContext('2d');
+  const col = (h) => (window.ppSnap ? window.ppSnap(h) : h);
+  g.fillStyle = col('#12101f'); g.fillRect(0, 0, 60, 60);
+  g.fillStyle = col('#2b0b47');
+  for (let y = 4; y < 56; y++) for (let x = 4; x < 56; x++) if (((x + y) & 1) === 0 && ((x >> 2) + (y >> 2)) % 3 === 0) g.fillRect(x, y, 1, 1);
+  const ring = (i, hex) => { g.fillStyle = col(hex); g.fillRect(i, i, 60 - 2 * i, 1); g.fillRect(i, 59 - i, 60 - 2 * i, 1); g.fillRect(i, i, 1, 60 - 2 * i); g.fillRect(59 - i, i, 1, 60 - 2 * i); };
+  ring(0, '#fad54a'); ring(1, '#fad54a'); ring(2, '#08060c'); ring(3, '#1aedff');
+  g.fillStyle = col('#fad54a');
+  for (const [x, y] of [[5, 5], [52, 5], [5, 52], [52, 52]]) g.fillRect(x, y, 3, 3);
+  const Q = [[1, 0, 3, 1], [0, 1, 1, 1], [4, 1, 1, 1], [4, 2, 1, 1], [3, 3, 1, 1], [2, 4, 1, 1], [2, 6, 1, 1]];   // 5×7-Fragezeichen
+  for (const [dx, dy] of [[2, 2], [0, 0]]) {
+    g.fillStyle = dx ? col('#08060c') : col('#fad54a');
+    for (const [x, y, w, h] of Q) g.fillRect(20 + x * 4 + dx, 16 + y * 4 + dy, w * 4, h * 4);
+  }
+  return c.toDataURL('image/png');
+}
+
+// Mosaik-Auflösung: das Avatar-Bild setzt sich aus groben Blöcken zu voller Schärfe zusammen (Pixelart-typisch, in harten Stufen).
+function ShopMosaic({ src, fast }) {
+  const ref = useRef(null);
+  useEffect(() => {
+    const cv = ref.current; if (!cv) return undefined;
+    let dead = false, timer = 0;
+    const img = new Image();
+    img.onload = () => {
+      if (dead) return;
+      const N = img.naturalWidth || 200;
+      cv.width = N; cv.height = N;
+      const g = cv.getContext('2d'); g.imageSmoothingEnabled = false;
+      const tmp = document.createElement('canvas'), tg = tmp.getContext('2d');
+      const steps = [3, 5, 8, 12, 18, 28, 44, 0];
+      let i = 0;
+      const tick = () => {
+        if (dead) return;
+        const b = steps[i++];
+        g.clearRect(0, 0, N, N);
+        if (b) { tmp.width = tmp.height = b; tg.imageSmoothingEnabled = true; tg.drawImage(img, 0, 0, b, b); g.drawImage(tmp, 0, 0, N, N); }
+        else g.drawImage(img, 0, 0, N, N);
+        if (i < steps.length) timer = setTimeout(tick, fast ? 24 : 110);
+      };
+      tick();
+    };
+    img.src = src;
+    return () => { dead = true; clearTimeout(timer); };
+  }, [src]);
+  return <canvas ref={ref} className="pull-fx-mosaic" />;
+}
+
+// Die Pull-Inszenierung — Pixelart, ohne Vollbild-Blitze. Zwei Fassungen (`reveal.kind`):
+//   'card'   (Skins, Sleeves, Structure Decks — 5:7): Beschwörungskreis auf dem Boden, Lichtsäule, kreisende Funken; der
+//            Kartenrücken steigt aus dem Kreis, überzieht sich mit Rissen und zerspringt in 6×8 Splitter.
+//   'avatar' (quadratisch): ein versiegeltes Tile in einem Tunnel aus Quadraten, die nach außen strömen; Funken umrunden das Tile
+//            auf einer Quadratbahn; es zerspringt in 8×8 Splitter, der Avatar löst sich per Mosaik zu voller Schärfe auf.
+// Gemeinsam: Dither-Einblendung, fünf Risse (sie überziehen die ganze Fläche), „Überladung“, Explosion (Druckwellenring, Strahlen,
+// Beben, Salven), Enthüllung mit Banner, Sternenring und Münzregen. Klang und Bild sind gekoppelt: Töne laufen NUR über `cue()`.
+// Klick überspringt. Der Reveal öffnet sofort beim Drücken von PULL (`reveal.pending`) und wartet am Höhepunkt auf den Server.
+function ShopPullReveal({ reveal, onClose, fast, onToggleFast }) {
+  const AV = (reveal && reveal.kind) === 'avatar';
+  const reduced = useMemo(() => { try { return window.matchMedia('(prefers-reduced-motion: reduce)').matches; } catch { return false; } }, []);
+  const [phase, setPhase] = useState('charge');   // 'charge' | 'shatter' | 'reveal'
+  const [overload, setOverload] = useState(false); // letzte Stufe vor dem Einschlag: das Siegel zittert dauernd
+  const [tremor, setTremor] = useState(0);        // Zähler: Zucken (gerade/ungerade = zwei gleiche Animationen im Wechsel)
+  const [quake, setQuake] = useState(0);          // Zähler: Bildschirm bebt
+  const [sheen, setSheen] = useState(0);          // Zähler: Lichtstreifen über dem Banner
+  const [canClose, setCanClose] = useState(false);
+  const alive = useRef(true);
+  const climaxed = useRef(false);
+  const abortRef = useRef(false);                  // Escape: Animation abbrechen, direkt zum Ergebnis
+  const rootRef = useRef(null);
+  // Zeit der Inszenierung: eine virtuelle Uhr (ms seit dem Öffnen), die mit Faktor 1 oder 5 läuft. Zeitplan, Szene, Partikel und
+  // CSS-Animationen hängen alle an ihr, so lässt sich der Tempo-Schalter (Checkbox im Shop / Leertaste) auch mitten im Lauf umlegen.
+  const vt = useRef(0);
+  const ev = useRef([]);                           // Zeitplan: { at, fn } in virtueller Zeit
+  const speedRef = useRef(fast ? 5 : 1);
+  speedRef.current = fast ? 5 : 1;
+  const toggleRef = useRef(onToggleFast); toggleRef.current = onToggleFast;
+  const closeRef = useRef(onClose); closeRef.current = onClose;
+  const revealed = useRef(false);
+  const revealRef = useRef(reveal);
+  revealRef.current = reveal;
+  const phaseRef = useRef(phase);
+  phaseRef.current = phase;
+  const sceneRef = useRef(null);
+  const slotRef = useRef(null);
+  const crackRef = useRef(null);
+  const partRef = useRef(null);
+  const parts = useRef([]);
+  const grid = SHOP_CRACK_GRID[AV ? 'avatar' : 'card'];
+  const S = useRef({ t0: 0, stage: 0, lit: 0, litTarget: 0, pw: 0, ripple: 0, blast: 0, tun: 0, bigQuake: false, tReveal: 0, overload: 0, crack: [-1, -1, -1, -1, -1] });
+  const NC = AV ? 8 : 6, NR = 8;
+  const shards = useMemo(() => Array.from({ length: NC * NR }, (_, i) => {
+    const col = i % NC, row = (i / NC) | 0;
+    return { col, row, dx: Math.round((col - (NC - 1) / 2) * (AV ? 78 : 86) + (Math.random() - 0.5) * 60), dy: Math.round((row - 3.5) * 44 - 90 + (Math.random() - 0.5) * 70), d: Math.round(Math.random() * 90) };
+  }), []);
+  const sealedUrl = useMemo(() => (AV ? shopSealedArt() : null), []);
+  const backUrl = AV ? sealedUrl : '/cardback.png';
+  const later = (fn, ms) => { ev.current.push({ at: vt.current + ms, fn }); };
+  const clearLater = () => { ev.current = []; };
+
+  // Eine gemeinsame Partikelfläche für alle Salven.
+  const emit = (list) => {
+    const a = parts.current;
+    let w = 0;
+    for (let i = 0; i < a.length; i++) if (a[i].life > 0) a[w++] = a[i];
+    a.length = w;
+    for (const p of list) a.push(p);
+  };
+
+  // cue = Klang + Bild. c: { sound | sounds: [[name, opts], …], stage, lit, crack, overload, ripple, blast, tremor, quake (true | 2 = stark),
+  //                          sheen, burst: [fx, fy, n, speed], stars, coins }
+  const cue = (c) => {
+    try {
+      if (window.playSFX) {
+        // ×5: die langen Aufbau-Klänge entfallen, schnell aufeinanderfolgende gleiche Klänge werden zusammengefasst
+        const quick = speedRef.current > 1, skipQuick = { pull_circle: 1, pull_swell: 1, pull_sparkle: 1 };
+        const play = (name, opt) => { if (quick && skipQuick[name]) return; window.playSFX(name, { dedupe: quick ? 150 : 0, ...(opt || {}) }); };
+        if (c.sound) play(c.sound, c.opt);
+        for (const sd of (c.sounds || [])) play(sd[0], sd[1]);
+      }
+    } catch {}
+    const st = S.current, now = vt.current;
+    if (c.overload) { st.overload = now; setOverload(true); }
+    if (c.stage != null) st.stage = c.stage;
+    if (c.lit != null) st.litTarget = c.lit;
+    if (c.crack != null) st.crack[c.crack] = now;
+    if (c.ripple) st.ripple = now;
+    if (c.blast) st.blast = now;
+    if (c.tremor) setTremor(n => n + 1);
+    if (c.quake) { st.bigQuake = c.quake === 2; setQuake(n => n + 1); }
+    if (c.sheen) setSheen(n => n + 1);
+    if (c.burst) emit(shopBurstParticles(window.innerWidth * c.burst[0], window.innerHeight * c.burst[1], c.burst[2], c.burst[3]));
+    if (c.stars) emit(shopStarParticles(window.innerWidth / 2, window.innerHeight * 0.5, c.stars));
+    if (c.coins) emit(shopCoinParticles(c.coins));
+  };
+
+  const toReveal = () => {
+    if (revealed.current) return;
+    revealed.current = true;
+    clearLater();
+    S.current.tReveal = vt.current;
+    setPhase('reveal');
+    cue({ sound: 'pull_reveal', stage: 7, quake: true, burst: [0.5, 0.5, 200, 1.1] });                  // Siegel steigt/löst sich auf, Banner fällt, Strahlen blenden ein
+    later(() => cue({ sound: 'pull_sparkle', stars: 28, sheen: true }), 200);                          // Sternenring + Lichtstreifen über dem Banner
+    later(() => cue({ sound: 'gold_gain', coins: 90, burst: [0.3, 0.5, 100, 0.9] }), 520);              // Münzregen
+    later(() => emit(shopBurstParticles(window.innerWidth * 0.7, window.innerHeight * 0.5, 100, 0.9)), 530);
+    later(() => setCanClose(true), 1000);
+  };
+
+  // Höhepunkt: wartet, bis die Antwort des Servers da ist; dann bricht es frei — eine Explosion.
+  const climax = () => {
+    if (climaxed.current || !alive.current) return;
+    if (revealRef.current && revealRef.current.pending) { later(climax, 80); return; }
+    climaxed.current = true;
+    clearLater();
+    try { const im = new Image(); im.src = revealRef.current.imgUrl; } catch {}
+    if (abortRef.current) { toReveal(); return; }       // Escape: ohne Explosion direkt zum Ergebnis
+    setPhase('shatter');
+    // Splitter + Druckwellenring + Strahlen + starkes Beben + Salve; der Klang ist die Explosion (mit tiefem Einschlag darunter)
+    cue({ sounds: [['pull_shatter'], ['heavy_impact', { rate: 0.72, volume: 0.7 }]], stage: 6, ripple: !AV, blast: true, quake: 2, burst: [0.5, 0.5, 340, 1.7] });
+    later(() => emit(shopBurstParticles(window.innerWidth * 0.5, window.innerHeight * 0.5, 200, 2.1)), 130);
+    later(() => emit(shopBurstParticles(window.innerWidth * 0.5, window.innerHeight * 0.5, 160, 1.2)), 300);
+    later(toReveal, 780);
+  };
+
+  useEffect(() => {
+    if (reduced) { later(climax, 0); return () => { alive.current = false; clearLater(); }; }
+    // Klangkulisse = Animation: Kreis/Tunnel baut sich auf (Swell), fünf Risse (Knacken + je ein Glockenton, Dur-Arpeggio steigt),
+    // Überladung (steigender Sweep), Explosion, Enthüllung (Akkord), Sternenring (Glockenarpeggio), Münzen.
+    later(() => cue({ sound: 'pull_circle', opt: AV ? { rate: 1.25 } : {} }), 60);
+    const BEAT = (i, semis, burst) => () => cue({
+      sounds: [['pull_crack', { rate: 0.94 + 0.07 * i, volume: 0.75 + 0.06 * i }], ['pull_note', { rate: Math.pow(2, semis / 12), volume: 0.55 + 0.05 * i }]],
+      stage: i + 1, lit: 4 * (i + 1), crack: i, tremor: true, burst: [0.5, 0.5, burst[0], burst[1]] });
+    later(BEAT(0, 0, [18, 0.45]), 900);
+    later(BEAT(1, 4, [26, 0.55]), 1400);
+    later(BEAT(2, 7, [34, 0.65]), 1800);
+    later(BEAT(3, 12, [44, 0.75]), 2150);
+    later(BEAT(4, 16, [60, 0.9]), 2450);
+    later(() => cue({ sound: 'pull_swell', overload: true, burst: [0.5, 0.5, 40, 0.6] }), 2550);
+    later(() => emit(shopBurstParticles(window.innerWidth * 0.5, window.innerHeight * 0.5, 50, 0.8)), 2750);
+    later(() => emit(shopBurstParticles(window.innerWidth * 0.5, window.innerHeight * 0.5, 70, 1.0)), 2950);
+    later(climax, 3350);
+    return () => { alive.current = false; clearLater(); };
+  }, []);
+
+  // Uhr: lässt die virtuelle Zeit mit Faktor 1 oder 5 laufen, führt fällige Zeitplan-Einträge aus und zieht die CSS-Animationen
+  // des Reveals (Beben, Splitter, Banner, Sterne …) auf dasselbe Tempo.
+  useEffect(() => {
+    let last = performance.now(), lastAnim = 0;
+    const id = setInterval(() => {
+      const now = performance.now(), sp = speedRef.current;
+      vt.current += (now - last) * sp; last = now;
+      const due = ev.current.filter(e => e.at <= vt.current);
+      if (due.length) {
+        ev.current = ev.current.filter(e => e.at > vt.current);
+        due.sort((a, b) => a.at - b.at);
+        for (const e of due) { try { e.fn(); } catch {} }
+      }
+      if (rootRef.current && now - lastAnim > 50) {
+        lastAnim = now;
+        try { for (const a of rootRef.current.getAnimations({ subtree: true })) if (a.playbackRate !== sp) a.playbackRate = sp; } catch {}
+      }
+    }, 16);
+    return () => clearInterval(id);
+  }, []);
+
+  // Tasten: Escape bricht die Animation ab (direkt zum Ergebnis, ein zweites Escape schließt), Leertaste schaltet ×5 um.
+  // Die Handler sitzen im Capture und halten die Ereignisse an, damit ein fokussierter Knopf (PULL!) nicht erneut auslöst.
+  useEffect(() => {
+    const abort = () => {
+      if (phaseRef.current === 'reveal') { closeRef.current(); return; }
+      abortRef.current = true;
+      if (climaxed.current) toReveal(); else climax();
+    };
+    const kd = (e) => {
+      if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); if (!e.repeat) abort(); }
+      else if (e.key === ' ' || e.code === 'Space') { e.preventDefault(); e.stopPropagation(); if (!e.repeat && toggleRef.current) toggleRef.current(); }
+    };
+    const ku = (e) => { if (e.key === ' ' || e.code === 'Space') { e.preventDefault(); e.stopPropagation(); } };
+    window.addEventListener('keydown', kd, true);
+    window.addEventListener('keyup', ku, true);
+    try { if (document.activeElement && document.activeElement.blur) document.activeElement.blur(); } catch {}
+    return () => { window.removeEventListener('keydown', kd, true); window.removeEventListener('keyup', ku, true); };
+  }, []);
+
+  // Partikelfläche (ein unsichtbarer Dauer-Partikel hält die Schleife am Leben).
+  useEffect(() => {
+    const cv = partRef.current; if (!cv) return undefined;
+    parts.current.push({ x: -9999, y: -9999, vx: 0, vy: 0, size: 1, color: '#ffffff', shape: 'circle', life: 1e12, decay: 0, rotation: 0, rotSpeed: 0, gravity: 0 });
+    const stopp = window.ppPixelPartikel(cv, parts.current, { px: 3, tempo: () => speedRef.current });
+    return () => stopp();
+  }, []);
+
+  // Szene auf grobem Raster (5 px je Kunstpixel): Dither-Einblendung, Dunst, Strahlen, Kreis/Säule bzw. Tunnel, Funken, Explosion.
+  useEffect(() => {
+    const cv = sceneRef.current; if (!cv) return undefined;
+    const CELL = 5;
+    const W = Math.max(40, Math.ceil(window.innerWidth / CELL)), H = Math.max(30, Math.ceil(window.innerHeight / CELL));
+    cv.width = W; cv.height = H; cv.style.imageRendering = 'pixelated';
+    const g = cv.getContext('2d');
+    const img = g.createImageData(W, H);
+    const buf = new Uint32Array(img.data.buffer);
+    const c32 = (hex) => {
+      const sn = window.ppSnap ? window.ppSnap(hex) : hex;
+      const n = parseInt(String(sn).replace('#', ''), 16);
+      return ((255 << 24) | ((n & 255) << 16) | (((n >> 8) & 255) << 8) | ((n >> 16) & 255)) >>> 0;
+    };
+    const BG = c32('#08060c'), HOT = c32('#f7f7ad'), GOLD = c32('#fad54a'), ORANGE = c32('#f9ac20');
+    const CYAN = c32('#1aedff'), PINK = c32('#fb1ea9'), DIM = c32('#58238c'), RUNEDIM = c32('#405f8c'), WHITE = c32('#ffffff'), BLUE = c32('#4580f6');
+    const HAZE = AV ? c32('#2d4362') : c32('#2b0b47');
+    const RAY_HOT = AV ? WHITE : HOT, RAY_A = AV ? CYAN : GOLD, RAY_B = AV ? BLUE : ORANGE;
+    const ang = new Float32Array(W * H), dist = new Float32Array(W * H);
+    const rcx = W / 2, rcy = H * 0.5, maxD = Math.hypot(Math.max(rcx, W - rcx), Math.max(rcy, H - rcy));
+    for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+      const i = y * W + x;
+      ang[i] = Math.atan2(y - rcy, x - rcx) + Math.PI;
+      dist[i] = Math.hypot(x - rcx, y - rcy) / maxD;
+    }
+    const cxg = W / 2, cyg = Math.round(H * 0.8), rx = W * 0.3, ry = rx * 0.27, axisX = Math.round(W / 2);
+    const plot = (x, y, c) => { x = Math.round(x); y = Math.round(y); if (x < 0 || y < 0 || x >= W || y >= H) return; buf[y * W + x] = c; };
+    const bay = (x, y) => SHOP_BAYER[((y | 0) & 3) * 4 + ((x | 0) & 3)] / 16;
+    const motes = Array.from({ length: 40 }, (_, i) => ({ a: Math.random() * 6.283, h: Math.random(), r0: W * 0.03 + Math.random() * W * 0.13, c: i % 4, u: Math.random(), k: i % 5 }));
+    const MOTE = AV ? [CYAN, PINK, WHITE, BLUE] : [GOLD, HOT, CYAN, PINK];
+    const GLYPH = [[[0, -1], [-1, 0], [0, 0], [1, 0], [0, 1]], [[-1, -1], [0, -1], [1, -1], [0, 0], [0, 1]], [[-1, -1], [-1, 0], [-1, 1], [0, 1], [1, 1]], [[-1, -1], [1, -1], [0, 0], [-1, 1], [1, 1]]];
+    const RUNES = 20, PW = [0, 3, 5, 8, 11, 15, 22, 6];
+    const blastDirs = Array.from({ length: 22 }, () => ({ a: Math.random() * Math.PI * 2, l: 0.45 + Math.random() * 0.55 }));
+    // Risse: je Klick ein Paar Hauptbrüche in entgegengesetzte Richtungen (36° Versatz von Klick zu Klick) + gezackter Ring.
+    const cracks = [0, 1, 2, 3, 4].map(i => shopMakeCracks(grid.w, grid.h, 0.2 + i * (Math.PI / 5) + (Math.random() - 0.5) * 0.3, 7 + i * 4.5));
+    const cc = crackRef.current ? crackRef.current.getContext('2d') : null;
+    if (crackRef.current) { crackRef.current.width = grid.w; crackRef.current.height = grid.h; }
+    const snap = (hex) => (window.ppSnap ? window.ppSnap(hex) : hex);
+    const CC = { dark: snap('#08060c'), gold: snap('#fad54a'), orange: snap('#f9ac20'), hot: snap('#f7f7ad'), white: snap('#ffffff') };
+    // Mitte (in Rasterzellen) und halbe Breite des Siegels/der Karte
+    const center = () => {
+      const el = slotRef.current;
+      if (!el) return [W / 2, H / 2, 20];
+      const r = el.getBoundingClientRect();
+      return [(r.left + r.width / 2) / CELL, (r.top + r.height / 2) / CELL, r.width / CELL / 2];
+    };
+    const perim = (u, h) => {                                     // Punkt auf einer Quadratbahn mit halber Kantenlänge h (u: 0…1)
+      const t = u * 4, side = Math.floor(t) % 4, f = t - Math.floor(t);
+      return side === 0 ? [-h + 2 * h * f, -h] : side === 1 ? [h, -h + 2 * h * f] : side === 2 ? [h - 2 * h * f, h] : [-h, h - 2 * h * f];
+    };
+
+    const draw = () => {
+      const now = vt.current, st = S.current, tt = now - st.t0, ph = phaseRef.current, sp = speedRef.current;
+      const [ccx, ccy, half] = center();
+      const ov = (st.overload > 0 ? 1.8 : 1) * sp;      // Überladung × Tempo-Schalter (Inkremente pro Bild)
+      // 1) Dither-Einblendung der Dunkelheit (die Shop-Seite scheint zuerst noch durch)
+      const fade = Math.min(1, tt / 700);
+      if (fade >= 1) buf.fill(BG);
+      else { buf.fill(0); for (let i = 0; i < buf.length; i++) { const x = i % W, y = (i / W) | 0; if (fade > SHOP_BAYER[(y & 3) * 4 + (x & 3)] / 16) buf[i] = BG; } }
+      // 2) Dunst um die Mitte (wächst mit der Stufe) + Strahlen (nur in der Enthüllung, weich eingeblendet)
+      const hazeGain = ph === 'reveal' ? 0.5 : 0.18 + st.stage * 0.07;
+      const rayK = ph === 'reveal' ? Math.min(1, (now - st.tReveal) / 900) : 0;
+      const spin = tt * 0.00022;
+      for (let i = 0; i < buf.length; i++) {
+        const x = i % W, y = (i / W) | 0, b = SHOP_BAYER[(y & 3) * 4 + (x & 3)] / 16, dd = dist[i];
+        if ((1 - dd) * hazeGain * 1.6 > b) buf[i] = HAZE;
+        if (rayK > 0) {
+          const a = (((ang[i] + spin) / (2 * Math.PI)) * 18) % 1;
+          if (a < 0.5) { const inten = (1 - dd) * rayK * 0.95; if (inten > b) buf[i] = inten > 0.62 ? RAY_HOT : (a < 0.25 ? RAY_A : RAY_B); }
+        }
+      }
+      if (!AV) {
+        // 3a) Lichtsäule über dem Kreis (Breite folgt der Stufe)
+        st.pw += (PW[Math.min(st.stage, 7)] - st.pw) * 0.3;
+        const pw = st.pw;
+        if (pw > 0.5) {
+          for (let dx = -Math.ceil(pw); dx <= Math.ceil(pw); dx++) {
+            const inten = 1 - Math.abs(dx) / (pw + 0.01);
+            for (let y = 0; y < cyg; y++) {
+              const v = inten * (0.55 + 0.45 * (y / cyg)) + (Math.abs(dx) < 1 ? 0.3 : 0);
+              if (v > SHOP_BAYER[(y & 3) * 4 + ((axisX + dx) & 3)] / 16) plot(axisX + dx, y, inten > 0.65 ? HOT : (inten > 0.3 ? GOLD : ORANGE));
+            }
+          }
+        }
+        // 3b) Beschwörungskreis: Ringe zeichnen sich im Uhrzeigersinn, Runen zünden mit den Klicks
+        const cp = Math.min(1, tt / 1300), rot = tt * 0.0004 * (1 + st.stage * 0.5);
+        const ringCol = st.stage === 0 ? RUNEDIM : (st.stage >= 6 ? HOT : GOLD), innerCol = st.stage >= 3 ? CYAN : RUNEDIM;
+        const ring = (rxr, col, thick) => {
+          const end = cp * Math.PI * 2;
+          for (let a = 0; a < end; a += 1 / Math.max(rxr, 1)) {
+            const x = cxg + Math.cos(a - Math.PI / 2) * rxr, y = cyg + Math.sin(a - Math.PI / 2) * rxr * (ry / rx);
+            plot(x, y, col); if (thick) plot(x, y + 1, col);
+          }
+        };
+        ring(rx, ringCol, true); ring(rx * 0.84, innerCol, false); ring(rx * 0.5, ringCol, false);
+        for (let k = 0; k < 36; k++) {                                   // Zacken zwischen den Ringen
+          if (cp < k / 36) break;
+          const a = -rot * 0.5 + (k / 36) * Math.PI * 2;
+          for (let r = 0.86; r <= 0.98; r += 0.04) plot(cxg + Math.cos(a) * rx * r, cyg + Math.sin(a) * ry * r, k % 3 === 0 ? ringCol : DIM);
+        }
+        if (st.lit < st.litTarget) st.lit = Math.min(st.litTarget, st.lit + sp);
+        for (let k = 0; k < RUNES; k++) {
+          if (cp < (k + 1) / RUNES) break;
+          const a = rot + (k / RUNES) * Math.PI * 2, x = cxg + Math.cos(a) * rx * 0.67, y = cyg + Math.sin(a) * ry * 0.67;
+          const lit = k < st.lit, col = lit ? (k % 2 ? CYAN : GOLD) : DIM;
+          for (const o of GLYPH[k % 4]) plot(x + o[0], y + o[1], col);
+          if (lit && k === st.lit - 1) { plot(x, y - 3, HOT); plot(x, y + 3, HOT); plot(x - 3, y, HOT); plot(x + 3, y, HOT); }
+        }
+        // 3c) kreisende Funken: je höher die Stufe, desto mehr, schneller und enger an der Säule
+        const active = Math.min(motes.length, st.stage * 7);
+        for (let i = 0; i < active; i++) {
+          const m = motes[i];
+          m.a += (0.07 + 0.045 * st.stage) * ov; m.h += (0.012 + 0.004 * st.stage) * ov;
+          if (m.h > 1) { m.h = 0; m.a = Math.random() * 6.283; m.r0 = W * 0.03 + Math.random() * W * 0.13; }
+          const r = m.r0 * (1 - 0.55 * Math.min(1, st.stage / 6));
+          const x = cxg + Math.cos(m.a) * r, y = cyg - m.h * cyg * 0.92 + Math.sin(m.a) * r * 0.25;
+          const col = MOTE[m.c];
+          plot(x, y, col); plot(x + 1, y, col); plot(x, y + 1, col); plot(x + 1, y + 1, col);
+          plot(cxg + Math.cos(m.a - 0.35) * r, y + 2, DIM);
+        }
+        // 3d) Einschlag-Welle auf dem Kreisboden
+        if (st.ripple) {
+          const age = (now - st.ripple) / 750;
+          if (age < 1) {
+            const rr = age * 1.8;
+            for (let a = 0; a < Math.PI * 2; a += 1 / (rx * Math.max(rr, 0.1))) {
+              const x = cxg + Math.cos(a) * rx * rr, y = cyg + Math.sin(a) * ry * rr, c = ((Math.round(x) + Math.round(y)) & 1) ? WHITE : GOLD;
+              plot(x, y, c); plot(x, y + 1, c); plot(x, y - 1, DIM);
+            }
+          }
+        }
+      } else if (ph !== 'reveal') {
+        // 3e) Avatar: Tunnel aus Quadraten, die vom Siegel nach außen strömen (je Stufe schneller, in der Überladung am schnellsten)
+        st.tun += 0.00032 * (1 + st.stage * 0.9) * ov * 66;   // ov enthält das Tempo
+        const N = 7, frac = st.tun % 1, pulse = Math.floor(tt / 400);
+        for (let k = 0; k < N; k++) {
+          const f = (k + frac) / N, h = 6 + f * f * Math.max(W, H) * 0.8, inten = (1 - f * 0.85) * (0.55 + 0.1 * st.stage);
+          const col = st.stage === 0 ? BLUE : (((k + pulse) & 1) ? CYAN : PINK), th = f < 0.4 ? 1 : 2;
+          const x0 = Math.round(ccx - h), x1 = Math.round(ccx + h), y0 = Math.round(ccy - h), y1 = Math.round(ccy + h);
+          for (let x = x0; x <= x1; x++) for (let q = 0; q < th; q++) {
+            if (inten > bay(x, y0 + q)) plot(x, y0 + q, col);
+            if (inten > bay(x, y1 - q)) plot(x, y1 - q, col);
+          }
+          for (let y = y0; y <= y1; y++) for (let q = 0; q < th; q++) {
+            if (inten > bay(x0 + q, y)) plot(x0 + q, y, col);
+            if (inten > bay(x1 - q, y)) plot(x1 - q, y, col);
+          }
+        }
+        // 3f) Funken umrunden das Siegel auf einer Quadratbahn
+        const active = Math.min(motes.length, st.stage * 8), dOrb = half * 1.35 + 3;
+        for (let i = 0; i < active; i++) {
+          const m = motes[i];
+          m.u = (m.u + (0.012 + 0.006 * st.stage) * ov) % 1;
+          const p = perim(m.u, dOrb + m.k * 0.6), t2 = perim((m.u + 0.97) % 1, dOrb + m.k * 0.6), col = MOTE[m.c];
+          plot(ccx + p[0], ccy + p[1], col); plot(ccx + p[0] + 1, ccy + p[1], col); plot(ccx + p[0], ccy + p[1] + 1, col); plot(ccx + p[0] + 1, ccy + p[1] + 1, col);
+          plot(ccx + t2[0], ccy + t2[1], DIM);
+        }
+      }
+      // 4) Explosion: Druckwellenring mit Dither-Rand + Strahlen vom Zentrum nach außen (kein Vollbildblitz)
+      if (st.blast) {
+        const age = (now - st.blast) / 800;
+        if (age < 1) {
+          const maxR = Math.hypot(W, H) * 0.62, R = (1 - (1 - age) * (1 - age)) * maxR, th = 4 + age * 9;
+          for (let a = 0; a < Math.PI * 2; a += 1 / Math.max(R * 0.8, 1)) {
+            const cs = Math.cos(a), sn = Math.sin(a);
+            for (let r = 0; r < th; r++) {
+              const rr = R - r; if (rr < 0) break;
+              const x = ccx + cs * rr, y = ccy + sn * rr, v = (1 - r / th) * (1 - age * 0.55) + 0.1;
+              if (v > bay(x, y)) plot(x, y, r < th * 0.25 ? HOT : (r < th * 0.6 ? GOLD : ORANGE));
+            }
+          }
+          for (const d of blastDirs) {
+            const L = R * d.l, cs = Math.cos(d.a), sn = Math.sin(d.a);
+            for (let u = R * 0.25; u < L; u += 1) {
+              const x = ccx + cs * u, y = ccy + sn * u;
+              if ((1 - u / (L + 1)) * (1 - age * 0.5) > bay(x, y)) plot(x, y, u < L * 0.5 ? HOT : GOLD);
+            }
+          }
+        }
+      }
+      // 5) Licht, das durch die Risse nach außen bricht: Strahlen in Rissrichtung, länger mit jeder Stufe, in der Überladung am längsten
+      if (ph === 'charge') {
+        for (let i = 0; i < 5; i++) {
+          const t = st.crack[i]; if (t < 0) continue;
+          const grow = Math.min(1, (now - t) / 380), L = W * 0.06 * (1 + st.stage * 0.5) * (st.overload > 0 ? 2.1 : 1) * grow;
+          for (const dir of cracks[i].dirs) {
+            const cs = Math.cos(dir), sn = Math.sin(dir);
+            for (let u = 0; u < L; u += 0.6) {
+              const fall = 1 - u / L, hw = Math.max(0.5, fall * (0.9 + st.stage * 0.25));
+              for (let o = -hw; o <= hw; o += 0.8) {
+                const x = ccx + cs * u - sn * o, y = ccy + sn * u + cs * o;
+                if (fall * 0.9 + 0.1 > bay(x, y)) plot(x, y, fall > 0.55 ? HOT : GOLD);
+              }
+            }
+          }
+        }
+      }
+      g.putImageData(img, 0, 0);
+      // 6) Risse auf dem Kartenrücken/Siegel: dunkle Kontur, gedithertes Leuchten, heller Kern; die Spitze wächst als weißer Funke
+      if (cc) {
+        cc.clearRect(0, 0, grid.w, grid.h);
+        if (ph === 'charge') {
+          const over = st.overload > 0, stage = st.stage, tips = [], vis = [];
+          for (let i = 0; i < 5; i++) {
+            const t = st.crack[i]; if (t < 0) continue;
+            const c = cracks[i], n = Math.max(1, Math.floor(Math.min(1, (now - t) / 380) * c.pts.length));
+            for (let k = 0; k < n; k++) vis.push(c.pts[k]);
+            if (n < c.pts.length) tips.push(c.pts[n - 1]);
+          }
+          cc.fillStyle = CC.dark;
+          for (const p of vis) { cc.fillRect(p.x - 1, p.y, 1, 1); cc.fillRect(p.x + 1, p.y, 1, 1); cc.fillRect(p.x, p.y - 1, 1, 1); cc.fillRect(p.x, p.y + 1, 1, 1); }
+          if (stage >= 2) {                                           // Leuchten: jedes zweite Randpixel in Orange
+            cc.fillStyle = CC.orange;
+            for (const p of vis) if (((p.x + p.y) & 1) === 0) { cc.fillRect(p.x - 1, p.y, 1, 1); cc.fillRect(p.x + 1, p.y, 1, 1); cc.fillRect(p.x, p.y - 1, 1, 1); cc.fillRect(p.x, p.y + 1, 1, 1); }
+          }
+          cc.fillStyle = (over || stage >= 3) ? CC.hot : CC.gold;
+          for (const p of vis) { cc.fillRect(p.x, p.y, 1, 1); if (stage >= 4 && p.r < 10) cc.fillRect(p.x + 1, p.y, 1, 1); }
+          cc.fillStyle = CC.white;
+          for (const p of tips) cc.fillRect(p.x, p.y, 2, 2);
+          if (tips.length) {                                          // Funken sprühen an den wachsenden Spitzen
+            const r = crackRef.current.getBoundingClientRect(), sp = [];
+            for (const p of tips) for (let q = 0; q < 2; q++) sp.push({ x: r.left + (p.x + 0.5) * r.width / grid.w, y: r.top + (p.y + 0.5) * r.height / grid.h,
+              vx: (Math.random() - 0.5) * 6, vy: -1 - Math.random() * 3, size: 4, color: Math.random() < 0.5 ? '#fad54a' : '#f7f7ad', shape: 'spark',
+              life: 1, decay: 0.07, gravity: 0.15, rotation: 0, rotSpeed: 0 });
+            emit(sp);
+          }
+        }
+      }
+    };
+    draw();
+    const id = setInterval(draw, 66);
+    return () => clearInterval(id);
+  }, []);
+
+  const click = () => {
+    if (phase === 'charge') { climax(); return; }
+    if (phase === 'shatter') { toReveal(); return; }
+    if (canClose) onClose();
+  };
+  // Funkeln: feste Plätze um die Karte (langsames Blinken per steps).
+  const STARS = [[-62, 12], [-74, 40], [-58, 70], [-70, 98], [58, 8], [72, 36], [60, 66], [74, 92], [-34, -4], [34, -2], [-20, 108], [22, 106]];
+  const ab = (n, base) => (n > 0 ? base + (n % 2 ? '-a' : '-b') : '');
+
+  return (
+    <div ref={rootRef} className={'pull-fx pull-fx-ph-' + phase + (AV ? ' pull-fx-avatar' : '')} onClick={click}>
+      <canvas ref={sceneRef} className="pull-fx-scene" />
+      <canvas ref={partRef} className="pull-fx-burst" />
+      <div className="pull-fx-hud" onClick={e => e.stopPropagation()}>
+        <button type="button" tabIndex={-1} className={'pull-fx-hud-btn' + (fast ? ' pull-fx-hud-on' : '')} onClick={() => onToggleFast && onToggleFast()}>
+          SPACE: SPEED x5 {fast ? 'ON' : 'OFF'}
+        </button>
+        <span className="pull-fx-hud-key">ESC: SKIP</span>
+      </div>
+      <div className={'pull-fx-stage ' + ab(quake, S.current.bigQuake ? 'pull-fx-bquake' : 'pull-fx-quake')} onClick={e => e.stopPropagation()}>
+        {phase === 'reveal' && (
+          <div className="pull-fx-banner">
+            <span key={sheen} className={'pull-fx-sheen ' + ab(sheen, 'pull-fx-sheen')} />
+            <span className="pull-fx-banner-text">NEW PULL!</span>
+          </div>
+        )}
+        <div ref={slotRef} className={'pull-fx-cardslot' + (AV ? ' pull-fx-slot-sq' : '')}>
+          {phase === 'charge' && (
+            <div className={'pull-fx-tremor ' + ab(tremor, 'pull-fx-trem') + (overload ? ' pull-fx-trem-hard' : '')}>
+              <img src={backUrl} className={'pull-fx-back' + (AV ? ' pull-fx-back-sq' : '')} draggable={false} />
+              <canvas ref={crackRef} className="pull-fx-cracks" />
+            </div>
+          )}
+          {phase === 'shatter' && (
+            <div className={'pull-fx-shards' + (AV ? ' pull-fx-shards-sq' : '')}
+              style={{ '--cols': NC, '--rows': NR, '--c1': NC - 1, '--r1': NR - 1, '--img': 'url(' + backUrl + ')' }}>
+              {shards.map((s, i) => (
+                <span key={i} className="pull-fx-shard" style={{ '--col': s.col, '--row': s.row, '--dx': s.dx + 'px', '--dy': s.dy + 'px', animationDelay: s.d + 'ms' }} />
+              ))}
+            </div>
+          )}
+          {phase === 'reveal' && (
+            <React.Fragment>
+              {AV
+                ? <div className="pull-fx-front pull-fx-front-sq"><ShopMosaic src={reveal.imgUrl} fast={fast} /></div>
+                : <div className="pull-fx-front"><img src={reveal.imgUrl} draggable={false} /></div>}
+              {STARS.map((s, i) => (
+                <span key={i} className="pull-fx-star" style={{ left: s[0] + '%', top: s[1] + '%', animationDelay: (i * 160) + 'ms' }} />
+              ))}
+            </React.Fragment>
+          )}
+        </div>
+        {phase === 'reveal' && (
+          <React.Fragment>
+            {reveal.label && <div className="pull-fx-label">{reveal.label}</div>}
+            {reveal.subtitle && <div className="pull-fx-subtitle">{reveal.subtitle}</div>}
+            <button className={'btn pull-fx-btn' + (canClose ? ' pull-fx-btn-on' : '')} disabled={!canClose}
+              onClick={(e) => { e.stopPropagation(); onClose(); }}>NICE!</button>
+          </React.Fragment>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// Raster, das nur die ersten Kacheln rendert und beim Scrollen nachlädt: ~220 Avatar-Kacheln auf einmal
+// (DOM, Bilder, Styles) kosteten beim Reiterwechsel spürbar Zeit. Der Wächter am Ende lädt nach, sobald er
+// (mit Vorlauf) in den Sichtbereich des scrollenden Elternelements kommt.
+function ShopLazyGrid({ items, renderItem, className, resetKey, step = 48 }) {
+  const [limit, setLimit] = useState(step);
+  const sentinel = useRef(null);
+  useEffect(() => { setLimit(step); }, [resetKey]);
+  useEffect(() => {
+    const el = sentinel.current;
+    if (!el || limit >= items.length || typeof IntersectionObserver === 'undefined') return undefined;
+    let root = el.parentElement;
+    while (root && root !== document.body) {
+      const oy = getComputedStyle(root).overflowY;
+      if (oy === 'auto' || oy === 'scroll') break;
+      root = root.parentElement;
+    }
+    if (root === document.body) root = null;
+    const io = new IntersectionObserver((es) => { if (es.some(e => e.isIntersecting)) setLimit(l => l + step); },
+      { root, rootMargin: '0px 0px 700px 0px' });
+    io.observe(el);
+    return () => io.disconnect();
+  }, [limit, items.length]);
+  return (
+    <React.Fragment>
+      <div className={className}>{items.slice(0, limit).map(renderItem)}</div>
+      {limit < items.length && <div ref={sentinel} style={{ height: 1 }} />}
+    </React.Fragment>
   );
 }
 
@@ -3720,6 +4466,10 @@ function ShopScreen() {
   const [buying, setBuying] = useState(false);
   const [tab, setTab] = useState('skins');
   const [skinFilter, setSkinFilter] = useState('');
+  // ×5-Modus für die Pull-Animationen (auch per Leertaste im Reveal umschaltbar), pro Gerät gemerkt
+  const [fastPull, setFastPull] = useState(() => { try { return localStorage.getItem('pp_pull_fast') === '1'; } catch { return false; } });
+  useEffect(() => { try { localStorage.setItem('pp_pull_fast', fastPull ? '1' : '0'); } catch {} }, [fastPull]);
+  const [collFilter, setCollFilter] = useState('all'); // Sammlungsansicht: 'all' | 'owned' | 'missing'
   const [selected, setSelected] = useState(null); // { type, id }
   const [celebration, setCelebration] = useState(null); // { cx, cy } or null
   const [randomReveal, setRandomReveal] = useState(null); // { imgUrl, label, subtitle } or null
@@ -3782,9 +4532,12 @@ function ShopScreen() {
   // Fires the "Khekhekhe!" speech bubble + celebration + SFX trio that
   // every purchase path shares. Centralized so adding a new buy handler
   // automatically gets the shopkeep reaction.
-  const triggerPurchaseFanfare = useCallback((pos) => {
-    setCelebration(pos);
-    if (window.playSFX) window.playSFX('shop_purchase');
+  const triggerPurchaseFanfare = useCallback((pos, opt) => {
+    // Pulls: Konfetti und Klang liefert der Reveal (ShopPullReveal) selbst.
+    if (!(opt && opt.pull)) {
+      setCelebration(pos);
+      if (window.playSFX) window.playSFX('shop_purchase');
+    }
     lastPurchaseAtRef.current = Date.now();
     setBubble(prev => ({ visible: true, key: prev.key + 1, text: 'Khekhekhe!', chatter: false }));
     if (bubbleTimerRef.current) clearTimeout(bubbleTimerRef.current);
@@ -3862,17 +4615,18 @@ function ShopScreen() {
     if (!((user.sc || 0) >= structureCatalog.randomPrice)) { notify('Not enough 🪙!', 'error'); return; }
     const pos = e ? getItemCenter(e) : { cx: window.innerWidth / 2, cy: window.innerHeight / 2 };
     setBuying(true);
+    setRandomReveal({ pending: true, kind: 'card' });   // die Inszenierung startet sofort, das Ergebnis kommt nach
     try {
       const data = await api('/shop/buy-random-structure-deck', { method: 'POST' });
       setUser(u => ({ ...u, sc: data.sc }));
-      triggerPurchaseFanfare(pos);
+      triggerPurchaseFanfare(pos, { pull: true });
       setRandomReveal({
         imgUrl: (data.coverCard && window.cardImageUrl) ? (window.cardImageUrl(data.coverCard) || '/cardback.png') : '/cardback.png',
         label: data.name,
         subtitle: 'New Structure Deck!',
       });
       await refreshStructures();
-    } catch (e2) { notify(e2.message, 'error'); }
+    } catch (e2) { setRandomReveal(null); notify(e2.message, 'error'); }
     setBuying(false);
   };
 
@@ -3900,7 +4654,7 @@ function ShopScreen() {
     else return;
     try {
       const data = await api('/profile', { method: 'PUT', body: JSON.stringify({
-        color: user.color || '#00f0ff', avatar, cardback, bio: user.bio || '', board,
+        color: user.color || '#66b6ff', avatar, cardback, bio: user.bio || '', board,
       })});
       setUser(data.user);
       if (window.playSFX) window.playSFX('ui_click');
@@ -3921,7 +4675,8 @@ function ShopScreen() {
 
   // Get center coords of the clicked button's parent .shop-item
   const getItemCenter = (e) => {
-    const item = e.target.closest('.shop-item') || e.target.closest('.shop-random-wrap');
+    const item = e.target.closest('.shop-item') || e.target.closest('.shop-random-wrap')
+      || e.target.closest('.shop-gacha') || e.target.closest('.shop-coll-head');
     if (item) {
       const r = item.getBoundingClientRect();
       return { cx: r.left + r.width / 2, cy: r.top + r.height / 2 };
@@ -3950,17 +4705,18 @@ function ShopScreen() {
     if (!((user.sc || 0) >= rp)) { notify('Not enough 🪙!', 'error'); return; }
     const pos = e ? getItemCenter(e) : { cx: window.innerWidth / 2, cy: window.innerHeight / 2 };
     setBuying(true);
+    setRandomReveal({ pending: true, kind: 'card' });
     try {
       const data = await api('/shop/buy-random-skin', { method: 'POST' });
       setOwned(prev => ({ ...prev, skin: [...prev.skin, data.skinName] }));
       setUser(u => ({ ...u, sc: data.sc }));
-      triggerPurchaseFanfare(pos);
+      triggerPurchaseFanfare(pos, { pull: true });
       setRandomReveal({
         imgUrl: '/cards/skins/' + encodeURIComponent(data.skinName) + '.png',
         label: data.skinName,
         subtitle: data.heroName
       });
-    } catch (e) { notify(e.message, 'error'); }
+    } catch (e) { setRandomReveal(null); notify(e.message, 'error'); }
     setBuying(false);
   };
 
@@ -3970,18 +4726,21 @@ function ShopScreen() {
     if (!((user.sc || 0) >= rp)) { notify('Not enough 🪙!', 'error'); return; }
     const pos = e ? getItemCenter(e) : { cx: window.innerWidth / 2, cy: window.innerHeight / 2 };
     setBuying(true);
+    const kind = itemType === 'avatar' ? 'avatar' : 'card';   // Avatare sind quadratisch und haben eine eigene Inszenierung
+    setRandomReveal({ pending: true, kind });
     try {
       const data = await api('/shop/buy-random', { method: 'POST', body: JSON.stringify({ itemType }) });
       setOwned(prev => ({ ...prev, [itemType]: [...prev[itemType], data.itemId] }));
       setUser(u => ({ ...u, sc: data.sc }));
-      triggerPurchaseFanfare(pos);
+      triggerPurchaseFanfare(pos, { pull: true });
       const subdir = itemType === 'avatar' ? 'avatars' : 'sleeves';
       setRandomReveal({
         imgUrl: '/data/shop/' + subdir + '/' + encodeURIComponent(data.itemId) + '.png',
         label: itemType === 'sleeve' ? ((catalog.sleeves || []).find(s => s.id === data.itemId)?.name || null) : null,
-        subtitle: itemType === 'avatar' ? 'New Avatar!' : 'New Sleeve!'
+        subtitle: itemType === 'avatar' ? 'New Avatar!' : 'New Sleeve!',
+        kind,
       });
-    } catch (e) { notify(e.message, 'error'); }
+    } catch (e) { setRandomReveal(null); notify(e.message, 'error'); }
     setBuying(false);
   };
 
@@ -4002,29 +4761,13 @@ function ShopScreen() {
     skin: new Set(owned.skin),
   };
 
-  // Gather unique hero names for skin filter
-  const heroNames = [...new Set((catalog.skins || []).map(s => s.heroName))].sort();
-  const filteredSkins = skinFilter
-    ? (catalog.skins || []).filter(s => s.heroName === skinFilter)
-    : (catalog.skins || []);
-
   const isSelected = (type, id) => selected && selected.type === type && selected.id === id;
 
+  // Nur noch Boards: Skins, Avatare und Sleeves gibt es ausschließlich per Pull (renderGachaPage).
   const renderItemGrid = (items, type, imgBase) => {
     if (items.length === 0) return <div className="shop-empty">No items available yet</div>;
-    const unownedCount = items.filter(it => !ownedSet[type].has(it.id)).length;
-    const hasRandom = type === 'avatar' || type === 'sleeve';
     return (
       <React.Fragment>
-        {hasRandom && (
-          <div className="shop-random-wrap">
-            <button className="btn shop-random-btn" disabled={buying || unownedCount === 0 || !((user.sc || 0) >= randomPrices[type])}
-              onClick={(e) => buyRandom(type, e)}>
-              🎲 Random {type === 'avatar' ? 'Avatar' : 'Sleeve'} — <img src="/data/sc.png" className="shop-sc-icon" /> {randomPrices[type] ?? '?'}
-            </button>
-            <span className="shop-random-hint">{unownedCount > 0 ? unownedCount + ' left to collect' : 'All collected!'}</span>
-          </div>
-        )}
         <div className="shop-grid">
           {items.map(item => {
             const isOwned = ownedSet[type].has(item.id);
@@ -4150,62 +4893,165 @@ function ShopScreen() {
     );
   };
 
-  const renderSkinGrid = () => {
-    if ((catalog.skins || []).length === 0) return <div className="shop-empty">No skins available yet</div>;
-    const allOwned = ownedSet.skin;
-    const unownedCount = (catalog.skins || []).filter(s => !allOwned.has(s.id)).length;
+  // ── Gacha-Seiten (Skins / Avatare / Sleeves) ────────────────────────────
+  // Diese drei Dinge kann man NICHT gezielt kaufen, nur ziehen (Pull): oben der Pull-Automat mit
+  // „Möglichen Pulls“, darunter die eigene Sammlung (Besitz = Karte in Farbe, noch Fehlendes = gesperrt).
+  const gachaDefs = {
+    skin: {
+      title: 'SKIN PULL', noun: 'Skin', plural: 'skins',
+      items: (catalog.skins || []).map(s => ({ id: s.id, name: s.skinName, sub: s.heroName, heroName: s.heroName,
+        src: '/cards/skins/' + encodeURIComponent(s.skinName) + '.png' })),
+    },
+    avatar: {
+      title: 'AVATAR PULL', noun: 'Avatar', plural: 'avatars',
+      items: (catalog.avatars || []).map(a => ({ id: a.id, name: a.name || '', src: '/data/shop/avatars/' + encodeURIComponent(a.file) })),
+    },
+    sleeve: {
+      title: 'SLEEVE PULL', noun: 'Sleeve', plural: 'sleeves',
+      items: (catalog.sleeves || []).map(s => ({ id: s.id, name: s.name || '', src: '/data/shop/sleeves/' + encodeURIComponent(s.file) })),
+    },
+  };
+  const gachaCounts = (type) => {
+    const items = gachaDefs[type].items;
+    return { owned: items.filter(it => ownedSet[type].has(it.id)).length, total: items.length };
+  };
+
+  // Tempo-Schalter der Pull-Animationen: direkt am Pull-Knopf (Gacha-Seiten und Zufalls-Structure-Deck), gemeinsamer Zustand.
+  const speedToggle = (
+    <label className="shop-fast" title="Play the pull animations at 5x speed. During an animation: Space toggles, Esc skips.">
+      <input type="checkbox" checked={fastPull} onChange={e => { setFastPull(e.target.checked); if (window.playSFX) window.playSFX('ui_click'); }} />
+      <span className="shop-fast-box" aria-hidden="true" />
+      <span className="shop-fast-text">ANIMATION SPEED x5</span>
+    </label>
+  );
+
+  const renderGachaPage = (type) => {
+    const def = gachaDefs[type];
+    const items = def.items;
+    if (items.length === 0) return <div className="shop-empty">No {def.plural} available yet</div>;
+    const price = randomPrices[type];
+    const missing = items.filter(it => !ownedSet[type].has(it.id));
+    const ownedN = items.length - missing.length;
+    const pct = Math.round(100 * ownedN / items.length);
+    const canPull = !buying && missing.length > 0 && (user.sc || 0) >= price;
+    const pull = (e) => (type === 'skin' ? buyRandomSkin(e) : buyRandom(type, e));
+    const pullLabel = (
+      <React.Fragment>🎲 PULL — <img src="/data/sc.png" className="shop-sc-icon" /> {price ?? '?'}</React.Fragment>
+    );
+
+    const heroQuery = skinFilter.trim().toLowerCase();
+    const filtered = items.filter(it => {
+      if (type === 'skin' && heroQuery && !String(it.heroName).toLowerCase().includes(heroQuery)) return false;
+      const own = ownedSet[type].has(it.id);
+      return collFilter === 'owned' ? own : collFilter === 'missing' ? !own : true;
+    });
+    const chips = [
+      { id: 'all', label: 'ALL', n: items.length },
+      { id: 'owned', label: 'OWNED', n: ownedN },
+      { id: 'missing', label: 'MISSING', n: missing.length },
+    ];
+
     return (
-      <React.Fragment>
-        {/* Random Skin Button */}
-        <div className="shop-random-wrap">
-          <button className="btn shop-random-btn" disabled={buying || unownedCount === 0 || !((user.sc || 0) >= randomPrices.skin)}
-            onClick={(e) => buyRandomSkin(e)}>
-            🎲 Random Skin — <img src="/data/sc.png" className="shop-sc-icon" /> {randomPrices.skin ?? '?'}
-          </button>
-          <span className="shop-random-hint">{unownedCount > 0 ? unownedCount + ' skin' + (unownedCount !== 1 ? 's' : '') + ' left to collect' : 'All collected!'}</span>
+      <div className="shop-gacha-page">
+        <div className="shop-gacha-pinned">
+        <div className="shop-gacha">
+          <div className="shop-gacha-machine">
+            <div className="shop-gacha-title">{def.title}</div>
+            <div className="shop-gacha-capsule" aria-hidden="true"><span className="shop-gacha-q" /></div>
+            <button className="btn shop-random-btn shop-gacha-btn" disabled={!canPull} onClick={pull}>{pullLabel}</button>
+            {speedToggle}
+            <div className="shop-gacha-hint">
+              {missing.length > 0
+                ? missing.length + ' ' + (missing.length === 1 ? def.noun.toLowerCase() : def.plural) + ' still to discover'
+                : 'Collection complete!'}
+            </div>
+          </div>
+          <div className="shop-gacha-preview">
+            <div className="shop-gacha-preview-title">
+              {missing.length > 0 ? 'POSSIBLE PULLS' : 'YOU HAVE THEM ALL'}
+            </div>
+            <div className="shop-gacha-rule">No buying — every pull unlocks a random {def.noun.toLowerCase()} you don’t own yet.</div>
+            {missing.length > 0 && (
+              <ShopPullPreview pool={missing} type={type}
+                onHover={type === 'skin' ? (it => setHoverSkin(it ? { skinName: it.name, heroName: it.heroName } : null)) : null} />
+            )}
+          </div>
         </div>
-        <div className="shop-grid shop-grid-skins">
-          {filteredSkins.map(skin => {
-            const isOwned = ownedSet.skin.has(skin.id);
-            const sel = isSelected('skin', skin.id);
-            const showHero = skinShowHero.has(skin.id);
-            const imgSrc = showHero
-              ? (cardImageUrl(skin.heroName) || '/cardback.png')
-              : '/cards/skins/' + encodeURIComponent(skin.skinName) + '.png';
-            return (
-              <div key={skin.id} className={'shop-item shop-skin-item' + (isOwned ? ' shop-owned' : ' shop-unowned-skin') + (sel ? ' shop-selected' : '')}
-                onMouseEnter={() => setHoverSkin({ skinName: skin.skinName, heroName: skin.heroName })}
-                onMouseLeave={() => setHoverSkin(null)}
-                onClick={() => toggleSelect('skin', skin.id)}>
-                <span className="shop-item-zier" aria-hidden="true" />
-                <div className="shop-item-img-wrap">
-                  <img src={imgSrc} draggable={false}
-                    className={!isOwned ? 'shop-skin-locked' : ''} />
-                  {isOwned && <div className="shop-owned-badge">OWNED</div>}
-                  {!isOwned && (
-                    <div className="shop-lock-overlay">
-                      <span className="shop-lock-badge" aria-label="Locked">🔒</span>
-                    </div>
+
+        <div className="shop-coll-head">
+          <div className="shop-coll-head-in">
+            <div className="shop-coll-title">YOUR COLLECTION</div>
+            <div className="shop-coll-count">{ownedN} / {items.length}</div>
+            <div className="shop-coll-bar" role="progressbar" aria-valuemin={0} aria-valuemax={items.length} aria-valuenow={ownedN}>
+              <span style={{ width: pct + '%' }} />
+            </div>
+            <div className="shop-coll-filters">
+              {chips.map(c => (
+                <button key={c.id} className={'shop-coll-chip' + (collFilter === c.id ? ' shop-coll-chip-active' : '')}
+                  onClick={() => { setCollFilter(c.id); if (window.playSFX) window.playSFX('ui_click'); }}>
+                  {c.label} <span className="shop-coll-chip-n">{c.n}</span>
+                </button>
+              ))}
+              {type === 'skin' && (
+                <input type="text" className="shop-coll-search" value={skinFilter} placeholder="Filter by Hero name…"
+                  onChange={e => setSkinFilter(e.target.value)} aria-label="Filter by Hero name" spellCheck={false} autoComplete="off" />
+              )}
+            </div>
+          </div>
+        </div>
+        </div>
+
+        <div className="shop-coll-scroll">
+
+        {filtered.length === 0 ? (
+          <div className="shop-empty">
+            {collFilter === 'owned'
+              ? 'Nothing here yet — pull to start your ' + def.noun.toLowerCase() + ' collection!'
+              : 'Nothing to show for this filter.'}
+          </div>
+        ) : (
+          <ShopLazyGrid key={type} items={filtered} resetKey={type + '|' + collFilter + '|' + heroQuery}
+            className={'shop-grid' + (type === 'skin' ? ' shop-grid-skins' : '')}
+            renderItem={(it) => {
+              const isOwned = ownedSet[type].has(it.id);
+              const equipped = type !== 'skin' && isOwned && isEquipped(type, it.id);
+              const showHero = type === 'skin' && skinShowHero.has(it.id);
+              const imgSrc = showHero ? (cardImageUrl(it.heroName) || '/cardback.png') : it.src;
+              const cls = 'shop-item'
+                + (type === 'avatar' ? ' shop-avatar-item' : '')
+                + (type === 'skin' ? ' shop-skin-item' : '')
+                + (isOwned ? ' shop-owned' : ' shop-unowned-skin shop-missing')
+                + (equipped ? ' shop-equipped' : '');
+              return (
+                <div key={it.id} className={cls}
+                  onMouseEnter={type === 'skin' ? () => setHoverSkin({ skinName: it.name, heroName: it.heroName }) : undefined}
+                  onMouseLeave={type === 'skin' ? () => setHoverSkin(null) : undefined}
+                  onClick={type === 'skin' ? undefined : () => { if (isOwned && !equipped) equipItem(type, it.id); }}>
+                  <span className="shop-item-zier" aria-hidden="true" />
+                  <div className="shop-item-img-wrap">
+                    <img src={imgSrc} draggable={false} loading="lazy" decoding="async" className={isOwned || showHero ? '' : 'shop-skin-locked'} />
+                    {equipped ? <div className="shop-owned-badge shop-equipped-badge">EQUIPPED</div>
+                      : isOwned ? <div className="shop-owned-badge">OWNED</div> : showHero ? null : (
+                        <div className="shop-lock-overlay">
+                          <span className="shop-lock-badge" aria-label="Locked">🔒</span>
+                        </div>
+                      )}
+                  </div>
+                  {it.name && type !== 'skin' && <div className="shop-item-name" title={it.name}>{it.name}</div>}
+                  {/* Zwischen Skin- und Heldenbild umschalten, damit man sieht, zu welchem Helden ein Skin gehört
+                      (Skin-Namen sind für die Kachel meist zu lang). */}
+                  {type === 'skin' && (
+                    <button className="btn shop-skin-toggle"
+                      onClick={(e) => { e.stopPropagation(); toggleSkinHero(it.id); if (window.playSFX) window.playSFX('ui_click'); }}>
+                      {showHero ? 'Show Skin' : 'Show Hero'}
+                    </button>
                   )}
                 </div>
-                {/* Flip between the skin art and the original Hero art so the
-                    player can tell which Hero a skin belongs to (names removed
-                    because most skin names overflowed the tile). */}
-                <button className="btn shop-skin-toggle"
-                  onClick={(e) => { e.stopPropagation(); toggleSkinHero(skin.id); if (window.playSFX) window.playSFX('ui_click'); }}>
-                  {showHero ? 'Show Skin' : 'Show Hero'}
-                </button>
-                {!isOwned && (
-                  <button className="btn shop-buy-btn" disabled={buying || !((user.sc || 0) >= prices.skin)}
-                    onClick={(e) => buyItem('skin', skin.id, prices.skin, e)}>
-                    <img src="/data/sc.png" className="shop-sc-icon" /> {prices.skin}
-                  </button>
-                )}
-              </div>
-            );
-          })}
+              );
+            }} />
+        )}
         </div>
-      </React.Fragment>
+      </div>
     );
   };
 
@@ -4224,6 +5070,7 @@ function ShopScreen() {
             onClick={buyRandomStructureDeck}>
             🎲 Random Structure Deck — <img src="/data/sc.png" className="shop-sc-icon" /> {randomPrice ?? '?'}
           </button>
+          {speedToggle}
           <span className="shop-random-hint">{unownedCount > 0 ? unownedCount + ' left to collect' : 'All collected!'}</span>
         </div>
         <div className="shop-grid">
@@ -4258,22 +5105,22 @@ function ShopScreen() {
                 <span className="shop-item-zier" aria-hidden="true" />
                 <img src={coverUrl} alt={d.name} draggable={false}
                   style={{ width: '100%', height: 148, objectFit: 'cover', objectPosition: 'center top', borderRadius: 4, opacity: d.owned ? 1 : 0.5 }} />
-                <div style={{ fontSize: 11, textAlign: 'center', padding: '6px 4px 2px', color: isCurrentDefault ? '#33ff88' : (d.owned ? '#ffd700' : 'var(--text2)'), fontWeight: 600 }}>
+                <div style={{ fontSize: 11, textAlign: 'center', padding: '6px 4px 2px', color: isCurrentDefault ? '#4ceb70' : (d.owned ? '#fad54a' : 'var(--text2)'), fontWeight: 600 }}>
                   {d.name}
                 </div>
                 {d.owned ? (
                   isCurrentDefault ? (
-                    <div className="shop-price" style={{ borderColor: '#33ff88', color: '#33ff88' }}>DEFAULT</div>
+                    <div className="shop-price" style={{ borderColor: '#4ceb70', color: '#4ceb70' }}>DEFAULT</div>
                   ) : (
                     <button className="btn" onClick={(e) => { e.stopPropagation(); pickStructureAsDefault(d.id); }}
-                      style={{ padding: '4px 10px', fontSize: 11, marginTop: 4, borderColor: '#ffd700', color: '#ffd700' }}>
+                      style={{ padding: '4px 10px', fontSize: 11, marginTop: 4, borderColor: '#fad54a', color: '#fad54a' }}>
                       SELECT
                     </button>
                   )
                 ) : (
                   <button className="btn" disabled={buying || !canAfford}
                     onClick={(e) => buyStructureDeck(d.structureId, e)}
-                    style={{ padding: '4px 10px', fontSize: 11, marginTop: 4, borderColor: '#ffd700', color: canAfford ? '#ffd700' : 'var(--text2)' }}>
+                    style={{ padding: '4px 10px', fontSize: 11, marginTop: 4, borderColor: '#fad54a', color: canAfford ? '#fad54a' : 'var(--text2)' }}>
                     🔒 {price ?? '?'} <CoinIcon size={13} />
                   </button>
                 )}
@@ -4290,10 +5137,11 @@ function ShopScreen() {
     );
   };
 
+  const tabCount = (type) => { const c = gachaCounts(type); return c.owned + '/' + c.total; };
   const tabs = [
-    { id: 'skins', label: '🎨 Skins', count: (catalog.skins || []).length },
-    { id: 'avatars', label: '👤 Avatars', count: (catalog.avatars || []).length },
-    { id: 'sleeves', label: '🃏 Sleeves', count: (catalog.sleeves || []).length },
+    { id: 'skins', label: '🎨 Skins', count: tabCount('skin') },
+    { id: 'avatars', label: '👤 Avatars', count: tabCount('avatar') },
+    { id: 'sleeves', label: '🃏 Sleeves', count: tabCount('sleeve') },
     { id: 'cpuSleeves', label: '🏆 Opponent Sleeves', count: (cpuSleeves.sleeves || []).length },
     { id: 'cpuAvatars', label: '🏆 Opponent Avatars', count: (cpuAvatars.avatars || []).length },
     { id: 'boards', label: '🎮 Boards', count: (catalog.boards || []).length },
@@ -4301,7 +5149,7 @@ function ShopScreen() {
   ];
 
   return (
-    <div className="screen-full shop-screen" style={{ background: 'linear-gradient(180deg, #0a0a12 0%, #12101f 40%, #0a0a12 100%)' }}>
+    <div className="screen-full shop-screen" style={{ background: 'linear-gradient(180deg, #08060c 0%, #12101f 40%, #08060c 100%)' }}>
       {/* Shopkeep — pinned to the top-left corner at the same vertical
           level as the "Random X" buttons inside each sub-tab. The sprite
           bobs via a slow CSS float animation (see .shop-antonia-float);
@@ -4322,25 +5170,12 @@ function ShopScreen() {
         </span>
       </div>
       {celebration && <PurchaseCelebration cx={celebration.cx} cy={celebration.cy} onDone={() => setCelebration(null)} />}
-      {randomReveal && (
-        <div className="modal-overlay" style={{ zIndex: 90000 }} onClick={() => setRandomReveal(null)}>
-          <div className="shop-reveal-modal animate-in" onClick={e => e.stopPropagation()}>
-            <div className="shop-reveal-glow" />
-            <div className="shop-reveal-img-wrap">
-              <img src={randomReveal.imgUrl} draggable={false} />
-            </div>
-            {randomReveal.label && <div className="shop-reveal-label">{randomReveal.label}</div>}
-            {randomReveal.subtitle && <div className="shop-reveal-subtitle">{randomReveal.subtitle}</div>}
-            <button className="btn" style={{ marginTop: 16, padding: '8px 32px', fontSize: 13, borderColor: '#ffd700', color: '#ffd700' }}
-              onClick={() => setRandomReveal(null)}>NICE!</button>
-          </div>
-        </div>
-      )}
+      {randomReveal && <ShopPullReveal reveal={randomReveal} fast={fastPull} onToggleFast={() => setFastPull(v => !v)} onClose={() => setRandomReveal(null)} />}
       <div className="top-bar">
         <button className="btn" onClick={() => setScreen('menu')}>← BACK</button>
         <h2 className="orbit-font" style={{ fontSize: 22, fontWeight: 800, color: 'var(--player-color)' }}>SHOP</h2>
         <div style={{ flex: 1 }} />
-        <div className="badge" style={{ background: 'rgba(255,215,0,.12)', color: '#ffd700', display: 'flex', alignItems: 'center', gap: 6, fontSize: 18, padding: '6px 14px' }}>
+        <div className="badge" style={{ background: 'rgba(250,213,74,.12)', color: '#fad54a', display: 'flex', alignItems: 'center', gap: 6, fontSize: 18, padding: '6px 14px' }}>
           <img src="/data/sc.png" style={{ width: 22, height: 22, imageRendering: 'pixelated' }} /> {user.sc || 0}
         </div>
         <VolumeControl />
@@ -4352,10 +5187,10 @@ function ShopScreen() {
           </button>
         ))}
       </div>
-      <div className="shop-content animate-in">
-        {tab === 'skins' && renderSkinGrid()}
-        {tab === 'avatars' && renderItemGrid(catalog.avatars || [], 'avatar', '/data/shop/avatars/')}
-        {tab === 'sleeves' && renderItemGrid(catalog.sleeves || [], 'sleeve', '/data/shop/sleeves/')}
+      <div className={'shop-content animate-in' + ((tab === 'skins' || tab === 'avatars' || tab === 'sleeves') ? ' shop-content-gacha' : '')}>
+        {tab === 'skins' && renderGachaPage('skin')}
+        {tab === 'avatars' && renderGachaPage('avatar')}
+        {tab === 'sleeves' && renderGachaPage('sleeve')}
         {tab === 'cpuSleeves' && renderCpuSleeves()}
         {tab === 'cpuAvatars' && renderCpuAvatars()}
         {tab === 'boards' && renderItemGrid(catalog.boards || [], 'board', '/data/shop/boards/')}
@@ -4482,7 +5317,7 @@ function RulesScreen({ onBack }) {
   );
 
   return (
-    <div className="screen-full" style={{ background: 'linear-gradient(180deg, #0a0a12 0%, #10101d 40%, #0a0a12 100%)' }}>
+    <div className="screen-full" style={{ background: 'linear-gradient(180deg, #08060c 0%, #12101f 40%, #08060c 100%)' }}>
       <div className="top-bar">
         <button className="btn" onClick={goBack}>← BACK</button>
         <h2 className="orbit-font" style={{ fontSize: 22, fontWeight: 800, color: 'var(--player-color)' }}>RULES</h2>
@@ -4522,18 +5357,18 @@ function RulesScreen({ onBack }) {
           <div className="rules-divider" />
 
           {/* ── HEROES ── */}
-          <SectionTitle id="heroes"><span style={{ color: '#aa44ff' }}>Heroes</span></SectionTitle>
+          <SectionTitle id="heroes"><span style={{ color: '#a040ff' }}>Heroes</span></SectionTitle>
           <div className="rules-card-row">
             <Img src="hero.png" alt="Hero card example" className="rules-card-img" />
             <div className="rules-text-block">
               <p>Heroes are the backbone of your strategy! You start the game with three different ones and have to defeat all enemy Heroes to win.</p>
               <p>Your deck may contain Hero cards, but you can never play new Heroes from your hand to bolster your party!</p>
               <p>Each Hero brings a unique effect, two Starting Abilities, and its own stats to the table, so there's a lot to consider when choosing your perfect Party!</p>
-              <h3 className="rules-sub-title orbit-font" style={{ color: '#4488ff' }}>Starting Abilities</h3>
+              <h3 className="rules-sub-title orbit-font" style={{ color: '#4580f6' }}>Starting Abilities</h3>
               <p>The two Ability cards specified here are attached to that Hero before the start of the game. They do not come from or count as part of your main deck.</p>
-              <h3 className="rules-sub-title orbit-font" style={{ color: '#ff3366' }}>HP</h3>
+              <h3 className="rules-sub-title orbit-font" style={{ color: '#fc1c5f' }}>HP</h3>
               <p>If a Hero's HP drops to 0, it is defeated and grayed out on the board. Its Abilities stay attached to it, and there are ways to revive it, so it is not removed from the board.</p>
-              <h3 className="rules-sub-title orbit-font" style={{ color: '#c0c0c0' }}>Attack</h3>
+              <h3 className="rules-sub-title orbit-font" style={{ color: '#b9b9b9' }}>Attack</h3>
               <p>A Hero's Attack stat is used to determine the damage it deals with Attack cards. Heroes do <strong>NOT</strong> have the inherent ability to attack targets — an Attack card is always necessary!</p>
             </div>
           </div>
@@ -4541,7 +5376,7 @@ function RulesScreen({ onBack }) {
           <div className="rules-divider" />
 
           {/* ── ABILITIES ── */}
-          <SectionTitle id="abilities"><span style={{ color: '#4488ff' }}>Abilities</span></SectionTitle>
+          <SectionTitle id="abilities"><span style={{ color: '#4580f6' }}>Abilities</span></SectionTitle>
           <div className="rules-card-row">
             <Img src="ability.png" alt="Ability card example" className="rules-card-img" />
             <div className="rules-text-block">
@@ -4549,7 +5384,7 @@ function RulesScreen({ onBack }) {
               <p>Each Hero has <strong>three Ability Zones</strong> and can thus have up to three different Abilities attached to it. Additionally, copies of the same Ability on the same Hero are stacked on top of each other in the same Ability Zone, leveling that Ability up. All in all, a Hero can have up to <strong>9 Ability cards</strong> attached to it!</p>
               <p>A player can only attach <strong>one Ability to each of their Heroes every turn</strong>, and Abilities can be used the turn they are attached.</p>
               <p>When a Hero is defeated, its Abilities stay attached to it. They remain on the board, but are <strong>negated</strong> and cannot be activated in any way until that Hero is revived.</p>
-              <h3 className="rules-sub-title orbit-font" style={{ color: '#4488ff' }}>Effects per Level</h3>
+              <h3 className="rules-sub-title orbit-font" style={{ color: '#4580f6' }}>Effects per Level</h3>
               <p>What effect an Ability provides depends on its level, meaning the number of copies attached to that Hero. At one copy (level 1), the top effect applies. At two copies (level 2), it's the middle effect, and at three copies (level 3), it's the bottom.</p>
               <p>If an Ability has a once per turn effect that you can choose to activate during your turn, you can only activate that effect <strong>once during that turn</strong>, even if multiple Heroes have it!</p>
               <p className="rules-callout">You can not choose to use an Ability at a lower level than it has!</p>
@@ -4559,7 +5394,7 @@ function RulesScreen({ onBack }) {
           <div className="rules-divider" />
 
           {/* ── ATTACKS & SPELLS ── */}
-          <SectionTitle id="attacks-spells"><span style={{ color: '#ff3366' }}>Attacks, Spells and Creatures</span></SectionTitle>
+          <SectionTitle id="attacks-spells"><span style={{ color: '#fc1c5f' }}>Attacks, Spells and Creatures</span></SectionTitle>
           <div className="rules-card-row">
             <Img src="spell.png" alt="Spell card example" className="rules-card-img" />
             <div className="rules-text-block">
@@ -4570,27 +5405,27 @@ function RulesScreen({ onBack }) {
             </div>
           </div>
 
-          <h3 className="rules-sub-title orbit-font" style={{ color: '#ff3366' }}>Sub-Types</h3>
+          <h3 className="rules-sub-title orbit-font" style={{ color: '#fc1c5f' }}>Sub-Types</h3>
           <p style={{ marginBottom: 12, fontSize: 17, lineHeight: 1.7 }}>There are 5 total Sub-Types of Attacks, Spells and Creatures. If a card has no icon at the bottom left, it is a "Normal" type — resolved when played and sent to the discard pile.</p>
 
           <div className="rules-subtype-grid">
             <div className="rules-subtype-entry">
-              <div className="rules-school-header" style={{ color: '#ff3366' }}><img src="/rules/icon-attach.png" className="rules-school-icon" /> <span>Attachments</span></div>
+              <div className="rules-school-header" style={{ color: '#fc1c5f' }}><img src="/rules/icon-attach.png" className="rules-school-icon" /> <span>Attachments</span></div>
               <p>Attachments are not sent to the discard pile after use, instead getting attached to a target. Unless stated otherwise, an Attachment can be attached to any Hero, but some specify they can only go to one of your Heroes, an opponent's Hero, or just the user itself. When a Hero is defeated, any Attachments on it are sent to the discard pile.</p>
             </div>
             <div className="rules-subtype-entry">
-              <div className="rules-school-header" style={{ color: '#ff3366' }}><img src="/rules/icon-instant.png" className="rules-school-icon" /> <span>Reactions</span></div>
+              <div className="rules-school-header" style={{ color: '#fc1c5f' }}><img src="/rules/icon-instant.png" className="rules-school-icon" /> <span>Reactions</span></div>
               <p>Like Normal cards, Reactions go to the discard pile after resolving. The difference is that they can only be used in reaction to specific triggers. Reactions will always specify when they can be used — they are the <strong>only sub-type that can be played from your hand during an opponent's turn</strong>.</p>
             </div>
             <div className="rules-subtype-entry">
-              <div className="rules-school-header" style={{ color: '#ff3366' }}><img src="/rules/icon-trap.png" className="rules-school-icon" /> <span>Surprises</span></div>
+              <div className="rules-school-header" style={{ color: '#fc1c5f' }}><img src="/rules/icon-trap.png" className="rules-school-icon" /> <span>Surprises</span></div>
               <p>Surprises are prepared face-down on your side of the board during your turn and then activated once a specific condition is met by flipping them face-up.</p>
               <p>To prepare a Surprise, place it face-down into a Hero's Surprise Zone during your turn. Once prepared, you can activate it at any time — during either player's turn — as long as its condition is met and the preparing Hero is able to activate it.</p>
               <p>To activate a Surprise, the preparing Hero must have the Abilities necessary to activate it and cannot be defeated or otherwise unable to perform an Action (for example by being Stunned). On the other hand, you <strong>can</strong> prepare Surprises with a Hero, even if it does not have the Abilities necessary to activate them.</p>
               <p>After activation, a Surprise resolves and is then sent to the discard pile.</p>
             </div>
             <div className="rules-subtype-entry">
-              <div className="rules-school-header" style={{ color: '#ff3366' }}><img src="/rules/icon-area.png" className="rules-school-icon" /> <span>Areas</span></div>
+              <div className="rules-school-header" style={{ color: '#fc1c5f' }}><img src="/rules/icon-area.png" className="rules-school-icon" /> <span>Areas</span></div>
               <p>Areas provide global effects that either affect both players or that both players can activate. Each player has one Zone for an Area. The Area Zone is not directly associated with a Hero — you may play an Area with any of your Heroes (but you still need at least one Hero able to use it).</p>
               <p>Areas remain in play until they are removed by an effect. You cannot play an Area while you already control an Area.</p>
             </div>
@@ -4603,28 +5438,28 @@ function RulesScreen({ onBack }) {
 
           <div className="rules-schools-grid">
             <div className="rules-school-entry">
-              <div className="rules-school-header" style={{ color: '#c0c0c0' }}><img src="/rules/icon-sword.png" className="rules-school-icon" /> <span>Attacks (Fighting)</span></div>
+              <div className="rules-school-header" style={{ color: '#b9b9b9' }}><img src="/rules/icon-sword.png" className="rules-school-icon" /> <span>Attacks (Fighting)</span></div>
               <p>Attacks are the only type that isn't a Spell School. They specialize in dealing scaling damage, being the only card type that uses a Hero's Attack stat to determine its damage. As such, Attack-based strategies will excel in picking off individual targets.</p>
               <p>Attacks can also have a wide variety of secondary utility effects. The distinction between Attacks, Spells and Creatures is important, because many effects interact with specifically one or the other.</p>
             </div>
             <div className="rules-school-entry">
-              <div className="rules-school-header" style={{ color: '#ff3366' }}><img src="/rules/icon-destruction.png" className="rules-school-icon" /> <span>Destruction Spells</span></div>
+              <div className="rules-school-header" style={{ color: '#fc1c5f' }}><img src="/rules/icon-destruction.png" className="rules-school-icon" /> <span>Destruction Spells</span></div>
               <p>Destruction Spells deal a ton of damage. They often have downsides, such as dealing recoil damage to your own Heroes, giving your opponent ways to counteract the damage, or having conditions a target must fulfill before it takes damage. Where Attacks excel at quickly taking out individual targets, Destruction Spells have by far the best <strong>spread damage</strong> options in the game.</p>
             </div>
             <div className="rules-school-entry">
-              <div className="rules-school-header" style={{ color: '#aa44ff' }}><img src="/rules/icon-decay.png" className="rules-school-icon" /> <span>Decay Spells</span></div>
+              <div className="rules-school-header" style={{ color: '#a040ff' }}><img src="/rules/icon-decay.png" className="rules-school-icon" /> <span>Decay Spells</span></div>
               <p>Decay Spells make life harder for your opponent. Denying resources, applying debuffs, or inflicting status effects. Decks revolving around them will often rely on Poison and Burn to slowly melt away the opponent's HP over time. Decay Magic also has the best <strong>negation Spells</strong> in the game. It's a slower, more control-focused playstyle.</p>
             </div>
             <div className="rules-school-entry">
-              <div className="rules-school-header" style={{ color: '#ffdd44' }}><img src="/rules/icon-support.png" className="rules-school-icon" /> <span>Support Spells</span></div>
+              <div className="rules-school-header" style={{ color: '#ffe23d' }}><img src="/rules/icon-support.png" className="rules-school-icon" /> <span>Support Spells</span></div>
               <p>Support Spells excel in healing and buffing your own Heroes. They keep your Heroes alive, make them stronger, generate resources, and may hinder your opponent. Support Spells are particularly good at doing a lot of things in one turn, facilitating a more <strong>combo-oriented</strong> playstyle.</p>
             </div>
             <div className="rules-school-entry">
-              <div className="rules-school-header" style={{ color: '#4488ff' }}><img src="/rules/icon-arts.png" className="rules-school-icon" /> <span>Magic Arts Spells</span></div>
+              <div className="rules-school-header" style={{ color: '#4580f6' }}><img src="/rules/icon-arts.png" className="rules-school-icon" /> <span>Magic Arts Spells</span></div>
               <p>Magic Arts Spells focus on "changing the rules." Applying buffs or debuffs that affect players themselves, searching cards from the deck, generating resources, extending turns, and situational negation. Unlike other Spell Schools, Magic Arts is not meant to be played by itself — it's an <strong>auxiliary</strong> Spell School.</p>
             </div>
             <div className="rules-school-entry rules-school-entry-wide">
-              <div className="rules-school-header" style={{ color: '#44cc44' }}><img src="/rules/icon-summoning.png" className="rules-school-icon" /> <span>Summoning Spells and Creatures</span></div>
+              <div className="rules-school-header" style={{ color: '#3ddc57' }}><img src="/rules/icon-summoning.png" className="rules-school-icon" /> <span>Summoning Spells and Creatures</span></div>
               <div className="rules-card-row" style={{ marginTop: 10 }}>
                 <Img src="creature.png" alt="Creature card example" className="rules-card-img rules-card-img-sm" />
                 <div>
@@ -4640,7 +5475,7 @@ function RulesScreen({ onBack }) {
           <div className="rules-divider" />
 
           {/* ── ARTIFACTS ── */}
-          <SectionTitle id="artifacts"><span style={{ color: '#ffd700' }}>Artifacts</span></SectionTitle>
+          <SectionTitle id="artifacts"><span style={{ color: '#fad54a' }}>Artifacts</span></SectionTitle>
           <div className="rules-card-row">
             <Img src="artifact.png" alt="Artifact card example" className="rules-card-img" />
             <div className="rules-text-block">
@@ -4653,7 +5488,7 @@ function RulesScreen({ onBack }) {
           <div className="rules-divider" />
 
           {/* ── POTIONS ── */}
-          <SectionTitle id="potions"><span style={{ color: '#a0724a' }}>Potions</span></SectionTitle>
+          <SectionTitle id="potions"><span style={{ color: '#886c44' }}>Potions</span></SectionTitle>
           <div className="rules-card-row">
             <Img src="potion.png" alt="Potion card example" className="rules-card-img" />
             <div className="rules-text-block">
@@ -4666,25 +5501,25 @@ function RulesScreen({ onBack }) {
           <div className="rules-divider" />
 
           {/* ── ASCENDED HEROES ── */}
-          <SectionTitle id="ascended"><span style={{ color: '#aa44ff' }}>Ascended Heroes</span></SectionTitle>
+          <SectionTitle id="ascended"><span style={{ color: '#a040ff' }}>Ascended Heroes</span></SectionTitle>
           <div className="rules-card-row">
             <Img src="ascended.png" alt="Ascended Hero card example" className="rules-card-img" />
             <div className="rules-text-block">
               <p>Ascended Heroes are special, more powerful versions of Heroes. You play them in your deck and place them on top of a Hero to Ascend it once a certain condition has been fulfilled.</p>
               <p className="rules-callout">Ascending a Hero immediately ends your turn!</p>
               <p>When a Hero Ascends, it gains new stats, but keeps any damage it already had as well as status effects and any other effects that affected it.</p>
-              <h3 className="rules-sub-title orbit-font" style={{ color: '#aa44ff' }}>Ascension Bonus</h3>
-              <p>When a Hero Ascends, its Ascension Bonus is applied. If the bonus specifies Abilities, you may attach them from your hand, deck, or discard pile to the Ascended Hero immediately. You may choose to attach fewer copies than specified. Other Ascension Bonuses apply a different effect instead.</p>
+              <h3 className="rules-sub-title orbit-font" style={{ color: '#a040ff' }}>Ascension Bonus</h3>
+              <p>When a Hero Ascends, its Ascension Bonus is applied. If the bonus specifies Abilities, you may attach them from your hand, deck, or discard pile to the Ascended Hero immediately. If it lists more than one Ability, choose one of them ("or", not "and"). You may choose to attach fewer copies than specified. Other Ascension Bonuses apply a different effect instead.</p>
             </div>
           </div>
 
           <div className="rules-divider" />
 
           {/* ── ACTIONS ── */}
-          <SectionTitle id="actions"><span style={{ color: '#ff3366' }}>Actions</span></SectionTitle>
+          <SectionTitle id="actions"><span style={{ color: '#fc1c5f' }}>Actions</span></SectionTitle>
           <div className="rules-text-block">
             <p>Besides Gold, which you passively generate every turn and spend on Artifacts, <strong>Actions</strong> are the other important resource in Pixel Parties. You get a <strong>single Action</strong> every turn, and Attacks, Spells and Creatures cost an Action to use.</p>
-            <p style={{ color: '#ff3366', fontWeight: 700, fontStyle: 'italic' }}>Wait, so you can only use a single Attack/Spell/Creature per turn to advance the game?</p>
+            <p style={{ color: '#fc1c5f', fontWeight: 700, fontStyle: 'italic' }}>Wait, so you can only use a single Attack/Spell/Creature per turn to advance the game?</p>
             <p>Not exactly. <strong>Reactions</strong> and <strong>Surprises</strong> do not cost Actions to use. Additionally, there are Attacks, Spells and Creatures that can count as <strong>additional Actions</strong>, either inherently or if you fulfill specific conditions. Additional Actions do not consume your Action per turn.</p>
             <p>On the other hand, there are also effects on Abilities, Artifacts, and other cards that can cost an Action to activate. If you choose to spend your Action on such an effect, that means you cannot use an Attack/Spell/Creature that turn, unless it's an additional Action, a Reaction, or a Surprise.</p>
             <p>When a Creature is "placed" into a Support Zone, that always means that it is summoned without costing an Action and without requiring a Hero to actually be able to summon it.</p>
@@ -4884,73 +5719,64 @@ function RulesScreen({ onBack }) {
 //  Kachel nutzt denselben Baustein mit Goldton und einem Bild, das wie
 //  ein Spielautomat durch die freigeschalteten Gegner laeuft.
 // ═══════════════════════════════════════════════════════════════
-function VsCpuKachel({ farbe, zufall, disabled, onClick, bild, name, fuss }) {
+function VsCpuKachel({ farbe, zufall, disabled, onClick, bild, name, fuss, klasse, zusatz, stempel }) {
   const [hover, setHover] = useState(false);
   // Jede Kachel glaenzt zu ihrer eigenen Zeit, nicht alle im Gleichschritt.
   const verzug = useMemo(() => (0.4 + Math.random() * 5).toFixed(2) + 's', []);
   return (
-    <button className={'vscpu-kachel' + (zufall ? ' vscpu-kachel--zufall' : '')}
+    <button className={'vscpu-kachel' + (zufall ? ' vscpu-kachel--zufall' : '') + (klasse ? ' ' + klasse : '')}
       disabled={disabled} onClick={onClick}
       style={{ '--kachel-farbe': farbe }}
       onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)}>
-      <span className="vscpu-ecken" aria-hidden="true"><i /><i /><i /><i /></span>
+      {zusatz}
       <div className="vscpu-bild" style={{ '--glanz-verzug': verzug }}>
         {bild(hover && !disabled)}
         <span className="vscpu-bild-vignette" aria-hidden="true" />
         <GlanzBand klasse="vscpu-glanz" />
+        {stempel && <span className="vscpu-stempel">{stempel}</span>}
       </div>
-      <div className="vscpu-name orbit-font">{name}</div>
+      <div className="vscpu-name-band">
+        <div className="vscpu-name orbit-font">{name}</div>
+      </div>
       <div className="vscpu-fuss">{fuss}</div>
     </button>
   );
 }
 
-// ★ v1408 (Al 25.9.): ein ECHTER Würfel — 3D-Würfel aus sechs Seiten mit
-// Augen. Beim Hover wird immer wieder geworfen: Er hüpft hoch, über-
-// schlägt sich mehrfach und landet auf einer zufälligen Zahl, liegt kurz
-// still und wird erneut geworfen. Ohne Hover ruht er schräg auf seiner
-// letzten Zahl.
+// ★ v1408 (Al 25.9.): ein Würfel, der beim Hover immer wieder geworfen wird: er hüpft hoch, zeigt im Flug rasch wechselnde Augenzahlen und
+// landet auf einer zufälligen Zahl, liegt kurz still und wird erneut geworfen. Ohne Hover ruht er auf seiner letzten Zahl.
+// ★ W86u2 (Pixelart): FLACHER Pixelwürfel statt 3D-Quader (rotateX/rotateY, Perspektive, Rundungen) — die Überschläge sind Augenwechsel im
+// 80-ms-Takt, der Sprung eine reine Verschiebung; Flächen, Ränder und Augen sind harte Rechtecke (Palette).
 const WUERFEL_AUGEN = { 1: [4], 2: [0, 8], 3: [0, 4, 8], 4: [0, 2, 6, 8], 5: [0, 2, 4, 6, 8], 6: [0, 2, 3, 5, 6, 8] };
-// Seite → Drehung des Würfels, die sie nach vorn bringt (Grad, x/y).
-const WUERFEL_LAGE = { 1: [0, 0], 6: [0, 180], 3: [0, -90], 4: [0, 90], 5: [-90, 0], 2: [90, 0] };
-const WUERFEL_SEITEN = [
-  ['vorn', 1], ['hinten', 6], ['rechts', 3], ['links', 4], ['oben', 5], ['unten', 2],
-];
 function RollenderWuerfel({ rollt }) {
   const ruhig = typeof window !== 'undefined' && window.matchMedia
     && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-  const [wurf, setWurf] = useState({ x: 0, y: 0, n: 0, zahl: 5 });
+  const [wurf, setWurf] = useState({ n: 0, zahl: 5 });
   useEffect(() => {
     if (!rollt || ruhig) return;
-    const werfen = () => setWurf(w => {
-      let zahl = 1 + Math.floor(Math.random() * 6);
-      if (zahl === w.zahl) zahl = (zahl % 6) + 1;      // jedes Mal eine andere Zahl
-      const [zx, zy] = WUERFEL_LAGE[zahl];
-      // Immer vorwärts drehen: zur nächsten vollen Umdrehung aufrunden,
-      // ein bis zwei Extra-Überschläge je Achse, dann die Ziellage.
-      const weiter = (alt, ziel, extra) => Math.ceil(alt / 360) * 360 + extra * 360 + ziel;
-      return {
-        x: weiter(w.x, zx, 1 + Math.floor(Math.random() * 2)),
-        y: weiter(w.y, zy, 1 + Math.floor(Math.random() * 2)),
-        n: w.n + 1, zahl,
-      };
-    });
+    let timers = [], letzte = 0;
+    const werfen = () => {
+      timers.forEach(clearTimeout); timers = [];
+      setWurf(w => {
+        let zahl = 1 + Math.floor(Math.random() * 6);
+        if (zahl === w.zahl) zahl = (zahl % 6) + 1;      // jedes Mal eine andere Zahl
+        letzte = zahl;
+        return { n: w.n + 1, zahl: 1 + Math.floor(Math.random() * 6) };
+      });
+      // Flug: drei wechselnde Zahlen, dann die Ziel-Zahl (ein Bild je 80 ms)
+      for (let k = 1; k <= 3; k++) timers.push(setTimeout(() => setWurf(w => ({ n: w.n, zahl: k < 3 ? 1 + Math.floor(Math.random() * 6) : (letzte || w.zahl) })), 80 * k));
+    };
     werfen();
-    // v1409 (Al 25.9.): drastisch schneller — ein Wurf alle 0,4 s; Flug-
-    // und Sprungdauer in style.css (.vscpu-wuerfel / vscpuSprung) passen dazu.
+    // v1409 (Al 25.9.): drastisch schneller — ein Wurf alle 0,4 s; Sprungdauer in style.css (.vscpu-wuerfel-sprung / vscpuSprung) passt dazu.
     const iv = setInterval(werfen, 400);
-    return () => clearInterval(iv);
+    return () => { clearInterval(iv); timers.forEach(clearTimeout); };
   }, [rollt, ruhig]);
   return (
     <span className="vscpu-wuerfel-buehne" aria-hidden="true">
       <span key={wurf.n} className={'vscpu-wuerfel-sprung' + (wurf.n > 0 ? ' vscpu-wuerfel-sprung--an' : '')}>
-        <span className="vscpu-wuerfel" style={{ transform: `rotateX(${wurf.x}deg) rotateY(${wurf.y}deg)` }}>
-          {WUERFEL_SEITEN.map(([seite, zahl]) => (
-            <span key={seite} className={'vscpu-wuerfel-seite vscpu-wuerfel-' + seite}>
-              {Array.from({ length: 9 }, (_, i) => (
-                <i key={i} className={WUERFEL_AUGEN[zahl].includes(i) ? 'an' : ''} />
-              ))}
-            </span>
+        <span className={'vscpu-wuerfel vscpu-wuerfel-z' + wurf.zahl}>
+          {Array.from({ length: 9 }, (_, i) => (
+            <i key={i} className={WUERFEL_AUGEN[wurf.zahl].includes(i) ? 'an' : ''} />
           ))}
         </span>
       </span>
@@ -5006,7 +5832,7 @@ function HeroArtCrop({ heroName, width = 160, skinName = null }) {
     return (
       <div style={{
         width, height: width * (398 / 594),
-        background: '#1a1a28', display: 'flex',
+        background: '#1a1a2e', display: 'flex',
         alignItems: 'center', justifyContent: 'center',
         color: 'var(--text2)', fontSize: 10, letterSpacing: 2,
       }}>NO ART</div>
@@ -5019,7 +5845,7 @@ function HeroArtCrop({ heroName, width = 160, skinName = null }) {
       width, height,
       overflow: 'hidden',
       position: 'relative',
-      background: '#0a0a12',
+      background: '#08060c',
     }}>
       <img src={src} draggable={false}
         style={{
@@ -5081,9 +5907,9 @@ function GuestRegisterModal({ onClose, starterDeckId }) {
         <div className="orbit-font" style={{ fontSize: 11, color: 'var(--text2)', marginBottom: 16, letterSpacing: 1 }}>Keep your deck &amp; unlock everything</div>
         {step === 'form' ? (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-            <input className="input" placeholder="Username" value={username} autoComplete="username" maxLength={10} onChange={e => setUsername(e.target.value)} onKeyDown={e => e.key === 'Enter' && submitSignup()} />
-            <input className="input" type="email" placeholder="Email" value={email} autoComplete="email" onChange={e => setEmail(e.target.value)} onKeyDown={e => e.key === 'Enter' && submitSignup()} />
-            <input className="input" type="password" placeholder="Password" value={password} autoComplete="new-password" onChange={e => setPassword(e.target.value)} onKeyDown={e => e.key === 'Enter' && submitSignup()} />
+            <input data-pp-tastatur="an" className="input" placeholder="Username" value={username} autoComplete="username" maxLength={10} onChange={e => setUsername(e.target.value)} onKeyDown={e => e.key === 'Enter' && submitSignup()} />
+            <input data-pp-tastatur="an" className="input" type="email" placeholder="Email" value={email} autoComplete="email" onChange={e => setEmail(e.target.value)} onKeyDown={e => e.key === 'Enter' && submitSignup()} />
+            <input data-pp-tastatur="an" className="input" type="password" placeholder="Password" value={password} autoComplete="new-password" onChange={e => setPassword(e.target.value)} onKeyDown={e => e.key === 'Enter' && submitSignup()} />
             {error && <div className="auth-msg auth-err">{error}</div>}
             <button className="btn btn-big" onClick={submitSignup} disabled={loading}>{loading ? '...' : 'SIGN UP'}</button>
             <div className="auth-fine">We'll email you a 6-digit code to confirm your address.</div>
@@ -5091,7 +5917,7 @@ function GuestRegisterModal({ onClose, starterDeckId }) {
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
             <div className="auth-fine">We sent a 6-digit code to <b>{pendingEmail}</b>.</div>
-            <input className="input auth-code" inputMode="numeric" autoComplete="one-time-code" placeholder="6-digit code" maxLength={6} value={code} autoFocus onChange={e => setCode(e.target.value.replace(/\D/g, ''))} onKeyDown={e => e.key === 'Enter' && submitVerify()} />
+            <input data-pp-tastatur="an" className="input auth-code" inputMode="numeric" autoComplete="one-time-code" placeholder="6-digit code" maxLength={6} value={code} autoFocus onChange={e => setCode(e.target.value.replace(/\D/g, ''))} onKeyDown={e => e.key === 'Enter' && submitVerify()} />
             {error && <div className="auth-msg auth-err">{error}</div>}
             {info && <div className="auth-msg auth-ok">{info}</div>}
             <button className="btn btn-big" onClick={submitVerify} disabled={loading}>{loading ? '...' : 'VERIFY & PLAY'}</button>
@@ -5103,10 +5929,32 @@ function GuestRegisterModal({ onClose, starterDeckId }) {
   );
 }
 
+let _ppTutorialAssetsCache = null;   // Antwort von /api/tutorial-assets, fuer die Heldenfiguren unten
 function SingleplayerScreen() {
   // Antonia-Praesenz auch hier, fuer den Tutorial-Zweig weiter unten.
   const antoniaHere2 = useAntoniaPresent();
   const { user, setUser, setScreen, notify, setBgmMode } = useContext(AppContext);
+  // ★ TUTORIAL VORLADEN (Befund: der Start von Mission 1 ruckelte auf dem Handy, ebenso der erste Treffer): Karten und Heldenfiguren, die die
+  // Missionen zeigen, werden schon hier im Leerlauf bereitgelegt — Kartenbilder gerendert und dekodiert, Heldenfiguren geladen
+  // (inkl. der Umriss-Berechnung, die sonst beim ersten Auftritt im Spiel laeuft). Nichts davon blockiert das Menue: Leerlauf, eine Figur nach der anderen.
+  useEffect(() => {
+    let weg = false; const timers = [];
+    const idle = (fn, ms) => { const t = setTimeout(() => { if (weg) return; if (window.requestIdleCallback) requestIdleCallback(fn, { timeout: 2500 }); else fn(); }, ms); timers.push(t); };
+    idle(async () => {
+      try {
+        const a = (await window.ppTutorialVorwaermen()) || _ppTutorialAssetsCache;
+        if (!a || weg) return;
+        _ppTutorialAssetsCache = a;
+        // Pixelbilder der grossen Zauber-Animation (kostet kalt Sekunden auf schwachen Handys, s. app-board.jsx).
+        idle(() => { if (window.ppAnimVorwaermen) window.ppAnimVorwaermen('cataclysm'); }, 3500);
+        // Magic Hammer (Mission 1, Magic Hammer/Heavy Hit der Starterdecks): das erste Pixelieren kostete mitten im Kampf 0,3–0,4 s (Ruckler vor Beatos Tod).
+        idle(() => { if (window.ppAnimVorwaermen) window.ppAnimVorwaermen('magic_hammer', { w: 70, h: 90 }); }, 6500);
+        const H = window.HeroIdleAnims;
+        if (H && H.hole && H.slug) (a.heroes || []).forEach((n, i) => timers.push(setTimeout(() => { if (!weg) idle(() => { try { H.hole(H.slug(n)); } catch (e) { /* Vorladen ist optional */ } }, 0); }, 400 + i * 350)));
+      } catch (e) { /* Vorladen ist optional */ }
+    }, 800);
+    return () => { weg = true; timers.forEach(clearTimeout); };
+  }, []);
   const [opponents, setOpponents] = useState(null);          // null = loading
   const [personalDecks, setPersonalDecks] = useState([]);
   const [sampleDecks, setSampleDecks] = useState([]);
@@ -5116,6 +5964,25 @@ function SingleplayerScreen() {
   const [search, setSearch] = useState('');
   const [showRegister, setShowRegister] = useState(false); // guest registration modal
   const [tutorialBrowserOpen, setTutorialBrowserOpen] = useState(false); // Tutorial Raccoon
+  // Kachelbreite: so viele Spalten wie passen, die Kacheln wachsen bis 300 px,
+  // damit der Rahmen auch bei wenigen Gegnern gefuellt wirkt. Gemessen wird in
+  // Layout-Pixeln (auf dem Handy liegt ein Zoom von .7 darueber).
+  const gitterRef = useRef(null);
+  const [kachel, setKachel] = useState({ breite: 248, spalten: 4 });
+  useEffect(() => {
+    const el = gitterRef.current; if (!el) return;
+    const rechne = () => {
+      const w = el.offsetWidth - 44;   // Innenabstand links/rechts
+      const mind = window.ppIsPhone && window.ppIsPhone() ? 204 : 248, luecke = 20;
+      const spalten = Math.max(1, Math.floor((w + luecke) / (mind + luecke)));
+      const breite = Math.max(mind, Math.min(304, Math.floor((w - (spalten - 1) * luecke) / spalten)));
+      setKachel(k => (k.breite === breite && k.spalten === spalten) ? k : { breite, spalten });
+    };
+    rechne();
+    const ro = (typeof ResizeObserver !== 'undefined') ? new ResizeObserver(rechne) : null;
+    if (ro) ro.observe(el); else window.addEventListener('resize', rechne);
+    return () => { if (ro) ro.disconnect(); else window.removeEventListener('resize', rechne); };
+  }, []);
   const [showRules, setShowRules] = useState(false); // in-place Rules overlay (guests)
   const cpuBattleRoom = useRef(null);
   const { tutorialList, tutorialAttemptState, startTutorialAttempt, onTutorialAttemptLeave } = useTutorialFlow(tutorialBrowserOpen);
@@ -5144,6 +6011,7 @@ function SingleplayerScreen() {
         const personal = mine?.decks || [];
         const sampleList = samples?.decks || [];
         setOpponents(gal?.opponents || []);
+        (gal?.opponents || []).slice(0, 3).forEach(o => window.ppDeckVorwaermen(o.warm, false));
         setPersonalDecks(personal);
         setSampleDecks(sampleList);
         // Bootstrap the dropdown from the user's saved default (custom
@@ -5191,8 +6059,11 @@ function SingleplayerScreen() {
         setCpuBattleState(state);
       }
     };
-    const onError = (msg) => {
+    const onError = (msg, meta) => {
       console.error('[SP cpu_battle_error]', msg);
+      setStarting(false);
+      // Server ausgelastet (Zulassungsgrenze): ein ruhiger Hinweis im Spielstil statt der roten Fehlermeldung.
+      if (meta && meta.busy && window.ppHinweis) { window.ppHinweis('The arena is packed right now!\nPlease try again in a minute.', { okText: 'OK' }); return; }
       notify('CPU battle error: ' + msg, 'error');
     };
     socket.on('game_state', onGameState);
@@ -5310,6 +6181,44 @@ function SingleplayerScreen() {
     setTimeout(() => setStarting(false), 3000);
   }, [personalDecks, sampleDecks, selectedDeck, starting, notify]);
 
+  // ★ Frisch freigeschaltetes Deck SOFORT waehlbar (Befund: im Victory-Screen fehlte es in der Deckauswahl): schaltet ein Sieg einen Gegner frei und schenkt dem Gast
+  // dessen Deck (`deckAdded`), laedt die Liste der eigenen Decks neu — der Victory-Screen bekommt sie als `sampleDecks`.
+  useEffect(() => {
+    const onUnlocked = async (data) => {
+      (data && data.opponents || []).forEach(o => o && window.ppDeckVorwaermen(o.warm, true));
+      if (!data || !(data.opponents || []).some(o => o && o.deckAdded)) return;
+      try { const r = await api('/sample-decks/owned'); if (r && r.decks) setSampleDecks(r.decks); } catch (e) { /* bleibt die alte Liste */ }
+    };
+    socket.on('opponents_unlocked', onUnlocked);
+    return () => socket.off('opponents_unlocked', onUnlocked);
+  }, []);
+
+  // ★ DECK VORLADEN (Befund: Starthand und Mulligan ruckeln auf dem Handy): Beim Ziehen werden die Kartenbilder erst gezeichnet (Canvas, mehrere
+  // Karten gleichzeitig) — Zeit, die das Ziehen kostet. Darum werden die Karten des GEWAEHLTEN Decks sowie die Figuren seiner Helden schon hier im
+  // Leerlauf bereitgelegt (gerendert, im dauerhaften Cache gespeichert, dekodiert); beim Spielstart sind sie nur noch ein Speicher-Treffer.
+  useEffect(() => {
+    const d = personalDecks.find(x => x.id === selectedDeck) || sampleDecks.find(x => x.id === selectedDeck);
+    if (!d) return undefined;
+    let weg = false; const timers = [];
+    const nm = (x) => (typeof x === 'string' ? x : (x && x.name) || null);
+    const t = setTimeout(() => {
+      if (weg) return;
+      const run = () => {
+        if (weg) return;
+        try {
+          const heroes = (d.heroes || []).map(h => h && h.hero).filter(Boolean);
+          const abilities = (d.heroes || []).flatMap(h => h ? [h.ability1, h.ability2] : []).filter(Boolean);
+          const names = Array.from(new Set([...(d.mainDeck || []), ...(d.potionDeck || []), ...heroes, ...abilities].map(nm).filter(Boolean)));
+          if (window.CardImageShim && window.CardImageShim.warmDrip) window.CardImageShim.warmDrip(names, { heroes, abilities, front: true });
+          const H = window.HeroIdleAnims;
+          if (H && H.hole && H.slug) heroes.forEach((n, i) => timers.push(setTimeout(() => { if (!weg) { try { H.hole(H.slug(n)); } catch (e) { /* optional */ } } }, 600 + i * 400)));
+        } catch (e) { /* Vorladen ist optional */ }
+      };
+      if (window.requestIdleCallback) requestIdleCallback(run, { timeout: 2500 }); else run();
+    }, 1500);
+    return () => { weg = true; clearTimeout(t); timers.forEach(clearTimeout); };
+  }, [personalDecks, sampleDecks, selectedDeck]);
+
   const onBattleLeave = useCallback(() => {
     const roomId = cpuBattleRoom.current;
     if (roomId) socket.emit('leave_game', { roomId });
@@ -5384,7 +6293,7 @@ function SingleplayerScreen() {
   };
 
   return (
-    <div className="screen-full" style={{ background: 'linear-gradient(180deg, #0a0a12 0%, #12101f 40%, #0a0a12 100%)', overflow: 'hidden' }}>
+    <div className="screen-full" style={{ background: 'linear-gradient(180deg, #08060c 0%, #12101f 40%, #08060c 100%)', overflow: 'hidden' }}>
       {showRegister && <GuestRegisterModal starterDeckId={selectedDeck} onClose={() => setShowRegister(false)} />}
       {tutorialBrowserOpen && (
         <TutorialBrowserModal
@@ -5409,8 +6318,8 @@ function SingleplayerScreen() {
           // (5/16 px) ist raus, beide nehmen das `.btn`-Grundmass (v1260).
           <button className="btn" onClick={() => setShowRegister(true)}>★ REGISTER NOW!</button>
         )}
-        <h2 className="orbit-font" style={{ fontSize: 22, fontWeight: 800, color: 'var(--player-color)' }}>CHOOSE OPPONENT!</h2>
-        <div style={{ flex: 1 }} />
+        <h2 className="orbit-font titel-links" style={{ fontSize: 22, fontWeight: 800, color: 'var(--player-color)' }}>CHOOSE OPPONENT!</h2>
+        <div className="top-bar-abstand" style={{ flex: 1 }} />
         <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
           <input
             className="select"
@@ -5428,10 +6337,9 @@ function SingleplayerScreen() {
             >×</button>
           )}
         </div>
-        <label style={{ fontSize: 12, color: 'var(--text)', display: 'flex', alignItems: 'center', gap: 8, fontWeight: 600 }}>
+        <div style={{ fontSize: 12, color: 'var(--text)', display: 'flex', alignItems: 'center', gap: 8, fontWeight: 600 }}>
           🃏 Deck:
-          <select className="select" value={selectedDeck} onChange={async e => {
-              const id = e.target.value;
+          <PPDropdown value={selectedDeck} onChange={async id => {
               setSelectedDeck(id);
               // Mirror the Find Player dropdown: save the picked deck as
               // the user's default. Custom decks go through /decks/:id/
@@ -5449,12 +6357,13 @@ function SingleplayerScreen() {
                   setUser(u => u ? { ...u, defaultSampleDeckId: id } : u);
                 }
               } catch (err) { notify('Could not save your default deck: ' + (err?.message || 'unknown error'), 'error'); }
-            }} style={{ fontSize: 12, minWidth: 180, padding: '4px 8px', borderColor: 'var(--player-color)', color: 'var(--text)' }}>
-            {personalDecks.map(d => <option key={d.id} value={d.id}>{d.name} {isDeckLegal(d).legal ? '✓' : '✗'}{d.isDefault ? ' ★' : ''}</option>)}
-            {sampleDecks.filter(d => isDeckLegal(d).legal).length > 0 && <option disabled>── Sample Decks ──</option>}
-            {sampleDecks.filter(d => isDeckLegal(d).legal).map(d => <option key={d.id} value={d.id}>📋 {d.name}{user?.defaultSampleDeckId === d.id ? ' ★' : ''}</option>)}
-          </select>
-        </label>
+            }} style={{ fontSize: 12, minWidth: 180, padding: '4px 8px', borderColor: 'var(--player-color)', color: 'var(--text)' }}
+            options={[
+              ...personalDecks.map(d => ({ value: d.id, label: `${d.name} ${isDeckLegal(d).legal ? '✓' : '✗'}${d.isDefault ? ' ★' : ''}` })),
+              ...(sampleDecks.filter(d => isDeckLegal(d).legal).length > 0 ? [{ value: '__sample_kopf', disabled: true, label: '── Sample Decks ──' }] : []),
+              ...sampleDecks.filter(d => isDeckLegal(d).legal).map(d => ({ value: d.id, label: `📋 ${d.name}${user?.defaultSampleDeckId === d.id ? ' ★' : ''}` })),
+            ]} />
+        </div>
         <VolumeControl />
       </div>
       {/* Gerahmter Kasten wie im Hauptmenue (`ornate-frame pp-menuekasten`).
@@ -5462,9 +6371,9 @@ function SingleplayerScreen() {
           scrollt INNEN (`.vscpu-content`) — vorher scrollte die ganze
           Seite und der Kasten lief ohne Abschluss unten aus dem Bild. */}
       <div className="vscpu-rahmen ornate-frame pp-menuekasten">
-      <div className="vscpu-content" style={{ padding: '22px 22px 30px', boxSizing: 'border-box', width: '100%' }}>
+      <div className="vscpu-content" ref={gitterRef} style={{ padding: '22px 22px 30px', boxSizing: 'border-box', width: '100%' }}>
         {!hasAnyLegal && (
-          <div style={{ color: '#ff7777', textAlign: 'center', padding: '12px 16px', marginBottom: 20, border: '1px solid #ff7777', borderRadius: 4, background: 'rgba(255,119,119,.08)', fontSize: 12 }}>
+          <div style={{ color: '#fe7476', textAlign: 'center', padding: '12px 16px', marginBottom: 20, border: '1px solid #fe7476', borderRadius: 4, background: 'rgba(254,116,118,.08)', fontSize: 12 }}>
             You need at least one legal deck to play. Edit a deck or pick a starter deck first.
           </div>
         )}
@@ -5476,52 +6385,41 @@ function SingleplayerScreen() {
           // from actual foes. Registered players don't see her.
           const showRaccoon = !!user?.isGuest && (!q || 'tutorial raccoon how to play smug mastermind antonia'.includes(q));
           const oppTiles = (opponents && visibleOpponents) ? visibleOpponents : [];
-          const racColor = '#ff44cc';
+          const racColor = '#fb1ea9';
+          const bildB = kachel.breite - 32;   // Bildbreite = Kachel minus Rand und Innenabstand
           return (
-          <>
+          <div className="vscpu-mitte">
+          {/* Zierleiste ueber dem Gitter: Pixel-Streifen links und rechts, in der Mitte die Zahl der Gegner. */}
+          {oppTiles.length > 0 && (
+            <div className="vscpu-leiste" aria-hidden="true">
+              <span className="vscpu-leiste-streifen" />
+              <span className="vscpu-leiste-text orbit-font">{oppTiles.length} OPPONENT{oppTiles.length === 1 ? '' : 'S'} UNLOCKED</span>
+              <span className="vscpu-leiste-streifen" />
+            </div>
+          )}
           <div style={{
             display: 'grid',
-            // Kachel 232 px (Bild 208): im breiten Rahmen passen 6 je Zeile.
-            gridTemplateColumns: 'repeat(auto-fill, 232px)',
+            // Spaltenbreite kommt aus der Messung oben (`kachel`).
+            gridTemplateColumns: 'repeat(auto-fit, ' + kachel.breite + 'px)',
             justifyContent: 'center',
-            gap: 14,
+            gap: 20,
           }}>
             {showRaccoon && (
-              <button
-                key="__tutorial_raccoon"
-                // ★ v1264 (Al 22.9.): im Gastmodus genauso hervorgehoben
-                // wie der Gast-Knopf im Login — Schein + Foil-Glanz, damit
-                // der neue Spieler vom ersten Klick an derselben Spur folgt.
-                // Die Kachel ist ohnehin nur fuer Gaeste sichtbar.
-                className="pp-lotse vscpu-raccoon"
+              // ★ v1264 (Al 22.9.): im Gastmodus genauso hervorgehoben wie der
+              // Gast-Knopf im Login — Schein + Foil-Glanz, damit der neue Spieler
+              // vom ersten Klick an derselben Spur folgt. Die Kachel ist ohnehin
+              // nur fuer Gaeste sichtbar. Seit der Gegnerwahl-Ueberarbeitung im
+              // selben Rahmen wie die Gegner (Pink statt Rot).
+              <VsCpuKachel key="__tutorial_raccoon" farbe={racColor}
+                klasse="pp-lotse vscpu-raccoon vscpu-kachel--lotse"
                 disabled={starting}
                 onClick={() => setTutorialBrowserOpen(true)}
-                style={{
-                  display: 'flex', flexDirection: 'column', alignItems: 'center',
-                  gap: 6, padding: 8,
-                  // Opaque (tint mixed into --bg2) so the dithered content
-                  // behind the tile doesn't show through it.
-                  background: 'color-mix(in srgb, ' + racColor + ' 8%, var(--bg2))',
-                  border: '2px solid ' + racColor,
-                  borderRadius: 6,
-                  boxShadow: '0 0 10px ' + racColor + '44',
-                  cursor: starting ? 'not-allowed' : 'pointer',
-                  opacity: starting ? 0.55 : 1,
-                  transition: 'transform .15s ease, box-shadow .15s ease',
-                  fontFamily: 'inherit', color: 'inherit',
-                }}
-                onMouseEnter={e => { if (!starting) { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = '0 0 18px ' + racColor + '88'; } }}
-                onMouseLeave={e => { e.currentTarget.style.transform = ''; e.currentTarget.style.boxShadow = '0 0 10px ' + racColor + '44'; }}
-              >
-                <LotsenGlanz />
-                <HeroArtCrop heroName="Smug Mastermind Antonia" width={208} />
-                <div className="orbit-font" style={{ fontSize: 16, color: racColor, textAlign: 'center', fontWeight: 700, lineHeight: 1.2, minHeight: '2.4em', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  Tutorial Raccoon
-                </div>
-                <div style={{ display: 'flex', gap: 6, fontSize: 13, marginTop: 'auto', color: racColor, fontWeight: 700 }}>
-                  ★ Learn to Play
-                </div>
-              </button>
+                zusatz={<LotsenGlanz />}
+                stempel="GUIDE"
+                bild={() => <HeroArtCrop heroName="Smug Mastermind Antonia" width={bildB} />}
+                name="Tutorial Raccoon"
+                fuss={<span className="vscpu-chip vscpu-chip--breit">★ Learn to Play</span>}
+              />
             )}
             {/* ★ v1370 (Als Wunsch): ZUFALLS-GEGNER als erste Kachel (oben
                 links). Zieht aus ALLEN freigeschalteten Gegnern — die Galerie
@@ -5531,14 +6429,15 @@ function SingleplayerScreen() {
             {!user?.isGuest && Array.isArray(opponents) && opponents.length > 0 && (() => {
               const aktiv = hasAnyLegal && !starting;
               return (
-                <VsCpuKachel key="__random_opponent" farbe="#ffcc33" zufall
+                <VsCpuKachel key="__random_opponent" farbe="#f8ca21" zufall
                   disabled={!aktiv}
                   onClick={() => {
                     const op = opponents[Math.floor(Math.random() * opponents.length)];
                     if (op) startBattle(op.id);
                   }}
-                  bild={(schnell) => <ZufallsGegnerBild gegner={opponents} schnell={schnell} width={208} />}
+                  bild={(schnell) => <ZufallsGegnerBild gegner={opponents} schnell={schnell} width={bildB} />}
                   name="Random Opponent"
+                  stempel="?"
                   fuss={<span className="vscpu-chip">{opponents.length} unlocked</span>}
                 />
               );
@@ -5546,10 +6445,11 @@ function SingleplayerScreen() {
             {oppTiles.map(op => {
               const total = (op.wins || 0) + (op.losses || 0);
               return (
-                <VsCpuKachel key={op.id} farbe="#ff4444"
+                <VsCpuKachel key={op.id} farbe="#f03232"
                   disabled={!hasAnyLegal || starting}
                   onClick={() => startBattle(op.id)}
-                  bild={() => <HeroArtCrop heroName={op.middleHero} width={208} />}
+                  bild={() => <HeroArtCrop heroName={op.middleHero} width={bildB} />}
+                  stempel={(op.wins || 0) > 0 ? '★ BEATEN' : null}
                   name={op.middleHero || op.name}
                   fuss={<>
                     {total > 0 ? (
@@ -5574,7 +6474,15 @@ function SingleplayerScreen() {
           {opponents !== null && opponents.length > 0 && visibleOpponents.length === 0 && (
             <div style={{ textAlign: 'center', color: 'var(--text2)', padding: 40, fontSize: 13 }}>No opponents match “{search.trim()}”.</div>
           )}
-          </>
+          {/* Gast: Hinweis, wie es weitergeht (siehe unlockRandomOpponent im Server). */}
+          {user?.isGuest && oppTiles.length > 0 && (
+            <div className="vscpu-leiste vscpu-leiste--fuss" aria-hidden="true">
+              <span className="vscpu-leiste-streifen" />
+              <span className="vscpu-leiste-text orbit-font">WIN A DUEL TO UNLOCK THE NEXT FOE</span>
+              <span className="vscpu-leiste-streifen" />
+            </div>
+          )}
+          </div>
           );
         })()}
       </div>

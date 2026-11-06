@@ -127,9 +127,7 @@ function _getBorrowableCreatures(engine, gs, pi, level) {
       const slot = (ops.supportZones[hi] || [])[zi] || [];
       if (slot.length === 0) continue;
 
-      const inst = engine.cardInstances.find(c =>
-        c.zone === 'support' && c.owner === oi && c.heroIdx === hi && c.zoneSlot === zi
-      );
+      const inst = engine.kreaturImPlatz(oi, hi, zi).inst;   // Darion: eine Moana-Kreatur kann im Equip-Stapel auch weiter hinten liegen
       if (!inst || inst.faceDown) continue;
       if ((inst.controller ?? inst.owner) !== oi) continue; // skip charmed-back / stolen-back
 
@@ -144,6 +142,7 @@ function _getBorrowableCreatures(engine, gs, pi, level) {
       // Effects-suppressed gate (same predicate the engine uses).
       const c = inst.counters || {};
       if (c.negated || c.nulled || c.frozen || c.stunned) continue;
+      if (engine.isCreatureActiveEffectLocked(inst)) continue;   // W14b (Q152): Unwanted Audience sperrt den aktiven Effekt
 
       // Summoning sickness — same rule the standard HOPT path enforces.
       if (inst.turnPlayed === (gs.turn || 0)) continue;
@@ -199,9 +198,7 @@ function _getOwnSingableCreatures(engine, gs, pi, level) {
       const slot = (ps.supportZones[hi] || [])[zi] || [];
       if (slot.length === 0) continue;
 
-      const inst = engine.cardInstances.find(c =>
-        c.zone === 'support' && c.owner === pi && c.heroIdx === hi && c.zoneSlot === zi
-      );
+      const inst = engine.kreaturImPlatz(pi, hi, zi).inst;   // Darion: eine Moana-Kreatur kann im Equip-Stapel auch weiter hinten liegen
       if (!inst || inst.faceDown) continue;
       if ((inst.controller ?? inst.owner) !== pi) continue; // skip stolen-away
 
@@ -215,6 +212,7 @@ function _getOwnSingableCreatures(engine, gs, pi, level) {
 
       const c = inst.counters || {};
       if (c.negated || c.nulled || c.frozen || c.stunned) continue;
+      if (engine.isCreatureActiveEffectLocked(inst)) continue;   // W14b (Q152)
       if (inst.turnPlayed === (gs.turn || 0)) continue;
 
       let canActivate = true;
@@ -347,6 +345,7 @@ module.exports = {
     if (!stillThere || stillThere.zone !== 'support' || stillThere.faceDown) return false;
     const c = stillThere.counters || {};
     if (c.negated || c.nulled || c.frozen || c.stunned) return false;
+    if (engine.isCreatureActiveEffectLocked(stillThere)) return false;   // W14b (Q152)
 
     engine.log(picked.isOwn ? 'singing_megu_own' : 'singing_borrow', {
       player: gs.players[pi].username, hero: hero.name,
@@ -421,6 +420,26 @@ module.exports = {
       } catch (err) {
         console.error(`[Singing] borrowed onCreatureEffect threw for ${realInst.name}:`, err.message);
         result = false;
+      }
+      // M02-24: Verschiebt der Effekt die Kreatur selbst in die Surprise Zone
+      // („move this Creature … into the Hero's Surprise Zone", Pure Advantage Camel & Co.),
+      // landet die Zonenänderung auf der Schatten-Instanz; die Zonen-Arrays der Brettseite
+      // sind aber schon umgeschrieben. Die echte Instanz folgt, sonst bleibt eine
+      // Geister-Instanz „im Support" zurück (zählt z. B. bei Massacre mit).
+      const echt = engine.cardInstances.find(c => c.id === realInst.id);
+      if (echt && echt.zone === 'support') {
+        if (fakeInst.zone === 'surprise') {
+          echt.zone = 'surprise';
+          echt.heroIdx = fakeInst.heroIdx;
+          echt.zoneSlot = fakeInst.zoneSlot;
+          echt.faceDown = true;
+          echt.knownToOpponent = true;
+          engine._resetCreatureForSurpriseZone(echt);
+        } else if (fakeInst.faceDown) {   // Bakhm-Platz: verdeckt an Ort und Stelle
+          echt.faceDown = true;
+          echt.knownToOpponent = true;
+          engine._resetCreatureForSurpriseZone(echt);
+        }
       }
     }
 

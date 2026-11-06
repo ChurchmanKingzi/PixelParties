@@ -2,9 +2,9 @@
 //  CARD EFFECT: "Great Detective Doq"
 //  Hero (500 HP, 100 ATK — Fighting + Premonition)
 //
-//  When this Hero attacks, the controller clicks
-//  any card in the opponent's hand to choose it,
-//  then declares one of five card-type groups:
+//  When this Hero attacks, a RANDOM card of the
+//  opponent's hand is chosen (Welle 13, Al: zufaellig,
+//  kein Anklicken), then the controller declares one of five card-type groups:
 //    • Attack / Spell / Creature
 //    • Artifact
 //    • Ability
@@ -15,14 +15,8 @@
 //  the Attack's damage is increased by 150 AND
 //  the controller draws 2 cards.
 //
-//  The pick UX uses the existing `pickFromOppHand`
-//  prompt — cards already revealed to Doq's
-//  controller (auto-reveal Crystals, Premonition,
-//  Bamboo Shield, etc.) stay face-up in the picker,
-//  letting the controller cherry-pick a known card
-//  for a guaranteed correct declaration. Hidden
-//  cards stay face-down — picking one of those is
-//  a blind guess.
+//  Die Karte wird per Zufall bestimmt (Math.random);
+//  bekannte/aufgedeckte Karten garantieren keinen Treffer mehr.
 //
 //  Wiring: listens to `onAttackDeclare`, the
 //  engine hook fired AFTER target selection but
@@ -102,11 +96,7 @@ function isOwnAttack(ctx, source) {
  *
  * Flow:
  *   1. Empty opp hand → bail with 0.
- *   2. Open a `pickFromOppHand` prompt covering every opp hand slot.
- *      Cards already revealed to Doq's controller (auto-reveal
- *      Crystals, Premonition, Bamboo Shield, etc.) render face-up in
- *      the picker without us touching `_revealedHandIndices`. Hidden
- *      slots render face-down — clicking one is a blind pick.
+ *   2. Pick a random opp hand slot (Welle 13: kein Prompt mehr).
  *   3. Declare a type via `optionPicker`.
  *   4. Broadcast `card_reveal` so the picked card is publicly visible
  *      on the verdict beat, then check the match.
@@ -117,19 +107,11 @@ async function runGuess(engine, pi, doqHeroIdx, doqSeite = pi) {   // Als Befund
   const hand = ops?.hand || [];
   if (hand.length === 0) return 0;
 
-  const eligibleIndices = hand.map((_, i) => i);
-  const pickResult = await engine.promptGeneric(pi, {
-    type: 'pickFromOppHand',
-    title: CARD_NAME,
-    description: `Click a card in ${ops.username}'s hand to investigate. `
-      + 'You will then declare its type — a correct guess grants +150 to this Attack '
-      + 'and 2 free draws.',
-    eligibleIndices,
-    cancellable: false,
-  });
-
-  const pickedHandIdx = pickResult?.handIndex;
-  if (!Number.isInteger(pickedHandIdx) || pickedHandIdx < 0 || pickedHandIdx >= hand.length) return 0;
+  // Welle 13 (Q118, Al: „Bestimme eine zufällige."): Der Kartentext sagt „choose a
+  // random card" — die Gegnerkarte wird zufällig bestimmt, der Spieler klickt
+  // sie nicht mehr an (kein gezieltes Wählen einer bekannten Karte). Erst
+  // danach wird der Typ deklariert; aufgedeckt wird die Karte weiter im Urteil.
+  const pickedHandIdx = Math.floor(Math.random() * hand.length);
   const pickedCard = hand[pickedHandIdx];
   if (!pickedCard) return 0;
 

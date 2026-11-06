@@ -13,6 +13,9 @@ const CARD_NAME = 'Elixir of Quickness';
 
 module.exports = {
   isPotion: true,
+  // D1 (Regel von Al): der Zug IST die ganze Karte - unter der Zieh-Sperre (drawLocked) nicht spielbar; unter handLocked
+  // markiert sie der Loader schon selbst (blockedByHandLock).
+  blockedByDrawLock: true,
 
   // Der Zug IST die ganze Karte — ohne ihn bleibt nichts uebrig.
   canActivate(gs, pi, engine) {
@@ -69,7 +72,7 @@ module.exports = {
       );
       if (inst) engine._untrackCard(inst.id);
       if (!ps.deletedPile) ps.deletedPile = [];
-      ps.deletedPile.push(CARD_NAME);
+      engine.handKartenBesitzerPs(ps, CARD_NAME).deletedPile.push(CARD_NAME);   // W3/W5a: Stapel des permanenten Besitzers
       // Clear the resolver pointer so the server's post-resolve splice
       // logic doesn't try to re-find / re-splice the (now-deleted) card.
       ps._resolvingCard = null;

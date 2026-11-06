@@ -41,9 +41,10 @@ const HIT_DAMAGE = 120;
  * Token als Creature hatte (und Monster in a Bottle blieb gesperrt).
  */
 function slotHoldsCreature(engine, cardDB, ownerIdx, heroIdx, slotIdx, slot) {
-  const inst = engine.cardInstances?.find(c =>
-    c.zone === 'support' && c.heroIdx === heroIdx && c.zoneSlot === slotIdx
-    && (c.owner === ownerIdx || c.controller === ownerIdx));
+  // Z1 (A02-31): `ownerIdx` ist hier die BRETTSEITE der durchsuchten Zone — Instanz ueber die
+  // Brettseite, nicht ueber „Besitzer oder Kontrolleur" (sonst trifft eine geliehene Kreatur
+  // an gleicher Koordinate der Gegenseite).
+  const inst = engine.kreaturAnBrett(ownerIdx, heroIdx, slotIdx);
   const cd = (inst ? engine.getEffectiveCardData(inst) : null) || cardDB[slot[0]];
   return !!cd && hasCardType(cd, 'Creature');
 }
@@ -60,16 +61,18 @@ function eachAliveHeroHasCreature(engine, ownerIdx) {
   if (!ps) return false;
   const cardDB = engine._getCardDB();
   let anyAlive = false;
-  for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
-    const hero = ps.heroes[hi];
+  // W31a (Al, 22.10.2026: „each of your Heroes" gilt nach aktueller KONTROLLE; auch uebernommene Gegnerhelden zaehlen, ein abgegebener eigener Held nicht):
+  // die Helden, die `ownerIdx` kontrolliert, ihre Zonen stehen auf der BRETTSEITE `phys` (eigene Spalte zuerst).
+  const helden = engine.heroesControlledBy(ownerIdx).sort((a, b) => (a.physOwner === ownerIdx ? 0 : 1) - (b.physOwner === ownerIdx ? 0 : 1));
+  for (const { physOwner: phys, heroIdx: hi, hero } of helden) {
     if (!hero?.name || hero.hp <= 0) continue;
     anyAlive = true;
-    const zones = ps.supportZones?.[hi] || [];
+    const zones = engine.gs.players[phys]?.supportZones?.[hi] || [];
     let hasCreature = false;
     for (let si = 0; si < zones.length; si++) {
       const slot = zones[si];
       if (!slot || slot.length === 0) continue;
-      if (slotHoldsCreature(engine, cardDB, ownerIdx, hi, si, slot)) { hasCreature = true; break; }
+      if (slotHoldsCreature(engine, cardDB, phys, hi, si, slot)) { hasCreature = true; break; }
     }
     if (!hasCreature) return false;
   }

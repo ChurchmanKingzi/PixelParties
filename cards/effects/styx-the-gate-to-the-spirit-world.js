@@ -142,6 +142,8 @@ module.exports = {
       // `alsoHealCurrent` defaults to true — a single call adds 100
       // to both current AND max HP, exactly matching "current and max
       // HP by 100 each".
+      // ★ Welle 14 (Al, Q7 aus W13b): „Ja, die prallen auch ab." — Heldenpassive, die den eigenen Helden aufbauen, blockt Resistance.
+      if (await engine.heroNonDamageEffectBlocked(ourSide, ourHi, 'max_hp', { sourceOwner: ourPi, source: CARD_NAME, amount: 100 })) return;
       engine.increaseMaxHp(ourHero, 100);
 
       engine.log('styx_absorb', {

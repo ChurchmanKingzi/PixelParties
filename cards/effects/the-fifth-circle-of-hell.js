@@ -42,6 +42,7 @@ module.exports = {
       const gs = engine.gs;
       const pi = ctx.cardOwner;
       const ps = gs.players[pi];
+      if (engine.spielerIstVonAreasAusgenommen(pi)) return;   // W82 (Shipwrecked): Area-Effekte aktivieren ist gesperrt
       if (!ps || ps._fifthCircleTurn === gs.turn) return;   // einmal je Zug
       ps._fifthCircleTurn = gs.turn;
       gs._naechsterEinzelschadenX2 = { turn: gs.turn, owner: pi, source: CARD_NAME };

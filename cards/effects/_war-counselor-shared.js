@@ -27,6 +27,7 @@
 //  also pruefe ich den Namen.
 // ═══════════════════════════════════════════
 
+const { anyName } = require('./_alias-name');   // Shroomasaur: Zusatzname zählt für Namensfamilien
 const { hasCardType } = require('./_hooks');
 
 const WC = 'War Counselor';
@@ -53,7 +54,7 @@ function controlledWarCounselors(engine, pi) {
   return (engine.cardInstances || []).filter((inst) => {
     if (!inst || inst.zone !== 'support' || inst.faceDown) return false;
     if ((inst.controller ?? inst.owner) !== pi) return false;
-    if (!isWarCounselorName(inst.name)) return false;
+    if (!anyName(inst, (n) => isWarCounselorName(n))) return false;
     const cd = engine.getEffectiveCardData?.(inst) || engine._getCardDB()[inst.name];
     return !!cd && hasCardType(cd, 'Creature');
   });
@@ -96,8 +97,61 @@ function makeSingletonCanSummon(cardName) {
   };
 }
 
+/**
+ * Feuert dieser `onCardLeaveZone` fuer den ABGANG DER EIGENEN KARTE SELBST
+ * (statt fuer eine fremde)? Der Todes-/Zerstoerungs-/Bounce-Pfad nennt sie als
+ * `leavingCard`; `actionTransferCreature` (Kontrollwechsel) nur ueber
+ * `_onlyCard`. Zu diesem Zeitpunkt steht die Instanz noch im Support und
+ * zaehlt sich bei jeder Feldzaehlung selbst mit (A06-18/19).
+ */
+function istEigenerAbgang(ctx) {
+  const inst = ctx.card;
+  if (!inst || ctx.fromZone !== 'support') return false;
+  if (ctx.leavingCard) return ctx.leavingCard.id === inst.id;
+  return !!ctx._onlyCard && ctx._onlyCard.id === inst.id;
+}
+
+/**
+ * ★ Welle 10 (Al, Q46 / A06-rebelliokai-35): vom Spieler `chooserPi` WÄHLBARE Kreaturen, die `ownerIdx` kontrolliert — dieselben harten
+ * Wahl-Schutzfilter wie im Zielfenster (`untargetable_all`, `untargetable_by_opponent`, Board-of-Kings-Deckung/`guardsCreatureChoice`).
+ * Für „wird der Effekt überhaupt angeboten?" (War Council Gathering Place); die weichen Schutz-Formen (Perfect Disguise: „ausser einziges Ziel") bleiben außen vor.
+ */
+function waehlbareKreaturen(engine, chooserPi, ownerIdx) {
+  return engine.getCreatureTargets(ownerIdx).filter((t) => {
+    const inst = t.cardInstance;
+    if (!inst || inst.faceDown) return false;
+    if (inst.counters?.untargetable_all) return false;
+    if (inst.counters?.untargetable_by_opponent && inst.counters.untargetable_by_opponent_pi === chooserPi) return false;
+    if (typeof engine._boardGuardsCreatureChoice === 'function' && engine._boardGuardsCreatureChoice(inst, chooserPi)) return false;
+    return true;
+  });
+}
+
+/**
+ * ★ Welle 11 (Al, R3): die 8 Gold des War Council Gathering Place werden NICHT beim Annehmen des Angebots abgezogen, sondern erst, wenn der
+ * ausgelöste Ratgeber-Effekt sein Ziel bestätigt hat — und zwar VOR der Auflösung (goldskalierende Effekte wie Harpthenean sehen den reduzierten
+ * Stand). Ratgeber-Effekte ohne Zielwahl zahlen direkt vor der Auflösung. Bricht der Spieler die Zielwahl ab, wird nie Gold abgezogen.
+ * Das Gathering Place hinterlegt die offene Gebühr in `engine._gatheringGebuehr` (`{ instId, betrag, bezahlt, bezahle() }`); der Ratgeber-Effekt
+ * ruft `zahleGatheringGebuehr` am Zusagepunkt auf und bricht ab (`return false`), wenn die Zahlung nicht mehr möglich ist.
+ * Ohne offene Gebühr (normale Aktivierung) tut beides nichts.
+ */
+function offeneGatheringGebuehr(engine, inst) {
+  const g = engine?._gatheringGebuehr;
+  return (g && inst && g.instId === inst.id && !g.bezahlt) ? g.betrag : 0;
+}
+
+async function zahleGatheringGebuehr(engine, inst) {
+  const g = engine?._gatheringGebuehr;
+  if (!g || !inst || g.instId !== inst.id || g.bezahlt) return true;
+  return await g.bezahle();
+}
+
 module.exports = {
+  offeneGatheringGebuehr,
+  zahleGatheringGebuehr,
+  waehlbareKreaturen,
   WC,
+  istEigenerAbgang,
   isWarCounselorName,
   isWarCounselorCreatureName,
   controlledWarCounselors,

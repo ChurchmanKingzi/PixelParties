@@ -12,6 +12,13 @@
 //  „all Heroes" / „no player" — die Karte kennt keine Seiten. Wer sie
 //  legt, legt sie auch gegen sich selbst.
 //
+//  ★ W59a (Al, 22.10.2026): DIVER HELMET nimmt einen Helden von Village
+//  aus — von BEIDEN Heldenwirkungen: ① keine Verdopplung (zentral:
+//  `engine._atkAuraFaktor` ueberspringt Area-Multiplikatoren fuer
+//  `engine.heldIstVonAreasAusgenommen`) und ③ kein Rueckstoss (unten).
+//  ② „no more than 1 Attack per turn" betrifft den SPIELER und bleibt:
+//  auch die Attack eines Helm-Helden zaehlt.
+//
 //  ── ① VERDOPPLUNG: WARUM DAS NICHT DIE UEBLICHE AURA IST ──────────
 //  ATK ist im Motor ein MUTIERTER Wert, keine Rechnung. Jede vorhandene
 //  Aura gibt einmal beim Eintritt und nimmt einmal beim Abgang (Bauform
@@ -73,6 +80,42 @@ function alleHelden(engine) {
   return out;
 }
 
+/**
+ * ③ Rueckstoss am angreifenden Helden. `gefallen` = wirklich angekommener
+ * Schaden. Der Angreifer muss ein HELD sein („when a HERO deals damage").
+ */
+async function rueckstoss(engine, inst, src, gefallen) {
+  if (!inst || inst.zone !== 'area') return;
+  if (engine._rvRecoilTiefe) return;                 // kein Kreisel
+  if (gefallen <= 0) return;
+
+  // `heroIdx` gilt fuer die Heldenreihe von `heroOwner` (geliehener Held:
+  // Kontrolleur != Brettseite), R02-13.
+  const pi = (src && typeof src === 'object') ? (src.heroOwner ?? src.controller ?? src.owner) : null;
+  const hi = (src && typeof src === 'object') ? src.heroIdx : null;
+  if (typeof pi !== 'number' || typeof hi !== 'number' || hi < 0) return;
+  const angreifer = engine.gs.players[pi]?.heroes?.[hi];
+  if (!angreifer?.name || angreifer.hp <= 0) return;
+  // ★ W59a (Al, 22.10.2026): ein Held mit Diver Helmet ist von Areas ausgenommen — kein Rueckstoss (und keine Verdopplung, s. `_atkAuraFaktor`).
+  if (engine.heldIstVonAreasAusgenommen(pi, hi)) return;
+
+  const rueckstoss = Math.ceil(gefallen / 2);
+  engine._rvRecoilTiefe = 1;
+  try {
+    // „cannot be reduced or negated" → True Damage.
+    await engine.actionDealTrueDamage(
+      { name: CARD_NAME, owner: inst.owner, controller: inst.controller ?? inst.owner },
+      angreifer, rueckstoss, { type: 'recoil' },
+    );
+  } finally {
+    engine._rvRecoilTiefe = 0;
+  }
+  engine.log('rioting_village_recoil', {
+    hero: angreifer.name, dealt: gefallen, recoil: rueckstoss,
+  });
+  engine.sync();
+}
+
 module.exports = {
   activeIn: ['hand', 'area'],
 
@@ -98,8 +141,9 @@ module.exports = {
    * Karte GESPERRT ist. Gilt fuer BEIDE Seiten — die Karte sagt „no
    * player", nicht „your opponent".
    */
-  blocksCardPlay(gs, pi, cardData) {
+  blocksCardPlay(gs, pi, cardData, engine) {
     if (cardData?.cardType !== 'Attack') return false;
+    if (engine?.spielerIstVonAreasAusgenommen?.(pi)) return false;   // W82 (Shipwrecked): der Spieler ist von Areas ausgenommen — das Attack-Limit gilt nicht fuer ihn
     return (gs.players[pi]?.attacksPlayedThisTurn || 0) >= 1;
   },
 
@@ -117,37 +161,21 @@ module.exports = {
 
     /** ③ Rueckstoss: halber ANGEKOMMENER Schaden, aufgerundet. */
     afterDamage: async (ctx) => {
-      const engine = ctx._engine;
-      const inst = ctx.card;
-      if (!inst || inst.zone !== 'area') return;
       if (ctx.type !== 'attack') return;
-      if (engine._rvRecoilTiefe) return;                 // kein Kreisel
-      const gefallen = (ctx.realDealt ?? ctx.amount) || 0;
-      if (gefallen <= 0) return;
+      await rueckstoss(ctx._engine, ctx.card, ctx.source, (ctx.realDealt ?? ctx.amount) || 0);
+    },
 
-      // Der Angreifer muss ein HELD sein („when a HERO deals damage").
-      const src = ctx.source;
-      const pi = (src && typeof src === 'object') ? (src.controller ?? src.owner) : null;
-      const hi = (src && typeof src === 'object') ? src.heroIdx : null;
-      if (typeof pi !== 'number' || typeof hi !== 'number' || hi < 0) return;
-      const angreifer = engine.gs.players[pi]?.heroes?.[hi];
-      if (!angreifer?.name || angreifer.hp <= 0) return;
-
-      const rueckstoss = Math.ceil(gefallen / 2);
-      engine._rvRecoilTiefe = 1;
-      try {
-        // „cannot be reduced or negated" → True Damage.
-        await engine.actionDealTrueDamage(
-          { name: CARD_NAME, owner: inst.owner, controller: inst.controller ?? inst.owner },
-          angreifer, rueckstoss, { type: 'recoil' },
-        );
-      } finally {
-        engine._rvRecoilTiefe = 0;
+    /**
+     * ③ Rueckstoss auch bei Kreaturenzielen (R02-12): „when a Hero deals
+     * damage with an Attack" kennt keine Einschraenkung auf Heldenziele.
+     * Kreaturenschaden laeuft nicht ueber `afterDamage`, sondern gebuendelt
+     * ueber `afterCreatureDamageBatch` (je Eintrag `realDealt`).
+     */
+    afterCreatureDamageBatch: async (ctx) => {
+      for (const e of (ctx.entries || [])) {
+        if (e.type !== 'attack' || e.cancelled || e.isStatusDamage) continue;
+        await rueckstoss(ctx._engine, ctx.card, e.source, e.realDealt || 0);
       }
-      engine.log('rioting_village_recoil', {
-        hero: angreifer.name, dealt: gefallen, recoil: rueckstoss,
-      });
-      engine.sync();
     },
   },
 };

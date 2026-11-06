@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
   <title>Pixel Parties TCG</title>
   <meta name="description" content="Assemble your party of Heroes, shape their Abilities and powers - and eliminate the competition! Pixel Parties is a free online multiplayer trading card game.">
-  <meta name="theme-color" content="#0a0a12">
+  <meta name="theme-color" content="#08060c">
 
   <!-- Icons / PWA -->
   <link rel="icon" type="image/png" href="/favicon.png">
@@ -20,19 +20,18 @@
        below is the production default; the server rewrites it to whatever
        host actually served the page (see serveIndexHtml in server.js), so
        previews resolve from both the live site and local test builds. -->
-  <link rel="canonical" href="https://pixelparties.onrender.com/">
+  <link rel="canonical" href="https://pixelpartiestcg.com/">
   <meta property="og:type" content="website">
-  <meta property="og:url" content="https://pixelparties.onrender.com/">
+  <meta property="og:url" content="https://pixelpartiestcg.com/">
   <meta property="og:title" content="Pixel Parties TCG">
   <meta property="og:description" content="Assemble your party of Heroes, shape their Abilities and powers - and eliminate the competition!">
-  <meta property="og:image" content="https://pixelparties.onrender.com/title.png">
+  <meta property="og:image" content="https://pixelpartiestcg.com/title.png">
   <meta name="twitter:card" content="summary_large_image">
   <meta name="twitter:title" content="Pixel Parties TCG">
   <meta name="twitter:description" content="Assemble your party of Heroes, shape their Abilities and powers - and eliminate the competition!">
-  <meta name="twitter:image" content="https://pixelparties.onrender.com/title.png">
+  <meta name="twitter:image" content="https://pixelpartiestcg.com/title.png">
 
   <!-- Warm up the connections the first paint depends on -->
-  <link rel="preconnect" href="https://unpkg.com" crossorigin>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="preload" href="/data/cards.json" as="fetch" crossorigin>
@@ -42,6 +41,9 @@
        right font on first render instead of a fallback that <input>s keep
        until focused. -->
   <link rel="preload" href="/data/Pixel%20Intv.otf" as="font" type="font/otf" crossorigin>
+  <!-- Pixel-Emoji-Schrift: schon beim Seitenaufruf holen UND (Skript unten) fuer die Spiel-Schriften laden, damit das erste Emoji nicht
+       einen Moment als weiches System-Emoji aufblitzt, bevor die Pixel-Fassung da ist (siehe scripts/pixel-emoji/README.md). -->
+  <link rel="preload" href="/fonts/pp-pixel-emoji.woff2?v=eb2408099f" as="font" type="font/woff2" crossorigin>
 
   <!-- Strukturierte Daten. Sagt Google, WAS diese Seite ist, statt es
        aus einem Ladebildschirm erraten zu lassen. Die Basis-URL wird
@@ -54,8 +56,8 @@
     "@type": "VideoGame",
     "name": "Pixel Parties TCG",
     "alternateName": "Pixel Parties",
-    "url": "https://pixelparties.onrender.com/",
-    "image": "https://pixelparties.onrender.com/title.png",
+    "url": "https://pixelpartiestcg.com/",
+    "image": "https://pixelpartiestcg.com/title.png",
     "description": "Pixel Parties is a free online trading card game simulator. Build decks from over 1400 cards, duel live opponents in your browser, and climb the ranks.",
     "genre": ["Trading Card Game", "Strategy"],
     "gamePlatform": "Web browser",
@@ -71,8 +73,24 @@
   }
   </script>
 
-  <link rel="stylesheet" href="/style.css">
-  <link rel="stylesheet" href="/style-skilltest.css">
+  <!-- Retro-Modus (Vorschau): ?retro=1 schaltet ein, ?retro=0 aus (wird gemerkt). Laedt die umgewandelten Stylesheets (scripts/retro/build-css.js) und den
+       Umwandlungs-Kern fuer Inline-Stile. Muss synchron VOR den Stylesheets laufen. -->
+  <script>
+    (function () {
+      var an = false;
+      try {
+        var q = /[?&]retro=(\w+)/.exec(location.search);
+        if (q) localStorage.setItem('pp-retro', (q[1] === '0' || q[1] === 'aus') ? '0' : '1');
+        an = localStorage.getItem('pp-retro') === '1';
+      } catch (e) { /* ohne Speicher: normaler Modus */ }
+      window.PP_RETRO = an;
+      if (an) document.documentElement.setAttribute('data-retro', '1');
+      // Normalmodus: vorgebackene Fassung (scripts/hart/build-css.js: pixel-hart.js schon angewandt, spart die Umwandlung zur Laufzeit); Retro: eigene Pipeline.
+      var s = an ? '.retro' : '.hart';
+      document.write('<link rel="stylesheet" href="/style' + s + '.css"><link rel="stylesheet" href="/style-skilltest' + s + '.css">');
+      if (an) document.write('<script src="/retro-core.js"><\/script>');
+    })();
+  </script>
 
   <!-- Instant branded splash, shown until React mounts. Styles are
        inlined so it renders before style.css and never flashes. React
@@ -84,32 +102,43 @@
     #boot-splash {
       position: fixed; inset: 0; z-index: 9999;
       display: flex; align-items: center; justify-content: center;
-      background-image: url('/title.png'), linear-gradient(135deg, #0a0a12 0%, #1a0a2e 50%, #0a1a1e 100%);
-      background-size: 100% 100%, auto;
-      background-position: center center, center center;
-      background-repeat: no-repeat, no-repeat;
-      background-color: #050510;
+      background-image: url('/title.png');
+      background-size: 100% 100%;
+      background-position: center center;
+      background-repeat: no-repeat;
+      background-color: #08060c;
       font-family: 'Segoe UI', system-ui, sans-serif;
     }
     #boot-splash .bs-panel {
       display: flex; flex-direction: column; align-items: center; gap: 18px;
       padding: 28px 44px;
-      background: rgba(10, 10, 20, .82);
-      backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
-      border: 1px solid rgba(170, 136, 255, .35); border-radius: 12px;
-      box-shadow: 0 0 40px rgba(0, 0, 0, .75), 0 0 60px rgba(170, 136, 255, .15);
+      /* W86u2 (Pixelart): deckende Flaeche, harter Rahmen statt Weichzeichner/Alpha/Rundung. */
+      background: #08060c;
+      border: 4px solid #7e41ba; border-radius: 0;
+      box-shadow: 0 0 0 4px #08060c, 8px 8px 0 4px rgba(0, 0, 0, .6);
     }
     #boot-splash .bs-title {
       font-size: 24px; font-weight: 800; letter-spacing: 6px;
-      text-transform: uppercase; color: #00f0ff; text-shadow: 0 0 24px rgba(0,240,255,.55);
+      text-transform: uppercase; color: #1aedff; text-shadow: 2px 2px 0 #405f8c;
     }
-    #boot-splash .bs-sub { font-size: 12px; letter-spacing: 4px; color: #8888aa; }
+    #boot-splash .bs-sub { font-size: 12px; letter-spacing: 4px; color: #7e7d9b; }
+    /* W86u2 (Pixelart): Lade-Anzeige aus acht 6-px-Quadraten (Achteck), das helle Quadrat laeuft im Achtertakt — kein gedrehter Vektorring. */
     #boot-splash .bs-ring {
-      width: 38px; height: 38px; border-radius: 50%;
-      border: 3px solid rgba(0,240,255,.18); border-top-color: #00f0ff;
-      animation: bs-spin .8s linear infinite;
+      width: 6px; height: 6px; margin: 16px 0;
+      box-shadow: var(--bs-sh, 0px -14px 0 0 #1aedff, 10px -10px 0 0 #2d4362, 14px 0px 0 0 #2d4362, 10px 10px 0 0 #2d4362, 0px 14px 0 0 #2d4362, -10px 10px 0 0 #2d4362, -14px 0px 0 0 #405f8c, -10px -10px 0 0 #1788bd);
+      animation: bs-spin .8s steps(1, end) infinite;
     }
-    @keyframes bs-spin { to { transform: rotate(360deg); } }
+    /* Gehaltene Bilder ueber eine Hilfsvariable (`--bs-sh`): der Pixel-Backer (pixel-anim.js) laesst Animationen, die nur Variablen wechseln, in Ruhe — Schatten-Schluesselbilder haette er zur Laufzeit neu gebacken. */
+    @keyframes bs-spin {
+      0% { --bs-sh: 0px -14px 0 0 #1aedff, 10px -10px 0 0 #2d4362, 14px 0px 0 0 #2d4362, 10px 10px 0 0 #2d4362, 0px 14px 0 0 #2d4362, -10px 10px 0 0 #2d4362, -14px 0px 0 0 #405f8c, -10px -10px 0 0 #1788bd; }
+      12.5% { --bs-sh: 0px -14px 0 0 #1788bd, 10px -10px 0 0 #1aedff, 14px 0px 0 0 #2d4362, 10px 10px 0 0 #2d4362, 0px 14px 0 0 #2d4362, -10px 10px 0 0 #2d4362, -14px 0px 0 0 #2d4362, -10px -10px 0 0 #405f8c; }
+      25% { --bs-sh: 0px -14px 0 0 #405f8c, 10px -10px 0 0 #1788bd, 14px 0px 0 0 #1aedff, 10px 10px 0 0 #2d4362, 0px 14px 0 0 #2d4362, -10px 10px 0 0 #2d4362, -14px 0px 0 0 #2d4362, -10px -10px 0 0 #2d4362; }
+      37.5% { --bs-sh: 0px -14px 0 0 #2d4362, 10px -10px 0 0 #405f8c, 14px 0px 0 0 #1788bd, 10px 10px 0 0 #1aedff, 0px 14px 0 0 #2d4362, -10px 10px 0 0 #2d4362, -14px 0px 0 0 #2d4362, -10px -10px 0 0 #2d4362; }
+      50% { --bs-sh: 0px -14px 0 0 #2d4362, 10px -10px 0 0 #2d4362, 14px 0px 0 0 #405f8c, 10px 10px 0 0 #1788bd, 0px 14px 0 0 #1aedff, -10px 10px 0 0 #2d4362, -14px 0px 0 0 #2d4362, -10px -10px 0 0 #2d4362; }
+      62.5% { --bs-sh: 0px -14px 0 0 #2d4362, 10px -10px 0 0 #2d4362, 14px 0px 0 0 #2d4362, 10px 10px 0 0 #405f8c, 0px 14px 0 0 #1788bd, -10px 10px 0 0 #1aedff, -14px 0px 0 0 #2d4362, -10px -10px 0 0 #2d4362; }
+      75% { --bs-sh: 0px -14px 0 0 #2d4362, 10px -10px 0 0 #2d4362, 14px 0px 0 0 #2d4362, 10px 10px 0 0 #2d4362, 0px 14px 0 0 #405f8c, -10px 10px 0 0 #1788bd, -14px 0px 0 0 #1aedff, -10px -10px 0 0 #2d4362; }
+      87.5% { --bs-sh: 0px -14px 0 0 #2d4362, 10px -10px 0 0 #2d4362, 14px 0px 0 0 #2d4362, 10px 10px 0 0 #2d4362, 0px 14px 0 0 #2d4362, -10px 10px 0 0 #405f8c, -14px 0px 0 0 #1788bd, -10px -10px 0 0 #1aedff; }
+    }
   </style>
 
   <!-- Card DB globals must exist before app-shared.js runs. This inline
@@ -123,9 +152,15 @@
     window.GOOGLE_CLIENT_ID = "__GOOGLE_CLIENT_ID__";
   </script>
 
-  <!-- React runtime (deferred so the splash paints first). -->
-  <script defer src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
-  <script defer src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+  <!-- React 18.3.1 runtime, selbst gehostet (public/vendor) — kein CDN (deferred so the splash paints first). -->
+  <!-- Spiel-Palette (256 Farben): rastet Farben, die erst zur Laufzeit entstehen, auf die Palette ein (scripts/palette). Synchron, vor allem anderen. -->
+  <script src="/palette.js"></script>
+  <!-- W86z: Pixel-Animation (Takt, Dither-Fade, Kunstpixel-Skalierung, Drehsprites) — nach palette.js, vor den Bundles -->
+  <script src="/pixel-anim.js"></script>
+  <!-- W86u1: weiche Schatten/Filter (box-/text-shadow, filter: blur/drop-shadow, backdrop-filter, mix-blend-mode) in Stylesheets und Inline-Stilen → harte Pixelkanten -->
+  <script src="/pixel-hart.js"></script>
+  <script defer src="/vendor/react.production.min.js"></script>
+  <script defer src="/vendor/react-dom.production.min.js"></script>
   <script defer src="/socket.io/socket.io.js"></script>
 
   <!-- Pre-compiled app bundles (built from public/*.jsx by scripts/build.js).
@@ -150,11 +185,76 @@
   <script defer src="/dist/app-puzzle.js"></script>
   <script defer src="/dist/app-deckbuilder.js"></script>
   <script defer src="/dist/app-board.js"></script>
+  <script defer src="/dist/app-fx-0.js"></script>
+  <script defer src="/dist/app-fx-1.js"></script>
+  <script defer src="/dist/app-fx-2.js"></script>
+  <script defer src="/dist/app-fx-3.js"></script>
+  <script defer src="/dist/app-fx-4.js"></script>
+  <script defer src="/dist/app-fx-5.js"></script>
+  <script defer src="/dist/app-fx-6.js"></script>
+  <script defer src="/dist/app-fx-7.js"></script>
+  <script defer src="/dist/app-fx-8.js"></script>
+  <script defer src="/dist/app-fx-9.js"></script>
+  <script defer src="/dist/app-fx-10.js"></script>
+  <script defer src="/dist/app-fx-11.js"></script>
+  <script defer src="/dist/app-fx-12.js"></script>
+  <script defer src="/dist/app-fx-13.js"></script>
+  <script defer src="/dist/app-fx-14.js"></script>
+  <script defer src="/dist/app-fx-15.js"></script>
+  <script defer src="/dist/app-fx-16.js"></script>
+  <script defer src="/dist/app-fx-17.js"></script>
+  <script defer src="/dist/app-fx-18.js"></script>
+  <script defer src="/dist/app-fx-19.js"></script>
+  <script defer src="/dist/app-fx-20.js"></script>
+  <script defer src="/dist/app-fx-21.js"></script>
+  <script defer src="/dist/app-fx-22.js"></script>
+  <script defer src="/dist/app-fx-23.js"></script>
+  <script defer src="/dist/app-fx-24.js"></script>
+  <script defer src="/dist/app-fx-25.js"></script>
+  <script defer src="/dist/app-fx-26.js"></script>
+  <script defer src="/dist/app-fx-27.js"></script>
+  <script defer src="/dist/app-fx-28.js"></script>
+  <script defer src="/dist/app-fx-29.js"></script>
+  <script defer src="/dist/app-fx-30.js"></script>
+  <script defer src="/dist/app-fx-31.js"></script>
+  <script defer src="/dist/app-fx-32.js"></script>
+  <script defer src="/dist/app-fx-33.js"></script>
+  <script defer src="/dist/app-fx-34.js"></script>
+  <script defer src="/dist/app-fx-35.js"></script>
+  <script defer src="/dist/app-fx-36.js"></script>
+  <script defer src="/dist/app-fx-37.js"></script>
+  <script defer src="/dist/app-fx-38.js"></script>
+  <script defer src="/dist/app-fx-40.js"></script>
+  <script defer src="/dist/app-fx-41.js"></script>
+  <script defer src="/dist/app-fx-43.js"></script>
+  <script defer src="/dist/app-fx-45.js"></script>
+  <script defer src="/dist/app-fx-46.js"></script>
+  <script defer src="/dist/app-fx-44.js"></script>
+  <script defer src="/dist/app-fx-47.js"></script>
+  <script defer src="/dist/app-fx-48.js"></script>
+  <script defer src="/dist/app-fx-49.js"></script>
+  <script defer src="/dist/app-fx-50.js"></script>
+  <script defer src="/dist/app-fx-51.js"></script>
+  <script defer src="/dist/app-fx-52.js"></script>
+  <script defer src="/dist/app-fx-53.js"></script>
+  <script defer src="/dist/app-fx-54.js"></script>
+  <script defer src="/dist/app-fx-55.js"></script>
   <script defer src="/dist/app-campaign.js"></script>
   <script defer src="/skilltest-rules.js"></script>
   <script defer src="/skilltest-art.js"></script>
   <script defer src="/dist/app-skilltest.js"></script>
   <script defer src="/dist/app-main.js"></script>
+  <script>
+    // Pixel-Emoji-Schrift sofort anfordern (unicode-range-Schriften laden sonst erst beim ersten Zeichen im Text). Die Zeichen sind Stichproben aus
+    // den Bereichen der Schrift (Emoji, Pfeile, Symbole); `document.fonts.load` holt jede Schrift, die eines davon abdeckt.
+    (function () {
+      if (!document.fonts || !document.fonts.load) return;
+      var familien = ['PP Pixel Emoji', 'Pixel Intv', 'Press Start 2P'];
+      var probe = '\uD83D\uDD25\u2605\u2192\u2694\u2728';
+      function los() { familien.forEach(function (f) { try { document.fonts.load("16px '" + f + "'", probe).catch(function () {}); } catch (e) {} }); }
+      if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', los); else los();
+    })();
+  </script>
 </head>
 <body>
   <div id="root">

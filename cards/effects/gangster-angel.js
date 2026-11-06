@@ -47,6 +47,7 @@
 
 const CARD_NAME = 'Gangster Angel';
 const PARTNER = 'Angler Angel';
+const { eligibleSummonZones } = require('./_summon-eligibility');
 const DAMAGE = 10;
 
 /**
@@ -55,7 +56,9 @@ const DAMAGE = 10;
  * Gegenspalte; jede Zone traegt `owner` (physische Seite).
  */
 function freieSlots(engine, pi) {
-  return engine.getFreeSupportZones(pi, { nachKontrolle: true, livingHeroesOnly: true });
+  // Welle 10 (Al, Q44-Regel: jedes „summon" erfordert einen agierfähigen Beschwörer): „summon an Angler Angel … as an additional Action" ist eine
+  // echte Beschwörung — nur Plätze von Helden, die sie wirklich ausführen dürfen (nicht Frozen/Stunned/Negated, Stufe/Schule, keine Beschwörungs-/Aktionssperre).
+  return eligibleSummonZones(engine, pi, PARTNER, { nachKontrolle: true, alsAktion: true });
 }
 
 /**
@@ -68,6 +71,22 @@ function gegnerHelden(engine, oi) {
     .map(({ physOwner, heroIdx, hero }) => ({
       id: `hero-${physOwner}-${heroIdx}`, type: 'hero', owner: physOwner, heroIdx, cardName: hero.name,
     }));
+}
+
+/**
+ * N3-09 (W24): Kreaturen, die `oi` kontrolliert — ALLE, auch „cannot be chosen" (Thicket). „all targets your opponent controls" waehlt nicht,
+ * der Schutz gilt nur Wahl-Effekten (Kopfkommentar thicket.js; Spirit of the Barbarian Sword, Biseria-Frost). `getCreatureTargets` laesst
+ * `untargetable_all` aus (gedacht fuer Targeting-Artefakte), deshalb hier ueber die Instanzen; Zielform wie dort (`kreaturZiel`: Brettseite).
+ */
+function gegnerKreaturen(engine, oi) {
+  const out = [];
+  for (const inst of (engine.cardInstances || [])) {
+    if (inst.zone !== 'support' || inst.faceDown || engine.kontrolleurVon(inst) !== oi) continue;
+    const cd = engine.getEffectiveCardData(inst) || engine._getCardDB()[inst.name];
+    if (!cd || !engine.isChoosableAsCreature(inst, cd)) continue;
+    out.push(engine.kreaturZiel(inst));
+  }
+  return out;
 }
 
 module.exports = {
@@ -90,7 +109,7 @@ module.exports = {
   canActivateCreatureEffect(ctx) {
     const engine = ctx._engine;
     const oi = engine.opponentOf(ctx.cardOwner);
-    return (gegnerHelden(engine, oi).length + engine.getCreatureTargets(oi).length) > 0;
+    return (gegnerHelden(engine, oi).length + gegnerKreaturen(engine, oi).length) > 0;
   },
 
   async onCreatureEffect(ctx) {
@@ -99,7 +118,7 @@ module.exports = {
     const pi = ctx.cardOwner;
     const oi = engine.opponentOf(pi);
 
-    const ziele = [...gegnerHelden(engine, oi), ...engine.getCreatureTargets(oi)];
+    const ziele = [...gegnerHelden(engine, oi), ...gegnerKreaturen(engine, oi)];
     if (ziele.length === 0) return false;
 
     for (const t of ziele) {
@@ -153,9 +172,9 @@ module.exports = {
       // Angebot nur, wenn es auch ausfuehrbar ist: Angler in der Hand
       // UND ein freier Platz. Sonst waere die Abfrage eine Falle —
       // „ja" haette den Zug beendet, ohne den Angler zu bringen.
-      if (!(ps.hand || []).includes(PARTNER)) return;
+      if (!(ps.hand || []).includes(PARTNER)) return ctx._engine.summonEffektFizzelt(ctx.card, ctx.cardName, { stumm: true });   // W11/R4: wirkt nicht → Blob stumm
       const slots = freieSlots(engine, pi);
-      if (slots.length === 0) return;
+      if (slots.length === 0) return ctx._engine.summonEffektFizzelt(ctx.card, ctx.cardName, { stumm: true });   // W11/R4: wirkt nicht → Blob stumm
 
       const antwort = await engine.promptGeneric(pi, {
         type: 'confirm',
@@ -166,7 +185,7 @@ module.exports = {
         cancelLabel: 'No, keep my turn',
         cancellable: true,
       });
-      if (!antwort || antwort.cancelled) return;
+      if (!antwort || antwort.cancelled) return ctx._engine.summonEffektFizzelt(ctx.card, ctx.cardName, { stumm: true });   // W11/R4: wirkt nicht → Blob stumm
 
       // Platz waehlen (bei genau einem freien Platz ohne Rueckfrage).
       let ziel = slots[0];

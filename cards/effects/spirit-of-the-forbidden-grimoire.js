@@ -30,6 +30,12 @@
 //    (`prepareCreatureEffect` → Ziele, dann `onCreatureEffect` mit
 //    diesen Zielen) in JEDEM Kreaturenskript.
 //
+//  ★ W12 (Al, Q5): „Ja, dürfen sie." — das Grimoire (und Kohta) darf auch einen
+//  Effekt nutzen, dessen EIGENES Limit erschöpft ist (3-Headed Giant bei 3/3,
+//  Analyzer mit beiden Optionen benutzt …): `reactivateCreatureEffect(…, { borrowed: true })`
+//  → `ctx._borrowedUse` in der Karte. Es bleiben: negiert, hart gesperrt
+//  (`_effectLockedTurn`), echte Voraussetzungen (Ziel/Vorrat), Levelgrenze.
+//
 //  Sperre danach
 //  ─────────────
 //  „cannot be used another time for the rest of the turn IN ANY WAY\" —
@@ -40,7 +46,7 @@
 //  ihn nicht noch einmal leihen.
 // ═══════════════════════════════════════════
 
-const { hasCardType, hasNumericCreatureLevel } = require('./_hooks');
+const { hasCardType, hasNumericCreatureLevel, heldSeite } = require('./_hooks');
 const { GRIMOIRE_NAME, hasGrimoire } = require('./_fiona-shared');
 
 const CARD_NAME = 'Spirit of the Forbidden Grimoire';
@@ -74,7 +80,7 @@ function levelVon(engine, inst) {
  * Die dynamischen Schranken — gleicher Name, Restbudget nach der
  * ersten Wahl — regelt der Picker live (`uniqueBy`, `maxBudget`).
  */
-function sammleKandidaten(engine) {
+function sammleKandidaten(engine, pi = null) {
   const { loadCardEffect } = require('./_loader');
   const out = [];
   for (const inst of (engine.cardInstances || [])) {
@@ -87,15 +93,19 @@ function sammleKandidaten(engine) {
 
     let grund = null;
     if (inst.counters?.negated || inst.counters?.nulled) grund = 'negated';
+    else if (engine.isCreatureActiveEffectLocked(inst)) grund = 'active effects locked';   // W15a (Al, R6): Unwanted Audience sperrt auch die geliehene Aktivierung — ausgegraut statt wählbar-und-wirkungslos
     else if (inst.counters?._effectLockedTurn === engine.gs.turn) grund = 'used this turn';
     else if (!hasNumericCreatureLevel(cd)) grund = 'no level';   // Artifact Creatures haben kein Level (Als Ruling 9.10.)
     else if (levelVon(engine, inst) > MAX_SUMME) grund = `level ${levelVon(engine, inst)}`;
     else if (typeof script.canActivateCreatureEffect === 'function') {
+      // N3-04 (W24): die Voraussetzung gilt aus Sicht des NUTZERS (Gegnerkreatur: Effekt „als ob du sie kontrollierst").
+      const undo = pi != null ? engine._leiheKontrolle(inst, pi) : null;
       try {
-        if (!script.canActivateCreatureEffect(engine._createContext(inst, {}))) {
+        if (!script.canActivateCreatureEffect(engine._createContext(inst, { _borrowedUse: true }))) {   // W12 (Q5): eigenes Limit steht nicht im Weg
           grund = 'requirements not met';
         }
       } catch { grund = 'requirements not met'; }
+      finally { if (undo) undo(); }
     }
     out.push({ inst, ineligible: !!grund, grund });
   }
@@ -103,8 +113,8 @@ function sammleKandidaten(engine) {
 }
 
 /** Nur die tatsaechlich ausleihbaren. */
-function ausleihbar(engine) {
-  return sammleKandidaten(engine).filter(k => !k.ineligible).map(k => k.inst);
+function ausleihbar(engine, pi = null) {
+  return sammleKandidaten(engine, pi).filter(k => !k.ineligible).map(k => k.inst);
 }
 
 /**
@@ -165,17 +175,19 @@ async function waehleBeide(engine, pi, kandidaten) {
 module.exports = {
   activeIn: ['support'],
   creatureEffect: true,
+  // Als Ruling (Al 26.10., Blinded): der Effekt wählt Kreaturen aufs Brett (deren Effekte er nutzt) — ein geblendeter Träger/Wirtsheld kann ihn nicht aktivieren.
+  requiresTarget: true,
 
   cpuMeta: { dealsDamage: true },
 
   /** „can only be summoned by a Hero equipped with …\" */
   canPlayWithHero(gs, pi, heroIdx, cardData, engine) {
     if (!engine) return true;
-    return hasGrimoire(engine, pi, heroIdx);
+    return hasGrimoire(engine, heldSeite(gs, pi, heroIdx), heroIdx);   // N3-03 (W24): Brettseite des uebernommenen Helden
   },
 
   canActivateCreatureEffect(ctx) {
-    return ausleihbar(ctx._engine).length > 0;
+    return ausleihbar(ctx._engine, ctx.cardOwner).length > 0;
   },
 
   async onCreatureEffect(ctx) {
@@ -184,7 +196,7 @@ module.exports = {
 
     // ── Schritt 1: BEIDE Kreaturen in EINEM Picker waehlen, bevor
     //    irgendein Ziel gewaehlt wird. ─────────────────────────────
-    const kandidaten = sammleKandidaten(engine);
+    const kandidaten = sammleKandidaten(engine, pi);
     if (!kandidaten.some(k => !k.ineligible)) return false;
 
     const geliehen = await waehleBeide(engine, pi, kandidaten);
@@ -212,6 +224,7 @@ module.exports = {
       if (inst.zone !== 'support') continue;        // zwischendurch gefallen
       await engine.reactivateCreatureEffect(inst, pi, {
         ignoreEffectLock: true,
+        borrowed: true,   // W12 (Q5): auch ein Effekt mit erschoepftem EIGENEM Limit darf geliehen werden
         plan: plaene.has(inst.id) ? plaene.get(inst.id) : undefined,
       });
     }

@@ -63,7 +63,7 @@ async function tryEat(ctx, deadName, deadOwnerSide) {
   const stack = engine.cardInstances.filter(c =>
     (feld === ourPi ? (c.controller ?? c.owner) === ourPi : c.owner === feld)   // Styx 28.9.
     && c.heroIdx === ourHi
-    && c.zone === 'ability'
+    && engine.istWirksameAbility(c)   // 24.10.: auch in einer Support Zone (Xal)
     && c.name === 'Cannibalism'
     && !c.faceDown);
   if (stack.length === 0) return;

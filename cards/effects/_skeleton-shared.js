@@ -10,7 +10,7 @@
 //  rules text says "this Creature is also treated
 //  as a Skeleton".
 //
-//  Current overrides:
+//  Current overrides (Loyal Bone Dog, Deepsea Skeleton — s. TREATED_AS_SKELETON):
 //    • Loyal Bone Dog — its own card text reads
 //      "This Creature is also treated as a
 //      'Skeleton' Creature." Hard-coded here so
@@ -21,6 +21,7 @@
 //      without needing its own special case.
 // ═══════════════════════════════════════════
 
+const { anyName } = require('./_alias-name');   // Shroomasaur: Zusatzname zählt für Namensfamilien
 const SKELETON_ARCHETYPE = 'Skeletons';
 
 // Names that count as Skeleton even though their
@@ -29,6 +30,9 @@ const SKELETON_ARCHETYPE = 'Skeletons';
 // scripted.
 const TREATED_AS_SKELETON = new Set([
   'Loyal Bone Dog',
+  // Welle 10 (Al, Q35 / A05-23: „Ja, es zählt als Skeleton und als Deepsea“): `archetype` ist „Deepsea“ (zählt für `isDeepseaCreature`),
+  // für alle Skeleton-Karten ist es zugleich ein „Skeleton“ Creature.
+  'Deepsea Skeleton',
 ]);
 
 /**
@@ -75,7 +79,7 @@ function getControlledSkeletons(engine, playerIdx) {
   for (const inst of engine.cardInstances) {
     if (inst.zone !== 'support') continue;
     if ((inst.controller ?? inst.owner) !== playerIdx) continue;
-    if (!isSkeletonCreature(inst.name, engine)) continue;
+    if (!anyName(inst, (n) => isSkeletonCreature(n, engine))) continue;
     out.push(inst);
   }
   return out;

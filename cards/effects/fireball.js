@@ -22,6 +22,9 @@ const CARD_NAME = 'Fireball';
 const FIREBALL_DAMAGE = 150;
 
 module.exports = {
+  // ★ Als Ruling (Al 26.10., Flame Avalanche: „Am besten gleich die Karten ganz sperren statt den Schaden fizzeln zu lassen"): die Karte richtet NUR Schaden an Zielen des Gegners an —
+  // unter der Schadenssperre (`ps.damageLocked`) unspielbar (Karte bleibt auf der Hand, keine Aktion/Kosten; Sperr-Stutzen `engine._cardBlockedBySearchLock`).
+  blockedByDamageLock: true,
   // ★★ v1179 — ENTKOPPELTE ZAUBERBILDER: ein Feuerball je Ziel vom
   // Wirker, dann die Flammenexplosion. Rein visuell — kein Zustand.
   spellVisual: {
@@ -69,6 +72,8 @@ module.exports = {
         confirmLabel: `🔥 Fireball! (${FIREBALL_DAMAGE})`,
         confirmClass: 'btn-danger',
         cancellable: !forced,
+        // Als Ruling (Al 26.10., Chaorc Friendly Fireballer): die Kosten dieser Ausführung (Opfer) fallen erst mit der bestätigten Zielwahl an — `ctx._nachZielwahl` (vom Aufrufer).
+        ...(typeof ctx._nachZielwahl === 'function' ? { nachZielwahl: ctx._nachZielwahl } : {}),
       });
 
       // [] = cancelled or fully negated (promptMultiTarget already set
@@ -115,9 +120,7 @@ module.exports = {
           heldenZiele.push({ t, hero });
         } else {
           const inst = t.cardInstance
-            || engine.cardInstances.find(c =>
-              (c.owner === t.owner || c.controller === t.owner)
-              && c.zone === 'support' && c.heroIdx === t.heroIdx && c.zoneSlot === t.slotIdx);
+            || engine.kreaturAnBrett(t.owner, t.heroIdx, t.slotIdx);   // Z1: Brettseite
           if (!inst) continue;
           kreaturZiele.push(inst);
         }

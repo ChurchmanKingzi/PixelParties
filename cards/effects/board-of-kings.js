@@ -24,6 +24,7 @@
 //     (`isOppEffectImmuneFrom` / `isOppDamageImmuneFrom`, „unaffected").
 //     Nicht rekursiv; Adjazenz = 9er-Reihe; Board beider Seiten zaehlt.
 // ═══════════════════════════════════════════
+const { anyName } = require('./_alias-name');   // Shroomasaur: Zusatzname zählt für Namensfamilien
 const {
   BOARD, reduceLevelByOfKingsFactory, coveredByBoardOfKings, ofKingsCreatures,
   summonedThisTurn, isOfKingsName, mainActionSlotFree, ofKingsCpuAnswer,
@@ -34,7 +35,7 @@ const CARD_NAME = BOARD;
 function sacrificeSpec(engine, pi) {
   return {
     minCount: 1, maxCount: 1, noHandSubstitute: true,
-    filter: c => isOfKingsName(c.inst?.name) && !summonedThisTurn(engine, c.inst),
+    filter: c => anyName(c.inst, (n) => isOfKingsName(n)) && !summonedThisTurn(engine, c.inst),
     title: CARD_NAME,
     description: 'Sacrifice an "of Kings" Creature you control that was not summoned this turn — playing Board of Kings then counts as an additional Action.',
     confirmLabel: '♟ Sacrifice!',

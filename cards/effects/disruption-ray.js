@@ -11,10 +11,17 @@
 //     (BUFF_EFFECTS in _hooks.js, damageMultiplier
 //     2). The engine's standard buff-multiplier
 //     pass doubles every hit on both hero and
-//     creature targets. True damage
-//     (actionDealTrueDamage) bypasses it, same
-//     engine-wide convention as Cloudy / Damage
-//     Immune.
+//     creature targets.
+//     Als Ruling (Al 26.10.): „All damage that target
+//     receives … is doubled" verdoppelt AUCH True Damage
+//     (Rockfall 200 → 400, Acid Vial 150 → 300) und
+//     unnegierbaren Schaden — Verdoppeln ist keine
+//     Senkung. Die Engine nimmt bei unnegierbarem /
+//     True Damage deshalb nur ERHÖHENDE Buff-
+//     Multiplikatoren (> 1) mit (`actionDealTrueDamage`,
+//     `actionDealDamage`, `processCreatureDamageBatch`);
+//     Cloudy / Petrified / Damage Immune bleiben dort
+//     weiter außen vor.
 //   • Duration: "until the end of your next turn".
 //     Buff expiry runs at TURN-START only
 //     (_processBuffExpiry). With turns alternating

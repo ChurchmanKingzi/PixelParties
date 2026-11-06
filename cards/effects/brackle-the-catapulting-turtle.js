@@ -87,13 +87,13 @@ const MAX_DAMAGE = 300;
 // overlay — and the client-side diff-detector that would otherwise
 // animate the destroy's discard-flight from the source slot is
 // pre-suppressed so it doesn't double-up.
-const LOAD_MS    = 1100;        // Creature slot → Brackle (slow, weighty).
-const HOLD_MS    =  400;        // Creature visibly parked on Brackle.
-const FIRE_MS    =  300;        // Brackle → target (snappy release).
-const IMPACT_MS  =  300;        // Creature parked at target while the
+const LOAD_MS    =  650;        // Creature slot → Brackle (zügig, aber mit Gewicht).
+const HOLD_MS    =  200;        // Creature visibly parked on Brackle.
+const FIRE_MS    =  200;        // Brackle → target (snappy release).
+const IMPACT_MS  =  200;        // Creature parked at target while the
                                 // explosion plays — sells the hit
                                 // before the body flies to discard.
-const DISCARD_MS =  500;        // Target → discard pile.
+const DISCARD_MS =  350;        // Target → discard pile.
 
 // Damage lands ~70% through the fire phase — early enough that the
 // impact reads as "the catapulted Creature hit the target" before
@@ -112,14 +112,17 @@ const ANIM_TOTAL_MS  = DESTROY_AT_MS + DISCARD_MS;
 
 /** Sacrifice candidates: engine pool intersected with the per-turn
  *  summoning-sickness filter. Pure read, side-effect-free. */
-function _eligibleSacrificeCandidates(engine, pi) {
+function _eligibleSacrificeCandidates(engine, pi, ausser) {
   const turn = engine.gs.turn || 0;
   return engine.getSacrificableCreatures(pi).filter(c =>
-    c.inst.turnPlayed !== turn,
+    c.inst.turnPlayed !== turn && !(ausser && ausser.includes(c.inst.id)),
   );
 }
 
 module.exports = {
+  // W26a (Al, Welle 26): als Attack geltender Heldeneffekt ohne Karte — Stufen-Bedingungen ("level X or lower": Glass Wall, Test Flight, Future Tech Escape Device …) lesen die Quellstufe.
+  // W32a (Al, 22.10.2026): „Zählt als Attack/Spell eines Helden = Ability-Level dieses Helden": die Quellstufe ist das FIGHTING-LEVEL Brackles (nicht mehr fix 0) — Engine: `_heldenEffektStufe`.
+  treatedAsAttack: { ability: 'Fighting' },
   activeIn: ['hero'],
   heroEffect: true,
   // Rein schaedlich: eigene Kreatur opfern, um Schaden auszuteilen. Unter
@@ -136,6 +139,9 @@ module.exports = {
     const engine = ctx._engine;
     const pi = ctx.cardOwner;
     if (engine.gs.players[pi] == null) return false;
+    // ★ W34a (Al, 22.10.2026): ein Effekt, der als Attack zählt, unterliegt den Attack-Zählern und -Sperren (Berserk-Limit, Knife Throw, Rioting Village, Mirjam, Muras …) — `heroKannAngreifen`.
+    if (!ctx._engine.heroKannAngreifen(ctx.cardHeroOwner ?? ctx.cardOwner, ctx.cardHeroIdx, ctx.cardOwner, { name: 'Brackle, the Catapulting Turtle' })) return false;
+
     return _eligibleSacrificeCandidates(engine, pi).length > 0;
   },
 
@@ -163,14 +169,16 @@ module.exports = {
     const own = validTargets.filter(t => t.type === 'equip' && t.cardInstance);
     if (own.length === 0) return undefined;
     const sorted = own.slice().sort((a, b) => {
-      const aHp = Math.min(a.cardInstance.counters?.currentHp || 0, MAX_DAMAGE);
-      const bHp = Math.min(b.cardInstance.counters?.currentHp || 0, MAX_DAMAGE);
+      const aHp = Math.min(engine.creatureCurrentHp(a.cardInstance), MAX_DAMAGE);   // Z5: unversehrt = gedruckte HP
+      const bHp = Math.min(engine.creatureCurrentHp(b.cardInstance), MAX_DAMAGE);
       return bHp - aHp;
     });
     return [sorted[0].id];
   },
 
-  async onHeroEffect(ctx) {
+  // W40a (Al, 22.10.2026, Punkt 3): `wdh` = Wiederholung durch Idej Sword - Kunagi — „Im Fall von Brackle wäre dafür ein zweites Opfer nötig": die Wiederholung verlangt ein WEITERES Opfer
+  // (`wdh.ausser` = das Opfer des ersten Schlags, das erst NACH dem Schlag abgelegt wird, ist nicht noch einmal wählbar); gibt es keins, findet sie nicht statt und kostet nichts.
+  async onHeroEffect(ctx, wdh) {
     const engine = ctx._engine;
     const gs = engine.gs;
     const pi = ctx.cardOwner;
@@ -186,8 +194,9 @@ module.exports = {
     let creatureInst;
     let baseDamage;
     let target;
+    let negiert = false;
     while (true) {
-      const candidates = _eligibleSacrificeCandidates(engine, pi);
+      const candidates = _eligibleSacrificeCandidates(engine, pi, wdh && wdh.ausser);
       if (candidates.length === 0) return false;
 
       const sacTargets = candidates.map(c => ({
@@ -234,10 +243,13 @@ module.exports = {
       // doesn't read a stale value (defensive — nothing should mutate
       // currentHp between here and the actionDealDamage call, but the
       // snapshot is the contract value per the card text).
-      baseDamage = Math.min(creatureInst.counters?.currentHp || 0, MAX_DAMAGE);
+      // Z5: unversehrte Kreatur hat noch kein `currentHp` -> gedruckte HP (sonst 0 Schaden).
+      baseDamage = Math.min(engine.creatureCurrentHp(creatureInst), MAX_DAMAGE);
 
       // ── Target picker — Cancel reads as "Back" (return to sac picker) ──
-      target = await ctx.promptDamageTarget({
+      // ★ W36a (Al, 22.10.2026): „Negierter Treffer: ja, definitiv" — wird der Treffer im Zielfenster NEGIERT (Invisibility Cloak, Schutzkarten …), ist der Effekt für die Runde verbraucht
+      // (Einmal-Stempel bleibt, Rückgabe `true`), zählt als gespielte Attack (Muster Alice) und das Opfer (Kosten) bleibt bezahlt; ein „Back" des Spielers bleibt ein Abbruch.
+      ({ target, negiert } = await engine.heldenEffektZielwahl(ctx, {
         side: 'any',
         types: ['hero', 'creature'],
         damageType: 'attack',
@@ -250,9 +262,30 @@ module.exports = {
         // Override the default "Cancel" label — cancelling here goes
         // BACK to the sacrifice picker, doesn't abort the effect.
         cancelLabel: '↩ Back',
-      });
-      if (target) break;     // Have both a sacrifice AND a target — proceed.
+        // Das Opfer wird erst nach dem Schaden abgelegt, steht aber nicht
+        // mehr zur Wahl (sonst Selbstbeschuss + doppelte Ablage, H01-heroes-17).
+        condition: (t) => t.cardInstance?.id !== creatureInst.id,
+        // Das Opfer bleibt auf dem Brett sichtbar, aber gesperrt und ROT markiert — kein Fehlklick auf die eigene Opfer-Kreatur.
+        dimUnmetCondition: true,
+        markUnmetRed: true,
+      }));
+      if (target || negiert) break;     // Have both a sacrifice AND a target (or a negated hit) — proceed.
       // Target prompt cancelled → loop back to sacrifice picker.
+    }
+
+    if (negiert) {
+      // W36a: Treffer negiert — kein Katapultflug, kein Schaden; das Opfer ist als Kosten bezahlt, der Treffer zählt als Attack dieses Helden.
+      const quelleNeg = { name: CARD_NAME, owner: pi, heroIdx: brackleHeroIdx,
+        ...((ctx.cardHeroOwner ?? pi) !== pi ? { heroOwner: ctx.cardHeroOwner } : {}) };
+      await engine.zaehleAlsArt('attack', { pi, heroIdx: brackleHeroIdx, heroOwner: ctx.cardHeroOwner ?? pi, name: CARD_NAME });
+      await engine.runHooks('onCreatureSacrificed', {
+        creature: creatureInst, cardName: creatureInst.name, owner: creatureInst.owner,
+        heroIdx: creatureInst.heroIdx, zoneSlot: creatureInst.zoneSlot, source: quelleNeg, _skipReactionCheck: true,
+      });
+      await engine.actionDestroyCard(quelleNeg, creatureInst, { fireCreatureDeath: true });
+      engine.log('brackle_catapult', { player: ps.username, hero: CARD_NAME, sacrificed: creatureInst.name, damage: baseDamage, negated: true });
+      engine.sync();
+      return true;
     }
 
     // ── Step 3: catapult animation (load → hold → fire) ─────────────────
@@ -293,6 +326,8 @@ module.exports = {
     // ── Step 5: deal damage as an Attack ─────────────────────────────────
     const source = { name: CARD_NAME, owner: pi, heroIdx: brackleHeroIdx,
       ...((ctx.cardHeroOwner ?? pi) !== pi ? { heroOwner: ctx.cardHeroOwner } : {}) };   // Styx 28.9.
+    // W32a (Al, 22.10.2026): der Treffer zählt als Attack — Attack-Reaktionen (Magic Topaz, Arrows …) über die virtuelle Attack-Kette; das Opfer (Kosten) bleibt bezahlt, auch wenn sie den Treffer negiert.
+    await engine.alsAttackKette({ name: CARD_NAME, pi, heroIdx: brackleHeroIdx, heroOwner: ctx.cardHeroOwner ?? pi, ziele: [target], wiederhole: () => module.exports.onHeroEffect(ctx, { ausser: [...((wdh && wdh.ausser) || []), creatureInst.id] }), resolve: async () => {
     if (target.type === 'hero') {
       const hero = gs.players[target.owner]?.heroes?.[target.heroIdx];
       if (hero && hero.hp > 0) {
@@ -304,6 +339,8 @@ module.exports = {
         { sourceOwner: pi, canBeNegated: true },
       );
     }
+    return true;
+    } });
 
     // Wait for the IMPACT phase to finish before running the
     // sacrifice — the explosion at the target plays during this

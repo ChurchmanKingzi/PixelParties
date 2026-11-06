@@ -10,6 +10,9 @@
 //    times as you have "Rebelliokai" Creatures
 //    with different names in your discard pile.
 //
+//  ★ W4b (Al, Welle 4): ÜBERHOLT — die Kosten werden jetzt VOR dem Reaktionsfenster bezahlt (`payActivationCost`, siehe unten)
+//  und bleiben bei Ganz-Negierung bezahlt; die Zielwahl danach ist nicht mehr abbrechbar. Der Rest dieses Absatzes beschreibt den alten Ablauf.
+//
 //  House clarifications (per user spec):
 //    • Cost (delete Courtly Kirin) is paid AFTER
 //      the first target is selected, BEFORE damage
@@ -51,6 +54,7 @@ const {
   countDifferentRebelliokaiInDiscard,
   payRebelliokaiCost,
 } = require('./_rebelliokai-shared');
+const { zweitwurfSchlaege } = require('./_second-target-shared');
 
 const CARD_NAME    = 'Kirin Firebreath';
 const COST_NAME    = 'Rebelliokai Courtly Kirin';
@@ -58,6 +62,11 @@ const STRIKE_DMG   = 50;
 const STRIKE_DELAY = 280; // ms between strikes — readable but snappy
 
 module.exports = {
+  // W80a: erwartete Schlagzahl fuer die CPU-Bilanz (Monia: Mehrfachtreffer). Die Kosten sind beim Angebot schon bezahlt, der Zaehler also der echte.
+  cpuMeta: { erwarteteSchlaege: (engine, pi) => countDifferentRebelliokaiInDiscard(engine.gs.players[pi], engine) },
+  // ★ Als Ruling (Al 26.10., Flame Avalanche: „Wenn du andere Schadenskarten unspielbar machst, müssen das Vial und Rockfall auch sein!"): die Karte richtet NUR Schaden an Zielen an (das Löschen ist nur Kostenpunkt) —
+  // unter der Schadenssperre (`ps.damageLocked`) unspielbar (Karte bleibt auf der Hand, keine Aktion/Kosten; Sperr-Stutzen `engine._cardBlockedBySearchLock`).
+  blockedByDamageLock: true,
   // ★★ v1181 — ENTKOPPELTE ZAUBERBILDER (Al 17.9.): Wird der Zauber
   // NEGIERT, laeuft sein Effekt-Rumpf nie — die Engine spielt dann diese
   // Bilder, damit der abgewehrte Zauber trotzdem zu sehen ist. Im
@@ -66,9 +75,26 @@ module.exports = {
 
   requiresTarget: true,
   // ^ Tagged for Blinded gating — see cards/effects/_hooks.js (blinded status).
-  spellPlayCondition(gs, pi /*, engine */) {
+  spellPlayCondition(gs, pi, engine) {
     const ps = gs.players[pi];
+    // „Delete … from your discard pile": unter Knight of Kings [B] nicht zahlbar (A06-08).
+    if (engine && !engine.pileOutAllowed(pi, 'discard', { sourceOwner: pi })) return false;
     return (ps?.discardPile || []).indexOf(COST_NAME) >= 0;
+  },
+
+  // ★ W4b (Al, Welle 4): die Kosten („Delete 1 … from your discard pile to play this card") werden VOR dem Reaktionsfenster
+  // bezahlt (`payActivationCost`) und bleiben bei Ganz-Negierung bezahlt (Silence, The Master's Plan …). Das ersetzt die
+  // frühere Hausregel „Kosten nach der ersten Zielwahl": die Zielwahl läuft unverändert in `onPlay` (gleiche Reihenfolge der
+  // Ziele), ist aber NICHT mehr abbrechbar, weil die Karte schon verbraucht ist (CARD_API.md, „Zielende Karten sind immer
+  // abbrechbar": Ausnahme nach dem Zusagepunkt). `false` = Kosten nicht zahlbar (Stapel-Sperre, Karte fehlt) → Karte bleibt auf der Hand.
+  // Fallback: lief `payActivationCost` nicht (Sofort-Guss von Attacks, anderer Weg), zahlt `onPlay` wie früher selbst.
+  async payActivationCost(ctx) {
+    const engine = ctx._engine;
+    const pi = ctx.cardOwner;
+    const ps = engine.gs.players[pi];
+    if (!ps || (ps.discardPile || []).indexOf(COST_NAME) < 0) return false;
+    if (!(await payRebelliokaiCost(engine, pi, COST_NAME, { source: CARD_NAME }))) return false;
+    if (ctx.card) ctx.card._kostenBezahlt = true;
   },
 
   hooks: {
@@ -78,6 +104,8 @@ module.exports = {
       const pi     = ctx.cardOwner;
       const ps     = gs.players[pi];
       if (!ps) return;
+      const vorab = !!ctx.card?._kostenBezahlt;   // W4b: Kosten schon vor dem Reaktionsfenster bezahlt?
+      if (ctx.card) delete ctx.card._kostenBezahlt;
 
       // ── Step 1: pick the FIRST target (commitment point) ──
       // This is the player's last chance to back out — promptDamageTarget
@@ -89,28 +117,37 @@ module.exports = {
         damageType:  'destruction_spell',
         baseDamage:  STRIKE_DMG,
         title:       CARD_NAME,
-        description: `Choose your first target. You will deal ${STRIKE_DMG} damage as many times as you have "Rebelliokai" Creatures with different names in your discard pile (after paying the cost).`,
+        description: gs._zweitzielWurf
+          ? `Choose the second target. It takes ${STRIKE_DMG} damage once.`
+          : `Choose your first target. You will deal ${STRIKE_DMG} damage as many times as you have "Rebelliokai" Creatures with different names in your discard pile (after paying the cost).`,
         confirmLabel: `🔥 Strike #1 (${STRIKE_DMG})`,
         confirmClass: 'btn-danger',
-        cancellable: true,
+        cancellable: !vorab,   // W4b: Kosten schon gezahlt → nicht mehr abbrechbar
       });
       if (!firstTarget) {
-        gs._spellCancelled = true;
+        if (!vorab) gs._spellCancelled = true;   // Kosten bezahlt: Karte ist verbraucht (negiert / kein Ziel)
         return;
       }
 
       // ── Step 2: pay the cost (commits the player past return) ──
       // Re-check the cost is still in discard — a parallel reaction
       // (rare) could have moved it during the prompt. Defensive bail.
-      if ((ps.discardPile || []).indexOf(COST_NAME) < 0) {
-        gs._spellCancelled = true;
-        return;
+      if (!vorab) {
+        if ((ps.discardPile || []).indexOf(COST_NAME) < 0) {
+          gs._spellCancelled = true;
+          return;
+        }
+        if (!(await payRebelliokaiCost(engine, pi, COST_NAME, { source: CARD_NAME }))) {
+          gs._spellCancelled = true;   // Kosten nicht zahlbar (Stapel-Sperre) → nichts passiert (A06-08)
+          return;
+        }
       }
-      await payRebelliokaiCost(engine, pi, COST_NAME, { source: CARD_NAME });
 
       // ── Step 3: snap N AFTER cost (deleted Kirin doesn't count) ──
-      const N = countDifferentRebelliokaiInDiscard(ps, engine);
-      if (N <= 0) {
+      // ★ W77b (Al, zu W76a-Frage 13): im Zweitwurf auf das zweite Ziel (Bartas, Grisgar, Andras) schlägt der Spell genau EINMAL zu, nicht N-mal (`zweitwurfSchlaege`).
+      const nVoll = countDifferentRebelliokaiInDiscard(ps, engine);
+      const N = zweitwurfSchlaege(gs, nVoll);
+      if (nVoll <= 0) {
         // Cost paid, no strikes. Spell resolves silently.
         engine.log('kirin_firebreath_fizzle', {
           player: ps.username, reason: 'no_rebelliokai_in_discard',

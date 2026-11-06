@@ -20,6 +20,22 @@
 //  Driven by the `guardChangeMove` prompt (frontend reuses the
 //  Slippery render path, extended with swap highlighting).
 //
+//  ── Kontrolle statt Brettseite (W18b, Al 19.10.2026) ────────────
+//  „Ja, sie dürfen bewegt werden (und eigene in die Zonen temporär
+//   gestohlener Heroes). Es gibt ja bereits Funktionalität für
+//   Creatures, die nicht auf der Seite ihres permanenten Kontrolleurs
+//   sind." Angeboten werden alle Kreaturen, die ich KONTROLLIERE
+//   (auch gestohlene/seitenfremde, `kontrolleurVon`), und alle freien
+//   Zonen der Helden, die ich kontrolliere (eigene Spalte ohne die
+//   abgegebenen, plus übernommene Helden der Gegenspalte,
+//   `getFreeSupportZones(…, { nachKontrolle: true })`). Wechselt eine
+//   Kreatur dabei die Brettseite, bleibt ihr Kontrolleur; `inst.owner`
+//   folgt der Zone und die Seitenfremd-Marke (`crossSideControlled`)
+//   wird passend gesetzt/gelöscht (`seiteWechseln`). Eine zeitweilig
+//   gestohlene Kreatur, die auf meiner Seite landet, bleibt dort; mit
+//   dem Ende des Diebstahls gehört sie wieder dem Besitzer und ist
+//   dann seitenfremd (`_revertStolenCreatures`).
+//
 //  ── Action economy ──────────────────────────────────────────────
 //  "If the user has at least Support Magic 2, this counts as an
 //   additional Action." Modelled exactly like Shapeshift: dynamic
@@ -33,7 +49,7 @@
 //  moved so a min-1 cancel doesn't burn the turn's use.
 // ═══════════════════════════════════════════
 
-const { hasCardType } = require('./_hooks');
+const { hasCardType, kontrollRechteVon } = require('./_hooks');
 
 const CARD_NAME = 'Guard Change';
 const HOPT_KEY  = 'guard-change';
@@ -41,8 +57,7 @@ const HOPT_KEY  = 'guard-change';
 /** Casting Hero's Support Magic level (base + Performance wildcard). */
 function supportMagicLevel(engine, pi, heroIdx) {
   if (!engine || heroIdx == null || heroIdx < 0) return 0;
-  const abZones = engine.gs.players[pi]?.abilityZones?.[heroIdx] || [];
-  return engine.countAbilitiesForSchool('Support Magic', abZones);
+  return engine.effectiveSchoolLevelForCaster('Support Magic', pi, heroIdx, pi);   // W4a: harte Negierung -> Stufe 0; W16g (S02-18): + Xals Support-Zonen-Stapel
 }
 
 /** Own support-zone CREATURE instances (NOT Equip Artifacts, which
@@ -54,7 +69,9 @@ function ownSupportCreatures(engine, pi) {
   const out = [];
   for (const inst of engine.cardInstances) {
     if (inst.zone !== 'support' || inst.faceDown) continue;
-    if ((inst.controller ?? inst.owner) !== pi) continue;
+    if (engine.kontrolleurVon(inst) !== pi) continue;
+    // W18b (Al 19.10., kehrt W16g um): auch gestohlene/seitenfremde Kreaturen (Kontrolle bei `pi`, Platz auf der Gegenseite) werden
+    // angeboten; `moveCreature`/`swapCreatures` arbeiten über die Brettseite (`physicalSide`).
     if (inst.counters?.treatAsEquip) continue; // Equip Artifact, not a Creature
     const cd = engine.getEffectiveCardData(inst) || cardDB[inst.name];
     if (!cd || !hasCardType(cd, 'Creature')) continue;
@@ -63,20 +80,41 @@ function ownSupportCreatures(engine, pi) {
   return out;
 }
 
-/** Free Support slots on every OTHER Hero (any column — not
- *  neighbour-restricted). Heroes are columns; dead/empty columns
- *  still count (Creatures are independent of their Hero). */
+/** W18b: Gehört die Zone (Brettseite `seite`, Held `hi`) einem Helden, den `pi` kontrolliert? Eigene Spalte wie bisher (auch leere/tote
+ *  Spalten — Kreaturen sind unabhängig von ihrem Helden), ausgenommen die an den Gegner abgegebenen Helden; Gegenspalte nur bei übernommenen Helden. */
+function heldKontrolliert(engine, pi, seite, hi) {
+  const hero = engine.gs.players[seite]?.heroes?.[hi];
+  if (seite === pi) return !(hero?.name && engine.heroSideOf(pi, hero) !== pi);
+  return !!hero?.name && engine.heroSideOf(seite, hero) === pi && kontrollRechteVon(hero).beschwoeren;
+}
+
+/** Free Support slots on every OTHER Hero I control (any column — not neighbour-restricted), eigene Spalte zuerst, dann übernommene
+ *  Helden der Gegenseite. Jede Zone nennt ihre Brettseite (`owner`). */
 function destsFor(engine, pi, inst) {
   const ps = engine.gs.players[pi];
+  const aSeite = engine.physicalSide(inst);
   const out = [];
   for (let hi = 0; hi < 3; hi++) {
-    if (hi === inst.heroIdx) continue;             // "other Heroes"
+    if (aSeite === pi && hi === inst.heroIdx) continue;   // "other Heroes"
+    if (!heldKontrolliert(engine, pi, pi, hi)) continue;
     const zones = ps.supportZones?.[hi] || [[], [], []];
     for (let zi = 0; zi < 3; zi++) {
-      if ((zones[zi] || []).length === 0) out.push({ heroIdx: hi, slotIdx: zi });
+      if ((zones[zi] || []).length === 0) out.push({ owner: pi, heroIdx: hi, slotIdx: zi });
     }
   }
-  return out;
+  for (const z of engine.getFreeSupportZones(pi, { nachKontrolle: true })) {
+    if (z.owner === pi) continue;                           // eigene Spalte oben
+    if (aSeite === z.owner && z.heroIdx === inst.heroIdx) continue;
+    if (z.slotIdx >= 3) continue;                           // Insel-Zonen bleiben wie bisher draußen
+    out.push({ owner: z.owner, heroIdx: z.heroIdx, slotIdx: z.slotIdx });
+  }
+  // ★ W63a (Al, 22.10.2026: „Solange der Effekt aktiv ist, kann eine Creature in eine geteilte Zone bewegt werden"): mit Alice-Teilung des Kontrolleurs auch die
+  // Zone einer GLEICHNAMIGEN Creature eines ANDEREN Helden (`engine.beschwoerZonenFuer`, nach Kontrolle) — die Creatures teilen sich die Zone. Geteilte Zonen
+  // stehen vorn (Al: erst die geteilte Zone, DANN die erste leere).
+  const geteilt = engine.beschwoerZonenFuer(pi, inst.name, { nachKontrolle: true })
+    .filter(z => z.shared && z.slotIdx < 3 && !(aSeite === z.owner && z.heroIdx === inst.heroIdx))
+    .map(z => ({ owner: z.owner, heroIdx: z.heroIdx, slotIdx: z.slotIdx, shared: true }));
+  return geteilt.length ? [...geteilt, ...out] : out;
 }
 
 /**
@@ -90,8 +128,13 @@ function collectMovable(engine, pi, movedIds) {
     const dests = destsFor(engine, pi, inst);
     // Swap partners: another not-yet-moved own Creature on a
     // DIFFERENT Hero ("swap Creatures between Heroes you control").
-    const swaps = creatures
-      .filter(o => o.id !== inst.id && o.heroIdx !== inst.heroIdx)
+    // W18b: beide Zonen müssen zu Helden gehören, die ich kontrolliere, und auf verschiedenen Helden liegen (Seite + Spalte).
+    const aSeite = engine.physicalSide(inst);
+    const swaps = !heldKontrolliert(engine, pi, aSeite, inst.heroIdx) ? [] : creatures
+      .filter(o => o.id !== inst.id
+        && !(engine.physicalSide(o) === aSeite && o.heroIdx === inst.heroIdx)
+        && heldKontrolliert(engine, pi, engine.physicalSide(o), o.heroIdx)
+        && tauschOhneMischung(engine, inst, o))   // W63a: ein Tausch mischt nie verschiedene Namen in einer geteilten Zone
       .map(o => o.id);
     if (dests.length === 0 && swaps.length === 0) continue;
     list.push({ inst, dests, swaps });
@@ -99,32 +142,60 @@ function collectMovable(engine, pi, movedIds) {
   return list;
 }
 
-/** Single move: `inst` → a free slot on another Hero. Mirrors the
- *  Slippery mover's animation/flow (creature_zone_move floater
- *  suppression + play_card_transfer flight + _isMove enter hook). */
-async function moveCreature(engine, pi, inst, destHeroIdx, destSlot) {
-  const ps = engine.gs.players[pi];
+/**
+ * ★ W63a: Beim TAUSCH zweier Kreaturen darf in keiner Zone eine Mischung verschiedener Namen entstehen. Liegt eine der beiden in einem Alice-Stapel
+ * (Zone mit mehreren Kreaturen), bliebe dort nach dem Heraustauschen ein Namensgleiches zurueck — die ungleichnamige Tauschpartnerin koennte nicht
+ * dazu. Getauscht wird also nur, wenn beide allein in ihrer Zone liegen oder beide denselben Namen tragen.
+ */
+function tauschOhneMischung(engine, a, b) {
+  if (a.name === b.name) return true;
+  const { stackAt } = require('./_alice-shared');
+  const tiefe = (x) => stackAt(engine, engine.kontrolleurVon(x), x.heroIdx, x.zoneSlot, engine.physicalSide(x)).length;   // nur Kreaturen (keine Anhaengsel)
+  return tiefe(a) <= 1 && tiefe(b) <= 1;
+}
+
+/** W18b: `inst` steht jetzt in einer Zone der Brettseite `neueSeite`. Der Kontrolleur bleibt; `owner` = Brettseite, die Seitenfremd-Marke
+ *  (`crossSideControlled`) gilt genau dann, wenn Kontrolleur und Brettseite auseinanderfallen (Muster `actionTransferCreature`). */
+function seiteWechseln(engine, inst, neueSeite) {
+  inst.owner = neueSeite;
+  inst.counters = inst.counters || {};
+  const k = engine.kontrolleurVon(inst);
+  if (k !== neueSeite) inst.counters.crossSideControlled = k;
+  else delete inst.counters.crossSideControlled;
+}
+
+/** Single move: `inst` → a free slot on another Hero I control (destOwner = Brettseite der Zone). Mirrors the Slippery mover's
+ *  animation/flow (creature_zone_move floater suppression + play_card_transfer flight + _isMove enter hook). */
+async function moveCreature(engine, pi, inst, destOwner, destHeroIdx, destSlot) {
+  const aSeite = engine.physicalSide(inst);
+  const ps = engine.gs.players[aSeite];
+  const dps = engine.gs.players[destOwner];
+  if (!ps || !dps) return false;
   const sH = inst.heroIdx, sS = inst.zoneSlot;
   const sArr = (ps.supportZones?.[sH] || [])[sS] || [];
   const sIdx = sArr.indexOf(inst.name);
   if (sIdx < 0) return false;
-  if (((ps.supportZones?.[destHeroIdx] || [])[destSlot] || []).length > 0) return false;
+  if (((dps.supportZones?.[destHeroIdx] || [])[destSlot] || []).length > 0
+      && !require('./_alice-shared').canShareInto(engine, engine.kontrolleurVon(inst), destHeroIdx, destSlot, inst, destOwner)) return false;   // W63a: belegt nur ok, wenn geteilt (Alice)
+  // W71b (Al, 25.10.2026): Verschieben durch eine Karte ist ein Effekt auf die Kreatur — Schutzfenster (Cool Rescuer Monia & Co.), VOR der ersten Änderung; negiert = Kreatur bleibt stehen.
+  if (!(await engine.kreaturBetroffen(inst, 'move', { name: 'Guard Change', owner: pi }, { sourceOwner: pi, detail: 'reposition' }))) { engine.gs._gcNegiert = true; return false; }
 
-  engine._broadcastEvent('creature_zone_move', { owner: pi, heroIdx: sH, zoneSlot: sS });
+  engine._broadcastEvent('creature_zone_move', { owner: aSeite, heroIdx: sH, zoneSlot: sS });
   sArr.splice(sIdx, 1);
   engine._broadcastEvent('play_card_transfer', {
-    sourceOwner: pi, sourceHeroIdx: sH, sourceZoneSlot: sS,
-    targetOwner: pi, targetHeroIdx: destHeroIdx, targetZoneSlot: destSlot,
+    sourceOwner: aSeite, sourceHeroIdx: sH, sourceZoneSlot: sS,
+    targetOwner: destOwner, targetHeroIdx: destHeroIdx, targetZoneSlot: destSlot,
     cardName: inst.name, duration: 500, particles: null,
   });
   engine.sync();
   await engine._delay(420);
 
-  if (!ps.supportZones[destHeroIdx]) ps.supportZones[destHeroIdx] = [[], [], []];
-  if (!ps.supportZones[destHeroIdx][destSlot]) ps.supportZones[destHeroIdx][destSlot] = [];
-  ps.supportZones[destHeroIdx][destSlot].push(inst.name);
+  if (!dps.supportZones[destHeroIdx]) dps.supportZones[destHeroIdx] = [[], [], []];
+  if (!dps.supportZones[destHeroIdx][destSlot]) dps.supportZones[destHeroIdx][destSlot] = [];
+  dps.supportZones[destHeroIdx][destSlot].push(inst.name);
   inst.heroIdx = destHeroIdx;
   inst.zoneSlot = destSlot;
+  if (destOwner !== aSeite) seiteWechseln(engine, inst, destOwner);
   engine.sync();
 
   await engine.runHooks('onCardEnterZone', {
@@ -136,43 +207,49 @@ async function moveCreature(engine, pi, inst, destHeroIdx, destSlot) {
 
 /** Swap two Creatures on different Heroes — BOTH fly to their new
  *  zones at the same time (both transfers broadcast before the
- *  shared delay, then both placed). */
+ *  shared delay, then both placed). W18b: auch über die Brettseiten hinweg. */
 async function swapCreatures(engine, pi, a, b) {
-  const ps = engine.gs.players[pi];
+  const aSeite = engine.physicalSide(a), bSeite = engine.physicalSide(b);
+  const aPs = engine.gs.players[aSeite], bPs = engine.gs.players[bSeite];
+  if (!aPs || !bPs) return false;
   const aH = a.heroIdx, aS = a.zoneSlot, bH = b.heroIdx, bS = b.zoneSlot;
-  const aArr = (ps.supportZones?.[aH] || [])[aS] || [];
-  const bArr = (ps.supportZones?.[bH] || [])[bS] || [];
+  const aArr = (aPs.supportZones?.[aH] || [])[aS] || [];
+  const bArr = (bPs.supportZones?.[bH] || [])[bS] || [];
   const aIdx = aArr.indexOf(a.name);
   const bIdx = bArr.indexOf(b.name);
   if (aIdx < 0 || bIdx < 0) return false;
+  // W71b (Al, 25.10.2026): Verschieben durch eine Karte ist ein Effekt auf die Kreatur — Schutzfenster (Cool Rescuer Monia & Co.), VOR der ersten Änderung; negiert = Kreatur bleibt stehen.
+  if (!(await engine.kreaturBetroffen(a, 'move', { name: 'Guard Change', owner: pi }, { sourceOwner: pi, detail: 'swap' }))) { engine.gs._gcNegiert = true; return false; }
+  if (!(await engine.kreaturBetroffen(b, 'move', { name: 'Guard Change', owner: pi }, { sourceOwner: pi, detail: 'swap' }))) { engine.gs._gcNegiert = true; return false; }
 
-  engine._broadcastEvent('creature_zone_move', { owner: pi, heroIdx: aH, zoneSlot: aS });
-  engine._broadcastEvent('creature_zone_move', { owner: pi, heroIdx: bH, zoneSlot: bS });
+  engine._broadcastEvent('creature_zone_move', { owner: aSeite, heroIdx: aH, zoneSlot: aS });
+  engine._broadcastEvent('creature_zone_move', { owner: bSeite, heroIdx: bH, zoneSlot: bS });
   aArr.splice(aIdx, 1);
   bArr.splice(bIdx, 1);
   // Simultaneous: A → B's slot, B → A's slot (both overlays animate
   // concurrently — onCardTransfer keys each by a unique id).
   engine._broadcastEvent('play_card_transfer', {
-    sourceOwner: pi, sourceHeroIdx: aH, sourceZoneSlot: aS,
-    targetOwner: pi, targetHeroIdx: bH, targetZoneSlot: bS,
+    sourceOwner: aSeite, sourceHeroIdx: aH, sourceZoneSlot: aS,
+    targetOwner: bSeite, targetHeroIdx: bH, targetZoneSlot: bS,
     cardName: a.name, duration: 500, particles: null,
   });
   engine._broadcastEvent('play_card_transfer', {
-    sourceOwner: pi, sourceHeroIdx: bH, sourceZoneSlot: bS,
-    targetOwner: pi, targetHeroIdx: aH, targetZoneSlot: aS,
+    sourceOwner: bSeite, sourceHeroIdx: bH, sourceZoneSlot: bS,
+    targetOwner: aSeite, targetHeroIdx: aH, targetZoneSlot: aS,
     cardName: b.name, duration: 500, particles: null,
   });
   engine.sync();
   await engine._delay(420);
 
-  if (!ps.supportZones[bH]) ps.supportZones[bH] = [[], [], []];
-  if (!ps.supportZones[bH][bS]) ps.supportZones[bH][bS] = [];
-  if (!ps.supportZones[aH]) ps.supportZones[aH] = [[], [], []];
-  if (!ps.supportZones[aH][aS]) ps.supportZones[aH][aS] = [];
-  ps.supportZones[bH][bS].push(a.name);
+  if (!bPs.supportZones[bH]) bPs.supportZones[bH] = [[], [], []];
+  if (!bPs.supportZones[bH][bS]) bPs.supportZones[bH][bS] = [];
+  if (!aPs.supportZones[aH]) aPs.supportZones[aH] = [[], [], []];
+  if (!aPs.supportZones[aH][aS]) aPs.supportZones[aH][aS] = [];
+  bPs.supportZones[bH][bS].push(a.name);
   a.heroIdx = bH; a.zoneSlot = bS;
-  ps.supportZones[aH][aS].push(b.name);
+  aPs.supportZones[aH][aS].push(b.name);
   b.heroIdx = aH; b.zoneSlot = aS;
+  if (aSeite !== bSeite) { seiteWechseln(engine, a, bSeite); seiteWechseln(engine, b, aSeite); }
   engine.sync();
 
   await engine.runHooks('onCardEnterZone', {
@@ -198,10 +275,11 @@ async function runGuardChangeMode(engine, pi) {
     // stop. Positional value is low; a deeper heuristic isn't worth
     // the MCTS cost here.
     const list = collectMovable(engine, pi, movedIds);
-    const moveEntry = list.find(e => e.dests.length > 0);
+    // W18b: erst der Altweg (eigene Kreatur auf der eigenen Seite in eine eigene Zone), sonst irgendein Zug.
+    const moveEntry = list.find(e => engine.physicalSide(e.inst) === pi && e.dests.some(d => d.owner === pi)) || list.find(e => e.dests.length > 0);
     if (moveEntry) {
-      const d = moveEntry.dests[0];
-      if (await moveCreature(engine, pi, moveEntry.inst, d.heroIdx, d.slotIdx)) {
+      const d = moveEntry.dests.find(x => x.owner === pi && engine.physicalSide(moveEntry.inst) === pi) || moveEntry.dests[0];
+      if (await moveCreature(engine, pi, moveEntry.inst, d.owner, d.heroIdx, d.slotIdx)) {
         movedIds.add(moveEntry.inst.id);
       }
     } else {
@@ -228,9 +306,10 @@ async function runGuardChangeMode(engine, pi) {
       creatures: list.map(e => ({
         instId: e.inst.id,
         name: e.inst.name,
+        owner: engine.physicalSide(e.inst),   // W18b: Brettseite (gestohlene Kreaturen stehen beim Gegner)
         heroIdx: e.inst.heroIdx,
         zoneSlot: e.inst.zoneSlot,
-        dests: e.dests.map(d => ({ heroIdx: d.heroIdx, slotIdx: d.slotIdx })),
+        dests: e.dests.map(d => ({ owner: d.owner, heroIdx: d.heroIdx, slotIdx: d.slotIdx, ...(d.shared ? { shared: true } : {}) })),
         swaps: e.swaps,
       })),
       doneLabel: movedIds.size > 0 ? '✓ Done' : '✕ Cancel',
@@ -238,7 +317,7 @@ async function runGuardChangeMode(engine, pi) {
     });
     if (!result || result.done) break;
 
-    const { instId, destHeroIdx, destSlot, swapWithInstId } = result;
+    const { instId, destHeroIdx, destSlot, swapWithInstId, destOwner } = result;
     const entry = list.find(e => e.inst.id === instId);
     if (!entry) continue;
 
@@ -251,8 +330,10 @@ async function runGuardChangeMode(engine, pi) {
         movedIds.add(partner.id);
       }
     } else if (destHeroIdx != null && destSlot != null) {
-      if (!entry.dests.some(d => d.heroIdx === destHeroIdx && d.slotIdx === destSlot)) continue;
-      if (await moveCreature(engine, pi, entry.inst, destHeroIdx, destSlot)) {
+      // W18b: `destOwner` (Brettseite der Zone) ist optional — ohne Angabe gilt die erste passende Zone (eigene Seite zuerst).
+      const dz = entry.dests.find(d => d.heroIdx === destHeroIdx && d.slotIdx === destSlot && (destOwner == null || d.owner === destOwner));
+      if (!dz) continue;
+      if (await moveCreature(engine, pi, entry.inst, dz.owner, destHeroIdx, destSlot)) {
         movedIds.add(entry.inst.id);
       }
     }
@@ -261,6 +342,10 @@ async function runGuardChangeMode(engine, pi) {
 }
 
 module.exports = {
+  // ★ Z7b: FIZZELT die Karte (Wirker beim Auflösen handlungsunfähig, v1328), war sie GESPIELT → Stempel (Engine: `_noteFizzledPlay`).
+  // Eine ganz NEGIERTE Karte stempelt nicht (Als Entscheidung, Welle 3).
+  onFizzledPlay: ({ engine, gs, pi }) => { engine.claimHOPT(HOPT_KEY, pi); },
+
   // "Counts as an additional Action" when the caster has Support
   // Magic ≥ 2 — Main-Phase self-provide (mirrors Shapeshift).
   inherentAction: (gs, pi, heroIdx, engine) => {
@@ -289,7 +374,19 @@ module.exports = {
         return;
       }
 
+      delete gs._gcNegiert;
       const movedCount = await runGuardChangeMode(engine, pi);
+
+      // W71b: hat ein Schutzfenster (Cool Rescuer Monia & Co.) das Versetzen NEGIERT, war der Zauber gespielt (Karte verbraucht, Sperre belegt, Aktion bezahlt) — er wirkte nur nicht.
+      // Nur wenn der Spieler von sich aus nichts bewegt hat, gilt „min. 1" als Abbruch.
+      if (movedCount === 0 && gs._gcNegiert) {
+        delete gs._gcNegiert;
+        engine.claimHOPT(HOPT_KEY, pi);
+        engine.log('guard_change_negated', { player: ps.username });
+        engine.sync();
+        return;
+      }
+      delete gs._gcNegiert;
 
       // "min. 1" — nothing repositioned ⇒ the Spell does nothing;
       // return it to hand (no HOPT spent, no Action burned).

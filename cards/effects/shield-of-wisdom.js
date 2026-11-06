@@ -103,6 +103,17 @@ function buildOpponentTargets(engine, sourceOwner, attackingInst) {
   return out;
 }
 
+/**
+ * W46a (Al, 22.10.2026: Creature-Surprises sind Creature effects): Effekte, die nur Kreaturen wählen können (Afflicted Vermin/Pests …), können nicht auf einen Helden umgeleitet werden — die
+ * Engine verwirft ein Umleitungsziel, das nicht in der Zielliste des Effekts steht (`applyRedirectWindows`), der Schild wäre verbraucht und der Effekt träfe das ursprüngliche Ziel.
+ * Der Pool beschränkt sich deshalb auf Ziele, die der Effekt überhaupt wählen konnte (`validTargets`); ohne Liste bleibt es beim bisherigen Pool.
+ */
+function legalPool(pool, validTargets) {
+  if (!Array.isArray(validTargets) || validTargets.length === 0) return pool;
+  const ids = new Set(validTargets.map(v => v && v.id));
+  return pool.filter(t => ids.has(t.id));
+}
+
 module.exports = {
   isSurprise: true,
   // Routes through `_checkTargetRedirect`'s surprise scan, NOT the
@@ -130,7 +141,7 @@ module.exports = {
     // A legal redirect target must exist (else the Surprise cannot
     // activate and the effect proceeds on the original target).
     const sourceOwner = sourceCard.controller ?? sourceCard.owner ?? -1;
-    return buildOpponentTargets(engine, sourceOwner, sourceCard).length > 0;
+    return legalPool(buildOpponentTargets(engine, sourceOwner, sourceCard), validTargets).length > 0;
   },
 
   /**
@@ -148,7 +159,7 @@ module.exports = {
     const sourceOwner = sourceCard?.controller ?? sourceCard?.owner ?? sourceInfo.owner ?? -1;
     if (sourceOwner < 0) return null;
 
-    const pool = buildOpponentTargets(engine, sourceOwner, sourceCard);
+    const pool = legalPool(buildOpponentTargets(engine, sourceOwner, sourceCard), sourceInfo.validTargets);
     if (pool.length === 0) return null; // Guarded by canSurpriseRedirect; belt-and-suspenders.
 
     // ── Shield's controller picks the new target ──
@@ -167,6 +178,9 @@ module.exports = {
         maxTotal: 1,
         minRequired: 1,
         greenSelect: true,
+        // W45a (Al, 22.10.2026): die Umleitungs-Zielwahl ist ein CREATURE effect (der umgeleitete Effekt behält seinen Typ): Quelle für den Taunt (Hardy Slime, Deepsea Horror Clown)
+        // ist die umgeleitete Kreatur, nicht die Karte Shield of Wisdom (Artifact). Der Taunt greift nur, wenn der Spötter selbst im Pool liegt (`pool` ohne den Angreifer).
+        _tauntQuelle: sourceCard,
       });
       const id = Array.isArray(picked) ? picked[0] : null;
       redirectTarget = pool.find(t => t.id === id) || pool[0];

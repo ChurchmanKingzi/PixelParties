@@ -16,6 +16,9 @@
 //     laesst den Trigger aus (nichts mehr zu
 //     treffen).
 //
+//  0. HARTES ONCE-PER-TURN (W75a): „You can only activate 1 "Aquatic Spear" per turn." —
+//     Merkmal `surpriseHartOPT` (Engine: `_canHeroActivateSurprise` / `_activateSurprise`).
+//
 //  2. DISCARD-RIDER (v697-Fenster): "deal 80
 //     damage to any target on the board" — freie
 //     Zielwahl, beide Seiten. Danach der geteilte
@@ -45,7 +48,7 @@ function allBoardTargets(engine) {
     if (inst.zone !== 'support' || inst.faceDown) continue;
     const cd = engine.getEffectiveCardData?.(inst) || cardDB[inst.name];
     if (!cd || !hasCardType(cd, 'Creature')) continue;
-    const owner = inst.controller ?? inst.owner;
+    const owner = engine.physicalSide(inst);   // IDs = Brettseite, nicht Kontrolle (Styx 28.9.; geliehene Kreatur)
     out.push({
       id: `equip-${owner}-${inst.heroIdx}-${inst.zoneSlot}`, type: 'equip',
       owner, heroIdx: inst.heroIdx, slotIdx: inst.zoneSlot,
@@ -95,6 +98,11 @@ module.exports = {
   },
 
   isSurprise: true,
+
+  // ★ W75a (Balancing, Al): „You can only activate 1 "Aquatic Spear" per turn." — HARTES Once-per-turn der AKTIVIERUNG, pro Spieler und Zug, egal welche Kopie.
+  // Die Engine liest das Merkmal (`surpriseHartOPT`): `_canHeroActivateSurprise` bietet eine weitere Kopie nicht mehr an, `_activateSurprise` stempelt
+  // (`claimHOPT`) hinter Wisdom/Kette/Negation. Der Abgang-Rider (`onBoardSentToDiscard`) ist KEINE Aktivierung und bleibt unberuehrt.
+  surpriseHartOPT: CARD_NAME,
 
   // ── TRIGGER: der Besitzer hat Schaden ausgeteilt ──────────────────
   // (gs, ownerIdx, hostHeroIdx, info, engine) — das Fenster hat

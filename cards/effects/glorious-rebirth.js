@@ -3,6 +3,8 @@
 //  Play only when the top of your Coolness Stack
 //  is a level 3 or lower Creature. Place that
 //  Creature into a free Support Zone of the user.
+//  W63a: mit Alice-Teilung des Wirkers zaehlt auch die Zone einer
+//  GLEICHNAMIGEN Creature (erst geteilte, dann erste leere Zone).
 // ═══════════════════════════════════════════
 
 const CARD_NAME = 'Glorious Rebirth';
@@ -21,6 +23,8 @@ module.exports = {
       ? engine.effectiveCardLevel(cd, pi)
       : (cd.level || 0);
     if (lvl > MAX_LEVEL) return false;
+    // W5b-B3 (Al, Welle 5): „You can only control 1 …" gilt auch beim Platzieren – nicht spielbar, wenn die Kreatur nicht platziert werden darf.
+    if (engine?.nurEinerSchonKontrolliert?.(pi, topName)) return false;
     return true;
   },
 
@@ -33,7 +37,8 @@ module.exports = {
       const topName = engine.getCoolnessStackTop(pi);
       const cardDB = engine._getCardDB();
       const cd = topName ? cardDB[topName] : null;
-      if (!cd || cd.cardType !== 'Creature' || engine.effectiveCardLevel(cd, pi) > MAX_LEVEL) {
+      if (!cd || cd.cardType !== 'Creature' || engine.effectiveCardLevel(cd, pi) > MAX_LEVEL
+          || engine.nurEinerSchonKontrolliert(pi, topName)) {   // W5b-B3: „You can only control 1" auch beim Platzieren
         engine.gs._spellCancelled = true;
         return;
       }
@@ -44,21 +49,14 @@ module.exports = {
       const hs = ctx.cardHeroOwner ?? pi;
       const hps = engine.gs.players[hs] || ps;
       if (hs !== pi && !engine.kontrollRechte(hs, heroIdx).beschwoeren) { engine.gs._spellCancelled = true; return; }
-      const slots = hps.supportZones?.[heroIdx] || [];
-      const hasFree = slots.some(s => !s || s.length === 0);
-      if (heroIdx == null || heroIdx < 0 || !hasFree) {
+      // ★ W63a (Al, 22.10.2026: Alices Effekt gilt fuer ALLE Platzierungs-Effekte; „erst die geteilte Zone, DANN die erste leere"): die EINE Zonenfrage der
+      // Engine — mit Alice-Teilung des Wirkers zaehlt auch die Zone einer GLEICHNAMIGEN Creature, und sie kommt vor der ersten leeren.
+      const zonenZ = (heroIdx == null || heroIdx < 0) ? [] : engine.beschwoerZonenFuer(pi, topName, { seite: hs, heroIdx });
+      if (zonenZ.length === 0) {
         engine.gs._spellCancelled = true;
         return;
       }
-
-      // Pre-compute the leftmost-free slot for the user's hero so we
-      // can broadcast the fly animation BEFORE mutating Stack/Support.
-      const heroSlots = hps.supportZones?.[heroIdx] || [];
-      let slotIdx = -1;
-      for (let si = 0; si < heroSlots.length; si++) {
-        if (!heroSlots[si] || heroSlots[si].length === 0) { slotIdx = si; break; }
-      }
-      if (slotIdx < 0) { engine.gs._spellCancelled = true; return; }
+      const slotIdx = zonenZ[0].slotIdx;
 
       // Fly first, commit after — keeps the card on the Stack until
       // the animation lands, then atomically Stack→empty + Support→
@@ -72,7 +70,7 @@ module.exports = {
 
       const popped = await ctx.popCoolnessStackTo(pi, 'board', { source: CARD_NAME });
       if (!popped) { engine.gs._spellCancelled = true; return; }
-      const placed = engine.safePlaceInSupport(topName, hs, heroIdx, slotIdx);
+      const placed = engine.safePlaceInSupport(topName, hs, heroIdx, slotIdx, hs !== pi ? { controller: pi } : {});
       if (!placed?.inst) return;
       placed.inst.zone = 'support';
       if (hs !== pi) engine.markiereSeitenfremd(placed.inst, pi);

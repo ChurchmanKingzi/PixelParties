@@ -19,6 +19,9 @@ const { attachmentHostsFor, attachToHero } = require('./_attachment-shared');
 const CARD_NAME = 'Intrude';
 
 module.exports = {
+  // Legt sich an „the user" (den wirkenden HELDEN) an: Demon's Gate (Kreatur als Wirker) darf diesen Spell nicht wirken (Ruling Al, QA-Welle 1 Nr. 34).
+  attachesToUser: true,
+
   // ★★ v1182 — ENTKOPPELTE BILDER (CARD_API): wird die Karte NEGIERT,
   // laeuft ihr Effekt-Rumpf nie — die Engine spielt dann diese Bilder.
   // Im normalen Weg bleibt es bei den Broadcasts im Effekt selbst.
@@ -98,7 +101,7 @@ module.exports = {
 
       await engine.runHooks('onCardEnterZone', {
         enteringCard: inst, toZone: 'support', toHeroIdx: targetHero,
-        _skipReactionCheck: true,
+        _skipReactionCheck: true, _anhaengselAnleger: pi,
       });
 
       engine.sync();
@@ -123,10 +126,10 @@ module.exports = {
       // Recursion guard
       if (gs._intrudeResolving) return;
 
-      // Host hero must be alive and functional
+      // Host hero must be alive
       const hero = ctx.attachedHero;
       if (!hero?.name || hero.hp <= 0) return;
-      if (hero.statuses?.frozen || hero.statuses?.stunned || hero.statuses?.negated) return;
+      // ★ W25b (N2-06, Al): kein Ruhen bei Frost/Betäubung/Negation des Trägers — Spell-Anhängsel bleiben aktiv (Anhänge sind eigene Karten).
 
       const drawCount = ctx.amount;
       if (drawCount <= 0) return;

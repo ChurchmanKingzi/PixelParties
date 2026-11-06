@@ -51,6 +51,7 @@ module.exports = {
       if (!inst || inst.zone !== 'area') return;
       const fps = gs.players[fragender];
       if (!fps) return;
+      if (engine.spielerIstVonAreasAusgenommen(fragender)) return;   // W82 (Shipwrecked): Area-Effekte aktivieren ist gesperrt
       if (fps.handLocked || fps.drawLocked) return;   // er koennte ohnehin nicht ziehen
 
       const deckType = ctx.deckType || 'main';

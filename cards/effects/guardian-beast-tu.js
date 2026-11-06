@@ -17,6 +17,9 @@ const {
   promptAndDeleteFromBothDiscards,
 } = require('./_guardian-beasts-shared');
 const { ablageLoeschKostenMoeglich } = require('./_guardian-beasts-shared');   // v1398
+// Regel von Al (D1, CARD_API „Zieh-Sperre und Aktivierungen“): NUR REINE Zieher graut die Hand-/Zieh-Sperre aus. Das Löschen aus den Ablagen ist etwas Eigenständiges – Tu bleibt unter
+// `drawLocked`/`handLocked` aktivierbar (die Kosten fallen an, gezogen wird nichts; ausdrücklich in der Liste „Aktivierbar bleibt …“). Nur Tuscan Artist (genau 2/3) bleibt in den Wahlmöglichkeiten.
+const { drawWouldBeBlocked } = require('./_draw-block-shared');
 
 const CARD_NAME = 'Guardian Beast Tu';
 
@@ -45,7 +48,8 @@ module.exports = {
     if (total < 3) return false;
 
     const deleted = await promptAndDeleteFromBothDiscards(ctx, {
-      validCounts: [3, 6, 9],
+      // Tuscan Artist negiert ein Ziehen von genau 2 oder 3 Karten (= 6 bzw. 9 gelöschte Karten) — diese Kosten wären umsonst.
+      validCounts: [3, 6, 9].filter(n => !drawWouldBeBlocked(engine, pi, n / 3)),
       title: CARD_NAME,
       description: 'Pick 3, 6 or 9 cards from the discard piles to delete. Draw 1 card per 3 deleted.',
       sourceName: CARD_NAME,

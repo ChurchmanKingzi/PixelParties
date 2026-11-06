@@ -54,8 +54,9 @@ function seiteDesZiels(gs, t) {
   return seiteVon(t.owner, gs?.players?.[t.owner]?.heroes?.[t.heroIdx]);
 }
 
-/** Kontrollierte Helden, die zuschlagen koennen (lebend, mit Angriffswert). */
-function angreifer(gs, pi) {
+/** Kontrollierte Helden, die zuschlagen koennen (lebend, mit Angriffswert).
+ *  W32a (Al, 22.10.2026): mit `engine` + `nurAngriffsfaehig` nur Helden, die ANGREIFEN koennen (`heroKannAngreifen`: nicht Frozen/Stunned/Webbed/Negated/gesperrt). */
+function angreifer(gs, pi, engine, nurAngriffsfaehig) {
   const out = [];
   for (let p = 0; p < (gs?.players || []).length; p++) {
     const helden = gs.players[p]?.heroes || [];
@@ -63,6 +64,7 @@ function angreifer(gs, pi) {
       const h = helden[hi];
       if (!h?.name || h.hp <= 0) continue;
       if (seiteVon(p, h) !== pi) continue;
+      if (nurAngriffsfaehig && engine && !engine.heroKannAngreifen(p, hi, pi)) continue;
       out.push({ physOwner: p, heroIdx: hi, hero: h });
     }
   }
@@ -75,21 +77,45 @@ function angreifer(gs, pi) {
  * Denselben Wert liest `attack.js` und `ctx.executeAttack`; einen
  * Helfer der Engine dafuer gibt es nicht.
  */
+/**
+ * W29a (Al, 21.10.2026: Alliance und Dive Down schuetzen auch vor Effekten, die als Attack ZAEHLEN): Paarregel „Angreifer-Held ↔ Opfer" (Alliance) —
+ * Angreifer und Opfer werden in EINEM Fenster gewaehlt, die flache Zielliste kennt das Paar nicht. Wahr, wenn dieser Angreifer dieses Opfer-Ziel nicht waehlen darf.
+ */
+function paarGesperrt(engine, pi, angreiferT, opferT, validTargets) {
+  if (!engine || !angreiferT || !opferT || opferT.type !== 'hero') return false;
+  const opfer = (validTargets || []).filter(t => t && seiteDesZiels(engine.gs, t) !== pi);
+  try {
+    return !!engine.heroBlocksTargeting(opferT.owner, opferT.heroIdx, {
+      sourceData: engine._getCardDB()[CARD_NAME], cardName: CARD_NAME, damageType: 'attack', chooserIdx: pi,
+      chooserHeroIdx: angreiferT.heroIdx, chooserHeroOwner: angreiferT.owner, allTargets: opfer,
+      // W32a (Al, 22.10.2026): Quellstufe = Fighting-Level DES gewaehlten Angreifer-Helden (Stealth/Jetpack lesen `info.treatedAsLevel`).
+      source: { name: CARD_NAME, owner: pi, controller: pi, heroIdx: angreiferT.heroIdx, heroOwner: angreiferT.owner },
+    });
+  } catch { return false; }
+}
+
 function angriffswert(engine, pi, heroIdx) {
   const hero = engine?.gs?.players?.[pi]?.heroes?.[heroIdx];
   return hero?.atk || 0;
 }
 
 module.exports = {
+  // ★ Als Ruling (Al 26.10., Flame Avalanche: „Am besten gleich die Karten ganz sperren statt den Schaden fizzeln zu lassen"): die Karte richtet NUR Schaden an Zielen des Gegners an —
+  // unter der Schadenssperre (`ps.damageLocked`) unspielbar (Karte bleibt auf der Hand, keine Aktion/Kosten; Sperr-Stutzen `engine._cardBlockedBySearchLock`).
+  blockedByDamageLock: true,
+  // W27a (Al, 21.10.2026): „treated as an Attack" — Leser der Quellstufe (Glass Wall, Test Flight, Escape Device, Stealth, Jetpack) fragen `_heldenEffektStufe`.
+  // W32a (Al, 22.10.2026): „Sie nehmen trotzdem das Fighting-Level": die Quellstufe ist das FIGHTING-LEVEL des gewählten eigenen Helden (nicht mehr fix 0). Der gewählte
+  // Held ist der ANGREIFER (Punkt 6): die Quelle trägt Brettseite + Index — Crimson Web hängt sich an ihn, Tharxian Horse trifft ihn. Kann er nicht angreifen (Frozen …), blockt der Trank.
+  treatedAsAttack: { ability: 'Fighting' },
   // ★ PFLICHTFLAGGE (Als Befund 12.9.): `doUsePotion` steigt ohne sie
   //   STILL aus (`if (!script?.isPotion) return false;`). Die Karte war
   //   im Client als nutzbar hervorgehoben, der Klick lief ins Leere —
   //   kein Fehler, kein Log. Alle 29 anderen Potion-Skripte tragen sie.
   isPotion: true,
 
-  canActivate(gs, playerIdx) {
+  canActivate(gs, playerIdx, engine) {
     if (schonGespielt(gs, playerIdx)) return false;
-    if (angreifer(gs, playerIdx).length === 0) return false;
+    if (angreifer(gs, playerIdx, engine, true).length === 0) return false;
     const gegner = opponentOfGs(gs, playerIdx);
     // Runde 1: der Gegner ist gegen alles immun — dann gibt es kein
     // legales Opfer und der Trank bleibt grau, statt ins Leere zu laufen.
@@ -114,6 +140,7 @@ module.exports = {
       for (const t of engine.getHeroTargets(p)) {
         const seite = engine.heroSideOf(p, gs.players[p]?.heroes?.[t.heroIdx]);
         if (seite === gegner && schutz) continue;
+        if (seite === playerIdx && !engine.heroKannAngreifen(p, t.heroIdx, playerIdx)) continue;   // W32a: nur angriffsfaehige eigene Helden als Angreifer
         ziele.push({ ...t, seite });
       }
     }
@@ -155,7 +182,7 @@ module.exports = {
    * Genau ein eigener Held (Angreifer) und genau ein gegnerisches Ziel
    * (Opfer). Reihenfolge egal — der Spieler klickt, was er zuerst sieht.
    */
-  validateSelection(selectedIds, validTargets) {
+  validateSelection(selectedIds, validTargets, engine, pi) {
     if (!selectedIds || selectedIds.length !== 2) return false;
     const gewaehlt = selectedIds.map(id => validTargets.find(t => t.id === id)).filter(Boolean);
     if (gewaehlt.length !== 2) return false;
@@ -166,7 +193,14 @@ module.exports = {
     // nicht zuschlagen.
     const eigenes = gewaehlt.find(t => validTargets.some(v => v.id === t.id) && t.type === 'hero'
       && gewaehlt.some(o => seite(o) !== seite(t)));
-    return !!eigenes;
+    if (!eigenes) return false;
+    if (engine && typeof pi === 'number' && !engine.heroKannAngreifen(eigenes.owner, eigenes.heroIdx, pi)) return false;   // W32a: der Angreifer muss angreifen koennen
+    // W29a: Paarregel (Alliance) – `engine`/`pi` liefert der Server (`doConfirmPotion`); ohne sie (alte Aufrufer) entfaellt die Pruefung.
+    if (engine && typeof pi === 'number' && paarGesperrt(engine, pi, eigenes, gewaehlt.find(o => o !== eigenes), validTargets)) return false;
+    // W39a: Hero-Zielschutz (Butterfly Cloud, Invisibility) gilt für dieses Paar, außer der Angreifer trägt das Truth-Seeing Eye
+    if (engine && typeof pi === 'number' && typeof engine.heroStatusGeschuetztGegen === 'function'
+        && engine.heroStatusGeschuetztGegen(validTargets, gewaehlt.find(o => o !== eigenes), pi, eigenes, CARD_NAME)) return false;
+    return true;
   },
 
   // ★ KEINE Huellen-Animation (Als Befund 12.9.) ────────────────────
@@ -209,12 +243,22 @@ module.exports = {
         wert = 500 + (h?.atk || 0);
       } else {
         const inst = t.cardInstance;
-        hp = inst?.counters?.currentHp ?? Infinity;
+        hp = inst ? engine.creatureCurrentHp(inst) : Infinity;   // Z5: unversehrt = gedruckte HP
         wert = inst?.counters?.maxHp || 0;
       }
       // Ein toedlicher Schlag schlaegt jeden Wert.
       if (hp <= bestAtk) wert += 10000 - hp;
       if (wert > bestwert) { bestwert = wert; opfer = t; }
+    }
+    // W29a: gesperrtes Paar (Alliance) → das staerkste erlaubte Paar suchen (Angreifer-Held ↔ Opfer); gibt es keins, keine Antwort.
+    if (paarGesperrt(engine, pi, angreiferZiel, opfer, ziele)) {
+      let paar = null, best = -1;
+      for (const a of eigene) for (const o of fremde) {
+        if (o.ineligible || paarGesperrt(engine, pi, a, o, ziele)) continue;
+        const atk = angriffswert(engine, a.owner, a.heroIdx);
+        if (atk > best) { best = atk; paar = [a, o]; }
+      }
+      return paar ? [paar[0].id, paar[1].id] : undefined;
     }
     return [angreiferZiel.id, opfer.id];
   },
@@ -236,6 +280,7 @@ module.exports = {
     const angreiferHeld = gs.players[held.owner]?.heroes?.[held.heroIdx];
     if (!angreiferHeld?.name || angreiferHeld.hp <= 0) return;
     if (seiteVon(held.owner, angreiferHeld) !== pi) return;
+    if (!engine.heroKannAngreifen(held.owner, held.heroIdx, pi)) return { aborted: true };   // W32a: zwischen Wahl und Aufloesung eingefroren/betaeubt/gesperrt → blockiert, Karte bleibt auf der Hand (Konvention `aborted`)
 
     const schaden = angriffswert(engine, held.owner, held.heroIdx);
     if (!(schaden > 0)) return;
@@ -252,14 +297,41 @@ module.exports = {
       heroOwner: held.owner,   // physische Spalte des Angreifers (wie bei bezauberten Helden)
     };
 
+    // ── Reaktionsfenster nach der Wahl (W32a, Al 22.10.2026, Punkt 5: Schutzkarten gelten auch gegen Effekte, die als Attack zählen) ──
+    // Der Trank-Zielweg (`doConfirmPotion`) öffnet sie nicht selbst. Wie `promptDamageTarget`: Umleitung (Challenge, Martyry, Anti-Magnet …), Surprise-Fenster eines
+    // gewählten KREATURENZIELS (Heldenziele öffnen es im Schadenspfad), dann die Post-Target-Handreaktionen (Test Flight, Future Tech Escape Device, Invisibility Cloak …).
+    let opferZ = opfer, negiert = false;
+    {
+      const liste = (validTargets || []).filter(t => t && seiteDesZiels(gs, t) !== pi);
+      const red = await engine._checkTargetRedirect(opferZ.owner, opferZ, liste, { damageType: 'attack', title: CARD_NAME }, quelle);
+      if (red?._redirectNegated || red?._dropTargetIds) negiert = true;
+      else if (red) opferZ = red;
+      if (!negiert && opferZ.type !== 'hero' && opferZ.cardInstance) {
+        const sr = await engine._checkSurpriseWindow([opferZ], quelle, { damageType: 'attack' });
+        if (sr?.effectNegated) negiert = true;
+      }
+      if (!negiert) {
+        const pt = await engine._checkPostTargetHandReactions([opferZ], quelle, { damageType: 'attack', dealsDamage: true });
+        if (pt?.effectNegated) { await engine.negationsBilder(quelle, [opferZ], pt); negiert = true; }
+        else if (pt?.newTargets?.length) opferZ = pt.newTargets[0];
+      }
+    }
+    if (negiert || (opferZ.type === 'hero' && !(gs.players[opferZ.owner]?.heroes?.[opferZ.heroIdx]?.hp > 0))) {
+      engine.log('sword_in_a_bottle', { player: gs.players[pi]?.username, attacker: angreiferHeld.name, target: opferZ.cardName, negated: true });
+      // R-12 (Al 26.10.): ein im Zielfenster NEGIERTER Schlag zählt als gespielte Attack des gewählten Helden (W36a, wie Broghan & Co.); der Trank ist verbraucht, der Einmal-Stempel steht.
+      if (negiert) await engine.zaehleAlsArt('attack', { pi, heroIdx: held.heroIdx, heroOwner: held.owner, name: CARD_NAME });
+      engine.sync();
+      return;
+    }
+
     // ── Inszenierung: Dash, dann Schnitt (Muster von Phoenix Tackle) ──
     // Der Angreifer fliegt sichtbar ins Ziel und zurueck — so ist ohne
     // Textzeile klar, WER zuschlaegt. Der Schnitt kommt erst im Moment
     // des Aufpralls, und nur auf dem Ziel.
-    const zielSlot = opfer.type === 'hero' ? -1 : opfer.slotIdx;
+    const zielSlot = opferZ.type === 'hero' ? -1 : opferZ.slotIdx;
     engine._broadcastEvent('play_ram_animation', {
       sourceOwner: held.owner, sourceHeroIdx: held.heroIdx,
-      targetOwner: opfer.owner, targetHeroIdx: opfer.heroIdx,
+      targetOwner: opferZ.owner, targetHeroIdx: opferZ.heroIdx,
       targetZoneSlot: zielSlot,
       cardName: angreiferHeld.name, duration: 1000,
     });
@@ -267,29 +339,74 @@ module.exports = {
     await engine._delay(150);
 
     engine._broadcastEvent('play_zone_animation', {
-      type: 'quick_slash', owner: opfer.owner,
-      heroIdx: opfer.heroIdx, zoneSlot: zielSlot,
+      type: 'quick_slash', owner: opferZ.owner,
+      heroIdx: opferZ.heroIdx, zoneSlot: zielSlot,
     });
     await engine._delay(180);
 
-    if (opfer.type === 'hero') {
-      const ziel = gs.players[opfer.owner]?.heroes?.[opfer.heroIdx];
+    // ★ W40a (Al, 22.10.2026, Punkt 3): Idej Sword - Kunagi („perform that Attack again") — derselbe Held schlägt erneut, das Ziel wird neu gewählt („a different target your opponent controls":
+    // `promptDamageTarget`, nur Gegnerziele, inkl. Umleitung/Surprise-/Post-Target-Fenstern). Kosten: keine über den Schlag hinaus — der Trank ist mit dem Spielen verbraucht und wird nicht
+    // erneut gespielt; die Einmal-pro-Zug-Sperre bleibt unberührt. Kann der Held nicht mehr angreifen oder wird die Wahl abgebrochen/negiert, findet keine Wiederholung statt.
+    const wiederhole = async () => {
+      const h = gs.players[held.owner]?.heroes?.[held.heroIdx];
+      if (!h?.name || h.hp <= 0 || !engine.heroKannAngreifen(held.owner, held.heroIdx, pi)) return false;
+      const dmg2 = angriffswert(engine, held.owner, held.heroIdx);
+      if (!(dmg2 > 0)) return false;
+      const vorhanden = engine.cardInstances.find(c => c.zone === 'hand' && c.owner === pi && c.name === CARD_NAME);
+      const handInst = vorhanden || engine._trackCard(CARD_NAME, pi, 'hand');
+      const c2 = engine._createContext(handInst, {});
+      delete gs._spellNegatedByEffect; delete gs._zielNegiertDurchSchutz;
+      let ziel2;
+      try {
+        ziel2 = await c2.promptDamageTarget({
+          side: 'enemy', types: ['hero', 'creature'], damageType: 'attack', baseDamage: dmg2, attackerSourceOverride: quelle,
+          title: CARD_NAME, description: `${h.name} strikes again! Choose a different target your opponent controls — ${dmg2} damage (treated as an Attack).`,
+          confirmLabel: `🗡️ ${dmg2} Damage!`, confirmClass: 'btn-danger', cancellable: true,
+        });
+      } finally { if (!vorhanden) engine._untrackCard(handInst.id); }   // (Hilfsinstanz nur für den Zielwahl-Kontext — kein Geisterzustand)
+      delete gs._spellNegatedByEffect; delete gs._zielNegiertDurchSchutz;
+      if (!ziel2) return false;
+      const slot2 = ziel2.type === 'hero' ? -1 : ziel2.slotIdx;
+      engine._broadcastEvent('play_ram_animation', { sourceOwner: held.owner, sourceHeroIdx: held.heroIdx, targetOwner: ziel2.owner, targetHeroIdx: ziel2.heroIdx, targetZoneSlot: slot2, cardName: h.name, duration: 1000 });
+      await engine._delay(150);
+      engine._broadcastEvent('play_zone_animation', { type: 'quick_slash', owner: ziel2.owner, heroIdx: ziel2.heroIdx, zoneSlot: slot2 });
+      await engine._delay(180);
+      await engine.alsAttackKette({ name: CARD_NAME, pi, heroIdx: held.heroIdx, heroOwner: held.owner, ziele: [ziel2], resolve: async () => {
+        if (ziel2.type === 'hero') {
+          const z = gs.players[ziel2.owner]?.heroes?.[ziel2.heroIdx];
+          if (z?.name && z.hp > 0) await engine.actionDealDamage(quelle, z, dmg2, 'attack');
+        } else {
+          const inst2 = ziel2.cardInstance || engine.findCards({ controller: ziel2.owner, zone: 'support', heroIdx: ziel2.heroIdx }).find(c => c.zoneSlot === ziel2.slotIdx);
+          if (inst2) await engine.actionDealCreatureDamage(quelle, inst2, dmg2, 'attack', { sourceOwner: pi });
+        }
+        return true;
+      } });
+      engine.log('sword_in_a_bottle', { player: gs.players[pi]?.username, attacker: h.name, target: ziel2.cardName, damage: dmg2, repeat: true });
+      engine.sync();
+      return true;
+    };
+    // W32a (Al, 22.10.2026): der Schlag zählt als Attack des gewählten Helden — Attack-Reaktionen (Magic Topaz, Arrows …) über die virtuelle Attack-Kette.
+    await engine.alsAttackKette({ name: CARD_NAME, pi, heroIdx: held.heroIdx, heroOwner: held.owner, ziele: [opferZ], wiederhole, resolve: async () => {
+    if (opferZ.type === 'hero') {
+      const ziel = gs.players[opferZ.owner]?.heroes?.[opferZ.heroIdx];
       if (ziel?.name && ziel.hp > 0) {
         await engine.actionDealDamage(quelle, ziel, schaden, 'attack');
       }
     } else {
-      const inst = opfer.cardInstance
-        || engine.findCards({ controller: opfer.owner, zone: 'support', heroIdx: opfer.heroIdx })
-             .find(c => c.zoneSlot === opfer.slotIdx);
+      const inst = opferZ.cardInstance
+        || engine.findCards({ controller: opferZ.owner, zone: 'support', heroIdx: opferZ.heroIdx })
+             .find(c => c.zoneSlot === opferZ.slotIdx);
       if (inst) {
         await engine.actionDealCreatureDamage(quelle, inst, schaden, 'attack', { sourceOwner: pi });
       }
     }
+    return true;
+    } });
 
     engine.log('sword_in_a_bottle', {
       player: gs.players[pi]?.username,
       attacker: angreiferHeld.name,
-      target: opfer.cardName,
+      target: opferZ.cardName,
       damage: schaden,
     });
     engine.sync();

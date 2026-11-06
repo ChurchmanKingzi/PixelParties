@@ -79,7 +79,8 @@ function _eligibleCostCards(engine, pi) {
 function _heroCanSummon(hero) {
   if (!hero?.name || hero.hp <= 0) return false;
   const s = hero.statuses || {};
-  if (s.frozen || s.stunned || s.negated || s.bound) return false;
+  // Welle 12 (Al): ein bloss Effekt-negierter Held beschwoert normal; harte Form (Abilities negiert) -> nur Stufe 0 ueber `heroMeetsLevelReq`.
+  if (s.frozen || s.stunned || s.bound) return false;
   return true;
 }
 
@@ -204,8 +205,7 @@ module.exports = {
     // Defensive cleanup helper — if anything below fails, push Kirin
     // to discard so the cardName isn't permanently lost from any pile.
     const fallbackDiscard = () => {
-      if (!ps.discardPile) ps.discardPile = [];
-      ps.discardPile.push(CARD_NAME);
+      engine.handKartenBesitzerPs(ps, CARD_NAME).discardPile.push(CARD_NAME);   // W64c: Ablage des permanenten Besitzers (gestohlene Handkarte)
     };
 
     const eligible = _eligibleCostCards(engine, pi);
@@ -239,7 +239,8 @@ module.exports = {
     // Pay the cost — discard the chosen Rebelliokai with the standard
     // archetype source tag so Kind Kitsune's hook + Backup Bakus's
     // recur trigger fire correctly off this discard.
-    const discarded = await engine.actionDiscardHandCard(pi, costName, null, {
+    // ★ W74c: Boris darf diese Abwurf-KOSTEN ignorieren — die Karte bleibt, Kirin wird trotzdem beschworen und der Effekt negiert.
+    const discarded = (await engine.borisVerzicht(pi, 1, { source: CARD_NAME })) || await engine.actionDiscardHandCard(pi, costName, null, {
       source: DISCARD_SOURCE_TAG,
     });
     if (!discarded) {

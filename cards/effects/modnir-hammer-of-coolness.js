@@ -30,6 +30,10 @@ module.exports = {
     },
     onCardLeaveZone: async (ctx) => {
       if (ctx.fromZone !== 'support') return;
+      // Nur der eigene Abgang nimmt den Bonus - nicht jede Karte, die irgendeine
+      // Support Zone verlaesst (A04-cute-19). Muster wie Cute Crown.
+      if (ctx.leavingCard && ctx.leavingCard.id !== ctx.card.id) return;
+      if (!ctx.leavingCard && (ctx.fromHeroIdx !== ctx.card.heroIdx || ctx.fromZoneSlot !== ctx.card.zoneSlot)) return;
       ctx.revokeAtk();
     },
   },
@@ -50,7 +54,8 @@ module.exports = {
     // Als Vorgabe 29.9.: dazu uebernommene Helden der Gegenseite mit Recht
     // `ausruesten` (Styx, Golden Apple …) — Ziel-ID/owner = Brettseite.
     const _plaetze = (ps.heroes || []).map((_, hi) => ({ seite: pi, hi }))
-      .concat((engine.fremdAusruestHelden?.(pi) || []).map(e => ({ seite: e.physOwner, hi: e.heroIdx })));
+      // W31a (Al, 22.10.2026): „one of your Heroes" - ein uebernommener Held, der durch die Kontrolle ausdruecklich immun gegen eigene Karten ist (Charme Lv3, Golden Apple), zaehlt nicht.
+      .concat((engine.fremdAusruestHelden?.(pi) || []).filter(e => !engine.heroImmunGegenEigene?.(e.physOwner, e.heroIdx, pi)).map(e => ({ seite: e.physOwner, hi: e.heroIdx })));
     for (const { seite, hi } of _plaetze) {
       const sps = engine.gs.players[seite];
       const hero = sps.heroes[hi];
@@ -65,14 +70,17 @@ module.exports = {
       if (hero.statuses?.frozen) continue;
       const slots = sps.supportZones?.[hi] || [];
       let leftmostFree = -1;
+      // ★ Darion: hat der Held schon einen Equip-Stapel, ist der Stapel der EINZIGE Platz fuer dieses Equip (keine freie Zone noetig, kein Wunschplatz).
+      const stapelPlatz = require('./_equip-stack-shared').pflichtPlatzFuer(engine, seite, hi, CARD_NAME);
       for (let si = 0; si < slots.length; si++) {
-        if (!slots[si] || slots[si].length === 0) {
+        if (stapelPlatz >= 0 ? si === stapelPlatz : (!slots[si] || slots[si].length === 0)) {
           if (leftmostFree < 0) leftmostFree = si;
           targets.push({
             id: `equip-${seite}-${hi}-${si}`,
             type: 'equip',
             owner: seite, heroIdx: hi, slotIdx: si,
             cardName: '',
+            ...(stapelPlatz >= 0 ? { _eigeneStapelWahl: true } : {}),   // Platzwahl, keine Kartenwahl: keine Rueckfrage „welches Equip?"
           });
         }
       }

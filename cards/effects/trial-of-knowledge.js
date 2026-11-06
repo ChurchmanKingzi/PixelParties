@@ -59,6 +59,7 @@
 //  den heute keine Karte im Pool herbeifuehrt.
 // ═══════════════════════════════════════════
 
+const { anyName } = require('./_alias-name');   // Shroomasaur: Zusatzname zählt für Namensfamilien
 const { hasCardType } = require('./_hooks');
 const {
   TRIAL_KEYS, isTrialOfName, trialTurnIsClean, stampTrialLock,
@@ -105,7 +106,7 @@ module.exports = {
    * bereits erhoehten Stufe ab.
    */
   reduceCardLevel(cardData, engine, ownerIdx, inst /*, heroIdx, evalOpts */) {
-    if (!cardData || !isTrialOfName(cardData.name)) return 0;
+    if (!cardData || !anyName(cardData, (n) => isTrialOfName(n))) return 0;
     if (!hasCardType(cardData, 'Spell')) return 0;
     // ★ Nur eine ABGELEGTE Pruefung wirkt. `activeIn` enthaelt seit
     // v494 auch `hand` — sonst kaeme der `onPlay`-Hook gar nicht an
@@ -161,7 +162,7 @@ module.exports = {
       const namenAufDerHand = new Set();
       for (const n of (ps.hand || [])) {
         const cd = cardDB[n];
-        if (!cd || !isTrialOfName(cd.name) || !hasCardType(cd, 'Spell')) continue;
+        if (!cd || !anyName(cd, (n) => isTrialOfName(n)) || !hasCardType(cd, 'Spell')) continue;
         if (cd.name === CARD_NAME) continue;   // sie selbst geht ja gerade weg
         namenAufDerHand.add(cd.name);
       }

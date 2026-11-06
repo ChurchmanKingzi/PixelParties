@@ -57,8 +57,8 @@ function areaImSpiel(gs) {
  * `effectiveSchoolLevelForCaster` rechnet Performance-Joker und
  * geliehene Ability-Zonen (Xal) korrekt mit.
  */
-// Als Vorgabe 29.9. (Runde 3): `seite` = Brettseite eines dauerhaft
-// uebernommenen Helden (Standard `pi`).
+// Als Vorgabe 29.9. (Runde 3): `seite` = Brettseite eines uebernommenen
+// Helden (Standard `pi`; W20c: dauerhaft oder temporaer).
 function heldKannWirken(engine, pi, heroIdx, seite = pi) {
   const ps = engine.gs.players[seite];
   const hero = ps?.heroes?.[heroIdx];
@@ -73,9 +73,12 @@ function gedeckteQuelle(info, kontrolleur = info.heroOwner) {
   // Als Vorgabe 29.9.: „your opponent" = Gegner des KONTROLLEURS.
   if (info.chooserIdx == null || info.chooserIdx === kontrolleur) return false;
   const cd = info.sourceData;
-  if (!cd) return false;
-  return hasCardType(cd, 'Attack') || hasCardType(cd, 'Spell')
-    || hasCardType(cd, 'Creature') || hasCardType(cd, 'Token');
+  if (cd && (hasCardType(cd, 'Attack') || hasCardType(cd, 'Spell')
+    || hasCardType(cd, 'Creature') || hasCardType(cd, 'Token'))) return true;
+  // W29a (Al, 21.10.2026: „Alliance und Dive Down schützen ausdrücklich auch vor Effekten, die als Attacks/Spells *zählen*"): als Attack/Spell geltende Heldeneffekte
+  // (Broghan & Co., Alice) und Gegenstandseffekte (Crusader's, Bamboo Staff, Javelin Throw, Sword in a Bottle, Sacrificial Dagger) sowie der Treffer von Infected Greatmaw
+  // haben keine Attack-/Spell-Karte als Quelle; `info.treatedAsLevel` (Engine: `heroBlocksTargeting`) ist ihr Kennzeichen, wie bei Flooding.
+  return info.treatedAsLevel != null;
 }
 
 /**
@@ -181,11 +184,10 @@ module.exports = {
       if (!areaImSpiel(gs)) return;
 
       while (ps.hand.includes(CARD_NAME)) {
-        // Als Vorgabe 29.9. (Runde 3): eigene Helden, die ich kontrolliere,
-        // plus DAUERHAFT uebernommene (Paraseed) — als { seite, hi }.
+        // Als Vorgabe 29.9. (Runde 3) / W20c (Al 20.10.: alle Reactions): alle Helden, die ich kontrolliere — eigene und uebernommene
+        // (dauerhaft oder temporaer) — als { seite, hi }.
         const waehlbar = [];
         for (const { physOwner: seite, heroIdx: hi, hero: h } of engine.heroesControlledBy(pi)) {
-          if (seite !== pi && h.permaControlBy !== pi) continue;
           if (istGetaucht(gs, h)) continue;   // schon unten
           if (heldKannWirken(engine, pi, hi, seite)) waehlbar.push({ seite, hi });
         }
@@ -239,11 +241,13 @@ module.exports = {
         // noch existiert (CARD_API „FLUG-ZIELFELDER\").
         const handIdx = ps.hand.indexOf(CARD_NAME);
         if (handIdx < 0) break;
+        const _besitzer = engine._handCardPileOwner(pi, CARD_NAME, handIdx);   // W63c: Loeschstapel des permanenten Besitzers
         engine._broadcastEvent('play_pile_transfer', {
           owner: pi, cardName: CARD_NAME,
           from: 'hand', to: 'deleted',
           fromHandIdx: handIdx, asPlay: 'sole',
           sfx: 'discard',
+          ...(_besitzer !== pi ? { fromOwner: pi, toOwner: _besitzer } : {}),
         });
         engine.takeFromPileSync(ps, 'hand', handIdx);
         const inst = engine.cardInstances.find(c =>
@@ -284,7 +288,7 @@ module.exports = {
           },
         });
 
-        ps.deletedPile.push(CARD_NAME);
+        engine.handKartenBesitzerPs(ps, CARD_NAME).deletedPile.push(CARD_NAME);   // W63c
         if (kette?.negated) {
           engine.log('dive_down_negated', { player: ps.username, hero: hero.name });
         } else if (kette?.fizzled) {

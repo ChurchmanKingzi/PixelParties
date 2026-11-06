@@ -79,16 +79,18 @@ function collectRemovableAbilities(engine, playerIdx) {
   if (!ps) return [];
 
   const result = [];
-  for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
-    const hero = ps.heroes[hi];
+  // W16g (S01-23): „Heroes THEY CONTROL“ — Kontrolle statt Spalte (`heroesControlledBy`, v718): ein vom Gegner gestohlener Held
+  // der Wirker-Spalte zaehlt, ein vom Wirker kontrollierter Held der Gegnerspalte nicht. Die Ability-Instanzen liegen in der
+  // Spalte des Helden (`physOwner`).
+  for (const { physOwner, heroIdx: hi, hero } of engine.heroesControlledBy(playerIdx)) {
     if (!hero?.name) continue;
 
     const startingCounts = getStartingCounts(hero, cardDB);
     const preservedSoFar = {};
 
     for (const inst of engine.cardInstances) {
-      if (inst.owner !== playerIdx) continue;
-      if (inst.zone !== 'ability') continue;
+      if (inst.owner !== physOwner) continue;
+      if (!engine.istWirksameAbility(inst)) continue;   // 24.10.: echte Ability Zone ODER Support Zone (Xal)
       if (inst.heroIdx !== hi) continue;
 
       const limit = startingCounts[inst.name] || 0;
@@ -104,6 +106,9 @@ function collectRemovableAbilities(engine, playerIdx) {
 }
 
 module.exports = {
+  // ★ Welle 12 (B-06, Al: „Eine Karte, deren Effekt komplett nutzlos wäre, ist nicht spielbar."): trifft NUR den Gegner — gegen den durch die
+  // Erste-Runden-Immunität geschützten Spieler unspielbar (Karte bleibt auf der Hand, keine Aktion/Kosten; `engine.ersterZugGeschuetzt`).
+  blockedByFirstTurnProtection: true,
   // ★★ v1181 — ENTKOPPELTE ZAUBERBILDER (Al 17.9.): Wird der Zauber
   // NEGIERT, laeuft sein Effekt-Rumpf nie — die Engine spielt dann diese
   // Bilder, damit der abgewehrte Zauber trotzdem zu sehen ist. Im
@@ -150,11 +155,12 @@ module.exports = {
       // are forgetting" tableau across the affected board side. Dedup
       // by heroIdx since multiple removals on one hero only need one
       // mark burst.
-      const affectedHeroes = new Set(order.map(inst => inst.heroIdx));
-      for (const hi of affectedHeroes) {
+      const affectedHeroes = new Set(order.map(inst => `${inst.owner}-${inst.heroIdx}`));
+      for (const key of affectedHeroes) {
+        const [ow, hi] = key.split('-').map(Number);
         engine._broadcastEvent('play_zone_animation', {
           type: 'forgetting_question_mark',
-          owner: oi, heroIdx: hi, zoneSlot: -1,
+          owner: ow, heroIdx: hi, zoneSlot: -1,
         });
       }
 
@@ -179,7 +185,7 @@ module.exports = {
         engine._broadcastEvent('play_pile_transfer', {
           owner: inst.owner,
           cardName: inst.name,
-          from: 'ability',
+          from: inst.zone === 'support' ? 'support' : 'ability',
           to: 'deck',
           fromHeroIdx: inst.heroIdx,
           fromSlotIdx: inst.zoneSlot,
@@ -201,12 +207,12 @@ module.exports = {
 
         // Splice from ability zone, push name to mainDeck, untrack —
         // immediately, so the slot empties as the flight begins.
-        const slotArr = oppPs.abilityZones?.[inst.heroIdx]?.[inst.zoneSlot];
+        const slotArr = (inst.zone === 'support' ? gs.players[inst.owner]?.supportZones : gs.players[inst.owner]?.abilityZones)?.[inst.heroIdx]?.[inst.zoneSlot];
         if (Array.isArray(slotArr)) {
           const idx = slotArr.indexOf(inst.name);
           if (idx >= 0) slotArr.splice(idx, 1);
         }
-        oppPs.mainDeck.push(inst.name);
+        (engine.gs.players[engine.kartenBesitzerVon(inst)] || oppPs).mainDeck.push(inst.name);   // W3 (Al 14.10.2026): Deck des permanenten Besitzers
         engine._untrackCard(inst.id);
         engine.log('ability_returned_to_deck', {
           player: oppPs.username, ability: inst.name,

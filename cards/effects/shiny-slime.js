@@ -10,6 +10,8 @@
 
 const { hasCardType, isArtifactCreature } = require('./_hooks');
 
+const { slimeLevelUpHook } = require('./_slime-shared');
+
 module.exports = {
   activeIn: ['support'],
 
@@ -44,9 +46,7 @@ module.exports = {
       await engine.actionDrawCards(pi, count);
     },
 
-    onTurnStart: async (ctx) => {
-      if (!ctx.isMyTurn) return;
-      await ctx.changeLevel(1);
-    },
+    // Als Ruling (Al 26.10.): „you may increase this Creature's level by 1" = Ja/Nein-Frage (Nein/Abbruch: Stufe bleibt) — `_slime-shared`.
+    onTurnStart: slimeLevelUpHook('Shiny Slime'),
   },
 };

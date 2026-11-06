@@ -1,4 +1,4 @@
-const { areaTargetId } = require('./_targeting-shared');
+const { areaTargetId, coolnessSpitzeZiel, supportAbilityZiel } = require('./_targeting-shared');
 // ═══════════════════════════════════════════
 //  CARD EFFECT: "Tengu Windstorm"
 //  Spell (Decay Magic Lv0, Normal). BANNED.
@@ -12,6 +12,9 @@ const { areaTargetId } = require('./_targeting-shared');
 //    deck. If this is the first Action you perform
 //    this turn, this counts as an additional
 //    Action.
+//
+//  ★ W4b (Al, Welle 4): ÜBERHOLT — die Kosten werden jetzt VOR dem Reaktionsfenster bezahlt (`payActivationCost`, siehe unten)
+//  und bleiben bei Ganz-Negierung bezahlt; die Zielwahl danach ist nicht mehr abbrechbar. Der Rest dieses Absatzes beschreibt den alten Ablauf.
 //
 //  House clarifications (per user spec):
 //    • Cost (delete Terror Tengu) is paid AFTER
@@ -108,6 +111,9 @@ function _collectBoardTargets(gs, engine) {
     seen.add(inst.id);
 
     if (inst.zone === 'support') {
+      if (engine.zaehltAlsHeld && engine.zaehltAlsHeld(inst)) continue;   // W79 (White Sacrificial Bull): zählt auch als Hero → kein „Nicht-Held"-Ziel
+      const sa = supportAbilityZiel(engine, inst);   // 25.10.: Ability in einer Support Zone = Ability-Stapel (ein Ziel, oberste Kopie)
+      if (sa !== undefined) { if (sa) targets.push(sa); continue; }
       targets.push({
         id:       `equip-${inst.owner}-${inst.heroIdx}-${inst.zoneSlot}`,
         type:     'equip',
@@ -123,8 +129,12 @@ function _collectBoardTargets(gs, engine) {
       // their slot's visible card is the top one).
       const slot = gs.players[inst.owner]?.abilityZones?.[inst.heroIdx]?.[inst.zoneSlot] || [];
       if (slot.length > 0 && slot[slot.length - 1] !== inst.name) continue;
+      // Ein Stapel gleichnamiger Karten (Ability Lv 2/3) hat mehrere Instanzen im selben Platz: EIN Ziel je Stapel (eindeutige ID), und zwar die letzte (= oberste) Kopie — wie `supportAbilitySpitze`.
+      const _abId = `ability-${inst.owner}-${inst.heroIdx}-${inst.zoneSlot}`;
+      const _abErst = targets.find(x => x.id === _abId);
+      if (_abErst) { _abErst._cardInstance = inst; continue; }
       targets.push({
-        id:       `ability-${inst.owner}-${inst.heroIdx}-${inst.zoneSlot}`,
+        id:       _abId,
         type:     'ability',
         owner:    inst.owner,
         heroIdx:  inst.heroIdx,
@@ -159,17 +169,22 @@ function _collectBoardTargets(gs, engine) {
         _cardInstance: inst,
       });
     } else if (inst.zone === 'surprise') {
+      // W17a (Al, 19.10.2026: any card on the board that is not a Hero - auch verdeckte Surprises): Client-ID einer Surprise-Zone wie _targeting-shared (v706); die alte equip-…-surprise-ID war unklickbar.
       targets.push({
-        id:       `equip-${inst.owner}-${inst.heroIdx}-surprise`,
-        type:     'equip',
+        id:       `surprise-${inst.owner}-${inst.heroIdx}`,
+        type:     'surprise',
         owner:    inst.owner,
         heroIdx:  inst.heroIdx,
         cardName: inst.name,
         _cardInstance: inst,
       });
+    } else if (inst.zone === 'coolnessStack') {
+      // W19a (Al, 19.10.2026): „any card on the board that is not a Hero" bietet auch die oberste Karte der Coolness Stacks an.
+      const spitze = coolnessSpitzeZiel(engine, inst);
+      if (spitze) targets.push(spitze);
     }
   }
-  return targets;
+  return require('./_equip-stack-shared').gruppiereZiele(targets);   // Darion: ein Ziel je Stapelplatz, die Rueckfrage nennt nur die zulaessigen Karten
 }
 
 /**
@@ -194,9 +209,35 @@ async function _bounceToDeck(engine, inst, position /* 'top' | 'bottom' */, sour
   const owner = inst.originalOwner != null ? inst.originalOwner : inst.owner;
   const ownerPs = gs.players[owner];
   if (!ownerPs) return false;
+  // W19a (Al, 19.10.2026): oberste Karte eines Coolness Stacks -> Stack abbauen (`actionPopCoolnessStackTo(…, 'board')`: Array +
+  // Instanz), Karte oben/unten ins Deck des Besitzers; kein Flug (der Client kennt keinen Stack->Deck-Flug).
+  if (inst.zone === 'coolnessStack') {
+    const stack = gs.players[inst.owner]?.coolnessStack || [];
+    if (stack.length === 0 || stack[stack.length - 1] !== inst.name) return false;
+    const popped = await engine.actionPopCoolnessStackTo(inst.owner, 'board');
+    if (!popped) return false;
+    await engine.runHooks('onCardLeaveZone', {
+      card: popped.inst, cardName: popped.cardName, leavingCardName: popped.cardName,
+      fromZone: 'coolnessStack', fromOwner: inst.owner, toOwner: owner, toZone: 'deck',
+      _skipReactionCheck: true,
+    });
+    if (!ownerPs.mainDeck) ownerPs.mainDeck = [];
+    if (position === 'top') ownerPs.mainDeck.unshift(popped.cardName);
+    else ownerPs.mainDeck.push(popped.cardName);
+    engine.log('tengu_windstorm_bounce', { player: ownerPs.username, card: popped.cardName, from: 'coolnessStack', position, by: sourceName });
+    engine.sync();
+    return true;
+  }
+  // 25.10.2026 (Xal-Runde 4): eine Ability (Ability Zone, oder oberste Kopie in einer Support Zone) wird von der Leafagami Snake gehalten — sie bleibt liegen,
+  // der Kontrolleur der Schlange zieht (der Effekt gilt als aufgelöst, wie bei Noble Mummy Guards).
+  if (await engine.abilityEntfernungVerhindert(inst, 'deck', { source: { name: sourceName } })) {
+    engine.sync();
+    return true;
+  }
   const fromZone = inst.zone;
   const fromHeroIdx = inst.heroIdx;
   const fromZoneSlot = inst.zoneSlot;
+  const istToken = engine.isTokenCard(inst);   // Z5 (A06-23)
 
   // Visual flight from the source zone to the deck. Uses the standard
   // play_pile_transfer envelope (now with `to: 'deck'` mapping to the
@@ -223,7 +264,7 @@ async function _bounceToDeck(engine, inst, position /* 'top' | 'bottom' */, sour
     toOwner:     owner,
     cardName:    inst.name,
     from:        fromZone,
-    to:          'deck',
+    to:          istToken ? 'deleted' : 'deck',
     flightStyle: 'windstorm',
   };
   if (fromZone === 'support' || fromZone === 'ability') {
@@ -265,14 +306,22 @@ async function _bounceToDeck(engine, inst, position /* 'top' | 'bottom' */, sour
 
   // Remove from origin zone. Mirrors `actionMoveCard`'s state step but
   // routes the destination to the deck rather than discard / hand.
+  // Ankhota: „Delete all Creatures that are moved from the board to anywhere else" — dieser Sonderweg umgeht den zentralen Move; vor dem Enttracken auswerten (Ankhota selbst zählt mit).
+  const ankhotaVorab = fromZone === 'support' && engine.ankhotaLoeschtVomBrett(inst);
   engine._removeCardFromState(inst);
   engine._untrackCard(inst.id);
 
-  if (!ownerPs.mainDeck) ownerPs.mainDeck = [];
-  if (position === 'top') {
-    ownerPs.mainDeck.unshift(inst.name);
-  } else {
-    ownerPs.mainDeck.push(inst.name);
+  if (istToken) {
+    // W5a (A06-23, Al 14.10.2026): ein Token ist ein legales Ziel, verschwindet aber vollstaendig (kommt nie ins Deck);
+    // eine echte Karte darunter (Biomancy-/Boulder-Token) wird gelöscht.
+    engine.tokenAbgang(inst);
+  } else if (!engine.ankhotaLoeschtSonderweg(inst, owner, { source: sourceName, vorab: ankhotaVorab })) {   // Ankhota: gelöscht statt oben/unten ins Deck
+    if (!ownerPs.mainDeck) ownerPs.mainDeck = [];
+    if (position === 'top') {
+      ownerPs.mainDeck.unshift(inst.name);
+    } else {
+      ownerPs.mainDeck.push(inst.name);
+    }
   }
 
   engine.log('tengu_windstorm_bounce', {
@@ -376,9 +425,31 @@ module.exports = {
     return true;
   },
 
-  spellPlayCondition(gs, pi /*, engine */) {
+  spellPlayCondition(gs, pi, engine) {
     const ps = gs.players[pi];
+    // „Delete … from your discard pile": unter Knight of Kings [B] nicht zahlbar (A06-08).
+    if (engine && !engine.pileOutAllowed(pi, 'discard', { sourceOwner: pi })) return false;
     return (ps?.discardPile || []).indexOf(COST_NAME) >= 0;
+  },
+
+  // ★ W4b (Al, Welle 4): die Kosten („Delete 1 … from your discard pile to play this card") werden VOR dem Reaktionsfenster
+  // bezahlt (`payActivationCost`) und bleiben bei Ganz-Negierung bezahlt (Silence, The Master's Plan …). Das ersetzt die
+  // frühere Hausregel „Kosten nach der ersten Zielwahl": die Zielwahl läuft unverändert in `onPlay` (gleiche Reihenfolge der
+  // Ziele), ist aber NICHT mehr abbrechbar, weil die Karte schon verbraucht ist (CARD_API.md, „Zielende Karten sind immer
+  // abbrechbar": Ausnahme nach dem Zusagepunkt). `false` = Kosten nicht zahlbar oder kein legales Ziel → nichts bezahlt,
+  // Karte bleibt auf der Hand. Fallback: lief `payActivationCost` nicht (anderer Spielweg), zahlt `onPlay` wie früher selbst.
+  async payActivationCost(ctx) {
+    const engine = ctx._engine;
+    const pi = ctx.cardOwner;
+    const ps = engine.gs.players[pi];
+    if (!ps || (ps.discardPile || []).indexOf(COST_NAME) < 0) return false;
+    // Ohne legales Ziel wird nichts bezahlt (wie bisher: „no legal targets → no cost paid").
+    if (_collectBoardTargets(engine.gs, engine).length === 0) {
+      engine.log('tengu_windstorm_fizzle', { player: ps.username, reason: 'no_targets' });
+      return false;
+    }
+    if (!(await payRebelliokaiCost(engine, pi, COST_NAME, { source: CARD_NAME }))) return false;
+    if (ctx.card) ctx.card._kostenBezahlt = true;
   },
 
   hooks: {
@@ -388,6 +459,9 @@ module.exports = {
       const pi     = ctx.cardOwner;
       const ps     = gs.players[pi];
       if (!ps) return;
+      const vorab = !!ctx.card?._kostenBezahlt;   // W4b: Kosten schon vor dem Reaktionsfenster bezahlt?
+      if (ctx.card) delete ctx.card._kostenBezahlt;
+      const abbruch = () => { if (!vorab) gs._spellCancelled = true; };   // Kosten bezahlt: Karte ist verbraucht
 
       // Snap "first Action this turn" BEFORE any prompt fires (otherwise
       // the pending-play-log for this Spell flushes on the first prompt
@@ -406,7 +480,8 @@ module.exports = {
         // Nothing to bounce. The Spell has not committed yet (no target
         // selected, so the cost path was never reached) — refund the
         // Action via _spellCancelled so the cost ALSO stays unpaid.
-        gs._spellCancelled = true;
+        // (W4b: nach dem Fenster verschwundene Ziele — Kosten bezahlt, Karte verbraucht.)
+        abbruch();
         engine.log('tengu_windstorm_fizzle', {
           player: ps.username, reason: 'no_targets',
         });
@@ -419,22 +494,22 @@ module.exports = {
         description:  'Choose any card on the board that is not a Hero.',
         confirmLabel: '🌪️ Banish to deck!',
         confirmClass: 'btn-info',
-        cancellable:  true,
+        cancellable:  !vorab,   // W4b: Kosten schon gezahlt → nicht mehr abbrechbar
         exclusiveTypes: true,
-        maxPerType:   { hero: 1, equip: 1, ability: 1, perm: 1, area: 1, surprise: 1 },
+        maxPerType:   { hero: 1, equip: 1, ability: 1, perm: 1, area: 1, surprise: 1, coolnessStackTop: 1 },
       });
 
       if (!cardPick || cardPick.length === 0) {
         // Cancelled BEFORE cost is paid — refund the Action and leave
         // Terror Tengu in the discard pile.
-        gs._spellCancelled = true;
+        abbruch();
         return;
       }
 
       const sel = boardTargets.find(t => t.id === cardPick[0]);
       const targetInst = sel?._cardInstance;
       if (!targetInst) {
-        gs._spellCancelled = true;
+        abbruch();
         return;
       }
 
@@ -443,12 +518,12 @@ module.exports = {
       if (targetInst.zone === 'hand' || targetInst.zone === 'discard'
           || targetInst.zone === 'deleted' || targetInst.zone === 'hero'
           || targetInst.zone === 'deck') {
-        gs._spellCancelled = true;
+        abbruch();
         return;
       }
       if (targetInst.counters?.immovable) {
         // Immovable target — refund (no cost paid yet).
-        gs._spellCancelled = true;
+        abbruch();
         engine.log('tengu_windstorm_blocked', {
           card: targetInst.name, reason: 'immovable',
         });
@@ -459,11 +534,36 @@ module.exports = {
       // Now that a valid target is locked in, delete Terror Tengu from
       // discard. Defensive re-check guards against a parallel reaction
       // having moved Tengu during the target prompt.
-      if ((ps.discardPile || []).indexOf(COST_NAME) < 0) {
-        gs._spellCancelled = true;
+      if (!vorab) {
+        if ((ps.discardPile || []).indexOf(COST_NAME) < 0) {
+          gs._spellCancelled = true;
+          return;
+        }
+        if (!(await payRebelliokaiCost(engine, pi, COST_NAME, { source: CARD_NAME }))) {
+          gs._spellCancelled = true;   // Kosten nicht zahlbar (Stapel-Sperre) → nichts passiert (A06-08)
+          return;
+        }
+      }
+
+      // ── Area-Schutzfenster (Pawn of Kings [B], Guardian of Teocuilatl, Wowhalla) ──
+      // Eine Area verlaesst das Brett hier ueber `_bounceToDeck` am Engine-Tor
+      // vorbei; die Kosten sind gezahlt, der Effekt verpufft (A06-06).
+      if (targetInst.zone === 'area') {
+        const negated = await engine.tryAreaProtection(targetInst, { name: CARD_NAME, owner: pi }, pi);
+        if (negated) {
+          engine.log('tengu_windstorm_area_protected', { player: ps.username, area: targetInst.name });
+          engine.sync();
+          return;
+        }
+      }
+
+      // ── Cosmic Malfunction (B2/E9): „moved from your side of the board to anywhere else by an opponent's card or effect" gilt auch für das Deck.
+      // Wie beim Area-Schutz oben: die Kosten sind gezahlt, der Effekt verpufft. Der Helfer meldet nur Fremdeffekte gegen Cosmic-Depths-Kreaturen (eigene Karten: kein Fenster).
+      if (targetInst.zone === 'support' && await engine._checkCdMovementHandReactions(targetInst, { name: CARD_NAME, owner: pi }, 'move')) {
+        engine.log('tengu_windstorm_cd_negated', { player: ps.username, card: targetInst.name });
+        engine.sync();
         return;
       }
-      await payRebelliokaiCost(engine, pi, COST_NAME, { source: CARD_NAME });
 
       // ── Step 3: top or bottom of original owner's deck ──
       // `inst.originalOwner` survives charm/steal flips; `inst.owner`

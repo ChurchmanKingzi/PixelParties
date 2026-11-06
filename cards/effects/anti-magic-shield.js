@@ -7,6 +7,10 @@
 // ═══════════════════════════════════════════
 
 module.exports = {
+  // ★ Z7b: „Negate that Spell/Attack/effect" = die gewirkte Karte löst NIE auf → ihre Einmal-Stempel werden zurückgegeben
+  // (Engine: `_merkeGanzeNegation`). Teil-Negierungen („… on that Hero", Schaden) tragen das Flag nicht.
+  negatesWholeCard: true,
+
   isPostTargetReaction: true,
 
   /**
@@ -33,7 +37,8 @@ module.exports = {
     const isSpellDamageType = /_spell$/.test(dmgType || '');
     if (!isSpellCard && !isSpellDamageType) return false;
 
-    const spellLevel = isSpellCard ? (srcData.level || 0) : 0;
+    // W32a (Al, 22.10.2026): ein Heldeneffekt, der als Spell zählt (Alice), hat als Stufe das ABILITY-LEVEL seines Helden (Destruction Magic) — nicht mehr fix 0.
+    const spellLevel = isSpellCard ? (srcData.level || 0) : (engine._heldenEffektStufe?.(sourceCard?.name, dmgType, sourceCard) ?? 0);
 
     // At least one targeted hero must belong to this player
     // AND have Magic Arts level >= spell level
@@ -42,26 +47,21 @@ module.exports = {
     const amsData = cardDB['Anti Magic Shield'];
 
     for (const tgt of targetedHeroes) {
-      if (tgt.owner !== pi || tgt.type !== 'hero') continue;
+      // W20c (Al 20.10.: alle Reactions ueber jeden kontrollierten Helden): „a Hero that can use this Spell is hit" — auch ein von `pi`
+      // uebernommener Held der Gegenspalte (Brettseite `tgt.owner`), mit SEINEN Ability Zones; Hand/Rabatte des Kontrolleurs `pi`.
+      if (tgt.type !== 'hero' || engine.zielSeite(tgt) !== pi) continue;
       const hi = tgt.heroIdx;
-      const hero = ps.heroes?.[hi];
+      const seite = tgt.owner;
+      const hero = gs.players[seite]?.heroes?.[hi];
       if (!hero?.name || hero.hp <= 0) continue;
-      if (hero.statuses?.frozen || hero.statuses?.stunned || hero.statuses?.negated) continue;
+      if (hero.statuses?.frozen || hero.statuses?.stunned) continue;   // W13 (Al, A2): `negated` sperrt die Reaktion nicht mehr
 
       // Must meet Shield's own level req (Magic Arts Lv1)
-      if (!engine.heroMeetsLevelReq(pi, hi, amsData)) continue;
+      if (!engine.heroMeetsLevelReq(seite, hi, amsData, seite !== pi ? { levelSourcePi: pi } : undefined)) continue;
 
-      // Count Magic Arts level on this hero (with Performance)
-      const abZones = ps.abilityZones[hi] || [];
-      let maLevel = 0;
-      for (const slot of abZones) {
-        if (!slot || slot.length === 0) continue;
-        const base = slot[0];
-        for (const ab of slot) {
-          if (ab === 'Magic Arts') maLevel++;
-          else if (ab === 'Performance' && base === 'Magic Arts') maLevel++;
-        }
-      }
+      // Magic Arts-Stufe des Helden ueber den Engine-Helfer (W24a, N1-15): zaehlt auch Abilities in Support Zones (Xal), Performance-Joker und die
+      // Negations-Blankung — vorher eine eigene Zaehlung nur ueber die Ability Zones.
+      const maLevel = engine.effectiveSchoolLevelForCaster('Magic Arts', pi, hi, seite);
 
       if (maLevel >= spellLevel) return true;
     }

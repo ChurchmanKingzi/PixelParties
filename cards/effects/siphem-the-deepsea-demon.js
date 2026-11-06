@@ -135,6 +135,12 @@ module.exports = {
     for (let n = 1; n <= count; n++) {
       options.push({ id: `n-${n}`, label: `${n} counter${n > 1 ? 's' : ''} → ${50 * n} damage` });
     }
+    // Tutorial (Mission 6): die Option mit ZWEI Zaehlern steht oben (und ist damit vorgewaehlt), sobald sie verfuegbar ist — die Option mit einem Zaehler bleibt
+    // waehlbar und wird NICHT ausgegraut, damit niemand den Effekt fuer schwach haelt, bloss weil er zuerst nur eine ausgegraute Option sieht.
+    if (gs.isTutorial && count >= 2) {
+      const zwei = options.findIndex(o => o.id === 'n-2');
+      if (zwei > 0) options.unshift(options.splice(zwei, 1)[0]);
+    }
     const optRes = await engine.promptGeneric(pi, {
       type: 'optionPicker',
       renderAs: 'dropdown',
@@ -153,7 +159,7 @@ module.exports = {
 
     const target = await ctx.promptDamageTarget({
       side: 'any', types: ['hero', 'creature'],
-      damageType: 'creature',
+      damageType: 'hero',   // ★ W16b (A02-deepsea-33): Schaden aus einem aktivierbaren HELDEN-Effekt (CARD_API „Schadenstyp 'hero'", v905) — Frog/Crocodile Race Boat erkennen ihn
       baseDamage: damage,
       title: CARD_NAME,
       description: `Deal ${damage} damage to a target.`,
@@ -180,11 +186,11 @@ module.exports = {
     if (target.type === 'hero') {
       const tHero = gs.players[target.owner]?.heroes?.[target.heroIdx];
       if (tHero?.name && tHero.hp > 0) {
-        await ctx.dealDamage(tHero, damage, 'creature');
+        await ctx.dealDamage(tHero, damage, 'hero');
       }
     } else if (target.cardInstance) {
       await engine.actionDealCreatureDamage(
-        ctx.card, target.cardInstance, damage, 'creature',
+        ctx.card, target.cardInstance, damage, 'hero',
         { sourceOwner: pi, canBeNegated: true },
       );
     }

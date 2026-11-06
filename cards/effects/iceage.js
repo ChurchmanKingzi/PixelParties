@@ -47,6 +47,9 @@ const { gegnerZiele, einfrieren } = require('./_frost-shared');
 const zieleDesGegners = (engine, oi) => gegnerZiele(engine, oi);
 
 module.exports = {
+  // ★ Welle 12 (B-06, Al: „Eine Karte, deren Effekt komplett nutzlos wäre, ist nicht spielbar."): trifft NUR den Gegner — gegen den durch die
+  // Erste-Runden-Immunität geschützten Spieler unspielbar (Karte bleibt auf der Hand, keine Aktion/Kosten; `engine.ersterZugGeschuetzt`).
+  blockedByFirstTurnProtection: true,
   // ★★ v1186 (Als Regel 18.9.): AoE OHNE SCHADEN. Die
   // Autoerkennung des Loaders haengt an der Schadensklammer —
   // diese Karte teilt keinen Schaden aus (Freeze auf ALLE gegnerischen Ziele), waere
@@ -111,6 +114,14 @@ module.exports = {
           ? engine._confirmSaidYes(ja) : !!(ja && !ja.cancelled);
         if (bestaetigt) dauer = DAUER_STARK;
       }
+
+      // ★ W14b (Q156, Al: „Jeder Treffer zählt, auch reines Status-Zufügen"): „hit by"-Surprises (Booby Trap, Toxic Trap) öffnen auch hier.
+      const sr = await engine.statusHitSurpriseWindow(ctx.card, ziele.filter(z => z.type === 'hero'), 'decay_spell', { ziele });   // W15a (R01-10): + Hand-Reaktionen (Post-Target)
+      if (sr?.effectNegated) return;
+
+      // W71b (Al, 25.10.2026): „Freeze all targets" betrifft Helden UND Kreaturen zugleich — das Schutzfenster der Kreaturen (Cool Rescuer Monia & Co.) öffnet VORAB für alle Kreaturen, noch bevor
+      // der erste Held (vielleicht Monia selbst) eingefroren ist. Die späteren Einfrier-Aufrufe übernehmen das gemerkte Ergebnis.
+      await engine.kreaturenVorab(ziele.filter(z => z.type !== 'hero' && z.inst).map(z => z.inst), 'status', { name: CARD_NAME, owner: pi }, { sourceOwner: pi, statusName: 'frozen' });
 
       // ── Der Blizzard ────────────────────────────────────────────
       engine._broadcastEvent('iceage_blizzard', { owner: pi, duration: dauer });

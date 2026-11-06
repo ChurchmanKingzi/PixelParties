@@ -38,6 +38,7 @@ const MAX_USES_PER_TURN = 5;
 
 const { usesLeft, spendUse } = require('./_charges');
 const USE_KEY = 'goldenVermin';
+const { drawBlockedFor } = require('./_draw-block-shared');
 module.exports = {
   // Ladungsanzeige oben rechts (Als Vorgabe 16.8.): nur LESEN,
   // niemals den Zaehler anfassen — laeuft bei jedem Zustandsversand.
@@ -64,13 +65,23 @@ module.exports = {
     // der Gegnerrunde. Vermin lief damit auf halbem Kontingent.
     // Der gemeinsame Zaehler stempelt die Runde mit.
 
+    // Welle 11 (Al, Q76): Zuschläge zum automatischen Rundeneinkommen (Ability Wealth, Treasure Huntress Semi …) sind Effekt-Gold und dürfen
+    // ersetzt werden — je Quelle ein Angebot über `onIncomeBonusGain` (engine.actionGainGold, gleicher Rumpf wie `onResourceGain`);
+    // das Grund-Einkommen (4) selbst bleibt unberührt.
+    onIncomeBonusGain: (ctx) => module.exports.hooks.onResourceGain(ctx),
+
     onResourceGain: async (ctx) => {
       if (ctx.playerIdx !== ctx.cardOwner) return;
+      if (ctx._isResourceGain) return;   // das automatische Einkommen ist kein „effect" (Al, Q76)
       const pending = ctx.amount || 0;
       if (pending <= 0) return;
 
       const inst = ctx.card;
       const gs = ctx._engine?.gs;
+      // Z6 (C03-08): Leerlauf entfaellt (wie Golden Ladybug) - Zieh-/Handsperre oder leeres Deck: kein Angebot,
+      // sonst gehen Gold UND Karte verloren.
+      const _ps = gs?.players?.[ctx.cardOwner];
+      if (drawBlockedFor(ctx._engine, ctx.cardOwner, 1) || (_ps?.mainDeck || []).length < 1) return;
       const frei = usesLeft(inst, gs, { key: USE_KEY, max: MAX_USES_PER_TURN });
       if (frei <= 0) return;
       const used = MAX_USES_PER_TURN - frei;

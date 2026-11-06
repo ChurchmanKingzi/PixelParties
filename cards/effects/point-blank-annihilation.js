@@ -104,12 +104,12 @@ module.exports = {
     await engine._delay(HIT_MS);
 
     let besiegt = 0;
-    engine.beginDestroyScope(opfer.length);
+    engine.beginDestroyScope(opfer.length, opfer);   // W78: die Opfer sind todgeweiht (Infallible Oracle Pythia darf keines opfern)
     try {
       for (const inst of opfer) {
         if (inst.zone !== 'support') continue;                      // zwischenzeitlich weg
         await engine.actionDestroyCard(
-          { name: CARD_NAME, owner: targetOwner, heroIdx: targetHeroIdx },
+          { name: CARD_NAME, owner: targetOwner, heroIdx: targetHeroIdx, ...(heroOwner !== targetOwner ? { heroOwner } : {}) },   // W20c: Brettseite des Nutzers
           inst,
           { sourceOwner: targetOwner, sourceName: CARD_NAME },
         );

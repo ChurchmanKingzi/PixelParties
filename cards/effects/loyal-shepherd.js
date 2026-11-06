@@ -27,6 +27,7 @@
 //  for instance are still valid summons.)
 // ═══════════════════════════════════════════
 
+const { anyName } = require('./_alias-name');   // Shroomasaur: Zusatzname zählt für Namensfamilien
 const { isLoyalCreature, getLoyalsInDeck } = require('./_loyal-shared');
 
 // v876: Namensvergleiche ueber den BASISNAMEN (siehe CARD_API).
@@ -61,7 +62,7 @@ module.exports = {
       },
       triggersOn(engine, tributeInst /*, sourceInst */) {
         if (tributeInst.name === CARD_NAME) return false;
-        return isLoyalCreature(tributeInst.name, engine);
+        return anyName(tributeInst, (n) => isLoyalCreature(n, engine));
       },
       valuePerTrigger: 25,
     },
@@ -95,7 +96,7 @@ module.exports = {
       // cross-side-placed onto opp's board doesn't count as ours.
       if ((death.controller ?? death.owner) !== pi) return;
       if (death.name === CARD_NAME) return;
-      if (!isLoyalCreature(death.name, engine)) return;
+      if (!anyName(death, (n) => isLoyalCreature(n, engine))) return;
 
       // Simultaneous-death gate: when a multi-target wipe (Forbidden
       // Zone, AoEs, etc.) takes Shepherd out alongside the Loyal that
@@ -227,6 +228,7 @@ module.exports = {
       await engine.actionNegateCreature(placed.inst, CARD_NAME, {
         expiresAtTurn,
         expiresForPlayer: pi,
+        fristBeginn: true,   // W68a: „until the beginning of your next turn"
         selfInflicted: true,
       });
 

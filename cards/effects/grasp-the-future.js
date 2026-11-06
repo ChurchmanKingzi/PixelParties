@@ -68,6 +68,8 @@ module.exports = {
       engine.revealHandCopy(pi, gewaehlt, wahl.handIndex);
       await engine.showTriggeredEffect(CARD_NAME, { playerIdx: pi });
       await engine.showTriggeredEffect(gewaehlt, { playerIdx: pi });
+      // W85c (Atta, Al 29.10.): ZWEI getrennte Aufdeck-Ereignisse in Textreihenfolge: (1) Grasp selbst + die gewählte Handkarte, (2) die gesuchte Kopie (unten, VOR dem Verschieben).
+      await engine.aufdeckEreignis(pi, [CARD_NAME, gewaehlt], { zone: 'hand', source: CARD_NAME });
       const geholt = await engine.actionAddCardFromDeckToHand(pi, gewaehlt, { source: CARD_NAME, reveal: true });
       engine.log('grasp_the_future', { player: ps.username, revealed: gewaehlt, found: !!geholt });
       engine.sync();

@@ -24,6 +24,11 @@
 //  abzubuchen — die Formulierung stellt nur klar, dass der Zug nicht
 //  verbraucht wird.
 //
+//  ★ Als Ruling (Al 27.10.): „You can only play 1 \"Cleansing of the Land\" per turn." — HOPT je Spieler
+//  (`claimHOPT`, Muster Big Oopsie): gestempelt, sobald der Effekt wirklich läuft (nach dem Prüfen von
+//  `_spellCancelled`, vor dem Abräumen) bzw. wenn die gespielte Karte fizzelt (`onFizzledPlay`); eine ganz
+//  NEGIERTE Karte stempelt nicht (Welle 3). `spellPlayCondition` graut die Karte danach aus.
+//
 //  ── ANIMATION ────────────────────────────────────────────────────
 //  Al 14.9.: eine Feuerwalze ueber das komplette Spielfeld, „aber auf
 //  Hintergrund-Layer". Dafuer gibt es seit v1088 `layer: 'background'`
@@ -33,11 +38,15 @@
 // ═══════════════════════════════════════════
 
 const CARD_NAME = 'Cleansing of the Land';
+const HOPT_KEY = 'cleansing-of-the-land';   // „You can only play 1 per turn" (je Spieler)
 
 /** Kann irgendein Held von `pi` diese Area einsetzen? */
 function einsetzbar(engine, pi, cd) {
   if (!cd) return false;
   if (!engine.canPlaceAnotherArea(pi, cd.name)) return false;
+  // Als Ruling (Al 27.10.): „immediately use it as an additional Action" ist ein SPIELEN der Area — Reality Crack („You cannot play another Area for the rest of the turn") und
+  // W82 (Shipwrecked: „you cannot … play Areas") sperren Schritt ②: die Area darf per ① auf die Hand geholt, aber nicht sofort gelegt werden.
+  if (engine.areaSpielGesperrt(pi)) return false;
   // Kontrolle statt Seite (Styx 28.9.) — „one of your Heroes"
   for (const { physOwner, heroIdx, hero } of engine.heroesControlledBy(pi)) {
     if (!hero?.name || hero.hp <= 0) continue;
@@ -77,10 +86,14 @@ module.exports = {
    * Abraeumen ODER eine Area im Deck zum Holen. (Vorher: nur Letzteres.)
    */
   spellPlayCondition(gs, pi, engine) {
+    if (gs.hoptUsed?.[`${HOPT_KEY}:${pi}`] === gs.turn) return false;   // Al 27.10.: höchstens 1 pro Zug
     if ((gs.areaZones || []).some(z => Array.isArray(z) && z.length > 0)) return true;
     const db = engine._getCardDB();
     return (gs.players[pi]?.mainDeck || []).some(n => db[n]?.subtype === 'Area');
   },
+
+  // Z7b: FIZZELT die gespielte Karte (Wirker beim Auflösen handlungsunfähig), zählt sie als gespielt → Stempel.
+  onFizzledPlay: ({ engine, gs, pi }) => { engine.claimHOPT(HOPT_KEY, pi); },
 
   hooks: {
     onPlay: async (ctx) => {
@@ -106,6 +119,7 @@ module.exports = {
       // erst abraeumen, dann suchen. Die Feuerwand laeuft waehrenddessen.
       const areasAufDemBrett = (gs.areaZones || []).some(z => Array.isArray(z) && z.length > 0);
       if (!areasAufDemBrett && areas.length === 0) { gs._spellCancelled = true; return; }
+      engine.claimHOPT(HOPT_KEY, pi);   // Al 27.10.: „You can only play 1 per turn" — ab hier läuft der Effekt wirklich
 
       // ── Die Feuerwalze, auf der HINTERGRUND-Ebene ─────────────────
       engine._broadcastEvent('play_zone_animation', {

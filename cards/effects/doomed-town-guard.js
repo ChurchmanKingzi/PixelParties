@@ -49,7 +49,7 @@ const CARD_NAME = 'Doomed Town Guard';
  * ueberhaupt einsetzen darf (Level 0 → jeder Held), plus freie Zone.
  */
 function summonableZones(engine, pi) {
-  return engine.getFreeSupportZones(pi, { nachKontrolle: true })
+  return engine.beschwoerZonenFuer(pi, CARD_NAME, { nachKontrolle: true })   // W62a: + Zone einer gleichnamigen Creature (Alice-Teilung)
     .filter(z => darfUeberHeld(engine, pi, z.owner, z.heroIdx));
 }
 
@@ -59,13 +59,26 @@ function summonableZones(engine, pi) {
 // `_canHeroActivateSurprise` kennt nur die eigene Spalte — fuer den
 // uebernommenen Helden dieselben Kernpruefungen an der physischen Adresse.
 function darfUeberHeld(engine, pi, feld, hi) {
-  if (feld === pi) return engine._canHeroActivateSurprise(pi, hi, CARD_NAME);
+  // W13 (Al, A2): dieselbe Prüfung wie jede Beschwörung (`canHeroSummon`): Frozen/Stunned/Webbed/Bound sperren, `negated` nicht.
+  if (feld === pi) return engine._canHeroActivateSurprise(pi, hi, CARD_NAME) && !engine.gs.players[pi]?.heroes?.[hi]?.statuses?.bound;
   if (engine._reaktionGesperrt(pi)) return false;
   const hero = engine.gs.players[feld]?.heroes?.[hi];
   if (!hero?.name || hero.hp <= 0) return false;
   const st = hero.statuses || {};
-  if (st.frozen || st.stunned || st.webbed || st.negated) return false;
+  if (st.frozen || st.stunned || st.webbed || st.bound) return false;   // W13 (Al, A2): `negated` sperrt nicht mehr (harte Form: Stufe über `heroMeetsLevelReq`)
   return engine.heroMeetsLevelReq(feld, hi, engine._getCardDB()[CARD_NAME], { levelSourcePi: pi });
+}
+
+/**
+ * W16d (C02-03): „one or more targets are defeated" - die Klammer gilt fuer das Sterbe-Ereignis, NICHT fuer den ganzen Zug:
+ * ein zweiter, getrennter Tod im selben Zug ist ein neuer Ausloeser (zweite Kopie). Ausserhalb jedes Sammlers (Kennung null)
+ * ist jeder Tod sein eigenes Ereignis.
+ */
+function dieserTodGeklammert(engine, ps) {
+  const gs = engine.gs;
+  if (ps._dtgSummonedForDeath !== gs.turn) return false;
+  const key = engine.todesEreignisSchluessel();
+  return key != null && ps._dtgSummonedEreignis === key;
 }
 
 /**
@@ -82,7 +95,7 @@ async function reagiereAufTod(ctx, opferName) {
   // „one or more targets": ein Mehrfachtod (Flaechenschaden) darf die
   // Karte nur EINMAL bringen. Die Klammer haengt am Spielerzustand und
   // wird beim naechsten Zugbeginn geloest.
-  if (ps._dtgSummonedForDeath === gs.turn) return;
+  if (dieserTodGeklammert(engine, ps)) return;
 
   let zones = summonableZones(engine, pi);
   if (zones.length === 0) return;
@@ -101,7 +114,7 @@ async function reagiereAufTod(ctx, opferName) {
   // Nach dem Prompt neu pruefen — waehrend der Spieler ueberlegt, kann
   // sich das Brett geaendert haben (Kettenreaktionen).
   if (!(ps.hand || []).includes(CARD_NAME)) return;
-  if (ps._dtgSummonedForDeath === gs.turn) return;
+  if (dieserTodGeklammert(engine, ps)) return;
   zones = summonableZones(engine, pi);
   if (zones.length === 0) return;
 
@@ -139,6 +152,7 @@ async function reagiereAufTod(ctx, opferName) {
   if (!res?.inst) { engine.handZugangSync(ps, CARD_NAME, { von: 'rueckgabe', ohneInstanz: true }); return; }   // v1395
 
   ps._dtgSummonedForDeath = gs.turn;
+  ps._dtgSummonedEreignis = engine.todesEreignisSchluessel();   // W16d (C02-03): die Klammer gilt fuer DIESES Sterbe-Ereignis
   setzeSchutzschirm(engine, res.inst);
   engine.log('doomed_town_guard_summon', { player: ps.username, defeated: opferName });
   engine.sync();
@@ -245,7 +259,7 @@ module.exports = {
     // Klammer je Sterbe-Ereignis loesen (siehe reagiereAufTod).
     onTurnStart: async (ctx) => {
       const ps = ctx._engine.gs.players[ctx.cardController ?? ctx.cardOwner];
-      if (ps) delete ps._dtgSummonedForDeath;
+      if (ps) { delete ps._dtgSummonedForDeath; delete ps._dtgSummonedEreignis; }
     },
   },
 

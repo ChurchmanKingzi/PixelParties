@@ -23,6 +23,13 @@ const { isSeat } = require('./_opp');   // N-Spieler: gültiger Sitzindex
 //  (Letzter Satz neu — Als Vorgabe 12.9., uebernommen von „Flame
 //  Avalanche".)
 //
+//  ★ Welle 14 (Q169, Al 16.10.2026): „Ja, wie Avalanche" — der Sperrsatz
+//  lautet jetzt „You cannot deal any other damage to targets your opponent
+//  controls the turn you activate this card." Gesperrt ist also NUR Schaden
+//  an Zielen, die der GEGNER kontrolliert; eigene Ziele (Kreatur, Held)
+//  koennen weiter normal getroffen werden, und Schaden an eigenen Zielen
+//  VOR dem Zauber macht ihn nicht unspielbar (`dealtDamageToOpponent`).
+//
 //  BAUART
 //  ──────
 //  • ★ DER SCHADEN STEHT VOR DEM TOD: „twice the user's CURRENT HP" —

@@ -34,6 +34,11 @@ const TABELLEN_KANAELE = [
   ['onTearsOfCreation', 'ev_tears_of_creation'], ['onHandSteal', 'ev_hand_steal'], ['onCloakVanish', 'ev_cloak_vanish'], ['onSkullBurst', 'ev_skull_burst'],
   ['onGuardianAngel', 'ev_guardian_angel'], ['onChaosScreen', 'ev_chaos_screen'], ['onBrackleCatapult', 'ev_catapult_fire'],
 ];
+// Log-Ereignisse, deren Klang in `playSFXForLog` (app-shared.jsx) stehen muss: `case '<typ>':` und danach ein playSFX('<klang>')
+const LOG_KLAENGE = [
+  { typ: 'surprise_set', klang: 'placement', karte: 'Surprise aus der Hand setzen' },
+  { typ: 'surprise_reset', klang: 'placement', karte: 'Pure Advantage Camel & Co. setzen sich selbst wieder verdeckt (surpriseCreatureReset)' },
+];
 const tabelle = (() => { const a = shared.indexOf('const ZONE_ANIM_SFX = '); return shared.slice(a, shared.indexOf('\n};', a)); })();
 
 const fehler = [];
@@ -60,8 +65,15 @@ for (const k of KANAELE) {
   if (!/category:\s*null/.test(aufruf[1])) fehler.push(`Kanal '${k.ereignis}' (${k.karte}): '${k.klang}' ohne \`category: null\` — die Sammelkategorie 'effect' kann ihn verschlucken.`);
 }
 
+for (const k of LOG_KLAENGE) {
+  const a = shared.indexOf(`case '${k.typ}':`, shared.indexOf('function playSFXForLog'));
+  if (a < 0) { fehler.push(`Log '${k.typ}' (${k.karte}): kein \`case\` in playSFXForLog — das Ereignis läuft stumm.`); continue; }
+  const aufruf = shared.slice(a).match(/playSFX\('([a-z_]+)'/);
+  if (!aufruf || aufruf[1] !== k.klang) fehler.push(`Log '${k.typ}' (${k.karte}): spielt '${aufruf ? aufruf[1] : '—'}' statt '${k.klang}'.`);
+}
+
 if (fehler.length) {
   for (const f of fehler) console.error('[check-event-sounds] ' + f);
   process.exit(1);
 }
-console.log(`[check-event-sounds] OK — ${KANAELE.length} Socket-Animationen mit eigenem Klang (category: null), ${TABELLEN_KANAELE.length} über die Tabelle.`);
+console.log(`[check-event-sounds] OK — ${KANAELE.length} Socket-Animationen mit eigenem Klang (category: null), ${TABELLEN_KANAELE.length} über die Tabelle, ${LOG_KLAENGE.length} Log-Klänge.`);

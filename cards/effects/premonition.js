@@ -91,10 +91,10 @@ module.exports = {
     if (!ps) return false;
     if ((ps.mainDeck || []).length === 0) return false;
 
-    // Lv1 says "1 card" (mandatory). Lv2/Lv3 say "up to N" (the first
-    // pick is cancellable so the player can decline searching at all).
+    // Als Ruling (Al, Welle 2): Die ERSTE Wahl ist auf JEDER Stufe abbrechbar (Lv1, Lv2, Lv3);
+    // Abbruch = Aktivierung zurückgenommen (nichts verbraucht, der Zug endet NICHT, Rückgabe `false`).
+    // Lv2/Lv3 sagen „up to N“: ab der zweiten Wahl beendet ein Abbruch nur die Suche (Zug endet).
     const maxPicks = Math.max(1, Math.min(3, level));
-    const minPicks = level === 1 ? 1 : 0;
 
     let picksTaken = 0;
 
@@ -120,12 +120,12 @@ module.exports = {
 
       if (galleryCards.length === 0) break;   // keine weitere Karte mit anderem Namen
 
-      const cancellable = picksTaken >= minPicks;
+      const cancellable = true;
       const slotLabel = `${picksTaken + 1}/${maxPicks}`;
       const baseDesc = `Choose a Card from your deck to place face-down on top of your deck (${slotLabel}).`;
-      const description = cancellable
-        ? `${baseDesc} Cancel to stop searching.`
-        : baseDesc;
+      const description = picksTaken === 0
+        ? `${baseDesc} Cancel to abort (nothing is used up).`
+        : `${baseDesc} Cancel to stop searching.`;
 
       const choice = await engine.promptGeneric(pi, {
         type: 'cardGallery',
@@ -136,7 +136,10 @@ module.exports = {
         confirmClass: 'btn-info',
         cancellable,
       });
-      if (!choice?.cardName) break;
+      if (!choice?.cardName) {
+        if (picksTaken === 0) return false;   // erste Wahl abgebrochen → Aktivierung zurückgenommen (nichts geändert)
+        break;
+      }
 
       const pickedName = choice.cardName;
 
@@ -189,9 +192,8 @@ module.exports = {
     // doActivateAbility consumes after onActionUsed hooks fire — the
     // turn advance has to happen there, not here, because we're
     // inside the ability's resolve path. (Same pattern as Tanuki
-    // Escape's spell-side use of this flag.) Fires regardless of
-    // pick count: activating Premonition commits to ending the turn
-    // even when 0 cards were stashed at Lv2/3.
+    // Escape's spell-side use of this flag.) Erst NACH der ersten
+    // bestätigten Wahl (ein Abbruch davor gibt `false` zurück, s. o.).
     gs._spellEndsTurn = true;
 
     engine.sync();

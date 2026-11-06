@@ -36,7 +36,8 @@ async function setup() {
   const authMiddleware = (req, res, next) => { const u = req.headers['x-user']; if (!u) return res.status(401).json({ error: 'no' }); req.user = { userId: u }; next(); };
   const daily = { heroes: ['A', 'B', 'C'], startTs: 1, expiresTs: 2, claimedBig: 0 };
   botApi.mount({ app, db, authMiddleware, getActiveDaily: u => (u.id === 'u1' ? daily : null),
-    nextNoonCETAfter: () => 99, mostRecentNoonCETSec: () => 11, uuidv4: () => Math.random().toString(36).slice(2) });
+    nextNoonCETAfter: () => 99, mostRecentNoonCETSec: () => 11, uuidv4: () => Math.random().toString(36).slice(2),
+    getCardOfDay: () => ({ date: '2026-10-21', card: 'Fireball', amount: 30 }) });
   const server = await new Promise(r => { const s = app.listen(0, '127.0.0.1', () => r(s)); });
   const base = 'http://127.0.0.1:' + server.address().port;
   const call = async (method, p, { body, headers } = {}) => {
@@ -173,4 +174,14 @@ test('Daily per Discord starten: würfelt nach den Spielregeln, gilt im Spiel, l
     assert.equal([a, b].filter(x => x.json.created).length, 1);
     assert.deepEqual(a.json.heroes, b.json.heroes, 'beide sehen dieselbe Challenge');
   } finally { server.close(); }
+});
+
+test('Karte des Tages: nur für den Bot, mit Datum, Karte und Bonus', async (t) => {
+  const { server, call } = await setup();
+  t.after(() => server.close());
+  assert.equal((await call('GET', '/api/bot/cotd')).status, 403);
+  assert.equal((await call('GET', '/api/bot/cotd', { headers: { ...bot, 'x-forwarded-for': '1.2.3.4' } })).status, 403);
+  const r = await call('GET', '/api/bot/cotd', { headers: bot });
+  assert.equal(r.status, 200);
+  assert.deepEqual(r.json, { date: '2026-10-21', card: 'Fireball', amount: 30 });
 });

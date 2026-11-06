@@ -3,9 +3,9 @@
 //  Creature (Summoning Magic Lv1, archetype
 //  "Steam Dwarfs") — 50 HP.
 //
-//  ① STEAM ENGINE passive (shared): once per
-//    turn, when you discard 1+ cards, gain +50
-//    current & max HP.
+//  ① STEAM ENGINE passive (shared): whenever you
+//    discard 1+ cards, gain +10 current & max HP
+//    per discarded card.
 //  ② Once per turn, if this Creature was NOT
 //    summoned this turn: sacrifice it to summon
 //    any Creature from your deck whose max HP is
@@ -18,6 +18,7 @@
 
 const { attachSteamEngine } = require('./_steam-dwarf-shared');
 const { hasCardType, isSummonablePileCreature } = require('./_hooks');
+const { loadCardEffect } = require('./_loader');
 
 const CARD_NAME = 'Steam Dwarf Engineer';
 
@@ -38,6 +39,8 @@ module.exports = attachSteamEngine({
     if (!inst || inst.zone !== 'support') return false;
     if (inst.counters?.negated || inst.counters?.nulled) return false;
     if (inst.turnPlayed === (gs.turn || 0)) return false;
+    // W20b (Al, 20.10.2026: Opfer-Zonen-Regel gilt für jede Opfer-Beschwörung): das neue Wesen kommt in die Zone des Engineers - nur wenn dessen Opferung sie leert (kein Alice-Stapel).
+    if (!engine.zoneFreiNachKostenzahlung(engine.physicalSide(inst), inst.heroIdx, inst.zoneSlot, inst)) return false;
 
     const cd = engine._getCardDB()[inst.name];
     const curHp = inst.counters?.currentHp ?? cd?.hp ?? 0;
@@ -51,6 +54,7 @@ module.exports = attachSteamEngine({
       const dcd = cardDB[deckCard];
       if (!dcd) continue;
       if (!isSummonablePileCreature(dcd, dcd.name)) continue;
+      if (loadCardEffect(deckCard)?.summonOnlyFromHand) continue;   // Ifrit: nie aus dem Deck (A03-futuretech-05)
       const dMax = dcd.hp || 0;
       if (dMax > 0 && dMax <= curHp) return true;
     }
@@ -77,6 +81,7 @@ module.exports = attachSteamEngine({
       const dcd = cardDB[deckCard];
       if (!dcd) continue;
       if (!isSummonablePileCreature(dcd, dcd.name)) continue;
+      if (loadCardEffect(deckCard)?.summonOnlyFromHand) continue;   // Ifrit: nie aus dem Deck (A03-futuretech-05)
       const dMax = dcd.hp || 0;
       if (dMax <= 0 || dMax > curHp) continue;
       countMap[deckCard] = (countMap[deckCard] || 0) + 1;
@@ -86,22 +91,22 @@ module.exports = attachSteamEngine({
       .map(([name, count]) => ({ name, source: 'deck', count }));
     if (galleryCards.length === 0) return false;
 
-    // Preview puff
+    const result = await engine.promptGeneric(pi, {
+      type: 'cardGallery',
+      cards: galleryCards,
+      title: CARD_NAME,
+      description: `Sacrifice this Creature to summon any Creature from your deck with max HP of ${curHp} or lower (this Creature's current HP). Additional sacrifice costs are negated.`,
+      confirmClass: 'btn-info',
+      cancellable: true,
+    });
+    if (!result || result.cancelled || !result.cardName) return false;
+
+    // Puff (W64b: erst NACH der Wahl — als Vorschau vor der abbrechbaren Galerie sah der Gegner die Aktivierung auch bei Abbruch)
     engine._broadcastEvent('play_zone_animation', {
       type: 'steam_puff',
       owner: inst.owner, heroIdx, zoneSlot,
     });
     await engine._delay(200);
-
-    const result = await engine.promptGeneric(pi, {
-      type: 'cardGallery',
-      cards: galleryCards,
-      title: CARD_NAME,
-      description: `Sacrifice this Creature to summon any Creature from your deck with max HP ≤ ${curHp} (this Creature's current HP). Additional sacrifice costs are negated.`,
-      confirmClass: 'btn-info',
-      cancellable: true,
-    });
-    if (!result || result.cancelled || !result.cardName) return false;
 
     // Verify still in deck (the player's own prompt may have shown
     // stale data in edge cases — mill, other effects).

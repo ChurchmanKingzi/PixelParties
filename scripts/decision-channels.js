@@ -48,6 +48,12 @@
 //      Karten, die auf Abraeumen reagieren). Siehe FORM 7 unten und
 //      cards/effects/_area-removal-shared.js.
 //
+//   9. HELD ALS KREATUR (Hulijing: 》verwandeln – und in WELCHE Kreatur aus
+//      Hand oder Deck?《) → Einheit ist das Paar (Entscheidung x angebotene
+//      Kreatur) gegen 》nichts aufgelegt《; Identitaet je Held plus additive
+//      Merkmals-/Lage-Tags (Herkunft, Wirkung, Stufe, HP-Verhaeltnis, Brett).
+//      Siehe FORM 9 unten und cards/effects/_hero-creature-learn-shared.js.
+//
 //  ── EIN ENTWURFSGEWINN, DER BETONT GEHOERT ────────────────────────
 //  Die ZUSTANDS-TAGS werden HIER abgeleitet, nicht beim Aufzeichnen.
 //  Der Recorder schreibt den rohen Zustand (`z`: Zug, Phase, lebende
@@ -677,6 +683,84 @@ function buildDecisionChannels(spiele, opts = {}) {
     stat.abil = { spiele: rows.length, own: Object.keys(own).length, opp: Object.keys(opp).length };
   }
 
+  // ═════════════════════════════════════════════════════════════════
+  //  FORM 9 — HELD ALS KREATUR (Hulijing, the Foxdemon; 24.10.2026)
+  // ═════════════════════════════════════════════════════════════════
+  //  „Die CPU soll Hulijing benutzen — mit einem eigenen Lernkanal."
+  //
+  //  Eine Zeile je Held, Zug und Phase (Art `heroCreature`): der Pool der legalen Kreaturen samt ihrer Merkmale (`hc.pl`), die Wahl
+  //  (`w` + Herkunft `wp`, null = nicht verwandelt) und der rohe Kontext. EINHEIT ist das Paar (Entscheidung × angebotene Kreatur):
+  //  》wurde DIESE Kreatur aufgelegt?《 gegen den Ausgang. Wie bei Form 7 gehört das ABLEHNEN zur Wahl — die Zeilen ohne Verwandlung
+  //  sind der Nicht-gewählt-Arm; wurde statt dieser eine ANDERE Kreatur aufgelegt, trägt die Zeile deren Wirkung und zählt für diese
+  //  nicht. IDENTITÄT ist lernbar (das Profil gehört einem Deck, dort kommt jede Kreatur oft genug vor).
+  //
+  //  Gelernt wird je Held:
+  //    ident[Name]  — diese Kreatur soll (oder soll nicht) aufgelegt werden
+  //    base         — Grundrate 》überhaupt verwandeln《
+  //    tags[Tag]    — situative Deltas, ADDITIV (nie gekreuzt), jedes mit eigenem Welch-Gate: Herkunft (`src:*`), Wirkung (`fx:*`), Stufe
+  //                   (`lv:*`), HP-Verhältnis (`mx:*`, `hpr:*`), Brett (`bd:*`, `bo:*`), Lage (`ma:*`, `pool:*`, `mix:*`), dazu `st:*`.
+  //  Vokabular: `_hero-creature-learn-shared.js` (Trainer und Laufzeit leiten die Tags aus DERSELBEN Funktion ab).
+  const HC_PREV_LO = 0.03, HC_PREV_HI = 0.97;
+  // Strengere Schwelle als die 2,5 der übrigen Formen: je Held werden rund 45 Tags und alle Namen verglichen — bei so vielen Vergleichen lässt 2,5 in der Negativkontrolle
+  // (Ausgang reiner Zufall) Scheinregeln durch. GEMESSEN (Synthetik, 1200 Spiele je Lauf, 30 Wiederholungen Negativkontrolle / 10 mit Signal): tMin 2,5 → 7/30 Fehlalarme (Signal 9/10 voll
+  // gefunden); 3,0 → 1/30 (6/10); 3,3 → 1/30 (4/10); 4,0 → 0/30 (2/10). Standard 3,0; `PP_HC_T_MIN` stellt ihn um. Siehe TRAINING.md.
+  const HC_T_MIN = parseFloat(process.env.PP_HC_T_MIN || '3.0');
+  const heroCreatureRules = {};
+  {
+    const hcShared = require('../cards/effects/_hero-creature-learn-shared.js');
+    const rows = nachArt('heroCreature').filter(r => r.d.c && r.d.hc && Array.isArray(r.d.hc.pl) && r.d.hc.pl.length);
+    const jeHeld = Object.create(null);
+    for (const r of rows) (jeHeld[r.d.c] = jeHeld[r.d.c] || []).push(r);
+    let nEinheiten = 0;
+    for (const [held, rs] of Object.entries(jeHeld)) {
+      const einheiten = [];
+      for (const r of rs) {
+        const gewaehlt = r.d.w == null ? null : String(r.d.w);
+        const wp = r.d.wp || null;
+        for (const k of r.d.hc.pl) {
+          const dies = gewaehlt !== null && gewaehlt === k.n && (!wp || wp === k.p);
+          // Eine ANDERE Kreatur wurde aufgelegt: die Zeile trägt deren Wirkung — für diese hier kein Beleg.
+          if (gewaehlt !== null && !dies) continue;
+          einheiten.push({ y: r.y, gi: r.gi, key: k.n, gew: dies, tags: r.tags.concat(hcShared.alleTags(r.d.hc, k)) });
+        }
+      }
+      nEinheiten += einheiten.length;
+      if (einheiten.length < MIN_ARM * 2) continue;
+      const ident = Object.create(null);
+      {
+        const jeKey = Object.create(null);
+        for (const u of einheiten) (jeKey[u.key] = jeKey[u.key] || []).push(u);
+        for (const [key, us] of Object.entries(jeKey)) {
+          const ja = us.filter(u => u.gew), nein = us.filter(u => !u.gew);
+          const prev = us.length ? ja.length / us.length : 0;
+          if (prev > HC_PREV_HI || prev < HC_PREV_LO) continue;
+          const pts = kontrast(ja, nein, { tMin: HC_T_MIN });
+          if (pts !== null) ident[key] = pts;
+        }
+      }
+      // Ohne signifikante Grundrate gilt 0 — die Tags dürfen trotzdem tragen (vgl. Form 1 》nurBedingt《, Form 7).
+      const basis = kontrast(einheiten.filter(u => u.gew), einheiten.filter(u => !u.gew), { tMin: HC_T_MIN }) || 0;
+      const tags = Object.create(null);
+      const alleTags = new Set();
+      for (const u of einheiten) for (const t of u.tags) alleTags.add(t);
+      for (const tag of alleTags) {
+        const mit = einheiten.filter(u => u.tags.includes(tag));
+        const prev = mit.length / einheiten.length;
+        if (prev > HC_PREV_HI || prev < HC_PREV_LO) continue;
+        const lift = kontrast(mit.filter(u => u.gew), mit.filter(u => !u.gew), { tMin: HC_T_MIN });
+        if (lift === null) continue;
+        const delta = Math.round((lift - basis) * 10) / 10;
+        if (Math.abs(delta) >= 3.5) tags[tag] = delta;
+      }
+      const regel = {};
+      if (Object.keys(ident).length) regel.ident = ident;
+      if (basis !== 0) regel.base = basis;
+      if (Object.keys(tags).length) regel.tags = tags;
+      if (Object.keys(regel).length) heroCreatureRules[held] = regel;
+    }
+    stat.hc = { zeilen: rows.length, einheiten: nEinheiten, helden: Object.keys(heroCreatureRules).length };
+  }
+
   // ── Bericht ──────────────────────────────────────────────────────
   log(`Entscheidungs-Kanaele: ${stat.zeilen} beschriftete Zeilen`);
   log(`  1 optIn (pro Karte):    ${stat.optIn.zeilen} Zeilen → ${stat.optIn.karten} Karten-Regeln`);
@@ -688,6 +772,7 @@ function buildDecisionChannels(spiele, opts = {}) {
   log(`  8 ability (Wertigkeit): ${stat.abil.spiele} Spiele → ${stat.abil.own} eigene / ${stat.abil.opp} gegnerische Ability-Werte`);
   log(`  7 area (Abräumung):     ${stat.area.einheiten} Paare → ${stat.area.ident} Identitäten, `
     + `${stat.area.tagsOwn} Tags eigene / ${stat.area.tagsOpp} Tags gegnerische Seite`);
+  log(`  9 heroCreature (Held):  ${stat.hc.zeilen} Zeilen, ${stat.hc.einheiten} Paare → ${stat.hc.helden} Helden-Regeln`);
 
   const leer = (o) => Object.keys(o).length === 0;
   return {
@@ -698,6 +783,7 @@ function buildDecisionChannels(spiele, opts = {}) {
     setOfferRules: leer(setOfferRules) ? undefined : setOfferRules,
     poolFeatureRules: leer(poolFeatureRules) ? undefined : poolFeatureRules,
     areaRemovalRules: leer(areaRemovalRules) ? undefined : areaRemovalRules,
+    heroCreatureRules: leer(heroCreatureRules) ? undefined : heroCreatureRules,
     abilityWorthRules: leer(abilityWorthRules) ? undefined : abilityWorthRules,
     decisionStats: stat,
   };

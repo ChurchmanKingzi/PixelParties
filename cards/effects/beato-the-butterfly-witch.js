@@ -115,6 +115,22 @@ module.exports = {
     },
 
     /**
+     * Geliehen (??? the Shapeshifter): Lv-1-Freigabe und Orbs gehen mit der
+     * Gestalt (H01-heroes-02). Die Aufstiegsmarke setzt der Shapeshifter
+     * nach der Rueckverwandlung selbst neu.
+     */
+    onIdentityLost: (ctx) => {
+      const hero = ctx.gameState.players[ctx.cardOriginalOwner]?.heroes?.[ctx.cardHeroIdx];
+      if (!hero) return;
+      delete hero.bypassLevelReq;
+      delete hero.ascensionOrbs;
+      if (hero.ascensionTarget === ASCENSION_TARGET) {
+        delete hero.ascensionTarget;
+        delete hero.ascensionReady;
+      }
+    },
+
+    /**
      * Track spell schools after a spell resolves successfully.
      * Only counts if:
      *  - Beato herself cast it (casterIdx + heroIdx match)

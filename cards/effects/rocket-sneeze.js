@@ -57,7 +57,7 @@ module.exports = {
   isOppPreDamageReaction: true,
 
   oppPreDamageCondition(gs, pi, engine, target, _targetHeroIdx, _source, amount /*, type */) {
-    if (_alreadyPrompted(gs, pi)) return false;
+    if (_alreadyPrompted(gs, pi, engine, _source)) return false;
     if (!target || target.hp === undefined) return false;
     if (target.hp <= 0) return false;
     if (!(amount > 0) || amount > MAX_TRIGGER_DAMAGE) return false;
@@ -67,12 +67,12 @@ module.exports = {
     const targetOwner = engine.gs.players.findIndex(ps => (ps.heroes || []).includes(target));
     // Kontrolle statt Seite (Styx 28.9.)
     if (targetOwner < 0 || engine.heroSideOf(targetOwner, target) === pi) return false;
-    _markPrompted(gs, pi);
+    _markPrompted(gs, pi, engine, _source);
     return true;
   },
 
   async oppPreDamageResolve(engine, pi, _target, _targetHeroIdx, source, amount, type) {
-    _markPrompted(engine.gs, pi);
+    _markPrompted(engine.gs, pi, engine, source);
     const gs = engine.gs;
     const oi = engine.opponentOf(pi); // target's controller side
     await _spreadDamage(engine, pi, oi, source, amount, type);
@@ -86,17 +86,17 @@ module.exports = {
   isOppCreaturePreDamageReaction: true,
 
   oppCreaturePreDamageCondition(gs, pi, engine, creatureInst, _source, amount /*, type */) {
-    if (_alreadyPrompted(gs, pi)) return false;
+    if (_alreadyPrompted(gs, pi, engine, _source)) return false;
     if (!creatureInst || creatureInst.zone !== 'support' || creatureInst.faceDown) return false;
     if (!(amount > 0) || amount > MAX_TRIGGER_DAMAGE) return false;
     const ctrl = creatureInst.controller ?? creatureInst.owner;
     if (ctrl === pi) return false;
-    _markPrompted(gs, pi);
+    _markPrompted(gs, pi, engine, _source);
     return true;
   },
 
   async oppCreaturePreDamageResolve(engine, pi, creatureInst, source, amount, type) {
-    _markPrompted(engine.gs, pi);
+    _markPrompted(engine.gs, pi, engine, source);
     const gs = engine.gs;
     const oi = creatureInst.controller ?? creatureInst.owner;
     await _spreadDamage(engine, pi, oi, source, amount, type);
@@ -119,13 +119,28 @@ module.exports = {
   },
 };
 
-/** Per-player per-source dedup — cleared at chain-resolve. */
-function _alreadyPrompted(gs, pi) {
-  return !!gs._rsPromptedFor?.[pi];
+/**
+ * Per-player per-source dedup. W16e (F02-16): Das Flag wurde nur in `onChainResolve` geloescht — Schaden OHNE Kette (Pocket Catapult,
+ * Ausruestungs-Aktivierungen) liess es stehen, und der naechste Schaden bekam keine Frage mehr. Jetzt traegt das Flag die Identitaet der
+ * Quelle (stabiler Schluessel: Name + Seite + Held + Instanz) UND den laufenden Effekt (`engine._currentEffectSource`, je Aufloesung
+ * ein frisches Objekt): derselbe Effekt, der mehrere Ziele trifft, fragt weiter nur einmal; ein neues Schadensereignis fragt neu.
+ */
+function _promptId(engine, source) {
+  const q = source;
+  const key = q == null ? '__none__'
+    : typeof q === 'string' ? `n:${q}`
+      : `n:${q.name || '?'}|${q.controller ?? q.owner ?? -1}|${q.heroIdx ?? -1}|${q.id ?? q.cardInstance?.id ?? ''}`;
+  return { key, ref: engine?._currentEffectSource ?? null };
 }
-function _markPrompted(gs, pi) {
+function _alreadyPrompted(gs, pi, engine, source) {
+  const e = gs._rsPromptedFor?.[pi];
+  if (!e) return false;
+  const id = _promptId(engine, source);
+  return e.key === id.key && e.ref === id.ref;
+}
+function _markPrompted(gs, pi, engine, source) {
   if (!gs._rsPromptedFor) gs._rsPromptedFor = {};
-  gs._rsPromptedFor[pi] = true;
+  gs._rsPromptedFor[pi] = _promptId(engine, source);
 }
 
 /**

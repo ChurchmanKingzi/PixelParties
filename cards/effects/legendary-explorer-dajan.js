@@ -84,6 +84,9 @@ function _countCopies(arr, cardName) {
 function _buildEligibleGallery(engine, pi) {
   const ps = engine.gs.players[pi];
   if (!ps) return [];
+  // Z6 (H02-27): dieselben Sperren wie der Handweg - Boomerangs Artefakt-Sperre und die Stapel-Sperre (Knight of Kings [B]).
+  if (ps._artifactLockTurn === engine.gs.turn) return [];
+  if (!engine.pileOutAllowed(pi, 'deck', { sourceOwner: pi })) return [];
   const cardDB = engine._getCardDB();
   const gold = ps.gold || 0;
   const seen = new Set();
@@ -93,8 +96,15 @@ function _buildEligibleGallery(engine, pi) {
     const cd = cardDB[cardName];
     const script = loadCardEffect(cardName);
     if (!_isPlayableArtifact(cd, script)) continue;
+    // Z6: die Sperr-Marken der Karte selbst (Zieh-/Hand-/Such-/Stapel-/Beschwoerungssperre), wie `_free-artifact-shared.spielweg`.
+    if (script?.blockedByDrawLock && ps.drawLocked) continue;
+    if (script?.blockedByHandLock && ps.handLocked) continue;
+    if (engine._cardBlockedBySearchLock?.(script, cd, ps, pi)) continue;
+    if (script?.blockedByPileLock && engine.isPileLockedFor(pi)) continue;
+    if (script?.blockedBySummonLock && ps.summonLocked) continue;
+    if (cd.subtype && cd.subtype.toLowerCase() === 'equipment' && !engine.hasLegalEquipHero(cardName, pi)) continue;
     const reducedCost = Math.max(0, (cd.cost || 0) - COST_REDUCTION);
-    if (gold < reducedCost) continue;
+    if (gold < reducedCost || (reducedCost > 0 && engine.goldSpendBlocked(pi))) continue;   // G1 (A09-11): Goldsperre
     seen.add(cardName);
     out.push({
       name: cardName, source: 'deck', cost: reducedCost,
@@ -123,7 +133,8 @@ async function _playEquip(engine, pi, cardName, cd, cost) {
   // Uebernahme `ausruesten` erlaubt (Styx, Golden Apple …; Charme nicht)
   // — Ziel-ID und `owner` tragen die Brettseite.
   const kandidaten = [];
-  for (let hi = 0; hi < (ps.heroes || []).length; hi++) kandidaten.push({ seite: pi, hi });
+  // Z6 (H02-26): auch die EIGENEN Helden fragen die Ausruest-Regel der Karte (`canEquipToHero`, z. B. "A Hero can only have 1 Race Boat").
+  for (let hi = 0; hi < (ps.heroes || []).length; hi++) if (engine.canEquipCardToHero(cardName, pi, hi)) kandidaten.push({ seite: pi, hi });
   for (const { physOwner, heroIdx } of (engine.fremdAusruestHelden?.(pi) || [])) {
     if (engine.canEquipCardToHero(cardName, physOwner, heroIdx)) kandidaten.push({ seite: physOwner, hi: heroIdx });
   }
@@ -137,12 +148,14 @@ async function _playEquip(engine, pi, cardName, cd, cost) {
     // Held der eigenen Spalte ist kein Ausruestungswirt.
     if (seite === pi && engine.heroSideOf(pi, hero) !== pi) continue;
     let firstFree = -1;
+    const _stapelDajan = engine.equipPflichtPlatz(seite, hi, cardName);   // Darion: der Equip-Stapel ist der einzige Platz
     for (let si = 0; si < 3; si++) {
-      if (((zps.supportZones[hi] || [])[si] || []).length === 0) {
+      if (_stapelDajan >= 0 ? si === _stapelDajan : ((zps.supportZones[hi] || [])[si] || []).length === 0) {
         if (firstFree === -1) firstFree = si;
         destTargets.push({
           id: `equip-${seite}-${hi}-${si}`, type: 'equip',
           owner: seite, heroIdx: hi, slotIdx: si, cardName: '',
+          _eigeneStapelWahl: true,   // Darion: ein Zielplatz, keine Karte — die Engine soll im Equip-Stapel nicht „welches Equip?" fragen
         });
       }
     }
@@ -185,7 +198,8 @@ async function _playEquip(engine, pi, cardName, cd, cost) {
     }
     if (destSlot === undefined) return false;
   }
-  if (((dps.supportZones[destHeroIdx] || [])[destSlot] || []).length > 0) return false;
+  if (engine.equipPflichtPlatz(destSeite, destHeroIdx, cardName) >= 0) destSlot = engine.equipPflichtPlatz(destSeite, destHeroIdx, cardName);   // Darion: Pflicht-Platz im Equip-Stapel
+  else if (((dps.supportZones[destHeroIdx] || [])[destSlot] || []).length > 0) return false;
 
   // Splice from deck right before the placement so a chain negate
   // routes the card to discard from a deck-pulled state.
@@ -358,7 +372,7 @@ module.exports = {
 
     const rawCost = cd.cost || 0;
     const cost = Math.max(0, rawCost - COST_REDUCTION);
-    if ((ps.gold || 0) < cost) return false;
+    if ((ps.gold || 0) < cost || (cost > 0 && engine.goldSpendBlocked(pi))) return false;   // G1 (A09-11): Goldsperre
 
     // Re-verify deck membership; a mid-prompt mill could have removed it.
     if (!ps.mainDeck.includes(chosenName)) return false;

@@ -47,26 +47,35 @@ module.exports = {
       const pi = ctx.cardOwner;
       const oi = engine.opponentOf(pi);
       const hearts = eigeneHearts(engine, pi);
-      if (hearts.length === 0) return;
+      if (hearts.length === 0) return ctx._engine.summonEffektFizzelt(ctx.card, ctx.cardName, { stumm: true });   // W11/R4: wirkt nicht → Blob stumm
 
-      const ziele = hearts.map(h => ({
-        id: `equip-${engine.physicalSide(h)}-${h.heroIdx}-${h.zoneSlot}`, type: 'equip',
-        owner: engine.physicalSide(h), heroIdx: h.heroIdx, slotIdx: h.zoneSlot, cardName: HEART, cardInstance: h,
-      }));
+      // Darion: mehrere Hearts in EINEM Equip-Stapel sind ein Ziel (gleiche Ziel-ID); die Rueckfrage der Engine („welche Karte?", Karte fuer Karte bis „Done")
+      // bietet nur die Hearts dieses Platzes an (`_erlaubteInstanzen`) und liefert die Wahl ueber `gewaehlteInstanzen`.
+      const ziele = [];
+      for (const h of hearts) {
+        const id = `equip-${engine.physicalSide(h)}-${h.heroIdx}-${h.zoneSlot}`;
+        const da = ziele.find(z => z.id === id);
+        if (da) { da._erlaubteInstanzen.push(h.id); continue; }
+        ziele.push({
+          id, type: 'equip',
+          owner: engine.physicalSide(h), heroIdx: h.heroIdx, slotIdx: h.zoneSlot, cardName: HEART, cardInstance: h,
+          _erlaubteInstanzen: [h.id],
+        });
+      }
       const ids = await engine.promptEffectTarget(pi, ziele, {
         title: CARD_NAME, source: CARD_NAME,
         description: 'Send any number of "Heart of Ice" to your discard pile. 1+: Freeze all enemy targets. 2+: 100 damage to all enemy targets. 4+: Frozen enemy targets stay Frozen 2 more turns.',
         confirmLabel: '❄️ Shatter!', confirmClass: 'btn-danger',
-        cancellable: true, minRequired: 1, maxTotal: ziele.length,
+        cancellable: true, minRequired: 1, maxTotal: hearts.length,
         _skipRedirectCheck: true, _skipPostTargetReactions: true,
       });
-      const gewaehlt = (ids || []).map(id => ziele.find(z => z.id === id)).filter(Boolean);
-      if (gewaehlt.length === 0) return;
+      const gewaehlt = [...new Set(ids || [])].flatMap(id => engine.gewaehlteInstanzen(ziele.find(z => z.id === id)));
+      if (gewaehlt.length === 0) return ctx._engine.summonEffektFizzelt(ctx.card, ctx.cardName, { stumm: true });   // W11/R4: wirkt nicht → Blob stumm
 
       let n = 0;
-      for (const z of gewaehlt) {
-        if (z.cardInstance.zone !== 'support') continue;
-        const ok = await engine.sendBoardCardToDiscard(z.cardInstance, { source: CARD_NAME, sourceOwner: pi });
+      for (const heart of gewaehlt) {
+        if (heart.zone !== 'support') continue;
+        const ok = await engine.sendBoardCardToDiscard(heart, { source: CARD_NAME, sourceOwner: pi });
         if (ok !== false) n++;
       }
       engine.log('yuki_onna', { player: gs.players[pi]?.username, hearts: n });
@@ -83,6 +92,13 @@ module.exports = {
 
       // 1+: alles einfrieren
       let feinde = gegnerZiele(engine, oi);
+      // ★ Als Ruling (Al 26.10.): Gruppen-Status eines Kreatureneffekts öffnet das Reaktionsfenster der AoE-Prinzipien — „hit by"-Surprises der getroffenen Helden
+      // (Booby/Toxic Trap …) und die Post-Target-Reaktionen über ALLE Ziele (Rook of Kings [B], Divine Gift of Rain, Castling …) VOR dem Frost. Negiert eine
+      // Reaktion den Effekt, entfallen auch die Folgestufen (100 Schaden, Frost verlängern): „that effect" ist als Ganzes negiert.
+      if (feinde.length > 0) {
+        const sr = await engine.statusHitSurpriseWindow(ctx.card, feinde.filter(z => z.type === 'hero'), 'creature', { ziele: feinde });
+        if (sr?.effectNegated) { engine.sync(); return; }
+      }
       eisblockAnimation(engine, feinde);
       await engine._delay(300);
       await engine.batchStatusWindow('frozen', async () => {   // EIN Reaktionsfenster nach dem ganzen Effekt (The Melting)

@@ -2,6 +2,11 @@
 //  CARD EFFECT: "Shamanic Curse"
 //  Spell (Reaction) — Decay Magic Lv3
 //
+//  ★ W34a (Al, 22.10.2026): reagiert NICHT auf Effekte, die nur als Spell
+//  ZÄHLEN (Alice): der Spell müsste in den Ablagestapel geschickt werden
+//  können — ein Effekt ohne Karte kann das nicht (`zaehltAlsArt`-Marke der
+//  virtuellen Kette).
+//
 //  When an opponent's Hero uses a Spell, increase that
 //  Spell's level by 1. If the Hero can no longer
 //  meet the level requirement — even via Wisdom
@@ -10,6 +15,8 @@
 //  pile. In that case the opponent may immediately
 //  perform an additional Action afterwards.
 // ═══════════════════════════════════════════
+
+const { stufeErhoehen } = require('./_level-bump-shared');
 
 module.exports = {
   // ★★ v1181 — ENTKOPPELTE ZAUBERBILDER (Al 17.9.): Wird der Zauber
@@ -27,6 +34,9 @@ module.exports = {
     const lastLink = chainCtx.chain[chainCtx.chain.length - 1];
     if (!lastLink || lastLink.owner === pi) return false;
     if (lastLink.cardType !== 'Spell') return false;
+    // ★ W34a (Al, 22.10.2026, Punkt 2): „Shamanic Curse nicht, da der Spell nicht zum Discard geschickt werden könnte" — ein Effekt, der nur als Spell ZÄHLT (Alice; virtuelle
+    // Kette `alsSpellKette`), ist kein gespielter Spell und hat keine Karte, die in die Ablage ginge: keine Reaktion. Gegenprobe: ein echter Spell (Kette ohne Marke) → reagiert.
+    if (lastLink.zaehltAlsArt) return false;
 
     const ps = gs.players[pi];
     if (!ps) return false;
@@ -34,10 +44,10 @@ module.exports = {
     for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
       const hero = ps.heroes[hi];
       if (!hero?.name || hero.hp <= 0) continue;
-      if (hero.statuses?.frozen || hero.statuses?.stunned || hero.statuses?.negated) continue;
+      if (hero.statuses?.frozen || hero.statuses?.stunned) continue;   // W13 (Al, A2): `negated` sperrt die Reaktion nicht mehr
       if (engine.heroMeetsLevelReq(pi, hi, cardData)) return true;
     }
-    return false;
+    return !!engine.fremderHeldKannStufe(pi, 'Shamanic Curse');   // W20c: auch ein uebernommener Held wirkt
   },
 
   resolve: async (engine, pi, selectedIds, validTargets, chain, myIndex) => {
@@ -45,61 +55,13 @@ module.exports = {
     const gs = engine.gs;
     const targetIndex = myIndex - 1;
     if (targetIndex < 0) return;
-    const targetLink = chain[targetIndex];
-    if (!targetLink) return;
 
+    // Stufe +1 prüfen / Wisdom-Zusatz zahlen / ggf. negieren — gemeinsamer Baustein mit Celia, the Class Clown.
+    const { status, link: targetLink } = await stufeErhoehen(engine, chain, targetIndex, { logPrefix: 'shamanic_curse' });
+    if (status !== 'negated') return;
     const oppIdx = targetLink.owner;
-    const oppPs = gs.players[oppIdx];
     const castingHi = targetLink.heroIdx ?? -1;
-    const castingHero = oppPs?.heroes?.[castingHi];
     const spellName = targetLink.cardName;
-    const spellCd = engine._getCardDB()[spellName];
-
-    if (!oppPs || !castingHero || !spellCd) {
-      engine.log('shamanic_curse_abort', { reason: 'caster-or-spell-missing' });
-      return;
-    }
-
-    // Determine the new required Wisdom cost when the spell's effective
-    // level goes up by 1. Temporarily patch the caster's levelOverrideCards
-    // so engine.getWisdomDiscardCost sees the bumped level.
-    if (!castingHero.levelOverrideCards) castingHero.levelOverrideCards = {};
-    const hadOverride = Object.prototype.hasOwnProperty.call(castingHero.levelOverrideCards, spellName);
-    const prevOverride = hadOverride ? castingHero.levelOverrideCards[spellName] : undefined;
-    const currentLevel = prevOverride != null ? prevOverride : (spellCd.level || 0);
-    castingHero.levelOverrideCards[spellName] = currentLevel + 1;
-
-    const newCost = engine.getWisdomDiscardCost(oppIdx, castingHi, spellCd);
-
-    // Restore override exactly as it was
-    if (!hadOverride) delete castingHero.levelOverrideCards[spellName];
-    else castingHero.levelOverrideCards[spellName] = prevOverride;
-
-    // newCost: -1 means uncoverable (no Wisdom path exists), otherwise the
-    // required extra discards. Spell survives iff the caster CAN cover it
-    // AND has enough hand cards to pay. The original cast already paid
-    // its own Wisdom cost before this reaction — we don't charge more.
-    const coverable = newCost >= 0;
-    const affordable = coverable && (oppPs.hand?.length || 0) >= newCost;
-
-    engine._broadcastEvent('play_zone_animation', {
-      type: 'plague_smoke', owner: oppIdx,
-      heroIdx: castingHi >= 0 ? castingHi : 0, zoneSlot: -1,
-    });
-    await engine._delay(500);
-
-    if (affordable) {
-      // Still legal — the +1 is flavor only; spell resolves normally.
-      engine.log('shamanic_curse_survived', {
-        player: gs.players[pi]?.username,
-        spell: spellName, newCost,
-      });
-      engine.sync();
-      return;
-    }
-
-    // Uncoverable → negate the Spell.
-    engine.negateChainLink(chain, targetIndex);
 
     // „If it does, your opponent may immediately perform an ADDITIONAL
     // Action afterwards" (Text 3.10.) — unabhaengig davon, ob der Zauber
@@ -111,6 +73,7 @@ module.exports = {
     engine.queuePostChainAction(async () => {
       await engine.performImmediateActionAnyHero(oppIdx, {
         title: 'Shamanic Curse',
+        mitUebernommenenAktionen: true,   // W36a (Al, 22.10.2026): auch Abilities/Heldeneffekte eines UEBERNOMMENEN Helden des Opfers (allgemeine Regel: Klau-Effekte hindern das Handeln nicht)
         description: 'Your Spell was negated. You may perform an additional Action with any Hero — or skip.',
         cancellable: true,
       });

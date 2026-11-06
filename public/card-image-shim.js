@@ -200,7 +200,7 @@
     await boot();
     for (let job; (job = nextJob());) {
       if (job.warm) {                                                           // Vorwaermen: nur in den Speicher holen, kein <img>
-        if (!failed) { const url = await blobFor(job.m); if (url) pin(job.m.id, url); }
+        if (!failed) { const url = await blobFor(job.m); if (url) pin(job.m.id, url, job.keep); }
         warming.delete(job.m.id); stats.warmed++;
         await new Promise(r => setTimeout(r, 0));
         continue;
@@ -215,6 +215,7 @@
       if (job.img.__cardTok !== job.tok) { stats.stale++; continue; }
       if (url) stats.applied++; else stats.fallback++;
       setReal(job.img, url || job.orig);                                  // ohne Kunst: ganz normal die Datei vom Server
+      if (url) waermeStufen(job.m);
       // Ein gemerkter Eintrag, der sich nicht dekodieren laesst (beschaedigt), wird verworfen und die Karte neu gezeichnet
       if (url && fromStore.has(url)) job.img.addEventListener('error', () => {
         if (protoDesc.get.call(job.img) !== url) return;                  // inzwischen ein anderes Bild
@@ -276,8 +277,15 @@
     if (!m || failed) { img.__cardOrig = null; return setReal(img, orig); }
     img.__cardOrig = orig;
     queueMicrotask(() => note(img, m));        // erst danach: React setzt `data-card-low` nach `src`
-    if (cache.has(m.id)) { const u = cache.get(m.id); cache.delete(m.id); cache.set(m.id, u); return setReal(img, u); }
+    if (cache.has(m.id)) { const u = cache.get(m.id); cache.delete(m.id); cache.set(m.id, u); img.__cardBase = m.kind + ':' + m.stem; return setReal(img, u); }
     const job = img.__cardJob = { img, m, tok, orig };
+    // ★ NUR EINE VARIANTE DERSELBEN KARTE (Stufe, Kosten, HP-Aufdruck — Fähigkeits-Level-Up, Handkarte wird billiger):
+    // das alte Bild bleibt stehen, bis das neue fertig ist, statt kurz zu verschwinden (Als Befund 23.10.: „die Stufen-Box
+    // hängt einen Moment"), und kommt SOFORT an die Reihe (Stufe 0) statt erst über IntersectionObserver und Leerlauf.
+    const basis = m.kind + ':' + m.stem;
+    const gleicheKarte = img.__cardBase === basis && img.isConnected && protoDesc.get.call(img).startsWith('blob:');
+    img.__cardBase = basis;
+    if (gleicheKarte) { job.low = false; setTimeout(() => { if (img.__cardTok === tok) enqueue(job, 0); }, 0); return; }
     // Eingebaute Bilder zeigen bis zum Rendern eine durchsichtige Fläche (kein Alt-Text-Flackern); `new Image()`
     // bleibt leer, damit onload erst mit der fertigen Karte feuert.
     if (!img.__viaCtor) setReal(img, PLACEHOLDER);
@@ -327,6 +335,24 @@
     }).observe(document, { childList: true, subtree: true });
   }
 
+  // ★ STUFEN-VARIANTEN VORWÄRMEN (Als Befund 23.10.): Eine Fähigkeitskarte mit drei Textboxen (`skill3`) steht auf dem Brett als
+  // `?stufe=N`; steigt ihre Stufe, wechselt die URL. War die neue Variante noch nie gezeichnet, blieb die Karte (bzw. der Tooltip)
+  // einen Moment leer oder falsch. Darum werden, sobald eine solche Karte (mit oder ohne Stufe) gezeigt wird, die Stufen 1–3 im
+  // Hintergrund bereitgelegt (Blob-URL im Speicher + dekodiert) — der Wechsel ist dann ein Cache-Treffer. Als Handkarte ohne Stufe zählt das
+  // schon im Voraus: bis sie auf dem Brett liegt, sind alle drei Varianten fertig.
+  function waermeStufen(m) {
+    if (m.kind !== 'card' || m.ohne || m.lv != null || m.kost != null) return;
+    const r = resolve(m);
+    const c = r && r.card;
+    if (!c || c.cardType !== 'Ability' || !/^\s*1\)/m.test(c.effect || '') || !/^\s*2\)/m.test(c.effect || '') || !/^\s*3\)/m.test(c.effect || '')) return;
+    for (let st = 1; st <= 3; st++) {
+      const id = 'card:' + m.stem + variantKey({ stufe: st });
+      if (id === m.id || warming.has(id) || (cache.has(id) && (pinned.has(id) || keepPinned.has(id)))) continue;
+      warming.add(id);
+      enqueue({ warm: true, m: fromId(id) }, m.stufe != null ? 1 : 3);
+    }
+  }
+
   // ── Vorwaermen ──
   // Wer das Hauptmenue verlaesst, oeffnet fast immer einen Bildschirm voller Karten (Deck Editor, Puzzle-Creator ...). Frisch
   // gerendert wird dort dank des dauerhaften Caches nichts mehr — aber jede Karte kostet trotzdem Warteschlange, IndexedDB-Lesen,
@@ -360,10 +386,12 @@
   }
   addEventListener('pagehide', flushRec);
   document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') flushRec(); });
-  function pin(id, url) {
-    if (pinned.has(id)) return;
+  const keepPinned = new Map();      // Tutorial-Karten (warmCards): bleiben dekodiert im Speicher, unabhaengig vom Deckel PIN_MAX
+  function pin(id, url, keep) {
+    if (pinned.has(id) || keepPinned.has(id)) return;
     const im = new NativeImage();
     setReal(im, url);
+    if (keep) { keepPinned.set(id, im); if (im.decode) im.decode().catch(() => {}); return; }
     pinned.set(id, im);
     if (pinned.size > PIN_MAX) pinned.delete(pinned.keys().next().value);
     if (im.decode) im.decode().catch(() => {});
@@ -392,9 +420,71 @@
   }
   boot().then(scheduleWarm);
 
+  /** Karten fuer ein Tutorial im Voraus rendern und dekodiert halten. `names`: Kartennamen; `opts.board`: Namen, die auf dem Brett als
+   *  Held/Kreatur (ohne gedruckte HP/ATK) bzw. Faehigkeit (Stufen 1-3) vorkommen. Laeuft im Hintergrund (Tier 3: nach allem Sichtbaren). */
+  async function warmCards(names, opts) {
+    await boot(); if (failed) return 0;
+    opts = opts || {};
+    const heroes = new Set(opts.heroes || []), abilities = new Set(opts.abilities || []);
+    let n = 0;
+    for (const name of names || []) {
+      const stem = strippedKey(name); if (!stem) continue;
+      const base = parse('/cards/' + encodeURIComponent(stem) + '.png'); if (!base) continue;
+      const variants = [base.id], url = '/cards/' + encodeURIComponent(stem) + '.png';
+      if (heroes.has(name)) variants.push(parse(url + '?ohne=atk,hp').id);                                   // Brett: ohne gedruckte HP/ATK
+      if (abilities.has(name)) for (let st = 1; st <= 3; st++) variants.push(parse(url + '?stufe=' + st).id); // Faehigkeit: Stufe hervorgehoben
+      for (const id of variants) {
+        if (warming.has(id) || keepPinned.has(id)) continue;
+        warming.add(id); n++;
+        enqueue({ warm: true, keep: opts.keep !== false, m: fromId(id) }, 3);
+      }
+    }
+    return n;
+  }
+
+  /** Wie warmCards, aber TROPFENWEISE: je Takt eine Karte, und nur, wenn nichts Sichtbares auf Rendern wartet und der Tab im Vordergrund ist —
+   *  das Vorwaermen selbst darf nie ruckeln (auf schwachen Handys kostet jede Karte einige 10 ms Zeichnen + Dekodieren). `opts.keep` falsch:
+   *  nur zeichnen und im dauerhaften Cache ablegen, nicht dauerhaft dekodiert im Speicher halten (fuer Gegner-Decks). Doppelte Namen werden verworfen. */
+  const dripQueue = [], dripSeen = new Set(); let dripTimer = 0;
+  function warmDrip(names, opts) {
+    opts = opts || {};
+    const heroes = new Set(opts.heroes || []), abilities = new Set(opts.abilities || []);
+    const neu = [];
+    for (const name of names || []) {
+      const key = (opts.keep === false ? 'c:' : 'k:') + name;
+      if (typeof name !== 'string' || dripSeen.has(key)) continue;
+      dripSeen.add(key);
+      neu.push({ name, keep: opts.keep !== false, heroes: heroes.has(name) ? [name] : [], abilities: abilities.has(name) ? [name] : [] });
+    }
+    if (opts.front) dripQueue.unshift(...neu); else dripQueue.push(...neu);   // `front`: vor die wartenden (z. B. Deck der naechsten Partie vor die Tutorial-Karten)
+    dripPlane(opts.delay || 800);
+  }
+  function dripPlane(ms) { if (dripTimer || !dripQueue.length) return; dripTimer = setTimeout(dripSchritt, ms); }
+  // Eingaben der letzten Sekunde: waehrenddessen wird nicht gezeichnet (Tippen, Wischen, Scrollen sollen nie auf eine Karte warten).
+  let letzteEingabe = 0, dripBusy = 0;
+  for (const ev of ['pointerdown', 'pointermove', 'touchstart', 'touchmove', 'keydown', 'wheel', 'scroll']) addEventListener(ev, () => { letzteEingabe = performance.now(); }, { passive: true, capture: true });
+  function dripSchritt() {
+    dripTimer = 0;
+    if (!dripQueue.length) return;
+    const frei = !document.hidden && queues.every(q => q.length === 0) && workers === 0 && performance.now() - letzteEingabe > 1000;
+    if (!frei) { dripPlane(700); return; }
+    // Nur in einer ECHTEN Leerlaufluecke anfangen (>= 25 ms am Stueck frei) — eine Karte kostet auf schwachen Handys einige 10 ms.
+    const los = () => {
+      if (!dripQueue.length) return;
+      const it = dripQueue.shift();
+      warmCards([it.name], { heroes: it.heroes, abilities: it.abilities, keep: it.keep }).finally(() => {
+        const weiter = () => dripPlane(260);          // naechste Karte frueh genug, aber mit Mindestabstand
+        if (window.requestIdleCallback) requestIdleCallback(weiter, { timeout: 1500 }); else weiter();
+      });
+    };
+    // Auf einer animierten Seite gibt es nie 25 ms am Stueck — nach drei Fehlversuchen (je 400 ms Pause) faengt eine Karte trotzdem an.
+    if (window.requestIdleCallback) requestIdleCallback((d) => { if (!d.didTimeout && d.timeRemaining() < 25 && dripBusy++ < 3) dripPlane(400); else { dripBusy = 0; los(); } }, { timeout: 2000 });
+    else los();
+  }
+
   // Für Hintergrund-Aufwärmer: Kunstindex und Rahmen schon vor den ersten Karten holen
   // Skin -> Basiskarte (fuer das Skin-Holo: es braucht den Kartentyp des Helden). Wartet auf boot().
   async function skinBase(skin) { await boot(); return (window.__cardShimSkinBase && window.__cardShimSkinBase[skin]) || null; }
-  window.CardImageShim = { boot, skinBase, parse, cacheSize: () => cache.size, stats, cacheStats: () => CardRender.cacheStats(), queued: () => queues.reduce((n, q) => n + q.length, 0) };
+  window.CardImageShim = { boot, skinBase, parse, warmCards, warmDrip, cacheSize: () => cache.size, stats, cacheStats: () => CardRender.cacheStats(), queued: () => queues.reduce((n, q) => n + q.length, 0) };
   boot();
 })();

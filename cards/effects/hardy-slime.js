@@ -3,8 +3,9 @@
 //  Creature (Summoning Magic Lv0, Slimes) — 30 HP.
 //
 //  When you summon this Creature, your opponent
-//  has to choose it with all Attacks and Spells
-//  they use until your next turn, if possible.
+//  has to choose it with all Attacks, Spells and
+//  Creature effects they use until your next turn,
+//  if possible.
 //  You can only activate this effect once per
 //  turn. At the beginning of each of your turns,
 //  you may increase this Creature's level on
@@ -19,12 +20,23 @@
 //  + 1` is enough; the engine check is
 //  `gs.turn > untilTurn`).
 //
+//  ★ W43a (Al, 22.10.2026): der Taunt gilt NUR für
+//  Zielwahlen, die von einem Attack, Spell oder
+//  Creature effect stammen (`tauntNurAttackSpellKreatur`
+//  → `engine.tauntGiltFuerQuelle`), nicht für Artefakt-,
+//  Trank-, Ability-, Helden- oder Equip-Effekte.
+//
 //  Hard once-per-turn so a re-summoned Hardy
 //  via Reincarnation / Necromancy etc. can't
 //  re-stamp the taunt the same turn.
 // ═══════════════════════════════════════════
 
+const { slimeLevelUpHook } = require('./_slime-shared');
+
 module.exports = {
+  // ★ W43a: Taunt nur für Attacks, Spells und Creature effects (s. Kopf; gelesen von `_applyForcesTargetingFilter`).
+  tauntNurAttackSpellKreatur: true,
+
   // ★★ v1182 — ENTKOPPELTE BILDER (CARD_API): wird die Karte NEGIERT,
   // laeuft ihr Effekt-Rumpf nie — die Engine spielt dann diese Bilder.
   // Im normalen Weg bleibt es bei den Broadcasts im Effekt selbst.
@@ -46,6 +58,7 @@ module.exports = {
       inst.counters.forcesTargeting = true;
       inst.counters.forcesTargeting_pi = oppIdx;
       inst.counters.forcesTargeting_untilTurn = (gs.turn || 0) + 1;
+      inst.counters.forcesTargeting_fristBeginn = true;   // W68a: „until your next turn" — endet zu BEGINN des nächsten eigenen Zuges (ein übersprungener Zug beendet ihn nicht)
       // Mirror as a buff entry so BuffColumn renders the standard 🎯
       // taunt icon (no bespoke overlay needed).
       if (!inst.counters.buffs) inst.counters.buffs = {};
@@ -62,9 +75,7 @@ module.exports = {
       engine.sync();
     },
 
-    onTurnStart: async (ctx) => {
-      if (!ctx.isMyTurn) return;
-      await ctx.changeLevel(1);
-    },
+    // Als Ruling (Al 26.10.): „you may increase this Creature's level by 1" = Ja/Nein-Frage (Nein/Abbruch: Stufe bleibt) — `_slime-shared`.
+    onTurnStart: slimeLevelUpHook('Hardy Slime'),
   },
 };

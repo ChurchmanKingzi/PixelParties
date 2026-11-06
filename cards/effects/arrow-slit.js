@@ -9,12 +9,12 @@
 //  Implementation — Arrow Slit chains ON TOP of
 //  the Arrow link. Chain resolution is LIFO, so
 //  Arrow Slit runs BEFORE the Arrow it targets.
-//  Arrow Slit's `resolve` immediately re-invokes
-//  the target Arrow's own `resolve` function,
-//  then the engine proceeds down the chain and
-//  runs the Arrow's resolve AGAIN as part of
-//  normal chain processing — net effect: the
-//  Arrow's resolve fires twice.
+//  Arrow Slit's `resolve` hängt dem Pfeil-Glied
+//  nur eine Nachaufloesung (`_nachAufloesung`) an;
+//  wenn der Pfeil dann auflöst, ruft die Kette sie
+//  sofort NACH der ersten Aktivierung auf — net
+//  effect: the Arrow's resolve fires twice, aber
+//  nur, wenn der Pfeil nicht vorher negiert wird.
 //
 //  All arrow `resolve`s are idempotent in
 //  terms of arming (each call pushes another
@@ -106,13 +106,19 @@ module.exports = {
       arrow: target.cardName,
     });
 
-    try {
-      // Re-invoke the Arrow's resolve with the same signature the
-      // reaction runner uses (engine, pi, null, null, chain, idx).
-      await script.resolve(engine, pi, null, null, chain, null);
-    } catch (err) {
-      console.error(`[Arrow Slit] re-invoking ${target.cardName}.resolve threw:`, err.message);
-    }
+    // W16d (A09-09): „activates a second time immediately AFTER its first activation" – die zweite Aktivierung hängt am Pfeil-Glied
+    // und läuft erst, wenn dieses Glied wirklich auflöst (`_resolveReactionChain` ruft `_nachAufloesung`). Wird der Pfeil
+    // vorher negiert (Misfire unter dem Slit), gibt es weder die erste noch die zweite Aktivierung.
+    const vorher = target._nachAufloesung;
+    target._nachAufloesung = async () => {
+      if (typeof vorher === 'function') await vorher();
+      try {
+        // Same signature the reaction runner uses (engine, pi, null, null, chain, idx).
+        await script.resolve(engine, pi, null, null, chain, null);
+      } catch (err) {
+        console.error(`[Arrow Slit] re-invoking ${target.cardName}.resolve threw:`, err.message);
+      }
+    };
 
     engine.sync();
     return true;

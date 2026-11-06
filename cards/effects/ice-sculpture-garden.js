@@ -13,10 +13,17 @@
 // ═══════════════════════════════════════════
 
 const { countFrozenTargets } = require('./_mischief-militia-shared');
+const { drawBlockedFor } = require('./_draw-block-shared');   // D1: Regel von Al
 
 const CARD_NAME = 'Ice Sculpture Garden';
 
 module.exports = {
+  // D1 (Regel von Al): Zug + Zusatzaktion + Folgesperre - der Zug ist der ganze Nutzen; unter Hand-/Zieh-Sperre nicht spielbar
+  // (Praezedenz Haste/Supply Chain). Bewusst ueber das Karten-Gate statt ueber die Loader-Flaggen `blockedBy*Lock` (die die KI
+  // auf "immer spielen" stellen wuerden).
+  canPlayWithHero(gs, pi, heroIdx, cardData, engine) {
+    return !drawBlockedFor(engine, pi);
+  },
   // Free-action when there are ≥2 Frozen targets on the board.
   inherentAction(gs, pi, heroIdx, engine) {
     if (!engine) return false;

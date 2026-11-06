@@ -41,19 +41,26 @@ async function loeseAusstehende(ctx) {
   const permId = ctx.card.counters?.permId;
   const perm = (ps.permanents || []).find(p => p.id === permId || (!permId && p.name === 'Elixir of Immortality'));
   if (!perm || perm._triggered) return;
-  if (!(perm._pendingHeroes?.length > 0 || perm._pendingCreatures?.length > 0)) return;
+  pileAufloesen(engine, ps, perm);
+  if (!(perm._pendingHeroes?.length > 0 || perm._pendingCreatures?.some(c => c.pile))) return;
   await resolveElixirPending(engine, pi, perm);
 }
 
 module.exports = {
   isPotion: true,
-  deferBroadcast: true,
+  // W64b: kein `deferBroadcast` mehr — der Auftritt kommt zentral (`commitAppearance()` im resolve).
   activeIn: ['permanent'],
   // Engine-level opt-in honoured by `checkAllHeroesDead()`. While this
   // permanent is on the owner's side, an all-heroes-dead state does
   // NOT end the game on that side — the permanent's own death-collect
   // path is responsible for handling the revive.
-  preventsAllHeroesDeadLoss: true,
+  // Nur solange das Elixir fuer mindestens einen toten Helden auch wirklich
+  // ausloesen kann (`onHeroKO` verwirft nicht wiederbelebbare Helden, z. B.
+  // Mirjam) — sonst bliebe die Partie ohne lebenden Helden ewig offen.
+  preventsAllHeroesDeadLoss: (engine, pi) => {
+    return engine.heroesControlledBy(pi, { permanentOnly: true })
+      .some(({ hero }) => hero.hp <= 0 && engine.canReviveHero(hero, { heilt: true }));
+  },
 
   // CPU evaluation hint — Elixir's value is a multi-turn safety net
   // (waits for a future death to revive). The immediate post-play
@@ -79,11 +86,7 @@ module.exports = {
     if (!ps._oncePerGameUsed) ps._oncePerGameUsed = new Set();
     ps._oncePerGameUsed.add('elixirOfImmortality');
 
-    const oi = engine.opponentOf(pi);
-    const oppSid = engine.gs.players[oi]?.socketId;
-    if (oppSid && engine.io) {
-      engine.io.to(oppSid).emit('card_reveal', { cardName: 'Elixir of Immortality' });
-    }
+    engine.commitAppearance();   // W64b: zentral (Gegner + Zuschauer)
     await engine._delay(100);
 
     if (!ps.permanents) ps.permanents = [];
@@ -208,9 +211,15 @@ module.exports = {
           // Biomancy-Token wurde deshalb nie eingesammelt und das Elixir
           // loeste gar nicht aus. Der Stapel wird jetzt mitgefuehrt, damit
           // die Wiederbelebung ihn aus dem richtigen holt.
-          const pile = ps.discardPile.includes(e.inst.name) ? 'discard'
-                     : ps.deletedPile.includes(e.inst.name) ? 'deleted'
-                     : null;
+          let pile = ps.discardPile.includes(e.inst.name) ? 'discard'
+                   : ps.deletedPile.includes(e.inst.name) ? 'deleted'
+                   : null;
+          // M01-18: In einer Flächenklammer (Fireball & Co.) wird der Tod erst beim
+          // Schließen der Klammer abgewickelt (Vorgabe 26.9., `_kreaturTodMelden`) — dieser
+          // Hook läuft davor, die Kreatur liegt noch auf dem Brett. Dann ohne Stapel
+          // vormerken; `pileAufloesen` ergänzt ihn, sobald die Karte wirklich liegt.
+          const aufgeschoben = !pile && !!engine._todesAufschub && e.inst.zone === 'support';
+          if (aufgeschoben) pile = 'offen';
           // v1389: „cannot be revived by any effects" (Gigantisaur) —
           // dann löst das Elixir gar nicht erst aus und bleibt liegen.
           if (pile && engine.darfAusAblageAufsFeld(e.inst.name)) {
@@ -220,7 +229,7 @@ module.exports = {
                 name: e.inst.name,
                 heroIdx: e.inst.heroIdx,
                 zoneSlot: e.inst.zoneSlot,
-                pile,
+                pile: pile === 'offen' ? null : pile,
                 // Token-Identitaet mitnehmen (siehe TOKEN_STATE_KEYS):
                 // ohne sie kaeme die Potion als sie selbst zurueck, ohne
                 // Kreatur-Kartendaten, ohne Aktiveffekt und mit den
@@ -291,10 +300,26 @@ function captureTokenState(inst) {
   return out;
 }
 
+// M01-18: Stapel für Kreaturen nachtragen, die beim Einsammeln noch nicht lagen
+// (Tod in einer Flächenklammer). Landet die Karte nicht (Tod verhindert) und die
+// Klammer ist zu, fällt der Eintrag weg.
+function pileAufloesen(engine, ps, perm) {
+  if (!perm._pendingCreatures?.length) return;
+  const aufschub = !!engine._todesAufschub;
+  perm._pendingCreatures = perm._pendingCreatures.filter(pc => {
+    if (pc.pile) return true;
+    pc.pile = ps.discardPile.includes(pc.name) ? 'discard'
+            : ps.deletedPile.includes(pc.name) ? 'deleted'
+            : null;
+    return !!pc.pile || aufschub;
+  });
+}
+
 async function resolveElixirPending(engine, pi, perm) {
   const ps = engine.gs.players[pi];
+  pileAufloesen(engine, ps, perm);
   const pendingHeroes = perm._pendingHeroes || [];
-  const pendingCreatures = perm._pendingCreatures || [];
+  const pendingCreatures = (perm._pendingCreatures || []).filter(c => c.pile);
   const allDead = [
     ...pendingHeroes.map(h => ({ ...h, deathType: 'hero' })),
     ...pendingCreatures.map(c => ({ ...c, deathType: 'creature' })),
@@ -362,30 +387,26 @@ async function reviveCreature(engine, pi, chosen) {
   const canPlaceOn = (hi) =>
     engine.isCreatureSummonable(chosen.name, pi, hi, { _bypassBeforeSummon: true });
 
+  // ★ W62a: mit Alice-Teilung gilt auch die Zone einer GLEICHNAMIGEN Creature als Landeplatz (W63a: der alte Platz, sonst geteilt vor frei) — `engine.zoneEintragen` legt dazu.
+  const { canShareInto } = require('./_alice-shared');
+  const teilbar = (hi, z) => z < 3 && canShareInto(engine, pi, hi, z, chosen.name);
   const origSlot = (ps.supportZones[chosen.heroIdx] || [])[chosen.zoneSlot] || [];
-  if (origSlot.length === 0 && ps.heroes[chosen.heroIdx]?.hp > 0 && canPlaceOn(chosen.heroIdx)) {
+  if ((origSlot.length === 0 || teilbar(chosen.heroIdx, chosen.zoneSlot)) && ps.heroes[chosen.heroIdx]?.hp > 0 && canPlaceOn(chosen.heroIdx)) {
     targetHi = chosen.heroIdx;
     targetSi = chosen.zoneSlot;
   }
 
+  // ★ W63a (Al, 22.10.2026: „erst die geteilte Zone, sofern Alices Effekt aktiv ist, DANN die erste leere"): faellt der alte Platz weg, waehlt das Elixir die
+  // Zone selbst — zuerst eine geteilte Zone (gleichnamige Creature, Alice), sonst die erste freie; zuerst am Helden des Gefallenen, dann an den anderen.
   if (targetHi < 0 && ps.heroes[chosen.heroIdx]?.hp > 0 && canPlaceOn(chosen.heroIdx)) {
-    const supZones = ps.supportZones[chosen.heroIdx] || [];
-    for (let z = 0; z < supZones.length; z++) {
-      if ((supZones[z] || []).length === 0) { targetHi = chosen.heroIdx; targetSi = z; break; }
-    }
+    const z0 = engine.beschwoerZonenFuer(pi, chosen.name, { heroIdx: chosen.heroIdx, livingHeroesOnly: true })[0];
+    if (z0) { targetHi = chosen.heroIdx; targetSi = z0.slotIdx; }
   }
 
   if (targetHi < 0) {
-    for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
-      if (hi === chosen.heroIdx) continue;
-      if (!ps.heroes[hi]?.name || ps.heroes[hi].hp <= 0) continue;
-      if (!canPlaceOn(hi)) continue;
-      const supZones = ps.supportZones[hi] || [];
-      for (let z = 0; z < supZones.length; z++) {
-        if ((supZones[z] || []).length === 0) { targetHi = hi; targetSi = z; break; }
-      }
-      if (targetHi >= 0) break;
-    }
+    const kand = engine.beschwoerZonenFuer(pi, chosen.name, { livingHeroesOnly: true })
+      .filter(z => z.heroIdx !== chosen.heroIdx && canPlaceOn(z.heroIdx));
+    if (kand.length) { targetHi = kand[0].heroIdx; targetSi = kand[0].slotIdx; }
   }
 
   if (targetHi < 0) {
@@ -407,8 +428,7 @@ async function reviveCreature(engine, pi, chosen) {
     return;
   }
 
-  if (!ps.supportZones[targetHi]) ps.supportZones[targetHi] = [[], [], []];
-  ps.supportZones[targetHi][targetSi] = [chosen.name];
+  engine.zoneEintragen(pi, targetHi, targetSi, chosen.name, pi);   // W62a: gleichnamige Kreatur (Alice) → dazustapeln statt ueberschreiben
 
   // v324: NICHT je Wiederbelebung die 0,83-MB-Kartendatei lesen und parsen,
   // nur um EINEN hp-Wert nachzuschlagen — dieselbe Klasse wie v323.

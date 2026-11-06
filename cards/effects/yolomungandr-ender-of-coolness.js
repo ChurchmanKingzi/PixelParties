@@ -146,7 +146,7 @@ async function fireGroupChoice(ctx, damage, postPromptReveal = false) {
   }
   if (ziele.length > 0) {
     await ctx.dealDamageToTargets(ziele, {
-      damage, damageType: 'creature', hitDelay: 0, surpriseCheck: false, postTargetCheck: false,
+      damage, damageType: 'creature', hitDelay: 0,   // Surprise- und Nach-Ziel-Fenster AN (AoE-Prinzip, Schritt „Reagieren"): die Gruppenwahl ist keine Zielwahl und oeffnet sie nicht selbst
     });
   }
 }

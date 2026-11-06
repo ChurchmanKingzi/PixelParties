@@ -40,10 +40,15 @@ const BASE_COST = 5;
  * destinations. Matches the engine-wide "Creatures are independent
  * of their Hero" rule.
  */
-function getFreeZones(gs, playerIdx) {
+function getFreeZones(gs, playerIdx, uebernahmeInst = null, engine = null) {
   const ps = gs.players[playerIdx];
   const zones = [];
+  const eng = engine || gs._engineRef;
   for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
+    // W16d (A07-31): „A Hero can only have 1 Gigantisaur" - Helden, die schon einen tragen, sind für einen Gigantisaurier kein Ziel.
+    if (uebernahmeInst && eng && eng.uebernahmeUnzulaessig(uebernahmeInst, playerIdx, playerIdx, hi) === 'gigantisaur_per_hero') continue;
+    // Mehrzonen-Kreatur (Land Sharks, Turtle): nur Helden mit genug freien Zonen für ALLE ihre Zonen.
+    if (uebernahmeInst && eng && eng.mehrzonenPlatzFehlt(uebernahmeInst, playerIdx, playerIdx, hi)) continue;
     const hero = ps.heroes[hi];
     const heroLabel = hero?.name
       ? (hero.hp <= 0 ? `${hero.name} (KO)` : hero.name)
@@ -54,6 +59,11 @@ function getFreeZones(gs, playerIdx) {
         zones.push({ heroIdx: hi, slotIdx: si, label: `${heroLabel} — Slot ${si + 1}` });
       }
     }
+  }
+  // ★ W63a (Al, 22.10.2026: Alices Effekt gilt fuer ALLE Platzierungs-Effekte; „erst die geteilte Zone, DANN die erste leere"): mit Alice-Teilung des Spielers
+  // zaehlt auch die Zone einer GLEICHNAMIGEN Creature als „free" fuer die uebernommene Kreatur — geteilte zuerst.
+  if (uebernahmeInst && eng) {
+    return require('./_alice-shared').mitGeteilten(eng, playerIdx, uebernahmeInst.name, zones, { nachKontrolle: false, livingHeroesOnly: false, nurBasis: true });
   }
   return zones;
 }
@@ -92,12 +102,16 @@ function getStealableCreatures(engine, playerIdx) {
   // `getUnactivatableArtifacts` instead of opening an empty picker.
   if (engine._isSideNondamageShielded(oppIdx)) return [];
   const ps = engine.gs.players[playerIdx];
-  const gold = ps.gold || 0;
+  const gold = engine.goldSpendBlocked(playerIdx) ? 0 : (ps.gold || 0);   // G1 (A09-11): Goldsperre - nur Kosten 0 (Level 0) zahlbar
   const cardDB = engine._getCardDB();
   return engine.getCreatureTargets(oppIdx).filter(t => {
     const inst = t.cardInstance;
     if (inst && engine.isCreatureImmune(inst, 'targeting_immune')) return false;
     if (inst && engine.isCreatureImmune(inst, 'control_immune')) return false;
+    // Als Ruling (Al 26.10., Dark Gear × Creepy Villager): „Control of this Creature cannot change" — ein Ziel, dessen Kontrolle feststeht, ist nicht waehlbar (statt Karte zu verbrauchen, ohne etwas zu uebernehmen).
+    if (inst && engine.controlIsLocked(inst)) return false;
+    if (inst && engine.uebernahmeUnzulaessig(inst, playerIdx) === 'only_control_1') return false;   // W16d (A07-31): „You can only control 1" (Brachion)
+    if (inst && engine.mehrzonenPlatzFehlt(inst, playerIdx)) return false;   // Mehrzonen-Kreatur (Land Sharks, Turtle): ohne Held mit genug freien Zonen nicht uebernehmbar — nicht waehlbar, kein Verbrauch
     // Read the EFFECTIVE card data — instances may carry a per-instance
     // override (Biomancy Token: a Potion repurposed as a Creature/Token
     // with `_cardDataOverride.level = 0/1/2` based on its Biomancy
@@ -154,7 +168,10 @@ module.exports = {
     if (hasOpponentCreatures(eng, pi)) return false;
     const targets = getStealableCreatures(eng, pi);
     if (targets.length === 0) return false;
-    if (getFreeZones(gs, pi).length === 0) return false;
+    if (getFreeZones(gs, pi).length === 0) {
+      // W63a: keine freie Zone — mit Alice-Teilung reicht die Zone einer GLEICHNAMIGEN Creature fuer ein Ziel
+      if (!targets.some(t => getFreeZones(gs, pi, t.cardInstance, eng).length > 0)) return false;
+    }
     return true;
   },
 
@@ -172,6 +189,9 @@ module.exports = {
     cancellable: true,
     exclusiveTypes: true,
     maxPerType: { equip: 1 },
+    // Genau EIN Ziel. Ohne eigenes `maxTotal` deckelt der Server X-Kosten-Karten auf floor(Gold / Grundpreis) - bei weniger als 5 Gold waere
+    // das 0, und die (kostenlose) Stufe-0-Kreatur liesse sich nicht mehr anklicken. Die Kosten (Stufe x 5) prueft `getStealableCreatures`.
+    maxTotal: 1,
   },
 
   validateSelection: (selectedIds) => selectedIds && selectedIds.length === 1,
@@ -221,7 +241,7 @@ module.exports = {
     }
 
     // Prompt for a free support zone on the player's side
-    const freeZones = getFreeZones(gs, pi);
+    const freeZones = getFreeZones(gs, pi, target.cardInstance, engine);
     if (freeZones.length === 0) {
       engine.log('dark_gear_fizzle', { player: ps.username, reason: 'no_free_zones' });
       return { aborted: true };

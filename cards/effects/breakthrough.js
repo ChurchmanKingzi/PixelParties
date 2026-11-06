@@ -73,6 +73,9 @@ function surpriseZiele(engine, pi) {
 }
 
 module.exports = {
+  // Als Ruling (Al 28.10.): diese Attack richtet nie Schaden an — Schadens-Pfeile und Magic Topaz sind an ihr nicht ankettbar (`_arrows-shared`: `arrowTriggerCondition`).
+  dealsNoAttackDamage: true,
+
   requiresTarget: true,
   // ^ Tagged for Blinded gating — see cards/effects/_hooks.js (blinded status).
 
@@ -130,7 +133,7 @@ module.exports = {
       if (vorher === 'surprise') {
         await engine.actionDestroyCard(quelle, inst, { sourceName: CARD_NAME });
       } else {
-        await engine.sendBoardCardToDiscard(inst, { source: quelle, sourceName: CARD_NAME, sourceOwner: pi });
+        await engine.sendBoardCardToDiscard(inst, { source: quelle, sourceName: CARD_NAME, sourceOwner: pi, fenster: true });   // W71b: eine offene Surprise-Kreatur ist eine Kreatur — Schutzfenster
       }
       engine.log('breakthrough', {
         player: ps.username, card: name, hero: hero.name, discarded: inst.zone !== vorher,

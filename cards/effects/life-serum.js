@@ -106,6 +106,18 @@ module.exports = {
     });
     await engine._delay(180);
 
+    // W13 (Q144, Al: Resistance blockt JEDEN Nicht-Schaden-Effekt): der Max-HP-Gewinn auf einen
+    // Helden fragt den zentralen Pruefer (Animation lief schon).
+    if (target.type === 'hero'
+        && await engine.heroNonDamageEffectBlocked(target.owner, target.heroIdx, 'max_hp', { sourceOwner: pi, source: CARD_NAME, amount: HP_GAIN })) {
+      engine.sync();
+      return;
+    }
+    // W71b (Al, 25.10.2026): der HP-Gewinn auf einer Kreatur ist ein Effekt auf sie — Schutzfenster (Cool Rescuer Monia & Co.) VOR dem Schreiben (wie Resistance beim Helden: Animation lief schon).
+    if (target.type !== 'hero' && !(await engine.kreaturBetroffen(ziel, 'stats', { name: CARD_NAME, owner: pi }, { sourceOwner: pi, detail: 'max_hp' }))) {
+      engine.sync();
+      return;
+    }
     const gestiegen = engine.increaseMaxHp(ziel, HP_GAIN);
     engine.log('life_serum', {
       player: gs.players[pi]?.username,

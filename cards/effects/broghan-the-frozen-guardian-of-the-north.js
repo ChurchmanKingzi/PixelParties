@@ -21,14 +21,39 @@ function applyFreezeImmunity(hero) {
   hero.statuses.freeze_immune = { source: CARD_NAME, innate: true };
 }
 
+/**
+ * W8 (Al, 14.10.2026: "Broghan ja"): "This Hero cannot be Frozen" ist ein laufender Passiv - solange Broghans Heldeneffekt ruht
+ * (Frost/Betäubung/Negation, `_isHeroEffectSilenced`), entfällt die Immunität; nach dem Ende ist sie wieder da. Bereits
+ * angewandter Frost bleibt. Der Stempel `freeze_immune` wird von mehreren Karten direkt gelesen, darum Stempel-Abgleich statt
+ * Leser-Abfrage (W7a-Muster): `bypassStatusFilter` hält die Abgleich-Hooks am Laufen, der Zustand wird direkt gefragt. Nur der
+ * eigene Stempel (source === Broghan) ruht; fremde Quellen (Heart of Ice, The Sun Sword …) bleiben unberührt.
+ */
+function abgleichen(ctx) {
+  const engine = ctx._engine;
+  const pi = ctx.cardOriginalOwner, hi = ctx.cardHeroIdx;
+  const hero = engine?.gs?.players?.[pi]?.heroes?.[hi];
+  if (!hero?.name || hero.hp <= 0) return;
+  if (engine._isHeroEffectSilenced(pi, hi)) {
+    if (hero.statuses?.freeze_immune?.source === CARD_NAME) { delete hero.statuses.freeze_immune; engine.sync?.(); }
+  } else if (!hero.statuses?.freeze_immune) {
+    applyFreezeImmunity(hero);
+  }
+}
+
 function computeDamage(deckSize) {
   return Math.max(10, 500 - 10 * deckSize);
 }
 
 module.exports = {
+  // W26a (Al, Welle 26): als Attack geltender Heldeneffekt ohne Karte — Stufen-Bedingungen ("level X or lower": Glass Wall, Test Flight, Future Tech Escape Device …) lesen die Quellstufe.
+  // W32a (Al, 22.10.2026): „Zählt als Attack/Spell eines Helden = Ability-Level dieses Helden": die Quellstufe ist das FIGHTING-LEVEL Broghans (nicht mehr fix 0) — Engine: `_heldenEffektStufe`.
+  treatedAsAttack: { ability: 'Fighting' },
   requiresTarget: true,
   // ^ Tagged for Blinded gating — see cards/effects/_hooks.js (blinded status).
   activeIn: ['hero'],
+  // W8: nur für den Stempel-Abgleich (alle Hooks dieser Karte betreffen ausschließlich `freeze_immune`; die Aktivierung des
+  // Heldeneffekts läuft nicht über den Verteiler). Die Immunität ruht trotzdem - `abgleichen` fragt den Zustand selbst.
+  bypassStatusFilter: true,
   heroEffect: true,
   // Rein schaedlich: 500 Schaden (deckabhaengig reduziert) auf ein Ziel.
   // Unter dem Spielstart-Schutz nicht nutzbar (Als Ruling 8.8.).
@@ -43,11 +68,14 @@ module.exports = {
 
   // Always activatable — there's always a target on the board (if not, the
   // engine will fizzle the prompt).
-  canActivateHeroEffect(_ctx) {
+  canActivateHeroEffect(ctx) {
+    // ★ W34a (Al, 22.10.2026): ein Effekt, der als Attack zählt, unterliegt den Attack-Zählern und -Sperren (Berserk-Limit, Knife Throw, Rioting Village, Mirjam, Muras …) — `heroKannAngreifen`.
+    if (!ctx._engine.heroKannAngreifen(ctx.cardHeroOwner ?? ctx.cardOwner, ctx.cardHeroIdx, ctx.cardOwner, { name: 'Broghan, the Frozen Guardian of the North' })) return false;
     return true;
   },
 
-  async onHeroEffect(ctx) {
+  // W40a (Al, 22.10.2026): `wdh` = Wiederholung durch Idej Sword - Kunagi ("perform that Attack again"): derselbe Schlag, neues Ziel; Einmal-Stempel und Aktion gehören dem Engine-Weg und bleiben unberührt.
+  async onHeroEffect(ctx, wdh) {
     const engine = ctx._engine;
     const pi = ctx.cardOwner;
     const heroIdx = ctx.cardHeroIdx;
@@ -55,7 +83,8 @@ module.exports = {
     const deckSize = ps?.mainDeck?.length || 0;
     const damage = computeDamage(deckSize);
 
-    const target = await ctx.promptDamageTarget({
+    // ★ W36a (Al, 22.10.2026): „Negierter Treffer: ja, definitiv" — wird der Treffer im Zielfenster NEGIERT (Invisibility Cloak, Schutzkarten …), ist der Effekt für die Runde verbraucht (Einmal-Stempel bleibt, Rückgabe `true`) und zählt als gespielte Attack (Muster Alice); ein Abbruch des Spielers bleibt ein Abbruch.
+    const { target, negiert } = await engine.heldenEffektZielwahl(ctx, {
       side: 'any',
       types: ['hero', 'creature'],
       damageType: 'attack',
@@ -67,6 +96,11 @@ module.exports = {
       cancellable: true,
     });
 
+    if (negiert) {
+      await engine.zaehleAlsArt('attack', { pi, heroIdx, heroOwner: ctx.cardHeroOwner ?? pi, name: CARD_NAME });
+      engine.sync();
+      return true;
+    }
     if (!target) return false; // Cancelled
 
     // Red laser beam — same animation Alice uses.
@@ -89,6 +123,8 @@ module.exports = {
     const attackSource = { name: CARD_NAME, owner: pi, heroIdx, controller: pi,
       ...(ctx.cardHeroOwner != null && ctx.cardHeroOwner !== pi ? { heroOwner: ctx.cardHeroOwner } : {}) };   // Styx 28.9.: Brettseite des Angreifers
 
+    // W32a (Al, 22.10.2026): der Treffer zählt als Attack — Reaktionen auf Attacks (Magic Topaz, Arrows …) greifen über die virtuelle Attack-Kette (Muster Arthor).
+    await engine.alsAttackKette({ name: CARD_NAME, pi, heroIdx, heroOwner: ctx.cardHeroOwner ?? pi, ziele: [target], wiederhole: () => module.exports.onHeroEffect(ctx, true), resolve: async () => {
     if (target.type === 'hero') {
       const targetHero = engine.gs.players[target.owner]?.heroes?.[target.heroIdx];
       if (targetHero && targetHero.hp > 0) {
@@ -106,6 +142,8 @@ module.exports = {
         );
       }
     }
+    return true;
+    } });
 
     engine.sync();
     await engine._delay(800);
@@ -116,18 +154,23 @@ module.exports = {
     // Innate freeze immunity. `hero.statuses` gets wiped by revive
     // (engine.actionReviveHero) and death cleanup, so re-apply on
     // game start, on revive, and as a turn-start safety net.
-    onGameStart: (ctx) => {
-      applyFreezeImmunity(ctx.gameState.players[ctx.cardOriginalOwner]?.heroes?.[ctx.cardHeroIdx]);
-    },
+    onGameStart: (ctx) => { abgleichen(ctx); },
     onHeroRevive: (ctx) => {
       if (ctx.playerIdx !== ctx.cardOriginalOwner) return;
       if (ctx.heroIdx !== ctx.cardHeroIdx) return;
       applyFreezeImmunity(ctx.hero);
+      abgleichen(ctx);   // W8: wiederbelebt, aber negiert -> Immunität ruht
     },
-    onTurnStart: (ctx) => {
+    onTurnStart: (ctx) => { abgleichen(ctx); },
+    // W8: Selbstabgleich bei Statuswechseln und je Phasenbeginn (leises Abklingen der Negation)
+    onStatusApplied: (ctx) => { abgleichen(ctx); },
+    onStatusRemoved: (ctx) => { abgleichen(ctx); },
+    onPhaseStart: (ctx) => { abgleichen(ctx); },
+    // Geliehen (??? the Shapeshifter): mit der Gestalt faellt auch die
+    // Unfreezable-Marke ab (H01-heroes-02).
+    onIdentityLost: (ctx) => {
       const hero = ctx.gameState.players[ctx.cardOriginalOwner]?.heroes?.[ctx.cardHeroIdx];
-      if (!hero || hero.hp <= 0) return;
-      if (!hero.statuses?.freeze_immune) applyFreezeImmunity(hero);
+      if (hero?.statuses?.freeze_immune?.source === CARD_NAME) delete hero.statuses.freeze_immune;
     },
   },
 };

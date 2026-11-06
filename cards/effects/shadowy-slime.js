@@ -10,6 +10,8 @@
 
 const { isSummonablePileCreature, hasCardType } = require('./_hooks');
 
+const { slimeLevelUpHook } = require('./_slime-shared');
+
 module.exports = {
   // ★★ v1182 — ENTKOPPELTE BILDER (CARD_API): wird die Karte NEGIERT,
   // laeuft ihr Effekt-Rumpf nie — die Engine spielt dann diese Bilder.
@@ -36,10 +38,11 @@ module.exports = {
       // Check HOPT manually — only mark used AFTER successful summon
       if (!engine.gs.hoptUsed) engine.gs.hoptUsed = {};
       const hoptKey = `shadowy-slime-summon:${pi}`;
-      if (engine.gs.hoptUsed[hoptKey] === engine.gs.turn) return;
+      // Welle 10 (Al, Q30): ohne Kandidat/Platz FIZZELT der Effekt (Sandy Blob feuert dann nicht); Einmal-pro-Zug verbraucht / Sperre = gar nicht verfügbar.
+      if (engine.gs.hoptUsed[hoptKey] === engine.gs.turn) { await engine.summonEffektFizzelt(ctx.card, 'Shadowy Slime', { stumm: true }); return; }
 
       // Check summon lock
-      if (ctx.isSummonLocked()) return;
+      if (ctx.isSummonLocked()) { await engine.summonEffektFizzelt(ctx.card, 'Shadowy Slime', { stumm: true }); return; }
 
       // Load card database
       // v323: NICHT je Auslösung von der Platte lesen — 0,83 MB Datei,
@@ -58,17 +61,17 @@ module.exports = {
       for (const name of (ps.discardPile || [])) {
         if (seen.has(name)) continue;
         const c = cardDB[name];
-        if (c && isSummonablePileCreature(c) && (c.level || 0) === 0 && canPlaceOnHere(name)) {
+        if (c && isSummonablePileCreature(c) && engine.effectiveCardLevel(c, pi, { pileSide: 'discard' }) === 0 && canPlaceOnHere(name)) {   // W26a (Al, Welle 26): wirksame Stufe in der Ablage (Lethe-Stempel), nicht die gedruckte
           seen.add(name);
           eligibleCards.push({ name, source: 'discard' });
         }
       }
 
       // Fizzle if no eligible creatures in discard
-      if (eligibleCards.length === 0) return;
+      if (eligibleCards.length === 0) { await engine.summonEffektFizzelt(ctx.card, 'Shadowy Slime', { playerIdx: pi, grund: 'no_target' }); return; }
 
       // Find free support zones on the SAME hero only
-      const getFreeZones = () => {
+      const getFreeZones = (forCardName = null) => {
         const zones = [];
         const hero = hps.heroes[heroIdx];
         // ── ALS RULING (31.7.) ──────────────────────────────────────
@@ -83,18 +86,25 @@ module.exports = {
             zones.push({ heroIdx, slotIdx: s, label: `${hero.name} — Support ${s + 1}`, ...(feld !== pi ? { owner: feld } : {}) });
           }
         }
-        return zones;
+        // ★ W62a: mit Alice-Teilung ist auch die Zone einer GLEICHNAMIGEN Creature ein Ziel; `beschwoerZonenFuer` kennt die Kontrolle.
+        // ★ W63a (Al, 22.10.2026): erst die geteilte Zone, DANN die erste leere.
+        if (forCardName) {
+          for (const z of engine.beschwoerZonenFuer(pi, forCardName, { seite: feld, heroIdx, namedHeroesOnly: true })) {
+            if (z.shared) zones.push({ heroIdx, slotIdx: z.slotIdx, label: z.label, shared: true, ...(feld !== pi ? { owner: feld } : {}) });
+          }
+        }
+        return require('./_alice-shared').geteiltZuerst(zones);
       };
 
-      // Fizzle if no free zones on this hero
-      if (getFreeZones().length === 0) return;
+      // Fizzle if no free zones on this hero (W62a: oder eine geteilte Zone fuer eine der Karten)
+      if (getFreeZones().length === 0 && !eligibleCards.some(c => getFreeZones(c.name).length > 0)) { await engine.summonEffektFizzelt(ctx.card, 'Shadowy Slime', { playerIdx: pi, grund: 'zone_taken' }); return; }
 
       // Step 1: Confirm
       const confirmed = await ctx.promptConfirmEffect({
         title: 'Shadowy Slime',
         message: 'Summon a Lv 0 Creature from your discard pile? (You won\'t be able to summon any more Creatures this turn!)',
       });
-      if (!confirmed) return;
+      if (!confirmed) { await engine.summonEffektFizzelt(ctx.card, 'Shadowy Slime', { stumm: true }); return; }   // W24d (N4-14, W11/R4): abgelehntes „you may" = kein feuernder Effekt
 
       // Step 2 + 3: Pick creature → pick zone (with back navigation)
       while (true) {
@@ -104,23 +114,23 @@ module.exports = {
         for (const name of (ps.discardPile || [])) {
           if (currentSeen.has(name)) continue;
           const c = cardDB[name];
-          if (c && isSummonablePileCreature(c) && (c.level || 0) === 0 && canPlaceOnHere(name)) {
+          if (c && isSummonablePileCreature(c) && engine.effectiveCardLevel(c, pi, { pileSide: 'discard' }) === 0 && canPlaceOnHere(name)) {   // W26a (Al, Welle 26): wirksame Stufe in der Ablage (Lethe-Stempel), nicht die gedruckte
             currentSeen.add(name);
             currentEligible.push({ name, source: 'discard' });
           }
         }
-        if (currentEligible.length === 0) return;
+        if (currentEligible.length === 0) { await engine.summonEffektFizzelt(ctx.card, 'Shadowy Slime', { stumm: true }); return; }   // W24d (N4-14)
 
         const selected = await ctx.promptCardGallery(currentEligible, {
           title: 'Shadowy Slime',
           description: 'Select a Lv 0 Creature from your discard pile.',
           cancellable: true,
         });
-        if (!selected) return; // Escape = abort
+        if (!selected) { await engine.summonEffektFizzelt(ctx.card, 'Shadowy Slime', { stumm: true }); return; } // Escape = abort   // W24d (N4-14)
 
         // Step 3: Pick a zone (same hero only)
-        const freeZones = getFreeZones();
-        if (freeZones.length === 0) return;
+        const freeZones = getFreeZones(selected.cardName);
+        if (freeZones.length === 0) { await engine.summonEffektFizzelt(ctx.card, 'Shadowy Slime', { stumm: true }); return; }   // W24d (N4-14)
 
         const zone = await ctx.promptZonePick(freeZones, {
           title: 'Shadowy Slime',
@@ -133,17 +143,17 @@ module.exports = {
         const cardName = selected.cardName;
         // v1389: Entnahme über die EINE Ablage-Stelle (Sperre, Lethe).
         const ab = await engine.ablageEntnahme(pi, pi, cardName, { source: 'shadowy-slime' });
-        if (!ab) return;
+        if (!ab) { await engine.summonEffektFizzelt(ctx.card, 'Shadowy Slime', { stumm: true }); return; }   // W24d (N4-14): Ablage-Entnahme verweigert (Sperre)
 
         // Place into support zone
         const si = zone.slotIdx;
-        if (!hps.supportZones[heroIdx]) hps.supportZones[heroIdx] = [[], [], []];
-        hps.supportZones[heroIdx][si] = [cardName];
+        engine.zoneEintragen(feld, heroIdx, si, cardName, pi);   // W62a: gleichnamige Kreatur (Alice) → dazustapeln statt ueberschreiben
 
         // Track card instance with placement flag
         const inst = engine._trackCard(cardName, feld, 'support', heroIdx, si);
         if (feld !== pi) engine.markiereSeitenfremd(inst, pi);
         inst.counters.isPlacement = 1;
+        engine.zaehleBeschwoerung(pi);   // Welle 10 (Q47): Platzierung zaehlt als Beschwoerung
         const ablageExtras = engine.ablageLandung(inst, ab, 'place');   // Lethe, SC, Signal
 
         engine.log('placement', { card: cardName, by: 'Shadowy Slime', from: 'discard', heroIdx, zoneSlot: si });
@@ -168,9 +178,7 @@ module.exports = {
       }
     },
 
-    onTurnStart: async (ctx) => {
-      if (!ctx.isMyTurn) return;
-      await ctx.changeLevel(1);
-    },
+    // Als Ruling (Al 26.10.): „you may increase this Creature's level by 1" = Ja/Nein-Frage (Nein/Abbruch: Stufe bleibt) — `_slime-shared`.
+    onTurnStart: slimeLevelUpHook('Shadowy Slime'),
   },
 };

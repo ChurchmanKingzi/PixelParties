@@ -2,12 +2,13 @@
 //  Shared helpers for the "Steam Dwarfs" archetype.
 //
 //  Five of the six members share the SAME passive
-//  trigger: "Once per turn, when you discard 1+
-//  cards, this Creature's current & max HP are
-//  increased by 50." — the so-called "steam engine".
+//  trigger: "Whenever you discard 1 or more cards,
+//  this Creature's current and max HP are increased
+//  by 10 times the number of cards discarded." —
+//  the so-called "steam engine".
 //
 //  This file exposes:
-//    - STEAM_ENGINE_GAIN : the +HP constant
+//    - STEAM_ENGINE_GAIN_PER_CARD : the +HP per discarded card
 //    - attachSteamEngine(mod) : mixin that merges the
 //        onDiscard hook into a card script
 //    - decreaseCreatureMaxHp(engine, inst, amount) :
@@ -20,24 +21,9 @@
 //  never registered as a card.
 // ═══════════════════════════════════════════
 
-const STEAM_ENGINE_GAIN = 50;
+const STEAM_ENGINE_GAIN_PER_CARD = 10;
 const ARCHETYPE = 'Steam Dwarfs';
 
-/**
- * Fire the shared "+50 current & max HP on discard" passive for the
- * creature whose onDiscard hook is executing.
- *
- * Fires only when:
- *   - the discard belongs to this creature's controller, AND
- *   - the creature is alive in a support zone, AND
- *   - the creature is not negated, AND
- *   - the creature hasn't already triggered this turn (HOPT per instance).
- *
- * The "1 or more" batch semantics are preserved by the HOPT guard:
- * if five cards are discarded by a single effect the hook fires five
- * times, but only the first pass mutates HP. Subsequent passes see
- * the turn-stamp and exit.
- */
 /**
  * Zaehlwerk fuer die Diagnose (12.8., Als Auftrag nach dem
  * 582-Sekunden-Rollout). Bewusst am ENGINE-Objekt und nicht ueber
@@ -59,37 +45,35 @@ function steamMax(engine, feld, wert) {
   } catch { /* Diagnose darf nie stoeren */ }
 }
 
+/**
+ * Fire the shared "+10 current & max HP per discarded card" passive for the
+ * creature whose onDiscard hook is executing.
+ *
+ * Fires only when:
+ *   - the discard belongs to this creature's controller, AND
+ *   - the creature is alive in a support zone, AND
+ *   - the creature is not negated.
+ *
+ * There is no once-per-turn limit. The engine runs `onDiscard` once per
+ * discarded card (batched discards included), so granting
+ * STEAM_ENGINE_GAIN_PER_CARD per call adds up to exactly
+ * "10 times the number of cards discarded".
+ */
 async function fireSteamEngine(ctx) {
   const engine = ctx._engine;
   const gs = engine.gs;
   const inst = ctx.card;
 
-  // Jeder Aufruf wird gezaehlt — auch die, die gleich wieder aussteigen.
-  // Erst der Vergleich „aufgerufen" gegen „gefeuert" zeigt, ob die Kette
-  // lang ist oder ob nur oft vergeblich gefragt wird.
   steamZaehl(engine, 'aufgerufen');
 
   if (!inst || inst.zone !== 'support') { steamZaehl(engine, 'raus_zone'); return; }
   if (ctx.playerIdx !== ctx.cardOwner) { steamZaehl(engine, 'raus_fremd'); return; }        // only my discards
-  // Als Ruling (Kreaturen-Audit): kein Hero-Bezug im Steam-Engine-Text
-  // → nur der Zustand der Kreatur selbst gated (kanonisch via
-  // isCardEffectActive statt des alten attachedHero-Gates; deckt jetzt
-  // auch frozen/stunned/faceDown der Kreatur).
   if (!engine.isCardEffectActive(inst)) { steamZaehl(engine, 'raus_inaktiv'); return; }
 
-  // Hard once-per-turn per creature instance
-  if (!inst.counters) inst.counters = {};
-  const turn = gs.turn || 0;
-  if (inst.counters._steamEngineTurn === turn) { steamZaehl(engine, 'raus_hopt'); return; }
-  inst.counters._steamEngineTurn = turn;
   steamZaehl(engine, 'gefeuert');
-
-  // Apply the engine — engine.increaseMaxHp handles the creature path
-  // (bumps both counters.maxHp and counters.currentHp by the amount).
-  engine.increaseMaxHp(inst, STEAM_ENGINE_GAIN);
+  engine.increaseMaxHp(inst, STEAM_ENGINE_GAIN_PER_CARD);
   steamMax(engine, 'maxHp_hoechster', inst.counters?.maxHp || 0);
 
-  // Steam puff animation on the creature's zone
   engine._broadcastEvent('play_zone_animation', {
     type: 'steam_puff',
     owner: inst.owner,
@@ -97,17 +81,22 @@ async function fireSteamEngine(ctx) {
     zoneSlot: inst.zoneSlot,
   });
 
+  // Gruene "+10" ueber der Kreatur (Client: `play_steam_hp`).
+  engine._broadcastEvent('play_steam_hp', {
+    owner: inst.owner,
+    heroIdx: inst.heroIdx,
+    zoneSlot: inst.zoneSlot,
+    amount: STEAM_ENGINE_GAIN_PER_CARD,
+  });
+
   engine.log('steam_engine_fired', {
     card: inst.name,
     player: gs.players[inst.owner]?.username,
-    gain: STEAM_ENGINE_GAIN,
+    gain: STEAM_ENGINE_GAIN_PER_CARD,
     newMax: inst.counters.maxHp,
   });
 
   engine.sync();
-  // Diese 150 ms liegen INNERHALB eines Hooks und fallen je Steam Dwarf
-  // auf dem Brett einmal an. Mitgezaehlt, damit im Bericht steht, wie
-  // viel Wartezeit die Abwurfketten allein hier erzeugen.
   steamZaehl(engine, 'delay_ms', 150);
   await engine._delay(150);
 }
@@ -126,6 +115,8 @@ function attachSteamEngine(mod) {
   // Force the shared-engine cards to have activeIn 'support' so the
   // hook doesn't fire while the creature is in hand/discard/etc.
   if (!mod.activeIn) mod.activeIn = ['support'];
+  // Mehrfach-Abwurf: nach JEDER abgeworfenen Karte sofort +10, nicht gebuendelt am Ende (Engine: `_abwurfHookVormerken`).
+  mod.discardSofort = true;
   const existing = mod.hooks.onDiscard;
   mod.hooks.onDiscard = async (ctx) => {
     if (existing) {
@@ -211,7 +202,7 @@ function isSteamDwarf(cardName, engine) {
 module.exports = {
   steamZaehl,
   steamMax,
-  STEAM_ENGINE_GAIN,
+  STEAM_ENGINE_GAIN_PER_CARD,
   ARCHETYPE,
   attachSteamEngine,
   fireSteamEngine,

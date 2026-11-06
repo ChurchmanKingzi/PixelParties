@@ -17,7 +17,7 @@
 // ═══════════════════════════════════════════
 
 const {
-  tokenStatsForLevel, freeSupportSlots, placeBiomancyToken,
+  tokenStatsForLevel, tokenZonePossible, placeBiomancyToken,
 } = require('./_biomancy-shared');
 
 module.exports = {
@@ -51,6 +51,11 @@ module.exports = {
       const gs = engine.gs;
       const pi = ctx.cardOwner;
 
+      // Die Potion hat sich selbst aufs Brett gelegt (Boulder in a Bottle) — dessen eigenes
+      // `afterPotionUsed` setzt `placed` erst NACH uns; die Marke sagt es schon vorher.
+      if (ctx.potionName === 'Boulder in a Bottle' && gs._boulderSelbstPlatziert != null
+          && engine.cardInstances.some(c => c.id === gs._boulderSelbstPlatziert && c.zone === 'support')) return;
+
       // Only trigger for the potion owner's Biomancy
       if (ctx.potionOwner !== pi) return;
 
@@ -66,16 +71,16 @@ module.exports = {
         if (!hero?.name || hero.hp <= 0) continue;
         if (hero.statuses?.frozen || hero.statuses?.stunned || hero.statuses?.negated) continue;
 
-        // Must have a free support zone
-        if (freeSupportSlots(engine, feld, hi).length === 0) continue;
+        // Must have a free support zone — W64a (Al, 23.10.2026): bei aktiver Alice-Teilung zaehlt auch die Zone eines Biomancy Tokens GLEICHEN Namens
+        if (!tokenZonePossible(engine, pi, feld, hi, ctx.potionName)) continue;
 
         // Soft HOPT: check if this hero's Biomancy was already used this turn
         const hoptKey = `biomancy:${feld}:${hi}`;
         if (gs.hoptUsed?.[hoptKey] === gs.turn) continue;
 
         // Determine Biomancy level on this hero
-        const abZones = gs.players[feld]?.abilityZones?.[hi] || [];
-        const level = engine.countAbilitiesForSchool('Biomancy', abZones);
+        // 24.10.: echte Ability Zonen UND Support-Stapel (Xal).
+        const level = engine.countAbilitiesForSchool('Biomancy', engine.abilityStapelListe(feld, hi).map(e => e.namen));
         if (level <= 0) continue;
 
         eligible.push({ heroIdx: hi, level, hero, feld });

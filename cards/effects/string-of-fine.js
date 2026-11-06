@@ -89,6 +89,7 @@ module.exports = {
         await ctx.addBuff(h, target.owner, target.heroIdx, 'damage_immune', {
           expiresAtTurn: expiryTurn,
           expiresForPlayer: pi,
+          fristBeginn: true,   // W68a: „until the beginning of your next turn"
         });
       }
     } else if (target.cardInstance) {
@@ -96,6 +97,7 @@ module.exports = {
       await ctx.addCreatureBuff(target.cardInstance, 'damage_immune', {
         expiresAtTurn: expiryTurn,
         expiresForPlayer: pi,
+        fristBeginn: true,
       });
     }
 

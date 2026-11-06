@@ -17,6 +17,8 @@
 //    das generische „dies ist ein zweiter Guss": verhindert Rekursion
 //    und Kettenlauscher). Anders als Bartas KEINE Zielausschlussliste —
 //    Saya darf dasselbe Ziel erneut waehlen.
+//  · W5b-B13 (Al, Welle 5): der Zweitguss ist ein VOLLSTÄNDIGES erneutes Wirken – Einmal-Klauseln
+//    („1 pro Zug / pro Spiel", `oncePerGame`-Stempel, `spellPlayCondition`) gelten auch dafür.
 //  · Kosten: keine — die Karte ist bereits gespielt; kein Gold, keine
 //    Aktion, keine zweite Karte aus der Hand.
 // ═══════════════════════════════════════════
@@ -60,6 +62,15 @@ module.exports = {
       // genereller Aktionsblock.
       if (ps.supportSpellLocked || engine.areActionsBlocked(pi)) return;
 
+      // W5b-B13 (Al, Welle 5): der Zweitguss ist ein vollständiges erneutes Wirken der Karte – „You can only play 1 … per
+      // turn / per game"-Klauseln und Einmal-pro-Spiel-Stempel gelten also auch dafür (überholt Ruling v1277 für Saya).
+      // Nach dem Erstguss gestempelt/gesperrt => kein Zweitguss (und kein Angebot).
+      // Der Einmal-pro-Spiel-Stempel setzt `doPlaySpell` erst NACH `afterSpellResolved`; der (aufgelöste, nicht ganz negierte)
+      // Erstguss verbraucht die Grenze aber sicher – für Zauber mit `oncePerGame` ist der Zweitguss daher nie erlaubt.
+      if (spellScript.oncePerGame || spellScript.oncePerGameKey) return;
+      try { if (typeof spellScript.spellPlayCondition === 'function' && !spellScript.spellPlayCondition(gs, pi, engine)) return; }
+      catch (err) { console.error('[Saya] spellPlayCondition', ctx.spellName, err.message); }
+
       const confirmed = await ctx.promptConfirmEffect({
         title: CARD_NAME,
         message: `Cast ${ctx.spellName} a second time?`,
@@ -70,6 +81,7 @@ module.exports = {
       engine.log('saya_second_cast', { player: ps.username, hero: hero.name, spell: ctx.spellName });
       await engine.announceHookActivation(CARD_NAME, pi);
       gs._spellDamageLog = [];
+      require('./_monia-shared').neuerGuss(gs);   // W83a (Al 28.10.): der Zweitguss ist für Cool Rescuer Monia ein EIGENER Effekt (eigenes Angebot, 2 Karten)
       gs._bartasSecondCast = true;
       const tempInst = engine._trackCard(ctx.spellName, pi, 'hand', heroIdx, -1);
       if (feld !== pi) tempInst.heroOwner = feld;   // Styx 28.9.: wie der Server bei Uebernahme

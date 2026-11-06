@@ -45,7 +45,7 @@
 //  Zug.
 // ═══════════════════════════════════════════
 
-const { heldenSperreFrei, heldenSperreSetzen } = require('./_hero-hopt-shared');   // v1275: Heldensperre pro Spieler (Ruling 22.9.)
+const { heldenSperreFrei, heldenSperreSetzen, heldenSperreFreigeben } = require('./_hero-hopt-shared');   // v1275: Heldensperre pro Spieler (Ruling 22.9.)
 const { hasCardType } = require('./_hooks');
 const { loadCardEffect } = require('./_loader');
 
@@ -87,12 +87,14 @@ function eligibleHandIndices(engine, pi, heroIdx, feld = pi) {
         const script = loadCardEffect(name);
         ok = true;
         if (script?.isReaction || script?.isSurprise || script?.neverPlayable) ok = false;
+        if (ok && engine.areaKarteGesperrt(cd, pi, { kapazitaet: true })) ok = false;   // Als Ruling (Al 27.10.): Reality Crack („cannot play another Area") / Shipwrecked — eine Area ist als Zusatzaktion nicht waehlbar; Als Fix (Al 27.10.): auch ohne Platz in der Area Zone (Limit 1, Spatial Crevice 3 VERSCHIEDENE) bzw. als Dublette nicht
         if (ok && !engine.heroMeetsLevelReq(feld, heroIdx, cd, feld !== pi ? { levelSourcePi: pi } : {})) ok = false;
         if (ok) {
           const wisdomCost = engine.getWisdomDiscardCost(feld, heroIdx, cd);
           if (wisdomCost > 0 && wisdomPool < wisdomCost) ok = false;
         }
         if (ok && heroScript?.canPlayCard
+            && !engine.isHeroPassiveDormant(feld, heroIdx)   // W8: Heldenbeschränkung ruht bei Frost/Betäubung/Negation
             && !heroScript.canPlayCard(gs, feld, heroIdx, cd, engine)) ok = false;
         if (ok && typeof script?.spellPlayCondition === 'function') {
           try { if (!script.spellPlayCondition(gs, pi)) ok = false; }
@@ -134,6 +136,8 @@ async function performSpell(engine, pi, heroIdx, cardName, feld = pi) {
     const c = engine.cardInstances[i];
     if (c.zone === 'hand' && c.owner === pi && c.name === cardName) { handInst = c; break; }
   }
+  // Als Fix (Al 27.10.): fehlt die getrackte Hand-Instanz, ein Ersatz anlegen (sonst `_onlyCard: null` → onPlay JEDER Hand-Karte feuert ungefiltert, s. learning.js).
+  if (!handInst) handInst = engine._trackCard(cardName, pi, 'hand', heroIdx, -1);
   if (handInst) handInst.heroIdx = heroIdx;
   // Als Vorgabe 29.9.: geliehener Wirker — Instanz traegt die Brettseite
   // (wie `doPlaySpell` mit `charmedOwner`).
@@ -161,7 +165,7 @@ async function performSpell(engine, pi, heroIdx, cardName, feld = pi) {
   if (chainResult.negated || chainResult.fizzled) {
     const i = findInHand();
     if (i >= 0) engine.takeFromPileSync(ps, 'hand', i);
-    ps.discardPile.push(cardName);
+    engine.handKartenBesitzerPs(ps, cardName).discardPile.push(cardName);   // W3/W5a: Stapel des permanenten Besitzers
     if (handInst) engine._untrackCard(handInst.id);
     // v1323: negierte Aktivierung → keine Wisdom-Kosten.
     if (chainResult.negated) engine.log('rubin_spell_negated', { player: ps.username, spell: cardName });
@@ -171,6 +175,8 @@ async function performSpell(engine, pi, heroIdx, cardName, feld = pi) {
 
   gs._immediateActionContext = true;
   gs._spellResolutionDepth = (gs._spellResolutionDepth || 0) + 1;
+  const _cancelVorher = gs._spellCancelled;
+  gs._spellCancelled = false;   // W13 (Q129): eigener Abbruchmerker für diesen Zusatz-Guss
   // ★ v1476: eigenes Schadensprotokoll fuer den Nachguss (wie v1469 in
   // `_castSpellImmediately`) — sonst saehe `afterSpellResolved` auch die
   // Ziele des aeusseren Zaubers (Bartas' „exactly 1 target“) und umgekehrt.
@@ -189,7 +195,7 @@ async function performSpell(engine, pi, heroIdx, cardName, feld = pi) {
       _skipReactionCheck: true,
     }));
 
-    if (!gs._spellNegatedByEffect) {
+    if (!gs._spellNegatedByEffect && !gs._spellCancelled) {   // W13 (Q129): ein abgebrochener Guss löst nichts aus
       const uniqueTargets = [];
       const seenIds = new Set();
       for (const t of (gs._spellDamageLog || [])) {
@@ -217,10 +223,21 @@ async function performSpell(engine, pi, heroIdx, cardName, feld = pi) {
   const placedOnBoard = !!gs._spellPlacedOnBoard;
   delete gs._spellPlacedOnBoard;
 
+  // ★ Welle 13 (Al, Q129 – allgemeine Regel für „automatische" Zusatzaktionen): Abbruch in der Zielwahl des Zaubers → die Karte wird gar nicht erst
+  // konsumiert (bleibt auf der Hand), der Einmal-pro-Zug-Stempel wird frei, keine Wisdom-Kosten.
+  const abgebrochen = !!gs._spellCancelled && !gs._spellNegatedByEffect;
+  gs._spellCancelled = _cancelVorher;
+  if (abgebrochen && !placedOnBoard) {
+    heldenSperreFreigeben(gs, 'rubin-dragoneer', pi);
+    engine.log('rubin_perform_cancelled', { player: ps.username, spell: cardName });
+    engine.sync();
+    return true;
+  }
+
   const i = findInHand();
   if (i >= 0) engine.takeFromPileSync(ps, 'hand', i);
   if (!placedOnBoard) {
-    ps.discardPile.push(cardName);
+    engine.handKartenBesitzerPs(ps, cardName).discardPile.push(cardName);   // W3/W5a: Stapel des permanenten Besitzers
     if (handInst) engine._untrackCard(handInst.id);
   }
   await payWisdom();

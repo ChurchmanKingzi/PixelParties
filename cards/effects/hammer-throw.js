@@ -3,7 +3,9 @@
 //  Attack (Fighting Lv1, Normal)
 //
 //  Deal damage equal to attacker's ATK stat.
-//  If the attack is not negated, the target's
+//  If the card is not negated AS A WHOLE (Welle 13, Q139:
+//  Escape/Schild/Immunitaet, die nur den Schaden verhindern,
+//  halten den Lock NICHT auf), the target's
 //  controller is Itemlocked for their next
 //  turn: whenever they play an Artifact, they
 //  must delete a card from their hand
@@ -11,6 +13,10 @@
 //  A player can only be affected every other
 //  turn. Not applied on Turn 1 (the card text
 //  no longer mentions it).
+//  ★ W69a (Al, 23.10.2026): „every other turn" rechnet in den
+//  TATSAECHLICH gespielten Zuegen des Betroffenen (`_hammerLockZug`,
+//  `engine.echteEigeneZuegeBis`) — ein uebersprungener Zug verschiebt den
+//  Takt nicht.
 //
 //  Animation: spinning hammer projectile →
 //  impact slash on target.
@@ -86,13 +92,27 @@ module.exports = {
       });
       await engine._delay(150);
 
+      // W16f (M01-14): "The target's CONTROLLER must delete a card ..." - Kontrolle statt Brettseite (gestohlene Kreatur, übernommener
+      // Held). Vor dem Schaden bestimmt, weil das Ziel dabei sterben kann.
+      let sperrSeite = tgtOwner;
+      if (target.type === 'hero') {
+        sperrSeite = engine.kontrolleurVonHeld(tgtOwner, tgtHeroIdx);
+      } else {
+        const _ziel = target.cardInstance || engine.cardInstances.find(c =>
+          c.owner === tgtOwner && c.zone === 'support' &&
+          c.heroIdx === tgtHeroIdx && c.zoneSlot === target.slotIdx
+        );
+        if (_ziel) sperrSeite = _ziel.controller ?? _ziel.owner;
+      }
+
       // Deal ATK damage
       let negated = false;
 
       if (target.type === 'hero') {
         const targetHero = gs.players[tgtOwner]?.heroes?.[tgtHeroIdx];
         if (targetHero && targetHero.hp > 0) {
-          await engine.actionDealDamage(attackSource, targetHero, finalAtk, 'attack');
+          const _r = await engine.actionDealDamage(attackSource, targetHero, finalAtk, 'attack');
+          if (_r?.surpriseNegated || _r?.effectNegated) negated = true;
         }
       } else if (target.type === 'equip') {
         const inst = target.cardInstance || engine.cardInstances.find(c =>
@@ -100,16 +120,25 @@ module.exports = {
           c.heroIdx === tgtHeroIdx && c.zoneSlot === target.slotIdx
         );
         if (inst) {
-          await engine.actionDealCreatureDamage(
+          const _r = await engine.actionDealCreatureDamage(
             attackSource, inst, finalAtk, 'attack',
             { sourceOwner: pi, canBeNegated: true },
           );
+          if (_r?.surpriseNegated || _r?.effectNegated) negated = true;
         }
       }
 
+      // Welle 13 (Q139, Al: „Wenn NUR der Schaden verhindert wird, ja. Wenn die Karte
+      // insgesamt negiert wird, nein."): Escape, Schilde, Immunitaet verhindern nur den
+      // Schaden — der Item Lock kommt trotzdem. Eine GANZ negierte Karte (Z7b:
+      // `negatesWholeCard`, `gs._negationWhole`) loest nie auf: dann kein Lock. Die
+      // ueblichen Ganz-Negierungen (Post-Target-Fenster, Surprise vor dem Schaden)
+      // brechen den Wurf schon vorher ab; dies ist der Guertel fuer Negierungen am Treffer.
+      if (gs._spellNegatedByEffect && gs._negationWhole) negated = true;
+
       // Apply Itemlock to target's controller (not on turn 1)
-      if ((gs.turn || 1) > 1) {
-        const oppIdx = tgtOwner;
+      if ((gs.turn || 1) > 1 && !negated) {
+        const oppIdx = sperrSeite;
         const oppPs = gs.players[oppIdx];
         if (oppPs) {
           // ── "A player can only be affected by this effect every other
@@ -126,14 +155,21 @@ module.exports = {
           // freie eigene Runde hat, müssen zwischen zwei Anwendungen
           // mindestens 4 gezählt werden (Wurf in Zug 3 sperrt Zug 4,
           // nächster erlaubter Wurf in Zug 7 sperrt Zug 8).
-          const last = oppPs._hammerLockTurn;
-          if (last != null && (gs.turn - last) < 4) {
+          //
+          // ★ W69a (Al, 23.10.2026: „… 'every other turn' rechnet in echten eigenen Zuegen"): gezaehlt werden die TATSAECHLICH gespielten
+          // Zuege des Betroffenen. `_hammerLockZug` = Ordnungszahl seines echten Zuges, den die letzte Sperre getroffen hat (der naechste echte
+          // Zug nach dem Wurf); eine neue Sperre ist erst fuer den uebernaechsten echten Zug erlaubt. Ein uebersprungener Zug des Betroffenen
+          // (die Sperre liegt dann weiter bis zu seinem naechsten echten Zug) oder des Werfers verschiebt den Takt nicht. Ohne Skip wie zuvor.
+          const zugNr = engine.echteEigeneZuegeBis(oppIdx, gs.turn) + 1;
+          const last = oppPs._hammerLockZug;
+          if (last != null && (zugNr - last) < 2) {
             engine.log('item_lock_blocked', {
               player: oppPs.username, by: 'Hammer Throw',
-              reason: 'every-other-turn', lastAppliedTurn: last,
+              reason: 'every-other-turn', lastAppliedTurn: oppPs._hammerLockTurn,
             });
           } else {
             oppPs._hammerLockTurn = gs.turn;
+            oppPs._hammerLockZug = zugNr;
             oppPs.itemLocked = true;
             engine.log('item_locked', {
               player: oppPs.username, by: 'Hammer Throw',

@@ -5,7 +5,20 @@
 //  "Look at as many of the top cards of your deck as there are
 //   \"Future Tech Lamp\" cards in your discard pile +1. Add all
 //   Artifacts you find among those cards to your hand and shuffle the
-//   rest of the cards back into your deck."
+//   rest of the cards back into your deck. You can only play 1
+//   \"Future Tech Lamp\" per turn."
+//
+//  ── W71a (Al): HARTE Rundensperre ──
+//  „You can only play 1 per turn" gilt je SPIELER und zaehlt die gespielte
+//  KARTE, nicht den Effekt. Muster der Magic Gems / Future Tech Bomb:
+//  `canActivate` liest `hoptUsed["Future Tech Lamp:<Spieler>"]` (Hand-Liste
+//  graut die zweite Lamp aus, Server `doUseArtifactEffect` und CPU
+//  fragen dasselbe Gate), der Stempel kommt erst im Rumpf von `resolve`
+//  (= nach der Reaktionskette, Kosten-und-Limits-erst-nach-dem-Commit):
+//  eine GANZ negierte Lamp (Rusty Touch, Misfire …) loest nie auf und
+//  stempelt nicht (Z7b); eine aufgeloeste Lamp stempelt auch dann, wenn
+//  die Oberen kein Artefakt enthalten. Die Lamp hat keine abbrechbare
+//  Frage, der Stempel steht deshalb am Anfang des Rumpfes.
 //
 //  ── Die einzige Karte des Archetyps mit „+1" ──
 //  Sie funktioniert also auch mit leerer Ablage: eine Karte anschauen.
@@ -44,6 +57,8 @@ module.exports = {
   blockedByHandLock: true,
 
   canActivate(gs, pi) {
+    // W71a: harte Rundensperre je Spieler (Schluessel `<Kartenname>:<Spieler>`, wie die Magic Gems).
+    if (gs.hoptUsed?.[`${CARD_NAME}:${pi}`] === gs.turn) return false;
     return (gs.players[pi]?.mainDeck || []).length > 0;
   },
 
@@ -55,6 +70,10 @@ module.exports = {
     const wieViele = GRUND + zaehleInAblage(gs, pi, CARD_NAME);
     const oben = (ps.mainDeck || []).slice(0, wieViele);
     if (oben.length === 0) return { cancelled: true };
+
+    // W71a: „You can only play 1 per turn" — gestempelt wird die gespielte Karte (Commit ist erreicht:
+    // keine Frage mehr, die Kette ist durch). Schon gestempelt (Server-Gate umgangen)? Dann nichts tun.
+    if (!engine.claimHOPT(CARD_NAME, pi)) return { cancelled: true };
 
     const db = engine._getCardDB();
     const artefakte = oben.filter(n => {

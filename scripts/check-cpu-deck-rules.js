@@ -43,6 +43,8 @@ function fakeEngine(players, { turn = 5 } = {}) {
     _isHeroEffectSilenced: () => false,
     heroHoptKey: (n, pi) => `hero-effect:${n}:${pi}`,
     getFreeSupportZones: () => [{ owner: 0, heroIdx: 0, slotIdx: 0 }],
+    beschwoerZonenFuer: () => [{ owner: 0, heroIdx: 0, slotIdx: 0 }],   // W62a: die zentrale Zonenfrage der Engine (frei + geteilt)
+    hatBeschwoerZone: () => true,
     heroEffectIdentity(p, hi) { return this.gs.players[p].heroes[hi].name; },
     _deckProfileCache: [null, null],      // kein Profil (und kein Laden der echten Profile)
   };
@@ -242,6 +244,10 @@ console.log('Armageddon — sichtbare Schadensminderung (echte Engine, echte Tem
   // Die Fähigkeiten der umbenannten Helden stammen aus der Seed-Ziehung (jede neue Karte mit Bild verschiebt den Pool). Resistance,
   // Interference & Co. würden den Schlag im Trockenlauf schlucken — die Prüfung gilt Tempeste, nicht der Ziehung.
   gs.players[1].abilityZones = gs.players[1].abilityZones.map(() => [[], [], []]);
+  // Ebenso die Support Zonen der Seed-Ziehung (Schilde, Auren, Ausrüstung …): sie verschlucken den Schlag, sobald ein neues Bild den Pool verschiebt.
+  for (const c of [...engine.cardInstances]) if (c.owner === 1 && (c.zone === 'support' || c.zone === 'surprise')) engine._untrackCard(c.id);
+  gs.players[1].supportZones = gs.players[1].supportZones.map(z => z.map(() => []));
+  gs.players[1].surpriseZones = (gs.players[1].surpriseZones || []).map(() => []);
   gs.players[1].hand = ['Heal', 'Icebolt'];
   const hps = () => gs.players.map(p => p.heroes.map(h => h.hp).join('/')).join(' | ');
   const vorher = hps();

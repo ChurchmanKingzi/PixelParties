@@ -61,7 +61,7 @@ module.exports = {
     }
     for (const inst of engine.cardInstances) {
       if ((inst.controller ?? inst.owner) !== oppIdx || inst.zone !== 'support' || inst.faceDown) continue;
-      if (inst.counters._baihuStunned) continue; // Already stunned
+      if (inst.counters._baihuStunned || inst.counters.stunned) continue; // Already stunned (wie beim Helden)
       const cd = engine.getEffectiveCardData(inst) || cardDB[inst.name];   // wirksame Daten: Tokens/Artifact Creatures auf dem Brett (Als Sweep 9.10.)
       if (!cd || !engine.isChoosableAsCreature(inst, cd)) continue;
       const hp = inst.counters?.currentHp ?? cd.hp ?? 0;
@@ -103,9 +103,15 @@ module.exports = {
         _baihuPetrify: true,
       });
     } else if (picked.cardInstance) {
+      // W16d (A07-03): „Stun it for 3 turns" ist ein ECHTER Stun (wie Petrifier): `counters.stunned` +
+      // `stunnedDuration` über `applyCreatureStatus` — damit gilt Stun-Immunität/Schutz-Tore, und die Kreatur ist
+      // stillgelegt (kein aktiver Effekt, keine Passiv-Hooks). Die Schadensimmunität („Stunned by this effect")
+      // hängt als `_petrified` AM Stun: nur wenn der Stun wirklich haftet. `_baihuStunned` bleibt nur für alte Spielstände.
       if (!picked.cardInstance.counters._cardinalImmune) {
-        picked.cardInstance.counters._baihuStunned = { duration: 3 };
-        picked.cardInstance.counters._baihuPetrify = true;
+        const applied = await engine.applyCreatureStatus(picked.cardInstance, 'stunned', {
+          duration: 3, sourceOwner: pi, source: 'Cardinal Beast Baihu',
+        });
+        if (applied) picked.cardInstance.counters._petrified = 1;
       }
     }
 

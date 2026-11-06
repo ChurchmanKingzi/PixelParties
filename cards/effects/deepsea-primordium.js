@@ -15,6 +15,7 @@
 //  contract (turn-rollover wipe in switchTurn).
 // ═══════════════════════════════════════════
 
+const { anyName } = require('./_alias-name');   // Shroomasaur: Zusatzname zählt für Namensfamilien
 const { hasCardType } = require('./_hooks');
 const {
   inherentActionIfBounceable,
@@ -86,7 +87,7 @@ module.exports = {
           if (!cardData || !hasCardType(cardData, 'Creature')) return false;
           // Read archetype via the shared helper so Deepsea Spores (all
           // creatures treated as Deepsea) works.
-          return isDeepseaCreature(cardData.name, engine);
+          return anyName(cardData, (n) => isDeepseaCreature(n, engine));
         },
       });
       ctx.grantAdditionalAction(ADDITIONAL_TYPE);

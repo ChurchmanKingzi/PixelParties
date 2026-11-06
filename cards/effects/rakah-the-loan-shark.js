@@ -91,7 +91,7 @@ module.exports = {
       // feuert, streamt seine Karte an BEIDE Spieler.
       await engine.showTriggeredEffect(CARD_NAME, { playerIdx: pi });
 
-      engine._applyHeroAtkDelta(hero, feld, heroIdx, hp);
+      engine.actionPermAtk(hero, feld, heroIdx, hp, CARD_NAME);   // W54a: DAUERHAFT — gebucht in hero.permAtkDelta, ueberlebt Aufstieg/Abstieg
       engine.log('atk_grant', { hero: hero.name, amount: hp, source: CARD_NAME });
       engine.log('rakah_collect', {
         player: gs.players[pi]?.username,

@@ -25,6 +25,7 @@
 //  creatures). 1 per turn.
 // ═══════════════════════════════════════════
 
+const { anyName } = require('./_alias-name');   // Shroomasaur: Zusatzname zählt für Namensfamilien
 const {
   inherentActionIfBounceable,
   canBypassLevelReqIfBounceable,
@@ -39,6 +40,14 @@ const {
   promptOptionalOnSummon,
 } = require('./_deepsea-shared');
 const { loadCardEffect } = require('./_loader');
+const sirenSkript = require('./deepsea-siren');
+
+// ★ W16b (A02-deepsea-25): kopiert die Monstrosity den Einsatz-Effekt der Siren („choose any target. Any damage this Creature takes is also
+// applied to that target … defeat the chosen target"), gilt die Verknüpfung für DIESE Kreatur. Die Link-Marken liegen an der Instanz;
+// die Wirkung (Schaden weitergeben, Tod weitergeben) sind die Hooks der Siren — hier nur durchgereicht, wenn die Marken da sind.
+function _sirenDurchreichen(name) {
+  return (ctx) => (ctx.card?.counters?._sirenLinkType ? sirenSkript.hooks[name](ctx) : undefined);
+}
 
 const CARD_NAME = 'Deepsea Monstrosity';
 
@@ -52,6 +61,9 @@ module.exports = {
   canSummon: (ctx) => canSummonPerTurnLimit(ctx, CARD_NAME),
 
   hooks: {
+    beforeCreatureDamageBatch: _sirenDurchreichen('beforeCreatureDamageBatch'),
+    onCreatureDeath: _sirenDurchreichen('onCreatureDeath'),
+    onCardLeaveZone: _sirenDurchreichen('onCardLeaveZone'),
     onPlay: async (ctx) => {
       markSummonedPerTurnLimit(ctx, CARD_NAME);
       // Don't recurse — if this is being fired via Blood Moon retrigger or
@@ -71,10 +83,10 @@ module.exports = {
         if (inst.zone !== 'support') continue;
         if ((inst.controller ?? inst.owner) !== pi) continue;
         if (inst.id === selfInst.id) continue;
-        if (!isDeepseaCreature(inst.name, engine, inst)) continue;
+        if (!anyName(inst, (n) => isDeepseaCreature(n, engine, inst))) continue;
         candidates.push(inst);
       }
-      if (candidates.length === 0) return;
+      if (candidates.length === 0) return ctx._engine.summonEffektFizzelt(ctx.card, ctx.cardName, { stumm: true });   // W11/R4: wirkt nicht → Blob stumm
 
       if (!(await promptOptionalOnSummon(ctx, CARD_NAME,
         'Bounce one of your other Deepsea Creatures and copy its on-summon effect?'
@@ -98,14 +110,16 @@ module.exports = {
         // darf nicht stillschweigend dessen linkeste waehlen (s. promptZonePick).
         heroShortcut: false,
       });
-      if (!picked) return;
+      if (!picked) return ctx._engine.summonEffektFizzelt(ctx.card, ctx.cardName, { stumm: true });   // W11/R4: wirkt nicht → Blob stumm
 
-      const chosenInst = candidates.find(i => i.heroIdx === picked.heroIdx && i.zoneSlot === picked.slotIdx);
-      if (!chosenInst) return;
+      // Held/Slot gibt es auf BEIDEN Brettern — die Brettseite (`picked.owner`) gehört zur Wahl.
+      const chosenInst = candidates.find(i => i.heroIdx === picked.heroIdx && i.zoneSlot === picked.slotIdx
+        && (picked.owner ?? engine.physicalSide(i)) === engine.physicalSide(i));
+      if (!chosenInst) return ctx._engine.summonEffektFizzelt(ctx.card, ctx.cardName, { stumm: true });   // W11/R4: wirkt nicht → Blob stumm
       const copiedName = chosenInst.name;
 
       // Step 1: bounce the chosen creature back to hand.
-      await returnSupportCreatureToHand(engine, chosenInst, CARD_NAME);
+      await returnSupportCreatureToHand(engine, chosenInst, CARD_NAME, { sourceOwner: pi });
 
       // Step 2: invoke the copied creature's on-summon effect with
       // Monstrosity's instance as the firing card, BUT the copied name

@@ -18,8 +18,8 @@
 //  ① „a card from your hand" — die Handkarte wird nur ALS VORLAGE
 //    gewählt und bleibt liegen. Sie wird nicht abgeworfen; der Text
 //    sagt „choose", nicht „discard".
-//  ② „up to 2 … from your deck" — es werden so viele Kopien
-//    verschoben, wie da sind, höchstens zwei. Liegt keine im Deck,
+//  ② „up to 2 … from your deck" — der Spieler wählt 1 oder 2 (Al,
+//    Welle 9, Q17; nur eine Kopie im Deck: ohne Rückfrage 1). Liegt keine im Deck,
 //    fizzelt die Wahl; deshalb stehen solche Handkarten gar nicht erst
 //    zur Auswahl.
 //  ③ „If the user has at least Magic Arts 2, this counts as an
@@ -32,7 +32,7 @@
 //  Kreatureffekte gilt sie je SPIELER, nicht je Instanz.
 // ═══════════════════════════════════════════
 
-const { schickeVonDeckInAblage, waehleAusNamen } = require('./_future-tech-shared');
+const { schickeVonDeckInAblage, waehleAusNamen, waehleAnzahl, cpuAnzahlHoechstzahl } = require('./_future-tech-shared');
 
 // v875: Namensvergleiche ueber den BASISNAMEN — „[B]"/„[W]" sind
 // Kosmetik (siehe CARD_API, „Namen vergleichen").
@@ -41,12 +41,24 @@ const CARD_NAME = 'Iterative Testing';
 const MAX_SENDS = 2;
 const MA_SCHWELLE = 2;
 
+/**
+ * Die Hand OHNE die Iterative Testing, die gerade gespielt wird (Konvention v1405: die auflösende Karte bleibt zwar bis zum Schluss in `ps.hand`
+ * liegen, ist aber keine „card from your hand" mehr — sonst bietet sich der Zauber selbst als Vorlage an und ist allein auf der Hand „spielbar").
+ * Beim Auflösen kennt die Engine die Karte (`_resolvingCard`); in der Spielbarkeitsprüfung (Hand-Ausgrauen) nimmt man eine Kopie heraus.
+ */
+function handOhneSelbst(engine, ps) {
+  const hand = ps?.hand || [];
+  if (ps?._resolvingCard?.name === CARD_NAME) return engine?._handOhneAufloesendeKarte ? engine._handOhneAufloesendeKarte(ps) : hand.slice();
+  const i = hand.indexOf(CARD_NAME);
+  return i < 0 ? hand.slice() : hand.filter((_, k) => k !== i);
+}
+
 /** Handkarten, von denen mindestens eine Kopie im Deck liegt. */
-function brauchbareHandkarten(gs, pi) {
+function brauchbareHandkarten(gs, pi, engine) {
   const ps = gs.players[pi];
   if (!ps) return [];
   const imDeck = new Set(ps.mainDeck || []);
-  return [...new Set(ps.hand || [])].filter(n => imDeck.has(n)
+  return [...new Set(handOhneSelbst(engine, ps))].filter(n => imDeck.has(n)
     || (ps.mainDeck || []).some(k => baseCardName(k) === baseCardName(n)));
 }
 
@@ -55,13 +67,20 @@ function magicArts(gs, pi, heroIdx, engine) {
   const ps = gs.players[pi];
   const zonen = ps?.abilityZones?.[heroIdx];
   if (!zonen) return 0;
-  return engine.countAbilitiesForSchool('Magic Arts', zonen);
+  return engine.heroSchoolLevel('Magic Arts', pi, heroIdx);   // W4a: harte Negierung -> Stufe 0
 }
 
 module.exports = {
+  // ★ Z7b: FIZZELT die Karte (Wirker beim Auflösen handlungsunfähig, v1328), war sie GESPIELT → Stempel (Engine: `_noteFizzledPlay`).
+  // Eine ganz NEGIERTE Karte stempelt nicht (Als Entscheidung, Welle 3).
+  onFizzledPlay: ({ engine, gs, pi }) => { engine.claimHOPT('iterative-testing', pi); },
+
+  // CPU: bei „up to 2“ die Höchstzahl (Q17).
+  cpuResponse: (engine, promptType, promptData) => cpuAnzahlHoechstzahl(promptData),
+
   // Ohne Handkarte mit Deck-Kopie bewirkt der Zauber nichts.
-  spellPlayCondition(gs, pi) {
-    return brauchbareHandkarten(gs, pi).length > 0;
+  spellPlayCondition(gs, pi, engine) {
+    return brauchbareHandkarten(gs, pi, engine).length > 0;
   },
 
   // ③ Zusatzaktion ab Magic Arts 2 — je Held ausgewertet.
@@ -83,7 +102,7 @@ module.exports = {
         return;
       }
 
-      const kandidaten = brauchbareHandkarten(gs, pi);
+      const kandidaten = brauchbareHandkarten(gs, pi, engine);
       if (kandidaten.length === 0) { gs._spellCancelled = true; return; }
 
       const name = await waehleAusNamen(engine, pi, kandidaten, {
@@ -99,8 +118,13 @@ module.exports = {
       // `iterative-testing:0:0` und die Vorpruefung oben greift nie.
       engine.claimHOPT('iterative-testing', pi);
 
-      // ② so viele Kopien wie vorhanden, höchstens zwei
-      const wieViele = Math.min(MAX_SENDS, (ps.mainDeck || []).filter(k => baseCardName(k) === baseCardName(name)).length);
+      // ② „up to 2“: der Spieler wählt 1 oder 2 (Al, Welle 9, Q17); gibt es nur
+      // eine Kopie im Deck, ohne Rückfrage 1. CPU: die Höchstzahl.
+      const vorhanden = (ps.mainDeck || []).filter(k => baseCardName(k) === baseCardName(name)).length;
+      const wieViele = await waehleAnzahl(engine, pi, Math.min(MAX_SENDS, vorhanden), {
+        title: CARD_NAME, showCard: name,
+        description: `How many copies of ${name} go from your deck to the discard pile?`,
+      });
       const bewegt = await schickeVonDeckInAblage(engine, pi, Array(wieViele).fill(name), CARD_NAME);
 
       engine.log('iterative_testing', {

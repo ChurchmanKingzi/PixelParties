@@ -9,9 +9,10 @@
 //
 //  BAUART
 //  ──────
-//  • Ausloeser `onPlay` mit Selbsttest, Zonenpruefung und dem
-//    `isPlacement`-Riegel: PLATZIEREN ist keine BESCHWOERUNG (Muster
-//    Knight of Kings, Wire Hatchling, Gravedigger).
+//  • Ausloeser `onPlay` mit Selbsttest und Zonenpruefung.
+//    ★ W25c (N3-13, Al): „place triggert On-Summon" - auch das PLATZIEREN
+//    (Drill Sergeant & Co.) loest den Effekt aus; der fruehere
+//    `isPlacement`-Riegel ist entfallen (CARD_API „Platzieren triggert On-Summon").
 //
 //  • ★ „FROM OUTSIDE THE GAME" — die Karten kommen aus KEINEM Stapel.
 //    Also auch KEIN Flug: `card_reveal` (beide Spieler sehen, WAS
@@ -50,14 +51,16 @@ module.exports = {
       const engine = ctx._engine;
       const gs = engine.gs;
       if (ctx.playedCard?.id !== ctx.card?.id || ctx.card.zone !== 'support') return;
-      if (ctx.card.counters?.isPlacement) return;        // platziert ≠ beschworen
 
       const pi = ctx.cardOwner;
       const ps = gs.players[pi];
       if (!ps) return;
 
       const fehlen = ZIEL_HANDGROESSE - (ps.hand || []).length;
-      if (fehlen <= 0) return;                           // Hand ist schon voll genug
+      if (fehlen <= 0) return ctx._engine.summonEffektFizzelt(ctx.card, ctx.cardName, { stumm: true });   // W11/R4: wirkt nicht → Blob stumm
+      // Z6 (C01-01): "add ... to your hand" - Hand-Sperre und Such-Sperre ("cannot search or add cards to your hand")
+      // verbieten das Hinzufuegen; gar nicht erst anbieten.
+      if (engine._isSearchBlocked(pi, {}, 'deck')) return ctx._engine.summonEffektFizzelt(ctx.card, ctx.cardName, { stumm: true });   // W11/R4: wirkt nicht → Blob stumm
 
       const ja = await engine.promptGeneric(pi, {
         type: 'confirm',
@@ -71,7 +74,7 @@ module.exports = {
       const bestaetigt = typeof engine._confirmSaidYes === 'function'
         ? engine._confirmSaidYes(ja)
         : !!(ja && !ja.cancelled);
-      if (!bestaetigt) return;
+      if (!bestaetigt) return ctx._engine.summonEffektFizzelt(ctx.card, ctx.cardName, { stumm: true });   // W11/R4: wirkt nicht → Blob stumm
 
       await engine.showTriggeredEffect(CARD_NAME, { playerIdx: pi });
 

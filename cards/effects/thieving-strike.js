@@ -49,17 +49,20 @@ function _targetControllerIdx(gs, target) {
   return target.owner;
 }
 
-function _snapshotHp(gs, target) {
+function _snapshotHp(gs, target, engine) {
   if (target.type === 'hero') {
     return gs.players[target.owner]?.heroes?.[target.heroIdx]?.hp ?? 0;
   }
   if (target.cardInstance) {
-    return target.cardInstance.counters?.currentHp ?? 0;
+    return engine.creatureCurrentHp(target.cardInstance);   // Z5: unversehrt = gedruckte HP (sonst Vorher 0, kein Klau)
   }
   return 0;
 }
 
 module.exports = {
+  // ★ Als Ruling (Al 26.10., Flame Avalanche: „Wenn du andere Schadenskarten unspielbar machst, müssen das Vial und Rockfall auch sein!"): die Karte richtet NUR Schaden an Zielen an (Zusatzwirkung nur bei tatsächlichem Schaden — unter der Sperre trifft nichts davon ein) —
+  // unter der Schadenssperre (`ps.damageLocked`) unspielbar (Karte bleibt auf der Hand, keine Aktion/Kosten; Sperr-Stutzen `engine._cardBlockedBySearchLock`).
+  blockedByDamageLock: true,
   // ★★ v1181 — ENTKOPPELTE ZAUBERBILDER (Al 17.9.): Wird der Zauber
   // NEGIERT, laeuft sein Effekt-Rumpf nie — die Engine spielt dann diese
   // Bilder, damit der abgewehrte Zauber trotzdem zu sehen ist. Im
@@ -79,7 +82,9 @@ module.exports = {
    * the Thieving Ability qualifies (the ability itself scales in
    * strength per level, but the bypass clause doesn't).
    */
-  canBypassLevelReq: (gs, pi, heroIdx) => {
+  canBypassLevelReq: (gs, pi, heroIdx, cardData, engine) => {
+    // W4a (Al, Welle 4): unter Ability-Negation (harte Form / Stowaway) hat der Held keinen Zugriff auf Thieving.
+    if ((engine || gs._engineRef)?.heroAbilityLevelsBlanked?.(pi, heroIdx)) return false;
     return _heroHasThieving(gs.players[pi], heroIdx);
   },
 
@@ -136,7 +141,7 @@ module.exports = {
       await engine._delay(100);
 
       // Snapshot HP pre-damage so we can decide whether the steal fires.
-      const prevHp = _snapshotHp(gs, target);
+      const prevHp = _snapshotHp(gs, target, engine);
       const wasOppControlled = _targetControllerIdx(gs, target) !== pi;
 
       if (target.type === 'hero') {
@@ -160,7 +165,7 @@ module.exports = {
 
       // Did damage actually land? Hero's `.hp` drops; creature's
       // `.counters.currentHp` drops (or zeroes out on death).
-      const postHp = _snapshotHp(gs, target);
+      const postHp = _snapshotHp(gs, target, engine);
       const damageDealt = Math.max(0, prevHp - postHp);
 
       engine.log('thieving_strike', {

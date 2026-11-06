@@ -50,7 +50,9 @@ function durchGegnerAttackOderSpell(engine, pi, d) {
   if (d.type && STATUS_TYPEN.has(d.type)) return false;
   if (d.type === 'attack' || (typeof d.type === 'string' && d.type.includes('spell'))) return true;
   const cd = d.source?.name ? engine._getCardDB()[d.source.name] : null;
-  return !!cd && (cd.cardType === 'Spell' || cd.cardType === 'Attack');
+  if (!!cd && (cd.cardType === 'Spell' || cd.cardType === 'Attack')) return true;
+  // W32a (Al, 22.10.2026): auch ein Besiegen ohne Schaden durch einen Effekt, der als Attack/Spell ZÄHLT (Kohta, Gegenstandseffekte).
+  return require('./_hooks').quelleIstAttackOderSpell(engine, d.source, d.type);
 }
 
 /** Kann diese Karte ueberhaupt als Creature zurueck aufs Brett? */
@@ -88,10 +90,13 @@ function kandidaten(engine, pi, defeated) {
   return out;
 }
 
-function zoneFrei(engine, pi, heroIdx, slot) {
+function zoneFrei(engine, pi, heroIdx, slot, name = null, sharer = pi) {
   const z = engine.gs.players[pi]?.supportZones?.[heroIdx]?.[slot];
-  if (!Array.isArray(z) || z.length > 0) return false;
-  return !engine.isSupportZoneLocked(pi, heroIdx, { source: CARD_NAME, via: 'pick' });
+  if (!Array.isArray(z)) return false;
+  if (engine.isSupportZoneLocked(pi, heroIdx, { source: CARD_NAME, via: 'pick' })) return false;
+  if (z.length === 0) return true;
+  // W62a: mit Alice-Teilung gilt auch die Zone einer GLEICHNAMIGEN Creature (die alte Zone eines Stapels) als Landeplatz.
+  return !!name && slot < 3 && require('./_alice-shared').canShareInto(engine, sharer, heroIdx, slot, name, pi);
 }
 
 /**
@@ -110,13 +115,12 @@ async function zielZone(engine, pi, d) {
   const altSeite = eigeneSeite ? pi
     : (fremdHeld?.name && engine.heroSideOf(seite, fremdHeld) === pi ? seite : null);
   if (altSeite != null && d.heroIdx != null && d.zoneSlot != null) {
-    if (zoneFrei(engine, altSeite, d.heroIdx, d.zoneSlot)) return { owner: altSeite, heroIdx: d.heroIdx, slotIdx: d.zoneSlot };
-    const gleicherHeld = engine.getFreeSupportZones(altSeite, { namedHeroesOnly: true, source: CARD_NAME })
-      .filter(z => z.heroIdx === d.heroIdx);
+    if (zoneFrei(engine, altSeite, d.heroIdx, d.zoneSlot, d.name, pi)) return { owner: altSeite, heroIdx: d.heroIdx, slotIdx: d.zoneSlot };
+    const gleicherHeld = engine.beschwoerZonenFuer(pi, d.name, { seite: altSeite, heroIdx: d.heroIdx, namedHeroesOnly: true, source: CARD_NAME });   // W62a: + geteilte Zone (Alice)
     if (gleicherHeld.length) return { owner: altSeite, heroIdx: gleicherHeld[0].heroIdx, slotIdx: gleicherHeld[0].slotIdx };
   }
   // Kontrolle statt Seite (Styx 28.9.): Ausweichzonen = alle Helden, die `pi` kontrolliert.
-  const alle = engine.getFreeSupportZones(pi, { nachKontrolle: true, source: CARD_NAME });
+  const alle = engine.beschwoerZonenFuer(pi, d.name, { nachKontrolle: true, source: CARD_NAME });   // W62a: + geteilte Zonen (Alice)
   if (alle.length === 0) return null;
   if (alle.length === 1) return { owner: alle[0].owner, heroIdx: alle[0].heroIdx, slotIdx: alle[0].slotIdx };
   const wahl = await engine.promptGeneric(pi, {
@@ -166,9 +170,12 @@ async function schlageZurueck(engine, pi, casterIdx, d, level) {
     return { betrag, ziel: rc.name };
   }
   const hi = quelle?.heroIdx ?? -1;
-  const held = engine.gs.players[seite]?.heroes?.[hi];
+  // R02-20: `heroIdx` gilt fuer die Heldenreihe von `heroOwner` (geliehener Held:
+  // Kontrolleur != Brettseite).
+  const heldSeite = quelle?.heroOwner ?? seite;
+  const held = engine.gs.players[heldSeite]?.heroes?.[hi];
   if (!held?.name || held.hp <= 0) return { betrag: 0, ziel: null };
-  engine._broadcastEvent('play_zone_animation', { type: 'claw_maul', owner: seite, heroIdx: hi, zoneSlot: -1 });
+  engine._broadcastEvent('play_zone_animation', { type: 'claw_maul', owner: heldSeite, heroIdx: hi, zoneSlot: -1 });
   await engine._delay(260);
   // Vergeltung: der Angreifer ist das einzige Ziel — Submerged/Stealth & Co. schuetzen nicht (Als Ruling 9.10.).
   await engine.actionDealDamage(spellQuelle, held, betrag, 'decay_spell', { festesZiel: true });

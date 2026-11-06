@@ -9,10 +9,11 @@
 //
 //  ── AUSLEGUNG ─────────────────────────────────────────────────────
 //  • Aktiver Held-Effekt, einmal pro Zug (Held-Effekt-Sperre der Engine); zwei Wege, einer pro Aktivierung.
-//    VORBEDINGUNG: schon mindestens eine eigene geloeschte Area (Level ≤ 3) — die Areas, die der Effekt selbst
-//    loescht, zaehlen NICHT mit; sonst ist Dante nicht aktivierbar (beide Wege).
+//    VORBEDINGUNG NUR FUER DEN AREA-WEG (Entscheidung Al): schon mindestens eine eigene geloeschte Area (Level ≤ 3) —
+//    die Areas, die der Effekt selbst loescht, zaehlen NICHT mit. Der Spell-Weg braucht sie NICHT; Dante ist aktivierbar,
+//    wenn ein loeschbarer Spell in der Hand liegt ODER eine solche geloeschte Area existiert.
 //    Mit loeschbarem Spell in der Hand geht es DIREKT in den Handwahl-Modus (`forceDiscardCancellable`, gueltige
-//    Spells leuchten, Escape = Abbruch ohne Verbrauch); gibt es auch Areas, bietet derselbe Modus einen Knopf
+//    Spells leuchten, Escape = Abbruch ohne Verbrauch); gibt es eine geloeschte Area (Area-Weg moeglich), bietet derselbe Modus einen Knopf
 //    „Delete Areas instead". Ohne loeschbaren Spell nur Weg 2 (mit kurzer Bestaetigung, abbrechbar).
 //  • Weg 1: Spell (Kartentyp Spell, KEINE Attack) mit WIRKSAMEM Level ≤ 3 aus der eigenen Hand waehlen und
 //    LOESCHEN (Loesch-Rettung moeglich; wird er gerettet, ist „if you do" nicht erfuellt). Dann so viele Karten
@@ -50,9 +51,12 @@ function spellsInHand(engine, pi) {
 }
 
 function geloeschteAreas(engine, pi) {
+  // Als Ruling (Al 27.10.): Reality Crack („You cannot play another Area for the rest of the turn") sperrt auch „bring directly into play" — Weg 2 entfaellt dann ganz (kein Loeschen der Areas, keine Wahl).
+  if (engine.areaSpielGesperrt(pi, { direkt: true })) return [];
+  if (engine.spielerIstVonAreasAusgenommen(pi)) return [];   // W82 (Shipwrecked): keine Area ins Spiel bringen — der Area-Weg entfaellt
   const ps = engine.gs.players[pi];
   const db = engine._getCardDB();
-  return [...new Set((ps?.deletedPile || []).filter(n => isTutorableArea(db[n], engine, pi)))];
+  return [...new Set((ps?.deletedPile || []).filter(n => isTutorableArea(db[n], engine, pi) && engine.areaPlatzNachAbraeumen(pi, n)))];   // Als Fix (Al 27.10.): nur Areas, fuer die nach dem Abraeumen Platz ist (Gigalopolis bleibt liegen)
 }
 
 /** Eine Handkarte gezielt loeschen (Loesch-Rettung, Flug). true = wirklich geloescht. */
@@ -65,8 +69,9 @@ async function handkarteLoeschen(engine, pi, name) {
   const gerettet = await engine._tryBeforeDelete(name, pi, { fromZone: 'hand', fromInstance: inst, source: CARD_NAME });
   if (gerettet) { engine.log('delete_rescued', { player: ps.username, card: name, source: CARD_NAME }); engine.sync(); return false; }
   engine._pileFlight(pi, name, 'hand', 'deleted', { fromHandIdx: idx });
-  engine._geloeschtVerfolgen(pi);
-  ps.deletedPile.push(name);
+  const dPs = engine.handKartenBesitzerPs(pi, name);   // W3/W5a: Gelöscht-Stapel des permanenten Besitzers
+  engine._geloeschtVerfolgen(engine._resolvePi(dPs));
+  dPs.deletedPile.push(name);
   if (inst) engine._untrackCard(inst.id);
   engine.log('forced_delete', { player: ps.username, card: name, source: CARD_NAME });
   engine.sync();
@@ -98,7 +103,7 @@ async function weg2(engine, pi) {
   const vorher = geloeschteAreas(engine, pi);
   const areas = engine.getAreas(pi).slice();
   for (const inst of areas) await engine.deleteArea(inst, CARD_NAME, { _skipLimitEnforce: true });
-  const kandidaten = vorher.filter(n => (ps.deletedPile || []).includes(n));
+  const kandidaten = vorher.filter(n => (ps.deletedPile || []).includes(n) && engine.canPlaceAnotherArea(pi, n));   // Als Fix (Al 27.10.): nach dem Loeschen bleibt eine unentfernbare Area (Gigalopolis) liegen — dort ist kein Platz
   let gebracht = null;
   if (kandidaten.length > 0) {
     const db = engine._getCardDB();
@@ -142,9 +147,9 @@ module.exports = {
     const feld = ctx.cardHeroOwner ?? pi;
     const hero = engine.gs.players[feld]?.heroes?.[ctx.cardHeroIdx];
     if (!hero?.name || hero.hp <= 0) return false;
-    // Nur aktivierbar, wenn SCHON mindestens eine eigene Area (Level ≤ 3) im Geloescht-Stapel liegt — die Areas, die
-    // der Effekt selbst loescht, zaehlen nicht mit. Dann reicht fuer Weg 1 ein loeschbarer Spell oder fuer Weg 2 die Area.
-    return geloeschteAreas(engine, pi).length > 0;
+    // Weg 1 (Spell): ein loeschbarer Spell in der Hand genuegt. Weg 2 (Areas): nur, wenn SCHON mindestens eine eigene
+    // Area (Level ≤ 3) im Geloescht-Stapel liegt — die Areas, die der Effekt selbst loescht, zaehlen nicht mit.
+    return spellsInHand(engine, pi).length > 0 || geloeschteAreas(engine, pi).length > 0;
   },
 
   async onHeroEffect(ctx) {
@@ -152,8 +157,8 @@ module.exports = {
     const pi = ctx.cardOwner;
     const ps = engine.gs.players[pi];
     const spells = spellsInHand(engine, pi);
-    const area = geloeschteAreas(engine, pi).length > 0;     // Vorbedingung des Effekts (siehe canActivateHeroEffect)
-    if (!area) return false;
+    const area = geloeschteAreas(engine, pi).length > 0;     // Vorbedingung NUR des Area-Wegs (siehe canActivateHeroEffect)
+    if (!area && spells.length === 0) return false;
 
     // Weg 2 allein (keine loeschbare Handkarte): kurze Bestaetigung, dann die Areas.
     if (spells.length === 0) {

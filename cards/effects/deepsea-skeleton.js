@@ -79,28 +79,26 @@ module.exports = {
       const engine = ctx._engine;
       const pi = ctx.cardOwner;
       const ps = engine.gs.players[pi];
-      if (!ps || (ps.mainDeck || []).length === 0) return;
+      if (!ps || (ps.mainDeck || []).length === 0) return ctx._engine.summonEffektFizzelt(ctx.card, ctx.cardName, { stumm: true });   // W11/R4: wirkt nicht → Blob stumm
 
       if (!(await promptOptionalOnSummon(ctx, CARD_NAME,
         'Choose up to 2 cards in your deck to send to the discard pile?'
       ))) return;
 
-      // Build a gallery of unique card names in the deck — same shape as
-      // Magenta's effect. Sorted alphabetically so duplicates of the same
-      // name collapse to one tile (actionMillCards with targetCardName
+      // Build a gallery of the deck's cards — same shape as
+      // Magenta's effect. Sorted alphabetically (actionMillCards with targetCardName
       // pulls a specific copy per call, so two picks of the same name
       // mill two copies).
       const cardDB = engine._getCardDB();
-      const seen = new Set();
+      // ★ W16b (A02-deepsea-08, Text „choose up to 2 cards from your deck"): EINE Kachel je Karte (auch gleichnamige) — der Client
+      // wählt nach Galerie-Index, so lassen sich beide Exemplare derselben Karte gemeinsam in die Ablage schicken.
       const gallery = [];
       for (const cn of ps.mainDeck) {
-        if (seen.has(cn)) continue;
-        seen.add(cn);
         if (!cardDB[cn]) continue;
         gallery.push({ name: cn, source: 'deck' });
       }
       gallery.sort((a, b) => a.name.localeCompare(b.name));
-      if (gallery.length === 0) return;
+      if (gallery.length === 0) return ctx._engine.summonEffektFizzelt(ctx.card, ctx.cardName, { stumm: true });   // W11/R4: wirkt nicht → Blob stumm
 
       const picked = await engine.promptGeneric(pi, {
         type: 'cardGalleryMulti',
@@ -113,9 +111,9 @@ module.exports = {
         confirmClass: 'btn-danger',
         cancellable: true,
       });
-      if (!picked || picked.cancelled) return;
+      if (!picked || picked.cancelled) return ctx._engine.summonEffektFizzelt(ctx.card, ctx.cardName, { stumm: true });   // W11/R4: wirkt nicht → Blob stumm
       const chosen = Array.isArray(picked.selectedCards) ? picked.selectedCards : [];
-      if (chosen.length === 0) return;
+      if (chosen.length === 0) return ctx._engine.summonEffektFizzelt(ctx.card, ctx.cardName, { stumm: true });   // W11/R4: wirkt nicht → Blob stumm
 
       // Mill both cards in a SINGLE batch so the deck→discard animation
       // staggers them 200ms apart (via the batch handler's `i * 200`

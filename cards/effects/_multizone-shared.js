@@ -268,7 +268,8 @@ async function handleIslandRemoval(engine, pi, heroIdx, abIdx) {
       const zielPs = engine.gs.players[inst.originalOwner ?? inst.owner];
       if (zielPs) {
         if (!zielPs.discardPile) zielPs.discardPile = [];
-        zielPs.discardPile.push(inst.name);
+        if (inst._swagdriRouteToDelete) zielPs.deletedPile.push(inst.name);   // W18a (Swagdri, A04-30): von Swagdri ausgespielt → gelöscht statt Ablage
+        else zielPs.discardPile.push(inst.name);
       }
       engine.log('multizone_no_room', {
         player: ps.username, card: inst.name, hero: ps.heroes?.[heroIdx]?.name,
@@ -320,6 +321,36 @@ function multiZoneHooks(cardName, opts = {}) {
   };
 }
 
+/**
+ * ★ KONTROLLWECHSEL (`actionTransferCreature`: Diplomacy, Dark Gear, Capture, Betrayal, Enemy of my Enemy …): die Kreatur wechselt mit ALLEN ihren Zonen. Am Ziel-Helden `ps`/`heroIdx`
+ * werden `anzahl` weitere freie Zonen (außer dem Ankerplatz) mit dem Platzhalter belegt — der Aufrufer hat vorher geprüft, dass sie frei sind (`engine.mehrzonenPlatzFehlt`).
+ */
+function besetzePlatzhalter(ps, heroIdx, ankerSlot, anzahl) {
+  const sup = ps?.supportZones?.[heroIdx];
+  if (!sup) return 0;
+  let gesetzt = 0;
+  for (let z = 0; z < sup.length && gesetzt < anzahl; z++) {
+    if (z === ankerSlot) continue;
+    if ((sup[z] || []).length === 0) { sup[z] = [ZONE_BLOCKED]; gesetzt++; }
+  }
+  return gesetzt;
+}
+
+/**
+ * Gegenstück beim BISHERIGEN Helden: die Platzhalter der Kreatur (höchstens `anzahl`) abräumen, nachdem ihr Anker den Platz verlassen hat.
+ * Der Hook der Karte (`releaseZones`) läuft beim Kontrollwechsel nicht (`actionTransferCreature` meldet kein `leavingCard`).
+ */
+function raeumePlatzhalter(ps, heroIdx, anzahl) {
+  const sup = ps?.supportZones?.[heroIdx];
+  if (!sup) return 0;
+  let weg = 0;
+  for (let z = 0; z < sup.length && weg < anzahl; z++) {
+    const slot = sup[z] || [];
+    if (slot.length === 1 && slot[0] === ZONE_BLOCKED) { sup[z] = []; weg++; }
+  }
+  return weg;
+}
+
 module.exports = {
   ZONE_BLOCKED,
   ZONES_PRO_HELD,
@@ -330,6 +361,8 @@ module.exports = {
   canSummonMultiZone,
   claimZones,
   releaseZones,
+  besetzePlatzhalter,
+  raeumePlatzhalter,
   handleIslandRemoval,
   multiZoneHooks,
 };

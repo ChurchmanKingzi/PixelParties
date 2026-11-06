@@ -57,7 +57,9 @@
 //  activation UI greys out for the rest of the turn.
 // ═══════════════════════════════════════════
 
+const { hatName, hatNameIn, namenIn } = require('./_alias-name');   // Shroomasaur: Zusatzname zählt
 const { hasCardType, isArtifactCreature } = require('./_hooks');
+const { drawBlockedFor } = require('./_draw-block-shared');   // D1: Regel von Al
 const {
   QUEEN_NAME,
   SPARKFLY_NAMES,
@@ -98,7 +100,7 @@ function countSparkflies(engine, pi) {
   let n = 0;
   for (const inst of engine.cardInstances) {
     if (inst.zone !== 'support') continue;
-    if (!SPARKFLY_NAMES.includes(inst.name)) continue;
+    if (!hatNameIn(inst, SPARKFLY_NAMES)) continue;
     if ((inst.controller ?? inst.owner) !== pi) continue;
     n++;
   }
@@ -220,7 +222,7 @@ module.exports = {
     const pi = ctx.cardOwner;
     for (const inst of engine.cardInstances) {
       if (inst.zone !== 'support') continue;
-      if (inst.name !== QUEEN_NAME) continue;
+      if (!hatName(inst, QUEEN_NAME)) continue;   // Shroomasaur: Zusatzname zählt
       if ((inst.controller ?? inst.owner) !== pi) continue;
       return false; // already controlling one
     }
@@ -230,15 +232,17 @@ module.exports = {
   // ── Activated multi-mode effect ───────────────────────────────────
   creatureEffect: true,
 
+  // ★ W12 (Al, Q5): eine geliehene/wiederholte Verwendung (Grimoire, Kohta: `ctx._borrowedUse`) ignoriert die Einmal-Stempel je Modus.
   canActivateCreatureEffect(ctx) {
     const turn = ctx._engine.gs.turn || 0;
     const inst = ctx.card;
     const gifts = inst?.counters?._sparkflyGifts || {};
     // MAIN mode is always available (subject to per-mode HOPT). Gifts
     // require their respective tags. Any unused mode → activatable.
-    if (!isModeUsed(inst, 'main', turn)) return true;
-    if (gifts.architect && !isModeUsed(inst, 'architect', turn)) return true;
-    if (gifts.worker    && !isModeUsed(inst, 'worker',    turn)) return true;
+    if ((ctx._borrowedUse || !isModeUsed(inst, 'main', turn))) return true;
+    // D1 (Regel von Al): der Architect-Modus ist ein reiner Zug - unter Hand-/Zieh-Sperre kein Grund zur Aktivierung.
+    if (gifts.architect && (ctx._borrowedUse || !isModeUsed(inst, 'architect', turn)) && !drawBlockedFor(ctx._engine, ctx.cardOwner)) return true;
+    if (gifts.worker    && (ctx._borrowedUse || !isModeUsed(inst, 'worker',    turn))) return true;
     return false;
   },
 
@@ -253,13 +257,13 @@ module.exports = {
 
     // Build the mode picker — only show modes still unused this turn.
     const modeOptions = [];
-    if (!isModeUsed(inst, 'main', turn)) {
+    if ((ctx._borrowedUse || !isModeUsed(inst, 'main', turn))) {
       modeOptions.push({ id: 'main', label: '👑  Declare a card type' });
     }
-    if (gifts.architect && !isModeUsed(inst, 'architect', turn)) {
+    if (gifts.architect && (ctx._borrowedUse || !isModeUsed(inst, 'architect', turn)) && !drawBlockedFor(engine, pi)) {
       modeOptions.push({ id: 'architect', label: '✏️  Architect gift: draw to opponent\'s hand size' });
     }
-    if (gifts.worker && !isModeUsed(inst, 'worker', turn)) {
+    if (gifts.worker && (ctx._borrowedUse || !isModeUsed(inst, 'worker', turn))) {
       modeOptions.push({ id: 'worker', label: '🪲  Worker gift: opponent picks a non-Hero card → your hand' });
     }
     if (modeOptions.length === 0) return false;
@@ -285,13 +289,13 @@ module.exports = {
     let resolvedSomething = false;
     if (chosenMode === 'main') {
       resolvedSomething = await runMainEffect(ctx, engine, gs, pi, oi, inst);
-      if (resolvedSomething) markModeUsed(inst, 'main', turn);
+      if (resolvedSomething && !ctx._borrowedUse) markModeUsed(inst, 'main', turn);   // W13 (Al, Rueckfrage 9): geliehen = Zaehler bleibt
     } else if (chosenMode === 'architect') {
       resolvedSomething = await runArchitectGift(ctx, engine, gs, pi, oi);
-      if (resolvedSomething) markModeUsed(inst, 'architect', turn);
+      if (resolvedSomething && !ctx._borrowedUse) markModeUsed(inst, 'architect', turn);   // W13 (Al, Rueckfrage 9): geliehen = Zaehler bleibt
     } else if (chosenMode === 'worker') {
       resolvedSomething = await runWorkerGift(ctx, engine, gs, pi, oi);
-      if (resolvedSomething) markModeUsed(inst, 'worker', turn);
+      if (resolvedSomething && !ctx._borrowedUse) markModeUsed(inst, 'worker', turn);   // W13 (Al, Rueckfrage 9): geliehen = Zaehler bleibt
     }
 
     if (!resolvedSomething) {
@@ -305,9 +309,9 @@ module.exports = {
     // the global creature-effect HOPT so the player can fire another
     // mode this turn.
     const stillAnyUnused =
-      !isModeUsed(inst, 'main', turn)
-      || (gifts.architect && !isModeUsed(inst, 'architect', turn))
-      || (gifts.worker    && !isModeUsed(inst, 'worker',    turn));
+      (ctx._borrowedUse || !isModeUsed(inst, 'main', turn))
+      || (gifts.architect && (ctx._borrowedUse || !isModeUsed(inst, 'architect', turn)))
+      || (gifts.worker    && (ctx._borrowedUse || !isModeUsed(inst, 'worker',    turn)));
     if (stillAnyUnused) ctx._skipCreatureEffectHopt = true;
 
     return true;
@@ -550,7 +554,7 @@ async function runWorkerGift(ctx, engine, gs, pi, oi) {
     confirmClass: 'btn-warning',
     cancellable: false,
     exclusiveTypes: true,
-    maxPerType: { equip: 1, ability: 1, perm: 1, area: 1, surprise: 1 },
+    maxPerType: { equip: 1, ability: 1, perm: 1, area: 1, surprise: 1, coolnessStackTop: 1 },
   });
   if (!picked || picked.length === 0) {
     // Forced prompt with no pick — pick the first target as fallback

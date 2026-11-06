@@ -78,6 +78,11 @@ async function zeigeAuftritt(engine, ownerIdx) {
 }
 
 module.exports = {
+  // W27a (Al, 21.10.2026): „treated as an Attack" zählt als LEVEL 0 überall, wo eine Karte die Stufe der Quelle liest (Glass Wall, Test Flight, Escape Device, Stealth, Jetpack) — Engine: `_heldenEffektStufe`.
+  // W30a (Al, 21.10.2026): Bamboo Staff nennt den Helden als Angreifer (treated as that Hero hitting the target with an Attack) → die Stufe ist das FIGHTING-LEVEL
+  // des ausgerüsteten Helden (`fightingOfHost`: Quelle = Karteninstanz in den Zielwahl-/Reaktionsfenstern; im Treffer trägt das Quellobjekt den dynamischen Stempel). Ohne Instanz: 0.
+  // W32a (Al, 22.10.2026): allgemeine Regel „Zählt als Attack eines Helden = Ability-Level dieses Helden" (hier Fighting-Level des Trägers); die Deklaration trägt keine Sonderstufe mehr.
+  treatedAsAttack: { ability: 'Fighting' },
   requiresTarget: true,
   // ^ Tagged for Blinded gating — see cards/effects/_hooks.js (blinded status).
   activeIn: ['support'],
@@ -96,7 +101,10 @@ module.exports = {
       delete ctx.card.counters._bambooFiredOnTurn;
     },
 
-    onCardAddedFromDiscardToHand: async (ctx) => {
+    // W40a (Al, 22.10.2026, Punkt 3): `wdh` = Wiederholung durch Idej Sword - Kunagi („perform that Attack again"): derselbe Schlag, neues Ziel; das Weich-Einmal-pro-Zug (`_bambooFiredOnTurn`)
+    // wird weder geprüft noch neu gesetzt (der Auslöser — eine Karte aus der Ablage auf die Hand — ist keine Kosten des Schlags).
+    // ★ W42a (Al, 22.10.2026, Punkt 3): „when a card is added from your discard pile to your hand" ist die AKTIVIERUNGSBEDINGUNG, kein Preis — die Kunagi-Wiederholung verlangt KEINE weitere Ablagekarte (W41a zurückgenommen).
+    onCardAddedFromDiscardToHand: async (ctx, wdh) => {
       // Only react when the recovered card landed in OUR controller's
       // hand — opponents recovering their own cards must not fire our
       // Staff. (`cardOwner` already accounts for charm/steal.)
@@ -113,9 +121,11 @@ module.exports = {
       const feld    = ctx.cardHeroOwner ?? pi;   // Styx 28.9.: Brettseite des Helden
       const hero    = gs.players[feld]?.heroes?.[heroIdx];
       if (!hero?.name || hero.hp <= 0) return;
+      // W32a (Al, 22.10.2026): der Schlag ist ein Attack DES TRÄGERS — kann er nicht angreifen (Frozen, Stunned, Webbed, Negated, Attack-Sperren), löst der Stab nicht aus.
+      if (!engine.heroKannAngreifen(feld, heroIdx, pi)) return;
 
       // Per-instance soft-HOPT.
-      if (ctx.card.counters._bambooFiredOnTurn === gs.turn) return;
+      if (!wdh && ctx.card.counters._bambooFiredOnTurn === gs.turn) return;
 
       // Damage scales off the Hero's BASE Attack — printed-stat value,
       // unaffected by Vampiric Sword / Fighting / any buff or debuff.
@@ -134,7 +144,7 @@ module.exports = {
       // pick can't get re-entered by a sibling
       // onCardAddedFromDiscardToHand fire (Xiong tutoring multiple
       // cards in a single AoE wipe, for instance).
-      ctx.card.counters._bambooFiredOnTurn = gs.turn;
+      if (!wdh) ctx.card.counters._bambooFiredOnTurn = gs.turn;
 
       // Track damage targets via the spell-damage log so the fake
       // afterSpellResolved fire has accurate `damageTargets`.
@@ -143,7 +153,11 @@ module.exports = {
       // No "Activate?" confirmation step — the target picker IS the
       // opt-in path. Cancelling it is how the player declines, same
       // pattern Loyal Terrier's follow-up uses.
-      const target = await ctx.promptDamageTarget({
+      // ★ W39a: die Quelle des Schlags ist der Held (nicht die Bamboo-Staff-Instanz in der Support Zone, die Leser für eine Kreatur-Quelle halten: Firewall/Toxic Trap/Mountain Tear River).
+      const dmgSource = { name: hero.name, owner: pi, heroOwner: feld, heroIdx, treatedAsAttack: engine.heldenAngriffStempel(feld, heroIdx) };   // W30a: Stufe = Fighting-Level des Helden (war W27a: 0)
+      // ★ R-12 (Al 26.10.): `heldenEffektZielwahl` trennt Negierung im Zielfenster (Surprise, Hand-Reaktion, Schutz-/Redirect-Fenster) vom Abbruch des Spielers (W36a, wie Broghan & Co.).
+      const { target, negiert } = await engine.heldenEffektZielwahl(ctx, {
+        attackerSourceOverride: dmgSource,
         side: 'any',
         types: ['hero', 'creature'],
         damageType: 'attack',
@@ -154,8 +168,15 @@ module.exports = {
         confirmClass: 'btn-danger',
         cancellable: true,
       });
+      if (negiert) {
+        // R-12: negierter Schlag = verbraucht (Weich-Einmal-pro-Zug bleibt gestempelt) und zählt als gespielte Attack des Trägers.
+        delete gs._spellDamageLog;
+        await engine.zaehleAlsArt('attack', { pi, heroIdx, heroOwner: feld, name: CARD_NAME });
+        engine.sync();
+        return;
+      }
       if (!target) {
-        delete ctx.card.counters._bambooFiredOnTurn;
+        if (!wdh) delete ctx.card.counters._bambooFiredOnTurn;
         delete gs._spellDamageLog;
         return;
       }
@@ -180,7 +201,9 @@ module.exports = {
       });
       await engine._delay(380);
 
-      const dmgSource = { name: hero.name, owner: pi, heroOwner: feld, heroIdx };
+      // W32a (Al, 22.10.2026): der Schlag zählt als Attack des Trägers — Attack-Reaktionen (Magic Topaz, Arrows …) über die virtuelle Attack-Kette.
+      // W39a: dieselbe Kette meldet auch `afterSpellResolved` als Attack (vorher feuerte der Staff es selbst, ohne `heroOwner`).
+      await engine.alsAttackKette({ name: CARD_NAME, pi, heroIdx, heroOwner: feld, ziele: [target], wiederhole: () => module.exports.hooks.onCardAddedFromDiscardToHand(ctx, true), resolve: async () => {
       if (target.type === 'hero') {
         const tgtHero = gs.players[target.owner]?.heroes?.[target.heroIdx];
         if (tgtHero && tgtHero.hp > 0) {
@@ -192,28 +215,10 @@ module.exports = {
           { sourceOwner: pi, canBeNegated: true },
         );
       }
+      return true;
+      } });
 
-      // Collect unique struck targets from the damage log (matches
-      // Arthor's "treat as Attack" pattern), then fire afterSpellResolved
-      // with fake Attack data so anything that listens for "this Hero
-      // attacked" (Reiza poison+stun, Vampiric Sword heal redundancy,
-      // arrow rider clearing in server.js, …) chains naturally.
-      const uniqueTargets = [];
-      const seenIds = new Set();
-      for (const t of (gs._spellDamageLog || [])) {
-        if (!seenIds.has(t.id)) { seenIds.add(t.id); uniqueTargets.push(t); }
-      }
-      delete gs._spellDamageLog;
-
-      await engine.runHooks('afterSpellResolved', {
-        spellName: CARD_NAME,
-        spellCardData: FAKE_ATTACK_DATA,
-        heroIdx,
-        casterIdx: pi,
-        damageTargets: uniqueTargets,
-        isSecondCast: false,
-        _skipReactionCheck: true,
-      });
+      delete gs._spellDamageLog;   // W39a: `afterSpellResolved` (Attack) feuert die Kette `alsAttackKette` (oben), nicht mehr der Staff selbst
 
       engine.log('bamboo_staff_strike', {
         player: ps.username, hero: hero.name,

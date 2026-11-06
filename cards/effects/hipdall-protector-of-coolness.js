@@ -7,6 +7,14 @@
 //  Once per turn, when a card is removed from your
 //  Coolness Stack, you may add it to your hand and
 //  place the top of your deck on top of your Stack.
+//
+//  Als Ruling (Al 26.10.): Das Nachfuellen („if you do") gibt es nur,
+//  wenn Hipdalls EIGENES „add it to your hand" wirklich eine Karte auf
+//  die Hand bringt. Geht die Karte ohnehin schon auf die Hand (Cool
+//  Rescue) oder ist die Hand gesperrt, gibt es keine Frage und keinen
+//  Nachschub; der Einmal-Stempel bleibt unberuehrt. Bei liegender
+//  Wowhalla gilt der Stack auch leer als vorhanden (Nr. 55): holt
+//  Hipdall die LETZTE Karte, kommt die Deckkarte als Ersatz.
 // ═══════════════════════════════════════════
 
 const CARD_NAME = 'Hipdall, Protector of Coolness';
@@ -65,12 +73,25 @@ module.exports = {
       // counter; claim only after the player confirms.
       if (ctx.card?.counters?.[HOPT_KEY] === engine.gs.turn) return;
 
-      const cardName = ctx.cardName;
+      // `ctx.cardName` ist der ZUHOERER (Hipdall); die gehende Karte reicht
+      // die Engine als `leavingCardName` mit (A04-cute-09).
+      const cardName = ctx.leavingCardName;
+      if (!cardName) return;
       const toZone = ctx.toZone;
       // Skip if the target is the board (Glorious Rebirth, Modnir,
       // Swellpnir, Hipdall self-summon, Swagdri self-summon) — those
       // landings are deliberate placements.
       if (!toZone || toZone === 'support' || toZone === 'permanent') return;
+      // Als Ruling (Al 26.10.): „Hipdall legt nur die oberste Karte auf den Stack, wenn auch wirklich eine Karte auf der Hand ankommt."
+      // Landet die Karte ohnehin schon auf der Hand (Cool Rescue: „Add the top card of your Coolness Stack to your hand"), bringt Hipdalls
+      // „add it to your hand" nichts Neues -> weder Frage noch Nachfuellen. Dasselbe unter einer Hand-Sperre („cannot add cards to your hand").
+      if (toZone === 'hand') return;
+      if (engine.handZugangGesperrt(pi)) return;
+
+      // Die Karte muss noch dort liegen: hat ein anderer Hipdall sie in diesem Zug schon zurueckgeholt, gibt es nichts mehr zu fragen
+      // (die Frage waere umsonst und braeuchte den Einmal-Stempel dieses Hipdall auf).
+      if (toZone === 'discard' && !ps.discardPile.includes(cardName)) return;
+      if (toZone === 'deleted' && !ps.deletedPile.includes(cardName)) return;
 
       const confirmed = await engine.promptGeneric(pi, {
         type: 'confirm',
@@ -90,24 +111,19 @@ module.exports = {
       // Pull the card back out of the destination pile/hand if it landed.
       let recovered = false;
       if (toZone === 'discard') {
-        if (await engine.takeFromPile(ps, 'discard', cardName, { source: CARD_NAME, last: true, toHand: true })) recovered = true;   // v820: Stapel-Schicht
+        if (await engine.takeFromPile(ps, 'discard', cardName, { source: CARD_NAME, last: true, toHand: true, ohneZugangsFenster: true })) recovered = true;   // v820: Stapel-Schicht
       } else if (toZone === 'deleted') {
         if (await engine.takeFromPile(ps, 'deleted', cardName, { source: CARD_NAME, last: true })) recovered = true;   // v820: Stapel-Schicht
-      } else if (toZone === 'hand') {
-        // Already in hand — no-op.
-        recovered = true;
       }
       if (!recovered) return;
 
-      if (toZone !== 'hand') {
-        await engine.handZugang(ps, cardName, { von: 'ablage', source: CARD_NAME, ohneInstanz: true });
-        // Move the leaving inst back to hand. ctx.card on a leave-zone
-        // hook is the LISTENING inst (Hipdall itself); the leaving
-        // inst is exposed differently — we lookup by name+toZone.
-        const inst = engine.cardInstances.find(c => c.owner === pi && c.name === cardName && c.zone === toZone);
-        if (inst) inst.zone = 'hand';
-        else engine._trackCard(cardName, pi, 'hand');
-      }
+      await engine.handZugang(ps, cardName, { von: 'ablage', source: CARD_NAME, ohneInstanz: true, ohneZugangsFenster: true });   // W72a: kommt aus dem Coolness Stack, nicht aus Deck/Ablage (Control Monitors)
+      // Move the leaving inst back to hand. ctx.card on a leave-zone
+      // hook is the LISTENING inst (Hipdall itself); the leaving
+      // inst is exposed differently — we lookup by name+toZone.
+      const inst = engine.cardInstances.find(c => c.owner === pi && c.name === cardName && c.zone === toZone);
+      if (inst) inst.zone = 'hand';
+      else engine._trackCard(cardName, pi, 'hand');
       engine.log('hipdall_recover', { player: ps.username, card: cardName });
 
       // Push top of deck onto the Stack.
@@ -127,35 +143,42 @@ module.exports = {
 // Eligibility:
 //   • Hero must be alive (hp > 0).
 //   • Frozen / Stunned / Mummified Heroes cannot summon.
-//   • Negated Heroes can summon ONLY Lv-0 Creatures (matches the
-//     general rule for Negated — only Lv-0 cards bypass).
+//   • Negated Heroes: effect-only negation summons normally; with the
+//     ABILITIES negated (hard form) only Lv-0 Creatures (Welle 12, Al).
 //   • Hero must have at least one free Support Zone.
+//   • Hero must meet the Creature's level requirement ("summon", Q25).
 async function summonFromStack(engine, pi, cardName) {
   const ps = engine.gs.players[pi];
   if (!ps) return { aborted: true, reason: 'no_player' };
   const cardDB = engine._getCardDB();
   const cd = cardDB[cardName];
-  const isLv0 = (cd?.level || 0) === 0;
 
   const targets = [];
   for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
     const hero = ps.heroes[hi];
     if (!hero?.name || hero.hp <= 0) continue;
-    if (hero.statuses?.frozen || hero.statuses?.stunned) continue;
-    if (hero.statuses?.negated && !isLv0) continue;
+    // Welle 11 (Al, R5): „summon" erfordert einen aktionsfähigen Beschwörer (Frozen/Stunned/Webbed/Bound; gleiche Menge wie `canHeroSummon`).
+    // Welle 12 (Al, Rückfrage 2): ein Negierter beschwört wieder — Effekt-negiert normal, Abilities-negiert (harte Form) nur Lv-0 (die Ausnahme
+    // „Negated + Lv0" gilt wieder): das erledigt die Stufenprüfung `heroMeetsLevelReq` unten (harte Form -> leere Zonenmenge).
+    if (!require('./_summon-eligibility').heroAgiert(hero, engine, pi)) continue;   // W20c (Al 20.10.): nur der aktuelle Kontrolleur beschwoert mit dem Helden
     if (engine._isHeroMummified?.(pi, hi)) continue;
-    const slots = ps.supportZones?.[hi] || [];
+    // ★ Al, Welle 9 (Q25): „Sagt der Effekt 'summon', ist das Level nötig, bei
+    // 'place' nicht." Hipdall/Swagdri/Wildur werden vom Coolness Stack
+    // BESCHWOREN — der Held braucht die Stufe (Wildur Lv1: Summoning Magic 1).
+    // (Glorious Rebirth „Place that Creature" bleibt ohne Stufe.)
+    if (cd && !engine.heroMeetsLevelReq(pi, hi, cd)) continue;
+    // ★ W63a (Al, 22.10.2026: Alices Effekt gilt fuer ALLE Beschwoerungs-Effekte; „erst die geteilte Zone, DANN die erste leere"): freie Zonen UND — mit Alice-Teilung —
+    // die Zone einer GLEICHNAMIGEN Creature (`engine.beschwoerZonenFuer`); der Helden-Klick nimmt die erste Zone der Liste, also die geteilte.
     let leftmostFree = -1;
-    for (let si = 0; si < slots.length; si++) {
-      if (!slots[si] || slots[si].length === 0) {
-        if (leftmostFree < 0) leftmostFree = si;
-        targets.push({
-          id: `equip-${pi}-${hi}-${si}`,
-          type: 'equip',
-          owner: pi, heroIdx: hi, slotIdx: si,
-          cardName: '',
-        });
-      }
+    for (const zz of engine.beschwoerZonenFuer(pi, cardName, { heroIdx: hi, namedHeroesOnly: true })) {
+      if (leftmostFree < 0) leftmostFree = zz.slotIdx;
+      targets.push({
+        id: `equip-${pi}-${hi}-${zz.slotIdx}`,
+        type: 'equip',
+        owner: pi, heroIdx: hi, slotIdx: zz.slotIdx,
+        cardName: '',
+        ...(zz.shared ? { shared: true } : {}),
+      });
     }
     if (leftmostFree >= 0) {
       targets.push({

@@ -43,6 +43,9 @@ module.exports = {
       type: 'barrier_of_faith', owner: inst.owner, heroIdx: inst.heroIdx, zoneSlot: inst.zoneSlot,
     });
     await engine._delay(450);
+    // W71b (Al, 25.10.2026): HP auf 1 + spätere Löschung sind ein Effekt DIESER Karte auf die Kreatur (zusätzlich zum Fenster der Zerstörung) — Schutzfenster (Cool Rescuer Monia & Co.)
+    // VOR dem Schreiben. Negiert: die Karte rettet nicht, die Kreatur wird wie ohne Barrier besiegt.
+    if (!(await engine.kreaturBetroffen(inst, 'stats', { name: CARD_NAME, owner: reactorIdx }, { sourceOwner: reactorIdx, detail: 'barrier', isSacrifice: !!info?.isSacrifice }))) return { saved: false };
     if (!inst.counters) inst.counters = {};
     inst.counters.currentHp = 1;
     const besitzer = inst.owner;

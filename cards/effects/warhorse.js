@@ -78,5 +78,20 @@ module.exports = {
 
       ctx.modifyAmount(BONUS);
     },
+
+    // Kreaturenseite (F03-14): ein Angriff auf eine Kreatur läuft über den Stapelpfad, nicht über `beforeDamage`.
+    // Dieselben Bedingungen: „exactly 1 target" (Zielprotokoll) und der Angriff kommt vom Wirtshelden.
+    beforeCreatureDamageBatch: (ctx) => {
+      const hero = ctx.attachedHero;
+      if (!hero?.name || hero.hp <= 0) return;
+      const gs = ctx._engine.gs;
+      if ((gs._spellDamageLog?.length ?? 0) !== 1) return;
+      for (const e of (ctx.entries || [])) {
+        if (e.cancelled || e.isStatusDamage || e.type !== 'attack') continue;
+        if (e.source?.heroIdx !== ctx.cardHeroIdx) continue;
+        if (!ctx._engine.quelleIstHeld(e.source, ctx.cardHeroOwner ?? ctx.cardOwner, ctx.cardHeroIdx)) continue;
+        e.modifyAmount(BONUS);
+      }
+    },
   },
 };

@@ -1,4 +1,5 @@
-const { areaTargetId } = require('./_targeting-shared');
+const { areaTargetId, coolnessSpitzeZiel, supportAbilityZiel } = require('./_targeting-shared');
+const { anyName, hatName } = require('./_alias-name');   // Shroomasaur: Zusatzname zählt
 // ═══════════════════════════════════════════
 //  Shared Sparkfly archetype helpers.
 //
@@ -35,7 +36,7 @@ function isNonQueenSparkfly(name) {
 function findControlledQueen(engine, playerIdx) {
   for (const inst of engine.cardInstances) {
     if (inst.zone !== 'support') continue;
-    if (inst.name !== QUEEN_NAME) continue;
+    if (!hatName(inst, QUEEN_NAME)) continue;   // Shroomasaur: Zusatzname „Sparkfly Queen" zählt (Worker: „while you control a Sparkfly Queen")
     if ((inst.controller ?? inst.owner) !== playerIdx) continue;
     return inst;
   }
@@ -52,7 +53,7 @@ function findSacrificeCandidates(engine, playerIdx) {
   const out = [];
   for (const inst of engine.cardInstances) {
     if (inst.zone !== 'support') continue;
-    if (!isNonQueenSparkfly(inst.name)) continue;
+    if (!anyName(inst, isNonQueenSparkfly)) continue;
     if ((inst.controller ?? inst.owner) !== playerIdx) continue;
     out.push(inst);
   }
@@ -165,10 +166,14 @@ function grantInheritedAbility(queenInst, sourceName) {
  * after the aura strip to make sure the gift doesn't accidentally
  * lose its non-damage immunity.
  */
-function refreshAttendantAura(engine, playerIdx) {
+function refreshAttendantAura(engine, playerIdx, opts = {}) {
+  // `opts.ausserId`: ein Attendant, der gerade geht - sein Abgangs-Hook feuert,
+  // solange er noch in der Zone `support` gefuehrt wird; er zaehlt nicht mehr (A05-11).
   const hasAttendant = engine.cardInstances.some(inst =>
     inst.zone === 'support'
     && inst.name === 'Sparkfly Attendant'
+    && inst.id !== opts.ausserId
+    && !inst.counters?.negated && !inst.counters?.nulled   // W5b-Z3 (Al): ein negierter Attendant gibt keinen Schutz mehr
     && (inst.controller ?? inst.owner) === playerIdx,
   );
 
@@ -226,20 +231,31 @@ function collectNonHeroBoardTargets(gs, engine) {
     seen.add(inst.id);
 
     if (inst.zone === 'support') {
+      if (engine.zaehltAlsHeld && engine.zaehltAlsHeld(inst)) continue;   // W79 (White Sacrificial Bull): zählt auch als Hero → kein „Nicht-Held"-Ziel
+      const sa = supportAbilityZiel(engine, inst);   // 25.10.: Ability in einer Support Zone = Ability-Stapel (ein Ziel, oberste Kopie)
+      if (sa !== undefined) { if (sa) targets.push(sa); continue; }
+      // ★ Darion: mehrere Equips im selben Platz = EIN Ziel je Platz (wie `_targeting-shared`); welche Karte gemeint ist, fragt `engine._disambiguateStackedTargets`.
+      const _id = `equip-${_brettSeite(engine, inst)}-${inst.heroIdx}-${inst.zoneSlot}`;
+      const _erstes = targets.find(x => x.id === _id);
+      if (_erstes && engine.istEquipArtifact && engine.istEquipArtifact(inst) && engine.istEquipArtifact(_erstes._cardInstance)) continue;
       targets.push({
         // ★ 26.9. (Als Befund, Crimson Web): ID und `owner` nennen die Seite, auf
         // der die Zone LIEGT — sonst findet der Client sie nicht. Eine an
         // den Angreifer angelegte Crimson Web gehoert dem Verteidiger,
         // steckt aber in einer Support Zone des Angreifers.
-        id: `equip-${_brettSeite(engine, inst)}-${inst.heroIdx}-${inst.zoneSlot}`,
+        id: _id,
         type: 'equip', owner: _brettSeite(engine, inst), heroIdx: inst.heroIdx, slotIdx: inst.zoneSlot,
         cardName: inst.name, _cardInstance: inst,
       });
     } else if (inst.zone === 'ability') {
       const slot = gs.players[inst.owner]?.abilityZones?.[inst.heroIdx]?.[inst.zoneSlot] || [];
       if (slot.length > 0 && slot[slot.length - 1] !== inst.name) continue;
+      // Ein Stapel gleichnamiger Karten (Ability Lv 2/3) hat mehrere Instanzen im selben Platz: EIN Ziel je Stapel (eindeutige ID), und zwar die letzte (= oberste) Kopie — wie `supportAbilitySpitze`.
+      const _abId = `ability-${inst.owner}-${inst.heroIdx}-${inst.zoneSlot}`;
+      const _abErst = targets.find(x => x.id === _abId);
+      if (_abErst) { _abErst._cardInstance = inst; continue; }
       targets.push({
-        id: `ability-${inst.owner}-${inst.heroIdx}-${inst.zoneSlot}`,
+        id: _abId,
         type: 'ability', owner: inst.owner, heroIdx: inst.heroIdx, slotIdx: inst.zoneSlot,
         cardName: inst.name, _cardInstance: inst,
       });
@@ -264,11 +280,16 @@ function collectNonHeroBoardTargets(gs, engine) {
         cardName: inst.name, _cardInstance: inst,
       });
     } else if (inst.zone === 'surprise') {
+      // W17a (Al, 19.10.2026: any card on the board that is not a Hero - auch verdeckte Surprises): Client-ID einer Surprise-Zone wie _targeting-shared (v706); die alte equip-…-surprise-ID war unklickbar.
       targets.push({
-        id: `equip-${inst.owner}-${inst.heroIdx}-surprise`,
-        type: 'equip', owner: inst.owner, heroIdx: inst.heroIdx,
+        id: `surprise-${inst.owner}-${inst.heroIdx}`,
+        type: 'surprise', owner: inst.owner, heroIdx: inst.heroIdx,
         cardName: inst.name, _cardInstance: inst,
       });
+    } else if (inst.zone === 'coolnessStack') {
+      // W19a (Al, 19.10.2026): „any card on the board that is not a Hero" bietet auch die oberste Karte der Coolness Stacks an.
+      const spitze = coolnessSpitzeZiel(engine, inst);
+      if (spitze) targets.push(spitze);
     }
   }
 
@@ -291,8 +312,27 @@ async function stealBoardCardToHand(engine, pi, targetInst, sourceName) {
   const gs = engine.gs;
   const ps = gs.players[pi];
   if (!ps) return false;
+  // Z6 (F01-21): Hand-Sperre ("cannot draw or add cards to your hand") gilt auch fuer diesen Brett->Hand-Weg
+  // (Capture Net, Sparkfly Queen/Worker). Die Such-Sperre nicht - Add aus dem BRETT ist Gruppe D (Al 14.9.).
+  if (engine.handZugangGesperrt?.(pi)) {
+    engine.log('steal_to_hand_blocked', { card: targetInst.name, by: sourceName, reason: 'handLocked' });
+    return false;
+  }
 
-  const owner    = targetInst.owner;
+  // W19a (Al, 19.10.2026): die oberste Karte eines Coolness Stacks ist ein gültiges Ziel („any card on the board that is not a Hero").
+  if (targetInst.zone === 'coolnessStack') return await _stackSpitzeAufHand(engine, pi, targetInst, sourceName);
+
+  // 25.10.2026 (Xal-Runde 4): eine Ability (Ability Zone ODER Support Zone) wandert nur als OBERSTE KOPIE auf die Hand, und die Leafagami Snake schützt sie wie überall
+  // („When Abilities would be removed from Heroes you control, don't remove them and draw a card instead"): sie bleibt liegen, der Kontrolleur der Schlange zieht.
+  if (await engine.abilityEntfernungVerhindert(targetInst, 'hand', { source: { name: sourceName, owner: pi } })) {
+    engine.log('steal_to_hand_blocked', { card: targetInst.name, by: sourceName, reason: 'Leafagami Snake' });
+    return false;
+  }
+  const _supAbility = engine.istAbilityImSupport(targetInst);
+
+  // W66d: Brettseite einer Support-Karte = wo ihre Zone liegt (`physicalSide`), nicht `inst.owner` — Plant Golem (Besitzer = Beschwoerer, liegt beim Gegner) und
+  // eine an den Angreifer angelegte Crimson Web blieben sonst als Geister-Name in ihrer Zone stehen (die Zone der FALSCHEN Seite wurde geleert).
+  const owner    = targetInst.zone === 'support' ? _brettSeite(engine, targetInst) : targetInst.owner;
   const heroIdx  = targetInst.heroIdx;
   const zoneSlot = targetInst.zoneSlot;
   const zone     = targetInst.zone;
@@ -306,11 +346,30 @@ async function stealBoardCardToHand(engine, pi, targetInst, sourceName) {
   // the steal-to-hand silently fizzles. Mirrors the same guard in
   // actionTransferCreature / actionDestroyCard / the Deepsea
   // return-to-hand helper. Callers treat `false` as "didn't move".
-  if (engine.isOmniImmune?.(targetInst)) {
+  if (engine.isOmniImmune?.(targetInst, pi)) {   // W17b: Golden Wings – Quelle = der Nehmende
     engine.log('cardinal_immune_block', {
       card: cardName, by: sourceName, action: 'steal_to_hand',
     });
     return false;
+  }
+
+  // W16c (A05-20): Schutzkarten (Winged Skeleton: "chosen by an opponent's card ... negate") lesen `beforeCreatureAffected` ('move') -
+  // dieser Brett->Hand-Weg macht rohe Zonen-Splices und umgeht `actionMoveCard`, das den Haken sonst feuert.
+  if (zone === 'support' && !engine.isTokenCard?.(targetInst)) {
+    const cdAff = engine.getEffectiveCardData?.(targetInst) || engine._getCardDB()[cardName];
+    if (cdAff && require('./_hooks').hasCardType(cdAff, 'Creature')) {
+      const affCtx = {
+        creature: targetInst, effectType: 'move',
+        source: { name: sourceName, owner: pi },
+        cancelled: false, _skipReactionCheck: true,
+      };
+      await engine.runHooks('beforeCreatureAffected', affCtx);
+      if (affCtx.cancelled) {
+        engine.log('steal_to_hand_blocked', { card: cardName, by: sourceName, reason: 'creature protection' });
+        engine.sync();
+        return false;
+      }
+    }
   }
 
   // Defending the Gate — the Surprise that shields a side's Support
@@ -330,10 +389,50 @@ async function stealBoardCardToHand(engine, pi, targetInst, sourceName) {
     }
   }
 
+  // ★ 23.10. (Kidnapping, Als Befund: „die gestohlene Creature fliegt zweimal auf die Hand“): Flug und Floater-Sperre gehen VOR jeder Zustandsänderung raus
+  // (Muster `gold-trap.js`). `handZugangSync` und die Leave-Hooks pushen den Zustand (`sync`) — kam der Zustand „Hand gewachsen, Kreatur vom Brett weg“ im Client VOR dem
+  // `play_pile_transfer`, lief dessen automatischer Hand-Diff-Melder (zusätzlicher Zieh-Flug) los, bevor die Unterdrückung gesetzt war (Wettlauf, nur manchmal sichtbar), und
+  // das Verschwinden der Kreatur las der Schadens-Melder als tödlichen Treffer (Schadenszahl am alten Platz): `creature_zone_move` sperrt das. Folgt der Zustand dem Event,
+  // fängt der Client die Quelle noch am echten Platz ab und blendet sie für den Flug aus.
+  const istTokenKarte = !!engine.isTokenCard?.(targetInst);
+  // Der Platz, den die Karte auf der Hand einnimmt — gerechnet OHNE die gerade aufgelöste Karte (Kidnapping, Mine! …): sie liegt bis zum Ende der Auflösung noch in der Hand und verlässt
+  // sie gleich danach; die Flugkopie soll auf dem Platz der FERTIGEN Hand landen, sonst springt die echte Karte beim Eintreffen um einen Platz zur Seite.
+  const handBasis = engine._handIndizesOhneAufloesende ? engine._handIndizesOhneAufloesende(ps).length : ps.hand.length;
+  const handPlatz = handBasis;
+  const zoneBekannt = ['support', 'ability', 'permanent', 'area', 'surprise'].includes(zone);   // sonst bricht es unten ohne Wirkung ab
+  if (zone === 'support') engine._broadcastEvent('creature_zone_move', { owner, heroIdx, zoneSlot });
+  if (zoneBekannt && !istTokenKarte) {
+    const fromPile = (zone === 'support' || zone === 'ability' || zone === 'surprise')
+      ? zone
+      : (zone === 'permanent' ? 'permanent' : 'area');
+    engine._broadcastEvent('play_pile_transfer', {
+      fromOwner: owner,
+      toOwner: pi,
+      cardName,
+      from: fromPile,
+      to: 'hand',
+      fromHeroIdx: heroIdx,
+      fromSlotIdx: zoneSlot,
+      // `play_pile_transfer`'s permanent-zone selector keys on `permId`
+      // (Mass Multiplication / Deepsea swaps both pass it). Read it off
+      // the original instance's counter — falls back gracefully to the
+      // instance's id, which the handler accepts as a permId match.
+      fromPermId: targetInst.counters?.permId || targetInst.id,
+      toHandIdx: handPlatz,
+      finalHandSize: handBasis + 1,
+    });
+  }
+
   // Remove from its source zone.
   if (zone === 'support') {
     if (ownerPs.supportZones?.[heroIdx]) {
-      ownerPs.supportZones[heroIdx][zoneSlot] = [];
+      // Nur DIESE Karte nehmen: liegen mehrere Karten im Platz (Darion: Equip-Stapel; Alices Kreaturenstapel; ein Ability-Stapel von Xal/Xalibur), bleiben die anderen liegen.
+      const arr = ownerPs.supportZones[heroIdx][zoneSlot];
+      // Ein Ability-Stapel verliert seine OBERSTE Kopie (letzter gleichnamiger Eintrag, die Stufe sinkt um 1).
+      const idx = Array.isArray(arr) && _supAbility ? arr.lastIndexOf(cardName) : -1;
+      if (idx >= 0 && arr.length > 1) arr.splice(idx, 1);
+      else if (Array.isArray(arr) && !_supAbility && arr.length > 1 && arr.includes(cardName)) engine.entferneNameAmPlatz(arr, targetInst);   // Darion: nur die Karte, nicht den ganzen Platz
+      else ownerPs.supportZones[heroIdx][zoneSlot] = [];
     }
   } else if (zone === 'ability') {
     const slot = ownerPs.abilityZones?.[heroIdx]?.[zoneSlot];
@@ -365,8 +464,10 @@ async function stealBoardCardToHand(engine, pi, targetInst, sourceName) {
   // Fire onCardLeaveZone for the moved card so any departing-listeners
   // (Pollution Piranha leave-hand-discard etc.) react before we stamp
   // it as hand-resident.
+  // ★ Darion (Equip-Stapel): `leavingCard` benennt die abgehende Karte — ohne sie hoeren auch die Stapelnachbarn „ich verlasse die Zone" (gleiche Koordinaten) und nehmen ihre Boni zurueck.
   await engine.runHooks('onCardLeaveZone', {
     card: targetInst,
+    leavingCard: targetInst,   // 25.10.: ohne `leavingCard` erkennt die Engine eine Ability in einer Support Zone nicht (Fighting nimmt sonst seinen ATK-Bonus nicht zurück)
     fromZone: zone,
     fromOwner: owner,
     fromHeroIdx: heroIdx,
@@ -377,34 +478,20 @@ async function stealBoardCardToHand(engine, pi, targetInst, sourceName) {
   // Untrack the original board instance, then re-track in hand under pi
   // with originalOwner pinned to the source side.
   engine._untrackCard(targetInst.id);
-  const newInst = engine.handZugangSync(ps, cardName, { von: 'brett' });
-  newInst.originalOwner = owner;
+  // W5a (Al 14.10.2026): ein Token ist ein legales Ziel, verschwindet aber vollstaendig (kommt nie auf die Hand);
+  // eine echte Karte darunter (Biomancy-/Boulder-Token) wird gelöscht. Der Effekt gilt als ausgefuehrt.
+  if (engine.tokenAbgang(targetInst)) {
+    engine.log('sparkfly_steal', { by: sourceName, player: ps.username, card: cardName, fromZone: zone, fromOwner: gs.players[owner]?.username, token: true });
+    engine.sync();
+    return true;
+  }
+  // W16c (A05-13): die Herkunft wird auch als Hand-PLATZ-Marke gesetzt (`originalOwner`-Option) - der Abwurf/Spielweg liest zuerst den Platz,
+  // erst danach die Instanz; ohne die Platzmarke landete eine dauerhaft uebernommene Fremdkreatur in der Ablage des Uebernehmers.
+  const newInst = engine.handZugangSync(ps, cardName, { von: 'brett', originalOwner: engine.kartenBesitzerVon(targetInst) });
+  // W3 (Al 14.10.2026): die Karte bleibt Eigentum ihres PERMANENTEN Besitzers (nicht der Brettseite, auf der sie gerade liegt).
+  if (newInst) newInst.originalOwner = engine.kartenBesitzerVon(targetInst);
 
-  // Authoritative flight animation — start at the EXACT board slot the
-  // card was sitting in (not the receiver's deck/hand). The
-  // `play_pile_transfer` handler suppresses the auto hand-grew detector
-  // for this arrival, so this is the sole visual for the move.
-  // `fromOwner` (board side) and `toOwner` (receiver) are different —
-  // the cross-player path the handler supports.
-  const newHandIdx = ps.hand.length - 1;
-  const fromPile = (zone === 'support' || zone === 'ability' || zone === 'surprise')
-    ? zone
-    : (zone === 'permanent' ? 'permanent' : 'area');
-  engine._broadcastEvent('play_pile_transfer', {
-    fromOwner: owner,
-    toOwner: pi,
-    cardName,
-    from: fromPile,
-    to: 'hand',
-    fromHeroIdx: heroIdx,
-    fromSlotIdx: zoneSlot,
-    // `play_pile_transfer`'s permanent-zone selector keys on `permId`
-    // (Mass Multiplication / Deepsea swaps both pass it). Read it off
-    // the original instance's counter — falls back gracefully to the
-    // instance's id, which the handler accepts as a permId match.
-    fromPermId: targetInst.counters?.permId || targetInst.id,
-    toHandIdx: newHandIdx,
-  });
+  // (Der Flug ist oben schon rausgegangen — VOR dem Zustand, s. dort.)
   engine.log('sparkfly_steal', {
     by: sourceName,
     player: ps.username,
@@ -413,11 +500,47 @@ async function stealBoardCardToHand(engine, pi, targetInst, sourceName) {
     fromOwner: gs.players[owner]?.username,
   });
 
-  await engine.runHooks('onCardAddedToHand', {
-    playerIdx: pi, card: newInst, cardName,
-    source: sourceName, _skipReactionCheck: true,
-  });
+  if (newInst) {   // Ankhota: eine gelöschte Kreatur kam nie auf die Hand
+    await engine.runHooks('onCardAddedToHand', {
+      playerIdx: pi, card: newInst, cardName,
+      source: sourceName, _skipReactionCheck: true,
+    });
+  }
 
+  engine.sync();
+  return true;
+}
+
+/**
+ * W19a: oberste Karte des Coolness Stacks (`targetInst.owner`) auf die Hand von `pi`; sie bleibt Eigentum ihres Besitzers
+ * (`originalOwner`, wie jede Brettkarte hier). Der Stapel wird über `actionPopCoolnessStackTo(…, 'board')` abgebaut (Array + Instanz).
+ */
+async function _stackSpitzeAufHand(engine, pi, targetInst, sourceName) {
+  const gs = engine.gs;
+  const ps = gs.players[pi];
+  const owner = targetInst.owner;
+  const stack = gs.players[owner]?.coolnessStack || [];
+  if (!ps || stack.length === 0 || stack[stack.length - 1] !== targetInst.name) return false;
+  const popped = await engine.actionPopCoolnessStackTo(owner, 'board');
+  if (!popped) return false;
+  const cardName = popped.cardName;
+  await engine.runHooks('onCardLeaveZone', {
+    card: popped.inst, cardName, leavingCardName: cardName,
+    fromZone: 'coolnessStack', fromOwner: owner, toZone: 'hand', toOwner: pi,
+    _skipReactionCheck: true,
+  });
+  const newInst = engine.handZugangSync(ps, cardName, { von: 'brett', originalOwner: owner });
+  if (newInst) newInst.originalOwner = owner;
+  engine.log('sparkfly_steal', {
+    by: sourceName, player: ps.username, card: cardName,
+    fromZone: 'coolnessStack', fromOwner: gs.players[owner]?.username,
+  });
+  if (newInst) {
+    await engine.runHooks('onCardAddedToHand', {
+      playerIdx: pi, card: newInst, cardName,
+      source: sourceName, _skipReactionCheck: true,
+    });
+  }
   engine.sync();
   return true;
 }

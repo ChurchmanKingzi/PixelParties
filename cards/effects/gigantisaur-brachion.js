@@ -163,15 +163,14 @@ module.exports = {
 
       // Pay the discard cost. If it fails (hand emptied between
       // prompt and now), bail without redirecting.
-      const handBefore = ps.hand.length;
-      await engine.actionPromptForceDiscard(pi, 1, {
+      // ★ W74c: von Boris erlassene Kosten gelten als bezahlt.
+      const kosten = await engine.zahleAbwurfKosten(pi, 1, {
       costFor: CARD_NAME,          // ★ v1041: Kosten-Abwurf-Lernkanal
       costKind: 'protect',
         title: CARD_NAME,
         source: CARD_NAME,
-        selfInflicted: true,
       });
-      if (ps.hand.length >= handBefore) return;
+      if (!kosten.bezahlt) return;
 
       // Cancel the original damage on the Hero.
       ctx.cancelled = true;

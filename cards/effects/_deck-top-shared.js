@@ -44,6 +44,7 @@ async function decke(engine, pi, name, opts = {}) {
   const ps = engine.gs.players[pi];
   const dest = opts.dest || 'deck';
   engine.log('hand_card_revealed', { player: ps?.username, card: name, by: opts.source || null });
+  engine.meldeAufgedeckt?.(pi, [name], { zone: 'deck', source: opts.source || null });   // Atta: aufgedeckt aus dem Deck
   engine._broadcastEvent('mill_center_reveal', {
     owner: pi, cardNames: [name], revealMs: REVEAL_MS, dest,
     ...(dest === 'support' ? { destHeroIdx: opts.destHeroIdx, destSlotIdx: opts.destSlotIdx, destSide: opts.destSide } : {}),
@@ -61,6 +62,7 @@ async function haltenImZentrum(engine, pi, name, opts = {}) {
   engine._haltZaehler = (engine._haltZaehler || 0) + 1;
   const key = `${pi}-${engine.gs.turn}-${engine._haltZaehler}`;
   engine.log('hand_card_revealed', { player: ps?.username, card: name, by: opts.source || null });
+  engine.meldeAufgedeckt?.(pi, [name], { zone: 'deck', source: opts.source || null });   // Atta: aufgedeckt aus dem Deck
   engine._broadcastEvent('mill_center_reveal', {
     owner: pi, cardNames: [name], revealMs: HALT_EIN_MS, dest: 'center', hold: true, holdKey: key,
   });

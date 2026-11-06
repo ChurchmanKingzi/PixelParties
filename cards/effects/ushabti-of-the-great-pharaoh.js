@@ -46,7 +46,7 @@ module.exports = {
     // Boardzustand mit Folgefehler-Flut) und crashte dann bei
     // `inst.zone = …` ("Cannot set properties of undefined").
     const inst = target.cardInstance || engine.cardInstances.find(c =>
-      c.zone === 'support' && (c.controller ?? c.owner) === target.owner
+      c.zone === 'support' && engine.physicalSide(c) === target.owner   // A08-16: Brettseite, nicht Besitzer/Kontrolleur
       && c.heroIdx === target.heroIdx && c.zoneSlot === target.slotIdx
       && c.name === cardName);
     if (!inst || inst.zone !== 'support') return false; // sauber abbrechen — VOR jeder Mutation
@@ -54,11 +54,14 @@ module.exports = {
     const heroIdx = target.heroIdx;
     const slotIdx = target.slotIdx;
     const ps = gs.players[heroOwner];
+    if (engine.surprisesLockedFor(pi)) return false;   // Arcane Eyes (Welle 72): der Gegner kontrolliert wirksame Augen — keine Surprise setzen
 
     if ((ps.surpriseZones?.[heroIdx] || []).length > 0) return false;
 
     await engine._triggerGateCheck(heroOwner, 'Ushabti of the Great Pharaoh');
     if (engine._isGateShielded(heroOwner)) return false;
+    // W71b (Al, 25.10.2026): das Verschwinden der Kreatur in die Surprise Zone ist ein Effekt auf sie — Schutzfenster (Cool Rescuer Monia & Co.), NACH dem Tor, VOR der ersten Änderung.
+    if (!(await engine.kreaturBetroffen(inst, 'move', { name: 'Ushabti of the Great Pharaoh', owner: pi }, { sourceOwner: pi, detail: 'entomb' }))) return false;
 
     engine._broadcastEvent('play_zone_animation', {
       type: 'sand_reset', owner: heroOwner, heroIdx, zoneSlot: slotIdx,
@@ -86,8 +89,14 @@ module.exports = {
     inst.zoneSlot = 0;
     inst.faceDown = true;
     inst.knownToOpponent = true;
+    // Al (Ruling 26.10.): eine eingelagerte Kreatur ist keine Kreatur auf dem Feld mehr — Schaden und Status wandern NICHT mit, sie kommt frisch zurück (volle HP, keine Status),
+    // genau wie beim Zurücksetzen der Camel-/PACMAN-Kreaturen (`_resetCreatureForSurpriseZone`). VOR dem Setzen der Ushabti-Marken: der gemeinsame Reset räumt sie ab (B1/S5).
+    engine._resetCreatureForSurpriseZone(inst);
     inst.ushabtiPlaced = true;
     inst.ushabtiTurn = gs.turn || 0;
+    // W16d (A08-17): die Surprise Zone gehört zur SEITE des Helden (`heroOwner`) – bei einer seitenfremd beschworenen Kreatur
+    // (Plant Golem: Besitzer 0, steht auf Seite 1) ist das nicht `inst.owner`. Der Beschwörungsweg (server.js) liest diese Seite.
+    inst.ushabtiSide = heroOwner;
 
     engine.log('ushabti_entomb', { card: cardName, player: ps.username, hero: ps.heroes?.[heroIdx]?.name });
 
@@ -129,7 +138,7 @@ function _getEligibleCreatures(gs, engine) {
 
         if (engine) {
           const inst = engine.cardInstances.find(c =>
-            (c.owner === pi || c.controller === pi) && c.zone === 'support' && c.heroIdx === hi && c.zoneSlot === si && c.name === cardName
+            c.zone === 'support' && engine.physicalSide(c) === pi && c.heroIdx === hi && c.zoneSlot === si && c.name === cardName
           );
           if (inst?.faceDown) continue;
           targets.push({

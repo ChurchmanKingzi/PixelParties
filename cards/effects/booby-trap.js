@@ -18,6 +18,10 @@
 const { resolveSourceCreature, isCreatureSource, isAttackSpellOrCreatureSource } = require('./_hooks');
 
 module.exports = {
+  // ★ Z7b: „Negate that Spell/Attack/effect" = die gewirkte Karte löst NIE auf → ihre Einmal-Stempel werden zurückgegeben
+  // (Engine: `_merkeGanzeNegation`). Teil-Negierungen („… on that Hero", Schaden) tragen das Flag nicht.
+  negatesWholeCard: true,
+
   // ★★ v1182 — ENTKOPPELTE BILDER (CARD_API): wird die Karte NEGIERT,
   // laeuft ihr Effekt-Rumpf nie — die Engine spielt dann diese Bilder.
   // Im normalen Weg bleibt es bei den Broadcasts im Effekt selbst.
@@ -130,7 +134,7 @@ module.exports = {
       await engine._delay(400);
 
       // If the creature was killed, negate the entire effect
-      if ((srcInst.counters?.currentHp ?? 0) <= 0) {
+      if (engine.creatureCurrentHp(srcInst) <= 0) {   // Z5: Schaden verpufft/negiert = unversehrt, nicht getoetet
         engine.log('surprise_negate', {
           card: 'Booby Trap', killed: srcInst.name,
           player: gs.players[ctx.cardOwner]?.username,

@@ -72,8 +72,17 @@ function chaorcFreshSacCandidates(engine, pi, selfId) {
   return cs.filter(keep);
 }
 
-/** First empty Support-Zone slot (0–2) on `heroIdx`, or -1 if full. */
-function firstFreeSupportSlot(engine, pi, heroIdx) {
+/**
+ * First empty Support-Zone slot (0–2) on `heroIdx`, or -1 if full.
+ * ★ W63a (Al, 22.10.2026: Alices Effekt gilt fuer ALLE Beschwoerungs-/Platzierungs-Effekte; „erst die geteilte Zone, DANN die erste leere"): mit `name` (und
+ * dem Beschwoerer `sharer`, Standard `pi`) zaehlt auch die Zone einer GLEICHNAMIGEN Creature (Alice-Teilung) — sie kommt VOR der ersten leeren.
+ * `pi` ist hier die BRETTSEITE des Helden.
+ */
+function firstFreeSupportSlot(engine, pi, heroIdx, name = null, sharer = pi) {
+  if (name) {
+    const z = engine.ersteBeschwoerZone(sharer, name, { seite: pi, heroIdx, nurBasis: true, namedHeroesOnly: true });
+    return z ? z.slotIdx : -1;
+  }
   const zones = engine.gs.players[pi]?.supportZones?.[heroIdx] || [];
   for (let z = 0; z < 3; z++) {
     if ((zones[z] || []).length === 0) return z;

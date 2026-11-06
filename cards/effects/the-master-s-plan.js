@@ -74,10 +74,10 @@ module.exports = {
     for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
       const hero = ps.heroes[hi];
       if (!hero?.name || hero.hp <= 0) continue;
-      if (hero.statuses?.frozen || hero.statuses?.stunned || hero.statuses?.negated) continue;
+      if (hero.statuses?.frozen || hero.statuses?.stunned) continue;   // W13 (Al, A2): `negated` sperrt die Reaktion nicht mehr
       if (engine.heroMeetsLevelReq(pi, hi, cardData)) return true;
     }
-    return false;
+    return !!engine.fremderHeldKannStufe(pi, "The Master's Plan");   // W20c: auch ein uebernommener Held wirkt
   },
 
   /**
@@ -109,7 +109,7 @@ module.exports = {
     const selfLink = chain[myIndex];
     const casterHeroIdx = selfLink?.casterHeroIdx ?? selfLink?.heroIdx ?? 0;
     engine._broadcastEvent('play_zone_animation', {
-      type: 'plague_smoke', owner: pi,
+      type: 'plague_smoke', owner: selfLink?.heroOwner ?? pi,   // W20c: Brettseite des Wirkers (uebernommener Held)
       heroIdx: casterHeroIdx, zoneSlot: -1,
     });
     await engine._delay(500);
@@ -165,6 +165,7 @@ module.exports = {
     engine.queuePostChainAction(async () => {
       await engine.performImmediateActionAnyHero(oppIdx, {
         title: "The Master's Plan",
+        mitUebernommenenAktionen: true,   // W36a (Al, 22.10.2026): auch Abilities/Heldeneffekte eines UEBERNOMMENEN Helden des Opfers (allgemeine Regel: Klau-Effekte hindern das Handeln nicht)
         description: 'Your card was negated. You may perform a different Action with any Hero — or skip.',
         cancellable: true,
       });

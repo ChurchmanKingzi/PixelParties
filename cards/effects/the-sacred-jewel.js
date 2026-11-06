@@ -34,6 +34,9 @@
 const CARD_NAME = 'The Sacred Jewel';
 
 module.exports = {
+  // ★ Welle 11 (Q66, Al): trifft den Gegner nur mit Nicht-Schadens-Effekten (Ziehen für beide Spieler) — gegen den durch die Erste-Runden-Immunität
+  // geschützten Spieler unspielbar (`engine.ersterZugGeschuetzt`, Sperr-Stutzen `_cardBlockedBySearchLock`).
+  blockedByFirstTurnProtection: true,
   // Greys out the card in hand when the caster is hand-locked — the
   // draw effect would fizzle with nothing happening, so the server's
   // use_artifact_effect handler refuses activation in that state.

@@ -1,0 +1,29 @@
+{
+ "beschreibung": "Farben, die der Spielgestalter exakt vorgibt. Sie werden von scripts/palette/build_palette.py unverändert als Zentralfarben in die Palette aufgenommen (nie auf Nachbarfarben gerastet) und von der Oberfläche exakt verwendet.",
+ "farben": [
+  {
+   "hex": "#fad54a",
+   "name": "Gold hell (Münze)"
+  },
+  {
+   "hex": "#f29a3e",
+   "name": "Gold orange (Münze)"
+  },
+  {
+   "hex": "#ee6428",
+   "name": "Gold dunkelorange (Münze)"
+  },
+  {
+   "hex": "#b62600",
+   "name": "Gold Kontur (Münze)"
+  },
+  {
+   "hex": "#f7f7ad",
+   "name": "Gold Glanz (Münze)"
+  },
+  {
+   "hex": "#ffffff",
+   "name": "Weiß"
+  }
+ ]
+}

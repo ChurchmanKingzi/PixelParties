@@ -26,7 +26,7 @@
 // ═══════════════════════════════════════════
 
 const { loadCardEffect } = require('./_loader');
-const { hasCardType, isAttackSpellOrCreatureSource } = require('./_hooks');
+const { hasCardType, isAttackSpellOrCreatureSource, istUngelegteCreatureSurprise } = require('./_hooks');
 
 const CARD_NAME = 'Firewall';
 const DAMAGE    = 100;
@@ -42,7 +42,8 @@ const DAMAGE    = 100;
 function firewallMods(engine, pi, heroIdx) {
   const hero = engine.gs.players[pi]?.heroes?.[heroIdx];
   if (!hero?.name || hero.hp <= 0) return { extraDamage: 0, burnAllOpponentTargets: false };
-  const script = loadCardEffect(hero.name);
+  if (engine.isHeroPassiveDormant(pi, heroIdx)) return { extraDamage: 0, burnAllOpponentTargets: false };   // W8: Lunas Zuschlag ruht bei Frost/Betäubung/Negation
+  const script = engine.heroScript(hero);   // W16f (H03-23): verschmolzenes Skript — auch GEWONNENE Effekte (Pseudonia/Tempeluna mit Luna)
   const m = (typeof script?.firewallModifiers === 'function')
     ? script.firewallModifiers(engine.gs, pi, heroIdx, engine)
     : script?.firewallModifiers;
@@ -97,6 +98,7 @@ module.exports = {
     // effect" — Quellenart selbst pruefen, das Engine-Fenster oeffnet
     // fuer jede Zielwahl (Molindas Heldeneffekt). Gemeinsamer Helfer.
     if (!isAttackSpellOrCreatureSource(engine, sourceInfo)) return false;
+    if (istUngelegteCreatureSurprise(engine, sourceInfo)) return false;   // W46a: Creature-Surprise noch nicht auf dem Brett: kein Angreifer da (nicht ersatzweise ihr Träger-Held)
 
     if (srcInst?.zone === 'support') {
       // Creature attacker — alive?
@@ -214,7 +216,7 @@ module.exports = {
       // landed — a Spectral-Armor-style full cancellation also
       // negates the Burn rider.
       if (!creatureDmgResult?.cancelled
-          && (srcInst.counters?.currentHp ?? 0) > 0) {
+          && engine.creatureCurrentHp(srcInst) > 0) {   // Z5
         const applied = await engine.applyCreatureStatus(srcInst, 'burned', {
           sourceOwner: ctx.cardOwner,
           source: CARD_NAME,

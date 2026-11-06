@@ -41,7 +41,7 @@
 // ═══════════════════════════════════════════
 
 const { hasCardType } = require('./_hooks');
-const { isCosmicCard } = require('./_cosmic-shared');
+const { isCosmicCard, geteilteSlotsBeiderSeiten } = require('./_cosmic-shared');
 
 const CARD_NAME = 'Invader from the Cosmic Depths';
 const INVADER_TOKEN = 'Invader Token';
@@ -81,7 +81,13 @@ function allFreeSupportSlotsBothSides(engine) {
       }
     }
   }
-  return out;
+  // W64a (Al, 23.10.2026): bei aktiver Alice-Teilung stoesst ein Invader Token zur Zone eines Invader Tokens dazu — geteilte Zonen VORN.
+  return [...geteilteSlotsBeiderSeiten(engine, INVADER_TOKEN), ...out];
+}
+
+/** Wie viele Tokens passen hoechstens (eine geteilte Zone nimmt beliebig viele auf)? */
+function platzKapazitaet(slots, max) {
+  return slots.some(s => s.shared) ? max : Math.min(slots.length, max);
 }
 
 /**
@@ -109,7 +115,7 @@ async function placeInvaderTokens(engine, pi, reservedSlot = null) {
   let freeSlots = slotsAvailable();
   if (freeSlots.length === 0) return;
 
-  const initialCap = Math.min(freeSlots.length, MAX_TOKEN_PLACES_ON_SUMMON);
+  const initialCap = platzKapazitaet(freeSlots, MAX_TOKEN_PLACES_ON_SUMMON);
   const opts = [{ id: '0', label: 'Place 0 (skip)' }];
   for (let n = 1; n <= initialCap; n++) {
     opts.push({ id: String(n), label: `Place ${n} Invader Token${n === 1 ? '' : 's'}` });
@@ -145,7 +151,8 @@ async function placeInvaderTokens(engine, pi, reservedSlot = null) {
     } else {
       const zones = slots.map(s => ({
         owner: s.owner, heroIdx: s.heroIdx, slotIdx: s.slotIdx,
-        label: `${s.owner === pi ? '(You) ' : '(Opp) '}${s.heroName} — Slot ${s.slotIdx + 1}`,
+        label: `${s.owner === pi ? '(You) ' : '(Opp) '}${s.heroName} — Slot ${s.slotIdx + 1}${s.shared ? ` (×${s.stackDepth})` : ''}`,
+        ...(s.shared ? { shared: true, stackDepth: s.stackDepth } : {}),
       }));
       const zp = await promptCtx.promptZonePick(zones, {
         title: CARD_NAME,
@@ -167,6 +174,12 @@ async function placeInvaderTokens(engine, pi, reservedSlot = null) {
       owner: chosen.owner, heroIdx: chosen.heroIdx, zoneSlot: chosen.slotIdx,
     });
     await engine._delay(220);
+    // ★ W16b (A02-deepsea-11): ein gelegter Token betritt die Support Zone — Eintritts-Fenster wie bei jeder Platzierung (Ruling 3.10./Welle 9 Q10:
+    // „place" zählt für Trigger und Reaktionen; Aquatic Arrows, Cybug RHINOCEROS …). Pollution-/Mummy-Token feuern denselben Hook.
+    await engine.runHooks('onCardEnterZone', {
+      enteringCard: placeRes.inst, toZone: 'support', toHeroIdx: chosen.heroIdx,
+      _bypassDeadHeroFilter: true, _isPlacement: true,
+    });
   }
 
   engine.log('invader_tokens_placed', { player: ps.username, placed });
@@ -348,7 +361,8 @@ module.exports = {
       : ps.hand.indexOf(discardName);
     // v1394: Abwurf über die zentrale Funktion — bis v1393 lief dieser
     // Kosten-Abwurf ohne onDiscard (Cute Dog, Cute Familiar & Co. sahen ihn nicht).
-    if (handIdx >= 0 && ps.hand[handIdx] === discardName) {
+    // ★ W74c: Boris darf diese Abwurf-KOSTEN ignorieren — wie bei Zira Racer bleibt die Karte auf der Hand, der Schaden richtet sich weiter nach ihrem Level.
+    if (handIdx >= 0 && ps.hand[handIdx] === discardName && !(await engine.borisVerzicht(pi, 1, { source: CARD_NAME }))) {
       await engine.actionDiscardHandCard(pi, discardName, handIdx, { source: CARD_NAME, _noGlow: true });
       engine.log('invader_discard', { player: ps.username, discarded: discardName, lvl });
     }

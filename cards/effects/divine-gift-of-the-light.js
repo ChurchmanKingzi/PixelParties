@@ -9,7 +9,8 @@
 //  While active: the first time every turn a Hero
 //  uses a non-healing Support Magic Spell, that
 //  Spell's controller chooses a target to heal
-//  for 100 HP. Per-hero HOPT.
+//  for 100 HP. Einmal pro ZUG und Karte, NICHT je Held
+//  (Al 16.10.2026, Welle 14, Q168).
 //
 //  Healing is attributed to the casting Hero
 //  (matters for Nao's overheal passive).
@@ -101,6 +102,18 @@ function pingIstScharf(engine, pi) {
     if (!inst.counters?.usedThisTurn) return true;
   }
   return false;
+}
+
+/** W16g (S02-03): Heilung waehrend einer Zauber-Aufloesung vormerken (nur das liegende Permanent). */
+function merkeHeilung(ctx) {
+  if (ctx.card?.zone !== 'permanent') return;
+  if (!((ctx.healedAmount || 0) > 0)) return;
+  const engine = ctx._engine;
+  const zauber = engine._currentResolvingSpellName?.();
+  if (!zauber) return;
+  const gs = engine.gs;
+  if (!gs._heilteImZauber) gs._heilteImZauber = new Set();
+  gs._heilteImZauber.add(zauber);
 }
 
 module.exports = {
@@ -196,8 +209,20 @@ module.exports = {
     },
 
     /**
+     * W16g (S02-03): „… a Support Magic Spell that does NOT heal the HP of one or more targets“ — tatsaechliche Heilung zaehlt.
+     * Jede Heilung (Held oder Kreatur, > 0 HP), die waehrend der Aufloesung eines Zaubers geschieht, merkt sich der Zauber-Name;
+     * `afterSpellResolved` unten ueberspringt solche Zauber (zusaetzlich zum statischen Skript-Flag `includesHealing`:
+     * Energy Drain, Inheritance Ceremony, Refreshing Night … tragen keins). Gemerkt wird erst beim ersten Treffer, aufgeraeumt
+     * wird nach der Handlung bzw. zum Zugbeginn.
+     */
+    afterHeal: (ctx) => merkeHeilung(ctx),
+    afterCreatureHeal: (ctx) => merkeHeilung(ctx),
+    onAnyActionResolved: (ctx) => { if (ctx._engine.gs._heilteImZauber) delete ctx._engine.gs._heilteImZauber; },
+    onTurnStart: (ctx) => { if (ctx._engine.gs._heilteImZauber) delete ctx._engine.gs._heilteImZauber; },
+
+    /**
      * After any spell resolves: check if it was a non-healing Support Spell,
-     * and trigger the healing prompt for the caster (per-hero HOPT).
+     * and trigger the healing prompt for the caster (einmal pro Zug, Q168).
      */
     afterSpellResolved: async (ctx) => {
       // Only triggers while on the board as a permanent, not from hand
@@ -217,6 +242,7 @@ module.exports = {
       // Skip healing spells
       const script = loadCardEffect(spellData.name || ctx.spellName);
       if (script?.includesHealing) return;
+      if (engine.gs._heilteImZauber?.has(spellData.name || ctx.spellName)) return;   // W16g (S02-03): hat tatsaechlich geheilt
 
       const spellCasterIdx = ctx.casterIdx;
       const spellHeroIdx = ctx.heroIdx;
@@ -227,9 +253,10 @@ module.exports = {
       const hero = ps.heroes?.[spellHeroIdx];
       if (!hero?.name || hero.hp <= 0) return;
 
-      // Per-hero HOPT: each hero triggers at most once per turn
-      const hoptKey = `gift-of-light:${spellCasterIdx}:${spellHeroIdx}`;
-      if (!engine.claimHOPT(hoptKey, spellCasterIdx)) return;
+      // Welle 14 (Q168, Al): „the first time every turn" = EINMAL PRO ZUG (egal welcher Held),
+      // nicht einmal je Held und Zug. Der Stempel haengt an der Karte (Instanz), nicht am Helden.
+      const hoptKey = `gift-of-light:${ctx.card.id}`;
+      if (!engine.claimHOPT(hoptKey, ctx.cardOwner)) return;
 
       // Flash the permanent card itself
       const permInst = ctx.card;

@@ -66,6 +66,12 @@ function candidateHosts(gs, pi, engine, opts = {}) {
     const ps = gs.players[side];
     const h = ps?.heroes?.[hi];
     if (!h?.name || h.hp <= 0) return;
+    // W25a (N1-11, Al 21.10.2026: „geht immer nach aktueller Kontrolle"): „Attach … to a Hero you control" — ein an den Gegner (dauerhaft oder
+    // zeitweise) abgegebener eigener Held in der eigenen Spalte ist kein Wirt; uebernommene Gegnerhelden kommen ueber `fremdAusruestHelden` hinzu.
+    if (!opts.sides && side === pi && typeof engine?.heroSideOf === 'function' && engine.heroSideOf(side, h) !== pi) return;
+    // W31a (Al, 22.10.2026): Form „one of your Heroes" (nicht „a Hero you control"): ein uebernommener Held, der durch die Kontrolle ausdruecklich immun gegen eigene
+    // Karten/Effekte ist (Charme Lv3, Golden Apple, Sixth Circle), ist kein Wirt — `opts.ausserImmun` (Siege).
+    if (opts.ausserImmun && !opts.sides && typeof engine?.heroImmunGegenEigene === 'function' && engine.heroImmunGegenEigene(side, hi, pi)) return;
     if (opts.heroFilter && !opts.heroFilter(h, hi, side, engine)) return;
     for (const si of freeSlots(ps, hi)) out.push({ side, heroIdx: hi, slotIdx: si });
   };
@@ -107,6 +113,32 @@ function attachmentHostsFor(gs, pi, engine, opts = {}) {
  * kein Wirt, `_spellNegatedByEffect` gesetzt.
  */
 async function pickAttachmentHost(ctx, CARD_NAME, opts = {}) {
+  const host = await _pickAttachmentHostMitFenstern(ctx, CARD_NAME, opts);
+  if (host) wirtswahlProtokollieren(ctx, host);
+  return host;
+}
+
+/**
+ * Als Ruling (Al 26.10., Invisibility): die Wahl eines gegnerisch KONTROLLIERTEN Helden als Wirt eines Anhaengsel-Zaubers (Curse, Polymorph, Overheal Shock …) ist
+ * eine Zielwahl „a target your opponent controls with a Spell" — sie kommt wie die Ziele von Icy Grave/Heal in das Zielprotokoll des Zaubers (`gs._spellDamageLog`,
+ * Leser: `afterSpellResolved.damageTargets`, z. B. Invisibility des WIRKENDEN Helden). Eigene Wirte (auch mit Brettseite der Gegenseite, aber eigener Kontrolle) bleiben aussen vor.
+ * Nur wenn die Aufloesung ein Protokoll fuehrt (Zauber-Weg des Servers / Sofort-Guss); Dubletten raeumt der Leser ueber die Id ab.
+ */
+function wirtswahlProtokollieren(ctx, host) {
+  const engine = ctx._engine;
+  const gs = engine.gs;
+  if (!Array.isArray(gs._spellDamageLog)) return;
+  const hero = gs.players[host.owner]?.heroes?.[host.heroIdx];
+  if (!hero?.name) return;
+  const pi = ctx.cardOwner;
+  const kontrolle = typeof engine.heroSideOf === 'function' ? engine.heroSideOf(host.owner, hero) : host.owner;
+  if (kontrolle === pi) return;
+  const id = `hero-${host.owner}-${host.heroIdx}`;
+  if (gs._spellDamageLog.some(t => t.id === id)) return;
+  gs._spellDamageLog.push({ id, type: 'hero', owner: host.owner, heroIdx: host.heroIdx, cardName: hero.name });
+}
+
+async function _pickAttachmentHostMitFenstern(ctx, CARD_NAME, opts = {}) {
   let host = await _pickAttachmentHostRaw(ctx, CARD_NAME, opts);
   if (!host || opts.skipHitWindows) return host;
   const engine = ctx._engine;
@@ -247,7 +279,9 @@ async function _pickAttachmentHostRaw(ctx, CARD_NAME, opts = {}) {
     for (const h of list) targets.push({ id: `equip-${side}-${heroIdx}-${h.slotIdx}`, type: 'equip', owner: side, heroIdx, slotIdx: h.slotIdx, cardName: '', ...zusatz });
     targets.push({ id: `hero-${side}-${heroIdx}`, type: 'hero', owner: side, heroIdx, cardName: gs.players[side].heroes[heroIdx].name, _autoSlot: list[0].slotIdx, ...zusatz });
   }
-  const result = await engine.promptEffectTarget(pi, targets, {
+  // ★ W82 (Pflichtregel „Ziel-Picker graut alles Nicht-Wählbare aus"): `opts.dimRest` reicht alle übrigen Helden und Support-Zonen-Karten ausgegraut hinein (Shipwrecked).
+  const alleZiele = opts.dimRest ? [...targets, ...require('./_target-dim-shared').ausgegrauteRestkarten(engine, targets)] : targets;
+  const result = await engine.promptEffectTarget(pi, alleZiele, {
     title: CARD_NAME,
     description: opts.description || `Choose a Hero (leftmost free Support Zone) or a specific empty Support Zone to attach ${CARD_NAME} to.`,
     confirmLabel: opts.confirmLabel || '📎 Attach!', confirmClass: opts.confirmClass || 'btn-success',
@@ -274,6 +308,20 @@ async function placeAttachment(ctx, CARD_NAME, host, opts = {}) {
     engine._playAntiMagicBlockedAnim(hero);
     return null;
   }
+  // ★ W16a (Al, 19.10.2026, Frage 2: „Attachments ja"): ein Spell-Anhang am Helden ist ein Nicht-Schaden-Effekt auf ihn — Resistance fängt das Anlegen ab (Curse & Co.; auch der eigene
+  // Anhang am eigenen Helden, Regel W14a Q5). Nach dem Anti-Magic-Schutz und vor jeder Kartenbewegung gefragt: bei `true` liegt die Karte nicht am Helden (wie Anti Magic: Rückgabe `null`,
+  // `_spellPlacedOnBoard` bleibt aus → der Zauber geht in die Ablage), kein Status, kein Hook.
+  if (!opts.skipResistance && await engine.heroNonDamageEffectBlocked(host.owner, host.heroIdx, 'attach_spell', { sourceOwner: pi, source: CARD_NAME })) {
+    engine.log('attach_blocked', { card: CARD_NAME, target: hero.name, reason: 'resistance' });
+    return null;
+  }
+  // ★ W24a (N1-08): Effekt-Immunitaet fuer diese Aufloesung (Barrier of Faith: „negate any effects that card would have on the Hero"). Das Anlegen IST
+  // ein Effekt auf den Helden; vorher wehrten nur die Statuswege (`addHeroStatus`) ab — Curse/Berserk blieben als tote Karte liegen, Decisive Defeat
+  // schrieb seinen Status am Riegel vorbei. Wie bei Anti Magic/Resistance: `null` → keine Karte am Helden, der Zauber geht in die Ablage.
+  if (!opts.skipEffectImmunity && engine.hasEffectImmunity(host.owner, host.heroIdx, CARD_NAME)) {
+    engine.log('attach_blocked', { card: CARD_NAME, target: hero.name, reason: 'effect_immunity' });
+    return null;
+  }
   if (!hps.supportZones[host.heroIdx]) hps.supportZones[host.heroIdx] = [[], [], []];
   let slot = host.slotIdx;
   if ((hps.supportZones[host.heroIdx][slot] || []).length > 0) {
@@ -285,8 +333,11 @@ async function placeAttachment(ctx, CARD_NAME, host, opts = {}) {
   hps.supportZones[host.heroIdx][slot].push(CARD_NAME);
   const oldInst = engine.cardInstances.find(c => c.owner === pi && c.zone === 'hand' && c.name === CARD_NAME);
   if (oldInst) engine._untrackCard(oldInst.id);
+  // W63c: die Spell-Instanz einer GESTOHLENEN Karte (Herkunft fremd) darf nicht als Geister-Handkarte zurueckbleiben - eine spaetere eigene Kopie
+  // gleichen Namens wuerde sonst ueber den Namens-Notnagel in die Ablage des fremden Besitzers laufen.
+  if (ctx.card && ctx.card !== oldInst && ctx.card.zone === 'hand' && Number.isInteger(ctx.card.originalOwner) && ctx.card.originalOwner !== ctx.card.owner) engine._untrackCard(ctx.card.id);
   const inst = engine._trackCard(CARD_NAME, host.owner, 'support', host.heroIdx, slot);
-  inst.originalOwner = pi;
+  inst.originalOwner = (ctx.card && Number.isInteger(ctx.card.originalOwner)) ? ctx.card.originalOwner : pi;   // W63c: gestohlene Handkarte bleibt Eigentum ihres Besitzers
   inst.turnPlayed = gs.turn || 0;
   gs._spellPlacedOnBoard = true;
   // v651 (Als Befund): die Karte verlaesst die Hand JETZT — nicht erst,
@@ -307,7 +358,7 @@ async function placeAttachment(ctx, CARD_NAME, host, opts = {}) {
   }
   engine.log('attachment_placed', { card: CARD_NAME, player: gs.players[pi]?.username, hero: hero.name, side: host.owner, heroIdx: host.heroIdx, zoneSlot: slot });
   if (!opts.skipEnterHook) {
-    await engine.runHooks('onCardEnterZone', { enteringCard: inst, toZone: 'support', toHeroIdx: host.heroIdx, _skipReactionCheck: true });
+    await engine.runHooks('onCardEnterZone', { enteringCard: inst, toZone: 'support', toHeroIdx: host.heroIdx, _skipReactionCheck: true, _anhaengselAnleger: pi });
   }
   engine.sync();
   return inst;
@@ -346,15 +397,20 @@ async function attachToHero(ctx, CARD_NAME, opts = {}) {
 //        nicht mehr (`engine._attachmentStatusHaelt`).
 // ═══════════════════════════════════════════
 
-function setzeAnhaengselStatus(engine, owner, heroIdx, CARD_NAME, STATUS_NAME) {
+function setzeAnhaengselStatus(engine, owner, heroIdx, CARD_NAME, STATUS_NAME, extras) {
   const wirt = engine.gs.players[owner]?.heroes?.[heroIdx];
   if (!wirt?.name || wirt.hp <= 0) return false;
+  // W12 (Al, Q114): Karian wird NIE durch Negation (oder Frost/Betaeubung) am Handeln gehindert — der Anhaengsel-Status wird bei ihr nicht angelegt.
+  if (STATUS_NAME === 'negated' && engine.heroIgnoresHaltStatuses?.(owner, heroIdx)) return false;
   if (!wirt.statuses) wirt.statuses = {};
+  const alt = wirt.statuses[STATUS_NAME];
   wirt.statuses[STATUS_NAME] = {
     permanent: true,
     appliedTurn: engine.gs.turn || 0,
     _fromAttachment: CARD_NAME,
+    ...(extras || {}),   // S1: z. B. `abilitiesNegated` (Stowaway: harte Form „effect and Abilities")
   };
+  if (STATUS_NAME === 'negated' && alt && !alt._fromAttachment) wirt.statuses[STATUS_NAME]._fremd = alt;   // W24a (N1-09): laufende fremde Negierung bleibt darunter erhalten
   engine._heldenStatusVerursacher(wirt.statuses[STATUS_NAME], { source: CARD_NAME });   // v1399
   return true;
 }
@@ -375,8 +431,8 @@ function anhaengselStatusHooks(CARD_NAME, STATUS_NAME, optionen = {}) {
       if (inst.zone !== 'support' || inst.faceDown) return;
       const engine = ctx._engine;
       const wirt = engine.gs.players[inst.owner]?.heroes?.[inst.heroIdx];
-      if (!wirt?.name || wirt.statuses?.[STATUS_NAME]) return;
-      setzeAnhaengselStatus(engine, inst.owner, inst.heroIdx, CARD_NAME, STATUS_NAME);
+      if (!wirt?.name || (wirt.statuses?.[STATUS_NAME] && !(STATUS_NAME === 'negated' && !wirt.statuses[STATUS_NAME]._fromAttachment))) return;   // W24a (N1-09): eine fremde Negierung steht dem Anlegen nicht im Weg
+      setzeAnhaengselStatus(engine, inst.owner, inst.heroIdx, CARD_NAME, STATUS_NAME, optionen.statusExtras);
       engine.sync();
     },
 
@@ -396,7 +452,9 @@ function anhaengselStatusHooks(CARD_NAME, STATUS_NAME, optionen = {}) {
       if (kopienAmWirt(engine, CARD_NAME, owner, heroIdx, inst).length > 0) return;
       // Direkt statt `removeHeroStatus`: kein `onStatusRemoved`, sonst
       // liefe `heilenWirftAb` gegen die Karte, die ohnehin schon geht.
-      delete wirt.statuses[STATUS_NAME];
+      // W24a (N1-09): eine darunter liegende fremde Negierung (`_fremd`) laeuft weiter statt mitzuverschwinden.
+      const fremd = wirt.statuses[STATUS_NAME]._fremd;
+      if (fremd) wirt.statuses[STATUS_NAME] = fremd; else delete wirt.statuses[STATUS_NAME];
       engine.log('status_remove', { target: wirt.name, status: STATUS_NAME, by: CARD_NAME });
       engine.sync();
     },

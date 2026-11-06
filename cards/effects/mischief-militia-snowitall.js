@@ -33,6 +33,7 @@ const { hasCardType, isSummonablePileCreature } = require('./_hooks');
 const { loadCardEffect } = require('./_loader');
 const { CARDINAL_NAMES } = require('./_cardinal-shared');
 const { countFrozenTargets } = require('./_mischief-militia-shared');
+const { eligibleSummonZones } = require('./_summon-eligibility');
 
 const CARD_NAME = 'Mischief Militia - SnowItAll';
 const FREEZE_DURATION = 2;
@@ -77,27 +78,23 @@ function _getSummonableHandIndices(engine, pi) {
     const lvl = engine.effectiveCardLevel(cd, pi, { handIdx: i });
     if (lvl > 1) continue;
     if (!_isFreezableOnSummon(cn)) continue;
+    // „summon … as an additional Action" ist eine normale Beschwoerung (Ruling 8.8.):
+    // ohne tauglichen Beschwoerer mit freier Zone (Schule/Level, Status,
+    // summonLocked, Aktionssperre) ist die Karte nicht waehlbar (A06-25).
+    if (_findFreeOwnSupportSlots(engine, pi, cn).length === 0) continue;
     out.push(i);
   }
   return out;
 }
 
-function _findFreeOwnSupportSlots(engine, pi) {
+function _findFreeOwnSupportSlots(engine, pi, cardName) {
   const ps = engine.gs.players[pi];
   if (!ps) return [];
-  const slots = [];
   // Kontrolle statt Seite (Styx 28.9.): alle Helden, die `pi` kontrolliert
   // (auch uebernommene der Gegenspalte); `owner` = physische Seite.
-  for (const { physOwner, heroIdx: hi, hero } of engine.heroesControlledBy(pi)) {
-    if (!hero?.name || hero.hp <= 0) continue;
-    const zones = engine.gs.players[physOwner]?.supportZones?.[hi] || [];
-    for (let zi = 0; zi < 3; zi++) {
-      if ((zones[zi] || []).length === 0) {
-        slots.push({ owner: physOwner, heroIdx: hi, slotIdx: zi, label: `${hero.name} — Slot ${zi + 1}` });
-      }
-    }
-  }
-  return slots;
+  // Nur Zonen tauglicher Beschwoerer fuer GENAU diese Karte (A06-25).
+  return eligibleSummonZones(engine, pi, cardName, { nachKontrolle: true })
+    .map(z => ({ owner: z.owner, heroIdx: z.heroIdx, slotIdx: z.slotIdx, label: z.label }));
 }
 
 module.exports = {
@@ -121,6 +118,16 @@ module.exports = {
     onDeathBenefit: 0,
   },
 
+  // W16c (A06-32): Wiederbelebung OHNE Hooks (Rewrite History, "does not trigger on-summon effects"): "cannot be Frozen" ist eine Dauereigenschaft,
+  // kein On-Summon-Effekt - sie gehoert auch der wiederbelebten Karte (Konvention `onRevive`, wie Doomed Town Guards Schirm).
+  onRevive(ctx) {
+    const inst = ctx.card;
+    if (!inst || inst.zone !== 'support') return;
+    if (!inst.counters) inst.counters = {};
+    inst.counters.freeze_immune = 1;
+    inst.counters._hasHaste = true;
+  },
+
   hooks: {
     onPlay: async (ctx) => {
       const inst = ctx.card;
@@ -142,8 +149,7 @@ module.exports = {
 
     // Must have at least one Lv≤1 freezable Creature in hand.
     if (_getSummonableHandIndices(engine, pi).length === 0) return false;
-    // Must have at least one free own Support Zone to land into.
-    if (_findFreeOwnSupportSlots(engine, pi).length === 0) return false;
+    // (Freie Zone eines tauglichen Beschwoerers ist schon Teil der Handauswahl.)
 
     // Summon-turn gate: a Frozen target must already exist for the
     // haste to apply. Off-summon-turn, the standard sickness gate
@@ -219,7 +225,7 @@ module.exports = {
         const picked = await engine.promptGeneric(pi, {
           type: 'pickHandCard',
           title: CARD_NAME,
-          description: 'Click a Level ≤ 1 Creature in your hand to summon. SnowItAll will Freeze it for 2 turns.',
+          description: 'Click a Level 1 or lower Creature in your hand to summon. SnowItAll will Freeze it for 2 turns.',
           eligibleIndices,
           confirmLabel: '❄️ Summon!',
           cancellable: true,
@@ -236,7 +242,7 @@ module.exports = {
       // exactly 1 eligible Creature, both steps auto-pick — no way
       // to cancel back, which matches the "single legal choice"
       // expectation.
-      const freeSlots = _findFreeOwnSupportSlots(engine, pi);
+      const freeSlots = _findFreeOwnSupportSlots(engine, pi, chosenName);
       if (freeSlots.length === 0) return false;
       if (freeSlots.length === 1) {
         dest = freeSlots[0];
@@ -277,23 +283,28 @@ module.exports = {
     }
 
     // ── Step 3: splice from hand + summon with full hooks ──
-    // Zone confirmed → the effect is now officially committing.
-    // Restore the engine's pending card reveal + play log and fire
-    // them so opp sees SnowItAll's activation banner exactly at the
-    // moment of commitment (not at hand-pick time). HOPT stamping
-    // is handled by the engine on our non-false return.
+    // Zone confirmed → the effect is committing. ★ W65a: ABER die Beschwoerungskosten der gewaehlten Kreatur (Opfer-/Tribut-Wahl,
+    // abbrechbar) kommen noch: solange der Spieler sie abbrechen kann, sieht der Gegner nichts (kein Banner, keine Zeile). Erst
+    // wenn die Kosten bezahlt sind, wird der gemerkte Auftritt gezeigt — dann die Landung. HOPT bleibt bei einem Abbruch frei.
     if (savedReveal) engine.gs._pendingCardReveal = savedReveal;
     if (savedPlayLog) engine.gs._pendingPlayLog = savedPlayLog;
-    engine._firePendingCardReveal();
 
     const handIdx = ps.hand.indexOf(chosenName);
     if (handIdx < 0) return false;
     engine.takeFromPileSync(ps, 'hand', handIdx);
 
-    const summonResult = await engine.summonCreatureWithHooks(
-      chosenName, dest.owner, dest.heroIdx, dest.slotIdx,
-      { source: CARD_NAME, controller: pi },   // Kontrolle statt Seite (Styx 28.9.): Feldseite + Kontrolleur
-    );
+    const kernOpts = { source: CARD_NAME, controller: pi };   // Kontrolle statt Seite (Styx 28.9.): Feldseite + Kontrolleur
+    if (!(await engine._beschwoerungKostenVorAuftritt(chosenName, dest.owner, dest.heroIdx, dest.slotIdx, kernOpts))) {
+      // Kosten abgebrochen / Sperre: Karte zurueck auf die Hand, der Effekt gilt als nicht benutzt, der Gegner hat nichts gesehen.
+      delete engine.gs._pendingCardReveal; delete engine.gs._pendingPlayLog;
+      engine.returnToPile(ps, 'hand', chosenName, handIdx);   // v1394
+      engine.sync();
+      return false;
+    }
+    kernOpts._sperrenGeprueft = true; kernOpts._kostenGezahlt = true;
+    engine._firePendingCardReveal();
+
+    const summonResult = await engine.summonCreatureWithHooks(chosenName, dest.owner, dest.heroIdx, dest.slotIdx, kernOpts);
     if (!summonResult?.inst) {
       // Race / cancelled by a beforeSummon cost — refund the hand card.
       engine.returnToPile(ps, 'hand', chosenName, handIdx);   // v1394

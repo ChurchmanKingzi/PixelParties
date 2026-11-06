@@ -415,7 +415,7 @@ function attachDemoRecorder(engine, opts = {}) {
   if (typeof engine.promptEffectTarget === 'function') {
     const origEffTarget = engine.promptEffectTarget.bind(engine);
     engine.promptEffectTarget = async function (pi, validTargets, config = {}) {
-      if (engine._inMctsSim || finished) return origEffTarget(pi, validTargets, config);
+      if (engine._inMctsSim || finished || config?._waehlbarProbe) return origEffTarget(pi, validTargets, config);   // R-12: Trockenlauf (Future Tech Fists) wird nicht mitgeschnitten
       const stateOf = (t) => {
         try {
           if (t?.type === 'hero') {

@@ -47,10 +47,17 @@ module.exports = {
 
   activeIn: ['hand'],
 
+  // AoE-Regel (CARD_API ⑦, Als Regel 18.9.): der Zauber legt auf ALLE gegnerischen Helden einen Status, teilt aber keinen Schaden aus — die
+  // Autoerkennung des Loaders (Schadensklammer) sieht ihn nicht, also von Hand deklarieren (wie Poisoned Well, Iceage, Medusa's Curse).
+  hitsMultipleTargets: true,
+
   /** Ohne einen erreichbaren gegnerischen Helden bewirkt die Karte nichts. */
-  spellPlayCondition(gs, playerIdx) {
+  spellPlayCondition(gs, playerIdx, engine) {
     const oi = opponentOfGs(gs, playerIdx);
     if (gs.firstTurnProtectedPlayer === oi) return false;
+    // W16g (S02-02): „Heroes your opponent CONTROLS“ — Kontrolle statt Spalte (`heroesControlledBy`).
+    const eng = engine || gs._engineRef;
+    if (eng?.heroesControlledBy) return eng.heroesControlledBy(oi).some(({ hero }) => hero?.name && hero.hp > 0);
     return (gs.players[oi]?.heroes || []).some(h => h?.name && h.hp > 0);
   },
 
@@ -65,6 +72,16 @@ module.exports = {
 
       // Bis zum Beginn des naechsten eigenen Zuges (siehe Kopf).
       const expiresAtTurn = (gs.turn || 0) + 2;
+
+      // ★ W14b (Q156, Al: „Jeder Treffer zählt, auch reines Status-Zufügen") + W15a (R01-10): reine Status-Flächenzauber auf gegnerische Helden öffnen VOR dem Status
+      // die „hit by"-Surprises (Booby Trap, Toxic Trap …) und die Hand-Reaktionen (Post-Target: MOE Shield, Barrier of Faith, Storm Ring …) — wie Poisoned Well und Iceage.
+      const ziele = engine.heroesControlledBy(oi)
+        .filter(({ hero }) => hero?.name && hero.hp > 0)
+        .map(({ physOwner, heroIdx: hi, hero }) => ({ type: 'hero', owner: physOwner, heroIdx: hi, cardName: hero.name }));
+      if (ziele.length > 0) {
+        const sr = await engine.statusHitSurpriseWindow(ctx.card, ziele, 'decay_spell', { ziele });
+        if (sr?.effectNegated) return;
+      }
 
       // Bildschirmweite Blende (v880, Als Vorgabe): kurz abdunkeln und
       // verzerren, bevor der Status landet. `heroIdx: -1` routet die
@@ -87,15 +104,14 @@ module.exports = {
 
       const getroffen = [];
       const ops = gs.players[oi];
-      for (let hi = 0; hi < (ops?.heroes || []).length; hi++) {
-        const hero = ops.heroes[hi];
+      // W16g (S02-02): Kontrolle statt Spalte — ein Held, den der Gegner kontrolliert (auch aus MEINER Spalte), wird getroffen;
+      // ein Gegnerheld unter meiner Kontrolle nicht (`heroesControlledBy` schliesst ihn aus).
+      for (const { physOwner, heroIdx: hi, hero } of engine.heroesControlledBy(oi)) {
         if (!hero?.name || hero.hp <= 0) continue;
-        // Helden, die der GEGNER besitzt, aber ich kontrolliere, sind
-        // nicht „Heroes your opponent controls".
-        if (hero.permaControlBy === pi || hero.charmedBy === pi) continue;
-        await engine.addHeroStatus(oi, hi, STATUS, {
+        await engine.addHeroStatus(physOwner, hi, STATUS, {
           expiresAtTurn,
           expiresForPlayer: pi,
+          fristBeginn: true,   // W68a: „until the beginning of your next turn"
           appliedBy: pi,
           source: CARD_NAME,
           animationType: 'dark_swarm',

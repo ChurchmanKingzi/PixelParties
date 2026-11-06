@@ -20,6 +20,7 @@ const {
   countGigantisaursInSupport,
 } = require('./_gigantisaurs-shared');
 
+const { drawBlockedFor } = require('./_draw-block-shared');
 const CARD_NAME = 'Gigantisaur Raptoren';
 
 /**
@@ -50,7 +51,7 @@ function eligibleHostSlots(engine, pi, cardData) {
     // nachgezogenen Gigantisaurier — Chimera-Abwurf, Trex-Opfer — liefe
     // dort mit der Feldseite als `cardOwner`.)
     if (engine.heroSideOf(pi, h) !== pi) continue;
-    if (h.statuses?.frozen || h.statuses?.stunned) continue;
+    if (!require('./_summon-eligibility').heroAgiert(h)) continue;   // Welle 11 (Al, R5): „summon" erfordert einen aktionsfähigen Beschwörer (nicht Frozen/Stunned/Webbed/Bound/Negated) — `heroAgiert`.
     if (!engine.heroMeetsLevelReq(pi, hi, cardData)) continue;
     // Per-creature canSummon check — handles the archetype's "1 per
     // Hero" rule for most Gigantisaurs (via gigantisaursCanSummon)
@@ -106,7 +107,7 @@ module.exports = {
       };
 
       let initialEligible = buildEligibleHandIndices();
-      if (initialEligible.length === 0) return;
+      if (initialEligible.length === 0) return ctx._engine.summonEffektFizzelt(ctx.card, ctx.cardName, { stumm: true });   // W11/R4: wirkt nicht → Blob stumm
 
       // No upfront Yes/No confirm — the player goes straight into the
       // picker. Cancelling the picker is the opt-out.
@@ -293,9 +294,12 @@ module.exports = {
     const engine = ctx._engine;
     const ps = engine.gs.players[ctx.cardOwner];
     if (!ps) return false;
-    if (ps.handLocked) return false;
+    // D1 (A07-21, Regel von Al): der Zug ist der EINZIGE Nutzen - Hand-/Zieh-Sperre (handLocked/drawLocked) und Tuscan Artist
+    // (Z6, A07-19: Zug von genau 2/3) sperren die Aktivierung; kein Once-Stempel fuer nichts.
+    const anzahl = countGigantisaursInSupport(ctx.cardOwner, engine);
+    if (drawBlockedFor(engine, ctx.cardOwner, anzahl)) return false;
     // Effect is meaningless when there are no Gigantisaurs to count.
-    return countGigantisaursInSupport(ctx.cardOwner, engine) > 0;
+    return anzahl > 0;
   },
 
   async onCreatureEffect(ctx) {

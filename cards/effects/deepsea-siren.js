@@ -13,7 +13,8 @@
 //  Implementation notes:
 //    • The link is stored on the Siren's
 //      counters (_sirenLinkType / _sirenLinkOwner
-//      / _sirenLinkHeroIdx / _sirenLinkSlotIdx).
+//      / _sirenLinkHeroIdx für Helden, _sirenLinkInstId
+//      für Kreaturen — die Karte, nicht der Platz).
 //      Both Siren and linked target also get
 //      `sirenLinked = 1` + a partner-name counter
 //      so the "Linked" StatusBadge renders on
@@ -59,12 +60,13 @@ function _resolveLinkedTarget(engine, inst) {
     return null;
   }
   if (c._sirenLinkType === 'creature') {
+    // Verknüpfung hängt an der gewählten KARTE (Instanz-ID), nicht am Platz:
+    // ein verschobenes Ziel bleibt verbunden, eine Nachfolgerin im alten Platz nicht.
     const linkedInst = engine.cardInstances.find(x =>
-      x.owner === c._sirenLinkOwner && x.zone === 'support' &&
-      x.heroIdx === c._sirenLinkHeroIdx && x.zoneSlot === c._sirenLinkSlotIdx
+      x.id === c._sirenLinkInstId && x.zone === 'support'
     );
     if (linkedInst && linkedInst.id !== inst.id) {
-      return { type: 'creature', inst: linkedInst, owner: c._sirenLinkOwner };
+      return { type: 'creature', inst: linkedInst, owner: linkedInst.owner };
     }
     return null;
   }
@@ -131,7 +133,7 @@ module.exports = {
         cancellable: true,
         excludeSelf: true,
       });
-      if (!target) return;
+      if (!target) return ctx._engine.summonEffektFizzelt(ctx.card, ctx.cardName, { stumm: true });   // W11/R4: wirkt nicht → Blob stumm
 
       const engine = ctx._engine;
       const selfInst = ctx.card;
@@ -155,9 +157,7 @@ module.exports = {
         }
       } else if (target.cardInstance) {
         c._sirenLinkType = 'creature';
-        c._sirenLinkOwner = target.cardInstance.owner;
-        c._sirenLinkHeroIdx = target.cardInstance.heroIdx;
-        c._sirenLinkSlotIdx = target.cardInstance.zoneSlot;
+        c._sirenLinkInstId = target.cardInstance.id;
         target.cardInstance.counters = target.cardInstance.counters || {};
         target.cardInstance.counters.sirenLinked = 1;
         target.cardInstance.counters._sirenLinkedToName = CARD_NAME;
@@ -232,6 +232,10 @@ module.exports = {
           }
         }
 
+        // ★ W16b (A02-deepsea-27): der Tod-Teil ist im Schadenspfad erledigt (Spiegeltreffer auf Gegner-Kill) — `onCreatureDeath`
+        // darf ihn nicht ein zweites Mal auslösen.
+        if (willDie && isEnemy) selfInst.counters._sirenKillDone = true;
+
         // If Siren is about to die, the linked target's "Linked" badge
         // becomes stale — clear it now since onCardLeaveZone won't fire
         // on an untracked Siren.
@@ -244,6 +248,38 @@ module.exports = {
           amount, willDie, isEnemy,
         });
       }
+    },
+
+    // ★ W16b (A02-deepsea-27, Text „When this Creature is defeated by an opponent's card or effect, also defeat the chosen target"):
+    // auch Besiegen-/Zerstören-Effekte (Deepsea Reaper, `actionDestroyCard`) geben den Tod weiter, nicht nur tödlicher Schaden
+    // (der bleibt im Schadenspfad oben; `_sirenKillDone` verhindert die Doppelung). Muster Ghoul Guard (eigene Instanz, Quelle = Gegner).
+    // Gilt auch für eine Deepsea Monstrosity, die den Einsatz-Effekt der Siren kopiert hat (die Link-Marken liegen an der Instanz).
+    onCreatureDeath: async (ctx) => {
+      const death = ctx.creature;
+      const selfInst = ctx.card;
+      if (!death || !selfInst || death.instId !== selfInst.id) return;
+      const c = selfInst.counters || {};
+      if (!c._sirenLinkType || c._sirenKillDone) return;
+      const engine = ctx._engine;
+      const src = ctx.source;
+      const srcOwner = src?.controller ?? src?.owner ?? src?.heroOwner ?? -1;
+      const ctrl = death.controller ?? death.owner;
+      if (!src || srcOwner < 0 || srcOwner === ctrl) return;        // nur „by an opponent's card or effect"
+      const linked = _resolveLinkedTarget(engine, selfInst);
+      if (!linked) return;
+      c._sirenKillDone = true;
+      await engine.showTriggeredEffect(selfInst.name || CARD_NAME, { playerIdx: ctrl });   // Auftritt: die Karte (Siren bzw. kopierende Monstrosity) zieht das Ziel mit
+      const quelle = { name: CARD_NAME, owner: ctrl, heroIdx: death.heroIdx };
+      if (linked.type === 'creature') {
+        await engine.actionDestroyCard(quelle, linked.inst, { fireCreatureDeath: true });
+      } else if (linked.hero?.hp > 0) {
+        await engine.actionDefeat(quelle, linked.hero, { damageType: 'creature', wirkungsSchutz: true });   // W66a: Effekt-Schutz gilt für JEDE Form von „defeat"
+      }
+      _clearLinkFlags(engine, linked);
+      engine.log('siren_link_defeat', {
+        siren: CARD_NAME, target: linked.type === 'hero' ? linked.hero.name : linked.inst.name,
+      });
+      engine.sync();
     },
 
     // Fires only for non-damage destruction paths (Poltergeister, Silver

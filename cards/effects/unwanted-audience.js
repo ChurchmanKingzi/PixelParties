@@ -16,15 +16,19 @@
 //  never runs → no aura.
 //
 //  ── Effect ──────────────────────────────────────────────────────
-//  Every Creature the opponent controls that HAS an active effect
-//  (its script exports `creatureEffect` — the manually-triggered
-//  kind gated by summoning sickness) is `negated` — the SAME status
-//  Dark Gear / Diplomacy apply, which the engine already treats as
-//  "can't activate its effect". Two differences from a normal
-//  negate:
-//    • It is applied `cleansable: true`, so — uniquely — Beer / Juice
-//      CAN heal it off (normal negation is permanent). Handled by the
-//      per-instance `<status>Cleansable` engine override.
+//  ★ W14b (Q152, Al: „NUR aktive Effekte, passive Komponenten bleiben
+//  unberührt!"): Every Creature the opponent controls that HAS an
+//  active effect (script exports `creatureEffect` + `onCreatureEffect`
+//  — the manually-triggered kind gated by summoning sickness) gets the
+//  negative status `active_locked`. It blocks ONLY the activation
+//  (`engine.isCreatureActiveEffectLocked`: activation gate, offer list,
+//  CPU, Grimoire/Kohta repeats); passives, triggers and reactions of the
+//  Creature keep working (a Bomb Mite, a rein passive Kreatur, is not
+//  touched at all). Earlier versions applied `negated`, which silenced
+//  the WHOLE Creature. Two properties stay:
+//    • It is applied `cleansable: true`, so Beer / Juice CAN heal it
+//      off (counts as a negative status effect; Lunatic / Light Ball
+//      immunity is honoured on application and on the gate).
 //    • It expires on its own at the end of the opponent's turn.
 //  Creatures with an active effect the opponent summons LATER that
 //  same turn are caught via the discard-resident `onCardEnterZone`
@@ -52,7 +56,7 @@ function creatureHasActiveEffect(engine, inst) {
   if (!cd || !hasCardType(cd, 'Creature')) return false;
   const effectName = inst.counters?._effectOverride || inst.name;
   const s = loadCardEffect(effectName);
-  return !!s?.creatureEffect;
+  return !!(s?.creatureEffect && s?.onCreatureEffect);   // W14b: wie das Aktivierungs-Tor (server.js) – Bomb Mite (nur Flagge, rein passiv) hat KEINEN aktiven Effekt
 }
 
 /**
@@ -62,8 +66,27 @@ function creatureHasActiveEffect(engine, inst) {
  * @param {number} ownerPi - the Unwanted Audience controller (drives expiry)
  */
 async function sleepCreature(engine, inst, ownerPi) {
-  if (!inst || inst.counters?.negated) return;
+  if (!inst || inst.counters?.active_locked) return;
+  // R02-05: „This counts as a negative status effect" — `actionNegateCreature`
+  // prueft Light Ball und die Immunitaet gegen negative Status (Lunatic Golem)
+  // nicht selbst (die sitzen in `canApplyCreatureStatus`), also hier.
+  if (engine._lightBallProtects(inst.controller ?? inst.owner, 'creature')) return;
+  if (engine._creatureNegStatusImmune(inst)) return;
+  // W5b-Z2 (Al, Welle 5: „Monia kann darauf reagieren"): Cool Rescuer Monia schützt „Creatures either player controls, die von
+  // einer Karte/einem Effekt betroffen würden" – das Setzen der Negierung hat das Fenster `beforeCreatureAffected` bisher
+  // nie geöffnet (wie bei Gift: `actionApplyCreaturePoison`). Bricht Monia ab, schläft die Kreatur nicht ein.
+  // Monias Schild („… all Creatures") steht für diesen Effekt schon (angenommenes Angebot bei einer früheren Kreatur): kein weiteres Fenster, die Kreatur schläft nicht ein.
+  // (W58a: die Einmal-pro-Zug-Sperre ist weg; Monias Hook prüft den Schild selbst — die Prüfung hier spart nur das Fenster.)
+  if (engine.moniaSchildBlockt(inst, { name: CARD_NAME }, inst.controller ?? inst.owner)) return;
+  const fensterCtx = { creature: inst, effectType: 'status', statusName: 'negated', source: { name: CARD_NAME, owner: ownerPi }, cancelled: false, _skipReactionCheck: true };
+  await engine.runHooks('beforeCreatureAffected', fensterCtx);
+  if (fensterCtx.cancelled) return;
+  // ★ W14b (Q152, Al: „NUR aktive Effekte, passive Komponenten bleiben unberührt!"): kein `negated` mehr (das legte die GANZE Kreatur still,
+  // auch Passive wie Bomb Mites Zündung), sondern der eigene Status `active_locked`, der nur das AKTIVIEREN sperrt
+  // (`engine.isCreatureActiveEffectLocked`). Ablauf, Heilbarkeit (Beer/Juice) und Schutzprüfungen wie gehabt über `actionNegateCreature`.
   await engine.actionNegateCreature(inst, CARD_NAME, {
+    statusKey: 'active_locked',
+    _skipAffectedWindow: true,   // W16b: das Monia-Fenster ist oben schon aufgegangen
     // Current turn is the OPPONENT's; it ends when ownerPi's next
     // turn starts (gs.turn + 1 / expiresForPlayer = ownerPi). Same
     // arithmetic Jump in the River uses for its turn-scoped buff.
@@ -72,7 +95,7 @@ async function sleepCreature(engine, inst, ownerPi) {
     cleansable: true,            // ← Beer / Juice may heal THIS negation
     buffKey: BUFF_KEY,
   });
-  if (inst.counters?.negated) {
+  if (inst.counters?.active_locked) {
     engine._broadcastEvent('play_zone_animation', {
       type: 'unwanted_audience_zzz',
       owner: inst.owner, heroIdx: inst.heroIdx, zoneSlot: inst.zoneSlot,
@@ -125,6 +148,9 @@ module.exports = {
 
       const ps = gs.players[pi];
       if (!ps?.hand?.includes(CARD_NAME)) return;
+      // ★ W21a (Al, 20.10.2026: „ja"): Wirker-Held mit Decay Magic 1 (Magic Arts zaehlt als zweite Schule laut Kartendaten) noetig —
+      // eigener oder uebernommener; sonst kein Angebot.
+      if (!engine.hookReaktionWirkerVorhanden(pi, CARD_NAME)) return;
 
       const want = await engine.promptGeneric(pi, {
         type: 'confirm',
@@ -140,6 +166,10 @@ module.exports = {
       // discard-resident listener for later summons).
       const removeIdx = ps.hand.indexOf(CARD_NAME);
       if (removeIdx < 0) return;
+      // ★ W21a: Wirker waehlen (vor jeder Entnahme; Abbruch = nichts passiert).
+      const wirkerPlan = await engine.hookReaktionWirkerWaehlen(pi, CARD_NAME);
+      if (!wirkerPlan) return;
+      if (ps.hand.indexOf(CARD_NAME) !== removeIdx) return;
 
       // Zone-anchored hand→discard flight. This card is removed from
       // hand here and pushed to discard only AFTER executeCardWithChain
@@ -169,6 +199,7 @@ module.exports = {
       // gross ist wie beim Abflug — bleibt der `sync` aus, taucht sie
       // nach dem Flug wieder auf (Als Befund 18.9. zu „Dive Down").
       engine.sync();
+      await engine._rxPayWisdom(ps, wirkerPlan);   // W21a: Wisdom-Abwurf des Wirkers (Karte ist schon aus der Hand)
       const inst = engine.cardInstances.find(c =>
         c.owner === pi && c.zone === 'hand' && c.name === CARD_NAME);
 
@@ -203,6 +234,7 @@ module.exports = {
             if (!creatureHasActiveEffect(engine, cInst)) continue;
             await sleepCreature(engine, cInst, pi);
           }
+          require('./_monia-shared').angeboteBeenden(gs);   // Z2: Monias Schild gilt für DIESEN Effekt (alle Kreaturen), nicht darüber hinaus
           engine.log('unwanted_audience', {
             player: ps.username, target: gs.players[oppIdx]?.username,
           });
@@ -219,7 +251,7 @@ module.exports = {
         inst.heroIdx = -1;
         inst.zoneSlot = -1;
       }
-      ps.discardPile.push(CARD_NAME);
+      engine.handKartenBesitzerPs(ps, CARD_NAME).discardPile.push(CARD_NAME);   // W63c: Ablage des permanenten Besitzers
 
       if (chainResult.negated) {
         engine.log('unwanted_audience_negated', { player: ps.username });
@@ -241,9 +273,10 @@ module.exports = {
       const inst = ctx.enteringCard;
       if (!inst) return;
       if ((inst.controller ?? inst.owner) !== ua.player) return;  // opponent's side only
-      if (inst.counters?.negated) return;            // already asleep (idempotent vs. dup copies)
+      if (inst.counters?.active_locked) return;      // already asleep (idempotent vs. dup copies)
       if (!creatureHasActiveEffect(engine, inst)) return;
       await sleepCreature(engine, inst, ua.owner);
+      require('./_monia-shared').angeboteBeenden(gs);   // Z2: Schild nur für diese Auslösung
       engine.sync();
     },
 

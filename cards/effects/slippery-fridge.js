@@ -1,9 +1,11 @@
 // ═══════════════════════════════════════════
 //  CARD EFFECT: "Slippery Fridge"
 //  Normal Artifact — Manual activation only.
-//  Choose an Equip Artifact on the board and
-//  move it to a different Hero of the same
+//  Choose ANY NUMBER of Equip Artifacts on the board and
+//  move them to a different Hero of the same
 //  controller (without paying Cost again).
+//  Welle 12 (Q102, Al): erst alle Equips + deren Ziel-Zonen
+//  wählen, dann werden alle gleichzeitig verschoben.
 //
 //  Equip detection covers three sources:
 //  1. cardDB subtype === 'Equipment'
@@ -13,72 +15,41 @@
 //  An equip is only eligible if its controller
 //  has another living Hero with a free base
 //  Support Zone (slots 0–2, not island zones).
+//
+//  ★ W50a (Al, 22.10.2026): Erkennung, Zielhelden/-zonen und das Verschieben
+//  stehen in `_equip-shared.js` (Baustein fuer Fridge UND Inheritance
+//  Ceremony). Die Fridge bleibt die Karte mit der freien Heldenwahl: Quell-
+//  und Zielheld gehoeren demselben Spieler, das darf auch der GEGNER sein.
+//  Details: CARD_API „Welle 50 / W50a", Punkt 2.
 // ═══════════════════════════════════════════
 
-const { hasCardType } = require('./_hooks');
-
 const { loadCardEffect } = require('./_loader');
-const { getCardDB: _getCardDB } = require('./_card-db');
+const {
+  istEquipKartenname, istUmhaengbaresEquip, umhaengZielHelden, umhaengFreieZonen, fuehreUmhaengenAus,
+} = require('./_equip-shared');
 
-// ─── MODULE-LEVEL CARD DB (cached) ───────
+// ★ W50a (Al, 22.10.2026): Erkennung, Zielhelden/-zonen und das Verschieben selbst stehen jetzt in `_equip-shared.js` (EIN Baustein fuer Slippery Fridge
+// und Inheritance Ceremony: „Der Equip-Artifact-Teil sollte bei Ceremony genauso funktionieren wie bei Fridge"). Fridge bleibt die Karte mit der
+// freien Heldenwahl: Quell- und Zielheld gehoeren demselben Spieler, das darf auch der GEGNER sein (Ceremony: nur eigene Helden).
+// Neu fuer die Fridge gegenueber W49: versiegelte Zonen (Madame Guillotine) und Zonensperren (Puppets) zaehlen nicht als frei; Quell- und Zielheld muessen
+// vom selben Spieler KONTROLLIERT werden (Charme/Uebernahme); die bewegte Ausruestung bekommt `_isMove` (Einmal-Wirkungen beim Anlegen feuern nicht neu);
+// das Equip-Fenster (Afflicted Pests …) oeffnet fuer den AUSFUEHRENDEN der Fridge als Ausruestenden.
 
-// ─── EQUIP DETECTION ─────────────────────
-
-function _isEquipByData(cardName) {
-  const cardDB = _getCardDB();
-  const cd = cardDB[cardName];
-  if (!cd) return false;
-  if ((cd.subtype || '').toLowerCase() === 'equipment') return true;
-  if (hasCardType(cd, 'Hero') || hasCardType(cd, 'Ascended Hero')) return true;
-  const script = loadCardEffect(cardName);
-  if (script?.isEquip) return true;
-  return false;
-}
-
-function _isEquipInstance(inst) {
-  if (!inst || inst.zone !== 'support') return false;
-  if (inst.counters?.immovable) return false;
-  if (inst.counters?.treatAsEquip) return true;
-  const script = inst.loadScript();
-  if (script?.isEquip) return true;
-  const cardDB = _getCardDB();
-  const cd = cardDB[inst.name];
-  if (cd && (cd.subtype || '').toLowerCase() === 'equipment') return true;
-  return false;
-}
-
-// ─── ZONE HELPERS ────────────────────────
-
-function _getFreeBaseZones(ps, heroIdx) {
-  const free = [];
-  for (let si = 0; si < 3; si++) {
-    if (((ps.supportZones[heroIdx] || [])[si] || []).length === 0) {
-      free.push(si);
-    }
-  }
-  return free;
-}
-
-function _hasOtherHeroWithFreeZone(ps, heroIdx) {
-  for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
-    if (hi === heroIdx) continue;
-    const h = ps.heroes[hi];
-    if (!h?.name || h.hp <= 0) continue;
-    if (_getFreeBaseZones(ps, hi).length > 0) return true;
-  }
-  return false;
+/** Zonen, in die ein Zielheld das Equip aufnehmen kann: leer, nicht versiegelt, nicht gesperrt. */
+function _umhaengZiele(engine, inst, opts) {
+  return umhaengZielHelden(engine, inst, opts);
 }
 
 function _findEligibleEquips(gs, engine) {
   const eligible = [];
   for (const inst of engine.cardInstances) {
     if (inst.zone !== 'support') continue;
-    if (!_isEquipInstance(inst)) continue;
-    const ps = gs.players[inst.owner];
+    if (!istUmhaengbaresEquip(engine, inst)) continue;
+    const ps = gs.players[engine.physicalSide(inst)];
     if (!ps) continue;
     const hero = ps.heroes?.[inst.heroIdx];
     if (!hero?.name || hero.hp <= 0) continue;
-    if (!_hasOtherHeroWithFreeZone(ps, inst.heroIdx)) continue;
+    if (_umhaengZiele(engine, inst).length === 0) continue;
     eligible.push(inst);
   }
   return eligible;
@@ -89,8 +60,7 @@ function _findEligibleEquips(gs, engine) {
 module.exports = {
   isTargetingArtifact: true,
 
-  canActivate(gs, pi) {
-    // Check if any equip on the board can be moved
+  canActivate(gs, pi, engine) {
     // Erst-Runden-Immunität (Als Regel): Fridge bleibt in Runde 1
     // spielbar, aber NUR auf eigene Equips — die Karten des geschützten
     // Spielers sind unantastbar. Ohne diese Zeile meldete das Gate
@@ -98,21 +68,11 @@ module.exports = {
     // Ziel-Filter sie im Picker anschließend entfernt hätte: Karte
     // gespielt, Gold weg, leerer Picker.
     const ftProtected = gs.firstTurnProtectedPlayer;
-    for (let pIdx = 0; pIdx < gs.players.length; pIdx++) {
-      if (ftProtected != null && pIdx === ftProtected && pi !== ftProtected) continue;
-      const ps = gs.players[pIdx];
-      for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
-        const hero = ps.heroes[hi];
-        if (!hero?.name || hero.hp <= 0) continue;
-        for (let si = 0; si < (ps.supportZones[hi] || []).length; si++) {
-          const slot = (ps.supportZones[hi] || [])[si] || [];
-          if (slot.length === 0) continue;
-          if (!_isEquipByData(slot[0])) continue;
-          if (_hasOtherHeroWithFreeZone(ps, hi)) return true;
-        }
-      }
-    }
-    return false;
+    if (!engine) return false;
+    return _findEligibleEquips(gs, engine).some(inst => {
+      const seite = engine.physicalSide(inst);
+      return !(ftProtected != null && seite === ftProtected && pi !== ftProtected);
+    });
   },
 
   animationType: 'none',
@@ -238,8 +198,13 @@ module.exports = {
   },
 
   // ── RESOLVE ────────────────────────────
-  // Moves exactly ONE Equip Artifact to a different Hero of the same controller.
-  // First prompt is cancellable — cancelling returns card to hand.
+  // Welle 12 (Q102, Al: „Ja, soll mehrere verschieben können. Das Prozedere ist: Erst alle Equips und deren Ziel-Zonen auswählen, dann werden
+  // alle gleichzeitig verschoben."): ANY NUMBER of equipped Artifacts. Ablauf:
+  //   1. Equip-Wahl (mehrere, abbrechbar — der Abbruch ist nur VOR der ersten Wahl möglich, Karte bleibt dann in der Hand);
+  //   2. je gewähltem Equip eine Ziel-Zone (Pflichtwahl, nicht abbrechbar): freie Basiszone eines ANDEREN lebenden Helden desselben Spielers;
+  //      bereits für ein anderes Equip gewählte Zonen sind belegt, Zonen, die durch die Wahl frei werden, zählen als frei (gleichzeitig);
+  //   3. erst jetzt werden ALLE verschoben (zuerst alle Abgänge, dann alle Ankünfte): Boni wandern wie bisher (Welle 5).
+  // Hat ein gewähltes Equip keine freie Zone mehr, bleibt es liegen.
   resolve: async (engine, pi) => {
     const gs = engine.gs;
 
@@ -248,179 +213,108 @@ module.exports = {
     if (eligible.length === 0) return { cancelled: true }; // Fizzle — no valid targets
 
     const equipTargets = eligible.map(inst => ({
-      id: `equip-${inst.owner}-${inst.heroIdx}-${inst.zoneSlot}`,
+      id: `equip-${engine.physicalSide(inst)}-${inst.heroIdx}-${inst.zoneSlot}`,
       type: 'equip',
-      owner: inst.owner,
+      owner: engine.physicalSide(inst),
       heroIdx: inst.heroIdx,
       slotIdx: inst.zoneSlot,
       cardName: inst.name,
       cardInstance: inst,
     }));
 
-    // ── Step 2: Select equip to move (cancellable) ──
+    // ── Step 2: Select the equips to move (cancellable — only here, before the first choice) ──
     const pickedIds = await engine.promptEffectTarget(pi, equipTargets, {
-      maxTotal: 1,   // Einfachauswahl: ein Klick TAUSCHT das Ziel
+      maxTotal: equipTargets.length,   // „any number of Artifacts"
       title: 'Slippery Fridge',
-      description: 'Select an equipped Artifact to move.',
+      description: 'Select any number of equipped Artifacts to move.',
       confirmLabel: '🧊 Select!',
       confirmClass: 'btn-info',
       cancellable: true,
       exclusiveTypes: true,
-      maxPerType: { equip: 1 },
+      maxPerType: { equip: equipTargets.length },
     });
 
     if (!pickedIds || pickedIds.length === 0) return { cancelled: true };
 
-    const picked = equipTargets.find(t => t.id === pickedIds[0]);
-    if (!picked) return true;
+    const gewaehlt = [];
+    for (const id of pickedIds) {
+      const t = equipTargets.find(q => q.id === id);
+      for (const inst of engine.gewaehlteInstanzen(t)) if (!gewaehlt.includes(inst)) gewaehlt.push(inst);   // Darion: Mehrfachwahl im Stapel
+    }
+    if (gewaehlt.length === 0) return true;
 
-    const inst = picked.cardInstance;
-    const equipOwner = inst.owner;
-    const ps = gs.players[equipOwner];
-    const srcHeroIdx = inst.heroIdx;
-    const srcSlot = inst.zoneSlot;
+    // ── Step 3: Destination per equip (mandatory) — all choices first, nothing moves yet ──
+    // Zonen, die durch diese Wahl frei werden (Quellplätze der gewählten Equips), zählen als frei (gleichzeitiges Verschieben).
+    const wirdFrei = (owner, hi, si) => gewaehlt.some(g => engine.physicalSide(g) === owner && g.heroIdx === hi && g.zoneSlot === si);
+    const reserviert = new Set();   // `${seite}:${hi}:${si}`
 
-    // ── Step 3: Build destination targets ──
-    const destTargets = [];
-    for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
-      if (hi === srcHeroIdx) continue;
-      const hero = ps.heroes[hi];
-      if (!hero?.name || hero.hp <= 0) continue;
-      const freeZones = _getFreeBaseZones(ps, hi);
-      for (const si of freeZones) {
+    const plan = [];   // { inst, owner, srcHeroIdx, srcSlot, destHeroIdx, destSlot }
+    for (const inst of gewaehlt) {
+      const equipOwner = engine.physicalSide(inst);
+      const srcHeroIdx = inst.heroIdx;
+      const srcSlot = inst.zoneSlot;
+
+      const heldenZiele = _umhaengZiele(engine, inst, { wirdFrei, reserviert });
+      const destTargets = [];
+      for (const z of heldenZiele) {
+        for (const si of z.freie) {
+          destTargets.push({
+            id: `equip-${equipOwner}-${z.heroIdx}-${si}`,
+            type: 'equip',
+            owner: equipOwner,
+            heroIdx: z.heroIdx,
+            slotIdx: si,
+            cardName: '',
+            _eigeneStapelWahl: true,   // Darion: Zielplatz (auch der Equip-Stapel) — keine Rueckfrage „welches Equip?"
+          });
+        }
+        // Also allow clicking the hero directly (auto-picks first free slot)
         destTargets.push({
-          id: `equip-${equipOwner}-${hi}-${si}`,
-          type: 'equip',
-          owner: equipOwner,
-          heroIdx: hi,
-          slotIdx: si,
-          cardName: '',
-        });
-      }
-      // Also allow clicking the hero directly (auto-picks first free slot)
-      if (freeZones.length > 0) {
-        destTargets.push({
-          id: `hero-${equipOwner}-${hi}`,
+          id: `hero-${equipOwner}-${z.heroIdx}`,
           type: 'hero',
           owner: equipOwner,
-          heroIdx: hi,
-          cardName: hero.name,
+          heroIdx: z.heroIdx,
+          cardName: z.hero.name,
         });
       }
+
+      if (destTargets.length === 0) continue; // keine freie Zone mehr — dieses Equip bleibt liegen
+
+      const destIds = await engine.promptEffectTarget(pi, destTargets, {
+        maxTotal: 1,   // Einfachauswahl: ein Klick TAUSCHT das Ziel
+        title: `Slippery Fridge — Move ${inst.name}`,
+        description: `Select a Support Zone to move ${inst.name} to.`,
+        confirmLabel: '🧊 Move!',
+        confirmClass: 'btn-info',
+        cancellable: false,
+        greenSelect: true,
+        exclusiveTypes: false,
+        maxPerType: { hero: 1, equip: 1 },
+      });
+
+      if (!destIds || destIds.length === 0) continue; // Safety
+
+      const dest = destTargets.find(t => t.id === destIds[0]);
+      if (!dest) continue;
+
+      let destHeroIdx, destSlot;
+      if (dest.type === 'equip') {
+        destHeroIdx = dest.heroIdx;
+        destSlot = dest.slotIdx;
+      } else {
+        destHeroIdx = dest.heroIdx;
+        const freeZones = umhaengFreieZonen(engine, equipOwner, destHeroIdx, { cardName: inst.name, instId: inst.id, wirdFrei, reserviert });
+        if (freeZones.length === 0) continue;
+        destSlot = freeZones[0];
+      }
+      reserviert.add(`${equipOwner}:${destHeroIdx}:${destSlot}`);
+      plan.push({ inst, owner: equipOwner, srcHeroIdx, srcSlot, destHeroIdx, destSlot });
     }
 
-    if (destTargets.length === 0) return true; // Fizzle
+    if (plan.length === 0) return true; // Fizzle
 
-    // ── Step 4: Select destination (non-cancellable) ──
-    const destIds = await engine.promptEffectTarget(pi, destTargets, {
-      maxTotal: 1,   // Einfachauswahl: ein Klick TAUSCHT das Ziel
-      title: `Slippery Fridge — Move ${inst.name}`,
-      description: `Select a Support Zone to move ${inst.name} to.`,
-      confirmLabel: '🧊 Move!',
-      confirmClass: 'btn-info',
-      cancellable: false,
-      greenSelect: true,
-      exclusiveTypes: false,
-      maxPerType: { hero: 1, equip: 1 },
-    });
-
-    if (!destIds || destIds.length === 0) return true; // Safety
-
-    const dest = destTargets.find(t => t.id === destIds[0]);
-    if (!dest) return true;
-
-    let destHeroIdx, destSlot;
-    if (dest.type === 'equip') {
-      destHeroIdx = dest.heroIdx;
-      destSlot = dest.slotIdx;
-    } else {
-      destHeroIdx = dest.heroIdx;
-      const freeZones = _getFreeBaseZones(ps, destHeroIdx);
-      if (freeZones.length === 0) return true;
-      destSlot = freeZones[0];
-    }
-
-    // ── Step 5: Execute the move ──
-
-    // 5a: Fire onCardLeaveZone for ONLY the moved card (prevents other equips revoking ATK).
-    //
-    // Equipment scripts (Legendary Sword, Vampiric Sword, Sun Sword, both
-    // Hammers, both Blades, etc.) gate their leave-zone hook on
-    //   ctx.fromOwner === ctx.cardOwner
-    //   ctx.fromHeroIdx === ctx.card.heroIdx
-    //   ctx.fromZoneSlot === ctx.card.zoneSlot
-    // — the "did THIS card actually leave?" check. Omitting `fromOwner`
-    // or `fromZoneSlot` here makes those checks evaluate
-    // `undefined !== ctx.cardOwner` and bail silently, which used to
-    // skip revokeAtk (old hero kept the +X ATK), expireAdditionalAction
-    // (Sword's summon token persisted on the old hero), and equipment-
-    // specific ascension re-checks (checkArthorAscension on the source
-    // hero). Pass the full canonical payload — same shape as
-    // _engine.js's death/move paths and the runHooks call at line 14045.
-    await engine.runHooks('onCardLeaveZone', {
-      _onlyCard: inst, card: inst,
-      fromZone: 'support',
-      fromOwner: equipOwner,
-      fromHeroIdx: srcHeroIdx,
-      fromZoneSlot: srcSlot,
-      _skipReactionCheck: true,
-    });
-
-    // 5a-cleanup: Reset atkGranted counter so re-grant on new hero starts fresh
-    // (revokeAtk subtracts from hero.atk but doesn't reset the counter)
-    if (inst.counters.atkGranted) inst.counters.atkGranted = 0;
-
-    // 5b: Remove from source support zone
-    const srcSlotArr = (ps.supportZones[srcHeroIdx] || [])[srcSlot] || [];
-    const srcIdx = srcSlotArr.indexOf(inst.name);
-    if (srcIdx >= 0) srcSlotArr.splice(srcIdx, 1);
-
-    // 5c: Animate slide
-    engine._broadcastEvent('play_card_transfer', {
-      sourceOwner: equipOwner,
-      sourceHeroIdx: srcHeroIdx,
-      sourceZoneSlot: srcSlot,
-      targetOwner: equipOwner,
-      targetHeroIdx: destHeroIdx,
-      targetZoneSlot: destSlot,
-      cardName: inst.name,
-      duration: 600,
-      particles: null,
-    });
-    engine.sync();
-    await engine._delay(500);
-
-    // 5d: Place into destination support zone
-    if (!ps.supportZones[destHeroIdx]) ps.supportZones[destHeroIdx] = [[], [], []];
-    if (!ps.supportZones[destHeroIdx][destSlot]) ps.supportZones[destHeroIdx][destSlot] = [];
-    ps.supportZones[destHeroIdx][destSlot].push(inst.name);
-
-    // 5e: Update card instance
-    inst.zone = 'support';
-    inst.heroIdx = destHeroIdx;
-    inst.zoneSlot = destSlot;
-
-    engine.sync();
-
-    // 5f: Fire onCardEnterZone for ONLY the moved card
-    await engine.runHooks('onCardEnterZone', {
-      _onlyCard: inst, enteringCard: inst,
-      toZone: 'support', toHeroIdx: destHeroIdx,
-    });
-
-    // 5g: Re-fire onPlay so the equip re-grants ATK on the new hero
-    await engine.runHooks('onPlay', {
-      _onlyCard: inst, playedCard: inst,
-      cardName: inst.name, zone: 'support',
-      heroIdx: destHeroIdx, zoneSlot: destSlot,
-    });
-
-    engine.log('slippery_fridge_move', {
-      card: inst.name,
-      fromHero: ps.heroes[srcHeroIdx]?.name || '?',
-      toHero: ps.heroes[destHeroIdx]?.name || '?',
-      player: ps.username,
-    });
+    // ── Step 4: Execute — ALLE gleichzeitig (gemeinsamer Baustein mit Inheritance Ceremony) ──
+    await fuehreUmhaengenAus(engine, plan, { anleger: pi, logType: 'slippery_fridge_move', quelle: 'Slippery Fridge' });
 
     engine.sync();
     return true;

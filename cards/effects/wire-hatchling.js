@@ -7,11 +7,11 @@
 //
 //  BAUART
 //  ──────
-//  • Ausloeser: `onPlay` mit Selbsttest und Zonenpruefung, dazu
-//    `counters.isPlacement` als Riegel — PLATZIEREN ist keine
-//    BESCHWOERUNG (Muster Knight of Kings). Eine Effektbeschwoerung
-//    (Skullmael's Greatsword, Necromancy) ist dagegen eine und loest
-//    mit aus.
+//  • Ausloeser: `onPlay` mit Selbsttest und Zonenpruefung.
+//    ★ W25c (N3-13, Al): „place triggert On-Summon" - auch das PLATZIEREN
+//    (Drill Sergeant & Co.) und jede Effektbeschwoerung (Skullmael's
+//    Greatsword, Necromancy) loesen den Effekt aus (der fruehere
+//    `isPlacement`-Riegel ist entfallen).
 //
 //  • „half its CURRENT HP (rounded up)": gerechnet wird auf dem
 //    aktuellen Wert des ZIELS, nicht auf dem Maximum —
@@ -20,6 +20,10 @@
 //    aendern.
 //    Randfall aus der Aufrundung: ein Ziel mit 1 HP nimmt 1 und stirbt.
 //    Alles darueber ueberlebt rechnerisch — halbieren toetet nicht.
+//
+//  • ★ W12 (Al, Q86): die Zielwahl ist PFLICHT (`cancellable: false`) — „Sobald er in einer Zone liegt, MUSS man ein
+//    Ziel waehlen, man kommt da nicht raus." Es gibt keinen Abbruch und damit auch keine Rücknahme der Beschwörung;
+//    gibt es kein legales Ziel, fizzelt der Effekt sichtbar (`summonEffektFizzelt`, nicht stumm).
 //
 //  • Schadenstyp `creature`: der Schaden kommt vom Effekt einer
 //    Kreatur, nicht von einem Zauber oder Angriff.
@@ -46,7 +50,6 @@ module.exports = {
     onPlay: async (ctx) => {
       const engine = ctx._engine;
       if (ctx.playedCard?.id !== ctx.card?.id || ctx.card.zone !== 'support') return;
-      if (ctx.card.counters?.isPlacement) return;        // platziert ≠ beschworen
 
       const ziel = await ctx.promptDamageTarget({
         side: 'any',
@@ -56,9 +59,10 @@ module.exports = {
         description: "Deal damage equal to half the target's current HP (rounded up).",
         confirmLabel: '⚡ Half it!',
         confirmClass: 'btn-danger',
-        cancellable: true,
+        cancellable: false,   // pflichtwahl: Al (Q86/C05-09) - liegt der Hatchling in einer Zone, MUSS man ein Ziel waehlen, man kommt da nicht raus
       });
-      if (!ziel) return;
+      // W12 (Q86): gibt es gar kein legales Ziel, FIZZELT der Effekt sichtbar; die Beschwoerung wird nie zurueckgenommen.
+      if (!ziel) return ctx._engine.summonEffektFizzelt(ctx.card, ctx.cardName, { playerIdx: ctx.cardOwner });
 
       // Der Wert wird ERST JETZT genommen.
       let betrag = 0;
@@ -71,11 +75,13 @@ module.exports = {
         inst = ziel.cardInstance || engine.findCards({
           controller: ziel.owner, zone: 'support', heroIdx: ziel.heroIdx,
         }).find(c => c.zoneSlot === ziel.slotIdx);
-        const hp = inst?.counters?.currentHp ?? 0;
+        // Unversehrte Kreaturen haben noch kein `currentHp` (erst beim ersten Schaden gesetzt) — dann gelten die gedruckten HP (C05-01).
+        const hp = inst?.counters?.currentHp
+          ?? (inst ? (inst.counters?._cardDataOverride || engine._getCardDB()[inst.name])?.hp : 0) ?? 0;
         if (!inst || hp <= 0) return;
         betrag = Math.ceil(hp / 2);
       }
-      if (betrag <= 0) return;
+      if (betrag <= 0) return ctx._engine.summonEffektFizzelt(ctx.card, ctx.cardName, { stumm: true });   // W11/R4: wirkt nicht → Blob stumm
 
       engine._broadcastEvent('play_zone_animation', {
         type: 'paralyzing_bolts', owner: ziel.owner, heroIdx: ziel.heroIdx,

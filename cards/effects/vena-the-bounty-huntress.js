@@ -194,12 +194,12 @@ module.exports = {
   canActivateHeroEffect(ctx) {
     const engine = ctx._engine;
     const pi = ctx.cardOwner;
-    if ((engine?.gs?.players?.[pi]?.gold || 0) < GOLD_COST) return false;
+    if ((engine?.gs?.players?.[pi]?.gold || 0) < GOLD_COST || engine?.goldSpendBlocked?.(pi)) return false;   // G1 (A09-11): Goldsperre
     return !!bountyFinden(engine, pi);
   },
 
   cpuShouldUseHeroEffect(engine, pi) {
-    if ((engine?.gs?.players?.[pi]?.gold || 0) < GOLD_COST) return false;
+    if ((engine?.gs?.players?.[pi]?.gold || 0) < GOLD_COST || engine?.goldSpendBlocked?.(pi)) return false;   // G1 (A09-11): Goldsperre
     return !!bountyFinden(engine, pi);
   },
 
@@ -299,7 +299,7 @@ module.exports = {
     const pi = ctx.cardOwner;
     const ps = gs.players[pi];
     if (!ps) return false;
-    if ((ps.gold || 0) < GOLD_COST) return false;
+    if ((ps.gold || 0) < GOLD_COST || engine.goldSpendBlocked(pi)) return false;   // G1 (A09-11): Goldsperre
 
     const bounty = bountyFinden(engine, pi);
     if (!bounty) return false;
@@ -345,7 +345,7 @@ module.exports = {
     // Zwischen Anzeige und Antwort kann sich alles geaendert haben.
     const nochDa = bountyFinden(engine, pi);
     if (!nochDa || nochDa.heroIdx !== bounty.heroIdx) return false;
-    if ((ps.gold || 0) < GOLD_COST) return false;
+    if ((ps.gold || 0) < GOLD_COST || engine.goldSpendBlocked(pi)) return false;   // G1 (A09-11): Goldsperre
 
     // Ueber `actionSpendGold`, nicht ueber `gold -=`: nur so feuern die
     // Ausgabe-Hooks (Debt-O-Tron, Wealth) und das Log.
@@ -402,7 +402,8 @@ module.exports = {
           minRequired: 1,
         });
         const treffer = pick && pick.length ? ziele.find(t => t.id === pick[0]) : null;
-        if (treffer) gewaehlt = karten.find(k => k.slot === treffer.slotIdx) || gewaehlt;
+        // Darion: ein Stapel ist EIN Platz mit mehreren Karten — die Rueckfrage der Engine hat die Karte gewaehlt (`treffer.cardInstance`).
+        if (treffer) gewaehlt = karten.find(k => k.inst === treffer.cardInstance) || karten.find(k => k.slot === treffer.slotIdx) || gewaehlt;
       }
       await engine.actionMoveCard(gewaehlt.inst, 'discard', -1, -1, {
         source: CARD_NAME, sourceOwner: pi,

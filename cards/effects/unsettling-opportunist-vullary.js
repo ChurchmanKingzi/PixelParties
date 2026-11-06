@@ -28,8 +28,8 @@
 //      effect.
 //
 //  The summon bypasses school/level requirements
-//  via `actionPlaceCreature` (`countAsSummon:
-//  false` — same Klaus pattern), so a Lv0 host
+//  via `actionPlaceCreature` (Welle 10, Q47: die
+//  Platzierung zaehlt als Beschwoerung), so a Lv0 host
 //  Hero with no Summoning Magic can still drop
 //  a Lv3 Creature here. The negation is applied
 //  on-place and tied to a buff with
@@ -54,7 +54,15 @@ function freeHostSlot(ps, heroIdx) {
   return -1;
 }
 
-function levelMaxNCreatureNames(engine, pi, hand, maxLevel) {
+/**
+ * ★ W63a (Al, 22.10.2026: Alices Effekt gilt fuer ALLE Beschwoerungs-/Platzierungs-Effekte; „erst die geteilte Zone, DANN die erste leere"):
+ * Vullarys Zonen fuer `name` — freie Zonen des Helden und, mit Alice-Teilung, die Zone einer GLEICHNAMIGEN Creature (geteilte zuerst).
+ */
+function zonenFuer(engine, pi, heroIdx, name) {
+  return engine.beschwoerZonenFuer(pi, name, { heroIdx, nurBasis: true, namedHeroesOnly: true });
+}
+
+function levelMaxNCreatureNames(engine, pi, hand, maxLevel, heroIdx = -1) {
   const cardDB = engine._getCardDB();
   const seen = new Set();
   const out = [];
@@ -67,10 +75,16 @@ function levelMaxNCreatureNames(engine, pi, hand, maxLevel) {
     // Effective level (handIdx forwarded so per-slot offsets count).
     const lvl = engine.effectiveCardLevel(cd, pi, { handIdx: i });
     if (lvl > maxLevel) continue;
+    // „regardless of its level" — nur das LEVEL entfaellt; die kartenseitigen
+    // Beschwoerungstore (`canSummon`: Gigantisaurier, Guardian Beasts …) gelten (A07-04).
+    if (heroIdx >= 0 && !engine.isCreatureSummonable(cn, pi, heroIdx)) continue;
+    if (heroIdx >= 0 && zonenFuer(engine, pi, heroIdx, cn).length === 0) continue;   // W63a: frei oder (Alice) geteilt
     out.push(cn);
   }
   return out;
 }
+
+const { heldFolgtAbgang } = require('./_dream-lander-shared');   // A07-05
 
 module.exports = {
   activeIn: ['support'],
@@ -91,8 +105,7 @@ module.exports = {
 
     // Mode B: Mary attached — summon Lv≤3 Creature with bypass.
     if (ps.summonLocked) return false;
-    if (freeHostSlot(ps, ctx.cardHeroIdx) < 0) return false;
-    return levelMaxNCreatureNames(engine, ctx.cardOwner, ps.hand, 3).length > 0;
+    return levelMaxNCreatureNames(engine, ctx.cardOwner, ps.hand, 3, ctx.cardHeroIdx).length > 0;
   },
 
   async onCreatureEffect(ctx) {
@@ -116,11 +129,8 @@ module.exports = {
     // Mode B: bypass-summon a Lv≤3 Creature with negate-until-next-turn.
     const pi = ctx.cardOwner;
     const heroIdx = ctx.cardHeroIdx;
-    const eligible = levelMaxNCreatureNames(engine, pi, ps.hand, 3);
+    const eligible = levelMaxNCreatureNames(engine, pi, ps.hand, 3, heroIdx);
     if (eligible.length === 0) return false;
-
-    const slot = freeHostSlot(ps, heroIdx);
-    if (slot < 0) return false;
 
     const picked = await engine.promptGeneric(pi, {
       type: 'cardGallery',
@@ -134,17 +144,26 @@ module.exports = {
     const chosenName = picked.cardName;
     if ((ps.hand || []).indexOf(chosenName) < 0) return false;
     // Re-verify free slot — async prompt could have shifted state.
-    const slotNow = freeHostSlot(ps, heroIdx);
+    const slotNow = zonenFuer(engine, pi, heroIdx, chosenName)[0]?.slotIdx ?? -1;   // W63a: geteilte Zone (Alice) zuerst, dann die erste freie
     if (slotNow < 0) return false;
 
+    // Beschwoerungskosten der Kreatur (`beforeSummon`: Opfer, Tribut …) zahlen —
+    // `actionPlaceCreature` fuehrt sie nicht aus (A07-04).
+    if (!(await engine._runBeforeSummon(chosenName, pi, heroIdx, {}, slotNow))) return false;
+    if ((ps.hand || []).indexOf(chosenName) < 0) return false;
+    if ((ps.supportZones?.[heroIdx]?.[slotNow] || []).length > 0 && !require('./_alice-shared').canShareInto(engine, pi, heroIdx, slotNow, chosenName)) return false;   // Kosten koennen den Platz belegt haben (W63a: ausser geteilt)
+
     // Place — `actionPlaceCreature` bypasses level/school via the
-    // placement code path. `countAsSummon: false` keeps the per-turn
-    // summon tally clean (matches Klaus's place-on-Decay pattern).
+    // placement code path. Welle 10 (Q47): die Platzierung zaehlt als
+    // Beschwoerung dieses Zuges (zentral in `actionPlaceCreature`).
     const res = await engine.actionPlaceCreature(chosenName, pi, heroIdx, slotNow, {
       source: 'hand',
       sourceName: CARD_NAME,
       countAsSummon: false,
       animationType: 'summon',
+      // W16d (A07-27): „negate its effects" gilt wie bei Necromancy/The Master's Key schon für den Einsatz-Effekt
+      // (Soul-Shard-Texte: „effects don't get negated when summoned by Necromancy") – Negation VOR den Eintritts-Hooks.
+      negateEffects: true,
     });
     if (!res?.inst) return false;
 
@@ -155,16 +174,12 @@ module.exports = {
     // lockstep with the buff. `negated_placement` parallels the flag
     // `actionPlaceCreature` would set under `negateEffects: true`,
     // keeping placement-style negate state consistent.
-    await engine.applyCreatureStatus(res.inst, 'negated', {
-      sourceOwner: pi,
-      source: CARD_NAME,
-      keinStatus: true,   // „negate its effects until …" — kein Statuseffekt, nicht heilbar
-    });
     res.inst.counters.negated_placement = 1;
     await engine.actionAddCreatureBuff(res.inst, NEGATED_BUFF, {
       // `gs.turn` zaehlt pro Spielerwechsel: naechste eigene Runde = +2.
       expiresAtTurn: engine.gs.activePlayer === pi ? engine.gs.turn + 2 : engine.gs.turn + 1,
       expiresForPlayer: pi,
+      fristBeginn: true,   // W68a: „until the beginning of your next turn"
       clearCountersOnExpire: ['negated', 'negated_placement'],
       source: CARD_NAME,
     });
@@ -187,4 +202,9 @@ module.exports = {
   },
 
   cpuMeta: { alwaysCommit: true },
+
+  hooks: {
+    // A07-05: der angelegte Held folgt der Kreatur in die Ablage, wenn sie ohne Schadens-Tod geht.
+    onCardLeaveZone: heldFolgtAbgang,
+  },
 };

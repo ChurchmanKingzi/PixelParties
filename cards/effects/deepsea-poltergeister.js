@@ -62,6 +62,8 @@ module.exports = {
         if (engine.countsAsAbilityInZone(inst.name, inst)) continue;
         if (!cd || !hasCardType(cd, 'Artifact')) continue;
         const ownerPi = inst.controller ?? inst.owner;
+        // ★ Darion: ein Equip-Stapel (mehrere Karten, ein Platz) ist EIN Ziel; welche Karte gemeint ist, fragt die Engine nach (`_disambiguateStackedTargets`).
+        if (targets.some(t => t.id === `equip-${ownerPi}-${inst.heroIdx}-${inst.zoneSlot}`)) continue;
         targets.push({
           id: `equip-${ownerPi}-${inst.heroIdx}-${inst.zoneSlot}`,
           type: 'equip', owner: ownerPi,
@@ -69,7 +71,7 @@ module.exports = {
           cardName: inst.name, cardInstance: inst,
         });
       }
-      if (targets.length === 0) return;
+      if (targets.length === 0) return ctx._engine.summonEffektFizzelt(ctx.card, ctx.cardName, { stumm: true });   // W11/R4: wirkt nicht → Blob stumm
 
       if (!(await promptOptionalOnSummon(ctx, CARD_NAME,
         'Destroy an Artifact on the board?'
@@ -83,9 +85,9 @@ module.exports = {
         cancellable: true,
         maxTotal: 1,
       });
-      if (!selectedIds || selectedIds.length === 0) return;
+      if (!selectedIds || selectedIds.length === 0) return ctx._engine.summonEffektFizzelt(ctx.card, ctx.cardName, { stumm: true });   // W11/R4: wirkt nicht → Blob stumm
       const chosen = targets.find(t => t.id === selectedIds[0]);
-      if (!chosen?.cardInstance) return;
+      if (!chosen?.cardInstance) return ctx._engine.summonEffektFizzelt(ctx.card, ctx.cardName, { stumm: true });   // W11/R4: wirkt nicht → Blob stumm
 
       // Spooky ghost haunts the Artifact slot BEFORE it's destroyed so
       // the player sees the cause-and-effect.

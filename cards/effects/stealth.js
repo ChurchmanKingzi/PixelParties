@@ -33,8 +33,9 @@ const { hasCardType } = require('./_hooks');
 const ABILITY = 'Stealth';
 
 function stealthLevel(engine, pi, heroIdx) {
-  const ps = engine.gs.players[pi];
-  return engine.countAbilitiesForSchool(ABILITY, ps?.abilityZones?.[heroIdx] || []);
+  // W7a (M02-05, Al): Stealth ist ein Ability-Passiv und ruht bei Frost/Betäubung/„Abilities negiert" (leichte Negation nicht).
+  if (engine._isHeroAbilityPassiveSilenced(pi, heroIdx)) return 0;
+  return engine.heroSchoolLevel(ABILITY, pi, heroIdx);   // W4a: harte Negierung -> Stufe 0
 }
 
 /**
@@ -49,6 +50,11 @@ function kontrolleur(engine, seite, heroIdx) {
 /** Ist diese Quelle ein gegnerischer Attack/Spell, den Stealth-Level `lvl` abdeckt? */
 function coveredBy(engine, lvl, info, ctrl) {
   if (lvl <= 0) return false;
+  // W27a (Al, 21.10.2026): als Attack geltende Heldeneffekte (Broghan & Co.) und Gegenstandseffekte (Bamboo Staff, Crusader's …) sind IMMER Level 0.
+  if (info.treatedAsLevel != null) {
+    if (info.chooserIdx === ctrl || info.chooserIdx == null) return false; // eigene Karten
+    return info.treatedAsLevel <= lvl;
+  }
   const cd = info.sourceData;
   if (!cd || !(hasCardType(cd, 'Attack') || hasCardType(cd, 'Spell'))) return false;
   if (info.chooserIdx === ctrl || info.chooserIdx == null) return false; // eigene Karten

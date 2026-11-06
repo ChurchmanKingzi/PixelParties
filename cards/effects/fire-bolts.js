@@ -3,7 +3,8 @@
 //  Spell (Destruction Magic Lv1)
 //
 //  1. Choose an enemy target → deal 100 damage.
-//  2. Choose an own target → deal 50 recoil.
+//  2. Choose an own target → deal 50 recoil (DIREKT nach dem Schaden; W75a: bei einem
+//     Zweitwurf — Bartas — nach dessen Schaden ein zweites Mal, mit neuer Zielwahl).
 //
 //  ENHANCED MODE (optional):
 //  Requires: casting Hero has Destruction Magic
@@ -85,6 +86,11 @@ function isFirstDMSpellThisTurn(engine, playerIdx) {
   for (let i = entries.length - 1; i >= 0; i--) {
     const entry = entries[i];
     if (entry.turn !== currentTurn) continue;
+    // ★ W34a (Al, 22.10.2026, Punkt 3): ein Effekt, der als Spell ZÄHLT (Alice: Destruction Magic), ist ein früherer Destruction-Magic-Spell dieses Zuges (`engine.zaehleAlsArt`).
+    if (entry.type === 'effect_counted_as_spell') {
+      if (entry.player === playerName && entry.school === 'Destruction Magic') { sawEarlierDM = true; break; }
+      continue;
+    }
     if (entry.type !== 'spell_played' && entry.type !== 'immediate_action') continue;
     if (entry.player !== playerName) continue;
     const cd = cardDB[entry.card];
@@ -106,6 +112,9 @@ function canEnhance(gs, engine, playerIdx, heroIdx) {
 // ─── CARD MODULE ─────────────────────────
 
 module.exports = {
+  // ★ Als Ruling (Al 26.10., Flame Avalanche: „Am besten gleich die Karten ganz sperren statt den Schaden fizzeln zu lassen"): die Karte richtet NUR Schaden an Zielen des Gegners an —
+  // unter der Schadenssperre (`ps.damageLocked`) unspielbar (Karte bleibt auf der Hand, keine Aktion/Kosten; Sperr-Stutzen `engine._cardBlockedBySearchLock`).
+  blockedByDamageLock: true,
   // ★★ v1182 — ENTKOPPELTE BILDER (CARD_API): wird die Karte NEGIERT,
   // laeuft ihr Effekt-Rumpf nie — die Engine spielt dann diese Bilder.
   // Im normalen Weg bleibt es bei den Broadcasts im Effekt selbst.
@@ -145,11 +154,18 @@ module.exports = {
       // ── Step 1: Determine enhanced mode BEFORE targeting ──
       // Must check before promptDamageTarget, which fires the pending play log
       // (isFirstDMSpellThisTurn would see Fire Bolts itself and fail)
-      const enhancedAvailable = canEnhance(gs, engine, pi, heroIdx);
+      // ★ W75a (Al): Zweitwurf (Bartas, Saya, Grisgar …) = dieselbe Karte, dieselbe Entscheidung. Die Frage „increase to 200" wird NICHT
+      // erneut gestellt (die Karte liegt dann noch „in flight" und waere sonst wieder „erster Destruction-Zauber"); die beim Hauptwurf
+      // getroffene Entscheidung gilt fuer beide Rueckstoesse.
+      const zweitwurf = !!gs._bartasSecondCast;
+      const enhancedAvailable = !zweitwurf && canEnhance(gs, engine, pi, heroIdx);
       let recoilDamage = 50;
       let enhanced = false;
 
-      if (enhancedAvailable) {
+      if (zweitwurf) {
+        const vorher = engine._fireBoltsEntscheid;   // an der Engine, nicht im Spielzustand: ein Abbruch vor dem Commit darf nichts im Zustand hinterlassen (W66b)
+        if (vorher && vorher.pi === pi && vorher.turn === gs.turn) { enhanced = !!vorher.enhanced; recoilDamage = vorher.recoilDamage; }
+      } else if (enhancedAvailable) {
         const isMainPhase = gs.currentPhase === 2 || gs.currentPhase === 4;
         const isImmediate = !!gs._immediateActionContext;
 
@@ -172,12 +188,13 @@ module.exports = {
             gerrymanderEligible: true,
           });
 
-          if (confirmed && !confirmed.cancelled) {
+          if (engine._confirmSaidYes(confirmed)) {
             enhanced = true;
             recoilDamage = 200;
           }
         }
       }
+      if (!zweitwurf) engine._fireBoltsEntscheid = { pi, turn: gs.turn, enhanced, recoilDamage };   // fuer einen Zweitwurf (aufgeraeumt in `doPlaySpell`)
 
       // ── Step 2: Select enemy target and deal 100 damage ──
       const enemyTarget = await ctx.promptDamageTarget({
@@ -230,24 +247,31 @@ module.exports = {
       engine.sync();
       await engine._delay(300);
 
-      // ── Step 3: Defer recoil to after afterSpellResolved ──
-      // This ensures recoil happens AFTER Bartas's second cast (if any).
-      // Second cast skips recoil entirely — only one recoil per Fire Bolts play.
-      if (!gs._bartasSecondCast) {
-        gs._deferredRecoil = {
-          cardName: 'Fire Bolts',
-          ownerIdx: pi,
-          heroIdx,
-          damage: recoilDamage,
-          enhanced,
-          damageType: 'destruction_spell',
-        };
-      }
+      // ── Step 3: Recoil DIREKT nach dem Schaden (W75a) ──
+      // „Then, choose a target you control and deal 50 damage to it." — je ein Recoil nach jedem Schaden, auch im Zweitwurf von
+      // Bartas (wie bei Phoenix Tackle): Hauptwurf 100 → Recoil → Zweitwurf 100 → Recoil, jeweils mit eigener Zielwahl und
+      // demselben Betrag (die Entscheidung 200/50 gilt fuer beide). Vorher wurde EIN Recoil aufgeschoben und nach dem Zweitwurf
+      // abgerechnet, der Zweitwurf selbst blieb ohne Recoil.
+      await engine.resolveRecoil({
+        cardName: 'Fire Bolts',
+        ownerIdx: pi,
+        heroIdx,
+        damage: recoilDamage,
+        enhanced,
+        damageType: 'destruction_spell',
+      });
 
       // ── Step 4: Set free action flag if enhanced ──
-      if (enhanced) {
+      // „this counts as an additional Action" gilt EINMAL (Hauptwurf); der Zweitwurf ist kein neues Ausspielen (v1277).
+      if (enhanced && !zweitwurf) {
         gs._spellFreeAction = true;
       }
+
+      // ── Step 4b: Sofort-Guss (Chaos-Diamond, Overflowing Chalice, Zusatzaktion …) ──
+      // `resolveDeferredRecoil` ruft nur `doPlaySpell` auf — `_castSpellImmediately` nicht. Der Rückstoß fiel dort ersatzlos weg
+      // (bzw. blieb als `_deferredRecoil` stehen und traf beim nächsten gespielten Zauber). Im Sofort-Guss gleich hier auflösen
+      // (verschachtelt in einem `doPlaySpell`, z. B. Aurora Borealis, ist der spätere Aufruf dort dann ein No-op).
+      if (gs._immediateActionContext && !gs._bartasSecondCast) await engine.resolveDeferredRecoil();
 
       engine.log('fire_bolts', {
         player: gs.players[pi].username,

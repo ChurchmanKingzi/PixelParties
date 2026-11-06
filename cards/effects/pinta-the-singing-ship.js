@@ -44,14 +44,30 @@
 //     sie unmoeglich. Beschwoerungsarten, die danach fragen, tun es nicht
 //     mehr (Blue-Ice Dragon: `ctx._alsZusatzaktion`, bekommt Haste).
 //
-//     PLATZ: KEINE Zonenwahl — Pinta nimmt die ERSTE freie Zone. Einzige
+//     ★ W62a (Al: „Pintas Effekt erkennt Zonen mit bereits liegenden gleichnamigen Creatures nicht"): mit „Alice, the Transfer
+//     Student" (Alice-Teilung des Kontrolleurs: auch bei gefallener/negierter Alice, `_alice-shared.sharingActive`) ist auch eine
+//     BELEGTE Zone ein Landeplatz, in der schon nur Kreaturen GLEICHEN Namens liegen — die aufgedeckte Creature stapelt sich dazu,
+//     wie beim Hand-Weg. Die Zonenfrage ist EINE zentrale (`eligibleSummonZones` → `canShareInto`, dieselbe Auslegung wie
+//     `engine.beschwoerZonenFuer`): ★ W63a (Al, 22.10.2026: „erst die geteilte Zone, DANN die erste leere"): GETEILTE Zonen zuerst, dahinter
+//     die freien — wählt der Spieler selbst (Hand-Weg), bleiben beide wählbar; Pinta wählt nie und nimmt die erste Zone der Liste. Ohne Alice-Teilung oder ohne gleichnamige Kreatur bleibt es bei „keine Zone →
+//     nicht beschwörbar". Die Opfer-Zonen unten gelten nur, wenn WEDER eine freie NOCH eine geteilte Zone da ist.
+//
+//     PLATZ: KEINE Zonenwahl — Pinta nimmt die ERSTE geteilte Zone (W63a; Alice-Teilung), sonst die erste freie. Einzige
 //     Ausnahme: sind alle Zonen Pintas belegt und verlangt die aufgedeckte
 //     Creature Opfer (Blue-Ice Dragon), waehlt der Spieler NACH dem
 //     Aufdecken die Zone, in die sie soll — die Creature, die dort steht,
 //     wird dadurch automatisch zu einem der Opfer (`_requiredSacrificeInstIds`
-//     → `resolveSacrificeCost`), die uebrigen waehlt er wie gewohnt. Nur
-//     Zonen, deren Creature als Opfer taugt, stehen zur Wahl; bleibt nur
-//     eine, entfaellt auch diese Wahl.
+//     → `resolveSacrificeCost`), die uebrigen waehlt er wie gewohnt.
+//     ★ W20b (Al, 20.10.2026; allgemeine Regel aus W19: „Es ist jede Zone ein
+//     Ziel, die durch Opfern für die Beschwörung leer wird. Wählt man eine Zone
+//     mit 2 Creatures darin, müssen beide geopfert werden, bei mehr Creatures
+//     als benötigten Opfern ist eine Zone nicht viable."): angeboten werden nur
+//     Zonen, die die geforderten Opfer VOLLSTÄNDIG leeren können
+//     (`engine.zoneLeerbarDurchOpfer`: Insassen <= Opferzahl, alle opferbar,
+//     Mindestopfer-Summen weiter erfüllbar); ALLE Insassen der gewählten Zone
+//     (Alice-Stapel!) sind Pflicht-Opfer. Sind keine Zonen viable, beschwört
+//     Pinta nicht („if possible"); das Potion Deck wird trotzdem gemischt.
+//     Bleibt nur eine Zone, entfaellt auch die Wahl.
 //
 //     „IF POSSIBLE" heisst: Pinta ist ein tauglicher Beschwoerer (lebendig,
 //     nicht Frozen/Stunned/Webbed/Bound/Negated, Level-/Schulanforderung der
@@ -84,7 +100,10 @@ function beschwoerbareKarte(engine, pi, feld, heroIdx, name) {
   return engine.isCreatureSummonable(name, feld, heroIdx, { beschwoerer: pi });
 }
 
-/** Pintas eigene freie Zonen, auf die `name` JETZT beschwoert werden koennte („if possible"). */
+/**
+ * Pintas eigene Zonen, auf die `name` JETZT beschwoert werden koennte („if possible"): freie Zonen und — bei Alice-Teilung —
+ * die Zonen, in denen schon nur gleichnamige Kreaturen liegen (`shared: true`; freie vorn). Opfer-Zonen: `opferZonen`.
+ */
 function moeglicheZonen(engine, pi, feld, heroIdx, name) {
   const hero = engine.gs.players[feld]?.heroes?.[heroIdx];
   if (!hero?.name || hero.hp <= 0 || !name) return [];
@@ -95,10 +114,10 @@ function moeglicheZonen(engine, pi, feld, heroIdx, name) {
 }
 
 /**
- * Sind ALLE Zonen Pintas belegt und verlangt die Karte Opfer: die Zonen, deren Creature als Opfer taugt. Die
- * Creature dort wird automatisch zu einem der Opfer. Die Karte nennt ihre Kosten ueber den Vertrag
- * `summonSacrificeSpec(engine)` (Blue-Ice Dragon); ohne ihn gibt es keinen Weg in eine belegte Zone.
- * Eintraege wie die von `eligibleSummonZones`, dazu `opferInstId`.
+ * Sind ALLE Zonen Pintas belegt und verlangt die Karte Opfer: die Zonen, die die geforderten Opfer vollstaendig leeren
+ * koennen (W20b: `engine.zoneLeerbarDurchOpfer`). ALLE Insassen der Zone werden automatisch zu Opfern. Die Karte nennt
+ * ihre Kosten ueber den Vertrag `summonSacrificeSpec(engine)` (Blue-Ice Dragon); ohne ihn gibt es keinen Weg in eine
+ * belegte Zone. Eintraege wie die von `eligibleSummonZones`, dazu `opferInstIds`.
  */
 function opferZonen(engine, pi, feld, heroIdx, name) {
   const hero = engine.gs.players[feld]?.heroes?.[heroIdx];
@@ -111,16 +130,14 @@ function opferZonen(engine, pi, feld, heroIdx, name) {
   const zonen = engine.gs.players[feld]?.supportZones?.[heroIdx] || [];
   const anzahl = Math.min(zonen.length, 3);
   for (let z = 0; z < anzahl; z++) if (!engine.supportSlotBelegt(feld, heroIdx, z)) return [];   // sonst nimmt Pinta die erste freie
-  const opfer = engine.getSacrificableCreatures(pi);
   const out = [];
   for (let z = 0; z < anzahl; z++) {
-    const eintrag = opfer.find(c => c.inst.zone === 'support' && c.inst.heroIdx === heroIdx
-      && c.inst.zoneSlot === z && engine.physicalSide(c.inst) === feld);
-    if (!eintrag) continue;
-    if (!engine.canSatisfySacrifice(pi, { ...spec, requiredInstIds: [eintrag.inst.id] })) continue;
+    // W20b: eine Zone ist viable, wenn die geforderten Opfer sie ganz leeren koennen; alle ihre Insassen sind Pflicht-Opfer.
+    if (!engine.zoneLeerbarDurchOpfer(pi, feld, heroIdx, z, spec)) continue;
+    const insassen = engine.zoneInsassen(feld, heroIdx, z);
     out.push({
-      heroIdx, slotIdx: z, label: `${hero.name} — Slot ${z + 1} (sacrifices ${eintrag.cardName})`,
-      opferInstId: eintrag.inst.id,
+      heroIdx, slotIdx: z, label: `${hero.name} — Slot ${z + 1} (sacrifices ${insassen.map(c => c.name).join(' + ')})`,
+      opferInstIds: insassen.map(c => c.id),
       ...(feld !== pi ? { owner: feld } : {}),
     });
   }
@@ -227,11 +244,11 @@ module.exports = {
         hookExtras: {
           _isNormalSummon: false,
           // Die Creature in der gewaehlten Zone wird automatisch zu einem der Opfer.
-          ...(ziel.opferInstId ? { _requiredSacrificeInstIds: [ziel.opferInstId] } : {}),
+          ...(ziel.opferInstIds ? { _requiredSacrificeInstIds: ziel.opferInstIds } : {}),
         },
         ...(feld !== pi ? { heldSeite: feld } : {}),
       });
-      engine.log('pinta_summon', { player: ps.username, card: oben, ok: !!inst });
+      engine.log('pinta_summon', { player: ps.username, card: oben, ok: !!inst, ...(ziel.shared ? { shared: true } : {}) });
     } else {
       engine.log('pinta_reveal_unsummonable', { player: ps.username, card: oben });
     }
@@ -246,6 +263,7 @@ module.exports = {
   hooks: {
     // „starting Heroes" + „you can never draw cards from your Potion Deck".
     onGameStart: starthelden.onGameStart,
+    onIdentityLost: starthelden.onIdentityLost,   // W12 (Q109): geliehene Gestalt faellt ab → Sperre faellt mit
   },
 
   _test: { moeglicheZonen, opferZonen },

@@ -15,7 +15,7 @@
 //  dort). Platzieren nur zu lebenden Helden, regardless of level, keine
 //  Aktion. Auftritt beim Ja (v818-Grundregel).
 // ═══════════════════════════════════════════
-const { PAWN, boardOfKingsOnBoard, freeZonesOfHero, ofKingsCpuAnswer } = require('./_of-kings-shared');
+const { PAWN, boardOfKingsOnBoard, freeZonesOfHero, geteiltVorn, ofKingsCpuAnswer } = require('./_of-kings-shared');
 
 const CARD_NAME = 'Bishop of Kings [W]';
 const key = (pi) => `bishop-of-kings-w:${pi}`;
@@ -64,11 +64,12 @@ module.exports = {
       if (!boardOfKingsOnBoard(engine)) return;
       // Kontrolle statt Seite (Styx 28.9.): „an undefeated Hero you
       // control" — auch uebernommene Helden der Gegenspalte (`owner`).
-      const zones = [];
+      let zones = [];
       for (const { physOwner, heroIdx: hi, hero: h } of engine.heroesControlledBy(pi)) {
         if (!h?.name || h.hp <= 0) continue;
-        for (const z of freeZonesOfHero(engine, physOwner, hi)) zones.push({ owner: physOwner, heroIdx: hi, slotIdx: z });
+        for (const z of freeZonesOfHero(engine, physOwner, hi, name, pi)) zones.push({ owner: physOwner, heroIdx: hi, slotIdx: z });   // W62a: + geteilte Zone (Alice)
       }
+      zones = geteiltVorn(engine, pi, zones, name);   // W63a (Al): geteilte Zone vor der ersten leeren
       if (zones.length === 0) return;
       const place = await engine.promptGeneric(pi, {
         type: 'confirm', title: CARD_NAME,

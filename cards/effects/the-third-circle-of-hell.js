@@ -23,7 +23,7 @@
 
 const { hasCardType } = require('./_hooks');
 const { loadCardEffect } = require('./_loader');
-const { alleEigenenAreasLoeschen, cpuBejahen } = require('./_hell-circles-shared');
+const { alleEigenenAreasLoeschen, cpuBejahen, sperreHinweis } = require('./_hell-circles-shared');
 
 const CARD_NAME = 'The Third Circle of Hell';
 const ANZAHL = 6;
@@ -35,6 +35,7 @@ function istAreaZauber(cd) {
 /** Die uebrigen aufgedeckten Karten in den Geloescht-Stapel legen, ohne neue Animation (mit Loesch-Rettung). */
 async function restOhneFlugLoeschen(engine, pi, karten) {
   const ps = engine.gs.players[pi];
+  const gelandet = [];
   engine._geloeschtVerfolgen(pi);
   for (const name of karten) {
     if (loadCardEffect(name)?.beforeDelete
@@ -43,8 +44,10 @@ async function restOhneFlugLoeschen(engine, pi, karten) {
       continue;
     }
     ps.deletedPile.push(name);
+    gelandet.push(name);
   }
   engine.sync();
+  return gelandet;
 }
 
 module.exports = {
@@ -54,7 +57,9 @@ module.exports = {
   onDeletedFromAnywhere: async (engine, pi) => {
     const gs = engine.gs;
     const ps = gs.players[pi];
-    if (!ps || ps._thirdCircleTurn === gs.turn) return;
+    if (!ps) return;
+    if (ps._thirdCircleTurn === gs.turn) { await sperreHinweis(engine, pi, CARD_NAME, 'once_per_turn'); return; }   // W84a: nicht stumm - only once per turn sichtbar machen
+    if (engine.spielerIstVonAreasAusgenommen(pi)) return;   // W82 (Shipwrecked): Area-Effekte aktivieren und Areas spielen ist gesperrt
     if (!(ps.mainDeck || []).length) return;
     await engine.showTriggeredEffect(CARD_NAME, { playerIdx: pi });
     const antwort = await engine.promptGeneric(pi, {
@@ -78,6 +83,7 @@ module.exports = {
     const aufdeckMs = 1100;
     let gezeigt = [];            // die noch offenen Karten (Area-Zauber)
     let genommenAnz = 0, geloeschtAnz = 0;
+    const geloeschtNamen = [];   // alles, was wirklich aus dem Deck im Geloescht-Stapel gelandet ist (-> `onMill`, s. unten)
     engine._geloeschtVerfolgen(pi);
     for (let i = 0; i < ANZAHL && ps.mainDeck.length > 0; i++) {
       const genommen = engine.takeFromPileSync(pi, 'deck', 0, { source: CARD_NAME });
@@ -95,7 +101,7 @@ module.exports = {
       engine.sync();
       await engine._delay(aufdeckMs);
       if (offen) gezeigt.push(name);
-      else { ps.deletedPile.push(name); geloeschtAnz++; engine.sync(); }
+      else { ps.deletedPile.push(name); geloeschtAnz++; geloeschtNamen.push(name); engine.sync(); }
     }
     if (genommenAnz === 0) return;
     await engine._delay(150);
@@ -104,7 +110,8 @@ module.exports = {
     await alleEigenenAreasLoeschen(engine, pi, CARD_NAME);
 
     // ③ Area-Zauber waehlen und als Zusatzaktion spielen.
-    const kandidaten = [...new Set(gezeigt.filter(n => istAreaZauber(db[n])))];
+    // Als Ruling (Al 27.10.): „play it … if possible" — unter der Reality-Crack-Sperre („You cannot play another Area for the rest of the turn") ist es nicht möglich: keine Wahl, die Karten fallen in den Rest (④).
+    const kandidaten = engine.areaSpielGesperrt(pi) ? [] : [...new Set(gezeigt.filter(n => istAreaZauber(db[n])))];
     let gespielt = null;
     if (kandidaten.length > 0) {
       let wahl = kandidaten[0];
@@ -149,9 +156,25 @@ module.exports = {
     // ④ Den Rest loeschen.
     // Der Flug „Deck → Mitte → Geloescht-Stapel" lief schon beim Aufdecken (`deleteMode`); hier nur noch den
     // Zustand nachziehen — KEIN zweiter Flug vom Deck.
-    if (gezeigt.length > 0) { await restOhneFlugLoeschen(engine, pi, gezeigt); geloeschtAnz += gezeigt.length; }
+    if (gezeigt.length > 0) {
+      const rest = await restOhneFlugLoeschen(engine, pi, gezeigt);
+      geloeschtNamen.push(...rest); geloeschtAnz += rest.length;
+    }
     engine.log('third_circle', { player: ps.username, revealed: genommenAnz, played: gespielt, deleted: geloeschtAnz });
     engine.sync();
+
+    // ⑤ „deleted from your deck": die geloeschten Deckkarten melden (Mystery Box zieht 2, Jean & Co.) — wie `actionMillCards`
+    // mit `deleteMode`: Karten mit `onMill`-Hook brauchen dafuer eine verfolgte Instanz im Geloescht-Stapel.
+    if (geloeschtNamen.length > 0) {
+      for (const name of geloeschtNamen) {
+        const vorhanden = engine.cardInstances.find(c => c.owner === pi && c.name === name && c.zone === 'deleted');
+        if (!vorhanden && loadCardEffect(name)?.hooks?.onMill) engine._trackCard(name, pi, 'deleted');
+      }
+      await engine.runHooks('onMill', {
+        playerIdx: pi, milledCards: geloeschtNamen, count: geloeschtNamen.length, source: CARD_NAME, deleteMode: true, _skipReactionCheck: true,
+      });
+      engine.sync();
+    }
   },
 
   hooks: {

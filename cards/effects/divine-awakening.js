@@ -63,12 +63,13 @@ function legaleZiele(gs, pi, engine) {
   const ps = gs.players[pi];
   if (!ps || !engine?.heroHasAscendedForm) return [];
   const raus = [];
-  for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
-    const hero = ps.heroes[hi];
+  // W25a (N1-11, Al 21.10.2026: „geht immer nach aktueller Kontrolle"): „a Hero you control" = `heroesControlledBy` — der abgegebene eigene
+  // Held faellt heraus, ein uebernommener Gegnerheld (mit Recht `ausruesten`, siehe `candidateHosts`) zaehlt mit. Schluessel `Brettseite:Index`.
+  for (const { physOwner, heroIdx: hi, hero } of engine.heroesControlledBy(pi)) {
     if (!hero?.name || hero.hp <= 0) continue;
-    if (findFreeSlot(ps, hi) < 0) continue;
+    if (findFreeSlot(gs.players[physOwner], hi) < 0) continue;
     if (!engine.heroHasAscendedForm(hero.name)) continue;
-    raus.push(hi);
+    raus.push(`${physOwner}:${hi}`);
   }
   return raus;
 }
@@ -112,7 +113,7 @@ module.exports = {
    */
   attachmentHosts(gs, pi, engine) {
     const erlaubt = new Set(legaleZiele(gs, pi, engine));
-    return attachmentHostsFor(gs, pi, engine, { heroFilter: (h, hi, side) => side === pi && erlaubt.has(hi) });   // `erlaubt` = eigene Indizes
+    return attachmentHostsFor(gs, pi, engine, { heroFilter: (h, hi, side) => erlaubt.has(`${side}:${hi}`) });   // `erlaubt` = kontrollierte Helden (Brettseite:Index)
   },
   // ── Vertrag fuer die Engine ────────────────────────────────────
   // `performAscension` fragt ueber diesen Namen, ob der aufsteigende
@@ -142,13 +143,13 @@ module.exports = {
       // Ascended-Form), Drop-Hinweise und Prompt kommen vom Baustein.
       const erlaubt = new Set(legaleZiele(gs, pi, engine));
       const res = await attachToHero(ctx, CARD_NAME, {
-        heroFilter: (h, hi, side) => side === pi && erlaubt.has(hi), preferCaster: true,   // `erlaubt` = eigene Indizes
+        heroFilter: (h, hi, side) => erlaubt.has(`${side}:${hi}`), preferCaster: true,   // `erlaubt` = kontrollierte Helden (Brettseite:Index)
         description: 'Choose one of your Heroes that has an Ascended form (auto-leftmost-free slot), or click a specific empty Support Zone.',
         confirmLabel: '✨ Attach!', animationType: 'divine_awakening',
       });
       if (!res) return;
       const destHero = res.host.heroIdx, destSlot = res.host.slotIdx, inst = res.inst;
-      const destHeroObj = ps.heroes?.[destHero];
+      const destHeroObj = gs.players[res.host.owner]?.heroes?.[destHero];   // W25a: Brettseite des Wirts
       engine.log('divine_awakening_attached', {
         player: ps.username, hero: destHeroObj?.name, heroIdx: destHero, zoneSlot: destSlot,
       });

@@ -39,7 +39,7 @@ module.exports = {
       const pi = ctx.cardOwner;
       const oi = engine.opponentOf(pi);
       const ops = engine.gs.players[oi];
-      if (!ops || (ops.hand || []).length === 0) return;
+      if (!ops || (ops.hand || []).length === 0) return ctx._engine.summonEffektFizzelt(ctx.card, ctx.cardName, { stumm: true });   // W11/R4: wirkt nicht → Blob stumm
 
       await engine.actionPromptForceDiscard(oi, 1, {
         title: CARD_NAME,

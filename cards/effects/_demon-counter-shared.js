@@ -33,6 +33,7 @@
 //  neue Animation braucht einen Klang; hier gibt es nichts Neues).
 // ═══════════════════════════════════════════
 
+const { anyName } = require('./_alias-name');   // Shroomasaur: Zusatzname zählt für Namensfamilien
 const { hasCardType } = require('./_hooks');
 
 const COUNTER_KEY = 'demonCounter';
@@ -59,7 +60,7 @@ function hornedDemonsOnBoard(engine) {
   const out = [];
   for (const inst of engine.cardInstances || []) {
     if (inst.zone !== 'support' || inst.faceDown || inst._deathResolved) continue;
-    if (!isHornedDemonName(inst.name)) continue;
+    if (!anyName(inst, (n) => isHornedDemonName(n))) continue;
     const cd = engine.getEffectiveCardData?.(inst) || engine._getCardDB()[inst.name];
     if (!cd || !hasCardType(cd, 'Creature')) continue;
     out.push(inst);

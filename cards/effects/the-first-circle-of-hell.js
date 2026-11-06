@@ -176,6 +176,7 @@ module.exports = {
       const engine = ctx._engine;
       const pi = ctx.activePlayer;
       if (pi == null || pi < 0) return;
+      if (engine.spielerIstVonAreasAusgenommen(pi)) return;   // W82 (Shipwrecked): der Zugspieler ist von Areas ausgenommen
       const dp = engine.gs.players[pi]?.discardPile;
       if (!dp || dp.length === 0) return;
       if (dp.length % 2 !== 1) return; // even → no-op
@@ -192,6 +193,7 @@ module.exports = {
       const engine = ctx._engine;
       const pi = ctx.activePlayer;
       if (pi == null || pi < 0) return;
+      if (engine.spielerIstVonAreasAusgenommen(pi)) return;   // W82 (Shipwrecked): der Zugspieler ist von Areas ausgenommen
       const dPile = engine.gs.players[pi]?.deletedPile || [];
       if (dPile.length === 0) return;        // 0 is even but no-op
       if (dPile.length % 2 !== 0) return;    // odd → no-op

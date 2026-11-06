@@ -37,21 +37,24 @@
 //       is a valid target; the buff applies
 //       preemptively.
 //
-//  Immunity: sets `_cardinalImmune` (engine's
-//  generic absolute-creature-shield: blocks damage,
-//  destroy, move, buff add/remove, AND — with the
-//  canApplyCreatureStatus update — status effects)
-//  plus `untargetable_by_opponent` so opponent
-//  targeting UIs skip this creature on future
-//  plays. Both counters are cleared on buff expiry
-//  via `clearCountersOnExpire`; the buff's
-//  `expiresForceClear: true` lets the expiry path
-//  bypass _cardinalImmune's own guard against
-//  actionRemoveCreatureBuff — without that bypass
-//  the protection would be self-perpetuating.
+//  Immunity: ★ W17b (A01-25): sets `_gwImmune` — eine EIGENE,
+//  QUELLENBEWUSSTE Marke (nicht mehr `_cardinalImmune`, das
+//  quellenblind alles sperrt und den Cardinal Beasts bleibt):
+//  „unaffected by your OPPONENT'S cards and effects" — Schaden,
+//  Zerstören, Zonenwechsel/Stehlen/Bewegen, Buff hinzufügen/
+//  entfernen, Status, Negation und Aura-Negation prallen NUR ab,
+//  wenn die Quelle einem anderen Spieler als dem Kontrolleur der
+//  Kreatur gehört (`engine.kreaturGegnerEffektImmun`). Eigene
+//  Karten/Effekte/Kosten (Opfer, Goldify, Buffs …) wirken normal;
+//  ist keine Quelle bekannt, bleibt sie geschützt.
+//  Dazu `untargetable_by_opponent`, damit gegnerische
+//  Zielwahlen die Kreatur überspringen. Beide Zähler fallen beim
+//  Ablauf über `clearCountersOnExpire`; `expiresForceClear: true`
+//  lässt den Ablauf die Sperre von `actionRemoveCreatureBuff`
+//  umgehen — sonst wäre der Schutz selbsterhaltend.
 // ═══════════════════════════════════════════
 
-const { placePollutionTokens, hasFreeZone } = require('./_pollution-shared');
+const { placePollutionTokens, hasFreeZone, payTokenCost, kostenSchonBezahlt } = require('./_pollution-shared');
 const { hasCardType } = require('./_hooks');
 
 /** Shared precondition: caster has a Creature, a free zone, and a castable hero. */
@@ -78,10 +81,10 @@ function hasValidContext(gs, pi, engine) {
   for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
     const hero = ps.heroes[hi];
     if (!hero?.name || hero.hp <= 0) continue;
-    if (hero.statuses?.frozen || hero.statuses?.stunned || hero.statuses?.negated) continue;
+    if (hero.statuses?.frozen || hero.statuses?.stunned) continue;   // W13 (Al, A2): `negated` sperrt die Reaktion nicht mehr
     if (engine.heroMeetsLevelReq(pi, hi, cardData)) return true;
   }
-  return false;
+  return !!engine.fremderHeldKannStufe(pi, 'Golden Wings');   // W20c: auch ein uebernommener Held wirkt
 }
 
 /** Clickable target list of the caster's own Creatures. */
@@ -104,12 +107,12 @@ function getOwnCreatureTargets(engine, pi) {
 }
 
 /** Apply the Golden Wings buff + immunity flags to a specific creature instance. */
-async function applyBuff(engine, pi, inst, promptCtxShim) {
+async function applyBuff(engine, pi, inst, promptCtxShim, vorab) {
   const gs = engine.gs;
   const ps = gs.players[pi];
 
-  // Cost: 1 Pollution Token.
-  await placePollutionTokens(engine, pi, 1, 'Golden Wings', { promptCtx: promptCtxShim });
+  // Cost: 1 Pollution Token. (W4b: im proaktiven Spielweg schon vor dem Reaktionsfenster bezahlt, `payActivationCost`.)
+  if (!vorab) await placePollutionTokens(engine, pi, 1, 'Golden Wings', { promptCtx: promptCtxShim });
 
   // Shield animation on the protected creature.
   engine._broadcastEvent('play_zone_animation', {
@@ -118,19 +121,21 @@ async function applyBuff(engine, pi, inst, promptCtxShim) {
   });
   await engine._delay(1100);
 
-  // Order matters: add buff FIRST (while _cardinalImmune is still unset so
+  // Order matters: add buff FIRST (while _gwImmune is still unset so
   // actionAddCreatureBuff's own guard doesn't reject it), then set the
   // immunity counters. On expiry, clearCountersOnExpire strips both
   // flags together, and expiresForceClear lets the expiry path bypass
-  // _cardinalImmune's guard in actionRemoveCreatureBuff.
-  await engine.actionAddCreatureBuff(inst, 'golden_wings', {
+  // _gwImmune's guard in actionRemoveCreatureBuff.
+  const gewirkt = await engine.actionAddCreatureBuff(inst, 'golden_wings', {
     expiresAtTurn: gs.turn + 1,
     expiresForPlayer: engine.opponentOf(gs.activePlayer), // end of current half-turn, whichever side we're on
     expiresForceClear: true,
     source: 'Golden Wings',
-    clearCountersOnExpire: ['_cardinalImmune', 'untargetable_by_opponent', 'untargetable_by_opponent_pi'],
+    clearCountersOnExpire: ['_gwImmune', 'untargetable_by_opponent', 'untargetable_by_opponent_pi'],
   });
-  inst.counters._cardinalImmune = true;
+  // W71b: negiert ein Schutzfenster (Cool Rescuer Monia & Co.) den Buff, fallen auch die Immunitäts-Marken weg (ein Effekt, eine Negation).
+  if (gewirkt === false) { engine.log('golden_wings_negated', { player: ps.username, creature: inst.name }); engine.sync(); return; }
+  inst.counters._gwImmune = true;   // W17b: quellenbewusst (nur Gegner), nicht `_cardinalImmune`
   inst.counters.untargetable_by_opponent = 1;
   inst.counters.untargetable_by_opponent_pi = engine.opponentOf(pi);
 
@@ -142,7 +147,7 @@ async function applyBuff(engine, pi, inst, promptCtxShim) {
  * Prompt the caster to click one of their Creatures, then apply the buff.
  * Used for the proactive play path (all own creatures eligible).
  */
-async function promptAndApply(engine, pi, promptCtxShim) {
+async function promptAndApply(engine, pi, promptCtxShim, vorab) {
   const gs = engine.gs;
   const targets = getOwnCreatureTargets(engine, pi);
   if (targets.length === 0) {
@@ -155,7 +160,7 @@ async function promptAndApply(engine, pi, promptCtxShim) {
     description: 'Click one of your Creatures to grant it Golden Wings — full immunity to opponent effects for the rest of this turn.',
     confirmLabel: '🪽 Shield!',
     confirmClass: 'btn-success',
-    cancellable: true,
+    cancellable: !vorab,
     maxTotal: 1,
   });
   if (!selectedIds || selectedIds.length === 0) return false;
@@ -163,7 +168,7 @@ async function promptAndApply(engine, pi, promptCtxShim) {
   const chosen = targets.find(t => t.id === selectedIds[0]);
   if (!chosen?.cardInstance) return false;
 
-  await applyBuff(engine, pi, chosen.cardInstance, promptCtxShim);
+  await applyBuff(engine, pi, chosen.cardInstance, promptCtxShim, vorab);
   return true;
 }
 
@@ -273,13 +278,21 @@ module.exports = {
     return null;
   },
 
+  // ★ W4b (Al, Welle 4): im proaktiven Spielweg ist der Token Kostenpunkt und wird VOR dem Reaktionsfenster bezahlt (bleibt
+  // bei Ganz-Negierung liegen); danach ist die Kreaturwahl nicht mehr abbrechbar. Die Post-Target-Reaktion (`postTargetResolve`)
+  // kennt kein Negationsfenster und zahlt weiter beim Auflösen.
+  async payActivationCost(ctx) {
+    await payTokenCost(ctx, 1, 'Golden Wings');
+  },
+
   hooks: {
     // Proactive play path — no Action cost (inherentAction above). Any own
     // Creature is a valid pick; the ctx already wires promptZonePick for
     // placePollutionTokens.
     onPlay: async (ctx) => {
-      const ok = await promptAndApply(ctx._engine, ctx.cardOwner, ctx);
-      if (!ok) ctx.gameState._spellCancelled = true;
+      const vorab = kostenSchonBezahlt(ctx);
+      const ok = await promptAndApply(ctx._engine, ctx.cardOwner, ctx, vorab);
+      if (!ok && !vorab) ctx.gameState._spellCancelled = true;
     },
   },
 };

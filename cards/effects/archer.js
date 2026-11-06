@@ -188,11 +188,15 @@ module.exports = {
       spendUse(inst, gs, { key: USE_KEY, max: MAX_USES });
 
       const targetSlot = target.type === 'equip' ? target.slotIdx : -1;
-      engine._broadcastEvent('play_zone_animation', {
-        type: 'electric_strike',
-        owner: target.owner, heroIdx: target.heroIdx, zoneSlot: targetSlot,
-      });
-      await engine._delay(400);
+      // Pfeil-Animation statt Blitz (app-fx-52, `archerPfeil`): ein Holzpfeil fliegt von der Zone des Archers zum Ziel; der Schaden folgt nach dem Flug (Einschlag).
+      // ★ VERMERK: Creatures haben noch keine Sprites — die Quelle ist die Support-Zone des Archers. Sobald es animierte Creature-Sprites gibt, den Start auf deren Sprite umstellen.
+      // Clients ohne Pfeil (Animationen aus, Retro) bekommen den alten Blitz als `ersatz`; spielt niemand den Pfeil, laeuft der alte Blitz mit kurzer Wartezeit.
+      const blitz = ['play_zone_animation', { type: 'electric_strike', owner: target.owner, heroIdx: target.heroIdx, zoneSlot: targetSlot }, 0];
+      const pfeilGespielt = await require('./_arrows-shared').archerPfeil(engine, inst, target, blitz);
+      if (!pfeilGespielt) {
+        engine._broadcastEvent(blitz[0], blitz[1]);
+        await engine._delay(400);
+      }
 
       const source = { name: CARD_NAME, owner: ctx.cardOwner, heroIdx: inst.heroIdx };
       if (target.type === 'hero') {

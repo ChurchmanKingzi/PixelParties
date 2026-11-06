@@ -40,6 +40,8 @@ const {
   WC,
   countWarCounselors,
   makeSingletonCanSummon,
+  offeneGatheringGebuehr,
+  zahleGatheringGebuehr,
 } = require('./_war-counselor-shared');
 
 const CARD_NAME = 'Harpthenean War Counselor';
@@ -77,8 +79,10 @@ module.exports = {
 
     const counselors = countWarCounselors(engine, pi);
     const goldGain = GOLD_PER_COUNSELLOR * counselors;
-    const gold = ps.gold || 0;
-    const damage = Math.min(DAMAGE_CAP, DAMAGE_PER_GOLD * gold);
+    // Welle 11 (Al, R3): eine offene Gathering-Place-Gebühr (8 Gold) wird erst nach der Zielbestätigung abgezogen, aber VOR der Auflösung —
+    // der Schaden skaliert deshalb schon in der Anzeige mit dem Stand NACH der Zahlung.
+    const gold = Math.max(0, (ps.gold || 0) - offeneGatheringGebuehr(engine, inst));
+    let damage = Math.min(DAMAGE_CAP, DAMAGE_PER_GOLD * gold);
 
     const choice = await engine.promptGeneric(pi, {
       type: 'optionPicker',
@@ -108,6 +112,8 @@ module.exports = {
     // ── Gold ──
     if (choice.optionId === 'gold') {
       if (goldGain <= 0) return false;              // nichts zu holen
+      // Welle 11 (Al, R3): War Council Gathering Place — ohne Zielwahl: die 8 Gold werden direkt vor der Auflösung abgezogen.
+      if (!(await zahleGatheringGebuehr(engine, inst))) return false;
       engine._broadcastEvent('play_gold_coins', { owner: pi });
       await engine._delay(300);
       await engine.actionGainGold(pi, goldGain);
@@ -132,6 +138,11 @@ module.exports = {
       cancellable: true,
     });
     if (!target) return false;
+    // Welle 11 (Al, R3): War Council Gathering Place — die 8 Gold werden erst jetzt (Ziel bestätigt, vor der Auflösung) abgezogen.
+    if (!(await zahleGatheringGebuehr(engine, inst))) return false;
+    // Der Schaden gilt für den tatsächlichen Goldstand nach der Zahlung.
+    damage = Math.min(DAMAGE_CAP, DAMAGE_PER_GOLD * (ps.gold || 0));
+    if (damage <= 0) return false;
 
     const tgtZoneSlot = target.type === 'hero' ? -1 : target.slotIdx;
     engine._broadcastEvent('play_zone_animation', {

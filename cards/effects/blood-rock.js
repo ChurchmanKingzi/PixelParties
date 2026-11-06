@@ -33,7 +33,7 @@
 //     Blood Rocks deal 100 + 100 as written.
 // ═══════════════════════════════════════════
 
-const { heroHasDiverHelmet } = require('./_diver-helmet-shared');
+const { isAreaImmuneHero } = require('./_diver-helmet-shared');   // Diver Helmet + W82 Shipwrecked
 
 const CARD_NAME = 'Blood Rock';
 
@@ -90,7 +90,7 @@ module.exports = {
         // Diver Helmet: the equipped Hero is unaffected by Areas — skip
         // it entirely (no damage AND no blood-pulse animation). tpi is
         // the targeted Hero's side.
-        heroFilter: (hero, hi, tpi) => !heroHasDiverHelmet(engine, tpi, hi),
+        heroFilter: (hero, hi, tpi) => !isAreaImmuneHero(engine, tpi, hi),
       });
 
       ctx._engine.log('blood_rock_tick', {

@@ -11,7 +11,9 @@
 //    automatically by the existing thaw-immune
 //    system: when a target thaws at END phase,
 //    it receives a 1-turn Immune buff that
-//    blocks re-freezing.
+//    blocks re-freezing. (Kreaturen: W16e — eigener Zugstempel
+//    `counters._frostbringerTurn` an der Kreatur; W69a: gezaehlt werden
+//    nur ECHTE Zuege des Besitzers, `engine.echteEigeneZuegeBis`.)
 //
 //  Uses afterSpellResolved (fires for both Spells
 //  and Attacks) with spellCardData.cardType check
@@ -107,6 +109,14 @@ module.exports = {
           );
         if (!inst || inst.zone !== 'support') return;
         if (inst.counters.frozen) return;
+        // W16e (F01-04): „A target cannot be Frozen in 2 consecutive turns by this effect" gilt auch fuer Kreaturen. Helden erledigt die
+        // Auftau-Immunitaet der Engine; Kreaturen haben keine — die Klinge merkt sich den Zug ihres letzten Einfrierens
+        // (gefroren in Zug t, taut am Ende von t+1, in t+2 nicht erneut).
+        // ★ W69a (Al, 23.10.2026: „… soll 'echte' eigene Züge zählen!"): wie beim Helden (Auftau-Immunitaet bis zum BEGINN des naechsten Zuges des
+        // Traegers) zaehlen die tatsaechlich gespielten Zuege des Kreatur-Besitzers: gesperrt, bis nach dem Zug, in dem sie auftaut (dem ersten
+        // echten Zug ab dem Einfrieren), ein weiterer echter Zug des Besitzers begonnen hat. Ein uebersprungener Zug dazwischen hebt die Sperre nicht auf.
+        const letzter = inst.counters._frostbringerTurn;
+        if (letzter != null && engine.echteEigeneZuegeBis(inst.owner, gs.turn, letzter) < 2) return;
 
         // Animation plays unconditionally — Cardinal-immune / shielded
         // targets visibly receive the freeze even when the status itself
@@ -120,7 +130,10 @@ module.exports = {
           sourceOwner: ctx.cardOwner,
           source: CARD_NAME,
         });
-        if (applied) engine.log('frostbringer_freeze', { target: inst.name, by: CARD_NAME });
+        if (applied) {
+          inst.counters._frostbringerTurn = gs.turn;
+          engine.log('frostbringer_freeze', { target: inst.name, by: CARD_NAME });
+        }
       }
 
       engine.sync();

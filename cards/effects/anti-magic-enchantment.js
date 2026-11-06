@@ -24,9 +24,11 @@
 //    the Artifact must already be sitting in the
 //    Support Zone for the enchantment to attach.
 //
-//  • Instead, AME listens on `onCardEnterZone` while
-//    still in hand. When the Artifact actually lands
-//    in a Support Zone, the hook offers AME's holder
+//  • Instead, AME listens on `onEquipGained` (W51a: der EINE
+//    generische Hook „Equip/Attachment gained", gefeuert von
+//    `engine.fireEquipGained` — auch beim UMHAENGEN durch Slippery
+//    Fridge / Inheritance Ceremony) while still in hand. When the
+//    Artifact actually lands in a Support Zone, the hook offers AME's holder
 //    the opportunity to play it. On accept: pay a
 //    Pollution Token, stamp `counters.antiMagicEnchanted`
 //    onto the Artifact, add the `anti_magic_enchanted`
@@ -64,21 +66,21 @@ module.exports = {
   // played via the post-land prompt.
   neverPlayable: true,
 
-  // Must stay live while in hand (so the `onCardEnterZone` hook fires there).
+  // Must stay live while in hand (so the `onEquipGained` hook fires there).
   activeIn: ['hand'],
 
   hooks: {
     /**
-     * Fires for every zone entry event. We only care when an Equipment
-     * Artifact lands in a Support Zone on the AME holder's own side
-     * (card text benefits the "controlling player" — for that to mean
-     * anything, AME's holder must be the Artifact's controller).
+     * Fires for every equip/attach event (`onEquipGained`). We only care when an Equipment
+     * Artifact lands in a Support Zone — auf JEDER Seite, von jedem angelegt
+     * (Welle 11, Al R6). Die Negier-Fähigkeit gehört dem Kontrolleur des
+     * Artefakts („controlling player").
      *
      * Uses a hookCtx flag so if the player holds multiple copies of AME,
      * only one prompts per event. Self-dedupes via engine.sync after the
      * card leaves hand.
      */
-    onCardEnterZone: async (ctx) => {
+    onEquipGained: async (ctx) => {
       const engine = ctx._engine;
       const gs = ctx.gameState;
       const inst = ctx.card;
@@ -90,16 +92,21 @@ module.exports = {
       const ps = gs.players[pi];
       if (!ps || !ps.hand.includes('Anti Magic Enchantment')) return;
 
-      const entering = ctx.enteringCard;
-      if (!entering || ctx.toZone !== 'support') return;
+      const entering = ctx.equipCard;
+      if (!entering || entering.zone !== 'support') return;
 
       const cardDB = engine._getCardDB();
       const cd = cardDB[entering.name];
-      if (!cd || cd.cardType !== 'Artifact') return;
-      if ((cd.subtype || '').toLowerCase() !== 'equipment') return;
+      if (!cd) return;
+      // ★ W52a (Al, 22.10.2026: „Nein, soll angeboten werden!"): ein Equipment-Artifact ODER ein als Equip angelegter HELD („While a Hero is equipped via this effect, it is
+      // treated as an equippable Artifact" — Initiation Ritual; ebenso die angelegte Gestalt des Shapeshifters). Der Schutz-Effekt haengt dann an diesem angelegten Helden
+      // („While that Artifact is equipped to a Hero …"): die Engine liest `counters.antiMagicEnchanted` an jeder Support-Karte des Wirts. NICHT dazu zaehlt Tempelunas
+      // angehaengte Fee (angehaengt, kein Equip — `_keinEquip`).
+      if (!engine.istEquipArtifact(entering)) return;
 
-      // AME enchants YOUR own artifacts — opponent's artifacts do nothing for you.
-      if (entering.owner !== pi) return;
+      // Welle 11 (Al, R6: „Jedes Equip zählt, egal wer es anlegt."): jedes angelegte Artefakt – auch auf der Gegenseite
+      // und auch vom Gegner angelegt – darf verzaubert werden (vorher nur Artefakte der eigenen Brettseite). Die Negier-Fähigkeit
+      // gehört dem Kontrolleur des Träger-Helden (Welle 12, siehe `ownerPi` unten).
 
       // Dedupe: if multiple AME instances are in this player's hand, only
       // the first that reaches this point prompts. Scoped per-player so the
@@ -169,6 +176,7 @@ module.exports = {
       await engine._delay(AME_FLUG_MS);
 
       engine.takeFromPileSync(ps, 'hand', handIdx);
+      const _ablagePs = engine.handKartenBesitzerPs(ps, 'Anti Magic Enchantment');   // W63c: Ablage des permanenten Besitzers (gestohlene Handkarte)
       // ★★ v1222: Abgleich SOFORT nach dem Hand-Abgang. Der Client verdeckt den
       // Startplatz der abfliegenden Karte nur, solange die Hand noch so
       // gross ist wie beim Abflug — bleibt der `sync` aus, taucht sie
@@ -187,14 +195,16 @@ module.exports = {
         promptCtx: promptCtxShim,
       });
 
+      // Welle 12 (Al, Rueckfrage 3: „Der Halter des Equips …"): die Faehigkeit gehoert dem Kontrolleur des TRAEGER-Helden (Brettseite des Artefakts,
+      // `heroSideOf`); die Engine liest ihn beim Negieren neu (`_ameHalter`), `ownerPi` hier ist nur der Stand beim Verzaubern.
       entering.counters.antiMagicEnchanted = {
-        ownerPi: pi,
+        ownerPi: engine.heroSideOf(entering.owner, gs.players[entering.owner]?.heroes?.[entering.heroIdx]),
         charges: 1,
       };
       if (!entering.counters.buffs) entering.counters.buffs = {};
       entering.counters.buffs.anti_magic_enchanted = { source: 'Anti Magic Enchantment' };
 
-      ps.discardPile.push('Anti Magic Enchantment');
+      _ablagePs.discardPile.push('Anti Magic Enchantment');
       inst.zone = 'discard';
 
       engine.log('anti_magic_enchantment_applied', {

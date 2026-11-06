@@ -51,6 +51,7 @@
 // ═══════════════════════════════════════════
 
 const { hasCardType, baseCardName } = require('./_hooks');
+const { loadCardEffect } = require('./_loader');
 
 const CARD_NAME = 'Timeless King Zi';
 const PICK_COUNT = 3;
@@ -333,8 +334,22 @@ module.exports = {
     // indizierte eigene Held); der Guss laeuft ueber ihn (`heroOwner`).
     const feld = ctx.cardHeroOwner ?? pi;
     const hero = ctx.attachedHero ?? gs.players[feld]?.heroes?.[heroIdx];
-    const canPerform = hero?.name && hero.hp > 0
+    // ★ Z7 (H04-17): „if possible" — ein bereits verbrauchtes „Einmal pro Spiel" (Divine Gift …)
+    // lässt sich nicht noch einmal wirken; ein gewirktes stempelt (der Weg hier umgeht server.js).
+    const _opgSk = loadCardEffect(oppChoice);
+    const _opgKey = (_opgSk?.oncePerGame || _opgSk?.oncePerGameKey) ? (_opgSk.oncePerGameKey || oppChoice) : null;
+    // ★ Welle 13 (Al, Q132): „Das Level wird ignoriert, alle anderen Bedingungen, etwa schon verbrauchte once-per-games oder notwendige und
+    // unbezahlbare Ressourcen, führen dazu, dass der Zauber einfach fizzelt." — `kannSofortWirken` ist die EINE Prüfung des Sofort-Gusses
+    // (`validateActionPlay` mit `sofortGuss`: ohne Hand und ohne Stufe, aber mit Spielbedingung `spellPlayCondition`, Einmal-Grenzen,
+    // Pflichtziel, Heldensperren, Spell-Sperren, Pile-/Hand-/Such-/Ziehsperren). Fällt sie durch, zeigt Zi das Fizzeln (kein Effekt, keine
+    // Kosten ohne Wirkung); der Zauber geht wie ein verpuffter Guss in die Ablage.
+    const heldOk = hero?.name && hero.hp > 0
       && !hero.statuses?.frozen && !hero.statuses?.stunned && !hero.statuses?.negated;
+    const canPerform = !!heldOk && engine.kannSofortWirken(pi, heroIdx, oppChoice, feld);
+    if (heldOk && !canPerform) {
+      engine.log('timeless_king_zi_fizzle', { player: ps.username, spell: oppChoice });
+      await engine.zeigeFizzle(oppChoice, { playerIdx: pi, grund: 'cannot_cast_now' });
+    }
 
     if (canPerform) {
       engine.log('timeless_king_zi_perform', { player: ps.username, spell: oppChoice });
@@ -345,6 +360,7 @@ module.exports = {
       // globals so Bartas-style second-casts compose).
       gs._spellDamageLog = [];
       gs._spellExcludeTargets = [];
+      gs._spellCancelled = false;   // W13 (Q132/Q129): eigener Abbruchmerker für diesen Guss
       // Zi has NO subtype restriction (unlike Chaos Magic) — the chosen
       // Spell may be an Area / Attachment that PLACES ITSELF on the
       // board. `_spellPlacedOnBoard` is the engine's canonical "this
@@ -354,12 +370,25 @@ module.exports = {
       const subInst = engine._trackCard(oppChoice, pi, 'hand', heroIdx, -1);
       if (feld !== pi) subInst.heroOwner = feld;
       let placedOnBoard = false;
+      // ★ Welle 14 (Al, Q4 aus W13a): „Zis Spell soll unabbrechbar sein! Der Spell MUSS ausgeführt werden, falls möglich. Und ist das nicht
+      // möglich, wandert er in den Discard." — Zielwahlen/Abfragen des Gusses sind Pflichtwahlen (`cancellable: false`; wie Learning und Copy
+      // Device über `gs._forcedCommitPlayer`, auf Zi's Spieler beschränkt: Reaktionen des Gegners behalten ihren Abbruch). Die Unmöglichkeit
+      // ("nicht möglich") prüft vorher `kannSofortWirken` (→ Fizzeln + Ablage, "Einmal pro Spiel" bleibt frei).
+      const _zwangVorher = gs._forcedCommitPlayer;
       try {
-        await engine.runHooks('onPlay', {
-          _onlyCard: subInst, playedCard: subInst,
-          cardName: oppChoice, zone: 'hand', heroIdx,
-          _skipReactionCheck: true,
-        });
+        // Der Zwang gilt nur für die Auflösung des Zauberkörpers (`onPlay`), nicht für die Nachwirkungs-Haken (`afterSpellResolved`: Heldenpassive mit eigenen "may"-Abfragen).
+        gs._forcedCommitPlayer = pi;
+        try {
+          require('./_monia-shared').neuerGuss(gs);   // W83a (Al 28.10.): der gewirkte Spell ist für Cool Rescuer Monia ein EIGENER Effekt (eigenes Angebot)
+          await engine.runHooks('onPlay', {
+            _onlyCard: subInst, playedCard: subInst,
+            cardName: oppChoice, zone: 'hand', heroIdx,
+            _skipReactionCheck: true,
+          });
+        } finally {
+          if (_zwangVorher != null) gs._forcedCommitPlayer = _zwangVorher;
+          else delete gs._forcedCommitPlayer;
+        }
         const uniqueTargets = [];
         const seenIds = new Set();
         for (const t of (gs._spellDamageLog || [])) {
@@ -374,6 +403,11 @@ module.exports = {
         console.error('[Timeless King Zi] sub-spell error:', err?.message || err);
       }
       placedOnBoard = !!gs._spellPlacedOnBoard;
+      // „Einmal pro Spiel" erst NACH dem Guss und nur, wenn er nicht abgebrochen wurde (allgemeine Regel Q129: Stempel erst nach dem Commit).
+      const _abgebrochen = !!gs._spellCancelled && !gs._spellNegatedByEffect;
+      if (_opgKey && !_abgebrochen) { if (!ps._oncePerGameUsed) ps._oncePerGameUsed = new Set(); ps._oncePerGameUsed.add(_opgKey); }
+      delete gs._spellCancelled;
+      delete gs._spellNegatedByEffect;
       delete gs._spellDamageLog;
       delete gs._spellExcludeTargets;
       delete gs._bartasSecondCast;

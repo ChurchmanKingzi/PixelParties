@@ -6,7 +6,8 @@
   "scripts": {
     "start": "node server.js",
     "dev": "node server.js",
-    "build": "node scripts/build.js --force"
+    "build": "node scripts/build.js --force",
+    "test": "node --test test/*.test.js"
   },
   "dependencies": {
     "express": "^4.21.0",

@@ -43,6 +43,10 @@ function warAktion(engine, quelle, gegner) {
 }
 
 module.exports = {
+  // ★ Z7b: „Negate that Spell/Attack/effect" = die gewirkte Karte löst NIE auf → ihre Einmal-Stempel werden zurückgegeben
+  // (Engine: `_merkeGanzeNegation`). Teil-Negierungen („… on that Hero", Schaden) tragen das Flag nicht.
+  negatesWholeCard: true,
+
   isPostTargetReaction: true,
   postTargetKreaturWahl: true,
   spellVisual: { impact: { type: 'gold_sparkle' }, impactMs: 260 },
@@ -69,6 +73,7 @@ module.exports = {
       engine.queuePostChainAction(async () => {
         await engine.performImmediateActionAnyHero(gegner, {
           title: CARD_NAME,
+          mitUebernommenenAktionen: true,   // W36a (Al, 22.10.2026): auch Abilities/Heldeneffekte eines UEBERNOMMENEN Helden des Opfers (allgemeine Regel: Klau-Effekte hindern das Handeln nicht)
           description: 'Your card was negated by Dream Dust. You may immediately perform an additional Action — or skip.',
           cancellable: true,
         });

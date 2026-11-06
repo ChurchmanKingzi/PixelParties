@@ -19,14 +19,25 @@
 //  Cute archetype starts with capital "Cute".
 // ═══════════════════════════════════════════
 
+const { anyName } = require('./_alias-name');   // Shroomasaur: Zusatzname zählt für Namensfamilien
 const { hasCardType } = require('./_hooks');
 
 const CUTE_RE = /\bCute\b/;
+
+// ★ Al, Welle 9 (Q24): „Cute" Creature = der NAME zaehlt (das Wort „Cute"),
+// nicht das Archetyp-Feld. Cute Spider (Archetyp Spiders) ist damit ueberall
+// eine Cute Creature. Alle Stellen pruefen ueber `hasCuteInName` /
+// `isCuteCreatureCard` / `isCuteCreatureInst` — nie `archetype === 'Cute'`.
 const CUTE_WINGS = 'Cute Wings';
 
 function hasCuteInName(cardName) {
   if (!cardName) return false;
   return CUTE_RE.test(cardName);
+}
+
+/** Kartendaten einer „Cute" Creature (Name enthaelt das Wort „Cute"; ohne Wings-Kontext). */
+function isCuteCreatureCard(cd) {
+  return !!cd && hasCardType(cd, 'Creature') && anyName(cd, (n) => hasCuteInName(n));
 }
 
 // ── Dynamic "Cute" membership via "Cute Wings" ─────────────────────
@@ -65,7 +76,7 @@ function heroHasCuteWings(engine, playerIdx, heroIdx) {
 
 /**
  * Does this Creature INSTANCE count as a "Cute" Creature right now?
- * True when EITHER (a) its printed archetype is "Cute", OR (b) it sits
+ * True when EITHER (a) its NAME contains the word "Cute" (Q24), OR (b) it sits
  * in the Support Zone of a Hero wearing "Cute Wings". Uses the
  * instance's PHYSICAL side (`owner`) for the zone lookup because Support
  * Zones are physical (a charmed Creature still occupies its owner's zone).
@@ -75,10 +86,24 @@ function isCuteCreatureInst(engine, inst) {
   if (!engine || !inst) return false;
   const cd = engine._getCardDB?.()[inst.name];
   if (!cd || !hasCardType(cd, 'Creature')) return false;
-  if (cd.archetype === 'Cute') return true; // printed Cute-archetype Creature
+  if (hasCuteInName(cd.name || inst.name) || anyName(inst, (n) => hasCuteInName(n))) return true; // Name zaehlt (Al, Welle 9, Q24); W73c: auch ein Zusatzname (Shroomasaur)
   if (inst.zone === 'support' && inst.heroIdx != null && inst.heroIdx >= 0
       && heroHasCuteWings(engine, inst.owner, inst.heroIdx)) return true;
   return false;
 }
 
-module.exports = { hasCuteInName, CUTE_WINGS, heroHasCuteWings, isCuteCreatureInst };
+/**
+ * W16c (A04-29): Stufe einer Schule am Helden INKLUSIVE der Ability-Stapel in seinen Support Zones (Xal) - wie
+ * `heroSchoolLevel` (harte Negierung -> 0), nur mit `heroSupportAbilityStacks` dazu (derselbe Griff wie
+ * `effectiveSchoolLevelForCaster`, ohne dessen Zauber-Overrides).
+ */
+function schoolLevelMitSupport(engine, school, seite, heroIdx) {
+  if (engine.heroAbilityLevelsBlanked(seite, heroIdx)) return 0;
+  const ps = engine.gs.players[seite];
+  return engine.countAbilitiesForSchool(school, [
+    ...(ps?.abilityZones?.[heroIdx] || []),
+    ...engine.heroSupportAbilityStacks(seite, heroIdx),
+  ]);
+}
+
+module.exports = { hasCuteInName, isCuteCreatureCard, CUTE_WINGS, heroHasCuteWings, isCuteCreatureInst, schoolLevelMitSupport };

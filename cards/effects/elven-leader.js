@@ -16,9 +16,13 @@
 //      its own retinue and shrink the cascade
 //      mid-fire, which nobody wants.
 //    - Each iteration re-prompts for a fresh
-//      target. Cancelling a prompt ends the
-//      cascade; if the player simply has no legal
-//      targets left, the loop also ends.
+//      target. Als Ruling (Al 26.10.): NUR die
+//      ERSTE Wahl ist abbrechbar (Abbruch = die
+//      Fähigkeit wird nicht eingesetzt, nichts
+//      verbraucht); die Wiederholungen („Repeat
+//      this effect …") sind Pflicht und nicht mehr
+//      abbrechbar. Hat der Spieler keine legalen
+//      Ziele mehr, endet die Schleife.
 // ═══════════════════════════════════════════
 
 const { hasCardType } = require('./_hooks');
@@ -97,9 +101,9 @@ module.exports = {
           : `Deal ${DAMAGE} damage to any target. (${remaining} hits remaining)`,
         confirmLabel: `⚔ ${DAMAGE} Damage!`,
         confirmClass: 'btn-danger',
-        cancellable: true,
+        cancellable: i === 0,   // Als Ruling (Al 26.10.): nur die erste Wahl ist abbrechbar, die Wiederholungen nicht
       });
-      // No legal targets OR player cancelled → end cascade early
+      // No legal targets OR (first prompt only) player cancelled → end cascade early
       if (!target) break;
 
       const tgtOwner    = target.owner;

@@ -17,7 +17,7 @@
 //  (`allow: 'of-kings'`) aus v818 — sie greift in `validateActionPlay`,
 //  `getHeroPlayableCards` und allen Hand-Reaktionsfenstern.
 //  „Knight summoned this turn": Stempel `gs.hoptUsed` je Spieler, gesetzt
-//  in `onPlay` fuer JEDE Knight-Beschwoerung (beide Farben, Queen zaehlt
+//  in `onPlay` fuer JEDE Knight-Beschwoerung UND -Platzierung (W25c, N3-13: place triggert On-Summon; beide Farben, Queen zaehlt
 //  hier nicht — sie WIRD nicht als Knight beschworen).
 // ═══════════════════════════════════════════
 const { KNIGHT, mainActionSlotFree, ofKingsCpuAnswer } = require('./_of-kings-shared');
@@ -102,7 +102,6 @@ module.exports = {
   hooks: {
     onPlay: async (ctx) => {
       if (ctx.playedCard?.id !== ctx.card.id || ctx.card.zone !== 'support') return;
-      if (ctx.card.counters?.isPlacement) return;
       const gs = ctx._engine.gs;
       if (!gs.hoptUsed) gs.hoptUsed = {};
       gs.hoptUsed[summonedKey(ctx.cardOwner)] = gs.turn;

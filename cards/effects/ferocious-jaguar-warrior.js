@@ -15,6 +15,7 @@
 // ═══════════════════════════════════════════
 
 const D = require('./_doom-clock-shared');
+const T = require('./_teocuilatl-shared');   // Special/Normal-Wahl (Nr. 82)
 
 const CARD_NAME = 'Ferocious Jaguar Warrior';
 const DAMAGE = 50;
@@ -24,16 +25,23 @@ module.exports = {
   requiresTarget: true,
 
   // Zusatz-Aktion nur, wenn irgendwo ein Counter liegt.
+  // Als Ruling (Al 26.10.): „Ja, natürlich nur, wenn reguläre Beschwörung via Action verfügbar ist" — Special (Counter, Zusatzaktion) ODER Normal (Aktion, ohne Counter):
+  // wahr nur dort, wo Special der EINZIGE Weg ist (Main Phase / keine freie Aktion); sonst wählt der Spieler in `beforeSummon` (Muster Blue-Ice Dragon).
   inherentAction(gs, pi, heroIdx, engine) {
-    return D.clocksWithCounters(engine).length > 0;
+    return T.specialErzwungen(engine, pi, heroIdx, CARD_NAME, engine ? D.clocksWithCounters(engine).length > 0 : false);
   },
 
   async beforeSummon(ctx) {
-    // Nur der Zusatz-Aktions-Weg kostet einen Counter; normale
-    // Beschwoerungen und Effekt-Platzierungen bleiben frei.
-    if (!ctx.isInherentAction) return true;
     const engine = ctx._engine;
     const pi = ctx.cardOwner;
+    // Nur der Zusatz-Aktions-Weg kostet einen Counter; normale
+    // Beschwoerungen und Effekt-Platzierungen bleiben frei.
+    // Wahl Special/Normal nur im Spieler-Weg (`_isNormalSummon`) mit Counter UND freier regulärer Beschwörung; fremde „as an additional Action"-Beschwörungen (Ushabti …) fragen nicht.
+    let special = !!ctx.isInherentAction;
+    if (!special && ctx._isNormalSummon === true && !ctx._alsZusatzaktion && D.clocksWithCounters(engine).length > 0) {
+      special = await T.frageSpecial(engine, pi, CARD_NAME, '🐆 Special (remove 1 Doom Counter, free Action)');
+    }
+    if (!special) return true;
 
     const uhr = await D.pickClock(engine, pi, D.clocksWithCounters(engine), {
       title: CARD_NAME,
@@ -45,6 +53,8 @@ module.exports = {
     engine.log('jaguar_summon_cost', {
       player: engine.gs.players[pi]?.username,
     });
+    // Special bei schon eingezogener Aktion: server.js erstattet sie (Muster Blue-Ice Dragon).
+    if (!ctx.isInherentAction) engine.gs._summonModeUpgradedToInherent = pi;
     return true;
   },
 

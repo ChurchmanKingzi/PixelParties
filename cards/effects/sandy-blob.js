@@ -24,12 +24,17 @@
 //      onPlay hook — passive Creatures (including
 //      other Sandy Blobs) don't spuriously burn
 //      one of the 3 uses per turn.
+//    • ★ Welle 12 (Al): UND sein KARTENTEXT muss einen
+//      On-Summon-Effekt haben („When you summon this
+//      Creature …"); ein bloßer onPlay-Haken für etwas
+//      anderes zählt nie (`hatOnSummonText`).
 //    • Sandy Blob itself must be active on the
 //      board (not negated/nulled, host hero alive).
 // ═══════════════════════════════════════════
 
 const { hasCardType } = require('./_hooks');
 const { loadCardEffect } = require('./_loader');
+const { hatOnSummonText } = require('./_summon-eligibility');   // Welle 12: On-Summon nur nach Kartentext
 
 const CARD_NAME = 'Sandy Blob';
 const DISCHARGE_DAMAGE = 50;
@@ -102,15 +107,15 @@ module.exports = {
       // Hooks mit face-up-Instanz nachschiebt.
       if (entering.faceDown) return;
       const enteringScript = loadCardEffect(entering.name);
+      // ★ Welle 12 (Al, Rueckfrage 1: „Nein, nur explizit On-Summon-Effekte triggern Blob."): maßgeblich ist der KARTENTEXT
+      // („When you summon this Creature …", `hatOnSummonText`). Ein technischer `onPlay`-/`beforeSummon`-Haken ohne On-Summon-Text im
+      // Kartentext (Archer, Spinnen, Albrecht, Priest of Luna, Censpartan, Land Sharks, Kosten/Zusatzaktion/Aktiv-Effekt, ~45 Kreaturen) löst
+      // den Blob nie aus; ebenso keine Kreatur-SURPRISE (ihr Text heißt „Activate this Surprise …", nicht On-Summon) — es sei denn (Welle 13,
+      // Al A1), ihr Kartentext enthält AUSDRÜCKLICH einen Satz „When this Creature is summoned/placed, …" (`hatOnSummonText`).
+      // Zusätzlich muss das Skript den Effekt wirklich tragen (onPlay oder die Beschwörungsklammer `beforeSummon`, DDG).
+      if (!hatOnSummonText(cd)) return;
       const hasOnSummon = !!(enteringScript?.hooks?.onPlay)
-        || typeof enteringScript?.beforeSummon === 'function'
-        // Kreatur-SURPRISES tragen ihren Beschwörungs-Effekt in
-        // `onSurpriseActivate` (Pure Advantage Camel zieht dort seine
-        // Karte) — hooks.onPlay ist bei ihnen leer. Ohne diesen dritten
-        // Zweig hätte Sandy Blob sie in KEINEM Pfad gesehen, auch nicht
-        // beim regulären Aufdecken aus der Surprise Zone. Als Ruling:
-        // die Aktivierung ist die On-Play-Aktivierung.
-        || typeof enteringScript?.onSurpriseActivate === 'function';
+        || typeof enteringScript?.beforeSummon === 'function';
       if (!hasOnSummon) return;
       // Conditional on-summon gate. Cards whose on-summon effect runs
       // ONLY under specific entry conditions (Soul Shards' "summoned
@@ -148,6 +153,9 @@ module.exports = {
       // don't burn one of the 3 uses on a creature whose effect was
       // suppressed before it could run.
       if (entering.counters?.negated || entering.counters?.nulled) return;
+      // Welle 10 (Al, Q30): „nur, wenn der On-Summon-Effekt wirklich feuert und nicht fizzelt“ — ein Effekt ohne legales Ziel/Kandidat
+      // (Cloudy/Shadowy Slime) meldet sich über `engine.summonEffektFizzelt` und löst den Blob nicht aus.
+      if (entering.counters?._summonFizzledTurn === gs.turn) return;
 
       // Sandy Blob must be live on the board — by ITS OWN state only.
       // Als Bugreport (Demo 22-43-23, T7-T11): der Blob feuerte nie,
@@ -226,3 +234,6 @@ module.exports = {
     },
   },
 };
+
+// W16c (A05-09): Slime Ranchers zusaetzliche Aktivierung des On-Summon-Effekts zaehlt wie eine Aktivierung (gleiche Pruefungen, gleiche 3er-Kappe).
+module.exports.hooks.onSummonEffectRepeated = module.exports.hooks.onCardEnterZone;

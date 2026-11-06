@@ -62,7 +62,7 @@ module.exports = makeCrusaderArtifact({
     // ★ v1057 („Enhanced Guard Dog"): Zerstoerungs-Klammer. Der Dog
     // darf nur bei EINZELNEN Zerstoerungen feuern; ohne diese Klammer
     // saehe er beim ersten Opfer eine Einzelzerstoerung.
-    engine.beginDestroyScope(opfer.length);
+    engine.beginDestroyScope(opfer.length, opfer);   // W78: die Opfer sind todgeweiht (Infallible Oracle Pythia darf keines opfern)
     try {
       for (const inst of opfer) {
         if (!inst || inst.zone !== 'support') continue;   // Trigger war schneller

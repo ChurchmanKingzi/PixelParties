@@ -15,7 +15,9 @@
 //     INVERSER Reihenfolge (5, 4, 3, 2, 1) aufs Deck. Die Reihenfolge ist NICHT oeffentlich (`deckTopVisible` bleibt leer).
 //  3. „You may shuffle": Ja/Nein; Ja mischt das ganze Deck (die Reihenfolge ist dann hinfaellig).
 //  4. „Then, draw 1 card": eine Karte ziehen (auch wenn gemischt wurde).
-//  Beschwoerung, nicht Platzierung (`isPlacement` loest nichts aus).
+//  ★ W25c (N3-13, Al „ja, definitiv"): „place triggert On-Summon" - auch beim
+//  PLATZIEREN (Drill Sergeant & Co.) loest der Effekt aus (der fruehere
+//  `isPlacement`-Riegel ist entfallen).
 // ═══════════════════════════════════════════
 
 const CARD_NAME = 'Scavenging Crane';
@@ -34,7 +36,6 @@ module.exports = {
     onPlay: async (ctx) => {
       const engine = ctx._engine;
       if (ctx.playedCard?.id !== ctx.card?.id || ctx.card.zone !== 'support') return;
-      if (ctx.card.counters?.isPlacement) return;   // platziert ≠ beschworen
       const pi = ctx.cardOwner;
       const ps = engine.gs.players[pi];
       if (!ps) return;

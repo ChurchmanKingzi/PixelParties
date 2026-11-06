@@ -15,6 +15,16 @@
 //  ③ When this card is removed from the board, the
 //     entire Coolness Stack is deleted.
 //
+//  Als Ruling (Al 26.10.): Der Coolness Stack EXISTIERT, solange
+//  Wowhalla in der eigenen Area liegt — auch leer. Freshya,
+//  Lolki, Wowkyrie, Nornstellar, Hipdall (Nachfuellen) und
+//  Prophecy funktionieren dann auch bei leerem Stack
+//  (`engine.hasCoolnessStack` = Stack nicht leer ODER eigene
+//  Wowhalla in der eigenen Area). Wer eine KARTE aus dem Stack
+//  braucht (Cool Rescue, Ragnarock, der Selbstschutz ④), prueft
+//  `getCoolnessStackSize > 0`. Liegt Wowhalla nicht mehr, ist der
+//  Stack wie bisher geloescht/nicht vorhanden (③).
+//
 //  ④ When this card is the target of an opponent's
 //     effect, the controller may delete the top of
 //     their Coolness Stack to negate it. Hooks into
@@ -47,9 +57,13 @@ module.exports = {
       if (ctx.cardZone !== 'hand') return;
       if (ctx.playedCard?.id !== ctx.card.id) return;
       const engine = ctx._engine;
+      const sizeBefore = engine.getCoolnessStackSize(ctx.cardOwner);
       await engine.placeArea(ctx.cardOwner, ctx.card);
       // Seed the Stack from the top of the deck. requireStack is OFF
       // here — Wowhalla creates the Stack from nothing on entry.
+      // Hat der onCardEnterZone-Hook (unten) beim Platzieren schon
+      // geseedet, wird nicht ein zweites Mal gelegt (A04-cute-01).
+      if (engine.getCoolnessStackSize(ctx.cardOwner) > sizeBefore) return;
       await ctx.pushDeckTopToCoolnessStack(ctx.cardOwner, { source: CARD_NAME });
     },
 
@@ -61,6 +75,7 @@ module.exports = {
     onTurnEnd: async (ctx) => {
       if (ctx.cardZone !== 'area') return;
       if (ctx.activePlayer !== ctx.cardOwner) return;
+      if (ctx._engine.spielerIstVonAreasAusgenommen(ctx.cardOwner)) return;   // W82 (Shipwrecked): von Areas ausgenommen — der Stack wächst nicht
       // Defensive: skip if Wowhalla has already left the Area zone
       // this turn (race with onCardLeaveZone — the engine gates the
       // listener on inst.zone but a stale ctx can still fire).
@@ -83,14 +98,14 @@ module.exports = {
      *
      * Der Kartentext sagt „When this card comes into play" — eine
      * Puzzle-Platzierung IST das. Doppelbefuellung ist ausgeschlossen:
-     * `onPlay` legt den Stack an, bevor dieser Hook laeuft, und wir
-     * fuellen nur einen LEEREN Stack.
+     * wir fuellen hier nur einen LEEREN Stack, und `onPlay` seedet
+     * nur, wenn dieser Hook beim Platzieren nichts gelegt hat.
      */
     onCardEnterZone: async (ctx) => {
       if (ctx.toZone !== 'area') return;
       if (ctx.enteringCard?.id !== ctx.card.id) return;
       const engine = ctx._engine;
-      if (engine.hasCoolnessStack(ctx.cardOwner)) return;
+      if (engine.getCoolnessStackSize(ctx.cardOwner) > 0) return;   // Als Ruling (Al 26.10.): „leer" heisst Karten zaehlen — `hasCoolnessStack` ist bei liegender Wowhalla auch leer wahr
       await ctx.pushDeckTopToCoolnessStack(ctx.cardOwner, { source: CARD_NAME });
     },
 
@@ -108,7 +123,7 @@ module.exports = {
     onGameStart: async (ctx) => {
       if (ctx.cardZone !== 'area') return;
       const engine = ctx._engine;
-      if (engine.hasCoolnessStack(ctx.cardOwner)) return;
+      if (engine.getCoolnessStackSize(ctx.cardOwner) > 0) return;   // Als Ruling (Al 26.10.): s. o.
       await ctx.pushDeckTopToCoolnessStack(ctx.cardOwner, { source: CARD_NAME });
     },
 
@@ -124,6 +139,9 @@ module.exports = {
     onCardLeaveZone: async (ctx) => {
       if (ctx.fromZone !== 'area') return;
       if (ctx.fromOwner !== undefined && ctx.fromOwner !== ctx.cardOwner) return;
+      // Nur der eigene Abgang loescht den Stack – nicht jede andere
+      // eigene Area, die das Brett verlaesst (A04-cute-02).
+      if (ctx.leavingCard && ctx.leavingCard.id !== ctx.card.id) return;
       await ctx.deleteCoolnessStack(ctx.cardOwner, { source: CARD_NAME });
     },
   },
@@ -142,7 +160,8 @@ module.exports = {
     if (info.sourceOwner === ctx.cardOwner) return null;
     const engine = ctx._engine;
     const pi = ctx.cardOwner;
-    if (!engine.hasCoolnessStack(pi)) return null;
+    if (engine.spielerIstVonAreasAusgenommen(pi)) return null;   // W82 (Shipwrecked): Area-Effekte aktivieren ist gesperrt
+    if (!(engine.getCoolnessStackSize(pi) > 0)) return null;   // Als Ruling (Al 26.10.): der Stack kann bei liegender Wowhalla leer sein — dann gibt es nichts zu loeschen
 
     const sourceName = info.source?.name || 'an opposing effect';
     const confirmed = await engine.promptGeneric(pi, {

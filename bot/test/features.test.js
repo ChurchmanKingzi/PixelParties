@@ -305,9 +305,12 @@ test('!help zeigt Admin-Befehle nur Admins', async () => {
   assert.ok(!msg.replies[0].content.includes('!setupReaction'));
   assert.ok(msg.replies[0].content.includes('!show'));
   msg = message({ guild: g, member: boss, content: '!help' }); await ctx.handleMessage(msg);
-  assert.ok(!/[äöüß]|\b(Karte|Kartenname|Nachricht|Fehler|zeigt|Rolle|Kanal|nicht|oder|und)\b/.test(msg.replies[0].content), 'die Hilfe ist durchgehend Englisch:\n' + msg.replies[0].content);
-  assert.ok(msg.replies[0].content.includes('!setupReaction'));
-  assert.ok(msg.replies[0].content.includes('!addsc'));
+  const all = msg.replies.map(r => r.content).join('\n');
+  assert.ok(msg.replies.every(r => r.content.length <= 2000), 'Discord erlaubt höchstens 2000 Zeichen je Nachricht (Längen: ' + msg.replies.map(r => r.content.length) + ')');
+  assert.ok(!/[äöüß]|\b(Karte|Kartenname|Nachricht|Fehler|zeigt|Rolle|Kanal|nicht|oder|und)\b/.test(all), 'die Hilfe ist durchgehend Englisch:\n' + all);
+  assert.ok(all.includes('!setupReaction'));
+  assert.ok(all.includes('!addsc'));
+  assert.ok(all.includes('!duel') && all.includes('/bug'), 'nichts geht beim Aufteilen verloren');
 });
 
 test('Rollenabgleich: eine von Hand vergebene gleichnamige Rolle bleibt unangetastet, solange sie nicht übernommen wurde', async () => {
@@ -364,4 +367,52 @@ test('Reaction Roles: Rollen mit Mod-/Verwaltungsrechten, Bot-Admin-Rollen und v
   assert.match(out, /managed by the bot/);
   assert.match(await run('!setupReaction buttons 500000000000000077\nPick\n🔥 Gamer'), /only be added to a \*\*new\*\* post/);
   assert.equal((await run('!setupReaction\nPick\n🔥 Gamer')), '', 'harmlose Rolle wird eingerichtet (keine Fehlerantwort)');
+});
+
+// ── Karte des Tages (die Karte wählt das Spiel; der Bonus „Card of the Day!" wird dort gezahlt) ──
+test('!cotd: Karte vom Spielserver als Bild, mit Hinweis auf den SC-Bonus; Veröffentlichung einmal je Tag; ohne Spielserver nichts', async () => {
+  let info = { date: '2026-10-21', card: 'Teocuilatl, the Embodiment of Gods', amount: 30 };
+  const { ctx, db, client, config } = await setup({ cotd: async () => { if (!info) throw new Error('down'); return info; } });
+  const m = member({ id: '300000000000000009' });
+  const g = guild({ members: [m] });
+
+  const msg = message({ guild: g, member: m, content: '!cotd' });
+  await ctx.handleMessage(msg);
+  const r = msg.replies.at(-1);
+  assert.ok(isPng(r.files[0].attachment), 'Kartenbild');
+  assert.equal(r.content, '🃏 **Card of the day:** Teocuilatl, the Embodiment of Gods\nWin a game using **Teocuilatl, the Embodiment of Gods** today to earn **30 SC**!');
+  assert.deepEqual(r.allowedMentions, { parse: [] });
+
+  info = { ...info, amount: 0 };
+  const m2 = member({ id: '300000000000000010' });
+  const msg2 = message({ guild: g, member: m2, content: '!cotd' });
+  await ctx.handleMessage(msg2);
+  assert.equal(msg2.replies.at(-1).content, '🃏 **Card of the day:** Teocuilatl, the Embodiment of Gods', 'ohne Bonus kein Hinweis');
+
+  // Veröffentlichung im Kanal: erst ab 12:00 Berliner Zeit, einmal je Tag; fällt der Spielserver aus, später erneut versuchen
+  const sent = [];
+  g.channels.cache.set('CH_COTD', { isTextBased: () => true, send: async p => { sent.push(p); } });
+  client.guilds.cache.set(config.guildId, g);
+  config.channels.cardOfDay = 'CH_COTD';
+  info = { date: '2026-10-21', card: 'Teocuilatl, the Embodiment of Gods', amount: 30 };
+  await ctx._cotd.postCotdIfDue(new Date('2026-10-21T09:30:00Z'));           // 11:30 Berlin: noch zu früh
+  assert.equal(sent.length, 0);
+  info = null;
+  await ctx._cotd.postCotdIfDue(new Date('2026-10-21T10:30:00Z'));           // 12:30, aber Spielserver nicht erreichbar
+  assert.equal(sent.length, 0);
+  assert.equal(await db.kvGet('cotd_last'), null);
+  info = { date: '2026-10-21', card: 'Teocuilatl, the Embodiment of Gods', amount: 30 };
+  await ctx._cotd.postCotdIfDue(new Date('2026-10-21T10:35:00Z'));
+  await ctx._cotd.postCotdIfDue(new Date('2026-10-21T10:40:00Z'));           // nicht doppelt
+  assert.equal(sent.length, 1);
+  assert.match(sent[0].content, /Win a game using \*\*Teocuilatl, the Embodiment of Gods\*\* today to earn \*\*30 SC\*\*!$/);
+  assert.deepEqual(sent[0].allowedMentions, { parse: [] });
+  await ctx._cotd.postCotdIfDue(new Date('2026-10-22T10:30:00Z'));           // nächster Tag
+  assert.equal(sent.length, 2);
+
+  info = null;
+  const m3 = member({ id: '300000000000000011' });
+  const msg3 = message({ guild: g, member: m3, content: '!cotd' });
+  await ctx.handleMessage(msg3);
+  assert.equal(msg3.replies.at(-1).content, 'No card of the day available.', 'Spielserver nicht erreichbar → freundliche Meldung');
 });

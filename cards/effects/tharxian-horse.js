@@ -30,14 +30,19 @@
 //     dependent costs are ALL respected. Necromancy deliberately
 //     bypasses beforeSummon; Tharxian Horse does the opposite.
 //   • Once-per-game: `oncePerGame: true` + `oncePerGameKey: 'Tharxian Horse'`.
-//     The engine's `getBlockedSpells` grays the hand copy out after
-//     the first play; `server.js doPlaySurprise` also enforces it and
-//     marks `_oncePerGameUsed` when set.
+//     ★ Z7c (Als Entscheidung, Welle 3): die Grenze gilt für die
+//     AKTIVIERUNG, nicht fürs verdeckte Setzen. Beliebig viele Kopien
+//     dürfen (auch an mehreren Helden) verdeckt liegen; erst die nicht
+//     negierte Aktivierung (`_activateSurprise`) stempelt
+//     `_oncePerGameUsed`, danach lösen weitere Kopien nicht mehr aus
+//     (`_canHeroActivateSurprise`) und bleiben verdeckt liegen. Eine
+//     komplett negierte Aktivierung (Boots of Hermes) lässt die Grenze
+//     unverbraucht (Z7b).
 //   • Telekinesis disallowed (no real triggering effect to negate, no
 //     attacker to damage). Same gate Frost Rune / Magic Mirror use.
 // ═══════════════════════════════════════════
 
-const { hasCardType, resolveSourceCreature, isCreatureSource } = require('./_hooks');
+const { hasCardType, resolveSourceCreature, isCreatureSource, zaehltAlsAttackOderSpell } = require('./_hooks');
 
 const CARD_NAME = 'Tharxian Horse';
 const DAMAGE_PER_TARGET = 50;
@@ -92,21 +97,20 @@ function eligibleDestinations(engine, pi, creatureName) {
     if (hero.statuses?.frozen
         || hero.statuses?.stunned
         || hero.statuses?.webbed
-        || hero.statuses?.bound
-        || hero.statuses?.negated) continue;
+        || hero.statuses?.bound) continue;   // Welle 12 (Al): Negated sperrt „summon" nicht; die harte Form (Abilities negiert) begrenzt ueber `heroMeetsLevelReq` auf Stufe 0
     if (!engine.heroMeetsLevelReq(physOwner, hi, cd, { pileSide: 'discard' })) continue;
     if (!engine.isCreatureSummonable(creatureName, physOwner, hi)) continue;
-    const sup = engine.gs.players[physOwner].supportZones?.[hi] || [];
-    for (let si = 0; si < 3; si++) {
-      if (((sup[si] || []).length === 0)) {
-        out.push({
-          owner: physOwner, heroIdx: hi, slotIdx: si,
-          label: `${hero.name} — Slot ${si + 1}`,
-        });
-      }
+    // W63a (Al, 22.10.2026: Alices Effekt gilt fuer ALLE Beschwoerungs-Effekte; „erst die geteilte Zone, DANN die erste leere"): freie Zonen UND — mit
+    // Alice-Teilung des Beschwoerers — die Zone einer GLEICHNAMIGEN Creature (`engine.beschwoerZonenFuer`).
+    for (const zz of engine.beschwoerZonenFuer(pi, creatureName, { seite: physOwner, heroIdx: hi, nurBasis: true, namedHeroesOnly: true })) {
+      out.push({
+        owner: physOwner, heroIdx: hi, slotIdx: zz.slotIdx,
+        label: `${hero.name} — Slot ${zz.slotIdx + 1}${zz.shared ? ` (×${zz.stackDepth})` : ''}`,
+        ...(zz.shared ? { shared: true, stackDepth: zz.stackDepth } : {}),
+      });
     }
   }
-  return out;
+  return require('./_alice-shared').geteiltZuerst(out);
 }
 
 /** Build the discard-revive gallery, filtered to summonable Creatures. */
@@ -132,6 +136,10 @@ function eligibleDiscardCreatures(engine, pi) {
 }
 
 module.exports = {
+  // ★ Z7b: „Negate that Spell/Attack/effect" = die gewirkte Karte löst NIE auf → ihre Einmal-Stempel werden zurückgegeben
+  // (Engine: `_merkeGanzeNegation`). Teil-Negierungen („… on that Hero", Schaden) tragen das Flag nicht.
+  negatesWholeCard: true,
+
   // ★★ v1182 — ENTKOPPELTE BILDER (CARD_API): wird die Karte NEGIERT,
   // laeuft ihr Effekt-Rumpf nie — die Engine spielt dann diese Bilder.
   // Im normalen Weg bleibt es bei den Broadcasts im Effekt selbst.
@@ -158,7 +166,8 @@ module.exports = {
     const cardDB = engine._getCardDB();
     const cd = sourceInfo.cardName ? cardDB[sourceInfo.cardName] : null;
     if (!cd) return false;
-    if (cd.cardType !== 'Attack' && cd.cardType !== 'Spell') return false;
+    // W30a (Al, 21.10.2026): auch Effekte, die als Attack/Spell ZÄHLEN (Broghan & Co., Alice, Gegenstandseffekte, Greatmaw-Treffer) — wie Flooding.
+    if (cd.cardType !== 'Attack' && cd.cardType !== 'Spell' && !zaehltAlsAttackOderSpell(engine, sourceInfo)) return false;
     // Live attacker required — mirrors Booby Trap / Frost Rune.
     if (isCreatureSource(engine, sourceInfo)) {
       return !!resolveSourceCreature(engine, sourceInfo);
@@ -221,7 +230,7 @@ module.exports = {
       if (isCreatureSource(engine, sourceInfo)) {
         const srcInst = resolveSourceCreature(engine, sourceInfo);
         if (srcInst) {
-          const beforeHp = srcInst.counters?.currentHp ?? 0;
+          const beforeHp = engine.creatureCurrentHp(srcInst);   // Z5: unversehrter Angreifer = gedruckte HP
           engine._broadcastEvent('play_zone_animation', {
             type: 'explosion', owner: srcInst.owner,
             heroIdx: srcInst.heroIdx, zoneSlot: srcInst.zoneSlot,
@@ -232,7 +241,7 @@ module.exports = {
             srcInst, damage, 'attack',
             { sourceOwner: pi, canBeNegated: true },
           );
-          const afterHp = srcInst.counters?.currentHp ?? 0;
+          const afterHp = engine.creatureCurrentHp(srcInst);   // Z5: Schaden verpufft (Immunitaet) -> unversehrt, nicht "besiegt"
           if (beforeHp > 0 && afterHp <= 0) attackerDefeated = true;
         }
       } else {

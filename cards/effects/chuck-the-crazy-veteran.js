@@ -63,7 +63,7 @@ const CARD_NAME = 'Chuck, the Crazy Veteran';
  * qualify, otherwise Chuck would lose his shield against any source
  * his team has even partial mitigation for.
  */
-function _isImmuneToSource(hero, type, engine, festesZiel = false) {
+function _isImmuneToSource(hero, type, engine, festesZiel = false, source = null, durchschlag = false, ort = null) {
   if (!hero) return true;
   // Tot zaehlt als immun — AUSSER der Tod ist im laufenden
   // Flaechenschlag nur vorgemerkt: dann steht der Held fuer die
@@ -84,6 +84,14 @@ function _isImmuneToSource(hero, type, engine, festesZiel = false) {
   // itself or the type+'ed' form.
   const statusByType = STATUS_EFFECTS?.[type] || STATUS_EFFECTS?.[type + 'ed'];
   if (statusByType?.immuneKey && hero.statuses?.[statusByType.immuneKey]) return true;
+  // N5-06 (Al, Welle 25, „ja"): Anti Magic (`magic_immune`) macht den Helden gegen Zauber bis Stufe N immun - das zaehlt als „immun gegen diese
+  // Quelle" (dieselbe Pruefung wie die Engine-Schadenssperre, `_wouldHeroDamageBeVoided`; unabwehrbarer Schaden - `cannotBeNegated` - schlaegt durch).
+  if (!durchschlag && source && engine?._wouldHeroDamageBeVoided?.(hero, source, type)) return true;
+  // N5-06 Nachtrag (Al, Welle 25): Burn-/Gift-Schaden (Statustick, Quelle „Burn"/„Poison") - ist der Held gegen den STATUS immun (Light Ball, Immunitaets-Anhaengsel
+  // wie Petrification Break, Johanna, `negative_status_immune`, `burn_immune`/`poison_immune` ...), gilt er als immun gegen diese Quelle (`heroBlocksStatusNow`,
+  // dieselbe Pruefung wie beim Setzen des Status). `ort` = { physOwner, heroIdx } des Helden (Brettseite und Index).
+  const tick = Object.keys(STATUS_EFFECTS || {}).find(k => STATUS_EFFECTS[k].dealsTickDamage && source?.name && STATUS_EFFECTS[k].damageSourceName === source.name) || null;   // Quelle Burn -> burned, Poison -> poisoned
+  if (tick && ort && engine?.heroBlocksStatusNow?.(ort.physOwner, ort.heroIdx, tick, { festesZiel })) return true;
   return false;
 }
 
@@ -148,16 +156,17 @@ module.exports = {
       let anyVulnerable = false;
       let verwundbarerName = null;
       // Kontrolle statt Seite (Styx 28.9.): „all other Heroes you control".
-      const heroes = engine.heroesControlledBy(pi)
-        .filter(({ hero }) => hero !== ctx.attachedHero)
-        .map(({ hero }) => hero);
+      const eintraege = engine.heroesControlledBy(pi)
+        .filter(({ hero }) => hero !== ctx.attachedHero);
+      const heroes = eintraege.map(({ hero }) => hero);
       for (let i = 0; i < heroes.length; i++) {
         const h = heroes[i];
+        const ort = { physOwner: eintraege[i].physOwner, heroIdx: eintraege[i].heroIdx };
         // „Erst alle Schadensberechnungen, dann die Tode" (28.9.): ein
         // Mitspieler, der frueher im selben Flaechenschlag gefallen ist,
         // ist nur vorgemerkt und zaehlt hier noch als lebend.
         if (!h?.name || (h.hp <= 0 && !engine.heldTodAufgeschoben(h))) continue;
-        if (!_isImmuneToSource(h, ctx.type, engine, ctx.festesZiel)) {
+        if (!_isImmuneToSource(h, ctx.type, engine, ctx.festesZiel, ctx.source, !!ctx.cannotBeNegated, ort)) {
           anyVulnerable = true;
           verwundbarerName = h.name;
           break;
@@ -169,7 +178,7 @@ module.exports = {
       } else {
         _diag('schild-faellt', {
           mitspieler: heroes.map(h => (h?.name
-            ? `${h.name} hp${h.hp}${_isImmuneToSource(h, ctx.type, engine, ctx.festesZiel) ? ' IMMUN' : ''}` : 'leer')),
+            ? `${h.name} hp${h.hp}${_isImmuneToSource(h, ctx.type, engine, ctx.festesZiel, ctx.source, !!ctx.cannotBeNegated, { physOwner: eintraege[heroes.indexOf(h)]?.physOwner, heroIdx: eintraege[heroes.indexOf(h)]?.heroIdx }) ? ' IMMUN' : ''}` : 'leer')),
         });
       }
     },

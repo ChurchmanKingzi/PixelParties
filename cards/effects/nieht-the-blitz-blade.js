@@ -178,6 +178,10 @@ module.exports = {
 
       engine.takeFromPileSync(ps, 'hand', handIdx);
 
+      // W40a (Al, 22.10.2026: „Arrows boosten nur EINE Attack"): die Bonus-Attack ist eine EIGENE Attack — der Pfeil-Bonus der ersten ist verbraucht (sonst bliebe er bis zum Ende der
+      // äußeren Karte scharf und träfe auch die Bonus-Attack).
+      await require('./_arrows-shared').clearArmedArrows(engine, pi);
+
       // Reveal the bonus Attack to the opponent.
       const oppSid = gs.players[oppIdx]?.socketId;
       if (oppSid && engine.io) {
@@ -197,6 +201,10 @@ module.exports = {
 
       const bonusInst = engine._trackCard(bonusName, pi, 'hand', heroIdx, -1);
       if (feld !== pi) bonusInst.heroOwner = feld;   // Styx 28.9.: wie der Server bei Uebernahme
+      // Clone (Welle 72): auch die Bonus-Attack ist ein „Normal Attack, den der Held benutzt" — die Zielwahlen (hier das erzwungene Ziel) werden aufgezeichnet; die Aufzeichnung der ersten Attack
+      // (die Clone nach diesem Hook noch lesen kann) wird gesichert und danach wiederhergestellt.
+      const klonAufnahmeAlt = gs._klonAufnahme;
+      gs._klonAufnahme = { pi, heroIdx, heroOwner: feld, name: bonusName, eintraege: [] };
       try {
         await engine.runHooks('onPlay', {
           _onlyCard: bonusInst, playedCard: bonusInst,
@@ -216,12 +224,16 @@ module.exports = {
           _skipReactionCheck: true,
         });
         // v1364: „as an additional Action" — als ausgefuehrte Aktion melden.
-        if (!gs._spellCancelled) await engine.meldeGussAlsAktion(pi, heroIdx, bonusName, { heroOwner: feld });
+        if (!gs._spellCancelled) {
+          await engine.zaehleAlsArt('attack', { pi, heroIdx, heroOwner: feld, name: bonusName, karte: true });   // W35a (Al, Frage 4): die Bonus-Attack zaehlt als gespielte Attack
+          await engine.meldeGussAlsAktion(pi, heroIdx, bonusName, { heroOwner: feld });
+        }
       } catch (err) {
         console.error(`[Engine] Nieht bonus Attack error for "${bonusName}":`, err.message);
       }
 
       // Cleanup tracking.
+      if (klonAufnahmeAlt === undefined) delete gs._klonAufnahme; else gs._klonAufnahme = klonAufnahmeAlt;
       delete gs._spellDamageLog;
       delete gs._spellExcludeTargets;
       // Defensive: clear forced-target in case the bonus Attack
@@ -231,7 +243,7 @@ module.exports = {
       delete gs._forcedDamageTarget;
 
       engine._untrackCard(bonusInst.id);
-      ps.discardPile.push(bonusName);
+      engine.handKartenBesitzerPs(ps, bonusName).discardPile.push(bonusName);   // W63c: Ablage des permanenten Besitzers
 
       engine.log('nieht_blitz_extra_attack', {
         player: ps.username, hero: hero.name,

@@ -156,7 +156,10 @@ module.exports = {
     // entry. Use explicit negation when 150 ≥ incoming so the engine
     // skips the residual zero-damage path entirely (animations stay
     // sane).
-    const effectNegated = DAMAGE_REDUCTION >= incoming;
+    // W25a (N1-14): ist die Reduktion gesperrt (Dichotomy of Luna and Tempeste), wird auch nichts „weg-reduziert" – kein Negieren, der Schaden bleibt (die Engine
+    // setzt `damageReduced` dann auf 0).
+    const gesperrt = engine._surpriseReduktionGesperrt?.(target, sourceInfo.cardInstance) === true;
+    const effectNegated = DAMAGE_REDUCTION >= incoming && !gesperrt;
     return { damageReduced: DAMAGE_REDUCTION, effectNegated };
   },
 };

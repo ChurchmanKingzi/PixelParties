@@ -6,6 +6,11 @@
 //  Self-deletes when sent to discard from
 //  outside hand or board.
 //
+//  Als Ruling (Al 26.10.): löst auch aus, wenn der
+//  Abwurf vom Effekt einer Rebelliokai-Kreatur kommt,
+//  die sich unter ihrem Kartennamen meldet
+//  (Timid Tanuki: „discard 2 cards").
+//
 //  Trigger: when Kitsune is discarded from hand
 //  by a Rebelliokai Creature's effect, the
 //  controller may choose a non-Creature card
@@ -42,7 +47,7 @@
 //      the controller's next turn-start.
 // ═══════════════════════════════════════════
 
-const { DISCARD_SOURCE_TAG } = require('./_rebelliokai-shared');
+const { DISCARD_SOURCE_TAG, isRebelliokaiCreature } = require('./_rebelliokai-shared');
 
 // v876: Namensvergleiche ueber den BASISNAMEN (siehe CARD_API).
 const { baseCardName, isPileCreature } = require('./_hooks');   // Stapel-Suche: Artifact Creatures sind Creatures (Als Ruling 9.10.)
@@ -73,8 +78,10 @@ module.exports = {
       if (!ctx._fromHand) return;
       if (ctx.discardedCardName !== CARD_NAME) return;
       if (ctx.playerIdx !== ctx.cardOwner) return;
-      // Strict source filter — must be a Rebelliokai-tagged discard.
-      if (ctx.source !== DISCARD_SOURCE_TAG) return;
+      // Source filter — must be a Rebelliokai-tagged discard.
+      // Als Ruling (Al 26.10.): „Erlauben" — auch ein Abwurf, den der Effekt einer Rebelliokai-KREATUR auslöst, zählt: Timid Tanuki (Strafe beim
+      // Besiegtwerden: „discard 2 cards") meldet sich unter seinem Kartennamen statt unter der Marke.
+      if (ctx.source !== DISCARD_SOURCE_TAG && !isRebelliokaiCreature(ctx.source, ctx._engine)) return;
       // Self-detect via instance id. Without this, a previously-
       // discarded Kitsune sitting in the discard pile would ALSO
       // pass the "name matches" filter when a sibling Kitsune is

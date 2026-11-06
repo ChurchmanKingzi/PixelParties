@@ -48,6 +48,9 @@ function eligibleIdejHeroes(engine, pi) {
   for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
     const hero = ps.heroes[hi];
     if (!hero?.name || hero.hp <= 0) continue;
+    // W28a (Al, 21.10.2026: „'you control' = aktuelle Kontrolle, nicht Besitzer"): ein an den Gegner abgegebener eigener Idej-Held ist kein „Idej Hero you control".
+    // (Ein uebernommener Idej-Gegnerheld bleibt ausgenommen: `attachIdejCardToHero` legt nur in die EIGENE Spalte — gemeldet, nicht umgebaut.)
+    if (engine.heroSideOf(pi, hero) !== pi) continue;
     if (!isIdejHero(hero.name, engine)) continue;
     if (freeSupportSlots(ps, hi).length === 0) continue;
     out.push({ heroIdx: hi, name: hero.name });
@@ -152,6 +155,13 @@ module.exports = {
     const pileArr = ps[PILE_KEY[source]] || [];
     const idx = pileArr.indexOf(PROJECTION_NAME);
     if (idx < 0) return { aborted: true };
+    // ★ W16a (Al, Frage 2: „Attachments ja"): das Anlegen der Idej Projection per Effekt ist ein Nicht-Schaden-Effekt auf den Idej-Helden — Resistance fängt ihn ab (vor jeder
+    // Kartenbewegung; die Projection bleibt in Hand/Deck/Ablage, der Projector ist verbraucht).
+    if (await engine.heroNonDamageEffectBlocked(pi, dest.heroIdx, 'attach_spell', { sourceOwner: pi, source: CARD_NAME })) {
+      engine.log('idej_projector_blocked', { player: ps.username, hero: dest.name });
+      engine.sync();
+      return true;
+    }
     pileArr.splice(idx, 1);
 
     const inst = await attachIdejCardToHero(engine, pi, dest.heroIdx, PROJECTION_NAME, { fromPile: source });

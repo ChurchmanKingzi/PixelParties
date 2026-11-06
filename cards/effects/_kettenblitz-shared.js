@@ -48,6 +48,7 @@ async function kettenblitz(engine, cfg) {
     creatures: ziele
       .map((t, i) => ({ inst: t.cardInstance, amount: schaden[i] }))
       .filter(k => k.inst),
+    heroes: ziele.map((t, i) => (t.type === 'hero' ? { owner: t.owner, heroIdx: t.heroIdx, amount: schaden[i] } : null)).filter(Boolean),   // W78 (Pythia): Helden der Kette, die ihr Glied faellt, sind todgeweiht
     source: quelle, type: typ, sourceOwner: pi,
   });
 

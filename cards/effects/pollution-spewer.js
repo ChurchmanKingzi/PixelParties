@@ -50,12 +50,10 @@ module.exports = {
       // Only react when a token was removed from OUR side.
       if (ownerIdx !== ctx.cardOwner) return;
 
-      // Per-instance HOPT keyed on (owner, heroIdx, zoneSlot) so two
-      // Spewers on the same side each get their own once-per-turn. The
-      // board position is guaranteed unique (no two cards share a slot)
-      // and stable across this turn, so each Spewer can react to one
-      // Pollution Token removal per turn without crossing signals.
-      const hoptKey = `pollution_spewer:${ctx.cardOriginalOwner}:${ctx.cardHeroIdx}:${ctx.card?.zoneSlot}`;
+      // Per-instance HOPT. ★ W16b (A01-pollution-30): Schlüssel = Instanz-ID der Karte statt (Besitzer, Held, Slot) — die Position
+      // trennt weder einen gestohlenen Spewer (gleicher Besitzer, gleiche Position auf der anderen Brettseite) noch ein Ersatz-
+      // Exemplar im selben Slot nach dem Tod des ersten: jede KARTE feuert einmal pro Zug.
+      const hoptKey = `pollution_spewer:${ctx.card?.id ?? `${ctx.cardOriginalOwner}:${ctx.cardHeroIdx}:${ctx.card?.zoneSlot}`}`;
       if (gs.hoptUsed?.[hoptKey] === gs.turn) return;
 
       // Controller may decline — make the prompt cancellable. If declined,

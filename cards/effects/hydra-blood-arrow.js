@@ -8,16 +8,45 @@
 //  30 full damage the Attack would have dealt
 //  instead.
 //
-//  Implementation detail: the "would have dealt"
-//  amount is the post-flat-bump but pre-zero
-//  value — so if an Angelfeather Arrow chained
-//  first (+60), Hydra Blood sees the boosted
-//  total and its poison-stacks count scales
-//  accordingly. `_arrows-shared.js` stashes that
-//  value on each armed arrow as
-//  `_preZeroDamage`; the afterDamage pass reads
-//  it and floor-divides by 30 for the stack
-//  count.
+//  Als Ruling (Al 26.10.): „bei Hydra Blood Arrow passt es so, dass JEDER
+//  Hero es triggern kann" — der Kartentext sagt „when a Hero hits …" (ohne
+//  „you control"): der Pfeil darf auch auf die Attack eines GEGNERISCHEN
+//  Helden ausgelöst werden (`anyHero`; Schaden 0, Gift am Ziel der Attack,
+//  Quelle des Gifts = Spieler des Pfeils).
+//
+//  Als Ruling (Al 26.10.): „Eine andere Regel, die dann für ALLE True-Damage-
+//  Sources gelten soll: Diese können Hydra Blood Arrow schlicht nicht aktivieren."
+//  Der Pfeil wird NICHT angeboten (auch nicht der CPU), wenn der Schaden der
+//  Attack QUELLEN-seitig unreduzierbar ist („cannot be reduced"): Surefire Shot,
+//  ein mit Elixir of Strength verstärkter Treffer, Club of Gobbo am Angreifer
+//  (auch für dessen Träger: „Club of Gobbo macht Hydra Blood Arrow für seinen
+//  Träger unbenutzbar, ja") — EIN Prädikat, `engine._attackSchadenUnreduzierbar`
+//  (Option `blockUnreducible` der Bedingung). Das Fenster öffnet VOR der Zielwahl.
+//
+//  Als Ruling (Al 26.10.): „Hydra Arrow *darf nicht* zusammen mit Elixir of Strength an
+//  irgendwas angekettet werden, die müssen sich ausschließen." Ein bereitstehender
+//  Elixir of Strength (Buff `empowered_strike`) des angreifenden Helden sperrt die Hydra
+//  bei JEDER Attack — auch bei Mehrziel-Attacks (Ricochet, Whirlwind Strike) und
+//  virtuellen Attack-Ketten (Bamboo Staff & Co.); umgekehrt nimmt der Elixir keinen
+//  Helden mit scharfer Hydra als Ziel (`elixir-of-strength.js`).
+//
+//  Als Ruling (Al 26.10.): ZIEL-seitiges „cannot be reduced" (Tempeste, Prophecy of
+//  Tempeste, Gigantisaur Brachion, Monia Bot, Test Dummy …) hält Hydra NICHT auf:
+//  „in dem Fall wird der Schaden ganz normal zu 0 und in Gift konvertiert. Der Pfeil
+//  macht den Schaden zu 0, *bevor* er trifft, das umgeht Effekte am Ziel."
+//
+//  Als Ruling (Al 26.10.): „Immer Hydra Blood Arrow nach ALLEN anderen
+//  Schadens-Modifikatoren!" — die Null (`applyArrowsZero`, Stufe 2) setzt erst, wenn
+//  der Betrag feststeht (Elixir, andere Pfeile, Darge, Unreasonable Anger, Disruption
+//  Ray, Warhorse, Buffs/Boni am Angreifer und am Ziel); die Giftstapel kommen aus
+//  diesem ENDBETRAG (1 je volle 30). Schilde und Reaktionen am Ziel sehen schon die 0.
+//
+//  Implementation detail: the "would have dealt" amount is the FINAL amount of
+//  the hit (all modifiers applied) — so if an Angelfeather Arrow chained
+//  first (+60), Hydra Blood sees the boosted total and its poison-stacks
+//  count scales accordingly. `_arrows-shared.js` stashes that value per target
+//  on each armed arrow (`_preZeroByTarget`, `_preZeroDamage`); the afterDamage
+//  pass reads it and floor-divides by 30 for the stack count.
 // ═══════════════════════════════════════════
 
 const { arrowTriggerCondition, armAttackerWithArrow } = require('./_arrows-shared');
@@ -30,12 +59,13 @@ module.exports = {
   canActivate: () => false,
 
   reactionCondition: (gs, pi, engine, chainCtx) =>
-    arrowTriggerCondition(gs, pi, engine, chainCtx),
+    arrowTriggerCondition(gs, pi, engine, chainCtx, { anyHero: true, blockUnreducible: true }),
 
   resolve: async (engine, pi, _sel, _val, chain, _idx) => {
     armAttackerWithArrow(engine, pi, chain, {
       setAmount0: true,
       poisonStacksPer: 30,
+      anyHero: true,
       sourceCard: CARD_NAME,
     });
     engine.log('arrow_armed', { player: engine.gs.players[pi]?.username, arrow: CARD_NAME });

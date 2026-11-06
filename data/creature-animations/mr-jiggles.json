@@ -1,0 +1,15 @@
+{
+  "creature": "Mr. Jiggles",
+  "sheet": "mr-jiggles.png",
+  "frameWidth": 20,
+  "frameHeight": 22,
+  "frames": 32,
+  "frameMs": 80,
+  "loop": true,
+  "layout": "horizontal",
+  "padTop": 4,
+  "padLeft": 2,
+  "padRight": 3,
+  "padBottom": 2,
+  "faceX": 10.0
+}

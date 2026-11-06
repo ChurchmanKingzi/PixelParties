@@ -268,6 +268,7 @@ function sammle(deck, welle) {
         PP_TRAIN_OUT: out,
         PP_TRAIN_HORIZON: process.env.PP_TRAIN_HORIZON || '2',
         PP_GAME_TIMEOUT_MS: process.env.PP_GAME_TIMEOUT_MS || '600000',
+        PP_TRAIN_JOBS: '1',   // dieses Skript parallelisiert selbst über Decks (--jobs) — nicht zusätzlich je Deck
       };
       // ── GEGENARME DER NEUEN KANAELE ───────────────────────────────
       // Ohne Exploration sieht der Trainer in JEDER Zeile dieselbe Wahl

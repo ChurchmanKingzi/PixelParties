@@ -33,7 +33,7 @@
 
 const {
   addChangeCounters, removeChangeCounters, moveChangeCounters,
-  getChangeCounters, allBoardTargets, targetToPromptEntry,
+  getChangeCounters, allBoardTargets, targetToPromptEntry, geteilteSlotsBeiderSeiten,
 } = require('./_cosmic-shared');
 
 const CARD_NAME = 'Analyzer from the Cosmic Depths';
@@ -89,7 +89,8 @@ function allFreeSupportSlotsBothSides(engine) {
       }
     }
   }
-  return out;
+  // W64a (Al, 23.10.2026): bei aktiver Alice-Teilung stoesst ein Invader Token zur Zone eines Invader Tokens dazu — geteilte Zonen VORN.
+  return [...geteilteSlotsBeiderSeiten(engine, INVADER_TOKEN), ...out];
 }
 
 // ── ACTIVE 1: Move counters ────────────────────────────────────────
@@ -133,9 +134,13 @@ async function runMove(engine, inst, ctx) {
   if (!picked || picked.length === 0) return false;
   const tgt = allTargets.find(t => targetToPromptEntry(t).id === picked[0]);
   if (!tgt) return false;
+  // Darion: alle Equips eines Stapels teilen die Ziel-ID — `allTargets.find` trifft immer die erste Karte. Die Rueckfrage der Engine
+  // („welches Equip?") schreibt die Wahl auf den Eintrag der Zielliste (`targetEntries`); von dort kommt die gewaehlte Karte.
+  const eintrag = targetEntries.find(e => e.id === picked[0]);
+  const ziel = (eintrag && eintrag.type === 'equip' && eintrag.cardInstance) ? eintrag.cardInstance : tgt.ref;
 
-  moveChangeCounters(engine, inst, tgt.ref, n);
-  stampHopt(gs, HOPT_MOVE, inst.id);
+  moveChangeCounters(engine, inst, ziel, n);
+  if (!ctx._borrowedUse) stampHopt(gs, HOPT_MOVE, inst.id);   // W13 (Al, Rueckfrage 9): geliehene Verwendung verbraucht den Stempel NICHT
   ctx._skipCreatureEffectHopt = true; // engine HOPT bypassed; script-level wins
   return true;
 }
@@ -154,7 +159,7 @@ async function runSpawn(engine, inst, ctx) {
   if (freeSlots.length === 0) return false;
 
   const maxByCounters = Math.min(have, 6);
-  const maxByTokens = Math.min(Math.floor(maxByCounters / 2), freeSlots.length);
+  const maxByTokens = freeSlots.some(sl => sl.shared) ? Math.floor(maxByCounters / 2) : Math.min(Math.floor(maxByCounters / 2), freeSlots.length);
   if (maxByTokens < 1) return false;
 
   const opts = [];
@@ -195,7 +200,8 @@ async function runSpawn(engine, inst, ctx) {
     } else {
       const zones = slots.map(s => ({
         owner: s.owner, heroIdx: s.heroIdx, slotIdx: s.slotIdx,
-        label: `${s.owner === pi ? '(You) ' : '(Opp) '}${s.heroName} — Slot ${s.slotIdx + 1}`,
+        label: `${s.owner === pi ? '(You) ' : '(Opp) '}${s.heroName} — Slot ${s.slotIdx + 1}${s.shared ? ` (×${s.stackDepth})` : ''}`,
+        ...(s.shared ? { shared: true, stackDepth: s.stackDepth } : {}),
       }));
       const zp = await promptCtx.promptZonePick(zones, {
         title: CARD_NAME,
@@ -218,12 +224,18 @@ async function runSpawn(engine, inst, ctx) {
       owner: chosen.owner, heroIdx: chosen.heroIdx, zoneSlot: chosen.slotIdx,
     });
     await engine._delay(220);
+    // ★ W16b (A02-deepsea-11): ein gelegter Token betritt die Support Zone — Eintritts-Fenster wie bei jeder Platzierung (Ruling 3.10./Welle 9 Q10:
+    // „place" zählt für Trigger und Reaktionen; Aquatic Arrows, Cybug RHINOCEROS …). Pollution-/Mummy-Token feuern denselben Hook.
+    await engine.runHooks('onCardEnterZone', {
+      enteringCard: placeRes.inst, toZone: 'support', toHeroIdx: chosen.heroIdx,
+      _bypassDeadHeroFilter: true, _isPlacement: true,
+    });
   }
 
   engine.log('analyzer_spawn', {
     player: gs.players[pi]?.username, tokens, cost,
   });
-  stampHopt(gs, HOPT_SPAWN, inst.id);
+  if (!ctx._borrowedUse) stampHopt(gs, HOPT_SPAWN, inst.id);   // W13 (Al, Rueckfrage 9)
   ctx._skipCreatureEffectHopt = true;
   return true;
 }
@@ -262,16 +274,18 @@ module.exports = {
   // Engine HOPT is bypassed inside each ability's resolve via
   // _skipCreatureEffectHopt. We expose creatureEffect=true so the engine
   // surfaces the activate-button, but the actual gating below.
+  // ★ W12 (Al, Q5): eine GELIEHENE/WIEDERHOLTE Verwendung (Spirit of the Forbidden Grimoire, Kohta: `ctx._borrowedUse`) ignoriert das
+  // eigene Einmal-Limit je Option — auch mit beiden Optionen schon benutzt darf sie noch einmal laufen (Counter-/Platz-Voraussetzungen bleiben).
   canActivateCreatureEffect(ctx) {
     const inst = ctx.card;
     const engine = ctx._engine;
     const gs = engine.gs;
     const have = getChangeCounters(inst);
 
-    const moveAvail = !hoptUsed(gs, HOPT_MOVE, inst.id) && have > 0
+    const moveAvail = (ctx._borrowedUse || !hoptUsed(gs, HOPT_MOVE, inst.id)) && have > 0
       && allBoardTargets(engine).some(t => !(t.kind === 'creature' && t.ref?.id === inst.id));
 
-    const spawnAvail = !hoptUsed(gs, HOPT_SPAWN, inst.id)
+    const spawnAvail = (ctx._borrowedUse || !hoptUsed(gs, HOPT_SPAWN, inst.id))
       && have >= 2 && allFreeSupportSlotsBothSides(engine).length > 0;
 
     return moveAvail || spawnAvail;
@@ -284,9 +298,9 @@ module.exports = {
     const pi = inst.controller ?? inst.owner;
     const have = getChangeCounters(inst);
 
-    const moveAvail = !hoptUsed(gs, HOPT_MOVE, inst.id) && have > 0
+    const moveAvail = (ctx._borrowedUse || !hoptUsed(gs, HOPT_MOVE, inst.id)) && have > 0
       && allBoardTargets(engine).some(t => !(t.kind === 'creature' && t.ref?.id === inst.id));
-    const spawnAvail = !hoptUsed(gs, HOPT_SPAWN, inst.id)
+    const spawnAvail = (ctx._borrowedUse || !hoptUsed(gs, HOPT_SPAWN, inst.id))
       && have >= 2 && allFreeSupportSlotsBothSides(engine).length > 0;
 
     if (!moveAvail && !spawnAvail) return false;
@@ -343,6 +357,17 @@ module.exports = {
     },
     onCardAddedFromDiscardToHand: (ctx) => {
       if (ctx.playerIdx === ctx.cardOwner) return;
+      addChangeCounters(ctx._engine, ctx.card, 1);
+    },
+    // ★ Welle 9 (Al, 15.10.2026, A02-deepsea-21): „Ja, das soll zählen" — auch die Rückgabe vom Brett auf die Hand des Gegners per Effekt
+    // (Deepsea-Bounce, Shapeshift, Castle, Encounter, Monstrosity …) ist „adds cards to their hand". Ein Counter je Rückgabe-Ereignis
+    // (`onCardsReturnedToHand`), nicht je Karte. Tokens verschwinden beim Verlassen und landen nie auf der Hand → zählen nicht.
+    // Gezählt wird, wenn die Hand des GEGNERS (`ownerIdx`) Karten erhält; die eigene Rückgabe zählt nicht.
+    onCardsReturnedToHand: (ctx) => {
+      if (ctx.ownerIdx === ctx.cardOwner) return;
+      const insts = ctx.returnedInsts || [];
+      if ((ctx.returnedCards || []).length === 0) return;
+      if (insts.length > 0 && insts.every(i => ctx._engine.isTokenCard(i))) return;
       addChangeCounters(ctx._engine, ctx.card, 1);
     },
   },

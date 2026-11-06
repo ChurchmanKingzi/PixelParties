@@ -25,6 +25,7 @@
 // ═══════════════════════════════════════════
 
 const { isChaorcCreature } = require('./_chaorcs-shared');
+const { anyName } = require('./_alias-name');
 
 const CARD_NAME = 'Chaorc Interception';
 
@@ -46,7 +47,7 @@ function targetKeys(targetedHeroes) {
 function availableTributes(engine, pi, targetedHeroes) {
   const { ids, slots } = targetKeys(targetedHeroes);
   return engine.getSacrificableCreatures(pi).filter(c => {
-    if (!isChaorcCreature(c.cardName, engine)) return false;
+    if (!anyName(c.inst || { name: c.cardName }, (n) => isChaorcCreature(n, engine))) return false;   // Shroomasaur: Zusatzname zählt
     if (ids.has(c.inst.id)) return false;
     if (slots.has(`${c.inst.owner}:${c.inst.heroIdx}:${c.inst.zoneSlot}`)) return false;
     return true;
@@ -54,6 +55,10 @@ function availableTributes(engine, pi, targetedHeroes) {
 }
 
 module.exports = {
+  // ★ Z7b: „Negate that Spell/Attack/effect" = die gewirkte Karte löst NIE auf → ihre Einmal-Stempel werden zurückgegeben
+  // (Engine: `_merkeGanzeNegation`). Teil-Negierungen („… on that Hero", Schaden) tragen das Flag nicht.
+  negatesWholeCard: true,
+
   isPostTargetReaction: true,
   // "Delete this card" — the hub routes deleteOnUse reactions to the
   // deleted pile instead of discard.
@@ -64,7 +69,7 @@ module.exports = {
     const srcOwner = sourceCard?.controller ?? sourceCard?.owner ?? -1;
     if (srcOwner < 0 || srcOwner === pi) return false;
     // "a target YOU control" — at least one chosen target is yours.
-    if (!Array.isArray(targetedHeroes) || !targetedHeroes.some(t => t?.owner === pi)) return false;
+    if (!Array.isArray(targetedHeroes) || !targetedHeroes.some(t => t && engine.zielSeite(t) === pi)) return false;   // W33a: „a target you control" = Kontrolle (Held abgegeben nein, übernommen ja)
     // Need a non-target Chaorc Creature to sacrifice.
     return availableTributes(engine, pi, targetedHeroes).length > 0;
   },
@@ -91,9 +96,9 @@ module.exports = {
     // den Chaorc — und erst im Nachlauf (`nachBilder`) fliegt er von
     // dort zur Ablage. Sein eigener Flug vom Brett entfaellt dafuer
     // (`skipPileTransfer`).
-    const zielT = (targetedHeroes || []).find(t => t?.owner === pi);
+    const zielT = (targetedHeroes || []).find(t => t && engine.zielSeite(t) === pi);
     const ziel = zielT
-      ? { owner: pi, heroIdx: zielT.heroIdx, zoneSlot: zielT.type === 'hero' ? -1 : (zielT.slotIdx ?? -1) }
+      ? { owner: zielT.owner ?? pi, heroIdx: zielT.heroIdx, zoneSlot: zielT.type === 'hero' ? -1 : (zielT.slotIdx ?? -1) }
       : null;
     const wurfKey = `ci-${Date.now()}-${Math.floor(Math.random() * 1e6)}`;
     let geworfen = false;

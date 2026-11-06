@@ -180,6 +180,10 @@ module.exports = {
       // creature actually landed in our discard pile (not deleted /
       // exiled).
       if (!(ps.discardPile || []).includes(death.name)) return;
+      // W16d (C03-07): die besiegte Karte muss WIRKLICH in MEINE Ablage gegangen sein - nicht gelöscht (Hell Fox: „delete it", Ghazma,
+      // Token) und nicht in die Ablage des Besitzers einer geliehenen Kreatur; ein anderes Exemplar desselben Namens in meiner Ablage
+      // genügt nicht. Die Todes-Hooks tragen `ziel`/`ablageBesitzer`; fehlen sie (alte Pfade), gilt weiter die Namensprüfung.
+      if (death.ziel !== undefined && (death.ziel !== 'discard' || death.ablageBesitzer !== pi)) return;
 
       // State-based "am I in the discard pile?" gate. This is the
       // real check that lets us listen broadly across zones — works
@@ -207,9 +211,10 @@ module.exports = {
       // summons.
       const hostHero = ps.heroes?.[death.heroIdx];
       if (!hostHero?.name || hostHero.hp <= 0) return;
-      if (hostHero.statuses?.frozen
-          || hostHero.statuses?.stunned
-          || hostHero.statuses?.bound) return;
+      // Welle 11 (Al, R5): „summon" erfordert einen aktionsfähigen Beschwörer (nicht Frozen/Stunned/Webbed/Bound) — `heroAgiert`.
+      // Welle 12 (Al): Negated sperrt nicht (auch die leichte Form beschwört wie vor Welle 11); die harte Form (Abilities negiert) lässt über
+      // `heroMeetsLevelReq` nur Stufe 0 zu - der Grave Worm ist Stufe 0.
+      if (!require('./_summon-eligibility').heroAgiert(hostHero, engine, pi)) return;   // W20c (Al 20.10.): nur der aktuelle Kontrolleur beschwoert mit dem Helden
       if (ps.summonLocked) return;
       const ourCardData = cardDB[CARD_NAME];
       if (!ourCardData) return;
@@ -252,7 +257,10 @@ module.exports = {
       // SUMMON (not placement) at the dying creature's slot — v1389 über
       // die EINE Ablage-Stelle (`summonFromDiscard`: Signal, Lethe,
       // Rückgabe bei Fehlschlag). Der Listener-Klon wird danach abgeräumt.
-      const listenerId = ctx.card?.id;
+      // Abzuräumen ist der Ablage-Zuhörer — nicht zwingend der Haken-Ausführende: `activeIn` deckt auch einen
+      // zweiten Wurm auf Brett/Hand ab, dessen Instanz sonst getilgt würde (C03-06).
+      const listenerId = (ctx.card?.zone === 'discard' ? ctx.card
+        : engine.cardInstances.find(c => c.name === CARD_NAME && c.zone === 'discard' && (c.controller ?? c.owner) === pi))?.id;
       const placed = await engine.summonFromDiscard(pi, pi, dpIdx, death.heroIdx, death.zoneSlot, {
         source: CARD_NAME, flug: false,
         hookExtras: { _summonedBy: CARD_NAME, _summonedAsAdditional: true },

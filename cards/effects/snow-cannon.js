@@ -10,6 +10,9 @@ const { hasCardType } = require('./_hooks');
 const { opponentOfGs } = require('./_opp');
 
 module.exports = {
+  // ★ Welle 12 (B-06, Al: „Eine Karte, deren Effekt komplett nutzlos wäre, ist nicht spielbar."): trifft NUR den Gegner — gegen den durch die
+  // Erste-Runden-Immunität geschützten Spieler unspielbar (Karte bleibt auf der Hand, keine Aktion/Kosten/Einmal-Stempel; `engine.ersterZugGeschuetzt`).
+  blockedByFirstTurnProtection: true,
   isTargetingArtifact: true,
   animationType: null, // No destruction animation — just freezes
 
@@ -60,6 +63,8 @@ module.exports = {
         if (inst.faceDown) continue;
         { const cd = engine.getEffectiveCardData(inst) || cardDB[inst.name]; if (!cd || !engine.isChoosableAsCreature(inst, cd)) continue; }   // wirksame Daten: Tokens/Artifact Creatures auf dem Brett (Als Sweep 9.10.)
         if (inst.counters?.frozen) continue;
+        // Harte Unwählbarkeit (Thicket): „cannot be chosen by cards and effects" — wie im Engine-Sammler (F03-04).
+        if (inst.counters?.untargetable_all) continue;
         if (typeof engine.canApplyCreatureStatus === 'function'
             && !engine.canApplyCreatureStatus(inst, 'frozen', { name: 'Snow Cannon' })) continue;
         targets.push({

@@ -25,6 +25,11 @@
 //    that path is a voluntary self-sacrifice that must
 //    bypass protections.)
 //
+//    ★ W66a (Al, 23.10.2026: „Bitte nimm alles zurück, was ich fälschlicherweise zu Eraser Beam angemerkt habe"): die W64a-Auslegung
+//    „defeat umgeht Schadensimmunität" galt NUR Eraser Beam und beruhte auf einer Verwechslung (gemeint war Hand of Death) — zurückgenommen.
+//    Eraser Beam läuft wieder als 999999 Schaden durch die Schadens-/Zerstörungs-Pipelines; Inyas „takes no damage", Immortal, Carris,
+//    Storm Piano, Egg of God, Resilient Monkee halten ihn ab, Effekt-Schutz wie zuvor. Zeitpunkt: sofort (unverändert).
+//
 //  "Only Spell this turn" enforcement:
 //    - CAST TIME: `spellPlayCondition` reads
 //      `ps._eraserBeamPriorSpellTurn`, stamped via a
@@ -32,6 +37,12 @@
 //    - POST CAST: `onPlay` sets the generic engine
 //      flag `ps._spellLockTurn = gs.turn`. The engine
 //      blocks any further Spell plays until turn end.
+//
+//  ★ W40a (Al, 22.10.2026): „Attacks sollen den Stempel GAR NICHT setzen, sondern nur Spells! … auch solche ohne Karte (etwa Alices Effekt)
+//    setzen den Stempel und verbieten Eraser Beam." Gelesen wie der Kartentext: „the only SPELL you play this turn" — nur Spell-Karten
+//    (auch Sofort-Güsse) und Effekte, die als Spell zählen (Alice, `treatedAsSpell`), stempeln; gespielte Attack-Karten und Effekte, die als
+//    Attack zählen (Broghan, Javelin Throw, Duel …), nie. Zentral in `Engine.runHooks('afterSpellResolved')` (`_spellResolvedTurn`) und im
+//    Hook unten (`_eraserBeamPriorSpellTurn`) über die Kartendaten (`spellCardData.cardType`).
 //
 //  Animation: blood-red beam from caster to target with
 //  crackling lightning arcs — one of the deadliest Spells
@@ -45,6 +56,8 @@ const CARD_NAME = 'Eraser Beam';
 module.exports = {
   requiresTarget: true,
   // ^ Tagged for Blinded gating — see cards/effects/_hooks.js (blinded status).
+  // ★ W75b (Al: „Unbedingt Flag setzen, Bartas darf damit nicht 2 Ziele treffen!"): „This Spell can never hit more than 1 target." — Bartas bietet keinen Zweitwurf an.
+  neverMultiTarget: true,
   placesPollutionTokens: true,
   oncePerGame: true,
   oncePerGameKey: 'eraserBeam',
@@ -90,6 +103,8 @@ module.exports = {
       const engine = ctx._engine;
       const gs = engine.gs;
       if (!ctx.spellName || ctx.spellName === CARD_NAME) return;
+      // W40a (Al, 22.10.2026): nur Spells stempeln — eine gespielte Attack-Karte (und ein als Attack zählender Effekt) gar nicht.
+      if (ctx.spellCardData?.cardType === 'Attack' || ctx._alsEffekt) return;
       // casterIdx identifies whose spell just resolved. Only stamp that
       // player's tracker — Eraser Beam in the opponent's deck doesn't care.
       const casterIdx = ctx.casterIdx;
@@ -109,8 +124,9 @@ module.exports = {
       if (!ps) return;
 
       // Cost has already been paid via payActivationCost. Mark the
-      // once-per-game key now so even a same-turn negation still
-      // consumes the game-long charge.
+      // once-per-game key now (Teil-Negierung/Fizzle verbrauchen die Ladung). Z7b: wird der
+      // Zauber GANZ negiert (Silence in der Kette: onPlay läuft nie; MOE Shield & Co. nach der
+      // Zielwahl: `_stempelZurueck`), bleibt die Ladung frei — nur die Token-Kosten sind bezahlt.
       if (!ps._oncePerGameUsed) ps._oncePerGameUsed = new Set();
       ps._oncePerGameUsed.add('eraserBeam');
 
@@ -166,7 +182,14 @@ module.exports = {
       if (target.type === 'hero') {
         const tgtHero = gs.players[target.owner]?.heroes?.[target.heroIdx];
         if (tgtHero && tgtHero.hp > 0) {
-          await ctx.dealDamage(tgtHero, ERASE_DAMAGE, 'destruction_spell');
+          // W66a (Al, 23.10.2026: „der Resistance-Schutz sollte JEDE Form von defeat abdecken"): „defeat it" ist ein Nicht-Schaden-Effekt auf den Helden —
+          // Resistance (W13/W14-Ruling, Stufen: 1/2 erste Karten je Zug, 3 alles außer Schaden) fängt ihn ab, bevor der Riesenschaden läuft. Alle übrigen
+          // Schichten (Zielschutz, Anti Magic, Submerged, Schadensschutz …) wirken wie bisher in der Schadens-Pipeline.
+          if (await engine.heroNonDamageEffectBlocked(target.owner, target.heroIdx, 'defeat', { sourceOwner: pi, source: CARD_NAME })) {
+            engine.log('defeat_negated', { hero: tgtHero.name, source: CARD_NAME, reason: 'hero_effect_blocked' });
+          } else {
+            await ctx.dealDamage(tgtHero, ERASE_DAMAGE, 'destruction_spell');
+          }
         }
       } else if (target.cardInstance) {
         await engine.processCreatureDamageBatch([{

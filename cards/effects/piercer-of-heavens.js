@@ -43,6 +43,9 @@ const DAMAGE = 250;
 const ANIM = 'lightning_rain';
 
 module.exports = {
+  // ★ Als Ruling (Al 26.10., Flame Avalanche: „Wenn du andere Schadenskarten unspielbar machst, müssen das Vial und Rockfall auch sein!"): die Karte richtet NUR Schaden an Zielen an —
+  // unter der Schadenssperre (`ps.damageLocked`) unspielbar (Karte bleibt auf der Hand, keine Aktion/Kosten; Sperr-Stutzen `engine._cardBlockedBySearchLock`).
+  blockedByDamageLock: true,
   // ★★ v1181 — ENTKOPPELTE ZAUBERBILDER (Al 17.9.): Wird der Zauber
   // NEGIERT, laeuft sein Effekt-Rumpf nie — die Engine spielt dann diese
   // Bilder, damit der abgewehrte Zauber trotzdem zu sehen ist. Im
@@ -68,7 +71,7 @@ module.exports = {
         description: `Choose any target — ${DAMAGE} damage that cannot be reduced or negated. Nothing can hide from the Piercer.`,
         confirmLabel: `☄️ ${DAMAGE} Damage!`,
         confirmClass: 'btn-danger',
-        cancellable: false,
+        cancellable: true,   // N5-11 (Regel 23.9): keine Kosten vor der Zielwahl, kein Zusagepunkt → abbrechbar (wie Rockfall); `if (!target) return` unten
         _skipPostTargetReactions: true,
       });
       if (!target) return;

@@ -34,6 +34,7 @@
 //  beim Verbrauch der Ladung schlagen die Flügel, die Krone hebt sich, goldene Funken stieben. Klänge in ZONE_ANIM_SFX; Log `cute_crown_summon`.
 // ═══════════════════════════════════════════
 
+const { anyName } = require('./_alias-name');   // Shroomasaur: Zusatzname zählt für Namensfamilien
 const { hasCardType } = require('./_hooks');
 const { hasCuteInName, heroHasCuteWings } = require('./_cute-shared');
 
@@ -43,7 +44,7 @@ const ADDITIONAL_TYPE = 'cute_crown_summon';
 /** Ist `cardData` für den Träger (Kontext `c`) eine „Cute" Creature? Ohne Kontext zählt nur der Name. */
 function istCuteKreatur(cardData, c) {
   if (!cardData || !hasCardType(cardData, 'Creature')) return false;
-  if (hasCuteInName(cardData.name)) return true;
+  if (anyName(cardData, (n) => hasCuteInName(n))) return true;
   return !!(c && c.engine && heroHasCuteWings(c.engine, c.playerIdx, c.heroIdx));
 }
 
@@ -98,7 +99,7 @@ module.exports = {
    */
   canPlayCard(gs, playerIdx, heroIdx, cardData, engine) {
     if (!cardData || !hasCardType(cardData, 'Creature')) return true;
-    return hasCuteInName(cardData.name) || heroHasCuteWings(engine, playerIdx, heroIdx);
+    return anyName(cardData, (n) => hasCuteInName(n)) || heroHasCuteWings(engine, playerIdx, heroIdx);
   },
 
   hooks: {

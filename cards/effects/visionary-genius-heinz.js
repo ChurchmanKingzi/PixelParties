@@ -57,7 +57,9 @@ module.exports = {
     const pi = ctx.cardOwner;
     const ps = ctx.players[pi];
     if (!ps) return false;
-    if (ps.handLocked) return false;
+    // D1 (Regel von Al): "discard up to 4 copies ... to draw that many" ist ein Mischeffekt (der Abwurf ist eigenstaendig - es gibt Decks,
+    // die abwerfen wollen): unter Hand-/Zieh-Sperre bleibt die Aktivierung moeglich, man wirft dann nur ab. (Z6 H04-16 hatte das
+    // gesperrt, davor galt nur `handLocked`.) Tuscan Artist: Heinz kann 1 oder 4 Kopien waehlen, bleibt also ebenfalls nutzbar.
     return (ps.hand?.length || 0) >= 1;
   },
 
@@ -98,6 +100,15 @@ module.exports = {
 
     // Sort descending so each splice doesn't shift remaining indices.
     picked.sort((a, b) => b.handIndex - a.handIndex);
+
+    // ★ W74c: Boris darf den Abwurf ignorieren — einmal gefragt (vor dem ersten Abwurf), die Antwort gilt für den ganzen Stapel. Die Wirkung hängt an der
+    // ANZAHL der abgeworfenen Karten ("that many", "the same number"): bei Verzicht 0, der Effekt endet ohne Wirkung.
+    // Aktiviert ist der Effekt trotzdem (Sperre gestempelt) — er läuft nur mit 0 abgeworfenen Karten und zieht deshalb nichts.
+    if (await engine.borisVerzicht(pi, picked.length, { source: CARD_NAME, skipVoidsEffect: true })) {
+      engine.log('heinz_research', { player: ps.username, cardName: targetName, discarded: 0, drew: 0, borisSkipped: true });
+      engine.sync();
+      return true;
+    }
 
     // v696: Flug (vom exakten Hand-Slot) und Abwurf-Takt (0,5 s je
     // Karte) kommen aus `actionDiscardHandCard` selbst — der frühere

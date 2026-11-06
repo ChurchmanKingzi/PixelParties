@@ -33,7 +33,7 @@ module.exports = {
   // isWildcardAbility: true,    // Counts as any spell school when stacked on an ability
   // potionLockAfterN: 2,        // Hero flag: lock potions after N uses per turn
   // manualGoldCost: true,       // Handle own gold deduction in resolve()
-  // deferBroadcast: true,       // Don't reveal card to opponent before resolution
+  // (W64b: kein `deferBroadcast` mehr nötig — der Auftritt kommt zentral VOR dem ersten Effektschritt; bei eigenen abbrechbaren Fragen `engine.commitAppearance()` HINTER der letzten Wahl)
   // animationType: 'explosion', // Post-resolve animation ('none' to skip)
 
   // ══════════════════════════════════════════

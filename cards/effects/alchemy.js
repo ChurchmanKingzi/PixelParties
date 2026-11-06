@@ -12,6 +12,8 @@
 //  highlighted but also NOT grayed out.
 // ═══════════════════════════════════════════
 
+const { drawBlockedFor } = require('./_draw-block-shared');   // D1: Regel von Al
+
 module.exports = {
   blockedByHandLock: true,
   activeIn: ['ability'],
@@ -61,14 +63,17 @@ module.exports = {
   // Harte CPU-Restriktion (Als Ruling): Alchemy niemals unter Hand-
   // oder Draw-Lock aktivieren — der Potion-Draw fizzlet dann
   // (actionDrawFromPotionDeck liefert []), das Gold wäre verschwendet.
-  // CPU-only: Menschen dürfen weiterhin (der Engine-Pfad prüft dieses
-  // Flag bewusst nicht).
+  // (Frueher "CPU-only: Menschen duerfen weiterhin" - D1 hat das mit der Regel von Al abgeloest, s. canFreeActivate.)
   cpuSkipActivationWhenDrawLocked: true,
 
   canFreeActivate(ctx, level) {
     const ps = ctx.players[ctx.cardOwner];
+    // D1 (M01-23, Regel von Al): "spend N Gold in order to draw" / "draw" - der Zug ist der ganze Nutzen, das Gold nur sein Preis
+    // (Smuggler's-Pier-artig). Unter Hand-/Zieh-Sperre nicht aktivierbar: weder Gold noch Einmal-Stempel gehen fuer nichts weg.
+    if (drawBlockedFor(ctx._engine, ctx.cardOwner)) return false;
     const goldCost = level >= 3 ? 0 : level >= 2 ? 4 : 8;
     if ((ps.gold || 0) < goldCost) return false;
+    if (goldCost > 0 && ctx._engine.goldSpendBlocked(ctx.cardOwner)) return false;   // G1 (A09-11): Goldsperre - "spend N Gold"
     if (ctx._engine.deckLeer(ctx.cardOwner, 'potion')) return false;
     return true;
   },
@@ -81,7 +86,9 @@ module.exports = {
     const engine = ctx._engine;
     const pi = ctx.cardOwner;
     const ps = ctx.players[pi];
-    const goldCost = level >= 3 ? 0 : level >= 2 ? 4 : 8;
+    // W82 (Sinister Idol, Al): die Kosten bleiben die der Stufe BEIM Aktivieren — senkt Idol die Stufe vor der Auflösung, ändert das die Kosten nicht (`ctx.kostenStufe`).
+    const kostenLevel = ctx.kostenStufe ?? level;
+    const goldCost = kostenLevel >= 3 ? 0 : kostenLevel >= 2 ? 4 : 8;
 
     // Confirmation prompt
     const confirmed = await ctx.promptConfirmEffect({
@@ -94,7 +101,7 @@ module.exports = {
 
     // Pay gold
     if (goldCost > 0) {
-      if ((ps.gold || 0) < goldCost) return false; // Safety
+      if ((ps.gold || 0) < goldCost || engine.goldSpendBlocked(pi)) return false; // Safety (G1: auch Goldsperre)
       await engine._payCardCost(pi, goldCost);
       engine.log('gold_spent', { player: ps.username, amount: goldCost, reason: 'Alchemy' });
       engine._broadcastEvent('gold_change', { owner: pi, amount: -goldCost });

@@ -43,6 +43,22 @@
 //  Absicht: dort haengt die Curse-Regel ("Angriff ist
 //  0"), die eine direkte Zuweisung umgehen wuerde.
 //
+//  ── ①b Formwechsel (W55a, Al: „Die Verdopplung muss neu berechnet werden!") ──
+//  Aufstieg/Abstieg (`performAscension`/`performDescend`) setzen `hero.baseAtk` auf den GEDRUCKTEN Wert der
+//  neuen Form zurueck (`_atkNachFormwechsel`: gedruckter Wert + fortbestehende Boni; die Verdopplung gehoert
+//  zur alten Basis und ist dabei erloschen). Vorher blieb `_cykyranBonus` mit dem ALTEN Betrag stehen:
+//  der Held stand ohne Verdopplung da (Test: 40 -> 80, nach dem Aufstieg 90 statt 180) und ein spaeterer
+//  Abgleich rechnete `natuerlich = baseAtk - altem Bonus` falsch (100 statt 180).
+//  Jetzt in zwei Schichten:
+//    • `onFormChanged` (neuer Engine-Hook, feuert direkt nach der Zustandsuebertragung): `resync` bucht auf
+//      die neue Basis um — alte Buchung zuruecknehmen (sie ist mit dem Zuruecksetzen der Basis schon weg,
+//      es gibt nichts abzuziehen) und, solange die Bedingung gilt, die NEUE Basis einmal verdoppeln.
+//    • Selbstheilung im `resync` selbst: die Buchung traegt den Formwechsel-Zaehler `hero._formGen`
+//      (`_cykyranGen`). Weicht er ab, ist die Buchung verwaist und zaehlt als 0 — egal ueber welchen
+//      Weg der Abgleich laeuft (jeder andere Hook, Zugbeginn, Wiederbelebung …).
+//  Boni (Ausruestung, Fighting, dauerhafte Zuwaechse `permAtkDelta`, befristete Gaben) werden nicht
+//  verdoppelt: verdoppelt wird allein `baseAtk` (= gedruckter Wert der aktuellen Form).
+//
 //  ── ② Der Schuss ──
 //  "one of your Heroes" — der Spieler waehlt, welcher
 //  Held den Wert stellt; gedeckelt bei 300. Der
@@ -52,8 +68,10 @@
 
 const {
   WC,
-  countDistinctWarCounselors,
+  controlledWarCounselors,
+  istEigenerAbgang,
   makeSingletonCanSummon,
+  zahleGatheringGebuehr,
 } = require('./_war-counselor-shared');
 
 const CARD_NAME = 'Cykyran War Counselor';
@@ -61,10 +79,18 @@ const NEEDED_DISTINCT = 3;
 const DAMAGE_CAP = 300;
 
 /** Verdopplung an- oder abgleichen. */
-function resync(engine, pi) {
+function resync(engine, pi, ausserId = null) {
   const ps = engine.gs.players[pi];
   if (!ps) return;
-  const active = countDistinctWarCounselors(engine, pi) >= NEEDED_DISTINCT;
+  // `ausserId`: die Kopie, die gerade abgeht — sie steht im Leave-Hook noch im
+  // Support und darf sich nicht mehr mitzaehlen (A06-18).
+  // ★ W7a (A06-13, Al): die Verdopplung ist ein laufender Passiv Cykyrans — sie gilt nur, solange eine Cykyran WIRKT (nicht
+  // gefroren/betäubt/negiert/Aura-negiert); mitgezählt werden die Ratgeber unabhängig von ihrem Zustand („you control").
+  const active = new Set(controlledWarCounselors(engine, pi)
+    .filter((i) => i.id !== ausserId).map((i) => i.name)).size >= NEEDED_DISTINCT
+    && engine.cardInstances.some((i) => i.name === CARD_NAME && i.zone === 'support' && !i.faceDown
+      && i.id !== ausserId && (i.controller ?? i.owner) === pi
+      && !engine.isCreatureEffectSuppressed(i, { honorNegStatusImmune: false }));
 
   // Kontrolle statt Seite (Styx 28.9.) — „your Heroes": alle Helden, die
   // `pi` kontrolliert, plus die, auf denen noch SEIN Zuschlag liegt
@@ -77,6 +103,14 @@ function resync(engine, pi) {
     const hero = heroes[hi];
     if (!hero?.name) continue;
     const kontrolliert = engine.heroSideOf(p, hero) === pi;
+    // W55a: verwaiste Buchung (der Held hat seit dem Setzen die Form gewechselt): `baseAtk` ist dabei auf den
+    // gedruckten Wert der neuen Form zurueckgesetzt worden, die Verdopplung steckt nicht mehr darin —
+    // es gibt nichts zurueckzunehmen. Aeltere Staende ohne Stempel (`_cykyranGen` fehlt) gelten als frisch.
+    if (hero._cykyranBonus && hero._cykyranGen !== undefined && hero._cykyranGen !== (hero._formGen || 0)) {
+      hero._cykyranBonus = 0;
+      delete hero._cykyranBy;
+      delete hero._cykyranGen;
+    }
     const current = hero._cykyranBonus || 0;
     if (!kontrolliert && !(current && (hero._cykyranBy ?? p) === pi)) continue;
     // Natuerlicher Basiswert = gespeicherte Basis minus unser eigener
@@ -91,6 +125,7 @@ function resync(engine, pi) {
     if (hero.baseAtk !== undefined) hero.baseAtk = Math.max(0, hero.baseAtk + delta);
     hero._cykyranBonus = wanted;
     hero._cykyranBy = pi;
+    hero._cykyranGen = hero._formGen || 0;
   }
   }
 }
@@ -119,6 +154,8 @@ module.exports = {
   // ^ Tagged for Blinded gating — see cards/effects/_hooks.js (blinded status).
   activeIn: ['support'],
   creatureEffect: true,
+  // W7a: der Abgleich muss Zustandswechsel auch im stillgelegten Zustand mitbekommen (Hooks laufen immer, fragen selbst).
+  bypassStatusFilter: true,
 
   canSummon: makeSingletonCanSummon(CARD_NAME),
 
@@ -185,6 +222,8 @@ module.exports = {
       cancellable: true,
     });
     if (!target) return false;
+    // Welle 11 (Al, R3): War Council Gathering Place — die 8 Gold werden erst jetzt (Ziel bestätigt, vor der Auflösung) abgezogen.
+    if (!(await zahleGatheringGebuehr(engine, inst))) return false;
 
     const tgtZoneSlot = target.type === 'hero' ? -1 : target.slotIdx;
     engine._broadcastEvent('play_zone_animation', {
@@ -213,15 +252,33 @@ module.exports = {
     return true;
   },
 
+  // W16c (A06-32): Wiederbelebung OHNE Hooks (Rewrite History, Zombified Assault, ...): die Verdopplung gleicht sich sofort ab, nicht erst am Zugende.
+  onRevive: (ctx) => resyncFromCtx(ctx),
+
   hooks: {
+    onNameChanged: (ctx) => resyncFromCtx(ctx),   // W73c: Shroomasaur bekommt/verliert einen Zusatznamen - der Bestand der Ratgeber ändert sich
     // Bedingung UND Grundwert koennen sich bei jedem dieser Ereignisse
     // aendern — kein Filter auf die gespielte Karte, gerade FREMDE
     // Beschwoerungen und Tode veraendern ja die Ratgeberzahl.
     onPlay: (ctx) => resyncFromCtx(ctx),
     onCardEnterZone: (ctx) => resyncFromCtx(ctx),
-    onCardLeaveZone: (ctx) => resyncFromCtx(ctx),
-    onCreatureDeath: (ctx) => resyncFromCtx(ctx),
+    onCardLeaveZone: (ctx) => {
+      if (istEigenerAbgang(ctx)) { resync(ctx._engine, ctx.cardOwner, ctx.card.id); return; }
+      resyncFromCtx(ctx);
+    },
+    // Der eigene Tod ist schon im Leave-Hook abgeglichen; hier steht die Instanz
+    // noch im Support und wuerde sich sonst wieder mitzaehlen (A06-18/19).
+    onCreatureDeath: (ctx) => {
+      if (ctx.creature?.instId === ctx.card?.id) return;
+      resyncFromCtx(ctx);
+    },
     onTurnStart: (ctx) => resyncFromCtx(ctx),
+    // W55a: Aufstieg/Abstieg — die Verdopplung auf den NEUEN Grundwert umbuchen (siehe ①b)
+    onFormChanged: (ctx) => resyncFromCtx(ctx),
     afterDamage: (ctx) => resyncFromCtx(ctx),
+    // W7a: Frost/Betäubung/Negation kommen und gehen
+    onPhaseStart: (ctx) => resyncFromCtx(ctx),
+    onStatusApplied: (ctx) => resyncFromCtx(ctx),
+    onStatusRemoved: (ctx) => resyncFromCtx(ctx),
   },
 };

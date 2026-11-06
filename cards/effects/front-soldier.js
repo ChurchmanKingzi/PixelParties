@@ -159,7 +159,7 @@ module.exports = {
   async resolve(engine, pi, _selectedIds, _validTargets, chain, myIdx) {
     const ps = engine.gs.players[pi];
     if (!ps) return false;
-    const fallbackDiscard = () => { ps.discardPile = ps.discardPile || []; ps.discardPile.push(CARD_NAME); engine.sync(); };
+    const fallbackDiscard = () => { engine.handKartenBesitzerPs(ps, CARD_NAME).discardPile.push(CARD_NAME); engine.sync(); };   // W64c: Ablage des permanenten Besitzers (gestohlene Handkarte)
 
     const frei = zonen(engine, pi);
     if (frei.length === 0) { fallbackDiscard(); return false; }

@@ -17,8 +17,8 @@
 //  2. BORROW HERO EFFECT (`creatureEffect`):
 //     Once per turn, if the linked Hero has
 //     used its hero-effect THIS turn (engine's
-//     standard `hero-effect:${name}:${pi}:${hi}`
-//     HOPT key), invoke that hero's `onHeroEffect`
+//     standard HOPT key `engine.heroHoptKey(name, pi)`
+//     = `hero-effect:${name}:${pi}`, seit v1275 ohne Heldenindex), invoke that hero's `onHeroEffect`
 //     with the linked Hero's context. Sleeping
 //     Beauty's own creature HOPT is the once-
 //     per-turn lock; the linked Hero's HOPT is
@@ -38,16 +38,16 @@
 
 const CARD_NAME = 'Sleeping Beauty';
 const ON_DEFEAT_DAMAGE = 300;
+const HARD_KEY = 'sleeping-beauty-hard';   // W13 (Rueckfrage 8)
 
-function _eligibleLinkHeroes(gs, pi) {
-  const ps = gs.players[pi];
-  if (!ps) return [];
+function _eligibleLinkHeroes(engine, pi) {
+  // W16e (C04-03): „a Hero you permanently control" = eigene Spalte ohne die abgegebenen
+  // PLUS dauerhaft uebernommene Gegnerhelden (Paraseed Control …) — `heroesControlledBy(pi, { permanentOnly })`.
   const out = [];
-  for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
-    const h = ps.heroes[hi];
+  for (const { physOwner, heroIdx: hi, hero: h } of engine.heroesControlledBy(pi, { permanentOnly: true })) {
     if (!h?.name || h.hp <= 0) continue;
-    if (h.charmedBy != null) continue; // not "permanently controlled"
-    out.push(hi);
+    if (h.charmedBy != null && h.permaControlBy !== pi) continue; // vorlaeufig gecharmt: nicht „permanently controlled"
+    out.push({ owner: physOwner, heroIdx: hi, hero: h });
   }
   return out;
 }
@@ -75,15 +75,15 @@ module.exports = {
       const ps     = gs.players[pi];
       if (!ps) return;
 
-      const eligible = _eligibleLinkHeroes(gs, pi);
-      if (eligible.length === 0) return; // No legal pick → effect stays dormant.
+      const eligible = _eligibleLinkHeroes(engine, pi);
+      if (eligible.length === 0) return ctx._engine.summonEffektFizzelt(ctx.card, ctx.cardName, { stumm: true });   // W11/R4: wirkt nicht → Blob stumm
 
-      const targets = eligible.map(hi => ({
-        id: `hero-${pi}-${hi}`,
+      const targets = eligible.map(e => ({
+        id: `hero-${e.owner}-${e.heroIdx}`,
         type: 'hero',
-        owner: pi,
-        heroIdx: hi,
-        cardName: ps.heroes[hi].name,
+        owner: e.owner,
+        heroIdx: e.heroIdx,
+        cardName: e.hero.name,
       }));
 
       const picked = await engine.promptEffectTarget(pi, targets, {
@@ -100,17 +100,18 @@ module.exports = {
 
       // Defensive default: if the pick was somehow dismissed, link to
       // the host hero so the on-summon mandate always resolves.
+      let chosenOwner = pi;
       let chosenIdx = ctx.card.heroIdx;
       if (picked && picked.length > 0) {
         const found = targets.find(t => t.id === picked[0]);
-        if (found) chosenIdx = found.heroIdx;
+        if (found) { chosenOwner = found.owner; chosenIdx = found.heroIdx; }
       }
 
-      ctx.card.counters._linkedHeroOwner = pi;
+      ctx.card.counters._linkedHeroOwner = chosenOwner;
       ctx.card.counters._linkedHeroIdx = chosenIdx;
       engine.log('sleeping_beauty_link', {
         player: ps.username,
-        target: ps.heroes[chosenIdx]?.name || 'Hero',
+        target: gs.players[chosenOwner]?.heroes?.[chosenIdx]?.name || 'Hero',
       });
       engine.sync();
     },
@@ -127,6 +128,8 @@ module.exports = {
       const linkedHero = gs.players[linkedOwner]?.heroes?.[linkedIdx];
       if (!linkedHero?.name || linkedHero.hp <= 0) return; // Already dead.
       const source = { name: CARD_NAME, owner: ctx.cardOwner, heroIdx: -1 };
+      // CARD_API „Jeder getriggerte passive Effekt zeigt seine Karte" (Todes-Trigger): Auftritt für beide Spieler, wenn der Schlag wirklich fällt.
+      await engine.showTriggeredEffect(CARD_NAME, { playerIdx: ctx.cardOwner });
       // „that Hero": der beim Beschwoeren gewaehlte Held steht fest (Als Ruling 9.10.).
       await engine.actionDealDamage(source, linkedHero, ON_DEFEAT_DAMAGE, 'creature', { festesZiel: true });
       engine.log('sleeping_beauty_death_damage', {
@@ -146,6 +149,8 @@ module.exports = {
     const linkedOwner = inst.counters?._linkedHeroOwner;
     const linkedIdx   = inst.counters?._linkedHeroIdx;
     if (linkedOwner == null || linkedIdx == null) return false;
+    // W13 (Al, Rueckfrage 8): „You can only activate the effect of "Sleeping Beauty" once per turn" = hard once per turn, ein Stempel je Spieler fuer alle Kopien.
+    if (gs.hoptUsed?.[`${HARD_KEY}:${ctx.cardOwner}`] === gs.turn) return false;
 
     const linkedHero = gs.players[linkedOwner]?.heroes?.[linkedIdx];
     if (!linkedHero?.name || linkedHero.hp <= 0) return false;
@@ -158,7 +163,8 @@ module.exports = {
     // Linked hero's hero-effect HOPT must be stamped this turn — i.e.,
     // the hero ALREADY USED their effect, which is the trigger
     // condition for Sleeping Beauty to re-cast it.
-    const hoptKey = `hero-effect:${linkedHero.name}:${linkedOwner}:${linkedIdx}`;
+    // Schluessel ueber die Engine (v1275: Kartenname + Spieler, ohne Heldenindex).
+    const hoptKey = engine.heroHoptKey(linkedHero.name, engine.heroSideOf(linkedOwner, linkedHero));   // Stempel des Kontrolleurs
     if (gs.hoptUsed?.[hoptKey] !== gs.turn) return false;
 
     const { loadCardEffect } = require('./_loader');
@@ -205,6 +211,7 @@ module.exports = {
     // place. Sleeping Beauty's own creature HOPT is stamped by the
     // engine after this returns (standard behavior).
     const heroCtx = engine._createContext(heroInst, {});
+    if (!engine.claimHOPT(HARD_KEY, ctx.cardOwner)) return false;   // W13 (Rueckfrage 8): vor dem Lauf stempeln (verschachtelte Ketten sehen die Sperre)
     let result;
     try {
       result = await heroScript.onHeroEffect(heroCtx);
@@ -213,6 +220,7 @@ module.exports = {
       result = false;
     }
 
+    if (result === false && gs.hoptUsed) delete gs.hoptUsed[`${HARD_KEY}:${ctx.cardOwner}`];   // W13: Fehlschlag verbraucht nichts
     engine.log('sleeping_beauty_borrow', {
       owner: linkedOwner, hero: linkedHero.name,
     });

@@ -81,8 +81,11 @@ const FLIGHT_DURATION = 700;
 const RESOLVE_ANIM_MS = 200 + USER_BOUND_INTER_DELAY + FLIGHT_DURATION + 200;
 
 module.exports = {
+  // ★ Welle 11 (Q66, Al): trifft den Gegner nur mit Nicht-Schadens-Effekten (Karte schenken) — gegen den durch die Erste-Runden-Immunität
+  // geschützten Spieler unspielbar (`engine.ersterZugGeschuetzt`, Sperr-Stutzen `_cardBlockedBySearchLock`).
+  blockedByFirstTurnProtection: true,
   blockedByHandLock: true,
-  deferBroadcast: true,
+  // W64b: kein `deferBroadcast` mehr — der Auftritt kommt zentral (`commitAppearance()` unten).
 
   canActivate(gs, pi) {
     const ps = gs.players[pi];
@@ -99,23 +102,21 @@ module.exports = {
     if ((ps.mainDeck?.length || 0) < REVEAL_COUNT) return { cancelled: true };
 
     // ── Step 1: take the top 3 cards off the deck ────────────────────────
-    const revealed = await engine.takeTop(pi, REVEAL_COUNT, { source: 'Birthday Present' });   // v820: Stapel-Schicht
-    if (revealed.length < REVEAL_COUNT) { for (const n of revealed.reverse()) engine.returnToPile(pi, 'deck', n, 0); return { cancelled: true }; }
+    // W85c (Atta, Al 29.10.: „löschen STATT auf die Hand"): die 3 obersten Karten sind EIN Aufdeck-Ereignis, gemeldet BEVOR sie das Deck verlassen; eine von Atta gelöschte Karte kommt
+    // nie auf eine Hand (der Gegner wählt dann unter den übrigen). Die übrigen Karten werden beim NAMEN genommen (das Deck hat sich durch die Löschung verschoben).
+    const oben = (ps.mainDeck || []).slice(0, REVEAL_COUNT);
+    const _ereignis = await engine.aufdeckEreignis(pi, oben, { source: CARD_NAME, zone: 'deck' });
+    const _weg = _ereignis.geloescht.slice();
+    const zuNehmen = oben.filter(n => { const k = _weg.indexOf(n); if (k >= 0) { _weg.splice(k, 1); return false; } return true; });
+    const revealed = [];
+    for (const n of zuNehmen) { if (await engine.takeFromPile(ps, 'deck', n, { source: 'Birthday Present' })) revealed.push(n); }   // v820: Stapel-Schicht
+    if (revealed.length < zuNehmen.length || revealed.length === 0) { for (const n of revealed.reverse()) engine.returnToPile(pi, 'deck', n, 0); return { cancelled: true }; }
     engine.sync();
 
     // ── Step 2: reveal the Birthday Present artifact itself to opp ───────
-    // `deferBroadcast: true` suppressed the engine's auto-reveal. Emit
-    // manually so opp sees "Birthday Present is being played" before the
+    // W64b: zentral über den Auftritts-Puffer (Gegner UND Zuschauer): opp sees "Birthday Present is being played" before the
     // 3-card slide-in animation kicks off.
-    const oppSid = oppPs.socketId;
-    if (oppSid && engine.io) {
-      engine.io.to(oppSid).emit('card_reveal', { cardName: CARD_NAME });
-    }
-    if (engine.room?.spectators) {
-      for (const spec of engine.room.spectators) {
-        if (spec.socketId) engine.io.to(spec.socketId).emit('card_reveal', { cardName: CARD_NAME });
-      }
-    }
+    engine.commitAppearance();
     await engine._delay(400);
 
     // ── Step 3: broadcast Phase 1/2/3 — slide-in + flip + hold ───────────
@@ -206,23 +207,31 @@ module.exports = {
     // Opp's gifted card carries `originalOwner = pi` so its eventual
     // discard / deleted disposition routes back to the activator.
     // Reaktionsfenster (Ambush the Scout), Kategorie 'insert'.
+    // Negiert wird NUR die Gabe an den Gegner (Teileffekt): die eigenen 2 Karten kommen trotzdem auf die Hand,
+    // die entfallene Gabe geht zurück OBEN aufs Deck — keine Karte darf verschwinden (F01-02).
     if (await engine.checkHandInteractionReaction(oppIdx, 'insert',
           { byPi: pi, count: 1, sourceName: 'Birthday Present' })) {
       engine.log('birthday_present_negated', { player: gs.players[pi]?.username });
-      engine.sync();
-      return;
+      engine.returnToPile(pi, 'deck', oppChoice, 0);
+    } else {
+      const oppInst = engine.handZugangSync(oppPs, oppChoice, { source: CARD_NAME });
+      oppInst.originalOwner = pi;
+      engine.log('card_added_to_hand', { card: oppChoice, player: oppPs.username, by: CARD_NAME });
     }
-    const oppInst = engine.handZugangSync(oppPs, oppChoice, { source: CARD_NAME });
-    oppInst.originalOwner = pi;
-    engine.log('card_added_to_hand', { card: oppChoice, player: oppPs.username, by: CARD_NAME });
 
     for (const name of playerCards) {
       engine.handZugangSync(ps, name, { source: CARD_NAME });
+      engine.noteHandZugangAusStapel(pi, name, { pile: 'deck', source: CARD_NAME });   // W72a: die 2 eigenen Karten kommen aus dem eigenen Deck (Control Monitors)
       // originalOwner defaults to pi (own deck → own hand) — no override.
       engine.log('card_added_to_hand', { card: name, player: ps.username, by: CARD_NAME });
     }
 
     engine.sync();
+
+    // ★ Z4 (F01-06 b): Geschenk und eigene Karten kommen ohne Zieh-/Such-Hook auf die Hand — Handlimit-Waechter
+    // (Charm of Balance) werden ueber `onHandGrew` benachrichtigt (beide Haende).
+    await engine.runHooks('onHandGrew', { playerIdx: oppIdx });
+    await engine.runHooks('onHandGrew', { playerIdx: pi });
 
     // ── Step 8: wait for client highlight + fly-out animation ────────────
     // The `bounceReturnHidden` keys the client set when receiving

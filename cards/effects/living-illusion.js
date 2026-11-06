@@ -44,12 +44,17 @@ const { heldSeite } = require('./_hooks');   // Als Befund 29.9.: Brettseite gel
  * Return the free Support Zones belonging to a specific Hero only.
  * (getFreeZones walks all heroes; Living Illusion must restrict to
  * the casting Hero per the card's "user's free Support Zone" wording.)
+ *
+ * ★ W63a (Al, 22.10.2026: Alices Effekt gilt fuer ALLE Platzierungs-Effekte; „erst die geteilte Zone, DANN die erste leere"): mit `name` kommt die
+ * EINE Zonenfrage der Engine (`beschwoerZonenFuer`) — geteilte Zone einer GLEICHNAMIGEN Creature (Alice-Teilung des Wirkers) vorn, dahinter die freien
+ * Basiszonen des Helden. Ohne `name` nur die freien Zonen (Vorpruefung ohne Kartenwahl).
  */
-function getFreeZonesForHero(gs, playerIdx, heroIdx) {
+function getFreeZonesForHero(gs, playerIdx, heroIdx, engine = null, name = null) {
   const ps = gs.players[playerIdx];
   if (!ps) return [];
   const hero = ps.heroes?.[heroIdx];
   if (!hero?.name || hero.hp <= 0) return [];
+  if (engine && name) return engine.beschwoerZonenFuer(playerIdx, name, { heroIdx, nurBasis: true, livingHeroesOnly: true });
   const result = [];
   for (let si = 0; si < 3; si++) {
     const slot = (ps.supportZones?.[heroIdx] || [])[si] || [];
@@ -58,6 +63,29 @@ function getFreeZonesForHero(gs, playerIdx, heroIdx) {
     }
   }
   return result;
+}
+
+/**
+ * ★ W63a: Namen der Level-<=3-Kreaturen im Deck, fuer die der Held `heroIdx` eine Zone hat (frei oder, mit Alice-Teilung, geteilt) und die er
+ * beschwoeren darf. Quelle der Galerie UND der Spielbarkeit — die Creature steht erst nach der Deck-Wahl fest, aber SIE WIRD GEWAEHLT, also ist
+ * der Zauber spielbar, sobald mindestens ein Name eine Zone findet.
+ */
+function deckKandidaten(engine, gs, pi, heroIdx) {
+  const ps = gs.players[pi];
+  const cardDB = engine._getCardDB();
+  const out = [];
+  const gesehen = new Set();
+  for (const name of (ps?.mainDeck || [])) {
+    if (gesehen.has(name)) continue;
+    gesehen.add(name);
+    const cd = cardDB[name];
+    if (!cd || !isSummonablePileCreature(cd, name)) continue;
+    if (engine.effectiveCardLevel(cd, pi) > 3) continue;
+    if (getFreeZonesForHero(gs, pi, heroIdx, engine, name).length === 0) continue;
+    if (!engine.isCreatureSummonable(name, pi, heroIdx)) continue;
+    out.push(name);
+  }
+  return out;
 }
 
 module.exports = {
@@ -74,23 +102,29 @@ module.exports = {
   // Hero B empty was previously able to try to cast from Hero A and
   // fizzle mid-resolution. The engine calls this per hero during the
   // eligibility check and re-validates at play-time.
-  canPlayWithHero(gs, pi, heroIdx) {
+  canPlayWithHero(gs, pi, heroIdx, cardData, engine) {
     const ps = gs.players[heldSeite(gs, pi, heroIdx)];
     const supZones = ps?.supportZones?.[heroIdx] || [];
     for (let z = 0; z < 3; z++) {
       if ((supZones[z] || []).length === 0) return true;
     }
+    // ★ W63a (Al): mit Alice-Teilung reicht auch die Zone einer GLEICHNAMIGEN Creature — spielbar, sobald eine Deck-Kreatur dort hineinpasst.
+    if (engine && require('./_alice-shared').sharingActive(gs, pi)) return deckKandidaten(engine, gs, pi, heroIdx).length > 0;
     return false;
   },
 
-  spellPlayCondition(gs, pi) {
+  spellPlayCondition(gs, pi, engine) {
     const ps = gs.players[pi];
     if (!ps) return false;
     // Need at least one free zone total for the creature placement.
     // (Pollution Token count depends on the creature's level, so we can't
     // pre-validate exactly — the spell fizzles partially at runtime if
     // there aren't enough zones for all tokens.)
-    if (countFreeZones(gs, pi) === 0) return false;
+    // ★ W63a (Al): ... oder, mit Alice-Teilung, die Zone einer gleichnamigen Creature fuer eine Deck-Kreatur.
+    if (countFreeZones(gs, pi) === 0) {
+      if (!engine || !require('./_alice-shared').sharingActive(gs, pi)) return false;
+      if (!(ps.heroes || []).some((h, hi) => h?.name && h.hp > 0 && deckKandidaten(engine, gs, pi, hi).length > 0)) return false;
+    }
     // Need at least one level-≤3 Creature in the deck.
     // Defer the actual check to onPlay to keep spellPlayCondition cheap
     // approximate here by requiring a non-empty deck.
@@ -114,9 +148,9 @@ module.exports = {
 
       const cardDB = engine._getCardDB();
 
-      // ── Check: does the caster's Hero have any free Support Zone? ──
+      // ── Check: does the caster's Hero have any free Support Zone? (W63a: oder, mit Alice-Teilung, eine geteilte Zone fuer eine Deck-Kreatur) ──
       const userZones = getFreeZonesForHero(gs, pi, userHeroIdx);
-      if (userZones.length === 0) {
+      if (userZones.length === 0 && deckKandidaten(engine, gs, pi, userHeroIdx).length === 0) {
         engine.log('living_illusion_fizzle', {
           player: ps.username, hero: hero.name, reason: 'no_free_zone_on_user',
         });
@@ -138,6 +172,7 @@ module.exports = {
         const lvl = engine.effectiveCardLevel(cd, pi);
         if (lvl > 3) continue;
         if (!engine.isCreatureSummonable(name, pi, userHeroIdx)) continue;
+        if (getFreeZonesForHero(gs, pi, userHeroIdx, engine, name).length === 0) continue;   // W63a: Zone je Karte (frei oder geteilt)
         countMap[name] = (countMap[name] || 0) + 1;
         effLevels[name] = lvl;
       }
@@ -172,16 +207,19 @@ module.exports = {
       const creatureLevel = creatureCd?.level || 0;
 
       // ── Pick which of the user's free slots to place it into ──
+      // W63a: Zonen der gewaehlten Karte — geteilte Zone (Alice) zuerst, dahinter die freien.
+      const userZonesFuer = getFreeZonesForHero(gs, pi, userHeroIdx, engine, creatureName);
+      if (userZonesFuer.length === 0) { gs._spellCancelled = true; return; }
       let destZone;
-      if (userZones.length === 1) {
-        destZone = userZones[0];
+      if (userZonesFuer.length === 1) {
+        destZone = userZonesFuer[0];
       } else {
-        const zonePick = await ctx.promptZonePick(userZones, {
+        const zonePick = await ctx.promptZonePick(userZonesFuer, {
           title: 'Living Illusion — Placement',
           description: `Place ${creatureName} into which of ${hero.name}'s free Support Zones?`,
           cancellable: false,
         });
-        destZone = (zonePick && userZones.find(z => z.heroIdx === zonePick.heroIdx && z.slotIdx === zonePick.slotIdx)) || userZones[0];
+        destZone = (zonePick && userZonesFuer.find(z => z.heroIdx === zonePick.heroIdx && z.slotIdx === zonePick.slotIdx)) || userZonesFuer[0];
       }
 
       // ── Remove one copy from the deck and shuffle ──

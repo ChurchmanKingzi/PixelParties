@@ -31,6 +31,7 @@ const { countDistinctLunaticCycle, hostHeroOf } = require('./_lunatic-shared');
 const { getNegativeStatuses } = require('./_hooks');
 
 const CARD_NAME = 'Lunatic Golem';
+const HARD_KEY = 'lunatic-golem-hard';   // W13 (Rueckfrage 8)
 const DMG_PER_CYCLE = 100;
 
 /** Keep the tier-2+ `negative_status_immune` buff in sync with the
@@ -64,6 +65,7 @@ function reevalImmunity(engine, inst) {
 module.exports = {
   activeIn: ['support'],
   creatureEffect: true, // tier 1+ activated (free; engine HOPT = once/turn)
+  requiresTarget: true, // Zielwahl-Effekt: Blinded sperrt ihn (siehe _hooks.js / getActivatableCreatures)
 
   // The tier-2+ immunity is MAINTAINED by `reevalImmunity` running on
   // onGameStart/onTurnStart/onCardEnterZone/etc. Without this flag the
@@ -82,6 +84,8 @@ module.exports = {
     const inst = ctx.card;
     if (!inst || inst.zone !== 'support') return false;
     if (ctx._engine.istHartNegiert(inst)) return false;   // v1444
+    // W13 (Al, Rueckfrage 8): „You can only activate this effect once per turn" = hard once per turn: ein Stempel je Spieler fuer alle Golems (auch geliehene Verwendung).
+    if (ctx._engine.gs.hoptUsed?.[`${HARD_KEY}:${ctx.cardOwner}`] === ctx._engine.gs.turn) return false;
     return countDistinctLunaticCycle(ctx._engine) >= 1;
   },
 
@@ -119,6 +123,7 @@ module.exports = {
       cancellable: true,
     });
     if (!target) return false;
+    if (!engine.claimHOPT(HARD_KEY, pi)) return false;   // W13 (Rueckfrage 8): Hard-Stempel erst nach der Zielwahl
 
     // Moon beam: a pale moonlight ray from the Golem to the target —
     // light-yellow, almost white. `color` drives the core line + the
@@ -150,7 +155,9 @@ module.exports = {
         // damage" reaction prompts, and every form of damage protection
         // (incl. Golem's own tier-4 host-damage negation) is bypassed
         // by construction. "instead of damaging it" — to the letter.
-        await engine.actionDefeatHero(source, hero, { reason: CARD_NAME });
+        // W66a (Al, 23.10.2026: Effekt-Schutz gegen JEDE Form von „defeat"): Resistance, Zielschutz, Anti Magic, Charmed, Submerged, Versteinerung … gelten
+        // (`wirkungsSchutz`, Typ `creature`); SCHADENS-Schutz (Schadensimmunität, Stufe-4-Negation) gilt nicht, es ist kein Schaden.
+        await engine.actionDefeat(source, hero, { reason: CARD_NAME, damageType: 'creature', wirkungsSchutz: true });
       } else {
         await ctx.dealDamage(hero, dmg, 'creature');
       }

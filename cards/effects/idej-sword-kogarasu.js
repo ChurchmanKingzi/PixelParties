@@ -26,6 +26,15 @@ function stampSelf(ctx) {
   }
 }
 
+function stampSpellUsed(ctx) {
+  if (!ctx.spellCardData || ctx.spellCardData.cardType !== 'Spell') return;
+  if (ctx.casterIdx !== ctx.cardOwner || ctx.heroIdx !== ctx.cardHeroIdx) return;
+  // Styx 28.9.: gleicher Index reicht nicht — gleiche Brettseite (geliehener Held).
+  if ((ctx.heroOwner ?? ctx.casterIdx) !== (ctx.cardHeroOwner ?? ctx.cardOwner)) return;
+  const hero = ctx.attachedHero;
+  if (hero) hero._idejKogarasuSpellTurn = ctx._engine.gs.turn;
+}
+
 module.exports = {
   activeIn: ['support'],
 
@@ -41,8 +50,7 @@ module.exports = {
   reduceCardLevel(cardData, engine, ownerIdx, inst, heroIdx) {
     if (!cardData || cardData.cardType !== 'Spell') return 0;
     if (heroIdx == null || !inst || heroIdx !== inst.heroIdx) return 0;
-    const abZones = engine.gs.players?.[ownerIdx]?.abilityZones?.[heroIdx] || [];
-    return engine.countAbilitiesForSchool('Fighting', abZones) || 0;
+    return engine.heroSchoolLevel('Fighting', ownerIdx, heroIdx) || 0;   // W4a: harte Negierung -> Stufe 0
   },
 
   // "the equipped Hero can only use 1 Spell per turn." Consulted by the
@@ -62,13 +70,10 @@ module.exports = {
 
     // Record that the equipped Hero has cast a Spell this turn so
     // canPlayCard blocks the next one.
-    afterSpellResolved: (ctx) => {
-      if (!ctx.spellCardData || ctx.spellCardData.cardType !== 'Spell') return;
-      if (ctx.casterIdx !== ctx.cardOwner || ctx.heroIdx !== ctx.cardHeroIdx) return;
-      // Styx 28.9.: gleicher Index reicht nicht — gleiche Brettseite (geliehener Held).
-      if ((ctx.heroOwner ?? ctx.casterIdx) !== (ctx.cardHeroOwner ?? ctx.cardOwner)) return;
-      const hero = ctx.attachedHero;
-      if (hero) hero._idejKogarasuSpellTurn = ctx._engine.gs.turn;
-    },
+    afterSpellResolved: (ctx) => stampSpellUsed(ctx),
+    // ★ Z7b (A09-17, Als Entscheidung, Welle 3): „1 Spell pro Zug" zählt, wenn der Zauber AUFLÖSEN
+    // durfte — auch mit verhindertem Ergebnis (Teil-Negierung, Fizzle): `afterSpellPrevented`.
+    // Ein GANZ negierter Zauber (Silence …) hat nie aufgelöst und verbraucht den Zug-Zauber nicht.
+    afterSpellPrevented: (ctx) => stampSpellUsed(ctx),
   },
 };

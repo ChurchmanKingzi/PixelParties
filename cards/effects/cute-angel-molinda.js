@@ -58,13 +58,19 @@ function _isFromMolinda(source, ctx) {
  * `[]` if she's KO'd or her column has no empty slots —
  * matches dark-gear.js' getFreeZones, scoped to one hero.
  */
-function _molindaFreeZones(engine, ctx) {
+function _molindaFreeZones(engine, ctx, name = null) {
   // Styx 28.9.: Zonen auf Molindas Brettseite.
   const ps = engine.gs.players[ctx.cardHeroOwner ?? ctx.cardOwner];
   if (!ps) return [];
   const heroIdx = ctx.cardHeroIdx;
   const hero = ctx.attachedHero ?? ps.heroes?.[heroIdx];
   if (!hero?.name || hero.hp <= 0) return [];
+  // ★ W63a (Al, 22.10.2026: Alices Effekt gilt fuer ALLE Platzierungs-Effekte; „erst die geteilte Zone, DANN die erste leere"): mit `name` zaehlt auch die Zone
+  // einer GLEICHNAMIGEN Creature (Alice-Teilung des Kontrolleurs) — `engine.beschwoerZonenFuer`, geteilte Zonen vorn.
+  if (name) {
+    return engine.beschwoerZonenFuer(ctx.cardOwner, name, { seite: ctx.cardHeroOwner ?? ctx.cardOwner, heroIdx, namedHeroesOnly: true })
+      .map(z => ({ heroIdx, slotIdx: z.slotIdx, label: z.label, ...(z.shared ? { shared: true, stackDepth: z.stackDepth } : {}) }));
+  }
   const slots = ps.supportZones?.[heroIdx] || [];
   const zones = [];
   for (let si = 0; si < slots.length; si++) {
@@ -240,6 +246,8 @@ module.exports = {
         if (!inst || (inst.counters?.currentHp ?? 1) <= 0) continue;
         const tgtCtrl = inst.controller ?? inst.owner;
         if (tgtCtrl === ctx.cardOwner) continue;
+        // W5b-B3 (Al, Welle 5): „You can only control 1 …" gilt auch bei der Übernahme – nicht anbieten.
+        if (engine.nurEinerSchonKontrolliert?.(ctx.cardOwner, inst.name)) continue;
         // Per-side non-damage shield (The Great Wall of Deri). Molinda's
         // steal is a non-damage effect — opp's protected Creatures are
         // unreachable even though the preceding damage hit them legally
@@ -247,13 +255,15 @@ module.exports = {
         // control flip does not).
         if (engine._isSideNondamageShielded?.(tgtCtrl)) continue;
         if (engine.isCreatureImmune?.(inst, 'control_immune')) continue;
+        if (engine.controlIsLocked(inst)) continue;   // Als Ruling (Al 26.10.): „Control of this Creature cannot change" (Creepy Villager) — keine Uebernahme-Frage
         if (inst.counters?._cardinalImmune) continue;
-        if (inst.counters?._baihuPetrify) continue;
+        if (engine.kreaturGegnerEffektImmun(inst, ctx.cardOwner)) continue;   // W17b: Golden Wings
+        if (inst.counters?._baihuPetrify || inst.counters?._petrified) continue;
         if (inst.counters?._damageDestroyImmune) continue;
-        if (inst.counters?._guardianImmune) continue;
+        if (engine._guardianSchutzFuer(inst)) continue;   // W25b (N2-05): Spieler-Marke massgeblich
         if (inst.counters?._stealImmortal) continue;
 
-        const freeZones = _molindaFreeZones(engine, ctx);
+        const freeZones = _molindaFreeZones(engine, ctx, inst.name);   // W63a: + Zone einer gleichnamigen Creature (Alice), geteilte zuerst
         if (freeZones.length === 0) break; // No room — bail on remaining hits.
 
         const confirmed = await ctx.promptConfirmEffect({

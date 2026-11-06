@@ -99,7 +99,22 @@ function drawWouldBeBlocked(engine, playerIdx, amount) {
   return blockerAufDemBrett(engine, playerIdx);
 }
 
+/**
+ * Z6: DIE Sammelfrage fuer Zieh-Aktivierungen ("Zug ist der einzige Nutzen"): wuerde ein Zug von
+ * `amount` Karten fuer `playerIdx` GANZ ausfallen? Hand-Sperre (`handLocked`), Zieh-Sperre
+ * (`drawLocked`, Sacred Jewel) und Tuscan Artist (genau 2/3) in EINER Zeile - statt dass jede Karte
+ * nur eine der drei Sperren kennt (A07-19, A02-20, H04-16, C03-08, F03-16 ...).
+ * `amount` darf fehlen (dann zaehlen nur die beiden Spielerflaggen).
+ */
+function drawBlockedFor(engine, playerIdx, amount) {
+  const ps = engine?.gs?.players?.[playerIdx];
+  if (!ps) return false;
+  if (ps.handLocked || ps.drawLocked) return true;
+  return amount == null ? false : drawWouldBeBlocked(engine, playerIdx, amount);
+}
+
 module.exports = {
+  drawBlockedFor,
   BLOCKER_NAME,
   MIN_BLOCKED,
   MAX_BLOCKED,

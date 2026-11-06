@@ -125,17 +125,24 @@ module.exports = {
       // Commit discards — sort by hand index descending so the splices don't
       // shift later indices mid-loop.
       const sortedDescend = [...selected].sort((a, b) => b.handIndex - a.handIndex);
-      for (const { handIndex, cardName } of sortedDescend) {
-        if (handIndex < 0 || handIndex >= ps.hand.length) continue;
-        const actualName = ps.hand[handIndex];
-        if (actualName !== cardName) {
-          // Name drifted between prompt and commit — be conservative and skip.
-          continue;
+      // ★ W74c: Boris darf den Abwurf (Kosten, „any number") ignorieren — einmal nach der Wahl, vor dem ersten Abwurf. „Remove the same number of Pollution
+      // Tokens" hängt an den tatsächlich abgeworfenen Karten: bei Verzicht 0 Tokens.
+      const borisVerzicht = await engine.borisVerzicht(pi, selected.length, { source: CARD_NAME, skipVoidsEffect: true });
+      // „Discard any number of cards … " = EIN Abwurfvorgang: in einer Abwurf-Klammer, damit „2 or more cards at the same time"-Karten
+      // (Cute Bunny: Ziehen bzw. Beschwörung aus der Hand) den Stapel als EINEN Vorgang sehen (`onForcedDiscardBatchEnd`).
+      await engine.withDiscardBatch(pi, { source: CARD_NAME }, async () => {
+        for (const { handIndex, cardName } of (borisVerzicht ? [] : sortedDescend)) {
+          if (handIndex < 0 || handIndex >= ps.hand.length) continue;
+          const actualName = ps.hand[handIndex];
+          if (actualName !== cardName) {
+            // Name drifted between prompt and commit — be conservative and skip.
+            continue;
+          }
+          // v1394: Abwurf über die zentrale Funktion.
+          await engine.actionDiscardHandCard(pi, actualName, handIndex, { source: 'Mana Beacon', _noGlow: true });
         }
-        // v1394: Abwurf über die zentrale Funktion.
-        await engine.actionDiscardHandCard(pi, actualName, handIndex, { source: 'Mana Beacon', _noGlow: true });
-      }
-      const discardedCount = selected.length;
+      });
+      const discardedCount = borisVerzicht ? 0 : selected.length;
       engine.sync();
       await engine._delay(250);
 
@@ -146,7 +153,9 @@ module.exports = {
       const allTokens = getAllPollutionTokens(engine);
 
       let removalList = [];
-      if (discardedCount >= allTokens.length) {
+      if (discardedCount === 0) {
+        removalList = [];   // W74c: Boris hat den Abwurf ignoriert — 0 Karten abgeworfen, 0 Tokens entfernt
+      } else if (discardedCount >= allTokens.length) {
         // All of them — auto-select the entire pool.
         removalList = allTokens.slice();
       } else {

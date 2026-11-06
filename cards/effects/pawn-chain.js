@@ -15,13 +15,14 @@
 //  vor ON_CREATURE_DEATH). Platzieren = keine Aktion, kein Level-Check.
 //  Harte Einmal-pro-Zug-Sperre je Spieler ueber `gs.hoptUsed`.
 // ═══════════════════════════════════════════
+const { anyName } = require('./_alias-name');   // Shroomasaur: Zusatzname zählt für Namensfamilien
 const {
   PAWN, isOfKingsName, collectHandAndDeck, pickFromHandOrDeck, placeFromHandOrDeck, ofKingsCpuAnswer,
 } = require('./_of-kings-shared');
 
 const CARD_NAME = 'Pawn Chain';
 const key = (pi) => `pawn-chain:${pi}`;
-const isPawn = (cd) => !!cd && isOfKingsName(cd.name) && cd.name.startsWith(PAWN);
+const isPawn = (cd) => !!cd && anyName(cd, (n) => isOfKingsName(n)) && cd.name.startsWith(PAWN);
 
 function zoneFree(engine, pi, heroIdx, slot) {
   const z = engine.gs.players[pi]?.supportZones?.[heroIdx]?.[slot];

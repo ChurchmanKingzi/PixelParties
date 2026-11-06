@@ -73,6 +73,9 @@ function wirtsheld(engine, inst) {
 }
 
 module.exports = {
+  // ★ Welle 11 (Q66, Al): trifft den Gegner nur mit Nicht-Schadens-Effekten (Ausrüsten an seinen Helden) — gegen den durch die Erste-Runden-Immunität
+  // geschützten Spieler unspielbar (`engine.ersterZugGeschuetzt`, Sperr-Stutzen `_cardBlockedBySearchLock`).
+  blockedByFirstTurnProtection: true,
   activeIn: ['support'],
   placesOnOpponentBoard: true,
   equipEffect: true,

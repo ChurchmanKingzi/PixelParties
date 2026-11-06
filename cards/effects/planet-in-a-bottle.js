@@ -49,8 +49,12 @@ function isEligibleArea(cd, engine, pi) {
   return isTutorableArea(cd, engine, pi);
 }
 
-/** Player already controls an Area → Planet in a Bottle is locked out. */
-function playerControlsArea(gs, pi) {
+/**
+ * Player kann keine weitere Area legen → Planet in a Bottle ist gesperrt. W16f (M02-21): die EINE Stelle der Engine
+ * (`canPlaceAnotherArea`: Limit 1, mit Spatial Crevice 3 VERSCHIEDENE Areas) statt eines harten "irgendeine Area liegt".
+ */
+function playerControlsArea(gs, pi, engine) {
+  if (engine && typeof engine.canPlaceAnotherArea === 'function') return !engine.canPlaceAnotherArea(pi);
   return (gs.areaZones?.[pi] || []).length > 0;
 }
 
@@ -69,6 +73,7 @@ function buildAreaGallery(ps, cardDB, engine, pi) {
       if (seen.has(key)) continue;
       const cd = cardDB[name];
       if (!isEligibleArea(cd, engine, pi)) continue;
+      if (engine?.canPlaceAnotherArea && !engine.canPlaceAnotherArea(pi, name)) continue;   // W16f: dieselbe Area liegt schon (Crevice: nur VERSCHIEDENE)
       seen.add(key);
       const lvl = engine?.effectiveCardLevel
         ? engine.effectiveCardLevel(cd, pi)
@@ -91,7 +96,7 @@ module.exports = {
   // Defer the card reveal until AFTER the player has picked an Area,
   // matching Monster in a Bottle. The opponent sees "Planet in a Bottle"
   // and the chosen Area in the same beat.
-  deferBroadcast: true,
+  // W64b: kein `deferBroadcast` mehr — der Auftritt kommt zentral; `commitAppearance()` unten = nach allen Wahlen.
 
   canActivate(gs, pi, engine) {
     const ps = gs.players[pi];
@@ -99,7 +104,11 @@ module.exports = {
 
     // Hard gate: one Area per player. No replace option — if the player
     // already controls an Area, Planet in a Bottle is grayed out.
-    if (playerControlsArea(gs, pi)) return false;
+    if (playerControlsArea(gs, pi, engine)) return false;
+    // Als Ruling (Al 27.10.): Reality Crack („You cannot play another Area for the rest of the turn") sperrt auch „bring directly into play" — der Trank ist dann ausgegraut.
+    // Shipwrecked sperrt ihn nicht (`direkt`, CARD_API W82).
+    if (engine?.areaSpielGesperrt?.(pi, { direkt: true })) return false;
+    if (engine?.spielerIstVonAreasAusgenommen?.(pi)) return false;   // W82 (Shipwrecked): keine Area ins Spiel bringen (Tranke ausgegraut)
 
     const cardDB = engine ? engine._getCardDB() : null;
     if (!cardDB) return true; // Fallback: let resolve() re-check.
@@ -114,7 +123,9 @@ module.exports = {
 
     // Re-check the one-Area gate: game state can change between canActivate
     // and resolve (reaction chains, etc.).
-    if (playerControlsArea(gs, pi)) return { cancelled: true };
+    if (playerControlsArea(gs, pi, engine)) return { cancelled: true };
+    if (engine.areaSpielGesperrt(pi, { direkt: true })) return { cancelled: true };   // Als Ruling (Al 27.10.): Reality-Crack-Sperre (s. `canActivate`)
+    if (engine.spielerIstVonAreasAusgenommen(pi)) return { cancelled: true };   // W82 (Shipwrecked): Server-Pruefung
 
     const cardDB = engine._getCardDB();
     const gallery = buildAreaGallery(ps, cardDB, engine, pi);
@@ -138,12 +149,9 @@ module.exports = {
     if (!chosenEntry) return { cancelled: true };
     const chosenSource = chosenEntry.source;
 
-    // ── Step 2: All decisions made — reveal the potion card to opponent NOW ──
+    // ── Step 2: All decisions made — reveal the potion card to opponent NOW (W64b: zentral, auch für Zuschauer) ──
     const oi = engine.opponentOf(pi);
-    const oppSid = gs.players[oi]?.socketId;
-    if (oppSid && engine.io) {
-      engine.io.to(oppSid).emit('card_reveal', { cardName: 'Planet in a Bottle' });
-    }
+    engine.commitAppearance();
     await engine._delay(100);
 
     // ── Step 3: Remove the chosen Area from its source pile ──

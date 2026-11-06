@@ -25,6 +25,10 @@
 //       `actionMoveCard` flips the destination to the deleted pile
 //       before the card lands. Tokens, Equipment, and other non-
 //       Creatures route normally.
+//
+//       — ★ D1 (Baustein-Phase): der SCHADENSTOD (Schaden, Brand, Gift) laeuft nicht ueber `actionMoveCard`, sondern durch den Schadens-Batch
+//       der Engine — dort meldet der Tod vor dem Ablegen `onCreatureWouldBeDiscarded` (gleiche Felder wie das Leave-Ereignis); dieselbe Marke
+//       gilt dort. Vorher blieb die Klausel bei Schadenstod wirkungslos (nur Zerstoerung/Opfer wurden geloescht).
 // ═══════════════════════════════════════════
 
 const { hasCardType } = require('./_hooks');
@@ -35,6 +39,9 @@ module.exports = {
   activeIn: ['hero'],
 
   hooks: {
+    // D1: Schadenstod (Engine-Batch) — dasselbe wie die Zerstoerungs-/Opfer-Wege ueber `onCardLeaveZone` (`toZone: 'discard'`).
+    onCreatureWouldBeDiscarded: (ctx) => module.exports.hooks.onCardLeaveZone(ctx),
+
     onCardLeaveZone: (ctx) => {
       // Only intercept discard-bound moves out of THIS Vacarn's
       // own Support Zone (matched by owner + heroIdx).

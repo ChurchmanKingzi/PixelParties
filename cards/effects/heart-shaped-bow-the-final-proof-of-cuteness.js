@@ -16,9 +16,10 @@
 //     mit Namensfilter und `bypassesCasterRequirement: true` — genau
 //     das Wolflesia-Flag, ueber das `heroMeetsLevelReq` uebersprungen
 //     wird („regardless of its level"). Ablauf wie Legendary Swords
-//     Gratis-Beschwoerung: HOPT je Bogen-Instanz, Token gewaehren,
+//     Gratis-Beschwoerung: Token gewaehren,
 //     `performImmediateAction` mit Namensfilter, bei Abbruch Token
-//     verfallen + HOPT zurueck.
+//     verfallen. Welle 12 (Q94, Al): KEIN Once-per-Turn (Ueberbleibsel
+//     von vor einem Buff) — Angebot bei jedem Angriff.
 //
 //  Aufstiegsbaustein von Molinda — die Bereitschaft pflegt der
 //  Basisheld selbst (`_molinda-shared`), hier ist nichts zu tun.
@@ -102,12 +103,10 @@ module.exports = {
       const pi = ctx.cardOwner;
       const heroIdx = ctx.cardHeroIdx;
 
-      const hoptKey = `heart-bow-love-shot:${ctx.card.id}`;
-      if (!ctx.hardOncePerTurn(hoptKey)) return;
-      const refundHopt = () => { if (gs.hoptUsed) delete gs.hoptUsed[`${hoptKey}:${pi}`]; };
-
+      // Welle 12 (Q94, Al: „Nimm das Once-per-Turn raus, das ist ein Überbleibsel von vor einem Buff!"): KEINE Einmal-pro-Zug-Grenze mehr —
+      // das Love-Shot-Angebot kommt bei jedem Angriff des Trägers (der Kartentext nennt keine Grenze).
       const hero = gs.players[ctx.cardHeroOwner ?? pi]?.heroes?.[heroIdx];   // Styx 28.9.: Brettseite
-      if (!hero?.name || hero.hp <= 0) { refundHopt(); return; }
+      if (!hero?.name || hero.hp <= 0) return;
 
       registerType(engine);
       // Token ZUERST, damit die Eignungspruefung den Level-Bypass sieht.
@@ -115,7 +114,6 @@ module.exports = {
       const eligible = engine.getHeroEligibleActionCards(pi, heroIdx).filter(n => n === LOVE_SHOT);
       if (eligible.length === 0) {
         ctx.expireAdditionalAction();
-        refundHopt();
         return;
       }
 
@@ -133,7 +131,6 @@ module.exports = {
         engine.log('heart_bow_love_shot', { player: gs.players[pi].username, hero: hero.name });
       } else {
         ctx.expireAdditionalAction();
-        refundHopt();
       }
       engine.sync();
     },

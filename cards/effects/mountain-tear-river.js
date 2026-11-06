@@ -49,7 +49,7 @@
 //    the player's pick on a no-op.
 // ═══════════════════════════════════════════
 
-const { isAttackSpellOrCreatureSource } = require('./_hooks');
+const { isAttackSpellOrCreatureSource, istUngelegteCreatureSurprise } = require('./_hooks');
 
 const CARD_NAME = 'Mountain Tear River';
 const REQUIRED_DM_LEVEL = 3;
@@ -129,6 +129,7 @@ module.exports = {
     // v666 (Sweep): „by an Attack, Spell or Creature effect“ — Helden-/
     // Artefakt-/Trank-Effekte als Quelle loesen NICHT aus.
     if (!isAttackSpellOrCreatureSource(engine, sourceInfo)) return false;
+    if (istUngelegteCreatureSurprise(engine, sourceInfo)) return false;   // W46a: Creature-Surprise noch nicht auf dem Brett: kein Angreifer da (nicht ersatzweise ihr Träger-Held)
 
     // Source must be alive — burning a corpse is meaningless.
     const srcInst = sourceInfo.cardInstance;
@@ -196,7 +197,7 @@ module.exports = {
     engine.sync();
 
     // ── DM-3 bonus: up to 2 additional Burns ──
-    const dmLevel = countDestructionMagic(gs.players[ctx.cardHeroOwner ?? pi] || ps, ctx.cardHeroIdx);   // 29.9.: Traeger-Seite
+    const dmLevel = engine.heroSchoolLevel('Destruction Magic', ctx.cardHeroOwner ?? pi, ctx.cardHeroIdx);   // 29.9.: Traeger-Seite; W4a: harte Negierung -> Stufe 0
     if (dmLevel >= REQUIRED_DM_LEVEL) {
       const extra = await ctx.promptMultiTarget({
         side: 'any',
@@ -212,6 +213,7 @@ module.exports = {
         confirmLabel: '🔥 Burn!',
         confirmClass: 'btn-danger',
         cancellable: true,
+        noSpellCancel: true,   // R02-09: kein Abbruch des Zaubers des GEGNERS ("up to 2" erlaubt 0)
         condition: (t, eng) => !isAlreadyBurned(t, eng),
       });
       if (Array.isArray(extra) && extra.length > 0) {

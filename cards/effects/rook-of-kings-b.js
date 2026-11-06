@@ -41,9 +41,13 @@ module.exports = {
     const mine = targets.filter(t => t.owner === pi);
     let granted = 0;
     for (const t of mine) {
-      if (t.type === 'equip' && t.cardInstance) {
-        if (engine.grantCreatureEffectImmunity(t.cardInstance, source)) granted++;
-      } else if (t.heroIdx != null && t.heroIdx >= 0 && t.type !== 'equip') {
+      // Flaechenschlaege (`dealDamageToTargets`) reichen Kreaturen als `type: 'creature'` mit Platz statt `cardInstance` — Instanz nachschlagen.
+      const kreatur = t.cardInstance || (t.type === 'creature'
+        ? engine.cardInstances.find(i => i.zone === 'support' && !i.faceDown && engine.physicalSide(i) === t.owner && i.heroIdx === t.heroIdx && i.zoneSlot === t.slotIdx)
+        : null);
+      if ((t.type === 'equip' || t.type === 'creature') && kreatur) {
+        if (engine.grantCreatureEffectImmunity(kreatur, source)) granted++;
+      } else if (t.heroIdx != null && t.heroIdx >= 0 && t.type !== 'equip' && t.type !== 'creature') {
         if (engine.grantEffectImmunity(t.owner, t.heroIdx, source)) granted++;
       }
     }

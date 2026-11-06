@@ -1,4 +1,4 @@
-const { areaTargetId } = require('./_targeting-shared');
+const { areaTargetId, coolnessSpitzeZiel, supportAbilityZiel } = require('./_targeting-shared');
 // ═══════════════════════════════════════════
 //  SPELL: "Coolness Overcharge"
 //  Stack must have ≥6 cards.
@@ -165,13 +165,20 @@ function collectTargets(engine) {
     if (seen.has(inst.id)) continue;
     seen.add(inst.id);
     if (inst.zone === 'support') {
+      if (engine.zaehltAlsHeld && engine.zaehltAlsHeld(inst)) continue;   // W79 (White Sacrificial Bull): zählt auch als Hero → kein „Nicht-Held"-Ziel
+      const sa = supportAbilityZiel(engine, inst);   // 25.10.: Ability in einer Support Zone = Ability-Stapel (ein Ziel, oberste Kopie)
+      if (sa !== undefined) { if (sa) targets.push(sa); continue; }
       targets.push({ id: `equip-${inst.owner}-${inst.heroIdx}-${inst.zoneSlot}`, type: 'equip',
         owner: inst.owner, heroIdx: inst.heroIdx, slotIdx: inst.zoneSlot,
         cardName: inst.name, _cardInstance: inst });
     } else if (inst.zone === 'ability') {
       const slot = gs.players[inst.owner]?.abilityZones?.[inst.heroIdx]?.[inst.zoneSlot] || [];
       if (slot.length > 0 && slot[slot.length - 1] !== inst.name) continue;
-      targets.push({ id: `ability-${inst.owner}-${inst.heroIdx}-${inst.zoneSlot}`, type: 'ability',
+      // Ein Stapel gleichnamiger Karten (Ability Lv 2/3) hat mehrere Instanzen im selben Platz: EIN Ziel je Stapel (eindeutige ID), und zwar die letzte (= oberste) Kopie — wie `supportAbilitySpitze`.
+      const _abId = `ability-${inst.owner}-${inst.heroIdx}-${inst.zoneSlot}`;
+      const _abErst = targets.find(x => x.id === _abId);
+      if (_abErst) { _abErst._cardInstance = inst; continue; }
+      targets.push({ id: _abId, type: 'ability',
         owner: inst.owner, heroIdx: inst.heroIdx, slotIdx: inst.zoneSlot,
         cardName: inst.name, _cardInstance: inst });
     } else if (inst.zone === 'permanent') {
@@ -189,13 +196,12 @@ function collectTargets(engine) {
       targets.push({ id: areaTargetId(inst.owner, stapelPlatz), type: 'area',
         owner: inst.owner, heroIdx: -1, cardName: inst.name, _cardInstance: inst });
     } else if (inst.zone === 'surprise') {
-      targets.push({ id: `equip-${inst.owner}-${inst.heroIdx}-surprise`, type: 'equip',
+      // W17a (Al, 19.10.2026: any card on the board that is not a Hero - auch verdeckte Surprises): Client-ID einer Surprise-Zone wie _targeting-shared (v706); die alte equip-…-surprise-ID war unklickbar.
+      targets.push({ id: `surprise-${inst.owner}-${inst.heroIdx}`, type: 'surprise',
         owner: inst.owner, heroIdx: inst.heroIdx, cardName: inst.name, _cardInstance: inst });
     } else if (inst.zone === 'coolnessStack') {
-      const stack = gs.players[inst.owner]?.coolnessStack || [];
-      if (stack.length === 0 || stack[stack.length - 1] !== inst.name) continue;
-      targets.push({ id: `coolness-${inst.owner}`, type: 'coolnessStackTop',
-        owner: inst.owner, heroIdx: -1, cardName: inst.name, _cardInstance: inst });
+      const spitze = coolnessSpitzeZiel(engine, inst);   // W19a: Stack-Spitze an EINER Stelle (_targeting-shared)
+      if (spitze) targets.push(spitze);
     }
   }
   return targets;

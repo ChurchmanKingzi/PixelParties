@@ -30,6 +30,8 @@ const {
   targetToPromptEntry,
 } = require('./_cosmic-shared');
 
+const { drawBlockedFor } = require('./_draw-block-shared');
+
 const CARD_NAME = 'Gatherer from the Cosmic Depths';
 const HOPT_MOVE = 'gatherer-move';
 const HOPT_DRAW = 'gatherer-draw';
@@ -56,6 +58,10 @@ async function runMove(engine, inst, ctx) {
 
   // Step 1: pick the source card.
   const sourceEntries = sources.map(targetToPromptEntry);
+  // Darion: Equips eines Stapels teilen die Ziel-ID — die Rueckfrage „welches Equip?" soll nur die Karten MIT Change Counters anbieten.
+  for (const e of sourceEntries) {
+    if (e.type === 'equip' && e.cardInstance) e._erlaubteInstanzen = sourceEntries.filter(x => x.id === e.id && x.cardInstance).map(x => x.cardInstance.id);
+  }
   const srcPicked = await engine.promptEffectTarget(pi, sourceEntries, {
     maxTotal: 1,   // Einfachauswahl: ein Klick TAUSCHT das Ziel
     title: CARD_NAME,
@@ -69,7 +75,10 @@ async function runMove(engine, inst, ctx) {
   if (!srcPicked || srcPicked.length === 0) return false;
   const src = sources.find(s => targetToPromptEntry(s).id === srcPicked[0]);
   if (!src) return false;
-  const have = getChangeCounters(src.ref);
+  // Darion: bei einem Equip-Stapel liegt die gewaehlte Karte auf dem Eintrag der Zielliste (`src` waere immer die erste Karte des Stapels).
+  const srcEintrag = sourceEntries.find(e => e.id === srcPicked[0]);
+  const srcRef = (srcEintrag && srcEintrag.type === 'equip' && srcEintrag.cardInstance) ? srcEintrag.cardInstance : src.ref;
+  const have = getChangeCounters(srcRef);
   if (have <= 0) return false;
 
   // Step 2: pick how many.
@@ -80,7 +89,7 @@ async function runMove(engine, inst, ctx) {
   const countPick = await engine.promptGeneric(pi, {
     type: 'optionPicker',
     title: CARD_NAME,
-    description: `Move how many counters from ${src.ref.name}? (Source has ${have}.)`,
+    description: `Move how many counters from ${srcRef.name}? (Source has ${have}.)`,
     options: countOpts,
     cancellable: true,
   });
@@ -108,8 +117,8 @@ async function runMove(engine, inst, ctx) {
   const dst = destCreatures.find(c => `equip-${c.owner}-${c.heroIdx}-${c.zoneSlot}` === dstPicked[0]);
   if (!dst) return false;
 
-  moveChangeCounters(engine, src.ref, dst, n);
-  stampHopt(gs, HOPT_MOVE, inst.id);
+  moveChangeCounters(engine, srcRef, dst, n);
+  if (!ctx._borrowedUse) stampHopt(gs, HOPT_MOVE, inst.id);   // W13 (Al, Rueckfrage 9): geliehene Verwendung verbraucht den Stempel NICHT
   ctx._skipCreatureEffectHopt = true;
   return true;
 }
@@ -121,7 +130,7 @@ async function runDraw(engine, inst, ctx) {
   const ps = gs.players[pi];
   const have = getChangeCounters(inst);
   if (have <= 0) return false;
-  if (ps?.handLocked) return false; // Defensive — handLocked blocks draw
+  if (drawBlockedFor(engine, pi)) return false; // Defensive — Hand-/Zieh-Sperre (Z6, A02-20: Jewel zaehlte nicht)
 
   const max = Math.min(have, MAX_DRAW);
   const opts = [];
@@ -145,7 +154,7 @@ async function runDraw(engine, inst, ctx) {
   engine.log('gatherer_draw', {
     player: ps?.username, drawn: n,
   });
-  stampHopt(gs, HOPT_DRAW, inst.id);
+  if (!ctx._borrowedUse) stampHopt(gs, HOPT_DRAW, inst.id);   // W13 (Al, Rueckfrage 9)
   ctx._skipCreatureEffectHopt = true;
   return true;
 }
@@ -176,14 +185,14 @@ module.exports = {
     const gs = engine.gs;
     const pi = inst.controller ?? inst.owner;
 
-    const moveAvail = !hoptUsed(gs, HOPT_MOVE, inst.id)
+    const moveAvail = (ctx._borrowedUse || !hoptUsed(gs, HOPT_MOVE, inst.id))
       && changeCounterCardsOnSide(engine, pi).length > 0
       && ownCosmicCreatures(engine, pi).length > 0;
 
     const ps = gs.players[pi];
-    const drawAvail = !hoptUsed(gs, HOPT_DRAW, inst.id)
+    const drawAvail = (ctx._borrowedUse || !hoptUsed(gs, HOPT_DRAW, inst.id))
       && getChangeCounters(inst) > 0
-      && !ps?.handLocked;
+      && !drawBlockedFor(engine, pi);
 
     return moveAvail || drawAvail;
   },
@@ -195,12 +204,12 @@ module.exports = {
     const pi = inst.controller ?? inst.owner;
     const ps = gs.players[pi];
 
-    const moveAvail = !hoptUsed(gs, HOPT_MOVE, inst.id)
+    const moveAvail = (ctx._borrowedUse || !hoptUsed(gs, HOPT_MOVE, inst.id))
       && changeCounterCardsOnSide(engine, pi).length > 0
       && ownCosmicCreatures(engine, pi).length > 0;
-    const drawAvail = !hoptUsed(gs, HOPT_DRAW, inst.id)
+    const drawAvail = (ctx._borrowedUse || !hoptUsed(gs, HOPT_DRAW, inst.id))
       && getChangeCounters(inst) > 0
-      && !ps?.handLocked;
+      && !drawBlockedFor(engine, pi);
 
     if (!moveAvail && !drawAvail) return false;
 
@@ -249,6 +258,17 @@ module.exports = {
     },
     onCardAddedFromDiscardToHand: (ctx) => {
       if (ctx.playerIdx === ctx.cardOwner) return;
+      addChangeCounters(ctx._engine, ctx.card, 1);
+    },
+    // ★ Welle 9 (Al, 15.10.2026, A02-deepsea-21): „Ja, das soll zählen" — auch die Rückgabe vom Brett auf die Hand des Gegners per Effekt
+    // (Deepsea-Bounce, Shapeshift, Castle, Encounter, Monstrosity …) ist „adds cards to their hand". Ein Counter je Rückgabe-Ereignis
+    // (`onCardsReturnedToHand`), nicht je Karte. Tokens verschwinden beim Verlassen und landen nie auf der Hand → zählen nicht.
+    // Gezählt wird, wenn die Hand des GEGNERS (`ownerIdx`) Karten erhält; die eigene Rückgabe zählt nicht.
+    onCardsReturnedToHand: (ctx) => {
+      if (ctx.ownerIdx === ctx.cardOwner) return;
+      const insts = ctx.returnedInsts || [];
+      if ((ctx.returnedCards || []).length === 0) return;
+      if (insts.length > 0 && insts.every(i => ctx._engine.isTokenCard(i))) return;
       addChangeCounters(ctx._engine, ctx.card, 1);
     },
   },

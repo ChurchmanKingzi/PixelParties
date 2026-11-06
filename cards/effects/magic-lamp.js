@@ -8,8 +8,9 @@
 
 module.exports = {
   blockedByHandLock: true,
+  blockedBySearchLock: true,   // Z6 (M02-19): Deck-Suche ist der ganze Ertrag (Gruppe A, Al 14.9.) - unter der Such-Sperre unspielbar
   isPotion: true,
-  deferBroadcast: true, // Broadcast after selections, not before
+  // W64b: kein `deferBroadcast` mehr — der Auftritt kommt zentral; `commitAppearance()` unten = nach den Wahlen.
 
   canActivate(gs, pi) {
     // Not usable on the very first turn of the game
@@ -83,18 +84,16 @@ module.exports = {
       return { cancelled: true };
     }
 
-    // Broadcast card to opponent NOW (after player decisions finalized)
-    const oppSid = oppPs.socketId;
-    if (oppSid && engine.io) {
-      engine.io.to(oppSid).emit('card_reveal', { cardName: 'Magic Lamp' });
-    }
+    // Stream the card NOW (after player decisions finalized; W64b: zentral, auch für Zuschauer)
+    engine.commitAppearance();
     await engine._delay(100);
-
-    // Remove chosen cards from deck
-    for (const name of chosenNames) {
-      await engine.takeFromPile(ps, 'deck', name, { source: 'magic-lamp' });   // v820: Stapel-Schicht
+    // W85c (Atta, Al 29.10.: „löschen STATT auf die Hand"): die 3 gewählten Karten sind EIN Aufdeck-Ereignis VOR dem Verschieben; eine von Atta gelöschte Karte kommt nie auf eine Hand
+    // (der Gegner wählt dann unter den übrigen).
+    const _ereignis = await engine.aufdeckEreignis(pi, chosenNames, { source: 'Magic Lamp', zone: 'deck' });
+    if (_ereignis.geloescht.length) {
+      for (const g of _ereignis.geloescht) { const k = chosenNames.indexOf(g); if (k >= 0) chosenNames.splice(k, 1); }
+      if (chosenNames.length === 0) return { cancelled: true };
     }
-    engine.sync();
 
     // Step 2: Opponent picks 1 of the 3
     const oppResult = await engine.promptGeneric(oppIdx, {
@@ -145,14 +144,29 @@ module.exports = {
     // flight visual, the reveal popup will always show the correct
     // card the opponent ended up with.
     engine._broadcastEvent('card_reveal', { cardName: oppChoice });
-    engine._broadcastEvent('deck_search_add', { cardName: oppChoice, playerIdx: oppIdx });
     // Reaktionsfenster (Ambush the Scout), Kategorie 'insert'.
-    if (await engine.checkHandInteractionReaction(oppIdx, 'insert',
-          { byPi: pi, count: 1, sourceName: 'Magic Lamp' })) {
-      engine.log('magic_lamp_negated', { player: gs.players[pi]?.username });
-      engine.sync();
-      return;
+    // W5b-B2 (Al, Welle 5; wie Birthday Present): Negiert wird NUR die Gabe an den Gegner (Teileffekt) –
+    // die eigenen 2 Karten kommen trotzdem auf die Hand, die entfallene Gabe bleibt im Deck; die Lampe
+    // gilt als aufgelöst (nicht ganz negiert).
+    const gabeNegiert = await engine.checkHandInteractionReaction(oppIdx, 'insert',
+          { byPi: pi, count: 1, sourceName: 'Magic Lamp' });
+    if (gabeNegiert) engine.log('magic_lamp_negated', { player: gs.players[pi]?.username });
+    // Flug der Gabe: aus dem DECK des Nutzers auf die Hand des GEGNERS (beide sehen die aufgedeckte Karte). Vorher lief hier ein `deck_search_add` fuer den Gegner,
+    // der Client animierte den Zuwachs der Gegnerhand dann von der Hand des Nutzers aus (Tester 30.10.). Vor der Entnahme, damit der Flug noch aus dem vollen Deck startet;
+    // eine negierte Gabe fliegt nicht.
+    if (!gabeNegiert) {
+      engine._broadcastEvent('play_pile_transfer', {
+        owner: pi, fromOwner: pi, toOwner: oppIdx, cardName: oppChoice, from: 'deck', to: 'hand', toHandIdx: oppPs.hand.length,
+      });
+      await engine._delay(700);
     }
+    // Remove chosen cards from deck — erst NACH dem Reaktionsfenster (M02-18): wird das
+    // Einfügen negiert, bleibt die Gabe im Deck, nichts geht verloren.
+    for (const name of (gabeNegiert ? playerCards : chosenNames)) {
+      await engine.takeFromPile(ps, 'deck', name, { source: 'magic-lamp' });   // v820: Stapel-Schicht
+    }
+    engine.sync();
+    if (!gabeNegiert) {
     const oppInst = engine.handZugangSync(oppPs, oppChoice, {  });
     // Track the gifted card with a foreign-origin tag so when the
     // opponent plays it, the discard / deleted pile routes back to
@@ -168,11 +182,13 @@ module.exports = {
     engine.log('card_added_to_hand', { card: oppChoice, player: oppPs.username, by: 'Magic Lamp' });
     engine.sync();
     await engine._delay(600);
+    }
 
     // Add remaining 2 to player's hand one at a time (face-up to both players)
     for (const name of playerCards) {
       engine._broadcastEvent('deck_search_add', { cardName: name, playerIdx: pi });
       engine.handZugangSync(ps, name, {  });
+      engine.noteHandZugangAusStapel(pi, name, { pile: 'deck', source: 'Magic Lamp' });   // W72a: die 2 eigenen Karten kommen aus dem eigenen Deck (Control Monitors)
       // Self-routed cards: track for parity. originalOwner defaults to
       // pi (the holder), so no override needed.
       engine.log('card_added_to_hand', { card: name, player: ps.username, by: 'Magic Lamp' });

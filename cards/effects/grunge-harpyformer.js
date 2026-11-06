@@ -38,13 +38,13 @@ module.exports = {
       const ps = engine.gs.players[pi];
       if (!ps) return;
 
-      if (!(ps.mainDeck || []).includes(ABILITY_NAME)) return;
+      if (!(ps.mainDeck || []).includes(ABILITY_NAME)) return ctx._engine.summonEffektFizzelt(ctx.card, ctx.cardName, { stumm: true });   // W11/R4 (Al): kein Treffer → wirkt nicht → Blob stumm
 
       const confirm = await ctx.promptConfirmEffect({
         title: CARD_NAME,
         message: `Search your deck for a "${ABILITY_NAME}" Ability and add it to your hand?`,
       });
-      if (!confirm) return;
+      if (!confirm) return ctx._engine.summonEffektFizzelt(ctx.card, ctx.cardName, { stumm: true });   // W11/R4 (Al): abgelehntes „you may" → Blob stumm
 
       await engine.searchDeckForNamedCard(pi, ABILITY_NAME, CARD_NAME);
     },
@@ -123,7 +123,7 @@ module.exports = {
     } else if (target.cardInstance) {
       const inst = target.cardInstance;
       const hookCtx = {
-        creature: inst, effectType: 'status',
+        creature: inst, effectType: 'status', statusName: 'burned',
         source: { name: CARD_NAME, owner: pi, heroIdx },
         cancelled: false, _skipReactionCheck: true,
       };
@@ -132,6 +132,7 @@ module.exports = {
         const applied = await engine.applyCreatureStatus(inst, 'burned', {
           sourceOwner: pi,
           source: CARD_NAME,
+          _skipAffectedWindow: true,   // W16b: Fenster oben schon aufgegangen
         });
         if (applied) engine.log('creature_burned', { card: inst.name, owner: inst.owner, by: CARD_NAME });
       }

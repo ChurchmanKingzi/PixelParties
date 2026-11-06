@@ -60,6 +60,9 @@ function eligibleCreatures(engine, pi) {
 }
 
 module.exports = {
+  // W26a (Al, Welle 26): als Attack geltender Heldeneffekt ohne Karte — Stufen-Bedingungen ("level X or lower": Glass Wall, Test Flight, Future Tech Escape Device …) lesen die Quellstufe.
+  // W32a (Al, 22.10.2026): „Zählt als Attack/Spell eines Helden = Ability-Level dieses Helden": die Quellstufe ist das FIGHTING-LEVEL Heragas' (nicht mehr fix 0) — Engine: `_heldenEffektStufe`.
+  treatedAsAttack: { ability: 'Fighting' },
   activeIn: ['hero'],
   heroEffect: true,
   // Nur die Zeitmarken-Buchfuehrung im onTurnEnd laeuft auch durch
@@ -83,10 +86,14 @@ module.exports = {
   canActivateHeroEffect(ctx) {
     const hero = ctx.attachedHero;
     if (!hero?.name || hero.hp <= 0) return false;
+    // ★ W34a (Al, 22.10.2026): ein Effekt, der als Attack zählt, unterliegt den Attack-Zählern und -Sperren (Berserk-Limit, Knife Throw, Rioting Village, Mirjam, Muras …) — `heroKannAngreifen`.
+    if (!ctx._engine.heroKannAngreifen(ctx.cardHeroOwner ?? ctx.cardOwner, ctx.cardHeroIdx, ctx.cardOwner, { name: 'Heragas, the Monster Slayer' })) return false;
+
     return eligibleCreatures(ctx._engine, ctx.cardOwner).length > 0;
   },
 
-  async onHeroEffect(ctx) {
+  // W40a (Al, 22.10.2026): `wdh` = Wiederholung durch Idej Sword - Kunagi ("perform that Attack again"): derselbe Schlag, neues Ziel, ohne Einmal-Stempel.
+  async onHeroEffect(ctx, wdh) {
     const engine = ctx._engine;
     const gs = engine.gs;
     const pi = ctx.cardOwner;
@@ -101,7 +108,8 @@ module.exports = {
 
     // Ziel-Picker mit Angriffs-Semantik (Taunt, Untargetable, Truth-
     // Seeing Eye …) — die Frische-Regel als `condition` obendrauf.
-    const target = await ctx.promptDamageTarget({
+    // ★ W36a (Al, 22.10.2026): „Negierter Treffer: ja, definitiv" — wird der Treffer im Zielfenster NEGIERT (Invisibility Cloak, Schutzkarten …), ist der Effekt für die Runde verbraucht (Einmal-Stempel bleibt, Rückgabe `true`) und zählt als gespielte Attack (Muster Alice); ein Abbruch des Spielers bleibt ein Abbruch.
+    const { target, negiert } = await engine.heldenEffektZielwahl(ctx, {
       side: 'any',
       types: ['creature'],
       damageType: 'attack',
@@ -112,6 +120,11 @@ module.exports = {
       cancellable: true,
       condition: (t) => !!t.cardInstance && erlaubt.has(t.cardInstance.id),
     });
+    if (negiert) {
+      await engine.zaehleAlsArt('attack', { pi, heroIdx, heroOwner: feld, name: CARD_NAME });
+      engine.sync();
+      return true;
+    }
     if (!target?.cardInstance) return false;   // abgebrochen — HOPT bleibt
     const inst = target.cardInstance;
 
@@ -132,8 +145,12 @@ module.exports = {
     });
 
     const source = { name: CARD_NAME, owner: pi, heroIdx, ...(feld !== pi ? { heroOwner: feld } : {}) };
-    await engine.actionDealCreatureDamage(source, inst, betrag, 'attack',
-      { sourceOwner: pi, canBeNegated: true });
+    // W32a (Al, 22.10.2026): der Treffer zählt als Attack — Attack-Reaktionen (Magic Topaz, Arrows …) über die virtuelle Attack-Kette.
+    await engine.alsAttackKette({ name: CARD_NAME, pi, heroIdx, heroOwner: feld, ziele: [{ id: `equip-${engine.physicalSide(inst)}-${inst.heroIdx}-${inst.zoneSlot}`, type: 'equip', owner: engine.physicalSide(inst), heroIdx: inst.heroIdx, slotIdx: inst.zoneSlot, cardName: inst.name, cardInstance: inst }], wiederhole: () => module.exports.onHeroEffect(ctx, true), resolve: async () => {
+      await engine.actionDealCreatureDamage(source, inst, betrag, 'attack',
+        { sourceOwner: pi, canBeNegated: true });
+      return true;
+    } });
 
     engine.log('heragas_slay', {
       player: gs.players[pi].username, creature: inst.name, damage: betrag,
@@ -152,6 +169,10 @@ module.exports = {
       const quelle = ctx.source;
       // Styx 28.9.: Quelle = dieser Held (Brettseite `heroOwner` + Index).
       if (!quelle || (quelle.heroOwner ?? quelle.owner) !== (ctx.cardHeroOwner ?? pi) || quelle.heroIdx !== hi) return;
+      // „this Hero defeats": ein Kreatureneffekt aus seiner Spalte (Quelle mit dem `heroIdx` der Spalte: Haressassin, Mr. Jiggles …) ist nicht der Held.
+      if (require('./_hooks').isCreatureSource(engine, quelle)) return;
+      // W7a (H02-20, Al): `bypassStatusFilter` gilt nur der Zeitmarke im onTurnEnd — das Ziehen ist ein Heldeneffekt und ruht bei Frost/Betäubung/Negation.
+      if (engine._isHeroEffectSilenced(ctx.cardHeroOwner ?? pi, hi)) return;
       await engine.showTriggeredEffect(CARD_NAME);   // Regel: aktivierter Effekt zeigt seine Karte
       await engine.actionDrawCards(pi, 1, { source: CARD_NAME });
       engine.log('heragas_draw', {

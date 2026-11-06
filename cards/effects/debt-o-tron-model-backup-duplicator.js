@@ -57,6 +57,8 @@ module.exports = {
       const pi = ctx.cardOwner;
       const ps = gs.players[pi];
       if (!ps) return;
+      // Z6 (A03-23): unter Hand-/Such-Sperre kann nichts auf die Hand - gar nicht erst fragen, Ladung bleibt (verbuche() unten).
+      if (engine._isSearchBlocked(pi, {}, 'deck')) return;
 
       // ── DIE GALERIE BRAUCHT OBJEKTE, KEINE NAMEN (Als Screenshot 16.8.) ──
       // `CardGalleryMultiPrompt` liest jeden Eintrag als `entry.name`

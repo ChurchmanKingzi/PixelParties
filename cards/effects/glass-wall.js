@@ -14,7 +14,7 @@
 //  ── ERSTE AKTIVIERUNG (gewöhnliche Surprise, Bauform „Frost Rune") ──────
 //  `surpriseTrigger`: der Träger wird von einem Attack, Spell oder Creature-Effekt GEWÄHLT (`isAttackSpellOrCreatureSource`) und die Quelle hat die Stufe 1 oder niedriger.
 //  Die Stufe ist die gedruckte der Quellkarte (Attack/Spell: die Karte; Creature-Effekt: die Kreatur). Quellen ohne Katalogeintrag (Heldeneffekte) haben keine Stufe und
-//  lösen nicht aus. `onSurpriseActivate` liefert `{ effectNegated: true }` (die Quelle wird ganz negiert) und fragt: „You may leave this activated Surprise face-up" —
+//  lösen nicht aus — außer „als Spell geltende" (`treatedAsSpell`, Alice: Stufe 0; W24b N2-08). `onSurpriseActivate` liefert `{ effectNegated: true }` (die Quelle wird ganz negiert) und fragt: „You may leave this activated Surprise face-up" —
 //  `stayFaceUp: true` in der Antwort lässt die Karte offen in der Surprise Zone liegen (neu in der Engine, `_activateSurprise`; wie `staysFaceUpOnActivation`, aber als
 //  Entscheidung zur Laufzeit). Nein = die Karte geht wie jede Surprise in die Ablage. Eine offen liegende Karte löst NICHT ein zweites Mal als Surprise aus
 //  (`_checkSurpriseWindow` überspringt offene Karten).
@@ -43,8 +43,19 @@ const BRUCH_MS = 420;           // bis die Scheibe bricht (deckt sich mit BRUCH 
 /** Gedruckte Stufe der Quellkarte (Attack/Spell: die Karte; Creature-Effekt: die Kreatur); null = keine Karte, keine Stufe. */
 function quellStufe(engine, quelle) {
   const name = quelle?.cardName || quelle?.cardInstance?.name || quelle?.name;
+  // W30a (Al, 21.10.2026): zählt der Effekt als Attack EINES HELDEN (Stempel `treatedAsAttack`: Infected Greatmaw, Bamboo Staff, Sacrificial Dagger, Alluring Light,
+  // Clash of Champions), ist die Quellstufe das Fighting-Level dieses Helden — NICHT die gedruckte Stufe der Karte.
+  const stempel = engine._stempelStufe?.(quelle, quelle?.damageType);
+  if (stempel != null) return stempel;
   const cd = name ? engine._getCardDB()[name] : null;
-  return (cd && typeof cd.level === 'number') ? cd.level : null;
+  if (cd && typeof cd.level === 'number') return cd.level;
+  // W24b N2-08: ein Heldeneffekt, der „als Spell" gilt (Alice, `treatedAsSpell`, Q108), zählt mit der dort erklärten Stufe (Alice: 0).
+  // W26a (Al, Welle 26): auch Broghan, Brackle, Arthor, Heragas, Kohta (als Attack geltend) zählen als Stufe 0 (`_heldenEffektStufe`).
+  // W27a (Al, 21.10.2026): auch als Attack geltende Gegenstandseffekte (Bamboo Staff, Crusader's, Javelin Throw, Sword in a Bottle …) = Stufe 0.
+  // W32a (Al, 22.10.2026): „Zählt als Attack/Spell eines Helden = Ability-Level dieses Helden" — Quellobjekt mitgeben (Held = Brettseite + Index der Quelle): Alice = Destruction-Level,
+  // Broghan, Brackle, Arthor, Heragas, Kohta und die Gegenstandseffekte = Fighting-Level (nicht mehr fix 0).
+  const lv = name ? (engine._spellLevelAlsQuelle?.(name, quelle?.damageType, quelle?.cardInstance || quelle) ?? engine._heldenEffektStufe?.(name, quelle?.damageType, quelle?.cardInstance || quelle)) : null;
+  return Number.isFinite(lv) ? lv : null;
 }
 
 /** Träger der offen liegenden Karte: Brettseite (`inst.owner`), Heldenindex, Held. */
@@ -62,6 +73,10 @@ function istAttack(engine, source, info) {
 }
 
 module.exports = {
+  // ★ Z7b: „Negate that Spell/Attack/effect" = die gewirkte Karte löst NIE auf → ihre Einmal-Stempel werden zurückgegeben
+  // (Engine: `_merkeGanzeNegation`). Teil-Negierungen („… on that Hero", Schaden) tragen das Flag nicht.
+  negatesWholeCard: true,
+
   // ★★ v1182 — ENTKOPPELTE BILDER (CARD_API): wird die Karte NEGIERT, läuft ihr Effekt-Rumpf nie — die Engine spielt dann dieses Bild.
   spellVisual: { impact: { type: 'glass_wall_up' }, impactMs: 300 },
 

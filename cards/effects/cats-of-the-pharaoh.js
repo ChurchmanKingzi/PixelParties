@@ -41,6 +41,7 @@
 // ═══════════════════════════════════════════
 
 const { canHeroSummon } = require('./_summon-eligibility');
+const { hasCardType } = require('./_hooks');
 
 const CARD_NAME = 'Cats of the Pharaoh';
 
@@ -53,7 +54,7 @@ function kontrolliertKreaturen(engine, pi) {
     if ((inst.controller ?? inst.owner) !== pi) continue;
     const cd = engine.getEffectiveCardData(inst) || cardDB[inst.name];
     if (!cd) continue;
-    if ((cd.cardType || '').toLowerCase() !== 'creature') continue;
+    if (!hasCardType(cd, 'Creature')) continue;   // W16d (C01-17): Kreatur-Tokens und Artifact Creatures sind Creatures (CARD_API: Dominance-Ruling)
     return true;
   }
   return false;

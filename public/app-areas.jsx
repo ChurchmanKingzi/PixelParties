@@ -35,6 +35,28 @@ const { useState, useEffect, useLayoutEffect, useRef, useMemo } = React;
 //  nicht gerendert.
 // ═══════════════════════════════════════════════════════════════════
 
+// ★ Perf (Kampf-Stresstest 28.10.: jede Area-Szene traegt 30-120 laufende Animationen, und jeder Hauptthread-Frame wertet alle neu
+// aus; zwei deckende Areas = zwei volle Szenen). Die Zahl der bewegten Elemente laeuft ueber `ppAreaN` statt `ppFxN` (das bleibt dem
+// Kampfbrett): Telefon wie bisher 40 %, am Desktop `PP_AREA_FAKTOR`. Liegen ZWEI verschiedene deckende Areas, sieht man von jeder nur
+// ihre Haelfte (diagonaler Schnitt, `AreaBackgrounds`) — die Teilchen der verdeckten Haelfte liefen trotzdem; darum bekommt dann jede
+// Szene nur noch `PP_AREA_ZWEI` ihrer Teilchen, ohne dass die sichtbare Dichte spuerbar sinkt. Die Bewegung selbst (Takt, steps(),
+// Dauer) bleibt unangetastet: es sind weniger Elemente, keine ruckelnden. Gezaehlt wird beim Einhaengen der Szene (useMemo); wechselt der
+// Zustand ein/zwei Szenen, haengen sich die Szenen deshalb neu ein (Schluessel in `AreaBackgrounds`).
+const PP_AREA_FAKTOR = 0.75;
+const PP_AREA_ZWEI = 0.7;
+let ppAreaDichte = 1;
+function ppAreaN(n) {
+  const telefon = !!(window.ppIsPhone && window.ppIsPhone());
+  const basis = window.ppFxN ? window.ppFxN(n) : n;          // Telefon: 40 %, mindestens 2
+  return Math.max(Math.min(n, 2), Math.round(basis * (telefon ? 1 : PP_AREA_FAKTOR) * ppAreaDichte));
+}
+/** Teilchen-Array gleichmaessig ausduennen: bleibt `ppAreaN(Laenge)` Elemente, gleichmaessig ueber die Reihe verteilt (Verteilung, Dauern und Phasen bleiben so wie gemalt). */
+function ppDuenn(arr) {
+  const n = arr.length, k = ppAreaN(n);
+  return k >= n ? arr : arr.filter((_, i) => Math.floor((i + 1) * k / n) > Math.floor(i * k / n));
+}
+const ppDuennVon = (spec, f) => ppDuenn(Array.from(spec, f));
+
 const AREA_TIER_ORDER = ['opaque', 'translucent', 'partial'];
 const AREA_OVERLAYS = {
   'Board of Kings':               { tier: 'opaque',      C: () => <BoardOfKingsOverlay /> },   // v1438: Kartenstil
@@ -76,6 +98,11 @@ const AREA_OVERLAYS = {
   // opaque-Area, und die Crevice liegt in aller Regel zuerst. Als
   // 'partial' laege die deckende Szene dagegen OBEN auf allem.
   'Spatial Crevice':              { tier: 'opaque',      C: () => <SpatialCreviceOverlay /> },   // v1440: Kartenstil
+  'Tearing Mountain':             { tier: 'opaque',      C: () => <TearingMountainOverlay /> },   // 23.10.: Lavaberg mit Wasserfall und Lavafluss
+  'The Golden Gate':              { tier: 'opaque',      C: () => <GoldenGateOverlay /> },   // W76: goldenes Tor im Abendlicht
+  'Tree of Golden Apples':        { tier: 'opaque',      C: () => <TreeOfGoldenApplesOverlay /> },   // W79: goldener Baum voller glitzernder Äpfel, im Wind schwankend
+  'Gigalopolis, the Mega-City':   { tier: 'opaque',      C: () => <GigalopolisOverlay /> },   // Welle 6b: antike Riesenstadt aus großer Höhe, winzige Menschen
+  'Barrel Home':                  { tier: 'opaque',      C: () => <BarrelHomeOverlay /> },   // Welle 6b: riesiges Fass auf der Seite, Abenddämmerung
 };
 
 /** Faserige Diagonale: Punkte von links oben nach rechts unten, leicht gezackt. */
@@ -102,6 +129,9 @@ function AreaBackgrounds({ areaZones, myIdx, oppIdx, spielstand }) {
   // kleiner Auszug, vom Aufrufer gefuellt: Kampfbrett aus gameState,
   // Puzzle-Creator aus seinem Editorzustand).
   const seam = useMemo(() => buildFrayedSeam(), []);
+  // Die Teilchenzahl wird beim Einhaengen der Szenen gelesen (waehrend dieses Durchlaufs); danach zurueck auf 1, damit nichts daran haengen bleibt.
+  ppAreaDichte = 1;
+  useLayoutEffect(() => { ppAreaDichte = 1; });
   const mine = areaZones?.[myIdx] || [];
   const theirs = areaZones?.[oppIdx] || [];
   const besitzerVon = (n) => [myIdx, oppIdx].filter(i => (areaZones?.[i] || []).includes(n));
@@ -114,22 +144,16 @@ function AreaBackgrounds({ areaZones, myIdx, oppIdx, spielstand }) {
       // Je Seite zählt die zuletzt gelegte opaque-Area.
       const a = mineT[mineT.length - 1];
       const b = theirsT[theirsT.length - 1];
-      if (a && b && a !== b) {
+      const zwei = !!(a && b && a !== b);
+      ppAreaDichte = zwei ? PP_AREA_ZWEI : 1;     // wird von den Szenen beim Einhaengen gelesen (`ppAreaN`)
+      if (zwei) {
         const diag = seam.map(p => `${p.x.toFixed(2)}% ${p.y.toFixed(2)}%`).join(', ');
         const clipMine = `polygon(${diag}, 0% 100%)`;          // links/unten
         const clipTheirs = `polygon(${diag}, 100% 0%)`;        // rechts/oben
         layers.push(
-          <div key={`op-${b}`} style={{ position: 'absolute', inset: 0, pointerEvents: 'none', isolation: 'isolate', clipPath: clipTheirs }}>{szene(b)}</div>,
-          <div key={`op-${a}`} style={{ position: 'absolute', inset: 0, pointerEvents: 'none', isolation: 'isolate', clipPath: clipMine }}>{szene(a)}</div>,
-          <svg key="op-seam" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', pointerEvents: 'none' }}
-            viewBox="0 0 100 100" preserveAspectRatio="none">
-            <polyline points={seam.map(p => `${p.x},${p.y}`).join(' ')} fill="none"
-              stroke="rgba(0,0,0,0.55)" strokeWidth="0.9" strokeLinejoin="round" vectorEffect="non-scaling-stroke"
-              style={{ filter: 'blur(1.2px)' }} />
-            <polyline points={seam.map(p => `${p.x},${p.y}`).join(' ')} fill="none"
-              stroke="rgba(255,240,220,0.35)" strokeWidth="0.25" strokeLinejoin="round"
-              strokeDasharray="1.2 0.7 0.4 0.9" vectorEffect="non-scaling-stroke" />
-          </svg>,
+          <div key={`op-${b}-zwei`} style={{ position: 'absolute', inset: 0, pointerEvents: 'none', isolation: 'isolate', clipPath: clipTheirs }}>{szene(b)}</div>,
+          <div key={`op-${a}-zwei`} style={{ position: 'absolute', inset: 0, pointerEvents: 'none', isolation: 'isolate', clipPath: clipMine }}>{szene(a)}</div>,
+          <PpFx40Naht key="op-seam" seam={seam} />,   // Pixelart-Leinwand (app-fx-40.jsx): gezackte Pixellinie statt SVG-Polylinie mit Weichzeichner
         );
       } else {
         const only = a || b;
@@ -174,14 +198,156 @@ function AreaBackgrounds({ areaZones, myIdx, oppIdx, spielstand }) {
 //  ANIMATIONEN nur per CSS-Keyframes: „Play Animations: aus" friert sie
 //  dann ein (globale Regel), bewegte Einzelelemente tragen zusaetzlich
 //  `pp-area-dyn` und werden dort ganz ausgeblendet. Anzahl bewegter
-//  Elemente immer ueber `ppFxN` (Telefon-Deckel).
+//  Elemente immer ueber `ppAreaN` (Telefon-Deckel, Desktop-Faktor, zwei Szenen).
 // ═══════════════════════════════════════════════════════════════════
+// ★ W86a: 1x1 deckend weisses PNG als Maskenfläche (statt `linear-gradient(#fff …)`-Masken mit harten Stopps)
+const PP_WEISS = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAAC0lEQVR4nGP4DwQACfsD/fteaysAAAAASUVORK5CYII=';
 const ppArt = (n) => `calc(${n} * var(--px))`;
 const ppArtX = (x, bezugsbreite) => `calc(50% + ${x - bezugsbreite / 2} * var(--px))`;
 
+// ★ W86z — Randabdunklung der Szenen als Pixelart (Bayer-Dither aus deckendem Schwarz statt Radialverlauf mit Alpha; Bild: ppRandDimUrl in
+// app-shared.jsx). Ein Dither-Punkt ist ein Szenen-Kunstpixel (Szenenhoehe / artH); bei jeder Groessenaenderung neu gemalt.
+function PpRandDim() {
+  const ref = useRef(null);
+  const retro = !!window.PP_RETRO;          // Retro-Modus: bleibt beim alten Verlauf (Retro-Look unveraendert)
+  useLayoutEffect(() => {
+    const el = ref.current; if (!el || retro) return undefined;
+    const szene = el.closest('.pp-pixel-scene') || el.parentElement;
+    const zeichnen = () => {
+      const W = el.clientWidth, H = el.clientHeight;
+      if (!W || !H || !window.ppRandDimUrl) return;
+      const artH = +(szene && szene.getAttribute('data-art-h')) || 0;
+      const px = artH ? Math.max(2, H / artH) : 2;
+      const q = (v) => Math.max(8, Math.round(v / px / 8) * 8);       // Groesse grob gerastert: weniger verschiedene Bilder beim Skalieren
+      el.style.backgroundImage = `url(${window.ppRandDimUrl(q(W), q(H))})`;
+    };
+    zeichnen();
+    const ro = window.ResizeObserver ? new ResizeObserver(zeichnen) : null;
+    if (ro) ro.observe(el);
+    return () => { if (ro) ro.disconnect(); };
+  }, []);
+  return retro
+    ? <div className="pp-rand-dim" style={{ background: 'radial-gradient(ellipse 75% 70% at 50% 50%, rgba(0,0,0,0) 55%, rgba(0,0,0,.3) 100%)' }} />
+    : <div ref={ref} className="pp-rand-dim" data-pp-px="aus" />;
+}
+
+// ★ W86a — Leuchtflecken (Glut, Schein, Blitzlicht) als Pixelart. Statt `radial-/linear-gradient` mit Alpha (weicher Verlauf) malt `ppGlowUrl`
+// ein Bayer-gedithertes Bild aus DECKENDEN Pixeln: eine Zelle = ein Szenen-Kunstpixel, die Dichte der Punkte folgt dem alten Alpha-Verlauf.
+// `form`: 'kreis' | 'ellipse' (Radialverlauf, Mitte bei cx/cy, Radius wie `farthest-corner`), 'hoch' / 'runter' (linear nach oben / unten).
+// `stops`: [[Lage 0..1, [r, g, b], Alpha], …] wie bei CSS; Farben rasten über `ppPxBild` auf die Palette.
+function ppGlowUrl(form, stops, cx, cy, nx, ny) {
+  nx = Math.max(2, Math.min(600, Math.round(nx))); ny = Math.max(2, Math.min(400, Math.round(ny)));
+  const key = 'glow:' + form + ':' + cx + ',' + cy + ':' + nx + 'x' + ny + ':' + stops.map(s => s[0] + s[1].join('.') + s[2]).join('|');
+  return window.ppPxBild(key, nx, ny, (setze) => {
+    const fx = Math.max(cx, 1 - cx) * nx, fy = Math.max(cy, 1 - cy) * ny;
+    const Rk = Math.hypot(fx, fy), Rx = fx * Math.SQRT2, Ry = fy * Math.SQRT2;
+    for (let y = 0; y < ny; y++) {
+      for (let x = 0; x < nx; x++) {
+        const px = x + 0.5, py = y + 0.5;
+        let t;
+        if (form === 'hoch') t = 1 - py / ny;
+        else if (form === 'runter') t = py / ny;
+        else if (form === 'ellipse') t = Math.hypot((px - cx * nx) / Rx, (py - cy * ny) / Ry);
+        else t = Math.hypot(px - cx * nx, py - cy * ny) / Rk;
+        if (t >= stops[stops.length - 1][0]) continue;
+        let k = 0; while (k < stops.length - 2 && t > stops[k + 1][0]) k++;
+        const [t0, c0, a0] = stops[k], [t1, c1, a1] = stops[k + 1];
+        const u = t <= t0 ? 0 : Math.min(1, (t - t0) / Math.max(1e-6, t1 - t0));
+        const a = a0 + (a1 - a0) * u;
+        if (a > ppBayer(x, y)) setze(x, y, [(c0[0] + (c1[0] - c0[0]) * u) * .8, (c0[1] + (c1[1] - c0[1]) * u) * .8, (c0[2] + (c1[2] - c0[2]) * u) * .8, 1]);      // etwas abgedunkelt: deckende Punkte wirken sonst heller als der alte Alpha-Schein
+      }
+    }
+  }, 1);
+}
+window.ppGlowUrl = ppGlowUrl;
+
+// ★ W86a — Stopps der Leuchtflecken (vorher CSS-Verläufe mit Alpha): [Lage, [r, g, b], Alpha]
+const GL_AR_SCHEIN = { form: 'kreis', stops: [[0, [251, 200, 106], .34], [.45, [255, 155, 58], .14], [.7, [255, 155, 58], 0]] };
+const GL_BG_GLUT = { form: 'kreis', stops: [[0, [255, 155, 58], .30], [.45, [248, 116, 32], .12], [.7, [248, 116, 32], 0]] };
+const GL_DOC_BLITZ = { form: 'runter', stops: [[0, [210, 210, 219], .2], [.45, [210, 210, 219], .07], [.8, [210, 210, 219], 0]] };
+const GL_DC_PULS = { form: 'kreis', stops: [[0, [255, 26, 26], .55], [.4, [200, 0, 0], .25], [.7, [120, 0, 0], 0]] };
+const GL_DC_GLUT = { form: 'kreis', stops: [[0, [255, 26, 26], .6], [.7, [255, 26, 26], 0]] };
+const GL_DC_BLITZ = { form: 'kreis', stops: [[0, [255, 133, 102], .35], [.45, [239, 41, 41], .12], [.7, [255, 26, 26], 0]] };
+const GL_RVG_AUGE = { form: 'ellipse', stops: [[0, [255, 26, 26], .5], [.7, [255, 26, 26], 0]] };
+const GL_RVG_BODEN = { form: 'ellipse', stops: [[0, [255, 139, 26], .42], [.45, [255, 73, 26], .16], [.7, [255, 73, 26], 0]] };
+const GL_FC4 = { form: 'hoch', stops: [[0, [255, 185, 26], .30], [.38, [255, 139, 26], .12], [.62, [255, 125, 0], 0]] };
+const GL_FI = { form: 'ellipse', cy: .62, stops: [[0, [255, 155, 58], .34], [.45, [248, 116, 32], .14], [.7, [255, 73, 26], 0]] };
+const GL_SX = { form: 'ellipse', cy: .6, stops: [[0, [255, 154, 26], .32], [.5, [255, 73, 26], .12], [.72, [255, 73, 26], 0]] };
+const GL_SV = { form: 'ellipse', stops: [[0, [255, 26, 26], .30], [.5, [255, 26, 26], .1], [.72, [255, 26, 26], 0]] };
+const GL_EG = { form: 'ellipse', stops: [[0, [144, 58, 230], .30], [.5, [102, 24, 180], .12], [.72, [102, 24, 180], 0]] };
+
+/** Leuchtfleck-Element (`<i>`): Größe und Lage kommen aus der Klasse bzw. dem Stil; das Bild wird auf die Zellenzahl (Elementgröße / Szenenpixel) gemalt. */
+function PpGlow({ form = 'kreis', stops, cx = 0.5, cy = 0.5, className, style }) {
+  const ref = useRef(null);
+  useLayoutEffect(() => {
+    const el = ref.current; if (!el) return undefined;
+    const szene = el.closest('.pp-pixel-scene');
+    const zeichnen = () => {
+      const artH = +(szene && szene.getAttribute('data-art-h')) || 100;
+      const px = (szene ? szene.clientHeight : 0) / artH;
+      const W = el.clientWidth, H = el.clientHeight;
+      if (!(px > 0) || !W || !H) return;
+      el.style.backgroundImage = `url(${ppGlowUrl(form, stops, cx, cy, W / px, H / px)})`;
+    };
+    zeichnen();
+    const ro = window.ResizeObserver ? new ResizeObserver(zeichnen) : null;
+    if (ro) ro.observe(el);
+    return () => { if (ro) ro.disconnect(); };
+  }, []);
+  return <i ref={ref} className={'pp-glow ' + (className || '')} style={style} />;
+}
+
+/** Farbfilter (brightness/hue-rotate …) einmal in ein Pixelbild rechnen (statt CSS-`filter` zur Laufzeit); Ergebnis als data-URL, rastet auf die Palette. */
+const _ppFilterBilder = new Map();
+function ppFarbfilterBild(src, filter, fertig) {
+  const key = src + '|' + filter;
+  if (_ppFilterBilder.has(key)) { fertig(_ppFilterBilder.get(key)); return; }
+  const im = new Image();
+  im.onload = () => {
+    try {
+      const cv = document.createElement('canvas'); cv.width = im.naturalWidth; cv.height = im.naturalHeight;
+      const g = cv.getContext('2d', { willReadFrequently: true }); g.imageSmoothingEnabled = false; g.drawImage(im, 0, 0);
+      const id = g.getImageData(0, 0, cv.width, cv.height), d = id.data;
+      const rein = window.PPPixelAnim && window.PPPixelAnim.rein, liste = rein && rein.farbFilterLesen(filter);
+      for (let i = 0; i < d.length; i += 4) {
+        if (d[i + 3] < 128) { d[i + 3] = 0; continue; }
+        d[i + 3] = 255;
+        const c = liste ? rein.farbFilterAnwenden(liste, d[i], d[i + 1], d[i + 2]) : [d[i], d[i + 1], d[i + 2]];
+        const q = window.ppSnapRgb ? window.ppSnapRgb(c[0], c[1], c[2]) : c;
+        d[i] = q[0]; d[i + 1] = q[1]; d[i + 2] = q[2];
+      }
+      g.putImageData(id, 0, 0);
+      const u = cv.toDataURL('image/png'); _ppFilterBilder.set(key, u); fertig(u);
+    } catch (e) { /* bleibt beim Original */ }
+  };
+  im.src = src;
+}
+/** `<i>` mit Sprite-Blatt `src`, dessen Farben vorab durch `filter` gerechnet sind (Klasse liefert Größe und Blatt-Verschiebung). */
+function PpFarbfilterSprite({ src, filter, className, style }) {
+  const ref = useRef(null);
+  useLayoutEffect(() => {
+    let weg = false;
+    ppFarbfilterBild(src, filter, (u) => { if (!weg && ref.current) ref.current.style.backgroundImage = `url(${u})`; });
+    return () => { weg = true; };
+  }, [src, filter]);
+  return <i ref={ref} className={className} style={style} />;
+}
+
 function PixelScene({ artH, bg, className, children }) {
+  // ★ W86z: Pixelart-Bewegung (public/pixel-anim.js) fuer die ganze Szene: Takt, Dither-Fade, Verschiebung/Skalierung auf Szenenpixel.
+  // Ein Szenenpixel ist `Szenenhoehe / artH` px (`--pp-raster`); das Kampfbrett-Raster (2 px) gilt hier nicht.
+  const ref = useRef(null);
+  useLayoutEffect(() => {
+    const el = ref.current; if (!el) return undefined;
+    const setzen = () => { const px = el.clientHeight / artH; if (px > 0) el.style.setProperty('--pp-raster', px.toFixed(3) + 'px'); };
+    setzen();
+    const ro = window.ResizeObserver ? new ResizeObserver(setzen) : null;
+    if (ro) ro.observe(el);
+    const ab = window.PPPixelAnim ? window.PPPixelAnim.anhaengen(el, { geometrie: false }) : null;
+    return () => { if (ro) ro.disconnect(); if (ab) ab(); };
+  }, []);
   return (
-    <div className={'pp-pixel-scene ' + (className || '')} style={{
+    <div ref={ref} className={'pp-pixel-scene ' + (className || '')} data-art-h={artH} style={{
       position: 'absolute', inset: 0, pointerEvents: 'none', overflow: 'hidden',
       containerType: 'size', '--px': `calc(100cqh / ${artH})`,
       background: bg || '#000',
@@ -197,25 +363,24 @@ function PixelScene({ artH, bg, className, children }) {
         @keyframes ppSprite2 { 0% { background-position: 0 0; } 50% { background-position: 100% 0; } }
         @keyframes ppSprite3 { 0% { background-position: 0 0; } 33.3% { background-position: 50% 0; } 66.6% { background-position: 100% 0; } }
         @keyframes ppBob { from { translate: 0 0; } to { translate: 0 var(--bob, var(--px)); } }
-        @keyframes ppDrehen { to { rotate: 360deg; } }
         .pp-quer { position: absolute; left: 0; }
         @keyframes ppQuerLtr { from { transform: translateX(calc(-30 * var(--px))); } to { transform: translateX(calc(100cqw + 10 * var(--px))); } }
         @keyframes ppQuerRtl { from { transform: translateX(calc(100cqw + 10 * var(--px))); } to { transform: translateX(calc(-30 * var(--px))); } }
         /* Weisses Funkelkreuz (Karten: Crystal Well), 3×3 Kunstpixel */
-        .pp-px-funkeln {
-          position: absolute; width: calc(3 * var(--px)); height: calc(3 * var(--px)); opacity: 0;
-          background:
-            linear-gradient(#fff, #fff) 50% 0 / var(--px) 100% no-repeat,
-            linear-gradient(#fff, #fff) 0 50% / 100% var(--px) no-repeat;
-        }
+        /* ★ W86a: die zwei Balken des Kreuzes sind Pseudo-Elemente (deckendes Weiss) statt zwei Verlaeufen */
+        .pp-px-funkeln { position: absolute; width: calc(3 * var(--px)); height: calc(3 * var(--px)); opacity: 0; }
+        .pp-px-funkeln::before, .pp-px-funkeln::after { content: ''; position: absolute; background: var(--funkel, #fff); }
+        .pp-px-funkeln::before { left: var(--px); top: 0; width: var(--px); height: 100%; }
+        .pp-px-funkeln::after { left: 0; top: var(--px); width: 100%; height: var(--px); }
+        .pp-glow { position: absolute; background-size: 100% 100%; background-repeat: no-repeat; image-rendering: pixelated; }
         @keyframes ppFunkeln { 0%, 60% { opacity: 0; } 64% { opacity: .6; } 70% { opacity: 1; } 80% { opacity: .6; } 84%, 100% { opacity: 0; } }
         /* Leichte Randabdunklung — die Karten bleiben das Hellste */
-        .pp-rand-dim { position: absolute; inset: 0; pointer-events: none; background: radial-gradient(ellipse 75% 70% at 50% 50%, rgba(0,0,0,0) 55%, rgba(0,0,0,.3) 100%); }
+        .pp-rand-dim { position: absolute; inset: 0; pointer-events: none; background-size: 100% 100%; background-repeat: no-repeat; image-rendering: pixelated; }
         /* Blutstropfen (Blood Rock, Shared Blood Tanks …): haengt, schwillt,
            faellt um --fall. Farben ueber --tropfen / --tropfen-dunkel. */
         .pp-px-tropfen {
           position: absolute; width: var(--px); height: calc(2 * var(--px)); transform-origin: top;
-          background: var(--tropfen, #a41e14); box-shadow: 0 calc(-1 * var(--px)) 0 var(--tropfen-dunkel, #5a0909);
+          background: var(--tropfen, #8f0000); box-shadow: 0 calc(-1 * var(--px)) 0 var(--tropfen-dunkel, #5b0102);
         }
         @keyframes ppPxTropfen {
           0%   { transform: translateY(0) scaleY(.5); opacity: 0; }
@@ -336,18 +501,18 @@ const brKachelX = (x, rand = 4) => {
 };
 
 const BloodRockOverlay = React.memo(function BloodRockOverlay() {
-  const bats = useMemo(() => ppZufall(ppFxN(4), (i) => ({
+  const bats = useMemo(() => ppZufall(ppAreaN(4), (i) => ({
     y: 3 + Math.random() * 22, dur: 18 + Math.random() * 14, delay: -Math.random() * 30,
     bob: 1 + Math.round(Math.random() * 2), bobDur: 1.4 + Math.random() * 1.2, flap: .3 + Math.random() * .12, rtl: i % 2 === 1,
   })), []);
-  const batsFern = useMemo(() => ppZufall(ppFxN(3), (i) => ({
+  const batsFern = useMemo(() => ppZufall(ppAreaN(3), (i) => ({
     y: 2 + Math.random() * 14, dur: 34 + Math.random() * 16, delay: -Math.random() * 40,
     flap: .26 + Math.random() * .1, rtl: i % 2 === 0,
   })), []);
   const ripples = useMemo(() => {
     const out = [...BR_TORBAU_FUESSE];
     for (const [x, y] of BR_KACHEL_FUESSE) for (const xx of brKachelX(x)) out.push([xx, y]);
-    return out.slice(0, ppFxN(30)).map(([x, y]) => ({ x, y, dur: .6 + Math.random() * .5, delay: -Math.random() * 2 }));
+    return out.slice(0, ppAreaN(30)).map(([x, y]) => ({ x, y, dur: .6 + Math.random() * .5, delay: -Math.random() * 2 }));
   }, []);
   const kaefige = useMemo(() => brKachelX(BR_KAEFIG[0], 8).map((x) => ({
     x, dur: 3.2 + Math.random() * .8, delay: -Math.random() * 4,
@@ -355,20 +520,20 @@ const BloodRockOverlay = React.memo(function BloodRockOverlay() {
   const haende = useMemo(() => {
     const out = BR_HAENDE_TORBAU.map(([x, y]) => ({ left: ppArtX(x - 2, BR_KEEP_W), y }));
     for (const [x, y] of BR_HAENDE_KACHEL) for (const xx of brKachelX(x)) out.push({ left: ppArtX(xx - 2, 0), y });
-    return out.slice(0, ppFxN(6)).map((h) => ({ ...h, dur: 9 + Math.random() * 9, delay: -Math.random() * 18 }));
+    return out.slice(0, ppAreaN(6)).map((h) => ({ ...h, dur: 9 + Math.random() * 9, delay: -Math.random() * 18 }));
   }, []);
   const tropfen = useMemo(() => {
     const out = BR_GALERIE_TROPFEN.map((x) => ({ left: ppArtX(x, BR_KEEP_W), y0: 30, y1: 33 }));
     for (const [x, y] of BR_TROPFSTEINE) for (const xx of brKachelX(x)) out.push({ left: ppArtX(xx, 0), y0: y, y1: 29 });
     for (const k of kaefige) out.push({ left: ppArtX(k.x + 1, 0), y0: BR_KAEFIG[1] + 25, y1: 78 });
-    return out.slice(0, ppFxN(12)).map((d) => ({ ...d, dur: 3.2 + Math.random() * 2.6, delay: -Math.random() * 6 }));
+    return out.slice(0, ppAreaN(12)).map((d) => ({ ...d, dur: 3.2 + Math.random() * 2.6, delay: -Math.random() * 6 }));
   }, [kaefige]);
-  const ratten = useMemo(() => ppZufall(ppFxN(2), (i) => ({
+  const ratten = useMemo(() => ppZufall(ppAreaN(2), (i) => ({
     y: 86 + i * 7 + Math.random() * 3, dur: 26 + Math.random() * 14, delay: -Math.random() * 30 - i * 11, rtl: i === 1,
   })), []);
   const wand = BR_KEEP_W;
   return (
-    <PixelScene artH={100} bg="#140606" className="blood-rock-overlay">
+    <PixelScene artH={100} bg="#08060c" className="blood-rock-overlay">
       <PixelBand src={BR + 'tile.png'} />
       <div className="pp-pixel-layer br-strom" style={ppMaske(BR + 'mask-tile.png', true)} />
       {batsFern.map((b, i) => (
@@ -407,7 +572,7 @@ const BloodRockOverlay = React.memo(function BloodRockOverlay() {
       {tropfen.map((d, i) => (
         <i key={'d' + i} className="pp-area-dyn pp-px-tropfen" style={{
           left: d.left, top: ppArt(d.y0), '--fall': ppArt(d.y1 - d.y0),
-          '--tropfen': '#8a120d', '--tropfen-dunkel': '#3d0506',
+          '--tropfen': '#8b0d0d', '--tropfen-dunkel': '#3a0000',
           animation: `ppPxTropfen ${d.dur.toFixed(2)}s ease-in ${d.delay.toFixed(2)}s infinite`,
         }} />
       ))}
@@ -428,7 +593,7 @@ const BloodRockOverlay = React.memo(function BloodRockOverlay() {
           }} />
         </div>
       ))}
-      <div className="pp-rand-dim" />
+      <PpRandDim />
       <style>{`
         /* Blut läuft: helle Schlieren wandern durch die Ströme nach unten */
         .br-strom {
@@ -587,21 +752,21 @@ function pgnGang(name, plan) {
 }
 
 const PangaiaOverlay = React.memo(function PangaiaOverlay() {
-  const dinos = useMemo(() => PGN_DINOS.slice(0, Math.max(4, ppFxN(PGN_DINOS.length))).map((d, i) => {
+  const dinos = useMemo(() => PGN_DINOS.slice(0, Math.max(4, ppAreaN(PGN_DINOS.length))).map((d, i) => {
     const g = pgnGang('pgnGang' + i, d.plan);
     const dur = g.n * d.takt;
     return { ...d, css: g.css, name: 'pgnGang' + i, dur, delay: d.verz !== undefined ? d.verz : -Math.random() * dur };
   }), []);
-  const flieger = useMemo(() => ppZufall(ppFxN(3), (i) => ({
+  const flieger = useMemo(() => ppZufall(ppAreaN(3), (i) => ({
     y: [6, 52, 30][i] + Math.random() * 8, dur: 20 + Math.random() * 10, delay: -Math.random() * 30, rtl: i % 2 === 1,
   })), []);
-  const rauch = useMemo(() => ppZufall(ppFxN(6), (i) => ({ dur: 5.5 + Math.random() * 2.5, delay: -i * 1.25 - Math.random(), dx: Math.round(Math.random() * 4) })), []);
-  const dampf = useMemo(() => ppZufall(ppFxN(3), (i) => ({ dur: 2.6 + Math.random(), delay: -i * 1.0, dx: i - 1 })), []);
-  const blasen = useMemo(() => PGN_KRATER.slice(0, ppFxN(PGN_KRATER.length)).map(([x, y]) => ({ x, y, dur: 2.2 + Math.random() * 2.2, delay: -Math.random() * 4 })), []);
-  const kraeusel = useMemo(() => PGN_SEE.slice(0, ppFxN(PGN_SEE.length)).map(([x, y]) => ({ x, y, dur: 4 + Math.random() * 4, delay: -Math.random() * 8 })), []);
+  const rauch = useMemo(() => ppZufall(ppAreaN(6), (i) => ({ dur: 5.5 + Math.random() * 2.5, delay: -i * 1.25 - Math.random(), dx: Math.round(Math.random() * 4) })), []);
+  const dampf = useMemo(() => ppZufall(ppAreaN(3), (i) => ({ dur: 2.6 + Math.random(), delay: -i * 1.0, dx: i - 1 })), []);
+  const blasen = useMemo(() => PGN_KRATER.slice(0, ppAreaN(PGN_KRATER.length)).map(([x, y]) => ({ x, y, dur: 2.2 + Math.random() * 2.2, delay: -Math.random() * 4 })), []);
+  const kraeusel = useMemo(() => PGN_SEE.slice(0, ppAreaN(PGN_SEE.length)).map(([x, y]) => ({ x, y, dur: 4 + Math.random() * 4, delay: -Math.random() * 8 })), []);
   const mitte = { left: `calc(50% - ${PGN_W / 2} * var(--px))`, width: ppArt(PGN_W), right: 'auto' };
   return (
-    <PixelScene artH={100} bg="#123a96" className="pangaia-overlay">
+    <PixelScene artH={100} bg="#02398c" className="pangaia-overlay">
       <PixelBand src={PGN + 'sea.png'} />
       <PixelPiece src={PGN + 'island.png'} w={PGN_W} />
       <div className="pp-pixel-layer pgn-glitzer" />
@@ -636,7 +801,7 @@ const PangaiaOverlay = React.memo(function PangaiaOverlay() {
           </div>
         </div>
       ))}
-      <div className="pp-rand-dim" />
+      <PpRandDim />
       <style>{`
         ${dinos.map(d => d.css).join('\n')}
         .pgn-dino { position: absolute; background-size: 800% 100%; background-repeat: no-repeat; }
@@ -644,10 +809,11 @@ const PangaiaOverlay = React.memo(function PangaiaOverlay() {
         .pgn-glitzer {
           position: absolute; inset: 0;
           background: url(${PGN}glitter.png) 0 0 / calc(32 * var(--px)) calc(96 * var(--px)) repeat;
-          -webkit-mask-image: url(${PGN}mask-water.png), linear-gradient(to right, #fff calc(50% - ${PGN_W / 2} * var(--px)), transparent 0 calc(50% + ${PGN_W / 2} * var(--px)), #fff 0);
-          mask-image: url(${PGN}mask-water.png), linear-gradient(to right, #fff calc(50% - ${PGN_W / 2} * var(--px)), transparent 0 calc(50% + ${PGN_W / 2} * var(--px)), #fff 0);
-          -webkit-mask-size: calc(${PGN_W} * var(--px)) 100%, 100% 100%; mask-size: calc(${PGN_W} * var(--px)) 100%, 100% 100%;
-          -webkit-mask-position: 50% 0, 0 0; mask-position: 50% 0, 0 0;
+          -webkit-mask-image: url(${PGN}mask-water.png), url(${PP_WEISS}), url(${PP_WEISS});
+          mask-image: url(${PGN}mask-water.png), url(${PP_WEISS}), url(${PP_WEISS});
+          -webkit-mask-size: calc(${PGN_W} * var(--px)) 100%, calc(50% - ${PGN_W / 2} * var(--px)) 100%, calc(50% - ${PGN_W / 2} * var(--px)) 100%;
+          mask-size: calc(${PGN_W} * var(--px)) 100%, calc(50% - ${PGN_W / 2} * var(--px)) 100%, calc(50% - ${PGN_W / 2} * var(--px)) 100%;
+          -webkit-mask-position: 50% 0, 0 0, 100% 0; mask-position: 50% 0, 0 0, 100% 0;
           -webkit-mask-repeat: no-repeat; mask-repeat: no-repeat;
           animation: pgnGlitzer 2.7s steps(1) infinite;
         }
@@ -743,40 +909,40 @@ const BOK_HECKEN_X = BOK_HECKEN.flatMap(([t, ks]) => ks.map(k => bokKachel(t, k)
   .filter(x => Math.abs(x) > 80).sort((a, b) => Math.abs(a) - Math.abs(b));
 
 const BoardOfKingsOverlay = React.memo(function BoardOfKingsOverlay() {
-  const glanz = useMemo(() => ppZufall(ppFxN(6), () => {
+  const glanz = useMemo(() => ppZufall(ppAreaN(6), () => {
     const col = Math.floor(Math.random() * BOK_BRETT.spalten), row = 1 + Math.floor(Math.random() * 7);
     return {
       x: -BOK_BRETT.feld * BOK_BRETT.spalten / 2 + col * BOK_BRETT.feld + 1, y: BOK_BRETT.oy + row * BOK_BRETT.feld + 1,
       dunkel: (col + row) % 2 === 1, dur: 6 + Math.random() * 6, delay: -Math.random() * 12,
     };
   }), []);
-  const funkeln = useMemo(() => ppZufall(ppFxN(4), (i) => ({
+  const funkeln = useMemo(() => ppZufall(ppAreaN(4), (i) => ({
     x: i % 2 ? 61 : -62, y: BOK_BRETT.oy + BOK_BRETT.feld * (1 + Math.floor(Math.random() * 8)),
     dur: 5 + Math.random() * 5, delay: -Math.random() * 10,
   })), []);
-  const blaetter = useMemo(() => ppZufall(ppFxN(8), (i) => ({
+  const blaetter = useMemo(() => ppZufall(ppAreaN(8), (i) => ({
     y: 4 + Math.random() * 86, dur: 16 + Math.random() * 12, delay: -Math.random() * 28, rtl: i % 2 === 1,
     farbe: i % 3, bob: 2 + Math.floor(Math.random() * 4), tumble: .5 + Math.random() * .5,
   })), []);
-  const falter = useMemo(() => ppZufall(ppFxN(4), (i) => ({
+  const falter = useMemo(() => ppZufall(ppAreaN(4), (i) => ({
     x: BOK_HECKEN_X[i % BOK_HECKEN_X.length] + (Math.random() - .5) * 8, y: 12 + Math.random() * 70,
     farbe: i % 3, dur: 7 + Math.random() * 5, delay: -Math.random() * 12, b: i % 2 === 1,
   })), []);
-  const quer = useMemo(() => ppZufall(ppFxN(1), () => ({
+  const quer = useMemo(() => ppZufall(ppAreaN(1), () => ({
     y: 20 + Math.random() * 50, dur: 34 + Math.random() * 10, delay: -Math.random() * 30, rtl: Math.random() < .5,
   })), []);
-  const bienen = useMemo(() => ppZufall(ppFxN(6), (i) => ({
+  const bienen = useMemo(() => ppZufall(ppAreaN(6), (i) => ({
     x: BOK_HECKEN_X[i % 4] + (Math.random() - .5) * 12, y: 8 + Math.random() * 82,
     dur: 1.4 + Math.random() * 1.2, delay: -Math.random() * 3, b: i % 2 === 1, drift: 2 + Math.floor(Math.random() * 3),
   })), []);
-  const tauben = useMemo(() => ppZufall(ppFxN(1), () => ({
+  const tauben = useMemo(() => ppZufall(ppAreaN(1), () => ({
     y: 14 + Math.random() * 50, dur: 46 + Math.random() * 14, delay: -Math.random() * 20, rtl: Math.random() < .5,
   })), []);
-  const kaefer = useMemo(() => ppZufall(ppFxN(2), (i) => ({
+  const kaefer = useMemo(() => ppZufall(ppAreaN(2), (i) => ({
     x: i ? 68 : -71, dur: 70 + Math.random() * 30, delay: -Math.random() * 80, ab: i === 1,
   })), []);
   return (
-    <PixelScene artH={100} bg="#1c3a18" className="board-of-kings-overlay">
+    <PixelScene artH={100} bg="#18300a" className="board-of-kings-overlay">
       <PixelBand src={BOK + 'hedge.png'} />
       <PixelBand src={BOK + 'blossoms.png'} style={{ backgroundSize: 'auto 300%', animation: 'ppBand3 2.7s steps(1) infinite' }} />
       <PixelPiece src={BOK + 'board.png'} w={BOK_W} />
@@ -793,7 +959,7 @@ const BoardOfKingsOverlay = React.memo(function BoardOfKingsOverlay() {
       <i className="pp-area-dyn bok-wolke b" />
       {tauben.map((t, i) => (
         <div key={'ts' + i} className="pp-area-dyn bok-flug" style={{ top: ppArt(t.y + 8), marginLeft: ppArt(-6), animation: `${t.rtl ? 'bokFlugRtl' : 'bokFlugLtr'} ${t.dur.toFixed(1)}s linear ${t.delay.toFixed(1)}s infinite` }}>
-          <i className="bok-taube schatten" style={{ transform: t.rtl ? 'scaleX(-1)' : undefined }} />
+          <PpFarbfilterSprite src={BOK + 'dove.png'} filter="brightness(0)" className="bok-taube schatten" style={{ transform: t.rtl ? 'scaleX(-1)' : undefined }} />
         </div>
       ))}
       {bienen.map((b, i) => (
@@ -821,7 +987,7 @@ const BoardOfKingsOverlay = React.memo(function BoardOfKingsOverlay() {
           <i className="bok-taube" style={{ transform: t.rtl ? 'scaleX(-1)' : undefined }} />
         </div>
       ))}
-      <div className="pp-rand-dim" />
+      <PpRandDim />
       <style>{`
         .bok-glanz {
           position: absolute; width: calc(11 * var(--px)); height: calc(11 * var(--px));
@@ -835,7 +1001,7 @@ const BoardOfKingsOverlay = React.memo(function BoardOfKingsOverlay() {
           95.5% { background-position-x: 71.43%; } 97% { background-position-x: 85.71%; }
           98.5%, 100% { background-position-x: 0%; }
         }
-        .bok-funkeln { filter: sepia(1) saturate(2.2) brightness(1.05); }
+        .bok-funkeln { --funkel: #f7f7ad; }
         .bok-wolke {
           position: absolute; top: 0; left: 0; width: calc(112 * var(--px)); height: calc(60 * var(--px));
           background: url(${BOK}cloud.png) 0 0 / 100% 100% no-repeat;
@@ -870,8 +1036,8 @@ const BoardOfKingsOverlay = React.memo(function BoardOfKingsOverlay() {
           70% { transform: translate(calc(7 * var(--px)), calc(1 * var(--px))); } 85% { transform: translate(calc(2 * var(--px)), calc(4 * var(--px))); }
         }
         .bok-biene-ort { position: absolute; width: var(--px); height: var(--px); }
-        .bok-biene { position: absolute; width: calc(2 * var(--px)); height: var(--px); background: linear-gradient(90deg, #1e1406 50%, #f0c23a 50%); }
-        @keyframes bokFluegel { 0% { box-shadow: 0 calc(-1 * var(--px)) 0 rgba(230, 236, 245, .8); } 50% { box-shadow: var(--px) calc(-1 * var(--px)) 0 rgba(230, 236, 245, .55); } }
+        .bok-biene { position: absolute; width: calc(2 * var(--px)); height: var(--px); background: #fad54a; box-shadow: inset var(--px) 0 0 0 #1f0f04; }
+        @keyframes bokFluegel { 0% { box-shadow: 0 calc(-1 * var(--px)) 0 rgba(229,237,250,.8); } 50% { box-shadow: var(--px) calc(-1 * var(--px)) 0 rgba(229,237,250,.55); } }
         @keyframes bokSummA {
           0%, 100% { transform: translate(0, 0); } 12.5% { transform: translate(calc(3 * var(--px)), calc(-2 * var(--px))); }
           25% { transform: translate(calc(5 * var(--px)), 0); } 37.5% { transform: translate(calc(3 * var(--px)), calc(2 * var(--px))); }
@@ -891,7 +1057,7 @@ const BoardOfKingsOverlay = React.memo(function BoardOfKingsOverlay() {
           background: url(${BOK}dove.png) 0 0 / 300% 100% no-repeat;
           animation: bokSchlag .6s steps(1) infinite;
         }
-        .bok-taube.schatten { filter: brightness(0); opacity: .22; }
+        .bok-taube.schatten { background-image: none; opacity: .22; }      /* ★ W86a: Silhouette als vorgerechnetes Bild (PpFarbfilterSprite) statt filter: brightness(0) */
         @keyframes bokSchlag { 0% { background-position: 0 0; } 25% { background-position: 50% 0; } 50% { background-position: 100% 0; } 75% { background-position: 50% 0; } }
         .bok-kaefer {
           position: absolute; top: 0; width: calc(3 * var(--px)); height: calc(4 * var(--px));
@@ -976,7 +1142,7 @@ const SharedBloodTanksOverlay = React.memo(function SharedBloodTanksOverlay() {
   // Blasen: Tanks bei 64·k neben der Brettmitte (k = 0 steht hinter der Pumpe)
   const blasen = useMemo(() => {
     const tanks = [-1, 1, -2, 2, -3, 3, -4, 4, -5, 5];
-    return ppZufall(ppFxN(24), (i) => ({
+    return ppZufall(ppAreaN(24), (i) => ({
       x: tanks[i % tanks.length] * 64 - 17 + Math.floor(Math.random() * 35),
       dur: 3 + Math.random() * 3, delay: -Math.random() * 6, gross: Math.random() < .3,
     }));
@@ -987,16 +1153,16 @@ const SharedBloodTanksOverlay = React.memo(function SharedBloodTanksOverlay() {
     { x: 96, y0: 47, y1: 86, dur: 5.1 }, { x: -96, y0: 47, y1: 85, dur: 3.9 },
     { x: 160, y0: 47, y1: 86, dur: 4.7 }, { x: -160, y0: 47, y1: 85, dur: 5.5 },
     { x: -37, y0: 10, y1: 37, dur: 6.2 }, { x: 37, y0: 10, y1: 37, dur: 5.8 }, { x: 91, y0: 10, y1: 37, dur: 6.8 },
-  ].slice(0, ppFxN(9)).map(d => ({ ...d, delay: -Math.random() * d.dur })), []);
+  ].slice(0, ppAreaN(9)).map(d => ({ ...d, delay: -Math.random() * d.dur })), []);
   const laternen = useMemo(() => Array.from({ length: 12 }, (_, i) => ({
     x: 32 + 64 * (i - 6), dur: 1.6 + Math.random() * 1.4, delay: -Math.random() * 3,
   })), []);
-  const ratten = useMemo(() => ppZufall(ppFxN(2), (i) => ({
+  const ratten = useMemo(() => ppZufall(ppAreaN(2), (i) => ({
     y: 94 + i * 3, dur: 26 + Math.random() * 12, delay: -Math.random() * 30, rtl: i % 2 === 1,
   })), []);
-  const dampf = useMemo(() => ppZufall(ppFxN(3), (i) => ({ dur: 3.2, delay: -i * 1.07 })), []);
+  const dampf = useMemo(() => ppZufall(ppAreaN(3), (i) => ({ dur: 3.2, delay: -i * 1.07 })), []);
   return (
-    <PixelScene artH={100} bg="#120d0d" className="shared-blood-tanks-overlay">
+    <PixelScene artH={100} bg="#141414" className="shared-blood-tanks-overlay">
       <PixelBand src={SBT + 'tile.png'} />
       {/* Blut in den Tanks: Maske = Glasinneres, darin hebt/senkt sich die Blutebene */}
       <div className="pp-pixel-layer" style={{ position: 'absolute', inset: 0, ...ppMaske(SBT + 'mask-tank.png', true) }}>
@@ -1040,7 +1206,7 @@ const SharedBloodTanksOverlay = React.memo(function SharedBloodTanksOverlay() {
         <React.Fragment key={'d' + i}>
           <i className="pp-area-dyn pp-px-tropfen" style={{
             left: ppArtX(d.x, 0), top: ppArt(d.y0), '--fall': ppArt(d.y1 - d.y0),
-            '--tropfen': '#9a1614', '--tropfen-dunkel': '#4a0607',
+            '--tropfen': '#8b0d0d', '--tropfen-dunkel': '#520a0c',
             animation: `ppPxTropfen ${d.dur}s ease-in ${d.delay.toFixed(2)}s infinite`,
           }} />
           <i className="pp-area-dyn sbt-kraeusel" style={{
@@ -1056,12 +1222,12 @@ const SharedBloodTanksOverlay = React.memo(function SharedBloodTanksOverlay() {
           <i className="sbt-ratte" style={{ transform: r.rtl ? 'scaleX(-1)' : undefined }} />
         </div>
       ))}
-      <div className="pp-rand-dim" />
+      <PpRandDim />
       <style>{`
         .sbt-spiegel { position: absolute; inset: 0; animation: sbtSpiegel ${SBT_LEVEL_S}s steps(1) infinite; }
         @keyframes sbtSpiegel { ${SBT_SPIEGEL_KF} }
-        .sbt-blase { position: absolute; width: var(--px); height: var(--px); background: #d0564a; opacity: 0; }
-        .sbt-blase.gross { box-shadow: var(--px) 0 0 #a8302a, 0 var(--px) 0 #a8302a, var(--px) var(--px) 0 #7c1a18; background: #e27a6c; }
+        .sbt-blase { position: absolute; width: var(--px); height: var(--px); background: #e94e53; opacity: 0; }
+        .sbt-blase.gross { box-shadow: var(--px) 0 0 #9d342f, 0 var(--px) 0 #9d342f, var(--px) var(--px) 0 #780014; background: #ec7f79; }
         @keyframes sbtBlase {
           0% { transform: translate(0, 0); opacity: 0; }
           8% { opacity: .9; }
@@ -1224,28 +1390,28 @@ const AR_BANNER = [81, 135];                        // linke Kante (Stück-x), h
 const arHofHalb = (y) => 36 + (y - 56) * (72 / 44);
 
 const AcidRainOverlay = React.memo(function AcidRainOverlay() {
-  const spritzer = useMemo(() => ppZufall(ppFxN(16), () => {
+  const spritzer = useMemo(() => ppZufall(ppAreaN(16), () => {
     const y = 60 + Math.random() * 38;
     const hw = arHofHalb(y) - 4;
     return { x: (Math.random() * 2 - 1) * hw, y, dur: 0.8 + Math.random() * 1.3, delay: -Math.random() * 2 };
   }), []);
-  const ringe = useMemo(() => ppZufall(ppFxN(16), () => {
+  const ringe = useMemo(() => ppZufall(ppAreaN(16), () => {
     const y = 57 + Math.random() * 41;
     const rand = arHofHalb(y) + 5;
     const x = (Math.random() < 0.5 ? -1 : 1) * (rand + Math.random() * (200 - rand));
     return { x, y, dur: 1.1 + Math.random() * 1.4, delay: -Math.random() * 2.5 };
   }), []);
-  const dampf = useMemo(() => AR_PFUETZEN.slice(0, ppFxN(AR_PFUETZEN.length)).map(([x, y, w]) => ({
+  const dampf = useMemo(() => AR_PFUETZEN.slice(0, ppAreaN(AR_PFUETZEN.length)).map(([x, y, w]) => ({
     x: x + (Math.random() * 2 - 1) * (w - 2), y, dur: 2.6 + Math.random() * 1.8, delay: -Math.random() * 4,
   })), []);
-  const blasen = useMemo(() => AR_PFUETZEN.slice(0, ppFxN(AR_PFUETZEN.length)).map(([x, y, w]) => ({
+  const blasen = useMemo(() => AR_PFUETZEN.slice(0, ppAreaN(AR_PFUETZEN.length)).map(([x, y, w]) => ({
     x: x + (Math.random() * 2 - 1) * (w - 2), y, dur: 1.2 + Math.random() * 1.2, delay: -Math.random() * 2,
   })), []);
-  const speier = useMemo(() => AR_SPEIER.slice(0, ppFxN(AR_SPEIER.length)).map(() => ({
+  const speier = useMemo(() => AR_SPEIER.slice(0, ppAreaN(AR_SPEIER.length)).map(() => ({
     dur: 0.3 + Math.random() * 0.12,
   })), []);
   return (
-    <PixelScene artH={100} bg="#1e0e12" className="acid-rain-overlay">
+    <PixelScene artH={100} bg="#1f0f04" className="acid-rain-overlay">
       <div className="pp-pixel-layer ar-wolken" />
       <div className="pp-area-dyn ar-himmelblitz" />
       <i className="pp-area-dyn ar-blitz" style={{ left: ppArtX(-74, 0), top: 0, animation: 'arBlitz 13s steps(1) -4s infinite, arBlitzForm 13s steps(1) -4s infinite' }} />
@@ -1261,7 +1427,7 @@ const AcidRainOverlay = React.memo(function AcidRainOverlay() {
       <div className="pp-pixel-layer ar-dunst" style={{ top: ppArt(47) }} />
       <PixelPiece src={AR + 'court.png'} w={AR_W} />
       {AR_LATERNEN.map((x, i) => (
-        <i key={'l' + i} className="ar-schein" style={{ left: ppArtX(x - 7, AR_W), top: ppArt(27), animationDelay: `${-i * .9}s` }} />
+        <PpGlow {...GL_AR_SCHEIN} key={'l' + i} className="ar-schein" style={{ left: ppArtX(x - 7, AR_W), top: ppArt(27), animationDelay: `${-i * .9}s` }} />
       ))}
       {AR_BANNER.map((x, i) => (
         <i key={'b' + i} className="ar-banner" style={{ left: ppArtX(x, AR_W), top: ppArt(8), animationDuration: `${1.1 + i * .17}s` }} />
@@ -1293,7 +1459,7 @@ const AcidRainOverlay = React.memo(function AcidRainOverlay() {
       ))}
       <div className="pp-pixel-layer pp-area-dyn ar-regen nah" />
       <div className="pp-area-dyn ar-blitzlicht" />
-      <div className="pp-rand-dim" />
+      <PpRandDim />
       <style>{`
         .ar-wolken {
           position: absolute; left: 0; right: 0; top: 0; height: calc(12 * var(--px));
@@ -1303,7 +1469,7 @@ const AcidRainOverlay = React.memo(function AcidRainOverlay() {
         @keyframes arWolken { from { background-position: 50% 0; } to { background-position: calc(50% - 128 * var(--px)) 0; } }
         /* Blitze zucken hinter den Zinnen: der Himmelsstreifen hellt auf, die Zinnen stehen als Scherenschnitt davor */
         .ar-himmelblitz {
-          position: absolute; left: 0; right: 0; top: 0; height: calc(12 * var(--px)); background: #9c3a34; opacity: 0;
+          position: absolute; left: 0; right: 0; top: 0; height: calc(12 * var(--px)); background: #9d342f; opacity: 0;
           animation: arBlitzLicht 13s steps(1) -4s infinite;
         }
         .ar-blitz {
@@ -1316,8 +1482,12 @@ const AcidRainOverlay = React.memo(function AcidRainOverlay() {
         @keyframes arBlitzForm { 0%, 94% { background-position: 0 0; } 94.2%, 100% { background-position: 100% 0; } }
         @keyframes arBlitzFern { 0%, 95% { opacity: 0; } 95.6% { opacity: .75; } 96.4%, 100% { opacity: 0; } }
         .ar-blitzlicht {
-          position: absolute; inset: 0; background: #ff6a54; mix-blend-mode: soft-light; opacity: 0;
-          animation: arBlitzLicht 13s steps(1) -4s infinite;
+          /* ★ W86a: kein Mischmodus mehr — das Aufhellen ist ein heller Rosa-Dither (Deckkraft = Punktdichte, vom Pixelierer gedithert) */
+          position: absolute; inset: 0; background: #f9b3b3; opacity: 0;
+          animation: arBlitzLicht2 13s steps(1) -4s infinite;
+        }
+        @keyframes arBlitzLicht2 {
+          0%, 91% { opacity: 0; } 92% { opacity: .25; } 93% { opacity: .06; } 94.5% { opacity: .2; } 95.5% { opacity: .06; } 96.5%, 100% { opacity: 0; }
         }
         @keyframes arBlitzLicht {
           0%, 91% { opacity: 0; } 92% { opacity: .5; } 93% { opacity: .1; } 94.5% { opacity: .4; } 95.5% { opacity: .12; } 96.5%, 100% { opacity: 0; }
@@ -1345,8 +1515,7 @@ const AcidRainOverlay = React.memo(function AcidRainOverlay() {
           background: url(${AR}foam.png) 0 0 / 300% 100% no-repeat; animation: ppSprite3 .42s steps(1) infinite;
         }
         .ar-schein {
-          position: absolute; width: calc(14 * var(--px)); height: calc(14 * var(--px)); border-radius: 50%;
-          background: radial-gradient(circle, rgba(255,190,90,.34) 0%, rgba(255,150,60,.14) 45%, rgba(255,150,60,0) 70%);
+          position: absolute; width: calc(14 * var(--px)); height: calc(14 * var(--px));
           animation: arSchein 1.7s steps(1) infinite;
         }
         @keyframes arSchein { 0% { opacity: .85; } 18% { opacity: 1; } 31% { opacity: .7; } 52% { opacity: .95; } 71% { opacity: .78; } 86% { opacity: 1; } }
@@ -1444,15 +1613,15 @@ const COT = '/areas/cottage/';
 const COT_W = 184;                         // Hüttenstück; Stück-x 92 = Brettmitte
 const COT_KAMIN = [143, 6];                // Schornsteinmündung (Stück-x, y)
 const CottageOverlay = React.memo(function CottageOverlay() {
-  const falter = useMemo(() => ppZufall(ppFxN(3), (i) => ({
+  const falter = useMemo(() => ppZufall(ppAreaN(3), (i) => ({
     y: 40 + Math.random() * 46, dur: 22 + Math.random() * 14, delay: -Math.random() * 30,
-    bob: 2 + Math.random() * 3, rtl: i % 2 === 1, farbe: i === 1 ? 'hue-rotate(160deg) saturate(.6) brightness(1.3)' : undefined,
+    bob: 2 + Math.random() * 3, rtl: i % 2 === 1, farbe: i === 1 ? 'hue-rotate(160deg) saturate(.6) brightness(1.3)' : undefined,   // pp-ok: drehung (Farbfilter-Text, keine Drehung: wird in PpFarbfilterSprite ins Bild gerechnet)
   })), []);
-  const blaetter = useMemo(() => ppZufall(ppFxN(6), () => ({
+  const blaetter = useMemo(() => ppZufall(ppAreaN(6), () => ({
     x: Math.random() * 100, dur: 9 + Math.random() * 7, delay: -Math.random() * 14,
   })), []);
   // Glühwürmchen am Waldrand links und rechts der Hütte (und ein paar vorn in der Wiese)
-  const gluehw = useMemo(() => ppZufall(ppFxN(14), (i) => {
+  const gluehw = useMemo(() => ppZufall(ppAreaN(14), (i) => {
     const seite = i % 2 ? 1 : -1;
     const vorn = i >= 10;
     return {
@@ -1462,9 +1631,9 @@ const CottageOverlay = React.memo(function CottageOverlay() {
       wdur: 6 + Math.random() * 6, wdelay: -Math.random() * 10,
     };
   }), []);
-  const rauch = useMemo(() => ppZufall(ppFxN(4), (i) => ({ delay: -i * 1.6 })), []);
+  const rauch = useMemo(() => ppZufall(ppAreaN(4), (i) => ({ delay: -i * 1.6 })), []);
   return (
-    <PixelScene artH={100} bg="#2e3c24" className="cottage-overlay">
+    <PixelScene artH={100} bg="#1a4128" className="cottage-overlay">
       <PixelBand src={COT + 'far.png'} />
       <PixelBand src={COT + 'tile.png'} />
       <PixelBand src={COT + 'shafts.png'} className="cot-strahlen" />
@@ -1493,10 +1662,11 @@ const CottageOverlay = React.memo(function CottageOverlay() {
       ))}
       {falter.map((f, i) => (
         <div key={'f' + i} className="pp-area-dyn pp-quer" style={ppQuer(f.y, f.dur, f.delay, f.rtl)}>
-          <i className="cot-falter" style={{ '--bob': ppArt(f.bob), transform: f.rtl ? 'scaleX(-1)' : undefined, filter: f.farbe }} />
+          {f.farbe ? <PpFarbfilterSprite src={COT + 'butterfly.png'} filter={f.farbe} className="cot-falter" style={{ '--bob': ppArt(f.bob), transform: f.rtl ? 'scaleX(-1)' : undefined }} />
+            : <i className="cot-falter" style={{ '--bob': ppArt(f.bob), transform: f.rtl ? 'scaleX(-1)' : undefined }} />}
         </div>
       ))}
-      <div className="pp-rand-dim" />
+      <PpRandDim />
       <style>{`
         .cot-strahlen { animation: cotStrahl 7s steps(1) infinite; }
         @keyframes cotStrahl { 0% { opacity: .7; } 20% { opacity: .85; } 40% { opacity: 1; } 60% { opacity: .9; } 80% { opacity: .75; } }
@@ -1516,8 +1686,9 @@ const CottageOverlay = React.memo(function CottageOverlay() {
         }
         @keyframes cotRauchZug { from { transform: translate(0, 0); } to { transform: translate(calc(-26 * var(--px)), calc(-7 * var(--px))); } }
         .cot-gluehw {
-          position: absolute; width: var(--px); height: var(--px); background: #f4ff9a; opacity: 0;
-          box-shadow: 0 0 calc(2 * var(--px)) calc(.5 * var(--px)) rgba(220, 255, 120, .55);
+          position: absolute; width: var(--px); height: var(--px); background: #fff196; opacity: 0;
+          /* ★ W86a: Schein = vier dunklere Nachbarpixel (Kreuz) statt weichem Halo */
+          box-shadow: 0 calc(-1 * var(--px)) 0 0 #80bf59, 0 var(--px) 0 0 #80bf59, calc(-1 * var(--px)) 0 0 0 #80bf59, var(--px) 0 0 0 #80bf59;
         }
         @keyframes cotGlueh { 0%, 45% { opacity: 0; } 50% { opacity: .6; } 56%, 74% { opacity: 1; } 80% { opacity: .5; } 85%, 100% { opacity: 0; } }
         @keyframes cotSchweb { from { translate: 0 0; } to { translate: calc(4 * var(--px)) calc(-3 * var(--px)); } }
@@ -1619,7 +1790,7 @@ const cwlKachel = (t, k) => t - 64 + 128 * k;
 const CWL_DRUSEN = [[104, 28], [101, 32], [107, 31], [40, 86], [74, 24]];
 
 const CrystalWellOverlay = React.memo(function CrystalWellOverlay() {
-  const funken = useMemo(() => ppZufall(ppFxN(22), (i) => {
+  const funken = useMemo(() => ppZufall(ppAreaN(22), (i) => {
     const a = Math.random() * Math.PI * 2;
     if (i < 10) return { x: Math.cos(a) * 58, y: 50 + Math.sin(a) * 22, dur: 1.8 + Math.random() * 2, delay: -Math.random() * 4 };
     if (i < 13) return { x: (Math.random() - .5) * 50, y: 47 + Math.random() * 9, dur: 1.4 + Math.random() * 1.6, delay: -Math.random() * 3 };
@@ -1627,21 +1798,21 @@ const CrystalWellOverlay = React.memo(function CrystalWellOverlay() {
     const k = [-2, -1, 1, 2][Math.floor(Math.random() * 4)];
     return { x: cwlKachel(t, k) + Math.round((Math.random() - .5) * 4), y: y + Math.round(Math.random() * 5), dur: 2.4 + Math.random() * 2, delay: -Math.random() * 5 };
   }), []);
-  const ringe = useMemo(() => ppZufall(ppFxN(4), () => ({
+  const ringe = useMemo(() => ppZufall(ppAreaN(4), () => ({
     x: Math.round((Math.random() - .5) * 40), y: 49 + Math.round(Math.random() * 5), dur: 3.2 + Math.random() * 2.4, delay: -Math.random() * 6,
   })), []);
-  const steigen = useMemo(() => ppZufall(ppFxN(8), () => ({
+  const steigen = useMemo(() => ppZufall(ppAreaN(8), () => ({
     x: Math.round((Math.random() - .5) * 52), y: 50 + Math.round(Math.random() * 6), dur: 3.5 + Math.random() * 3, delay: -Math.random() * 7,
   })), []);
-  const gluehen = useMemo(() => ppZufall(ppFxN(14), () => ({
+  const gluehen = useMemo(() => ppZufall(ppAreaN(14), () => ({
     x: Math.round((Math.random() - .5) * 420), y: 26 + Math.round(Math.random() * 70),
     dur: 5 + Math.random() * 5, delay: -Math.random() * 10, b: Math.random() < .5,
   })).filter(g => !(Math.abs(g.x) < 70 && g.y > 18 && g.y < 94)), []);
-  const falter = useMemo(() => ppZufall(ppFxN(2), (i) => ({
+  const falter = useMemo(() => ppZufall(ppAreaN(2), (i) => ({
     y: 30 + Math.random() * 50, dur: 24 + Math.random() * 12, delay: -Math.random() * 30, rtl: i % 2 === 1, bob: 2 + Math.random() * 2,
   })), []);
   return (
-    <PixelScene artH={100} bg="#1664e8" className="crystal-well-overlay">
+    <PixelScene artH={100} bg="#3866f0" className="crystal-well-overlay">
       <PixelBand src={CWL + 'tile.png'} />
       <PixelBand src={CWL + 'glow.png'} className="cwl-atmen" />
       <PixelBand src={CWL + 'sway-b.png'} className="cwl-wiegen b" style={{ backgroundSize: 'auto 300%' }} />
@@ -1669,7 +1840,7 @@ const CrystalWellOverlay = React.memo(function CrystalWellOverlay() {
           <i className="cwl-falter" style={{ '--bob': ppArt(f.bob), transform: f.rtl ? 'scaleX(-1)' : undefined }} />
         </div>
       ))}
-      <div className="pp-rand-dim" />
+      <PpRandDim />
       <style>{`
         .cwl-atmen { animation: cwlAtmen 3.4s ease-in-out infinite alternate; }
         .cwl-atmen.b { animation-duration: 2.6s; animation-delay: -1.3s; }
@@ -1695,17 +1866,17 @@ const CrystalWellOverlay = React.memo(function CrystalWellOverlay() {
           20% { background-position: 66.667% 0; } 30% { background-position: 100% 0; } 40%, 100% { opacity: 0; }
         }
         .cwl-funke {
-          position: absolute; width: var(--px); height: var(--px); background: #e8fcff; opacity: 0;
-          box-shadow: 0 var(--px) 0 rgba(120, 210, 255, .55);
+          position: absolute; width: var(--px); height: var(--px); background: #e5f5fa; opacity: 0;
+          box-shadow: 0 var(--px) 0 rgba(119,200,238,.55);
         }
         @keyframes cwlSteigen {
           0% { transform: translateY(0); opacity: 0; } 10% { opacity: 1; } 70% { opacity: .8; }
           100% { transform: translateY(calc(-26 * var(--px))); opacity: 0; }
         }
         .cwl-gluehwurm {
-          position: absolute; width: var(--px); height: var(--px); background: #f2ffff; opacity: 0;
-          box-shadow: var(--px) 0 0 rgba(140, 225, 255, .45), calc(-1 * var(--px)) 0 0 rgba(140, 225, 255, .45),
-                      0 var(--px) 0 rgba(140, 225, 255, .45), 0 calc(-1 * var(--px)) 0 rgba(140, 225, 255, .45);
+          position: absolute; width: var(--px); height: var(--px); background: #e5f5fa; opacity: 0;
+          box-shadow: var(--px) 0 0 rgba(127,223,255,.45), calc(-1 * var(--px)) 0 0 rgba(127,223,255,.45),
+                      0 var(--px) 0 rgba(127,223,255,.45), 0 calc(-1 * var(--px)) 0 rgba(127,223,255,.45);
         }
         @keyframes cwlSchwebenA {
           0% { transform: translate(0, 0); opacity: 0; } 15% { opacity: 1; }
@@ -1736,7 +1907,7 @@ const CrystalWellOverlay = React.memo(function CrystalWellOverlay() {
 //  Karte: dunkelgraue, FARBLOSE Meeresoberfläche. Als Vorgabe (5.8.):
 //  dunkelgrau, entsättigt, bedrohlich, mit Seegang — die Karten dürfen
 //  nicht verschleiert werden. Farblos bleibt farblos: alles in Grautönen
-//  (nur der leichte Kaltstich des alten #323335).
+//  (nur der leichte Kaltstich des alten #323232).
 //
 //  Überarbeitung v1441 (Al 25.9.: „deine haben ein anderes Level"): mehr
 //  Tiefe und Leben im Wasser. Leichte Perspektive (fern oben: kleinere
@@ -1769,25 +1940,25 @@ const CrystalWellOverlay = React.memo(function CrystalWellOverlay() {
 const DOC = '/areas/dark-ocean/';
 const DOC_TREIBGUT = [0, 1, 2, 3];                  // Zeilen in debris.png (26×10 je Bild)
 const DarkOceanOverlay = React.memo(function DarkOceanOverlay() {
-  const kronen = useMemo(() => ppZufall(ppFxN(11), (i) => {
+  const kronen = useMemo(() => ppZufall(ppAreaN(11), (i) => {
     const y = 18 + Math.random() * 78;
     return { x: 3 + Math.random() * 94, y, gross: y > 46, dur: 5 + Math.random() * 6, delay: -Math.random() * 11 };
   }), []);
-  const tropfen = useMemo(() => ppZufall(ppFxN(18), () => ({
+  const tropfen = useMemo(() => ppZufall(ppAreaN(18), () => ({
     x: Math.random() * 100, y: 4 + Math.random() * 93, dur: 1.3 + Math.random() * 1.6, delay: -Math.random() * 3,
   })), []);
   const treibgut = useMemo(() => {
     const start = Math.floor(Math.random() * 4);          // jedes Stück nur einmal
-    return ppZufall(ppFxN(3), (i) => ({
+    return ppZufall(ppAreaN(3), (i) => ({
     art: DOC_TREIBGUT[(start + i) % 4], y: 20 + i * 24 + Math.random() * 12,
     dur: 120 + Math.random() * 60, delay: -Math.random() * 180, bob: 1.7 + Math.random() * 1.2,
     }));
   }, []);
-  const fische = useMemo(() => ppZufall(ppFxN(2), (i) => ({
+  const fische = useMemo(() => ppZufall(ppAreaN(2), (i) => ({
     y: 25 + Math.random() * 55, dur: 26 + Math.random() * 12, delay: -Math.random() * 40, rtl: i === 0,
   })), []);
   return (
-    <PixelScene artH={100} bg="#303134" className="dark-ocean-overlay">
+    <PixelScene artH={100} bg="#323232" className="dark-ocean-overlay">
       <PixelBand src={DOC + 'tile.png'} />
       <div className="pp-area-dyn doc-tier-bahn"><i className="doc-tier" /></div>
       {fische.map((f, i) => (
@@ -1819,8 +1990,8 @@ const DarkOceanOverlay = React.memo(function DarkOceanOverlay() {
       ))}
       <div className="pp-pixel-layer pp-area-dyn doc-regen" />
       <PixelBand src={DOC + 'fog.png'} className="doc-nebel" />
-      <div className="pp-area-dyn doc-blitz" />
-      <div className="pp-rand-dim" />
+      <PpGlow {...GL_DOC_BLITZ} className="pp-area-dyn doc-blitz" />
+      <PpRandDim />
       <style>{`
         .doc-see { animation: docSee 8.1s steps(18) infinite; }
         @keyframes docSee { from { background-position: 50% 0; } to { background-position: 50% calc(-1800 * var(--px)); } }
@@ -1877,7 +2048,6 @@ const DarkOceanOverlay = React.memo(function DarkOceanOverlay() {
         @keyframes docWippen { 0% { translate: 0 0; } 50% { translate: 0 var(--px); } }
         .doc-blitz {
           position: absolute; inset: 0; opacity: 0;
-          background: linear-gradient(180deg, rgba(205,207,214,.2) 0%, rgba(205,207,214,.07) 45%, rgba(205,207,214,0) 80%);
           animation: docBlitz 23s steps(1) infinite;
         }
         @keyframes docBlitz { 0%, 88% { opacity: 0; } 88.4% { opacity: .8; } 88.9% { opacity: .15; } 89.6% { opacity: .55; } 90.3%, 100% { opacity: 0; } }
@@ -1941,25 +2111,25 @@ const DSC_WIMPEL = [[53, 19], [123, 19]];            // Mastspitzen (Stück-x, y
 const DSC_GLANZ = [[87, 1], [36, 1], [138, 1], [20, 35], [154, 35], [69, 89], [73, 89]];
 const DSC_TRUHE = [70, 88];                          // Blasen aus dem Truhenspalt
 const DeepseaCastleOverlay = React.memo(function DeepseaCastleOverlay() {
-  const blasen = useMemo(() => ppZufall(ppFxN(12), () => ({
+  const blasen = useMemo(() => ppZufall(ppAreaN(12), () => ({
     x: Math.random() * 100, dur: 6 + Math.random() * 5, delay: -Math.random() * 11, gross: Math.random() < .3,
   })), []);
-  const truhe = useMemo(() => ppZufall(ppFxN(3), (i) => ({ dur: 5.5 + i * .7, delay: -i * 2.1 - Math.random() })), []);
-  const schnee = useMemo(() => ppZufall(ppFxN(18), () => ({
+  const truhe = useMemo(() => ppZufall(ppAreaN(3), (i) => ({ dur: 5.5 + i * .7, delay: -i * 2.1 - Math.random() })), []);
+  const schnee = useMemo(() => ppZufall(ppAreaN(18), () => ({
     x: Math.random() * 100, dur: 16 + Math.random() * 12, delay: -Math.random() * 28, hell: Math.random() < .4,
   })), []);
-  const fische = useMemo(() => ppZufall(ppFxN(4), (i) => ({
+  const fische = useMemo(() => ppZufall(ppAreaN(4), (i) => ({
     y: 34 + Math.random() * 40, dur: 22 + Math.random() * 16, delay: -Math.random() * 36, rtl: i % 2 === 0,
     art: i % 2, vorne: i >= 2,
   })), []);
-  const quallen = useMemo(() => ppZufall(ppFxN(3), (i) => ({
+  const quallen = useMemo(() => ppZufall(ppAreaN(3), (i) => ({
     x: [14, 81, 58][i] + Math.random() * 8, dur: 46 + Math.random() * 20, delay: -Math.random() * 60, puls: 1.5 + Math.random() * .5,
   })), []);
-  const glanz = useMemo(() => DSC_GLANZ.slice(0, ppFxN(DSC_GLANZ.length)).map(() => ({
+  const glanz = useMemo(() => DSC_GLANZ.slice(0, ppAreaN(DSC_GLANZ.length)).map(() => ({
     dur: 3 + Math.random() * 3, delay: -Math.random() * 6,
   })), []);
   return (
-    <PixelScene artH={100} bg="#bdb4e1" className="deepsea-castle-overlay">
+    <PixelScene artH={100} bg="#d9c0ec" className="deepsea-castle-overlay">
       <PixelBand src={DSC + 'back.png'} />
       <div className="pp-area-dyn pp-quer" style={ppQuer(14, 120, -50, true)}><i className="dsc-wal" /></div>
       <div className="pp-area-dyn pp-quer" style={ppQuer(40, 52, -12, false)}><i className="dsc-schwarm" /></div>
@@ -2011,7 +2181,7 @@ const DeepseaCastleOverlay = React.memo(function DeepseaCastleOverlay() {
           animation: `dscTruhe ${b.dur.toFixed(1)}s steps(88) ${b.delay.toFixed(1)}s infinite`,
         }} />
       ))}
-      <div className="pp-rand-dim" />
+      <PpRandDim />
       <style>{`
         .dsc-fahnen { animation: dscFahnen 96s steps(128) infinite, dscAtmen 7s ease-in-out infinite alternate; }
         @keyframes dscFahnen { from { background-position: 50% 0; } to { background-position: calc(50% - 128 * var(--px)) 0; } }
@@ -2039,11 +2209,11 @@ const DeepseaCastleOverlay = React.memo(function DeepseaCastleOverlay() {
           100% { transform: translate(0, calc(-12 * var(--px))); }
         }
         .dsc-krabbe { display: block; width: calc(9 * var(--px)); height: calc(6 * var(--px)); background: url(${DSC}crab.png) 0 0 / 200% 100% no-repeat; animation: ppSprite2 .34s steps(1) infinite; }
-        .dsc-schnee { position: absolute; top: 0; width: var(--px); height: var(--px); background: #efe6ff; opacity: .55; }
+        .dsc-schnee { position: absolute; top: 0; width: var(--px); height: var(--px); background: #f1e5fa; opacity: .55; }
         .dsc-schnee.hell { opacity: .85; }
         @keyframes dscSinken { from { transform: translate(0, 0); } 50% { transform: translate(calc(3 * var(--px)), calc(50 * var(--px))); } to { transform: translate(0, calc(100 * var(--px))); } }
-        .dsc-blase { position: absolute; top: calc(96 * var(--px)); width: var(--px); height: var(--px); background: #f4eeff; opacity: 0; }
-        .dsc-blase.gross { width: calc(2 * var(--px)); height: calc(2 * var(--px)); background: transparent; box-shadow: inset 0 0 0 var(--px) #f4eeff; }
+        .dsc-blase { position: absolute; top: calc(96 * var(--px)); width: var(--px); height: var(--px); background: #f1e5fa; opacity: 0; }
+        .dsc-blase.gross { width: calc(2 * var(--px)); height: calc(2 * var(--px)); background: transparent; box-shadow: inset 0 0 0 var(--px) #f1e5fa; }
         @keyframes dscSteigen {
           0% { transform: translate(0, 0); opacity: 0; } 8% { opacity: .9; }
           50% { transform: translate(calc(2 * var(--px)), calc(-48 * var(--px))); }
@@ -2107,45 +2277,125 @@ const DC_MAX = 20;
 // Schädel an den Viertelmarken (Kunstpixel neben der Uhrmitte)
 const DC_SCHAEDEL = [[0, -33], [33, 0], [0, 33], [-33, 0]];
 // Zeigerbilder: Breite, Höhe, Drehpunkt (Pixel im Bild)
+const DC_ZEIGER_BILD = { std: 'hand-hour.png', min: 'hand-min.png', sek: 'hand-sec.png' };
 const DC_ZEIGER = { std: [9, 28, 4, 22], min: [7, 37, 3, 31], sek: [5, 44, 2, 34] };
 // Schwebende Zahnräder (x neben der Mitte, y, groß?) — nur neben der Uhr
 const DC_RAEDER = [[-60, 22, 0], [-86, 44, 1], [-140, 30, 0], [62, 30, 1], [96, 14, 0], [138, 46, 1]];
 // Blitze in der Ferne (x neben der Mitte)
 const DC_BLITZE = [-138, -96, -62, 66, 104, 146];
+// ★ W86a — Zeiger der Doom Clock als gedrehte Pixel-Sprites. Der Zeiger dreht nicht per CSS (weich gesampelt), sondern wird je Winkel mit
+// `PPPixelAnim.drehen` (RotSprite-artig: harte Kanten, Palettenfarben) aus dem Quellbild neu gesampelt und als Hintergrund gesetzt; der
+// Übergang zum neuen Stand (1,4 s) läuft im 30-Hz-Takt (`ppTaktRaf`). `sekunde`: tickt im Sekundentakt der Uhr. Ohne Pipeline (Retro): CSS-Drehung.
+const _dcZeigerDaten = new Map();
+function dcZeigerDaten(src, fertig) {
+  const hit = _dcZeigerDaten.get(src);
+  if (hit && hit.daten) { fertig(hit.daten); return; }
+  if (hit) { hit.wartend.push(fertig); return; }
+  const eintrag = { daten: null, wartend: [fertig] };
+  _dcZeigerDaten.set(src, eintrag);
+  const im = new Image();
+  im.onload = () => {
+    const cv = document.createElement('canvas'); cv.width = im.naturalWidth; cv.height = im.naturalHeight;
+    const g = cv.getContext('2d', { willReadFrequently: true }); g.imageSmoothingEnabled = false; g.drawImage(im, 0, 0);
+    eintrag.daten = { w: cv.width, h: cv.height, data: g.getImageData(0, 0, cv.width, cv.height).data };
+    for (const f of eintrag.wartend.splice(0)) f(eintrag.daten);
+  };
+  im.src = src;
+}
+if (typeof Image !== 'undefined') ['hand-hour', 'hand-min', 'hand-sec'].forEach((n) => dcZeigerDaten('/areas/doom-clock/' + n + '.png', () => {}));   // vorladen
+function DcZeiger({ cls, bild, pivot, winkel, sekunde, style }) {
+  const ref = useRef(null);
+  const zu = useRef({ ist: null, daten: null, raf: 0, cache: new Map() });
+  const [zx, zy] = pivot;
+  useLayoutEffect(() => {
+    const el = ref.current; if (!el) return undefined;
+    const z = zu.current;
+    const szene = el.closest('.pp-pixel-scene');
+    const pa = window.PPPixelAnim;
+    const mitSprite = !!(pa && pa.KONFIG && pa.KONFIG.aktiv && pa.drehen);
+    const P = () => ((szene ? szene.clientHeight : 0) / 100) || 0;
+    const zeigen = (grad) => {
+      z.ist = grad;
+      const px = P(); if (!(px > 0)) return;
+      if (!mitSprite) { el.style.backgroundImage = `url(${bild})`; el.style.transformOrigin = `${(zx + .5) * px}px ${(zy + .5) * px}px`; el.style.transform = `rotate(${grad}deg)`; return; }   // pp-ok: drehung (nur Retro-Modus ohne Pipeline)
+      if (!z.daten) return;
+      const g1 = Math.round(grad) % 360, key = px.toFixed(3) + ':' + g1;
+      let r = z.cache.get(key);
+      if (!r) {
+        const rad = g1 * Math.PI / 180, c = Math.cos(rad), sn = Math.sin(rad);
+        const res = pa.drehen(z.daten, 0, 0, [c, sn, -sn, c], [(zx + .5) * px, (zy + .5) * px], { raster: px });
+        if (!res) return;
+        const cv = document.createElement('canvas'); cv.width = res.w; cv.height = res.h;
+        const g = cv.getContext('2d'); const id = g.createImageData(res.w, res.h); id.data.set(res.data); g.putImageData(id, 0, 0);
+        r = { url: cv.toDataURL('image/png'), res };
+        if (z.cache.size > 400) z.cache.clear();
+        z.cache.set(key, r);
+      }
+      const st = el.style;
+      st.backgroundImage = `url(${r.url})`; st.transform = 'none';
+      st.width = r.res.w * px + 'px'; st.height = r.res.h * px + 'px';
+      st.marginLeft = r.res.x0 + 'px'; st.marginTop = r.res.y0 + 'px';
+    };
+    z.zeigen = zeigen;
+    dcZeigerDaten(bild, (d) => { z.daten = d; zeigen(z.ist == null ? winkel : z.ist); });
+    const ro = window.ResizeObserver && szene ? new ResizeObserver(() => zeigen(z.ist == null ? winkel : z.ist)) : null;
+    if (ro) ro.observe(szene);
+    let tick = 0;
+    if (sekunde) {
+      const jetzt = () => zeigen(6 * new Date().getSeconds());
+      jetzt();
+      tick = setInterval(jetzt, 250);          // beim Sekundenwechsel höchstens 250 ms zu spät
+    } else zeigen(winkel);
+    return () => { if (ro) ro.disconnect(); if (tick) clearInterval(tick); if (z.raf) cancelAnimationFrame(z.raf); };
+  }, []);
+  // Übergang zum neuen Winkel (nur Stunden-/Minutenzeiger)
+  useLayoutEffect(() => {
+    const z = zu.current; if (sekunde || z.ist == null || z.ist === winkel || !z.zeigen) return undefined;
+    const von = z.ist, nach = winkel, t0 = performance.now(), D = 1400;
+    const ease = (t) => t * t * (3 - 2 * t);
+    const raf = window.ppTaktRaf || window.requestAnimationFrame;
+    const schritt = (jetzt) => {
+      const t = Math.min(1, ((jetzt || performance.now()) - t0) / D);
+      z.zeigen(von + (nach - von) * ease(t));
+      z.raf = t < 1 ? raf(schritt) : 0;
+    };
+    z.raf = raf(schritt);
+    return () => { if (z.raf) { cancelAnimationFrame(z.raf); z.raf = 0; } };
+  }, [winkel]);
+  return <i ref={ref} className={'dc-zeiger ' + cls} style={style} />;
+}
 const DoomClockOverlay = React.memo(function DoomClockOverlay({ besitzer = [], spielstand = {} }) {
   const zaehler = Math.max(0, ...besitzer.map(i => spielstand.doomCounters?.[i] || 0));
   const t = Math.min(1, zaehler / DC_MAX);
   const winkelMin = 360 * t;               // 0 → :00, 20 → einmal herum
   const winkelStd = 330 + 30 * t;          // 11 Uhr → 12 Uhr
-  const sek = useMemo(() => -new Date().getSeconds(), []);
-  const asche = useMemo(() => ppZufall(ppFxN(18), () => ({
+  const asche = useMemo(() => ppZufall(ppAreaN(18), () => ({
     x: Math.random() * 100, dur: 6 + Math.random() * 6, delay: -Math.random() * 12, glut: Math.random() < .5,
   })), []);
-  const raeder = useMemo(() => DC_RAEDER.slice(0, ppFxN(6)).map(([x, y, gross], i) => ({
+  const raeder = useMemo(() => DC_RAEDER.slice(0, ppAreaN(6)).map(([x, y, gross], i) => ({
     x, y, gross, dreh: (gross ? 1.8 : 1.1) + Math.random() * .8, bob: 3 + Math.random() * 2.5,
     delay: -Math.random() * 6, rueck: i % 2 === 1,
   })), []);
-  const blitze = useMemo(() => DC_BLITZE.slice(0, ppFxN(6)).map((x, i) => ({
+  const blitze = useMemo(() => DC_BLITZE.slice(0, ppAreaN(6)).map((x, i) => ({
     x, y: 18 + Math.random() * 8, bild: i % 3, dur: 7 + Math.random() * 9, delay: -Math.random() * 16,
   })), []);
-  const kraehen = useMemo(() => ppZufall(ppFxN(3), (i) => ({
+  const kraehen = useMemo(() => ppZufall(ppAreaN(3), (i) => ({
     y: 6 + Math.random() * 26, dur: 22 + Math.random() * 16, delay: -Math.random() * 30, rtl: i % 2 === 0,
   })), []);
-  const zeiger = (cls, stil) => {
+  const zeiger = (cls, winkel, sekunde) => {
     const [bw, bh, zx, zy] = DC_ZEIGER[cls];
     return (
-      <i className={'dc-zeiger ' + cls} style={{
+      <DcZeiger cls={cls} bild={DCL + DC_ZEIGER_BILD[cls]} pivot={[zx, zy]} winkel={winkel} sekunde={sekunde} style={{
         left: ppArtX(-(zx + .5), 0), top: ppArt(DC_MITTE_Y - zy - .5), width: ppArt(bw), height: ppArt(bh),
-        transformOrigin: `${ppArt(zx + .5)} ${ppArt(zy + .5)}`, ...stil,
       }} />
     );
   };
   return (
-    <PixelScene artH={100} bg="#1a0409" className="doom-clock-overlay">
+    <PixelScene artH={100} bg="#1f0f04" className="doom-clock-overlay">
       <PixelBand src={DCL + 'sky.png'} />
       {blitze.map((b, i) => (
         <React.Fragment key={'b' + i}>
-          <i className="pp-area-dyn dc-blitzschein" style={{ left: ppArtX(b.x - 20, 0), top: ppArt(b.y - 6), animation: `dcBlitz ${b.dur.toFixed(2)}s linear ${b.delay.toFixed(2)}s infinite` }} />
+          <PpGlow {...GL_DC_BLITZ} className="pp-area-dyn dc-blitzschein" style={{ left: ppArtX(b.x - 20, 0), top: ppArt(b.y - 6), animation: `dcBlitz ${b.dur.toFixed(2)}s linear ${b.delay.toFixed(2)}s infinite` }} />
           <i className="pp-area-dyn dc-blitz" style={{ left: ppArtX(b.x - 5.5, 0), top: ppArt(b.y), backgroundPosition: `${b.bild * 50}% 0`, animation: `dcBlitz ${b.dur.toFixed(2)}s steps(1) ${b.delay.toFixed(2)}s infinite` }} />
         </React.Fragment>
       ))}
@@ -2163,21 +2413,21 @@ const DoomClockOverlay = React.memo(function DoomClockOverlay({ besitzer = [], s
       ))}
       <PixelBand src={DCL + 'clouds-near.png'} className="dc-nah" />
       <PixelBand src={DCL + 'smoke.png'} className="dc-rauch" />
-      <i className="dc-puls" style={{ '--dc-t': t, animationDuration: (3.2 - 2.4 * t).toFixed(2) + 's' }} />
+      <PpGlow {...GL_DC_PULS} className="dc-puls" style={{ '--dc-t': t, animationDuration: (3.2 - 2.4 * t).toFixed(2) + 's' }} />
       <PixelPiece src={DCL + 'clock.png'} w={91} />
       <i className="dc-spirale" style={{ animationDuration: (7 - 5 * t).toFixed(2) + 's' }} />
       {DC_SCHAEDEL.map(([dx, dy], i) => (
-        <i key={'g' + i} className="pp-area-dyn dc-glut" style={{ left: ppArtX(dx - 4, 0), top: ppArt(DC_MITTE_Y + dy - 4.5), animationDelay: (-i * .7) + 's' }} />
+        <PpGlow {...GL_DC_GLUT} key={'g' + i} className="pp-area-dyn dc-glut" style={{ left: ppArtX(dx - 4, 0), top: ppArt(DC_MITTE_Y + dy - 4.5), animationDelay: (-i * .7) + 's' }} />
       ))}
-      {zeiger('std', { rotate: winkelStd + 'deg' })}
-      {zeiger('min', { rotate: winkelMin + 'deg' })}
-      {zeiger('sek', { animation: `ppDrehen 60s steps(60) ${sek}s infinite` })}
+      {zeiger('std', winkelStd)}
+      {zeiger('min', winkelMin)}
+      {zeiger('sek', 0, true)}
       <i className="dc-kappe" style={{ left: ppArtX(-3.5, 0), top: ppArt(DC_MITTE_Y - 3.5) }} />
       <PixelBand src={DCL + 'wisps.png'} className="dc-schwaden" />
       {asche.map((a, i) => (
         <i key={'a' + i} className={'pp-area-dyn dc-asche' + (a.glut ? ' glut' : '')} style={{ left: a.x + '%', animation: `dcAsche ${a.dur}s linear ${a.delay}s infinite` }} />
       ))}
-      <div className="pp-rand-dim" />
+      <PpRandDim />
       <style>{`
         @keyframes dcWolken { from { background-position: 0 0; } to { background-position: calc(128 * var(--px)) 0; } }
         .dc-ferne { animation: dcWolken 300s steps(128) infinite; }
@@ -2186,8 +2436,7 @@ const DoomClockOverlay = React.memo(function DoomClockOverlay({ besitzer = [], s
         .dc-schwaden { animation: dcWolken 75s steps(128) infinite; }
         .dc-puls {
           position: absolute; left: calc(50% - 60 * var(--px)); top: calc(${DC_MITTE_Y} * var(--px) - 60 * var(--px));
-          width: calc(120 * var(--px)); height: calc(120 * var(--px)); border-radius: 50%;
-          background: radial-gradient(circle, rgba(255,40,20,.55) 0%, rgba(200,10,10,.25) 40%, rgba(120,0,0,0) 70%);
+          width: calc(120 * var(--px)); height: calc(120 * var(--px));
           animation: dcPuls 3s ease-in-out infinite;
         }
         @keyframes dcPuls {
@@ -2203,28 +2452,23 @@ const DoomClockOverlay = React.memo(function DoomClockOverlay({ besitzer = [], s
           animation: dcSpirale 7s steps(14) infinite;
         }
         @keyframes dcSpirale { from { background-position: 0 0; } to { background-position: 0 calc(-854 * var(--px)); } }
-        .dc-zeiger { position: absolute; background-size: 100% 100%; background-repeat: no-repeat; transition: rotate 1.4s cubic-bezier(.5, 0, .2, 1); }
-        .dc-zeiger.std { background-image: url(${DCL}hand-hour.png); }
-        .dc-zeiger.min { background-image: url(${DCL}hand-min.png); }
-        .dc-zeiger.sek { background-image: url(${DCL}hand-sec.png); transition: none; }
+        .dc-zeiger { position: absolute; background-size: 100% 100%; background-repeat: no-repeat; }
         .dc-kappe { position: absolute; width: calc(7 * var(--px)); height: calc(7 * var(--px)); background: url(${DCL}cap.png) 0 0 / 100% 100% no-repeat; }
         .dc-glut {
           position: absolute; width: calc(8 * var(--px)); height: calc(8 * var(--px));
-          background: radial-gradient(circle, rgba(255,40,40,.6) 0%, rgba(255,40,40,0) 70%);
           animation: dcGlut 2.8s ease-in-out infinite alternate;
         }
         @keyframes dcGlut { from { opacity: .25; } to { opacity: 1; } }
         .dc-blitz { position: absolute; width: calc(11 * var(--px)); height: calc(30 * var(--px)); background: url(${DCL}bolt.png) 0 0 / 300% 100% no-repeat; opacity: 0; }
         .dc-blitzschein {
           position: absolute; width: calc(40 * var(--px)); height: calc(40 * var(--px)); opacity: 0;
-          background: radial-gradient(circle, rgba(255,120,80,.35) 0%, rgba(255,60,40,.12) 45%, rgba(255,40,20,0) 70%);
         }
         @keyframes dcBlitz { 0%, 90% { opacity: 0; } 91% { opacity: 1; } 92% { opacity: .15; } 93.5% { opacity: 1; } 96%, 100% { opacity: 0; } }
         .dc-rad { position: absolute; width: calc(9 * var(--px)); height: calc(9 * var(--px)); background: url(${DCL}gear-s.png) 0 0 / 300% 100% no-repeat; }
         .dc-rad.gross { width: calc(13 * var(--px)); height: calc(13 * var(--px)); background-image: url(${DCL}gear.png); }
         .dc-kraehe { display: block; width: calc(7 * var(--px)); height: calc(4 * var(--px)); background: url(${DCL}crow.png) 0 0 / 200% 100% no-repeat; }
-        .dc-asche { position: absolute; top: calc(98 * var(--px)); width: var(--px); height: var(--px); background: #3a0a0a; opacity: 0; }
-        .dc-asche.glut { background: #ff5a2a; }
+        .dc-asche { position: absolute; top: calc(98 * var(--px)); width: var(--px); height: var(--px); background: #3a0000; opacity: 0; }
+        .dc-asche.glut { background: #ff491a; }
         @keyframes dcAsche { 0% { transform: translate(0,0); opacity: 0; } 15% { opacity: .9; } 100% { transform: translate(calc(4 * var(--px)), calc(-64 * var(--px))); opacity: 0; } }
       `}</style>
     </PixelScene>
@@ -2278,12 +2522,12 @@ const gydX = (x, k) => x - 64 + k * 128;
 const GYD_LATERNE = { x: GYD_TREE_X - GYD_TREE_W / 2 + 27, y: 26 };   // Mitte, Oberkante
 const GYD_KRAEHE = { x: GYD_TREE_X - GYD_TREE_W / 2 + 74, y: 6 };     // Mitte, Oberkante
 const GraveyardOfLimitedPowerOverlay = React.memo(function GraveyardOfLimitedPowerOverlay() {
-  const seelen = useMemo(() => ppZufall(ppFxN(9), () => {
+  const seelen = useMemo(() => ppZufall(ppAreaN(9), () => {
     const [gx, , gb] = GYD_GRAEBER[Math.floor(Math.random() * GYD_GRAEBER.length)];
     const k = Math.floor(Math.random() * 3) - 1;
     return { x: gydX(gx, k), y: gb - 12, dur: 6 + Math.random() * 4, delay: -Math.random() * 10, bild: .5 + Math.random() * .3 };
   }), []);
-  const funken = useMemo(() => ppZufall(ppFxN(14), () => {
+  const funken = useMemo(() => ppZufall(ppAreaN(14), () => {
     const [gx, gt, gb] = GYD_GRAEBER[Math.floor(Math.random() * GYD_GRAEBER.length)];
     const k = Math.floor(Math.random() * 5) - 2;
     return {
@@ -2291,13 +2535,13 @@ const GraveyardOfLimitedPowerOverlay = React.memo(function GraveyardOfLimitedPow
       dx: Math.round((Math.random() - .5) * 4), dur: 3 + Math.random() * 3, delay: -Math.random() * 6,
     };
   }), []);
-  const blaetter = useMemo(() => ppZufall(ppFxN(3), () => ({
+  const blaetter = useMemo(() => ppZufall(ppAreaN(3), () => ({
     x: GYD_TREE_X - 40 + Math.round(Math.random() * 80), y: 4 + Math.round(Math.random() * 18),
     dur: 9 + Math.random() * 6, delay: -Math.random() * 15, rot: Math.random() < .5,
   })), []);
-  const motten = useMemo(() => ppZufall(ppFxN(2), (i) => ({ dur: 1.6 + i * .5, delay: -Math.random() * 2, rev: i % 2 === 1 })), []);
+  const motten = useMemo(() => ppZufall(ppAreaN(2), (i) => ({ dur: 1.6 + i * .5, delay: -Math.random() * 2, rev: i % 2 === 1 })), []);
   return (
-    <PixelScene artH={100} bg="#322e2f" className="graveyard-overlay">
+    <PixelScene artH={100} bg="#323232" className="graveyard-overlay">
       <PixelBand src={GYD + 'tile.png'} />
       <PixelBand src={GYD + 'glow-a.png'} className="gyd-schein" />
       <PixelBand src={GYD + 'glow-b.png'} className="gyd-schein b" />
@@ -2332,7 +2576,7 @@ const GraveyardOfLimitedPowerOverlay = React.memo(function GraveyardOfLimitedPow
         }} />
       ))}
       <div className="pp-pixel-layer gyd-nebel b" style={{ top: ppArt(72) }} />
-      <div className="pp-rand-dim" />
+      <PpRandDim />
       <style>{`
         .gyd-schein { animation: gydPuls 3.4s ease-in-out infinite alternate; }
         .gyd-schein.b { animation-delay: -3.4s; }
@@ -2350,7 +2594,7 @@ const GraveyardOfLimitedPowerOverlay = React.memo(function GraveyardOfLimitedPow
           animation: gydLaterne 1.15s steps(1) infinite;
         }
         @keyframes gydLaterne { 0% { background-position: 0 0; } 30% { background-position: 50% 0; } 42% { background-position: 0 0; } 70% { background-position: 100% 0; } 84% { background-position: 50% 0; } }
-        .gyd-motte { position: absolute; width: var(--px); height: var(--px); background: #d8cdb8; }
+        .gyd-motte { position: absolute; width: var(--px); height: var(--px); background: #e2d8cb; }
         @keyframes gydMotte {
           0% { transform: translate(calc(4 * var(--px)), calc(-2 * var(--px))); }
           12% { transform: translate(calc(5 * var(--px)), calc(1 * var(--px))); }
@@ -2388,13 +2632,13 @@ const GraveyardOfLimitedPowerOverlay = React.memo(function GraveyardOfLimitedPow
           80% { transform: translate(var(--px), calc(-19 * var(--px))); }
           100% { transform: translate(0, calc(-24 * var(--px))); opacity: 0; }
         }
-        .gyd-funke { position: absolute; width: var(--px); height: var(--px); background: #ff5060; opacity: 0; }
+        .gyd-funke { position: absolute; width: var(--px); height: var(--px); background: #fe5154; opacity: 0; }
         @keyframes gydFunke {
           0% { transform: translate(0, 0); opacity: 0; } 20% { opacity: .9; } 50% { opacity: .4; } 70% { opacity: .8; }
           100% { transform: translate(var(--dx), calc(-10 * var(--px))); opacity: 0; }
         }
-        .gyd-blatt { position: absolute; width: calc(2 * var(--px)); height: var(--px); background: #5a2620; box-shadow: var(--px) 0 0 #7c3a26; opacity: 0; }
-        .gyd-blatt.rot { background: #6a2c22; box-shadow: var(--px) 0 0 #3c1a17; }
+        .gyd-blatt { position: absolute; width: calc(2 * var(--px)); height: var(--px); background: #68332a; box-shadow: var(--px) 0 0 #8e503a; opacity: 0; }
+        .gyd-blatt.rot { background: #68332a; box-shadow: var(--px) 0 0 #311402; }   /* pp-ok: blur (harter Schatten, Unschärfe 0; die Hex-Farbe liest der Wächter als Zahl) */
         @keyframes gydFallen {
           0% { transform: translate(0, 0); opacity: 0; } 2% { opacity: 1; }
           10% { transform: translate(calc(2 * var(--px)), calc(6 * var(--px))); }
@@ -2496,7 +2740,7 @@ const ParaseedGreenhouseOverlay = React.memo(function ParaseedGreenhouseOverlay(
     }
     return out;
   }, []);
-  const tropfen = useMemo(() => ppZufall(ppFxN(8), () => {
+  const tropfen = useMemo(() => ppZufall(ppAreaN(8), () => {
     const [a, e] = PSG_SCHEIBEN[Math.floor(Math.random() * 4)];
     const [r0, r1] = PSG_REIHEN[Math.floor(Math.random() * 3)];
     const k = Math.floor(Math.random() * 5) - 2;
@@ -2509,22 +2753,22 @@ const ParaseedGreenhouseOverlay = React.memo(function ParaseedGreenhouseOverlay(
   const duesen = useMemo(() => {
     const out = [];
     for (let k = -2; k <= 2; k++) PSG_DUESEN.forEach((x) => out.push({ x: x - PSG_KACHEL / 2 + k * PSG_KACHEL, dur: 2.6 + Math.random() * 2.4, delay: -Math.random() * 4 }));
-    return out.slice(0, ppFxN(out.length));
+    return out.slice(0, ppAreaN(out.length));
   }, []);
-  const fliegen = useMemo(() => ppZufall(ppFxN(4), () => ({
+  const fliegen = useMemo(() => ppZufall(ppAreaN(4), () => ({
     x: Math.round((Math.random() - .5) * 220), y: 58 + Math.round(Math.random() * 10),
     dur: 3.5 + Math.random() * 3, delay: -Math.random() * 6, rtl: Math.random() < .5,
   })), []);
-  const schnecke = useMemo(() => ppZufall(Math.min(1, ppFxN(1)), () => ({
+  const schnecke = useMemo(() => ppZufall(Math.min(1, ppAreaN(1)), () => ({
     y: 55 + Math.floor(Math.random() * 4), dur: 260 + Math.random() * 80, delay: -Math.random() * 260,
   })), []);
-  const sporen = useMemo(() => ppZufall(ppFxN(14), () => ({
+  const sporen = useMemo(() => ppZufall(ppAreaN(14), () => ({
     x: Math.random() * 100, y: 66 + Math.round(Math.random() * 8), dur: 7 + Math.random() * 6, delay: -Math.random() * 12,
-    farbe: Math.random() < .5 ? '#c9ff2f' : '#ff6ad5',
+    farbe: Math.random() < .5 ? '#b1ff1a' : '#fc69c6',
   })), []);
   const B = PSG_BLUME;
   return (
-    <PixelScene artH={100} bg="#7c807a" className="paraseed-greenhouse-overlay">
+    <PixelScene artH={100} bg="#7f7f7f" className="paraseed-greenhouse-overlay">
       <PixelBand src={PSG + 'tile.png'} />
       <PixelBand src={PSG + 'tile-glow.png'} className="psg-pochen" />
       <PixelBand src={PSG + 'shafts.png'} className="psg-strahlen" />
@@ -2542,7 +2786,7 @@ const ParaseedGreenhouseOverlay = React.memo(function ParaseedGreenhouseOverlay(
       {duesen.map((d, i) => (
         <i key={'d' + i} className="pp-area-dyn pp-px-tropfen" style={{
           left: ppArtX(d.x, 0), top: ppArt(18), '--fall': ppArt(42),
-          '--tropfen': '#c4d0cc', '--tropfen-dunkel': '#7e8a86',
+          '--tropfen': '#d2d2db', '--tropfen-dunkel': '#7f7f7f',
           animation: `ppPxTropfen ${d.dur.toFixed(2)}s ease-in ${d.delay.toFixed(2)}s infinite`,
         }} />
       ))}
@@ -2560,12 +2804,12 @@ const ParaseedGreenhouseOverlay = React.memo(function ParaseedGreenhouseOverlay(
       <PixelPiece src={PSG + 'pod-glow.png'} w={PSG_POD_W} className="psg-samen" />
       <i className="pp-area-dyn pp-px-tropfen" style={{
         left: ppArtX(-1, 0), top: ppArt(56), '--fall': ppArt(18),
-        '--tropfen': '#b6f25a', '--tropfen-dunkel': '#5c8a1c',
+        '--tropfen': '#cbff66', '--tropfen-dunkel': '#5b9438',
         animation: 'ppPxTropfen 4.6s ease-in -1.2s infinite',
       }} />
       <i className="pp-area-dyn pp-px-tropfen" style={{
         left: ppArtX(1, 0), top: ppArt(51), '--fall': ppArt(22),
-        '--tropfen': '#b6f25a', '--tropfen-dunkel': '#5c8a1c',
+        '--tropfen': '#cbff66', '--tropfen-dunkel': '#5b9438',
         animation: 'ppPxTropfen 6.1s ease-in -3.9s infinite',
       }} />
       <div className="pp-pixel-layer psg-dunst b" style={{ top: ppArt(64) }} />
@@ -2581,7 +2825,7 @@ const ParaseedGreenhouseOverlay = React.memo(function ParaseedGreenhouseOverlay(
           animation: `psgSpore ${s.dur.toFixed(2)}s steps(40) ${s.delay.toFixed(2)}s infinite`,
         }} />
       ))}
-      <div className="pp-rand-dim" />
+      <PpRandDim />
       <style>{`
         .psg-blume {
           position: absolute; width: calc(${B.w} * var(--px)); height: calc(${B.h} * var(--px));
@@ -2731,7 +2975,7 @@ const RiotingVillageOverlay = React.memo(function RiotingVillageOverlay() {
   const feuer = useMemo(() => {
     // Bodenfeuer: zufällig verteilt, mit Mindestabstand, drei Größen
     const out = [];
-    const n = ppFxN(7);
+    const n = ppAreaN(7);
     for (let tries = 0; out.length < n && tries < 300; tries++) {
       const x = (Math.random() - .5) * 300, fuss = 72 + Math.random() * 25;
       if (Math.abs(x) < 26 && fuss < 76) continue;                         // nicht auf die Stufen
@@ -2756,19 +3000,19 @@ const RiotingVillageOverlay = React.memo(function RiotingVillageOverlay() {
   }, [feuer]);
   const funken = useMemo(() => {
     const quellen = [...feuer.map(f => ({ x: f.x, y: f.fuss - f.h + 3 })), ...kachel.dach.map(d => ({ x: d.x, y: d.y - 14 }))];
-    return ppZufall(ppFxN(20), () => {
+    return ppZufall(ppAreaN(20), () => {
       const q = quellen[Math.floor(Math.random() * quellen.length)];
       return { x: Math.round(q.x + (Math.random() - .5) * 6), y: Math.round(q.y), dur: 1.8 + Math.random() * 1.8, delay: -Math.random() * 3.6, hell: Math.random() < .4 };
     });
   }, [feuer, kachel]);
-  const asche = useMemo(() => ppZufall(ppFxN(14), () => ({
+  const asche = useMemo(() => ppZufall(ppAreaN(14), () => ({
     x: Math.random() * 100, y: Math.round(Math.random() * 40), dur: 7 + Math.random() * 6, delay: -Math.random() * 12,
   })), []);
-  const aufruehrer = useMemo(() => ppZufall(ppFxN(2), (i) => ({
+  const aufruehrer = useMemo(() => ppZufall(ppAreaN(2), (i) => ({
     rtl: i === 1, figur: i, dur: 42 + Math.random() * 18, delay: -Math.random() * 50 - i * 20,
   })), []);
   return (
-    <PixelScene artH={100} bg="#3a3531" className="rioting-village-overlay">
+    <PixelScene artH={100} bg="#323232" className="rioting-village-overlay">
       <PixelBand src={RVG + 'sky.png'} />
       <PixelBand src={RVG + 'sky-glow.png'} className="rvg-fern" />
       <PixelBand src={RVG + 'haze.png'} className="pp-area-dyn rvg-dunst" />
@@ -2796,7 +3040,7 @@ const RiotingVillageOverlay = React.memo(function RiotingVillageOverlay() {
       ))}
       <PixelPiece src={RVG + 'house.png'} w={RVG_HAUS_W} />
       <PixelPiece src={RVG + 'house-glow.png'} w={RVG_HAUS_W} className="rvg-schein" />
-      <i className="rvg-augenglut" style={{ left: ppArtX(RVG_AUGE.x - 4, 0), top: ppArt(RVG_AUGE.y - 4) }} />
+      <PpGlow {...GL_RVG_AUGE} className="rvg-augenglut" style={{ left: ppArtX(RVG_AUGE.x - 4, 0), top: ppArt(RVG_AUGE.y - 4) }} />
       <i className="rvg-auge" style={{ left: ppArtX(RVG_AUGE.x, 0), top: ppArt(RVG_AUGE.y) }} />
       <i className="rvg-fackel" style={{ left: ppArtX(RVG_HAUSFACKEL.x - 2.5, 0), top: ppArt(RVG_HAUSFACKEL.y - 6), animationDuration: '.47s' }} />
       <i className="rvg-schild" style={{ left: ppArtX(RVG_SCHILD.x, 0), top: ppArt(RVG_SCHILD.y) }} />
@@ -2805,7 +3049,7 @@ const RiotingVillageOverlay = React.memo(function RiotingVillageOverlay() {
       ))}
       {feuer.map((f, i) => (
         <React.Fragment key={'b' + i}>
-          <i className="rvg-bodenschein" style={{
+          <PpGlow {...GL_RVG_BODEN} className="rvg-bodenschein" style={{
             left: ppArtX(f.x - f.w * 1.7, 0), top: ppArt(f.fuss - f.w * 1.5), width: ppArt(f.w * 3.4), height: ppArt(f.w * 2.4),
             animationDuration: f.schein + 's', animationDelay: (-f.schein * i / 3).toFixed(2) + 's',
           }} />
@@ -2831,7 +3075,7 @@ const RiotingVillageOverlay = React.memo(function RiotingVillageOverlay() {
       {asche.map((a, i) => (
         <i key={'x' + i} className="pp-area-dyn rvg-asche" style={{ left: a.x + '%', top: ppArt(a.y), animation: `rvgAsche ${a.dur.toFixed(2)}s steps(60) ${a.delay.toFixed(2)}s infinite` }} />
       ))}
-      <div className="pp-rand-dim" />
+      <PpRandDim />
       <style>{`
         .rvg-fern { animation: rvgFern 3.4s steps(1) infinite; }
         @keyframes rvgFern { 0% { opacity: .7; } 20% { opacity: 1; } 45% { opacity: .8; } 70% { opacity: .95; } 85% { opacity: .65; } }
@@ -2862,8 +3106,7 @@ const RiotingVillageOverlay = React.memo(function RiotingVillageOverlay() {
         @keyframes rvgFlackern { from { background-position: 0 0; } to { background-position: var(--rvg-lauf) 0; } }
         .rvg-haufen { position: absolute; background-size: 100% 100%; background-repeat: no-repeat; }
         .rvg-bodenschein {
-          position: absolute; border-radius: 50%;
-          background: radial-gradient(ellipse, rgba(255,140,40,.42) 0%, rgba(255,90,20,.16) 45%, rgba(255,90,20,0) 70%);
+          position: absolute;
           animation: rvgSchein 1.1s steps(1) infinite;
         }
         .rvg-puff { position: absolute; width: calc(9 * var(--px)); height: calc(8 * var(--px)); background: url(${RVG}puff.png) 0 0 / 400% 100% no-repeat; opacity: 0; }
@@ -2882,14 +3125,13 @@ const RiotingVillageOverlay = React.memo(function RiotingVillageOverlay() {
         }
         .rvg-augenglut {
           position: absolute; width: calc(19 * var(--px)); height: calc(13 * var(--px));
-          background: radial-gradient(ellipse, rgba(255,30,20,.5) 0%, rgba(255,30,20,0) 70%);
           animation: rvgAugenglut 2.4s ease-in-out infinite alternate;
         }
         @keyframes rvgAugenglut { from { opacity: .45; } to { opacity: 1; } }
-        .rvg-funke { position: absolute; width: var(--px); height: var(--px); background: #f47a1c; opacity: 0; }
-        .rvg-funke.hell { background: #ffd060; }
+        .rvg-funke { position: absolute; width: var(--px); height: var(--px); background: #f87420; opacity: 0; }
+        .rvg-funke.hell { background: #ffd066; }
         @keyframes rvgFunke { 0% { transform: translate(0,0); opacity: 0; } 8% { opacity: 1; } 70% { opacity: 1; } 100% { transform: translate(calc(-5 * var(--px)), calc(-26 * var(--px))); opacity: 0; } }
-        .rvg-asche { position: absolute; width: var(--px); height: var(--px); background: #7a716b; opacity: 0; }
+        .rvg-asche { position: absolute; width: var(--px); height: var(--px); background: #686868; opacity: 0; }
         @keyframes rvgAsche { 0% { transform: translate(0,0); opacity: 0; } 10% { opacity: .7; } 85% { opacity: .6; } 100% { transform: translate(calc(-18 * var(--px)), calc(60 * var(--px))); opacity: 0; } }
       `}</style>
     </PixelScene>
@@ -2950,7 +3192,7 @@ const SLI_BAHNEN = [
 const SLI_SCHOLLEN = [-170, -40, 5, 105, 160];
 const SLI_FISCHE = [[-150, 90], [-30, 93], [100, 89], [175, 92]];   // Sprungstellen (x neben der Mitte, y)
 const SlipperyIceOverlay = React.memo(function SlipperyIceOverlay() {
-  const bahnen = useMemo(() => SLI_BAHNEN.slice(0, Math.max(2, ppFxN(SLI_BAHNEN.length))), []);
+  const bahnen = useMemo(() => SLI_BAHNEN.slice(0, Math.max(2, ppAreaN(SLI_BAHNEN.length))), []);
   // v1435 (Al 25.9.): Richtungen fest — der zweite Pinguin rutscht nach
   // links, die anderen nach rechts; der Block startet nach links.
   const pinguine = useMemo(() => bahnen.filter(b => b.art === 'pinguin').map((b, i) => ({
@@ -2961,21 +3203,21 @@ const SlipperyIceOverlay = React.memo(function SlipperyIceOverlay() {
     y: b.y, von: 50 + Math.random() * 60, bis: -120 + Math.random() * 40,
     dur: 7 + Math.random() * 5, delay: 0,
   })), [bahnen]);
-  const schollen = useMemo(() => SLI_SCHOLLEN.slice(0, ppFxN(SLI_SCHOLLEN.length)).map((x, i) => ({
+  const schollen = useMemo(() => SLI_SCHOLLEN.slice(0, ppAreaN(SLI_SCHOLLEN.length)).map((x, i) => ({
     x: x + (Math.random() - .5) * 10, y: 86 + Math.random() * 8, v: i % 3,
     dur: 9 + Math.random() * 6, delay: -Math.random() * 10,
   })), []);
-  const schwimmer = useMemo(() => ppZufall(ppFxN(1), () => ({
+  const schwimmer = useMemo(() => ppZufall(ppAreaN(1), () => ({
     y: 92 + Math.random() * 2, dur: 55 + Math.random() * 20, delay: -Math.random() * 50, rtl: Math.random() < .5,
   })), []);
-  const fische = useMemo(() => SLI_FISCHE.slice(0, ppFxN(SLI_FISCHE.length)).map(() => ({
+  const fische = useMemo(() => SLI_FISCHE.slice(0, ppAreaN(SLI_FISCHE.length)).map(() => ({
     dur: 7 + Math.random() * 6, delay: -Math.random() * 12,
   })), []);
-  const funken = useMemo(() => ppZufall(ppFxN(10), () => ({
+  const funken = useMemo(() => ppZufall(ppAreaN(10), () => ({
     x: Math.random() * 100, y: 3 + Math.random() * 54, dur: 1.8 + Math.random() * 2, delay: -Math.random() * 4,
   })), []);
   return (
-    <PixelScene artH={100} bg="#d2d1f7" className="slippery-ice-overlay">
+    <PixelScene artH={100} bg="#b4cff8" className="slippery-ice-overlay">
       <PixelBand src={SLI + 'water.png'} style={{ backgroundSize: 'auto 300%', animation: 'ppBand3 2.1s steps(1) infinite' }} />
       {schollen.map((s, i) => (
         <i key={'s' + i} className="pp-area-dyn sli-scholle" style={{
@@ -3015,7 +3257,7 @@ const SlipperyIceOverlay = React.memo(function SlipperyIceOverlay() {
           </div>
         </div>
       ))}
-      <div className="pp-rand-dim" />
+      <PpRandDim />
       <style>{`
         .sli-quer { position: absolute; left: 0; }
         @keyframes sliQuerLtr { from { transform: translateX(calc(-60 * var(--px))); } to { transform: translateX(calc(100cqw + 4 * var(--px))); } }
@@ -3113,22 +3355,22 @@ const SMP_GLITZER = [               // Wasserstellen (x neben der Mitte, y)
   [78, 48], [104, 26], [120, 62], [132, 44], [150, 18], [166, 70], [110, 92], [170, 34],
 ];
 const SmugglersPierOverlay = React.memo(function SmugglersPierOverlay() {
-  const moewen = useMemo(() => ppZufall(ppFxN(3), (i) => ({
+  const moewen = useMemo(() => ppZufall(ppAreaN(3), (i) => ({
     // eigene Höhe je Möwe (13 hoch, 12er-Abstand) — sie fliegen nie übereinander
     y: [1, 13, 25][i] + Math.random() * 2, dur: 14 + Math.random() * 10, delay: -Math.random() * 25, rtl: i % 2 === 1,
     schlag: .55 + Math.random() * .25,
   })), []);
-  const fische = useMemo(() => ppZufall(ppFxN(3), (i) => ({
+  const fische = useMemo(() => ppZufall(ppAreaN(3), (i) => ({
     y: [8, 58, 84][i] + Math.random() * 6, dur: 40 + Math.random() * 20, delay: -Math.random() * 60, rtl: i % 2 === 0,
   })), []);
-  const wolken = useMemo(() => ppZufall(ppFxN(2), (i) => ({
+  const wolken = useMemo(() => ppZufall(ppAreaN(2), (i) => ({
     y: [-6, 44][i] + Math.random() * 10, dur: 90 + Math.random() * 40, delay: -Math.random() * 130,
   })), []);
-  const glitzer = useMemo(() => SMP_GLITZER.slice(0, ppFxN(16)).map(([x, y]) => ({
+  const glitzer = useMemo(() => SMP_GLITZER.slice(0, ppAreaN(16)).map(([x, y]) => ({
     x, y, dur: 3 + Math.random() * 4, delay: -Math.random() * 7,
   })), []);
   return (
-    <PixelScene artH={100} bg="#1646cc" className="smugglers-pier-overlay">
+    <PixelScene artH={100} bg="#0351c9" className="smugglers-pier-overlay">
       <PixelBand src={SMP + 'water.png'} style={{ backgroundSize: 'auto 300%', animation: 'ppBand3 2.4s steps(1) infinite' }} />
       {fische.map((f, i) => (
         <div key={'f' + i} className="pp-area-dyn pp-quer" style={ppQuer(f.y, f.dur, f.delay, f.rtl)}>
@@ -3157,7 +3399,7 @@ const SmugglersPierOverlay = React.memo(function SmugglersPierOverlay() {
       {wolken.map((w, i) => (
         <i key={'w' + i} className="pp-area-dyn smp-wolke" style={{ top: ppArt(w.y), animation: `smpWolke ${w.dur.toFixed(1)}s linear ${w.delay.toFixed(1)}s infinite` }} />
       ))}
-      <div className="pp-rand-dim" />
+      <PpRandDim />
       <style>{`
         .smp-steg {
           position: absolute; top: 0; bottom: 0; left: 0; width: calc(50% + ${SMP_L} * var(--px));
@@ -3251,7 +3493,7 @@ const SC_GLOW_W = 240;
 const SC_RX = 38, SC_RY = 34, SC_CY = 48;
 const SpatialCreviceOverlay = React.memo(function SpatialCreviceOverlay() {
   // Glut: startet am Rand des Risses, treibt nach außen/oben ins Wasser, erlischt
-  const glut = useMemo(() => ppZufall(ppFxN(16), () => {
+  const glut = useMemo(() => ppZufall(ppAreaN(16), () => {
     const a = Math.random() * Math.PI * 2;
     const r = .75 + Math.random() * .2;
     const weg = 10 + Math.random() * 18;
@@ -3261,24 +3503,24 @@ const SpatialCreviceOverlay = React.memo(function SpatialCreviceOverlay() {
       dur: 3 + Math.random() * 3, delay: -Math.random() * 6,
     };
   }), []);
-  const blasen = useMemo(() => ppZufall(ppFxN(12), () => ({
+  const blasen = useMemo(() => ppZufall(ppAreaN(12), () => ({
     x: Math.random() * 100, dur: 6 + Math.random() * 5, delay: -Math.random() * 11, gross: Math.random() < .3,
   })), []);
-  const schnee = useMemo(() => ppZufall(ppFxN(16), () => ({
+  const schnee = useMemo(() => ppZufall(ppAreaN(16), () => ({
     x: Math.random() * 100, dur: 16 + Math.random() * 12, delay: -Math.random() * 28,
   })), []);
-  const fische = useMemo(() => ppZufall(ppFxN(2), (i) => ({
+  const fische = useMemo(() => ppZufall(ppAreaN(2), (i) => ({
     y: 22 + Math.random() * 50, dur: 34 + Math.random() * 16, delay: -Math.random() * 40, rtl: i % 2 === 1,
   })), []);
-  const quallen = useMemo(() => ppZufall(ppFxN(3), (i) => ({
+  const quallen = useMemo(() => ppZufall(ppAreaN(3), (i) => ({
     y: 14 + Math.random() * 40, dur: 70 + Math.random() * 40, delay: -Math.random() * 100, rtl: i % 2 === 0,
     bob: 3 + Math.random() * 4,
   })), []);
-  const flieger = useMemo(() => ppZufall(ppFxN(2), (i) => ({
+  const flieger = useMemo(() => ppZufall(ppAreaN(2), (i) => ({
     y: 16 + Math.random() * 22, dur: 11 + Math.random() * 6, delay: -Math.random() * 16, rtl: i % 2 === 1,
   })), []);
   return (
-    <PixelScene artH={100} bg="#0c2144" className="spatial-crevice-overlay">
+    <PixelScene artH={100} bg="#00213f" className="spatial-crevice-overlay">
       <PixelBand src={SC + 'tile.png'} />
       <PixelBand src={SC + 'rays.png'} className="sc-strahlen" />
       <PixelBand src={SC + 'shimmer.png'} style={{ backgroundSize: 'auto 300%', animation: 'ppBand3 2.7s steps(1) infinite' }} />
@@ -3323,7 +3565,7 @@ const SpatialCreviceOverlay = React.memo(function SpatialCreviceOverlay() {
       {blasen.map((b, i) => (
         <i key={'b' + i} className={'pp-area-dyn sc-blase' + (b.gross ? ' gross' : '')} style={{ left: b.x + '%', animation: `scSteigen ${b.dur}s linear ${b.delay}s infinite` }} />
       ))}
-      <div className="pp-rand-dim" />
+      <PpRandDim />
       <style>{`
         .sc-strahlen { animation: scStrahlen 5.5s ease-in-out infinite alternate; }
         @keyframes scStrahlen { from { opacity: .35; } to { opacity: 1; } }
@@ -3350,14 +3592,14 @@ const SpatialCreviceOverlay = React.memo(function SpatialCreviceOverlay() {
         }
         @keyframes scFlugLtr { from { transform: translateX(calc(40 * var(--px))); } to { transform: translateX(calc(130 * var(--px))); } }
         @keyframes scFlugRtl { from { transform: translateX(calc(130 * var(--px))); } to { transform: translateX(calc(40 * var(--px))); } }
-        .sc-glut { position: absolute; width: var(--px); height: var(--px); background: #ffc050; opacity: 0; }
+        .sc-glut { position: absolute; width: var(--px); height: var(--px); background: #ffd066; opacity: 0; }
         @keyframes scGlut {
-          0% { transform: translate(0, 0); opacity: 0; background: #ffd060; }
+          0% { transform: translate(0, 0); opacity: 0; background: #ffd066; }
           6% { opacity: 1; }
-          35% { background: #f58a2c; }
-          65% { background: #b8321a; opacity: .95; }
-          85% { background: #5a1a2a; opacity: .7; }
-          100% { transform: translate(var(--dx), var(--dy)); background: #1c2a4a; opacity: 0; }
+          35% { background: #ff9b3a; }
+          65% { background: #b5171c; opacity: .95; }
+          85% { background: #4b1021; opacity: .7; }
+          100% { transform: translate(var(--dx), var(--dy)); background: #00213f; opacity: 0; }
         }
         .sc-fisch {
           display: block; width: calc(9 * var(--px)); height: calc(6 * var(--px));
@@ -3368,10 +3610,10 @@ const SpatialCreviceOverlay = React.memo(function SpatialCreviceOverlay() {
           background: url(${SC}jelly.png) 0 0 / 200% 100% no-repeat;
           animation: ppSprite2 1.6s steps(1) infinite, ppBob 3.2s ease-in-out infinite alternate;
         }
-        .sc-schnee { position: absolute; top: 0; width: var(--px); height: var(--px); background: #9fb8e0; opacity: .55; }
+        .sc-schnee { position: absolute; top: 0; width: var(--px); height: var(--px); background: #89abdc; opacity: .55; }
         @keyframes scSinken { from { transform: translate(0, 0); } 50% { transform: translate(calc(3 * var(--px)), calc(50 * var(--px))); } to { transform: translate(0, calc(100 * var(--px))); } }
-        .sc-blase { position: absolute; top: calc(96 * var(--px)); width: var(--px); height: var(--px); background: #b8d0f4; opacity: 0; }
-        .sc-blase.gross { width: calc(2 * var(--px)); height: calc(2 * var(--px)); background: transparent; box-shadow: inset 0 0 0 var(--px) #b8d0f4; }
+        .sc-blase { position: absolute; top: calc(96 * var(--px)); width: var(--px); height: var(--px); background: #b4cff8; opacity: 0; }
+        .sc-blase.gross { width: calc(2 * var(--px)); height: calc(2 * var(--px)); background: transparent; box-shadow: inset 0 0 0 var(--px) #b4cff8; }
         @keyframes scSteigen {
           0% { transform: translate(0, 0); opacity: 0; } 8% { opacity: .8; }
           50% { transform: translate(calc(2 * var(--px)), calc(-48 * var(--px))); }
@@ -3424,16 +3666,16 @@ const SH_STAUB = [[-52,21,50],[52,24,46],[76,21,50],[-76,24,46],[-88,69,79],[90,
 const SH_BEUTE = [[-92, 61], [164, 61], [33, 12], [-220, 61]];
 
 const SpiderHiveOverlay = React.memo(function SpiderHiveOverlay() {
-  const lider = useMemo(() => SH_LIDER.slice(0, ppFxN(SH_LIDER.length)).map(([x, y]) => ({
+  const lider = useMemo(() => SH_LIDER.slice(0, ppAreaN(SH_LIDER.length)).map(([x, y]) => ({
     x, y, weg: Math.random() < .25, dur: 3 + Math.random() * 7, delay: -Math.random() * 10,
   })), []);
-  const funkeln = useMemo(() => ppZufall(ppFxN(16), () => {
+  const funkeln = useMemo(() => ppZufall(ppAreaN(16), () => {
     const [x, y, r] = SH_NETZE[Math.floor(Math.random() * SH_NETZE.length)];
     const [dx, dy] = [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [-1, 1], [1, -1], [-1, -1]][Math.floor(Math.random() * 8)];
     const d = 1 + Math.floor(Math.random() * (r - 1));
     return { x: x + dx * d, y: y + dy * d, dur: 2.2 + Math.random() * 2.6, delay: -Math.random() * 5 };
   }), []);
-  const krabbler = useMemo(() => ppZufall(ppFxN(8), () => {
+  const krabbler = useMemo(() => ppZufall(ppAreaN(8), () => {
     let x, y, weg;
     do {                                                          // ganze Strecke nicht im schwarzen Schlund
       x = Math.round((Math.random() - .5) * 340); y = Math.round(18 + Math.random() * 72);
@@ -3441,21 +3683,21 @@ const SpiderHiveOverlay = React.memo(function SpiderHiveOverlay() {
     } while (Math.min(x, x + weg) < 28 && Math.max(x, x + weg) + 13 > -28 && y > 34 && y < 82);
     return { x, y, weg, dur: Math.abs(weg) * (.22 + Math.random() * .15), delay: -Math.random() * 10 };
   }), []);
-  const junge = useMemo(() => ppZufall(ppFxN(6), (i) => {
+  const junge = useMemo(() => ppZufall(ppAreaN(6), (i) => {
     const gx = Math.round((Math.random() - .5) * 320), gy = Math.round(78 + Math.random() * 16);
     const weg = Math.round((i % 2 ? -1 : 1) * (10 + Math.random() * 14));
     return { x: gx + (i % 3) * 4, y: gy - (i % 2) * 3, weg, dur: Math.abs(weg) * .09, delay: -Math.random() * 6 };
   }), []);
-  const seiler = useMemo(() => ppZufall(ppFxN(4), (i) => ({
+  const seiler = useMemo(() => ppZufall(ppAreaN(4), (i) => ({
     x: Math.round((i - 1.5) * 84 + (Math.random() - .5) * 40), tief: Math.round(14 + Math.random() * 26),
     dur: 11 + Math.random() * 8, delay: -Math.random() * 18,
   })), []);
-  const staub = useMemo(() => ppZufall(ppFxN(10), () => {
+  const staub = useMemo(() => ppZufall(ppAreaN(10), () => {
     const [x, y0, y1] = SH_STAUB[Math.floor(Math.random() * SH_STAUB.length)];
     return { x: x + Math.round((Math.random() - .5) * 6), y0, fall: Math.min(10, y1 - y0), dur: 5 + Math.random() * 5, delay: -Math.random() * 10 };
   }), []);
   return (
-    <PixelScene artH={100} bg="#7b5428" className="spider-hive-overlay">
+    <PixelScene artH={100} bg="#72541d" className="spider-hive-overlay">
       <PixelBand src={SH + 'tile.png'} />
       <PixelBand src={SH + 'tile-glow.png'} className="sh-glimmen" />
       <PixelBand src={SH + 'vines.png'} style={{ backgroundSize: 'auto 200%', animation: 'ppBand2 2.8s steps(1) infinite' }} />
@@ -3498,7 +3740,7 @@ const SpiderHiveOverlay = React.memo(function SpiderHiveOverlay() {
           animation: `shAbseilen ${s.dur.toFixed(2)}s steps(${s.tief + 10}) ${s.delay.toFixed(2)}s infinite, ppSprite2 .5s steps(1) infinite`,
         }} />
       ))}
-      <div className="pp-rand-dim" />
+      <PpRandDim />
       <style>{`
         .sh-glimmen { animation: shGlimmen 3.4s ease-in-out infinite alternate; }
         .sh-schlund { animation-duration: 4.6s; animation-delay: -1.3s; }
@@ -3513,7 +3755,7 @@ const SpiderHiveOverlay = React.memo(function SpiderHiveOverlay() {
           65% { background-position: 50% 0; } 66%, 86% { background-position: 0 0; } 87% { background-position: 50% 0; }
           88% { background-position: 100% 0; } 89% { background-position: 50% 0; } 90%, 100% { background-position: 0 0; }
         }
-        .sh-lid { position: absolute; width: calc(3 * var(--px)); height: var(--px); background: #080403; opacity: 0; }
+        .sh-lid { position: absolute; width: calc(3 * var(--px)); height: var(--px); background: #000000; opacity: 0; }
         @keyframes shBlinzeln { 0%, 90% { opacity: 0; } 91%, 93% { opacity: 1; } 94%, 100% { opacity: 0; } }
         @keyframes shWeg { 0%, 45% { opacity: 0; } 46%, 55% { opacity: 1; } 56%, 58% { opacity: 0; } 59%, 90% { opacity: 1; } 91%, 100% { opacity: 0; } }
         .sh-spinne { position: absolute; width: calc(13 * var(--px)); height: calc(7 * var(--px)); background: url(${SH}spider.png) 0 0 / 200% 100% no-repeat; }
@@ -3522,7 +3764,7 @@ const SpiderHiveOverlay = React.memo(function SpiderHiveOverlay() {
         .sh-seiler { position: absolute; top: 0; width: calc(7 * var(--px)); height: calc(7 * var(--px)); background: url(${SH}hang.png) 0 0 / 200% 100% no-repeat; }
         .sh-seiler::before {
           content: ''; position: absolute; left: calc(3 * var(--px)); bottom: calc(100% - var(--px)); width: var(--px); height: calc(110 * var(--px));
-          background: rgba(236, 228, 214, .55);
+          background: rgba(226,216,203,.55);
         }
         @keyframes shAbseilen {
           0% { translate: 0 calc(-10 * var(--px)); } 30%, 62% { translate: 0 var(--tief); } 100% { translate: 0 calc(-10 * var(--px)); }
@@ -3533,7 +3775,7 @@ const SpiderHiveOverlay = React.memo(function SpiderHiveOverlay() {
           78% { background-position: 50% 0; } 81% { background-position: 100% 0; } 84%, 92% { background-position: 0 0; }
           93% { background-position: 100% 0; } 96%, 100% { background-position: 0 0; }
         }
-        .sh-staub { position: absolute; width: var(--px); height: var(--px); background: #c09452; opacity: 0; }
+        .sh-staub { position: absolute; width: var(--px); height: var(--px); background: #ca874e; opacity: 0; }
         @keyframes shRieseln {
           0% { translate: 0 0; opacity: 0; } 1% { opacity: .9; }
           24% { translate: 0 var(--fall); opacity: .9; }
@@ -3593,15 +3835,15 @@ const SS_RITZEN = [41, 97];                   // Dachritzen (Kachel-x), Strahl f
 const StinkyStablesOverlay = React.memo(function StinkyStablesOverlay() {
   const schwaden = useMemo(() => {
     const quellen = [...SS_GIPFEL.slice(0, 7), ...SS_GIPFEL.slice(7).sort(() => Math.random() - .5)];
-    return quellen.slice(0, ppFxN(12)).map(([x, y]) => ({
+    return quellen.slice(0, ppAreaN(12)).map(([x, y]) => ({
       x: x + (Math.random() - .5) * 8, y, dur: 4.5 + Math.random() * 3, delay: -Math.random() * 8,
     }));
   }, []);
-  const wolken = useMemo(() => ppZufall(ppFxN(7), (i) => {
+  const wolken = useMemo(() => ppZufall(ppAreaN(7), (i) => {
     const [x, y] = i < 3 ? SS_GIPFEL[[0, 3, 4][i]] : SS_GIPFEL[7 + Math.floor(Math.random() * (SS_GIPFEL.length - 7))];
     return { x: x + (Math.random() - .5) * 14, y: y + 2 + Math.random() * 6, dur: 6 + Math.random() * 3, delay: -Math.random() * 9 };
   }), []);
-  const fliegen = useMemo(() => ppZufall(ppFxN(12), (i) => {
+  const fliegen = useMemo(() => ppZufall(ppAreaN(12), (i) => {
     const [x, y] = SS_GIPFEL[i % SS_GIPFEL.length];
     return {
       x: x + (Math.random() - .5) * 10, y: y - 4 - Math.random() * 5,
@@ -3609,19 +3851,19 @@ const StinkyStablesOverlay = React.memo(function StinkyStablesOverlay() {
       drift: 3 + Math.random() * 3,
     };
   }), []);
-  const staub = useMemo(() => ppZufall(ppFxN(14), () => {
+  const staub = useMemo(() => ppZufall(ppAreaN(14), () => {
     const t = SS_RITZEN[Math.floor(Math.random() * 2)] + Math.random() * 3;
     const k = Math.floor(Math.random() * 5) - 2;
     return { x: ssKachel(t, k), y: 4 + Math.random() * 6, dur: 11 + Math.random() * 8, delay: -Math.random() * 19 };
   }), []);
-  const blasen = useMemo(() => SS_BLASEN.slice(0, ppFxN(SS_BLASEN.length)).map(([x, y]) => ({
+  const blasen = useMemo(() => SS_BLASEN.slice(0, ppAreaN(SS_BLASEN.length)).map(([x, y]) => ({
     x, y, dur: 4 + Math.random() * 4, delay: -Math.random() * 8,
   })), []);
-  const schwalben = useMemo(() => ppZufall(ppFxN(2), (i) => ({
+  const schwalben = useMemo(() => ppZufall(ppAreaN(2), (i) => ({
     y: 16 + Math.random() * 16, dur: 9 + Math.random() * 6, delay: -Math.random() * 15, rtl: i % 2 === 1,
   })), []);
   return (
-    <PixelScene artH={100} bg="#1a110a" className="stinky-stables-overlay">
+    <PixelScene artH={100} bg="#1f0f04" className="stinky-stables-overlay">
       <PixelBand src={SS + 'tile.png'} />
       <PixelPiece src={SS + 'heap.png'} w={SS_W} />
       <i className="ss-huhn" style={{ left: ppArtX(24, SS_W), top: ppArt(84) }} />
@@ -3657,7 +3899,7 @@ const StinkyStablesOverlay = React.memo(function StinkyStablesOverlay() {
           <i className="ss-schwalbe" style={{ transform: s.rtl ? 'scaleX(-1)' : undefined }} />
         </div>
       ))}
-      <div className="pp-rand-dim" />
+      <PpRandDim />
       <style>{`
         .ss-dunst {
           position: absolute; left: 0; right: 0; height: calc(40 * var(--px));
@@ -3706,15 +3948,15 @@ const StinkyStablesOverlay = React.memo(function StinkyStablesOverlay() {
           100% { transform: translateY(calc(-18 * var(--px))); opacity: 0; }
         }
         @keyframes ssMiefBild { 0% { background-position: 0 0; } 30% { background-position: 50% 0; } 62%, 100% { background-position: 100% 0; } }
-        .ss-staub { position: absolute; width: var(--px); height: var(--px); background: #f4dd9c; opacity: 0; }
+        .ss-staub { position: absolute; width: var(--px); height: var(--px); background: #f9ecb3; opacity: 0; }
         @keyframes ssRieseln {
           0% { transform: translate(0, 0); opacity: 0; } 10% { opacity: .75; }
           50% { opacity: .4; } 60% { opacity: .8; } 90% { opacity: .5; }
           100% { transform: translate(calc(-23 * var(--px)), calc(56 * var(--px))); opacity: 0; }
         }
         .ss-fliege-ort { position: absolute; width: var(--px); height: var(--px); }
-        .ss-fliege { position: absolute; width: var(--px); height: var(--px); background: #120b06; }
-        @keyframes ssSurr { 0% { box-shadow: 0 calc(-1 * var(--px)) 0 rgba(215, 225, 235, .75); } 50% { box-shadow: var(--px) 0 0 rgba(215, 225, 235, .5); } }
+        .ss-fliege { position: absolute; width: var(--px); height: var(--px); background: #141414; }
+        @keyframes ssSurr { 0% { box-shadow: 0 calc(-1 * var(--px)) 0 rgba(229,237,250,.75); } 50% { box-shadow: var(--px) 0 0 rgba(229,237,250,.5); } }
         @keyframes ssFlugA {
           0% { transform: translate(0, 0); } 12.5% { transform: translate(calc(3 * var(--px)), calc(-2 * var(--px))); }
           25% { transform: translate(calc(5 * var(--px)), 0); } 37.5% { transform: translate(calc(3 * var(--px)), calc(2 * var(--px))); }
@@ -3790,29 +4032,29 @@ const FI_INSELN = [
 const FI_FALTER = [[92, 30], [140, 40], [48, 40]];
 
 const FloatingIslandOverlay = React.memo(function FloatingIslandOverlay() {
-  const voegel = useMemo(() => ppZufall(ppFxN(3), (i) => ({
+  const voegel = useMemo(() => ppZufall(ppAreaN(3), (i) => ({
     y: [6, 22, 40][i] + Math.random() * 4, dur: 20 + Math.random() * 12, delay: -Math.random() * 30,
     rtl: i % 2 === 1, schlag: .45 + Math.random() * .2,
   })), []);
-  const falter = useMemo(() => FI_FALTER.slice(0, ppFxN(3)).map(([x, y], i) => ({
+  const falter = useMemo(() => FI_FALTER.slice(0, ppAreaN(3)).map(([x, y], i) => ({
     x, y, dur: 9 + Math.random() * 5, delay: -Math.random() * 10, flip: i % 2 === 1,
   })), []);
-  const kruemel = useMemo(() => ppZufall(ppFxN(8), (i) => {
+  const kruemel = useMemo(() => ppZufall(ppAreaN(8), (i) => {
     const [x, y] = FI_ZACKEN[i % FI_ZACKEN.length];
     return { x: x + Math.round(Math.random() * 2 - 1), y, fall: 10 + Math.random() * 14, dur: 3 + Math.random() * 3, delay: -Math.random() * 6 };
   }), []);
-  const tropfen = useMemo(() => ppZufall(ppFxN(8), () => ({
+  const tropfen = useMemo(() => ppZufall(ppAreaN(8), () => ({
     x: FI_FALL.x + (Math.random() < .5 ? -1 : 1) * (4 + Math.random() * 3), y: 64 + Math.random() * 10,
     fall: 14 + Math.random() * 10, dur: 1 + Math.random() * .8, delay: -Math.random() * 2,
   })), []);
-  const gischt = useMemo(() => ppZufall(ppFxN(4), (i) => ({
+  const gischt = useMemo(() => ppZufall(ppAreaN(4), (i) => ({
     x: FI_FALL.x - 6 + i * 3 + Math.random() * 2, dur: 3 + Math.random() * 2, delay: -Math.random() * 5,
   })), []);
-  const glanz = useMemo(() => ppZufall(ppFxN(4), (i) => ({
+  const glanz = useMemo(() => ppZufall(ppAreaN(4), (i) => ({
     x: [60, 58, 61, 63][i], y: [10, 30, 46, 70][i], dur: 2 + Math.random() * 2, delay: -Math.random() * 4,
   })), []);
   return (
-    <PixelScene artH={100} bg="#1a5dd7" className="floating-island-overlay">
+    <PixelScene artH={100} bg="#0351c9" className="floating-island-overlay">
       <PixelBand src={FI + 'sky.png'} />
       <PixelBand src={FI + 'clouds-back.png'} className="fi-wolken-hinten" />
       {FI_INSELN.map((s, i) => (
@@ -3861,7 +4103,7 @@ const FloatingIslandOverlay = React.memo(function FloatingIslandOverlay() {
           <i className="fi-vogel" style={{ transform: v.rtl ? 'scaleX(-1)' : undefined, animationDuration: `${v.schlag.toFixed(2)}s, 2.3s` }} />
         </div>
       ))}
-      <div className="pp-rand-dim" />
+      <PpRandDim />
       <style>{`
         .fi-wolken-hinten { animation: fiZug 150s steps(256) infinite; }
         .fi-wolken-vorn { opacity: .92; animation: fiZug 60s steps(256) infinite; }
@@ -3872,14 +4114,14 @@ const FloatingIslandOverlay = React.memo(function FloatingIslandOverlay() {
           60% { translate: 0 calc(-1 * var(--px)); } 82% { translate: 0 0; } 100% { translate: 0 0; }
         }
         .fi-insel { position: absolute; background-size: 100% 100%; background-repeat: no-repeat; }
-        .fi-kruemel, .fi-tropfen { position: absolute; width: var(--px); height: var(--px); background: #5a3a1e; opacity: 0; }
-        .fi-tropfen { background: #bcd9ff; }
+        .fi-kruemel, .fi-tropfen { position: absolute; width: var(--px); height: var(--px); background: #5a341a; opacity: 0; }
+        .fi-tropfen { background: #b4cff8; }
         @keyframes fiRieseln {
           0% { transform: translateY(0); opacity: 0; } 5% { opacity: 1; }
           80% { opacity: 1; } 100% { transform: translateY(var(--fall)); opacity: 0; }
         }
         .fi-nebel { position: absolute; width: calc(24 * var(--px)); height: calc(10 * var(--px)); background: url(${FI}mist.png) 0 0 / 300% 100% no-repeat; animation: ppSprite3 .9s steps(1) infinite; }
-        .fi-gischt { position: absolute; width: calc(3 * var(--px)); height: calc(2 * var(--px)); background: #e3edfb; opacity: 0; box-shadow: var(--px) calc(-1 * var(--px)) 0 #f4f8fe; }
+        .fi-gischt { position: absolute; width: calc(3 * var(--px)); height: calc(2 * var(--px)); background: #e5edfa; opacity: 0; box-shadow: var(--px) calc(-1 * var(--px)) 0 #ffffff; }
         @keyframes fiGischt {
           0% { transform: translate(0, 0); opacity: 0; } 15% { opacity: .85; }
           100% { transform: translate(calc(-4 * var(--px)), calc(-14 * var(--px))); opacity: 0; }
@@ -3948,16 +4190,16 @@ const TempleOfSacrificeOverlay = React.memo(function TempleOfSacrificeOverlay() 
   // Rauch: von den Schalen und aus dem Altar
   const rauch = useMemo(() => {
     const quellen = [...TS_FEUER.map(f => ({ x: f.x, y: f.y })), { x: 0, y: 30 }];
-    return ppZufall(ppFxN(7), (i) => {
+    return ppZufall(ppAreaN(7), (i) => {
       const q = quellen[i % quellen.length];
       return { x: q.x, y: q.y, dur: 4 + Math.random() * 3, delay: -Math.random() * 7 };
     });
   }, []);
-  const funken = useMemo(() => ppZufall(ppFxN(8), (i) => {
+  const funken = useMemo(() => ppZufall(ppAreaN(8), (i) => {
     const f = TS_FEUER[i % TS_FEUER.length];
     return { x: f.x + Math.round((Math.random() - .5) * 4), y: f.y + 2, dur: 1.6 + Math.random() * 1.4, delay: -Math.random() * 3 };
   }), []);
-  const gluehen = useMemo(() => ppZufall(ppFxN(14), () => {
+  const gluehen = useMemo(() => ppZufall(ppAreaN(14), () => {
     const seite = Math.random() < .5 ? -1 : 1;
     return {
       x: seite * (40 + Math.random() * 150), y: 50 + Math.random() * 46,
@@ -3965,11 +4207,11 @@ const TempleOfSacrificeOverlay = React.memo(function TempleOfSacrificeOverlay() 
       dx: Math.round((Math.random() - .5) * 10), dy: -Math.round(2 + Math.random() * 6),
     };
   }), []);
-  const flieger = useMemo(() => ppZufall(Math.min(1, ppFxN(1)), () => ({
+  const flieger = useMemo(() => ppZufall(Math.min(1, ppAreaN(1)), () => ({
     y: 6 + Math.random() * 14, dur: 34 + Math.random() * 12, delay: -Math.random() * 30, rtl: Math.random() < .5,
   })), []);
   return (
-    <PixelScene artH={100} bg="#10251b" className="temple-of-sacrifice-overlay">
+    <PixelScene artH={100} bg="#0f2412" className="temple-of-sacrifice-overlay">
       <PixelBand src={TS + 'tile.png'} />
       <PixelBand src={TS + 'sway.png'} className="ts-wiegen" style={{ backgroundSize: 'auto 300%' }} />
       <PixelPiece src={TS + 'temple.png'} w={TS_W} />
@@ -4011,7 +4253,7 @@ const TempleOfSacrificeOverlay = React.memo(function TempleOfSacrificeOverlay() 
           <i className="ts-ara-flug" style={{ transform: f.rtl ? 'scaleX(-1)' : undefined }} />
         </div>
       ))}
-      <div className="pp-rand-dim" />
+      <PpRandDim />
       <style>{`
         .ts-wiegen { animation: tsPendel 3.2s steps(1) infinite; }
         @keyframes tsPendel {
@@ -4034,7 +4276,7 @@ const TempleOfSacrificeOverlay = React.memo(function TempleOfSacrificeOverlay() 
           60% { opacity: .5; }
           100% { transform: translate(calc(-6 * var(--px)), calc(-28 * var(--px))); opacity: 0; }
         }
-        .ts-funke { position: absolute; width: var(--px); height: var(--px); background: #ffb040; opacity: 0; }
+        .ts-funke { position: absolute; width: var(--px); height: var(--px); background: #f9ac20; opacity: 0; }
         @keyframes tsFunke { 0% { transform: translate(0, 0); opacity: 0; } 10% { opacity: 1; } 100% { transform: translate(calc(-2 * var(--px)), calc(-14 * var(--px))); opacity: 0; } }
         .ts-ara {
           position: absolute; width: calc(9 * var(--px)); height: calc(14 * var(--px));
@@ -4061,8 +4303,8 @@ const TempleOfSacrificeOverlay = React.memo(function TempleOfSacrificeOverlay() 
           100% { transform: translateX(calc(-20 * var(--px))); }
         }
         .ts-gluehwurm {
-          position: absolute; width: var(--px); height: var(--px); background: #f4ff9a; opacity: 0;
-          box-shadow: 0 0 calc(2 * var(--px)) calc(.6 * var(--px)) rgba(210, 255, 90, .45);
+          position: absolute; width: var(--px); height: var(--px); background: #fff196; opacity: 0;
+          box-shadow: 0 calc(-1 * var(--px)) 0 0 #80bf59, 0 var(--px) 0 0 #80bf59, calc(-1 * var(--px)) 0 0 0 #80bf59, var(--px) 0 0 0 #80bf59;
         }
         @keyframes tsGluehen {
           0% { transform: translate(0, 0); opacity: 0; } 20% { opacity: .9; } 40% { opacity: .25; }
@@ -4120,26 +4362,26 @@ const BonegrinderOverlay = React.memo(function BonegrinderOverlay() {
     x: -BGR_KACHEL / 2 + (i - 2) * BGR_KACHEL,
     dur: .5 + Math.random() * .25, delay: -Math.random(), glut: 1.3 + Math.random() * .8,
   })), []);
-  const knochen = useMemo(() => ppZufall(ppFxN(3), (i) => ({
+  const knochen = useMemo(() => ppZufall(ppAreaN(3), (i) => ({
     x: -6 + Math.random() * 12, dur: 3.2 + Math.random() * 1.6, delay: -i * 1.4 - Math.random(),
     dreh: .3 + Math.random() * .2,
   })), []);
-  const staubwolken = useMemo(() => ppZufall(ppFxN(6), () => ({
+  const staubwolken = useMemo(() => ppZufall(ppAreaN(6), () => ({
     x: -9 + Math.random() * 18, dur: 1.6 + Math.random() * 1.4, delay: -Math.random() * 3,
     dx: (Math.random() - .5) * 8,
   })), []);
-  const staub = useMemo(() => ppZufall(ppFxN(14), () => ({
+  const staub = useMemo(() => ppZufall(ppAreaN(14), () => ({
     x: Math.random() * 100, y: 10 + Math.random() * 80, dur: 10 + Math.random() * 10, delay: -Math.random() * 20,
   })), []);
   const ratte = useMemo(() => ({ dur: 9 + Math.random() * 4, delay: -Math.random() * 30, rtl: Math.random() < .5 }), []);
   return (
-    <PixelScene artH={100} bg="#2a2422" className="bonegrinder-overlay">
+    <PixelScene artH={100} bg="#222222" className="bonegrinder-overlay">
       <PixelBand src={BGR + 'tile.png'} />
       <PixelBand src={BGR + 'tile-glow.png'} className="bg-schein" />
       <PixelBand src={BGR + 'chains.png'} className="bg-ketten" style={{ backgroundSize: 'auto 300%' }} />
       {fackeln.map((f, i) => (
         <React.Fragment key={'f' + i}>
-          <i className="bg-glut" style={{
+          <PpGlow {...GL_BG_GLUT} className="bg-glut" style={{
             left: ppArtX(f.x - 9, 0), top: ppArt(BGR_FACKEL_Y - 14), animation: `bgGlut ${f.glut.toFixed(2)}s steps(1) ${f.delay.toFixed(2)}s infinite`,
           }} />
           <i className="bg-flamme" style={{
@@ -4174,7 +4416,7 @@ const BonegrinderOverlay = React.memo(function BonegrinderOverlay() {
           left: s.x + '%', top: ppArt(s.y), animation: `bgSchweben ${s.dur.toFixed(1)}s steps(24) ${s.delay.toFixed(1)}s infinite`,
         }} />
       ))}
-      <div className="pp-rand-dim" />
+      <PpRandDim />
       <style>{`
         .bg-schein { animation: bgSchein 2.3s steps(1) infinite; }
         @keyframes bgSchein { 0% { opacity: .85; } 18% { opacity: 1; } 31% { opacity: .75; } 52% { opacity: .95; } 70% { opacity: .8; } 86% { opacity: 1; } }
@@ -4182,7 +4424,6 @@ const BonegrinderOverlay = React.memo(function BonegrinderOverlay() {
         @keyframes bgPendel { 0% { background-position: 50% 0%; } 25% { background-position: 50% 50%; } 50% { background-position: 50% 0%; } 75% { background-position: 50% 100%; } }
         .bg-glut {
           position: absolute; width: calc(18 * var(--px)); height: calc(18 * var(--px));
-          background: radial-gradient(circle, rgba(255,170,70,.30) 0%, rgba(255,120,40,.12) 45%, rgba(255,120,40,0) 70%);
         }
         @keyframes bgGlut { 0% { opacity: .8; } 22% { opacity: 1; } 40% { opacity: .65; } 63% { opacity: .95; } 81% { opacity: .75; } }
         .bg-flamme {
@@ -4209,7 +4450,7 @@ const BonegrinderOverlay = React.memo(function BonegrinderOverlay() {
           animation: bgRieseln .5s steps(8) infinite;
         }
         @keyframes bgRieseln { from { background-position: 0 0; } to { background-position: 0 calc(8 * var(--px)); } }
-        .bg-wolke { position: absolute; width: var(--px); height: var(--px); background: #d9d3c5; opacity: 0; }
+        .bg-wolke { position: absolute; width: var(--px); height: var(--px); background: #e2d8cb; opacity: 0; }
         @keyframes bgStauben {
           0% { transform: translate(0, 0); opacity: 0; } 15% { opacity: .8; }
           100% { transform: translate(var(--dx), calc(-7 * var(--px))); opacity: 0; }
@@ -4248,7 +4489,7 @@ const BonegrinderOverlay = React.memo(function BonegrinderOverlay() {
           background: url(${BGR}rat.png) 0 0 / 200% 100% no-repeat;
           animation: ppSprite2 .18s steps(1) infinite;
         }
-        .bg-staub { position: absolute; width: var(--px); height: var(--px); background: #cfc3a8; opacity: 0; }
+        .bg-staub { position: absolute; width: var(--px); height: var(--px); background: #c5b7a0; opacity: 0; }
         @keyframes bgSchweben {
           0% { transform: translate(0, 0); opacity: 0; } 20% { opacity: .45; } 80% { opacity: .45; }
           100% { transform: translate(calc(6 * var(--px)), calc(-10 * var(--px))); opacity: 0; }
@@ -4300,25 +4541,25 @@ const CD_AUGE = { x: 40, y: 58, w: 23, h: 45 };                      // Mitte vo
 const CD_KOERPER = { w: 76, h: 98 };                                 // Schattenkörper, um das Auge zentriert
 
 const CosmicDepthsOverlay = React.memo(function CosmicDepthsOverlay() {
-  const funkeln = useMemo(() => ppZufall(ppFxN(10), () => ({
+  const funkeln = useMemo(() => ppZufall(ppAreaN(10), () => ({
     x: Math.random() * 100, y: 2 + Math.random() * 94, dur: 2.6 + Math.random() * 3, delay: -Math.random() * 6,
   })), []);
-  const schnuppen = useMemo(() => ppZufall(ppFxN(3), () => ({
+  const schnuppen = useMemo(() => ppZufall(ppAreaN(3), () => ({
     x: 15 + Math.random() * 85, y: 2 + Math.random() * 45, dur: 8 + Math.random() * 10, delay: -Math.random() * 18,
   })), []);
-  const brocken = useMemo(() => ppZufall(ppFxN(3), (i) => ({
+  const brocken = useMemo(() => ppZufall(ppAreaN(3), (i) => ({
     gross: i === 0, y: 12 + i * 29 + Math.random() * 12, dur: 80 + Math.random() * 50,
     delay: -Math.random() * 120, rtl: i % 2 === 1, dreh: 2.4 + Math.random() * 2.4, bob: 1 + Math.random() * 2,
   })), []);
-  const schwaerme = useMemo(() => ppZufall(Math.min(1, ppFxN(1)), () => ({
+  const schwaerme = useMemo(() => ppZufall(Math.min(1, ppAreaN(1)), () => ({
     y: 80 + Math.random() * 8, dur: 44 + Math.random() * 14, delay: -Math.random() * 50, rtl: Math.random() < .5,
   })), []);
-  const funken = useMemo(() => ppZufall(ppFxN(8), () => {
+  const funken = useMemo(() => ppZufall(ppAreaN(8), () => {
     const a = Math.random() * Math.PI * 2, d = 10 + Math.random() * 14;
     return { dx: Math.cos(a) * d, dy: Math.sin(a) * d * 1.3, dur: 2.2 + Math.random() * 2.2, delay: -Math.random() * 4.4 };
   }), []);
   return (
-    <PixelScene artH={100} bg="#01021f" className="cosmic-depths-overlay">
+    <PixelScene artH={100} bg="#12101f" className="cosmic-depths-overlay">
       <PixelBand src={CD + 'tile.png'} />
       <PixelBand src={CD + 'twinkle.png'} style={{ backgroundSize: 'auto 300%', animation: 'ppBand3 3.6s steps(1) infinite' }} />
       <div className="pp-pixel-layer cd-nebel" />
@@ -4366,7 +4607,7 @@ const CosmicDepthsOverlay = React.memo(function CosmicDepthsOverlay() {
           ))}
         </div>
       ))}
-      <div className="pp-rand-dim" />
+      <PpRandDim />
       <style>{`
         .cd-nebel {
           position: absolute; inset: 0;
@@ -4401,11 +4642,11 @@ const CosmicDepthsOverlay = React.memo(function CosmicDepthsOverlay() {
           animation: cdRiss 2.8s steps(1) infinite;
         }
         @keyframes cdRiss { 0% { background-position: 0 0; } 25% { background-position: 50% 0; } 50% { background-position: 100% 0; } 75% { background-position: 50% 0; } }
-        .cd-funke { position: absolute; width: var(--px); height: var(--px); background: #ff5a4a; opacity: 0; }
+        .cd-funke { position: absolute; width: var(--px); height: var(--px); background: #fe5154; opacity: 0; }
         @keyframes cdSog {
           0% { transform: translate(var(--dx), var(--dy)); opacity: 0; }
           20% { opacity: .9; }
-          85% { opacity: .9; background: #ff2a6a; }
+          85% { opacity: .9; background: #fc1c5f; }
           100% { transform: translate(0, 0); opacity: 0; }
         }
         .cd-schnuppe {
@@ -4487,7 +4728,7 @@ const FC_STEHER = [{ x: -62, y: 74, v: 1, dur: 7 }, { x: 88, y: 86, v: 0, dur: 9
 const FirstCircleOfHellOverlay = React.memo(function FirstCircleOfHellOverlay() {
   const seelen = useMemo(() => {
     const plaetze = FC_STEHER.map(s => [s.x, s.y]);
-    return ppZufall(ppFxN(10), (i) => {
+    return ppZufall(ppAreaN(10), (i) => {
       // ein Drittel weiter hinten (klein), die Haelfte nahe der Mitte, der Rest weit verstreut
       const mitte = i % 3 === 2;
       let x, y, n = 0;
@@ -4504,12 +4745,12 @@ const FirstCircleOfHellOverlay = React.memo(function FirstCircleOfHellOverlay() 
       };
     });
   }, []);
-  const ferne = useMemo(() => ppZufall(ppFxN(9), () => ({
+  const ferne = useMemo(() => ppZufall(ppAreaN(9), () => ({
     x: (Math.random() - .5) * 360, y: FC_HORIZONT + 1 + Math.random() * 6,
     dur: 18 + Math.random() * 18, delay: -Math.random() * 36, weg: 3 + Math.floor(Math.random() * 5),
     links: Math.random() < .5,
   })), []);
-  const asche = useMemo(() => ppZufall(ppFxN(16), () => ({
+  const asche = useMemo(() => ppZufall(ppAreaN(16), () => ({
     y: Math.random() * 90, dur: 30 + Math.random() * 30, delay: -Math.random() * 60,
     art: Math.random() < .3 ? ' dunkel' : Math.random() < .2 ? ' gross' : '',
   })), []);
@@ -4537,7 +4778,7 @@ const FirstCircleOfHellOverlay = React.memo(function FirstCircleOfHellOverlay() 
     );
   };
   return (
-    <PixelScene artH={100} bg="#4f4e4b" className="first-circle-overlay">
+    <PixelScene artH={100} bg="#535353" className="first-circle-overlay">
       <PixelBand src={FC + 'tile.png'} />
       {ferne.map((f, i) => (
         <div key={'f' + i} className="pp-area-dyn fc-fern" style={{
@@ -4558,7 +4799,7 @@ const FirstCircleOfHellOverlay = React.memo(function FirstCircleOfHellOverlay() 
         }} />
       ))}
       <div className="pp-pixel-layer fc-staub vorn" style={{ top: ppArt(74) }} />
-      <div className="pp-rand-dim" />
+      <PpRandDim />
       <style>{`
         .fc-dunst {
           position: absolute; left: 0; right: 0; height: calc(40 * var(--px));
@@ -4617,9 +4858,9 @@ const FirstCircleOfHellOverlay = React.memo(function FirstCircleOfHellOverlay() 
           26.9% { opacity: 1; transform: translateY(0); }
           27%, 100% { opacity: 0; transform: translateY(0); }
         }
-        .fc-asche { position: absolute; left: 0; width: var(--px); height: var(--px); background: #9a978f; opacity: .6; }
-        .fc-asche.dunkel { background: #4a4946; }
-        .fc-asche.gross { width: calc(2 * var(--px)); background: #a8a59d; }
+        .fc-asche { position: absolute; left: 0; width: var(--px); height: var(--px); background: #929292; opacity: .6; }
+        .fc-asche.dunkel { background: #535353; }
+        .fc-asche.gross { width: calc(2 * var(--px)); background: #a8a8a8; }
         @keyframes fcAsche {
           0% { transform: translate(calc(-10 * var(--px)), 0); }
           25% { transform: translate(calc(25cqw), calc(3 * var(--px))); }
@@ -4698,19 +4939,19 @@ const BigGwenOverlay = React.memo(function BigGwenOverlay() {
       }
     }
     out.sort(() => Math.random() - .5);
-    return out.slice(0, ppFxN(22)).map(r => ({
+    return out.slice(0, ppAreaN(22)).map(r => ({
       ...r, dur: (r.gross ? 5 : 3.6) + Math.random() * 2.5, delay: -Math.random() * 7,
     }));
   }, []);
-  const gluehen = useMemo(() => ppZufall(ppFxN(12), () => ({
+  const gluehen = useMemo(() => ppZufall(ppAreaN(12), () => ({
     x: (Math.random() - .5) * 300, y: 70 + Math.random() * 9,
     dur: 5 + Math.random() * 4, delay: -Math.random() * 9, blink: 1.6 + Math.random() * 1.8,
   })), []);
-  const dohlen = useMemo(() => ppZufall(ppFxN(4), () => ({
+  const dohlen = useMemo(() => ppZufall(ppAreaN(4), () => ({
     rx: 12 + Math.random() * 16, ry: 2 + Math.random() * 4, cy: 7 + Math.random() * 12,
     dur: 3.5 + Math.random() * 3, delay: -Math.random() * 12, flap: .22 + Math.random() * .12,
   })), []);
-  const zieher = useMemo(() => ppZufall(ppFxN(2), (i) => ({
+  const zieher = useMemo(() => ppZufall(ppAreaN(2), (i) => ({
     y: 4 + Math.random() * 22, dur: 26 + Math.random() * 14, delay: -Math.random() * 30, rtl: i % 2 === 1,
   })), []);
   const zeiger = (bild, anim) => (
@@ -4720,7 +4961,7 @@ const BigGwenOverlay = React.memo(function BigGwenOverlay() {
     }} />
   );
   return (
-    <PixelScene artH={100} bg="#120f30" className="big-gwen-overlay">
+    <PixelScene artH={100} bg="#170b28" className="big-gwen-overlay">
       <PixelBand src={GW + 'sky.png'} />
       <i className="gw-mond" style={{ left: ppArtX(GW_MOND_X - 8.5, 0), top: ppArt(3) }} />
       <PixelBand src={GW + 'smog.png'} className="gw-smog" />
@@ -4764,7 +5005,7 @@ const BigGwenOverlay = React.memo(function BigGwenOverlay() {
           <i className="gw-dohle" style={{ '--bob': ppArt(2), animation: 'ppSprite2 .28s steps(1) infinite, ppBob 1.5s ease-in-out infinite alternate' }} />
         </div>
       ))}
-      <div className="pp-rand-dim" />
+      <PpRandDim />
       <style>{`
         .gw-mond {
           position: absolute;
@@ -4787,8 +5028,8 @@ const BigGwenOverlay = React.memo(function BigGwenOverlay() {
         /* Blumen wiegen: gerade – rechts – gerade – links */
         @keyframes gwWiegen { 0% { background-position: 50% 0%; } 25% { background-position: 50% 50%; } 50% { background-position: 50% 0%; } 75% { background-position: 50% 100%; } }
         .gw-gluehwurm {
-          position: absolute; width: var(--px); height: var(--px); background: #e4f47a; opacity: 0;
-          box-shadow: 0 0 calc(2 * var(--px)) calc(.5 * var(--px)) rgba(210, 240, 110, .45);
+          position: absolute; width: var(--px); height: var(--px); background: #f0f075; opacity: 0;
+          box-shadow: 0 calc(-1 * var(--px)) 0 0 #d1a148, 0 var(--px) 0 0 #d1a148, calc(-1 * var(--px)) 0 0 0 #d1a148, var(--px) 0 0 0 #d1a148;
         }
         @keyframes gwSchwirren {
           0%, 100% { transform: translate(0, 0); } 25% { transform: translate(calc(4 * var(--px)), calc(-3 * var(--px))); }
@@ -4802,7 +5043,7 @@ const BigGwenOverlay = React.memo(function BigGwenOverlay() {
           background-repeat: no-repeat; background-size: calc(${60 * GW_ZEIGER} * var(--px)) 100%;
         }
         @keyframes gwZeiger { from { background-position: 0 0; } to { background-position: calc(${-60 * GW_ZEIGER} * var(--px)) 0; } }
-        .gw-achse { position: absolute; width: var(--px); height: var(--px); background: #e8b83a; }
+        .gw-achse { position: absolute; width: var(--px); height: var(--px); background: #c79e05; }
         .gw-rauch { position: absolute; width: calc(6 * var(--px)); height: calc(5 * var(--px)); background: url(${GW}smoke.png) 0 0 / 100% 100% no-repeat; opacity: 0; }
         .gw-rauch.gross { width: calc(9 * var(--px)); height: calc(7 * var(--px)); background-image: url(${GW}smoke-big.png); }
         @keyframes gwRauch {
@@ -4872,25 +5113,25 @@ const WarCouncilOverlay = React.memo(function WarCouncilOverlay() {
     }
     return out.map(s => ({ ...s, dur: .5 + Math.random() * .25, delay: -Math.random() }));
   }, []);
-  const funken = useMemo(() => ppZufall(ppFxN(10), (i) => {
+  const funken = useMemo(() => ppZufall(ppAreaN(10), (i) => {
     const s = schalen[i % schalen.length];
     return { x: s.x + Math.round((Math.random() - .5) * 4), y: s.fuss - 16, dur: 1.4 + Math.random() * 1.2, delay: -Math.random() * 3 };
   }), [schalen]);
-  const rauch = useMemo(() => ppZufall(ppFxN(6), (i) => {
+  const rauch = useMemo(() => ppZufall(ppAreaN(6), (i) => {
     const s = schalen[i % schalen.length];
     return { x: s.x, y: s.fuss - 22, dur: 4 + Math.random() * 2, delay: -Math.random() * 6 };
   }), [schalen]);
-  const wolken = useMemo(() => ppZufall(ppFxN(4), (i) => ({
+  const wolken = useMemo(() => ppZufall(ppAreaN(4), (i) => ({
     y: -1 + Math.random() * 9, dur: 70 + Math.random() * 50, delay: -Math.random() * 120, art: i % 2,
   })), []);
-  const voegel = useMemo(() => ppZufall(ppFxN(3), (i) => ({
+  const voegel = useMemo(() => ppZufall(ppAreaN(3), (i) => ({
     y: 3 + Math.random() * 10, dur: 26 + Math.random() * 14, delay: -Math.random() * 40, bob: 1 + Math.random() * 2, rtl: i === 2,
   })), []);
-  const laub = useMemo(() => ppZufall(ppFxN(6), () => ({
+  const laub = useMemo(() => ppZufall(ppAreaN(6), () => ({
     y: 44 + Math.random() * 36, dur: 9 + Math.random() * 7, delay: -Math.random() * 16, bob: 2 + Math.random() * 3,
   })), []);
   return (
-    <PixelScene artH={100} bg="#4a66a2" className="war-council-overlay">
+    <PixelScene artH={100} bg="#405f8c" className="war-council-overlay">
       <PixelBand src={WC + 'sky.png'} />
       {wolken.map((w, i) => (
         <div key={'w' + i} className="pp-area-dyn pp-quer" style={ppQuer(w.y, w.dur.toFixed(1), w.delay.toFixed(1), false)}>
@@ -4923,7 +5164,7 @@ const WarCouncilOverlay = React.memo(function WarCouncilOverlay() {
           <i className="wc-blatt" style={{ '--bob': ppArt(l.bob) }} />
         </div>
       ))}
-      <div className="pp-rand-dim" />
+      <PpRandDim />
       <style>{`
         @keyframes wcFahnen {
           0% { background-position: 50% 0%; } 25% { background-position: 50% 33.333%; }
@@ -4939,7 +5180,7 @@ const WarCouncilOverlay = React.memo(function WarCouncilOverlay() {
           background: url(${WC}fire.png) 0 0 / 400% 100% no-repeat;
         }
         @keyframes wcFeuer { from { background-position: 0 0; } to { background-position: calc(-36 * var(--px)) 0; } }
-        .wc-funke { position: absolute; width: var(--px); height: var(--px); background: #ffb040; opacity: 0; }
+        .wc-funke { position: absolute; width: var(--px); height: var(--px); background: #f9ac20; opacity: 0; }
         @keyframes wcFunke {
           0% { transform: translate(0, 0); opacity: 0; } 10% { opacity: 1; }
           60% { transform: translate(calc(5 * var(--px)), calc(-9 * var(--px))); }
@@ -4947,7 +5188,7 @@ const WarCouncilOverlay = React.memo(function WarCouncilOverlay() {
         }
         .wc-rauch {
           position: absolute; width: calc(4 * var(--px)); height: calc(3 * var(--px)); opacity: 0;
-          background: rgba(96, 90, 112, .55); box-shadow: inset calc(-1 * var(--px)) calc(1 * var(--px)) 0 rgba(60, 54, 74, .5);
+          background: rgba(89,96,110,.55); box-shadow: inset calc(-1 * var(--px)) calc(1 * var(--px)) 0 rgba(62,62,81,.5);
         }
         @keyframes wcRauch {
           0% { transform: translate(0, 0); opacity: 0; } 15% { opacity: .75; }
@@ -5025,10 +5266,10 @@ const WH_GLITZER = [[98, 99], [87, 93], [91, 96], [89, 96], [80, 92], [98, 93]];
 // </gen>
 const WH_TAKT = 0.9;                 // Sekunden je Zahnteilung (für ALLE Räder gleich)
 const WowhallaOverlay = React.memo(function WowhallaOverlay() {
-  const dampf = useMemo(() => WH_DAMPF.slice(0, ppFxN(WH_DAMPF.length)).map(() => ({
+  const dampf = useMemo(() => WH_DAMPF.slice(0, ppAreaN(WH_DAMPF.length)).map(() => ({
     dur: 3.2 + Math.random() * 3, delay: -Math.random() * 6,
   })), []);
-  const glitzer = useMemo(() => ppZufall(ppFxN(12), (i) => i < WH_GLITZER.length
+  const glitzer = useMemo(() => ppZufall(ppAreaN(12), (i) => i < WH_GLITZER.length
     ? { x: WH_GLITZER[i][0] - WH_W / 2, y: WH_GLITZER[i][1], dur: 2 + Math.random() * 2.5, delay: -Math.random() * 4 }
     : { x: (Math.random() - .5) * 340, y: 74 + Math.random() * 24, dur: 2.4 + Math.random() * 2.5, delay: -Math.random() * 5 }), []);
   const rad = (g, i) => (
@@ -5038,7 +5279,7 @@ const WowhallaOverlay = React.memo(function WowhallaOverlay() {
     }} />
   );
   return (
-    <PixelScene artH={100} bg="#8fd6dc" className="wowhalla-overlay">
+    <PixelScene artH={100} bg="#91e6e6" className="wowhalla-overlay">
       <PixelBand src={WH + 'tile.png'} />
       <PixelBand src={WH + 'clouds.png'} className="wh-wolken" />
       <div className="pp-pixel-layer pp-area-dyn wh-schnee fern" />
@@ -5056,7 +5297,7 @@ const WowhallaOverlay = React.memo(function WowhallaOverlay() {
         <i key={'g' + i} className="pp-area-dyn pp-px-funkeln" style={{ left: ppArtX(g.x - 1, 0), top: ppArt(g.y - 1), animation: `ppFunkeln ${g.dur.toFixed(2)}s steps(1) ${g.delay.toFixed(2)}s infinite` }} />
       ))}
       <div className="pp-pixel-layer pp-area-dyn wh-schnee nah" />
-      <div className="pp-rand-dim" />
+      <PpRandDim />
       <style>{`
         .wh-wolken { animation: whWolken 140s steps(128) infinite; }
         @keyframes whWolken { from { background-position: 50% 0; } to { background-position: calc(50% - 128 * var(--px)) 0; } }
@@ -5122,12 +5363,12 @@ const SecondCircleOfHellOverlay = React.memo(function SecondCircleOfHellOverlay(
   }, []);
   // Jede Frau schickt DREI Herzen (4 s / 6 s / 12 s, gegeneinander versetzt); alle Dauern teilen die Periode
   // 12 s, damit alles nahtlos schleift.
-  const herzen = useMemo(() => frauen.flatMap((f, i) => [4, 6, 12].map((dur, k) => ({
+  const herzen = useMemo(() => ppDuenn(frauen.flatMap((f, i) => [4, 6, 12].map((dur, k) => ({
     x: f.x + ((i * 7 + k * 3) % 7 - 3), y: f.feet - f.h + 2, dur, delay: -(((i * 1.9 + k * 2.3) % dur)),
     f: (i + k) % 2, dx: ((i + k) % 3 - 1) * 2,
-  }))), [frauen]);
+  })))), [frauen]);
   return (
-    <PixelScene artH={100} bg="#1e0a2c" className="second-circle-overlay">
+    <PixelScene artH={100} bg="#19062d" className="second-circle-overlay">
       <PixelBand src={LC + 'tile.png'} className="lc-wand" style={{ backgroundSize: 'auto 200%', backgroundPosition: '0 0' }} />
       <div className="lc-volk">
         {frauen.map((f, i) => (
@@ -5154,7 +5395,7 @@ const SecondCircleOfHellOverlay = React.memo(function SecondCircleOfHellOverlay(
           }} />
         ))}
       </div>
-      <div className="pp-rand-dim" />
+      <PpRandDim />
       <style>{`
         .lc-wand { animation: lcPuls 3s steps(1) infinite; }
         /* Herzschlag der Augen: Bild 2 kurz, dann wieder Bild 1 */
@@ -5222,7 +5463,7 @@ const ThirdCircleOfHellOverlay = React.memo(function ThirdCircleOfHellOverlay() 
     return out;
   }, []);
   return (
-    <PixelScene artH={100} bg="#4a0a0a" className="third-circle-overlay">
+    <PixelScene artH={100} bg="#520a0c" className="third-circle-overlay">
       <PixelBand src={TCI + 'tile.png'} className="tc-wand" style={{ backgroundSize: 'auto 200%', backgroundPosition: '0 0' }} />
       <div className="tc-volk">
         {fresser.map((f, i) => (
@@ -5239,7 +5480,7 @@ const ThirdCircleOfHellOverlay = React.memo(function ThirdCircleOfHellOverlay() 
           }} />
         ))}
       </div>
-      <div className="pp-rand-dim" />
+      <PpRandDim />
       <style>{`
         .tc-wand { animation: tcFlackern 1.5s steps(1) infinite; }
         /* Kerzenflackern: Bild 2 unregelmaessig kurz */
@@ -5290,18 +5531,18 @@ const FourthCircleOfHellOverlay = React.memo(function FourthCircleOfHellOverlay(
   const helden = useMemo(() => Array.from({ length: 6 }, (_, i) => ({
     x: (i % 2 ? 104 : 40) + 128 * Math.floor(i / 2), v: i % 2, delay: -((i * 1.7) % 6),
   })), []);
-  const hagel = useMemo(() => Array.from({ length: 30 }, (_, i) => {
+  const hagel = useMemo(() => ppDuennVon({ length: 30 }, (_, i) => {
     const dur = [3, 4, 6][i % 3];
     return { x: -10 + ((i * 13.7) % 380), k: (i * 5) % 3, dur, delay: -((i * 0.83) % dur), flackern: -((i * 0.13) % 0.4) };
   }), []);
-  const glitzer = useMemo(() => Array.from({ length: 22 }, (_, i) => {
+  const glitzer = useMemo(() => ppDuennVon({ length: 22 }, (_, i) => {
     const dur = [3, 4, 6, 12][i % 4];
     return { x: (i * 53 + 7) % 380, y: i < 15 ? 3 + (i * 29) % 40 : 52 + (i * 17) % 38, dur, delay: -((i * 1.1) % dur) };
   }), []);
   return (
-    <PixelScene artH={100} bg="#0a0000" className="fourth-circle-overlay">
+    <PixelScene artH={100} bg="#000000" className="fourth-circle-overlay">
       <PixelBand src={FCI + 'back.png'} style={{ backgroundPosition: '0 0' }} />
-      <div className="pp-area-dyn fc4-glut" />
+      <PpGlow {...GL_FC4} className="pp-area-dyn fc4-glut" />
       <div className="fc4-volk">
         {hagel.map((h, i) => (
           <React.Fragment key={'h' + i}>
@@ -5329,12 +5570,11 @@ const FourthCircleOfHellOverlay = React.memo(function FourthCircleOfHellOverlay(
           }} />
         ))}
       </div>
-      <div className="pp-rand-dim" />
+      <PpRandDim />
       <style>{`
         .fc4-volk { position: absolute; inset: 0; }
         .fc4-glut {
-          position: absolute; inset: 0; opacity: .85;
-          background: linear-gradient(to top, rgba(255,196,64,.30), rgba(255,140,30,.12) 38%, rgba(255,120,20,0) 62%);
+          position: absolute; inset: 0; opacity: 0;
           animation: fc4Puls 6s ease-in-out infinite alternate;
         }
         @keyframes fc4Puls { from { opacity: .55; } to { opacity: 1; } }
@@ -5406,21 +5646,21 @@ const FifthCircleOfHellOverlay = React.memo(function FifthCircleOfHellOverlay() 
   const helden = useMemo(() => Array.from({ length: Math.ceil(FI_BREITE / 64) }, (_, k) => ({
     x: 48 + 64 * k, v: k % 2, delay: -((k * 1.7) % 6), flamme: -((k * 0.35) % 1.2),
   })), []);
-  const funken = useMemo(() => Array.from({ length: 34 }, (_, i) => {
+  const funken = useMemo(() => ppDuennVon({ length: 34 }, (_, i) => {
     const dur = [3, 4, 6][i % 3];
     return { x: 16 + 64 * (i % 6) + ((i * 7) % 24) - 12, y0: 62 - (i % 5) * 4, dur, k: i % 3, delay: -((i * 0.77) % dur), drift: ((i % 5) - 2) * 3 };
   }), []);
-  const asche = useMemo(() => Array.from({ length: 26 }, (_, i) => {
+  const asche = useMemo(() => ppDuennVon({ length: 26 }, (_, i) => {
     const dur = [6, 12][i % 2];
     return { x: ((i * 29) % FI_BREITE), k: i % 3, dur, delay: -((i * 1.9) % dur), drift: 8 + (i % 4) * 4 };
   }), []);
   return (
-    <PixelScene artH={100} bg="#140806" className="fifth-circle-overlay">
+    <PixelScene artH={100} bg="#08060c" className="fifth-circle-overlay">
       <PixelBand src={FII + 'back.png'} style={{ backgroundPosition: '0 0' }} />
       <div className="fi-volk">
         {fontaenen.map((f, i) => (
           <React.Fragment key={'f' + i}>
-            <i className="pp-area-dyn fi-glut" style={{ left: ppArt(f.x - 30), animation: `fiGlut 3s ease-in-out ${f.delay}s infinite alternate` }} />
+            <PpGlow {...GL_FI} className="pp-area-dyn fi-glut" style={{ left: ppArt(f.x - 30), animation: `fiGlut 3s ease-in-out ${f.delay}s infinite alternate` }} />
             <i className={'fi-fontaene ' + (f.gross ? 'gross' : 'klein')} style={{
               left: ppArt(f.x - (f.gross ? 15 : 11)), top: ppArt(f.gross ? 14 : 30),
               animation: `${f.gross ? 'fiFontA' : 'fiFontB'} 1.2s steps(1) ${f.delay}s infinite`,
@@ -5452,7 +5692,7 @@ const FifthCircleOfHellOverlay = React.memo(function FifthCircleOfHellOverlay() 
           }} />
         ))}
       </div>
-      <div className="pp-rand-dim" />
+      <PpRandDim />
       <style>{`
         .fi-volk { position: absolute; inset: 0; }
         .fi-fontaene { position: absolute; }
@@ -5461,8 +5701,7 @@ const FifthCircleOfHellOverlay = React.memo(function FifthCircleOfHellOverlay() 
         @keyframes fiFontA { ${[0,1,2,3,4,5,6,7].map(b => `${(b * 12.5)}% { background-position-x: ${(b * 100 / 7).toFixed(3)}%; }`).join(' ')} }
         @keyframes fiFontB { ${[0,1,2,3,4,5,6,7].map(b => `${(b * 12.5)}% { background-position-x: ${(b * 100 / 7).toFixed(3)}%; }`).join(' ')} }
         /* Schein der Fontaenen: warmes Pulsieren */
-        .fi-glut { position: absolute; top: calc(10 * var(--px)); width: calc(60 * var(--px)); height: calc(80 * var(--px)); opacity: .5;
-          background: radial-gradient(ellipse at 50% 62%, rgba(255,160,50,.34), rgba(255,100,20,.14) 45%, rgba(255,80,10,0) 70%); }
+        .fi-glut { position: absolute; top: calc(10 * var(--px)); width: calc(60 * var(--px)); height: calc(80 * var(--px)); opacity: 0; }
         @keyframes fiGlut { from { opacity: .35; } to { opacity: .8; } }
         .fi-held { position: absolute; top: calc(42 * var(--px)); width: calc(26 * var(--px)); height: calc(36 * var(--px)); background: url(${FII}hero.png) 0 0 / ${FI_BILDER * 100}% 200% no-repeat; }
         @keyframes fiHeld { ${FI_KEYFRAMES} }
@@ -5507,17 +5746,17 @@ const sxReihe = (n) => Array.from({ length: n }, (_, b) => `${(b * 100 / n).toFi
 const SX_PAN = 256;                                       // Breite des Panoramas (Kunstpixel), mittig; links/rechts setzt die Wand (back.png) fort
 const SX = (x) => ppArtX(x, SX_PAN);                     // Kunstpixel-x im Panorama → Position
 const SixthCircleOfHellOverlay = React.memo(function SixthCircleOfHellOverlay() {
-  const funken = useMemo(() => Array.from({ length: 36 }, (_, i) => {
+  const funken = useMemo(() => ppDuennVon({ length: 36 }, (_, i) => {
     const dur = [3, 4, 6][i % 3];
     return { x: -240 + ((i * 53) % 480), y0: 84 - (i % 4) * 6, dur, k: i % 3, delay: -((i * 0.83) % dur), drift: ((i % 5) - 2) * 3 };
   }), []);
-  const tropfen = useMemo(() => Array.from({ length: 16 }, (_, i) => {
+  const tropfen = useMemo(() => ppDuennVon({ length: 16 }, (_, i) => {
     const dur = [3, 4][i % 2];
     return { x: -240 + ((i * 61 + 9) % 480), dur, k: i % 3, delay: -((i * 0.61) % dur) };
   }), []);
   const himmel = useMemo(() => Array.from({ length: 12 }, (_, k) => k - 6), []);
   return (
-    <PixelScene artH={100} bg="#140000" className="sixth-circle-overlay">
+    <PixelScene artH={100} bg="#08060c" className="sixth-circle-overlay">
       <PixelBand src={SXX + 'back.png'} style={{ backgroundPosition: '50% 0' }} />
       <PixelPiece src={SXX + 'panorama.png'} w={SX_PAN} />
       <div className="sx-volk">
@@ -5526,7 +5765,7 @@ const SixthCircleOfHellOverlay = React.memo(function SixthCircleOfHellOverlay() 
         ))}
         {[[34, 46, 0], [100, 34, -0.5], [196, 42, -0.9]].map(([nx, ny, d], i) => (
           <React.Fragment key={'n' + i}>
-            <i className="pp-area-dyn sx-glut" style={{ left: SX(nx - 5), top: ppArt(ny - 8), animation: `sxGlut 3s ease-in-out ${d}s infinite alternate` }} />
+            <PpGlow {...GL_SX} className="pp-area-dyn sx-glut" style={{ left: SX(nx - 5), top: ppArt(ny - 8), animation: `sxGlut 3s ease-in-out ${d}s infinite alternate` }} />
             <i className="sx-feuer" style={{ left: SX(nx + 1), top: ppArt(ny + 3), animation: `sxFeuer 1.2s steps(1) ${d * .6}s infinite` }} />
           </React.Fragment>
         ))}
@@ -5546,15 +5785,14 @@ const SixthCircleOfHellOverlay = React.memo(function SixthCircleOfHellOverlay() 
         ))}
       </div>
       <PixelBand src={SXX + 'front.png'} style={{ backgroundPosition: '50% 0' }} />
-      <div className="pp-rand-dim" />
+      <PpRandDim />
       <style>{`
         .sx-volk { position: absolute; inset: 0; }
         .sx-himmel { position: absolute; top: 0; width: calc(128 * var(--px)); height: calc(46 * var(--px)); background: url(${SXX}sky.png) 0 0 / 800% 100% no-repeat; }
         @keyframes sxHimmel { ${sxReihe(8)} }
         .sx-feuer { position: absolute; width: calc(12 * var(--px)); height: calc(18 * var(--px)); background: url(${SXX}grave-fire.png) 0 0 / 800% 100% no-repeat; }
         @keyframes sxFeuer { ${sxReihe(8)} }
-        .sx-glut { position: absolute; width: calc(24 * var(--px)); height: calc(34 * var(--px)); opacity: .5;
-          background: radial-gradient(ellipse at 50% 60%, rgba(255,150,40,.32), rgba(255,90,20,.12) 50%, rgba(255,80,10,0) 72%); }
+        .sx-glut { position: absolute; width: calc(24 * var(--px)); height: calc(34 * var(--px)); opacity: 0; }
         @keyframes sxGlut { from { opacity: .3; } to { opacity: .8; } }
         .sx-gott { position: absolute; top: calc(31 * var(--px)); width: calc(46 * var(--px)); height: calc(48 * var(--px)); background: url(${SXX}god.png) 0 0 / ${12 * 100}% 100% no-repeat; }
         @keyframes sxGott { ${sxFolge(SX_GOTT, 12)} }
@@ -5600,15 +5838,15 @@ const SV_BLASE = [null,null,null,null,null,null,null,null,null,null,null,null,nu
 const SV_BLASE_KF = SV_BLASE.map((b, i) => `${(i * 100 / SV_BLASE.length).toFixed(3)}% { ${b === null ? 'opacity: 0;' : `opacity: 1; background-position-x: ${(b * 100 / 5).toFixed(3)}%;`} }`).join(' ');
 const SeventhCircleOfHellOverlay = React.memo(function SeventhCircleOfHellOverlay() {
   const see = useMemo(() => Array.from({ length: 12 }, (_, k) => k - 6), []);
-  const blasen = useMemo(() => Array.from({ length: 16 }, (_, i) => ({
+  const blasen = useMemo(() => ppDuennVon({ length: 16 }, (_, i) => ({
     x: -230 + ((i * 71 + 13) % 460), y: SV_LAVA + 4 + ((i * 5) % 17), delay: -((i * 1.37) % 6),
   })), []);
-  const funken = useMemo(() => Array.from({ length: 30 }, (_, i) => {
+  const funken = useMemo(() => ppDuennVon({ length: 30 }, (_, i) => {
     const dur = [3, 4, 6][i % 3];
     return { x: -230 + ((i * 59 + 7) % 460), y0: SV_LAVA + 6 + (i % 4) * 4, dur, k: i % 3, delay: -((i * 0.79) % dur), drift: ((i % 5) - 2) * 3 };
   }), []);
   return (
-    <PixelScene artH={100} bg="#200000" className="seventh-circle-overlay">
+    <PixelScene artH={100} bg="#270d0c" className="seventh-circle-overlay">
       <PixelBand src={SVX + 'back.png'} style={{ backgroundPosition: '50% 0' }} />
       <PixelPiece src={SVX + 'statue.png'} w={SV_PAN} />
       <div className="sv-volk">
@@ -5618,7 +5856,7 @@ const SeventhCircleOfHellOverlay = React.memo(function SeventhCircleOfHellOverla
       </div>
       <PixelPiece src={SVX + 'bank.png'} w={SV_PAN} />
       <div className="sv-volk">
-        <i className="pp-area-dyn sv-augenglut" style={{ left: SV(113 - 6), animation: 'svGlut 2s ease-in-out infinite alternate' }} />
+        <PpGlow {...GL_SV} className="pp-area-dyn sv-augenglut" style={{ left: SV(113 - 6), animation: 'svGlut 2s ease-in-out infinite alternate' }} />
         <i className="sv-held" style={{ left: SV(30), animation: 'svHeld 6s steps(1) -1.7s infinite' }} />
         <i className="sv-augen" style={{ left: SV(113), animation: 'svAugen 2s steps(1) infinite' }} />
         <i className="sv-blut" style={{ left: SV(128 - 8 - 2), animation: 'svBlut 1s steps(1) infinite' }} />
@@ -5635,7 +5873,7 @@ const SeventhCircleOfHellOverlay = React.memo(function SeventhCircleOfHellOverla
         <i className="pp-area-dyn sv-nebel a" />
         <i className="pp-area-dyn sv-nebel b" />
       </div>
-      <div className="pp-rand-dim" />
+      <PpRandDim />
       <style>{`
         .sv-volk { position: absolute; inset: 0; }
         .sv-see { position: absolute; top: calc(${SV_LAVA - 2} * var(--px)); width: calc(128 * var(--px)); height: calc(26 * var(--px)); background: url(${SVX}lava.png) 0 0 / 2400% 100% no-repeat; }
@@ -5644,8 +5882,7 @@ const SeventhCircleOfHellOverlay = React.memo(function SeventhCircleOfHellOverla
         @keyframes svHeld { ${sxFolge(SX_HELD, 12)} }
         .sv-augen { position: absolute; top: calc(31 * var(--px)); width: calc(30 * var(--px)); height: calc(5 * var(--px)); background: url(${SVX}eyes.png) 0 0 / 400% 100% no-repeat; }
         @keyframes svAugen { ${sxReihe(4)} }
-        .sv-augenglut { position: absolute; top: calc(20 * var(--px)); width: calc(42 * var(--px)); height: calc(28 * var(--px)); opacity: .5;
-          background: radial-gradient(ellipse at 50% 50%, rgba(255,40,20,.30), rgba(255,20,10,.1) 50%, rgba(255,0,0,0) 72%); }
+        .sv-augenglut { position: absolute; top: calc(20 * var(--px)); width: calc(42 * var(--px)); height: calc(28 * var(--px)); opacity: 0; }
         @keyframes svGlut { from { opacity: .3; } to { opacity: .85; } }
         .sv-blut { position: absolute; top: calc(36 * var(--px)); width: calc(7 * var(--px)); height: calc(42 * var(--px)); background: url(${SVX}blood.png) 0 0 / 400% 100% no-repeat; }
         @keyframes svBlut { ${sxReihe(4)} }
@@ -5685,17 +5922,17 @@ const EG = (x) => ppArtX(x, EG_PAN);
 const EG_DAEMON = [0,0,1,1,0,2,3,4,5,5,6,7,7,8,9,9,10,11,12,12,13,14,15,0,0,1,1,0,16,17,17,16,0,18,0,0,2,3,4,5,5,6,7,19,19,19,11,12,20,21,21,20,22,23,23,22,15,0,1,0];   // 60 Schritte in 6 s (0,1 s je Schritt), 24 Bilder inkl. Zwischenstellungen des Arms
 const EG_REISE = [0,0,1,1,0,2,2,0,3,3,0,4,4,5,5,4,0,6,6,7,7,6,0,8,8,0,9,9,0,10,10,0,11,11,0,1,1,0,0,0];
 const EighthCircleOfHellOverlay = React.memo(function EighthCircleOfHellOverlay() {
-  const funken = useMemo(() => Array.from({ length: 28 }, (_, i) => {
+  const funken = useMemo(() => ppDuennVon({ length: 28 }, (_, i) => {
     const dur = [3, 4, 6][i % 3];
     const links = i % 2 === 0;
     return { x: (links ? -126 + ((i * 13) % 34) : 82 + ((i * 11) % 40)), y0: 84 - (i % 4) * 8, dur, k: i % 3, delay: -((i * 0.83) % dur), drift: ((i % 5) - 2) * 3 };
   }), []);
   return (
-    <PixelScene artH={100} bg="#200000" className="eighth-circle-overlay">
+    <PixelScene artH={100} bg="#270d0c" className="eighth-circle-overlay">
       <PixelBand src={EIX + 'back.png'} style={{ backgroundPosition: '50% 0' }} />
       <PixelPiece src={EIX + 'ground.png'} w={EG_PAN} />
       <div className="eg-volk">
-        <i className="pp-area-dyn eg-glut" style={{ left: EG(150 - 56), animation: 'egGlut 3s ease-in-out infinite alternate' }} />
+        <PpGlow {...GL_EG} className="pp-area-dyn eg-glut" style={{ left: EG(150 - 56), animation: 'egGlut 3s ease-in-out infinite alternate' }} />
         <i className="eg-portal" style={{ left: EG(150 - 36), animation: 'egPortal 4s steps(1) infinite' }} />
         <i className="eg-fluss a" style={{ left: EG(2), animation: 'egFluss 6s steps(1) infinite' }} />
         <i className="eg-fluss b" style={{ left: EG(208), animation: 'egFluss 6s steps(1) -2s infinite' }} />
@@ -5708,13 +5945,12 @@ const EighthCircleOfHellOverlay = React.memo(function EighthCircleOfHellOverlay(
           }} />
         ))}
       </div>
-      <div className="pp-rand-dim" />
+      <PpRandDim />
       <style>{`
         .eg-volk { position: absolute; inset: 0; }
         .eg-portal { position: absolute; top: 0; width: calc(72 * var(--px)); height: calc(80 * var(--px)); background: url(${EIX}portal.png) 0 0 / 2400% 100% no-repeat; }
         @keyframes egPortal { ${sxReihe(24)} }
-        .eg-glut { position: absolute; top: calc(-20 * var(--px)); width: calc(112 * var(--px)); height: calc(120 * var(--px)); opacity: .5;
-          background: radial-gradient(ellipse at 50% 50%, rgba(150,60,220,.30), rgba(110,30,190,.12) 50%, rgba(80,0,160,0) 72%); }
+        .eg-glut { position: absolute; top: calc(-20 * var(--px)); width: calc(112 * var(--px)); height: calc(120 * var(--px)); opacity: 0; }
         @keyframes egGlut { from { opacity: .3; } to { opacity: .9; } }
         .eg-fluss { position: absolute; top: 0; height: calc(100 * var(--px)); background-size: 2400% 100%; background-repeat: no-repeat; }
         .eg-fluss.a { width: calc(36 * var(--px)); background-image: url(${EIX}flow-a.png); }
@@ -5729,6 +5965,361 @@ const EighthCircleOfHellOverlay = React.memo(function EighthCircleOfHellOverlay(
           0% { opacity: 0; transform: translate(0, 0); } 10% { opacity: 1; }
           80% { opacity: .8; } 100% { opacity: 0; transform: translate(var(--dx), calc(-50 * var(--px))); }
         }
+      `}</style>
+    </PixelScene>
+  );
+});
+
+// ═══════════════════════════════════════════════════════════════════
+//  TEARING MOUNTAIN — Lavaberg mit Wasserfall und Lavafluss (23.10., Al)
+//
+//  Nach dem Kartenmotiv (ein Lava-Wasserfall zwischen dunklen Felswänden, darunter
+//  ein Lavabecken) und dem Auftrag: „einen Berg mit einem Lava-Wasserfall und
+//  Lava-Fluss". Ein kantiger, rissiger Vulkanberg trägt im Krater einen Lavasee;
+//  eine Rinne läuft zur Kante, stürzt als Wasserfall durch eine Basaltschlucht
+//  (dazu vier Rinnsale) und sammelt sich in einem breiten Lavafluss, der quer
+//  durch die Szene zieht. Davor eine Basaltebene mit glühenden Rissen, Tümpeln
+//  und Felsbrocken; dahinter rote Gipfel, ein ferner Vulkan und Glutwolken.
+//  Licht IMMER oben rechts; Lava und Fels in den Farben des Kartenbilds (Al 23.10.: „dieselben Lava-Farben wie das Card Art“) — Hellgelb, Gelb,
+//  Orange; Fels in Braun; alles Palettenfarben.
+//
+//  Ebenen (Kunsthöhe 100; per Generator gemalt, der nicht im Projekt liegt):
+//  land.png — Kachel 128 (Himmel, Gipfel, Ufer, Fluss, Ebene); mountain.png —
+//  Versatzstück 160 (Berg samt Wasserfall; sein Fuß liegt genau auf der
+//  Flussoberkante); mask-river.png (Kachel) / mask-fall.png (Versatzstück) —
+//  Schablonen für die bewegte Lava; flow-river.png (16×16, fließt nach rechts) /
+//  flow-fall.png (16×16, fließt nach unten); glow-land.png / glow-mountain.png —
+//  zwei Flackerbilder des Lichtscheins auf dem Fels (Raster, kein Verlauf);
+//  splash.png (3 Bilder 30×14, Gischt am Fuß des Falls); bubble.png (3 Bilder
+//  3×3, Lavablasen); smoke.png (4 Bilder 11×11, Rauchfahne vom Krater).
+//
+//  Animiert: Lava strömt (Fall senkrecht, Fluss waagerecht), der Glutschein auf
+//  dem Fels flackert, Gischt spritzt am Fall, Blasen steigen im Fluss auf und
+//  platzen, Funken steigen aus Fluss und Krater, Rauch zieht vom Krater ab.
+//  ALLE Animationen teilen die Periode 12 s (0,8/2,4/3/4/6/12 s) → nahtlose Schleife.
+// ═══════════════════════════════════════════════════════════════════
+const TMT = '/areas/tearing-mountain/';
+const TMT_W = 160;                       // Berg-Versatzstück
+const TMT_FLUSS_Y = 56;                  // erste Zeile der Fließkachel (der Fluss liegt in den Zeilen 56–71)
+const TMT_FALL_FUSS = 65;                // Gischt-Bild (30 breit) so, dass seine Mitte auf der Fallachse (x 80) sitzt
+// Blasen im Fluss: [x (Kunstpixel neben der Mitte), y, Takt s]
+const TMT_BLASEN = [[-92, 62], [-61, 66], [-33, 61], [-14, 67], [22, 63], [49, 66], [71, 61], [96, 65], [118, 63], [-118, 65]];
+
+/** Kleiner, fester Zufall (mulberry32) — gleiche Szene bei jedem Zeichnen, damit die 12-s-Schleife stimmt. */
+function tmtZufall(seed) {
+  let a = seed >>> 0;
+  return () => { a = (a + 0x6D2B79F5) >>> 0; let t = a; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
+}
+
+const TearingMountainOverlay = React.memo(function TearingMountainOverlay() {
+  const funken = useMemo(() => {
+    const r = tmtZufall(2310);
+    const aus = ppZufall(ppAreaN(18), (i) => {
+      const krater = i % 6 === 5;
+      return {
+        x: krater ? Math.round(-6 + r() * 12) : Math.round(-120 + r() * 240),
+        y: krater ? 7 : Math.round(57 + r() * 12),
+        steig: krater ? Math.round(14 + r() * 8) : Math.round(26 + r() * 22),
+        dx: Math.round(2 + r() * 9),
+        dur: [4, 6, 12][i % 3], delay: -Math.round(r() * 24) / 2,
+      };
+    });
+    return aus;
+  }, []);
+  const blasen = useMemo(() => TMT_BLASEN.slice(0, ppAreaN(TMT_BLASEN.length)).map(([x, y], i) => ({ x, y, dur: [4, 6, 3][i % 3], delay: -((i * 7) % 12) / 2 })), []);
+  const rauch = useMemo(() => ppZufall(ppAreaN(3), (i) => ({ delay: -i * 4, dy: i % 2 })), []);
+  const mitte = { left: `calc(50% - ${TMT_W / 2} * var(--px))`, width: ppArt(TMT_W), right: 'auto' };
+  return (
+    <PixelScene artH={100} bg="#1f0f04" className="tearing-mountain-overlay">
+      <PixelBand src={TMT + 'land.png'} />
+      <PixelPiece src={TMT + 'mountain.png'} w={TMT_W} />
+      <div className="pp-pixel-layer tmt-fluss" style={{ position: 'absolute', inset: 0, ...ppMaske(TMT + 'mask-river.png', true) }} />
+      <PixelBand src={TMT + 'glow-land.png'} className="pp-area-dyn" style={{ backgroundSize: 'auto 200%', animation: 'ppBand2 3s steps(1) infinite' }} />
+      <div className="pp-pixel-layer tmt-fall" style={{ ...mitte, ...ppMaske(TMT + 'mask-fall.png', false) }} />
+      <PixelPiece src={TMT + 'glow-mountain.png'} w={TMT_W} className="pp-area-dyn" style={{ backgroundSize: '100% 200%', animation: 'ppBand2 3s steps(1) infinite' }} />
+      <i className="pp-area-dyn tmt-gischt" style={{ left: ppArtX(TMT_FALL_FUSS, TMT_W), top: ppArt(48) }} />
+      {blasen.map((b, i) => (
+        <i key={'b' + i} className="pp-area-dyn tmt-blase" style={{ left: ppArtX(b.x - 1, 0), top: ppArt(b.y - 1), animation: `tmtBlubb ${b.dur}s steps(1) ${b.delay}s infinite` }} />
+      ))}
+      {rauch.map((r, i) => (
+        <i key={'r' + i} className="pp-area-dyn tmt-rauch" style={{ left: ppArtX(80 - 6, 0), top: ppArt(-2 + r.dy), animation: `tmtRauch 12s steps(34) ${r.delay}s infinite, tmtRauchBild 12s steps(1) ${r.delay}s infinite` }} />
+      ))}
+      {funken.map((f, i) => (
+        <i key={'f' + i} className="pp-area-dyn tmt-funke" style={{
+          left: ppArtX(f.x, 0), top: ppArt(f.y), '--dx': ppArt(f.dx), '--steig': ppArt(-f.steig),
+          animation: `tmtSteig ${f.dur}s steps(${f.steig}) ${f.delay}s infinite, tmtFarbe ${f.dur}s steps(1) ${f.delay}s infinite`,
+        }} />
+      ))}
+      <PpRandDim />
+      <style>{`
+        /* Lavafluss: Kachel 16×16, Zeile 56 der Szene, nur waagerecht gescrollt (16 Schritte in 2,4 s) */
+        .tmt-fluss {
+          background: url(${TMT}flow-river.png) 0 calc(${TMT_FLUSS_Y} * var(--px)) / calc(16 * var(--px)) calc(16 * var(--px)) repeat-x;
+          animation: tmtFluss 2.4s steps(16) infinite;
+        }
+        @keyframes tmtFluss { from { background-position: 0 calc(${TMT_FLUSS_Y} * var(--px)); } to { background-position: calc(16 * var(--px)) calc(${TMT_FLUSS_Y} * var(--px)); } }
+        /* Wasserfall und Rinne: Kachel 16×16, senkrecht gescrollt (16 Schritte in 0,8 s) */
+        .tmt-fall {
+          position: absolute; top: 0; bottom: 0;
+          background: url(${TMT}flow-fall.png) 0 0 / calc(16 * var(--px)) calc(16 * var(--px)) repeat;
+          animation: tmtFall .8s steps(16) infinite;
+        }
+        @keyframes tmtFall { from { background-position: 0 0; } to { background-position: 0 calc(16 * var(--px)); } }
+        .tmt-gischt { position: absolute; width: calc(30 * var(--px)); height: calc(14 * var(--px)); background: url(${TMT}splash.png) 0 0 / 300% 100% no-repeat; animation: ppSprite3 .6s steps(1) infinite; }
+        .tmt-blase { position: absolute; width: calc(3 * var(--px)); height: calc(3 * var(--px)); background: url(${TMT}bubble.png) 0 0 / 300% 100% no-repeat; opacity: 0; }
+        @keyframes tmtBlubb { 0%, 70% { opacity: 0; background-position: 0 0; } 72% { opacity: 1; background-position: 0 0; } 80% { background-position: 50% 0; } 88% { background-position: 100% 0; } 94%, 100% { opacity: 0; background-position: 100% 0; } }
+        /* Rauchfahne: vom Krater nach rechts über den Himmel (Wind), vier Bilder (wächst, löst sich auf) */
+        .tmt-rauch { position: absolute; width: calc(11 * var(--px)); height: calc(11 * var(--px)); background: url(${TMT}smoke.png) 0 0 / 400% 100% no-repeat; }
+        @keyframes tmtRauch { from { transform: translate(0, 0); } to { transform: translate(calc(46 * var(--px)), calc(-4 * var(--px))); } }
+        @keyframes tmtRauchBild { 0% { background-position: 0 0; } 20% { background-position: 33.33% 0; } 55% { background-position: 66.67% 0; } 82% { background-position: 100% 0; } }
+        /* Funken: ein Kunstpixel, steigt in ganzen Pixeln auf und kühlt in harten Stufen ab (Lavafarben des Kartenmotivs: Hellgelb → Orange) */
+        .tmt-funke { position: absolute; width: var(--px); height: var(--px); opacity: 0; background: #fff196; }
+        @keyframes tmtSteig { from { transform: translate(0, 0); } to { transform: translate(var(--dx), var(--steig)); } }
+        @keyframes tmtFarbe {
+          0% { opacity: 0; background: #fff196; } 3% { opacity: 1; background: #fff196; } 22% { background: #ffd066; } 45% { background: #ff9b3a; }
+          68% { background: #f87420; } 88% { background: #e37435; } 97%, 100% { opacity: 0; background: #e37435; }
+        }
+      `}</style>
+    </PixelScene>
+  );
+});
+
+// ═══════════════════════════════════════════════════════════════════
+//  THE GOLDEN GATE — goldenes Tor im Abendlicht (W76)
+//
+//  Kartenmotiv: ein riesiges Tor aus goldenen Ziegeln, im Torbogen
+//  strahlt schraeges Gold-Licht, davor ein Erdweg. Kunsthoehe 100.
+//  Ebenen (public/areas/golden-gate/): sky (Kachel, Bayer-Verlauf),
+//  clouds (Kachel, driftet), floor (Kachel, Pflaster), glow (2 Bilder,
+//  Lichtstreifen im Bogen laufen), gate (Versatzstueck 160 breit),
+//  twinkle (Funkelsprite, 3 Bilder), dazu aufsteigende Goldfunken.
+// ═══════════════════════════════════════════════════════════════════
+const GGT = '/areas/golden-gate/';
+const GGT_W = 160;
+const GGT_FUNKEN = [[-70, 20], [-52, 52], [-30, 14], [-12, 36], [14, 24], [34, 58], [56, 18], [72, 44], [-86, 66], [88, 70], [0, 8], [-40, 70]];
+const GGT_FARBEN = ['#fad54a', '#f7f7ad', '#f29a3e'];
+const GoldenGateOverlay = React.memo(function GoldenGateOverlay() {
+  const funkel = useMemo(() => GGT_FUNKEN.slice(0, ppAreaN(GGT_FUNKEN.length)).map(([x, y], i) => ({ x, y, dur: [3.6, 4.8, 6][i % 3], delay: -((i * 5) % 11) / 2 })), []);
+  const staub = useMemo(() => ppZufall(ppAreaN(14), (i) => ({
+    x: Math.round(-30 + ((i * 53) % 61)), y: 76 + (i % 3) * 3, steig: 22 + (i * 7) % 26, dx: ((i * 5) % 7) - 3,
+    dur: [5, 7, 9][i % 3], delay: -((i * 3) % 14) / 2, farbe: GGT_FARBEN[i % 3],
+  })), []);
+  return (
+    <PixelScene artH={100} bg="#f29a3e" className="golden-gate-overlay">
+      <PixelBand src={GGT + 'sky.png'} />
+      <PixelBand src={GGT + 'clouds.png'} className="pp-area-dyn ggt-wolken" />
+      <PixelBand src={GGT + 'floor.png'} />
+      {/* erstes Bild bleibt stehen (Play Animations: aus), das laufende Licht liegt darauf */}
+      <PixelPiece src={GGT + 'glow.png'} w={GGT_W} style={{ backgroundSize: '100% 200%', backgroundPosition: '50% 0%' }} />
+      <PixelPiece src={GGT + 'glow.png'} w={GGT_W} className="pp-area-dyn" style={{ backgroundSize: '100% 200%', animation: 'ppBand2 1.2s steps(1) infinite' }} />
+      <PixelPiece src={GGT + 'gate.png'} w={GGT_W} />
+      {funkel.map((f, i) => (
+        <i key={'f' + i} className="pp-area-dyn ggt-funkel" style={{ left: ppArtX(f.x - 2, 0), top: ppArt(f.y - 2), animation: `ppSprite3 .5s steps(1) infinite, ggtFunkel ${f.dur}s steps(1) ${f.delay}s infinite` }} />
+      ))}
+      {staub.map((f, i) => (
+        <i key={'s' + i} className="pp-area-dyn ggt-staub" style={{
+          left: ppArtX(f.x, 0), top: ppArt(f.y), background: f.farbe, '--dx': ppArt(f.dx), '--steig': ppArt(-f.steig),
+          animation: `ggtSteig ${f.dur}s steps(${f.steig}) ${f.delay}s infinite`,
+        }} />
+      ))}
+      <PpRandDim />
+      <style>{`
+        /* Wolken: eine Kachel (64 Kunstpixel) pro Umlauf, ganze Pixel */
+        .ggt-wolken { animation: ggtWolken 128s steps(64) infinite; }
+        @keyframes ggtWolken { from { background-position: 0 0; } to { background-position: calc(64 * var(--px)) 0; } }
+        /* Funkeln: 5×5-Sprite (Punkt, kleines, grosses Kreuz) blitzt kurz auf, sonst unsichtbar */
+        .ggt-funkel { position: absolute; width: calc(5 * var(--px)); height: calc(5 * var(--px)); background: url(${GGT}twinkle.png) 0 0 / 300% 100% no-repeat; opacity: 0; }
+        @keyframes ggtFunkel { 0%, 70% { opacity: 0; } 71%, 80% { opacity: 1; } 81%, 100% { opacity: 0; } }
+        /* Goldstaub: ein Kunstpixel steigt in ganzen Pixeln, blinkt am Ende weg */
+        .ggt-staub { position: absolute; width: var(--px); height: var(--px); opacity: 0; }
+        @keyframes ggtSteig { 0% { opacity: 0; transform: translate(0, 0); } 4%, 88% { opacity: 1; } 96%, 100% { opacity: 0; transform: translate(var(--dx), var(--steig)); } }
+      `}</style>
+    </PixelScene>
+  );
+});
+
+// ═════════════════════════════════════════════════════════════════
+//  TREE OF GOLDEN APPLES — goldener Baum voller glitzernder Äpfel (W79)
+//
+//  Kartenmotiv: ein riesiger Baum mit goldener Krone, in der gelbe Äpfel hängen, auf einer grünen Wiese, Glitzerkreuze ringsum. Kunsthöhe 100.
+//  Ebenen (public/areas/tree-of-golden-apples/): sky (Kachel, Bayer-Verlauf), forest (Kachel, ferne Baumkronen), ground (Kachel, Wiese mit Blümchen),
+//  glow (2 Bilder, Heiligenschein „atmet"), crown_back (Krone, Versatzstück 160 breit), trunk (Stamm mit Wurzeln), crown_front (vordere Blätter + 16 Äpfel),
+//  twinkle (Funkelsprite, 3 Bilder). Der WIND: Krone hinten und vorn schwanken in ganzen Pixeln um den Stamm, mit versetzter Phase (wie Tiefe); dazu fallen
+//  goldene Blätter schräg zu Boden und Funkelkreuze blitzen an den Äpfeln auf.
+// ═════════════════════════════════════════════════════════════════
+const TGA = '/areas/tree-of-golden-apples/';
+const TGA_W = 160;
+const TGA_FUNKEL = [[34, 40], [52, 52], [70, 44], [88, 54], [108, 42], [124, 50], [46, 28], [64, 34], [84, 28], [102, 30], [122, 32], [28, 52], [98, 58], [60, 60], [78, 20], [112, 54], [14, 40], [146, 44]];
+const TreeOfGoldenApplesOverlay = React.memo(function TreeOfGoldenApplesOverlay() {
+  const funkel = useMemo(() => TGA_FUNKEL.slice(0, ppAreaN(TGA_FUNKEL.length)).map(([x, y], i) => ({ x, y, dur: [3.4, 4.6, 5.8][i % 3], delay: -((i * 7) % 13) / 2 })), []);
+  const blaetter = useMemo(() => ppZufall(ppAreaN(12), (i) => ({
+    x: Math.round(-60 + ((i * 41) % 121)), y: 30 + (i % 4) * 6, fall: 40 + (i * 9) % 22, drift: 16 + (i * 5) % 14,
+    dur: [7, 9, 11][i % 3], delay: -((i * 3) % 14), farbe: ['#fad54a', '#f29a3e', '#fff196'][i % 3],
+  })), []);
+  return (
+    <PixelScene artH={100} bg="#167927" className="tree-golden-apples-overlay">
+      <PixelBand src={TGA + 'sky.png'} />
+      <PixelBand src={TGA + 'forest.png'} />
+      <PixelBand src={TGA + 'ground.png'} />
+      <PixelPiece src={TGA + 'glow.png'} w={TGA_W} style={{ backgroundSize: '100% 200%', backgroundPosition: '50% 0%' }} />
+      <PixelPiece src={TGA + 'glow.png'} w={TGA_W} className="pp-area-dyn" style={{ backgroundSize: '100% 200%', animation: 'ppBand2 3.2s steps(1) infinite' }} />
+      <PixelPiece src={TGA + 'crown_back.png'} w={TGA_W} className="tga-wind-hinten" />
+      <PixelPiece src={TGA + 'trunk.png'} w={TGA_W} />
+      <PixelPiece src={TGA + 'crown_front.png'} w={TGA_W} className="tga-wind-vorn" />
+      {funkel.map((f, i) => (
+        <i key={'f' + i} className="pp-area-dyn tga-funkel" style={{ left: ppArtX(f.x - 2, 0), top: ppArt(f.y - 2), animation: `ppSprite3 .5s steps(1) infinite, tgaFunkel ${f.dur}s steps(1) ${f.delay}s infinite` }} />
+      ))}
+      {blaetter.map((f, i) => (
+        <i key={'b' + i} className="pp-area-dyn tga-blatt" style={{
+          left: ppArtX(f.x, 0), top: ppArt(f.y), background: f.farbe, '--dx': ppArt(f.drift), '--fall': ppArt(f.fall),
+          animation: `tgaFall ${f.dur}s steps(${f.fall}) ${f.delay}s infinite`,
+        }} />
+      ))}
+      <PpRandDim />
+      <style>{`
+        /* Wind: die Krone schwankt in ganzen Kunstpixeln (links – Mitte – rechts – Mitte), hinten und vorn mit versetzter Phase */
+        .tga-wind-hinten { animation: tgaWind 7s steps(1) infinite; }
+        .tga-wind-vorn { animation: tgaWind 7s steps(1) -1.2s infinite; }
+        @keyframes tgaWind {
+          0%, 100% { translate: 0 0; } 14% { translate: calc(var(--px)) 0; } 28% { translate: calc(2 * var(--px)) 0; } 42% { translate: calc(var(--px)) 0; }
+          57% { translate: 0 0; } 71% { translate: calc(-1 * var(--px)) 0; } 85% { translate: calc(-2 * var(--px)) 0; }
+        }
+        /* Funkeln: 5×5-Sprite (Punkt, kleines, grosses Kreuz) blitzt kurz auf, sonst unsichtbar */
+        .tga-funkel { position: absolute; width: calc(5 * var(--px)); height: calc(5 * var(--px)); background: url(${TGA}twinkle.png) 0 0 / 300% 100% no-repeat; opacity: 0; }
+        @keyframes tgaFunkel { 0%, 68% { opacity: 0; } 69%, 80% { opacity: 1; } 81%, 100% { opacity: 0; } }
+        /* Goldblatt: 2×1 Kunstpixel, treibt schräg zu Boden und blinkt am Ende weg */
+        .tga-blatt { position: absolute; width: calc(2 * var(--px)); height: var(--px); opacity: 0; }
+        @keyframes tgaFall { 0% { opacity: 0; transform: translate(0, 0); } 4%, 90% { opacity: 1; } 97%, 100% { opacity: 0; transform: translate(var(--dx), var(--fall)); } }
+      `}</style>
+    </PixelScene>
+  );
+});
+
+// ═════════════════════════════════════════════════════════════════
+//  GIGALOPOLIS, THE MEGA-CITY — antike griechische Riesenstadt aus großer Höhe (Welle 6b, 26.10.)
+//
+//  Al: „eine riesige antike griechische Stadt, die man aus großer Höhe sieht; winzige Menschen als sich bewegende Punkte." Kunsthöhe 100, Blick senkrecht von oben.
+//  Ebenen (public/areas/gigalopolis/, Generator scratchpad gen/gigalopolis.py, nicht im Projekt): tile.png — Kachel 128, nahtlos (Strassenraster mit Häuserblöcken: Terrakotta-,
+//  Marmor- und Lehmdächer, Innenhöfe, Haine, kleine Plätze); acropolis.png — Burgbezirk 160 breit, mittig, mit Alpha (Mauerring mit Türmen, Parthenon-artiger Tempel mit
+//  Säulenkranz, Altar, Theater, Agora mit Stoa, Rundtempel, Prozessionsweg); clouds.png — Wolken (gedithert, nahtlos, treiben); smoke.png — Altarrauch (4 Bilder).
+//  Bewegung (CSS, ganze Pixel, `steps()`): winzige Menschen (1 Kunstpixel, weiß/rot/blau/dunkel) wandern auf den Strassen der Kachel und den Prozessionsweg hinauf; Rauch steigt
+//  vom Altar; Wolken ziehen über die Stadt.
+// ═════════════════════════════════════════════════════════════════
+const GIG = '/areas/gigalopolis/';
+const GIG_W = 160;                       // Burgbezirk (Versatzstück)
+const GIG_ALTAR_Y = 40;                  // Altar im Burgbezirk (Kunstpixel von oben); x = Mitte
+const GIG_ZEILEN = [1, 26, 51, 76];      // Strassenmitten der Kachel (y)
+const GIG_SPALTEN = [1, 33, 65, 97];     // Strassenmitten der Kachel (x; Kachelmitte = 64)
+const GIG_FARBEN = ['#ffffff', '#e94e53', '#4e77ca', '#323232', '#fff196', '#4ceb70'];
+/** Liegt der Punkt (x neben der Mitte, y von oben) AUSSERHALB des Burgbezirks (Ellipse 77 × 47 um die Mitte)? */
+const gigAusserhalb = (x, y) => (x / 80) ** 2 + ((y - 50) / 49) ** 2 > 1.12;
+const GigalopolisOverlay = React.memo(function GigalopolisOverlay() {
+  const leute = useMemo(() => {
+    const r = tmtZufall(2610);
+    const aus = [];
+    const N = ppAreaN(46);
+    for (let versuch = 0; aus.length < N && versuch < 600; versuch++) {
+      const waag = r() < 0.5;
+      const farbe = GIG_FARBEN[Math.floor(r() * GIG_FARBEN.length)];
+      if (waag) {
+        const y = GIG_ZEILEN[Math.floor(r() * GIG_ZEILEN.length)], len = 14 + Math.round(r() * 40), x = Math.round(-190 + r() * 380 - len / 2);
+        if (![x, x + len / 2, x + len].every(px => gigAusserhalb(px, y))) continue;
+        const tempo = 2.5 + r() * 3, dur = len / tempo;
+        aus.push({ waag, x, y, len, dur, delay: -r() * dur * 2, farbe });
+      } else {
+        const sp = GIG_SPALTEN[Math.floor(r() * GIG_SPALTEN.length)], x = sp - 64 + 128 * (Math.floor(r() * 4) - 2), len = 12 + Math.round(r() * 30), y = Math.round(r() * (98 - len));
+        if (![y, y + len / 2, y + len].every(py => gigAusserhalb(x, py))) continue;
+        const tempo = 2.5 + r() * 3, dur = len / tempo;
+        aus.push({ waag, x, y, len, dur, delay: -r() * dur * 2, farbe });
+      }
+    }
+    // Pilger auf dem Prozessionsweg (Burgbezirk): gehen langsam zum Tempel hinauf
+    ppZufall(ppAreaN(6), (i) => {
+      const len = 38 + (i % 3) * 3, dur = 16 + i * 2.5;
+      aus.push({ waag: false, x: -3 + (i % 4) * 2, y: 94 - len, len, dur, delay: -(i * 3.1), farbe: GIG_FARBEN[(i + 1) % GIG_FARBEN.length], rueck: i % 2 === 1 });
+    });
+    return aus;
+  }, []);
+  const rauch = useMemo(() => ppZufall(ppAreaN(3), (i) => ({ delay: -i * 3 })), []);
+  return (
+    <PixelScene artH={100} bg="#b29466" className="gigalopolis-overlay">
+      <PixelBand src={GIG + 'tile.png'} />
+      <PixelPiece src={GIG + 'acropolis.png'} w={GIG_W} />
+      {leute.map((m, i) => (
+        <i key={'m' + i} className="pp-area-dyn gig-mensch" style={{
+          left: ppArtX(m.x, 0), top: ppArt(m.y), background: m.farbe, '--len': ppArt(m.len),
+          animation: `${m.waag ? 'gigGehH' : 'gigGehV'} ${m.dur}s steps(${m.len}) ${m.delay}s infinite alternate${m.rueck ? '-reverse' : ''}`,
+        }} />
+      ))}
+      {rauch.map((r, i) => (
+        <i key={'r' + i} className="pp-area-dyn gig-rauch" style={{ left: ppArtX(-4.5, 0), top: ppArt(GIG_ALTAR_Y - 11), animation: `gigRauch 9s steps(24) ${r.delay}s infinite, gigRauchBild 9s steps(1) ${r.delay}s infinite` }} />
+      ))}
+      <PixelBand src={GIG + 'clouds.png'} className="pp-area-dyn gig-wolken" />
+      <PpRandDim />
+      <style>{`
+        .gig-mensch { position: absolute; width: var(--px); height: var(--px); }
+        @keyframes gigGehH { from { translate: 0 0; } to { translate: var(--len) 0; } }
+        @keyframes gigGehV { from { translate: 0 0; } to { translate: 0 var(--len); } }
+        .gig-rauch { position: absolute; width: calc(9 * var(--px)); height: calc(11 * var(--px)); background: url(${GIG}smoke.png) 0 0 / 400% 100% no-repeat; }
+        @keyframes gigRauch { from { transform: translate(0, 0); } to { transform: translate(calc(10 * var(--px)), calc(-16 * var(--px))); } }
+        @keyframes gigRauchBild { 0% { background-position: 0 0; } 20% { background-position: 33.33% 0; } 55% { background-position: 66.67% 0; } 82% { background-position: 100% 0; } }
+        /* Wolken: eine Kachel (128 Kunstpixel) pro Umlauf, ganze Pixel */
+        .gig-wolken { animation: gigWolken 220s steps(128) infinite; }
+        @keyframes gigWolken { from { background-position: 0 0; } to { background-position: calc(128 * var(--px)) 0; } }
+      `}</style>
+    </PixelScene>
+  );
+});
+
+// ═════════════════════════════════════════════════════════════════
+//  BARREL HOME — ein riesiges hölzernes Fass auf der Seite (Welle 6b, 26.10.)
+//
+//  Al: „ein großes hölzernes Fass, das auf der Seite liegt." Kunsthöhe 100, Abenddämmerung: das Fass als Wohnhaus — Rundbogentür im Boden mit warmem Licht, Fenster mit grünen
+//  Läden, Ofenrohr mit Rauch, Eisenreifen, Holzkeile, Stufen. Ebenen (public/areas/barrel-home/, Generator scratchpad gen/barrel-home.py, nicht im Projekt): sky.png (Kachel,
+//  Bayer-Verlauf), hills.png (Kachel, Hügel und Tannen), ground.png (Kachel, Wiese und Pfad), barrel.png (Versatzstück 160 breit), glow.png (2 Bilder: flackerndes Türlicht),
+//  smoke.png (Rauch, 4 Bilder). Bewegung: Türlicht flackert, Rauch steigt, Sterne funkeln, Glühwürmchen schweben über der Wiese.
+// ═════════════════════════════════════════════════════════════════
+const BRH = '/areas/barrel-home/';
+const BRH_W = 160;
+const BRH_STERNE = [[-70, 6], [-52, 14], [-30, 5], [-8, 12], [18, 4], [40, 10], [62, 18], [78, 7], [-84, 20], [88, 26], [-20, 22], [30, 24], [-60, 26], [70, 2]];
+const BarrelHomeOverlay = React.memo(function BarrelHomeOverlay() {
+  const sterne = useMemo(() => BRH_STERNE.slice(0, ppAreaN(BRH_STERNE.length)).map(([x, y], i) => ({ x, y, dur: [2.4, 3.6, 4.8][i % 3], delay: -((i * 5) % 9) / 2 })), []);
+  const fliegen = useMemo(() => ppZufall(ppAreaN(10), (i) => ({
+    x: Math.round(-90 + ((i * 37) % 181)), y: 70 + ((i * 11) % 24), dx: ((i * 7) % 15) - 7, dy: -(4 + (i * 5) % 9),
+    dur: [6, 8, 10][i % 3], delay: -((i * 3) % 10) / 2,
+  })), []);
+  const rauch = useMemo(() => ppZufall(ppAreaN(3), (i) => ({ delay: -i * 3 })), []);
+  return (
+    <PixelScene artH={100} bg="#170b28" className="barrel-home-overlay">
+      <PixelBand src={BRH + 'sky.png'} />
+      {sterne.map((s, i) => (
+        <i key={'s' + i} className="pp-area-dyn brh-stern" style={{ left: ppArtX(s.x, 0), top: ppArt(s.y), animation: `brhStern ${s.dur}s steps(1) ${s.delay}s infinite` }} />
+      ))}
+      <PixelBand src={BRH + 'hills.png'} />
+      <PixelBand src={BRH + 'ground.png'} />
+      <PixelPiece src={BRH + 'barrel.png'} w={BRH_W} />
+      {/* erstes Bild bleibt stehen (Play Animations: aus), das flackernde Licht liegt darauf */}
+      <PixelPiece src={BRH + 'glow.png'} w={BRH_W} style={{ backgroundSize: '100% 200%', backgroundPosition: '50% 0%' }} />
+      <PixelPiece src={BRH + 'glow.png'} w={BRH_W} className="pp-area-dyn" style={{ backgroundSize: '100% 200%', animation: 'ppBand2 1.1s steps(1) infinite' }} />
+      {rauch.map((r, i) => (
+        <i key={'r' + i} className="pp-area-dyn brh-rauch" style={{ left: ppArtX(96, BRH_W), top: ppArt(-4), animation: `brhRauch 9s steps(20) ${r.delay}s infinite, brhRauchBild 9s steps(1) ${r.delay}s infinite` }} />
+      ))}
+      {fliegen.map((f, i) => (
+        <i key={'f' + i} className="pp-area-dyn brh-fliege" style={{
+          left: ppArtX(f.x, 0), top: ppArt(f.y), '--dx': ppArt(f.dx), '--dy': ppArt(f.dy),
+          animation: `brhFliege ${f.dur}s steps(${Math.abs(f.dy) + 4}) ${f.delay}s infinite alternate, brhBlink ${f.dur / 2}s steps(1) ${f.delay}s infinite`,
+        }} />
+      ))}
+      <PpRandDim />
+      <style>{`
+        .brh-stern { position: absolute; width: var(--px); height: var(--px); background: #ffffff; opacity: 0; }
+        @keyframes brhStern { 0%, 55% { opacity: 1; } 60%, 70% { opacity: 0; } 75%, 100% { opacity: 1; } }
+        .brh-rauch { position: absolute; width: calc(9 * var(--px)); height: calc(11 * var(--px)); background: url(${BRH}smoke.png) 0 0 / 400% 100% no-repeat; }
+        @keyframes brhRauch { from { transform: translate(0, 0); } to { transform: translate(calc(14 * var(--px)), calc(-6 * var(--px))); } }
+        @keyframes brhRauchBild { 0% { background-position: 0 0; } 20% { background-position: 33.33% 0; } 55% { background-position: 66.67% 0; } 82% { background-position: 100% 0; } }
+        .brh-fliege { position: absolute; width: var(--px); height: var(--px); background: #fff196; }
+        @keyframes brhFliege { from { translate: 0 0; } to { translate: var(--dx) var(--dy); } }
+        @keyframes brhBlink { 0%, 45% { opacity: 1; } 50%, 70% { opacity: 0; } 75%, 100% { opacity: 1; } }
       `}</style>
     </PixelScene>
   );

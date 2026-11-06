@@ -12,9 +12,11 @@
 //     to any target × the number of Creatures
 //     with DIFFERENT NAMES in the controller's
 //     discard pile. The damage is uncategorised
-//     ("other" type), so it bypasses fire /
-//     status / etc. resistances. Animation: a
-//     flame strike on the target.
+//     ("creature" type, Als Ruling Al 26.10.:
+//     Kreatureneffekt — Zielwahl und Schaden
+//     laufen beide als 'creature', NICHT 'other';
+//     vorher stand hier „bypasses resistances").
+//     Animation: a flame strike on the target.
 //
 //  3. SELF-REVIVE — if defeated by an
 //     opponent's card or effect (NOT by status
@@ -30,6 +32,8 @@
 // ═══════════════════════════════════════════
 
 const { hasCardType, isOwnSideSummonableCreature, baseCardName } = require('./_hooks');
+
+const { kontrolliert } = require('./_double-shared');
 
 const CARD_NAME = 'Cute Phoenix';
 
@@ -138,6 +142,13 @@ module.exports = {
    * on this player's side. The `ctx.card.id` self-exclusion prevents
    * the just-being-summoned dummy from blocking itself.
    */
+  // „You can only control 1" gilt auch fuer jede Beschwoerung, die nicht
+  // ueber die Hand laeuft (Cute Bird, Annoyance Mini, ...): `beforeSummon`
+  // laeuft vor JEDER Beschwoerung dieser Karte (A04-cute-10).
+  async beforeSummon(ctx) {
+    return !kontrolliert(ctx._engine, ctx.cardOwner, CARD_NAME);
+  },
+
   canSummon(ctx) {
     const engine = ctx._engine;
     const pi = ctx.cardOwner;
@@ -174,7 +185,7 @@ module.exports = {
     const target = await ctx.promptDamageTarget({
       side: 'any',
       types: ['hero', 'creature'],
-      damageType: 'other',
+      damageType: 'creature',   // Als Ruling (Al 26.10.): Kreatureneffekt → 'creature' (wie der gebuchte Schaden unten), nicht 'other'
       baseDamage: damage,
       title: CARD_NAME,
       description: `Deal ${damage} damage (50 × ${count} different-named Creature${count === 1 ? '' : 's'} in discard) to any target.`,

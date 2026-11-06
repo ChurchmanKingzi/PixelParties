@@ -45,7 +45,10 @@ const { hasCardType } = require('./_hooks');
 const {
   WC,
   controlledWarCounselors,
+  istEigenerAbgang,
   makeSingletonCanSummon,
+  waehlbareKreaturen,
+  zahleGatheringGebuehr,
 } = require('./_war-counselor-shared');
 
 const CARD_NAME = 'Censpartan War Counselor';
@@ -65,9 +68,14 @@ function controlledCreatures(engine, pi) {
  * bekommen ihn, alles andere verliert ihn wieder — aber nur, wenn er von
  * hier kam.
  */
-function resyncShield(engine, pi, selfId) {
+function resyncShield(engine, pi, selfId, selfLeaving = false) {
   const oppIdx = engine.opponentOf(pi);
-  const shouldHave = new Set(
+  // Geht Censpartan selbst ab (A06-19), schirmt er niemanden mehr: er steht im
+  // Leave-Hook noch im Support, die anderen Ratgeber bleiben aber auf dem Feld.
+  // ★ W7a (A06-12, Al): der Schirm ist ein laufender Passiv Censpartans — ruht, solange er gefroren/betäubt/negiert ist.
+  const quelle = engine.cardInstances.find(i => i.id === selfId);
+  const quelleRuht = !!quelle && engine.isCreatureEffectSuppressed(quelle, { honorNegStatusImmune: false });
+  const shouldHave = new Set((selfLeaving || quelleRuht) ? [] :
     controlledWarCounselors(engine, pi)
       .filter((inst) => inst.id !== selfId)
       .map((inst) => inst.id),
@@ -114,6 +122,8 @@ module.exports = {
   // ^ Tagged for Blinded gating — see cards/effects/_hooks.js (blinded status).
   activeIn: ['support'],
   creatureEffect: true,
+  // W7a: der Schirm-Abgleich muss Zustandswechsel auch im stillgelegten Zustand mitbekommen (Hooks laufen immer, fragen selbst).
+  bypassStatusFilter: true,
 
   canSummon: makeSingletonCanSummon(CARD_NAME),
 
@@ -124,6 +134,12 @@ module.exports = {
     const mine = controlledCreatures(engine, pi).length;
     const theirs = controlledCreatures(engine, oppIdx).length;
     return theirs > mine;
+  },
+
+  // Welle 10 (Al, Q46): Angebote ausserhalb der normalen Aktivierung (War Council Gathering Place) nur mit mindestens einer wählbaren gegnerischen Kreatur.
+  hasLegalTargetForOffer(ctx) {
+    const engine = ctx._engine;
+    return waehlbareKreaturen(engine, ctx.cardOwner, engine.opponentOf(ctx.cardOwner)).length > 0;
   },
 
   async onCreatureEffect(ctx) {
@@ -154,11 +170,13 @@ module.exports = {
       cancellable: true,
     });
     if (!picked || picked.length === 0) return false;
+    // Welle 11 (Al, R3): War Council Gathering Place — die 8 Gold werden erst jetzt (Ziel bestätigt, vor der Auflösung) abgezogen.
+    if (!(await zahleGatheringGebuehr(engine, inst))) return false;
 
     let defeated = 0;
     // ★ v1057 („Enhanced Guard Dog"): Zerstoerungs-Klammer. Zaehlt die
     // GEWAEHLTEN Ziele — bei genau einem darf der Dog feuern.
-    engine.beginDestroyScope(picked.length);
+    engine.beginDestroyScope(picked.length, picked.map(t => t.cardInstance));   // W78: die gewaehlten Opfer sind todgeweiht (Infallible Oracle Pythia darf keines opfern)
     try {
     for (const t of picked) {
       const victim = t.cardInstance;
@@ -182,15 +200,31 @@ module.exports = {
     return true;
   },
 
+  // W16c (A06-32): Wiederbelebung OHNE Hooks (Rewrite History, ...): der Schirm gleicht sich sofort ab, nicht erst am Zugende.
+  onRevive: (ctx) => resyncFromCtx(ctx),
+
   hooks: {
+    onNameChanged: (ctx) => resyncFromCtx(ctx),   // W73c: Shroomasaur bekommt/verliert einen Zusatznamen - der Bestand der Ratgeber ändert sich
     // Der Schirm haengt am Feldzustand — nach jedem Ereignis, das ihn
     // aendern kann, neu ausrichten. Alle Hooks laufen ueber ALLE
     // Zuhoerer, ein Filter auf die gespielte Karte waere hier also
     // falsch: gerade FREMDE Beschwoerungen muessen den Schirm auslösen.
     onPlay: (ctx) => resyncFromCtx(ctx),
     onCardEnterZone: (ctx) => resyncFromCtx(ctx),
-    onCardLeaveZone: (ctx) => resyncFromCtx(ctx),
-    onCreatureDeath: (ctx) => resyncFromCtx(ctx),
+    onCardLeaveZone: (ctx) => {
+      if (istEigenerAbgang(ctx)) { resyncShield(ctx._engine, ctx.cardOwner, ctx.card.id, true); return; }
+      resyncFromCtx(ctx);
+    },
+    // Der eigene Tod ist schon im Leave-Hook abgeglichen; hier steht die Instanz
+    // noch im Support und wuerde sich sonst wieder mitzaehlen (A06-18/19).
+    onCreatureDeath: (ctx) => {
+      if (ctx.creature?.instId === ctx.card?.id) return;
+      resyncFromCtx(ctx);
+    },
     onTurnStart: (ctx) => resyncFromCtx(ctx),
+    // W7a: Frost/Betäubung/Negation kommen und gehen
+    onPhaseStart: (ctx) => resyncFromCtx(ctx),
+    onStatusApplied: (ctx) => resyncFromCtx(ctx),
+    onStatusRemoved: (ctx) => resyncFromCtx(ctx),
   },
 };

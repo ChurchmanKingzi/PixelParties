@@ -79,7 +79,7 @@ function istBetroffen(engine, pi, inst) {
   if (!inst || (inst.zone !== 'support' && inst.zone !== 'area')) return false;
   if ((inst.originalOwner ?? inst.owner) !== pi) return false;
   if ((inst.controller ?? inst.owner) === pi) return false;
-  if (engine.isOmniImmune(inst) || engine.controlIsLocked(inst)) return false;
+  if (engine.isOmniImmune(inst, pi) || engine.controlIsLocked(inst)) return false;
   return true;
 }
 
@@ -116,7 +116,10 @@ function zonenFuerKreatur(engine, pi, inst) {
       out.push({ owner: physOwner, heroIdx, slotIdx: si, label: `${hero.hp <= 0 ? hero.name + ' (KO)' : hero.name} — ${si >= 3 ? 'Island ' + (si - 2) : 'Slot ' + (si + 1)}` });
     }
   }
-  return out;
+  // ★ W63a (Al, 22.10.2026: Alices Effekt gilt fuer ALLE Platzierungs-Effekte; „erst die geteilte Zone, DANN die erste leere"): mit Alice-Teilung des Spielers
+  // zaehlt auch die Zone einer GLEICHNAMIGEN Creature als „free" fuer die uebernommene Kreatur — geteilte zuerst.
+  return require('./_alice-shared').mitGeteilten(engine, pi, inst.name, out, { nachKontrolle: true, livingHeroesOnly: false, nurBasis: true },
+    z => !engine.isSupportZoneLocked(z.owner, z.heroIdx, { cardName: inst.name, via: 'move' }));
 }
 
 /** Freie Basis-Zonen für Ausrüstung bzw. Anhängsel: nur eigene Helden der eigenen Seite, mit den Regeln der Kartenart. */
@@ -129,10 +132,11 @@ function zonenFuerAnhang(engine, pi, inst, art) {
     if (!hero?.name || hero.hp <= 0) continue;                                  // tote Helden: weder Equips noch Attachments
     if (engine.heroSideOf(pi, hero) !== pi) continue;                           // abgegebene Helden zählen nicht
     if (art === 'equip') {
-      if (!istAusruestTraeger(engine, pi, hi, inst.name)) continue;             // lebend, nicht Frozen, Basis-Zone frei, Kartenbeschränkung
-    } else if (!engine.canEquipCardToHero(inst.name, pi, hi)) continue;         // Kartenbeschränkung gilt auch für Anhängsel
+      if (!istAusruestTraeger(engine, pi, hi, inst.name, pi, engine.ausruestOpts(inst).kartenBesitzer ?? pi)) continue;             // lebend, nicht Frozen, Basis-Zone frei, Kartenbeschränkung (W14b Q153: Besitzer der liegenden Karte)
+    } else if (!engine.canEquipCardToHero(inst.name, pi, hi, engine.ausruestOpts(inst))) continue;         // Kartenbeschränkung gilt auch für Anhängsel
     if (engine.isSupportZoneLocked(pi, hi, { cardName: inst.name, via: 'move' })) continue;
-    for (const si of freieBasisZonen(ps, hi, engine, pi)) {
+    // Darion: eine Ausrüstung kommt bei einem Helden mit Equip-Stapel NUR in den Stapel (Pflicht-Platz).
+    for (const si of freieBasisZonen(ps, hi, engine, pi, art === 'equip' ? inst.name : null)) {
       out.push({ owner: pi, heroIdx: hi, slotIdx: si, label: `${hero.name} — Slot ${si + 1}` });
     }
   }
@@ -167,10 +171,11 @@ async function uebernimm(engine, pi, inst, ergebnis) {
   const name = inst.name;
   if (!istBetroffen(engine, pi, inst)) return;                                  // während der Abfragen kann sich das Brett geändert haben
   if (inst.zone === 'area') {
+    if (engine.spielerIstVonAreasAusgenommen(pi)) return;   // W82 (Shipwrecked): keine Area auf mein Brett bringen
     if (!engine.gs.areaZones) engine.gs.areaZones = [];
     if (!engine.gs.areaZones[pi]) engine.gs.areaZones[pi] = [];
-    const meine = engine.gs.areaZones[pi];
-    if (meine.length < engine.areaLimitFor(pi)) {
+    // Als Fix (Al 27.10.): auch keine Dublette — „up to 3 DIFFERENT Areas" (Spatial Crevice): liegt dieselbe Area schon in meiner Zone, bleibt die fremde liegen (`canPlaceAnotherArea` = Platz UND keine Dublette).
+    if (engine.canPlaceAnotherArea(pi, name)) {
       const von = inst.owner;
       const arr = engine.gs.areaZones?.[von] || [];
       const i = arr.indexOf(name);
@@ -184,18 +189,22 @@ async function uebernimm(engine, pi, inst, ergebnis) {
     return;
   }
   const art = artVon(engine, inst);
-  const auswahl = inst.owner === pi ? null : await waehlePlatz(engine, pi, inst, zonenFuer(engine, pi, inst, art));
+  // W53a: Nicht-Kreatur-Tokens (W52a) und Tempelunas angehängte Fee werden nie umgesetzt (`actionTransferAttachment` lehnt sie ab) — die Platzfrage entfällt, die Kontrolle wechselt trotzdem.
+  const festgesetzt = art !== 'creature' && (engine.isTokenCard(inst) || !!inst.counters?._keinEquip);
+  const auswahl = (inst.owner === pi || festgesetzt) ? null : await waehlePlatz(engine, pi, inst, zonenFuer(engine, pi, inst, art));
   if (!istBetroffen(engine, pi, inst)) return;
   if (auswahl) {
     let ok = false;
     // frisch prüfen: zwischen Abfrage und Umzug kann der Platz weg sein
     if (art === 'creature') {
-      if (!engine.supportSlotBelegt(auswahl.owner, auswahl.heroIdx, auswahl.slotIdx)) {
+      if (!engine.supportSlotBelegt(auswahl.owner, auswahl.heroIdx, auswahl.slotIdx)
+          || (auswahl.shared && require('./_alice-shared').canShareInto(engine, pi, auswahl.heroIdx, auswahl.slotIdx, name, auswahl.owner))) {   // W63a: belegt nur ok, wenn geteilt (Alice)
         const r = await engine.actionTransferCreature(inst, auswahl.owner, auswahl.heroIdx, auswahl.slotIdx, { sourceName: CARD_NAME, sourceOwner: pi, controller: pi });
         ok = !!r?.success;
       }
-    } else if (!engine.supportSlotBelegt(auswahl.owner, auswahl.heroIdx, auswahl.slotIdx)) {
-      const r = await engine.actionTransferAttachment(inst, auswahl.owner, auswahl.heroIdx, auswahl.slotIdx, { sourceName: CARD_NAME });
+    } else if (!engine.supportSlotBelegt(auswahl.owner, auswahl.heroIdx, auswahl.slotIdx)
+        || (art === 'equip' && engine.equipPflichtPlatz(auswahl.owner, auswahl.heroIdx, name) === auswahl.slotIdx)) {   // Darion: der Equip-Stapel ist „belegt" und nimmt trotzdem auf
+      const r = await engine.actionTransferAttachment(inst, auswahl.owner, auswahl.heroIdx, auswahl.slotIdx, { sourceName: CARD_NAME, anleger: pi });
       ok = !!r?.success;
     }
     if (ok) { ergebnis.uebernommen.push(name); ergebnis.umgesetzt.push(name); return; }

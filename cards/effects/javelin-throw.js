@@ -69,6 +69,8 @@ function eligibleHeroes(engine, pi) {
   const out = [];
   for (const { physOwner, heroIdx: hi } of engine.heroesControlledBy(pi)) {
     if (engine.isHeroIncapacitated(physOwner, hi)) continue;
+    // W32a (Al, 22.10.2026): der Wurf ist ein Attack DES HELDEN — Frozen/Stunned/Webbed/Negated/Attack-Sperren blocken (`heroKannAngreifen`, wie `validateActionPlay`).
+    if (!engine.heroKannAngreifen(physOwner, hi, pi)) continue;
     if (equippedArtifacts(engine, physOwner, hi).length === 0) continue;
     out.push({ physOwner, heroIdx: hi });
   }
@@ -83,6 +85,12 @@ function heroTargets(engine, pi) {
 }
 
 module.exports = {
+  // ★ Als Ruling (Al 26.10., Flame Avalanche: „Am besten gleich die Karten ganz sperren statt den Schaden fizzeln zu lassen"): die Karte richtet NUR Schaden an Zielen des Gegners an —
+  // unter der Schadenssperre (`ps.damageLocked`) unspielbar (Karte bleibt auf der Hand, keine Aktion/Kosten; Sperr-Stutzen `engine._cardBlockedBySearchLock`).
+  blockedByDamageLock: true,
+  // W27a (Al, 21.10.2026): „treated as an Attack" — Leser der Quellstufe (Glass Wall, Test Flight, Escape Device, Stealth, Jetpack) fragen `_heldenEffektStufe`.
+  // W32a (Al, 22.10.2026): „Sie nehmen trotzdem das Fighting-Level": die Quellstufe ist das FIGHTING-LEVEL des gewählten Helden (nicht mehr fix 0).
+  treatedAsAttack: { ability: 'Fighting' },
   isTargetingArtifact: true,
   requiresTarget: true,
   animationType: 'none',
@@ -108,17 +116,20 @@ module.exports = {
   },
   validateSelection: (selectedIds) => !!selectedIds && selectedIds.length === 1,
 
-  async resolve(engine, pi, selectedIds, validTargets) {
+  // W40a (Al, 22.10.2026, Punkt 3): `wdh` = Wiederholung durch Idej Sword - Kunagi („perform that Attack again"): derselbe Held wirft erneut — „ein weiteres Equip müsste entfernt werden"
+  // (Kosten fallen erneut an: ein weiteres ausgerüstetes Artefakt geht in die Ablage; hat der Held keins mehr, findet die Wiederholung nicht statt). Die Einmal-pro-Zug-Sperre
+  // (`hoptUsed`/`claimHOPT`) wird weder geprüft noch erneut gesetzt; das Ziel wird neu gewählt (nur Gegnerziele, `gs._kunagiWdh`).
+  async resolve(engine, pi, selectedIds, validTargets, wdh) {
     if (!selectedIds || selectedIds.length === 0) return { aborted: true };
     const gs = engine.gs;
     const ps = gs.players[pi];
-    if (!ps || hoptUsed(engine, pi)) return { aborted: true };
+    if (!ps || (!wdh && hoptUsed(engine, pi))) return { aborted: true };
     const sel = validTargets.find(t => t.id === selectedIds[0]);
     if (!sel || sel.type !== 'hero') return { aborted: true };
     const hi = sel.heroIdx;
     const heroOwner = sel.owner ?? pi;   // physische Seite des Helden
     const hero = gs.players[heroOwner]?.heroes?.[hi];
-    if (!hero?.name || engine.isHeroIncapacitated(heroOwner, hi)) return { aborted: true };
+    if (!hero?.name || engine.isHeroIncapacitated(heroOwner, hi) || !engine.heroKannAngreifen(heroOwner, hi, pi)) return { aborted: true };   // W32a: nicht angriffsfähig → blockiert
     if (engine.heroSideOf(heroOwner, hero) !== pi) return { aborted: true };
 
     // ── Artefakt waehlen ──────────────────────────────────────────
@@ -147,8 +158,8 @@ module.exports = {
 
     // ── Wurfziel waehlen (VOR dem Abwerfen: Abbruch kostet nichts) ──
     const damage = Math.max(0, hero.baseAtk || 0);
-    const handInst = engine.cardInstances.find(c => c.zone === 'hand' && c.owner === pi && c.name === CARD_NAME)
-      || engine._trackCard(CARD_NAME, pi, 'hand');
+    const handVorhanden = engine.cardInstances.find(c => c.zone === 'hand' && c.owner === pi && c.name === CARD_NAME);
+    const handInst = handVorhanden || engine._trackCard(CARD_NAME, pi, 'hand');
     const ctx = engine._createContext(handInst, {});
     // „This is treated as an Attack": die Reaktionen (Invisibility Cloak,
     // Spectral Armor, …) sehen als Quelle den WERFENDEN HELDEN, nicht die
@@ -156,28 +167,32 @@ module.exports = {
     const attackSource = { name: CARD_NAME, owner: pi, heroIdx: hi, controller: pi };
     // Uebernommener Held: physische Seite wie beim Charme-Angriff.
     if (heroOwner !== pi) attackSource.heroOwner = heroOwner;
-    delete gs._spellNegatedByEffect;
-    const target = await ctx.promptDamageTarget({
-      side: 'enemy',
-      types: ['hero', 'creature'],
-      damageType: 'attack',
-      baseDamage: damage,
-      attackerSourceOverride: attackSource,
-      title: CARD_NAME,
-      description: `${hero.name} hurls ${thrown.name}! Choose a target your opponent controls — ${damage} damage (${hero.name}'s Base Attack). This is treated as an Attack.`,
-      confirmLabel: `↑ ${damage} Damage!`,
-      confirmClass: 'btn-danger',
-      cancellable: true,
-    });
+    delete gs._spellNegatedByEffect; delete gs._zielNegiertDurchSchutz;   // W36a: auch die Negation durch Schutz-/Redirect-Fenster zaehlt als Negierung
+    let target;
+    try {
+      target = await ctx.promptDamageTarget({
+        side: 'enemy',
+        types: ['hero', 'creature'],
+        damageType: 'attack',
+        baseDamage: damage,
+        attackerSourceOverride: attackSource,
+        title: CARD_NAME,
+        description: `${hero.name} hurls ${thrown.name}! Choose a target your opponent controls — ${damage} damage (${hero.name}'s Base Attack). This is treated as an Attack.`,
+        confirmLabel: `↑ ${damage} Damage!`,
+        confirmClass: 'btn-danger',
+        cancellable: true,
+      });
+    } finally { if (wdh && !handVorhanden) engine._untrackCard(handInst.id); }   // W40a: Hilfsinstanz der Wiederholung (die Karte liegt längst in der Ablage) — kein Geisterzustand
+
     // Negiert (Invisibility Cloak): die Karte IST gespielt — Wurf-Artefakt
     // weg (Textreihenfolge: erst abwerfen, dann Ziel), OPT verbraucht,
     // kein Schaden. Nur ein echter Abbruch gibt die Karte zurueck.
-    const negated = !target && !!gs._spellNegatedByEffect;
-    delete gs._spellNegatedByEffect;
+    const negated = !target && (!!gs._spellNegatedByEffect || !!gs._zielNegiertDurchSchutz);
+    delete gs._spellNegatedByEffect; delete gs._zielNegiertDurchSchutz;
     if (!target && !negated) return { aborted: true };
 
     // ── Ab hier ist die Karte gespielt ─────────────────────────────
-    if (!engine.claimHOPT(HOPT_KEY, pi)) return { aborted: true };
+    if (!wdh && !engine.claimHOPT(HOPT_KEY, pi)) return { aborted: true };
 
     // Artefakt in den Discard (Ausruestungs-Abbau ueber den Engine-Weg).
     const thrownName = thrown.name;
@@ -186,6 +201,8 @@ module.exports = {
       engine.log('javelin_throw', {
         player: ps.username, hero: hero.name, artifact: thrownName, negated: true,
       });
+      // R-12 (Al 26.10.): ein im Zielfenster negierter Wurf zählt als gespielte Attack des Helden (W36a, wie Broghan & Co.) — auch bei der Kunagi-Wiederholung.
+      await engine.zaehleAlsArt('attack', { pi, heroIdx: hi, heroOwner, name: CARD_NAME });
       engine.sync();
       return true;
     }
@@ -214,6 +231,8 @@ module.exports = {
 
     // Typ 'attack', Quelle mit heroIdx → Attack-Declare-Lauscher,
     // Angriffsmodifikatoren.
+    // W32a (Al, 22.10.2026): der Wurf zählt als Attack des Helden — Attack-Reaktionen (Magic Topaz, Arrows …) über die virtuelle Attack-Kette.
+    await engine.alsAttackKette({ name: CARD_NAME, pi, heroIdx: hi, heroOwner, ziele: [target], wiederhole: () => module.exports.resolve(engine, pi, selectedIds, validTargets, true), resolve: async () => {
     if (target.type === 'hero') {
       const tgtHero = gs.players[target.owner]?.heroes?.[target.heroIdx];
       if (tgtHero && tgtHero.hp > 0) await engine.actionDealDamage(attackSource, tgtHero, damage, 'attack');
@@ -221,6 +240,8 @@ module.exports = {
       await engine.actionDealCreatureDamage(attackSource, target.cardInstance, damage, 'attack',
         { sourceOwner: pi, canBeNegated: true });
     }
+    return true;
+    } });
     engine.sync();
     return true;
   },

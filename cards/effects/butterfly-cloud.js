@@ -16,6 +16,13 @@
 // ═══════════════════════════════════════════
 
 module.exports = {
+  // ★ Welle 12 (B-06, Al: „Eine Karte, deren Effekt komplett nutzlos wäre, ist nicht spielbar."): trifft NUR den Gegner — gegen den durch die
+  // Erste-Runden-Immunität geschützten Spieler unspielbar (Karte bleibt auf der Hand, keine Aktion/Kosten; `engine.ersterZugGeschuetzt`).
+  blockedByFirstTurnProtection: true,
+  // ★ Z7b: FIZZELT die Karte (Wirker beim Auflösen handlungsunfähig, v1328), war sie GESPIELT → Stempel (Engine: `_noteFizzledPlay`).
+  // Eine ganz NEGIERTE Karte stempelt nicht (Als Entscheidung, Welle 3).
+  onFizzledPlay: ({ engine, gs, pi }) => { gs.players[pi]._butterflyCloudUsedThisTurn = true; },
+
   // Cooldown: blocked if any Butterfly Cloud was played last turn
   spellPlayCondition: (gs, playerIdx) => {
     const ps = gs.players[playerIdx];
@@ -79,7 +86,9 @@ module.exports = {
       // ── AoE 50 damage to all enemy targets ──
       await ctx.aoeHit({
         damage: 50,
-        damageType: 'other',
+        // W16g (R01-09, S01-03): ein ZAUBER → Typ '<school>_spell' (nicht 'other'); sonst blockt Dark Ocean ihn und
+        // Corpse Explosion erkennt den Tod nicht als „Attack or Spell".
+        damageType: 'magic_arts_spell',
         side: 'enemy',
         types: ['hero', 'creature'],
         animationType: 'none',

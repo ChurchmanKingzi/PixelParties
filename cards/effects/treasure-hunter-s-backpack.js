@@ -12,9 +12,16 @@
 //
 //  The deck-search reveals to the opponent and
 //  shuffles afterwards (standard tutor etiquette).
+//
+//  ★ W63d (Al, 22.10.2026): BEIDE Auswahlen (Ausrüstung aus dem Deck, Träger/Zone) sind abbrechbar und werden
+//  VOR dem Reaktionsfenster getroffen (`payArtifactCost`, Vertrag wie bei Hive's Crown & Co.): der Gegner sieht die
+//  Karte erst, wenn nichts mehr abgebrochen werden kann (zentraler Auftritts-Puffer der Engine, CARD_API
+//  „Auftritt streamen — erst nach dem Commit"). Abbruch an irgendeiner Stelle = Karte bleibt auf der Hand, nichts
+//  gesehen, nichts bezahlt. Wird das Artefakt danach negiert, bleibt das Deck unberührt.
 // ═══════════════════════════════════════════
 
 const { getCardDB: _getCardDB } = require('./_card-db');
+const { loadCardEffect } = require('./_loader');
 const { waehleAusruestPlatz, ausruestTraegerMitSeite } = require('./_equip-shared');
 
 const CARD_NAME = "Treasure Hunter's Backpack";
@@ -44,6 +51,10 @@ function buildEligibleGallery(gs, pi, engine) {
     const cd = _getCardDB()[cardName];
     const cost = cd.cost || 0;
     if (cost > MAX_EQUIP_COST) continue;
+    // ★ Z7 (F03-06): das Backpack SPIELT die Ausrüstung („play it immediately") — „You can only
+    // play 1 … per game" (Smug Coin) gilt also auch hier: kein verbrauchtes Exemplar anbieten.
+    const _sc = loadCardEffect(cardName);
+    if ((_sc?.oncePerGame || _sc?.oncePerGameKey) && ps._oncePerGameUsed?.has(_sc.oncePerGameKey || cardName)) continue;
     // ★ Als Regel 19.8.: eine Ausruestung ohne legalen Traeger ist
     // keine legale Wahl. Gibt es dadurch gar keine, ist die Karte
     // insgesamt nicht aktivierbar (siehe `canActivate` unten).
@@ -62,16 +73,48 @@ function buildEligibleGallery(gs, pi, engine) {
   return out.sort((a, b) => a.name.localeCompare(b.name));
 }
 
-/** True if this player has at least one alive hero with a free Support Zone. */
-function hasHeroWithFreeZone(ps) {
+/** True if this player has at least one alive hero with a free Support Zone (Darion: oder einem Equip-Stapel, der weitere Equips aufnimmt). */
+function hasHeroWithFreeZone(ps, engine = null, pi = null) {
   for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
     const hero = ps.heroes[hi];
     if (!hero?.name || hero.hp <= 0) continue;
     for (let si = 0; si < 3; si++) {
       if (((ps.supportZones[hi] || [])[si] || []).length === 0) return true;
     }
+    if (engine && pi != null && require('./_equip-stack-shared').hatStapelPlatz(engine, pi, hi)) return true;
   }
   return false;
+}
+
+/**
+ * Beide abbrechbaren Wahlen des Backpacks: (1) die Ausrüstung aus dem Deck, (2) Träger und Zone.
+ * Rückgabe `{ equipName, heroIdx, slot, seite }` oder `null` bei Abbruch / ungültiger Wahl.
+ * ★ v1268: Trägerregeln und Zonenwahl kommen aus `_equip-shared.js` (wie bei Riffel und der Weapon Collecting Wight).
+ */
+async function waehleAusruestungUndPlatz(engine, pi) {
+  const gs = engine.gs;
+  const ps = gs.players[pi];
+  if (!ps) return null;
+  const gallery = buildEligibleGallery(gs, pi, engine);
+  if (gallery.length === 0) return null;
+  const picked = await engine.promptGeneric(pi, {
+    type: 'cardGallery',
+    cards: gallery,
+    title: CARD_NAME,
+    description: `Choose an equippable Artifact (Cost ${MAX_EQUIP_COST} or lower) from your deck.`,
+    cancellable: true,
+  });
+  if (!picked || picked.cancelled || !picked.cardName) return null;
+  const equipName = picked.cardName;
+  if (!isEquipByData(equipName)) return null;
+  if (ps.mainDeck.indexOf(equipName) < 0) return null;
+  const platz = await waehleAusruestPlatz(engine, pi, equipName, {
+    title: `${CARD_NAME} — Equip ${equipName}`,
+    description: `Select a Support Zone to equip ${equipName} to. The chosen Hero cannot perform an Action this turn.`,
+    confirmLabel: '🎒 Equip!',
+  });
+  if (!platz) return null;
+  return { equipName, heroIdx: platz.heroIdx, slot: platz.slot, seite: platz.seite ?? pi };
 }
 
 module.exports = {
@@ -81,7 +124,7 @@ module.exports = {
   canActivate(gs, pi, engine) {
     const ps = gs.players[pi];
     if (!ps) return false;
-    if (!hasHeroWithFreeZone(ps)) return false;
+    if (!hasHeroWithFreeZone(ps, engine, pi)) return false;
     return buildEligibleGallery(gs, pi, engine).length > 0;
   },
 
@@ -89,7 +132,7 @@ module.exports = {
   getValidTargets: () => [],
 
   targetingConfig: {
-    description: 'Search your deck for an equippable Artifact (Cost ≤ 50).',
+    description: 'Search your deck for an equippable Artifact (Cost 50 or lower).',
     confirmLabel: '🎒 Unpack!',
     confirmClass: 'btn-info',
     cancellable: true,
@@ -100,40 +143,32 @@ module.exports = {
 
   animationType: 'none',
 
-  resolve: async (engine, pi /*, selectedIds, validTargets */) => {
+  // ★ W63d: die Wahlen (Ausrüstung aus dem Deck → Träger/Zone) VOR dem Reaktionsfenster. `false` = abgebrochen: Karte bleibt auf der Hand, nichts bezahlt, nichts gezeigt.
+  payArtifactCost: async (engine, pi) => {
+    const wahl = await waehleAusruestungUndPlatz(engine, pi);
+    return wahl ? { wahl } : false;
+  },
+
+  resolve: async (engine, pi, selectedIds, validTargets, kosten) => {
     const gs = engine.gs;
     const ps = gs.players[pi];
     if (!ps) return { aborted: true };
 
-    // ── Step 1: pick equip from deck ──
-    const gallery = buildEligibleGallery(gs, pi, engine);
-    if (gallery.length === 0) return { aborted: true };
-
-    const picked = await engine.promptGeneric(pi, {
-      type: 'cardGallery',
-      cards: gallery,
-      title: CARD_NAME,
-      description: `Choose an equippable Artifact (Cost ≤ ${MAX_EQUIP_COST}) from your deck.`,
-      cancellable: true,
-    });
-    if (!picked || picked.cancelled || !picked.cardName) return { aborted: true };
-
-    const equipName = picked.cardName;
-    if (!isEquipByData(equipName)) return { aborted: true };
-    const deckIdx = ps.mainDeck.indexOf(equipName);
-    if (deckIdx < 0) return { aborted: true };
-
-    // ── Step 2: pick destination Hero / Support Zone ──
-    // ★ v1268: Traegerregeln und Wahl kommen aus `_equip-shared.js` —
-    // derselben Stelle wie bei Riffel und der Weapon Collecting Wight.
-    // Inhaltlich wie bisher (lebendig, nicht Frozen, freie Zone,
-    // `canEquipCardToHero`), NEU: auch nicht Charmed — wie im Handweg.
-    const platz = await waehleAusruestPlatz(engine, pi, equipName, {
-      title: `${CARD_NAME} — Equip ${equipName}`,
-      description: `Select a Support Zone to equip ${equipName} to. The chosen Hero cannot perform an Action this turn.`,
-      confirmLabel: '🎒 Equip!',
-    });
-    if (!platz) return { aborted: true };
+    // ── Step 1+2: Ausrüstung aus dem Deck und Träger/Zone — normalerweise schon VOR dem Reaktionsfenster gewählt (`payArtifactCost`).
+    // Hat sich der Zustand inzwischen verschoben (Zone belegt, Karte nicht mehr im Deck) oder kam der Aufruf ohne Vorab-Wahl
+    // (Gratis-Spiel durch Sky Archeologist u. ä.), wird hier (erneut) gefragt.
+    let wahl = kosten && kosten.wahl;
+    if (wahl) {
+      const _zs = gs.players[wahl.seite];
+      const _frei = _zs && ((((_zs.supportZones[wahl.heroIdx] || [])[wahl.slot] || []).length === 0) || engine.equipPflichtPlatz(wahl.seite, wahl.heroIdx, wahl.equipName) === wahl.slot);   // Darion: der Equip-Stapel nimmt auf
+      const _imDeck = ps.mainDeck.indexOf(wahl.equipName) >= 0;
+      const _traeger = ausruestTraegerMitSeite(engine, pi, wahl.equipName).some(t => t.heroIdx === wahl.heroIdx && t.seite === wahl.seite);
+      if (!_frei || !_imDeck || !_traeger) wahl = null;
+    }
+    if (!wahl) wahl = await waehleAusruestungUndPlatz(engine, pi);
+    if (!wahl) return { aborted: true };
+    const equipName = wahl.equipName;
+    const platz = { heroIdx: wahl.heroIdx, slot: wahl.slot, seite: wahl.seite };
     const destHeroIdx = platz.heroIdx;
     const destSlot = platz.slot;
     // Als Vorgabe 29.9.: Brettseite eines uebernommenen Helden; die Karte
@@ -141,8 +176,16 @@ module.exports = {
     const seite = platz.seite ?? pi;
     const zps = gs.players[seite];
 
-    // Final validation: slot still free + deck still contains the equip
-    if (((zps.supportZones[destHeroIdx] || [])[destSlot] || []).length > 0) return { aborted: true };
+    // Final validation: slot still free + deck still contains the equip (Darion: der Equip-Stapel des Helden nimmt weitere Equips auf)
+    if (((zps.supportZones[destHeroIdx] || [])[destSlot] || []).length > 0
+        && engine.equipPflichtPlatz(seite, destHeroIdx, equipName) !== destSlot) return { aborted: true };
+    // ★ W15a (Al, R3 und Regel W14a Q5): Ausrüsten PER EFFEKT — Resistance des Trägers fängt es ab (vor jeder Kartenbewegung; die Ausrüstung bleibt im Deck, kein Mischen).
+    // Der Artefakt-Einsatz ist gespielt und verbraucht.
+    if (await engine.heroNonDamageEffectBlocked(seite, destHeroIdx, 'equip', { sourceOwner: pi, source: CARD_NAME })) {
+      engine.log('treasure_hunters_backpack_blocked', { player: ps.username, equip: equipName, hero: zps.heroes[destHeroIdx]?.name });
+      engine.sync();
+      return true;
+    }
     const _taken_stillIdx = await engine.takeFromPile(ps, 'deck', equipName, { source: CARD_NAME });   // v820: Stapel-Schicht
     if (!_taken_stillIdx) return { aborted: true };
     if (!zps.supportZones[destHeroIdx]) zps.supportZones[destHeroIdx] = [[], [], []];
@@ -151,6 +194,14 @@ module.exports = {
 
     const inst = engine._trackCard(equipName, seite, 'support', destHeroIdx, destSlot);
     if (seite !== pi) inst.originalOwner = pi;
+    // ★ Z7 (F03-06): … und die gespielte Ausrüstung verbraucht ihre Partie-Grenze.
+    {
+      const _es = loadCardEffect(equipName);
+      if (_es?.oncePerGame || _es?.oncePerGameKey) {
+        if (!ps._oncePerGameUsed) ps._oncePerGameUsed = new Set();
+        ps._oncePerGameUsed.add(_es.oncePerGameKey || equipName);
+      }
+    }
 
     engine.sync();
 
@@ -186,6 +237,7 @@ module.exports = {
     });
     await engine.runHooks('onCardEnterZone', {
       enteringCard: inst, toZone: 'support', toHeroIdx: destHeroIdx,
+      _isEffectEquip: true,   // W16e (F03-21): per Effekt angelegt — Summoning Instructions: X = 1 ohne Frage
     });
 
     // ── Step 6: lock the chosen Hero out of acting THIS turn ──
@@ -196,6 +248,7 @@ module.exports = {
     const destHero = zps.heroes[destHeroIdx];
     if (destHero) {
       destHero._actionLockedTurn = gs.turn;
+      destHero._actionLockedFremd = gs.turn;   // W8: Fremdsperre (Lethes Selbstabgleich löst nur die eigene)
     }
 
     // ── Step 7: shuffle deck + reveal to opponent ──

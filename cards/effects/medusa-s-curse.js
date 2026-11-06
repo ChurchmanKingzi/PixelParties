@@ -11,7 +11,7 @@
 //  buff — damageMultiplier: 0).
 // ═══════════════════════════════════════════
 
-const { placePollutionTokens, countFreeZones } = require('./_pollution-shared');
+const { placePollutionTokens, countFreeZones, payTokenCost, kostenSchonBezahlt } = require('./_pollution-shared');
 const { hasCardType } = require('./_hooks');
 
 module.exports = {
@@ -29,11 +29,19 @@ module.exports = {
     impact: { type: 'petrify' }, impactMs: 260,
   },
 
+  // ★ Welle 11 (Q66, Al): trifft den Gegner nur mit Nicht-Schadens-Effekten (Stun auf alle seine Ziele) — gegen den durch die Erste-Runden-Immunität
+  // geschützten Spieler unspielbar (`engine.ersterZugGeschuetzt`, Sperr-Stutzen `_cardBlockedBySearchLock`).
+  blockedByFirstTurnProtection: true,
   placesPollutionTokens: true,
 
   // Cost gate: need 2 free Support Zones.
   spellPlayCondition(gs, pi) {
     return countFreeZones(gs, pi) >= 2;
+  },
+
+  // ★ W4b (Al, Welle 4): die Token-Kosten werden VOR dem Reaktionsfenster bezahlt und bleiben bei Ganz-Negierung bezahlt.
+  async payActivationCost(ctx) {
+    await payTokenCost(ctx, 2, "Medusa's Curse");
   },
 
   hooks: {
@@ -45,8 +53,9 @@ module.exports = {
       const opp = gs.players[oppIdx];
       const cardDB = engine._getCardDB();
 
+      const _vorab = kostenSchonBezahlt(ctx);   // W4b: Kosten schon vor dem Fenster bezahlt?
       if (!opp) {
-        gs._spellCancelled = true;
+        if (!_vorab) gs._spellCancelled = true;
         return;
       }
 
@@ -91,9 +100,17 @@ module.exports = {
       // The spell is always consumed — Pollution placement is a cost per the
       // card text ("Place 2 Pollution Tokens... to use this Spell"), so we
       // pay it even if the filter produced 0 eligible targets.
-      await placePollutionTokens(engine, pi, 2, "Medusa's Curse", { promptCtx: ctx });
+      if (!_vorab) await placePollutionTokens(engine, pi, 2, "Medusa's Curse", { promptCtx: ctx });
 
       if (totalTargets === 0) return;
+
+      // ★ W14b (Q156, Al: „Jeder Treffer zählt, auch reines Status-Zufügen"): „hit by"-Surprises (Booby Trap, Toxic Trap) öffnen auch hier
+      // (nach der Kostenzahlung, wie jede andere Abwehr der gewirkten Karte).
+      const sr = await engine.statusHitSurpriseWindow(ctx.card, heroTargets, 'decay_spell', {   // W15a (R01-10): + Hand-Reaktionen (Post-Target)
+        ziele: [...heroTargets.map(h => ({ type: 'hero', owner: h.owner, heroIdx: h.heroIdx })),
+                ...creatureTargets.map(inst => ({ type: 'creature', owner: engine.physicalSide(inst), heroIdx: inst.heroIdx, slotIdx: inst.zoneSlot, cardName: inst.name }))],
+      });
+      if (sr?.effectNegated) return;
 
       // ── Animation: petrify on every affected target ──
       for (const ht of heroTargets) {
@@ -118,6 +135,9 @@ module.exports = {
       const expiresAtTurn = gs.turn + 2;
       const expiresForPlayer = pi;
 
+      // W71b (Al, 25.10.2026): das Schutzfenster der Kreaturen (Cool Rescuer Monia & Co.) öffnet VORAB für alle Kreaturen — sonst wäre Monias Held schon betäubt, bevor die erste Kreatur dran ist.
+      await engine.kreaturenVorab(creatureTargets, 'status', { name: "Medusa's Curse", owner: pi }, { sourceOwner: pi, statusName: 'stunned' });
+
       for (const ht of heroTargets) {
         await engine.addHeroStatus(ht.owner, ht.heroIdx, 'stunned', {
           appliedBy: pi,
@@ -125,6 +145,8 @@ module.exports = {
           expiresForPlayer,
         });
         // Parallel damage-block buff (damageMultiplier: 0 comes from BUFF_EFFECTS).
+        // ★ W15a: ein per Reaktion (Barrier of Faith) geschützter Held ist von ALLEN Wirkungen der Karte ausgenommen — auch vom Schadensschutz-Buff.
+        if (engine.hasEffectImmunity(ht.owner, ht.heroIdx, ctx.card)) continue;
         await engine.actionAddBuff(ht.hero, ht.owner, ht.heroIdx, 'medusa_petrified', {
           sourceOwner: pi,   // v1067: Quelle ist Pflicht (siehe _affected-shared)
           expiresAtTurn,

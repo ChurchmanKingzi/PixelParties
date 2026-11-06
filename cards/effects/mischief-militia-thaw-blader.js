@@ -113,6 +113,7 @@ module.exports = {
 
     const picked = await engine.promptEffectTarget(pi, candidates, {
       title: CARD_NAME,
+      sourceCard: ctx.card,   // Quelle -> Post-Target-Fenster (Castling, Invisibility Cloak) oeffnet (A06-33)
       description: `Choose a Frozen target. Deal ${DAMAGE} damage to it and free it from Freeze.`,
       confirmLabel: `🗡️ ${DAMAGE} Damage!`,
       confirmClass: 'btn-danger',
@@ -153,7 +154,7 @@ module.exports = {
       );
       const stillAlive = engine.cardInstances.find(c => c.id === target.cardInstance.id && c.zone === 'support');
       if (stillAlive && stillAlive.counters?.frozen) {
-        engine.cleanseCreatureStatuses(stillAlive, ['frozen'], CARD_NAME);
+        await engine.cleanseCreatureStatusesGefragt(stillAlive, ['frozen'], CARD_NAME);   // W71b: gehört zum selben Effekt wie der Schaden (ein negierter Schaden lässt auch das Auftauen weg)
       }
     }
 

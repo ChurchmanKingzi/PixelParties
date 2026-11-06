@@ -74,6 +74,9 @@ module.exports = {
       if (!bootsInst || bootsInst.zone !== 'hand') return;
       const ps = gs.players[bootsOwner];
       if (!ps || ps.hand.indexOf(CARD_NAME) < 0) return;
+      // Z6 (F01-13): Boots geht an den Engine-Fenstern vorbei - das gemeinsame
+      // Hand-Spielsperren-Prädikat (inkl. Artefakt-Sperre Boomerang) selbst fragen.
+      if (engine._handPlayLockedFor(ps, CARD_NAME)) return;
 
       const surpriseName = ctx.surpriseCardName || 'that Surprise';
 
@@ -147,7 +150,7 @@ module.exports = {
       // spent, not discarded. Untrack the hand instance so no orphan
       // listener lingers in the hand zone.
       engine.takeFromPileSync(ps, 'hand', handIdx);
-      ps.discardPile.push(CARD_NAME);
+      engine.handKartenBesitzerPs(ps, CARD_NAME).discardPile.push(CARD_NAME);   // W3/W5a: Stapel des permanenten Besitzers
       if (bootsInst.id != null) engine._untrackCard(bootsInst.id);
 
       // Negate the Surprise — engine reads these after this hook.

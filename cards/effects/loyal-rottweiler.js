@@ -52,6 +52,9 @@ module.exports = {
     // Kontrolle statt Seite (Styx 28.9.): „your deck" = Kontrolleur.
     const ps     = engine.gs.players[ctx.cardOwner];
     if (!ps) return false;
+    // W20b (Al, 20.10.2026: Opfer-Zonen-Regel gilt für jede Opfer-Beschwörung): der Loyal kommt in die Zone des Rottweilers - nur wenn dessen Opferung sie leert (kein Alice-Stapel).
+    const rw = ctx.card;
+    if (rw && !engine.zoneFreiNachKostenzahlung(engine.physicalSide(rw), rw.heroIdx, rw.zoneSlot, rw)) return false;
     // No deck Loyals → can't tutor anything → bail before paying the cost.
     return getLoyalsInDeck(ps, engine).length > 0;
   },

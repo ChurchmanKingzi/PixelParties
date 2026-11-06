@@ -15,6 +15,7 @@
 //  `archetype: "Spider"`. No per-card archetype overrides today.
 // ═══════════════════════════════════════════
 
+const { anyName } = require('./_alias-name');   // Shroomasaur: Zusatzname zählt für Namensfamilien
 const SPIDER_ARCHETYPE = 'Spiders';
 
 /** Is this card a Spider Creature? */
@@ -38,7 +39,7 @@ function countSpiderCreaturesControlled(engine, playerIdx) {
     if ((inst.controller ?? inst.owner) !== playerIdx) continue;
     if (inst.zone !== 'support') continue;
     if (inst.faceDown) continue;
-    if (!isSpiderCreature(inst.name, engine)) continue;
+    if (!anyName(inst, (n) => isSpiderCreature(n, engine))) continue;
     n++;
   }
   return n;
@@ -54,7 +55,7 @@ function countSpiderCreaturesOnBoard(engine) {
   for (const inst of engine.cardInstances) {
     if (inst.zone !== 'support') continue;
     if (inst.faceDown) continue;
-    if (!isSpiderCreature(inst.name, engine)) continue;
+    if (!anyName(inst, (n) => isSpiderCreature(n, engine))) continue;
     n++;
   }
   return n;
@@ -68,7 +69,7 @@ function countSpiderCreaturesOnBoard(engine) {
  * Surprise-cost summon helper (Box / Brain / Crimson Skull / Diamond
  * Spider) and by Baby Spider's "activate any of your Surprises".
  */
-function listOwnFaceDownSurprises(engine, playerIdx) {
+function listOwnFaceDownSurprises(engine, playerIdx, opts = {}) {
   const out = [];
   if (!engine.gs.players[playerIdx]) return out;
   // Als Vorgabe 29.9.: „Surprises you control" — Zonen nach Kontrolle,
@@ -84,7 +85,9 @@ function listOwnFaceDownSurprises(engine, playerIdx) {
       && c.zone === 'surprise' && c.heroIdx === hi && c.name === cardName
     );
     if (!inst) continue;
-    if (!inst.faceDown) continue;
+    // Welle 10 (Al, Q36: „ja, generell jede offene Surprise zählt“): für die Kosten „send N Surprises“ zählt auch eine OFFEN liegende
+    // Surprise (Spider Silk Bridge bleibt aufgedeckt in der Surprise Zone). Ohne `includeFaceUp` bleibt es bei den verdeckten.
+    if (!inst.faceDown && !opts.includeFaceUp) continue;
     out.push({ inst, heroIdx: hi, cardName, seite });
   }
   return out;
@@ -106,7 +109,7 @@ function listOwnFaceDownSurprises(engine, playerIdx) {
  * is refused.
  */
 async function paySurpriseCostToSummon(engine, playerIdx, count, sourceCardName, summonHeroIdx) {
-  const available = listOwnFaceDownSurprises(engine, playerIdx);
+  const available = listOwnFaceDownSurprises(engine, playerIdx, { includeFaceUp: true });
   if (available.length < count) return false;
 
   // Interactive board picker — the player clicks face-down Surprises
@@ -126,7 +129,7 @@ async function paySurpriseCostToSummon(engine, playerIdx, count, sourceCardName,
     minSelect: count,
     cancellable: true,
     title: sourceCardName,
-    description: `Sacrifice ${count} face-down Surprise${count > 1 ? 's' : ''} you control to summon ${sourceCardName} as an additional Action.`,
+    description: `Sacrifice ${count} Surprise${count > 1 ? 's' : ''} you control to summon ${sourceCardName} as an additional Action.`,
     confirmLabel: '🕷️ Sacrifice & Summon!',
   });
 
@@ -257,9 +260,10 @@ function _heroCanNormalSummonSpider(engine, pi, heroIdx) {
   const ps = engine.gs.players[pi];
   const hero = ps?.heroes?.[heroIdx];
   if (!hero?.name || hero.hp <= 0) return false;
-  if (hero.statuses?.frozen || hero.statuses?.stunned || hero.statuses?.negated) return false;
-  const abZones = ps.abilityZones?.[heroIdx] || [];
-  return engine.countAbilitiesForSchool('Summoning Magic', abZones) >= 1;
+  // Welle 12 (Al, Rueckfrage 2): ein nur Effekt-negierter Held beschwoert normal; bei negierten Abilities (harte Form) ist die Summoning Magic weg -
+  // `heroSchoolLevel` liest dann 0 (vorher sperrte jede Negation).
+  if (hero.statuses?.frozen || hero.statuses?.stunned) return false;
+  return engine.heroSchoolLevel('Summoning Magic', pi, heroIdx) >= 1;
 }
 
 /**
@@ -288,7 +292,7 @@ function _heroCanNormalSummonSpider(engine, pi, heroIdx) {
  */
 function makeSurpriseCostSummon(surpriseCost, cardName) {
   function specialEligible(engine, pi) {
-    return listOwnFaceDownSurprises(engine, pi).length >= surpriseCost;
+    return listOwnFaceDownSurprises(engine, pi, { includeFaceUp: true }).length >= surpriseCost;
   }
   // True iff the action-economy context FORCES the special (free-
   // Action) path: Main Phase (no Action exists), or Action Phase

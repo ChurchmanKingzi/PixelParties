@@ -77,6 +77,17 @@ function heldUndHand(gs, pi, hi) {
 }
 
 /**
+ * ★ W7b (H03-14, Al 14.10.): Kann die Gegenseite die Pflicht-Karte ueberhaupt annehmen? Unter Hand-Sperre oder Such-Sperre
+ * ("cannot ... add cards to your hand") des Gegners liefert `actionTransferCardToOppHand` `false` - der „must"-Preis wuerde nie
+ * faellig, die Aktion waere gratis. Darum ist sie dann gesperrt (wie Cool Presents). `ps` = Hand des Kontrolleurs.
+ */
+function _gegnerKannAnnehmen(engine, gs, ps) {
+  const ctrl = (gs.players || []).indexOf(ps);
+  if (ctrl < 0 || !engine?._isSearchBlocked) return true;
+  return !engine._isSearchBlocked(engine.opponentOf(ctrl), {}, 'deck');
+}
+
+/**
  * Hand indices of Potion-type cards in `ps`'s hand. Used by both the
  * `canPerformAction` gate (zero-length → block Actions) and the
  * pay-cost picker (one entry → auto-mark, multiple → prompt).
@@ -154,6 +165,7 @@ module.exports = {
     const s = hero.statuses || {};
     if (s.frozen || s.stunned || s.negated) return true;
     if (!ps) return true;
+    if (!_gegnerKannAnnehmen(engine, gs, ps)) return false;   // W7b (H03-14)
     const db = engine._getCardDB();
     return _potionIndicesInHand(ps, db).length > 0;
   },
@@ -171,6 +183,7 @@ module.exports = {
     const s = hero.statuses || {};
     if (s.frozen || s.stunned || s.negated) return true;
     if (!ps) return true;
+    if (!_gegnerKannAnnehmen(engine, gs, ps)) return false;   // W7b (H03-14)
     const db = engine._getCardDB();
     return _potionIndicesInHand(ps, db).length > 0;
   },

@@ -17,6 +17,9 @@ const { hasCardType } = require('./_hooks');
 
 module.exports = {
   isAfterDamageReaction: true,
+  // W16f (M02-15): "when a TARGET you control takes damage" - auch eine eigene Kreatur (Held UND Kreatur, wie Spiky Armor). Das Kreaturen-Fenster
+  // (`_checkAfterCreatureDamageHandReactions`) ist ein eigener Weg; Rückschlag und Zielwahl sind dieselben (`afterDamageResolve`).
+  isAfterCreatureDamageReaction: true,
   isPotion: true,
 
   // CPU reactive-fire decision. Default would be "fire on every damage"
@@ -72,6 +75,14 @@ module.exports = {
     // Damage must be > 0 (already guaranteed by the system, but be safe)
     if (amount <= 0) return false;
     return true;
+  },
+
+  afterCreatureDamageCondition(gs, pi, engine, inst, source, amount, type) {
+    return module.exports.afterDamageCondition(gs, pi, engine, inst, inst?.heroIdx, source, amount, type);
+  },
+
+  async afterCreatureDamageResolve(engine, pi, inst, source, amount, type) {
+    return module.exports.afterDamageResolve(engine, pi, inst, inst?.heroIdx, source, amount, type);
   },
 
   async afterDamageResolve(engine, pi, target, targetHeroIdx, source, amount, type) {

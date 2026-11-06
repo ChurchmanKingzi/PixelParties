@@ -41,6 +41,7 @@
 // ═══════════════════════════════════════════
 
 const { opponentOfGs } = require('./_opp');
+const { hatEffekt } = require('./_gained-effects-shared');
 const CARD_NAME = "Rha'Bi, the Living Skeleton";
 const KOSTEN    = 100;
 const SCHADEN   = 100;   // v1029 (Als Anpassung 12.9.; 200 → 150 → 100)
@@ -366,7 +367,11 @@ module.exports = {
 
         // ── ④ Rha'Bi bekommt SOFORT seine 100 ────────────────────────
         const jetzt = rhabiVon(ctx);
-        if (jetzt?.name && jetzt.hp > 0) engine.increaseMaxHp(jetzt, ZUWACHS);
+        // ★ Welle 14 (Al, Q7 aus W13b): „Ja, die prallen auch ab." — der Zuwachs des eigenen Helden ist ein Nicht-Schaden-Effekt: Resistance blockt ihn.
+        if (jetzt?.name && jetzt.hp > 0
+            && !(await engine.heroNonDamageEffectBlocked(ctx.cardHeroOwner ?? pi, ctx.cardHeroIdx, 'max_hp', { sourceOwner: pi, source: CARD_NAME, amount: ZUWACHS }))) {
+          engine.increaseMaxHp(jetzt, ZUWACHS);
+        }
 
         zurueck++;
         engine.log('rhabi_return', {
@@ -394,7 +399,9 @@ module.exports = {
       const engine = ctx._engine;
       const pi = ctx.cardOwner;
       const gefallen = ctx.hero;
-      if (!gefallen?.name || gefallen.name !== CARD_NAME) return;
+      // W16f (H03-02): auch der Träger des GEWONNENEN Effekts (Pseudonia); es fällt genau der Träger dieser Instanz.
+      if (!gefallen?.name || !hatEffekt(gefallen, CARD_NAME)) return;
+      if (ctx.attachedHero && ctx.attachedHero !== gefallen) return;
 
       const liegend = platzierte(engine, pi);
       if (liegend.length === 0) return;

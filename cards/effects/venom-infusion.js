@@ -103,15 +103,12 @@ module.exports = {
         });
         await engine._delay(500);
 
+        // W25a (N5-09-Klasse): die Unheilbar-Marke (`poisonedUnhealable`) steht VOR dem Reaktionsfenster des Giftes (`opts.unhealable`),
+        // nicht erst danach - sonst reinigt eine Reaktion im Fenster (The Melting & Co.) die Kreatur noch. Same semantics as heroes: once unhealable, always unhealable.
         await engine.actionApplyCreaturePoison(
           { name: 'Venom Infusion', owner: pi, heroIdx, heroOwner: ctx.cardHeroOwner ?? pi }, inst,   // Als Befund 29.9.: Brettseite des Wirkers
+          1, { unhealable: isUnhealable },
         );
-
-        // Stamp unhealable flag on the creature (same semantics as heroes —
-        // once unhealable, always unhealable).
-        if (isUnhealable && inst.counters?.poisoned) {
-          inst.counters.poisonedUnhealable = true;
-        }
 
         engine.log('venom_infusion', {
           player: ps.username, hero: hero.name,

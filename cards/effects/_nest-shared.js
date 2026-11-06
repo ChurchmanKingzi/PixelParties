@@ -74,7 +74,7 @@ function slotOf(engine, pi, heroIdx, zoneSlot) {
 function nestedUnder(engine, pi, heroIdx, zoneSlot) {
   return engine.cardInstances.find(c =>
     c.zone === ZONES.NESTED
-    && (c.controller ?? c.owner) === pi
+    && engine.physicalSide(c) === pi
     && c.heroIdx === heroIdx
     && c.zoneSlot === zoneSlot,
   ) || null;
@@ -94,7 +94,8 @@ function coveringInstance(engine, nestInst) {
   const inst = engine.cardInstances.find(c => c.id === id);
   if (!inst || inst.zone !== ZONES.SUPPORT) return null;
   if (inst.heroIdx !== nestInst.heroIdx || inst.zoneSlot !== nestInst.zoneSlot) return null;
-  if ((inst.controller ?? inst.owner) !== (nestInst.controller ?? nestInst.owner)) return null;
+  // Brettseite, nicht Kontrolleur: ein geliehenes/gestohlenes Nest liegt auf der Seite seines Besitzers (C03-04).
+  if (engine.physicalSide(inst) !== engine.physicalSide(nestInst)) return null;
   return inst;
 }
 
@@ -140,7 +141,7 @@ function sink(engine, nestInst) {
  */
 function surface(engine, nestInst, opts = {}) {
   if (!nestInst || nestInst.zone !== ZONES.NESTED) return false;
-  const pi = nestInst.controller ?? nestInst.owner;
+  const pi = engine.physicalSide(nestInst);   // Brettseite (geliehenes Nest: Seite des Besitzers, C03-04)
   const ps = engine.gs.players[pi];
   if (!ps) return false;
   const hi = nestInst.heroIdx;
@@ -254,7 +255,7 @@ async function reconcile(engine, nestInst) {
 async function deleteWithoutDefeat(engine, inst, opts = {}) {
   if (!inst || inst.zone !== ZONES.SUPPORT) return false;
   const gs = engine.gs;
-  const pi = inst.controller ?? inst.owner;
+  const pi = engine.physicalSide(inst);   // Brettseite, nicht Kontrolleur (C03-04)
   const heroIdx = inst.heroIdx;
   const zoneSlot = inst.zoneSlot;
   const name = inst.name;

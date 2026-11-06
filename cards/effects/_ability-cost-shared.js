@@ -43,11 +43,44 @@ function abilityCardCount(abilities) {
   return abilities.reduce((n, a) => n + (a.level || 1), 0);
 }
 
-function targetsFor(engine, pi, heroIdx, kinds) {
+/** W73d (Leafagami Snake): wie viele Kopien dieses Ability-Eintrags wurden in dieser Schleife schon (geschützt) „abgeworfen"? */
+function geschuetzteKopien(engine, a) {
+  const set = engine._laubGeschuetzt;
+  if (!set || !set.size) return 0;
+  let n = 0;
+  for (const c of engine.cardInstances || []) {
+    if (set.has(c.id) && c.owner === a.owner && c.heroIdx === a.heroIdx && c.zoneSlot === a.slotIdx && c.zone === ZONES.ABILITY) n++;
+  }
+  return n;
+}
+
+/**
+ * Helden, die `pi` DAUERHAFT kontrolliert (Patty): eigene Spalte ohne die abgegebenen, plus die aus der Gegenspalte uebernommenen (`permaControlBy`,
+ * Paraseed Control). Temporaer gesteuerte Helden (Charme, Love Shot, Styx …) zaehlen nicht — ihre Abilities sind ohnehin geschuetzt
+ * (`abilityZoneGeschuetzt`). Gefallene Helden zaehlen mit (ihre Karte liegt weiter auf dem Brett). Die Abilities liegen in der Spalte des Vorbesitzers (`physOwner`).
+ * @returns {Array<{physOwner:number, heroIdx:number, hero:object}>}
+ */
+function permanentHeroes(engine, pi) {
+  return engine.heroesControlledBy(pi, { permanentOnly: true })
+    .filter(h => h.hero?.name && !engine.istTemporaerGesteuert(h.hero));
+}
+
+function targetsFor(engine, pi, heroIdx, kinds, heroes) {
+  // Mehrere Helden (Patty): die Ziele aller Helden zusammen; `heroes` = [{ physOwner, heroIdx }] oder eine Funktion, die sie liefert (je Durchlauf neu gefragt).
+  const liste = typeof heroes === 'function' ? heroes() : heroes;
+  if (Array.isArray(liste)) return liste.flatMap(h => targetsFor(engine, h.physOwner, h.heroIdx, kinds));
   const { abilities, equips } = sendables(engine, pi, heroIdx);
   const out = [];
   if (kinds.includes('ability')) {
     for (const a of abilities) {
+      if (a.zoneKind !== 'support' && geschuetzteKopien(engine, a) >= (a.level || 1)) continue;   // alle Kopien dieses Platzes schon „abgeworfen" (geschützt)
+      // Support-STAPEL (Xal, Xalibur): je Karte eine Instanz, im Eintrag nur durch EINE vertreten — erst ausblenden, wenn ALLE Kopien des Stapels geschützt sind
+      // (sonst bezahlt ein Stapel der Höhe 2 nur einmal, und die Kosten bleiben unvollständig). Eine einzelne Karte (Cloak of Edge) ist der Sonderfall Höhe 1.
+      if (a.zoneKind === 'support' && a.cardInstance && engine._laubGeschuetzt && engine._laubGeschuetzt.size) {
+        const v = a.cardInstance;
+        const kopien = (engine.cardInstances || []).filter(c => c.zone === ZONES.SUPPORT && c.owner === v.owner && c.heroIdx === v.heroIdx && c.zoneSlot === v.zoneSlot && c.name === v.name);
+        if (kopien.length > 0 && kopien.every(c => engine._laubGeschuetzt.has(c.id))) continue;
+      }
       out.push({
         id: a.id, type: a.type, owner: a.owner, heroIdx: a.heroIdx, slotIdx: a.slotIdx,
         cardName: a.cardName, cardInstance: a.cardInstance || undefined,
@@ -79,15 +112,25 @@ function targetsFor(engine, pi, heroIdx, kinds) {
  * @param opts.describe     (sent, abilitiesSent, remaining) → Beschreibung
  * @param opts.sourceOwner  Verursacher, falls nicht der Waehlende (v1335)
  * @param opts.heroOwner    Brettseite des Helden, falls nicht `pi` (Als Befund 29.9.: geliehener Held)
+ * @param opts.heroes       statt EINES Helden mehrere: `[{ physOwner, heroIdx }]` oder eine Funktion, die sie je Durchlauf liefert (Patty: alle dauerhaft kontrollierten Helden, `permanentHeroes`)
+ * @param opts.onSent       `(ziel) => void`, nach jeder tatsaechlich bezahlten Karte (Patty merkt sich den Helden der ersten Ability; `opts.heroes` liefert danach nur noch ihn)
  * @returns {{sent, abilitiesSent, equipsSent, aborted}}
  */
 async function sendCardsLoop(engine, pi, heroIdx, opts) {
+  // W73d: Schutz-Menge für die Dauer der Schleife (Leafagami Snake lässt Abilities liegen — dieselbe Karte darf nicht mehrfach „bezahlen")
+  const laubVorher = engine._laubGeschuetzt;
+  engine._laubGeschuetzt = new Set();
+  try { return await sendCardsLoopKern(engine, pi, heroIdx, opts); }
+  finally { engine._laubGeschuetzt = laubVorher; }
+}
+
+async function sendCardsLoopKern(engine, pi, heroIdx, opts) {
   const kinds = opts.kinds || ['ability', 'equip'];
   const min = Math.max(0, opts.min || 0);
   const max = opts.max == null ? Infinity : opts.max;
   let sent = 0, abilitiesSent = 0, equipsSent = 0, schleifen = 0, aborted = false;
   while (schleifen++ < 40 && sent < max) {
-    const ziele = targetsFor(engine, opts.heroOwner ?? pi, heroIdx, kinds);   // Als Befund 29.9.: Brettseite des Helden
+    const ziele = targetsFor(engine, opts.heroOwner ?? pi, heroIdx, kinds, opts.heroes);   // Als Befund 29.9.: Brettseite des Helden; `opts.heroes`: mehrere Helden (Patty)
     if (ziele.length === 0) break;
     const remaining = Math.max(0, min - sent);
     const fertigErlaubt = remaining === 0 && sent > 0;
@@ -140,11 +183,13 @@ async function sendCardsLoop(engine, pi, heroIdx, opts) {
       weg = await engine.discardAbilityTopCopy(ziel._send.entry, { source: opts.cardName, sourceOwner: opts.sourceOwner ?? pi });
       if (weg) abilitiesSent++;
     } else {
-      weg = await engine.sendBoardCardToDiscard(ziel._send.inst, { source: opts.cardName, sourceOwner: opts.sourceOwner ?? pi });
+      // Darion: die Wahl im Stapel (`_disambiguateStackedTargets`) steht am gewaehlten Ziel; `_send.inst` ist nur die Instanz beim Aufzaehlen (die oberste).
+      weg = await engine.sendBoardCardToDiscard(ziel.cardInstance || ziel._send.inst, { source: opts.cardName, sourceOwner: opts.sourceOwner ?? pi });
       if (weg) equipsSent++;
     }
     if (!weg) continue;
     sent++;
+    if (typeof opts.onSent === 'function') opts.onSent(ziel);
     engine.sync();
     await engine._delay(350);
   }
@@ -172,4 +217,4 @@ function cpuSendFallback(engine, promptData, { school, wantMore } = {}) {
   return pick ? [pick.id] : [];
 }
 
-module.exports = { sendables, abilityCardCount, targetsFor, sendCardsLoop, cpuSendFallback };
+module.exports = { sendables, abilityCardCount, targetsFor, sendCardsLoop, cpuSendFallback, permanentHeroes };

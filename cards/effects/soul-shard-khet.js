@@ -50,14 +50,13 @@ function eligibleHostSlots(engine, pi, creatureCardData) {
     if (!h?.name || h.hp <= 0) continue;
     if (h.statuses?.frozen || h.statuses?.stunned) continue;
     if (!engine.heroMeetsLevelReq(physOwner, hi, creatureCardData)) continue;
-    const zones = engine.gs.players[physOwner].supportZones?.[hi] || [[], [], []];
-    for (let z = 0; z < 3; z++) {
-      if ((zones[z] || []).length === 0) {
-        out.push({ owner: physOwner, heroIdx: hi, slotIdx: z, heroName: h.name });
-      }
+    // W63a (Al, 22.10.2026: Alices Effekt gilt fuer ALLE Beschwoerungs-Effekte; „erst die geteilte Zone, DANN die erste leere"): freie Zonen UND — mit
+    // Alice-Teilung des Beschwoerers — die Zone einer GLEICHNAMIGEN Creature (`engine.beschwoerZonenFuer`).
+    for (const zz of engine.beschwoerZonenFuer(pi, creatureCardData.name, { seite: physOwner, heroIdx: hi, nurBasis: true, namedHeroesOnly: true })) {
+      out.push({ owner: physOwner, heroIdx: hi, slotIdx: zz.slotIdx, heroName: h.name, ...(zz.shared ? { shared: true, stackDepth: zz.stackDepth } : {}) });
     }
   }
-  return out;
+  return require('./_alice-shared').geteiltZuerst(out);
 }
 
 module.exports = {
@@ -121,7 +120,8 @@ module.exports = {
         const zones = hosts.map(h => ({
           owner: h.owner,   // Kontrolle statt Seite (Styx 28.9.)
           heroIdx: h.heroIdx, slotIdx: h.slotIdx,
-          label: `${h.heroName} — Support ${h.slotIdx + 1}`,
+          label: `${h.heroName} — Support ${h.slotIdx + 1}${h.shared ? ` (×${h.stackDepth})` : ''}`,
+          ...(h.shared ? { shared: true, stackDepth: h.stackDepth } : {}),
         }));
         const zp = await ctx.promptZonePick(zones, {
           title: CARD_NAME,

@@ -146,8 +146,9 @@ module.exports = {
       if (target.type === 'hero') {
         const hero = engine.gs.players[target.owner]?.heroes?.[target.heroIdx];
         if (hero?.statuses) {
-          engine.cleanseHeroStatuses(hero, target.owner, target.heroIdx, selectedStatuses, 'Elixir of Recovery');
-          heroStatusesRemoved += selectedStatuses.length;
+          const entfernt = engine.cleanseHeroStatuses(hero, target.owner, target.heroIdx, selectedStatuses, 'Elixir of Recovery');
+          // „draw a card for each effect removed": nur was WIRKLICH entfernt wurde zählt (Stinky Stables hält Gift fest, unentfernbare Status …).
+          heroStatusesRemoved += Array.isArray(entfernt) ? entfernt.length : selectedStatuses.length;
         }
         engine._broadcastEvent('play_zone_animation', {
           type: 'recovery_drops', owner: target.owner, heroIdx: target.heroIdx, zoneSlot: -1,
@@ -158,7 +159,7 @@ module.exports = {
           c.heroIdx === target.heroIdx && c.zoneSlot === target.slotIdx
         );
         if (inst) {
-          engine.cleanseCreatureStatuses(inst, selectedStatuses, 'Elixir of Recovery');
+          await engine.cleanseCreatureStatusesGefragt(inst, selectedStatuses, 'Elixir of Recovery');
         }
         engine._broadcastEvent('play_zone_animation', {
           type: 'recovery_drops', owner: target.owner, heroIdx: target.heroIdx, zoneSlot: target.slotIdx,

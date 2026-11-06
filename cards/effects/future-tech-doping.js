@@ -33,13 +33,15 @@ module.exports = {
   isPotion: true,
   requiresTarget: true,
 
-  canActivate(gs, playerIdx) {
+  // W28a (Al, 21.10.2026: „'you control' = aktuelle Kontrolle, nicht Besitzer"): „a Hero you control" = `getControlledHeroTargets`.
+  canActivate(gs, playerIdx, engine) {
     const ps = gs.players[playerIdx];
+    if (engine) return engine.getControlledHeroTargets(playerIdx).length > 0;
     return !!ps && (ps.heroes || []).some(h => h?.name && h.hp > 0);
   },
 
   getValidTargets(gs, playerIdx, engine) {
-    return engine.getHeroTargets(playerIdx);
+    return engine.getControlledHeroTargets(playerIdx);
   },
 
   // ★ OHNE DIESEN BLOCK PASSIERT GAR NICHTS (Als Befund 21.8.: „lässt
@@ -107,6 +109,11 @@ module.exports = {
     // keine Karteninstanz, also gibt es hier auch keinen Kontext
     // (`_createContext(null)` wirft). Der Engine-Aufruf ist der
     // richtige Weg, nicht der Umweg ueber einen gebauten Kontext.
+    // W13 (Q144): Resistance blockt auch den Max-HP-Gewinn (zentraler Pruefer; Animation lief schon).
+    if (await engine.heroNonDamageEffectBlocked(ziel.owner, ziel.heroIdx, 'max_hp', { sourceOwner: pi, source: CARD_NAME, amount: bonus })) {
+      engine.sync();
+      return;
+    }
     engine.increaseMaxHp(held, bonus);
     engine.sync();
   },

@@ -15,8 +15,26 @@
 //  scaleX squeeze on the target zone).
 // ═══════════════════════════════════════════
 
+const { getNegativeStatuses, STATUS_EFFECTS } = require('./_hooks');
+
 const DAMAGE_PER_STATUS = 50;
-const NEGATIVE_STATUSES = ['frozen', 'stunned', 'burned', 'poisoned', 'negated'];
+// W16f (M02-01): ALLE negativen Status der Engine (`negative: true`), nicht nur fünf - der Kartentext schränkt nicht ein.
+// Poison-Stapel zählen als EIN Status; `blinded` und `blinded_hit` sind zwei Quellen desselben Status "Blinded" (gleiche Beschriftung) und
+// zählen zusammen einmal. Anhängsel, die als negativer Status zählen (Decisive Defeat, Stowaway ...), kommen über `cleansableHeroEntries`.
+const NEGATIVE_STATUSES = getNegativeStatuses();
+
+function zaehleStatusSchluessel(vorhanden) {
+  const labels = new Set();
+  let n = 0;
+  for (const s of NEGATIVE_STATUSES) {
+    if (!vorhanden(s)) continue;
+    const label = STATUS_EFFECTS[s]?.label || s;
+    if (labels.has(label)) continue;
+    labels.add(label);
+    n++;
+  }
+  return n;
+}
 
 /**
  * Count negative status effects on a target.
@@ -27,8 +45,9 @@ function countNegativeStatuses(target, engine) {
   if (target.type === 'hero') {
     const hero = engine.gs.players[target.owner]?.heroes?.[target.heroIdx];
     if (!hero) return 0;
-    for (const s of NEGATIVE_STATUSES) {
-      if (hero.statuses?.[s]) count++;
+    count += zaehleStatusSchluessel(s => !!hero.statuses?.[s]);
+    for (const e of (engine.cleansableHeroEntries?.(target.owner, target.heroIdx) || [])) {
+      if (typeof e.key === 'string' && e.key.startsWith('attach:')) count++;   // Anhängsel ohne eigenen Statusschlüssel
     }
   } else if (target.type === 'equip') {
     const inst = target.cardInstance || engine.cardInstances.find(c =>
@@ -36,9 +55,7 @@ function countNegativeStatuses(target, engine) {
       c.heroIdx === target.heroIdx && c.zoneSlot === target.slotIdx
     );
     if (!inst) return 0;
-    for (const s of NEGATIVE_STATUSES) {
-      if (inst.counters[s]) count++;
-    }
+    count += zaehleStatusSchluessel(s => !!inst.counters?.[s]);
   }
   return count;
 }
@@ -61,6 +78,9 @@ function getFightingLevel(ps, heroIdx) {
 }
 
 module.exports = {
+  // ★ Als Ruling (Al 26.10., Flame Avalanche: „Wenn du andere Schadenskarten unspielbar machst, müssen das Vial und Rockfall auch sein!"): die Karte richtet NUR Schaden an Zielen an —
+  // unter der Schadenssperre (`ps.damageLocked`) unspielbar (Karte bleibt auf der Hand, keine Aktion/Kosten; Sperr-Stutzen `engine._cardBlockedBySearchLock`).
+  blockedByDamageLock: true,
   // ★★ v1182 — ENTKOPPELTE BILDER (CARD_API): wird die Karte NEGIERT,
   // laeuft ihr Effekt-Rumpf nie — die Engine spielt dann diese Bilder.
   // Im normalen Weg bleibt es bei den Broadcasts im Effekt selbst.
@@ -80,7 +100,7 @@ module.exports = {
       const hero = ctx.attachedHero || ps?.heroes?.[heroIdx];   // v1364: geliehener Held (Love Shot, Charme) — physische Seite
       if (!hero?.name || hero.hp <= 0) return;
 
-      const fightingLevel = getFightingLevel(gs.players[ctx.cardHeroOwner ?? pi] || ps, heroIdx);   // Als Befund 29.9.: Zonen des Nutzers auf seiner Brettseite
+      const fightingLevel = engine.heroSchoolLevel('Fighting', ctx.cardHeroOwner ?? pi, heroIdx);   // W4a: harte Negierung -> Stufe 0; Als Befund 29.9.: Zonen des Nutzers auf seiner Brettseite
       const atkBonus = fightingLevel >= 3 ? (hero.baseAtk || 0) : 0;
 
       // Prompt for target (any living target except the caster)

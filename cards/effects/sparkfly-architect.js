@@ -84,7 +84,10 @@ module.exports = {
 
       // Hand-lock = silent no-op. The base summon still resolves; we
       // just can't add a card. Keeps parity with other draw-only effects.
-      if (ps.handLocked) return;
+      if (ps.handLocked) return ctx._engine.summonEffektFizzelt(ctx.card, ctx.cardName, { stumm: true });   // W11/R4: wirkt nicht → Blob stumm
+
+      // W24d (N4-14, W11/R4): unter Such-Sperre wie Deepsea Witch gar nicht erst anbieten – der Effekt wirkt nicht → Blob stumm.
+      if (engine._isSearchBlocked(pi, {}, 'deck')) return ctx._engine.summonEffektFizzelt(ctx.card, ctx.cardName, { stumm: true });
 
       const cardDB = engine._getCardDB();
       const seen = new Set();
@@ -100,7 +103,7 @@ module.exports = {
         gallery.push({ name, source: 'deck' });
       }
 
-      if (gallery.length === 0) return;
+      if (gallery.length === 0) return ctx._engine.summonEffektFizzelt(ctx.card, ctx.cardName, { stumm: true });   // W11/R4: wirkt nicht → Blob stumm
 
       gallery.sort((a, b) => a.name.localeCompare(b.name));
 
@@ -112,7 +115,7 @@ module.exports = {
         description: 'Search your deck for a "Sparkfly" card or "Hive\'s Crown" and add it to your hand.',
         cancellable: true,
       });
-      if (!picked || picked.cancelled || !picked.cardName) return;
+      if (!picked || picked.cancelled || !picked.cardName) return ctx._engine.summonEffektFizzelt(ctx.card, ctx.cardName, { stumm: true });   // W11/R4: wirkt nicht → Blob stumm
 
       const chosenName = picked.cardName;
       if (!gallery.some(g => g.name === chosenName)) return;

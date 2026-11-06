@@ -83,6 +83,9 @@ module.exports = {
       });
       if (!confirmed) return;
 
+      // ★ W74c: erzwungener Abwurf des Gegners — ERST Erstrunden-Schutz und Ambush the Scout, DANN Boris (Verzicht: nichts wird abgeworfen).
+      if (await engine.fremdAbwurfEntfaellt(tgtOwner, 1, { source: CARD_NAME, sourceOwner: pi })) { engine.sync(); return; }
+
       // Discard a random card from the target's hand
       const hand = tgtPs.hand;
       if (hand.length === 0) return;
@@ -91,7 +94,7 @@ module.exports = {
       // v1394: fremder Abwurf über die zentrale Funktion — damit greifen
       // Erstrunden-Schutz, Hand-Interaktions-Fenster und onDiscard (bis
       // v1393 alle drei übersprungen).
-      if (!(await engine.actionDiscardHandCard(tgtOwner, discarded, randomIdx, { source: CARD_NAME, sourceOwner: pi }))) {
+      if (!(await engine.actionDiscardHandCard(tgtOwner, discarded, randomIdx, { source: CARD_NAME, sourceOwner: pi, _skipHandInteractionCheck: true }))) {
         engine.sync();
         return;
       }
@@ -121,11 +124,15 @@ module.exports = {
      */
     onCardLeaveZone: (ctx) => {
       if (ctx.fromZone !== 'support') return;
-      if (ctx.toZone !== 'discard') return;
+      // W16e (F03-01): das Heldentod-Aufraeumen ruft den Haken ohne `toZone` (die Ausruestung geht dort in die Ablage) — auch das ist
+      // "sent to your discard pile".
+      if (ctx.toZone !== undefined && ctx.toZone !== 'discard') return;
 
       // Confirm the leaving card is The White Eye itself (match by slot)
+      // ★ Darion (Equip-Stapel): mehrere Equips teilen Held + Platz — „die erste Instanz am Platz" ist dort ein Nachbar. Die abgehende Karte nennt der Abgang selbst
+      // (`leavingCard`, beim Heldentod-Aufraeumen `_onlyCard`); nur ohne beides gilt der Koordinatenvergleich wie bisher.
       const engine = ctx._engine;
-      const leavingInst = engine.cardInstances.find(c =>
+      const leavingInst = ctx.leavingCard || ctx._onlyCard || engine.cardInstances.find(c =>
         (c.owner === ctx.cardOwner || c.owner === ctx.cardHeroOwner) && c.zone === 'support' &&   // Styx 28.9.: Brettseite
         c.heroIdx === ctx.fromHeroIdx && c.zoneSlot === ctx.fromZoneSlot,
       );

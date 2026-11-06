@@ -21,9 +21,15 @@
 //     Everything else (non-Normal Spells, level
 //     4+, already resolved this game, non-Spells)
 //     just counts toward the 5.
+//   • ★ W15b (Al): Ein aufgedeckter, sonst legaler Spell, der
+//     wegen einer Restriktion fizzelt (verbrauchter Einmal-Stempel,
+//     Zustand, keine Ziele …), IST der von Chaos Magic gewirkte
+//     Zauber (fizzelt sichtbar, Chaos Magic ist beendet), zählt aber
+//     NICHT als aufgelöst: er kommt nicht in die Liste unten und kann
+//     von einem späteren Chaos Magic wieder aufgedeckt werden.
 //   • "Resolved this game" is tracked per-PLAYER by
 //     Spell NAME (any Hero, normal cast OR via
-//     Chaos Magic; negated Spells don't count) in
+//     Chaos Magic; negated/fizzled Spells don't count) in
 //     `ps._spellsResolvedThisGame` — populated by
 //     server.js doPlaySpell and, for the copied
 //     sub-Spell, here.
@@ -128,8 +134,6 @@ module.exports = {
       }
 
       if (found) {
-        // Record the copied Spell so a later Chaos Magic skips it.
-        if (!resolved.includes(found)) resolved.push(found);
         engine.log('chaos_magic_become', { player: ps.username, spell: found });
         await engine._delay(250);
 
@@ -144,19 +148,51 @@ module.exports = {
           engine.log('chaos_magic_fizzle', { player: ps.username, reason: 'cannot_cast_found_spell', spell: found });
           await engine.zeigeFizzle(found, { playerIdx: pi, grund: 'cannot_cast_now' });
           engine.sync();
-          return;
+          return;   // ★ W15b (Al, C1): ein FIZZELNDER Zauber zählt nicht als „resolved" — nicht in der Liste, ein späteres Chaos Magic kann ihn wieder aufdecken.
         }
+        // Record the copied Spell so a later Chaos Magic skips it (nur, wenn er wirklich aufgelöst wird; s. o.).
+        const _warSchonAufgeloest = resolved.includes(found);
+        if (!_warSchonAufgeloest) resolved.push(found);
         gs._spellDamageLog = [];
         gs._spellExcludeTargets = [];
         const subInst = engine._trackCard(found, pi, 'hand', heroIdx, -1);
+        // Die Zielwahl des gefundenen Zaubers ist abbrechbar und setzt dabei `gs._spellCancelled` — das würde die ÄUSSERE Karte (Chaos Magic)
+        // zurück auf die Hand legen, obwohl Mischen, Aufdecken und Löschen schon geschehen sind. Abbruch dort = der Zauber fizzelt (W15b):
+        // Chaos Magic ist beendet, der Zauber zählt nicht als aufgelöst.
+        const _cancelVorher = gs._spellCancelled;
+        gs._spellCancelled = false;
+        let _subAbgebrochen = false;
         try {
           const _kosten = loadCardEffect(found)?.payActivationCost;
           if (typeof _kosten === 'function') await _kosten.call(loadCardEffect(found), engine._createContext(subInst, {}));
+          require('./_monia-shared').neuerGuss(gs);   // W83a (Al 28.10.): der gewirkte Spell ist für Cool Rescuer Monia ein EIGENER Effekt (eigenes Angebot)
           await engine.runHooks('onPlay', {
             _onlyCard: subInst, playedCard: subInst,
             cardName: found, zone: 'hand', heroIdx,
             _skipReactionCheck: true,
           });
+          _subAbgebrochen = !!gs._spellCancelled && !gs._spellNegatedByEffect;
+          gs._spellCancelled = _cancelVorher;
+          if (_subAbgebrochen) {
+            if (!_warSchonAufgeloest) { const _ri = resolved.lastIndexOf(found); if (_ri >= 0) resolved.splice(_ri, 1); }
+            engine.log('chaos_magic_fizzle', { player: ps.username, reason: 'found_spell_cancelled', spell: found });
+            await engine.zeigeFizzle(found, { playerIdx: pi, grund: 'cancelled' });
+            delete gs._spellDamageLog;
+            delete gs._spellExcludeTargets;
+            delete gs._bartasSecondCast;
+            engine._untrackCard(subInst.id);
+            engine.sync();
+            return;
+          }
+          // ★ Z7 (S01-14): Chaos Magic IST jetzt der gefundene Zauber — „Einmal pro Spiel" (Divine Gift …)
+          // wird verbraucht, wie bei jedem Sofort-Guss (`_castSpellImmediately`).
+          {
+            const _fs = loadCardEffect(found);
+            if (_fs?.oncePerGame || _fs?.oncePerGameKey) {
+              if (!ps._oncePerGameUsed) ps._oncePerGameUsed = new Set();
+              ps._oncePerGameUsed.add(_fs.oncePerGameKey || found);
+            }
+          }
 
           const uniqueTargets = [];
           const seenIds = new Set();
@@ -187,7 +223,8 @@ module.exports = {
       if (revealedCount >= MAX_REVEALS) {
         // Failure clause: discard the entire hand.
         const handCount = (ps.hand || []).length;
-        if (handCount > 0) await engine.actionDiscardCardsAnimated(pi, handCount);
+        // ★ W74c: Boris wird von `actionDiscardCardsAnimated` selbst gefragt (einmal für den ganzen Stapel).
+        if (handCount > 0) await engine.actionDiscardCardsAnimated(pi, handCount, { source: 'Chaos Magic' });
         engine.log('chaos_magic_fizzle', {
           player: ps.username, reason: 'no_spell_in_5', discarded: handCount,
         });

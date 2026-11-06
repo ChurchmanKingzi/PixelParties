@@ -32,7 +32,7 @@
 //  geloescht, wenn er faellt — solange er noch steht, gilt seine Aura.
 // ═══════════════════════════════════════════
 
-const { hasCardType } = require('./_hooks');
+const { hasCardType, heldSeite } = require('./_hooks');
 
 const CARD_NAME = 'Spirit of the Super-Killing Knife';
 const KNIFE = 'Super-Killing Knife, the Tool of Liquidation';
@@ -54,12 +54,14 @@ function spiritSteht(engine) {
 module.exports = {
   activeIn: ['support'],
 
+  deletesDefeatedCreaturesWhileOnBoard: true,   // W25c (N3-14): Engine-Schadens-Batch (`_gefalleneKreaturenGeloescht`) loescht besiegte Kreaturen (Schaden/Brand/Gift)
+
   cpuMeta: { dealsDamage: true },
 
   /** ① „can only be summoned by a Hero equipped with …\" */
   canPlayWithHero(gs, pi, heroIdx, cardData, engine) {
     if (!engine) return true;
-    return hatMesser(engine, pi, heroIdx);
+    return hatMesser(engine, heldSeite(gs, pi, heroIdx), heroIdx);   // N3-03 (W24): Brettseite des uebernommenen Helden
   },
 
   hooks: {
@@ -77,7 +79,7 @@ module.exports = {
         if (inst.id === spirit.id) continue;              // „any OTHER Creature\"
         const cd = engine.getEffectiveCardData(inst) || engine._getCardDB()[inst.name];
         if (!cd || !hasCardType(cd, 'Creature')) continue;
-        if (engine.isOmniImmune(inst)) continue;
+        if (engine.isOmniImmune(inst, spirit)) continue;
         ziele.push({
           id: `equip-${inst.owner}-${inst.heroIdx}-${inst.zoneSlot}`,
           type: 'equip', owner: inst.owner, heroIdx: inst.heroIdx,

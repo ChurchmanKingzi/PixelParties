@@ -58,9 +58,7 @@ const summonFromStack = hipdall._summonFromStack;
 function _stackExists(engine, pi) {
   const ps = engine.gs.players[pi];
   if (!ps) return false;
-  if (Array.isArray(ps.coolnessStack) && ps.coolnessStack.length > 0) return true;
-  const areaList = engine.gs.areaZones?.[pi] || [];
-  return areaList.includes('Wowhalla, the Hall of the Cool');
+  return engine.hasCoolnessStack(pi);   // Als Ruling (Al 26.10.): derselbe Begriff wie bei allen Coolness-Karten (Stack nicht leer ODER eigene Wowhalla liegt)
 }
 
 /**
@@ -99,6 +97,16 @@ function _findSourceInst(engine, pi, cardName) {
   return null;
 }
 
+/**
+ * ★ W7a (A04-cute-26, Al 14.10.2026): die Umleitung ist ein laufender Ersatzeffekt und ruht, solange KEIN Wildur der Seite
+ * wirksam ist (gefroren/betäubt/negiert/Clown-Aura: `isCreatureEffectSuppressed`). Der Override bleibt installiert; er fragt je Push.
+ */
+function _wildurWirkt(engine, pi) {
+  return engine.cardInstances.some(c =>
+    c.name === CARD_NAME && c.zone === 'support' && (c.controller ?? c.owner) === pi
+    && !engine.isCreatureEffectSuppressed(c, { honorNegStatusImmune: false }));
+}
+
 function _installRedirect(engine, pi) {
   const ps = engine.gs.players[pi];
   if (!ps || ps[INSTALLED_FLAG]) return;
@@ -109,7 +117,7 @@ function _installRedirect(engine, pi) {
     if (cards.length === 0) return this.length;
     // Only redirect when (a) the per-turn slot is open, AND (b) the
     // Stack visualisation actually exists for this controller.
-    if (!ps[TURN_FLAG] && _stackExists(engine, pi)) {
+    if (!ps[TURN_FLAG] && _wildurWirkt(engine, pi) && _stackExists(engine, pi)) {
       const first = cards[0];
       ps[TURN_FLAG] = true;
 
@@ -127,7 +135,9 @@ function _installRedirect(engine, pi) {
       // engine's downstream cleanup may untrack the source inst (creature
       // death does) or re-zone it to discard (hand discard); either way
       // we have a separate tracker on the new resting place.
-      engine._trackCard(first, pi, 'coolnessStack');
+      const stackInst = engine._trackCard(first, pi, 'coolnessStack');
+      // Marke fuer die Wiederbelebung (Cute Phoenix & Co.): diese Kopie IST der Kadaver (A04-cute-17).
+      if (stackInst) stackInst._wildurKadaver = true;
 
       engine._broadcastEvent('coolness_stack_change', {
         owner: pi, mode: 'push', from: fromZone, card: first,

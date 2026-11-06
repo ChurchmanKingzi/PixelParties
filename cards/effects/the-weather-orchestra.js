@@ -45,22 +45,31 @@ const MAX_PIECES = 3;
 
 function singingOnBoard(engine) {
   let n = 0;
-  for (const ps of engine.gs.players || []) {
+  for (let seite = 0; seite < (engine.gs.players || []).length; seite++) {
+    const ps = engine.gs.players[seite];
     for (let hi = 0; hi < (ps?.heroes || []).length; hi++) {
       if (!ps.heroes[hi]?.name) continue;
-      n += engine.countAbilitiesForSchool('Singing', ps.abilityZones?.[hi] || []);
+      n += engine.heroSchoolLevel('Singing', seite, hi);   // W4a: harte Negierung -> Stufe 0
     }
   }
   return n;
 }
 
-/** Freie Basis-Support-Zones (0-2) der eigenen, lebenden Helden. */
+/**
+ * Platz fuer Ausruestungen bei den eigenen, lebenden Helden: freie Basis-Support-Zones (0-2).
+ * ★ Darion („All Artifacts equipped to this Hero share 1 Support Zone"): ein Held mit Equip-Stapel (oder wenigstens einer freien Zone, die den Stapel
+ * eroeffnet) nimmt beliebig viele weitere Ausruestungen auf — er zaehlt dann als „unbegrenzt" (`Infinity`).
+ */
 function ownFreeBaseZones(engine, pi) {
   const ps = engine.gs.players[pi];
+  const ES = require('./_equip-stack-shared');
   let n = 0;
   for (let hi = 0; hi < (ps?.heroes || []).length; hi++) {
     if (!ps.heroes[hi]?.name || ps.heroes[hi].hp <= 0) continue;
-    for (let si = 0; si < 3; si++) if (((ps.supportZones[hi] || [])[si] || []).length === 0) n++;
+    let frei = 0;
+    for (let si = 0; si < 3; si++) if (((ps.supportZones[hi] || [])[si] || []).length === 0) frei++;
+    if (ES.teilenAktiv(engine, pi, hi) && (frei > 0 || ES.stapelPlatz(engine, pi, hi) >= 0)) return Infinity;
+    n += frei;
   }
   return n;
 }
@@ -82,11 +91,26 @@ function hasExactSubset(costs, target, maxN) {
 function equippedArtifactTargets(engine) {
   const db = engine._getCardDB();
   const out = [];
+  const stapel = new Map();   // Darion: Platz -> Ziel (ein Ziel je Platz, dahinter alle Equips des Stapels)
   for (const inst of engine.cardInstances) {
     if (inst.zone !== 'support' || inst.faceDown) continue;
     const cd = engine.getEffectiveCardData?.(inst) || db[inst.name];
     if (!cd || !hasCardType(cd, 'Artifact') || hasCardType(cd, 'Creature')) continue;
     const side = inst.controller ?? inst.owner;
+    // ★ Darion: mehrere Equips in EINEM Platz sind in der Zielwahl EIN Ziel (Platz-ID wie ueberall); welche Karte gemeint ist, fragt die Engine nach (`_disambiguateStackedTargets`).
+    if (engine.istEquipArtifact(inst)) {
+      const seite = engine.physicalSide(inst);
+      const key = `${seite}-${inst.heroIdx}-${inst.zoneSlot}`;
+      const ES = require('./_equip-stack-shared');
+      const alle = ES.equipsAt(engine, seite, inst.heroIdx, inst.zoneSlot);
+      if (alle.length > 1) {
+        if (stapel.has(key)) continue;
+        const ziel = { id: `equip-${seite}-${inst.heroIdx}-${inst.zoneSlot}`, type: 'equip', owner: seite, heroIdx: inst.heroIdx, slotIdx: inst.zoneSlot, cardName: alle[0].name, cardInstance: alle[0], _erlaubteInstanzen: alle.map(i => i.id) };
+        stapel.set(key, ziel);
+        out.push(ziel);
+        continue;
+      }
+    }
     out.push({ id: `equip-${side}-${inst.heroIdx}-${inst.zoneSlot}-${inst.id}`, type: 'equip', owner: side, heroIdx: inst.heroIdx, slotIdx: inst.zoneSlot, cardName: inst.name, cardInstance: inst });
   }
   return out;
@@ -95,6 +119,8 @@ function equippedArtifactTargets(engine) {
 module.exports = {
   activeIn: ['hand', 'support'],
   creatureEffect: true,
+  // Als Ruling (Al 26.10., Blinded): der aktive Effekt wählt ein ausgerüstetes Artefakt auf dem Brett — ein geblendeter Träger/Wirtsheld kann ihn nicht aktivieren.
+  requiresTarget: true,
 
   reduceCardLevel(cardData, engine, ownerIdx, inst) {
     if (!cardData || cardData.name !== CARD_NAME) return 0;
@@ -151,13 +177,13 @@ module.exports = {
       for (const n of (ps.discardPile || [])) add(n, 'discard');
       for (const n of (ps.mainDeck || [])) add(n, 'deck');
       cards.sort((a, b) => a.name.localeCompare(b.name) || a.source.localeCompare(b.source));
-      if (cards.length === 0) return;
+      if (cards.length === 0) return ctx._engine.summonEffektFizzelt(ctx.card, ctx.cardName, { stumm: true });   // W11/R4: wirkt nicht → Blob stumm
 
       // Obergrenze (Als Regel 29.8.): min(3, freie Support Zones der EIGENEN
       // Helden). Nur eine freie Zone → nur ein einzelnes Equip mit Kosten
       // genau 12 moeglich.
       const cap = Math.min(MAX_PIECES, ownFreeBaseZones(engine, pi));
-      if (cap <= 0) { engine.log('weather_orchestra_no_zone', { player: ps.username }); return; }
+      if (cap <= 0) { engine.log('weather_orchestra_no_zone', { player: ps.username }); return ctx._engine.summonEffektFizzelt(ctx.card, ctx.cardName, { stumm: true }); }   // W11/R4: wirkt nicht → Blob stumm
 
       // Machbarkeit: gibt es ueberhaupt eine Kombination aus 1..cap
       // VERSCHIEDENEN Namen mit Summe genau 12? Sonst feuert der Effekt
@@ -165,7 +191,7 @@ module.exports = {
       const distinctCosts = [...new Map(cards.map(c => [c.name, c.cost])).values()];
       if (!hasExactSubset(distinctCosts, EXACT_COST, cap)) {
         engine.log('weather_orchestra_no_combo', { player: ps.username, cap });
-        return;
+        return ctx._engine.summonEffektFizzelt(ctx.card, ctx.cardName, { stumm: true });   // W11/R4: wirkt nicht → Blob stumm
       }
 
       const result = await engine.promptGeneric(pi, {
@@ -175,7 +201,7 @@ module.exports = {
         description: `Choose up to ${cap} different Artifacts with a combined Cost of EXACTLY ${EXACT_COST} — from your hand, deck or discard pile — and equip them to Heroes on the board for free.`,
         confirmLabel: '🎼 Equip!', confirmClass: 'btn-success', cancellable: true,
       });
-      if (!result || result.cancelled) return;
+      if (!result || result.cancelled) return ctx._engine.summonEffektFizzelt(ctx.card, ctx.cardName, { stumm: true });   // W11/R4: wirkt nicht → Blob stumm
       // Eintraege ueber die Indizes aufloesen (Quelle!); Fallback ueber Namen.
       const idxs = Array.isArray(result.selectedIndices) ? result.selectedIndices
         : (result.selectedCards || []).map(n => cards.findIndex(c => c.name === n));
@@ -193,7 +219,8 @@ module.exports = {
       for (const c of chosen) {
         const dests = equipDestinations(engine, pi, c.name, { sides: engine.gs.players.map((_, i) => i) });
         if (dests.length === 0) continue;
-        const zoneTargets = dests.map(d => ({ id: `equip-${d.side}-${d.heroIdx}-${d.slotIdx}`, type: 'equip', owner: d.side, heroIdx: d.heroIdx, slotIdx: d.slotIdx, cardName: '' }));
+        // `_eigeneStapelWahl`: Darion — hier wird ein PLATZ gewaehlt (auch Darions Stapel), keine Karte darin; die Engine fragt nicht nach „welches Equip?".
+        const zoneTargets = dests.map(d => ({ id: `equip-${d.side}-${d.heroIdx}-${d.slotIdx}`, type: 'equip', owner: d.side, heroIdx: d.heroIdx, slotIdx: d.slotIdx, cardName: '', _eigeneStapelWahl: true }));
         let dest = dests[0];
         if (dests.length > 1) {
           const ids = await engine.promptEffectTarget(pi, zoneTargets, {

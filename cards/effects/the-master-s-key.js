@@ -63,15 +63,17 @@ function zonenFuer(engine, pi, cardName) {
       out.push({ owner: physOwner, heroIdx: hi, slotIdx: si, label: `${h.name} — Slot ${si + 1}` });
     }
   }
-  return out;
+  // W63a (Al, 22.10.2026): mit Alice-Teilung zaehlt auch die Zone einer GLEICHNAMIGEN Creature als „free" — geteilte Zone zuerst, dann die erste leere.
+  return require('./_alice-shared').mitGeteilten(engine, pi, cardName, out, { source: CARD_NAME, livingHeroesOnly: false, namedHeroesOnly: true },
+    z => !engine.isSupportZoneLocked(z.owner, z.heroIdx, { source: CARD_NAME, cardName, via: 'place' })
+      && (!cardName || engine.isCreatureSummonable(cardName, z.owner, z.heroIdx)));
 }
 
 /** Summe der Decay-Magic-Level aller kontrollierten Helden. */
 function decayLevel(engine, pi) {
   let summe = 0;
   for (const { physOwner, heroIdx: hi } of engine.heroesControlledBy(pi)) {
-    const zonen = engine.gs.players[physOwner]?.abilityZones?.[hi] || [];
-    summe += engine.countAbilitiesForSchool('Decay Magic', zonen) || 0;
+    summe += engine.heroSchoolLevel('Decay Magic', physOwner, hi) || 0;   // W4a: harte Negierung -> Stufe 0
   }
   return summe;
 }

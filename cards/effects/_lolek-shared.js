@@ -24,9 +24,37 @@ const ASCEND_TARGET = 'Lolek, Mender of the Shattered Trident';
 const TRIDENT_NAME  = 'Shattered Trident, Treasure of the Deepsea';
 const HELMET_NAME   = 'Diver Helmet';
 
-/** Halber Preis, aufgerundet — wie „Spirit of the Shattered Trident" es ausschreibt. */
-function halfCost(cd) {
-  return Math.ceil((cd?.cost || 0) / 2);
+/**
+ * Aktuell WIRKSAMER Preis einer Ablage-Karte (Welle 13, Q125, Al: „Den aktuellen").
+ * Wie `kopierKosten` (Future Tech Copy Device): Grundpreis mit Rusting-Crystal-
+ * Verdopplung minus `selfCostReduction` der Karte (Laser Cannon: −20 je Kopie in
+ * der Ablage); die gewaehlte Kopie selbst verlaesst die Ablage und zaehlt nicht mit
+ * (Ruling 21.8.). BEWUSST nicht dabei: handindizierte Rabatte und einmalige
+ * Gutscheine fuers SPIELEN einer Handkarte (Shu'Chaku, Misfire, Dajan).
+ */
+function wirksamerPreis(engine, pi, name, cd) {
+  const { applyRustingCrystalCostMultiplier } = require('./_crystals-shared');
+  const { loadCardEffect } = require('./_loader');
+  cd = cd || engine._getCardDB()[name];
+  let kosten = applyRustingCrystalCostMultiplier(engine.gs, pi, name, cd?.cost || 0, engine);
+  let sk = null;
+  try { sk = loadCardEffect(name); } catch { sk = null; }
+  if (typeof sk?.selfCostReduction !== 'function') return Math.max(0, kosten);
+  const ps = engine.gs.players[pi];
+  const idx = (ps?.discardPile || []).lastIndexOf(name);
+  const probe = idx >= 0 ? engine.takeFromPileSync(ps, 'discard', idx, { source: 'Lolek' }) : null;
+  try {
+    kosten -= (sk.selfCostReduction(engine.gs, pi, cd, engine) || 0);
+  } catch { /* eine defekte Rabattrechnung darf die Karte nicht sperren */ } finally {
+    if (probe) engine.returnToPile(ps, 'discard', name, idx);
+  }
+  return Math.max(0, kosten);
+}
+
+/** Halber Preis, aufgerundet — wie „Spirit of the Shattered Trident" es ausschreibt. Mit `engine`/`pi`: vom wirksamen Preis (Q125), sonst vom gedruckten. */
+function halfCost(cd, engine, pi) {
+  const preis = (engine && cd?.name) ? wirksamerPreis(engine, pi, cd.name, cd) : (cd?.cost || 0);
+  return Math.ceil(preis / 2);
 }
 
 /**
@@ -90,13 +118,16 @@ async function chooseAndEquip(engine, pi, entries, opts = {}) {
   const cost = typeof opts.costOf === 'function' ? (opts.costOf(entry.name, cd) || 0) : 0;
   if (cost > 0 && !engine.canAffordGold(pi, cost, entry.name)) return false;
 
-  const dests = equipDestinations(engine, pi, entry.name, { sides: [pi] });
+  // `opts.nurHeld` {side, heroIdx}: nur dieser Held (Darion: „equip it to this Hero").
+  const dests = equipDestinations(engine, pi, entry.name, { sides: [pi] })
+    .filter(d => !opts.nurHeld || (d.side === opts.nurHeld.side && d.heroIdx === opts.nurHeld.heroIdx));
   if (dests.length === 0) return false;
   let dest = dests[0];
   if (dests.length > 1) {
     const zoneTargets = dests.map(d => ({
       id: `equip-${d.side}-${d.heroIdx}-${d.slotIdx}`, type: 'equip',
       owner: d.side, heroIdx: d.heroIdx, slotIdx: d.slotIdx, cardName: '',
+      _eigeneStapelWahl: true,   // Darion: ein Zielplatz, keine Karte — die Engine soll im Equip-Stapel nicht „welches Equip?" fragen
     }));
     const ids = await engine.promptEffectTarget(pi, zoneTargets, {
       maxTotal: 1,   // Einfachauswahl: ein Klick TAUSCHT das Ziel
@@ -118,9 +149,13 @@ async function chooseAndEquip(engine, pi, entries, opts = {}) {
     await engine._payCardCost(pi, cost, { cardName: entry.name });
     engine._broadcastEvent('gold_change', { owner: pi, amount: -cost });
   }
-  const inst = await equipArtifactToHero(engine, pi, entry.name, dest.side, dest.heroIdx, dest.slotIdx, {
-    from: entry.source, source: opts.source || opts.title,
-  });
+  const eqOpts = { from: entry.source, source: opts.source || opts.title, ...(opts.animationType ? { animationType: opts.animationType } : {}) };
+  const inst = await equipArtifactToHero(engine, pi, entry.name, dest.side, dest.heroIdx, dest.slotIdx, eqOpts);
+  // ★ W16a (Al, Frage 3: „Ja!"): von Resistance abgefangen → der Einmal-Einsatz ist verbraucht (true, Kosten bleiben bezahlt wie bei Cool Repair), die Karte bleibt liegen.
+  if (!inst && eqOpts.blockiert) {
+    engine.log('lolek_equip_blocked', { player: ps.username, card: entry.name, by: opts.title });
+    return true;
+  }
   if (!inst) {
     // Discard-out-Sperre abgelehnt o.ae. — Gold zurueck.
     if (cost > 0) { ps.gold = (ps.gold || 0) + cost; engine._broadcastEvent('gold_change', { owner: pi, amount: cost }); }

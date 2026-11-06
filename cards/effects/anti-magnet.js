@@ -46,10 +46,13 @@
 //     target of the original effect (either side),
 //     excluding the originally-chosen one.
 //   • Usable only "while you control other possible
-//     targets" — implemented as: there must be ≥1
-//     OTHER valid target of the original effect. If
-//     the chosen target was the effect's ONLY valid
-//     target, Anti-Magnet cannot be used.
+//     targets" — W12 (Al, Q88): there must be ≥1 OTHER
+//     valid target of the original effect that the
+//     Anti-Magnet OWNER controls ("Es braucht mindestens
+//     ein zweites eigenes legales Ziel"). Targets of
+//     the opponent alone do not enable it. The
+//     replacement itself is still chosen by the
+//     opponent among ALL other valid targets.
 //
 //  ── Reaction-only (never proactive) ──
 //  cards.json subtype is "Reaction" and this script
@@ -61,6 +64,7 @@
 //  the target-redirect hub above.
 // ═══════════════════════════════════════════
 
+const { istHeldOderKreatur } = require('./_targeting-shared');
 const CARD_NAME = 'Anti-Magnet';
 const GOLD_COST = 2;
 
@@ -70,9 +74,10 @@ const GOLD_COST = 2;
  * opponent picks the redirect from, and its non-emptiness is also the
  * "while you control other possible targets" usability gate.
  */
-function getOtherValidTargets(selected, validTargets) {
+function getOtherValidTargets(selected, validTargets, engine) {
   if (!Array.isArray(validTargets)) return [];
-  return validTargets.filter(t => t && t.id !== selected.id);
+  // Al, 25.10.2026: „target" = Held oder Kreatur - Ausruestung, Anhaengsel, Areas ... sind keine Umleitungsziele und zaehlen nicht als „other possible target".
+  return validTargets.filter(t => t && t.id !== selected.id && istHeldOderKreatur(engine, t));
 }
 
 module.exports = {
@@ -95,6 +100,7 @@ module.exports = {
     // NICHT aus (Alleria-Muster).
     const kind = engine?.sourceEffectKind ? engine.sourceEffectKind(sourceCard) : null;
     if (kind !== 'attack' && kind !== 'spell' && kind !== 'creature') return false;
+    if (!istHeldOderKreatur(engine, selected)) return false;   // das gewaehlte Ziel muss ein Held oder eine Kreatur sein (Al, 25.10.)
     // Must be a target the Anti-Magnet player controls.
     // Kontrolle statt Seite (Styx 28.9.).
     if ((engine?.zielSeite ? engine.zielSeite(selected) : selected.owner) !== pi) return false;
@@ -103,10 +109,11 @@ module.exports = {
     const ps = gs.players[pi];
     if (!ps || ps.goldLocked || (ps.gold || 0) < GOLD_COST) return false;
 
-    // "while you control other possible targets" → there must be at
-    // least one OTHER valid target of the original effect. If the chosen
-    // target was the effect's only valid target, Anti-Magnet is unusable.
-    return getOtherValidTargets(selected, validTargets).length > 0;
+    // "while you control other possible targets" → W12 (Al, Q88/F01-08): „Es braucht mindestens ein zweites **eigenes**
+    // legales Ziel." Der Besitzer muss selbst (Kontrolle statt Seite) ein ZWEITES legales Ziel des Effekts kontrollieren;
+    // ein beliebiges anderes Ziel (z. B. ein Held des Angreifers) genuegt nicht.
+    return getOtherValidTargets(selected, validTargets, engine)
+      .some(t => (engine?.zielSeite ? engine.zielSeite(t) : t.owner) === pi);
   },
 
   /**
@@ -117,7 +124,7 @@ module.exports = {
   onRedirect: async (engine, pi, selected, validTargets, config, sourceCard) => {
     const gs = engine.gs;
     const ps = gs.players[pi];
-    const eligible = getOtherValidTargets(selected, validTargets);
+    const eligible = getOtherValidTargets(selected, validTargets, engine);
     if (eligible.length === 0) return null;
 
     // The opponent (the source's controller) chooses the new target.
@@ -166,7 +173,7 @@ module.exports = {
     // ── Chain visualization (mirrors Challenge / Martyry) ──
     const attackerName = config.title || sourceCard?.name || 'Effect';
     const srcOwner = sourceCard?.controller ?? sourceCard?.owner ?? oppIdx;
-    const srcIsCreature = sourceCard?.zone === 'support';
+    const srcIsCreature = sourceCard?.zone === 'support' || engine.sourceEffectKind?.(sourceCard) === 'creature';   // W46a: auch die auflösende Creature-Surprise (Anzeige der Kette)
     const srcCardType = srcIsCreature
       ? 'Creature'
       : (config.damageType === 'attack' ? 'Attack' : 'Spell');

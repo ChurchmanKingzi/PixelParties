@@ -37,7 +37,7 @@
 //  kein freier Slot.
 // ═══════════════════════════════════════════
 
-const { hasCardType } = require('./_hooks');
+const { hasCardType, equipZustandHooks } = require('./_hooks');
 const { waehleAusNamen } = require('./_future-tech-shared');
 const { ASCENSION_ITEMS, hasEquipped, checkRiffelAscension } = require('./_riffel-shared');
 const { istAusruestTraeger, freieBasisZonen, ruesteAusStapelAus } = require('./_equip-shared');
@@ -79,6 +79,9 @@ function kandidaten(gs, pi, heroIdx, engine, seite = pi) {
     if ((cd.subtype || '') !== 'Equipment') continue;   // „equippable"
     if (!imDeck.has(name)) continue;                    // Kopie im Deck noetig
     if (schonAngelegt(gs.players[seite], heroIdx, name)) continue;
+    // ★ W16b (A03-futuretech-12): eine Karte mit geliehener Identität (Copy Device als Gun) liegt unter IHREM Namen in der Zone — „no copies
+    // equipped" zählt die wirksame Identität (`_effectOverride`), wie der Aufstiegs-Check (`hasEquipped`).
+    if (hasEquipped(engine, seite, heroIdx, name)) continue;
     // v1268: kartenseitige Ausruest-Beschraenkung (Crusader's & Co.) —
     // ohne diese Pruefung waere die Wahl erlaubt, das Anlegen danach aber
     // nicht (`_equip-shared`).
@@ -108,7 +111,9 @@ module.exports = {
     return n / ASCENSION_ITEMS.length;
   },
 
-  hooks: {
+  hooks: equipZustandHooks({
+    // W51b: `equipZustandHooks` — Umhaengen (Slippery Fridge / Inheritance Ceremony) sendet Enter/Leave nur an die bewegte Karte; dieser Zustandslauscher bekommt es ueber
+    // `onEquipLost` / `onEquipGained` (isMove) mit denselben Handlern (siehe _hooks.js).
     // Styx 28.9.: Pruefung auf der Brettseite des Helden (`cardHeroOwner`).
     onGameStart: (ctx) => {
       checkRiffelAscension(ctx._engine, ctx.cardHeroOwner ?? ctx.cardOwner, ctx.cardHeroIdx, null);
@@ -126,7 +131,7 @@ module.exports = {
       // `ctx.card` ist der Lauscher, die gehende Karte `ctx.leavingCard`.
       checkRiffelAscension(ctx._engine, ctx.cardHeroOwner ?? ctx.cardOwner, ctx.cardHeroIdx, ctx.leavingCard?.id);
     },
-  },
+  }),
 
   async onHeroEffect(ctx) {
     const engine = ctx._engine;
@@ -147,7 +152,7 @@ module.exports = {
     const zps = gs.players[seite];
     if (seite !== pi && !engine.darfFremdAusruesten(pi, seite, heroIdx)) return false;
 
-    if (freieSlots(zps, heroIdx).length === 0) return false;
+    if (freieSlots(zps, heroIdx).length === 0 && !require('./_equip-stack-shared').hatStapelPlatz(engine, seite, heroIdx)) return false;   // Darion: der Equip-Stapel zaehlt als Platz
 
     const wahl = kandidaten(gs, pi, heroIdx, engine, seite);
     if (wahl.length === 0) return false;
@@ -171,8 +176,10 @@ module.exports = {
     // Riffel bisher), und das Surprise-Fenster beim Ausruesten oeffnet
     // wie beim Handweg (vorher `_skipReactionCheck`). Flug Deck → Zone
     // wie bisher.
-    const inst = await ruesteAusStapelAus(engine, pi, 'deck', name, heroIdx, slot, { source: CARD_NAME, seite });
-    if (!inst) return false;
+    const eqOpts = { source: CARD_NAME, seite };
+    const inst = await ruesteAusStapelAus(engine, pi, 'deck', name, heroIdx, slot, eqOpts);
+    // ★ W16a (Al, Frage 3: „Ja!"): von Resistance abgefangen → der Einmal-Einsatz ist verbraucht (true), die Kopie bleibt im Deck (kein Mischen).
+    if (!inst) return !!eqOpts.blockiert;
 
     engine.shuffleDeck(pi, 'main');                // „Search your deck"
 

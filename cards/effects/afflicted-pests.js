@@ -3,7 +3,10 @@
 //  Creature (Surprise) — Summoning Magic Lv1
 //
 //  Activate when the opponent equips or
-//  attaches a card to a Hero.
+//  attaches a card into a Hero's Support Zone.
+//  (Welle 11, Al Q59/R1: Text so präzisiert — Spell-/Attack-
+//  Anhängsel zählen, ABILITIES nicht: sie liegen in Ability-
+//  Zonen, nicht in Support Zones.)
 //  Choose a non-Creature card in any Hero's
 //  Support Zone and destroy it, then summon
 //  this Creature.
@@ -13,6 +16,8 @@
 //  move itself back face-down into that
 //  Surprise Zone (re-set).
 // ═══════════════════════════════════════════
+
+const { hasCardType } = require('./_hooks');
 
 module.exports = {
   // ★★ v1182 — ENTKOPPELTE BILDER (CARD_API): wird die Karte NEGIERT,
@@ -117,6 +122,7 @@ module.exports = {
       await engine.runHooks('onCardLeaveZone', {
         _onlyCard: tInst, card: tInst, leavingCard: tInst,
         fromZone: 'support', fromHeroIdx: tHeroIdx,
+        _equipGrund: 'destroyed',   // W52a: Grund fuer `onEquipLost`
         _skipReactionCheck: true,
       });
     }
@@ -128,9 +134,13 @@ module.exports = {
       if (idx >= 0) supSlot.splice(idx, 1);
     }
 
-    // Send to discard (original owner's pile)
+    // Send to discard (original owner's pile) – Tokens kommen nie in die Ablage, sondern in den Geloescht-Stapel (A08-11)
     const discardPs = gs.players[tInst?.originalOwner ?? tOwner];
-    if (discardPs) discardPs.discardPile.push(tCardName);
+    if (discardPs) {
+      // W5a (Al 14.10.2026): ein Token verschwindet vollstaendig (nur eine echte Karte darunter wird gelöscht).
+      if (tInst ? engine.isTokenCard(tInst) : hasCardType(cardDB[tCardName], 'Token')) { if (tInst) engine.tokenAbgang(tInst); }
+      else discardPs.discardPile.push(tCardName);
+    }
 
     // Untrack instance
     if (tInst) engine._untrackCard(tInst.id);

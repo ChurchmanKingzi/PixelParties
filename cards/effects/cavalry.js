@@ -97,7 +97,9 @@ module.exports = {
       damageType: 'creature',
       sourceName: CARD_NAME,
       heroFilter: (hero, hi, tpi) => tpi === tgtOwner && hi === tgtHeroIdx,
-      creatureFilter: (inst) => (inst.controller ?? inst.owner) === tgtOwner && inst.heroIdx === tgtHeroIdx,
+      // Z1 (C01-05): „Creatures in its Support Zones" = nach ZONE (Brettseite), nicht nach Kontrolle.
+      creatureBoardSide: tgtOwner,
+      creatureFilter: (inst) => inst.heroIdx === tgtHeroIdx,
       hitDelay: 120,
     });
 

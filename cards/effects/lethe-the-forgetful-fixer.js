@@ -46,6 +46,7 @@
 // ═══════════════════════════════════════════
 
 const { usesLeft, spendUse, charges } = require('./_charges');
+const { hatEffekt } = require('./_gained-effects-shared');   // W13 (Q120): auch gewonnene Effekte (Pseudonia) tragen die Sperre
 
 const CARD_NAME = 'Lethe, the Forgetful Fixer';
 const MAX_NECROMANCY_USES = 3;
@@ -63,7 +64,7 @@ const NECRO_KEY = 'letheNecromancy';
  */
 function necromancyInstanz(engine, feld, heroIdx) {
   return (engine?.cardInstances || []).find(c => c
-    && c.name === 'Necromancy' && c.zone === 'ability'
+    && c.name === 'Necromancy' && engine.istWirksameAbility(c)   // 24.10.: auch in einer Support Zone (Xal)
     && c.heroIdx === heroIdx
     && (c.heroOwner ?? c.owner) === feld) || null;
 }
@@ -82,12 +83,36 @@ function necromancyInstanz(engine, feld, heroIdx) {
 function lockLethe(engine, controller) {
   // Kontrolle statt Seite (Styx 28.9.): jede Lethe, die `controller`
   // KONTROLLIERT — auch eine geliehene in der Gegenspalte.
+  //
+  // ★ W8 (Al, 14.10.2026): „Freeze, Stun und Negated unterbrechen alle laufenden Passive" — auch Lethes Sperre ruht, solange
+  // sie gefroren/betäubt/negiert ist (`bypassStatusFilter` hält nur die BUCHFÜHRUNG am Laufen, nicht die Wirkung; der Prüfer
+  // `isHeroPassiveDormant` wäre wegen dieser Fahne blind, darum direkt `_isHeroEffectSilenced`). Die Sperre ist ein Stempel
+  // (`_actionLockedTurn`, von Engine, Server, CPU und Client gelesen) und gleicht sich deshalb selbst ab: ruhende Lethe =
+  // Stempel weg, sobald sie wieder wirkt = Stempel zurück (Hooks `onStatusApplied/Removed`, `onPhaseStart`). Hat eine ANDERE
+  // Karte (Cute Familiar, Treasure Hunter's Backpack) denselben Held gesperrt, trägt der Held `_actionLockedFremd` und die
+  // Sperre bleibt bei der Freigabe stehen.
   const gs = engine.gs;
-  for (const { hero: h } of engine.heroesControlledBy(controller)) {
-    if (h?.name !== CARD_NAME) continue;
-    h._actionLockedTurn = gs.turn;
-    h._letheActionLocked = gs.turn;
+  const ps = gs.players[controller];
+  const soll = !!ps?._letheTargetDefeated && gs.activePlayer === controller;
+  // ★ Welle 13 (Al, Q120): „Lethe/ihr Kopierer wird gesperrt, selbst wenn der Effekt erst im laufenden Zug angenommen wird, sofern die
+  // Sperr-Condition erfüllt ist." — jeder Held, der Lethes Effekt TRÄGT: Lethe selbst, ein Shapeshifter in ihrer Gestalt (Name) oder ein Erbe
+  // (Pseudonia & Co.: gewonnener Effekt, `hatEffekt`). Der Verlust-Merker `_letheTargetDefeated` führt die Engine unabhängig von Lethes Anwesenheit.
+  for (const { hero: h, heroIdx, physOwner } of engine.heroesControlledBy(controller)) {
+    if (!hatEffekt(h, CARD_NAME) || h.hp <= 0) continue;
+    if (soll && !engine._isHeroEffectSilenced(physOwner, heroIdx)) {
+      if (h._actionLockedTurn === gs.turn && h._letheActionLocked !== gs.turn) h._actionLockedFremd = gs.turn;
+      h._actionLockedTurn = gs.turn;
+      h._letheActionLocked = gs.turn;
+    } else if (h._letheActionLocked === gs.turn) {
+      delete h._letheActionLocked;
+      if (h._actionLockedFremd !== gs.turn && h._actionLockedTurn === gs.turn) delete h._actionLockedTurn;
+    }
   }
+}
+
+/** ★ W8: alle Spieler abgleichen (Statuswechsel an irgendeinem Helden kann Lethes Ruhezustand ändern). */
+function sperreAbgleichen(engine) {
+  for (let p = 0; p < engine.playerCount(); p++) lockLethe(engine, p);
 }
 
 module.exports = {
@@ -101,6 +126,8 @@ module.exports = {
     if (abilityName !== 'Necromancy') return null;
     // Styx 28.9.: Sperren gehoeren dem Kontrolleur des Traegerhelden.
     const _traeger = gs?.players?.[inst?.owner]?.heroes?.[inst?.heroIdx];
+    // W8: ruht Lethe (Frost/Betäubung/Negation), gibt es keine 3 Einsätze - kein Abzeichen (wie `_isHeroEffectSilenced`)
+    if (_traeger?.statuses?.frozen || _traeger?.statuses?.stunned || _traeger?.statuses?.webbed || _traeger?.statuses?.negated) return null;
     const pi = _traeger?.charmedBy ?? inst?.controller ?? inst?.owner;
     const ps = gs?.players?.[pi];
     const leer = { remaining: 0, max: MAX_NECROMANCY_USES };
@@ -141,6 +168,13 @@ module.exports = {
      * counter (turn-key based reset — fires on the activator's start
      * too via the controller filter).
      */
+    // ★ W8: Selbstabgleich der Sperre bei Statuswechseln (Frost/Betäubung/Negation an/aus) und je Phasenbeginn (leises Abklingen).
+    // ★ Welle 13 (Q120): Lethes Effekt wird ANGENOMMEN (Shapeshifter-Gestalt, Pseudonia-Erbe: `initGainedHeroEffect`) – die Sperre gilt ab sofort.
+    onIdentityGained: async (ctx) => { sperreAbgleichen(ctx._engine); },
+    onStatusApplied: async (ctx) => { sperreAbgleichen(ctx._engine); },
+    onStatusRemoved: async (ctx) => { sperreAbgleichen(ctx._engine); },
+    onPhaseStart: async (ctx) => { sperreAbgleichen(ctx._engine); },
+
     onTurnStart: async (ctx) => {
       const engine = ctx._engine;
       const gs = engine.gs;
@@ -213,6 +247,9 @@ module.exports = {
       // Styx 28.9.: Brettseite des Wirts, sofern necromancy.js sie meldet.
       const feld = ctx.cardHeroOwner ?? controller;
       if (ctx.hostHeroOwner != null && ctx.hostHeroOwner !== feld) return;
+      // ★ W8: die 3 Einsätze und die Stufen-Welle sind laufende Effekte der Held-Karte - sie ruhen bei Frost/Betäubung/Negation
+      // (Necromancy selbst bleibt einmal pro Zug; necromancy.js hält die Sperre für die übrigen Helden).
+      if (ctx._engine._isHeroEffectSilenced(feld, ctx.hostHeroIdx)) return;
 
       const ps = gs.players[controller];
       if (!ps) return;

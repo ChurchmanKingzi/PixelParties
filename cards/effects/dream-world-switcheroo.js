@@ -31,15 +31,16 @@ module.exports = {
   isPostTargetReaction: true,
   spellVisual: { impact: { type: 'gold_sparkle' }, impactMs: 260 },
 
-  postTargetCondition(gs, pi, engine, ziele, quelle) {
+  postTargetCondition(gs, pi, engine, ziele, quelle, opts) {
     if (quelle?._isAoeCheck || quelle?.cardInstance?._isAoeCheck) return false;
-    if (!istAttackOderSpell(engine, quelle, hasCardType)) return false;
-    if (!(ziele || []).some(t => t?.type === 'hero' && t.owner === pi)) return false;
+    // W30a (Al, 21.10.2026): „chosen by an Attack or Spell" — auch Effekte, die als Attack/Spell ZÄHLEN (wie Bluff, Crimson Web, Tharxian Horse, Flooding).
+    if (!istAttackOderSpell(engine, quelle, hasCardType, opts?.damageType)) return false;
+    if (!(ziele || []).some(t => t?.type === 'hero' && engine.zielSeite(t) === pi)) return false;   // W33a (Al): „a Hero you control" = Kontrolle, nicht Brettseite
     return freieTraeger(engine, pi, ziele).length > 0;
   },
 
   async postTargetResolve(engine, pi, ziele, quelle) {
-    const eigene = (ziele || []).filter(t => t?.type === 'hero' && t.owner === pi);
+    const eigene = (ziele || []).filter(t => t?.type === 'hero' && engine.zielSeite(t) === pi);   // W33a: Kontrolle (Adresse `t.owner` bleibt die Brettseite)
     const kandidaten = freieTraeger(engine, pi, ziele);
     if (eigene.length === 0 || kandidaten.length === 0) return null;
 

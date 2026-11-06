@@ -54,21 +54,37 @@ async function bezahlen(engine, inst, ctrl, was) {
   const ps = engine.gs.players[ctrl];
   if (!ps || (ps.hand || []).length < DISCARD_COST) return false;
   const vorher = ps.hand.length;
-  await engine.actionPromptForceDiscard(ctrl, DISCARD_COST, {
+  const kosten = await engine.zahleAbwurfKosten(ctrl, DISCARD_COST, {
     costFor: CARD_NAME, costKind: 'protect',
-    title: CARD_NAME, source: CARD_NAME, selfInflicted: true, cancellable: true,
+    title: CARD_NAME, source: CARD_NAME, cancellable: true,
+    cancelOnlyFirst: true,   // N3-18 (W24): nach der ersten Karte kein Abbruch mehr (Kosten ganz oder gar nicht)
     description: `Discard ${DISCARD_COST} cards to negate ${was} on ${CARD_NAME}?`,
   });
-  return ps.hand.length === vorher - DISCARD_COST;
+  // ★ W74c: von Boris erlassene Kosten gelten als bezahlt — die Wirkung wird trotzdem negiert.
+  return kosten.erlassen || ps.hand.length === vorher - DISCARD_COST;
 }
 
 module.exports = {
+  // ★ Welle 11 (Q66, Al): trifft den Gegner nur mit Nicht-Schadens-Effekten (Platzieren in seine Zone) — gegen den durch die Erste-Runden-Immunität
+  // geschützten Spieler unspielbar (`engine.ersterZugGeschuetzt`, Sperr-Stutzen `_cardBlockedBySearchLock`).
+  blockedByFirstTurnProtection: true,
   inherentAction: true,
   playOnAnyHeroSide: true,
   playOnOppSideOnly: true,   // eigene Zonen sind beim Ziehen kein Ziel
   activeIn: ['support'],
 
   canSummon: (ctx) => oppFreeZones(ctx._engine, ctx.cardOwner).length > 0,
+
+  /**
+   * CPU-Vorabpruefung (W82b, Vertrag `cpuSchuetzt`, gelesen von `engine.kreaturGeschuetztVor`): der KONTROLLEUR der Hirschkuh kann 2 Handkarten zahlen und so jede (negierbare) Wirkung
+   * eines ANDEREN Spielers auf sie negieren — nur fuer die Hirschkuh selbst. Nur die Hand-ANZAHL, keine Kartennamen.
+   */
+  cpuSchuetzt(engine, traeger, ziel, e) {
+    if (!traeger || !ziel || traeger.id !== ziel.id || e?.canBeNegated === false) return false;
+    const ctrl = traeger.controller ?? traeger.owner;
+    if (ctrl === e?.quelleOwner) return false;
+    return (engine.gs.players[ctrl]?.hand || []).length >= DISCARD_COST;
+  },
 
   cpuMeta: {
     onDeathBenefit: 8,
@@ -138,6 +154,9 @@ module.exports = {
       const inst = ctx.card;
       if (inst?.zone !== 'support' || ctx.cancelled) return;
       if (!ctx.creature || ctx.creature.id !== inst.id) return;
+      // N3-07 (W24): ein Opfer (Tribut/Kosten des eigenen Kontrolleurs, z. B. Foresta) ist kein fremder Zugriff — wie Cool Rescuer Monia
+      // (`ctx.isSacrifice`, Ruling 1.8.): kein Angebot, sonst zaehlte die Negation als bezahltes Opfer.
+      if (ctx.isSacrifice) return;
       const ctrl = inst.controller ?? inst.owner;
       if (!(await bezahlen(engine, inst, ctrl, 'that effect'))) return;
       ctx.cancelled = true;
@@ -191,14 +210,20 @@ module.exports = {
         gewaehlt.push(n);
         if (gewaehlt.length >= 2) break;
       }
+      // W85c (Atta, Al 29.10.): „reveal them" ist EIN Aufdeck-Ereignis VOR dem Verschieben; eine von Atta gelöschte Karte kommt nie auf die Hand.
+      const _ereignis = await engine.aufdeckEreignis(pi, gewaehlt, {
+        source: CARD_NAME, zone: 'deck',
+        fenster: () => engine.revealSearchedCards(pi, gewaehlt, CARD_NAME, { _aufdeckGemeldet: true }),
+      });
       const geholt = [];
       for (const n of gewaehlt) {
+        if (_ereignis.geloescht.includes(n)) { geholt.push(n); continue; }
         const ok = await engine.actionAddCardFromDeckToHand(pi, n, {
           source: CARD_NAME, reveal: false, _noKrates: true,   // Mehrfach-Tutor
         });
         if (ok) geholt.push(n);
       }
-      if (geholt.length > 0) await engine.revealSearchedCards(pi, geholt, CARD_NAME);
+      if (geholt.length > 0 && !_ereignis.fensterGezeigt) await engine.revealSearchedCards(pi, geholt, CARD_NAME);
       engine.shuffleDeck(pi);
       engine.log('elusive_hind_search', { player: ps.username, cards: geholt });
       engine.sync();

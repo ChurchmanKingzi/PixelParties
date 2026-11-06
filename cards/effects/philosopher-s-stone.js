@@ -21,6 +21,8 @@
 //  · Suche → die Such-Sperre greift (`blockedBySearchLock`). Nur eine Art
 //    Karte (oder gar keine) im Potion Deck → nicht angeboten (Als Vorgabe
 //    24.9.: die Suche braechte nichts gegenueber dem Zug). Danach wird das Potion Deck gemischt.
+//  · Control Monitors (W72b, Al): die Suche im Potion Deck ist ein „add … from their deck to their hand" und löst das Fenster aus (`noteHandZugangAusStapel`, pile 'potionDeck');
+//    das bloße Ziehen, das die Stone ersetzt, nicht.
 //  · Bild: die gesuchte Karte fliegt glitzernd aus dem Potion Deck auf die
 //    Hand (`flightStyle: 'glitzer'`, wie Relic in the Sky).
 // ═══════════════════════════════════════════
@@ -71,6 +73,19 @@ module.exports = {
       if (wahl?.cardName && karten.some(k => k.name === wahl.cardName)) gewaehlt = wahl.cardName;
     }
 
+    // W85d (Atta, Al: das Potion Deck zählt als „your deck"): das Aufdecken ist ein Ereignis VOR dem Verschieben — Such-Fenster für den Gegner zuerst, dann Atta; löscht Atta die Karte,
+    // kommt sie nie auf die Hand (kein Flug, keine Hand-Zugangs-Wirkung, kein Control-Monitors-Fenster).
+    const _oi = engine.opponentOf(pi);
+    const _ereignis = await engine.aufdeckEreignis(pi, [gewaehlt], {
+      source: CARD_NAME, zone: 'potionDeck',
+      fenster: () => engine.promptGeneric(_oi, { type: 'deckSearchReveal', searchToHand: true, cardName: gewaehlt, searcherName: ps.username, title: CARD_NAME, cancellable: false, _aufdeckGemeldet: true }),
+    });
+    if (_ereignis.geloescht.includes(gewaehlt)) {
+      engine.noteKnownCard?.(_oi, gewaehlt, 'hand');
+      engine.log('philosophers_stone', { player: ps.username, card: CARD_NAME, target: gewaehlt, deleted: true });
+      engine.sync();
+      return;
+    }
     const genommen = await engine.takeFromPile(pi, 'potionDeck', gewaehlt, {
       source: CARD_NAME, toHand: true, shuffle: true,
     });
@@ -86,6 +101,9 @@ module.exports = {
     engine.sync();
     await engine._delay(650);
     const inst = engine.handZugangSync(ps, gewaehlt, { source: CARD_NAME });
+    // W72b (Al: „Doch, das betrifft etwa Philosopher's Stone"): das Potion Deck zählt als „their deck" — Control Monitors darf auf dieses Hinzufügen reagieren
+    // (Fenster am Ende der Wirkung; `takeFromPile(toHand)` hat die Entnahme schon vorgemerkt, die Meldung hier ist dieselbe Karte → zählt nur einmal).
+    engine.noteHandZugangAusStapel(pi, gewaehlt, { pile: 'potionDeck', source: CARD_NAME });
     // „reveal it": beiden zeigen, der Gegner bekommt die Such-Aufdeckung.
     engine._broadcastEvent('card_reveal', { cardName: gewaehlt, playerIdx: pi });
     const oi = engine.opponentOf(pi);
@@ -95,7 +113,7 @@ module.exports = {
       playerIdx: pi, card: inst, cardName: gewaehlt, _skipReactionCheck: true,
     });
     engine.sync();
-    await engine.promptGeneric(oi, {
+    if (!_ereignis.fensterGezeigt) await engine.promptGeneric(oi, {
       type: 'deckSearchReveal', searchToHand: true,
       cardName: gewaehlt, searcherName: ps.username, title: CARD_NAME, cancellable: false,
     });

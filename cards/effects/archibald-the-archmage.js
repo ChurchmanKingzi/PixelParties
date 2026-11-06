@@ -7,7 +7,8 @@
 //  Spell from their hand, the controller may immediately cast that
 //  Spell as an additional Action with Archibald. The Spell's level
 //  is temporarily increased by 1 for the duration of this cast.
-//  Triggers on ANY discard, including during the opponent's turn —
+//  Triggers on ANY discard during the controller's own turn (W16f: gedruckt
+//  "during your turn" — ein Abwurf im Gegnerzug löst NICHT aus) —
 //  Wisdom cost, Acid Rain delete, Magenta self-mill, Forced Discard,
 //  etc. all count.
 //
@@ -97,7 +98,8 @@ async function castSpellAsArchibald(engine, ctx, hero, cardName, evalResult) {
   // Track the spell BEFORE casting so a nested discard re-trigger
   // (Wisdom cost during the cast) sees the dupe ban and skips.
   if (!hero[CAST_LIST_KEY]) hero[CAST_LIST_KEY] = [];
-  if (!hero[CAST_LIST_KEY].includes(cardName)) hero[CAST_LIST_KEY].push(cardName);
+  let eingetragen = false;   // W13 (Q129): bei Abbruch wieder austragen
+  if (!hero[CAST_LIST_KEY].includes(cardName)) { hero[CAST_LIST_KEY].push(cardName); eingetragen = true; }
 
   // ── Wisdom cost on the BOOSTED level ──
   // Archibald's only school is Wisdom, so almost every cast carries
@@ -135,6 +137,9 @@ async function castSpellAsArchibald(engine, ctx, hero, cardName, evalResult) {
   gs._spellDamageLog = [];
   // v1339: der Guss aus der Ablage wird dem Gegner gezeigt (Engine-Helfer).
   const _auftritt = engine.gussAuftrittBeginnen(cardName, ctx.cardOwner);
+  const _cancelVorher = gs._spellCancelled;
+  gs._spellCancelled = false;   // W13 (Q129): eigener Abbruchmerker für diesen Guss
+  let abgebrochen = false;
 
   try {
     await engine.runHooks('onPlay', {
@@ -144,7 +149,8 @@ async function castSpellAsArchibald(engine, ctx, hero, cardName, evalResult) {
       _skipReactionCheck: true,
     });
 
-    if (!gs._spellNegatedByEffect) {
+    abgebrochen = !!gs._spellCancelled && !gs._spellNegatedByEffect;
+    if (!gs._spellNegatedByEffect && !abgebrochen) {
       const uniqueTargets = [];
       const seen = new Set();
       for (const t of (gs._spellDamageLog || [])) {
@@ -171,8 +177,21 @@ async function castSpellAsArchibald(engine, ctx, hero, cardName, evalResult) {
     if (prevOverride === undefined) delete hero.levelOverrideCards[cardName];
     else hero.levelOverrideCards[cardName] = prevOverride;
     engine._untrackCard(synthInst.id);
-    engine.gussAuftrittBeenden(_auftritt, { abgebrochen: !!gs._spellCancelled });
+    engine.gussAuftrittBeenden(_auftritt, { abgebrochen: abgebrochen || !!gs._spellCancelled });
+    gs._spellCancelled = _cancelVorher;
   }
+
+  // ★ Welle 13 (Al, Q129 – allgemeine Regel für „automatische" Zusatzaktionen): Abbruch der Zielwahl → nichts konsumiert. Die Karte lag und liegt in der
+  // Ablage; der Einmal-pro-Zug-Stempel (vom Aufrufer, `resolveTrigger`) und der Eintrag in der Doppelt-Sperre dieses Zuges werden frei, keine Wisdom-Kosten.
+  if (abgebrochen) {
+    if (eingetragen) hero[CAST_LIST_KEY] = (hero[CAST_LIST_KEY] || []).filter(n => n !== cardName);
+    engine.log('archibald_cast_cancelled', { player: gs.players[ctx.cardOwner]?.username, spell: cardName });
+    engine.sync();
+    return { abgebrochen: true };
+  }
+
+  // W36a (Al, 22.10.2026): der Nachguss ist ein gespielter Spell und zaehlt wie jeder (`spellsPlayedThisTurn`; auch ganz negiert, nur ein Abbruch zaehlt nicht).
+  await engine.zaehleAlsArt('spell', { pi: ctx.cardOwner, heroIdx: ctx.cardHeroIdx, heroOwner: feld, name: cardName, karte: true });
 
   // ★ v1323 (Tester-Befund 23.9.): Wisdom NACH dem Guss — wie im
   // regulaeren Zauber-Weg; ein abgebrochener Guss kostet nichts. Die Hoehe
@@ -241,7 +260,7 @@ async function resolveTrigger(ctx, candidateNames) {
   if (eligible.length === 1) {
     // Single-target — yes/no confirm prompt.
     const { name, ev } = eligible[0];
-    const confirmed = await engine.promptGeneric(ctx.cardOwner, {
+    const confirmed = await engine.promptSpellAuswahl(ctx.cardOwner, {   // W48a: Zeitfenster der Spell-Auswahl (keine Surprise aktivierbar)
       type: 'confirm',
       title: CARD_NAME,
       message: `${name} was just discarded — cast it as an additional Action with ${hero.name}? (Level becomes ${ev.boostedLevel}.)`,
@@ -260,7 +279,7 @@ async function resolveTrigger(ctx, candidateNames) {
       // ignores unknown keys but cost / level / count are honoured.
       level: ev.boostedLevel,
     }));
-    const result = await engine.promptGeneric(ctx.cardOwner, {
+    const result = await engine.promptSpellAuswahl(ctx.cardOwner, {   // W48a: Zeitfenster der Spell-Auswahl
       type: 'cardGallery',
       cards,
       title: CARD_NAME,
@@ -279,7 +298,8 @@ async function resolveTrigger(ctx, candidateNames) {
     return;
   }
 
-  await castSpellAsArchibald(engine, ctx, hero, picked.name, picked.ev);
+  const res = await castSpellAsArchibald(engine, ctx, hero, picked.name, picked.ev);
+  if (res?.abgebrochen && gs.hoptUsed) delete gs.hoptUsed[`${HOPT_KEY}:${ctx.cardOwner}`];   // W13 (Q129): Abbruch der Zielwahl gibt den Stempel zurück
 }
 
 module.exports = {
@@ -347,6 +367,9 @@ module.exports = {
 
       const engine = ctx._engine;
       const gs = engine.gs;
+
+      // W16f (H01-01): gedruckt „during your turn" — ein Abwurf im Zug des Gegners löst nicht aus.
+      if (gs.activePlayer !== ctx.cardOwner) return;
 
       // Re-entry guard — same one castSpellAsArchibald uses.
       if (gs._archibaldCasting) return;

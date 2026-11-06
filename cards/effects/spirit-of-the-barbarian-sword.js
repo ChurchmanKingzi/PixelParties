@@ -32,7 +32,7 @@
 //  im selben Moment ausgeloest, danach faellt der Schaden.
 // ═══════════════════════════════════════════
 
-const { hasCardType } = require('./_hooks');
+const { hasCardType, heldSeite } = require('./_hooks');
 const { isTutorableArea } = require('./_area-shared');
 
 const CARD_NAME = 'Spirit of the Barbarian Sword';
@@ -116,7 +116,7 @@ module.exports = {
   /** ① „can only be summoned by a Hero equipped with …\" */
   canPlayWithHero(gs, pi, heroIdx, cardData, engine) {
     if (!engine) return true;
-    return hatSchwert(engine, pi, heroIdx);
+    return hatSchwert(engine, heldSeite(gs, pi, heroIdx), heroIdx);   // N3-03 (W24): Brettseite des uebernommenen Helden
   },
 
   /** ③ Kosten: es muss mindestens eine Area liegen, und das Deck etwas hergeben. */
@@ -124,9 +124,12 @@ module.exports = {
     const engine = ctx._engine;
     const pi = ctx.cardOwner;
     if (areaCount(engine.gs) < 1) return false;
+    // Als Ruling (Al 27.10.): Reality Crack („You cannot play another Area for the rest of the turn") sperrt auch „bring … directly into play" — die Aktivierung ist dann ausgegraut (nichts wird abgeraeumt).
+    if (engine.areaSpielGesperrt(pi, { direkt: true })) return false;
+    if (engine.spielerIstVonAreasAusgenommen(pi)) return false;   // W82 (Shipwrecked): keine Area ins Spiel bringen
     const cardDB = engine._getCardDB();
     return (engine.gs.players[pi]?.mainDeck || [])
-      .some(n => isTutorableArea(cardDB[n], engine, pi));
+      .some(n => isTutorableArea(cardDB[n], engine, pi) && engine.areaPlatzNachAbraeumen(pi, n));   // Als Fix (Al 27.10.): nur eine Area, fuer die nach dem Abraeumen Platz ist (Gigalopolis bleibt liegen)
   },
 
   async onCreatureEffect(ctx) {
@@ -136,11 +139,14 @@ module.exports = {
     const ps = gs.players[pi];
     if (!ps) return false;
     if (areaCount(gs) < 1) return false;              // Kosten nicht zahlbar
+    if (engine.areaSpielGesperrt(pi, { direkt: true })) return false;   // Als Ruling (Al 27.10.): Reality-Crack-Sperre (s. `canActivateCreatureEffect`)
+    if (engine.spielerIstVonAreasAusgenommen(pi)) return false;   // W82 (Shipwrecked): keine Area ins Spiel bringen
 
     const cardDB = engine._getCardDB();
     const zaehler = {};
     for (const n of (ps.mainDeck || [])) {
       if (!isTutorableArea(cardDB[n], engine, pi)) continue;
+      if (!engine.areaPlatzNachAbraeumen(pi, n)) continue;   // Als Fix (Al 27.10.): s. `canActivateCreatureEffect` — mit liegender Gigalopolis (unentfernbar) kein Platz, nichts wird abgeraeumt
       zaehler[n] = (zaehler[n] || 0) + 1;
     }
     const galerie = Object.entries(zaehler)

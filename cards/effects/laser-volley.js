@@ -16,6 +16,16 @@ const CARD_NAME = 'Laser Volley';
 const VOLLEY_DAMAGE = 200;
 
 module.exports = {
+  // ★ Welle 12 (B-06, Al: „Eine Karte, deren Effekt komplett nutzlos wäre, ist nicht spielbar."): trifft NUR den Gegner — gegen den durch die
+  // Erste-Runden-Immunität geschützten Spieler unspielbar (Karte bleibt auf der Hand, keine Aktion/Kosten; `engine.ersterZugGeschuetzt`).
+  blockedByFirstTurnProtection: true,
+  // ★ Als Ruling (Al 26.10., Flame Avalanche: „Am besten gleich die Karten ganz sperren statt den Schaden fizzeln zu lassen"): die Karte richtet NUR Schaden an Zielen des Gegners an —
+  // unter der Schadenssperre (`ps.damageLocked`) unspielbar (Karte bleibt auf der Hand, keine Aktion/Kosten; Sperr-Stutzen `engine._cardBlockedBySearchLock`).
+  blockedByDamageLock: true,
+  // ★ Z7b: FIZZELT die Karte (Wirker beim Auflösen handlungsunfähig, v1328), war sie GESPIELT → Stempel (Engine: `_noteFizzledPlay`).
+  // Eine ganz NEGIERTE Karte stempelt nicht (Als Entscheidung, Welle 3).
+  onFizzledPlay: ({ engine, gs, pi }) => { engine.claimHOPT(`spell-played:${CARD_NAME}`, pi); },
+
   // Once-per-turn-by-name gate. The play is rejected upstream by
   // doPlaySpell when this returns false; the same `gs.hoptUsed` map
   // every other HOPT keys into.
@@ -76,6 +86,24 @@ module.exports = {
         return;
       }
 
+      // Ida („never hit more than 1 target with a Destruction Spell"): aus „alle Ziele" wird
+      // EIN gewaehltes Ziel (H02-heroes-05). Die Wahl oeffnet die Reaktionsfenster selbst
+      // (wie `actionAoeHit` im Einzelmodus) — die Sammelfenster unten entfallen dann.
+      // Die Verschonen-Runde des Gegners laeuft danach unveraendert ueber dieses eine Ziel.
+      const idaEinzel = !!ctx._engine.heroFlagsLive(ctx.cardHeroOwner ?? pi, ctx.cardHeroIdx)?.forcesSingleTarget;
+      if (idaEinzel) {
+        const t = await ctx.promptDamageTarget({
+          side: 'enemy', types: ['hero', 'creature'], damageType: 'destruction_spell', baseDamage: VOLLEY_DAMAGE,
+          title: CARD_NAME, description: `Deal ${VOLLEY_DAMAGE} damage to a single target.`,
+          confirmLabel: `💥 ${VOLLEY_DAMAGE} Damage!`, confirmClass: 'btn-danger', cancellable: false,   // pflichtwahl: Idas Einzelziel-Wahl ist Pflicht, wie in `actionAoeHit`
+        });
+        const gewaehlt = t && targets.find(x => t.type === 'hero'
+          ? (x.kind === 'hero' && x.physOwner === t.owner && x.heroIdx === t.heroIdx)
+          : (x.kind === 'creature' && x.instId === t.cardInstance?.id));
+        if (!gewaehlt) return;
+        targets.splice(0, targets.length, gewaehlt);
+      }
+
       // Opp counter-window: each spare costs 1 hand card. Iterate
       // discard → spare-pick until opp opts out (cancel) or runs out
       // of either hand cards or targets to spare. Cap at
@@ -84,6 +112,7 @@ module.exports = {
       const sparedIds = new Set();
       let discardsPaid = 0;
       const maxIter = Math.min(ops.hand?.length || 0, targets.length);
+      const borisGegner = engine.borisStapel(oi, { source: CARD_NAME, skipVoidsEffect: true });   // ★ W74c: Boris des Gegners, einmal für den ganzen Schonen-Stapel
 
       for (let iter = 0; iter < maxIter; iter++) {
         const remaining = targets.filter(t => !sparedIds.has(t.id));
@@ -100,6 +129,9 @@ module.exports = {
           cancelLabel: 'Done',
         });
         if (!dRes || dRes.cancelled || dRes.cardName == null) break;
+        // ★ W74c: Boris darf den Abwurf (Kosten, „may discard any number") ignorieren. Verschont wird „that many" = so viele Ziele, wie Karten
+        // abgeworfen wurden — bei Verzicht 0: es wird nichts verschont, die Wahl endet.
+        if (await borisGegner(1)) break;
 
         const ok = await engine.actionDiscardHandCard(oi, dRes.cardName, dRes.handIndex, {
           source: CARD_NAME,
@@ -111,10 +143,18 @@ module.exports = {
         // committed.
         const sparePick = await engine.promptGeneric(oi, {
           type: 'cardGallery',
-          cards: remaining.map(t => ({
-            name: t.cardName, source: t.kind === 'hero' ? 'hero' : 'support',
-            heroIdx: t.heroIdx,
-          })),
+          // W16g (S02-07): gleichnamige Ziele muessen unterscheidbar bleiben — die Client-Antwort ist nur `{ cardName, source }`
+          // (ohne Slot), also traegt `source` die Ziel-ID und `label` den Platz (v862-Muster, wie Great Offensive).
+          cards: remaining.map(t => {
+            const inst = t.kind === 'hero' ? null : engine.cardInstances.find(c => c.id === t.instId);
+            const hostName = engine.gs.players[inst ? engine.physicalSide(inst) : t.physOwner]?.heroes?.[t.heroIdx]?.name || '';
+            const kurz = hostName.split(',')[0].split(' ').slice(-1)[0] || `Hero ${t.heroIdx + 1}`;
+            return {
+              name: t.cardName, source: t.id,
+              label: t.kind === 'hero' ? 'Hero' : `${kurz} · ${t.slotIdx + 1}`,
+              heroIdx: t.heroIdx,
+            };
+          }),
           title: CARD_NAME,
           description: `Choose a target to spare from ${VOLLEY_DAMAGE} damage.`,
           confirmLabel: '🛡️ Spare',
@@ -124,9 +164,8 @@ module.exports = {
         if (!sparePick?.cardName) break;
         // Match by name AND slot to avoid picking a duplicate-named
         // creature that was already spared.
-        const matchedSpare = remaining.find(t =>
-          t.cardName === sparePick.cardName,
-        );
+        const matchedSpare = remaining.find(t => t.id === sparePick.source)   // W16g (S02-07): eindeutig ueber die Ziel-ID
+          || remaining.find(t => t.cardName === sparePick.cardName);
         if (matchedSpare) sparedIds.add(matchedSpare.id);
       }
 
@@ -152,7 +191,7 @@ module.exports = {
         .map(t => ({
           type: 'hero', owner: t.physOwner, heroIdx: t.heroIdx, cardName: t.cardName,
         }));
-      if (unsparedHeroTargets.length > 0) {
+      if (unsparedHeroTargets.length > 0 && !idaEinzel) {
         if (ctx.card) ctx.card._isAoeCheck = true;
         const surpriseResult = await engine._checkSurpriseWindow(
           unsparedHeroTargets, ctx.card, { damageType: 'destruction_spell' }
@@ -213,7 +252,7 @@ module.exports = {
           .map(t => t.kind === 'hero'
             ? { type: 'hero', owner: t.physOwner, heroIdx: t.heroIdx, cardName: t.cardName }
             : { type: 'creature', owner: oi, heroIdx: t.heroIdx, slotIdx: t.slotIdx, cardName: t.cardName });
-        const _negR = await engine.preDamageMultiTargetWindow(source, allUnspared);
+        const _negR = idaEinzel ? null : await engine.preDamageMultiTargetWindow(source, allUnspared);
         // Full-negate reaction (Storm Ring / Invisibility Cloak): bail
         // before any damage so the whole Spell is negated.
         if (_negR?.effectNegated) return;
@@ -232,6 +271,7 @@ module.exports = {
           .filter(t => !sparedIds.has(t.id) && t.kind === 'creature')
           .map(t => engine.cardInstances.find(c => c.id === t.instId))
           .filter(Boolean),
+        heroes: targets.filter(t => !sparedIds.has(t.id) && t.kind === 'hero').map(t => ({ owner: t.physOwner, heroIdx: t.heroIdx })),   // W78 (Pythia): Helden, die dieser Schlag faellt, sind todgeweiht
         source: { name: CARD_NAME, owner: pi, heroIdx: ctx.cardHeroIdx, heroOwner: ctx.cardHeroOwner ?? pi },   // Als Befund 29.9.: Brettseite des Wirkers
         amount: VOLLEY_DAMAGE, type: 'destruction_spell', sourceOwner: pi,
       });

@@ -29,6 +29,7 @@ module.exports = {
     const hs = heldSeite(gs, pi, heroIdx);
     if (engine?.isHeroIncapacitated?.(hs, heroIdx)) return false;
     const abZones = gs.players[hs]?.abilityZones?.[heroIdx] || [];
+    if (engine?.heroAbilityLevelsBlanked?.(hs, heroIdx)) return false;   // W4a: harte Negierung -> Stufe 0 (Stowaway)
     let magicArtsCount = 0;
     for (const slot of abZones) {
       if (!slot || slot.length === 0) continue;
@@ -43,6 +44,10 @@ module.exports = {
   spellPlayCondition(gs, playerIdx, engine) {
     const ps = gs.players[playerIdx];
     if (!ps) return false;
+    // W16g (S03-13): spielbar nur, wenn die Wahl nachher auch eine AKTIVIERBARE Surprise anbietet — dieselbe Liste wie `onPlay`
+    // (`_getEligibleTelekinesisTargets` inkl. `_canHeroActivateSurprise`: Schul-/Stufen-Voraussetzung des Wirtshelden, Negation,
+    // Spell-Sperren). Sonst verpuffte die Karte samt Aktion ohne Zielwahl.
+    if (engine) return _getEligibleTelekinesisTargets(engine, playerIdx).length > 0;
     // Als Vorgabe 29.9.: „a face-down Surprise you control" — Zonen nach
     // Kontrolle, auch am geliehenen Helden (`_getAllSurpriseEntries`).
     if (engine && _regulaereZonen(engine, playerIdx).some(e => {
@@ -84,7 +89,7 @@ module.exports = {
 
       // Build list of eligible face-down surprises
       const targets = _getEligibleTelekinesisTargets(engine, pi);
-      if (targets.length === 0) return;
+      if (targets.length === 0) { gs._spellCancelled = true; return; }   // W16g (S03-13): Abbruch = Karte bleibt auf der Hand
 
       // Prompt player to select a surprise
       const selectedIds = await engine.promptEffectTarget(pi, targets, {

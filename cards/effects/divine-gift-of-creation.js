@@ -77,7 +77,13 @@ module.exports = {
       // opp search effect). `reveal: false` defers the disclosure to
       // the multi-card revealSearchedCards call below so opp sees a
       // single reveal sequence instead of one per card.
+      // W85c (Atta): „reveal them" ist EIN Aufdeck-Ereignis VOR dem Verschieben — eine von Atta gelöschte Karte kommt nie auf die Hand.
+      const _ereignis = await engine.aufdeckEreignis(pi, chosen, {
+        source: 'Divine Gift of Creation', zone: 'deck',
+        fenster: () => engine.revealSearchedCards(pi, chosen, 'Divine Gift of Creation', { _aufdeckGemeldet: true }),
+      });
       for (const name of chosen) {
+        if (_ereignis.geloescht.includes(name)) continue;
         if (ps.mainDeck.indexOf(name) < 0) continue;
         await engine.actionAddCardFromDeckToHand(pi, name, {
           source: 'Divine Gift of Creation',
@@ -87,7 +93,7 @@ module.exports = {
       }
 
       // Reveal chosen cards to opponent one by one (opponent confirms each)
-      await engine.revealSearchedCards(pi, chosen, 'Divine Gift of Creation');
+      if (!_ereignis.fensterGezeigt) await engine.revealSearchedCards(pi, chosen, 'Divine Gift of Creation');
 
       // If 2 cards chosen: lock those names for the rest of the turn
       if (chosen.length >= 2) {

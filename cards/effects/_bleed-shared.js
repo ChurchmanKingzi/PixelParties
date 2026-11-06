@@ -27,8 +27,7 @@ const { hasCardType, ZONES, heroFightingLevel } = require('./_hooks');
 function isTargetBleeding(engine, t) {
   if (!t) return false;
   if (t.type === 'hero') return !!engine.gs.players[t.owner]?.heroes?.[t.heroIdx]?.statuses?.bleeding;
-  const inst = t.cardInstance || t._cardInstance || engine.cardInstances.find(c =>
-    (c.controller ?? c.owner) === t.owner && c.zone === ZONES.SUPPORT && c.heroIdx === t.heroIdx && c.zoneSlot === t.slotIdx);
+  const inst = t.cardInstance || t._cardInstance || engine.kreaturAnBrett(t.owner, t.heroIdx, t.slotIdx);   // Z1: Ziel-`owner` = Brettseite
   return !!inst?.counters?.bleeding;
 }
 
@@ -70,8 +69,7 @@ async function bleedCreature(engine, inst, sourceName, appliedBy, opts = {}) {
 async function bleedTarget(engine, t, sourceName, appliedBy, opts = {}) {
   if (!t) return false;
   if (t.type === 'hero') return bleedHero(engine, t.owner, t.heroIdx, sourceName, appliedBy, opts);
-  const inst = t.cardInstance || t._cardInstance || engine.cardInstances.find(c =>
-    (c.controller ?? c.owner) === t.owner && c.zone === ZONES.SUPPORT && c.heroIdx === t.heroIdx && c.zoneSlot === t.slotIdx);
+  const inst = t.cardInstance || t._cardInstance || engine.kreaturAnBrett(t.owner, t.heroIdx, t.slotIdx);   // Z1: Ziel-`owner` = Brettseite
   return bleedCreature(engine, inst, sourceName, appliedBy, opts);
 }
 

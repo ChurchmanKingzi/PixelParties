@@ -109,6 +109,15 @@ module.exports = {
       if (hero.hp <= 0) return;
       if (hero.statuses?.frozen || hero.statuses?.stunned || hero.statuses?.negated) return;
 
+      // ★ W16g (S03-15): der Folgezauber IST eine Zusatzaktion („as an additional Action“) — Mission of the Light Brigade und Duigno
+      // („You cannot perform any OTHER additional Actions“) sperren ihn wie jeden Sofort-Guss (`kannSofortWirken`, Chaos Diamond …).
+      // Bisher umging VPC diese Sperre ueber `_castSpellImmediately`: unter Mission liefen VPC + Folgezauber + ein weiterer Zauber
+      // = 3 Zusatzaktionen statt hoechstens 2.
+      if (engine.additionalActionsLocked(pi) || engine.missionLockActive(pi)) {
+        engine.log('victory_phoenix_cannon_followup_locked', { player: ps.username });
+        return;
+      }
+
       // Find eligible spells in hand: Normal Destruction Magic, level ≤ 1
       // v323: NICHT je Auslösung von der Platte lesen — 0,83 MB Datei,
       // mehrere MB Müll je Hook-Auslösung, dazu synchrone E/A im Event-Loop.
@@ -148,6 +157,10 @@ module.exports = {
           if (wisdomCost > 0 && engine.handFodderFor(pi, cardName) < wisdomCost
               && !engine.discardCostWaived(pi)) continue;
         }
+        // ★ Z7 (S03-P1): „Einmal pro Spiel" (Divine Gift …) gilt auch für den Folgezauber — Wirkung
+        // und Stempel liegen in `_castSpellImmediately`, hier fällt die verbrauchte Karte nur aus dem Angebot.
+        const _opg = loadCardEffect(cardName);
+        if ((_opg?.oncePerGame || _opg?.oncePerGameKey) && ps._oncePerGameUsed?.has(_opg.oncePerGameKey || cardName)) continue;
         seen.add(cardName);
         eligibleSpells.push({ name: cardName, source: 'hand' });
       }
@@ -155,14 +168,14 @@ module.exports = {
       if (eligibleSpells.length === 0) return;
 
       // Prompt: "Cast another Spell with [Hero Name] (200 recoil)?"
-      const confirmed = await ctx.promptConfirmEffect({
+      const confirmed = await engine._mitSpellAuswahl(() => ctx.promptConfirmEffect({   // W48a: Zeitfenster der Spell-Auswahl (keine Surprise aktivierbar)
         title: 'Victory Phoenix Cannon',
         message: `Cast another Spell with ${hero.name} (200 recoil)?`,
-      });
+      }));
       if (!confirmed) return;
 
       // Player picks a spell from hand
-      const selected = await engine.promptGeneric(pi, {
+      const selected = await engine.promptSpellAuswahl(pi, {   // W48a: Zeitfenster der Spell-Auswahl
         type: 'cardGallery',
         cards: eligibleSpells,
         title: 'Victory Phoenix Cannon',

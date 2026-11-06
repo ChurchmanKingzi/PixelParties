@@ -114,6 +114,9 @@ async function ausloesen(ctx) {
 
       // Nur wenn der GEGNER etwas auf die Hand bekommen hat.
       if (ctx.playerIdx !== oi) return;
+      // ★ W16b (A03-futuretech-08, Text „… via an effect"): das Pflicht-Ziehen der Ressourcen-Phase (`_isResourceDraw`) ist kein Effekt-Ziehen —
+      // es mahlt nichts und verbraucht die Rundensperre nicht (Konvention wie Cute Meanie Melissa / Dirty Smuggler).
+      if (ctx._isResourceDraw) return;
       if (!istDieVorderste(engine, ctx.card, owner)) return;
 
       // „The first time every turn" — EINE Sperre fuer beide Wege.

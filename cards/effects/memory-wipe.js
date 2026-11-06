@@ -70,6 +70,14 @@ module.exports = {
       });
       await engine._delay(700);
 
+      // W13 (Q144, Al: Resistance blockt JEDEN Nicht-Schaden-Effekt): der Ability-Abwurf ist EIN Effekt auf den
+      // Helden — einmal fragen (zentraler Pruefer), nicht je Ability. Bild lief schon.
+      if (await engine.heroNonDamageEffectBlocked(besitzer, heroIdx, 'ability_discard', { sourceOwner: pi, source: CARD_NAME })) {
+        engine.log('memory_wipe', { player: gs.players[pi]?.username, hero: held.name, sent: 0, blocked: true });
+        engine.sync();
+        return;
+      }
+
       // ── 3. Der Gegner waehlt ─────────────────────────────────────
       const vorrat = abilityCardCount(sendables(engine, besitzer, heroIdx).abilities);
       const anzahl = Math.min(HOECHSTENS, vorrat);

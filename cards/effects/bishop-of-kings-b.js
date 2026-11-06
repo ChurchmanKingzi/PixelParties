@@ -43,6 +43,7 @@ async function syncBishopNegation(engine, ignoreInstId) {
         if (st) { st._bishopOfKings = true; st.sourceBound = true; st.noAbsorb = true; engine.sync(); continue; }
         await engine.addHeroStatus(physOwner, heroIdx, 'negated', {
           _bishopOfKings: true, sourceBound: true, noAbsorb: true, permanent: true,
+          effectOnly: true,   // W4a (Al): Text sagt nur "effects ... negated" -> leichte Form, Abilities laufen weiter
           appliedBy: pi, source: { name: CARD_NAME, owner: pi }, _skipReactionCheck: true,
         });
       } else if (st?._bishopOfKings) {
@@ -55,8 +56,18 @@ async function syncBishopNegation(engine, ignoreInstId) {
 module.exports = {
   cpuResponse(engine, kind, payload) { return ofKingsCpuAnswer(engine, kind, payload); },
   activeIn: ['support'],
+  // ★ W7a (A06-11, Al): die Negation ist ein laufender Passiv des Bishops und ruht, solange er gefroren/betäubt/negiert ist
+  // (`conditionHolds` fragt `isCreatureEffectSuppressed`). Damit der Abgleich den Zustandswechsel mitbekommt, laufen die
+  // Hooks auch im stillgelegten Zustand — sie rufen nur den Abgleich, der die Stilllegung selbst prüft.
+  bypassStatusFilter: true,
+
+  // W16c (A06-32): Wiederbelebung OHNE Hooks (Rewrite History, ...): die Negation gleicht sich sofort ab, nicht erst am Zugende.
+  onRevive: async (ctx) => { await syncBishopNegation(ctx._engine); },
 
   hooks: {
+    onStatusApplied: async (ctx) => { if (ctx.card?.zone === 'support') await syncBishopNegation(ctx._engine); },
+    onStatusRemoved: async (ctx) => { if (ctx.card?.zone === 'support') await syncBishopNegation(ctx._engine); },
+    onPhaseStart: async (ctx) => { await syncBishopNegation(ctx._engine); },
     onCardEnterZone: async (ctx) => { await syncBishopNegation(ctx._engine); },
     onCardLeaveZone: async (ctx) => {
       const self = ctx.leavingCard?.id === ctx.card.id;

@@ -88,7 +88,7 @@ module.exports = {
    * @param {number} amount    - Incoming damage
    * @returns {boolean}
    */
-  preDamageCondition(gs, ownerIdx, engine, target, heroIdx, source, amount /*, type */) {
+  preDamageCondition(gs, ownerIdx, engine, target, heroIdx, source, amount, type) {
     if (!(amount > 0)) return false;
     // Trigger condition: damage would be lethal. `target.hp` is the
     // current HP at the moment of the check; the reaction is offered
@@ -102,14 +102,18 @@ module.exports = {
     // from the lookup and are filtered out here.
     const cd = engine._getCardDB()[source?.name];
     if (!cd) return false;
-    if (cd.cardType !== 'Attack' && cd.cardType !== 'Spell') return false;
+    // W32a (Al, 22.10.2026): auch Effekte, die als Attack/Spell ZÄHLEN (Heldeneffekte Broghan & Co./Alice, Gegenstandseffekte, Greatmaw-Treffer, Alluring-Light-Angriff).
+    if (cd.cardType !== 'Attack' && cd.cardType !== 'Spell'
+        && !require('./_hooks').quelleIstAttackOderSpell(engine, source, type)) return false;
 
     // The target Hero must be able to play Escape themselves. The
     // engine's standard level-req helper handles Performance,
     // Wisdom, Divinity gap-coverage, etc.
     const escapeCd = engine._getCardDB()[CARD_NAME];
     if (!escapeCd) return false;
-    if (!engine.heroMeetsLevelReq(ownerIdx, heroIdx, escapeCd)) return false;
+    // W20c: ein uebernommener Zielheld der Gegenspalte (Brettseite `seite` ≠ Kontrolleur `ownerIdx`) wirkt mit SEINEN Schulen/Stufen.
+    const seite = engine._findHeroOwner(target);
+    if (!engine.heroMeetsLevelReq(seite, heroIdx, escapeCd, seite !== ownerIdx ? { levelSourcePi: ownerIdx } : undefined)) return false;
 
     // Need at least one extra card to pay the discard cost. At
     // condition-check time, Escape itself is still in hand — so
@@ -145,7 +149,7 @@ module.exports = {
     // `app-board.jsx#ANIM_REGISTRY.escape_dodge`; the visual is a
     // ~700ms left-right shimmy of the Hero Zone DOM element itself.
     engine._broadcastEvent('play_zone_animation', {
-      type: 'escape_dodge', owner: ownerIdx, heroIdx, zoneSlot: -1,
+      type: 'escape_dodge', owner: engine._findHeroOwner(target), heroIdx, zoneSlot: -1,   // W20c: Brettseite des Helden
     });
     engine.log('escape_negate', {
       player: engine.gs.players[ownerIdx]?.username,

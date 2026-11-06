@@ -15,7 +15,7 @@ module.exports = {
   shufflesFromHandOrDiscardIntoDeck: true,   // Herkunft: Hand
 
   isPotion: true,
-  deferBroadcast: true,
+  // W64b: kein `deferBroadcast` mehr — der Auftritt kommt zentral (`commitAppearance()` unten).
 
   resolve: async (engine, pi) => {
     const gs = engine.gs;
@@ -41,7 +41,7 @@ module.exports = {
     // If no cards to pick from (hand is just the potion), skip picking and draw 1
     if (eligibleIndices.length === 0) {
       // Reveal now — player can't cancel at this point
-      engine._broadcastEvent('card_reveal', { cardName: 'Horn in a Bottle' });
+      engine.commitAppearance();
       await engine._delay(200);
       await engine.actionDrawCards(pi, 1);
       engine.log('horn_in_a_bottle', { player: ps.username, shuffled: 0, drawn: 1 });
@@ -63,7 +63,7 @@ module.exports = {
     if (!result || result.cancelled) return { cancelled: true };
 
     // Reveal card to opponent now that the player has committed
-    engine._broadcastEvent('card_reveal', { cardName: 'Horn in a Bottle' });
+    engine.commitAppearance();
     await engine._delay(200);
 
     const selectedCards = result.selectedCards || [];

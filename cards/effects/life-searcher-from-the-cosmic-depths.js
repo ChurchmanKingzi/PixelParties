@@ -28,7 +28,7 @@ const { hasCardType } = require('./_hooks');
 const {
   COSMIC_DEPTHS_CREATURES, COSMIC_DEPTHS_ANY,
   changeCounterCardsOnSide, getChangeCounters,
-  isCosmicCard, canSummonInvaderViaSource,
+  isCosmicCard, canSummonInvaderViaSource, invaderLimitAllows,
 } = require('./_cosmic-shared');
 
 const CARD_NAME = 'Life-Searcher from the Cosmic Depths';
@@ -55,18 +55,18 @@ module.exports = {
       // hookExtras; we read either as a fallback.
       const byCosmic = ctx._summonedByCosmic
         || (typeof ctx._summonedBy === 'string' && isCosmicCard(ctx._summonedBy));
-      if (!byCosmic) return;
+      if (!byCosmic) return ctx._engine.summonEffektFizzelt(ctx.card, ctx.cardName, { stumm: true });   // W11/R4: wirkt nicht → Blob stumm
 
       const engine = ctx._engine;
       const gs = engine.gs;
       const pi = ctx.cardOwner;
       const ps = gs.players[pi];
       if (!ps) return;
-      if ((ps.hand || []).length === 0) return;
+      if ((ps.hand || []).length === 0) return ctx._engine.summonEffektFizzelt(ctx.card, ctx.cardName, { stumm: true });   // W11/R4: wirkt nicht → Blob stumm
 
       // Search-target check: any Cosmic Depths card present in the deck.
       const eligible = (ps.mainDeck || []).filter(n => COSMIC_DEPTHS_ANY.has(n));
-      if (eligible.length === 0) return;
+      if (eligible.length === 0) return ctx._engine.summonEffektFizzelt(ctx.card, ctx.cardName, { stumm: true });   // W11/R4: wirkt nicht → Blob stumm
 
       // Optional ("you may") — discard cost requires a confirm.
       const confirmed = await engine.promptGeneric(pi, {
@@ -77,8 +77,9 @@ module.exports = {
         confirmLabel: '🌌 Discard & Search',
         cancelLabel: 'No',
         cancellable: true,
+        searchToHand: true, searchPile: 'deck',   // Z6 (A02-22): Angebot unter Hand-/Such-Sperre unterdruecken (wie Deepsea Witch)
       });
-      if (!confirmed) return;
+      if (!confirmed) return ctx._engine.summonEffektFizzelt(ctx.card, ctx.cardName, { stumm: true });   // W11/R4: wirkt nicht → Blob stumm
 
       // Pay the discard cost (player picks the card to discard).
       await engine.actionPromptForceDiscard(pi, 1, {
@@ -94,7 +95,7 @@ module.exports = {
       const stillEligible = (ps.mainDeck || []).filter(n => COSMIC_DEPTHS_ANY.has(n));
       if (stillEligible.length === 0) {
         engine.log('life_searcher_fizzle', { player: ps.username, reason: 'no_target_post_discard' });
-        return;
+        return;   // (Abwurf ist schon bezahlt → der Effekt hat gewirkt; kein Stempel)
       }
 
       // Build deduped gallery of CD cards in deck.
@@ -112,7 +113,7 @@ module.exports = {
         description: 'Choose a "Cosmic Depths" card to add to your hand.',
         cancellable: false,
       });
-      if (!pick?.cardName) return;
+      if (!pick?.cardName) return ctx._engine.summonEffektFizzelt(ctx.card, ctx.cardName, { stumm: true });   // W11/R4: wirkt nicht → Blob stumm
       const chosen = pick.cardName;
       // Krates, the Smartass & Co.: Suche des Gegners umgebaut → Karten bereits verteilt.
       const kratesNamen = new Set(stillEligible);
@@ -124,6 +125,9 @@ module.exports = {
         engine.sync();
         return;
       }
+      // W85c (Atta, Al 29.10.): das Aufdecken ist ein Ereignis VOR dem Verschieben — löscht Atta die Karte, kommt sie nie auf die Hand.
+      const _ereignis = await engine.aufdeckTutorEreignis(pi, [chosen], CARD_NAME);
+      if (_ereignis.geloescht.includes(chosen)) { engine.shuffleDeck(pi); engine.log('life_searcher_search', { player: ps.username, card: chosen, deleted: true }); engine.sync(); return; }
       const _taken_idx = await engine.takeFromPile(ps, 'deck', chosen, { source: CARD_NAME, toHand: true });   // v820: Stapel-Schicht
       if (!_taken_idx) return;
       const inst = await engine.handZugang(ps, chosen, { von: 'deck', source: CARD_NAME });
@@ -140,7 +144,7 @@ module.exports = {
       engine.sync();
 
       const oi = engine.opponentOf(pi);
-      await engine.promptGeneric(oi, {
+      if (!_ereignis.fensterGezeigt) await engine.promptGeneric(oi, {
         type: 'deckSearchReveal',
         searchToHand: true,   // v1119: Suche AUF DIE HAND
         cardName: chosen,
@@ -148,6 +152,8 @@ module.exports = {
         title: CARD_NAME,
         cancellable: false,
       });
+      // Control Monitors: 1 Karte aus dem Deck auf die Hand, bezahlt mit 1 Abwurf.
+      await engine.meldeHandZugangAusStapel(pi, { source: CARD_NAME });
     },
   },
 
@@ -160,8 +166,16 @@ module.exports = {
     const ps = gs.players[pi];
     if (!ps) return false;
 
+    // W3/W5a (Al 14.10.2026): auch eine GELIEHENE Life-Searcher (liegt auf der Gegenseite) darf — sie wird ins Deck ihres
+    // BESITZERS gemischt („Karten werden immer ins Deck ihres originalen Besitzers gemischt"), die Suche läuft im Deck des
+    // Kontrolleurs, der Nachfolger kommt in dieselbe Zone (Brettseite des Besitzers), kontrolliert vom Kontrolleur.
+
     // Gate: ≥3 Change Counters across cards we control.
     if (totalChangeCountersOnSide(engine, pi) < 3) return false;
+
+    // ★ W64a (Al, 23.10.2026): „… into the same Support Zone this Creature occupied" — liegt die Life-Searcher in einer geteilten Zone (Alice-Stapel),
+    // wäre die Zone nach dem Zurückmischen nicht frei: sie ist für diesen Effekt kein legales Ziel (nicht aktivierbar, nichts bezahlt).
+    if (!engine.zoneFreiNachKostenzahlung(engine.physicalSide(inst), inst.heroIdx, inst.zoneSlot, inst)) return false;
 
     // Engine HOPT (creature-effect:${id}) handles the once-per-turn
     // gate naturally. No script-level HOPT needed.
@@ -175,7 +189,8 @@ module.exports = {
       if (!COSMIC_DEPTHS_CREATURES.has(n)) return false;
       const cd = cardDB[n];
       if (!cd || (cd.level ?? 0) !== targetLvl) return false;
-      return canSummonInvaderViaSource(n, CARD_NAME);
+      // 1-Invader-Limit schon bei der Auswahl, sonst geht die Karte beim Platzieren verloren.
+      return canSummonInvaderViaSource(n, CARD_NAME) && invaderLimitAllows(engine, pi, n);
     });
     if (upgrades.length === 0) return false;
     return true;
@@ -189,7 +204,14 @@ module.exports = {
     const ps = gs.players[pi];
     if (!ps) return false;
 
+    // Siehe canActivateCreatureEffect: geliehen erlaubt (W3/W5a).
+    const seite = engine.physicalSide(inst);              // Brettseite der Zone
+    const besitzerIdx = engine.kartenBesitzerVon(inst);   // Deck, in das sie gemischt wird
+    const sps = gs.players[seite];                        // Spielerzustand der Brettseite (Zonen-Arrays)
+    if (!sps) return false;
+
     if (totalChangeCountersOnSide(engine, pi) < 3) return false;
+    if (!engine.zoneFreiNachKostenzahlung(seite, inst.heroIdx, inst.zoneSlot, inst)) return false;   // W64a: Alice-Stapel kein Ziel (s. canActivateCreatureEffect)
 
     const cardDB = engine._getCardDB();
     const myLvl = cardDB[CARD_NAME]?.level ?? 3;
@@ -198,7 +220,8 @@ module.exports = {
       if (!COSMIC_DEPTHS_CREATURES.has(n)) return false;
       const cd = cardDB[n];
       if (!cd || (cd.level ?? 0) !== targetLvl) return false;
-      return canSummonInvaderViaSource(n, CARD_NAME);
+      // 1-Invader-Limit schon bei der Auswahl, sonst geht die Karte beim Platzieren verloren.
+      return canSummonInvaderViaSource(n, CARD_NAME) && invaderLimitAllows(engine, pi, n);
     });
     if (upgrades.length === 0) return false;
 
@@ -226,13 +249,13 @@ module.exports = {
 
     // ── Phase 1: Remove Life-Searcher from board, fire onCardLeaveZone,
     //             shuffle into deck ─────────────────────────────────
-    const slotArr = (ps.supportZones?.[sameHero] || [])[sameSlot] || [];
+    const slotArr = (sps.supportZones?.[sameHero] || [])[sameSlot] || [];
     const lsIdx = slotArr.indexOf(CARD_NAME);
     if (lsIdx >= 0) slotArr.splice(lsIdx, 1);
 
     // Suppress damage-number for the disappearing creature.
     engine._broadcastEvent('creature_zone_move', {
-      owner: inst.owner, heroIdx: sameHero, zoneSlot: sameSlot,
+      owner: seite, heroIdx: sameHero, zoneSlot: sameSlot,
     });
 
     await engine.runHooks('onCardLeaveZone', {
@@ -243,8 +266,8 @@ module.exports = {
     });
 
     engine._untrackCard(inst.id);
-    engine.returnToPile(ps, 'deck', CARD_NAME);
-    engine.shuffleDeck(pi);
+    engine.returnToPile(gs.players[besitzerIdx] || ps, 'deck', CARD_NAME);   // W3: ins Deck des BESITZERS
+    engine.shuffleDeck(besitzerIdx);
 
     engine.log('life_searcher_shuffle', { player: ps.username });
     engine.sync();
@@ -252,7 +275,7 @@ module.exports = {
 
     // ── Phase 2: Place upgrade in the same slot (may have been filled
     //             by another effect mid-resolve) ──────────────────────
-    const occupied = ((ps.supportZones?.[sameHero] || [])[sameSlot] || []).length > 0;
+    const occupied = ((sps.supportZones?.[sameHero] || [])[sameSlot] || []).length > 0;
     if (occupied) {
       engine.log('life_searcher_fizzle', { player: ps.username, reason: 'slot_occupied' });
       await engine.zeigeFizzle(CARD_NAME, { playerIdx: pi, grund: 'zone_taken' });   // v1360
@@ -273,7 +296,7 @@ module.exports = {
 
     engine._broadcastEvent('deck_search_add', { cardName: chosen, playerIdx: pi });
     engine._broadcastEvent('play_zone_animation', {
-      type: ANIM_PORTAL, owner: pi, heroIdx: sameHero, zoneSlot: sameSlot,
+      type: ANIM_PORTAL, owner: seite, heroIdx: sameHero, zoneSlot: sameSlot,
     });
     await engine._delay(500);
 
@@ -284,9 +307,10 @@ module.exports = {
     // IS a Cosmic card by name, so the cosmic flag is set both for
     // Invader's by-Cosmic gate (the Lv4 upgrade pool includes Invader)
     // and for Cosmic Manipulation's deck-summon reaction window.
-    await engine.summonCreatureWithHooks(chosen, pi, sameHero, sameSlot, {
+    await engine.summonCreatureWithHooks(chosen, seite, sameHero, sameSlot, {
       source: CARD_NAME,
       isPlacement: true,
+      ...(seite !== pi ? { controller: pi } : {}),   // geliehen: Nachfolger seitenfremd auf der Brettseite des Besitzers, kontrolliert vom Kontrolleur
       hookExtras: {
         _summonedBy: CARD_NAME,
         _summonedByCosmic: true,

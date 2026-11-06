@@ -81,7 +81,9 @@ module.exports = {
     return getValidTargets(gs, engine).length > 0;
   },
 
-  canActivate: (gs, pi) => {
+  canActivate: (gs, pi, engine) => {
+    // W16e (F02-15): mit Engine die echte Zielliste fragen (Helden UND Kreaturen) — wie Cure/Tea; eine gefrorene Kreatur macht Juice spielbar.
+    if (engine) return getValidTargets(gs, engine).length > 0;
     // Proactive check (no engine access) — optimistic, real check in getValidTargets
     for (let phi = 0; phi < gs.players.length; phi++) {
       const ps = gs.players[phi];
@@ -209,7 +211,7 @@ module.exports = {
         c.heroIdx === target.heroIdx && c.zoneSlot === target.slotIdx
       );
       if (inst) {
-        engine.cleanseCreatureStatuses(inst, selectedStatuses, 'Juice');
+        await engine.cleanseCreatureStatusesGefragt(inst, selectedStatuses, 'Juice');
       }
       engine._broadcastEvent('play_zone_animation', { type: 'juice_bubbles', owner: target.owner, heroIdx: target.heroIdx, zoneSlot: target.slotIdx });
     }

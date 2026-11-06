@@ -93,6 +93,13 @@ function regulaereAktionOffen(gs, pi, engine) {
 }
 
 module.exports = {
+  // ★ Z7b: FIZZELT die Karte (Wirker beim Auflösen handlungsunfähig, v1328), war sie GESPIELT → Stempel (Engine: `_noteFizzledPlay`).
+  // Eine ganz NEGIERTE Karte stempelt nicht (Als Entscheidung, Welle 3).
+  onFizzledPlay: ({ engine, gs, pi }) => { engine.claimHOPT(HOPT_KEY, pi); },
+
+  // ★ Welle 11 (Q66, Al): trifft den Gegner nur mit Nicht-Schadens-Effekten (Zwangssuche) — gegen den durch die Erste-Runden-Immunität
+  // geschützten Spieler unspielbar (`engine.ersterZugGeschuetzt`, Sperr-Stutzen `_cardBlockedBySearchLock`).
+  blockedByFirstTurnProtection: true,
   requiresTarget: false,
 
   // ★ Bedingte Zusatzaktion — s. Kopf, Stufe 1.
@@ -158,7 +165,9 @@ module.exports = {
       // ── Der Gegner sucht ────────────────────────────────────────
       const trifft = (n) => baseCardName(n) === baseCardName(genannt);   // v875
       const idx = (ops.mainDeck || []).findIndex(trifft);
-      const gefunden = idx >= 0;
+      // W16g (S03-11): „if possible“ / „if they find a card“ — verweigert `takeFromPile` die Entnahme (Siege, Knight of Kings [B], Such-/Hand-
+      // sperren), hat der Gegner nichts GEFUNDEN: keine Zieh-Frage, die Aktion wird wie bei „nicht gefunden“ verbraucht.
+      let gefunden = idx >= 0;
 
       if (gefunden) {
         const name = ops.mainDeck[idx];
@@ -168,6 +177,8 @@ module.exports = {
           await engine.handZugang(ops, name, { von: 'deck', source: CARD_NAME });
           engine.sync();
           await engine._delay(500);
+        } else {
+          gefunden = false;
         }
       }
 

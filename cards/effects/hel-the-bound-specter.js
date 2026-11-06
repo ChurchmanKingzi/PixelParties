@@ -345,7 +345,8 @@ module.exports = {
       const discHas = !!name && (ps.discardPile || []).includes(name);
       if (!name || !cd) return doDefeat('no_reference');
       if (!handHas && !discHas) return doDefeat('no_copy');
-      if (cost > 0 && (ps.goldLocked || (ps.gold || 0) < cost)) return doDefeat('cant_pay');
+      // Z6 (H02-31): Kents Kreditrahmen zaehlt (`canAffordGold` statt rohem Goldvergleich) - "by paying its Cost" wie beim Handspiel.
+      if (cost > 0 && (ps.goldLocked || !engine.canAffordGold(pi, cost, name))) return doDefeat('cant_pay');
       if (_firstFreeSupportSlot(gs.players[feld], helHeroIdx) < 0) return doDefeat('no_slot');
       if (!_helCanUseEquip(engine, feld, helHeroIdx, name)) return doDefeat('cant_equip');
       // Als Vorgabe 29.9.: uebernommene Hel nur ausruestbar, wenn die
@@ -353,22 +354,18 @@ module.exports = {
       // „If you can't, defeat this Hero".
       if (feld !== pi && !engine.kontrollRechte(feld, helHeroIdx).ausruesten) return doDefeat('cant_equip');
 
-      // Source: player chooses only when BOTH piles hold a copy
-      // (mandatory effect — they must pick one). Otherwise automatic.
+      // Source: EIN Picker mit Herkunfts-Label (CARD_API „Mehrere Quellen = ein Picker") — hält BEIDE Stapel eine Kopie, zeigt die Galerie das Artefakt zweimal (HAND / DISCARD);
+      // Pflichtwirkung, also nicht abbrechbar (kein „Cancel = Ablage" mehr). Sonst automatisch.
       let fromHand;
       if (handHas && discHas) {
         const pick = await engine.promptGeneric(pi, {
-          type: 'confirm',
+          type: 'cardGallery',
+          cards: [{ name, source: 'hand' }, { name, source: 'discard' }],
           title: CARD_NAME,
-          message: `${helHero.name}: equip "${name}" (Cost ${cost} Gold). Take it from your Hand or your Discard Pile?`,
-          showCard: name,
-          confirmLabel: '✋ From Hand',
-          cancelLabel: '🗑️ From Discard Pile',
-          cancellable: true,
+          description: `${helHero.name}: equip "${name}" (Cost ${cost} Gold). Take it from your hand or from your discard pile?`,
+          cancellable: false,
         });
-        // confirm → Hand; cancel/decline → Discard Pile (Johanna shape).
-        fromHand = !!pick
-          && !(typeof pick === 'object' && (pick.cancelled || pick.confirmed === false));
+        fromHand = pick?.source !== 'discard';
       } else {
         fromHand = handHas;
       }
@@ -384,7 +381,7 @@ module.exports = {
 
       // Pay the Cost. Only now — failure here still means "can't".
       if (cost > 0) {
-        const paid = await engine.actionSpendGold(pi, cost);
+        const paid = await engine.actionSpendGold(pi, cost, { cardName: name });
         if (!paid) return doDefeat('cant_pay');
       }
 

@@ -62,6 +62,15 @@
 const CARD_NAME    = "Smuggler's Pier";
 const GOLD_PER_CARD = 5;
 const MAX_CARDS    = 6;
+const { drawWouldBeBlocked } = require('./_draw-block-shared');
+
+// Z6: waehlbare Zahlstufen (1..maxCards), die nicht von Tuscan Artist negiert werden.
+function _stufen(engine, pi, ps) {
+  const max = Math.min(MAX_CARDS, Math.floor((ps.gold || 0) / GOLD_PER_CARD), (ps.mainDeck || []).length);
+  const out = [];
+  for (let n = 1; n <= max; n++) if (!drawWouldBeBlocked(engine, pi, n)) out.push(n);
+  return out;
+}
 
 module.exports = {
   // Active in 'hand' (for the play-time gate) and 'area' (for the
@@ -76,8 +85,12 @@ module.exports = {
    * route through that gate. Boomerang's Artifact-lockout is checked
    * upstream and doesn't need to be duplicated here.
    */
-  canActivate(gs, pi /*, engine */) {
+  canActivate(gs, pi, engine) {
+    // Als Ruling (Al 27.10.): auch der Artifact-Area ist ein SPIELEN einer Area — Reality Crack („You cannot play another Area for the rest of the turn") und W82 (Shipwrecked) sperren sie.
+    if (engine?.areaSpielGesperrt?.(pi)) return false;
     if (!gs?.areaZones) return true;
+    // Als Fix (Al 27.10.): Area-Fassungsvermoegen statt „Zone leer" — mit Spatial Crevice (Limit 3 VERSCHIEDENE Areas) ist die Pier auch bei liegenden Areas spielbar.
+    if (engine?.canPlaceAnotherArea) return engine.canPlaceAnotherArea(pi, CARD_NAME);
     return (gs.areaZones[pi] || []).length === 0;
   },
 
@@ -98,7 +111,8 @@ module.exports = {
     // an interleaved effect between play-time and resolve could in
     // theory have placed an Area. Bail cleanly without a partial
     // commit.
-    if ((gs.areaZones?.[pi] || []).length > 0) return { cancelled: true };
+    if (!engine.canPlaceAnotherArea(pi, CARD_NAME)) return { cancelled: true };   // Als Fix (Al 27.10.): Fassungsvermoegen/Dublette statt „Zone leer" (s. `canActivate`)
+    if (engine.areaSpielGesperrt(pi)) return { cancelled: true };   // Als Ruling (Al 27.10.): Reality-Crack-/Shipwrecked-Sperre (s. `canActivate`)
 
     // Find the resolving inst — the card currently held at the
     // resolving hand-index. `getResolvingHandIndex` returns the
@@ -130,9 +144,12 @@ module.exports = {
     const pi     = ctx._activator ?? ctx.cardOwner;
     const ps     = engine.gs.players[pi];
     if (!ps) return false;
-    if (ps.handLocked) return false;
+    if (ps.handLocked || ps.drawLocked) return false;   // Z6 (A09-13): auch die Zieh-Sperre (Jewel)
+    if (ps.goldLocked) return false;                    // Z6 (A09-04): "spend Gold" - Golden Arrow
     if ((ps.gold || 0) < GOLD_PER_CARD) return false;
     if ((ps.mainDeck || []).length === 0) return false;
+    // Z6 (A09-13): Tuscan Artist negiert Zuege von genau 2/3 - die Stufe 1 (oder 4+) bleibt waehlbar.
+    if (_stufen(engine, pi, ps).length === 0) return false;
     return true;
   },
 
@@ -141,7 +158,7 @@ module.exports = {
     const pi     = ctx._activator ?? ctx.cardOwner;
     const ps     = engine.gs.players[pi];
     if (!ps) return false;
-    if (ps.handLocked) return false;
+    if (ps.handLocked || ps.drawLocked || ps.goldLocked) return false;   // Z6 (A09-04, A09-13)
 
     const deckSize = (ps.mainDeck || []).length;
     if (deckSize === 0) return false;
@@ -156,6 +173,8 @@ module.exports = {
     // can pick by either dimension without doing the math themselves.
     const options = [];
     for (let cards = 1; cards <= maxCards; cards++) {
+      // Z6 (A09-13): ein von Tuscan Artist negierter Zug (genau 2/3) waere reines Geldverbrennen - nicht anbieten.
+      if (drawWouldBeBlocked(engine, pi, cards)) continue;
       const cost = cards * GOLD_PER_CARD;
       options.push({
         id: `pay-${cards}`,
@@ -176,6 +195,7 @@ module.exports = {
 
     const cards = parseInt(String(choice.optionId).replace('pay-', ''), 10);
     if (!Number.isInteger(cards) || cards < 1 || cards > maxCards) return false;
+    if (drawWouldBeBlocked(engine, pi, cards)) return false;
 
     const cost = cards * GOLD_PER_CARD;
     // Defensive re-check — async prompt could have interleaved an
@@ -190,7 +210,9 @@ module.exports = {
     // Lock further hand-additions for the rest of the turn. This is
     // the engine-canonical flag — turn-start resets it via the
     // standard cleanup path (see `_engine.js` ~L10011).
-    ps.handLocked = true;
+    // Z6 (A09-07): Kartentext "they cannot DRAW cards for the rest of the turn" - reine Zieh-Sperre wie Sacred
+    // Jewel/Prayer (`drawLocked`), NICHT die volle Hand-Sperre (die auch Suchen/Adds verbietet).
+    ps.drawLocked = true;
 
     engine.log('smugglers_pier_draw', {
       player: ps.username, cards, cost,
@@ -290,7 +312,7 @@ module.exports.cpuResponse = function cpuResponse(engine, kind, promptData) {
     // `engine` haette waehrend jedes Rollouts die ECHTE Partie belastet.
     await eng._payCardCost(cpuIdx, cost);
     for (let i = 0; i < cards; i++) ps.hand.push(deck.shift());
-    ps.handLocked = true;
+    ps.drawLocked = true;   // Z6 (A09-07)
     return true;
   };
 

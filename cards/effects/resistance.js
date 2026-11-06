@@ -7,8 +7,16 @@
 //  Lv2: Block the first 2 statuses/effects per turn.
 //  Lv3: Block ALL statuses/effects (permanent).
 //
-//  "Except damage" — only status application is
-//  intercepted, not HP/ATK changes from damage.
+//  "Except damage" — Welle 13 (Q144, Al: „Es soll *jeden*
+//  Nicht-Schaden-Effekt blocken!"): Resistance fängt JEDEN
+//  Nicht-Schaden-Effekt auf den Träger ab — Status, Heilung,
+//  Buffs, Max-HP-Gewinn (Life Serum), Entfernen aus dem Spiel
+//  (Teleportation Powder), fremden Ability-Abwurf, dauerhafte
+//  Kontrolle. Alle Wege fragen den Hook `beforeHeroEffect`
+//  (Status: `onStatusApplied`); neue Wege über den zentralen
+//  Prüfer `engine.heroNonDamageEffectBlocked(...)`.
+//  Schaden bleibt unberührt. Welle 7 gilt weiter: Resistance
+//  ruht bei Frost/Betäubung/„Abilities negiert".
 //
 //  Block counter tracked on gs._resistanceBlocks
 //  (keyed by "playerIdx:heroIdx") and reset each
@@ -55,15 +63,14 @@ module.exports = {
 
       const hero = gs.players[pi]?.heroes?.[heroIdx];
       if (!hero?.name || hero.hp <= 0) return;
+      // ★ W7a (Al 14.10.2026): ein laufender Ability-Schutz — ruht bei Frost/Betäubung/„Abilities negiert" des Helden.
+      if (engine._isHeroAbilityPassiveSilenced(pi, heroIdx)) return;
 
-      // Compute level + slot
-      const abZones = gs.players[pi]?.abilityZones?.[heroIdx] || [];
-      let level = 0;
-      let zoneSlot = -1;
-      for (let z = 0; z < abZones.length; z++) {
-        const slot = abZones[z] || [];
-        if (slot.length > 0 && slot[0] === CARD_NAME) { level = slot.length; zoneSlot = z; break; }
-      }
+      // Compute level + slot — 24.10.: echte Ability Zonen UND Support-Stapel (Xal)
+      const eintrag = engine.abilityStapelEintrag(pi, heroIdx, CARD_NAME);
+      const level = eintrag ? eintrag.namen.length : 0;
+      const zoneSlot = eintrag ? eintrag.slot : -1;
+      const zoneKind = eintrag ? eintrag.art : 'ability';
       if (level === 0) return;
 
       // Check block budget
@@ -86,7 +93,7 @@ module.exports = {
       // players, makes "an effect was just absorbed" obvious without
       // hunting through the log.
       if (zoneSlot >= 0) {
-        engine._broadcastEvent('ability_block_flash', { owner: pi, heroIdx, zoneIdx: zoneSlot });
+        engine._broadcastEvent('ability_block_flash', { owner: pi, heroIdx, zoneIdx: zoneSlot, zoneKind });
       }
       engine.sync();
     },
@@ -102,6 +109,9 @@ module.exports = {
 
       const statusName = ctx.statusName;
       if (!statusName) return;
+      // ★ 23.10. (Tearing Mountain: „any effects that would prevent targets from being Burned are negated"): der Engine-Pfad meldet, dass jeder Schutz vor
+      // diesem Status aufgehoben ist — Resistance fängt ihn dann nicht ab (und verbraucht keine Ladung).
+      if (ctx.schutzAufgehoben) return;
 
       // ── SCHUTZ-STATUS DER ENGINE NIE ABFANGEN (v328, Als Report) ────
       // `shielded` ist der Anfangsschutz aus der Turn-1-Regel: die Engine
@@ -133,18 +143,23 @@ module.exports = {
       // If another Resistance instance already removed this status, skip
       if (!hero.statuses?.[statusName]) return;
 
-      // Compute level from the ability zone slot
-      const abZones = gs.players[pi]?.abilityZones?.[heroIdx] || [];
-      let level = 0;
-      let zoneSlot = -1;
-      for (let z = 0; z < abZones.length; z++) {
-        const slot = abZones[z] || [];
-        if (slot.length > 0 && slot[0] === CARD_NAME) {
-          level = slot.length;
-          zoneSlot = z;
-          break;
-        }
+      // ★ W7a (Al 14.10.2026): Resistance ist ein laufender Ability-Passiv und ruht, solange der Held gefroren/betäubt/„Abilities
+      // negiert" ist. Das `bypassStatusFilter` bleibt nötig (der Status, der gerade auflag, würde den Hook sonst selbst stummschalten);
+      // deshalb zählt für die Frage nur der Zustand OHNE den eingehenden Status.
+      {
+        const eingehend = hero.statuses[statusName];
+        delete hero.statuses[statusName];
+        let ruht = false;
+        try { ruht = engine._isHeroAbilityPassiveSilenced(pi, heroIdx); }
+        finally { hero.statuses[statusName] = eingehend; }
+        if (ruht) return;
       }
+
+      // Compute level from the ability zone slot — 24.10.: echte Ability Zonen UND Support-Stapel (Xal)
+      const eintrag = engine.abilityStapelEintrag(pi, heroIdx, CARD_NAME);
+      const level = eintrag ? eintrag.namen.length : 0;
+      const zoneSlot = eintrag ? eintrag.slot : -1;
+      const zoneKind = eintrag ? eintrag.art : 'ability';
       if (level === 0) return;
 
       // Check block budget (Lv3 = unlimited)
@@ -187,7 +202,7 @@ module.exports = {
       // absorbed by Resistance" signal than the previous gold sparkle
       // on the hero zone (which read like an activation, not a block).
       if (zoneSlot >= 0) {
-        engine._broadcastEvent('ability_block_flash', { owner: pi, heroIdx, zoneIdx: zoneSlot });
+        engine._broadcastEvent('ability_block_flash', { owner: pi, heroIdx, zoneIdx: zoneSlot, zoneKind });
       }
       engine.sync();
     },

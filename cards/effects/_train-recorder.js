@@ -772,10 +772,14 @@ function attachTrainingRecorder(engine, { pinnedIdx, pinnedName, opponentName, f
   // Karte selbst — der afterArtifactUsed-Hook (server.js, Universal
   // observer) ist die verlässliche Play-Quelle und schließt die
   // Report-Unterzählung (Amethyst 3/700 trotz realer Plays).
+  // Zustandslog fürs CPU-Wertnetz (PP_VALUE_NET=log, siehe _value-encode.js): ohne den Schalter entsteht nichts und es läuft alles wie bisher.
+  const valueEnc = require('./_value-encode');
+  const valueLog = valueEnc.enabled() ? new valueEnc.ValueLog(engine) : null;
   const origRunHooks = engine.runHooks.bind(engine);
   engine.runHooks = async function (hookName, hookCtx = {}) {
     const result = await origRunHooks(hookName, hookCtx);
     sampleEval();
+    if (valueLog && (hookName === 'onTurnStart' || hookName === 'onAnyActionResolved')) valueLog.capture(hookName === 'onTurnStart' ? 0 : 1);
     try {
       if (hookName === 'afterSpellResolved') {
         // Spells AND Attacks funnel through here. Only count the pinned
@@ -1063,7 +1067,7 @@ function attachTrainingRecorder(engine, { pinnedIdx, pinnedName, opponentName, f
       // Lage. Daraus fittet der Trainer `costDiscardRules`.
       const costDiscards = (engine._costDiscardLog || [])
         .filter(e => e.pi === pinnedIdx)
-        .map(({ c, t, paid, card, tags }) => ({ c, t, paid: paid ? 1 : 0, card: card || null, tags: tags || [] }));
+        .map(({ c, t, paid, card, cards, tags }) => ({ c, t, paid: paid ? 1 : 0, card: card || null, ...(cards ? { cards } : {}), tags: tags || [] }));   // W77b: `cards` = Stapel-Abwurf (Cute Hydra)
       // Surprise-Fire/Hold-Log der pinned Seite (Surprise-Lernkanal).
       const surpriseDecisions = (engine._surpriseLog || [])
         .filter(e => e.pi === pinnedIdx)
@@ -1196,7 +1200,8 @@ function attachTrainingRecorder(engine, { pinnedIdx, pinnedName, opponentName, f
         for (let hi = 0; hi < (heroes.length || 0); hi++) {
           const names = [];
           for (const slot of (ps?.supportZones?.[hi] || [])) {
-            if (slot && slot.length > 0) names.push(slot[0]);
+            // Darion: ein Equip-Stapel haelt mehrere verschiedene Karten - jede (je Name einmal) zaehlt fuer die Paar-Statistik (wie `boardPairBonus` in _deck-profile).
+            if (slot && slot.length > 0) for (const n of new Set(slot)) names.push(n);
           }
           for (const slot of (ps?.abilityZones?.[hi] || [])) {
             if (slot && slot.length > 0) names.push(slot[0]);
@@ -1243,7 +1248,7 @@ function attachTrainingRecorder(engine, { pinnedIdx, pinnedName, opponentName, f
         // Rauchtest liest das Feld und weiss es sofort.
         _decisionDiag = _dlm.diagnose(engine);
       } catch { /* egal */ }
-      return {
+      const record = {
         deck: pinnedName,
         opponent: opponentName,
         decisions: _decisions,
@@ -1359,6 +1364,16 @@ function attachTrainingRecorder(engine, { pinnedIdx, pinnedName, opponentName, f
         equips,
         locks,
       };
+      // Schattenmodus des Wertnetzes (PP_VALUE_NET=shadow): Paare aus Evaluator und Netz samt Zeiten in die Zeile (sonst nichts).
+      if (process.env.PP_VALUE_NET === 'shadow') { const sm = require('./_value-shadow').summary(engine); if (sm) record.valueShadow = sm; }
+      // Denkzeit je Sitz (Millisekunden; die Uhr wechselt am Zugbeginn, siehe makeCpuDriver in server.js) und Kosten des Netzes als Blatt
+      if (engine._seatClock) { const c = engine._seatClock; (engine._seatMs || (engine._seatMs = [0, 0]))[c.seat === 1 ? 1 : 0] += Date.now() - c.t0; engine._seatClock = null; }
+      if (engine._seatMs) record.seatMs = engine._seatMs.map(v => Math.round(v));
+      if (engine._valueLeaf) record.valueLeaf = { calls: engine._valueLeaf.calls, ms: engine._valueLeaf.ms.map(v => +v.toFixed(1)) };
+      if (engine._greedyProbe) record.greedyProbe = engine._greedyProbe;
+      // Zustandslog hängt UNSICHTBAR am Record (nicht aufzählbar → nie in der jsonl); der Aufrufer packt ihn nach dem Schreiben der Zeile.
+      if (valueLog) Object.defineProperty(record, '_valueLog', { value: valueLog, enumerable: false });
+      return record;
     },
   };
 }

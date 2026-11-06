@@ -54,7 +54,7 @@ function kandidaten(engine, pi, seite, heroIdx) {
   for (const besitzer of piles) {
     for (const name of (engine.gs.players[besitzer]?.discardPile || [])) {
       if (gesehen.has(name) || !istEquip(engine, name)) continue;
-      if (!istAusruestTraeger(engine, pi, heroIdx, name, seite)) continue;
+      if (!istAusruestTraeger(engine, pi, heroIdx, name, seite, besitzer)) continue;   // W14b (Q153): Control Device nur aus der Gegner-Ablage
       gesehen.add(name);
       out.push({ name, besitzer });
     }
@@ -114,7 +114,7 @@ module.exports = {
 
     // ── 2. Platz: eine freie Basis-Support-Zone des Nutzers ──
     const zps = gs.players[seite];
-    const frei = freieBasisZonen(zps, casterIdx, engine, seite);
+    const frei = freieBasisZonen(zps, casterIdx, engine, seite, name);   // Darion: mit dem Kartennamen — ein Held mit Equip-Stapel hat nur diesen einen Platz (keine Zonenwahl, keine freie Zone noetig)
     if (frei.length === 0) return;
     let slot = frei[0];
     if (frei.length > 1) {

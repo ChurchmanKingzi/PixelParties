@@ -41,6 +41,7 @@ const {
   countDifferentRebelliokaiInDiscard,
 } = require('./_rebelliokai-shared');
 
+const { drawBlockedFor } = require('./_draw-block-shared');   // D1: Regel von Al - reine Zieh-Aktivierungen unter Zieh-/Hand-Sperre gesperrt
 const CARD_NAME = 'Rebelliokai Timid Tanuki';
 
 module.exports = {
@@ -132,8 +133,12 @@ module.exports = {
     // Kontrolle statt Seite (Styx 28.9.): „your discard pile" = Kontrolleur.
     const ps     = engine.gs.players[ctx.cardOwner];
     if (!ps) return false;
-    if (ps.handLocked) return false;
-    return countDifferentRebelliokaiInDiscard(ps, engine, 3) > 0;
+    if (drawBlockedFor(engine, ctx.cardOwner)) return false;   // D1: reiner Zug - auch unter der Zieh-Sperre (drawLocked) gesperrt
+    const n = countDifferentRebelliokaiInDiscard(ps, engine, 3);
+    // W16c (A06-30, Ruling 16.8. in _draw-block-shared): Zug ist der einzige Nutzen - wuerde Tuscan Artist genau diese Menge (2/3) negieren,
+    // ist der Effekt gesperrt (ausgegraut) und verbraucht sein Einmal-pro-Zug nicht.
+    if (drawBlockedFor(engine, ctx.cardOwner, n)) return false;
+    return n > 0;
   },
 
   async onCreatureEffect(ctx) {
@@ -144,6 +149,7 @@ module.exports = {
 
     const draws = countDifferentRebelliokaiInDiscard(ps, engine, 3);
     if (draws <= 0) return false;
+    if (drawBlockedFor(engine, pi, draws)) return false;   // W16c (A06-30): Tuscan Artist negiert den Zug -> Effekt feuert nicht (kein Stempel)
 
     await engine.actionDrawCards(pi, draws, { source: CARD_NAME });
 

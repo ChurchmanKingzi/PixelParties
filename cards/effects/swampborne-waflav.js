@@ -59,7 +59,7 @@ module.exports = {
    */
   async onAscensionBonus(engine, pi, heroIdx) {
     await W.applyStatusOnAscension(engine, pi, CARD_NAME, 'poisoned', {
-      stacks: 1, animationType: 'poison_tick',
+      stacks: 1, addStacks: true, animationType: 'poison_tick',
       description: 'Choose any target on the board and apply 1 Stack of Poison to it.',
       confirmLabel: '☠️ Poison!',
       confirmClass: 'btn-danger',

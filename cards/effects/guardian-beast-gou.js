@@ -54,6 +54,7 @@ const {
   buildAllBoardTargets,
 } = require('./_guardian-beasts-shared');
 const { ablageLoeschKostenMoeglich } = require('./_guardian-beasts-shared');   // v1398
+const { hatName } = require('./_alias-name');
 
 const CARD_NAME = 'Guardian Beast Gou';
 const BUFF_NAME = 'gou_protected';
@@ -101,6 +102,8 @@ function countEligibleOwnTargets(engine, pi, selfInstId) {
     if (inst.zone !== 'support' || inst.faceDown) continue;
     if (inst.id === selfInstId) continue;
     if (inst.name === CARD_NAME) continue;
+    // W16d (A07-10): nur Kreaturen zählen (Ausrüstung ist kein „target on the board")
+    if (!engine.isChoosableAsCreature(inst, engine.getEffectiveCardData(inst) || engine._getCardDB()[inst.name])) continue;
     n++;
   }
   return n;
@@ -111,7 +114,7 @@ function buildProtectableTargets(engine) {
   // off-limits. ALL other on-board targets (yours or opp's, hero or
   // creature) are eligible per the text "the same number of targets
   // on the board".
-  return buildAllBoardTargets(engine).filter(t => t.cardName !== CARD_NAME);
+  return buildAllBoardTargets(engine).filter(t => !(t.cardInstance ? hatName(t.cardInstance, CARD_NAME) : t.cardName === CARD_NAME));   // Shroomasaur mit dem Namen Gou ist ebenfalls ausgenommen
 }
 
 /**
@@ -148,6 +151,7 @@ function isStillProtected(engine, target) {
 }
 
 module.exports = {
+  buildProtectableTargets,   // W73f: für den Namensreferenz-Test
   // ★★ v1182 — ENTKOPPELTE BILDER (CARD_API): wird die Karte NEGIERT,
   // laeuft ihr Effekt-Rumpf nie — die Engine spielt dann diese Bilder.
   // Im normalen Weg bleibt es bei den Broadcasts im Effekt selbst.
@@ -159,6 +163,10 @@ module.exports = {
   // ^ Tagged for Blinded gating — see cards/effects/_hooks.js (blinded status).
   activeIn: ['support'],
   creatureEffect: true,
+  // ★ W7a (A07-14, Al 14.10.2026): der erteilte Schutz ist eine an ANDERE Karten VERGEBENE Wirkung, kein laufender Passiv Gous —
+  // er bleibt, auch wenn Gou danach gefroren/betäubt/negiert wird (nur der Abgang vom Brett beendet ihn vorzeitig). Alle Hooks der
+  // Karte betreffen nur diesen Schutz (Schild + Aufräumen) und laufen deshalb immer.
+  bypassStatusFilter: true,
 
   canSummon: canSummonGuardianBeast,
   inherentAction: (gs, pi) => inherentActionForFirstSummon(gs, pi),

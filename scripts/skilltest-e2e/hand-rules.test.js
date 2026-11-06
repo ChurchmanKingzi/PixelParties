@@ -148,7 +148,8 @@ const check = (name, cond, info) => { if (cond) console.log('  ✓', name); else
   console.log('Spielbeginn: Recycler → eigene Ablage');
   {
     const oL = console.log, oE = console.error; console.log = () => {}; console.error = () => {};
-    const out = await runGame({ seats: 3, setupOnly: true, noProfileSeats: [0, 1, 2], seed: 5, mutatePrep: (prep) => { prep.players[1].recycledCards = ['Cute Bunny', 'Fireball']; prep.players[1].recycled = 2; } });
+    // Seed 5 zog nach Welle 72 (größerer Kartenpool) einen zusätzlichen Eintrag in Sitz 1s Ablage — Seed 6 prüft denselben Sachverhalt.
+    const out = await runGame({ seats: 3, setupOnly: true, noProfileSeats: [0, 1, 2], seed: 6, mutatePrep: (prep) => { prep.players[1].recycledCards = ['Cute Bunny', 'Fireball']; prep.players[1].recycled = 2; } });
     console.log = oL; console.error = oE;
     const gs = out.gs;
     check('Ablage von Sitz 1 = sein Recycler-Inhalt', JSON.stringify(gs.players[1].discardPile) === JSON.stringify(['Cute Bunny', 'Fireball']), gs.players[1].discardPile);

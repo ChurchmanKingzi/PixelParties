@@ -73,18 +73,81 @@ function _validVictims(engine, pi) {
     if ((inst.controller ?? inst.owner) !== oi) continue;
     const cd = engine.getEffectiveCardData(inst) || cardDB[inst.name];
     if (!cd || !hasCardType(cd, 'Creature')) continue;
-    if (engine.isOmniImmune(inst)) continue;          // Cardinal / omni
+    if (engine.isOmniImmune(inst, pi)) continue;      // Cardinal / omni (Golden Wings: nur gegen den Gegner, W17b)
     if (inst.counters?._damageDestroyImmune) continue; // Time Bomblebee armed
     if (inst.counters?.immovable) continue;
     if (inst.counters?._stealImmortal) continue;      // Stolen-and-immortal
-    out.push({
-      id: `equip-${inst.owner}-${inst.heroIdx}-${inst.zoneSlot}`,
-      type: 'equip', owner: inst.owner,
-      heroIdx: inst.heroIdx, slotIdx: inst.zoneSlot,
-      cardName: inst.name, cardInstance: inst,
-    });
+    // ★ W64a (Al, 23.10.2026): „Creatures in einer geteilten Zone sind für diese Effekte schlicht keine legalen Ziele" — die Piranhas nimmt den Platz des
+    // Besiegten ein; liegt dort noch eine Karte (Alice-Stapel), wäre die Zone danach nicht frei. Nur Zonen mit genau EINER Karte.
+    if (!engine.zoneFreiNachKostenzahlung(engine.physicalSide(inst), inst.heroIdx, inst.zoneSlot, inst)) continue;
+    out.push(engine.kreaturZiel(inst));   // Z1: ID/owner = Brettseite
   }
   return out;
+}
+
+/**
+ * KOSTEN: gegnerische Kreatur wählen und besiegen. `false` = abgebrochen / nicht möglich (nichts bezahlt bzw. Rettung),
+ * sonst `{ victimName, destHi, destSlot, vSeite }` für die Platzierung. Eine Stelle für `paySummonCost` und den Fallback.
+ */
+async function _zahleKosten(ctx) {
+  const engine = ctx._engine;
+  const gs = engine.gs;
+  const pi = ctx.cardOwner;
+  const ps = gs.players[pi];
+  if (!ps) return false;
+  if (_hoptUsed(gs, pi)) return false;
+
+  const victims = _validVictims(engine, pi);
+  if (victims.length === 0) return false;
+
+  // ── Step 1: pick the opp Creature to defeat ────────────────
+  const picked = await engine.promptEffectTarget(pi, victims, {
+    maxTotal: 1,   // Einfachauswahl: ein Klick TAUSCHT das Ziel
+    title: FULL_NAME,
+    description: 'Choose an opponent Creature to defeat. The Piranhas takes its slot.',
+    confirmLabel: '🐟 Devour!',
+    confirmClass: 'btn-danger',
+    cancellable: true,
+    exclusiveTypes: true,
+    maxPerType: { equip: 1 },
+  });
+  if (!picked || picked.length === 0) return false;
+  const victim = victims.find(t => t.id === picked[0]);
+  if (!victim?.cardInstance) return false;
+
+  const targetInst = victim.cardInstance;
+  const destHi = targetInst.heroIdx;
+  const destSlot = targetInst.zoneSlot;
+  // Z1 (C01-06): die Zone des Opfers liegt auf seiner BRETTSEITE (`vSeite`) — bei einer vom
+  // Gegner gestohlenen EIGENEN Kreatur ist das MEINE Seite, nicht die des Gegners.
+  const vSeite = engine.physicalSide(targetInst);
+  const ops = gs.players[vSeite];
+  if (!ops) return false;
+
+  // ── Step 2: defeat the chosen Creature ─────────────────────
+  // Use actionDestroyCard so on-death hooks fire (Phoenix revive,
+  // Loyal Terrier chain, etc.). Source is the Piranhas (owned by
+  // us) so reactions correctly attribute the kill.
+  const dummySource = { name: FULL_NAME, owner: pi, heroIdx: -1 };
+  await engine.actionDestroyCard(dummySource, targetInst, {
+    fireCreatureDeath: true,
+  });
+
+  // If the target was rescued (Cool Rescuer Monia, Cosmic
+  // Malfunction, …) the destroy fizzled — bail and DON'T claim the
+  // HOPT (the play didn't go through).
+  if (targetInst.zone === 'support') {
+    engine.log('piranhas_fizzle', {
+      player: ps.username, reason: 'destroy_blocked',
+      target: targetInst.name,
+    });
+    return false;
+  }
+
+  // ★ Welle 11 (Q72, Al: „b falls möglich, aber es muss eine Zone desselben Heroes sein, wähle automatisch die erstbeste,
+  // sonst c."): belegt ein Todes-Effekt (Cute Bird → Cute Phoenix, Wiederbelebung …) die Zone sofort wieder, ist das KEIN
+  // Fizzle mehr — die Ersatzzone (erste freie Zone desselben Helden) bzw. die Ablage entscheidet `beforeSummon` (`_ersatzzone`).
+  return { victimName: victim.cardName, destHi, destSlot, vSeite };
 }
 
 module.exports = {
@@ -122,70 +185,50 @@ module.exports = {
     return _validVictims(engine, pi).length > 0;
   },
 
+  // ★ W4b (Al, Welle 4): das Besiegen der gegnerischen Kreatur ist der KOSTENPUNKT („… and defeat it to play this card").
+  // Wahl + Tod laufen VOR dem Reaktionsfenster der Beschwörung (`paySummonCost`); wird die Beschwörung danach komplett
+  // negiert (Off Duty …), bleibt die Kreatur besiegt, die Piranhas gehen in die Ablage und die Rundengrenze bleibt frei.
+  // `beforeSummon` platziert danach nur noch in den frei gewordenen Platz (ohne `paySummonCost`, z. B. bei
+  // Effekt-Beschwörungen, zahlt es wie früher selbst).
+  paySummonCost: async (ctx) => _zahleKosten(ctx),
+
   beforeSummon: async (ctx) => {
     const engine = ctx._engine;
     const gs = engine.gs;
     const pi = ctx.cardOwner;
     const ps = gs.players[pi];
     if (!ps) return false;
-    if (_hoptUsed(gs, pi)) return false;
 
-    const victims = _validVictims(engine, pi);
-    if (victims.length === 0) return false;
-
-    // ── Step 1: pick the opp Creature to defeat ────────────────
-    const picked = await engine.promptEffectTarget(pi, victims, {
-      maxTotal: 1,   // Einfachauswahl: ein Klick TAUSCHT das Ziel
-      title: FULL_NAME,
-      description: 'Choose an opponent Creature to defeat. The Piranhas takes its slot.',
-      confirmLabel: '🐟 Devour!',
-      confirmClass: 'btn-danger',
-      cancellable: true,
-      exclusiveTypes: true,
-      maxPerType: { equip: 1 },
-    });
-    if (!picked || picked.length === 0) return false;
-    const victim = victims.find(t => t.id === picked[0]);
-    if (!victim?.cardInstance) return false;
-
-    const targetInst = victim.cardInstance;
-    const oi = engine.opponentOf(pi);
-    const destHi = targetInst.heroIdx;
-    const destSlot = targetInst.zoneSlot;
-    const ops = gs.players[oi];
+    const kosten = ctx._summonKosten || await _zahleKosten(ctx);
+    if (!kosten) return false;
+    const { victimName, destHi, vSeite } = kosten;
+    let destSlot = kosten.destSlot;
+    const ops = gs.players[vSeite];
     if (!ops) return false;
+    const oi = engine.opponentOf(pi);
 
-    // ── Step 2: defeat the chosen Creature ─────────────────────
-    // Use actionDestroyCard so on-death hooks fire (Phoenix revive,
-    // Loyal Terrier chain, etc.). Source is the Piranhas (owned by
-    // us) so reactions correctly attribute the kill.
-    const dummySource = { name: FULL_NAME, owner: pi, heroIdx: -1 };
-    await engine.actionDestroyCard(dummySource, targetInst, {
-      fireCreatureDeath: true,
-    });
-
-    // If the target was rescued (Cool Rescuer Monia, Cosmic
-    // Malfunction, …) the destroy fizzled — bail and DON'T claim the
-    // HOPT (the play didn't go through).
-    if (targetInst.zone === 'support') {
-      engine.log('piranhas_fizzle', {
-        player: ps.username, reason: 'destroy_blocked',
-        target: targetInst.name,
-      });
-      return false;
-    }
-
-    // The destroy may have triggered an on-death effect that re-
-    // occupies the slot (revives, cluster summons, etc.). If so,
-    // there's no opening for the Piranhas — fizzle without claiming
-    // the HOPT.
-    const slotAfter = ((ops.supportZones?.[destHi] || [])[destSlot] || []);
-    if (slotAfter.length > 0) {
-      engine.log('piranhas_fizzle', {
-        player: ps.username, reason: 'slot_reoccupied',
-        target: victim.cardName,
-      });
-      return false;
+    // Der Platz kann sofort nach dem Besiegen (Cute Phoenix …) oder im Reaktionsfenster belegt worden sein.
+    // Q72 (Al): (b) automatisch die erste freie Zone DESSELBEN Helden, sonst (c) die Piranhas geht in die Ablage
+    // (Opfer ist gefallen, Kosten bezahlt, Karte gespielt und verloren; die Rundengrenze ist verbraucht).
+    if (((ops.supportZones?.[destHi] || [])[destSlot] || []).length > 0) {
+      const ersatz = engine.getFreeSupportZones(vSeite).find(z => z.heroIdx === destHi);
+      if (ersatz) {
+        engine.log('piranhas_ersatzzone', { player: ps.username, target: victimName, slot: ersatz.slotIdx });
+        destSlot = ersatz.slotIdx;
+      } else {
+        const handIdx0 = ctx._summonedFromPile ? -1 : (ps.hand || []).indexOf(FULL_NAME);   // W66b: aus Ablage/Deck beschworen (Skullmael, Forceful Revival …) kommt sie NICHT von der Hand — keine andere Kopie von dort nehmen
+        if (handIdx0 >= 0) {
+          engine.takeFromPileSync(ps, 'hand', handIdx0);
+          engine.notePlayedFromHand(pi);
+        }
+        const ablageSeite = engine._consumeHandCardOrigin(pi, FULL_NAME);
+        (gs.players[ablageSeite]?.discardPile || ps.discardPile).push(FULL_NAME);
+        _stampHopt(gs, pi);
+        ps._placementConsumedByCard = FULL_NAME;
+        engine.log('piranhas_verworfen', { player: ps.username, reason: 'no_free_zone_on_hero', target: victimName });
+        engine.sync();
+        return false;
+      }
     }
 
     // ── Step 3: place the Piranhas on OPP'S side ──────────────
@@ -194,8 +237,9 @@ module.exports = {
     // manually correct `originalOwner` back to us so destruction
     // routes the card to OUR discard pile (it WAS our card; opp
     // shouldn't get to recover it via their pile).
-    const placeRes = engine.summonCreature(FULL_NAME, oi, destHi, destSlot, {
+    const placeRes = engine.summonCreature(FULL_NAME, vSeite, destHi, destSlot, {
       source: FULL_NAME,
+      ...(vSeite !== oi ? { controller: oi } : {}),   // Z1: liegt in meiner Zone, wird vom Gegner kontrolliert
     });
     if (!placeRes) {
       engine.log('piranhas_fizzle', {
@@ -205,14 +249,14 @@ module.exports = {
     }
     const inst = placeRes.inst;
     inst.originalOwner = pi; // discard routes back to us, not opp
-    inst.controller = oi;    // explicit — already true via owner
+    inst.controller = oi;    // explicit — already true via owner (Z1: bei seitenfremder Zone gesetzt von `controller`)
 
     // Remove the card from our hand (the standard server flow
     // would do this for a normal summon, but we're bypassing it
     // via `_placementConsumedByCard` below). Splice the FIRST
     // matching name; the server's `_resolvingCard` flag pins
     // which copy is the in-flight one.
-    const handIdx = (ps.hand || []).indexOf(FULL_NAME);
+    const handIdx = ctx._summonedFromPile ? -1 : (ps.hand || []).indexOf(FULL_NAME);   // W66b (siehe oben)
     if (handIdx >= 0) {
       engine.takeFromPileSync(ps, 'hand', handIdx);
       engine.notePlayedFromHand(pi);
@@ -221,7 +265,7 @@ module.exports = {
     // Visual: many bites on the host hero zone.
     engine._broadcastEvent('play_zone_animation', {
       type: 'piranha_bites',
-      owner: oi, heroIdx: destHi, zoneSlot: -1,
+      owner: vSeite, heroIdx: destHi, zoneSlot: -1,
     });
     await engine._delay(700);
 
@@ -230,7 +274,7 @@ module.exports = {
 
     engine.log('piranhas_summon', {
       player: ps.username,
-      victim: victim.cardName,
+      victim: victimName,
       hostHero: ops.heroes?.[destHi]?.name,
     });
     engine.sync();
@@ -250,20 +294,23 @@ module.exports = {
       // under the opp's ownership in beforeSummon, so cardOwner is opp
       // and isMyTurn is true exactly at the end of opp's turn — which
       // is the spec ("end of each of its controller's turns").
-      if (!ctx.isMyTurn) return;
       const inst = ctx.card;
       if (!inst || inst.zone !== 'support') return;
       const engine = ctx._engine;
       const gs = engine.gs;
-      const controller = ctx.cardOwner;
 
       const host = ctx.attachedHero;
       if (!host?.name || host.hp <= 0) return;
+      // ★ Welle 11 (Q69, Al): „Der Schaden wird am Ende der Runde des Spielers applied, der aktuell die
+      // permanente Kontrolle über den Hero in question hält." — nicht der Kontrolleur der Piranhas, sondern
+      // der des Wirtshelden (Brettseite, bei dauerhafter Übernahme `permaControlBy`; Charme zählt nicht).
+      const controller = host.permaControlBy ?? engine.physicalSide(inst);
+      if (gs.activePlayer !== controller) return;
 
       // Animation: bites land on host hero.
       engine._broadcastEvent('play_zone_animation', {
         type: 'piranha_bites',
-        owner: controller, heroIdx: inst.heroIdx, zoneSlot: -1,
+        owner: ctx.cardHeroOwner ?? controller, heroIdx: inst.heroIdx, zoneSlot: -1,   // Z1: Brettseite
       });
       await engine._delay(450);
 

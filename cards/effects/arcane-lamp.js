@@ -39,7 +39,8 @@ const CARD_NAME = 'Arcane Lamp';
 function heroCanBeBurned(hero, engine = null, quelle = null) {
   if (!hero?.name || hero.hp <= 0) return false;
   if (hero.statuses?.burned) return false;
-  if (hero.statuses?.immune) return false;
+  if (engine?.statusSchutzAufgehoben?.('burned', hero)) return true;   // 23.10. Tearing Mountain: kein Schutz verhindert Burn — jeder Held ist ein Ziel
+  // W16e (F01-20): `statuses.immune` (Auftau-Puffer) schuetzt nur vor Frozen/Stunned/Negated/Bound (`CC_STATUSES`), nicht vor Brand — kein Ausschluss.
   // Charme schuetzt nur in seiner Auspraegung (Charme Lv3: alles, Golden
   // Apple: nur gegen den Kontrolleur, Styx: gar nicht) — `_charmBlocksFrom`.
   if (hero.statuses?.charmed && (engine?._charmBlocksFrom ? engine._charmBlocksFrom(hero, quelle) : true)) return false;
@@ -54,6 +55,9 @@ function gegnerHelden(gs, oi, engine) {
 }
 
 module.exports = {
+  // ★ Welle 12 (B-06, Al: „Eine Karte, deren Effekt komplett nutzlos wäre, ist nicht spielbar."): trifft NUR den Gegner — gegen den durch die
+  // Erste-Runden-Immunität geschützten Spieler unspielbar (Karte bleibt auf der Hand, keine Aktion/Kosten/Einmal-Stempel; `engine.ersterZugGeschuetzt`).
+  blockedByFirstTurnProtection: true,
   isTargetingArtifact: true,
 
   canActivate(gs, pi, engine) {

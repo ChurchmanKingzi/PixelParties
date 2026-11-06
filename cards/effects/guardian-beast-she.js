@@ -126,21 +126,12 @@ module.exports = {
       if (tgt.type === 'hero') {
         const hero = engine.gs.players[tgt.owner]?.heroes?.[tgt.heroIdx];
         if (!hero || hero.hp <= 0) continue;
-        const wasPoisoned = !!hero.statuses?.poisoned;
-        if (wasPoisoned) {
-          // Target already poisoned → bump stack count by 1 (= +30 dmg
-          // per tick). Don't go through addHeroStatus's surprise-check
-          // path again; just write the stack directly so we don't
-          // accidentally re-apply Surprise redirects.
-          const cur = hero.statuses.poisoned;
-          cur.stacks = (cur.stacks || 1) + 1;
-          cur.permanent = true;
-          engine.log('status_add', { target: hero.name, status: 'poisoned', addStacks: 1, by: CARD_NAME });
-        } else {
-          await engine.addHeroStatus(tgt.owner, tgt.heroIdx, 'poisoned', {
-            permanent: true, addStacks: 1, appliedBy: pi, by: CARD_NAME,
-          });
-        }
+        // „1 Stack of Poison": auch ein schon vergifteter Held bekommt den Stapel über `addHeroStatus` (stapelt dort selbst um +1) — nur so
+        // greifen Schilde/Immunitäten (Erste-Runde-Schild, Johanna, Light Ball, negative_status_immune, Submerged) und Umleitungen (Cactus Creature).
+        // Ein direktes Hochzählen von `stacks` umging sie alle.
+        await engine.addHeroStatus(tgt.owner, tgt.heroIdx, 'poisoned', {
+          permanent: true, addStacks: 1, appliedBy: pi, by: CARD_NAME,
+        });
       } else if (tgt.cardInstance) {
         const inst = tgt.cardInstance;
         const applied = await engine.applyCreatureStatus(inst, 'poisoned', {

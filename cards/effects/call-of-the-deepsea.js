@@ -133,33 +133,41 @@ module.exports = {
         await engine.zeigeFizzle(CARD_NAME, { playerIdx: pi, grund: 'zone_taken' });   // v1360
         return;
       }
-      if (!engine.claimHOPT(hoptKey(self), pi)) return;
-
-      await engine.showTriggeredEffect(CARD_NAME, { playerIdx: pi });
-      engine._broadcastEvent('play_zone_animation', {
-        type: 'deepsea_summon_whirlpool', owner: seite, heroIdx, zoneSlot: slotIdx,
-      });
-      await engine._delay(450);
-
-      // ① delete it
-      const geloescht = await engine.deleteFromPile(stapelBesitzer, 'discard', tod.name, { source: CARD_NAME });
-      if (!geloescht) {
-        if (gs.hoptUsed) delete gs.hoptUsed[`${hoptKey(self)}:${pi}`];
-        await engine.zeigeFizzle(CARD_NAME, { playerIdx: pi, grund: 'delete_failed' });
-        return;
-      }
-      // v1359: der Platz kann waehrend des Loeschens belegt worden sein.
-      if (engine.supportSlotBelegt(seite, heroIdx, slotIdx)) {
-        engine.log('call_of_the_deepsea_fizzle', { player: ps.username, card: name });
-        await engine.zeigeFizzle(CARD_NAME, { playerIdx: pi, grund: 'zone_taken' });
-        return;
-      }
-      // ② summon … as an additional Action
+      // ★ W66b (Al, 23.10.2026): „Wird einer der Effekte abgebrochen, werden dadurch alle Limits nicht verbraucht." Die Kosten-/Opfer-/Tribut-Wahl der beschworenen Kreatur ist die
+      // letzte Abbruchstelle: `summonFromPile` fragt sie ZUERST (Abbruch = Karte zurück, Einmal-Sperre unberührt, nichts gezeigt, die besiegte Karte bleibt in der Ablage).
+      // Erst HINTER ihr (`nachKostenAnim`, committed) kommen: Anspruch (HOPT), Banner, Strudel — und „delete it" (Löschen der besiegten Karte).
+      let abgesagt = null;
       const neu = await engine.summonFromPile(pi, quelle, name, heroIdx, slotIdx, {
         source: CARD_NAME, alsZusatzaktion: true,
         ...(seite !== pi ? { heldSeite: seite } : {}),   // Kontrolle statt Seite (Styx 28.9.)
+        nachKostenAnim: async () => {
+          engine.claimHOPT(hoptKey(self), pi);
+          await engine.showTriggeredEffect(CARD_NAME, { playerIdx: pi });
+          engine._broadcastEvent('play_zone_animation', {
+            type: 'deepsea_summon_whirlpool', owner: seite, heroIdx, zoneSlot: slotIdx,
+          });
+          await engine._delay(450);
+          // ① delete it
+          const geloescht = await engine.deleteFromPile(stapelBesitzer, 'discard', tod.name, { source: CARD_NAME });
+          if (!geloescht) { abgesagt = 'delete_failed'; return false; }
+          // v1359: der Platz kann waehrend des Loeschens belegt worden sein.
+          if (engine.supportSlotBelegt(seite, heroIdx, slotIdx)) { abgesagt = 'zone_taken'; return false; }
+          return true;
+        },
       });
       if (!neu) {
+        if (abgesagt === 'delete_failed') {
+          if (gs.hoptUsed) delete gs.hoptUsed[`${hoptKey(self)}:${pi}`];
+          await engine.zeigeFizzle(CARD_NAME, { playerIdx: pi, grund: 'delete_failed' });
+          return;
+        }
+        if (abgesagt === 'zone_taken') {
+          engine.log('call_of_the_deepsea_fizzle', { player: ps.username, card: name });
+          await engine.zeigeFizzle(CARD_NAME, { playerIdx: pi, grund: 'zone_taken' });
+          return;
+        }
+        // Kostenwahl abgebrochen / gesperrt (vor dem Commit): nichts verbraucht, nichts gezeigt — „you may" abgelehnt.
+        if (!gs.hoptUsed || gs.hoptUsed[`${hoptKey(self)}:${pi}`] !== gs.turn) return;
         engine.log('call_of_the_deepsea_fizzle', { player: ps.username, card: name });
         await engine.zeigeFizzle(CARD_NAME, { playerIdx: pi, grund: 'summon_refused' });
         return;

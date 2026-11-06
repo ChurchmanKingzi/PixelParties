@@ -2,7 +2,10 @@
 //  CARD EFFECT: "Willy, the Valiant Leprechaun"
 //  Hero — At the end of your first turn, choose:
 //  Draw 5 cards OR Gain 30 Gold.
-//  No hand size limit during your first turn.
+//  No hand size limit until the start of your second turn (W16f: bis einschliesslich der Gegnerrunde dazwischen).
+//  ★ W69a (Al, 23.10.2026: „Nein, sie sollen nur 'echte' eigene Züge zählen!"): „first"/„second turn" sind der erste/zweite TATSAECHLICH gespielte
+//  eigene Zug (`engine.echterEigenerZugIndex` / `echteEigeneZuegeBis`); `_willyFirstTurn` ist nur die Zugnummer, ab der gezaehlt wird (der
+//  nominell erste Zug). Wird der nominell erste Zug uebersprungen (Hand-of-Death-Rider im ersten Zug des Startspielers), ist der naechste echte Zug der erste.
 // ═══════════════════════════════════════════
 
 // Als Ruling 17.8. ("Tuscan Aristocrat"): eine Gold-OPTION faellt weg,
@@ -29,6 +32,17 @@ module.exports = {
     return { optionId: 'gold' };
   },
 
+  /**
+   * "You do not have a hand size limit until the start of your second turn." (W16f: bis einschliesslich der Gegnerrunde dazwischen;
+   * 2 Spieler: firstTurn + 1). Die Engine fragt nur lebende, nicht stillgelegte Helden (`_isHeroEffectSilenced`, Welle 7).
+   */
+  bypassHandLimit(engine, pi, hero) {
+    const first = hero?._willyFirstTurn;
+    if (first == null) return false;
+    if ((engine.gs.turn || 1) < first) return true;   // vor dem nominell ersten Zug (Aufbau)
+    return engine.echteEigeneZuegeBis(pi, engine.gs.turn || 1, first) < 2;   // bis zum BEGINN des zweiten echten eigenen Zuges
+  },
+
   hooks: {
     /**
      * On game start: record the owner's first turn number
@@ -47,8 +61,9 @@ module.exports = {
       hero._willyFirstTurn = firstTurn;
       hero._willyEffectUsed = false;
 
-      // Generic hand-limit bypass: enforceHandLimit checks this
-      ps._noHandLimitUntilTurn = firstTurn;
+      // W17a (H04-08, Al 19.10.2026): die handlimitfreie Phase ist KEIN Spielerzustand mehr, sondern haengt an Willys aktuellem Zustand
+      // (`bypassHandLimit` unten, von `_shouldBypassHandLimit` gelesen): stirbt Willy oder ist er gefroren/betaeubt/negiert, gilt das
+      // Handlimit sofort wieder; endet das vor dem Start seines zweiten Zuges, gilt die Freiheit bis dahin wieder.
     },
 
     /**
@@ -63,7 +78,7 @@ module.exports = {
       const hero = ctx.attachedHero;
       if (!hero || hero._willyEffectUsed) return;
       if (gs.activePlayer !== pi) return; // Only on owner's turn
-      if ((gs.turn || 1) !== hero._willyFirstTurn) return; // Only first turn
+      if (engine.echterEigenerZugIndex(pi, gs.turn || 1, hero._willyFirstTurn) !== 1) return; // Only first (real) turn
 
       // Must be alive and not incapacitated
       if (hero.hp <= 0) return;

@@ -9,6 +9,8 @@
 //   that card or effect would have on that Area."
 //
 //  ── Part 1: summon-by-sacrifice as additional Action ──
+//  Als Ruling (Al 26.10.): Special (Opfer, Zusatzaktion) ODER Normal (Aktion, ohne Opfer) — der Spieler wählt, wenn eine reguläre Beschwörung per
+//  Action offensteht; sonst bleibt es zwangsweise Special (`_teocuilatl-shared`: `specialErzwungen`/`frageSpecial`, Wahl in `paySummonCost`).
 //  The Archer pattern: `inherentAction` is a function gated on an
 //  eligible tribute (a Creature NOT summoned this turn, OR a hand
 //  substitute like Chosen Sacrifice). While that holds, the engine
@@ -54,12 +56,31 @@ const findOccupant        = (engine, pi, hi, si, heroOwner = pi) => T.findOccupa
 const sacrificeableSlots  = (engine, pi) => T.sacrificeableSlots(engine, pi, CARD_NAME);
 const sacrificeSummonIntoSlot = (engine, pi, req) => T.sacrificeSummonIntoSlot(engine, pi, req, CARD_NAME);
 
+/** KOSTEN (inhärent, freier Platz): ein Opfer, nicht in diesem Zug beschworen. `true` = bezahlt. */
+async function zahleOpfer(ctx) {
+  const engine = ctx._engine;
+  const turn = engine.gs.turn;
+  const paid = await engine.resolveSacrificeCost(ctx, {
+    minCount: 1,
+    maxCount: 1,
+    title: `${CARD_NAME} — Sacrifice`,
+    description: 'Sacrifice 1 of your Creatures (not summoned this turn) to summon Guardian of Teocuilatl as an additional Action.',
+    confirmLabel: '🗡️ Sacrifice!',
+    confirmClass: 'btn-danger',
+    cancellable: true,
+    filter: (c) => c.inst.turnPlayed !== turn,
+  });
+  return !!paid;
+}
+
 module.exports = {
   activeIn: ['hand', 'support'],
 
   // Part 1 — alt summon available while a tribute exists.
+  // Als Ruling (Al 26.10.): „Ja, natürlich nur, wenn reguläre Beschwörung via Action verfügbar ist" — Special (Opfer, Zusatzaktion) ODER Normal (Aktion, ohne Opfer):
+  // wahr nur dort, wo Special der EINZIGE Weg ist (Main Phase / keine freie Aktion); sonst wählt der Spieler in `paySummonCost` (Muster Blue-Ice Dragon).
   inherentAction(gs, pi, heroIdx, engine) {
-    return hasTribute(engine, pi);
+    return T.specialErzwungen(engine, pi, heroIdx, CARD_NAME, engine ? hasTribute(engine, pi) : false);
   },
 
   // ── Full-board sacrifice-summon hooks (Suspicious Monster pattern) ──
@@ -87,10 +108,43 @@ module.exports = {
     return T.bounceTargets(engine, pi, CARD_NAME);
   },
 
+  // ★ W4b (Al, Welle 4): das Opfer ist KOSTE der Beschwörung und wird VOR dem Reaktionsfenster bezahlt (`paySummonCost`,
+  // Engine `_payCreatureSummonCost`); wird die Beschwörung danach komplett negiert (Off Duty …), bleibt es bezahlt.
+  // Tausch (Wurf auf einen belegten Platz): `T.paySacrificeSwap` opfert den Bewohner und hält den Platz, `beforeSummon`
+  // setzt die neue Kreatur danach hinein (`T.placeAfterSacrificeSwap`). Ohne `paySummonCost`-Lauf (Effekt-Beschwörung o. ä.)
+  // zahlt `beforeSummon` wie früher selbst (`ctx._summonKosten` fehlt).
+  async paySummonCost(ctx) {
+    const engine = ctx._engine;
+    const pi = ctx.cardOwner;
+    const ps = engine.gs.players[pi];
+    if (ps?._requestedBouncePlaceSlot) {   // Marke bleibt gesetzt: `beforeSummon` räumt sie ab
+      const d = await T.paySacrificeSwap(engine, pi, ps._requestedBouncePlaceSlot, CARD_NAME);
+      return d ? { kind: 'swap', special: true, ...d } : false;   // der Tausch geht nur per Opfer = Special
+    }
+    if (ctx._alsZusatzaktion) return { kind: 'none' };   // fremder Effekt beschwört „as an additional Action" (Ushabti …): kein eigenes Opfer
+    // Special/Normal-Wahl (Als Ruling Al 26.10.): nur im Spieler-Weg, mit Opfer-Möglichkeit UND freier regulärer Beschwörung; sonst zwangsweise Special (`inherentAction`).
+    let special = !!ctx.isInherentAction;
+    if (!special && ctx._isNormalSummon === true && T.hasTribute(engine, pi)) {
+      special = await T.frageSpecial(engine, pi, CARD_NAME, '🗡️ Special (sacrifice a Creature, free Action)');
+    }
+    if (!special) return { kind: 'none' };
+    return (await zahleOpfer(ctx)) ? { kind: 'sac', special: true } : false;
+  },
+
   async beforeSummon(ctx) {
     const engine = ctx._engine;
     const pi = ctx.cardOwner;
     const ps = engine.gs.players[pi];
+    // W4b: Kosten schon vor dem Reaktionsfenster bezahlt → nur noch landen.
+    const pre = ctx._summonKosten;
+    if (pre) {
+      if (ps?._requestedBouncePlaceSlot) delete ps._requestedBouncePlaceSlot;
+      if (ps?._requestedNormalSummonSlot) delete ps._requestedNormalSummonSlot;
+      const gelandet = pre.kind === 'swap' ? await T.placeAfterSacrificeSwap(engine, pi, pre, CARD_NAME) : true;
+      // Special bei schon eingezogener Aktion: server.js erstattet sie (Muster Blue-Ice Dragon).
+      if (gelandet && pre.special && !ctx.isInherentAction) engine.gs._summonModeUpgradedToInherent = pi;
+      return gelandet;
+    }
 
     // Drop onto an occupied slot → full-board sacrifice-summon: sacrifice
     // that slot's Creature and install Guardian into the freed slot. This
@@ -113,19 +167,7 @@ module.exports = {
     // Free-slot additional-Action summon: pick any tribute (a board
     // Creature not summoned this turn, OR a hand substitute like Chosen
     // Sacrifice); the engine then places Guardian into the chosen slot.
-    const turn = engine.gs.turn;
-    const paid = await engine.resolveSacrificeCost(ctx, {
-      minCount: 1,
-      maxCount: 1,
-      title: `${CARD_NAME} — Sacrifice`,
-      description: 'Sacrifice 1 of your Creatures (not summoned this turn) to summon Guardian of Teocuilatl as an additional Action.',
-      confirmLabel: '🗡️ Sacrifice!',
-      confirmClass: 'btn-danger',
-      cancellable: true,
-      filter: (c) => c.inst.turnPlayed !== turn,
-    });
-    // Cancel → abort the alt summon: card returns to hand, Action kept.
-    return !!paid;
+    return await zahleOpfer(ctx);
   },
 
   // ── CPU: Confirm-Prompts pauschal bejahen (Barker-Bugklasse) ──────
@@ -136,7 +178,8 @@ module.exports = {
   // Kartentitel — Pauschal-Confirm ist damit korrekt gescopet.
   cpuResponse(engine, kind, promptData) {
     if (kind !== 'generic') return undefined;
-    if (promptData?.type === 'confirm') return { confirmed: true };
+    // Welle 9: nur für die EIGENE Area pauschal opfern; eine gegnerische Area schützt die CPU nicht (kein Plan dafür).
+    if (promptData?.type === 'confirm') return { confirmed: promptData.cpuEigeneArea !== false };
     return undefined;
   },
 
@@ -146,14 +189,16 @@ module.exports = {
       if (ctx.cancelled) return; // already negated by another Guardian
       const engine = ctx._engine;
       const pi = ctx.cardController ?? ctx.cardOwner;
-      // Only protect YOUR OWN Areas.
-      if (ctx.affectedOwner !== pi) return;
+      // ★ Welle 9 (Al, 15.10.2026, A01-pollution-10): Der Text sagt „an Area“, nicht „your Area“ — der Guardian darf JEDE
+      // Area schützen, auch eine gegnerische. Der Besitzer des Guardians (Kontrolleur) entscheidet, `pi` ist er.
+      const eigene = ctx.affectedOwner === pi;
 
       const ok = await engine.promptGeneric(pi, {
         type: 'confirm',
         title: CARD_NAME,
-        message: `${ctx.source || 'An effect'} would affect your "${ctx.areaName}" Area. Sacrifice ${CARD_NAME} to negate it?`,
+        message: `${ctx.source || 'An effect'} would affect ${eigene ? 'your' : "your opponent's"} "${ctx.areaName}" Area. Sacrifice ${CARD_NAME} to negate it?`,
         showCard: CARD_NAME,
+        cpuEigeneArea: eigene,
         confirmLabel: '🛡️ Sacrifice & Protect!',
         cancelLabel: 'No',
         cancellable: true,

@@ -103,6 +103,10 @@ module.exports = {
       // vereinheitlicht, machen wir es ebenso.
       const applied = ctx.statusName || ctx.status;
       if (applied !== TRIGGER_STATUS) return;
+      // Al, Welle 10 (Q55): Burn zaehlt nur beim INITIALEN Hinzufuegen des Burned-Status
+      // (nicht, wenn das Ziel schon brennt) — Helden und Kreaturen gleich. (Swampborne
+      // zaehlt dagegen jeden neuen Gift-Stapel.)
+      if (ctx.wasAlreadyActive) return;
       const engine = ctx._engine;
       const pi = ctx.cardOriginalOwner;
       const heroIdx = ctx.card?.heroIdx;

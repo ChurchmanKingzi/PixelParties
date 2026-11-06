@@ -29,7 +29,7 @@
 //  gleichzeitig mit einem zweiten aufloesen kann.
 // ═══════════════════════════════════════════
 
-const { hasCardType } = require('./_hooks');
+const { hasCardType, heldSeite } = require('./_hooks');
 
 const CARD_NAME = 'Spirit of the Heart Bow';
 const BOW = 'Heart-Shaped Bow, the Final Proof of Cuteness';
@@ -45,8 +45,14 @@ function hatBogen(engine, pi, heroIdx) {
  * Erste freie Support Zone des Wirtshelden dieses Spirits. Styx 28.9.:
  * der Wirt steht auf der BRETTSEITE (seitenfremd beschworen: B).
  */
-function freieZoneAmWirt(engine, inst) {
+function freieZoneAmWirt(engine, inst, name = null) {
   const seite = engine.physicalSide(inst);
+  // ★ W63a (Al, 22.10.2026: Alices Effekt gilt fuer ALLE Platzierungs-Effekte; „erst die geteilte Zone, DANN die erste leere"): mit `name` (der geholten Kreatur)
+  // zaehlt auch die Zone einer GLEICHNAMIGEN Creature (Alice-Teilung des Kontrolleurs), und sie kommt zuerst — `engine.ersteBeschwoerZone`.
+  if (name) {
+    const z = engine.ersteBeschwoerZone(inst.controller ?? inst.owner, name, { seite, heroIdx: inst.heroIdx, namedHeroesOnly: true });
+    return z ? z.slotIdx : -1;
+  }
   const slots = engine.gs.players[seite]?.supportZones?.[inst.heroIdx] || [];
   const anzahl = Math.max(3, slots.length);
   for (let si = 0; si < anzahl; si++) {
@@ -64,7 +70,8 @@ function beute(engine, pi) {
     if ((inst.controller ?? inst.owner) !== oppIdx) continue;
     const cd = engine.getEffectiveCardData(inst) || engine._getCardDB()[inst.name];
     if (!cd || !hasCardType(cd, 'Creature')) continue;
-    if (engine.isOmniImmune(inst)) continue;          // Kardinalbestien
+    if (engine.isOmniImmune(inst, pi)) continue;      // Kardinalbestien (Golden Wings: nur gegen den Gegner, W17b)
+    if (engine.controlIsLocked(inst)) continue;       // Als Ruling (Al 26.10.): „Control of this Creature cannot change" (Creepy Villager) — nicht waehlbar
     out.push(inst);
   }
   return out;
@@ -82,6 +89,7 @@ module.exports = {
 
   activeIn: ['support'],
   creatureEffect: true,
+  requiresTarget: true,   // Zielwahl-Effekt („choose a Creature your opponent controls"): Blinded sperrt ihn (siehe _hooks.js / getActivatableCreatures)
   // Holt Ziele auf die eigene Seite — dieselbe Marke, die Boris & Co.
   // lesen.
   takesControlOfTargets: true,
@@ -91,22 +99,20 @@ module.exports = {
   /** ① „can only be summoned by a Hero equipped with …\" */
   canPlayWithHero(gs, pi, heroIdx, cardData, engine) {
     if (!engine) return true;
-    return hatBogen(engine, pi, heroIdx);
+    return hatBogen(engine, heldSeite(gs, pi, heroIdx), heroIdx);   // N3-03 (W24): Brettseite des uebernommenen Helden
   },
 
   canActivateCreatureEffect(ctx) {
     const engine = ctx._engine;
-    if (freieZoneAmWirt(engine, ctx.card) < 0) return false;   // kein Platz
-    return beute(engine, ctx.cardOwner).length > 0;
+    return beute(engine, ctx.cardOwner).some(t => freieZoneAmWirt(engine, ctx.card, t.name) >= 0);   // kein Platz → nicht aktivierbar (W63a: frei oder — Alice — geteilt, je Beute)
   },
 
   /** ② Stufe 1: nur waehlen. */
   async prepareCreatureEffect(ctx) {
     const engine = ctx._engine;
     const pi = ctx.cardOwner;
-    const kandidaten = beute(engine, pi);
+    const kandidaten = beute(engine, pi).filter(t => freieZoneAmWirt(engine, ctx.card, t.name) >= 0);   // W63a: nur Beute mit Platz (frei oder geteilt)
     if (kandidaten.length === 0) return null;
-    if (freieZoneAmWirt(engine, ctx.card) < 0) return null;
 
     const ziele = kandidaten.map(inst => ({
       id: `equip-${inst.owner}-${inst.heroIdx}-${inst.zoneSlot}`,
@@ -148,7 +154,7 @@ module.exports = {
     if (!ziel || ziel.zone !== 'support') return false;
     if ((ziel.controller ?? ziel.owner) === pi) return false;   // schon meins
 
-    const slot = freieZoneAmWirt(engine, spirit);
+    const slot = freieZoneAmWirt(engine, spirit, ziel.name);   // W63a: geteilte Zone (Alice) zuerst, dann die erste freie
     if (slot < 0) return false;
 
     // Herzpfeil vom Spirit zum Ziel. Das Emoji 💘 zeigt von Haus aus

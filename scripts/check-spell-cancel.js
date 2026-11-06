@@ -56,6 +56,7 @@ const GEPRUEFT = {
   'Call of the Deepsea':      'Prompt im Todes-Hook des Anhaengsels (v1358); der Handweg bricht ueber `attachToHero` ab, das das Flag selbst setzt',
   'Idej Projection':          'kein onPlay — der Prompt gehoert dem angelegten Anhaengsel',
   'Intrude':                  'Prompt im Reaktions-Hook des Anhaengsels',
+  'Redirecting Aura':         'Ja/Nein-Frage und Zielwahl liegen im Umleitungs-Hook des angelegten Anhaengsels (Brett-Waechter, nicht der Handweg); der Handweg bricht ueber `attachToHero` ab, das das Flag selbst setzt',
   'Laser Volley':             'fragt den GEGNER, Folgeentscheidung nach der Aufloesung',
   'Grasp the Future':         'Startblatt-Effekt (startingHand), kein Handweg - Abbruch heisst nichts aufdecken, die Karte bleibt auf der Hand',
   'Spider Dance':             'Deck-Suche mit `minSelect: 0` — Abbruch heisst „nichts suchen", nicht „Zauber zurueck"',

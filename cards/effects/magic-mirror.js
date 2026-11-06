@@ -20,7 +20,20 @@ const { placePollutionTokens } = require('./_pollution-shared');
 const { hasCardType } = require('./_hooks');
 const { loadCardEffect } = require('./_loader');
 
+// ★ Welle 9 (Al, 15.10.2026, A01-pollution-16): Die Kopie ist ein vollwertiges Wirken des Spiegel-Besitzers, nur die STUFE
+// wird ignoriert. (a) Sie zahlt die „… to use this Spell"-Kosten des gespiegelten Zaubers (`payActivationCost`). (b) Ein
+// „once per game"-Zauber verbraucht das EIGENE Limit des Spiegel-Besitzers (nicht das des Originalbesitzers — dessen
+// Stempel gibt die Ganz-Negierung zurück); ist es schon verbraucht, ist die Kopie nicht nutzbar → der Spiegel wird nicht angeboten.
+function eigenesLimitVerbraucht(gs, ownerIdx, script, cardName) {
+  if (!script || !(script.oncePerGame || script.oncePerGameKey)) return false;
+  return !!gs.players[ownerIdx]?._oncePerGameUsed?.has(script.oncePerGameKey || cardName);
+}
+
 module.exports = {
+  // ★ Z7b: „Negate that Spell/Attack/effect" = die gewirkte Karte löst NIE auf → ihre Einmal-Stempel werden zurückgegeben
+  // (Engine: `_merkeGanzeNegation`). Teil-Negierungen („… on that Hero", Schaden) tragen das Flag nicht.
+  negatesWholeCard: true,
+
   // ★★ v1181 — ENTKOPPELTE ZAUBERBILDER (Al 17.9.): Wird der Zauber
   // NEGIERT, laeuft sein Effekt-Rumpf nie — die Engine spielt dann diese
   // Bilder, damit der abgewehrte Zauber trotzdem zu sehen ist. Im
@@ -61,7 +74,12 @@ module.exports = {
     if (!sourceCard) return false;
     const cd = cardDB[sourceCard];
     if (!cd) return false;
-    return hasCardType(cd, 'Spell');
+    // ★ W34a (Al, 22.10.2026, Punkt 2: „Magic Mirror funktioniert"): auch ein Effekt, der als Spell ZÄHLT (Alice), ist „a Spell" — er wird negiert. Eine Kopie gibt es nur für
+    // eine echte Spell-KARTE (`script.hooks.onPlay` fehlt am Heldenskript); die Pollution Tokens zählen die Stufe der Quelle (Alice: ihr Destruction-Magic-Level).
+    if (!hasCardType(cd, 'Spell') && engine._zaehltAlsArt(sourceInfo) !== 'spell') return false;
+    // Welle 9: die Kopie eines „once per game"-Zaubers braucht das EIGENE Limit des Spiegel-Besitzers frei.
+    if (eigenesLimitVerbraucht(gs, ownerIdx, loadCardEffect(sourceCard), sourceCard)) return false;
+    return true;
   },
 
   /**
@@ -83,7 +101,9 @@ module.exports = {
     const sourceCd = cardDB[sourceCard];
     if (!sourceCd) return null;
 
-    const spellLevel = sourceCd.level || 0;
+    // W34a: ein Effekt, der als Spell zählt, hat als Stufe das Ability-Level seines Helden (`_spellLevelAlsQuelle`); eine Spell-Karte ihre gedruckte Stufe.
+    const spellLevel = hasCardType(sourceCd, 'Spell') ? (sourceCd.level || 0)
+      : (engine._spellLevelAlsQuelle(sourceCard, sourceInfo?.damageType, sourceInfo?.cardInstance || sourceInfo) || 0);
 
     // ── Animation: Magic Mirror shimmer on host Hero ──
     // No dedicated animation yet — use plague_smoke as a placeholder for the
@@ -111,15 +131,52 @@ module.exports = {
     //    onPlay, then clean up. This mirrors the pattern in
     //    performImmediateAction (line 4313–4325) minus the hand bookkeeping. ──
     const script = loadCardEffect(sourceCard);
-    if (script?.hooks?.onPlay) {
+    // Welle 9: Kosten der Kopie. Die Tokens des Spiegels liegen schon; reicht der Platz/Vorrat für die Kosten des Zaubers nicht
+    // mehr (`spellPlayCondition` der Kostenzahler) oder bricht der Spieler die Kostenwahl ab (`false`), gibt es keine Kopie —
+    // das Original bleibt negiert.
+    let kopieMoeglich = !!script?.hooks?.onPlay;
+    let synthInstVorab = null;
+    if (kopieMoeglich && eigenesLimitVerbraucht(gs, ownerIdx, script, sourceCard)) kopieMoeglich = false;
+    if (kopieMoeglich && typeof script.payActivationCost === 'function' && script.payActivationCost.length <= 1) {
+      // Nur die Zauber-Form `payActivationCost(ctx)` (Kreaturen-/Helden-Reaktionen tragen `(engine, pi, …)` und sind keine Zauber).
+      try {
+        if (script.spellPlayCondition && !script.spellPlayCondition(gs, ownerIdx, engine)) kopieMoeglich = false;
+      } catch (err) { console.error('[Magic Mirror] spellPlayCondition', sourceCard, err.message); }
+      if (kopieMoeglich) {
+        synthInstVorab = engine._trackCard(sourceCard, ownerIdx, 'hand', hostHeroIdx, -1);
+        if (ctx.cardHeroOwner != null && ctx.cardHeroOwner !== ownerIdx) synthInstVorab.heroOwner = ctx.cardHeroOwner;
+        let bezahlt;
+        try { bezahlt = await script.payActivationCost(engine._createContext(synthInstVorab, {})); }
+        catch (err) { console.error('[Magic Mirror] payActivationCost', sourceCard, err.message); }
+        if (bezahlt === false) {
+          kopieMoeglich = false;
+          engine._untrackCard(synthInstVorab.id);
+          synthInstVorab = null;
+        }
+      }
+    }
+    if (kopieMoeglich) {
+      // Eigenes „once per game"-Limit des Spiegel-Besitzers verbrauchen; `_surpriseStempel` schützt es vor dem Z7b-Abzug,
+      // falls der Spiegel-Besitzer zugleich Wirker des negierten Zaubers ist.
+      const opgKey = script.oncePerGameKey || (script.oncePerGame ? sourceCard : null);
+      if (opgKey) {
+        const ops = gs.players[ownerIdx];
+        if (ops) {
+          if (!ops._oncePerGameUsed) ops._oncePerGameUsed = new Set();
+          ops._oncePerGameUsed.add(opgKey);
+          (engine._surpriseStempel || (engine._surpriseStempel = new Set())).add(`${ownerIdx}|${opgKey}`);
+        }
+      }
+    }
+    if (kopieMoeglich) {
       // Synthesize the card as if it were in the user's hand attached to
       // the host hero. _trackCard returns a fresh instance object; we pass
       // zone 'hand' so downstream cost logic in the spell treats it as a
       // normal play.
-      const synthInst = engine._trackCard(sourceCard, ownerIdx, 'hand', hostHeroIdx, -1);
+      const synthInst = synthInstVorab || engine._trackCard(sourceCard, ownerIdx, 'hand', hostHeroIdx, -1);
       // Als Vorgabe 29.9.: Wirker ist der Traeger auf seiner Brettseite
       // (geliehener Held) — `cardHeroOwner` der Kopie zeigt dorthin.
-      if (ctx.cardHeroOwner != null && ctx.cardHeroOwner !== ownerIdx) synthInst.heroOwner = ctx.cardHeroOwner;
+      if (!synthInstVorab && ctx.cardHeroOwner != null && ctx.cardHeroOwner !== ownerIdx) synthInst.heroOwner = ctx.cardHeroOwner;
 
       // Mark this as an immediate/copied play so nested systems know to
       // skip certain once-per-turn restrictions that would otherwise lock
@@ -138,12 +195,11 @@ module.exports = {
       } finally {
         delete gs._immediateActionContext;
         delete gs._magicMirrorBypassLevel;
-        // Move the synthetic instance to the user's discard (or deleted pile,
-        // depending on the card's own `_spellPlacedOnBoard` flag). Standard
-        // spells get discarded; placed-on-board ones handled themselves.
+        // Die synthetische Instanz ist eine KOPIE, keine Karte: sie verschwindet nach der Ausführung.
+        // ★ W16b (A01-pollution-15, Text „performs a copy of it"): sie landet NICHT in der Ablage des Spiegel-Besitzers
+        // (sonst Kartenvermehrung + Rückholfutter); das Original liegt in der Ablage seines Spielers. Auf dem Brett
+        // platzierte Kopien (`_spellPlacedOnBoard`) kümmern sich selbst um sich.
         if (!gs._spellPlacedOnBoard) {
-          const ps = gs.players[ownerIdx];
-          if (ps) ps.discardPile.push(sourceCard);
           engine._untrackCard(synthInst.id);
         } else {
           delete gs._spellPlacedOnBoard;

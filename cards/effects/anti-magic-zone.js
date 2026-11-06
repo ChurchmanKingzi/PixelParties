@@ -81,7 +81,7 @@ async function applyToHero(engine, ownerIdx, heroIdx, expiresAtTurn, expiresForP
  *    • the canonical buffs[<buffKey>].clearCountersOnExpire pattern
  *      so the standard status-expiry sweep clears the silence at
  *      `expiresAtTurn` / `expiresForPlayer`. */
-async function applyToCreature(engine, inst, expiresAtTurn, expiresForPlayer) {
+async function applyToCreature(engine, inst, expiresAtTurn, expiresForPlayer, quelleOwner) {
   if (!inst || inst.zone !== 'support' || inst.faceDown) return;
   await engine.actionNegateCreature(inst, CARD_NAME, {
     statusKey: STATUS_NAME,
@@ -91,6 +91,9 @@ async function applyToCreature(engine, inst, expiresAtTurn, expiresForPlayer) {
     // future "negated-but-cleansable" cards.
     cleansable: true,
     selfInflicted: true,
+    fensterTrotzdem: true,   // W71b: globaler Effekt auf bestehende Kreaturen — Monia & Co. dürfen negieren
+    sourceOwner: quelleOwner,
+    gwSourceOwner: quelleOwner,   // W17b: Golden Wings – nur der Gegner des Wirkers ist ausgenommen
     expiresAtTurn,
     expiresForPlayer,
     buffKey: '_anti_magic_zone_silenced',
@@ -131,6 +134,23 @@ module.exports = {
       // next turn (N+1).
       const expiresAtTurn = (gs.turn || 0) + 2;
       const expiresForPlayer = pi;
+
+      // ★ W15a (Al, R01-10 + Q156: „Jeder Treffer zählt, auch reines Status-Zufügen"): Fläche ohne Schaden öffnet wie ein Flächenschlag die „hit by"-Surprises
+      // und die Hand-Reaktionen (Divine Gift of Rain, Barrier of Faith, Anti Magic Shield …) über ALLE Ziele des Bretts, bevor etwas wirkt.
+      {
+        const ziele = [];
+        for (let p = 0; p < engine.playerCount(); p++) {
+          (gs.players[p]?.heroes || []).forEach((h, hi) => { if (h?.name && h.hp > 0) ziele.push({ type: 'hero', owner: p, heroIdx: hi }); });
+        }
+        for (const inst of engine.cardInstances) {
+          if (inst.zone !== 'support' || inst.faceDown) continue;
+          const cd = engine.getEffectiveCardData(inst) || engine._getCardDB()[inst.name];
+          if (!cd || !hasCardType(cd, 'Creature')) continue;
+          ziele.push({ type: 'creature', owner: engine.physicalSide(inst), heroIdx: inst.heroIdx, slotIdx: inst.zoneSlot, cardName: inst.name });
+        }
+        const sr = await engine.statusHitSurpriseWindow(ctx.card, ziele.filter(z => z.type === 'hero'), 'decay_spell', { ziele });
+        if (sr?.effectNegated) return;
+      }
 
       // Board-wide dark-magic swarm — hits every alive Hero AND
       // every face-up Creature on both sides simultaneously, so the
@@ -200,7 +220,7 @@ module.exports = {
         if (inst.faceDown) continue;
         const cd = engine.getEffectiveCardData(inst) || engine._getCardDB()[inst.name];   // wirksame Daten (Als Sweep 9.10.)
         if (!cd || !hasCardType(cd, 'Creature')) continue;
-        await applyToCreature(engine, inst, expiresAtTurn, expiresForPlayer);
+        await applyToCreature(engine, inst, expiresAtTurn, expiresForPlayer, pi);
       }
 
       // Stamp the cast's expiry on this card instance — the
@@ -212,6 +232,14 @@ module.exports = {
       ctx.card.counters = ctx.card.counters || {};
       ctx.card.counters._amzExpiresAtTurn   = expiresAtTurn;
       ctx.card.counters._amzExpiresForPlayer = expiresForPlayer;
+      // W16g (S01-07): ohne diese Marke entsorgte der Spielweg die Instanz nach der Aufloesung (`_untrackCard`) und mit ihr den
+      // Stempel — der Ablage-Haken unten (`onCardEnterZone`) fand nie eine Instanz und spaeter beschworene Kreaturen blieben
+      // ungestillt. Muster Weapon Unleashing / Mission of the Light Brigade.
+      gs._spellKeepInstance = true;
+      // W18b (Al 19.10.: „Wiederbelebte (oder via Teleport Powder zurückkehrende) Heroes bekommen automatisch den Status"): das Fenster steht
+      // im Spielstand; die Engine (`amzFensterAufHeldAnwenden`) belegt jeden Helden, der bis zum Ablauf neu ins Spiel kommt.
+      if (!Array.isArray(gs._amzFenster)) gs._amzFenster = [];
+      gs._amzFenster.push({ expiresAtTurn, expiresForPlayer, sourceOwner: pi });
 
       engine.log('anti_magic_zone_cast', {
         player: gs.players[pi]?.username,
@@ -239,7 +267,7 @@ module.exports = {
       const expiresForPlayer = ctx.card.counters?._amzExpiresForPlayer;
       if (!windowActive(engine.gs, expiresAtTurn, expiresForPlayer)) return;
 
-      await applyToCreature(engine, entering, expiresAtTurn, expiresForPlayer);
+      await applyToCreature(engine, entering, expiresAtTurn, expiresForPlayer, ctx.cardOwner);
     },
   },
 };

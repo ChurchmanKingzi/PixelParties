@@ -45,6 +45,7 @@
 //      automatically.
 // ═══════════════════════════════════════════
 
+const { anyName } = require('./_alias-name');   // Shroomasaur: Zusatzname zählt für Namensfamilien
 const { isLoyalCreature } = require('./_loyal-shared');
 const { isSkeletonCreature } = require('./_skeleton-shared');
 
@@ -54,6 +55,9 @@ module.exports = {
   // Engine flag — surfaces this card in the creature pre-defeat hand
   // reaction window.
   isCreaturePreDefeatReaction: true,
+  // Welle 10 (Al, Q37 / A06-rebelliokai-02: „Zerstören ja, opfern nein“): Bone Dog wird auch gegen ZERSTÖREN-Effekte angeboten
+  // (zusätzlich zu tödlichem Schaden), aber nicht gegen ein Opfer (`info.isSacrifice`, siehe Bedingung).
+  preDefeatOnDestroy: true,
 
   // Strictly reactive: never proactively playable, never a chain-link
   // candidate. Hand cards stay dimmed in the regular UI.
@@ -68,8 +72,9 @@ module.exports = {
    * reduction). Bone Dog fires when the doomed Creature is on the
    * controller's side AND is a Loyal or Skeleton.
    */
-  creaturePreDefeatCondition(gs, ownerIdx, engine, creatureInst /*, source, amount, type */) {
+  creaturePreDefeatCondition(gs, ownerIdx, engine, creatureInst, source, amount, type, info) {
     if (!creatureInst) return false;
+    if (info?.isSacrifice) return false;   // Welle 10 (Q37): ein Opfer ist kein Zerstören
     // Dying creature must be on our side.
     const targetController = creatureInst.controller ?? creatureInst.owner;
     if (targetController !== ownerIdx) return false;
@@ -77,8 +82,8 @@ module.exports = {
     // case implicitly: a Bone Dog only fires from HAND, so a Bone Dog
     // on the board dying could only be saved by ANOTHER Bone Dog in
     // hand, which is fine per card text.
-    if (isLoyalCreature(creatureInst.name, engine)) return true;
-    if (isSkeletonCreature(creatureInst.name, engine)) return true;
+    if (anyName(creatureInst, (n) => isLoyalCreature(n, engine))) return true;
+    if (anyName(creatureInst, (n) => isSkeletonCreature(n, engine))) return true;
     return false;
   },
 
@@ -105,6 +110,8 @@ module.exports = {
       heroIdx: creatureInst.heroIdx,
       zoneSlot: creatureInst.zoneSlot,
       by: CARD_NAME,
+      // Welle 10 (Al, Q38): „revive … immediately" — vor den Todes-Triggern anderer Karten (Shepherd, Terrier …) aufgelöst.
+      sofort: true,
     };
 
     engine.log('loyal_bone_dog_save', {

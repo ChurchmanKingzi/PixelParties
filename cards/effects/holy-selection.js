@@ -100,6 +100,9 @@ function _collectTargets(engine, gs) {
 }
 
 module.exports = {
+  // ★ Als Ruling (Al 26.10., Flame Avalanche: „Wenn du andere Schadenskarten unspielbar machst, müssen das Vial und Rockfall auch sein!"): die Karte richtet NUR Schaden an Zielen an —
+  // unter der Schadenssperre (`ps.damageLocked`) unspielbar (Karte bleibt auf der Hand, keine Aktion/Kosten; Sperr-Stutzen `engine._cardBlockedBySearchLock`).
+  blockedByDamageLock: true,
   // ★★ v1182 — ENTKOPPELTE BILDER (CARD_API): wird die Karte NEGIERT,
   // laeuft ihr Effekt-Rumpf nie — die Engine spielt dann diese Bilder.
   // Im normalen Weg bleibt es bei den Broadcasts im Effekt selbst.
@@ -151,7 +154,7 @@ module.exports = {
       // use cardHeroOwner (board side), not cardOwner (caster).
       // Diverges only under Love Shot, where the caster casts
       // through an opp-side Hero.
-      const casterFlags = gs.heroFlags?.[`${ctx.cardHeroOwner}-${heroIdx}`];
+      const casterFlags = ctx._engine.heroFlagsLive(ctx.cardHeroOwner, heroIdx);
       const idaForcesSingle = !!casterFlags?.forcesSingleTarget;
       const totalTargets = heroTargets.length + creatureTargets.length;
 
@@ -172,7 +175,7 @@ module.exports = {
           description: `Ida focuses — deal ${DAMAGE} damage to a single eligible target.`,
           confirmLabel: `✨ ${DAMAGE} Damage!`,
           confirmClass: 'btn-danger',
-          cancellable: false,
+          cancellable: true,   // W16g (S02-14): Regel 23.9 — die Einzelzielwahl ist die erste Abfrage, Abbruch = Karte bleibt auf der Hand
           condition: (t) => validIds.has(t.id),
         });
 
@@ -308,6 +311,7 @@ module.exports = {
           + lebendeKreaturen.length,
           {
             creatures: lebendeKreaturen.map(t => t.inst),
+            heroes: heroTargets,   // W78 (Pythia): Helden, die dieser Schlag faellt, sind todgeweiht
             source, amount: DAMAGE, type: 'destruction_spell', sourceOwner: pi,
           });
       }

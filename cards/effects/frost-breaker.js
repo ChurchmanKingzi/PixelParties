@@ -148,7 +148,7 @@ module.exports = {
           await ctx.dealDamage(h, damage, 'destruction_spell');
         }
       } else if (ziel.cardInstance && ziel.cardInstance.zone === 'support') {
-        aufgetaut = engine.cleanseCreatureStatuses(ziel.cardInstance, ['frozen'], CARD_NAME).includes('frozen');
+        aufgetaut = (await engine.cleanseCreatureStatusesGefragt(ziel.cardInstance, ['frozen'], CARD_NAME)).includes('frozen');
         engine.sync();
         await engine.actionDealCreatureDamage(
           { name: CARD_NAME, owner: pi, heroIdx, heroOwner: heroSeite },

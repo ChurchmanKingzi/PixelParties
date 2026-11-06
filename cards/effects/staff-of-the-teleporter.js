@@ -45,20 +45,25 @@
 const CARD_NAME = 'Staff of the Teleporter';
 
 module.exports = {
+  // R02-10: mischt Handkarten ins Deck — Erkennung fuer „No Retreat!" und
+  // Distracting Crystal.
+  shufflesFromHandOrDiscardIntoDeck: true,
+
   // Hand-lock greys-out: when the controller is hand-locked, the staff's
   // own draws would silently fizzle and the player would be 4 gold poorer
   // for nothing. Tagging this opts into the standard 🚫-and-dim treatment
   // (server.js builds `handLockBlockedCards`, app-board.jsx renders the
   // overlay). The loader's auto-tagger missed it because the header
   // comment mentions `actionPlaceCreature` — a NON_DRAW substring match.
-  blockedByHandLock: true,
+  // D1 (Antwort von Al): Mischeffekt (Mischen ist eigenstaendig) - unter Zieh-/Hand-Sperre BLEIBT der Stab aktivierbar, nur der Nachzug
+  // entfaellt. Das fruehere `blockedByHandLock` ist deshalb ausdruecklich AUS (`false` schlaegt den Auto-Tagger des Loaders).
+  blockedByHandLock: false,
+  // KI: wie bisher "immer spielen" (frueher ueber das Flag), aber nicht unter der Sperre, wo der Nachzug entfaellt.
+  cpuMeta: { alwaysCommit: (engine, pi) => !(engine.gs.players[pi]?.handLocked || engine.gs.players[pi]?.drawLocked) },
 
   canActivate(gs, pi) {
     const ps = gs.players[pi];
     if (!ps) return false;
-    // Hand-locked → the staff's own draws would silently fizzle, so
-    // there's no value in activating. Mirrors Leadership / similar.
-    if (ps.handLocked) return false;
     return true;
   },
 
@@ -108,8 +113,24 @@ module.exports = {
     // that don't reference an eligible slot (a desynced client could
     // send phantom indices).
     const eligibleSet = new Set(eligibleIndices);
-    const selected = (result.selectedCards || [])
+    let selected = (result.selectedCards || [])
       .filter(s => Number.isInteger(s?.handIndex) && eligibleSet.has(s.handIndex));
+
+    // Welle 12 (Q92, Al): Item-Lock-Kosten (falls vorgemerkt) NACH dem Commit (bestätigte Handwahl), VOR dem Zurückmischen. Die Kostenlöschung
+    // verschiebt die Handindizes: die gewählten Karten werden per Name neu zugeordnet (traf die Kostenwahl eine gewählte Karte, fällt sie weg),
+    // die wählbaren Plätze neu gebildet.
+    if (engine.gs._itemLockOffen?.pi === pi) {
+      const gemerkt = selected.map(s => ps.hand[s.handIndex]);
+      await engine.itemLockFordern(pi);
+      eligibleIndices.length = 0;
+      for (let i = 0; i < ps.hand.length; i++) if (!engine._istAufloesendeHandkarte(ps, i, false)) eligibleIndices.push(i);
+      const benutzt = new Set();
+      selected = gemerkt.map(n => {
+        const i = ps.hand.findIndex((c, j) => c === n && !benutzt.has(j) && !engine._istAufloesendeHandkarte(ps, j, false));
+        if (i >= 0) benutzt.add(i);
+        return i >= 0 ? { handIndex: i, cardName: n } : null;
+      }).filter(Boolean);
+    }
 
     const count = selected.length;
     const isAllHand = eligibleIndices.length > 0 && count === eligibleIndices.length;
@@ -154,8 +175,11 @@ module.exports = {
     }
 
     // Locks land AFTER our own draws complete.
-    ps.handLocked = true;
+    // W16e (F03-18, Al Welle 3: "Staebe sperren nur das Ziehen"): reiner Zieh-Lock wie The Sacred Jewel (Suchen/Hinzufuegen bleibt erlaubt);
+    // das Verbot, Karten aus der Ablage zu bewegen, tragen `_discardLockedTurn`/`_discardLockHard`.
+    ps.drawLocked = true;
     ps._discardLockedTurn = gs.turn;
+    ps._discardLockHard = gs.turn;   // Z6 (F03-10): harte Sperre - der Freikauf des Eye of Ren gilt hier nicht
 
     engine.log('staff_of_the_teleporter', {
       player: ps.username,

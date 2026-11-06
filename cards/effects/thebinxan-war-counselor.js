@@ -43,7 +43,7 @@
 // ═══════════════════════════════════════════
 
 const { hasCardType } = require('./_hooks');
-const { makeSingletonCanSummon } = require('./_war-counselor-shared');
+const { makeSingletonCanSummon, zahleGatheringGebuehr } = require('./_war-counselor-shared');
 
 const CARD_NAME = 'Thebinxan War Counselor';
 const DAMAGE = 50;
@@ -152,6 +152,9 @@ module.exports = {
 
   canActivateCreatureEffect(ctx) {
     const ps = ctx._engine.gs.players[ctx.cardOwner];
+    // W5b-Z5 (Al, Welle 5): „Thebinxan unter Handsperre ist gesperrt!" – die aufgedeckte Karte käme nicht auf die Hand;
+    // nicht aktivierbar, nichts verbraucht (Vorbild Camouflaged Kappa / Timid Tanuki).
+    if (ps?.handLocked) return false;
     return (ps?.mainDeck || []).length > 0;
   },
 
@@ -167,6 +170,8 @@ module.exports = {
 
     const topCard = (ps.mainDeck || [])[0];
     if (!topCard) return false;
+    // Welle 11 (Al, R3): keine Zielwahl — die 8 Gold des War Council Gathering Place werden direkt vor der Auflösung abgezogen.
+    if (!(await zahleGatheringGebuehr(engine, inst))) return false;
 
     // ── Der Gegner sagt an (keine Abbruchmoeglichkeit) ──
     const declared = await engine.promptGeneric(oppIdx, {
@@ -237,6 +242,7 @@ module.exports = {
     // Anti-AoE-Fenster (Deepsea Idol).
     await engine.beginAoeStrike(_lebendeHelden + _oppKreaturen.length, {
       creatures: _oppKreaturen,
+      heroes: _oppHelden().map(({ hero }) => hero),   // W78 (Pythia): Helden, die dieser Schlag faellt, sind todgeweiht
       source: { name: CARD_NAME, owner: pi, heroIdx: inst.heroIdx },
       amount: DAMAGE, type: 'creature', sourceOwner: pi,
     });

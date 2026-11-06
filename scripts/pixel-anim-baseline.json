@@ -1,0 +1,504 @@
+{
+ "jsxkf:app-board:bb-dive-streak": {
+  "drehung": 3
+ },
+ "kf:bday-present-highlight": {
+  "blur": 2
+ },
+ "kf:foilBorderPulse": {
+  "blur": 3
+ },
+ "kf:foilDiamondBorderPulse": {
+  "blur": 4
+ },
+ "kf:sparkleGlow": {
+  "blur": 2
+ },
+ "kf:stActing": {
+  "blur": 1
+ },
+ "reg:angel_revival": {
+  "blur": 2,
+  "drehung": 1
+ },
+ "reg:arrow_impact": {
+  "blur": 2
+ },
+ "reg:assassination_cut": {
+  "blur": 1,
+  "drehung": 1
+ },
+ "reg:battle_axe_cleave": {
+  "blur": 4,
+  "drehung": 5
+ },
+ "reg:biseria_ice_engulf": {
+  "blur": 5,
+  "drehung": 4,
+  "mischmodus": 2
+ },
+ "reg:blood_hearts": {
+  "blur": 1
+ },
+ "reg:blood_moon_pulse": {
+  "blur": 4,
+  "drehung": 1
+ },
+ "reg:blue_ice_flames": {
+  "blur": 2,
+  "drehung": 3,
+  "mischmodus": 3
+ },
+ "reg:boiling_oil": {
+  "blur": 2
+ },
+ "reg:cactus_burst": {
+  "blur": 1
+ },
+ "reg:cataclysm": {
+  "blur": 6,
+  "drehung": 2
+ },
+ "reg:claw_maul": {
+  "blur": 3,
+  "drehung": 2
+ },
+ "reg:cloud_disperse": {
+  "blur": 2
+ },
+ "reg:cloud_gather": {
+  "blur": 2
+ },
+ "reg:club_bash": {
+  "blur": 4,
+  "drehung": 4
+ },
+ "reg:cold_coffin_encase": {
+  "blur": 3,
+  "drehung": 1
+ },
+ "reg:cold_strike_apply": {
+  "blur": 3,
+  "drehung": 1
+ },
+ "reg:coolness_summon": {
+  "blur": 4,
+  "drehung": 9
+ },
+ "reg:corpse_explosion": {
+  "blur": 2,
+  "drehung": 1
+ },
+ "reg:cosmic_counter_add": {
+  "blur": 2
+ },
+ "reg:cosmic_counter_remove": {
+  "blur": 1
+ },
+ "reg:cosmic_invader_strike": {
+  "blur": 1,
+  "drehung": 4
+ },
+ "reg:cosmic_token_drop": {
+  "blur": 2
+ },
+ "reg:crescent_reap": {
+  "blur": 1
+ },
+ "reg:cute_hearts": {
+  "blur": 1,
+  "drehung": 3
+ },
+ "reg:dark_swarm": {
+  "blur": 1
+ },
+ "reg:dark_wave_engulf": {
+  "blur": 2
+ },
+ "reg:death_skulls": {
+  "blur": 1
+ },
+ "reg:debt_incurred": {
+  "blur": 1,
+  "drehung": 1
+ },
+ "reg:deep_sea_bubbles": {
+  "blur": 1
+ },
+ "reg:deepsea_idol_negate": {
+  "blur": 2,
+  "drehung": 3
+ },
+ "reg:deepsea_spores_growth": {
+  "blur": 3,
+  "drehung": 1
+ },
+ "reg:deepsea_spores_rain": {
+  "blur": 1
+ },
+ "reg:deepsea_summon_whirlpool": {
+  "blur": 4,
+  "drehung": 1
+ },
+ "reg:dino_bite": {
+  "blur": 7,
+  "drehung": 11
+ },
+ "reg:disruption_impact": {
+  "blur": 1
+ },
+ "reg:dive_down": {
+  "blur": 1
+ },
+ "reg:dog_bite": {
+  "blur": 3,
+  "drehung": 10
+ },
+ "reg:dumbbell_pump": {
+  "blur": 2
+ },
+ "reg:egg_of_god_glow": {
+  "blur": 2,
+  "drehung": 1,
+  "mischmodus": 1
+ },
+ "reg:elephant_stomp": {
+  "drehung": 1
+ },
+ "reg:empowered_strike_apply": {
+  "blur": 4
+ },
+ "reg:equip_flash": {
+  "blur": 1
+ },
+ "reg:falling_boulder": {
+  "blur": 1,
+  "drehung": 5
+ },
+ "reg:fan_blow": {
+  "drehung": 5
+ },
+ "reg:field_standard_rally": {
+  "blur": 2
+ },
+ "reg:fifth_circle_flames": {
+  "blur": 1,
+  "drehung": 3
+ },
+ "reg:fireball": {
+  "blur": 3,
+  "drehung": 4
+ },
+ "reg:firewall": {
+  "blur": 2
+ },
+ "reg:flame_jet": {
+  "blur": 2
+ },
+ "reg:flame_pillars": {
+  "blur": 3
+ },
+ "reg:flame_slash": {
+  "blur": 5,
+  "drehung": 2
+ },
+ "reg:flamethrower_douse": {
+  "blur": 3,
+  "drehung": 1
+ },
+ "reg:flaming_slash": {
+  "blur": 2,
+  "drehung": 4
+ },
+ "reg:flooding": {
+  "blur": 2,
+  "mischmodus": 1
+ },
+ "reg:gate_shield": {
+  "blur": 2
+ },
+ "reg:gift_shower": {
+  "blur": 1
+ },
+ "reg:glass_blade_shatter": {
+  "blur": 2,
+  "drehung": 4
+ },
+ "reg:golden_ankh_revival": {
+  "blur": 1,
+  "drehung": 1
+ },
+ "reg:golden_apple_burst": {
+  "blur": 2,
+  "drehung": 1
+ },
+ "reg:golden_banana_rain": {
+  "blur": 1
+ },
+ "reg:golden_explosion": {
+  "blur": 4,
+  "drehung": 2
+ },
+ "reg:golden_feathers": {
+  "blur": 2,
+  "drehung": 1
+ },
+ "reg:golden_scale": {
+  "blur": 1
+ },
+ "reg:goldify_transmute": {
+  "blur": 3,
+  "drehung": 1,
+  "mischmodus": 1
+ },
+ "reg:golem_smash_ice": {
+  "blur": 2,
+  "drehung": 2
+ },
+ "reg:guardian_shield": {
+  "blur": 2
+ },
+ "reg:guillotine_drop": {
+  "blur": 2,
+  "drehung": 4
+ },
+ "reg:hand_of_death_strike": {
+  "blur": 7,
+  "drehung": 9
+ },
+ "reg:healing_hearts": {
+  "blur": 1
+ },
+ "reg:heart_burst": {
+  "blur": 1
+ },
+ "reg:heart_expand": {
+  "blur": 1
+ },
+ "reg:hell_charm": {
+  "blur": 1,
+  "drehung": 1
+ },
+ "reg:hydra_goo": {
+  "blur": 4,
+  "drehung": 5
+ },
+ "reg:icy_grave_strike": {
+  "blur": 7,
+  "drehung": 8
+ },
+ "reg:johanna_cleanse": {
+  "blur": 2,
+  "drehung": 3
+ },
+ "reg:knife_throw_fly": {
+  "blur": 2,
+  "drehung": 3
+ },
+ "reg:knowledge_sparkle": {
+  "blur": 2
+ },
+ "reg:laser_burst": {
+  "blur": 2,
+  "drehung": 1
+ },
+ "reg:last_resort_blast": {
+  "blur": 3,
+  "drehung": 1
+ },
+ "reg:lava_fountain": {
+  "blur": 5,
+  "drehung": 4
+ },
+ "reg:love_burst": {
+  "blur": 1,
+  "drehung": 4
+ },
+ "reg:loyalty_birds": {
+  "blur": 1
+ },
+ "reg:lunar_eclipse_pulse": {
+  "blur": 4,
+  "drehung": 1
+ },
+ "reg:lure_beacon": {
+  "drehung": 1
+ },
+ "reg:massacre": {
+  "blur": 2,
+  "drehung": 4
+ },
+ "reg:mega_explosion": {
+  "blur": 1
+ },
+ "reg:mini_hearts": {
+  "blur": 1
+ },
+ "reg:moana_rain": {
+  "blur": 3,
+  "drehung": 4
+ },
+ "reg:monkee_shield": {
+  "blur": 2
+ },
+ "reg:moonlight_beam": {
+  "blur": 3
+ },
+ "reg:mummy_wrap": {
+  "blur": 1,
+  "drehung": 2
+ },
+ "reg:mushroom_spore": {
+  "blur": 1
+ },
+ "reg:music_notes": {
+  "blur": 2,
+  "drehung": 2
+ },
+ "reg:necromancy_summon": {
+  "blur": 2,
+  "drehung": 1
+ },
+ "reg:night_howl": {
+  "blur": 3,
+  "drehung": 2
+ },
+ "reg:orbital_laser_red": {
+  "blur": 5
+ },
+ "reg:overheal_shock_equip": {
+  "blur": 1
+ },
+ "reg:paralyzing_bolts": {
+  "blur": 3,
+  "drehung": 1
+ },
+ "reg:petrify": {
+  "blur": 2,
+  "mischmodus": 1
+ },
+ "reg:piranha_bite": {
+  "blur": 3
+ },
+ "reg:piranha_bites": {
+  "blur": 2,
+  "drehung": 3
+ },
+ "reg:poison_ooze": {
+  "blur": 1
+ },
+ "reg:poison_pollen_rain": {
+  "blur": 2
+ },
+ "reg:pollution_evaporate": {
+  "blur": 2,
+  "drehung": 1,
+  "mischmodus": 1
+ },
+ "reg:pressed_skill_rain": {
+  "blur": 2,
+  "drehung": 3
+ },
+ "reg:pressure_shatter": {
+  "blur": 1
+ },
+ "reg:promotion_burst": {
+  "blur": 4,
+  "drehung": 2
+ },
+ "reg:rain_of_death": {
+  "blur": 3,
+  "drehung": 2
+ },
+ "reg:rain_of_spores_rain": {
+  "blur": 1
+ },
+ "reg:red_lightning": {
+  "blur": 2
+ },
+ "reg:root_evil_mist": {
+  "blur": 2,
+  "drehung": 1
+ },
+ "reg:sand_twister": {
+  "blur": 1,
+  "drehung": 4
+ },
+ "reg:scythe_cut": {
+  "blur": 3,
+  "drehung": 2
+ },
+ "reg:shield_block": {
+  "blur": 3
+ },
+ "reg:silence_seal": {
+  "blur": 1,
+  "drehung": 3
+ },
+ "reg:slimy_heal_goo": {
+  "blur": 4,
+  "drehung": 1
+ },
+ "reg:smoke_vial": {
+  "blur": 2
+ },
+ "reg:snake_devour": {
+  "drehung": 6
+ },
+ "reg:soul_shard_dark_grant": {
+  "blur": 2,
+  "drehung": 1
+ },
+ "reg:soul_shard_inferno": {
+  "blur": 2
+ },
+ "reg:spectral_armor": {
+  "blur": 3
+ },
+ "reg:spooky_ghost": {
+  "blur": 3
+ },
+ "reg:steam_puff": {
+  "blur": 1
+ },
+ "reg:sun_beam": {
+  "blur": 4
+ },
+ "reg:sunglasses_drop": {
+  "blur": 2
+ },
+ "reg:super_kill_cut": {
+  "drehung": 1
+ },
+ "reg:super_saiyan_aura": {
+  "blur": 4
+ },
+ "reg:tempeluna_infuse": {
+  "blur": 3,
+  "drehung": 2
+ },
+ "reg:tempeluna_steam": {
+  "blur": 2
+ },
+ "reg:time_rewind": {
+  "blur": 2
+ },
+ "reg:toxic_fumes_gas": {
+  "blur": 3,
+  "mischmodus": 1
+ },
+ "reg:victorica_holy_cleanse": {
+  "blur": 3,
+  "drehung": 4
+ },
+ "reg:water_wave": {
+  "blur": 4
+ },
+ "reg:weird_doll_grow": {
+  "blur": 1
+ },
+ "reg:whirlpool": {
+  "blur": 3,
+  "drehung": 1
+ }
+}

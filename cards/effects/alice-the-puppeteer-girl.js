@@ -24,7 +24,7 @@ const { hasCardType } = require('./_hooks');
 function _qualifies(inst, pi, currentTurn, cardDB) {
   if (inst.zone !== 'support') return false;
   if ((inst.controller ?? inst.owner) !== pi) return false;
-  if (inst.stolenBy != null) return false;
+  // W16f (H01-05): eine von mir gestohlene Kreatur ist „a Creature you control" (controller == pi) und zählt mit.
   if (inst.turnPlayed === currentTurn) return false;
   const cd = inst.counters?._cardDataOverride || cardDB[inst.name]; // token-override-aware (Biomancy Token — Als AoE-Report)
   if (!cd || !hasCardType(cd, 'Creature')) return false;
@@ -32,6 +32,11 @@ function _qualifies(inst, pi, currentTurn, cardDB) {
 }
 
 module.exports = {
+  // ★ W12 (Al, Q108/H01-heroes-06): „Ja, Alices Effekt soll blockbar sein und als lv 0 gelten!" — der Effekt zaehlt fuer Stufen-Spell-
+  // Immunitaeten (Anti Magic: `magic_immune` Stufe >= 0) als Destruction Magic Spell der Stufe 0 (Engine: `_spellLevelAlsQuelle`).
+  // W32a (Al, 22.10.2026): „Zählt als Attack/Spell eines Helden = Ability-Level dieses Helden": Alice zählt als Destruction-Magic-Spell der Stufe = ihr DESTRUCTION-MAGIC-LEVEL
+  // (nicht mehr fix 0) — Anti Magic (Spell-Immunität nach Stufe), Anti Magic Shield, Glass Wall & Co. lesen sie über `_heldenEffektStufe`/`_spellLevelAlsQuelle`.
+  treatedAsSpell: { school: 'Destruction Magic' },
   requiresTarget: true,
   // ^ Tagged for Blinded gating — see cards/effects/_hooks.js (blinded status).
   activeIn: ['hero'],
@@ -64,6 +69,10 @@ module.exports = {
     const currentTurn = engine.gs.turn || 0;
     const cardDB = engine._getCardDB();
 
+    // ★ W34a (Al, 22.10.2026): ein Effekt, der als Spell zählt, unterliegt den Spell-Sperren (Nulled/Null Zone, Magic Silenced, Frightened/Howling in the Night, Berserk,
+    // Trial of …, Eraser Beam/Silence, Idej Sword - Kogarasu …) — `heroKannZaubern`.
+    if (!engine.heroKannZaubern(ctx.cardHeroOwner ?? pi, ctx.cardHeroIdx, pi, { name: 'Alice, the Puppeteer Girl', schule: 'Destruction Magic' })) return false;
+
     return engine.cardInstances.some(inst => _qualifies(inst, pi, currentTurn, cardDB));
   },
 
@@ -90,6 +99,11 @@ module.exports = {
     const damage = 50 * creatureCount;
 
     // Prompt: select an enemy target (hero or creature)
+    // ★ W35a (Al, 22.10.2026, Frage 1): „Wenn Alices Effekt abgeblockt/negiert wird, ist er für die Runde verbraucht." Negiert ein Reaktionsfenster der Zielwahl (MOE Shield, Magic Mirror,
+    // Invisibility Cloak …) den Effekt, liefert `promptDamageTarget` `null` MIT `gs._spellNegatedByEffect` — das ist KEIN Abbruch (Muster Javelin Throw): der Effekt gilt als gespielt
+    // (Spell-Zähler), der Einmal-Stempel bleibt gesetzt (Rückgabe `true`). Nur ein echter Abbruch (`false`) gibt die Aktivierung frei. Wie bei Silence (virtuelle Spell-Kette unten).
+    const _negVorher = engine.gs._spellNegatedByEffect;
+    delete engine.gs._spellNegatedByEffect; delete engine.gs._zielNegiertDurchSchutz;   // W36a: auch die Negation durch Schutz-/Redirect-Fenster (Preserve-Wächter …) ist eine Negierung
     const target = await ctx.promptDamageTarget({
       side: 'enemy',
       types: ['hero', 'creature'],
@@ -102,8 +116,20 @@ module.exports = {
       cancellable: true,
     });
 
+    const _negiert = !target && (!!engine.gs._spellNegatedByEffect || !!engine.gs._zielNegiertDurchSchutz);
+    delete engine.gs._zielNegiertDurchSchutz;
+    if (_negVorher) engine.gs._spellNegatedByEffect = _negVorher; else { delete engine.gs._spellNegatedByEffect; if (_negiert) delete engine.gs._negationWhole; }
+    if (_negiert) {
+      await engine.zaehleAlsArt('spell', { pi, heroIdx, heroOwner: ctx.cardHeroOwner ?? pi, name: 'Alice, the Puppeteer Girl' });   // der negierte Effekt zählt als gespielter Spell (wie bei Silence)
+      engine.sync();
+      return true;
+    }
     if (!target) return false; // Cancelled
 
+    // ★ W34a (Al, 22.10.2026, Punkt 2/3): „Treated as a Destruction Magic Spell" — der Treffer zählt als Spell (Spell-Zähler) und öffnet ein Reaktionsfenster wie ein Spell
+    // (virtuelle Spell-Kette `alsSpellKette`, NACH der Zielwahl, VOR dem Treffer): Silence negiert ihn; Shamanic Curse reagiert nicht (kein Kartenspiel); MOE Shield (Nach-Zielwahl-
+    // Fenster der Zielwahl) und Magic Mirror (Treffer-Fenster) lesen die Quelle über `_zaehltAlsArt`.
+    const spellErgebnis = await engine.alsSpellKette({ name: 'Alice, the Puppeteer Girl', pi, heroIdx, heroOwner: ctx.cardHeroOwner ?? pi, ziele: [target], resolve: async () => {
     // Play laser beam animation from Alice to target
     const targetZoneSlot = target.type === 'equip' ? target.slotIdx : -1;
     engine._broadcastEvent('play_beam_animation', {
@@ -131,10 +157,18 @@ module.exports = {
       );
       if (inst) {
         await engine.actionDealCreatureDamage(
-          { name: 'Alice, the Puppeteer Girl', heroIdx }, inst, damage, 'destruction_spell',
+          // W32a (Al, 22.10.2026): die Quelle nennt Spieler und Brettseite des Helden wie bei jedem Heldeneffekt (Reaktionen auf „Spell besiegt Kreatur": Zombified Assault …; Stufe = Destruction-Level).
+          { name: 'Alice, the Puppeteer Girl', owner: pi, controller: pi, heroIdx, ...((ctx.cardHeroOwner ?? pi) !== pi ? { heroOwner: ctx.cardHeroOwner } : {}) }, inst, damage, 'destruction_spell',
           { sourceOwner: pi, canBeNegated: true }
         );
       }
+    }
+    return true;
+    } });
+    // Negiert (Silence …) oder gefizzelt: der Spell hat nie aufgelöst — kein `afterSpellResolved`; die Aktivierung gilt als gebraucht (Muster Arthor/Broghan).
+    if (spellErgebnis?.negated || spellErgebnis?.fizzled) {
+      engine.sync();
+      return true;
     }
 
     // Fire `afterSpellResolved` so passive on-spell-cast listeners

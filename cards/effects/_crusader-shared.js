@@ -205,7 +205,7 @@ async function zugEndeKreislauf(ctx, selbstName) {
 
   const neu = engine.safePlaceInSupport(gewaehlt.name, pi, heroIdx, platz);
   if (!neu?.inst) {
-    ps.discardPile.push(gewaehlt.name);
+    engine.handKartenBesitzerPs(ps, gewaehlt.name).discardPile.push(gewaehlt.name);   // W63c: Ablage des permanenten Besitzers
     return;
   }
   await engine.runHooks('onPlay', {
@@ -244,6 +244,11 @@ function makeCrusaderArtifact(spec) {
   return {
     activeIn: ['support'],
 
+    // W27a (Al, 21.10.2026): „That is treated as an Attack" — Leser der Quellstufe (Glass Wall, Test Flight, Escape Device, Stealth, Jetpack) fragen `_heldenEffektStufe`.
+    // W32a (Al, 22.10.2026): „Sie nehmen trotzdem das Fighting-Level": die Quellstufe ist das FIGHTING-LEVEL des Trägers (Cecilia; nicht mehr fix 0). Kann der Träger nicht
+    // angreifen (Frozen, Stunned, Webbed, Negated, Attack-Sperren), ist der Effekt nicht aktivierbar (`canActivateEquipEffect`).
+    treatedAsAttack: { ability: 'Fighting' },
+
     canEquipToHero(gs, pi, heroIdx, engine) {
       return darfAufHeld(gs, pi, heroIdx, engine, cardName);
     },
@@ -252,13 +257,18 @@ function makeCrusaderArtifact(spec) {
 
     canActivateEquipEffect(ctx) {
       const inst = ctx.card;
-      return !!inst && inst.zone === 'support';
+      if (!(inst && inst.zone === 'support')) return false;
+      const engine = ctx._engine;
+      if (!engine || typeof engine.heroKannAngreifen !== 'function') return true;
+      return engine.heroKannAngreifen(ctx.cardHeroOwner ?? (inst.controller ?? inst.owner), inst.heroIdx, ctx.cardOwner ?? (inst.controller ?? inst.owner));   // W32a: der Träger muss angreifen können
     },
 
     // Die Engine wertet den Rueckgabewert aus: `false` heisst
     // „abgebrochen" und gibt das reservierte Einmal-pro-Zug wieder frei
     // (server.js `doActivateEquipEffect`, `releaseHopt`).
-    async onEquipEffect(ctx) {
+    // W40a (Al, 22.10.2026, Punkt 3): `wdh` = Wiederholung durch Idej Sword - Kunagi („perform that Attack again"): derselbe Schlag (80 Schaden samt eigener Klausel), neues Ziel; der
+    // Einmal-pro-Zug-Stempel (an der Instanz) gehört dem Engine-Weg und bleibt unberührt. Kosten hat der Schlag keine.
+    async onEquipEffect(ctx, wdh) {
       const engine = ctx._engine;
       const gs = engine.gs;
       const inst = ctx.card;
@@ -270,7 +280,13 @@ function makeCrusaderArtifact(spec) {
       const heroIdx = inst.heroIdx;
       const oppIdx = engine.opponentOf(pi);
 
-      const target = await ctx.promptDamageTarget({
+      // ★ W39a: die Quelle des Schlags ist der TRÄGER (Held), nicht die Ausrüstungs-Instanz in der Support Zone — sonst hält jeder Leser den Treffer für eine Kreatur-Quelle
+      // (Firewall/Toxic Trap/Mountain Tear River trafen „Crusader's …" statt Cecilia; Explosivo's Sword, Big Gwen, Skullmael, Bazooka, Wavilion übersahen den Heldentreffer).
+      const schlagQuelle = { name: cardName, owner: pi, controller: pi, heroOwner: feld, heroIdx };
+      // ★ R-12 (Al 26.10.): wie bei Broghan & Co. (W36a) — wird der Schlag im Zielfenster NEGIERT (Surprise wie Glass Wall, Invisibility Cloak, Schutz-/Redirect-Fenster), ist der Effekt
+      // für die Runde verbraucht (Einmal-Stempel bleibt, Rückgabe `true`) und zählt als gespielte Attack; ein Abbruch durch den Spieler bleibt ein Abbruch.
+      const { target, negiert } = await engine.heldenEffektZielwahl(ctx, {
+        attackerSourceOverride: schlagQuelle,
         side: 'any',
         types: ['hero', 'creature'],
         damageType: 'attack',
@@ -281,6 +297,11 @@ function makeCrusaderArtifact(spec) {
         confirmClass: 'btn-danger',
         cancellable: true,
       });
+      if (negiert) {
+        await engine.zaehleAlsArt('attack', { pi, heroIdx, heroOwner: feld, name: cardName });
+        engine.sync();
+        return true;
+      }
       if (!target) return false;   // Abbruch — Zug bleibt unverbraucht
 
       // Zustand VOR dem Schaden festhalten, damit die eigene Klausel
@@ -296,6 +317,9 @@ function makeCrusaderArtifact(spec) {
       const impactSlot = target.type === 'hero' ? -1 : target.slotIdx;
       const tgtZoneSlot = target.type === 'hero' ? undefined : target.slotIdx;
 
+      // W32a (Al, 22.10.2026): der Schlag zählt als Attack des Trägers — Attack-Reaktionen (Magic Topaz, Arrows …) über die virtuelle Attack-Kette;
+      // negiert eine Reaktion den Schlag, hat auch die eigene Klausel (Schaden/Besiegen) keinen Anlass.
+      await engine.alsAttackKette({ name: cardName, pi, heroIdx, heroOwner: feld, ziele: [target], wiederhole: () => require('./_loader').loadCardEffect(cardName).onEquipEffect(ctx, true), resolve: async () => {
       if (attackAnim) {
         await attackAnim(ctx, {
           engine, pi, feld, heroIdx, target,
@@ -305,15 +329,17 @@ function makeCrusaderArtifact(spec) {
 
       if (target.type === 'hero') {
         if (hero && hero.hp > 0) {
-          await ctx.dealDamage(hero, ATTACK_DAMAGE, 'attack');
+          await engine.actionDealDamage(schlagQuelle, hero, ATTACK_DAMAGE, 'attack');
         }
       } else if (target.cardInstance) {
         await engine.actionDealCreatureDamage(
-          { name: cardName, owner: pi, heroOwner: feld, heroIdx },
+          schlagQuelle,
           target.cardInstance, ATTACK_DAMAGE, 'attack',
           { sourceOwner: pi, canBeNegated: true },
         );
       }
+      return true;
+      } });
 
       const hatSchaden = hero ? (hero.hp < hpVorher) : false;
       const besiegt = hero ? (hpVorher > 0 && hero.hp <= 0) : false;

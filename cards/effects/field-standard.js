@@ -2,7 +2,7 @@
 //  CARD EFFECT: "Field Standard"
 //  Artifact (Normal, Cost 10) — Banned base
 //
-//  Choose up to 3 Lv≤1 Creatures with DIFFERENT
+//  Choose up to 3 Level 1 or lower Creatures with DIFFERENT
 //  names you control that already used their
 //  active effects this turn. They may use those
 //  effects an additional time this turn. You can
@@ -225,7 +225,7 @@ module.exports = {
     // know to take the max number of own-side equip targets for
     // Field Standard's reimburse-as-many shape).
     title: CARD_NAME,
-    description: 'Choose up to 3 Lv≤1 Creatures with different names that already used their effects this turn. Each picked Creature may use its effect again.',
+    description: 'Choose up to 3 Level 1 or lower Creatures with different names that already used their effects this turn. Each picked Creature may use its effect again.',
     confirmLabel: '🚩 Rally!',
     confirmClass: 'btn-info',
     cancellable: true,
