@@ -175,10 +175,10 @@
   <script defer src="/potion-deck-clauses.js"></script>
   <!-- Karten entstehen zur Laufzeit (Rahmen + Kunst-Atlas + Schrift) statt als 1.200 fertige PNGs.
        card-render.js zeichnet, card-image-shim.js haengt es an die <img>-Quellen /cards/…. -->
+  <!-- Rang-Rahmen (Silber … Obsidian, Duplikate) für Karten, Sleeves und Avatare: Pixelart-Generator, setzt window.ppRankFrames; vor dem Karten-Shim, der ihn in Skin-Karten einbackt -->
+  <script defer src="/rank-frames.js"></script>
   <script defer src="/card-render.js"></script>
   <script defer src="/card-image-shim.js"></script>
-  <!-- Rang-Rahmen (Silber … Obsidian) für Karten, Sleeves und Avatare: Pixelart-Generator, setzt window.ppRankFrames (nach palette.js, vor den Bundles) -->
-  <script defer src="/rank-frames.js"></script>
   <script defer src="/dist/app-shared.js"></script>
   <script defer src="/dist/app-areas.js"></script>
   <script defer src="/dist/app-screens.js"></script>

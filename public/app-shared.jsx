@@ -1957,52 +1957,65 @@ function ppPixelPartikel(canvas, teile, opt) {
 }
 window.ppPixelPartikel = ppPixelPartikel;
 
-// ═══ RANG-RAHMEN: <RankFrame> ═══════════════════════════════════════════
-// Legt einen Rang-Rahmen (public/rank-frames.js) um beliebigen Inhalt (Kartenbild, Sleeve, Avatar). Die Größe des Inhalts wird in
-// Kunstpixeln (`px` Bildschirmpixel je Kunstpixel) auf ganze Zahlen gerundet; der Rahmen ragt mit seinem Zierrat über die Kante hinaus
-// (absolut positioniert, ohne das Layout zu verschieben). Alle animierten Rahmen teilen sich EINEN Takt (10 Bilder/s, pausiert im
-// versteckten Tab); animated={false} zeichnet nur das Standbild.
-//   rank: 0 … 7 (Silver, Gold, Platinum, Diamond, Ruby, Sapphire, Emerald, Obsidian) oder null (kein Rahmen)
-//   kind: 'card' | 'sleeve' | 'avatar'
-//   compact: KOMPAKTE Stufe für das laufende Spiel (Duell, Hand, Deckbau): Band innen auf der Kante, Zierrat ragt höchstens 3 Kunstpixel heraus;
-//            für kleine Karten (~90 px breit) mit px = 2. Ohne compact: die große Stufe (Galerie, Profil, Vorschau).
-const _rfLive = new Set();
-let _rfTimer = 0;
-function _rfAn(e) {
-  _rfLive.add(e);
-  if (!_rfTimer) _rfTimer = setInterval(() => {
-    if (document.hidden) return;
-    const t = performance.now() / 1000;
-    for (const x of _rfLive) { try { x.f.draw(x.ctx, t); } catch {} }
-  }, 100);
+// ═══ RANG-RAHMEN (Duplikate) ═══════════════════════════════════════════
+// Zieht man ein Item mehrfach, bekommt es dauerhaft einen Rahmen (public/rank-frames.js): 1 Kopie über das Original = Silber … 8 = Obsidian.
+// Es gibt EINE Rahmenstufe, überall gleich. Der Rahmen liegt innerhalb der Bildkante und wird FEST IN DAS BILD EINGEBACKEN, darum zeigt jedes
+// `<img>` ihn ohne weiteren Aufwand:
+//   Avatar / Sleeve   ppRankFrames.bakeUrl(url, kind, rank) → data-URL;  Hook useFramedSrc / <FramedImg>;  im Duell useFramedPlayer(p)
+//   Skin-Karten       `?rahmen=<Kopien>` an der Karten-URL (card-image-shim.js backt ihn beim Zeichnen der Karte ein);
+//                     cardImageUrl(held, skins) hängt ihn selbst an, wenn dem Skin-Objekt Ränge zugeordnet sind (ppSkinRanksSet / ppSkinMerge)
+function ppFrameRank(dupes) { return window.ppRankFrames ? window.ppRankFrames.rankOf(dupes) : null; }
+const _ppSkinRanks = new WeakMap();           // Skin-Zuordnung { Held: Skin } → { Held: Kopien }
+/** Ordnet einer Skin-Zuordnung (Held → Skin) die Ränge zu (`ranksBySkin`: Skin → Kopien, so schickt sie der Server). Liefert dieselbe Zuordnung zurück. */
+function ppSkinRanksSet(skins, ranksBySkin) {
+  if (!skins || typeof skins !== 'object') return skins;
+  const byHero = {};
+  for (const [hero, skin] of Object.entries(skins)) { const d = ranksBySkin && ranksBySkin[skin]; if (d) byHero[hero] = d; }
+  if (Object.keys(byHero).length) _ppSkinRanks.set(skins, byHero); else _ppSkinRanks.delete(skins);
+  return skins;
 }
-function _rfAus(e) { _rfLive.delete(e); if (!_rfLive.size && _rfTimer) { clearInterval(_rfTimer); _rfTimer = 0; } }
-function RankFrame({ rank, kind = 'card', width, height, px = 3, compact = false, animated = true, className = '', style, children }) {
-  const iw = Math.max(8, Math.round(width / px)), ih = Math.max(8, Math.round(height / px));
-  const f = useMemo(() => (rank == null || !window.ppRankFrames ? null : window.ppRankFrames.create(rank, kind, iw, ih, compact ? { compact: true } : undefined)), [rank, kind, iw, ih, compact]);
-  const cvRef = useRef(null);
+/** Wie `{ ...a, ...b }` für Skin-Zuordnungen, nimmt aber die Ränge mit (der Spätere gewinnt je Held). */
+function ppSkinMerge(...parts) {
+  const out = {}, ranks = {};
+  for (const o of parts) {
+    if (!o) continue;
+    Object.assign(out, o);
+    const r = _ppSkinRanks.get(o);
+    for (const h of Object.keys(o)) { if (r && r[h]) ranks[h] = r[h]; else delete ranks[h]; }
+  }
+  if (Object.keys(ranks).length) _ppSkinRanks.set(out, ranks);
+  return out;
+}
+/** Quelle mit eingebackenem Rahmen: gibt zuerst die Original-URL, sobald der Rahmen fertig ist die gebackene zurück. */
+function useFramedSrc(src, kind, dupes) {
+  const rank = ppFrameRank(dupes);
+  const [baked, setBaked] = useState(null);
   useEffect(() => {
-    const cv = cvRef.current;
-    if (!f || !cv) return undefined;
-    const ctx = cv.getContext('2d');
-    f.draw(ctx, 0.9, true);
-    let ruhig = !animated;
-    try { if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) ruhig = true; } catch {}
-    if (ruhig) return undefined;
-    const e = { f, ctx };
-    _rfAn(e);
-    return () => _rfAus(e);
-  }, [f, animated]);
-  const M = f ? f.M : 0;
-  return (
-    <div className={'rank-frame ' + className} style={{ position: 'relative', display: 'inline-block', width: iw * px, height: ih * px, ...style }}>
-      {children}
-      {f && <canvas ref={cvRef} width={f.w} height={f.h} data-pp-px="aus" className="rank-frame-cv"
-        style={{ position: 'absolute', left: -M * px, top: -M * px, width: f.w * px, height: f.h * px, imageRendering: 'pixelated', pointerEvents: 'none' }} />}
-    </div>
-  );
+    setBaked(null);
+    if (rank == null || !src) return undefined;
+    let live = true;
+    window.ppRankFrames.bakeUrl(src, kind, rank).then(u => { if (live) setBaked(u); });
+    return () => { live = false; };
+  }, [src, kind, rank]);
+  return (rank != null && baked) || src;
 }
-window.RankFrame = RankFrame;
+/** <img> mit Rahmen nach Kopienzahl (`dupes` 0 / fehlt: ohne Rahmen). */
+function FramedImg({ src, kind = 'card', dupes, ...rest }) {
+  return <img src={useFramedSrc(src, kind, dupes)} {...rest} />;
+}
+/** Spieler im Duell: Avatar und Sleeve mit Rahmen (nach avatarRank / cardbackRank), sonst unverändert dasselbe Objekt. */
+function useFramedPlayer(p) {
+  const aR = p ? ppFrameRank(p.avatarRank) : null, cR = p ? ppFrameRank(p.cardbackRank) : null;
+  const avatar = p && p.avatar, cardback = p && p.cardback;
+  const av = useFramedSrc(aR != null ? avatar : null, 'avatar', p && p.avatarRank);
+  const cb = useFramedSrc(cR != null ? cardback : null, 'sleeve', p && p.cardbackRank);
+  return useMemo(() => {
+    if (!p || ((aR == null || !av || av === avatar) && (cR == null || !cb || cb === cardback))) return p;
+    return { ...p, avatar: (aR != null && av) || p.avatar, cardback: (cR != null && cb) || p.cardback };
+  }, [p, av, cb, aR, cR]);
+}
+window.ppFrameRank = ppFrameRank; window.ppSkinRanksSet = ppSkinRanksSet; window.ppSkinMerge = ppSkinMerge;
+window.useFramedSrc = useFramedSrc; window.FramedImg = FramedImg; window.useFramedPlayer = useFramedPlayer;
 
 window.PxZeichen = PxZeichen;
 window.PxIcon = PxIcon;
@@ -5848,7 +5861,8 @@ window.matchesStartingAbilities = matchesStartingAbilities;
 function cardImageUrl(cardName, skinOverrides) {
   // If a skin is selected for this card, use the skin image
   if (skinOverrides && skinOverrides[cardName]) {
-    return '/cards/skins/' + encodeURIComponent(skinOverrides[cardName]) + '.png';
+    const dupes = (_ppSkinRanks.get(skinOverrides) || {})[cardName];   // Rang-Rahmen des Skins (Duplikate), vom Karten-Shim eingebacken
+    return '/cards/skins/' + encodeURIComponent(skinOverrides[cardName]) + '.png' + (dupes ? '?rahmen=' + dupes : '');
   }
   const file = window.AVAILABLE_MAP[cardName];
   return file ? '/cards/' + encodeURIComponent(file) : null;

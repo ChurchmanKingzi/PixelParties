@@ -37854,9 +37854,12 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
   const goldCrashRaf = useRef(null);
   // 'crash' (rot) oder 'recover' (gruen) — steuert die Zaehler-Klasse.
   const [goldCrashTone, setGoldCrashTone] = useState('crash');
-  const me = gameState.players[myIdx];
-  const opp = gameState.players[oppIdx];
-  const gameSkins = useMemo(() => ({ ...(me.deckSkins || {}), ...(opp.deckSkins || {}) }), [me.deckSkins, opp.deckSkins]);
+  // Rang-Rahmen (Duplikate): Avatar und Sleeve beider Spieler tragen ihren Rahmen eingebacken (useFramedPlayer, app-shared.jsx); die Ränge der
+  // Skin-Karten hängen an der Skin-Zuordnung des jeweiligen Besitzers (cardImageUrl hängt `?rahmen=N` an, der Karten-Shim backt ihn ein).
+  const me = useFramedPlayer(gameState.players[myIdx]);
+  const opp = useFramedPlayer(gameState.players[oppIdx]);
+  window.ppSkinRanksSet(me.deckSkins, me.skinRanks); window.ppSkinRanksSet(opp.deckSkins, opp.skinRanks);
+  const gameSkins = useMemo(() => window.ppSkinMerge(me.deckSkins, opp.deckSkins), [me.deckSkins, opp.deckSkins]);
   const result = gameState.result;
   const iWon = result && result.winnerIdx === myIdx;
   const stRes = (result && gameState.skillTest && result.skillTest) || null;
@@ -57093,7 +57096,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                       hp: hero.hp, maxHp: hero.maxHp, atk: hero.atk, hpPosition: 'hero',
                       children: orbsEl || undefined,
                       orbs: hero.ascensionOrbs,
-                      skins: p.deckSkins ? { ...gameSkins, ...p.deckSkins } : gameSkins, abilities: p.abilityZones?.[i],
+                      skins: p.deckSkins ? window.ppSkinMerge(gameSkins, p.deckSkins) : gameSkins, abilities: p.abilityZones?.[i],
                       copiedHeroes: _kopiert,
                       inheritedEffects: _kopiert
                         .map(n => ({ label: n, text: CARDS_BY_NAME[n]?.effect || '' }))
