@@ -3,13 +3,23 @@
 // ═════════════════════════════════════════════════════════════════
 //  Vorher (app-board.jsx, `ZielMarkenEbene`): je Pfadsegment (#1 → #2 → #3 …) zwei SVG-<line> (runde Linie, halbtransparent) + <marker> mit weich gezeichneter Pfeilspitze, die
 //  Striche liefen per CSS-Animation (`zielPfadLauf`, stroke-dashoffset) — Vektor, Alpha, Dauer-Animation.
-//  Jetzt: EINE Leinwand (Rastermaß 3 px, `image-rendering: pixelated`, Fensterhülle der Zielmarken-Ebene) für ALLE Segmente. Linie = Treppenlinie in ganzen Zellen (1 Zelle dick), Striche 3 an / 3 aus
+//  Jetzt: EINE Leinwand (Rastermaß = Hero-Pixel (`ppFxZelle`; vorher 3 px), `image-rendering: pixelated`, Fensterhülle der Zielmarken-Ebene) für ALLE Segmente. Linie = Treppenlinie in ganzen Zellen (1 Zelle dick), Striche 3 an / 3 aus
 //  wie die alten 10/8 px, wandern in ganzen Zellen vorwärts (6 Schritte je 0,9 s wie `zielPfadLauf`); Schatten = Schachbrett-Raster (Dithering statt Alpha) um die Linie; Spitze = gefülltes
 //  Pixel-Dreieck (7 Zellen lang und breit, Spitze 2 Zellen über dem Ziel-Endpunkt hinaus) mit Dither-Rand.
 //  Kosten: gezeichnet wird nur, wenn sich Segmente ODER der Strich-Versatz (≈ 7 ×/s) ändern; dazwischen tut der 30-Hz-Takt nichts außer einem Zahlenvergleich. Ohne Segmente: Leinwand
 //  leer, kein Takt. Kein Layout-Lesen im Takt (Größe: nur bei Fenstergröße). Rückfall: fehlt `window.PpZielPfad`, nimmt app-board.jsx den alten SVG-Pfad.
 // ═════════════════════════════════════════════════════════════════
-const PP_FX41_S = 3;                       // Zellgröße (CSS-px)
+const PP_FX41_S = 3;                       // Rückfall der Zellgröße (CSS-px); gezeichnet wird mit der Hero-Pixel-Zelle (`ppFx41Zelle`, Phase 2)
+/** Rasterzelle der Fenster-Ebenen dieser Datei = Hero-Pixel der eigenen Reihe (`ppFxZelle`, app-board.jsx); nur beim Aufbau/bei Größen- und Segmentwechsel gelesen, nie im Takt. */
+function ppFx41Zelle() {
+  try { if (typeof ppFxZelle === 'function') return ppFxZelle(null); } catch (e) { /* Rückfall */ }
+  return PP_FX41_S;
+}
+/** Zelle am Ziel-Element (Zone/Hero-Kind): Hero-Pixel der Reihe, in der es liegt. */
+function ppFx41ZelleFuer(el) {
+  try { if (typeof ppFxZelle === 'function') return ppFxZelle(el); } catch (e) { /* Rückfall */ }
+  return PP_FX41_S;
+}
 const PP_FX41_TAKT = 1000 / 30;
 const PP_FX41_LAUF = 900;                  // ms je Strich-Periode (wie zielPfadLauf)
 const PP_FX41_PERIODE = 6;                 // Zellen je Strich + Lücke
@@ -18,9 +28,9 @@ const PP_FX41_KOPF = 7;                    // Länge/Breite der Pfeilspitze in Z
 const PP_FX41_ROT = '#fe5154';
 const PP_FX41_SCHATTEN = '#2a0404';
 
-function ppFx41Zeichne(ctx, gw, gh, segs, versatz, schattenMuster) {
+function ppFx41Zeichne(ctx, gw, gh, segs, versatz, schattenMuster, S) {
   ctx.clearRect(0, 0, gw, gh);
-  const S = PP_FX41_S;
+  S = S || PP_FX41_S;
   const sch = [];
   // 1) Schatten (Schachbrett) entlang jeder Linie und um die Spitze
   ctx.fillStyle = schattenMuster || PP_FX41_SCHATTEN;
@@ -95,12 +105,13 @@ function PpZielPfadInnen({ segmente }) {
       const g = m.getContext('2d'); g.fillStyle = PP_FX41_SCHATTEN; g.fillRect(0, 0, 1, 1); g.fillRect(1, 1, 1, 1);
       muster = ctx.createPattern(m, 'repeat');
     } catch (e) { muster = null; }
-    let gw = 0, gh = 0, id = 0, tot = false, letzte = '';
+    let gw = 0, gh = 0, id = 0, tot = false, letzte = '', zS = 0;
     const groesse = () => {
-      const w = Math.ceil((window.innerWidth || 1280) / PP_FX41_S), h = Math.ceil((window.innerHeight || 720) / PP_FX41_S);
-      if (w !== gw || h !== gh) {
-        gw = w; gh = h; cv.width = w; cv.height = h;
-        cv.style.width = (w * PP_FX41_S) + 'px'; cv.style.height = (h * PP_FX41_S) + 'px';
+      const S = ppFx41Zelle();
+      const w = Math.ceil((window.innerWidth || 1280) / S), h = Math.ceil((window.innerHeight || 720) / S);
+      if (w !== gw || h !== gh || S !== zS) {
+        zS = S; gw = w; gh = h; cv.width = w; cv.height = h;
+        cv.style.width = (w * S) + 'px'; cv.style.height = (h * S) + 'px';
         letzte = '';
       }
     };
@@ -114,13 +125,13 @@ function PpZielPfadInnen({ segmente }) {
       if (schl !== letzte) {
         letzte = schl;
         const zm = window.__ppFx41Zeit;                    // nur Tests: Kosten je Bild sammeln
-        if (zm) { const a = performance.now(); ppFx41Zeichne(ctx, gw, gh, segs, versatz, muster); zm.push(performance.now() - a); }
-        else ppFx41Zeichne(ctx, gw, gh, segs, versatz, muster);
+        if (zm) { const a = performance.now(); ppFx41Zeichne(ctx, gw, gh, segs, versatz, muster, zS); zm.push(performance.now() - a); }
+        else ppFx41Zeichne(ctx, gw, gh, segs, versatz, muster, zS);
       }
       if (!ruhig) id = raf(tick);
     };
     const wecke = () => { if (!id && !tot) id = raf(tick); };
-    stoss.current = wecke;
+    stoss.current = () => { groesse(); wecke(); };           // Segmentwechsel: Zelle neu lesen (Tutorial-Zoom), dann zeichnen
     groesse();
     const beiGroesse = () => { groesse(); wecke(); };
     window.addEventListener('resize', beiGroesse);
@@ -404,11 +415,12 @@ function ppFx41WolkenBild(skala, S) {
 }
 const PP_FX41_SKALEN = [1.5, 2.0, 2.5, 3.0];
 function PpFx41SturmInnen() {
-  const wurzel = React.useRef(null), leinwand = React.useRef(null);
+  const wurzel = React.useRef(null), leinwand = React.useRef(null), himmelRef = React.useRef(null);
   React.useEffect(() => {
-    const wz = wurzel.current, cv = leinwand.current;
-    if (!wz || !cv) return undefined;
-    const S = 3, raf = window.ppTaktRaf || window.requestAnimationFrame, ctx = cv.getContext('2d');
+    const wz = wurzel.current, cv = leinwand.current, hv = himmelRef.current;
+    if (!wz || !cv || !hv) return undefined;
+    let S = ppFx41Zelle();                                    // Rasterzelle = Hero-Pixel (Phase 2; vorher fest 3); bei Fenstergröße neu gelesen
+    const raf = window.ppTaktRaf || window.requestAnimationFrame, ctx = cv.getContext('2d');
     ctx.imageSmoothingEnabled = false;
     const wolken = Array.from({ length: ppFxN(22) }, () => ({
       y: -8 + Math.random() * 116, b: Math.floor(Math.random() * PP_FX41_SKALEN.length), dur: 8 + Math.random() * 7,
@@ -423,10 +435,12 @@ function PpFx41SturmInnen() {
     const rot = ppHex('#ef2929'), kern = ppHex('#f0bfbc');
     const css = (c) => 'rgb(' + c[0] + ',' + c[1] + ',' + c[2] + ')';
     const groesse = (w, h) => {
+      const S2 = ppFx41Zelle();
+      if (S2 !== S) { S = S2; if (bilder) bilder = PP_FX41_SKALEN.map((s) => ppFx41WolkenBild(s, S)); gw = 0; gh = 0; }
       const nw = Math.max(8, Math.ceil(w / S)), nh = Math.max(8, Math.ceil(h / S));
       if (nw === gw && nh === gh) return;
       gw = nw; gh = nh; cv.width = nw; cv.height = nh; cv.style.width = nw * S + 'px'; cv.style.height = nh * S + 'px';
-      himmel = document.createElement('canvas'); himmel.width = nw; himmel.height = nh;        // dunkelrotes Schachbrett (Dither statt multiply-Verlauf)
+      himmel = hv; himmel.width = nw; himmel.height = nh; himmel.style.width = nw * S + 'px'; himmel.style.height = nh * S + 'px';   // dunkelrotes Schachbrett (Dither statt multiply-Verlauf): eigene, ruhende Leinwand unter den Wolken — wird nur bei Größenänderung gemalt, nicht mehr in jedem Bild über die ganze Fläche kopiert (Zelle = Hero-Pixel → mehr Zellen)
       const hc = himmel.getContext('2d'), im = hc.createImageData(nw, nh), c = ppFx41Pal(ppHex('#2a0404'));
       for (let j = 0; j < nh; j++) for (let i = 0; i < nw; i++) {
         const dx = (i / nw - 0.5) * 2, dy = (j / nh - 0.5) * 2, r = Math.min(1, Math.sqrt(dx * dx + dy * dy) / 1.2);
@@ -442,7 +456,6 @@ function PpFx41SturmInnen() {
     const zeichnen = (jetzt) => {
       if (!(gw > 0)) return;
       ctx.clearRect(0, 0, gw, gh);
-      if (himmel) ctx.drawImage(himmel, 0, 0);
       if (bilder) for (const c of wolken) {
         const f = ((((jetzt / 1000 + c.ph) / c.dur) % 1) + 1) % 1, p = c.rev ? 1 - f : f, b = bilder[c.b];
         const x = Math.round((-0.25 + 1.5 * p) * gw + b.ox), y = Math.round(c.y / 100 * gh + b.oy);
@@ -496,6 +509,7 @@ function PpFx41SturmInnen() {
   return (
     <div ref={wurzel} className="gathering-storm-overlay" data-pp-px="aus" aria-hidden="true"
       style={{ position: 'absolute', inset: 0, pointerEvents: 'none', overflow: 'hidden' }}>
+      <canvas ref={himmelRef} style={{ position: 'absolute', left: 0, top: 0, imageRendering: 'pixelated' }} />
       <canvas ref={leinwand} style={{ position: 'absolute', left: 0, top: 0, imageRendering: 'pixelated' }} />
     </div>
   );
@@ -557,15 +571,18 @@ function PpFx41NetzLeinwand({ weg }) {
   React.useEffect(() => {
     const wz = wurzel.current, cv = leinwand.current;
     if (!wz || !cv) return undefined;
-    const S = 3, raf = window.ppTaktRaf || window.requestAnimationFrame, ctx = cv.getContext('2d'), t0 = performance.now();
+    let S = ppFx41ZelleFuer(wz);                              // Rasterzelle = Hero-Pixel des Helden, auf dem das Netz liegt (Phase 2; vorher fest 3)
+    const raf = window.ppTaktRaf || window.requestAnimationFrame, ctx = cv.getContext('2d'), t0 = performance.now();
     if (!_ppFx41Netz) _ppFx41Netz = ppR1NetzEcken(52, 72, 12, 6);
     const netz = _ppFx41Netz, TON = ppFx41Pal(ppHex('#3a0000'));
     const stufen = [ppHex('#b21a29'), ppFx41Mix(ppHex('#b21a29'), ppHex('#e73b41'), 0.33), ppFx41Mix(ppHex('#b21a29'), ppHex('#e73b41'), 0.66), ppHex('#e73b41')].map(ppFx41Pal);
     const css = (c) => 'rgb(' + c[0] + ',' + c[1] + ',' + c[2] + ')';
-    let gw = 0, gh = 0, tot = false, id = 0, letzte = '';
+    let gw = 0, gh = 0, tot = false, id = 0, letzte = '', zS = 0;
     const groesse = (w, h) => {
+      S = ppFx41ZelleFuer(wz);
       const nw = Math.max(4, Math.ceil(w / S)), nh = Math.max(4, Math.ceil(h / S));
-      if (nw === gw && nh === gh) return;
+      if (nw === gw && nh === gh && S === zS) return;
+      zS = S;
       gw = nw; gh = nh; cv.width = nw; cv.height = nh; cv.style.width = nw * S + 'px'; cv.style.height = nh * S + 'px'; letzte = '';
     };
     const zeichne = (farbe, a) => {

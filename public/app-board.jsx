@@ -8836,7 +8836,10 @@ const ZONE_FASS_ZEILEN = [
 ];
 const ZONE_FASS_FARBEN = { k: '#1f0f04', d: '#5a341a', m: '#8e503a', l: '#b06746', h: '#ca874e', n: '#323232', i: '#686868', j: '#a8a8a8' };
 const ZoneFassMarke = React.memo(function ZoneFassMarke() {
-  const S = 3, w = ZONE_FASS_ZEILEN[0].length, h = ZONE_FASS_ZEILEN.length;
+  // Rasterzelle = Hero-Pixel (ppFxZelle); folgt dem Fenster (resize) — das Fass ist 14 × 19 Zellen
+  const [S, setS] = useState(() => ppFxZelle(null));
+  useEffect(() => { const f = () => setS(ppFxZelle(null)); f(); window.addEventListener('resize', f); return () => window.removeEventListener('resize', f); }, []);
+  const w = ZONE_FASS_ZEILEN[0].length, h = ZONE_FASS_ZEILEN.length;
   return (
     <div data-pp-px="aus" title="Barrel Home: this Support Zone is closed" style={{
       position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', pointerEvents: 'none',
@@ -10124,12 +10127,13 @@ const PythiaFlamesEffect = (() => {
 function ppGlasWand(modus) {
   const GLAS = ['#ffffff', '#bddcef', '#77c8ee', '#1788bd'].map(ppHex);
   const STERN = ['#ffffff', '#fff196', '#fad54a'].map(ppHex);
-  const S = 3, TAKT = 33, ENDE = 1000, PAD = 16;
+  const TAKT = 33, ENDE = 1000, PAD = 16;
   const AUFBAU = 300, TREFFER = modus === 'up' ? 360 : 140, BRUCH = 420;
   const klemme = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
   const glatt = (u) => { const q = klemme(u, 0, 1); return q * q * (3 - 2 * q); };
-  return function GlasWandEffekt({ x, y, w, h }) {
+  return function GlasWandEffekt({ x, y, w, h, zelleS }) {
     const cvs = useRef(null);
+    const S = useMemo(() => ppFxZelleFuer({ x, y, w, zelleS }), []);   // Rasterzelle = Hero-Pixel (ppFxZelle)
     const kw = Math.max(14, Math.round((w || 64) / S)) + 4, kh = Math.max(18, Math.round((h || 90) / S)) + 4;       // die Scheibe überragt die Karte um 2 Pixel
     const GW = kw + PAD * 2, GH = kh + PAD * 2;
     const L = PAD, T = PAD, CX = L + kw / 2, CY = T + kh / 2;
@@ -10317,11 +10321,12 @@ function ppBeute() {
     '....########...',
   ];
   const BW = 15, BH = FORM.length;
-  const S = 3, TAKT = 33, ENDE = 900, PAD = 20;
+  const TAKT = 33, ENDE = 900, PAD = 20;
   const klemme = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
   const glatt = (u) => { const q = klemme(u, 0, 1); return q * q * (3 - 2 * q); };
-  return function BeuteEffekt({ x, y, w, h }) {
+  return function BeuteEffekt({ x, y, w, h, zelleS }) {
     const cvs = useRef(null);
+    const S = useMemo(() => ppFxZelleFuer({ x, y, w, zelleS }), []);   // Rasterzelle = Hero-Pixel (ppFxZelle)
     const kw = Math.max(14, Math.round((w || 64) / S)), kh = Math.max(18, Math.round((h || 90) / S));
     const GW = kw + PAD * 2 + 16, GH = kh + PAD * 2 + 8;
     const CX = Math.floor(GW / 2), CY = Math.floor(GH / 2) + 4;
@@ -10420,9 +10425,10 @@ function ppBeute() {
  * ein Canvas um beide Punkte (3 Bildschirmpixel je Rasterpixel, Bayer-Dithering statt Alpha, ~30 Bilder/s). `malen(g, t, geo, teile)`: `geo` = { gw, gh, a: {x, y, hw, hh}, b: {…} } in RASTERkoordinaten.
  */
 function ppPunktFlug(malen, ende, vorbereiten) {
-  const S = 3, TAKT = 33, RAND = 60;
-  return function PunktFlugEffekt({ targetPoints }) {
+  const TAKT = 33, RAND = 60;
+  return function PunktFlugEffekt({ targetPoints, zelleS }) {
     const cvs = useRef(null);
+    const S = useMemo(() => ppFxZelleFuer({ x: targetPoints && targetPoints[0] && targetPoints[0].x, y: targetPoints && targetPoints[0] && targetPoints[0].y, zelleS }), []);   // Rasterzelle = Hero-Pixel (ppFxZelle)
     const geo = useMemo(() => {
       const p = (targetPoints || []).slice(0, 2);
       if (p.length < 2) return null;
@@ -12392,11 +12398,25 @@ function ppR1Pinsel(buf, gw, gh, S) {
 // Welt-Animationen tragen FELD-Koordinaten (Fenster + Scrollstand des Brettes, s. ppFxWeltAnker). Ursprung (`ox`/`oy`) und Ziele (`targetPoints`) kommen als FENSTERpunkte aus dem
 // Brett-Zweig von `onZoneAnim` — ohne diesen Versatz lagen sie bei gescrolltem Brett (Handy) um den Scrollstand daneben (Flame Avalanche startete viel zu hoch).
 function ppR1FeldVersatz(p) { return (p && p.welt && window.ppFxScrollOffset) ? window.ppFxScrollOffset() : { dx: 0, dy: 0 }; }
+/**
+ * Rasterzelle eines Effekts = Hero-Pixel (`ppFxZelleFuer`), bei fensterfüllenden Leinwänden gedeckelt: höchstens 140 000 Zellen (Handy: 60 000, wie app-fx-58), sonst Zelle + 1. Bei 720p (S = 2) hatten Flut,
+ * Feuerwalze, Meteor … 230 000 Zellen und kosteten je Bild das Doppelte (gemessen, 4x gedrosselt: Flut 9,1 statt 4,6 ms, Armageddon 10,9 statt 5,3 ms); am Handy (S = 2, 82 000 Zellen) ebenso.
+ * `mass` wie bei `ppR1Leinwand` (Funktion der Props oder Objekt mit `breite`/`hoehe`). Die Notbremse `__ppFxZelleFest` gilt unverändert (feste Zelle, kein Deckel).
+ */
+function ppFxZelleGedeckelt(props, mass) {
+  let s = ppFxZelleFuer(props);
+  if (window.__ppFxZelleFest > 0) return s;
+  try {
+    const q = typeof mass === 'function' ? mass(props) : mass;
+    if (q && q.breite > 0 && q.hoehe > 0) { const maxZ = (window.ppIsPhone && window.ppIsPhone()) ? 60000 : 140000; while (s < 3 && (q.breite / s) * (q.hoehe / s) > maxZ) s++; }   // nur Zelle 2 -> 3 (Kostenschutz bei feinerem Raster als vor der Hero-Pixel-Regel); ab Zelle 3 bleibt es bei Hero-Pixel (1080p: 230k Zellen wie schon immer)
+  } catch (e) { /* Maß braucht Daten des Aufrufers: Zelle bleibt */ }
+  return s;
+}
 function ppR1Leinwand(malen, ende, mass, opt) {
   const o = opt || {}, TAKT = 1000 / 30;
   return function R1Effekt(props) {
     const cvs = useRef(null);
-    const S = useMemo(() => ppFxZelleFuer(props), []);   // Rasterzelle = Hero-Pixel (ppFxZelle); vorher fest 3
+    const S = useMemo(() => ppFxZelleGedeckelt(props, mass), []);   // Rasterzelle = Hero-Pixel (ppFxZelle), bei fensterfüllenden Leinwänden gedeckelt (ppFxZelleGedeckelt); vorher fest 3
     const m = useMemo(() => {
       const q = typeof mass === 'function' ? mass(props) : mass;
       const breite = Math.ceil(q.breite / S) * S, hoehe = Math.ceil(q.hoehe / S) * S;
@@ -13786,10 +13806,10 @@ const PP_R1_FSCHLAG_BILD = {
   stern: ['..Y..', '..Y..', 'YYWYY', '..Y..', '..Y..'],
 };
 function ppR1FlammenSchlag(skala) {
-  const S = 3, R = Math.ceil(130 * skala + 30);
+  const R = Math.ceil(130 * skala + 30);
   const FUNKEN = ['#ff491a', '#ff8b1a', '#fad54a', '#ff1a1a', '#f9ac20'].map(ppHex);
   return ppR1Leinwand((g, t, sz, teile) => {
-    const cx = sz.cx, cy = sz.cy;
+    const S = sz.S, cx = sz.cx, cy = sz.cy;   // Rasterzelle = Hero-Pixel (ppR1Leinwand)
     // Feuerschein (ab 250 ms, 600 ms)
     const fk = (t - 250) / 600;
     if (fk >= 0 && fk <= 1) {
@@ -27976,14 +27996,15 @@ const ANIM_REGISTRY = {
     const RESTE = ['#e2d8cb', '#f9b3b3', '#ff6666', '#e73b41'].map(hex);
     const STREIFEN = hex('#bddcef');
     const BAYER = [0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5].map(v => (v + 0.5) / 16);
-    const S = 3;                                  // Bildschirmpixel je Rasterpixel
+    // Rasterzelle: je Aufruf aus dem Hero-Pixel (ppFxZelle) in der Komponente; // Bildschirmpixel je Rasterpixel
     const GW = 80, GH = 72;                       // Raster
     const CX = 40, CY = 52;                       // Einschlagpunkt im Raster
     const FALL = 380;                             // Aufsetzen (ms) — deckt sich mit dem Klang `slash` (delay 360)
     const ENDE = 960;                             // alles ist vor der Standard-Lebensdauer (1000 ms) verschwunden
     const GRAV = 170;                             // Rasterpixel / s²
-    return function KnifeSacrificeEffect({ x, y }) {
+    return function KnifeSacrificeEffect({ x, y, w, h, zelleS }) {
       const cvs = useRef(null);
+      const S = useMemo(() => ppFxZelleFuer({ x, y, w, zelleS }), []);   // Rasterzelle = Hero-Pixel (ppFxZelle)
       // Teilchen einmal würfeln. Zahlen über `ppFxN` (Effekt-Dichte, Lite-Modus).
       const teile = useMemo(() => {
         const funken = Array.from({ length: ppFxN(24) }, () => {
@@ -28147,15 +28168,16 @@ const ANIM_REGISTRY = {
     const RAUCH = ['#d2d2db', '#a5b0c0', '#808898', '#59606e'].map(ppHex);
     const WIND = ['#ffffff', '#e5edfa', '#b3d8f9'].map(ppHex);
     const FUNKEN = ['#ffffff', '#fff196', '#ffc61c', '#ff8b1a'].map(ppHex);
-    const S = 3, TAKT = 33, ENDE = 980;
+    const TAKT = 33, ENDE = 980;
     const PADX = 22, PAD_OBEN = 16, PAD_UNTEN = 48;              // Platz um die Karte (Rasterpixel): Flammen/Rauch ragen darunter
     const ZUENDEN = 110, BRENNT_BIS = 640, AUS = 840, LAENGE = 14;
     const rausch = (a, b) => { const x = Math.sin(a * 127.1 + b * 311.7) * 43758.5453; return x - Math.floor(x); };
     // Flammenlaenge zur Zeit t (ms), ohne Flackern.
     const laenge = (t) => t < ZUENDEN ? 3 + (LAENGE - 3) * (t / ZUENDEN)
       : t < BRENNT_BIS ? LAENGE : t < AUS ? LAENGE * (1 - (t - BRENNT_BIS) / (AUS - BRENNT_BIS)) : 0;
-    return function TestFlightEffect({ x, y, w, h }) {
+    return function TestFlightEffect({ x, y, w, h, zelleS }) {
       const cvs = useRef(null);
+      const S = useMemo(() => ppFxZelleFuer({ x, y, w, zelleS }), []);   // Rasterzelle = Hero-Pixel (ppFxZelle)
       const kw = Math.max(12, Math.round((w || 64) / S)), kh = Math.max(16, Math.round((h || 90) / S));
       const GW = kw + PADX * 2, GH = kh + PAD_OBEN + PAD_UNTEN;
       const CX = Math.floor(GW / 2), CY = PAD_OBEN + Math.floor(kh / 2);
@@ -28297,13 +28319,14 @@ const ANIM_REGISTRY = {
     const WEISS = ppHex('#ffffff'), SCHATTEN = ppHex('#d2d2db');
     const FUNKEN = ['#ffffff', '#fff196', '#ffc61c', '#ff8b1a'].map(ppHex);
     const FRAGEZEICHEN = ['.###.', '#...#', '....#', '..##.', '..#..', '.....', '..#..'];
-    const S = 3, TAKT = 33, ENDE = 1000, AUFSPRUNG = 200, AUS_AB = 700;
+    const TAKT = 33, ENDE = 1000, AUFSPRUNG = 200, AUS_AB = 700;
     const PADX = 18, PAD_OBEN = 42, PAD_UNTEN = 10;               // Platz um die Karte (Rasterpixel): das Fragezeichen steht darueber
     const rausch = (a, b) => { const x = Math.sin(a * 127.1 + b * 311.7) * 43758.5453; return x - Math.floor(x); };
     // Aufsprung mit kleinem Ueberschwinger (0 → 1.12 → 1)
     const springe = (u) => u >= 1 ? 1 : (u < 0.7 ? (u / 0.7) * 1.12 : 1.12 - 0.12 * ((u - 0.7) / 0.3));
-    return function SurprisingOpportunityEffect({ x, y, w, h }) {
+    return function SurprisingOpportunityEffect({ x, y, w, h, zelleS }) {
       const cvs = useRef(null);
+      const S = useMemo(() => ppFxZelleFuer({ x, y, w, zelleS }), []);   // Rasterzelle = Hero-Pixel (ppFxZelle)
       const kw = Math.max(12, Math.round((w || 64) / S)), kh = Math.max(16, Math.round((h || 90) / S));
       const GW = kw + PADX * 2, GH = kh + PAD_OBEN + PAD_UNTEN;
       const CX = Math.floor(GW / 2), CY = PAD_OBEN + Math.floor(kh / 2);
@@ -28423,13 +28446,14 @@ const ANIM_REGISTRY = {
     const SEIL = ['#f7e0b5', '#d1a148', '#9d612f', '#5a3c14'].map(ppHex);  // Licht, hell, mittel, dunkel
     const FUNKEN = ['#ffffff', '#fff196', '#ffc61c', '#ff8b1a'].map(ppHex);
     const AUSRUF = ['##', '##', '##', '##', '..', '##'];
-    const S = 3, TAKT = 33, ENDE = 1000, AUFSPRUNG = 190, AUS_AB = 700;
+    const TAKT = 33, ENDE = 1000, AUFSPRUNG = 190, AUS_AB = 700;
     const SCHLINGE_AB = 140, ZU_BIS = 520, ENGER_BIS = 640, BLITZ_BIS = 700;
     const PADX = 22, PAD_OBEN = 50, PAD_UNTEN = 26;              // Platz um die Karte (Rasterpixel): Ausrufezeichen oben, Schlinge ringsum
     const GROSS = 2;
     const springe = (u) => u >= 1 ? 1 : (u < 0.7 ? (u / 0.7) * 1.15 : 1.15 - 0.15 * ((u - 0.7) / 0.3));
-    return function CaptureLassoEffect({ x, y, w, h }) {
+    return function CaptureLassoEffect({ x, y, w, h, zelleS }) {
       const cvs = useRef(null);
+      const S = useMemo(() => ppFxZelleFuer({ x, y, w, zelleS }), []);   // Rasterzelle = Hero-Pixel (ppFxZelle)
       const kw = Math.max(12, Math.round((w || 64) / S)), kh = Math.max(16, Math.round((h || 90) / S));
       const GW = kw + PADX * 2, GH = kh + PAD_OBEN + PAD_UNTEN;
       const CX = Math.floor(GW / 2), CY = PAD_OBEN + Math.floor(kh / 2);
@@ -28570,12 +28594,13 @@ const ANIM_REGISTRY = {
     const PAL = ['#ffffff', '#f8f8bd', '#fad54a', '#ff9a1a', '#cc2b00', '#b5171c', '#6a1c14', '#535353', '#323232', '#222222'].map(ppHex);
     const FUNKEN = ['#ffffff', '#fbe181', '#ff9a1a', '#cc2b00'].map(ppHex);
     const WELLE = ['#ffffff', '#f8f8bd', '#fad54a'].map(ppHex);
-    const S = 3, TAKT = 33, ENDE = 1500, FADE_AB = 1050;
+    const TAKT = 33, ENDE = 1500, FADE_AB = 1050;
     const PADX = 40, PAD_OBEN = 64, PAD_UNTEN = 12;
     const rausch = (a, b) => { const x = Math.sin(a * 127.1 + b * 311.7) * 43758.5453; return x - Math.floor(x); };
     const klemme = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
-    return function BigOopsieEffect({ x, y, w, h }) {
+    return function BigOopsieEffect({ x, y, w, h, zelleS }) {
       const cvs = useRef(null);
+      const S = useMemo(() => ppFxZelleFuer({ x, y, w, zelleS }), []);   // Rasterzelle = Hero-Pixel (ppFxZelle)
       const kw = Math.max(12, Math.round((w || 64) / S)), kh = Math.max(16, Math.round((h || 90) / S));
       const GW = kw + PADX * 2, GH = kh + PAD_OBEN + PAD_UNTEN;
       const CX = Math.floor(GW / 2), CY = PAD_OBEN + Math.floor(kh / 2);
@@ -28728,12 +28753,13 @@ const ANIM_REGISTRY = {
     const EIS = ['#ffffff', '#e5f5fa', '#b3e8f9', '#77c8ee', '#399edf', '#4e82cb'].map(ppHex);
     const DAMPF = ['#ffffff', '#e5edfa', '#a5b0c0', '#808898'].map(ppHex);
     const FUNKEN = ['#f8f8bd', '#fad54a', '#ff9a1a', '#cc2b00'].map(ppHex);
-    const S = 3, TAKT = 33, ENDE = 1500, FADE_AB = 1150, BERSTEN = 540;
+    const TAKT = 33, ENDE = 1500, FADE_AB = 1150, BERSTEN = 540;
     const PADX = 26, PAD_UNTEN = 10;
     const rausch = (a, b) => { const x = Math.sin(a * 127.1 + b * 311.7) * 43758.5453; return x - Math.floor(x); };
     const klemme = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
-    return function FrostBreakerEffect({ x, y, w, h }) {
+    return function FrostBreakerEffect({ x, y, w, h, zelleS }) {
       const cvs = useRef(null);
+      const S = useMemo(() => ppFxZelleFuer({ x, y, w, zelleS }), []);   // Rasterzelle = Hero-Pixel (ppFxZelle)
       const kw = Math.max(12, Math.round((w || 64) / S)), kh = Math.max(16, Math.round((h || 90) / S));
       // Held-Zone: breiter als hoch — der Sprite steht ueber der Karte, die Kruste soll ihn mit einhuellen
       const HOEHE = (w || 64) > (h || 90) * 1.1 ? Math.round(kw * 1.6) : kh;
@@ -29744,7 +29770,7 @@ const ANIM_REGISTRY = {
     const SPLITTER = ['#ffffff', '#b3e8f9', '#77c8ee', '#399edf'].map(ppHex);
     const RISS = ppHex('#e5f5fa'), RISS2 = ppHex('#7bbeea');
     const WELLE = ['#ffffff', '#b3e8f9', '#77c8ee'].map(ppHex);
-    const S = 3, TAKT = 33, ENDE = 1500, TREFFER = 400, ZERFALL_AB = 820, ZERFALL_BIS = 1180, FADE_AB = 1100;
+    const TAKT = 33, ENDE = 1500, TREFFER = 400, ZERFALL_AB = 820, ZERFALL_BIS = 1180, FADE_AB = 1100;
     const PADX = 50, PAD_OBEN = 118, PAD_UNTEN = 14;
     const rausch = (a, b) => { const x = Math.sin(a * 127.1 + b * 311.7) * 43758.5453; return x - Math.floor(x); };
     const klemme = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
@@ -29753,8 +29779,9 @@ const ANIM_REGISTRY = {
       const qx = Math.abs(px) - (hw - r), qy = Math.abs(py) - (hh - r);
       return Math.hypot(Math.max(qx, 0), Math.max(qy, 0)) + Math.min(Math.max(qx, qy), 0) - r;
     };
-    return function BiseriaFistEffect({ x, y, w, h }) {
+    return function BiseriaFistEffect({ x, y, w, h, zelleS }) {
       const cvs = useRef(null);
+      const S = useMemo(() => ppFxZelleFuer({ x, y, w, zelleS }), []);   // Rasterzelle = Hero-Pixel (ppFxZelle)
       const kw = Math.max(12, Math.round((w || 64) / S)), kh = Math.max(16, Math.round((h || 90) / S));
       const GW = kw + PADX * 2, GH = kh + PAD_OBEN + PAD_UNTEN;
       const CX = Math.floor(GW / 2), CY = PAD_OBEN + Math.floor(kh / 2);
@@ -30119,7 +30146,7 @@ const ANIM_REGISTRY = {
     ];
     const KONTUR = ppHex('#170b28'), KORK = ppHex('#ca874e'), KORK2 = ppHex('#9d612f'), GLANZ = ppHex('#ffffff');
     const STERN = [ppHex('#ffffff'), ppHex('#fbe181'), ppHex('#b3d8f9')];
-    const S = 3, TAKT = 33, ENDE = 1200, EIN = 150, FADE_AB = 1000;
+    const TAKT = 33, ENDE = 1200, EIN = 150, FADE_AB = 1000;
     const PADX = 34, PAD_OBEN = 44, PAD_UNTEN = 8;
     const klemme = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
     // Flasche in lokalen Koordinaten (u nach rechts, v nach unten, Ursprung = Mitte): Körper (Ellipse), Hals, Kork — gibt eine Farbstufe zurück
@@ -30139,8 +30166,9 @@ const ANIM_REGISTRY = {
       if (imHals) return Math.abs(u) > 1.0 ? 1 : 3;
       return 0;
     };
-    return function PotionJuggleEffect({ x, y, w, h }) {
+    return function PotionJuggleEffect({ x, y, w, h, zelleS }) {
       const cvs = useRef(null);
+      const S = useMemo(() => ppFxZelleFuer({ x, y, w, zelleS }), []);   // Rasterzelle = Hero-Pixel (ppFxZelle)
       const kw = Math.max(12, Math.round((w || 64) / S)), kh = Math.max(16, Math.round((h || 90) / S));
       const GW = kw + PADX * 2, GH = kh + PAD_OBEN + PAD_UNTEN;
       const CX = Math.floor(GW / 2), CY = PAD_OBEN + Math.floor(kh / 2);
@@ -30229,12 +30257,13 @@ const ANIM_REGISTRY = {
   triumphant_return: (() => {
     const GOLD = ['#ffffff', '#f7f7ad', '#fad54a', '#f29a3e', '#ee6428', '#b62600'].map(ppHex);
     const KONF = ['#fe5154', '#f8ca21', '#6d9bf8', '#ffffff', '#4ceb70'].map(ppHex);
-    const S = 3, TAKT = 33, ENDE = 1300, EIN = 120, FADE_AB = 1000;
+    const TAKT = 33, ENDE = 1300, EIN = 120, FADE_AB = 1000;
     const PADX = 40, PAD_OBEN = 92, PAD_UNTEN = 16;
     const klemme = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
     const rausch = (a, b) => { const x = Math.sin(a * 127.1 + b * 311.7) * 43758.5453; return x - Math.floor(x); };
-    return function TriumphantReturnEffect({ x, y, w, h }) {
+    return function TriumphantReturnEffect({ x, y, w, h, zelleS }) {
       const cvs = useRef(null);
+      const S = useMemo(() => ppFxZelleFuer({ x, y, w, zelleS }), []);   // Rasterzelle = Hero-Pixel (ppFxZelle)
       const kw = Math.max(12, Math.round((w || 64) / S)), kh = Math.max(16, Math.round((h || 90) / S));
       const GW = kw + PADX * 2, GH = kh + PAD_OBEN + PAD_UNTEN;
       const CX = Math.floor(GW / 2), CY = PAD_OBEN + Math.floor(kh / 2);
@@ -31239,7 +31268,7 @@ const ANIM_REGISTRY = {
   //  Der Server schickt `ablageBesitzer` (Seite der Ablage), der Client rechnet daraus `ablageDx/Dy/W/H` (Abstand zur Zone) — ohne Ablage entfallen Schweif und Aufprall.
   // ═══════════════════════════════════════════════════════════════════
   sinister_idol: (() => {
-    const S = 3, TAKT = 33;
+    const TAKT = 33;
     const ENDE = 2000, FLUG_AB = 900, FLUG_MS = 500, BEAT = 880, FADE_AB = 1550;
     const klemme = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
     const GOLD = ['#fffbd2', '#ffe23d', '#ffd61a', '#f9ac20', '#c68206', '#8b5b04', '#5a3c14'].map(ppHex);
@@ -31355,7 +31384,7 @@ const ANIM_REGISTRY = {
     const NRUNEN = 14;
 
     // ── Geometrie: Canvas deckt Zone, Götze, Strahlen UND (falls vorhanden) die Ablage ab ──
-    const geometrie = (p) => {
+    const geometrie = (p, S) => {   // S = Rasterzelle (Hero-Pixel, ppFxZelle)
       const w = p.w || 64, h = p.h || 90;
       const hatAblage = typeof p.ablageDx === 'number' && typeof p.ablageDy === 'number';
       const aw = p.ablageW || 64, ah = p.ablageH || 90;
@@ -31363,7 +31392,7 @@ const ANIM_REGISTRY = {
       const minY = Math.min(-(h / 2 + 150), hatAblage ? p.ablageDy - ah / 2 - 50 : 0), maxY = Math.max(h / 2 + 60, hatAblage ? p.ablageDy + ah / 2 + 50 : 0);
       const gw = Math.ceil((maxX - minX) / S), gh = Math.ceil((maxY - minY) / S);
       return {
-        gw, gh, links: Math.round(minX), oben: Math.round(minY),
+        S, gw, gh, links: Math.round(minX), oben: Math.round(minY),
         cx: -minX / S, cy: -minY / S, hw: Math.max(8, Math.round(w / S / 2)), hh: Math.max(10, Math.round(h / S / 2)),
         pile: hatAblage ? { x: -minX / S + p.ablageDx / S, y: -minY / S + p.ablageDy / S, w: aw / S, h: ah / S } : null,
       };
@@ -31585,7 +31614,8 @@ const ANIM_REGISTRY = {
     // ── Komponente: wie `ppPunktBild`, aber der Canvas wächst bis zur Ablage ──
     const Komponente = function SinisterIdolEffekt(props) {
       const cvs = useRef(null);
-      const sz = useMemo(() => geometrie(props), []);
+      const S = useMemo(() => ppFxZelleFuer(props), []);   // Rasterzelle = Hero-Pixel (ppFxZelle)
+      const sz = useMemo(() => geometrie(props, S), []);
       const teile = useMemo(() => vorbereiten(sz), []);
       useEffect(() => {
         const el = cvs.current;
@@ -37517,7 +37547,7 @@ function TutorialFinaleFeuerwerk() {
   useEffect(() => {
     const cv = leinwand.current;
     if (!cv || window._playAnimations === false) return undefined;
-    const S = 3;
+    const S = ppFxZelle(null);   // Rasterzelle = Hero-Pixel (ppFxZelle)
     const r0 = cv.parentElement.getBoundingClientRect();
     const W = Math.max(40, Math.ceil(r0.width / S)), H = Math.max(40, Math.ceil(r0.height / S));
     cv.width = W; cv.height = H;

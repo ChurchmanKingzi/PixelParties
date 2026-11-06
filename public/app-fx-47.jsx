@@ -3,7 +3,7 @@
 // ═════════════════════════════════════════════════════════════════
 //  Vorher: je Ring/Funke/Blitz ein DOM-Element mit eigener CSS-Animation (Radialverlauf, Glüh-Schatten, border-radius 50 %, Alpha) — 28 + 40 Funken + 5 Ringe + 2 Blitze starteten im dramatischsten Moment
 //  des Tutorials gleichzeitig und wurden von `pixel-anim.js` einzeln gebacken (68 Starts, ~205 ms Hauptfaden-Blockade bei Antonias Boost auf 9999).
-//  Jetzt: eine Vollbild-Leinwand (Rasterzelle 3 Bildschirmpixel, 30 Bilder/s auf `ppTaktRaf`, Schmutzrechteck-Upload), Zeiten und Wege wie die CSS-Fassung:
+//  Jetzt: eine Vollbild-Leinwand (Rasterzelle = Hero-Pixel am Zähler, `ppFxZelle`; vorher 3 Bildschirmpixel, 30 Bilder/s auf `ppTaktRaf`, Schmutzrechteck-Upload), Zeiten und Wege wie die CSS-Fassung:
 //    Ring     Radius 5 → Größe/2 in 1,1 s (ease-out), Deckkraft 0 → 0,95 (bei 12 %) → 0; zwei Ringe (Gold außen, Orange innen), Deckkraft als Dither-Stufe (kein Alpha)
 //    Funke    1 s, ease-out, Verzug bis 120 ms, 2×2 Zellen → 1×1, Farben Gold/Orange/Rot/Weiß/Creme, ab 60 % Blinken
 //    Blitz    Bildschirmrand-Vignette (Ellipse um 50 % / 55 %): Bayer-Dither in Orange (schwach) bzw. Weiß → Gold → Rot (stark), Hüllkurve 0 → 1 (22 %) → 0 in 0,9 s / 1 s
@@ -18,7 +18,7 @@ const ppFx47Aus = (t) => 1 - Math.pow(1 - Math.max(0, Math.min(1, t)), 3);      
 function ppFx47Wow(cx, cy) {
   try {
     if (window._playAnimations === false || window.__ppFxAlt) return null;
-    const S = 3, W = Math.ceil(window.innerWidth / S), H = Math.ceil(window.innerHeight / S);
+    const S = (typeof ppFxZelleFuer === 'function' ? ppFxZelleFuer({ x: cx, y: cy }) : 3), W = Math.ceil(window.innerWidth / S), H = Math.ceil(window.innerHeight / S);   // Rasterzelle = Hero-Pixel am Zähler (Phase 2; vorher fest 3)
     if (W < 8 || H < 8) return null;
     const cv = document.createElement('canvas');
     cv.width = W; cv.height = H;
@@ -36,7 +36,8 @@ function ppFx47Wow(cx, cy) {
     const vignette = () => {
       if (vign) return vign;
       vign = new Uint8Array(W * H);
-      for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) vign[y * W + x] = Math.min(255, Math.round(Math.hypot((x - ex) / rx, (y - ey) / ry) / maxd * 255));
+      const qx = new Float32Array(W); for (let x = 0; x < W; x++) { const u = (x - ex) / rx; qx[x] = u * u; }       // getrennt je Spalte/Zeile, sqrt statt hypot (Zellenzahl steigt mit kleinerer Zelle)
+      for (let y = 0; y < H; y++) { const v = (y - ey) / ry, qy = v * v, o = y * W; for (let x = 0; x < W; x++) vign[o + x] = Math.min(255, Math.round(Math.sqrt(qx[x] + qy) / maxd * 255)); }
       return vign;
     };
     const api = {
@@ -49,26 +50,37 @@ function ppFx47Wow(cx, cy) {
       blitz(stark) { blitze.push({ t: jetzt(), stark: !!stark, dauer: stark ? 1000 : 900 }); anwerfen(); },
       stop() { if (aus) return; aus = true; try { cancelAnimationFrame(raf); } catch (e) { /* weg */ } cv.remove(); },
     };
+    // Blitz-Tafeln (einmal je Art gerechnet): Dither-Schwelle (Bayer) und Deckung·16 je Zelle, fertige Pixelfarbe — das Bild ist dann nur noch ein enger Durchlauf ohne Verzweigungen
+    // (Phase 2: die Zelle ist jetzt das Hero-Pixel, 720p/Handy haben 2,3–2,2× so viele Zellen wie mit festen 3 px; der alte Durchlauf mit m.rect je Zelle wäre dort entsprechend teurer geworden).
+    const u32 = new Uint32Array(buf.buffer), tafeln = {};
+    const pack = (c) => ((255 << 24) | (c[2] << 16) | (c[1] << 8) | c[0]) >>> 0;
+    const tafel = (stark) => {
+      const k = stark ? 's' : 'w';
+      if (tafeln[k]) return tafeln[k];
+      const v = vignette(), a16 = new Float32Array(W * H), col = new Uint32Array(W * H), bay = new Uint8Array(W * H);
+      const cW = pack(PP_FX47_C.weiss), cO = pack(PP_FX47_C.org), cA = pack(PP_FX47_C.amber), cR = pack(PP_FX47_C.rot);
+      for (let y = 0; y < H; y++) {
+        const bz = PP_FX47_BAYER[y & 3], o = y * W;
+        for (let x = 0; x < W; x++) {
+          const i = o + x, d = v[i] / 255;                                           // 0 Mitte … 1 Ecke
+          let a, c;
+          if (!stark) { a = d <= 0.38 ? 0 : Math.min(1, (d - 0.38) / 0.62) * 0.5; c = cO; }
+          else if (d < 0.4) { a = 0.55 - d / 0.4 * 0.15; c = cW; }
+          else { a = 0.4 + (d - 0.4) / 0.6 * 0.25; c = d < 0.7 ? cA : cR; }
+          a16[i] = a * 16; col[i] = c; bay[i] = bz[x & 3];
+        }
+      }
+      return (tafeln[k] = { a16, col, bay });
+    };
     const malen = (T) => {
       // Blitze zuerst (Hintergrund)
       for (const b of blitze) {
         const u = (T - b.t) / b.dauer; if (u < 0 || u > 1) continue;
         const env = u < 0.22 ? u / 0.22 : 1 - (u - 0.22) / 0.78;                    // 0 → 1 (22 %) → 0
         if (env <= 0.02) continue;
-        const v = vignette();
-        for (let y = 0; y < H; y++) {
-          const bz = PP_FX47_BAYER[y & 3], o = y * W;
-          for (let x = 0; x < W; x++) {
-            const d = v[o + x] / 255;                                                // 0 Mitte … 1 Ecke
-            let a, c;
-            if (!b.stark) { a = d <= 0.38 ? 0 : Math.min(1, (d - 0.38) / 0.62) * 0.5; c = PP_FX47_C.org; }
-            else if (d < 0.4) { a = 0.55 - d / 0.4 * 0.15; c = PP_FX47_C.weiss; }
-            else { a = 0.4 + (d - 0.4) / 0.6 * 0.25; c = d < 0.7 ? PP_FX47_C.amber : PP_FX47_C.rot; }
-            const lvl = a * env * 16;
-            if (lvl <= 0.5 || bz[x & 3] >= lvl) continue;
-            m.rect(x, y, 1, 1, c);
-          }
-        }
+        const { a16, col, bay } = tafel(b.stark), n = W * H;
+        for (let i = 0; i < n; i++) { const lvl = a16[i] * env; if (lvl > 0.5 && bay[i] < lvl) u32[i] = col[i]; }
+        const dd = m.d; dd.x0 = 0; dd.y0 = 0; dd.x1 = W; dd.y1 = H;                // ganzes Bild berührt
       }
       for (const r of ringe) {
         const u = (T - r.t) / 1100; if (u < 0 || u > 1) continue;

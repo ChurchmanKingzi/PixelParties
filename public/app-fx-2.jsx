@@ -141,7 +141,7 @@ function ppFx2Leinwand(malen, ende, mass, opt) {
   const o = opt || {}, TAKT = 1000 / 30;
   return function Fx2Effekt(props) {
     const cvs = React.useRef(null);
-    const S = React.useMemo(() => ppFxZelleFuer(props), []);   // Rasterzelle = Hero-Pixel (ppFxZelle, app-board.jsx)
+    const S = React.useMemo(() => ppFxZelleGedeckelt(props, mass), []);   // Rasterzelle = Hero-Pixel (ppFxZelle), bei fensterfüllenden Leinwänden gedeckelt (ppFxZelleGedeckelt, app-board.jsx)
     const m = React.useMemo(() => {
       const q = typeof mass === 'function' ? mass(props) : mass;
       const breite = Math.ceil(q.breite / S) * S, hoehe = Math.ceil(q.hoehe / S) * S;

@@ -160,7 +160,7 @@ const ppFx19DebtFlames = ppR1Leinwand((g, t, sz, d) => {
   vorbereiten: (sz) => {
     const schaden = Math.max(1, Number(sz.props.damage) || 10);
     const stufe = Math.min(1, Math.log10(schaden / 10 + 1) / Math.log10(31));
-    const anzahl = Math.round(5 + stufe * 11), basis = 16 + stufe * 24;
+    const anzahl = ppFxN(Math.round(5 + stufe * 11)), basis = 16 + stufe * 24;   // Handy: 40 % der Flammen (je Flamme ~25 × 30 Rasterpixel bei Zelle 2)
     return {
       flammen: Array.from({ length: anzahl }, () => ({
         xOff: (-18 - stufe * 26) + Math.random() * (36 + stufe * 52), size: basis * (0.62 + Math.random() * 0.62), delay: Math.random() * 190,

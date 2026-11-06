@@ -2,14 +2,14 @@
 //
 // ═════════════════════════════════════════════════════════════════
 //  Vorlage: Prototyp „Ketten-Tempo und Reaction-Bar“ (Zeichenroutinen dort `ChainFx`). Die Karten der Leiste bleiben DOM (`ReactionChainOverlay`, app-board.jsx: echte Karten, echte Lage);
-//  diese Datei legt EINE Leinwand (Raster 2 px, Handy 3 px) darüber und lässt die Karte des gerade auflösenden Glieds zerbröseln. Alles Übrige sind kurze CSS-Stufenanimationen (`steps()`, style.css `.rc53`).
+//  diese Datei legt EINE Leinwand (Raster = Hero-Pixel, `ppFxZelle`; vorher 2 px, Handy 3 px) darüber und lässt die Karte des gerade auflösenden Glieds zerbröseln. Alles Übrige sind kurze CSS-Stufenanimationen (`steps()`, style.css `.rc53`).
 //  ABLAUF (Takt in Bildern zu 30 Hz, vom Server mit `_kettenTakt` getaktet): `reaction_chain_resolving_start` → Rahmen blinkt (Gold/Weiß) · je Glied `link_resolving`: Impuls (gestrichelter Funke
 //  vom vorigen Glied), weißer Bayer-Blitz (75 % → 50 %), Goldring, Karte schiebt sich nach links heraus, Pfeilmarke ► · `link_resolved`: Karte zerfällt in Kacheln (fliegen gegen die Brettmitte,
 //  Dither statt Alpha), die Leiste schließt die Lücke in 3 ganzen Schritten · `link_negated`: roter Ring, Wackeln, X-Zeichen, rote Kacheln nach 12 Bildern · `reaction_chain_done`: Ringblinken,
 //  Dither-Wisch über die Leiste (8 Bilder), dann wird sie ausgehängt.
 //  TON: `chain_add` zu Beginn (Rate 0,7) und Ende (1,3), je Glied `ping` mit steigender Tonhöhe (0,85 + 0,075·k), `spell_cast` (1,35, leise), `discard` beim Kartenflug, `negate`.
 //  TECHNIK: 30 Hz auf `ppTaktRaf`, nur bei neuem Bild zeichnen, Schmutzrechteck, Palette `ppSnapRgb`, `data-pp-px="aus"`, Texturen der Karten vorab (beim Anketten) und im Leerlauf aufgewärmt,
-//  Lage der Karten nur je Ereignis gelesen (nie im Takt). Handy (`ppIsPhone`): Raster 3, nur jede zweite Kachel.
+//  Lage der Karten nur je Ereignis gelesen (nie im Takt). Handy (`ppIsPhone`): nur jede zweite Kachel.
 //  RÜCKFALL (`aktiv()` = false: Retro, `__ppFxAlt`, „Play Animations aus“, reduzierte Bewegung, `__ppFx53Aus`): die schlichte Darstellung von heute (Glühen/Blitz per CSS) — mit den neuen kurzen Server-Delays.
 //  Test: `window.__ppFx53Aus = true` schaltet die Leiste ab; `window.__ppFx53Messen = true` → `window.__ppFx53Zeiten` = Zeichenzeit je Bild (ms).
 // ═════════════════════════════════════════════════════════════════
@@ -88,6 +88,8 @@
   }
 
   const phone = () => { try { return !!(root.ppIsPhone && root.ppIsPhone()); } catch (e) { return false; } };
+  // Rasterzelle = Hero-Pixel der eigenen Reihe (`ppFxZelle`, app-board.jsx; Phase 2). Vorher fest 2, Handy 3. Wege/Größen, die vorher in Zellen zu 2 px gedacht waren, rechnen mit `2 / G` auf Bildschirmpixel zurück.
+  const zelle = () => { try { if (typeof root.ppFxZelle === 'function') return root.ppFxZelle(null); } catch (e) { /* Rückfall */ } return phone() ? 3 : 2; };
   function aktiv() {
     try {
       if (root.PP_RETRO || root._playAnimations === false || root.__ppFxAlt || root.__ppFx53Aus || typeof ppFx30Maler !== 'function') return false;
@@ -113,7 +115,7 @@
     init();
     const ov = overlayEl(); if (!ov) return false;
     const cards = ov.querySelector('.reaction-chain-cards'); if (!cards) return false;
-    const G = phone() ? 3 : 2;
+    const G = zelle();
     const r = ov.getBoundingClientRect(), rc = cards.getBoundingClientRect();
     if (!(rc.width > 8 && rc.height > 8)) return false;
     const L = Math.floor((rc.left - 230) / G) * G, T = Math.floor((r.top - 40) / G) * G;
@@ -161,7 +163,7 @@
     if (S.vor) for (let j = S.vor.y0; j < S.vor.y1; j++) buf.fill(0, (j * gw + S.vor.x0) * 4, (j * gw + S.vor.x1) * 4);
     const d = m.d; d.x0 = gw; d.y0 = gh; d.x1 = 0; d.y1 = 0;
     const fr = Math.floor((jetzt - S.tStart) / MS + 1e-4);
-    const fc = framCards(), ph = S.phone;
+    const fc = framCards(), ph = S.phone, vk = 2 / S.G, av = rd(16 / S.G);   // vk: Tempo der Kacheln in Bildschirmpixeln wie bei Zelle 2; av: Abstand der Pfeilmarke links von der Karte (8 Zellen zu 2 px)
     // Rahmen blinkt zu Beginn (4 Bilder) und beim Schließen
     if (fc && fr < 4) m.rahmen(fc.x - 2, fc.y - 2, fc.w + 4, fc.h + 4, [[(fr & 1) ? C.gold : C.weiss, 1]]);
     for (const [idx, r] of S.links) {
@@ -184,20 +186,20 @@
           if (un >= 0) m.dith(x, y, w, h, 6, C.rotD);
           if (un >= 2) m.blit(SPR.kreuz, x + ((w - SPR.kreuz.w) >> 1), y + ((h - SPR.kreuz.h) >> 1));
         }
-        if (u >= 1 || neg) m.blit(SPR.pfeil, x - 8, y + ((h - SPR.pfeil.h) >> 1));
+        if (u >= 1 || neg) m.blit(SPR.pfeil, x - av, y + ((h - SPR.pfeil.h) >> 1));
       }
       // Zerbröseln
       if (a >= 0) {
         if (!r.crumble) { r.crumble = true; r.el.style.visibility = 'hidden'; r.el.classList.add('rc53-weg'); }
         const tex = r.tex || (r.tex = holeTex(r.name, r.tw, r.th));
-        const TS = ph ? 8 : 5;
+        const TS = Math.max(2, rd((ph ? 24 : 10) / S.G));   // Kachelkante: 10 px (Handy 24 px), in ganzen Zellen
         if (tex && a <= KRUMEN + 3) {
           const cols = Math.ceil(tex.w / TS), rows = Math.ceil(tex.h / TS);
           for (let ty = 0; ty < rows; ty++) for (let tx = 0; tx < cols; tx++) {
             if (ph && ((tx + ty) & 1)) continue;
             const hh = H(r.k * 977 + tx * 31 + ty, 7), h2 = H(r.k * 131 + tx, ty + 99);
             const vx = -(1.6 + hh * 3.6), vy = -0.7 + h2 * 1.5 - ty * 0.05;
-            const px0 = x - RAUS[5] + tx * TS + vx * a * 1.8, py0 = y + ty * TS + vy * a * 1.8 + 0.28 * a * a, life = 4 + hh * 3, lv = clamp((a - life) / 3) * 16;
+            const px0 = x - RAUS[5] + tx * TS + vx * a * 1.8 * vk, py0 = y + ty * TS + vy * a * 1.8 * vk + 0.28 * a * a * vk, life = 4 + hh * 3, lv = clamp((a - life) / 3) * 16;
             if (lv >= 16) continue;
             for (let j = 0; j < TS; j++) for (let i = 0; i < TS; i++) {
               const sx = tx * TS + i, sy = ty * TS + j; if (sx >= tex.w || sy >= tex.h) continue;
@@ -228,7 +230,7 @@
   const FX = {
     aktiv,
     /** Beim Anketten: Texturen der Karten vorbereiten (kein Laden mitten in der Auflösung). */
-    vorladen(namen) { try { if (!aktiv()) return; init(); const G = phone() ? 3 : 2; for (const n of namen || []) holeTex(n, rd(80 / G), rd(112 / G)); } catch (e) { /* weg */ } },
+    vorladen(namen) { try { if (!aktiv()) return; init(); const G = zelle(); for (const n of namen || []) holeTex(n, rd(80 / G), rd(112 / G)); } catch (e) { /* weg */ } },
     /** `reaction_chain_resolving_start` */
     start(o) {
       try {

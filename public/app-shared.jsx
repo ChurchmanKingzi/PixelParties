@@ -466,6 +466,10 @@ function _ppAlphaStufe(a, x, y) {
 
 /** Pixelgroesse in Bildschirmpunkten (v1446: 2 statt 3 — mehr, feinere Pixel). */
 const PP_PX_GROESSE = 2;
+/** Zelle der Pixelbilder (Rahmen, Scheine, Ellipsen, Verlaeufe): im Kampf das Hero-Pixel (pixel-anim.js `standardRaster`: 1080p 3, 720p/Handy 2), sonst PP_PX_GROESSE. */
+function ppPxZelle() {
+  try { const pa = window.PPPixelAnim; return (pa && pa.standardRaster && pa.KONFIG.aktiv) ? pa.standardRaster() : PP_PX_GROESSE; } catch (e) { return PP_PX_GROESSE; }
+}
 
 /** Pixelzahl fuer eine Seite: ~PP_PX_GROESSE px pro Pixel, schmale Baender (Ringe) bekommen mehr. */
 function _ppAufloesung(v, laengePx) {
@@ -475,7 +479,7 @@ function _ppAufloesung(v, laengePx) {
     if (d > 0.001 && d < minLuecke) minLuecke = d;
   }
   const fuerRinge = Math.min(96, Math.ceil(2.2 / (minLuecke * 0.707)));
-  const fuerGroesse = laengePx > 0 ? Math.round(laengePx / PP_PX_GROESSE) : 32;
+  const fuerGroesse = laengePx > 0 ? Math.round(laengePx / ppPxZelle()) : 32;
   return Math.max(2, Math.min(160, Math.max(fuerGroesse, laengePx > 0 && laengePx < 24 ? 0 : fuerRinge)));
 }
 
@@ -1423,7 +1427,7 @@ function ppPxPartikelUrl(farbe) {
  */
 function ppPxRahmenUrl(farbe, dicke, w, h, radius) {
   const f = ppFarbe(farbe);
-  const P = PP_PX_GROESSE;
+  const P = ppPxZelle();
   const nx = Math.max(2, Math.round(w / P)), ny = Math.max(2, Math.round(h / P));
   const d = Math.max(1, Math.round(dicke / P));
   const rund = radius >= Math.min(w, h) / 2 - 0.5;
@@ -1460,11 +1464,11 @@ function ppPxRahmenUrl(farbe, dicke, w, h, radius) {
  */
 function ppPxHaloUrl(farbe, w, h, rand, rund) {
   const f = ppFarbe(farbe);
-  const P = PP_PX_GROESSE;
+  const P = ppPxZelle();
   const W = w + 2 * rand, H = h + 2 * rand;
   const nx = Math.max(2, Math.round(W / P)), ny = Math.max(2, Math.round(H / P));
   const qr = Math.max(1, Math.round(rand / 2) * 2);
-  return ppPxBild(`hl:${f.join(',')}:${Math.round(w / 4)}x${Math.round(h / 4)}:${qr}:${rund ? 1 : 0}`, nx, ny, (setze) => {
+  return ppPxBild(`hl:${f.join(',')}:${Math.round(w / 4)}x${Math.round(h / 4)}:${qr}:${rund ? 1 : 0}:${P}`, nx, ny, (setze) => {
     for (let y = 0; y < ny; y++) for (let x = 0; x < nx; x++) {
       const u = (x + 0.5) * P - W / 2, v = (y + 0.5) * P - H / 2;   // px relativ zur Mitte
       let abstand;
@@ -1485,7 +1489,7 @@ function ppPxHaloUrl(farbe, w, h, rand, rund) {
 
 /** Pixelige Ellipse als Maske in Elementgroesse (runde Flaechen behalten ihre Form). */
 function ppPxEllipseUrl(w, h) {
-  const P = PP_PX_GROESSE;
+  const P = ppPxZelle();
   const nx = Math.max(2, Math.round(w / P / 2) * 2), ny = Math.max(2, Math.round(h / P / 2) * 2);
   return ppPxBild('el:' + nx + 'x' + ny, nx, ny, (setze) => {
     for (let y = 0; y < ny; y++) for (let x = 0; x < nx; x++) {
