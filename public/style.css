@@ -27009,3 +27009,7 @@ input[type="checkbox"]:focus-visible, input[type="radio"]:focus-visible { outlin
 
 /* Kachel mit Rang-Rahmen (Duplikate): der eingebackene Rahmen ist der Schmuck — kein Zier-Overlay darüber, das ihn verdecken würde */
 .shop-item.shop-item-ranked .shop-item-zier { display: none; }
+
+/* Rang-Aufstieg im Pull-Reveal: Zellen-Scan zwischen altem und neuem Rahmen (Canvas, ganze Pixelzellen) */
+.pull-fx-swap { display: block; width: 100%; aspect-ratio: 5 / 7; object-fit: cover; image-rendering: pixelated; }
+.pull-fx-swap.pull-fx-swap-sq { aspect-ratio: 1; }
