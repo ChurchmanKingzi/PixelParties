@@ -1,4 +1,4 @@
-/* PP-HART-GEBACKEN 51c0ae4867be494d — ERZEUGT von scripts/hart/build-css.js aus style.css (pixel-hart.js vorab angewandt) — nicht von Hand ändern. */
+/* PP-HART-GEBACKEN 51e043283cd1c78e — ERZEUGT von scripts/hart/build-css.js aus style.css (pixel-hart.js vorab angewandt) — nicht von Hand ändern. */
 .pp-hart-gebacken { --pp-hart: 1; }
 @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Rajdhani:wght@400;500;600;700&family=Orbitron:wght@400;500;600;700;800;900&display=swap');
 
@@ -26754,3 +26754,6 @@ input[type="checkbox"]:focus-visible, input[type="radio"]:focus-visible { outlin
 /* Spieler-Avatar mit Rang-Rahmen (Chat, Spielerlisten): quadratisch statt Pixel-Kreis und groß genug, dass der Rahmen lesbar bleibt */
 .chat-msg-avatar.pp-av-ranked { width: 24px; height: 24px; -webkit-mask: none; mask: none; image-rendering: pixelated; }
 .player-list-avatar.pp-av-ranked { width: 28px; height: 28px; -webkit-mask: none; mask: none; image-rendering: pixelated; }
+
+/* Kachel mit Rang-Rahmen (Duplikate): der eingebackene Rahmen ist der Schmuck — kein Zier-Overlay darüber, das ihn verdecken würde */
+.shop-item.shop-item-ranked .shop-item-zier { display: none; }

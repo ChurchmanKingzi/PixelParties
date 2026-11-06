@@ -3736,7 +3736,7 @@ function PurchaseCelebration({ cx, cy, onDone }) {
 
 // „Mögliche Pulls“: ein Streifen mit Beispielen aus dem Pool (nur, was der Spieler noch NICHT besitzt —
 // genau das kann der nächste Pull ergeben). Wechselt alle paar Sekunden hart (kein Überblenden: Pixelart).
-function ShopPullPreview({ pool, type, count = 4, onHover }) {
+function ShopPullPreview({ pool, type, count = 4, onHover, dupes }) {
   const sig = pool.map(p => p.id).join('|');
   const order = useMemo(() => {
     const a = pool.slice();
@@ -3754,11 +3754,16 @@ function ShopPullPreview({ pool, type, count = 4, onHover }) {
   return (
     <div className="shop-pull-strip">
       {shown.map(it => (
-        <div key={it.id} className={'shop-item shop-unowned-skin shop-pull-tile' + (type === 'avatar' ? ' shop-sq-item' : '')}
+        <div key={it.id} className={'shop-item shop-unowned-skin shop-pull-tile' + (type === 'avatar' ? ' shop-sq-item' : '') + (dupes && dupes[it.id] > 0 ? ' shop-item-ranked' : '')}
           onMouseEnter={() => onHover && onHover(it)} onMouseLeave={() => onHover && onHover(null)}>
           <span className="shop-item-zier" aria-hidden="true" />
           <div className="shop-item-img-wrap">
-            <img src={it.src} draggable={false} />
+            {(() => {
+              // Besitzt man den Kandidaten schon, zeigt die Vorschau seinen aktuellen Rahmen (Duplikate)
+              const d = (dupes && dupes[it.id]) || 0;
+              if (d > 0 && type !== 'skin') return <FramedImg src={it.src} kind={type} dupes={d} draggable={false} />;
+              return <img src={d > 0 ? it.src + '?rahmen=' + d : it.src} draggable={false} />;
+            })()}
           </div>
           {it.name && <div className="shop-item-name" title={it.name}>{it.name}</div>}
         </div>
@@ -5000,7 +5005,7 @@ function ShopScreen() {
             </div>
             <div className="shop-gacha-rule">No buying — every pull is a random {def.noun.toLowerCase()}. Pull one you own again and its frame ranks up!</div>
             {eligible.length > 0 && (
-              <ShopPullPreview pool={missing.length > 0 ? missing : eligible} type={type}
+              <ShopPullPreview pool={missing.length > 0 ? missing : eligible} type={type} dupes={dp}
                 onHover={type === 'skin' ? (it => setHoverSkin(it ? { skinName: it.name, heroName: it.heroName } : null)) : null} />
             )}
           </div>
@@ -5049,6 +5054,7 @@ function ShopScreen() {
                 + (type === 'avatar' ? ' shop-avatar-item shop-sq-item' : '')
                 + (type === 'skin' ? ' shop-skin-item' : '')
                 + (isOwned ? ' shop-owned' : ' shop-unowned-skin shop-missing')
+                + (isOwned && !showHero && (dp[it.id] || 0) > 0 ? ' shop-item-ranked' : '')   // Rang-Rahmen ersetzt den Zierrahmen der Kachel
                 + (equipped ? ' shop-equipped' : '');
               return (
                 <div key={it.id} className={cls}

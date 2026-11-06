@@ -3129,7 +3129,7 @@ function OpponentUnlockPopup() {
     };
     // Skin-Game gewonnen: derselbe Popup-Rahmen, nur mit Skin-Bild und -Text.
     const onSkinUnlocked = (data) => {
-      if (data && data.skinName) setQueue(q => [...q, { kind: 'skin', id: 'skin:' + data.skinName, skinName: data.skinName, heroName: data.heroName }]);
+      if (data && data.skinName) setQueue(q => [...q, { kind: 'skin', id: 'skin:' + data.skinName + ':' + (data.dupes || 0), skinName: data.skinName, heroName: data.heroName, rankUp: data.isNew === false, dupes: data.dupes || 0 }]);
     };
     socket.on('opponents_unlocked', onUnlocked);
     socket.on('skin_unlocked', onSkinUnlocked);
@@ -3242,7 +3242,7 @@ function OpponentUnlockPopup() {
           <div className="orbit-font pp-unlock-titel" style={{
             fontSize: 15, fontWeight: 800, letterSpacing: 3, color: '#ffd966',
             marginBottom: 18, animation: 'ppUnlockTitle 2.2s ease-in-out infinite',
-          }}>{current.kind === 'skin' ? '✦ NEW SKIN UNLOCKED ✦' : '✦ NEW OPPONENT UNLOCKED ✦'}</div>
+          }}>{current.kind === 'skin' ? (current.rankUp ? '✦ SKIN RANK UP ✦' : '✦ NEW SKIN UNLOCKED ✦') : '✦ NEW OPPONENT UNLOCKED ✦'}</div>
 
           {/* Hero portrait in a gold frame */}
           <div className="pp-unlock-bild" style={{
@@ -3250,18 +3250,26 @@ function OpponentUnlockPopup() {
             border: '2px solid #fad54a', background: '#08060c',
             boxShadow: '0 0 0 4px #72541d', marginBottom: 18,
           }}>
-            {heroArt
+            {current.kind === 'skin' && current.rankUp
+              // Rang-Aufstieg: die ganze Karte mit dem neuen Rahmen (der Karten-Shim backt `?rahmen=N` ein)
+              ? <img src={'/cards/skins/' + encodeURIComponent(current.skinName) + '.png?rahmen=' + current.dupes} alt={current.skinName} draggable={false}
+                  style={{ display: 'block', width: (window.ppIsPhone && window.ppIsPhone()) ? 130 : 210, height: 'auto', imageRendering: 'pixelated' }} />
+              : heroArt
               ? <HeroArtCrop heroName={current.kind === 'skin' ? current.heroName : current.middleHero} skinName={current.kind === 'skin' ? current.skinName : null} width={(window.ppIsPhone && window.ppIsPhone()) ? 190 : 300} />
               : <div style={{ width: 300, height: 200, background: '#1a1a2e' }} />}
           </div>
 
           <div className="pp-unlock-satz" style={{ fontSize: 16, color: 'var(--text)', lineHeight: 1.5, marginBottom: 22 }}>
-            You unlocked{' '}
+            {current.kind === 'skin' && current.rankUp ? 'You won a copy of' : 'You unlocked'}{' '}
             <span className="orbit-font" style={{
               color: '#fbe181', fontWeight: 800, fontSize: 20,
               textShadow: '2px 2px 0 #72541d',
             }}>{current.kind === 'skin' ? current.skinName : (current.middleHero || current.name)}</span>{' '}
-            {current.kind === 'skin' ? <>as a new skin for <b>{current.heroName}</b>!</> : 'as a new opponent!'}
+            {current.kind === 'skin'
+              ? (current.rankUp
+                ? <>— its frame ranked up to <b>{(window.ppRankFrames && window.ppRankFrames.RANKS[window.ppRankFrames.rankOf(current.dupes)] || {}).name || 'a new rank'}</b>!</>
+                : <>as a new skin for <b>{current.heroName}</b>!</>)
+              : 'as a new opponent!'}
           </div>
 
           {current.deckAdded && (
