@@ -614,9 +614,10 @@
   const sortiereBelohnungen = (liste) => liste.map((r, i) => [r, i]).sort((x, y) => ((LIMIT_RANG[x[0] && x[0].limit] ?? 4) - (LIMIT_RANG[y[0] && y[0].limit] ?? 4)) || (x[1] - y[1])).map((e) => e[0]);
   const bandArt = (r) => /^daily/.test((r && r.limit) || '') ? 'daily' : /^once/.test((r && r.limit) || '') ? 'once' : null;
 
-  function Zeremonie({ won, spectator, title, subtitle, rewards: rewardsRoh, total, eloChanges, myName, oppName, extra, cpuProgress, helden, klasse, vorn, eigenerCluster, children }) {
+  function Zeremonie({ won, spectator, title, subtitle, rewards: rewardsRoh, total, eloChanges, myName, oppName, extra, cpuProgress, helden, klasse, vorn, eigenerCluster, kurz, children }) {
     const rewards = React.useMemo(() => sortiereBelohnungen(rewardsRoh || []), [rewardsRoh]);
-    const n = rewards.length, stat = React.useMemo(() => statisch(), []);
+    // `kurz`: Runden-Ergebnis im Satz (Best of N) — steht nur ~1,5 s, dann beginnt die nächste Runde: sofort das fertige Standbild statt des Einlaufs
+    const n = rewards.length, stat = React.useMemo(() => !!kurz || statisch(), []);
     // Die Belohnungen kommen vom Server oft erst NACH dem Ergebnis (sc_earned): Zeilen werden deshalb nach der Anzahl `n` (neu) eingeplant; die Knöpfe erscheinen erst, wenn alle Zeilen da sind.
     const [reihen, setReihen] = React.useState(stat ? n : 0), [btnBereit, setBtnBereit] = React.useState(stat), [u1, setU1] = React.useState(stat), [summeDa, setSummeDa] = React.useState(stat);
     const fertig = stat || (btnBereit && reihen >= n);
@@ -673,7 +674,7 @@
     const vis = (an) => (an ? '' : ' pp-cer-aus');
     return (
       <div ref={wurzel} className={'pp-cer' + (won ? ' pp-cer-win' : ' pp-cer-lose') + (klasse ? ' ' + klasse : '')} data-pp-px="aus" onClick={ueberspringen}>
-        <Buehne wurzel={wurzel} platz={platz} inhalt={inhalt} sieg={won} titel={title} helden={spectator ? [] : (helden || [])} statisch={stat} />
+        <Buehne wurzel={wurzel} platz={platz} inhalt={inhalt} sieg={won} titel={title} helden={[]} statisch={stat} />   {/* Hero-Sprites auf den Ergebnis-Screens entfallen (Nutzerentscheid: zu unterschiedliche Pixelgrößen); der Zeichner kann sie weiter, wird aber nicht mehr damit befüllt */}
         <div className="pp-cer-klone" ref={klonRef} aria-hidden="true" />
         {vorn}
         <div className="pp-cer-spalte">

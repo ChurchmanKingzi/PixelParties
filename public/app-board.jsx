@@ -2920,10 +2920,15 @@ const HeroIdleAnims = (() => {
       }
       // Rechte Kante des KOPFES (nicht der ganzen Figur): in den obersten ~30 % der Figur je Bild und Zeile der waagrechte Pixelstreifen, der an der Kopfmitte (`kopfX`) hängt;
       // das Maximum über alle Bilder. Ragt ein Detail (Andras' Flammenarme, Flügel, Waffen) weit nach rechts, sitzt die Statusanzeige trotzdem am Kopf, nicht am Detail.
-      const kopfMitte = Math.round(n ? summe / n : (x0 + x1) / 2), bandBis = y0 + Math.max(2, Math.round((y1 - y0) * 0.3));
+      // Mitte und Höhe des Kopfes: `faceX`/`faceY` aus dem Sheet (Gesichtsmitte, vom Gestalter gesetzt), sonst Schwerpunkt der obersten Figurenreihen. Mit `faceY` (z. B. Medea: Gas über dem Kopf) wird
+      // das Band um die Gesichtshöhe gelegt statt an die Figurenoberkante.
+      const gesichtY = typeof meta.faceY === 'number' ? meta.faceY : null, hoeheK = Math.max(1, y1 - y0);
+      const kopfMitte = Math.round(typeof meta.faceX === 'number' ? meta.faceX : (n ? summe / n : (x0 + x1) / 2));
+      const bandVon = gesichtY != null ? Math.max(y0, Math.round(gesichtY - hoeheK * 0.15)) : y0;
+      const bandBis = gesichtY != null ? Math.round(gesichtY + hoeheK * 0.15) : y0 + Math.max(2, Math.round(hoeheK * 0.3));
       let kopfX1 = 0;
       for (let fi = 0; fi < frames; fi++) {
-        for (let ly = y0; ly < Math.min(fh, bandBis); ly++) {
+        for (let ly = bandVon; ly < Math.min(fh, bandBis); ly++) {
           const basis = (fi * fh + ly) * fw;
           let start = -1;
           for (let dx = 0; dx <= 4 && start < 0; dx++) {
@@ -2946,7 +2951,7 @@ const HeroIdleAnims = (() => {
         const t = punkte[i]; punkte[i] = punkte[j]; punkte[j] = t;
       }
       punkte = punkte.slice(0, 400);
-      return { x0, y0, x1, y1, kopfX: n ? summe / n : (x0 + x1) / 2, kopfX1, punkte };
+      return { x0, y0, x1, y1, kopfX: n ? summe / n : (x0 + x1) / 2, kopfX1, kopfY: gesichtY, punkte };
     } catch { return rueckfall; }
   }
 
@@ -4194,7 +4199,7 @@ function HeroIdleSprite({ cardName, angehalten, versteinert, eingefroren, effekt
               <canvas ref={canvasRef} width={fw} height={fh} className="hero-idle-canvas" style={canvasStil} />
               {statusIcons && (statusIcons.burn || statusIcons.poison || statusIcons.bleed) && (
                 <HeroStatusSymbole st={statusIcons} k={Math.max(1, Math.min(3, Math.round(s * (parseFloat(document.documentElement.style.getPropertyValue('--board-scale')) || 1) / 1.4)))}
-                  links={`calc(${bs((kern.kopfX1 || kern.x1) * s + 3)})`} oben={`calc(${bs((kern.y0 + ch * 0.18) * s)})`} />
+                  links={`calc(${bs((kern.kopfX1 || kern.x1) * s + 3)})`} oben={`calc(${bs((kern.kopfY != null ? kern.kopfY - 4 : kern.y0 + ch * 0.18) * s)})`} />
               )}
               {eisPhase !== 'weg' && (
                 <HeroEiskruste quelleRef={canvasRef} breite={fw} hoehe={fh} rand={EIS_RAND}
@@ -54250,6 +54255,9 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       });
       return;
     }
+    // Skill Test: Aufgeben = ausscheiden, der Spieler BLEIBT im Raum und bekommt am Ende seinen Platz samt Rangliste (bisher sendete der Knopf `leave_game`: der Server nahm ihm den Raum,
+    // er hing ohne Ergebnis und ohne Ausweg im Brett). Wer ausgeschieden ist, hat oben rechts LEAVE (siehe Kopfleiste).
+    if (gameState.skillTest) { socket.emit('surrender_game', { roomId: gameState.roomId }); return; }
     socket.emit('leave_game', { roomId: gameState.roomId });
     // Don't call onLeave — server will send updated game state with result
   };
@@ -59549,8 +59557,8 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                 🏳 SURRENDER
               </button>
             ) : (
-              <button className="btn btn-danger game-hand-quit" onClick={() => result ? handleLeave() : setShowSurrender(true)}>
-                {result ? '✕ LEAVE' : gameState.isPuzzle ? '✕ EXIT' : '⚑ SURRENDER'}
+              <button className="btn btn-danger game-hand-quit" onClick={() => (result || (gameState.skillTest && (gameState.skillTest.eliminated || []).includes(myIdx))) ? handleLeave() : setShowSurrender(true)}>
+                {(result || (gameState.skillTest && (gameState.skillTest.eliminated || []).includes(myIdx))) ? '✕ LEAVE' : gameState.isPuzzle ? '✕ EXIT' : '⚑ SURRENDER'}
               </button>
             )}
             </div>
@@ -63281,118 +63289,18 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
            Nur die drei ERGEBNIS-Overlays werden angehoben, nicht
            `.modal-overlay` global: das tragen auch Lobby und Deckbau, und
            deren Ebenen sollen sich nicht mitverschieben. */}
-      {/* Win/Loss overlay — round result (non-final) */}
+      {/* Runden-Ergebnis (Best of N, Satz noch offen): dieselbe Zeremonie wie Sieg/Niederlage (app-fx-54), ohne Knöpfe — sie verschwindet mit dem Ergebnis, sobald die nächste Runde beginnt (Wahl „Go first/second“ blendet sie ebenfalls aus). */}
       {result && !showFirstChoice && !result.setOver && result.format > 1 && !sideDeckPhase && (
-        <div className="modal-overlay" style={{ zIndex: 10080, background: 'rgba(0,0,0,.65)' }}>
-          <div className="animate-in" style={{ textAlign: 'center' }}>
-            <div className="pixel-font" style={{
-              fontSize: 28, marginBottom: 12,
-              color: isSpectator ? 'var(--accent)' : (iWon ? 'var(--success)' : 'var(--danger)'),
-              textShadow: isSpectator ? '0 0 30px rgba(102,182,255,.3)' : (iWon ? '0 0 30px rgba(76,235,112,.4)' : '0 0 30px rgba(252,28,95,.4)'),
-            }}>
-              {isSpectator ? `${result.winnerName} wins the round!` : (iWon ? 'ROUND WIN!' : 'ROUND LOSS')}
-            </div>
-            <div className="orbit-font" style={{ fontSize: 32, marginBottom: 8, color: 'var(--text)' }}>
-              {result.setScore[0]} — {result.setScore[1]}
-            </div>
-            <div style={{ fontSize: 11, color: 'var(--text2)' }}>Next round starting soon...</div>
-            {renderSCEarned()}
-          </div>
-        </div>
-      )}
-
-      {/* Set complete overlay — fireworks + final score */}
-      {result && !showFirstChoice && result.setOver && result.format > 1 && (
-        <div className="modal-overlay set-complete-overlay" style={{ zIndex: 10080, background: 'rgba(0,0,0,.8)' }}>
-          <div className="set-fireworks">
-            {Array.from({ length: ppFxN(24) }).map((_, i) => (
-              <div key={i} className="firework-particle" style={{
-                '--fw-x': (Math.random() * 200 - 100) + 'px',
-                '--fw-y': (Math.random() * -200 - 40) + 'px',
-                '--fw-color': ['#fad54a','#fc1c5f','#4ceb70','#1ca9fd','#ff8b1a','#a952ff'][i % 6],
-                '--fw-delay': (Math.random() * 2) + 's',
-                '--fw-dur': (1 + Math.random()) + 's',
-                left: (20 + Math.random() * 60) + '%',
-                top: (30 + Math.random() * 30) + '%',
-              }} />
-            ))}
-          </div>
-          <div className="animate-in" style={{ textAlign: 'center', position: 'relative', zIndex: 2 }}>
-            <div className="pixel-font" style={{
-              fontSize: 40, marginBottom: 8,
-              color: isSpectator ? '#fad54a' : (iWon ? '#fad54a' : 'var(--danger)'),
-              textShadow: isSpectator ? '0 0 40px rgba(250,213,74,.6)' : (iWon ? '0 0 40px rgba(250,213,74,.6)' : '0 0 40px rgba(252,28,95,.5)'),
-            }}>
-              {isSpectator ? `🏆 ${result.winnerName} WINS! 🏆` : (iWon ? '🏆 SET VICTORY! 🏆' : 'SET DEFEAT')}
-            </div>
-            <div className="orbit-font" style={{ fontSize: 48, margin: '16px 0', color: 'var(--text)' }}>
-              {result.setScore[0]} — {result.setScore[1]}
-            </div>
-            <div style={{ fontSize: 13, color: 'var(--text2)', marginBottom: 4 }}>
-              Best of {result.format}
-            </div>
-            <div style={{ fontSize: 13, color: 'var(--text2)', marginBottom: 16 }}>
-              {result.reason === 'disconnect_timeout' ? `${result.loserName} timed out` :
-               result.reason === 'surrender' ? `${result.loserName} surrendered` :
-               result.reason === 'all_heroes_dead' ? `All of ${result.loserName}'s Heroes defeated!` :
-               ppGameOverText(result.reason, isSpectator ? null : (iWon ? 'win' : 'lose'), result.loserName, result.winnerName)}
-            </div>
-            {result.eloChanges && (
-              <div style={{ marginBottom: 20 }}>
-                {result.eloChanges.map(ec => (
-                  <div key={ec.username} style={{ fontSize: 12, color: ec.username === user.username ? 'var(--text)' : 'var(--text2)' }}>
-                    {ec.username}: {ec.oldElo} → <span style={{ color: ec.newElo > ec.oldElo ? 'var(--success)' : 'var(--danger)', fontWeight: 700 }}>{ec.newElo}</span>
-                    {' '}({ec.newElo > ec.oldElo ? '+' : ''}{ec.newElo - ec.oldElo})
-                  </div>
-                ))}
-              </div>
-            )}
-            {renderSCEarned()}
-            {!isSpectator && ((decks && decks.length > 0) || (sampleDecks || []).some(d => isDeckLegal(d).legal)) && (
-              <div style={{ marginBottom: 14, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10 }}>
-                <label style={{ fontSize: 14, color: 'var(--text2)', fontWeight: 600 }}>🃏 Deck:</label>
-                {/* Eigenes Dropdown statt `<select>` (Android: das System-Auswahlfenster holt im Vollbild die Systemleiste; Pixel-Emoji). */}
-                <PPDropdown value={selectedDeck || ''} onChange={id => {
-                  setSelectedDeck(id);
-                  socket.emit('change_deck', { roomId: gameState.roomId, deckId: id });
-                }} style={{ fontSize: 14, minWidth: 240, padding: '8px 14px', borderColor: 'var(--accent)', color: 'var(--text)' }}
-                  options={[
-                    ...(decks || []).map(d => ({ value: d.id, label: d.name })),
-                    ...((sampleDecks || []).filter(d => isDeckLegal(d).legal).length > 0 ? [{ value: '__sample_kopf', disabled: true, label: '── Sample Decks ──' }] : []),
-                    ...(sampleDecks || []).filter(d => isDeckLegal(d).legal).map(d => ({ value: d.id, label: '📋 ' + d.name })),
-                  ]} />
-              </div>
-            )}
-            <div className="ergebnis-knoepfe" style={{ display: 'flex', gap: 12, justifyContent: 'center' }}>
-              {isSpectator ? (
-                <button className="btn btn-danger" style={{ padding: '12px 32px', fontSize: 14 }} onClick={handleLeave}>LEAVE</button>
-              ) : gameState.isCampaign ? (
-                // KAMPAGNEN-DUELL: der Ausgang gehoert der STORY. Kein
-                // Deckwechsel, keine Revanche — wer verliert, lebt mit
-                // dem Ergebnis (oder landet bei einem Pflichtduell ueber
-                // den Ruecksetzpunkt ohnehin wieder am Szenenanfang).
-                // Ein Wiederholungsknopf waere hier ein Ausweichknopf.
-                <button className="btn btn-success" style={{ padding: '12px 32px', fontSize: 14 }} onClick={handleLeave}>→ CONTINUE</button>
-              ) : gameState.isCpuBattle ? (
-                <>
-                  <button className="btn btn-success" style={{ padding: '12px 32px', fontSize: 14 }} onClick={handleRematch}>
-                    🔄 REMATCH
-                  </button>
-                  <button className="btn btn-danger" style={{ padding: '12px 32px', fontSize: 14 }} onClick={handleLeave}>LEAVE</button>
-                </>
-              ) : !oppLeft && !oppDisconnected ? (
-                <>
-                  <button className="btn btn-success" style={{ padding: '12px 32px', fontSize: 14 }} onClick={handleRematch} disabled={myRematchSent}>
-                    {myRematchSent ? '⏳ WAITING...' : '🔄 REMATCH'}
-                  </button>
-                  <button className="btn btn-danger" style={{ padding: '12px 32px', fontSize: 14 }} onClick={handleLeave}>LEAVE</button>
-                </>
-              ) : (
-                <button className="btn btn-danger" style={{ padding: '12px 32px', fontSize: 14 }} onClick={handleLeave}>LEAVE</button>
-              )}
-            </div>
-          </div>
-        </div>
+        <ResultCeremony
+          won={!!iWon} spectator={!!isSpectator}
+          title={isSpectator ? 'ROUND OVER' : (iWon ? 'ROUND WIN!' : 'ROUND LOST!')}
+          subtitle={`${isSpectator ? `${result.winnerName || gameState.players?.[result.winnerIdx]?.username || '?'} wins the round  |  ` : ''}Score ${(result.setScore || [0, 0])[0]} - ${(result.setScore || [0, 0])[1]}  |  Next round starting soon`}
+          rewards={(!isSpectator && scEarned && !user?.isGuest) ? (scEarned.rewards || []) : []}
+          total={(!isSpectator && scEarned && !user?.isGuest) ? (scEarned.total || 0) : 0}
+          eloChanges={null} myName={user?.username}
+          oppName={(gameState.isCpuBattle && opp?.username === 'CPU') ? heroDisplayName(opp.heroes?.[1]?.name || opp.heroes?.find(h => h?.name)?.name || opp.username) : opp?.username}
+          extra={user?.isGuest ? renderSCEarned() : null}
+          helden={[]} eigenerCluster={false} cpuProgress={null} kurz />
       )}
 
       {/* ── Puzzle / Tutorial Result Overlay ── */}
@@ -63451,23 +63359,26 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           hochzaehlender SC-Zaehler, zum Schluss die Knoepfe. Ein Klick auf
           den Hintergrund ueberspringt die Staffelung. Deck-Auswahl und
           Knoepfe sind unveraendert die bisherigen. */}
-      {result && !result.isPuzzle && !showFirstChoice && (result.setOver || !result.format || result.format === 1) && !(result.format > 1) && (
+      {result && !result.isPuzzle && !showFirstChoice && (result.setOver || !result.format || result.format === 1) && (() => {
+        const satz = result.format > 1;   // Satz (Best of N) entschieden: gleiche Zeremonie, Titel SET VICTORY!/SET LOST!, Satzstand im Untertitel
+        const grundText = (() => { const r = result; const w = iWon; return (
+          isSpectator ? (
+            r.reason === 'disconnect_timeout' ? `${r.loserName} timed out` :
+            r.reason === 'surrender' ? `${r.loserName} surrendered` :
+            r.reason === 'all_heroes_dead' ? `All of ${r.loserName}'s Heroes defeated!` :
+            ppGameOverText(r.reason, null, r.loserName, r.winnerName)
+          ) : (
+            r.reason === 'disconnect_timeout' ? 'Opponent timed out' :
+            r.reason === 'opponent_left' ? 'Opponent left the game' :
+            r.reason === 'surrender' ? (w ? 'Opponent surrendered' : 'You surrendered') :
+            r.reason === 'all_heroes_dead' ? (w ? 'All enemy Heroes defeated!' : 'All your Heroes were defeated') :
+            ppGameOverText(r.reason, w ? 'win' : 'lose', r.loserName, r.winnerName)
+          )); })();
+        return (
         <ResultCeremony
           won={!!iWon} spectator={!!isSpectator}
-          title={isSpectator ? `${result.winnerName || gameState.players?.[result.winnerIdx]?.username || '?'} WINS!` : (iWon ? 'VICTORY' : (stRes ? stPlaceTitle(stRes.placements?.[myIdx]) : 'DEFEAT'))}
-          subtitle={stRes ? `${stRes.rounds} round${stRes.rounds === 1 ? '' : 's'} played` : (() => { const r = result; const w = iWon; return (
-            isSpectator ? (
-              r.reason === 'disconnect_timeout' ? `${r.loserName} timed out` :
-              r.reason === 'surrender' ? `${r.loserName} surrendered` :
-              r.reason === 'all_heroes_dead' ? `All of ${r.loserName}'s Heroes defeated!` :
-              ppGameOverText(r.reason, null, r.loserName, r.winnerName)
-            ) : (
-              r.reason === 'disconnect_timeout' ? 'Opponent timed out' :
-              r.reason === 'opponent_left' ? 'Opponent left the game' :
-              r.reason === 'surrender' ? (w ? 'Opponent surrendered' : 'You surrendered') :
-              r.reason === 'all_heroes_dead' ? (w ? 'All enemy Heroes defeated!' : 'All your Heroes were defeated') :
-              ppGameOverText(r.reason, w ? 'win' : 'lose', r.loserName, r.winnerName)
-            )); })()}
+          title={isSpectator ? `${result.winnerName || gameState.players?.[result.winnerIdx]?.username || '?'} WINS!` : (iWon ? (satz ? 'SET VICTORY!' : 'VICTORY') : (stRes ? stPlaceTitle(stRes.placements?.[myIdx]) : (satz ? 'SET LOST!' : 'DEFEAT')))}
+          subtitle={stRes ? `${stRes.rounds} round${stRes.rounds === 1 ? '' : 's'} played` : (satz ? `Best of ${result.format}  |  Score ${(result.setScore || [0, 0])[0]} - ${(result.setScore || [0, 0])[1]}` : grundText)}
           rewards={stRes ? ((isSpectator || user?.isGuest) ? [] : stRewards(stRes, myIdx)) : ((!isSpectator && scEarned && !user?.isGuest) ? (scEarned.rewards || []) : [])}
           total={stRes ? ((isSpectator || user?.isGuest) ? 0 : (stRes.sc?.[myIdx] || 0)) : ((!isSpectator && scEarned && !user?.isGuest) ? (scEarned.total || 0) : 0)}
           eloChanges={result.eloChanges || null}
@@ -63478,7 +63389,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
             : (gameState.isCpuBattle && opp?.username === 'CPU')
               ? heroDisplayName(opp.heroes?.[1]?.name || opp.heroes?.find(h => h?.name)?.name || opp.username)
               : opp?.username}
-          extra={(isSpectator || user?.isGuest) ? renderSCEarned() : null}
+          extra={(satz || isSpectator || user?.isGuest) ? <>{satz && !stRes && <div className="pp-cer-unter">{grundText}</div>}{(isSpectator || user?.isGuest) ? renderSCEarned() : null}</> : null}
           // Ergebnis-Zeremonie (app-fx-54): Namen der eigenen Helden fuer die Siegerfiguren am Rand (nur wenn Platz ist)
           helden={isSpectator ? [] : (gameState.players?.[myIdx]?.heroes || []).map(h => h && h.name).filter(Boolean)}
           eigenerCluster={!!meBubbleMsg}
@@ -63539,7 +63450,8 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
               )}
             </div>
         </ResultCeremony>
-      )}
+        );
+      })()}
       {/* ── GROSSER KARTEN-AUFTRITT (1.8.) ──────────────────────────
           Terror beendet den Zug — die Karte erscheint einmal mittig,
           wächst über zwei Sekunden und blendet dabei aus. Rein
