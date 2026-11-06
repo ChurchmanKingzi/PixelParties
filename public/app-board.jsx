@@ -47168,19 +47168,30 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
 
       // Fire the beam after a short charge delay
       setTimeout(() => {
-        // Outer beam glow — thicker, hazier
+        // Outer beam glow — thicker, hazier.
+        // ★ Bugfix: der Glanz trug die Drehung zum Ziel INLINE (`transform: rotate(angle)`), aber seine Keyframes (`eraserBeamOuter`) setzen selbst
+        // `transform: scaleX() scaleY()` und überschrieben sie — der rote Schein lag immer waagerecht (Winkel 0°) statt auf der Strecke zum Ziel. Jetzt
+        // steckt er (wie der Kern) in einer gedrehten Hülle; die Keyframes skalieren nur noch im Hüllen-Koordinatensystem.
+        const outerWrap = document.createElement('div');
+        outerWrap.style.cssText = [
+          `position:fixed`, `left:${sx}px`, `top:${sy}px`,
+          `width:${len}px`, `height:0px`,
+          `transform-origin:0 0`, `transform:rotate(${angle}deg)`,
+          `pointer-events:none`, `z-index:10011`,
+        ].join(';');
+        document.body.appendChild(outerWrap);
         const outer = document.createElement('div');
         outer.style.cssText = [
-          `position:fixed`, `left:${sx}px`, `top:${sy}px`,
-          `width:${len}px`, `height:28px`,
-          `transform-origin:0 50%`, `transform:rotate(${angle}deg)`,
+          `position:absolute`, `left:0`, `top:-14px`,
+          `width:100%`, `height:28px`,
+          `transform-origin:0 50%`,
           `background:linear-gradient(180deg, transparent 0%, rgba(181,23,28,0.65) 40%, rgba(240,50,50,0.85) 50%, rgba(181,23,28,0.65) 60%, transparent 100%)`,
           `filter:blur(6px)`,
-          `pointer-events:none`, `z-index:10011`, `opacity:0`,
+          `pointer-events:none`, `opacity:0`,
           `animation:eraserBeamOuter 1000ms ease-out forwards`,
         ].join(';');
-        document.body.appendChild(outer);
-        setTimeout(() => outer.remove(), 1050);
+        outerWrap.appendChild(outer);
+        setTimeout(() => outerWrap.remove(), 1050);
 
         // Rotated container for the beam itself + lightning (so bolts
         // can be placed along the beam axis using left/top relative to
@@ -47383,6 +47394,8 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     //    zone — it sits centered above the board-center element.
     const onBigGwenClockActivation = ({ owner }) => {
       if (window.playSFXForZoneAnim) window.playSFXForZoneAnim('ev_big_gwen_clock');   // Als Befund 10.10.: war stumm (Sweep, ZONE_ANIM_SFX)
+      // Pixelart-Fassung (app-fx-58: Leinwand, Hero-Pixel, Bayer-Raster). Nur im Rückfall (Animationen aus, Retro, reduzierte Bewegung) läuft die DOM-Fassung unten.
+      if (window.ppFx58BigGwenStart && window.ppFx58BigGwenStart()) return;
       const container = document.querySelector('.board-center');
       if (!container) return;
       const r = container.getBoundingClientRect();
@@ -47423,6 +47436,8 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
             80%, 99% { transform: translate(-50%, -100%) rotate(-6deg); } /* pp-ok: drehung */
             100%     { transform: translate(-50%, -100%) rotate(0deg); }
           }
+          @keyframes bgDimIn { 0% { opacity: 0; } 100% { opacity: 1; } }
+          @keyframes bgDimOut { 0% { opacity: 1; } 100% { opacity: 0; } }
           @keyframes bgBell {
             0%   { opacity: 0; transform: translate(-50%, -50%) scale(0.4); }
             30%  { opacity: 1; transform: translate(-50%, -50%) scale(1.3); }
@@ -47434,7 +47449,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
 
       // Dimmer behind the clock
       const dimmer = document.createElement('div');
-      dimmer.style.cssText = 'position:fixed;inset:0;background:radial-gradient(ellipse at center,rgba(31,15,4,.45),rgba(0,0,0,.15) 60%,transparent 90%);pointer-events:none;z-index:10020;opacity:0;animation:bgClockFadeIn 0.6s ease-out forwards,bgClockFadeOut 0.6s ease-in 1.6s forwards;';
+      dimmer.style.cssText = 'position:fixed;inset:0;background:radial-gradient(ellipse at center,rgba(31,15,4,.45),rgba(0,0,0,.15) 60%,transparent 90%);pointer-events:none;z-index:10020;opacity:0;animation:bgDimIn 0.6s steps(6,end) forwards,bgDimOut 0.6s steps(6,end) 1.6s forwards;';   // nur Deckkraft: die Aufpop-Keyframes (translate/scale/rotate) schoben den Vollbild-Abdunkler aus dem Bild
       document.body.appendChild(dimmer);
       setTimeout(() => dimmer.remove(), 2300);
 
