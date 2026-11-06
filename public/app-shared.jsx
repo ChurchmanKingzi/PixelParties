@@ -1964,6 +1964,8 @@ window.ppPixelPartikel = ppPixelPartikel;
 // versteckten Tab); animated={false} zeichnet nur das Standbild.
 //   rank: 0 … 7 (Silver, Gold, Platinum, Diamond, Ruby, Sapphire, Emerald, Obsidian) oder null (kein Rahmen)
 //   kind: 'card' | 'sleeve' | 'avatar'
+//   compact: KOMPAKTE Stufe für das laufende Spiel (Duell, Hand, Deckbau): Band innen auf der Kante, Zierrat ragt höchstens 3 Kunstpixel heraus;
+//            für kleine Karten (~90 px breit) mit px = 2. Ohne compact: die große Stufe (Galerie, Profil, Vorschau).
 const _rfLive = new Set();
 let _rfTimer = 0;
 function _rfAn(e) {
@@ -1975,9 +1977,9 @@ function _rfAn(e) {
   }, 100);
 }
 function _rfAus(e) { _rfLive.delete(e); if (!_rfLive.size && _rfTimer) { clearInterval(_rfTimer); _rfTimer = 0; } }
-function RankFrame({ rank, kind = 'card', width, height, px = 3, animated = true, className = '', style, children }) {
+function RankFrame({ rank, kind = 'card', width, height, px = 3, compact = false, animated = true, className = '', style, children }) {
   const iw = Math.max(8, Math.round(width / px)), ih = Math.max(8, Math.round(height / px));
-  const f = useMemo(() => (rank == null || !window.ppRankFrames ? null : window.ppRankFrames.create(rank, kind, iw, ih)), [rank, kind, iw, ih]);
+  const f = useMemo(() => (rank == null || !window.ppRankFrames ? null : window.ppRankFrames.create(rank, kind, iw, ih, compact ? { compact: true } : undefined)), [rank, kind, iw, ih, compact]);
   const cvRef = useRef(null);
   useEffect(() => {
     const cv = cvRef.current;
