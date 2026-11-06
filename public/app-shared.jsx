@@ -1957,6 +1957,51 @@ function ppPixelPartikel(canvas, teile, opt) {
 }
 window.ppPixelPartikel = ppPixelPartikel;
 
+// ═══ RANG-RAHMEN: <RankFrame> ═══════════════════════════════════════════
+// Legt einen Rang-Rahmen (public/rank-frames.js) um beliebigen Inhalt (Kartenbild, Sleeve, Avatar). Die Größe des Inhalts wird in
+// Kunstpixeln (`px` Bildschirmpixel je Kunstpixel) auf ganze Zahlen gerundet; der Rahmen ragt mit seinem Zierrat über die Kante hinaus
+// (absolut positioniert, ohne das Layout zu verschieben). Alle animierten Rahmen teilen sich EINEN Takt (10 Bilder/s, pausiert im
+// versteckten Tab); animated={false} zeichnet nur das Standbild.
+//   rank: 0 … 7 (Silver, Gold, Platinum, Diamond, Ruby, Sapphire, Emerald, Obsidian) oder null (kein Rahmen)
+//   kind: 'card' | 'sleeve' | 'avatar'
+const _rfLive = new Set();
+let _rfTimer = 0;
+function _rfAn(e) {
+  _rfLive.add(e);
+  if (!_rfTimer) _rfTimer = setInterval(() => {
+    if (document.hidden) return;
+    const t = performance.now() / 1000;
+    for (const x of _rfLive) { try { x.f.draw(x.ctx, t); } catch {} }
+  }, 100);
+}
+function _rfAus(e) { _rfLive.delete(e); if (!_rfLive.size && _rfTimer) { clearInterval(_rfTimer); _rfTimer = 0; } }
+function RankFrame({ rank, kind = 'card', width, height, px = 3, animated = true, className = '', style, children }) {
+  const iw = Math.max(8, Math.round(width / px)), ih = Math.max(8, Math.round(height / px));
+  const f = useMemo(() => (rank == null || !window.ppRankFrames ? null : window.ppRankFrames.create(rank, kind, iw, ih)), [rank, kind, iw, ih]);
+  const cvRef = useRef(null);
+  useEffect(() => {
+    const cv = cvRef.current;
+    if (!f || !cv) return undefined;
+    const ctx = cv.getContext('2d');
+    f.draw(ctx, 0.9, true);
+    let ruhig = !animated;
+    try { if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) ruhig = true; } catch {}
+    if (ruhig) return undefined;
+    const e = { f, ctx };
+    _rfAn(e);
+    return () => _rfAus(e);
+  }, [f, animated]);
+  const M = f ? f.M : 0;
+  return (
+    <div className={'rank-frame ' + className} style={{ position: 'relative', display: 'inline-block', width: iw * px, height: ih * px, ...style }}>
+      {children}
+      {f && <canvas ref={cvRef} width={f.w} height={f.h} data-pp-px="aus" className="rank-frame-cv"
+        style={{ position: 'absolute', left: -M * px, top: -M * px, width: f.w * px, height: f.h * px, imageRendering: 'pixelated', pointerEvents: 'none' }} />}
+    </div>
+  );
+}
+window.RankFrame = RankFrame;
+
 window.PxZeichen = PxZeichen;
 window.PxIcon = PxIcon;
 window.pxHintergrund = pxHintergrund;

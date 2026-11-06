@@ -7,7 +7,8 @@ const { api, socket, AppContext, CardMini, cardImageUrl,
         typeColor, skinImageUrl, CardTooltipContent, isDeckLegal } = window;
 const { ALL_CARDS, CARDS_BY_NAME, AVAILABLE_CARDS, AVAILABLE_MAP, SKINS_DB } = window;
 const { useAntoniaPresent, setAntoniaPresent, tutorialStartsWithAntonia } = window;
-const { GlanzBand, LotsenGlanz, PpVerlauf } = window;   // v1264: Glanzband + Lotsen-Schein; W86u2: Pixel-Schleier (Dither)
+const { GlanzBand, LotsenGlanz, PpVerlauf } = window;
+const { RankFrame } = window;   // Rang-Rahmen (app-shared.jsx / public/rank-frames.js)   // v1264: Glanzband + Lotsen-Schein; W86u2: Pixel-Schleier (Dither)
 
 // Eye / eye-off sprites for the password show/hide toggle (PixelIcon sprites `auge` / `augeZu` in app-shared.jsx; 11x7 sprite pixels at 2 px, colour = currentColor).
 const EyeIcon = () => <PixelIcon name="auge" style={{ width: 22, height: 14 }} />;
@@ -5137,6 +5138,56 @@ function ShopScreen() {
     );
   };
 
+  // Rahmen-Galerie: die acht Rang-Rahmen (Silber … Obsidian) für Karten, Sleeves und Avatare. Vorschau der Upgrade-Stufen, die Duplikate
+  // beim Pullen freischalten (je zusätzliche Kopie ein Rang: 1 Kopie = Silber … 8 Kopien = Obsidian).
+  const RANK_COLORS = ['#d2d2db', '#fad54a', '#e5edfa', '#7fdfff', '#ff6666', '#66b6ff', '#75f091', '#c98aff'];
+  const renderFrames = () => {
+    const ranks = (window.ppRankFrames && window.ppRankFrames.RANKS) || [];
+    if (!ranks.length) return <div className="shop-empty">Frames are not available.</div>;
+    const sk = (catalog.skins || [])[0], sl = (catalog.sleeves || [])[0], av = (catalog.avatars || [])[0];
+    const imgs = {
+      card: sk ? (cardImageUrl(sk.heroName) || '/cardback.png') : '/cardback.png',
+      sleeve: sl ? '/data/shop/sleeves/' + encodeURIComponent(sl.file) : '/cardback.png',
+      avatar: av ? '/data/shop/avatars/' + encodeURIComponent(av.file) : '/cardback.png',
+    };
+    const dims = { card: [120, 168], sleeve: [120, 168], avatar: [132, 132] };
+    return (
+      <div className="shop-frames">
+        <div className="shop-frames-intro">
+          <div className="shop-frames-title">RANK FRAMES</div>
+          <div className="shop-frames-text">
+            Pull a Skin, Avatar or Sleeve you already own and its frame ranks up for good — the more copies, the grander the frame.
+          </div>
+          <div className="shop-frames-note">Preview: the duplicate upgrades are coming soon.</div>
+          <div className="shop-frames-ladder">
+            {ranks.map((r, i) => (
+              <span key={r.id} className="shop-frames-chip" style={{ color: RANK_COLORS[i] }}>{r.copies}× {r.name}</span>
+            ))}
+          </div>
+        </div>
+        {ranks.map((r, i) => (
+          <div key={r.id} className="shop-frames-rank">
+            <div className="shop-frames-head" style={{ color: RANK_COLORS[i] }}>
+              <span className="shop-frames-no">RANK {i + 1}</span>
+              <span className="shop-frames-name">{r.name.toUpperCase()}</span>
+              <span className="shop-frames-copies">{r.copies} {r.copies === 1 ? 'copy' : 'copies'}</span>
+            </div>
+            <div className="shop-frames-row">
+              {['card', 'sleeve', 'avatar'].map(kind => (
+                <div key={kind} className="shop-frames-item">
+                  <RankFrame rank={i} kind={kind} width={dims[kind][0]} height={dims[kind][1]} px={3}>
+                    <img src={imgs[kind]} alt="" draggable={false} style={{ width: '100%', height: '100%', display: 'block', objectFit: 'cover', imageRendering: 'pixelated' }} />
+                  </RankFrame>
+                  <div className="shop-frames-kind">{kind === 'card' ? 'SKIN CARD' : kind === 'sleeve' ? 'SLEEVE' : 'AVATAR'}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+        ))}
+      </div>
+    );
+  };
+
   const tabCount = (type) => { const c = gachaCounts(type); return c.owned + '/' + c.total; };
   const tabs = [
     { id: 'skins', label: '🎨 Skins', count: tabCount('skin') },
@@ -5146,6 +5197,7 @@ function ShopScreen() {
     { id: 'cpuAvatars', label: '🏆 Opponent Avatars', count: (cpuAvatars.avatars || []).length },
     { id: 'boards', label: '🎮 Boards', count: (catalog.boards || []).length },
     { id: 'structures', label: '📜 Structure Decks', count: (structureCatalog?.decks || []).length },
+    { id: 'frames', label: '💎 Frames', count: ((window.ppRankFrames && window.ppRankFrames.RANKS) || []).length },
   ];
 
   return (
@@ -5195,6 +5247,7 @@ function ShopScreen() {
         {tab === 'cpuAvatars' && renderCpuAvatars()}
         {tab === 'boards' && renderItemGrid(catalog.boards || [], 'board', '/data/shop/boards/')}
         {tab === 'structures' && renderStructureDecks()}
+        {tab === 'frames' && renderFrames()}
       </div>
       {/* Shared hover-preview tooltip for shop items that have an associated
           card (structure deck covers, skins). Uses the same
