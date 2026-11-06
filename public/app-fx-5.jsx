@@ -251,7 +251,7 @@ const ppFx5LastResort = ppR1Leinwand((g, t, sz, teile) => {
   const R = Math.max(Math.max(p.w || 80, 80), Math.max(p.h || 110, 110)) * 3.1, E = Math.ceil(R * 1.12);
   return { breite: 2 * E, hoehe: 2 * E };
 }, {
-  z: 10260,
+  ohneDeckel: true, z: 10260,
   vorbereiten: (sz) => {
     const w = Math.max(sz.props.w || 80, 80), h = Math.max(sz.props.h || 110, 110), R = Math.max(w, h) * 3.1;
     return {
@@ -654,7 +654,7 @@ const ppFx5Meteor = ppR1Leinwand((g, t, sz, teile) => {
   const ax = Math.ceil(Math.min(Math.max(p.x, E), 1600)), rw = Math.ceil(Math.max(E, Math.min(window.innerWidth - p.x + 90, 1700))), at = Math.ceil(Math.max(E, Math.min(p.y + 110, 1000)));
   return { breite: ax + rw, hoehe: at + E, ankerX: ax, ankerY: at };
 }, {
-  z: 10100,
+  ohneDeckel: true, z: 10100,
   vorbereiten: (sz) => {
     const p = sz.props, k = Math.min(Math.max(p.intensity || 1, 1), 3);
     return {

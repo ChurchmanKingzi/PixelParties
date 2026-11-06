@@ -12403,9 +12403,9 @@ function ppR1FeldVersatz(p) { return (p && p.welt && window.ppFxScrollOffset) ? 
  * Feuerwalze, Meteor … 230 000 Zellen und kosteten je Bild das Doppelte (gemessen, 4x gedrosselt: Flut 9,1 statt 4,6 ms, Armageddon 10,9 statt 5,3 ms); am Handy (S = 2, 82 000 Zellen) ebenso.
  * `mass` wie bei `ppR1Leinwand` (Funktion der Props oder Objekt mit `breite`/`hoehe`). Die Notbremse `__ppFxZelleFest` gilt unverändert (feste Zelle, kein Deckel).
  */
-function ppFxZelleGedeckelt(props, mass) {
+function ppFxZelleGedeckelt(props, mass, frei) {
   let s = ppFxZelleFuer(props);
-  if (window.__ppFxZelleFest > 0) return s;
+  if (window.__ppFxZelleFest > 0 || frei) return s;   // `frei` (Option ohneDeckel): Effekt, für den kein Kostenvorteil des Deckels gemessen wurde
   try {
     const q = typeof mass === 'function' ? mass(props) : mass;
     if (q && q.breite > 0 && q.hoehe > 0) { const maxZ = (window.ppIsPhone && window.ppIsPhone()) ? 60000 : 140000; while (s < 3 && (q.breite / s) * (q.hoehe / s) > maxZ) s++; }   // nur Zelle 2 -> 3 (Kostenschutz bei feinerem Raster als vor der Hero-Pixel-Regel); ab Zelle 3 bleibt es bei Hero-Pixel (1080p: 230k Zellen wie schon immer)
@@ -12416,7 +12416,7 @@ function ppR1Leinwand(malen, ende, mass, opt) {
   const o = opt || {}, TAKT = 1000 / 30;
   return function R1Effekt(props) {
     const cvs = useRef(null);
-    const S = useMemo(() => ppFxZelleGedeckelt(props, mass), []);   // Rasterzelle = Hero-Pixel (ppFxZelle), bei fensterfüllenden Leinwänden gedeckelt (ppFxZelleGedeckelt); vorher fest 3
+    const S = useMemo(() => ppFxZelleGedeckelt(props, mass, o.ohneDeckel), []);   // Rasterzelle = Hero-Pixel (ppFxZelle), bei fensterfüllenden Leinwänden gedeckelt (ppFxZelleGedeckelt); vorher fest 3
     const m = useMemo(() => {
       const q = typeof mass === 'function' ? mass(props) : mass;
       const breite = Math.ceil(q.breite / S) * S, hoehe = Math.ceil(q.hoehe / S) * S;
