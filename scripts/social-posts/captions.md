@@ -191,14 +191,14 @@ Datei: `argos-the-eye-of-the-cosmos.mp4`
 
 > Your opponent's hand feeds the void. 👁️
 >
-> Argos collects a Change Counter for every card in your opponent's hand. Then you can cash them in once per turn to place a "Cosmic Depths" Creature of that level straight into his Support Zone.
+> Argos watches your opponent's hand: each card they hold becomes a Change Counter on him. Spend X of them once per turn to put a "Cosmic Depths" Creature of level X straight into his Support Zone – Analyzer, Gatherer, Life-Searcher, and finally the Invader.
 >
 > One of almost 200 animated Heroes you can lead into battle in Pixel Parties, the free online TCG where parties clash!
 > 👉 pixelpartiestcg.com (link in bio)
 >
-> #PixelParties #TCG #CardGame #PixelArt #IndieGame #TradingCardGame #FreeToPlay #DarkFantasy #Cosmic
+> #PixelParties #TCG #CardGame #PixelArt #IndieGame #TradingCardGame #FreeToPlay #DarkFantasy #Cosmic #Eldritch
 
-**Alt-Text**: Animated pixel art trading card of Argos, the Eye of the Cosmos, with black fog, floating red eyes and stars around the hero.
+**Alt-Text**: Animated pixel art trading card of Argos, the Eye of the Cosmos, with a giant black eye with tentacles collecting glowing purple Change Counters and summoning four Cosmic Depths cards as support pieces below it around the hero.
 
 ---
 

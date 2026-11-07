@@ -387,7 +387,9 @@ def main():
     rows = bb.heroes_with_music()
     missing = [r['name'] for r in rows if r['name'] not in HEROES]
     extra = [n for n in HEROES if n not in {r['name'] for r in rows}]
-    assert not missing, f'ohne Caption: {missing}'
+    if missing:                                                                 # neue Heroes aus dem Spiel ohne Caption: Warnung statt Abbruch, sie werden übersprungen
+        print('WARNUNG: ohne Caption (übersprungen):', missing)
+        rows = [r for r in rows if r['name'] in HEROES]
     assert not extra, f'Caption ohne Reel: {extra}'
     lines = [
         '# Captions für alle Reels (Entwürfe, Englisch)',
