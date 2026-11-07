@@ -4560,6 +4560,9 @@ function ShopScreen() {
   const [cpuSleeves, setCpuSleeves] = useState({ need: 5, sleeves: [] });
   // Gegner-Avatare (cpu-avatars.js): nicht käuflich, der erste Sieg gegen die CPU schaltet das Portrait frei.
   const [cpuAvatars, setCpuAvatars] = useState({ need: 1, avatars: [] });
+  // Boosterpacks (app-booster.jsx): Katalog aus GET /api/boosters, offenes (gekauftes, noch nicht eingefordertes) Pack aus GET /api/boosters/pending
+  const [boosters, setBoosters] = useState(null);      // { price, packs: [{ id, name, tagline, variants }] }
+  const [pendingPack, setPendingPack] = useState(null); // { id, packId, variantId, cards: [{ name, rarity }] } | null
   const [loading, setLoading] = useState(true);
   const [buying, setBuying] = useState(false);
   const [tab, setTab] = useState('skins');
@@ -4597,13 +4600,18 @@ function ShopScreen() {
   useEffect(() => {
     (async () => {
       try {
-        const [catData, ownData, structData, cpuData, cpuAvData] = await Promise.all([
+        const [catData, ownData, structData, cpuData, cpuAvData, boosterData, pendData] = await Promise.all([
           api('/shop/catalog'),
           api('/shop/owned'),
           api('/shop/structure-decks'),
           api('/shop/cpu-sleeves').catch(() => null),
           api('/shop/cpu-avatars').catch(() => null),
+          api('/boosters').catch(() => null),
+          api('/boosters/pending').catch(() => null),
         ]);
+        if (boosterData) setBoosters(boosterData);
+        // Wiederaufnahme: ein gekauftes, noch nicht eingefordertes Pack liegt offen -> Pack-Ansicht sofort fortsetzen
+        if (pendData && pendData.pending) { setPendingPack(pendData.pending); setTab('boosters'); }
         setCatalog(catData);
         setOwned(ownData.owned);
         setDupes({ avatar: {}, sleeve: {}, skin: {}, ...(ownData.dupes || {}) });
@@ -4856,6 +4864,24 @@ function ShopScreen() {
     setBuying(false);
   };
 
+  // Boosterpack kaufen (20 SC): der Server würfelt die 9 Karten und speichert sie als offenes Pack; danach öffnet die Vollbild-Ansicht (BoosterOpening).
+  // Ist schon ein Pack offen, liefert die Antwort dieses (kaufen ist dann nicht erlaubt) und die Ansicht wird einfach fortgesetzt.
+  const buyBooster = async (packId) => {
+    if (buying || pendingPack) return;
+    const price = boosters && boosters.price != null ? boosters.price : 20;
+    if (!((user.sc || 0) >= price)) { notify('Not enough 🪙!', 'error'); return; }
+    setBuying(true);
+    try {
+      const r = await window.ppBoosterApi.buy(packId);
+      if (r.data && r.data.pending) setPendingPack(r.data.pending);
+      if (r.ok) {
+        if (r.data.sc != null) setUser(u => ({ ...u, sc: r.data.sc }));
+        triggerPurchaseFanfare({ cx: window.innerWidth / 2, cy: window.innerHeight / 2 }, { pull: true });
+      } else if (!(r.data && r.data.pending)) notify((r.data && r.data.error) || 'Purchase failed', 'error');
+    } catch (e) { notify(e.message, 'error'); }
+    setBuying(false);
+  };
+
   if (loading || !catalog) {
     return <div className="screen-center"><div className="pixel-font" style={{ color: 'var(--accent)', animation: 'pulse 1.5s infinite' }}>Loading shop...</div></div>;
   }
@@ -4913,16 +4939,20 @@ function ShopScreen() {
   // Gegner-Sleeves: Trophäen aus dem Singleplayer. Freigeschaltete lassen sich
   // ausrüsten wie gekaufte; gesperrte zeigen den Fortschritt gegen ihre CPU.
   // Noch unbekannte Gegner bleiben verdeckt, damit nichts vorweggenommen wird.
-  const renderCpuSleeves = () => {
-    const list = cpuSleeves.sleeves || [];
-    if (list.length === 0) return <div className="shop-empty">No opponent sleeves available yet</div>;
+  // `eingebettet`: am Ende der Sleeves-Liste (Reiter „Sleeves“); der Sammlungsfilter (ALL/OWNED/MISSING) gilt dann auch hier.
+  const cpuFilter = (all) => collFilter === 'owned' ? all.filter(it => it.unlocked) : collFilter === 'missing' ? all.filter(it => !it.unlocked) : all;
+  const renderCpuSleeves = (eingebettet) => {
+    const all = cpuSleeves.sleeves || [];
+    const list = eingebettet ? cpuFilter(all) : all;
+    if (all.length === 0) return eingebettet ? null : <div className="shop-empty">No opponent sleeves available yet</div>;
+    if (list.length === 0) return null;
     const need = cpuSleeves.need || 5;
-    const earned = list.filter(it => it.unlocked).length;
+    const earned = all.filter(it => it.unlocked).length;
     return (
       <React.Fragment>
-        <div className="shop-random-wrap">
+        <div className={'shop-random-wrap' + (eingebettet ? ' shop-cpu-embedded' : '')}>
           <div className="shop-cpu-sleeves-intro">🏆 Every CPU opponent plays with its own sleeve. Defeat an opponent {need} times to claim it!</div>
-          <span className="shop-random-hint">{earned} / {list.length} earned</span>
+          <span className="shop-random-hint">{earned} / {all.length} earned</span>
         </div>
         <div className="shop-grid">
           {list.map(item => {
@@ -4960,16 +4990,18 @@ function ShopScreen() {
     );
   };
 
-  const renderCpuAvatars = () => {
-    const list = cpuAvatars.avatars || [];
-    if (list.length === 0) return <div className="shop-empty">No opponent avatars available yet</div>;
+  const renderCpuAvatars = (eingebettet) => {
+    const all = cpuAvatars.avatars || [];
+    const list = eingebettet ? cpuFilter(all) : all;
+    if (all.length === 0) return eingebettet ? null : <div className="shop-empty">No opponent avatars available yet</div>;
+    if (list.length === 0) return null;
     const need = cpuAvatars.need || 1;
-    const earned = list.filter(it => it.unlocked).length;
+    const earned = all.filter(it => it.unlocked).length;
     return (
       <React.Fragment>
-        <div className="shop-random-wrap">
+        <div className={'shop-random-wrap' + (eingebettet ? ' shop-cpu-embedded' : '')}>
           <div className="shop-cpu-sleeves-intro">🏆 Every CPU opponent has a portrait. Defeat an opponent {need === 1 ? 'once' : need + ' times'} to claim it as your avatar!</div>
-          <span className="shop-random-hint">{earned} / {list.length} earned</span>
+          <span className="shop-random-hint">{earned} / {all.length} earned</span>
         </div>
         <div className="shop-grid">
           {list.map(item => {
@@ -5176,6 +5208,9 @@ function ShopScreen() {
               );
             }} />
         )}
+        {/* Gegner-Items stehen am Ende der jeweiligen Liste (früher eigene Reiter „Opponent Sleeves/Avatars“) */}
+        {type === 'sleeve' && renderCpuSleeves(true)}
+        {type === 'avatar' && renderCpuAvatars(true)}
         </div>
       </div>
     );
@@ -5268,8 +5303,7 @@ function ShopScreen() {
     { id: 'skins', label: '🎨 Skins', count: tabCount('skin') },
     { id: 'avatars', label: '👤 Avatars', count: tabCount('avatar') },
     { id: 'sleeves', label: '🃏 Sleeves', count: tabCount('sleeve') },
-    { id: 'cpuSleeves', label: '🏆 Opponent Sleeves', count: (cpuSleeves.sleeves || []).length },
-    { id: 'cpuAvatars', label: '🏆 Opponent Avatars', count: (cpuAvatars.avatars || []).length },
+    { id: 'boosters', label: '📦 Boosterpacks', count: ((boosters && boosters.packs) || []).length },
     { id: 'boards', label: '🎮 Boards', count: (catalog.boards || []).length },
     { id: 'structures', label: '📜 Structure Decks', count: (structureCatalog?.decks || []).length },
   ];
@@ -5296,6 +5330,10 @@ function ShopScreen() {
         </span>
       </div>
       {celebration && <PurchaseCelebration cx={celebration.cx} cy={celebration.cy} onDone={() => setCelebration(null)} />}
+      {pendingPack && window.BoosterOpening && (
+        <window.BoosterOpening pending={pendingPack} boosters={boosters}
+          onClaimed={() => { setPendingPack(null); notify('Cards added to your collection!', 'success'); }} />
+      )}
       {randomReveal && <ShopPullReveal reveal={randomReveal} fast={fastPull} onToggleFast={() => setFastPull(v => !v)} onClose={() => setRandomReveal(null)} />}
       <div className="top-bar">
         <button className="btn" onClick={() => setScreen('menu')}>← BACK</button>
@@ -5317,8 +5355,7 @@ function ShopScreen() {
         {tab === 'skins' && renderGachaPage('skin')}
         {tab === 'avatars' && renderGachaPage('avatar')}
         {tab === 'sleeves' && renderGachaPage('sleeve')}
-        {tab === 'cpuSleeves' && renderCpuSleeves()}
-        {tab === 'cpuAvatars' && renderCpuAvatars()}
+        {tab === 'boosters' && window.BoosterShop && <window.BoosterShop boosters={boosters} sc={user.sc || 0} busy={buying || !!pendingPack} onBuy={buyBooster} />}
         {tab === 'boards' && renderItemGrid(catalog.boards || [], 'board', '/data/shop/boards/')}
         {tab === 'structures' && renderStructureDecks()}
       </div>

@@ -412,8 +412,10 @@ function ZaehlZahl({ wert }) {
 }
 window.ZaehlZahl = ZaehlZahl;
 
-function BoardCard({ cardName, faceDown, flipped, label, hp, maxHp, atk, hpPosition, style, noTooltip, skins, tooltipCardOverride, tooltipDarunter, tooltipDarunterTitel, inheritedEffects, copiedHeroes, revealTooltipWhenFaceDown, abilities, orbs, effectiveLevel, stampBonus, showLevelBadge, handLevel, handCost, handNotes, abilityLevel, children }) {
+function BoardCard({ cardName, faceDown, flipped, label, hp, maxHp, atk, hpPosition, style, noTooltip, skins, tooltipCardOverride, tooltipDarunter, tooltipDarunterTitel, inheritedEffects, copiedHeroes, revealTooltipWhenFaceDown, abilities, orbs, effectiveLevel, stampBonus, showLevelBadge, handLevel, handCost, handNotes, abilityLevel, rarity: rarityProp, children }) {
   const card = faceDown ? null : CARDS_BY_NAME[cardName];
+  // Rarity der Karteninstanz (Prop vor card.rarity; Test-Schalter ?rarity=… vor beidem). Auf dem Brett und in der Hand nur als Standbild (CardFoil, FoilBrettContext).
+  const rar = faceDown ? 'common' : ppRarityOf(card, rarityProp);
   const imgUrl = card ? cardImageUrl(card.name, skins) : null;
   // Auf dem Brett liegen die LIVE-Werte (HP, bei Helden auch ATK) ueber der Karte —
   // die gedruckten Zahlen bleiben weg (Als Vorgabe 12.10.): sonst schimmern sie
@@ -430,7 +432,7 @@ function BoardCard({ cardName, faceDown, flipped, label, hp, maxHp, atk, hpPosit
   // Ability auf dem Brett (Als Vorgabe 13.10.): die Box der aktuellen Stufe (1–3) ist hervorgehoben, die anderen beiden sind grau.
   // Der Renderer wendet das nur auf Faehigkeitskarten mit drei Stufen an; bei allen anderen Karten bleibt es ohne Wirkung.
   if (abilityLevel != null) bildParams.push('stufe=' + abilityLevel);
-  const boardImgUrl = imgUrl && bildParams.length ? imgUrl + '?' + bildParams.join('&') : imgUrl;
+  const boardImgUrl = ppRarityUrl(imgUrl && bildParams.length ? imgUrl + '?' + bildParams.join('&') : imgUrl, rar);
   // A caller (e.g. Biomancy Token in the puzzle builder) can override what
   // the hover tooltip renders without changing the card image / name by
   // passing `tooltipCardOverride`. Falls back to the canonical card.
@@ -454,7 +456,8 @@ function BoardCard({ cardName, faceDown, flipped, label, hp, maxHp, atk, hpPosit
     ? CARDS_BY_NAME[cardName]
     : card;
   // Gewählter Skin gilt auch im Hover-Tooltip (CardTooltipContent liest `_skinUrl`).
-  const tooltipBase0 = tooltipCardOverride || tooltipCardData;
+  const tooltipBase00 = tooltipCardOverride || tooltipCardData;
+  const tooltipBase0 = tooltipBase00 && rar !== 'common' && tooltipBase00.rarity !== rar ? { ...tooltipBase00, rarity: rar } : tooltipBase00;   // der Tooltip zeigt dieselbe Rarity (animiert)
   const tooltipBase = (tooltipBase0 && !faceDown && skins && skins[cardName] && imgUrl) ? { ...tooltipBase0, _skinUrl: imgUrl } : tooltipBase0;
   const tooltipTarget0 = (() => {
     if (!tooltipBase) return null;
@@ -499,14 +502,9 @@ function BoardCard({ cardName, faceDown, flipped, label, hp, maxHp, atk, hpPosit
   // Zweite Karte unter dem Tooltip (verwandelte Hulijing: oben die Kreatur, darunter der Held — `tooltipDarunter` = Kartendaten samt Live-Werten).
   const tooltipTarget = (tooltipTarget0 && tooltipDarunter) ? { ...tooltipTarget0, _darunterKarte: tooltipDarunter, _darunterTitel: tooltipDarunterTitel } : tooltipTarget0;
 
-  // Foil support — Bänder, Schimmer und Funken kommen komplett aus
-  // `CardFoil` (app-shared, v1203). Hier bleibt nur die Randklasse, die
-  // am Kartenrahmen selbst haengt.
-  const foilType = card?.foil || null;
-  const foilClass = foilType === 'diamond_rare' ? 'foil-diamond-rare' : foilType === 'secret_rare' ? 'foil-secret-rare' : '';
-
+  // Rarity-Effekt (Standbild) und Skin-Holo kommen komplett aus `CardFoil` (app-shared).
   return (
-    <div className={'board-card' + (faceDown ? ' face-down' : '') + (flipped ? ' flipped' : '') + (foilClass ? ' ' + foilClass : '')}
+    <div className={'board-card' + (faceDown ? ' face-down' : '') + (flipped ? ' flipped' : '')}
       style={style}
       ref={(el) => { if (el) el._ppTip = (noTooltip || (faceDown && !revealTooltipWhenFaceDown)) ? null : tooltipTarget; }}   // fuer ppHandTipp (Tipp auf Handkarten)
       onMouseEnter={() => !noTooltip && (revealTooltipWhenFaceDown || !faceDown) && tooltipTarget && setBoardTooltip(tooltipTarget)}
@@ -520,7 +518,7 @@ function BoardCard({ cardName, faceDown, flipped, label, hp, maxHp, atk, hpPosit
           setBoardTooltip(tooltipTarget);
         }, window.LONG_PRESS_MS || 400);
       }}>
-      <CardFoil card={card} skin={window.skinOfUrl ? window.skinOfUrl(imgUrl) : null}
+      <CardFoil card={card} rarity={rar} skin={window.skinOfUrl ? window.skinOfUrl(imgUrl) : null}
         werte={(ohneGedruckt.length || handLevel != null || handCost != null) ? {
           noHp: ohneGedruckt.includes('hp') || undefined, noAtk: ohneGedruckt.includes('atk') || undefined,
           lv: handLevel != null ? handLevel : undefined, kost: handCost != null ? handCost : undefined } : null} />
@@ -4309,8 +4307,8 @@ function CardRevealOverlay({ reveals, onRemove }) {
 const FIZZLE_ANZEIGE_MS = 1400;
 function CardRevealEntry({ cardName, onDone, fizzled }) {
   const card = CARDS_BY_NAME[cardName];
-  const imgUrl = card ? cardImageUrl(card.name) : null;
-  const foilType = card?.foil || null;
+  const rar = ppRarityOf(card, null);
+  const imgUrl = card ? ppRarityUrl(cardImageUrl(card.name), rar) : null;
   // v1360 (Als Befund: „die gefizzelte Karte bleibt deutlich zu lange
   // sichtbar"): ein Fizzeln ist eine kurze Meldung — 1,4 s statt 3,5 s,
   // die letzten 300 ms blendet es aus (`.card-reveal-fizzled-weg`).
@@ -4332,9 +4330,10 @@ function CardRevealEntry({ cardName, onDone, fizzled }) {
       onMouseLeave={() => { gehovert.current = false; setBoardTooltip(null); }}>
       <div className={'card-reveal-card' + (fizzled ? ' card-reveal-fizzled' : '')}>
         {fizzled && <div className="chain-negate-symbol">🚫</div>}
+        {imgUrl && rar !== 'common' && <CardFoil card={card} rarity={rar} />}
         {imgUrl ? (
           <img src={imgUrl} style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: 6,
-            border: foilType === 'diamond_rare' ? '3px solid rgba(104,198,253,.7)' : foilType === 'secret_rare' ? '3px solid rgba(250,213,74,.6)' : '2px solid var(--bg4)' }} draggable={false} />
+            border: '2px solid var(--bg4)' }} draggable={false} />
         ) : (
           <div style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
             background: 'var(--bg3)', borderRadius: 6, border: '2px solid var(--bg4)', padding: 16, textAlign: 'center' }}>
@@ -61609,19 +61608,15 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         const traeger = hoverName ? CARDS_BY_NAME[hoverName] : null;
         const card = (hoverIdentity && CARDS_BY_NAME[hoverIdentity]) || traeger;
         if (!card) return null;
-        const imgUrl = cardImageUrl(card.name);
-        const foilType = card.foil || null;
+        const rar = ppRarityOf(card, hoveredPileCard && hoveredPileCard.rarity);
+        const imgUrl = ppRarityUrl(cardImageUrl(card.name), rar);
         const shownLevel = hoverEffLvl != null ? hoverEffLvl : card.level;
         return (
           <div className="board-tooltip">
             {imgUrl && (
               <div style={{ position: 'relative', width: '100%', flexShrink: 0 }}>
-                <img src={imgUrl} style={{ width: '100%', aspectRatio: '750/1050', objectFit: 'cover', display: 'block',
-                  border: foilType === 'diamond_rare' ? '2px solid rgba(104,198,253,.6)' : foilType === 'secret_rare' ? '2px solid rgba(250,213,74,.5)' : 'none' }} />
-                {/* ★ v1203: Dieses Vorschaubild rechnete `isFoil` aus und
-                    zeichnete die Schicht dann NIE — dritte Stelle derselben
-                    Bauart. Jetzt haengt auch sie an CardFoil. */}
-                <CardFoil card={card} />
+                <img src={imgUrl} style={{ width: '100%', aspectRatio: '750/1050', objectFit: 'cover', display: 'block' }} />
+                <CardFoil card={card} rarity={rar} animated />
               </div>
             )}
             <div style={{ padding: '10px 12px' }}>

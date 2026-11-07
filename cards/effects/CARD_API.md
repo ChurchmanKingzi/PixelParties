@@ -1008,77 +1008,20 @@ Eine Area ohne Overlay ist unfertig. Board of Kings: Schachbrett in
 leichter Perspektive mit Walnuss-Rahmen, Holzmaserung, Vignette und
 aufsteigenden Figuren-Silhouetten.
 
-## ★ FOIL-KARTEN: EIN ANSCHLUSS, `<CardFoil card={…} />` (v1203)
+## ★ RARITY-KARTEN: EIN ANSCHLUSS, `<CardFoil card={…} rarity={…} />`
 
-`foil` steht in cards.json auf der Karte selbst (`secret_rare` |
-`diamond_rare`) und ist damit eine Eigenschaft der KARTE, nicht des
-einzelnen Exemplars. Die Schicht darüber hat seit v1204 **vier Lagen**:
+Jede Karteninstanz hat eine **Rarity** (ID aus `rarities.js`: common, uncommon, rare, prismatic, super, diamond, spectral, umbra, stained;
+Feld `rarity` der Karte oder Prop, Standard Common). Der alte Foil (`card.foil`, FoilOverlay, CSS-Schimmer) ist ersetzt.
 
-1. **Textur** — die Prägung der Folie. Secret Rare: feine Schrägrillen;
-   Diamond Rare: breite 45°-Facetten (ein feines Gitter beißt sich mit
-   dem Pixelraster der Karten). Bewusst fast unsichtbar.
-   **★ v1205 (Als Befund 18.9.): ab 120 px Kartenbreite fällt die
-   Prägung weg** — Rillen haben eine feste Breite und werden auf einer
-   groß gezeichneten Karte zu gemalten Balken. Das gilt für die Lage
-   selbst UND für die Rillen im Band (`.foil-band::after`), die dieselbe
-   Prägung nur beleuchtet zeigen. Umgesetzt als Größenregel, nicht als
-   Liste von Stellen: `.foil-shine-overlay` ist `container-type:
-   inline-size`, die Lagen hängen an `@container (min-width: 120px)`.
-   Damit greift es automatisch im großen Tooltip, in den Helden-Plätzen
-   des Deck-Editors, im Karten-Auftritt und in allem, was später
-   dazukommt; Brett, Hand und Galerien liegen mit 64–100 px darunter.
-2. **Schimmer** — farbige Interferenz über die ganze Karte.
-3. **Bänder** — wandernde Lichtstreifen, `mix-blend-mode: screen`, mit
-   heißem weißem Kern (`::before`) und den Rillen der Prägung als
-   Schatten IM Licht (`::after`, multiply). Dass die Textur beleuchtet
-   statt aufgemalt wird, ist das, was sie physisch wirken lässt.
-   **★ v1205: Diamond Rare hat jetzt ebenfalls Bänder** (vorher keine) —
-   drei statt fünf, deutlich breiter, flacher geneigt und rund doppelt
-   so langsam, in Türkis/Aqua/Tiefblau mit weißem Kern. Licht, das über
-   eine geschliffene Fläche GLEITET, statt Folie, die blitzt; die
-   Palette steht in `DIAMOND_BAND_GRADIENTS`.
-4. **Funken + Staub** — Lichtkreuze mit langen Spitzen und Bloom, dazu
-   langsam aufsteigende Staubkörner.
-
-**Alles läuft per CSS.** Bis v1203 schob ein JS-Zeitgeber je Karte alle
-150–850 ms ein Band in den React-Zustand — Dutzende Re-Renders je
-Sekunde für reine Deko. Seit v1204 bekommt jede Karte EINMAL fünf
-Bandbeschreibungen mit gestaffelten Laufzeiten; jedes Band belegt nur
-40 % seines Taktes und wartet den Rest unsichtbar ab. Gleiche
-unregelmäßige Dichte, null React-Arbeit nach dem ersten Render.
-
-Jede animierte Lage hat einen Grundzustand, der ohne Animation richtig
-aussieht (`opacity: 0` bei Funken/Bändern/Staub, `.18` beim Schimmer) —
-sonst stünden bei „Play Animations: aus" starre Lichtkreuze auf der
-Karte.
-
-Genau das war die Bruchstelle: jede Anzeigestelle trug ihre eigene
-Kopie derselben sechs Anschlusszeilen, und eine davon (der große
-Tooltip, beim Herauslösen aus BoardCard) stand auf `bands={[]}` — die
-Karte funkelte weiter, aber kein Band lief je über sie. Eine zweite
-rechnete `isFoil` aus und zeichnete gar nichts, eine dritte (die
-Handkarten des Puzzle-Creators) hatte nie eine Schicht bekommen.
-
-**Deshalb gilt: wer ein Kartenbild zeigt, hängt `<CardFoil card={…} />`
-als Geschwister direkt daneben — mehr nicht.** Die Komponente
-(app-shared, per `window.CardFoil`) hält Bänder, Schimmerphase und
-Funkenversatz selbst und rendert bei Nicht-Foil-Karten `null`. Der
-Elternknoten braucht `position: relative` (die Schicht liegt absolut
-auf `inset: 0`) — sonst hängt sie sich an den nächsten positionierten
-Vorfahren, im Zweifel die ganze Leiste.
-
-`FoilOverlay` bleibt exportiert, ist aber ein Rohteil:
-`scripts/check-foil.js` lässt `<FoilOverlay>` nur noch im Rumpf von
-`CardFoil` stehen und meldet jede neue Kopie. `useFoilBands` ist mit
-v1204 entfallen.
-
-**Diamond Rare ist durchgehend türkis-blau gehalten** (Als Vorgabe
-18.9.): Rahmenpuls, Schimmerfolie, Facetten, Bänder, Funken und Staub
-ziehen alle an derselben Palette. Die Trennung zur Secret Rare ist
-bewusst farblich UND im Takt — Regenbogen/schnell gegen Türkis/langsam;
-sonst sind die beiden Seltenheiten auf einen Blick nicht zu
-unterscheiden.
-
+* **Bild:** `ppRarityUrl(url, rarity)` hängt `?rar=<id>` an die Kartenbild-URL; der Karten-Shim rendert dann die Basiskarte der Stufe
+  (Stempel, Gold-/Silber-/Cyan-Rahmen, Namensfarbe: `CardRender.rarityBase`). Ohne Angabe: Common.
+* **Effekt:** `<CardFoil card={card} rarity={r} animated? werte? skin? />` als Geschwister direkt neben dem Bild (Elternknoten `position: relative`).
+  Dahinter steckt `RarityLayer` → `PpRarityFx.attach` (`public/rarity-fx.js`): EINE Canvas je Karte auf dem 150 x 210-Raster, Palette, kein CSS-Dauerlauf.
+  `animated` (nur Tooltip, Großansicht, Rarity-Auswahl im Deckbuilder): 20-Bilder-Takt, nur sichtbar. Sonst ein Standbild ohne Takt (Brett, Hand, Listen,
+  `FoilBrettContext`/`FoilKleinContext`). Umbra und Stained brauchen eine Motiv-Maske (`public/cardgen/masks.bin`, `scripts/build-masks.js`); ohne Maske
+  zeigt die Karte den Effekt nicht (der Server würfelt solche Karten nie als Umbra/Stained).
+* **Test-Schalter:** `?rarity=<id>` (oder `mix` = je Kartenname eine andere Stufe) in der Adresse bzw. `window.__ppTestRarity` setzt die Rarity ALLER Karten.
+* Skin-Karten behalten ihr eigenes Holo (`SkinHolo`) statt des Rarity-Effekts.
 
 ## ★ ZONEN-EINSCHLAG: JEDE PLATZIERUNG WIRD SICHTBAR (v1206 — Als Vorgabe 18.9.)
 

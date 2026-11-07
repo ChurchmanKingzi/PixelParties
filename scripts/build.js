@@ -63,6 +63,7 @@ const ENTRIES = [
   'app-shared',
   'app-areas',            // v1410: Area-Hintergruende (Registry + Szenen)
   'app-screens',
+  'app-booster',          // Boosterpacks: Shop-Reiter, Öffnung, Aufdecken
   'app-player-profile',   // v1289: Spielerprofil-Popup
   'app-social',           // Who's Online, private Chats, Herausforderungen
   'app-puzzle',
@@ -103,7 +104,6 @@ const ENTRIES = [
   'app-fx-32',
   'app-fx-33',
   'app-fx-34',
-  'app-fx-35',
   'app-fx-36',
   'app-fx-37',
   'app-fx-38',
@@ -193,6 +193,8 @@ function buildAll({ force = false, quiet = false } = {}) {
     }
   }
   if (!quiet && built === 0) console.log('[build] up to date');
+  // Motiv-Masken (Umbra/Stained Rare) als kompakte Binärdatei für den Client (public/cardgen/masks.bin)
+  try { require('./build-masks.js').build({ quiet }); } catch (e) { console.warn('[build] masks.bin:', e.message); }
   return built;
 }
 
