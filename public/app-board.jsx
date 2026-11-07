@@ -582,7 +582,7 @@ function BoardCard({ cardName, faceDown, flipped, label, hp, maxHp, atk, hpPosit
   );
 }
 
-function BoardZone({ type, cards, label, faceDown, flipped, stackLabel, children, onClick, onHoverCard, style, className, dataAttrs, ownerLetheStamps, badge, pileIdentities, renderStack }) {
+function BoardZone({ type, cards, label, faceDown, flipped, stackLabel, children, onClick, onHoverCard, style, className, dataAttrs, ownerLetheStamps, badge, pileIdentities, renderStack, rarities }) {
   const cls = 'board-zone board-zone-' + type + (className ? ' ' + className : '') + ((cards?.length > 0) ? ' zone-has-card' : '');
   const topCardName = cards && cards.length > 0 && !faceDown ? cards[cards.length - 1] : null;
   const suppressChildTooltip = !!onClick && !!onHoverCard;
@@ -620,12 +620,15 @@ function BoardZone({ type, cards, label, faceDown, flipped, stackLabel, children
     const e = pileIdentities[(cards || []).length - 1];
     return (e && e.name === topCardName && e.identity) ? e.identity : null;
   })();
-  const hoverPayload = topCardName == null ? null : ((topLevelInfo || topIdentity)
+  // Rarity der obersten Karte (Server: players[i].rarity.discardPile/deletedPile) — der Hover-Tooltip zeigt sie animiert.
+  const topRarity = topCardName != null && rarities ? (rarities[(cards || []).length - 1] || undefined) : undefined;
+  const hoverPayload = topCardName == null ? null : ((topLevelInfo || topIdentity || topRarity)
     ? {
       name: topCardName,
       effectiveLevel: topLevelInfo?.effectiveLevel,
       stampBonus: topLevelInfo?.stampBonus,
       identity: topIdentity || undefined,
+      rarity: topIdentity ? undefined : topRarity,
     }
     : topCardName);
   return (
@@ -652,10 +655,12 @@ function BoardZone({ type, cards, label, faceDown, flipped, stackLabel, children
         renderStack ? renderStack(cards) : (
         cards.length === 1 ? (
           <BoardCard cardName={cards[0]} faceDown={faceDown} flipped={flipped} label={stackLabel} noTooltip={suppressChildTooltip}
+            rarity={(rarities && rarities[0]) || undefined}
             effectiveLevel={topLevelInfo?.effectiveLevel} stampBonus={topLevelInfo?.stampBonus} showLevelBadge={topLevelInfo != null} />
         ) : (
           <div className="board-stack">
             <BoardCard cardName={cards[cards.length - 1]} faceDown={faceDown} flipped={flipped} label={stackLabel || (cards.length + '')} noTooltip={suppressChildTooltip}
+              rarity={(rarities && rarities[cards.length - 1]) || undefined}
               effectiveLevel={topLevelInfo?.effectiveLevel} stampBonus={topLevelInfo?.stampBonus} showLevelBadge={topLevelInfo != null} />
           </div>
         ))
@@ -992,7 +997,7 @@ function FightingAtkNumber({ amount, owner, heroIdx, myIdx }) {
 }
 
 // Floating card that animates from deck position to hand slot position
-function DrawAnimCard({ cardName, origIdx, startX, startY, dimmed }) {
+function DrawAnimCard({ cardName, origIdx, startX, startY, dimmed, rarity }) {
   const [endPos, setEndPos] = useState(null);
   const flugRef = useRef(null);
   // Pixelart-Schweif + Abheb-Funken (app-fx-49): eine Leinwand von der Stapelmitte bis zur Mitte des Handplatzes, sobald die Karte fliegt.
@@ -1042,7 +1047,7 @@ function DrawAnimCard({ cardName, origIdx, startX, startY, dimmed }) {
   return (
     <div ref={flugRef} className={'draw-anim-card' + (dimmed ? ' hand-card-dimmed' : '')}
       style={{ left, top, '--dx': dx, '--dy': dy, '--fan-rot': endPos.rot || '0deg' }}>
-      <BoardCard cardName={cardName} />
+      <BoardCard cardName={cardName} rarity={rarity} />
     </div>
   );
 }
@@ -6666,7 +6671,7 @@ function TempesteRainOverlay() {
  * Zielwahl der Zone getrennt — die Zone bleibt fuer Potion-Ziele
  * zustaendig, die Karte fuer ihre eigene Aktivierung.
  */
-function AreaStack({ cards, entries, onActivate, effectLocked, charge, targeting }) {
+function AreaStack({ cards, entries, onActivate, effectLocked, charge, targeting, rarities }) {
   return (
     <div className="board-area-stack">
       {cards.map((name, i) => {
@@ -6693,7 +6698,7 @@ function AreaStack({ cards, entries, onActivate, effectLocked, charge, targeting
               cursor: (waehlbar || aktivierbar) ? 'pointer' : undefined }}
             data-area-stack-idx={i}
             onClick={klick}>
-            <BoardCard cardName={name} />
+            <BoardCard cardName={name} rarity={(rarities && rarities[i]) || undefined} />
           </div>
         );
       })}
@@ -35760,7 +35765,7 @@ function GameAnimationRenderer({ type, x, y, w, h, _gemountet, prewarm, prewarmB
 //     eine andere Kreatur. Richtung wie bei `attachedHero` — ungehovert
 //     steht die OBENLIEGENDE Kreatur da (das ist der Spielzustand),
 //     beim Hovern kommt die verdeckte Karte zum Vorschein (🪺).
-function AttachableCreatureCard({ creatureName, attachedHero, mimicCreature, shapeshiftBase, nestedUnder, heldHero, ...boardCardProps }) {
+function AttachableCreatureCard({ creatureName, attachedHero, mimicCreature, shapeshiftBase, nestedUnder, heldHero, overlayRarity, ...boardCardProps }) {
   // `useStickyHoverFlag` statt eines nackten useState: der Hover TAUSCHT
   // hier das Kartenbild, der Knoten unter dem Zeiger wird also mitten in
   // der Bewegung ersetzt — genau die Lage, in der ein mouseleave
@@ -35798,6 +35803,7 @@ function AttachableCreatureCard({ creatureName, attachedHero, mimicCreature, sha
       style={{ position: 'relative', width: '100%', height: '100%' }}
       {...hoverProps}>
       <BoardCard {...boardCardProps} cardName={showName}
+        {...(hovered && overlayRarity !== undefined ? { rarity: overlayRarity } : null)}
         {...(darunter ? { tooltipDarunter: darunter, tooltipDarunterTitel: 'Also treated as a Hero' } : null)} />
       {!hovered && overlay && (
         <div className="attached-hero-badge"
@@ -35897,7 +35903,7 @@ function ReactionChainOverlay({ chain, myIdx, fx }) {
   );
 }
 
-function AbilityStack({ cards }) {
+function AbilityStack({ cards, rarities }) {
   // Gleiche Bauform wie AttachableCreatureCard oben — der Hover tauscht
   // das Bild der obersten Performance-Karte, also dieselbe Falle.
   const stackRef = useRef(null);
@@ -35919,7 +35925,8 @@ function AbilityStack({ cards }) {
         }
         return (
           <div key={ci} className="board-ability-stack-card" style={{ top: ci * 5 }}>
-            <BoardCard cardName={hovered && ci === cards.length - 1 && isTopPerformance ? 'Performance' : showName} abilityLevel={Math.min(3, cards.length)} />
+            <BoardCard cardName={hovered && ci === cards.length - 1 && isTopPerformance ? 'Performance' : showName} abilityLevel={Math.min(3, cards.length)}
+              rarity={(rarities && rarities[ci]) || undefined} />
           </div>
         );
       })}
@@ -35934,7 +35941,7 @@ function AbilityStack({ cards }) {
  * eigenen Hover-Tooltip (jede Karte ist ein eigenes `BoardCard`; unter dem Zeiger gewinnt die Karte, deren Streifen er trifft). Die Stueckzahl steht als Pixel-Ziffernbadge
  * an der obersten Karte. Der Klick geht an die Zone durch (dort oeffnet er die Galerie bzw. waehlt das Ziel).
  */
-function EquipStack({ cards, skins, geist }) {
+function EquipStack({ cards, skins, geist, rarities }) {
   const n = cards.length;
   const schritt = equipStapelVersatz(n);
   return (
@@ -35942,7 +35949,7 @@ function EquipStack({ cards, skins, geist }) {
       {cards.map((c, ci) => (
         // `geist`: die LETZTE Karte ist die Vorschau der gerade gezogenen Ausruestung (gestrichelter harter Rand statt Durchsichtigkeit).
         <div key={ci} className={'board-equip-stack-card' + (geist && ci === n - 1 ? ' board-equip-stack-geist' : '')} style={{ top: `max(${ci}px, calc(${ci * schritt}px * var(--board-scale)))`, zIndex: ci + 1 }}>
-          <BoardCard cardName={c} skins={skins} noTooltip={!!(geist && ci === n - 1)} />
+          <BoardCard cardName={c} skins={skins} noTooltip={!!(geist && ci === n - 1)} rarity={(rarities && rarities[ci]) || undefined} />
           {ci === n - 1 && n > 1 && <div className="board-equip-stack-count">{n}</div>}
         </div>
       ))}
@@ -36310,7 +36317,7 @@ function IdentityPileCard({ traegerCard, identityCard, nutzbar = false, onActiva
  * NAMEN abgehakt, und bei zwei Prototypes traf es die falsche Karte
  * (Als Befund 22.8.). Die Sortierung fuehrt den Index deshalb mit.
  */
-function PileSearchModal({ title, cards, onClose, preserveOrder = false, ownerLetheStamps = null, entries = null, onActivate = null }) {
+function PileSearchModal({ title, cards, onClose, preserveOrder = false, ownerLetheStamps = null, entries = null, onActivate = null, rarities = null }) {
   const [filter, setFilter] = useState('');
   const TYPE_ORDER = ['Hero', 'Creature', 'Spell', 'Attack', 'Artifact', 'Ability', 'Potion', 'Ascended Hero', 'Token'];
   const sorted = useMemo(() => {
@@ -36386,9 +36393,11 @@ function PileSearchModal({ title, cards, onClose, preserveOrder = false, ownerLe
                 const isCreature = card.cardType === 'Creature' && card.level != null;
                 const stamp = (isCreature && ownerLetheStamps?.[idx]) || 0;
                 const effectiveLevel = isCreature ? (card.level || 0) + stamp : null;
-                const displayCard = stamp > 0
+                const stapelRar = (rarities && rarities[idx]) || null;   // Rarity DIESES Stapelplatzes (null = Common)
+                const displayCard0 = stamp > 0
                   ? { ...card, level: effectiveLevel, _liveLevel: effectiveLevel, _stampBonus: stamp }
                   : card;
+                const displayCard = stapelRar ? { ...displayCard0, rarity: stapelRar } : displayCard0;
                 // Geliehene Identitaet (Future Tech Copy Device): die
                 // Karte liegt unter ihrem echten Namen in der Ablage,
                 // IST aber gerade eine andere. Ueberfahren zeigt, was
@@ -56719,6 +56728,10 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     const supZones = p.supportZones || [];
     const surZones = p.surpriseZones || [];
     const islandCounts = p.islandZoneCount || [0, 0, 0];
+    // Rarity je Karteninstanz dieser Seite (Server: players[i].rarity in Zonenform, null = Common; fehlt = alles Common).
+    const rar = p.rarity || {};
+    const rarAb = (hi, z) => ((rar.abilityZones || [])[hi] || [])[z] || [];
+    const rarSup = (hi, z) => ((rar.supportZones || [])[hi] || [])[z] || [];
     const ownerLabel = isOpp ? ((Number.isInteger(sideOwner) && sideOwner !== outerOppIdx) ? 'mini' + sideOwner : 'opp') : 'me';
 
     // Board skin: extract number from board ID (e.g. "board1" → "1")
@@ -57228,8 +57241,9 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                         })}
                       </div>
                     ));
+                    const heroRar = (rar.heroes || [])[i] || undefined;
                     const heroCardProps = {
-                      hp: hero.hp, maxHp: hero.maxHp, atk: hero.atk, hpPosition: 'hero',
+                      hp: hero.hp, maxHp: hero.maxHp, atk: hero.atk, hpPosition: 'hero', rarity: heroRar,
                       children: orbsEl || undefined,
                       orbs: hero.ascensionOrbs,
                       skins: p.deckSkins ? window.ppSkinMerge(gameSkins, p.deckSkins) : gameSkins, abilities: p.abilityZones?.[i],
@@ -57261,14 +57275,14 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                       return <AttachableCreatureCard
                         creatureName={hero.heldKreatur.name}
                         heldHero={hero.name}
-                        {...heroCardProps} />;
+                        {...heroCardProps} rarity={undefined} overlayRarity={heroRar} />;
                     }
                     if (hero._shapeshiftBase && CARDS_BY_NAME[hero._shapeshiftBase]) {
                       return <AttachableCreatureCard
                         creatureName={hero.name}
                         shapeshiftBase={hero._shapeshiftBase}
                         tooltipCardOverride={CARDS_BY_NAME[hero._shapeshiftBase]}
-                        {...heroCardProps} />;
+                        {...heroCardProps} rarity={undefined} overlayRarity={heroRar} />;
                     }
                     // v1188: vorgezogene Gestalt (siehe formPreview)
                     const _vorgezogen = (formPreview
@@ -57784,7 +57798,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                     selbst, nicht an ihrem Rahmen — sonst verschwand die
                     ganze Surprise Zone kurz mit (die Regel verbirgt alle
                     Kinder des markierten Elements). */}
-                <BoardZone type="surprise" cards={surZones[i] || []} faceDown={(isOpp ? !(p.surpriseKnown || [])[i] : (surZones[i] || []).length > 0) && (surZones[i] || []).every(c => c === '?')} label="Surprise" style={zs('surprise')}
+                <BoardZone type="surprise" cards={surZones[i] || []} rarities={((rar.surpriseZones || [])[i]) || undefined} faceDown={(isOpp ? !(p.surpriseKnown || [])[i] : (surZones[i] || []).length > 0) && (surZones[i] || []).every(c => c === '?')} label="Surprise" style={zs('surprise')}
                   dataAttrs={(bounceOutgoingHidden.has(`sp-${pi}-${i}`) && (surZones[i] || []).length > 0) ? { 'data-bounce-hiding': 'true' } : undefined} />
                 {/* Reduced-level badge — only when the server-computed
                     effective Surprise level differs from the printed
@@ -58063,7 +58077,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                     style={zsMerge('ability', (canActivate || attachPickZoneValid || isValidPotionTarget || isPengueSrc || isPengueDestActive) ? { cursor: 'pointer' } : undefined)}>
                     {cards.length > 0 ? (
                       <>
-                        <AbilityStack cards={cards} />
+                        <AbilityStack cards={cards} rarities={rarAb(i, z)} />
                         {/* Ladungen einer „up to X times per turn"-Ability.
                             Al will den Zaehler ausdruecklich AN DER ABILITY
                             sehen, nicht am Helden (16.8.) — Lethes
@@ -58173,6 +58187,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
               const _behalten = bounceBehalten[`${isOpp ? oppIdx : myIdx}-${i}-${z}`];
               const cards = (_behalten != null && cardsVoll.length > _behalten && _behalten > 0
                 && cardsVoll.every(n => n === cardsVoll[0])) ? cardsVoll.slice(0, _behalten) : cardsVoll;
+              const rarCards = rarSup(i, z);   // Rarity je Karte dieses Platzes (gleiche Reihenfolge wie `cards`)
               // Cross-side equip drag (Powder Keg etc.) drops onto OPP's
               // row instead of own — flip the side gate to `isOpp` when
               // the drag is flagged cross-side.
@@ -58860,7 +58875,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                     // ★ Darion: die gezogene Ausruestung kommt als Vorschau OBEN auf den Stapel (der Stapel bleibt sichtbar).
                     <EquipStack cards={[...cards, playDrag.cardName]} skins={gameSkins} geist />
                   ) : (isPlayTarget || isAutoTarget) && playDrag.card && !(cards.length > 0 && cards.every(n => n === playDrag.cardName)) ? (
-                    <BoardCard cardName={playDrag.cardName} hp={playDrag.card.hp} maxHp={playDrag.card.hp} hpPosition="creature" style={{ opacity: 0.5 }} />
+                    <BoardCard cardName={playDrag.cardName} rarity={me.rarity?.[playDrag.fromCreation ? 'creationZone' : 'hand']?.[playDrag.idx] || undefined} hp={playDrag.card.hp} maxHp={playDrag.card.hp} hpPosition="creature" style={{ opacity: 0.5 }} />
                   ) : (!isOpp && pendingAdditionalPlay && pendingAdditionalPlay.heroIdx === i && pendingAdditionalPlay.zoneSlot === z
                       && !(cards.length > 0 && cards.every(n => n === pendingAdditionalPlay.cardName))) ? (
                     <BoardCard cardName={pendingAdditionalPlay.cardName} hp={CARDS_BY_NAME[pendingAdditionalPlay.cardName]?.hp} maxHp={CARDS_BY_NAME[pendingAdditionalPlay.cardName]?.hp} hpPosition="creature" style={{ opacity: 0.6 }} />
@@ -58876,7 +58891,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                     // sah ein Stapel der Hoehe 2 wie eine einzelne
                     // Karte aus (Als Befund 5.9.).
                     if (CARDS_BY_NAME[cards[0]]?.cardType === 'Ability') {
-                      return <AbilityStack cards={cards} />;
+                      return <AbilityStack cards={cards} rarities={rarCards} />;
                     }
                     // Multi-zone Creature placeholder slot (Populated
                     // Island Turtle's `_ZoneBlocked` sentinel). The
@@ -58917,10 +58932,10 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                     if (cc?.faceDown) {
                       if (isOpp) {
                         // Opponent sees known re-set surprise: face-up, semi-transparent
-                        return <BoardCard cardName={cards[0]} style={{ opacity: 0.6, filter: 'sepia(0.3)' }} />;
+                        return <BoardCard cardName={cards[0]} rarity={rarCards[0] || undefined} style={{ opacity: 0.6, filter: 'sepia(0.3)' }} />;
                       } else {
                         // Owner sees own face-down surprise: face-up, semi-transparent (like surprise zones)
-                        return <BoardCard cardName={cards[0]} style={{ opacity: 0.6 }} />;
+                        return <BoardCard cardName={cards[0]} rarity={rarCards[0] || undefined} style={{ opacity: 0.6 }} />;
                       }
                     }
                     // ── Geliehene Identität (Future Tech Copy Device) ──
@@ -58936,6 +58951,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                       return <AttachableCreatureCard
                         creatureName={cc._ftCopyOf}
                         mimicCreature={cards[0]}
+                        overlayRarity={rarCards[0] || undefined}
                         skins={gameSkins}
                       />;
                     }
@@ -58983,8 +58999,8 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                       : undefined; return !isCreature ? (
                       <>
                         {equipStapelAnzeige
-                          ? <EquipStack cards={cards} skins={gameSkins} />
-                          : <BoardCard cardName={cards[cards.length-1]} skins={gameSkins} />}
+                          ? <EquipStack cards={cards} skins={gameSkins} rarities={rarCards} />
+                          : <BoardCard cardName={cards[cards.length-1]} skins={gameSkins} rarity={rarCards[cards.length-1] || undefined} />}
                         {ladung ? (
                           <div className={'zone-charge-badge' + (ladung.remaining === 0 ? ' zone-charge-empty' : '')}
                             onMouseEnter={e => showGameTooltip(e, ladung.max != null
@@ -59109,6 +59125,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                           return <AttachableCreatureCard
                             creatureName={cards[0]}
                             attachedHero={cc.attachedHero}
+                            rarity={rarCards[0] || undefined}
                             hp={curHp} maxHp={mHp} hpPosition="creature"
                             skins={gameSkins} style={creatureStyle}
                             tooltipCardOverride={tooltipOverride}
@@ -59137,6 +59154,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                               <AttachableCreatureCard
                                 creatureName={cards[0]}
                                 nestedUnder={cc._nestedUnder}
+                                rarity={rarCards[0] || undefined}
                                 hp={curHp} maxHp={mHp} hpPosition="creature"
                                 skins={gameSkins} style={creatureStyle}
                                 tooltipCardOverride={tooltipOverride}
@@ -59153,6 +59171,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                           return <AttachableCreatureCard
                             creatureName={cards[0]}
                             mimicCreature={cc._effectOverride}
+                            rarity={rarCards[0] || undefined}
                             hp={curHp} maxHp={mHp} hpPosition="creature"
                             skins={gameSkins} style={creatureStyle}
                             tooltipCardOverride={tooltipOverride}
@@ -59174,12 +59193,12 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                         const _effLvl = CARDS_BY_NAME[cards[0]]?.level != null || cc?._cardDataOverride?.level != null
                           ? _cardLvl + _delta + _letheBonus
                           : null;
-                        return <BoardCard cardName={cards[0]} hp={curHp} maxHp={mHp} hpPosition="creature" skins={gameSkins} style={_fremdRing ? { ...(creatureStyle || {}), ..._fremdRing } : creatureStyle} tooltipCardOverride={tooltipOverride} inheritedEffects={cc?._inheritedEffects}
+                        return <BoardCard cardName={cards[0]} rarity={rarCards[0] || undefined} hp={curHp} maxHp={mHp} hpPosition="creature" skins={gameSkins} style={_fremdRing ? { ...(creatureStyle || {}), ..._fremdRing } : creatureStyle} tooltipCardOverride={tooltipOverride} inheritedEffects={cc?._inheritedEffects}
                           effectiveLevel={_effLvl} stampBonus={_letheBonus} />;
                       })()
                     ) : (
                       <div className="board-stack">
-                        {(() => { const curHp = cc?.currentHp ?? cc?.maxHp ?? cc?._cardDataOverride?.hp ?? CARDS_BY_NAME[cards[cards.length-1]]?.hp; const mHp = cc?.maxHp ?? cc?._cardDataOverride?.hp ?? CARDS_BY_NAME[cards[cards.length-1]]?.hp; return <BoardCard cardName={cards[cards.length-1]} hp={curHp} maxHp={mHp} hpPosition="creature" label={cards.length+''} skins={gameSkins} />; })()}
+                        {(() => { const curHp = cc?.currentHp ?? cc?.maxHp ?? cc?._cardDataOverride?.hp ?? CARDS_BY_NAME[cards[cards.length-1]]?.hp; const mHp = cc?.maxHp ?? cc?._cardDataOverride?.hp ?? CARDS_BY_NAME[cards[cards.length-1]]?.hp; return <BoardCard cardName={cards[cards.length-1]} rarity={rarCards[cards.length-1] || undefined} hp={curHp} maxHp={mHp} hpPosition="creature" label={cards.length+''} skins={gameSkins} />; })()}
                       </div>
                     )}
                     {/* ── Geteilte Zone: Stueckzahl + Nachschlagen ──
@@ -59571,7 +59590,8 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                 <div key={i}
                   ref={(el) => {
                     if (!el) return;
-                    const c = revealEntry && CARDS_BY_NAME[revealEntry.name];
+                    const c0 = revealEntry && CARDS_BY_NAME[revealEntry.name];
+                    const c = c0 && revealEntry.rarity ? { ...c0, rarity: revealEntry.rarity } : c0;   // aufgedeckte Gegnerkarte in ihrer Rarity
                     el._ppTip = c ? (revealEntry.handLevel != null ? { ...c, _handNotes: [{ color: '#75f091', text: `Level ${revealEntry.handLevel} in their hand (printed ${c.level}).` }] } : c) : null;   // fuer ppHandTipp
                   }}
                   className={'board-card hand-card'
@@ -59632,13 +59652,15 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                     socket.emit('trigger_treacherous_crystal', { roomId: gameState.roomId });
                   } : undefined))}>
                   {revealEntry ? (
-                    <img src={cardImageUrl(revealEntry.name) + (revealEntry.handLevel != null ? '?lv=' + revealEntry.handLevel : '')} style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: 'inherit' }} draggable={false}
+                    <><img src={ppRarityUrl(cardImageUrl(revealEntry.name) + (revealEntry.handLevel != null ? '?lv=' + revealEntry.handLevel : ''), ppRarityOf(CARDS_BY_NAME[revealEntry.name], revealEntry.rarity))} style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: 'inherit' }} draggable={false}
                       onMouseEnter={() => {
-                        const c = CARDS_BY_NAME[revealEntry.name];
+                        const c0 = CARDS_BY_NAME[revealEntry.name];
+                        const c = c0 && revealEntry.rarity ? { ...c0, rarity: revealEntry.rarity } : c0;
                         // 23.10.: eine aufgedeckte Gegnerkarte mit gesenkter Stufe (Great Vanguard Demon) zeigt sie auf der Karte (`?lv=`, wie die eigene Hand) und im Tooltip
                         if (c) setBoardTooltip(revealEntry.handLevel != null ? { ...c, _handNotes: [{ color: '#75f091', text: `Level ${revealEntry.handLevel} in their hand (printed ${c.level}).` }] } : c);
                       }}
                       onMouseLeave={() => setBoardTooltip(null)} />
+                    {CARDS_BY_NAME[revealEntry.name] && ppRarityOf(CARDS_BY_NAME[revealEntry.name], revealEntry.rarity) !== 'common' && <CardFoil card={CARDS_BY_NAME[revealEntry.name]} rarity={ppRarityOf(CARDS_BY_NAME[revealEntry.name], revealEntry.rarity)} />}</>
                   ) : (
                     <img src={opp.cardback || "/cardback.png"} style={{ width: '100%', height: '100%', objectFit: 'cover' }} draggable={false} />
                   )}
@@ -59660,7 +59682,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                 {(opp.creationZone || []).map((cardName, ci) => (
                   <div key={'oppcz' + ci} className="creation-slot"
                     data-creation-idx={ci} data-card-name={cardName}>
-                    <BoardCard cardName={cardName} skins={gameSkins} />
+                    <BoardCard cardName={cardName} skins={gameSkins} rarity={opp.rarity?.creationZone?.[ci] || undefined} />
                   </div>
                 ))}
               </div>
@@ -59789,8 +59811,8 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           })()}
           <div className="board-util board-util-left">
             <div className="board-util-side">
-              <div data-opp-discard="1"><BoardZone type="discard" cards={ablageSicht(opp.discardPile, oppIdx, oppDiscardHidden)} label="Discard" onClick={() => setPileViewer({ title: 'Opponent Discard', pile: 'discard', cards: opp.discardPile, ownerIdx: oppIdx, isDiscard: true })} onHoverCard={setHoveredPileCard} style={oppBoardZone('discard')} ownerLetheStamps={opp.letheStamps} pileIdentities={opp.discardEntries} /></div>
-              <div data-opp-deleted="1"><BoardZone type="deleted" cards={oppDeletedHidden > 0 ? opp.deletedPile.slice(0, -oppDeletedHidden) : opp.deletedPile} label="Deleted" onClick={() => setPileViewer({ title: 'Opponent Deleted', pile: 'deleted', cards: opp.deletedPile, ownerIdx: oppIdx })} onHoverCard={setHoveredPileCard} style={oppBoardZone('delete')} ownerLetheStamps={opp.letheStamps} /></div>
+              <div data-opp-discard="1"><BoardZone type="discard" cards={ablageSicht(opp.discardPile, oppIdx, oppDiscardHidden)} label="Discard" onClick={() => setPileViewer({ title: 'Opponent Discard', pile: 'discard', cards: opp.discardPile, ownerIdx: oppIdx, isDiscard: true })} onHoverCard={setHoveredPileCard} style={oppBoardZone('discard')} ownerLetheStamps={opp.letheStamps} pileIdentities={opp.discardEntries} rarities={opp.rarity?.discardPile} /></div>
+              <div data-opp-deleted="1"><BoardZone type="deleted" cards={oppDeletedHidden > 0 ? opp.deletedPile.slice(0, -oppDeletedHidden) : opp.deletedPile} label="Deleted" onClick={() => setPileViewer({ title: 'Opponent Deleted', pile: 'deleted', cards: opp.deletedPile, ownerIdx: oppIdx })} onHoverCard={setHoveredPileCard} style={oppBoardZone('delete')} ownerLetheStamps={opp.letheStamps} rarities={opp.rarity?.deletedPile} /></div>
               <div className="board-util-spacer" />
             </div>
             {/* ★ v1472 (Als Vorgabe 28.9.: „Ganz links im Battle-Screen,
@@ -59823,8 +59845,8 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
             </div>
             <div className="board-util-side">
               <div className="board-util-spacer" />
-              <div data-my-deleted="1"><BoardZone type="deleted" cards={myDeletedHidden > 0 ? me.deletedPile.slice(0, -myDeletedHidden) : me.deletedPile} label="Deleted" onClick={() => setPileViewer({ title: 'My Deleted', pile: 'deleted', cards: me.deletedPile, ownerIdx: myIdx })} onHoverCard={setHoveredPileCard} style={myBoardZone('delete')} ownerLetheStamps={me.letheStamps} /></div>
-              <div data-my-discard="1"><BoardZone type="discard" cards={ablageSicht(me.discardPile, myIdx, myDiscardHidden)} label="Discard" onClick={() => setPileViewer({ title: 'My Discard', pile: 'discard', cards: me.discardPile, ownerIdx: myIdx, isDiscard: true })} onHoverCard={setHoveredPileCard} style={myBoardZone('discard')} ownerLetheStamps={me.letheStamps} pileIdentities={me.discardEntries}
+              <div data-my-deleted="1"><BoardZone type="deleted" cards={myDeletedHidden > 0 ? me.deletedPile.slice(0, -myDeletedHidden) : me.deletedPile} label="Deleted" onClick={() => setPileViewer({ title: 'My Deleted', pile: 'deleted', cards: me.deletedPile, ownerIdx: myIdx })} onHoverCard={setHoveredPileCard} style={myBoardZone('delete')} ownerLetheStamps={me.letheStamps} rarities={me.rarity?.deletedPile} /></div>
+              <div data-my-discard="1"><BoardZone type="discard" cards={ablageSicht(me.discardPile, myIdx, myDiscardHidden)} label="Discard" onClick={() => setPileViewer({ title: 'My Discard', pile: 'discard', cards: me.discardPile, ownerIdx: myIdx, isDiscard: true })} onHoverCard={setHoveredPileCard} style={myBoardZone('discard')} ownerLetheStamps={me.letheStamps} pileIdentities={me.discardEntries} rarities={me.rarity?.discardPile}
                 /* Liegt etwas Benutzbares in der Ablage (Future Tech
                    Prototypes), leuchtet der STAPEL — sonst muesste man
                    ihn jede Runde aufklappen, um nachzusehen. Das
@@ -60170,7 +60192,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                       ? `☠️${gameState.doomCounters?.[myIdx] || 0}/20` : null}
                     onClick={onMyAreaClick}
                     renderStack={(cards) => (
-                      <AreaStack cards={cards} entries={myAreaEntries}
+                      <AreaStack cards={cards} entries={myAreaEntries} rarities={me.rarity?.area}
                         onActivate={activateArea(myIdx)} effectLocked={isEffectLocked}
                         targeting={zielwahlFuer(myIdx)}
                         charge={(gameState.zoneCharges || []).find(c => c.zone === 'area') || null} />
@@ -60183,7 +60205,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                       ? `☠️${gameState.doomCounters?.[oppIdx] || 0}/20` : null}
                     onClick={onOppAreaClick}
                     renderStack={(cards) => (
-                      <AreaStack cards={cards} entries={oppAreaEntries}
+                      <AreaStack cards={cards} entries={oppAreaEntries} rarities={opp.rarity?.area}
                         onActivate={activateArea(oppIdx)} effectLocked={isEffectLocked}
                         targeting={zielwahlFuer(oppIdx)}
                         charge={null} />
@@ -60276,6 +60298,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                     : (fullyMasked
                         ? opp.coolnessStack[stackLen - 1]
                         : opp.coolnessStack[visibleLen - 1]);
+                  const csTopRar = (opp.rarity?.coolnessStack || [])[fullyMasked ? stackLen - 1 : visibleLen - 1] || undefined;
                   const stackTargetId = `coolness-${oppIdx}`;
                   const isValidStackTarget = isTargeting && validTargetIds.has(stackTargetId);
                   const isSelectedStackTarget = selectedSet.has(stackTargetId);
@@ -60283,13 +60306,13 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                     <div data-opp-coolness="1"
                       className={'board-coolness-slot' + (isValidStackTarget ? ' potion-target-valid' : '') + (isSelectedStackTarget ? ' potion-target-selected' : '')}
                       onClick={isValidStackTarget ? () => togglePotionTarget(stackTargetId)
-                        : (stackLen > 0 ? () => setPileViewer({ title: 'Opponent Coolness Stack', cards: opp.coolnessStack, preserveOrder: true }) : undefined)}
-                      onMouseEnter={() => topName && !fullyMasked && setHoveredPileCard && setHoveredPileCard(topName)}
+                        : (stackLen > 0 ? () => setPileViewer({ title: 'Opponent Coolness Stack', cards: opp.coolnessStack, preserveOrder: true, rarities: opp.rarity?.coolnessStack }) : undefined)}
+                      onMouseEnter={() => topName && !fullyMasked && setHoveredPileCard && setHoveredPileCard(csTopRar ? { name: topName, rarity: csTopRar } : topName)}
                       onMouseLeave={() => setHoveredPileCard && setHoveredPileCard(null)}
                       style={isValidStackTarget ? { cursor: 'pointer' } : undefined}>
                       {topName ? (
                         <div style={fullyMasked ? { visibility: 'hidden' } : undefined}>
-                          <BoardCard cardName={topName} label={visibleLen > 1 ? `${visibleLen}` : null} />
+                          <BoardCard cardName={topName} rarity={csTopRar} label={visibleLen > 1 ? `${visibleLen}` : null} />
                         </div>
                       ) : (
                         // Empty placeholder — same dimensions as a card
@@ -60358,6 +60381,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                     : (fullyMasked
                         ? me.coolnessStack[stackLen - 1]
                         : me.coolnessStack[visibleLen - 1]);
+                  const csTopRar = (me.rarity?.coolnessStack || [])[fullyMasked ? stackLen - 1 : visibleLen - 1] || undefined;
                   const stackTargetId = `coolness-${myIdx}`;
                   const isValidStackTarget = isTargeting && validTargetIds.has(stackTargetId);
                   const isSelectedStackTarget = selectedSet.has(stackTargetId);
@@ -60381,7 +60405,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                     ? () => togglePotionTarget(stackTargetId)
                     : canPlayFromStack
                       ? () => socket.emit('play_from_coolness_stack', { roomId: gameState.roomId })
-                      : (stackLen > 0 ? () => setPileViewer({ title: 'My Coolness Stack', cards: me.coolnessStack, preserveOrder: true }) : undefined);
+                      : (stackLen > 0 ? () => setPileViewer({ title: 'My Coolness Stack', cards: me.coolnessStack, preserveOrder: true, rarities: me.rarity?.coolnessStack }) : undefined);
                   return (
                     <div data-my-coolness="1"
                       className={'board-coolness-slot'
@@ -60389,12 +60413,12 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                         + (isSelectedStackTarget ? ' potion-target-selected' : '')
                         + (canPlayFromStack ? ' coolness-playable' : '')}
                       onClick={onStackClick}
-                      onMouseEnter={() => topName && !fullyMasked && setHoveredPileCard && setHoveredPileCard(topName)}
+                      onMouseEnter={() => topName && !fullyMasked && setHoveredPileCard && setHoveredPileCard(csTopRar ? { name: topName, rarity: csTopRar } : topName)}
                       onMouseLeave={() => setHoveredPileCard && setHoveredPileCard(null)}
                       style={(isValidStackTarget || canPlayFromStack) ? { cursor: 'pointer' } : undefined}>
                       {topName ? (
                         <div style={fullyMasked ? { visibility: 'hidden' } : undefined}>
-                          <BoardCard cardName={topName} label={visibleLen > 1 ? `${visibleLen}` : null} />
+                          <BoardCard cardName={topName} rarity={csTopRar} label={visibleLen > 1 ? `${visibleLen}` : null} />
                         </div>
                       ) : (
                         <div style={{ width: 'var(--zone-w, 68px)', height: 'var(--zone-h, 95px)' }} />
@@ -60796,9 +60820,9 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                     }}
                     onMouseDown={(e) => onHandMouseDown(e, item.origIdx)}
                     onTouchStart={(e) => onHandMouseDown(e, item.origIdx)}
-                    onMouseEnter={() => isAnyDiscard && setHoveredPileCard(item.card)}
+                    onMouseEnter={() => isAnyDiscard && setHoveredPileCard(me.rarity?.hand?.[item.origIdx] ? { name: item.card, rarity: me.rarity.hand[item.origIdx] } : item.card)}
                     onMouseLeave={() => isAnyDiscard && setHoveredPileCard(null)}>
-                    <BoardCard cardName={item.card} noTooltip={isAnyDiscard} skins={gameSkins}
+                    <BoardCard cardName={item.card} noTooltip={isAnyDiscard} skins={gameSkins} rarity={me.rarity?.hand?.[item.origIdx] || undefined}
                       handLevel={handEffectiveLevel} handCost={handEffectiveCost} handNotes={handNotes} />
                     {istFrischErschienen(item.origIdx) && <HandMaterializeFxInline />}
                     {(me.handApplause?.[item.origIdx] > 0) && <ApplauseBadge n={me.handApplause[item.origIdx]} hand akey={`h:${myIdx}:${item.origIdx}`} />}
@@ -60867,7 +60891,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                         onHandMouseDown(e, item.origIdx, true);
                       }}
                       onTouchStart={(e) => { if (!czPrompt) onHandMouseDown(e, item.origIdx, true); }}>
-                      <BoardCard cardName={cardName} skins={gameSkins} />
+                      <BoardCard cardName={cardName} skins={gameSkins} rarity={me.rarity?.creationZone?.[item.origIdx] || undefined} />
                     </div>
                   );
                 })}
@@ -60901,7 +60925,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       {/* Floating draw animation cards (outside game-layout to avoid overflow clip) */}
       {!isSpectator && drawAnimCards.map(anim => (
         <DrawAnimCard key={anim.id} cardName={anim.cardName} origIdx={anim.origIdx}
-          startX={anim.startX} startY={anim.startY} dimmed={getCardDimmed(anim.cardName)} />
+          startX={anim.startX} startY={anim.startY} dimmed={getCardDimmed(anim.cardName)} rarity={me.rarity?.hand?.[anim.origIdx] || undefined} />
       ))}
       {oppDrawAnims.map(anim => (
         <OppDrawAnimCard key={anim.id} startX={anim.startX} startY={anim.startY}
@@ -60994,12 +61018,12 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       {/* Floating drag card (outside game-layout to avoid overflow clip) */}
       {handDrag && (
         <div className="hand-floating-card" style={{ left: 0, top: 0, transform: `translate3d(${handDrag.mouseX - (handDrag.griffX ?? 32)}px, ${handDrag.mouseY - (handDrag.griffY ?? 45)}px, 0) rotate(3deg)` }}>
-          <BoardCard cardName={handDrag.cardName} />
+          <BoardCard cardName={handDrag.cardName} rarity={me.rarity?.[handDrag.fromCreation ? 'creationZone' : 'hand']?.[handDrag.idx] || undefined} />
         </div>
       )}
       {playDrag && (
         <div className="hand-floating-card" style={{ left: 0, top: 0, transform: `translate3d(${playDrag.mouseX - (playDrag.griffX ?? 32)}px, ${playDrag.mouseY - (playDrag.griffY ?? 45)}px, 0) rotate(3deg)` }}>
-          <BoardCard cardName={playDrag.cardName} />
+          <BoardCard cardName={playDrag.cardName} rarity={me.rarity?.[playDrag.fromCreation ? 'creationZone' : 'hand']?.[playDrag.idx] || undefined} />
         </div>
       )}
       {/* Stufen-Hinweis beim Ziehen einer Karte mit heldenabhängiger Stufe (You are the Chosen One!!!): die Stufe, die sie für den Helden unter dem Zeiger hätte. Auf Wurzelebene (über
@@ -62083,6 +62107,9 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           // Klicken darf nur der Besitzer in seinem Zug — der Server
           // prüft beides noch einmal, aber ein Angebot, das nicht
           // klickbar sein darf, gehört gar nicht erst gezeigt.
+          rarities={pileViewer.ownerIdx != null && pileViewer.pile
+            ? (gameState.players?.[pileViewer.ownerIdx]?.rarity?.[pileViewer.pile === 'discard' ? 'discardPile' : 'deletedPile'] || null)
+            : (pileViewer.rarities || null)}
           onActivate={pileViewer.ownerIdx === myIdx && pileViewer.isDiscard
             ? (eintrag) => {
               socket.emit('activate_discard_effect', {
