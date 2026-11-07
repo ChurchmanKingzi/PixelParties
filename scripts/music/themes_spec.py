@@ -73,6 +73,8 @@ HERO_TITLES = {
     'shapeshifter': ('???, the Shapeshifter', 'A Thousand Borrowed Faces'),
     # Champion: Champion, the Stormbringer und Champion, the Eye of the Storm teilen sich den Slug 'champion' (Namensregel).
     'champion': ('Champion, the Stormbringer', 'Eye of the Storm, Hand on the Hilt'),
+    'broghan': ('Broghan, the Frozen Guardian of the North', 'Older Than the Ice'),
+    'kyli': ('Kyli, the Deceptive Sapling', 'Field Trip to the Old Tree'),
 }
 
 # Skill Test (bis zu 8 Spieler, zufällige Layouts): fünf gleichwertige Kampfmusiken `bgm_skilltest1…5.ogg`,

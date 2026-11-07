@@ -43,6 +43,27 @@ window.ppZustandVeraltet = ppZustandVeraltet;
    ============================================================ */
 const { useState, useEffect, useLayoutEffect, useRef, useCallback, useMemo, createContext, useContext } = React;
 
+// ★ BILDSCHIRMTASTATUR NICHT VON SELBST AUFKLAPPEN (Als Befund 2.11.: „bei einem Mobile-Nutzer war die On-Screen-Tastatur angesprungen"): auf Touch-Geräten
+// (`pointer: coarse`) klappt jedes PROGRAMMATISCHE `focus()` auf ein Texteingabefeld die Tastatur auf — `autoFocus` (Such-/Filterfelder, Auth, Puzzle-Dialoge …)
+// ebenso wie `ref.current.focus()`. Antippen eines Felds fokussiert nativ und ist davon nicht betroffen. Hier wird das programmatische Fokussieren von Text-
+// feldern unterdrückt, AUSSER das Feld trägt `data-pp-tastatur="an"` (Eingaben, die der Nutzer gerade ausdrücklich gewollt hat: Umbenennen, Texteingabe-Dialog,
+// Chat-Nachricht). Mit Maus (Desktop, auch Touch-Notebooks mit Maus) ändert sich nichts.
+(function () {
+  try {
+    if (!window.matchMedia || !window.matchMedia('(pointer: coarse)').matches) return;
+    const TEXT = new Set(['text', 'search', 'email', 'password', 'number', 'tel', 'url', '']);
+    const bremsen = (Klasse) => {
+      const orig = Klasse.prototype.focus;
+      Klasse.prototype.focus = function () {
+        const art = this instanceof HTMLTextAreaElement ? '' : (this.getAttribute('type') || 'text').toLowerCase();
+        if (TEXT.has(art) && !(this.dataset && this.dataset.ppTastatur === 'an')) return;   // Tastatur bleibt zu
+        return orig.apply(this, arguments);
+      };
+    };
+    bremsen(HTMLInputElement); bremsen(HTMLTextAreaElement);
+  } catch (e) { /* ohne Bremse: altes Verhalten */ }
+})();
+
 // ===== TOUCH DETECTION =====
 window._isTouchDevice = false;
 window.addEventListener('touchstart', function onFirstTouch() {
@@ -445,6 +466,10 @@ function _ppAlphaStufe(a, x, y) {
 
 /** Pixelgroesse in Bildschirmpunkten (v1446: 2 statt 3 — mehr, feinere Pixel). */
 const PP_PX_GROESSE = 2;
+/** Zelle der Pixelbilder (Rahmen, Scheine, Ellipsen, Verlaeufe): im Kampf das Hero-Pixel (pixel-anim.js `standardRaster`: 1080p 3, 720p/Handy 2), sonst PP_PX_GROESSE. */
+function ppPxZelle() {
+  try { const pa = window.PPPixelAnim; return (pa && pa.standardRaster && pa.KONFIG.aktiv) ? pa.standardRaster() : PP_PX_GROESSE; } catch (e) { return PP_PX_GROESSE; }
+}
 
 /** Pixelzahl fuer eine Seite: ~PP_PX_GROESSE px pro Pixel, schmale Baender (Ringe) bekommen mehr. */
 function _ppAufloesung(v, laengePx) {
@@ -454,7 +479,7 @@ function _ppAufloesung(v, laengePx) {
     if (d > 0.001 && d < minLuecke) minLuecke = d;
   }
   const fuerRinge = Math.min(96, Math.ceil(2.2 / (minLuecke * 0.707)));
-  const fuerGroesse = laengePx > 0 ? Math.round(laengePx / PP_PX_GROESSE) : 32;
+  const fuerGroesse = laengePx > 0 ? Math.round(laengePx / ppPxZelle()) : 32;
   return Math.max(2, Math.min(160, Math.max(fuerGroesse, laengePx > 0 && laengePx < 24 ? 0 : fuerRinge)));
 }
 
@@ -1402,7 +1427,7 @@ function ppPxPartikelUrl(farbe) {
  */
 function ppPxRahmenUrl(farbe, dicke, w, h, radius) {
   const f = ppFarbe(farbe);
-  const P = PP_PX_GROESSE;
+  const P = ppPxZelle();
   const nx = Math.max(2, Math.round(w / P)), ny = Math.max(2, Math.round(h / P));
   const d = Math.max(1, Math.round(dicke / P));
   const rund = radius >= Math.min(w, h) / 2 - 0.5;
@@ -1439,11 +1464,11 @@ function ppPxRahmenUrl(farbe, dicke, w, h, radius) {
  */
 function ppPxHaloUrl(farbe, w, h, rand, rund) {
   const f = ppFarbe(farbe);
-  const P = PP_PX_GROESSE;
+  const P = ppPxZelle();
   const W = w + 2 * rand, H = h + 2 * rand;
   const nx = Math.max(2, Math.round(W / P)), ny = Math.max(2, Math.round(H / P));
   const qr = Math.max(1, Math.round(rand / 2) * 2);
-  return ppPxBild(`hl:${f.join(',')}:${Math.round(w / 4)}x${Math.round(h / 4)}:${qr}:${rund ? 1 : 0}`, nx, ny, (setze) => {
+  return ppPxBild(`hl:${f.join(',')}:${Math.round(w / 4)}x${Math.round(h / 4)}:${qr}:${rund ? 1 : 0}:${P}`, nx, ny, (setze) => {
     for (let y = 0; y < ny; y++) for (let x = 0; x < nx; x++) {
       const u = (x + 0.5) * P - W / 2, v = (y + 0.5) * P - H / 2;   // px relativ zur Mitte
       let abstand;
@@ -1464,7 +1489,7 @@ function ppPxHaloUrl(farbe, w, h, rand, rund) {
 
 /** Pixelige Ellipse als Maske in Elementgroesse (runde Flaechen behalten ihre Form). */
 function ppPxEllipseUrl(w, h) {
-  const P = PP_PX_GROESSE;
+  const P = ppPxZelle();
   const nx = Math.max(2, Math.round(w / P / 2) * 2), ny = Math.max(2, Math.round(h / P / 2) * 2);
   return ppPxBild('el:' + nx + 'x' + ny, nx, ny, (setze) => {
     for (let y = 0; y < ny; y++) for (let x = 0; x < nx; x++) {
@@ -1909,7 +1934,7 @@ function ppPixelPartikel(canvas, teile, opt) {
   const bild = g.createImageData(W, H), d = bild.data;
   const schritt = (t) => {
     id = 0; if (aus) return;
-    const dt = letzt ? Math.min(3, (t - letzt) / 16.667) : 1; letzt = t;
+    const dt = (letzt ? Math.min(3, (t - letzt) / 16.667) : 1) * (opt.tempo ? opt.tempo() : 1); letzt = t;   // opt.tempo(): Zeitfaktor (Shop: ×5-Modus)
     d.fill(0);
     let lebt = false;
     for (const p of teile) {
@@ -1935,6 +1960,123 @@ function ppPixelPartikel(canvas, teile, opt) {
   return () => { aus = true; if (id) caf(id); };
 }
 window.ppPixelPartikel = ppPixelPartikel;
+
+// ═══ RANG-RAHMEN (Duplikate) ═══════════════════════════════════════════
+// Zieht man ein Item mehrfach, bekommt es dauerhaft einen Rahmen (public/rank-frames.js): 1 Kopie über das Original = Silber … 8 = Obsidian.
+// Es gibt EINE Rahmenstufe, überall gleich. Der Rahmen liegt innerhalb der Bildkante und wird FEST IN DAS BILD EINGEBACKEN, darum zeigt jedes
+// `<img>` ihn ohne weiteren Aufwand:
+//   Avatar / Sleeve   ppRankFrames.bakeUrl(url, kind, rank) → data-URL;  Hook useFramedSrc / <FramedImg>;  im Duell useFramedPlayer(p)
+//   Skin-Karten       `?rahmen=<Kopien>` an der Karten-URL (card-image-shim.js backt ihn beim Zeichnen der Karte ein);
+//                     cardImageUrl(held, skins) hängt ihn selbst an, wenn dem Skin-Objekt Ränge zugeordnet sind (ppSkinRanksSet / ppSkinMerge)
+/** Karten-URL ohne `?rahmen=N` (Tooltips zeigen den Rang-Rahmen nie). */
+function ppOhneRahmen(url) { return url ? url.replace(/[?&]rahmen=\d+/, '') : url; }
+/** Item-Id eines Avatars/Sleeves aus seiner URL (wie frame-ids.js im Server): Shop-Item → Id, Standard-Avatar → 'std:<Name>', Standard-Sleeve → 'default'. */
+function ppShopIdOfUrl(url, subdir) {
+  const u = String(url || '').split('?')[0];
+  const dec = (x) => { try { return decodeURIComponent(x); } catch { return x; } };
+  let m = new RegExp('^/data/shop/' + subdir + '/([^/]+)\\.[a-z]+$', 'i').exec(u);
+  if (m) return dec(m[1]);
+  if (subdir === 'avatars') { m = /^\/avatars\/([^/]+)\.[a-z]+$/i.exec(u); if (m) return 'std:' + dec(m[1]); }
+  if (subdir === 'sleeves' && (!u || u === '/cardback.png')) return 'default';
+  return null;
+}
+function ppFrameRank(dupes) { return window.ppRankFrames ? window.ppRankFrames.rankOf(dupes) : null; }
+const _ppSkinRanks = new WeakMap();           // Skin-Zuordnung { Held: Skin } → { Held: Kopien }
+/** Ordnet einer Skin-Zuordnung (Held → Skin) die Ränge zu (`ranksBySkin`: Skin → Kopien, so schickt sie der Server). Liefert dieselbe Zuordnung zurück. */
+function ppSkinRanksSet(skins, ranksBySkin) {
+  if (!skins || typeof skins !== 'object') return skins;
+  const byHero = {};
+  for (const [hero, skin] of Object.entries(skins)) { const d = ranksBySkin && ranksBySkin[skin]; if (d) byHero[hero] = d; }
+  if (Object.keys(byHero).length) _ppSkinRanks.set(skins, byHero); else _ppSkinRanks.delete(skins);
+  return skins;
+}
+/** Wie `{ ...a, ...b }` für Skin-Zuordnungen, nimmt aber die Ränge mit (der Spätere gewinnt je Held). */
+function ppSkinMerge(...parts) {
+  const out = {}, ranks = {};
+  for (const o of parts) {
+    if (!o) continue;
+    Object.assign(out, o);
+    const r = _ppSkinRanks.get(o);
+    for (const h of Object.keys(o)) { if (r && r[h]) ranks[h] = r[h]; else delete ranks[h]; }
+  }
+  if (Object.keys(ranks).length) _ppSkinRanks.set(out, ranks);
+  return out;
+}
+/** Quelle mit eingebackenem Rahmen: gibt zuerst die Original-URL, sobald der Rahmen fertig ist die gebackene zurück. */
+function useFramedSrc(src, kind, dupes) {
+  const rank = ppFrameRank(dupes);
+  const [baked, setBaked] = useState(null);
+  useEffect(() => {
+    setBaked(null);
+    if (rank == null || !src) return undefined;
+    let live = true;
+    window.ppRankFrames.bakeUrl(src, kind, rank).then(u => { if (live) setBaked(u); });
+    return () => { live = false; };
+  }, [src, kind, rank]);
+  return (rank != null && baked) || src;
+}
+/** <img> mit Rahmen nach Kopienzahl (`dupes` 0 / fehlt: ohne Rahmen). */
+function FramedImg({ src, kind = 'card', dupes, ...rest }) {
+  return <img src={useFramedSrc(src, kind, dupes)} {...rest} />;
+}
+/** Spieler im Duell: Avatar und Sleeve mit Rahmen (nach avatarRank / cardbackRank), sonst unverändert dasselbe Objekt. */
+function useFramedPlayer(p) {
+  const aR = p ? ppFrameRank(p.avatarRank) : null, cR = p ? ppFrameRank(p.cardbackRank) : null;
+  const avatar = p && p.avatar, cardback = p && p.cardback;
+  const av = useFramedSrc(aR != null ? avatar : null, 'avatar', p && p.avatarRank);
+  const cb = useFramedSrc(cR != null ? cardback : null, 'sleeve', p && p.cardbackRank);
+  return useMemo(() => {
+    if (!p || ((aR == null || !av || av === avatar) && (cR == null || !cb || cb === cardback))) return p;
+    return { ...p, avatar: (aR != null && av) || p.avatar, cardback: (cR != null && cb) || p.cardback };
+  }, [p, av, cb, aR, cR]);
+}
+// ── Avatar-Rahmen für Spieler überall (Menü, Chat, Spielerlisten …) ──
+// Der Rang hängt am Spieler (Name): bekannt aus dem Spielzustand (explizit übergeben) oder per Sammelabfrage /players/avatar-ranks.
+const _ppAv = { ranks: new Map(), asked: new Map(), pending: new Set(), subs: new Set(), timer: null };
+const PP_AV_TTL = 90000;
+function _ppAvNotify() { _ppAv.subs.forEach(f => { try { f(); } catch {} }); }
+function ppAvatarRankSet(name, dupes) {
+  if (!name) return;
+  _ppAv.ranks.set(name, dupes || 0); _ppAv.asked.set(name, Date.now()); _ppAvNotify();
+}
+function _ppAvFlush() {
+  _ppAv.timer = null;
+  const names = [..._ppAv.pending]; _ppAv.pending.clear();
+  if (!names.length) return;
+  fetch('/api/players/avatar-ranks?' + names.map(n => 'n=' + encodeURIComponent(n)).join('&'))
+    .then(r => r.json()).catch(() => ({ ranks: {} }))
+    .then(j => { for (const n of names) { _ppAv.ranks.set(n, (j.ranks && j.ranks[n]) || 0); _ppAv.asked.set(n, Date.now()); } _ppAvNotify(); });
+}
+function _ppAvAsk(name) {
+  const t = _ppAv.asked.get(name);
+  if ((t && Date.now() - t < PP_AV_TTL) || _ppAv.pending.has(name)) return;
+  _ppAv.pending.add(name);
+  if (!_ppAv.timer) _ppAv.timer = setTimeout(_ppAvFlush, 40);
+}
+/** Avatar oder Rang eines Spielers hat sich geändert (Pull, Avatarwechsel): beim nächsten Zeichnen neu erfragen. */
+function ppAvatarRankForget(name) {
+  if (!name) return;
+  _ppAv.asked.delete(name); _ppAv.pending.add(name);
+  if (!_ppAv.timer) _ppAv.timer = setTimeout(_ppAvFlush, 40);
+}
+function usePlayerAvatarRank(name, explicit) {
+  const [, bump] = useState(0);
+  useEffect(() => {
+    const f = () => bump(n => n + 1);
+    _ppAv.subs.add(f);
+    return () => { _ppAv.subs.delete(f); };
+  }, []);
+  useEffect(() => { if (explicit == null && name) _ppAvAsk(name); }, [name, explicit]);
+  return explicit != null ? explicit : (_ppAv.ranks.get(name) || 0);
+}
+/** Spieler-Avatar mit Rang-Rahmen. `rank` (Kopien) ist optional: ohne ihn wird er über den Namen erfragt. */
+function PlayerAvatar({ name, src, rank, className, ...rest }) {
+  const d = usePlayerAvatarRank(name, rank);
+  return <FramedImg src={src} kind="avatar" dupes={d} className={(className || '') + (d > 0 ? ' pp-av-ranked' : '')} {...rest} />;
+}
+window.ppAvatarRankSet = ppAvatarRankSet; window.ppAvatarRankForget = ppAvatarRankForget; window.usePlayerAvatarRank = usePlayerAvatarRank; window.PlayerAvatar = PlayerAvatar;
+window.ppOhneRahmen = ppOhneRahmen; window.ppShopIdOfUrl = ppShopIdOfUrl; window.ppFrameRank = ppFrameRank; window.ppSkinRanksSet = ppSkinRanksSet; window.ppSkinMerge = ppSkinMerge;
+window.useFramedSrc = useFramedSrc; window.FramedImg = FramedImg; window.useFramedPlayer = useFramedPlayer;
 
 window.PxZeichen = PxZeichen;
 window.PxIcon = PxIcon;
@@ -2065,6 +2207,8 @@ const SFX_NAMES = [
   'summon', 'sunglasses_drop', 'turn_start', 'ui_cancel', 'ui_click',
   'ui_error', 'ui_prompt_open', 'victory',
   'doom_tick',   // v1421: Uhrzeiger-Tick der Doom Clock (synthetisiert)
+  // Shop-Pull-Inszenierung (synthetisiert, scripts/sfx/pull-sounds.py)
+  'pull_circle', 'pull_crack', 'pull_note', 'pull_swell', 'pull_shatter', 'pull_reveal', 'pull_sparkle',
 ];
 
 let _sfxCtx = null;
@@ -4151,7 +4295,38 @@ const ZONE_ANIM_SFX = {
   // zum Animationsstart (ZONE_ANIM_MOUNT_DELAY_MS) rechnet
   // `playSFXForZoneAnim` selbst dazu, damit die beiden Zahlen nicht
   // auseinanderlaufen koennen.
-  magic_hammer:            { name: 'heavy_impact', opts: { delay: 340 } },
+  // Hammer-Animationen (app-fx-57): geschwungene Waffe, EIN Schlag; die Zeiten sind die Bilder der Animation (30 Hz) ab Mount — Treffer MH bei Bild 33 (1100 ms), HH bei Bild 28 (933 ms), HS bei Bild 24 (800 ms).
+  // Heftigkeit: Magic Hammer 1,0 (tief gepitcht, mehrfach geschichtet) · Heavy Hit 0,6 · Hammer Skeleton 0,35 (hoch, leise). Der Schaden-Klang (`damage`) kommt wie bisher mit dem Zustandsvergleich.
+  magic_hammer: [
+    { name: 'booster_card_whoosh', opts: { volume: 0.5, rate: 0.5, delay: 1 } },
+    { name: 'booster_card_whoosh', opts: { volume: 0.65, rate: 0.55, delay: 967 } },
+    { name: 'booster_card_whoosh', opts: { volume: 0.85, rate: 0.5, delay: 1033 } },
+    { name: 'heavy_impact', opts: { volume: 1.0, rate: 0.6, delay: 1100 } },
+    { name: 'heavy_impact', opts: { volume: 0.6, rate: 0.85, delay: 1100 } },
+    { name: 'attack_ram', opts: { volume: 0.75, rate: 0.6, delay: 1100 } },
+    { name: 'pull_crack', opts: { volume: 0.9, rate: 0.7, delay: 1133 } },
+    { name: 'heavy_impact', opts: { volume: 0.5, rate: 0.45, delay: 1200 } },
+    { name: 'booster_card_whoosh', opts: { volume: 0.5, rate: 0.6, delay: 1500 } },
+    { name: 'booster_card_land', opts: { volume: 0.5, rate: 0.5, delay: 1433 } },
+    { name: 'booster_card_land', opts: { volume: 0.35, rate: 0.45, delay: 1533 } },
+  ],
+  heavy_hit_smash: [
+    { name: 'booster_card_whoosh', opts: { volume: 0.55, rate: 0.65, delay: 800 } },
+    { name: 'booster_card_whoosh', opts: { volume: 0.7, rate: 0.6, delay: 867 } },
+    { name: 'heavy_impact', opts: { volume: 0.75, rate: 0.95, delay: 933 } },
+    { name: 'attack_ram', opts: { volume: 0.45, rate: 1.0, delay: 933 } },
+    { name: 'pull_crack', opts: { volume: 0.5, rate: 1.0, delay: 967 } },
+    { name: 'booster_card_land', opts: { volume: 0.35, rate: 0.6, delay: 1133 } },
+    { name: 'booster_card_whoosh', opts: { volume: 0.4, rate: 0.7, delay: 1200 } },
+  ],
+  hammer_skeleton_smash: [
+    { name: 'booster_card_whoosh', opts: { volume: 0.35, rate: 0.85, delay: 700 } },
+    { name: 'booster_card_whoosh', opts: { volume: 0.4, rate: 0.8, delay: 767 } },
+    { name: 'heavy_impact', opts: { volume: 0.45, rate: 1.25, delay: 800 } },
+    { name: 'pull_crack', opts: { volume: 0.4, rate: 1.3, delay: 833 } },
+    { name: 'booster_card_land', opts: { volume: 0.3, rate: 0.9, delay: 933 } },
+    { name: 'booster_card_whoosh', opts: { volume: 0.25, rate: 0.9, delay: 967 } },
+  ],
   // Shattering Strike (v814): kleinerer Hammer, dumpferer Einschlag mit Erde.
   shattering_strike:       { name: 'heavy_impact', opts: { rate: 1.15, volume: 0.85, delay: 300 } },
   tiger_impact:            { name: 'heavy_impact' },
@@ -4970,6 +5145,8 @@ const ZONE_ANIM_NONEFFECT = new Set([
   // belegt und der Thud fiel komplett aus; der erste Klang NACH dem
   // sichtbaren Aufprall war dann der `damage`-Cue bei ~900ms.
   'magic_hammer',
+  'heavy_hit_smash',
+  'hammer_skeleton_smash',
   // v1422 (Als Befund 25.9.: „den Sound hoere ich im Spiel nicht"): der
   // Doom-Tick kommt fast immer im selben Augenblick wie andere Effekt-
   // Klaenge (Rundenende, Besiegung) und wurde von der 'effect'-Sperre
@@ -5778,7 +5955,8 @@ window.matchesStartingAbilities = matchesStartingAbilities;
 function cardImageUrl(cardName, skinOverrides) {
   // If a skin is selected for this card, use the skin image
   if (skinOverrides && skinOverrides[cardName]) {
-    return '/cards/skins/' + encodeURIComponent(skinOverrides[cardName]) + '.png';
+    const dupes = (_ppSkinRanks.get(skinOverrides) || {})[cardName];   // Rang-Rahmen des Skins (Duplikate), vom Karten-Shim eingebacken
+    return '/cards/skins/' + encodeURIComponent(skinOverrides[cardName]) + '.png' + (dupes ? '?rahmen=' + dupes : '');
   }
   const file = window.AVAILABLE_MAP[cardName];
   return file ? '/cards/' + encodeURIComponent(file) : null;
@@ -6682,6 +6860,8 @@ function FoilOverlay({ bands, motes, sparkles, shimmerOffset, foilType, klein, f
   const posn = isDiamond ? DIAMOND_SPARKLE_POSITIONS : SPARKLE_POSITIONS;
   // Brett mit vielen Foil-Karten: nur so viele Funken + Staubkoerner, wie `teilchen` erlaubt (siehe `foilBrettTeilchen`).
   const { funken: nFunken, staub: nStaub } = foilTeilchenAnteil(posn.length, (motes || []).length, teilchen);
+  // app-fx-35: Funken + Staub als EINE Leinwand (statt ~18 DOM-Elemente mit Endlos-Animation); Kleinansicht/Telefon/ohne Pipeline: wie bisher.
+  const cvFoil = !klein && !!window.PpFx35Foil && !!window.ppFx35FoilAn && window.ppFx35FoilAn();
   return (
     <div className={'foil-shine-overlay' + (isDiamond ? ' foil-shine-diamond' : '') + (klein ? ' foil-klein' : '')} data-foil-key={fkey}>
       {/* 1) Die Praegung der Folie. Fuer sich genommen kaum zu sehen —
@@ -6707,6 +6887,7 @@ function FoilOverlay({ bands, motes, sparkles, shimmerOffset, foilType, klein, f
         }} />
       ))}
       {/* 4) Glanzpunkte und Staub. */}
+      {cvFoil ? <window.PpFx35Foil posn={posn} sparkles={sparkles} motes={motes} nFunken={nFunken} nStaub={nStaub} diamond={isDiamond} fkey={fkey} /> : <>
       {posn.map((sp, i) => {
         if (klein && i % FOIL_KLEIN_FUNKEN_JEDER !== 0) return null;   // v1298
         if (!foilBehalten(i, posn.length, nFunken)) return null;
@@ -6732,6 +6913,7 @@ function FoilOverlay({ bands, motes, sparkles, shimmerOffset, foilType, klein, f
           '--mote-o': m.o.toFixed(2),
         }} />
       ))}
+      </>}
     </div>
   );
 }
@@ -7242,6 +7424,24 @@ window.PpLogoBild = PpLogoBild;
 // Gezeichnet als SVG mit `crispEdges` — scharfe Bloecke in jeder Groesse,
 // je Farbe EIN Pfad aus Zeilenlaeufen.
 const PIXEL_ICONS = {
+  auge: [
+    '...#####...',
+    '.##.....##.',
+    '#...###...#',
+    '#..#####..#',
+    '#...###...#',
+    '.##.....##.',
+    '...#####...',
+  ],
+  augeZu: [
+    '#..#####...',
+    '.##.....##.',
+    '#..####...#',
+    '#..#####..#',
+    '#...####..#',
+    '.##.....##.',
+    '...#####..#',
+  ],
   discord: [
     '...##..........##...',
     '..#####......#####..',
@@ -7604,8 +7804,11 @@ function spawnZoneLandFx(el, opts) {
   // Funken in alle Richtungen — vom Einschlag UND von der Beschwoerung
   // genutzt (★ v1209, Als Befund: „zu klein, weil sie nicht die ganze
   // Karte highlightet").
+  // Funken-Daten für die Leinwand (app-fx-44, `ppFx44Funken`): ein Einschlag = EINE Leinwand statt 10–15 CSS-animierter Knoten (die der Backer je Start abtasten musste).
+  const funkenDaten = [];
   const funkenHtml = (anzahl) => {
     const out = [];
+    const leinwand = !!window.ppFx44Funken && !window.__ppFxAlt;
     for (let i = 0; i < anzahl; i++) {
       const w = (i / anzahl) * Math.PI * 2 + (Math.random() - 0.5) * 0.7;
       const weite = r.width * (0.45 + Math.random() * 0.45);
@@ -7615,6 +7818,10 @@ function spawnZoneLandFx(el, opts) {
       // eigene Flugbahn — ein runder Punkt allein liest sich bei dieser
       // Groesse als Staubkorn, nicht als Funkenflug.
       const winkelGrad = Math.atan2(dy, dx) * 180 / Math.PI;
+      if (leinwand) {
+        funkenDaten.push({ dx, dy, dur: 560 + Math.random() * 380, delay: Math.random() * 110, ang: winkelGrad, len: 7 + Math.random() * 9, dick: 2 + Math.random() * 2 });
+        continue;
+      }
       out.push(`<i class="zone-land-spark" style="--zdx:${dx.toFixed(0)}px;--zdy:${dy.toFixed(0)}px;`
         + `--zdur:${(560 + Math.random() * 380).toFixed(0)}ms;`
         + `--zdelay:${(Math.random() * 110).toFixed(0)}ms">`
@@ -7701,6 +7908,7 @@ function spawnZoneLandFx(el, opts) {
     teileS.push(...funkenHtml(n));
     oben.innerHTML = teileS.join('');
     schicht().appendChild(oben);
+    if (funkenDaten.length) window.ppFx44Funken(oben, funkenDaten, farbe);
     setTimeout(() => oben.remove(), ZONE_FX_SUMMON_MS + 150);
     return;
   }
@@ -7709,9 +7917,15 @@ function spawnZoneLandFx(el, opts) {
   box.className = 'zone-land-fx';
   box.style.cssText = mitte + masse;
 
-  const teile = ['<i class="zone-land-glow"></i>', '<i class="zone-land-ring"></i>', ...funkenHtml(n)];
+  // Schockringe + Aufleuchten (app-fx-49) laufen auf der Funken-Leinwand; ohne sie (Notbremse `__ppFxAlt`, Animationen aus, Modul fehlt) bleiben Ring und Schein als CSS-Knoten.
+  const zusatz = (!!window.ppFx49Einschlag && !!window.ppFx44Funken && !window.__ppFxAlt) ? window.ppFx49Einschlag(r.width, r.height, farbe, window.ppFxZelle ? window.ppFxZelle(el) : 0) : null;
+  const teile = zusatz ? funkenHtml(n) : ['<i class="zone-land-glow"></i>', '<i class="zone-land-ring"></i>', ...funkenHtml(n)];
   box.innerHTML = teile.join('');
   schicht().appendChild(box);
+  if (funkenDaten.length) {
+    const lauft = window.ppFx44Funken(box, funkenDaten, farbe, zusatz);
+    if (zusatz && !lauft && window._playAnimations !== false) box.insertAdjacentHTML('afterbegin', '<i class="zone-land-glow"></i><i class="zone-land-ring"></i>');
+  }
   setTimeout(() => box.remove(), ZONE_FX_MS + 150);
 }
 
@@ -8257,7 +8471,8 @@ function zoneLandStyle(cardName) {
   if (!c) return { color: '#fbe181', variant: null };
   const t = c.cardType || '';
   const istKreatur = t.includes('Creature') || (t === 'Token' && c.hp != null);
-  return { color: typeColor(t), variant: istKreatur ? 'summon' : null };
+  // ★ Ability = BLAU (Zonenfarbe der Fähigkeiten, wie Hero lila / Surprise rot / Support gelb): Landung, Kartenflug und Stufenaufstieg zeigen dieses Blau (app-fx-49/48); alle anderen Typen unverändert.
+  return { color: t === 'Ability' ? '#4580f6' : typeColor(t), variant: istKreatur ? 'summon' : null };
 }
 
 // Gallery panel dimensions
@@ -8441,8 +8656,58 @@ function CardMini({ card, onClick, onRightClick, count, maxCount, dimmed, style,
  * Mausrad-Scrollen (`.card-tooltip-info`, App-weiter Wheel-Handler in
  * app-main) greifen damit automatisch fuer beide.
  */
-function CardSideTooltip({ card, imgUrl, inGallery }) {
+/**
+ * ★ Breiter, mit dem Finger greifbarer Bildlaufstreifen für Galerien auf Touch-Geräten (Als Befund 2.11.: „die Scrollbar für Kartengalerien auf Mobile ist zu
+ * schmal und schwer zu scrollen"). Die nativen Leisten sind auf dem Handy ein dünner, kurz sichtbarer Strich. Der Streifen liegt absolut rechts im
+ * Elternelement (das `position: relative` sein muss), folgt `scrollRef.current` (Scrollen, Größe, Inhalt) und lässt sich am Griff ziehen oder durch Tippen
+ * auf die Spur setzen. Pointer-Ereignisse mit Capture; `touch-action: none` hält die Seite still. Stil: `.pp-bildlauf-spur` / `.pp-bildlauf-griff` (style.css).
+ */
+function TouchScrollbar({ scrollRef }) {
+  const spur = useRef(null), griff = useRef(null), zug = useRef(null);
+  const nachziehen = useCallback(() => {
+    const el = scrollRef.current, sp = spur.current, gr = griff.current;
+    if (!el || !sp || !gr) return;
+    if (!(el.clientHeight > 0 && el.scrollHeight > el.clientHeight + 1)) { sp.style.display = 'none'; return; }
+    sp.style.display = '';
+    const h = sp.clientHeight, gh = Math.max(56, Math.min(h, h * el.clientHeight / el.scrollHeight));
+    const pos = el.scrollTop / Math.max(1, el.scrollHeight - el.clientHeight);
+    gr.style.height = gh + 'px'; gr.style.top = Math.round(pos * (h - gh)) + 'px';
+  }, [scrollRef]);
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el) return undefined;
+    el.addEventListener('scroll', nachziehen, { passive: true });
+    const ro = new ResizeObserver(nachziehen); ro.observe(el);
+    const mo = new MutationObserver(nachziehen); mo.observe(el, { childList: true, subtree: true });   // Seitenwechsel, Filter: der Inhalt wird länger/kürzer
+    nachziehen();
+    return () => { el.removeEventListener('scroll', nachziehen); ro.disconnect(); mo.disconnect(); };
+  }, [scrollRef, nachziehen]);
+  const zuSpurPosition = (clientY) => {
+    const el = scrollRef.current, sp = spur.current, gr = griff.current;
+    if (!el || !sp || !gr) return;
+    const r = sp.getBoundingClientRect(), gh = gr.clientHeight;
+    const anteil = Math.min(1, Math.max(0, (clientY - r.top - gh / 2) / Math.max(1, r.height - gh)));
+    el.scrollTop = anteil * (el.scrollHeight - el.clientHeight);
+  };
+  const runter = (e) => {
+    e.stopPropagation();
+    try { e.currentTarget.setPointerCapture(e.pointerId); } catch (_) { /* ohne Capture */ }
+    zug.current = true;
+    zuSpurPosition(e.clientY);
+  };
+  const bewegt = (e) => { if (zug.current) { e.stopPropagation(); zuSpurPosition(e.clientY); } };
+  const hoch = (e) => { zug.current = false; try { e.currentTarget.releasePointerCapture(e.pointerId); } catch (_) { /* ok */ } };
+  return (
+    <div ref={spur} className="pp-bildlauf-spur" onPointerDown={runter} onPointerMove={bewegt} onPointerUp={hoch} onPointerCancel={hoch}>
+      <div ref={griff} className="pp-bildlauf-griff" />
+    </div>
+  );
+}
+window.TouchScrollbar = TouchScrollbar;
+
+function CardSideTooltip({ card, imgUrl: imgUrl0, inGallery }) {
   if (!card) return null;
+  const imgUrl = ppOhneRahmen(imgUrl0);   // Tooltips zeigen nie den Rang-Rahmen (er würde Werte/Text der Karte verdecken)
   const foilType = card.foil;
   const bonus = ascensionBonusText(card);
   const effectText = ttEffectText(card.effect, bonus);
@@ -8925,7 +9190,23 @@ function poisonTooltipText(stacks, perStack, isUnhealable, deadly) {
 }
 window.poisonTooltipText = poisonTooltipText;
 
-function StatusBadges({ statuses, counters, buffs, isHero, player, cardName, isOpponentSide }) {
+/**
+ * Dauer-Anzeige von Brand, Gift und Blutung: Pixel-Symbole (app-fx-52, `PpFx52.iconUrl`) statt Emoji im Abzeichen. Ein statisches Bild je Abzeichen (keine Dauer-Animation),
+ * ganzzahlig vergroessert (Brettmassstab >= 1,6 -> doppelt); auf dem Handy ohne Kontur (das 12-px-Abzeichen liefert den Rahmen).
+ */
+function PpStatusSpr({ kind, fallback, k: kFest }) {
+  const P = window.PpFx52;
+  let ic = null;
+  try { ic = (P && P.iconUrl && !window.__ppFx52SymbolAlt) ? P.iconUrl(kind, !(window.ppIsPhone && window.ppIsPhone())) : null; } catch (e) { ic = null; }
+  if (!ic) return <PxIcon z={fallback} />;
+  let k = kFest || 1;
+  if (!kFest) { try { k = (parseFloat(document.documentElement.style.getPropertyValue('--board-scale')) || 1) >= 1.6 ? 2 : 1; } catch (e) { k = 1; } }
+  return <img src={ic.url} alt="" draggable={false} data-pp-px="aus" className="pp-px pp-px-icon"
+    style={{ width: ic.w * k, height: ic.h * k, imageRendering: 'pixelated', objectFit: 'fill' }} />;
+}
+window.PpStatusSpr = PpStatusSpr;
+
+function StatusBadges({ statuses, counters, buffs, isHero, player, cardName, isOpponentSide, ohneZahl }) {
   const badges = [];
   // Spielername zu einem Sitz-Index (das Brett stellt `window._ppPlayerNames` bereit); `null`, wenn unbekannt.
   const spielerName = (idx) => {
@@ -9044,13 +9325,13 @@ function StatusBadges({ statuses, counters, buffs, isHero, player, cardName, isO
   if (isHero && b.blessed_skill?.locked) badges.push({ key: 'skill_locked', icon: '🚫',
     tooltip: 'Action-locked (Divine Gift of Skill): This Hero cannot perform any more Actions this turn, including additional Actions — unless the Hero that cast Divine Gift of Skill (\"the user\") has at least Magic Arts 1.' });
   if (c._baihuStunned) badges.push({ key: 'petrified', icon: '🪨', tooltip: `Petrified: Stunned and immune to all damage. Lasts for ${c._baihuStunned.duration || 1} of its owner's turns.` });
-  if (s.burned || c.burned) badges.push({ key: 'burned', icon: '🔥', tooltip: 'Burned: Takes 60 damage at the start of each of its owner\'s turns.' });
-  if (s.bleeding || c.bleeding) badges.push({ key: 'bleeding', icon: '🩸', tooltip: 'Bleeding: takes 50 damage after each of its own actions or active effects. Permanent until cleansed.' });
+  if (s.burned || c.burned) badges.push({ key: 'burned', icon: '🔥', px: 'burn', tooltip: 'Burned: Takes 60 damage at the start of each of its owner\'s turns.' });
+  if (s.bleeding || c.bleeding) badges.push({ key: 'bleeding', icon: '🩸', px: 'bleed', tooltip: 'Bleeding: takes 50 damage after each of its own actions or active effects. Permanent until cleansed.' });
   if (s.poisoned || c.poisoned) {
     const stacks = s.poisoned?.stacks || c.poisonStacks || c.poisoned || 1;
     const perStack = player?.poisonDamagePerStack || 30;
     const isUnhealable = s.poisoned?.unhealable || c.poisonedUnhealable;
-    badges.push({ key: 'poisoned', icon: isUnhealable ? '💀' : '☠️', tooltip: poisonTooltipText(stacks, perStack, isUnhealable, !!s.poisoned?.deadly), className: isUnhealable ? 'status-unhealable' : '' });
+    badges.push({ key: 'poisoned', icon: isUnhealable ? '💀' : '☠️', px: isUnhealable ? undefined : 'poison', zaehler: isUnhealable ? undefined : 'x' + stacks, tooltip: poisonTooltipText(stacks, perStack, isUnhealable, !!s.poisoned?.deadly), className: isUnhealable ? 'status-unhealable' : '' });
   }
   if (s.negated || c.negated) {
     // Skeleton Death Knight applies negated with a `_dkSilenced`
@@ -9414,7 +9695,8 @@ function StatusBadges({ statuses, counters, buffs, isHero, player, cardName, isO
         <div key={b.key} className={'status-badge' + (b.className ? ' ' + b.className : '')}
           onMouseEnter={e => { showGameTooltip(e, b.tooltip); showBoardTip(); }}
           onMouseLeave={() => { hideGameTooltip(); hideBoardTip(); }}>
-          <PxIcon z={b.icon} />
+          {b.px ? <PpStatusSpr kind={b.px} fallback={b.icon} /> : <PxIcon z={b.icon} />}
+          {b.zaehler != null && !ohneZahl && <span className="status-badge-duration">{b.zaehler}</span>}   {/* steht die Figur da, zeigt sie die Zahl (HeroStatusSymbole) */}
           {b.duration != null && <span className="status-badge-duration">{b.duration >= STATUS_FOREVER ? '∞' : b.duration}</span>}
         </div>
       ))}
@@ -9681,7 +9963,7 @@ function TTIcon({ kind, color, px = 2 }) {
   if (!rows) return null;
   const d = rows.map((row, y) => [...row].map((c, x) => c === 'X' ? `M${x} ${y}h1v1h-1z` : '').join('')).join('');
   return (
-    <svg className="tt-icon" width={rows[0].length * px} height={rows.length * px} viewBox={`0 0 ${rows[0].length} ${rows.length}`} aria-hidden="true">
+    <svg className="tt-icon" width={rows[0].length * px} height={rows.length * px} viewBox={`0 0 ${rows[0].length} ${rows.length}`} shapeRendering="crispEdges" aria-hidden="true">
       <path d={d} fill={color} />
     </svg>
   );
@@ -10021,7 +10303,8 @@ function CardTooltipContent({ card, children, imageUrl }) {
   // imageUrl prop forces a specific asset (used by the shop to show a
   // skin portrait in the hover preview while still listing the base
   // hero's stats).
-  const imgUrl = imageUrl || card._skinUrl || cardImageUrl(card.name);
+  // Rang-Rahmen (`?rahmen=N`) gehören nicht in den Tooltip: dort würden sie Werte und Details der Karte verdecken.
+  const imgUrl = ppOhneRahmen(imageUrl || card._skinUrl || cardImageUrl(card.name));
   const foilType = card.foil || null;
   const displayName = card.displayName || card.name;
   // Die HP AUF DER KARTE zeigen die aktuelle max. HP, sobald sie von der
@@ -11261,13 +11544,15 @@ function TextBox() {
         const gedreht = h.flat && (h.drehung != null || h.handkarte);
         const inner = (
           <div className={'textbox-highlight' + (h.pulse ? ' textbox-highlight-pulse' : '') + (h.handkarte ? ' textbox-highlight-hand' : '') + (h.phasenleiste ? ' textbox-highlight-phase' : '')}
-            style={gedreht
+            style={{ ...(gedreht
               ? { position: 'absolute', left: 0, top: 0, width: '100%', height: '100%', pointerEvents: 'none' }
               : h.flat
               ? { position: 'fixed', left: h.rect.left, top: h.rect.top,
                   width: h.rect.width, height: h.rect.height, pointerEvents: 'none' }
               : { position: 'absolute', left: h.local.left, top: h.local.top,
-                  width: h.local.width, height: h.local.height, pointerEvents: 'none' }}>
+                  width: h.local.width, height: h.local.height, pointerEvents: 'none' }),
+              // Phasenleiste: gestufte Größen des Wachsens (`tbPhaseGross`, app-fx-44) — im Raster der Kunstpixel
+              ...(h.phasenleiste && window.ppFx44Stufen ? window.ppFx44Stufen(h.flat ? h.rect.width : h.local.width, 0) : null) }}>
             <div className="textbox-highlight-clone" style={h.vars} dangerouslySetInnerHTML={{ __html: h.html }} />
           </div>
         );
@@ -11284,7 +11569,10 @@ function TextBox() {
             // Gehighlightete HANDKARTE: waehrend des Highlights ~50 % groesser (eigene Eigenschaften `scale`/`translate`, damit Faecherdrehung und Hover-Massstab darunter bleiben);
             // nach oben versetzt, damit die Karte nicht unten aus dem Bild waechst. Gestuft statt stufenlos (Pixelart).
             ...(h.handkarte ? { '--tb-hoch': `${Math.round(Math.min(0, window.innerHeight - 8 - (h.rect.top + h.rect.height * 1.25)))}px`,   // unterer Rand nach dem Wachsen (Mitte + 0,75·Hoehe) bleibt im Bild
-             animation: 'tbHandGross .24s steps(4, end) both' } : null),
+             // Größen/Versatz je Stufe vorgerechnet (app-fx-44): die Schlüsselbilder wechseln nur Hilfsvariablen, gebacken wird zur Laufzeit nichts
+             ...(window.ppFx44Stufen ? window.ppFx44Stufen(h.rect.width, Math.round(Math.min(0, window.innerHeight - 8 - (h.rect.top + h.rect.height * 1.25)))) : null),
+             scale: 'var(--tbs, 1)', translate: '0 var(--tbt, 0px)',
+             animation: 'tbHandGross .24s steps(1, end) both' } : null),
             pointerEvents: 'none', zIndex: 90001 + h.stapel + (h.hover ? 1000 : 0) + (h.handkarte ? 500 : 0),
           }}>{inner}</div>
         );
@@ -11407,8 +11695,10 @@ function atkWowStart(heldSelektor) {
   wurzel.appendChild(zahl);
   document.body.appendChild(wurzel);
   const wertEl = zahl.querySelector('.atk-wow-wert');
+  const c47 = window.ppFx47Wow ? window.ppFx47Wow(cx, cy) : null;      // app-fx-47.jsx: Ringe/Funken/Blitz als EINE Pixelart-Leinwand statt ~75 DOM-Elementen mit eigener Animation
   const FARBEN = ['#fad54a', '#ff9a1a', '#ff491a', '#ffffff', '#f9ecb3'];
   const ring = (verzoegerung, groesse) => {
+    if (c47) { c47.ring(verzoegerung, groesse); return; }
     const e = document.createElement('div');
     e.className = 'atk-wow-ring';
     e.style.animationDelay = verzoegerung + 'ms';
@@ -11416,6 +11706,7 @@ function atkWowStart(heldSelektor) {
     wurzel.appendChild(e);
   };
   const funken = (anzahl, weit) => {
+    if (c47) { c47.funken(anzahl, weit); return; }
     for (let i = 0; i < anzahl; i++) {
       const e = document.createElement('div');
       e.className = 'atk-wow-funke';
@@ -11428,6 +11719,7 @@ function atkWowStart(heldSelektor) {
     }
   };
   const blitz = (stark) => {
+    if (c47) { c47.blitz(stark); return; }
     const b = document.createElement('div');
     b.className = 'atk-wow-blitz' + (stark ? ' atk-wow-blitz-stark' : '');
     document.body.appendChild(b);
@@ -11453,7 +11745,7 @@ function atkWowStart(heldSelektor) {
       }
       // Kurz stehen lassen, dann ausblenden und aufraeumen.
       setTimeout(() => wurzel.classList.add('atk-wow-aus'), 2100);
-      setTimeout(() => wurzel.remove(), 2700);
+      setTimeout(() => { wurzel.remove(); if (c47) c47.stop(); }, 2700);
     },
   };
 }
@@ -12053,7 +12345,7 @@ function PPDialogBox({ text, eingabe, vorgabe, okText, abbruchText, gefahr, fert
     <div style={{ position: 'fixed', inset: 0, zIndex: 100002, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(8,6,12,.8)' }} onClick={nein}>
       <div onClick={(e) => e.stopPropagation()} style={{ minWidth: 260, maxWidth: 'min(92vw, 420px)', padding: '16px 18px', background: 'var(--bg2)', border: '3px solid ' + (gefahr ? 'var(--danger)' : 'var(--accent)'), textAlign: 'center' }}>
         <div style={{ fontSize: 13, color: 'var(--text)', lineHeight: 1.5, marginBottom: 12, whiteSpace: 'pre-wrap' }}>{text}</div>
-        {eingabe && <input ref={eingabeRef} className="input" value={wert} onChange={(e) => setWert(e.target.value)} style={{ width: '100%', boxSizing: 'border-box', marginBottom: 12, fontSize: 13 }} />}
+        {eingabe && <input ref={eingabeRef} data-pp-tastatur="an" className="input" value={wert} onChange={(e) => setWert(e.target.value)} style={{ width: '100%', boxSizing: 'border-box', marginBottom: 12, fontSize: 13 }} />}
         <div style={{ display: 'flex', gap: 10, justifyContent: 'center' }}>
           <button className={'btn' + (gefahr ? ' btn-danger' : ' btn-success')} style={{ padding: '8px 22px', fontSize: 12 }} onClick={ok}>{okText || 'OK'}</button>
           {abbruchText !== false && <button className="btn" style={{ padding: '8px 22px', fontSize: 12 }} onClick={nein}>{abbruchText || 'Cancel'}</button>}

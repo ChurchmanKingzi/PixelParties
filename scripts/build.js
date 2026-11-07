@@ -85,6 +85,46 @@ const ENTRIES = [
   'app-fx-14',
   'app-fx-15',
   'app-fx-16',
+  'app-fx-17',
+  'app-fx-18',
+  'app-fx-19',
+  'app-fx-20',
+  'app-fx-21',
+  'app-fx-22',
+  'app-fx-23',
+  'app-fx-24',
+  'app-fx-25',
+  'app-fx-26',
+  'app-fx-27',
+  'app-fx-28',
+  'app-fx-29',
+  'app-fx-30',
+  'app-fx-31',
+  'app-fx-32',
+  'app-fx-33',
+  'app-fx-34',
+  'app-fx-35',
+  'app-fx-36',
+  'app-fx-37',
+  'app-fx-38',
+  'app-fx-40',
+  'app-fx-41',
+  'app-fx-43',
+  'app-fx-45',
+  'app-fx-46',
+  'app-fx-44',
+  'app-fx-47',
+  'app-fx-48',
+  'app-fx-49',
+  'app-fx-50',
+  'app-fx-51',
+  'app-fx-52',
+  'app-fx-53',
+  'app-fx-54',
+  'app-fx-55',
+  'app-fx-56',
+  'app-fx-57',
+  'app-fx-58',
   'app-campaign',
   'app-skilltest',        // Modus „Skill Test" (Lobby, Vorbereitung, Kampfanzeige)
   'app-main',
@@ -183,5 +223,15 @@ module.exports = { buildAll, watch, ENTRIES, DIST_DIR };
 if (require.main === module) {
   const force = process.argv.includes('--force');
   buildAll({ force });
+  // Vorgebackene Stylesheets (public/style.hart.css) aktuell halten — braucht Playwright; ohne läuft das Spiel trotzdem (der Server liefert dann die ungebackene Quelle aus).
+  try {
+    const hart = require('./hart/build-css.js');
+    const alt = hart.veraltet();
+    if (alt.length) {
+      console.log('[build] style.hart.css veraltet → backen …');
+      const r = require('child_process').spawnSync(process.execPath, [path.join(__dirname, 'hart', 'build-css.js')], { stdio: 'inherit' });
+      if (r.status !== 0) console.warn('[build] WARNUNG: style.hart.css konnte nicht gebacken werden (' + alt.join('; ') + ') — der Server liefert die ungebackene Quelle aus. Auf einem Rechner mit Playwright: node scripts/hart/build-css.js');
+    }
+  } catch (e) { console.warn('[build] style.hart.css-Prüfung übersprungen:', e.message); }
   if (process.argv.includes('--watch')) watch();
 }

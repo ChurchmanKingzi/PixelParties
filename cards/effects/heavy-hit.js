@@ -11,7 +11,7 @@ module.exports = {
   // laeuft ihr Effekt-Rumpf nie — die Engine spielt dann diese Bilder.
   // Im normalen Weg bleibt es bei den Broadcasts im Effekt selbst.
   spellVisual: {
-    impact: { type: 'magic_hammer' }, impactMs: 260,
+    impact: { type: 'heavy_hit_smash' }, impactMs: 930,   // Treffer des Kriegshammers (app-fx-57: Bild 28 bei 30 Hz)
   },
 
   hooks: {
@@ -27,8 +27,8 @@ module.exports = {
         title: 'Heavy Hit',
         description: `Deal ${hero.atk || 0} damage and Stun the target.`,
         confirmLabel: `⚔️ Heavy Hit! (${hero.atk || 0})`,
-        animationType: 'magic_hammer',
-        animDuration: 500,
+        animationType: 'heavy_hit_smash',   // app-fx-57: Kriegshammer, Heftigkeit 0,6
+        animDuration: 1200,                // Schaden nach dem Hit-Stop (Treffer bei 0,93 s)
         side: 'any',
         types: ['hero', 'creature'],
         excludeSelf: true,

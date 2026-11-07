@@ -21,7 +21,7 @@ function ppFx16Fit(verzug, dauer, ende) {
 }
 /** Runder Punkt mit Durchmesser `px` (Bildschirmpixel): 1 Rasterpixel, 2×2 oder Scheibe. */
 function ppFx16Korn(g, x, y, px, c, a) {
-  const d = px / 3;
+  const d = px / (g.S || 3);
   if (d < 0.55 || a <= 0.02) return;
   if (d < 1.5) g.put(x, y, c, a);
   else if (d < 2.5) g.block(x - 1, y - 1, 2, 2, c, a);

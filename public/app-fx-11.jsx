@@ -126,7 +126,7 @@ const ppFx11GearCCW = ppR1Leinwand((g, t, sz, d) => {
   if (u > 1) return;
   // Schein (ease-out je Abschnitt): Größe .3 → 1,2 (15 %) → 1 (85 %) → 1,5; Deckung 0 → .8 → .5 → 0
   const fs = ppFx11Kf(u, [[0, 0.3], [0.15, 1.2], [0.85, 1], [1, 1.5]], ppFx11Aus), fo = ppFx11Kf(u, [[0, 0], [0.15, 0.8], [0.85, 0.5], [1, 0]], ppFx11Aus);
-  if (fo > 0.03) ppFx11Glow(g, sz.cx, sz.cy + 10 / S, 50 * fs * 0.78 / S, 60 * fs * 0.78 / S, [C.dunkel, C.mittel], fo * 0.9, 0.9);
+  if (fo > 0.03) ppFx11Glow(g, sz.cx, sz.cy + 10 / 3, 50 * fs * 0.78 / 3, 60 * fs * 0.78 / 3, [C.dunkel, C.mittel], fo * 0.9, 0.9);
   // Zahnrad (linear): Drehung 0 → −40° → −320° → −360°, Größe .3 → 1 → 1 → .3, Deckung 0 → 1 → 1 → 0
   const rot = ppFx11Kf(u, [[0, 0], [0.15, -40], [0.85, -320], [1, -360]]) * Math.PI / 180;
   const sk = ppFx11Kf(u, [[0, 0.3], [0.15, 1], [0.85, 1], [1, 0.3]]), a = ppFx11Kf(u, [[0, 0], [0.15, 1], [0.85, 1], [1, 0]]);

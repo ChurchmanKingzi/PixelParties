@@ -19,7 +19,7 @@ const AUSLOESER_HOOKS = new Set([
   HOOKS.ON_CARD_ADDED_FROM_DISCARD_TO_HAND, HOOKS.BEFORE_CREATURE_DAMAGE_BATCH,
 ]);
 const { handSizeWithoutResolving, handIndicesWithoutResolving } = require('./_hand-resolve');   // v1288 (+ Z4: Handindizes ohne aufloesende Karte)
-const { loadCardEffect } = require('./_loader');
+const { loadCardEffect, nameToFile } = require('./_loader');
 const { isSeat, opponentOfGs, opponentsOfGs, playerCountGs } = require('./_opp');   // N-Spieler-Umbau
 const { gainedNames, heroScriptsOf, heroScriptOf, eigenesHeldenSkript } = require('./_gained-effects-shared');
 const { charges: ladungenLesen } = require('./_charges');
@@ -27,6 +27,7 @@ const ScTracking = require('./_sc-tracking');   // v1381
 const SpyShared = require('./_spy-shared');   // Spy in the Enemy's Camp: Spionage-Marke an der Kreatur
 const ZugFristen = require('./_zug-fristen');   // W68a: „nur echte Züge zählen"
 // ★ W63d: Ereignisse, die den Beginn einer Aktion ANKÜNDIGEN, aber noch keine sichtbare Wirkung sind: sie lösen den Commit des Auftritts nicht aus (nur Protokoll + Flug/Aktivierungsschein).
+const AUFTRITT_HALTE_MAX_MS = 4000;   // Fail-safe: so lange hält eine Vormerkung den Zustand höchstens zurück, wenn der Besitzer keine Frage offen hat (siehe `_auftrittWaechterStellen`)
 const AUFTRITT_HALTE_EREIGNISSE = new Set(['action_log', 'hand_to_board_fly', 'ability_activated', 'potion_resolved']);   // `potion_resolved`: der Server sendet es beim START der Auflösung — also VOR den abbrechbaren Fragen der Karte
 
 // Aufstiegs-Erlasse (Perilous Journey): `true` weitete das Fenster zum
@@ -137,7 +138,10 @@ function heapGuardExceeded(mu) {
   const rssM = Math.round(mu.rss / 1024 / 1024);
   const totM = Math.round(mu.heapTotal / 1024 / 1024);
   const usedM = Math.round(mu.heapUsed / 1024 / 1024);
-  if (usedM * 2 < HEAP_CHECK_USED_MB) {
+  // `heapSample()` liest RSS nur bei jeder 8. Probe neu (`rssFresh`); dazwischen ist `rss` der letzte Wert und gilt weder für die
+  // Grundlast-Nachführung (sonst blähte ein veralteter Wert gegen einen frischen heapTotal die Grundlast auf) noch für den RSS-Vergleich.
+  const rssFresh = mu.rssFresh !== false;
+  if (rssFresh && usedM * 2 < HEAP_CHECK_USED_MB) {
     const gap = Math.max(0, rssM - totM);
     if (gap > _rssNonHeapMB) _rssNonHeapMB = gap;
   }
@@ -153,7 +157,7 @@ function heapGuardExceeded(mu) {
   }
   if (usedM > HEAP_CHECK_USED_MB) return `heapUsed ${usedM} > ${HEAP_CHECK_USED_MB} MB`;
   if (totM > HEAP_CHECK_TOTAL_MB) return `heapTotal ${totM} > ${HEAP_CHECK_TOTAL_MB} MB`;
-  if (rssM > HEAP_CHECK_RSS_MB + _rssNonHeapMB) {
+  if (rssFresh && rssM > HEAP_CHECK_RSS_MB + _rssNonHeapMB) {
     return `rss ${rssM} > ${HEAP_CHECK_RSS_MB} + ${_rssNonHeapMB} MB Grundlast`;
   }
   return null;
@@ -438,8 +442,10 @@ const SCHADENSBERECHNUNGS_HOOKS = new Set([HOOKS.BEFORE_DAMAGE, HOOKS.BEFORE_CRE
 // ═══════════════════════════════════════════
 
 class CardInstance {
-  constructor(name, owner, zone, heroIdx = -1, zoneSlot = -1) {
-    this.id = uuidv4().substring(0, 12);
+  constructor(name, owner, zone, heroIdx = -1, zoneSlot = -1, id = undefined) {
+    // `id` nur beim Zurückspielen eines Schnappschusses (`restore`): dort wird die alte Kennung ohnehin gleich wieder eingesetzt, die
+    // frische UUID (~0,6 µs × ~135 Karten je Zurückspielen) wäre verschenkt.
+    this.id = id || uuidv4().substring(0, 12);
     this.name = name;
     this.owner = owner;       // Player index (0 or 1)
     this.originalOwner = owner; // Original owner — never changes (for discard pile routing)
@@ -580,6 +586,62 @@ function todesWacheAn() {
 }
 
 const _v8Stat = require('v8');   // billige Heap-Statistik für `_crashProbe` (statt process.memoryUsage())
+/**
+ * Billiger Ersatz für `process.memoryUsage()` in den Heap-Wächtern (Hook-Zähler, Snapshot, Schaden) und im Zugwechsel-Vermerk.
+ * `heapUsed`/`heapTotal` sind dieselben Zahlen (V8-Statistik: `used_heap_size`/`total_heap_size`); teuer ist das Lesen des RSS (im
+ * laufenden Spiel rund 4 % der Rechenzeit der CPU-Suche) — er wird deshalb nur bei jeder 8. Probe neu gelesen, dazwischen gilt der
+ * letzte Wert (`rssFresh: false`, siehe `heapGuardExceeded`). Die Schwellen und die Wächter-Logik bleiben unverändert: ein Runaway,
+ * der den RSS sprengt, wird höchstens acht Proben (einige Millisekunden Spielzeit) später erkannt als vorher.
+ */
+let _heapSampleN = 0, _heapSampleRss = 0;
+function heapSample() {
+  const h = _v8Stat.getHeapStatistics();
+  const fresh = (_heapSampleN++ & 7) === 0;
+  if (fresh) _heapSampleRss = process.memoryUsage.rss();
+  return { rss: _heapSampleRss, rssFresh: fresh, heapTotal: h.total_heap_size, heapUsed: h.used_heap_size };
+}
+/**
+ * Erste Stufe von `snapshot()`/`restore()`: nimmt `structuredClone` die Fälle ab, in denen es nichts zu klonen gibt. Jede Kartenkopie hat
+ * rund 14 Felder, fast alle Zahlen/Zeichenketten/Wahrheitswerte, dazu zwei meist leere Objekte (`statuses`, `counters`); bei ~135
+ * Karten sind das ~1.500 `structuredClone`-Aufrufe je Schnappschuss UND je Zurückspielen, jeder mit festem Aufwand (Puffer anlegen,
+ * serialisieren, lesen) und Müll. Gemessen an einem echten Zwischenstand: Instanz-Kopie 1,1 ms → 0,3 ms.
+ * Ergebnis ist in jedem Fall dasselbe wie vom bisherigen `structuredClone` — Primitive sind ihr eigener Klon (Funktionen/Symbole bleiben
+ * `undefined`, wie bisher); ein Objekt/Array ohne aufzählbaren Schlüssel und ohne Länge wird zum frischen `{}`/`[]`, alles andere geht
+ * unverändert an `structuredClone`. Gibt `NICHT_SCHNELL` zurück, wenn der Aufrufer selbst klonen soll.
+ */
+const KLON_NICHT_SCHNELL = Symbol('klon-nicht-schnell');
+function klonSchnell(v) {
+  if (v === undefined || v === null) return v;
+  const t = typeof v;
+  if (t !== 'object') return (t === 'function' || t === 'symbol') ? undefined : v;
+  const proto = Object.getPrototypeOf(v);
+  if (proto === Object.prototype) { for (const _k in v) return KLON_NICHT_SCHNELL; return {}; }
+  if (proto === Array.prototype && v.length === 0) { for (const _k in v) return KLON_NICHT_SCHNELL; return []; }
+  return KLON_NICHT_SCHNELL;
+}
+/**
+ * Setzt die aufzählbaren Eigenschaften von `ziel` auf die von `quelle` (Zweck: `restore`, das `gs` und die Spielerobjekte an ihrem Platz
+ * behalten muss). `bleibt` ist ein Schlüssel, der unangetastet bleibt (`gs.players`).
+ *
+ * Altverhalten: alle Schlüssel löschen, dann in Quell-Reihenfolge neu anlegen. Das wirft das Objekt in V8 in den Dictionary-Modus
+ * (Löschen eines nicht zuletzt angelegten Schlüssels, danach mehr als ~12 neu angelegte) — und dort bleibt es: `gs` und die Spielerobjekte
+ * sind die am häufigsten gelesenen Objekte der Simulation, jeder `ps.hand`/`gs.turn` wird zur Hash-Suche statt zum Inline-Cache-Treffer.
+ * Neu: bleiben Schlüssel und Reihenfolge dieselben (Normalfall: ein Rollout ändert Werte, legt keine Schlüssel an), werden die Werte nur
+ * überschrieben; Schlüssel, die der Rollout dazugelegt hat, werden gelöscht, fehlende hinten angehängt. Ergibt das nicht dieselbe
+ * Reihenfolge der Schlüssel wie die Quelle, läuft das Altverhalten unverändert. Einzige Abweichung davon: die STELLE des Schlüssels
+ * `bleibt` (`gs.players`) in der Schlüsselliste — das Altverhalten schob ihn beim ersten Zurückspielen nach vorn, jetzt bleibt er stehen;
+ * sonst käme `gs` nie in den schnellen Weg. Reihenfolge der Schlüssel von `gs` wird nirgends ausgewertet.
+ */
+function eigenschaftenUeberschreiben(ziel, quelle, bleibt) {
+  const kz = Object.keys(ziel).filter(k => k !== bleibt), kq = Object.keys(quelle).filter(k => k !== bleibt);
+  const imZiel = new Set(kz), imQuelle = new Set(kq);
+  const ort = kz.filter(k => imQuelle.has(k));
+  for (const k of kq) if (!imZiel.has(k)) ort.push(k);
+  let gleich = ort.length === kq.length;
+  for (let i = 0; gleich && i < ort.length; i++) if (ort[i] !== kq[i]) gleich = false;
+  for (const k of kz) if (!gleich || !imQuelle.has(k)) delete ziel[k];
+  for (const k of kq) ziel[k] = quelle[k];
+}
 // Auswertungs-Scope (siehe `GameEngine._scoped`): Prüfmodus und Karten-Kennungen für Schlüssel.
 const EVAL_SCOPE_CHECK = process.env.PP_EVAL_SCOPE_CHECK === '1';
 const EVAL_SCOPE_MISMATCHES = { count: 0, checked: 0 };
@@ -1379,7 +1441,7 @@ class GameEngine {
     // Trip on whichever metric crosses first; rss is the real proxy for
     // committed memory hitting `--max-old-space-size`.
     if (this._snapshotsTaken % 10 === 0) {
-      const mu = process.memoryUsage();
+      const mu = heapSample();
       const rssM = Math.round(mu.rss / 1024 / 1024);
       const totM = Math.round(mu.heapTotal / 1024 / 1024);
       const usedM = Math.round(mu.heapUsed / 1024 / 1024);
@@ -1395,11 +1457,11 @@ class GameEngine {
       }
     }
     const _clone = (v) => {
-      if (v === undefined || v === null) return v;
-      // Functions / symbols can't be cloned or JSONified — drop them. A card
+      // Functions / symbols can't be cloned or JSONified — drop them (`klonSchnell` gibt dafür `undefined`). A card
       // that needs a function-valued field to survive snapshot/restore must
       // use the same detach/reattach dance as `_deferredSurprises` below.
-      if (typeof v === 'function' || typeof v === 'symbol') return undefined;
+      const _schnell = klonSchnell(v);
+      if (_schnell !== KLON_NICHT_SCHNELL) return _schnell;
       try { return structuredClone(v); }
       catch {
         // ── JSON-RÜCKFALLPFAD, JETZT GEDECKELT (31.7.) ────────────────
@@ -1611,8 +1673,8 @@ class GameEngine {
 
   restore(snap) {
     const _clone = (v) => {
-      if (v === undefined || v === null) return v;
-      if (typeof v === 'function' || typeof v === 'symbol') return undefined;
+      const _schnell = klonSchnell(v);
+      if (_schnell !== KLON_NICHT_SCHNELL) return _schnell;
       try { return structuredClone(v); }
       catch {
         // Match snapshot()'s Set/Map preservation — same rationale.
@@ -1652,8 +1714,7 @@ class GameEngine {
       const newPs = newPlayers[i];
       const origPs = origPlayers[i];
       if (newPs && origPs) {
-        for (const k of Object.keys(origPs)) delete origPs[k];
-        for (const k of Object.keys(newPs)) origPs[k] = newPs[k];
+        eigenschaftenUeberschreiben(origPs, newPs);
       } else if (newPs && !origPs) {
         origPlayers[i] = newPs;
       }
@@ -1662,14 +1723,7 @@ class GameEngine {
     origPlayers.length = newPlayers.length;
     // Preserve gs object identity: copy top-level gs props in place, skipping
     // the players slot (already handled above).
-    for (const k of Object.keys(origGs)) {
-      if (k === 'players') continue;
-      delete origGs[k];
-    }
-    for (const k of Object.keys(newGs)) {
-      if (k === 'players') continue;
-      origGs[k] = newGs[k];
-    }
+    eigenschaftenUeberschreiben(origGs, newGs, 'players');
     // this.gs retains its original identity. Make sure room.gameState
     // still points at the same object (it always has, but belt-and-braces).
     if (this.room) this.room.gameState = this.gs;
@@ -1702,7 +1756,7 @@ class GameEngine {
     // und die Abholung (`_loeschAbholungAnmelden`) meldet sich beim naechsten Entleeren bzw. der naechsten Loeschung selbst neu an.
     this._loeschWarteschlange = Array.isArray(snap.loeschQ) ? snap.loeschQ.map(e => ({ ...e })) : [];
     this.cardInstances = snap.cardInstances.map(data => {
-      const inst = new CardInstance(data.name, data.owner, data.zone, data.heroIdx ?? -1, data.zoneSlot ?? -1);
+      const inst = new CardInstance(data.name, data.owner, data.zone, data.heroIdx ?? -1, data.zoneSlot ?? -1, data.id);
       for (const key of Object.keys(data)) {
         inst[key] = _clone(data[key]);
       }
@@ -3476,7 +3530,7 @@ class GameEngine {
     // headroom on the 8GB heap. Normal play stays under 500MB, so 2.5GB
     // means something is allocating badly.
     if (this._hooksFiredThisTurn > 0 && this._hooksFiredThisTurn % 20 === 0) {
-      const mu = process.memoryUsage();
+      const mu = heapSample();
       const rssM = Math.round(mu.rss / 1024 / 1024);
       const totM = Math.round(mu.heapTotal / 1024 / 1024);
       const usedM = Math.round(mu.heapUsed / 1024 / 1024);
@@ -9486,7 +9540,7 @@ class GameEngine {
       throw err;
     }
     if (this._damageCallsTotal % DAMAGE_HEAP_CHECK_EVERY === 0) {
-      const mu = process.memoryUsage();
+      const mu = heapSample();
       const rssM = Math.round(mu.rss / 1024 / 1024);
       const totM = Math.round(mu.heapTotal / 1024 / 1024);
       const usedM = Math.round(mu.heapUsed / 1024 / 1024);
@@ -10460,11 +10514,14 @@ class GameEngine {
     }
 
     const actualAmount = Math.max(0, hookCtx.amount);
+    // Pfeilsalve (nur Darstellung): die Salve zeigt den REELLEN Schaden Pfeil fuer Pfeil (auch die 0 von Hydra Blood Arrow); der HP-Abzug folgt nach ihrer Dauer.
+    const _salveGespielt = (type === 'attack' && target && target.hp !== undefined && target.hp > 0 && !this._inMctsSim && !this._fastMode)
+      ? await require('./_arrows-shared').pfeilSalve(this, source, target, { amount: actualAmount, hpVor: target.hp, maxHp: target.maxHp }) : false;
     // Null-Floater (v690): kam Schaden > 0 herein und geht 0 raus —
     // egal ob Buff, flat Reduktion (Tempeste), Deckel oder
     // Handreaktion —, zeigt der Held eine rote 0. Der HP-Diff-Detektor
     // des Clients feuert bei unveraenderten HP nicht.
-    if (target?.hp !== undefined && _eingangsBetrag > 0 && actualAmount === 0) {
+    if (target?.hp !== undefined && _eingangsBetrag > 0 && actualAmount === 0 && !_salveGespielt) {
       this._flashHeroDamageZero(target);
     }
     const hpBefore = (target && target.hp !== undefined) ? target.hp : actualAmount;
@@ -10706,6 +10763,9 @@ class GameEngine {
         }
       }
 
+      if (_atkBoni && target.hp > 0 && !this._inMctsSim && !this._fastMode) {
+        await require('./_arrows-shared').pfeilSalve(this, source, target, { amount: Math.min(amount, target.hp), hpVor: target.hp, maxHp: target.maxHp });   // Pfeilsalve (nur Darstellung)
+      }
       const hpBefore = target.hp;
       target.hp = Math.max(0, target.hp - amount);
       const dealt = hpBefore - target.hp;
@@ -28245,13 +28305,17 @@ this._deathWatch = (this._deathWatchStack || []).length
     // game without waiting for the heap-trip threshold to fire. If
     // rss climbs steadily turn-over-turn, there's a structural leak
     // if it stays flat, the per-turn GC is keeping up.
-    const mu = process.memoryUsage();
-    const rssM = Math.round(mu.rss / 1024 / 1024);
-    const totM = Math.round(mu.heapTotal / 1024 / 1024);
-    const usedM = Math.round(mu.heapUsed / 1024 / 1024);
-    this._trailWrite('switchTurn', {
-      note: `ending p${this.gs.activePlayer} rss=${rssM}MB heapTotal=${totM}MB heapUsed=${usedM}MB`,
-    });
+    // In der Simulation verwirft `_trailWrite` den Eintrag sofort (nur 'rollout' kommt durch) — das Lesen des RSS dafür war reine Verschwendung
+    // (rund 1 % der Rechenzeit der CPU-Suche, ein Zugwechsel je simuliertem Zug).
+    if (!this._inMctsSim) {
+      const mu = process.memoryUsage();
+      const rssM = Math.round(mu.rss / 1024 / 1024);
+      const totM = Math.round(mu.heapTotal / 1024 / 1024);
+      const usedM = Math.round(mu.heapUsed / 1024 / 1024);
+      this._trailWrite('switchTurn', {
+        note: `ending p${this.gs.activePlayer} rss=${rssM}MB heapTotal=${totM}MB heapUsed=${usedM}MB`,
+      });
+    }
 
     // Fire end-of-turn hooks for the ENDING player FIRST — even in puzzle
     // mode where the puzzle-failure check below would otherwise short-
@@ -33550,6 +33614,7 @@ this._deathWatch = (this._deathWatchStack || []).length
       const proj = schonGezeigt.proj ? null : bilder.projectile;
       if (proj && ziele.length > 0 && (isSeat(this, daten.owner))) {
         const stagger = bilder.stagger ?? 0;
+        const flug = bilder.flightMs ?? Math.max(120, (proj.duration || 500) - 70);
         for (let i = 0; i < ziele.length; i++) {
           const t = ziele[i];
           this._broadcastEvent('play_projectile_animation', {
@@ -33557,11 +33622,11 @@ this._deathWatch = (this._deathWatchStack || []).length
             sourceZoneSlot: daten.zoneSlot,
             targetOwner: t.owner, targetHeroIdx: t.heroIdx,
             targetZoneSlot: t.type === 'hero' ? undefined : t.slotIdx,
+            landMs: flug + (ziele.length - 1 - i) * stagger,   // Client (Feuerball, app-fx-30): so lange bis zum Einschlag — rein visuell, die Wartezeit bleibt `flug`
             ...proj,
           });
           if (stagger > 0 && i < ziele.length - 1) await this._delay(stagger);
         }
-        const flug = bilder.flightMs ?? Math.max(120, (proj.duration || 500) - 70);
         await this._delay(flug);
       }
 
@@ -45383,6 +45448,7 @@ this._deathWatch = (this._deathWatchStack || []).length
       // verlangen (Shamanic Curse: der Zauber müsste in den Ablagestapel gehen), schließen solche Glieder aus.
       zaehltAlsArt: cardInfo.zaehltAlsArt || null,
       goldCost: goldCost || 0,
+      handFlug: cardInfo.handFlug || null,   // Handkarte des Initialglieds: { handIdx, to, toOwner } — Flug beim Aufloesen des Glieds (`_resolveReactionChain`)
       isInitialCard: true,
       negated: false,
       chainClosed: false,
@@ -45428,6 +45494,7 @@ this._deathWatch = (this._deathWatchStack || []).length
           fizzled: !initialLink.negated && !!initialLink.fizzled,
           fizzleReason: initialLink.fizzleReason || null,
           chainFormed: true,
+          initialFlug: !!initialLink._flugFrueh,   // die Handkarte ist beim Aufloesen schon geflogen (Aufrufer schickt den Flug nicht noch einmal)
           resolveResult: initialLink.resolveResult || null,
           // Lunar Eclipse flags a negated card for deletion instead of
           // discard — server play paths route via routeNegatedInitialCard.
@@ -46598,7 +46665,11 @@ this._deathWatch = (this._deathWatchStack || []).length
       };
 
       chain.push(link);
+      // Handgeist (nur Darstellung): die Karte hat die Hand verlassen, fliegt aber erst beim Aufloesen weg. Der Client haelt sie bis dahin ausgegraut
+      // an ihrem Platz (`fromHandIdx`). Der Zustand MIT der kleineren Hand geht VOR dem Kettenupdate raus, damit der Client die Karte nie doppelt zeigt.
+      this.sync();
       if (chain.length >= 2) this._broadcastChainUpdate(chain);
+      else this._broadcastEvent('reaction_chain_geister', { geister: this._kettenGeister(chain) });
 
       // Fire onReactionActivated hook (for board passives)
       await this.runHooks('onReactionActivated', {
@@ -46661,6 +46732,33 @@ this._deathWatch = (this._deathWatchStack || []).length
     return this.wirkerHandlungsunfaehig(link.casterOwner ?? link.owner, hi);
   }
 
+  /**
+   * ★ KETTEN-TEMPO (Nutzer 4.11.): Takt der Kettenaufloesung in Bildern (30 Hz) — passend zur Pixelart-Leiste (`app-fx-53.jsx`, gleiche Zahlen dort).
+   * Je Glied P Bilder (10 bis 4 Glieder, darueber `max(6, round(40/n))`), aufgeteilt in Gluehen G, Flug-Wartezeit Fl (Landung der Karte) und Nachlauf R.
+   * Start 4, Ende 8 Bilder, Negation +8 Bilder. Fruehere Werte: Start 500, Gluehen 400, Vorlauf 250, Flug 650, Nachlauf 300, Negation 600, Ende 400 ms
+   * (= 1600 ms je Reaktions-Glied). In `_fastMode` (KI-Simulationen) gibt `_delay` weiterhin sofort zurueck.
+   */
+  _kettenTakt(n) {
+    const F = 1000 / 30, P = n <= 4 ? 10 : Math.max(6, Math.round(40 / n));
+    const G = Math.round(P * 0.3), R = Math.max(1, Math.round(P * 0.2)), Fl = Math.max(3, P - G - R);
+    return { P, start: 4 * F, G: G * F, Fl: Fl * F, R: R * F, neg: 4 * F, negRest: (P + 8 - 4) * F - Fl * F, ende: 8 * F, flugMs: Math.round(Fl * F * 1.25) };
+  }
+
+  /** Darf die Handkarte des Initialglieds beim Aufloesen SOFORT in die Ablage fliegen? Nein, wenn ihr Skript (oder ein Held des Wirkers) sie auf das Brett / zurueck in die Hand legen koennte. */
+  _initialFlugSicher(pi, cardName) {
+    const cache = this._flugQuellCache || (this._flugQuellCache = new Map());
+    const unsicher = (n) => {
+      if (!n) return false;
+      if (cache.has(n)) return cache.get(n);
+      let r = true;
+      try { r = /_spellReturnToHand|_spellPlacedOnBoard|aufloesenderSpellInDieAblage|_spellKeepInstance|_buddyTicket|neuesBuddyTicket/.test(require('fs').readFileSync(require('path').join(__dirname, nameToFile(n) + '.js'), 'utf8')); } catch (e) { r = false; }
+      cache.set(n, r); return r;
+    };
+    if (unsicher(cardName)) return false;
+    for (const h of (this.gs.players[pi]?.heroes || [])) if (h?.name && unsicher(h.name)) return false;
+    return true;
+  }
+
   async _resolveReactionChain(chain) {
     // ── HAND-SPERRE WAEHREND DER GANZEN KETTE (Als Befund 5.8.) ──────
     // Die Abwurf-Sperre aus v203 deckte nur die Stapelabfrage selbst
@@ -46673,10 +46771,11 @@ this._deathWatch = (this._deathWatchStack || []).length
     const prevChainLock = this.gs._chainResolvingLock;
     this.gs._chainResolvingLock = true;
     try {
-    this._broadcastEvent('reaction_chain_resolving_start', {});
+    const TK = this._kettenTakt(chain.length);
+    this._broadcastEvent('reaction_chain_resolving_start', { takt: TK.P, n: chain.length });
     // SC (v1382, Chain Reaction): Laenge der Kette, die jetzt aufloest.
     if (this.gs._scTracking) ScTracking.kette(this.gs._scTracking, chain);
-    await this._delay(500);
+    await this._delay(TK.start);
 
     for (let i = chain.length - 1; i >= 0; i--) {
       const link = chain[i];
@@ -46723,7 +46822,8 @@ this._deathWatch = (this._deathWatchStack || []).length
           try { link._equipRefund(); }
           catch (err) { console.error(`[Engine] equipReactionRefund for ${link.cardName} failed:`, err.message); }
         }
-        await this._delay(600);
+        await this._delay(TK.neg);
+        let _fl = false;
 
         // Negated non-initial cards go to discard — or the deleted
         // pile when the negator flagged deletion (Lunar Eclipse).
@@ -46754,10 +46854,11 @@ this._deathWatch = (this._deathWatchStack || []).length
             cardName: link.cardName, from: 'hand', to: 'hand',
             fromOwner: link.owner, toOwner: dieb,
             toHandIdx: zielIdx, finalHandSize: diebPs.hand.length,
+            ...(Number.isInteger(link.fromHandIdx) ? { fromHandIdx: link.fromHandIdx, chainLinkId: link.id } : {}),
           });
           this.log('negated_card_stolen', { card: link.cardName, from: oppPs?.username, to: diebPs.username });
           this.sync();
-          await this._delay(650);
+          _fl = true; await this._delay(TK.Fl);
         } else if (!link.isInitialCard
             && !loadCardEffect(link.cardName)?.skipPostResolveDiscard) {
           const ps = this.gs.players[link.owner];
@@ -46777,16 +46878,18 @@ this._deathWatch = (this._deathWatchStack || []).length
             this._broadcastEvent('play_pile_transfer', {
               owner: link.owner, cardName: link.cardName,
               from: link.fromDeck ? 'deck' : 'hand', to: toDeleted ? 'deleted' : 'discard',
-              ...(Number.isInteger(link.fromHandIdx) ? { fromHandIdx: link.fromHandIdx } : {}),
+              ...(Number.isInteger(link.fromHandIdx) ? { fromHandIdx: link.fromHandIdx, chainLinkId: link.id } : {}),
+              flugMs: TK.flugMs,
             });
             // 3. Landung ERST NACH der Animation.
-            await this._delay(650);
+            _fl = true; await this._delay(TK.Fl);
             const _kettenPs = link.fromDeck ? ps : this.handKartenBesitzerPs(ps, link.cardName);   // W63c: Stapel des permanenten Besitzers
             if (!_kettenPs[pile]) _kettenPs[pile] = [];
             _kettenPs[pile].push(link.cardName);
             this.sync();
           }
         }
+        await this._delay(_fl ? TK.negRest : TK.negRest + TK.Fl);   // Rest des Negations-Takts (die Leiste zerbroeselt das Glied, siehe app-fx-53)
         // „Whenever you negate an opponent's card or effect" (Natas).
         if (link.negated) {
           await this._meldeNegation({
@@ -46799,7 +46902,7 @@ this._deathWatch = (this._deathWatchStack || []).length
         this._broadcastEvent('reaction_chain_link_resolving', {
           linkIndex: i, cardName: link.cardName, owner: link.owner,
         });
-        await this._delay(400);
+        await this._delay(TK.G);
 
         if (link.resolve) {
           try {
@@ -46812,6 +46915,8 @@ this._deathWatch = (this._deathWatchStack || []).length
             this._rxResolvingCard = link.cardName;
             let result;
             const _hoptVorher = link.isInitialCard ? this._hoptAbzug() : null;
+            // Pfeilsalve (nur Darstellung): hat der Angreifer Pfeile an der Kette, haelt das Schild die Standard-Animationen der Attack zurueck (`_arrows-shared.js`).
+            const _pfeilSchild = (link.isInitialCard && link.cardType === 'Attack') ? require('./_arrows-shared').pfeilSchildOeffnen(this, chain, link) : null;
             try {
               result = await link.resolve(chain, i);
               // W16d (A09-09): Nachaufloesung am Glied (Arrow Slit: zweite Aktivierung unmittelbar nach der ersten).
@@ -46819,6 +46924,7 @@ this._deathWatch = (this._deathWatchStack || []).length
             } finally {
               this._rxResolvingOwner = _vorherAufloeser;
               this._rxResolvingCard = _vorherKarte;
+              if (_pfeilSchild) require('./_arrows-shared').pfeilSchildSchliessen(this, _pfeilSchild);
             }
             if (link.isInitialCard) link.resolveResult = this._applyDiscardOutDecline(link.cardName, result, _hoptVorher);
           } catch (err) {
@@ -46894,7 +47000,6 @@ this._deathWatch = (this._deathWatchStack || []).length
           const spellPlaced = this.gs._spellPlacedOnBoard === true || !!_kettenBuddy?.token;   // W67a: Inyas Token ersetzt die Ablage
           if (this.gs._spellPlacedOnBoard) delete this.gs._spellPlacedOnBoard;
           if (!linkScript?.skipPostResolveDiscard && !spellPlaced) {
-            await this._delay(250);
             const ps = this.gs.players[link.owner];
             // ★ v1327: „Delete this card" (`deleteOnUse`) — bisher kannte
             // nur jedes HAND-Reaktionsfenster das Feld, die Kette legte
@@ -46909,13 +47014,14 @@ this._deathWatch = (this._deathWatchStack || []).length
               this._broadcastEvent('play_pile_transfer', {
                 owner: link.owner, cardName: link.cardName,
                 from: link.fromDeck ? 'deck' : 'hand', to: zumLoeschen ? 'deleted' : 'discard',
-                ...(Number.isInteger(link.fromHandIdx) ? { fromHandIdx: link.fromHandIdx } : {}),
+                ...(Number.isInteger(link.fromHandIdx) ? { fromHandIdx: link.fromHandIdx, chainLinkId: link.id } : {}),
+                flugMs: TK.flugMs,
               });
               // Push ERST NACH dem Flug: es gibt clientseitig kein
               // "Karte im Stapel verstecken, bis sie landet", also
               // erschiene sie sonst schon beim START der Animation.
               // Gleiche Reihenfolge wie routeNegatedInitialCard.
-              await this._delay(650);
+              await this._delay(TK.Fl);
               const _kettenPs = link.fromDeck ? ps : this.handKartenBesitzerPs(ps, link.cardName);   // W63c: Stapel des permanenten Besitzers
               if (zumLoeschen) { if (!_kettenPs.deletedPile) _kettenPs.deletedPile = []; _kettenPs.deletedPile.push(link.cardName); }
               else _kettenPs.discardPile.push(link.cardName);
@@ -46924,17 +47030,27 @@ this._deathWatch = (this._deathWatchStack || []).length
           }
         }
 
+        // ★ Initialkarte (Attack/Spell aus der Hand): ihre Handkarte fliegt, sobald das Glied aufloest (in der Leiste zerbroeselt) — nicht erst nach der ganzen Aufloesung.
+        // `handFlug` kommt vom Aufrufer (server.js `doPlaySpell`); die Karte bleibt im Zustand, bis der Zauber fertig ist (nur der FLUG wird vorgezogen, `chainResult.initialFlug`
+        // sagt dem Aufrufer, dass er ihn nicht zweimal schickt). Nur wenn das Ziel sicher feststeht (`_initialFlugSicher`).
+        if (link.isInitialCard && link.handFlug && !this._inMctsSim && this._initialFlugSicher(link.owner, link.cardName)) {
+          this._broadcastEvent('play_pile_transfer', {
+            fromOwner: link.owner, toOwner: link.handFlug.toOwner, cardName: link.cardName, from: 'hand', to: link.handFlug.to,
+            fromHandIdx: link.handFlug.handIdx, flugMs: TK.flugMs, halten: true,
+          });
+          link._flugFrueh = true;
+        }
         this._broadcastEvent('reaction_chain_link_resolved', {
           linkIndex: i, cardName: link.cardName, owner: link.owner,
         });
-        await this._delay(300);
+        await this._delay(TK.R);
       }
 
       this.sync();
     }
 
     this._broadcastEvent('reaction_chain_done', {});
-    await this._delay(400);
+    await this._delay(TK.ende);
 
     // Surprise reactions (Lunar Eclipse) stayed face-up in their
     // Surprise Zone for the entire chain. NOW — after the negated
@@ -47361,9 +47477,17 @@ this._deathWatch = (this._deathWatchStack || []).length
   }
 
   /** Broadcast chain state to both clients */
+  /** Handgeister (nur Darstellung): Reaktionsglieder, deren Karte die Hand schon verlassen hat, aber erst beim Aufloesen wegfliegt. */
+  _kettenGeister(chain) {
+    return chain
+      .filter(l => !l.isInitialCard && Number.isInteger(l.fromHandIdx) && !l.fromHero && !l.fromCreature && !l.fromDeck && !l.fromSurprise)
+      .map(l => ({ id: l.id, cardName: l.cardName, owner: l.owner, fromHandIdx: l.fromHandIdx }));
+  }
+
   _broadcastChainUpdate(chain) {
     this._broadcastEvent('reaction_chain_update', {
       vorlauf: this._chainVorlauf || null,
+      geister: this._kettenGeister(chain),
       links: chain.map(l => ({
         id: l.id, cardName: l.cardName, owner: l.owner,
         cardType: l.cardType, isInitialCard: l.isInitialCard,
@@ -56577,7 +56701,7 @@ this._deathWatch = (this._deathWatchStack || []).length
       throw err;
     }
     if (this._damageCallsTotal % DAMAGE_HEAP_CHECK_EVERY === 0) {
-      const mu = process.memoryUsage();
+      const mu = heapSample();
       const rssM = Math.round(mu.rss / 1024 / 1024);
       const totM = Math.round(mu.heapTotal / 1024 / 1024);
       const usedM = Math.round(mu.heapUsed / 1024 / 1024);
@@ -57173,7 +57297,10 @@ this._deathWatch = (this._deathWatchStack || []).length
         // creature. Heroes already get visible feedback via the
         // 0 hp-delta path being a no-op; creatures didn't, so
         // this is creature-only on purpose.
-        if (!e._nullGezeigt) {
+        // Pfeilsalve (nur Darstellung): die Salve zeigt die 0 selbst (und haelt die Anzeige bis zum Ende zurueck)
+        const _salveKr = (e.type === 'attack' && !this._inMctsSim && !this._fastMode)
+          ? await require('./_arrows-shared').pfeilSalve(this, e.source, e.inst, { amount: 0, hpVor: e.inst.counters.currentHp, maxHp: e.inst.counters.maxHp }) : false;
+        if (!e._nullGezeigt && !_salveKr) {
           this._broadcastEvent('creature_damage_floater', {
             owner: this.physicalSide(e.inst),
             heroIdx: e.inst.heroIdx,
@@ -57294,6 +57421,9 @@ this._deathWatch = (this._deathWatchStack || []).length
         }
       }
 
+      if (e.type === 'attack' && !this._inMctsSim && !this._fastMode) {
+        await require('./_arrows-shared').pfeilSalve(this, e.source, e.inst, { amount: actualAmount, hpVor: e.inst.counters.currentHp, maxHp: e.inst.counters.maxHp });   // Pfeilsalve (nur Darstellung)
+      }
       const creatureHpBefore = e.inst.counters.currentHp;
       e.inst.counters.currentHp -= actualAmount;
       // Generic damage-tracking flag — mirrors the hero path above.
@@ -59275,6 +59405,9 @@ this._deathWatch = (this._deathWatchStack || []).length
   _broadcastEvent(event, data, opts) {
     if (this._aborted) return;
     if (this._fastMode) return; // Silent during MCTS simulations.
+    // Pfeilsalve: die Standard-Animationen einer Attack mit Pfeilen werden zurueckgehalten und reisen mit `play_arrow_salvo` (Fallback fuer Clients ohne Salve).
+    if (event === 'reaction_chain_done' && this._pfeilSchild && !this._pfeilSchild.aktiv && !this._pfeilSchild.fertig) this._pfeilSchild.aktiv = true;   // Pfeilsalve: ab Kettenende scharf
+    if (this._pfeilSchild && this._pfeilSchild.aktiv && require('./_arrows-shared').PFEIL_SCHILD_EVENTE.has(event)) { this._pfeilSchild.puffer.push([event, data, opts, Date.now()]); return; }
     // W6: Tokens fliegen nicht zu einem Stapel, sie zerfallen (`token_disintegrate`, siehe `_tokenZerfallSenden`).
     if (event === 'play_pile_transfer') { data = this._tokenStapelFlug(data); if (!data) return; }
     // 23.10. (Luck, Liquid Luck — „Whenever your opponent plays a card"): die Reaktionsfenster und selbstspielenden Reaction-Karten melden ihren Play nur als Flug mit
@@ -59456,6 +59589,23 @@ this._deathWatch = (this._deathWatchStack || []).length
   //  `gs._holdCardReveal = true` hält den Auftritt weiterhin zurück, bis die Karte ihn selbst freigibt (ältere Muster bleiben gültig).
   // ═══════════════════════════════════════════════════════════════════════════
 
+  /**
+   * FAIL-SAFE gegen hängende Spiele: hält die Vormerkung den Zustand zurück, wacht ein Zeitgeber darüber. Nach `AUFTRITT_HALTE_MAX_MS` ohne offene Frage des Besitzers (= nichts wartet auf eine Antwort,
+   * die den Commit auslösen könnte) oder wenn das Spiel zu Ende ist, wird der Auftritt ausgeliefert — samt zurückgehaltenem Zustand. Mit offener Frage (der Besitzer überlegt noch) läuft er weiter.
+   */
+  _auftrittWaechterStellen(pend) {
+    if (this._inMctsSim || this._fastMode || (this._auftrittWaechter && this._auftrittWaechter.pend === pend)) return;
+    if (this._auftrittWaechter) clearTimeout(this._auftrittWaechter.t);
+    const w = this._auftrittWaechter = { pend, t: null };   // bewusst NICHT im Spielzustand (gs wird kopiert/serialisiert)
+    const pruefen = () => {
+      if (this._auftrittWaechter === w) this._auftrittWaechter = null;
+      if (this._aborted || this.gs._pendingCardReveal !== pend) return;   // schon committet oder abgebrochen
+      if (this.gs.result || !this._auftrittFrageOffen(pend.ownerIdx)) { this.gs._holdCardReveal = false; this._firePendingCardReveal(); return; }
+      w.t = setTimeout(pruefen, AUFTRITT_HALTE_MAX_MS); if (w.t.unref) w.t.unref(); this._auftrittWaechter = w;
+    };
+    w.t = setTimeout(pruefen, AUFTRITT_HALTE_MAX_MS); if (w.t.unref) w.t.unref();
+  }
+
   /** Hat der Besitzer gerade eine Frage offen (Prompt, Zielwahl)? Dann kann er noch abbrechen. */
   _auftrittFrageOffen(ownerIdx) {
     const gs = this.gs;
@@ -59471,6 +59621,7 @@ this._deathWatch = (this._deathWatchStack || []).length
   _auftrittEntscheide(event) {
     const pend = this.gs._pendingCardReveal;
     if (!pend || this._inMctsSim || this._fastMode || this._auftrittFlush) return null;
+    if (this.gs.result) { this.gs._holdCardReveal = false; this._firePendingCardReveal(); return null; }   // Spielende: nichts mehr zurückhalten (siehe `_auftrittZustandHalten`)
     // Liegengebliebener Auftritt aus einem früheren Zug (Fehlerfall): lieber nachliefern als Sendungen verschlucken.
     if (pend._turn == null) pend._turn = this.gs.turn;
     else if (pend._turn !== this.gs.turn) { this._firePendingCardReveal(); return this.gs._pendingCardReveal || null; }
@@ -59570,9 +59721,13 @@ this._deathWatch = (this._deathWatchStack || []).length
     const pend = this.gs && this.gs._pendingCardReveal;
     if (!pend || this._inMctsSim || this._fastMode || this._auftrittFlush) return false;
     if (empfaengerIdx === pend.ownerIdx) return false;
+    // ENDE-SICHERUNG: ein Spielergebnis (Aufgabe, Heldentod, Ausscheiden, Verbindungsabbruch …) darf NIE zurückgehalten werden — danach kommt kein Commit mehr, der Zustand mit `result` ginge sonst verloren
+    // (der Spieler bliebe ohne Ergebnis im Brett hängen). Die Vormerkung wird jetzt ausgeliefert (Auftritt + Puffer), das Ergebnis geht sofort hinterher.
+    if (this.gs.result) { this.gs._holdCardReveal = false; this._firePendingCardReveal(); return false; }
     if (pend._turn == null) pend._turn = this.gs.turn;
     else if (pend._turn !== this.gs.turn) { this._firePendingCardReveal(); return false; }   // liegengebliebene Vormerkung: nie Zustände verschlucken
     pend.zustandGehalten = true;
+    this._auftrittWaechterStellen(pend);
     return this._auftrittFrageOffen(pend.ownerIdx) ? 'huelle' : 'halten';   // 'huelle': nur die Hülle der Frage ist neu, der Rest bleibt der Zustand von vor der Karte
   }
 
@@ -60917,4 +61072,4 @@ for (const _name of Object.getOwnPropertyNames(GameEngine.prototype)) {
   } }[_name];
 }
 
-module.exports = { GameEngine, CardInstance, SPEED, STATUS_EFFECTS, getNegativeStatuses };
+module.exports = { GameEngine, CardInstance, SPEED, STATUS_EFFECTS, getNegativeStatuses, _heapSample: heapSample, _heapGuardExceeded: heapGuardExceeded };   // die beiden letzten nur für test/heap-guard.test.js

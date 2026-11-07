@@ -74,7 +74,7 @@ test('extractState liest eine Engine-Stellung (Helden, Fähigkeiten, Support, Ab
     turn: 6, currentPhase: 2, activePlayer: 1,
     areaZones: [[], ['Cosmic Skeleton']],
     players: [
-      { gold: 8, hand: ['Deepsea Idol', 'Deepsea Idol', 'Skeleton Bard'], mainDeck: new Array(20).fill('x'), potionDeck: [], discardPile: ['Skeleton Bard'], deletedPile: [],
+      { gold: 8, hand: ['Deepsea Idol', 'Deepsea Idol', 'Skeleton Bard'], mainDeck: ['Skeleton Bard', 'Deepsea Idol', ...new Array(18).fill('x')], potionDeck: [], discardPile: ['Skeleton Bard'], deletedPile: [],
         heroes: [{ name: 'Cute Nerd Magenta', hp: 350, maxHp: 350, atk: 30, statuses: { burned: true } }, { name: '', hp: 0 }],
         abilityZones: [[['Necromancy', 'Necromancy', 'Necromancy'], [], []], [[], [], []]], surpriseZones: [['Cosmic Skeleton'], []],
         supportZones: [[[], [], []]], permanents: [], coolnessStack: [], heroesActedThisTurn: [0], summonLocked: true },
@@ -111,6 +111,16 @@ test('extractState liest eine Engine-Stellung (Helden, Fähigkeiten, Support, Ab
   assert.equal(sup[0][6], 2, 'Alter = Zug 6 − gelegt in Zug 4');
   assert.equal(sup[0][7], 2, 'Zähler ohne currentHp'); assert.equal(sup[0][8], 1, 'eine Verstärkung');
   assert.deepEqual(V.readState(V.writeState(S)), S, 'und die Bytes geben es wieder her');
+  // oberste Deckkarten (Zusatzblock 1): oberste zuerst, höchstens TOP_N, unbekannte Namen als 0; ein leeres Deck gibt eine leere Liste
+  assert.deepEqual(V.topCards(S), [[ids('Skeleton Bard')[0], ids('Deepsea Idol')[0], 0, 0], []]);
+  assert.deepEqual(V.topCards(V.readState(V.writeState(S))), V.topCards(S));
+  assert.equal(V.topCards(state()), null, 'Zustände ohne den Block (ältere Aufnahmen) liefern null');
+  // Netzpfad ohne Zusatzblock: alles andere bleibt gleich
+  const noTop = V.extractState(eng, 1, [5, -5], { top: false });
+  assert.deepEqual(noTop.extra, []); assert.equal(V.topCards(noTop), null);
+  assert.deepEqual({ ...noTop, extra: S.extra }, S, 'ohne den Block unterscheidet sich nur `extra`');
+  assert.deepEqual(V.honestView(S, 0).opp.sc.deck, 0, 'die ehrliche Sicht kennt nur die Größe des Gegnerdecks');
+  assert.equal('top' in V.honestView(S, 0), false, 'und gibt die Deckreihenfolge nicht weiter');
 });
 
 test('Spielblock: packen, finden, lesen; Dateien zusammenführen; abgeschnittenes Ende reparieren', () => {

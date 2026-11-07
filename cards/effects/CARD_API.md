@@ -711,6 +711,13 @@ Die Zuordnung ist zentral — kein Karten-Code ruft `playSFX` selbst auf:
   auf das gesendete `play_zone_animation`.
 
 
+* **Hammer-Animationen** (`public/app-fx-57.jsx`; Pixelart-Leinwand, eine geschwungene Waffe treibt das Ziel mit EINEM Schlag wie einen Nagel in die Bodenlinie = untere Zonenkante):
+  `magic_hammer` (Magic Hammer, Heftigkeit 1,0, Schaden nach ca. 1450 ms) · `heavy_hit_smash` (Heavy Hit, 0,6, `animDuration: 1200`) · `hammer_skeleton_smash` (Hammer Skeleton, 0,35, `_delay(1000)`,
+  Ziel: Support-Slot oder Area). Alle drei erwarten das Zonen-Element des Ziels (`PP_SQUASH_ANIMS` in app-board.jsx reicht `zoneEl`) und kommen mit `play_zone_animation`-Standardfeldern (`owner`, `heroIdx`, `zoneSlot`,
+  `zoneType`) aus; ein `h`-/Größen-Kniff ist nicht nötig. Der Schaden folgt erst NACH dem Hit-Stop (`_delay`/`animDuration` wie oben, Vorlauf des Mountens ≈ 110 ms eingerechnet); `PP_ANIM_MINDAUER`
+  (app-board.jsx) hält die Animation länger am Leben als ein kürzeres `animDuration`. Negiert: `spellVisual.impact` mit dem passenden Typ und `impactMs` (1100 / 930 / 800). Die Pixelgröße der Effekt-Zelle
+  folgt der Hero-Pixelgröße des Ziels (Regel in der Kopfzeile von app-fx-57.jsx). Kamera-Shake nur am Desktop; Rückfall auf den alten Hammer bei Retro / `__ppFxAlt` / reduzierter Bewegung.
+
 ## ★ SCHADENSTYPEN — DAS VOLLSTÄNDIGE VOKABULAR
 
 Der `type`-Parameter jedes Schadensaufrufs. **Es gibt keine
@@ -1444,6 +1451,15 @@ Brett neu; den Editor auf dieselbe Mechanik zu heben hieße, genau diese
 Schwäche in die Oberfläche zu tragen, die heute sauber läuft — und der
 Editor zieht mehr als Hände (Galerie → Brett, Zone → Zone), er bekäme
 also zwei Mechaniken statt einer.
+
+## ★ HANDGEIST: REAKTIONSKARTEN BLEIBEN IN DER HAND, BIS SIE WEGFLIEGEN (Kette)
+
+Die Engine nimmt eine Hand-Reaktion beim ANKETTEN aus `ps.hand` (Regelreihenfolge unverändert); ihr Flug in die Ablage passiert erst beim AUFLÖSEN.
+Damit sie bis dahin nicht verschwindet, zeigt der Client einen rein visuellen **Handgeist** (ausgegraut im Bayer-Raster, Ketten-Sprite, kein
+Hover/Ziehen) an ihrem alten Platz. Vertrag: `reaction_chain_update` / `reaction_chain_geister` tragen `geister: [{ id, cardName, owner, fromHandIdx }]`
+(`_kettenGeister`); der Flug des Glieds trägt `chainLinkId` (= Glied-`id`) und startet am Geist, der Geist geht in genau diesem Moment. Glieder ohne Flug
+(`skipPostResolveDiscard`: Reaktions-Creature, Magic Topaz …) geben den Geist spätestens bei `reaction_chain_link_resolved` frei; `reaction_chain_done`
+räumt alles. Wer neue Hand-Wege ins Kettenglied baut, setzt `fromHandIdx` am Glied und schickt beim Wegfliegen `chainLinkId` mit.
 
 ## ★ NACH DEM HAND-FLUG SOFORT ABGLEICHEN (v1221)
 
@@ -3541,6 +3557,8 @@ Keyframe `ramJetCharge` in `public/style.css`. Wer eine davon
 verschiebt, muss die andere mitziehen; `JET.arriveAt × duration` ist
 ausserdem mit dem `_delay(...)` der aufrufenden Karte verzahnt, damit
 der Treffer direkt nach dem Aufprall folgt.
+
+**Held mit animierter Figur (Trailer-Look, `public/app-fx-27.jsx`):** Rammt ein HELD (`sourceZoneSlot < 0`) und steht seine Figur auf dem Brett (nicht versteinert/gelaehmt/unsichtbar), faehrt die FIGUR statt der Karte (Streckung, Nachbilder, Federung); die Karte bleibt stehen. Dieselbe Dauer und dieselben Aufprallanteile (12 % / `fire` 45 % / `rueckwaerts` 26 %) — wer sie aendert, aendert `ppFx27Zeitlinie` UND die Keyframes. Kreaturen als Quelle und Helden ohne Figur fahren weiter als Karte.
 
 `ramCharge` selbst ist fuer laengere Dauern gebaut: bei `duration: 600`
 faellt der gesamte Hinflug in 42 ms und die Karte steht danach 420 ms
@@ -26563,7 +26581,7 @@ Repro (lokal, `docs/niche-tests/repro/W85/d-01`): Edge/Journal/Stone mit und ohn
 |---|---|
 | Takt | gehaltene Bilder, 30/s (lange Schleifen: höchstens 90 Bilder je Durchlauf, also langsamer) |
 | `opacity` | **Dither** statt Alpha: `opacity` 0/1 plus Bayer-4×4-Maske (8 Stufen, Zelle 2 px, `mask-image` aus SVG-Kacheln). Elemente < 20 × 20 px blenden nur ein/aus (`KONFIG.ditherMin`). Elemente mit Kindern geben ihre Malerei an ein Körper-Kind `i.pp-px-body` ab und steuern die Masken der Blätter über eine vererbte Variable `--pp-dmN` (eine Maske schneidet sonst überstehende Kinder ab) |
-| `transform`/`translate`/`scale` | Verschiebung auf Kunstpixel (Vielfache des Rasters, 2 px); Skalierung auf Vielfache von `1/raster` (Kunstpixel = 1, 2, 3 … ganze Bildschirmpixel; unter 0,25 ausgeblendet); Scherung entfällt. Oberfläche (dokumentweit): Skalierung stattdessen auf ganze Kunstpixel-**Größen** (Hover 1,05 bleibt sichtbar) |
+| `transform`/`translate`/`scale` | Verschiebung auf Kunstpixel (Vielfache des Rasters: im Kampf das Hero-Pixel der eigenen Reihe = 3 px ab ca. 1600×900, sonst 2 px — `PPPixelAnim.standardRaster()`; Dither-Zellen und Ring-/Halo-Pixelbilder folgen); Skalierung auf Vielfache von `1/raster` (Kunstpixel = 1, 2, 3 … ganze Bildschirmpixel; unter 0,25 ausgeblendet); Scherung entfällt. Oberfläche (dokumentweit): Skalierung stattdessen auf ganze Kunstpixel-**Größen** (Hover 1,05 bleibt sichtbar) |
 | Drehung | Blattelement aus Pixelbildern/Farbflächen, `position: absolute/fixed`: **Sprite** — das Element wird einmal ins Kunstpixelraster gemalt und je Winkelstufe (15° bei animierten, 1° bei ruhenden Drehungen) mit Supersampling neu gesampelt (`PPPixelAnim.drehen`, RotSprite-artig; Kanten bleiben hart, Farben bleiben Palettenfarben); alles andere (Text, SVG, Elemente mit bewegten Kindern, Karten): nur **Viertelschritte** (0/90/180/270°, verlustfrei) |
 | Farben | `ppSnapCss` (Palette) auf `color`/`background-color`/`border-*-color`/`fill`/…; weiche `box-shadow`/`text-shadow` in Keyframes → harte Ringe, `filter: blur()/drop-shadow()` fällt weg |
 | Layout (`left/top/width/height/margin…`) | Größen auf Vielfache von 4, Lagen auf gerade Pixel, Rest ganze px |
@@ -26669,3 +26687,16 @@ Die CPU-Bewertung (`_cpu.js` → `evaluateState`) ist synchron und schreibt nich
 * **Neue Abfrage einhängen:** nur rein lesende Funktionen, der Schlüssel enthält ALLE Argumente (Karten über `engine._scopeCardIdOf(cardData)`, nicht über den Namen), und Arrays/Objekte kopiert zurückgeben.
 
 **Prüfen:** `PP_EVAL_SCOPE_CHECK=1` rechnet bei jedem Treffer zusätzlich ungecacht nach und meldet Abweichungen (`[eval-scope] ABWEICHUNG …`, am Ende `Prüfung: N Treffer gegengerechnet, M Abweichungen`). Über 10 Deck×Profil-Kombinationen und rund 22 Mio. Treffer: 0 Abweichungen, die Spielaufzeichnungen eines geseedeten Laufs sind mit und ohne Scope identisch (Ausnahme: Decks, deren Basislauf wegen Wanduhr-Limits selbst nicht reproduzierbar ist).
+
+## Pfeilsalve — Angriff mit angeketteten „Arrow"-Artefakten (nur Darstellung, 4.11.2026)
+
+Hängen an der Attack eines Helden ein oder mehr Pfeile (`isArrow: true` UND „Arrow" im Namen; Magic Topaz zählt nicht), zeigt der Client statt der Standard-Animation der Attack EINE Salve (`public/app-fx-52.jsx`). Die Regeln ändern sich nicht.
+* **Engine:** `armAttackerWithArrow` merkt die Kette (`_KETTEN`), `pfeilSalve` (`_arrows-shared.js`) sendet vor dem HP-Abzug `play_arrow_salvo` (Pfeile in Kettenreihenfolge mit Status-Flags `burn`/`poison`/`hydra`, REELLER Schaden `total` am Ziel, `hpVor`/`hpNach`, Status vorher, `ersatz`) und wartet `PFEIL_SALVE_MS` (1,55 s), BEVOR die Engine die HP abzieht und die Status anwendet. Aufrufe in den drei Schadenswegen (Held, True Damage mit `angriffsBoni`, Kreatur inkl. 0-Zweig). Neue Schadenswege für Attacks müssen `pfeilSalve` vor dem Abzug rufen.
+* **Schild:** ab Kettenende (`reaction_chain_done`) hält `engine._pfeilSchild` die Standard-Animationen der Attack zurück (`PFEIL_SCHILD_EVENTE`); sie reisen als `ersatz` mit und werden vom Client nur abgespielt, wenn die Salve nicht läuft (Animationen aus, Retro, reduzierte Bewegung, Zone fehlt). Ohne Treffer (negiert, kein Schaden) spielt `clearArmedArrows` sie nachträglich.
+* **Client:** `ppFx52Salve(payload, { myIdx })`; die Zustandsvergleiche in `app-board.jsx` (Schadenszahl, Zonenblitz, Flammenschlag des Brandes) schlucken genau den Treffer, den die Salve gezeigt hat (`ppFx52Geschluckt`). Bausteine: `PpFx52.hpBar`, `PpFx52.statusIcon`, `PpFx52.glyph`.
+* **Wartezeit nur bei gespielter Salve:** Jeder Client meldet `client_fx { salve }` (`ppFx52KannSalve`: Animationen an, kein Retro, keine reduzierte Bewegung); `server.js` legt es in `socket.data.pfeilSalve` ab. `pfeilSalveGewuenscht(engine)` fragt alle verbundenen Spieler/Zuschauer: spielt niemand die Salve, entfallen Schild und die 1,55 s (normale Attack-Animationen, HP/Status sofort). Spielt nur ein Teil sie, wartet der Server; die anderen spielen den `ersatz`/den Zustand.
+* **Dauer-Statusanzeige:** Burn/Poison/Bleed stehen im Status-Abzeichen (`StatusBadges`, `PpStatusSpr` in `app-shared.jsx`) als Pixel-Symbole aus `PpFx52.iconUrl` (statisches Bild, Gift mit Zähler „xN", Blutung `bleeding` = boolescher Status wie Burn). Die Stapelzahl-Anzeige auf der Karte (`poison-stack-count`) entfällt, solange die Symbole laufen. Unheilbares Gift bleibt Emoji (💀).
+* **Allgemeine HP-Anzeige:** der Zustandsvergleich in `app-board.jsx` ruft bei JEDER HP-Änderung eines Helden/einer Kreatur `ppFx52Hp` (Balken + aktuelle HP über der Zone, ca. 1,25 s, höchstens 8 gleichzeitig, Handy 4; Leinwand nur solange Einträge laufen). Für ein Ziel mit laufender Salve schweigt sie.
+
+* **Archer-Pfeil:** Der Archer-Schuss spielt statt des Blitzes (`electric_strike`) einen einzelnen Holzpfeil (`archerPfeil` in `_arrows-shared.js`, Event `play_arrow_salvo` mit `einzel: true`, Sprite `holz` in `app-fx-52.jsx`). Der Server wartet den Flug (780 ms) und wendet danach den Schaden an; Schadenszahl, HP-Anzeige und Treffer-Blitz kommen wie immer aus dem Zustandsvergleich beim Einschlag. Clients ohne Pfeil bekommen den alten Blitz als `ersatz`. **Creatures sind noch nicht animiert:** der Pfeil startet von der Support-Zone des Archers (`srcKind: 'creature'`); sobald es animierte Creature-Sprites gibt, die Quelle auf deren Sprite umstellen (Vermerk an `archer.js` und `ppFx52Salve`).
+* **Animierter HP-Balken:** `PF.hpAnim` (reine Funktion der Zeit) + `PF.hpBar2`: Schaden = Balken schrumpft in 9 Stufen (300 ms), dunkelroter Verlustteil bleibt 250 ms stehen und rutscht dann in 8 Stufen nach; Heilung = dunkelgrüner Zuwachs, Zahl zählt mit. Gilt für die allgemeine HP-Anzeige (`ppFx52Hp`, `prev` = alter Wert) und je Pfeil-Einschlag in der Salve. Die Zahl der Karte (`ZaehlZahl` in `app-board.jsx`) zählt im selben Takt von ALT auf NEU (nur beim Wechsel, ohne Animationen/Retro springt sie).

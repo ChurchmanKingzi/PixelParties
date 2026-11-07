@@ -201,6 +201,9 @@ function armAttackerWithArrow(engine, pi, chain, modifier) {
     hero._armedArrows.push({ ...modifier, ownerPi: pi });   // `ownerPi` = Spieler des Pfeils (bei Hydra Blood auf eine gegnerische Attack ≠ Angreifer)
   }
   hero._arrowsChainedCount = _countArrowLinks(chain);
+  if (Array.isArray(chain)) _KETTEN.set(hero, chain);   // Pfeilsalve: die Kette bleibt (Verweis, kein Zustand) und wird beim Treffer fuer die Anzeige gelesen
+  // Pfeilsalve: Schild bereitstellen; scharf wird es mit dem Ende der Kette (`reaction_chain_done`, siehe `_broadcastEvent`) — die Attack loest in aller Regel NACH der Kette auf (Zielwahl, Animation, Schaden).
+  if (Array.isArray(chain) && !engine._pfeilSchild && !engine._fastMode && !engine._inMctsSim && engine.room && pfeilSalveGewuenscht(engine)) engine._pfeilSchild = { puffer: [], aktiv: false, davor: null };
   return true;
 }
 
@@ -410,11 +413,156 @@ async function clearArmedArrows(engine, pi) {
       }
     }
   }
+  if (engine._pfeilSchild) pfeilSchildSchliessen(engine, engine._pfeilSchild);   // Attack zu Ende: Zurueckgehaltenes (kein Treffer, kein Salve) spielt jetzt noch
   for (const hero of helden) {
     if (!hero) continue;
     if (hero._armedArrows) delete hero._armedArrows;
     if (hero._arrowsChainedCount != null) delete hero._arrowsChainedCount;
+    _KETTEN.delete(hero);
   }
+}
+
+// ───────────── Pfeilsalve (nur Darstellung) ─────────────
+//
+//  Haengen an einer Attack eines Helden ein oder mehr „Arrow"-Artefakte, ersetzt der Client die Standard-Angriffsanimation durch EINE Salve aller
+//  tatsaechlich geschossenen Pfeile (public/app-fx-52.jsx). Die Regeln des Spiels aendern sich nicht: Schaden, Brand, Gift und Gold laufen wie bisher.
+//  Der Server liefert nur die Anzeigedaten (`play_arrow_salvo`: Pfeile in Kettenreihenfolge, REELLER Schaden am Ziel, Status je Pfeil) und
+//  haelt den HP-Abzug fuer die Dauer der Salve zurueck (`pfeilSalve` wartet, BEVOR die Engine die HP abzieht) — so zeigt der Client die HP und die
+//  Status erst beim Einschlag des jeweiligen Pfeils, und der Zustand ist nach der Salve sofort richtig.
+//  Waehrend der Aufloesung der Attack (`pfeilSchildOeffnen`) werden ihre Standard-Animationen zurueckgehalten (`engine._pfeilSchild`) und der Salve als
+//  `ersatz` mitgegeben: spielt der Client die Salve nicht (Animationen aus, Retro, Fehler), spielt er sie selbst ab — „sonst laeuft alles unveraendert".
+const _KETTEN = new WeakMap();   // Held -> Kettenfeld der Pfeile (Verweis; die `negated`-Marken liest `pfeilNamen` erst beim Treffer)
+const PFEIL_SALVE_MS = 1550;     // Dauer der Salve (Wartezeit vor dem HP-Abzug); der letzte Einschlag liegt bei <= 1,41 s
+const PFEIL_SCHILD_EVENTE = new Set(['play_zone_animation', 'play_projectile_animation', 'play_ram_animation', 'play_beam_animation', 'play_weapon_barrage', 'play_screen_shake', 'punch_impact', 'play_pusher_fling', 'play_card_throw']);
+
+/**
+ * Spielt irgendein Teilnehmer (Spieler mit Verbindung, Zuschauer) die Salve? Jeder Client meldet es per `client_fx` ({ salve }); ohne Meldung gilt „ja".
+ * Spielt niemand sie (alle Animationen aus / Retro / reduzierte Bewegung), entfallen Wartezeit und Schild: die normalen Attack-Animationen laufen, HP/Status gelten sofort.
+ */
+function pfeilSalveGewuenscht(engine) {
+  try {
+    const room = engine.room, sockets = engine.io && engine.io.sockets && engine.io.sockets.sockets;
+    if (!room || !sockets || typeof sockets.get !== 'function') return true;
+    const ids = [...(room.players || []).map((p) => p && p.socketId), ...(room.spectators || []).map((p) => p && p.socketId)].filter(Boolean);
+    let gesehen = false;
+    for (const id of ids) { const so = sockets.get(id); if (!so) continue; gesehen = true; if (!so.data || so.data.pfeilSalve !== false) return true; }
+    return !gesehen;
+  } catch (e) { return true; }
+}
+
+/** Namen der tatsaechlich geschossenen Pfeile in Kettenreihenfolge (nicht negiert, `isArrow` UND „Arrow" im Namen: Magic Topaz zaehlt nicht); Arrow Slit schiesst einen Pfeil ein zweites Mal (Mehrfach-Eintrag in `_armedArrows`). */
+function pfeilNamen(chain, hero) {
+  const { loadCardEffect } = require('./_loader');
+  const out = [];
+  for (const link of chain || []) {
+    if (link.isInitialCard || link.negated || !/Arrow/.test(link.cardName || '')) continue;
+    if (loadCardEffect(link.cardName)?.isArrow) out.push(link.cardName);
+  }
+  const imKette = {};
+  for (const n of out) imKette[n] = (imKette[n] || 0) + 1;
+  const bewaffnet = {};
+  for (const a of hero?._armedArrows || []) if (a.sourceCard) bewaffnet[a.sourceCard] = (bewaffnet[a.sourceCard] || 0) + 1;
+  for (const n in bewaffnet) for (let k = imKette[n] || 0; k < bewaffnet[n]; k++) out.push(n);
+  return out;
+}
+
+/** Oeffnet das Schild um die Aufloesung der Attack, falls ihr Held Pfeile an der Kette hat. Rueckgabe: Schild (zum Schliessen) oder null. */
+function pfeilSchildOeffnen(engine, chain, link) {
+  try {
+    if (engine._fastMode || engine._inMctsSim || engine._aborted || !engine.room || !pfeilSalveGewuenscht(engine)) return null;
+    const hero = _findAttackerHero(engine, link.owner, chain, true);
+    const kette = hero && _KETTEN.get(hero);
+    if (!kette || !pfeilNamen(kette, hero).length) return null;
+    const schild = { puffer: [], aktiv: true, davor: engine._pfeilSchild || null };
+    engine._pfeilSchild = schild;
+    return schild;
+  } catch (e) { return null; }
+}
+
+/** Schliesst das Schild; was nie zur Salve kam (Attack ohne Treffer), spielt jetzt doch. */
+function pfeilSchildSchliessen(engine, schild) {
+  if (!schild) return;
+  if (engine._pfeilSchild === schild) engine._pfeilSchild = schild.davor || null;
+  const rest = schild.puffer; schild.puffer = []; schild.aktiv = false; schild.fertig = true;
+  for (const [ev, data, opts] of rest) { try { engine._broadcastEvent(ev, data, opts); } catch (e) { /* weiter */ } }
+}
+
+/**
+ * Anzeige der Salve fuer EINEN Treffer (Aufruf in den Schadenswegen der Engine, NACH der Schadensberechnung und VOR dem HP-Abzug).
+ * info = { amount (reeller Schaden dieses Treffers), hpVor, maxHp, kind: 'hero' | 'creature' }. Wartet die Dauer der Salve ab.
+ * Status je Pfeil (Anzeige, vorausgesagt wie die Engine ihn gleich anwendet): Flame -> burn, Poisoned -> 1 Gift, Hydra Blood -> floor(Schaden-ohne-Null / 30) Gift.
+ */
+async function pfeilSalve(engine, source, target, info) {
+  try {
+    if (!source || !target || engine._fastMode || engine._inMctsSim || engine._aborted || !engine.room) return false;
+    const hero = heroFromSource(engine, source);
+    const kette = hero && _KETTEN.get(hero);
+    if (!kette) return false;
+    const namen = pfeilNamen(kette, hero);
+    if (!namen.length) return false;
+    if (!pfeilSalveGewuenscht(engine)) { if (engine._pfeilSchild) pfeilSchildSchliessen(engine, engine._pfeilSchild); return false; }   // niemand spielt die Salve: keine Wartezeit, normale Animationen, sofortiger Abzug
+    const loc = resolveTargetLocation(engine, target);
+    if (!loc) return false;
+    const frei = (hero._armedArrows || []).slice();
+    const arrows = namen.map((n) => {
+      const k = frei.findIndex((a) => a.sourceCard === n);
+      const a = k >= 0 ? frei.splice(k, 1)[0] : null;
+      const pf = { n };
+      if (a && a.applyBurn) pf.burn = 1;
+      if (a && a.applyPoison1) pf.poison = 1;
+      if (a && typeof a.poisonStacksPer === 'number' && a.poisonStacksPer > 0) {
+        const basis = a._preZeroByTarget?.has(target) ? a._preZeroByTarget.get(target) : (a._preZeroDamage || 0);
+        const st = Math.floor(basis / a.poisonStacksPer);
+        if (st > 0) pf.poison = st;
+      }
+      if (a && a.setAmount0) pf.hydra = 1;
+      return pf;
+    });
+    const amount = Math.max(0, Math.round(info.amount || 0)), hpVor = Math.max(0, Math.round(info.hpVor || 0));
+    const seite = engine.physicalSide ? engine.physicalSide(loc.kind === 'creature' ? loc.inst : null) : null;
+    const payload = {
+      srcOwner: source.heroOwner ?? source.owner ?? -1, srcHeroIdx: source.heroIdx ?? -1,
+      tgt: loc.kind === 'hero'
+        ? { kind: 'hero', owner: loc.owner, heroIdx: loc.heroIdx }
+        : { kind: 'creature', owner: seite ?? loc.owner, heroIdx: loc.heroIdx, zoneSlot: loc.slotIdx },
+      vorBurn: loc.kind === 'hero' ? (target.statuses?.burned ? 1 : 0) : (target.counters?.burned ? 1 : 0),            // Status VOR der Salve (Anzeige zaehlt von hier weiter)
+      vorPoison: loc.kind === 'hero' ? (target.statuses?.poisoned ? (target.statuses.poisoned.stacks || 1) : 0) : (target.counters?.poisoned ? (target.counters.poisonStacks || 1) : 0),
+      arrows, total: amount, hpVor, hpNach: Math.max(0, hpVor - amount), maxHp: Math.max(1, Math.round(info.maxHp || (loc.kind === 'creature' ? engine._getCardDB?.()?.[target.name]?.hp : 0) || hpVor || 1)),
+      seed: ((engine.gs?.turn || 1) * 131 + (engine._damageCallsTotal || 0) * 17 + namen.length) & 0xffff,
+    };
+    const sch = engine._pfeilSchild;
+    if (sch && sch.aktiv) {                                    // die zurueckgehaltene Standard-Animation reist als Ersatz mit
+      const t0 = sch.puffer.length ? sch.puffer[0][3] : 0;
+      if (sch.puffer.length) payload.ersatz = sch.puffer.map(([ev, data, , t]) => [ev, data, t - t0]);   // Abstand zum ersten Ereignis (ms)
+      sch.puffer = []; sch.aktiv = false; sch.fertig = true;   // ab hier laufen Folgeanimationen (Statuswirkungen, Reaktionen) wieder wie gewohnt
+    }
+    engine._broadcastEvent('play_arrow_salvo', payload);
+    await engine._delay(PFEIL_SALVE_MS);
+    return true;
+  } catch (e) { try { console.error('[Pfeilsalve]', e.message); } catch (e2) { /* still */ } return false; }
+}
+
+/**
+ * Archer (Kreatur): EIN Pfeil von der Zone des Archers zum Ziel statt des Blitzes (nur Darstellung). Wartet den Flug ab (`ARCHER_PFEIL_MS`), BEVOR der Aufrufer den Schaden anwendet:
+ * Schadenszahl, HP-Anzeige und Treffer-Blitz kommen danach wie gewohnt aus dem Zustandsvergleich des Clients und liegen damit genau auf dem Einschlag (die Zahl ist der echte Schaden).
+ * Rueckgabe `true`, wenn die Animation lief (der Aufrufer spielt den alten Blitz dann nicht). Spielt niemand sie, `false`: alter Blitz mit kurzer Wartezeit.
+ * ★ VERMERK: Creatures sind noch nicht animiert — die Quelle ist die Support-Zone des Archers; sobald es animierte Creature-Sprites gibt, auf deren Sprite umstellen (Client: `app-fx-52.jsx`, `P.srcKind: 'creature'`).
+ * `ziel` = { type: 'hero' | 'equip', owner, heroIdx, slotIdx }, `ersatz` = Standardanimation fuer Clients ohne Pfeil.
+ */
+const ARCHER_PFEIL_MS = 780;
+async function archerPfeil(engine, srcInst, ziel, ersatz) {
+  try {
+    if (!srcInst || !ziel || engine._fastMode || engine._inMctsSim || engine._aborted || !engine.room || !pfeilSalveGewuenscht(engine)) return false;
+    const seite = engine.physicalSide ? engine.physicalSide(srcInst) : srcInst.owner;
+    engine._broadcastEvent('play_arrow_salvo', {
+      einzel: true, srcKind: 'creature', srcOwner: seite, srcHeroIdx: srcInst.heroIdx, srcZoneSlot: srcInst.zoneSlot,
+      tgt: ziel.type === 'hero' ? { kind: 'hero', owner: ziel.owner, heroIdx: ziel.heroIdx } : { kind: 'creature', owner: ziel.owner, heroIdx: ziel.heroIdx, zoneSlot: ziel.slotIdx },
+      arrows: [{ n: 'Archer Arrow' }], total: 0, hpVor: 0, hpNach: 0, maxHp: 1, seed: ((engine.gs?.turn || 1) * 53 + (engine._damageCallsTotal || 0) * 7) & 0xffff,
+      ...(ersatz ? { ersatz: [ersatz] } : {}),
+    });
+    await engine._delay(ARCHER_PFEIL_MS);
+    return true;
+  } catch (e) { return false; }
 }
 
 // ───────────── internals ─────────────
@@ -527,5 +675,13 @@ module.exports = {
   hydraWirdNullen,
   applyArrowsAfterDamage,
   clearArmedArrows,
+  pfeilNamen,
+  pfeilSalveGewuenscht,
+  pfeilSchildOeffnen,
+  pfeilSchildSchliessen,
+  pfeilSalve,
+  archerPfeil,
+  PFEIL_SCHILD_EVENTE,
+  PFEIL_SALVE_MS,
   pickLastUntriggeredArrowLink,
 };

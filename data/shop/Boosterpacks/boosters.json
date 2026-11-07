@@ -1,0 +1,1046 @@
+{
+ "version": 1,
+ "size": [
+  192,
+  320
+ ],
+ "frames": 16,
+ "frameMs": 60,
+ "tagline": "9 Rarity Skins for your Collection!",
+ "packs": [
+  {
+   "id": "ability",
+   "name": "Ability Pack",
+   "tagline": "9 Rarity Skins for your Collection!",
+   "variants": [
+    {
+     "id": "ability-1",
+     "theme": "Cobalt",
+     "template": "focus",
+     "prism": false,
+     "base": "ability/ability-1.png",
+     "shimmer": "ability/ability-1.shimmer.png",
+     "motifs": [
+      "Fighting",
+      "Destruction Magic",
+      "Alchemy",
+      "Leadership"
+     ]
+    },
+    {
+     "id": "ability-2",
+     "theme": "Sapphire",
+     "template": "focus",
+     "prism": false,
+     "base": "ability/ability-2.png",
+     "shimmer": "ability/ability-2.shimmer.png",
+     "motifs": [
+      "Alchemy",
+      "Decay Magic",
+      "Magic Arts",
+      "Wealth"
+     ]
+    },
+    {
+     "id": "ability-3",
+     "theme": "Azure",
+     "template": "focus",
+     "prism": false,
+     "base": "ability/ability-3.png",
+     "shimmer": "ability/ability-3.shimmer.png",
+     "motifs": [
+      "Leadership",
+      "Diplomacy",
+      "Charme",
+      "Training"
+     ]
+    },
+    {
+     "id": "ability-4",
+     "theme": "Navy",
+     "template": "focus",
+     "prism": false,
+     "base": "ability/ability-4.png",
+     "shimmer": "ability/ability-4.shimmer.png",
+     "motifs": [
+      "Destruction Magic",
+      "Fighting",
+      "Resistance",
+      "Interference"
+     ]
+    },
+    {
+     "id": "ability-5",
+     "theme": "Cobalt Dots",
+     "template": "grid",
+     "prism": false,
+     "base": "ability/ability-5.png",
+     "shimmer": "ability/ability-5.shimmer.png",
+     "motifs": [
+      "Fighting",
+      "Alchemy",
+      "Leadership",
+      "Destruction Magic",
+      "Decay Magic",
+      "Support Magic",
+      "Magic Arts",
+      "Divinity",
+      "Training"
+     ]
+    },
+    {
+     "id": "ability-6",
+     "theme": "Cobalt Stars",
+     "template": "focus",
+     "prism": false,
+     "base": "ability/ability-6.png",
+     "shimmer": "ability/ability-6.shimmer.png",
+     "motifs": [
+      "Magic Arts",
+      "Support Magic",
+      "Divinity",
+      "Singing"
+     ]
+    },
+    {
+     "id": "ability-7",
+     "theme": "Prism Blue",
+     "template": "grid",
+     "prism": true,
+     "base": "ability/ability-7.png",
+     "shimmer": "ability/ability-7.shimmer.png",
+     "motifs": [
+      "Hunting",
+      "Trade",
+      "Wealth",
+      "Luck",
+      "Navigation",
+      "Toughness",
+      "Terror",
+      "Wisdom",
+      "Learning"
+     ]
+    },
+    {
+     "id": "ability-8",
+     "theme": "Ice Blue",
+     "template": "focus",
+     "prism": false,
+     "base": "ability/ability-8.png",
+     "shimmer": "ability/ability-8.shimmer.png",
+     "motifs": [
+      "Biomancy",
+      "Cannibalism",
+      "Premonition",
+      "Terror"
+     ]
+    }
+   ]
+  },
+  {
+   "id": "hero",
+   "name": "Hero Pack",
+   "tagline": "9 Rarity Skins for your Collection!",
+   "variants": [
+    {
+     "id": "hero-1",
+     "theme": "Violet",
+     "template": "hero",
+     "prism": false,
+     "base": "hero/hero-1.png",
+     "shimmer": "hero/hero-1.shimmer.png",
+     "motifs": [
+      "Cute Angel Molinda"
+     ]
+    },
+    {
+     "id": "hero-2",
+     "theme": "Twilight",
+     "template": "hero",
+     "prism": false,
+     "base": "hero/hero-2.png",
+     "shimmer": "hero/hero-2.shimmer.png",
+     "motifs": [
+      "Ida, the Adept of Destruction"
+     ]
+    },
+    {
+     "id": "hero-3",
+     "theme": "Deep Violet",
+     "template": "hero",
+     "prism": false,
+     "base": "hero/hero-3.png",
+     "shimmer": "hero/hero-3.shimmer.png",
+     "motifs": [
+      "Alleria, the Queen of Spiders"
+     ]
+    },
+    {
+     "id": "hero-4",
+     "theme": "Amethyst",
+     "template": "hero",
+     "prism": false,
+     "base": "hero/hero-4.png",
+     "shimmer": "hero/hero-4.shimmer.png",
+     "motifs": [
+      "Arthor, the King of Blackport"
+     ]
+    },
+    {
+     "id": "hero-5",
+     "theme": "Violet Scales",
+     "template": "hero",
+     "prism": false,
+     "base": "hero/hero-5.png",
+     "shimmer": "hero/hero-5.shimmer.png",
+     "motifs": [
+      "Bomb Berserker Bartas"
+     ]
+    },
+    {
+     "id": "hero-6",
+     "theme": "Orchid",
+     "template": "hero",
+     "prism": false,
+     "base": "hero/hero-6.png",
+     "shimmer": "hero/hero-6.shimmer.png",
+     "motifs": [
+      "Alice, the Puppeteer Girl"
+     ]
+    },
+    {
+     "id": "hero-7",
+     "theme": "Lilac",
+     "template": "hero",
+     "prism": false,
+     "base": "hero/hero-7.png",
+     "shimmer": "hero/hero-7.shimmer.png",
+     "motifs": [
+      "Treasure Huntress Semi"
+     ]
+    },
+    {
+     "id": "hero-8",
+     "theme": "Prism Violet",
+     "template": "hero",
+     "prism": true,
+     "base": "hero/hero-8.png",
+     "shimmer": "hero/hero-8.shimmer.png",
+     "motifs": [
+      "Monia Bot, the Foretold Rescuer of Coolness"
+     ]
+    }
+   ]
+  },
+  {
+   "id": "clash",
+   "name": "Clash of Heroes",
+   "tagline": "9 Rarity Skins for your Collection!",
+   "variants": [
+    {
+     "id": "clash-1",
+     "theme": "Sunfire",
+     "template": "scene",
+     "prism": false,
+     "base": "clash/clash-1.png",
+     "shimmer": "clash/clash-1.shimmer.png",
+     "motifs": [
+      "Fireball"
+     ]
+    },
+    {
+     "id": "clash-2",
+     "theme": "Skyline",
+     "template": "scene",
+     "prism": false,
+     "base": "clash/clash-2.png",
+     "shimmer": "clash/clash-2.shimmer.png",
+     "motifs": [
+      "Chain Lightning"
+     ]
+    },
+    {
+     "id": "clash-3",
+     "theme": "Desert",
+     "template": "focus",
+     "prism": false,
+     "base": "clash/clash-3.png",
+     "shimmer": "clash/clash-3.shimmer.png",
+     "motifs": [
+      "Treasure Chest",
+      "Alice, the Puppeteer Girl",
+      "Andras, the Human Weapon",
+      "Card Game Player Inya"
+     ]
+    },
+    {
+     "id": "clash-4",
+     "theme": "Ember",
+     "template": "scene",
+     "prism": true,
+     "base": "clash/clash-4.png",
+     "shimmer": "clash/clash-4.shimmer.png",
+     "motifs": [
+      "Flame Avalanche"
+     ]
+    },
+    {
+     "id": "clash-5",
+     "theme": "Royal",
+     "template": "grid",
+     "prism": false,
+     "base": "clash/clash-5.png",
+     "shimmer": "clash/clash-5.shimmer.png",
+     "motifs": [
+      "Toras, Master of all Weapons",
+      "Treasure Huntress Semi",
+      "Timeless King Zi",
+      "Güldefaber, the King of Dwarfs",
+      "Arcane Lamp",
+      "Grand Inquisitor Karian",
+      "Bow Sniper Darge",
+      "Legendary Explorer Dajan",
+      "Omikron, the Faceless Illusionist"
+     ]
+    },
+    {
+     "id": "clash-6",
+     "theme": "Frost",
+     "template": "scene",
+     "prism": false,
+     "base": "clash/clash-6.png",
+     "shimmer": "clash/clash-6.shimmer.png",
+     "motifs": [
+      "Elixir of Cold"
+     ]
+    },
+    {
+     "id": "clash-7",
+     "theme": "Noir",
+     "template": "focus",
+     "prism": false,
+     "base": "clash/clash-7.png",
+     "shimmer": "clash/clash-7.shimmer.png",
+     "motifs": [
+      "The Sun Sword",
+      "Arcane Eyes",
+      "Tharx, the Never-Losing General",
+      "Haressassin"
+     ]
+    },
+    {
+     "id": "clash-8",
+     "theme": "Rosebud",
+     "template": "grid",
+     "prism": false,
+     "base": "clash/clash-8.png",
+     "shimmer": "clash/clash-8.shimmer.png",
+     "motifs": [
+      "Toughness",
+      "Cute Angel Molinda",
+      "Fiedel, the Mercenary Mage",
+      "Skeleton Healer",
+      "Demon's Gate",
+      "Johanna, Crusader of Light",
+      "Ida, the Adept of Destruction",
+      "Heal",
+      "Hand of Death"
+     ]
+    }
+   ]
+  },
+  {
+   "id": "monia",
+   "name": "Rise of Monia",
+   "tagline": "9 Rarity Skins for your Collection!",
+   "variants": [
+    {
+     "id": "monia-1",
+     "theme": "Skyline",
+     "template": "hero",
+     "prism": false,
+     "base": "monia/monia-1.png",
+     "shimmer": "monia/monia-1.shimmer.png",
+     "motifs": [
+      "Cool Rescuer Monia"
+     ]
+    },
+    {
+     "id": "monia-2",
+     "theme": "Rosebud",
+     "template": "scene",
+     "prism": false,
+     "base": "monia/monia-2.png",
+     "shimmer": "monia/monia-2.shimmer.png",
+     "motifs": [
+      "The Final Trial"
+     ]
+    },
+    {
+     "id": "monia-3",
+     "theme": "Sunfire",
+     "template": "scene",
+     "prism": false,
+     "base": "monia/monia-3.png",
+     "shimmer": "monia/monia-3.shimmer.png",
+     "motifs": [
+      "Cute Phoenix"
+     ]
+    },
+    {
+     "id": "monia-4",
+     "theme": "Prism",
+     "template": "scene",
+     "prism": true,
+     "base": "monia/monia-4.png",
+     "shimmer": "monia/monia-4.shimmer.png",
+     "motifs": [
+      "Trial of Coolness"
+     ]
+    },
+    {
+     "id": "monia-5",
+     "theme": "Royal",
+     "template": "grid",
+     "prism": false,
+     "base": "monia/monia-5.png",
+     "shimmer": "monia/monia-5.shimmer.png",
+     "motifs": [
+      "Cute Starlet Megu",
+      "Sky Archeologist",
+      "Sky Shaman",
+      "Cuteness Sensor",
+      "Black Marketeer",
+      "Cute Bird",
+      "???, the Shapeshifter",
+      "Cute Dog",
+      "Wisdom"
+     ]
+    },
+    {
+     "id": "monia-6",
+     "theme": "Ocean",
+     "template": "focus",
+     "prism": false,
+     "base": "monia/monia-6.png",
+     "shimmer": "monia/monia-6.shimmer.png",
+     "motifs": [
+      "Singing",
+      "Cute Annoyance Mini",
+      "Cute Meanie Melissa",
+      "Cute Ditz Monami"
+     ]
+    },
+    {
+     "id": "monia-7",
+     "theme": "Amethyst",
+     "template": "scene",
+     "prism": false,
+     "base": "monia/monia-7.png",
+     "shimmer": "monia/monia-7.shimmer.png",
+     "motifs": [
+      "Army of the Cute"
+     ]
+    },
+    {
+     "id": "monia-8",
+     "theme": "Platinum",
+     "template": "grid",
+     "prism": true,
+     "base": "monia/monia-8.png",
+     "shimmer": "monia/monia-8.shimmer.png",
+     "motifs": [
+      "Cute Nerd Magenta",
+      "Cute Wings",
+      "Flying Island in the Sky",
+      "Accusation",
+      "Trial of Loyalty",
+      "MOE Shield",
+      "Cute Conversion",
+      "Phoenix Tackle",
+      "Performance"
+     ]
+    }
+   ]
+  },
+  {
+   "id": "future",
+   "name": "Dreadful Future",
+   "tagline": "9 Rarity Skins for your Collection!",
+   "variants": [
+    {
+     "id": "future-1",
+     "theme": "Ember",
+     "template": "scene",
+     "prism": true,
+     "base": "future/future-1.png",
+     "shimmer": "future/future-1.shimmer.png",
+     "motifs": [
+      "Armageddon"
+     ]
+    },
+    {
+     "id": "future-2",
+     "theme": "Sunfire",
+     "template": "scene",
+     "prism": false,
+     "base": "future/future-2.png",
+     "shimmer": "future/future-2.shimmer.png",
+     "motifs": [
+      "Ifrit"
+     ]
+    },
+    {
+     "id": "future-3",
+     "theme": "Desert",
+     "template": "scene",
+     "prism": false,
+     "base": "future/future-3.png",
+     "shimmer": "future/future-3.shimmer.png",
+     "motifs": [
+      "Guardian Beast Tu"
+     ]
+    },
+    {
+     "id": "future-4",
+     "theme": "Noir",
+     "template": "scene",
+     "prism": false,
+     "base": "future/future-4.png",
+     "shimmer": "future/future-4.shimmer.png",
+     "motifs": [
+      "Lunatic Hawk"
+     ]
+    },
+    {
+     "id": "future-5",
+     "theme": "Royal",
+     "template": "scene",
+     "prism": false,
+     "base": "future/future-5.png",
+     "shimmer": "future/future-5.shimmer.png",
+     "motifs": [
+      "Cybug BEE"
+     ]
+    },
+    {
+     "id": "future-6",
+     "theme": "Ocean",
+     "template": "focus",
+     "prism": false,
+     "base": "future/future-6.png",
+     "shimmer": "future/future-6.shimmer.png",
+     "motifs": [
+      "Deepsea Castle",
+      "Deepsea Witch",
+      "Siphem, the Deepsea Demon",
+      "Deepsea Werewolf"
+     ]
+    },
+    {
+     "id": "future-7",
+     "theme": "Crimson",
+     "template": "grid",
+     "prism": false,
+     "base": "future/future-7.png",
+     "shimmer": "future/future-7.shimmer.png",
+     "motifs": [
+      "Future Tech Mech",
+      "Future Tech Jetpack",
+      "Future Tech Database",
+      "Future Tech Fists",
+      "Future Tech Barrage",
+      "Future Tech Battery",
+      "Future Tech Doomsday Bomb",
+      "Future Tech Prototypes",
+      "Future Tech Organnon"
+     ]
+    },
+    {
+     "id": "future-8",
+     "theme": "Forest",
+     "template": "grid",
+     "prism": false,
+     "base": "future/future-8.png",
+     "shimmer": "future/future-8.shimmer.png",
+     "motifs": [
+      "Guardian Beast Hu",
+      "Guardian Beast Hou",
+      "Guardian Beast Gou",
+      "Guardian Beast Yang",
+      "Guardian Beast Ma",
+      "Mao, the Vengeful Guardian",
+      "Guard Duty",
+      "Guardian Beast Shu",
+      "Guardian Beast Ji"
+     ]
+    }
+   ]
+  },
+  {
+   "id": "world1",
+   "name": "Around the World 1",
+   "tagline": "9 Rarity Skins for your Collection!",
+   "variants": [
+    {
+     "id": "world1-1",
+     "theme": "Desert",
+     "template": "mosaic",
+     "prism": false,
+     "base": "world1/world1-1.png",
+     "shimmer": "world1/world1-1.shimmer.png",
+     "motifs": [
+      "Steam Dwarf Engineer",
+      "Sinister Idol",
+      "Sarcophagus of Sealed Magic",
+      "Big Gwen Guard"
+     ]
+    },
+    {
+     "id": "world1-2",
+     "theme": "Skyline",
+     "template": "scene",
+     "prism": false,
+     "base": "world1/world1-2.png",
+     "shimmer": "world1/world1-2.shimmer.png",
+     "motifs": [
+      "Tree of Golden Apples"
+     ]
+    },
+    {
+     "id": "world1-3",
+     "theme": "Ember",
+     "template": "focus",
+     "prism": true,
+     "base": "world1/world1-3.png",
+     "shimmer": "world1/world1-3.shimmer.png",
+     "motifs": [
+      "Ferocious Jaguar Warrior",
+      "Steam Dwarf Engineer",
+      "Teocuilatl, the Embodiment of Gods",
+      "Thep, the Court Scribe"
+     ]
+    },
+    {
+     "id": "world1-4",
+     "theme": "Verdant",
+     "template": "scene",
+     "prism": false,
+     "base": "world1/world1-4.png",
+     "shimmer": "world1/world1-4.shimmer.png",
+     "motifs": [
+      "Soul Shard Sekhem"
+     ]
+    },
+    {
+     "id": "world1-5",
+     "theme": "Royal",
+     "template": "grid",
+     "prism": false,
+     "base": "world1/world1-5.png",
+     "shimmer": "world1/world1-5.shimmer.png",
+     "motifs": [
+      "Thebinxan War Counselor",
+      "Grinning Cat",
+      "Elusive Hind",
+      "Sinister Idol",
+      "Harpthenean War Counselor",
+      "Cykyran War Counselor",
+      "Sarcophagus of Sealed Magic",
+      "Feral, the Fortress Breaker",
+      "Lethe, the Forgetful Fixer"
+     ]
+    },
+    {
+     "id": "world1-6",
+     "theme": "Ocean",
+     "template": "scene",
+     "prism": false,
+     "base": "world1/world1-6.png",
+     "shimmer": "world1/world1-6.shimmer.png",
+     "motifs": [
+      "Crystal Well"
+     ]
+    },
+    {
+     "id": "world1-7",
+     "theme": "Platinum",
+     "template": "mosaic",
+     "prism": true,
+     "base": "world1/world1-7.png",
+     "shimmer": "world1/world1-7.shimmer.png",
+     "motifs": [
+      "3-Headed Giant",
+      "Sacrificial Dagger",
+      "Soul Shard Sah",
+      "Medusa's Curse"
+     ]
+    },
+    {
+     "id": "world1-8",
+     "theme": "Prism",
+     "template": "scene",
+     "prism": true,
+     "base": "world1/world1-8.png",
+     "shimmer": "world1/world1-8.shimmer.png",
+     "motifs": [
+      "Doom Prophecy"
+     ]
+    }
+   ]
+  },
+  {
+   "id": "world2",
+   "name": "Around the World 2",
+   "tagline": "9 Rarity Skins for your Collection!",
+   "variants": [
+    {
+     "id": "world2-1",
+     "theme": "Rosebud",
+     "template": "mosaic",
+     "prism": false,
+     "base": "world2/world2-1.png",
+     "shimmer": "world2/world2-1.shimmer.png",
+     "motifs": [
+      "Pinta, the Singing Ship",
+      "Dive Bomblebee",
+      "Potion Juggler",
+      "Treasure Skeleton",
+      "Cardinal Beast Xuanwu"
+     ]
+    },
+    {
+     "id": "world2-2",
+     "theme": "Sunfire",
+     "template": "scene",
+     "prism": false,
+     "base": "world2/world2-2.png",
+     "shimmer": "world2/world2-2.shimmer.png",
+     "motifs": [
+      "Dance of the Flame Pillars"
+     ]
+    },
+    {
+     "id": "world2-3",
+     "theme": "Verdant",
+     "template": "scene",
+     "prism": false,
+     "base": "world2/world2-3.png",
+     "shimmer": "world2/world2-3.shimmer.png",
+     "motifs": [
+      "Scavenging Crane"
+     ]
+    },
+    {
+     "id": "world2-4",
+     "theme": "Crimson",
+     "template": "focus",
+     "prism": false,
+     "base": "world2/world2-4.png",
+     "shimmer": "world2/world2-4.shimmer.png",
+     "motifs": [
+      "Priest of Luna",
+      "Cardinal Beast Xuanwu",
+      "Dive Bomblebee",
+      "Pinta, the Singing Ship"
+     ]
+    },
+    {
+     "id": "world2-5",
+     "theme": "Amethyst",
+     "template": "scene",
+     "prism": false,
+     "base": "world2/world2-5.png",
+     "shimmer": "world2/world2-5.shimmer.png",
+     "motifs": [
+      "Idej Sword - Onima"
+     ]
+    },
+    {
+     "id": "world2-6",
+     "theme": "Ocean",
+     "template": "grid",
+     "prism": false,
+     "base": "world2/world2-6.png",
+     "shimmer": "world2/world2-6.shimmer.png",
+     "motifs": [
+      "Xiong, the Bamboo Guardian",
+      "Idej Lord Shoguwana",
+      "Treasure Skeleton",
+      "Bonded Companion Mellvy",
+      "Idej Lord Todugawin",
+      "Rebelliokai Timid Tanuki",
+      "Rebelliokai Courtly Kirin",
+      "Wolflesia, the Canine Flower",
+      "Secret Blue Spice"
+     ]
+    },
+    {
+     "id": "world2-7",
+     "theme": "Frost",
+     "template": "mosaic",
+     "prism": false,
+     "base": "world2/world2-7.png",
+     "shimmer": "world2/world2-7.shimmer.png",
+     "motifs": [
+      "Golden Bananas",
+      "Luna Kiai",
+      "Smugness",
+      "Idej Sword - Onima",
+      "Elixir of Mana"
+     ]
+    },
+    {
+     "id": "world2-8",
+     "theme": "Prism",
+     "template": "scene",
+     "prism": true,
+     "base": "world2/world2-8.png",
+     "shimmer": "world2/world2-8.shimmer.png",
+     "motifs": [
+      "Cardinal Beast Zhuque"
+     ]
+    }
+   ]
+  },
+  {
+   "id": "community",
+   "name": "Community Pack",
+   "tagline": "9 Rarity Skins for your Collection!",
+   "variants": [
+    {
+     "id": "community-1",
+     "theme": "Ocean",
+     "template": "scene",
+     "prism": false,
+     "base": "community/community-1.png",
+     "shimmer": "community/community-1.shimmer.png",
+     "motifs": [
+      "Aurora Borealis"
+     ]
+    },
+    {
+     "id": "community-2",
+     "theme": "Prism",
+     "template": "grid",
+     "prism": true,
+     "base": "community/community-2.png",
+     "shimmer": "community/community-2.shimmer.png",
+     "motifs": [
+      "Gigantisaur Spinor",
+      "Classical Harpyformer",
+      "Steam Dwarf Dragon Pilot",
+      "Tazune, the Angry Hot-Blood",
+      "Xal, the Animated Armor",
+      "Diamond, the Keeper of Peace",
+      "Shanty Harpyformer",
+      "Natas, the Master of Hell",
+      "Tamed Hell Fox"
+     ]
+    },
+    {
+     "id": "community-3",
+     "theme": "Amethyst",
+     "template": "scene",
+     "prism": false,
+     "base": "community/community-3.png",
+     "shimmer": "community/community-3.shimmer.png",
+     "motifs": [
+      "Greatmaw Siren"
+     ]
+    },
+    {
+     "id": "community-4",
+     "theme": "Noir",
+     "template": "focus",
+     "prism": false,
+     "base": "community/community-4.png",
+     "shimmer": "community/community-4.shimmer.png",
+     "motifs": [
+      "Luna, the Flame Fairy",
+      "Archibald, the Archmage",
+      "Ballad Harpyformer",
+      "Key, the Cursed Thief"
+     ]
+    },
+    {
+     "id": "community-5",
+     "theme": "Sunfire",
+     "template": "scene",
+     "prism": false,
+     "base": "community/community-5.png",
+     "shimmer": "community/community-5.shimmer.png",
+     "motifs": [
+      "The Fifth Circle of Hell"
+     ]
+    },
+    {
+     "id": "community-6",
+     "theme": "Verdant",
+     "template": "grid",
+     "prism": false,
+     "base": "community/community-6.png",
+     "shimmer": "community/community-6.shimmer.png",
+     "motifs": [
+      "Fairy Queen Crestina, the Creation Fairy",
+      "Harpyformer Choir",
+      "Brackle, the Catapulting Turtle",
+      "Monster Nest",
+      "Golden Ladybug",
+      "Gigantisaur Stegon",
+      "Populated Island Turtle",
+      "Tuscan Mystic",
+      "Diamond Spider"
+     ]
+    },
+    {
+     "id": "community-7",
+     "theme": "Rosebud",
+     "template": "scene",
+     "prism": false,
+     "base": "community/community-7.png",
+     "shimmer": "community/community-7.shimmer.png",
+     "motifs": [
+      "Liquid Luck"
+     ]
+    },
+    {
+     "id": "community-8",
+     "theme": "Royal",
+     "template": "focus",
+     "prism": false,
+     "base": "community/community-8.png",
+     "shimmer": "community/community-8.shimmer.png",
+     "motifs": [
+      "Golden Ankh",
+      "Weapon Collecting Wight",
+      "Ska Harpyformer",
+      "Kasperov, the King of Kings [B]"
+     ]
+    }
+   ]
+  },
+  {
+   "id": "trials",
+   "name": "Trials and Tribulations",
+   "tagline": "9 Rarity Skins for your Collection!",
+   "variants": [
+    {
+     "id": "trials-1",
+     "theme": "Royal",
+     "template": "mosaic",
+     "prism": false,
+     "base": "trials/trials-1.png",
+     "shimmer": "trials/trials-1.shimmer.png",
+     "motifs": [
+      "Moonlight Butterfly",
+      "Wise Village Elder",
+      "Alleria, the Queen of Spiders",
+      "Mimic",
+      "???, the Shapeshifter",
+      "Flaming Dragonegg",
+      "Cuberto, Supreme Lord of Edges",
+      "The Golden Gate",
+      "Mary Crestmas"
+     ]
+    },
+    {
+     "id": "trials-2",
+     "theme": "Sunfire",
+     "template": "scene",
+     "prism": false,
+     "base": "trials/trials-2.png",
+     "shimmer": "trials/trials-2.shimmer.png",
+     "motifs": [
+      "Heat Wave"
+     ]
+    },
+    {
+     "id": "trials-3",
+     "theme": "Verdant",
+     "template": "focus",
+     "prism": false,
+     "base": "trials/trials-3.png",
+     "shimmer": "trials/trials-3.shimmer.png",
+     "motifs": [
+      "Bifab, Bridge to Coolness",
+      "Cuberto, Supreme Lord of Edges",
+      "Moonlight Butterfly",
+      "Spirit of the Super-Killing Knife"
+     ]
+    },
+    {
+     "id": "trials-4",
+     "theme": "Noir",
+     "template": "scene",
+     "prism": false,
+     "base": "trials/trials-4.png",
+     "shimmer": "trials/trials-4.shimmer.png",
+     "motifs": [
+      "Initiation Ritual"
+     ]
+    },
+    {
+     "id": "trials-5",
+     "theme": "Skyline",
+     "template": "grid",
+     "prism": false,
+     "base": "trials/trials-5.png",
+     "shimmer": "trials/trials-5.shimmer.png",
+     "motifs": [
+      "Mimic",
+      "Wise Village Elder",
+      "Alleria, the Queen of Spiders",
+      "Spirit of the Heart Bow",
+      "Glasowt",
+      "Sparkfly Queen",
+      "Lolki, Trickstar of Coolness",
+      "Fiery Slime",
+      "Spirit of the Shattered Trident"
+     ]
+    },
+    {
+     "id": "trials-6",
+     "theme": "Crimson",
+     "template": "scene",
+     "prism": false,
+     "base": "trials/trials-6.png",
+     "shimmer": "trials/trials-6.shimmer.png",
+     "motifs": [
+      "Voodoo Curse"
+     ]
+    },
+    {
+     "id": "trials-7",
+     "theme": "Platinum",
+     "template": "mosaic",
+     "prism": true,
+     "base": "trials/trials-7.png",
+     "shimmer": "trials/trials-7.shimmer.png",
+     "motifs": [
+      "Celia, the Class Clown",
+      "Hipdall, Protector of Coolness",
+      "Divine Gift of Equality",
+      "Beer",
+      "Null, the Mage Slayer",
+      "Icy Dragonegg",
+      "Divine Gift of Death",
+      "Poison Pollen",
+      "Saint Nicolas"
+     ]
+    },
+    {
+     "id": "trials-8",
+     "theme": "Prism",
+     "template": "scene",
+     "prism": true,
+     "base": "trials/trials-8.png",
+     "shimmer": "trials/trials-8.shimmer.png",
+     "motifs": [
+      "Flaming Dragonegg"
+     ]
+    }
+   ]
+  }
+ ]
+}

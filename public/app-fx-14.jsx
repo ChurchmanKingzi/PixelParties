@@ -385,7 +385,7 @@ const ppFx14Spore = ppR1Leinwand((g, t, sz, te) => {
 //  140 + 130 · i ms, verschieben, kippen und strecken sich); ③ sieben Augenpaare im Dunkeln (gelb, 420–740 ms ab 120–540 ms). Das Vollbild schreibt direkt in den Bildpuffer (`ppFx2Leinwand`).
 // ═════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
 const PP_FX14_NACHT = { dunkel: ['#12101f', '#08060c'].map(ppHex), schliere: ppHex('#ac87de'), auge: ppHex('#ffd066'), augeHell: ppHex('#fff196'), augeRand: ppHex('#a87c00') };
-const ppFx14NachtHeulen = ppFx2Leinwand((g, t, sz, te, buf) => {
+const ppFx14NachtHeulenLeinwand = ppFx2Leinwand((g, t, sz, te, buf) => {
   const S = sz.S, gw = sz.gw, gh = sz.gh, W = te.W, H = te.H, C = PP_FX14_NACHT, EIO = PP_FX14_E.eio;
   const env = ppFx14Kf(t / 1400, [[0, 0], [0.25, 1], [0.7, 0.9], [1, 0]], EIO), b32 = te.b32 || (te.b32 = new Uint32Array(buf.buffer, buf.byteOffset, buf.length >> 2)), bay = te.bay, ps = te.schliere;
   if (env > 0.003) {
@@ -448,6 +448,17 @@ const ppFx14NachtHeulen = ppFx2Leinwand((g, t, sz, te, buf) => {
     };
   },
 });
+// Vollbild-Deckel (P2-a Teil 2): Fensterbreite/Zelle × Fensterhöhe/Zelle > 140 000 Zellen (720p mit Hero-Pixel 2: 230 000) → Zelle +1 (wie app-fx-58). Gemessen bei 4× Drosselung: Median 2,0 → 5,3 ms, p99 23 → 50 ms
+// (Vignette + Farbwahl je Zelle und Bild); mit Deckel (720p: Zelle 3 = 102 000 Zellen, Handy 844×390: Zelle 3 = 37 000) wieder auf dem alten Stand (Handy 6×: Median 2,0 → 3,3 ms ohne Deckel). Die Zelle gibt `zelleS` vor (Notbremse `__ppFxZelleFest` bleibt maßgeblich).
+function ppFx14NachtHeulen(props) {
+  let S = ppFxZelleFuer(props);
+  if (!(window.__ppFxZelleFest > 0)) {
+    const W = Math.max(320, window.innerWidth), H = Math.max(240, window.innerHeight);
+    const MAX = window.ppIsPhone && window.ppIsPhone() ? 60000 : 140000;   // Handy: 6× gedrosselt Median 3,3 ms bei 82 000 Zellen → Deckel 60 000
+    while (Math.ceil(W / S) * Math.ceil(H / S) > MAX && S < 8) S++;
+  }
+  return React.createElement(ppFx14NachtHeulenLeinwand, { ...props, zelleS: S });
+}
 
 // ═════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
 //  Orbitallaser, rot (`orbital_laser_red`, Siphem / Blood Moon under the Sea) — PIXELART. Strahl von 20 px unter dem oberen Fensterrand bis 40 px unter die Zielmitte, Ladekugel bei 24 px:

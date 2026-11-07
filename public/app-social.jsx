@@ -553,7 +553,7 @@ function DmChatWindow({ peer, meId, onClose }) {
         ? <div className="social-chat-blocked">{iBlocked ? 'You blocked this player. Unblock to chat again.' : "You can't chat with this player."}</div>
         : (
           <form className="social-chat-input" onSubmit={(e) => { e.preventDefault(); send(); }}>
-            <input className="input" value={text} maxLength={500} autoFocus placeholder={'Message ' + name + '…'}
+            <input className="input" data-pp-tastatur="an" value={text} maxLength={500} autoFocus placeholder={'Message ' + name + '…'}
                    onChange={(e) => setText(e.target.value)} />
             <button className="btn" type="submit" disabled={!text.trim()}>SEND</button>
           </form>
