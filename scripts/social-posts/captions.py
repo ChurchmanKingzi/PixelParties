@@ -45,9 +45,9 @@ HEROES = {
         "#Warrior #FantasyArt"),
     "Argos, the Eye of the Cosmos": (
         "Your opponent's hand feeds the void. 👁️",
-        "Argos collects a Change Counter for every card in your opponent's hand. Then you can cash them in once per turn to place a \"Cosmic Depths\" Creature of that level straight into his Support Zone.",
-        "black fog, floating red eyes and stars",
-        "#DarkFantasy #Cosmic"),
+        "Argos watches your opponent's hand: each card they hold becomes a Change Counter on him. Spend X of them once per turn to put a \"Cosmic Depths\" Creature of level X straight into his Support Zone – Analyzer, Gatherer, Life-Searcher, and finally the Invader.",
+        "a giant black eye with tentacles collecting glowing purple Change Counters and summoning four Cosmic Depths cards as support pieces below it",
+        "#DarkFantasy #Cosmic #Eldritch"),
     "Arthor, Inheritor of the Barbarian Sword": (
         "Once per turn: 300 damage to any target. ⚔️",
         "Arthor ascends on top of \"Arthor, the King of Blackport\" once he is equipped with the Legendary Sword of a Barbarian King and a Summoning Circle. Then, once per turn, he can deal 300 damage to any target. It counts as an Attack.",

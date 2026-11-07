@@ -108,7 +108,11 @@
   "logoFront": true,
   "eyeAt": 330,
   "nameFront": true,
-  "noShadow": true
+  "noShadow": true,
+  "cosmosshow": true,
+  "opener": "wind",
+  "musicHit": 9.6,
+  "accent": "#9544d5"
  },
  "Arthor, Inheritor of the Barbarian Sword": {
   "particles": [
