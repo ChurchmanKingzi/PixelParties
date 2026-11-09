@@ -67,9 +67,6 @@ class WebShow:
         c.paste(inner, (1, 1))
         self.opp_back = c.transpose(Image.ROTATE_180).resize((98, 133), Image.NEAREST)        # gegnerische Helden: verdeckt, 180° gedreht
         self.spiders = [self._outlined(ld(n)) for n in self.SPIDER_FILES]
-        self.fire = self._outlined(ld('fireball-2'))
-        self.bolt = ld('chain-lightning')
-        self.arrow = ld('flame-arrow')
         self.trap = ld('trapping')
         self._build_web()
         self.SHOCKS = tuple([0.0] + [t + 1.25 for t in self.T_ACT] + [self.T_ACT[2] + 1.9])
@@ -322,53 +319,42 @@ class WebShow:
                     sx, sy = x + 70 + (i - 1) * 4, y0 - 6
                 self._spider(canvas, 2 + (i % 2), sx, sy, t)
 
+    def _cellpt(self, x, y):
+        return ((x - self.ox) / self.gp, (y - self.oy) / self.gp)
+
     def _draw_attack(self, canvas, d, t):
+        """Die drei Angriffe sind Python-Nachbauten der echten Spiel-Animationen (gamefx.py): Feuerball, Kettenblitz, Sandstrahl."""
+        import gamefx
         cx, cy = self.center
         tgt = (cx, 690)
-        # (Start, Ende, Bild, Quelle) je Akt
-        for a, T in enumerate(self.T_ACT):
-            t0, t1 = T + 0.3, T + 1.25
-            src = (self.OPP_X[a], self.OPP_Y + 40)
-            if not (t0 - 0.0 <= t < t1 + 0.5):
-                continue
-            u = min(1.0, (t - t0) / (t1 - t0))
-            if t < T + 0.3:
-                continue
-            if t >= self.reveal_t(a) and a == 0:                                         # Akt 1: der Feuerball bleibt im Netz hängen
-                u = 0.7
-            x = src[0] + (tgt[0] - src[0]) * u
-            y = src[1] + (tgt[1] - src[1]) * u
-            if t >= t1 and a != 0:
-                continue
-            if a == 0 and t >= self.reveal_t(0) + 0.5:
-                continue
-            if a == 0:
-                s = self.stamp(self.fire, ('fire',), scale=self.gp)
-                self._blit(canvas, s, x, y)
-                if t >= self.reveal_t(0):
-                    self._web_ball(d, x, y, 90)
-            elif a == 1:                                                                  # Blitz zuckt von oben herab
-                b = self.stamp(self.bolt, ('bolt',), scale=self.gp // 2)
-                ly = src[1] + b.height / 2 - 40
-                if int(t * 20) % 2 == 0:
-                    canvas.paste(b, (int(src[0] + (tgt[0] - src[0]) * u - b.width / 2), int(src[1] + (tgt[1] - src[1]) * u - b.height * 0.3)), b)
-            else:
-                for k in range(3):                                                        # Pfeilsalve
-                    uk = max(0.0, min(1.0, u - 0.08 * k))
-                    xx = src[0] + (tgt[0] - src[0] + (k - 1) * 120) * uk
-                    yy = src[1] + (tgt[1] - src[1]) * uk
-                    s = self.stamp(self.arrow, ('arrow',), scale=self.gp // 2)
-                    self._blit(canvas, s, xx, yy)
-        # Treffer auf Alleria (Akt 2, 3)
+        m = gamefx.Cells(canvas, self.ox, self.oy, self.gp)
+        T0, T1, T2 = self.T_ACT
+        # Akt 1: Feuerball – bleibt im Crimson Web hängen (Flug endet beim Aufdecken)
+        src0 = (self.OPP_X[0], self.OPP_Y + 70)
+        if not hasattr(self, '_fb'):
+            self._fb = gamefx.Feuerball(self._cellpt(*src0), self._cellpt(*tgt), tA=1.7, k=0.75, gr=0.85, stop=self.reveal_t(0) - (T0 + 0.3), kill=self.reveal_t(0) - (T0 + 0.3) + 0.45)
+        tau = t - (T0 + 0.3)
+        if 0 <= tau < self._fb.kill + 0.8:
+            self._fb.draw(m, tau)
+            if t >= self.reveal_t(0) and t < self.reveal_t(0) + 0.5:
+                hx, hy = self._fb.kopf(self._fb.stop)
+                px, py = self.cpos(hx, hy)
+                self._web_ball(d, px, py, 110)
+        # Akt 2: Kettenblitz trifft Alleria
+        if not hasattr(self, '_kb'):
+            self._kb = gamefx.Kettenblitz(self._cellpt(self.OPP_X[1], self.OPP_Y + 70), self._cellpt(*tgt), step=1, k=0.62)
+        t_b = self.reveal_t(1) - gamefx.LT
+        self._kb.laden(m, t - (T1 + 0.3), t_b - (T1 + 0.3))
+        if t >= t_b:
+            self._kb.draw(m, t - t_b)
+        # Akt 3: Sandstrahl
+        if not hasattr(self, '_sd'):
+            self._sd = gamefx.Sandstrahl((self.OPP_X[2], self.OPP_Y + 70), tgt, self.gp, dur=800, dichte=2.2)
+        self._sd.draw(m, t - (T2 + 0.4))
+        # Schadenszahlen auf Alleria (Akt 2, 3)
         for a in (1, 2):
             tau = t - (self.T_ACT[a] + 1.25)
             if 0 <= tau < 0.9:
-                if tau < 0.25:
-                    for k in range(12):
-                        ang = 2 * math.pi * k / 12
-                        r = 5 + 8 * ease_out(tau / 0.25)
-                        ci, cj = self.cell(tgt[0] + math.cos(ang) * r * self.gp, tgt[1] + math.sin(ang) * r * self.gp)
-                        self.rect(d, ci, cj, (255, 255, 255) if k % 2 else (255, 120, 60))
                 self.draw_text(canvas, str(90 if a == 1 else 60), 8, (tgt[0] + 230, 660 - 100 * smooth(tau / 0.9)), color=(255, 244, 220), outline=(210, 20, 40), shadow=None)
         # Akt 1: Negation
         tau = t - self.reveal_t(0)
