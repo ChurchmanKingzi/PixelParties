@@ -400,7 +400,9 @@ function ppFx32Tod(platz) {
         const v = t >= PP_FX32_HALT + PP_FX32_DAUER ? 0 : (t >= PP_FX32_HALT + PP_FX32_DAUER * 0.62 ? 2 : 1);   // Karte: hell → Schachbrett-Schleier → Gefallen-Verdunklung
         if (v !== Z.veil) {
           Z.veil = v;
-          if (v === 0) zone.removeAttribute('data-pp-stirbt'); else zone.setAttribute('data-pp-stirbt', String(v));
+          // Schachbrett-Schleier in Hero-Pixel-Zellen (vorher fest `4px · --board-scale`: gebrochene, gröbere Zelle als die Figur): Zelle dieser Zone = Rasterzelle der Effekte (`ppFxZelle`)
+          if (v === 2 && !window.PP_RETRO) { try { zone.style.setProperty('--pp-zelle', (typeof ppFxZelle === 'function' ? ppFxZelle(zone) : 3) + 'px'); } catch (e) { /* Rückfall in style.css: 2 px */ } }
+          if (v === 0) { zone.removeAttribute('data-pp-stirbt'); zone.style.removeProperty('--pp-zelle'); } else zone.setAttribute('data-pp-stirbt', String(v));
         }
         ppFx32Zeichne(Z, t, f);
       }

@@ -2168,11 +2168,15 @@ function _ppTzFahre(bc, nach) {
   // Teilbaum seinen Stil neu berechnen (jede Stufe ~60 ms bei 6× Drosselung), ein Inline-`transform` fasst nur die beiden Ebenen an.
   const ruhe = (v) => {
     for (const e of ebenen()) { e.style.transform = ''; e.style.transition = ''; }
-    bc.style.setProperty('--tz-x', v.x.toFixed(1) + 'px'); bc.style.setProperty('--tz-y', v.y.toFixed(1) + 'px'); bc.style.setProperty('--tz-s', v.s.toFixed(3));
+    bc.style.setProperty('--tz-x', v.x.toFixed(1) + 'px'); bc.style.setProperty('--tz-y', v.y.toFixed(1) + 'px'); bc.style.setProperty('--tz-s', v.s.toFixed(4));
     window._ppTzAnz = { x: v.x, y: v.y, s: v.s };
+    if (window.ppTbDimmerZelle) window.ppTbDimmerZelle();
   };
   const stufe = (v) => {
-    const t = `translate(${v.x.toFixed(1)}px, ${v.y.toFixed(1)}px) scale(${v.s.toFixed(3)})`;
+    // Pixelart: auch die Zwischenbilder der Fahrt liegen auf den Zoomstufen (Hero-Pixel × Zoom = ganze Bildschirmpixel, s. ppTutorialZoom) und auf ganzen Verschiebungen — kein stufenloses Skalieren
+    const h0 = window._ppTzH0;
+    if (h0 > 0) v = { x: Math.round(v.x), y: Math.round(v.y), s: Math.max(1, Math.round(v.s * h0) / h0) };
+    const t = `translate(${v.x.toFixed(1)}px, ${v.y.toFixed(1)}px) scale(${v.s.toFixed(4)})`;
     for (const e of ebenen()) e.style.transform = t;
     window._ppTzAnz = { x: v.x, y: v.y, s: v.s };
   };
@@ -2207,9 +2211,48 @@ function ppTutorialZoomAus() {
     if (!bc || !bc.classList.contains('tut-zoom') || !window._ppTz) return null;
     window._ppTz = null;
     _ppTzFahre(bc, { x: 0, y: 0, s: 1 });
-    return new Promise((fertig) => setTimeout(() => { if (!window._ppTz) bc.classList.remove('tut-zoom'); fertig(); }, 560));
+    return new Promise((fertig) => setTimeout(() => { if (!window._ppTz) { bc.classList.remove('tut-zoom'); window._ppTzH0 = 0; if (window.ppTbDimmerZelle) window.ppTbDimmerZelle(); } fertig(); }, 560));
   } catch { return null; }
 }
+// Hero-Pixel (CSS-px, Kommazahl) der Brettreihe der Ziele OHNE Zoom. Gemessen wird nur im unzoomten Zustand (je Fenstergröße/Brettskala gemerkt, beide Reihen); steht der Zoom schon, gilt der gemerkte
+// Wert — fehlt er, wird der Messwert durch den laufenden Zoom geteilt (nur im Ruhezustand verlässlich). 0 = unbekannt (dann Rückfall auf 0,05er-Stufen).
+function _ppTzH0Messen(liste, py, cur) {
+  try {
+    if (typeof ppFxHeldPixel !== 'function') return 0;
+    const sig = window.innerWidth + 'x' + window.innerHeight + '|' + (document.documentElement.style.getPropertyValue('--board-scale') || '');
+    const zoomt = !!document.querySelector('.board-center.tut-zoom') && window._ppTz;
+    let c = window._ppTzH0Cache;
+    if (!c || c.sig !== sig) c = window._ppTzH0Cache = { sig, me: 0, opp: 0 };
+    if (!zoomt) {
+      const H = window.innerHeight;
+      const m = ppFxHeldPixel({ x: window.innerWidth / 2, y: H * 0.75 }).px, o = ppFxHeldPixel({ x: window.innerWidth / 2, y: H * 0.25 }).px;
+      if (m > 0) c.me = m; if (o > 0) c.opp = o;
+    }
+    const reihe = py < window.innerHeight * 0.5 ? 'opp' : 'me';
+    let h0 = c[reihe] || c.me || c.opp;
+    if (!(h0 > 0) && zoomt && !window._ppTzRaf && cur && cur.s > 0) { const p = ppFxHeldPixel(liste[0]).px; if (p > 0) h0 = p / cur.s; }
+    return h0 > 0 ? h0 : 0;
+  } catch (e) { return 0; }
+}
+// Textbox-Dimmer (Dither-Raster über dem Brett): Zelle = Hero-Pixel des Bretts, im Tutorial-Zoom = das gezoomte Hero-Pixel (k ganze Pixel). Außerhalb des Bretts (Menü) und im Retro-Modus bleibt es bei 2 px.
+// Setzt `--tb-dz` am Overlay (style.css `.textbox-overlay`) und gibt die Zelle zurück; die Textbox ruft es beim Rendern, der Zoom nach jeder Fahrt.
+function ppTbDimmerZelle() {
+  let z = 2;
+  try {
+    if (!window.PP_RETRO) {
+      const pa = window.PPPixelAnim;
+      if (pa && pa.KONFIG && pa.KONFIG.aktiv && document.querySelector('.board-center')) {
+        z = pa.standardRaster();
+        if (window._ppTz && window._ppTzH0 > 0 && document.querySelector('.board-center.tut-zoom')) z = Math.round(window._ppTzH0 * window._ppTz.s);
+      }
+    }
+    z = Math.max(2, Math.min(8, Math.round(z) || 2));
+    const ov = document.querySelector('.textbox-overlay');
+    if (ov && ov.style.getPropertyValue('--tb-dz') !== z + 'px') ov.style.setProperty('--tb-dz', z + 'px');
+  } catch (e) { /* bleibt bei 2 px */ }
+  return z;
+}
+window.ppTbDimmerZelle = ppTbDimmerZelle;
 function ppTutorialZoom(elemente) {
   try {
     if (window.ppIsPhone && window.ppIsPhone()) return null;
@@ -2241,9 +2284,20 @@ function ppTutorialZoom(elemente) {
     if (tb) { const q = tb.getBoundingClientRect(); if (q.height > 0 && q.top + q.height / 2 < window.innerHeight / 2) oben = Math.max(oben, q.bottom + 8); }
     const Aw = bcr.width, Ah = Math.max(80, unten - oben);
     const bw = (br - bl) + 28, bh = (bb - bt) + 28;
-    let s = Math.min((Aw * 0.8) / bw, (Ah * 0.8) / bh, 2);
-    if (!(s >= 1.12)) return ppTutorialZoomAus();
-    s = Math.round(s * 20) / 20;
+    const sFit = Math.min((Aw * 0.8) / bw, (Ah * 0.8) / bh, 2);
+    if (!(sFit >= 1.12)) return ppTutorialZoomAus();
+    // ★ PIXELART-ZOOM (Tutorial-Befund „Zoom nicht ganzzahlig, Raster gröber als die Heldenpixel"): Die Zoomstufen sind nicht mehr stufenlos (vorher in 0,05er-Schritten, 1,15–2,0), sondern
+    // s = k / h0 mit ganzem k — h0 = Hero-Pixel der Reihe im Brett OHNE Zoom (CSS-px). Dann ist das Hero-Pixel im Zoom exakt k ganze Bildschirmpixel (jedes Sprite-Pixel gleich breit, die
+    // Rasterzelle der Effekte S·s und der Textbox-Dimmer `ppTbDimmerZelle` ebenso ganzzahlig). 1080p (h0 ≈ 3): 1,33 · 1,67 · 2,0; 720p (h0 ≈ 2): 1,5 · 2,0. Gewählt wird die größte Stufe, die in die freie Fläche passt.
+    const h0 = _ppTzH0Messen(liste, (bt + bb) / 2, cur);
+    let s = sFit, kz = 0;
+    if (h0 > 0) {
+      const kmin = Math.ceil(1.12 * h0 - 1e-6), kmax = Math.floor(2 * h0 + 1e-6);
+      for (let k = kmin; k <= kmax; k++) if (k / h0 <= sFit + 1e-6) kz = k;
+      if (!kz && kmin / h0 <= sFit * 1.1) kz = kmin;               // knapp unter der kleinsten Stufe: sie noch nehmen
+      if (!kz) return ppTutorialZoomAus();
+      s = kz / h0;
+    } else s = Math.round(sFit * 20) / 20;
     const Cx = bcr.left + Aw / 2, Cy = oben + Ah / 2, px = (bl + br) / 2, py = (bt + bb) / 2;
     let tx = Cx - O.x - s * (px - O.x), ty = Cy - O.y - s * (py - O.y);
     // das gezoomte Brett soll den Kasten weiter ausfuellen (keine leeren Raender): Kanten begrenzen
@@ -2251,8 +2305,11 @@ function ppTutorialZoom(elemente) {
     const klemme = (v, lo, hi) => (lo <= hi ? Math.min(hi, Math.max(lo, v)) : (lo + hi) / 2);
     tx = klemme(tx, bcr.right - O.x - s * W, bcr.left - O.x);
     ty = klemme(ty, bcr.bottom - O.y - s * H, bcr.top - O.y);
+    tx = Math.round(tx); ty = Math.round(ty);                         // ganze Bildschirmpixel: das Raster der Figuren/Sprites verschiebt sich nicht um Bruchteile
     if (Math.abs(tx - cur.x) < 2 && Math.abs(ty - cur.y) < 2 && Math.abs(s - cur.s) < 0.02) return null;
     window._ppTz = { x: tx, y: ty, s };
+    window._ppTzH0 = h0 > 0 ? h0 : 0;
+    if (window.ppTbDimmerZelle) window.ppTbDimmerZelle();
     bc.classList.add('tut-zoom');
     _ppTzFahre(bc, { x: tx, y: ty, s });
     return new Promise((fertig) => setTimeout(fertig, 580));
@@ -8766,6 +8823,57 @@ function ppSzene(malen, ende, vorbereiten, opts) {
     );
   };
 }
+
+// ═══════════════════════════════════════════════════════════════════
+//  VOLLBILD-SCHEIN AUS DITHER (Area-Landung, `area_descend`) — eine Leinwand in Rasterzellen (Zelle = Hero-Pixel, `ppFxZelle`), 30 Bilder/s
+//  Ersetzt den CSS-Radialverlauf über dem ganzen Fenster (`radial-gradient(ellipse at center, …)`, vom Netz als 160-Zellen-Pixelbild gerastert: 12-px-Zellen, 4× gröber als die Heroes, Moiré auf dem Brett).
+//  Verlauf wie vorher (Ellipse zur fernsten Ecke: 0 % Creme-Gold 55 %, 30 % Orange 25 %, 70 % leer), Hüllkurve 0 → 1 (30 %) → 0; Deckung als Bayer-Schwelle je Zelle (einmal vorgerechnet), je Bild nur ein enger Durchlauf.
+// ═══════════════════════════════════════════════════════════════════
+function ppAreaSchein(dauer) {
+  try {
+    if (window._playAnimations === false) return;
+    let S = 3; try { S = ppFxZelle(null); } catch (e) { /* Rückfall */ }
+    const W = Math.ceil(window.innerWidth / S), H = Math.ceil(window.innerHeight / S);
+    if (W < 8 || H < 8) return;
+    const cv = document.createElement('canvas');
+    cv.width = W; cv.height = H;
+    cv.setAttribute('aria-hidden', 'true'); cv.setAttribute('data-pp-px', 'aus');
+    cv.style.cssText = `position:fixed;left:0;top:0;width:${W * S}px;height:${H * S}px;z-index:9995;pointer-events:none;image-rendering:pixelated;`;
+    const ctx = cv.getContext('2d'), img = ctx.createImageData(W, H), u32 = new Uint32Array(img.data.buffer);
+    const snap = (c) => { try { return window.ppSnapRgb ? window.ppSnapRgb(c[0], c[1], c[2]) : c; } catch (e) { return c; } };
+    const pack = (c) => { const q = snap(c); return ((255 << 24) | (q[2] << 16) | (q[1] << 8) | q[0]) >>> 0; };
+    const C1 = pack([255, 241, 150]), C2 = pack([249, 172, 32]);
+    const a0 = new Float32Array(W * H), thr = new Float32Array(W * H), col = new Uint32Array(W * H);
+    const ex = W / 2, ey = H / 2, rx = ex * Math.SQRT2, ry = ey * Math.SQRT2;
+    for (let y = 0; y < H; y++) {
+      const v = (y + 0.5 - ey) / ry;
+      for (let x = 0; x < W; x++) {
+        const u = (x + 0.5 - ex) / rx, d = Math.sqrt(u * u + v * v), i = y * W + x;
+        const a = d < 0.3 ? 0.55 - 0.30 * (d / 0.3) : d < 0.7 ? 0.25 * (1 - (d - 0.3) / 0.4) : 0;
+        a0[i] = a; col[i] = d < 0.15 ? C1 : C2;
+        thr[i] = Math.pow(ppBayer(x + 2, y + 1), 1 / 0.62);        // Schwelle so, dass `a·env > thr` dem `a^0,62 > Bayer` des Pixelierers entspricht
+      }
+    }
+    document.body.appendChild(cv);
+    const t0 = performance.now(); let raf = 0, letzte = -1;
+    const schritt = (jetzt) => {
+      const t = jetzt - t0;
+      if (t >= dauer) { cv.remove(); return; }
+      const fr = Math.floor(t / 33);
+      if (fr !== letzte) {
+        letzte = fr;
+        const uu = t / dauer, env = uu < 0.3 ? 1 - Math.pow(1 - uu / 0.3, 2) : 1 - (uu - 0.3) / 0.7;
+        const n = W * H;
+        for (let i = 0; i < n; i++) u32[i] = (a0[i] * env > thr[i]) ? col[i] : 0;
+        ctx.putImageData(img, 0, 0);
+      }
+      raf = requestAnimationFrame(schritt);
+    };
+    raf = requestAnimationFrame(schritt);
+    setTimeout(() => { try { cancelAnimationFrame(raf); cv.remove(); } catch (e) { /* weg */ } }, dauer + 300);
+  } catch (e) { /* rein kosmetisch */ }
+}
+window.ppAreaSchein = ppAreaSchein;
 
 // ═══════════════════════════════════════════════════════════════════
 //  PIXELART-GESCHOSSE — Quelle → Ziel (24.10., Welle 3: Doomed Pirate, Zira Racer, Glasowt, Buttap)
@@ -25455,6 +25563,37 @@ const ANIM_REGISTRY = {
         </div>
       );
     };
+  })(),
+
+  // ── Area-Einschlag (`area_descend`: die fallende Area-Karte landet) — PIXELART (Canvas-Szene `ppSzene`, Rasterzelle = Hero-Pixel) ──
+  // Vorher DOM: Ring mit `border-radius: 50 %` (anti-aliaster Kreis, Schein-Schatten), Radialverlauf-Scheibe und 18 runde Staubkörner (Alpha) — alles weichgezeichnet. Jetzt auf einer Leinwand: Ring 2 Zellen dick
+  // (Deckung gedithert), Dither-Scheibe, Staub als Zellenquadrate. Zeiten/Wege wie vorher: Ring 0,9 s (Radius 0,06 → 1,56 → 2,52 Zonenbreiten), Blitz 0,7 s, Staub 0,7 s.
+  area_impact: (() => {
+    const STAUB = ['#fbe181', '#ffe469', '#f9ac20', '#e0c085', '#fff196', '#ffb91a'].map(ppHex);
+    return ppSzene((g, t, sz, tl) => {
+      const S = sz.S, cx = sz.cx, cy = sz.cy, zw = (sz.props.w || 100) / S;
+      { const u = t / 700;                                   // Blitz: Scheibe 0,1 → 1,8 (40 %) → 3,5 mal 0,8 Zonenbreiten, Deckung 0 → 1 → 0
+        if (u >= 0 && u <= 1) {
+          const k = u < .4 ? .1 + 1.7 * (u / .4) : 1.8 + 1.7 * ((u - .4) / .6), o = u < .4 ? u / .4 : 1 - (u - .4) / .6, r = zw * 0.8 * k;
+          g.radial(cx, cy, r, r, [[0, [255, 251, 210], .95], [.35, [255, 208, 102], .55], [.75, [255, 208, 102], 0], [1, [255, 208, 102], 0]], o);
+        } }
+      { const u = t / 900;                                   // Ring: Radius 0,6·zw·(0,1 → 2,6 → 4,2), 2 Zellen dick + 1 Zelle heller Innenrand
+        if (u >= 0 && u <= 1) {
+          const k = u < .6 ? .1 + 2.5 * (u / .6) : 2.6 + 1.6 * ((u - .6) / .4), o = u < .6 ? 1 - .4 * (u / .6) : .6 * (1 - (u - .6) / .4), r = zw * 0.6 * k;
+          g.band(cx, cy, r, r, 2, ppHex('#ffe469'), o);
+          g.band(cx, cy, r - 2, r - 2, 1, ppHex('#fff196'), o * .85);
+        } }
+      tl.staub.forEach((p) => {                              // Staub: Quadrate (6–16 px → ganze Zellen), Deckung 0 → 1 (30 %) → 0, Größe 0,3 → 1,4
+        const u = t / 700; if (u < 0 || u > 1) return;
+        const e = 1 - Math.pow(1 - u, 2), o = u < .3 ? u / .3 : 1 - (u - .3) / .7, n = Math.max(1, Math.round(p.size * (.3 + 1.1 * u) / S));
+        g.rect(cx + p.dx * e / S - n / 2, cy + p.dy * e / S - n / 2, n, n, p.farbe, o);
+      });
+    }, 950, () => ({
+      staub: Array.from({ length: ppFxN(18) }, (_, i) => {
+        const w = (i / 18) * Math.PI * 2 + Math.random() * 0.3, d = 60 + Math.random() * 80;
+        return { dx: Math.cos(w) * d, dy: Math.sin(w) * d * 0.6, size: 6 + Math.random() * 10, farbe: STAUB[Math.floor(Math.random() * STAUB.length)] };
+      }),
+    }), { radius: (p) => Math.max(120, (p.w || 100) * 2.7), z: 10005 });
   })(),
 
   // ── Pollution Token placement ─────────────────────────────
@@ -46883,36 +47022,12 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
             85%  { transform: translate(-50%, 6px) rotateZ(-1deg) scale(1.12); filter: brightness(1.3); } /* pp-ok: drehung */
             100% { transform: translate(-50%, 0) rotateZ(0deg) scale(1); opacity: 1; filter: brightness(1); }
           }
-          @keyframes areaImpactRing {
-            0%   { transform: translate(-50%, -50%) scale(0.1); opacity: 1; }
-            60%  { transform: translate(-50%, -50%) scale(2.6); opacity: 0.6; }
-            100% { transform: translate(-50%, -50%) scale(4.2); opacity: 0; }
-          }
-          @keyframes areaImpactFlash {
-            0%   { transform: translate(-50%, -50%) scale(0.1); opacity: 0; }
-            40%  { transform: translate(-50%, -50%) scale(1.8); opacity: 1; }
-            100% { transform: translate(-50%, -50%) scale(3.5); opacity: 0; }
-          }
-          @keyframes areaDustParticle {
-            0%   { opacity: 0; transform: translate(-50%, -50%) scale(0.3); }
-            30%  { opacity: 1; }
-            100% { opacity: 0; transform: translate(calc(-50% + var(--adx)), calc(-50% + var(--ady))) scale(1.4); }
-          }
-          @keyframes areaBgFlash {
-            0%   { opacity: 0; }
-            30%  { opacity: 1; }
-            100% { opacity: 0; }
-          }
         `;
         document.head.appendChild(style);
       }
 
-      // Full-viewport flash dimming (feels "important")
-      const flashBg = document.createElement('div');
-      // Pixelart: der Verlauf steht fest im Stil (das Netz in pixel-hart.js macht ihn zum gedithertem Pixelbild, Groesse aus width/height), nur die Deckkraft laeuft
-      flashBg.style.cssText = `position:fixed;left:0;top:0;width:${window.innerWidth}px;height:${window.innerHeight}px;pointer-events:none;z-index:9995;background:radial-gradient(ellipse at center, rgba(255,241,150,.55) 0%, rgba(249,172,32,.25) 30%, transparent 70%);animation:areaBgFlash 1.1s ease-out forwards;`;
-      document.body.appendChild(flashBg);
-      setTimeout(() => flashBg.remove(), 1200);
+      // Vollbild-Schein (Dither-Leinwand in Hero-Pixel-Zellen, s. ppAreaSchein)
+      if (window.ppAreaSchein) window.ppAreaSchein(1100);
 
       // Falling card body — uses card image when available, large scale
       const imgUrl = window.cardImageUrl ? window.cardImageUrl(cardName) : null;
@@ -46975,55 +47090,10 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       };
       requestAnimationFrame(folgeBild);
 
-      // Impact ring + flash at landing point — fires right before the
-      // card fully settles (~75% into the fall). Ziel und Breite dort, wo die Zone zu diesem Zeitpunkt steht.
+      // Aufprall (Ring, Blitz, Staub) — Pixelart-Szene `area_impact`; feuert kurz bevor die Karte sich ganz setzt (~75 % des Falls), an der Stelle, wo die Zone JETZT steht.
       setTimeout(() => {
-        const { cx, cy, w: zoneW } = zielJetzt();
-        const ring = document.createElement('div');
-        ring.style.cssText = [
-          `position:fixed`, `left:${cx}px`, `top:${cy}px`,
-          `width:${zoneW * 1.2}px`, `height:${zoneW * 1.2}px`,
-          `border:4px solid rgba(255,228,105,.95)`, `border-radius:50%`,
-          `box-shadow:0 0 40px rgba(251,225,129,.8), inset 0 0 30px rgba(255,208,102,.4)`,
-          `pointer-events:none`, `z-index:10005`,
-          `animation:areaImpactRing .9s ease-out forwards`,
-        ].join(';');
-        document.body.appendChild(ring);
-        setTimeout(() => ring.remove(), 950);
-
-        const flash = document.createElement('div');
-        flash.style.cssText = [
-          `position:fixed`, `left:${cx}px`, `top:${cy}px`,
-          `width:${zoneW * 1.6}px`, `height:${zoneW * 1.6}px`,
-          `background:radial-gradient(circle, rgba(255,251,210,.95) 0%, rgba(255,208,102,.55) 35%, transparent 75%)`,
-          `border-radius:50%`,
-          `pointer-events:none`, `z-index:10004`,
-          `animation:areaImpactFlash .7s ease-out forwards`,
-        ].join(';');
-        document.body.appendChild(flash);
-        setTimeout(() => flash.remove(), 750);
-
-        // Radial dust particles
-        for (let i = 0; i < 18; i++) {
-          const angle = (i / 18) * Math.PI * 2 + Math.random() * 0.3;
-          const dist = 60 + Math.random() * 80;
-          const dx = Math.cos(angle) * dist;
-          const dy = Math.sin(angle) * dist * 0.6;
-          const size = 6 + Math.random() * 10;
-          const p = document.createElement('div');
-          p.style.cssText = [
-            `position:fixed`, `left:${cx}px`, `top:${cy}px`,
-            `width:${size}px`, `height:${size}px`,
-            `border-radius:50%`,
-            `background:rgba(${200 + Math.random() * 55},${160 + Math.random() * 70},${60 + Math.random() * 80},.9)`,
-            `box-shadow:0 0 10px rgba(251,200,106,.5)`,
-            `pointer-events:none`, `z-index:10006`,
-            `--adx:${dx}px`, `--ady:${dy}px`,
-            `animation:areaDustParticle .7s ease-out forwards`,
-          ].join(';');
-          document.body.appendChild(p);
-          setTimeout(() => p.remove(), 750);
-        }
+        const el = tgtEl.isConnected ? tgtEl : document.querySelector(zonenSel);
+        if (el) playAnimation('area_impact', el, { duration: 1000 });
       }, 820);
     };
     socket.on('area_descend', onAreaDescend);

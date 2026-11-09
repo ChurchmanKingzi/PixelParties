@@ -11292,7 +11292,8 @@ function TextBox() {
   if (rechtsFarbe) farbStil['--tb-rechts'] = rechtsFarbe;
 
   return (
-    <div className={'textbox-overlay' + (fading ? ' textbox-fading' : '') + (highlightRects.some(h => h.pulse) ? ' textbox-puls' : '')}>
+    <div className={'textbox-overlay' + (fading ? ' textbox-fading' : '') + (highlightRects.some(h => h.pulse) ? ' textbox-puls' : '')}
+      style={{ '--tb-dz': (window.ppTbDimmerZelle ? window.ppTbDimmerZelle() : 2) + 'px' }}>
       {highlightRects.map((h, i) => {
         const gedreht = h.flat && (h.drehung != null || h.handkarte);
         const inner = (
