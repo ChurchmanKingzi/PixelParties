@@ -160,7 +160,7 @@ Datei: `alleria-the-queen-of-spiders.mp4`
 >
 > #PixelParties #TCG #CardGame #PixelArt #IndieGame #TradingCardGame #FreeToPlay #DarkFantasy #Spiders
 
-**Alt-Text**: Animated pixel art trading card of Alleria, the Queen of Spiders, with spiders dangling on silk threads and drifting purple poison gas around the hero.
+**Alt-Text**: Animated pixel art trading card of Alleria, the Queen of Spiders, with a huge spider web, three face-down Surprise cards revealed in reaction to enemy attacks, and swarms of spiders around the hero.
 
 ---
 

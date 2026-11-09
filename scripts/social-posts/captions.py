@@ -36,7 +36,7 @@ HEROES = {
     "Alleria, the Queen of Spiders": (
         "Redirect the attack. Spring the trap. 🕷️",
         "Once per turn, Alleria can redirect an opponent's single-target Attack, Spell or Creature effect to one of your Heroes that has a Surprise waiting. The damage then can't be reduced or negated, except by a Surprise. And whenever a Surprise in her own Surprise Zone activates, you draw a card.",
-        "spiders dangling on silk threads and drifting purple poison gas",
+        "a huge spider web, three face-down Surprise cards revealed in reaction to enemy attacks, and swarms of spiders",
         "#DarkFantasy #Spiders"),
     "Andras, the Human Weapon": (
         "Hit one target. Then hit another. 🔥",

@@ -46,7 +46,10 @@
     "poison",
     24
    ]
-  ]
+  ],
+  "webshow": true,
+  "opener": "wind",
+  "musicHit": 3.24
  },
  "Andras, the Human Weapon": {
   "px": 14,

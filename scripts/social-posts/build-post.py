@@ -573,12 +573,13 @@ def main():
     args_opener = opener
     opener_on = opener in ('heart', 'storm', 'shift', 'wind')
     aliceshow_on = bool(hero_cfg.get('aliceshow'))                            # Alice-Show (alicefx.AliceShow): nutzt dieselbe Schnittstelle wie die Wind-Show
+    webshow_on = bool(hero_cfg.get('webshow'))                                # Netz-Show (webfx.WebShow, Alleria)
     cosmosshow_on = bool(hero_cfg.get('cosmosshow'))                          # Kosmos-Show (cosmosfx.CosmosShow, Argos)
     hopshow_on = bool(hero_cfg.get('hopshow'))                                # Hüpf-Show (hopfx.HopShow, Ghuanjun)
     rockshow_on = bool(hero_cfg.get('rockshow'))                              # Konzert-Show (rockfx.ConcertShow, Elana)
     rootshow_on = bool(hero_cfg.get('rootshow'))                              # Wurzel-Show (rootfx.RootShow, Kyli)
     iceshow_on = bool(hero_cfg.get('iceshow'))                                # Eis-Show (icefx.IceShow, Broghan)
-    windshow_on = bool(hero_cfg.get('windshow')) or aliceshow_on or iceshow_on or rootshow_on or rockshow_on or hopshow_on or cosmosshow_on              # Show mit Zeitleiste (windfx.WindShow / alicefx.AliceShow) statt Schleife
+    windshow_on = bool(hero_cfg.get('windshow')) or aliceshow_on or iceshow_on or rootshow_on or rockshow_on or hopshow_on or cosmosshow_on or webshow_on              # Show mit Zeitleiste (windfx.WindShow / alicefx.AliceShow) statt Schleife
     wind_on = args.wind or bool(hero_cfg.get('wind')) or windshow_on
     horror_on = args.horror or bool(hero_cfg.get('horror'))
     show_on = (args.show or hero_cfg.get('show') or 'none') == 'mini'
@@ -695,7 +696,13 @@ def main():
         import windfx
         lxw, lyw = (W - logo.width) // 2, 40 + oy + (args.logo_dy if args.logo_dy is not None else hero_cfg.get('logoDy', 0))
         wgeom = dict(logo_rect=(lxw, lyw, logo.width, logo.height), logo_img=logo, center=(card_x + CARD_W / 2, card_y + CARD_H * 0.47))
-        if cosmosshow_on:
+        if webshow_on:
+            import webfx
+            wg = dict(logo_rect=wgeom['logo_rect'], logo_img=logo, badge_rect=badge_rect, badge_img=badge_img, plate_rect=(plate_x, plate_y, plate.width, plate.height),
+                      grid=(sx, sy, spr.px), draw_text=draw_text, center=(card_x + CARD_W / 2, card_y + CARD_H / 2),
+                      assets_dir=str(HERE / 'assets' / 'alleria'), cardback_path=str(ROOT / 'public' / 'cardback.png'))
+            wind = webfx.WebShow(W, H, U, float(fps), loop, wg, loop * WIND_LOOPS / float(fps))
+        elif cosmosshow_on:
             import cosmosfx
             cg = dict(logo_rect=wgeom['logo_rect'], logo_img=logo, badge_rect=badge_rect, badge_img=badge_img, plate_rect=(plate_x, plate_y, plate.width, plate.height),
                       grid=(sx, sy, spr.px), draw_text=draw_text, eye=(sx + spr.meta.get('faceX', spr.center_x) * spr.px, sy + spr.meta.get('faceY', 85) * spr.px),
@@ -1484,7 +1491,7 @@ def main():
     if first_on:
         for f in range(loop * first_loops):
             render(f, intro_on, punch_on, opener_on).save(fdir / f'i{f:03d}.png')
-    cover = Image.open(fdir / ('i%03d.png' % int((17.4 if show_on else 17.3 if iceshow_on else 14.6 if rootshow_on else 15.0 if rockshow_on else 11.0 if hopshow_on else 17.6 if cosmosshow_on else 16.8) * float(fps)))) if (show_on or windshow_on) else Image.open(fdir / ('f%03d.png' % (min(loop - 1, per * 3))) if reel else fdir / 'f000.png')
+    cover = Image.open(fdir / ('i%03d.png' % int((17.4 if show_on else 17.3 if iceshow_on else 14.6 if rootshow_on else 15.0 if rockshow_on else 11.0 if hopshow_on else 14.6 if webshow_on else 17.6 if cosmosshow_on else 16.8) * float(fps)))) if (show_on or windshow_on) else Image.open(fdir / ('f%03d.png' % (min(loop - 1, per * 3))) if reel else fdir / 'f000.png')
     cover_path = out / ('reel-cover.png' if reel else 'post.png')
     cover.save(cover_path)
     print('Standbild', cover_path)
