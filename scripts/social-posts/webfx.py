@@ -38,8 +38,10 @@ class WebShow:
     CW, CH = 180, 252
     SLOT_X = [330, 540, 750]
     SLOT_Y = 1762
-    OPP_X = [270, 540, 810]
-    OPP_Y = 138
+    OPP_X = [300, 540, 780]
+    OPP_Y = 128
+    OW, OH = 160, 224
+    OPP_NAMES = ['opp-ida', 'opp-solrym', 'opp-hatusbal']                               # Ida (Feuerball), Sol Rym (Chain Lightning), Hatusbal (Sand)
     CARD_NAMES = ['crimson-web', 'jumper-spider', 'spider-avalanche', 'spider-silk-bridge']
     LABELS = ['CRIMSON WEB', 'JUMPER', 'AVALANCHE']
     SPIDER_FILES = ['spider-c06-12x8', 'spider-c07-12x8', 'spider-c10-14x8', 'spider-c11-15x9', 'spider-c12-17x13']
@@ -66,6 +68,14 @@ class WebShow:
         c = Image.new('RGBA', (w, h), (255, 150, 40, 255))
         c.paste(inner, (1, 1))
         self.opp_back = c.transpose(Image.ROTATE_180).resize((98, 133), Image.NEAREST)        # gegnerische Helden: verdeckt, 180° gedreht
+        ow, oh = self.OW // U, self.OH // U                                             # gegnerische Helden: offene Karten, 180° gedreht, Pixelraster des Reels
+        self.opp_open, self.opp_hit = [], []
+        for n in self.OPP_NAMES:
+            im = ld(n).convert('RGB').transpose(Image.ROTATE_180).resize((ow, oh), Image.BOX)
+            a = np.asarray(im).astype(np.float32)
+            hit = np.clip(a * np.array([1.0, 0.35, 0.35]) + np.array([70, 0, 0]), 0, 255).astype(np.uint8)    # Treffer: rot gefärbt (feste Farbvariante, kein Alpha)
+            self.opp_open.append(Image.fromarray(a.astype(np.uint8), 'RGB').resize((ow * U, oh * U), Image.NEAREST).convert('RGBA'))
+            self.opp_hit.append(Image.fromarray(hit, 'RGB').resize((ow * U, oh * U), Image.NEAREST).convert('RGBA'))
         self.spiders = [self._outlined(ld(n)) for n in self.SPIDER_FILES]
         self.trap = ld('trapping')
         self._build_web()
@@ -243,20 +253,28 @@ class WebShow:
         return (int(t * 8) + i) % 2                                                      # zwei Beinstellungen im Wechsel
 
     def _draw_opp(self, canvas, d, t):
+        T = self.T_ACT[2] + 1.25
         for i, x in enumerate(self.OPP_X):
             t_in = 2.9 + 0.2 * i
             if t < t_in:
                 continue
             u = ease_out((t - t_in) / 0.3)
             y = self.OPP_Y - 130 * (1 - u)
-            canvas.paste(self.opp_back, (int(round((x - 49) / self.U) * self.U), int(round((y - 66) / self.U) * self.U)), self.opp_back)
-            if i == 0 and t >= self.reveal_t(0) + 0.4:                                   # Crimson Web: der Angreifer ist eingesponnen
-                self._web_ball(d, x, self.OPP_Y, 70)
+            ta = t - (T + 0.9 + 0.12 * i)                                                 # Spider Avalanche beißt zu
+            hit = 0 <= ta < 0.7
+            im = self.opp_hit[i] if (hit and int(t * 15) % 2 == 0) else self.opp_open[i]
+            sh = (6 if int(t * 30) % 2 else -6) if hit else 0
+            canvas.paste(im, (int(round((x - im.width / 2 + sh) / self.U) * self.U), int(round((y - im.height / 2) / self.U) * self.U)), im)
+            if i == 0 and t >= self.reveal_t(0) + 0.4:                    # Crimson Web: der Angreifer ist eingesponnen
+                self._web_ball(d, x, self.OPP_Y, 120)
                 if int(t * 6) % 2:
-                    self.draw_text(canvas, "CAN'T ACT", 2, (x, self.OPP_Y + 92), color=WEB, outline=None, shadow=(20, 10, 30))
-                self._spider(canvas, 2, x + 34, self.OPP_Y + 6, t)
-        if t >= self.T_ACT[2] + 4.6:
-            return
+                    self.draw_text(canvas, "CAN'T ACT", 2, (x, self.OPP_Y + 134), color=WEB, outline=None, shadow=(20, 10, 30))
+                self._spider(canvas, 2, x + 60, self.OPP_Y + 10, t)
+            if hit:                                                                       # Spinnen krabbeln über die Karte
+                for k in range(4):
+                    sx = x + (k - 1.5) * 34 + 8 * math.sin(t * 20 + k * 2)
+                    sy = self.OPP_Y + (k % 2 - 0.5) * 70 + 8 * math.sin(t * 17 + k)
+                    self._spider(canvas, (k + int(t * 10)) % 5, sx, sy, t)
 
     def _web_ball(self, d, x, y, r):
         for k in range(10):
@@ -300,16 +318,6 @@ class WebShow:
             canvas.paste(im, (int(x0 + shake), int(y0)), im)
             if t >= tr and gone <= 0:
                 self.draw_text(canvas, self.LABELS[i], 2, (x, y0 - 16), color=GOLD_HL if t - tr < 1.0 else (255, 255, 255), outline=None, shadow=(20, 10, 30))
-            # Aufdeck-Netzblitz
-            tau = t - tr
-            if 0 <= tau < 0.6:
-                for k in range(12):
-                    a = 2 * math.pi * k / 12
-                    u2 = ease_out(tau / 0.5)
-                    ci, cj = self.cell(x + math.cos(a) * 170 * u2, self.SLOT_Y + math.sin(a) * 190 * u2)
-                    if tau > 0.4 and (k + int(t * 30)) % 2:
-                        continue
-                    self.rect(d, ci, cj, WEB if k % 2 else GOLD_HL)
             # Wächter-Spinne
             if t >= ts + 0.5 and gone <= 0:
                 sx, sy = x - 60 + 4 * math.sin(t * 3 + i), y0 - 6
@@ -318,6 +326,144 @@ class WebShow:
                 if t >= tr + 0.4 and i != 1:
                     sx, sy = x + 70 + (i - 1) * 4, y0 - 6
                 self._spider(canvas, 2 + (i % 2), sx, sy, t)
+
+    EXCL = ['XXX', 'XXX', 'XXX', 'XXX', 'XXX', '...', 'XXX', 'XXX']
+
+    def _draw_activate(self, canvas, d, t):
+        """Aufmerksamkeit für aufgedeckte Surprises: goldener Rahmen blinkt und ein „!“ springt, beim Aufdecken Blitz, Ringe und Strahlen (Rasterzellen, harte Kanten)."""
+        import gamefx
+        C = gamefx.C30
+        m = gamefx.Cells(canvas, self.ox, self.oy, self.gp)
+        gp = self.gp
+        for i, x in enumerate(self.SLOT_X):
+            tr = self.reveal_t(i)
+            tau = t - tr
+            if not (-0.5 <= tau < 0.9):
+                continue
+            if self.slot_t(i) + 0.3 > t:
+                continue
+            x0, y0 = x - self.CW / 2, self.SLOT_Y - self.CH / 2
+            X, Y = self._cellpt(x, self.SLOT_Y)
+            X, Y = gamefx.rd(X), gamefx.rd(Y)
+            if tau < 0.35 and int(t * 15) % 2 == 0:                                       # blinkender Rahmen (4 Zellen Abstand, 1 Zelle dick)
+                th = gp
+                self.pix_rect(d, x0 - 2 * gp, y0 - 2 * gp, x0 + self.CW + 2 * gp, y0 - 2 * gp + th - 1, GOLD_HL)
+                self.pix_rect(d, x0 - 2 * gp, y0 + self.CH + 2 * gp - th, x0 + self.CW + 2 * gp, y0 + self.CH + 2 * gp - 1, GOLD_HL)
+                self.pix_rect(d, x0 - 2 * gp, y0 - 2 * gp, x0 - 2 * gp + th - 1, y0 + self.CH + 2 * gp, GOLD_HL)
+                self.pix_rect(d, x0 + self.CW + 2 * gp - th, y0 - 2 * gp, x0 + self.CW + 2 * gp - 1, y0 + self.CH + 2 * gp, GOLD_HL)
+            if -0.5 <= tau < 0.5:                                                          # „!“ hüpft über der Karte
+                bob = -(int(t * 12) % 2) * gp
+                cx, cy = self._cellpt(x, y0 - 150)
+                cx, cy = gamefx.rd(cx) - 1, gamefx.rd(cy) + bob // gp
+                for r, row in enumerate(self.EXCL):
+                    for c, ch in enumerate(row):
+                        if ch == 'X':
+                            for dx in (-1, 0, 1):
+                                for dy in (-1, 0, 1):
+                                    if dx or dy:
+                                        m.rect(cx + c + dx, cy + r + dy, 1, 1, C['tinte'])
+                for r, row in enumerate(self.EXCL):
+                    for c, ch in enumerate(row):
+                        if ch == 'X':
+                            m.rect(cx + c, cy + r, 1, 1, C['gelb'] if c == 1 or r > 5 else C['org'])
+            if 0 <= tau < 0.07:                                                           # Aufdeck-Blitz: Karte kurz weiß
+                self.pix_rect(d, x0, y0, x0 + self.CW - 1, y0 + self.CH - 1, (255, 255, 255))
+            if 0 <= tau < 0.7:
+                m.ring(X, Y, gamefx.rd(gamefx.ease(tau / 0.4) * 13), 2 if tau < 0.12 else 1, C['creme'], False)
+                if tau > 0.04:
+                    m.ring(X, Y, gamefx.rd(gamefx.ease((tau - 0.04) / 0.5) * 19), 1, C['gelb'], False)
+                if tau > 0.1:
+                    m.ring(X, Y, gamefx.rd(gamefx.ease((tau - 0.1) / 0.55) * 26), 1, C['org'], True)
+            if 0 <= tau < 0.3:
+                L = gamefx.ease(min(1.0, tau / 0.1)) * (1 - max(0.0, (tau - 0.1) / 0.2))
+                for r in range(16):
+                    an = r * math.pi / 8 + 0.2
+                    ln = L * (9 if r % 2 else 17)
+                    m.linie(X, Y, gamefx.rd(X + math.cos(an) * ln), gamefx.rd(Y + math.sin(an) * ln), 1 if r % 2 else 2, C['gelb'] if r % 2 else C['creme'])
+
+    # ───────── Untertitel im Video ─────────
+    CAPTIONS = [
+        (1.2, 4.0, 'One trap, two traps, three traps - *Alleria* has set them all!'),
+        (4.1, 8.0, 'A *Fireball*? Pfff, *negated*! Here, have a *web* instead!'),
+        (8.6, 12.7, 'Ouch - *lightning*? The *Jumper Spider* jumps out for support!'),
+        (13.1, 17.4, 'Throwing *sand*? Throw your *Spider Avalanche* back!'),
+        (17.7, 20.4, 'Set the trap. Spring the *Surprise*!'),
+    ]
+    CPS = 38.0                                                                           # Schreibmaschine: Zeichen pro Sekunde
+
+    def _tw(self, text, scale):
+        tmp = Image.new('RGBA', (4, 4))
+        x, y, w, h = self.draw_text(tmp, text, scale, (0, 0), color=(255, 255, 255), outline=None, shadow=None, anchor='lm')
+        return w - 2 * scale
+
+    def _cap_layout(self, idx):
+        key = ('cap', idx)
+        if key in self._cache:
+            return self._cache[key]
+        scale = 4
+        maxw = 880
+        text = self.CAPTIONS[idx][2]
+        space = self._tw('A A', scale) - self._tw('AA', scale)
+        words = []                                                                       # (Wort ohne *, gold?, Zeichenindex des Anfangs)
+        gold, n = False, 0
+        for raw in text.split(' '):
+            pieces = []
+            cur = ''
+            for ch in raw:
+                if ch == '*':
+                    if cur:
+                        pieces.append((cur, gold)); cur = ''
+                    gold = not gold
+                else:
+                    cur += ch
+            if cur:
+                pieces.append((cur, gold))
+            words.append(pieces)
+        # Zeilen umbrechen (ein „Wort“ kann aus mehreren gefärbten Stücken bestehen, z. B. „*Fireball*?“)
+        lines, cur, cw = [], [], 0
+        for pieces in words:
+            ww = sum(self._tw(p, scale) for p, g in pieces)
+            add = ww if not cur else space + ww
+            if cur and cw + add > maxw:
+                lines.append((cur, cw)); cur, cw = [], 0; add = ww
+            cur.append(pieces); cw += add
+        lines.append((cur, cw))
+        # Zeichenpositionen
+        out, ci = [], 0
+        for li, (ws, lw) in enumerate(lines):
+            x = -lw / 2.0
+            for pieces in ws:
+                for p, g in pieces:
+                    out.append((li, x, p, g, ci))
+                    ci += len(p); x += self._tw(p, scale)
+                ci += 1; x += space
+        res = dict(scale=scale, lines=len(lines), items=out, width=max(lw for ws, lw in lines), total=ci)
+        self._cache[key] = res
+        return res
+
+    def _draw_caption(self, canvas, d, t):
+        for idx, (t0, t1, text) in enumerate(self.CAPTIONS):
+            if not (t0 <= t < t1):
+                continue
+            L = self._cap_layout(idx)
+            sc = L['scale']
+            n = int((t - t0) * self.CPS)
+            lh = sc * 12
+            bw, bh = L['width'] + 6 * sc * 2, L['lines'] * lh + 5 * sc * 2
+            cx, cy = 540, 1150
+            u = self.U
+            x0 = int(round((cx - bw / 2) / u) * u); y0 = int(round((cy - bh / 2) / u) * u)
+            x1 = x0 + int(round(bw / u) * u); y1 = y0 + int(round(bh / u) * u)
+            d.rectangle([x0 - 2 * u, y0 - 2 * u, x1 + 2 * u - 1, y1 + 2 * u - 1], fill=(20, 10, 30, 255))
+            d.rectangle([x0 - 2 * u, y0 - 2 * u, x1 + 2 * u - 1, y1 + 2 * u - 1], outline=GOLD, width=u)
+            d.rectangle([x0, y0, x1 - 1, y1 - 1], outline=(120, 100, 170, 255), width=max(1, u // 2))
+            ty = y0 + (bh - L['lines'] * lh) // 2 + lh // 2
+            for li, x, p, g, ci in L['items']:
+                if ci >= n:
+                    break
+                shown = p[:n - ci]
+                self.draw_text(canvas, shown, sc, (cx + x, ty + li * lh), color=GOLD_HL if g else (255, 255, 255), outline=None, shadow=(20, 10, 30), anchor='lm')
+            return
 
     def _cellpt(self, x, y):
         return ((x - self.ox) / self.gp, (y - self.oy) / self.gp)
@@ -330,7 +476,7 @@ class WebShow:
         m = gamefx.Cells(canvas, self.ox, self.oy, self.gp)
         T0, T1, T2 = self.T_ACT
         # Akt 1: Feuerball – bleibt im Crimson Web hängen (Flug endet beim Aufdecken)
-        src0 = (self.OPP_X[0], self.OPP_Y + 70)
+        src0 = (self.OPP_X[0], self.OPP_Y + 105)
         if not hasattr(self, '_fb'):
             self._fb = gamefx.Feuerball(self._cellpt(*src0), self._cellpt(*tgt), tA=1.7, k=0.75, gr=0.85, stop=self.reveal_t(0) - (T0 + 0.3), kill=self.reveal_t(0) - (T0 + 0.3) + 0.45)
         tau = t - (T0 + 0.3)
@@ -342,14 +488,14 @@ class WebShow:
                 self._web_ball(d, px, py, 110)
         # Akt 2: Kettenblitz trifft Alleria
         if not hasattr(self, '_kb'):
-            self._kb = gamefx.Kettenblitz(self._cellpt(self.OPP_X[1], self.OPP_Y + 70), self._cellpt(*tgt), step=1, k=0.62)
+            self._kb = gamefx.Kettenblitz(self._cellpt(self.OPP_X[1], self.OPP_Y + 105), self._cellpt(*tgt), step=1, k=0.62)
         t_b = self.reveal_t(1) - gamefx.LT
         self._kb.laden(m, t - (T1 + 0.3), t_b - (T1 + 0.3))
         if t >= t_b:
             self._kb.draw(m, t - t_b)
         # Akt 3: Sandstrahl
         if not hasattr(self, '_sd'):
-            self._sd = gamefx.Sandstrahl((self.OPP_X[2], self.OPP_Y + 70), tgt, self.gp, dur=800, dichte=2.2)
+            self._sd = gamefx.Sandstrahl((self.OPP_X[2], self.OPP_Y + 105), tgt, self.gp, dur=800, dichte=2.2)
         self._sd.draw(m, t - (T2 + 0.4))
         # Schadenszahlen auf Alleria (Akt 2, 3)
         for a in (1, 2):
@@ -440,6 +586,8 @@ class WebShow:
         self._draw_slots(canvas, d, t)
         d = ImageDraw.Draw(canvas)
         self._draw_attack(canvas, d, t)
+        d = ImageDraw.Draw(canvas)
+        self._draw_activate(canvas, d, t)
         self._draw_jumper(canvas, d, t)
         self._draw_avalanche(canvas, d, t)
         d = ImageDraw.Draw(canvas)
@@ -451,6 +599,7 @@ class WebShow:
                 a = 2 * math.pi * i / 10 + 0.3
                 r = (900 * (1 - smooth(u))) + 40
                 self._spider(canvas, (int(t * 8) + i) % 2, cx + 0.9 * r * math.cos(a), 880 + r * math.sin(a), t)
+        self._draw_caption(canvas, ImageDraw.Draw(canvas), t)
 
     # ───────── Bild-Nachbearbeitung ─────────
     def post_fx(self, img, f):
@@ -486,7 +635,9 @@ class WebShow:
         'reveal':  [('reveal', -4), ('ability_activate', -8, 0.05)],                    # Surprise wird aufgedeckt
         'draw':    [('draw', -5)],
         'rain':    [('heavy_impact', -6)],
-        'skitter': [('ping', -16, 0.0, 0.6, 0.12)],                                      # Spinnenfüße
+        'skitter': [('ping', -16, 0.0, 0.6, 0.12)],
+        'bite':    [('slash', -9, 0.0, 1.15)],                                           # Spider Avalanche beißt zu
+        'warn':    [('ping', -9)],                                                       # „!“ über der Surprise                                      # Spinnenfüße
     }
 
     def sfx_events(self):
@@ -511,8 +662,13 @@ class WebShow:
             for k in range(v):
                 add(tt + 0.06 * k, 'draw')
         add(self.T_ACT[2] + 1.3, 'rain')
-        for k in range(10):
+        for k in range(22):
             add(self.T_ACT[2] + 1.3 + 0.1 * k, 'skitter')
+        for i in range(3):                                                               # jeder Gegner wird gebissen und getroffen
+            tb = self.T_ACT[2] + 1.25 + 0.9 + 0.12 * i
+            add(tb, 'hit'); add(tb + 0.02, 'bite'); add(tb + 0.2, 'bite')
+        for a in range(3):
+            add(self.reveal_t(a) - 0.4, 'warn')
         for k in range(6):
             add(0.1 * k, 'skitter')
         ev.append((D - 1.0, 'ascension', -9, 1.2))
