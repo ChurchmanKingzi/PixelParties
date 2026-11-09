@@ -68,10 +68,10 @@ class WebShow:
         c = Image.new('RGBA', (w, h), (255, 150, 40, 255))
         c.paste(inner, (1, 1))
         self.opp_back = c.transpose(Image.ROTATE_180).resize((98, 133), Image.NEAREST)        # gegnerische Helden: verdeckt, 180° gedreht
-        ow, oh = self.OW // U, self.OH // U                                             # gegnerische Helden: offene Karten, 180° gedreht, Pixelraster des Reels
+        ow, oh = self.OW // U, self.OH // U                                             # gegnerische Helden: offene Karten, aus Sicht der Betrachter aufrecht, Pixelraster des Reels
         self.opp_open, self.opp_hit = [], []
         for n in self.OPP_NAMES:
-            im = ld(n).convert('RGB').transpose(Image.ROTATE_180).resize((ow, oh), Image.BOX)
+            im = ld(n).convert('RGB').resize((ow, oh), Image.BOX)
             a = np.asarray(im).astype(np.float32)
             hit = np.clip(a * np.array([1.0, 0.35, 0.35]) + np.array([70, 0, 0]), 0, 255).astype(np.uint8)    # Treffer: rot gefärbt (feste Farbvariante, kein Alpha)
             self.opp_open.append(Image.fromarray(a.astype(np.uint8), 'RGB').resize((ow * U, oh * U), Image.NEAREST).convert('RGBA'))
@@ -326,6 +326,26 @@ class WebShow:
                 if t >= tr + 0.4 and i != 1:
                     sx, sy = x + 70 + (i - 1) * 4, y0 - 6
                 self._spider(canvas, 2 + (i % 2), sx, sy, t)
+
+    DANGLE = [(165, 330, 5.5, 0.0), (915, 260, 6.5, 0.35), (235, 200, 4.8, 0.7), (845, 300, 6.0, 0.15)]      # (x, Sinktiefe, Dauer, Phase)
+
+    def _draw_dangle(self, canvas, d, t):
+        """Spinnen (Ingame-Sprites) seilen sich an Seidenfäden vom Banner ab und ziehen sich wieder hoch."""
+        gp = self.gp
+        y_anchor = 385
+        for k, (x, depth, per, ph) in enumerate(self.DANGLE):
+            u = ((t / per) + ph) % 1.0
+            y = y_anchor + depth * (0.5 - 0.5 * math.cos(2 * math.pi * u)) + 60
+            pose = (int(t * 6) + k) % 2
+            im = self.spiders[pose]
+            s = self.stamp(im, ('sp', pose))
+            px = int(round((x - s.width / 2) / gp) * gp)
+            py = int(round((y - s.height / 2) / gp) * gp)
+            ci, cj0 = self.cell(px + s.width / 2, y_anchor)
+            _, cj1 = self.cell(px + s.width / 2, py)
+            for cj in range(cj0, cj1 + 1):
+                self.rect(d, ci, cj, WEB)
+            canvas.paste(s, (px, py), s)
 
     EXCL = ['XXX', 'XXX', 'XXX', 'XXX', 'XXX', '...', 'XXX', 'XXX']
 
@@ -582,6 +602,7 @@ class WebShow:
                 if 0 <= u < 1.0:
                     r = 120 + 1100 * u
                     self._spider(canvas, 0 + (int(t * 9) + h['k']) % 2, self.web_c[0] + 0.9 * r * math.cos(h['a']), self.web_c[1] + r * math.sin(h['a']), t)
+        self._draw_dangle(canvas, d, t)
         self._draw_opp(canvas, d, t)
         self._draw_slots(canvas, d, t)
         d = ImageDraw.Draw(canvas)

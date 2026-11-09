@@ -25,15 +25,6 @@
   "particles": [
    [
     "glyph",
-    "webspider",
-    7,
-    {
-     "g": "spider",
-     "move": "dangle"
-    }
-   ],
-   [
-    "glyph",
     "web",
     9,
     {
