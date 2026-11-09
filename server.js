@@ -1285,6 +1285,8 @@ async function initDatabase() {
     created_at INTEGER DEFAULT (unixepoch())
   )`);
   await db.execute('CREATE UNIQUE INDEX IF NOT EXISTS idx_pending_booster_user ON pending_booster(user_id)');
+  // Sell Back: Index der aus diesem Pack zurückgegebenen Karte (-1 = noch keine). Je Pack nur eine; bestehende Zeilen bekommen den Default.
+  try { await db.execute('ALTER TABLE pending_booster ADD COLUMN sold_idx INTEGER NOT NULL DEFAULT -1'); } catch {}
 
   // Shop purchases table
   await db.execute(`CREATE TABLE IF NOT EXISTS user_shop_items (
@@ -4355,6 +4357,8 @@ app.post('/api/shop/buy', authMiddleware, async (req, res) => {
 const BOOSTER_DIR = path.join(__dirname, 'data', 'shop', 'Boosterpacks');
 const BOOSTER_URL_DIR = '/data/shop/Boosterpacks/';
 const BOOSTER_SC_REASON = 'shop:booster';   // sc_log.reward_id des Packkaufs (Betrag negativ = Ausgabe)
+const BOOSTER_SELLBACK_REASON = 'shop:booster_sellback';   // Gutschrift für „Sell Back!“ (Betrag positiv)
+const BOOSTER_DISPLAY_REASON = 'shop:display';             // Kauf aus der Auslage (Betrag negativ)
 
 let _boosterCache = null;
 function boosterManifest() {
@@ -4414,7 +4418,8 @@ async function addRarityCopies(userId, items, dbh) {
 function pendingBoosterView(row) {
   let cards = [];
   try { cards = JSON.parse(row.cards_json); } catch { /* leer */ }
-  return { id: row.id, packId: row.pack_id, variantId: row.variant_id, cards };
+  const sold = Number.isInteger(Number(row.sold_idx)) ? Number(row.sold_idx) : -1;
+  return { id: row.id, packId: row.pack_id, variantId: row.variant_id, cards, sold: sold >= 0 && sold < cards.length ? sold : -1 };
 }
 
 // GET /api/collection — gesammelte Rarities { rarities: { "<Karte>": { uncommon: n, … } } } (Common implizit unbegrenzt)
@@ -4424,11 +4429,12 @@ app.get('/api/collection', authMiddleware, async (req, res) => {
 });
 
 // GET /api/boosters — Packs mit Cover-Varianten (Pack-Bild `base`, Schimmer-Streifen `shimmer`; relativ zu `dir`, dazu fertige URLs)
+//  `sellback`: Gutschrift je Rarity für „Sell Back!“ (eine Karte je Pack)
 app.get('/api/boosters', authMiddleware, (req, res) => {
   try {
     const man = boosterManifest();
     res.json({
-      price: RARITIES.PACK_PRICE, size: man.size, frames: man.frames, frameMs: man.frameMs, dir: BOOSTER_URL_DIR,
+      price: RARITIES.PACK_PRICE, sellback: RARITIES.SELLBACK, size: man.size, frames: man.frames, frameMs: man.frameMs, dir: BOOSTER_URL_DIR,
       packs: man.packs.map(p => ({
         id: p.id, name: p.name, tagline: p.tagline || man.tagline,
         variants: p.variants.map(v => ({
@@ -4440,7 +4446,7 @@ app.get('/api/boosters', authMiddleware, (req, res) => {
   } catch (err) { console.error('[boosters]', err.message); res.status(500).json({ error: 'Failed to load boosters' }); }
 });
 
-// GET /api/boosters/pending — offenes Pack (Wiederaufnahme nach Neuladen) oder null
+// GET /api/boosters/pending — offenes Pack (Wiederaufnahme nach Neuladen) oder null; `sold` = Index der zurückgegebenen Karte oder -1
 app.get('/api/boosters/pending', authMiddleware, async (req, res) => {
   try {
     const row = await db.get('SELECT * FROM pending_booster WHERE user_id = ?', [req.user.userId]);
@@ -4448,67 +4454,226 @@ app.get('/api/boosters/pending', authMiddleware, async (req, res) => {
   } catch (err) { console.error('[boosters/pending]', err.message); res.status(500).json({ error: 'Failed to load pack' }); }
 });
 
+/**
+ * Kauf eines Packs: 20 SC ab, Karten würfeln, als offenes Pack speichern. Gemeinsam für /buy und /rip-more.
+ * Liefert { status, body } — 200 { pending, sc } · 402 { error, sc } · 404 · 409 { error, pending } · 500.
+ */
+async function buyBoosterPack(userId, packId) {
+  const pack = boosterManifest().packs.find(p => p.id === packId);
+  if (!pack) return { status: 404, body: { error: 'Unknown booster pack' } };
+  const offen = await db.get('SELECT * FROM pending_booster WHERE user_id = ?', [userId]);
+  if (offen) return { status: 409, body: { error: 'You still have an unopened pack.', pending: pendingBoosterView(offen) } };
+  const pool = packPool(packId);
+  if (!pool.length) return { status: 500, body: { error: 'This pack is empty right now.' } };
+
+  const price = RARITIES.PACK_PRICE;
+  const cards = RARITIES.rollPack(pool, { hasMask: cardHasMask });
+  const variant = pack.variants[Math.floor(Math.random() * pack.variants.length)];
+  const id = uuidv4();
+  let nichtGenug = false;
+  try {
+    await db.transaction(async (tx) => {
+      // Atomar: SC nur abziehen, wenn genug da sind; Pack und Buchung gehen mit oder gar nicht.
+      const upd = await tx.run('UPDATE users SET sc = sc - ? WHERE id = ? AND sc >= ?', [price, userId, price]);
+      if (!upd.rowsAffected) { nichtGenug = true; throw new Error('not-enough-sc'); }
+      await tx.run('INSERT INTO pending_booster (id, user_id, pack_id, variant_id, cards_json) VALUES (?, ?, ?, ?, ?)',
+        [id, userId, packId, variant.id, JSON.stringify(cards)]);
+      await tx.run('INSERT INTO sc_log (id, user_id, reward_id, opponent_id, amount) VALUES (?, ?, ?, ?, ?)',
+        [uuidv4(), userId, BOOSTER_SC_REASON, packId, -price]);
+    });
+  } catch (err) {
+    if (nichtGenug) {
+      const u = await db.get('SELECT sc FROM users WHERE id = ?', [userId]);
+      return { status: 402, body: { error: 'Not enough SC', sc: u?.sc || 0 } };
+    }
+    // Gleichzeitiger zweiter Kauf: der Unique-Index auf pending_booster(user_id) hat ihn abgewiesen und die Buchung zurueckgerollt.
+    const jetzt = await db.get('SELECT * FROM pending_booster WHERE user_id = ?', [userId]);
+    if (jetzt) return { status: 409, body: { error: 'You still have an unopened pack.', pending: pendingBoosterView(jetzt) } };
+    throw err;
+  }
+  const u = await db.get('SELECT sc FROM users WHERE id = ?', [userId]);
+  return { status: 200, body: { pending: { id, packId, variantId: variant.id, cards, sold: -1 }, sc: u?.sc || 0 } };
+}
+
+/**
+ * Einlösen des offenen Packs: die Karten in die Sammlung (+1 je (Karte, Rarity)), die zurückverkaufte Karte (sold_idx) NICHT, Pack löschen.
+ * Liefert { status, body } — 200 { ok, added, sold, rarities, packId } · 404.
+ */
+async function claimBoosterPack(userId, id) {
+  const row = await db.get('SELECT * FROM pending_booster WHERE user_id = ?', [userId]);
+  if (!row || (id && row.id !== id)) return { status: 404, body: { error: 'No such open pack' } };
+  const view = pendingBoosterView(row);
+  const added = view.cards.filter((c, i) => i !== view.sold);
+  let schonWeg = false;
+  await db.transaction(async (tx) => {
+    const del = await tx.run('DELETE FROM pending_booster WHERE id = ? AND user_id = ?', [row.id, userId]);
+    if (!del.rowsAffected) { schonWeg = true; return; }   // doppelter Klick: nur einmal buchen
+    await addRarityCopies(userId, added, tx);
+  });
+  if (schonWeg) return { status: 404, body: { error: 'No such open pack' } };
+  return { status: 200, body: { ok: true, added, sold: view.sold >= 0 ? view.cards[view.sold] : null, rarities: await ownedRarities(userId), packId: view.packId } };
+}
+
 // POST /api/boosters/buy { packId } — 20 SC ab, Pack wuerfeln und als offenes Pack speichern.
 //  402 { error, sc }: zu wenig SC · 409 { error, pending }: es liegt schon ein offenes Pack (Antwort liefert es)
 app.post('/api/boosters/buy', authMiddleware, async (req, res) => {
+  try {
+    const r = await buyBoosterPack(req.user.userId, String(req.body?.packId || ''));
+    res.status(r.status).json(r.body);
+  } catch (err) { console.error('[boosters/buy]', err.message); res.status(500).json({ error: 'Failed to buy pack' }); }
+});
+
+// POST /api/boosters/claim { id } — die Karten (ohne die zurückverkaufte) in die Sammlung, offenes Pack loeschen.
+//  Antwort { ok, added: [{ name, rarity }], sold, rarities: <gesamte Sammlung wie /api/collection> }
+app.post('/api/boosters/claim', authMiddleware, async (req, res) => {
+  try {
+    const r = await claimBoosterPack(req.user.userId, String(req.body?.id || ''));
+    res.status(r.status).json(r.body);
+  } catch (err) { console.error('[boosters/claim]', err.message); res.status(500).json({ error: 'Failed to add cards' }); }
+});
+
+// POST /api/boosters/rip-more { id } — „Add and rip one more!“: das offene Pack einlösen UND sofort ein Pack DERSELBEN Art kaufen.
+//  Zwei getrennte Transaktionen, damit das alte Pack nie verloren geht: erst wird eingelöst (bleibt eingelöst, was danach auch passiert),
+//  dann gekauft. Antwort 200 { ok, added, rarities, pending, sc } · 402 { error, sc, claimed: true, added, rarities } (zu wenig SC: das Pack ist
+//  trotzdem eingelöst, ein neues gibt es nicht) · 404 (kein offenes Pack) · 5xx { error, claimed } (Kauf gescheitert; `claimed`: altes Pack schon eingelöst).
+//  Eine Gutschrift aus „Sell Back!“ steht schon im Kontostand (sie wird beim Verkauf gebucht) und zählt damit für den Preis.
+app.post('/api/boosters/rip-more', authMiddleware, async (req, res) => {
+  const userId = req.user.userId;
+  let claimed = null;
+  try {
+    const c = await claimBoosterPack(userId, String(req.body?.id || ''));
+    if (c.status !== 200) return res.status(c.status).json(c.body);
+    claimed = c.body;
+    const b = await buyBoosterPack(userId, claimed.packId);
+    if (b.status === 200) return res.json({ ok: true, added: claimed.added, sold: claimed.sold, rarities: claimed.rarities, pending: b.body.pending, sc: b.body.sc });
+    const u = await db.get('SELECT sc FROM users WHERE id = ?', [userId]);
+    return res.status(b.status === 404 || b.status === 409 ? 500 : b.status).json({
+      ...b.body, sc: b.body.sc != null ? b.body.sc : (u?.sc || 0), claimed: true, added: claimed.added, sold: claimed.sold, rarities: claimed.rarities,
+    });
+  } catch (err) {
+    console.error('[boosters/rip-more]', err.message);
+    res.status(500).json({
+      error: claimed ? 'Your cards were added, but the next pack could not be bought.' : 'Failed to add cards', claimed: !!claimed,
+      ...(claimed ? { added: claimed.added, sold: claimed.sold, rarities: claimed.rarities } : {}),
+    });
+  }
+});
+
+// POST /api/boosters/sell { id, index } — „Sell Back!“: EINE Karte des offenen Packs zurückgeben, Gutschrift in SC nach Rarity
+//  (RARITIES.SELLBACK). Idempotent: ein zweiter Verkauf (auch einer anderen Karte) → 409. Die Karte kommt beim Einlösen nicht in die Sammlung.
+//  Antwort 200 { ok, sold: index, amount, sc } · 400 (Index / Common) · 404 (kein offenes Pack) · 409 { error, sold }
+app.post('/api/boosters/sell', authMiddleware, async (req, res) => {
   const userId = req.user.userId;
   try {
-    const packId = String(req.body?.packId || '');
-    const pack = boosterManifest().packs.find(p => p.id === packId);
-    if (!pack) return res.status(404).json({ error: 'Unknown booster pack' });
-    const offen = await db.get('SELECT * FROM pending_booster WHERE user_id = ?', [userId]);
-    if (offen) return res.status(409).json({ error: 'You still have an unopened pack.', pending: pendingBoosterView(offen) });
-    const pool = packPool(packId);
-    if (!pool.length) return res.status(500).json({ error: 'This pack is empty right now.' });
+    const id = String(req.body?.id || '');
+    const index = req.body?.index;
+    const row = await db.get('SELECT * FROM pending_booster WHERE user_id = ?', [userId]);
+    if (!row || (id && row.id !== id)) return res.status(404).json({ error: 'No such open pack' });
+    const view = pendingBoosterView(row);
+    if (!Number.isInteger(index) || index < 0 || index >= view.cards.length) return res.status(400).json({ error: 'No such card' });
+    if (view.sold >= 0) return res.status(409).json({ error: 'You already sold a card from this pack.', sold: view.sold });
+    const amount = RARITIES.sellbackValue(view.cards[index].rarity);
+    if (!(amount > 0)) return res.status(400).json({ error: 'This card cannot be sold back.' });
+    let schonVerkauft = false;
+    await db.transaction(async (tx) => {
+      // Atomar: nur der erste Verkauf setzt die Markierung (sold_idx < 0); er bucht die Gutschrift im selben Zug.
+      const upd = await tx.run('UPDATE pending_booster SET sold_idx = ? WHERE id = ? AND user_id = ? AND sold_idx < 0', [index, row.id, userId]);
+      if (!upd.rowsAffected) { schonVerkauft = true; return; }
+      await tx.run('UPDATE users SET sc = sc + ? WHERE id = ?', [amount, userId]);
+      await tx.run('INSERT INTO sc_log (id, user_id, reward_id, opponent_id, amount) VALUES (?, ?, ?, ?, ?)',
+        [uuidv4(), userId, BOOSTER_SELLBACK_REASON, view.cards[index].rarity + ':' + view.cards[index].name, amount]);
+    });
+    if (schonVerkauft) {
+      const jetzt = await db.get('SELECT * FROM pending_booster WHERE id = ? AND user_id = ?', [row.id, userId]);
+      if (!jetzt) return res.status(404).json({ error: 'No such open pack' });
+      return res.status(409).json({ error: 'You already sold a card from this pack.', sold: pendingBoosterView(jetzt).sold });
+    }
+    const u = await db.get('SELECT sc FROM users WHERE id = ?', [userId]);
+    res.json({ ok: true, sold: index, amount, sc: u?.sc || 0 });
+  } catch (err) { console.error('[boosters/sell]', err.message); res.status(500).json({ error: 'Failed to sell the card' }); }
+});
 
-    const price = RARITIES.PACK_PRICE;
-    const cards = RARITIES.rollPack(pool, { hasMask: cardHasMask });
-    const variant = pack.variants[Math.floor(Math.random() * pack.variants.length)];
-    const id = uuidv4();
+// ── Auslage (Showcase): je Rarity eine Karte, wechselt jede volle Stunde (UTC), für alle gleich ──
+// Pool = alle Pack-Pools zusammen (sammelbare Karten: keine Tokens, nur Karten mit Kartenbild); Umbra/Stained nur mit Motiv-Maske.
+let _displayPool = null;
+function displayPool() {
+  if (!_displayPool) {
+    const seen = new Set(), out = [];
+    for (const id of RARITIES.PACK_IDS) for (const c of packPool(id)) if (!seen.has(c.name)) { seen.add(c.name); out.push(c.name); }
+    _displayPool = out;
+  }
+  return _displayPool;
+}
+const _displayCache = { hour: null, cards: null };
+/** Auslage der Stunde `hour` (zwischengespeichert für die jeweils letzte Stunde). */
+function displayForHour(hour) {
+  if (_displayCache.hour !== hour) { _displayCache.cards = RARITIES.rollDisplay(hour, displayPool(), cardHasMask); _displayCache.hour = hour; }
+  return _displayCache.cards;
+}
+async function displayView(userId, now) {
+  const t = typeof now === 'number' ? now : Date.now();
+  const hour = RARITIES.displayHourIndex(t);
+  const own = userId ? await ownedRarities(userId) : {};
+  return {
+    hour, msLeft: RARITIES.msToNextHour(t), nextAt: (hour + 1) * RARITIES.HOUR_MS, serverTime: t,
+    cards: displayForHour(hour).map(c => ({ ...c, owned: (own[c.name] && own[c.name][c.rarity]) || 0 })),
+  };
+}
+
+// GET /api/boosters/display — aktuelle Auslage { hour, msLeft, nextAt, serverTime, cards: [{ rarity, name, price, owned, special? , fullPrice? }] }
+//  Plätze 0–7: je Rarity eine Karte (aufsteigend); Platz 8: Sonderangebot (`special: true`, halber Preis aufgerundet, `fullPrice` = Normalpreis)
+app.get('/api/boosters/display', authMiddleware, async (req, res) => {
+  try { res.json(await displayView(req.user.userId)); }
+  catch (err) { console.error('[boosters/display]', err.message); res.status(500).json({ error: 'Failed to load the showcase' }); }
+});
+
+// POST /api/boosters/display/buy { slot, rarity?, hour?, name?, price?, special? } — eine Karte der aktuellen Auslage kaufen (beliebig oft, kein Lagerbestand):
+//  SC ab (sc_log 'shop:display'), Karte+Rarity +1 in user_card_rarities. `slot` = Platz in `cards` (0–7 je Rarity, 8 = Sonderangebot zum halben
+//  Preis); ohne `slot` zählt der reguläre Platz der Rarity. Der PREIS kommt immer vom Server (Platz der aktuellen Stunde). Weicht etwas vom Platz ab,
+//  was der Client mitschickt (Stunde, Name, Rarity, Sonderangebot, Preis — Wechsel an der Stundengrenze), antwortet der Server 409 mit der
+//  aktuellen Auslage und bucht nichts.
+//  Antwort 200 { ok, card, owned, sc, display } · 400 · 402 { error, sc } · 409 { error, display }
+app.post('/api/boosters/display/buy', authMiddleware, async (req, res) => {
+  const userId = req.user.userId;
+  try {
+    const body = req.body || {};
+    const now = Date.now(), hour = RARITIES.displayHourIndex(now);
+    const cards = displayForHour(hour);
+    let idx;
+    if (body.slot != null) idx = body.slot;
+    else {
+      if (!RARITIES.DISPLAY_PRICE[String(body.rarity || '')]) return res.status(400).json({ error: 'Unknown rarity' });
+      idx = cards.findIndex(c => c.rarity === body.rarity && !c.special);
+    }
+    if (!Number.isInteger(idx) || idx < -1 || idx >= RARITIES.DISPLAY_RARITIES.length + 1) return res.status(400).json({ error: 'Unknown slot' });
+    const slot = cards[idx];
+    const stale = !slot
+      || (body.hour != null && Number(body.hour) !== hour)
+      || (body.name != null && String(body.name) !== slot.name)
+      || (body.rarity != null && String(body.rarity) !== slot.rarity)
+      || (body.special != null && !!body.special !== !!slot.special)
+      || (body.price != null && Number(body.price) !== slot.price);
+    if (stale) return res.status(409).json({ error: 'The showcase just changed. Take a look at the new cards!', display: await displayView(userId, now) });
     let nichtGenug = false;
     try {
       await db.transaction(async (tx) => {
-        // Atomar: SC nur abziehen, wenn genug da sind; Pack und Buchung gehen mit oder gar nicht.
-        const upd = await tx.run('UPDATE users SET sc = sc - ? WHERE id = ? AND sc >= ?', [price, userId, price]);
+        const upd = await tx.run('UPDATE users SET sc = sc - ? WHERE id = ? AND sc >= ?', [slot.price, userId, slot.price]);
         if (!upd.rowsAffected) { nichtGenug = true; throw new Error('not-enough-sc'); }
-        await tx.run('INSERT INTO pending_booster (id, user_id, pack_id, variant_id, cards_json) VALUES (?, ?, ?, ?, ?)',
-          [id, userId, packId, variant.id, JSON.stringify(cards)]);
         await tx.run('INSERT INTO sc_log (id, user_id, reward_id, opponent_id, amount) VALUES (?, ?, ?, ?, ?)',
-          [uuidv4(), userId, BOOSTER_SC_REASON, packId, -price]);
+          [uuidv4(), userId, BOOSTER_DISPLAY_REASON, slot.rarity + ':' + slot.name + (slot.special ? ':special' : ''), -slot.price]);
+        await addRarityCopies(userId, [{ name: slot.name, rarity: slot.rarity }], tx);
       });
     } catch (err) {
       if (nichtGenug) {
         const u = await db.get('SELECT sc FROM users WHERE id = ?', [userId]);
         return res.status(402).json({ error: 'Not enough SC', sc: u?.sc || 0 });
       }
-      // Gleichzeitiger zweiter Kauf: der Unique-Index auf pending_booster(user_id) hat ihn abgewiesen und die Buchung zurueckgerollt.
-      const jetzt = await db.get('SELECT * FROM pending_booster WHERE user_id = ?', [userId]);
-      if (jetzt) return res.status(409).json({ error: 'You still have an unopened pack.', pending: pendingBoosterView(jetzt) });
       throw err;
     }
     const u = await db.get('SELECT sc FROM users WHERE id = ?', [userId]);
-    res.json({ pending: { id, packId, variantId: variant.id, cards }, sc: u?.sc || 0 });
-  } catch (err) { console.error('[boosters/buy]', err.message); res.status(500).json({ error: 'Failed to buy pack' }); }
-});
-
-// POST /api/boosters/claim { id } — die neun Karten in die Sammlung (+1 je (Karte, Rarity)), offenes Pack loeschen.
-//  Antwort { ok, added: [{ name, rarity }], rarities: <gesamte Sammlung wie /api/collection> }
-app.post('/api/boosters/claim', authMiddleware, async (req, res) => {
-  const userId = req.user.userId;
-  try {
-    const id = String(req.body?.id || '');
-    const row = await db.get('SELECT * FROM pending_booster WHERE user_id = ?', [userId]);
-    if (!row || (id && row.id !== id)) return res.status(404).json({ error: 'No such open pack' });
-    const view = pendingBoosterView(row);
-    let schonWeg = false;
-    await db.transaction(async (tx) => {
-      const del = await tx.run('DELETE FROM pending_booster WHERE id = ? AND user_id = ?', [row.id, userId]);
-      if (!del.rowsAffected) { schonWeg = true; return; }   // doppelter Klick: nur einmal buchen
-      await addRarityCopies(userId, view.cards, tx);
-    });
-    if (schonWeg) return res.status(404).json({ error: 'No such open pack' });
-    res.json({ ok: true, added: view.cards, rarities: await ownedRarities(userId) });
-  } catch (err) { console.error('[boosters/claim]', err.message); res.status(500).json({ error: 'Failed to add cards' }); }
+    const own = await ownedRarities(userId);
+    res.json({ ok: true, card: { name: slot.name, rarity: slot.rarity, price: slot.price, special: !!slot.special }, owned: (own[slot.name] && own[slot.name][slot.rarity]) || 0, sc: u?.sc || 0, display: await displayView(userId, now) });
+  } catch (err) { console.error('[boosters/display/buy]', err.message); res.status(500).json({ error: 'Failed to buy the card' }); }
 });
 
 // ───── Duplikate: Rahmen-Ränge ─────

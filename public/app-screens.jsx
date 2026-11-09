@@ -5328,8 +5328,20 @@ function ShopScreen() {
       </div>
       {celebration && <PurchaseCelebration cx={celebration.cx} cy={celebration.cy} onDone={() => setCelebration(null)} />}
       {pendingPack && window.BoosterOpening && (
-        <window.BoosterOpening pending={pendingPack} boosters={boosters}
-          onClaimed={() => { setPendingPack(null); notify('Cards added to your collection!', 'success'); }} />
+        <window.BoosterOpening key={pendingPack.id} pending={pendingPack} boosters={boosters} sc={user.sc || 0}
+          onSc={(n) => setUser(u => ({ ...u, sc: n }))}
+          onClaimed={(data, info) => {
+            // „Add and rip one more!“ ohne genug SC: das Pack ist trotzdem eingelöst (Server), der Kontostand steht in der Antwort
+            if (data && data.sc != null) setUser(u => ({ ...u, sc: data.sc }));
+            setPendingPack(null);
+            if (info && info.ripFailed) notify('Cards added to your collection! ' + info.ripFailed + '.', 'error');
+            else notify('Cards added to your collection!', 'success');
+          }}
+          onRipMore={(data) => {
+            // Altes Pack eingelöst + neues gekauft: die Ansicht wechselt (key) sofort zum neuen Pack und seiner Öffnungsanimation
+            if (data.sc != null) setUser(u => ({ ...u, sc: data.sc }));
+            setPendingPack(data.pending);
+          }} />
       )}
       {randomReveal && <ShopPullReveal reveal={randomReveal} fast={fastPull} onToggleFast={() => setFastPull(v => !v)} onClose={() => setRandomReveal(null)} />}
       <div className="top-bar">
@@ -5352,7 +5364,8 @@ function ShopScreen() {
         {tab === 'skins' && renderGachaPage('skin')}
         {tab === 'avatars' && renderGachaPage('avatar')}
         {tab === 'sleeves' && renderGachaPage('sleeve')}
-        {tab === 'boosters' && window.BoosterShop && <window.BoosterShop boosters={boosters} sc={user.sc || 0} busy={buying || !!pendingPack} onBuy={buyBooster} />}
+        {tab === 'boosters' && window.BoosterShop && <window.BoosterShop boosters={boosters} sc={user.sc || 0} busy={buying || !!pendingPack} onBuy={buyBooster}
+          onSc={(n) => setUser(u => ({ ...u, sc: n }))} notify={notify} />}
         {tab === 'boards' && renderItemGrid(catalog.boards || [], 'board', '/data/shop/boards/')}
         {tab === 'structures' && renderStructureDecks()}
       </div>
