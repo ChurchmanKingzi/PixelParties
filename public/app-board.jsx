@@ -44883,7 +44883,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       // Pixelart-Leiste (app-fx-53): beim ersten Update der Kette festlegen, ob sie läuft (sonst die schlichte Darstellung von heute)
       if (!chainFxRef.current && links.length >= 2) { const an = !!(window.ppFx53 && window.ppFx53.aktiv()); chainFxRef.current = an; setChainFx(an); }
       if (chainFxRef.current && window.ppFx53) window.ppFx53.vorladen(links.map(l => l.cardName));
-      setReactionChain(prevK => [...vor, ...links.map(l => ({ ...l, rarity: l.rarity || (prevK.find(x => x.id === l.id) || {}).rarity || window.ppRarityLookup(l.cardName, l.owner), isInitialCard: vorlauf ? false : l.isInitialCard, status: l.negated ? 'negated' : 'pending' }))]);
+      setReactionChain(prevK => [...vor, ...links.map(l => ({ ...l, rarity: l.rarity || ((prevK || []).find(x => x.id === l.id) || {}).rarity || window.ppRarityLookup(l.cardName, l.owner), isInitialCard: vorlauf ? false : l.isInitialCard, status: l.negated ? 'negated' : 'pending' }))]);
     };
     const chainIdx = (prev, i) => i + (prev?.[0]?._vorlauf ? 1 : 0);
     const fxDomIdx = (linkIndex) => linkIndex + (chainVorlaufRef.current ? 1 : 0);
