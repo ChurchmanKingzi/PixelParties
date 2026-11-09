@@ -8,8 +8,8 @@
 //  gestufte Helligkeit, Bewegung im 20-Bilder-Takt (Umbra/Stained 15), Funken als Pixelkreuze.
 //
 //  Stufen (Entwürfe: abgenommene Mockups):  Common (kein Effekt) · Uncommon (silberner Name/Werte/Icon) · Rare (Prisma-Strahl, Silberrahmen) ·
-//  Prismatic (Regenbogenkacheln) · Super Rare (Lichtlauf, Schraffur) · Diamond (Rautengitter) · Spectral (Echo, Glitches) ·
-//  Umbra (Schattenrauch um das Motiv, Regen) · Stained Rare (Buntglas-Hintergrund, Aura, goldener Text).
+//  Prismatic (wandernde Regenbogenbaender) · Super Rare (Lichtlauf, Schraffur) · Diamond (Rautengitter) · Spectral (Echo, Glitches) ·
+//  Umbra (Schattenrauch um das Motiv, schwarze glaenzende Schrift) · Stained Rare (Buntglas-Hintergrund, Aura, goldener Text).
 //
 //  API (window.PpRarityFx):
 //    available(rarity)                     Gibt es für diese Stufe einen Effekt? (false bei Common/unbekannt)
@@ -31,6 +31,8 @@
 //     Eimer nach Lauf-Koordinate, Rauschsaum der Umbra, geaenderte Kacheln der Prismatic, Glaszellen mit gleichen Stufen aus der Tabelle).
 //   * Die Effekte schreiben in ein Uint32-Raster (ein Schreibzugriff je Pixel, keine Zwischenfelder), Text in Uint32-Sichten der Ebenen.
 //   * Stained quantisiert im Raster statt die Leinwand zurueckzulesen (kein getImageData im Takt).
+//   * Prismatic: wenige Baender, nur Zellen im Band werden je Bild beschrieben (Eimer nach Lauf-Koordinate), Text-Ebenen entfallen ganz. Umbra-Schrift: Grundpuffer je Ebene
+//     einmal fertig (Buchstaben, Kantenlicht, ggf. Kontursaum), je Bild nur Kopie plus Glanzlauf.
 //   * Schwere Erstberechnung (Glasscheiben, Bleiruten, Quantisierungs- und Glastabellen) laeuft in Zeitscheiben (`prepG`, `runSliced`), nicht als ein Block.
 //   Gegenprobe bei jeder Aenderung: Leinwand-Hashes je Rarity x Kartentyp x Groesse x Zeitpunkt gegen den Stand davor (muessen alle gleich sein).
 // ═══════════════════════════════════════════════════════════════════
@@ -44,7 +46,7 @@
   const SPEC = {
     uncommon: { fx: 'unc', stamp: 'silver', fps: 20, still: 1.5 },
     rare: { fx: 'rare', stamp: 'rainbow', fps: 20, still: 1.2 },   // Standbild: Strahl mitten im Bild (Lauf 4,6 s, 72 %)
-    prismatic: { fx: 'pris', stamp: 'prismatic', fps: 20, still: 2.2, textTop: true },
+    prismatic: { fx: 'pris', stamp: 'prismatic', fps: 20, still: 2.2 },
     super: { fx: 'sr', stamp: 'srstar', fps: 20, still: 1.4 },
     diamond: { fx: 'dia', stamp: 'diamond', fps: 20, still: 1.0 },
     spectral: { fx: 'spec', stamp: 'spectral', fps: 20, still: 1.3 },
@@ -403,19 +405,73 @@
       for (let k = 0; k < pre.n; k++) { const x = L[k * 2]; d32[pidx[k]] = (fgy[k] + F) % 4 === 0 ? tab1[x] : tab0[x]; }
     }
   }
-  /** Umbra-Schrift: Farbe nach Spalte und oberer/unterer Zeilenhälfte */
+  /** Umbra-Schrift: Name und Werte schwarz und glaenzend. Je Ebene (und Ansicht) einmal vorberechnet (`umbraLayerPre`): fertiger Grundpuffer mit schwarzen Buchstaben,
+   *  Kantenlicht (dunkles Violett oben/links an dicken Strichen) und, wo der Untergrund dunkel ist, einem harten hellen Kontursaum von einer Zelle.
+   *  Je Bild: Grundpuffer kopieren, dann nur der wandernde Glanzlauf (harte Stufen, Bayer-Raster) und einzelne Funkelkreuze. */
+  const UM_NEED = .215;   // relative Helligkeit des Untergrunds, darunter bekommt die Ebene einen hellen Saum (gemessen an den Karten: Namen auf Rot/Grau/Gelb darueber, Helden-Violett, Blau, Dunkelrot darunter)
+  const UM_OUT = [236, 224, 255], UM_L3 = [220, 204, 255], UM_L2 = [126, 84, 206], UM_L1 = [58, 30, 104], UM_TOP = [58, 34, 100], UM_LEFT = [24, 10, 44], UM_ARM = [198, 178, 255];
+  /** Maske um rx waagerecht und ry senkrecht aufweiten (Rechteck) in einem w x h grossen Puffer */
+  function dilateWH(m, w, h, rx, ry) {
+    const hz = new Uint8Array(w * h), z = new Uint8Array(w * h);
+    if (rx) for (let y = 0; y < h; y++) {
+      let last = -1e9; for (let x = 0, p = y * w; x < w; x++, p++) { if (m[p]) last = x; if (x - last <= rx) hz[p] = 1; }
+      last = 1e9; for (let x = w - 1, p = y * w + w - 1; x >= 0; x--, p--) { if (m[p]) last = x; if (last - x <= rx) hz[p] = 1; }
+    } else hz.set(m);
+    if (!ry) return hz;
+    for (let x = 0; x < w; x++) {
+      let last = -1e9; for (let y = 0, p = x; y < h; y++, p += w) { if (hz[p]) last = y; if (y - last <= ry) z[p] = 1; }
+      last = 1e9; for (let y = h - 1, p = (h - 1) * w + x; y >= 0; y--, p -= w) { if (hz[p]) last = y; if (last - y <= ry) z[p] = 1; }
+    }
+    return z;
+  }
+  function umbraLayerPre(lay, img, K) {
+    const w = lay.w, h = lay.h, L = lay.list, n = L.length >> 1, W = w * h, ink = new Uint8Array(W), pre = layPre(lay);
+    for (let k = 0; k < n; k++) ink[L[k * 2 + 1] * w + L[k * 2]] = 1;
+    // Untergrund: das Basisbild unter der Ebene
+    const f = img.naturalWidth / (GW * K), [c, g] = cv2d(w, h, true); g.imageSmoothingEnabled = true; g.drawImage(img, lay.x0 * f, lay.y0 * f, w * f, h * f, 0, 0, w, h);
+    const d = g.getImageData(0, 0, w, h).data, near = dilateWH(ink, w, h, K, K), far = dilateWH(ink, w, h, 2 * K, 2 * K), yl = new Float32Array(W);
+    for (let p = 0; p < W; p++) yl[p] = (.299 * d[p * 4] + .587 * d[p * 4 + 1] + .114 * d[p * 4 + 2]) / 255;
+    const rel = m => Math.pow((m + .055) / 1.055, 2.4), hist = new Int32Array(64);
+    // Untergrund der Ebene: Median der Helligkeit im Streifen 1..2 Zellen neben der Schrift (der Schlagschatten des Basistextes und ferne Plakettenraender zaehlen nicht mit)
+    let nb = 0; for (let p = 0; p < W; p++) if (far[p] && !near[p]) { hist[Math.min(63, (yl[p] * 64) | 0)]++; nb++; }
+    let med = .5; if (nb >= 8) { let acc = 0; for (let i = 0; i < 64; i++) { acc += hist[i]; if (acc * 2 >= nb) { med = (i + .5) / 64; break; } } }
+    // dunkler Untergrund -> heller Saum um alle Buchstaben der Ebene (je Ebene eine Entscheidung, nicht je Buchstabe: sonst springt der Saum innerhalb eines Wortes)
+    const outlined = rel(med) < UM_NEED;
+    const base = new Uint32Array(W), BK = sn(0, 0, 0), TOP = packC(lay, UM_TOP[0], UM_TOP[1], UM_TOP[2]), LEFT = packC(lay, UM_LEFT[0], UM_LEFT[1], UM_LEFT[2]), OUT = sn(UM_OUT[0], UM_OUT[1], UM_OUT[2]);
+    if (outlined) {
+      const hz = dilateWH(ink, w, h, K, 0), vt = dilateWH(ink, w, h, 0, K);
+      for (let p = 0; p < W; p++) if (!ink[p] && (hz[p] || vt[p])) base[p] = OUT;
+    }
+    for (let k = 0; k < n; k++) {
+      const x = L[k * 2], y = L[k * 2 + 1], p = y * w + x;
+      const up = y - K >= 0 && ink[p - K * w], dn = y + K < h && ink[p + K * w], lf = x - K >= 0 && ink[p - K], rt = x + K < w && ink[p + K];
+      base[p] = !up && dn ? TOP : !lf && rt ? LEFT : BK;
+    }
+    const bv = new Float32Array(n); for (let k = 0; k < n; k++) bv[k] = bay(Math.floor(pre.gx[k]), Math.floor(pre.gy[k]));
+    lay.um = { base, bv, outlined, c3: packC(lay, UM_L3[0], UM_L3[1], UM_L3[2]), c2: packC(lay, UM_L2[0], UM_L2[1], UM_L2[2]), c1: packC(lay, UM_L1[0], UM_L1[1], UM_L1[2]) };
+  }
   function umbraText(E, t) {
+    const pos = glintU(t, 3.4, .5), p0 = pos.length ? pos[0] : 0;
+    let li = 0;
     for (const lay of E.layers) {
-      const pre = layPre(lay), d32 = lay.d32, U = lay.U, W = lay.w;
-      if (!pre.colGx) { pre.colGx = new Float64Array(W); for (let x = 0; x < W; x++) pre.colGx[x] = (x + lay.x0) / U; pre.tab0 = new Uint32Array(W); pre.tab1 = new Uint32Array(W); }
-      const { colGx, tab0, tab1, ry, pidx } = pre;
-      for (let x = 0; x < W; x++) {
-        const w = .5 + .5 * Math.sin(t * 2 + colGx[x] * .3), m = w * .22;
-        tab0[x] = packC(lay, 252 + (176 - 252) * m, 246 + (128 - 246) * m, 255 + (240 - 255) * m);   // ry < .5
-        tab1[x] = packC(lay, 226 + (176 - 226) * m, 212 + (128 - 212) * m, 252 + (240 - 252) * m);
+      const pre = layPre(lay), um = lay.um, d32 = lay.d32, n = pre.n; li++;
+      d32.set(um.base);
+      if (!n) continue;
+      if (pos.length) {   // Glanzlauf: heller Kern, Violett, Dunkelviolett — Pixel nur teilweise (Bayer), die Buchstaben bleiben als Form lesbar
+        const bk = layBuckets(lay, 'ud'), span = bucketSpan(bk, p0 - 4.4, p0 + 4.4);
+        if (span) for (let q = span[0]; q < span[1]; q++) {
+          const k = bk.ord[q], a = Math.abs(pre.ud[k] - p0), bv = um.bv[k];
+          const c = a < 1.2 ? (bv < .6 ? um.c3 : um.c2) : a < 2.8 ? (bv < .75 ? um.c2 : um.c1) : a < 4.4 && bv < .45 ? um.c1 : 0;
+          if (c) d32[pre.pidx[k]] = c;
+        }
       }
-      const L = lay.list;
-      for (let k = 0; k < pre.n; k++) { const x = L[k * 2]; d32[pidx[k]] = ry[k] < .5 ? tab0[x] : tab1[x]; }
+      // vereinzelte Funkelkreuze auf den Buchstaben (Name zwei, jede Werte-Ebene eines)
+      const slots = lay.kind === 'name' ? 2 : 1, per = 1.7, L = lay.list, U = lay.U;
+      for (let s = 0; s < slots; s++) {
+        const tt = t + s * .85 + li * .41, k = Math.floor(tt / per), ph = (tt % per) / per; if (ph > .55) continue;
+        const f = Math.floor(ph / .55 * SPARK_SIZE.length), q = Math.floor(hash(k, s + li * 7, 3) * n);
+        lstar(lay, Math.round((L[q * 2] + lay.x0) / U), Math.round((L[q * 2 + 1] + lay.y0) / U), Math.min(1, SPARK_SIZE[f]), UM_ARM, WHITE3);
+      }
     }
   }
 
@@ -475,24 +531,11 @@
     },
   };
 
-  // Prismatic: Regenbogenkacheln über die ganze Karte (Cracked Ice, „Kräftig“), Text liegt scharf obenauf
-  const LV = 12;
-  function prismaticPrep(E) {
-    const r = rng(11), sites = [], S = 12.5;
-    for (let gy = -1; gy * S < GH + S; gy++) for (let gx = -1; gx * S < GW + S; gx++) {
-      sites.push({ x: gx * S + (gy & 1) * S * .5 + (r() - .5) * S * .9, y: gy * S + (r() - .5) * S * .9 });
-    }
-    const v = voronoi(sites, 'l2'), e = edges(v.id, 1), n = sites.length, ph = new Float32Array(n), tilt = new Float32Array(n), lite = new Float32Array(n);
-    for (let i = 0; i < n; i++) { ph[i] = r(); tilt[i] = r() * 6.283; lite[i] = r(); }
-    const cx = new Float32Array(n), cy = new Float32Array(n), cnt = new Int32Array(n);
-    for (let p = 0; p < NPX; p++) { const c = v.id[p]; cx[c] += p % GW; cy[c] += (p / GW) | 0; cnt[c]++; }
-    for (let i = 0; i < n; i++) if (cnt[i]) { cx[i] /= cnt[i]; cy[i] /= cnt[i]; }
-    const cstart = new Int32Array(n + 1), cpx = new Int32Array(NPX);   // Pixel je Kachel (nach Kachel sortiert)
-    for (let p = 0; p < NPX; p++) cstart[v.id[p] + 1]++;
-    for (let c = 0; c < n; c++) cstart[c + 1] += cstart[c];
-    const fillc = cstart.slice(0, n); for (let p = 0; p < NPX; p++) cpx[fillc[v.id[p]]++] = p;
-    return { v, e, n, ph, tilt, lite, cx, cy, cstart, cpx };
-  }
+  // Prismatic: wenige diagonale Regenbogenbaender wandern langsam ueber Motiv und Rahmen. Im Band wird das Motiv leicht im Farbton verschoben (Stufen zu 5 Grad,
+  // Helligkeit bleibt) und mit einem spektralen Ton gleicher Helligkeit (sieben flache Stufen Rot..Violett) gemischt; die Baenderkanten laufen per Bayer-Raster
+  // aus (kein Alpha), ausserhalb der Baender bleibt die Karte unveraendert. Text, Plaketten und Textfelder werden nie beruehrt (Textzone), Wirkung nur auf
+  // Bildfeld, Rahmen um das Bild und Kartenrand. Kein Text-Ebenen-Zeichnen, keine Loecher noetig.
+  const PRIS_PER = 150, PRIS_W = 64, PRIS_SPD = 12, PRIS_TINT = .45, PRIS_COV = .85, PRIS_FRAME = .5;
   /** wie hsv(), schreibt r, g, b (0..255, Rohwerte) nach out[j..j+2] — ohne Zwischenfelder */
   function hsvOut(h, s, v, out, j) {
     h = fract(h); const i6 = Math.floor(h * 6), f = h * 6 - i6, p = v * (1 - s), q = v * (1 - f * s), t = v * (1 - (1 - f) * s);
@@ -500,53 +543,56 @@
     switch (i6 % 6) { case 0: r = v; g = t; b = p; break; case 1: r = q; g = v; b = p; break; case 2: r = p; g = v; b = t; break; case 3: r = p; g = q; b = v; break; case 4: r = t; g = p; b = v; break; default: r = v; g = p; b = q; }
     out[j] = r * 255; out[j + 1] = g * 255; out[j + 2] = b * 255;
   }
-  const MLV = Float64Array.from({ length: 10 }, (_, i) => Math.min(.9, i / 10));
-  function prismaticFrame(E, st, t, o, str, share) {
-    const { B, L } = E, { v, e, ph, tilt, lite, cx, cy, n } = st;
-    if (!st.pre) {
-      const outl = new Float32Array(NPX), art = new Uint8Array(NPX), qi = new Uint8Array(NPX), LVN0 = LV - 1;
-      for (let p = 0; p < NPX; p++) { outl[p] = .45 + .55 * sstep(.04, .3, L[p]); art[p] = inArt(p % GW, (p / GW) | 0) ? 1 : 0; qi[p] = Math.round(clamp(.2 + .9 * L[p], 0, art[p] ? 1 : .86) * LVN0); }
-      st.pre = { outl, art, qi, lut: new Uint8Array(n * LV * 3), cellK: new Float32Array(n), lutPrev: new Uint8Array(n * LV * 3), kPrev: new Float32Array(n).fill(NaN), out: new Uint32Array(NPX), changed: new Uint8Array(n), hP: new Float64Array(n * 3).fill(NaN) };
-    }
-    const { outl, art, qi, lut, cellK, lutPrev, kPrev, out, changed, hP } = st.pre, LVN = LV - 1, { cstart, cpx } = st;
-    const sweep = ((t * 0.17) % 1) * (GW + GH + 60) - 30;
-    for (let c = 0; c < n; c++) {
-      const wave = Math.max(0, 1 - Math.abs((cx[c] + cy[c] * 0.8) - sweep) / 46);
-      const sh = Math.max(0, Math.sin(t * 1.4 + ph[c] * 6.283 + tilt[c])), glow = 0.5 * wave + 0.5 * sh * sh * sh;
-      const steps = 14, hue = Math.floor(fract(ph[c] + t * 0.045 + (cx[c] - cy[c]) * 0.002) * steps) / steps;
-      const sat = 0.86 - glow * .3, act = lite[c] < share ? 1 : .22;
-      const k = (0.12 + act * 0.42 + glow * 0.3 * (.4 + act * .6)) * str;
-      cellK[c] = k; const gu = clamp((k / str - .5) * 1.2);
-      if (hue !== hP[c * 3] || sat !== hP[c * 3 + 1] || gu !== hP[c * 3 + 2]) { hP[c * 3] = hue; hP[c * 3 + 1] = sat; hP[c * 3 + 2] = gu; for (let q = 0; q < LV; q++) hsvOut(hue, sat, clamp(q / LVN + gu * .3), lut, (c * LV + q) * 3); }   // Farbstufen nur neu, wenn sich Farbton/Saettigung/Helligkeit der Kachel aendern
-      // Kacheln, deren Helligkeit und Farbstufen sich gegenueber dem letzten Bild nicht geaendert haben, behalten ihre Pixel (jedes Pixel haengt nur von Kachel, Karte und diesen Werten ab)
-      let same = kPrev[c] === cellK[c]; for (let q = c * LV * 3, qe = q + LV * 3; same && q < qe; q++) if (lut[q] !== lutPrev[q]) same = false;
-      changed[c] = same ? 0 : 1; kPrev[c] = cellK[c];
-    }
-    lutPrev.set(lut);
-    const sA = 0.62 * (.25 + .75 * str), sB = 0.62 * .4 * (.25 + .75 * str), whiteTop = str > .6;
-    for (let c = 0; c < n; c++) {
-      if (!changed[c]) continue;
-      const ck = cellK[c];
-      for (let jj = cstart[c], je = cstart[c + 1]; jj < je; jj++) {
-        const p = cpx[jj], i = p * 4;
-        let k = ck; if (!art[p]) k *= .72; k *= outl[p];
-        const kl = Math.round(k * 10);   // kq = kl / 10; kq > 0,04 genau ab kl = 1
-        let r = B[i], g = B[i + 1], b = B[i + 2];
-        if (kl >= 1) {
-          const j = (c * LV + qi[p]) * 3, m = MLV[kl > 9 ? 9 : kl]; r += (lut[j] - r) * m; g += (lut[j + 1] - g) * m; b += (lut[j + 2] - b) * m;
-        }
-        if (e[p]) {
-          const y = (p / GW) | 0, es = y >= 118 && y < 197 ? sB : sA;
-          if (y < 118 && whiteTop && hash(p % GW, y, 2) < .35) { r = g = b = 255; } else { r += (255 - r) * es; g += (255 - g) * es; b += (255 - b) * es; }
-        }
-        out[p] = snIn(r, g, b);
-      }
-    }
-    o.set(out);
-    sparkles(o, t, 7, 1.5, .55, (k, s) => { const c = Math.floor(hash(k, s, 41) * n); return [Math.round(cx[c]), Math.round(cy[c])]; }, [255, 255, 255], [255, 255, 255], 1);
+  /** Zellen im Abstand (2, 1) von jeder Schrift (Name, Werte, Regeltext, Symbole): dort wirkt kein Effekt */
+  function textZone(core) {
+    const [c, g] = cv2d(GW, GH, true); g.imageSmoothingEnabled = true; g.imageSmoothingQuality = 'high';
+    g.drawImage(core.masks.name, 0, 0, GW, GH); g.drawImage(core.masks.body, 0, 0, GW, GH);
+    const d = g.getImageData(0, 0, GW, GH).data, ink = new Uint8Array(NPX);
+    for (let p = 0; p < NPX; p++) ink[p] = d[p * 4 + 3] > 24 ? 1 : 0;
+    return dilateWH(ink, GW, GH, 2, 1);
   }
-  let prisShared = null;   // Kachelnetz, Phasen und Schwerpunkte haengen nicht von der Karte ab: einmal fuer alle
-  FX.pris = { prep: E => Object.assign({}, prisShared || (prisShared = prismaticPrep(E))), frame: (E, st, t, o) => prismaticFrame(E, st, t, o, .5, 1) };
+  /** Matrix der Farbton-Drehung um `deg` Grad, helligkeitserhaltend (wie CSS hue-rotate) */
+  function hueMatrix(deg) {
+    const a = deg * Math.PI / 180, c = Math.cos(a), s = Math.sin(a);
+    return Float64Array.of(.213 + c * .787 - s * .213, .715 - c * .715 - s * .715, .072 - c * .072 + s * .928,
+      .213 - c * .213 + s * .143, .715 + c * .285 + s * .140, .072 - c * .072 - s * .283,
+      .213 - c * .213 - s * .787, .715 - c * .715 + s * .715, .072 + c * .928 + s * .072);
+  }
+  const PRIS_HR = Array.from({ length: 13 }, (_, i) => hueMatrix((i - 6) * 5));
+  const PRIS_SPEC = [0, .08, .16, .33, .5, .62, .75].map(h => { const o = new Float64Array(3); hsvOut(h, .9, 1, o, 0); return Float64Array.of(o[0], o[1], o[2], .299 * o[0] + .587 * o[1] + .114 * o[2] + 1); });
+  /** je Karte einmal: betroffene Zellen (Bild: voll, Rahmen/Rand: halb) mit Lauf-Koordinate, Bayer-Stelle und Grundhelligkeit, nach Lauf-Koordinate in Eimern */
+  function prisPre(E) {
+    const { A, L } = E, zone = textZone(E), reg = dilateWH(A, GW, GH, 3, 3), zoneFar = dilateWH(zone, GW, GH, 4, 4), cp = [], cu = [], cw = [], cb = [], cl = [], gl = [];
+    for (let y = 0; y < GH; y++) for (let x = 0; x < GW; x++) {
+      const p = y * GW + x; if (zone[p]) continue;
+      const wgt = A[p] ? 1 : (reg[p] || x < 4 || x >= GW - 4 || y < 4 || y >= GH - 4) ? PRIS_FRAME : 0; if (!wgt) continue;
+      cp.push(p); cu.push(UD(x, y)); cw.push(wgt); cb.push(bay(x, y)); cl.push(L[p] * 255);
+      if (A[p] && !zoneFar[p]) gl.push(p);   // Glanzpixel nur im Bild und weit weg von der Schrift
+    }
+    const cuA = Float64Array.from(cu);
+    return { cp: Int32Array.from(cp), cu: cuA, cw: Float64Array.from(cw), cb: Float64Array.from(cb), cl: Float64Array.from(cl), gl: Int32Array.from(gl), bk: bucketsOf(cuA, cuA.length) };
+  }
+  FX.pris = {
+    noText: true,
+    prep: () => ({}),
+    warm(E, st) { st.pre = prisPre(E); },
+    frame(E, st, t, o) {
+      const pre = st.pre || (st.pre = prisPre(E)), B = E.B, { cp, cu, cw, cb, cl, bk } = pre, u0 = (t * PRIS_SPD) % PRIS_PER;
+      for (let k = 0; k < 3; k++) {
+        const lo = u0 + k * PRIS_PER - PRIS_W, span = bucketSpan(bk, lo - 1e-6, lo + PRIS_W + 1e-6); if (!span) continue;
+        for (let j = span[0]; j < span[1]; j++) {
+          const q = bk.ord[j], w = (cu[q] - lo) / PRIS_W; if (w < 0 || w >= 1) continue;
+          const e = Math.min(w, 1 - w) * 3.2;
+          if (cb[q] >= (e >= 1 ? 1 : e) * PRIS_COV * cw[q]) continue;
+          const p = cp[q], i = p * 4, r = B[i], g = B[i + 1], b = B[i + 2], m = PRIS_HR[Math.round((w - .5) * 12) + 6], sp = PRIS_SPEC[(w * 7) | 0], f = Math.min(2.2, (cl[q] + 30) / sp[3]);
+          const R = m[0] * r + m[1] * g + m[2] * b, G = m[3] * r + m[4] * g + m[5] * b, Bc = m[6] * r + m[7] * g + m[8] * b;
+          o[p] = sn(R + (sp[0] * f - R) * PRIS_TINT, G + (sp[1] * f - G) * PRIS_TINT, Bc + (sp[2] * f - Bc) * PRIS_TINT);
+        }
+      }
+      // wenige Glanzpixel im Bild
+      const gl = pre.gl; if (gl.length) sparkles(o, t, 2, 2.6, .45, (k, s) => { const p = gl[Math.floor(hash(k, s, 41) * gl.length)]; return [p % GW, (p / GW) | 0]; }, [255, 255, 255], [255, 255, 255], 1);
+    },
+  };
 
   // Super Rare: Einfach-Schraffur und ein Lichtlauf über Rahmen, Bild, Name, Werte und Stern
   /** je Bildpixel einmal: Schraffurlinie (nur Linienpixel mit Tor >= 0,05) in sechs Pastellfarben fertig gemischt, Lichtlauf-Farbe, Lauf-Koordinate */
@@ -1098,7 +1144,7 @@
     return core;
   }
   // Text-Ebenen in Leinwand-Auflösung: Tinte (alpha > 100) in Zeilengruppen
-  function inkLayers(maskCv, K, kindOf, gap, clearRects, minusCv) {
+  function inkLayers(maskCv, K, kindOf, gap, clearRects, minusCv, pad) {
     const W = GW * K, H = GH * K, [c, g] = cv2d(W, H, true);
     g.imageSmoothingEnabled = K !== 5; g.imageSmoothingQuality = 'high'; g.drawImage(maskCv, 0, 0, W, H);
     if (minusCv) { g.globalCompositeOperation = 'destination-out'; g.drawImage(minusCv, 0, 0, W, H); g.globalCompositeOperation = 'source-over'; }
@@ -1112,10 +1158,10 @@
     groups.forEach(([a, b], gi) => {
       let x0 = W, x1 = -1; const list = [];
       for (let y = a; y <= b; y++) for (let x = 0, o = (y * W) * 4 + 3; x < W; x++, o += 4) if (d[o] > 100) { if (x < x0) x0 = x; if (x > x1) x1 = x; }
-      const w = x1 - x0 + 1, h = b - a + 1;
-      for (let y = a; y <= b; y++) for (let x = x0; x <= x1; x++) if (d[(y * W + x) * 4 + 3] > 100) list.push(x - x0, y - a);
+      const pd = pad | 0, w = x1 - x0 + 1 + 2 * pd, h = b - a + 1 + 2 * pd;   // pad: Rand in Pixeln um die Tinte (Umbra: Platz fuer den Kontursaum)
+      for (let y = a; y <= b; y++) for (let x = x0; x <= x1; x++) if (d[(y * W + x) * 4 + 3] > 100) list.push(x - x0 + pd, y - a + pd);
       const [cv, cx] = cv2d(w, h);
-      out.push({ kind: kindOf(gi, a), x0, y0: a, w, h, U: K, list: Int16Array.from(list), gy0: 0, gh: h, cv, cx, im: cx.createImageData(w, h), data: null });
+      out.push({ kind: kindOf(gi, a), x0: x0 - pd, y0: a - pd, w, h, U: K, list: Int16Array.from(list), gy0: 0, gh: h, cv, cx, im: cx.createImageData(w, h), data: null });
       out[out.length - 1].data = out[out.length - 1].im.data; out[out.length - 1].d32 = new Uint32Array(out[out.length - 1].data.buffer);
     });
     return out;
@@ -1137,26 +1183,13 @@
   /** Ansicht: alles, was von der Pixelgröße der Leinwand abhängt */
   function buildView(core, img, K) {
     const sp = core.sp, W = GW * K, H = GH * K, CR = root.CardRender;
-    const nameL = inkLayers(core.masks.name, K, (gi, y) => (gi === 0 && y < 150 * K / 5 ? 'name' : 'stats'), 14, stampRects(K));
+    const noText = !!FX[sp.fx].noText;   // Effekt ohne eigene Text-Ebenen (Prismatic): Name/Werte/Regeltext bleiben das Basisbild
+    const nameL = noText ? [] : inkLayers(core.masks.name, K, (gi, y) => (gi === 0 && y < 150 * K / 5 ? 'name' : 'stats'), 14, stampRects(K), null, sp.fx === 'umbra' ? K : 0);
     const bodyL = sp.body ? inkLayers(core.masks.body, K, () => 'body', 40, null, core.masks.name) : [];
     const layers = nameL.concat(bodyL);
     markLightPlates(layers, img, K);
-    const view = { K, W, H, layers, layers0: layers, holes: null, cut: null, rim: null };
-    if (sp.textTop) {   // Text bleibt scharf: Löcher in der Effekt-Ebene genau auf der Tinte (Name, Werte, Regeltext)
-      const [hc, hg] = cv2d(W, H); hg.imageSmoothingEnabled = K !== 5; hg.drawImage(core.masks.name, 0, 0, W, H); hg.drawImage(core.masks.body, 0, 0, W, H);
-      // Alpha hart schneiden (Pixelkanten): jede Tinte mit alpha > 100 wird ganz durchsichtig
-      const id = hg.getImageData(0, 0, W, H), d = id.data; for (let i = 3; i < d.length; i += 4) d[i] = d[i] > 100 ? 255 : 0; hg.putImageData(id, 0, 0);
-      view.holes = hc;
-      // Zeilenbaender mit Tinte (mit Rand x-Ausdehnung): beim Ausstanzen nur diese Rechtecke zeichnen — die leeren Stellen aendern nichts
-      const bands = []; let y0 = -1, bx0 = W, bx1 = -1;
-      for (let y = 0; y <= H; y++) {
-        let ink = false, xa = W, xb = -1;
-        if (y < H) for (let x = 0, o = y * W * 4 + 3; x < W; x++, o += 4) if (d[o]) { ink = true; if (x < xa) xa = x; xb = x; }
-        if (ink) { if (y0 < 0) y0 = y; if (xa < bx0) bx0 = xa; if (xb > bx1) bx1 = xb; }
-        else if (y0 >= 0) { bands.push([bx0, y0, bx1 - bx0 + 1, y - y0]); y0 = -1; bx0 = W; bx1 = -1; }
-      }
-      view.holeBands = bands;
-    }
+    if (sp.fx === 'umbra') for (const lay of layers) umbraLayerPre(lay, img, K);
+    const view = { K, W, H, layers, layers0: layers, cut: null, rim: null };
     if (sp.cut) {
       const e = core.e, ax = core.full ? 0 : 14 * K, ay = core.full ? 0 : 34 * K, aw = core.full ? W : 122 * K, ah = core.full ? H : 80 * K;
       const sx = core.full ? 0 : 70 * img.naturalWidth / 750, sy = core.full ? 0 : 170 * img.naturalWidth / 750, sw = core.full ? img.naturalWidth : 610 * img.naturalWidth / 750, sh = core.full ? img.naturalHeight : 400 * img.naturalWidth / 750;
@@ -1284,7 +1317,6 @@
     FX[sp.fx].frame(E, st, t, o);
     g.imageSmoothingEnabled = false;
     if (!FX[sp.fx].gridless) { gb.g.putImageData(gb.im, 0, 0); g.drawImage(gb.c, 0, 0, GW, GH, 0, 0, W, H); }   // gridless: der Effekt schreibt nichts ins Raster (nur Text und Stempel)
-    if (view.holes) { g.globalCompositeOperation = 'destination-out'; for (const b of view.holeBands) g.drawImage(view.holes, b[0], b[1], b[2], b[3], b[0], b[1], b[2], b[3]); g.globalCompositeOperation = 'source-over'; }
     if (sp.quant) quantize(core, view, g, o);
     if (view.rim) { const bx = view.rimBox; if (bx[2] > 0 && bx[3] > 0) g.drawImage(view.rim[Math.floor(t * 4) % 6 < 3 ? 1 : 0], bx[0], bx[1], bx[2], bx[3], bx[0], bx[1], bx[2], bx[3]); }
     if (view.cut) g.drawImage(view.cut.cv, view.cut.x, view.cut.y);
