@@ -1010,7 +1010,7 @@
     { const dil = new Uint8Array(NPX);
       for (let y = 1; y < GH - 1; y++) for (let x = 1; x < GW - 1; x++) { const p = y * GW + x; dil[p] = S0[p - GW - 1] | S0[p - GW] | S0[p - GW + 1] | S0[p - 1] | S0[p] | S0[p + 1] | S0[p + GW - 1] | S0[p + GW] | S0[p + GW + 1]; }
       for (let y = 1; y < GH - 1; y++) for (let x = 1; x < GW - 1; x++) { const p = y * GW + x; if (!A[p]) continue; sm[p] = S0[p] | (dil[p - GW - 1] & dil[p - GW] & dil[p - GW + 1] & dil[p - 1] & dil[p] & dil[p + 1] & dil[p + GW - 1] & dil[p + GW] & dil[p + GW + 1]); } }
-    // 2) Komponenten des Motivs (8er-Nachbarschaft); duenne Teile (kein Innenpixel) und Kleinstteile bekommen eine Kontur von 1 Zelle, die anderen von 2
+    // 2) Komponenten des Motivs (8er-Nachbarschaft); alle Teile bekommen eine Kontur von 1 Zelle
     const comp = new Int32Array(NPX), thick = [0];
     for (let p0 = 0; p0 < NPX; p0++) {
       if (!sm[p0] || comp[p0]) continue;
@@ -1020,17 +1020,15 @@
         for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) { const nx = x + dx, ny = y + dy; if (nx < 0 || ny < 0 || nx >= GW || ny >= GH) continue; const np = ny * GW + nx; if (!sm[np]) all = false; else if (!comp[np]) { comp[np] = id; q.push(np); } }
         if (all) inner = true;
       }
-      thick.push(inner && q.length >= 3 ? 2 : 1);
+      thick.push(1);
     }
     yield;
-    // 3) Kontur: Hintergrundzellen am Motivrand (8er-Nachbarschaft, bei dicken Teilen zusaetzlich eine Zelle nach aussen); danach ist der Hintergrund `dom`
+    // 3) Kontur: Hintergrundzellen am Motivrand (8er-Nachbarschaft, 1 Zelle); danach ist der Hintergrund `dom`
     const ring = new Uint8Array(NPX), rc = new Int32Array(NPX), dom = new Uint8Array(NPX);
     for (let y = 1; y < GH - 1; y++) for (let x = 1; x < GW - 1; x++) {
       const p = y * GW + x; if (!A[p] || sm[p]) continue;
       for (let dy = -1; dy <= 1 && !ring[p]; dy++) for (let dx = -1; dx <= 1; dx++) { const q = p + dy * GW + dx; if (sm[q]) { ring[p] = 1; rc[p] = comp[q]; break; } }
     }
-    { const add = []; for (let y = 1; y < GH - 1; y++) for (let x = 1; x < GW - 1; x++) { const p = y * GW + x; if (!A[p] || sm[p] || ring[p]) continue; for (const q of [p - 1, p + 1, p - GW, p + GW]) if (ring[q] && thick[rc[q]] === 2) { add.push(p); break; } }
-      for (const p of add) ring[p] = 1; }
     for (let p = 0; p < NPX; p++) dom[p] = A[p] && !sm[p] && !ring[p] ? 1 : 0;
     // Abstand zum Motiv (fuer die Hinterleuchtung)
     const dS = new Uint8Array(NPX).fill(255), dq = []; for (let p = 0; p < NPX; p++) if (sm[p]) { dS[p] = 0; dq.push(p); }
