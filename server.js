@@ -84,6 +84,7 @@ const funnelModule = require('./funnel');   // Spieler-Trichter (Besucher -> Gas
 const skillTest = require('./skilltest');   // Modus „Skill Test" (Lobby, Vorbereitung, Rounds)
 const { K: ELO_K, placementDelta } = require('./placement-elo');   // Ranked-Elo nach Platzierung (Draft + Skill Test)
 const { isSeat, opponentOfGs, playerCountGs, emitToOpponentsGs } = require('./cards/effects/_opp');
+const RarityTrack = require('./cards/effects/_rarity-track');   // Rarity je physischer Kartenkopie (Identitaetsverfolgung ueber Zonenwechsel)
 const RARITIES = require('./rarities');   // Seltenheiten (UMD, auch im Browser): Namen, Gewichte, Würfeln, Pack-Pools, Deck-Rechnung
 
 /**
@@ -5178,14 +5179,18 @@ function revealedMitStufe(ps, liste, engine, pi) {
  */
 function attachRarityToState(gs, state) {
   try {
+    if (!(gs.players || []).some(ps => ps && ps.rarityLedger)) return;
+    RarityTrack.reconcile(gs);   // Identitaet je Kartenkopie: Schattenzustand gegen die echten Zonen abgleichen (cards/effects/_rarity-track.js)
     (state.players || []).forEach((pv, i) => {
-      const ledger = gs.players?.[i]?.rarityLedger;
-      if (!ledger) return;
-      const r = RARITIES.annotatePlayer(pv, ledger, { area: (state.areaZones || [])[i] });
+      const ps = gs.players?.[i];
+      if (!ps || !ps.rarityLedger) return;
+      const r = RarityTrack.annotate(ps, pv, (state.areaZones || [])[i]);
       if (r) pv.rarity = r;
       if (pv.revealedHandCards && pv.revealedHandCards.length) {
-        const rr = RARITIES.annotateNames(pv.revealedHandCards.map(c => c && c.name), ledger);
-        if (rr) pv.revealedHandCards = pv.revealedHandCards.map((c, k) => (c && rr[k] ? { ...c, rarity: rr[k] } : c));
+        pv.revealedHandCards = pv.revealedHandCards.map(c => {
+          const rr = c && Number.isInteger(c.index) ? RarityTrack.at(ps, 'hand', c.index, c.name) : null;
+          return rr ? { ...c, rarity: rr } : c;
+        });
       }
     });
   } catch (err) { console.error('[rarity] Zustand nicht beschriftbar:', err.message); }
@@ -15214,7 +15219,7 @@ async function rarityLedgerFor(userId, deck) {
     if (!deck.rarityTemp && deck.mode !== 'drafted' && userId && !isCpuUserId(userId)) {
       r = RARITIES.downgradeToOwned(deck, r, await ownedRarities(userId));
     }
-    return RARITIES.deckLedger(deck, r);
+    return { ledger: RARITIES.deckLedger(deck, r), zones: RARITIES.deckZoneInfo(deck, r) };
   } catch (err) {
     console.error('[rarity] Kopienvorrat nicht berechenbar:', err.message);
     return null;
@@ -15290,8 +15295,10 @@ async function setupGameState(room) {
 
       deck = await withProfileHeroSkins(p.userId, deck);
       // Rarity je Kartenkopie: Besitz-Konsistenz pruefen (Fallback: auf Common herabstufen, nie abbrechen) und als Kopienvorrat je Name festhalten.
-      const rarityLedger = await rarityLedgerFor(p.userId, deck);
-      if (deck) deck = { ...deck, rarityLedger };
+      const rarityInfo = await rarityLedgerFor(p.userId, deck);
+      const rarityLedger = rarityInfo ? rarityInfo.ledger : null;
+      const rarityZones = rarityInfo ? rarityInfo.zones : null;
+      if (deck) deck = { ...deck, rarityLedger, rarityZones };
 
       // Save original deck state at match start (for side-deck reset)
       if (!room._originalDecks) room._originalDecks = [{}, {}];
@@ -15300,6 +15307,7 @@ async function setupGameState(room) {
         potionDeck: deck?.potionDeck || [], sideDeck: deck?.sideDeck || [],
         skins: deck?.skins || {},
         rarityLedger,   // Name → Rarities der Kopien (bleibt beim Seitendeck-Tausch gueltig, anders als Positionen)
+        rarityZones,    // dieselben Kopien nach Zone (Hauptdeck/Traenke/Seitendeck/Helden) — Ausgangszuordnung der Identitaetsverfolgung
       }));
       if (!room._currentDecks) room._currentDecks = [null, null];
       room._currentDecks[idx] = JSON.parse(JSON.stringify(room._originalDecks[idx]));
@@ -15339,7 +15347,8 @@ async function setupGameState(room) {
     const mainDeck = shuffle(deck?.mainDeck||[]);
     const potionDeck = shuffle(deck?.potionDeck||[]);
     // Kopienvorrat (Rarity je Kartenname) dieses Spielers: aus dem Deck-Schnappschuss, sonst frisch berechnet (voreingestellte Decks von CPU-Duellen).
-    const spielerLedger = deck && deck.rarityLedger !== undefined ? deck.rarityLedger : await rarityLedgerFor(p.userId, deck);
+    const spielerInfo = deck && deck.rarityLedger !== undefined ? { ledger: deck.rarityLedger, zones: deck.rarityZones || null } : await rarityLedgerFor(p.userId, deck);
+    const spielerLedger = spielerInfo ? spielerInfo.ledger : null;
     // Side Deck snapshot at game start. The pre-game side-deck phase has
     // already finalized swaps (room._currentDecks reflects post-swap state),
     // so the remaining names are the truly out-of-game pool. Effects like
@@ -15365,7 +15374,7 @@ async function setupGameState(room) {
       abilityGivenThisTurn:[false,false,false], islandZoneCount:[0,0,0],
       damageLocked:false, itemLocked:false, dealtDamageToOpponent:false, potionLocked:false, potionsUsedThisTurn:0,
       permanents:[], coolnessStack:[], creationZone:[], _oncePerGameUsed: new Set(), _resolvingCard: null, deckSkins: deck?.skins || {},
-      rarityLedger: spielerLedger || null });
+      rarityLedger: spielerLedger || null, rarityZones: spielerLedger ? (spielerInfo.zones || null) : null });
   }
   room.gameState = { players:playerStates, areaZones:[[],[]], turn:0, activePlayer:0, currentPhase:0, result:null, rematchRequests:[], awaitingFirstChoice:true,
     _gameStartTime: Date.now(),
@@ -15379,6 +15388,7 @@ async function setupGameState(room) {
       return sock ? getSocketIP(sock) : 'unknown';
     }),
   };
+  RarityTrack.reconcile(room.gameState);   // Rarity je Kartenkopie: Ausgangszuordnung (Helden, Faehigkeiten, Deck) vor dem ersten Ziehen festlegen
   room.status = 'playing';
   room.players.forEach(p => activeGames.set(p.userId, room.id));
 }

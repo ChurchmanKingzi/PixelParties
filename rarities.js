@@ -283,6 +283,32 @@
   }
 
   /**
+   * Rarity der Kopien eines Decks NACH ZONE (für die Identitätsverfolgung im Spiel, cards/effects/_rarity-track.js):
+   * { main:{name:[r…]}, potion:{…}, side:{…}, heroes:[{ hero, ability1, hr, r1, ability2, r2 }] } — nur Nicht-Common; null, wenn alles Common.
+   */
+  function deckZoneInfo(deck, rarities) {
+    if (!deck) return null;
+    const r = normalizeDeckRarities(deck, rarities);
+    const out = { main: {}, potion: {}, side: {}, heroes: [] };
+    let any = false;
+    for (const [k, f] of LISTS) {
+      (deck[f] || []).forEach((name, i) => {
+        const x = r[k][i];
+        if (!name || x === 'common') return;
+        (out[k][name] || (out[k][name] = [])).push(x);
+        any = true;
+      });
+    }
+    out.heroes = (deck.heroes || []).map((h, i) => {
+      const x = r.heroes[i] || {};
+      const keep = (v) => (v && v !== 'common' ? v : null);
+      if (keep(x.hero) || keep(x.ability1) || keep(x.ability2)) any = true;
+      return { hero: (h && h.hero) || '', hr: keep(x.hero), ability1: (h && h.ability1) || '', r1: keep(x.ability1), ability2: (h && h.ability2) || '', r2: keep(x.ability2) };
+    });
+    return any ? out : null;
+  }
+
+  /**
    * Rarity-Beschriftung der sichtbaren Zonen eines Spielers (Spielersicht, nach dem Verbergen verdeckter Karten).
    * Liefert null (alles Common) oder Zonen in derselben Form wie im Zustand, mit Rarity-Id oder null je Karte:
    * { heroes:[r], abilityZones:[[[r]]], supportZones:[[[r]]], surpriseZones:[[r]], area:[r], hand:[r], creationZone:[r],
@@ -343,6 +369,6 @@
     rollFromTable, rollPack, rollDraftRarity,
     PACK_IDS, PACK_SETS, FUTURE_ARCHETYPES, FUTURE_NAMES, normSet, packOfSet, packOfCard, cardsOfPack,
     normalizeDeckRarities, deckCopies, rarityUsage, firstOwnershipViolation, downgradeToOwned, hasAnyRarity,
-    deckLedger, annotatePlayer, annotateNames,
+    deckLedger, deckZoneInfo, annotatePlayer, annotateNames,
   };
 });
