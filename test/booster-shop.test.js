@@ -23,9 +23,9 @@ const pool = (() => {
 
 // ── Reine Logik ──────────────────────────────────────────────
 test('Auslage: ein Platz je Rarity der Preistabelle (Zahl der Plätze folgt der Rarity-Liste)', () => {
-  assert.deepStrictEqual(R.DISPLAY_RARITIES, ['uncommon', 'rare', 'prismatic', 'super', 'diamond', 'spectral', 'stained', 'umbra']);
-  assert.deepStrictEqual(R.DISPLAY_PRICE, { uncommon: 2, rare: 4, prismatic: 8, super: 20, diamond: 30, spectral: 40, stained: 70, umbra: 100 });
-  assert.deepStrictEqual(R.SELLBACK, { uncommon: 1, rare: 2, prismatic: 4, super: 6, diamond: 8, spectral: 10, stained: 14, umbra: 18 });
+  assert.deepStrictEqual(R.DISPLAY_RARITIES, ['uncommon', 'rare', 'prismatic', 'super', 'storm', 'spectral', 'stained', 'umbra']);
+  assert.deepStrictEqual(R.DISPLAY_PRICE, { uncommon: 2, rare: 4, prismatic: 8, super: 20, storm: 30, spectral: 40, stained: 70, umbra: 100 });
+  assert.deepStrictEqual(R.SELLBACK, { uncommon: 1, rare: 2, prismatic: 4, super: 6, storm: 8, spectral: 10, stained: 14, umbra: 18 });
   for (const id of R.DISPLAY_RARITIES) { assert.ok(R.isRarity(id) && id !== 'common'); assert.ok(R.SELLBACK[id] > 0); }
   assert.strictEqual(R.sellbackValue('common'), 0);
   assert.strictEqual(R.sellbackValue('nonsense'), 0);
@@ -128,6 +128,7 @@ async function startServer() {
   dbc = createClient({ url: 'file:' + dbPath });
   await dbc.execute('PRAGMA journal_mode = WAL');   // zwei Prozesse (Server + Test) an einer Datei: Leser sperren Schreiber nicht
   await dbc.execute(`CREATE TABLE pending_booster (id TEXT PRIMARY KEY, user_id TEXT NOT NULL, pack_id TEXT NOT NULL, variant_id TEXT NOT NULL, cards_json TEXT NOT NULL, created_at INTEGER DEFAULT (unixepoch()))`);
+  await dbc.execute('CREATE UNIQUE INDEX idx_pending_booster_user ON pending_booster(user_id)');   // altes Schema: höchstens ein offenes Pack je Nutzer
   await dbc.execute({ sql: 'INSERT INTO pending_booster (id, user_id, pack_id, variant_id, cards_json) VALUES (?, ?, ?, ?, ?)', args: ['legacy', 'legacy-user', 'hero', 'hero-1', JSON.stringify([{ name: 'Alice', rarity: 'rare' }])] });
   dbc.close(); dbc = null;   // ab hier öffnet nur noch dbx() kurzlebige Verbindungen
   port = await freePort();
@@ -170,13 +171,25 @@ async function guest() {
     await dbx({ sql: 'INSERT INTO pending_booster (id, user_id, pack_id, variant_id, cards_json, sold_idx) VALUES (?, ?, ?, ?, ?, ?)', args: [pid, id, packId, packId + '-1', JSON.stringify(list), soldIdx == null ? -1 : soldIdx] });
     return pid;
   };
-  return { id, api, setSc, sc, log, owned, seedPending };
+  // mehrere offene Packs (in dieser Reihenfolge): lists = [Kartenliste, …]; sold = [Index | null, …] (optional)
+  const seedMany = async (packId, lists, sold) => {
+    await dbx({ sql: 'DELETE FROM pending_booster WHERE user_id = ?', args: [id] });
+    const ids = [];
+    for (let i = 0; i < lists.length; i++) {
+      const pid = 'm' + i + Math.random().toString(36).slice(2);
+      await dbx({ sql: 'INSERT INTO pending_booster (id, user_id, pack_id, variant_id, cards_json, sold_idx, seq) VALUES (?, ?, ?, ?, ?, ?, ?)', args: [pid, id, packId, packId + '-1', JSON.stringify(lists[i]), sold && sold[i] != null ? sold[i] : -1, i] });
+      ids.push(pid);
+    }
+    return ids;
+  };
+  const openCount = async () => Number((await dbx({ sql: 'SELECT COUNT(*) AS n FROM pending_booster WHERE user_id = ?', args: [id] })).rows[0].n);
+  return { id, api, setSc, sc, log, owned, seedPending, seedMany, openCount };
 }
 
 const total = (own) => Object.values(own).reduce((a, o) => a + Object.values(o).reduce((x, y) => x + y, 0), 0);
 const nineCards = (over) => {
   const base = ['Alice', 'Bifab, Bridge to Coolness', 'Pyroblast', 'Trade', 'Alchemy', 'Archer', 'Splashy Slime', 'Elixir of Immortality', 'Shard of Chaos'];
-  const rar = ['uncommon', 'uncommon', 'rare', 'rare', 'prismatic', 'super', 'diamond', 'spectral', 'umbra'];
+  const rar = ['uncommon', 'uncommon', 'rare', 'rare', 'prismatic', 'super', 'storm', 'spectral', 'umbra'];
   return base.map((name, i) => ({ name, rarity: (over && over[i]) || rar[i] }));
 };
 
@@ -198,6 +211,24 @@ test('Migration: altes pending_booster bekommt sold_idx = -1, GET /pending liefe
   assert.strictEqual(p.status, 200);
   assert.strictEqual(p.data.pending.id, 'legacy');
   assert.strictEqual(p.data.pending.sold, -1);
+  assert.deepStrictEqual(p.data.packs.map(x => x.id), ['legacy'], 'GET /pending liefert zusätzlich die Liste');
+});
+
+test('Migration: der UNIQUE-Index auf user_id ist weg (Alt-DB), bestehende Zeile bleibt gültig, mehrere offene Packs je Nutzer gehen', async () => {
+  const idx = (await dbx("SELECT name, sql FROM sqlite_master WHERE type = 'index' AND tbl_name = 'pending_booster'")).rows;
+  assert.ok(!idx.some(r => r.name === 'idx_pending_booster_user'), 'alter UNIQUE-Index entfernt: ' + JSON.stringify(idx));
+  assert.ok(!idx.some(r => /UNIQUE/i.test(String(r.sql || ''))), 'kein UNIQUE-Index auf pending_booster');
+  const col = (await dbx("SELECT name FROM pragma_table_info('pending_booster')")).rows.map(r => r.name);
+  assert.ok(col.includes('seq'));
+  const row = (await dbx("SELECT seq, sold_idx FROM pending_booster WHERE id = 'legacy'")).rows[0];
+  assert.strictEqual(Number(row.seq), 0);
+  assert.strictEqual(Number(row.sold_idx), -1);
+  const u = await guest();
+  const ids = await u.seedMany('hero', [nineCards(), nineCards(), nineCards()]);
+  assert.strictEqual(await u.openCount(), 3);
+  const p = await u.api('GET', '/boosters/pending');
+  assert.deepStrictEqual(p.data.packs.map(x => x.id), ids, 'stabile Reihenfolge');
+  assert.strictEqual(p.data.pending.id, ids[0], 'pending = das erste (altes Format)');
 });
 
 test('GET /api/boosters nennt Preis und Rückkaufwerte', async () => {
@@ -498,4 +529,224 @@ test('Add and rip one more ohne offenes Pack → 404 und nichts gebucht', async 
   const r = await u.api('POST', '/boosters/rip-more', { id: 'gibts-nicht' });
   assert.strictEqual(r.status, 404);
   assert.strictEqual(await u.sc(), 100);
+});
+
+// ── Mengenkauf (count) ───────────────────────────────────────
+test('Katalog: GET /boosters nennt die Obergrenze je Kauf (maxCount)', async () => {
+  const u = await guest();
+  const r = await u.api('GET', '/boosters');
+  assert.strictEqual(r.status, 200);
+  assert.strictEqual(r.data.maxCount, 20);
+  assert.strictEqual(r.data.price, 20);
+});
+
+test('Mengenkauf: count Packs in einer Transaktion, SC −20 je Pack, je Pack ein Log-Eintrag, alle mit sold = -1 und eigener id', async () => {
+  const u = await guest();
+  await u.setSc(100);
+  const r = await u.api('POST', '/boosters/buy', { packId: 'hero', count: 3 });
+  assert.strictEqual(r.status, 200);
+  assert.strictEqual(r.data.sc, 40);
+  assert.strictEqual(await u.sc(), 40);
+  assert.strictEqual(r.data.packs.length, 3);
+  assert.strictEqual(r.data.pending.id, r.data.packs[0].id, 'pending = erstes Pack (altes Format)');
+  assert.strictEqual(new Set(r.data.packs.map(p => p.id)).size, 3);
+  for (const p of r.data.packs) { assert.strictEqual(p.packId, 'hero'); assert.strictEqual(p.cards.length, 9); assert.strictEqual(p.sold, -1); }
+  assert.strictEqual(await u.openCount(), 3);
+  const g = (await u.api('GET', '/boosters/pending')).data;
+  assert.deepStrictEqual(g.packs.map(p => p.id), r.data.packs.map(p => p.id), 'Reihenfolge stabil');
+  assert.deepStrictEqual(g.packs.map(p => p.cards), r.data.packs.map(p => p.cards), 'gespeichert = geliefert');
+  const buys = await u.log('shop:booster');
+  assert.deepStrictEqual(buys.map(b => [b.amount, b.opponent_id]), [[-20, 'hero'], [-20, 'hero'], [-20, 'hero']]);
+  // Einlösen: alle auf einmal (ohne ids), 27 Karten, nichts offen
+  const c = await u.api('POST', '/boosters/claim', {});
+  assert.strictEqual(c.status, 200);
+  assert.strictEqual(c.data.count, 3);
+  assert.strictEqual(c.data.added.length, 27);
+  assert.strictEqual(c.data.packs.length, 3);
+  assert.strictEqual(c.data.sold, null);
+  assert.strictEqual(total(await u.owned()), 27);
+  assert.strictEqual(await u.openCount(), 0);
+});
+
+test('Mengenkauf: ohne count = 1 (wie bisher), genau die Summe reicht, die Obergrenze 20 geht', async () => {
+  const u = await guest();
+  await u.setSc(20 * 20 + 5);
+  let r = await u.api('POST', '/boosters/buy', { packId: 'monia' });
+  assert.strictEqual(r.status, 200);
+  assert.strictEqual(r.data.packs.length, 1);
+  assert.strictEqual(r.data.sc, 385);
+  await u.api('POST', '/boosters/claim', {});
+  r = await u.api('POST', '/boosters/buy', { packId: 'monia', count: 1 });
+  assert.strictEqual(r.status, 200);
+  assert.strictEqual(r.data.sc, 365);
+  await u.api('POST', '/boosters/claim', {});
+  await u.setSc(400);
+  r = await u.api('POST', '/boosters/buy', { packId: 'monia', count: 20 });
+  assert.strictEqual(r.status, 200, JSON.stringify(r.data).slice(0, 200));
+  assert.strictEqual(r.data.packs.length, 20);
+  assert.strictEqual(r.data.sc, 0);
+  assert.strictEqual(await u.openCount(), 20);
+  assert.strictEqual((await u.log('shop:booster')).filter(l => l.amount === -20).length, 22);
+});
+
+test('Mengenkauf: zu wenig SC für die Gesamtsumme → 402, nichts gebucht (kein Teilkauf); ungültige Menge → 400', async () => {
+  const u = await guest();
+  await u.setSc(59);
+  let r = await u.api('POST', '/boosters/buy', { packId: 'hero', count: 3 });
+  assert.strictEqual(r.status, 402);
+  assert.strictEqual(r.data.sc, 59);
+  assert.strictEqual(await u.sc(), 59);
+  assert.strictEqual(await u.openCount(), 0);
+  assert.strictEqual((await u.log('shop:booster')).length, 0);
+  await u.setSc(1000);
+  for (const bad of [0, -1, -5, 21, 100, 1.5, 2.0000001, '3', 'x', [], {}, true, NaN, 1e9]) {
+    r = await u.api('POST', '/boosters/buy', { packId: 'hero', count: bad });
+    assert.strictEqual(r.status, 400, 'count ' + JSON.stringify(bad));
+    assert.strictEqual(r.data.max, 20);
+  }
+  assert.strictEqual(await u.sc(), 1000);
+  assert.strictEqual(await u.openCount(), 0);
+  r = await u.api('POST', '/boosters/buy', { packId: 'nonexistent', count: 2 });
+  assert.strictEqual(r.status, 404);
+  assert.strictEqual(await u.sc(), 1000);
+});
+
+test('Mengenkauf: bei offenen Packs wird nicht nachgekauft (409 liefert alle), Gleichzeitigkeit: nur EIN Kauf gewinnt', async () => {
+  const u = await guest();
+  await u.setSc(1000);
+  const ids = await u.seedMany('hero', [nineCards(), nineCards()]);
+  let r = await u.api('POST', '/boosters/buy', { packId: 'hero', count: 2 });
+  assert.strictEqual(r.status, 409);
+  assert.deepStrictEqual(r.data.packs.map(p => p.id), ids);
+  assert.strictEqual(r.data.pending.id, ids[0]);
+  assert.strictEqual(await u.sc(), 1000);
+  await u.api('POST', '/boosters/claim', {});
+  const rs = await Promise.all([1, 2, 3, 4].map(() => u.api('POST', '/boosters/buy', { packId: 'trials', count: 3 })));
+  const okays = rs.filter(x => x.status === 200);
+  assert.strictEqual(okays.length, 1, 'genau ein Kauf: ' + rs.map(x => x.status));
+  assert.ok(rs.filter(x => x.status !== 200).every(x => x.status === 409));
+  assert.strictEqual(await u.openCount(), 3);
+  assert.strictEqual(await u.sc(), 940, 'nur einmal bezahlt');
+});
+
+test('Mehrere offene Packs: Sell Back je Pack unabhängig (eine Karte je Pack), Einlösen überspringt je Pack die verkaufte Karte', async () => {
+  const u = await guest();
+  await u.setSc(0);
+  const ids = await u.seedMany('hero', [nineCards(), nineCards(), nineCards()]);
+  // Pack 0: Umbra-Karte (Index 8, +18); Pack 2: Karte 2 (rare, +2); Pack 1 bleibt unberührt
+  let r = await u.api('POST', '/boosters/sell', { id: ids[0], index: 8 });
+  assert.strictEqual(r.status, 200);
+  assert.strictEqual(r.data.sc, 18);
+  r = await u.api('POST', '/boosters/sell', { id: ids[0], index: 1 });        // zweiter Verkauf im selben Pack
+  assert.strictEqual(r.status, 409);
+  assert.strictEqual(r.data.sold, 8);
+  r = await u.api('POST', '/boosters/sell', { id: ids[2], index: 2 });        // anderes Pack: unabhängig
+  assert.strictEqual(r.status, 200);
+  assert.strictEqual(r.data.sc, 20);
+  assert.strictEqual(r.data.sold, 2);
+  r = await u.api('POST', '/boosters/sell', { id: ids[2], index: 3 });
+  assert.strictEqual(r.status, 409);
+  // ohne id bei mehreren offenen Packs → 404 (Mehrdeutigkeit), falsche id → 404
+  assert.strictEqual((await u.api('POST', '/boosters/sell', { index: 0 })).status, 404);
+  assert.strictEqual((await u.api('POST', '/boosters/sell', { id: 'nope', index: 0 })).status, 404);
+  assert.strictEqual(await u.sc(), 20);
+  const g = (await u.api('GET', '/boosters/pending')).data.packs;
+  assert.deepStrictEqual(g.map(p => p.sold), [8, -1, 2], 'Verkäufe überleben Neuladen, je Pack');
+  // Einlösen aller: 8 + 9 + 8 Karten, zwei verkaufte fehlen
+  const c = await u.api('POST', '/boosters/claim', { ids });
+  assert.strictEqual(c.status, 200);
+  assert.strictEqual(c.data.added.length, 25);
+  assert.strictEqual(c.data.count, 3);
+  assert.deepStrictEqual(c.data.packs.map(p => p.added.length), [8, 9, 8]);
+  assert.deepStrictEqual(c.data.soldCards.map(x => x.rarity), ['umbra', 'rare']);
+  assert.strictEqual(c.data.sold.rarity, 'umbra');
+  assert.strictEqual(total(await u.owned()), 25);
+  assert.strictEqual(await u.openCount(), 0);
+  const lg = await u.log('shop:booster_sellback');
+  assert.deepStrictEqual(lg.map(l => l.amount), [18, 2]);
+});
+
+test('Claim: nur ausgewählte ids, Rest bleibt offen; zweiter Claim derselben Packs → 404 und nichts doppelt gebucht', async () => {
+  const u = await guest();
+  const ids = await u.seedMany('world1', [nineCards(), nineCards(), nineCards()]);
+  let c = await u.api('POST', '/boosters/claim', { ids: [ids[1]] });
+  assert.strictEqual(c.status, 200);
+  assert.strictEqual(c.data.count, 1);
+  assert.strictEqual(c.data.packs[0].id, ids[1]);
+  assert.strictEqual(await u.openCount(), 2);
+  assert.strictEqual(total(await u.owned()), 9);
+  c = await u.api('POST', '/boosters/claim', { ids: [ids[1]] });
+  assert.strictEqual(c.status, 404);
+  // Doppelklick / zwei Fenster: nur eine Buchung je Pack
+  const cs = await Promise.all([1, 2, 3].map(() => u.api('POST', '/boosters/claim', {})));
+  assert.strictEqual(cs.filter(x => x.status === 200).length, 1, cs.map(x => x.status).join());
+  assert.strictEqual(cs.filter(x => x.status === 404).length, 2);
+  assert.strictEqual(total(await u.owned()), 27);
+  assert.strictEqual((await u.api('POST', '/boosters/claim', {})).status, 404);
+});
+
+test('Claim und Sell Back gleichzeitig: die verkaufte Karte wird nie zusätzlich eingelöst', async () => {
+  const u = await guest();
+  await u.setSc(0);
+  for (let k = 0; k < 6; k++) {
+    const ids = await u.seedMany('hero', [nineCards()]);
+    const [s, c] = await Promise.all([u.api('POST', '/boosters/sell', { id: ids[0], index: 8 }), u.api('POST', '/boosters/claim', { ids })]);
+    assert.strictEqual(c.status, 200);
+    const gotUmbra = c.data.added.some(x => x.rarity === 'umbra');
+    // entweder gewinnt der Verkauf (Gutschrift, Karte fehlt beim Einlösen) oder das Einlösen (Pack weg → Verkauf 404): nie beides
+    assert.strictEqual(gotUmbra, s.status !== 200, 'Verkauf ' + s.status + ', Umbra eingelöst: ' + gotUmbra);
+    if (s.status === 200) assert.strictEqual(c.data.sold.rarity, 'umbra'); else assert.strictEqual(s.status, 404);
+  }
+});
+
+test('Add and rip one more mit n Packs: löst alle ein, kauft n neue derselben Art, SC −20·n, Sell-Back-Gutschrift zählt', async () => {
+  const u = await guest();
+  await u.setSc(60);
+  const ids = await u.seedMany('monia', [nineCards(), nineCards(), nineCards()]);
+  const r = await u.api('POST', '/boosters/rip-more', { ids });
+  assert.strictEqual(r.status, 200);
+  assert.strictEqual(r.data.packs.length, 3);
+  assert.strictEqual(r.data.pending.id, r.data.packs[0].id);
+  assert.ok(r.data.packs.every(p => p.packId === 'monia' && p.cards.length === 9 && p.sold === -1 && !ids.includes(p.id)));
+  assert.strictEqual(r.data.sc, 0);
+  assert.strictEqual(await u.sc(), 0);
+  assert.strictEqual(r.data.added.length, 27);
+  assert.strictEqual(total(await u.owned()), 27);
+  assert.strictEqual(await u.openCount(), 3);
+  const g = (await u.api('GET', '/boosters/pending')).data.packs;
+  assert.deepStrictEqual(g.map(p => p.id), r.data.packs.map(p => p.id));
+  assert.deepStrictEqual((await u.log('shop:booster')).map(b => [b.amount, b.opponent_id]), [[-20, 'monia'], [-20, 'monia'], [-20, 'monia']]);
+  // zu wenig SC für ALLE: 402, die Packs sind trotzdem eingelöst, kein Teilkauf
+  await u.api('POST', '/boosters/claim', {});
+  await u.setSc(59);
+  const ids2 = await u.seedMany('future', [nineCards(), nineCards(), nineCards()]);
+  const r2 = await u.api('POST', '/boosters/rip-more', { ids: ids2 });
+  assert.strictEqual(r2.status, 402);
+  assert.strictEqual(r2.data.claimed, true);
+  assert.strictEqual(r2.data.added.length, 27);
+  assert.strictEqual(r2.data.sc, 59);
+  assert.strictEqual(await u.sc(), 59);
+  assert.strictEqual(await u.openCount(), 0);
+  assert.strictEqual((await u.api('POST', '/boosters/rip-more', { ids: ids2 })).status, 404);
+  // Sell-Back-Gutschriften zählen für den Gesamtpreis: 4 SC + 2 × 18 (Umbra je Pack) = 40 = zwei neue Packs
+  await u.setSc(4);
+  const ids3 = await u.seedMany('world1', [nineCards(), nineCards()]);
+  assert.strictEqual((await u.api('POST', '/boosters/sell', { id: ids3[0], index: 8 })).data.sc, 22);
+  assert.strictEqual((await u.api('POST', '/boosters/sell', { id: ids3[1], index: 8 })).data.sc, 40);
+  const r3 = await u.api('POST', '/boosters/rip-more', { ids: ids3 });
+  assert.strictEqual(r3.status, 200);
+  assert.strictEqual(r3.data.sc, 0);
+  assert.strictEqual(r3.data.packs.length, 2);
+  assert.strictEqual(r3.data.added.length, 16, 'je Pack ohne die verkaufte Karte');
+});
+
+test('Add and rip one more: gemischte Pack-Arten werden je Pack derselben Art nachgekauft', async () => {
+  const u = await guest();
+  await u.setSc(40);
+  await dbx({ sql: 'DELETE FROM pending_booster WHERE user_id = ?', args: [u.id] });
+  for (const [i, pk] of ['hero', 'clash'].entries()) await dbx({ sql: 'INSERT INTO pending_booster (id, user_id, pack_id, variant_id, cards_json, seq) VALUES (?, ?, ?, ?, ?, ?)', args: ['mix' + i + u.id, u.id, pk, pk + '-1', JSON.stringify(nineCards()), i] });
+  const r = await u.api('POST', '/boosters/rip-more', { ids: ['mix0' + u.id] });
+  assert.strictEqual(r.status, 200);
+  assert.deepStrictEqual(r.data.packs.map(p => p.packId), ['hero', 'clash']);
+  assert.strictEqual(r.data.sc, 0);
 });

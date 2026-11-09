@@ -6905,7 +6905,7 @@ function SkinHolo({ skin, fkey }) {
 window.SkinHolo = SkinHolo;
 
 /**
- * Bild-Foil fuer Karten OHNE Skin: Fullart-Karten sowie Super und Diamond Rares — Schraffur UND Glanzband, nur auf dem
+ * Bild-Foil fuer Karten OHNE Skin: Fullart-Karten sowie Super Rares — Schraffur UND Glanzband, nur auf dem
  * Bild (dieselben Schichten wie beim Skin-Holo, ohne Namen; der Rarity-Effekt kommt von RarityLayer). Bei Fullarts
  * liegt beides auf der ganzen Flaeche ausser den Textfeldern (hart ausgeschnittene Maske, card-render.js `artMask`).
  */
@@ -6966,7 +6966,7 @@ function FoilRim({ rim, fkey }) {
 // ═══════════════════════════════════════════════════════════════
 //  RARITY-SCHICHT — EINE Stelle für alles, was eine Karte über ihrem Bild trägt
 //
-//  Jede Karteninstanz hat eine Rarity (String-ID aus rarities.js: common, uncommon, rare, prismatic, super, diamond, spectral, umbra, stained;
+//  Jede Karteninstanz hat eine Rarity (String-ID aus rarities.js: common, uncommon, rare, prismatic, super, storm, spectral, umbra, stained;
 //  Feld `rarity` der Karte bzw. Prop). Das Kartenbild selbst zeigt die Basiskarte der Stufe (`?rar=` in der Bild-URL, `ppRarityUrl`: Stempel, Rahmen,
 //  Namensfarbe); darüber legt `RarityLayer` EINE Canvas (public/rarity-fx.js). Standbild (kein Dauerlauf) überall außer in Großansichten:
 //  `animated` nur im Tooltip, in der Großansicht und im Rarity-Auswahlfeld des Deckbuilders. Common: nichts. Test-Schalter: ?rarity=<id|mix>

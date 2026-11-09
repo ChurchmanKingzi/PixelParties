@@ -4572,7 +4572,7 @@ function ShopScreen() {
   const [cpuAvatars, setCpuAvatars] = useState({ need: 1, avatars: [] });
   // Boosterpacks (app-booster.jsx): Katalog aus GET /api/boosters, offenes (gekauftes, noch nicht eingefordertes) Pack aus GET /api/boosters/pending
   const [boosters, setBoosters] = useState(null);      // { price, packs: [{ id, name, tagline, variants }] }
-  const [pendingPack, setPendingPack] = useState(null); // { id, packId, variantId, cards: [{ name, rarity }] } | null
+  const [pendingPacks, setPendingPacks] = useState(null); // [{ id, packId, variantId, cards: [{ name, rarity }], sold }] (alle offenen Packs, Kaufreihenfolge) | null
   const [loading, setLoading] = useState(true);
   const [buying, setBuying] = useState(false);
   const [tab, setTab] = useState('skins');
@@ -4621,7 +4621,8 @@ function ShopScreen() {
         ]);
         if (boosterData) setBoosters(boosterData);
         // Wiederaufnahme: ein gekauftes, noch nicht eingefordertes Pack liegt offen -> Pack-Ansicht sofort fortsetzen
-        if (pendData && pendData.pending) { setPendingPack(pendData.pending); setTab('boosters'); }
+        const pendList = pendData && (pendData.packs && pendData.packs.length ? pendData.packs : (pendData.pending ? [pendData.pending] : null));
+        if (pendList) { setPendingPacks(pendList); setTab('boosters'); }
         setCatalog(catData);
         setOwned(ownData.owned);
         setDupes({ avatar: {}, sleeve: {}, skin: {}, ...(ownData.dupes || {}) });
@@ -4874,20 +4875,22 @@ function ShopScreen() {
     setBuying(false);
   };
 
-  // Boosterpack kaufen (20 SC): der Server würfelt die 9 Karten und speichert sie als offenes Pack; danach öffnet die Vollbild-Ansicht (BoosterOpening).
-  // Ist schon ein Pack offen, liefert die Antwort dieses (kaufen ist dann nicht erlaubt) und die Ansicht wird einfach fortgesetzt.
-  const buyBooster = async (packId) => {
-    if (buying || pendingPack) return;
+  // Boosterpacks kaufen (20 SC je Pack, `count` Stück in einer Buchung): der Server würfelt je Pack die 9 Karten und speichert sie als offene Packs; danach öffnet
+  // die Vollbild-Ansicht (BoosterOpening) alle auf einmal. Sind schon Packs offen, liefert die Antwort diese (kaufen ist dann nicht erlaubt) und die Ansicht wird fortgesetzt.
+  const buyBooster = async (packId, count) => {
+    if (buying || pendingPacks) return;
     const price = boosters && boosters.price != null ? boosters.price : 20;
-    if (!((user.sc || 0) >= price)) { notify('Not enough 🪙!', 'error'); return; }
+    const n = count > 0 ? count : 1;
+    if (!((user.sc || 0) >= price * n)) { notify('Not enough 🪙!', 'error'); return; }
     setBuying(true);
     try {
-      const r = await window.ppBoosterApi.buy(packId);
-      if (r.data && r.data.pending) setPendingPack(r.data.pending);
+      const r = await window.ppBoosterApi.buy(packId, n);
+      const got = r.data && (r.data.packs && r.data.packs.length ? r.data.packs : (r.data.pending ? [r.data.pending] : null));
+      if (got) setPendingPacks(got);
       if (r.ok) {
         if (r.data.sc != null) setUser(u => ({ ...u, sc: r.data.sc }));
         triggerPurchaseFanfare({ cx: window.innerWidth / 2, cy: window.innerHeight / 2 }, { pull: true });
-      } else if (!(r.data && r.data.pending)) notify((r.data && r.data.error) || 'Purchase failed', 'error');
+      } else if (!got) notify((r.data && r.data.error) || 'Purchase failed', 'error');
     } catch (e) { notify(e.message, 'error'); }
     setBuying(false);
   };
@@ -5337,20 +5340,20 @@ function ShopScreen() {
         </span>
       </div>
       {celebration && <PurchaseCelebration cx={celebration.cx} cy={celebration.cy} onDone={() => setCelebration(null)} />}
-      {pendingPack && window.BoosterOpening && (
-        <window.BoosterOpening key={pendingPack.id} pending={pendingPack} boosters={boosters} sc={user.sc || 0}
+      {pendingPacks && window.BoosterOpening && (
+        <window.BoosterOpening key={pendingPacks[0].id + ':' + pendingPacks.length} packs={pendingPacks} boosters={boosters} sc={user.sc || 0}
           onSc={(n) => setUser(u => ({ ...u, sc: n }))}
           onClaimed={(data, info) => {
             // „Add and rip one more!“ ohne genug SC: das Pack ist trotzdem eingelöst (Server), der Kontostand steht in der Antwort
             if (data && data.sc != null) setUser(u => ({ ...u, sc: data.sc }));
-            setPendingPack(null);
+            setPendingPacks(null);
             if (info && info.ripFailed) notify('Cards added to your collection! ' + info.ripFailed + '.', 'error');
             else notify('Cards added to your collection!', 'success');
           }}
           onRipMore={(data) => {
-            // Altes Pack eingelöst + neues gekauft: die Ansicht wechselt (key) sofort zum neuen Pack und seiner Öffnungsanimation
+            // Alte Packs eingelöst + gleich viele neue gekauft: die Ansicht wechselt (key) sofort zu den neuen Packs und ihrer Öffnungsanimation
             if (data.sc != null) setUser(u => ({ ...u, sc: data.sc }));
-            setPendingPack(data.pending);
+            setPendingPacks(data.packs && data.packs.length ? data.packs : [data.pending]);
           }} />
       )}
       {randomReveal && <ShopPullReveal reveal={randomReveal} fast={fastPull} onToggleFast={() => setFastPull(v => !v)} onClose={() => setRandomReveal(null)} />}
@@ -5374,7 +5377,7 @@ function ShopScreen() {
         {tab === 'skins' && renderGachaPage('skin')}
         {tab === 'avatars' && renderGachaPage('avatar')}
         {tab === 'sleeves' && renderGachaPage('sleeve')}
-        {tab === 'boosters' && window.BoosterShop && <window.BoosterShop boosters={boosters} sc={user.sc || 0} busy={buying || !!pendingPack} onBuy={buyBooster}
+        {tab === 'boosters' && window.BoosterShop && <window.BoosterShop boosters={boosters} sc={user.sc || 0} busy={buying || !!pendingPacks} onBuy={buyBooster}
           onSc={(n) => setUser(u => ({ ...u, sc: n }))} notify={notify} />}
         {tab === 'boards' && renderItemGrid(catalog.boards || [], 'board', '/data/shop/boards/')}
         {tab === 'structures' && renderStructureDecks()}

@@ -870,11 +870,11 @@
    * @param {object} [meta] reine Darstellungsdaten (data/card-render.json, cards[Name]): { r: Seltenheit, f: Rahmen, sb, sb2, soft: Zeilenumbrueche im Text sind nur Leerstellen }
    * @param {object} [over] { name, rarity } — Skins ersetzen nur Namen (und Kunst); `rarity`: Rarity-ID der Karteninstanz (siehe rarityBase)
    */
-  // Seltenheit je KARTEN-INSTANZ (Rarity-System): `over.rarity` ist die ID aus rarities.js (common … stained). Die Basiskarte zeigt je Stufe
-  // Stempel, Rahmen und Namensfarbe der Vorlage (uncommon, rare, super rare, diamond); Prismatic, Spectral, Umbra und Stained tragen
+  // Seltenheit je KARTEN-INSTANZ (Rarity-System): `over.rarity` ist die ID aus rarities.js (common … umbra). Die Basiskarte zeigt je Stufe
+  // Stempel, Rahmen und Namensfarbe der Vorlage (uncommon, rare, super rare); Prismatic, Storm, Spectral, Umbra und Stained tragen
   // KEIN Stempel/Rahmen-Element ('none'), ihr Zeichen malt `public/rarity-fx.js` selbst. Ohne Angabe: Common (die alte, je Karte gedruckte
   // Seltenheit `card-render.json` r gilt nicht mehr).
-  const RARITY_BASE = { common: 'common', uncommon: 'uncommon', rare: 'rare', prismatic: 'none', super: 'super rare', diamond: 'diamond', spectral: 'none', umbra: 'none', stained: 'none',
+  const RARITY_BASE = { common: 'common', uncommon: 'uncommon', rare: 'rare', prismatic: 'none', super: 'super rare', storm: 'none', spectral: 'none', umbra: 'none', stained: 'none',
     'super rare': 'super rare', none: 'none' };
   const rarityBase = r => RARITY_BASE[r] || 'common';
   /** W77b: zwei Ability-Boni („<Ability> N" in beiden Feldern) → „A or B" in einer Zeile; sonst null. */
