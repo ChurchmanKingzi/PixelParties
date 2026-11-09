@@ -1287,6 +1287,11 @@ async function initDatabase() {
   await db.execute('CREATE UNIQUE INDEX IF NOT EXISTS idx_pending_booster_user ON pending_booster(user_id)');
   // Sell Back: Index der aus diesem Pack zurückgegebenen Karte (-1 = noch keine). Je Pack nur eine; bestehende Zeilen bekommen den Default.
   try { await db.execute('ALTER TABLE pending_booster ADD COLUMN sold_idx INTEGER NOT NULL DEFAULT -1'); } catch {}
+  // Rarity-Umbenennung Diamond → Storm Rare in Sammlung, Decks und offenen Packs (idempotent, siehe rarity-migrate.js)
+  try {
+    const rm = await require('./rarity-migrate').migrateRarityRenames(db);
+    if (rm.collection || rm.decks || rm.packs) console.log(`[rarity] Umbenennung Diamond → Storm: Sammlung ${rm.collection}, Decks ${rm.decks}, offene Packs ${rm.packs}`);
+  } catch (err) { console.error('[rarity] Umbenennung Diamond → Storm fehlgeschlagen:', err.message); }
 
   // Auslage: je Stunde und Platz kann jeder Spieler die Karte nur EINMAL kaufen (danach ausgegraut bis zum nächsten Wechsel).
   await db.execute(`CREATE TABLE IF NOT EXISTS display_buys (
@@ -4374,7 +4379,7 @@ function boosterManifest() {
   return _boosterCache;
 }
 
-/** Motiv-Masken (data/subject-masks.json): nur die Kartennamen werden gebraucht (Umbra/Stained setzen eine Maske voraus). */
+/** Motiv-Masken (data/subject-masks.json): nur die Kartennamen werden gebraucht (Umbra/Stained/Storm setzen eine Maske voraus). */
 let _maskNames = null;
 function maskNameSet() {
   if (!_maskNames) {
@@ -4602,7 +4607,7 @@ app.post('/api/boosters/sell', authMiddleware, async (req, res) => {
 });
 
 // ── Auslage (Showcase): je Rarity eine Karte, wechselt jede volle Stunde (UTC), für alle gleich ──
-// Pool = alle Pack-Pools zusammen (sammelbare Karten: keine Tokens, nur Karten mit Kartenbild); Umbra/Stained nur mit Motiv-Maske.
+// Pool = alle Pack-Pools zusammen (sammelbare Karten: keine Tokens, nur Karten mit Kartenbild); Umbra/Stained/Storm nur mit Motiv-Maske.
 let _displayPool = null;
 function displayPool() {
   if (!_displayPool) {
@@ -13891,7 +13896,7 @@ function cubeBuildPacks(cubeCards, cardDB, packCount = CUBE_PACKS_PER_ROUND * CU
 }
 
 /**
- * Draft-Rarities: JEDE Karte des Cubes bekommt serverseitig eine Rarity aus RARITIES.DRAFT_TABLE (Umbra/Stained nur mit Motiv-Maske,
+ * Draft-Rarities: JEDE Karte des Cubes bekommt serverseitig eine Rarity aus RARITIES.DRAFT_TABLE (Umbra/Stained/Storm nur mit Motiv-Maske,
  * sonst wird neu gewuerfelt). Karten sind im Draft einmalig, darum genuegt eine Abbildung Name → Rarity; Common steht nicht darin.
  * Die Rarities sind TEMPORAER: sie leben nur im Draft-Deck, nie in der Sammlung (Ausnahme: der Siegbonus, cubeAwardWinnerBonus).
  */

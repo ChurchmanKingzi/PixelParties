@@ -1,4 +1,4 @@
-/* PP-HART-GEBACKEN b0102c793b090bb0 — ERZEUGT von scripts/hart/build-css.js aus style.css (pixel-hart.js vorab angewandt) — nicht von Hand ändern. */
+/* PP-HART-GEBACKEN 841f51225caae971 — ERZEUGT von scripts/hart/build-css.js aus style.css (pixel-hart.js vorab angewandt) — nicht von Hand ändern. */
 .pp-hart-gebacken { --pp-hart: 1; }
 @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Rajdhani:wght@400;500;600;700&family=Orbitron:wght@400;500;600;700;800;900&display=swap');
 
@@ -26365,7 +26365,7 @@ input[type="checkbox"]:focus-visible, input[type="radio"]:focus-visible { outlin
 .bp-sc-r-rare { --rc: #66d9ff; }
 .bp-sc-r-prismatic { --rc: #fa6bed; }
 .bp-sc-r-super { --rc: #fad54a; }
-.bp-sc-r-diamond { --rc: #b2eeee; }
+.bp-sc-r-storm { --rc: #66d9ff; }
 .bp-sc-r-spectral { --rc: #c98aff; }
 .bp-sc-r-umbra { --rc: #751ff9; }
 .bp-sc-r-stained { --rc: #fb1ea9; }

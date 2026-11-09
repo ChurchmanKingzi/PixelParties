@@ -28,7 +28,7 @@ function cubeDraftOverallPick(draft) {
 }
 
 /** Anzeigename einer Rarity (rarities.js → window.PpRarities.LABEL; Rueckfall, falls das Modul nicht geladen ist). */
-const PP_RAR_LABEL_FALLBACK = { common: 'Common', uncommon: 'Uncommon', rare: 'Rare', prismatic: 'Prismatic', super: 'Super Rare', diamond: 'Diamond', spectral: 'Spectral', umbra: 'Umbra', stained: 'Stained Rare' };
+const PP_RAR_LABEL_FALLBACK = { common: 'Common', uncommon: 'Uncommon', rare: 'Rare', prismatic: 'Prismatic', super: 'Super Rare', storm: 'Storm Rare', spectral: 'Spectral', umbra: 'Umbra', stained: 'Stained Rare' };
 function ppRarLabel(r) { return ((window.PpRarities && window.PpRarities.LABEL) || PP_RAR_LABEL_FALLBACK)[r] || r; }
 
 /** Kleines Namensschild der Draft-Rarity (Pixelrahmen, Schrift) unten links an der Karte; Common zeigt nichts. */

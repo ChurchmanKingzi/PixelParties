@@ -23,9 +23,9 @@ const pool = (() => {
 
 // ── Reine Logik ──────────────────────────────────────────────
 test('Auslage: ein Platz je Rarity der Preistabelle (Zahl der Plätze folgt der Rarity-Liste)', () => {
-  assert.deepStrictEqual(R.DISPLAY_RARITIES, ['uncommon', 'rare', 'prismatic', 'super', 'diamond', 'spectral', 'stained', 'umbra']);
-  assert.deepStrictEqual(R.DISPLAY_PRICE, { uncommon: 2, rare: 4, prismatic: 8, super: 20, diamond: 30, spectral: 40, stained: 70, umbra: 100 });
-  assert.deepStrictEqual(R.SELLBACK, { uncommon: 1, rare: 2, prismatic: 4, super: 6, diamond: 8, spectral: 10, stained: 14, umbra: 18 });
+  assert.deepStrictEqual(R.DISPLAY_RARITIES, ['uncommon', 'rare', 'prismatic', 'super', 'storm', 'spectral', 'stained', 'umbra']);
+  assert.deepStrictEqual(R.DISPLAY_PRICE, { uncommon: 2, rare: 4, prismatic: 8, super: 20, storm: 30, spectral: 40, stained: 70, umbra: 100 });
+  assert.deepStrictEqual(R.SELLBACK, { uncommon: 1, rare: 2, prismatic: 4, super: 6, storm: 8, spectral: 10, stained: 14, umbra: 18 });
   for (const id of R.DISPLAY_RARITIES) { assert.ok(R.isRarity(id) && id !== 'common'); assert.ok(R.SELLBACK[id] > 0); }
   assert.strictEqual(R.sellbackValue('common'), 0);
   assert.strictEqual(R.sellbackValue('nonsense'), 0);
@@ -176,7 +176,7 @@ async function guest() {
 const total = (own) => Object.values(own).reduce((a, o) => a + Object.values(o).reduce((x, y) => x + y, 0), 0);
 const nineCards = (over) => {
   const base = ['Alice', 'Bifab, Bridge to Coolness', 'Pyroblast', 'Trade', 'Alchemy', 'Archer', 'Splashy Slime', 'Elixir of Immortality', 'Shard of Chaos'];
-  const rar = ['uncommon', 'uncommon', 'rare', 'rare', 'prismatic', 'super', 'diamond', 'spectral', 'umbra'];
+  const rar = ['uncommon', 'uncommon', 'rare', 'rare', 'prismatic', 'super', 'storm', 'spectral', 'umbra'];
   return base.map((name, i) => ({ name, rarity: (over && over[i]) || rar[i] }));
 };
 

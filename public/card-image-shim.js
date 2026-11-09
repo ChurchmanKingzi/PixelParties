@@ -29,7 +29,7 @@
   // der IntersectionObserver meldet ihn nie als sichtbar, und die Karte würde nie gezeichnet).
   const PLACEHOLDER = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="750" height="1050"/>');
   const MAX_CACHE = 400;
-  const RARITY_IDS = new Set(['common', 'uncommon', 'rare', 'prismatic', 'super', 'diamond', 'spectral', 'umbra', 'stained']);
+  const RARITY_IDS = new Set(['common', 'uncommon', 'rare', 'prismatic', 'super', 'storm', 'spectral', 'umbra', 'stained']);
 
   // Dateinamen verlieren Satzzeichen („Hello, World“ -> „Hello World.png“): gleiche Regel wie card-images.js
   const strippedKey = n => String(n || '').replace(/[^a-zA-Z0-9 ]/g, '').replace(/\s+/g, ' ').trim();

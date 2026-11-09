@@ -17,16 +17,16 @@
 })(typeof self !== 'undefined' ? self : this, function () {
 
   /** Aufsteigend: je weiter hinten, desto seltener. */
-  const ORDER = ['common', 'uncommon', 'rare', 'prismatic', 'super', 'diamond', 'spectral', 'stained', 'umbra'];
+  const ORDER = ['common', 'uncommon', 'rare', 'prismatic', 'super', 'storm', 'spectral', 'stained', 'umbra'];
   const LABEL = {
     common: 'Common', uncommon: 'Uncommon', rare: 'Rare', prismatic: 'Prismatic', super: 'Super Rare',
-    diamond: 'Diamond', spectral: 'Spectral', umbra: 'Umbra', stained: 'Stained Rare',
+    storm: 'Storm Rare', spectral: 'Spectral', umbra: 'Umbra', stained: 'Stained Rare',
   };
   const RANK = {};
   ORDER.forEach((id, i) => { RANK[id] = i; });
 
   /** Seltenheiten, die ein Motiv (Subject-Maske, data/subject-masks.json) brauchen. */
-  const NEEDS_MASK = { umbra: true, stained: true };
+  const NEEDS_MASK = { umbra: true, stained: true, storm: true };
 
   function isRarity(id) { return typeof id === 'string' && Object.prototype.hasOwnProperty.call(RANK, id); }
   /** Rang einer Rarity (common = 0); Unbekanntes zählt als Common. */
@@ -37,11 +37,11 @@
 
   // ── Gewichte (Prozent, jede Zeile = 100) ──────────────────────
   const PACK_STAGES = [
-    { uncommon: 60, rare: 30, prismatic: 5, super: 3, diamond: 1, spectral: 0.5, stained: 0.35, umbra: 0.15 },   // Karten 1–3
-    { uncommon: 50, rare: 30, prismatic: 10, super: 5, diamond: 3, spectral: 1, stained: 0.65, umbra: 0.35 },    // Karten 4–6
-    { rare: 50, prismatic: 25, super: 10, diamond: 6, spectral: 4, stained: 3, umbra: 2 },                       // Karten 7–9
+    { uncommon: 60, rare: 30, prismatic: 5, super: 3, storm: 1, spectral: 0.5, stained: 0.35, umbra: 0.15 },   // Karten 1–3
+    { uncommon: 50, rare: 30, prismatic: 10, super: 5, storm: 3, spectral: 1, stained: 0.65, umbra: 0.35 },    // Karten 4–6
+    { rare: 50, prismatic: 25, super: 10, storm: 6, spectral: 4, stained: 3, umbra: 2 },                       // Karten 7–9
   ];
-  const DRAFT_TABLE = { common: 90, uncommon: 4, rare: 2, prismatic: 1, super: 0.75, diamond: 0.75, spectral: 0.5, umbra: 0.5, stained: 0.5 };
+  const DRAFT_TABLE = { common: 90, uncommon: 4, rare: 2, prismatic: 1, super: 0.75, storm: 0.75, spectral: 0.5, umbra: 0.5, stained: 0.5 };
   const PACK_SIZE = 9;
   /** Booster-Pack-Preis in SC. */
   const PACK_PRICE = 20;
@@ -61,7 +61,7 @@
     return last;
   }
 
-  /** Eine Tabelle ohne die Rarities, die `ok(id)` ablehnt (für „Umbra/Stained nur mit Maske“). */
+  /** Eine Tabelle ohne die Rarities, die `ok(id)` ablehnt (für „Umbra/Stained/Storm nur mit Maske“). */
   function tableWithout(table, ok) {
     const t = {};
     for (const k of Object.keys(table)) if (ok(k)) t[k] = table[k];
@@ -69,7 +69,7 @@
   }
 
   /**
-   * Draft-Rarity einer Karte (Tabelle DRAFT_TABLE). Umbra/Stained gibt es nur, wenn die Karte eine Motiv-Maske hat:
+   * Draft-Rarity einer Karte (Tabelle DRAFT_TABLE). Umbra/Stained/Storm gibt es nur, wenn die Karte eine Motiv-Maske hat:
    * wird so etwas gewürfelt, wird neu gewürfelt.
    * @param {string} cardName
    * @param {() => number} [rand]
@@ -87,7 +87,7 @@
   /**
    * Würfelt ein Booster-Pack: PACK_SIZE (9) Karten aus dem Pool, Rarities nach Stufe (Karten 1–3, 4–6, 7–9), danach nach Rarity
    * aufsteigend sortiert (gleiche Rarity: Reihenfolge der Würfe). Karte je Platz gleichverteilt aus dem Pool, Dubletten erlaubt.
-   * Ohne Motiv-Maske keine Umbra/Stained: dann wird eine ANDERE Karte des Pools mit Maske gezogen (Rarity bleibt).
+   * Ohne Motiv-Maske keine Umbra/Stained/Storm: dann wird eine ANDERE Karte des Pools mit Maske gezogen (Rarity bleibt).
    * @param {Array<string|{name:string}>} cards Pack-Pool
    * @param {{rand?:()=>number, hasMask?:(name:string)=>boolean, size?:number}} [opts]
    * @returns {Array<{name:string, rarity:string}>}
@@ -109,7 +109,7 @@
       if (NEEDS_MASK[rarity] && !hasMask(name)) {
         if (!masked) masked = names.filter(n => hasMask(n));
         if (masked.length) name = pickFrom(masked);
-        else rarity = 'diamond';   // Pool ohne ein einziges Motiv: nächstniedrigere Stufe ohne Maske-Pflicht
+        else rarity = 'super';   // Pool ohne ein einziges Motiv: nächstniedrigere Stufe ohne Maske-Pflicht
       }
       out.push({ name, rarity, _i: i });
     }
@@ -119,9 +119,9 @@
 
   // ── Rückkauf (Sell Back) und Auslage (Showcase) ──────────────
   /** Sell Back: Gutschrift in SC für die EINE Karte, die man aus einem frisch geöffneten Pack zurückgeben darf. */
-  const SELLBACK = { uncommon: 1, rare: 2, prismatic: 4, super: 6, diamond: 8, spectral: 10, stained: 14, umbra: 18 };
+  const SELLBACK = { uncommon: 1, rare: 2, prismatic: 4, super: 6, storm: 8, spectral: 10, stained: 14, umbra: 18 };
   /** Auslage: Preis in SC je Rarity. Die Auslage hat genau einen Platz je Rarity in dieser Tabelle (Common gibt es nicht zu kaufen). */
-  const DISPLAY_PRICE = { uncommon: 2, rare: 4, prismatic: 8, super: 20, diamond: 30, spectral: 40, stained: 70, umbra: 100 };
+  const DISPLAY_PRICE = { uncommon: 2, rare: 4, prismatic: 8, super: 20, storm: 30, spectral: 40, stained: 70, umbra: 100 };
   /** Plätze der Auslage in Rarity-Reihenfolge (aus der Preistabelle, nicht fest verdrahtet). */
   const DISPLAY_RARITIES = ORDER.filter(id => DISPLAY_PRICE[id] > 0);
   const HOUR_MS = 3600 * 1000;
@@ -152,7 +152,7 @@
    * Auslage einer Stunde: je Rarity aus DISPLAY_PRICE genau EINE Karte (die ersten Plätze, in Rarity-Reihenfolge) und als LETZTER Platz ein
    * Sonderangebot `special: true`: eine gewürfelte Rarity zum halben Preis (aufgerundet). Keine Karte steht doppelt, auch das Sonderangebot
    * ist eine andere Karte als die übrigen (die Rarity darf doppelt vorkommen). Rein aus (Stundenindex, Pool) bestimmt: jede Rarity hat ihren
-   * eigenen Zufall (mulberry32 mit Hash aus „Stunde:Rarity“), das Sonderangebot seinen eigenen („Stunde:special“). Umbra/Stained nur mit
+   * eigenen Zufall (mulberry32 mit Hash aus „Stunde:Rarity“), das Sonderangebot seinen eigenen („Stunde:special“). Umbra/Stained/Storm nur mit
    * Motiv-Maske; die Rarities mit Masken-Pflicht werden zuerst gezogen (kleinster Pool), damit sie nie an einer schon vergebenen Karte scheitern.
    * @param {number} hour Stundenindex (displayHourIndex)
    * @param {Array<string|{name:string}>} cards sammelbare Karten (Pool; Reihenfolge egal, wird nach Namen sortiert)
