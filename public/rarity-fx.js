@@ -975,7 +975,7 @@
   //  (Kunstpixel-Raster) -> Funken und Staub. Je Bild laufen nur: Kachelhelligkeit (Puls/Funken), Strahltabelle, Glaspixel (Tabellenzugriff), Motivpixel im Lichtband, Funken.
   //  Alles andere ist je Karte einmal vorberechnet (Zeitscheiben `prepG` / `warm`).
   const STAIN = { seed: 5, rArt: 12, rArtMin: 8, minArea: 30, base: 1.3, glow: 4.8, glowRel: .85, glowPow: .9 };   // Kachelgroesse (Radius in Zellen), Mindestflaeche, Grundstufe, Innenlicht (Stufen, Reichweite, Verlauf)
-  const LEAD = [18, 16, 22], LEAD_MID = [50, 50, 62], LEAD_GRAIN = [34, 32, 42], LEAD_SHINE = [120, 124, 140], LEAD_GL = [255, 236, 160];
+  const LEAD_GL = [255, 236, 160];
   const GL_SZ = [0, 1, 2, 3, 3, 2, 1, 0, -1, -1], GL_HOP = 10, GL_N = 5, GL_NH = 40, NU = 360, CS_SZ = [0, 1, 2, 1];
   /** Rechenarbeit in Zeitscheiben: Generator, der zwischen den Teilschritten `yield`et (der Aufrufer gibt dem Hauptfaden zwischendurch Luft) */
   function* stainedBuildG(E) {
@@ -1103,7 +1103,7 @@
           for (let j = ts[c]; j < ts[c + 1]; j++) { const dk = tkey[j] - kk; if (dk === 0 || dk === 1) o[tpx[j]] = w; else if (dk === -1) o[tpx[j]] = w2; }
         } }
       // Licht auf den Bleiruten: im Lichtband glaenzen die Ruten
-      if (pre.lutMax > 2.2) { const { lbp, lbu, leadHi } = pre; for (let q = 0; q < lbp.length; q++) { const l = lut[lbu[q]]; if (l > 2.2) o[lbp[q]] = l > 4 ? leadHi[1] : leadHi[0]; } }
+      if (pre.lutMax > 2.2) { const { lbp, lbu, lh1, lh2 } = pre; for (let q = 0; q < lbp.length; q++) { const l = lut[lbu[q]]; if (l > 2.2) o[lbp[q]] = l > 4 ? lh2[q] : lh1[q]; } }
       // Glanzpunkte auf den Bleiruten
       const ls = pre.lsp;
       if (ls.length) for (let s = 0; s < 12; s++) { const tt = ft + s * 4, k = Math.floor(tt / 7); if (tt - k * 7 > 2) continue; o[ls[Math.floor(hash(k, s, 303) * ls.length)]] = pre.leadGl; }
@@ -1135,21 +1135,38 @@
    *  Glanzlichter, Wege der Funken, Pixel je Kachel fuer die Glanzblitze, Hintergrundmaske fuer die Funken */
   function stainPre(E, st) {
     const { v, lead, d, n, dmax, sites } = st, { A, S } = E, e = E.e, full = E.full, opt = STAIN;
-    const base = new Uint32Array(NPX), fp = [], fc = [], fs = [], fu = [], fth = [], lsp = [], kp = [], kc = [], lbp = [], lbu = [];
+    const base = new Uint32Array(NPX), fp = [], fc = [], fs = [], fu = [], fth = [], lsp = [], kp = [], kc = [], lbp = [], lbu = [], lh1 = [], lh2 = [];
     const nbr = new Uint8Array(NPX), lead2 = new Uint8Array(NPX);
     for (let p = GW; p < NPX - GW; p++) if (A[p] && (!A[p - 1] || !A[p + 1] || !A[p - GW] || !A[p + GW])) nbr[p] = 1;
-    const mid = sn(LEAD_MID[0], LEAD_MID[1], LEAD_MID[2]), dark = sn(LEAD[0], LEAD[1], LEAD[2]), grain = sn(LEAD_GRAIN[0], LEAD_GRAIN[1], LEAD_GRAIN[2]), shine = sn(LEAD_SHINE[0], LEAD_SHINE[1], LEAD_SHINE[2]);
+    // Bleiruten: dicke Fugen (2 Zellen, bei grossen Kacheln 3, bei sehr kleinen 1), komplett vom Effekt gemalt. Farbe = stark abgedunkelte Mischung der beiden angrenzenden Kachelfarben (Palettenstufen)
+    const L2 = new Uint8Array(NPX), id = v.id;
     for (let y = AY0; y < AY0 + AH; y++) for (let x = AX0; x < AX0 + AW; x++) {
       const p = y * GW + x; if (!A[p]) continue;
-      if (nbr[p]) { lead2[p] = 1; base[p] = dark; }                                                                    // Rahmen des Bildfelds (aussen dunkel)
-      else if (nbr[p - 1] || nbr[p + 1] || nbr[p - GW] || nbr[p + GW]) { lead2[p] = 1; base[p] = (x + y) % 3 === 0 ? dark : mid; }   // ... innen etwas heller
-      else if (lead[p] || d[p] === 1) {                                                                                // Netz der Kacheln und Umriss des Motivs
-        lead2[p] = 1; base[p] = hash(x, y, 9) < .2 ? grain : dark;
-        if (!S[p]) { lsp.push(p); lbp.push(p); lbu.push(Math.round(x + y * .9)); }
+      if (lead[p] || d[p] === 1 || d[p] === 2) L2[p] = 1;                                                           // Netz der Kacheln (1 Zelle) und Umriss des Motivs (2 Zellen)
+      else { const c = id[p], dm = dmax[c]; if (dm >= 5 && ((lead[p - 1] && id[p - 1] !== c) || (lead[p - GW] && id[p - GW] !== c))) L2[p] = 1;                       // 2. Zelle auf der anderen Seite der Kante
+        else if (dm >= 9.5 && ((lead[p + 1] && id[p + 1] === c) || (lead[p + GW] && id[p + GW] === c))) L2[p] = 1; }   // 3. Zelle bei grossen Kacheln
+    }
+    const tcol = [];   // Kachelfarbe (RGB, Stufe 5) je Kachel
+    for (let c = 0; c < n; c++) tcol.push(stainRamp(st.hue[c], st.sat[c], .73));
+    for (let y = AY0; y < AY0 + AH; y++) for (let x = AX0; x < AX0 + AW; x++) {
+      const p = y * GW + x; if (!A[p]) continue;
+      const border = nbr[p] ? 2 : (nbr[p - 1] || nbr[p + 1] || nbr[p - GW] || nbr[p + GW]) ? 1 : 0;
+      if (!L2[p] && !border) continue;
+      lead2[p] = 1;
+      const c1 = id[p]; let c2 = c1;   // die andere angrenzende Kachel: erster abweichender Nachbar im 5x5-Fenster
+      for (let dy = -2; dy <= 2 && c2 === c1; dy++) for (let dx = -2; dx <= 2; dx++) { const q = p + dy * GW + dx; if (q >= 0 && q < NPX && A[q] && id[q] !== c1) { c2 = id[q]; break; } }
+      const a1 = tcol[c1], a2 = tcol[c2], f = (border === 1 ? .5 : .3) * (hash(x, y, 9) < .2 ? .8 : 1);
+      base[p] = sn((a1[0] + a2[0]) * .5 * f + 4, (a1[1] + a2[1]) * .5 * f + 3, (a1[2] + a2[2]) * .5 * f + 6);
+      if (!S[p] && !border) {
+        lsp.push(p); lbp.push(p); lbu.push(Math.round(x + y * .9));
+        lh1.push(sn((a1[0] + a2[0]) * .5 * .85, (a1[1] + a2[1]) * .5 * .85, (a1[2] + a2[2]) * .5 * .85)); lh2.push(sn(((a1[0] + a2[0]) * .5 + 255) * .5, ((a1[1] + a2[1]) * .5 + 240) * .5, ((a1[2] + a2[2]) * .5 + 200) * .5));
       }
     }
-    // Glanzsaum der Bleiruten: Rutenpixel mit Glas darueber/links bekommen stellenweise einen hellen Metallton
-    for (let y = AY0; y < AY0 + AH; y++) for (let x = AX0; x < AX0 + AW; x++) { const p = y * GW + x; if (lead2[p] && !nbr[p] && (lead[p] || d[p] === 1) && (!lead2[p - GW] || !lead2[p - 1]) && hash(x, y, 13) < .34) base[p] = shine; }
+    // Glanzpixel: sparsam an EINER Seite der Fuge (Pixel mit Glas darueber oder links), in der aufgehellten Kachelfarbe, keine zweite Kontur
+    for (let y = AY0; y < AY0 + AH; y++) for (let x = AX0; x < AX0 + AW; x++) {
+      const p = y * GW + x; if (!lead2[p] || nbr[p] || !(L2[p]) || (lead2[p - GW] && lead2[p - 1]) || hash(x, y, 13) >= .3) continue;
+      const a = tcol[id[p]]; base[p] = sn(a[0] * 1.15 + 30, a[1] * 1.15 + 30, a[2] * 1.15 + 30);
+    }
     const tcnt = new Int32Array(n + 1);
     for (let y = AY0; y < AY0 + AH; y++) for (let x = AX0; x < AX0 + AW; x++) {
       const p = y * GW + x; if (!A[p] || lead2[p]) continue;
@@ -1203,7 +1220,7 @@
     const ray = new Float32Array(256), rr = rng(11); { let i = 0; while (i < 256) { const w = 2 + Math.floor(rr() * 4), val = rr() < .38 ? .4 : rr() < .5 ? 1 : 1.45; for (let j = 0; j < w && i < 256; j++) ray[i++] = val; } }
     const [pCv, pCx] = cv2d(GW, GH), pIm = pCx.createImageData(GW, GH);
     return { base, fp: Int32Array.from(fp), fc: Int16Array.from(fc), fs: Float32Array.from(fs), fu: Uint16Array.from(fu), fth: Float32Array.from(fth), lsp: Int32Array.from(lsp),
-      kp: Int32Array.from(kp), kc: Int16Array.from(kc), lbp: Int32Array.from(lbp), lbu: Uint16Array.from(lbu), leadHi: [sn(160, 150, 130), sn(240, 214, 150)], leadGl: sn(LEAD_GL[0], LEAD_GL[1], LEAD_GL[2]),
+      kp: Int32Array.from(kp), kc: Int16Array.from(kc), lbp: Int32Array.from(lbp), lbu: Uint16Array.from(lbu), lh1: Uint32Array.from(lh1), lh2: Uint32Array.from(lh2), leadGl: sn(LEAD_GL[0], LEAD_GL[1], LEAD_GL[2]),
       n, kfd: new Float32Array(n), fl: new Float32Array(n), hue: st.hue, sat: st.sat, lut: new Float32Array(NU), lutMax: 0, ray, tab: new Uint32Array(n * 16), lead2, gm,
       ts, tpx, tkey, tkmin, tkmax, gP, gO, cP, cO, cx, cy,
       sx, sy, path, gx: new Int16Array(GL_N), gy: new Int16Array(GL_N), gs: new Int8Array(GL_N), gn: 0,
