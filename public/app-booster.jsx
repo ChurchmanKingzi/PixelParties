@@ -283,11 +283,6 @@ function BoosterShop({ boosters, sc, busy, onBuy, onSc, notify }) {
   const canBuy = !busy && sc >= price;
   return (
     <div className="bp-shop">
-      <div className="bp-intro">
-        <div className="bp-intro-title">BOOSTERPACKS</div>
-        <div className="bp-intro-text">Every pack holds <b>9 Rarity Skins</b> for your cards: Uncommon, Rare, Prismatic, Super Rare, Diamond, Spectral, Umbra and, very rarely, Stained Rare.
-          The last three cards of a pack are the luckiest. Don't like one? <b>Sell Back</b> a card from the pack you just opened.</div>
-      </div>
       <div className="bp-layout">
         <div className="bp-layout-aside"><BpShowcase sc={sc} onSc={onSc} notify={notify} onHoverCard={setTipCard} /></div>
         <div className="bp-grid">

@@ -26522,11 +26522,7 @@ input[type="checkbox"]:focus-visible, input[type="radio"]:focus-visible { outlin
    Nur Pixelart: harte Ringe aus gestapelten box-shadows, Palettenfarben, ganzzahlige Größen, keine Verläufe/Schlagschatten mit Unschärfe.
    Die Packbilder, die Bühne und alle Effekte sind Leinwände (image-rendering: pixelated).
    ═══════════════════════════════════════════════════════════════════════════ */
-.bp-shop { display: flex; flex-direction: column; align-items: center; gap: 20px; padding: 4px 0 24px; container-type: inline-size; }
-.bp-intro { max-width: 760px; text-align: center; padding: 10px 18px; background: #12101f; box-shadow: 0 0 0 2px #08060c, 0 0 0 4px #72541d, 0 0 0 6px #08060c; }
-.bp-intro-title { font-family: var(--font-display), sans-serif; font-size: 18px; letter-spacing: 3px; color: #fad54a; text-shadow: 2px 2px 0 #000; margin-bottom: 6px; }
-.bp-intro-text { font-size: 13px; line-height: 1.5; color: #a5b0c0; }
-.bp-intro-text b { color: #f7f7ad; font-weight: 700; }
+.bp-shop { display: flex; flex-direction: column; align-items: center; gap: 20px; padding: 0 0 24px; container-type: inline-size; }
 .bp-grid { display: grid; grid-template-columns: repeat(3, 224px); gap: 28px 22px; justify-content: center; }
 @media (max-width: 800px) { .bp-grid { grid-template-columns: repeat(2, 224px); } }
 @media (max-width: 520px) { .bp-grid { grid-template-columns: 224px; } }
@@ -26585,6 +26581,13 @@ input[type="checkbox"]:focus-visible, input[type="radio"]:focus-visible { outlin
 /* ── Auslage (Showcase) rechts neben den Packs; schmal: über den Packs ── */
 .bp-layout { display: grid; grid-template-columns: minmax(0, 1fr); gap: 22px; justify-items: center; width: 100%; }
 .bp-layout-aside { width: 100%; max-width: 380px; }
+/* Mittlere Breite: Packs und Auslage nebeneinander (Auslage rechts, oben bündig) */
+@container (min-width: 1120px) and (max-width: 1479px) {
+  .bp-layout { grid-template-columns: auto auto; column-gap: 26px; align-items: start; justify-content: center; }
+  .bp-grid { grid-column: 1; grid-row: 1; }
+  .bp-layout-aside { grid-column: 2; grid-row: 1; justify-self: start; width: clamp(260px, calc(var(--scw) * 3 + 94px), 380px); position: sticky; top: 8px; }
+  .bp-layout-aside .bp-showcase { width: 100%; }
+}
 @container (min-width: 1480px) {
   .bp-layout { grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); column-gap: 30px; align-items: start; }
   .bp-grid { grid-column: 2; grid-row: 1; }
