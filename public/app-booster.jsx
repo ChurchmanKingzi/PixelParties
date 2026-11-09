@@ -171,7 +171,7 @@ function BpShowCard({ card }) {
   );
 }
 
-function BpShowcase({ sc, onSc, notify }) {
+function BpShowcase({ sc, onSc, notify, onHoverCard }) {
   const [disp, setDisp] = useState(null);       // { hour, nextAt, cards }
   const [left, setLeft] = useState(0);          // ms bis zum Wechsel
   const [busy, setBusy] = useState(-1);         // Platz, dessen Kauf gerade läuft
@@ -233,8 +233,9 @@ function BpShowcase({ sc, onSc, notify }) {
   };
 
   const cards = (disp && disp.cards) || [];
+  const gotten = (disp && disp.bought) || [];     // Plätze, die ich in dieser Stunde schon gekauft habe (ausgegraut bis zum Wechsel)
   return (
-    <aside className="bp-showcase" aria-label="Showcase">
+    <aside className="bp-showcase" aria-label="Showcase" onMouseLeave={() => onHoverCard && onHoverCard(null)}>
       <div className="bp-sc-head">
         <div className="bp-sc-title">SHOWCASE</div>
         <div className="bp-sc-sub">One card of each rarity. Fresh picks every hour.</div>
@@ -243,14 +244,16 @@ function BpShowcase({ sc, onSc, notify }) {
       {!disp && <div className="bp-sc-empty">Loading…</div>}
       <div className="bp-sc-grid">
         {cards.map((c, i) => {
-          const can = (sc || 0) >= c.price && busy < 0;
+          const got = gotten.indexOf(i) >= 0;
+          const can = (sc || 0) >= c.price && busy < 0 && !got;
           const just = added.slot === i;
           return (
-            <div key={disp.hour + ':' + i + ':' + c.name} className={'bp-sc-cell bp-sc-r-' + c.rarity + (c.special ? ' bp-sc-special' : '')}>
-              {c.special && <div className="bp-sc-flag">HALF PRICE</div>}
+            <div key={disp.hour + ':' + i + ':' + c.name} className={'bp-sc-cell bp-sc-r-' + c.rarity + (c.special ? ' bp-sc-special' : '') + (got ? ' bp-sc-got' : '')}
+              onMouseEnter={() => onHoverCard && onHoverCard(c)}>
+              {c.special && <div className="bp-sc-flagrow"><div className="bp-sc-flag">HALF PRICE!</div></div>}
               <BpShowCard card={c} />
-              <div className="bp-sc-name" title={c.name}>{c.name}</div>
-              <div className="bp-sc-rar">{bpRarityLabel(c.rarity)}{c.owned > 0 ? <span className="bp-sc-own" title="Copies you own"> ×{c.owned}</span> : null}</div>
+              {got && <div className="bp-sc-dim" />}
+              <div className="bp-sc-name" title={bpRarityLabel(c.rarity) + ' · ' + c.name}>{c.name}{c.owned > 0 ? <span className="bp-sc-own" title="Copies you own"> ×{c.owned}</span> : null}</div>
               <div className="bp-sc-buyrow">
                 <div className="bp-sc-price" title={c.special ? 'Special offer: half price (normally ' + c.fullPrice + ' SC)' : c.price + ' SC'}>
                   <img src="/data/sc.png" className="bp-coin" alt="" />
@@ -258,8 +261,8 @@ function BpShowcase({ sc, onSc, notify }) {
                   <b>{c.price}</b>
                 </div>
                 <button type="button" className={'btn bp-sc-buy' + (just ? ' bp-sc-added' : '')} disabled={!can && !just} onClick={() => buy(i)}
-                  title={(sc || 0) < c.price ? 'Not enough Smug Coins' : 'Buy this card (' + bpRarityLabel(c.rarity) + ')'}>
-                  {just ? 'ADDED!' : 'BUY'}
+                  title={got ? 'Already bought. New cards arrive with the next rotation.' : (sc || 0) < c.price ? 'Not enough Smug Coins' : 'Buy this card (' + bpRarityLabel(c.rarity) + ')'}>
+                  {just ? 'ADDED!' : got ? 'BOUGHT' : 'BUY'}
                 </button>
               </div>
             </div>
@@ -272,6 +275,7 @@ function BpShowcase({ sc, onSc, notify }) {
 
 function BoosterShop({ boosters, sc, busy, onBuy, onSc, notify }) {
   useEffect(() => { bpWarmSounds(); }, []);
+  const [tipCard, setTipCard] = useState(null);     // Karte der Auslage unter der Maus → Tooltip links (über Shopkeeper und Sprechblase)
   const packs = (boosters && boosters.packs) || [];
   const price = boosters && boosters.price != null ? boosters.price : 20;
   const zoom = 1;
@@ -285,7 +289,7 @@ function BoosterShop({ boosters, sc, busy, onBuy, onSc, notify }) {
           The last three cards of a pack are the luckiest. Don't like one? <b>Sell Back</b> a card from the pack you just opened.</div>
       </div>
       <div className="bp-layout">
-        <div className="bp-layout-aside"><BpShowcase sc={sc} onSc={onSc} notify={notify} /></div>
+        <div className="bp-layout-aside"><BpShowcase sc={sc} onSc={onSc} notify={notify} onHoverCard={setTipCard} /></div>
         <div className="bp-grid">
           {packs.map(p => (
             <div key={p.id} className={'bp-tile' + (canBuy ? '' : ' bp-tile-off')}>
@@ -300,8 +304,23 @@ function BoosterShop({ boosters, sc, busy, onBuy, onSc, notify }) {
           ))}
         </div>
       </div>
+      {tipCard && <BpShopTip card={tipCard} />}
     </div>
   );
+}
+
+// Tooltip der Auslage: links, über dem Shopkeeper-Sprite UND seiner Sprechblase (hängt am Shop-Bildschirm, z-index über .shop-antonia); die Karte
+// läuft hier voll animiert (CardTooltipContent mit der Rarity), damit man den Effekt im Detail sieht.
+function BpShopTip({ card }) {
+  const Tooltip = window.CardTooltipContent, base = window.CARDS_BY_NAME && window.CARDS_BY_NAME[card.name];
+  if (!Tooltip || !base) return null;
+  const tree = (
+    <div className="tooltip card-tooltip bp-shop-tip">
+      <Tooltip card={{ ...base, rarity: card.rarity }} rarity={card.rarity} />
+    </div>
+  );
+  const host = typeof document !== 'undefined' && document.querySelector('.shop-screen');
+  return (host && typeof ReactDOM !== 'undefined' && ReactDOM.createPortal) ? ReactDOM.createPortal(tree, host) : tree;
 }
 window.BoosterShop = BoosterShop;
 
@@ -894,6 +913,9 @@ function BoosterOpening({ pending, boosters, sc, onSc, onClaimed, onRipMore }) {
   const [selling, setSelling] = useState(false);
   const [note, setNote] = useState('');                // kurze Meldung im HUD (Sell Back / Add and rip one more)
   const [hover, setHover] = useState(-1);
+  const [scHit, setScHit] = useState(null);        // { n, key }: Verkauf → Goldanzeige kurz hervorheben, grünes „+X“ daneben
+  const scHitTimer = useRef(0);
+  useEffect(() => () => clearTimeout(scHitTimer.current), []);
   const [vp, setVp] = useState({ w: window.innerWidth, h: window.innerHeight });
   const [op, setOp] = useState(null);                  // opening.json
 
@@ -1088,6 +1110,10 @@ function BoosterOpening({ pending, boosters, sc, onSc, onClaimed, onRipMore }) {
         setSold(i);
         bpPlay('gold_gain', { volume: 0.8 });
         if (onSc && r.data.sc != null) onSc(r.data.sc);
+        const gain = sellTable[cards[i].rarity] || 0;
+        setScHit({ n: gain, key: Date.now() });
+        clearTimeout(scHitTimer.current);
+        scHitTimer.current = setTimeout(() => setScHit(null), 2000);
       } else if (r.status === 409 && Number.isInteger(r.data.sold) && r.data.sold >= 0) setSold(r.data.sold);
       else setNote((r.data && r.data.error) || 'Could not sell the card');
     } catch (e) { setNote(e.message); }
@@ -1143,7 +1169,12 @@ function BoosterOpening({ pending, boosters, sc, onSc, onClaimed, onRipMore }) {
           {note && <div className="bp-hint bp-hint-warn">{note}</div>}
         </div>
       )}
-      {phase === 'cards' && <div className="bp-sc" title="Your Smug Coins"><img src="/data/sc.png" className="bp-coin" alt="" /> {sc || 0}</div>}
+      {phase === 'cards' && (
+        <div className={'bp-sc' + (scHit ? ' bp-sc-hit' : '')} key={scHit ? 'hit' + scHit.key : 'idle'} title="Your Smug Coins">
+          <img src="/data/sc.png" className="bp-coin" alt="" /> {sc || 0}
+          {scHit && <span className="bp-sc-plus">+{scHit.n}</span>}
+        </div>
+      )}
       {hoverCard && Tooltip && window.CARDS_BY_NAME && window.CARDS_BY_NAME[hoverCard.name] && (
         <div className="tooltip card-tooltip bp-tooltip">
           <Tooltip card={{ ...window.CARDS_BY_NAME[hoverCard.name], rarity: hoverCard.rarity }} rarity={hoverCard.rarity} />

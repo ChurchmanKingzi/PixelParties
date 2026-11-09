@@ -1288,6 +1288,14 @@ async function initDatabase() {
   // Sell Back: Index der aus diesem Pack zurückgegebenen Karte (-1 = noch keine). Je Pack nur eine; bestehende Zeilen bekommen den Default.
   try { await db.execute('ALTER TABLE pending_booster ADD COLUMN sold_idx INTEGER NOT NULL DEFAULT -1'); } catch {}
 
+  // Auslage: je Stunde und Platz kann jeder Spieler die Karte nur EINMAL kaufen (danach ausgegraut bis zum nächsten Wechsel).
+  await db.execute(`CREATE TABLE IF NOT EXISTS display_buys (
+    user_id TEXT NOT NULL,
+    hour INTEGER NOT NULL,
+    slot INTEGER NOT NULL,
+    PRIMARY KEY (user_id, hour, slot)
+  )`);
+
   // Shop purchases table
   await db.execute(`CREATE TABLE IF NOT EXISTS user_shop_items (
     id TEXT PRIMARY KEY,
@@ -4614,8 +4622,9 @@ async function displayView(userId, now) {
   const t = typeof now === 'number' ? now : Date.now();
   const hour = RARITIES.displayHourIndex(t);
   const own = userId ? await ownedRarities(userId) : {};
+  const bought = userId ? (await db.all('SELECT slot FROM display_buys WHERE user_id = ? AND hour = ?', [userId, hour])).map(r => r.slot) : [];
   return {
-    hour, msLeft: RARITIES.msToNextHour(t), nextAt: (hour + 1) * RARITIES.HOUR_MS, serverTime: t,
+    bought, hour, msLeft: RARITIES.msToNextHour(t), nextAt: (hour + 1) * RARITIES.HOUR_MS, serverTime: t,
     cards: displayForHour(hour).map(c => ({ ...c, owned: (own[c.name] && own[c.name][c.rarity]) || 0 })),
   };
 }
@@ -4627,7 +4636,8 @@ app.get('/api/boosters/display', authMiddleware, async (req, res) => {
   catch (err) { console.error('[boosters/display]', err.message); res.status(500).json({ error: 'Failed to load the showcase' }); }
 });
 
-// POST /api/boosters/display/buy { slot, rarity?, hour?, name?, price?, special? } — eine Karte der aktuellen Auslage kaufen (beliebig oft, kein Lagerbestand):
+// POST /api/boosters/display/buy { slot, rarity?, hour?, name?, price?, special? } — eine Karte der aktuellen Auslage kaufen (je Spieler, Stunde und
+//  Platz nur EINMAL: danach 409 „already bought“, `bought` in der Auslage nennt die gekauften Plätze):
 //  SC ab (sc_log 'shop:display'), Karte+Rarity +1 in user_card_rarities. `slot` = Platz in `cards` (0–7 je Rarity, 8 = Sonderangebot zum halben
 //  Preis); ohne `slot` zählt der reguläre Platz der Rarity. Der PREIS kommt immer vom Server (Platz der aktuellen Stunde). Weicht etwas vom Platz ab,
 //  was der Client mitschickt (Stunde, Name, Rarity, Sonderangebot, Preis — Wechsel an der Stundengrenze), antwortet der Server 409 mit der
@@ -4654,9 +4664,11 @@ app.post('/api/boosters/display/buy', authMiddleware, async (req, res) => {
       || (body.special != null && !!body.special !== !!slot.special)
       || (body.price != null && Number(body.price) !== slot.price);
     if (stale) return res.status(409).json({ error: 'The showcase just changed. Take a look at the new cards!', display: await displayView(userId, now) });
-    let nichtGenug = false;
+    let nichtGenug = false, schonGekauft = false;
     try {
       await db.transaction(async (tx) => {
+        const ins = await tx.run('INSERT OR IGNORE INTO display_buys (user_id, hour, slot) VALUES (?, ?, ?)', [userId, hour, idx]);
+        if (!ins.rowsAffected) { schonGekauft = true; throw new Error('already-bought'); }
         const upd = await tx.run('UPDATE users SET sc = sc - ? WHERE id = ? AND sc >= ?', [slot.price, userId, slot.price]);
         if (!upd.rowsAffected) { nichtGenug = true; throw new Error('not-enough-sc'); }
         await tx.run('INSERT INTO sc_log (id, user_id, reward_id, opponent_id, amount) VALUES (?, ?, ?, ?, ?)',
@@ -4664,12 +4676,14 @@ app.post('/api/boosters/display/buy', authMiddleware, async (req, res) => {
         await addRarityCopies(userId, [{ name: slot.name, rarity: slot.rarity }], tx);
       });
     } catch (err) {
+      if (schonGekauft) return res.status(409).json({ error: 'You already bought this card. New cards arrive with the next rotation.', display: await displayView(userId, now) });
       if (nichtGenug) {
         const u = await db.get('SELECT sc FROM users WHERE id = ?', [userId]);
         return res.status(402).json({ error: 'Not enough SC', sc: u?.sc || 0 });
       }
       throw err;
     }
+    db.run('DELETE FROM display_buys WHERE hour < ?', [hour - 48]).catch(() => {});
     const u = await db.get('SELECT sc FROM users WHERE id = ?', [userId]);
     const own = await ownedRarities(userId);
     res.json({ ok: true, card: { name: slot.name, rarity: slot.rarity, price: slot.price, special: !!slot.special }, owned: (own[slot.name] && own[slot.name][slot.rarity]) || 0, sc: u?.sc || 0, display: await displayView(userId, now) });

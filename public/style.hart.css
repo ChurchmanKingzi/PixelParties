@@ -1,4 +1,4 @@
-/* PP-HART-GEBACKEN 88ccdd7453bcfe20 — ERZEUGT von scripts/hart/build-css.js aus style.css (pixel-hart.js vorab angewandt) — nicht von Hand ändern. */
+/* PP-HART-GEBACKEN e3f821116d905d31 — ERZEUGT von scripts/hart/build-css.js aus style.css (pixel-hart.js vorab angewandt) — nicht von Hand ändern. */
 .pp-hart-gebacken { --pp-hart: 1; }
 @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Rajdhani:wght@400;500;600;700&family=Orbitron:wght@400;500;600;700;800;900&display=swap');
 
@@ -26338,16 +26338,18 @@ input[type="checkbox"]:focus-visible, input[type="radio"]:focus-visible { outlin
   .bp-grid { grid-column: 2; grid-row: 1; }
   .bp-layout-aside { grid-column: 3; grid-row: 1; justify-self: start; max-width: min(350px, 100%); }
 }
-/* Nur bei genug Höhe haftet die Auslage beim Scrollen der Packs am oberen Rand (sonst würde ihre untere Reihe abgeschnitten) */
-@media (min-height: 940px) { @container (min-width: 1480px) { .bp-layout-aside { position: sticky; top: 8px; } } }
-.bp-showcase { box-sizing: border-box; width: 100%; padding: 12px; background: #12101f; box-shadow: 0 0 0 2px #08060c, 0 0 0 4px #72541d, 0 0 0 6px #08060c; }
-.bp-sc-head { text-align: center; margin-bottom: 10px; }
+/* Die Auslage haftet beim Scrollen der Packs oben (breites Layout) und passt immer ganz in die Höhe: die Kartenbreite (--scw) folgt der Fensterhöhe
+   (--vh = 1 % der Fensterhöhe in Layout-Pixeln unter dem UI-Zoom; 170px = Kopf- und Reiterleiste, 284px = Kopf, Namenszeilen, Knopfzeilen, Abstände). */
+@container (min-width: 1480px) { .bp-layout-aside { position: sticky; top: 8px; } }
+.bp-layout-aside { --scw: clamp(40px, calc((100 * var(--vh, 1vh) - 170px / var(--ui-scale, 1) - 284px) * 5 / 21), 150px); }
+.bp-showcase { box-sizing: border-box; width: min(100%, calc(var(--scw) * 3 + 94px)); margin: 0 auto; padding: 12px; background: #12101f; box-shadow: 0 0 0 2px #08060c, 0 0 0 4px #72541d, 0 0 0 6px #08060c; }
+.bp-sc-head { text-align: center; margin-bottom: 8px; }
 .bp-sc-title { font-family: var(--font-display), sans-serif; font-size: 18px; letter-spacing: 3px; color: #fad54a; text-shadow: 2px 2px 0 #000; }
-.bp-sc-sub { font-size: 10px; white-space: nowrap; color: #a5b0c0; margin-top: 4px; }
-.bp-sc-clock { display: inline-block; margin-top: 8px; padding: 4px 10px; font-size: 12px; color: #a5b0c0; background: #08060c; box-shadow: 0 0 0 2px #3e3e51; }
+.bp-sc-sub { display: none; }
+.bp-sc-clock { display: inline-block; margin-top: 6px; padding: 4px 10px; font-size: 12px; color: #a5b0c0; background: #08060c; box-shadow: 0 0 0 2px #3e3e51; }
 .bp-sc-clock b { color: #f7f7ad; font-family: var(--font-display), sans-serif; letter-spacing: 1px; }
 .bp-sc-empty { text-align: center; padding: 30px 0; color: #7e7d9b; font-size: 12px; }
-.bp-sc-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px 8px; }
+.bp-sc-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 18px 8px; }
 .bp-sc-cell { --rc: #3e3e51; position: relative; display: flex; flex-direction: column; gap: 3px; padding: 5px 5px 6px; min-width: 0; background: #08060c; box-shadow: 0 0 0 2px var(--rc); }
 .bp-sc-r-uncommon { --rc: #a8a8a8; }
 .bp-sc-r-rare { --rc: #66d9ff; }
@@ -26359,10 +26361,10 @@ input[type="checkbox"]:focus-visible, input[type="radio"]:focus-visible { outlin
 .bp-sc-r-stained { --rc: #fb1ea9; }
 .bp-sc-face { position: relative; width: 100%; aspect-ratio: 5 / 7; overflow: hidden; background: #12101f; }
 .bp-sc-face img { position: absolute; left: 0; top: 0; width: 100%; height: 100%; display: block; pointer-events: none; }
-.bp-sc-name { font-size: 9px; line-height: 1.2; color: #ffffff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 2px; }
-.bp-sc-rar { font-size: 9px; line-height: 1.2; color: var(--rc); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.bp-sc-r-umbra .bp-sc-rar { color: #c98aff; }
+.bp-sc-name { font-size: 9px; line-height: 1.2; color: var(--rc); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 2px; }
+.bp-sc-r-umbra .bp-sc-name { color: #c98aff; }
 .bp-sc-own { color: #a5b0c0; }
+.bp-sc-r-uncommon { --rc: #d2d2db; }
 .bp-sc-buyrow { display: flex; align-items: center; justify-content: space-between; gap: 4px; margin-top: 2px; }
 .bp-sc-price { display: inline-flex; align-items: center; gap: 3px; font-family: var(--font-display), sans-serif; font-size: 12px; color: #fad54a; white-space: nowrap; }
 .bp-sc-price b { font-weight: 400; }
@@ -26374,8 +26376,19 @@ input[type="checkbox"]:focus-visible, input[type="radio"]:focus-visible { outlin
 @keyframes bpAddedBlink { 0% { color: #66ffa2; border-color: #66ffa2; } 50% { color: #ffffff; border-color: #ffffff; } }
 .bp-sc-special { --rc: #ee6428; animation: bpSpecialRing 1s steps(1) infinite; }
 @keyframes bpSpecialRing { 0% { box-shadow: 0 0 0 2px #ee6428, 0 0 0 4px #08060c, 0 0 0 6px #fad54a; } 50% { box-shadow: 0 0 0 2px #fad54a, 0 0 0 4px #08060c, 0 0 0 6px #ee6428; } }
-.bp-sc-flag { position: absolute; z-index: 3; left: -5px; top: -10px; padding: 2px 5px 1px; font-family: var(--font-display), sans-serif; font-size: 9px; letter-spacing: 1px; color: #ffffff; background: #ee6428; box-shadow: 0 0 0 2px #08060c; }
-.bp-sc-special .bp-sc-rar { color: #fad54a; }
+.bp-sc-flagrow { position: absolute; z-index: 3; left: 0; right: 0; top: -19px; display: flex; justify-content: center; pointer-events: none; }
+.bp-sc-flag { padding: 4px 8px 3px; font-family: var(--font-display), sans-serif; font-size: 12px; letter-spacing: 1px; white-space: nowrap; color: #08060c; background: #fad54a; box-shadow: 0 0 0 2px #08060c, 0 0 0 4px #ee6428, inset 0 -3px 0 #ee6428; animation: bpFlagBlink .8s steps(1) infinite; }
+@keyframes bpFlagBlink { 0% { background: #fad54a; box-shadow: 0 0 0 2px #08060c, 0 0 0 4px #ee6428, inset 0 -3px 0 #ee6428; } 50% { background: #ffffff; box-shadow: 0 0 0 2px #08060c, 0 0 0 4px #fad54a, inset 0 -3px 0 #fad54a; } }
+.bp-sc-special .bp-sc-name { color: #fad54a; }
+.bp-sc-cell.bp-sc-got { --rc: #3e3e51; animation: none; }
+.bp-sc-got .bp-sc-face, .bp-sc-got .bp-sc-name, .bp-sc-got .bp-sc-price { filter: grayscale(1) brightness(.55); }
+.bp-sc-dim { position: absolute; left: 5px; right: 5px; top: 5px; aspect-ratio: 5 / 7; z-index: 2; pointer-events: none; image-rendering: pixelated;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='2' height='2' shape-rendering='crispEdges'%3E%3Crect width='1' height='1' fill='%2308060c'/%3E%3Crect x='1' y='1' width='1' height='1' fill='%2308060c'/%3E%3C/svg%3E"); background-size: 4px 4px; }
+.bp-sc-got .bp-sc-buy:disabled { border-color: #3e3e51; color: #7e7d9b; }
+
+/* Tooltip der Auslage: links (über Shopkeeper und Sprechblase, .shop-antonia hat z-index 500) */
+.bp-shop-tip { position: fixed; left: 0; top: calc(78px / var(--ui-scale, 1)); width: 400px; max-height: calc(100 * var(--vh, 1vh) - 90px / var(--ui-scale, 1)); display: flex; flex-direction: column; overflow: hidden; z-index: 600; pointer-events: none; }
+@media (max-width: 760px) { .bp-shop-tip { display: none; } }
 
 /* Sell Back! unter jeder aufgedeckten Karte (sitzt auf deren Unterkante), SC-Anzeige, Add-and-rip-Knopf */
 .bp-card { --bh: max(22px, calc(var(--bpz, 2) * 12px)); --bpx: calc(var(--bpz, 2) * 1px); }
@@ -26402,3 +26415,7 @@ input[type="checkbox"]:focus-visible, input[type="radio"]:focus-visible { outlin
 .bp-hint-warn { color: #ff9a1a; }
 .bp-sc { position: absolute; right: 14px; top: 12px; z-index: 7; display: flex; align-items: center; gap: 6px; padding: 5px 12px; font-family: var(--font-display), sans-serif; font-size: 16px; color: #fad54a; background: #12101f; box-shadow: 0 0 0 2px #08060c, 0 0 0 4px #72541d; }
 .bp-sc .bp-coin { width: 18px; height: 18px; }
+.bp-sc-hit { animation: bpScHit 1.6s steps(1) 1; }
+@keyframes bpScHit { 0%, 24%, 48%, 72% { color: #ffffff; background: #72541d; box-shadow: 0 0 0 2px #08060c, 0 0 0 4px #66ffa2, 0 0 0 6px #08060c; } 12%, 36%, 60%, 84% { color: #fad54a; background: #12101f; box-shadow: 0 0 0 2px #08060c, 0 0 0 4px #fad54a, 0 0 0 6px #08060c; } 100% { color: #fad54a; background: #12101f; box-shadow: 0 0 0 2px #08060c, 0 0 0 4px #72541d; } }
+.bp-sc-plus { position: absolute; right: calc(100% + 12px); top: 50%; margin-top: -9px; font-size: 20px; line-height: 18px; color: #66ffa2; text-shadow: 2px 2px 0 #08060c; white-space: nowrap; animation: bpScPlus 1.8s steps(6) 1 forwards; }
+@keyframes bpScPlus { 0% { transform: translateY(8px); } 25% { transform: translateY(0); } 85% { transform: translateY(0); } 100% { transform: translateY(-8px); } }
