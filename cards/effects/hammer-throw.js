@@ -18,18 +18,32 @@
 //  `engine.echteEigeneZuegeBis`) — ein uebersprungener Zug verschiebt den
 //  Takt nicht.
 //
-//  Animation: spinning hammer projectile →
-//  impact slash on target.
+//  Animation: `hammer_throw` (public/app-fx-59.jsx, Pixelart-Leinwand, 32 Bilder ≈ 1,07 s): der Werfer holt aus, der Hammer
+//  fliegt im Bogen mit Drehungen zum Ziel, Aufprall mit Hit-Stop (Bild 15 = 500 ms nach Animationsstart), steckt kurz, prallt ab
+//  und zerfällt. EIN `play_zone_animation` am Ziel; die Quelle (der werfende Held) steht in `von` (der Client löst sie auf).
+//  Schaden und HP-Zahl kommen im Aufprallbild (`_delay` unten, gemessen — nicht die nackten 500 ms: Mount-Vorlauf und Zustands-Broadcast gleichen sich teilweise aus), danach 200 ms Nachbeben.
 // ═══════════════════════════════════════════
 
 module.exports = {
   // ★★ v1181 — ENTKOPPELTE ZAUBERBILDER (siehe CARD_API): bei einer
   // Negation spielt die Engine diese Bilder, damit der abgewehrte
   // Zauber sichtbar bleibt.
-  spellVisual: {
-    projectile: { emoji: '🔨', duration: 520 },
-    stagger: 110, flightMs: 330,
-    impact: { type: 'quick_slash' }, impactMs: 260,
+  // Funktion statt Tabelle: die Zonen-Animation `hammer_throw` braucht neben dem Ziel auch den Werfer (`von`), den `impact` nicht tragen kann.
+  async spellVisual(engine, info) {
+    const ziele = (info.targets || []).filter(Boolean);
+    const quellSeite = info.heroOwner ?? info.owner;
+    if (!ziele.length || quellSeite == null || !(info.heroIdx >= 0)) return;
+    if (info.schonGezeigt && info.schonGezeigt.zone.has('hammer_throw')) return;   // der Effekt-Rumpf hat den Wurf schon gezeigt
+    for (let i = 0; i < ziele.length; i++) {
+      const t = ziele[i];
+      engine._broadcastEvent('play_zone_animation', {
+        type: 'hammer_throw', owner: t.owner, heroIdx: t.heroIdx,
+        zoneSlot: t.type === 'hero' ? -1 : (t.slotIdx ?? -1),
+        von: { owner: quellSeite, heroIdx: info.heroIdx, el: true },
+      });
+      if (i < ziele.length - 1) await engine._delay(110);
+    }
+    await engine._delay(1070);
   },
 
   requiresTarget: true,
@@ -64,7 +78,6 @@ module.exports = {
 
       const tgtOwner = target.owner;
       const tgtHeroIdx = target.heroIdx;
-      const tgtZoneSlot = target.type === 'hero' ? undefined : target.slotIdx;
 
       // Pre-resolution hook (Doq's guess, future "when this Hero
       // attacks" effects) fires AFTER target pick but BEFORE the
@@ -73,24 +86,14 @@ module.exports = {
       const attackSource = { name: 'Hammer Throw', owner: pi, heroIdx, controller: pi, heroOwner: ctx.cardHeroOwner ?? pi, usesHeroAtk: true };   // Als Befund 29.9.: Brettseite des Angreifers
       const finalAtk = await engine._fireAttackDeclare(attackSource, target, atk);
 
-      // Spinning hammer projectile animation
-      engine._broadcastEvent('play_projectile_animation', {
-        sourceOwner: pi, sourceHeroIdx: heroIdx,
-        targetOwner: tgtOwner, targetHeroIdx: tgtHeroIdx,
-        targetZoneSlot: tgtZoneSlot,
-        emoji: '🔨',
-        emojiStyle: { animation: 'hammerSpin 300ms linear infinite', fontSize: 28 },
-        duration: 500,
-      });
-      await engine._delay(450);
-
-      // Impact animation
+      // Hammer Throw: ein Wurf-Bild (Ausholen, Flug im Bogen, Aufprall bei Bild 15). Quelle = der werfende Held (`von`, Brettseite des Angreifers).
       const impactSlot = target.type === 'hero' ? -1 : (target.slotIdx ?? -1);
       engine._broadcastEvent('play_zone_animation', {
-        type: 'quick_slash', owner: tgtOwner,
+        type: 'hammer_throw', owner: tgtOwner,
         heroIdx: tgtHeroIdx, zoneSlot: impactSlot,
+        von: { owner: ctx.cardHeroOwner ?? pi, heroIdx, el: true },
       });
-      await engine._delay(150);
+      await engine._delay(550);   // gemessen: Bild 15 liegt ~630–730 ms nach dem Ereignis (Mount 100 ms + Aufbau 20–120 ms + 500 ms), der Schaden-Zustand trifft ~70–110 ms nach Ablauf dieses Wartens ein → Schaden und HP-Zahl im Aufprallbild (Hit-Stop = Bilder 15–17), nicht davor
 
       // W16f (M01-14): "The target's CONTROLLER must delete a card ..." - Kontrolle statt Brettseite (gestohlene Kreatur, übernommener
       // Held). Vor dem Schaden bestimmt, weil das Ziel dabei sterben kann.
@@ -127,6 +130,8 @@ module.exports = {
           if (_r?.surpriseNegated || _r?.effectNegated) negated = true;
         }
       }
+
+      await engine._delay(200);   // Nachbeben: der Hammer steckt, das Ziel federt zurück
 
       // Welle 13 (Q139, Al: „Wenn NUR der Schaden verhindert wird, ja. Wenn die Karte
       // insgesamt negiert wird, nein."): Escape, Schilde, Immunitaet verhindern nur den

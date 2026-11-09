@@ -4340,6 +4340,14 @@ const ZONE_ANIM_SFX = {
     { name: 'booster_card_land', opts: { volume: 0.35, rate: 0.6, delay: 1133 } },
     { name: 'booster_card_whoosh', opts: { volume: 0.4, rate: 0.7, delay: 1200 } },
   ],
+  // Hammer Throw (app-fx-59): Abwurf bei Bild 0 (EIN Standard-`projectile`), Aufprall bei Bild 15 (500 ms). Zeiten animationsrelativ (30 Hz), der Mount-Vorlauf kommt von `playSFXForZoneAnim` dazu.
+  hammer_throw: [
+    { name: 'projectile', opts: { delay: 40 } },
+    { name: 'heavy_impact', opts: { volume: 0.85, rate: 0.8, delay: 500 } },
+    { name: 'attack_ram', opts: { volume: 0.45, rate: 0.9, delay: 500 } },
+    { name: 'pull_crack', opts: { volume: 0.5, rate: 0.9, delay: 533 } },
+    { name: 'booster_card_land', opts: { volume: 0.4, rate: 0.8, delay: 700 } },
+  ],
   hammer_skeleton_smash: [
     { name: 'booster_card_whoosh', opts: { volume: 0.35, rate: 0.85, delay: 700 } },
     { name: 'booster_card_whoosh', opts: { volume: 0.4, rate: 0.8, delay: 767 } },
@@ -5168,6 +5176,7 @@ const ZONE_ANIM_NONEFFECT = new Set([
   'magic_hammer',
   'heavy_hit_smash',
   'hammer_skeleton_smash',
+  'hammer_throw',   // Abwurf-Klang + Aufprall liegen ~0,5 s auseinander (wie die Hammer-Animationen)
   // v1422 (Als Befund 25.9.: „den Sound hoere ich im Spiel nicht"): der
   // Doom-Tick kommt fast immer im selben Augenblick wie andere Effekt-
   // Klaenge (Rundenende, Besiegung) und wurde von der 'effect'-Sperre

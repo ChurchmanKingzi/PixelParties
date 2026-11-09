@@ -717,6 +717,7 @@ Die Zuordnung ist zentral — kein Karten-Code ruft `playSFX` selbst auf:
   `zoneType`) aus; ein `h`-/Größen-Kniff ist nicht nötig. Der Schaden folgt erst NACH dem Hit-Stop (`_delay`/`animDuration` wie oben, Vorlauf des Mountens ≈ 110 ms eingerechnet); `PP_ANIM_MINDAUER`
   (app-board.jsx) hält die Animation länger am Leben als ein kürzeres `animDuration`. Negiert: `spellVisual.impact` mit dem passenden Typ und `impactMs` (1100 / 930 / 800). Die Pixelgröße der Effekt-Zelle
   folgt der Hero-Pixelgröße des Ziels (Regel in der Kopfzeile von app-fx-57.jsx). Kamera-Shake nur am Desktop; Rückfall auf den alten Hammer bei Retro / `__ppFxAlt` / reduzierter Bewegung.
+* **Hammer Throw** (`hammer_throw`, `public/app-fx-59.jsx`; 32 Bilder ≈ 1,07 s, Aufprall = Bild 15 bei 500 ms ab Animationsstart): EIN `play_zone_animation` am Ziel (Hero oder Support-Slot) mit `von: { owner, heroIdx, el: true }` = der werfende Held (Brettseite; `onZoneAnim` löst es zu `vonDx/vonDy/vonEl` auf). Der Wurf-Klang `projectile` steckt in `ZONE_ANIM_SFX.hammer_throw` (kein eigener Projektil-Broadcast). Schaden nach ca. 550 ms `_delay` (Mount-Vorlauf + Aufbau + 500 ms, gemessen), danach 200 ms Nachbeben. Negation: `spellVisual` ist eine Funktion (Tabellen-`impact` kann `von` nicht tragen).
 
 ## ★ SCHADENSTYPEN — DAS VOLLSTÄNDIGE VOKABULAR
 
