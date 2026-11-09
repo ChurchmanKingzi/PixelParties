@@ -40,7 +40,7 @@
   if (root.PpRarityFx) return;
 
   const GW = 150, GH = 210, NPX = GW * GH;
-  const ORDER = ['common', 'uncommon', 'rare', 'prismatic', 'super', 'diamond', 'spectral', 'umbra', 'stained'];
+  const ORDER = ['common', 'uncommon', 'rare', 'prismatic', 'super', 'diamond', 'spectral', 'stained', 'umbra'];
   const LABEL = { common: 'Common', uncommon: 'Uncommon', rare: 'Rare', prismatic: 'Prismatic', super: 'Super Rare', diamond: 'Diamond', spectral: 'Spectral', umbra: 'Umbra', stained: 'Stained Rare' };
   // Je Stufe: Basiskarte (nur Information; die URL-Variante steht in CardRender.rarityBase), Effekt, Stempel, Takt, Standbild-Zeit
   const SPEC = {

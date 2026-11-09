@@ -23,9 +23,9 @@ const pool = (() => {
 
 // ── Reine Logik ──────────────────────────────────────────────
 test('Auslage: ein Platz je Rarity der Preistabelle (Zahl der Plätze folgt der Rarity-Liste)', () => {
-  assert.deepStrictEqual(R.DISPLAY_RARITIES, ['uncommon', 'rare', 'prismatic', 'super', 'diamond', 'spectral', 'umbra', 'stained']);
-  assert.deepStrictEqual(R.DISPLAY_PRICE, { uncommon: 2, rare: 4, prismatic: 8, super: 20, diamond: 30, spectral: 40, umbra: 70, stained: 100 });
-  assert.deepStrictEqual(R.SELLBACK, { uncommon: 1, rare: 2, prismatic: 4, super: 6, diamond: 8, spectral: 10, umbra: 14, stained: 18 });
+  assert.deepStrictEqual(R.DISPLAY_RARITIES, ['uncommon', 'rare', 'prismatic', 'super', 'diamond', 'spectral', 'stained', 'umbra']);
+  assert.deepStrictEqual(R.DISPLAY_PRICE, { uncommon: 2, rare: 4, prismatic: 8, super: 20, diamond: 30, spectral: 40, stained: 70, umbra: 100 });
+  assert.deepStrictEqual(R.SELLBACK, { uncommon: 1, rare: 2, prismatic: 4, super: 6, diamond: 8, spectral: 10, stained: 14, umbra: 18 });
   for (const id of R.DISPLAY_RARITIES) { assert.ok(R.isRarity(id) && id !== 'common'); assert.ok(R.SELLBACK[id] > 0); }
   assert.strictEqual(R.sellbackValue('common'), 0);
   assert.strictEqual(R.sellbackValue('nonsense'), 0);
@@ -176,7 +176,7 @@ async function guest() {
 const total = (own) => Object.values(own).reduce((a, o) => a + Object.values(o).reduce((x, y) => x + y, 0), 0);
 const nineCards = (over) => {
   const base = ['Alice', 'Bifab, Bridge to Coolness', 'Pyroblast', 'Trade', 'Alchemy', 'Archer', 'Splashy Slime', 'Elixir of Immortality', 'Shard of Chaos'];
-  const rar = ['uncommon', 'uncommon', 'rare', 'rare', 'prismatic', 'super', 'diamond', 'spectral', 'stained'];
+  const rar = ['uncommon', 'uncommon', 'rare', 'rare', 'prismatic', 'super', 'diamond', 'spectral', 'umbra'];
   return base.map((name, i) => ({ name, rarity: (over && over[i]) || rar[i] }));
 };
 
@@ -269,12 +269,12 @@ test('Auslage kaufen: zu wenig SC → 402 ohne Buchung; genug → SC ab, Rarity 
   assert.ok(Array.isArray(d.bought));
 
   const before = await u.sc();
-  r = await buy('stained');
+  r = await buy('umbra');
   assert.strictEqual(r.status, 200);
   assert.strictEqual(r.data.card.price, 100);
   assert.strictEqual(await u.sc(), before - 100);
-  assert.ok(masks.has(r.data.card.name), 'Stained trägt eine Maske');
-  assert.strictEqual((await u.owned())[r.data.card.name].stained, 1);
+  assert.ok(masks.has(r.data.card.name), 'Umbra trägt eine Maske');
+  assert.strictEqual((await u.owned())[r.data.card.name].umbra, 1);
 
   const lg = await u.log('shop:display');
   assert.deepStrictEqual(lg.map(l => l.amount), [-2, -100]);
@@ -371,15 +371,15 @@ test('Sell Back: Gutschrift je Rarity, nur eine Karte je Pack (409), Zustand üb
   // Fehlerpfade
   r = await u.api('POST', '/boosters/sell', { id: 'nope', index: 1 });
   assert.strictEqual(r.status, 404);
-  // Einlösen: die verkaufte Karte (Stained) fehlt, alle anderen sind da
+  // Einlösen: die verkaufte Karte (Umbra) fehlt, alle anderen sind da
   const c = await u.api('POST', '/boosters/claim', { id: pid });
   assert.strictEqual(c.status, 200);
   assert.strictEqual(c.data.added.length, 8);
-  assert.ok(!c.data.added.some(x => x.rarity === 'stained'));
+  assert.ok(!c.data.added.some(x => x.rarity === 'umbra'));
   assert.strictEqual(c.data.sold.name, 'Shard of Chaos');
   const own = await u.owned();
   assert.strictEqual(total(own), 8 + 0);   // earlier loop packs were never claimed
-  assert.ok(!(own['Shard of Chaos'] && own['Shard of Chaos'].stained));
+  assert.ok(!(own['Shard of Chaos'] && own['Shard of Chaos'].umbra));
   assert.strictEqual(own['Alice'].uncommon, 1);
   // kein offenes Pack mehr: Verkauf → 404
   r = await u.api('POST', '/boosters/sell', { id: pid, index: 0 });
@@ -470,7 +470,7 @@ test('Add and rip one more: die Gutschrift aus Sell Back zählt für den Preis, 
   const list = nineCards();
   const pid = await u.seedPending('world1', list, null);
   // 2 SC reichen nicht …
-  // … aber nach dem Verkauf der Stained-Karte (+18) sind es genau 20
+  // … aber nach dem Verkauf der Umbra-Karte (+18) sind es genau 20
   const s = await u.api('POST', '/boosters/sell', { id: pid, index: 8 });
   assert.strictEqual(s.status, 200);
   assert.strictEqual(s.data.sc, 20);

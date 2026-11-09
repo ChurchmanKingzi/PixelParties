@@ -413,6 +413,8 @@ const BP_TALL = [[0, -3], [-1, -2], [0, -2], [1, -2], [-1, -1], [0, -1], [1, -1]
 const BP_SHARD = [BP_KITE, BP_TALL, BP_KITE, BP_TALL.map(([x, y]) => [y, x])];
 
 // Dauer der Effekte in Takten (30 Hz) und Verzögerung bis die Karte sichtbar wird (ms)
+// Aufdeck-Inszenierung nach RANG: Umbra ist die höchste Rarity und bekommt die große Inszenierung (Effekt, Verzögerung, Klänge), Stained Rare die kleinere.
+const BP_REVEAL = { umbra: 'stained', stained: 'umbra' };
 const BP_FX_LEN = { rare: 30, prismatic: 40, super: 44, diamond: 44, spectral: 48, umbra: 64, stained: 130 };
 const BP_FACE_DELAY = { uncommon: 0, rare: 0, prismatic: 60, super: 120, diamond: 180, spectral: 120, umbra: 330, stained: 700 };
 
@@ -1037,7 +1039,7 @@ function BoosterOpening({ pending, boosters, sc, onSc, onClaimed, onRipMore }) {
     if (opt && opt.mix) mixRef.current = opt.mix;
   }, []);
   const onEdge = useCallback((i) => {
-    const r = cards[i].rarity, mix = mixRef.current, vol = mix > 1 ? Math.min(1, 1.3 / Math.sqrt(mix)) : 1;
+    const r = BP_REVEAL[cards[i].rarity] || cards[i].rarity, mix = mixRef.current, vol = mix > 1 ? Math.min(1, 1.3 / Math.sqrt(mix)) : 1;
     (BP_FLIP_SOUNDS[r] || [['draw', { volume: 0.5 }]]).forEach(([n, o]) => bpPlay(n, { ...o, volume: (o.volume != null ? o.volume : 1) * vol }));
     if (BP_FX_LEN[r] && fx.current && geom) {
       const [sx, sy] = geom.slots[i], cw = geom.cw / S, ch = geom.ch / S;
@@ -1131,7 +1133,7 @@ function BoosterOpening({ pending, boosters, sc, onSc, onClaimed, onRipMore }) {
         <canvas ref={stageRef} className="bp-stage" width={geom.stage[0]} height={geom.stage[1]}
           style={{ left: geom.left, top: geom.top, width: stageW, height: stageH, visibility: phase === 'load' ? 'hidden' : 'visible' }} />
         {phase === 'cards' && cards.map((c, i) => (
-          <BpCard key={i} idx={i} card={c} geom={geom} open={flipped[i]} hold={Math.round((BP_FACE_DELAY[c.rarity] || 0) / BP_TAKT)} hot={hover === i}
+          <BpCard key={i} idx={i} card={c} geom={geom} open={flipped[i]} hold={Math.round((BP_FACE_DELAY[BP_REVEAL[c.rarity] || c.rarity] || 0) / BP_TAKT)} hot={hover === i}
             sold={sold === i} sellOff={sold >= 0 || selling || claiming} sellValue={sellTable[c.rarity] || 0} onSell={sell}
             onEdge={onEdge} onDone={onCardDone} onClick={(k) => { mixRef.current = 1; flip(k); }} onHover={(k, on) => setHover(on ? k : (h => (h === k ? -1 : h)))} />
         ))}

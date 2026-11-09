@@ -18,7 +18,7 @@ function seeded(seed) {
 }
 
 test('Reihenfolge, Namen und Rang', () => {
-  assert.deepStrictEqual(R.ORDER, ['common', 'uncommon', 'rare', 'prismatic', 'super', 'diamond', 'spectral', 'umbra', 'stained']);
+  assert.deepStrictEqual(R.ORDER, ['common', 'uncommon', 'rare', 'prismatic', 'super', 'diamond', 'spectral', 'stained', 'umbra']);
   assert.strictEqual(R.LABEL.super, 'Super Rare');
   assert.strictEqual(R.LABEL.stained, 'Stained Rare');
   for (const id of R.ORDER) { assert.ok(R.isRarity(id)); assert.ok(R.LABEL[id]); }
@@ -101,10 +101,10 @@ test('rollPack: gleiche Rarity behält die Reihenfolge der Würfe (stabile Sorti
 test('Masken-Fallback: Umbra/Stained nur mit Maske, die Rarity bleibt', () => {
   // Pool: nur "X" hat eine Maske. Immer Stained würfeln (rand = 0.9999 → seltenste Rarity der Stufe).
   const pool = [{ name: 'A' }, { name: 'B' }, { name: 'X' }, { name: 'C' }];
-  const rand = () => 0.99999;   // seltenste Rarity der Stufe (Stained), letzte Karte des Pools (C, ohne Maske)
+  const rand = () => 0.99999;   // seltenste Rarity der Stufe (Umbra), letzte Karte des Pools (C, ohne Maske)
   const pack = R.rollPack(pool, { rand, hasMask: n => n === 'X' });
-  assert.ok(pack.every(c => c.rarity === 'stained'), JSON.stringify(pack));
-  assert.ok(pack.every(c => c.name === 'X'), 'jede Stained-Karte muss die mit Maske sein');
+  assert.ok(pack.every(c => c.rarity === 'umbra'), JSON.stringify(pack));
+  assert.ok(pack.every(c => c.name === 'X'), 'jede Umbra-Karte muss die mit Maske sein');
   // Pool ohne jede Maske: nie Umbra/Stained
   for (let seed = 1; seed <= 200; seed++) {
     const p = R.rollPack(pool, { rand: seeded(seed), hasMask: () => false });

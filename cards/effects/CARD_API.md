@@ -1010,7 +1010,7 @@ aufsteigenden Figuren-Silhouetten.
 
 ## ★ RARITY-KARTEN: EIN ANSCHLUSS, `<CardFoil card={…} rarity={…} />`
 
-Jede Karteninstanz hat eine **Rarity** (ID aus `rarities.js`: common, uncommon, rare, prismatic, super, diamond, spectral, umbra, stained;
+Jede Karteninstanz hat eine **Rarity** (ID aus `rarities.js`: common, uncommon, rare, prismatic, super, diamond, spectral, stained, umbra (aufsteigend, Umbra ist die höchste);
 Feld `rarity` der Karte oder Prop, Standard Common). Der alte Foil (`card.foil`, FoilOverlay, CSS-Schimmer) ist ersetzt.
 
 * **Bild:** `ppRarityUrl(url, rarity)` hängt `?rar=<id>` an die Kartenbild-URL; der Karten-Shim rendert dann die Basiskarte der Stufe

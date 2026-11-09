@@ -17,7 +17,7 @@
 })(typeof self !== 'undefined' ? self : this, function () {
 
   /** Aufsteigend: je weiter hinten, desto seltener. */
-  const ORDER = ['common', 'uncommon', 'rare', 'prismatic', 'super', 'diamond', 'spectral', 'umbra', 'stained'];
+  const ORDER = ['common', 'uncommon', 'rare', 'prismatic', 'super', 'diamond', 'spectral', 'stained', 'umbra'];
   const LABEL = {
     common: 'Common', uncommon: 'Uncommon', rare: 'Rare', prismatic: 'Prismatic', super: 'Super Rare',
     diamond: 'Diamond', spectral: 'Spectral', umbra: 'Umbra', stained: 'Stained Rare',
@@ -37,9 +37,9 @@
 
   // ── Gewichte (Prozent, jede Zeile = 100) ──────────────────────
   const PACK_STAGES = [
-    { uncommon: 60, rare: 30, prismatic: 5, super: 3, diamond: 1, spectral: 0.5, umbra: 0.35, stained: 0.15 },   // Karten 1–3
-    { uncommon: 50, rare: 30, prismatic: 10, super: 5, diamond: 3, spectral: 1, umbra: 0.65, stained: 0.35 },    // Karten 4–6
-    { rare: 50, prismatic: 25, super: 10, diamond: 6, spectral: 4, umbra: 3, stained: 2 },                       // Karten 7–9
+    { uncommon: 60, rare: 30, prismatic: 5, super: 3, diamond: 1, spectral: 0.5, stained: 0.35, umbra: 0.15 },   // Karten 1–3
+    { uncommon: 50, rare: 30, prismatic: 10, super: 5, diamond: 3, spectral: 1, stained: 0.65, umbra: 0.35 },    // Karten 4–6
+    { rare: 50, prismatic: 25, super: 10, diamond: 6, spectral: 4, stained: 3, umbra: 2 },                       // Karten 7–9
   ];
   const DRAFT_TABLE = { common: 90, uncommon: 4, rare: 2, prismatic: 1, super: 0.75, diamond: 0.75, spectral: 0.5, umbra: 0.5, stained: 0.5 };
   const PACK_SIZE = 9;
@@ -119,9 +119,9 @@
 
   // ── Rückkauf (Sell Back) und Auslage (Showcase) ──────────────
   /** Sell Back: Gutschrift in SC für die EINE Karte, die man aus einem frisch geöffneten Pack zurückgeben darf. */
-  const SELLBACK = { uncommon: 1, rare: 2, prismatic: 4, super: 6, diamond: 8, spectral: 10, umbra: 14, stained: 18 };
+  const SELLBACK = { uncommon: 1, rare: 2, prismatic: 4, super: 6, diamond: 8, spectral: 10, stained: 14, umbra: 18 };
   /** Auslage: Preis in SC je Rarity. Die Auslage hat genau einen Platz je Rarity in dieser Tabelle (Common gibt es nicht zu kaufen). */
-  const DISPLAY_PRICE = { uncommon: 2, rare: 4, prismatic: 8, super: 20, diamond: 30, spectral: 40, umbra: 70, stained: 100 };
+  const DISPLAY_PRICE = { uncommon: 2, rare: 4, prismatic: 8, super: 20, diamond: 30, spectral: 40, stained: 70, umbra: 100 };
   /** Plätze der Auslage in Rarity-Reihenfolge (aus der Preistabelle, nicht fest verdrahtet). */
   const DISPLAY_RARITIES = ORDER.filter(id => DISPLAY_PRICE[id] > 0);
   const HOUR_MS = 3600 * 1000;
