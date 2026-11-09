@@ -11,6 +11,138 @@ const { ALL_CARDS, CARDS_BY_NAME, AVAILABLE_CARDS, AVAILABLE_MAP, CARD_TYPES, SU
 let _persistedUnsaved = {};
 let _persistedSectionHist = {};
 
+// ═══════════════════════════════════════════
+//  RARITIES — je KOPIE im Deck (Spec „Rarity-System", Client D)
+//
+//  Zustand: `deck.rarities = { main:[…], potion:[…], side:[…], heroes:[{hero,ability1,ability2} ×3] }`, parallel zu
+//  mainDeck/potionDeck/sideDeck/heroes (gleiche Laenge/Reihenfolge) — genau die Form, die GET/PUT /api/decks tragen.
+//  Besitz: `collection[Karte][rarity] = n` (GET /api/collection, nur >0); Common ist unbegrenzt.
+//  Regel: ein Deck im Editor ist IMMER besitzkonsistent. `normalizeDeckRarities` stuft zu hohe Rarities herab (hoechste
+//  noch freie Rarity darunter, sonst Common); mit `autoFill` bekommen Eintraege ohne Wert (neu hinzugefuegt) die
+//  hoechste freigeschaltete freie Rarity.
+// ═══════════════════════════════════════════
+const RAR_FALLBACK = ['common', 'uncommon', 'rare', 'prismatic', 'super', 'diamond', 'spectral', 'umbra', 'stained'];
+const RAR_FALLBACK_LABEL = { common: 'Common', uncommon: 'Uncommon', rare: 'Rare', prismatic: 'Prismatic', super: 'Super Rare', diamond: 'Diamond', spectral: 'Spectral', umbra: 'Umbra', stained: 'Stained Rare' };
+const rarOrder = () => (window.PpRarities && window.PpRarities.ORDER) || RAR_FALLBACK;
+const rarLabel = (r) => ((window.PpRarities && window.PpRarities.LABEL) || RAR_FALLBACK_LABEL)[r] || r;
+const HERO_FIELDS = ['hero', 'ability1', 'ability2'];
+const rarOwnedCount = (coll, name, r) => {
+  if (r === 'common') return Infinity;
+  const e = coll && coll[name];
+  return (e && Number(e[r])) || 0;
+};
+
+function normalizeDeckRarities(deck, coll, autoFill) {
+  if (!deck) return deck;
+  const ORDER = rarOrder();
+  const cube = isCubeDeck(deck);
+  // Gedraftete Decks tragen TEMPORAERE Draft-Rarities (nicht in der Sammlung; der Server prueft sie nicht gegen den Besitz) → unveraendert lassen.
+  const temp = deck.mode === 'drafted';
+  const inR = deck.rarities || {};
+  const heroesIn = Array.isArray(deck.heroes) ? deck.heroes : [];
+  const nHeroes = Math.max(3, heroesIn.length);
+  const used = Object.create(null);
+  const valid = (r) => (typeof r === 'string' && ORDER.indexOf(r) > 0) ? r : (r === 'common' ? 'common' : null);
+  // Eintraege: { name, want } je Kopie, in fester Zonenfolge (Helden, Main, Potion, Side).
+  const out = { main: [], potion: [], side: [], heroes: [] };
+  const pending = [];
+  const claim = (name, want) => {
+    if (cube || !name || want === 'common') return 'common';
+    if (temp) return want;
+    const u = used[name] || (used[name] = {});
+    for (let i = ORDER.indexOf(want); i > 0; i--) {
+      const r = ORDER[i];
+      if ((u[r] || 0) < rarOwnedCount(coll, name, r)) { u[r] = (u[r] || 0) + 1; return r; }
+    }
+    return 'common';
+  };
+  const slot = (arr, idx, name, want) => {
+    if (!name) { arr[idx] = 'common'; return; }
+    const v = valid(want);
+    if (v) arr[idx] = claim(name, v);
+    else if (autoFill && !temp) { arr[idx] = null; pending.push(() => { arr[idx] = claim(name, ORDER[ORDER.length - 1]); }); }
+    else arr[idx] = 'common';
+  };
+  for (let i = 0; i < nHeroes; i++) {
+    const h = heroesIn[i] || {};
+    const hr = (inR.heroes && inR.heroes[i]) || {};
+    const o = { hero: 'common', ability1: 'common', ability2: 'common' };
+    for (const f of HERO_FIELDS) slot(o, f, h[f], hr[f]);
+    out.heroes.push(o);
+  }
+  const zone = (sec, names) => {
+    const arr = [];
+    const inn = inR[sec] || [];
+    (names || []).forEach((n, i) => slot(arr, i, n, inn[i]));
+    out[sec] = arr;
+  };
+  zone('main', deck.mainDeck); zone('potion', deck.potionDeck); zone('side', deck.sideDeck);
+  pending.forEach(f => f());
+  if (JSON.stringify(out) === JSON.stringify(inR)) return deck;
+  return { ...deck, rarities: out };
+}
+
+// Beim Umbau einer Zone die Rarities der unveraenderten Kopien mitnehmen: je Kartenname der Reihe nach (stabil), neue Eintraege = null.
+function alignRarList(oldN, oldR, newN) {
+  const pool = Object.create(null);
+  (oldN || []).forEach((n, i) => { (pool[n] || (pool[n] = [])).push((oldR && oldR[i]) || null); });
+  return (newN || []).map(n => { const p = pool[n]; return p && p.length ? p.shift() : null; });
+}
+function alignHeroRars(oldH, oldR, newH) {
+  return (newH || []).map((h, i) => {
+    const o = (oldH && oldH[i]) || {}, orr = (oldR && oldR[i]) || {}, r = {};
+    for (const f of HERO_FIELDS) r[f] = (h && h[f] && o[f] === h[f]) ? (orr[f] || null) : null;
+    return r;
+  });
+}
+// Anzahl belegter Kopien je (Karte, Rarity) ueber alle Zonen des Decks.
+function rarUsedCounts(deck) {
+  const used = Object.create(null);
+  const add = (n, r) => { if (!n) return; const u = used[n] || (used[n] = {}); u[r] = (u[r] || 0) + 1; };
+  const R = deck.rarities || {};
+  (deck.mainDeck || []).forEach((n, i) => add(n, (R.main && R.main[i]) || 'common'));
+  (deck.potionDeck || []).forEach((n, i) => add(n, (R.potion && R.potion[i]) || 'common'));
+  (deck.sideDeck || []).forEach((n, i) => add(n, (R.side && R.side[i]) || 'common'));
+  (deck.heroes || []).forEach((h, i) => { for (const f of HERO_FIELDS) add(h && h[f], (R.heroes && R.heroes[i] && R.heroes[i][f]) || 'common'); });
+  return used;
+}
+// Karten-Objekt mit gesetztem `rarity` (gecacht, damit CardMini stabile Objekte bekommt). Common = die nackte Karte.
+const _rarCardCache = new Map();
+function cardWithRarity(name, rarity) {
+  const base = CARDS_BY_NAME[name];
+  if (!base || !rarity || rarity === 'common') return base;
+  const k = name + '|' + rarity;
+  const hit = _rarCardCache.get(k);
+  if (hit && hit.base === base) return hit.obj;
+  const obj = { ...base, rarity };
+  _rarCardCache.set(k, { base, obj });
+  return obj;
+}
+
+// Eine Auswahlkarte im Rarity-Fenster: Kartenbild + voll animierte Rarity-Ebene (PpRarityFx.attach, animated:true).
+function RarityOptionCard({ name, rarity, skins, selected, disabled, countText, onPick }) {
+  const hostRef = useRef(null);
+  useEffect(() => {
+    const fx = window.PpRarityFx;
+    if (!fx || !hostRef.current || rarity === 'common') return undefined;
+    let h = null;
+    try { h = fx.attach(hostRef.current, { card: CARDS_BY_NAME[name], rarity, animated: true }); } catch (e) { h = null; }
+    return () => { try { h && h.destroy && h.destroy(); } catch (e) {} };
+  }, [name, rarity]);
+  return (
+    <div className={'skin-gallery-item' + (selected ? ' skin-selected' : '')} data-rarity-option={rarity}
+      style={disabled ? { opacity: .5, cursor: 'default' } : undefined}
+      onClick={() => { if (!disabled) onPick(rarity); }}>
+      <div ref={hostRef} style={{ position: 'relative' }}>
+        <img src={cardImageUrl(name, skins)} draggable={false} />
+      </div>
+      <div className="skin-gallery-label" style={{ color: selected ? 'var(--text)' : undefined }}>
+        {rarLabel(rarity)} <span data-rarity-count={rarity}>{countText}</span>
+      </div>
+    </div>
+  );
+}
+
 function CtxMenu({ x, y, items, onClose }) {
   useEffect(() => {
     const h = (e) => { if (!e.target.closest('.ctx-menu')) onClose(); };
@@ -112,6 +244,10 @@ function DeckBuilder() {
   }, [setBgmMode]);
 
   const [decks, setDecks] = useState([]);
+  // Sammlung (GET /api/collection): { Kartenname: { uncommon: n, rare: n, … } } — nur Besitz > 0, Common ist implizit unbegrenzt.
+  const [collection, setCollection] = useState(null);
+  // Rarity-Fenster (Linksklick auf eine Deckkarte): { name, sec, idx, field, items }
+  const [rarPick, setRarPick] = useState(null);
   const [activeIdx, setActiveIdx] = useState(0);
   const [unsaved, setUnsaved] = useState(_persistedUnsaved);
 
@@ -176,6 +312,8 @@ function DeckBuilder() {
       // Die Beispiel-Decks haengen nicht von den eigenen ab: gleichzeitig anfragen statt hintereinander (ein Roundtrip weniger,
       // bevor das Kartengitter erscheint). Ausgewertet wird weiter erst nach den eigenen Decks.
       const sampleReq = api('/sample-decks/owned').catch(() => null);
+      // Die Sammlung gehoert zum Deck-Zustand: erst mit ihr wird ein Deck besitzkonsistent angezeigt (Common-Rueckfall, falls der Abruf scheitert).
+      const collReq = api('/collection').then(d => (d && d.rarities) || {}).catch(() => ({}));
       try {
         const data = await api('/decks');
         if (data.decks && data.decks.length > 0) {
@@ -197,6 +335,7 @@ function DeckBuilder() {
         }
       } catch (e) { notify(e.message, 'error'); }
       try { const sd = await sampleReq; if (sd) setSampleDecks(sd.decks || []); } catch (e) { /* ignore */ }
+      try { setCollection(await collReq); } catch (e) { setCollection({}); }
       setLoaded(true);
     })();
   }, []);
@@ -223,6 +362,7 @@ function DeckBuilder() {
       if (s.deckDropdownOpen) { e.preventDefault(); e.stopImmediatePropagation(); setDeckDropdownOpen(false); return; }
       if (s.renaming) { e.preventDefault(); e.stopImmediatePropagation(); setRenaming(false); setRenameVal(''); return; }
       if (s.showLeaveConfirm) { e.preventDefault(); e.stopImmediatePropagation(); setShowLeaveConfirm(false); setScreen('menu'); return; }
+      if (s.rarPick) { e.preventDefault(); e.stopImmediatePropagation(); setRarPick(null); return; }
       if (s.skinGallery) { e.preventDefault(); e.stopImmediatePropagation(); setSkinGallery(null); return; }
       if (s.ctxMenu) { e.preventDefault(); e.stopImmediatePropagation(); setCtxMenu(null); return; }
       if (s.hasUnsaved && !s.isSampleMode) { e.preventDefault(); e.stopImmediatePropagation(); setShowLeaveConfirm(true); return; }
@@ -237,28 +377,55 @@ function DeckBuilder() {
     const base = isSampleMode ? sampleDecks[sampleActive] : decks[activeIdx];
     if (!base) return null;
     const overlay = unsaved[base.id];
-    return overlay ? { ...base, ...overlay } : base;
-  }, [decks, activeIdx, unsaved, sampleDecks, sampleActive, isSampleMode]);
+    const merged = overlay
+      ? { ...base, ...overlay, rarities: { ...(base.rarities || {}), ...(overlay.rarities || {}) } }
+      : base;
+    // Jede Quelle (Server, Beispiel-/Strukturdeck, Import, Kopie, Undo) laeuft hier gegen den Besitz: zu hohe Rarities werden herabgestuft,
+    // fehlende `rarities` bedeuten Common. Ein nicht besessenes Deck erreicht den Editor nie.
+    return normalizeDeckRarities(merged, collection || {}, false);
+  }, [decks, activeIdx, unsaved, sampleDecks, sampleActive, isSampleMode, collection]);
 
   // Section key mapping
   const SK = { main: 'mainDeck', heroes: 'heroes', potion: 'potionDeck', side: 'sideDeck' };
 
-  // Update one or more sections with per-section history
-  const updateSections = (changes) => {
+  // Update one or more sections with per-section history.
+  // `rarChanges` ({ main:[…], potion:[…], side:[…], heroes:[{…}] }) traegt die Rarities je Kopie mit, wo die Aktion sie genau kennt
+  // (Entfernen/Umsortieren/Verschieben/Tauschen). Ohne Angabe werden sie aus dem alten Stand abgeleitet (gleicher Name, gleiche Reihenfolge);
+  // neue Kopien (null) bekommen automatisch die hoechste freigeschaltete freie Rarity. Danach wird alles gegen den Besitz normalisiert.
+  const SEC_NAMES = { main: 'mainDeck', heroes: 'heroes', potion: 'potionDeck', side: 'sideDeck' };
+  const updateSections = (changes, rarChanges) => {
     const base = isSampleMode ? sampleDecks[sampleActive] : decks[activeIdx];
     const deckId = base?.id;
     if (!deckId) return;
-    for (const [sec, val] of Object.entries(changes)) {
+    const cd = currentDeck;
+    const oldR = (cd && cd.rarities) || {};
+    const secs = Array.from(new Set([...Object.keys(changes), ...Object.keys(rarChanges || {})]));
+    const nextDeck = { ...cd, rarities: { ...oldR } };
+    for (const sec of secs) {
+      const nm = sec in changes ? changes[sec] : cd[SEC_NAMES[sec]];
+      nextDeck[SEC_NAMES[sec]] = nm;
+      if (rarChanges && rarChanges[sec]) nextDeck.rarities[sec] = rarChanges[sec];
+      else if (sec === 'heroes') nextDeck.rarities.heroes = alignHeroRars(cd.heroes, oldR.heroes, nm);
+      else nextDeck.rarities[sec] = alignRarList(cd[SEC_NAMES[sec]], oldR[sec], nm);
+    }
+    const norm = normalizeDeckRarities(nextDeck, collection || {}, true);
+    const nr = norm.rarities;
+    const rarOverlay = {};
+    for (const sec of ['main', 'potion', 'side', 'heroes']) {
+      if (secs.includes(sec) || JSON.stringify(nr[sec]) !== JSON.stringify(oldR[sec])) rarOverlay[sec] = nr[sec];
+    }
+    for (const sec of secs) {
       const h = getSH(deckId, sec);
       const truncated = h.stack.slice(0, h.idx + 1);
-      truncated.push(val);
+      truncated.push({ n: nextDeck[SEC_NAMES[sec]], r: nr[sec] });
       if (truncated.length > 51) truncated.shift();
       h.idx = truncated.length - 1;
       h.stack = truncated;
     }
     setUnsaved(prev => {
       const overlay = { ...(prev[deckId] || {}) };
-      for (const [sec, val] of Object.entries(changes)) overlay[SK[sec]] = val;
+      for (const sec of secs) overlay[SK[sec]] = nextDeck[SEC_NAMES[sec]];
+      overlay.rarities = { ...(overlay.rarities || {}), ...rarOverlay };
       return { ...prev, [deckId]: overlay };
     });
     setHistoryTick(t => t + 1);
@@ -282,8 +449,13 @@ function DeckBuilder() {
     const val = h.stack[h.idx];
     setUnsaved(prev => {
       const overlay = { ...(prev[deckId] || {}) };
-      if (val === null) delete overlay[SK[sec]];
-      else overlay[SK[sec]] = val;
+      if (val === null) {
+        delete overlay[SK[sec]];
+        if (overlay.rarities) { const rr = { ...overlay.rarities }; delete rr[sec]; if (Object.keys(rr).length) overlay.rarities = rr; else delete overlay.rarities; }
+      } else {
+        overlay[SK[sec]] = val.n;
+        overlay.rarities = { ...(overlay.rarities || {}), [sec]: val.r };
+      }
       if (Object.keys(overlay).length === 0) { const n = { ...prev }; delete n[deckId]; return n; }
       return { ...prev, [deckId]: overlay };
     });
@@ -293,7 +465,12 @@ function DeckBuilder() {
     const deckId = currentDeck?.id; if (!deckId) return;
     const h = getSH(deckId, sec); if (h.idx >= h.stack.length - 1) return;
     h.idx++;
-    setUnsaved(prev => ({ ...prev, [deckId]: { ...(prev[deckId] || {}), [SK[sec]]: h.stack[h.idx] } }));
+    const val = h.stack[h.idx];
+    setUnsaved(prev => {
+      const overlay = { ...(prev[deckId] || {}), [SK[sec]]: val.n };
+      overlay.rarities = { ...(overlay.rarities || {}), [sec]: val.r };
+      return { ...prev, [deckId]: overlay };
+    });
     setHistoryTick(t => t + 1);
   };
   const canUndoSec = (sec) => { const id = currentDeck?.id; const h = id && shRef.current[id]?.[sec]; return h && h.idx > 0; };
@@ -305,7 +482,7 @@ function DeckBuilder() {
     try {
       const data = await api('/decks/' + currentDeck.id, {
         method: 'PUT',
-        body: JSON.stringify({ name: currentDeck.name, mainDeck: currentDeck.mainDeck, heroes: currentDeck.heroes, potionDeck: currentDeck.potionDeck, sideDeck: currentDeck.sideDeck, isDefault: currentDeck.isDefault, coverCard: currentDeck.coverCard || '', skins: currentDeck.skins || {} })
+        body: JSON.stringify({ name: currentDeck.name, mainDeck: currentDeck.mainDeck, heroes: currentDeck.heroes, potionDeck: currentDeck.potionDeck, sideDeck: currentDeck.sideDeck, rarities: currentDeck.rarities, isDefault: currentDeck.isDefault, coverCard: currentDeck.coverCard || '', skins: currentDeck.skins || {} })
       });
       const newDecks = [...decks]; newDecks[activeIdx] = data.deck;
       const id = currentDeck.id;
@@ -325,7 +502,7 @@ function DeckBuilder() {
         if (isSampleMode) {
           // Sample deck rename → create a new real deck with this name and content
           const created = await api('/decks', { method: 'POST', body: JSON.stringify({ name: newName }) });
-          await api('/decks/' + created.deck.id, { method: 'PUT', body: JSON.stringify({ name: newName, mainDeck: currentDeck.mainDeck, heroes: currentDeck.heroes, potionDeck: currentDeck.potionDeck, sideDeck: currentDeck.sideDeck, isDefault: false }) });
+          await api('/decks/' + created.deck.id, { method: 'PUT', body: JSON.stringify({ name: newName, mainDeck: currentDeck.mainDeck, heroes: currentDeck.heroes, potionDeck: currentDeck.potionDeck, sideDeck: currentDeck.sideDeck, rarities: currentDeck.rarities, isDefault: false }) });
           const final = await api('/decks/' + created.deck.id);
           const sampleId = currentDeck.id;
           setUnsaved(prev => { const n = { ...prev }; delete n[sampleId]; return n; });
@@ -335,7 +512,7 @@ function DeckBuilder() {
         } else {
           const data = await api('/decks/' + currentDeck.id, {
             method: 'PUT',
-            body: JSON.stringify({ name: newName, mainDeck: currentDeck.mainDeck, heroes: currentDeck.heroes, potionDeck: currentDeck.potionDeck, sideDeck: currentDeck.sideDeck, isDefault: currentDeck.isDefault, coverCard: currentDeck.coverCard || '', skins: currentDeck.skins || {} })
+            body: JSON.stringify({ name: newName, mainDeck: currentDeck.mainDeck, heroes: currentDeck.heroes, potionDeck: currentDeck.potionDeck, sideDeck: currentDeck.sideDeck, rarities: currentDeck.rarities, isDefault: currentDeck.isDefault, coverCard: currentDeck.coverCard || '', skins: currentDeck.skins || {} })
           });
           const newDecks = [...decks]; newDecks[activeIdx] = data.deck;
           const id = currentDeck.id;
@@ -357,14 +534,14 @@ function DeckBuilder() {
       if (isSampleMode) {
         // Sample deck: create a brand new DB deck with the sample's content
         const created = await api('/decks', { method: 'POST', body: JSON.stringify({ name: newName }) });
-        await api('/decks/' + created.deck.id, { method: 'PUT', body: JSON.stringify({ name: newName, mainDeck: currentDeck.mainDeck, heroes: currentDeck.heroes, potionDeck: currentDeck.potionDeck, sideDeck: currentDeck.sideDeck, isDefault: false }) });
+        await api('/decks/' + created.deck.id, { method: 'PUT', body: JSON.stringify({ name: newName, mainDeck: currentDeck.mainDeck, heroes: currentDeck.heroes, potionDeck: currentDeck.potionDeck, sideDeck: currentDeck.sideDeck, rarities: currentDeck.rarities, isDefault: false }) });
         const final = await api('/decks/' + created.deck.id);
         const sampleId = currentDeck.id;
         setUnsaved(prev => { const n = { ...prev }; delete n[sampleId]; return n; });
         delete shRef.current[sampleId];
         const newDecks = [...decks, final.deck]; setDecks(newDecks); setActiveIdx(newDecks.length - 1); setSampleActive(-1);
       } else {
-        await api('/decks/' + currentDeck.id, { method: 'PUT', body: JSON.stringify({ name: currentDeck.name, mainDeck: currentDeck.mainDeck, heroes: currentDeck.heroes, potionDeck: currentDeck.potionDeck, sideDeck: currentDeck.sideDeck, isDefault: currentDeck.isDefault, coverCard: currentDeck.coverCard || '', skins: currentDeck.skins || {} }) });
+        await api('/decks/' + currentDeck.id, { method: 'PUT', body: JSON.stringify({ name: currentDeck.name, mainDeck: currentDeck.mainDeck, heroes: currentDeck.heroes, potionDeck: currentDeck.potionDeck, sideDeck: currentDeck.sideDeck, rarities: currentDeck.rarities, isDefault: currentDeck.isDefault, coverCard: currentDeck.coverCard || '', skins: currentDeck.skins || {} }) });
         const id = currentDeck.id;
         setUnsaved(prev => { const n = { ...prev }; delete n[id]; return n; });
         delete shRef.current[id];
@@ -400,7 +577,7 @@ function DeckBuilder() {
         deckId = created.deck.id;
         const final = await api('/decks/' + deckId, { method: 'PUT', body: JSON.stringify({
           name: currentDeck.name, mainDeck: currentDeck.mainDeck, heroes: currentDeck.heroes,
-          potionDeck: currentDeck.potionDeck, sideDeck: currentDeck.sideDeck || [], isDefault: true,
+          potionDeck: currentDeck.potionDeck, sideDeck: currentDeck.sideDeck || [], rarities: currentDeck.rarities, isDefault: true,
         }) });
         const sampleId = currentDeck.id;
         setUnsaved(prev => { const n = { ...prev }; delete n[sampleId]; return n; });
@@ -419,6 +596,17 @@ function DeckBuilder() {
   };
 
   // ——— Card operations ———
+  // Nicolas verlaesst das Team: Potions wandern aus dem Main ins Potion Deck (bis 15) — samt ihrer Rarity; der Rest bleibt in Reihenfolge.
+  const nicolasAufraeumen = (mainN, mainR, potN, potR, dropOverflow) => {
+    const main = [], mainRo = [], potion = [...(potN || [])], potionR = [...(potR || [])];
+    (mainN || []).forEach((cn, i) => {
+      const r = (mainR && mainR[i]) || null;
+      if (CARDS_BY_NAME[cn]?.cardType === 'Potion') {
+        if (potion.length < 15) { potion.push(cn); potionR.push(r); }
+      } else { main.push(cn); mainRo.push(r); }
+    });
+    return { main, mainR: mainRo, potion, potionR };
+  };
   const addCardTo = useCallback((cardName, section) => {
     if (!currentDeck) return false;
     const card = CARDS_BY_NAME[cardName];
@@ -490,19 +678,13 @@ function DeckBuilder() {
     if (!canAddCard(probeDeck, cardName, 'hero')) return false;
     const replacedHero = heroes[slot]?.hero;
     heroes[slot] = { hero: cardName, ability1: card.startingAbility1 || null, ability2: card.startingAbility2 || null };
+    // Rarities der Helden-Zone: der neue Held samt Starting Abilities bekommt je die hoechste freie Rarity (null = automatisch).
+    const heroRars = (currentDeck.rarities?.heroes || []).map(r => ({ ...r }));
+    heroRars[slot] = { hero: null, ability1: null, ability2: null };
     // Nicolas removal cleanup: if replacing Nicolas with another hero, move potions out of main deck
     if (replacedHero === 'Nicolas, the Hidden Alchemist' && cardName !== 'Nicolas, the Hidden Alchemist') {
-      const mainDeck = [...(currentDeck.mainDeck || [])];
-      const potionDeck = [...(currentDeck.potionDeck || [])];
-      const cleanedMain = [];
-      for (const cn of mainDeck) {
-        if (CARDS_BY_NAME[cn]?.cardType === 'Potion') {
-          if (potionDeck.length < 15) potionDeck.push(cn);
-        } else {
-          cleanedMain.push(cn);
-        }
-      }
-      updateSections({ heroes, main: cleanedMain, potion: potionDeck });
+      const m = nicolasAufraeumen(currentDeck.mainDeck, currentDeck.rarities?.main, currentDeck.potionDeck, currentDeck.rarities?.potion, false);
+      updateSections({ heroes, main: m.main, potion: m.potion }, { heroes: heroRars, main: m.mainR, potion: m.potionR });
     } else {
       // Wird ein Held ERSETZT, kann damit auch eine Deckbauklausel
       // wegfallen (Cecilia). Gleiche Aufraeumung wie beim Entfernen.
@@ -512,7 +694,7 @@ function DeckBuilder() {
       updateSections({
         heroes,
         main: getrimmt.mainDeck, potion: getrimmt.potionDeck, side: getrimmt.sideDeck,
-      });
+      }, { heroes: heroRars });
     }
     if (window.playSFX) window.playSFX('draw');
     return true;
@@ -522,32 +704,32 @@ function DeckBuilder() {
     if (!currentDeck) return;
     if (window.playSFX) window.playSFX('discard');
     const removeOne = (arr, idx) => { const n = [...arr]; if (idx != null) n.splice(idx, 1); else { const i = n.indexOf(cardName); if (i >= 0) n.splice(i, 1); } return n; };
-    // "The Sacred Jewel" clause: removing this card may drop the deck's
-    // Sacred Jewel count below the 4-copy threshold that grants every
-    // Artifact a 5-copy allowance. When that happens, any Artifact
-    // currently at 5 copies must be auto-trimmed back to 4. We assemble
-    // the prospective post-remove deck, then run trimOverLimitCopies.
-    // Frueher stand hier ein Namensvergleich auf "The Sacred Jewel".
-    // Seit Cecilia (Attacks/Spells/Artifacts auf 5, solange sie im Team
-    // steht) gibt es eine zweite solche Klausel — und es werden weitere
-    // kommen. `trimOverLimitCopies` ist bei einem regelkonformen Deck
-    // ohnehin wirkungslos, der Aufruf kann also bedingungslos laufen und
-    // deckt jede kuenftige Klausel automatisch ab. Cube-Decks bleiben
-    // aussen vor: dort gilt keine Kopiengrenze, ein Trim wuerde die
-    // Liste zusammenstreichen.
+    // Dieselbe Kopie (gleicher Index) fliegt aus der Rarity-Liste — nicht irgendeine mit demselben Namen.
+    const removeIdx = (arr, idx) => (idx != null ? idx : arr.indexOf(cardName));
+    const dropAt = (arr, i) => { const n = [...(arr || [])]; if (i >= 0 && i < n.length) n.splice(i, 1); return n; };
+    const rarsOf = (sec) => currentDeck.rarities?.[sec] || [];
+    // Auto-Trim nach dem Entfernen: „The Sacred Jewel" (4-Kopien-Schwelle fuer 5 Artifacts), Cecilia, Sacred Mirror usw. —
+    // `trimOverLimitCopies` ist bei einem regelkonformen Deck wirkungslos; Cube-Decks bleiben aussen vor (keine Kopiengrenze).
     const maybeAutoTrim = (draftDeck) => (
       isCubeDeck(draftDeck) ? draftDeck : trimOverLimitCopies(draftDeck)
     );
-    if (section === 'main') {
-      const next = maybeAutoTrim({ ...currentDeck, mainDeck: removeOne(currentDeck.mainDeck || [], index) });
-      updateSections({ main: next.mainDeck, potion: next.potionDeck, side: next.sideDeck });
-    } else if (section === 'potion') {
-      const next = maybeAutoTrim({ ...currentDeck, potionDeck: removeOne(currentDeck.potionDeck || [], index) });
-      updateSections({ main: next.mainDeck, potion: next.potionDeck, side: next.sideDeck });
-    } else if (section === 'side') {
-      const next = maybeAutoTrim({ ...currentDeck, sideDeck: removeOne(currentDeck.sideDeck || [], index) });
-      updateSections({ main: next.mainDeck, potion: next.potionDeck, side: next.sideDeck });
-    } else if (section === 'hero') {
+    // Entfernen + Auto-Trim: die Rarities der uebrigen Kopien werden aus dem Zwischenstand (nach dem Entfernen) abgeleitet.
+    const removeAndTrim = (sec, key) => {
+      const arr = currentDeck[key] || [];
+      const i = removeIdx(arr, index);
+      const mid = { ...currentDeck, [key]: removeOne(arr, index) };
+      const midR = { ...currentDeck.rarities, [sec]: dropAt(rarsOf(sec), i) };
+      const next = maybeAutoTrim(mid);
+      updateSections({ main: next.mainDeck, potion: next.potionDeck, side: next.sideDeck }, {
+        main: alignRarList(mid.mainDeck, midR.main, next.mainDeck),
+        potion: alignRarList(mid.potionDeck, midR.potion, next.potionDeck),
+        side: alignRarList(mid.sideDeck, midR.side, next.sideDeck),
+      });
+    };
+    if (section === 'main') removeAndTrim('main', 'mainDeck');
+    else if (section === 'potion') removeAndTrim('potion', 'potionDeck');
+    else if (section === 'side') removeAndTrim('side', 'sideDeck');
+    else if (section === 'hero') {
       const heroes = [...(currentDeck.heroes || [])];
       // Prefer the explicit slot index when provided so multi-team
       // duplicates (Peter Röll) can be removed individually instead of
@@ -556,22 +738,13 @@ function DeckBuilder() {
         ? index
         : heroes.findIndex(h => h && h.hero === cardName);
       if (slot >= 0) heroes[slot] = { hero: null, ability1: null, ability2: null };
+      const heroRars = (currentDeck.rarities?.heroes || []).map(r => ({ ...r }));
+      if (slot >= 0) heroRars[slot] = { hero: 'common', ability1: 'common', ability2: 'common' };
       // Nicolas removal: move main deck Potions back to potion deck
       if (cardName === 'Nicolas, the Hidden Alchemist') {
-        const mainDeck = [...(currentDeck.mainDeck || [])];
-        const potionDeck = [...(currentDeck.potionDeck || [])];
-        const potionsInMain = [];
-        const cleanedMain = [];
-        for (const cn of mainDeck) {
-          if (CARDS_BY_NAME[cn]?.cardType === 'Potion') potionsInMain.push(cn);
-          else cleanedMain.push(cn);
-        }
-        // Move as many as possible to potion deck (cap 15)
-        for (const pn of potionsInMain) {
-          if (potionDeck.length < 15) potionDeck.push(pn);
-          // else: overflow — removed from deck entirely
-        }
-        updateSections({ heroes, main: cleanedMain, potion: potionDeck });
+        // Move as many as possible to potion deck (cap 15); overflow is removed from the deck entirely.
+        const m = nicolasAufraeumen(currentDeck.mainDeck, rarsOf('main'), currentDeck.potionDeck, rarsOf('potion'), true);
+        updateSections({ heroes, main: m.main, potion: m.potion }, { heroes: heroRars, main: m.mainR, potion: m.potionR });
       } else {
         // Verlaesst Cecilia das Team, faellt die 6-Kopien-Erlaubnis weg —
         // dieselbe Aufraeumung wie beim Sacred Jewel, nur ueber den
@@ -581,7 +754,7 @@ function DeckBuilder() {
         updateSections({
           heroes,
           main: getrimmt.mainDeck, potion: getrimmt.potionDeck, side: getrimmt.sideDeck,
-        });
+        }, { heroes: heroRars });
       }
     }
   }, [currentDeck, unsaved, decks, activeIdx]);
@@ -595,7 +768,11 @@ function DeckBuilder() {
     const [card] = arr.splice(fromIdx, 1);
     const adjusted = toIdx > fromIdx ? toIdx - 1 : toIdx;
     arr.splice(adjusted, 0, card);
-    updateSections({ [section]: arr });
+    // Die Rarity wandert mit ihrer Kopie.
+    const rars = [...(currentDeck.rarities?.[section] || [])];
+    const [rar] = rars.splice(fromIdx, 1);
+    rars.splice(adjusted, 0, rar);
+    updateSections({ [section]: arr }, { [section]: rars });
   }, [currentDeck, unsaved, decks, activeIdx]);
 
   // Hero swapping
@@ -603,7 +780,9 @@ function DeckBuilder() {
     if (!currentDeck) return;
     const heroes = [...(currentDeck.heroes || [])].map(h => ({ ...h }));
     [heroes[fromIdx], heroes[toIdx]] = [heroes[toIdx], heroes[fromIdx]];
-    updateSections({ heroes });
+    const hr = (currentDeck.rarities?.heroes || []).map(r => ({ ...r }));
+    if (hr[fromIdx] && hr[toIdx]) [hr[fromIdx], hr[toIdx]] = [hr[toIdx], hr[fromIdx]];
+    updateSections({ heroes }, { heroes: hr });
   }, [currentDeck, unsaved, decks, activeIdx]);
 
   // Auto-add (right-click DB card)
@@ -724,6 +903,33 @@ function DeckBuilder() {
   }, [currentDeck?.mainDeck, currentDeck?.potionDeck, currentDeck?.sideDeck, currentDeck?.heroes]);
 
   // Left-click deck card → cover card + skin menu
+  // Besessene Rarities einer Karte (Common immer; nicht besessene gar nicht erst) und die Rarity einer bestimmten Kopie im Deck.
+  const ownedRarities = (name) => currentDeck?.mode === 'drafted' ? ['common'] : rarOrder().filter(r => r === 'common' || rarOwnedCount(collection || {}, name, r) > 0);
+  const copyRarity = (pick) => {
+    const R = currentDeck?.rarities;
+    if (!R || !pick) return 'common';
+    if (pick.sec === 'hero') return (R.heroes?.[pick.idx]?.[pick.field || 'hero']) || 'common';
+    return R[pick.sec]?.[pick.idx] || 'common';
+  };
+  // Rarity EINER Kopie tauschen — nur gegen eine freie Kopie (Common immer frei).
+  const setCopyRarity = (pick, rarity) => {
+    if (!currentDeck || !pick || rarity === copyRarity(pick)) return;
+    if (rarity !== 'common') {
+      const used = rarUsedCounts(currentDeck)[pick.name] || {};
+      if ((used[rarity] || 0) >= rarOwnedCount(collection || {}, pick.name, rarity)) return;
+    }
+    if (pick.sec === 'hero') {
+      const hr = (currentDeck.rarities?.heroes || []).map(r => ({ ...r }));
+      if (!hr[pick.idx]) return;
+      hr[pick.idx][pick.field || 'hero'] = rarity;
+      updateSections({ heroes: currentDeck.heroes }, { heroes: hr });
+    } else {
+      const arr = [...(currentDeck.rarities?.[pick.sec] || [])];
+      arr[pick.idx] = rarity;
+      updateSections({ [pick.sec]: currentDeck[SEC_NAMES[pick.sec]] }, { [pick.sec]: arr });
+    }
+    if (window.playSFX) window.playSFX('draw');
+  };
   const showCoverMenu = useCallback((cardName, e, section, origIdx) => {
     if (!currentDeck) return;
     const isCover = currentDeck.coverCard === cardName;
@@ -743,8 +949,13 @@ function DeckBuilder() {
     if (section) {
       items.push({ label: 'Remove from deck', icon: '🗑', color: 'var(--danger)', action: () => removeFrom(cardName, section, origIdx) });
     }
+    // Linksklick auf eine Deckkarte: hat der Spieler mehrere Rarities davon, oeffnet das Auswahlfenster (mit denselben Aktionen darunter).
+    if (section && section !== 'cube' && !isCubeDeck(currentDeck) && ownedRarities(cardName).length > 1) {
+      setRarPick({ name: cardName, sec: section, idx: origIdx, field: 'hero', items });
+      return;
+    }
     setCtxMenu({ x: e.clientX, y: e.clientY, items });
-  }, [currentDeck, setCoverCard, removeFrom]);
+  }, [currentDeck, setCoverCard, removeFrom, collection]);
 
   // Left-click DB card → context menu
   const showAddMenu = useCallback((cardName, e) => {
@@ -823,9 +1034,20 @@ function DeckBuilder() {
       potionDeck: [...(currentDeck.potionDeck || [])],
       sideDeck: [...(currentDeck.sideDeck || [])],
     };
-    if (fromSection === 'main') { const idx = fromIndex != null ? fromIndex : tempDeck.mainDeck.indexOf(cardName); if (idx >= 0) tempDeck.mainDeck.splice(idx, 1); }
-    else if (fromSection === 'potion') { const idx = fromIndex != null ? fromIndex : tempDeck.potionDeck.indexOf(cardName); if (idx >= 0) tempDeck.potionDeck.splice(idx, 1); }
-    else if (fromSection === 'side') { const idx = fromIndex != null ? fromIndex : tempDeck.sideDeck.indexOf(cardName); if (idx >= 0) tempDeck.sideDeck.splice(idx, 1); }
+    // Rarities laufen parallel: die verschobene Kopie nimmt ihre Rarity mit (null = Gallerie-Drop → automatisch).
+    const tempR = {
+      main: [...(currentDeck.rarities?.main || [])],
+      potion: [...(currentDeck.rarities?.potion || [])],
+      side: [...(currentDeck.rarities?.side || [])],
+      heroes: (currentDeck.rarities?.heroes || []).map(r => ({ ...r })),
+    };
+    let movedRar = null;
+    const zonen = { main: 'mainDeck', potion: 'potionDeck', side: 'sideDeck' };
+    if (zonen[fromSection]) {
+      const arr = tempDeck[zonen[fromSection]];
+      const idx = fromIndex != null ? fromIndex : arr.indexOf(cardName);
+      if (idx >= 0) { arr.splice(idx, 1); movedRar = tempR[fromSection].splice(idx, 1)[0] || null; }
+    }
     else if (fromSection === 'hero') {
       // Prefer the explicit drag-source index so multi-team duplicates
       // (Peter Röll) can be moved out of a specific slot rather than
@@ -833,21 +1055,18 @@ function DeckBuilder() {
       const s = (typeof fromIndex === 'number' && tempDeck.heroes[fromIndex]?.hero === cardName)
         ? fromIndex
         : tempDeck.heroes.findIndex(h => h && h.hero === cardName);
-      if (s >= 0) tempDeck.heroes[s] = { hero: null, ability1: null, ability2: null };
+      if (s >= 0) {
+        movedRar = (tempR.heroes[s] && tempR.heroes[s].hero) || null;
+        tempDeck.heroes[s] = { hero: null, ability1: null, ability2: null };
+        tempR.heroes[s] = { hero: 'common', ability1: 'common', ability2: 'common' };
+      }
     }
 
     // Nicolas removal cleanup: move main deck Potions to potion deck
     if (fromSection === 'hero' && targetSection !== 'hero' && cardName === 'Nicolas, the Hidden Alchemist') {
-      const potionsInMain = [];
-      const cleanedMain = [];
-      for (const cn of tempDeck.mainDeck) {
-        if (CARDS_BY_NAME[cn]?.cardType === 'Potion') potionsInMain.push(cn);
-        else cleanedMain.push(cn);
-      }
-      for (const pn of potionsInMain) {
-        if (tempDeck.potionDeck.length < 15) tempDeck.potionDeck.push(pn);
-      }
-      tempDeck.mainDeck = cleanedMain;
+      const m = nicolasAufraeumen(tempDeck.mainDeck, tempR.main, tempDeck.potionDeck, tempR.potion, true);
+      tempDeck.mainDeck = m.main; tempR.main = m.mainR;
+      tempDeck.potionDeck = m.potion; tempR.potion = m.potionR;
     }
 
     if (targetSection === 'hero') {
@@ -863,6 +1082,8 @@ function DeckBuilder() {
         : tempDeck;
       if (!canAddCard(probeDeck, cardName, 'hero')) return;
       tempDeck.heroes[slot] = { hero: cardName, ability1: card?.startingAbility1 || null, ability2: card?.startingAbility2 || null };
+      // Die gezogene Kopie bleibt in ihrer Rarity; die Starting Abilities bekommen automatisch die hoechste freie.
+      tempR.heroes[slot] = { hero: movedRar, ability1: null, ability2: null };
     } else {
       if (!canAddCard(tempDeck, cardName, targetSection)) return;
       const key = { main: 'mainDeck', potion: 'potionDeck', side: 'sideDeck' }[targetSection];
@@ -870,9 +1091,12 @@ function DeckBuilder() {
         // Adjust index: if we removed from same array earlier, shift down
         let adj = posIdx;
         if (fromSection === targetSection && fromIndex != null && fromIndex < posIdx) adj--;
-        tempDeck[key].splice(Math.min(adj, tempDeck[key].length), 0, cardName);
+        const at = Math.min(adj, tempDeck[key].length);
+        tempDeck[key].splice(at, 0, cardName);
+        tempR[targetSection].splice(Math.min(at, tempR[targetSection].length), 0, movedRar);
       } else {
         tempDeck[key].push(cardName);
+        tempR[targetSection].push(movedRar);
       }
     }
 
@@ -890,6 +1114,9 @@ function DeckBuilder() {
         || getrimmt.sideDeck.length !== tempDeck.sideDeck.length;
       if (veraendert) {
         kappung = getrimmt;
+        tempR.main = alignRarList(tempDeck.mainDeck, tempR.main, getrimmt.mainDeck);
+        tempR.potion = alignRarList(tempDeck.potionDeck, tempR.potion, getrimmt.potionDeck);
+        tempR.side = alignRarList(tempDeck.sideDeck, tempR.side, getrimmt.sideDeck);
         tempDeck.mainDeck = getrimmt.mainDeck;
         tempDeck.potionDeck = getrimmt.potionDeck;
         tempDeck.sideDeck = getrimmt.sideDeck;
@@ -902,7 +1129,7 @@ function DeckBuilder() {
     if (fromSection === 'heroes' || targetSection === 'heroes' || fromSection === 'hero' || targetSection === 'hero') changes.heroes = tempDeck.heroes;
     if (fromSection === 'potion' || targetSection === 'potion' || nicolasCleanup || kappung) changes.potion = tempDeck.potionDeck;
     if (fromSection === 'side' || targetSection === 'side' || kappung) changes.side = tempDeck.sideDeck;
-    updateSections(changes);
+    updateSections(changes, Object.fromEntries(Object.keys(changes).map(k => [k, tempR[k]])));
   }, [currentDeck, addCardTo, addCardAt, updateSections]);
 
   // Per-section sort/shuffle/empty
@@ -910,9 +1137,16 @@ function DeckBuilder() {
     if (!currentDeck) return;
     if (sec === 'main') setHandHighlight(false);
     const keyMap = { main: 'mainDeck', potion: 'potionDeck', side: 'sideDeck' };
-    if (keyMap[sec]) updateSections({ [sec]: sortDeckCards(currentDeck[keyMap[sec]] || []) });
+    if (keyMap[sec]) updateSections({ [sec]: sortDeckCards(currentDeck[keyMap[sec]] || []) });   // stabil → Rarities folgen ihrer Kopie (alignRarList)
   };
-  const shuffleMain = () => { if (currentDeck) { updateSections({ main: shuffleArray(currentDeck.mainDeck || []) }); setHandHighlight(true); } };
+  const shuffleMain = () => {
+    if (!currentDeck) return;
+    // Mischen ueber die Positionen, damit jede Kopie ihre Rarity mitnimmt.
+    const names = currentDeck.mainDeck || [], rars = currentDeck.rarities?.main || [];
+    const order = shuffleArray(names.map((_, i) => i));
+    updateSections({ main: order.map(i => names[i]) }, { main: order.map(i => rars[i] || null) });
+    setHandHighlight(true);
+  };
   const emptySec = (sec) => {
     if (!currentDeck) return;
     const emptyVals = { main: [], heroes: [{hero:null,ability1:null,ability2:null},{hero:null,ability1:null,ability2:null},{hero:null,ability1:null,ability2:null}], potion: [], side: [] };
@@ -1023,7 +1257,7 @@ function DeckBuilder() {
   const hasUnsaved = currentDeck && unsaved[currentDeck.id];
   // Profil → Skins: der gewählte Skin je Held ersetzt die Karte; ein Deck-Skin hat Vorrang.
   const viewSkins = { ...(user?.heroSkins || {}), ...(currentDeck?.skins || {}) };
-  escStateRef.current = { showLeaveConfirm, skinGallery, ctxMenu, renaming, hasUnsaved, isSampleMode, deckDropdownOpen };
+  escStateRef.current = { showLeaveConfirm, rarPick, skinGallery, ctxMenu, renaming, hasUnsaved, isSampleMode, deckDropdownOpen };
   const heroes = currentDeck?.heroes || [{ hero:null,ability1:null,ability2:null },{ hero:null,ability1:null,ability2:null },{ hero:null,ability1:null,ability2:null }];
   // ★ v992: Wie viele Helden verlangt diese Aufstellung? Mit
   // „Zhigao, the Heavenly Emperor" sind es ZWEI statt drei
@@ -1072,7 +1306,8 @@ function DeckBuilder() {
           clearTimeout(window._longPressTimer);
           window.deckDragState = { section, fromIdx, cardName };
         }
-        setDeckDrag({ section, fromIdx, cardName, card: CARDS_BY_NAME[cardName], mouseX: mx, mouseY: my });
+        const rar = section === 'hero' ? currentDeck?.rarities?.heroes?.[fromIdx]?.hero : currentDeck?.rarities?.[section]?.[fromIdx];
+        setDeckDrag({ section, fromIdx, cardName, card: cardWithRarity(cardName, rar), mouseX: mx, mouseY: my });
       },
       (mx, my) => {
         if (!dragging) {
@@ -1398,13 +1633,21 @@ function DeckBuilder() {
         return { hero: name, ability1: card?.startingAbility1 || null, ability2: card?.startingAbility2 || null };
       });
 
+      // Die Textdatei kennt keine Rarities: jede Kopie bekommt die hoechste freigeschaltete freie (Besitz-Normalisierung wie beim Hinzufuegen).
+      const importR = normalizeDeckRarities({
+        mode: currentDeck && currentDeck.mode, heroes: importedHeroes, mainDeck: mainCards, potionDeck: potionCards, sideDeck: sideCards,
+        rarities: {
+          main: mainCards.map(() => null), potion: potionCards.map(() => null), side: sideCards.map(() => null),
+          heroes: importedHeroes.map(() => ({ hero: null, ability1: null, ability2: null })),
+        },
+      }, collection || {}, true).rarities;
       // Apply all sections at once
       updateSections({
         heroes: importedHeroes,
         main: mainCards,
         potion: potionCards,
         side: sideCards
-      });
+      }, importR);
 
       // Auto-save imported deck (only for user decks, not sample decks)
       const deckToSave = isSampleMode ? null : decks[activeIdx];
@@ -1412,7 +1655,7 @@ function DeckBuilder() {
         try {
           const data = await api('/decks/' + deckToSave.id, {
             method: 'PUT',
-            body: JSON.stringify({ name: deckToSave.name, mainDeck: mainCards, heroes: importedHeroes, potionDeck: potionCards, sideDeck: sideCards, isDefault: deckToSave.isDefault, coverCard: deckToSave.coverCard || '', skins: deckToSave.skins || {} })
+            body: JSON.stringify({ name: deckToSave.name, mainDeck: mainCards, heroes: importedHeroes, potionDeck: potionCards, sideDeck: sideCards, rarities: importR, isDefault: deckToSave.isDefault, coverCard: deckToSave.coverCard || '', skins: deckToSave.skins || {} })
           });
           const newDecks = [...decks]; newDecks[activeIdx] = data.deck; setDecks(newDecks);
           setUnsaved(prev => { const n = { ...prev }; delete n[deckToSave.id]; return n; });
@@ -1671,7 +1914,7 @@ function DeckBuilder() {
                       if (item.count > 1) {
                         menuItems.push({ label: 'Remove all ' + item.count + ' copies', icon: '🗑', color: 'var(--danger)', action: () => {
                           const filtered = (currentDeck?.mainDeck || []).filter(n => n !== item.card);
-                          updateSections({ main: filtered });
+                          updateSections({ main: filtered });   // Rarities: nur Common im Cube, alignRarList leitet sie ab
                           if (window.playSFX) window.playSFX('discard');
                         } });
                       }
@@ -1732,8 +1975,8 @@ function DeckBuilder() {
                           onMouseDown={(e) => onDeckCardMouseDown(e, 'hero', i, h.hero)}
                           onTouchStart={(e) => onDeckCardMouseDown(e, 'hero', i, h.hero)}
                           onContextMenu={(e) => { e.preventDefault(); removeFrom(h.hero, 'hero', i); }}>
-                          <CardMini card={CARDS_BY_NAME[h.hero]}
-                            onClick={(e) => showCoverMenu(h.hero, e, 'hero')}
+                          <CardMini card={cardWithRarity(h.hero, currentDeck?.rarities?.heroes?.[i]?.hero)}
+                            onClick={(e) => showCoverMenu(h.hero, e, 'hero', i)}
                             isCover={h.hero === currentDeck?.coverCard} skins={viewSkins} />
                           <button style={{ position: 'absolute', top: -5, right: -5, background: 'var(--danger)', color: '#fff',
                             border: 'none', width: 18, height: 18, fontSize: 11, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', lineHeight: 1 }}
@@ -1754,7 +1997,8 @@ function DeckBuilder() {
                       <div className="db-hero-abilities">
                         {[h?.ability1, h?.ability2].map((ab, ai) => {
                           const abCard = ab ? CARDS_BY_NAME[ab] : null;
-                          if (abCard) return <CardMini key={ai} card={abCard} onClick={() => {}} />;
+                          if (abCard) return <CardMini key={ai} card={cardWithRarity(ab, currentDeck?.rarities?.heroes?.[i]?.['ability' + (ai + 1)])}
+                            onClick={() => { if (!isCube && ownedRarities(ab).length > 1) setRarPick({ name: ab, sec: 'hero', idx: i, field: 'ability' + (ai + 1), items: [] }); }} />;
                           return (
                             <div key={ai} className="ability-slot" style={{ padding: 6, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                               {ab ? <span style={{ color: '#ffeb1a' }}>{ab}</span> : <span style={{ color: 'var(--text2)' }}>Ability {ai + 1}</span>}
@@ -1783,7 +2027,7 @@ function DeckBuilder() {
                     onMouseDown={(e) => onDeckCardMouseDown(e, 'main', item.origIdx, item.card)}
                     onTouchStart={(e) => onDeckCardMouseDown(e, 'main', item.origIdx, item.card)}
                     onContextMenu={(e) => { e.preventDefault(); removeFrom(item.card, 'main', item.origIdx); }}>
-                    <CardMini card={card} onClick={(e) => showCoverMenu(item.card, e, 'main', item.origIdx)} isCover={item.card === currentDeck?.coverCard} skins={viewSkins} />
+                    <CardMini card={cardWithRarity(item.card, currentDeck?.rarities?.main?.[item.origIdx])} onClick={(e) => showCoverMenu(item.card, e, 'main', item.origIdx)} isCover={item.card === currentDeck?.coverCard} skins={viewSkins} />
                   </div>;
                 })}
               </div>
@@ -1804,7 +2048,7 @@ function DeckBuilder() {
                     onMouseDown={(e) => onDeckCardMouseDown(e, 'potion', item.origIdx, item.card)}
                     onTouchStart={(e) => onDeckCardMouseDown(e, 'potion', item.origIdx, item.card)}
                     onContextMenu={(e) => { e.preventDefault(); removeFrom(item.card, 'potion', item.origIdx); }}>
-                    <CardMini card={card} onClick={(e) => showCoverMenu(item.card, e, 'potion', item.origIdx)} isCover={item.card === currentDeck?.coverCard} skins={viewSkins} />
+                    <CardMini card={cardWithRarity(item.card, currentDeck?.rarities?.potion?.[item.origIdx])} onClick={(e) => showCoverMenu(item.card, e, 'potion', item.origIdx)} isCover={item.card === currentDeck?.coverCard} skins={viewSkins} />
                   </div>;
                 })}
               </div>
@@ -1824,7 +2068,7 @@ function DeckBuilder() {
                     onMouseDown={(e) => onDeckCardMouseDown(e, 'side', item.origIdx, item.card)}
                     onTouchStart={(e) => onDeckCardMouseDown(e, 'side', item.origIdx, item.card)}
                     onContextMenu={(e) => { e.preventDefault(); removeFrom(item.card, 'side', item.origIdx); }}>
-                    <CardMini card={card} onClick={(e) => showCoverMenu(item.card, e, 'side', item.origIdx)} isCover={item.card === currentDeck?.coverCard} skins={viewSkins} />
+                    <CardMini card={cardWithRarity(item.card, currentDeck?.rarities?.side?.[item.origIdx])} onClick={(e) => showCoverMenu(item.card, e, 'side', item.origIdx)} isCover={item.card === currentDeck?.coverCard} skins={viewSkins} />
                   </div>;
                 })}
               </div>
@@ -1941,6 +2185,39 @@ function DeckBuilder() {
         </div>
       )}
 
+      {rarPick && currentDeck && (() => {
+        const opts = ownedRarities(rarPick.name);
+        const cur = copyRarity(rarPick);
+        const used = rarUsedCounts(currentDeck)[rarPick.name] || {};
+        return (
+          <div className="modal-overlay" data-rarity-dialog style={{ background: 'rgba(0,0,0,.7)', zIndex: 10000 }} onClick={() => setRarPick(null)}>
+            <div className="skin-gallery-panel animate-in" onClick={e => e.stopPropagation()} style={{ maxWidth: 560 }}>
+              <div className="orbit-font" style={{ fontSize: 14, color: 'var(--accent)', marginBottom: 4 }}>{rarPick.name}</div>
+              <div style={{ fontSize: 10, color: 'var(--text2)', marginBottom: 10 }}>Choose the rarity of this copy · free / owned</div>
+              <div className="skin-gallery-grid">
+                {opts.map(r => {
+                  const owned = rarOwnedCount(collection || {}, rarPick.name, r);
+                  const free = owned - (used[r] || 0);
+                  return <RarityOptionCard key={r} name={rarPick.name} rarity={r} skins={viewSkins}
+                    selected={r === cur} disabled={r !== cur && r !== 'common' && free <= 0}
+                    countText={r === 'common' ? '∞' : free + '/' + owned}
+                    onPick={(rr) => { setCopyRarity(rarPick, rr); setRarPick(null); }} />;
+                })}
+              </div>
+              {(rarPick.items || []).length > 0 && (
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, justifyContent: 'center', marginTop: 12 }}>
+                  {rarPick.items.map((it, i) => (
+                    <button key={i} className="btn" style={{ padding: '4px 10px', fontSize: 10, color: it.color }}
+                      onClick={() => { setRarPick(null); it.action(); }}>{it.icon} {it.label}</button>
+                  ))}
+                </div>
+              )}
+              <button className="btn" style={{ marginTop: 12, padding: '6px 20px', fontSize: 11 }} onClick={() => setRarPick(null)}>Close</button>
+            </div>
+          </div>
+        );
+      })()}
+
       {skinGallery && (
         <div className="modal-overlay" style={{ background: 'rgba(0,0,0,.7)', zIndex: 10000 }} onClick={() => setSkinGallery(null)}>
           <div className="skin-gallery-panel animate-in" onClick={e => e.stopPropagation()}>
@@ -1995,3 +2272,4 @@ function DeckBuilder() {
 
 // ===== CROSS-FILE EXPORTS =====
 window.DeckBuilder = DeckBuilder;
+window.cardWithRarity = cardWithRarity;   // Karte mit gesetztem `rarity` (Draft-Anzeige in app-main nutzt es mit)

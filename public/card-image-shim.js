@@ -29,6 +29,7 @@
   // der IntersectionObserver meldet ihn nie als sichtbar, und die Karte würde nie gezeichnet).
   const PLACEHOLDER = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="750" height="1050"/>');
   const MAX_CACHE = 400;
+  const RARITY_IDS = new Set(['common', 'uncommon', 'rare', 'prismatic', 'super', 'diamond', 'spectral', 'umbra', 'stained']);
 
   // Dateinamen verlieren Satzzeichen („Hello, World“ -> „Hello World.png“): gleiche Regel wie card-images.js
   const strippedKey = n => String(n || '').replace(/[^a-zA-Z0-9 ]/g, '').replace(/\s+/g, ' ').trim();
@@ -95,34 +96,37 @@
     const ohne = qm ? ['atk', 'hp'].filter(k => qm[1].split(',').includes(k)).join(',') : '';
     const zahl = name => { const m = new RegExp('(?:^|&)' + name + '=(\\d{1,3})(?:&|$)').exec(query); return m ? parseInt(m[1], 10) : null; };
     const lv = zahl('lv'), kost = zahl('kost'), stufe = zahl('stufe'), rahmen = zahl('rahmen');   // rahmen = Rang-Rahmen (Duplikate), 1 … 8
+    // `?rar=<Rarity-ID>`: Basiskarte der Seltenheit (Stempel, Rahmen, Namensfarbe; Common = Standard und ohne Parameter), siehe rarities.js / CardRender.rarityBase
+    const rm = /(?:^|&)rar=([a-z]{3,12})(?:&|$)/.exec(query), rar = rm && RARITY_IDS.has(rm[1]) && rm[1] !== 'common' ? rm[1] : '';
     path = path.split(/[?#]/)[0];
     if (!path.startsWith('/cards/') || path.startsWith('/cards/effects/')) return null;
     let rel;
     try { rel = decodeURIComponent(path.slice(7)); } catch (e) { return null; }
     if (!/\.(png|webp|jpe?g)$/i.test(rel)) return null;
     const stem = rel.replace(/\.[a-z]+$/i, '');
-    const sfx = variantKey({ ohne, lv, kost, stufe, rahmen });
+    const sfx = variantKey({ ohne, lv, kost, stufe, rahmen, rar });
     if (stem.startsWith('skins/')) {
       const file = stem.replace(/^skins\/(?:unlockable\/)?/, '');
-      return { kind: 'skin', stem: file, ohne, lv, kost, stufe, rahmen, id: 'skin:' + file + sfx };
+      return { kind: 'skin', stem: file, ohne, lv, kost, stufe, rahmen, rar, id: 'skin:' + file + sfx };
     }
     if (stem.includes('/')) return null;
-    return { kind: 'card', stem, ohne, lv, kost, stufe, rahmen, id: 'card:' + stem + sfx };
+    return { kind: 'card', stem, ohne, lv, kost, stufe, rahmen, rar, id: 'card:' + stem + sfx };
   }
   /** Die Variante als Anhang der Karten-ID: `|o=hp,atk|l=2|k=3` (leer ohne Variante). */
   function variantKey(v) {
-    return (v.ohne ? '|o=' + v.ohne : '') + (v.lv != null ? '|l=' + v.lv : '') + (v.kost != null ? '|k=' + v.kost : '') + (v.stufe != null ? '|s=' + v.stufe : '') + (v.rahmen != null ? '|r=' + v.rahmen : '');
+    return (v.ohne ? '|o=' + v.ohne : '') + (v.lv != null ? '|l=' + v.lv : '') + (v.kost != null ? '|k=' + v.kost : '') + (v.stufe != null ? '|s=' + v.stufe : '') + (v.rahmen != null ? '|r=' + v.rahmen : '') + (v.rar ? '|q=' + v.rar : '');
   }
   /** Karten-ID (`card:Stem` / `skin:Stem`, optional mit Variante) -> wie `parse`; fuer das Vorwaermen aus der gemerkten Liste. */
   function fromId(id) {
     const teile = id.split('|');
-    const m = { kind: id.startsWith('skin:') ? 'skin' : 'card', stem: teile[0].slice(5), ohne: '', lv: null, kost: null, stufe: null, rahmen: null, id };
+    const m = { kind: id.startsWith('skin:') ? 'skin' : 'card', stem: teile[0].slice(5), ohne: '', lv: null, kost: null, stufe: null, rahmen: null, rar: '', id };
     for (const t of teile.slice(1)) {
       if (t.startsWith('o=')) m.ohne = t.slice(2);
       else if (t.startsWith('l=')) m.lv = parseInt(t.slice(2), 10);
       else if (t.startsWith('k=')) m.kost = parseInt(t.slice(2), 10);
       else if (t.startsWith('s=')) m.stufe = parseInt(t.slice(2), 10);
       else if (t.startsWith('r=')) m.rahmen = parseInt(t.slice(2), 10);
+      else if (t.startsWith('q=')) m.rar = t.slice(2);
     }
     return m;
   }
@@ -170,6 +174,7 @@
       if (m.lv != null) opts.lv = m.lv;
       if (m.kost != null) opts.kost = m.kost;
       if (m.stufe != null) opts.stufe = m.stufe;
+      if (m.rar) opts.rarity = m.rar;
       let cv = await CardRender.renderCard(r.card, Object.keys(opts).length ? opts : null);
       if (!cv) return null;
       // Rang-Rahmen (Duplikate): fest in die Karte einbacken (public/rank-frames.js); ohne den Generator bleibt die Karte rahmenlos
@@ -344,7 +349,7 @@
   // Hintergrund bereitgelegt (Blob-URL im Speicher + dekodiert) — der Wechsel ist dann ein Cache-Treffer. Als Handkarte ohne Stufe zählt das
   // schon im Voraus: bis sie auf dem Brett liegt, sind alle drei Varianten fertig.
   function waermeStufen(m) {
-    if (m.kind !== 'card' || m.ohne || m.lv != null || m.kost != null) return;
+    if (m.kind !== 'card' || m.ohne || m.lv != null || m.kost != null || m.rar) return;
     const r = resolve(m);
     const c = r && r.card;
     if (!c || c.cardType !== 'Ability' || !/^\s*1\)/m.test(c.effect || '') || !/^\s*2\)/m.test(c.effect || '') || !/^\s*3\)/m.test(c.effect || '')) return;

@@ -316,10 +316,12 @@ function PpfHeroes({ deck, skinRanks, onTip }) {
 
 /** Eine Heldenkarte — Bild + Foil wie CardMini, aber mit eigenem Tooltip. */
 function PpfHeroCard({ card, skins, onTip }) {
-  const imageUrl = window.cardImageUrl ? window.cardImageUrl(card.name, skins) : null;
+  const rar = window.ppRarityOf ? window.ppRarityOf(card, null) : 'common';
+  const imageUrl0 = window.cardImageUrl ? window.cardImageUrl(card.name, skins) : null;
+  const imageUrl = window.ppRarityUrl ? window.ppRarityUrl(imageUrl0, rar) : imageUrl0;
   const CardFoil = window.CardFoil;
-  const foilClass = card.foil === 'diamond_rare' ? ' foil-diamond-rare' : card.foil === 'secret_rare' ? ' foil-secret-rare' : '';
-  const zeigen = () => onTip({ card, imageUrl });
+  const cardR = rar !== 'common' && card.rarity !== rar ? { ...card, rarity: rar } : card;   // Tooltip: dieselbe Rarity, animiert
+  const zeigen = () => onTip({ card: cardR, imageUrl: imageUrl0 });
   const touch = () => !!window._isTouchDevice;
 
   // Beruehrung: Tippen schaltet den Tooltip, Tippen anderswo schliesst ihn.
@@ -331,21 +333,21 @@ function PpfHeroCard({ card, skins, onTip }) {
     const weg = (e) => {
       if (ref.current && ref.current.contains(e.target)) return;
       if (e.target && e.target.closest && e.target.closest('.card-tooltip')) return;
-      onTip(t => (t && t.card === card ? null : t));
+      onTip(t => (t && t.card.name === card.name ? null : t));
     };
     document.addEventListener('pointerdown', weg, true);
     return () => document.removeEventListener('pointerdown', weg, true);
   }, [card, onTip]);
 
   return (
-    <div ref={ref} className={'card-mini ppf-card' + foilClass}
+    <div ref={ref} className="card-mini ppf-card"
       onMouseEnter={() => { if (!touch()) zeigen(); }}
       onMouseLeave={() => { if (!touch()) onTip(null); }}
       onClick={() => {
         ppfSfx('ui_click', { dedupe: 60 });
-        if (touch()) onTip(t => (t && t.card === card ? null : { card, imageUrl }));
+        if (touch()) onTip(t => (t && t.card.name === card.name ? null : { card: cardR, imageUrl: imageUrl0 }));
       }}>
-      {CardFoil && <CardFoil card={card} skin={window.skinOfUrl ? window.skinOfUrl(imageUrl) : null} />}
+      {CardFoil && <CardFoil card={card} rarity={rar} skin={window.skinOfUrl ? window.skinOfUrl(imageUrl) : null} />}
       {imageUrl
         ? <img src={imageUrl} alt={card.name} draggable={false} />
         : <div className="ppf-card-name">{card.name}</div>}

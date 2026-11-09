@@ -2448,6 +2448,32 @@ class GameEngine {
   }
 
   /**
+   * Rarity-Identitaet (cards/effects/_rarity-track.js): HINWEIS, dass gleich `count` Karten ab `start` aus Zone `key` ('hand', 'dp', 'xp' …) von
+   * `pi` entfernt werden — VOR dem Entfernen aufrufen. Ohne Rarity-Ledger (alles Common) und in Simulationen ein No-op.
+   */
+  /** Wie `_rarityTake`, aus den Argumenten eines `splice(start, deleteCount, …)` auf einer Liste der Laenge `len`. */
+  _rarityTakeSplice(pi, key, len, args) {
+    if (!args.length) return;
+    let start = Math.trunc(Number(args[0])) || 0;
+    if (start < 0) start = Math.max(0, len + start); else start = Math.min(start, len);
+    const del = args.length < 2 ? len - start : Math.min(Math.max(0, Math.trunc(Number(args[1])) || 0), len - start);
+    if (del > 0) this._rarityTake(pi, key, start, del);
+  }
+
+  /** Ereignisdaten mit `rarity`/`rarities` der betroffenen Karten ergaenzen (nur wenn ein Spieler Nicht-Common-Karten im Deck hat). */
+  _rarityMitEreignis(event, data) {
+    if (!data || !this.gs?.players?.some(ps => ps && ps.rarityLedger)) return data;
+    try { return require('./_rarity-track').eventRarity(this.gs, event, data); } catch (e) { console.error('[rarity] event:', e.message); return data; }
+  }
+
+  _rarityTake(pi, key, start, count) {
+    if (this._fastMode || this._inMctsSim) return;
+    const ps = this.gs?.players?.[pi];
+    if (!ps || !ps.rarityLedger) return;
+    try { require('./_rarity-track').take(this.gs, pi, key, start, count); } catch (e) { console.error('[rarity] take:', e.message); }
+  }
+
+  /**
    * Monkey-patch `ps.hand.splice` so that every registered per-hand-index
    * field on `ps` stays consistent across hand mutations. Covers every
    * caller that already does `ps.hand.splice(i, 1)` — no refactor needed.
@@ -2542,6 +2568,7 @@ class GameEngine {
             }
           }
         }
+        if ((delCount ?? 0) > 0) engine._rarityTake(pi, 'hand', start, delCount);   // Rarity-Identitaet: die entfernte Kopie nimmt ihre Rarity mit
         const result = origSplice.call(this, start, delCount, ...items);
         // Rebase every registered field's map on `ps`.
         for (const [fieldName] of engine._handIndexedFields) {
@@ -14823,9 +14850,10 @@ class GameEngine {
     def('_stempelVerfolgt', true);
     def('push', function (...items) { stamps().push(...items.map(jetzt)); const r = Array.prototype.push.apply(this, items); engine._geloeschtMeldung(pi, items); return r; });
     def('unshift', function (...items) { stamps().unshift(...items.map(jetzt)); const r = Array.prototype.unshift.apply(this, items); engine._geloeschtMeldung(pi, items); return r; });
-    def('pop', function () { stamps().pop(); return Array.prototype.pop.call(this); });
-    def('shift', function () { stamps().shift(); return Array.prototype.shift.call(this); });
+    def('pop', function () { engine._rarityTake(pi, 'xp', this.length - 1, 1); stamps().pop(); return Array.prototype.pop.call(this); });
+    def('shift', function () { engine._rarityTake(pi, 'xp', 0, 1); stamps().shift(); return Array.prototype.shift.call(this); });
     def('splice', function (...args) {
+      engine._rarityTakeSplice(pi, 'xp', this.length, args);
       const sargs = args.length > 2 ? [args[0], args[1], ...args.slice(2).map(jetzt)] : args;
       Array.prototype.splice.apply(stamps(), sargs);
       return Array.prototype.splice.apply(this, args);
@@ -15019,9 +15047,10 @@ class GameEngine {
     umhuellen('unshift', function (n0) { const d = this.length - n0; if (d > 0) { angleichen(n0); stamps().unshift(...Array(d).fill(jetzt())); } });
     if (!arr._ablage_pop) {
       def('_ablage_pop', true);
-      def('pop', function () { stamps().pop(); return Array.prototype.pop.call(this); });
-      def('shift', function () { stamps().shift(); return Array.prototype.shift.call(this); });
+      def('pop', function () { engine._rarityTake(pi, 'dp', this.length - 1, 1); stamps().pop(); return Array.prototype.pop.call(this); });
+      def('shift', function () { engine._rarityTake(pi, 'dp', 0, 1); stamps().shift(); return Array.prototype.shift.call(this); });
       def('splice', function (...args) {
+        engine._rarityTakeSplice(pi, 'dp', this.length, args);
         Array.prototype.splice.apply(stamps(), args.length > 2 ? [args[0], args[1], ...Array(args.length - 2).fill(jetzt())] : args);
         return Array.prototype.splice.apply(this, args);
       });
@@ -47484,12 +47513,22 @@ this._deathWatch = (this._deathWatchStack || []).length
       .map(l => ({ id: l.id, cardName: l.cardName, owner: l.owner, fromHandIdx: l.fromHandIdx }));
   }
 
+  /** Rarity der Karte eines Kettenglieds, einmal beim ersten Mal festgehalten (die Karte hat die Hand dann meist schon verlassen). */
+  _rarityFuerKettenglied(l) {
+    if (l._rarity !== undefined) return l._rarity || undefined;
+    if (!this.gs?.players?.some(ps => ps && ps.rarityLedger)) return undefined;
+    let r = null;
+    try { r = require('./_rarity-track').rarityOf(this.gs, l.owner, l.cardName, ['hand', 'dp', 'S*', 'cz'], { idx: l.fromHandIdx, idxZone: 'hand' }); } catch {}
+    l._rarity = r;
+    return r || undefined;
+  }
+
   _broadcastChainUpdate(chain) {
     this._broadcastEvent('reaction_chain_update', {
       vorlauf: this._chainVorlauf || null,
       geister: this._kettenGeister(chain),
       links: chain.map(l => ({
-        id: l.id, cardName: l.cardName, owner: l.owner,
+        id: l.id, cardName: l.cardName, owner: l.owner, rarity: this._rarityFuerKettenglied(l),
         cardType: l.cardType, isInitialCard: l.isInitialCard,
         negated: l.negated, negationStyle: l.negationStyle || null, chainClosed: l.chainClosed,
       })),
@@ -59405,6 +59444,7 @@ this._deathWatch = (this._deathWatchStack || []).length
   _broadcastEvent(event, data, opts) {
     if (this._aborted) return;
     if (this._fastMode) return; // Silent during MCTS simulations.
+    data = this._rarityMitEreignis(event, data);   // Rarity der fliegenden/aufgedeckten Karte mitgeben (Identitaetsverfolgung, _rarity-track.js)
     // Pfeilsalve: die Standard-Animationen einer Attack mit Pfeilen werden zurueckgehalten und reisen mit `play_arrow_salvo` (Fallback fuer Clients ohne Salve).
     if (event === 'reaction_chain_done' && this._pfeilSchild && !this._pfeilSchild.aktiv && !this._pfeilSchild.fertig) this._pfeilSchild.aktiv = true;   // Pfeilsalve: ab Kettenende scharf
     if (this._pfeilSchild && this._pfeilSchild.aktiv && require('./_arrows-shared').PFEIL_SCHILD_EVENTE.has(event)) { this._pfeilSchild.puffer.push([event, data, opts, Date.now()]); return; }
