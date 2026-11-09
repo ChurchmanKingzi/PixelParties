@@ -396,6 +396,13 @@ function bpPen(g, W, H) {
         if (xi > 0) { span(o, row, cx - xo, cx - xi - 1); span(o, row, cx + xi + 1, cx + xo); } else span(o, row, cx - xo, cx + xo);
       }
     },
+    // Bild (Uint32Array w×h, 0 = durchsichtig) mit der linken oberen Ecke bei (x, y) aufsetzen
+    blit(src, w, h, x, y) {
+      for (let j = 0; j < h; j++) {
+        const yy = y + j; if (yy < 0 || yy >= H) continue;
+        for (let i = 0, o = yy * W + x, q = j * w; i < w; i++) { const v = src[q + i], xx = x + i; if (v !== 0 && xx >= 0 && xx < W) buf[o + i] = v; }
+      }
+    },
     // Pixelspeicher sichern / laden
     snap(dst) { dst.set(buf); },
     load(src) { buf.set(src); },
@@ -548,8 +555,9 @@ function bpFxCreate(cv, S, shakeEl) {
       e.suck = [];
       for (let i = 0, n = Math.round(80 * m); i < n; i++) e.suck.push({ a: r() * Math.PI * 2, r0: (0.22 + r() * 0.3) * e.maxR, born: 2 + ((r() * 14) | 0), dur: 18 + ((r() * 14) | 0), c: [BPC.purpleL, BPC.violet, BPC.purple, BPC.white][(r() * 4) | 0] });
       e.shards = [];
-      const shc = [BPC.violet, BPC.purple, BPC.plum, BPC.purpleL, BPC.white, BPC.black, BPC.violet];
-      for (let i = 0, n = Math.round(70 * m); i < n; i++) { const a = r() * Math.PI * 2, v = (2.5 + r() * 4.5) * e.u; e.shards.push({ a, v, s: r() < 0.35 ? 3 : 2, life: 36 + ((r() * 28) | 0), c: shc[i % shc.length] }); }
+      // Splitter tragen die Dither-Farben der Scheibe: Grundfarbe + zweite Farbe im Schachbrett, dazu wenige helle Randstücke
+      const shc = [[BPC.night, BPC.plum], [BPC.plum, BPC.violet], [BPC.black, BPC.plum], [BPC.plum, BPC.purple], [BPC.violet, BPC.purpleL], [BPC.night, BPC.violet], [BPC.white, BPC.purpleL]];
+      for (let i = 0, n = Math.round(70 * m); i < n; i++) { const a = r() * Math.PI * 2, v = (2.5 + r() * 4.5) * e.u; const c2 = shc[i % shc.length]; e.shards.push({ a, v, s: r() < 0.4 ? 4 : 3, life: 36 + ((r() * 28) | 0), c: c2[0], c2: c2[1] }); }
       e.embers = [];
       for (let i = 0, n = Math.round(46 * m); i < n; i++) { const p = edge(); e.embers.push({ x: p.x * 1.05, y: p.y * 1.05, vx: (r() - 0.5) * 0.4, vy: -(0.3 + r() * 0.8) * e.u, born: 4 + ((r() * 40) | 0), life: 40 + ((r() * 50) | 0), ph: (r() * 6) | 0, c: [BPC.violet, BPC.purpleL, BPC.white, BPC.purple][(r() * 4) | 0] }); }
     } else if (e.kind === 'stained') {
@@ -565,6 +573,55 @@ function bpFxCreate(cv, S, shakeEl) {
   //   37     Aufschlag: Schirm weiß (zwei Takte voll), Scheibe zerbricht in Splitter, drei Druckwellen, Rückstoß (Bildschirmzucken 7 Zellen, 48 Takte), Risse blitzen
   //   37–150 Nachglühen: violetter Rahmenschein um die Karte, Glut steigt, die Dunkelheit weicht in Stufen (Dither wird dünner)
   const UMB_BANDS = [0.1, 0.26, 0.44, 0.62, 0.78, 0.88, 0.94];
+  // ── Textur der Scheibe ────────────────────────────────────────────────────
+  // Innenleben in Palettenstufen (Schwarz, Nacht, Plum, selten Violett), per Bayer-Raster gemischt: Spiralarme wirbeln langsam (Drehung in Stufen alle drei Takte),
+  // Schattenschwaden wandern in ganzen Zellen, zur Mitte hin dunkler; ein Randlicht-Saum in Stufen (Weiß/Hellviolett → Violett → Plum) und ein paar Sterne.
+  // Die Textur wird nur alle drei Takte (10 Hz, und beim Wachsen) neu berechnet und dazwischen aufgesetzt.
+  const discGeo = {};   // je Radius: Abstand und Winkel jeder Zelle (einmal berechnet)
+  const DK = { b: bpU32(BPC.black), n: bpU32(BPC.night), p: bpU32(BPC.plum), v: bpU32(BPC.violet), pl: bpU32(BPC.purpleL), w: bpU32(BPC.white) };
+  const DNOISE = (() => { const a = new Float32Array(1024); for (let j = 0; j < 32; j++) for (let i = 0; i < 32; i++) a[j * 32 + i] = 0.5 + 0.25 * Math.sin(i * Math.PI / 16 + j * Math.PI / 8) + 0.25 * Math.sin(j * Math.PI * 3 / 16 - i * Math.PI / 16); return a; })();
+  function umbraDisc(e, R, X, Y) {
+    const rd = e.rd, D = 2 * rd + 3, c = rd + 1;
+    let G = discGeo[rd];
+    if (!G) {
+      G = discGeo[rd] = { r: new Float32Array(D * D), a: new Float32Array(D * D) };
+      for (let j = 0; j < D; j++) for (let i = 0; i < D; i++) { const dx = i - c, dy = j - c; G.r[j * D + i] = Math.sqrt(dx * dx + dy * dy); G.a[j * D + i] = Math.atan2(dy, dx) / (2 * Math.PI) + 0.5; }
+    }
+    const step = (e.t / 3) | 0, key = R * 4096 + step;
+    if (e.texKey !== key) {
+      if (!e.tex) { e.tex = new Uint32Array(D * D); e.stars = []; const q = bpRng(e.seed + 5); for (let i = 0; i < 16; i++) { const a = q() * Math.PI * 2, rr = Math.sqrt(q()) * rd * 0.85; e.stars.push([Math.round(Math.cos(a) * rr), Math.round(Math.sin(a) * rr), (q() * 6) | 0]); } }
+      const tex = e.tex, gr = G.r, ga = G.a, Rr = R + 0.5;
+      tex.fill(0);
+      const rot = step * 0.03, lo = Math.max(0, c - R - 1), hi = Math.min(D - 1, c + R + 1);
+      for (let j = lo; j <= hi; j++) {
+        const yb = ((Y + j - c) & 3) << 2;
+        for (let i = lo; i <= hi; i++) {
+          const k = j * D + i, r = gr[k];
+          if (r > Rr) continue;
+          const bay = (BP_BAY16[yb + ((X + i - c) & 3)] + 0.5) / 16, d = Rr - r;
+          let v;
+          if (d < 1.5) v = bay < 0.6 ? DK.w : DK.pl;                     // Randlicht
+          else if (d < 3) v = bay < 0.55 ? DK.pl : DK.v;
+          else if (d < 5) v = bay < 0.6 ? DK.v : DK.p;
+          else if (d < 8 && bay < 0.5) v = DK.p;
+          else {
+            const rho = r / rd, a = (ga[k] * 3 + r * 0.045 - rot) % 1, arm = a < 0 ? a + 1 : a;
+            const nz = DNOISE[(((j - c) + step) & 31) * 32 + (((i - c) - (step >> 1)) & 31)];
+            const lv = 0.4 * rho * rho + (arm < 0.34 ? (1 - arm / 0.34) * 0.5 * (0.35 + 0.65 * rho) : 0) + nz * 0.2 * rho;
+            const L = Math.floor(lv * 4 + bay);
+            v = L <= 0 ? DK.b : L === 1 ? DK.n : L === 2 ? DK.p : DK.v;
+          }
+          tex[k] = v;
+        }
+      }
+      for (const st of e.stars) {   // Sterne: blinken in Stufen
+        const ph = (step + st[2]) % 6, k = (c + st[1]) * D + c + st[0];
+        if (gr[k] < R - 6 && ph < 2) tex[k] = ph === 0 ? DK.w : DK.pl;
+      }
+      e.texKey = key;
+    }
+    pen.blit(e.tex, D, D, X - c, Y - c);
+  }
   // Dunkelheit der Umbra-Karte: Radius des hellen Kreises Rc und Dichte-Faktor f (null: keine Dunkelheit mehr)
   function umbraDark(e) {
     const t = e.t, tt = t - e.imp, u = e.u, near = e.rd + Math.round(18 * u);
@@ -598,7 +655,7 @@ function bpFxCreate(cv, S, shakeEl) {
       const toti = t >= imp - 5;                                       // Totalität
       // Scheibe wächst in Stufen vor der Karte, innen ein dunkler Violettsaum
       const R = Math.round(rd * (1 - Math.pow(1 - Math.min(1, t / 10), 2)));
-      if (R > 0) { pen.band(X, Y, 0, R, 1, BPC.black); if (R > 8) pen.ring(X, Y, R - 3, BPC.plum, 1, 2); }
+      if (R > 0) umbraDisc(e, R, X, Y);
       // Korona
       if (t >= 6) {
         const grow = Math.min(1, (t - 6) / 10) * (toti ? 1.7 : 1), stp = t >> 1;
@@ -677,7 +734,8 @@ function bpFxCreate(cv, S, shakeEl) {
       const x = X + Math.cos(p.a) * (rd + p.v * tt), y = Y + Math.sin(p.a) * (rd + p.v * tt) + 0.12 * tt * tt * 0.5;
       if (tt > p.life - 8 && (tt & 1)) continue;
       pen.rect(x, y, p.s, p.s, p.c);
-      if (p.c === BPC.black || p.c === BPC.plum) pen.rect(x - 1, y - 1, 1, p.s + 2, BPC.violet);
+      pen.dither(x, y, p.s, p.s, 0.5, p.c2);
+      pen.rect(x - 1, y - 1, 1, p.s + 1, BPC.violet);   // Randlicht an der linken Kante
     }
     // Rahmenschein um die Karte (violett, pulsiert zwischen Violett und Weiß), Dither nach außen dünner
     if (tt < 100) {
@@ -904,7 +962,6 @@ function bpFxCreate(cv, S, shakeEl) {
       if (e.kind === 'stained' && e.t >= Math.round(BP_FACE_DELAY.stained / BP_TAKT) + 4) pen.erase(e.cx - e.cw / 2 - 1, e.cy - e.ch / 2 - 1, e.cw + 2, e.ch + 2);
       else if (e.kind === 'umbra') {
         if (e.t >= e.imp + 3) pen.erase(e.cx - e.cw / 2 - 1, e.cy - e.ch / 2 - 1, e.cw + 2, e.ch + 2);
-        else pen.erase(e.cx - 3, e.cy - e.ch / 2 - 5, 6, e.ch + 10);
       }
     }
     pen.flush();
@@ -1036,7 +1093,7 @@ function bpPixels(url, cw, ch) {
 // `sold`: diese Karte wurde zurückverkauft (ausgegraut, „Sold“); `sellOff`: Sell Back ist für dieses Pack schon verbraucht/gesperrt; `sellValue`: SC-Gutschrift
 function BpCard({ idx, card, geom, open, hold, onEdge, onDone, onClick, onHover, hot, sold, sellOff, sellValue, onSell }) {
   const [ph, setPh] = useState(0);
-  const hostRef = useRef(null), cvRef = useRef(null);
+  const hostRef = useRef(null), cvRef = useRef(null), groundRef = useRef(null);
   const cbRef = useRef({}); cbRef.current = { onEdge, onDone };
   const Z = geom.Z, cw = geom.cw, ch = geom.ch, pad = bpFlipPad(ch);
   const url = bpCardUrl(card.name, card.rarity);
@@ -1058,6 +1115,7 @@ function BpCard({ idx, card, geom, open, hold, onEdge, onDone, onClick, onHover,
       if (f <= BP_FLIP_EDGE) i = f;
       else if (f < BP_FLIP_EDGE + hold || !facePix) { i = BP_FLIP_EDGE; if (!facePix) t0 = now - (BP_FLIP_EDGE + hold) * BP_TAKT; }
       else i = Math.min(BP_FLIP_LAST, f - hold);
+      if (i > BP_FLIP_EDGE && groundRef.current && groundRef.current.style.background) groundRef.current.style.background = '';   // Umbra: Boden wieder schwarz, sobald die Vorderseite aufschlägt
       if (i >= BP_FLIP_EDGE && !edged) { edged = true; try { cbRef.current.onEdge && cbRef.current.onEdge(idx); } catch (e) { /* ohne */ } }
       if (i !== lastIdx) {
         lastIdx = i;
@@ -1088,7 +1146,7 @@ function BpCard({ idx, card, geom, open, hold, onEdge, onDone, onClick, onHover,
       onMouseEnter={() => onHover(idx, true)} onMouseLeave={() => onHover(idx, false)}
       role="button" tabIndex={open ? -1 : 0} aria-label={open ? bpRarityLabel(card.rarity) + ' ' + card.name : 'Card ' + (idx + 1) + ', face down'}
       onKeyDown={(e) => { if (!open && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); onClick(idx); } }}>
-      {open && <div className="bp-card-ground" />}
+      {open && <div className="bp-card-ground" ref={groundRef} style={card.rarity === 'umbra' && !done ? { background: 'transparent' } : undefined} />}   {/* Umbra: solange die Karte auf der Kante steht, scheint die Scheibe (Effekt-Leinwand) durch; sobald sie sich dreht, kommt der schwarze Boden zurück (tick) */}
       {open && (
         <div className="bp-card-face" ref={hostRef} style={{ visibility: done ? 'visible' : 'hidden' }}>
           <img src={url} alt="" draggable={false} />
