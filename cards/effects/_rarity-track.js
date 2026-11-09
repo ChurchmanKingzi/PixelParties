@@ -331,18 +331,55 @@ function annotate(ps, pv, areaNames) {
   return any ? out : null;
 }
 
+const ALL_ZONES = ['hand', 'S*', 'A*', 'U*', 'G', 'cz', 'cs', 'dp', 'xp', 'P', 'H'];
+
+/** Zonen-Schluessel eines Ereignis-Ortes ('hand', 'support', 'discard' …) fuer die Suche; mit Held/Platz/Handindex genauer. */
+function zoneKeysOf(where, heroIdx, slotIdx) {
+  switch (where) {
+    case 'hand': return ['hand'];
+    case 'support': return Number.isInteger(heroIdx) && Number.isInteger(slotIdx) ? ['S' + heroIdx + '.' + slotIdx] : ['S*'];
+    case 'ability': return Number.isInteger(heroIdx) ? ['A' + heroIdx + '.*'] : ['A*'];
+    case 'surprise': return ['U*'];
+    case 'discard': return ['dp'];
+    case 'deleted': case 'delete': return ['xp'];
+    case 'deck': return ['md', 'pd'];
+    case 'area': return ['G'];
+    case 'creation': return ['cz'];
+    case 'coolness': return ['cs'];
+    case 'permanent': case 'permanents': return ['P'];
+    case 'hero': return ['H'];
+    default: return [];
+  }
+}
+
+function expandKeys(sh, keys) {
+  const out = [];
+  for (const k of keys) {
+    if (k.endsWith('*')) { const pre = k.slice(0, -1); for (const key of Object.keys(sh.z)) if (key.startsWith(pre) && !out.includes(key)) out.push(key); }
+    else if (!out.includes(k)) out.push(k);
+  }
+  return out;
+}
+
 /**
- * Rarity einer Karte fuer ein Ereignis (Flug, Aufdecken): sucht den Namen in den genannten Zonen des Spielers (zuletzt hinzugekommene
- * zuerst), danach im Schwebe-Pool. `zones` = Zonen-Schluessel in Suchreihenfolge, z.B. ['hand','dp'].
+ * Rarity einer Karte fuer ein Ereignis (Flug, Aufdecken): sucht den Namen in den genannten Zonen des Spielers, zuletzt hinzugekommene
+ * zuerst, danach im Schwebe-Pool. `zones` = Schluessel in Suchreihenfolge ('hand', 'dp', 'S1.0', Praefix mit '*' wie 'S*'); `opts.idx`/`opts.idxZone`
+ * nennt einen bekannten Platz. Reihenfolge: genauer Platz → frisch entnommene Kopie (Pool) → genannte Zonen → Rest → alter Pool.
  * @returns {string|null}
  */
-function rarityOf(gs, pi, name, zones) {
+function rarityOf(gs, pi, name, zones, opts) {
   const ps = gs && gs.players && gs.players[pi];
   if (!ps || !ps.rarityLedger || !name) return null;
   reconcile(gs);
   const sh = ps.rarityShadow;
   if (!sh) return null;
-  for (const key of zones || []) {
+  const o = opts || {};
+  if (Number.isInteger(o.idx) && o.idxZone) {
+    const z = sh.z[o.idxZone];
+    if (z && z.n[o.idx] === name) return clean(z.r[o.idx]);
+  }
+  for (let i = sh.limbo.length - 1; i >= 0; i--) if (sh.limbo[i].n === name && sh.limbo[i].rd >= sh.rd - 1) return sh.limbo[i].r || null;
+  for (const key of expandKeys(sh, (zones || []).concat(ALL_ZONES))) {
     const z = sh.z[key];
     if (!z) continue;
     for (let i = z.n.length - 1; i >= 0; i--) if (z.n[i] === name) return clean(z.r[i]);
@@ -351,4 +388,44 @@ function rarityOf(gs, pi, name, zones) {
   return null;
 }
 
-module.exports = { reconcile, take, permute, annotate, at, rarityOf, initPlayer, liveZones, align };
+/**
+ * Ereignis mit Rarity versehen: `data.rarity` (bei `cardName`) bzw. `data.rarities` (bei `cardNames`), wenn der Spieler eine Nicht-Common-Karte
+ * dieses Namens hat. Gibt `data` unveraendert zurueck, wenn nichts zu ergaenzen ist; sonst eine flache Kopie.
+ */
+function eventRarity(gs, event, data) {
+  if (!data || typeof data !== 'object' || !gs || !gs.players) return data;
+  if (!gs.players.some(ps => ps && ps.rarityLedger)) return data;
+  if (data.rarity !== undefined || data.rarities !== undefined) return data;
+  const name = typeof data.cardName === 'string' ? data.cardName : null;
+  const names = Array.isArray(data.cardNames) ? data.cardNames : null;
+  if (!name && !names) return data;
+  const own = [data.fromOwner, data.owner, data.player, data.playerIdx, data.casterIdx, data.fromPlayer, data.toOwner].filter(x => Number.isInteger(x) && gs.players[x]);
+  let owners = own.filter((x, i) => own.indexOf(x) === i);
+  if (!owners.length && event === 'card_reveal') {   // Aufdeck-Meldung ohne Besitzer: aktiver Spieler zuerst
+    const a = Number.isInteger(gs.activePlayer) ? gs.activePlayer : 0;
+    owners = [a].concat(gs.players.map((_, i) => i).filter(i => i !== a));
+  }
+  if (!owners.length) return data;
+  const from = zoneKeysOf(data.from, data.fromHeroIdx, data.fromSlotIdx);
+  const to = zoneKeysOf(data.to, data.toHeroIdx, data.toSlotIdx);
+  const zones = (data.from === 'deck' ? from.concat(to) : from.concat(to));
+  const handLike = data.from === 'hand' || (!data.from && Array.isArray(data.indices));
+  const find = (n, k) => {
+    for (const pi of owners) {
+      const idx = Array.isArray(data.indices) && k != null ? data.indices[k] : data.fromHandIdx;
+      const r = rarityOf(gs, pi, n, zones, { idx, idxZone: handLike ? 'hand' : null });
+      if (r) return r;
+    }
+    return null;
+  };
+  try {
+    if (names) {
+      const rs = names.map((n, k) => find(n, k));
+      return rs.some(Boolean) ? { ...data, rarities: rs } : data;
+    }
+    const r = find(name, null);
+    return r ? { ...data, rarity: r } : data;
+  } catch { return data; }
+}
+
+module.exports = { reconcile, take, permute, annotate, at, rarityOf, eventRarity, initPlayer, liveZones, align };

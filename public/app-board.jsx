@@ -1555,7 +1555,7 @@ function ppJetzt() {
   return (typeof performance !== 'undefined' ? performance.now() : Date.now());
 }
 
-function DiscardAnimCard({ cardName, startX, startY, endX, endY, dest, delay, t0, ausHand, startW, startH, endW }) {
+function DiscardAnimCard({ cardName, startX, startY, endX, endY, dest, delay, t0, ausHand, startW, startH, endW, rarity, owner }) {
   // ★ v1331: Brettquellen bringen ihr Bildschirmmass mit (`startW/H`, aus
   // `kartenMassAmBildschirm`) und das des Zielstapels (`endW`). Die Karte
   // startet dann exakt so gross wie auf dem Brett und endet in
@@ -1606,7 +1606,11 @@ function DiscardAnimCard({ cardName, startX, startY, endX, endY, dest, delay, t0
       '— verstrichen', Math.round(verstrichen), 'ms, Versatz', Math.round(versatz), 'ms');
   }
   const card = CARDS_BY_NAME[cardName];
-  const imgUrl = card ? cardImageUrl(card.name) : null;
+  // Rarity der fliegenden Karte: vom Eintrag, sonst aus dem zuletzt bekannten Zustand — einmal festgehalten (der Flug darf nicht umspringen).
+  const rarRef = useRef(null);
+  if (rarRef.current === null) rarRef.current = ppRarityOf(card, rarity || ppRarityLookup(cardName, owner));
+  const rarF = rarRef.current;
+  const imgUrl = card ? ppRarityUrl(cardImageUrl(card.name), rarF) : null;
   const isDeleted = dest === 'deleted';
   const isDeckReturn = dest === 'deck';
   // `delay` (ms) staggers a simultaneous multi-card batch. The flight
@@ -1630,6 +1634,7 @@ function DiscardAnimCard({ cardName, startX, startY, endX, endY, dest, delay, t0
       <div className="board-card" style={{ width: '100%', height: '100%' }}>
         {imgUrl ? <img src={imgUrl} style={{ width: '100%', height: '100%', objectFit: 'cover' }} draggable={false} />
         : <div className="board-card-text">{cardName || '?'}</div>}
+        {imgUrl && rarF !== 'common' && <RarityLayer card={card} rarity={rarF} animated={false} />}
       </div>
       {isDeleted && <div className="delete-energy-overlay" />}
     </div>
@@ -4300,7 +4305,7 @@ function CardRevealOverlay({ reveals, onRemove }) {
   return (
     <div className="card-reveal-stack">
       {reveals.map((rev, idx) => (
-        <CardRevealEntry key={rev.id} cardName={rev.cardName} fizzled={rev.fizzled} onDone={() => onRemove(rev.id)} />
+        <CardRevealEntry key={rev.id} cardName={rev.cardName} rarity={rev.rarity} fizzled={rev.fizzled} onDone={() => onRemove(rev.id)} />
       ))}
     </div>
   );
@@ -4310,9 +4315,9 @@ function CardRevealOverlay({ reveals, onRemove }) {
 // (Glitch, entsaettigt, 🚫 gross AUF der Karte, KEIN Schriftzug — Al 27.10.) —
 // der Effekt wurde ausgeloest, konnte aber nichts mehr tun (`engine.zeigeFizzle`).
 const FIZZLE_ANZEIGE_MS = 1400;
-function CardRevealEntry({ cardName, onDone, fizzled }) {
+function CardRevealEntry({ cardName, onDone, fizzled, rarity }) {
   const card = CARDS_BY_NAME[cardName];
-  const rar = ppRarityOf(card, null);
+  const rar = ppRarityOf(card, rarity);
   const imgUrl = card ? ppRarityUrl(cardImageUrl(card.name), rar) : null;
   // v1360 (Als Befund: „die gefizzelte Karte bleibt deutlich zu lange
   // sichtbar"): ein Fizzeln ist eine kurze Meldung — 1,4 s statt 3,5 s,
@@ -4331,7 +4336,7 @@ function CardRevealEntry({ cardName, onDone, fizzled }) {
   return (
     <div className={'card-reveal-entry' + (fizzled ? ' card-reveal-fizzled-weg' : '')}
       style={fizzled ? { '--fizzle-ms': FIZZLE_ANZEIGE_MS + 'ms' } : undefined}
-      onMouseEnter={() => { gehovert.current = true; setBoardTooltip(card); }}
+      onMouseEnter={() => { gehovert.current = true; setBoardTooltip(rar !== 'common' ? { ...card, rarity: rar } : card); }}
       onMouseLeave={() => { gehovert.current = false; setBoardTooltip(null); }}>
       <div className={'card-reveal-card' + (fizzled ? ' card-reveal-fizzled' : '')}>
         {fizzled && <div className="chain-negate-symbol">🚫</div>}
@@ -5507,7 +5512,7 @@ function HeldenRammkarte({ r }) {
   if (r.figur && !figurFehlt) return null;                           // die Figur fährt in der Sprite-Ebene, hier gibt es nichts zu zeigen
   return (
     <div ref={el} className="ram-anim-card ram-clash" style={{ left: r.srcX - c.w / 2, top: r.srcY - c.h / 2, width: c.w, height: c.h }}>
-      <BoardCard cardName={r.cardName} noTooltip />
+      <BoardCard cardName={r.cardName} rarity={ppRarityLookup(r.cardName) || undefined} noTooltip />
     </div>
   );
 }
@@ -35871,7 +35876,7 @@ function ReactionChainOverlay({ chain, myIdx, fx }) {
             + (!fx && link.status === 'negated' ? ' chain-negated' : '')
             + (!fx && link.status === 'resolved' ? ' chain-resolved' : '')
           }>
-            <BoardCard cardName={link.cardName} style={{ width: 80, height: 112, borderRadius: 4 }} />
+            <BoardCard cardName={link.cardName} rarity={link.rarity || undefined} style={{ width: 80, height: 112, borderRadius: 4 }} />
             {link.isInitialCard && <div className="chain-badge chain-badge-initial">INITIAL</div>}
             {!fx && link.status === 'negated' && <div className="chain-negate-symbol">🚫</div>}
             {link.status === 'negated' && link.negationStyle === 'thief' && (
@@ -39500,7 +39505,11 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
   const [bounceBehalten, setBounceBehalten] = useState({});
   // Der Socket-Hörer unten hängt mit `[]` am ERSTEN Render: der aktuelle Brettzustand kommt über diese Referenz.
   const spielerLiveRef = useRef(gameState.players);
+  // Rarity-Gedächtnis für Flüge ohne Ereignis-Rarity (`ppRarityLookup`): die Spielerlisten des jetzigen und des vorigen Zustands.
+  const spielerVorherRef = useRef(null);
+  if (spielerLiveRef.current !== gameState.players) spielerVorherRef.current = spielerLiveRef.current;
   spielerLiveRef.current = gameState.players;
+  window.ppRarityMem = { jetzt: gameState.players, vorher: spielerVorherRef.current };
   // ★ v1366: Surprise-Abflug-Schluessel (`sp-<owner>-<hero>`) fallen weg,
   // sobald der Zustand die Zone geleert hat — eine danach neu gesetzte
   // Surprise darf nicht mitverborgen werden.
@@ -44702,7 +44711,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     // `replace` (v694): raeumt den Stapel und zeigt NUR diese Karte —
     // ein Held, der in die Kette greift (Key), loest die Karte ab, auf
     // die er reagiert, statt sich daneben zu stellen.
-    const onReveal = ({ cardName, sfx, replace, fizzled }) => { if (window.playSFX) window.playSFX(sfx || 'reveal', sfx ? { dedupe: 200, category: 'effect' } : undefined); setCardReveals(prev => [...(replace ? [] : prev), { id: Date.now() + Math.random(), cardName, fizzled: !!fizzled }]); };
+    const onReveal = ({ cardName, sfx, replace, fizzled, rarity, owner }) => { if (window.playSFX) window.playSFX(sfx || 'reveal', sfx ? { dedupe: 200, category: 'effect' } : undefined); setCardReveals(prev => [...(replace ? [] : prev), { id: Date.now() + Math.random(), cardName, fizzled: !!fizzled, rarity: rarity || (window.ppRarityLookup ? window.ppRarityLookup(cardName, owner) : undefined) }]); };
     const onDeckSearchAdd = ({ cardName, playerIdx, castOnly }) => {
       // If the OPPONENT searched, prepare face-up draw animation
       if (playerIdx !== myIdx && !castOnly) {
@@ -44739,14 +44748,14 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     };
     const onChainGeister = ({ geister }) => geisterSetzen(geister);
     const onChainUpdate = ({ links, vorlauf, geister }) => {
-      const vor = vorlauf ? [{ id: 'vorlauf', cardName: vorlauf.cardName, owner: vorlauf.owner, cardType: vorlauf.cardType, isInitialCard: true, _vorlauf: true, status: 'resolved' }] : [];
+      const vor = vorlauf ? [{ id: 'vorlauf', cardName: vorlauf.cardName, owner: vorlauf.owner, cardType: vorlauf.cardType, isInitialCard: true, _vorlauf: true, status: 'resolved', rarity: vorlauf.rarity || window.ppRarityLookup(vorlauf.cardName, vorlauf.owner) }] : [];
       geisterKettenRef.current = links.map(l => l.id);
       chainVorlaufRef.current = !!vorlauf;
       if (geister) geisterSetzen(geister);
       // Pixelart-Leiste (app-fx-53): beim ersten Update der Kette festlegen, ob sie läuft (sonst die schlichte Darstellung von heute)
       if (!chainFxRef.current && links.length >= 2) { const an = !!(window.ppFx53 && window.ppFx53.aktiv()); chainFxRef.current = an; setChainFx(an); }
       if (chainFxRef.current && window.ppFx53) window.ppFx53.vorladen(links.map(l => l.cardName));
-      setReactionChain([...vor, ...links.map(l => ({ ...l, isInitialCard: vorlauf ? false : l.isInitialCard, status: l.negated ? 'negated' : 'pending' }))]);
+      setReactionChain(prevK => [...vor, ...links.map(l => ({ ...l, rarity: l.rarity || (prevK.find(x => x.id === l.id) || {}).rarity || window.ppRarityLookup(l.cardName, l.owner), isInitialCard: vorlauf ? false : l.isInitialCard, status: l.negated ? 'negated' : 'pending' }))]);
     };
     const chainIdx = (prev, i) => i + (prev?.[0]?._vorlauf ? 1 : 0);
     const fxDomIdx = (linkIndex) => linkIndex + (chainVorlaufRef.current ? 1 : 0);
@@ -46580,7 +46589,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     // Zone. Self-contained (raw DOM, like onPunchImpact) plus a
     // React-state slot-mask so the real card stays hidden across the
     // re-renders that happen mid-flight (damage application etc.).
-    const onPusherFling = ({ owner, heroIdx, zoneSlot, cardName, duration }) => {
+    const onPusherFling = ({ owner, heroIdx, zoneSlot, cardName, duration, rarity }) => {
       if (window.playSFXForZoneAnim) window.playSFXForZoneAnim('ev_pusher_fling');   // Als Befund 10.10.: war stumm (Sweep, ZONE_ANIM_SFX)
       const ownerLabel = ownerLbl(owner, myIdx);
       const sel = `[data-support-zone][data-support-owner="${ownerLabel}"][data-support-hero="${heroIdx}"][data-support-slot="${zoneSlot}"]`;
@@ -46629,7 +46638,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       ].join(';');
       if (imgUrl) {
         const img = document.createElement('img');
-        img.src = imgUrl;
+        img.src = imgUrl; ppFlugRarity(img, cardName, rarity, owner);
         img.style.cssText = 'width:100%;height:100%;object-fit:cover;';
         img.draggable = false;
         card.appendChild(img);
@@ -46649,7 +46658,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     socket.on('play_pusher_fling', onPusherFling);
     // ★ 25.10. (Ultimate Destroyer Punch, Crash Landing): die KARTE selbst fliegt in Pixelschritten (`ppKartenWurf`) — `throw` zum Helden, `crash` in den Ablagestapel. Die Quell-Zone ist
     // währenddessen leer gemalt (gleiche Maske wie beim Pusher), der Standardflug zur Ablage wird auf Wunsch unterdrückt (`suppressDiscard`, gleicher Eimer wie Brackle).
-    const onCardThrow = ({ mode, cardName, fromOwner, fromHeroIdx, fromSlot, toOwner, toHeroIdx, discardOwner, suppressDiscard, duration }) => {
+    const onCardThrow = ({ mode, cardName, fromOwner, fromHeroIdx, fromSlot, toOwner, toHeroIdx, discardOwner, suppressDiscard, duration, rarity }) => {
       if (window.playSFXForZoneAnim) window.playSFXForZoneAnim(mode === 'crash' ? 'ev_card_crash' : mode === 'shatter' ? 'ev_card_shatter' : 'ev_card_throw');
       const srcEl = document.querySelector(`[data-support-zone][data-support-owner="${ownerLbl(fromOwner, myIdx)}"][data-support-hero="${fromHeroIdx}"][data-support-slot="${fromSlot}"]`);
       const dstEl = mode === 'shatter' ? srcEl : mode === 'crash'
@@ -46671,7 +46680,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         sm.set(suppressKey, (sm.get(suppressKey) || 0) + 1);
       }
       const stop = ppKartenWurf({
-        mode, cardUrl: window.cardImageUrl ? window.cardImageUrl(cardName) : null, dauer,
+        mode, cardUrl: window.cardImageUrl ? ppRarityUrl(window.cardImageUrl(cardName), ppRarityOf(CARDS_BY_NAME[cardName], rarity || ppRarityLookup(cardName, fromOwner))) : null, dauer,   // Basiskarte der Rarity (Rahmen/Stempel); der Wurf ist Pixelwerk ohne Funkenebene
         A: { x: sr.left + sr.width / 2, y: sr.top + sr.height / 2, w: sr.width, h: sr.height },
         B: { x: dr.left + dr.width / 2, y: dr.top + dr.height / 2, w: dr.width, h: dr.height },
       });
@@ -46832,7 +46841,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     };
     socket.on('red_lightning_rain', onRedLightningRain);
     // ── Area card placement: big flashy descend + shockwave ──
-    const onAreaDescend = ({ owner, cardName, fromPile }) => {
+    const onAreaDescend = ({ owner, cardName, fromPile, rarity }) => {
       const ownerLabel = ownerLbl(owner, myIdx);
       const zonenSel = `[data-area-zone][data-area-owner="${ownerLabel}"]`;
       const tgtEl = document.querySelector(zonenSel);
@@ -46944,7 +46953,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       }
       if (imgUrl) {
         const img = document.createElement('img');
-        img.src = imgUrl;
+        img.src = imgUrl; ppFlugRarity(img, cardName, rarity, owner);
         img.style.cssText = `width:100%;height:100%;object-fit:cover;border-radius:6px;box-shadow:0 0 28px rgba(255,208,102,.9),0 0 60px rgba(249,172,32,.5);border:2px solid rgba(251,225,129,.95);`;
         img.draggable = false;
         cardEl.appendChild(img);
@@ -47124,7 +47133,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     // Eine Angelschnur haengt an einem Punkt ueber der Ziel-Zone; der Haken packt die Karte im Ablagestapel,
     // zieht sie hoch zum Aufhaengepunkt, sie pendelt hin und her (gedaempfte Schwingung) und wird dann in die
     // Ziel-Zone abgeseilt. Reine DOM-/rAF-Animation (Schnur = gedrehtes Element zwischen Anker und Karte).
-    const onFishingCatch = ({ owner, cardName, toOwner, toHeroIdx, toSlotIdx, durationMs }) => {
+    const onFishingCatch = ({ owner, cardName, toOwner, toHeroIdx, toSlotIdx, durationMs, rarity }) => {
       if (window._playAnimations === false) return;
       const ownerLabel = ownerLbl(owner, myIdx);
       const toLabel = ownerLbl((toOwner ?? owner), myIdx);
@@ -47146,7 +47155,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       const haken = mk(`left:0;top:0;width:12px;height:12px;border:3px solid #ebdcc1;border-top-color:transparent;border-radius:50%;z-index:10022;box-shadow:0 0 6px rgba(255,248,232,.7);`);
       const karte = mk(`left:0;top:0;width:${cardW}px;height:${cardH}px;border-radius:5px;z-index:10019;box-shadow:0 6px 18px rgba(0,0,0,.55),0 0 14px rgba(104,198,253,.7);border:2px solid rgba(180,223,248,.9);overflow:hidden;background:linear-gradient(135deg,#77c8ee,#405f8c);`);
       karte.className = 'card-flight';
-      if (imgUrl) { const im = document.createElement('img'); im.src = imgUrl; im.draggable = false; im.style.cssText = 'width:100%;height:100%;object-fit:cover;'; karte.appendChild(im); }
+      if (imgUrl) { const im = document.createElement('img'); im.src = imgUrl; ppFlugRarity(im, cardName, rarity, owner); im.draggable = false; im.style.cssText = 'width:100%;height:100%;object-fit:cover;'; karte.appendChild(im); }
       const sfx = (name, opts, at) => setTimeout(() => { if (window.playSFX) window.playSFX(name, { ...opts, dedupe: 0 }); }, at);
       sfx('elem_water', { rate: 1.35, volume: 1.2 }, 0);              // Auswerfen/Platschen
       sfx('reveal', { rate: 0.9, volume: 1.0 }, 0.18 * total);          // Haken packt zu
@@ -48773,8 +48782,15 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           return;
         }
       }
+      // Rarity der rammenden Karte: die der Karte auf dem Quellplatz im jetzigen Zustand (Held: die des Helden), sonst aus dem Gedächtnis.
+      const _ramRar = (() => {
+        const pr = spielerLiveRef.current?.[sourceOwner]?.rarity;
+        if (!pr) return undefined;
+        if (sourceZoneSlot != null && sourceZoneSlot >= 0) return (pr.supportZones?.[sourceHeroIdx]?.[sourceZoneSlot] || [])[0] || undefined;
+        return pr.heroes?.[sourceHeroIdx] || undefined;
+      })();
       setRamAnims(prev => [...prev, {
-        id, cardName,
+        id, cardName, rarity: _ramRar,
         srcX: sr.left + sr.width / 2 + _fo.dx, srcY: sr.top + sr.height / 2 + _fo.dy,
         tgtX: tr.left + tr.width / 2 + _fo.dx, tgtY: tr.top + tr.height / 2 + _fo.dy,
         srcOwner: sourceOwner, srcHeroIdx: sourceHeroIdx,
@@ -50133,7 +50149,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     };
     socket.on('divine_time_rewind', onDivineTimeRewind);
 
-    const onDiscardToDeck = ({ owner, cardNames }) => {
+    const onDiscardToDeck = ({ owner, cardNames, rarities }) => {
       const isMe = owner === myIdx;
       const discardSel = isMe ? '[data-my-discard]' : '[data-opp-discard]';
       const deckSel = isMe ? '[data-my-deck]' : '[data-opp-deck]';
@@ -50183,7 +50199,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         `;
         if (imgUrl) {
           const img = document.createElement('img');
-          img.src = imgUrl;
+          img.src = imgUrl; ppFlugRarity(img, cardNames[i], rarities && rarities[i], owner);
           img.style.cssText = 'width:100%;height:100%;object-fit:cover;';
           img.draggable = false;
           card.appendChild(img);
@@ -50201,7 +50217,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     // Generic pile-to-pile flying card animation. Used for moves the
     // automatic hand → pile detector can't see — specifically
     // discard → deleted (Mass Multiplication's consumed source card).
-    const onPileTransfer = ({ owner, cardName, from, to, fromOwner, toOwner, fromHeroIdx, fromSlotIdx, fromHandIdx, fromPermId, toHandIdx, toHeroIdx, toSlotIdx, finalHandSize, zielLayout, flightStyle, faceDown, sfx, landSfx, chainLinkId, flugMs, halten }) => {
+    const onPileTransfer = ({ owner, cardName, from, to, fromOwner, toOwner, fromHeroIdx, fromSlotIdx, fromHandIdx, fromPermId, toHandIdx, toHeroIdx, toSlotIdx, finalHandSize, zielLayout, flightStyle, faceDown, sfx, landSfx, chainLinkId, flugMs, halten, rarity }) => {
       // ★ v1122 (Al 15.9.: „fuer die 4 Karten, die vom Discard ins Deck
       // fliegen, fehlt jeweils ein Woosh-Sound-Effect (wie beim Ziehen
       // von Karten)"). Ein Flug konnte bisher keinen Klang mitbringen —
@@ -51021,7 +51037,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       }, document);
       if (imgUrl) {
         const img = document.createElement('img');
-        img.src = imgUrl;
+        img.src = imgUrl; if (!faceDown) ppFlugRarity(img, cardName, rarity, fromOwner ?? owner);
         img.style.cssText = 'width:100%;height:100%;object-fit:cover;';
         img.draggable = false;
         inhalt.appendChild(img);
@@ -52541,7 +52557,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     };
     socket.on('side_deck_appear', onSideDeckAppear);
 
-    const onDeckToDiscard = ({ owner, cardNames, deleteMode, holdDuration }) => {
+    const onDeckToDiscard = ({ owner, cardNames, deleteMode, holdDuration, rarities }) => {
       const isMe    = owner === myIdx;
       // Pre-register the milled names so the pile-growth auto-detector
       // doesn't spawn a phantom board→pile flight when one of these
@@ -52651,7 +52667,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         ].join(';');
         if (imgUrl) {
           const img = document.createElement('img');
-          img.src        = imgUrl;
+          img.src        = imgUrl; ppFlugRarity(img, cardNames[i], rarities && rarities[i], owner);
           img.style.cssText = 'width:100%;height:100%;object-fit:cover;';
           img.draggable  = false;
           card.appendChild(img);
@@ -52673,7 +52689,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     // physically migrate from one pile to the other instead of just
     // silently disappearing. Mirrors `onDeckToDiscard` but with the
     // discard pile as the source.
-    const onDiscardToDeleted = ({ owner, cardNames }) => {
+    const onDiscardToDeleted = ({ owner, cardNames, rarities }) => {
       const isMe = owner === myIdx;
       if (!Array.isArray(cardNames) || cardNames.length === 0) return;
       // Pre-register the names with the deletedPile-growth auto-
@@ -52736,7 +52752,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         ].join(';');
         if (imgUrl) {
           const img = document.createElement('img');
-          img.src = imgUrl;
+          img.src = imgUrl; ppFlugRarity(img, cardNames[i], rarities && rarities[i], owner);
           img.style.cssText = 'width:100%;height:100%;object-fit:cover;';
           img.draggable = false;
           card.appendChild(img);
@@ -52757,7 +52773,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     // out of the deleted pile (Yang). Distinct green-cyan glow ("back
     // from oblivion") so a glance distinguishes it from the red-purple
     // deletion flight.
-    const onDeletedToDiscard = ({ owner, cardNames }) => {
+    const onDeletedToDiscard = ({ owner, cardNames, rarities }) => {
       const isMe = owner === myIdx;
       if (!Array.isArray(cardNames) || cardNames.length === 0) return;
       // Pre-register so the discardPile-growth auto-detector doesn't
@@ -52818,7 +52834,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         ].join(';');
         if (imgUrl) {
           const img = document.createElement('img');
-          img.src = imgUrl;
+          img.src = imgUrl; ppFlugRarity(img, cardNames[i], rarities && rarities[i], owner);
           img.style.cssText = 'width:100%;height:100%;object-fit:cover;';
           img.draggable = false;
           card.appendChild(img);
@@ -52834,7 +52850,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     };
     socket.on('deleted_to_discard_animation', onDeletedToDiscard);
 
-    const onDeckToAbility = ({ owner, heroIdx, slotIdx, cardName, count, source, destOwner, zoneKind }) => {
+    const onDeckToAbility = ({ owner, heroIdx, slotIdx, cardName, count, source, destOwner, zoneKind, rarity }) => {
       const ownerLabel = ownerLbl(owner, myIdx);
       // 29.9.: Ziel-Zone eines geliehenen Helden liegt auf der anderen Seite.
       const zielLabel = ownerLbl((destOwner ?? owner), myIdx);
@@ -52898,7 +52914,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         ].join(';');
         if (imgUrl) {
           const img = document.createElement('img');
-          img.src = imgUrl; img.style.cssText = 'width:100%;height:100%;object-fit:cover;';
+          img.src = imgUrl; ppFlugRarity(img, cardName, rarity, owner); img.style.cssText = 'width:100%;height:100%;object-fit:cover;';
           img.draggable = false; card.appendChild(img); card.style.opacity = '1';
         } else {
           card.style.background = 'linear-gradient(135deg,#332300,#27180c)';
@@ -53092,7 +53108,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       }
     };
     socket.on('tears_of_creation_animation', onTearsOfCreation);
-    const onHandSteal = ({ fromPlayer, toPlayer, indices, cardNames, count, duration, highlightMs: hlMs, toBaseCount }) => {
+    const onHandSteal = ({ fromPlayer, toPlayer, indices, cardNames, count, duration, highlightMs: hlMs, toBaseCount, rarities }) => {
       if (window.playSFXForZoneAnim) window.playSFXForZoneAnim('ev_hand_steal');   // Als Befund 10.10.: war stumm (Sweep, ZONE_ANIM_SFX)
       stealInProgressRef.current = true;
       const iAmVictim = fromPlayer === myIdx;
@@ -53198,7 +53214,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           const imgUrl = name ? window.cardImageUrl(name) : null;
           if (imgUrl) {
             const img = document.createElement('img');
-            img.src = imgUrl;
+            img.src = imgUrl; ppFlugRarity(img, name, rarities && rarities[i], fromPlayer);
             img.style.cssText = 'width:100%;height:100%;object-fit:cover;';
             img.draggable = false;
             flyEl.appendChild(img);
@@ -58878,10 +58894,10 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                     <BoardCard cardName={playDrag.cardName} rarity={me.rarity?.[playDrag.fromCreation ? 'creationZone' : 'hand']?.[playDrag.idx] || undefined} hp={playDrag.card.hp} maxHp={playDrag.card.hp} hpPosition="creature" style={{ opacity: 0.5 }} />
                   ) : (!isOpp && pendingAdditionalPlay && pendingAdditionalPlay.heroIdx === i && pendingAdditionalPlay.zoneSlot === z
                       && !(cards.length > 0 && cards.every(n => n === pendingAdditionalPlay.cardName))) ? (
-                    <BoardCard cardName={pendingAdditionalPlay.cardName} hp={CARDS_BY_NAME[pendingAdditionalPlay.cardName]?.hp} maxHp={CARDS_BY_NAME[pendingAdditionalPlay.cardName]?.hp} hpPosition="creature" style={{ opacity: 0.6 }} />
+                    <BoardCard cardName={pendingAdditionalPlay.cardName} rarity={ppRarityLookup(pendingAdditionalPlay.cardName, myIdx)} hp={CARDS_BY_NAME[pendingAdditionalPlay.cardName]?.hp} maxHp={CARDS_BY_NAME[pendingAdditionalPlay.cardName]?.hp} hpPosition="creature" style={{ opacity: 0.6 }} />
                   ) : (isOpp && oppPendingPlacement && oppPendingPlacement.heroIdx === i && oppPendingPlacement.zoneSlot === z
                       && !(cards.length > 0 && cards.every(n => n === oppPendingPlacement.cardName))) ? (
-                    <BoardCard cardName={oppPendingPlacement.cardName} hp={CARDS_BY_NAME[oppPendingPlacement.cardName]?.hp} maxHp={CARDS_BY_NAME[oppPendingPlacement.cardName]?.hp} hpPosition="creature" style={{ opacity: 0.6 }} />
+                    <BoardCard cardName={oppPendingPlacement.cardName} rarity={ppRarityLookup(oppPendingPlacement.cardName, oppIdx)} hp={CARDS_BY_NAME[oppPendingPlacement.cardName]?.hp} maxHp={CARDS_BY_NAME[oppPendingPlacement.cardName]?.hp} hpPosition="creature" style={{ opacity: 0.6 }} />
                   ) : cards.length > 0 ? (
                     (() => { const cKey = `${pi}-${i}-${z}`; const cc = (gameState.creatureCounters || {})[cKey];
                     if (cc?._dying) return null;
@@ -60250,7 +60266,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
               || (opp.coolnessStack || []).length > 0
               || (gameState.areaZones?.[oppIdx] || []).includes('Wowhalla, the Hall of the Cool')) && (
               <div className="board-permanents board-permanents-opp">
-                {(opp.permanents || []).map(perm => {
+                {(opp.permanents || []).map((perm, permIdx) => {
                   const permTargetId = `perm-${oppIdx}-${perm.id}`;
                   const isValidPermTarget = isTargeting && validTargetIds.has(permTargetId);
                   const isSelectedPermTarget = selectedSet.has(permTargetId);
@@ -60270,7 +60286,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                         // v1284: verdeckt, solange die Enthuellung noch fliegt.
                         ...(csVerdeckt.has(`${oppIdx}-${perm.name}`) ? { visibility: 'hidden' } : {}),
                       }}>
-                      <BoardCard cardName={perm.name} />
+                      <BoardCard cardName={perm.name} rarity={opp.rarity?.permanents?.[permIdx] || undefined} />
                       {perm.teleportalUntil != null && (
                         <div className="perm-tohand-badge"
                           title="Joins their hand at the start of their next turn">
@@ -60330,7 +60346,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
               || (me.coolnessStack || []).length > 0
               || (gameState.areaZones?.[myIdx] || []).includes('Wowhalla, the Hall of the Cool')) && (
               <div className="board-permanents board-permanents-me">
-                {(me.permanents || []).map(perm => {
+                {(me.permanents || []).map((perm, permIdx) => {
                   const permTargetId = `perm-${myIdx}-${perm.id}`;
                   const isValidPermTarget = isTargeting && validTargetIds.has(permTargetId);
                   const isSelectedPermTarget = selectedSet.has(permTargetId);
@@ -60350,7 +60366,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                         // v1284: verdeckt, solange die Enthuellung noch fliegt.
                         ...(csVerdeckt.has(`${myIdx}-${perm.name}`) ? { visibility: 'hidden' } : {}),
                       }}>
-                      <BoardCard cardName={perm.name} />
+                      <BoardCard cardName={perm.name} rarity={me.rarity?.permanents?.[permIdx] || undefined} />
                       {/* ★ v1084 („Teleportal", Als Vorgabe 14.9.): das
                           offene Permanent ist hier nur ZWISCHENSTATION —
                           es kommt am naechsten Rundenbeginn auf die Hand.
@@ -60572,7 +60588,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                 if (item.isGeist) return (
                   <div key={'g-' + item.geist.id} className="hand-slot hand-geist hand-card-dimmed" data-hand-geist={item.geist.id} data-card-name={item.card}
                     style={{ ...(window.handFanStyle?.(i, anzeigeHand.length, { seite: 'me' })) }}>
-                    <BoardCard cardName={item.card} noTooltip skins={gameSkins} />
+                    <BoardCard cardName={item.card} noTooltip skins={gameSkins} rarity={ppRarityLookup(item.card, myIdx)} />
                   </div>
                 );
                 // ★ 28.8., Als Befund: „wird immer in der Main-Hand
@@ -61005,14 +61021,14 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           <DiscardAnimCard key={anim.id} cardName={anim.cardName} dest={anim.dest}
             startX={anim.startX} startY={anim.startY} endX={anim.endX} endY={anim.endY}
             delay={anim.delay} t0={anim.t0} ausHand={anim.ausHand}
-            startW={anim.startW} startH={anim.startH} endW={anim.endW} />
+            startW={anim.startW} startH={anim.startH} endW={anim.endW} rarity={anim.rarity} owner={anim.owner} />
         ))}
       </div>
       {discardAnims.filter(a => !a.welt).map(anim => (
         <DiscardAnimCard key={anim.id} cardName={anim.cardName} dest={anim.dest}
           startX={anim.startX} startY={anim.startY} endX={anim.endX} endY={anim.endY}
           delay={anim.delay} t0={anim.t0} ausHand={anim.ausHand}
-          startW={anim.startW} startH={anim.startH} endW={anim.endW} />
+          startW={anim.startW} startH={anim.startH} endW={anim.endW} rarity={anim.rarity} owner={anim.owner} />
       ))}
 
       {/* Floating drag card (outside game-layout to avoid overflow clip) */}
@@ -61035,7 +61051,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       )}
       {abilityDrag && (
         <div className="hand-floating-card" style={{ left: 0, top: 0, transform: `translate3d(${abilityDrag.mouseX - (abilityDrag.griffX ?? 32)}px, ${abilityDrag.mouseY - (abilityDrag.griffY ?? 45)}px, 0) rotate(3deg)` }}>
-          <BoardCard cardName={abilityDrag.cardName} />
+          <BoardCard cardName={abilityDrag.cardName} rarity={me.rarity?.[abilityDrag.fromCreation ? 'creationZone' : 'hand']?.[abilityDrag.idx] || undefined} />
         </div>
       )}
 
@@ -61243,7 +61259,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
             '--ramAngle': (r.angle || 0) + 'deg',
             animationDuration: r.dur + 'ms',
           }}>
-            <BoardCard cardName={r.cardName} noTooltip />
+            <BoardCard cardName={r.cardName} rarity={r.rarity} noTooltip />
             {r.trailType === 'fire' ? (
               /* Auspuff-Fahne am Heck. Die Karte ist um `--ramAngle`
                  gedreht (Oberkante zeigt zum Ziel), „unten" ist also
@@ -61415,7 +61431,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       {/* Card transfer animations (Dark Gear creature steal, etc.) */}
       {claimHolds.map(h => (
         <div key={h.id} className="transfer-anim-card claim-hold-card" style={{ left: h.x, top: h.y }}>
-          <BoardCard cardName={h.cardName} noTooltip />
+          <BoardCard cardName={h.cardName} rarity={ppRarityLookup(h.cardName)} noTooltip />
         </div>
       ))}
       {transferAnims.map(t => (
@@ -61425,7 +61441,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           '--transferDy': (t.tgtY - t.srcY) + 'px',
           animationDuration: t.dur + 'ms',
         }}>
-          <BoardCard cardName={t.cardName} noTooltip />
+          <BoardCard cardName={t.cardName} rarity={ppRarityLookup(t.cardName)} noTooltip />
         </div>
       ))}
 
@@ -63235,7 +63251,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           {ep.description && <div style={{ fontSize: 12, color: 'var(--text2)', marginBottom: 10 }}>{ep.description}</div>}
           {ep.cardName && (
             <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 10 }}>
-              <BoardCard cardName={ep.cardName} style={{ width: 110, height: 154, borderRadius: 6, boxShadow: '0 0 18px rgba(102,255,162,.55)' }} />
+              <BoardCard cardName={ep.cardName} rarity={ppRarityLookup(ep.cardName, myIdx)} style={{ width: 110, height: 154, borderRadius: 6, boxShadow: '0 0 18px rgba(102,255,162,.55)' }} />
             </div>
           )}
           <div style={{
@@ -63269,7 +63285,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                     boxShadow: '0 0 50px rgba(0,0,0,.9), 0 0 100px rgba(255,255,255,.08)',
                     borderRadius: 8,
                   }}>
-                    <div className="pp-aufdeck-karte" style={{ width: 220, height: 308 }}><BoardCard cardName={cn} style={{ width: '100%', height: '100%', borderRadius: 8 }} /></div>
+                    <div className="pp-aufdeck-karte" style={{ width: 220, height: 308 }}><BoardCard cardName={cn} rarity={ppRarityLookup(cn)} style={{ width: '100%', height: '100%', borderRadius: 8 }} /></div>
                   </div>
                 ))}
               </div>
@@ -63639,7 +63655,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
               260×364 auf dem Desktop, auf Telefonen relativ zur
               Bildschirmhoehe — die Animation waechst noch auf das
               2,1-Fache, auf 390 px Hoehe war das eine Wand. */}
-          <BoardCard cardName={cardShowcase.cardName} noTooltip
+          <BoardCard cardName={cardShowcase.cardName} rarity={ppRarityLookup(cardShowcase.cardName)} noTooltip
             style={{ width: 'var(--showcase-w)', height: 'var(--showcase-h)', filter: 'drop-shadow(0 0 40px rgba(0,0,0,.9))' }} />
         </div>
       )}

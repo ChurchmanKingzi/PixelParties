@@ -6975,6 +6975,78 @@ function RarityLayer({ card, rarity, animated, werte }) {
 window.RarityLayer = RarityLayer;
 
 /**
+ * Rarity einer fliegenden/aufgedeckten Karte aus dem zuletzt bekannten Zustand (`window.ppRarityMem`, vom Brett gepflegt: { jetzt, vorher } =
+ * players-Listen der letzten beiden Zustände), wenn das Ereignis keine `rarity` mitbringt. Erster Treffer des Namens (Hand, Brett, Ablage …);
+ * `owner` (Spielerindex) engt ein, sonst zählen beide Seiten. Gibt undefined für Common/unbekannt zurück.
+ */
+function ppRarityLookup(name, owner) {
+  const m = window.ppRarityMem;
+  if (!m || !name) return undefined;
+  const flatSuche = (p, r, zone) => {
+    const a = p[zone], b = r[zone];
+    if (!Array.isArray(a) || !Array.isArray(b)) return -1;
+    return zone === 'hand' || zone === 'creationZone' ? a.indexOf(name) : a.lastIndexOf(name);   // Stapel: die zuletzt hinzugekommene Kopie liegt oben
+  };
+  for (const lst of [m.jetzt, m.vorher]) {
+    if (!lst) continue;
+    for (let pi = 0; pi < lst.length; pi++) {
+      if (owner != null && pi !== owner) continue;
+      const p = lst[pi], r = p && p.rarity;
+      if (!r) continue;
+      for (const z of ['hand', 'creationZone', 'discardPile', 'deletedPile', 'coolnessStack']) {
+        const i = flatSuche(p, r, z);
+        if (i >= 0) return (r[z] && r[z][i]) || undefined;
+      }
+      for (const z of ['supportZones', 'abilityZones']) {
+        const zz = p[z], rz = r[z];
+        if (!Array.isArray(zz) || !Array.isArray(rz)) continue;
+        for (let h = 0; h < zz.length; h++) for (let s = 0; s < (zz[h] || []).length; s++) {
+          const i = (zz[h][s] || []).indexOf(name);
+          if (i >= 0) return (rz[h] && rz[h][s] && rz[h][s][i]) || undefined;
+        }
+      }
+      const hi = (p.heroes || []).findIndex(h => h && h.name === name);
+      if (hi >= 0) return (r.heroes && r.heroes[hi]) || undefined;
+    }
+  }
+  return undefined;
+}
+window.ppRarityLookup = ppRarityLookup;
+
+/**
+ * Rarity für ein fliegendes Kartenbild (vanilla DOM): setzt die Basiskarte der Stufe (`?rar=`) und legt EINE Standbild-Canvas darüber
+ * (`PpRarityFx.attach`, animated: false — kein Dauerlauf; Common und unbekannte Karten: nichts). Aufruf direkt nach `img.src = …`; die Ebene
+ * kommt, sobald das Bild einen Elternknoten hat, und endet mit dem Flug (`lebenMs`).
+ * @param {HTMLImageElement} img @param {string} cardName @param {string} [rarity] vom Server mitgegeben @param {number} [owner] Spielerindex
+ */
+function ppFlugRarity(img, cardName, rarity, owner, lebenMs) {
+  try {
+    const fx = window.PpRarityFx;
+    const card = window.CARDS_BY_NAME && window.CARDS_BY_NAME[cardName];
+    if (!img || !fx || !card) return;
+    const r = ppRarityOf(card, rarity || ppRarityLookup(cardName, owner));
+    if (r === 'common' || !fx.available(r)) return;
+    const roh = img.getAttribute('src');
+    if (roh) img.src = ppRarityUrl(roh, r);
+    const los = () => {
+      const host = img.parentElement;
+      if (!host) return false;
+      if (getComputedStyle(host).position === 'static') host.style.position = 'relative';
+      const layer = document.createElement('div');
+      layer.className = 'pp-rarity-layer';
+      layer.setAttribute('data-rarity', r);
+      layer.setAttribute('aria-hidden', 'true');
+      host.appendChild(layer);
+      const inst = fx.attach(layer, { card, rarity: r, animated: false, img });
+      setTimeout(() => { try { inst.destroy(); layer.remove(); } catch {} }, lebenMs || 9000);
+      return true;
+    };
+    Promise.resolve().then(() => { if (!los()) setTimeout(los, 40); });
+  } catch (e) { /* Flug ohne Rarity ist besser als kein Flug */ }
+}
+window.ppFlugRarity = ppFlugRarity;
+
+/**
  * Alles über dem Kartenbild: Rarity-Effekt (`RarityLayer`), Skin-Holo (Skin-Karten), Schraffur und Rahmenglanz der Vollbild-Helden.
  * Aufrufer schreiben `<CardFoil card={card} skin={…} werte={…} rarity={…} animated />`; ohne Rarity/Skin/Vollbild rendert sie nichts.
  * Ein Skin ersetzt den Rarity-Effekt (zwei Effekte übereinander wären unruhig); Kleinansichten und das Brett zeigen nur Standbilder.

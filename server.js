@@ -16487,6 +16487,7 @@ io.on('connection', (socket) => {
         }
       }
     }
+    if (validMap) RarityTrack.permute(room.gameState, pi, 'hand', validMap);   // Rarity je Kopie: folgt der Kopie durch das Umsortieren
     ps.hand = hand;
     // Array reassignment wiped the splice interceptor — re-install.
     if (room.engine) room.engine._installHandRevealInterceptor(pi);

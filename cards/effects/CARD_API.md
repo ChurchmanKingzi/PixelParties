@@ -1022,6 +1022,13 @@ Feld `rarity` der Karte oder Prop, Standard Common). Der alte Foil (`card.foil`,
   zeigt die Karte den Effekt nicht (der Server würfelt solche Karten nie als Umbra/Stained).
 * **Test-Schalter:** `?rarity=<id>` (oder `mix` = je Kartenname eine andere Stufe) in der Adresse bzw. `window.__ppTestRarity` setzt die Rarity ALLER Karten.
 * Skin-Karten behalten ihr eigenes Holo (`SkinHolo`) statt des Rarity-Effekts.
+* **Kopien-Identität im Duell (`cards/effects/_rarity-track.js`):** Die Engine kennt Karten nur als Namen; jede PHYSISCHE Kopie behält ihre Rarity trotzdem über
+  alle Zonenwechsel (Deck, Hand, Brett, Ablage, Gelöscht, Permanents). Je Spieler mit Nicht-Common-Karten gibt es `ps.rarityShadow` (parallele Rarity-Arrays je Zone),
+  das beim Senden gegen die echten Zonen abgeglichen wird. **Skripte müssen dafür nichts tun** — Karten dürfen Zonen direkt mutieren. Zwei gleichnamige Kopien
+  mit verschiedener Rarity in EINER Zone löst die Hand-Splice-Überlagerung, die Ablage-/Gelöscht-Überlagerung (`splice`/`pop`/`shift`) und `reorder_hand` über
+  `engine._rarityTake` auf; eigene Karten-Datenstrukturen, die Karten aus Zonen nehmen, ohne dass der Name in einer anderen Zone auftaucht, brauchen nichts.
+  Ereignisse (`play_pile_transfer`, `card_reveal`, `deck_to_discard_animation` …) tragen `rarity`/`rarities`, wenn die Karte eine hat (`_broadcastEvent`); der Client
+  fällt sonst auf `ppRarityLookup(name, owner)` zurück. Fliegende Kartenbilder (vanilla DOM): `ppFlugRarity(img, name, rarity, owner)` direkt nach `img.src = …`.
 
 ## ★ ZONEN-EINSCHLAG: JEDE PLATZIERUNG WIRD SICHTBAR (v1206 — Als Vorgabe 18.9.)
 

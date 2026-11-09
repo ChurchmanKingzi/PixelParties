@@ -2460,6 +2460,12 @@ class GameEngine {
     if (del > 0) this._rarityTake(pi, key, start, del);
   }
 
+  /** Ereignisdaten mit `rarity`/`rarities` der betroffenen Karten ergaenzen (nur wenn ein Spieler Nicht-Common-Karten im Deck hat). */
+  _rarityMitEreignis(event, data) {
+    if (!data || !this.gs?.players?.some(ps => ps && ps.rarityLedger)) return data;
+    try { return require('./_rarity-track').eventRarity(this.gs, event, data); } catch (e) { console.error('[rarity] event:', e.message); return data; }
+  }
+
   _rarityTake(pi, key, start, count) {
     if (this._fastMode || this._inMctsSim) return;
     const ps = this.gs?.players?.[pi];
@@ -47507,12 +47513,22 @@ this._deathWatch = (this._deathWatchStack || []).length
       .map(l => ({ id: l.id, cardName: l.cardName, owner: l.owner, fromHandIdx: l.fromHandIdx }));
   }
 
+  /** Rarity der Karte eines Kettenglieds, einmal beim ersten Mal festgehalten (die Karte hat die Hand dann meist schon verlassen). */
+  _rarityFuerKettenglied(l) {
+    if (l._rarity !== undefined) return l._rarity || undefined;
+    if (!this.gs?.players?.some(ps => ps && ps.rarityLedger)) return undefined;
+    let r = null;
+    try { r = require('./_rarity-track').rarityOf(this.gs, l.owner, l.cardName, ['hand', 'dp', 'S*', 'cz'], { idx: l.fromHandIdx, idxZone: 'hand' }); } catch {}
+    l._rarity = r;
+    return r || undefined;
+  }
+
   _broadcastChainUpdate(chain) {
     this._broadcastEvent('reaction_chain_update', {
       vorlauf: this._chainVorlauf || null,
       geister: this._kettenGeister(chain),
       links: chain.map(l => ({
-        id: l.id, cardName: l.cardName, owner: l.owner,
+        id: l.id, cardName: l.cardName, owner: l.owner, rarity: this._rarityFuerKettenglied(l),
         cardType: l.cardType, isInitialCard: l.isInitialCard,
         negated: l.negated, negationStyle: l.negationStyle || null, chainClosed: l.chainClosed,
       })),
@@ -59428,6 +59444,7 @@ this._deathWatch = (this._deathWatchStack || []).length
   _broadcastEvent(event, data, opts) {
     if (this._aborted) return;
     if (this._fastMode) return; // Silent during MCTS simulations.
+    data = this._rarityMitEreignis(event, data);   // Rarity der fliegenden/aufgedeckten Karte mitgeben (Identitaetsverfolgung, _rarity-track.js)
     // Pfeilsalve: die Standard-Animationen einer Attack mit Pfeilen werden zurueckgehalten und reisen mit `play_arrow_salvo` (Fallback fuer Clients ohne Salve).
     if (event === 'reaction_chain_done' && this._pfeilSchild && !this._pfeilSchild.aktiv && !this._pfeilSchild.fertig) this._pfeilSchild.aktiv = true;   // Pfeilsalve: ab Kettenende scharf
     if (this._pfeilSchild && this._pfeilSchild.aktiv && require('./_arrows-shared').PFEIL_SCHILD_EVENTE.has(event)) { this._pfeilSchild.puffer.push([event, data, opts, Date.now()]); return; }
