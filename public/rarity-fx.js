@@ -974,10 +974,9 @@
   //  Schichten (unten nach oben): Glas im 150x210-Raster (Kacheln mit Innenlicht, Puls, Lichtstrahlen, Bleiruten) -> Motiv (Original, `cut`) -> Lichtband-Tint des Motivs
   //  (Kunstpixel-Raster) -> Funken und Staub. Je Bild laufen nur: Kachelhelligkeit (Puls/Funken), Strahltabelle, Glaspixel (Tabellenzugriff), Motivpixel im Lichtband, Funken.
   //  Alles andere ist je Karte einmal vorberechnet (Zeitscheiben `prepG` / `warm`).
-  const JEWELS = [.985, .05, .115, .385, .5, .615, .72, .83];   // Farbtoene: Rubin, Orange, Bernstein, Smaragd, Tuerkis, Saphir, Violett, Magenta
-  const STAIN = { seed: 5, rArt: 12, rArtMin: 8, minArea: 30, base: 0, glow: 9.5, glowRel: .85, glowPow: .9 };   // Kachelgroesse (Radius in Zellen), Mindestflaeche, Grundstufe, Innenlicht (Stufen, Reichweite, Verlauf)
+  const STAIN = { seed: 5, rArt: 12, rArtMin: 8, minArea: 30, base: 1.3, glow: 4.8, glowRel: .85, glowPow: .9 };   // Kachelgroesse (Radius in Zellen), Mindestflaeche, Grundstufe, Innenlicht (Stufen, Reichweite, Verlauf)
   const LEAD = [18, 16, 22], LEAD_MID = [50, 50, 62], LEAD_GRAIN = [34, 32, 42], LEAD_SHINE = [120, 124, 140], LEAD_GL = [255, 236, 160];
-  const GL_SZ = [0, 1, 2, 3, 3, 2, 1, 0, -1, -1], GL_HOP = 10, GL_N = 9, GL_NH = 40, NU = 360, SGL_N = 3;
+  const GL_SZ = [0, 1, 2, 3, 3, 2, 1, 0, -1, -1], GL_HOP = 10, GL_N = 5, GL_NH = 40, NU = 360, CS_SZ = [0, 1, 2, 1];
   /** Rechenarbeit in Zeitscheiben: Generator, der zwischen den Teilschritten `yield`et (der Aufrufer gibt dem Hauptfaden zwischendurch Luft) */
   function* stainedBuildG(E) {
     const opt = STAIN, { B, L, A, S } = E, r = rng(opt.seed);
@@ -1023,38 +1022,23 @@
       if (v.dist[p] > dmax[c]) dmax[c] = v.dist[p];
       if (A[p]) { if (A[p + 1] && v.id[p + 1] !== c) { adj[c].add(v.id[p + 1]); adj[v.id[p + 1]].add(c); } if (A[p + GW] && v.id[p + GW] !== c) { adj[c].add(v.id[p + GW]); adj[v.id[p + GW]].add(c); } }
     }
-    // Glasfarbe je Kachel: jede Karte bekommt ein stimmiges Farbschema aus den drei vorherrschenden Farbtoenen ihres Bildes (plus Gold und wenig Milchglas); die Kachel folgt ihrem Bildton
-    // (zum naechsten Schematon gezogen) oder wird nach Gewicht gewaehlt. Nachbarn bekommen verschiedene Farbtoene. lb: Grundhelligkeitsstufe (die Bildhelligkeit der Kachel fliesst ein).
-    const ph = new Float32Array(n), hue = new Float32Array(n), sat = new Float32Array(n), lb = new Float32Array(n), hvs = [];
-    const cd = (a, b) => { let d = b - a; d -= Math.round(d); return d; };   // Farbton-Differenz im Kreis (-.5 .. .5)
-    const hist = new Float64Array(24);
-    for (let c = 0; c < n; c++) {
-      const hv = cnt[c] ? rgb2hsv(sum[c * 3] / cnt[c], sum[c * 3 + 1] / cnt[c], sum[c * 3 + 2] / cnt[c]) : [0, 0, .3]; hvs.push(hv);
-      if (hv[1] > .2 && hv[2] > .2) hist[Math.floor(hv[0] * 24) % 24] += cnt[c] * hv[1] * hv[2];
-    }
-    const scheme = [], wsch = [];   // drei Spitzen des Farbton-Histogramms (je mindestens 3 Klassen auseinander)
-    for (let k = 0; k < 3; k++) {
-      let bi = -1, bv = 0;
-      for (let i = 0; i < 24; i++) { let ok = true; for (const q of scheme) { let dd = Math.abs(i - Math.round(q * 24)); dd = Math.min(dd, 24 - dd); if (dd < 3) ok = false; } if (ok && hist[i] > bv) { bv = hist[i]; bi = i; } }
-      if (bi < 0) break; scheme.push((bi + .5) / 24); wsch.push(bv);
-    }
-    if (!scheme.length) scheme.push(JEWELS[Math.floor(hash(1, 2, opt.seed) * JEWELS.length)], 0, 0);   // graues Bild: ein Edelstein als Leitfarbe
-    while (scheme.length < 3) scheme.push(fract(scheme[0] + (scheme.length === 1 ? .33 : .66)));
+    // Glasfarbe je Kachel: die ECHTE lokale Bildfarbe der Kachel (Mittel der Bildzellen, kraeftiger gesaettigt und aufgehellt; Gruen bleibt Gruen, Blau bleibt Blau).
+    // Variation je Kachel nur als Helligkeit (Stufe lb) und kleine Farbton-Nachbarschaft (+-.06 = +-22 Grad); dunkle Kacheln bekommen den Grundton des Bildes.
+    // Akzente sparsam und passend: wenig Milchglas, Goldglas nur bei warmen Kacheln.
+    const ph = new Float32Array(n), hue = new Float32Array(n), sat = new Float32Array(n), lb = new Float32Array(n);
+    let ar = 0, ag = 0, ab = 0, an = 0;
+    for (let p = 0; p < NPX; p++) if (A[p] && !S[p] && L[p] > .12) { ar += B[p * 4]; ag += B[p * 4 + 1]; ab += B[p * 4 + 2]; an++; }
+    const baseHue = an ? rgb2hsv(ar / an, ag / an, ab / an)[0] : 0;
     for (let c = 0; c < n; c++) {
       ph[c] = r();
-      const hv = hvs[c], u1 = hash(c, 21, opt.seed), u2 = hash(c, 23, opt.seed), u3 = hash(c, 29, opt.seed), u4 = hash(c, 37, opt.seed);
-      let h, s;
-      if (u3 < .06) { h = .12 + u2 * .04; s = .14 + u1 * .1; }                         // Milchglas
-      else {
-        if (u3 < .12) h = .115 + (u2 - .5) * .03;                                      // Goldglas als Akzent
-        else if (u3 < .17) h = scheme[0] + .5 + (u2 - .5) * .12;                       // Komplementaerton als Akzent
-        else if (hv[1] > .18 && hv[2] > .2 && u4 < .94) { let bj = scheme[0]; for (const j of scheme) if (Math.abs(cd(hv[0], j)) < Math.abs(cd(hv[0], bj))) bj = j; h = hv[0] + cd(hv[0], bj) * .25; }
-        else h = scheme[u2 < .62 ? 0 : u2 < .9 ? 1 : 2];
-        h += (u1 - .5) * .05;
-        for (const nb of adj[c]) if (nb < c) { const dd = cd(hue[nb], h); if (Math.abs(dd) < .028) h += (dd >= 0 ? 1 : -1) * (.035 + u3 * .03); }
-        h = fract(h); s = clamp(.6 + hv[1] * .36 + u1 * .12, .6, .97);
-      }
-      hue[c] = h; sat[c] = s; lb[c] = opt.base + u2 * 1.2 + clamp((hv[2] - .4) * 2.6, -1.5, 1.7);
+      const hv = cnt[c] ? rgb2hsv(sum[c * 3] / cnt[c], sum[c * 3 + 1] / cnt[c], sum[c * 3 + 2] / cnt[c]) : [0, 0, .2];
+      const u1 = hash(c, 21, opt.seed), u2 = hash(c, 23, opt.seed), u3 = hash(c, 29, opt.seed);
+      const dark = hv[2] < .3;
+      let h = dark ? baseHue : hv[0], s = dark ? .72 : clamp(hv[1] * 1.55 + .05), vv = dark ? clamp(hv[2] * 1.3 + .2, .3, .6) : clamp(hv[2] * 1.38 + .1, .36, 1);
+      h = fract(h + (u1 - .5) * .12);
+      if (u3 < .035) { s = .14 + u1 * .1; h = .12; vv = Math.max(vv, .7); }                      // Milchglas
+      else if (u3 < .07 && h > .04 && h < .2) { h = .115 + (u2 - .5) * .03; s = Math.max(s, .8); }   // Goldglas nur bei warmen Kacheln
+      hue[c] = h; sat[c] = s; lb[c] = opt.base + 3.8 * vv + (u2 - .5) * 1.2;
     }
     const lead = edges(v.id, 1);
     return { v, n, ph, hue, sat, lb, dmax, lead, sites, adj: adj.map(s => Int32Array.from(s)) };
@@ -1070,14 +1054,6 @@
     const col = stainRamp(pre.hue[c], pre.sat[c], .28 + .09 * L), vv = sn(col[0], col[1], col[2]);
     pre.tab[c * 16 + L] = vv; return vv;
   }
-  /** Kunstpixel-Farben des Bildfelds (K-unabhaengig): je Maskenpixel die Farbe in der Mitte seines Blocks im Kartenbild (Basiskarte) */
-  function stainArtRGB(img, e, full) {
-    const nw = img.naturalWidth, f = nw / 750, sx = full ? 0 : Math.round(70 * f), sy = full ? 0 : Math.round(170 * f), sw = full ? nw : Math.round(610 * f), sh = full ? img.naturalHeight : Math.round(400 * f);
-    const [c, g] = cv2d(sw, sh, true); g.imageSmoothingEnabled = false; g.drawImage(img, sx, sy, sw, sh, 0, 0, sw, sh);
-    const d = g.getImageData(0, 0, sw, sh).data, out = new Uint32Array(e.w * e.h);
-    for (let y = 0; y < e.h; y++) for (let x = 0; x < e.w; x++) { const o = ((Math.min(sh - 1, Math.floor((y + .5) * sh / e.h)) * sw) + Math.min(sw - 1, Math.floor((x + .5) * sw / e.w))) * 4; out[y * e.w + x] = d[o] | (d[o + 1] << 8) | (d[o + 2] << 16); }
-    return out;
-  }
   FX.stain = {
     noText: true,   // keine eigenen Textebenen: Name, Werte, Regeltext, Symbole bleiben das Basisbild
     prep(E) { return runSync(FX.stain.prepG(E)); },
@@ -1090,20 +1066,18 @@
       return st;
     },
     frame(E, st, t, o) {
-      const pre = st.pre || (st.pre = stainPre(E, st)), { n, kfd, fl, lut, tab, cph } = pre, ft = Math.floor(t * 15 + 1e-4), TAU = 6.283185;
-      // Glasfunken wandern von Kachel zu Kachel (jeder Funke: eigener Weg, GL_HOP Bilder je Kachel); die Kachel leuchtet im Takt des Funkens auf
+      const pre = st.pre || (st.pre = stainPre(E, st)), { n, kfd, fl, lut, tab } = pre, ft = Math.floor(t * 15 + 1e-4);
+      // Glasfunken wandern von Kachel zu Kachel (jeder Funke: eigener Weg, GL_HOP Bilder je Kachel); die Kachel leuchtet im Takt des Funkens kurz auf (kein Dauerpuls)
       fl.fill(0); let gi = 0;
       if (n) for (let k = 0; k < GL_N; k++) {
-        const gt = ft + k * 7 + 17, hop = Math.floor(gt / GL_HOP), sz = GL_SZ[gt - hop * GL_HOP];
+        const gt = ft + k * 13 + 17, hop = Math.floor(gt / GL_HOP), sz = GL_SZ[gt - hop * GL_HOP];
         if (sz < 0) continue;
         const c = pre.path[k * GL_NH + hop % GL_NH];
         if (sz + 1 > fl[c]) fl[c] = sz + 1;
         pre.gx[gi] = pre.sx[c]; pre.gy[gi] = pre.sy[c]; pre.gs[gi] = sz + (k % 3 === 0 && sz > 2 ? 1 : 0); gi++;
       }
       pre.gn = gi;
-      // Puls je Kachel in 5 harten Stufen, gegeneinander versetzt
-      const pt = ft / 15 / 2.6;
-      for (let c = 0; c < n; c++) { let ps = Math.floor(2.5 + 2.5 * Math.sin(TAU * (pt + cph[c]))); if (ps > 4) ps = 4; kfd[c] = (ps - 2) * 1.05 + fl[c] * 1.3; }
+      for (let c = 0; c < n; c++) kfd[c] = fl[c] * 1.2;
       // Lichtstrahlen: zwei Lichtbaender (Sonne durchs Kirchenfenster) laufen langsam diagonal ueber das Glas; Streifen im Band = Strahlen
       lut.fill(0); pre.lutMax = 0;
       const sec = ft / 15;
@@ -1111,67 +1085,57 @@
         const per = b ? 11.5 : 7.5, hw = b ? 18 : 44, amp = b ? 5.2 : 4.4, pos = -60 + (((sec + (b ? 4.6 : 0)) / per) % 1) * (NU + 120), ip = Math.round(pos);
         for (let u = Math.max(0, ip - hw); u <= Math.min(NU - 1, ip + hw); u++) { const k = 1 - Math.abs(u - pos) / hw; if (k > 0) { const v = lut[u] += amp * k * (2 - k) * pre.ray[(u - ip + 200) & 255]; if (v > pre.lutMax) pre.lutMax = v; } }
       }
-      // Glas: Stufe = Innenlicht/Saum (fest) + Puls/Funken (je Kachel) + Lichtband (je Lichtkoordinate); Bayer-Raster verteilt die Bruchteile (Dithering in Stufen)
+      // Glas: Stufe = Grundleuchtkraft/Innenlicht/Saum (fest je Pixel) + Funkenflackern + Lichtband (je Lichtkoordinate); Bayer-Raster verteilt die Bruchteile (Dithering in Stufen)
       o.set(pre.base);
       const { fp, fc, fs, fu, fth } = pre;
       for (let q = 0; q < fp.length; q++) {
         const c = fc[q]; let L = (fs[q] + kfd[c] + lut[fu[q]] + fth[q]) | 0; L = L < 0 ? 0 : L > 15 ? 15 : L;
         o[fp[q]] = tab[c * 16 + L] || stainTab(pre, c, L);
       }
-      // Glanzlichter der Kacheln (kurze Diagonale oben links): im Takt je Kachel weiss, solange ein Funke auf der Kachel sitzt
-      { const { kp, kc, kt } = pre;
-        for (let q = 0; q < kp.length; q++) { const c = kc[q], L = ((ft + kt[q]) % 29) < 3 || fl[c] > 1.5 ? 15 : 13; o[kp[q]] = tab[c * 16 + L] || stainTab(pre, c, L); } }
+      // festes Glanzlicht je Kachel (kurze Diagonale oben links)
+      { const { kp, kc } = pre; for (let q = 0; q < kp.length; q++) { const c = kc[q]; o[kp[q]] = tab[c * 16 + 13] || stainTab(pre, c, 13); } }
+      // Glanzblitz je Kachel: ein schmaler heller Diagonalstreifen huscht in 3 Bildern ueber EINE Kachel; jede Kachel hat Takt und Versatz, die Abstaende sind unregelmaessig
+      { const { gP, gO, ts, tkey, tpx, tkmin, tkmax } = pre;
+        for (let c = 0; c < n; c++) {
+          const P = gP[c]; if (!P) continue;
+          const u = ft + gO[c], k = Math.floor(u / P), f = u - k * P - Math.floor(hash(c, k, 61) * (P - 3)); if (f < 0 || f > 2) continue;
+          const kk = tkmin[c] + Math.round((f + .5) / 3 * (tkmax[c] - tkmin[c])), w = tab[c * 16 + 15] || stainTab(pre, c, 15), w2 = tab[c * 16 + 13] || stainTab(pre, c, 13);
+          for (let j = ts[c]; j < ts[c + 1]; j++) { const dk = tkey[j] - kk; if (dk === 0 || dk === 1) o[tpx[j]] = w; else if (dk === -1) o[tpx[j]] = w2; }
+        } }
       // Licht auf den Bleiruten: im Lichtband glaenzen die Ruten
       if (pre.lutMax > 2.2) { const { lbp, lbu, leadHi } = pre; for (let q = 0; q < lbp.length; q++) { const l = lut[lbu[q]]; if (l > 2.2) o[lbp[q]] = l > 4 ? leadHi[1] : leadHi[0]; } }
       // Glanzpunkte auf den Bleiruten
       const ls = pre.lsp;
       if (ls.length) for (let s = 0; s < 12; s++) { const tt = ft + s * 4, k = Math.floor(tt / 7); if (tt - k * 7 > 2) continue; o[ls[Math.floor(hash(k, s, 303) * ls.length)]] = pre.leadGl; }
     },
-    /** nach dem Motiv (Original): Lichtband auf dem Motiv (farbig durch die Kachel, im Kunstpixel-Raster), danach Funken und Staub (ganz oben, im Raster der Karte) */
+    /** nach dem Motiv (Original, unberuehrt): Funkensterne ganz oben (Raster der Karte), nur auf dem gekachelten Hintergrund, nie auf dem Motiv */
     after(core, view, g, st, t) {
       const pre = st.pre; if (!pre) return;
-      const e = core.e, W = view.W, H = view.H, K = view.K, full = core.full, ax = full ? 0 : 14 * K, ay = full ? 0 : 34 * K, aw = full ? W : 122 * K, ah = full ? H : 80 * K;
-      const { lut, tab, tq, tc, tu, tr, tg, tb } = pre, T32 = pre.t32;
-      if (pre.lutMax > .9 || pre.tOn) {   // ohne Lichtband auf dem Motiv bleibt die Tint-Ebene leer: nichts zeichnen (ein leeres Bild genuegt nach dem Abklingen)
-        T32.fill(0); let any = false;
-        if (pre.lutMax > .9) for (let q = 0; q < tq.length; q++) {
-          const lu = lut[tu[q]]; if (lu < .9) continue;
-          const c = tc[q], r0 = tr[q], g0 = tg[q], b0 = tb[q], mw = lu > 3 ? .22 : lu > 1.8 ? .15 : .09, gv = tab[c * 16 + 10] || stainTab(pre, c, 10);
-          T32[tq[q]] = snIn(r0 + ((gv & 255) - r0) * mw, g0 + (((gv >> 8) & 255) - g0) * mw, b0 + (((gv >> 16) & 255) - b0) * mw); any = true;
-        }
-        pre.tOn = any; pre.tCx.putImageData(pre.tIm, 0, 0); g.drawImage(pre.tCv, 0, 0, e.w, e.h, ax, ay, aw, ah);
-      }
-      const top = pre.top32, A = core.A, sc = pre.sc, ft = Math.floor(t * 15 + 1e-4);
+      const W = view.W, H = view.H, top = pre.top32, gm = pre.gm, sc = pre.sc, ft = Math.floor(t * 15 + 1e-4);
       top.fill(0);
-      for (let k = 0; k < pre.gn; k++) stainStar(top, A, pre.gx[k], pre.gy[k], pre.gs[k], sc);
-      const sp = pre.sps;
-      if (sp.length) for (let s = 0; s < SGL_N; s++) {   // Funken auch auf dem Motiv
-        const tt = ft + s * 9, k = Math.floor(tt / 16), f = tt - k * 16; if (f > 6) continue;
-        const p = sp[Math.floor(hash(k, s, 411) * sp.length)]; stainStar(top, A, p % GW, (p / GW) | 0, SPARK_SIZE[f], sc);
-      }
-      // Staub: einzelne Lichtpunkte blitzen kurz an wechselnden Stellen des Glases auf
-      const lead = pre.lead2;
-      for (let s = 0; s < 18; s++) {
-        const tt = ft + s * 5, k = Math.floor(tt / 11), f = tt - k * 11; if (f > 3) continue;
-        const x = AX0 + Math.floor(hash(k, s, 501) * AW), y = AY0 + Math.floor(hash(k, s, 502) * AH), p = y * GW + x; if (!A[p] || lead[p]) continue;
-        top[p] = sc[f === 1 ? 0 : 1];
-        if (f === 1 || f === 2) { const c1 = sc[1]; if (A[p - 1] && !lead[p - 1]) top[p - 1] = c1; if (A[p + 1] && !lead[p + 1]) top[p + 1] = c1; if (A[p - GW] && !lead[p - GW]) top[p - GW] = c1; if (A[p + GW] && !lead[p + GW]) top[p + GW] = c1; }
-      }
+      for (let k = 0; k < pre.gn; k++) stainStar(top, gm, pre.gx[k], pre.gy[k], pre.gs[k], sc);
+      // Eckfunken: kleine Sternchen an Kachelecken/-kanten, je Kachel eigener Takt (2 bis 4 Bilder)
+      { const { cP, cO, cx, cy } = pre;
+        for (let c = 0; c < pre.n; c++) {
+          const P = cP[c]; if (!P) continue;
+          const u = ft + cO[c], k = Math.floor(u / P), f = u - k * P - Math.floor(hash(c, k, 71) * (P - 4)); if (f < 0 || f > 3) continue;
+          stainStar(top, gm, cx[c], cy[c], CS_SZ[f], sc);
+        } }
       pre.pCx.putImageData(pre.pIm, 0, 0); g.drawImage(pre.pCv, 0, 0, GW, GH, 0, 0, W, H);
     },
   };
-  /** Funkenstern (Pixelkreuz, ab Groesse 2 mit Diagonalen) ins Funken-Raster; nur auf dem Bildfeld (A); sc: Kern, Arm, Spitze */
-  function stainPut(top, A, x, y, c) { if (x >= 0 && y >= 0 && x < GW && y < GH && A[y * GW + x]) top[y * GW + x] = c; }
-  function stainStar(top, A, cx, cy, sz, sc) {
-    stainPut(top, A, cx, cy, sc[0]);
-    for (let k = 1; k <= sz; k++) { const c = k === sz && sz > 1 ? sc[2] : k === 1 ? sc[0] : sc[1]; stainPut(top, A, cx + k, cy, c); stainPut(top, A, cx - k, cy, c); stainPut(top, A, cx, cy + k, c); stainPut(top, A, cx, cy - k, c); }
-    if (sz >= 2) { stainPut(top, A, cx + 1, cy + 1, sc[1]); stainPut(top, A, cx - 1, cy + 1, sc[1]); stainPut(top, A, cx + 1, cy - 1, sc[1]); stainPut(top, A, cx - 1, cy - 1, sc[1]); }
+  /** Funkenstern (Pixelkreuz, ab Groesse 2 mit Diagonalen) ins Funken-Raster; nur auf Hintergrundzellen des Bildfelds (gm); sc: Kern, Arm, Spitze */
+  function stainPut(top, gm, x, y, c) { if (x >= 0 && y >= 0 && x < GW && y < GH && gm[y * GW + x]) top[y * GW + x] = c; }
+  function stainStar(top, gm, cx, cy, sz, sc) {
+    stainPut(top, gm, cx, cy, sc[0]);
+    for (let k = 1; k <= sz; k++) { const c = k === sz && sz > 1 ? sc[2] : k === 1 ? sc[0] : sc[1]; stainPut(top, gm, cx + k, cy, c); stainPut(top, gm, cx - k, cy, c); stainPut(top, gm, cx, cy + k, c); stainPut(top, gm, cx, cy - k, c); }
+    if (sz >= 2) { stainPut(top, gm, cx + 1, cy + 1, sc[1]); stainPut(top, gm, cx - 1, cy + 1, sc[1]); stainPut(top, gm, cx + 1, cy - 1, sc[1]); stainPut(top, gm, cx - 1, cy - 1, sc[1]); }
   }
   /** Unveraenderliches des Glasbildes (je Karte einmal): Bleiruten (Rahmen des Bildfelds, Netz, Umriss des Motivs), Glaspixel mit Kachel/Innenlicht/Lichtkoordinate/Bayer-Stelle,
-   *  Glanzlichter, Wege der Funken, Motivpixel fuer das Lichtband */
+   *  Glanzlichter, Wege der Funken, Pixel je Kachel fuer die Glanzblitze, Hintergrundmaske fuer die Funken */
   function stainPre(E, st) {
     const { v, lead, d, n, dmax, sites } = st, { A, S } = E, e = E.e, full = E.full, opt = STAIN;
-    const base = new Uint32Array(NPX), fp = [], fc = [], fs = [], fu = [], fth = [], lsp = [], kp = [], kc = [], kt = [], lbp = [], lbu = [];
+    const base = new Uint32Array(NPX), fp = [], fc = [], fs = [], fu = [], fth = [], lsp = [], kp = [], kc = [], lbp = [], lbu = [];
     const nbr = new Uint8Array(NPX), lead2 = new Uint8Array(NPX);
     for (let p = GW; p < NPX - GW; p++) if (A[p] && (!A[p - 1] || !A[p + 1] || !A[p - GW] || !A[p + GW])) nbr[p] = 1;
     const mid = sn(LEAD_MID[0], LEAD_MID[1], LEAD_MID[2]), dark = sn(LEAD[0], LEAD[1], LEAD[2]), grain = sn(LEAD_GRAIN[0], LEAD_GRAIN[1], LEAD_GRAIN[2]), shine = sn(LEAD_SHINE[0], LEAD_SHINE[1], LEAD_SHINE[2]);
@@ -1186,19 +1150,41 @@
     }
     // Glanzsaum der Bleiruten: Rutenpixel mit Glas darueber/links bekommen stellenweise einen hellen Metallton
     for (let y = AY0; y < AY0 + AH; y++) for (let x = AX0; x < AX0 + AW; x++) { const p = y * GW + x; if (lead2[p] && !nbr[p] && (lead[p] || d[p] === 1) && (!lead2[p - GW] || !lead2[p - 1]) && hash(x, y, 13) < .34) base[p] = shine; }
+    const tcnt = new Int32Array(n + 1);
     for (let y = AY0; y < AY0 + AH; y++) for (let x = AX0; x < AX0 + AW; x++) {
       const p = y * GW + x; if (!A[p] || lead2[p]) continue;
       const c = v.id[p], rel = dmax[c] ? v.dist[p] / dmax[c] : 0;
-      let s = st.lb[c] + opt.glow * Math.pow(clamp(1 - rel / opt.glowRel), opt.glowPow);                  // Innenlicht: Mitte heller als Rand
+      let s = st.lb[c] + opt.glow * Math.pow(clamp(1 - rel / opt.glowRel), opt.glowPow);                  // Grundleuchtkraft (fest) + Innenlicht: Mitte heller als Rand
       if (lead2[p - GW] || lead2[p - 1]) s += 2.1; if (lead2[p + GW] || lead2[p + 1]) s -= 1.5;           // Glanzsaum oben/links, Schatten unten/rechts an den Bleiruten
       if (d[p] < 6) s += 3.4 - d[p] * .6;                                                                  // Hinterleuchtung um das Motiv
-      fp.push(p); fc.push(c); fs.push(s); fu.push(Math.round(x + y * .9)); fth.push(bay(x, y));
+      fp.push(p); fc.push(c); fs.push(s); fu.push(Math.round(x + y * .9)); fth.push(bay(x, y)); tcnt[c + 1]++;
+    }
+    // Pixel je Kachel (Glas, nach Kachel geordnet) mit Diagonalschluessel x + y fuer die Glanzblitze; Eckpixel je Kachel (weitester Punkt vom Mittelpunkt) fuer die Eckfunken
+    const ts = new Int32Array(n + 1); for (let c = 0; c < n; c++) ts[c + 1] = ts[c] + tcnt[c + 1];
+    const tpx = new Int32Array(fp.length), tkey = new Int16Array(fp.length), fill = ts.slice(0, n), tkmin = new Int16Array(n).fill(32000), tkmax = new Int16Array(n).fill(-32000), cx = new Int16Array(n), cy = new Int16Array(n), cbest = new Float32Array(n).fill(-1);
+    for (let q = 0; q < fp.length; q++) {
+      const c = fc[q], p = fp[q], x = p % GW, y = (p / GW) | 0, j = fill[c]++, key = x + y; tpx[j] = p; tkey[j] = key;
+      if (key < tkmin[c]) tkmin[c] = key; if (key > tkmax[c]) tkmax[c] = key;
+      const dd = v.dist[p] + hash(x, y, 5) * .6; if (dd > cbest[c]) { cbest[c] = dd; cx[c] = x; cy[c] = y; }
+    }
+    const gP = new Uint8Array(n), gO = new Uint8Array(n), cP = new Uint8Array(n), cO = new Uint8Array(n);
+    for (let c = 0; c < n; c++) {
+      if (ts[c + 1] - ts[c] < 12) continue;
+      if (hash(c, 51, 7) < .8) { gP[c] = 30 + Math.floor(hash(c, 52, 7) * 60); gO[c] = Math.floor(hash(c, 53, 7) * 200); }      // Glanzblitz: Takt 2 bis 6 s
+      if (hash(c, 54, 7) < .85) { cP[c] = 30 + Math.floor(hash(c, 55, 7) * 90); cO[c] = Math.floor(hash(c, 56, 7) * 200); }      // Eckfunke: Takt 2 bis 8 s
+    }
+    // Hintergrundmaske fuer Funken: Bildfeld und NICHT Motiv (Kunstpixel der Maske in der Zellenmitte)
+    const gm = new Uint8Array(NPX);
+    for (let y = AY0; y < AY0 + AH; y++) for (let x = AX0; x < AX0 + AW; x++) {
+      const p = y * GW + x; if (!A[p]) continue;
+      const ax = Math.min(e.w - 1, Math.floor((full ? x + .5 : x - AX0 + .5) / (full ? GW : AW) * e.w)), ay = Math.min(e.h - 1, Math.floor((full ? y + .5 : y - AY0 + .5) / (full ? GH : AH) * e.h));
+      gm[p] = e.mn[ay * e.w + ax] ? 0 : 1;
     }
     // Glanzlicht je Kachel: kurze Diagonale ('/') oben links der Kachelmitte (bei 4 von 5 Kacheln)
     for (let c = 0; c < n; c++) {
       if (hash(c, 41, 3) > .8) continue;
       const len = 2 + Math.floor(Math.min(dmax[c], 11) / 4), hx = Math.round(sites[c].x - dmax[c] * .35), hy = Math.round(sites[c].y - dmax[c] * .1);
-      for (let k = 0; k < len; k++) { const x = hx + k, y = hy - k, p = y * GW + x; if (x > 0 && y > 0 && x < GW && y < GH && A[p] && !lead2[p] && v.id[p] === c) { kp.push(p); kc.push(c); kt.push(Math.floor(hash(c, 43, 3) * 29)); } }
+      for (let k = 0; k < len; k++) { const x = hx + k, y = hy - k, p = y * GW + x; if (x > 0 && y > 0 && x < GW && y < GH && A[p] && !lead2[p] && v.id[p] === c) { kp.push(p); kc.push(c); } }
     }
     // Wege der Funken: von Kachel zu Nachbarkachel, mit einer Vorzugsrichtung je Funke
     const sx = new Int16Array(n), sy = new Int16Array(n), path = new Int32Array(GL_N * GL_NH), r = rng(77);
@@ -1215,24 +1201,13 @@
     }
     // Strahlen-Muster (Streifen im Lichtband, relativ zur Bandmitte)
     const ray = new Float32Array(256), rr = rng(11); { let i = 0; while (i < 256) { const w = 2 + Math.floor(rr() * 4), val = rr() < .38 ? .4 : rr() < .5 ? 1 : 1.45; for (let j = 0; j < w && i < 256; j++) ray[i++] = val; } }
-    // Motivpixel (Kunstpixel-Raster): Farbe, Kachel, Lichtkoordinate
-    const rgb = E.artRGB, tq = [], tc = [], tu = [], tr = [], tg = [], tb = [], sps = [];
-    if (rgb) for (let ay = 0; ay < e.h; ay++) for (let ax = 0; ax < e.w; ax++) {
-      const qi = ay * e.w + ax; if (!e.mn[qi]) continue;
-      const gx = full ? Math.min(GW - 1, Math.floor((ax + .5) / e.w * GW)) : AX0 + Math.min(AW - 1, Math.floor((ax + .5) / e.w * AW)), gy = full ? Math.min(GH - 1, Math.floor((ay + .5) / e.h * GH)) : AY0 + Math.min(AH - 1, Math.floor((ay + .5) / e.h * AH)), p = gy * GW + gx;
-      if (!A[p]) continue;
-      const c = rgb[qi];
-      tq.push(qi); tc.push(v.id[p]); tu.push(Math.round(gx + gy * .9)); tr.push(c & 255); tg.push((c >> 8) & 255); tb.push((c >> 16) & 255);
-    }
-    for (let p = 0; p < NPX; p++) if (A[p] && S[p] && !isEdgeS(S, p) && d[p] === 0) sps.push(p);
-    const [tCv, tCx] = cv2d(e.w, e.h), [pCv, pCx] = cv2d(GW, GH), tIm = tCx.createImageData(e.w, e.h), pIm = pCx.createImageData(GW, GH);
+    const [pCv, pCx] = cv2d(GW, GH), pIm = pCx.createImageData(GW, GH);
     return { base, fp: Int32Array.from(fp), fc: Int16Array.from(fc), fs: Float32Array.from(fs), fu: Uint16Array.from(fu), fth: Float32Array.from(fth), lsp: Int32Array.from(lsp),
-      kp: Int32Array.from(kp), kc: Int16Array.from(kc), kt: Uint8Array.from(kt), lbp: Int32Array.from(lbp), lbu: Uint16Array.from(lbu), leadHi: [sn(160, 150, 130), sn(240, 214, 150)], leadGl: sn(LEAD_GL[0], LEAD_GL[1], LEAD_GL[2]),
-      n, kfd: new Float32Array(n), fl: new Float32Array(n), cph: st.ph, hue: st.hue, sat: st.sat, lut: new Float32Array(NU), lutMax: 0, ray, tab: new Uint32Array(n * 16), lead2,
+      kp: Int32Array.from(kp), kc: Int16Array.from(kc), lbp: Int32Array.from(lbp), lbu: Uint16Array.from(lbu), leadHi: [sn(160, 150, 130), sn(240, 214, 150)], leadGl: sn(LEAD_GL[0], LEAD_GL[1], LEAD_GL[2]),
+      n, kfd: new Float32Array(n), fl: new Float32Array(n), hue: st.hue, sat: st.sat, lut: new Float32Array(NU), lutMax: 0, ray, tab: new Uint32Array(n * 16), lead2, gm,
+      ts, tpx, tkey, tkmin, tkmax, gP, gO, cP, cO, cx, cy,
       sx, sy, path, gx: new Int16Array(GL_N), gy: new Int16Array(GL_N), gs: new Int8Array(GL_N), gn: 0,
-      tq: Int32Array.from(tq), tc: Int16Array.from(tc), tu: Uint16Array.from(tu), tr: Uint8Array.from(tr), tg: Uint8Array.from(tg), tb: Uint8Array.from(tb), tOn: false,
-      tCx, tCv, tIm, t32: new Uint32Array(tIm.data.buffer), pCv, pCx, pIm, top32: new Uint32Array(pIm.data.buffer), sps: Int32Array.from(sps),
-      sc: [sn(255, 255, 245), sn(255, 226, 120), sn(240, 176, 64)] };
+      pCv, pCx, pIm, top32: new Uint32Array(pIm.data.buffer), sc: [sn(255, 255, 245), sn(255, 226, 120), sn(240, 176, 64)] };
   }
 
   // ═══════════ Motiv-Masken (public/cardgen/masks.bin, gebaut von scripts/build-masks.js) ═══════════
@@ -1326,7 +1301,6 @@
     const core = { rarity, sp, full: geo.full, type: geo.type, A, B, L, S: null, e, st: null, stamp: stampInfo(img), card, variant };
     // Text-Ebenen (K-unabhängige Masken in Kartengröße)
     core.masks = CR.textMasks(card, variant);
-    if (sp.fx === 'stain' && e) core.artRGB = stainArtRGB(img, e, geo.full);   // Kunstpixel-Farben fuer den Tint des Motivs
     if (sp.mask) {
       const [mc] = [maskCanvas(e)], [gc, gg] = cv2d(GW, GH, true); gg.imageSmoothingEnabled = false;
       if (geo.full) gg.drawImage(mc, 0, 0, GW, GH); else gg.drawImage(mc, 14, 34, 122, 80);
