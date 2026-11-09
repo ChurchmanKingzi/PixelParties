@@ -865,7 +865,7 @@ function BpCard({ idx, card, geom, open, hold, onEdge, onDone, onClick, onHover,
         <button type="button" className={'bp-sell' + (sold ? ' bp-sell-sold' : '')} disabled={sellOff || sold}
           title={sold ? 'Sold back' : sellOff ? 'You can sell back one card per pack' : 'Sell this card back for ' + sellValue + ' SC (one card per pack)'}
           onClick={(e) => { e.stopPropagation(); if (!sellOff && !sold) onSell(idx); }}>
-          {sold ? 'Sold' : <React.Fragment>Sell Back! <span className="bp-sell-val">+{sellValue}</span></React.Fragment>}
+          {sold ? 'SOLD' : <React.Fragment>{Z < 2 ? 'SELL' : 'SELL BACK!'} <span className="bp-sell-val">+{sellValue}<img src="/data/sc.png" className="bp-coin" alt="" /></span></React.Fragment>}
         </button>
       )}
       {open && !done && (
@@ -1098,8 +1098,10 @@ function BoosterOpening({ pending, boosters, sc, onSc, onClaimed, onRipMore }) {
   const Tooltip = window.CardTooltipContent;
   const stageW = geom.stage[0] * Z, stageH = geom.stage[1] * Z;
   const cardsBottom = geom.top + (geom.slots[6] ? (geom.slots[6][1] + (op ? op.cardSize[1] : 105)) * Z : stageH);
-  const hudTop = cardsBottom + 6 * Z + 10;     // + Platz für die Sell-Back-Knöpfe, die über der Unterkante der untersten Karten sitzen
-  const tight = vp.h - cardsBottom < 56;      // niedriger Bildschirm (Handy quer): Knöpfe an den rechten Rand statt unter die Karten
+  const sellHalf = Math.ceil(Math.max(22, Z * 12) / 2) + 2 * Z;   // untere Hälfte der Sell-Back-Knöpfe + Rahmen, sie ragen unter die Karten
+  const hudTop = cardsBottom + sellHalf + 10;
+  const hudRoom = vp.h - hudTop;
+  const tight = hudRoom < 48;      // niedriger Bildschirm (Handy quer): Knöpfe an den rechten Rand statt unter die Karten
 
   // Die Shop-Seite läuft unter CSS-`zoom` (--ui-scale): die Vollbild-Ansicht hängt deshalb direkt an <body>, damit Fenster- und Bildpunkte übereinstimmen
   // (ganzzahliger Bühnenfaktor Z in echten Bildschirmpunkten, nicht ein mitgezoomtes Mischmaß).
@@ -1121,7 +1123,7 @@ function BoosterOpening({ pending, boosters, sc, onSc, onClaimed, onRipMore }) {
         <button className="btn bp-skip" onClick={() => { skipRef.current = true; }}>SKIP ▸</button>
       )}
       {phase === 'cards' && (
-        <div className={'bp-hud' + (tight ? ' bp-hud-tight' : '')} style={tight ? undefined : { left: Math.max(0, geom.left - 60 * Z), width: stageW + 120 * Z, top: Math.max(0, Math.min(hudTop, vp.h - (allDone ? 124 : 52))) }}>
+        <div className={'bp-hud' + (tight ? ' bp-hud-tight' : '')} style={tight ? undefined : { left: Math.max(0, geom.left - 60 * Z), width: stageW + 120 * Z, top: hudTop }}>
           {!allDone && (
             <button className="btn bp-btn" disabled={allOpen} onClick={flipAll}>FLIP ALL</button>
           )}
@@ -1136,7 +1138,7 @@ function BoosterOpening({ pending, boosters, sc, onSc, onClaimed, onRipMore }) {
               </button>
             </div>
           )}
-          {allDone && !canRip && <div className="bp-hint bp-hint-warn">Not enough SC for another pack ({packPrice} SC needed)</div>}
+          {allDone && !canRip && (tight || hudRoom >= 84) && <div className="bp-hint bp-hint-warn">Not enough SC for another pack ({packPrice} SC needed)</div>}
           {!allOpen && <div className="bp-hint">Click a card to flip it</div>}
           {note && <div className="bp-hint bp-hint-warn">{note}</div>}
         </div>

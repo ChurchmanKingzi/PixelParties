@@ -26630,15 +26630,17 @@ input[type="checkbox"]:focus-visible, input[type="radio"]:focus-visible { outlin
 .bp-sc-special .bp-sc-rar { color: #fad54a; }
 
 /* Sell Back! unter jeder aufgedeckten Karte (sitzt auf deren Unterkante), SC-Anzeige, Add-and-rip-Knopf */
-.bp-card { --bh: max(14px, calc(var(--bpz, 2) * 9px)); }
-.bp-sell { position: absolute; z-index: 6; left: calc(var(--bpz, 2) * 3px); right: calc(var(--bpz, 2) * 3px); bottom: calc(var(--bh) / -2); height: var(--bh); box-sizing: border-box; padding: 0 2px; display: flex; align-items: center; justify-content: center; gap: 4px;
-  font-family: var(--font-display), sans-serif; font-size: max(8px, calc(var(--bpz, 2) * 4.5px)); letter-spacing: 0; line-height: 1; white-space: nowrap; cursor: pointer; border: 0; color: #fad54a; background: #12101f; box-shadow: 0 0 0 2px #08060c, 0 0 0 4px #fad54a; }
-.bp-sell:hover:not(:disabled), .bp-sell:focus-visible:not(:disabled) { color: #08060c; background: #fad54a; outline: none; }
-.bp-sell:disabled { cursor: default; color: #7e7d9b; background: #12101f; box-shadow: 0 0 0 2px #08060c, 0 0 0 4px #3e3e51; }
-.bp-sell-val { color: #66ffa2; }
-.bp-sell:hover:not(:disabled) .bp-sell-val { color: #08060c; }
-.bp-sell:disabled .bp-sell-val { color: #7e7d9b; }
-.bp-sell-sold { color: #ef2929; box-shadow: 0 0 0 2px #08060c, 0 0 0 4px #c80000; }
+.bp-card { --bh: max(22px, calc(var(--bpz, 2) * 12px)); --bpx: calc(var(--bpz, 2) * 1px); }
+.bp-sell { position: absolute; z-index: 6; left: calc(var(--bpz, 2) * 2px); right: calc(var(--bpz, 2) * 2px); bottom: calc(var(--bh) / -2); height: var(--bh); box-sizing: border-box; padding: 0 calc(var(--bpz, 2) * 2px); display: flex; align-items: center; justify-content: center; gap: calc(var(--bpz, 2) * 2px);
+  font-family: var(--font-display), sans-serif; font-size: max(11px, calc(var(--bpz, 2) * 6px)); letter-spacing: 0; line-height: 1; white-space: nowrap; cursor: pointer; border: 0; border-radius: 0;
+  color: #08060c; background: #fad54a; box-shadow: 0 0 0 var(--bpx) #08060c, 0 0 0 calc(var(--bpx) * 2) #fad54a, 0 0 0 calc(var(--bpx) * 3) #08060c, inset 0 calc(var(--bpx) * 2) 0 #f7f7ad, inset 0 calc(var(--bpx) * -2) 0 #72541d; }
+.bp-sell .bp-coin { width: calc(var(--bpz, 2) * 7px); height: calc(var(--bpz, 2) * 7px); flex: none; }
+.bp-sell:hover:not(:disabled), .bp-sell:focus-visible:not(:disabled) { background: #66ffa2; outline: none; box-shadow: 0 0 0 var(--bpx) #08060c, 0 0 0 calc(var(--bpx) * 2) #66ffa2, 0 0 0 calc(var(--bpx) * 3) #08060c, inset 0 calc(var(--bpx) * 2) 0 #ffffff, inset 0 calc(var(--bpx) * -2) 0 #1d6b3a; }
+.bp-sell:active:not(:disabled) { transform: translateY(var(--bpx)); }
+.bp-sell:disabled { cursor: default; color: #7e7d9b; background: #12101f; box-shadow: 0 0 0 var(--bpx) #08060c, 0 0 0 calc(var(--bpx) * 2) #3e3e51, 0 0 0 calc(var(--bpx) * 3) #08060c; }
+.bp-sell:disabled .bp-coin { opacity: 1; filter: grayscale(1) brightness(.6); }
+.bp-sell-val { display: inline-flex; align-items: center; gap: calc(var(--bpz, 2) * 1px); }
+.bp-sell-sold { color: #ef2929; box-shadow: 0 0 0 var(--bpx) #08060c, 0 0 0 calc(var(--bpx) * 2) #c80000, 0 0 0 calc(var(--bpx) * 3) #08060c; }
 .bp-sold-dim { position: absolute; inset: 0; z-index: 4; pointer-events: none; image-rendering: pixelated; background-color: transparent;
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='2' height='2' shape-rendering='crispEdges'%3E%3Crect width='1' height='1' fill='%2308060c'/%3E%3Crect x='1' y='1' width='1' height='1' fill='%2308060c'/%3E%3Crect x='1' width='1' height='1' fill='%2308060c'/%3E%3C/svg%3E");
   background-size: calc(var(--bpz, 2) * 2px) calc(var(--bpz, 2) * 2px); }
