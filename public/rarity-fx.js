@@ -34,7 +34,7 @@
   // Je Stufe: Basiskarte (nur Information; die URL-Variante steht in CardRender.rarityBase), Effekt, Stempel, Takt, Standbild-Zeit
   const SPEC = {
     uncommon: { fx: 'unc', stamp: 'silver', fps: 20, still: 1.5 },
-    rare: { fx: 'rare', stamp: 'rainbow', fps: 20, still: 2.6 },
+    rare: { fx: 'rare', stamp: 'rainbow', fps: 20, still: 1.2 },   // Standbild: Strahl mitten im Bild (Lauf 4,6 s, 72 %)
     prismatic: { fx: 'pris', stamp: 'prismatic', fps: 20, still: 2.2, textTop: true },
     super: { fx: 'sr', stamp: 'srstar', fps: 20, still: 1.4 },
     diamond: { fx: 'dia', stamp: 'diamond', fps: 20, still: 1.0 },
@@ -245,7 +245,8 @@
   }
 
   // ═══════════ Text-Ebenen: Name/Werte und Regeltext als Pixellisten in der Leinwand-Auflösung (K Pixel je Rasterzelle) ═══════════
-  function lput(lay, lx, ly, c) { if (lx < 0 || ly < 0 || lx >= lay.w || ly >= lay.h) return; const i = (ly * lay.w + lx) * 4, d = lay.data, v = sn(c[0], c[1], c[2]); d[i] = v & 255; d[i + 1] = (v >> 8) & 255; d[i + 2] = (v >> 16) & 255; d[i + 3] = 255; }
+  // lay.dark: helle Textfelder (Artefakte) bekommen dunkle Tinte desselben Farbtons
+  function lput(lay, lx, ly, c) { if (lx < 0 || ly < 0 || lx >= lay.w || ly >= lay.h) return; const i = (ly * lay.w + lx) * 4, d = lay.data, v = lay.dark ? sn(c[0] * .4, c[1] * .4, c[2] * .4) : sn(c[0], c[1], c[2]); d[i] = v & 255; d[i + 1] = (v >> 8) & 255; d[i + 2] = (v >> 16) & 255; d[i + 3] = 255; }
   function lblock(lay, gx, gy, c) { const U = lay.U, x0 = gx * U - lay.x0, y0 = gy * U - lay.y0; for (let dy = 0; dy < U; dy++) for (let dx = 0; dx < U; dx++) lput(lay, x0 + dx, y0 + dy, c); }
   function lstar(lay, gx, gy, size, arm, core) { lblock(lay, gx, gy, core); for (let k = 1; k <= size; k++) { lblock(lay, gx + k, gy, arm); lblock(lay, gx - k, gy, arm); lblock(lay, gx, gy + k, arm); lblock(lay, gx, gy - k, arm); } }
   const SILVER = ry => (ry < .22 ? [252, 253, 255] : ry < .48 ? [214, 222, 236] : ry < .74 ? [168, 180, 200] : [120, 132, 154]);
@@ -328,6 +329,8 @@
         put(o, p, c);
       });
       rimBand(E, o, pos, 5, [236, 242, 255], UD);
+      // Silberfunken im Bild: auch in der Ruhephase zwischen den Läufen ist mehr zu sehen als das feine Punktraster
+      sparkles(o, t, 5, 1.6, .55, (k, s) => [AX0 + 5 + Math.floor(hash(k, s, 61) * (AW - 10)), AY0 + 5 + Math.floor(hash(k, s, 62) * (AH - 10))], [200, 214, 238], [255, 255, 255], 1);
       paintName(E, t, SILVER, 4.6, .72);
     },
   };
@@ -407,7 +410,7 @@
     frame(E, st, t, o) {
       const { B, L } = E, pos = glintAt(t, 1.9, .78, 2);
       artLoop(E, (x, y, p, i) => {
-        const gate = sstep(.12, .45, L[p]);
+        const gate = .4 + .6 * sstep(.12, .45, L[p]);   // Untergrenze: auch auf dunkler Kunst bleibt das Rautengitter sichtbar (sonst nur Knotenpunkte = Punktraster)
         const l1 = ((2 * x + y) % 6 + 6) % 6 < 2, l2 = ((2 * x - y) % 6 + 6) % 6 < 2;
         if (!l1 && !l2) { if (gate > .3 && bay(x, y) < .2) put(o, p, mixc([B[i], B[i + 1], B[i + 2]], [40, 120, 200], .32)); return; }
         const node = l1 && l2;
@@ -800,12 +803,26 @@
     return out;
   }
   function stampRects(K) { return [[683, 984, 67, 66]]; }
+  /** Textebenen auf hellem Grund (gelbe Artefakt-Karten): `dark` — die Effektfarben werden abgedunkelt, sonst wäre heller Text (Silber, Gold, Weiss) auf Pergament unlesbar.
+   *  Gemessen wird der Grund des Basisbildes zwischen den Buchstaben (nicht die Tinte selbst). */
+  function markLightPlates(layers, img, K) {
+    const nw = img.naturalWidth, f = nw / (GW * K);
+    for (const lay of layers) {
+      const [c, g] = cv2d(lay.w, lay.h, true); g.imageSmoothingEnabled = true;
+      g.drawImage(img, lay.x0 * f, lay.y0 * f, lay.w * f, lay.h * f, 0, 0, lay.w, lay.h);
+      const d = g.getImageData(0, 0, lay.w, lay.h).data, ink = new Uint8Array(lay.w * lay.h), L = lay.list;
+      for (let k = 0; k < L.length; k += 2) for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) { const x = L[k] + dx, y = L[k + 1] + dy; if (x >= 0 && y >= 0 && x < lay.w && y < lay.h) ink[y * lay.w + x] = 1; }
+      let s = 0, n = 0; for (let q = 0; q < ink.length; q += 3) if (!ink[q]) { s += .299 * d[q * 4] + .587 * d[q * 4 + 1] + .114 * d[q * 4 + 2]; n++; }
+      lay.dark = n > 20 && s / n / 255 > .66;
+    }
+  }
   /** Ansicht: alles, was von der Pixelgröße der Leinwand abhängt */
   function buildView(core, img, K) {
     const sp = core.sp, W = GW * K, H = GH * K, CR = root.CardRender;
     const nameL = inkLayers(core.masks.name, K, (gi, y) => (gi === 0 && y < 150 * K / 5 ? 'name' : 'stats'), 14, stampRects(K));
     const bodyL = sp.body ? inkLayers(core.masks.body, K, () => 'body', 40, null, core.masks.name) : [];
     const layers = nameL.concat(bodyL);
+    markLightPlates(layers, img, K);
     const view = { K, W, H, layers, layers0: layers, holes: null, cut: null, rim: null };
     if (sp.textTop) {   // Text bleibt scharf: Löcher in der Effekt-Ebene genau auf der Tinte (Name, Werte, Regeltext)
       const [hc, hg] = cv2d(W, H); hg.imageSmoothingEnabled = K !== 5; hg.drawImage(core.masks.name, 0, 0, W, H); hg.drawImage(core.masks.body, 0, 0, W, H);
@@ -928,6 +945,13 @@
   let queue = Promise.resolve();
   function enqueue(fn) { const p = queue.then(() => new Promise(r => setTimeout(r, 0))).then(fn); queue = p.catch(() => {}); return p; }
 
+  /** Glatt verkleinern (Kleinansichten): Zeichnen mit Filter, danach wieder hart (Pixelraster der Leinwand bleibt). */
+  function blitSmooth(g, src, tw, th) { g.imageSmoothingEnabled = true; g.imageSmoothingQuality = 'high'; g.drawImage(src, 0, 0, src.width, src.height, 0, 0, tw, th); g.imageSmoothingEnabled = false; }
+  function downscale(src, tw, th) {
+    let cur = src;   // in Halbierungsschritten, damit der Filter keine Pixel überspringt
+    while (cur.width > tw * 2) { const [c, g] = cv2d(Math.max(tw, cur.width >> 1), Math.max(th, cur.height >> 1)); blitSmooth(g, cur, c.width, c.height); cur = c; }
+    const [c, g] = cv2d(tw, th); blitSmooth(g, cur, tw, th); return c;
+  }
   function lruGet(map, k) { const v = map.get(k); if (v !== undefined) { map.delete(k); map.set(k, v); } return v; }
   function lruSet(map, k, v, max) { map.set(k, v); if (map.size > max) map.delete(map.keys().next().value); }
 
@@ -984,30 +1008,40 @@
           stats.cores++;
           lruSet(coreCache, ck, core, CORE_MAX);
         }
-        const sk = ck + '|' + K;
-        this.core = core;
+        // Zielgröße der sichtbaren Leinwand: in Kleinansichten (Anzeige deutlich schmaler als die K-Leinwand) wird glatt auf Gerätepixel
+        // heruntergerechnet — wie der Browser es beim Basisbild tut. Die Nearest-Skalierung des Browsers würde Zeilen/Spalten des Textes
+        // und der Raster verschlucken (Text unleserlich, Dithering als grobes Punktraster) und deckt sich dann nicht mit der Basiskarte.
+        const devW = Math.round(css * dprNow()), W = GW * K, H = GH * K;
+        const tw = devW < W * 0.8 ? Math.max(48, devW) : W, th = tw === W ? H : Math.round(tw * GH / GW);
+        const sk = ck + '|' + K + '|' + tw;
+        this.core = core; this.tw = tw; this.th = th; this.W = W; this.H = H;
         if (this.canvas && this.canvas.__wrf !== !!SPEC[rarity].quant) this.clear();
         if (!this.canvas) this.mkCanvas();
-        const W = GW * K, H = GH * K;
-        if (this.canvas.width !== W) { this.canvas.width = W; this.canvas.height = H; }
+        if (this.canvas.width !== tw || this.canvas.height !== th) { this.canvas.width = tw; this.canvas.height = th; this.g.imageSmoothingEnabled = false; }   // beide prüfen: eine frische Canvas ist 300 x 150, bei K = 2 stimmt die Breite schon
         this.K = K;
         if (!this.animated) {
           let still = lruGet(stillCache, sk);
           if (!still) {
-            const view = buildView(core, img, K), [c, g] = cv2d(W, H);
-            render(core, view, g, SPEC[rarity].still); still = c; stats.stills++;
+            const view = buildView(core, img, K), [c, g] = cv2d(W, H, !!SPEC[rarity].quant);
+            render(core, view, g, SPEC[rarity].still); still = tw === W ? c : downscale(c, tw, th); stats.stills++;
             lruSet(stillCache, sk, still, STILL_MAX);
           }
-          this.g.clearRect(0, 0, W, H); this.g.drawImage(still, 0, 0); this.view = null; this.drawn = true;
+          this.g.clearRect(0, 0, tw, th); this.g.drawImage(still, 0, 0); this.view = null; this.drawn = true;
         } else {
           this.view = buildView(core, img, K); this.phase = (hash(card.name.length, card.name.charCodeAt(0) || 1, 3) * 6) | 0; this.lastF = -1;
-          render(core, this.view, this.g, SPEC[rarity].still + this.phase);
+          if (tw !== W) { const [oc, og] = cv2d(W, H, !!SPEC[rarity].quant); og.imageSmoothingEnabled = false; this.off = oc; this.og = og; } else { this.off = null; this.og = null; }
+          this.draw(SPEC[rarity].still + this.phase, true);
           schedule();
         }
         stats.buildMs += performance.now() - t0;
         this.host.classList.add('pp-rarity-on');
       },
-      draw(t) { const t0 = performance.now(); render(this.core, this.view, this.g, t); stats.frames++; stats.frameMs += performance.now() - t0; },
+      draw(t) {
+        const t0 = performance.now();
+        if (this.off) { render(this.core, this.view, this.og, t); this.g.clearRect(0, 0, this.tw, this.th); blitSmooth(this.g, this.off, this.tw, this.th); }
+        else render(this.core, this.view, this.g, t);
+        stats.frames++; stats.frameMs += performance.now() - t0;
+      },
       findImg() {
         if (this.opts.img) return typeof this.opts.img === 'function' ? this.opts.img() : this.opts.img;
         const h = this.host;
