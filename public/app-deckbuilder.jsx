@@ -21,7 +21,7 @@ let _persistedSectionHist = {};
 //  noch freie Rarity darunter, sonst Common); mit `autoFill` bekommen Eintraege ohne Wert (neu hinzugefuegt) die
 //  hoechste freigeschaltete freie Rarity.
 // ═══════════════════════════════════════════
-const RAR_FALLBACK = ['common', 'uncommon', 'rare', 'prismatic', 'super', 'diamond', 'spectral', 'umbra', 'stained'];
+const RAR_FALLBACK = ['common', 'uncommon', 'rare', 'prismatic', 'super', 'diamond', 'spectral', 'stained', 'umbra'];
 const RAR_FALLBACK_LABEL = { common: 'Common', uncommon: 'Uncommon', rare: 'Rare', prismatic: 'Prismatic', super: 'Super Rare', diamond: 'Diamond', spectral: 'Spectral', umbra: 'Umbra', stained: 'Stained Rare' };
 const rarOrder = () => (window.PpRarities && window.PpRarities.ORDER) || RAR_FALLBACK;
 const rarLabel = (r) => ((window.PpRarities && window.PpRarities.LABEL) || RAR_FALLBACK_LABEL)[r] || r;
