@@ -975,11 +975,66 @@
   //  (Kunstpixel-Raster) -> Funken und Staub. Je Bild laufen nur: Kachelhelligkeit (Puls/Funken), Strahltabelle, Glaspixel (Tabellenzugriff), Motivpixel im Lichtband, Funken.
   //  Alles andere ist je Karte einmal vorberechnet (Zeitscheiben `prepG` / `warm`).
   const STAIN = { seed: 5, rArt: 12, rArtMin: 8, minArea: 30, base: 1.3, glow: 4.8, glowRel: .85, glowPow: .9 };   // Kachelgroesse (Radius in Zellen), Mindestflaeche, Grundstufe, Innenlicht (Stufen, Reichweite, Verlauf)
+  const LEAD_DEF = [110, 96, 120];
   const LEAD_GL = [255, 236, 160];
   const GL_SZ = [0, 1, 2, 3, 3, 2, 1, 0, -1, -1], GL_HOP = 10, GL_N = 5, GL_NH = 40, NU = 360, CS_SZ = [0, 1, 2, 1];
+  /** Geodaetisches Voronoi ueber die Zellen von `dom` (Dijkstra, 8 Nachbarn): Kacheln entstehen nur im Hintergrund, laufen nie unter dem Motiv durch und enden an der Motivkontur. id = -1 ausserhalb. */
+  function geoVoronoi(sites, dom) {
+    const id = new Int16Array(NPX).fill(-1), dist = new Float32Array(NPX).fill(255), hk = [], hv = [];
+    const push = (k, p) => { let i = hk.length; hk.push(k); hv.push(p); while (i > 0) { const j = (i - 1) >> 1; if (hk[j] <= k) break; hk[i] = hk[j]; hv[i] = hv[j]; i = j; } hk[i] = k; hv[i] = p; };
+    for (let c = 0; c < sites.length; c++) { const p = Math.floor(sites[c].y) * GW + Math.floor(sites[c].x); if (!dom[p] || id[p] >= 0) continue; id[p] = c; dist[p] = 0; push(0, p); }
+    while (hk.length) {
+      const k = hk[0], p = hv[0], lk = hk.pop(), lp = hv.pop();
+      if (hk.length) { let i = 0; const n = hk.length; for (;;) { let j = 2 * i + 1; if (j >= n) break; if (j + 1 < n && hk[j + 1] < hk[j]) j++; if (hk[j] >= lk) break; hk[i] = hk[j]; hv[i] = hv[j]; i = j; } hk[i] = lk; hv[i] = lp; }
+      if (k > dist[p]) continue;
+      const x = p % GW, y = (p / GW) | 0, c = id[p];
+      for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) {
+        if (!dx && !dy) continue; const nx = x + dx, ny = y + dy; if (nx < 0 || ny < 0 || nx >= GW || ny >= GH) continue;
+        const q = ny * GW + nx; if (!dom[q]) continue;
+        const nd = k + (dx && dy ? 1.4142 : 1); if (nd < dist[q]) { dist[q] = nd; id[q] = c; push(nd, q); }
+      }
+    }
+    return { id, dist };
+  }
   /** Rechenarbeit in Zeitscheiben: Generator, der zwischen den Teilschritten `yield`et (der Aufrufer gibt dem Hauptfaden zwischendurch Luft) */
   function* stainedBuildG(E) {
-    const opt = STAIN, { B, L, A, S } = E, r = rng(opt.seed);
+    const opt = STAIN, { B, L, A } = E, r = rng(opt.seed), e = E.e, full = E.full;
+    // 1) Motivmaske auf Zellen: jede Zelle, die ein Maskenpixel beberuehrt; kleine Luecken/Zacken per Schliessen (3x3) zu. Das sichtbare Motiv bleibt das Original (cut), nur Kontur und Kachelgrenzen nutzen diese Maske.
+    const S0 = new Uint8Array(NPX), sm = new Uint8Array(NPX), gx0 = full ? 0 : AX0, gy0 = full ? 0 : AY0, gW = full ? GW : AW, gH = full ? GH : AH;
+    for (let y = gy0; y < gy0 + gH; y++) for (let x = gx0; x < gx0 + gW; x++) {
+      const p = y * GW + x; if (!A[p]) continue;
+      const a0 = Math.floor((x - gx0) / gW * e.w), a1 = Math.min(e.w - 1, Math.ceil((x + 1 - gx0) / gW * e.w) - 1), b0 = Math.floor((y - gy0) / gH * e.h), b1 = Math.min(e.h - 1, Math.ceil((y + 1 - gy0) / gH * e.h) - 1);
+      let any = 0; for (let yy = b0; yy <= b1 && !any; yy++) for (let xx = a0; xx <= a1; xx++) if (e.mn[yy * e.w + xx]) { any = 1; break; }
+      S0[p] = any;
+    }
+    { const dil = new Uint8Array(NPX);
+      for (let y = 1; y < GH - 1; y++) for (let x = 1; x < GW - 1; x++) { const p = y * GW + x; dil[p] = S0[p - GW - 1] | S0[p - GW] | S0[p - GW + 1] | S0[p - 1] | S0[p] | S0[p + 1] | S0[p + GW - 1] | S0[p + GW] | S0[p + GW + 1]; }
+      for (let y = 1; y < GH - 1; y++) for (let x = 1; x < GW - 1; x++) { const p = y * GW + x; if (!A[p]) continue; sm[p] = S0[p] | (dil[p - GW - 1] & dil[p - GW] & dil[p - GW + 1] & dil[p - 1] & dil[p] & dil[p + 1] & dil[p + GW - 1] & dil[p + GW] & dil[p + GW + 1]); } }
+    // 2) Komponenten des Motivs (8er-Nachbarschaft); duenne Teile (kein Innenpixel) und Kleinstteile bekommen eine Kontur von 1 Zelle, die anderen von 2
+    const comp = new Int32Array(NPX), thick = [0];
+    for (let p0 = 0; p0 < NPX; p0++) {
+      if (!sm[p0] || comp[p0]) continue;
+      const id = thick.length, q = [p0]; comp[p0] = id; let inner = false;
+      for (let h = 0; h < q.length; h++) {
+        const p = q[h], x = p % GW, y = (p / GW) | 0; let all = x > 0 && y > 0 && x < GW - 1 && y < GH - 1;
+        for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) { const nx = x + dx, ny = y + dy; if (nx < 0 || ny < 0 || nx >= GW || ny >= GH) continue; const np = ny * GW + nx; if (!sm[np]) all = false; else if (!comp[np]) { comp[np] = id; q.push(np); } }
+        if (all) inner = true;
+      }
+      thick.push(inner && q.length >= 3 ? 2 : 1);
+    }
+    yield;
+    // 3) Kontur: Hintergrundzellen am Motivrand (8er-Nachbarschaft, bei dicken Teilen zusaetzlich eine Zelle nach aussen); danach ist der Hintergrund `dom`
+    const ring = new Uint8Array(NPX), rc = new Int32Array(NPX), dom = new Uint8Array(NPX);
+    for (let y = 1; y < GH - 1; y++) for (let x = 1; x < GW - 1; x++) {
+      const p = y * GW + x; if (!A[p] || sm[p]) continue;
+      for (let dy = -1; dy <= 1 && !ring[p]; dy++) for (let dx = -1; dx <= 1; dx++) { const q = p + dy * GW + dx; if (sm[q]) { ring[p] = 1; rc[p] = comp[q]; break; } }
+    }
+    { const add = []; for (let y = 1; y < GH - 1; y++) for (let x = 1; x < GW - 1; x++) { const p = y * GW + x; if (!A[p] || sm[p] || ring[p]) continue; for (const q of [p - 1, p + 1, p - GW, p + GW]) if (ring[q] && thick[rc[q]] === 2) { add.push(p); break; } }
+      for (const p of add) ring[p] = 1; }
+    for (let p = 0; p < NPX; p++) dom[p] = A[p] && !sm[p] && !ring[p] ? 1 : 0;
+    // Abstand zum Motiv (fuer die Hinterleuchtung)
+    const dS = new Uint8Array(NPX).fill(255), dq = []; for (let p = 0; p < NPX; p++) if (sm[p]) { dS[p] = 0; dq.push(p); }
+    for (let h = 0; h < dq.length; h++) { const p = dq[h]; if (dS[p] >= 24) continue; for (const np of [p - 1, p + 1, p - GW, p + GW]) if (np >= 0 && np < NPX && dS[np] > dS[p] + 1) { dS[np] = dS[p] + 1; dq.push(np); } }
     const g = new Float32Array(NPX);
     yield;
     for (let y = 1; y < GH - 1; y++) for (let x = 1; x < GW - 1; x++) { const p = y * GW + x; g[p] = Math.abs(L[p + 1] - L[p - 1]) + Math.abs(L[p + GW] - L[p - GW]); }
@@ -988,46 +1043,57 @@
     const rad = (x, y) => lerp(opt.rArt, opt.rArtMin, clamp(gs[y * GW + x] * 7));
     const sites = [];
     const tries = Math.round(14000 * (FULLART ? 3.2 : 1));
-    // Dart-Throwing mit variablem Radius; Standortliste in einem Gitter, damit der Abstandstest nicht jede Probe gegen alle Standorte laufen lässt
+    // Dart-Throwing mit variablem Radius im Hintergrund; Standortliste in einem Gitter, damit der Abstandstest nicht jede Probe gegen alle Standorte laufen laesst
     const CELL = 12, gw = Math.ceil(GW / CELL), gh = Math.ceil(GH / CELL), grid = Array.from({ length: gw * gh }, () => []);
+    const addSite = q => { sites.push(q); grid[Math.floor(q.y / CELL) * gw + Math.floor(q.x / CELL)].push(q); };
     for (let k = 0; k < tries; k++) {
       if ((k & 4095) === 4095) yield;
       const x = r() * GW, y = r() * GH, px = Math.floor(x), py = Math.floor(y), rr = rad(px, py);
-      if (!A[py * GW + px] || S[py * GW + px]) continue;
+      if (!dom[py * GW + px]) continue;
       let ok = true;
-      const gx0 = Math.max(0, Math.floor((x - 14) / CELL)), gx1 = Math.min(gw - 1, Math.floor((x + 14) / CELL)), gy0 = Math.max(0, Math.floor((y - 14) / CELL)), gy1 = Math.min(gh - 1, Math.floor((y + 14) / CELL));
-      for (let cy = gy0; cy <= gy1 && ok; cy++) for (let cx = gx0; cx <= gx1; cx++) {
+      const gx1 = Math.min(gw - 1, Math.floor((x + 14) / CELL)), gy1 = Math.min(gh - 1, Math.floor((y + 14) / CELL));
+      for (let cy = Math.max(0, Math.floor((y - 14) / CELL)); cy <= gy1 && ok; cy++) for (let cx = Math.max(0, Math.floor((x - 14) / CELL)); cx <= gx1; cx++) {
         const cl = grid[cy * gw + cx];
         for (let i = 0; i < cl.length; i++) { const q = cl[i], dx = q.x - x, dy = q.y - y, m = Math.min(rr, q.r); if (dx * dx + dy * dy < m * m) { ok = false; break; } }
         if (!ok) break;
       }
-      if (ok) { const q = { x, y, r: rr }; sites.push(q); grid[Math.floor(y / CELL) * gw + Math.floor(x / CELL)].push(q); }
+      if (ok) addSite({ x, y, r: rr });
     }
     yield;
-    let v = voronoi(sites, 'l2');
+    // Hintergrundinseln (vom Motiv/der Kontur eingeschlossen) ohne Standort: ab Mindestgroesse bekommen sie einen eigenen, sonst werden sie Kontur
+    { const lab = new Int32Array(NPX), has = [];
+      const siteAt = new Uint8Array(NPX); for (const q of sites) siteAt[Math.floor(q.y) * GW + Math.floor(q.x)] = 1;
+      for (let p0 = 0; p0 < NPX; p0++) {
+        if (!dom[p0] || lab[p0]) continue;
+        const idc = has.length + 1, q = [p0]; lab[p0] = idc; let hasSite = false, sx = 0, sy = 0;
+        for (let h = 0; h < q.length; h++) { const p = q[h]; if (siteAt[p]) hasSite = true; sx += p % GW; sy += (p / GW) | 0; for (const np of [p - 1, p + 1, p - GW, p + GW]) if (np >= 0 && np < NPX && dom[np] && !lab[np]) { lab[np] = idc; q.push(np); } }
+        has.push(hasSite);
+        if (!hasSite && q.length >= opt.minArea) { sx /= q.length; sy /= q.length; let bp = q[0], bd = 1e9; for (const p of q) { const dd = (p % GW - sx) ** 2 + (((p / GW) | 0) - sy) ** 2; if (dd < bd) { bd = dd; bp = p; } } addSite({ x: bp % GW + .5, y: ((bp / GW) | 0) + .5, r: opt.rArt }); }
+      } }
+    let v = geoVoronoi(sites, dom);
     for (let pass = 0; pass < 3; pass++) {
       yield;
       const area = new Int32Array(sites.length);
-      for (let p = 0; p < NPX; p++) if (A[p] && !S[p]) area[v.id[p]]++;
+      for (let p = 0; p < NPX; p++) if (v.id[p] >= 0) area[v.id[p]]++;
       const keep = sites.filter((q, k) => area[k] >= opt.minArea);
       if (keep.length === sites.length) break;
-      sites.length = 0; for (const q of keep) sites.push(q); v = voronoi(sites, 'l2');
+      sites.length = 0; for (const q of keep) sites.push(q); v = geoVoronoi(sites, dom);
     }
     yield;
     const n = sites.length;
     const sum = new Float64Array(n * 3), cnt = new Int32Array(n), dmax = new Float32Array(n), adj = Array.from({ length: n }, () => new Set());
     for (let p = 0; p < NPX; p++) {
-      const c = v.id[p], i = p * 4;
-      if (!S[p] && A[p] && A[p - 2] && A[p + 2] && A[p - 2 * GW] && A[p + 2 * GW]) { sum[c * 3] += B[i]; sum[c * 3 + 1] += B[i + 1]; sum[c * 3 + 2] += B[i + 2]; cnt[c]++; }
+      const c = v.id[p], i = p * 4; if (c < 0) continue;
+      if (A[p] && A[p - 2] && A[p + 2] && A[p - 2 * GW] && A[p + 2 * GW]) { sum[c * 3] += B[i]; sum[c * 3 + 1] += B[i + 1]; sum[c * 3 + 2] += B[i + 2]; cnt[c]++; }
       if (v.dist[p] > dmax[c]) dmax[c] = v.dist[p];
-      if (A[p]) { if (A[p + 1] && v.id[p + 1] !== c) { adj[c].add(v.id[p + 1]); adj[v.id[p + 1]].add(c); } if (A[p + GW] && v.id[p + GW] !== c) { adj[c].add(v.id[p + GW]); adj[v.id[p + GW]].add(c); } }
+      if (v.id[p + 1] >= 0 && v.id[p + 1] !== c) { adj[c].add(v.id[p + 1]); adj[v.id[p + 1]].add(c); } if (v.id[p + GW] >= 0 && v.id[p + GW] !== c) { adj[c].add(v.id[p + GW]); adj[v.id[p + GW]].add(c); }
     }
     // Glasfarbe je Kachel: die ECHTE lokale Bildfarbe der Kachel (Mittel der Bildzellen, kraeftiger gesaettigt und aufgehellt; Gruen bleibt Gruen, Blau bleibt Blau).
     // Variation je Kachel nur als Helligkeit (Stufe lb) und kleine Farbton-Nachbarschaft (+-.06 = +-22 Grad); dunkle Kacheln bekommen den Grundton des Bildes.
     // Akzente sparsam und passend: wenig Milchglas, Goldglas nur bei warmen Kacheln.
     const ph = new Float32Array(n), hue = new Float32Array(n), sat = new Float32Array(n), lb = new Float32Array(n);
     let ar = 0, ag = 0, ab = 0, an = 0;
-    for (let p = 0; p < NPX; p++) if (A[p] && !S[p] && L[p] > .12) { ar += B[p * 4]; ag += B[p * 4 + 1]; ab += B[p * 4 + 2]; an++; }
+    for (let p = 0; p < NPX; p++) if (v.id[p] >= 0 && L[p] > .12) { ar += B[p * 4]; ag += B[p * 4 + 1]; ab += B[p * 4 + 2]; an++; }
     const baseHue = an ? rgb2hsv(ar / an, ag / an, ab / an)[0] : 0;
     for (let c = 0; c < n; c++) {
       ph[c] = r();
@@ -1040,8 +1106,12 @@
       else if (u3 < .07 && h > .04 && h < .2) { h = .115 + (u2 - .5) * .03; s = Math.max(s, .8); }   // Goldglas nur bei warmen Kacheln
       hue[c] = h; sat[c] = s; lb[c] = opt.base + 3.8 * vv + (u2 - .5) * 1.2;
     }
-    const lead = edges(v.id, 1);
-    return { v, n, ph, hue, sat, lb, dmax, lead, sites, adj: adj.map(s => Int32Array.from(s)) };
+    const id = v.id, lead = new Uint8Array(NPX);   // Kachelkanten: nur zwischen zwei Kacheln (Kontur und Rand sind eigene Fugen)
+    for (let p = 0; p < NPX - GW - 1; p++) { const c = id[p]; if (c >= 0 && ((id[p + 1] >= 0 && id[p + 1] !== c) || (id[p + GW] >= 0 && id[p + GW] !== c))) lead[p] = 1; }
+    // naechste Kachel je Zelle (fuer die Farbe der Kontur)
+    const nid = new Int16Array(NPX).fill(-1), nq = []; for (let p = 0; p < NPX; p++) if (id[p] >= 0) { nid[p] = id[p]; nq.push(p); }
+    for (let h = 0; h < nq.length; h++) { const p = nq[h], x = p % GW; for (const np of [x > 0 ? p - 1 : -1, x < GW - 1 ? p + 1 : -1, p - GW, p + GW]) if (np >= 0 && np < NPX && nid[np] < 0 && A[np]) { nid[np] = nid[p]; nq.push(np); } }
+    return { v, n, ph, hue, sat, lb, dmax, lead, sites, adj: adj.map(s => Int32Array.from(s)), sm, dS, nid };
   }
   /** Farbe einer Glasflaeche: Edelstein (Farbton h, Saettigung s), Helligkeitsfaktor m (1 = volle Farbe, darueber Aufhellung ueber Weissgold, darunter tiefes Glas) */
   function stainRamp(h, s, m) {
@@ -1060,7 +1130,6 @@
     warm(E, st) { st.pre = stainPre(E, st); },
     *prepG(E) {
       const t0 = performance.now(), st = yield* stainedBuildG(E), t1 = performance.now();
-      st.d = distToS(E, 24);
       yield;
       stats.prep = [Math.round(t1 - t0), Math.round(performance.now() - t1), 0];
       return st;
@@ -1134,38 +1203,54 @@
   /** Unveraenderliches des Glasbildes (je Karte einmal): Bleiruten (Rahmen des Bildfelds, Netz, Umriss des Motivs), Glaspixel mit Kachel/Innenlicht/Lichtkoordinate/Bayer-Stelle,
    *  Glanzlichter, Wege der Funken, Pixel je Kachel fuer die Glanzblitze, Hintergrundmaske fuer die Funken */
   function stainPre(E, st) {
-    const { v, lead, d, n, dmax, sites } = st, { A, S } = E, e = E.e, full = E.full, opt = STAIN;
+    const { v, lead, n, dmax, sites, sm, nid } = st, d = st.dS, { A } = E, e = E.e, full = E.full, opt = STAIN, id = v.id;
     const base = new Uint32Array(NPX), fp = [], fc = [], fs = [], fu = [], fth = [], lsp = [], kp = [], kc = [], lbp = [], lbu = [], lh1 = [], lh2 = [];
     const nbr = new Uint8Array(NPX), lead2 = new Uint8Array(NPX);
     for (let p = GW; p < NPX - GW; p++) if (A[p] && (!A[p - 1] || !A[p + 1] || !A[p - GW] || !A[p + GW])) nbr[p] = 1;
-    // Bleiruten: dicke Fugen (2 Zellen, bei grossen Kacheln 3, bei sehr kleinen 1), komplett vom Effekt gemalt. Farbe = stark abgedunkelte Mischung der beiden angrenzenden Kachelfarben (Palettenstufen)
-    const L2 = new Uint8Array(NPX), id = v.id;
+    // Bleiruten: dicke Fugen (2 Zellen, bei grossen Kacheln 3, bei sehr kleinen 1), komplett vom Effekt gemalt. Motiv (Maske), Motivkontur, Reste und Rahmen sind ebenfalls Blei.
+    // Farbe = stark abgedunkelte Mischung der beiden angrenzenden Kachelfarben (Palettenstufen)
+    const L2 = new Uint8Array(NPX), tid = new Int16Array(NPX).fill(-1);
+    for (let p = 0; p < NPX; p++) tid[p] = id[p] >= 0 ? id[p] : nid[p];
     for (let y = AY0; y < AY0 + AH; y++) for (let x = AX0; x < AX0 + AW; x++) {
       const p = y * GW + x; if (!A[p]) continue;
-      if (lead[p] || d[p] === 1 || d[p] === 2) L2[p] = 1;                                                           // Netz der Kacheln (1 Zelle) und Umriss des Motivs (2 Zellen)
-      else { const c = id[p], dm = dmax[c]; if (dm >= 5 && ((lead[p - 1] && id[p - 1] !== c) || (lead[p - GW] && id[p - GW] !== c))) L2[p] = 1;                       // 2. Zelle auf der anderen Seite der Kante
+      const c = id[p];
+      if (c < 0 || lead[p]) L2[p] = 1;                                                                               // Motiv, Kontur, Reste / Kachelkante (1 Zelle)
+      else { const dm = dmax[c]; if (dm >= 5 && ((lead[p - 1] && id[p - 1] !== c) || (lead[p - GW] && id[p - GW] !== c))) L2[p] = 1;                       // 2. Zelle auf der anderen Seite der Kante
         else if (dm >= 9.5 && ((lead[p + 1] && id[p + 1] === c) || (lead[p + GW] && id[p + GW] === c))) L2[p] = 1; }   // 3. Zelle bei grossen Kacheln
     }
+    const bd = new Uint8Array(NPX);   // Rahmen des Bildfelds: 2 aussen, 1 innen
+    for (let y = AY0; y < AY0 + AH; y++) for (let x = AX0; x < AX0 + AW; x++) { const p = y * GW + x; if (A[p]) bd[p] = nbr[p] ? 2 : (nbr[p - 1] || nbr[p + 1] || nbr[p - GW] || nbr[p + GW]) ? 1 : 0; }
+    // Splitter und Zerfall: von der Kachel bleibt nur die groesste zusammenhaengende Glasflaeche (mindestens 12 Zellen und 3 Innenzellen); alles andere wird Blei
+    { const glass = q => A[q] && id[q] >= 0 && !L2[q] && !bd[q], lab = new Int32Array(NPX).fill(-1), best = new Int32Array(n).fill(-1), bestSz = new Int32Array(n), csz = [], cin = [], cti = [];
+      for (let p0 = 0; p0 < NPX; p0++) {
+        if (!glass(p0) || lab[p0] >= 0) continue;
+        const ci = csz.length, c = id[p0], q = [p0]; lab[p0] = ci; let inner = 0;
+        for (let h = 0; h < q.length; h++) { const p = q[h]; let all = true; for (const np of [p - 1, p + 1, p - GW, p + GW]) { if (np < 0 || np >= NPX || !glass(np) || id[np] !== c) { all = false; continue; } if (lab[np] < 0) { lab[np] = ci; q.push(np); } } if (all) inner++; }
+        csz.push(q.length); cin.push(inner); cti.push(c);
+        if (q.length >= 12 && inner >= 3 && q.length > bestSz[c]) { best[c] = ci; bestSz[c] = q.length; }
+      }
+      for (let p = 0; p < NPX; p++) if (lab[p] >= 0 && best[id[p]] !== lab[p]) L2[p] = 1; }
     const tcol = [];   // Kachelfarbe (RGB, Stufe 5) je Kachel
     for (let c = 0; c < n; c++) tcol.push(stainRamp(st.hue[c], st.sat[c], .73));
     for (let y = AY0; y < AY0 + AH; y++) for (let x = AX0; x < AX0 + AW; x++) {
       const p = y * GW + x; if (!A[p]) continue;
-      const border = nbr[p] ? 2 : (nbr[p - 1] || nbr[p + 1] || nbr[p - GW] || nbr[p + GW]) ? 1 : 0;
+      const border = bd[p];
       if (!L2[p] && !border) continue;
       lead2[p] = 1;
-      const c1 = id[p]; let c2 = c1;   // die andere angrenzende Kachel: erster abweichender Nachbar im 5x5-Fenster
-      for (let dy = -2; dy <= 2 && c2 === c1; dy++) for (let dx = -2; dx <= 2; dx++) { const q = p + dy * GW + dx; if (q >= 0 && q < NPX && A[q] && id[q] !== c1) { c2 = id[q]; break; } }
-      const a1 = tcol[c1], a2 = tcol[c2], f = (border === 1 ? .5 : .3) * (hash(x, y, 9) < .2 ? .8 : 1);
-      base[p] = sn((a1[0] + a2[0]) * .5 * f + 4, (a1[1] + a2[1]) * .5 * f + 3, (a1[2] + a2[2]) * .5 * f + 6);
-      if (!S[p] && !border) {
+      const c1 = tid[p]; let c2 = c1;   // die andere angrenzende Kachel: erster abweichender Nachbar im 5x5-Fenster
+      for (let dy = -2; dy <= 2 && c2 === c1; dy++) for (let dx = -2; dx <= 2; dx++) { const q = p + dy * GW + dx; if (q >= 0 && q < NPX && A[q] && tid[q] >= 0 && tid[q] !== c1) { c2 = tid[q]; break; } }
+      const a1 = tcol[c1] || LEAD_DEF, a2 = tcol[c2] || a1, f = (border === 1 ? .5 : .3) * (hash(x, y, 9) < .2 ? .8 : 1);
+      const mr = (a1[0] + a2[0]) * .5, mg = (a1[1] + a2[1]) * .5, mb = (a1[2] + a2[2]) * .5, ml = mr * .3 + mg * .59 + mb * .11, ff = Math.min(f, (border === 1 ? 44 : 30) / (ml + 1));   // helle Kachelfarben werden staerker abgedunkelt: die Kontur bleibt dunkel genug
+      base[p] = sn(mr * ff + 4, mg * ff + 3, mb * ff + 6);
+      if (!sm[p] && !border) {
         lsp.push(p); lbp.push(p); lbu.push(Math.round(x + y * .9));
         lh1.push(sn((a1[0] + a2[0]) * .5 * .85, (a1[1] + a2[1]) * .5 * .85, (a1[2] + a2[2]) * .5 * .85)); lh2.push(sn(((a1[0] + a2[0]) * .5 + 255) * .5, ((a1[1] + a2[1]) * .5 + 240) * .5, ((a1[2] + a2[2]) * .5 + 200) * .5));
       }
     }
     // Glanzpixel: sparsam an EINER Seite der Fuge (Pixel mit Glas darueber oder links), in der aufgehellten Kachelfarbe, keine zweite Kontur
     for (let y = AY0; y < AY0 + AH; y++) for (let x = AX0; x < AX0 + AW; x++) {
-      const p = y * GW + x; if (!lead2[p] || nbr[p] || !(L2[p]) || (lead2[p - GW] && lead2[p - 1]) || hash(x, y, 13) >= .3) continue;
-      const a = tcol[id[p]]; base[p] = sn(a[0] * 1.15 + 30, a[1] * 1.15 + 30, a[2] * 1.15 + 30);
+      const p = y * GW + x; if (!lead2[p] || nbr[p] || !(L2[p]) || id[p] < 0 || (lead2[p - GW] && lead2[p - 1]) || hash(x, y, 13) >= .3) continue;
+      const a = tcol[tid[p]] || LEAD_DEF; base[p] = sn(a[0] * 1.15 + 30, a[1] * 1.15 + 30, a[2] * 1.15 + 30);
     }
     const tcnt = new Int32Array(n + 1);
     for (let y = AY0; y < AY0 + AH; y++) for (let x = AX0; x < AX0 + AW; x++) {
@@ -1195,7 +1280,7 @@
     for (let y = AY0; y < AY0 + AH; y++) for (let x = AX0; x < AX0 + AW; x++) {
       const p = y * GW + x; if (!A[p]) continue;
       const ax = Math.min(e.w - 1, Math.floor((full ? x + .5 : x - AX0 + .5) / (full ? GW : AW) * e.w)), ay = Math.min(e.h - 1, Math.floor((full ? y + .5 : y - AY0 + .5) / (full ? GH : AH) * e.h));
-      gm[p] = e.mn[ay * e.w + ax] ? 0 : 1;
+      gm[p] = e.mn[ay * e.w + ax] || sm[p] ? 0 : 1;
     }
     // Glanzlicht je Kachel: kurze Diagonale ('/') oben links der Kachelmitte (bei 4 von 5 Kacheln)
     for (let c = 0; c < n; c++) {
