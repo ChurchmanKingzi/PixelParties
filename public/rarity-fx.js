@@ -24,6 +24,15 @@
 //    testRarity(cardName)                  Test-Schalter: ?rarity=<id|mix> in der Adresse oder window.__ppTestRarity
 //    ORDER, LABEL
 //  Messung / Test:  PpRarityFx.stats()
+//
+//  Rechenaufwand (Stand Performance-Umbau): Die Ausgabe ist Pixel fuer Pixel dieselbe wie vorher; es wird nur weniger gerechnet.
+//   * Je Karte einmal vorberechnet (core.st.pre bzw. je Ansicht): alles, was von der Zeit nicht abhaengt (Torwerte, Bayer-Stellen, Lauf-Koordinaten, Grundfarben,
+//     Bleiruten, Schriftpixel), dazu Farbtabellen, die erst beim ersten Bedarf gefuellt werden. Je Bild laufen nur die bewegten Anteile (Lichtlaeufe ueber
+//     Eimer nach Lauf-Koordinate, Rauschsaum der Umbra, geaenderte Kacheln der Prismatic, Glaszellen mit gleichen Stufen aus der Tabelle).
+//   * Die Effekte schreiben in ein Uint32-Raster (ein Schreibzugriff je Pixel, keine Zwischenfelder), Text in Uint32-Sichten der Ebenen.
+//   * Stained quantisiert im Raster statt die Leinwand zurueckzulesen (kein getImageData im Takt).
+//   * Schwere Erstberechnung (Glasscheiben, Bleiruten, Quantisierungs- und Glastabellen) laeuft in Zeitscheiben (`prepG`, `runSliced`), nicht als ein Block.
+//   Gegenprobe bei jeder Aenderung: Leinwand-Hashes je Rarity x Kartentyp x Groesse x Zeitpunkt gegen den Stand davor (muessen alle gleich sein).
 // ═══════════════════════════════════════════════════════════════════
 (function (root) {
   if (root.PpRarityFx) return;
@@ -80,9 +89,11 @@
     SNAP[k] = v;
     return v;
   }
+  /** wie sn(), nur fuer Werte, die sicher in 0..255 liegen (Mischungen zweier Farbwerte): ohne Begrenzung */
+  function snIn(r, g, b) { const v = SNAP[(((r | 0) >> 2) << 12) | (((g | 0) >> 2) << 6) | ((b | 0) >> 2)]; return v || sn(r, g, b); }
   /** Palettenfarbe als CSS-Text (fillStyle) */
   function rgbStr(c) { const v = sn(c[0], c[1], c[2]); return 'rgb(' + (v & 255) + ',' + ((v >> 8) & 255) + ',' + ((v >> 16) & 255) + ')'; }
-  function put(o, p, c) { const v = sn(c[0], c[1], c[2]), i = p * 4; o[i] = v & 255; o[i + 1] = (v >> 8) & 255; o[i + 2] = (v >> 16) & 255; o[i + 3] = 255; }
+  function put(o, p, c) { o[p] = sn(c[0], c[1], c[2]); }   // o: Uint32Array (RGBA little-endian, wie sn() es liefert)
 
   // ─── Geometrie (Bildfeld im Raster; bei Vollbild-Karten die ganze Karte) ───
   let AX0 = 14, AY0 = 34, AW = 122, AH = 80, FULLART = false;
@@ -121,6 +132,25 @@
     const id = new Int16Array(NPX), dist = new Float32Array(NPX), n = sites.length;
     const sx = new Float32Array(n), sy = new Float32Array(n);
     for (let i = 0; i < n; i++) { sx[i] = sites[i].x; sy[i] = sites[i].y; }
+    if (metric !== 'l1' && n >= 24) {
+      // Naechster Standort je Pixel, ohne alle Standorte zu pruefen: Standorte nach x sortiert, vom Pixel aus nach links/rechts, solange dx^2 den bisher besten
+      // Abstand nicht uebersteigt; Startwert = Gewinner des linken Nachbarpixels. Gleiche Abstandsformel und Gleichstandsregel (kleinster Index) wie die volle Suche.
+      const ord = Int32Array.from({ length: n }, (_, i) => i).sort((a, b) => sx[a] - sx[b] || a - b), sxs = new Float64Array(n);
+      for (let j = 0; j < n; j++) sxs[j] = sx[ord[j]];
+      let rowStart = 0;
+      for (let y = 0; y < GH; y++) {
+        let ix = 0, bi = rowStart;
+        for (let x = 0; x < GW; x++) {
+          let dx = x - sx[bi], dy = y - sy[bi], best = dx * dx + dy * dy;
+          while (ix < n && sxs[ix] < x) ix++;
+          for (let j = ix; j < n; j++) { const s = ord[j]; dx = x - sx[s]; const dx2 = dx * dx; if (dx2 > best) break; dy = y - sy[s]; const d = dx2 + dy * dy; if (d < best || (d === best && s < bi)) { best = d; bi = s; } }
+          for (let j = ix - 1; j >= 0; j--) { const s = ord[j]; dx = x - sx[s]; const dx2 = dx * dx; if (dx2 > best) break; dy = y - sy[s]; const d = dx2 + dy * dy; if (d < best || (d === best && s < bi)) { best = d; bi = s; } }
+          const p = y * GW + x; id[p] = bi; dist[p] = Math.sqrt(best);
+          if (x === 0) rowStart = bi;
+        }
+      }
+      return { id, dist };
+    }
     for (let y = 0; y < GH; y++) for (let x = 0; x < GW; x++) {
       let best = 1e9, bi = 0;
       for (let i = 0; i < n; i++) {
@@ -245,63 +275,148 @@
   }
 
   // ═══════════ Text-Ebenen: Name/Werte und Regeltext als Pixellisten in der Leinwand-Auflösung (K Pixel je Rasterzelle) ═══════════
-  // lay.dark: helle Textfelder (Artefakte) bekommen dunkle Tinte desselben Farbtons
-  function lput(lay, lx, ly, c) { if (lx < 0 || ly < 0 || lx >= lay.w || ly >= lay.h) return; const i = (ly * lay.w + lx) * 4, d = lay.data, v = lay.dark ? sn(c[0] * .4, c[1] * .4, c[2] * .4) : sn(c[0], c[1], c[2]); d[i] = v & 255; d[i + 1] = (v >> 8) & 255; d[i + 2] = (v >> 16) & 255; d[i + 3] = 255; }
+  // lay.dark: helle Textfelder (Artefakte) bekommen dunkle Tinte desselben Farbtons.
+  // Die Ebenen werden als Uint32-Sicht (lay.d32) beschrieben; alles, was je Tintenpixel gleich bleibt (Koordinaten, Grundfarbe), ist je Ebene einmal vorberechnet
+  // (layPre / layBase), der Lichtlauf sucht seine Pixel über Eimer nach Lauf-Koordinate statt jedes Tintenpixel zu prüfen.
+  const BODY_C = [232, 204, 134];
+  function lput(lay, lx, ly, c) { if (lx < 0 || ly < 0 || lx >= lay.w || ly >= lay.h) return; lay.d32[ly * lay.w + lx] = lay.dark ? sn(c[0] * .4, c[1] * .4, c[2] * .4) : sn(c[0], c[1], c[2]); }
+  const packC = (lay, r, g, b) => (lay.dark ? sn(r * .4, g * .4, b * .4) : sn(r, g, b));
   function lblock(lay, gx, gy, c) { const U = lay.U, x0 = gx * U - lay.x0, y0 = gy * U - lay.y0; for (let dy = 0; dy < U; dy++) for (let dx = 0; dx < U; dx++) lput(lay, x0 + dx, y0 + dy, c); }
   function lstar(lay, gx, gy, size, arm, core) { lblock(lay, gx, gy, core); for (let k = 1; k <= size; k++) { lblock(lay, gx + k, gy, arm); lblock(lay, gx - k, gy, arm); lblock(lay, gx, gy + k, arm); lblock(lay, gx, gy - k, arm); } }
   const SILVER = ry => (ry < .22 ? [252, 253, 255] : ry < .48 ? [214, 222, 236] : ry < .74 ? [168, 180, 200] : [120, 132, 154]);
   const GOLDNAME = ry => (ry < .22 ? [255, 246, 190] : ry < .5 ? [250, 213, 74] : ry < .75 ? [226, 170, 30] : [176, 118, 8]);
-  function eachText(E, which, fn) {
-    for (const lay of E.layers) {
-      if (which !== 'all' && lay.kind !== which) continue;
-      const L = lay.list, U = lay.U;
-      for (let k = 0; k < L.length; k += 2) { const lx = L[k], ly = L[k + 1]; fn(lay, lx, ly, Math.floor((ly - lay.gy0) / U) * U / lay.gh, (lx + lay.x0) / U, (ly + lay.y0) / U); }
+  /** Je Ebene einmal: Index im Puffer, Rasterkoordinaten (gx, gy), Zeilenanteil ry, Lichtlauf-Koordinaten (ud, ub) je Tintenpixel */
+  function layPre(lay) {
+    if (lay.pre) return lay.pre;
+    const L = lay.list, n = L.length >> 1, U = lay.U, w = lay.w;
+    const pidx = new Int32Array(n), gx = new Float64Array(n), gy = new Float64Array(n), ry = new Float64Array(n), ud = new Float64Array(n), ub = new Float64Array(n), fgy = new Int32Array(n);
+    for (let k = 0; k < n; k++) {
+      const lx = L[k * 2], ly = L[k * 2 + 1];
+      pidx[k] = ly * w + lx; gx[k] = (lx + lay.x0) / U; gy[k] = (ly + lay.y0) / U; ry[k] = Math.floor((ly - lay.gy0) / U) * U / lay.gh;
+      ud[k] = UD(gx[k], gy[k]); ub[k] = (2 * gx[k] + gy[k]) / 2.236; fgy[k] = Math.floor(gy[k]);
     }
+    return (lay.pre = { n, pidx, gx, gy, ry, ud, ub, fgy, bases: new Map(), buckets: {} });
+  }
+  /** Eintraege in Eimern (Breite 1) nach Wert: bk.ord[bk.start[b] .. bk.start[b+1]) */
+  function bucketsOf(vals, n) {
+    let mn = Infinity, mx = -Infinity;
+    for (let k = 0; k < n; k++) { if (vals[k] < mn) mn = vals[k]; if (vals[k] > mx) mx = vals[k]; }
+    if (!n) { mn = 0; mx = 0; }
+    const mn0 = Math.floor(mn), nb = Math.floor(mx - mn0) + 2, start = new Int32Array(nb + 1), ord = new Int32Array(n);
+    for (let k = 0; k < n; k++) start[Math.floor(vals[k] - mn0) + 1]++;
+    for (let b = 0; b < nb; b++) start[b + 1] += start[b];
+    const fill = start.slice(0, nb);
+    for (let k = 0; k < n; k++) ord[fill[Math.floor(vals[k] - mn0)]++] = k;
+    return { ord, start, mn0, nb };
+  }
+  function layBuckets(lay, kind) {
+    const pre = layPre(lay); let bk = pre.buckets[kind]; if (bk) return bk;
+    return (pre.buckets[kind] = bucketsOf(pre[kind], pre.n));
+  }
+  /** Eimer-Bereich [from, to) (Indizes in bk.ord) aller Pixel mit Koordinate in [lo, hi] (Obermenge) */
+  function bucketSpan(bk, lo, hi) {
+    let b0 = Math.floor(lo - bk.mn0), b1 = Math.floor(hi - bk.mn0);
+    if (b1 < 0 || b0 >= bk.nb) return null;
+    if (b0 < 0) b0 = 0; if (b1 >= bk.nb) b1 = bk.nb - 1;
+    return [bk.start[b0], bk.start[b1 + 1]];
+  }
+  /** Grundfarbe jeder Tintenpixels einer Ebene für einen Farbverlauf `ramp` (Name/Werte nach Zeilenanteil, Regeltext in einem Ton), fertig gepackt */
+  function layBase(lay, ramp) {
+    const pre = layPre(lay); let b = pre.bases.get(ramp); if (b) return b;
+    b = new Uint32Array(lay.w * lay.h); const body = lay.kind === 'body';
+    for (let k = 0; k < pre.n; k++) { const c = body ? BODY_C : ramp(pre.ry[k]); b[pre.pidx[k]] = packC(lay, c[0], c[1], c[2]); }
+    pre.bases.set(ramp, b); return b;
   }
   function paintName(E, t, ramp, per, run, sparkCol, wide) {
-    const pos = glintU(t, per || 3.2, run || .5);
-    eachText(E, 'all', (lay, lx, ly, ry, gx, gy) => {
-      const body = lay.kind === 'body'; let c = body ? [232, 204, 134] : ramp(ry);
-      if (pos.length) {
-        const a = Math.abs(UD(gx, gy) - pos[0]), m = body ? 2.4 : 1;
-        if (a < 1.5 * m) c = [255, 255, 255]; else if (a < 3.2 * m) c = mixc(c, [255, 255, 255], .6);
-        else if (wide && a < wide) {
-          const k = 1 - a / wide, X = lx + lay.x0, Y = ly + lay.y0;
-          if ((((X >> 1) & 1) * 2 + ((Y >> 1) & 1) + 0.5) / 4 < k * 1.6) c = mixc(c, [255, 250, 228], k > .66 ? .88 : k > .33 ? .66 : .4);
-        }
+    const pos = glintU(t, per || 3.2, run || .5), p0 = pos.length ? pos[0] : 0;
+    for (const lay of E.layers) {
+      const pre = layPre(lay), d32 = lay.d32, L = lay.list;
+      d32.set(layBase(lay, ramp));
+      if (!pos.length) continue;
+      const body = lay.kind === 'body', m = body ? 2.4 : 1, thr = wide ? Math.max(3.2 * m, wide) : 3.2 * m;
+      const span = bucketSpan(layBuckets(lay, 'ud'), p0 - thr - 1e-6, p0 + thr + 1e-6); if (!span) continue;
+      const ord = layBuckets(lay, 'ud').ord;
+      for (let q = span[0]; q < span[1]; q++) {
+        const k = ord[q], a = Math.abs(pre.ud[k] - p0);
+        if (a < 1.5 * m) { d32[pre.pidx[k]] = packC(lay, 255, 255, 255); continue; }
+        if (!(a < 3.2 * m) && !(wide && a < wide)) continue;
+        const c = body ? BODY_C : ramp(pre.ry[k]);
+        if (a < 3.2 * m) { d32[pre.pidx[k]] = packC(lay, c[0] + (255 - c[0]) * .6, c[1] + (255 - c[1]) * .6, c[2] + (255 - c[2]) * .6); continue; }
+        const kk = 1 - a / wide, X = L[k * 2] + lay.x0, Y = L[k * 2 + 1] + lay.y0;
+        if ((((X >> 1) & 1) * 2 + ((Y >> 1) & 1) + 0.5) / 4 < kk * 1.6) { const f = kk > .66 ? .88 : kk > .33 ? .66 : .4; d32[pre.pidx[k]] = packC(lay, c[0] + (255 - c[0]) * f, c[1] + (250 - c[1]) * f, c[2] + (228 - c[2]) * f); }
       }
-      lput(lay, lx, ly, c);
-    });
+    }
     const nl = E.layers[0]; if (!nl || nl.kind !== 'name' || !nl.list.length) return;
     const L = nl.list, n = L.length / 2, arm = sparkCol || [190, 214, 255], U = nl.U;
     for (let s2 = 0; s2 < 3; s2++) {
       const tt = t + s2 * .5, per2 = 1.5, k = Math.floor(tt / per2), ph = (tt % per2) / per2; if (ph > .6) continue;
       const f = Math.floor(ph / .6 * SPARK_SIZE.length), q = Math.floor(hash(k, s2, 3) * n);
-      lstar(nl, Math.round((L[q * 2] + nl.x0) / U), Math.round((L[q * 2 + 1] + nl.y0) / U), Math.min(2, SPARK_SIZE[f]), arm, [255, 255, 255]);
+      lstar(nl, Math.round((L[q * 2] + nl.x0) / U), Math.round((L[q * 2 + 1] + nl.y0) / U), Math.min(2, SPARK_SIZE[f]), arm, WHITE3);
     }
   }
+  const WHITE3 = [255, 255, 255];
   function textBand(E, pos, w, hi, mid) {
     if (!pos.length) return;
-    eachText(E, 'all', (lay, lx, ly, ry, gx, gy) => { const k = glintK((2 * gx + gy) / 2.236, pos, w); if (k > .62) lput(lay, lx, ly, hi); else if (k > .25 && mid) lput(lay, lx, ly, mid); });
-  }
-  function rimBand(E, o, pos, w, col, dfn) {
-    dfn = dfn || ((x, y) => (2 * x + y) / 2.236);
-    if (!pos.length) return;
-    const B = E.B;
-    for (let y = 0; y < GH; y++) for (let x = 0; x < GW; x++) {
-      if (!(x < 3 || x >= GW - 3 || y < 3 || y >= GH - 3)) continue;
-      const k = glintK(dfn(x, y), pos, w); if (k <= .2) continue;
-      const p = y * GW + x, i = p * 4, f = k > .62 ? .85 : k > .4 ? .55 : .3;
-      put(o, p, mixc([B[i], B[i + 1], B[i + 2]], col, f));
+    for (const lay of E.layers) {
+      const pre = layPre(lay), d32 = lay.d32, bk = layBuckets(lay, 'ub'), ord = bk.ord;
+      const hiP = packC(lay, hi[0], hi[1], hi[2]), midP = mid ? packC(lay, mid[0], mid[1], mid[2]) : 0;
+      for (let pi = 0; pi < pos.length; pi++) {
+        const span = bucketSpan(bk, pos[pi] - w - 1e-6, pos[pi] + w + 1e-6); if (!span) continue;
+        for (let q = span[0]; q < span[1]; q++) {
+          const k = ord[q], kk = glintK(pre.ub[k], pos, w);
+          if (kk > .62) d32[pre.pidx[k]] = hiP; else if (kk > .25 && mid) d32[pre.pidx[k]] = midP;
+        }
+      }
     }
   }
+  const rimLists = new WeakMap();
+  /** Randpixel (3 Zellen) mit ihrer Lauf-Koordinate (ud = x + 0.9 y wie UD, sonst ub = (2x + y) / 2.236): je Karte einmal */
+  function rimList(E, useUD) {
+    let m = rimLists.get(E.B); if (!m) rimLists.set(E.B, m = {});
+    const key = useUD ? 'ud' : 'ub'; if (m[key]) return m[key];
+    const P = [], D = [];
+    for (let y = 0; y < GH; y++) for (let x = 0; x < GW; x++) { if (!(x < 3 || x >= GW - 3 || y < 3 || y >= GH - 3)) continue; P.push(y * GW + x); D.push(useUD ? UD(x, y) : (2 * x + y) / 2.236); }
+    return (m[key] = { p: Int32Array.from(P), d: Float64Array.from(D) });
+  }
+  function rimBand(E, o, pos, w, col, dfn) {
+    if (!pos.length) return;
+    const B = E.B, rl = rimList(E, dfn === UD), RP = rl.p, RD = rl.d;
+    for (let j = 0; j < RP.length; j++) {
+      const k = glintK(RD[j], pos, w); if (k <= .2) continue;
+      const p = RP[j], i = p * 4, f = k > .62 ? .85 : k > .4 ? .55 : .3, r0 = B[i], g0 = B[i + 1], b0 = B[i + 2];
+      o[p] = sn(r0 + (col[0] - r0) * f, g0 + (col[1] - g0) * f, b0 + (col[2] - b0) * f);
+    }
+  }
+  /** Geist-Schrift (Spectral): jedes Tintenpixel jedes Bild neu — Farbe nur nach Spalte und Zeilenband, daher je Bild zwei kleine Tabellen */
   function ghostName(E, t) {
-    eachText(E, 'all', (lay, lx, ly, ry, gx, gy) => {
-      const w = 0.5 + 0.5 * Math.sin(t * 2.4 + gx * 0.45);
-      let c = mixc([238, 255, 248], [188, 160, 255], w * .7);
-      if ((Math.floor(gy) + Math.floor(t * 5)) % 4 === 0) c = mixc(c, [120, 200, 230], .45);
-      lput(lay, lx, ly, c);
-    });
+    const F = Math.floor(t * 5);
+    for (const lay of E.layers) {
+      const pre = layPre(lay), d32 = lay.d32, U = lay.U, W = lay.w;
+      if (!pre.colGx) { pre.colGx = new Float64Array(W); for (let x = 0; x < W; x++) pre.colGx[x] = (x + lay.x0) / U; pre.tab0 = new Uint32Array(W); pre.tab1 = new Uint32Array(W); }
+      const { colGx, tab0, tab1 } = pre;
+      for (let x = 0; x < W; x++) {
+        const w = 0.5 + 0.5 * Math.sin(t * 2.4 + colGx[x] * 0.45);
+        const m = w * .7, r = 238 + (188 - 238) * m, g = 255 + (160 - 255) * m, b = 248 + (255 - 248) * m;
+        tab0[x] = packC(lay, r, g, b); tab1[x] = packC(lay, r + (120 - r) * .45, g + (200 - g) * .45, b + (230 - b) * .45);
+      }
+      const { pidx, fgy } = pre, L = lay.list;
+      for (let k = 0; k < pre.n; k++) { const x = L[k * 2]; d32[pidx[k]] = (fgy[k] + F) % 4 === 0 ? tab1[x] : tab0[x]; }
+    }
+  }
+  /** Umbra-Schrift: Farbe nach Spalte und oberer/unterer Zeilenhälfte */
+  function umbraText(E, t) {
+    for (const lay of E.layers) {
+      const pre = layPre(lay), d32 = lay.d32, U = lay.U, W = lay.w;
+      if (!pre.colGx) { pre.colGx = new Float64Array(W); for (let x = 0; x < W; x++) pre.colGx[x] = (x + lay.x0) / U; pre.tab0 = new Uint32Array(W); pre.tab1 = new Uint32Array(W); }
+      const { colGx, tab0, tab1, ry, pidx } = pre;
+      for (let x = 0; x < W; x++) {
+        const w = .5 + .5 * Math.sin(t * 2 + colGx[x] * .3), m = w * .22;
+        tab0[x] = packC(lay, 252 + (176 - 252) * m, 246 + (128 - 246) * m, 255 + (240 - 255) * m);   // ry < .5
+        tab1[x] = packC(lay, 226 + (176 - 226) * m, 212 + (128 - 212) * m, 252 + (240 - 252) * m);
+      }
+      const L = lay.list;
+      for (let k = 0; k < pre.n; k++) { const x = L[k * 2]; d32[pidx[k]] = ry[k] < .5 ? tab0[x] : tab1[x]; }
+    }
   }
 
   // ═══════════ Der Effekt-Katalog ═══════════
@@ -310,24 +425,49 @@
   const ICE = [[178, 238, 238], [124, 233, 220], [102, 217, 255], [229, 245, 250], [78, 130, 203], [255, 255, 255]];
 
   // Uncommon: silberner Name und Werte, Lichtlauf über Name, Werte und Icon
-  FX.unc = { glint: t => glintU(t, 3.6, .6), frame(E, st, t, o) { paintName(E, t, SILVER, 3.6, .6); } };
+  FX.unc = { textFull: true, gridless: true, glint: t => glintU(t, 3.6, .6), frame(E, st, t, o) { paintName(E, t, SILVER, 3.6, .6); } };
 
   // Rare: Prisma-Strahl über dem Bild, silberner Rahmen, Name/Werte im selben Lauf
+  const RARE_W = 34, TMP3 = new Float64Array(3);
+  function rareFill(pre, q, h) {
+    const p = pre.c0[q], i = p * 4, B = pre.B; hsvOut(h / 14, .8, clamp(.38 + .95 * pre.L[p]), TMP3, 0);
+    return (pre.tab[q * 14 + h] = sn(B[i] + (TMP3[0] - B[i]) * .8, B[i + 1] + (TMP3[1] - B[i + 1]) * .8, B[i + 2] + (TMP3[2] - B[i + 2]) * .8));
+  }
+  /** Rare: je Bildpixel einmal Torwert, Bayer-Stelle und Lauf-Koordinate; ausserhalb des Strahls bleiben nur die Rasterpunkte (Bayer < 0,14 * Tor) in 14 Farbstufen */
+  function rarePre(E) {
+    const { B, L, A } = E, c0 = [], c0Q = [], cp = [], cu = [], cg = [], cb = [];
+    for (let y = AY0; y < AY0 + AH; y++) for (let x = AX0; x < AX0 + AW; x++) {
+      const p = y * GW + x; if (!A[p]) continue;
+      const gate = sstep(.08, .4, L[p]), bv = bay(x, y);
+      if (gate > 0) { cp.push(p); cu.push(UD(x, y)); cg.push(gate); cb.push(bv); }
+      if (bv < (0.14 + 0 * 0.95) * gate) c0.push(p);
+    }
+    const c0P = Int32Array.from(c0), tab = new Uint32Array(c0P.length * 14), uc = new Float64Array(c0P.length);   // tab: Farbstufen werden beim ersten Bedarf gefuellt
+    for (let q = 0; q < c0P.length; q++) { const p = c0P[q]; uc[q] = UD(p % GW, (p / GW) | 0); }
+    const cuA = Float64Array.from(cu);
+    return { B, L, c0: c0P, uc, tab, cp: Int32Array.from(cp), cu: cuA, cg: Float64Array.from(cg), cb: Float64Array.from(cb), bk: bucketsOf(cuA, cuA.length), WHITE: sn(255, 255, 255) };
+  }
   FX.rare = {
+    textFull: true,
+    prep: () => ({}),
     glint: t => glintU(t, 4.6, .72),
     frame(E, st, t, o) {
-      const { B, L } = E, pos = glintU(t, 4.6, .72), W = 34;
-      artLoop(E, (x, y, p, i) => {
-        const u = pos.length ? UD(x, y) - pos[0] : 999, a = Math.abs(u);
-        const beam = Math.max(0, 1 - a / W), gate = sstep(.08, .4, L[p]);
-        const cov = (0.14 + beam * 0.95) * gate;
-        if (bay(x, y) >= cov) return;
-        const hq = Math.floor(fract(u * 0.026 + .02) * 14) / 14;
-        let c = hsv(hq, beam > .1 ? .95 : .8, clamp(.38 + .95 * L[p]));
-        c = mixc([B[i], B[i + 1], B[i + 2]], c, .8);
-        if (a < 2.2) c = [255, 255, 255];
-        put(o, p, c);
-      });
+      const { B, L } = E, pos = glintU(t, 4.6, .72), W = RARE_W, pre = st.pre || (st.pre = rarePre(E)), p0 = pos.length ? pos[0] : 0;
+      // Rasterpunkte (Strahl-frei); der Farbton laeuft mit der Lauf-Koordinate
+      { const { c0, uc, tab } = pre;
+        for (let q = 0; q < c0.length; q++) { const u = pos.length ? uc[q] - p0 : 999, hq = Math.floor(fract(u * 0.026 + .02) * 14); o[c0[q]] = Math.abs(u) < 2.2 ? pre.WHITE : (tab[q * 14 + hq] || rareFill(pre, q, hq)); } }
+      // im Strahl: alle Bildpixel mit |u| < W
+      if (pos.length) {
+        const { cp, cu, cg, cb, bk } = pre, span = bucketSpan(bk, p0 - W - 1e-6, p0 + W + 1e-6);
+        if (span) for (let j = span[0]; j < span[1]; j++) {
+          const q = bk.ord[j], u = cu[q] - p0, a = Math.abs(u), beam = Math.max(0, 1 - a / W), cov = (0.14 + beam * 0.95) * cg[q];
+          if (cb[q] >= cov) continue;
+          const p = cp[q], i = p * 4;
+          if (a < 2.2) { o[p] = pre.WHITE; continue; }
+          hsvOut(Math.floor(fract(u * 0.026 + .02) * 14) / 14, beam > .1 ? .95 : .8, clamp(.38 + .95 * L[p]), TMP3, 0);
+          o[p] = sn(B[i] + (TMP3[0] - B[i]) * .8, B[i + 1] + (TMP3[1] - B[i + 1]) * .8, B[i + 2] + (TMP3[2] - B[i + 2]) * .8);
+        }
+      }
       rimBand(E, o, pos, 5, [236, 242, 255], UD);
       // Silberfunken im Bild: auch in der Ruhephase zwischen den Läufen ist mehr zu sehen als das feine Punktraster
       sparkles(o, t, 5, 1.6, .55, (k, s) => [AX0 + 5 + Math.floor(hash(k, s, 61) * (AW - 10)), AY0 + 5 + Math.floor(hash(k, s, 62) * (AH - 10))], [200, 214, 238], [255, 255, 255], 1);
@@ -347,16 +487,28 @@
     const cx = new Float32Array(n), cy = new Float32Array(n), cnt = new Int32Array(n);
     for (let p = 0; p < NPX; p++) { const c = v.id[p]; cx[c] += p % GW; cy[c] += (p / GW) | 0; cnt[c]++; }
     for (let i = 0; i < n; i++) if (cnt[i]) { cx[i] /= cnt[i]; cy[i] /= cnt[i]; }
-    return { v, e, n, ph, tilt, lite, cx, cy };
+    const cstart = new Int32Array(n + 1), cpx = new Int32Array(NPX);   // Pixel je Kachel (nach Kachel sortiert)
+    for (let p = 0; p < NPX; p++) cstart[v.id[p] + 1]++;
+    for (let c = 0; c < n; c++) cstart[c + 1] += cstart[c];
+    const fillc = cstart.slice(0, n); for (let p = 0; p < NPX; p++) cpx[fillc[v.id[p]]++] = p;
+    return { v, e, n, ph, tilt, lite, cx, cy, cstart, cpx };
   }
+  /** wie hsv(), schreibt r, g, b (0..255, Rohwerte) nach out[j..j+2] — ohne Zwischenfelder */
+  function hsvOut(h, s, v, out, j) {
+    h = fract(h); const i6 = Math.floor(h * 6), f = h * 6 - i6, p = v * (1 - s), q = v * (1 - f * s), t = v * (1 - (1 - f) * s);
+    let r, g, b;
+    switch (i6 % 6) { case 0: r = v; g = t; b = p; break; case 1: r = q; g = v; b = p; break; case 2: r = p; g = v; b = t; break; case 3: r = p; g = q; b = v; break; case 4: r = t; g = p; b = v; break; default: r = v; g = p; b = q; }
+    out[j] = r * 255; out[j + 1] = g * 255; out[j + 2] = b * 255;
+  }
+  const MLV = Float64Array.from({ length: 10 }, (_, i) => Math.min(.9, i / 10));
   function prismaticFrame(E, st, t, o, str, share) {
     const { B, L } = E, { v, e, ph, tilt, lite, cx, cy, n } = st;
     if (!st.pre) {
-      const outl = new Float32Array(NPX), art = new Uint8Array(NPX);
-      for (let p = 0; p < NPX; p++) { outl[p] = .45 + .55 * sstep(.04, .3, L[p]); art[p] = inArt(p % GW, (p / GW) | 0) ? 1 : 0; }
-      st.pre = { outl, art, lut: new Uint8Array(n * LV * 3), cellK: new Float32Array(n) };
+      const outl = new Float32Array(NPX), art = new Uint8Array(NPX), qi = new Uint8Array(NPX), LVN0 = LV - 1;
+      for (let p = 0; p < NPX; p++) { outl[p] = .45 + .55 * sstep(.04, .3, L[p]); art[p] = inArt(p % GW, (p / GW) | 0) ? 1 : 0; qi[p] = Math.round(clamp(.2 + .9 * L[p], 0, art[p] ? 1 : .86) * LVN0); }
+      st.pre = { outl, art, qi, lut: new Uint8Array(n * LV * 3), cellK: new Float32Array(n), lutPrev: new Uint8Array(n * LV * 3), kPrev: new Float32Array(n).fill(NaN), out: new Uint32Array(NPX), changed: new Uint8Array(n), hP: new Float64Array(n * 3).fill(NaN) };
     }
-    const { outl, art, lut, cellK } = st.pre, LVN = LV - 1;
+    const { outl, art, qi, lut, cellK, lutPrev, kPrev, out, changed, hP } = st.pre, LVN = LV - 1, { cstart, cpx } = st;
     const sweep = ((t * 0.17) % 1) * (GW + GH + 60) - 30;
     for (let c = 0; c < n; c++) {
       const wave = Math.max(0, 1 - Math.abs((cx[c] + cy[c] * 0.8) - sweep) / 46);
@@ -365,39 +517,69 @@
       const sat = 0.86 - glow * .3, act = lite[c] < share ? 1 : .22;
       const k = (0.12 + act * 0.42 + glow * 0.3 * (.4 + act * .6)) * str;
       cellK[c] = k; const gu = clamp((k / str - .5) * 1.2);
-      for (let q = 0; q < LV; q++) { const col = hsv(hue, sat, clamp(q / LVN + gu * .3)); const j = (c * LV + q) * 3; lut[j] = col[0]; lut[j + 1] = col[1]; lut[j + 2] = col[2]; }
+      if (hue !== hP[c * 3] || sat !== hP[c * 3 + 1] || gu !== hP[c * 3 + 2]) { hP[c * 3] = hue; hP[c * 3 + 1] = sat; hP[c * 3 + 2] = gu; for (let q = 0; q < LV; q++) hsvOut(hue, sat, clamp(q / LVN + gu * .3), lut, (c * LV + q) * 3); }   // Farbstufen nur neu, wenn sich Farbton/Saettigung/Helligkeit der Kachel aendern
+      // Kacheln, deren Helligkeit und Farbstufen sich gegenueber dem letzten Bild nicht geaendert haben, behalten ihre Pixel (jedes Pixel haengt nur von Kachel, Karte und diesen Werten ab)
+      let same = kPrev[c] === cellK[c]; for (let q = c * LV * 3, qe = q + LV * 3; same && q < qe; q++) if (lut[q] !== lutPrev[q]) same = false;
+      changed[c] = same ? 0 : 1; kPrev[c] = cellK[c];
     }
-    for (let p = 0; p < NPX; p++) {
-      const i = p * 4, c = v.id[p], x = p % GW, y = (p / GW) | 0;
-      let k = cellK[c]; if (!art[p]) k *= .72; k *= outl[p];
-      const kq = Math.round(k * 10) / 10, bl = L[p];
-      let r = B[i], g = B[i + 1], b = B[i + 2];
-      if (kq > 0.04) {
-        const q = Math.round(clamp(.2 + .9 * bl, 0, art[p] ? 1 : .86) * LVN), j = (c * LV + q) * 3;
-        const m = Math.min(.9, kq); r += (lut[j] - r) * m; g += (lut[j + 1] - g) * m; b += (lut[j + 2] - b) * m;
+    lutPrev.set(lut);
+    const sA = 0.62 * (.25 + .75 * str), sB = 0.62 * .4 * (.25 + .75 * str), whiteTop = str > .6;
+    for (let c = 0; c < n; c++) {
+      if (!changed[c]) continue;
+      const ck = cellK[c];
+      for (let jj = cstart[c], je = cstart[c + 1]; jj < je; jj++) {
+        const p = cpx[jj], i = p * 4;
+        let k = ck; if (!art[p]) k *= .72; k *= outl[p];
+        const kl = Math.round(k * 10);   // kq = kl / 10; kq > 0,04 genau ab kl = 1
+        let r = B[i], g = B[i + 1], b = B[i + 2];
+        if (kl >= 1) {
+          const j = (c * LV + qi[p]) * 3, m = MLV[kl > 9 ? 9 : kl]; r += (lut[j] - r) * m; g += (lut[j + 1] - g) * m; b += (lut[j + 2] - b) * m;
+        }
+        if (e[p]) {
+          const y = (p / GW) | 0, es = y >= 118 && y < 197 ? sB : sA;
+          if (y < 118 && whiteTop && hash(p % GW, y, 2) < .35) { r = g = b = 255; } else { r += (255 - r) * es; g += (255 - g) * es; b += (255 - b) * es; }
+        }
+        out[p] = snIn(r, g, b);
       }
-      if (e[p]) {
-        const s = 0.62 * (y >= 118 && y < 197 ? .4 : 1) * (.25 + .75 * str);
-        if (y < 118 && str > .6 && hash(x, y, 2) < .35) { r = g = b = 255; } else { r += (255 - r) * s; g += (255 - g) * s; b += (255 - b) * s; }
-      }
-      const vv = sn(r, g, b); o[i] = vv & 255; o[i + 1] = (vv >> 8) & 255; o[i + 2] = (vv >> 16) & 255; o[i + 3] = 255;
     }
+    o.set(out);
     sparkles(o, t, 7, 1.5, .55, (k, s) => { const c = Math.floor(hash(k, s, 41) * n); return [Math.round(cx[c]), Math.round(cy[c])]; }, [255, 255, 255], [255, 255, 255], 1);
   }
-  FX.pris = { prep: E => prismaticPrep(E), frame: (E, st, t, o) => prismaticFrame(E, st, t, o, .5, 1) };
+  let prisShared = null;   // Kachelnetz, Phasen und Schwerpunkte haengen nicht von der Karte ab: einmal fuer alle
+  FX.pris = { prep: E => Object.assign({}, prisShared || (prisShared = prismaticPrep(E))), frame: (E, st, t, o) => prismaticFrame(E, st, t, o, .5, 1) };
 
   // Super Rare: Einfach-Schraffur und ein Lichtlauf über Rahmen, Bild, Name, Werte und Stern
+  /** je Bildpixel einmal: Schraffurlinie (nur Linienpixel mit Tor >= 0,05) in sechs Pastellfarben fertig gemischt, Lichtlauf-Farbe, Lauf-Koordinate */
+  function srPre(E) {
+    const { B, L, A } = E, lp = [], lic = [], ltab = [], gp = [], gd = [], gcol = [];
+    for (let y = AY0; y < AY0 + AH; y++) for (let x = AX0; x < AX0 + AW; x++) {
+      const p = y * GW + x; if (!A[p]) continue;
+      const gate = sstep(.14, .5, L[p]); if (gate < .05) continue;
+      const i = p * 4, r0 = B[i], g0 = B[i + 1], b0 = B[i + 2];
+      if (((2 * x + y) % 6 + 6) % 6 < 2) { lp.push(p); lic.push(x * 0.35 + y * 0.12); ltab.push(0.72 * gate); }
+      if (gate > .3) { gp.push(p); gd.push((2 * x + y) / 2.236); }
+    }
+    const gdA = Float64Array.from(gd);   // Farben (Linie in sechs Pastelltoenen, Lichtlauf) werden beim ersten Bedarf gefuellt
+    return { B, lp: Int32Array.from(lp), lic: Float64Array.from(lic), lf: Float64Array.from(ltab), ltab: new Uint32Array(lp.length * 6), gp: Int32Array.from(gp), gd: gdA, gcol: new Uint32Array(gp.length), bk: bucketsOf(gdA, gdA.length) };
+  }
+  function srFill(pre, q, k) {
+    const p = pre.lp[q], i = p * 4, B = pre.B, r0 = B[i], g0 = B[i + 1], b0 = B[i + 2], c = PASTEL[k], f = pre.lf[q];
+    return (pre.ltab[q * 6 + k] = sn(r0 + (c[0] - r0) * f, g0 + (c[1] - g0) * f, b0 + (c[2] - b0) * f));
+  }
+  function srGlow(pre, q) {
+    const p = pre.gp[q], i = p * 4, B = pre.B, r0 = B[i], g0 = B[i + 1], b0 = B[i + 2];
+    return (pre.gcol[q] = sn(r0 + (255 - r0) * .55, g0 + (255 - g0) * .55, b0 + (255 - b0) * .55));
+  }
   FX.sr = {
+    prep: () => ({}),
     glint: t => glintAt(t, 3.4, .55, 1),
     frame(E, st, t, o) {
-      const { B, L } = E, pos = glintAt(t, 3.4, .55, 1);
-      artLoop(E, (x, y, p, i) => {
-        const gate = sstep(.14, .5, L[p]); if (gate < .05) return;
-        const line = ((2 * x + y) % 6 + 6) % 6 < 2;
-        const c = PASTEL[Math.floor(fract((x * 0.35 + y * 0.12 - t * 9) / 60) * 6)];
-        if (line) put(o, p, mixc([B[i], B[i + 1], B[i + 2]], c, 0.72 * gate));
-        if (pos.length && gate > .3 && glintK((2 * x + y) / 2.236, pos, 3.4) > .02) put(o, p, mixc([B[i], B[i + 1], B[i + 2]], [255, 255, 255], .55));
-      });
+      const pos = glintAt(t, 3.4, .55, 1), pre = st.pre || (st.pre = srPre(E)), { lp, lic, ltab } = pre, tt = t * 9;
+      for (let q = 0; q < lp.length; q++) { const k = Math.floor(fract((lic[q] - tt) / 60) * 6); o[lp[q]] = ltab[q * 6 + k] || srFill(pre, q, k); }
+      for (let pi = 0; pi < pos.length; pi++) {
+        const span = bucketSpan(pre.bk, pos[pi] - 3.4 - 1e-6, pos[pi] + 3.4 + 1e-6); if (!span) continue;
+        for (let j = span[0]; j < span[1]; j++) { const q = pre.bk.ord[j]; if (glintK(pre.gd[q], pos, 3.4) > .02) o[pre.gp[q]] = pre.gcol[q] || srGlow(pre, q); }
+      }
       rimBand(E, o, pos, 5, [255, 246, 190]);
       textBand(E, pos, 4, [255, 252, 225], [255, 232, 140]);
       sparkles(o, t, 5, 1.7, .55, (k, s) => [AX0 + 4 + Math.floor(hash(k, s, 9) * (AW - 8)), AY0 + 4 + Math.floor(hash(k, s, 10) * (AH - 8))], [255, 232, 130], [255, 255, 255], 1);
@@ -405,21 +587,43 @@
   };
 
   // Diamond: Rautengitter in Eisfarben, Knoten funkeln, zwei Lichtläufe
+  /** Gitterpixel einmal: Raster ausserhalb der Linien und Knoten ohne Lauf sind in jedem Bild gleich (base); Linienpixel in fuenf Eisfarben fertig gemischt */
+  function diaPre(E) {
+    const { B, L, A } = E, base = new Uint32Array(NPX), lp = [], lic = [], ltab = [], cp = [], cu = [], cic = [], cg = [], cn = [];
+    for (let y = AY0; y < AY0 + AH; y++) for (let x = AX0; x < AX0 + AW; x++) {
+      const p = y * GW + x; if (!A[p]) continue;
+      const i = p * 4, r0 = B[i], g0 = B[i + 1], b0 = B[i + 2], gate = .4 + .6 * sstep(.12, .45, L[p]);
+      const l1 = ((2 * x + y) % 6 + 6) % 6 < 2, l2 = ((2 * x - y) % 6 + 6) % 6 < 2;
+      if (!l1 && !l2) { if (gate > .3 && bay(x, y) < .2) base[p] = sn(r0 + (40 - r0) * .32, g0 + (120 - g0) * .32, b0 + (200 - b0) * .32); continue; }
+      const node = l1 && l2, ic = (x * 0.3 + y * 0.2) / 44;
+      cp.push(p); cu.push((2 * x + y) / 2.236); cic.push(ic); cg.push(gate); cn.push(node ? 1 : 0);
+      if (node) { const k = Math.min(1, .85 + 0); base[p] = sn(r0 + (255 - r0) * k, g0 + (255 - g0) * k, b0 + (255 - b0) * k); }
+      else { lp.push(p); lic.push(ic); ltab.push((.72 + 0 * .28) * gate); }
+    }
+    const cuA = Float64Array.from(cu);   // Linienfarben in fuenf Eistoenen werden beim ersten Bedarf gefuellt
+    return { B, base, lp: Int32Array.from(lp), lic: Float64Array.from(lic), lk: Float64Array.from(ltab), ltab: new Uint32Array(lp.length * 5), cp: Int32Array.from(cp), cu: cuA, cic: Float64Array.from(cic), cg: Float64Array.from(cg), cn: Uint8Array.from(cn), bk: bucketsOf(cuA, cuA.length) };
+  }
+  function diaFill(pre, q, h) {
+    const p = pre.lp[q], i = p * 4, B = pre.B, r0 = B[i], g0 = B[i + 1], b0 = B[i + 2], c = ICE[h], k = pre.lk[q];
+    return (pre.ltab[q * 5 + h] = sn(r0 + (c[0] - r0) * k, g0 + (c[1] - g0) * k, b0 + (c[2] - b0) * k));
+  }
   FX.dia = {
+    prep: () => ({}),
     glint: t => glintAt(t, 1.9, .78, 2),
     frame(E, st, t, o) {
-      const { B, L } = E, pos = glintAt(t, 1.9, .78, 2);
-      artLoop(E, (x, y, p, i) => {
-        const gate = .4 + .6 * sstep(.12, .45, L[p]);   // Untergrenze: auch auf dunkler Kunst bleibt das Rautengitter sichtbar (sonst nur Knotenpunkte = Punktraster)
-        const l1 = ((2 * x + y) % 6 + 6) % 6 < 2, l2 = ((2 * x - y) % 6 + 6) % 6 < 2;
-        if (!l1 && !l2) { if (gate > .3 && bay(x, y) < .2) put(o, p, mixc([B[i], B[i + 1], B[i + 2]], [40, 120, 200], .32)); return; }
-        const node = l1 && l2;
-        const wave = glintK((2 * x + y) / 2.236, pos, 12);
-        let c = ICE[Math.floor(fract((x * 0.3 + y * 0.2) / 44 - t * 0.18) * 5)];
-        let k = (.72 + wave * .28) * gate;
-        if (node) { c = [255, 255, 255]; k = Math.min(1, .85 + wave); }
-        put(o, p, mixc([B[i], B[i + 1], B[i + 2]], c, k));
-      });
+      const { B } = E, pos = glintAt(t, 1.9, .78, 2), pre = st.pre || (st.pre = diaPre(E)), { lp, lic, ltab } = pre, tt = t * 0.18;
+      o.set(pre.base);
+      for (let q = 0; q < lp.length; q++) { const h = Math.floor(fract(lic[q] - tt) * 5); o[lp[q]] = ltab[q * 5 + h] || diaFill(pre, q, h); }
+      for (let pi = 0; pi < pos.length; pi++) {
+        const span = bucketSpan(pre.bk, pos[pi] - 12 - 1e-6, pos[pi] + 12 + 1e-6); if (!span) continue;
+        for (let j = span[0]; j < span[1]; j++) {
+          const q = pre.bk.ord[j], wave = glintK(pre.cu[q], pos, 12); if (wave <= 0) continue;
+          const p = pre.cp[q], i = p * 4, r0 = B[i], g0 = B[i + 1], b0 = B[i + 2];
+          let c, k;
+          if (pre.cn[q]) { c = WHITE3; k = Math.min(1, .85 + wave); } else { c = ICE[Math.floor(fract(pre.cic[q] - tt) * 5)]; k = (.72 + wave * .28) * pre.cg[q]; }
+          o[p] = sn(r0 + (c[0] - r0) * k, g0 + (c[1] - g0) * k, b0 + (c[2] - b0) * k);
+        }
+      }
       rimBand(E, o, pos, 6, [225, 252, 255]);
       textBand(E, pos, 4.5, [235, 255, 255], [140, 238, 232]);
       sparkles(o, t, 9, 1.3, .55, (k, s) => [AX0 + 4 + Math.floor(hash(k, s, 19) * (AW - 8)), AY0 + 4 + Math.floor(hash(k, s, 20) * (AH - 8))], [124, 233, 220], [255, 255, 255], 1.2);
@@ -428,28 +632,40 @@
 
   // Spectral: Echo-Abbild mit gedrosselten Glitches, Seelenfunken, schwarze Funken
   const BLACK_ARM = [14, 6, 30], BLACK_CORE = [0, 0, 0];
+  const BAYV = Float64Array.from(BAY, v => (v + 0.5) / 16);
+  function spectralSums(B) { const a = new Uint16Array(NPX); for (let p = 0; p < NPX; p++) a[p] = B[p * 4] + B[p * 4 + 1] + B[p * 4 + 2]; return a; }
   FX.spec = {
+    textFull: true,
     prep(E) { const r = rng(31), w = []; for (let k = 0; k < 11; k++) w.push({ x: AX0 + 6 + r() * (AW - 12), sp: .07 + r() * .08, ph: r(), amp: 2 + r() * 3 }); return { w }; },
     frame(E, st, t, o) {
-      const { B } = E, ev = specEvent(t), gi = ev.fr, on = ev.on, big = ev.big;
+      const { B, A } = E, ev = specEvent(t), gi = ev.fr, on = ev.on, big = ev.big;
       const dx = Math.round(4 * Math.sin(t * .8)), dy = Math.round(1.4 * Math.cos(t * 1.1));
-      const inv = (x, y, ch) => { x = clamp(x, AX0, AX0 + AW - 1); y = clamp(y, AY0, AY0 + AH - 1); return 255 - B[(y * GW + x) * 4 + ch]; };
+      const AX1 = AX0 + AW - 1, AY1 = AY0 + AH - 1, cl = (v, a, b) => (v < a ? a : v > b ? b : v);
       const rects = [];
       if (on) for (let k = 0; k < (big ? 4 : 2); k++) rects.push({ x: AX0 + Math.floor(hash(ev.slot, k, 21) * (AW - 30)), y: AY0 + Math.floor(hash(ev.slot, k, 22) * (AH - 10)), w: 10 + Math.floor(hash(ev.slot, k, 23) * 22), h: 3 + Math.floor(hash(ev.slot, k, 24) * 6), sx: Math.round((hash(ev.slot, k, 25) - .5) * 26), mode: hash(ev.slot, k, 26) });
-      const bh = 3 + Math.floor(hash(ev.slot, 4, 5) * 4);
-      artLoop(E, (x, y, p, i) => {
-        let sx = 0, split = 0;
-        if (on) { const band = Math.floor((y + gi * 3) / bh); if (hash(band, gi >> 1, 5) < (big ? .45 : .3)) { sx = Math.round((hash(band, gi >> 1, 6) - .5) * (big ? 34 : 18)); split = big ? 3 : 2; } }
-        else if (hash(y, gi >> 1, 17) < .006) sx = hash(y, gi, 18) < .5 ? -2 : 2;
-        for (const rc of rects) if (x >= rc.x && x < rc.x + rc.w && y >= rc.y && y < rc.y + rc.h) { sx += rc.sx; if (rc.mode < .4) split = 2; }
-        let r = inv(x + sx + split, y, 0), g = inv(x + sx, y, 1), b = inv(x + sx - split, y, 2);
-        const er = inv(x - dx, y - dy, 0), eg = inv(x - dx, y - dy, 1), eb = inv(x - dx, y - dy, 2), el = (er + eg + eb) / 765;
-        if (bay(x, y) < .42 && el > .18) { r = scr(r, el * 120 + 20); g = scr(g, el * 255); b = scr(b, el * 220); }
-        const e2 = inv(x + dx * 2, y + dy * 2, 0) / 255; if (bay(x + 1, y) < .2 && e2 > .3) { r = scr(r, 160 * e2); b = scr(b, 255 * e2); }
-        for (const rc of rects) if (rc.mode > .75 && x >= rc.x && x < rc.x + rc.w && y >= rc.y && y < rc.y + rc.h) { r = 255 - r; g = 255 - g; b = 255 - b; }
-        if (on && big && (y + gi) % 4 === 0) { r *= .8; g *= .8; b *= .9; }
-        put(o, p, [r, g, b]);
-      });
+      const nr = rects.length, bh = 3 + Math.floor(hash(ev.slot, 4, 5) * 4), bsum = st.bsum || (st.bsum = spectralSums(B)), BV = BAYV;
+      const xe = st.xe || (st.xe = new Int32Array(GW)), xe2 = st.xe2 || (st.xe2 = new Int32Array(GW));
+      for (let x = AX0; x <= AX1; x++) { xe[x] = cl(x - dx, AX0, AX1); xe2[x] = cl(x + dx * 2, AX0, AX1); }
+      for (let y = AY0; y <= AY1; y++) {
+        let sxr = 0, splitr = 0;
+        if (on) { const band = Math.floor((y + gi * 3) / bh); if (hash(band, gi >> 1, 5) < (big ? .45 : .3)) { sxr = Math.round((hash(band, gi >> 1, 6) - .5) * (big ? 34 : 18)); splitr = big ? 3 : 2; } }
+        else if (hash(y, gi >> 1, 17) < .006) sxr = hash(y, gi, 18) < .5 ? -2 : 2;
+        const rowE = cl(y - dy, AY0, AY1) * GW, rowE2 = cl(y + dy * 2, AY0, AY1) * GW, dark = on && big && (y + gi) % 4 === 0, yb = (y & 3) * 4, rowY = y * GW;
+        for (let x = AX0; x <= AX1; x++) {
+          const p = rowY + x; if (!A[p]) continue;
+          let sx = sxr, split = splitr, inRect = false;
+          for (let q = 0; q < nr; q++) { const rc = rects[q]; if (x >= rc.x && x < rc.x + rc.w && y >= rc.y && y < rc.y + rc.h) { sx += rc.sx; if (rc.mode < .4) split = 2; } }
+          let r, g, b;
+          if (sx === 0 && split === 0) { const i = p * 4; r = 255 - B[i]; g = 255 - B[i + 1]; b = 255 - B[i + 2]; }
+          else { r = 255 - B[(rowY + cl(x + sx + split, AX0, AX1)) * 4]; g = 255 - B[(rowY + cl(x + sx, AX0, AX1)) * 4 + 1]; b = 255 - B[(rowY + cl(x + sx - split, AX0, AX1)) * 4 + 2]; }
+          const el = (765 - bsum[rowE + xe[x]]) / 765, bx = yb + (x & 3);
+          if (BV[bx] < .42 && el > .18) { r = scr(r, el * 120 + 20); g = scr(g, el * 255); b = scr(b, el * 220); }
+          if (BV[yb + ((x + 1) & 3)] < .2) { const e2 = (255 - B[(rowE2 + xe2[x]) * 4]) / 255; if (e2 > .3) { r = scr(r, 160 * e2); b = scr(b, 255 * e2); } }
+          for (let q = 0; q < nr; q++) { const rc = rects[q]; if (rc.mode > .75 && x >= rc.x && x < rc.x + rc.w && y >= rc.y && y < rc.y + rc.h) { r = 255 - r; g = 255 - g; b = 255 - b; } }
+          if (dark) { r *= .8; g *= .8; b *= .9; }
+          o[p] = sn(r, g, b);
+        }
+      }
       for (const w of st.w) {
         const life = fract(t * w.sp + w.ph), y = Math.round(AY0 + AH - 2 - life * (AH + 6)), x = Math.round(w.x + w.amp * Math.sin(life * 9 + w.ph * 6));
         if (bay(x, y) < 1 - Math.abs(life - .5) * 1.6) { for (let k = 0; k < 3; k++) putXY(o, x, y + k, k === 0 ? [255, 255, 255] : [206, 232, 255]); putXY(o, x + 1, y + 1, [190, 170, 255]); }
@@ -469,19 +685,57 @@
     return d;
   }
   const isEdgeS = (S, p) => S[p] && (!S[p - 1] || !S[p + 1] || !S[p - GW] || !S[p + GW]);
+  const UMBRA_LV = [[150, 92, 200], [86, 38, 124], [44, 18, 70], [24, 8, 40]];
+  /** Umbra: Pixel ausserhalb des Rauchsaums (dens = 0) sind in jedem Bild gleich und fertig vorberechnet; nur der Saum (Abstand < 17 zur Silhouette) rechnet das Rauschen */
+  function umbraPre(E, st) {
+    const { B, A } = E, d = st.d, base = new Uint32Array(NPX), lvP = UMBRA_LV.map(c => sn(c[0], c[1], c[2])), dp = [], dxi = [], dyi = [], dens = [], bt = [], bsn = [];
+    const level = (s, own) => (s > .62 ? lvP[0] : s > .44 ? lvP[1] : s > .26 ? lvP[2] : s > .12 ? lvP[3] : own);
+    for (let y = AY0; y < AY0 + AH; y++) for (let x = AX0; x < AX0 + AW; x++) {
+      const p = y * GW + x; if (!A[p]) continue;
+      const i = p * 4, own = sn(B[i] * .26 + 6, B[i + 1] * .22 + 4, B[i + 2] * .36 + 16), dist = d[p], dn = dist < 255 ? clamp(1 - dist / 17) : 0, b = (bay(x, y) - .5) * .35;
+      if (dn > 0) { dp.push(p); dxi.push(x); dyi.push(y); dens.push(dn); bt.push(b); bsn.push(own); base[p] = own; }
+      else base[p] = level(clamp(dn * (0 * 1.9 - .25) + b), own);
+    }
+    return { base, lvP, dp: Int32Array.from(dp), dxi: Uint8Array.from(dxi), dyi: Uint8Array.from(dyi), dens: Float64Array.from(dens), bt: Float64Array.from(bt), bsn: Uint32Array.from(bsn),
+      cx: new Int32Array(3 * GW), cx1: new Int32Array(3 * GW), cu: new Float64Array(3 * GW), ry: new Int32Array(3 * GH), ry1: new Int32Array(3 * GH), cv: new Float64Array(3 * GH) };
+  }
   FX.umbra = {
+    textFull: true,
     prep(E) { return { d: distToS(E, 18) }; },
     frame(E, st, t, o) {
-      const { B } = E, d = st.d;
-      artLoop(E, (x, y, p, i) => {
-        let c = [B[i] * .26 + 6, B[i + 1] * .22 + 4, B[i + 2] * .36 + 16];
-        const dist = d[p], dens = dist < 255 ? clamp(1 - dist / 17) : 0;
-        const n = fbm(x * .085 + t * .25, y * .085 - t * .85), s = clamp(dens * (n * 1.9 - .25) + (bay(x, y) - .5) * .35);
-        const lv = s > .62 ? [150, 92, 200] : s > .44 ? [86, 38, 124] : s > .26 ? [44, 18, 70] : s > .12 ? [24, 8, 40] : null;
-        if (lv) c = lv;
-        put(o, p, c);
-      });
-      eachText(E, 'all', (lay, lx, ly, ry, gx, gy) => { const w = .5 + .5 * Math.sin(t * 2 + gx * .3); lput(lay, lx, ly, mixc(ry < .5 ? [252, 246, 255] : [226, 212, 252], [176, 128, 240], w * .22)); });
+      const pre = st.pre || (st.pre = umbraPre(E, st)), { dp, dxi, dyi, dens, bt, bsn, lvP, cx, cx1, cu, ry, ry1, cv } = pre;
+      o.set(pre.base);
+      // Rauschkoordinaten: je Spalte und Zeile einmal (drei Oktaven)
+      for (let x = AX0; x < AX0 + AW; x++) {
+        const X = x * .085 + t * .25;
+        for (let j = 0; j < 3; j++) {
+          const a = j === 0 ? X : j === 1 ? X * 2.1 + 7 : X * 4.3 + 11, xi = Math.floor(a), xf = a - xi;
+          cx[j * GW + x] = xi & 63; cx1[j * GW + x] = (xi + 1) & 63; cu[j * GW + x] = xf * xf * (3 - 2 * xf);
+        }
+      }
+      for (let y = AY0; y < AY0 + AH; y++) {
+        const Y = y * .085 - t * .85;
+        for (let j = 0; j < 3; j++) {
+          const a = j === 0 ? Y : j === 1 ? Y * 2.1 + 3 : Y * 4.3 + 5, yi = Math.floor(a), yf = a - yi;
+          ry[j * GH + y] = (yi & 63) << 6; ry1[j * GH + y] = ((yi + 1) & 63) << 6; cv[j * GH + y] = yf * yf * (3 - 2 * yf);
+        }
+      }
+      const l0 = lvP[0], l1 = lvP[1], l2 = lvP[2], l3 = lvP[3], GH1 = GH, GH2 = 2 * GH;
+      for (let q = 0; q < dp.length; q++) {
+        const x = dxi[q], y = dyi[q];
+        let r0 = ry[y], r1 = ry1[y], c0 = cx[x], c1 = cx1[x], u = cu[x], v = cv[y];
+        let g00 = NZ[r0 | c0], g10 = NZ[r0 | c1], g01 = NZ[r1 | c0], g11 = NZ[r1 | c1], ab0 = g00 + (g10 - g00) * u, ab1 = g01 + (g11 - g01) * u;
+        let nz = 0 + (ab0 + (ab1 - ab0) * v) * .55;
+        r0 = ry[GH1 + y]; r1 = ry1[GH1 + y]; c0 = cx[GW + x]; c1 = cx1[GW + x]; u = cu[GW + x]; v = cv[GH1 + y];
+        g00 = NZ[r0 | c0]; g10 = NZ[r0 | c1]; g01 = NZ[r1 | c0]; g11 = NZ[r1 | c1]; ab0 = g00 + (g10 - g00) * u; ab1 = g01 + (g11 - g01) * u;
+        nz += (ab0 + (ab1 - ab0) * v) * .3;
+        r0 = ry[GH2 + y]; r1 = ry1[GH2 + y]; c0 = cx[2 * GW + x]; c1 = cx1[2 * GW + x]; u = cu[2 * GW + x]; v = cv[GH2 + y];
+        g00 = NZ[r0 | c0]; g10 = NZ[r0 | c1]; g01 = NZ[r1 | c0]; g11 = NZ[r1 | c1]; ab0 = g00 + (g10 - g00) * u; ab1 = g01 + (g11 - g01) * u;
+        nz += (ab0 + (ab1 - ab0) * v) * .15;
+        const s = clamp(dens[q] * (nz * 1.9 - .25) + bt[q]);
+        o[dp[q]] = s > .62 ? l0 : s > .44 ? l1 : s > .26 ? l2 : s > .12 ? l3 : bsn[q];
+      }
+      umbraText(E, t);
     },
   };
 
@@ -497,9 +751,11 @@
     const P = root.PP_PALETTE || [];
     return (paletteRgb.v = P.map(h => [parseInt(h.slice(1, 3), 16), parseInt(h.slice(3, 5), 16), parseInt(h.slice(5, 7), 16)]));
   }
-  function stainedBuild(E) {
+  /** Rechenarbeit in Zeitscheiben: Generator, der zwischen den Teilschritten `yield`et (der Aufrufer gibt dem Hauptfaden zwischendurch Luft) */
+  function* stainedBuildG(E) {
     const opt = STAIN, { B, L, A, S } = E, r = rng(opt.seed), pal = paletteRgb();
     const g = new Float32Array(NPX);
+    yield;
     for (let y = 1; y < GH - 1; y++) for (let x = 1; x < GW - 1; x++) { const p = y * GW + x; g[p] = Math.abs(L[p + 1] - L[p - 1]) + Math.abs(L[p + GW] - L[p - GW]); }
     const gs = new Float32Array(NPX);
     for (let y = 3; y < GH - 3; y++) for (let x = 3; x < GW - 3; x++) { let s = 0; for (let dy = -3; dy <= 3; dy += 3) for (let dx = -3; dx <= 3; dx += 3) s += g[(y + dy) * GW + x + dx]; gs[y * GW + x] = s / 9; }
@@ -509,6 +765,7 @@
     // Dart-Throwing mit variablem Radius; Standortliste in einem Gitter, damit der Abstandstest nicht jede Probe gegen alle Standorte laufen lässt
     const CELL = 12, gw = Math.ceil(GW / CELL), gh = Math.ceil(GH / CELL), grid = Array.from({ length: gw * gh }, () => []);
     for (let k = 0; k < tries; k++) {
+      if ((k & 4095) === 4095) yield;
       const x = r() * GW, y = r() * GH, px = Math.floor(x), py = Math.floor(y), rr = rad(px, py);
       if (!A[py * GW + px] || S[py * GW + px]) continue;
       let ok = true;
@@ -520,14 +777,17 @@
       }
       if (ok) { const q = { x, y, r: rr }; sites.push(q); grid[Math.floor(y / CELL) * gw + Math.floor(x / CELL)].push(q); }
     }
+    yield;
     let v = voronoi(sites, 'l2');
     for (let pass = 0; pass < 3; pass++) {
+      yield;
       const area = new Int32Array(sites.length);
       for (let p = 0; p < NPX; p++) if (A[p] && !S[p]) area[v.id[p]]++;
       const keep = sites.filter((q, k) => area[k] >= opt.minArea);
       if (keep.length === sites.length) break;
       sites.length = 0; for (const q of keep) sites.push(q); v = voronoi(sites, 'l2');
     }
+    yield;
     const n = sites.length;
     const sum = new Float64Array(n * 3), cnt = new Int32Array(n), dmax = new Float32Array(n), cx = new Float32Array(n), cy = new Float32Array(n), cn = new Int32Array(n);
     for (let p = 0; p < NPX; p++) { const c = v.id[p], i = p * 4; if (!S[p] && A[p] && A[p - 2] && A[p + 2] && A[p - 2 * GW] && A[p + 2 * GW]) { sum[c * 3] += B[i]; sum[c * 3 + 1] += B[i + 1]; sum[c * 3 + 2] += B[i + 2]; cnt[c]++; } cn[c]++; if (v.dist[p] > dmax[c]) dmax[c] = v.dist[p]; cx[c] += p % GW; cy[c] += (p / GW) | 0; }
@@ -552,19 +812,29 @@
     return { v, n, cellRGB, ph, cx, cy, dmax, lead, sites };
   }
   /** Bleiruten für die Interface-Elemente (Namensplatte, Fähigkeitsfelder, Textfeld, Werteleiste); gehen aus demselben Standortnetz hervor wie die Bildzellen */
-  function uiLeadBuild(E, st) {
+  function* uiLeadBuildG(E, st) {
     const opt = STAIN, r = rng(opt.seed + 40), sites = st.sites.map(q => ({ x: q.x, y: q.y, r: q.r || opt.rArt })), rr = opt.rArt, B = E.B, A = E.A;
     const U = new Uint8Array(NPX);
     for (let y = 2; y < GH - 2; y++) for (let x = 2; x < GW - 2; x++) { const p = y * GW + x; if (!A[p]) U[p] = 1; }
     const dA = new Uint8Array(NPX).fill(255), qa = []; for (let p = 0; p < NPX; p++) if (A[p]) { dA[p] = 0; qa.push(p); }
     for (let h = 0; h < qa.length; h++) { const p = qa[h]; if (dA[p] >= 36) continue; for (const np of [p - 1, p + 1, p - GW, p + GW]) if (np >= 0 && np < NPX && dA[np] > dA[p] + 1) { dA[np] = dA[p] + 1; qa.push(np); } }
     const dArt = st.v.dist;
+    // Bildzellen-Einfang: ein Punkt gehoert zum Bildfeld, wenn ein Bildpixel q naeher als (Zellabstand + 0,5) liegt. Blockweise (8 x 8) mit dem groessten Radius je Block vorgeprueft.
+    const BS = 8, nbx = Math.ceil(GW / BS), nby = Math.ceil(GH / BS), bmax = new Float64Array(nbx * nby), rq = new Float64Array(NPX);
+    for (let q = 0; q < NPX; q++) if (A[q]) { const r = dArt[q] + 0.5; rq[q] = r * r; const b = ((q / GW | 0) >> 3) * nbx + ((q % GW) >> 3); if (r > bmax[b]) bmax[b] = r; }
     const captures = (x, y) => { const R = 22, x0 = Math.max(0, Math.floor(x - R)), x1 = Math.min(GW - 1, Math.ceil(x + R)), y0 = Math.max(0, Math.floor(y - R)), y1 = Math.min(GH - 1, Math.ceil(y + R));
-      for (let yy = y0; yy <= y1; yy++) for (let xx = x0; xx <= x1; xx++) { const q = yy * GW + xx; if (!A[q]) continue; const dx = xx - x, dy = yy - y; if (dx * dx + dy * dy < (dArt[q] + 0.5) * (dArt[q] + 0.5)) return true; }
+      for (let by = y0 >> 3; by <= y1 >> 3; by++) for (let bx = x0 >> 3; bx <= x1 >> 3; bx++) {
+        const m = bmax[by * nbx + bx]; if (m === 0) continue;
+        const ddx = x < bx * BS ? bx * BS - x : x > bx * BS + BS - 1 ? x - (bx * BS + BS - 1) : 0, ddy = y < by * BS ? by * BS - y : y > by * BS + BS - 1 ? y - (by * BS + BS - 1) : 0;
+        if (ddx * ddx + ddy * ddy >= m * m) continue;
+        for (let yy = Math.max(y0, by * BS); yy <= Math.min(y1, by * BS + BS - 1); yy++) for (let xx = Math.max(x0, bx * BS); xx <= Math.min(x1, bx * BS + BS - 1); xx++) { const q = yy * GW + xx; if (!A[q]) continue; const dx = xx - x, dy = yy - y; if (dx * dx + dy * dy < rq[q]) return true; }
+      }
       return false; };
     const CELL = 12, gw = Math.ceil(GW / CELL), gh = Math.ceil(GH / CELL), grid = Array.from({ length: gw * gh }, () => []);
     for (const q of sites) grid[Math.min(gh - 1, Math.floor(q.y / CELL)) * gw + Math.min(gw - 1, Math.floor(q.x / CELL))].push(q);
+    yield;
     for (let k = 0; k < 60000; k++) {
+      if ((k & 8191) === 8191) yield;
       const x = r() * GW, y = r() * GH, p = Math.floor(y) * GW + Math.floor(x); if (!U[p] || dA[p] < 2 || (dA[p] <= 34 && captures(x, y))) continue;   // weiter als 34 Zellen vom Bildfeld kann keine Bildzelle den Punkt einfangen (Radius 22 + größte Zelle)
       let ok = true;
       const gx0 = Math.max(0, Math.floor((x - 14) / CELL)), gx1 = Math.min(gw - 1, Math.floor((x + 14) / CELL)), gy0 = Math.max(0, Math.floor((y - 14) / CELL)), gy1 = Math.min(gh - 1, Math.floor((y + 14) / CELL));
@@ -575,7 +845,9 @@
       }
       if (ok) { const q = { x, y, r: rr }; sites.push(q); grid[Math.floor(y / CELL) * gw + Math.floor(x / CELL)].push(q); }
     }
+    yield;
     const v2 = voronoi(sites, 'l2'), e = edges(v2.id, 1);
+    yield;
     // Zellen mit Text bekommen keine Linie (die Buchstaben liegen obenauf), ebenso Zellen mit Symbolen (Herz, Schwert, Seltenheits-Icon)
     const txt = new Uint8Array(NPX);
     for (const lay of E.layers0) { const L = lay.list, UN = lay.U; for (let k = 0; k < L.length; k += 2) { const gx = Math.floor((L[k] + lay.x0) / UN), gy = Math.floor((L[k + 1] + lay.y0) / UN); if (gx >= 0 && gy >= 0 && gx < GW && gy < GH) txt[gy * GW + gx] = 1; } }
@@ -606,78 +878,124 @@
   }
   const EP_WARM = [255, 238, 176], EP_WHITE = [255, 255, 245];
   function starA(o, E, cx, cy, size, arm, core) {
-    const ok = (x, y) => x >= 0 && y >= 0 && x < GW && y < GH && E.A[y * GW + x];
+    const A = E.A, ok = (x, y) => x >= 0 && y >= 0 && x < GW && y < GH && A[y * GW + x];
     if (ok(cx, cy)) putXY(o, cx, cy, core);
-    for (let k = 1; k <= size; k++) for (const [dx, dy] of [[k, 0], [-k, 0], [0, k], [0, -k]]) if (ok(cx + dx, cy + dy)) putXY(o, cx + dx, cy + dy, arm);
+    for (let k = 1; k <= size; k++) {
+      if (ok(cx + k, cy)) putXY(o, cx + k, cy, arm); if (ok(cx - k, cy)) putXY(o, cx - k, cy, arm);
+      if (ok(cx, cy + k)) putXY(o, cx, cy + k, arm); if (ok(cx, cy - k)) putXY(o, cx, cy - k, arm);
+    }
   }
   FX.stain = {
-    prep(E) {
-      const t0 = performance.now(), st = stainedBuild(E), t1 = performance.now();
+    textFull: true,
+    prep(E) { return runSync(FX.stain.prepG(E)); },
+    warm(E, st) { st.pre = stainPre(E, st); },
+    *prepG(E) {
+      const t0 = performance.now(), st = yield* stainedBuildG(E), t1 = performance.now();
       st.d = distToS(E, 24); st.edge = [];
       const S = E.S; for (let p = GW; p < NPX - GW; p++) if (isEdgeS(S, p)) st.edge.push(p);
       const t2 = performance.now();
-      st.ui = uiLeadBuild(E, st);
+      yield;
+      st.ui = yield* uiLeadBuildG(E, st);
       stats.prep = [Math.round(t1 - t0), Math.round(t2 - t1), Math.round(performance.now() - t2)];
       return st;
     },
     frame(E, st, t, o) {
-      const opt = STAIN, T = opt.T, ph = (t % T) / T, TAU = 6.283185, { v, n, cellRGB, ph: cph, cx, cy, dmax, lead, d } = st, { A, S } = E;
+      const opt = STAIN, T = opt.T, ph = (t % T) / T, TAU = 6.283185, { n, cellRGB, ph: cph, cx, cy, d } = st, { A, S } = E;
+      const pre = st.pre || (st.pre = stainPre(E, st)), kf = pre.kf;
       // Glasscheiben: wandernder Lichtstreif + Flackern, Helligkeit in Stufen, gehämmertes Glas per Bayer-Raster
       const beamPos = (t % T) / T * (GW + GH + 90) - 40;
-      const k = new Float32Array(n);
       for (let c = 0; c < n; c++) {
         const wave = Math.max(0, 1 - Math.abs((cx[c] + cy[c] * 0.9) - beamPos) / 34);
         const flick = Math.pow(Math.max(0, Math.sin(t * TAU / T + cph[c] * TAU)), 4);
-        k[c] = 0.78 + 0.16 * flick + 0.62 * wave;
+        kf[c] = 0.78 + 0.16 * flick + 0.62 * wave;
       }
-      const LC = opt.leadCol;
-      for (let y = AY0; y < AY0 + AH; y++) for (let x = AX0; x < AX0 + AW; x++) {
-        const p = y * GW + x; if (!A[p]) continue;
-        if (lead[p]) { put(o, p, LC); continue; }
-        const c = v.id[p], col = cellRGB[c], rel = dmax[c] ? v.dist[p] / dmax[c] : 0;
-        let m = k[c] * (1.12 - 0.34 * rel * rel);
-        m = Math.round(m * 7) / 7;
-        m += (bay(x, y) - .5) * .09;
-        let r = col[0] * m, g = col[1] * m, b = col[2] * m;
-        if (m > 1.04) { const w = Math.min(1, (m - 1.04) * 2.2); r = lerp(r, 255, w * .6); g = lerp(g, 246, w * .6); b = lerp(b, 214, w * .55); }
-        put(o, p, [r, g, b]);
+      // Bleiruten (Bildfeld und Interface-Elemente in der Randfarbe des jeweiligen Elements): unveraendert, fertig vorberechnet
+      o.set(pre.base);
+      const { fp, fc, fb, fy, tab } = pre;
+      for (let q = 0; q < fp.length; q++) {
+        const c = fc[q], L = Math.round(kf[c] * fb[q] * 7), key = (c * 16 + L) * 16 + fy[q];
+        let vv = L >= 0 && L < 16 ? tab[key] : 0;
+        if (!vv) vv = stainPx(pre, cellRGB[c], L, fy[q], key);
+        o[fp[q]] = vv;
       }
-      // Bleiruten der Interface-Elemente in der Randfarbe des jeweiligen Elements
-      const ui = st.ui; for (let q = 0; q < ui.idx.length; q++) { const p = ui.idx[q], i = p * 4, vv = ui.col[q]; o[i] = vv & 255; o[i + 1] = (vv >> 8) & 255; o[i + 2] = (vv >> 16) & 255; o[i + 3] = 255; }
-      const mixPx = (p, col, w) => { const i = p * 4; put(o, p, [o[i] + (col[0] - o[i]) * w, o[i + 1] + (col[1] - o[i + 1]) * w, o[i + 2] + (col[2] - o[i + 2]) * w]); };
+      const mixPx = (p, col, w) => { const v = o[p], r0 = v & 255, g0 = (v >> 8) & 255, b0 = (v >> 16) & 255; o[p] = sn(r0 + (col[0] - r0) * w, g0 + (col[1] - g0) * w, b0 + (col[2] - b0) * w); };
       const R = 7 + 4 * (.5 + .5 * Math.sin(TAU * ph)), gl = glintU(t, T, .5), sweep = gl.length ? gl[0] : -999;
-      for (let y = AY0; y < AY0 + AH; y++) for (let x = AX0; x < AX0 + AW; x++) {
-        const p = y * GW + x; if (!A[p] || S[p] || lead[p]) continue;
-        const dist = d[p];
-        if (dist < 255 && dist <= R + 5) { const h = clamp(1 - dist / (R + 5)); if (bay(x, y) < h * h * .95 + (dist < 3 ? .25 : 0)) mixPx(p, EP_WARM, dist < 3 ? .62 : .46); }
-        const dd = Math.abs((x + y * .9) - sweep);
-        if (dd < 12) { const kk = 1 - dd / 12; if (dd < 2.2) mixPx(p, EP_WHITE, .5); else if (bay(x, y) < kk * .85) mixPx(p, EP_WARM, .38); }
-      }
+      // Aura um das Motiv: nur Pixel bis R + 5 Zellen Abstand (nach Abstand sortiert)
+      { const { ap, ab, aStart } = pre, lim = R + 5;
+        for (let dist = 0; dist <= 24 && dist <= lim; dist++) {
+          const q0 = aStart[dist], q1 = aStart[dist + 1]; if (q0 === q1) continue;
+          const h = clamp(1 - dist / lim), th = h * h * .95 + (dist < 3 ? .25 : 0), mw = dist < 3 ? .62 : .46;
+          for (let q = q0; q < q1; q++) if (ab[q] < th) mixPx(ap[q], EP_WARM, mw);
+        } }
+      // Lichtstreif ueber das Bild
+      { const bk = pre.beam, span = bucketSpan(bk, sweep - 12 - 1e-6, sweep + 12 + 1e-6);
+        if (span) for (let j = span[0]; j < span[1]; j++) {
+          const q = bk.ord[j], dd = Math.abs(pre.cu[q] - sweep);
+          if (dd < 12) { const kk = 1 - dd / 12; if (dd < 2.2) mixPx(pre.cp[q], EP_WHITE, .5); else if (pre.cb[q] < kk * .85) mixPx(pre.cp[q], EP_WARM, .38); }
+        } }
       const per = T / 2, slots = 18;
       for (let s = 0; s < slots; s++) {
         const tt = (t + s * per / slots * 1.37) % T, kk = Math.floor(tt / per), ph2 = (tt % per) / per; if (ph2 > .62) continue;
-        const sz = SPARK_SIZE[Math.floor(ph2 / .62 * SPARK_SIZE.length)];
-        let pos = null; for (let tr = 0; tr < 40 && !pos; tr++) { const x = AX0 + Math.floor(hash(kk, s, tr) * AW), y = AY0 + Math.floor(hash(kk, s, tr + 77) * AH), p = y * GW + x; if (A[p] && !S[p] && !lead[p] && d[p] > 3 && y < 120) pos = [x, y]; }
-        if (pos) starA(o, E, pos[0], pos[1], sz, [255, 226, 120], [255, 255, 255]);
+        const sz = SPARK_SIZE[Math.floor(ph2 / .62 * SPARK_SIZE.length)], sk = (kk * slots + s);
+        let pp = pre.spk[sk];
+        if (pp === undefined) {
+          pp = -1;
+          for (let tr = 0; tr < 40 && pp < 0; tr++) { const x = AX0 + Math.floor(hash(kk, s, tr) * AW), y = AY0 + Math.floor(hash(kk, s, tr + 77) * AH), p = y * GW + x; if (A[p] && !S[p] && !st.lead[p] && d[p] > 3 && y < 120) pp = p; }
+          pre.spk[sk] = pp;
+        }
+        if (pp >= 0) starA(o, E, pp % GW, (pp / GW) | 0, sz, SPK_GOLD, WHITE3);
       }
       const Ed = st.edge;
       if (Ed.length) for (let s = 0; s < 8; s++) {
         const tt = (t + s * per / 8 * 1.13) % T, kk = Math.floor(tt / per), ph2 = (tt % per) / per; if (ph2 > .5) continue;
         const sz = SPARK_SIZE[Math.floor(ph2 / .5 * SPARK_SIZE.length)], q = Ed[Math.floor(hash(kk, s, 211) * Ed.length)], x = q % GW, y = (q / GW) | 0;
-        starA(o, E, x, y, Math.min(2, sz), [196, 232, 255], [255, 255, 255]);
+        starA(o, E, x, y, Math.min(2, sz), SPK_ICE, WHITE3);
       }
       // goldener Name und Werte, Regeltext in Goldton, der breite Lichtstreif der Glasscheiben nimmt den Text mit
-      paintName(E, t, GOLDNAME, T, .5, [255, 226, 140]);
-      eachText(E, 'all', (lay, lx, ly, ry, gx, gy) => {
-        const w = Math.max(0, 1 - Math.abs(UD(gx, gy) - beamPos) / 34); if (w <= 0) return;
-        const X = lx + lay.x0, Y = ly + lay.y0;
-        if ((((X >> 1) & 1) * 2 + ((Y >> 1) & 1) + 0.5) / 4 >= w * 1.5) return;
-        const i = (ly * lay.w + lx) * 4, dd = lay.data, cur = [dd[i], dd[i + 1], dd[i + 2]];
-        lput(lay, lx, ly, mixc(cur, [255, 250, 228], w > .75 ? .8 : w > .5 ? .6 : w > .25 ? .42 : .26));
-      });
+      paintName(E, t, GOLDNAME, T, .5, SPK_NAME);
+      for (const lay of E.layers) {
+        const lp = layPre(lay), d32 = lay.d32, bk = layBuckets(lay, 'ud'), L = lay.list, span = bucketSpan(bk, beamPos - 34 - 1e-6, beamPos + 34 + 1e-6); if (!span) continue;
+        for (let q = span[0]; q < span[1]; q++) {
+          const k = bk.ord[q], w = Math.max(0, 1 - Math.abs(lp.ud[k] - beamPos) / 34); if (w <= 0) continue;
+          const X = L[k * 2] + lay.x0, Y = L[k * 2 + 1] + lay.y0;
+          if ((((X >> 1) & 1) * 2 + ((Y >> 1) & 1) + 0.5) / 4 >= w * 1.5) continue;
+          const pi = lp.pidx[k], cv = d32[pi], r0 = cv & 255, g0 = (cv >> 8) & 255, b0 = (cv >> 16) & 255, f = w > .75 ? .8 : w > .5 ? .6 : w > .25 ? .42 : .26;
+          d32[pi] = packC(lay, r0 + (255 - r0) * f, g0 + (250 - g0) * f, b0 + (228 - b0) * f);
+        }
+      }
     },
   };
-
+  const SPK_GOLD = [255, 226, 120], SPK_ICE = [196, 232, 255], SPK_NAME = [255, 226, 140];
+  /** Unveraenderliches des Glasbildes: Bleiruten (fertig im Raster), Glasflaechen (Zelle, Abstandsanteil, Bayer-Stelle), Aura- und Lichtstreif-Kandidaten */
+  function stainPre(E, st) {
+    const { v, lead, d, cellRGB, dmax, n, ui } = st, { A, S } = E, LC = STAIN.leadCol, snLC = sn(LC[0], LC[1], LC[2]);
+    const base = new Uint32Array(NPX), fp = [], fc = [], fb = [], fy = [], ap = [], ad = [], ab = [], cp = [], cu = [], cb = [];
+    for (let q = 0; q < ui.idx.length; q++) base[ui.idx[q]] = ui.col[q];
+    for (let y = AY0; y < AY0 + AH; y++) for (let x = AX0; x < AX0 + AW; x++) {
+      const p = y * GW + x; if (!A[p]) continue;
+      if (lead[p]) { base[p] = snLC; continue; }
+      const c = v.id[p], rel = dmax[c] ? v.dist[p] / dmax[c] : 0, bi = (y & 3) * 4 + (x & 3);
+      fp.push(p); fc.push(c); fb.push(1.12 - 0.34 * rel * rel); fy.push(bi);
+      if (!S[p]) { ap.push(p); ad.push(d[p]); ab.push(bay(x, y)); cp.push(p); cu.push(x + y * .9); cb.push(bay(x, y)); }
+    }
+    // Aura-Kandidaten nach Abstand sortieren (nur Abstand < 255)
+    const aStart = new Int32Array(27), cnt = new Int32Array(26);
+    for (let k = 0; k < ap.length; k++) if (ad[k] < 255 && ad[k] <= 24) cnt[ad[k]]++;
+    for (let k = 0; k < 25; k++) aStart[k + 1] = aStart[k] + cnt[k];
+    aStart[26] = aStart[25];
+    const apS = new Int32Array(aStart[25]), abS = new Float64Array(aStart[25]), fill = aStart.slice(0, 25);
+    for (let k = 0; k < ap.length; k++) if (ad[k] < 255 && ad[k] <= 24) { const j = fill[ad[k]]++; apS[j] = ap[k]; abS[j] = ab[k]; }
+    const cuA = Float64Array.from(cu);
+    return { base, fp: Int32Array.from(fp), fc: Int16Array.from(fc), fb: Float64Array.from(fb), fy: Uint8Array.from(fy), kf: new Float32Array(n), tab: new Uint32Array(n * 256),
+      ap: apS, ab: abS, aStart, cp: Int32Array.from(cp), cu: cuA, cb: Float64Array.from(cb), beam: bucketsOf(cuA, cuA.length), spk: {} };
+  }
+  /** Farbe einer Glasflaeche: Zelle `col`, Helligkeitsstufe L (Siebtel), Bayer-Stelle bi */
+  function stainPx(pre, col, L, bi, key) {
+    let m = L / 7; m += ((BAY[bi] + 0.5) / 16 - .5) * .09;
+    let r = col[0] * m, g = col[1] * m, b = col[2] * m;
+    if (m > 1.04) { const w = Math.min(1, (m - 1.04) * 2.2); r = lerp(r, 255, w * .6); g = lerp(g, 246, w * .6); b = lerp(b, 214, w * .55); }
+    const vv = sn(r, g, b); if (L >= 0 && L < 16) pre.tab[key] = vv; return vv;
+  }
   // ═══════════ Motiv-Masken (public/cardgen/masks.bin, gebaut von scripts/build-masks.js) ═══════════
   let maskIndex = null, maskBuf = null, maskPromise = null;
   function loadMasks() {
@@ -798,7 +1116,7 @@
       for (let y = a; y <= b; y++) for (let x = x0; x <= x1; x++) if (d[(y * W + x) * 4 + 3] > 100) list.push(x - x0, y - a);
       const [cv, cx] = cv2d(w, h);
       out.push({ kind: kindOf(gi, a), x0, y0: a, w, h, U: K, list: Int16Array.from(list), gy0: 0, gh: h, cv, cx, im: cx.createImageData(w, h), data: null });
-      out[out.length - 1].data = out[out.length - 1].im.data;
+      out[out.length - 1].data = out[out.length - 1].im.data; out[out.length - 1].d32 = new Uint32Array(out[out.length - 1].data.buffer);
     });
     return out;
   }
@@ -829,6 +1147,15 @@
       // Alpha hart schneiden (Pixelkanten): jede Tinte mit alpha > 100 wird ganz durchsichtig
       const id = hg.getImageData(0, 0, W, H), d = id.data; for (let i = 3; i < d.length; i += 4) d[i] = d[i] > 100 ? 255 : 0; hg.putImageData(id, 0, 0);
       view.holes = hc;
+      // Zeilenbaender mit Tinte (mit Rand x-Ausdehnung): beim Ausstanzen nur diese Rechtecke zeichnen — die leeren Stellen aendern nichts
+      const bands = []; let y0 = -1, bx0 = W, bx1 = -1;
+      for (let y = 0; y <= H; y++) {
+        let ink = false, xa = W, xb = -1;
+        if (y < H) for (let x = 0, o = y * W * 4 + 3; x < W; x++, o += 4) if (d[o]) { ink = true; if (x < xa) xa = x; xb = x; }
+        if (ink) { if (y0 < 0) y0 = y; if (xa < bx0) bx0 = xa; if (xb > bx1) bx1 = xb; }
+        else if (y0 >= 0) { bands.push([bx0, y0, bx1 - bx0 + 1, y - y0]); y0 = -1; bx0 = W; bx1 = -1; }
+      }
+      view.holeBands = bands;
     }
     if (sp.cut) {
       const e = core.e, ax = core.full ? 0 : 14 * K, ay = core.full ? 0 : 34 * K, aw = core.full ? W : 122 * K, ah = core.full ? H : 80 * K;
@@ -848,6 +1175,7 @@
       }
       view.cut = { cv: cut, x: ax, y: ay };
       if (sp.fx === 'umbra') {   // Randlicht im Pixelraster der Kunst (ein Kunstpixel breit), direkt um das Motiv; zwei Zustände (Puls)
+        let rx0 = W, ry0 = H, rx1 = 0, ry1 = 0;
         view.rim = [0, 1].map(pu => {
           const [rc, rg] = cv2d(W, H), cA = rgbStr(pu ? [190, 130, 250] : [150, 100, 235]), cB = rgbStr(pu ? [104, 56, 176] : [86, 38, 124]), cw = aw / e.w, ch = ah / e.h, mn = e.mn;
           for (let yy = 0; yy < e.h; yy++) for (let xx = 0; xx < e.w; xx++) {
@@ -855,76 +1183,117 @@
             if (xx > 0 && mn[yy * e.w + xx - 1]) nb = true; if (xx < e.w - 1 && mn[yy * e.w + xx + 1]) nb = true; if (yy > 0 && mn[(yy - 1) * e.w + xx]) nb = true; if (yy < e.h - 1 && mn[(yy + 1) * e.w + xx]) nb = true;
             if (!nb) continue;
             if (core.full) { const gx = Math.min(GW - 1, Math.floor((xx + .5) / e.w * GW)), gy = Math.min(GH - 1, Math.floor((yy + .5) / e.h * GH)); if (!core.A[gy * GW + gx]) continue; }
-            rg.fillStyle = ((xx + yy + pu) & 1) ? cA : cB; rg.fillRect(ax + Math.round(xx * cw), ay + Math.round(yy * ch), Math.ceil(cw), Math.ceil(ch));
+            const fx = ax + Math.round(xx * cw), fy = ay + Math.round(yy * ch), fw = Math.ceil(cw), fh = Math.ceil(ch);
+            rg.fillStyle = ((xx + yy + pu) & 1) ? cA : cB; rg.fillRect(fx, fy, fw, fh);
+            if (fx < rx0) rx0 = fx; if (fy < ry0) ry0 = fy; if (fx + fw > rx1) rx1 = fx + fw; if (fy + fh > ry1) ry1 = fy + fh;
           }
           return rc;
         });
+        view.rimBox = [Math.max(0, rx0), Math.max(0, ry0), Math.min(W, rx1) - Math.max(0, rx0), Math.min(H, ry1) - Math.max(0, ry0)];
       }
     }
     return view;
   }
   /** Glas im Pixelraster der Kunst: je Kunstpixel eine Farbe (dunkle Pixel = Bleirute), auf der Leinwand der Karte (nur Stained).
-   *  Die Zellen sind je Ansicht einmal vorberechnet (view.qc); jede Zelle liest und schreibt nur ihr eigenes Rechteck (daher an Ort und Stelle). */
-  function quantize(core, view, g) {
+   *  Die Leinwand enthaelt hier nur das mit ganzzahligem K hart vergroesserte Raster (Pixel (x, y) = Rasterzelle (x / K, y / K)); darum wird in den Rasterzellen
+   *  gerechnet (je Kunstpixel-Zelle gewichtete Summen ueber die ueberdeckten Rasterzellen, Gewichte = Zahl der Leinwandpixel) und das Ergebnis als Bild
+   *  des Bildfelds geschrieben — ohne die Leinwand zurueckzulesen. Ergebnis pixelgleich zum Auslesen und Zellenweise-Fuellen. */
+  const CLAMP8 = new Uint8ClampedArray(1);
+  function quantPre(core, view) {
     const e = core.e, K = view.K, full = core.full, ox = full ? 0 : 14 * K, oy = full ? 0 : 34 * K, bw = full ? view.W : 122 * K, bh = full ? view.H : 80 * K;
-    if (!view.qc) {
-      const sx = bw / e.w, sy = bh / e.h, A = core.A, qc = [];
-      for (let yy = 0; yy < e.h; yy++) for (let xx = 0; xx < e.w; xx++) {
-        const x0 = Math.round(xx * sx), x1 = Math.min(bw, Math.round((xx + 1) * sx)), y0 = Math.round(yy * sy), y1 = Math.min(bh, Math.round((yy + 1) * sy)); if (x1 <= x0 || y1 <= y0) continue;
-        if (full) { const gx = Math.min(GW - 1, Math.floor((x0 + x1) / 2 / K)), gy = Math.min(GH - 1, Math.floor((y0 + y1) / 2 / K)); if (!A[gy * GW + gx]) continue; }
-        qc.push(x0, x1, y0, y1);
-      }
-      view.qc = Int32Array.from(qc);
+    const sx = bw / e.w, sy = bh / e.h, A = core.A, qc = [];
+    for (let yy = 0; yy < e.h; yy++) for (let xx = 0; xx < e.w; xx++) {
+      const x0 = Math.round(xx * sx), x1 = Math.min(bw, Math.round((xx + 1) * sx)), y0 = Math.round(yy * sy), y1 = Math.min(bh, Math.round((yy + 1) * sy)); if (x1 <= x0 || y1 <= y0) continue;
+      if (full) { const gx = Math.min(GW - 1, Math.floor((x0 + x1) / 2 / K)), gy = Math.min(GH - 1, Math.floor((y0 + y1) / 2 / K)); if (!A[gy * GW + gx]) continue; }
+      qc.push(x0, x1, y0, y1);
     }
-    const id = g.getImageData(ox, oy, bw, bh), D = id.data, qc = view.qc;
-    for (let q = 0; q < qc.length; q += 4) {
-      const x0 = qc[q], x1 = qc[q + 1], y0 = qc[q + 2], y1 = qc[q + 3];
-      let nl = 0, n = 0, lr = 0, lg = 0, lb = 0;
-      for (let y = y0; y < y1; y++) for (let x = x0, i = (y * bw + x0) * 4; x < x1; x++, i += 4) { if (!D[i + 3]) continue; n++; if (D[i] + D[i + 1] + D[i + 2] < 165) { nl++; lr += D[i]; lg += D[i + 1]; lb += D[i + 2]; } }
-      if (!n) continue;
-      let r, gc, b;
-      if (nl / n >= 0.32) { r = lr / nl; gc = lg / nl; b = lb / nl; }
-      else {
-        const cx = (x0 + x1) >> 1, cy = (y0 + y1) >> 1; let best = null;
-        for (let dy = -2; dy <= 2 && !best; dy++) for (let dx = -2; dx <= 2; dx++) { const xx2 = Math.min(x1 - 1, Math.max(x0, cx + dx)), yy2 = Math.min(y1 - 1, Math.max(y0, cy + dy)), i = (yy2 * bw + xx2) * 4; if (D[i + 3] && D[i] + D[i + 1] + D[i + 2] >= 165) { best = i; break; } }
-        if (best === null) best = (((y0 + y1) >> 1) * bw + ((x0 + x1) >> 1)) * 4;
-        r = D[best]; gc = D[best + 1]; b = D[best + 2];
+    const nc = qc.length >> 2, gx0 = ox / K, gy0 = oy / K;
+    const colGx = new Int32Array(bw), rowG = new Int32Array(bh);
+    for (let x = 0; x < bw; x++) colGx[x] = gx0 + Math.floor(x / K);
+    for (let y = 0; y < bh; y++) rowG[y] = (gy0 + Math.floor(y / K)) * GW;
+    const cOff = new Int32Array(nc + 1), cp = [], cw = [], covered = full ? new Uint8Array(bw * bh) : null;   // ohne Vollbild bilden die Zellen das Bildfeld lueckenlos (Raender aus Rundung)
+    for (let q = 0; q < nc; q++) {
+      const x0 = qc[q * 4], x1 = qc[q * 4 + 1], y0 = qc[q * 4 + 2], y1 = qc[q * 4 + 3];
+      for (let gy = Math.floor(y0 / K); gy <= Math.floor((y1 - 1) / K); gy++) {
+        const wy = Math.min(y1, (gy + 1) * K) - Math.max(y0, gy * K);
+        for (let gx = Math.floor(x0 / K); gx <= Math.floor((x1 - 1) / K); gx++) { const wx = Math.min(x1, (gx + 1) * K) - Math.max(x0, gx * K); cp.push((gy0 + gy) * GW + gx0 + gx); cw.push(wx * wy); }
       }
-      for (let y = y0; y < y1; y++) for (let x = x0, i = (y * bw + x0) * 4; x < x1; x++, i += 4) { if (!D[i + 3]) continue; D[i] = r; D[i + 1] = gc; D[i + 2] = b; }
+      cOff[q + 1] = cp.length;
+      if (covered) for (let y = y0; y < y1; y++) covered.fill(1, y * bw + x0, y * bw + x1);
     }
-    g.putImageData(id, ox, oy);
+    const unc = [], uncG = [];
+    if (covered) for (let y = 0; y < bh; y++) for (let x = 0; x < bw; x++) if (!covered[y * bw + x]) { unc.push(y * bw + x); uncG.push(rowG[y] + colGx[x]); }
+    const id = new ImageData(bw, bh);
+    return { K, ox, oy, bw, bh, qc: Int32Array.from(qc), nc, colGx, rowG, cOff, cp: Int32Array.from(cp), cw: Int32Array.from(cw), unc: Int32Array.from(unc), uncG: Int32Array.from(uncG), id, q32: new Uint32Array(id.data.buffer) };
+  }
+  function quantize(core, view, g, o) {
+    const Q = view.qd || (view.qd = quantPre(core, view)), { bw, qc, nc, colGx, rowG, cOff, cp, cw, q32 } = Q;
+    if (!Q.solid) {   // welche Kunstpixel-Zellen liegen ganz auf gezeichneten Rasterzellen? (die Deckung des Rasters aendert sich von Bild zu Bild nicht)
+      Q.solid = new Uint8Array(nc);
+      for (let q = 0; q < nc; q++) { let all = 1; for (let j = cOff[q]; j < cOff[q + 1]; j++) if (!o[cp[j]]) { all = 0; break; } Q.solid[q] = all; }
+    }
+    for (let q = 0; q < nc; q++) {
+      const x0 = qc[q * 4], x1 = qc[q * 4 + 1], y0 = qc[q * 4 + 2], y1 = qc[q * 4 + 3];
+      let nn = 0, nl = 0, lr = 0, lg = 0, lb = 0;
+      for (let j = cOff[q]; j < cOff[q + 1]; j++) {
+        const v = o[cp[j]]; if (!v) continue;
+        const w = cw[j], r = v & 255, gg = (v >> 8) & 255, b = (v >> 16) & 255; nn += w;
+        if (r + gg + b < 165) { nl += w; lr += w * r; lg += w * gg; lb += w * b; }
+      }
+      let col = 0;
+      if (nn) {
+        let r, gc, b;
+        if (nl / nn >= 0.32) { r = lr / nl; gc = lg / nl; b = lb / nl; }
+        else {
+          const cx = (x0 + x1) >> 1, cy = (y0 + y1) >> 1; let best = -1, bv = 0;
+          for (let dy = -2; dy <= 2 && best < 0; dy++) for (let dx = -2; dx <= 2; dx++) {
+            const xx2 = Math.min(x1 - 1, Math.max(x0, cx + dx)), yy2 = Math.min(y1 - 1, Math.max(y0, cy + dy)), gi = rowG[yy2] + colGx[xx2], v = o[gi];
+            if (v && (v & 255) + ((v >> 8) & 255) + ((v >> 16) & 255) >= 165) { best = gi; bv = v; break; }
+          }
+          if (best < 0) bv = o[rowG[(y0 + y1) >> 1] + colGx[(x0 + x1) >> 1]];
+          r = bv & 255; gc = (bv >> 8) & 255; b = (bv >> 16) & 255;
+        }
+        CLAMP8[0] = r; const r8 = CLAMP8[0]; CLAMP8[0] = gc; const g8 = CLAMP8[0]; CLAMP8[0] = b; const b8 = CLAMP8[0];
+        col = (0xFF000000 | (b8 << 16) | (g8 << 8) | r8) >>> 0;
+      }
+      if (Q.solid[q]) { for (let y = y0; y < y1; y++) for (let x = y * bw + x0, xe = y * bw + x1; x < xe; x++) q32[x] = col; }
+      else for (let y = y0; y < y1; y++) { const rb = y * bw, gb = rowG[y]; for (let x = x0; x < x1; x++) q32[rb + x] = o[gb + colGx[x]] ? col : 0; }
+    }
+    const { unc, uncG } = Q; for (let k = 0; k < unc.length; k++) q32[unc[k]] = o[uncG[k]];
+    g.putImageData(Q.id, Q.ox, Q.oy);
   }
 
   // ═══════════ Ein Bild zeichnen ═══════════
-  const gridCv = { c: null, g: null, im: null, o: null };
+  const gridCv = { c: null, g: null, im: null, o32: null };
   function gridBuf() {
-    if (!gridCv.c) { const [c, g] = cv2d(GW, GH); gridCv.c = c; gridCv.g = g; gridCv.im = g.createImageData(GW, GH); }
+    if (!gridCv.c) { const [c, g] = cv2d(GW, GH); gridCv.c = c; gridCv.g = g; gridCv.im = g.createImageData(GW, GH); gridCv.o32 = new Uint32Array(gridCv.im.data.buffer); }
     return gridCv;
   }
   const stampCv = { c: null, g: null, im: null };
+  const FILL_CSS = Object.create(null);
+  function makeE(core, view) { const E = Object.create(core); E.layers = view.layers; E.layers0 = view.layers; return E; }
   function render(core, view, g, t) {
-    const sp = core.sp, K = view.K, W = view.W, H = view.H, E = Object.create(core);
-    E.layers = view.layers; E.layers0 = view.layers;
+    const sp = core.sp, K = view.K, W = view.W, H = view.H, E = view.E || (view.E = makeE(core, view));
     setGeo(core.full);
     if (!core.st && FX[sp.fx].prep) { core.st = FX[sp.fx].prep(E); }
     const st = core.st;
     g.setTransform(1, 0, 0, 1, 0, 0); g.globalCompositeOperation = 'source-over'; g.clearRect(0, 0, W, H);
     // 1) Raster-Effekt
-    const gb = gridBuf(), o = gb.im.data; o.fill(0);
-    for (const l of view.layers) l.data.fill(0);
+    const gb = gridBuf(), o = gb.o32; o.fill(0);
+    if (!FX[sp.fx].textFull) for (const l of view.layers) l.d32.fill(0);
     FX[sp.fx].frame(E, st, t, o);
-    gb.g.putImageData(gb.im, 0, 0);
     g.imageSmoothingEnabled = false;
-    g.drawImage(gb.c, 0, 0, GW, GH, 0, 0, W, H);
-    if (view.holes) { g.globalCompositeOperation = 'destination-out'; g.drawImage(view.holes, 0, 0); g.globalCompositeOperation = 'source-over'; }
-    if (sp.quant) quantize(core, view, g);
-    if (view.rim) g.drawImage(view.rim[Math.floor(t * 4) % 6 < 3 ? 1 : 0], 0, 0);
+    if (!FX[sp.fx].gridless) { gb.g.putImageData(gb.im, 0, 0); g.drawImage(gb.c, 0, 0, GW, GH, 0, 0, W, H); }   // gridless: der Effekt schreibt nichts ins Raster (nur Text und Stempel)
+    if (view.holes) { g.globalCompositeOperation = 'destination-out'; for (const b of view.holeBands) g.drawImage(view.holes, b[0], b[1], b[2], b[3], b[0], b[1], b[2], b[3]); g.globalCompositeOperation = 'source-over'; }
+    if (sp.quant) quantize(core, view, g, o);
+    if (view.rim) { const bx = view.rimBox; if (bx[2] > 0 && bx[3] > 0) g.drawImage(view.rim[Math.floor(t * 4) % 6 < 3 ? 1 : 0], bx[0], bx[1], bx[2], bx[3], bx[0], bx[1], bx[2], bx[3]); }
     if (view.cut) g.drawImage(view.cut.cv, view.cut.x, view.cut.y);
     // 2) Text-Ebenen (neu gefärbte Tinte)
     for (const l of view.layers) { l.cx.putImageData(l.im, 0, 0); g.drawImage(l.cv, l.x0, l.y0); }
     // 3) Stempel / Icon unten rechts (5x5 Zellen zu 9 Kartenpixeln)
     const gp = FX[sp.fx].glint ? FX[sp.fx].glint(t) : [], k5 = K / 5;
-    const cell = (i, j, c) => { const x0 = Math.round((689 + 9 * i) * k5), x1 = Math.round((689 + 9 * (i + 1)) * k5), y0 = Math.round((989 + 9 * j) * k5), y1 = Math.round((989 + 9 * (j + 1)) * k5); const v = sn(c[0], c[1], c[2]); g.fillStyle = 'rgb(' + (v & 255) + ',' + ((v >> 8) & 255) + ',' + ((v >> 16) & 255) + ')'; g.fillRect(x0, y0, x1 - x0, y1 - y0); };
+    let lastV = -1;   // fillStyle nur setzen, wenn sich die Farbe aendert (jedes Setzen laeuft durch den Palettenfilter)
+    const cell = (i, j, c) => { const x0 = Math.round((689 + 9 * i) * k5), x1 = Math.round((689 + 9 * (i + 1)) * k5), y0 = Math.round((989 + 9 * j) * k5), y1 = Math.round((989 + 9 * (j + 1)) * k5); const v = sn(c[0], c[1], c[2]); if (v !== lastV) { lastV = v; g.fillStyle = FILL_CSS[v] || (FILL_CSS[v] = 'rgb(' + (v & 255) + ',' + ((v >> 8) & 255) + ',' + ((v >> 16) & 255) + ')'); } g.fillRect(x0, y0, x1 - x0, y1 - y0); };
     const s = sp.stamp;
     if (s === 'diamond') {
       if (!stampCv.c) { const [c, gg] = cv2d(45, 45); stampCv.c = c; stampCv.g = gg; stampCv.im = gg.createImageData(45, 45); }
@@ -943,6 +1312,31 @@
   const STILL_MAX = 160;
   const CORE_MAX = 10;
   let queue = Promise.resolve();
+  const runSync = gen => { let r; do { r = gen.next(); } while (!r.done); return r.value; };
+  const yieldMain = (() => { try { const ch = new MessageChannel(); let q = []; ch.port1.onmessage = () => { const f = q; q = []; for (const r of f) r(); }; return () => new Promise(r => { q.push(r); ch.port2.postMessage(0); }); } catch (e) { return () => new Promise(r => setTimeout(r, 0)); } })();
+  /** Generator in Zeitscheiben laufen lassen (zwischen den Scheiben bekommt der Hauptfaden Luft); `alive()` falsch: abbrechen (undefined) */
+  async function runSliced(gen, core, alive) {
+    for (;;) {
+      setGeo(core.full);
+      const r = gen.next(); if (r.done) return r.value;
+      await yieldMain(); if (!alive()) return undefined;
+    }
+  }
+  /** Schwere Erstberechnung des Effekts (Stained: Glasscheiben, Bleiruten) in Zeitscheiben, bevor das erste Bild gezeichnet wird */
+  async function ensureSt(core, view, alive) {
+    const fx = FX[core.sp.fx]; if (core.st || !fx.prepG) return true;
+    const st = await runSliced(fx.prepG(view.E || (view.E = makeE(core, view))), core, alive);
+    if (st === undefined) return false;
+    if (!core.st) core.st = st;
+    return true;
+  }
+  /** Danach die einmaligen Tabellen des ersten Bildes (Glas, Quantisierung) in eigenen Scheiben, nicht im ersten Zeichnen */
+  async function warmView(core, view, alive) {
+    const fx = FX[core.sp.fx];
+    if (fx.warm && core.st && !core.st.pre) { setGeo(core.full); fx.warm(view.E || (view.E = makeE(core, view)), core.st); await yieldMain(); if (!alive()) return false; }
+    if (core.sp.quant && !view.qd) { view.qd = quantPre(core, view); await yieldMain(); if (!alive()) return false; }
+    return true;
+  }
   function enqueue(fn) { const p = queue.then(() => new Promise(r => setTimeout(r, 0))).then(fn); queue = p.catch(() => {}); return p; }
 
   /** Glatt verkleinern (Kleinansichten): Zeichnen mit Filter, danach wieder hart (Pixelraster der Leinwand bleibt). */
@@ -1007,6 +1401,7 @@
           if (!core) { this.clear(); return; }
           stats.cores++;
           lruSet(coreCache, ck, core, CORE_MAX);
+          await yieldMain(); if (my !== this.token || this.dead) return;   // Erstberechnung in Scheiben: dem Hauptfaden zwischen den Schritten Luft lassen
         }
         // Zielgröße der sichtbaren Leinwand: in Kleinansichten (Anzeige deutlich schmaler als die K-Leinwand) wird glatt auf Gerätepixel
         // heruntergerechnet — wie der Browser es beim Basisbild tut. Die Nearest-Skalierung des Browsers würde Zeilen/Spalten des Textes
@@ -1015,21 +1410,25 @@
         const tw = devW < W * 0.8 ? Math.max(48, devW) : W, th = tw === W ? H : Math.round(tw * GH / GW);
         const sk = ck + '|' + K + '|' + tw;
         this.core = core; this.tw = tw; this.th = th; this.W = W; this.H = H;
-        if (this.canvas && this.canvas.__wrf !== !!SPEC[rarity].quant) this.clear();
         if (!this.canvas) this.mkCanvas();
         if (this.canvas.width !== tw || this.canvas.height !== th) { this.canvas.width = tw; this.canvas.height = th; this.g.imageSmoothingEnabled = false; }   // beide prüfen: eine frische Canvas ist 300 x 150, bei K = 2 stimmt die Breite schon
         this.K = K;
         if (!this.animated) {
           let still = lruGet(stillCache, sk);
           if (!still) {
-            const view = buildView(core, img, K), [c, g] = cv2d(W, H, !!SPEC[rarity].quant);
+            const view = buildView(core, img, K), [c, g] = cv2d(W, H);
+            await yieldMain(); if (my !== this.token || this.dead) return;
+            if (!(await ensureSt(core, view, () => !this.dead && my === this.token)) || !(await warmView(core, view, () => !this.dead && my === this.token))) return;
             render(core, view, g, SPEC[rarity].still); still = tw === W ? c : downscale(c, tw, th); stats.stills++;
             lruSet(stillCache, sk, still, STILL_MAX);
           }
           this.g.clearRect(0, 0, tw, th); this.g.drawImage(still, 0, 0); this.view = null; this.drawn = true;
         } else {
-          this.view = buildView(core, img, K); this.phase = (hash(card.name.length, card.name.charCodeAt(0) || 1, 3) * 6) | 0; this.lastF = -1;
-          if (tw !== W) { const [oc, og] = cv2d(W, H, !!SPEC[rarity].quant); og.imageSmoothingEnabled = false; this.off = oc; this.og = og; } else { this.off = null; this.og = null; }
+          const view = buildView(core, img, K);
+          await yieldMain(); if (my !== this.token || this.dead) return;
+          if (!(await ensureSt(core, view, () => !this.dead && my === this.token)) || !(await warmView(core, view, () => !this.dead && my === this.token))) return;
+          this.view = view; this.phase = (hash(card.name.length, card.name.charCodeAt(0) || 1, 3) * 6) | 0; this.lastF = -1;
+          if (tw !== W) { const [oc, og] = cv2d(W, H); og.imageSmoothingEnabled = false; this.off = oc; this.og = og; } else { this.off = null; this.og = null; }
           this.draw(SPEC[rarity].still + this.phase, true);
           schedule();
         }
@@ -1055,7 +1454,7 @@
       mkCanvas() {
         const c = document.createElement('canvas'); c.className = 'pp-rarity-cv'; c.setAttribute('aria-hidden', 'true');
         c.style.cssText = 'position:absolute;left:0;top:0;width:100%;height:100%;pointer-events:none;image-rendering:pixelated;image-rendering:crisp-edges';
-        this.host.appendChild(c); this.canvas = c; this.g = c.getContext('2d', { willReadFrequently: !!(SPEC[this.rarity] && SPEC[this.rarity].quant) }); this.g.imageSmoothingEnabled = false; c.__wrf = !!(SPEC[this.rarity] && SPEC[this.rarity].quant);
+        this.host.appendChild(c); this.canvas = c; this.g = c.getContext('2d'); this.g.imageSmoothingEnabled = false;
       },
       clear() { if (this.canvas) { this.canvas.remove(); this.canvas = null; this.g = null; } this.view = null; this.core = null; this.host.classList.remove('pp-rarity-on'); },
       update(o) {
