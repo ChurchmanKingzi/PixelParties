@@ -3803,8 +3803,8 @@ function ppFlugVerfolgen(fly, sourceEl, destEl, w0, ms, opEnd, farbe) {
  * Lage aller Heldenzonen/Support-Zonen im Moment des Aufrufs (Element -> Rechteck). Einschlag-Animationen (Magic Hammer, Keule, Dino …) suchen ihr Ziel
  * erst nach 300–500 ms; Verschiebt sich das Brett dazwischen (Handy: Kamerafahrt), lag der naechste Treffer ploetzlich ueber einem anderen Helden.
  */
-// Einschlag-Animationen, die ihre Zielzone selbst quetschen: bekommen das Zonen-Element direkt (`zoneEl`)
-const PP_SQUASH_ANIMS = new Set(['stranglehold_squeeze', 'magic_hammer', 'heavy_hit_smash', 'hammer_skeleton_smash', 'hammer_throw', 'shattering_strike', 'spiked_club_smash', 'giant_dino_stomp', 'mammoth_stomp', 'ankylo_tail_smash']);
+// Einschlag-Animationen, die ihre Zielzone selbst quetschen (bzw. deren Silhouette/Karte sie beschichten: acid_splash): bekommen das Zonen-Element direkt (`zoneEl`)
+const PP_SQUASH_ANIMS = new Set(['stranglehold_squeeze', 'magic_hammer', 'heavy_hit_smash', 'hammer_skeleton_smash', 'hammer_throw', 'shattering_strike', 'spiked_club_smash', 'giant_dino_stomp', 'mammoth_stomp', 'ankylo_tail_smash', 'acid_splash']);
 // Mindestlebensdauer (ms) je Animationstyp: `options.duration` (Engine `animDuration`) ist oft kuerzer als die Animation selbst — die Hammer-Animationen (app-fx-57) laufen 1,2–1,8 s.
 const PP_ANIM_MINDAUER = { magic_hammer: 2000, heavy_hit_smash: 1700, hammer_skeleton_smash: 1450, hammer_throw: 1500 };   // hammer_throw (app-fx-59): 32 Bilder = 1070 ms + Vorlauf + Reserve
 function ppZonenFrost() {
@@ -24009,41 +24009,29 @@ const ANIM_REGISTRY = {
     };
   })(),
   acid_splash: (() => {
-    return function AcidSplashEffect({ x, y }) {
-      const drops = useMemo(() => Array.from({ length: ppFxN(22) }, () => ({
-        xOff: -50 + Math.random() * 100,
-        size: 8 + Math.random() * 16,
-        delay: Math.random() * 120,
-        dur: 500 + Math.random() * 600,
-        wobble: -20 + Math.random() * 40,
-        color: ['#c80000','#ef2929','#ef2929','#c80000','#be0e0e','#e92f38','#ff1a1a','#c80000'][Math.floor(Math.random() * 8)],
-      })), []);
-      const splats = useMemo(() => Array.from({ length: ppFxN(6) }, () => ({
-        xOff: -25 + Math.random() * 50,
-        yOff: -15 + Math.random() * 30,
-        delay: 50 + Math.random() * 200,
-        dur: 600 + Math.random() * 400,
-        size: 18 + Math.random() * 8,
-      })), []);
+    // DOM-Rueckfall (nur mit `window.__ppFxAlt`; sonst ersetzt die Leinwand-Fassung in app-fx-9.jsx diesen Eintrag): rote Saeure faellt von oben auf die Zone — harte Streifen und eine flache Lache,
+    // keine Flaeschchen, keine Blasen. Einfache Entsprechung der Pixelart-Animation, ohne Silhouette.
+    return function AcidSplashEffect({ x, y, w, h }) {
+      const cw = w || 80, ch = h || 100;
+      const streifen = useMemo(() => Array.from({ length: ppFxN(14) }, (_, i) => ({
+        left: -cw * 0.5 + (i + Math.random() * 0.8) * (cw / ppFxN(14)),
+        breite: 4 + Math.round(Math.random() * 6),
+        hoehe: 14 + Math.round(Math.random() * 16),
+        delay: Math.round(Math.random() * 60),
+        dur: 200 + Math.round(Math.random() * 90),
+        farbe: ['#c80000', '#ef2929', '#ef2929', '#780000'][Math.floor(Math.random() * 4)],
+      })), [cw]);
       return (
         <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10100 }}>
-          <div className="anim-gold-flash" style={{ background: 'radial-gradient(circle, rgba(200,0,0,.95) 0%, rgba(190,14,14,.5) 35%, rgba(120,0,0,.2) 60%, transparent 80%)', width: 120, height: 120, marginLeft: -60, marginTop: -60 }} />
-          {drops.map((d, i) => (
-            <div key={'ad'+i} className="anim-beer-bubble" style={{
-              '--xOff': d.xOff + 'px', '--size': d.size + 'px', '--wobble': d.wobble + 'px',
-              '--color': d.color, animationDelay: d.delay + 'ms', animationDuration: d.dur + 'ms',
-            }} />
+          {streifen.map((s, i) => (
+            <div key={'ag' + i} style={{ position: 'absolute', left: s.left, top: -ch * 0.9, width: s.breite, height: s.hoehe, background: s.farbe, opacity: 0, '--agdy': (ch * 0.9) + 'px', animation: `acid-guss-fall ${s.dur}ms steps(8, end) ${s.delay}ms forwards, acid-guss-weg 520ms steps(4, end) 380ms forwards` }} />
           ))}
-          {splats.map((s, i) => (
-            <div key={'as'+i} style={{
-              position: 'absolute', left: s.yOff, bottom: -10, width: s.size, height: s.size, opacity: 0, '--wobble': '0px',
-              animation: `animBeerBubble ${s.dur}ms ease-out ${s.delay}ms forwards`,
-            }}>
-              {/* ★ W86p: Blase und Reagenzglas getrennt — ein Textkind in der maskierten Partikelklasse blieb beim Pixelieren unbehandelt (Schrift mit Mischfarben) */}
-              <i style={{ position: 'absolute', inset: 0, borderRadius: '50%', background: '#8f0000' }} />
-              <span style={{ position: 'absolute', left: 0, top: 0, fontSize: s.size, lineHeight: 1 }}>🧪</span>
-            </div>
-          ))}
+          <div style={{ position: 'absolute', left: -cw * 0.45, top: ch * 0.5 - 2, width: cw * 0.9, height: 6, background: '#c80000', opacity: 0, animation: 'acid-guss-lache 700ms steps(6, end) 260ms forwards' }} />
+          <style>{`
+            @keyframes acid-guss-fall { 0% { opacity: 1; transform: translateY(0); } 100% { opacity: 1; transform: translateY(var(--agdy)); } }
+            @keyframes acid-guss-weg { 0% { opacity: 1; } 100% { opacity: 0; } }
+            @keyframes acid-guss-lache { 0% { opacity: 1; transform: scaleX(0.3); } 60% { opacity: 1; transform: scaleX(1); } 100% { opacity: 0; transform: scaleX(1); } }
+          `}</style>
         </div>
       );
     };
