@@ -76,7 +76,7 @@ const bpAsset = (rel) => BP_DIR + rel.split('/').map(encodeURIComponent).join('/
 
 // Klänge vorladen (playSFX holt unbekannte Namen beim ersten Aufruf, spielt ihn aber noch nicht): leiser Aufruf beim Betreten des Reiters
 const BP_SOUNDS = ['booster_slide', 'booster_buildup', 'booster_rip', 'booster_strip', 'booster_burst', 'booster_glitter', 'booster_card_whoosh', 'booster_card_land', 'booster_ready', 'booster_umpf', 'shop_purchase',
-  'draw', 'pull_sparkle', 'pull_note', 'gold_gain', 'elem_lightning', 'pull_shatter', 'laser', 'negate', 'elem_dark', 'heavy_impact', 'pull_crack', 'ascension', 'pull_reveal'];
+  'draw', 'pull_sparkle', 'pull_note', 'gold_gain', 'elem_lightning', 'pull_shatter', 'laser', 'negate', 'elem_dark', 'heavy_impact', 'pull_crack', 'ascension', 'pull_reveal', 'pull_swell', 'doom_tick'];
 let _bpWarm = false;
 function bpWarmSounds() {
   if (_bpWarm || !window.playSFX) return;
@@ -337,9 +337,10 @@ function bpRng(seed) {
 }
 const BP_BAYER = [[0, 8, 2, 10], [12, 4, 14, 6], [3, 11, 1, 9], [15, 7, 13, 5]];
 const bpBay = (x, y) => (BP_BAYER[y & 3][x & 3] + 0.5) / 16;
+const BP_BAY16 = BP_BAYER.flat();   // flach, für die schnellen Pinsel (Schwelle: Zelle gesetzt, wenn BP_BAY16[...] < Dichte * 16 - 0.5)
 
 // Pinsel auf einer Leinwand mit Rasterzellen: schreibt in einen Pixelspeicher (ein Zug je Bild), Palettenfarben als Hex-Texte
-const _bpU32 = {};
+const _bpU32 = {}, _bpRows = {};   // _bpRows: fertige Rasterzeilen der Pinsel (je Stufe/Farbe/Phase), von bpPen gefüllt
 function bpU32(c) {
   let v = _bpU32[c];
   if (v === undefined) { v = ((255 << 24) | (parseInt(c.slice(5, 7), 16) << 16) | (parseInt(c.slice(3, 5), 16) << 8) | parseInt(c.slice(1, 3), 16)) >>> 0; _bpU32[c] = v; }
@@ -358,15 +359,53 @@ function bpPen(g, W, H) {
       const x1 = Math.min(W, x + w), y1 = Math.min(H, y + h); x = Math.max(0, x); y = Math.max(0, y);
       if (x1 <= x || y1 <= y) return;
       const v = bpU32(c);
+      if (x === 0 && x1 === W) { buf.fill(v, y * W, y1 * W); return; }
+      if (x1 - x <= 6) { for (let j = y; j < y1; j++) for (let i = j * W + x, e = j * W + x1; i < e; i++) buf[i] = v; return; }   // kleine Quadrate: Schleife statt fill-Aufrufen
       for (let j = y; j < y1; j++) buf.fill(v, j * W + x, j * W + x1);
     },
-    // Rechteck mit Dichte d (0..1) als Bayer-Raster
+    // Rechteck mit Dichte d (0..1) als Bayer-Raster (gleiches Ergebnis wie bpBay(x, y) < d, aber ganzzahlig und ohne Funktionsaufruf je Zelle)
     dither(x, y, w, h, d, c) {
       if (d <= 0) return;
       if (d >= 1) { pen.rect(x, y, w, h, c); return; }
       x = Math.floor(x); y = Math.floor(y); w = Math.floor(w); h = Math.floor(h);
-      const v = bpU32(c), x1 = Math.min(W, x + w), y1 = Math.min(H, y + h);
-      for (let j = Math.max(0, y); j < y1; j++) for (let i = Math.max(0, x); i < x1; i++) if (bpBay(i, j) < d) buf[j * W + i] = v;
+      const v = bpU32(c), x1 = Math.min(W, x + w), y1 = Math.min(H, y + h), lv = d * 16 - 0.5, x0 = Math.max(0, x);
+      for (let j = Math.max(0, y); j < y1; j++) {
+        const br = (j & 3) << 2, o = j * W;
+        for (let i = x0; i < x1; i++) if (BP_BAY16[br + (i & 3)] < lv) buf[o + i] = v;
+      }
+    },
+    // Kreisring zwischen den Radien rin und rout (rout = Infinity: bis zum Bildrand) um (cx, cy) mit Dichte d als Bayer-Raster. Jede Zelle des Rings wird
+    // genau einmal GESCHRIEBEN (auch die Lücken des Rasters als 0): nur auf einer leeren Fläche oder mit d = 1 benutzen, nicht über anderes Gemaltes.
+    // Zeilen kommen als fertige Rasterzeilen (Uint32Array je Stufe/Farbe/Zeilenphase, einmal angelegt) per set(): schnell auch bei Vollbild.
+    band(cx, cy, rin, rout, d, c) {
+      const L = Math.max(0, Math.min(16, Math.ceil(d * 16 - 0.5)));
+      if (L <= 0) return;
+      cx = Math.floor(cx); cy = Math.floor(cy);
+      const ri2 = rin * rin, ro2 = rout * rout, open = rout === Infinity;
+      const pat = [0, 1, 2, 3].map(ph => {
+        const key = L + c + ph; let row = _bpRows[key];
+        if (!row || row.length !== W) { row = _bpRows[key] = new Uint32Array(W); const v = bpU32(c), br = ph << 2; for (let x = 0; x < W; x++) row[x] = BP_BAY16[br + (x & 3)] < L ? v : 0; }
+        return row;
+      });
+      const span = (o, row, a, b) => { a = Math.max(0, a); b = Math.min(W - 1, b); if (b >= a) buf.set(row.subarray(a, b + 1), o + a); };
+      for (let y = 0; y < H; y++) {
+        const dy = y - cy, dy2 = dy * dy;
+        if (!open && dy2 >= ro2) continue;
+        const xo = open ? W : Math.round(Math.sqrt(ro2 - dy2)), xi = dy2 < ri2 ? Math.round(Math.sqrt(ri2 - dy2)) : 0;
+        const row = pat[y & 3], o = y * W;
+        if (xi > 0) { span(o, row, cx - xo, cx - xi - 1); span(o, row, cx + xi + 1, cx + xo); } else span(o, row, cx - xo, cx + xo);
+      }
+    },
+    // Pixelspeicher sichern / laden
+    snap(dst) { dst.set(buf); },
+    load(src) { buf.set(src); },
+    // Scheibe (löscht Zellen innerhalb des Radius r)
+    eraseDisc(cx, cy, r) {
+      cx = Math.floor(cx); cy = Math.floor(cy);
+      for (let y = Math.max(0, cy - r); y <= Math.min(H - 1, cy + r); y++) {
+        const dx = Math.round(Math.sqrt(Math.max(0, r * r - (y - cy) * (y - cy)))), x0 = Math.max(0, cx - dx), x1 = Math.min(W - 1, cx + dx);
+        if (x1 >= x0) buf.fill(0, y * W + x0, y * W + x1 + 1);
+      }
     },
     // Funkelstern: Mitte + Arme der Länge r (r=0: nur Mitte)
     star(x, y, r, c, core) {
@@ -394,6 +433,7 @@ function bpPen(g, W, H) {
       const dx = Math.abs(x1 - x0), dy = -Math.abs(y1 - y0), sx = x0 < x1 ? 1 : -1, sy = y0 < y1 ? 1 : -1;
       let err = dx + dy, guard = 0, n = 0;
       th = th || 1;
+      if ((x0 < -th && x1 < -th) || (y0 < -th && y1 < -th) || (x0 > W + th && x1 > W + th) || (y0 > H + th && y1 > H + th)) return;   // ganz außerhalb
       const k = Math.max(1, th >> 1);
       for (;;) {
         if (n++ % k === 0 && (d == null || d >= 1 || bpBay(x0, y0) < d)) pen.rect(x0 - (th >> 1), y0 - (th >> 1), th, th, c);
@@ -413,10 +453,11 @@ const BP_TALL = [[0, -3], [-1, -2], [0, -2], [1, -2], [-1, -1], [0, -1], [1, -1]
 const BP_SHARD = [BP_KITE, BP_TALL, BP_KITE, BP_TALL.map(([x, y]) => [y, x])];
 
 // Dauer der Effekte in Takten (30 Hz) und Verzögerung bis die Karte sichtbar wird (ms)
-// Aufdeck-Inszenierung nach RANG: Umbra ist die höchste Rarity und bekommt die große Inszenierung (Effekt, Verzögerung, Klänge), Stained Rare die kleinere.
-const BP_REVEAL = { umbra: 'stained', stained: 'umbra' };
-const BP_FX_LEN = { rare: 30, prismatic: 40, super: 44, diamond: 44, spectral: 48, umbra: 64, stained: 130 };
-const BP_FACE_DELAY = { uncommon: 0, rare: 0, prismatic: 60, super: 120, diamond: 180, spectral: 120, umbra: 330, stained: 700 };
+// Die Inszenierung folgt dem RANG: …Spectral < Stained Rare < Umbra (höchste Rarity: längster Aufbau, längste Kantenpause, meiste Klangschichten, stärkster Rückstoß).
+// Stained Rare = Kirche/Buntglas (Licht, Splitter), Umbra = Finsternis (Sonnenfinsternis, Schattenrisse, Verdunkelung).
+const BP_FX_LEN = { rare: 30, prismatic: 40, super: 44, diamond: 44, spectral: 48, stained: 96, umbra: 150 };
+const BP_FACE_DELAY = { uncommon: 0, rare: 0, prismatic: 60, super: 120, diamond: 180, spectral: 120, stained: 480, umbra: 1200 };
+const BP_HERZSCHLAG = [7, 19, 27, 32];   // Umbra: Takte (ab Kante) der vier Herzschläge vor dem Aufschlag, deckungsgleich mit den doom_tick-Klängen (BP_FLIP_SOUNDS)
 
 // Sammelstelle für die laufenden Effekte einer Leinwand
 function bpFxCreate(cv, S, shakeEl) {
@@ -426,16 +467,21 @@ function bpFxCreate(cv, S, shakeEl) {
   cv.width = W; cv.height = H;
   cv.style.width = W * S + 'px'; cv.style.height = H * S + 'px';
   const pen = bpPen(g, W, H);
+  const vigBuf = new Uint32Array(W * H);   // zuletzt gemalte Dunkelheits-Ebene (Umbra), einmal je Leinwand angelegt, nicht erst beim Aufdecken
+  let vigKey = '';
   const list = [];
-  let raf = 0, tak = 0, last = -1, dead = false, shake = null;
+  let raf = 0, tak = 0, last = -1, dead = false, shake = null, vigFresh = false;   // vigFresh: der Stift hält gerade die frisch gemalte Dunkelheits-Ebene
   const api = { W, H, S };
+  // Bildschirmzucken: Stärke in Rasterzellen, fällt über `dur` Takte stufenweise auf 0; ein stärkeres Zucken ersetzt ein schwächeres, nie umgekehrt
+  const shakeAmp = (k) => Math.max(0, Math.round(k.amp * (1 - k.t / k.dur)));
+  const kick = (amp, dur) => { if (!shake || amp >= shakeAmp(shake)) shake = { t: 0, amp, dur }; };
 
   function spawn(kind, cx, cy, cw, ch, mix) {
     const seed = (Math.random() * 1e9) | 0, rnd = bpRng(seed);
     const e = { kind, cx, cy, cw, ch, t: 0, rnd, seed, P: [], mix: mix > 1 ? mix : 1 };
     init(e);
     list.push(e);
-    if (kind === 'stained') shake = { t: 0, amp: mix > 1 ? 3 : 4 };
+    if (kind === 'stained') kick(2, 14);
     if (!raf && !dead) raf = bpRaf(loop);
   }
 
@@ -476,13 +522,182 @@ function bpFxCreate(cv, S, shakeEl) {
         P.push({ x: (r() - 0.5) * e.cw * 0.5, y: (r() - 0.5) * e.ch * 0.5, vx: Math.cos(a) * v, vy: Math.sin(a) * v - 0.6, life: 22 + (r() * 18) | 0, c: cols[i % cols.length], s: (r() * 4) | 0, big: i % 3 === 0 });
       }
     } else if (e.kind === 'umbra') {
-      const cols = [BPC.purple, BPC.violet, BPC.purpleL, BPC.purple, BPC.magenta];
-      for (let i = 0; i < 46; i++) {
-        const a = r() * Math.PI * 2, d = (6 + r() * 26) * e.u;
-        P.push({ x: Math.cos(a) * d * 0.9, y: Math.sin(a) * d, vx: (r() - 0.5) * 0.3, vy: -(0.1 + r() * 0.5), life: 30 + (r() * 30) | 0, c: cols[i % cols.length], ph: (r() * 6) | 0, d: 4 + (r() * 12) | 0 });
+      // Umbra: schwarze Scheibe („Mond“) vor der Karte, Korona aus Strahlen, Schattenrisse bis zum Bildrand, Sog ins Zentrum, nach dem Aufschlag Splitter und Glut.
+      // Alles Zufällige wird hier einmal gewürfelt (e.seed), das Malen je Takt rechnet nur noch.
+      const m = e.mix > 1 ? 0.6 : 1;                                // mehrere Effekte gleichzeitig (Flip All): weniger Teile
+      e.imp = Math.round(BP_FACE_DELAY.umbra / BP_TAKT) + 1;        // Takt des Aufschlags (die Vorderseite wird sichtbar)
+      e.rd = Math.round(e.ch / 2 * 1.15 + 2);                       // Radius der Scheibe
+      e.maxR = Math.ceil(Math.hypot(pen.W, pen.H));
+      e.rays = [];
+      for (let i = 0, n = Math.round(44 * m); i < n; i++) e.rays.push({ a: (i + r() * 0.8) / n * Math.PI * 2, len: (0.35 + r() * 0.65) * e.rd * 1.0, c: i % 3 === 0 ? BPC.white : (i & 1 ? BPC.purpleL : BPC.violet), tip: i % 3 === 1, th: i % 2 ? 3 : 2 });
+      e.cracks = [];
+      const crack = (x, y, a0, steps, t0, stepLen) => {
+        const pts = [[x, y]]; let a = a0, branchAt = [];
+        for (let k = 0; k < steps; k++) {
+          a += (r() - 0.5) * 0.8; x += Math.cos(a) * stepLen * (0.7 + r() * 0.6); y += Math.sin(a) * stepLen * (0.7 + r() * 0.6); pts.push([x, y]);
+          if (k > 2 && k % 4 === 1 && r() < 0.55) branchAt.push([k, a]);
+        }
+        return { pts, t0, branchAt };
+      };
+      const nc = Math.round(10 * m), L = Math.round(e.maxR * 0.55 / (10 * e.u));
+      for (let i = 0; i < nc; i++) {
+        const a = (i + r() * 0.7) / nc * Math.PI * 2, c = crack(Math.cos(a) * (e.rd + 2), Math.sin(a) * (e.rd + 2), a, L, 8 + (i % 5) * 1.5 + r() * 3, 10 * e.u);
+        e.cracks.push(c);
+        for (const [k, ba] of c.branchAt) { const q = c.pts[k], d = r() < 0.5 ? 1 : -1; e.cracks.push(crack(q[0], q[1], ba + d * (0.7 + r() * 0.5), 4 + ((r() * 4) | 0), c.t0 + k / 1.5, 8 * e.u)); }
       }
+      e.suck = [];
+      for (let i = 0, n = Math.round(80 * m); i < n; i++) e.suck.push({ a: r() * Math.PI * 2, r0: (0.22 + r() * 0.3) * e.maxR, born: 2 + ((r() * 14) | 0), dur: 18 + ((r() * 14) | 0), c: [BPC.purpleL, BPC.violet, BPC.purple, BPC.white][(r() * 4) | 0] });
+      e.shards = [];
+      const shc = [BPC.violet, BPC.purple, BPC.plum, BPC.purpleL, BPC.white, BPC.black, BPC.violet];
+      for (let i = 0, n = Math.round(70 * m); i < n; i++) { const a = r() * Math.PI * 2, v = (2.5 + r() * 4.5) * e.u; e.shards.push({ a, v, s: r() < 0.35 ? 3 : 2, life: 36 + ((r() * 28) | 0), c: shc[i % shc.length] }); }
+      e.embers = [];
+      for (let i = 0, n = Math.round(46 * m); i < n; i++) { const p = edge(); e.embers.push({ x: p.x * 1.05, y: p.y * 1.05, vx: (r() - 0.5) * 0.4, vy: -(0.3 + r() * 0.8) * e.u, born: 4 + ((r() * 40) | 0), life: 40 + ((r() * 50) | 0), ph: (r() * 6) | 0, c: [BPC.violet, BPC.purpleL, BPC.white, BPC.purple][(r() * 4) | 0] }); }
     } else if (e.kind === 'stained') {
-      e.rays = e.mix > 1 ? 10 : 18; e.rot = (r() * 4) | 0;   // mehrere Effekte gleichzeitig (Flip All): weniger Strahlen, damit alle Karten sichtbar bleiben
+      e.rays = e.mix > 1 ? 8 : 12; e.rot = (r() * 4) | 0;   // mehrere Effekte gleichzeitig (Flip All): weniger Strahlen, damit alle Karten sichtbar bleiben
+    }
+  }
+
+  // ── Umbra ────────────────────────────────────────────────────────────────
+  // Ablauf (Takte ab der Kante, 30 Hz; Aufschlag der Vorderseite bei e.imp = 37, die Karte steht 1,2 s auf der Kante):
+  //   0–12   Verdunkelung: Dither-Vignette (Kreise aus Bayer-Rastern, dichter nach außen) schließt sich um die Karte, schwarze Scheibe („Mond“) wächst vor ihr
+  //   6–36   Korona aus Strahlen um die Scheibe, Schattenrisse laufen bis zum Bildrand, Sog: violette Funken stürzen ins Zentrum, vier Herzschläge (7/19/27/32)
+  //   32–37  Totalität: Korona weiß und länger, Scheibenrand weiß, vor dem Aufschlag zuckt der Schirm
+  //   37     Aufschlag: Schirm weiß (zwei Takte voll), Scheibe zerbricht in Splitter, drei Druckwellen, Rückstoß (Bildschirmzucken 7 Zellen, 48 Takte), Risse blitzen
+  //   37–150 Nachglühen: violetter Rahmenschein um die Karte, Glut steigt, die Dunkelheit weicht in Stufen (Dither wird dünner)
+  const UMB_BANDS = [0.1, 0.26, 0.44, 0.62, 0.78, 0.88, 0.94];
+  // Dunkelheit der Umbra-Karte: Radius des hellen Kreises Rc und Dichte-Faktor f (null: keine Dunkelheit mehr)
+  function umbraDark(e) {
+    const t = e.t, tt = t - e.imp, u = e.u, near = e.rd + Math.round(18 * u);
+    let Rc, f = 1;
+    if (t < e.imp) {
+      const k = Math.min(1, (t & ~1) / 12);   // Schließen im 15-Hz-Takt (halb so viele Neuberechnungen)
+      Rc = Math.round(e.maxR + (near - e.maxR) * (1 - (1 - k) * (1 - k)));
+      for (const b of BP_HERZSCHLAG) if (t >= b && t < b + 3) Rc -= Math.round((3 - (t - b)) * 2 * u);   // kurzes Zusammenziehen im Herzschlag
+    } else {
+      Rc = near + Math.round(Math.min(1, tt / 14) * 24 * u);
+      f = tt < 24 ? 1 : Math.max(0, 1 - (tt - 24) / 70);
+    }
+    return (f <= 0 || Rc >= e.maxR) ? null : { Rc, f };
+  }
+  // Ebene in Bildgröße (Pixelspeicher), nur neu gemalt, wenn sich Radius oder Dichtestufen ändern (sonst ein Kopierzug)
+  function umbraLayer(e, d) {
+    const bw = Math.max(6, Math.round(14 * e.u)), m = (e.mix > 1 ? 0.8 : 1) * d.f;
+    const lv = UMB_BANDS.map(q => Math.max(0, Math.min(16, Math.ceil(q * m * 16 - 0.5))));   // Dichtestufen (Bayer 4x4 kennt nur 16)
+    const key = Math.floor(e.cx) + ',' + Math.floor(e.cy) + ',' + d.Rc + ':' + lv.join(',');
+    if (vigKey !== key) {
+      pen.clear();
+      let R = d.Rc;
+      for (let k = 0; k < UMB_BANDS.length; k++, R += bw) pen.band(Math.floor(e.cx), Math.floor(e.cy), R, k === UMB_BANDS.length - 1 ? Infinity : R + bw, UMB_BANDS[k] * m, k < 3 ? BPC.plum : BPC.black);
+      pen.snap(vigBuf); vigKey = key; vigFresh = true;   // der Pixelspeicher des Stifts enthält jetzt genau diese Ebene
+    }
+    return vigBuf;
+  }
+  function drawUmbra(e) {
+    const t = e.t, imp = e.imp, tt = t - imp, u = e.u, X = Math.floor(e.cx), Y = Math.floor(e.cy), hw = e.cw / 2, hh = e.ch / 2, rd = e.rd, m = e.mix > 1 ? 0.6 : 1;
+    if (t < imp) {
+      const toti = t >= imp - 5;                                       // Totalität
+      // Scheibe wächst in Stufen vor der Karte, innen ein dunkler Violettsaum
+      const R = Math.round(rd * (1 - Math.pow(1 - Math.min(1, t / 10), 2)));
+      if (R > 0) { pen.band(X, Y, 0, R, 1, BPC.black); if (R > 8) pen.ring(X, Y, R - 3, BPC.plum, 1, 2); }
+      // Korona
+      if (t >= 6) {
+        const grow = Math.min(1, (t - 6) / 10) * (toti ? 1.7 : 1), stp = t >> 1;
+        const rg = e.rays;
+        for (let i = 0; i < rg.length; i++) {
+          const q = rg[i], fl = 0.75 + 0.25 * bpRng(e.seed + stp * 977 + i)(), L = Math.max(2, Math.round(q.len * grow * fl)), a = q.a + (t >> 2) * 0.03;
+          const ca = Math.cos(a), sa = Math.sin(a), r0 = R + 2;
+          pen.line(X + ca * r0, Y + sa * r0, X + ca * (r0 + L), Y + sa * (r0 + L), toti ? (i & 1 ? BPC.white : BPC.purpleL) : q.c, q.th);
+          if (toti || q.tip) pen.put(X + ca * (r0 + L + 1), Y + sa * (r0 + L + 1), BPC.white);
+        }
+        pen.ring(X, Y, R + 4, BPC.violet, 1, 3);
+        pen.ring(X, Y, R + 9, BPC.purple, 0.6, 4);
+        pen.ring(X, Y, R + 15, BPC.plum, 0.5, 5);
+      }
+      // Rand der Scheibe: Aureole, in der Totalität weiß und dick
+      if (R > 0) { pen.ring(X, Y, R + 1, BPC.white, 1, toti ? 3 : 1); if (!toti) pen.ring(X, Y, R + 2, BPC.purpleL, 0.6, 1); }
+      // Herzschläge: Ring dehnt sich vom Rand
+      for (const b of BP_HERZSCHLAG) { const k = t - b; if (k >= 0 && k < 6) pen.ring(X, Y, R + 3 + k * 4 * u, k < 2 ? BPC.white : BPC.purpleL, 1 - k / 6, 2); }
+      // Schattenrisse
+      for (const c of e.cracks) {
+        const n = Math.min(c.pts.length - 1, Math.floor((t - c.t0) * 1.5));
+        if (n < 1) continue;
+        const col = ((t >> 1) & 1) ? BPC.violet : BPC.purple;
+        for (let k = 1; k <= n; k++) pen.line(c.pts[k - 1][0] + X, c.pts[k - 1][1] + Y, c.pts[k][0] + X, c.pts[k][1] + Y, col, 3);
+        for (let k = Math.max(1, n - 3); k <= n; k++) pen.line(c.pts[k - 1][0] + X, c.pts[k - 1][1] + Y, c.pts[k][0] + X, c.pts[k][1] + Y, BPC.white, 1);   // Spitze glüht
+      }
+      // Sog
+      for (const p of e.suck) {
+        const k = (t - p.born) / p.dur; if (k < 0 || k >= 1) continue;
+        for (let j = 0; j < 4; j++) {
+          const kk = Math.max(0, k - j * 0.03), rr = p.r0 * (1 - kk * kk) + R * kk * kk;
+          pen.put(X + Math.cos(p.a) * rr, Y + Math.sin(p.a) * rr, j === 0 ? BPC.white : (j < 3 ? p.c : BPC.plum));
+          if (j === 0) pen.put(X + Math.cos(p.a) * rr + 1, Y + Math.sin(p.a) * rr, p.c);
+        }
+      }
+      // Zucken des Schirms kurz vor dem Aufschlag; zwei volle Weißbilder beim Aufschlag selbst (verdecken die Kante der Karte)
+      if (!e.noFlash) {
+        if (t === imp - 2) pen.dither(0, 0, pen.W, pen.H, 0.16 * (m > 0.7 ? 1 : 0.6), BPC.violet);
+        if (t >= imp - 1) pen.rect(0, 0, pen.W, pen.H, BPC.white);
+      }
+      return;
+    }
+    // ── Aufschlag und Nachglühen ───────────────────────────────────────────
+    if (e.noFlash) { /* der Blitz einer gleichzeitig aufschlagenden Karte genügt */ }
+    else if (tt <= 2) pen.rect(0, 0, pen.W, pen.H, BPC.white);           // fünf volle Weißbilder (Takt -1 bis 2): die Vorderseite schlägt in dieser Zeit auf
+    else if (tt < 11) pen.dither(0, 0, pen.W, pen.H, [0.8, 0.6, 0.42, 0.3, 0.2, 0.12, 0.07, 0.03][tt - 3] * (e.mix > 1 ? 0.6 : 1), tt < 6 ? BPC.white : BPC.purpleL);
+    // Druckwellen: drei dicke Ringe, dahinter ein dunkler Saum
+    for (let k = 0; k < 3; k++) {
+      const q = tt - k * 4; if (q <= 0) continue;
+      const R = Math.round(q * 7.5 * u), dn = 1 - q / 55; if (dn <= 0 || R > e.maxR * 0.7) continue;
+      const th = Math.max(2, Math.round((8 - k * 2) * u));
+      if (k === 0) pen.ring(X, Y, R - th * 1.6, BPC.black, 0.9 * dn, Math.round(th * 1.5));
+      pen.ring(X, Y, R, [BPC.white, BPC.purpleL, BPC.violet][k], dn > 0.4 ? 1 : dn * 2.4, th);
+    }
+    // Risse: erst weiß, dann violett, verblassen
+    if (tt < 56) {
+      const dn = tt < 8 ? 1 : 1 - (tt - 8) / 48, col = tt < 6 ? BPC.white : (((tt >> 1) & 1) ? BPC.violet : BPC.purple);
+      for (const c of e.cracks) {
+        const n = Math.min(c.pts.length - 1, Math.floor((imp - c.t0) * 1.5 + tt * 3));
+        if (n < 1) continue;
+        for (let k = 1; k <= n; k++) { const gx = c.pts[k][0] + X, gy = c.pts[k][1] + Y; if (bpBay(Math.floor(gx), Math.floor(gy)) < dn) pen.line(c.pts[k - 1][0] + X, c.pts[k - 1][1] + Y, gx, gy, col, tt < 6 ? 4 : 3, dn); }
+      }
+    }
+    // Korona fällt in sich zusammen
+    if (tt < 10) {
+      const rg = e.rays, R0 = rd + 2;
+      for (let i = 0; i < rg.length; i++) {
+        const q = rg[i], L = Math.round(q.len * 1.7 * (1 - tt / 10)); if (L < 1) continue;
+        const ca = Math.cos(q.a), sa = Math.sin(q.a);
+        pen.line(X + ca * R0, Y + sa * R0, X + ca * (R0 + L), Y + sa * (R0 + L), tt < 4 ? BPC.white : BPC.purpleL, 2);
+      }
+    }
+    // Splitter der Scheibe
+    for (const p of e.shards) {
+      if (tt > p.life) continue;
+      const x = X + Math.cos(p.a) * (rd + p.v * tt), y = Y + Math.sin(p.a) * (rd + p.v * tt) + 0.12 * tt * tt * 0.5;
+      if (tt > p.life - 8 && (tt & 1)) continue;
+      pen.rect(x, y, p.s, p.s, p.c);
+      if (p.c === BPC.black || p.c === BPC.plum) pen.rect(x - 1, y - 1, 1, p.s + 2, BPC.violet);
+    }
+    // Rahmenschein um die Karte (violett, pulsiert zwischen Violett und Weiß), Dither nach außen dünner
+    if (tt < 100) {
+      const dn = tt < 50 ? 1 : 1 - (tt - 50) / 50, x0 = X - hw, y0 = Y - hh, x1 = X + hw, y1 = Y + hh, hot = (tt >> 2) & 1;
+      const fr = (o, th, d, c) => {
+        pen.dither(x0 - o - th, y0 - o - th, e.cw + 2 * (o + th), th, d, c); pen.dither(x0 - o - th, y1 + o, e.cw + 2 * (o + th), th, d, c);
+        pen.dither(x0 - o - th, y0 - o, th, e.ch + 2 * o, d, c); pen.dither(x1 + o, y0 - o, th, e.ch + 2 * o, d, c);
+      };
+      fr(2, 2, dn, hot && tt < 40 ? BPC.purpleL : BPC.purple);
+      fr(4, 3, 0.7 * dn, BPC.violet);
+      fr(7, 3, 0.4 * dn, BPC.plum);
+    }
+    // Glut steigt vom Kartenrand auf
+    for (const p of e.embers) {
+      const k = tt - p.born; if (k < 0 || k > p.life) continue;
+      const x = X + p.x + p.vx * k + Math.sin((k + p.ph) * 0.3) * 1.5, y = Y + p.y + p.vy * k;
+      const glow = ((k + p.ph) % 6) < 3;
+      if (k > p.life - 10 && (k & 1)) continue;
+      pen.put(x, y, glow ? p.c : BPC.violet); pen.put(x + 1, y, glow ? p.c : BPC.plum);
+      if (glow && k < p.life - 10) { pen.put(x, y - 1, BPC.purpleL); pen.put(x + 1, y - 1, p.c); }
     }
   }
 
@@ -615,36 +830,16 @@ function bpFxCreate(cv, S, shakeEl) {
       }
       return;
     }
-    if (e.kind === 'umbra') {
-      // Dunkle Welle: dicker Ring läuft nach außen, verdunkelt dabei die Nachbarkarten (Dither) und trägt einen violetten Saum; lila Glut steigt auf und glimmt
-      const maxR = Math.hypot(pen.W, pen.H) * 0.55, R = 3 + t * 2.6, dens = t < 38 ? 1 : Math.max(0, 1 - (t - 38) / 22);
-      const th = Math.max(5, Math.round(14 * u) - (t >> 3));
-      if (R < maxR && dens > 0) {
-        pen.ring(X, Y, R, BPC.black, 0.95 * dens, th);
-        pen.ring(X, Y, R - th * 0.5, BPC.plum, 0.7 * dens, Math.max(2, th * 0.4));
-        pen.ring(X, Y, R + th * 0.5, BPC.violet, 0.8 * dens, 2);
-        pen.ring(X, Y, R + th * 0.5 + 2, BPC.purpleL, 0.35 * dens, 1);
-      }
-      if (t < 12) pen.dither(X - hw - 3, Y - hh - 3, e.cw + 6, e.ch + 6, Math.max(0, 0.95 - t * 0.08), BPC.black);   // Verdunkelung bis die Karte erscheint
-      for (const p of e.P) {
-        if (t > p.life) continue;
-        const x = X + p.x + p.vx * t, y = Y + p.y + p.vy * t - t * 0.35;
-        const glow = ((t + p.ph) % 6) < 3;
-        pen.put(x, y, glow ? p.c : BPC.violet);
-        pen.put(x + 1, y, glow ? p.c : BPC.plum);
-        if (glow && t < p.life - 8) { pen.put(x, y - 1, BPC.purpleL); pen.put(x + 1, y - 1, p.c); }
-        if (p.d > 8 && t < p.life - 10) { pen.put(x, y + 1, BPC.plum); pen.put(x + 1, y + 1, BPC.plum); }
-      }
-      return;
-    }
+    if (e.kind === 'umbra') { drawUmbra(e); return; }
     if (e.kind === 'stained') {
-      // Blitz über den ganzen Bildschirm (Weiß, dann Gold) in sechs Stufen
-      const fl = [1, 0.85, 0.55, 0.3, 0.16, 0.08];
-      if (t < fl.length) pen.dither(0, 0, pen.W, pen.H, fl[t] * (e.mix > 1 ? 0.5 : 1), t < 2 ? BPC.white : BPC.goldL);
-      // Strahlen: 18 Strahlen mit Stained-Glass-Farben, drehen in Stufen, wachsen in 10 Takten, verlöschen per Dither
-      const grow = Math.min(1, t / 10), dens = t < 44 ? 1 : Math.max(0, 1 - (t - 44) / 64);
+      // Kirchenfenster: Licht fällt ein, Glas zerspringt. Zweithöchste Rarity: kürzer, weniger Strahlen/Funken/Wellen und kaum Zucken (Umbra ist größer).
+      // Blitz über den ganzen Bildschirm (Weiß, dann Gold) in vier Stufen
+      const fl = [1, 0.7, 0.4, 0.18];
+      if (t < fl.length && !e.noFlash) pen.dither(0, 0, pen.W, pen.H, fl[t] * (e.mix > 1 ? 0.5 : 1), t < 2 ? BPC.white : BPC.goldL);
+      // Strahlen: 12 Strahlen mit Buntglasfarben, drehen in Stufen, wachsen in 8 Takten, verlöschen per Dither
+      const grow = Math.min(1, t / 8), dens = t < 30 ? 1 : Math.max(0, 1 - (t - 30) / 50);
       if (dens > 0) {
-        const L = (Math.hypot(pen.W, pen.H) * (e.mix > 1 ? 0.4 : 0.62)) * grow, rot = (e.rot + (t >> 2)) * 0.07;
+        const L = (Math.hypot(pen.W, pen.H) * (e.mix > 1 ? 0.34 : 0.5)) * grow, rot = (e.rot + (t >> 2)) * 0.07;
         const cols = [BPC.gold, BPC.red, BPC.purple, BPC.cyan, BPC.goldL, BPC.magenta];
         for (let i = 0; i < e.rays; i++) {
           const a = rot + (i / e.rays) * Math.PI * 2, c = cols[i % cols.length], ca = Math.cos(a), sa = Math.sin(a);
@@ -656,14 +851,14 @@ function bpFxCreate(cv, S, shakeEl) {
         if (t > 3) pen.dither(X - 6, Y - 6, 12, 12, dens, BPC.white);
       }
       // Druckwellen
-      for (let k = 0; k < 3; k++) { const tt = t - k * 6; if (tt > 0 && tt < 44) pen.ring(X, Y, tt * 3.4, [BPC.white, BPC.gold, BPC.red][k], 1 - tt / 44, 3); }
+      for (let k = 0; k < 2; k++) { const tt = t - k * 6; if (tt > 0 && tt < 36) pen.ring(X, Y, tt * 3.4, [BPC.white, BPC.gold][k], 1 - tt / 36, 3); }
       // Funkenregen vom oberen Bildrand
-      if (t >= 6 && t < 100) {
+      if (t >= 6 && t < 96) {
         const cols = [BPC.goldL, BPC.gold, BPC.red, BPC.purple, BPC.cyan, BPC.white, BPC.green, BPC.magenta];
-        for (let i = 0; i < 90; i++) {
+        for (let i = 0, n = e.mix > 1 ? 36 : 60; i < n; i++) {
           const s = bpRng((e.seed + i * 2654435761) % 4294967296);
-          const born = 6 + (s() * 84) | 0, x = s() * pen.W, v = 1.1 + s() * 1.9;
-          if (t < born || t > born + 70) continue;
+          const born = 6 + (s() * 40) | 0, x = s() * pen.W, v = 1.1 + s() * 1.9;
+          if (t < born || t > born + 50) continue;
           const y = (t - born) * v;
           if (y > pen.H + 6) continue;
           const c = cols[(i * 5) % cols.length];
@@ -683,25 +878,44 @@ function bpFxCreate(cv, S, shakeEl) {
     if (k === last) { raf = bpRaf(loop); return; }
     const dt = last < 0 ? 1 : Math.min(3, k - last);
     last = k;
-    pen.clear();
+    // Dunkelheit der Umbra-Karten zuerst (darunter liegt sonst alles Helle verdeckt). Die erste Umbra-Karte malt die Vignette; weitere gleichzeitige Umbra-Karten
+    // (Flip All) bekommen nur ihren Lichtkreis ausgeschnitten, das spart je Karte einen Vollbild-Durchlauf
+    let base = null; vigFresh = false; const holes = [];
+    for (const e of list) if (e.kind === 'umbra') { const d = umbraDark(e); if (d) { if (!base) base = umbraLayer(e, d); else holes.push([e, d.Rc]); } }
+    if (!base) pen.clear();
+    else {
+      if (!vigFresh) pen.load(base);
+      for (const [e, R] of holes) pen.eraseDisc(e.cx, e.cy, R);
+    }
     for (let i = list.length - 1; i >= 0; i--) {
       const e = list[i];
       e.S = S;
+      // Vollbild-Blitz nur einmal, wenn gleich viele Karten derselben Art gleichzeitig aufschlagen (Flip All): spart je Karte einen Vollbild-Durchlauf
+      e.noFlash = false;
+      for (let j = 0; j < i; j++) { const o = list[j]; if (o.kind === e.kind && Math.abs(o.t - e.t) <= 1) { e.noFlash = true; break; } }
       drawOne(e);
+      if (e.kind === 'umbra' && !e.hit && e.t >= e.imp) { e.hit = true; kick(e.mix > 1 ? 5 : 7, 48); }   // Rückstoß beim Aufschlag
       e.t += dt;
       if (e.t > (BP_FX_LEN[e.kind] || 40)) list.splice(i, 1);
     }
-    // die enthüllten Stained-Karten bleiben frei von Strahlen und fremden Effekten (auch von denen gleichzeitig gespielter Karten)
-    for (const e of list) if (e.kind === 'stained' && e.t >= 16) pen.erase(e.cx - e.cw / 2 - 1, e.cy - e.ch / 2 - 1, e.cw + 2, e.ch + 2);
+    // die enthüllten Karten bleiben frei von Strahlen, Dunkelheit und fremden Effekten (auch von denen gleichzeitig gespielter Karten);
+    // vor dem Aufschlag zeigt Umbra nur einen schmalen Schlitz: die Kante der Karte im Schatten
+    for (const e of list) {
+      if (e.kind === 'stained' && e.t >= Math.round(BP_FACE_DELAY.stained / BP_TAKT) + 4) pen.erase(e.cx - e.cw / 2 - 1, e.cy - e.ch / 2 - 1, e.cw + 2, e.ch + 2);
+      else if (e.kind === 'umbra') {
+        if (e.t >= e.imp + 3) pen.erase(e.cx - e.cw / 2 - 1, e.cy - e.ch / 2 - 1, e.cw + 2, e.ch + 2);
+        else pen.erase(e.cx - 3, e.cy - e.ch / 2 - 5, 6, e.ch + 10);
+      }
+    }
     pen.flush();
     // Bildschirmzucken (Stained): Versatz der Bühne in ganzen Rasterzellen, verklingt in Stufen
     if (shake && shakeEl) {
-      const a = shake.t < 8 ? shake.amp : shake.t < 16 ? 3 : shake.t < 24 ? 2 : shake.t < 32 ? 1 : 0;
+      const a = shakeAmp(shake);
       const q = bpRng(shake.t * 31 + 7);
       const dx = a ? Math.round((q() - 0.5) * 2 * a) * S : 0, dy = a ? Math.round((q() - 0.5) * 2 * a) * S : 0;
       shakeEl.style.transform = a ? 'translate(' + dx + 'px,' + dy + 'px)' : '';
       shake.t += dt;
-      if (shake.t > 34) { shake = null; shakeEl.style.transform = ''; }
+      if (shake.t >= shake.dur) { shake = null; shakeEl.style.transform = ''; }
     }
     if (list.length || shake) raf = bpRaf(loop);
     else g.clearRect(0, 0, W, H);
@@ -721,9 +935,15 @@ const BP_FLIP_SOUNDS = {
   super: [['gold_gain', { volume: 0.8 }], ['pull_sparkle', { volume: 0.7, delay: 100 }]],
   diamond: [['elem_lightning', { volume: 0.9 }], ['pull_shatter', { volume: 0.7, rate: 1.2, delay: 160 }]],
   spectral: [['laser', { volume: 0.6, rate: 1.9 }], ['negate', { volume: 0.7, rate: 1.4, delay: 110 }], ['pull_crack', { volume: 0.5, rate: 1.7, delay: 220 }]],
-  umbra: [['elem_dark', { volume: 0.95 }], ['heavy_impact', { volume: 0.55, rate: 0.6, delay: 90 }], ['pull_swell', { volume: 0.6, rate: 0.7, delay: 200 }]],
-  stained: [['heavy_impact', { volume: 1, rate: 0.4 }], ['pull_crack', { volume: 0.9, rate: 0.55, delay: 40 }], ['pull_shatter', { volume: 0.9, rate: 0.7, delay: 150 }],
-    ['ascension', { volume: 0.9, delay: 300 }], ['pull_reveal', { volume: 0.9, rate: 0.8, delay: 650 }], ['heavy_impact', { volume: 0.7, rate: 0.3, delay: 700 }]],
+  // Stained Rare (Kirche): 4 Schichten – tiefer Schlag, splitterndes Glas, Aufstieg, Akkord
+  stained: [['heavy_impact', { volume: 0.8, rate: 0.45 }], ['pull_shatter', { volume: 0.7, rate: 0.8, delay: 110 }],
+    ['ascension', { volume: 0.7, delay: 220 }], ['pull_reveal', { volume: 0.7, rate: 0.9, delay: 470 }]],
+  // Umbra (höchste Rarity): 11 Schichten über 2,5 s – Sog der Finsternis, steigender Ton, vier Herzschläge (Takte 7/19/27/32 = 240/640/900/1060 ms, siehe BP_HERZSCHLAG),
+  // Aufschlag bei 1,2 s (tiefer Schlag, Sub-Bass, Glas, Riss), danach ein tiefer Akkord
+  umbra: [['elem_dark', { volume: 1, rate: 0.6 }], ['pull_swell', { volume: 0.7, rate: 0.68, delay: 60 }],
+    ['doom_tick', { volume: 0.8, rate: 0.55, delay: 240 }], ['doom_tick', { volume: 0.85, rate: 0.55, delay: 640 }], ['doom_tick', { volume: 0.9, rate: 0.55, delay: 900 }], ['doom_tick', { volume: 0.95, rate: 0.55, delay: 1060 }],
+    ['heavy_impact', { volume: 1, rate: 0.3, delay: 1190 }], ['booster_umpf', { volume: 0.9, rate: 0.8, delay: 1195 }], ['pull_shatter', { volume: 0.8, rate: 0.55, delay: 1200 }],
+    ['pull_crack', { volume: 0.7, rate: 0.4, delay: 1200 }], ['pull_reveal', { volume: 0.6, rate: 0.55, delay: 1500 }]],
 };
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -916,7 +1136,7 @@ function BoosterOpening({ pending, boosters, sc, onSc, onClaimed, onRipMore }) {
   const [op, setOp] = useState(null);                  // opening.json
 
   const stageRef = useRef(null), fxRef = useRef(null), worldRef = useRef(null);
-  const fx = useRef(null), playRef = useRef(null), mixRef = useRef(1);
+  const fx = useRef(null), playRef = useRef(null), mixRef = useRef(1), bigSoundT = useRef({});
   const skipRef = useRef(false);
 
   useEffect(() => {
@@ -1006,7 +1226,7 @@ function BoosterOpening({ pending, boosters, sc, onSc, onClaimed, onRipMore }) {
     const tick = (now) => {
       raf = 0;
       if (dead) return;
-      let f = Math.floor((now - t0) * o.fps / 1000);
+      let f = Math.max(0, Math.floor((now - t0) * o.fps / 1000));   // rAF-Zeitstempel kann knapp vor t0 liegen: nie negativ (sonst fehlt der Zeitleisteneintrag und die Öffnung hängt)
       if (skipRef.current) {
         skipRef.current = false; f = Math.max(f, ready + 1); t0 = now - f * 1000 / o.fps;
         // Klänge, die beim Überspringen nicht verloren gehen sollen (opening.json: skipPlay — der „Umpf“ beim Aufgehen des Packs), genau einmal:
@@ -1039,8 +1259,14 @@ function BoosterOpening({ pending, boosters, sc, onSc, onClaimed, onRipMore }) {
     if (opt && opt.mix) mixRef.current = opt.mix;
   }, []);
   const onEdge = useCallback((i) => {
-    const r = BP_REVEAL[cards[i].rarity] || cards[i].rarity, mix = mixRef.current, vol = mix > 1 ? Math.min(1, 1.3 / Math.sqrt(mix)) : 1;
-    (BP_FLIP_SOUNDS[r] || [['draw', { volume: 0.5 }]]).forEach(([n, o]) => bpPlay(n, { ...o, volume: (o.volume != null ? o.volume : 1) * vol }));
+    const r = cards[i].rarity, mix = mixRef.current;
+    // Flip All: mehrere Karten derselben großen Rarity schlagen gleichzeitig auf – ihre Klangfolge läuft nur einmal (identische Klänge übereinander addieren sich
+    // zu Übersteuerung, und eine Folge ist hier lauter genug); alle anderen Rarities behalten ihren Klang je Karte
+    const big = r === 'umbra' || r === 'stained', nowT = performance.now();
+    const quiet = big && mix > 1 && nowT - (bigSoundT.current[r] || -1e9) < 600;
+    if (big) bigSoundT.current[r] = nowT;
+    const vol = big && mix > 1 ? 0.8 : (mix > 1 ? Math.min(1, 1.3 / Math.sqrt(mix)) : 1);
+    if (!quiet) (BP_FLIP_SOUNDS[r] || [['draw', { volume: 0.5 }]]).forEach(([n, o]) => bpPlay(n, { ...o, volume: (o.volume != null ? o.volume : 1) * vol }));
     if (BP_FX_LEN[r] && fx.current && geom) {
       const [sx, sy] = geom.slots[i], cw = geom.cw / S, ch = geom.ch / S;
       fx.current.spawn(r, (geom.left + sx * Z) / S + cw / 2, (geom.top + sy * Z) / S + ch / 2, cw, ch, mix);
@@ -1133,7 +1359,7 @@ function BoosterOpening({ pending, boosters, sc, onSc, onClaimed, onRipMore }) {
         <canvas ref={stageRef} className="bp-stage" width={geom.stage[0]} height={geom.stage[1]}
           style={{ left: geom.left, top: geom.top, width: stageW, height: stageH, visibility: phase === 'load' ? 'hidden' : 'visible' }} />
         {phase === 'cards' && cards.map((c, i) => (
-          <BpCard key={i} idx={i} card={c} geom={geom} open={flipped[i]} hold={Math.round((BP_FACE_DELAY[BP_REVEAL[c.rarity] || c.rarity] || 0) / BP_TAKT)} hot={hover === i}
+          <BpCard key={i} idx={i} card={c} geom={geom} open={flipped[i]} hold={Math.round((BP_FACE_DELAY[c.rarity] || 0) / BP_TAKT)} hot={hover === i}
             sold={sold === i} sellOff={sold >= 0 || selling || claiming} sellValue={sellTable[c.rarity] || 0} onSell={sell}
             onEdge={onEdge} onDone={onCardDone} onClick={(k) => { mixRef.current = 1; flip(k); }} onHover={(k, on) => setHover(on ? k : (h => (h === k ? -1 : h)))} />
         ))}
