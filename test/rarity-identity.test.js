@@ -36,7 +36,7 @@ const sicht = (gs, pi) => {
 const zeile = (gs, pi, zone) => (sicht(gs, pi) || {})[zone] || [];
 
 const DECK = { main: ['Fireball', 'Fireball', 'Ice', 'Fireball'], heroes: [{ hero: 'Alice', ability1: 'Fighting', ability2: 'Fighting' }, { hero: 'Bob' }, { hero: 'Cara' }] };
-const RAR = { main: ['super', 'common', 'rare', 'diamond'], heroes: [{ hero: 'prismatic', ability1: 'rare', ability2: 'uncommon' }, {}, {}] };
+const RAR = { main: ['super', 'common', 'rare', 'storm'], heroes: [{ hero: 'prismatic', ability1: 'rare', ability2: 'uncommon' }, {}, {}] };
 
 function ziehe(gs, pi, n) { const ps = gs.players[pi]; for (let i = 0; i < n; i++) ps.hand.push(ps.mainDeck.shift()); }
 
@@ -47,7 +47,7 @@ test('Startzuordnung: Helden/Fähigkeiten exakt, Deckkopien nach Mehrfachmenge',
   assert.equal(r.abilityZones[0][0][0], 'rare');
   assert.equal(r.abilityZones[0][1][0], 'uncommon');
   const z = gs.players[0].rarityShadow.z.md;
-  assert.deepEqual(z.r.filter((x, i) => z.n[i] === 'Fireball').sort(), ['common', 'diamond', 'super'].sort().map(x => (x === 'common' ? null : x)).sort());
+  assert.deepEqual(z.r.filter((x, i) => z.n[i] === 'Fireball').sort(), ['common', 'storm', 'super'].sort().map(x => (x === 'common' ? null : x)).sort());
   assert.equal(z.r[z.n.indexOf('Ice')], 'rare');
 });
 

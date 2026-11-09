@@ -18,9 +18,12 @@ function seeded(seed) {
 }
 
 test('Reihenfolge, Namen und Rang', () => {
-  assert.deepStrictEqual(R.ORDER, ['common', 'uncommon', 'rare', 'prismatic', 'super', 'diamond', 'spectral', 'stained', 'umbra']);
+  assert.deepStrictEqual(R.ORDER, ['common', 'uncommon', 'rare', 'prismatic', 'super', 'storm', 'spectral', 'stained', 'umbra']);
   assert.strictEqual(R.LABEL.super, 'Super Rare');
   assert.strictEqual(R.LABEL.stained, 'Stained Rare');
+  assert.strictEqual(R.LABEL.storm, 'Storm Rare');
+  assert.ok(R.NEEDS_MASK.storm && R.NEEDS_MASK.umbra && R.NEEDS_MASK.stained && !R.NEEDS_MASK.super);
+  assert.ok(!R.isRarity('diamond'), 'Diamond gibt es nicht mehr');
   for (const id of R.ORDER) { assert.ok(R.isRarity(id)); assert.ok(R.LABEL[id]); }
   R.ORDER.forEach((id, i) => assert.strictEqual(R.rank(id), i));
   assert.strictEqual(R.rank('foil'), 0);

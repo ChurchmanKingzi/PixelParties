@@ -8,12 +8,12 @@
 //  gestufte Helligkeit, Bewegung im 20-Bilder-Takt (Umbra/Stained 15), Funken als Pixelkreuze.
 //
 //  Stufen (Entwürfe: abgenommene Mockups):  Common (kein Effekt) · Uncommon (silberner Name/Werte/Icon) · Rare (Prisma-Strahl, Silberrahmen) ·
-//  Prismatic (Glasstreifen aus Prisma-Kacheln) · Super Rare (Lichtlauf, Schraffur) · Diamond (Rautengitter) · Spectral (Echo, Glitches) ·
+//  Prismatic (Glasstreifen aus Prisma-Kacheln) · Super Rare (Lichtlauf, Schraffur) · Storm Rare (Sturm hinter dem Motiv, Pixel-Blitze) · Spectral (Echo, Glitches) ·
 //  Umbra (Schattenrauch um das Motiv, schwarze glaenzende Schrift) · Stained Rare (Buntglas-Hintergrund, Aura, goldener Text).
 //
 //  API (window.PpRarityFx):
 //    available(rarity)                     Gibt es für diese Stufe einen Effekt? (false bei Common/unbekannt)
-//    hasMask(cardName)                     Hat die Karte eine Motiv-Maske (nur dann Umbra/Stained)? Wahr erst, wenn `loadMasks()` fertig ist.
+//    hasMask(cardName)                     Hat die Karte eine Motiv-Maske (nur dann Umbra/Stained/Storm)? Wahr erst, wenn `loadMasks()` fertig ist.
 //    loadMasks()                           Promise: lädt public/cardgen/masks.bin einmal (gecacht)
 //    attach(hostEl, { card, rarity, animated, size, img, variant }) -> { update(opts), destroy() }
 //         legt EINE <canvas> in `hostEl` (absolut, füllt ihn) über das Kartenbild. `animated:false` zeichnet nur ein Standbild (kein Takt, kein
@@ -40,20 +40,20 @@
   if (root.PpRarityFx) return;
 
   const GW = 150, GH = 210, NPX = GW * GH;
-  const ORDER = ['common', 'uncommon', 'rare', 'prismatic', 'super', 'diamond', 'spectral', 'stained', 'umbra'];
-  const LABEL = { common: 'Common', uncommon: 'Uncommon', rare: 'Rare', prismatic: 'Prismatic', super: 'Super Rare', diamond: 'Diamond', spectral: 'Spectral', umbra: 'Umbra', stained: 'Stained Rare' };
+  const ORDER = ['common', 'uncommon', 'rare', 'prismatic', 'super', 'storm', 'spectral', 'stained', 'umbra'];
+  const LABEL = { common: 'Common', uncommon: 'Uncommon', rare: 'Rare', prismatic: 'Prismatic', super: 'Super Rare', storm: 'Storm Rare', spectral: 'Spectral', umbra: 'Umbra', stained: 'Stained Rare' };
   // Je Stufe: Basiskarte (nur Information; die URL-Variante steht in CardRender.rarityBase), Effekt, Stempel, Takt, Standbild-Zeit
   const SPEC = {
     uncommon: { fx: 'unc', stamp: 'silver', fps: 20, still: 1.5 },
     rare: { fx: 'rare', stamp: 'rainbow', fps: 20, still: 1.2 },   // Standbild: Strahl mitten im Bild (Lauf 4,6 s, 72 %)
     prismatic: { fx: 'pris', stamp: 'prismatic', fps: 20, still: 1.7 },
     super: { fx: 'sr', stamp: 'srstar', fps: 20, still: 1.4 },
-    diamond: { fx: 'dia', stamp: 'diamond', fps: 20, still: 1.0 },
+    storm: { fx: 'storm', stamp: 'storm', fps: 20, still: 1.05, cut: true, mask: true },
     spectral: { fx: 'spec', stamp: 'spectral', fps: 20, still: 1.3 },
     umbra: { fx: 'umbra', stamp: 'umbra', fps: 20, still: 1.2, cut: true, mask: true },
     stained: { fx: 'stain', stamp: 'stained', fps: 15, still: 1.0, cut: true, mask: true, quant: true, body: true },
   };
-  const IMG_RAR = { uncommon: 'uncommon', rare: 'rare', prismatic: 'prismatic', super: 'super', diamond: 'diamond', spectral: 'spectral', umbra: 'umbra', stained: 'stained' };
+  const IMG_RAR = { uncommon: 'uncommon', rare: 'rare', prismatic: 'prismatic', super: 'super', storm: 'storm', spectral: 'spectral', umbra: 'umbra', stained: 'stained' };
   const available = r => !!SPEC[r];
   const imageRarity = r => (SPEC[r] ? IMG_RAR[r] : '');
 
@@ -181,6 +181,7 @@
     spectral: ['.###.', '#o#o#', '#####', '#####', '#.#.#'],
     stained: ['..LL.', '.aabL', 'LaabL', 'LcbbL', '.LLL.'],
     umbra: ['..#..', '.#o#.', '#ooo#', '.#o#.', '..#..'],
+    storm: ['.pBBB', 'pBBpp', 'pBBBB', 'ppBBp', '.Bpp.'],   // B = Blitz, p = dunkle Platte dahinter (Kontrast auf jedem Kartenrot/-gelb), . = nichts
   };
   function specEvent(t) {
     const slot = Math.floor(t * 2), sp = (t * 2) % 1;
@@ -213,6 +214,10 @@
         if (ch === 'o') c = blink ? [40, 18, 70] : (i === 2 && j === 2) ? [255, 255, 255] : [150, 90, 230];
         else c = [64, 30, 104];
         if (Math.floor(t * 5 + i + j) % 11 === 0) c = [140, 100, 220];
+      } else if (kind === 'storm') {
+        const fl = stormFlashOf(stormEv(stormFrame(t), ST_EV));   // der Stempel flackert im Takt der Blitze
+        if (ch === 'B') c = fl >= 2 ? [255, 255, 255] : j >= 3 ? [255, 210, 64] : [255, 238, 120];
+        else c = fl >= 3 ? [70, 100, 190] : fl >= 1 ? [38, 48, 112] : [24, 28, 72];
       } else if (kind === 'stained') {
         if (ch === 'L') { c = [128, 90, 40]; if (((Math.floor(t * 8) + i * 2 + j * 3) % 13) === 0) c = [255, 232, 150]; else if (j === 0 || (i === 0 && j < 4)) c = [176, 128, 60]; }
         else {
@@ -263,19 +268,6 @@
     }
     return out;
   }
-  function diamondStampImage(dm, t, outData, pos) {
-    outData.fill(0);
-    for (let y = 0; y < 45; y++) for (let x = 0; x < 45; x++) {
-      const p = y * 45 + x, q = p * 4; if (!dm.mask[p]) continue;
-      const f = glintK((2 * (689 + x) / 5 + (989 + y) / 5) / 2.236, pos || [], 3.4);
-      let r = dm.rgb[q], g = dm.rgb[q + 1], b = dm.rgb[q + 2];
-      const w = f > .66 ? 1 : f > .33 ? .6 : f > 0 ? .28 : 0;
-      r += (255 - r) * w; g += (255 - g) * w; b += (255 - b) * w;
-      const v = sn(r, g, b); outData[q] = v & 255; outData[q + 1] = (v >> 8) & 255; outData[q + 2] = (v >> 16) & 255; outData[q + 3] = 255;
-    }
-    const ph = (t % 1.5) / 1.5; if (ph < .4) { const sz = ph < .1 ? 1 : ph < .2 ? 3 : ph < .3 ? 2 : 1, cx = 20, cy = 18; for (let a = -sz; a <= sz; a++) for (const [px, py] of [[cx + a, cy], [cx, cy + a]]) { const q = (py * 45 + px) * 4; if (dm.mask[py * 45 + px]) { outData[q] = outData[q + 1] = outData[q + 2] = 255; outData[q + 3] = 255; } } }
-  }
-
   // ═══════════ Text-Ebenen: Name/Werte und Regeltext als Pixellisten in der Leinwand-Auflösung (K Pixel je Rasterzelle) ═══════════
   // lay.dark: helle Textfelder (Artefakte) bekommen dunkle Tinte desselben Farbtons.
   // Die Ebenen werden als Uint32-Sicht (lay.d32) beschrieben; alles, was je Tintenpixel gleich bleibt (Koordinaten, Grundfarbe), ist je Ebene einmal vorberechnet
@@ -478,7 +470,6 @@
   // ═══════════ Der Effekt-Katalog ═══════════
   const FX = {};
   const PASTEL = [[229, 128, 146], [224, 192, 133], [255, 241, 150], [146, 211, 169], [119, 200, 238], [179, 142, 215]];
-  const ICE = [[178, 238, 238], [124, 233, 220], [102, 217, 255], [229, 245, 250], [78, 130, 203], [255, 255, 255]];
 
   // Uncommon: silberner Name und Werte, Lichtlauf über Name, Werte und Icon
   FX.unc = { textFull: true, gridless: true, glint: t => glintU(t, 3.6, .6), frame(E, st, t, o) { paintName(E, t, SILVER, 3.6, .6); } };
@@ -677,47 +668,192 @@
     },
   };
 
-  // Diamond: Rautengitter in Eisfarben, Knoten funkeln, zwei Lichtläufe
-  /** Gitterpixel einmal: Raster ausserhalb der Linien und Knoten ohne Lauf sind in jedem Bild gleich (base); Linienpixel in fuenf Eisfarben fertig gemischt */
-  function diaPre(E) {
-    const { B, L, A } = E, base = new Uint32Array(NPX), lp = [], lic = [], ltab = [], cp = [], cu = [], cic = [], cg = [], cn = [];
-    for (let y = AY0; y < AY0 + AH; y++) for (let x = AX0; x < AX0 + AW; x++) {
-      const p = y * GW + x; if (!A[p]) continue;
-      const i = p * 4, r0 = B[i], g0 = B[i + 1], b0 = B[i + 2], gate = .4 + .6 * sstep(.12, .45, L[p]);
-      const l1 = ((2 * x + y) % 6 + 6) % 6 < 2, l2 = ((2 * x - y) % 6 + 6) % 6 < 2;
-      if (!l1 && !l2) { if (gate > .3 && bay(x, y) < .2) base[p] = sn(r0 + (40 - r0) * .32, g0 + (120 - g0) * .32, b0 + (200 - b0) * .32); continue; }
-      const node = l1 && l2, ic = (x * 0.3 + y * 0.2) / 44;
-      cp.push(p); cu.push((2 * x + y) / 2.236); cic.push(ic); cg.push(gate); cn.push(node ? 1 : 0);
-      if (node) { const k = Math.min(1, .85 + 0); base[p] = sn(r0 + (255 - r0) * k, g0 + (255 - g0) * k, b0 + (255 - b0) * k); }
-      else { lp.push(p); lic.push(ic); ltab.push((.72 + 0 * .28) * gate); }
-    }
-    const cuA = Float64Array.from(cu);   // Linienfarben in fuenf Eistoenen werden beim ersten Bedarf gefuellt
-    return { B, base, lp: Int32Array.from(lp), lic: Float64Array.from(lic), lk: Float64Array.from(ltab), ltab: new Uint32Array(lp.length * 5), cp: Int32Array.from(cp), cu: cuA, cic: Float64Array.from(cic), cg: Float64Array.from(cg), cn: Uint8Array.from(cn), bk: bucketsOf(cuA, cuA.length) };
-  }
-  function diaFill(pre, q, h) {
-    const p = pre.lp[q], i = p * 4, B = pre.B, r0 = B[i], g0 = B[i + 1], b0 = B[i + 2], c = ICE[h], k = pre.lk[q];
-    return (pre.ltab[q * 5 + h] = sn(r0 + (c[0] - r0) * k, g0 + (c[1] - g0) * k, b0 + (c[2] - b0) * k));
-  }
-  FX.dia = {
-    prep: () => ({}),
-    glint: t => glintAt(t, 1.9, .78, 2),
-    frame(E, st, t, o) {
-      const { B } = E, pos = glintAt(t, 1.9, .78, 2), pre = st.pre || (st.pre = diaPre(E)), { lp, lic, ltab } = pre, tt = t * 0.18;
-      o.set(pre.base);
-      for (let q = 0; q < lp.length; q++) { const h = Math.floor(fract(lic[q] - tt) * 5); o[lp[q]] = ltab[q * 5 + h] || diaFill(pre, q, h); }
-      for (let pi = 0; pi < pos.length; pi++) {
-        const span = bucketSpan(pre.bk, pos[pi] - 12 - 1e-6, pos[pi] + 12 + 1e-6); if (!span) continue;
-        for (let j = span[0]; j < span[1]; j++) {
-          const q = pre.bk.ord[j], wave = glintK(pre.cu[q], pos, 12); if (wave <= 0) continue;
-          const p = pre.cp[q], i = p * 4, r0 = B[i], g0 = B[i + 1], b0 = B[i + 2];
-          let c, k;
-          if (pre.cn[q]) { c = WHITE3; k = Math.min(1, .85 + wave); } else { c = ICE[Math.floor(fract(pre.cic[q] - tt) * 5)]; k = (.72 + wave * .28) * pre.cg[q]; }
-          o[p] = sn(r0 + (c[0] - r0) * k, g0 + (c[1] - g0) * k, b0 + (c[2] - b0) * k);
+  // Storm Rare: das Motiv (Maske, wie Umbra/Stained) ist hervorgehoben — leicht aufgehellt und kontrastreicher, ein heller Blitzlicht-Saum (eine Kunstpixel-Breite) um die
+  // Silhouette, kurzes Aufflackern im Takt der Blitze — und DAHINTER tobt ein Sturm: ein dunkles, in Palettenstufen gedithertes Wolkenband, das in ganzen Zellen
+  // zieht und wirbelt, schraeg fallender Regen (Streifen aus 2 Zellen) und kleine Pixel-Blitze (gezackte, verzweigte Linien aus Einzelzellen, weiss/hellcyan/gelblich),
+  // die 5 bis 6 Mal je Sekunde an wechselnden Orten aufzucken (2-4 Bilder sichtbar, dazu ein Hintergrundaufblitzen in Dither-Stufen).
+  // Rahmen, Namensleiste, Textfelder und Werte bleiben unberuehrt (kein Text-Effekt, nur das Bildfeld und das Stempelzeichen).
+  // Aufbau je Bild: (1) Raster-Effekt `frame` malt den Sturm in alle Zellen des Bildfelds; (2) das Motiv liegt als Ausschnitt (view.cut) DARUEBER — in drei
+  // Helligkeitsstufen (Ruhe / Blitz schwach / Blitz stark), jede samt Randsaum; welche, steht in `sv.lvl` (Getter von `view.cut.cv`, so bleibt render() unveraendert).
+  // Zeitunabhaengiges ist je Karte einmal vorberechnet (st.pre: Zellenliste, Bayer-Versatz, Farbtabellen, Regentropfen), die Wolken kommen aus zwei einmal gebauten
+  // kachelbaren Rauschtexturen (nur Ganzzahl-Verschiebung je Zeile/Spalte im Bild), je Zelle zwei Lesezugriffe und eine Tabelle; kein Readback im Takt.
+  const ST_FPS = 20, ST_SL = 3, ST_P = .75;       // Takt, Bilder je Blitz-Zeitfenster (6,7 Fenster/s), Anteil der Fenster mit Blitz (ca. 5 Blitze/s)
+  const ST_FL = [[1, 0, 0, 0], [2, 1, 0, 0], [3, 2, 1, 0]];   // Hintergrundblitz (Stufe) nach Art (klein / mittel / gross) und Alter des Blitzes in Bildern
+  const ST_TINT = [[[255, 255, 255], [212, 232, 255], [128, 166, 226]], [[190, 244, 255], [150, 216, 246], [96, 156, 210]], [[255, 244, 170], [238, 216, 130], [170, 150, 96]]];
+  const ST_SKY = [[6, 5, 16], [14, 13, 34], [27, 28, 64], [46, 50, 96], [72, 84, 128], [108, 124, 168]];   // Wolkenstufen, dunkel (blaugrau / violett-schwarz)
+  const ST_SKY_FL = [0, .14, .26, .38], ST_FLASH_C = [150, 176, 228];
+  const ST_FTH = [0, 8, 12, 16];                  // Bayer-Schwelle: so viele von 16 Stellen bekommen die volle Blitzstufe, der Rest die darunter
+  const ST_TW = 256, ST_TH = 128;
+  const BAYI = Uint8Array.from(BAY);
+  let ST_CLA = null, ST_CLB = null;
+  /** kachelbares Rauschen (periodisch, mehrere Oktaven), Werte 0..255 mit Kontrastkurve; einmal je Seite gebaut */
+  function stormTex(seed, fx, fy, oct, lo, hi) {
+    const out = new Uint8Array(ST_TW * ST_TH), acc = new Float32Array(ST_TW * ST_TH);
+    let amp = 1, sum = 0;
+    for (let o = 0; o < oct; o++) {
+      const gx = fx << o, gy = fy << o, lat = new Float32Array(gx * gy);
+      for (let j = 0; j < gy; j++) for (let i = 0; i < gx; i++) lat[j * gx + i] = hash(i, j, seed * 31 + o);
+      for (let y = 0; y < ST_TH; y++) {
+        const v = y / ST_TH * gy, j0 = Math.floor(v), fv0 = v - j0, fv = fv0 * fv0 * (3 - 2 * fv0), ja = j0 % gy, jb = (j0 + 1) % gy;
+        for (let x = 0; x < ST_TW; x++) {
+          const u = x / ST_TW * gx, i0 = Math.floor(u), fu0 = u - i0, fu = fu0 * fu0 * (3 - 2 * fu0), ia = i0 % gx, ib = (i0 + 1) % gx;
+          const a = lat[ja * gx + ia] + (lat[ja * gx + ib] - lat[ja * gx + ia]) * fu, b = lat[jb * gx + ia] + (lat[jb * gx + ib] - lat[jb * gx + ia]) * fu;
+          acc[y * ST_TW + x] += (a + (b - a) * fv) * amp;
         }
       }
-      rimBand(E, o, pos, 6, [225, 252, 255]);
-      textBand(E, pos, 4.5, [235, 255, 255], [140, 238, 232]);
-      sparkles(o, t, 9, 1.3, .55, (k, s) => [AX0 + 4 + Math.floor(hash(k, s, 19) * (AW - 8)), AY0 + 4 + Math.floor(hash(k, s, 20) * (AH - 8))], [124, 233, 220], [255, 255, 255], 1.2);
+      sum += amp; amp *= .5;
+    }
+    for (let q = 0; q < out.length; q++) out[q] = Math.round(clamp((acc[q] / sum - lo) / (hi - lo)) * 255);
+    return out;
+  }
+  /** Blitze/Zeitfenster: Fenster s hat mit Wahrscheinlichkeit ST_P einen Blitz, der nach 0-2 Bildern beginnt und 2-4 Bilder lebt; out: je Blitz [Fenster, Alter, Dauer, Art 0 klein / 1 mittel / 2 gross, Farbton] */
+  function stormEv(fr, out) {
+    let n = 0; const s1 = Math.floor(fr / ST_SL);
+    for (let s = s1; s >= s1 - 2 && n < 3; s--) {
+      if (hash(s, 1, 77) >= ST_P) continue;
+      const life = 2 + Math.floor(hash(s, 3, 77) * 3), age = fr - (s * ST_SL + Math.floor(hash(s, 2, 77) * ST_SL));
+      if (age < 0 || age >= life) continue;
+      const o = n * 5; out[o] = s; out[o + 1] = age; out[o + 2] = life; const kh = hash(s, 4, 77); out[o + 3] = kh < .3 ? 0 : kh < .75 ? 1 : 2; out[o + 4] = Math.floor(hash(s, 5, 77) * 3);
+      n++;
+    }
+    return n;
+  }
+  const ST_EV = new Int32Array(15);
+  /** Hintergrundblitz (0..3) aus den Blitzen von ST_EV (n Stueck) */
+  function stormFlashOf(n) {
+    let f = 0;
+    for (let i = 0; i < n; i++) { const v = ST_FL[ST_EV[i * 5 + 3]][ST_EV[i * 5 + 1]]; if (v > f) f = v; }
+    return f;
+  }
+  const stormFrame = t => Math.floor(t * ST_FPS + 1e-6);
+  /** Ein Blitz: gezackte Hauptlinie von oben nach unten (Einzelzellen, 8-zusammenhaengend) plus 2-3 Abzweigungen; von drei Kandidaten gewinnt der sichtbarste (ausserhalb des Motivs) */
+  const ST_MARK = new Uint8Array(NPX);
+  function stormBolt(E, s) {
+    const A = E.A, S = E.S;
+    let best = null, bestV = -1;
+    for (let k = 0; k < 3; k++) {
+      const r = rng((Math.imul(s + 7, 2654435761) + k * 7919) >>> 0), cells = [];
+      const add = (x, y) => { if (x < AX0 || y < AY0 || x >= AX0 + AW || y >= AY0 + AH) return; const p = y * GW + x; if (ST_MARK[p]) return; ST_MARK[p] = 1; cells.push(p); };
+      const x0 = AX0 + 6 + Math.floor(r() * (AW - 12)), top = AY0 + Math.floor(r() * Math.min(.2 * AH, 26));
+      const len = Math.max(12, Math.min(AY0 + AH - 2 - top, Math.floor((.55 + .3 * r()) * Math.min(AH, 84)))), tx = x0 + Math.round((r() - .5) * 40);
+      let x = x0; const path = [];
+      for (let i = 0; i < len; i++) {
+        const y = top + i; add(x, y); path.push(x);
+        const rr = r(), want = Math.sign(tx - x);
+        let step = 0; if (rr < .36) step = want || (r() < .5 ? -1 : 1); else if (rr < .56) step = r() < .5 ? -1 : 1;
+        if (step) { x += step; add(x, y); if (r() < .2) { x += step; add(x, y); } }
+      }
+      const nMain = cells.length, nb = 2 + Math.floor(r() * 2);
+      for (let b = 0; b < nb; b++) {
+        const i = Math.floor(len * (.18 + .6 * r())), dir = r() < .5 ? -1 : 1, lb = 7 + Math.floor(r() * 9);
+        let bx = path[i], by = top + i;
+        for (let j = 0; j < lb; j++) { bx += dir; if (r() < .62) by++; add(bx, by); if (r() < .12) { bx += dir; add(bx, by); } }
+      }
+      let vis = 0; for (const p of cells) { if (A[p] && !S[p]) vis++; }
+      for (const p of cells) ST_MARK[p] = 0;
+      if (vis > bestV) { bestV = vis; best = { p: Int32Array.from(cells), nMain }; }
+    }
+    return best;
+  }
+  function stormPre(E) {
+    if (!ST_CLA) { ST_CLA = stormTex(1, 4, 2, 4, .36, .66); ST_CLB = stormTex(2, 6, 3, 3, .34, .67); }
+    const { A, L } = E, bp = [], bx = [], by = [], ol = [], bs = [];
+    for (let y = AY0; y < AY0 + AH; y++) for (let x = AX0; x < AX0 + AW; x++) {
+      const p = y * GW + x; if (!A[p]) continue;
+      bp.push(p); bx.push(x); by.push(y); ol.push(Math.round(L[p] * 26)); bs.push(Math.round((BAY[(y & 3) * 4 + (x & 3)] - 7.5) * 1.7));
+    }
+    const nA = bp.length;
+    // Farbtabelle: Stufe (Hintergrundblitz 0..3) x Wolkenstufe 0..5, fertig in Palettenfarben
+    const sky = new Uint32Array(4 * 6);
+    for (let f = 0; f < 4; f++) for (let l = 0; l < 6; l++) { const c = ST_SKY[l], k = ST_SKY_FL[f]; sky[f * 6 + l] = sn(c[0] + (ST_FLASH_C[0] - c[0]) * k, c[1] + (ST_FLASH_C[1] - c[1]) * k, c[2] + (ST_FLASH_C[2] - c[2]) * k); }
+    const lv = new Uint8Array(512); for (let v = 0; v < 512; v++) lv[v] = v < 52 ? 0 : v < 76 ? 1 : v < 100 ? 2 : v < 124 ? 3 : v < 150 ? 4 : 5;
+    const tint = ST_TINT.map(row => row.map(c => sn(c[0], c[1], c[2])));
+    // Regentropfen: Anfangsort und Tempo (Zellen/s) je Tropfen, gleichmaessig ueber das Bildfeld
+    const nd = Math.max(40, Math.round(nA / 55)), dx0 = new Int16Array(nd), dy0 = new Int16Array(nd), dv = new Float32Array(nd);
+    for (let i = 0; i < nd; i++) { dx0[i] = Math.floor(hash(i, 1, 31) * AW); dy0[i] = Math.floor(hash(i, 2, 31) * (AH + 8)); dv[i] = 30 + hash(i, 3, 31) * 22; }
+    return { nA, bp: Int32Array.from(bp), bx: Uint8Array.from(bx), by: Uint8Array.from(by), ol: Uint8Array.from(ol), bs: Int8Array.from(bs), sky, lv, tint,
+      halo: sn(110, 170, 255), rain: [sn(150, 172, 214), sn(94, 114, 162), sn(228, 240, 255), sn(150, 176, 226)], nd, dx0, dy0, dv,
+      sxA: new Int32Array(GH), sxB: new Int32Array(GH), oyA: new Int32Array(GW), oyB: new Int32Array(GW),
+      kA: Float64Array.from({ length: GH }, (_, y) => 1 + .5 * Math.sin(y * .06 + 1.3)), kB: Float64Array.from({ length: GH }, (_, y) => 1 + .4 * Math.cos(y * .08)), bolts: new Map() };
+  }
+  /** Motiv in einer Helligkeitsstufe (0 Ruhe, 1 Blitz schwach, 2 Blitz stark) samt Randsaum, aus dem Ausschnitt (src32 = dessen Pixel) */
+  function stormCutLevel(src32, aw, ah, lvl, rects) {
+    const out = new Uint32Array(aw * ah), ck = new Int32Array(8192).fill(-1), cvv = new Uint32Array(8192);
+    const MIX = lvl === 0 ? null : lvl === 1 ? [188, 214, 255, .12] : [236, 246, 255, .26];
+    for (let q = 0; q < src32.length; q++) {
+      const px = src32[q]; if (!(px >>> 24)) continue;
+      const key = px & 0xFFFFFF, h = (Math.imul(key, 2654435761) >>> 19) & 8191;
+      if (ck[h] === key) { out[q] = cvv[h]; continue; }
+      let r = (px & 255), g = (px >> 8) & 255, b = (px >> 16) & 255;
+      r = (r - 118) * 1.1 + 124; g = (g - 118) * 1.1 + 126; b = (b - 118) * 1.1 + 132;   // Ruhe: leicht heller, mehr Kontrast, kuehler Hauch
+      if (MIX) { r += (MIX[0] - r) * MIX[3]; g += (MIX[1] - g) * MIX[3]; b += (MIX[2] - b) * MIX[3]; }
+      const v = sn(r, g, b); ck[h] = key; cvv[h] = v; out[q] = v;
+    }
+    const [cv, g] = cv2d(aw, ah), im = g.createImageData(aw, ah); new Uint32Array(im.data.buffer).set(out); g.putImageData(im, 0, 0);
+    // Randsaum: Kunstpixel direkt ausserhalb des Motivs, zwei Toene im Schachbrett (Ruhe gedaempft, Blitz hell)
+    const RIM = [[[72, 92, 146], [44, 58, 104]], [[132, 168, 230], [100, 136, 204]], [[238, 250, 255], [196, 232, 255]]][lvl], css = RIM.map(rgbStr);
+    for (let par = 0; par < 2; par++) { g.fillStyle = css[par]; for (let i = 0; i < rects.length; i += 5) if (rects[i + 4] === par) g.fillRect(rects[i], rects[i + 1], rects[i + 2], rects[i + 3]); }
+    return cv;
+  }
+  /** von buildView nach dem Ausschnitt gerufen: drei Stufen vorab, `view.cut.cv` wird zum Getter auf die gerade gueltige */
+  function stormView(core, view) {
+    const e = core.e, cut = view.cut, base = cut.cv, aw = base.width, ah = base.height, cw = aw / e.w, ch = ah / e.h, mn = e.mn, rects = [];
+    for (let yy = 0; yy < e.h; yy++) for (let xx = 0; xx < e.w; xx++) {
+      if (mn[yy * e.w + xx]) continue;
+      let nb = false;
+      if (xx > 0 && mn[yy * e.w + xx - 1]) nb = true; if (xx < e.w - 1 && mn[yy * e.w + xx + 1]) nb = true; if (yy > 0 && mn[(yy - 1) * e.w + xx]) nb = true; if (yy < e.h - 1 && mn[(yy + 1) * e.w + xx]) nb = true;
+      if (!nb) continue;
+      if (core.full) { const gx = Math.min(GW - 1, Math.floor((xx + .5) / e.w * GW)), gy = Math.min(GH - 1, Math.floor((yy + .5) / e.h * GH)); if (!core.A[gy * GW + gx]) continue; }
+      rects.push(Math.round(xx * cw), Math.round(yy * ch), Math.ceil(cw), Math.ceil(ch), (xx + yy) & 1);
+    }
+    const src32 = new Uint32Array(base.getContext('2d').getImageData(0, 0, aw, ah).data.buffer);
+    const sv = { lvl: 0, cvs: [0, 1, 2].map(l => stormCutLevel(src32, aw, ah, l, rects)) };
+    Object.defineProperty(cut, 'cv', { get() { return sv.cvs[sv.lvl]; }, configurable: true });
+    view.E = makeE(core, view); view.E.sv = sv;
+  }
+  FX.storm = {
+    noText: true,
+    prep: () => ({}),
+    view: stormView,
+    frame(E, st, t, o) {
+      const pre = st.pre || (st.pre = stormPre(E)), fr = stormFrame(t), sv = E.sv, A = E.A;
+      const { nA, bp, bx, by, ol, bs, sky, lv, tint, kA, kB, sxA, sxB, oyA, oyB, bolts } = pre;
+      const nev = stormEv(fr, ST_EV), flash = stormFlashOf(nev);
+      if (sv) sv.lvl = flash >= 3 ? 2 : flash >= 2 ? 1 : 0;
+      // Wolken: zwei Schichten, ganzzahlig verschoben (Scherung je Zeile, Wellenversatz je Spalte); A zieht nach rechts, B schneller nach links
+      for (let y = AY0; y < AY0 + AH; y++) { sxA[y] = Math.floor(t * 4.2 * kA[y]); sxB[y] = -Math.floor(t * 8.5 * kB[y]); }
+      for (let x = AX0; x < AX0 + AW; x++) { oyA[x] = Math.floor(3 * Math.sin(x * .05 + t * .35) + 8); oyB[x] = Math.floor(2 * Math.sin(x * .09 - t * .5 + 2) + 8); }
+      const fth = ST_FTH[flash], hi = flash * 6, lo = (flash > 0 ? flash - 1 : 0) * 6;
+      for (let q = 0; q < nA; q++) {
+        const x = bx[q], y = by[q];
+        const a = ST_CLA[(((y + oyA[x]) & 127) << 8) | ((x + sxA[y]) & 255)], b = ST_CLB[(((y + oyB[x]) & 127) << 8) | ((x + sxB[y]) & 255)];
+        let v = ((a * .55 + b * .45) * .8 + ol[q] + bs[q]) | 0;
+        v = v < 0 ? 0 : v > 511 ? 511 : v;
+        const base = flash ? (BAYI[((y & 3) << 2) | (x & 3)] < fth ? hi : lo) : 0;
+        o[bp[q]] = sky[base + lv[v]];
+      }
+      // Regen: schraeg (eine Zelle nach rechts je drei Zeilen), Streifen aus Kopf und Schwanz
+      const rc = pre.rain, rh = flash >= 2 ? rc[2] : rc[0], rt = flash >= 2 ? rc[3] : rc[1], H8 = AH + 8;
+      for (let i = 0; i < pre.nd; i++) {
+        const yy = (pre.dy0[i] + Math.floor(t * pre.dv[i])) % H8, y1 = AY0 + yy - 4;
+        if (y1 < AY0 || y1 >= AY0 + AH) continue;
+        const x1 = AX0 + (pre.dx0[i] + Math.floor(yy * .34)) % AW, x2 = AX0 + (pre.dx0[i] + Math.floor((yy - 1) * .34)) % AW;
+        if (A[y1 * GW + x1]) o[y1 * GW + x1] = rh;
+        if (y1 > AY0 && A[(y1 - 1) * GW + x2]) o[(y1 - 1) * GW + x2] = rt;
+      }
+      // Blitze (aeltere zuerst, damit der frischeste oben liegt)
+      for (let i = nev - 1; i >= 0; i--) {
+        const s = ST_EV[i * 5], age = ST_EV[i * 5 + 1], big = ST_EV[i * 5 + 3] > 0, tn = ST_EV[i * 5 + 4];
+        let bolt = bolts.get(s); if (!bolt) { bolt = stormBolt(E, s); bolts.set(s, bolt); if (bolts.size > 5) bolts.delete(bolts.keys().next().value); }
+        if (!bolt) continue;
+        const P = bolt.p, col = tint[tn][age === 0 ? 0 : age === 1 ? 1 : 2];
+        const upto = age <= 1 ? P.length : age === 2 ? Math.floor(bolt.nMain * .62) : Math.floor(bolt.nMain * .3);
+        for (let k = 0; k < upto; k++) { const p = P[k]; if (A[p]) o[p] = col; }
+        if (age === 0 && big) {   // Lichtsaum links/rechts der Hauptlinie, jede zweite Zeile
+          const halo = pre.halo;
+          for (let k = 0; k < bolt.nMain; k += 2) { const p = P[k], x = p % GW; if (x > AX0 && A[p - 1] && o[p - 1] !== col) o[p - 1] = halo; if (x < AX0 + AW - 1 && A[p + 1] && o[p + 1] !== col) o[p + 1] = halo; }
+        }
+      }
     },
   };
 
@@ -1140,14 +1276,13 @@
   const coreCache = new Map();     // Schlüssel -> core (LRU)
   function stampInfo(img) {
     const [c, g] = cv2d(45, 45, true); g.imageSmoothingEnabled = false; g.drawImage(img, 689 * img.naturalWidth / 750, 989 * img.naturalWidth / 750, 45 * img.naturalWidth / 750, 45 * img.naturalWidth / 750, 0, 0, 45, 45);
-    const d = g.getImageData(0, 0, 45, 45).data, mask = [], star = { mask: [], col: [] }, dm = { mask: new Uint8Array(45 * 45), rgb: d };
+    const d = g.getImageData(0, 0, 45, 45).data, mask = [], star = { mask: [], col: [] };
     for (let j = 0; j < 5; j++) for (let i = 0; i < 5; i++) {
       const q = ((j * 9 + 4) * 45 + i * 9 + 4) * 4, r = d[q], gg = d[q + 1], b = d[q + 2];
       mask.push(r + gg + b < 90 ? 1 : 0);
       const gold = r > 200 && gg > 150 && b < 170 && r - b > 90; star.mask.push(gold ? 1 : 0); star.col.push([r, gg, b]);
     }
-    for (let q = 0; q < 45 * 45; q++) { const r = d[q * 4], gg = d[q * 4 + 1], b = d[q * 4 + 2]; dm.mask[q] = (gg > 150 && b > 150 && r < 215 && Math.abs(gg - b) < 45) ? 1 : 0; }
-    return { mask, star, dm };
+    return { mask, star };
   }
   function cleanSubject(S, A) {
     const fill = (isT, minSize, setTo) => {
@@ -1240,7 +1375,7 @@
       const sx = core.full ? 0 : 70 * img.naturalWidth / 750, sy = core.full ? 0 : 170 * img.naturalWidth / 750, sw = core.full ? img.naturalWidth : 610 * img.naturalWidth / 750, sh = core.full ? img.naturalHeight : 400 * img.naturalWidth / 750;
       const [cut, cg] = cv2d(aw, ah, true); cg.imageSmoothingEnabled = false;
       cg.drawImage(core.maskCv, 0, 0, aw, ah); cg.globalCompositeOperation = 'source-in'; cg.drawImage(img, sx, sy, sw, sh, 0, 0, aw, ah);
-      if (e.lift) {   // Regentropfen heller: die Farbe des Kunstpixels, 70 % zu Eisweiss
+      if (e.lift && sp.fx !== 'storm') {   // Regentropfen heller (Storm: nicht — der Regen kommt aus dem Sturm dahinter): die Farbe des Kunstpixels, 70 % zu Eisweiss
         cg.globalCompositeOperation = 'source-over';
         const cw = aw / e.w, ch = ah / e.h, Lc = [205, 248, 255], tt = 0.7, [bc, bx] = cv2d(aw, ah, true); bx.imageSmoothingEnabled = false; bx.drawImage(img, sx, sy, sw, sh, 0, 0, aw, ah);
         const bd = bx.getImageData(0, 0, aw, ah).data;
@@ -1270,6 +1405,7 @@
         view.rimBox = [Math.max(0, rx0), Math.max(0, ry0), Math.min(W, rx1) - Math.max(0, rx0), Math.min(H, ry1) - Math.max(0, ry0)];
       }
     }
+    if (sp.fx === 'storm') stormView(core, view);
     return view;
   }
   /** Glas im Pixelraster der Kunst: je Kunstpixel eine Farbe (dunkle Pixel = Bleirute), auf der Leinwand der Karte (nur Stained).
@@ -1347,7 +1483,6 @@
     if (!gridCv.c) { const [c, g] = cv2d(GW, GH); gridCv.c = c; gridCv.g = g; gridCv.im = g.createImageData(GW, GH); gridCv.o32 = new Uint32Array(gridCv.im.data.buffer); }
     return gridCv;
   }
-  const stampCv = { c: null, g: null, im: null };
   const FILL_CSS = Object.create(null);
   function makeE(core, view) { const E = Object.create(core); E.layers = view.layers; E.layers0 = view.layers; return E; }
   function render(core, view, g, t) {
@@ -1372,14 +1507,8 @@
     let lastV = -1;   // fillStyle nur setzen, wenn sich die Farbe aendert (jedes Setzen laeuft durch den Palettenfilter)
     const cell = (i, j, c) => { const x0 = Math.round((689 + 9 * i) * k5), x1 = Math.round((689 + 9 * (i + 1)) * k5), y0 = Math.round((989 + 9 * j) * k5), y1 = Math.round((989 + 9 * (j + 1)) * k5); const v = sn(c[0], c[1], c[2]); if (v !== lastV) { lastV = v; g.fillStyle = FILL_CSS[v] || (FILL_CSS[v] = 'rgb(' + (v & 255) + ',' + ((v >> 8) & 255) + ',' + ((v >> 16) & 255) + ')'); } g.fillRect(x0, y0, x1 - x0, y1 - y0); };
     const s = sp.stamp;
-    if (s === 'diamond') {
-      if (!stampCv.c) { const [c, gg] = cv2d(45, 45); stampCv.c = c; stampCv.g = gg; stampCv.im = gg.createImageData(45, 45); }
-      diamondStampImage(core.stamp.dm, t, stampCv.im.data, gp); stampCv.g.putImageData(stampCv.im, 0, 0);
-      const x0 = Math.round(689 * k5), y0 = Math.round(989 * k5); g.drawImage(stampCv.c, 0, 0, 45, 45, x0, y0, Math.round(734 * k5) - x0, Math.round(1034 * k5) - y0);
-    } else {
-      const px = s === 'silver' ? silverStampPixels(core.stamp.mask, t, gp) : s === 'rainbow' ? rainbowStampPixels(core.stamp.mask, t, gp) : s === 'srstar' ? starStampPixels(core.stamp.star, t, gp) : iconPixels(s, t);
-      for (const [i, j, c] of px) cell(i, j, c);
-    }
+    const px = s === 'silver' ? silverStampPixels(core.stamp.mask, t, gp) : s === 'rainbow' ? rainbowStampPixels(core.stamp.mask, t, gp) : s === 'srstar' ? starStampPixels(core.stamp.star, t, gp) : iconPixels(s, t);
+    for (const [i, j, c] of px) cell(i, j, c);
   }
 
   // ═══════════ Anbindung: attach ═══════════
@@ -1568,5 +1697,5 @@
   }
 
   root.PpRarityFx = { available, hasMask, loadMasks, attach, imageRarity, testRarity, ORDER, LABEL, SPEC, stats: () => Object.assign({}, stats, { instances: instances.size, stills: stillCache.size, cores: coreCache.size }),
-    _internals: { render, buildCore, buildView, FX, sn, maskOf, setGeo, pickK, GW, GH } };
+    _internals: { render, buildCore, buildView, FX, sn, maskOf, setGeo, pickK, GW, GH, stormFlashAt: t => stormFlashOf(stormEv(stormFrame(t), ST_EV)) } };
 })(typeof window !== 'undefined' ? window : globalThis);

@@ -31,7 +31,7 @@ const bpCancel = (id) => { try { window.cancelAnimationFrame(id); } catch (e) { 
 
 const BP_RARITY_LABEL = {
   common: 'Common', uncommon: 'Uncommon', rare: 'Rare', prismatic: 'Prismatic', super: 'Super Rare',
-  diamond: 'Diamond', spectral: 'Spectral', umbra: 'Umbra', stained: 'Stained Rare',
+  storm: 'Storm Rare', spectral: 'Spectral', umbra: 'Umbra', stained: 'Stained Rare',
 };
 const bpRarityLabel = (r) => (window.PpRarities && window.PpRarities.LABEL && window.PpRarities.LABEL[r]) || BP_RARITY_LABEL[r] || r;
 // ── Netz ────────────────────────────────────────────────────────────────────
@@ -454,16 +454,11 @@ function bpPen(g, W, H) {
   return pen;
 }
 
-// Splitter-Sprites (Diamond): vier Drehphasen eines Kristalls, Zellen relativ zur Mitte
-const BP_KITE = [[0, -2], [-1, -1], [0, -1], [1, -1], [-2, 0], [-1, 0], [0, 0], [1, 0], [2, 0], [-1, 1], [0, 1], [1, 1], [0, 2]];
-const BP_TALL = [[0, -3], [-1, -2], [0, -2], [1, -2], [-1, -1], [0, -1], [1, -1], [-1, 0], [0, 0], [1, 0], [-1, 1], [0, 1], [1, 1], [-1, 2], [0, 2], [1, 2], [0, 3]];
-const BP_SHARD = [BP_KITE, BP_TALL, BP_KITE, BP_TALL.map(([x, y]) => [y, x])];
-
 // Dauer der Effekte in Takten (30 Hz) und Verzögerung bis die Karte sichtbar wird (ms)
 // Die Inszenierung folgt dem RANG: …Spectral < Stained Rare < Umbra (höchste Rarity: längster Aufbau, längste Kantenpause, meiste Klangschichten, stärkster Rückstoß).
-// Stained Rare = Kirche/Buntglas (Licht, Splitter), Umbra = Finsternis (Sonnenfinsternis, Schattenrisse, Verdunkelung).
-const BP_FX_LEN = { rare: 30, prismatic: 40, super: 44, diamond: 44, spectral: 48, stained: 96, umbra: 150 };
-const BP_FACE_DELAY = { uncommon: 0, rare: 0, prismatic: 60, super: 120, diamond: 180, spectral: 120, stained: 480, umbra: 1200 };
+// Storm Rare = Gewitter (Blitz in die Karte, Regenschleier, Funkenregen), Stained Rare = Kirche/Buntglas (Licht, Splitter), Umbra = Finsternis (Sonnenfinsternis, Schattenrisse, Verdunkelung).
+const BP_FX_LEN = { rare: 30, prismatic: 40, super: 44, storm: 44, spectral: 48, stained: 96, umbra: 150 };
+const BP_FACE_DELAY = { uncommon: 0, rare: 0, prismatic: 60, super: 120, storm: 180, spectral: 120, stained: 480, umbra: 1200 };
 const BP_HERZSCHLAG = [7, 19, 27, 32];   // Umbra: Takte (ab Kante) der vier Herzschläge vor dem Aufschlag, deckungsgleich mit den doom_tick-Klängen (BP_FLIP_SOUNDS)
 
 // Sammelstelle für die laufenden Effekte einer Leinwand
@@ -522,11 +517,12 @@ function bpFxCreate(cv, S, shakeEl) {
       for (let i = 0; i < 60; i++) {
         P.push({ x: (r() - 0.5) * e.cw, y: e.ch * 0.1 + r() * e.ch * 0.4, vx: (r() - 0.5) * 1.4 * e.u, vy: -(0.9 + r() * 2.4) * e.u, life: 18 + (r() * 24) | 0, c: cols[i % cols.length], ph: (r() * 4) | 0, big: r() < 0.4 });
       }
-    } else if (e.kind === 'diamond') {
-      const cols = [BPC.cyanL, BPC.sky, BPC.white, BPC.blue, BPC.cyanL];
-      for (let i = 0; i < 26; i++) {
-        const a = r() * Math.PI * 2, v = (0.9 + r() * 2.0) * e.u;
-        P.push({ x: (r() - 0.5) * e.cw * 0.5, y: (r() - 0.5) * e.ch * 0.5, vx: Math.cos(a) * v, vy: Math.sin(a) * v - 0.6, life: 22 + (r() * 18) | 0, c: cols[i % cols.length], s: (r() * 4) | 0, big: i % 3 === 0 });
+    } else if (e.kind === 'storm') {
+      // Funkenregen nach dem Einschlag: Funken aus der Kartenmitte, fallen mit Schwerkraft (Gelb/Weiß/Hellcyan)
+      const cols = [BPC.yellow, BPC.white, BPC.cyanL, BPC.sky, BPC.white, BPC.yellow];
+      for (let i = 0; i < 34; i++) {
+        const a = r() * Math.PI * 2, v = (0.7 + r() * 2.1) * e.u;
+        P.push({ x: (r() - 0.5) * e.cw * 0.5, y: (r() - 0.5) * e.ch * 0.5, vx: Math.cos(a) * v, vy: Math.sin(a) * v - 0.9, life: 22 + (r() * 18) | 0, c: cols[i % cols.length], big: i % 4 === 0 });
       }
     } else if (e.kind === 'umbra') {
       // Umbra: schwarze Scheibe („Mond“) vor der Karte, Korona aus Strahlen, Schattenrisse bis zum Bildrand, Sog ins Zentrum, nach dem Aufschlag Splitter und Glut.
@@ -834,29 +830,42 @@ function bpFxCreate(cv, S, shakeEl) {
       }
       return;
     }
-    if (e.kind === 'diamond') {
-      // Blitz: Zickzack vom oberen Bildrand zur Karte (mit Abzweig), alle zwei Takte neu gewürfelt, Kern weiß, Rand türkis
-      if (t < 10) {
-        const rr = bpRng(e.seed + 977 * (t >> 1) + 13);
-        let x = X + (rr() - 0.5) * 8, y = 0;
+    if (e.kind === 'storm') {
+      // Gewitter: ein Blitz schlägt vom oberen Bildrand in die Karte (Zickzack mit Abzweig, alle zwei Takte neu gewürfelt, Kern weiß, Rand türkis), kurz darauf ein
+      // zweiter, dünnerer Schlag etwas weiter weg; Blitzlicht auf der Karte, der ganze Schirm zuckt in Dither-Stufen, schräger Regenschleier und Funkenregen.
+      const bolt = (seed, bx, th, t0) => {
+        const rr = bpRng(seed);
+        let x = bx + (rr() - 0.5) * 8, y = 0;
         const segs = 14, dy = Y / segs, pts = [[x, y]];
-        for (let i = 1; i <= segs; i++) { x = i === segs ? X : x + (rr() - 0.5) * 20 + (X - x) * 0.2; y = i * dy; pts.push([x, y]); }
-        const th = Math.max(3, Math.round(4 * u) + 2);
+        for (let i = 1; i <= segs; i++) { x = i === segs ? bx : x + (rr() - 0.5) * 20 + (bx - x) * 0.2; y = i * dy; pts.push([x, y]); }
         for (let i = 1; i < pts.length; i++) pen.line(pts[i - 1][0], pts[i - 1][1], pts[i][0], pts[i][1], BPC.cyan, th);
         for (let i = 1; i < pts.length; i++) pen.line(pts[i - 1][0], pts[i - 1][1], pts[i][0], pts[i][1], BPC.white, Math.max(1, th - 3));
         const bi = 5 + ((rr() * 4) | 0), sx = rr() < 0.5 ? -1 : 1;   // Abzweig
-        let bx = pts[bi][0], by = pts[bi][1];
-        for (let i = 0; i < 4; i++) { const nx = bx + sx * (6 + rr() * 8), ny = by + 6 + rr() * 10; pen.line(bx, by, nx, ny, BPC.cyanL, 2); bx = nx; by = ny; }
-      }
+        let qx = pts[bi][0], qy = pts[bi][1];
+        for (let i = 0; i < 4; i++) { const nx = qx + sx * (6 + rr() * 8), ny = qy + 6 + rr() * 10; pen.line(qx, qy, nx, ny, BPC.cyanL, 2); qx = nx; qy = ny; }
+      };
+      const th = Math.max(3, Math.round(4 * u) + 2);
+      if (t < 10) bolt(e.seed + 977 * (t >> 1) + 13, X, th, 0);
+      if (t >= 8 && t < 14) bolt(e.seed + 733 * (t >> 1) + 29, X + (e.seed & 1 ? 1 : -1) * (hw + 14 + (e.seed % 17)), Math.max(2, th - 2), 8);
       if (t >= 2 && t < 10) pen.dither(X - hw - 4, Y - hh - 4, e.cw + 8, e.ch + 8, [0.9, 0.7, 0.5, 0.35, 0.2, 0.12, 0.06, 0.03][t - 2] || 0, BPC.white);   // Blitzlicht
       if (t >= 3 && t < 7) pen.dither(0, 0, pen.W, pen.H, [0.22, 0.14, 0.08, 0.04][t - 3], BPC.cyanL);                                                      // ganzer Schirm zuckt
+      if (t >= 8 && t < 11) pen.dither(0, 0, pen.W, pen.H, [0.12, 0.07, 0.03][t - 8], BPC.cyanL);
+      if (t < 22) {   // Regenschleier: schräge Streifen (je 5 Zellen), fallen in ganzen Zellen
+        const dens = t < 14 ? 1 : 1 - (t - 14) / 8, rl = bpRng(e.seed + 5);
+        for (let i = 0; i < 46; i++) {
+          const x0 = rl() * (pen.W + 40) - 20, y0 = rl() * (pen.H + 20), v = 3 + rl() * 2;
+          if (rl() > dens) continue;
+          const yy = (y0 + t * v) % (pen.H + 20) - 10, xx = x0 + yy * 0.34;
+          for (let k = 0; k < 5; k++) pen.rect(xx - k * 0.34, yy - k, 1, 1, k < 2 ? BPC.cyanL : BPC.blueD);
+        }
+      }
       for (const p of e.P) {
         if (t > p.life || t < 2) continue;
-        const k = t - 2, x = X + p.x + p.vx * k, y = Y + p.y + p.vy * k + 0.06 * k * k;
-        const sp = BP_SHARD[(p.s + (k >> 1)) & 3];
+        const k = t - 2, x = X + p.x + p.vx * k, y = Y + p.y + p.vy * k + 0.09 * k * k;
         if (t > p.life - 6 && (t & 1)) continue;
         const sc = p.big ? 2 : 1;
-        for (const [dx, dy] of sp) pen.rect(x + dx * sc, y + dy * sc, sc, sc, (dx === 0 && dy <= 0 && dy >= -1) || (dy === 0 && dx === -1) ? BPC.white : p.c);
+        pen.rect(x, y, sc, sc, p.c);
+        if (p.big && t < p.life - 8) pen.rect(x - sc, y, sc, sc, BPC.white);
       }
       return;
     }
@@ -990,7 +999,8 @@ const BP_FLIP_SOUNDS = {
   rare: [['draw', { volume: 0.5 }], ['pull_sparkle', { volume: 0.5, delay: 60 }]],
   prismatic: [['pull_sparkle', { volume: 0.7 }], ['pull_note', { rate: 1.26, volume: 0.55, delay: 90 }], ['pull_note', { rate: 1.5, volume: 0.5, delay: 190 }]],
   super: [['gold_gain', { volume: 0.8 }], ['pull_sparkle', { volume: 0.7, delay: 100 }]],
-  diamond: [['elem_lightning', { volume: 0.9 }], ['pull_shatter', { volume: 0.7, rate: 1.2, delay: 160 }]],
+  // Storm Rare (Gewitter): Donner/Blitz, Nachschlag, Funkenregen
+  storm: [['elem_lightning', { volume: 0.9 }], ['elem_lightning', { volume: 0.55, rate: 1.3, delay: 140 }], ['pull_shatter', { volume: 0.6, rate: 1.4, delay: 200 }]],
   spectral: [['laser', { volume: 0.6, rate: 1.9 }], ['negate', { volume: 0.7, rate: 1.4, delay: 110 }], ['pull_crack', { volume: 0.5, rate: 1.7, delay: 220 }]],
   // Stained Rare (Kirche): 4 Schichten – tiefer Schlag, splitterndes Glas, Aufstieg, Akkord
   stained: [['heavy_impact', { volume: 0.8, rate: 0.45 }], ['pull_shatter', { volume: 0.7, rate: 0.8, delay: 110 }],
