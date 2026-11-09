@@ -723,7 +723,7 @@
       const phone = (() => { try { return !!(window.ppIsPhone && window.ppIsPhone()); } catch (e) { return false; } })();
       const n = arrows.length, lod = (n > 8 || phone) ? 1 : 0;
       const hzEl0 = (einzel || P.srcKind === 'creature') ? document.querySelector('[data-hero-zone]') : null;
-      const zoneH = Math.max(hzEl0 ? hzEl0.getBoundingClientRect().height : sr.height, 40), S = kl(rd(zoneH / ZELLEN_JE_KARTE), 2, 6), u = zoneH / WELT_JE_KARTE;   // u: Bildschirmpixel je Welteinheit
+      const zoneH = Math.max(hzEl0 ? hzEl0.getBoundingClientRect().height : sr.height, 40), S = (typeof ppFxZelle === 'function' ? ppFxZelle(tgtEl) : kl(rd(zoneH / ZELLEN_JE_KARTE), 2, 6)), u = zoneH / WELT_JE_KARTE;   // Rasterzelle = Hero-Pixel des Ziels (vorher aus der Zonenhöhe)   // u: Bildschirmpixel je Welteinheit
       const fo = window.ppFxScrollOffset ? window.ppFxScrollOffset() : { dx: 0, dy: 0 };
       const welt = !!window.ppFxWeltSchicht;
       const sx0 = sr.left + fo.dx, sy0 = sr.top + fo.dy, tx0 = tr.left + fo.dx, ty0 = tr.top + fo.dy;
@@ -903,7 +903,7 @@
       if (pending) {                                                        // Lage neuer Einträge: einmal lesen (ein erzwungenes Layout für alle)
         const tr0 = t0 ? performance.now() : 0;
         const fo = window.ppFxScrollOffset ? window.ppFxScrollOffset() : { dx: 0, dy: 0 };
-        let S = hpS; if (!S) { const he = document.querySelector('[data-hero-zone]'), hh = he ? he.getBoundingClientRect().height : 60; S = hpS = kl(rd(Math.max(hh, 40) / ZELLEN_JE_KARTE), 2, 6); }
+        let S = hpS; if (!S) { const he = document.querySelector('[data-hero-zone]'), hh = he ? he.getBoundingClientRect().height : 60; S = hpS = (typeof ppFxZelle === 'function' ? ppFxZelle(he) : kl(rd(Math.max(hh, 40) / ZELLEN_JE_KARTE), 2, 6)); }   // Zelle = Hero-Pixel
         for (const [key, e] of hpMap) {
           if (e.rc) continue;
           const el = zone({ kind: e.kind, owner: e.owner, heroIdx: e.heroIdx, zoneSlot: e.zoneSlot }, e.myIdx), r = el && el.getBoundingClientRect();

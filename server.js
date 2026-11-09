@@ -1268,6 +1268,8 @@ async function initDatabase() {
     UNIQUE(user_id, item_type, item_id)
   )`);
   await db.execute('CREATE INDEX IF NOT EXISTS idx_shop_items_user ON user_shop_items(user_id)');
+  // Kopien über das Original hinaus (Rahmen-Rang): 0 = keine, 1 = Silber … 8 = Obsidian (MAX_DUPES)
+  try { await db.execute('ALTER TABLE user_shop_items ADD COLUMN dupes INTEGER DEFAULT 0'); } catch {}
   // Sleeves heißen nicht mehr "sleeveN", sondern tragen englische Namen
   // (data/shop/sleeve-names.json). Gekaufte und ausgerüstete Sleeves auf die
   // neue ID umschreiben — idempotent, läuft bei jedem Start ohne Wirkung weiter.
@@ -3989,6 +3991,23 @@ async function unlockCpuSkin(userId, skinName) {
   return true;
 }
 
+/**
+ * Skin aus einem CPU-Skin-Spiel: neu freischalten – oder, wenn man ihn schon hat, den Rahmen-Rang erhöhen (Kopie, wie beim Gacha-Pull).
+ * Liefert { isNew, dupes } oder null, wenn der Skin schon das Maximum (MAX_DUPES Kopien) erreicht hat.
+ */
+async function rankUpCpuSkin(userId, skinName) {
+  if (!userId || !skinName) return null;
+  const row = await db.get("SELECT dupes FROM user_shop_items WHERE user_id = ? AND item_type = 'skin' AND item_id = ?", [userId, skinName]);
+  if (!row) {
+    await db.run('INSERT INTO user_shop_items (id, user_id, item_type, item_id, dupes) VALUES (?, ?, ?, ?, 0)', [uuidv4(), userId, 'skin', skinName]);
+    return { isNew: true, dupes: 0 };
+  }
+  const have = Number(row.dupes) || 0;
+  if (have >= MAX_DUPES) return null;
+  await db.run("UPDATE user_shop_items SET dupes = ? WHERE user_id = ? AND item_type = 'skin' AND item_id = ?", [have + 1, userId, skinName]);
+  return { isNew: false, dupes: have + 1 };
+}
+
 const SHOP_PRICES = { avatar: 50, sleeve: 50, board: 50, skin: 50 };
 const RANDOM_PRICES = { skin: 25, avatar: 25, sleeve: 25 };
 // Nur per Pull (Zufall) erhältlich, nicht gezielt kaufbar.
@@ -4183,10 +4202,12 @@ app.get('/api/shop/catalog', (req, res) => {
 
 // GET /api/shop/owned — user's purchased items
 app.get('/api/shop/owned', authMiddleware, async (req, res) => {
-  const rows = await db.all('SELECT item_type, item_id FROM user_shop_items WHERE user_id = ?', [req.user.userId]);
+  const rows = await db.all('SELECT item_type, item_id, dupes FROM user_shop_items WHERE user_id = ?', [req.user.userId]);
   const owned = { avatar: [], sleeve: [], board: [], skin: [] };
+  const dupes = { avatar: {}, sleeve: {}, skin: {} };          // Kopien über das Original hinaus = Rahmen-Rang (1 … MAX_DUPES)
   for (const r of rows) {
     if (owned[r.item_type]) owned[r.item_type].push(r.item_id);
+    if (dupes[r.item_type] && r.dupes > 0) dupes[r.item_type][r.item_id] = Math.min(MAX_DUPES, r.dupes);
   }
   // Freigeschaltete Gegner-Sleeves gehören dem Spieler wie gekaufte.
   const cpuOwned = await cpuSleeves.ownedIds(req.user.userId);
@@ -4201,7 +4222,9 @@ app.get('/api/shop/owned', authMiddleware, async (req, res) => {
     sleeve: Object.fromEntries(owned.sleeve.map(id => [id, cpuSleeves.nameOf(id) || sleeveDisplayName(id)])),
     avatar: Object.fromEntries(owned.avatar.map(id => [id, cpuAvatars.nameOf(id) || avatarDisplayName(id)])),
   };
-  res.json({ owned, names });
+  // Besessene Items außerhalb des Shop-Pools (Standard-/Gegner-Avatare, Standard-/Gegner-Sleeves, exklusive Skins): als Kopie ziehbar
+  const extras = { avatar: await extraPullItems(req.user.userId, 'avatar'), sleeve: await extraPullItems(req.user.userId, 'sleeve'), skin: await extraPullItems(req.user.userId, 'skin') };
+  res.json({ owned, names, dupes, maxDupes: MAX_DUPES, extras });
 });
 
 // GET /api/shop/cpu-sleeves — Gegner-Sleeves mit Fortschritt (cpu-sleeves.js)
@@ -4267,28 +4290,117 @@ app.post('/api/shop/buy', authMiddleware, async (req, res) => {
   res.json({ ok: true, sc: updated.sc });
 });
 
-// POST /api/shop/buy-random-skin — buy a random unowned skin
+// ───── Duplikate: Rahmen-Ränge ─────
+// Zieht man ein Item, das man schon hat, wird es „geupgradet“: `dupes` zählt die Kopien über das Original hinaus und bestimmt den Rahmen
+// (public/rank-frames.js): 1 = Silber, 2 = Gold, 3 = Platin, 4 = Diamant, 5 = Rubin, 6 = Saphir, 7 = Smaragd, 8 = Obsidian (Maximum).
+// Items auf dem Maximum scheiden aus dem Pull-Pool aus.
+const MAX_DUPES = 8;
+
+/** Id eines Shop-Bildes aus seiner URL (/data/shop/<subdir>/<id>.png), sonst null. */
+const { itemIdOfUrl } = require('./frame-ids');
+function shopIdOfUrl(url, subdir) { return itemIdOfUrl(url, subdir); }
+
+/**
+ * Items, die man schon besitzt, aber nicht im Shop-Pool stehen: sie kommen als DUPLIKATE in den Gacha-Pool (Rahmen-Rang).
+ *   Avatare  Standard-Avatare von Anfang an ('std:<Name>'), freigeschaltete Gegner-Avatare
+ *   Sleeves  Standard-Sleeve ('default'), freigeschaltete Gegner-Sleeves
+ *   Skins    freischaltbare/exklusive Skins, sobald man sie besitzt (die erste Kopie)
+ * Liefert [{ id, src?, name, heroName? }]; `src` fehlt bei Skins (der Client baut die Karten-URL selbst).
+ */
+async function extraPullItems(userId, itemType) {
+  const out = [];
+  if (!userId) return out;
+  if (itemType === 'avatar') {
+    try {
+      for (const f of fs.readdirSync(path.join(__dirname, 'public', 'avatars'), { withFileTypes: true })) {
+        if (!f.isFile() || !IMAGE_EXTS.has(path.extname(f.name).toLowerCase())) continue;
+        const stem = path.basename(f.name, path.extname(f.name));
+        out.push({ id: 'std:' + stem, src: '/avatars/' + encodeURIComponent(f.name), name: stem });
+      }
+    } catch {}
+    for (const id of await cpuAvatars.ownedIds(userId)) {
+      if (shopIds('avatars').has(id)) out.push({ id, src: '/data/shop/avatars/' + encodeURIComponent(id) + '.png', name: cpuAvatars.nameOf(id) || avatarDisplayName(id) });
+    }
+  } else if (itemType === 'sleeve') {
+    out.push({ id: 'default', src: '/cardback.png', name: 'Default Sleeve' });
+    for (const id of await cpuSleeves.ownedIds(userId)) {
+      if (shopIds('sleeves').has(id)) out.push({ id, src: '/data/shop/sleeves/' + encodeURIComponent(id) + '.png', name: cpuSleeves.nameOf(id) || sleeveDisplayName(id) });
+    }
+  } else if (itemType === 'skin') {
+    const rows = await db.all("SELECT item_id FROM user_shop_items WHERE user_id = ? AND item_type = 'skin'", [userId]);
+    for (const r of rows) {
+      if (!isUnlockableSkin(r.item_id)) continue;
+      const heroName = heroOfSkin(r.item_id);
+      if (heroName) out.push({ id: r.item_id, name: r.item_id, heroName });
+    }
+  }
+  return out;
+}
+
+/** Kopien-Zähler des Spielers je Typ: { avatar: {id: n}, sleeve: {...}, skin: {...} } (nur Items mit n > 0). */
+async function shopDupes(userId) {
+  const out = { avatar: {}, sleeve: {}, skin: {} };
+  if (!userId || String(userId).startsWith('cpu-')) return out;
+  const rows = await db.all('SELECT item_type, item_id, dupes FROM user_shop_items WHERE user_id = ? AND dupes > 0', [userId]);
+  for (const r of rows) if (out[r.item_type]) out[r.item_type][r.item_id] = Math.min(MAX_DUPES, r.dupes || 0);
+  return out;
+}
+
+/** Rahmen-Ränge eines Spielers für den Spielzustand: Avatar, Sleeve und die im Deck benutzten Skins. */
+async function framesForPlayer(userId, usr, deckSkins) {
+  const none = { avatarRank: 0, cardbackRank: 0, skinRanks: {} };
+  if (!usr) return none;
+  try {
+    const d = await shopDupes(userId);
+    const skinRanks = {};
+    for (const sk of Object.values(deckSkins || {})) if (d.skin[sk]) skinRanks[sk] = d.skin[sk];
+    return { avatarRank: d.avatar[shopIdOfUrl(usr.avatar, 'avatars')] || 0, cardbackRank: d.sleeve[shopIdOfUrl(usr.cardback, 'sleeves')] || 0, skinRanks };
+  } catch (err) { console.error('[frames] Ränge nicht ermittelt:', err.message); return none; }
+}
+
+/**
+ * Zieht ein zufälliges Item aus `pool` (Ids): der ganze Pool, außer was schon das Maximum erreicht hat. Besitzt der Spieler es schon,
+ * steigt `dupes` um 1 (Upgrade), sonst wird es neu eingetragen. Liefert { id, isNew, dupes } oder null, wenn alles auf dem Maximum ist.
+ */
+async function pullFromPool(userId, itemType, pool, preowned = []) {
+  const rows = await db.all('SELECT item_id, dupes FROM user_shop_items WHERE user_id = ? AND item_type = ?', [userId, itemType]);
+  const have = new Map(rows.map(r => [r.item_id, r.dupes || 0]));
+  // `preowned`: schon besessene Items außerhalb des Shop-Pools (Standard-/Gegner-Avatare und -Sleeves, exklusive Skins) –
+  // sie sind NUR als Duplikat ziehbar; ohne eigene Zeile zählt der erste Treffer als erste Kopie (Rang 1).
+  const extra = preowned.filter(id => !pool.includes(id));
+  const eligible = [...pool, ...extra].filter(id => !have.has(id) || have.get(id) < MAX_DUPES);
+  if (!eligible.length) return null;
+  const id = eligible[Math.floor(Math.random() * eligible.length)];
+  if (!have.has(id) && extra.includes(id)) {
+    await db.run('INSERT INTO user_shop_items (id, user_id, item_type, item_id, dupes) VALUES (?, ?, ?, ?, 1)', [uuidv4(), userId, itemType, id]);
+    return { id, isNew: false, dupes: 1 };
+  }
+  if (have.has(id)) {
+    const dupes = have.get(id) + 1;
+    await db.run('UPDATE user_shop_items SET dupes = ? WHERE user_id = ? AND item_type = ? AND item_id = ?', [dupes, userId, itemType, id]);
+    return { id, isNew: false, dupes };
+  }
+  await db.run('INSERT INTO user_shop_items (id, user_id, item_type, item_id, dupes) VALUES (?, ?, ?, ?, 0)', [uuidv4(), userId, itemType, id]);
+  return { id, isNew: true, dupes: 0 };
+}
+
+// POST /api/shop/buy-random-skin — pull a random skin (a duplicate upgrades its frame)
 app.post('/api/shop/buy-random-skin', authMiddleware, async (req, res) => {
   const user = await db.get('SELECT sc FROM users WHERE id = ?', [req.user.userId]);
   if ((user.sc || 0) < RANDOM_PRICES.skin) return res.status(400).json({ error: 'Not enough SC' });
 
-  const allSkins = getAvailableSkins();
-  const ownedRows = await db.all("SELECT item_id FROM user_shop_items WHERE user_id = ? AND item_type = 'skin'", [req.user.userId]);
-  const ownedSet = new Set(ownedRows.map(r => r.item_id));
-
-  const unowned = allSkins.filter(s => !ownedSet.has(s.skinName));
-  if (unowned.length === 0) return res.status(400).json({ error: 'You already own all available skins!' });
-
-  const pick = unowned[Math.floor(Math.random() * unowned.length)];
-
+  const heroOf = new Map(getAvailableSkins().map(s => [s.skinName, s.heroName]));
+  const extras = await extraPullItems(req.user.userId, 'skin');           // exklusive Skins, die man schon besitzt: ab jetzt als Kopie ziehbar
+  for (const x of extras) heroOf.set(x.id, x.heroName);
+  const got = await pullFromPool(req.user.userId, 'skin', getAvailableSkins().map(s => s.skinName), extras.map(x => x.id));
+  if (!got) return res.status(400).json({ error: 'All skins are at maximum rank!' });
   await db.run('UPDATE users SET sc = sc - ? WHERE id = ?', [RANDOM_PRICES.skin, req.user.userId]);
-  await db.run('INSERT INTO user_shop_items (id, user_id, item_type, item_id) VALUES (?, ?, ?, ?)', [uuidv4(), req.user.userId, 'skin', pick.skinName]);
 
   const updated = await db.get('SELECT * FROM users WHERE id = ?', [req.user.userId]);
-  res.json({ ok: true, sc: updated.sc, skinName: pick.skinName, heroName: pick.heroName });
+  res.json({ ok: true, sc: updated.sc, skinName: got.id, heroName: heroOf.get(got.id), isNew: got.isNew, dupes: got.dupes });
 });
 
-// POST /api/shop/buy-random — buy a random unowned item of a given type (avatar or sleeve)
+// POST /api/shop/buy-random — pull a random avatar or sleeve (a duplicate upgrades its frame)
 app.post('/api/shop/buy-random', authMiddleware, async (req, res) => {
   const { itemType } = req.body;
   if (!itemType || !RANDOM_PRICES[itemType]) return res.status(400).json({ error: 'Invalid item type for random buy' });
@@ -4302,19 +4414,14 @@ app.post('/api/shop/buy-random', authMiddleware, async (req, res) => {
   const allItems = scanShopDir(subdir).map(f => path.basename(f, path.extname(f)))
     .filter(id => itemType !== 'sleeve' || !cpuSleeves.isCpuSleeve(id))
     .filter(id => itemType !== 'avatar' || !cpuAvatars.isCpuAvatar(id));
-  const ownedRows = await db.all('SELECT item_id FROM user_shop_items WHERE user_id = ? AND item_type = ?', [req.user.userId, itemType]);
-  const ownedSet = new Set(ownedRows.map(r => r.item_id));
-
-  const unowned = allItems.filter(id => !ownedSet.has(id));
-  if (unowned.length === 0) return res.status(400).json({ error: 'You already own all available ' + subdir + '!' });
-
-  const pick = unowned[Math.floor(Math.random() * unowned.length)];
-
+  const extras = await extraPullItems(req.user.userId, itemType);         // Start-/Gegner-Items: nur als Kopie ziehbar
+  const got = await pullFromPool(req.user.userId, itemType, allItems, extras.map(x => x.id));
+  if (!got) return res.status(400).json({ error: 'All ' + subdir + ' are at maximum rank!' });
+  const extra = extras.find(x => x.id === got.id) || null;
   await db.run('UPDATE users SET sc = sc - ? WHERE id = ?', [price, req.user.userId]);
-  await db.run('INSERT INTO user_shop_items (id, user_id, item_type, item_id) VALUES (?, ?, ?, ?)', [uuidv4(), req.user.userId, itemType, pick]);
 
   const updated = await db.get('SELECT * FROM users WHERE id = ?', [req.user.userId]);
-  res.json({ ok: true, sc: updated.sc, itemId: pick, itemType });
+  res.json({ ok: true, sc: updated.sc, itemId: got.id, itemType, isNew: got.isNew, dupes: got.dupes, extra: extra ? { src: extra.src, name: extra.name } : null });
 });
 
 // ───── Structure decks (shop-gated sample decks) ─────
@@ -4724,6 +4831,24 @@ app.get('/api/stats/live', (req, res) => {
 });
 
 // ===== PLAYER PROFILE (v1289) =====
+// Rang-Rahmen (Duplikate) der Spieler-Avatare für Listen, Chat und Menü: GET /api/players/avatar-ranks?n=Name&n=Name (öffentlich wie das Profil).
+// Antwort: { ranks: { Name: Kopien } } – nur Spieler, deren getragener Avatar einen Rahmen hat.
+app.get('/api/players/avatar-ranks', async (req, res) => {
+  try {
+    const raw = [].concat(req.query.n || []).map(x => String(x).trim()).filter(Boolean);
+    const names = [...new Set(raw)].slice(0, 60);
+    const ranks = {};
+    for (const n of names) {
+      const u = await db.get('SELECT id, avatar FROM users WHERE username = ?', [n]);
+      if (!u) continue;
+      const d = await shopDupes(u.id);
+      const r = d.avatar[shopIdOfUrl(u.avatar, 'avatars')];
+      if (r) ranks[n] = r;
+    }
+    res.json({ ranks });
+  } catch (err) { console.error('[avatar-ranks]', err.message); res.json({ ranks: {} }); }
+});
+
 // Oeffentliches Profil fuer das Top-Players-Popup — Logik in
 // player-profile.js. Hier nur die Anbindung an Laufzeitdaten des
 // Servers (Sitzungen, laufende Partien), deshalb neben `activeGames`.
@@ -4934,6 +5059,7 @@ function sendGameState(room, playerIdx, extra) {
     myIndex: playerIdx, roomId: room.id,
     players: gs.players.map((ps, pi) => ({
       username: ps.username, color: ps.color, avatar: bildRef(ps.avatar), cardback: bildRef(ps.cardback) || null, board: bildRef(ps.board) || null,   // v1374
+      avatarRank: ps.avatarRank || 0, cardbackRank: ps.cardbackRank || 0, skinRanks: ps.skinRanks || {},   // Rahmen-Ränge (Duplikate)
       victoryMsg: ps.victoryMsg || '', defeatMsg: ps.defeatMsg || '',
       // ★ Teilt dieser Spieler seine Support-Zonen („Alice, the Transfer
       // Student")? Gehoert HIERHER, in den pro-Spieler-Block neben
@@ -6270,6 +6396,7 @@ function sendSpectatorGameState(room) {
     roomId: room.id,
     players: gs.players.map((ps, spi) => ({
       username: ps.username, color: ps.color, avatar: bildRef(ps.avatar), cardback: bildRef(ps.cardback) || null, board: bildRef(ps.board) || null,   // v1374
+      avatarRank: ps.avatarRank || 0, cardbackRank: ps.cardbackRank || 0, skinRanks: ps.skinRanks || {},   // Rahmen-Ränge (Duplikate)
       victoryMsg: ps.victoryMsg || '', defeatMsg: ps.defeatMsg || '',
       // ★ Teilt dieser Spieler seine Support-Zonen („Alice, the Transfer
       // Student")? Gehoert HIERHER, in den pro-Spieler-Block neben
@@ -7125,12 +7252,13 @@ function endCpuBattle(room, winnerIdx, reason) {
             io.to(humanSid).emit('opponents_unlocked', { opponents: newlyUnlocked });
           }
         }
-        // Skin-Game gewonnen → Skin des mittleren Gegner-Helden freischalten (falls noch nicht im
-        // Besitz). Das Popup kommt wie bei neuen Gegnern als eigenes Socket-Ereignis.
+        // Skin-Game gewonnen → Skin des mittleren Gegner-Helden freischalten; besitzt man ihn schon, steigt sein
+        // Rahmen-Rang um eine Stufe (Kopie, bis MAX_DUPES). Das Popup kommt wie bei neuen Gegnern als eigenes Socket-Ereignis.
         if (humanWon && room._cpuSkin) {
           try {
-            if (await unlockCpuSkin(humanUserId, room._cpuSkin.skinName) && humanSid) {
-              io.to(humanSid).emit('skin_unlocked', { skinName: room._cpuSkin.skinName, heroName: room._cpuSkin.heroName });
+            const got = await rankUpCpuSkin(humanUserId, room._cpuSkin.skinName);
+            if (got && humanSid) {
+              io.to(humanSid).emit('skin_unlocked', { skinName: room._cpuSkin.skinName, heroName: room._cpuSkin.heroName, isNew: got.isNew, dupes: got.dupes });
             }
           } catch (err) { console.error('[CPU battle] Skin-Freischaltung fehlgeschlagen:', err.message); }
         }
@@ -14896,6 +15024,7 @@ async function setupGameState(room) {
     const sideDeck = (room._currentDecks?.[idx]?.sideDeck || []).slice();
     playerStates.push({ userId:p.userId, username:(usr?.username||p.username), socketId:p.socketId,
       color:usr ? (usr.color||STANDARD_FARBE) : NICHT_MENSCH_FARBE, avatar:liveShopRef(usr?.avatar,'avatars'), cardback:liveShopRef(usr?.cardback,'sleeves'), board:usr?.board||null,
+      ...(await framesForPlayer(p.userId, usr, deck?.skins)),   // Rahmen-Ränge von Avatar, Sleeve und benutzten Skins
       // Gewählter Battle-Track (geprüft: nur Freigeschaltetes); der GEGNER hört ihn.
       battleTrack: usr ? await battleTracks.resolveForBattle(p.userId, usr.battle_track) : null,
       victoryMsg, defeatMsg, heroKilledMsg, middleHeroKilledMsg, greetingMsg, barkBounce,
@@ -17374,6 +17503,7 @@ io.on('connection', (socket) => {
     if (usr) {
       p0.color = usr.color || STANDARD_FARBE; p0.avatar = liveShopRef(usr.avatar, 'avatars');
       p0.cardback = liveShopRef(usr.cardback, 'sleeves'); p0.board = usr.board;
+      Object.assign(p0, await framesForPlayer(currentUser.userId, usr, null));
       // Apply the player's chosen board skin to the CPU side too so the
       // whole puzzle playfield — including the opponent's Area Zone —
       // uses the same skin as a normal game instead of the default.

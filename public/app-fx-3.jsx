@@ -5,7 +5,7 @@
 // Emojis sind kleine Pixel-Sprites. Zeitablauf, Anker und Streuung folgen den DOM-Fassungen in `ANIM_REGISTRY` (app-board.jsx) + style.css. Namen in dieser Datei tragen das Praefix `ppFx3`
 // (der Build macht aus `const` globale `var`s — gleiche Namen in anderen app-fx-Dateien wuerden sich ueberschreiben).
 
-const PP_FX3_S = 3;
+// Rasterzelle: `sz.S` (= Hero-Pixel, ppFxZelle in app-board.jsx), nicht mehr fest 3
 const ppFx3Aus = (u) => 1 - (1 - u) * (1 - u);                       // ease-out
 const ppFx3Zw = (a, b) => a + Math.random() * (b - a);                // Zufallszahl a..b
 const ppFx3Wahl = (liste) => liste[Math.floor(Math.random() * liste.length)];
@@ -104,7 +104,7 @@ const ppFx3Explosion = (() => {
   const GLUT = ppFx3Farben(['#ffe469', '#f9ac20', '#ff7d00']);
   const RAUCH = ppFx3Farben(['#59606e', '#3e3e51']);
   return ppR1Leinwand((g, t, sz, tl) => {
-    const S = PP_FX3_S, cx = sz.cx, cy = sz.cy, ow = tl.ow;
+    const S = sz.S, cx = sz.cx, cy = sz.cy, ow = tl.ow;
     for (const r of tl.rauch) {
       const u = (t - r.delay) / r.dur;
       if (u < 0 || u > 1) continue;
@@ -198,7 +198,7 @@ const ppFx3FeuerSaeule = (() => {
     }
   };
   return ppR1Leinwand((g, t, sz, tl) => {
-    const S = PP_FX3_S, cx = sz.cx, y0 = sz.cy + tl.h * 0.5 / S;
+    const S = sz.S, cx = sz.cx, y0 = sz.cy + tl.h * 0.5 / S;
     // Bodenglut
     let u = t / 1000;
     if (u <= 1) {
@@ -263,7 +263,7 @@ const ppFx3Laubsturm = (() => {
   ];
   const DREHT = ART.map(a => [0, 1, 2, 3].map(q => ppFx3Dreh(a.z, q)));
   return ppR1Leinwand((g, t, sz, tl) => {
-    const S = PP_FX3_S, cx = sz.cx, cy = sz.cy;
+    const S = sz.S, cx = sz.cx, cy = sz.cy;
     for (const l of tl.blaetter) {
       const u = (t - l.delay) / l.dur;
       if (u < 0 || u > 1) continue;
@@ -322,7 +322,7 @@ const ppFx3Elefant = (() => {
     return { breite: seite * 2, hoehe: oben + 130 + fw * 0.4, ankerY: oben };
   };
   return ppR1Leinwand((g, t, sz, tl) => {
-    const S = PP_FX3_S, cx = sz.cx, cy = sz.cy, u = t / 1000, px = tl.px, fw = tl.fw, fh = tl.fh, n = tl.n;
+    const S = sz.S, cx = sz.cx, cy = sz.cy, u = t / 1000, px = tl.px, fw = tl.fw, fh = tl.fh, n = tl.n;
     // Schatten (steps(8))
     {
       const us = Math.floor(u * 8) / 8, [sc, op] = ppKf(us, [[0, [0.35, 0]], [0.3, [1, 1]], [0.8, [1.1, 1]], [1, [1.1, 0]]], true);
@@ -368,7 +368,7 @@ const ppFx3Elefant = (() => {
     vorbereiten: (sz) => {
       const px = Math.max(2, Math.ceil((sz.props.w || 90) * 0.95 / 40)), fw = 40 * px, fh = 53 * px;
       return {
-        px, fw, fh, H: Math.round(fh * 3.2 + 220), n: Math.max(1, Math.round(px / PP_FX3_S)),
+        px, fw, fh, H: Math.round(fh * 3.2 + 220), n: Math.max(1, Math.round(px / sz.S)),
         staub: Array.from({ length: ppFxN(16) }, (_, i) => ({
           dx: (i % 2 === 0 ? -1 : 1) * (fw * 0.35 + Math.random() * fw * 0.7), dy: -(6 + Math.random() * fh * 0.55),
           gross: (Math.random() < 0.4 ? 2 : 1) * Math.max(3, px), farbe: STAUB[i % 4],
@@ -403,7 +403,7 @@ const ppFx3FeuerWalze = (() => {
   const kernA = (f) => { for (let i = 1; i < KERN_A.length; i++) if (f <= KERN_A[i][0]) { const a = KERN_A[i - 1], b = KERN_A[i]; return a[1] + (b[1] - a[1]) * (f - a[0]) / (b[0] - a[0]); } return 0; };
   const schleife = (t, verzug, dauer) => (t < verzug ? -1 : ((t - verzug) % dauer) / dauer);
   return ppR1Leinwand((g, t, sz) => {
-    const S = PP_FX3_S, W = sz.gw, H = sz.gh, Wd = 0.3 * W, L = -1.4 * Wd + 5.8 * Wd * ZUG(ppR1Klemme(t / 2100)), hoch = 1.24 * H, oben = -0.12 * H;
+    const S = sz.S, W = sz.gw, H = sz.gh, Wd = 0.3 * W, L = -1.4 * Wd + 5.8 * Wd * ZUG(ppR1Klemme(t / 2100)), hoch = 1.24 * H, oben = -0.12 * H;
     // verkohlte Spur: waechst von links mit der Zeit (scaleX 0 → 1 bis 70 % von 2,6 s), verglimmt gegen Ende
     {
       const u = t / 2600;
@@ -458,7 +458,7 @@ const ppFx3Fireball = (() => {
   const KOERPER = ppFx3Farben(['#ff1a1a', '#ff491a', '#ff8b1a', '#fad54a', '#f9ecb3']);
   const ZEIT = ppFx3Bezier(0.42, 0, 1, 1);
   return ppR1Leinwand((g, t, sz, tl) => {
-    const S = PP_FX3_S, cx = sz.cx, cy = sz.cy, cw = tl.cw, ch = tl.ch;
+    const S = sz.S, cx = sz.cx, cy = sz.cy, cw = tl.cw, ch = tl.ch;
     // Rauch (hinten)
     for (const s of tl.rauch) {
       const u = (t - s.delay) / s.dur;
@@ -517,7 +517,7 @@ const ppFx3Stichflamme = (() => {
   const HITZE = ppFx3Farben(['#ff7d00', '#ff9b3a']);
   const FARBEN = ['#fad54a', '#ff9a1a', '#ff7d00', '#ff491a', '#f7f7ad'];
   return ppR1Leinwand((g, t, sz, tl) => {
-    const S = PP_FX3_S, cx = sz.cx, cy = sz.cy;
+    const S = sz.S, cx = sz.cx, cy = sz.cy;
     {
       const u = t / 760;
       if (u <= 1) { const [sx, op] = ppKf(u, [[0, [0.4, 0]], [0.25, [1.1, 1]], [1, [1.4, 0]]]); g.glow(cx, cy + 17 / S, 34 * sx / S, 11 / S, HITZE, op * 0.9, 0.9); }
@@ -568,7 +568,7 @@ const ppFx3Flammenhieb = (() => {
   };
   const EMBER = ppFx3Farben(['#ffd066', '#ff8b1a', '#ff491a', '#f9ac20', '#f9ecb3']);
   return ppR1Leinwand((g, t, sz, tl) => {
-    const S = PP_FX3_S, cx = sz.cx, cy = sz.cy, ww = tl.ww, hh = tl.hh, len = tl.len;
+    const S = sz.S, cx = sz.cx, cy = sz.cy, ww = tl.ww, hh = tl.hh, len = tl.len;
     // Hitzeschein
     {
       const u = (t - 60) / 620;
@@ -636,7 +636,7 @@ const ppFx3Flammenwerfer = (() => {
   const SPUR = ppFx3Farben(['#ff491a', '#ff8b1a', '#fad54a']);
   const WEG = ppFx3Bezier(0.2, 0.7, 0.4, 1);
   return ppR1Leinwand((g, t, sz, tl) => {
-    const S = PP_FX3_S, cx = sz.cx, cy = sz.cy, cw = tl.cw, ch = tl.ch;
+    const S = sz.S, cx = sz.cx, cy = sz.cy, cw = tl.cw, ch = tl.ch;
     {
       const u = t / 360;
       if (u <= 1) { const [sc, op] = ppKf(u, [[0, [0.3, 0]], [0.3, [1.1, 0.95]], [1, [1.4, 0]]]); g.glow(cx, cy, cw * 0.45 * sc / S * 0.9, ch * 0.45 * sc / S * 0.9, BLITZ, op, 0.9); }
@@ -691,7 +691,7 @@ const ppFx3Flut = (() => {
   // Stufe s (0..3) bei Tiefe f (Anteil der 130vh hohen Wassermasse): Stopps 0 / .22 / .55 / 1
   const stufeBei = (f) => (f < 0.22 ? f / 0.22 : f < 0.55 ? 1 + (f - 0.22) / 0.33 : 2 + (f - 0.55) / 0.45);
   return ppR1Leinwand((g, t, sz, tl) => {
-    const S = PP_FX3_S, W = sz.gw, H = sz.gh, u = t / 2400, vh = tl.vh, vw = tl.vw;
+    const S = sz.S, W = sz.gw, H = sz.gh, u = t / 2400, vh = tl.vh, vw = tl.vw;
     // Wasserstand: translateY(100% → 15% → 15% → 100%) der 130vh hohen Masse, Oberkante bei vh * (-0.3 + 1.3 p)
     let p;
     if (u < 0.28) p = 1 - 0.85 * STEIG(u / 0.28); else if (u <= 0.72) p = 0.15; else p = 0.15 + 0.85 * STEIG((u - 0.72) / 0.28);
@@ -759,7 +759,7 @@ const ppFx3Erweckung = (() => {
     return { breite: seite * 2, hoehe: oben + Math.max(h * 0.7, 80) + 30, ankerY: oben };
   };
   return ppR1Leinwand((g, t, sz, tl) => {
-    const S = PP_FX3_S, cx = sz.cx, cy = sz.cy, w = tl.w, h = tl.h;
+    const S = sz.S, cx = sz.cx, cy = sz.cy, w = tl.w, h = tl.h;
     let u = t / 520;
     if (u <= 1) { const [sc, op] = ppKf(u, [[0, [0.4, 0]], [0.12, [1.05, 1]], [1, [1.3, 0]]]); g.glow(cx, cy, w * 1.05 * sc / S * 0.72, h * 0.85 * sc / S * 0.72, BLITZ, op, 0.8); }
     u = t / 650;
@@ -833,7 +833,7 @@ const ppFx3Geschenke = (() => {
   const HELL = ppFx3Farben(['#fe7476', '#5bbd7e', '#fff196', '#89abdc', '#c98aff']);
   const BAND = ppHex('#fff8e8'), KANTE = ppHex('#12101f');
   return ppR1Leinwand((g, t, sz) => {
-    const S = PP_FX3_S, cx = sz.cx, cy = sz.cy;
+    const S = sz.S, cx = sz.cx, cy = sz.cy;
     for (const p of PAKETE) {
       const u = (t - p.verzug) / 1000;
       if (u < 0 || u > 1) continue;
@@ -863,7 +863,7 @@ const ppFx3Glasbruch = (() => {
   const RISS = ppFx3Farben(['#b3e8f9', '#e5f5fa', '#ffffff']);
   const SC = [WEISS, HOF, TIEF, GLAS];
   return ppR1Leinwand((g, t, sz, tl) => {
-    const S = PP_FX3_S, cx = sz.cx, cy = sz.cy, ww = tl.ww;
+    const S = sz.S, cx = sz.cx, cy = sz.cy, ww = tl.ww;
     // Riss
     {
       const u = (t - 220) / 420;

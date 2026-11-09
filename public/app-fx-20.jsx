@@ -189,7 +189,7 @@ const ppFx20Freeze = ppR1Leinwand((g, t, sz, te) => {
     for (let j = -r; j <= r; j++) for (let i = -r; i <= r; i++) if (Math.abs(i) + Math.abs(j) <= r) g.put(x + i, y + j, c.farbe, a);
     g.put(x, y, PP_FX20_KRISTALL[3], a);
   }
-}, 1000, { breite: 330, hoehe: 280, ankerX: 190, ankerY: 140 }, {
+}, 1000, { breite: 360, hoehe: 280, ankerX: 190, ankerY: 140 }, {   // 360 statt 330: die Schneebälle starten bis 166 px rechts der Mitte (sonst am rechten Rand abgeschnitten)
   z: 10100,
   vorbereiten: () => ({
     baelle: Array.from({ length: ppFxN(8) }, (_, i) => ({ startX: ppFx20R(120, 160), startY: ppFx20R(-40, 0), delay: i * 60 + Math.random() * 40, dur: ppFx20R(250, 400), size: ppFx20R(6, 12) })),

@@ -86,7 +86,7 @@ function ppFx43Zeichne(g, name, X, Y, px, a, q, flip) {
   if (a <= 0.02 || px <= 0) return;
   let s = ppFx43Spr(name);
   if (!s) return;
-  const W = Math.max(1, Math.round(px / 3 * 1.15));
+  const W = Math.max(1, Math.round(px / (g.S || 3) * 1.15));
   if (s.klein && W <= 4) s = s.klein;
   const k = W / s.w, z = ppFx43Dreh(s, q | 0), h = z.length, w = z[0].length;
   const W2 = Math.max(1, Math.round(w * k)), H2 = Math.max(1, Math.round(h * k));
@@ -300,7 +300,7 @@ PpFx43.thought_bubbles = ppSzene((g, t, sz, bl) => {
 
 /** Weiche Wolke → Pixelwolke: gefüllte Scheibe mit geditherter Randzone (statt `blur`). */
 function ppFx43Wolke(g, X, Y, durchm, farbe, a) {
-  const r = durchm / 2 / 3;
+  const r = durchm / 2 / (g.S || 3);
   if (r < 0.9) { g.put(X, Y, farbe, a); return; }
   g.disc(X, Y, r + 0.9, farbe, a * 0.4);
   g.disc(X, Y, Math.max(0.6, r - 0.2), farbe, a);
@@ -344,7 +344,7 @@ PpFx43.poison_pollen_rain = ppSzene((g, t, sz, tl) => {
     const [fx, fy, sc, o] = ppKf(u, [[0, [0, 0, .5, 0]], [.15, [.3, 8, 1, .9]], [.7, [1, 35, .9, .7]], [1, [1.3, 55, .4, 0]]]);
     const x = cx + (s.xOff + s.wobble * fx) / S, y = cy + (-40 + fy) / S;
     if (s.spr) ppFx43Zeichne(g, s.spr, x, y, (s.size + 4) * sc * 1.15, o, 0);
-    else { const n = Math.max(1, Math.round(s.size * sc / 3)); g.rect(x - n / 2 - 1, y - n / 2 - 1, n + 2, n + 2, s.farbe, o * 0.35); g.rect(x - n / 2, y - n / 2, n, n, s.farbe, o); }
+    else { const n = Math.max(1, Math.round(s.size * sc / S)); g.rect(x - n / 2 - 1, y - n / 2 - 1, n + 2, n + 2, s.farbe, o * 0.35); g.rect(x - n / 2, y - n / 2, n, n, s.farbe, o); }
   });
 }, 1300, () => Array.from({ length: ppFxN(24) }, () => ({
   xOff: -35 + Math.random() * 70, size: 4 + Math.random() * 7, delay: Math.random() * 300, dur: 500 + Math.random() * 400,

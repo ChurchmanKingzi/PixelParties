@@ -156,8 +156,9 @@ function PlayerProfilePopup({ seed, onClose }) {
         ) : (
           <>
             <PpfStats p={p} />
+            <PpfShowcase p={p} />
             <PpfDecks decks={decks} selected={deckIdx} onSelect={setDeckIdx} />
-            {deck && <PpfHeroes deck={deck} onTip={setTip} />}
+            {deck && <PpfHeroes deck={deck} skinRanks={p.skinRanks} onTip={setTip} />}
             <PpfFacts p={p} />
           </>
         )}
@@ -178,7 +179,9 @@ function PpfHeader({ seed, p, color, rank, loaded }) {
     <div className="ppf-head">
       <div className="ppf-avatar" style={{ borderColor: color, boxShadow: '0 0 18px ' + color + '66' }}>
         {avatar
-          ? <img src={avatar} alt="" draggable="false" />
+          ? (window.FramedImg
+              ? <window.FramedImg src={avatar} kind="avatar" dupes={loaded ? p.avatarRank : 0} alt="" draggable="false" />
+              : <img src={avatar} alt="" draggable="false" />)
           : <span className="ppf-avatar-fallback">👤</span>}
         {rank === 1 && <span className="ppf-crown" aria-hidden="true">👑</span>}
       </div>
@@ -200,6 +203,30 @@ function PpfHeader({ seed, p, color, rank, loaded }) {
           {p.inGame && <span className="ppf-live"><span className="menu-live-dot" />In a game</span>}
         </div>
         {p.bio ? <div className="ppf-bio">{p.bio}</div> : null}
+      </div>
+    </div>
+  );
+}
+
+// ── Vitrine: Avatar und Sleeve mit Rang-Rahmen in voller Größe ──
+// Hier lassen sich die Rahmen (Duplikate aus dem Gacha) in allen Einzelheiten ansehen: ganzzahlig vergrößert, ohne Weichzeichnen.
+function PpfShowcase({ p }) {
+  const FramedImg = window.FramedImg, R = window.ppRankFrames;
+  const aRank = p.avatarRank || 0, cRank = p.cardbackRank || 0;
+  if (!FramedImg || !R || (!aRank && !cRank)) return null;
+  const nameOf = (d) => { const r = R.rankOf(d); return r == null ? null : R.RANKS[r].name; };
+  const item = (src, kind, d, cls, label) => (
+    <div className={'ppf-vitrine-item ' + cls}>
+      <FramedImg src={src} kind={kind} dupes={d} alt="" draggable="false" />
+      <div className="ppf-vitrine-label">{label}{nameOf(d) ? <b> · {nameOf(d)}</b> : null}</div>
+    </div>
+  );
+  return (
+    <div className="ppf-section">
+      <h4 className="ppf-section-title">Showcase</h4>
+      <div className="ppf-vitrine">
+        {p.avatar ? item(p.avatar, 'avatar', aRank, 'is-avatar', 'Avatar') : null}
+        {p.cardback ? item(p.cardback, 'sleeve', cRank, 'is-sleeve', 'Sleeve') : null}
       </div>
     </div>
   );
@@ -265,8 +292,10 @@ function PpfDecks({ decks, selected, onSelect }) {
 }
 
 // ── Helden des gewaehlten Decks als Kartenbilder ───────────────
-function PpfHeroes({ deck, onTip }) {
+function PpfHeroes({ deck, skinRanks, onTip }) {
   const cards = window.CARDS_BY_NAME || {};
+  // Rang-Rahmen der getragenen Skins (Duplikate): cardImageUrl hängt sie an, der Karten-Shim backt sie ein.
+  if (window.ppSkinRanksSet) window.ppSkinRanksSet(deck.skins, skinRanks);
   const heroes = deck.heroes || [];
   // Deckwechsel: ein offener Tooltip gehoert zur alten Karte.
   useEffect(() => () => onTip(null), [deck]);

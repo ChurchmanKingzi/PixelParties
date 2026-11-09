@@ -87,7 +87,7 @@ function ppFx44Ruecken(url, W, H) {
 window.ppFx44Vorladen = function (url, w, h) {
   try {
     const breite = Math.max(w || 44, 30), hoehe = Math.max(h || 62, 40);
-    ppFx44Ruecken(url || '/cardback.png', Math.max(4, Math.round(breite / PP_FX44_S)), Math.max(4, Math.round(hoehe / PP_FX44_S)));
+    { const Sv = typeof ppFxZelle === 'function' ? ppFxZelle(null) : PP_FX44_S; ppFx44Ruecken(url || '/cardback.png', Math.max(4, Math.round(breite / Sv)), Math.max(4, Math.round(hoehe / Sv))); }
   } catch (e) { /* optional */ }
 };
 
@@ -128,14 +128,13 @@ const ppFx44Mischen = ppR1Leinwand((g, t, sz, teile) => {
   }
 }, 640, (p) => {
   const breite = Math.max(p.w || 44, 30), hoehe = Math.max(p.h || 62, 40);
-  const rx = Math.ceil((breite * 0.55 + breite * 0.52 + hoehe * 0.12 + 6) / PP_FX44_S) * PP_FX44_S;
-  const ry = Math.ceil((hoehe * 0.52 + breite * 0.12 + 6) / PP_FX44_S) * PP_FX44_S;
+  const rx = Math.ceil(breite * 0.55 + breite * 0.52 + hoehe * 0.12 + 6), ry = Math.ceil(hoehe * 0.52 + breite * 0.12 + 6);   // in Bildschirmpixeln (ppR1Leinwand rundet auf ganze Zellen)
   return { breite: rx * 2, hoehe: ry * 2 };
 }, {
   z: 10100,
   vorbereiten: (sz) => {
     const p = sz.props, breite = Math.max(p.w || 44, 30), hoehe = Math.max(p.h || 62, 40);
-    const W = Math.max(4, Math.round(breite / PP_FX44_S)), H = Math.max(4, Math.round(hoehe / PP_FX44_S));
+    const W = Math.max(4, Math.round(breite / sz.S)), H = Math.max(4, Math.round(hoehe / sz.S));   // Zelle = Hero-Pixel (sz.S)
     const url = p.cardbackUrl || '/cardback.png';
     ppFx44Ruecken(url, W, H);
     return { W, H, url, bl: PP_FX44_BLAETTER(breite) };
@@ -160,7 +159,7 @@ function ppFx44Farbe(c) {
 window.ppFx44Funken = function (box, liste, farbe, zusatz) {
   try {
     if (!box || !liste || !liste.length || window._playAnimations === false || window.__ppFxAlt) return false;
-    const S = PP_FX44_S, TAKT = PP_FX44_TAKT;
+    const S = (zusatz && zusatz.S > 0) ? zusatz.S : (typeof ppFxZelle === 'function' ? ppFxZelle(box) : PP_FX44_S), TAKT = PP_FX44_TAKT;   // Zelle = Hero-Pixel
     let R = 0, ende = 0;
     for (const f of liste) { R = Math.max(R, Math.abs(f.dx), Math.abs(f.dy), 0); ende = Math.max(ende, f.delay + f.dur); }
     R = Math.ceil((R + 20) / S) * S;

@@ -2908,13 +2908,39 @@ const HeroIdleAnims = (() => {
       // sie sich bewegt. Höchstens 400, fest verwürfelt.
       const frames = Math.max(1, meta.frames | 0);
       const zaehler = new Uint16Array(fw * fh);
+      const belegt = new Uint8Array(frames * fh * fw);   // je Bild und Zeile: deckende Pixel (für die Kopf-Rechtskante der Status-Symbole)
       for (let y = 0; y < h; y++) {
         for (let x = 0; x < w; x++) {
           if (d[(y * w + x) * 4 + 3] < 160) continue;
           const lx = vertikal ? x : x % fw, ly = vertikal ? y % fh : y;
           zaehler[ly * fw + lx]++;
+          const fi = vertikal ? Math.floor(y / fh) : Math.floor(x / fw);
+          if (fi < frames) belegt[(fi * fh + ly) * fw + lx] = 1;
         }
       }
+      // Rechte Kante des KOPFES (nicht der ganzen Figur): in den obersten ~30 % der Figur je Bild und Zeile der waagrechte Pixelstreifen, der an der Kopfmitte (`kopfX`) hängt;
+      // das Maximum über alle Bilder. Ragt ein Detail (Andras' Flammenarme, Flügel, Waffen) weit nach rechts, sitzt die Statusanzeige trotzdem am Kopf, nicht am Detail.
+      // Mitte und Höhe des Kopfes: `faceX`/`faceY` aus dem Sheet (Gesichtsmitte, vom Gestalter gesetzt), sonst Schwerpunkt der obersten Figurenreihen. Mit `faceY` (z. B. Medea: Gas über dem Kopf) wird
+      // das Band um die Gesichtshöhe gelegt statt an die Figurenoberkante.
+      const gesichtY = typeof meta.faceY === 'number' ? meta.faceY : null, hoeheK = Math.max(1, y1 - y0);
+      const kopfMitte = Math.round(typeof meta.faceX === 'number' ? meta.faceX : (n ? summe / n : (x0 + x1) / 2));
+      const bandVon = gesichtY != null ? Math.max(y0, Math.round(gesichtY - hoeheK * 0.15)) : y0;
+      const bandBis = gesichtY != null ? Math.round(gesichtY + hoeheK * 0.15) : y0 + Math.max(2, Math.round(hoeheK * 0.3));
+      let kopfX1 = 0;
+      for (let fi = 0; fi < frames; fi++) {
+        for (let ly = bandVon; ly < Math.min(fh, bandBis); ly++) {
+          const basis = (fi * fh + ly) * fw;
+          let start = -1;
+          for (let dx = 0; dx <= 4 && start < 0; dx++) {
+            if (kopfMitte + dx < fw && belegt[basis + kopfMitte + dx]) start = kopfMitte + dx;
+            else if (kopfMitte - dx >= 0 && belegt[basis + kopfMitte - dx]) start = kopfMitte - dx;
+          }
+          if (start < 0) continue;
+          let r = start; while (r + 1 < fw && belegt[basis + r + 1]) r++;
+          if (r + 1 > kopfX1) kopfX1 = r + 1;
+        }
+      }
+      kopfX1 = kopfX1 ? Math.min(kopfX1, Math.round(kopfMitte + (x1 - x0) * 0.4)) : Math.round(kopfMitte + (x1 - x0) * 0.2);
       let punkte = [];
       const schwelle = Math.max(1, Math.round(frames * 0.6));
       for (let i = 0; i < zaehler.length; i++) if (zaehler[i] >= schwelle) punkte.push([i % fw, Math.floor(i / fw)]);
@@ -2925,7 +2951,7 @@ const HeroIdleAnims = (() => {
         const t = punkte[i]; punkte[i] = punkte[j]; punkte[j] = t;
       }
       punkte = punkte.slice(0, 400);
-      return { x0, y0, x1, y1, kopfX: n ? summe / n : (x0 + x1) / 2, punkte };
+      return { x0, y0, x1, y1, kopfX: n ? summe / n : (x0 + x1) / 2, kopfX1, kopfY: gesichtY, punkte };
     } catch { return rueckfall; }
   }
 
@@ -3711,7 +3737,9 @@ function ppFlugVerfolgen(fly, sourceEl, destEl, w0, ms, opEnd, farbe) {
  * erst nach 300–500 ms; Verschiebt sich das Brett dazwischen (Handy: Kamerafahrt), lag der naechste Treffer ploetzlich ueber einem anderen Helden.
  */
 // Einschlag-Animationen, die ihre Zielzone selbst quetschen: bekommen das Zonen-Element direkt (`zoneEl`)
-const PP_SQUASH_ANIMS = new Set(['stranglehold_squeeze', 'magic_hammer', 'shattering_strike', 'spiked_club_smash', 'giant_dino_stomp', 'mammoth_stomp', 'ankylo_tail_smash']);
+const PP_SQUASH_ANIMS = new Set(['stranglehold_squeeze', 'magic_hammer', 'heavy_hit_smash', 'hammer_skeleton_smash', 'shattering_strike', 'spiked_club_smash', 'giant_dino_stomp', 'mammoth_stomp', 'ankylo_tail_smash']);
+// Mindestlebensdauer (ms) je Animationstyp: `options.duration` (Engine `animDuration`) ist oft kuerzer als die Animation selbst — die Hammer-Animationen (app-fx-57) laufen 1,2–1,8 s.
+const PP_ANIM_MINDAUER = { magic_hammer: 2000, heavy_hit_smash: 1700, hammer_skeleton_smash: 1450 };
 function ppZonenFrost() {
   const m = new Map();
   try { document.querySelectorAll('[data-hero-zone],[data-support-zone]').forEach(el => m.set(el, el.getBoundingClientRect())); } catch (e) { /* ohne Frost: live messen */ }
@@ -4173,7 +4201,7 @@ function HeroIdleSprite({ cardName, angehalten, versteinert, eingefroren, effekt
               <canvas ref={canvasRef} width={fw} height={fh} className="hero-idle-canvas" style={canvasStil} />
               {statusIcons && (statusIcons.burn || statusIcons.poison || statusIcons.bleed) && (
                 <HeroStatusSymbole st={statusIcons} k={Math.max(1, Math.min(3, Math.round(s * (parseFloat(document.documentElement.style.getPropertyValue('--board-scale')) || 1) / 1.4)))}
-                  links={`calc(${bs(kern.x1 * s + 3)})`} oben={`calc(${bs((kern.y0 + ch * 0.18) * s)})`} />
+                  links={`calc(${bs((kern.kopfX1 || kern.x1) * s + 3)})`} oben={`calc(${bs((kern.kopfY != null ? kern.kopfY - 4 : kern.y0 + ch * 0.18) * s)})`} />
               )}
               {eisPhase !== 'weg' && (
                 <HeroEiskruste quelleRef={canvasRef} breite={fw} hoehe={fh} rand={EIS_RAND}
@@ -8339,14 +8367,98 @@ function ppSchleuderFlug(card, { dx, dy, dauer, start }) {
 // ═══════════════════════════════════════════════════════════════════
 // (Bayer-Matrix: `ppBayer(x, y)` aus app-shared.jsx)
 const ppHex = (h) => [parseInt(h.slice(1, 3), 16), parseInt(h.slice(3, 5), 16), parseInt(h.slice(5, 7), 16)];
+// ══════════════════════════════════════════════════════════════
+//  PIXELGRÖSSE DER EFFEKTE = PIXELGRÖSSE DER HELDEN (CLAUDE.md: „Jede Animation hat die Standard-Pixelgröße der Heroes")
+//  Hero-Pixel = Breite des Figuren-Canvas (`.hero-idle-canvas`) / Frame-Breite des Sheets, in CSS-Pixeln: 2,8125 · `--board-scale` · Brett-Projektion (Reihe!) · Tutorial-Zoom.
+//  Gemessen (Tutorial 1): 1920×1080: 2,67 (Gegnerreihe) / 3,02 (eigene Reihe) · 1280×720: 1,99 / 2,16 · Handy 844×390 (flaches Brett): 1,66.
+//    ppFxZelle(ziel?)    → ganzzahlige Rasterzelle S = clamp(round(Hero-Pixel), 2, 6) für eine Effekt-Leinwand. `ziel`: Zonen-Element | { x, y } (Fensterpunkt; ab der Fenstermitte „eigene" Reihe) | leer (eigene Reihe).
+//    ppFxHeldPixel(ziel) → { px, cv?, platz?, eintrag? } Hero-Pixel als Kommazahl (+ die Figur, wenn das Ziel selbst eine trägt)
+//  Ergebnisse je (Reihe, Fenstergröße, `--board-scale`) gemerkt: das Brett wird nur beim ersten Aufruf je Schlüssel gemessen (ein Rechteck lesen), danach reines Nachschlagen; Tutorial-Zoom misst live.
+//  Gelesen wird NUR beim Start einer Animation, nie im Takt. Invalidiert bei `resize` (und `window.ppFxZelleLeeren()`).
+//  Abweichung der ganzzahligen Zelle vom Hero-Pixel: 1080p ≤ 12 % (S=3), 720p ≤ 7 % (S=2), Handy 20 % (S=2; S=1 wäre exakt, kostet aber ~4× so viele Zellen).
+// ══════════════════════════════════════════════════════════════
+const PP_ZELLE_MIN = 2, PP_ZELLE_MAX = 6;
+const _ppZelleCache = new Map();
+function ppFxZelleLeeren() { _ppZelleCache.clear(); }
+window.ppFxZelleLeeren = ppFxZelleLeeren;
+try { window.addEventListener('resize', ppFxZelleLeeren); } catch (e) { /* ohne Fenster */ }
+function _ppZelleSig() {
+  let bs = '';
+  try { bs = document.documentElement.style.getPropertyValue('--board-scale'); } catch (e) { /* ohne */ }
+  return window.innerWidth + 'x' + window.innerHeight + '|' + bs;
+}
+/** Figur der Zone (falls vorhanden): { px, cv, platz, eintrag }. */
+function _ppZelleFigur(z) {
+  const platz = z && z._ppFigurPlatz, cv = platz && platz.querySelector && platz.querySelector('canvas');
+  if (!cv || !(cv.width > 0)) return null;
+  const r = cv.getBoundingClientRect();
+  return r.width > 0 ? { px: r.width / cv.width, cv, platz, eintrag: platz._ppEintrag } : null;
+}
+function _ppZelleLabel(ziel) {
+  try {
+    if (ziel && ziel.getAttribute) {
+      const e = ziel.closest ? ziel.closest('[data-hero-owner],[data-support-owner],[data-ability-owner],[data-area-owner],[data-surprise-owner]') : null;
+      const l = e && (e.getAttribute('data-hero-owner') || e.getAttribute('data-support-owner') || e.getAttribute('data-ability-owner') || e.getAttribute('data-area-owner') || e.getAttribute('data-surprise-owner'));
+      if (l) return l;
+    }
+    if (ziel && typeof ziel.y === 'number') return ziel.y < (window.innerHeight || 0) * 0.5 ? 'opp' : 'me';
+  } catch (e) { /* eigene Reihe */ }
+  return 'me';
+}
+function ppFxHeldPixel(ziel, w) {
+  try {
+    const zoom = !!document.querySelector('.board-center.tut-zoom');
+    // Plausibilität: Hero-Pixel / (2,8125 · `--board-scale`) liegt je Reihe und Gerät bei 1,0–1,15 (Projektion). Ein Messwert außerhalb (Figur gerade eingefahren/hervorgehoben/im Auftritt)
+    // wird verworfen — sonst bliebe ein flüchtiger Wert im Zwischenspeicher hängen. Im Tutorial-Zoom skaliert der Zoom zusätzlich: dort keine Prüfung, kein Zwischenspeicher.
+    const bsz0 = parseFloat((document.documentElement.style.getPropertyValue('--board-scale')) || '');
+    const stimmt = (v) => !(bsz0 > 0) || zoom || (v / (2.8125 * bsz0) >= 0.93 && v / (2.8125 * bsz0) <= 1.3);
+    const eigen = ziel && ziel.getAttribute ? _ppZelleFigur(ziel) : null;
+    if (eigen && stimmt(eigen.px)) return eigen;
+    const label = _ppZelleLabel(ziel), key = label + '|' + _ppZelleSig();
+    if (!zoom && _ppZelleCache.has(key)) return { px: _ppZelleCache.get(key) };
+    const suche = (l) => {
+      const zs = document.querySelectorAll('[data-hero-zone][data-hero-owner="' + l + '"]');
+      let beste = null;
+      for (const z of zs) { const f = _ppZelleFigur(z); if (!f || !stimmt(f.px)) continue; if (z.getAttribute('data-hero-idx') === '1') return f.px; if (!beste) beste = f.px; }
+      return beste;
+    };
+    const px = suche(label) || suche(label === 'me' ? 'opp' : 'me') || 0;
+    if (px > 0) { if (!zoom) _ppZelleCache.set(key, px); return { px }; }
+  } catch (e) { /* Rückfall */ }
+  // ohne (plausible) Figur im Brett (vor dem Laden der Sheets, Menü): aus `--board-scale` bzw. der Zonenbreite (Heldenzone 68 px breit bei Skala 1), geneigtes Brett · 1,08 bzw. 0,975
+  let geneigt = false;
+  try { const pl = document.querySelector('.board-plane'); geneigt = !!pl && getComputedStyle(pl).transform !== 'none'; } catch (e) { /* flach */ }
+  const bsz = parseFloat((document.documentElement.style.getPropertyValue('--board-scale')) || '');
+  if (bsz > 0) return { px: 2.8125 * bsz * (geneigt ? 1.08 : 1) };
+  return { px: (2.8125 / 68) * Math.min(w || 66, 68 * 1.2) * (geneigt ? 0.975 : 1) };
+}
+function ppFxZelle(ziel, w) {
+  if (window.__ppFxZelleFest > 0) return window.__ppFxZelleFest;   // Test/Notbremse: feste Zelle (3 = altes Verhalten)
+  const px = ppFxHeldPixel(ziel, w).px;
+  return Math.max(PP_ZELLE_MIN, Math.min(PP_ZELLE_MAX, Math.round(px)));
+}
+/** Für Effekt-Hüllen: Zelle zu den Props einer Animation (`zelleS` aus playAnimation, sonst Zone/Punkt). */
+function ppFxZelleFuer(props, fallbackS) {
+  try {
+    if (window.__ppFxZelleFest > 0) return window.__ppFxZelleFest;
+    if (props && props.zelleS > 0) return props.zelleS;
+    if (props && props.zoneEl) return ppFxZelle(props.zoneEl, props.w);
+    if (props && typeof props.x === 'number' && typeof props.y === 'number') return ppFxZelle({ x: props.x, y: props.y }, props.w);
+    return ppFxZelle(null);
+  } catch (e) { return fallbackS || 3; }
+}
+window.ppFxZelle = ppFxZelle; window.ppFxHeldPixel = ppFxHeldPixel; window.ppFxZelleFuer = ppFxZelleFuer;
+window.ppFxZelleFuer = ppFxZelleFuer;
+
 function ppSalve(malen, ende, vorbereiten, opts) {
   // `opts.extra` (Als Befund 10.10., Sky Shaman: „die Animation ist auf die Karte begrenzt und abgeschnitten"): zusaetzlicher Rand in Bildschirmpixeln um
   // Ursprung und Ziele. Der Canvas misst sich von den MITTEN der Ziele aus — alles, was weiter als ~10 px ueber die Kartenkante hinausragt (Federn, Strahl, ein
   // von oben fallender Schild), wurde sonst an der Canvaskante abgeschnitten.
   // `opts.z` (12.10., Duel): Ebene des Canvas (Standard 10110, unter den Rammkarten auf 10120) — der Aufprall zweier Heldenkarten muss UEBER ihnen liegen.
-  const S = 3, PAD = 60 + ((opts && opts.extra) || 0), TAKT = 33;
-  return function PixelSalveEffekt({ ox, oy, targetPoints, welt, regionBox, runde, wucht, mode }) {
+  const PAD = 60 + ((opts && opts.extra) || 0), TAKT = 33;
+  return function PixelSalveEffekt({ ox, oy, targetPoints, welt, regionBox, runde, wucht, mode, zelleS }) {
     const cvs = useRef(null);
+    const S = useMemo(() => ppFxZelleFuer({ x: ox, y: oy, zelleS }), []);   // Rasterzelle = Hero-Pixel (ppFxZelle)
     const sz = useMemo(() => {
       if (typeof ox !== 'number' || typeof oy !== 'number' || !Array.isArray(targetPoints) || targetPoints.length === 0) return null;
       // Welt-Effekte tragen FELD-Koordinaten (Fenster + Scrollstand des Feldes), s. ppFxWeltAnker; Ursprung und Ziele
@@ -8370,7 +8482,7 @@ function ppSalve(malen, ende, vorbereiten, opts) {
         return { x: q.x, y: q.y, w: p.w / S, h: p.h / S, len, selbst: len < 6,
           dx: len > 0.01 ? (q.x - o.x) / len : 0, dy: len > 0.01 ? (q.y - o.y) / len : -1 };
       });
-      return { links, oben, gw, gh, O: o, ziele, region, runde: runde || 1, wucht: Math.max(1, Math.min(3, Number(wucht) || 1)), mode: mode || null };
+      return { S, links, oben, gw, gh, O: o, ziele, region, runde: runde || 1, wucht: Math.max(1, Math.min(3, Number(wucht) || 1)), mode: mode || null };
     }, []);
     const teile = useMemo(() => (sz && vorbereiten ? vorbereiten(sz) : null), [sz]);
     useEffect(() => {
@@ -8387,6 +8499,7 @@ function ppSalve(malen, ende, vorbereiten, opts) {
         buf[i] = c[0]; buf[i + 1] = c[1]; buf[i + 2] = c[2]; buf[i + 3] = 255;
       };
       const g = {
+        S,   // Rasterzelle in Bildschirmpixeln
         put,
         block(px, py, w, h, c, a = 1) { for (let j = 0; j < h; j++) for (let i = 0; i < w; i++) put(px + i, py + j, c, a); },
         ring(cx, cy, rx, ry, c, a = 1) {
@@ -8493,9 +8606,10 @@ function ppKf(u, stops, ease) {                 // ease: weggelassen = ease-out 
   return stops[stops.length - 1][1];
 }
 function ppSzene(malen, ende, vorbereiten, opts) {
-  const S = (opts && opts.S) || 3, TAKT = 33;
+  const TAKT = 33;
   return function PixelSzeneEffekt(props) {
     const { x, y, w, h } = props;
+    const S = useMemo(() => (opts && opts.S) || ppFxZelleFuer(props), []);   // Rasterzelle = Hero-Pixel (ppFxZelle); `opts.S` erzwingt eine feste Zelle
     const cvs = useRef(null);
     const sz = useMemo(() => {
       if (typeof x !== 'number' || typeof y !== 'number') return null;
@@ -8520,6 +8634,7 @@ function ppSzene(malen, ende, vorbereiten, opts) {
         buf[i] = c[0]; buf[i + 1] = c[1]; buf[i + 2] = c[2]; buf[i + 3] = 255;
       };
       const g = {
+        S,   // Rasterzelle in Bildschirmpixeln
         put,
         block(px, py, bw, bh, c, a = 1) { for (let j = 0; j < bh; j++) for (let i = 0; i < bw; i++) put(px + i, py + j, c, a); },
         rect(px, py, bw, bh, c, a = 1) { px = Math.round(px); py = Math.round(py); for (let j = 0; j < bh; j++) for (let i = 0; i < bw; i++) put(px + i, py + j, c, a); },
@@ -8721,7 +8836,10 @@ const ZONE_FASS_ZEILEN = [
 ];
 const ZONE_FASS_FARBEN = { k: '#1f0f04', d: '#5a341a', m: '#8e503a', l: '#b06746', h: '#ca874e', n: '#323232', i: '#686868', j: '#a8a8a8' };
 const ZoneFassMarke = React.memo(function ZoneFassMarke() {
-  const S = 3, w = ZONE_FASS_ZEILEN[0].length, h = ZONE_FASS_ZEILEN.length;
+  // Rasterzelle = Hero-Pixel (ppFxZelle); folgt dem Fenster (resize) — das Fass ist 14 × 19 Zellen
+  const [S, setS] = useState(() => ppFxZelle(null));
+  useEffect(() => { const f = () => setS(ppFxZelle(null)); f(); window.addEventListener('resize', f); return () => window.removeEventListener('resize', f); }, []);
+  const w = ZONE_FASS_ZEILEN[0].length, h = ZONE_FASS_ZEILEN.length;
   return (
     <div data-pp-px="aus" title="Barrel Home: this Support Zone is closed" style={{
       position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', pointerEvents: 'none',
@@ -8797,12 +8915,13 @@ function ppFluegel(g, sx, sy, dir, haltung, deckung) {
 //      malen(g, t, sz, teile): Pinsel `g` wie bei `ppSalve` (put/block); `sz` { gw, gh, cx, cy, hw, hh, phase } in RASTERkoordinaten (cx/cy = Kartenmitte, hw/hh = halbe Karte; `phase` = Feld `phase` des Ereignisses oder null)
 // ═══════════════════════════════════════════════════════════════════
 function ppPunktBild(malen, ende, breite, hoehe, vorbereiten) {
-  const S = 3, TAKT = 33;
-  return function PunktBildEffekt({ x, y, w, h, phase }) {
+  const TAKT = 33;
+  return function PunktBildEffekt({ x, y, w, h, phase, zelleS }) {
     const cvs = useRef(null);
+    const S = useMemo(() => ppFxZelleFuer({ x, y, w, zelleS }), []);   // Rasterzelle = Hero-Pixel (ppFxZelle)
     const sz = useMemo(() => {
       const gw = Math.ceil(breite / S), gh = Math.ceil(hoehe / S);
-      return { gw, gh, cx: gw / 2, cy: gh / 2, hw: ((w || 64) / S) / 2, hh: ((h || 90) / S) / 2, phase: phase || null };
+      return { S, gw, gh, cx: gw / 2, cy: gh / 2, hw: ((w || 64) / S) / 2, hh: ((h || 90) / S) / 2, phase: phase || null };
     }, []);
     const teile = useMemo(() => (vorbereiten ? vorbereiten(sz) : null), []);
     useEffect(() => {
@@ -8818,7 +8937,7 @@ function ppPunktBild(malen, ende, breite, hoehe, vorbereiten) {
         const i = (Y * gw + X) * 4;
         buf[i] = c[0]; buf[i + 1] = c[1]; buf[i + 2] = c[2]; buf[i + 3] = 255;
       };
-      const g = { put, block(px, py, bw, bh, c, a = 1) { for (let j = 0; j < bh; j++) for (let i = 0; i < bw; i++) put(px + i, py + j, c, a); } };
+      const g = { S, put, block(px, py, bw, bh, c, a = 1) { for (let j = 0; j < bh; j++) for (let i = 0; i < bw; i++) put(px + i, py + j, c, a); } };
       const t0 = performance.now();
       let raf = 0, letzte = -1;
       const schritt = (jetzt) => {
@@ -10008,12 +10127,13 @@ const PythiaFlamesEffect = (() => {
 function ppGlasWand(modus) {
   const GLAS = ['#ffffff', '#bddcef', '#77c8ee', '#1788bd'].map(ppHex);
   const STERN = ['#ffffff', '#fff196', '#fad54a'].map(ppHex);
-  const S = 3, TAKT = 33, ENDE = 1000, PAD = 16;
+  const TAKT = 33, ENDE = 1000, PAD = 16;
   const AUFBAU = 300, TREFFER = modus === 'up' ? 360 : 140, BRUCH = 420;
   const klemme = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
   const glatt = (u) => { const q = klemme(u, 0, 1); return q * q * (3 - 2 * q); };
-  return function GlasWandEffekt({ x, y, w, h }) {
+  return function GlasWandEffekt({ x, y, w, h, zelleS }) {
     const cvs = useRef(null);
+    const S = useMemo(() => ppFxZelleFuer({ x, y, w, zelleS }), []);   // Rasterzelle = Hero-Pixel (ppFxZelle)
     const kw = Math.max(14, Math.round((w || 64) / S)) + 4, kh = Math.max(18, Math.round((h || 90) / S)) + 4;       // die Scheibe überragt die Karte um 2 Pixel
     const GW = kw + PAD * 2, GH = kh + PAD * 2;
     const L = PAD, T = PAD, CX = L + kw / 2, CY = T + kh / 2;
@@ -10201,11 +10321,12 @@ function ppBeute() {
     '....########...',
   ];
   const BW = 15, BH = FORM.length;
-  const S = 3, TAKT = 33, ENDE = 900, PAD = 20;
+  const TAKT = 33, ENDE = 900, PAD = 20;
   const klemme = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
   const glatt = (u) => { const q = klemme(u, 0, 1); return q * q * (3 - 2 * q); };
-  return function BeuteEffekt({ x, y, w, h }) {
+  return function BeuteEffekt({ x, y, w, h, zelleS }) {
     const cvs = useRef(null);
+    const S = useMemo(() => ppFxZelleFuer({ x, y, w, zelleS }), []);   // Rasterzelle = Hero-Pixel (ppFxZelle)
     const kw = Math.max(14, Math.round((w || 64) / S)), kh = Math.max(18, Math.round((h || 90) / S));
     const GW = kw + PAD * 2 + 16, GH = kh + PAD * 2 + 8;
     const CX = Math.floor(GW / 2), CY = Math.floor(GH / 2) + 4;
@@ -10304,9 +10425,10 @@ function ppBeute() {
  * ein Canvas um beide Punkte (3 Bildschirmpixel je Rasterpixel, Bayer-Dithering statt Alpha, ~30 Bilder/s). `malen(g, t, geo, teile)`: `geo` = { gw, gh, a: {x, y, hw, hh}, b: {…} } in RASTERkoordinaten.
  */
 function ppPunktFlug(malen, ende, vorbereiten) {
-  const S = 3, TAKT = 33, RAND = 60;
-  return function PunktFlugEffekt({ targetPoints }) {
+  const TAKT = 33, RAND = 60;
+  return function PunktFlugEffekt({ targetPoints, zelleS }) {
     const cvs = useRef(null);
+    const S = useMemo(() => ppFxZelleFuer({ x: targetPoints && targetPoints[0] && targetPoints[0].x, y: targetPoints && targetPoints[0] && targetPoints[0].y, zelleS }), []);   // Rasterzelle = Hero-Pixel (ppFxZelle)
     const geo = useMemo(() => {
       const p = (targetPoints || []).slice(0, 2);
       if (p.length < 2) return null;
@@ -12201,7 +12323,7 @@ const PP_R1_SCHRIFT = {   // 3×5-Pixelschrift (Großbuchstaben, Ziffern, + − 
   6: '111100111101111', 7: '111001001010010', 8: '111101111101111', 9: '111101111001111',
   '+': '000010111010000', '-': '000000111000000', '!': '010010010000010', '?': '111001011000010', ' ': '000000000000000',
 };
-function ppR1Pinsel(buf, gw, gh) {
+function ppR1Pinsel(buf, gw, gh, S) {
   const put = (px, py, c, a = 1) => {
     const X = Math.round(px), Y = Math.round(py);
     if (X < 0 || Y < 0 || X >= gw || Y >= gh || a <= 0) return;
@@ -12210,6 +12332,7 @@ function ppR1Pinsel(buf, gw, gh) {
     buf[i] = c[0]; buf[i + 1] = c[1]; buf[i + 2] = c[2]; buf[i + 3] = 255;
   };
   const g = {
+    S: S || 3,   // Rasterzelle in Bildschirmpixeln (Helfer rechnen Pixelmaße damit in Zellen um)
     put,
     block(px, py, w, h, c, a = 1) { px = Math.round(px); py = Math.round(py); for (let j = 0; j < h; j++) for (let i = 0; i < w; i++) put(px + i, py + j, c, a); },
     disc(cx, cy, r, c, a = 1) {
@@ -12275,10 +12398,25 @@ function ppR1Pinsel(buf, gw, gh) {
 // Welt-Animationen tragen FELD-Koordinaten (Fenster + Scrollstand des Brettes, s. ppFxWeltAnker). Ursprung (`ox`/`oy`) und Ziele (`targetPoints`) kommen als FENSTERpunkte aus dem
 // Brett-Zweig von `onZoneAnim` — ohne diesen Versatz lagen sie bei gescrolltem Brett (Handy) um den Scrollstand daneben (Flame Avalanche startete viel zu hoch).
 function ppR1FeldVersatz(p) { return (p && p.welt && window.ppFxScrollOffset) ? window.ppFxScrollOffset() : { dx: 0, dy: 0 }; }
+/**
+ * Rasterzelle eines Effekts = Hero-Pixel (`ppFxZelleFuer`), bei fensterfüllenden Leinwänden gedeckelt: höchstens 140 000 Zellen (Handy: 60 000, wie app-fx-58), sonst Zelle + 1. Bei 720p (S = 2) hatten Flut,
+ * Feuerwalze, Meteor … 230 000 Zellen und kosteten je Bild das Doppelte (gemessen, 4x gedrosselt: Flut 9,1 statt 4,6 ms, Armageddon 10,9 statt 5,3 ms); am Handy (S = 2, 82 000 Zellen) ebenso.
+ * `mass` wie bei `ppR1Leinwand` (Funktion der Props oder Objekt mit `breite`/`hoehe`). Die Notbremse `__ppFxZelleFest` gilt unverändert (feste Zelle, kein Deckel).
+ */
+function ppFxZelleGedeckelt(props, mass, frei) {
+  let s = ppFxZelleFuer(props);
+  if (window.__ppFxZelleFest > 0 || frei) return s;   // `frei` (Option ohneDeckel): Effekt, für den kein Kostenvorteil des Deckels gemessen wurde
+  try {
+    const q = typeof mass === 'function' ? mass(props) : mass;
+    if (q && q.breite > 0 && q.hoehe > 0) { const maxZ = (window.ppIsPhone && window.ppIsPhone()) ? 60000 : 140000; while (s < 3 && (q.breite / s) * (q.hoehe / s) > maxZ) s++; }   // nur Zelle 2 -> 3 (Kostenschutz bei feinerem Raster als vor der Hero-Pixel-Regel); ab Zelle 3 bleibt es bei Hero-Pixel (1080p: 230k Zellen wie schon immer)
+  } catch (e) { /* Maß braucht Daten des Aufrufers: Zelle bleibt */ }
+  return s;
+}
 function ppR1Leinwand(malen, ende, mass, opt) {
-  const o = opt || {}, S = 3, TAKT = 1000 / 30;
+  const o = opt || {}, TAKT = 1000 / 30;
   return function R1Effekt(props) {
     const cvs = useRef(null);
+    const S = useMemo(() => ppFxZelleGedeckelt(props, mass, o.ohneDeckel), []);   // Rasterzelle = Hero-Pixel (ppFxZelle), bei fensterfüllenden Leinwänden gedeckelt (ppFxZelleGedeckelt); vorher fest 3
     const m = useMemo(() => {
       const q = typeof mass === 'function' ? mass(props) : mass;
       const breite = Math.ceil(q.breite / S) * S, hoehe = Math.ceil(q.hoehe / S) * S;
@@ -12297,7 +12435,7 @@ function ppR1Leinwand(malen, ende, mass, opt) {
       if (!el || window._playAnimations === false) return undefined;
       const ctx = el.getContext('2d');
       const img = ctx.createImageData(sz.gw, sz.gh);
-      const g = ppR1Pinsel(img.data, sz.gw, sz.gh);
+      const g = ppR1Pinsel(img.data, sz.gw, sz.gh, S);
       const t0 = performance.now();
       let raf = 0, letzte = -1;
       const takt = window.ppTaktRaf || window.requestAnimationFrame;
@@ -13668,10 +13806,10 @@ const PP_R1_FSCHLAG_BILD = {
   stern: ['..Y..', '..Y..', 'YYWYY', '..Y..', '..Y..'],
 };
 function ppR1FlammenSchlag(skala) {
-  const S = 3, R = Math.ceil(130 * skala + 30);
+  const R = Math.ceil(130 * skala + 30);
   const FUNKEN = ['#ff491a', '#ff8b1a', '#fad54a', '#ff1a1a', '#f9ac20'].map(ppHex);
   return ppR1Leinwand((g, t, sz, teile) => {
-    const cx = sz.cx, cy = sz.cy;
+    const S = sz.S, cx = sz.cx, cy = sz.cy;   // Rasterzelle = Hero-Pixel (ppR1Leinwand)
     // Feuerschein (ab 250 ms, 600 ms)
     const fk = (t - 250) / 600;
     if (fk >= 0 && fk <= 1) {
@@ -27858,14 +27996,15 @@ const ANIM_REGISTRY = {
     const RESTE = ['#e2d8cb', '#f9b3b3', '#ff6666', '#e73b41'].map(hex);
     const STREIFEN = hex('#bddcef');
     const BAYER = [0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5].map(v => (v + 0.5) / 16);
-    const S = 3;                                  // Bildschirmpixel je Rasterpixel
+    // Rasterzelle: je Aufruf aus dem Hero-Pixel (ppFxZelle) in der Komponente; // Bildschirmpixel je Rasterpixel
     const GW = 80, GH = 72;                       // Raster
     const CX = 40, CY = 52;                       // Einschlagpunkt im Raster
     const FALL = 380;                             // Aufsetzen (ms) — deckt sich mit dem Klang `slash` (delay 360)
     const ENDE = 960;                             // alles ist vor der Standard-Lebensdauer (1000 ms) verschwunden
     const GRAV = 170;                             // Rasterpixel / s²
-    return function KnifeSacrificeEffect({ x, y }) {
+    return function KnifeSacrificeEffect({ x, y, w, h, zelleS }) {
       const cvs = useRef(null);
+      const S = useMemo(() => ppFxZelleFuer({ x, y, w, zelleS }), []);   // Rasterzelle = Hero-Pixel (ppFxZelle)
       // Teilchen einmal würfeln. Zahlen über `ppFxN` (Effekt-Dichte, Lite-Modus).
       const teile = useMemo(() => {
         const funken = Array.from({ length: ppFxN(24) }, () => {
@@ -28029,15 +28168,16 @@ const ANIM_REGISTRY = {
     const RAUCH = ['#d2d2db', '#a5b0c0', '#808898', '#59606e'].map(ppHex);
     const WIND = ['#ffffff', '#e5edfa', '#b3d8f9'].map(ppHex);
     const FUNKEN = ['#ffffff', '#fff196', '#ffc61c', '#ff8b1a'].map(ppHex);
-    const S = 3, TAKT = 33, ENDE = 980;
+    const TAKT = 33, ENDE = 980;
     const PADX = 22, PAD_OBEN = 16, PAD_UNTEN = 48;              // Platz um die Karte (Rasterpixel): Flammen/Rauch ragen darunter
     const ZUENDEN = 110, BRENNT_BIS = 640, AUS = 840, LAENGE = 14;
     const rausch = (a, b) => { const x = Math.sin(a * 127.1 + b * 311.7) * 43758.5453; return x - Math.floor(x); };
     // Flammenlaenge zur Zeit t (ms), ohne Flackern.
     const laenge = (t) => t < ZUENDEN ? 3 + (LAENGE - 3) * (t / ZUENDEN)
       : t < BRENNT_BIS ? LAENGE : t < AUS ? LAENGE * (1 - (t - BRENNT_BIS) / (AUS - BRENNT_BIS)) : 0;
-    return function TestFlightEffect({ x, y, w, h }) {
+    return function TestFlightEffect({ x, y, w, h, zelleS }) {
       const cvs = useRef(null);
+      const S = useMemo(() => ppFxZelleFuer({ x, y, w, zelleS }), []);   // Rasterzelle = Hero-Pixel (ppFxZelle)
       const kw = Math.max(12, Math.round((w || 64) / S)), kh = Math.max(16, Math.round((h || 90) / S));
       const GW = kw + PADX * 2, GH = kh + PAD_OBEN + PAD_UNTEN;
       const CX = Math.floor(GW / 2), CY = PAD_OBEN + Math.floor(kh / 2);
@@ -28179,13 +28319,14 @@ const ANIM_REGISTRY = {
     const WEISS = ppHex('#ffffff'), SCHATTEN = ppHex('#d2d2db');
     const FUNKEN = ['#ffffff', '#fff196', '#ffc61c', '#ff8b1a'].map(ppHex);
     const FRAGEZEICHEN = ['.###.', '#...#', '....#', '..##.', '..#..', '.....', '..#..'];
-    const S = 3, TAKT = 33, ENDE = 1000, AUFSPRUNG = 200, AUS_AB = 700;
+    const TAKT = 33, ENDE = 1000, AUFSPRUNG = 200, AUS_AB = 700;
     const PADX = 18, PAD_OBEN = 42, PAD_UNTEN = 10;               // Platz um die Karte (Rasterpixel): das Fragezeichen steht darueber
     const rausch = (a, b) => { const x = Math.sin(a * 127.1 + b * 311.7) * 43758.5453; return x - Math.floor(x); };
     // Aufsprung mit kleinem Ueberschwinger (0 → 1.12 → 1)
     const springe = (u) => u >= 1 ? 1 : (u < 0.7 ? (u / 0.7) * 1.12 : 1.12 - 0.12 * ((u - 0.7) / 0.3));
-    return function SurprisingOpportunityEffect({ x, y, w, h }) {
+    return function SurprisingOpportunityEffect({ x, y, w, h, zelleS }) {
       const cvs = useRef(null);
+      const S = useMemo(() => ppFxZelleFuer({ x, y, w, zelleS }), []);   // Rasterzelle = Hero-Pixel (ppFxZelle)
       const kw = Math.max(12, Math.round((w || 64) / S)), kh = Math.max(16, Math.round((h || 90) / S));
       const GW = kw + PADX * 2, GH = kh + PAD_OBEN + PAD_UNTEN;
       const CX = Math.floor(GW / 2), CY = PAD_OBEN + Math.floor(kh / 2);
@@ -28305,13 +28446,14 @@ const ANIM_REGISTRY = {
     const SEIL = ['#f7e0b5', '#d1a148', '#9d612f', '#5a3c14'].map(ppHex);  // Licht, hell, mittel, dunkel
     const FUNKEN = ['#ffffff', '#fff196', '#ffc61c', '#ff8b1a'].map(ppHex);
     const AUSRUF = ['##', '##', '##', '##', '..', '##'];
-    const S = 3, TAKT = 33, ENDE = 1000, AUFSPRUNG = 190, AUS_AB = 700;
+    const TAKT = 33, ENDE = 1000, AUFSPRUNG = 190, AUS_AB = 700;
     const SCHLINGE_AB = 140, ZU_BIS = 520, ENGER_BIS = 640, BLITZ_BIS = 700;
     const PADX = 22, PAD_OBEN = 50, PAD_UNTEN = 26;              // Platz um die Karte (Rasterpixel): Ausrufezeichen oben, Schlinge ringsum
     const GROSS = 2;
     const springe = (u) => u >= 1 ? 1 : (u < 0.7 ? (u / 0.7) * 1.15 : 1.15 - 0.15 * ((u - 0.7) / 0.3));
-    return function CaptureLassoEffect({ x, y, w, h }) {
+    return function CaptureLassoEffect({ x, y, w, h, zelleS }) {
       const cvs = useRef(null);
+      const S = useMemo(() => ppFxZelleFuer({ x, y, w, zelleS }), []);   // Rasterzelle = Hero-Pixel (ppFxZelle)
       const kw = Math.max(12, Math.round((w || 64) / S)), kh = Math.max(16, Math.round((h || 90) / S));
       const GW = kw + PADX * 2, GH = kh + PAD_OBEN + PAD_UNTEN;
       const CX = Math.floor(GW / 2), CY = PAD_OBEN + Math.floor(kh / 2);
@@ -28452,12 +28594,13 @@ const ANIM_REGISTRY = {
     const PAL = ['#ffffff', '#f8f8bd', '#fad54a', '#ff9a1a', '#cc2b00', '#b5171c', '#6a1c14', '#535353', '#323232', '#222222'].map(ppHex);
     const FUNKEN = ['#ffffff', '#fbe181', '#ff9a1a', '#cc2b00'].map(ppHex);
     const WELLE = ['#ffffff', '#f8f8bd', '#fad54a'].map(ppHex);
-    const S = 3, TAKT = 33, ENDE = 1500, FADE_AB = 1050;
+    const TAKT = 33, ENDE = 1500, FADE_AB = 1050;
     const PADX = 40, PAD_OBEN = 64, PAD_UNTEN = 12;
     const rausch = (a, b) => { const x = Math.sin(a * 127.1 + b * 311.7) * 43758.5453; return x - Math.floor(x); };
     const klemme = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
-    return function BigOopsieEffect({ x, y, w, h }) {
+    return function BigOopsieEffect({ x, y, w, h, zelleS }) {
       const cvs = useRef(null);
+      const S = useMemo(() => ppFxZelleFuer({ x, y, w, zelleS }), []);   // Rasterzelle = Hero-Pixel (ppFxZelle)
       const kw = Math.max(12, Math.round((w || 64) / S)), kh = Math.max(16, Math.round((h || 90) / S));
       const GW = kw + PADX * 2, GH = kh + PAD_OBEN + PAD_UNTEN;
       const CX = Math.floor(GW / 2), CY = PAD_OBEN + Math.floor(kh / 2);
@@ -28610,12 +28753,13 @@ const ANIM_REGISTRY = {
     const EIS = ['#ffffff', '#e5f5fa', '#b3e8f9', '#77c8ee', '#399edf', '#4e82cb'].map(ppHex);
     const DAMPF = ['#ffffff', '#e5edfa', '#a5b0c0', '#808898'].map(ppHex);
     const FUNKEN = ['#f8f8bd', '#fad54a', '#ff9a1a', '#cc2b00'].map(ppHex);
-    const S = 3, TAKT = 33, ENDE = 1500, FADE_AB = 1150, BERSTEN = 540;
+    const TAKT = 33, ENDE = 1500, FADE_AB = 1150, BERSTEN = 540;
     const PADX = 26, PAD_UNTEN = 10;
     const rausch = (a, b) => { const x = Math.sin(a * 127.1 + b * 311.7) * 43758.5453; return x - Math.floor(x); };
     const klemme = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
-    return function FrostBreakerEffect({ x, y, w, h }) {
+    return function FrostBreakerEffect({ x, y, w, h, zelleS }) {
       const cvs = useRef(null);
+      const S = useMemo(() => ppFxZelleFuer({ x, y, w, zelleS }), []);   // Rasterzelle = Hero-Pixel (ppFxZelle)
       const kw = Math.max(12, Math.round((w || 64) / S)), kh = Math.max(16, Math.round((h || 90) / S));
       // Held-Zone: breiter als hoch — der Sprite steht ueber der Karte, die Kruste soll ihn mit einhuellen
       const HOEHE = (w || 64) > (h || 90) * 1.1 ? Math.round(kw * 1.6) : kh;
@@ -29626,7 +29770,7 @@ const ANIM_REGISTRY = {
     const SPLITTER = ['#ffffff', '#b3e8f9', '#77c8ee', '#399edf'].map(ppHex);
     const RISS = ppHex('#e5f5fa'), RISS2 = ppHex('#7bbeea');
     const WELLE = ['#ffffff', '#b3e8f9', '#77c8ee'].map(ppHex);
-    const S = 3, TAKT = 33, ENDE = 1500, TREFFER = 400, ZERFALL_AB = 820, ZERFALL_BIS = 1180, FADE_AB = 1100;
+    const TAKT = 33, ENDE = 1500, TREFFER = 400, ZERFALL_AB = 820, ZERFALL_BIS = 1180, FADE_AB = 1100;
     const PADX = 50, PAD_OBEN = 118, PAD_UNTEN = 14;
     const rausch = (a, b) => { const x = Math.sin(a * 127.1 + b * 311.7) * 43758.5453; return x - Math.floor(x); };
     const klemme = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
@@ -29635,8 +29779,9 @@ const ANIM_REGISTRY = {
       const qx = Math.abs(px) - (hw - r), qy = Math.abs(py) - (hh - r);
       return Math.hypot(Math.max(qx, 0), Math.max(qy, 0)) + Math.min(Math.max(qx, qy), 0) - r;
     };
-    return function BiseriaFistEffect({ x, y, w, h }) {
+    return function BiseriaFistEffect({ x, y, w, h, zelleS }) {
       const cvs = useRef(null);
+      const S = useMemo(() => ppFxZelleFuer({ x, y, w, zelleS }), []);   // Rasterzelle = Hero-Pixel (ppFxZelle)
       const kw = Math.max(12, Math.round((w || 64) / S)), kh = Math.max(16, Math.round((h || 90) / S));
       const GW = kw + PADX * 2, GH = kh + PAD_OBEN + PAD_UNTEN;
       const CX = Math.floor(GW / 2), CY = PAD_OBEN + Math.floor(kh / 2);
@@ -30001,7 +30146,7 @@ const ANIM_REGISTRY = {
     ];
     const KONTUR = ppHex('#170b28'), KORK = ppHex('#ca874e'), KORK2 = ppHex('#9d612f'), GLANZ = ppHex('#ffffff');
     const STERN = [ppHex('#ffffff'), ppHex('#fbe181'), ppHex('#b3d8f9')];
-    const S = 3, TAKT = 33, ENDE = 1200, EIN = 150, FADE_AB = 1000;
+    const TAKT = 33, ENDE = 1200, EIN = 150, FADE_AB = 1000;
     const PADX = 34, PAD_OBEN = 44, PAD_UNTEN = 8;
     const klemme = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
     // Flasche in lokalen Koordinaten (u nach rechts, v nach unten, Ursprung = Mitte): Körper (Ellipse), Hals, Kork — gibt eine Farbstufe zurück
@@ -30021,8 +30166,9 @@ const ANIM_REGISTRY = {
       if (imHals) return Math.abs(u) > 1.0 ? 1 : 3;
       return 0;
     };
-    return function PotionJuggleEffect({ x, y, w, h }) {
+    return function PotionJuggleEffect({ x, y, w, h, zelleS }) {
       const cvs = useRef(null);
+      const S = useMemo(() => ppFxZelleFuer({ x, y, w, zelleS }), []);   // Rasterzelle = Hero-Pixel (ppFxZelle)
       const kw = Math.max(12, Math.round((w || 64) / S)), kh = Math.max(16, Math.round((h || 90) / S));
       const GW = kw + PADX * 2, GH = kh + PAD_OBEN + PAD_UNTEN;
       const CX = Math.floor(GW / 2), CY = PAD_OBEN + Math.floor(kh / 2);
@@ -30111,12 +30257,13 @@ const ANIM_REGISTRY = {
   triumphant_return: (() => {
     const GOLD = ['#ffffff', '#f7f7ad', '#fad54a', '#f29a3e', '#ee6428', '#b62600'].map(ppHex);
     const KONF = ['#fe5154', '#f8ca21', '#6d9bf8', '#ffffff', '#4ceb70'].map(ppHex);
-    const S = 3, TAKT = 33, ENDE = 1300, EIN = 120, FADE_AB = 1000;
+    const TAKT = 33, ENDE = 1300, EIN = 120, FADE_AB = 1000;
     const PADX = 40, PAD_OBEN = 92, PAD_UNTEN = 16;
     const klemme = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
     const rausch = (a, b) => { const x = Math.sin(a * 127.1 + b * 311.7) * 43758.5453; return x - Math.floor(x); };
-    return function TriumphantReturnEffect({ x, y, w, h }) {
+    return function TriumphantReturnEffect({ x, y, w, h, zelleS }) {
       const cvs = useRef(null);
+      const S = useMemo(() => ppFxZelleFuer({ x, y, w, zelleS }), []);   // Rasterzelle = Hero-Pixel (ppFxZelle)
       const kw = Math.max(12, Math.round((w || 64) / S)), kh = Math.max(16, Math.round((h || 90) / S));
       const GW = kw + PADX * 2, GH = kh + PAD_OBEN + PAD_UNTEN;
       const CX = Math.floor(GW / 2), CY = PAD_OBEN + Math.floor(kh / 2);
@@ -31121,7 +31268,7 @@ const ANIM_REGISTRY = {
   //  Der Server schickt `ablageBesitzer` (Seite der Ablage), der Client rechnet daraus `ablageDx/Dy/W/H` (Abstand zur Zone) — ohne Ablage entfallen Schweif und Aufprall.
   // ═══════════════════════════════════════════════════════════════════
   sinister_idol: (() => {
-    const S = 3, TAKT = 33;
+    const TAKT = 33;
     const ENDE = 2000, FLUG_AB = 900, FLUG_MS = 500, BEAT = 880, FADE_AB = 1550;
     const klemme = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
     const GOLD = ['#fffbd2', '#ffe23d', '#ffd61a', '#f9ac20', '#c68206', '#8b5b04', '#5a3c14'].map(ppHex);
@@ -31237,7 +31384,7 @@ const ANIM_REGISTRY = {
     const NRUNEN = 14;
 
     // ── Geometrie: Canvas deckt Zone, Götze, Strahlen UND (falls vorhanden) die Ablage ab ──
-    const geometrie = (p) => {
+    const geometrie = (p, S) => {   // S = Rasterzelle (Hero-Pixel, ppFxZelle)
       const w = p.w || 64, h = p.h || 90;
       const hatAblage = typeof p.ablageDx === 'number' && typeof p.ablageDy === 'number';
       const aw = p.ablageW || 64, ah = p.ablageH || 90;
@@ -31245,7 +31392,7 @@ const ANIM_REGISTRY = {
       const minY = Math.min(-(h / 2 + 150), hatAblage ? p.ablageDy - ah / 2 - 50 : 0), maxY = Math.max(h / 2 + 60, hatAblage ? p.ablageDy + ah / 2 + 50 : 0);
       const gw = Math.ceil((maxX - minX) / S), gh = Math.ceil((maxY - minY) / S);
       return {
-        gw, gh, links: Math.round(minX), oben: Math.round(minY),
+        S, gw, gh, links: Math.round(minX), oben: Math.round(minY),
         cx: -minX / S, cy: -minY / S, hw: Math.max(8, Math.round(w / S / 2)), hh: Math.max(10, Math.round(h / S / 2)),
         pile: hatAblage ? { x: -minX / S + p.ablageDx / S, y: -minY / S + p.ablageDy / S, w: aw / S, h: ah / S } : null,
       };
@@ -31467,7 +31614,8 @@ const ANIM_REGISTRY = {
     // ── Komponente: wie `ppPunktBild`, aber der Canvas wächst bis zur Ablage ──
     const Komponente = function SinisterIdolEffekt(props) {
       const cvs = useRef(null);
-      const sz = useMemo(() => geometrie(props), []);
+      const S = useMemo(() => ppFxZelleFuer(props), []);   // Rasterzelle = Hero-Pixel (ppFxZelle)
+      const sz = useMemo(() => geometrie(props, S), []);
       const teile = useMemo(() => vorbereiten(sz), []);
       useEffect(() => {
         const el = cvs.current;
@@ -37083,8 +37231,14 @@ function stRewards(res, seat) {
   return out;
 }
 function StRanking({ res, players, myIdx }) {
-  const rows = players.map((p, i) => ({ i, p, place: res.placements?.[i] ?? players.length, sc: res.sc?.[i] || 0 }))
+  const alle = players.map((p, i) => ({ i, p, place: res.placements?.[i] ?? players.length, sc: res.sc?.[i] || 0 }))
     .sort((a, b) => a.place - b.place || a.i - b.i);
+  // Handy (844×390): mehr als 4 Zeilen passen nicht sicher unter die Belohnungen (Zeilen 6–8 waren abgeschnitten, auch die eigene) — dort die ersten drei plus die eigene Zeile (mit ihrer echten Platznummer)
+  let rows = alle;
+  if (alle.length > 4 && typeof window.ppIsPhone === 'function' && window.ppIsPhone()) {
+    const ich = alle.find(r => r.i === myIdx), top = alle.slice(0, 3);
+    rows = (ich && !top.includes(ich)) ? [...top, ich] : alle.slice(0, 4);
+  }
   return (
     <div className="st-ranking">
       {rows.map(r => (
@@ -37275,14 +37429,14 @@ const ChatPanel = React.memo(function ChatPanel({ roomId, participants: particip
           <div className="chat-body">
             {participants.players.map(p => (
               <div key={p.username} className="player-list-entry" onClick={() => p.username !== myUsername && setChatView('private:' + p.username)}>
-                {p.avatar && <img className="player-list-avatar" src={p.avatar} alt="" />}
+                {p.avatar && <window.PlayerAvatar className="player-list-avatar" name={p.username} src={p.avatar} alt="" />}
                 <span className="player-list-name" style={{ color: p.color }}>{p.username}{p.username === myUsername ? ' (you)' : ''}</span>
                 <span className="player-list-badge">PLAYER</span>
               </div>
             ))}
             {participants.spectators.map(s => (
               <div key={s.username} className="player-list-entry" onClick={() => s.username !== myUsername && setChatView('private:' + s.username)}>
-                {s.avatar && <img className="player-list-avatar" src={s.avatar} alt="" />}
+                {s.avatar && <window.PlayerAvatar className="player-list-avatar" name={s.username} src={s.avatar} alt="" />}
                 <span className="player-list-name" style={{ color: '#7f7f7f' }}>{s.username}{s.username === myUsername ? ' (you)' : ''}</span>
                 <span className="player-list-badge">SPECTATOR</span>
               </div>
@@ -37292,7 +37446,7 @@ const ChatPanel = React.memo(function ChatPanel({ roomId, participants: particip
           <div className="chat-body" ref={chatBodyRef}>
             {(isPrivate ? privateMsgs : chatMessages).map(msg => (
               <div key={msg.id} className={'chat-msg' + (msg.isSpectator ? ' spectator-msg' : '')}>
-                {msg.avatar && <img className="chat-msg-avatar" src={msg.avatar} alt="" />}
+                {msg.avatar && <window.PlayerAvatar className="chat-msg-avatar" name={msg.from || msg.username} src={msg.avatar} alt="" />}
                 <span className="chat-msg-name"
                   style={{ color: msg.isSpectator ? '#7f7f7f' : (msg.color || '#fff') }}
                   onClick={() => (msg.from || msg.username) !== myUsername && setChatView('private:' + (msg.from || msg.username))}
@@ -37393,7 +37547,7 @@ function TutorialFinaleFeuerwerk() {
   useEffect(() => {
     const cv = leinwand.current;
     if (!cv || window._playAnimations === false) return undefined;
-    const S = 3;
+    const S = ppFxZelle(null);   // Rasterzelle = Hero-Pixel (ppFxZelle)
     const r0 = cv.parentElement.getBoundingClientRect();
     const W = Math.max(40, Math.ceil(r0.width / S)), H = Math.max(40, Math.ceil(r0.height / S));
     cv.width = W; cv.height = H;
@@ -37822,9 +37976,12 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
   const goldCrashRaf = useRef(null);
   // 'crash' (rot) oder 'recover' (gruen) — steuert die Zaehler-Klasse.
   const [goldCrashTone, setGoldCrashTone] = useState('crash');
-  const me = gameState.players[myIdx];
-  const opp = gameState.players[oppIdx];
-  const gameSkins = useMemo(() => ({ ...(me.deckSkins || {}), ...(opp.deckSkins || {}) }), [me.deckSkins, opp.deckSkins]);
+  // Rang-Rahmen (Duplikate): Avatar und Sleeve beider Spieler tragen ihren Rahmen eingebacken (useFramedPlayer, app-shared.jsx); die Ränge der
+  // Skin-Karten hängen an der Skin-Zuordnung des jeweiligen Besitzers (cardImageUrl hängt `?rahmen=N` an, der Karten-Shim backt ihn ein).
+  const me = useFramedPlayer(gameState.players[myIdx]);
+  const opp = useFramedPlayer(gameState.players[oppIdx]);
+  window.ppSkinRanksSet(me.deckSkins, me.skinRanks); window.ppSkinRanksSet(opp.deckSkins, opp.skinRanks);
+  const gameSkins = useMemo(() => window.ppSkinMerge(me.deckSkins, opp.deckSkins), [me.deckSkins, opp.deckSkins]);
   const result = gameState.result;
   const iWon = result && result.winnerIdx === myIdx;
   const stRes = (result && gameState.skillTest && result.skillTest) || null;
@@ -47131,19 +47288,30 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
 
       // Fire the beam after a short charge delay
       setTimeout(() => {
-        // Outer beam glow — thicker, hazier
+        // Outer beam glow — thicker, hazier.
+        // ★ Bugfix: der Glanz trug die Drehung zum Ziel INLINE (`transform: rotate(angle)`), aber seine Keyframes (`eraserBeamOuter`) setzen selbst
+        // `transform: scaleX() scaleY()` und überschrieben sie — der rote Schein lag immer waagerecht (Winkel 0°) statt auf der Strecke zum Ziel. Jetzt
+        // steckt er (wie der Kern) in einer gedrehten Hülle; die Keyframes skalieren nur noch im Hüllen-Koordinatensystem.
+        const outerWrap = document.createElement('div');
+        outerWrap.style.cssText = [
+          `position:fixed`, `left:${sx}px`, `top:${sy}px`,
+          `width:${len}px`, `height:0px`,
+          `transform-origin:0 0`, `transform:rotate(${angle}deg)`,
+          `pointer-events:none`, `z-index:10011`,
+        ].join(';');
+        document.body.appendChild(outerWrap);
         const outer = document.createElement('div');
         outer.style.cssText = [
-          `position:fixed`, `left:${sx}px`, `top:${sy}px`,
-          `width:${len}px`, `height:28px`,
-          `transform-origin:0 50%`, `transform:rotate(${angle}deg)`,
+          `position:absolute`, `left:0`, `top:-14px`,
+          `width:100%`, `height:28px`,
+          `transform-origin:0 50%`,
           `background:linear-gradient(180deg, transparent 0%, rgba(181,23,28,0.65) 40%, rgba(240,50,50,0.85) 50%, rgba(181,23,28,0.65) 60%, transparent 100%)`,
           `filter:blur(6px)`,
-          `pointer-events:none`, `z-index:10011`, `opacity:0`,
+          `pointer-events:none`, `opacity:0`,
           `animation:eraserBeamOuter 1000ms ease-out forwards`,
         ].join(';');
-        document.body.appendChild(outer);
-        setTimeout(() => outer.remove(), 1050);
+        outerWrap.appendChild(outer);
+        setTimeout(() => outerWrap.remove(), 1050);
 
         // Rotated container for the beam itself + lightning (so bolts
         // can be placed along the beam axis using left/top relative to
@@ -47346,6 +47514,8 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     //    zone — it sits centered above the board-center element.
     const onBigGwenClockActivation = ({ owner }) => {
       if (window.playSFXForZoneAnim) window.playSFXForZoneAnim('ev_big_gwen_clock');   // Als Befund 10.10.: war stumm (Sweep, ZONE_ANIM_SFX)
+      // Pixelart-Fassung (app-fx-58: Leinwand, Hero-Pixel, Bayer-Raster). Nur im Rückfall (Animationen aus, Retro, reduzierte Bewegung) läuft die DOM-Fassung unten.
+      if (window.ppFx58BigGwenStart && window.ppFx58BigGwenStart()) return;
       const container = document.querySelector('.board-center');
       if (!container) return;
       const r = container.getBoundingClientRect();
@@ -47386,6 +47556,8 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
             80%, 99% { transform: translate(-50%, -100%) rotate(-6deg); } /* pp-ok: drehung */
             100%     { transform: translate(-50%, -100%) rotate(0deg); }
           }
+          @keyframes bgDimIn { 0% { opacity: 0; } 100% { opacity: 1; } }
+          @keyframes bgDimOut { 0% { opacity: 1; } 100% { opacity: 0; } }
           @keyframes bgBell {
             0%   { opacity: 0; transform: translate(-50%, -50%) scale(0.4); }
             30%  { opacity: 1; transform: translate(-50%, -50%) scale(1.3); }
@@ -47397,7 +47569,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
 
       // Dimmer behind the clock
       const dimmer = document.createElement('div');
-      dimmer.style.cssText = 'position:fixed;inset:0;background:radial-gradient(ellipse at center,rgba(31,15,4,.45),rgba(0,0,0,.15) 60%,transparent 90%);pointer-events:none;z-index:10020;opacity:0;animation:bgClockFadeIn 0.6s ease-out forwards,bgClockFadeOut 0.6s ease-in 1.6s forwards;';
+      dimmer.style.cssText = 'position:fixed;inset:0;background:radial-gradient(ellipse at center,rgba(31,15,4,.45),rgba(0,0,0,.15) 60%,transparent 90%);pointer-events:none;z-index:10020;opacity:0;animation:bgDimIn 0.6s steps(6,end) forwards,bgDimOut 0.6s steps(6,end) 1.6s forwards;';   // nur Deckkraft: die Aufpop-Keyframes (translate/scale/rotate) schoben den Vollbild-Abdunkler aus dem Bild
       document.body.appendChild(dimmer);
       setTimeout(() => dimmer.remove(), 2300);
 
@@ -54039,7 +54211,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     if (window.ppBattleCamFocus) window.ppBattleCamFocus(el);
     const r = el.getBoundingClientRect();
     const id = Date.now() + Math.random();
-    const dur = options.duration || 800;
+    const dur = Math.max(options.duration || 800, PP_ANIM_MINDAUER[type] || 0);
     // ★ v1258 — Weltverankerung: liegt der Anker im Feld, bekommt die
     // Animation Feld-Koordinaten und das `welt`-Flag; der Renderer
     // (unten) haengt sie damit in die verschiebbare Welt-Huelle.
@@ -54053,7 +54225,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     const entfernen = () => setGameAnims(prev => prev.filter(a => a.id !== id));
     let gestartet = false;
     const _gemountet = () => { if (gestartet) return; gestartet = true; setTimeout(entfernen, dur); };
-    setGameAnims(prev => [...prev, { id, type, x: r.left + r.width / 2 + _wo.dx, y: r.top + r.height / 2 + _wo.dy, w: r.width, h: r.height, welt: _wo.welt, ...(PP_SQUASH_ANIMS.has(type) ? { zoneEl: el } : null), ...options, _gemountet }]);
+    setGameAnims(prev => [...prev, { id, type, x: r.left + r.width / 2 + _wo.dx, y: r.top + r.height / 2 + _wo.dy, w: r.width, h: r.height, welt: _wo.welt, zelleS: ppFxZelle(el, r.width), ...(PP_SQUASH_ANIMS.has(type) ? { zoneEl: el } : null), ...options, _gemountet }]);
     setTimeout(() => { if (!gestartet) { gestartet = true; entfernen(); } }, dur + 6000);
   };
 
@@ -54223,6 +54395,9 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       });
       return;
     }
+    // Skill Test: Aufgeben = ausscheiden, der Spieler BLEIBT im Raum und bekommt am Ende seinen Platz samt Rangliste (bisher sendete der Knopf `leave_game`: der Server nahm ihm den Raum,
+    // er hing ohne Ergebnis und ohne Ausweg im Brett). Wer ausgeschieden ist, hat oben rechts LEAVE (siehe Kopfleiste).
+    if (gameState.skillTest) { socket.emit('surrender_game', { roomId: gameState.roomId }); return; }
     socket.emit('leave_game', { roomId: gameState.roomId });
     // Don't call onLeave — server will send updated game state with result
   };
@@ -57058,7 +57233,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                       hp: hero.hp, maxHp: hero.maxHp, atk: hero.atk, hpPosition: 'hero',
                       children: orbsEl || undefined,
                       orbs: hero.ascensionOrbs,
-                      skins: p.deckSkins ? { ...gameSkins, ...p.deckSkins } : gameSkins, abilities: p.abilityZones?.[i],
+                      skins: p.deckSkins ? window.ppSkinMerge(gameSkins, p.deckSkins) : gameSkins, abilities: p.abilityZones?.[i],
                       copiedHeroes: _kopiert,
                       inheritedEffects: _kopiert
                         .map(n => ({ label: n, text: CARDS_BY_NAME[n]?.effect || '' }))
@@ -59522,8 +59697,8 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                 🏳 SURRENDER
               </button>
             ) : (
-              <button className="btn btn-danger game-hand-quit" onClick={() => result ? handleLeave() : setShowSurrender(true)}>
-                {result ? '✕ LEAVE' : gameState.isPuzzle ? '✕ EXIT' : '⚑ SURRENDER'}
+              <button className="btn btn-danger game-hand-quit" onClick={() => (result || (gameState.skillTest && (gameState.skillTest.eliminated || []).includes(myIdx))) ? handleLeave() : setShowSurrender(true)}>
+                {(result || (gameState.skillTest && (gameState.skillTest.eliminated || []).includes(myIdx))) ? '✕ LEAVE' : gameState.isPuzzle ? '✕ EXIT' : '⚑ SURRENDER'}
               </button>
             )}
             </div>
@@ -59818,9 +59993,12 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
             {/* Ambient pixel motes — FIRST child on purpose: paints behind
                 every zone, card and area overlay (see BoardAmbiance). */}
             {/* Kampffeld (app-fx-55): Boden in der Perspektive der Plane, vor der Ambiance und unter allem; eine Area-Szene (deckend) ersetzt es komplett. */}
-            {window.PpFx55Feld && <window.PpFx55Feld roomId={gameState.roomId} tutorial={!!gameState.isTutorial} verdeckt={(gameState.areaZones || []).some(z => (z || []).length > 0)} />}
+            {/* Skill Test: Heimbasen (app-fx-56, je Sitz eine Boden-Hälfte); sonst das Kampffeld (app-fx-55). */}
+            {gameState.skillTest && window.PpFx56Basen
+              ? <window.PpFx56Basen roomId={gameState.roomId} sitze={gameState.players.length} myIdx={myIdx} oppIdx={oppIdx} />
+              : (window.PpFx55Feld && <window.PpFx55Feld roomId={gameState.roomId} tutorial={!!gameState.isTutorial} />)}
             <BoardAmbiance colorMe={me.color} colorOpp={opp.color} />
-            <AreaBackgrounds areaZones={gameState.areaZones} myIdx={myIdx} oppIdx={oppIdx} spielstand={{ doomCounters: gameState.doomCounters }} />
+            <AreaBackgrounds areaZones={gameState.areaZones} myIdx={myIdx} oppIdx={oppIdx} spielstand={{ doomCounters: gameState.doomCounters }} halbiert={!!gameState.skillTest} />
             {(() => {
               // Gathering Storm is an Attachment Spell — it lives in a
               // hero's Support Zone rather than an Area Zone, so walk
@@ -62019,7 +62197,9 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                     const tg = !isMe && tutorialGegner ? tutorialGegner : null;
                     const bild = tg ? tg.avatar : p.avatar;
                     const held = portraetHeld(p);
-                    if (bild) return <img src={bild} alt="" style={{ width: 32, height: 32, borderRadius: '50%', objectFit: 'cover' }} />;
+                    if (bild) return (isMe || tg || !window.PlayerAvatar)
+                      ? <img src={bild} alt="" style={{ width: 32, height: 32, borderRadius: '50%', objectFit: 'cover' }} />
+                      : <window.PlayerAvatar name={p.username} src={bild} rank={p.avatarRank || 0} alt="" style={{ width: 32, height: 32, borderRadius: p.avatarRank ? 0 : '50%', objectFit: 'cover' }} />;
                     if (held && HeroArtCrop) return <HeroArtCrop heroName={held} width={56} />;
                     return null;
                   })()}
@@ -63254,118 +63434,18 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
            Nur die drei ERGEBNIS-Overlays werden angehoben, nicht
            `.modal-overlay` global: das tragen auch Lobby und Deckbau, und
            deren Ebenen sollen sich nicht mitverschieben. */}
-      {/* Win/Loss overlay — round result (non-final) */}
+      {/* Runden-Ergebnis (Best of N, Satz noch offen): dieselbe Zeremonie wie Sieg/Niederlage (app-fx-54), ohne Knöpfe — sie verschwindet mit dem Ergebnis, sobald die nächste Runde beginnt (Wahl „Go first/second“ blendet sie ebenfalls aus). */}
       {result && !showFirstChoice && !result.setOver && result.format > 1 && !sideDeckPhase && (
-        <div className="modal-overlay" style={{ zIndex: 10080, background: 'rgba(0,0,0,.65)' }}>
-          <div className="animate-in" style={{ textAlign: 'center' }}>
-            <div className="pixel-font" style={{
-              fontSize: 28, marginBottom: 12,
-              color: isSpectator ? 'var(--accent)' : (iWon ? 'var(--success)' : 'var(--danger)'),
-              textShadow: isSpectator ? '0 0 30px rgba(102,182,255,.3)' : (iWon ? '0 0 30px rgba(76,235,112,.4)' : '0 0 30px rgba(252,28,95,.4)'),
-            }}>
-              {isSpectator ? `${result.winnerName} wins the round!` : (iWon ? 'ROUND WIN!' : 'ROUND LOSS')}
-            </div>
-            <div className="orbit-font" style={{ fontSize: 32, marginBottom: 8, color: 'var(--text)' }}>
-              {result.setScore[0]} — {result.setScore[1]}
-            </div>
-            <div style={{ fontSize: 11, color: 'var(--text2)' }}>Next round starting soon...</div>
-            {renderSCEarned()}
-          </div>
-        </div>
-      )}
-
-      {/* Set complete overlay — fireworks + final score */}
-      {result && !showFirstChoice && result.setOver && result.format > 1 && (
-        <div className="modal-overlay set-complete-overlay" style={{ zIndex: 10080, background: 'rgba(0,0,0,.8)' }}>
-          <div className="set-fireworks">
-            {Array.from({ length: ppFxN(24) }).map((_, i) => (
-              <div key={i} className="firework-particle" style={{
-                '--fw-x': (Math.random() * 200 - 100) + 'px',
-                '--fw-y': (Math.random() * -200 - 40) + 'px',
-                '--fw-color': ['#fad54a','#fc1c5f','#4ceb70','#1ca9fd','#ff8b1a','#a952ff'][i % 6],
-                '--fw-delay': (Math.random() * 2) + 's',
-                '--fw-dur': (1 + Math.random()) + 's',
-                left: (20 + Math.random() * 60) + '%',
-                top: (30 + Math.random() * 30) + '%',
-              }} />
-            ))}
-          </div>
-          <div className="animate-in" style={{ textAlign: 'center', position: 'relative', zIndex: 2 }}>
-            <div className="pixel-font" style={{
-              fontSize: 40, marginBottom: 8,
-              color: isSpectator ? '#fad54a' : (iWon ? '#fad54a' : 'var(--danger)'),
-              textShadow: isSpectator ? '0 0 40px rgba(250,213,74,.6)' : (iWon ? '0 0 40px rgba(250,213,74,.6)' : '0 0 40px rgba(252,28,95,.5)'),
-            }}>
-              {isSpectator ? `🏆 ${result.winnerName} WINS! 🏆` : (iWon ? '🏆 SET VICTORY! 🏆' : 'SET DEFEAT')}
-            </div>
-            <div className="orbit-font" style={{ fontSize: 48, margin: '16px 0', color: 'var(--text)' }}>
-              {result.setScore[0]} — {result.setScore[1]}
-            </div>
-            <div style={{ fontSize: 13, color: 'var(--text2)', marginBottom: 4 }}>
-              Best of {result.format}
-            </div>
-            <div style={{ fontSize: 13, color: 'var(--text2)', marginBottom: 16 }}>
-              {result.reason === 'disconnect_timeout' ? `${result.loserName} timed out` :
-               result.reason === 'surrender' ? `${result.loserName} surrendered` :
-               result.reason === 'all_heroes_dead' ? `All of ${result.loserName}'s Heroes defeated!` :
-               ppGameOverText(result.reason, isSpectator ? null : (iWon ? 'win' : 'lose'), result.loserName, result.winnerName)}
-            </div>
-            {result.eloChanges && (
-              <div style={{ marginBottom: 20 }}>
-                {result.eloChanges.map(ec => (
-                  <div key={ec.username} style={{ fontSize: 12, color: ec.username === user.username ? 'var(--text)' : 'var(--text2)' }}>
-                    {ec.username}: {ec.oldElo} → <span style={{ color: ec.newElo > ec.oldElo ? 'var(--success)' : 'var(--danger)', fontWeight: 700 }}>{ec.newElo}</span>
-                    {' '}({ec.newElo > ec.oldElo ? '+' : ''}{ec.newElo - ec.oldElo})
-                  </div>
-                ))}
-              </div>
-            )}
-            {renderSCEarned()}
-            {!isSpectator && ((decks && decks.length > 0) || (sampleDecks || []).some(d => isDeckLegal(d).legal)) && (
-              <div style={{ marginBottom: 14, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10 }}>
-                <label style={{ fontSize: 14, color: 'var(--text2)', fontWeight: 600 }}>🃏 Deck:</label>
-                {/* Eigenes Dropdown statt `<select>` (Android: das System-Auswahlfenster holt im Vollbild die Systemleiste; Pixel-Emoji). */}
-                <PPDropdown value={selectedDeck || ''} onChange={id => {
-                  setSelectedDeck(id);
-                  socket.emit('change_deck', { roomId: gameState.roomId, deckId: id });
-                }} style={{ fontSize: 14, minWidth: 240, padding: '8px 14px', borderColor: 'var(--accent)', color: 'var(--text)' }}
-                  options={[
-                    ...(decks || []).map(d => ({ value: d.id, label: d.name })),
-                    ...((sampleDecks || []).filter(d => isDeckLegal(d).legal).length > 0 ? [{ value: '__sample_kopf', disabled: true, label: '── Sample Decks ──' }] : []),
-                    ...(sampleDecks || []).filter(d => isDeckLegal(d).legal).map(d => ({ value: d.id, label: '📋 ' + d.name })),
-                  ]} />
-              </div>
-            )}
-            <div className="ergebnis-knoepfe" style={{ display: 'flex', gap: 12, justifyContent: 'center' }}>
-              {isSpectator ? (
-                <button className="btn btn-danger" style={{ padding: '12px 32px', fontSize: 14 }} onClick={handleLeave}>LEAVE</button>
-              ) : gameState.isCampaign ? (
-                // KAMPAGNEN-DUELL: der Ausgang gehoert der STORY. Kein
-                // Deckwechsel, keine Revanche — wer verliert, lebt mit
-                // dem Ergebnis (oder landet bei einem Pflichtduell ueber
-                // den Ruecksetzpunkt ohnehin wieder am Szenenanfang).
-                // Ein Wiederholungsknopf waere hier ein Ausweichknopf.
-                <button className="btn btn-success" style={{ padding: '12px 32px', fontSize: 14 }} onClick={handleLeave}>→ CONTINUE</button>
-              ) : gameState.isCpuBattle ? (
-                <>
-                  <button className="btn btn-success" style={{ padding: '12px 32px', fontSize: 14 }} onClick={handleRematch}>
-                    🔄 REMATCH
-                  </button>
-                  <button className="btn btn-danger" style={{ padding: '12px 32px', fontSize: 14 }} onClick={handleLeave}>LEAVE</button>
-                </>
-              ) : !oppLeft && !oppDisconnected ? (
-                <>
-                  <button className="btn btn-success" style={{ padding: '12px 32px', fontSize: 14 }} onClick={handleRematch} disabled={myRematchSent}>
-                    {myRematchSent ? '⏳ WAITING...' : '🔄 REMATCH'}
-                  </button>
-                  <button className="btn btn-danger" style={{ padding: '12px 32px', fontSize: 14 }} onClick={handleLeave}>LEAVE</button>
-                </>
-              ) : (
-                <button className="btn btn-danger" style={{ padding: '12px 32px', fontSize: 14 }} onClick={handleLeave}>LEAVE</button>
-              )}
-            </div>
-          </div>
-        </div>
+        <ResultCeremony
+          won={!!iWon} spectator={!!isSpectator}
+          title={isSpectator ? 'ROUND OVER' : (iWon ? 'ROUND WIN!' : 'ROUND LOST!')}
+          subtitle={`${isSpectator ? `${result.winnerName || gameState.players?.[result.winnerIdx]?.username || '?'} wins the round  |  ` : ''}Score ${(result.setScore || [0, 0])[0]} - ${(result.setScore || [0, 0])[1]}  |  Next round starting soon`}
+          rewards={(!isSpectator && scEarned && !user?.isGuest) ? (scEarned.rewards || []) : []}
+          total={(!isSpectator && scEarned && !user?.isGuest) ? (scEarned.total || 0) : 0}
+          eloChanges={null} myName={user?.username}
+          oppName={(gameState.isCpuBattle && opp?.username === 'CPU') ? heroDisplayName(opp.heroes?.[1]?.name || opp.heroes?.find(h => h?.name)?.name || opp.username) : opp?.username}
+          extra={user?.isGuest ? renderSCEarned() : null}
+          helden={[]} eigenerCluster={false} cpuProgress={null} kurz />
       )}
 
       {/* ── Puzzle / Tutorial Result Overlay ── */}
@@ -63424,23 +63504,26 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           hochzaehlender SC-Zaehler, zum Schluss die Knoepfe. Ein Klick auf
           den Hintergrund ueberspringt die Staffelung. Deck-Auswahl und
           Knoepfe sind unveraendert die bisherigen. */}
-      {result && !result.isPuzzle && !showFirstChoice && (result.setOver || !result.format || result.format === 1) && !(result.format > 1) && (
+      {result && !result.isPuzzle && !showFirstChoice && (result.setOver || !result.format || result.format === 1) && (() => {
+        const satz = result.format > 1;   // Satz (Best of N) entschieden: gleiche Zeremonie, Titel SET VICTORY!/SET LOST!, Satzstand im Untertitel
+        const grundText = (() => { const r = result; const w = iWon; return (
+          isSpectator ? (
+            r.reason === 'disconnect_timeout' ? `${r.loserName} timed out` :
+            r.reason === 'surrender' ? `${r.loserName} surrendered` :
+            r.reason === 'all_heroes_dead' ? `All of ${r.loserName}'s Heroes defeated!` :
+            ppGameOverText(r.reason, null, r.loserName, r.winnerName)
+          ) : (
+            r.reason === 'disconnect_timeout' ? 'Opponent timed out' :
+            r.reason === 'opponent_left' ? 'Opponent left the game' :
+            r.reason === 'surrender' ? (w ? 'Opponent surrendered' : 'You surrendered') :
+            r.reason === 'all_heroes_dead' ? (w ? 'All enemy Heroes defeated!' : 'All your Heroes were defeated') :
+            ppGameOverText(r.reason, w ? 'win' : 'lose', r.loserName, r.winnerName)
+          )); })();
+        return (
         <ResultCeremony
           won={!!iWon} spectator={!!isSpectator}
-          title={isSpectator ? `${result.winnerName} WINS!` : (iWon ? 'VICTORY' : (stRes ? stPlaceTitle(stRes.placements?.[myIdx]) : 'DEFEAT'))}
-          subtitle={stRes ? `${stRes.rounds} round${stRes.rounds === 1 ? '' : 's'} played` : (() => { const r = result; const w = iWon; return (
-            isSpectator ? (
-              r.reason === 'disconnect_timeout' ? `${r.loserName} timed out` :
-              r.reason === 'surrender' ? `${r.loserName} surrendered` :
-              r.reason === 'all_heroes_dead' ? `All of ${r.loserName}'s Heroes defeated!` :
-              ppGameOverText(r.reason, null, r.loserName, r.winnerName)
-            ) : (
-              r.reason === 'disconnect_timeout' ? 'Opponent timed out' :
-              r.reason === 'opponent_left' ? 'Opponent left the game' :
-              r.reason === 'surrender' ? (w ? 'Opponent surrendered' : 'You surrendered') :
-              r.reason === 'all_heroes_dead' ? (w ? 'All enemy Heroes defeated!' : 'All your Heroes were defeated') :
-              ppGameOverText(r.reason, w ? 'win' : 'lose', r.loserName, r.winnerName)
-            )); })()}
+          title={isSpectator ? `${result.winnerName || gameState.players?.[result.winnerIdx]?.username || '?'} WINS!` : (iWon ? (satz ? 'SET VICTORY!' : 'VICTORY') : (stRes ? stPlaceTitle(stRes.placements?.[myIdx]) : (satz ? 'SET LOST!' : 'DEFEAT')))}
+          subtitle={stRes ? `${stRes.rounds} round${stRes.rounds === 1 ? '' : 's'} played` : (satz ? `Best of ${result.format}  |  Score ${(result.setScore || [0, 0])[0]} - ${(result.setScore || [0, 0])[1]}` : grundText)}
           rewards={stRes ? ((isSpectator || user?.isGuest) ? [] : stRewards(stRes, myIdx)) : ((!isSpectator && scEarned && !user?.isGuest) ? (scEarned.rewards || []) : [])}
           total={stRes ? ((isSpectator || user?.isGuest) ? 0 : (stRes.sc?.[myIdx] || 0)) : ((!isSpectator && scEarned && !user?.isGuest) ? (scEarned.total || 0) : 0)}
           eloChanges={result.eloChanges || null}
@@ -63451,7 +63534,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
             : (gameState.isCpuBattle && opp?.username === 'CPU')
               ? heroDisplayName(opp.heroes?.[1]?.name || opp.heroes?.find(h => h?.name)?.name || opp.username)
               : opp?.username}
-          extra={(isSpectator || user?.isGuest) ? renderSCEarned() : null}
+          extra={(satz || isSpectator || user?.isGuest) ? <>{satz && !stRes && <div className="pp-cer-unter">{grundText}</div>}{(isSpectator || user?.isGuest) ? renderSCEarned() : null}</> : null}
           // Ergebnis-Zeremonie (app-fx-54): Namen der eigenen Helden fuer die Siegerfiguren am Rand (nur wenn Platz ist)
           helden={isSpectator ? [] : (gameState.players?.[myIdx]?.heroes || []).map(h => h && h.name).filter(Boolean)}
           eigenerCluster={!!meBubbleMsg}
@@ -63512,7 +63595,8 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
               )}
             </div>
         </ResultCeremony>
-      )}
+        );
+      })()}
       {/* ── GROSSER KARTEN-AUFTRITT (1.8.) ──────────────────────────
           Terror beendet den Zug — die Karte erscheint einmal mittig,
           wächst über zwei Sekunden und blendet dabei aus. Rein

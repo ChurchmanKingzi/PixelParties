@@ -27,6 +27,7 @@ const ScTracking = require('./_sc-tracking');   // v1381
 const SpyShared = require('./_spy-shared');   // Spy in the Enemy's Camp: Spionage-Marke an der Kreatur
 const ZugFristen = require('./_zug-fristen');   // W68a: „nur echte Züge zählen"
 // ★ W63d: Ereignisse, die den Beginn einer Aktion ANKÜNDIGEN, aber noch keine sichtbare Wirkung sind: sie lösen den Commit des Auftritts nicht aus (nur Protokoll + Flug/Aktivierungsschein).
+const AUFTRITT_HALTE_MAX_MS = 4000;   // Fail-safe: so lange hält eine Vormerkung den Zustand höchstens zurück, wenn der Besitzer keine Frage offen hat (siehe `_auftrittWaechterStellen`)
 const AUFTRITT_HALTE_EREIGNISSE = new Set(['action_log', 'hand_to_board_fly', 'ability_activated', 'potion_resolved']);   // `potion_resolved`: der Server sendet es beim START der Auflösung — also VOR den abbrechbaren Fragen der Karte
 
 // Aufstiegs-Erlasse (Perilous Journey): `true` weitete das Fenster zum
@@ -59588,6 +59589,23 @@ this._deathWatch = (this._deathWatchStack || []).length
   //  `gs._holdCardReveal = true` hält den Auftritt weiterhin zurück, bis die Karte ihn selbst freigibt (ältere Muster bleiben gültig).
   // ═══════════════════════════════════════════════════════════════════════════
 
+  /**
+   * FAIL-SAFE gegen hängende Spiele: hält die Vormerkung den Zustand zurück, wacht ein Zeitgeber darüber. Nach `AUFTRITT_HALTE_MAX_MS` ohne offene Frage des Besitzers (= nichts wartet auf eine Antwort,
+   * die den Commit auslösen könnte) oder wenn das Spiel zu Ende ist, wird der Auftritt ausgeliefert — samt zurückgehaltenem Zustand. Mit offener Frage (der Besitzer überlegt noch) läuft er weiter.
+   */
+  _auftrittWaechterStellen(pend) {
+    if (this._inMctsSim || this._fastMode || (this._auftrittWaechter && this._auftrittWaechter.pend === pend)) return;
+    if (this._auftrittWaechter) clearTimeout(this._auftrittWaechter.t);
+    const w = this._auftrittWaechter = { pend, t: null };   // bewusst NICHT im Spielzustand (gs wird kopiert/serialisiert)
+    const pruefen = () => {
+      if (this._auftrittWaechter === w) this._auftrittWaechter = null;
+      if (this._aborted || this.gs._pendingCardReveal !== pend) return;   // schon committet oder abgebrochen
+      if (this.gs.result || !this._auftrittFrageOffen(pend.ownerIdx)) { this.gs._holdCardReveal = false; this._firePendingCardReveal(); return; }
+      w.t = setTimeout(pruefen, AUFTRITT_HALTE_MAX_MS); if (w.t.unref) w.t.unref(); this._auftrittWaechter = w;
+    };
+    w.t = setTimeout(pruefen, AUFTRITT_HALTE_MAX_MS); if (w.t.unref) w.t.unref();
+  }
+
   /** Hat der Besitzer gerade eine Frage offen (Prompt, Zielwahl)? Dann kann er noch abbrechen. */
   _auftrittFrageOffen(ownerIdx) {
     const gs = this.gs;
@@ -59603,6 +59621,7 @@ this._deathWatch = (this._deathWatchStack || []).length
   _auftrittEntscheide(event) {
     const pend = this.gs._pendingCardReveal;
     if (!pend || this._inMctsSim || this._fastMode || this._auftrittFlush) return null;
+    if (this.gs.result) { this.gs._holdCardReveal = false; this._firePendingCardReveal(); return null; }   // Spielende: nichts mehr zurückhalten (siehe `_auftrittZustandHalten`)
     // Liegengebliebener Auftritt aus einem früheren Zug (Fehlerfall): lieber nachliefern als Sendungen verschlucken.
     if (pend._turn == null) pend._turn = this.gs.turn;
     else if (pend._turn !== this.gs.turn) { this._firePendingCardReveal(); return this.gs._pendingCardReveal || null; }
@@ -59702,9 +59721,13 @@ this._deathWatch = (this._deathWatchStack || []).length
     const pend = this.gs && this.gs._pendingCardReveal;
     if (!pend || this._inMctsSim || this._fastMode || this._auftrittFlush) return false;
     if (empfaengerIdx === pend.ownerIdx) return false;
+    // ENDE-SICHERUNG: ein Spielergebnis (Aufgabe, Heldentod, Ausscheiden, Verbindungsabbruch …) darf NIE zurückgehalten werden — danach kommt kein Commit mehr, der Zustand mit `result` ginge sonst verloren
+    // (der Spieler bliebe ohne Ergebnis im Brett hängen). Die Vormerkung wird jetzt ausgeliefert (Auftritt + Puffer), das Ergebnis geht sofort hinterher.
+    if (this.gs.result) { this.gs._holdCardReveal = false; this._firePendingCardReveal(); return false; }
     if (pend._turn == null) pend._turn = this.gs.turn;
     else if (pend._turn !== this.gs.turn) { this._firePendingCardReveal(); return false; }   // liegengebliebene Vormerkung: nie Zustände verschlucken
     pend.zustandGehalten = true;
+    this._auftrittWaechterStellen(pend);
     return this._auftrittFrageOffen(pend.ownerIdx) ? 'huelle' : 'halten';   // 'huelle': nur die Hülle der Frage ist neu, der Rest bleibt der Zustand von vor der Karte
   }
 

@@ -324,9 +324,22 @@ function ppFx55Start(root, id, opt) {
   };
 }
 
-function PpFx55Feld({ roomId, tutorial, verdeckt }) {
+/** Deckt gerade eine Area-Szene (AreaBackgrounds: Schicht mit `isolation: isolate` direkt im Clip) das Feld? Maßgeblich ist, was AreaBackgrounds WIRKLICH zeigt (nur die Areas der beiden
+ *  sichtbaren Seiten) — im Skill Test (5–8 Sitze) liegen Areas anderer Sitze in `areaZones`, ohne dass eine Szene erscheint; die Prop `verdeckt` des Aufrufers (jede Area irgendwo) wäre dort falsch. */
+const ppFx55Abgedeckt = (clip) => !!(clip && clip.querySelector(':scope > div[style*="isolation: isolate"]'));
+function PpFx55Feld({ roomId, tutorial }) {
   const ref = React.useRef(null);
+  const [verdeckt, setVerdeckt] = React.useState(false);
   const id = React.useMemo(() => (window.PP_RETRO ? null : ppFx55Wahl(roomId, tutorial)), [roomId, tutorial]);
+  React.useLayoutEffect(() => {
+    const root = ref.current, clip = root && root.parentElement;
+    if (!root || !clip) return undefined;
+    const pruefen = () => setVerdeckt(ppFx55Abgedeckt(clip));
+    pruefen();
+    let mo = null;
+    try { mo = new MutationObserver(pruefen); mo.observe(clip, { childList: true }); } catch (e) { /* ohne */ }
+    return () => { if (mo) mo.disconnect(); };
+  }, [id]);
   React.useEffect(() => {
     const root = ref.current;
     if (!id || verdeckt || !root) return undefined;

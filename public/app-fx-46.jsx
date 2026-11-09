@@ -8,7 +8,7 @@
 //  konform" und lassen sich nicht statisch vorbacken (die Werte hängen an der Figurengröße) — darum rechnet `ppHeldAuftritt` dieselben Bilder selbst:
 //    • 17 Bilder (567 ms) im Takt von `ppTaktRaf`, die Stufen/Zeiten sind die, die der Backer aus den alten Keyframes abgetastet hat (steps(10) je
 //      Abschnitt, Schatten ease-out);
-//    • Versatz und Schattenbreite auf ganzen Kunstpixeln (2 px), die Deckkraft des Schattens nur ein/aus (`visibility`; seine Fläche ist < 400 px²);
+//    • Versatz und Schattenbreite auf ganzen Hero-Pixeln (Canvas-Höhe / Frame-Höhe; ohne Angabe Kunstpixel 2 px), die Deckkraft des Schattens nur ein/aus (`visibility`; seine Fläche ist < 400 px²);
 //    • geschrieben wird nur, wenn sich das Bild ändert, inline `transform`/`filter` am Canvas und `transform`/`visibility` am Schatten; am Ende wird alles
 //      wieder entfernt (der Beschnitt `heroIdleKlipp` am Steher ist statisches CSS, `steps(1, end)`, gleiche Dauer).
 //  Spielstart (app-fx-51): `ppHeldAuftritt(platz, zone)` meldet die Figur an `ppFx51Held` und beginnt höchstens 0,13 s später, damit der Auftritt im Bild des Held-Ausbruchs startet.
@@ -31,16 +31,16 @@
     for (let i = 0; i < 30; i++) { t = (lo + hi) / 2; if (bx(t) < x) lo = t; else hi = t; }
     return by(t);
   }
-  const snap2 = (v) => Math.round(v / 2) * 2;
+  const snap2 = (v, q) => { const k = q > 0 ? q : 2; return Math.round(v / k) * k; };   // ganze Hero-Pixel (q = Schichtpixel der Figur), ohne q Kunstpixel 2
   const stufe10 = (p) => Math.min(10, Math.floor(p * 10 + 1e-9));   // steps(10, end): Wert springt am Ende jedes Zehntels
 
   /** Bild f (0 … BILDER - 1): Versatz nach unten (px), Helligkeit, Schattenskalierung (X), Schatten sichtbar? */
-  function heldBild(f, hoehe, breite) {
+  function heldBild(f, hoehe, breite, q) {
     const u = (f + 0.001) / BILDER;
     let y, hell;
     if (u < KNICK) {
       const i = stufe10(u / KNICK);
-      y = snap2(hoehe * (1 - i / 10));
+      y = snap2(hoehe * (1 - i / 10), q);
       hell = 2.2 + (1.5 - 2.2) * (i / 10);
     } else {
       const i = stufe10((u - KNICK) / (1 - KNICK));
@@ -48,7 +48,7 @@
       hell = 1.5 + (1 - 1.5) * (i / 10);
     }
     const e = easeOut(u);
-    const sb = snap2(breite * (0.3 + 0.7 * e));
+    const sb = snap2(breite * (0.3 + 0.7 * e), q);
     const sx = breite > 0 ? Math.min(1, Math.max(0, sb / breite)) : 1;
     return { y, hell: Math.round(hell * 100) / 100, sx: Math.round(sx * 10000) / 10000, sichtbar: e >= 0.40625 };
   }
@@ -65,6 +65,7 @@
     const h = parseFloat(getComputedStyle(cv).height);
     const b = sch ? parseFloat(getComputedStyle(sch).width) : 0;
     if (!(h > 0)) return;
+    const qPx = cv.height > 0 ? h / cv.height : 0;   // Hero-Pixel in der Sprite-Ebene (Schichtpixel je Sprite-Pixel): Versatz und Schattenbreite auf ganzen Hero-Pixeln
     const raf = window.ppTaktRaf || window.requestAnimationFrame;
     // Spielstart (app-fx-51): der Auftritt beginnt im Bild des Ausbruchs (Aufschub höchstens 0,13 s; solange steht die Figur wie im ersten Bild verborgen)
     let verz = 0;
@@ -72,7 +73,7 @@
     let t0 = performance.now() + verz, letzt = -1, id = 0, fertig = false;
     let cvT = '', cvF = '', schT = '', schV = '';
     const setze = (f) => {
-      const bild = heldBild(f, h, b);
+      const bild = heldBild(f, h, b, qPx);
       const t = bild.y ? 'translateY(' + bild.y + 'px)' : '';
       const fi = bild.hell > 1.0001 ? 'brightness(' + bild.hell + ')' : '';
       if (t !== cvT) { cvT = t; cv.style.transform = t; }

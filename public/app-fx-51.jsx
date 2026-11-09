@@ -16,7 +16,7 @@
 //  Trailer-Werte, die geändert wurden: REVEAL0 3,70 s → tB + 0,06 s; REVEAL_SPREAD 1,5 s → 0,42 s; REVEAL_DUR 0,55 s → 0,16 s; WIGGLE0 → BURST0 (1,15 s) → 0,10 – 0,85 s; Kamera-Schütteln
 //  (amp 20) entfällt ganz (die Tutorial-Kamera fährt per Skript, der Schleier liegt in Feldkoordinaten); Bildschirm-Aufhellung (flash) und Kartensplitter entfallen.
 //
-//  TECHNIK: zwei Leinwände, Rasterzelle = 3 Bildschirmpixel (Handy: 4), 30 Bilder/s auf `ppTaktRaf`, nur bei neuem Bild zeichnen, Schmutzrechteck, feste Palettenfarben, Bayer-Dither statt Alpha.
+//  TECHNIK: zwei Leinwände, Rasterzelle = Hero-Pixel (`ppFxZelle`, Phase 2; vorher 3, Handy 4), 30 Bilder/s auf `ppTaktRaf`, nur bei neuem Bild zeichnen, Schmutzrechteck, feste Palettenfarben, Bayer-Dither statt Alpha.
 //    • SCHLEIER: in `.fx-unter-figuren` (z 51, unter den Figuren, über dem Brett) in einer Welt-Hülle (`.fx-welt-lock`, Scrollstand zurückgenommen): Feld-Box von `.board-center`,
 //      Zellen in Hintergrundfarbe (#08060c) außer an den Heldenkarten (Löcher: sie stehen von Anfang an da, wie im Trailer). Jede Zelle hat einen Auftauch-Eimer (Abstand zur Brettmitte);
 //      je Bild werden nur die Eimer der laufenden Welle angefasst (jede Zelle ~5 Mal), Bayer-Schwelle in 5 Stufen. Die Zonen selbst werden NICHT animiert (kein Re-Layout).
@@ -27,7 +27,7 @@
 //    • TUTORIAL: kein Schleier und kein Aufladen (das Brett steht schon, Textboxen laufen); nur Ausbruch (Strahlen, Ringe, Splitter) + Schockwelle, wenn die Figuren tatsächlich erscheinen
 //      (`ppHeldAuftritt` meldet sie; solange `tutorialFigurenGesperrt` gilt, gibt es keine Meldung).
 //    • Nicht im Retro-Modus, nicht bei reduzierter Bewegung / „Play Animations: aus“, nicht bei Wiedereintritt (`reconnected`), Zuschauern, Rätseln, `__ppFxAlt`; einmal je Raum.
-//    • Test: `window.__ppFx51Aus = true` (vor dem Start) schaltet den Effekt ab (Vorher/Nachher). Handy-Profil (`ppIsPhone`): Zelle 4 px, Teilchen über `ppFxN`, keine Schockwelle, keine Funkenfontäne/-regen.
+//    • Test: `window.__ppFx51Aus = true` (vor dem Start) schaltet den Effekt ab (Vorher/Nachher). Handy-Profil (`ppIsPhone`): Zelle = Hero-Pixel (2), Teilchen über `ppFxN`, keine Schockwelle, keine Funkenfontäne/-regen.
 //  Messung (nur Tests): `window.__ppFx51Messen = true` → `window.__ppFx51Zeiten` = [[art, ms], …] (Zeichnen + Upload je Bild; art 'v' Schleier, 'b' Ausbruch).
 // ═════════════════════════════════════════════════════════════════
 const PP_FX51_TAKT = 1000 / 30;
@@ -64,6 +64,15 @@ function ppFx51Fest() {
 }
 const ppFx51Phone = () => { try { return !!(window.ppIsPhone && window.ppIsPhone()); } catch (e) { return false; } };
 const ppFx51N = (n) => (typeof ppFxN === 'function' ? ppFxN(n) : n);
+// Rasterzelle = Hero-Pixel der eigenen Reihe (`ppFxZelle`, app-board.jsx; vorher fest 3, Handy 4). Zellenzahl-Deckel wie app-fx-58: bleibt die Leinwand über der Grenze (sehr breites/hohes Fenster,
+// 4K), wird die Zelle gröber — die Leinwand-Kanten (800/900 Zellen) schneiden das Brett sonst ab. Handy 844x390: Zelle 2 = 90 k Schleier-/135 k Ausbruchszellen (vorher Zelle 4: 23 k/34 k); Messung 6× gedrosselt, Schleier+Ausbruch je Bild: Median 0,1→0,2 ms, p90 ~5→~12 ms (einmal je Spiel, ~1 s; Frame-Budget 33 ms) — darum Zelle 2 statt 4.
+const PP_FX51_MAXZELLEN = 300000;
+function ppFx51Zelle(W, H) {
+  let S = ppFx51Phone() ? 4 : 3;
+  try { if (typeof ppFxZelle === 'function') S = ppFxZelle(null); } catch (e) { /* Rückfall */ }
+  while (S < 8 && ((W + 70) / S > 780 || (H + 200) / S > 680 || (W / S) * (H / S) > PP_FX51_MAXZELLEN)) S++;
+  return S;
+}
 
 // ───────────────────────── Rasterwerkzeug (Burst-Leinwand) ─────────────────────────
 /** Leinwand + RGBA-Puffer + Schmutzrechteck-Maler (ppFx30Maler) in einem Stück; `hoch(…)` lädt nur das hoch, was zwei Bilder lang berührt wurde. */
@@ -380,10 +389,11 @@ window.ppFx51Held = function (platz, zone) {
 function ppFx51Messen(s) {
   const bc = document.querySelector('.board-center');
   if (!bc) return null;
-  const S = ppFx51Phone() ? 4 : 3, fo = window.ppFxScrollOffset ? window.ppFxScrollOffset() : { dx: 0, dy: 0 }, r = bc.getBoundingClientRect();
+  const fo = window.ppFxScrollOffset ? window.ppFxScrollOffset() : { dx: 0, dy: 0 }, r = bc.getBoundingClientRect();
   const L = r.left + fo.dx - bc.scrollLeft + 0, T = r.top + fo.dy - bc.scrollTop;   // Inhaltsursprung des Feldes in Feldkoordinaten
   const W = Math.min(2400, Math.max(bc.clientWidth, bc.scrollWidth)), Hh = Math.min(2400, Math.max(bc.clientHeight, bc.scrollHeight));
   if (!(W > 40 && Hh > 40)) return null;
+  const S = ppFx51Zelle(W, Hh);
   const zonen = [];
   for (const el of document.querySelectorAll('[data-hero-zone]')) {
     const hk = ppFx51HeldKey(el);
@@ -557,7 +567,7 @@ function ppFx51Ende(s) {
   const los = () => {
     try {
       if (!ppFx51Erlaubt()) return;
-      const S = ppFx51Phone() ? 4 : 3, W = ppFx51Phone() ? 700 : 1000, Hh = ppFx51Phone() ? 260 : 560;
+      const W = ppFx51Phone() ? 700 : 1000, Hh = ppFx51Phone() ? 260 : 560, S = ppFx51Zelle(W, Hh);
       const schritte = [];
       const sch = ppFx51Schleier({ L: 60, T: 100, W, H: Hh, S, loecher: [{ x0: 200, y0: 150, x1: 260, y1: 240 }] });
       const fl = ppFx51Flaeche(Math.ceil(W / S), Math.ceil(Hh / S));

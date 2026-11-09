@@ -14,6 +14,7 @@ const ppFx24Pick = (l) => l[Math.floor(Math.random() * l.length)];
 // ═════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
 const PP_FX24_SAND = { L: ppHex('#f9ecb3'), M: ppHex('#e0c085'), D: ppHex('#ca874e'), K: ppHex('#9d612f'), Y: ppHex('#f7f7ad'), W: ppHex('#ffffff') };
 const PP_FX24_DUENE = {
+  gross: ['..LLM..', '.LMMDD.', 'LMMMDDK', 'DDDKKKK'],   // nur bei Zelle < 3 (720p, Handy): die Häufchen behalten ihre Bildschirmgröße (sonst 6×4 px)
   mittel: ['.LLM.', 'LMMDD', 'DDDKK'],
   klein: ['LMM', 'DDK'],
 };
@@ -29,9 +30,9 @@ const ppFx24SandReset = ppR1Leinwand((g, t, sz, te) => {
     const a = u < 0.6 ? 0.9 - 0.2 * eo(u / 0.6) : 0.7 * (1 - eo((u - 0.6) / 0.4));
     const x = cx + (p.tx * e) / S, y = cy + (p.ty * e) / S;
     if (p.funkel) { g.spr(sc > 0.6 ? PP_FX24_FUNKEL.gross : PP_FX24_FUNKEL.klein, PP_FX24_SAND, x, y, a); continue; }
-    const stufe = sc > 0.65 ? 0 : sc > 0.4 ? 1 : 2;
-    if (p.gross) { if (stufe === 0) g.spr(PP_FX24_DUENE.mittel, PP_FX24_SAND, x, y, a); else if (stufe === 1) g.spr(PP_FX24_DUENE.klein, PP_FX24_SAND, x, y, a); else g.put(x, y, C.M, a); }
-    else { if (stufe === 0) g.spr(PP_FX24_DUENE.klein, PP_FX24_SAND, x, y, a); else g.put(x, y, stufe === 1 ? C.M : C.D, a); }
+    const stufe = sc > 0.65 ? 0 : sc > 0.4 ? 1 : 2, D = PP_FX24_DUENE, fein = S < 3;   // fein: Sprites eine Stufe größer (gleiche Bildschirmgröße wie bei Zelle 3)
+    if (p.gross) { if (stufe === 0) g.spr(fein ? D.gross : D.mittel, PP_FX24_SAND, x, y, a); else if (stufe === 1) g.spr(fein ? D.mittel : D.klein, PP_FX24_SAND, x, y, a); else if (fein) g.spr(D.klein, PP_FX24_SAND, x, y, a); else g.put(x, y, C.M, a); }
+    else { if (stufe === 0) g.spr(fein ? D.mittel : D.klein, PP_FX24_SAND, x, y, a); else if (fein && stufe === 1) g.spr(D.klein, PP_FX24_SAND, x, y, a); else g.put(x, y, stufe === 1 ? C.M : C.D, a); }
   }
 }, 1000, { breite: 150, hoehe: 150 }, {
   z: 9999,

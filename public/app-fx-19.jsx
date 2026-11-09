@@ -46,7 +46,7 @@ const ppFx19GearCW = ppR1Leinwand((g, t, sz, d) => {
   const S = sz.S, C = PP_FX11_RAD, u = t / d.T;
   if (u > 1) return;
   const fs = ppFx11Kf(u, [[0, 0.3], [0.15, 1.2], [0.85, 1], [1, 1.5]], ppFx11Aus), fo = ppFx11Kf(u, [[0, 0], [0.15, 0.8], [0.85, 0.5], [1, 0]], ppFx11Aus);
-  if (fo > 0.03) ppFx11Glow(g, sz.cx, sz.cy + 10 / S, 50 * fs * 0.78 / S, 60 * fs * 0.78 / S, [C.dunkel, C.mittel], fo * 0.9, 0.9);
+  if (fo > 0.03) ppFx11Glow(g, sz.cx, sz.cy + 10 / 3, 50 * fs * 0.78 / 3, 60 * fs * 0.78 / 3, [C.dunkel, C.mittel], fo * 0.9, 0.9);
   // Zahnrad (linear): Drehung 0 → 40° → 320° → 360° (Uhrzeigersinn), Größe .3 → 1 → 1 → .3, Deckung 0 → 1 → 1 → 0
   const rot = ppFx11Kf(u, [[0, 0], [0.15, 40], [0.85, 320], [1, 360]]) * Math.PI / 180;
   const sk = ppFx11Kf(u, [[0, 0.3], [0.15, 1], [0.85, 1], [1, 0.3]]), a = ppFx11Kf(u, [[0, 0], [0.15, 1], [0.85, 1], [1, 0]]);
@@ -160,7 +160,7 @@ const ppFx19DebtFlames = ppR1Leinwand((g, t, sz, d) => {
   vorbereiten: (sz) => {
     const schaden = Math.max(1, Number(sz.props.damage) || 10);
     const stufe = Math.min(1, Math.log10(schaden / 10 + 1) / Math.log10(31));
-    const anzahl = Math.round(5 + stufe * 11), basis = 16 + stufe * 24;
+    const anzahl = ppFxN(Math.round(5 + stufe * 11)), basis = 16 + stufe * 24;   // Handy: 40 % der Flammen (je Flamme ~25 × 30 Rasterpixel bei Zelle 2)
     return {
       flammen: Array.from({ length: anzahl }, () => ({
         xOff: (-18 - stufe * 26) + Math.random() * (36 + stufe * 52), size: basis * (0.62 + Math.random() * 0.62), delay: Math.random() * 190,

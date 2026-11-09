@@ -466,6 +466,10 @@ function _ppAlphaStufe(a, x, y) {
 
 /** Pixelgroesse in Bildschirmpunkten (v1446: 2 statt 3 — mehr, feinere Pixel). */
 const PP_PX_GROESSE = 2;
+/** Zelle der Pixelbilder (Rahmen, Scheine, Ellipsen, Verlaeufe): im Kampf das Hero-Pixel (pixel-anim.js `standardRaster`: 1080p 3, 720p/Handy 2), sonst PP_PX_GROESSE. */
+function ppPxZelle() {
+  try { const pa = window.PPPixelAnim; return (pa && pa.standardRaster && pa.KONFIG.aktiv) ? pa.standardRaster() : PP_PX_GROESSE; } catch (e) { return PP_PX_GROESSE; }
+}
 
 /** Pixelzahl fuer eine Seite: ~PP_PX_GROESSE px pro Pixel, schmale Baender (Ringe) bekommen mehr. */
 function _ppAufloesung(v, laengePx) {
@@ -475,7 +479,7 @@ function _ppAufloesung(v, laengePx) {
     if (d > 0.001 && d < minLuecke) minLuecke = d;
   }
   const fuerRinge = Math.min(96, Math.ceil(2.2 / (minLuecke * 0.707)));
-  const fuerGroesse = laengePx > 0 ? Math.round(laengePx / PP_PX_GROESSE) : 32;
+  const fuerGroesse = laengePx > 0 ? Math.round(laengePx / ppPxZelle()) : 32;
   return Math.max(2, Math.min(160, Math.max(fuerGroesse, laengePx > 0 && laengePx < 24 ? 0 : fuerRinge)));
 }
 
@@ -1423,7 +1427,7 @@ function ppPxPartikelUrl(farbe) {
  */
 function ppPxRahmenUrl(farbe, dicke, w, h, radius) {
   const f = ppFarbe(farbe);
-  const P = PP_PX_GROESSE;
+  const P = ppPxZelle();
   const nx = Math.max(2, Math.round(w / P)), ny = Math.max(2, Math.round(h / P));
   const d = Math.max(1, Math.round(dicke / P));
   const rund = radius >= Math.min(w, h) / 2 - 0.5;
@@ -1460,11 +1464,11 @@ function ppPxRahmenUrl(farbe, dicke, w, h, radius) {
  */
 function ppPxHaloUrl(farbe, w, h, rand, rund) {
   const f = ppFarbe(farbe);
-  const P = PP_PX_GROESSE;
+  const P = ppPxZelle();
   const W = w + 2 * rand, H = h + 2 * rand;
   const nx = Math.max(2, Math.round(W / P)), ny = Math.max(2, Math.round(H / P));
   const qr = Math.max(1, Math.round(rand / 2) * 2);
-  return ppPxBild(`hl:${f.join(',')}:${Math.round(w / 4)}x${Math.round(h / 4)}:${qr}:${rund ? 1 : 0}`, nx, ny, (setze) => {
+  return ppPxBild(`hl:${f.join(',')}:${Math.round(w / 4)}x${Math.round(h / 4)}:${qr}:${rund ? 1 : 0}:${P}`, nx, ny, (setze) => {
     for (let y = 0; y < ny; y++) for (let x = 0; x < nx; x++) {
       const u = (x + 0.5) * P - W / 2, v = (y + 0.5) * P - H / 2;   // px relativ zur Mitte
       let abstand;
@@ -1485,7 +1489,7 @@ function ppPxHaloUrl(farbe, w, h, rand, rund) {
 
 /** Pixelige Ellipse als Maske in Elementgroesse (runde Flaechen behalten ihre Form). */
 function ppPxEllipseUrl(w, h) {
-  const P = PP_PX_GROESSE;
+  const P = ppPxZelle();
   const nx = Math.max(2, Math.round(w / P / 2) * 2), ny = Math.max(2, Math.round(h / P / 2) * 2);
   return ppPxBild('el:' + nx + 'x' + ny, nx, ny, (setze) => {
     for (let y = 0; y < ny; y++) for (let x = 0; x < nx; x++) {
@@ -1956,6 +1960,123 @@ function ppPixelPartikel(canvas, teile, opt) {
   return () => { aus = true; if (id) caf(id); };
 }
 window.ppPixelPartikel = ppPixelPartikel;
+
+// ═══ RANG-RAHMEN (Duplikate) ═══════════════════════════════════════════
+// Zieht man ein Item mehrfach, bekommt es dauerhaft einen Rahmen (public/rank-frames.js): 1 Kopie über das Original = Silber … 8 = Obsidian.
+// Es gibt EINE Rahmenstufe, überall gleich. Der Rahmen liegt innerhalb der Bildkante und wird FEST IN DAS BILD EINGEBACKEN, darum zeigt jedes
+// `<img>` ihn ohne weiteren Aufwand:
+//   Avatar / Sleeve   ppRankFrames.bakeUrl(url, kind, rank) → data-URL;  Hook useFramedSrc / <FramedImg>;  im Duell useFramedPlayer(p)
+//   Skin-Karten       `?rahmen=<Kopien>` an der Karten-URL (card-image-shim.js backt ihn beim Zeichnen der Karte ein);
+//                     cardImageUrl(held, skins) hängt ihn selbst an, wenn dem Skin-Objekt Ränge zugeordnet sind (ppSkinRanksSet / ppSkinMerge)
+/** Karten-URL ohne `?rahmen=N` (Tooltips zeigen den Rang-Rahmen nie). */
+function ppOhneRahmen(url) { return url ? url.replace(/[?&]rahmen=\d+/, '') : url; }
+/** Item-Id eines Avatars/Sleeves aus seiner URL (wie frame-ids.js im Server): Shop-Item → Id, Standard-Avatar → 'std:<Name>', Standard-Sleeve → 'default'. */
+function ppShopIdOfUrl(url, subdir) {
+  const u = String(url || '').split('?')[0];
+  const dec = (x) => { try { return decodeURIComponent(x); } catch { return x; } };
+  let m = new RegExp('^/data/shop/' + subdir + '/([^/]+)\\.[a-z]+$', 'i').exec(u);
+  if (m) return dec(m[1]);
+  if (subdir === 'avatars') { m = /^\/avatars\/([^/]+)\.[a-z]+$/i.exec(u); if (m) return 'std:' + dec(m[1]); }
+  if (subdir === 'sleeves' && (!u || u === '/cardback.png')) return 'default';
+  return null;
+}
+function ppFrameRank(dupes) { return window.ppRankFrames ? window.ppRankFrames.rankOf(dupes) : null; }
+const _ppSkinRanks = new WeakMap();           // Skin-Zuordnung { Held: Skin } → { Held: Kopien }
+/** Ordnet einer Skin-Zuordnung (Held → Skin) die Ränge zu (`ranksBySkin`: Skin → Kopien, so schickt sie der Server). Liefert dieselbe Zuordnung zurück. */
+function ppSkinRanksSet(skins, ranksBySkin) {
+  if (!skins || typeof skins !== 'object') return skins;
+  const byHero = {};
+  for (const [hero, skin] of Object.entries(skins)) { const d = ranksBySkin && ranksBySkin[skin]; if (d) byHero[hero] = d; }
+  if (Object.keys(byHero).length) _ppSkinRanks.set(skins, byHero); else _ppSkinRanks.delete(skins);
+  return skins;
+}
+/** Wie `{ ...a, ...b }` für Skin-Zuordnungen, nimmt aber die Ränge mit (der Spätere gewinnt je Held). */
+function ppSkinMerge(...parts) {
+  const out = {}, ranks = {};
+  for (const o of parts) {
+    if (!o) continue;
+    Object.assign(out, o);
+    const r = _ppSkinRanks.get(o);
+    for (const h of Object.keys(o)) { if (r && r[h]) ranks[h] = r[h]; else delete ranks[h]; }
+  }
+  if (Object.keys(ranks).length) _ppSkinRanks.set(out, ranks);
+  return out;
+}
+/** Quelle mit eingebackenem Rahmen: gibt zuerst die Original-URL, sobald der Rahmen fertig ist die gebackene zurück. */
+function useFramedSrc(src, kind, dupes) {
+  const rank = ppFrameRank(dupes);
+  const [baked, setBaked] = useState(null);
+  useEffect(() => {
+    setBaked(null);
+    if (rank == null || !src) return undefined;
+    let live = true;
+    window.ppRankFrames.bakeUrl(src, kind, rank).then(u => { if (live) setBaked(u); });
+    return () => { live = false; };
+  }, [src, kind, rank]);
+  return (rank != null && baked) || src;
+}
+/** <img> mit Rahmen nach Kopienzahl (`dupes` 0 / fehlt: ohne Rahmen). */
+function FramedImg({ src, kind = 'card', dupes, ...rest }) {
+  return <img src={useFramedSrc(src, kind, dupes)} {...rest} />;
+}
+/** Spieler im Duell: Avatar und Sleeve mit Rahmen (nach avatarRank / cardbackRank), sonst unverändert dasselbe Objekt. */
+function useFramedPlayer(p) {
+  const aR = p ? ppFrameRank(p.avatarRank) : null, cR = p ? ppFrameRank(p.cardbackRank) : null;
+  const avatar = p && p.avatar, cardback = p && p.cardback;
+  const av = useFramedSrc(aR != null ? avatar : null, 'avatar', p && p.avatarRank);
+  const cb = useFramedSrc(cR != null ? cardback : null, 'sleeve', p && p.cardbackRank);
+  return useMemo(() => {
+    if (!p || ((aR == null || !av || av === avatar) && (cR == null || !cb || cb === cardback))) return p;
+    return { ...p, avatar: (aR != null && av) || p.avatar, cardback: (cR != null && cb) || p.cardback };
+  }, [p, av, cb, aR, cR]);
+}
+// ── Avatar-Rahmen für Spieler überall (Menü, Chat, Spielerlisten …) ──
+// Der Rang hängt am Spieler (Name): bekannt aus dem Spielzustand (explizit übergeben) oder per Sammelabfrage /players/avatar-ranks.
+const _ppAv = { ranks: new Map(), asked: new Map(), pending: new Set(), subs: new Set(), timer: null };
+const PP_AV_TTL = 90000;
+function _ppAvNotify() { _ppAv.subs.forEach(f => { try { f(); } catch {} }); }
+function ppAvatarRankSet(name, dupes) {
+  if (!name) return;
+  _ppAv.ranks.set(name, dupes || 0); _ppAv.asked.set(name, Date.now()); _ppAvNotify();
+}
+function _ppAvFlush() {
+  _ppAv.timer = null;
+  const names = [..._ppAv.pending]; _ppAv.pending.clear();
+  if (!names.length) return;
+  fetch('/api/players/avatar-ranks?' + names.map(n => 'n=' + encodeURIComponent(n)).join('&'))
+    .then(r => r.json()).catch(() => ({ ranks: {} }))
+    .then(j => { for (const n of names) { _ppAv.ranks.set(n, (j.ranks && j.ranks[n]) || 0); _ppAv.asked.set(n, Date.now()); } _ppAvNotify(); });
+}
+function _ppAvAsk(name) {
+  const t = _ppAv.asked.get(name);
+  if ((t && Date.now() - t < PP_AV_TTL) || _ppAv.pending.has(name)) return;
+  _ppAv.pending.add(name);
+  if (!_ppAv.timer) _ppAv.timer = setTimeout(_ppAvFlush, 40);
+}
+/** Avatar oder Rang eines Spielers hat sich geändert (Pull, Avatarwechsel): beim nächsten Zeichnen neu erfragen. */
+function ppAvatarRankForget(name) {
+  if (!name) return;
+  _ppAv.asked.delete(name); _ppAv.pending.add(name);
+  if (!_ppAv.timer) _ppAv.timer = setTimeout(_ppAvFlush, 40);
+}
+function usePlayerAvatarRank(name, explicit) {
+  const [, bump] = useState(0);
+  useEffect(() => {
+    const f = () => bump(n => n + 1);
+    _ppAv.subs.add(f);
+    return () => { _ppAv.subs.delete(f); };
+  }, []);
+  useEffect(() => { if (explicit == null && name) _ppAvAsk(name); }, [name, explicit]);
+  return explicit != null ? explicit : (_ppAv.ranks.get(name) || 0);
+}
+/** Spieler-Avatar mit Rang-Rahmen. `rank` (Kopien) ist optional: ohne ihn wird er über den Namen erfragt. */
+function PlayerAvatar({ name, src, rank, className, ...rest }) {
+  const d = usePlayerAvatarRank(name, rank);
+  return <FramedImg src={src} kind="avatar" dupes={d} className={(className || '') + (d > 0 ? ' pp-av-ranked' : '')} {...rest} />;
+}
+window.ppAvatarRankSet = ppAvatarRankSet; window.ppAvatarRankForget = ppAvatarRankForget; window.usePlayerAvatarRank = usePlayerAvatarRank; window.PlayerAvatar = PlayerAvatar;
+window.ppOhneRahmen = ppOhneRahmen; window.ppShopIdOfUrl = ppShopIdOfUrl; window.ppFrameRank = ppFrameRank; window.ppSkinRanksSet = ppSkinRanksSet; window.ppSkinMerge = ppSkinMerge;
+window.useFramedSrc = useFramedSrc; window.FramedImg = FramedImg; window.useFramedPlayer = useFramedPlayer;
 
 window.PxZeichen = PxZeichen;
 window.PxIcon = PxIcon;
@@ -4174,7 +4295,38 @@ const ZONE_ANIM_SFX = {
   // zum Animationsstart (ZONE_ANIM_MOUNT_DELAY_MS) rechnet
   // `playSFXForZoneAnim` selbst dazu, damit die beiden Zahlen nicht
   // auseinanderlaufen koennen.
-  magic_hammer:            { name: 'heavy_impact', opts: { delay: 340 } },
+  // Hammer-Animationen (app-fx-57): geschwungene Waffe, EIN Schlag; die Zeiten sind die Bilder der Animation (30 Hz) ab Mount — Treffer MH bei Bild 33 (1100 ms), HH bei Bild 28 (933 ms), HS bei Bild 24 (800 ms).
+  // Heftigkeit: Magic Hammer 1,0 (tief gepitcht, mehrfach geschichtet) · Heavy Hit 0,6 · Hammer Skeleton 0,35 (hoch, leise). Der Schaden-Klang (`damage`) kommt wie bisher mit dem Zustandsvergleich.
+  magic_hammer: [
+    { name: 'booster_card_whoosh', opts: { volume: 0.5, rate: 0.5, delay: 1 } },
+    { name: 'booster_card_whoosh', opts: { volume: 0.65, rate: 0.55, delay: 967 } },
+    { name: 'booster_card_whoosh', opts: { volume: 0.85, rate: 0.5, delay: 1033 } },
+    { name: 'heavy_impact', opts: { volume: 1.0, rate: 0.6, delay: 1100 } },
+    { name: 'heavy_impact', opts: { volume: 0.6, rate: 0.85, delay: 1100 } },
+    { name: 'attack_ram', opts: { volume: 0.75, rate: 0.6, delay: 1100 } },
+    { name: 'pull_crack', opts: { volume: 0.9, rate: 0.7, delay: 1133 } },
+    { name: 'heavy_impact', opts: { volume: 0.5, rate: 0.45, delay: 1200 } },
+    { name: 'booster_card_whoosh', opts: { volume: 0.5, rate: 0.6, delay: 1500 } },
+    { name: 'booster_card_land', opts: { volume: 0.5, rate: 0.5, delay: 1433 } },
+    { name: 'booster_card_land', opts: { volume: 0.35, rate: 0.45, delay: 1533 } },
+  ],
+  heavy_hit_smash: [
+    { name: 'booster_card_whoosh', opts: { volume: 0.55, rate: 0.65, delay: 800 } },
+    { name: 'booster_card_whoosh', opts: { volume: 0.7, rate: 0.6, delay: 867 } },
+    { name: 'heavy_impact', opts: { volume: 0.75, rate: 0.95, delay: 933 } },
+    { name: 'attack_ram', opts: { volume: 0.45, rate: 1.0, delay: 933 } },
+    { name: 'pull_crack', opts: { volume: 0.5, rate: 1.0, delay: 967 } },
+    { name: 'booster_card_land', opts: { volume: 0.35, rate: 0.6, delay: 1133 } },
+    { name: 'booster_card_whoosh', opts: { volume: 0.4, rate: 0.7, delay: 1200 } },
+  ],
+  hammer_skeleton_smash: [
+    { name: 'booster_card_whoosh', opts: { volume: 0.35, rate: 0.85, delay: 700 } },
+    { name: 'booster_card_whoosh', opts: { volume: 0.4, rate: 0.8, delay: 767 } },
+    { name: 'heavy_impact', opts: { volume: 0.45, rate: 1.25, delay: 800 } },
+    { name: 'pull_crack', opts: { volume: 0.4, rate: 1.3, delay: 833 } },
+    { name: 'booster_card_land', opts: { volume: 0.3, rate: 0.9, delay: 933 } },
+    { name: 'booster_card_whoosh', opts: { volume: 0.25, rate: 0.9, delay: 967 } },
+  ],
   // Shattering Strike (v814): kleinerer Hammer, dumpferer Einschlag mit Erde.
   shattering_strike:       { name: 'heavy_impact', opts: { rate: 1.15, volume: 0.85, delay: 300 } },
   tiger_impact:            { name: 'heavy_impact' },
@@ -4993,6 +5145,8 @@ const ZONE_ANIM_NONEFFECT = new Set([
   // belegt und der Thud fiel komplett aus; der erste Klang NACH dem
   // sichtbaren Aufprall war dann der `damage`-Cue bei ~900ms.
   'magic_hammer',
+  'heavy_hit_smash',
+  'hammer_skeleton_smash',
   // v1422 (Als Befund 25.9.: „den Sound hoere ich im Spiel nicht"): der
   // Doom-Tick kommt fast immer im selben Augenblick wie andere Effekt-
   // Klaenge (Rundenende, Besiegung) und wurde von der 'effect'-Sperre
@@ -5801,7 +5955,8 @@ window.matchesStartingAbilities = matchesStartingAbilities;
 function cardImageUrl(cardName, skinOverrides) {
   // If a skin is selected for this card, use the skin image
   if (skinOverrides && skinOverrides[cardName]) {
-    return '/cards/skins/' + encodeURIComponent(skinOverrides[cardName]) + '.png';
+    const dupes = (_ppSkinRanks.get(skinOverrides) || {})[cardName];   // Rang-Rahmen des Skins (Duplikate), vom Karten-Shim eingebacken
+    return '/cards/skins/' + encodeURIComponent(skinOverrides[cardName]) + '.png' + (dupes ? '?rahmen=' + dupes : '');
   }
   const file = window.AVAILABLE_MAP[cardName];
   return file ? '/cards/' + encodeURIComponent(file) : null;
@@ -7763,7 +7918,7 @@ function spawnZoneLandFx(el, opts) {
   box.style.cssText = mitte + masse;
 
   // Schockringe + Aufleuchten (app-fx-49) laufen auf der Funken-Leinwand; ohne sie (Notbremse `__ppFxAlt`, Animationen aus, Modul fehlt) bleiben Ring und Schein als CSS-Knoten.
-  const zusatz = (!!window.ppFx49Einschlag && !!window.ppFx44Funken && !window.__ppFxAlt) ? window.ppFx49Einschlag(r.width, r.height, farbe) : null;
+  const zusatz = (!!window.ppFx49Einschlag && !!window.ppFx44Funken && !window.__ppFxAlt) ? window.ppFx49Einschlag(r.width, r.height, farbe, window.ppFxZelle ? window.ppFxZelle(el) : 0) : null;
   const teile = zusatz ? funkenHtml(n) : ['<i class="zone-land-glow"></i>', '<i class="zone-land-ring"></i>', ...funkenHtml(n)];
   box.innerHTML = teile.join('');
   schicht().appendChild(box);
@@ -8316,7 +8471,8 @@ function zoneLandStyle(cardName) {
   if (!c) return { color: '#fbe181', variant: null };
   const t = c.cardType || '';
   const istKreatur = t.includes('Creature') || (t === 'Token' && c.hp != null);
-  return { color: typeColor(t), variant: istKreatur ? 'summon' : null };
+  // ★ Ability = BLAU (Zonenfarbe der Fähigkeiten, wie Hero lila / Surprise rot / Support gelb): Landung, Kartenflug und Stufenaufstieg zeigen dieses Blau (app-fx-49/48); alle anderen Typen unverändert.
+  return { color: t === 'Ability' ? '#4580f6' : typeColor(t), variant: istKreatur ? 'summon' : null };
 }
 
 // Gallery panel dimensions
@@ -8549,8 +8705,9 @@ function TouchScrollbar({ scrollRef }) {
 }
 window.TouchScrollbar = TouchScrollbar;
 
-function CardSideTooltip({ card, imgUrl, inGallery }) {
+function CardSideTooltip({ card, imgUrl: imgUrl0, inGallery }) {
   if (!card) return null;
+  const imgUrl = ppOhneRahmen(imgUrl0);   // Tooltips zeigen nie den Rang-Rahmen (er würde Werte/Text der Karte verdecken)
   const foilType = card.foil;
   const bonus = ascensionBonusText(card);
   const effectText = ttEffectText(card.effect, bonus);
@@ -10146,7 +10303,8 @@ function CardTooltipContent({ card, children, imageUrl }) {
   // imageUrl prop forces a specific asset (used by the shop to show a
   // skin portrait in the hover preview while still listing the base
   // hero's stats).
-  const imgUrl = imageUrl || card._skinUrl || cardImageUrl(card.name);
+  // Rang-Rahmen (`?rahmen=N`) gehören nicht in den Tooltip: dort würden sie Werte und Details der Karte verdecken.
+  const imgUrl = ppOhneRahmen(imageUrl || card._skinUrl || cardImageUrl(card.name));
   const foilType = card.foil || null;
   const displayName = card.displayName || card.name;
   // Die HP AUF DER KARTE zeigen die aktuelle max. HP, sobald sie von der

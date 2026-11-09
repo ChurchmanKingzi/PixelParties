@@ -11311,6 +11311,15 @@ body[data-tb-hl] .hero-idle-platz.hero-idle-hover { scale: none; }
 .ppf-empty { color: var(--text2); font-size: 12px; text-align: center; padding: 14px 6px; }
 .ppf-loading { animation: menu-live-pulse 1.4s steps(24, end) infinite; }
 
+/* Vitrine: Avatar und Sleeve mit Rang-Rahmen, ganzzahlig vergrößert */
+.ppf-vitrine { display: flex; justify-content: center; align-items: flex-end; gap: 28px; padding: 6px 0 4px; }
+.ppf-vitrine-item { display: flex; flex-direction: column; align-items: center; gap: 6px; }
+.ppf-vitrine-item img { display: block; image-rendering: pixelated; }
+.ppf-vitrine-item.is-avatar img { width: 140px; height: 140px; }
+.ppf-vitrine-item.is-sleeve img { width: 100px; height: 140px; }
+.ppf-vitrine-label { font-size: 11px; color: var(--text2); letter-spacing: .5px; text-transform: uppercase; }
+.ppf-vitrine-label b { color: var(--ppf-color); }
+
 /* Top-Decks */
 .ppf-decks { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
 .ppf-deck { width: 100%; display: flex; align-items: center; gap: 8px; padding: 6px 9px; text-align: left; font-family: var(--font-body), sans-serif; font-size: 13px; color: var(--text); background: transparent; border: 2px solid var(--bg4); border-radius: 0; cursor: pointer; transition: background .12s steps(3, end),border-color .12s steps(3, end); }
@@ -13873,6 +13882,20 @@ input[type="checkbox"]:focus-visible, input[type="radio"]:focus-visible { outlin
 .pull-fx-hud-btn { cursor: pointer; }
 .pull-fx-hud-key { color: #9aa3b6; }
 .pull-fx-hud-on { background: #fad54a; color: #08060c; }
+
+/* Avatare sind quadratisch: Kachel und Vorschau zeigen sie unbeschnitten (Rahmen-Raster 35 × 35). */
+.shop-sq-item .shop-item-img-wrap img { aspect-ratio: 1 / 1; }
+
+/* Spieler-Avatar mit Rang-Rahmen (Chat, Spielerlisten): quadratisch statt Pixel-Kreis und groß genug, dass der Rahmen lesbar bleibt */
+.chat-msg-avatar.pp-av-ranked { width: 24px; height: 24px; -webkit-mask: none; mask: none; image-rendering: pixelated; }
+.player-list-avatar.pp-av-ranked { width: 28px; height: 28px; -webkit-mask: none; mask: none; image-rendering: pixelated; }
+
+/* Kachel mit Rang-Rahmen (Duplikate): der eingebackene Rahmen ist der Schmuck — kein Zier-Overlay darüber, das ihn verdecken würde */
+.shop-item.shop-item-ranked .shop-item-zier { display: none; }
+
+/* Rang-Aufstieg im Pull-Reveal: Zellen-Scan zwischen altem und neuem Rahmen (Canvas, ganze Pixelzellen) */
+.pull-fx-swap { display: block; width: 100%; aspect-ratio: 5 / 7; object-fit: cover; image-rendering: pixelated; }
+.pull-fx-swap.pull-fx-swap-sq { aspect-ratio: 1; }
 
 
 /* ── RETRO-ZUSATZ (scripts/retro/retro-extra.css) ── */

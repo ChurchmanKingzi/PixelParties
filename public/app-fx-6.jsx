@@ -724,9 +724,11 @@ const ppFx6Sporen = ppR1Leinwand((g, t, sz, tl) => {
     const op = ppFx6Kf(u, [[0, [0]], [0.1, [s.opacity]], [0.9, [s.opacity]], [1, [0]]])[0];
     const x = cx + (s.xStart + dx) / S, y = cy + (s.yStart + s.yEnd * u * 1.0) / S;
     if (y < 0 || y > sz.gh + 2) continue;
-    if (s.n >= 2) {
-      g.block(Math.round(x), Math.round(y), 2, 2, s.farbe, ppFx6Voll(op, 0.8));
-      if (s.n >= 3) { g.put(x - 1, y, s.farbe, op * 0.6); g.put(x + 2, y + 1, s.farbe, op * 0.6); g.put(x, y - 1, s.farbe, op * 0.6); g.put(x + 1, y + 2, s.farbe, op * 0.6); }
+    // Spore in BILDSCHIRMpixeln (3 / 6 / 6 px Kern je Größenklasse = 1 / 2 / 2 Zellen bei S = 3), in Zellen umgerechnet: bei S = 2 waren es 1 / 2 / 2 Zellen (2–4 px) — die Spore war kaum zu sehen (Mindestgröße: 2 Zellen)
+    const c = Math.max(s.n >= 2 ? 2 : 1, Math.round(([3, 6, 6][s.n - 1]) / S)), r = Math.max(1, Math.round(c / 2));
+    if (c >= 2) {
+      g.block(Math.round(x), Math.round(y), c, c, s.farbe, ppFx6Voll(op, 0.8));
+      if (s.n >= 3) { g.put(x - 1, y + r, s.farbe, op * 0.6); g.put(x + c, y + r, s.farbe, op * 0.6); g.put(x + r, y - 1, s.farbe, op * 0.6); g.put(x + r, y + c, s.farbe, op * 0.6); }
     } else g.put(x, y, s.farbe, ppFx6Voll(op, 0.8));
   }
 }, 2400, (p) => { const W = Math.max(p.w || window.innerWidth, 480), H = Math.max(p.h || window.innerHeight, 320); return { breite: W, hoehe: H }; }, {

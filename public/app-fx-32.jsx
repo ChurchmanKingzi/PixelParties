@@ -70,7 +70,7 @@ function ppFx32Geo(e, zw) {
   const fussY = zahl(m.footY) ?? k.y1;
   const unterkante = Math.max(fussY, k.y1);
   const s = 2.8125 * (Number(m.boardScale) > 0 ? Number(m.boardScale) : 1);
-  const sub = fw * fh > 6000 ? 1 : 2;                                  // Leinwandpixel je Sprite-Pixel (große Figuren gröber: Pufferkosten)
+  const sub = 1;                                                       // Leinwandpixel je Sprite-Pixel: EINS (Hero-Pixel-Regel, auch Partikel/Ringe auf dem Raster der Figur); vorher 2 bei kleinen Figuren (halbe Zellen)
   const mag = Math.max(0.7, Math.min(2.5, fh / 45));                   // große Figuren fliegen weiter
   zw = Math.max(12, Math.min(zw || 20, 60));
   const ring = zw * 0.8 + 3 * zw * 0.06;                              // größter Ringradius (Sprite-Pixel): die Ringe sind etwa anderthalb Karten breit
