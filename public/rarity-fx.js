@@ -51,9 +51,12 @@
     diamond: { fx: 'dia', stamp: 'diamond', fps: 20, still: 1.0 },
     spectral: { fx: 'spec', stamp: 'spectral', fps: 20, still: 1.3 },
     umbra: { fx: 'umbra', stamp: 'umbra', fps: 20, still: 1.2, cut: true, mask: true },
+    prismatic_a: { fx: 'pris_a', stamp: 'prismatic', fps: 20, still: 2.2 },   // Prototypen (nur per Testschalter), siehe PROTOTYPEN weiter unten
+    prismatic_b: { fx: 'pris_b', stamp: 'prismatic', fps: 20, still: 2.2 },
+    prismatic_c: { fx: 'pris_c', stamp: 'prismatic', fps: 20, still: 2.2 },
     stained: { fx: 'stain', stamp: 'stained', fps: 15, still: 1.0, cut: true, mask: true, quant: true, body: true },
   };
-  const IMG_RAR = { uncommon: 'uncommon', rare: 'rare', prismatic: 'prismatic', super: 'super', diamond: 'diamond', spectral: 'spectral', umbra: 'umbra', stained: 'stained' };
+  const IMG_RAR = { uncommon: 'uncommon', rare: 'rare', prismatic: 'prismatic', super: 'super', diamond: 'diamond', spectral: 'spectral', umbra: 'umbra', stained: 'stained', prismatic_a: 'prismatic', prismatic_b: 'prismatic', prismatic_c: 'prismatic' };
   const available = r => !!SPEC[r];
   const imageRarity = r => (SPEC[r] ? IMG_RAR[r] : '');
 
@@ -591,6 +594,202 @@
       }
       // wenige Glanzpixel im Bild
       const gl = pre.gl; if (gl.length) sparkles(o, t, 2, 2.6, .45, (k, s) => { const p = gl[Math.floor(hash(k, s, 41) * gl.length)]; return [p % GW, (p / GW) | 0]; }, [255, 255, 255], [255, 255, 255], 1);
+    },
+  };
+
+  // ═══════════ PROTOTYPEN Prismatic-Alternativen (Testschalter: rarity 'prismatic_a' / '_b' / '_c'; im Spiel bleibt 'prismatic' die Fassung oben) ═══════════
+  // Gemeinsam: wirken nur im Bildfeld (Motiv) ausserhalb der Textzone, harte Palettenstufen, Bayer-Raster statt Alpha, alles Zeitunabhaengige je Karte vorberechnet.
+  const PA_ZONE = new WeakMap();
+  /** Bildzellen ohne Textzone (Name, Werte, Regeltext, Symbole) — einmal je Karte */
+  function protoRegion(E) {
+    const core = Object.getPrototypeOf(E), hit = PA_ZONE.get(core); if (hit) return hit;
+    const zone = textZone(E), R = new Uint8Array(NPX);
+    for (let y = AY0; y < AY0 + AH; y++) for (let x = AX0; x < AX0 + AW; x++) { const p = y * GW + x; if (E.A[p] && !zone[p]) R[p] = 1; }
+    const o = { zone, R }; PA_ZONE.set(core, o); return o;
+  }
+  const PP_HM = Array.from({ length: 12 }, (_, i) => hueMatrix(i * 30));
+  /** Pixel i (Index in B) um k * 30 Grad im Farbton gedreht und mit spektralem Ton gleicher Helligkeit gemischt -> Palettenfarbe */
+  function protoHue(B, i, k, tint) {
+    const r = B[i], g = B[i + 1], b = B[i + 2], m = PP_HM[k % 12];
+    const R = m[0] * r + m[1] * g + m[2] * b, G = m[3] * r + m[4] * g + m[5] * b, Bc = m[6] * r + m[7] * g + m[8] * b;
+    if (tint <= 0) return sn(R, G, Bc);
+    hsvOut(k / 12, .9, 1, TMP3, 0);
+    const f = Math.min(2.2, (.299 * r + .587 * g + .114 * b + 30) / (.299 * TMP3[0] + .587 * TMP3[1] + .114 * TMP3[2] + 1));
+    return sn(R + (TMP3[0] * f - R) * tint, G + (TMP3[1] * f - G) * tint, Bc + (TMP3[2] * f - Bc) * tint);
+  }
+  /** Glas-Ton fuer Facetten: Motiv um k * 30 Grad gedreht und mit einem hellen Spektralton aufgehellt (Bildschirm-Mischung): wie farbiges Licht, das durch das Prisma faellt */
+  function protoGlass(B, i, k) {
+    const r = B[i], g = B[i + 1], b = B[i + 2], m = PP_HM[k % 12];
+    hsvOut(k / 12, .7, 1, TMP3, 0);
+    return sn(scr(m[0] * r + m[1] * g + m[2] * b, TMP3[0] * C_LIFT), scr(m[3] * r + m[4] * g + m[5] * b, TMP3[1] * C_LIFT), scr(m[6] * r + m[7] * g + m[8] * b, TMP3[2] * C_LIFT));
+  }
+  /** Kontrastkanten: 1 wo der Helligkeitsunterschied zu einem 4-Nachbarn gross ist (nur Zellen der Region) */
+  function protoEdges(E, R, thr) {
+    const L = E.L, e = new Uint8Array(NPX);
+    for (let y = AY0 + 1; y < AY0 + AH - 1; y++) for (let x = AX0 + 1; x < AX0 + AW - 1; x++) {
+      const p = y * GW + x; if (!R[p]) continue;
+      const g = Math.max(Math.abs(L[p + 1] - L[p - 1]), Math.abs(L[p + GW] - L[p - GW]));
+      if (g > thr) e[p] = 1;
+    }
+    return e;
+  }
+  const PA_WV = [236, 226, 255], PA_ARM = [196, 176, 255];
+  /** Prisma-Glanz: kleines Diagonalkreuz (X), waechst und schrumpft; Kern weiss, Arme Weiss-Violett */
+  function xStar(o, cx, cy, size) {
+    putXY(o, cx, cy, [255, 255, 255]);
+    for (let k = 1; k <= size; k++) { putXY(o, cx + k, cy + k, PA_ARM); putXY(o, cx - k, cy - k, PA_ARM); putXY(o, cx + k, cy - k, PA_ARM); putXY(o, cx - k, cy + k, PA_ARM); }
+  }
+  const X_SIZE = [0, 1, 2, 1, 0];
+  function xSparkles(o, t, slots, per, show, cand, seed) {
+    if (!cand.length) return;
+    for (let s = 0; s < slots; s++) {
+      const tt = t + s * per / slots * 1.37, k = Math.floor(tt / per), ph = (tt % per) / per; if (ph > show) continue;
+      const p = cand[Math.floor(hash(k, s, seed) * cand.length)];
+      xStar(o, p % GW, (p / GW) | 0, X_SIZE[Math.floor(ph / show * X_SIZE.length)]);
+    }
+  }
+
+  // ── A: Chromatische Aufspaltung ──────────────────────────────────────────────
+  // Der Rot-Kanal des Motivs wandert nach links/oben, der Blau-Kanal nach rechts/unten (1..3 Zellen); nur an Kontrastkanten entstehen so Farbsaeume
+  // (Rot/Orange aussen links, Cyan/Blau aussen rechts), Flaechen bleiben unveraendert. Der Versatz atmet in Stufen (je Stufe ein fertiges Raster, je Bild nur kopieren).
+  const A_LEV = [1, 2, 3, 3, 2, 1], A_STEP = 1.1, A_GAIN = 2;
+  /** Farbsaum bei Versatz d: Rot-Kanal um (d, .6 d) nach links/oben, Blau-Kanal nach rechts/unten; nur Zellen mit deutlichem Unterschied (Schwelle je Karte: oberstes Zehntel der Kanten) */
+  function chromaLevel(E, R, d, thr) {
+    const { B, A } = E, o = new Uint32Array(NPX), dx = d, dy = Math.max(1, Math.round(d * .6)), dd = thr ? null : new Float32Array(NPX);
+    const at = (x, y, p) => (x >= 0 && y >= 0 && x < GW && y < GH && A[y * GW + x] ? (y * GW + x) * 4 : p * 4);
+    for (let y = AY0; y < AY0 + AH; y++) for (let x = AX0; x < AX0 + AW; x++) {
+      const p = y * GW + x; if (!R[p]) continue;
+      const i = p * 4, ir = at(x + dx, y + dy, p), ib = at(x - dx, y - dy, p), r0 = B[i], g0 = B[i + 1], b0 = B[i + 2];
+      const r = r0 + (B[ir] - r0) * A_GAIN, b = b0 + (B[ib + 2] - b0) * A_GAIN, d0 = Math.abs(r - r0) + Math.abs(b - b0);
+      if (!thr) { dd[p] = d0; continue; }
+      if (d0 < thr) continue;
+      if (bay(x, y) >= clamp((d0 - thr) / thr + .4)) continue;
+      const l = .299 * r + .587 * g0 + .114 * b;
+      o[p] = sn(l + (r - l) * 1.7, l + (g0 - l) * 1.7, l + (b - l) * 1.7);
+    }
+    if (thr) return o;
+    const v = []; for (let p = 0; p < NPX; p++) if (dd[p] > 4) v.push(dd[p]);
+    v.sort((a, b) => a - b);
+    return Math.max(34, Math.min(110, v.length ? v[Math.floor(v.length * .9)] : 60));
+  }
+  FX.pris_a = {
+    noText: true,
+    prep: () => ({}),
+    warm(E, st) { const pre = st.pre = { R: protoRegion(E).R, lev: {} }; pre.thr = chromaLevel(E, pre.R, 2, 0); for (const d of [1, 2, 3]) pre.lev[d] = chromaLevel(E, pre.R, d, pre.thr); },
+    frame(E, st, t, o) {
+      const pre = st.pre || (st.pre = { R: protoRegion(E).R, lev: {} });
+      if (!pre.thr) pre.thr = chromaLevel(E, pre.R, 2, 0);
+      const d = A_LEV[Math.floor(t / A_STEP) % A_LEV.length];
+      o.set(pre.lev[d] || (pre.lev[d] = chromaLevel(E, pre.R, d, pre.thr)));
+    },
+  };
+
+  // ── B: Globaler Farbfluss (Seifenblase / Oelfilm) ─────────────────────────────
+  // Das ganze Motiv durchlaeuft den Farbkreis in 12 Palettenstufen (8 s je Umlauf); ein grosses, ruhiges Phasenfeld (niederfrequentes Rauschen) verschiebt die Stufe je Ort,
+  // die Stufenuebergaenge laufen per Bayer-Raster ineinander. Dazu seltene Prisma-Blitze (Diagonalkreuz) an Konturen.
+  const B_PER = 9.6, B_SPREAD = 20;
+  /** Mittelwert im (2r+1)-Quadrat (Boxfilter, getrennt) ueber ein Float32-Raster */
+  function boxBlur(src, r) {
+    const tmp = new Float32Array(NPX), out = new Float32Array(NPX), n = 2 * r + 1;
+    for (let y = 0; y < GH; y++) for (let x = 0; x < GW; x++) { let s = 0; for (let d = -r; d <= r; d++) s += src[y * GW + Math.min(GW - 1, Math.max(0, x + d))]; tmp[y * GW + x] = s / n; }
+    for (let y = 0; y < GH; y++) for (let x = 0; x < GW; x++) { let s = 0; for (let d = -r; d <= r; d++) s += tmp[Math.min(GH - 1, Math.max(0, y + d)) * GW + x]; out[y * GW + x] = s / n; }
+    return out;
+  }
+  function flowPre(E) {
+    const { R } = protoRegion(E), { B, L } = E, qs = new Float32Array(NPX), bv = new Float32Array(NPX), pf = new Float32Array(NPX), Lb = boxBlur(L, 3), vals = [];
+    let hs = 5; for (const ch of (E.card && E.card.name) || 'x') hs = (Math.imul(hs, 31) + ch.charCodeAt(0)) | 0;
+    const ox = (hs & 255) / 8, oy = ((hs >> 8) & 255) / 8;   // Lage der Flecken je Karte verschieden, aber stabil
+    for (let y = AY0; y < AY0 + AH; y++) for (let x = AX0; x < AX0 + AW; x++) { const p = y * GW + x; if (!R[p]) continue; vals.push(pf[p] = fbm(x / 36 + ox, y / 36 + oy)); }
+    vals.sort((a, b) => a - b);
+    // hoechstens das obere Drittel des Bildfelds kommt in Frage (Flecken), darin nur helle Gegenden; bleibt zu wenig Flaeche (dunkles Bild), wird der Fleck-Anteil stufenweise erweitert
+    let cp = [];
+    for (const q of [.68, .56, .44, .3, .15]) {
+      const cut = vals.length ? vals[Math.floor(vals.length * q)] : 1; cp = [];
+      for (let y = AY0; y < AY0 + AH; y++) for (let x = AX0; x < AX0 + AW; x++) {
+        const p = y * GW + x; if (!R[p] || L[p] < .1) continue;
+        const cov = sstep(.14, .46, Lb[p]) * sstep(cut - .02, cut + .07, pf[p]);
+        if (bay(x >> 1, y >> 1) >= cov) continue;
+        cp.push(p);
+      }
+      if (cp.length >= vals.length * .09) break;
+    }
+    for (const p of cp) { const x = p % GW, y = (p / GW) | 0; qs[p] = (fbm(x / 46 + 3.1, y / 46 + 1.7) - .5) * B_SPREAD; bv[p] = bay(x >> 1, (y >> 1) + 1); }
+    const tab = new Array(12).fill(null), ed = protoEdges(E, R, .28), gl = []; for (let p = 0; p < NPX; p++) if (ed[p]) gl.push(p);
+    return { cp: Int32Array.from(cp), qs, bv, tab, gl: Int32Array.from(gl), B };
+  }
+  function flowTab(pre, k) {
+    const t = new Uint32Array(NPX), { cp, B } = pre;
+    for (let j = 0; j < cp.length; j++) { const p = cp[j]; t[p] = protoHue(B, p * 4, k, .3); }
+    return (pre.tab[k] = t);
+  }
+  FX.pris_b = {
+    noText: true,
+    prep: () => ({}),
+    warm(E, st) { st.pre = flowPre(E); },
+    frame(E, st, t, o) {
+      const pre = st.pre || (st.pre = flowPre(E)), { cp, qs, bv, tab } = pre, q0 = t / B_PER * 12;
+      for (let j = 0; j < cp.length; j++) { const p = cp[j], k = (Math.floor(q0 + qs[p] + bv[p]) % 12 + 12) % 12; o[p] = (tab[k] || flowTab(pre, k))[p]; }
+      xSparkles(o, t, 2, 3.4, .5, pre.gl, 51);
+    },
+  };
+
+  // ── C: Prisma-Facetten ───────────────────────────────────────────────────────
+  // Wenige grosse Facetten (Dreiecke/Rauten aus einem lockeren Dreiecksgitter, je Karte stabil aus dem Kartennamen), Farbton je Facette langsam und versetzt im Kreis,
+  // nacheinander kurzes Aufblitzen (Weiss-Violett, Bayer-Stufen); Facettenkanten als 1-Zellen-Linien, in Ruhe gestrichelt, im Blitz voll. Alles andere bleibt unveraendert.
+  const C_PER = 10, C_FL = .8, C_GAP = .9, C_LIFT = .32;
+  function facetPre(E) {
+    const { R } = protoRegion(E), name = (E.card && E.card.name) || 'x'; let hs = 7; for (const ch of name) hs = (Math.imul(hs, 31) + ch.charCodeAt(0)) | 0;
+    const side = (p, a, b) => (p[0] - b[0]) * (a[1] - b[1]) - (a[0] - b[0]) * (p[1] - b[1]);
+    const r = rng(hs >>> 0), cols = 3, rows = 2, pts = [];
+    for (let j = 0; j <= rows; j++) for (let i = 0; i <= cols; i++) pts.push([AX0 + AW * (i / cols) + (i > 0 && i < cols ? (r() - .5) * AW / cols * .4 : 0), AY0 + AH * (j / rows) + (j > 0 && j < rows ? (r() - .5) * AH / rows * .4 : 0)]);
+    const tris = [];   // je Quad zwei Dreiecke, Diagonale wechselt
+    for (let j = 0; j < rows; j++) for (let i = 0; i < cols; i++) {
+      const a = pts[j * (cols + 1) + i], b = pts[j * (cols + 1) + i + 1], c = pts[(j + 1) * (cols + 1) + i], d = pts[(j + 1) * (cols + 1) + i + 1], flip = (i + j) & 1;
+      if (flip) { tris.push({ v: [a, b, c], q: j * cols + i, h: 0 }, { v: [b, d, c], q: j * cols + i, h: 1 }); } else { tris.push({ v: [a, b, d], q: j * cols + i, h: 0 }, { v: [a, d, c], q: j * cols + i, h: 1 }); }
+    }
+    const order = tris.map((_, i) => i).sort((a, b) => r() - r());   // zufaellige Auswahl, 3 bis 4 Facetten; ein Teil als Raute (Dreieck + Nachbardreieck desselben Quads)
+    const nf = 3 + (r() < .45 ? 1 : 0), used = new Set(), facets = [];
+    for (const ti of order) {
+      if (facets.length >= nf) break; if (used.has(ti) || Math.abs(side(tris[ti].v[2], tris[ti].v[0], tris[ti].v[1])) < AW * AH * .06) continue;   // zu schmale Dreiecke auslassen
+      const mate = ti ^ 1, rh = r() < .15 && !used.has(mate);
+      used.add(ti); const f = { tri: [tris[ti].v] }; if (rh) { used.add(mate); f.tri.push(tris[mate].v); } facets.push(f);
+    }
+    const fid = new Int8Array(NPX).fill(-1);
+    for (let y = AY0; y < AY0 + AH; y++) for (let x = AX0; x < AX0 + AW; x++) {
+      const p = y * GW + x; if (!R[p]) continue; const q = [x + .5, y + .5];
+      for (let f = 0; f < facets.length; f++) for (const v of facets[f].tri) { const d1 = side(q, v[0], v[1]), d2 = side(q, v[1], v[2]), d3 = side(q, v[2], v[0]); if ((d1 >= 0 && d2 >= 0 && d3 >= 0) || (d1 <= 0 && d2 <= 0 && d3 <= 0)) { fid[p] = f; } }
+    }
+    const nfc = facets.length, lists = facets.map(() => []), edge = facets.map(() => []);
+    for (let y = AY0; y < AY0 + AH; y++) for (let x = AX0; x < AX0 + AW; x++) {
+      const p = y * GW + x, f = fid[p]; if (f < 0) continue;
+      const e = (p % GW < GW - 1 && fid[p + 1] !== f && E.A[p + 1]) || (p % GW > 0 && fid[p - 1] !== f && E.A[p - 1]) || (fid[p + GW] !== f && E.A[p + GW]) || (fid[p - GW] !== f && E.A[p - GW]);
+      lists[f].push(p); if (e) edge[f].push(p);
+    }
+    const off = facets.map((_, f) => (f / nfc + (r() - .5) * .25 + 1) % 1);
+    return { B: E.B, nf: nfc, fid, lists: lists.map(a => Int32Array.from(a)), edge: edge.map(a => Int32Array.from(a)), off, tab: facets.map(() => new Array(12).fill(null)), WV: sn(PA_WV[0], PA_WV[1], PA_WV[2]) };
+  }
+  function facetTab(pre, f, k) {
+    const t = new Uint32Array(NPX), L = pre.lists[f], { B } = pre;
+    for (let j = 0; j < L.length; j++) { const p = L[j]; t[p] = protoGlass(B, p * 4, k); }
+    return (pre.tab[f][k] = t);
+  }
+  FX.pris_c = {
+    noText: true,
+    prep: () => ({}),
+    warm(E, st) { st.pre = facetPre(E); },
+    frame(E, st, t, o) {
+      const pre = st.pre || (st.pre = facetPre(E)), { B, nf } = pre, tc = t % (nf * C_FL + C_GAP + 1.2);
+      for (let f = 0; f < nf; f++) {
+        const L = pre.lists[f], ph = (tc - f * C_FL) / C_FL, fl = ph >= 0 && ph < 1 ? [.25, .5, .78, .5, .25][Math.floor(ph * 5)] : 0;
+        const kf = fract(t / C_PER + pre.off[f]) * 12, tabK = Math.floor(kf) % 12, frac = kf - Math.floor(kf), tab0 = pre.tab[f][tabK] || facetTab(pre, f, tabK), tab1 = pre.tab[f][(tabK + 1) % 12] || facetTab(pre, f, (tabK + 1) % 12);
+        for (let j = 0; j < L.length; j++) {
+          const p = L[j]; let v = bay(p % GW, (p / GW) | 0) < frac ? tab1[p] : tab0[p];
+          if (fl && bay(p % GW + 1, (p / GW) | 0) < fl) { const c = v; v = sn((c & 255) + (PA_WV[0] - (c & 255)) * .6, ((c >> 8) & 255) + (PA_WV[1] - ((c >> 8) & 255)) * .6, ((c >> 16) & 255) + (PA_WV[2] - ((c >> 16) & 255)) * .6); }
+          o[p] = v;
+        }
+        const Ed = pre.edge[f];
+        for (let j = 0; j < Ed.length; j++) { const p = Ed[j], x = p % GW, y = (p / GW) | 0; if (fl || ((x + y) % 5) < 3) o[p] = pre.WV; }
+      }
     },
   };
 
@@ -1513,13 +1712,13 @@
   // ═══════════ Test-Schalter ═══════════
   function testRarity(cardName) {
     let r = root.__ppTestRarity;
-    if (r == null) { try { const m = /[?&]rarity=([a-z]+)/.exec(location.search); r = m ? m[1] : null; } catch (e) { r = null; } }
+    if (r == null) { try { const m = /[?&]rarity=([a-z_]+)/.exec(location.search); r = m ? m[1] : null; } catch (e) { r = null; } }
     if (!r) return null;
     if (r === 'mix') {   // deterministisch je Kartenname, alle Stufen (auch Common)
       const n = ORDER.length; let h = 0; for (const ch of String(cardName || '')) h = (h * 31 + ch.charCodeAt(0)) | 0;
       return ORDER[Math.abs(h) % n];
     }
-    return ORDER.includes(r) ? r : null;
+    return ORDER.includes(r) || /^prismatic_[abc]$/.test(r) ? r : null;
   }
 
   root.PpRarityFx = { available, hasMask, loadMasks, attach, imageRarity, testRarity, ORDER, LABEL, SPEC, stats: () => Object.assign({}, stats, { instances: instances.size, stills: stillCache.size, cores: coreCache.size }),
