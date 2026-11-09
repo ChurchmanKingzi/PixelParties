@@ -26556,22 +26556,24 @@ input[type="checkbox"]:focus-visible, input[type="radio"]:focus-visible { outlin
 .bp-card-back { image-rendering: pixelated; }
 .bp-card-face { overflow: hidden; background: #08060c; }
 .bp-card-face img { display: block; width: 100%; height: 100%; pointer-events: none; image-rendering: pixelated; }
+.bp-card-flip { z-index: 4; }
+.bp-card-flipcv { position: absolute; display: block; image-rendering: pixelated; pointer-events: none; }
 .bp-card-done.bp-card-hot { z-index: 5; }
 
 .bp-hud { position: absolute; z-index: 6; display: flex; flex-direction: column; align-items: center; gap: 6px; pointer-events: none; }
 .bp-hud > * { pointer-events: auto; }
 .bp-hud-tight { right: 10px; bottom: 10px; align-items: flex-end; }
+.bp-hud-tight .bp-btn, .bp-hud-tight .bp-btn-go { font-size: 11px; letter-spacing: 1px; padding: 6px 10px; max-width: 250px; white-space: normal; line-height: 1.3; }
 .bp-btn { font-size: 13px; letter-spacing: 2px; padding: 8px 20px; border-color: #fad54a; color: #fad54a; background: #12101f; }
 .bp-btn:disabled { border-color: #3e3e51; color: #7e7d9b; }
 .bp-btn-go { color: #fad54a; border-color: #fad54a; font-size: 15px; padding: 10px 24px; box-shadow: 0 0 0 2px #08060c, 0 0 0 4px #72541d, 0 0 0 6px #08060c; animation: bpGoBlink 1s steps(1) infinite; }
 .bp-btn-go:disabled { animation: none; color: #7e7d9b; box-shadow: none; }
 @keyframes bpGoBlink { 0% { color: #fad54a; box-shadow: 0 0 0 2px #08060c, 0 0 0 4px #fad54a, 0 0 0 6px #08060c; } 50% { color: #ffffff; box-shadow: 0 0 0 2px #08060c, 0 0 0 4px #72541d, 0 0 0 6px #08060c; } }
 .bp-hint { font-size: 11px; color: #a5b0c0; letter-spacing: 1px; }
-.bp-chip { position: absolute; z-index: 7; text-align: center; pointer-events: none; font-family: var(--font-display), sans-serif; font-size: 11px; letter-spacing: 1px; line-height: 16px; height: 16px; background: #08060c; box-sizing: border-box; box-shadow: 0 0 0 2px #08060c; }
 .bp-tooltip { position: fixed; right: 0; top: 41px; width: 400px; height: calc(100vh - 41px); display: flex; flex-direction: column; overflow: hidden; z-index: 8; }
 @media (max-width: 760px) { .bp-tooltip { display: none; } }
 
-/* Gegner-Items am Ende der Avatare-/Sleeves-Liste: Trennzeile statt der angehefteten Kopfleiste */
-.shop-random-wrap.shop-cpu-embedded { position: static; top: auto; z-index: auto; margin: 26px 0 14px; padding: 10px 16px; background: #12101f;
+/* Filter-Reiter „OPPONENTS“ der Avatare/Sleeves: Kopfzeile statt der angehefteten Leiste */
+.shop-random-wrap.shop-cpu-embedded { position: static; top: auto; z-index: auto; margin: 4px 0 14px; padding: 10px 16px; background: #12101f;
   border: 0; box-shadow: 0 0 0 2px #08060c, 0 0 0 4px #72541d, 0 0 0 6px #08060c; }
 @media (max-height: 600px) { .bp-tooltip { display: none; } }

@@ -4939,18 +4939,16 @@ function ShopScreen() {
   // Gegner-Sleeves: Trophäen aus dem Singleplayer. Freigeschaltete lassen sich
   // ausrüsten wie gekaufte; gesperrte zeigen den Fortschritt gegen ihre CPU.
   // Noch unbekannte Gegner bleiben verdeckt, damit nichts vorweggenommen wird.
-  // `eingebettet`: am Ende der Sleeves-Liste (Reiter „Sleeves“); der Sammlungsfilter (ALL/OWNED/MISSING) gilt dann auch hier.
-  const cpuFilter = (all) => collFilter === 'owned' ? all.filter(it => it.unlocked) : collFilter === 'missing' ? all.filter(it => !it.unlocked) : all;
-  const renderCpuSleeves = (eingebettet) => {
+  // Sie erscheinen im Filter-Reiter „OPPONENTS“ neben ALL / OWNED / MISSING (Reiter „Sleeves“ bzw. „Avatars“).
+  const renderCpuSleeves = () => {
     const all = cpuSleeves.sleeves || [];
-    const list = eingebettet ? cpuFilter(all) : all;
-    if (all.length === 0) return eingebettet ? null : <div className="shop-empty">No opponent sleeves available yet</div>;
-    if (list.length === 0) return null;
+    const list = all;
+    if (all.length === 0) return <div className="shop-empty">No opponent sleeves available yet</div>;
     const need = cpuSleeves.need || 5;
     const earned = all.filter(it => it.unlocked).length;
     return (
       <React.Fragment>
-        <div className={'shop-random-wrap' + (eingebettet ? ' shop-cpu-embedded' : '')}>
+        <div className="shop-random-wrap shop-cpu-embedded">
           <div className="shop-cpu-sleeves-intro">🏆 Every CPU opponent plays with its own sleeve. Defeat an opponent {need} times to claim it!</div>
           <span className="shop-random-hint">{earned} / {all.length} earned</span>
         </div>
@@ -4990,16 +4988,15 @@ function ShopScreen() {
     );
   };
 
-  const renderCpuAvatars = (eingebettet) => {
+  const renderCpuAvatars = () => {
     const all = cpuAvatars.avatars || [];
-    const list = eingebettet ? cpuFilter(all) : all;
-    if (all.length === 0) return eingebettet ? null : <div className="shop-empty">No opponent avatars available yet</div>;
-    if (list.length === 0) return null;
+    const list = all;
+    if (all.length === 0) return <div className="shop-empty">No opponent avatars available yet</div>;
     const need = cpuAvatars.need || 1;
     const earned = all.filter(it => it.unlocked).length;
     return (
       <React.Fragment>
-        <div className={'shop-random-wrap' + (eingebettet ? ' shop-cpu-embedded' : '')}>
+        <div className="shop-random-wrap shop-cpu-embedded">
           <div className="shop-cpu-sleeves-intro">🏆 Every CPU opponent has a portrait. Defeat an opponent {need === 1 ? 'once' : need + ' times'} to claim it as your avatar!</div>
           <span className="shop-random-hint">{earned} / {all.length} earned</span>
         </div>
@@ -5091,15 +5088,18 @@ function ShopScreen() {
     );
 
     const heroQuery = skinFilter.trim().toLowerCase();
+    const cpuList = type === 'sleeve' ? (cpuSleeves.sleeves || []) : type === 'avatar' ? (cpuAvatars.avatars || []) : null;
+    const opponentsView = !!cpuList && collFilter === 'opponents';       // Reiter „OPPONENTS“: statt der Sammlung die Gegner-Items
     const filtered = items.filter(it => {
       if (type === 'skin' && heroQuery && !String(it.heroName).toLowerCase().includes(heroQuery)) return false;
       const own = ownedSet[type].has(it.id);
-      return collFilter === 'owned' ? own : collFilter === 'missing' ? !own : true;
+      return collFilter === 'owned' ? own : collFilter === 'missing' ? !own : true;       // 'opponents' (nur Avatare/Sleeves) zeigt eine eigene Liste, bei Skins gilt es wie ALL
     });
     const chips = [
       { id: 'all', label: 'ALL', n: items.length },
       { id: 'owned', label: 'OWNED', n: ownedN },
       { id: 'missing', label: 'MISSING', n: missing.length },
+      ...(cpuList ? [{ id: 'opponents', label: 'OPPONENTS', n: cpuList.length }] : []),
     ];
 
     return (
@@ -5154,7 +5154,7 @@ function ShopScreen() {
 
         <div className="shop-coll-scroll">
 
-        {filtered.length === 0 ? (
+        {opponentsView ? (type === 'sleeve' ? renderCpuSleeves() : renderCpuAvatars()) : filtered.length === 0 ? (
           <div className="shop-empty">
             {collFilter === 'owned'
               ? 'Nothing here yet — pull to start your ' + def.noun.toLowerCase() + ' collection!'
@@ -5208,9 +5208,6 @@ function ShopScreen() {
               );
             }} />
         )}
-        {/* Gegner-Items stehen am Ende der jeweiligen Liste (früher eigene Reiter „Opponent Sleeves/Avatars“) */}
-        {type === 'sleeve' && renderCpuSleeves(true)}
-        {type === 'avatar' && renderCpuAvatars(true)}
         </div>
       </div>
     );

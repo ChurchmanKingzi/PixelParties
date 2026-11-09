@@ -519,6 +519,7 @@ def main(argv):
     os.makedirs(out, exist_ok=True)
     only = set(args)
     card = load_cardback()
+    Image.fromarray(card, 'RGBA').save(os.path.join(out, 'cardback.png'))   # Rücken 75x105 für die Flip-Animation im Browser (public/app-booster.jsx)
     cut_masks(out)
     tl = None
     for pack in ACCENT:

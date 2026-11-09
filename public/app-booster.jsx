@@ -29,12 +29,6 @@ const BP_RARITY_LABEL = {
   diamond: 'Diamond', spectral: 'Spectral', umbra: 'Umbra', stained: 'Stained Rare',
 };
 const bpRarityLabel = (r) => (window.PpRarities && window.PpRarities.LABEL && window.PpRarities.LABEL[r]) || BP_RARITY_LABEL[r] || r;
-// Farbe der Namensplakette je Rarity (nur Palettenfarben)
-const BP_RARITY_COLOR = {
-  common: '#a8a8a8', uncommon: '#4ceb70', rare: '#66d9ff', prismatic: '#fa6bed', super: '#fad54a',
-  diamond: '#b2eeee', spectral: '#66ffa2', umbra: '#a040ff', stained: '#ff6666',
-};
-
 // ── Netz ────────────────────────────────────────────────────────────────────
 window.ppBoosterApi = (() => {
   async function call(path, opts) {
@@ -287,12 +281,12 @@ function bpFxCreate(cv, S, shakeEl) {
   let raf = 0, tak = 0, last = -1, dead = false, shake = null;
   const api = { W, H, S };
 
-  function spawn(kind, cx, cy, cw, ch) {
+  function spawn(kind, cx, cy, cw, ch, mix) {
     const seed = (Math.random() * 1e9) | 0, rnd = bpRng(seed);
-    const e = { kind, cx, cy, cw, ch, t: 0, rnd, seed, P: [] };
+    const e = { kind, cx, cy, cw, ch, t: 0, rnd, seed, P: [], mix: mix > 1 ? mix : 1 };
     init(e);
     list.push(e);
-    if (kind === 'stained') shake = { t: 0, amp: 4 };
+    if (kind === 'stained') shake = { t: 0, amp: mix > 1 ? 3 : 4 };
     if (!raf && !dead) raf = bpRaf(loop);
   }
 
@@ -339,7 +333,7 @@ function bpFxCreate(cv, S, shakeEl) {
         P.push({ x: Math.cos(a) * d * 0.9, y: Math.sin(a) * d, vx: (r() - 0.5) * 0.3, vy: -(0.1 + r() * 0.5), life: 30 + (r() * 30) | 0, c: cols[i % cols.length], ph: (r() * 6) | 0, d: 4 + (r() * 12) | 0 });
       }
     } else if (e.kind === 'stained') {
-      e.rays = 18; e.rot = (r() * 4) | 0;
+      e.rays = e.mix > 1 ? 10 : 18; e.rot = (r() * 4) | 0;   // mehrere Effekte gleichzeitig (Flip All): weniger Strahlen, damit alle Karten sichtbar bleiben
     }
   }
 
@@ -497,11 +491,11 @@ function bpFxCreate(cv, S, shakeEl) {
     if (e.kind === 'stained') {
       // Blitz über den ganzen Bildschirm (Weiß, dann Gold) in sechs Stufen
       const fl = [1, 0.85, 0.55, 0.3, 0.16, 0.08];
-      if (t < fl.length) pen.dither(0, 0, pen.W, pen.H, fl[t], t < 2 ? BPC.white : BPC.goldL);
+      if (t < fl.length) pen.dither(0, 0, pen.W, pen.H, fl[t] * (e.mix > 1 ? 0.5 : 1), t < 2 ? BPC.white : BPC.goldL);
       // Strahlen: 18 Strahlen mit Stained-Glass-Farben, drehen in Stufen, wachsen in 10 Takten, verlöschen per Dither
       const grow = Math.min(1, t / 10), dens = t < 44 ? 1 : Math.max(0, 1 - (t - 44) / 64);
       if (dens > 0) {
-        const L = (Math.hypot(pen.W, pen.H) * 0.62) * grow, rot = (e.rot + (t >> 2)) * 0.07;
+        const L = (Math.hypot(pen.W, pen.H) * (e.mix > 1 ? 0.4 : 0.62)) * grow, rot = (e.rot + (t >> 2)) * 0.07;
         const cols = [BPC.gold, BPC.red, BPC.purple, BPC.cyan, BPC.goldL, BPC.magenta];
         for (let i = 0; i < e.rays; i++) {
           const a = rot + (i / e.rays) * Math.PI * 2, c = cols[i % cols.length], ca = Math.cos(a), sa = Math.sin(a);
@@ -511,7 +505,6 @@ function bpFxCreate(cv, S, shakeEl) {
           pen.line(x0, y0, x1, y1, BPC.white, 2, dens * 0.5); // … weißer Kern
         }
         if (t > 3) pen.dither(X - 6, Y - 6, 12, 12, dens, BPC.white);
-        if (t >= 16) pen.erase(X - hw - 1, Y - hh - 1, e.cw + 2, e.ch + 2);   // die enthüllte Karte bleibt frei von Strahlen
       }
       // Druckwellen
       for (let k = 0; k < 3; k++) { const tt = t - k * 6; if (tt > 0 && tt < 44) pen.ring(X, Y, tt * 3.4, [BPC.white, BPC.gold, BPC.red][k], 1 - tt / 44, 3); }
@@ -549,6 +542,8 @@ function bpFxCreate(cv, S, shakeEl) {
       e.t += dt;
       if (e.t > (BP_FX_LEN[e.kind] || 40)) list.splice(i, 1);
     }
+    // die enthüllten Stained-Karten bleiben frei von Strahlen und fremden Effekten (auch von denen gleichzeitig gespielter Karten)
+    for (const e of list) if (e.kind === 'stained' && e.t >= 16) pen.erase(e.cx - e.cw / 2 - 1, e.cy - e.ch / 2 - 1, e.cw + 2, e.ch + 2);
     pen.flush();
     // Bildschirmzucken (Stained): Versatz der Bühne in ganzen Rasterzellen, verklingt in Stufen
     if (shake && shakeEl) {
@@ -583,59 +578,154 @@ const BP_FLIP_SOUNDS = {
 };
 
 // ═══════════════════════════════════════════════════════════════════════════
+//  FLIP-ANIMATION (aus Rücken UND Vorderseite zusammengesetzt)
+//  Die Karte dreht sich um die senkrechte Achse (Winkel a: 0 = Rücken liegt flach, 90 = Kante, 180 = Vorderseite liegt flach). Je Bildspalte wird
+//  rückwärts abgetastet (nächster Nachbar, ganze Bildpunkte): Spalte → Quellspalte, Zeilen je Spalte nach der Perspektive (näher am Betrachter
+//  höher: Ober-/Unterkante trapezförmig). Kanten-Schatten: Bayer-Dithering in Schwarz (zur abgewandten Seite dichter), harte dunkle Randspalte.
+//  Keine Verläufe, kein Alpha: die Leinwand bekommt nur Palettenfarben und volle Deckkraft. Takt: 30 Hz, nur bei Winkelwechsel gezeichnet.
+// ═══════════════════════════════════════════════════════════════════════════
+const BP_FLIP_ANG = [0, 7, 18, 33, 52, 72, 90, 108, 128, 147, 162, 173, 180];   // Grad je Bild; Index 6 = Kante (Aufschlagen der Vorderseite folgt)
+const BP_FLIP_EDGE = 6, BP_FLIP_LAST = BP_FLIP_ANG.length - 1;
+const BP_EDGE_C = [bpU32('#d2d2db'), bpU32('#a8a8a8')], BP_DARK = bpU32('#08060c');
+
+// Rand für die Perspektive (Bildpunkte), mit der die Leinwand größer ist als die Karte
+const bpFlipPad = (ch) => Math.ceil(ch * 0.07) + 2;
+
+// buf: Uint32Array CW×CH (wird gelöscht und neu gemalt); back/face: Uint32Array cw×ch (Quellbilder in Kartengröße)
+function bpFlipDraw(buf, CW, CH, cw, ch, deg, back, face, E) {
+  buf.fill(0);
+  const a = deg * Math.PI / 180, sn = Math.sin(a), cs = Math.cos(a), D = cw * 5, cx = CW / 2, cy = CH / 2;
+  const hf = cw / 2;
+  const sAt = (x) => 1 / (1 - x * sn / D);
+  if (Math.abs(cs) < 0.04) {
+    // Kante: schmaler Streifen (E Bildpunkte breit), links abgewandt (kürzer), rechts zugewandt (länger)
+    const x0 = Math.round(cx - E / 2);
+    for (let k = 0; k < E; k++) {
+      const X = x0 + k, s = sAt(-hf + (k + 0.5) / E * cw), h = Math.round(ch * s), top = Math.round(cy - h / 2);
+      const col = BP_EDGE_C[k < E / 2 ? 1 : 0];
+      for (let Y = Math.max(0, top); Y < Math.min(CH, top + h); Y++) buf[Y * CW + X] = ((Y + X) & 1) && k === 0 ? BP_DARK : col;
+    }
+    return;
+  }
+  const front = cs < 0, src = front ? face : back;
+  const xpOf = (x) => x * cs / (1 - x * sn / D);
+  const p0 = xpOf(-hf), p1 = xpOf(hf), lo = Math.min(p0, p1), hi = Math.max(p0, p1);
+  const X0 = Math.max(0, Math.floor(cx + lo)), X1 = Math.min(CW - 1, Math.ceil(cx + hi));
+  const sh = Math.abs(sn);
+  let first = -1, last = -1;
+  for (let X = X0; X <= X1; X++) {
+    const xp = X + 0.5 - cx, x = xp / (cs + xp * sn / D);
+    if (!(x >= -hf && x <= hf)) continue;
+    if (first < 0) first = X; last = X;
+    const s = sAt(x), h = ch * s, top = cy - h / 2;
+    let u = front ? hf - x : x + hf; u = u < 0 ? 0 : u >= cw ? cw - 1 : Math.floor(u);
+    // Schatten: je näher an der Kante und je weiter abgewandt, desto dichter; bei flacher Karte (0°/180°) keiner
+    const far = (1 - x / hf) / 2, dens = sh * sh * (0.04 + 0.4 * far);
+    const Y0 = Math.max(0, Math.ceil(top)), Y1 = Math.min(CH, Math.ceil(top + h));
+    for (let Y = Y0; Y < Y1; Y++) {
+      let r = Math.floor((Y + 0.5 - top) / h * ch); r = r < 0 ? 0 : r >= ch ? ch - 1 : r;
+      let c = src[r * cw + u];
+      if (dens > 0 && (BP_BAYER[Y & 3][X & 3] + 0.5) / 16 < dens) c = BP_DARK;
+      buf[Y * CW + X] = c;
+    }
+  }
+  // harte Randspalten (nur solange die Karte merklich schräg steht)
+  if (sh > 0.25 && first >= 0) {
+    for (const X of [first, last]) {
+      const xp = X + 0.5 - cx, x = xp / (cs + xp * sn / D), h = ch * sAt(x), top = Math.round(cy - h / 2);
+      for (let Y = Math.max(0, top); Y < Math.min(CH, top + Math.round(h)); Y++) buf[Y * CW + X] = BP_DARK;
+    }
+  }
+}
+
+// Quellbilder in Kartengröße (ganze Bildpunkte, nächster Nachbar): Rücken aus dem 75x105-Sprite der Öffnung, Vorderseite aus dem Kartenbild
+const _bpPix = new Map();
+function bpPixels(url, cw, ch) {
+  const key = url + '|' + cw + 'x' + ch;
+  let p = _bpPix.get(key);
+  if (!p) {
+    p = bpImg(url).then(im => {
+      const c = document.createElement('canvas'); c.width = cw; c.height = ch;
+      const g = c.getContext('2d', { willReadFrequently: true }); g.imageSmoothingEnabled = false;
+      g.drawImage(im, 0, 0, im.naturalWidth || im.width, im.naturalHeight || im.height, 0, 0, cw, ch);
+      const d = g.getImageData(0, 0, cw, ch).data, out = new Uint32Array(cw * ch);
+      for (let i = 0; i < out.length; i++) out[i] = ((255 << 24) | (d[i * 4 + 2] << 16) | (d[i * 4 + 1] << 8) | d[i * 4]) >>> 0;
+      return out;
+    });
+    _bpPix.set(key, p);
+    p.catch(() => _bpPix.delete(key));
+    if (_bpPix.size > 40) _bpPix.delete(_bpPix.keys().next().value);
+  }
+  return p;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
 //  EINE KARTE IM PACK
 // ═══════════════════════════════════════════════════════════════════════════
-// Aufdecken in ganzen Bildpunkten: der Rücken schrumpft in fünf Stufen zur Mittellinie (clip-path), dann öffnet sich das Gesicht von der Mitte
-// (fünf Stufen). Die Karte steht auf dem dunklen Grund der Bühne; harte Kanten, keine Drehung, keine stufenlose Skalierung.
-const BP_FLIP_N = 5, BP_FLIP_STEP = 7;
-function BpCard({ idx, card, geom, open, delay, onClick, onHover, hot }) {
-  const [ph, setPh] = useState(0);              // 0 verdeckt, 1..2N Aufdeckstufe (2N = fertig)
-  const hostRef = useRef(null);
+// Zustand `ph`: 0 verdeckt · 1 dreht sich (Leinwand mit der Flip-Animation) · 2 fertig (Kartenbild + Rarity-Ebene).
+// `hold` = Bilder, die die Karte auf der Kante stehen bleibt (hohe Rarities: der Effekt baut sich auf, bevor die Vorderseite aufschlägt).
+function BpCard({ idx, card, geom, open, hold, onEdge, onDone, onClick, onHover, hot }) {
+  const [ph, setPh] = useState(0);
+  const hostRef = useRef(null), cvRef = useRef(null);
+  const cbRef = useRef({}); cbRef.current = { onEdge, onDone };
+  const Z = geom.Z, cw = geom.cw, ch = geom.ch, pad = bpFlipPad(ch);
+  const url = bpCardUrl(card.name, card.rarity);
   useEffect(() => {
     if (!open) { setPh(0); return undefined; }
-    let dead = false, raf = 0;
-    const t0 = performance.now() + (delay || 0);
+    let dead = false, raf = 0, t0 = performance.now(), lastIdx = -1, edged = false, backPix = null, facePix = null;
+    const CW = cw + 2 * pad, CH = ch + 2 * pad, E = Math.max(4, Z * 2);
+    setPh(1);
+    const cv = cvRef.current;
+    if (!cv) return undefined;
+    const g = cv.getContext('2d');
+    const buf = new Uint32Array(CW * CH), img = new ImageData(new Uint8ClampedArray(buf.buffer), CW, CH);
+    Promise.all([bpPixels(BP_DIR + 'opening/cardback.png', cw, ch), bpPixels(url, cw, ch)]).then(([b, f]) => { backPix = b; facePix = f; }).catch(() => { backPix = backPix || new Uint32Array(cw * ch).fill(BP_DARK); facePix = facePix || backPix; });
     const tick = (now) => {
       raf = 0;
       if (dead) return;
-      const p = Math.max(0, Math.min(2 * BP_FLIP_N, 1 + Math.floor((now - t0) / BP_TAKT / 1.6)));
-      setPh(prev => (now < t0 ? prev : (p !== prev ? p : prev)));
-      if (now < t0 || p < 2 * BP_FLIP_N) raf = bpRaf(tick);
+      if (!backPix) { t0 = now; raf = bpRaf(tick); return; }              // Quellbilder noch nicht da: noch nichts zeichnen
+      let f = Math.floor((now - t0) / BP_TAKT), i;
+      if (f <= BP_FLIP_EDGE) i = f;
+      else if (f < BP_FLIP_EDGE + hold || !facePix) { i = BP_FLIP_EDGE; if (!facePix) t0 = now - (BP_FLIP_EDGE + hold) * BP_TAKT; }
+      else i = Math.min(BP_FLIP_LAST, f - hold);
+      if (i >= BP_FLIP_EDGE && !edged) { edged = true; try { cbRef.current.onEdge && cbRef.current.onEdge(idx); } catch (e) { /* ohne */ } }
+      if (i !== lastIdx) {
+        lastIdx = i;
+        if (i >= BP_FLIP_LAST) { setPh(2); try { cbRef.current.onDone && cbRef.current.onDone(idx); } catch (e) { /* ohne */ } return; }
+        bpFlipDraw(buf, CW, CH, cw, ch, BP_FLIP_ANG[i], backPix, facePix || backPix, E);
+        g.putImageData(img, 0, 0);
+      }
+      raf = bpRaf(tick);
     };
     raf = bpRaf(tick);
     return () => { dead = true; if (raf) bpCancel(raf); };
-  }, [open]);
-  const done = ph >= 2 * BP_FLIP_N;
+  }, [open, cw, ch, url]);
+  const done = ph >= 2;
   // Rarity-Ebene (Agent B, public/rarity-fx.js): animiert, sobald die Karte offen ist; ohne Modul/ohne Ebene bleibt es beim Kartenbild
   useEffect(() => {
     if (!done || !hostRef.current) return undefined;
     const F = window.PpRarityFx;
     if (!F || card.rarity === 'common' || (F.available && !F.available(card.rarity))) return undefined;
     let h = null;
-    try { h = F.attach(hostRef.current, { card: (window.CARDS_BY_NAME && window.CARDS_BY_NAME[card.name]) || { name: card.name }, rarity: card.rarity, animated: true, size: geom.cw }); } catch (e) { h = null; }
+    try { h = F.attach(hostRef.current, { card: (window.CARDS_BY_NAME && window.CARDS_BY_NAME[card.name]) || { name: card.name }, rarity: card.rarity, animated: true, size: cw }); } catch (e) { h = null; }
     return () => { try { h && h.destroy && h.destroy(); } catch (e) { /* ohne */ } };
   }, [done, card.rarity, card.name]);
-  const Z = geom.Z;
   const [sx, sy] = geom.slots[idx];
-  const style = { left: geom.left + sx * Z, top: geom.top + sy * Z, width: geom.cw, height: geom.ch };
-  const N = BP_FLIP_N;
-  const backIn = Math.min(ph, N) * BP_FLIP_STEP * Z;
-  const faceIn = Math.max(0, 2 * N - ph) * BP_FLIP_STEP * Z;
-  const url = bpCardUrl(card.name, card.rarity);
+  const style = { left: geom.left + sx * Z, top: geom.top + sy * Z, width: cw, height: ch };
   return (
-    <div className={'bp-card' + (open ? ' bp-card-open' : ' bp-card-shut') + (done ? ' bp-card-done' : '') + (hot ? ' bp-card-hot' : '')} style={style}
+    <div className={'bp-card' + (open ? ' bp-card-open' : ' bp-card-shut') + (open && !done ? ' bp-card-flip' : '') + (done ? ' bp-card-done' : '') + (hot ? ' bp-card-hot' : '')} style={style}
       onClick={() => { if (!open) onClick(idx); }}
       onMouseEnter={() => onHover(idx, true)} onMouseLeave={() => onHover(idx, false)}
       role="button" tabIndex={open ? -1 : 0} aria-label={open ? bpRarityLabel(card.rarity) + ' ' + card.name : 'Card ' + (idx + 1) + ', face down'}
       onKeyDown={(e) => { if (!open && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); onClick(idx); } }}>
-      {open && ph >= 1 && <div className="bp-card-ground" />}
-      {open && ph >= 1 && ph <= N && (
-        <img className="bp-card-back" src="/cardback.png" alt="" draggable={false} style={{ clipPath: 'inset(0 ' + backIn + 'px)' }} />
-      )}
-      {open && ph > N && (
-        <div className="bp-card-face" ref={hostRef} style={{ clipPath: faceIn ? 'inset(0 ' + faceIn + 'px)' : 'none' }}>
-          <img src={url} alt={card.name} draggable={false} />
+      {open && <div className="bp-card-ground" />}
+      {open && (
+        <div className="bp-card-face" ref={hostRef} style={{ visibility: done ? 'visible' : 'hidden' }}>
+          <img src={url} alt="" draggable={false} />
         </div>
+      )}
+      {open && !done && (
+        <canvas ref={cvRef} className="bp-card-flipcv" width={cw + 2 * pad} height={ch + 2 * pad} style={{ left: -pad, top: -pad, width: cw + 2 * pad, height: ch + 2 * pad }} />
       )}
     </div>
   );
@@ -653,15 +743,14 @@ function BoosterOpening({ pending, boosters, onClaimed }) {
   const [err, setErr] = useState('');
   const [flipped, setFlipped] = useState(() => cards.map(() => false));
   const flippedRef = useRef(flipped); flippedRef.current = flipped;
-  const [delays, setDelays] = useState(() => cards.map(() => 0));
+  const [doneN, setDoneN] = useState(0);              // Karten, deren Flip-Animation fertig ist
   const [claiming, setClaiming] = useState(false);
   const [hover, setHover] = useState(-1);
-  const [flipping, setFlipping] = useState(false);     // „Flip All“ läuft
   const [vp, setVp] = useState({ w: window.innerWidth, h: window.innerHeight });
   const [op, setOp] = useState(null);                  // opening.json
 
   const stageRef = useRef(null), fxRef = useRef(null), worldRef = useRef(null);
-  const fx = useRef(null), playRef = useRef(null), timers = useRef([]);
+  const fx = useRef(null), playRef = useRef(null), mixRef = useRef(1);
   const skipRef = useRef(false);
 
   useEffect(() => {
@@ -671,7 +760,7 @@ function BoosterOpening({ pending, boosters, onClaimed }) {
   }, []);
   useEffect(() => { bpWarmSounds(); }, []);
   useEffect(() => () => {
-    timers.current.forEach(clearTimeout); timers.current = []; if (fx.current) fx.current.destroy();
+    if (fx.current) fx.current.destroy();
     // die beiden großen Raster (je ~57 MB entpackt) nicht im Zwischenspeicher halten
     const R = playRef.current; if (R) { _bpImgs.delete(R.backUrl); _bpImgs.delete(R.frontUrl); playRef.current = null; }
   }, []);
@@ -718,6 +807,14 @@ function BoosterOpening({ pending, boosters, onClaimed }) {
     g.imageSmoothingEnabled = false;
     const SW = o.stage[0], SH = o.stage[1], [PX, PY] = o.packOrigin, ready = o.events.cardLanding[o.events.cardLanding.length - 1] + 1;
     const loopA = o.ambientLoop[0], loopB = o.ambientLoop[1];
+    // Weicher Rand der Bühne ohne Alpha: Bayer-Raster in der Farbe des Grundes (#08060c) zu den vier Kanten hin, damit die vorgerenderten Strahlen nicht als Rechteck enden
+    const fade = (() => {
+      const c = document.createElement('canvas'); c.width = SW; c.height = SH;
+      const x = c.getContext('2d'), id = x.createImageData(SW, SH), u = new Uint32Array(id.data.buffer), F = 30, dark = bpU32('#08060c');
+      for (let j = 0; j < SH; j++) for (let i = 0; i < SW; i++) { const d = Math.min(i, SW - 1 - i, j, SH - 1 - j); if (d < F && bpBay(i, j) < 1 - d / F) u[j * SW + i] = dark; }
+      x.putImageData(id, 0, 0);
+      return c;
+    })();
     let raf = 0, dead = false, lastF = -1, nextSound = 0, t0 = performance.now(), arrived = phase === 'cards';
     if (arrived) { t0 = performance.now() - (ready + 2) * (1000 / o.fps); nextSound = o.sounds.length; }
     const draw = (f) => {
@@ -738,6 +835,7 @@ function BoosterOpening({ pending, boosters, onClaimed }) {
         }
       }
       g.drawImage(R.front, col * SW, row * SH, SW, SH, 0, 0, SW, SH);
+      g.drawImage(fade, 0, 0);
     };
     const tick = (now) => {
       raf = 0;
@@ -762,42 +860,32 @@ function BoosterOpening({ pending, boosters, onClaimed }) {
     return () => { if (fx.current) { fx.current.destroy(); fx.current = null; } };
   }, [vp.w, vp.h, S, phase === 'load']);
 
-  // Karte aufdecken
+  // Karte aufdecken: die Flip-Animation der Karte (BpCard) läuft sofort; auf der Kante (Aufschlagen der Vorderseite) kommen Klänge und der Rarity-Effekt
   const flip = useCallback((i, opt) => {
     if (flippedRef.current[i]) return;
-    const c = cards[i], r = c.rarity;
     setFlipped(f => { const n = f.slice(); n[i] = true; flippedRef.current = n; return n; });
-    const dl = BP_FACE_DELAY[r] || 0;
-    setDelays(d => { const n = d.slice(); n[i] = dl; return n; });
-    (BP_FLIP_SOUNDS[r] || [['draw', { volume: 0.5 }]]).forEach(([n, o]) => bpPlay(n, o));
+    if (opt && opt.mix) mixRef.current = opt.mix;
+  }, []);
+  const onEdge = useCallback((i) => {
+    const r = cards[i].rarity, mix = mixRef.current, vol = mix > 1 ? Math.min(1, 1.3 / Math.sqrt(mix)) : 1;
+    (BP_FLIP_SOUNDS[r] || [['draw', { volume: 0.5 }]]).forEach(([n, o]) => bpPlay(n, { ...o, volume: (o.volume != null ? o.volume : 1) * vol }));
     if (BP_FX_LEN[r] && fx.current && geom) {
       const [sx, sy] = geom.slots[i], cw = geom.cw / S, ch = geom.ch / S;
-      fx.current.spawn(r, (geom.left + sx * Z) / S + cw / 2, (geom.top + sy * Z) / S + ch / 2, cw, ch);
+      fx.current.spawn(r, (geom.left + sx * Z) / S + cw / 2, (geom.top + sy * Z) / S + ch / 2, cw, ch, mix);
     }
   }, [cards, geom, Z, S]);
+  const onCardDone = useCallback(() => setDoneN(n => n + 1), []);
 
+  // „Flip All“: ALLE noch verdeckten Karten drehen sich gleichzeitig (jede mit eigener Flip-Animation und ihrem Effekt)
   const flipAll = () => {
-    if (flipping) return;
     const rest = cards.map((c, i) => i).filter(i => !flippedRef.current[i]);
     if (!rest.length) return;
-    setFlipping(true);
-    let at = 0;
-    rest.forEach((i, k) => {
-      timers.current.push(setTimeout(() => flip(i), at));
-      const r = cards[i].rarity;
-      at += r === 'stained' ? 2300 : r === 'umbra' ? 1100 : (r === 'diamond' || r === 'spectral' || r === 'super') ? 700 : 380;
-    });
-    timers.current.push(setTimeout(() => setFlipping(false), at + 200));
+    mixRef.current = rest.length;
+    rest.forEach(i => flip(i, { mix: rest.length }));
   };
 
   const allOpen = flipped.every(Boolean);
-  const [allDone, setAllDone] = useState(false);
-  useEffect(() => {
-    if (!allOpen) { setAllDone(false); return undefined; }
-    const last = Math.max(...delays) + 400;
-    const t = setTimeout(() => setAllDone(true), last);
-    return () => clearTimeout(t);
-  }, [allOpen]);
+  const allDone = allOpen && doneN >= cards.length;
 
   // Tastatur: Leertaste/Esc überspringt die Öffnungsanimation
   useEffect(() => {
@@ -826,14 +914,16 @@ function BoosterOpening({ pending, boosters, onClaimed }) {
   const hudTop = cardsBottom + 6 * Z;
   const tight = vp.h - cardsBottom < 56;      // niedriger Bildschirm (Handy quer): Knöpfe an den rechten Rand statt unter die Karten
 
-  return (
+  // Die Shop-Seite läuft unter CSS-`zoom` (--ui-scale): die Vollbild-Ansicht hängt deshalb direkt an <body>, damit Fenster- und Bildpunkte übereinstimmen
+  // (ganzzahliger Bühnenfaktor Z in echten Bildschirmpunkten, nicht ein mitgezoomtes Mischmaß).
+  const tree = (
     <div className="bp-open" data-pp-px="aus">
       <div className="bp-world" ref={worldRef}>
         <canvas ref={stageRef} className="bp-stage" width={geom.stage[0]} height={geom.stage[1]}
           style={{ left: geom.left, top: geom.top, width: stageW, height: stageH, visibility: phase === 'load' ? 'hidden' : 'visible' }} />
         {phase === 'cards' && cards.map((c, i) => (
-          <BpCard key={i} idx={i} card={c} geom={geom} open={flipped[i]} delay={delays[i]} hot={hover === i}
-            onClick={(k) => flip(k)} onHover={(k, on) => setHover(on ? k : (h => (h === k ? -1 : h)))} />
+          <BpCard key={i} idx={i} card={c} geom={geom} open={flipped[i]} hold={Math.round((BP_FACE_DELAY[c.rarity] || 0) / BP_TAKT)} hot={hover === i}
+            onEdge={onEdge} onDone={onCardDone} onClick={(k) => { mixRef.current = 1; flip(k); }} onHover={(k, on) => setHover(on ? k : (h => (h === k ? -1 : h)))} />
         ))}
       </div>
       <canvas ref={fxRef} className="bp-fx" />
@@ -845,7 +935,7 @@ function BoosterOpening({ pending, boosters, onClaimed }) {
       {phase === 'cards' && (
         <div className={'bp-hud' + (tight ? ' bp-hud-tight' : '')} style={tight ? undefined : { left: geom.left, width: stageW, top: Math.min(hudTop, vp.h - 52) }}>
           {!allDone && (
-            <button className="btn bp-btn" disabled={flipping || allOpen} onClick={flipAll}>FLIP ALL</button>
+            <button className="btn bp-btn" disabled={allOpen} onClick={flipAll}>FLIP ALL</button>
           )}
           {allDone && (
             <button className="btn bp-btn bp-btn-go" disabled={claiming} onClick={claim}>
@@ -855,11 +945,6 @@ function BoosterOpening({ pending, boosters, onClaimed }) {
           {!allOpen && <div className="bp-hint">Click a card to flip it</div>}
         </div>
       )}
-      {hoverCard && (
-        <div className="bp-chip" style={{ left: geom.left + geom.slots[hover][0] * Z, top: Math.max(0, geom.top + geom.slots[hover][1] * Z - 20), width: geom.cw, color: BP_RARITY_COLOR[hoverCard.rarity] || '#ffffff' }}>
-          {bpRarityLabel(hoverCard.rarity)}
-        </div>
-      )}
       {hoverCard && Tooltip && window.CARDS_BY_NAME && window.CARDS_BY_NAME[hoverCard.name] && (
         <div className="tooltip card-tooltip bp-tooltip">
           <Tooltip card={{ ...window.CARDS_BY_NAME[hoverCard.name], rarity: hoverCard.rarity }} rarity={hoverCard.rarity} />
@@ -867,5 +952,6 @@ function BoosterOpening({ pending, boosters, onClaimed }) {
       )}
     </div>
   );
+  return (typeof ReactDOM !== 'undefined' && ReactDOM.createPortal && document.body) ? ReactDOM.createPortal(tree, document.body) : tree;
 }
 window.BoosterOpening = BoosterOpening;
