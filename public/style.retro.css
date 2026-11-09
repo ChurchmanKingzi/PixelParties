@@ -980,6 +980,9 @@ select optgroup { background: var(--bg); color: var(--text); }
    --pf parallax, --shake shake amount, --ef explosion light, --tH/--tV
    tether amplitudes, --sAmp core-scale amplitude. */
 .anim-backdrop { zoom: calc(1 / var(--ui-scale, 1)); position: absolute; inset: 0; overflow: hidden; background: #12101f; z-index: 0; pointer-events: none; --pf: 1; --shake: 1; --ef: 1; --tH: calc(var(--abw,1vw) * 0.469); --tV: calc(var(--abh,1vh) * 0.37); --sAmp: 0.021; }
+/* Die Kulissenbilder (data/animated_screen/layers2, vorgebackene Pixelart mit 3-px-Zellen + Bayer-Dither, scripts/title-pixel/bake.py) duerfen NIE geglaettet werden:
+   bei Fenstern ausser 1920x1080 mischt die bilineare Skalierung die Palettenfarben und macht aus dem Dither Moire. `image-rendering` wird vererbt (Hintergrundplatte, Figuren, Katzen). */
+.anim-backdrop, .anim-cats-front, .pp-fx45-figur { image-rendering: pixelated; }
 .anim-shake { position: absolute; inset: 0; animation: ab-shake 10s steps(1, end) infinite; will-change: transform; }
 /* Front cats overlay — a separate layer ABOVE the auth panel (z-index:2) so
    the cats fly over the login form. pointer-events:none keeps the form

@@ -9,11 +9,13 @@
 //    · `ab-floaty` (Schweben): hin und zurück zwischen 0 und (mx, my) in Prozent der Fenstermaße, Dauer/Verzögerung je Figur, `ease-in-out` je Hälfte (cubic-bezier .42/0/.58/1);
 //    · `ab-jiggleTether` / `ab-broghanTether` (Kämpfer an der Laserkette): ±0,469 vw / 0,37 vh in 4,8 s; `ab-coreTether` (Explosionskern): 0,37 vh nach unten und 2,1 % kleiner (Größe auf ganze Pixel);
 //    · `ab-emberrise` (Glut): linearer Aufstieg um 112 vh mit Drift, Deckkraft 0 → .95 (8 %) → .7 (78 %) → 0 — als Bayer-Dither im Quadrat statt Alpha.
-//  Versätze rasten auf das 2-px-Kunstpixelraster (wie die gebackenen Animationen). `prefers-reduced-motion`: ein ruhiges Bild ohne Glut (wie vorher `animation: none` → Glut unsichtbar).
+//  Versätze rasten auf das Kunstpixelraster der Kulisse: eine Zelle = 3 px der vorgebackenen Bühne (scripts/title-pixel/bake.py, Retro 2 px), bei Fenstern ≠ 1920 px Breite die Zelle in Fensterpixeln
+//  (`max(2, round(3 · Breite / 1920))`, Hero-Pixel-Regel: ganzzahlig, nie unter 2). `prefers-reduced-motion`: ein ruhiges Bild ohne Glut (wie vorher `animation: none` → Glut unsichtbar).
 //  Messung (Login-Bildschirm 1280x720, Headless/Software, 10 s, Thread-CPU): Style 460 → 200 ms, Commit 185 → 250 ms, Summe 844 → 700 ms; laufende Animationen 68 → 11; Backzeit je Titelbild ~60 ms → 0.
 // ═════════════════════════════════════════════════════════════════
 const PP_FX45_TAKT = 1000 / 30;
-const PP_FX45_RASTER = 2;     // Kunstpixel in CSS-px (== PP_PX_GROESSE)
+const PP_FX45_ZELLE = window.PP_RETRO ? 2 : 3;   // Kunstpixel der Kulisse auf der 1920-px-Bühne (vorgebackene Zellen; Retro-Ebenen: 4-px-Zellen, Bewegung weiter im 2-px-Raster)
+const ppFx45Raster = (breite) => Math.max(2, Math.round(PP_FX45_ZELLE * breite / PP_FX45_BUEHNE_B));   // Zelle in CSS-px bei Fensterbreite `breite`
 const PP_FX45_BUEHNE_B = 1920, PP_FX45_BUEHNE_H = 1080;
 
 // Ebenen der Kulisse. rahmen: Alpha-Kasten in Bühnenpixeln (ANIM_SPRITE_RAHMEN, app-screens.jsx).
@@ -98,9 +100,8 @@ function ppFx45SzeneStart(host, gv, cfg) {
   const ruhig = ppFx45Ruhig();
   const nGlut = gv && !ruhig ? (ppFx45Handy() ? 15 : 46) : 0;
   const glut = Array.from({ length: nGlut }, () => {
-    const gr = 2 + Math.random() * 5;
     return {
-      px: Math.max(PP_FX45_RASTER, Math.round(gr / 2) * 2),
+      n: Math.random() < 0.55 ? 1 : 2,                              // Kantenlänge in Zellen (früher 2/4/6 px)
       dauer: 7 + Math.random() * 9, verz: -Math.random() * 16, links: Math.random() * 100,
       drift: (Math.random() * 2 - 1) * 2.604,                       // vw
       farbe: PP_FX45_GLUT_FARBEN[Math.floor(Math.random() * PP_FX45_GLUT_FARBEN.length)], sp: [],
@@ -113,17 +114,17 @@ function ppFx45SzeneStart(host, gv, cfg) {
     const n = cv.getAttribute('data-n'), d = PP_FX45_EBENEN[n], r = cfg.rahmen && cfg.rahmen[d.datei];
     return { cv, d, tkey: '', key: '', rahmen: r ? [Math.max(0, r[0] - 2), Math.max(0, r[1] - 2), Math.min(PP_FX45_BUEHNE_B, r[2] + 2), Math.min(PP_FX45_BUEHNE_H, r[3] + 2)] : [0, 0, PP_FX45_BUEHNE_B, PP_FX45_BUEHNE_H] };
   }).filter((o) => o.d);
-  let W = 0, H = 0, gctx = null, gW = 0, gH = 0, gestoppt = false, id = 0, letzter = -1;
+  let W = 0, H = 0, R = 2, gctx = null, gW = 0, gH = 0, gestoppt = false, id = 0, letzter = -1;
   ppFx45Binden();
 
   const mass = () => {
     const w = Math.max(1, Math.round(window.innerWidth)), h = Math.max(1, Math.round(window.innerHeight));
     if (w === W && h === H) return;
-    W = w; H = h;
+    W = w; H = h; R = ppFx45Raster(W);
     for (const o of el) { o.key = ''; o.tkey = ''; }
-    if (gv) { gW = Math.ceil(W / PP_FX45_RASTER); gH = Math.ceil(H / PP_FX45_RASTER); gv.width = gW; gv.height = gH; gctx = gv.getContext('2d'); gctx.imageSmoothingEnabled = false; }  // Glut in Kunstpixeln (1 Leinwandpixel = 2 CSS-px)
+    if (gv) { gW = Math.ceil(W / R); gH = Math.ceil(H / R); gv.width = gW; gv.height = gH; gctx = gv.getContext('2d'); gctx.imageSmoothingEnabled = false; }  // Glut in Kunstpixeln (1 Leinwandpixel = 1 Zelle = R CSS-px)
   };
-  const raster = (v) => Math.round(v / PP_FX45_RASTER) * PP_FX45_RASTER;
+  const raster = (v) => Math.round(v / R) * R;
   const pct = (v) => (v * 100).toFixed(4) + '%';
 
   function zeichnen(t) {
@@ -141,7 +142,7 @@ function ppFx45SzeneStart(host, gv, cfg) {
       let hh = bh, ww = bw;
       if (d.kern) {
         // Explosionskern: Breite in ganzen Kunstpixeln (gerade), Kasten um den Drehpunkt verkleinert; Größe/Lage setzen nur beim Wechsel der Breite, der Versatz nach unten läuft über `transform`
-        const w = Math.max(2, Math.round(bw * sk / PP_FX45_RASTER) * PP_FX45_RASTER), s = w / bw, px = d.kern.ox * W, py = d.kern.oy * H;
+        const w = Math.max(2, Math.round(bw * sk / R) * R), s = w / bw, px = d.kern.ox * W, py = d.kern.oy * H;
         const bl = R[0] * W / PP_FX45_BUEHNE_B, bt = R[1] * H / PP_FX45_BUEHNE_H;
         hh = Math.round(bh * s); ww = w;
         const key = w + ',' + hh;
@@ -158,15 +159,14 @@ function ppFx45SzeneStart(host, gv, cfg) {
     }
     if (gctx) {
       gctx.clearRect(0, 0, gW, gH);
-      const R = PP_FX45_RASTER;
       for (const e of glut) {
         const c = (((tau - e.verz) / e.dauer) % 1 + 1) % 1;
         const op = c < 0.08 ? 0.95 * c / 0.08 : (c < 0.78 ? 0.95 + (0.7 - 0.95) * (c - 0.08) / 0.7 : 0.7 * (1 - (c - 0.78) / 0.22));
         const stufe = Math.round(op * 16);
         if (stufe < 1) continue;
-        const x = raster(e.links / 100 * W + e.drift * W / 100 * c), y = raster(H * 1.01296 - e.px + H * (0.01852 + (-1.12 - 0.01852) * c));
-        if (y < -e.px || y > H) continue;
-        gctx.drawImage((e.sp[stufe] || (e.sp[stufe] = ppFx45GlutSprite(e.farbe, e.px / R, stufe))), x / R, y / R);
+        const ps = e.n * R, x = raster(e.links / 100 * W + e.drift * W / 100 * c), y = raster(H * 1.01296 - ps + H * (0.01852 + (-1.12 - 0.01852) * c));
+        if (y < -ps || y > H) continue;
+        gctx.drawImage((e.sp[stufe] || (e.sp[stufe] = ppFx45GlutSprite(e.farbe, e.n, stufe))), x / R, y / R);
       }
     }
   }

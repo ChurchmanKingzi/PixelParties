@@ -292,6 +292,13 @@ function TutorialBrowserModal({ onClose, tutorialList, onStart, onViewRules }) {
 // ═══════════════════════════════════════════
 const ANIM_LAYERS_DIR = window.PP_RETRO ? '/data/animated_screen/layers2-retro/' : '/data/animated_screen/layers2/';
 
+// ★ TITELKULISSE VORGEBACKEN (Pixelart, Raster 3 px, Bayer-Mischdither, 256-Farben-Palette): `data/animated_screen/layers2/*.png` und `public/title.png` sind das Ergebnis von
+// `python3 scripts/title-pixel/bake.py` (Originale: scripts/title-pixel/originals/). Zur Laufzeit wird NICHTS pixelisiert; die Bilder werden nur noch mit `image-rendering: pixelated`
+// gezeichnet (Canvas: `imageSmoothingEnabled = false`) — jede Glaettung wuerde das Dither-Muster zu Mischfarben/Moire verwischen. Der Hintergrund ist schon 4,06 % ueberstreckt
+// gebacken (1998x1125 = 666x375 Zellen), liegt also 1:1 statt per `inset: -2%`-Streckung (ungleiche Zellbreiten): bei 1920x1080 sind alle Zellen genau 3 px.
+// Retro (layers2-retro) bleibt bei der alten Streckung (1920x1080, 4x-Zellen).
+const ANIM_BG_INSET = window.PP_RETRO ? '-2%' : '-2.0833% -2.03125%';
+
 // ── ZUSCHNITT DER KULISSEN-EBENEN (v1265, Al 22.9.: „der Login-Screen
 // ruckelt") ─────────────────────────────────────────────────────────────
 // Jede Figur liegt als eigenes 1920×1080-Bild vor, fast ganz transparent,
@@ -334,7 +341,7 @@ function AnimatedTitleBackdrop() {
     <div className="anim-backdrop" aria-hidden="true">
       <div className="anim-shake">
         {/* 0 — background plate (overscanned so shake never reveals edges) */}
-        <div style={{ position: 'absolute', inset: '-2%', background: "url('" + ANIM_LAYERS_DIR + "background.png') center / 100% 100% no-repeat" }} />
+        <div style={{ position: 'absolute', inset: ANIM_BG_INSET, background: "url('" + ANIM_LAYERS_DIR + "background.png') center / 100% 100% no-repeat", imageRendering: 'pixelated' }} />
         {/* Impact flash + lightning FLASHES render BELOW the characters
             (screen-blended onto the background plate only) so they never light the
             laser beams baked into golem/rabbit. That keeps both beams at their
@@ -428,9 +435,12 @@ function TapBackdropCanvas({ hostRef }) {
         list.forEach((im, i) => {
           const n = NAMES[i], rf = ANIM_SPRITE_RAHMEN[n + '.png'];
           // Figuren auf ihren sichtbaren Kasten zuschneiden (wie die DOM-Kulisse): nur dieser Teil wird pro Bild gezeichnet
-          const x0 = rf ? Math.max(0, rf[0] - 2) : 0, y0 = rf ? Math.max(0, rf[1] - 2) : 0, x1 = rf ? Math.min(1920, rf[2] + 2) : 1920, y1 = rf ? Math.min(1080, rf[3] + 2) : 1080;
+          const bgv = n === 'background';   // Hintergrund: ganzes (ueberstrecktes) Bild, nicht auf die Buehne zugeschnitten
+          const Z = window.PP_RETRO ? 4 : 3;   // Zellgroesse der Kulisse: Zuschnitt auf Zellgrenzen, damit die Vorskalierung keine Zelle zerschneidet
+          const x0 = rf ? Math.max(0, Math.floor((rf[0] - 2) / Z) * Z) : 0, y0 = rf ? Math.max(0, Math.floor((rf[1] - 2) / Z) * Z) : 0,
+            x1 = rf ? Math.min(1920, Math.ceil((rf[2] + 2) / Z) * Z) : (bgv ? im.naturalWidth : 1920), y1 = rf ? Math.min(1080, Math.ceil((rf[3] + 2) / Z) * Z) : (bgv ? im.naturalHeight : 1080);
           const c = document.createElement('canvas'); c.width = Math.max(1, Math.round((x1 - x0) * sc)); c.height = Math.max(1, Math.round((y1 - y0) * sc));
-          const g = c.getContext('2d'); g.imageSmoothingEnabled = true; g.imageSmoothingQuality = 'high'; g.drawImage(im, x0, y0, x1 - x0, y1 - y0, 0, 0, c.width, c.height);   // Vorskalieren GEGLAETTET: 1920 px auf Handybreite per Naechster-Nachbar zerreisst das Motiv (Tap-Bildschirm sah kaputt aus)
+          const g = c.getContext('2d'); g.imageSmoothingEnabled = false; g.drawImage(im, x0, y0, x1 - x0, y1 - y0, 0, 0, c.width, c.height);   // Vorskalieren per Naechster-Nachbar: die Bilder sind vorgebackene Pixelart (3-px-Zellen, ab Buehnenmass 1/3 trifft jede Zelle mind. einen Bildpunkt); Glaetten wuerde Dither zu Mischfarben verwischen
           imgs[n] = { c, x0, y0, w: x1 - x0, h: y1 - y0 };
         });
         imgs._sc = sc;
@@ -475,7 +485,7 @@ function TapBackdropCanvas({ hostRef }) {
       g.setTransform(1, 0, 0, 1, 0, 0); g.fillStyle = '#12101f'; g.fillRect(0, 0, W, H);
       // Versatz der ganzen Buehne nur in ganzen Pixeln
       g.setTransform(S * zoom, 0, 0, S * zoom, Math.round(W / 2 - 960 * S * zoom + camX * S * zoom + sh[0] * S * zoom), Math.round(H / 2 - 540 * S * zoom + camY * S * zoom + sh[1] * S * zoom));
-      g.drawImage(imgs.background.c, -38.4, -21.6, 1996.8, 1123.2);
+      { const B = imgs.background; if (B.w > 1920) g.drawImage(B.c, -(B.w - 1920) / 2, -(B.h - 1080) / 2, B.w, B.h); else g.drawImage(B.c, -38.4, -21.6, 1996.8, 1123.2); }   // vorgebacken ueberstreckt (1998x1125) 1:1; Retro: alte 4-%-Streckung
       const aI = kfLin(KF_STRIKE, pc), aA = kfLin(KF_AMB, ((tau % 13) / 13) * 100);
       // Schein: fuenf Pixelringe, Dichte nach aussen abnehmend (Bayer-Dither) — Bildschirmpixel, daher ohne Buehnen-Transformation
       const glow = (cx, cy, R, a, col) => {
