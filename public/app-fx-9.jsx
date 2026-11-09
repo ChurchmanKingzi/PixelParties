@@ -198,12 +198,31 @@ const ppFx9BlackFlame = ppR1Leinwand((g, t, sz, te) => {
 });
 
 // ═════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
-//  Acid Splash (`acid_splash`; Acid Vial, Boiling Oil-Karte) — PIXELART. Ein roter Schein (500 ms: .3 → 1,3 → 1,6 mal 60 px) und 22 Saeureblasen, die vom unteren Rand der Zone aufsteigen
-//  (wackeln seitlich, wachsen .5 → 1,1, schrumpfen und verblassen; 500–1100 ms ab 0–120 ms), dazu 6 dunkle Spritzer mit Reagenzglas (die gleiche Bahn, 600–1000 ms ab 50–250 ms).
+//  Acid Splash (`acid_splash`; Acid Vial) — PIXELART. Ein roter Schein (500 ms: .3 → 1,3 → 1,6 mal 60 px) und 22 Saeureblasen, die vom unteren Rand der Zone aufsteigen (wackeln seitlich, wachsen
+//  .5 → 1,1, schrumpfen und verblassen; 500–1100 ms ab 0–120 ms, auf die Lebensdauer der Zone gekuerzt), dazu 6 Spritzer mit Reagenzglas (die gleiche Bahn, 600–1000 ms ab 50–250 ms).
+//  Alles sind handgesetzte Zellen-Sprites auf der Hero-Pixel-Zelle (`ppR1Leinwand`): Blasen in Stufen 2/4/6/8/10 Zellen (Groessenwechsel = anderes Sprite, nie stufenlos; dunkler Rand, Schattenkante, 1–2 Glanzzellen),
+//  Spritzer als Kreuz-/Rautenform, Reagenzglas in zwei Stufen. Verblassen = Bayer-Raster (nie Alpha). Schein = harte Ringe aus ganzen Zellen, Deckung nur in Viertelstufen (feste Rasterbilder statt Verlauf).
+//  Palette: vier Rottoene (#780000 #c80000 #ef2929 + Glanz #ff6666), keine Mischfarben.
 // ═════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
-const PP_FX9_SAEURE = ppFx9H(['#c80000', '#ef2929', '#ef2929', '#c80000', '#be0e0e', '#e92f38', '#ff1a1a', '#c80000']);
-const PP_FX9_SAEURE_SCHEIN = ppFx9H(['#780000', '#be0e0e', '#c80000']);
+const PP_FX9_ROT = ppFx9H(['#780000', '#c80000', '#ef2929', '#ff6666']);   // Rand/dunkel, Schatten/dunkle Blase, Koerper, Glanz
+const PP_FX9_BLASE_PAL = [
+  { o: PP_FX9_ROT[0], d: PP_FX9_ROT[1], b: PP_FX9_ROT[2], h: PP_FX9_ROT[3] },   // helle Blase
+  { o: PP_FX9_ROT[0], d: PP_FX9_ROT[0], b: PP_FX9_ROT[1], h: PP_FX9_ROT[2] },   // dunkle Blase
+];
+/** Blasen-Sprites je Stufe (Breite 2/4/6/8/10): o Rand, b Koerper, d Schattenkante unten rechts, h Glanz oben links. */
+const PP_FX9_BLASEN = [
+  ['hb', 'bd'],
+  ['.oo.', 'ohbo', 'obdo', '.oo.'],
+  ['.oooo.', 'obhbbo', 'obbbbo', 'obbbdo', 'obbddo', '.oooo.'],
+  ['..oooo..', '.obbbbo.', 'obhhbbbo', 'obhbbbdo', 'obbbbbdo', 'obbbbddo', '.obbddo.', '..oooo..'],
+  ['..oooooo..', '.obbbbbbo.', 'obhhbbbbbo', 'obhbbbbbdo', 'obbbbbbbdo', 'obbbbbbbdo', 'obbbbbbddo', 'obbbbbdddo', '.obbddddo.', '..oooooo..'],
+];
+const PP_FX9_BLASE_STUFE = [1.2, 3.2, 5.2, 7.2, 9.4];   // ab dieser Groesse (Zellen) das jeweils naechste Sprite
+/** Spritzer (dunkel, Kern etwas heller): Kreuz und Raute, danach das Reagenzglas. */
+const PP_FX9_SPRITZER = [['.o.', 'oro', '.o.'], ['..o..', '.oro.', 'orrro', '.oro.', '..o..']];
+const PP_FX9_SPRITZER_PAL = { o: PP_FX9_ROT[0], r: PP_FX9_ROT[1] };
 const PP_FX9_KOLBEN = ['..ccc..', '..owo..', '..owo..', '.owwwo.', '.oRRRo.', 'oRRrRRo', 'oRRRRRo', '.oRRRo.', '..ooo..'];
+const PP_FX9_KOLBEN_KLEIN = ['.ccc.', '.owo.', 'owwwo', 'oRRRo', 'oRrRo', 'oRRRo', '.ooo.'];
 const PP_FX9_KOLBEN_PAL = { c: ppHex('#9d612f'), o: ppHex('#59606e'), w: ppHex('#e5edfa'), R: ppHex('#e92f38'), r: ppHex('#ff6666') };
 /** Bahn einer aufsteigenden Blase (`animBeerBubble`, ease-out je Abschnitt): u 0..1 → Versatz (px), Massstab, Deckung. */
 function ppFx9Blase(u, wob) {
@@ -214,28 +233,44 @@ function ppFx9Blase(u, wob) {
     a: ppFx9Kf(u, [[0, 0], [0.2, 0.9], [0.6, 0.7], [1, 0]], PP_FX9_AUS),
   };
 }
+/** Schein: drei harte Ringe (aussen dunkel 25 %, Mitte 50 %, Kern voll) aus ganzen Zellen; Deckung `a` nur in Vierteln (feste Bayer-Muster). */
+function ppFx9SaeureSchein(g, cx, cy, r, a) {
+  r = Math.round(r); cx = Math.round(cx); cy = Math.round(cy);
+  if (r < 2 || a <= 0.12) return;
+  const o2 = r * r + r * 0.6, m2 = o2 * 0.49, i2 = o2 * 0.16;
+  const ring = [[PP_FX9_ROT[0], 0.25], [PP_FX9_ROT[1], 0.5], [PP_FX9_ROT[1], 1]];
+  for (let j = -r; j <= r; j++) for (let i = -r; i <= r; i++) {
+    const d = i * i + j * j;
+    if (d > o2) continue;
+    const k = d <= i2 ? 2 : d <= m2 ? 1 : 0, q = Math.round(ring[k][1] * a * 4) / 4;
+    if (q > 0 && ppBayer(cx + i, cy + j) < q) g.put(cx + i, cy + j, ring[k][0], 1);
+  }
+}
 const ppFx9Saeure = ppR1Leinwand((g, t, sz, te) => {
   const S = sz.S, cx = sz.cx, cy = sz.cy;
   const fk = t / 500;
   if (fk < 1) {
-    const sc = ppFx9Kf(fk, [[0, 0.3], [0.5, 1.3], [1, 1.6]], PP_FX9_AUS), a = ppFx9Kf(fk, [[0, 1], [0.5, 0.6], [1, 0]], PP_FX9_AUS), r = (60 * sc) / S;
-    ppFx9Schein(g, cx, cy, r, r, PP_FX9_SAEURE_SCHEIN, a, [0.3, 0.6, 0.95]);
+    const sc = ppFx9Kf(fk, [[0, 0.3], [0.5, 1.3], [1, 1.6]], PP_FX9_AUS), a = ppFx9Kf(fk, [[0, 1], [0.5, 0.6], [1, 0]], PP_FX9_AUS);
+    ppFx9SaeureSchein(g, cx, cy, (60 * sc) / S, a);
   }
   for (const d of te.tropfen) {
     const u = (t - d.delay) / d.dur;
     if (u < 0 || u > 1) continue;
     const b = ppFx9Blase(u, d.wobble), x = cx + (d.xOff + d.size / 2 + b.x) / S, y = cy + (10 - d.size / 2 + b.y) / S, n = (d.size * b.sc) / S;
-    if (n < 0.8) continue;
-    ppFx9Punkt(g, x, y, n, d.farbe, ppFx9Fest(b.a));
-    if (n >= 3.4) g.put(x - n * 0.22, y - n * 0.22, PP_FX9_KOLBEN_PAL.w, ppFx9Fest(b.a) * 0.7);
+    if (n < PP_FX9_BLASE_STUFE[0]) continue;
+    let st = 0;
+    while (st < PP_FX9_BLASE_STUFE.length - 1 && n >= PP_FX9_BLASE_STUFE[st + 1]) st++;
+    ppFx9Bild(g, PP_FX9_BLASEN[st], PP_FX9_BLASE_PAL[d.dunkel], x, y, ppFx9Fest(b.a));
   }
   for (const s of te.spritzer) {
     const u = (t - s.delay) / s.dur;
     if (u < 0 || u > 1) continue;
-    const b = ppFx9Blase(u, 0), x = cx + (s.links + s.size / 2 + b.x) / S, y = cy + (10 - s.size / 2 + b.y) / S, n = (s.size * b.sc) / S;
-    if (n < 1.2) continue;
-    ppFx9Punkt(g, x, y, n, PP_FX9_SAEURE_SCHEIN[0], ppFx9Fest(b.a));
-    if (n >= 5.6) ppFx9Bild(g, PP_FX9_KOLBEN, PP_FX9_KOLBEN_PAL, x, y, ppFx9Fest(b.a));
+    const b = ppFx9Blase(u, 0), x = cx + (s.links + s.size / 2 + b.x) / S, y = cy + (10 - s.size / 2 + b.y) / S, n = (s.size * b.sc) / S, a = ppFx9Fest(b.a);
+    if (n < 2.4) continue;
+    if (n < 4.4) ppFx9Bild(g, PP_FX9_SPRITZER[0], PP_FX9_SPRITZER_PAL, x, y, a);
+    else if (n < 5.8) ppFx9Bild(g, PP_FX9_SPRITZER[1], PP_FX9_SPRITZER_PAL, x, y, a);
+    else if (n < 7.6) ppFx9Bild(g, PP_FX9_KOLBEN_KLEIN, PP_FX9_KOLBEN_PAL, x, y, a);
+    else ppFx9Bild(g, PP_FX9_KOLBEN, PP_FX9_KOLBEN_PAL, x, y, a);
   }
 }, 1100, { breite: 213, hoehe: 213 }, {
   z: 10100,
@@ -244,8 +279,8 @@ const ppFx9Saeure = ppR1Leinwand((g, t, sz, te) => {
     return {
       tropfen: Array.from({ length: ppFxN(22) }, () => {
         const [delay, dur] = ppFx9Fit(Math.random() * 120, 500 + Math.random() * 600, ende);
-        return { xOff: -50 + Math.random() * 100, size: 8 + Math.random() * 16, wobble: -20 + Math.random() * 40, farbe: ppFx9Pick(PP_FX9_SAEURE), delay, dur };
-      }),
+        return { xOff: -50 + Math.random() * 100, size: 8 + Math.random() * 16, wobble: -20 + Math.random() * 40, dunkel: Math.random() < 0.45 ? 1 : 0, delay, dur };
+      }).sort((a, b) => b.size - a.size),   // grosse zuerst gemalt: kleine Blasen bleiben obenauf sichtbar
       spritzer: Array.from({ length: ppFxN(6) }, () => {
         const [delay, dur] = ppFx9Fit(50 + Math.random() * 200, 600 + Math.random() * 400, ende);
         return { links: -15 + Math.random() * 30, size: 18 + Math.random() * 8, delay, dur };   // wie vorher: `left` = der Zufallswert yOff (-15…15)
