@@ -14106,7 +14106,7 @@ html:not([data-phase-bereit]) .phase-column { visibility: hidden; }
 [data-pp-stirbt] .hero-dead-marker { visibility: hidden; }
 [data-pp-stirbt="1"].board-zone-dead::before { display: none; }
 [data-pp-stirbt="2"].board-zone-dead::before {
-  background: conic-gradient(#08060c 25%, transparent 0 50%, #08060c 0 75%, transparent 0) 0 0 / calc(4px * var(--board-scale, 1)) calc(4px * var(--board-scale, 1));
+  background: conic-gradient(#08060c 25%, transparent 0 50%, #08060c 0 75%, transparent 0) 0 0 / calc(2 * var(--pp-zelle, 2px)) calc(2 * var(--pp-zelle, 2px));   /* Schachbrett-Zelle = Hero-Pixel (`--pp-zelle`, app-fx-32) */
 }
 
 /* ═══════════════════════════════════════════════════════════════
@@ -15488,7 +15488,8 @@ html:not([data-phase-bereit]) .phase-column { visibility: hidden; }
   align-items: flex-start;
   justify-content: center;
   padding-top: 18px;
-  background: var(--pp-kachel-7) 0 0 / 8px 8px;
+  /* Dimmer-Dither: Zelle = Hero-Pixel des Bretts (`--tb-dz`, setzt `ppTbDimmerZelle` in app-board.jsx; im Tutorial-Zoom das gezoomte Hero-Pixel), Kachel 4 × 4 Zellen. Ohne Brett/Retro: 2 px. */
+  background: var(--pp-kachel-7) 0 0 / calc(4 * var(--tb-dz, 2px)) calc(4 * var(--tb-dz, 2px));
   pointer-events: none;
   animation: textbox-fade-in .2333s linear;
 }
