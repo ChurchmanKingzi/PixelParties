@@ -573,13 +573,14 @@ def main():
     args_opener = opener
     opener_on = opener in ('heart', 'storm', 'shift', 'wind')
     aliceshow_on = bool(hero_cfg.get('aliceshow'))                            # Alice-Show (alicefx.AliceShow): nutzt dieselbe Schnittstelle wie die Wind-Show
+    armsshow_on = bool(hero_cfg.get('armsshow'))                              # Waffen-Show (armsfx.ArmsShow, Toras)
     webshow_on = bool(hero_cfg.get('webshow'))                                # Netz-Show (webfx.WebShow, Alleria)
     cosmosshow_on = bool(hero_cfg.get('cosmosshow'))                          # Kosmos-Show (cosmosfx.CosmosShow, Argos)
     hopshow_on = bool(hero_cfg.get('hopshow'))                                # Hüpf-Show (hopfx.HopShow, Ghuanjun)
     rockshow_on = bool(hero_cfg.get('rockshow'))                              # Konzert-Show (rockfx.ConcertShow, Elana)
     rootshow_on = bool(hero_cfg.get('rootshow'))                              # Wurzel-Show (rootfx.RootShow, Kyli)
     iceshow_on = bool(hero_cfg.get('iceshow'))                                # Eis-Show (icefx.IceShow, Broghan)
-    windshow_on = bool(hero_cfg.get('windshow')) or aliceshow_on or iceshow_on or rootshow_on or rockshow_on or hopshow_on or cosmosshow_on or webshow_on              # Show mit Zeitleiste (windfx.WindShow / alicefx.AliceShow) statt Schleife
+    windshow_on = bool(hero_cfg.get('windshow')) or aliceshow_on or iceshow_on or rootshow_on or rockshow_on or hopshow_on or cosmosshow_on or webshow_on or armsshow_on              # Show mit Zeitleiste (windfx.WindShow / alicefx.AliceShow) statt Schleife
     wind_on = args.wind or bool(hero_cfg.get('wind')) or windshow_on
     horror_on = args.horror or bool(hero_cfg.get('horror'))
     show_on = (args.show or hero_cfg.get('show') or 'none') == 'mini'
@@ -696,7 +697,36 @@ def main():
         import windfx
         lxw, lyw = (W - logo.width) // 2, 40 + oy + (args.logo_dy if args.logo_dy is not None else hero_cfg.get('logoDy', 0))
         wgeom = dict(logo_rect=(lxw, lyw, logo.width, logo.height), logo_img=logo, center=(card_x + CARD_W / 2, card_y + CARD_H * 0.47))
-        if webshow_on:
+        if armsshow_on:
+            import armsfx, copy
+            AD = HERE / 'assets' / 'toras'
+            pose_names = ('pose-overheat1', 'pose-overheat2', 'pose-slash', 'pose-hammer', 'pose-fight')
+            PW_, PH_, CXP_, BOT_ = 100, 72, 50, 68
+            pose_spr = copy.copy(spr)                                         # Posen (Überhitzung, Schwert, Hammer, Kampf) als eigenes Sheet im Raster des Sprites
+            pw_ = Image.new('RGBA', (PW_ * len(pose_names), PH_), (0, 0, 0, 0))
+            for i_, n_ in enumerate(pose_names):
+                pim_ = Image.open(AD / (n_ + '.png')).convert('RGBA')
+                a_ = np.asarray(pim_).astype(int)
+                sk_ = (a_[..., 3] > 200) & (a_[..., 0] > 200) & (a_[..., 1] > 150) & (a_[..., 1] < 235) & (a_[..., 2] > 100) & (a_[..., 2] < 200) & (a_[..., 0] - a_[..., 2] > 40)
+                skx_ = float(np.where(sk_)[1].mean())                          # Gesichtsmitte (Hautpixel): liegt über der des Karten-Sprites (Hautmitte 16,3 bei Mitte 14,5)
+                pw_.paste(pim_, (i_ * PW_ + int(round(CXP_ + 1.8 - skx_)), BOT_ - pim_.height), pim_)
+            pose_spr.sheet, pose_spr.n, pose_spr.fw, pose_spr.fh, pose_spr._cache = pw_, len(pose_names), PW_, PH_, {}
+            pose_spr.center_x, pose_spr.foot = float(CXP_), BOT_
+            _ac = {}
+            def actor_fn(art, idx):
+                key_ = (art, idx)
+                if key_ not in _ac:
+                    od_, ol_, sp_, pad_ = pose_spr.layers(idx % pose_spr.n, stick_col, INK)
+                    im_ = Image.new('RGBA', od_.size, (0, 0, 0, 0))
+                    for l_ in (od_, ol_, sp_):
+                        im_.alpha_composite(l_)
+                    _ac[key_] = (im_, pad_)
+                im_, pad_ = _ac[key_]
+                return im_, pad_, pose_spr.center_x, pose_spr.foot
+            ag = dict(logo_rect=wgeom['logo_rect'], logo_img=logo, badge_rect=badge_rect, badge_img=badge_img, plate_rect=(plate_x, plate_y, plate.width, plate.height),
+                      grid=(sx, sy, spr.px), draw_text=draw_text, home=(sx + spr.center_x * spr.px, sy + spr.foot * spr.px), actor_fn=actor_fn, assets_dir=str(AD))
+            wind = armsfx.ArmsShow(W, H, U, float(fps), loop, ag, loop * WIND_LOOPS / float(fps))
+        elif webshow_on:
             import webfx
             wg = dict(logo_rect=wgeom['logo_rect'], logo_img=logo, badge_rect=badge_rect, badge_img=badge_img, plate_rect=(plate_x, plate_y, plate.width, plate.height),
                       grid=(sx, sy, spr.px), draw_text=draw_text, center=(card_x + CARD_W / 2, card_y + CARD_H / 2),
@@ -1491,7 +1521,7 @@ def main():
     if first_on:
         for f in range(loop * first_loops):
             render(f, intro_on, punch_on, opener_on).save(fdir / f'i{f:03d}.png')
-    cover = Image.open(fdir / ('i%03d.png' % int((17.4 if show_on else 17.3 if iceshow_on else 14.6 if rootshow_on else 15.0 if rockshow_on else 11.0 if hopshow_on else 14.6 if webshow_on else 17.6 if cosmosshow_on else 16.8) * float(fps)))) if (show_on or windshow_on) else Image.open(fdir / ('f%03d.png' % (min(loop - 1, per * 3))) if reel else fdir / 'f000.png')
+    cover = Image.open(fdir / ('i%03d.png' % int((17.4 if show_on else 17.3 if iceshow_on else 14.6 if rootshow_on else 15.0 if rockshow_on else 11.0 if hopshow_on else 14.6 if webshow_on else 16.2 if armsshow_on else 17.6 if cosmosshow_on else 16.8) * float(fps)))) if (show_on or windshow_on) else Image.open(fdir / ('f%03d.png' % (min(loop - 1, per * 3))) if reel else fdir / 'f000.png')
     cover_path = out / ('reel-cover.png' if reel else 'post.png')
     cover.save(cover_path)
     print('Standbild', cover_path)

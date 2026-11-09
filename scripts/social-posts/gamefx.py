@@ -515,3 +515,525 @@ class Sandstrahl:
                 continue
             X, Y = P(k['x'] + k['dx'] * u, k['y'] + k['dy'] * u)
             m.rect(rd(X), rd(Y), k['g'], k['g'], k['c'])
+
+
+# ═════════════════════════════ gemeinsame Zellen-Pinsel mit Dither (ppR1Pinsel) ═════════════════════════════
+BAY4 = [[0, 8, 2, 10], [12, 4, 14, 6], [3, 11, 1, 9], [15, 7, 13, 5]]
+
+
+def bayer(x, y):
+    return (BAY4[int(y) & 3][int(x) & 3] + 0.5) / 16.0
+
+
+class R1:
+    """Nachbau des Pinsels `ppR1Pinsel` (app-board.jsx): put/block/disc/ring/line in Rasterzellen, Deckung < 1 = Bayer-Dither, nie Alpha."""
+
+    def __init__(self, m):
+        self.m = m
+
+    def put(self, x, y, c, a=1.0):
+        X, Y = rd(x), rd(y)
+        if a <= 0 or (a < 1 and bayer(X, Y) >= a):
+            return
+        self.m.rect(X, Y, 1, 1, c)
+
+    def block(self, x, y, w, h, c, a=1.0):
+        x, y = rd(x), rd(y)
+        if a >= 1:
+            self.m.rect(x, y, w, h, c)
+            return
+        for j in range(h):
+            for i in range(w):
+                self.put(x + i, y + j, c, a)
+
+    def disc(self, cx, cy, r, c, a=1.0):
+        cx, cy = rd(cx), rd(cy)
+        R = int(math.ceil(r))
+        r2 = r * r + r * 0.6
+        for j in range(-R, R + 1):
+            for i in range(-R, R + 1):
+                if i * i + j * j <= r2:
+                    self.put(cx + i, cy + j, c, a)
+
+    def ring(self, cx, cy, r0, r1, c, a=1.0):
+        cx, cy = rd(cx), rd(cy)
+        R = int(math.ceil(r1))
+        o2, i2 = r1 * r1 + r1 * 0.6, r0 * r0 + r0 * 0.6
+        for j in range(-R, R + 1):
+            for i in range(-R, R + 1):
+                d = i * i + j * j
+                if i2 < d <= o2:
+                    self.put(cx + i, cy + j, c, a)
+
+    def line(self, x0, y0, x1, y1, c, a=1.0, dicke=1):
+        n = max(abs(x1 - x0), abs(y1 - y0), 1)
+        for k in range(int(n) + 1):
+            x = rd(x0 + (x1 - x0) * (k / float(n)))
+            y = rd(y0 + (y1 - y0) * (k / float(n)))
+            if dicke <= 1:
+                self.put(x, y, c, a)
+            else:
+                o = (dicke - 1) // 2
+                self.block(x - o, y - o, dicke, dicke, c, a)
+
+
+C31 = dict(creme=hexc('#fffbd2'), tinte=hexc('#12101f'), hblau=hexc('#b3d8f9'), blau=hexc('#4580f6'), gelb=hexc('#ffe23d'), orange=hexc('#ff9a1a'), rot=hexc('#fe5154'))
+BILD = 1.0 / 30
+
+
+# ═════════════════════════════ Schnitt (`critical_slash`, app-fx-31) ═════════════════════════════
+class Schnitt:
+    """cx, cy = Mitte des Ziels (Zellen), hh = Höhe des Ziels in Zellen (Maßstab des Effekts). krit = dreifacher Schnitt (critical_slash), sonst Quick Slash."""
+
+    def __init__(self, cx, cy, hh, krit=True, direction=(-0.6, 0.8), salt=11):
+        self.cx, self.cy, self.hh, self.krit, self.dir, self.salt = cx, cy, hh, krit, direction, salt
+        self.ende = 1.1 if krit else 0.52
+        C = C31
+        farben = [C['creme'], C['hblau'], C['blau'], C['creme']] if krit else [C['creme'], C['hblau'], C['creme'], C['gelb']]
+        n = 46 if krit else 16
+        self.sp = []
+        for i in range(n):
+            an = H(salt, i * 7 + 1) * math.pi * 2
+            v = (90 if krit else 50) + H(salt, i * 7 + 2) * (330 if krit else 160)
+            self.sp.append(dict(t0=H(salt, i * 7 + 3) * 0.06, leben=0.3 + H(salt, i * 7 + 4) * (0.45 if krit else 0.25), vx=math.cos(an) * v, vy=math.sin(an) * v * 0.7,
+                                plus=H(salt, i * 7 + 5) < 0.3, gross=2 if H(salt, i * 7 + 6) < 0.4 else 1, farbe=farben[int(H(salt, i * 7 + 7) * 4)]))
+
+    def _band(self, g, ax, ay, bx, by, anteil, dick):
+        C = C31
+        D = math.hypot(bx - ax, by - ay)
+        L = D * anteil
+        if L < 1:
+            return
+        ux, uy = (bx - ax) / D, (by - ay) / D
+        nx, ny = -uy, ux
+        n = int(math.ceil(L * 1.6))
+        for i in range(n + 1):
+            f = i / float(n)
+            hw = max(0.5, (dick / 2.0) * (math.sin(math.pi * min(1.0, f)) ** 0.6))
+            px, py = ax + ux * L * f, ay + uy * L * f
+            reich = hw + 2
+            q = -reich
+            while q <= reich + 1e-6:
+                d = abs(q)
+                g.put(px + nx * q, py + ny * q, C['creme'] if d <= hw else C['hblau'] if d <= hw + 1.2 else C['tinte'])
+                q += 0.6
+
+    def _ring(self, g, cx, cy, r, dicke, farbe, grob):
+        if r >= 1:
+            g.ring(cx, cy, max(0, r - dicke), r, farbe, 0.5 if grob else 1)
+
+    def _faecher(self, g, cx, cy, laenge, anzahl, dreh, kurz):
+        C = C31
+        for r in range(anzahl):
+            an = r * math.pi * 2 / anzahl + dreh
+            ln = laenge * (0.5 if r % 2 else 1)
+            x1, y1 = cx + math.cos(an) * ln, cy + math.sin(an) * ln
+            g.line(rd(cx), rd(cy), rd(x1), rd(y1), C['tinte'], 1, 3)
+            g.line(rd(cx), rd(cy), rd(x1), rd(y1), kurz if r % 2 else (C['creme'] if r % 3 == 0 else C['hblau']), 1, 1)
+
+    def draw(self, m, t):
+        if t < 0 or t >= self.ende:
+            return
+        g = R1(m)
+        C = C31
+        q = int(math.floor(t / BILD + 1e-6))
+        dt = t
+        cx, cy, hh, krit = self.cx, self.cy, self.hh, self.krit
+        if q < 3:
+            g.disc(cx, cy, hh * (0.5 if krit else 0.32), C['creme'], [1, 0.55, 0.25][q])
+        dx, dy = self.dir
+        nx, ny = -dy, dx
+        hl = hh * (1.05 if krit else 0.86)
+        Ax, Ay, Bx, By = cx - dx * hl, cy - dy * hl, cx + dx * hl, cy + dy * hl
+        if krit:
+            if q < 13:
+                anteil = (q + 1) / 3.0 if q < 3 else 1.0
+                dick = 7 if q < 7 else 4 if q < 10 else 2
+                if not (q >= 8 and q % 2):
+                    self._band(g, Ax, Ay, Bx, By, anteil, dick)
+                if 1 <= q < 9:
+                    o1x, o1y = nx * hh * 0.2 + dx * hh * 0.02, ny * hh * 0.2 + dy * hh * 0.02
+                    o2x, o2y = -nx * hh * 0.25, -ny * hh * 0.25
+                    a = min(1.0, q / 3.0)
+                    self._band(g, Ax + o1x, Ay + o1y, Bx + o1x, By + o1y, a, 4)
+                    self._band(g, Ax + o2x, Ay + o2y, Bx + o2x, By + o2y, a, 2)
+        elif q < 10:
+            anteil = (q + 1) / 3.0 if q < 3 else 1.0
+            dick = 5 if q < 5 else 3 if q < 8 else 1
+            if not (q >= 5 and q % 2):
+                self._band(g, Ax, Ay, Bx, By, anteil, dick)
+            if 1 <= q < 6:
+                self._band(g, Ax + hh * 0.2, Ay - hh * 0.06, Bx + hh * 0.2, By - hh * 0.06, min(1.0, q / 3.0), 2)
+        k = 1.0 if krit else 0.7
+        if krit:
+            if dt < 0.8:
+                self._ring(g, cx, cy, rd(ease(dt / 0.35) * hh * 0.95), 3 if dt < 0.1 else 1.5, C['creme'], False)
+                if dt > 0.04:
+                    self._ring(g, cx, cy, rd(ease((dt - 0.04) / 0.5) * hh * 1.45), 2, C['hblau'], True)
+                if dt > 0.1:
+                    self._ring(g, cx, cy, rd(ease((dt - 0.1) / 0.6) * hh * 1.85), 1.5, C['blau'], True)
+            if dt < 0.3:
+                L = ease(dt / 0.1) * (1 - max(0.0, (dt - 0.1) / 0.2))
+                self._faecher(g, cx, cy, L * hh * 1.0, 12, 0.2, C['hblau'])
+        else:
+            if dt < 0.3 * k + 0.1:
+                self._ring(g, cx, cy, rd(ease(dt / 0.25) * hh * 0.6), 2 if dt < 0.08 else 1, C['creme'], False)
+                if dt > 0.03:
+                    self._ring(g, cx, cy, rd(ease((dt - 0.03) / 0.25) * hh * 0.42), 1, C['hblau'], True)
+        sc = hh / 40.0
+        for s in self.sp:
+            u = (dt - s['t0']) / s['leben']
+            if u < 0 or u > 1:
+                continue
+            e = 1 - (1 - u) ** 2
+            x, y = cx + s['vx'] * e / 3.0 * sc, cy + s['vy'] * e / 3.0 * sc
+            if u > 0.75 and (q & 1):
+                continue
+            f = s['farbe']
+            if s['plus']:
+                g.put(x, y, f); g.put(x - 1, y, f); g.put(x + 1, y, f); g.put(x, y - 1, f); g.put(x, y + 1, f)
+            else:
+                g.block(x, y, s['gross'], s['gross'], f)
+
+
+# ═════════════════════════════ Hammer-Aufprall (app-fx-57, Magic Hammer, Heftigkeit 1,0) ═════════════════════════════
+C57 = dict(tinte=hexc('#12101f'), creme=hexc('#fffbd2'), weiss=hexc('#ffffff'), gelb=hexc('#ffe23d'), org=hexc('#ff9a1a'), funke=hexc('#f0f075'), grau=hexc('#9aa3b6'),
+           rauch=hexc('#3e3e51'), nacht=hexc('#08060c'), sand=hexc('#c5b7a0'), sandD=hexc('#a89370'), sandDD=hexc('#886c44'), stein=hexc('#7f7f7f'), steinH=hexc('#b9b9b9'),
+           steinD=hexc('#535353'), erde=hexc('#9d612f'), erdeD=hexc('#5a341a'))
+
+
+class HammerHit:
+    """Aufprall des Hammers (Starburst im Hit-Stop, Druckwellen, Funken, Brocken, Staub). cx, cy = Aufschlagpunkt (Zellen), tw = Breite des Ziels in Zellen."""
+
+    def __init__(self, cx, cy, tw, salt=7, I=1.0, flat=0.85):
+        C = C57
+        self.cx, self.cy, self.tw, self.I, self.flat = cx, cy, tw, I, flat
+        self.stop, self.ende = 7, (7 + 14 + 8) / 30.0 + 0.3
+        s = salt
+        self.W0 = max(tw * 1.75 * 0.8, tw * 1.3)
+        self.tips = [dict(a=(i + (H(s, i + 600) - 0.5) * 0.5) / 12 * math.pi * 2, r=0.75 + H(s, i + 610) * 0.5) for i in range(12)]
+        self.sp = []
+        for i in range(30):
+            a = -math.pi * (0.05 + H(s, i + 200) * 0.9)
+            self.sp.append(dict(vx=math.cos(a) * (1 + H(s, i + 210) * 2.4) * tw * 2.0 * I, vy=math.sin(a) * (1 + H(s, i + 220) * 2.0) * tw * 1.6 * I,
+                                life=6 + H(s, i + 230) * 8, kreuz=H(s, i + 240) < 0.3, c=[C['creme'], C['gelb'], C['weiss'], C['funke']][int(H(s, i + 250) * 4)]))
+        cols = [C['stein'], C['steinH'], C['steinD'], C['erde'], C['sandD'], C['erdeD']]
+        self.de = []
+        for i in range(22):
+            side = 1 if i % 2 else -1
+            self.de.append(dict(a=(0 if side > 0 else math.pi) + (H(s, i + 100) - 0.5) * 1.7, vh=(0.5 + H(s, i + 110)) * tw * 1.4 * (0.5 + 0.6 * I),
+                                vv=(0.8 + H(s, i + 120)) * tw * 1.5 * (0.5 + 0.6 * I), sz=3 if H(s, i + 130) < 0.3 else 2, c=cols[int(H(s, i + 140) * 6)]))
+        self.pu = [dict(a=(i + H(s, i + 150) * 0.8) / 26 * math.pi * 2, r0=2 + H(s, i + 170) * 2, r1=4 + H(s, i + 180) * 5, rise=6 + H(s, i + 190) * 10, id=i) for i in range(26)]
+
+    def _burst(self, m, Ro, pal, rot):
+        TP = math.pi * 2
+        NL = 128
+        N = len(self.tips)
+        V = []
+        for i in range(N):
+            V.append(((self.tips[i]['a'] + rot) % TP, Ro * self.tips[i]['r']))
+            V.append(((self.tips[i]['a'] + rot + math.pi / N) % TP, Ro * 0.46))
+        V.sort()
+        lut = []
+        seg = 0
+        for q in range(NL):
+            th = q / float(NL) * TP
+            while seg < len(V) - 1 and V[seg + 1][0] <= th:
+                seg += 1
+            a, b = V[seg], V[(seg + 1) % len(V)]
+            a1 = b[0]
+            if a1 <= a[0]:
+                a1 += TP
+            lut.append(a[1] + (b[1] - a[1]) * kl((th - a[0]) / (a1 - a[0] or 1), 0, 1))
+        R = int(math.ceil(Ro * 1.3))
+        SQ = 0.8
+        for j in range(-R, R + 1):
+            for i in range(-R, R + 1):
+                dx, dy = i + 0.5, (j + 0.5) / SQ
+                d2 = dx * dx + dy * dy
+                if d2 > Ro * Ro * 1.7:
+                    continue
+                th = math.atan2(dy, dx)
+                if th < 0:
+                    th += TP
+                r = lut[int(th / TP * NL) % NL]
+                d = math.sqrt(d2)
+                if d > r:
+                    continue
+                m.rect(rd(self.cx + i), rd(self.cy + j), 1, 1, pal[0] if d > r - 1.4 else pal[3] if d < r * 0.38 else pal[2] if d < r * 0.7 else pal[1])
+
+    def _dith(self, m, cx, cy, rx, ry, lv, c):
+        if lv <= 0 or rx < 0.5 or ry < 0.5:
+            return
+        for y in range(int(math.floor(cy - ry)), int(math.ceil(cy + ry)) + 1):
+            b = (y - cy) / ry
+            if b * b > 1:
+                continue
+            for x in range(int(math.floor(cx - rx)), int(math.ceil(cx + rx)) + 1):
+                a = (x - cx) / rx
+                if a * a + b * b > 1:
+                    continue
+                if lv >= 16 or BAY4[y & 3][x & 3] < lv:
+                    m.rect(x, y, 1, 1, c)
+
+    def _ell(self, m, cx, cy, rx, ry, th, c, dither):
+        n = max(16, rd(max(rx, ry) * 6))
+        lx = ly = None
+        for k in range(n):
+            a = k / float(n) * math.pi * 2
+            x, y = rd(cx + math.cos(a) * rx), rd(cy + math.sin(a) * ry)
+            if (x, y) == (lx, ly):
+                continue
+            lx, ly = x, y
+            if dither and ((x + y) & 1):
+                continue
+            m.rect(x, y, th, th, c)
+
+    def draw(self, m, t):
+        f = Fl(max(0.0, t))
+        if f > 7 + 14 + 10:
+            return
+        C = C57
+        I, tw, W0, flat = self.I, self.tw, self.W0, self.flat
+        cx, cy = self.cx, self.cy
+        if f < self.stop:
+            hh = f
+            szs = [0.85, 1.15, 1.0, 0.85, 0.7, 0.5, 0.3]
+            Ro = tw * 2.3 * szs[min(hh, 6)] * 0.62
+            self._burst(m, Ro, [C['tinte'], C['org'], C['gelb'], C['creme']], 0)
+            self._burst(m, Ro * 0.62, [C['tinte'], C['gelb'], C['creme'], C['weiss']], math.pi / 10)
+            lvA = rd(12 * (0.66 ** hh) * (0.3 + 0.7 * math.sqrt(I)))
+            rr = W0 * 1.6 * (0.9 + 0.15 * hh) * 0.62
+            self._dith(m, cx, cy, rr, rr * flat * 0.8, lvA, C['creme'])
+            if hh < 3:
+                self._dith(m, cx, cy, W0 * 0.45 * 0.62, W0 * 0.45 * 0.62 * flat * 0.8, 16, C['weiss'])
+        ti = f
+        rings = [(0, 9, 0.8 + 0.7, C['creme'], False), (1, 11, 2.0, C['gelb'], True), (3, 13, 2.2 + 0.3, C['sandD'], True)]
+        for t0, life, K, col, dit in rings:
+            tt = ti - t0
+            if tt < 0 or tt > life:
+                continue
+            r1 = rd(ease(tt / float(life)) * W0 * K * 0.62)
+            if r1 > 0:
+                self._ell(m, cx, cy, r1, rd(r1 * flat), 2 if (t0 == 0 and tt < 3) else 1, col, dit)
+        if 4 <= ti <= 18:
+            tt = ti - 4
+            r1 = rd(ease(tt / 14.0) * W0 * 3.4 * 0.62)
+            self._ell(m, cx, cy, r1, rd(r1 * flat), 1, C['creme'], True)
+        if f < self.stop:
+            hh = f
+            Lr = W0 * 2.2 * 0.62 * [0.6, 1, 0.9, 0.75, 0.6, 0.45, 0.3][min(6, hh)]
+            g = R1(m)
+            for r in range(20):
+                an = r * math.pi / 10 + 0.1
+                ln = Lr * (0.55 if r % 2 else 1)
+                ex, ey = cx + math.cos(an) * ln, cy + math.sin(an) * ln * flat
+                g.line(rd(cx), rd(cy), rd(ex), rd(ey), C['tinte'], 1, 3)
+                g.line(rd(cx), rd(cy), rd(ex), rd(ey), C['creme'] if r % 2 == 0 else C['gelb'], 1, 1)
+        for p in self.pu:
+            age = ti - (p['id'] % 3)
+            life = 20
+            if age < 0 or age >= life:
+                continue
+            e = ease(age / float(life))
+            kk = max(0.6, tw / 40.0)
+            r = (p['r0'] * 0.8 + (p['r1'] - p['r0'] * 0.8) * e) * kk * 1.2
+            dist = tw * 0.4 + W0 * 0.62 * (0.5 + 0.9) * e
+            x = cx + math.cos(p['a']) * dist
+            y = cy + math.sin(p['a']) * dist * flat - (3 + p['rise'] * e) * kk
+            lv = rd(11 * (1 - age / float(life)))
+            if lv <= 0:
+                continue
+            g = R1(m)
+            g.disc(x + r * 0.2, y + r * 0.25, max(1, rd(r)), C['rauch'], lv / 16.0)
+            g.disc(x, y, max(1, rd(r * 0.9)), C['sandDD'], lv / 16.0)
+            g.disc(x - r * 0.25, y - r * 0.3, max(1, rd(r * 0.55)), C['sand'], lv / 16.0)
+        gg = 0.9 * (tw / 40.0)
+        for b in self.de:
+            life = 28
+            if ti >= life:
+                continue
+            hgt = b['vv'] * (ti / 30.0) * 3.2 - gg * 0.5 * ti * ti * 1.05
+            fly = ti / 30.0 * 3.2
+            if hgt < 0:
+                hgt = 0
+            x = cx + math.cos(b['a']) * tw * 0.6 + math.cos(b['a']) * b['vh'] * min(1.0, fly) * 0.45
+            y = cy + math.sin(b['a']) * b['vh'] * min(1.0, fly) * 0.3 - hgt * 0.45
+            if ti > life - 7 and (ti & 1):
+                continue
+            sz = b['sz']
+            m.rect(rd(x), rd(y), sz, sz, b['c']); m.rect(rd(x), rd(y), max(1, sz - 1), 1, C['creme'])
+        for s in self.sp:
+            if ti >= s['life'] or (ti > s['life'] * 0.65 and (ti & 1)):
+                continue
+            x = cx + (s['vx'] * ti / 30.0) * 0.42
+            y = cy + (-s['vy'] * ti / 30.0) * 0.42 - 0.5 * 0 + 0.5 * 40 * (ti / 30.0) ** 2 * 0.42
+            if s['kreuz']:
+                m.rect(rd(x) - 1, rd(y), 3, 1, s['c']); m.rect(rd(x), rd(y) - 1, 1, 3, s['c'])
+            else:
+                vx, vy = s['vx'] * 0.42 / 30.0, -s['vy'] * 0.42 / 30.0
+                R1(m).line(rd(x), rd(y), rd(x - vx * 1.8), rd(y - vy * 1.8), s['c'], 1, 1)
+                m.rect(rd(x), rd(y), 1, 1, s['c'])
+
+
+# ═════════════════════════════ Geschosse (app-fx-38: Schwert, Hammer, Pfeil, Axt, Dolch, Dreizack) ═════════════════════════════
+C38 = dict(creme=hexc('#fffbd2'), gelb=hexc('#ffe23d'), org=hexc('#ff9a1a'), rot=hexc('#fe5154'), tinte=hexc('#12101f'), rauch=hexc('#3e3e51'), asche=hexc('#59606e'),
+           grau=hexc('#9aa3b6'), hell=hexc('#d2d2db'), weiss=hexc('#ffffff'), braun=hexc('#9d612f'), braunH=hexc('#ca874e'), gold=hexc('#c79e05'))
+
+
+def _scheibe(u, v, cx, cy, r):
+    a, b = u - cx, v - cy
+    return a * a + b * b <= r * r
+
+
+def _streifen(u, v, u0, u1, v0, v1):
+    return u0 <= u <= u1 and v0 <= v <= v1
+
+
+def _dreieck(u, v, ax, ay, bx, by, cx, cy):
+    d1 = (u - bx) * (ay - by) - (ax - bx) * (v - by)
+    d2 = (u - cx) * (by - cy) - (bx - cx) * (v - cy)
+    d3 = (u - ax) * (cy - ay) - (cx - ax) * (v - ay)
+    return not ((d1 < 0 or d2 < 0 or d3 < 0) and (d1 > 0 or d2 > 0 or d3 > 0))
+
+
+def _f_schwert(u, v, R, va):
+    if _dreieck(u, v, 0.85 * R, -0.22 * R - 0.4, 1.0 * R, 0, 0.85 * R, 0.22 * R + 0.4): return 1
+    if _streifen(u, v, -0.15 * R, 0.85 * R, -0.22 * R - 0.4, 0.22 * R + 0.4): return 2 if v > 0 else 1
+    if _streifen(u, v, -0.3 * R, -0.1 * R, -0.55 * R, 0.55 * R): return 3
+    if _streifen(u, v, -0.85 * R, -0.3 * R, -0.5, 0.5): return 4
+    if _scheibe(u, v, -0.95 * R, 0, 0.5 + 0.1 * R): return 3
+    return 0
+
+
+def _f_hammer(u, v, R, va):
+    if _streifen(u, v, 0.3 * R, 0.9 * R, -0.45 * R, 0.45 * R): return 2 if v < -0.2 * R else (4 if u > 0.7 * R else 1)
+    if _streifen(u, v, -0.9 * R, 0.3 * R, -0.5, 0.5): return 3
+    return 0
+
+
+def _f_pfeil(u, v, R, va):
+    hw = max(1.6, R * 0.2)
+    schaft = 4 if (va & 1) else 2
+    if _dreieck(u, v, 0.55 * R, -hw, 1.0 * R, 0, 0.55 * R, hw): return 1
+    if _streifen(u, v, -0.7 * R, 0.6 * R, -0.5, 0.5): return schaft
+    if _dreieck(u, v, -1.0 * R, -hw, -0.62 * R, 0, -1.0 * R, hw): return 3
+    if _dreieck(u, v, -0.8 * R, -hw, -0.42 * R, 0, -0.8 * R, hw): return 2
+    return 0
+
+
+def _f_axt(u, v, R, va):
+    if _streifen(u, v, -0.9 * R, 0.8 * R, -0.5, 0.5): return 3
+    a, b = (u - 0.35 * R) / (0.35 * R), v / (0.85 * R)
+    if a * a + b * b <= 1 and u >= 0.15 * R: return 2 if v < -0.3 * R else (4 if u > 0.55 * R else 1)
+    return 0
+
+
+def _f_dolch(u, v, R, va):
+    if _dreieck(u, v, 0.2 * R, -0.26 * R - 0.4, 1.0 * R, 0, 0.2 * R, 0.26 * R + 0.4): return 2 if v > 0 else 1
+    if _streifen(u, v, -0.05 * R, 0.2 * R, -0.5 * R, 0.5 * R): return 3
+    if _streifen(u, v, -0.8 * R, -0.05 * R, -0.5, 0.5): return 4
+    return 0
+
+
+def _f_dreizack(u, v, R, va):
+    if _streifen(u, v, -0.9 * R, 0.5 * R, -0.5, 0.5): return 4
+    if _streifen(u, v, 0.4 * R, 0.55 * R, -0.55 * R, 0.55 * R): return 3
+    if _streifen(u, v, 0.5 * R, 1.0 * R, -0.5, 0.5): return 1
+    if _streifen(u, v, 0.5 * R, 0.9 * R, -0.58 * R - 0.5, -0.58 * R + 0.5) or _streifen(u, v, 0.5 * R, 0.9 * R, 0.58 * R - 0.5, 0.58 * R + 0.5): return 2
+    return 0
+
+
+FORMEN = dict(
+    schwert=(_f_schwert, True, ['hell', 'grau', 'gold', 'braun']), hammer=(_f_hammer, False, ['grau', 'hell', 'braun', 'asche']),
+    pfeil=(_f_pfeil, True, ['hell', 'grau', 'asche', 'braunH']), axt=(_f_axt, True, ['grau', 'hell', 'braun', 'asche']),
+    dolch=(_f_dolch, True, ['hell', 'grau', 'gold', 'braun']), dreizack=(_f_dreizack, True, ['gold', 'gelb', 'org', 'braun']))
+_GITTER = {}
+
+
+def gitter(art, R, wi, va):
+    key = (art, R, wi, va)
+    if key in _GITTER:
+        return _GITTER[key]
+    f, rot, pal = FORMEN[art]
+    ext = int(math.ceil(R * 1.15 + 3))
+    N = 2 * ext + 1
+    ca, sa = math.cos(math.radians(wi)), math.sin(math.radians(wi))
+    c = [[0] * N for _ in range(N)]
+    for y in range(N):
+        for x in range(N):
+            dx, dy = x - ext, y - ext
+            c[y][x] = f(dx * ca + dy * sa, -dx * sa + dy * ca, R, va)
+    out = [row[:] for row in c]
+    for y in range(N):
+        for x in range(N):
+            if c[y][x]:
+                continue
+            if (x > 0 and c[y][x - 1]) or (x < N - 1 and c[y][x + 1]) or (y > 0 and c[y - 1][x]) or (y < N - 1 and c[y + 1][x]):
+                out[y][x] = 255
+    res = dict(N=N, ext=ext, c=out, pal=[C38[n] for n in pal])
+    _GITTER[key] = res
+    return res
+
+
+RAMPE_GLUT = [C38['creme'], C38['gelb'], C38['org'], C38['rot']]
+
+
+class Geschoss:
+    """Ein Wurfgeschoss wie `ppFx38`: erst kurz sichtbar an der Quelle (10 %), dann anfahrend (ease-in) zum Ziel (bis 85 %), dort blinkt es aus. A, B in Zellen; dur in s."""
+
+    def __init__(self, art, A, B, dur, t0=0.0, R=8, schweif=True, salt=5, va=0):
+        self.art, self.AX, self.AY, self.BX, self.BY = art, A[0], A[1], B[0], B[1]
+        self.dur, self.t0, self.R, self.schweif, self.id, self.va = dur, t0, R, schweif, salt * 977, va
+        self.wi = rd(math.degrees(math.atan2(self.BY - self.AY, self.BX - self.AX)))
+        self.ende = t0 + dur + 0.2
+
+    def lage(self, ms):
+        u = ms / (self.dur * 1000.0)
+        e = 0.0 if u <= 0.1 else (1.0 if u >= 0.85 else ((u - 0.1) / 0.75) ** 1.7)
+        return self.AX + (self.BX - self.AX) * e, self.AY + (self.BY - self.AY) * e
+
+    def landung(self):
+        return self.t0 + self.dur * 0.85
+
+    def draw(self, m, T):
+        ms = (T - self.t0) * 1000.0
+        if ms < 0 or ms > self.dur * 1000 + 200:
+            return
+        frame = Fl(T)
+        u = ms / (self.dur * 1000.0)
+        X0, Y0 = self.lage(ms)
+        X, Y = rd(X0), rd(Y0)
+        if self.schweif and ms > 0:
+            lebt, slot0 = 280.0, int(math.floor(ms / 25.0))
+            for k in range(14):
+                s = slot0 - k
+                tb = s * 25.0
+                a = ms - tb
+                if s < 0 or a < 0 or a > lebt:
+                    continue
+                bx2, by2 = self.lage(tb)
+                uu = a / lebt
+                sz = 2 if (uu < 0.5 and self.R > 6) else 1
+                px = rd(bx2 + (H(s + self.id, 1) - 0.5) * self.R * 0.9)
+                py = rd(by2 + (H(s + self.id, 2) - 0.5) * self.R * 0.9 - uu * 3)
+                if uu > 0.65 and ((px + py + frame) & 1):
+                    continue
+                m.rect(px, py, sz, sz, RAMPE_GLUT[min(3, int(uu * 4))])
+        if u > 0.85 and (frame & 1):
+            return
+        if ms < 66 and (frame & 1):
+            return
+        f, rot, pal = FORMEN[self.art]
+        wi = self.wi
+        if self.art == 'hammer':
+            wi = (frame * 36) % 360
+        elif not rot:
+            wi = 0
+        g = gitter(self.art, self.R, wi, self.va)
+        N, e = g['N'], g['ext']
+        for y in range(N):
+            for x in range(N):
+                k = g['c'][y][x]
+                if k:
+                    m.rect(X - e + x, Y - e + y, 1, 1, C38['tinte'] if k == 255 else g['pal'][k - 1])

@@ -901,7 +901,11 @@
     "dust",
     14
    ]
-  ]
+  ],
+  "px": 14,
+  "armsshow": true,
+  "opener": "wind",
+  "showLoops": 5
  },
  "Vacarn, the Dark Goblin Necromancer": {
   "particles": [
