@@ -1275,7 +1275,7 @@ async function initDatabase() {
     count INTEGER NOT NULL DEFAULT 0,
     PRIMARY KEY (user_id, card, rarity)
   )`);
-  // Offenes (gekauftes, noch nicht eingelöstes) Booster-Pack: höchstens eines je Nutzer.
+  // Offene (gekaufte, noch nicht eingelöste) Booster-Packs: mehrere je Nutzer möglich (Mengenkauf, bis BOOSTER_MAX_BUY je Kauf).
   await db.execute(`CREATE TABLE IF NOT EXISTS pending_booster (
     id TEXT PRIMARY KEY,
     user_id TEXT NOT NULL,
@@ -1284,9 +1284,14 @@ async function initDatabase() {
     cards_json TEXT NOT NULL,
     created_at INTEGER DEFAULT (unixepoch())
   )`);
-  await db.execute('CREATE UNIQUE INDEX IF NOT EXISTS idx_pending_booster_user ON pending_booster(user_id)');
   // Sell Back: Index der aus diesem Pack zurückgegebenen Karte (-1 = noch keine). Je Pack nur eine; bestehende Zeilen bekommen den Default.
   try { await db.execute('ALTER TABLE pending_booster ADD COLUMN sold_idx INTEGER NOT NULL DEFAULT -1'); } catch {}
+  // seq: Laufnummer des Packs innerhalb eines Kaufs (0 … n-1) — stabile Reihenfolge der Packs (created_at hat nur Sekundenauflösung).
+  try { await db.execute('ALTER TABLE pending_booster ADD COLUMN seq INTEGER NOT NULL DEFAULT 0'); } catch {}
+  // Früher: UNIQUE INDEX auf user_id (höchstens ein offenes Pack). Der Index wird entfernt (bestehende Zeilen bleiben unverändert gültig) und durch einen
+  // gewöhnlichen ersetzt. Die Doppelkauf-Sperre liegt jetzt in der Kauf-Transaktion (BEGIN IMMEDIATE: Prüfung „kein offenes Pack“ + Einfügen sind atomar).
+  await db.execute('DROP INDEX IF EXISTS idx_pending_booster_user');
+  await db.execute('CREATE INDEX IF NOT EXISTS idx_pending_booster_user_order ON pending_booster(user_id, created_at, seq)');
 
   // Auslage: je Stunde und Platz kann jeder Spieler die Karte nur EINMAL kaufen (danach ausgegraut bis zum nächsten Wechsel).
   await db.execute(`CREATE TABLE IF NOT EXISTS display_buys (
@@ -4359,11 +4364,14 @@ app.post('/api/shop/buy', authMiddleware, async (req, res) => {
 // ═══════════════════════════════════════════
 //  RARITIES — Sammlung, Booster-Packs, Draft-Würfeln (Gemeinsames Modul: rarities.js)
 //  Alle Karten gehören jedem unbegrenzt als Common. Höhere Rarities sind gesammelte Kopien (user_card_rarities).
-//  Ein Booster-Pack wird beim KAUF serverseitig gewürfelt und als offenes Pack gespeichert (pending_booster, höchstens eines je Nutzer);
-//  erst /api/boosters/claim bucht die neun Karten in die Sammlung. So überlebt ein Neuladen mitten in der Öffnung.
+//  Ein Booster-Pack wird beim KAUF serverseitig gewürfelt und als offenes Pack gespeichert (pending_booster, mehrere je Nutzer bei Mengenkauf, höchstens BOOSTER_MAX_BUY je Kauf);
+//  erst /api/boosters/claim bucht die Karten in die Sammlung. So überlebt ein Neuladen mitten in der Öffnung.
 // ═══════════════════════════════════════════
 const BOOSTER_DIR = path.join(__dirname, 'data', 'shop', 'Boosterpacks');
 const BOOSTER_URL_DIR = '/data/shop/Boosterpacks/';
+// Obergrenze je Kauf: 20 Packs = 180 Karten = 400 SC. Hält die Öffnungsansicht (ein Kartenblock je Pack, Rarity-Ebene je sichtbarer Karte), die Antwort (~10 KB JSON)
+// und die Kauf-Transaktion (je Pack ein Insert + ein Log-Eintrag) klein; mehr kauft man mit „Add and rip one more!“ oder einem zweiten Kauf.
+const BOOSTER_MAX_BUY = 20;
 const BOOSTER_SC_REASON = 'shop:booster';   // sc_log.reward_id des Packkaufs (Betrag negativ = Ausgabe)
 const BOOSTER_SELLBACK_REASON = 'shop:booster_sellback';   // Gutschrift für „Sell Back!“ (Betrag positiv)
 const BOOSTER_DISPLAY_REASON = 'shop:display';             // Kauf aus der Auslage (Betrag negativ)
@@ -4442,7 +4450,7 @@ app.get('/api/boosters', authMiddleware, (req, res) => {
   try {
     const man = boosterManifest();
     res.json({
-      price: RARITIES.PACK_PRICE, sellback: RARITIES.SELLBACK, size: man.size, frames: man.frames, frameMs: man.frameMs, dir: BOOSTER_URL_DIR,
+      price: RARITIES.PACK_PRICE, maxCount: BOOSTER_MAX_BUY, sellback: RARITIES.SELLBACK, size: man.size, frames: man.frames, frameMs: man.frameMs, dir: BOOSTER_URL_DIR,
       packs: man.packs.map(p => ({
         id: p.id, name: p.name, tagline: p.tagline || man.tagline,
         variants: p.variants.map(v => ({
@@ -4454,129 +4462,172 @@ app.get('/api/boosters', authMiddleware, (req, res) => {
   } catch (err) { console.error('[boosters]', err.message); res.status(500).json({ error: 'Failed to load boosters' }); }
 });
 
-// GET /api/boosters/pending — offenes Pack (Wiederaufnahme nach Neuladen) oder null; `sold` = Index der zurückgegebenen Karte oder -1
+// GET /api/boosters/pending — offene Packs (Wiederaufnahme nach Neuladen), in Kaufreihenfolge.
+//  { pending: <erstes offenes Pack | null> (altes Format), packs: [pending …] }; `sold` = Index der zurückgegebenen Karte oder -1
 app.get('/api/boosters/pending', authMiddleware, async (req, res) => {
   try {
-    const row = await db.get('SELECT * FROM pending_booster WHERE user_id = ?', [req.user.userId]);
-    res.json({ pending: row ? pendingBoosterView(row) : null });
+    const rows = await pendingBoosterRows(db, req.user.userId);
+    const packs = rows.map(pendingBoosterView);
+    res.json({ pending: packs[0] || null, packs });
   } catch (err) { console.error('[boosters/pending]', err.message); res.status(500).json({ error: 'Failed to load pack' }); }
 });
 
-/**
- * Kauf eines Packs: 20 SC ab, Karten würfeln, als offenes Pack speichern. Gemeinsam für /buy und /rip-more.
- * Liefert { status, body } — 200 { pending, sc } · 402 { error, sc } · 404 · 409 { error, pending } · 500.
- */
-async function buyBoosterPack(userId, packId) {
-  const pack = boosterManifest().packs.find(p => p.id === packId);
-  if (!pack) return { status: 404, body: { error: 'Unknown booster pack' } };
-  const offen = await db.get('SELECT * FROM pending_booster WHERE user_id = ?', [userId]);
-  if (offen) return { status: 409, body: { error: 'You still have an unopened pack.', pending: pendingBoosterView(offen) } };
-  const pool = packPool(packId);
-  if (!pool.length) return { status: 500, body: { error: 'This pack is empty right now.' } };
+/** Offene Packs eines Nutzers in stabiler Kaufreihenfolge; `ids` (Array) schränkt ein. */
+async function pendingBoosterRows(dbh, userId, ids) {
+  const rows = await dbh.all('SELECT * FROM pending_booster WHERE user_id = ? ORDER BY created_at, seq, rowid', [userId]);
+  return Array.isArray(ids) ? rows.filter(r => ids.includes(r.id)) : rows;
+}
 
-  const price = RARITIES.PACK_PRICE;
-  const cards = RARITIES.rollPack(pool, { hasMask: cardHasMask });
-  const variant = pack.variants[Math.floor(Math.random() * pack.variants.length)];
-  const id = uuidv4();
-  let nichtGenug = false;
+/**
+ * Kauf von Packs: `packIds` = eine Pack-Art je zu kaufendem Pack (Mengenkauf: dieselbe Art n-mal). Je Pack 20 SC ab, Karten würfeln, als offenes Pack speichern —
+ * alles in EINER Transaktion (SC-Prüfung für die Gesamtsumme; entweder alle Packs oder keins). Gemeinsam für /buy und /rip-more.
+ * Liefert { status, body } — 200 { pending (erstes), packs, sc } · 402 { error, sc } · 404 · 409 { error, pending, packs } · 500.
+ */
+async function buyBoosterPacks(userId, packIds) {
+  const man = boosterManifest();
+  const n = packIds.length;
+  const packs = packIds.map(id => man.packs.find(p => p.id === id));
+  if (!n || packs.some(p => !p)) return { status: 404, body: { error: 'Unknown booster pack' } };
+  const rolled = [];
+  for (const pack of packs) {
+    const pool = packPool(pack.id);
+    if (!pool.length) return { status: 500, body: { error: 'This pack is empty right now.' } };
+    const variant = pack.variants[Math.floor(Math.random() * pack.variants.length)];
+    rolled.push({ id: uuidv4(), packId: pack.id, variantId: variant.id, cards: RARITIES.rollPack(pool, { hasMask: cardHasMask }) });
+  }
+  const price = RARITIES.PACK_PRICE, total = price * n;
+  let nichtGenug = false, offen = null;
   try {
     await db.transaction(async (tx) => {
-      // Atomar: SC nur abziehen, wenn genug da sind; Pack und Buchung gehen mit oder gar nicht.
-      const upd = await tx.run('UPDATE users SET sc = sc - ? WHERE id = ? AND sc >= ?', [price, userId, price]);
+      // BEGIN IMMEDIATE: ab hier schreibt niemand sonst. Liegen noch offene Packs, wird nicht gekauft (die Antwort liefert sie; doppelter Klick / zweites Fenster).
+      const liegen = await pendingBoosterRows(tx, userId);
+      if (liegen.length) { offen = liegen; throw new Error('open-packs'); }
+      // Atomar: SC nur abziehen, wenn für die Gesamtsumme genug da sind; Packs und Buchungen gehen mit oder gar nicht.
+      const upd = await tx.run('UPDATE users SET sc = sc - ? WHERE id = ? AND sc >= ?', [total, userId, total]);
       if (!upd.rowsAffected) { nichtGenug = true; throw new Error('not-enough-sc'); }
-      await tx.run('INSERT INTO pending_booster (id, user_id, pack_id, variant_id, cards_json) VALUES (?, ?, ?, ?, ?)',
-        [id, userId, packId, variant.id, JSON.stringify(cards)]);
-      await tx.run('INSERT INTO sc_log (id, user_id, reward_id, opponent_id, amount) VALUES (?, ?, ?, ?, ?)',
-        [uuidv4(), userId, BOOSTER_SC_REASON, packId, -price]);
+      for (let i = 0; i < n; i++) {
+        const r = rolled[i];
+        await tx.run('INSERT INTO pending_booster (id, user_id, pack_id, variant_id, cards_json, seq) VALUES (?, ?, ?, ?, ?, ?)',
+          [r.id, userId, r.packId, r.variantId, JSON.stringify(r.cards), i]);
+        await tx.run('INSERT INTO sc_log (id, user_id, reward_id, opponent_id, amount) VALUES (?, ?, ?, ?, ?)',
+          [uuidv4(), userId, BOOSTER_SC_REASON, r.packId, -price]);   // ein Eintrag je Pack (wie beim Einzelkauf)
+      }
     });
   } catch (err) {
     if (nichtGenug) {
       const u = await db.get('SELECT sc FROM users WHERE id = ?', [userId]);
       return { status: 402, body: { error: 'Not enough SC', sc: u?.sc || 0 } };
     }
-    // Gleichzeitiger zweiter Kauf: der Unique-Index auf pending_booster(user_id) hat ihn abgewiesen und die Buchung zurueckgerollt.
-    const jetzt = await db.get('SELECT * FROM pending_booster WHERE user_id = ?', [userId]);
-    if (jetzt) return { status: 409, body: { error: 'You still have an unopened pack.', pending: pendingBoosterView(jetzt) } };
+    if (offen) { const views = offen.map(pendingBoosterView); return { status: 409, body: { error: 'You still have an unopened pack.', pending: views[0], packs: views } }; }
     throw err;
   }
   const u = await db.get('SELECT sc FROM users WHERE id = ?', [userId]);
-  return { status: 200, body: { pending: { id, packId, variantId: variant.id, cards, sold: -1 }, sc: u?.sc || 0 } };
+  const views = rolled.map(r => ({ id: r.id, packId: r.packId, variantId: r.variantId, cards: r.cards, sold: -1 }));
+  return { status: 200, body: { pending: views[0], packs: views, sc: u?.sc || 0 } };
 }
 
 /**
- * Einlösen des offenen Packs: die Karten in die Sammlung (+1 je (Karte, Rarity)), die zurückverkaufte Karte (sold_idx) NICHT, Pack löschen.
- * Liefert { status, body } — 200 { ok, added, sold, rarities, packId } · 404.
+ * Einlösen offener Packs: die Karten in die Sammlung (+1 je (Karte, Rarity)), je Pack die zurückverkaufte Karte (sold_idx) NICHT, Packs löschen.
+ * `ids` = nur diese Packs, sonst ALLE offenen des Nutzers. Auswahl, Löschen und Buchen laufen in einer Transaktion (kein Verkauf dazwischen).
+ * Liefert { status, body } — 200 { ok, added (alle Packs), sold (erste verkaufte Karte | null), soldCards, packs: [{ id, packId, added, sold }], count, packId, rarities } · 404.
  */
-async function claimBoosterPack(userId, id) {
-  const row = await db.get('SELECT * FROM pending_booster WHERE user_id = ?', [userId]);
-  if (!row || (id && row.id !== id)) return { status: 404, body: { error: 'No such open pack' } };
-  const view = pendingBoosterView(row);
-  const added = view.cards.filter((c, i) => i !== view.sold);
-  let schonWeg = false;
+async function claimBoosterPacks(userId, ids) {
+  const done = [];
   await db.transaction(async (tx) => {
-    const del = await tx.run('DELETE FROM pending_booster WHERE id = ? AND user_id = ?', [row.id, userId]);
-    if (!del.rowsAffected) { schonWeg = true; return; }   // doppelter Klick: nur einmal buchen
-    await addRarityCopies(userId, added, tx);
+    const rows = await pendingBoosterRows(tx, userId, ids);
+    for (const row of rows) {
+      const view = pendingBoosterView(row);
+      const del = await tx.run('DELETE FROM pending_booster WHERE id = ? AND user_id = ?', [row.id, userId]);
+      if (!del.rowsAffected) continue;   // doppelter Klick: nur einmal buchen
+      const added = view.cards.filter((c, i) => i !== view.sold);
+      await addRarityCopies(userId, added, tx);
+      done.push({ id: row.id, packId: view.packId, added, sold: view.sold >= 0 ? view.cards[view.sold] : null });
+    }
   });
-  if (schonWeg) return { status: 404, body: { error: 'No such open pack' } };
-  return { status: 200, body: { ok: true, added, sold: view.sold >= 0 ? view.cards[view.sold] : null, rarities: await ownedRarities(userId), packId: view.packId } };
+  if (!done.length) return { status: 404, body: { error: 'No such open pack' } };
+  const soldCards = done.map(d => d.sold).filter(Boolean);
+  return { status: 200, body: {
+    ok: true, added: done.flatMap(d => d.added), sold: soldCards[0] || null, soldCards, packs: done, count: done.length, packId: done[0].packId,
+    rarities: await ownedRarities(userId),
+  } };
 }
 
-// POST /api/boosters/buy { packId } — 20 SC ab, Pack wuerfeln und als offenes Pack speichern.
-//  402 { error, sc }: zu wenig SC · 409 { error, pending }: es liegt schon ein offenes Pack (Antwort liefert es)
+/** `ids` aus dem Request: `ids` (Array) oder `id` (String); leer/fehlend = alle offenen Packs (undefined). */
+function boosterIdsFromBody(body) {
+  if (Array.isArray(body?.ids)) return body.ids.map(String);
+  const id = body?.id != null ? String(body.id) : '';
+  return id ? [id] : undefined;
+}
+
+// POST /api/boosters/buy { packId, count = 1 } — count Packs (1 … BOOSTER_MAX_BUY) für je 20 SC in EINER Transaktion kaufen, würfeln und als offene Packs speichern.
+//  400 { error, max }: count ungültig (nur Ganzzahlen 1 … max) · 402 { error, sc }: zu wenig SC für die Gesamtsumme · 404: Pack unbekannt
+//  409 { error, pending, packs }: es liegen noch offene Packs (Antwort liefert sie) · 200 { pending (erstes Pack), packs: [alle], sc }
 app.post('/api/boosters/buy', authMiddleware, async (req, res) => {
   try {
-    const r = await buyBoosterPack(req.user.userId, String(req.body?.packId || ''));
+    const raw = req.body?.count;
+    const count = raw === undefined ? 1 : raw;
+    if (!Number.isInteger(count) || count < 1 || count > BOOSTER_MAX_BUY) return res.status(400).json({ error: 'Invalid pack count (1 to ' + BOOSTER_MAX_BUY + ')', max: BOOSTER_MAX_BUY });
+    const packId = String(req.body?.packId || '');
+    const r = await buyBoosterPacks(req.user.userId, Array(count).fill(packId));
     res.status(r.status).json(r.body);
   } catch (err) { console.error('[boosters/buy]', err.message); res.status(500).json({ error: 'Failed to buy pack' }); }
 });
 
-// POST /api/boosters/claim { id } — die Karten (ohne die zurückverkaufte) in die Sammlung, offenes Pack loeschen.
-//  Antwort { ok, added: [{ name, rarity }], sold, rarities: <gesamte Sammlung wie /api/collection> }
+// POST /api/boosters/claim { ids? | id? } — die Karten (ohne die je Pack zurückverkaufte) in die Sammlung, die Packs löschen. Ohne ids: ALLE offenen Packs.
+//  Antwort { ok, added: [{ name, rarity }] (alle Packs), sold (erste verkaufte Karte | null), soldCards, packs: [{ id, packId, added, sold }], count, rarities }
 app.post('/api/boosters/claim', authMiddleware, async (req, res) => {
   try {
-    const r = await claimBoosterPack(req.user.userId, String(req.body?.id || ''));
+    const r = await claimBoosterPacks(req.user.userId, boosterIdsFromBody(req.body));
     res.status(r.status).json(r.body);
   } catch (err) { console.error('[boosters/claim]', err.message); res.status(500).json({ error: 'Failed to add cards' }); }
 });
 
-// POST /api/boosters/rip-more { id } — „Add and rip one more!“: das offene Pack einlösen UND sofort ein Pack DERSELBEN Art kaufen.
-//  Zwei getrennte Transaktionen, damit das alte Pack nie verloren geht: erst wird eingelöst (bleibt eingelöst, was danach auch passiert),
-//  dann gekauft. Antwort 200 { ok, added, rarities, pending, sc } · 402 { error, sc, claimed: true, added, rarities } (zu wenig SC: das Pack ist
-//  trotzdem eingelöst, ein neues gibt es nicht) · 404 (kein offenes Pack) · 5xx { error, claimed } (Kauf gescheitert; `claimed`: altes Pack schon eingelöst).
+// POST /api/boosters/rip-more { ids? | id? } — „Add and rip one more!“: ALLE offenen Packs einlösen UND sofort dieselbe Anzahl Packs derselben Art(en) kaufen
+//  (ids/id dienen nur der Absicherung: passt keines zu einem offenen Pack → 404). Zwei getrennte Transaktionen, damit die alten Packs nie verloren gehen:
+//  erst wird eingelöst (bleibt eingelöst, was danach auch passiert), dann gekauft (alle oder keins, Gesamtsumme n × 20 SC).
+//  Antwort 200 { ok, added, sold, soldCards, rarities, pending (erstes neues Pack), packs: [neue Packs], sc } · 402 { error, sc, claimed: true, added, rarities } (zu wenig SC: die Packs
+//  sind trotzdem eingelöst, neue gibt es nicht) · 404 (kein offenes Pack) · 5xx { error, claimed } (Kauf gescheitert; `claimed`: alte Packs schon eingelöst).
 //  Eine Gutschrift aus „Sell Back!“ steht schon im Kontostand (sie wird beim Verkauf gebucht) und zählt damit für den Preis.
 app.post('/api/boosters/rip-more', authMiddleware, async (req, res) => {
   const userId = req.user.userId;
   let claimed = null;
   try {
-    const c = await claimBoosterPack(userId, String(req.body?.id || ''));
+    const ids = boosterIdsFromBody(req.body);
+    if (ids) {
+      const offen = await pendingBoosterRows(db, userId, ids);
+      if (!offen.length) return res.status(404).json({ error: 'No such open pack' });
+    }
+    const c = await claimBoosterPacks(userId, undefined);
     if (c.status !== 200) return res.status(c.status).json(c.body);
     claimed = c.body;
-    const b = await buyBoosterPack(userId, claimed.packId);
-    if (b.status === 200) return res.json({ ok: true, added: claimed.added, sold: claimed.sold, rarities: claimed.rarities, pending: b.body.pending, sc: b.body.sc });
+    const b = await buyBoosterPacks(userId, claimed.packs.map(p => p.packId));
+    const carry = { added: claimed.added, sold: claimed.sold, soldCards: claimed.soldCards, rarities: claimed.rarities };
+    if (b.status === 200) return res.json({ ok: true, ...carry, pending: b.body.pending, packs: b.body.packs, sc: b.body.sc });
     const u = await db.get('SELECT sc FROM users WHERE id = ?', [userId]);
     return res.status(b.status === 404 || b.status === 409 ? 500 : b.status).json({
-      ...b.body, sc: b.body.sc != null ? b.body.sc : (u?.sc || 0), claimed: true, added: claimed.added, sold: claimed.sold, rarities: claimed.rarities,
+      ...b.body, sc: b.body.sc != null ? b.body.sc : (u?.sc || 0), claimed: true, ...carry,
     });
   } catch (err) {
     console.error('[boosters/rip-more]', err.message);
     res.status(500).json({
       error: claimed ? 'Your cards were added, but the next pack could not be bought.' : 'Failed to add cards', claimed: !!claimed,
-      ...(claimed ? { added: claimed.added, sold: claimed.sold, rarities: claimed.rarities } : {}),
+      ...(claimed ? { added: claimed.added, sold: claimed.sold, soldCards: claimed.soldCards, rarities: claimed.rarities } : {}),
     });
   }
 });
 
-// POST /api/boosters/sell { id, index } — „Sell Back!“: EINE Karte des offenen Packs zurückgeben, Gutschrift in SC nach Rarity
-//  (RARITIES.SELLBACK). Idempotent: ein zweiter Verkauf (auch einer anderen Karte) → 409. Die Karte kommt beim Einlösen nicht in die Sammlung.
+// POST /api/boosters/sell { id, index } — „Sell Back!“: EINE Karte dieses offenen Packs zurückgeben, Gutschrift in SC nach Rarity
+//  (RARITIES.SELLBACK). Je Pack unabhängig; idempotent: ein zweiter Verkauf im selben Pack (auch einer anderen Karte) → 409. Die Karte kommt beim Einlösen nicht in die Sammlung.
+//  Ohne id gilt das einzige offene Pack (liegen mehrere, ist die id Pflicht → 404).
 //  Antwort 200 { ok, sold: index, amount, sc } · 400 (Index / Common) · 404 (kein offenes Pack) · 409 { error, sold }
 app.post('/api/boosters/sell', authMiddleware, async (req, res) => {
   const userId = req.user.userId;
   try {
-    const id = String(req.body?.id || '');
+    const id = req.body?.id != null ? String(req.body.id) : '';
     const index = req.body?.index;
-    const row = await db.get('SELECT * FROM pending_booster WHERE user_id = ?', [userId]);
-    if (!row || (id && row.id !== id)) return res.status(404).json({ error: 'No such open pack' });
+    const rows = await pendingBoosterRows(db, userId);
+    const row = id ? rows.find(r => r.id === id) : (rows.length === 1 ? rows[0] : null);
+    if (!row) return res.status(404).json({ error: 'No such open pack' });
     const view = pendingBoosterView(row);
     if (!Number.isInteger(index) || index < 0 || index >= view.cards.length) return res.status(400).json({ error: 'No such card' });
     if (view.sold >= 0) return res.status(409).json({ error: 'You already sold a card from this pack.', sold: view.sold });

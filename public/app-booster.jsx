@@ -1,17 +1,19 @@
 // ═══════════════════════════════════════════════════════════════════════════
 //  BOOSTERPACKS (Shop-Reiter „Boosterpacks“, Öffnung, Aufdecken)
 //
-//    window.ppBoosterApi          { list(), pending(), buy(packId), claim(id), ripMore(id), sell(id, index), display(), displayBuy(body) } → { ok, status, data }
-//    window.BoosterShop           Reiter: die 9 Packs (Bild + Schimmerstreifen aus boosters.json, Name, Tagline, Preis, Kaufen) + rechts die Auslage (BpShowcase)
+//    window.ppBoosterApi          { list(), pending(), buy(packId, count), claim(ids), ripMore(ids), sell(id, index), display(), displayBuy(body) } → { ok, status, data }
+//    window.BoosterShop           Reiter: die 9 Packs (Bild + Schimmerstreifen aus boosters.json, Name, Tagline, Mengenfeld „− n +“, Kaufen) + rechts die Auslage (BpShowcase)
 //    window.BoosterOpening        Vollbild: vorgerenderte Öffnungsanimation (opening.json) → 9 verdeckte Karten → aufdecken → „Sell Back!“ (eine Karte je Pack)
-//                                 → „Add Cards To Collection“ oder „Add and rip one more!“ (löst ein und öffnet sofort ein Pack derselben Art)
+//                                 → „Add Cards To Collection“ oder „Add and rip one more!“ (löst ein und öffnet sofort ein Pack derselben Art).
+//                                 Mehrere Packs (Mengenkauf, bis maxCount): die Animation läuft einmal, danach liegen alle Packs als 3×3-Blöcke untereinander in einem
+//                                 vertikal scrollbaren Bereich (verdeckt), die Knopfleiste bleibt fest darunter (BpMultiView-Layout in BoosterOpening).
 //
 //  Server-Vertrag (server.js):
 //    GET  /api/boosters           → { price, packs: [{ id, name, tagline, variants: [{ id, theme, base, shimmer }] }] }
-//    POST /api/boosters/buy       { packId } → { pending: { id, packId, variantId, cards: [{ name, rarity }] }, sc }   (bei offenem Pack: dessen pending)
-//    GET  /api/boosters/pending   → { pending | null }
-//    POST /api/boosters/claim     { id } → { added, … }            (die zurückverkaufte Karte wird nicht eingelöst)
-//    POST /api/boosters/rip-more  { id } → { added, pending, sc }   (402/5xx mit claimed: true: das alte Pack ist trotzdem eingelöst)
+//    POST /api/boosters/buy       { packId, count = 1 } → { pending (erstes Pack), packs: [{ id, packId, variantId, cards: [{ name, rarity }], sold }], sc }   (count 1 … maxCount; bei offenen Packs 409 mit deren packs)
+//    GET  /api/boosters/pending   → { pending (erstes | null), packs: [alle offenen, Kaufreihenfolge] }
+//    POST /api/boosters/claim     { ids } → { added, packs, … }     (alle offenen Packs; die je Pack zurückverkaufte Karte wird nicht eingelöst)
+//    POST /api/boosters/rip-more  { ids } → { added, pending, packs, sc }   (löst ALLE offenen Packs ein, kauft gleich viele derselben Art; 402/5xx mit claimed: true: die alten sind trotzdem eingelöst)
 //    POST /api/boosters/sell      { id, index } → { sold, amount, sc }   (409: aus diesem Pack wurde schon eine Karte verkauft)
 //    GET  /api/boosters/display   → { hour, msLeft, nextAt, serverTime, cards: [{ rarity, name, price, owned, special?, fullPrice? }] }  (9 Plätze, der letzte = Sonderangebot)
 //    POST /api/boosters/display/buy { slot, hour, name, rarity, price, special } → { card, owned, sc, display }   (409: Auslage hat gewechselt)
@@ -48,9 +50,9 @@ window.ppBoosterApi = (() => {
   return {
     list: () => call('/boosters'),
     pending: () => call('/boosters/pending'),
-    buy: (packId) => call('/boosters/buy', { method: 'POST', body: JSON.stringify({ packId }) }),
-    claim: (id) => call('/boosters/claim', { method: 'POST', body: JSON.stringify({ id }) }),
-    ripMore: (id) => call('/boosters/rip-more', { method: 'POST', body: JSON.stringify({ id }) }),
+    buy: (packId, count) => call('/boosters/buy', { method: 'POST', body: JSON.stringify({ packId, count: count || 1 }) }),
+    claim: (ids) => call('/boosters/claim', { method: 'POST', body: JSON.stringify({ ids: [].concat(ids) }) }),
+    ripMore: (ids) => call('/boosters/rip-more', { method: 'POST', body: JSON.stringify({ ids: [].concat(ids) }) }),
     sell: (id, index) => call('/boosters/sell', { method: 'POST', body: JSON.stringify({ id, index }) }),
     display: () => call('/boosters/display'),
     displayBuy: (body) => call('/boosters/display/buy', { method: 'POST', body: JSON.stringify(body) }),
@@ -273,30 +275,66 @@ function BpShowcase({ sc, onSc, notify, onHoverCard }) {
   );
 }
 
+// Mengenfeld einer Pack-Kachel: „− [n] +“ und MAX. Nur Ziffern; jede Eingabe wird auf 1 … max geklemmt (max = leistbare Packs, höchstens maxCount).
+// `value`: Zahl oder '' (Feld gerade leer beim Tippen; beim Verlassen wird daraus 1).
+function BpQty({ name, value, max, off, onChange }) {
+  const hi = Math.max(1, max), cur = value === '' ? 1 : Math.min(hi, Math.max(1, value));
+  const dead = off || max < 1;
+  const step = (d) => onChange(Math.min(hi, Math.max(1, cur + d)));
+  return (
+    <div className={'bp-qty' + (dead ? ' bp-qty-off' : '')} role="group" aria-label={'Number of ' + name + ' packs'}>
+      <button type="button" className="bp-qty-btn" disabled={dead || cur <= 1} aria-label="One pack less" onClick={() => step(-1)}>−</button>
+      <input className="bp-qty-in" type="text" inputMode="numeric" pattern="[0-9]*" maxLength={3} autoComplete="off" spellCheck={false} disabled={dead}
+        aria-label={'How many ' + name + ' packs (1 to ' + hi + ')'} value={value === '' ? '' : String(cur)}
+        onChange={(e) => { const t = e.target.value.replace(/\D/g, '').slice(0, 3); onChange(t === '' ? '' : Math.min(hi, Math.max(1, parseInt(t, 10) || 1))); }}
+        onFocus={(e) => { try { e.target.select(); } catch (er) { /* ohne */ } }}
+        onBlur={() => { if (value === '') onChange(1); }}
+        onKeyDown={(e) => {
+          if (e.key === 'ArrowUp') { e.preventDefault(); step(1); }
+          else if (e.key === 'ArrowDown') { e.preventDefault(); step(-1); }
+          else if (e.key === 'Enter') { e.preventDefault(); e.target.blur(); }
+        }} />
+      <button type="button" className="bp-qty-btn" disabled={dead || cur >= hi} aria-label="One pack more" onClick={() => step(1)}>+</button>
+      <button type="button" className="bp-qty-btn bp-qty-max" disabled={dead || cur >= hi} aria-label={'Maximum: ' + hi + ' packs'} title={'As many as you can afford (max ' + hi + ')'} onClick={() => onChange(hi)}>MAX</button>
+    </div>
+  );
+}
+
 function BoosterShop({ boosters, sc, busy, onBuy, onSc, notify }) {
   useEffect(() => { bpWarmSounds(); }, []);
   const [tipCard, setTipCard] = useState(null);     // Karte der Auslage unter der Maus → Tooltip links (über Shopkeeper und Sprechblase)
+  const [qty, setQty] = useState({});               // Menge je Pack-Art (Standard immer 1); '' = Feld beim Tippen leer
   const packs = (boosters && boosters.packs) || [];
   const price = boosters && boosters.price != null ? boosters.price : 20;
+  const maxCount = boosters && boosters.maxCount > 0 ? boosters.maxCount : 20;
   const zoom = 1;
   if (!packs.length) return <div className="shop-empty">Boosterpacks are not available right now</div>;
-  const canBuy = !busy && sc >= price;
+  // leistbar: floor(SC / Preis), höchstens maxCount. Ändert sich der Kontostand (Auslage, Verkauf), klemmt die Anzeige sofort nach (Werte werden beim Lesen geklemmt).
+  const afford = Math.max(0, Math.min(maxCount, Math.floor((sc || 0) / price)));
+  const hi = Math.max(1, afford);
+  const eff = (id) => { const r = qty[id]; return r === '' || r == null ? 1 : Math.min(hi, Math.max(1, r)); };
+  const canBuy = !busy && afford >= 1;
+  const buy = (id) => { const n = eff(id); setQty({}); onBuy(id, n); };   // nach dem Kauf zurück auf 1
   return (
     <div className="bp-shop">
       <div className="bp-layout">
         <div className="bp-layout-aside"><BpShowcase sc={sc} onSc={onSc} notify={notify} onHoverCard={setTipCard} /></div>
         <div className="bp-grid">
-          {packs.map(p => (
-            <div key={p.id} className={'bp-tile' + (canBuy ? '' : ' bp-tile-off')}>
-              <BpPackCanvas pack={p} zoom={zoom} />
-              <div className="bp-name">{p.name}</div>
-              <div className="bp-tagline">{p.tagline}</div>
-              <button className="btn bp-buy" disabled={!canBuy} onClick={() => onBuy(p.id)}
-                title={sc < price ? 'Not enough Smug Coins' : 'Buy and open this pack'}>
-                BUY — <img src="/data/sc.png" className="shop-sc-icon" /> {price}
-              </button>
-            </div>
-          ))}
+          {packs.map(p => {
+            const n = eff(p.id);
+            return (
+              <div key={p.id} className={'bp-tile' + (canBuy ? '' : ' bp-tile-off')}>
+                <BpPackCanvas pack={p} zoom={zoom} />
+                <div className="bp-name">{p.name}</div>
+                <div className="bp-tagline">{p.tagline}</div>
+                <BpQty name={p.name} value={qty[p.id] == null ? 1 : qty[p.id]} max={afford} off={busy} onChange={(v) => setQty(q => ({ ...q, [p.id]: v }))} />
+                <button className="btn bp-buy" disabled={!canBuy} onClick={() => buy(p.id)}
+                  title={afford < 1 ? 'Not enough Smug Coins' : n > 1 ? 'Buy ' + n + ' packs and open them all at once' : 'Buy and open this pack'}>
+                  {n > 1 ? 'BUY ×' + n : 'BUY'} — <img src="/data/sc.png" className="shop-sc-icon" /> {price * n}
+                </button>
+              </div>
+            );
+          })}
         </div>
       </div>
       {tipCard && <BpShopTip card={tipCard} />}
@@ -922,6 +960,7 @@ function bpFxCreate(cv, S, shakeEl) {
   }
 
   api.spawn = spawn;
+  api.shift = (dy) => { for (const e of list) e.cy += dy; };   // Öffnung mit mehreren Packs: die Karten scrollen, laufende Effekte wandern mit (dy in Rasterzellen)
   api.destroy = () => { dead = true; if (raf) bpCancel(raf); if (shakeEl) shakeEl.style.transform = ''; list.length = 0; };
   api.busy = () => list.length > 0;
   return api;
@@ -1034,14 +1073,41 @@ function bpPixels(url, cw, ch) {
 // Zustand `ph`: 0 verdeckt · 1 dreht sich (Leinwand mit der Flip-Animation) · 2 fertig (Kartenbild + Rarity-Ebene).
 // `hold` = Bilder, die die Karte auf der Kante stehen bleibt (hohe Rarities: der Effekt baut sich auf, bevor die Vorderseite aufschlägt).
 // `sold`: diese Karte wurde zurückverkauft (ausgegraut, „Sold“); `sellOff`: Sell Back ist für dieses Pack schon verbraucht/gesperrt; `sellValue`: SC-Gutschrift
-function BpCard({ idx, card, geom, open, hold, onEdge, onDone, onClick, onHover, hot, sold, sellOff, sellValue, onSell }) {
+// Mehrere Packs (`multi`, Karten liegen in einem scrollbaren Bereich `scrollRef`): `slot` = Platz im Pack-Block, verdeckte Karten zeigen den Kartenrücken selbst
+// (bei einem Pack steckt er im Bühnenbild); `quick`: ohne Flip-Animation aufgedeckt (Flip All für Karten außerhalb des Bildes); Bild und Rarity-Ebene nur in
+// der Nähe des Sichtbereichs (`near`); `onSeen`: eine schnell aufgedeckte Karte kommt zum ersten Mal ins Bild (vereinfachter Funkeneffekt)
+function BpCard({ idx, card, geom, slot, open, quick, hold, onEdge, onDone, onClick, onHover, hot, sold, sellOff, sellValue, onSell, multi, scrollRef, regEl, onSeen }) {
   const [ph, setPh] = useState(0);
-  const hostRef = useRef(null), cvRef = useRef(null);
-  const cbRef = useRef({}); cbRef.current = { onEdge, onDone };
+  const hostRef = useRef(null), cvRef = useRef(null), rootRef = useRef(null), finishedRef = useRef(false);
+  const cbRef = useRef({}); cbRef.current = { onEdge, onDone, onSeen };
+  const [near, setNear] = useState(!multi);
+  const [everNear, setEverNear] = useState(!multi);
   const Z = geom.Z, cw = geom.cw, ch = geom.ch, pad = bpFlipPad(ch);
   const url = bpCardUrl(card.name, card.rarity);
   useEffect(() => {
+    if (!multi) return undefined;
+    const root = scrollRef && scrollRef.current, el = rootRef.current;
+    if (!root || !el || typeof IntersectionObserver === 'undefined') { setNear(true); setEverNear(true); return undefined; }
+    const io = new IntersectionObserver(es => { const v = es[es.length - 1].isIntersecting; setNear(v); if (v) setEverNear(true); }, { root, rootMargin: '60% 0px 60% 0px' });
+    io.observe(el);
+    return () => io.disconnect();
+  }, [multi]);
+  // schnell aufgedeckte Karte: beim ersten richtigen Auftauchen (halb im Bild) ein kurzer Funkeneffekt statt der Flip-Inszenierung
+  useEffect(() => {
+    if (!multi || !quick || !open) return undefined;
+    const root = scrollRef && scrollRef.current, el = rootRef.current;
+    if (!root || !el || typeof IntersectionObserver === 'undefined') return undefined;
+    const io = new IntersectionObserver(es => { if (es[es.length - 1].isIntersecting) { io.disconnect(); try { cbRef.current.onSeen && cbRef.current.onSeen(idx); } catch (e) { /* ohne */ } } }, { root, threshold: 0.5 });
+    io.observe(el);
+    return () => io.disconnect();
+  }, [multi, quick, open]);
+  useEffect(() => {
     if (!open) { setPh(0); return undefined; }
+    if (quick || finishedRef.current) {   // ohne Animation (Flip All außerhalb des Bildes) bzw. schon einmal fertig (Größenänderung des Fensters: nicht noch einmal drehen)
+      setPh(2); finishedRef.current = true;
+      try { cbRef.current.onDone && cbRef.current.onDone(idx); } catch (e) { /* ohne */ }
+      return undefined;
+    }
     let dead = false, raf = 0, t0 = performance.now(), lastIdx = -1, edged = false, backPix = null, facePix = null;
     const CW = cw + 2 * pad, CH = ch + 2 * pad, E = Math.max(4, Z * 2);
     setPh(1);
@@ -1061,7 +1127,7 @@ function BpCard({ idx, card, geom, open, hold, onEdge, onDone, onClick, onHover,
       if (i >= BP_FLIP_EDGE && !edged) { edged = true; try { cbRef.current.onEdge && cbRef.current.onEdge(idx); } catch (e) { /* ohne */ } }
       if (i !== lastIdx) {
         lastIdx = i;
-        if (i >= BP_FLIP_LAST) { setPh(2); try { cbRef.current.onDone && cbRef.current.onDone(idx); } catch (e) { /* ohne */ } return; }
+        if (i >= BP_FLIP_LAST) { finishedRef.current = true; setPh(2); try { cbRef.current.onDone && cbRef.current.onDone(idx); } catch (e) { /* ohne */ } return; }
         bpFlipDraw(buf, CW, CH, cw, ch, BP_FLIP_ANG[i], backPix, facePix || backPix, E);
         g.putImageData(img, 0, 0);
       }
@@ -1069,29 +1135,30 @@ function BpCard({ idx, card, geom, open, hold, onEdge, onDone, onClick, onHover,
     };
     raf = bpRaf(tick);
     return () => { dead = true; if (raf) bpCancel(raf); };
-  }, [open, cw, ch, url]);
+  }, [open, quick, cw, ch, url]);
   const done = ph >= 2;
   // Rarity-Ebene (Agent B, public/rarity-fx.js): animiert, sobald die Karte offen ist; ohne Modul/ohne Ebene bleibt es beim Kartenbild
   useEffect(() => {
-    if (!done || !hostRef.current || sold) return undefined;     // zurückverkaufte Karte: keine Effektebene mehr
+    if (!done || !near || !hostRef.current || sold) return undefined;     // zurückverkaufte Karte: keine Effektebene mehr; weit außerhalb des Bildes keine animierte Ebene (Standbild genügt)
     const F = window.PpRarityFx;
     if (!F || card.rarity === 'common' || (F.available && !F.available(card.rarity))) return undefined;
     let h = null;
     try { h = F.attach(hostRef.current, { card: (window.CARDS_BY_NAME && window.CARDS_BY_NAME[card.name]) || { name: card.name }, rarity: card.rarity, animated: true, size: cw }); } catch (e) { h = null; }
     return () => { try { h && h.destroy && h.destroy(); } catch (e) { /* ohne */ } };
-  }, [done, card.rarity, card.name, !!sold]);
-  const [sx, sy] = geom.slots[idx];
+  }, [done, near, card.rarity, card.name, !!sold]);
+  const [sx, sy] = slot || geom.slots[idx];
   const style = { left: geom.left + sx * Z, top: geom.top + sy * Z, width: cw, height: ch, '--bpz': Z };
   return (
-    <div className={'bp-card' + (open ? ' bp-card-open' : ' bp-card-shut') + (open && !done ? ' bp-card-flip' : '') + (done ? ' bp-card-done' : '') + (hot ? ' bp-card-hot' : '') + (sold ? ' bp-card-sold' : '')} style={style}
+    <div ref={(el) => { rootRef.current = el; if (regEl) regEl(idx, el); }} className={'bp-card' + (open ? ' bp-card-open' : ' bp-card-shut') + (open && !done ? ' bp-card-flip' : '') + (done ? ' bp-card-done' : '') + (hot ? ' bp-card-hot' : '') + (sold ? ' bp-card-sold' : '')} style={style}
       onClick={() => { if (!open) onClick(idx); }}
       onMouseEnter={() => onHover(idx, true)} onMouseLeave={() => onHover(idx, false)}
       role="button" tabIndex={open ? -1 : 0} aria-label={open ? bpRarityLabel(card.rarity) + ' ' + card.name : 'Card ' + (idx + 1) + ', face down'}
       onKeyDown={(e) => { if (!open && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); onClick(idx); } }}>
+      {multi && !open && <img className="bp-card-back" src={BP_DIR + 'opening/cardback.png'} alt="" draggable={false} />}
       {open && <div className="bp-card-ground" />}
       {open && (
         <div className="bp-card-face" ref={hostRef} style={{ visibility: done ? 'visible' : 'hidden' }}>
-          <img src={url} alt="" draggable={false} />
+          {everNear && <img src={url} alt="" draggable={false} />}
         </div>
       )}
       {done && sold && <div className="bp-sold-dim" />}
@@ -1113,31 +1180,59 @@ function BpCard({ idx, card, geom, open, hold, onEdge, onDone, onClick, onHover,
 // ═══════════════════════════════════════════════════════════════════════════
 //  ÖFFNUNG (Vollbild)
 // ═══════════════════════════════════════════════════════════════════════════
-// Props: pending { id, packId, variantId, cards, sold }, boosters (GET /api/boosters: price, sellback), sc (Kontostand), onSc(n), onClaimed(data, info), onRipMore(data)
-function BoosterOpening({ pending, boosters, sc, onSc, onClaimed, onRipMore }) {
-  const cards = pending.cards || [];
-  const pack = ((boosters && boosters.packs) || []).find(p => p.id === pending.packId) || { id: pending.packId, name: pending.packId, variants: [] };
-  const variant = (pack.variants || []).find(v => v.id === pending.variantId) || (pack.variants || [])[0] || null;
+// Geometrie der Pack-Blöcke bei mehreren Packs (ganzzahliger Faktor Z): 3×3 Karten à 75×105 Bildpunkte, Spaltenabstand 8, Zeilenabstand so groß, dass der
+// Sell-Back-Knopf (ragt mit seiner halben Höhe + Rahmen unter die Karte) nie die nächste Karte berührt. Maße in Bildschirmpunkten (Z-fach).
+function bpBlockGeom(Z) {
+  const cw = 75 * Z, ch = 105 * Z, gx = 8 * Z;
+  const over = Math.ceil(Math.max(22, 12 * Z) / 2) + 3 * Z, gy = over + 6 * Z;
+  const hd = Math.max(26, 8 * Z + 8);          // Kopfzeile „Pack 2 / 5“
+  const gw = 3 * cw + 2 * gx, gh = 3 * ch + 2 * gy + over;
+  const slots = [];
+  for (let r = 0; r < 3; r++) for (let c = 0; c < 3; c++) slots.push([c * (75 + 8), Math.round(r * (ch + gy) / Z)]);
+  return { Z, cw, ch, gw, gh, gy, over, hd, slots, blockH: hd + 10 + gh + 18 };
+}
+// größter ganzzahliger Faktor, bei dem EIN Pack-Block ganz in den Bereich aw × ah passt (mindestens 1: dann scrollt man auch innerhalb eines Packs)
+function bpMultiScale(aw, ah) {
+  for (let Z = 6; Z > 1; Z--) { const g = bpBlockGeom(Z); if (g.gw + 56 <= aw && g.blockH + 8 <= ah) return Z; }
+  return 1;
+}
+const BP_WAVE_MS = 150;     // Flip All mit mehreren Packs: Abstand der Wellen (je sichtbarem Pack eine) in ms
+
+// Props: packs [{ id, packId, variantId, cards, sold }] (oder `pending` = ein Pack), boosters (GET /api/boosters: price, sellback), sc (Kontostand), onSc(n),
+// onClaimed(data, info), onRipMore(data)
+function BoosterOpening({ packs: packsProp, pending, boosters, sc, onSc, onClaimed, onRipMore }) {
+  const packs = packsProp || (pending ? [pending] : []);
+  const n = packs.length, multi = n > 1;
+  const first = packs[0] || {};
+  const cards = useMemo(() => packs.flatMap(p => p.cards || []), [packs]);
+  const where = useMemo(() => { const w = []; packs.forEach((p, pi) => (p.cards || []).forEach((c, i) => w.push([pi, i]))); return w; }, [packs]);   // Karte g → [Pack, Platz im Pack]
+  const pack = ((boosters && boosters.packs) || []).find(p => p.id === first.packId) || { id: first.packId, name: first.packId, variants: [] };
+  const variant = (pack.variants || []).find(v => v.id === first.variantId) || (pack.variants || [])[0] || null;
 
   const [phase, setPhase] = useState('load');         // 'load' | 'play' | 'cards'
   const [err, setErr] = useState('');
-  const [flipped, setFlipped] = useState(() => cards.map(() => false));
+  const [flipped, setFlipped] = useState(() => cards.map(() => false));   // je Karte: false · true (mit Flip-Animation) · 'q' (ohne, Flip All außerhalb des Bildes)
   const flippedRef = useRef(flipped); flippedRef.current = flipped;
+  const doneSet = useRef(new Set());
   const [doneN, setDoneN] = useState(0);              // Karten, deren Flip-Animation fertig ist
   const [claiming, setClaiming] = useState(false);
-  const [sold, setSold] = useState(() => (Number.isInteger(pending.sold) ? pending.sold : -1));   // Index der zurückverkauften Karte (-1: keine); überlebt Neuladen (Server)
+  const [soldArr, setSoldArr] = useState(() => packs.map(p => (Number.isInteger(p.sold) ? p.sold : -1)));   // je Pack: Index der zurückverkauften Karte (-1: keine); überlebt Neuladen (Server)
   const [selling, setSelling] = useState(false);
   const [note, setNote] = useState('');                // kurze Meldung im HUD (Sell Back / Add and rip one more)
   const [hover, setHover] = useState(-1);
   const [scHit, setScHit] = useState(null);        // { n, key }: Verkauf → Goldanzeige kurz hervorheben, grünes „+X“ daneben
   const scHitTimer = useRef(0);
-  useEffect(() => () => clearTimeout(scHitTimer.current), []);
+  const waveTimers = useRef([]);
+  useEffect(() => () => { clearTimeout(scHitTimer.current); waveTimers.current.forEach(clearTimeout); }, []);
   const [vp, setVp] = useState({ w: window.innerWidth, h: window.innerHeight });
   const [op, setOp] = useState(null);                  // opening.json
+  const [area, setArea] = useState(null);              // mehrere Packs: Größe des Scrollbereichs { w, h }
 
-  const stageRef = useRef(null), fxRef = useRef(null), worldRef = useRef(null);
+  const stageRef = useRef(null), fxRef = useRef(null), worldRef = useRef(null), scrollRef = useRef(null), scrollInRef = useRef(null);
+  const elsRef = useRef([]);                         // Kartenelemente (für die Lage der Effekte bei mehreren Packs)
+  const regEl = useCallback((g, el) => { elsRef.current[g] = el; }, []);
   const fx = useRef(null), playRef = useRef(null), mixRef = useRef(1), bigSoundT = useRef({});
-  const skipRef = useRef(false);
+  const skipRef = useRef(false), multiRef = useRef(multi); multiRef.current = multi;
 
   useEffect(() => {
     const on = () => setVp({ w: window.innerWidth, h: window.innerHeight });
@@ -1151,14 +1246,19 @@ function BoosterOpening({ pending, boosters, sc, onSc, onClaimed, onRipMore }) {
     const R = playRef.current; if (R) { _bpImgs.delete(R.backUrl); _bpImgs.delete(R.frontUrl); playRef.current = null; }
   }, []);
 
-  // Geometrie: Bühne mittig, ganzzahliger Faktor Z, Ursprung auf Rasterzellen (S) ausgerichtet
-  const Z = bpStageScale(vp.w, vp.h), S = Math.max(2, Z);
+  // Geometrie: Bühne mittig, ganzzahliger Faktor Z, Ursprung auf Rasterzellen (S) ausgerichtet.
+  // Mehrere Packs: die Bühne gilt nur für die Animation (Faktor Z); die Kartenblöcke haben ihren eigenen Faktor Zc (passt EIN Pack-Block in den Scrollbereich).
+  const Z = bpStageScale(vp.w, vp.h);
+  const cardsView = multi && phase === 'cards';
+  const Zc = cardsView ? bpMultiScale(area ? area.w : vp.w, area ? area.h : vp.h - 160) : Z;
+  const S = Math.max(2, cardsView ? Zc : Z);
   const geom = useMemo(() => {
     const stage = op ? op.stage : [320, 416];
     const left = Math.max(0, Math.round((vp.w - stage[0] * Z) / 2 / S) * S), top = Math.max(0, Math.round((vp.h - stage[1] * Z) / 2 / S) * S);
     const size = op ? op.cardSize : [75, 105];
     return { Z, S, stage, left, top, slots: op ? op.cardSlots : cards.map(() => [0, 0]), cw: size[0] * Z, ch: size[1] * Z };
-  }, [vp.w, vp.h, op]);
+  }, [vp.w, vp.h, op, S]);
+  const bgeom = useMemo(() => bpBlockGeom(Zc), [Zc]);
 
   // Laden: opening.json, Schichten des Packs, Packbild (+ Reißmasken); dann die Animation starten
   useEffect(() => {
@@ -1168,8 +1268,8 @@ function BoosterOpening({ pending, boosters, sc, onSc, onClaimed, onRipMore }) {
         const o = await fetch(BP_DIR + 'opening/opening.json').then(r => { if (!r.ok) throw new Error('opening.json'); return r.json(); });
         if (dead) return;
         const [back, front, base, top, body] = await Promise.all([
-          bpImg(BP_DIR + 'opening/' + o.layers.back.replace('<pack>', pending.packId)),
-          bpImg(BP_DIR + 'opening/' + o.layers.front.replace('<pack>', pending.packId)),
+          bpImg(BP_DIR + 'opening/' + o.layers.back.replace('<pack>', first.packId)),
+          bpImg(BP_DIR + 'opening/' + o.layers.front.replace('<pack>', first.packId)),
           variant ? bpImg(bpAsset(variant.base)) : Promise.reject(new Error('variant')),
           bpImg(BP_DIR + 'opening/' + o.cut.top), bpImg(BP_DIR + 'opening/' + o.cut.body),
         ]);
@@ -1177,13 +1277,13 @@ function BoosterOpening({ pending, boosters, sc, onSc, onClaimed, onRipMore }) {
         if (dead) return;
         // Siegelstreifen / Rest als eigene Bilder (Packbild mal Maske, harte Alphawerte)
         const cut = (mask) => { const c = document.createElement('canvas'); c.width = 192; c.height = 320; const g = c.getContext('2d'); g.drawImage(base, 0, 0); g.globalCompositeOperation = 'destination-in'; g.drawImage(mask, 0, 0); return c; };
-        playRef.current = { o, back, front, base, shim, topC: cut(top), bodyC: cut(body), backUrl: BP_DIR + 'opening/' + o.layers.back.replace('<pack>', pending.packId), frontUrl: BP_DIR + 'opening/' + o.layers.front.replace('<pack>', pending.packId) };
+        playRef.current = { o, back, front, base, shim, topC: cut(top), bodyC: cut(body), backUrl: BP_DIR + 'opening/' + o.layers.back.replace('<pack>', first.packId), frontUrl: BP_DIR + 'opening/' + o.layers.front.replace('<pack>', first.packId) };
         setOp(o);
         setPhase('play');
       } catch (e) { if (!dead) setErr('Could not load the pack animation (' + e.message + ')'); }
     })();
     return () => { dead = true; };
-  }, [pending.id]);
+  }, [first.id]);
 
   // Wiedergabe der Zeitleiste
   useEffect(() => {
@@ -1236,6 +1336,7 @@ function BoosterOpening({ pending, boosters, sc, onSc, onClaimed, onRipMore }) {
       }
       while (nextSound < o.sounds.length && o.sounds[nextSound].f <= f) { const s = o.sounds[nextSound++]; bpPlay(s.name, { volume: s.volume, rate: s.rate }); }
       if (!arrived && f >= ready) { arrived = true; setPhase('cards'); }
+      if (arrived && multiRef.current) { draw(Math.min(f, loopB)); return; }   // mehrere Packs: die Bühne wird ausgeblendet (die Blöcke übernehmen), nicht weiter malen
       const fd = f > loopB ? loopA + ((f - loopA) % (loopB - loopA + 1)) : f;
       if (fd !== lastF) { lastF = fd; draw(fd); }
       raf = bpRaf(tick);
@@ -1244,18 +1345,39 @@ function BoosterOpening({ pending, boosters, sc, onSc, onClaimed, onRipMore }) {
     return () => { dead = true; if (raf) bpCancel(raf); };
   }, [phase === 'load' ? 'load' : 'run', op]);
 
-  // Effekt-Leinwand (Größe folgt dem Fenster)
+  // Effekt-Leinwand (Größe folgt dem Fenster). Bildschirmzucken (Stained): bei mehreren Packs wackelt der Inhalt des Scrollbereichs, nicht die Bühne.
   useEffect(() => {
     if (!fxRef.current) return undefined;
     if (fx.current) fx.current.destroy();
-    fx.current = bpFxCreate(fxRef.current, S, worldRef.current);
+    fx.current = bpFxCreate(fxRef.current, S, cardsView ? scrollInRef.current : worldRef.current);
     return () => { if (fx.current) { fx.current.destroy(); fx.current = null; } };
-  }, [vp.w, vp.h, S, phase === 'load']);
+  }, [vp.w, vp.h, S, phase === 'load', cardsView]);
+
+  // Mehrere Packs: Größe des Scrollbereichs verfolgen (Fenstergröße, Knopfleiste bricht um) …
+  useEffect(() => {
+    if (!cardsView || !scrollRef.current) return undefined;
+    const el = scrollRef.current;
+    const measure = () => setArea(a => (a && a.w === el.clientWidth && a.h === el.clientHeight ? a : { w: el.clientWidth, h: el.clientHeight }));
+    measure();
+    if (typeof ResizeObserver === 'undefined') return undefined;
+    const ro = new ResizeObserver(measure); ro.observe(el);
+    return () => ro.disconnect();
+  }, [cardsView]);
+  // … und laufende Effekte beim Scrollen mitnehmen (Effektleinwand steht fest im Fenster; in ganzen Rasterzellen, der Rest wird mitgezählt)
+  const scrollAcc = useRef({ last: 0, acc: 0 });
+  const onScrollArea = () => {
+    const el = scrollRef.current, a = scrollAcc.current; if (!el) return;
+    const dy = el.scrollTop - a.last; a.last = el.scrollTop;
+    if (!fx.current || !fx.current.busy()) { a.acc = 0; return; }
+    a.acc += dy;
+    const k = Math.trunc(a.acc / S);
+    if (k) { fx.current.shift(-k); a.acc -= k * S; }
+  };
 
   // Karte aufdecken: die Flip-Animation der Karte (BpCard) läuft sofort; auf der Kante (Aufschlagen der Vorderseite) kommen Klänge und der Rarity-Effekt
   const flip = useCallback((i, opt) => {
     if (flippedRef.current[i]) return;
-    setFlipped(f => { const n = f.slice(); n[i] = true; flippedRef.current = n; return n; });
+    setFlipped(f => { const nf = f.slice(); nf[i] = (opt && opt.quick) ? 'q' : true; flippedRef.current = nf; return nf; });
     if (opt && opt.mix) mixRef.current = opt.mix;
   }, []);
   const onEdge = useCallback((i) => {
@@ -1266,24 +1388,51 @@ function BoosterOpening({ pending, boosters, sc, onSc, onClaimed, onRipMore }) {
     const quiet = big && mix > 1 && nowT - (bigSoundT.current[r] || -1e9) < 600;
     if (big) bigSoundT.current[r] = nowT;
     const vol = big && mix > 1 ? 0.8 : (mix > 1 ? Math.min(1, 1.3 / Math.sqrt(mix)) : 1);
-    if (!quiet) (BP_FLIP_SOUNDS[r] || [['draw', { volume: 0.5 }]]).forEach(([n, o]) => bpPlay(n, { ...o, volume: (o.volume != null ? o.volume : 1) * vol }));
+    if (!quiet) (BP_FLIP_SOUNDS[r] || [['draw', { volume: 0.5 }]]).forEach(([nm, o]) => bpPlay(nm, { ...o, volume: (o.volume != null ? o.volume : 1) * vol }));
     if (BP_FX_LEN[r] && fx.current && geom) {
+      if (multiRef.current) {   // Lage der Karte im Fenster (Fensterkoordinaten = Koordinaten der Effektleinwand); der Effekt scrollt danach mit (onScrollArea)
+        const el = elsRef.current[i]; if (!el) return;
+        const rc = el.getBoundingClientRect();
+        fx.current.spawn(r, (rc.left + rc.width / 2) / S, (rc.top + rc.height / 2) / S, rc.width / S, rc.height / S, mix);
+        return;
+      }
       const [sx, sy] = geom.slots[i], cw = geom.cw / S, ch = geom.ch / S;
       fx.current.spawn(r, (geom.left + sx * Z) / S + cw / 2, (geom.top + sy * Z) / S + ch / 2, cw, ch, mix);
     }
   }, [cards, geom, Z, S]);
-  const onCardDone = useCallback(() => setDoneN(n => n + 1), []);
+  const onCardDone = useCallback((g) => { if (!doneSet.current.has(g)) { doneSet.current.add(g); setDoneN(doneSet.current.size); } }, []);
+  // eine schnell aufgedeckte Karte kommt ins Bild: vereinfachter Effekt (ein Funkenstoß), ab Rare
+  const onSeen = useCallback((g) => {
+    const c = cards[g], el = elsRef.current[g];
+    if (!c || !el || !fx.current || !BP_FX_LEN[c.rarity]) return;
+    const rc = el.getBoundingClientRect();
+    fx.current.spawn('rare', (rc.left + rc.width / 2) / S, (rc.top + rc.height / 2) / S, rc.width / S, rc.height / S, 2);
+  }, [cards, S]);
 
-  // „Flip All“: ALLE noch verdeckten Karten drehen sich gleichzeitig (jede mit eigener Flip-Animation und ihrem Effekt)
+  // „Flip All“: ALLE noch verdeckten Karten (aller Packs) werden aufgedeckt.
+  //  Ein Pack: alle drehen sich gleichzeitig (jede mit eigener Flip-Animation und ihrem Effekt).
+  //  Mehrere Packs: nur die Karten im Sichtbereich bekommen die volle Inszenierung, in Wellen (je Pack eine, BP_WAVE_MS Abstand); alle anderen werden sofort
+  //  (ohne Animation, ohne Effekt) umgedreht und zeigen beim ersten Auftauchen einen kurzen Funkenstoß (onSeen) — so bleibt die Last durch die Zahl der sichtbaren Karten begrenzt.
   const flipAll = () => {
-    const rest = cards.map((c, i) => i).filter(i => !flippedRef.current[i]);
+    const rest = cards.map((c, g) => g).filter(g => !flippedRef.current[g]);
     if (!rest.length) return;
-    mixRef.current = rest.length;
-    rest.forEach(i => flip(i, { mix: rest.length }));
+    if (!multi) { mixRef.current = rest.length; rest.forEach(g => flip(g, { mix: rest.length })); return; }
+    const sc0 = scrollRef.current, sr = sc0 ? sc0.getBoundingClientRect() : { top: 0, bottom: vp.h };
+    const vis = [], hid = [];
+    for (const g of rest) { const el = elsRef.current[g], rc = el && el.getBoundingClientRect(); (rc && rc.bottom > sr.top && rc.top < sr.bottom ? vis : hid).push(g); }
+    if (hid.length) setFlipped(f => { const nf = f.slice(); for (const g of hid) if (!nf[g]) nf[g] = 'q'; flippedRef.current = nf; return nf; });
+    const byPack = new Map();
+    for (const g of vis) { const pi = where[g][0]; if (!byPack.has(pi)) byPack.set(pi, []); byPack.get(pi).push(g); }
+    mixRef.current = Math.max(2, vis.length);
+    [...byPack.keys()].sort((a, b) => a - b).forEach((pi, k) => {
+      const go = () => byPack.get(pi).forEach(g => flip(g, { mix: Math.max(2, vis.length) }));
+      if (k === 0) go(); else waveTimers.current.push(setTimeout(go, k * BP_WAVE_MS));
+    });
   };
 
   const allOpen = flipped.every(Boolean);
   const allDone = allOpen && doneN >= cards.length;
+  const openN = flipped.filter(Boolean).length;
 
   // Tastatur: Leertaste/Esc überspringt die Öffnungsanimation
   useEffect(() => {
@@ -1296,43 +1445,47 @@ function BoosterOpening({ pending, boosters, sc, onSc, onClaimed, onRipMore }) {
 
   const packPrice = boosters && boosters.price != null ? boosters.price : 20;
   const sellTable = (boosters && boosters.sellback) || (window.PpRarities && window.PpRarities.SELLBACK) || {};
-  const canRip = (sc || 0) >= packPrice;
+  const ripCost = packPrice * n;
+  const canRip = (sc || 0) >= ripCost;       // Gutschriften aus Sell Back stehen schon im Kontostand
+  const ids = packs.map(p => p.id);
 
   const claim = async () => {
     if (claiming) return;
     setClaiming(true); setErr(''); setNote('');
     try {
-      const r = await window.ppBoosterApi.claim(pending.id);
+      const r = await window.ppBoosterApi.claim(ids);
       if (!r.ok) throw new Error((r.data && r.data.error) || 'Could not add the cards');
       bpPlay('shop_purchase', { volume: 0.8 });
       onClaimed(r.data);
     } catch (e) { setErr(e.message); setClaiming(false); }
   };
 
-  // „Add and rip one more!“: Pack einlösen + sofort ein Pack derselben Art kaufen und öffnen (eine Anfrage; der Server prüft SC und löst das alte Pack
-  // in jedem Fall ein). Gelingt der Neukauf nicht (zu wenig SC), ist das Pack trotzdem eingelöst: die Ansicht schließt mit einer Meldung.
+  // „Add and rip one more!“: alle offenen Packs einlösen + sofort gleich viele Packs derselben Art kaufen und öffnen (eine Anfrage; der Server prüft SC und löst die
+  // alten Packs in jedem Fall ein). Gelingt der Neukauf nicht (zu wenig SC), sind sie trotzdem eingelöst: die Ansicht schließt mit einer Meldung.
   const ripMore = async () => {
     if (claiming || selling || !canRip) return;
     setClaiming(true); setErr(''); setNote('');
     try {
-      const r = await window.ppBoosterApi.ripMore(pending.id);
-      if (r.ok && r.data.pending) { bpPlay('shop_purchase', { volume: 0.8 }); onRipMore && onRipMore(r.data); return; }
+      const r = await window.ppBoosterApi.ripMore(ids);
+      if (r.ok && (r.data.packs || r.data.pending)) { bpPlay('shop_purchase', { volume: 0.8 }); onRipMore && onRipMore(r.data); return; }
       if (r.data && r.data.claimed) { onClaimed(r.data, { ripFailed: r.data.error || 'Could not buy another pack' }); return; }
       throw new Error((r.data && r.data.error) || 'Could not open another pack');
     } catch (e) { setNote(e.message); setClaiming(false); }
   };
 
-  // „Sell Back!“: EINE Karte je Pack gegen SC zurückgeben (Server: 409 beim zweiten Mal). Erst nach dem Aufdecken der Karte anklickbar.
-  const sell = async (i) => {
-    if (sold >= 0 || selling || claiming) return;
+  // „Sell Back!“: EINE Karte je Pack gegen SC zurückgeben (Server: 409 beim zweiten Mal im selben Pack). Erst nach dem Aufdecken der Karte anklickbar.
+  const sell = async (g) => {
+    const [pi, i] = where[g];
+    if (soldArr[pi] >= 0 || selling || claiming) return;
     setSelling(true); setNote('');
+    const setSold = (k) => setSoldArr(a => { const b = a.slice(); b[pi] = k; return b; });
     try {
-      const r = await window.ppBoosterApi.sell(pending.id, i);
+      const r = await window.ppBoosterApi.sell(packs[pi].id, i);
       if (r.ok) {
         setSold(i);
         bpPlay('gold_gain', { volume: 0.8 });
         if (onSc && r.data.sc != null) onSc(r.data.sc);
-        const gain = sellTable[cards[i].rarity] || 0;
+        const gain = r.data.amount != null ? r.data.amount : (sellTable[cards[g].rarity] || 0);
         setScHit({ n: gain, key: Date.now() });
         clearTimeout(scHitTimer.current);
         scHitTimer.current = setTimeout(() => setScHit(null), 2000);
@@ -1351,42 +1504,89 @@ function BoosterOpening({ pending, boosters, sc, onSc, onClaimed, onRipMore }) {
   const hudRoom = vp.h - hudTop;
   const tight = hudRoom < 48;      // niedriger Bildschirm (Handy quer): Knöpfe an den rechten Rand statt unter die Karten
 
+  const cardEl = (g, c, blockGeom, slot) => {
+    const [pi, i] = where[g];
+    return (
+      <BpCard key={g} idx={g} card={c} geom={blockGeom} slot={slot} open={!!flipped[g]} quick={flipped[g] === 'q'} hold={Math.round((BP_FACE_DELAY[c.rarity] || 0) / BP_TAKT)} hot={hover === g}
+        sold={soldArr[pi] === i} sellOff={soldArr[pi] >= 0 || selling || claiming} sellValue={sellTable[c.rarity] || 0} onSell={sell}
+        multi={multi} scrollRef={scrollRef} regEl={regEl} onSeen={onSeen}
+        onEdge={onEdge} onDone={onCardDone} onClick={(k) => { mixRef.current = 1; flip(k); }} onHover={(k, on) => setHover(on ? k : (h => (h === k ? -1 : h)))} />
+    );
+  };
+  const addLabel = multi ? 'ADD ALL CARDS TO COLLECTION' : 'ADD CARDS TO COLLECTION';
+  const ripLabel = multi ? 'ADD AND RIP ' + n + ' MORE!' : 'ADD AND RIP ONE MORE!';
+  const hudButtons = () => (
+    <React.Fragment>
+      {!allDone && (
+        <button className="btn bp-btn" disabled={allOpen} onClick={flipAll}>FLIP ALL</button>
+      )}
+      {allDone && (
+        <div className="bp-hud-row">
+          <button className="btn bp-btn bp-btn-go" disabled={claiming} onClick={claim}>
+            {claiming ? 'ADDING…' : addLabel}
+          </button>
+          <button className="btn bp-btn bp-btn-more" disabled={claiming || !canRip} onClick={ripMore}
+            title={canRip ? 'Add these cards to your collection and open ' + (multi ? n + ' more packs' : 'another pack') + ' of the same kind' : 'Not enough Smug Coins for ' + (multi ? n + ' more packs' : 'another pack') + ' (' + ripCost + ' needed)'}>
+            {ripLabel} <img src="/data/sc.png" className="bp-coin" alt="" /> {ripCost}
+          </button>
+        </div>
+      )}
+    </React.Fragment>
+  );
+  const warnRip = allDone && !canRip && (multi || tight || hudRoom >= 84)
+    ? <div className="bp-hint bp-hint-warn">{multi ? 'Not enough SC for ' + n + ' more packs (' + ripCost + ' SC needed)' : 'Not enough SC for another pack (' + packPrice + ' SC needed)'}</div> : null;
+
   // Die Shop-Seite läuft unter CSS-`zoom` (--ui-scale): die Vollbild-Ansicht hängt deshalb direkt an <body>, damit Fenster- und Bildpunkte übereinstimmen
   // (ganzzahliger Bühnenfaktor Z in echten Bildschirmpunkten, nicht ein mitgezoomtes Mischmaß).
   const tree = (
-    <div className="bp-open" data-pp-px="aus">
+    <div className={'bp-open' + (multi ? ' bp-open-multi' : '')} data-pp-px="aus">
       <div className="bp-world" ref={worldRef}>
         <canvas ref={stageRef} className="bp-stage" width={geom.stage[0]} height={geom.stage[1]}
-          style={{ left: geom.left, top: geom.top, width: stageW, height: stageH, visibility: phase === 'load' ? 'hidden' : 'visible' }} />
-        {phase === 'cards' && cards.map((c, i) => (
-          <BpCard key={i} idx={i} card={c} geom={geom} open={flipped[i]} hold={Math.round((BP_FACE_DELAY[c.rarity] || 0) / BP_TAKT)} hot={hover === i}
-            sold={sold === i} sellOff={sold >= 0 || selling || claiming} sellValue={sellTable[c.rarity] || 0} onSell={sell}
-            onEdge={onEdge} onDone={onCardDone} onClick={(k) => { mixRef.current = 1; flip(k); }} onHover={(k, on) => setHover(on ? k : (h => (h === k ? -1 : h)))} />
-        ))}
+          style={{ left: geom.left, top: geom.top, width: stageW, height: stageH, visibility: phase === 'load' || cardsView ? 'hidden' : 'visible' }} />
+        {phase === 'cards' && !multi && cards.map((c, i) => cardEl(i, c, geom, null))}
       </div>
+      {cardsView && (
+        <div className="bp-mview">
+          <div className="bp-topbar">
+            <div className="bp-top-title">{n} PACKS <span>· {pack.name}</span></div>
+          </div>
+          <div className="bp-scroll" ref={scrollRef} onScroll={onScrollArea} tabIndex={0} role="region" aria-label="Opened packs">
+            <div className="bp-scroll-in" ref={scrollInRef}>
+              {packs.map((p, pi) => {
+                const g0 = where.findIndex(w => w[0] === pi), sd = soldArr[pi], sc2 = sd >= 0 && p.cards[sd] ? sellTable[p.cards[sd].rarity] || 0 : 0;
+                return (
+                  <section className="bp-pk" key={p.id} style={{ width: bgeom.gw, '--bpz': Zc }} aria-label={'Pack ' + (pi + 1) + ' of ' + n}>
+                    <header className="bp-pk-head" style={{ height: bgeom.hd }}>
+                      <span className="bp-pk-no">PACK {pi + 1} / {n}</span>
+                      {sd >= 0 && <span className="bp-pk-sold">SOLD BACK +{sc2}<img src="/data/sc.png" className="bp-coin" alt="" /></span>}
+                    </header>
+                    <div className="bp-pk-grid" style={{ width: bgeom.gw, height: bgeom.gh }}>
+                      {p.cards.map((c, i) => cardEl(g0 + i, c, { ...bgeom, left: 0, top: 0 }, bgeom.slots[i]))}
+                    </div>
+                  </section>
+                );
+              })}
+            </div>
+          </div>
+          <div className="bp-hudbar">
+            {hudButtons()}
+            {warnRip}
+            {!allOpen && <div className="bp-hint">Click a card to flip it · {openN} / {cards.length} revealed</div>}
+            {note && <div className="bp-hint bp-hint-warn">{note}</div>}
+          </div>
+        </div>
+      )}
       <canvas ref={fxRef} className="bp-fx" />
-      {phase === 'load' && !err && <div className="bp-msg">Opening {pack.name}…</div>}
+      {phase === 'load' && !err && <div className="bp-msg">Opening {multi ? n + ' × ' : ''}{pack.name}…</div>}
       {err && <div className="bp-msg bp-msg-err">{err}</div>}
       {phase === 'play' && (
         <button className="btn bp-skip" onClick={() => { skipRef.current = true; }}>SKIP ▸</button>
       )}
-      {phase === 'cards' && (
+      {phase === 'play' && multi && <div className="bp-multi-badge">{n} PACKS</div>}
+      {phase === 'cards' && !multi && (
         <div className={'bp-hud' + (tight ? ' bp-hud-tight' : '')} style={tight ? undefined : { left: Math.max(0, geom.left - 60 * Z), width: stageW + 120 * Z, top: hudTop }}>
-          {!allDone && (
-            <button className="btn bp-btn" disabled={allOpen} onClick={flipAll}>FLIP ALL</button>
-          )}
-          {allDone && (
-            <div className="bp-hud-row">
-              <button className="btn bp-btn bp-btn-go" disabled={claiming} onClick={claim}>
-                {claiming ? 'ADDING…' : 'ADD CARDS TO COLLECTION'}
-              </button>
-              <button className="btn bp-btn bp-btn-more" disabled={claiming || !canRip} onClick={ripMore}
-                title={canRip ? 'Add these cards to your collection and open another pack of the same kind' : 'Not enough Smug Coins for another pack'}>
-                ADD AND RIP ONE MORE! <img src="/data/sc.png" className="bp-coin" alt="" /> {packPrice}
-              </button>
-            </div>
-          )}
-          {allDone && !canRip && (tight || hudRoom >= 84) && <div className="bp-hint bp-hint-warn">Not enough SC for another pack ({packPrice} SC needed)</div>}
+          {hudButtons()}
+          {warnRip}
           {!allOpen && <div className="bp-hint">Click a card to flip it</div>}
           {note && <div className="bp-hint bp-hint-warn">{note}</div>}
         </div>
