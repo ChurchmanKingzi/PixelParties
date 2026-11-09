@@ -222,6 +222,37 @@
     return t.length ? t.join(' ') : 'none';
   }
 
+  // ── Kartenflug (Pixelart): fliegende Kartenbilder werden nie stufenlos skaliert oder gekippt ──
+  // Das Kartenbild (750 x 1050, nächster Nachbar) bleibt nur scharf, solange sein Maßstab gleich bleibt: jede Zwischengröße (123 → 128,9 → 131,9 … 95,9 px) sampelt das Bild neu und
+  // ungleichmäßig (manche Kartenpixel 1, andere 2 px breit, Schrift und Rahmen flimmern); eine `rotateX`-Neigung (Brettebene → Stapel) verzerrt es zusätzlich. Flug-Elemente bekommen deshalb
+  // nur ZWEI Größen — die der Startkarte und die der Zielkarte, wie sie im Spiel ruhend stehen — mit einem einzigen Wechsel kurz vor der Landung, KEINE Neigung, Drehung nur in
+  // Viertelschritten (verlustfrei), Bewegung in ganzen Kunstpixeln. Zugriff: `istKartenflug(el)`; die Rechnung steht in `kartenflugBilder`.
+  const KARTENFLUG = '.card-flight, .card-flight-tilt, .draw-anim-card, .discard-anim-card, .transfer-anim-card, .hand-to-board-fly';
+  const KARTENFLUG_WECHSEL = 0.55;       // Anteil der Flugzeit, ab dem die Zielgröße gilt
+  const istKartenflug = (el) => !!(el && el.matches && el.matches(KARTENFLUG));
+  /** `transform` eines Flug-Elements als flache 2D-Matrix: `matrix3d` mit reiner X-Achsen-Drehung (Neigung) wird entkippt (Längen bleiben, Neigungswinkel entfällt); sonst null. */
+  function kartenflugMatrix(t) {
+    const m2 = matrixLesen(t);
+    if (m2) return m2;
+    const m = /^matrix3d\(([^)]*)\)$/.exec(t || '');
+    if (!m) return null;
+    const v = m[1].split(',').map(parseFloat);
+    if (v.length !== 16 || !v.every(Number.isFinite)) return null;
+    if (Math.abs(v[2]) + Math.abs(v[3]) + Math.abs(v[4]) + Math.abs(v[7]) + Math.abs(v[8]) + Math.abs(v[11]) > 1e-3) return null;     // nur Drehung um die X-Achse
+    return [v[0], v[1], 0, Math.hypot(v[5], v[6]) * (v[5] < 0 ? -1 : 1), v[12], Math.hypot(v[13], v[14]) * (v[13] < 0 ? -1 : 1)];
+  }
+  /** Quantisierte `transform`-Werte je Bild für ein Flug-Element (null: nicht lesbar → normaler Weg). */
+  function kartenflugBilder(roh, breite, hoehe, raster, weich) {
+    const n = roh.length, zs = [];
+    for (let j = 0; j < n; j++) { const m = kartenflugMatrix(roh[j].transform || 'none'); const z = m && zerlegen(m); if (!z) return null; zs.push(z); }
+    const sk = weich ? snapScaleGroesse : snapScale;
+    const sA = sk(Math.abs(zs[0].sx), breite, raster), sE = sk(Math.abs(zs[n - 1].sx), breite, raster);
+    return zs.map((z, j) => {
+      const s = (n < 2 || j / (n - 1) < KARTENFLUG_WECHSEL) ? sA : sE;
+      return transformCss({ tx: snapPx(z.tx, raster), ty: snapPx(z.ty, raster), rot: winkelSnap(z.rot, 90), sx: s, sy: s, sch: 0 });
+    });
+  }
+
   /** Laengen (`12.4px`) in einem Wert auf Vielfache von `schritt` px runden (Layout-Eigenschaften; Groessen 4, Lagen 2, sonst 1). */
   const laengenRunden = (v, schritt) => String(v).replace(/(-?\d*\.?\d+)px/g, (_, n) => zk(Math.round(parseFloat(n) / (schritt || 1)) * (schritt || 1)) + 'px');
 
@@ -987,9 +1018,12 @@
       // Skaliert das Element irgendwann (Faktor != 1)? Dann Groesse auf Vielfache von 4 (ganze Pixelkanten, s. groesseAusrichten)
       if ((roh.some(w => { const m = matrixLesen(w.transform || 'none'); const z = m && zerlegen(m); return z && (Math.abs(Math.abs(z.sx) - 1) > 0.02 || Math.abs(Math.abs(z.sy) - 1) > 0.02); })
           || roh.some(w => w.scale && w.scale !== 'none' && w.scale !== '1')) && !weich && !pe) { const tg = performance.now(); groesseAusrichten(el, cs, gitter); stat.t_groesse += performance.now() - tg; }
+      // Kartenflug: zwei Größen, keine Neigung (siehe `kartenflugBilder`)
+      const flugT = (hatT && !pe && !svgInnen && !props.includes('scale') && !props.includes('rotate') && istKartenflug(el)) ? kartenflugBilder(roh, W, H, raster, weich) : null;
       for (let j = 0; j < n; j++) {
         const w = roh[j];
-        if (hatT) {
+        if (hatT && flugT) aus[j].transform = flugT[j];
+        else if (hatT) {
           const m = matrixLesen(w.transform);
           if (!m) aus[j].transform = w.transform;
           else {

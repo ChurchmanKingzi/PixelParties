@@ -3825,12 +3825,13 @@ body.pp-dragging-card.pp-dragging-card.pp-dragging-card * { cursor: url("/cursor
 /* Card reveal — opponent's played card appears centered */
 .card-reveal-stack { position: fixed; left: 0; top: 0; bottom: 0; width: 33%; z-index: 10050; display: flex; align-items: center; justify-content: center; pointer-events: none; }
 .card-reveal-entry { position: absolute; pointer-events: auto; cursor: url("/cursor-arrow.png?v=4") 2 2, default; animation: cardRevealAnim 3.5s steps(24, end) forwards; }
-.card-reveal-card { width: var(--reveal-card-w, 340px); aspect-ratio: 750 / 1050; box-shadow: 0 0 0 3px #000000; border-radius: 0; }
+.card-reveal-card { width: round(var(--reveal-card-w, 340px), var(--pp-k75, 75px)); aspect-ratio: 750 / 1050; box-shadow: 0 0 0 2px var(--bg4), 0 0 0 3px #000000; border-radius: 0; }
+/* Kein Maßstab-Wechsel am Kartenbild (stufenloses Skalieren verwischt es): die Aufdeck-Anzeige kommt und geht nur über die Deckkraft (die Pixel-Pipeline macht daraus ein Dither-Raster). */
 @keyframes cardRevealAnim {
-  0% { transform: scale(0.8); opacity: 0; }
-  8% { transform: scale(1); opacity: 1; }
-  65% { transform: scale(1); opacity: 1; }
-  100% { transform: scale(0.97); opacity: 0; }
+  0% { opacity: 0; }
+  8% { opacity: 1; }
+  65% { opacity: 1; }
+  100% { opacity: 0; }
 }
 
 /* ═══ REACTION CHAIN VISUALIZATION ═══ */
@@ -11229,10 +11230,10 @@ body[data-tb-hl] .hero-idle-platz.hero-idle-hover { scale: none; }
    `FIZZLE_ANZEIGE_MS` (app-board.jsx) ueber `--fizzle-ms`. */
 .card-reveal-entry.card-reveal-fizzled-weg { animation: cardRevealFizzleAnim var(--fizzle-ms, 1400ms) ease-in-out forwards; }
 @keyframes cardRevealFizzleAnim {
-  0%   { transform: scale(0.8); opacity: 0; }
-  12%  { transform: scale(1); opacity: 1; }
-  72%  { transform: scale(1); opacity: 1; }
-  100% { transform: scale(0.95); opacity: 0; }
+  0%   { opacity: 0; }
+  12%  { opacity: 1; }
+  72%  { opacity: 1; }
+  100% { opacity: 0; }
 }
 
 /* ═══════════════════════════════════════════════════════════════
@@ -13328,13 +13329,17 @@ input[type="checkbox"]:focus-visible, input[type="radio"]:focus-visible { outlin
 /* Vier gehaltene Stufen (wie `steps(4)`), Größe/Versatz je Stufe rechnet `ppFx44Stufen` (app-fx-44, im Raster der Kunstpixel) vor und legt sie als --tbs1..3 / --tbt1..3 inline ab. Die Schlüsselbilder wechseln nur
    die Hilfsvariablen --tbs/--tbt (Wirkung: `scale`/`translate` der Hülle bzw. der Phasenleiste) — der Pixel-Backer lässt sie in Ruhe und backt nichts zur Laufzeit. */
 @property --tbs { syntax: '*'; inherits: false; }
+@property --tbx { syntax: '*'; inherits: false; }
 @property --tbt { syntax: '*'; inherits: false; }
+/* Handkarte: Stufe 4 = Endzustand. `ppFx44HandStufen` (app-fx-44) rechnet vor: `--tbs1..4` = `zoom` der Hülle (die Karte wird im Layout vergrößert und in Zielgröße gezeichnet, nicht als fertige Ebene gestreckt),
+   `--tbx0..4`/`--tbt0..4` = Lage (Versatz vor dem Zoom) — jede Stufe besteht aus GANZEN Kartenpixeln auf ganzen Bildschirmpixeln (Karte = 75 x 105 Kartenpixel, aufrecht). Ohne die Inline-Werte (Rückfall)
+   gilt wie früher `scale` 1 → 1,5. */
 @keyframes tbHandGross {
-  0%   { --tbs: 1; --tbt: 0px; animation-timing-function: steps(1, end); }
-  25%  { --tbs: var(--tbs1, 1.125); --tbt: var(--tbt1, 0px); animation-timing-function: steps(1, end); }
-  50%  { --tbs: var(--tbs2, 1.25); --tbt: var(--tbt2, 0px); animation-timing-function: steps(1, end); }
-  75%  { --tbs: var(--tbs3, 1.375); --tbt: var(--tbt3, 0px); animation-timing-function: steps(1, end); }
-  100% { --tbs: 1.5; --tbt: var(--tb-hoch, 0px); }
+  0%   { --tbs: 1; --tbx: var(--tbx0, 0px); --tbt: var(--tbt0, 0px); animation-timing-function: steps(1, end); }
+  25%  { --tbs: var(--tbs1, 1.125); --tbx: var(--tbx1, 0px); --tbt: var(--tbt1, 0px); animation-timing-function: steps(1, end); }
+  50%  { --tbs: var(--tbs2, 1.25); --tbx: var(--tbx2, 0px); --tbt: var(--tbt2, 0px); animation-timing-function: steps(1, end); }
+  75%  { --tbs: var(--tbs3, 1.375); --tbx: var(--tbx3, 0px); --tbt: var(--tbt3, 0px); animation-timing-function: steps(1, end); }
+  100% { --tbs: var(--tbs4, 1.5); --tbx: var(--tbx4, 0px); --tbt: var(--tbt4, var(--tb-hoch, 0px)); }
 }
 
 /* Gehighlightete Phasenleiste (Desktop): ~50 % groesser fuer die Dauer des Highlights, gestuft statt stufenlos. */

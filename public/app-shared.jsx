@@ -471,6 +471,27 @@ function ppPxZelle() {
   try { const pa = window.PPPixelAnim; return (pa && pa.standardRaster && pa.KONFIG.aktiv) ? pa.standardRaster() : PP_PX_GROESSE; } catch (e) { return PP_PX_GROESSE; }
 }
 
+// ═════ KARTENPIXEL-RASTER: vergrößerte Karten nur mit ganzzahligem Faktor ═════
+// Eine Karte (750 x 1050) ist 75 x 105 Kartenpixel: ein Rahmenpixel = 10 Bildpunkte (die Schrift ~5, das Kunstfeld ~8). Der Browser zeichnet das Bild mit `image-rendering: pixelated`
+// (nächster Nachbar) — bei einem Faktor wie 2,46 oder 5,51 Bildschirmpixel je Kartenpixel sind aber manche Kartenpixel 2, andere 3 (bzw. 5, andere 6) Pixel breit: Rahmen, Schrift und
+// Kanten wirken ungleichmäßig und „weich". Große Karten (Tutorial-Highlight, Aufdeck-Anzeige, Tooltip, Flug) bekommen deshalb eine Breite, die ein GANZES Vielfaches von 75 Gerätepixeln
+// ist (jedes Kartenpixel exakt N x N Gerätepixel). `--pp-k75` = 75 Gerätepixel in CSS-px (`round(…, var(--pp-k75, 75px))` in style.css); `ppKarteGanz` ist dieselbe Rechnung in JS.
+// Nur Rechnung, kein Layout-Lesen: die Variable wird beim Laden und bei Größen-/Zoomänderung gesetzt.
+const PP_KARTE_PX = 75;
+/** 75 Gerätepixel in CSS-px (bei devicePixelRatio 1: 75, bei 2: 37,5 — kleinere Stufen auf hochauflösenden Geräten). */
+function ppKarteEinheit() { const d = window.devicePixelRatio || 1; return PP_KARTE_PX / (d > 0 ? d : 1); }
+/** CSS-Breite `w` auf ein ganzes Vielfaches der Karteneinheit: `modus` 'ab' (abrunden, passt sicher hinein), 'auf' oder sonst nächstes; mindestens eine Einheit. */
+function ppKarteGanz(w, modus) {
+  const u = ppKarteEinheit(), q = w / u;
+  const n = modus === 'ab' ? Math.floor(q + 1e-6) : modus === 'auf' ? Math.ceil(q - 1e-6) : Math.round(q);
+  return Math.max(1, n) * u;
+}
+function ppKarteVarSetzen() { try { document.documentElement.style.setProperty('--pp-k75', ppKarteEinheit() + 'px'); } catch (e) { /* ohne Variable gilt der Rückfall 75px */ } }
+ppKarteVarSetzen();
+window.addEventListener('resize', ppKarteVarSetzen);
+window.ppKarteGanz = ppKarteGanz;
+window.ppKarteEinheit = ppKarteEinheit;
+
 /** Pixelzahl fuer eine Seite: ~PP_PX_GROESSE px pro Pixel, schmale Baender (Ringe) bekommen mehr. */
 function _ppAufloesung(v, laengePx) {
   let minLuecke = 1;
@@ -10070,10 +10091,11 @@ function CardTooltipContent({ card, children, imageUrl }) {
   const effectText = ttEffectText(card.effect, bonus);
   // Ability auf dem Brett: aktuelle Stufe (1 = oberes, 2 = mittleres, 3 = unteres Feld) — im Bild und im Text hervorgehoben
   const stufe = card.cardType === 'Ability' && card._abilityLevel >= 1 && card._abilityLevel <= 3 ? card._abilityLevel : null;
+  // Kartenbreite im Tooltip = ganzes Vielfaches von 75 Gerätepixeln (abgerundet, passt in die Spalte, mittig): jedes Kartenpixel exakt N x N Pixel statt z. B. 5,5 (`round`, `--pp-k75`, siehe PP_KARTE_PX).
   return (
     <>
       {imgUrl && (
-        <div style={{ position: 'relative', width: '100%', flexShrink: 0 }}>
+        <div style={{ position: 'relative', width: 'round(down, 100%, var(--pp-k75, 75px))', marginInline: 'auto', flexShrink: 0 }}>
           <TooltipCardImage card={card} src={imgUrl} hp={bildHp} stufe={stufe} rarity={rar} style={{
             width: '100%', aspectRatio: '750/1050', objectFit: 'cover', display: 'block',
           }} />
@@ -11319,14 +11341,19 @@ function TextBox() {
             position: 'fixed',
             left: h.rect.left, top: h.rect.top,
             width: h.rect.width, height: h.rect.height,
-            transform: `rotate(${h.drehung || 0}deg) scale(${h.skala || 1})`,
-            // Gehighlightete HANDKARTE: waehrend des Highlights ~50 % groesser (eigene Eigenschaften `scale`/`translate`, damit Faecherdrehung und Hover-Massstab darunter bleiben);
-            // nach oben versetzt, damit die Karte nicht unten aus dem Bild waechst. Gestuft statt stufenlos (Pixelart).
-            ...(h.handkarte ? { '--tb-hoch': `${Math.round(Math.min(0, window.innerHeight - 8 - (h.rect.top + h.rect.height * 1.25)))}px`,   // unterer Rand nach dem Wachsen (Mitte + 0,75·Hoehe) bleibt im Bild
-             // Größen/Versatz je Stufe vorgerechnet (app-fx-44): die Schlüsselbilder wechseln nur Hilfsvariablen, gebacken wird zur Laufzeit nichts
-             ...(window.ppFx44Stufen ? window.ppFx44Stufen(h.rect.width, Math.round(Math.min(0, window.innerHeight - 8 - (h.rect.top + h.rect.height * 1.25)))) : null),
-             scale: 'var(--tbs, 1)', translate: '0 var(--tbt, 0px)',
-             animation: 'tbHandGross .24s steps(1, end) both' } : null),
+            // Handkarte: KEINE Drehung/Hover-Skalierung des Kartenbilds (Pixelart: Fächerwinkel und Hover-Maßstab würden das Bild schief/ungleichmäßig sampeln), sie steht aufrecht
+            transform: (h.handkarte && window.ppFx44HandStufen) ? 'none' : `rotate(${h.drehung || 0}deg) scale(${h.skala || 1})`,
+            // Gehighlightete HANDKARTE: waehrend des Highlights ~50 % groesser (eigene Eigenschaften `scale`/`translate`);
+            // nach oben versetzt, damit die Karte nicht unten aus dem Bild waechst. Gestuft statt stufenlos (Pixelart), jede Stufe in GANZEN Kartenpixeln (`ppFx44HandStufen`, app-fx-44).
+            ...(h.handkarte ? (window.ppFx44HandStufen
+             ? { ...window.ppFx44HandStufen(h.rect, window.innerHeight),
+                 // `zoom` statt `scale`: die Karte wird im Layout vergrößert und in Zielgröße gezeichnet (kein bilineares Strecken einer fertigen Ebene); Hülle bei 0/0, Lage per `translate`
+                 left: 0, top: 0, zoom: 'var(--tbs, 1)', translate: 'var(--tbx, 0px) var(--tbt, 0px)',
+                 animation: 'tbHandGross .24s steps(1, end) both' }
+             : { '--tb-hoch': `${Math.round(Math.min(0, window.innerHeight - 8 - (h.rect.top + h.rect.height * 1.25)))}px`,   // Rückfall (ohne app-fx-44): unterer Rand nach dem Wachsen (Mitte + 0,75·Hoehe) bleibt im Bild
+                 ...(window.ppFx44Stufen ? window.ppFx44Stufen(h.rect.width, Math.round(Math.min(0, window.innerHeight - 8 - (h.rect.top + h.rect.height * 1.25)))) : null),
+                 scale: 'var(--tbs, 1)', translate: '0 var(--tbt, 0px)',
+                 animation: 'tbHandGross .24s steps(1, end) both' }) : null),
             pointerEvents: 'none', zIndex: 90001 + h.stapel + (h.hover ? 1000 : 0) + (h.handkarte ? 500 : 0),
           }}>{inner}</div>
         );

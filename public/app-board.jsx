@@ -3789,7 +3789,9 @@ function ppFlugVerfolgen(fly, sourceEl, destEl, w0, ms, opEnd, farbe) {
       const wJetzt = (w0 && w0.welt && window.ppFxWeltAnker) ? window.ppFxWeltAnker(destEl) : { dx: 0, dy: 0 };
       const driftX = (w0 && w0.welt) ? (w0.dx - wJetzt.dx) : 0, driftY = (w0 && w0.welt) ? (w0.dy - wJetzt.dy) : 0;
       const tx = dr.left + dr.width / 2, ty = dr.top + dr.height / 2;
-      fly.style.transform = `translate(${(tx - sx) * e - driftX}px, ${(ty - sy) * e - driftY}px) scale(${1 + (dr.width / sr.width - 1) * e})`;
+      // Pixelart: das Kartenbild wird nicht stufenlos skaliert (jede Zwischengröße sampelt es neu und ungleichmäßig) — Startgröße, ein Wechsel auf die Zielgröße kurz vor der Landung (wie `kartenflugBilder`, pixel-anim.js)
+      const groesse = q < 0.55 ? 1 : dr.width / sr.width;
+      fly.style.transform = `translate(${Math.round((tx - sx) * e - driftX)}px, ${Math.round((ty - sy) * e - driftY)}px) scale(${groesse})`;
       fly.style.opacity = String(1 - (1 - opEnd) * e);
       if (spur) spur.punkt(sx + (w0 ? w0.dx : 0) + (tx - sx) * e - driftX, sy + (w0 ? w0.dy : 0) + (ty - sy) * e - driftY);
     }
@@ -4399,8 +4401,7 @@ function CardRevealEntry({ cardName, onDone, fizzled, rarity }) {
         {fizzled && <div className="chain-negate-symbol">🚫</div>}
         {imgUrl && rar !== 'common' && <CardFoil card={card} rarity={rar} />}
         {imgUrl ? (
-          <img src={imgUrl} style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: 6,
-            border: '2px solid var(--bg4)' }} draggable={false} />
+          <img src={imgUrl} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} draggable={false} />
         ) : (
           <div style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
             background: 'var(--bg3)', borderRadius: 6, border: '2px solid var(--bg4)', padding: 16, textAlign: 'center' }}>
