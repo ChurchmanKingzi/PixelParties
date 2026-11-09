@@ -155,15 +155,15 @@ function BpPackCanvas({ pack, zoom }) {
 const bpClock = (ms) => { const t = Math.max(0, Math.ceil(ms / 1000)), m = Math.floor(t / 60), s = t % 60; return (m < 10 ? '0' : '') + m + ':' + (s < 10 ? '0' : '') + s; };
 
 // Eine Karte der Auslage: Kartenbild in der Basis der Rarity + animierte Effektebene (PpRarityFx), nur solange sichtbar (das Modul beobachtet das selbst).
-function BpShowCard({ card }) {
+function BpShowCard({ card, size }) {
   const hostRef = useRef(null);
   useEffect(() => {
     const F = window.PpRarityFx;
     if (!hostRef.current || !F || (F.available && !F.available(card.rarity))) return undefined;
     let h = null;
-    try { h = F.attach(hostRef.current, { card: (window.CARDS_BY_NAME && window.CARDS_BY_NAME[card.name]) || { name: card.name }, rarity: card.rarity, animated: true }); } catch (e) { h = null; }
+    try { h = F.attach(hostRef.current, { card: (window.CARDS_BY_NAME && window.CARDS_BY_NAME[card.name]) || { name: card.name }, rarity: card.rarity, animated: true, ...(size ? { size } : {}) }); } catch (e) { h = null; }
     return () => { try { h && h.destroy && h.destroy(); } catch (e) { /* ohne */ } };
-  }, [card.name, card.rarity]);
+  }, [card.name, card.rarity, size]);
   return (
     <div className="bp-sc-face" ref={hostRef} data-pp-px="aus">
       <img src={bpCardUrl(card.name, card.rarity)} alt={bpRarityLabel(card.rarity) + ' ' + card.name} draggable={false} />
@@ -304,14 +304,13 @@ function BoosterShop({ boosters, sc, busy, onBuy, onSc, notify }) {
   );
 }
 
-// Tooltip der Auslage: links, über dem Shopkeeper-Sprite UND seiner Sprechblase (hängt am Shop-Bildschirm, z-index über .shop-antonia); die Karte
-// läuft hier voll animiert (CardTooltipContent mit der Rarity), damit man den Effekt im Detail sieht.
+// Tooltip der Auslage: NUR das Kartenbild, groß und mit laufendem Rarity-Effekt, links über Shopkeeper-Sprite und Sprechblase (hängt am Shop-Bildschirm,
+// z-index über .shop-antonia). Ganzzahlige Vergrößerung der 150×210-Karte (3× auf großen, sonst 2×), damit das Raster scharf bleibt.
 function BpShopTip({ card }) {
-  const Tooltip = window.CardTooltipContent, base = window.CARDS_BY_NAME && window.CARDS_BY_NAME[card.name];
-  if (!Tooltip || !base) return null;
+  const K = (window.innerWidth >= 1700 && window.innerHeight >= 900) ? 3 : 2;
   const tree = (
-    <div className="tooltip card-tooltip bp-shop-tip">
-      <Tooltip card={{ ...base, rarity: card.rarity }} rarity={card.rarity} />
+    <div className="bp-shop-tip" style={{ width: 150 * K, height: 210 * K }}>
+      <BpShowCard key={card.name + ':' + card.rarity + ':' + K} card={card} size={150 * K} />
     </div>
   );
   const host = typeof document !== 'undefined' && document.querySelector('.shop-screen');

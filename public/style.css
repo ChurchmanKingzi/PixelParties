@@ -26642,7 +26642,9 @@ input[type="checkbox"]:focus-visible, input[type="radio"]:focus-visible { outlin
 .bp-sc-got .bp-sc-buy:disabled { border-color: #3e3e51; color: #7e7d9b; }
 
 /* Tooltip der Auslage: links (über Shopkeeper und Sprechblase, .shop-antonia hat z-index 500) */
-.bp-shop-tip { position: fixed; left: 0; top: calc(78px / var(--ui-scale, 1)); width: 400px; max-height: calc(100 * var(--vh, 1vh) - 90px / var(--ui-scale, 1)); display: flex; flex-direction: column; overflow: hidden; z-index: 600; pointer-events: none; }
+.bp-shop-tip { position: fixed; left: 24px; top: calc(96px / var(--ui-scale, 1)); box-sizing: content-box; z-index: 600; pointer-events: none; background: #08060c; box-shadow: 0 0 0 2px #08060c, 0 0 0 6px #fad54a, 0 0 0 8px #08060c; }
+.bp-shop-tip .bp-sc-face { width: 100%; height: 100%; aspect-ratio: auto; }
+.bp-shop-tip .bp-sc-face img { image-rendering: pixelated; }
 @media (max-width: 760px) { .bp-shop-tip { display: none; } }
 
 /* Sell Back! unter jeder aufgedeckten Karte (sitzt auf deren Unterkante), SC-Anzeige, Add-and-rip-Knopf */
