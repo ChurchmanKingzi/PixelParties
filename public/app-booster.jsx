@@ -1,15 +1,20 @@
 // ═══════════════════════════════════════════════════════════════════════════
 //  BOOSTERPACKS (Shop-Reiter „Boosterpacks“, Öffnung, Aufdecken)
 //
-//    window.ppBoosterApi          { list(), pending(), buy(packId), claim(id) } → { ok, status, data }
-//    window.BoosterShop           Reiter: die 9 Packs (Bild + Schimmerstreifen aus boosters.json, Name, Tagline, Preis, Kaufen)
-//    window.BoosterOpening        Vollbild: vorgerenderte Öffnungsanimation (opening.json) → 9 verdeckte Karten → aufdecken → „Add Cards To Collection“
+//    window.ppBoosterApi          { list(), pending(), buy(packId), claim(id), ripMore(id), sell(id, index), display(), displayBuy(body) } → { ok, status, data }
+//    window.BoosterShop           Reiter: die 9 Packs (Bild + Schimmerstreifen aus boosters.json, Name, Tagline, Preis, Kaufen) + rechts die Auslage (BpShowcase)
+//    window.BoosterOpening        Vollbild: vorgerenderte Öffnungsanimation (opening.json) → 9 verdeckte Karten → aufdecken → „Sell Back!“ (eine Karte je Pack)
+//                                 → „Add Cards To Collection“ oder „Add and rip one more!“ (löst ein und öffnet sofort ein Pack derselben Art)
 //
 //  Server-Vertrag (server.js):
 //    GET  /api/boosters           → { price, packs: [{ id, name, tagline, variants: [{ id, theme, base, shimmer }] }] }
 //    POST /api/boosters/buy       { packId } → { pending: { id, packId, variantId, cards: [{ name, rarity }] }, sc }   (bei offenem Pack: dessen pending)
 //    GET  /api/boosters/pending   → { pending | null }
-//    POST /api/boosters/claim     { id } → { added, … }
+//    POST /api/boosters/claim     { id } → { added, … }            (die zurückverkaufte Karte wird nicht eingelöst)
+//    POST /api/boosters/rip-more  { id } → { added, pending, sc }   (402/5xx mit claimed: true: das alte Pack ist trotzdem eingelöst)
+//    POST /api/boosters/sell      { id, index } → { sold, amount, sc }   (409: aus diesem Pack wurde schon eine Karte verkauft)
+//    GET  /api/boosters/display   → { hour, msLeft, nextAt, serverTime, cards: [{ rarity, name, price, owned, special?, fullPrice? }] }  (9 Plätze, der letzte = Sonderangebot)
+//    POST /api/boosters/display/buy { slot, hour, name, rarity, price, special } → { card, owned, sc, display }   (409: Auslage hat gewechselt)
 //
 //  Grafik: alles Pixelart. Die Öffnung ist vorgerendert (data/shop/Boosterpacks/opening/, scripts/booster/build_opening.py): Bühne 320x416 Bildpunkte,
 //  `<pack>.back.png` (hinter dem Pack) und `<pack>.front.png` (davor, samt den neun Karten) als Raster (9 Spalten), das Pack selbst (Bild + Schimmer
@@ -45,6 +50,10 @@ window.ppBoosterApi = (() => {
     pending: () => call('/boosters/pending'),
     buy: (packId) => call('/boosters/buy', { method: 'POST', body: JSON.stringify({ packId }) }),
     claim: (id) => call('/boosters/claim', { method: 'POST', body: JSON.stringify({ id }) }),
+    ripMore: (id) => call('/boosters/rip-more', { method: 'POST', body: JSON.stringify({ id }) }),
+    sell: (id, index) => call('/boosters/sell', { method: 'POST', body: JSON.stringify({ id, index }) }),
+    display: () => call('/boosters/display'),
+    displayBuy: (body) => call('/boosters/display/buy', { method: 'POST', body: JSON.stringify(body) }),
   };
 })();
 
@@ -66,7 +75,7 @@ function bpImg(url) {
 const bpAsset = (rel) => BP_DIR + rel.split('/').map(encodeURIComponent).join('/');
 
 // Klänge vorladen (playSFX holt unbekannte Namen beim ersten Aufruf, spielt ihn aber noch nicht): leiser Aufruf beim Betreten des Reiters
-const BP_SOUNDS = ['booster_slide', 'booster_buildup', 'booster_rip', 'booster_strip', 'booster_burst', 'booster_glitter', 'booster_card_whoosh', 'booster_card_land', 'booster_ready',
+const BP_SOUNDS = ['booster_slide', 'booster_buildup', 'booster_rip', 'booster_strip', 'booster_burst', 'booster_glitter', 'booster_card_whoosh', 'booster_card_land', 'booster_ready', 'booster_umpf', 'shop_purchase',
   'draw', 'pull_sparkle', 'pull_note', 'gold_gain', 'elem_lightning', 'pull_shatter', 'laser', 'negate', 'elem_dark', 'heavy_impact', 'pull_crack', 'ascension', 'pull_reveal'];
 let _bpWarm = false;
 function bpWarmSounds() {
@@ -139,7 +148,129 @@ function BpPackCanvas({ pack, zoom }) {
   );
 }
 
-function BoosterShop({ boosters, sc, busy, onBuy }) {
+// ═══════════════════════════════════════════════════════════════════════════
+//  AUSLAGE (Showcase): 9 Plätze, je Rarity eine Karte (Uncommon … Stained Rare), der letzte Platz ist das Sonderangebot zum halben Preis.
+//  Wechselt jede volle Stunde (UTC) für alle Spieler gleich; der Server würfelt (rarities.js rollDisplay) und prüft Kauf, Stunde und Preis.
+// ═══════════════════════════════════════════════════════════════════════════
+const bpClock = (ms) => { const t = Math.max(0, Math.ceil(ms / 1000)), m = Math.floor(t / 60), s = t % 60; return (m < 10 ? '0' : '') + m + ':' + (s < 10 ? '0' : '') + s; };
+
+// Eine Karte der Auslage: Kartenbild in der Basis der Rarity + animierte Effektebene (PpRarityFx), nur solange sichtbar (das Modul beobachtet das selbst).
+function BpShowCard({ card }) {
+  const hostRef = useRef(null);
+  useEffect(() => {
+    const F = window.PpRarityFx;
+    if (!hostRef.current || !F || (F.available && !F.available(card.rarity))) return undefined;
+    let h = null;
+    try { h = F.attach(hostRef.current, { card: (window.CARDS_BY_NAME && window.CARDS_BY_NAME[card.name]) || { name: card.name }, rarity: card.rarity, animated: true }); } catch (e) { h = null; }
+    return () => { try { h && h.destroy && h.destroy(); } catch (e) { /* ohne */ } };
+  }, [card.name, card.rarity]);
+  return (
+    <div className="bp-sc-face" ref={hostRef} data-pp-px="aus">
+      <img src={bpCardUrl(card.name, card.rarity)} alt={bpRarityLabel(card.rarity) + ' ' + card.name} draggable={false} />
+    </div>
+  );
+}
+
+function BpShowcase({ sc, onSc, notify }) {
+  const [disp, setDisp] = useState(null);       // { hour, nextAt, cards }
+  const [left, setLeft] = useState(0);          // ms bis zum Wechsel
+  const [busy, setBusy] = useState(-1);         // Platz, dessen Kauf gerade läuft
+  const [added, setAdded] = useState({ slot: -1, n: 0 });   // kurze Bestätigung „Added!“ am Knopf
+  const offRef = useRef(0), dispRef = useRef(null), loadingRef = useRef(false), addedTimer = useRef(0);
+  dispRef.current = disp;
+
+  const apply = (d) => {
+    if (!d || !d.cards) return;
+    offRef.current = (d.serverTime || Date.now()) - Date.now();
+    setDisp(d);
+    setLeft(Math.max(0, d.nextAt - (Date.now() + offRef.current)));
+  };
+  const load = useCallback(async () => {
+    if (loadingRef.current) return;
+    loadingRef.current = true;
+    try { const r = await window.ppBoosterApi.display(); if (r.ok) apply(r.data); } catch (e) { /* nächster Takt versucht es wieder */ }
+    loadingRef.current = false;
+  }, []);
+  useEffect(() => { load(); return () => { clearTimeout(addedTimer.current); }; }, []);
+
+  // Countdown im Sekundentakt; ist er abgelaufen (Stundenwechsel), wird die neue Auslage geholt (und bei Misserfolg im nächsten Takt wieder)
+  useEffect(() => {
+    const iv = setInterval(() => {
+      const d = dispRef.current;
+      if (!d) return;
+      const ms = d.nextAt - (Date.now() + offRef.current);
+      setLeft(Math.max(0, ms));
+      if (ms <= 0 && !document.hidden) load();
+    }, 1000);
+    const vis = () => { const d = dispRef.current; if (!document.hidden && d && d.nextAt - (Date.now() + offRef.current) <= 0) load(); };
+    document.addEventListener('visibilitychange', vis);
+    return () => { clearInterval(iv); document.removeEventListener('visibilitychange', vis); };
+  }, []);
+
+  const buy = async (i) => {
+    const d = dispRef.current, c = d && d.cards[i];
+    if (!c || busy >= 0) return;
+    if (!((sc || 0) >= c.price)) { notify && notify('Not enough 🪙!', 'error'); return; }
+    setBusy(i);
+    try {
+      const r = await window.ppBoosterApi.displayBuy({ slot: i, hour: d.hour, name: c.name, rarity: c.rarity, price: c.price, special: !!c.special });
+      if (r.ok) {
+        if (r.data.sc != null && onSc) onSc(r.data.sc);
+        if (r.data.display) apply(r.data.display);
+        bpPlay('shop_purchase', { volume: 0.8 });
+        setAdded(a => ({ slot: i, n: a.n + 1 }));
+        clearTimeout(addedTimer.current);
+        addedTimer.current = setTimeout(() => setAdded({ slot: -1, n: 0 }), 1500);
+      } else if (r.status === 409 && r.data.display) {
+        apply(r.data.display);
+        notify && notify((r.data.error) || 'The showcase just changed.', 'error');
+      } else if (r.status === 402) {
+        if (r.data.sc != null && onSc) onSc(r.data.sc);
+        notify && notify('Not enough 🪙!', 'error');
+      } else notify && notify((r.data && r.data.error) || 'Purchase failed', 'error');
+    } catch (e) { notify && notify(e.message, 'error'); }
+    setBusy(-1);
+  };
+
+  const cards = (disp && disp.cards) || [];
+  return (
+    <aside className="bp-showcase" aria-label="Showcase">
+      <div className="bp-sc-head">
+        <div className="bp-sc-title">SHOWCASE</div>
+        <div className="bp-sc-sub">One card of each rarity. Fresh picks every hour.</div>
+        <div className="bp-sc-clock">Next rotation in <b>{disp ? bpClock(left) : '--:--'}</b></div>
+      </div>
+      {!disp && <div className="bp-sc-empty">Loading…</div>}
+      <div className="bp-sc-grid">
+        {cards.map((c, i) => {
+          const can = (sc || 0) >= c.price && busy < 0;
+          const just = added.slot === i;
+          return (
+            <div key={disp.hour + ':' + i + ':' + c.name} className={'bp-sc-cell bp-sc-r-' + c.rarity + (c.special ? ' bp-sc-special' : '')}>
+              {c.special && <div className="bp-sc-flag">HALF PRICE</div>}
+              <BpShowCard card={c} />
+              <div className="bp-sc-name" title={c.name}>{c.name}</div>
+              <div className="bp-sc-rar">{bpRarityLabel(c.rarity)}{c.owned > 0 ? <span className="bp-sc-own" title="Copies you own"> ×{c.owned}</span> : null}</div>
+              <div className="bp-sc-buyrow">
+                <div className="bp-sc-price" title={c.special ? 'Special offer: half price (normally ' + c.fullPrice + ' SC)' : c.price + ' SC'}>
+                  <img src="/data/sc.png" className="bp-coin" alt="" />
+                  {c.special && <s className="bp-sc-old">{c.fullPrice}</s>}
+                  <b>{c.price}</b>
+                </div>
+                <button type="button" className={'btn bp-sc-buy' + (just ? ' bp-sc-added' : '')} disabled={!can && !just} onClick={() => buy(i)}
+                  title={(sc || 0) < c.price ? 'Not enough Smug Coins' : 'Buy this card (' + bpRarityLabel(c.rarity) + ')'}>
+                  {just ? 'ADDED!' : 'BUY'}
+                </button>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </aside>
+  );
+}
+
+function BoosterShop({ boosters, sc, busy, onBuy, onSc, notify }) {
   useEffect(() => { bpWarmSounds(); }, []);
   const packs = (boosters && boosters.packs) || [];
   const price = boosters && boosters.price != null ? boosters.price : 20;
@@ -151,20 +282,23 @@ function BoosterShop({ boosters, sc, busy, onBuy }) {
       <div className="bp-intro">
         <div className="bp-intro-title">BOOSTERPACKS</div>
         <div className="bp-intro-text">Every pack holds <b>9 Rarity Skins</b> for your cards: Uncommon, Rare, Prismatic, Super Rare, Diamond, Spectral, Umbra and, very rarely, Stained Rare.
-          The last three cards of a pack are the luckiest.</div>
+          The last three cards of a pack are the luckiest. Don't like one? <b>Sell Back</b> a card from the pack you just opened.</div>
       </div>
-      <div className="bp-grid">
-        {packs.map(p => (
-          <div key={p.id} className={'bp-tile' + (canBuy ? '' : ' bp-tile-off')}>
-            <BpPackCanvas pack={p} zoom={zoom} />
-            <div className="bp-name">{p.name}</div>
-            <div className="bp-tagline">{p.tagline}</div>
-            <button className="btn bp-buy" disabled={!canBuy} onClick={() => onBuy(p.id)}
-              title={sc < price ? 'Not enough Smug Coins' : 'Buy and open this pack'}>
-              BUY — <img src="/data/sc.png" className="shop-sc-icon" /> {price}
-            </button>
-          </div>
-        ))}
+      <div className="bp-layout">
+        <div className="bp-layout-aside"><BpShowcase sc={sc} onSc={onSc} notify={notify} /></div>
+        <div className="bp-grid">
+          {packs.map(p => (
+            <div key={p.id} className={'bp-tile' + (canBuy ? '' : ' bp-tile-off')}>
+              <BpPackCanvas pack={p} zoom={zoom} />
+              <div className="bp-name">{p.name}</div>
+              <div className="bp-tagline">{p.tagline}</div>
+              <button className="btn bp-buy" disabled={!canBuy} onClick={() => onBuy(p.id)}
+                title={sc < price ? 'Not enough Smug Coins' : 'Buy and open this pack'}>
+                BUY — <img src="/data/sc.png" className="shop-sc-icon" /> {price}
+              </button>
+            </div>
+          ))}
+        </div>
       </div>
     </div>
   );
@@ -664,7 +798,8 @@ function bpPixels(url, cw, ch) {
 // ═══════════════════════════════════════════════════════════════════════════
 // Zustand `ph`: 0 verdeckt · 1 dreht sich (Leinwand mit der Flip-Animation) · 2 fertig (Kartenbild + Rarity-Ebene).
 // `hold` = Bilder, die die Karte auf der Kante stehen bleibt (hohe Rarities: der Effekt baut sich auf, bevor die Vorderseite aufschlägt).
-function BpCard({ idx, card, geom, open, hold, onEdge, onDone, onClick, onHover, hot }) {
+// `sold`: diese Karte wurde zurückverkauft (ausgegraut, „Sold“); `sellOff`: Sell Back ist für dieses Pack schon verbraucht/gesperrt; `sellValue`: SC-Gutschrift
+function BpCard({ idx, card, geom, open, hold, onEdge, onDone, onClick, onHover, hot, sold, sellOff, sellValue, onSell }) {
   const [ph, setPh] = useState(0);
   const hostRef = useRef(null), cvRef = useRef(null);
   const cbRef = useRef({}); cbRef.current = { onEdge, onDone };
@@ -703,17 +838,17 @@ function BpCard({ idx, card, geom, open, hold, onEdge, onDone, onClick, onHover,
   const done = ph >= 2;
   // Rarity-Ebene (Agent B, public/rarity-fx.js): animiert, sobald die Karte offen ist; ohne Modul/ohne Ebene bleibt es beim Kartenbild
   useEffect(() => {
-    if (!done || !hostRef.current) return undefined;
+    if (!done || !hostRef.current || sold) return undefined;     // zurückverkaufte Karte: keine Effektebene mehr
     const F = window.PpRarityFx;
     if (!F || card.rarity === 'common' || (F.available && !F.available(card.rarity))) return undefined;
     let h = null;
     try { h = F.attach(hostRef.current, { card: (window.CARDS_BY_NAME && window.CARDS_BY_NAME[card.name]) || { name: card.name }, rarity: card.rarity, animated: true, size: cw }); } catch (e) { h = null; }
     return () => { try { h && h.destroy && h.destroy(); } catch (e) { /* ohne */ } };
-  }, [done, card.rarity, card.name]);
+  }, [done, card.rarity, card.name, !!sold]);
   const [sx, sy] = geom.slots[idx];
-  const style = { left: geom.left + sx * Z, top: geom.top + sy * Z, width: cw, height: ch };
+  const style = { left: geom.left + sx * Z, top: geom.top + sy * Z, width: cw, height: ch, '--bpz': Z };
   return (
-    <div className={'bp-card' + (open ? ' bp-card-open' : ' bp-card-shut') + (open && !done ? ' bp-card-flip' : '') + (done ? ' bp-card-done' : '') + (hot ? ' bp-card-hot' : '')} style={style}
+    <div className={'bp-card' + (open ? ' bp-card-open' : ' bp-card-shut') + (open && !done ? ' bp-card-flip' : '') + (done ? ' bp-card-done' : '') + (hot ? ' bp-card-hot' : '') + (sold ? ' bp-card-sold' : '')} style={style}
       onClick={() => { if (!open) onClick(idx); }}
       onMouseEnter={() => onHover(idx, true)} onMouseLeave={() => onHover(idx, false)}
       role="button" tabIndex={open ? -1 : 0} aria-label={open ? bpRarityLabel(card.rarity) + ' ' + card.name : 'Card ' + (idx + 1) + ', face down'}
@@ -723,6 +858,15 @@ function BpCard({ idx, card, geom, open, hold, onEdge, onDone, onClick, onHover,
         <div className="bp-card-face" ref={hostRef} style={{ visibility: done ? 'visible' : 'hidden' }}>
           <img src={url} alt="" draggable={false} />
         </div>
+      )}
+      {done && sold && <div className="bp-sold-dim" />}
+      {done && sold && <div className="bp-sold-tag">SOLD</div>}
+      {done && sellValue > 0 && (
+        <button type="button" className={'bp-sell' + (sold ? ' bp-sell-sold' : '')} disabled={sellOff || sold}
+          title={sold ? 'Sold back' : sellOff ? 'You can sell back one card per pack' : 'Sell this card back for ' + sellValue + ' SC (one card per pack)'}
+          onClick={(e) => { e.stopPropagation(); if (!sellOff && !sold) onSell(idx); }}>
+          {sold ? 'Sold' : <React.Fragment>Sell Back! <span className="bp-sell-val">+{sellValue}</span></React.Fragment>}
+        </button>
       )}
       {open && !done && (
         <canvas ref={cvRef} className="bp-card-flipcv" width={cw + 2 * pad} height={ch + 2 * pad} style={{ left: -pad, top: -pad, width: cw + 2 * pad, height: ch + 2 * pad }} />
@@ -734,7 +878,8 @@ function BpCard({ idx, card, geom, open, hold, onEdge, onDone, onClick, onHover,
 // ═══════════════════════════════════════════════════════════════════════════
 //  ÖFFNUNG (Vollbild)
 // ═══════════════════════════════════════════════════════════════════════════
-function BoosterOpening({ pending, boosters, onClaimed }) {
+// Props: pending { id, packId, variantId, cards, sold }, boosters (GET /api/boosters: price, sellback), sc (Kontostand), onSc(n), onClaimed(data, info), onRipMore(data)
+function BoosterOpening({ pending, boosters, sc, onSc, onClaimed, onRipMore }) {
   const cards = pending.cards || [];
   const pack = ((boosters && boosters.packs) || []).find(p => p.id === pending.packId) || { id: pending.packId, name: pending.packId, variants: [] };
   const variant = (pack.variants || []).find(v => v.id === pending.variantId) || (pack.variants || [])[0] || null;
@@ -745,6 +890,9 @@ function BoosterOpening({ pending, boosters, onClaimed }) {
   const flippedRef = useRef(flipped); flippedRef.current = flipped;
   const [doneN, setDoneN] = useState(0);              // Karten, deren Flip-Animation fertig ist
   const [claiming, setClaiming] = useState(false);
+  const [sold, setSold] = useState(() => (Number.isInteger(pending.sold) ? pending.sold : -1));   // Index der zurückverkauften Karte (-1: keine); überlebt Neuladen (Server)
+  const [selling, setSelling] = useState(false);
+  const [note, setNote] = useState('');                // kurze Meldung im HUD (Sell Back / Add and rip one more)
   const [hover, setHover] = useState(-1);
   const [vp, setVp] = useState({ w: window.innerWidth, h: window.innerHeight });
   const [op, setOp] = useState(null);                  // opening.json
@@ -789,7 +937,7 @@ function BoosterOpening({ pending, boosters, onClaimed }) {
         ]);
         const shim = variant && variant.shimmer ? await bpImg(bpAsset(variant.shimmer)).catch(() => null) : null;
         if (dead) return;
-        // Siegelstreifen / Rest als eigene Bilder (Packbild ∩ Maske, harte Alphawerte)
+        // Siegelstreifen / Rest als eigene Bilder (Packbild mal Maske, harte Alphawerte)
         const cut = (mask) => { const c = document.createElement('canvas'); c.width = 192; c.height = 320; const g = c.getContext('2d'); g.drawImage(base, 0, 0); g.globalCompositeOperation = 'destination-in'; g.drawImage(mask, 0, 0); return c; };
         playRef.current = { o, back, front, base, shim, topC: cut(top), bodyC: cut(body), backUrl: BP_DIR + 'opening/' + o.layers.back.replace('<pack>', pending.packId), frontUrl: BP_DIR + 'opening/' + o.layers.front.replace('<pack>', pending.packId) };
         setOp(o);
@@ -841,7 +989,13 @@ function BoosterOpening({ pending, boosters, onClaimed }) {
       raf = 0;
       if (dead) return;
       let f = Math.floor((now - t0) * o.fps / 1000);
-      if (skipRef.current) { skipRef.current = false; f = Math.max(f, ready + 1); t0 = now - f * 1000 / o.fps; nextSound = o.sounds.length; bpPlay('booster_ready', { volume: 0.85 }); }
+      if (skipRef.current) {
+        skipRef.current = false; f = Math.max(f, ready + 1); t0 = now - f * 1000 / o.fps;
+        // Klänge, die beim Überspringen nicht verloren gehen sollen (opening.json: skipPlay — der „Umpf“ beim Aufgehen des Packs), genau einmal:
+        // nur die, die noch NICHT gelaufen sind (nextSound = Zahl der schon gespielten Einträge)
+        for (let k = nextSound; k < o.sounds.length; k++) { const s = o.sounds[k]; if (s.skipPlay) bpPlay(s.name, { volume: s.volume, rate: s.rate }); }
+        nextSound = o.sounds.length; bpPlay('booster_ready', { volume: 0.85 });
+      }
       while (nextSound < o.sounds.length && o.sounds[nextSound].f <= f) { const s = o.sounds[nextSound++]; bpPlay(s.name, { volume: s.volume, rate: s.rate }); }
       if (!arrived && f >= ready) { arrived = true; setPhase('cards'); }
       const fd = f > loopB ? loopA + ((f - loopA) % (loopB - loopA + 1)) : f;
@@ -896,9 +1050,13 @@ function BoosterOpening({ pending, boosters, onClaimed }) {
     return () => window.removeEventListener('keydown', onKey, true);
   }, [phase]);
 
+  const packPrice = boosters && boosters.price != null ? boosters.price : 20;
+  const sellTable = (boosters && boosters.sellback) || (window.PpRarities && window.PpRarities.SELLBACK) || {};
+  const canRip = (sc || 0) >= packPrice;
+
   const claim = async () => {
     if (claiming) return;
-    setClaiming(true); setErr('');
+    setClaiming(true); setErr(''); setNote('');
     try {
       const r = await window.ppBoosterApi.claim(pending.id);
       if (!r.ok) throw new Error((r.data && r.data.error) || 'Could not add the cards');
@@ -907,11 +1065,40 @@ function BoosterOpening({ pending, boosters, onClaimed }) {
     } catch (e) { setErr(e.message); setClaiming(false); }
   };
 
+  // „Add and rip one more!“: Pack einlösen + sofort ein Pack derselben Art kaufen und öffnen (eine Anfrage; der Server prüft SC und löst das alte Pack
+  // in jedem Fall ein). Gelingt der Neukauf nicht (zu wenig SC), ist das Pack trotzdem eingelöst: die Ansicht schließt mit einer Meldung.
+  const ripMore = async () => {
+    if (claiming || selling || !canRip) return;
+    setClaiming(true); setErr(''); setNote('');
+    try {
+      const r = await window.ppBoosterApi.ripMore(pending.id);
+      if (r.ok && r.data.pending) { bpPlay('shop_purchase', { volume: 0.8 }); onRipMore && onRipMore(r.data); return; }
+      if (r.data && r.data.claimed) { onClaimed(r.data, { ripFailed: r.data.error || 'Could not buy another pack' }); return; }
+      throw new Error((r.data && r.data.error) || 'Could not open another pack');
+    } catch (e) { setNote(e.message); setClaiming(false); }
+  };
+
+  // „Sell Back!“: EINE Karte je Pack gegen SC zurückgeben (Server: 409 beim zweiten Mal). Erst nach dem Aufdecken der Karte anklickbar.
+  const sell = async (i) => {
+    if (sold >= 0 || selling || claiming) return;
+    setSelling(true); setNote('');
+    try {
+      const r = await window.ppBoosterApi.sell(pending.id, i);
+      if (r.ok) {
+        setSold(i);
+        bpPlay('gold_gain', { volume: 0.8 });
+        if (onSc && r.data.sc != null) onSc(r.data.sc);
+      } else if (r.status === 409 && Number.isInteger(r.data.sold) && r.data.sold >= 0) setSold(r.data.sold);
+      else setNote((r.data && r.data.error) || 'Could not sell the card');
+    } catch (e) { setNote(e.message); }
+    setSelling(false);
+  };
+
   const hoverCard = hover >= 0 && flipped[hover] ? cards[hover] : null;
   const Tooltip = window.CardTooltipContent;
   const stageW = geom.stage[0] * Z, stageH = geom.stage[1] * Z;
   const cardsBottom = geom.top + (geom.slots[6] ? (geom.slots[6][1] + (op ? op.cardSize[1] : 105)) * Z : stageH);
-  const hudTop = cardsBottom + 6 * Z;
+  const hudTop = cardsBottom + 6 * Z + 10;     // + Platz für die Sell-Back-Knöpfe, die über der Unterkante der untersten Karten sitzen
   const tight = vp.h - cardsBottom < 56;      // niedriger Bildschirm (Handy quer): Knöpfe an den rechten Rand statt unter die Karten
 
   // Die Shop-Seite läuft unter CSS-`zoom` (--ui-scale): die Vollbild-Ansicht hängt deshalb direkt an <body>, damit Fenster- und Bildpunkte übereinstimmen
@@ -923,6 +1110,7 @@ function BoosterOpening({ pending, boosters, onClaimed }) {
           style={{ left: geom.left, top: geom.top, width: stageW, height: stageH, visibility: phase === 'load' ? 'hidden' : 'visible' }} />
         {phase === 'cards' && cards.map((c, i) => (
           <BpCard key={i} idx={i} card={c} geom={geom} open={flipped[i]} hold={Math.round((BP_FACE_DELAY[c.rarity] || 0) / BP_TAKT)} hot={hover === i}
+            sold={sold === i} sellOff={sold >= 0 || selling || claiming} sellValue={sellTable[c.rarity] || 0} onSell={sell}
             onEdge={onEdge} onDone={onCardDone} onClick={(k) => { mixRef.current = 1; flip(k); }} onHover={(k, on) => setHover(on ? k : (h => (h === k ? -1 : h)))} />
         ))}
       </div>
@@ -933,18 +1121,27 @@ function BoosterOpening({ pending, boosters, onClaimed }) {
         <button className="btn bp-skip" onClick={() => { skipRef.current = true; }}>SKIP ▸</button>
       )}
       {phase === 'cards' && (
-        <div className={'bp-hud' + (tight ? ' bp-hud-tight' : '')} style={tight ? undefined : { left: geom.left, width: stageW, top: Math.min(hudTop, vp.h - 52) }}>
+        <div className={'bp-hud' + (tight ? ' bp-hud-tight' : '')} style={tight ? undefined : { left: Math.max(0, geom.left - 60 * Z), width: stageW + 120 * Z, top: Math.max(0, Math.min(hudTop, vp.h - (allDone ? 124 : 52))) }}>
           {!allDone && (
             <button className="btn bp-btn" disabled={allOpen} onClick={flipAll}>FLIP ALL</button>
           )}
           {allDone && (
-            <button className="btn bp-btn bp-btn-go" disabled={claiming} onClick={claim}>
-              {claiming ? 'ADDING…' : 'ADD CARDS TO COLLECTION'}
-            </button>
+            <div className="bp-hud-row">
+              <button className="btn bp-btn bp-btn-go" disabled={claiming} onClick={claim}>
+                {claiming ? 'ADDING…' : 'ADD CARDS TO COLLECTION'}
+              </button>
+              <button className="btn bp-btn bp-btn-more" disabled={claiming || !canRip} onClick={ripMore}
+                title={canRip ? 'Add these cards to your collection and open another pack of the same kind' : 'Not enough Smug Coins for another pack'}>
+                ADD AND RIP ONE MORE! <img src="/data/sc.png" className="bp-coin" alt="" /> {packPrice}
+              </button>
+            </div>
           )}
+          {allDone && !canRip && <div className="bp-hint bp-hint-warn">Not enough SC for another pack ({packPrice} SC needed)</div>}
           {!allOpen && <div className="bp-hint">Click a card to flip it</div>}
+          {note && <div className="bp-hint bp-hint-warn">{note}</div>}
         </div>
       )}
+      {phase === 'cards' && <div className="bp-sc" title="Your Smug Coins"><img src="/data/sc.png" className="bp-coin" alt="" /> {sc || 0}</div>}
       {hoverCard && Tooltip && window.CARDS_BY_NAME && window.CARDS_BY_NAME[hoverCard.name] && (
         <div className="tooltip card-tooltip bp-tooltip">
           <Tooltip card={{ ...window.CARDS_BY_NAME[hoverCard.name], rarity: hoverCard.rarity }} rarity={hoverCard.rarity} />

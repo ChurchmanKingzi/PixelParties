@@ -117,6 +117,75 @@
     return out.map(({ name, rarity }) => ({ name, rarity }));
   }
 
+  // ── Rückkauf (Sell Back) und Auslage (Showcase) ──────────────
+  /** Sell Back: Gutschrift in SC für die EINE Karte, die man aus einem frisch geöffneten Pack zurückgeben darf. */
+  const SELLBACK = { uncommon: 1, rare: 2, prismatic: 4, super: 6, diamond: 8, spectral: 10, umbra: 14, stained: 18 };
+  /** Auslage: Preis in SC je Rarity. Die Auslage hat genau einen Platz je Rarity in dieser Tabelle (Common gibt es nicht zu kaufen). */
+  const DISPLAY_PRICE = { uncommon: 2, rare: 4, prismatic: 8, super: 20, diamond: 30, spectral: 40, umbra: 70, stained: 100 };
+  /** Plätze der Auslage in Rarity-Reihenfolge (aus der Preistabelle, nicht fest verdrahtet). */
+  const DISPLAY_RARITIES = ORDER.filter(id => DISPLAY_PRICE[id] > 0);
+  const HOUR_MS = 3600 * 1000;
+
+  function sellbackValue(id) { return SELLBACK[id] > 0 ? SELLBACK[id] : 0; }
+
+  /** Stundenindex (UTC, volle Stunde seit 1.1.1970): die Auslage wechselt bei jedem :00 und ist für alle Spieler gleich. */
+  function displayHourIndex(ms) { return Math.floor((typeof ms === 'number' ? ms : Date.now()) / HOUR_MS); }
+  /** Millisekunden bis zur nächsten vollen Stunde (immer 1 … 3 600 000). */
+  function msToNextHour(ms) { const t = typeof ms === 'number' ? ms : Date.now(); return (displayHourIndex(t) + 1) * HOUR_MS - t; }
+
+  /** 32-Bit-Hash eines Textes (FNV-1a). */
+  function hash32(str) {
+    let h = 0x811C9DC5;
+    for (let i = 0; i < str.length; i++) { h ^= str.charCodeAt(i); h = Math.imul(h, 0x01000193) >>> 0; }
+    return h >>> 0;
+  }
+  /** Deterministischer Zufall in [0,1) (mulberry32). */
+  function mulberry32(seed) {
+    let a = seed >>> 0;
+    return () => { a = (a + 0x6D2B79F5) >>> 0; let t = a; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
+  }
+
+  /** Sonderangebot (neunter Platz): halber Preis der gewürfelten Rarity, aufgerundet (Uncommon 2 → 1, Rare 4 → 2, Umbra 70 → 35, Stained 100 → 50). */
+  function specialPrice(rarity) { return Math.ceil((DISPLAY_PRICE[rarity] || 0) / 2); }
+
+  /**
+   * Auslage einer Stunde: je Rarity aus DISPLAY_PRICE genau EINE Karte (die ersten Plätze, in Rarity-Reihenfolge) und als LETZTER Platz ein
+   * Sonderangebot `special: true`: eine gewürfelte Rarity zum halben Preis (aufgerundet). Keine Karte steht doppelt, auch das Sonderangebot
+   * ist eine andere Karte als die übrigen (die Rarity darf doppelt vorkommen). Rein aus (Stundenindex, Pool) bestimmt: jede Rarity hat ihren
+   * eigenen Zufall (mulberry32 mit Hash aus „Stunde:Rarity“), das Sonderangebot seinen eigenen („Stunde:special“). Umbra/Stained nur mit
+   * Motiv-Maske; die Rarities mit Masken-Pflicht werden zuerst gezogen (kleinster Pool), damit sie nie an einer schon vergebenen Karte scheitern.
+   * @param {number} hour Stundenindex (displayHourIndex)
+   * @param {Array<string|{name:string}>} cards sammelbare Karten (Pool; Reihenfolge egal, wird nach Namen sortiert)
+   * @param {(name:string)=>boolean} [hasMask]
+   * @returns {Array<{rarity:string, name:string, price:number, special?:true, fullPrice?:number}>} Plätze ohne passende Karte entfallen
+   */
+  function rollDisplay(hour, cards, hasMask) {
+    const mask = typeof hasMask === 'function' ? hasMask : () => true;
+    const names = Array.from(new Set((cards || []).map(c => (typeof c === 'string' ? c : c && c.name)).filter(Boolean))).sort();
+    const used = new Set(), got = {};
+    const pick = (r, seed) => {
+      const cand = names.filter(n => !used.has(n) && (!NEEDS_MASK[r] || mask(n)));
+      if (!cand.length) return null;
+      return cand[Math.min(cand.length - 1, Math.floor(mulberry32(hash32(seed))() * cand.length))];
+    };
+    const rollOrder = DISPLAY_RARITIES.filter(r => NEEDS_MASK[r]).concat(DISPLAY_RARITIES.filter(r => !NEEDS_MASK[r]));
+    for (const r of rollOrder) {
+      const name = pick(r, hour + ':' + r);
+      if (!name) continue;
+      used.add(name);
+      got[r] = name;
+    }
+    const out = DISPLAY_RARITIES.filter(r => got[r]).map(r => ({ rarity: r, name: got[r], price: DISPLAY_PRICE[r] }));
+    // Sonderangebot: Rarity aus allen Plätzen der Preistabelle (gleich verteilt); ohne passende Karte die nächste in der Reihe
+    const start = Math.floor(mulberry32(hash32(hour + ':special'))() * DISPLAY_RARITIES.length);
+    for (let k = 0; k < DISPLAY_RARITIES.length; k++) {
+      const r = DISPLAY_RARITIES[(start + k) % DISPLAY_RARITIES.length];
+      const name = pick(r, hour + ':special:' + r);
+      if (name) { out.push({ rarity: r, name, price: specialPrice(r), fullPrice: DISPLAY_PRICE[r], special: true }); break; }
+    }
+    return out;
+  }
+
   // ── Pack-Pools (1:1 aus scripts/booster/catalog.py) ───────────
   const PACK_IDS = ['ability', 'hero', 'clash', 'monia', 'future', 'world1', 'world2', 'community', 'trials'];
   // Set-Kennungen je Pack. Gleichwertige Schreibweisen (SET1/SET01, MS1/MS01 …) stehen mit drin.
@@ -366,6 +435,7 @@
   return {
     ORDER, LABEL, rank, isRarity, label, clean, NEEDS_MASK,
     PACK_STAGES, DRAFT_TABLE, PACK_SIZE, PACK_PRICE, tableSum,
+    SELLBACK, DISPLAY_PRICE, DISPLAY_RARITIES, HOUR_MS, sellbackValue, displayHourIndex, msToNextHour, hash32, mulberry32, specialPrice, rollDisplay,
     rollFromTable, rollPack, rollDraftRarity,
     PACK_IDS, PACK_SETS, FUTURE_ARCHETYPES, FUTURE_NAMES, normSet, packOfSet, packOfCard, cardsOfPack,
     normalizeDeckRarities, deckCopies, rarityUsage, firstOwnershipViolation, downgradeToOwned, hasAnyRarity,
