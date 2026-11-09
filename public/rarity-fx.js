@@ -999,37 +999,21 @@
   /** Rechenarbeit in Zeitscheiben: Generator, der zwischen den Teilschritten `yield`et (der Aufrufer gibt dem Hauptfaden zwischendurch Luft) */
   function* stainedBuildG(E) {
     const opt = STAIN, { B, L, A } = E, r = rng(opt.seed), e = E.e, full = E.full;
-    // 1) Motivmaske auf Zellen: jede Zelle, die ein Maskenpixel beberuehrt; kleine Luecken/Zacken per Schliessen (3x3) zu. Das sichtbare Motiv bleibt das Original (cut), nur Kontur und Kachelgrenzen nutzen diese Maske.
-    const S0 = new Uint8Array(NPX), sm = new Uint8Array(NPX), gx0 = full ? 0 : AX0, gy0 = full ? 0 : AY0, gW = full ? GW : AW, gH = full ? GH : AH;
+    // 1) Motivmaske auf Zellen: Sin = Zellen, die ganz vom Motiv bedeckt sind (alle ueberlappten Kunstpixel der Maske); kleine Luecken/Zacken darin per Schliessen (3x3) zu = sm (Blei unter dem Motiv).
+    // S0 = jede Zelle, die ein Maskenpixel beruehrt (fuer die Funken). Teilbedeckte Randzellen gehoeren den Kacheln: die duenne Kontur ums Motiv wird spaeter pixelgenau gezeichnet (`stainContour`).
+    const S0 = new Uint8Array(NPX), Sin = new Uint8Array(NPX), sm = new Uint8Array(NPX), gx0 = full ? 0 : AX0, gy0 = full ? 0 : AY0, gW = full ? GW : AW, gH = full ? GH : AH;
     for (let y = gy0; y < gy0 + gH; y++) for (let x = gx0; x < gx0 + gW; x++) {
       const p = y * GW + x; if (!A[p]) continue;
       const a0 = Math.floor((x - gx0) / gW * e.w), a1 = Math.min(e.w - 1, Math.ceil((x + 1 - gx0) / gW * e.w) - 1), b0 = Math.floor((y - gy0) / gH * e.h), b1 = Math.min(e.h - 1, Math.ceil((y + 1 - gy0) / gH * e.h) - 1);
-      let any = 0; for (let yy = b0; yy <= b1 && !any; yy++) for (let xx = a0; xx <= a1; xx++) if (e.mn[yy * e.w + xx]) { any = 1; break; }
-      S0[p] = any;
+      let nm = 0, nt = 0; for (let yy = b0; yy <= b1; yy++) for (let xx = a0; xx <= a1; xx++) { nt++; if (e.mn[yy * e.w + xx]) nm++; }
+      S0[p] = nm ? 1 : 0; Sin[p] = nm === nt ? 1 : 0;
     }
     { const dil = new Uint8Array(NPX);
-      for (let y = 1; y < GH - 1; y++) for (let x = 1; x < GW - 1; x++) { const p = y * GW + x; dil[p] = S0[p - GW - 1] | S0[p - GW] | S0[p - GW + 1] | S0[p - 1] | S0[p] | S0[p + 1] | S0[p + GW - 1] | S0[p + GW] | S0[p + GW + 1]; }
-      for (let y = 1; y < GH - 1; y++) for (let x = 1; x < GW - 1; x++) { const p = y * GW + x; if (!A[p]) continue; sm[p] = S0[p] | (dil[p - GW - 1] & dil[p - GW] & dil[p - GW + 1] & dil[p - 1] & dil[p] & dil[p + 1] & dil[p + GW - 1] & dil[p + GW] & dil[p + GW + 1]); } }
-    // 2) Komponenten des Motivs (8er-Nachbarschaft); alle Teile bekommen eine Kontur von 1 Zelle
-    const comp = new Int32Array(NPX), thick = [0];
-    for (let p0 = 0; p0 < NPX; p0++) {
-      if (!sm[p0] || comp[p0]) continue;
-      const id = thick.length, q = [p0]; comp[p0] = id; let inner = false;
-      for (let h = 0; h < q.length; h++) {
-        const p = q[h], x = p % GW, y = (p / GW) | 0; let all = x > 0 && y > 0 && x < GW - 1 && y < GH - 1;
-        for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) { const nx = x + dx, ny = y + dy; if (nx < 0 || ny < 0 || nx >= GW || ny >= GH) continue; const np = ny * GW + nx; if (!sm[np]) all = false; else if (!comp[np]) { comp[np] = id; q.push(np); } }
-        if (all) inner = true;
-      }
-      thick.push(1);
-    }
+      for (let y = 1; y < GH - 1; y++) for (let x = 1; x < GW - 1; x++) { const p = y * GW + x; dil[p] = Sin[p - GW - 1] | Sin[p - GW] | Sin[p - GW + 1] | Sin[p - 1] | Sin[p] | Sin[p + 1] | Sin[p + GW - 1] | Sin[p + GW] | Sin[p + GW + 1]; }
+      for (let y = 1; y < GH - 1; y++) for (let x = 1; x < GW - 1; x++) { const p = y * GW + x; if (!A[p]) continue; sm[p] = Sin[p] | (dil[p - GW - 1] & dil[p - GW] & dil[p - GW + 1] & dil[p - 1] & dil[p] & dil[p + 1] & dil[p + GW - 1] & dil[p + GW] & dil[p + GW + 1]); } }
+    const dom = new Uint8Array(NPX);
+    for (let p = 0; p < NPX; p++) dom[p] = A[p] && !sm[p] ? 1 : 0;
     yield;
-    // 3) Kontur: Hintergrundzellen am Motivrand (8er-Nachbarschaft, 1 Zelle); danach ist der Hintergrund `dom`
-    const ring = new Uint8Array(NPX), rc = new Int32Array(NPX), dom = new Uint8Array(NPX);
-    for (let y = 1; y < GH - 1; y++) for (let x = 1; x < GW - 1; x++) {
-      const p = y * GW + x; if (!A[p] || sm[p]) continue;
-      for (let dy = -1; dy <= 1 && !ring[p]; dy++) for (let dx = -1; dx <= 1; dx++) { const q = p + dy * GW + dx; if (sm[q]) { ring[p] = 1; rc[p] = comp[q]; break; } }
-    }
-    for (let p = 0; p < NPX; p++) dom[p] = A[p] && !sm[p] && !ring[p] ? 1 : 0;
     // Abstand zum Motiv (fuer die Hinterleuchtung)
     const dS = new Uint8Array(NPX).fill(255), dq = []; for (let p = 0; p < NPX; p++) if (sm[p]) { dS[p] = 0; dq.push(p); }
     for (let h = 0; h < dq.length; h++) { const p = dq[h]; if (dS[p] >= 24) continue; for (const np of [p - 1, p + 1, p - GW, p + GW]) if (np >= 0 && np < NPX && dS[np] > dS[p] + 1) { dS[np] = dS[p] + 1; dq.push(np); } }
@@ -1109,7 +1093,7 @@
     // naechste Kachel je Zelle (fuer die Farbe der Kontur)
     const nid = new Int16Array(NPX).fill(-1), nq = []; for (let p = 0; p < NPX; p++) if (id[p] >= 0) { nid[p] = id[p]; nq.push(p); }
     for (let h = 0; h < nq.length; h++) { const p = nq[h], x = p % GW; for (const np of [x > 0 ? p - 1 : -1, x < GW - 1 ? p + 1 : -1, p - GW, p + GW]) if (np >= 0 && np < NPX && nid[np] < 0 && A[np]) { nid[np] = nid[p]; nq.push(np); } }
-    return { v, n, ph, hue, sat, lb, dmax, lead, sites, adj: adj.map(s => Int32Array.from(s)), sm, dS, nid };
+    return { v, n, ph, hue, sat, lb, dmax, lead, sites, adj: adj.map(s => Int32Array.from(s)), sm, s0: S0, dS, nid };
   }
   /** Farbe einer Glasflaeche: Edelstein (Farbton h, Saettigung s), Helligkeitsfaktor m (1 = volle Farbe, darueber Aufhellung ueber Weissgold, darunter tiefes Glas) */
   function stainRamp(h, s, m) {
@@ -1174,6 +1158,27 @@
       // Glanzpunkte auf den Bleiruten
       const ls = pre.lsp;
       if (ls.length) for (let s = 0; s < 12; s++) { const tt = ft + s * 4, k = Math.floor(tt / 7); if (tt - k * 7 > 2) continue; o[ls[Math.floor(hash(k, s, 303) * ls.length)]] = pre.leadGl; }
+    },
+    /** je Ansicht einmal: duenne Kontur pixelgenau um das Motiv (Leinwandpixel, Breite ca. K/2) in die Motiv-Ebene (`cut`) malen; die Konturpixel liegen NEBEN dem Motiv, nie darauf */
+    warmView(core, view) {
+      const cut = view.cut, pre = core.st.pre; if (!cut) return;
+      const cvs = cut.cv, w = cvs.width, h = cvs.height, K = view.K, full = core.full, gx0 = full ? 0 : AX0, gy0 = full ? 0 : AY0, A = core.A, cd = pre.cd;
+      const al = cvs.getContext('2d').getImageData(0, 0, w, h).data, M = new Uint8Array(w * h);
+      for (let q = 0; q < w * h; q++) M[q] = al[q * 4 + 3] > 127 ? 1 : 0;
+      const t = Math.max(1, Math.round(K / 2)), offs = []; for (let dy = -t; dy <= t; dy++) for (let dx = -t; dx <= t; dx++) if ((dx || dy) && dx * dx + dy * dy <= t * t + 1) offs.push(dx, dy);
+      const out = new ImageData(w, h), o32 = new Uint32Array(out.data.buffer);
+      for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+        const q = y * w + x; if (!M[q]) continue;
+        if (!((x > 0 && !M[q - 1]) || (x < w - 1 && !M[q + 1]) || (y > 0 && !M[q - w]) || (y < h - 1 && !M[q + w]))) continue;   // nur Randpixel des Motivs stempeln
+        for (let k = 0; k < offs.length; k += 2) {
+          const nx = x + offs[k], ny = y + offs[k + 1]; if (nx < 0 || ny < 0 || nx >= w || ny >= h) continue;
+          const nq = ny * w + nx; if (M[nq]) continue;
+          const cell = (gy0 + Math.floor(ny / K)) * GW + gx0 + Math.floor(nx / K); if (!A[cell]) continue;
+          o32[nq] = cd[cell];
+        }
+      }
+      const [tc, tg] = cv2d(w, h); tg.putImageData(out, 0, 0); const cg = cvs.getContext('2d'); cg.globalCompositeOperation = 'source-over'; cg.drawImage(tc, 0, 0);
+      view.contourT = t;
     },
     /** nach dem Motiv (Original, unberuehrt): Funkensterne ganz oben (Raster der Karte), nur auf dem gekachelten Hintergrund, nie auf dem Motiv */
     after(core, view, g, st, t) {
@@ -1273,13 +1278,12 @@
       if (hash(c, 51, 7) < .8) { gP[c] = 30 + Math.floor(hash(c, 52, 7) * 60); gO[c] = Math.floor(hash(c, 53, 7) * 200); }      // Glanzblitz: Takt 2 bis 6 s
       if (hash(c, 54, 7) < .85) { cP[c] = 30 + Math.floor(hash(c, 55, 7) * 90); cO[c] = Math.floor(hash(c, 56, 7) * 200); }      // Eckfunke: Takt 2 bis 8 s
     }
-    // Hintergrundmaske fuer Funken: Bildfeld und NICHT Motiv (Kunstpixel der Maske in der Zellenmitte)
+    // Hintergrundmaske fuer Funken: Bildfeld, nicht Motiv und nicht dessen Nachbarzellen
     const gm = new Uint8Array(NPX);
-    for (let y = AY0; y < AY0 + AH; y++) for (let x = AX0; x < AX0 + AW; x++) {
-      const p = y * GW + x; if (!A[p]) continue;
-      const ax = Math.min(e.w - 1, Math.floor((full ? x + .5 : x - AX0 + .5) / (full ? GW : AW) * e.w)), ay = Math.min(e.h - 1, Math.floor((full ? y + .5 : y - AY0 + .5) / (full ? GH : AH) * e.h));
-      gm[p] = e.mn[ay * e.w + ax] || sm[p] ? 0 : 1;
-    }
+    for (let p = GW + 1; p < NPX - GW - 1; p++) { if (!A[p]) continue; let hit = 0; for (let dy = -GW; dy <= GW; dy += GW) for (let dx = -1; dx <= 1; dx++) { const q = p + dy + dx; if (st.s0[q] || sm[q]) hit = 1; } gm[p] = hit ? 0 : 1; }   // auch eine Zelle Abstand zum Motiv: Funken liegen nie auf Motiv oder Kontur
+    // Konturfarbe je Zelle (fuer die pixelgenaue Kontur ums Motiv): stark abgedunkelte Farbe der Kachel, helle Farben staerker
+    const cd = new Uint32Array(NPX);
+    for (let p = 0; p < NPX; p++) { if (!A[p]) continue; const a = tcol[tid[p]] || LEAD_DEF, l = a[0] * .3 + a[1] * .59 + a[2] * .11, f = Math.min(.3, 30 / (l + 1)); cd[p] = sn(a[0] * f + 4, a[1] * f + 3, a[2] * f + 6); }
     // Glanzlicht je Kachel: kurze Diagonale ('/') oben links der Kachelmitte (bei 4 von 5 Kacheln)
     for (let c = 0; c < n; c++) {
       if (hash(c, 41, 3) > .8) continue;
@@ -1304,7 +1308,7 @@
     const [pCv, pCx] = cv2d(GW, GH), pIm = pCx.createImageData(GW, GH);
     return { base, fp: Int32Array.from(fp), fc: Int16Array.from(fc), fs: Float32Array.from(fs), fu: Uint16Array.from(fu), fth: Float32Array.from(fth), lsp: Int32Array.from(lsp),
       kp: Int32Array.from(kp), kc: Int16Array.from(kc), lbp: Int32Array.from(lbp), lbu: Uint16Array.from(lbu), lh1: Uint32Array.from(lh1), lh2: Uint32Array.from(lh2), leadGl: sn(LEAD_GL[0], LEAD_GL[1], LEAD_GL[2]),
-      n, kfd: new Float32Array(n), fl: new Float32Array(n), hue: st.hue, sat: st.sat, lut: new Float32Array(NU), lutMax: 0, ray, tab: new Uint32Array(n * 16), lead2, gm,
+      n, cd, kfd: new Float32Array(n), fl: new Float32Array(n), hue: st.hue, sat: st.sat, lut: new Float32Array(NU), lutMax: 0, ray, tab: new Uint32Array(n * 16), lead2, gm,
       ts, tpx, tkey, tkmin, tkmax, gP, gO, cP, cO, cx, cy,
       sx, sy, path, gx: new Int16Array(GL_N), gy: new Int16Array(GL_N), gs: new Int8Array(GL_N), gn: 0,
       pCv, pCx, pIm, top32: new Uint32Array(pIm.data.buffer), sc: [sn(255, 255, 245), sn(255, 226, 120), sn(240, 176, 64)] };
@@ -1558,6 +1562,7 @@
   async function warmView(core, view, alive) {
     const fx = FX[core.sp.fx];
     if (fx.warm && core.st && !core.st.pre) { setGeo(core.full); fx.warm(view.E || (view.E = makeE(core, view)), core.st); await yieldMain(); if (!alive()) return false; }
+    if (fx.warmView && core.st && core.st.pre && !view.sxDone) { fx.warmView(core, view); view.sxDone = true; await yieldMain(); if (!alive()) return false; }
     return true;
   }
   function enqueue(fn) { const p = queue.then(() => new Promise(r => setTimeout(r, 0))).then(fn); queue = p.catch(() => {}); return p; }
