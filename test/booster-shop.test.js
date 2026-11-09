@@ -228,7 +228,7 @@ test('Auslage: GET liefert acht Karten der aktuellen Stunde mit Countdown', asyn
   assert.strictEqual(new Set(d.cards.map(c => c.name)).size, d.cards.length);
 });
 
-test('Auslage kaufen: zu wenig SC → 402 ohne Buchung; genug → SC ab, Rarity in der Sammlung, beliebig oft', async () => {
+test('Auslage kaufen: zu wenig SC → 402 ohne Buchung; genug → SC ab, Rarity in der Sammlung, je Platz und Stunde nur einmal', async () => {
   const u = await guest();
   const d0 = (await u.api('GET', '/boosters/display')).data;
   const slot = (r) => d0.cards.find(c => c.rarity === r);
@@ -257,11 +257,16 @@ test('Auslage kaufen: zu wenig SC → 402 ohne Buchung; genug → SC ab, Rarity 
   const name = r.data.card.name;
   assert.strictEqual((await u.owned())[name].uncommon, 1);
 
-  r = await buy('uncommon');             // kein Lagerbestand: nochmal
-  assert.strictEqual(r.status, 200);
-  assert.strictEqual(r.data.owned, 2);
-  assert.strictEqual((await u.owned())[name].uncommon, 2);
-  assert.strictEqual(await u.sc(), 496);
+  // derselbe Platz nochmal: 409 „schon gekauft“, nichts gebucht (läuft die Stunde genau jetzt ab, ist es eine neue Auslage: dann Test unverbindlich)
+  r = await u.api('POST', '/boosters/display/buy', { rarity: 'uncommon', hour: d.hour, name });
+  if (r.status === 409 && r.data.display.hour === d.hour) {
+    assert.ok(/already bought/i.test(r.data.error), r.data.error);
+    assert.deepStrictEqual(r.data.display.bought, [0]);
+    assert.strictEqual(await u.sc(), 498);
+    assert.strictEqual((await u.owned())[name].uncommon, 1);
+  }
+  d = (await u.api('GET', '/boosters/display')).data;
+  assert.ok(Array.isArray(d.bought));
 
   const before = await u.sc();
   r = await buy('stained');
@@ -272,7 +277,7 @@ test('Auslage kaufen: zu wenig SC → 402 ohne Buchung; genug → SC ab, Rarity 
   assert.strictEqual((await u.owned())[r.data.card.name].stained, 1);
 
   const lg = await u.log('shop:display');
-  assert.deepStrictEqual(lg.map(l => l.amount), [-2, -2, -100]);
+  assert.deepStrictEqual(lg.map(l => l.amount), [-2, -100]);
   assert.ok(lg[0].opponent_id.startsWith('uncommon:'));
 });
 
