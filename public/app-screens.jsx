@@ -4547,6 +4547,11 @@ function ShopScreen() {
   const [selected, setSelected] = useState(null); // { type, id }
   const [celebration, setCelebration] = useState(null); // { cx, cy } or null
   const [randomReveal, setRandomReveal] = useState(null); // { imgUrl, label, subtitle } or null
+  // Das Ergebnis eines Pulls (Besitz, Kopien, Zähler) wird erst NACH der Pull-Animation angewendet — sonst verrät der Zähler im Hintergrund
+  // schon vorher, dass etwas Neues gezogen wurde. Beim Schließen des Reveals (oder Verlassen des Shops) wird es nachgetragen.
+  const pendingPull = useRef(null);
+  const flushPull = () => { const f = pendingPull.current; pendingPull.current = null; if (f) f(); };
+  useEffect(() => () => { flushPull(); }, []);
   const [hoverDeckCard, setHoverDeckCard] = useState(null); // cover card name being previewed
   const [hoverSkin, setHoverSkin] = useState(null); // { skinName, heroName } being previewed
   // Skin ids currently flipped to show the original Hero art instead of the
@@ -4795,8 +4800,10 @@ function ShopScreen() {
     setRandomReveal({ pending: true, kind: 'card' });
     try {
       const data = await api('/shop/buy-random-skin', { method: 'POST' });
-      if (data.isNew) setOwned(prev => ({ ...prev, skin: [...prev.skin, data.skinName] }));
-      else setDupes(prev => ({ ...prev, skin: { ...prev.skin, [data.skinName]: data.dupes } }));
+      pendingPull.current = () => {
+        if (data.isNew) setOwned(prev => ({ ...prev, skin: [...prev.skin, data.skinName] }));
+        else setDupes(prev => ({ ...prev, skin: { ...prev.skin, [data.skinName]: data.dupes } }));
+      };
       setUser(u => ({ ...u, sc: data.sc }));
       triggerPurchaseFanfare(pos, { pull: true });
       setRandomReveal({
@@ -4806,7 +4813,7 @@ function ShopScreen() {
         subtitle: data.isNew ? data.heroName : data.heroName + ' · ' + frameName(data.dupes) + '!',
         kind: 'card', isNew: data.isNew, dupes: data.dupes,
       });
-    } catch (e) { setRandomReveal(null); notify(e.message, 'error'); }
+    } catch (e) { flushPull(); setRandomReveal(null); notify(e.message, 'error'); }
     setBuying(false);
   };
 
@@ -4820,9 +4827,11 @@ function ShopScreen() {
     setRandomReveal({ pending: true, kind });
     try {
       const data = await api('/shop/buy-random', { method: 'POST', body: JSON.stringify({ itemType }) });
-      if (data.isNew) setOwned(prev => ({ ...prev, [itemType]: [...prev[itemType], data.itemId] }));
-      else setDupes(prev => ({ ...prev, [itemType]: { ...prev[itemType], [data.itemId]: data.dupes } }));
-      if (itemType === 'avatar') window.ppAvatarRankForget(user.username);   // Rang des getragenen Avatars kann gestiegen sein
+      pendingPull.current = () => {
+        if (data.isNew) setOwned(prev => ({ ...prev, [itemType]: [...prev[itemType], data.itemId] }));
+        else setDupes(prev => ({ ...prev, [itemType]: { ...prev[itemType], [data.itemId]: data.dupes } }));
+        if (itemType === 'avatar') window.ppAvatarRankForget(user.username);   // Rang des getragenen Avatars kann gestiegen sein
+      };
       setUser(u => ({ ...u, sc: data.sc }));
       triggerPurchaseFanfare(pos, { pull: true });
       const subdir = itemType === 'avatar' ? 'avatars' : 'sleeves';
@@ -4834,7 +4843,7 @@ function ShopScreen() {
         subtitle: data.isNew ? 'New ' + noun + '!' : frameName(data.dupes) + '! (' + data.dupes + '/' + maxDupes + ')',
         kind, isNew: data.isNew, dupes: data.dupes, frameKind: itemType,        // Rahmen wird beim Anzeigen eingebacken (useFramedSrc)
       });
-    } catch (e) { setRandomReveal(null); notify(e.message, 'error'); }
+    } catch (e) { flushPull(); setRandomReveal(null); notify(e.message, 'error'); }
     setBuying(false);
   };
 
@@ -5307,7 +5316,7 @@ function ShopScreen() {
             setPendingPacks(data.packs && data.packs.length ? data.packs : [data.pending]);
           }} />
       )}
-      {randomReveal && <ShopPullReveal reveal={randomReveal} fast={fastPull} onToggleFast={() => setFastPull(v => !v)} onClose={() => setRandomReveal(null)} />}
+      {randomReveal && <ShopPullReveal reveal={randomReveal} fast={fastPull} onToggleFast={() => setFastPull(v => !v)} onClose={() => { flushPull(); setRandomReveal(null); }} />}
       <div className="top-bar">
         <button className="btn" onClick={() => setScreen('menu')}>← BACK</button>
         <h2 className="orbit-font" style={{ fontSize: 22, fontWeight: 800, color: 'var(--player-color)' }}>SHOP</h2>
