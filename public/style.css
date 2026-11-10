@@ -26100,12 +26100,13 @@ input[type="checkbox"]:focus-visible, input[type="radio"]:focus-visible { outlin
    Pixelart: harte Ringe aus gestapelten box-shadows, keine Unschaerfe, Bewegung
    in ganzen Pixeln mit steps(). */
 .shop-gacha {
-  display: grid;
-  grid-template-columns: 250px minmax(0, 1fr);
-  gap: 22px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 18px;
   max-width: 900px;
-  margin: 8px auto 18px;
-  padding: 14px 18px;
+  margin: 4px auto 8px;
+  padding: 6px 14px;
   box-sizing: border-box;
   background: var(--bg2);
   border: 3px solid color-mix(in srgb, var(--player-color, var(--accent)) 70%, #000);
@@ -26113,67 +26114,23 @@ input[type="checkbox"]:focus-visible, input[type="radio"]:focus-visible { outlin
     0 0 0 2px var(--pp-kontur),
     0 0 0 4px color-mix(in srgb, var(--player-color, var(--accent)) 50%, #000),
     0 0 0 6px var(--pp-kontur),
-    8px 9px 0 rgba(0, 0, 0, .45);
-}
-.shop-gacha-machine {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 12px;
-  text-align: center;
-  padding-right: 22px;
-  border-right: 3px solid var(--bg4);
+    6px 7px 0 rgba(0, 0, 0, .45);
 }
 .shop-gacha-title {
   font-family: var(--font-display), sans-serif;
-  font-size: 18px;
+  font-size: 15px;
   letter-spacing: 2px;
   color: #fad54a;
   text-shadow: 2px 2px 0 #000;
 }
-.shop-gacha-capsule {
-  width: 84px;
-  height: 84px;
-  margin: 10px 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-family: var(--font-display), sans-serif;
-  font-size: 46px;
-  color: #fad54a;
-  text-shadow: 3px 3px 0 #000;
-  background: var(--bg3);
-  box-shadow: 0 0 0 3px var(--pp-kontur), 0 0 0 6px #fad54a, 0 0 0 9px var(--pp-kontur), 6px 7px 0 9px rgba(0, 0, 0, .35);
-}
-}
-.shop-gacha-btn { width: 100%; justify-content: center; }
+.shop-gacha-btn { flex: 0 0 auto; width: auto; justify-content: center; padding: 6px 22px; }
 .shop-gacha-hint {
+  flex: 1 1 220px;
+  min-width: 0;
   font-size: 11px;
+  line-height: 1.4;
   color: var(--text2);
 }
-.shop-gacha-preview { min-width: 0; display: flex; flex-direction: column; gap: 8px; }
-.shop-gacha-preview-title {
-  font-family: var(--font-display), sans-serif;
-  font-size: 14px;
-  letter-spacing: 2px;
-  color: var(--text);
-  text-shadow: 2px 2px 0 #000;
-}
-.shop-gacha-rule {
-  font-size: 11px;
-  line-height: 1.5;
-  color: var(--text2);
-  margin-bottom: 4px;
-}
-.shop-pull-strip {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 16px;
-  padding: 8px 8px 12px;
-}
-.shop-pull-tile { cursor: default; }
-.shop-pull-tile .shop-item-name { padding-bottom: 0; }
 
 /* Kopfzeile der Sammlung — klebt oben, das Raster scrollt dahinter. */
 .shop-coll-head {
@@ -26181,7 +26138,7 @@ input[type="checkbox"]:focus-visible, input[type="radio"]:focus-visible { outlin
   top: -16px;
   z-index: 10;
   margin: 0 -16px 18px;
-  padding: 12px 16px;
+  padding: 8px 16px;
   background: var(--bg);
   border-bottom: 3px solid color-mix(in srgb, var(--player-color, var(--accent)) 25%, #1a1a2e);
   box-shadow: 0 2px 0 var(--pp-kontur);
@@ -26259,11 +26216,6 @@ input[type="checkbox"]:focus-visible, input[type="radio"]:focus-visible { outlin
 .shop-coll-search::placeholder { color: var(--text2); }
 .shop-item.shop-missing { cursor: default; }
 
-@media (max-width: 760px) {
-  .shop-gacha { grid-template-columns: 1fr; gap: 16px; }
-  .shop-gacha-machine { padding-right: 0; border-right: 0; padding-bottom: 16px; border-bottom: 3px solid var(--bg4); }
-  .shop-pull-strip { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-}
 
 /* Angepinnt: Pull-Bereich + Kopfzeile der Sammlung bleiben stehen, NUR die Sammlung scrollt.
    Auf kleinen Fenstern (zu wenig Platz) bleibt es beim einfachen Scrollen der ganzen Seite. */
@@ -26276,10 +26228,6 @@ input[type="checkbox"]:focus-visible, input[type="radio"]:focus-visible { outlin
   .shop-gacha-pinned .shop-coll-head { position: static; margin-bottom: 0; }
   .shop-coll-scroll { flex: 1; min-height: 0; overflow-y: auto; margin: 0 -16px; padding: 16px 16px 30px; }
 }
-@media (max-height: 820px) {
-  .shop-pull-strip { grid-template-columns: repeat(4, minmax(0, 96px)); justify-content: start; padding-bottom: 6px; }
-  .shop-gacha-capsule { width: 56px; height: 56px; font-size: 30px; margin: 4px 0; box-shadow: 0 0 0 3px var(--pp-kontur), 0 0 0 5px #fad54a, 0 0 0 8px var(--pp-kontur); }
-  .shop-gacha-machine { gap: 8px; }
 }
 
 /* ═══ SHOP: KAUF-FANFARE (Boards, Structure Decks) ════════════════════
@@ -26465,13 +26413,6 @@ input[type="checkbox"]:focus-visible, input[type="radio"]:focus-visible { outlin
   75%  { opacity: 1; }
 }
 
-/* Das Fragezeichen der Kapsel ist ein Pixel-Sprite (5×7 Pixel, ganzzahlig vergrößert) und sitzt dadurch exakt mittig. */
-.shop-gacha-q {
-  width: 35px; height: 49px;
-  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='5' height='7' viewBox='0 0 5 7' shape-rendering='crispEdges'%3E%3Cpath fill='%23fad54a' d='M1 0h3v1h-3zM0 1h1v1h-1zM4 1h1v1h-1zM4 2h1v1h-1zM3 3h1v1h-1zM2 4h1v1h-1zM2 6h1v1h-1z'/%3E%3C/svg%3E") center / 100% 100% no-repeat;
-  image-rendering: pixelated;
-}
-@media (max-height: 820px) { .shop-gacha-q { width: 25px; height: 35px; } }
 
 /* ═══ SHOP: SAMMLUNG OHNE DAUER-ANIMATIONEN (Performance) ══════════════
    Bis hier lief auf JEDER Kachel der Sammlung ein Satz Endlosanimationen (Puls des Rings, Regenbogen-Ecken,

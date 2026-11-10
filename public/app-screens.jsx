@@ -3746,43 +3746,6 @@ function PurchaseCelebration({ cx, cy, onDone }) {
 
 // „Mögliche Pulls“: ein Streifen mit Beispielen aus dem Pool (nur, was der Spieler noch NICHT besitzt —
 // genau das kann der nächste Pull ergeben). Wechselt alle paar Sekunden hart (kein Überblenden: Pixelart).
-function ShopPullPreview({ pool, type, count = 4, onHover, dupes }) {
-  const sig = pool.map(p => p.id).join('|');
-  const order = useMemo(() => {
-    const a = pool.slice();
-    for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; }
-    return a;
-  }, [sig]);
-  const [start, setStart] = useState(0);
-  useEffect(() => {
-    setStart(0);
-    if (order.length <= count) return undefined;
-    const t = setInterval(() => setStart(s => (s + count) % order.length), 3500);
-    return () => clearInterval(t);
-  }, [order, count]);
-  const shown = Array.from({ length: Math.min(count, order.length) }, (_, i) => order[(start + i) % order.length]);
-  return (
-    <div className="shop-pull-strip">
-      {shown.map(it => (
-        <div key={it.id} className={'shop-item shop-unowned-skin shop-pull-tile' + (type === 'avatar' ? ' shop-sq-item' : '') + (dupes && dupes[it.id] > 0 ? ' shop-item-ranked' : '')}
-          onMouseEnter={() => onHover && onHover(it)} onMouseLeave={() => onHover && onHover(null)}>
-          <span className="shop-item-zier" aria-hidden="true" />
-          <div className="shop-item-img-wrap">
-            {(() => {
-              // Besitzt man den Kandidaten schon, zeigt die Vorschau seinen aktuellen Rahmen (Duplikate)
-              const d = (dupes && dupes[it.id]) || 0;
-              if (d > 0 && type !== 'skin') return <FramedImg src={it.src} kind={type} dupes={d} draggable={false} />;
-              return <img src={d > 0 ? it.src + '?rahmen=' + d : it.src} draggable={false} />;
-            })()}
-          </div>
-          {it.name && <div className="shop-item-name" title={it.name}>{it.name}</div>}
-        </div>
-      ))}
-    </div>
-  );
-}
-
-
 // Gemeinsame Partikel-Salve für Shop-Effekte (Kauf-Fanfare und Pull-Reveal): bunte Pixelsprites in Palettenfarben
 // plus ein Funkenring. Gezeichnet von `ppPixelPartikel` (app-shared.jsx): ganze Kunstpixel, Dither statt Alpha.
 function shopBurstParticles(ox, oy, n, speedMul) {
@@ -5118,27 +5081,15 @@ function ShopScreen() {
     return (
       <div className="shop-gacha-page">
         <div className="shop-gacha-pinned">
+        {/* Flache Pull-Leiste: Titel, Pull-Knopf, Tempo-Schalter und ein Hinweis in EINER Zeile — den Platz bekommt die Sammlung */}
         <div className="shop-gacha">
-          <div className="shop-gacha-machine">
-            <div className="shop-gacha-title">{def.title}</div>
-            <div className="shop-gacha-capsule" aria-hidden="true"><span className="shop-gacha-q" /></div>
-            <button className="btn shop-random-btn shop-gacha-btn" disabled={!canPull} onClick={pull}>{pullLabel}</button>
-            {speedToggle}
-            <div className="shop-gacha-hint">
-              {missing.length > 0
-                ? missing.length + ' ' + (missing.length === 1 ? def.noun.toLowerCase() : def.plural) + ' still to discover'
-                : eligible.length > 0 ? 'Collection complete — duplicates upgrade frames!' : 'Everything is at maximum rank!'}
-            </div>
-          </div>
-          <div className="shop-gacha-preview">
-            <div className="shop-gacha-preview-title">
-              {missing.length > 0 ? 'POSSIBLE PULLS' : eligible.length > 0 ? 'UPGRADE CANDIDATES' : 'MAXED OUT'}
-            </div>
-            <div className="shop-gacha-rule">No buying — every pull is a random {def.noun.toLowerCase()}. Pull one you own again and its frame ranks up!</div>
-            {eligible.length > 0 && (
-              <ShopPullPreview pool={missing.length > 0 ? missing : eligible} type={type} dupes={dp}
-                onHover={type === 'skin' ? (it => setHoverSkin(it ? { skinName: it.name, heroName: it.heroName } : null)) : null} />
-            )}
+          <div className="shop-gacha-title">{def.title}</div>
+          <button className="btn shop-random-btn shop-gacha-btn" disabled={!canPull} onClick={pull}>{pullLabel}</button>
+          {speedToggle}
+          <div className="shop-gacha-hint" title="Every pull is random. Pull one you own again and its frame ranks up!">
+            {missing.length > 0
+              ? missing.length + ' ' + (missing.length === 1 ? def.noun.toLowerCase() : def.plural) + ' still to discover · copies rank up frames'
+              : eligible.length > 0 ? 'Collection complete — copies rank up frames!' : 'Everything is at maximum rank!'}
           </div>
         </div>
 
