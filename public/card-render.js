@@ -999,14 +999,16 @@
     // Skin-Holo: der Name steht golden auf der Karte (siehe unten, HOLO-TEXTUR); die schillernden Schichten
     // darueber zeichnet das Spiel als eigene DOM-Lage (SkinHolo in app-shared.jsx).
     if (skin && holoOn(skin)) spec.nameGold = true;
-    return draw(spec, art);
+    const cv = draw(spec, art);
+    cv.statType = spec.type;                       // statsLayer: welche Symbole (Herz, Schwert) die Wertezeile dieses Kartentyps trägt
+    return cv;
   }
 
   /**
    * Rang-Rahmen (Duplikate, rank-frames.js) liegen über dem Kartenbild und können die Zahlen am Kartenrand verdecken. Darum werden die
-   * STAT-ZAHLEN (HP, Angriff, Kosten, Stufe) und den NAMEN (nur der Text) nach dem Einbacken noch einmal über den Rahmen gelegt — nur die Schrift, mit dunkler Umrandung
+   * STAT-ZAHLEN (HP, Angriff, Kosten, Stufe), die HP-/ATK-SYMBOLE (Herz, Schwert) und den NAMEN (nur der Text) nach dem Einbacken noch einmal über den Rahmen gelegt — nur die Schrift, mit dunkler Umrandung
    * für die Lesbarkeit; Wertefelder, Symbole und Rahmen bleiben, wie sie sind.
-   * Die Schrift entsteht als Unterschied zwischen der Karte `un` (renderCard, ungerahmt) und derselben Karte ohne Zahlen und Namen (`noNums`). Symbole (Schule, Kartenart) bleiben unter dem Rahmen — angeschnitten erkennt man sie trotzdem.
+   * Die Schrift entsteht als Unterschied zwischen der Karte `un` (renderCard, ungerahmt) und derselben Karte ohne Zahlen und Namen (`noNums`). Schul- und Kartenart-Symbole bleiben unter dem Rahmen — angeschnitten erkennt man sie trotzdem.
    * @returns {Promise<HTMLCanvasElement|null>} 750 × 1050, durchsichtig bis auf Ziffern + Umrandung
    */
   async function statsLayer(card, o, un) {
@@ -1016,10 +1018,29 @@
     const out = document.createElement('canvas'); out.width = W; out.height = H;
     const g = out.getContext('2d'), img = g.createImageData(W, H), d = img.data, mask = new Uint8Array(W * H);
     let any = false;
+    // HP-Herz und Angriffs-Schwert der Wertezeile (Teil des Kartenrahmens, kein eigenes Sprite): per Flutfüllung vom Rand des Feldes aus
+    // werden Hintergrund und Symbol getrennt — was die Füllung nicht erreicht, ist das Symbol.
+    const t = un.statType, heroBox = t && (isHero3(t) || isSuperhero(t)) && t !== 'boss';
+    const icons = [];
+    if (t && hatHp(t)) icons.push([heroBox || t === 'artifactCreature' ? 88 : 198, 978, 78, 68]);   // Herz
+    if (heroBox) icons.push([394, 974, 66, 76]);                                                      // Schwert
+    const iconPx = new Uint8Array(W * H);
+    for (const [rx, ry, rw, rh] of icons) {
+      const bg = new Set(), at = (x, y) => (y * W + x) * 4, key = (x, y) => (b[at(x, y)] << 24 | b[at(x, y) + 1] << 16 | b[at(x, y) + 2] << 8 | b[at(x, y) + 3]) >>> 0;
+      const x1 = Math.min(W, rx + rw), y1 = Math.min(H, ry + rh);
+      for (let x = rx; x < x1; x++) { bg.add(key(x, ry)); bg.add(key(x, y1 - 1)); }
+      for (let y = ry; y < y1; y++) { bg.add(key(rx, y)); bg.add(key(x1 - 1, y)); }
+      const seen = new Uint8Array(W * H), stack = [];
+      const push = (x, y) => { if (x < rx || y < ry || x >= x1 || y >= y1) return; const i = y * W + x; if (seen[i] || !bg.has(key(x, y))) return; seen[i] = 1; stack.push(i); };
+      for (let x = rx; x < x1; x++) { push(x, ry); push(x, y1 - 1); }
+      for (let y = ry; y < y1; y++) { push(rx, y); push(x1 - 1, y); }
+      while (stack.length) { const i = stack.pop(), x = i % W, y = (i / W) | 0; push(x + 1, y); push(x - 1, y); push(x, y + 1); push(x, y - 1); }
+      for (let y = ry; y < y1; y++) for (let x = rx; x < x1; x++) if (!seen[y * W + x]) iconPx[y * W + x] = 1;
+    }
     const zeilen = new Uint8Array(H);                // Zeilen mit Ziffern: die Umrandung wird nur dort (± R) gesucht
     for (let i = 0; i < W * H; i++) {
       const k = i * 4;
-      if (a[k] !== b[k] || a[k + 1] !== b[k + 1] || a[k + 2] !== b[k + 2] || a[k + 3] !== b[k + 3]) {
+      if (iconPx[i] || a[k] !== b[k] || a[k + 1] !== b[k + 1] || a[k + 2] !== b[k + 2] || a[k + 3] !== b[k + 3]) {
         mask[i] = 1; any = true; zeilen[(i / W) | 0] = 1;
         d[k] = a[k]; d[k + 1] = a[k + 1]; d[k + 2] = a[k + 2]; d[k + 3] = 255;
       }
