@@ -6789,6 +6789,9 @@ const FoilBrettContext = React.createContext(false);
 window.FoilBrettContext = FoilBrettContext;
 const FoilKleinContext = React.createContext(false);
 window.FoilKleinContext = FoilKleinContext;
+// Deck-Editor: Kleinansichten zeigen die Rarity-Effekte reduziert animiert (wenige Karten gleichzeitig, niedrige Bildrate, Rest als Standbild)
+const FoilReduziertContext = React.createContext(false);
+window.FoilReduziertContext = FoilReduziertContext;
 
 /**
  * Das Kartenraster der Pile-Ansicht und der Galerien (`.deck-viewer-grid`)
@@ -7009,7 +7012,7 @@ window.ppRarityOf = ppRarityOf;
 window.ppRarityUrl = ppRarityUrl;
 
 /** Canvas-Ebene der Rarity über dem Kartenbild (dünner Wrapper um PpRarityFx.attach). `werte`: abweichende Zahlen auf dem Bild ({ hp, noHp, noAtk, lv, kost }). */
-function RarityLayer({ card, rarity, animated, werte }) {
+function RarityLayer({ card, rarity, animated, werte, reduced }) {
   const ref = useRef(null);
   const wk = werte ? JSON.stringify(werte) : '';
   const name = card && card.name;
@@ -7017,9 +7020,9 @@ function RarityLayer({ card, rarity, animated, werte }) {
     const el = ref.current, fx = window.PpRarityFx;
     if (!el || !card || !fx || !fx.available(rarity)) return undefined;
     const variant = werte ? { hp: werte.hp, noHp: werte.noHp, noAtk: werte.noAtk, lv: werte.lv, kost: werte.kost } : undefined;
-    const inst = fx.attach(el, { card, rarity, animated: !!animated, variant });
+    const inst = fx.attach(el, { card, rarity, animated: !!animated, reduced: !!reduced && !animated, variant });
     return () => inst.destroy();
-  }, [name, rarity, !!animated, wk]);
+  }, [name, rarity, !!animated, !!reduced, wk]);
   return <div ref={ref} className="pp-rarity-layer" data-rarity={rarity} aria-hidden="true" />;
 }
 window.RarityLayer = RarityLayer;
@@ -7104,6 +7107,7 @@ window.ppFlugRarity = ppFlugRarity;
 function CardFoil({ card, skin, werte, rarity, animated }) {
   const klein = useContext(FoilKleinContext);
   const brett = useContext(FoilBrettContext);
+  const reduziert = useContext(FoilReduziertContext);
   const holoSkin = !!skin && skinHoloAktiv();
   const r = ppRarityOf(card, rarity);
   const effekt = !holoSkin && !!card && r !== 'common' && !!window.PpRarityFx && window.PpRarityFx.available(r);
@@ -7113,7 +7117,7 @@ function CardFoil({ card, skin, werte, rarity, animated }) {
   if (!holoSkin && !schraffur && !rahmen && !effekt) return null;
   return (
     <>
-      {effekt && <RarityLayer card={card} rarity={r} animated={!!animated && !klein && !brett} werte={werte} />}
+      {effekt && <RarityLayer card={card} rarity={r} animated={!!animated && !klein && !brett} reduced={reduziert && klein && !brett} werte={werte} />}
       {holoSkin && <SkinHolo skin={skin} fkey={fkey} />}
       {schraffur && <FoilHatch card={card} fkey={fkey} />}
       {rahmen && <FoilRim rim={rahmen} fkey={fkey} />}
