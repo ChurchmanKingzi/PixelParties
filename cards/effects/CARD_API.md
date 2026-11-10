@@ -1263,6 +1263,8 @@ NEGIERTEN Guss zeigt `spellVisual` weiter etwas Kleines auf den Zielen
 (Flame Avalanche: `flame_strike`): eine Lawine, die über alles
 hinwegrollt und dann nichts tut, wäre das falsche Bild.
 
+★ **`waveAnimation.kreaturenZuerst`** (Flame Avalanche, neue Lawine `app-fx-60`; 11.2026): optionales Flag samt `{ delay, heroAt, hitDelay, vorlauf? }` — `delay` = Zeitpunkt der Kreaturen-Treffer (alle gleichzeitig, ohne die 200-ms-Staffelung des Kreaturen-Stapels), `heroAt` = erster Held (ABSOLUT ab Wellenstart), `hitDelay` = Abstand der Helden (Platz i der Zielliste → `heroAt + i * hitDelay`). `dealDamageToTargets` fällt den Schaden dann zu genau diesen Zeitpunkten (Kreaturen VOR den Helden); `_spieleWellenAnimation` sendet `kreaturenZuerst`/`delay`/`heroAt`/`hitDelay` im Ereignis mit, der Client rechnet daraus die Trefferbilder (Kreaturen `delay`, Held i `heroAt + i * hitDelay`, in Bildern zu 33,3 ms). `vorlauf` (ms) verschiebt nur die Engine-Wartezeiten gegenüber den Animationszeiten (Mount-Vorlauf der Animation). Idas Einzelziel: ein Ziel bei `delay` (auch ein Held). Ohne das Flag bleibt der alte Ablauf (Helden nacheinander im `hitDelay`-Takt, danach die Kreaturen) unverändert.
+
 ## ★ HANDKARTE UNTER DEM ZEIGER (v1214 — Als Vorgabe 18.9.)
 
 Die gehoverte Handkarte wird **1,42× größer**, bekommt eine Umrandung

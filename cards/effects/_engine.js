@@ -55868,8 +55868,19 @@ this._deathWatch = (this._deathWatchStack || []).length
    * `originOwner`/`originHeroIdx` und rechnet daraus ihre Richtung.
    * `delay` haelt den Ablauf so lange an, bis die Front bei den Zielen
    * ist — ohne das faellt der Schaden, bevor die Welle ankommt.
+   *
+   * ★ `kreaturenZuerst: true` (Flame Avalanche, Lawine von der Rueckkante
+   * auf den Wirker zu): die Kreaturen werden VOR den Helden getroffen
+   * (`dealDamageToTargets`). Dazu sendet die Welle `delay` (Kreaturen),
+   * `heroAt` (erster Held, ABSOLUT ab Wellenstart) und `hitDelay` (Abstand
+   * der Helden) mit — der Client rechnet daraus die Trefferbilder der
+   * Animation (Kreaturen: delay, Held i: heroAt + i * hitDelay). `vorlauf`
+   * (ms) verschiebt die Wartezeiten der ENGINE gegenueber diesen
+   * Animationszeiten (Mount-Vorlauf der Animation im Client). `einzel`
+   * (Idas Einzelziel): nur ein Ziel, es faellt bei `delay` (auch ein Held).
+   * Rueckgabe: `{ t0 }` = Wellenstart (Date.now) fuer die absoluten Wartezeiten.
    */
-  async _spieleWellenAnimation(config, cardInst, pi, heroIdx, ziele) {
+  async _spieleWellenAnimation(config, cardInst, pi, heroIdx, ziele, opts) {
     const welle = config && config.waveAnimation;
     if (!welle || !welle.type) return;
     // ★★ v1346 — KULISSE ZUR WELLE (`waveAnimation.backdrop`, „Hole in
@@ -55901,8 +55912,16 @@ this._deathWatch = (this._deathWatchStack || []).length
       zoneType: 'board', owner: pi, heroIdx: -1, zoneSlot: -1,
       originOwner: (cardInst && cardInst.heroOwner != null) ? cardInst.heroOwner : pi,
       originHeroIdx: heroIdx,
+      ...(welle.kreaturenZuerst ? {
+        kreaturenZuerst: true,
+        delay: welle.delay != null ? welle.delay : 380,
+        heroAt: (opts && opts.einzel) ? (welle.delay != null ? welle.delay : 380) : (welle.heroAt != null ? welle.heroAt : (welle.delay != null ? welle.delay : 380)),
+        hitDelay: (opts && opts.einzel) ? 0 : (welle.hitDelay != null ? welle.hitDelay : 150),
+      } : null),
     });
-    await this._delay(welle.delay != null ? welle.delay : 380);
+    const t0 = Date.now();
+    await this._delay((welle.delay != null ? welle.delay : 380) + (welle.kreaturenZuerst ? (welle.vorlauf || 0) : 0));
+    return { t0 };
   }
 
   async actionAoeHit(cardInst, config = {}) {
@@ -55976,7 +55995,7 @@ this._deathWatch = (this._deathWatchStack || []).length
       await this._spieleWellenAnimation(config, cardInst, pi, heroIdx, [{
         owner: target.owner, heroIdx: target.heroIdx,
         zoneSlot: target.type === 'hero' ? -1 : target.slotIdx,
-      }]);
+      }], { einzel: true });
 
       // Animation on single target
       if (animationType) {
@@ -56300,13 +56319,14 @@ this._deathWatch = (this._deathWatchStack || []).length
       });
     }
 
-    await this._spieleWellenAnimation(config, quelle || quellObjekt, pi, heroIdx, [
+    const _welle = await this._spieleWellenAnimation(config, quelle || quellObjekt, pi, heroIdx, [
       ...allHeroes.map(e => ({ owner: e.owner, heroIdx: e.heroIdx, zoneSlot: -1 })),
       ...creatureEntries.map(e => ({
         owner: this.physicalSide(e.inst), heroIdx: e.inst.heroIdx, zoneSlot: e.inst.zoneSlot,
         cardName: e.inst.name,   // v1347: fuer Wellen, die die Karte selbst bewegen
       })),
     ]);
+    const _kreaturenZuerst = !!(config.waveAnimation && config.waveAnimation.kreaturenZuerst);
     const _sog = this._sogBeginnen(config, creatureEntries.map(e => e.inst));
 
     if (animationType) {
@@ -56344,6 +56364,34 @@ this._deathWatch = (this._deathWatchStack || []).length
       // (Die Klammer schiebt auch die Heldentode bis nach dem Schlag auf,
       // s. `_heldKoMelden`.)
       try {
+        // ★ `waveAnimation.kreaturenZuerst` (Flame Avalanche: die Lawine rollt von der Rueckkante auf den Wirker zu und ueberrollt zuerst die Kreaturenreihe, dann die Helden):
+        // alle Kreaturen in EINEM Stapel (ohne Staffelung) im ersten Treffer-Augenblick, danach die Helden — jeder zu seinem ABSOLUTEN Zeitpunkt ab Wellenstart
+        // (`heroAt` + Platz in der Zielliste * `hitDelay`, dieselbe Rechnung wie im Client, der daraus die Trefferbilder macht). Die Tode sind ohnehin bis zum Klammerende aufgeschoben.
+        if (_kreaturenZuerst) {
+          const _w = config.waveAnimation, _t0 = _welle?.t0 ?? Date.now(), _vorl = _w.vorlauf || 0;
+          const _hd = _w.hitDelay != null ? _w.hitDelay : hitDelay, _h0 = _w.heroAt != null ? _w.heroAt : (_w.delay != null ? _w.delay : 380);
+          const _kr = creatureEntries.filter(e => e.amount > 0);
+          if (_kr.length > 0) { _kr._ohneStaffel = true; await this.processCreatureDamageBatch(_kr); }
+          let _slotZeit = _h0;
+          for (const _e of hitHeroes) {
+            const _slot = allHeroes.findIndex(a => a.owner === _e.owner && a.heroIdx === _e.heroIdx);
+            if (_slot >= 0) _slotZeit = _h0 + _slot * _hd;
+            const _warte = (_t0 + _vorl + _slotZeit) - Date.now();
+            if (_warte > 0) await this._delay(_warte);
+            if (_e.hero.hp <= 0 || !(_e.amount > 0)) continue;
+            if (hatInstanz || !opts.attrappenQuelle) {
+              await this.actionDealDamage(quelle || quellObjekt, _e.hero, _e.amount, damageType, trefferOpts);
+            } else {
+              const tmp = this._trackCard(sourceName, pi, 'hand', -1, -1);
+              try { await this.actionDealDamage(tmp, _e.hero, _e.amount, damageType, trefferOpts); }
+              finally { this._untrackCard(tmp.id); }
+            }
+            this.sync();
+          }
+          if (typeof opts.wirkung === 'function') {
+            await opts.wirkung({ heroes: hitHeroes, creatures: creatureEntries.map(e => e.inst) });
+          }
+        } else {
         for (const { hero, amount } of hitHeroes) {
           if (hero.hp <= 0 || !(amount > 0)) continue; // May have died from a previous hit this loop
           if (hatInstanz || !opts.attrappenQuelle) {
@@ -56361,6 +56409,7 @@ this._deathWatch = (this._deathWatchStack || []).length
         // ── SCHRITT 3b: Zusatzwirkung (Status, Sperren …) — noch VOR der Todesauswertung ──
         if (typeof opts.wirkung === 'function') {
           await opts.wirkung({ heroes: hitHeroes, creatures: creatureEntries.map(e => e.inst) });
+        }
         }
       } finally {
         // Vorgemerkte Heldentode JETZT — nach dem letzten Treffer.
@@ -56609,6 +56658,9 @@ this._deathWatch = (this._deathWatchStack || []).length
 
   async _processCreatureDamageBatchKern(entries) {
     if (!entries || entries.length === 0) return;
+    // ★ Welle mit `kreaturenZuerst` (Flame Avalanche): die Animation gibt den Takt vor, alle Kreaturen werden im selben Augenblick getroffen —
+    // keine 200 ms Staffelung je ueberlebender Kreatur (der Aufrufer setzt `entries._ohneStaffel`; die Filter unten bauen neue Arrays).
+    const ohneStaffel = !!entries._ohneStaffel;
 
     // Filter out face-down surprise creatures — they cannot be damaged
     entries = entries.filter(e => !e.inst?.faceDown);
@@ -57536,7 +57588,7 @@ this._deathWatch = (this._deathWatchStack || []).length
         sterbende.push(e);
       } else {
         this.sync();
-        await this._delay(200);
+        if (!ohneStaffel) await this._delay(200);
       }
     }
 

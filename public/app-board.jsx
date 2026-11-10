@@ -3806,7 +3806,7 @@ function ppFlugVerfolgen(fly, sourceEl, destEl, w0, ms, opEnd, farbe) {
 // Einschlag-Animationen, die ihre Zielzone selbst quetschen (bzw. deren Silhouette/Karte sie beschichten: acid_splash): bekommen das Zonen-Element direkt (`zoneEl`)
 const PP_SQUASH_ANIMS = new Set(['stranglehold_squeeze', 'magic_hammer', 'heavy_hit_smash', 'hammer_skeleton_smash', 'hammer_throw', 'shattering_strike', 'spiked_club_smash', 'giant_dino_stomp', 'mammoth_stomp', 'ankylo_tail_smash', 'acid_splash']);
 // Mindestlebensdauer (ms) je Animationstyp: `options.duration` (Engine `animDuration`) ist oft kuerzer als die Animation selbst — die Hammer-Animationen (app-fx-57) laufen 1,2–1,8 s.
-const PP_ANIM_MINDAUER = { magic_hammer: 2000, heavy_hit_smash: 1700, hammer_skeleton_smash: 1450, hammer_throw: 1500 };   // hammer_throw (app-fx-59): 32 Bilder = 1070 ms + Vorlauf + Reserve
+const PP_ANIM_MINDAUER = { magic_hammer: 2000, heavy_hit_smash: 1700, hammer_skeleton_smash: 1450, hammer_throw: 1500, flame_avalanche: 2000 };   // hammer_throw (app-fx-59): 32 Bilder = 1070 ms + Vorlauf + Reserve
 function ppZonenFrost() {
   const m = new Map();
   try { document.querySelectorAll('[data-hero-zone],[data-support-zone]').forEach(el => m.set(el, el.getBoundingClientRect())); } catch (e) { /* ohne Frost: live messen */ }
@@ -20926,7 +20926,7 @@ const ANIM_REGISTRY = {
       );
     };
   })(),
-  flame_avalanche: ppR1FlameAvalanche,   // v1215 — W86r1: Pixelart-Leinwand (ganzzahlige Hüpfer, keine halben Pixel)
+  flame_avalanche: ppR1FlameAvalanche,   // v1215 — W86r1: Pixelart-Leinwand (ganzzahlige Hüpfer, keine halben Pixel); app-fx-60 ersetzt den Eintrag durch die Lawine, diese Salve bleibt als Rückfall
   hole_in_the_sky_pull: HoleInTheSkyPullEffekt,   // v1346/v1347 — W86r1: Pixelart (Leinwand fürs Loch, Karten als <div>s auf fester Spiralbahn)
   guillotine_drop: (() => {
     // ★★ v1349 — „Madame Guillotine": ein Fallbeil saust auf die Zone der
@@ -45166,6 +45166,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                 x: q2.left + q2.width / 2, y: q2.top + q2.height / 2,
                 w: q2.width, h: q2.height, cardName: t.cardName || null,
                 zoneSlot: t.zoneSlot, el: el2,
+                idx: rest.targets.indexOf(t),   // Platz in der Zielliste der Engine (Flame Avalanche, app-fx-60: Trefferbild je Held aus seinem Platz)
               });
             }
             if (punkte.length) extra.targetPoints = punkte;
