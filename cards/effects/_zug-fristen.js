@@ -64,6 +64,9 @@ function fristenNachSkip(engine, S, Ts) {
     for (const hero of (ps.heroes || [])) {
       if (!hero) continue;
       for (const b of Object.values(hero.buffs || {})) stempel(b);
+      // Unreasonable Anger (10.11.): „The next damage the user deals to a single target during your next turn …" — `buffs.unreasonable_anger.fenster[].runde` = GENAU dieser Zug
+      // (Zeitfenster des Bonus). Fällt der Zug aus, rückt das Fenster auf den nächsten echten eigenen Zug (der Ablauf des Buffs, `expiresAtTurn`, steht oben im Standard-Stempel).
+      for (const f of (hero.buffs?.unreasonable_anger?.fenster || [])) wert(f, 'runde');
       for (const s of Object.values(hero.statuses || {})) { stempel(s); if (s && typeof s === 'object') stempel(s._fremd); }
       // Nasty Prank (24.10.): jeder gesperrte Name trägt seine eigene Frist (`statuses.pranked.names[Name]`, ENDE des nächsten gegnerischen Zuges).
       for (const e of Object.values(hero.statuses?.pranked?.names || {})) stempel(e);
