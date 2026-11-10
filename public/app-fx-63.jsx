@@ -349,7 +349,19 @@
     let L = 0, px = K[0], py = K[1];
     for (let i = 1; i <= 32; i++) { const t = i / 32, u = 1 - t, x = u * u * K[0] + 2 * u * t * P.C1[0] + t * t * M[0], y = u * u * K[1] + 2 * u * t * P.C1[1] + t * t * M[1]; L += hyp(x - px, y - py); px = x; py = y; }
     P.L = mx(8, L);
-    const ndr = mx(3, rd(7 * n)); for (let i = 0; i < ndr; i++) P.drips.push({ t: 0.3 + 0.5 * H(sd + 10, i), s: 5 + 2 * i, vx: (H(sd + 11, i) - 0.5) * 0.5 });
+    // Schwälle: der Strahl besteht aus Klumpen, die vom Ziel zum Mund fliegen. In einem Schub (3 Stück, Bild 2 / 5 / 8) liegen sie dicht, vorn dick (Wellenfront), hinten dünn; dazwischen nur Einzeltropfen und Tropfenketten.
+    // Jeder Klumpen zieht einen Schweif (Streifen aus Scheiben); er schrumpft zum Mund hin, sodass der Strahl zerfasert (Plateau-Rayleigh: Klumpen → Ketten → Tropfen).
+    P.blobs = [];
+    const nbur = mx(4, rd(9 * n)), starts = [2, 5, 8];
+    for (let k = 0; k < 3; k++) for (let j = 0; j < nbur; j++) {
+      const fr = j / nbur, hh = H(sd + 40 + k, j), r = (0.9 + 2.5 * Math.pow(1 - fr, 0.75)) * (k === 0 ? 1.15 : 1) * (0.55 + 0.95 * hh);
+      P.blobs.push({ t0: starts[k] + 2.2 * fr + (H(sd + 44 + k, j) - 0.5) * 0.9, T: 7.4 + 0.8 * H(sd + 48, j + 17 * k), r, str: 0.6 - 0.4 * fr, lat: (H(sd + 52 + k, j) - 0.5) * 3.2, sat: H(sd + 56 + k, j) < 0.7, id: k * 31 + j });
+    }
+    const nsp = mx(3, rd(4 * n)); for (let g2 = 0; g2 < 3; g2++) for (let j = 0; j < nsp; j++) {
+      const hh = H(sd + 60 + g2, j); P.blobs.push({ t0: starts[g2] + 2.4 + 0.7 * j / nsp * 1.2 + hh * 0.3, T: 7.8 + 0.8 * H(sd + 64, j + 9 * g2), r: 0.6 + 0.9 * H(sd + 66 + g2, j), str: 0.18, lat: (H(sd + 70 + g2, j) - 0.5) * 4.5, sat: false, id: 200 + g2 * 17 + j });
+    }
+    P.blobs.sort((u1, u2) => u1.t0 - u2.t0);
+    const ndr = mx(4, rd(10 * n)); for (let i = 0; i < ndr; i++) P.drips.push({ t: 0.15 + 0.6 * H(sd + 10, i), s: 4 + 1.3 * i, vx: (H(sd + 11, i) - 0.5) * 0.7 });
     const nm = mx(4, rd(9 * n)); for (let i = 0; i < nm; i++) P.mund.push({ ang: -PI / 2 + (H(sd + 20, i) - 0.5) * 2.6, v: 1.4 + 3.2 * H(sd + 21, i), big: H(sd + 22, i) < 0.25 });
     return P;
   };
@@ -393,38 +405,50 @@
       if (age >= 1) { const a2 = age - 1, tx = K[0] + d.vx * a2, ty = K[1] + d.vy * a2 + 0.5 * g * a2 * a2; m.linie(tx, ty, x, y, 1, c2, 16); }
       blutTropfen(m, X, Y, d.big, c1, c2, c3, c4);
     }
-    // ───── Strahl: Bogen Ziel → Mund ─────
-    const ub = f < 2 ? 0 : easeOut2((f - 2) / 8), ua = f < 11 ? 0 : Math.pow(clamp((f - 11) / 8), 2);
+    // ───── Strahl: Klumpen im Bogen (Parabel) Ziel → Mund ─────
     const bez = (t) => { const u = 1 - t; return [u * u * K[0] + 2 * u * t * P.C1[0] + t * t * M[0], u * u * K[1] + 2 * u * t * P.C1[1] + t * t * M[1]]; };
-    if (ub - ua > 0.012 && f < BLUT_HEAL_F + 1) {
-      const ns = mx(4, Math.ceil(P.L * (ub - ua))), xs = [], ys = [], ws = [], amp = P.phone ? 1.2 : 1.7;
-      for (let i = 0; i <= ns; i++) {
-        const t = ua + (ub - ua) * i / ns, p = bez(t), q = bez(mn(1, t + 0.01)), q0 = bez(mx(0, t - 0.01));
-        let tx = q[0] - q0[0], ty = q[1] - q0[1]; const tl = hyp(tx, ty) || 1; tx /= tl; ty /= tl;
-        const env = Math.pow(Math.sin(PI * clamp(t)), 0.6), w = Math.sin(t * P.L / 5.5 - f * 1.15) * amp * env;
-        xs.push(rd(p[0] - ty * w)); ys.push(rd(p[1] + tx * w));
-        const dTail = i, dHead = ns - i; ws.push(mn(dTail, dHead) < 2 ? 2 : 3);
+    const dxs = [], dys = [], drs = [];   // Scheiben dieses Bildes (Mitte, Radius)
+    const disc2 = (x, y, r) => { dxs.push(x); dys.push(y); drs.push(r); };
+    // Ursprung: der Schwall quillt am Treffer (Masse pulsiert mit den Schüben)
+    { let env = 0; for (const s0 of [2, 5, 8]) env = mx(env, 1 - clamp(Math.abs(f - (s0 + 1.1)) / 2.4)); if (f >= 1 && f <= 12 && env > 0) disc2(rd(K[0] + P.sgn * 1), rd(K[1] - 1), 1.5 + 2.4 * env); }
+    let mouthArr = 0;
+    for (const bl of P.blobs) {
+      const age = f - bl.t0; if (age < 0) continue;
+      const u = age / bl.T; if (u >= 1) { if (u < 1 + 1.6 / bl.T && bl.r > 0.8) mouthArr = mx(mouthArr, bl.r); continue; }
+      const ue = u * (1.08 - 0.08 * u), p = bez(ue), q = bez(mn(1, ue + 0.01)), q0 = bez(mx(0, ue - 0.01)); let tx = q[0] - q0[0], ty = q[1] - q0[1]; const tl = hyp(tx, ty) || 1; tx /= tl; ty /= tl;
+      const sh = clamp((u - 0.45) / 0.5), strk = bl.str * (1 - 0.7 * sh * sh * (3 - 2 * sh)) / bl.T;   // Schweiflänge in u: wird zum Mund hin kürzer → Kette aus Tropfen
+      const rr = bl.r * (1 - 0.3 * u), lat = bl.lat * Math.sin(PI * ue), step = mx(0.8, rr * 0.7) / P.L, nsm = mx(1, Math.ceil(strk / step));
+      for (let i = 0; i <= nsm; i++) {
+        const w = nsm === 1 && strk < step ? 0 : i / nsm, ss = clamp(ue - strk * w), pp = bez(ss), tr = rr * (1 - 0.45 * w) * (0.72 + 0.56 * H(P.sd + 80 + i, bl.id));   // Schweif verjüngt sich (Tropfenform)
+        disc2(rd(pp[0] - ty * lat), rd(pp[1] + tx * lat), tr);
+        if (nsm === 1 && strk < step) break;
       }
-      for (let i = 0; i <= ns; i++) sq(m, xs[i], ys[i], ws[i] + 2, c0);
-      for (let i = 0; i <= ns; i++) sq(m, xs[i], ys[i], ws[i], c2);
-      for (let i = 0; i <= ns; i++) { m.px(xs[i], ys[i], c3); if (ws[i] === 3) m.px(xs[i] - 1, ys[i] - 1, c3); if (i % 3 === 0 && ws[i] === 3) m.px(xs[i] - 1, ys[i] - 1, c4); }
-      // Perlen: 2×2 helle Tropfen laufen mit dem Fluss
-      const nb = mx(2, rd(5 * P.n));
-      for (let k = 0; k < nb; k++) { const t = ((k / nb + f * 0.075) % 1); if (t < ua || t > ub) continue; const j = mn(ns, rd((t - ua) / mx(1e-6, ub - ua) * ns)); const X = xs[j], Y = ys[j]; sq(m, X, Y, 4, c0); m.px(X - 1, Y - 1, c4); m.px(X, Y - 1, c3); m.px(X - 1, Y, c3); m.px(X, Y, c2); }
-      // Kopf des Strahls: gerundeter Tropfen
-      if (ub < 1) { const X = xs[ns], Y = ys[ns]; sq(m, X, Y, 5, c0); sq(m, X, Y, 3, c3); m.px(X - 1, Y - 1, c4); }
-      // Tropfen lösen sich vom Strahl und fallen
-      for (const dp of P.drips) {
-        const age = f - dp.s; if (age < 0 || age > 10) continue; const p = bez(dp.t), x = p[0] + dp.vx * age, y = p[1] + 0.5 * g * 0.7 * age * age, lv = age < 6 ? 16 : 16 * (1 - (age - 6) / 5);
-        m.pd(rd(x), rd(y), c2, lv); m.pd(rd(x), rd(y) - 1, c1, lv * 0.8);
+      if (bl.sat && u > 0.1) { const sx = rd(p[0] - ty * (lat + (rr + 1.5) * (bl.lat > 0 ? 1 : -1)) - tx * 2), sy = rd(p[1] + tx * (lat + (rr + 1.5) * (bl.lat > 0 ? 1 : -1)) - ty * 2); m.px(sx, sy, c2); }
+    }
+    // Zeichnen: erst alle Ränder (Union-Kontur), dann Körper mit Schattierung (Licht oben links)
+    for (let i = 0; i < dxs.length; i++) { const r = drs[i], ri = Math.ceil(r + 1), X = dxs[i], Y = dys[i]; for (let yy = -ri; yy <= ri; yy++) for (let xx = -ri; xx <= ri; xx++) if (hyp(xx, yy) <= r + 0.95) m.px(X + xx, Y + yy, c0); }
+    for (let i = 0; i < dxs.length; i++) {
+      const r = drs[i], ri = Math.ceil(r), X = dxs[i], Y = dys[i];
+      for (let yy = -ri; yy <= ri; yy++) for (let xx = -ri; xx <= ri; xx++) {
+        const dd = hyp(xx, yy); if (dd > r + 0.25) continue;
+        const l = (-xx * 0.6 - yy * 0.8) / mx(1, r);
+        m.px(X + xx, Y + yy, r < 1.3 ? c3 : (l > 0.55 && r >= 1.9 ? c4 : l > 0.1 ? c3 : l > -0.45 ? c2 : c1));
       }
     }
+    // Plopp am Mund: jeder ankommende Klumpen spritzt kurz auf (der Angreifer trinkt)
+    if (mouthArr > 0) { const X = rd(M[0]), Y = rd(M[1]), r = mouthArr * 1.1 + 1; for (let yy = -4; yy <= 4; yy++) for (let xx = -4; xx <= 4; xx++) { const dd = hyp(xx, yy); if (dd <= r) m.pd(X + xx, Y + yy, dd < r * 0.45 ? c4 : c3, 9); } }
+    // Tropfen lösen sich vom Strahl und fallen (Schwerkraft)
+    for (const dp of P.drips) {
+      const age = f - dp.s; if (age < 0 || age > 11) continue; const p = bez(dp.t), x = p[0] + dp.vx * age, y = p[1] + 0.5 * g * 0.8 * age * age, lv = age < 7 ? 16 : 16 * (1 - (age - 7) / 4);
+      if (age >= 1) { const a2 = age - 0.5, y2 = p[1] + 0.5 * g * 0.8 * a2 * a2; m.pd(rd(x - dp.vx * 0.5), rd(y2), c1, lv * 0.7); }
+      m.pd(rd(x), rd(y), c3, lv); m.pd(rd(x) + 1, rd(y), c2, lv); m.pd(rd(x), rd(y) + 1, c2, lv); m.pd(rd(x) + 1, rd(y) + 1, c1, lv);
+    }
     // ───── Mund: Plopp-Kreuz, Spritzer, roter Flash auf dem Angreifer ─────
-    if (f >= 10 && f <= 15) {
+    if (f >= 10 && f <= 18) {
       const X = rd(M[0]), Y = rd(M[1]), a = f - 10;
       if (a <= 2) { const L = [3, 5, 3][a]; for (let i = -L; i <= L; i++) { m.px(X + i, Y, i === 0 ? c5 : c4); m.px(X, Y + i, i === 0 ? c5 : c4); } m.px(X - 1, Y - 1, c3); m.px(X + 1, Y + 1, c3); m.px(X + 1, Y - 1, c3); m.px(X - 1, Y + 1, c3); }
-      for (const d of P.mund) { const x = M[0] + Math.cos(d.ang) * d.v * a, y = M[1] + Math.sin(d.ang) * d.v * a + 0.5 * 0.8 * a * a; if (a < 5 || BAY[rd(y) & 3][rd(x) & 3] < 16 - (a - 5) * 6) blutTropfen(m, x, y, d.big && a < 3, c1, c2, c3, c4); }
-      if (hook && hook.aura) hook.aura(m, [4, 7, 9, 7, 5, 2][a], [8, 13, 16, 12, 8, 4][a]);
+      if (a <= 5) for (const d of P.mund) { const x = M[0] + Math.cos(d.ang) * d.v * a, y = M[1] + Math.sin(d.ang) * d.v * a + 0.5 * 0.8 * a * a; if (a < 5 || BAY[rd(y) & 3][rd(x) & 3] < 16 - (a - 5) * 6) blutTropfen(m, x, y, d.big && a < 3, c1, c2, c3, c4); }
+      if (hook && hook.aura) hook.aura(m, [4, 7, 9, 7, 5, 6, 8, 5, 2][a], [8, 13, 16, 12, 8, 10, 14, 9, 4][a]);   // Flash pulsiert mit den ankommenden Schwällen
     }
   };
   /** Trockenlauf (Leerlauf): wärmt den Blut-Code. */
