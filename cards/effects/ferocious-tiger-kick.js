@@ -14,6 +14,8 @@
 //  im Moment des Kontakts (Bild 0 der Zonen-Animation `tiger_kick`, Quelle = `von`) tritt er zu: Schlagstern, ein brüllender Tigerkopf über dem Ziel
 //  (Maul voll auf bei Bild 2 = SCHADEN, Engine `_delay`), drei Krallenstreifen, danach kreisen drei Sterne um das Ziel (ab Bild 12 = Stun). 34 Bilder (30 Hz) ≈ 1,13 s.
 //  Die Sterne ersetzen die alte Betäubungs-Optik `electric_strike` (kein Blitzbündel mehr obendrauf).
+//  2. Angriff mit Heilung: nach dem Schaden zusätzlich `tiger_blood` (Blutfontäne am Ziel, Blutstrahl zum Mund des Angreifers, er trinkt); die Heilung (HP-Zahl, `heal_sparkle`) folgt erst nach dem Trinken
+//  (BLUT_HEAL_MS), also nach der Betäubung — Menge, Negation und Heilsperren sind unverändert (Heilen läuft weiter über `actionHealHero`).
 // ═══════════════════════════════════════════
 
 // Zeiten (ms) der Zonen-Animation `tiger_kick` (app-fx-63.jsx, 30 Hz). `VORLAUF`: Mount-Vorlauf der Animation im Client (ZONE_ANIM_MOUNT_DELAY_MS 100 + Aufbau,
@@ -24,6 +26,8 @@ const VORLAUF_MS = 120;
 const SCHADEN_MS = Math.round(2 * BILD_MS) + VORLAUF_MS;       // Bild 2 = Maul voll auf
 const STUN_MS = Math.round(12 * BILD_MS) + VORLAUF_MS;         // Bild 12 = die Sterne erscheinen
 const ENDE_MS = Math.round(33 * BILD_MS) + VORLAUF_MS;         // Bild 33 = leer
+// Blut-Zonen-Animation `tiger_blood` (app-fx-63.jsx, 26 Bilder; nur beim 2. Angriff MIT Heilung, gesendet nach dem Schaden): Der Angreifer „trinkt" den Strahl bis Bild 19 — dann erst setzt die Heilung ein.
+const BLUT_HEAL_MS = Math.round(19 * BILD_MS) + VORLAUF_MS;     // ab dem Blut-Ereignis
 
 module.exports = {
   // ★★ v1182 — ENTKOPPELTE BILDER (CARD_API): wird die Karte NEGIERT,
@@ -146,20 +150,15 @@ module.exports = {
         return;
       }
 
-      // 2nd Attack bonus: heal attacker for damage dealt
-      if (is2nd && dealt > 0 && hero.hp > 0) {
-        const healAmount = Math.min(dealt, hero.maxHp - hero.hp);
-        if (healAmount > 0) {
-          // ★ v1467: ueber `actionHealHero` statt direkt `hero.hp +=` — nur
-          // so greifen Heilsperren (Mirjam, Curse of Aging), Heilumkehr
-          // und die Heil-Hooks. Bild und Log nur, wenn wirklich geheilt.
-          const vorher = hero.hp;
-          await engine.actionHealHero(ctx.card, hero, healAmount);
-          if (hero.hp > vorher) {
-            engine._broadcastEvent('play_zone_animation', { type: 'heal_sparkle', owner: ctx.cardHeroOwner, heroIdx, zoneSlot: -1 });
-            engine.log('tiger_kick_heal', { hero: hero.name, amount: hero.hp - vorher });
-          }
-        }
+      // 2nd Attack bonus: heal attacker for damage dealt. Mit Blut-Optik: der Angreifer trinkt zuerst (`tiger_blood`), die Heilung selbst folgt BLUT_HEAL_MS später (siehe unten).
+      // Das Blut-Ereignis geht nur raus, wenn die Heilung nach dem Stand JETZT einsetzt (Schaden nicht negiert, `dealt` > 0, Angreifer lebt und hat Platz zum Heilen).
+      let blutT0 = 0;
+      if (is2nd && dealt > 0 && hero.hp > 0 && Math.min(dealt, hero.maxHp - hero.hp) > 0) {
+        blutT0 = Date.now();
+        engine._broadcastEvent('play_zone_animation', {
+          type: 'tiger_blood', owner: tgtOwner, heroIdx: tgtHeroIdx, zoneSlot: impactZoneSlot,
+          von: { owner: ctx.cardHeroOwner ?? pi, heroIdx, el: true },
+        });
       }
 
       // Betäubung erst, wenn die Sterne erscheinen (Bild 12) — die Sterne der Animation sind die Betäubungs-Optik (kein `electric_strike` mehr)
@@ -186,6 +185,26 @@ module.exports = {
             source: 'Ferocious Tiger Kick',
           });
           if (applied) engine.log('stun', { target: inst.name, by: 'Ferocious Tiger Kick', type: 'creature' });
+        }
+      }
+
+      // Heilung nach dem Trinken (mit Blut) bzw. wie bisher direkt (ohne Blut-Ereignis: gleicher Zweig, keine Wartezeit)
+      if (blutT0) await engine._delay(Math.max(0, BLUT_HEAL_MS - (Date.now() - blutT0)));
+      if (is2nd && dealt > 0 && hero.hp > 0) {
+        const healAmount = Math.min(dealt, hero.maxHp - hero.hp);
+        if (healAmount > 0) {
+          // ★ v1467: ueber `actionHealHero` statt direkt `hero.hp +=` — nur
+          // so greifen Heilsperren (Mirjam, Curse of Aging), Heilumkehr
+          // und die Heil-Hooks. Bild und Log nur, wenn wirklich geheilt.
+          const vorher = hero.hp;
+          await engine.actionHealHero(ctx.card, hero, healAmount);
+          if (hero.hp > vorher) {
+            engine._broadcastEvent('play_zone_animation', { type: 'heal_sparkle', owner: ctx.cardHeroOwner, heroIdx, zoneSlot: -1 });
+            engine.log('tiger_kick_heal', { hero: hero.name, amount: hero.hp - vorher });
+            // Zustand (HP-Zahl +Heilung) erst jetzt senden: sonst käme er erst mit dem Schluss-Sync (≈ 8 Bilder nach dem Heilbild). Die Heilanimation hängt ~100 ms Mount-Vorlauf an, der Sync folgt knapp danach.
+            await engine._delay(80);
+            engine.sync();
+          }
         }
       }
 

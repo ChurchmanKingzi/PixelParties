@@ -4382,6 +4382,12 @@ const ZONE_ANIM_SFX = {
     ];
     return L;
   })(),
+  // Ferocious Tiger Kick, Blut (app-fx-63, `tiger_blood`; nur 2. Angriff mit Heilung): Bild 0 = Aufplatzen am Ziel, Strahl 2–10, am Mund Bild 10 (Schluck), aufgesogen bis 19 (= Heilung der Engine, deren `heal`-Klang kommt vom Log).
+  // Zeiten animationsrelativ (Bild = 33,3 ms), der Mount-Vorlauf kommt von `playSFXForZoneAnim` dazu. Alle Lagen `category: null, dedupe: 0`.
+  tiger_blood: (() => {
+    const e = (name, bild, volume, rate) => ({ name, opts: { volume, rate, delay: Math.max(1, Math.round(bild * 1000 / 30)), category: null, dedupe: 0 } });
+    return [e('elem_water', 0, 0.5, 0.8), e('slash', 0, 0.3, 0.6), e('poison', 3, 0.35, 0.9), e('elem_water', 7, 0.3, 1.1), e('poison', 10, 0.3, 1.3), e('booster_umpf', 11, 0.35, 1.2), e('poison', 14, 0.2, 1.0)];
+  })(),
   venom_strike: (p) => {
     const st = Math.max(1, Math.min(3, (p && p.stacks) | 0 || 1));
     const e = (name, bild, volume, rate, extra) => ({ name, opts: { volume, rate, delay: Math.max(1, Math.round(bild * 1000 / 30)), category: null, dedupe: 0, ...(extra || null) } });
@@ -5240,6 +5246,7 @@ const ZONE_ANIM_NONEFFECT = new Set([
   'ox_headbutt',    // gestaffelte Lagen über 2 s (Absprung, Kontakt, Landung): jede trägt ihren Klang, keine Sammel-Sperre
   'venom_strike',   // gestaffelte Lagen über 1 s (Biss, Gift-Adern): jede trägt ihren Klang, keine Sammel-Sperre
   'tiger_kick',     // gestaffelte Lagen über 0,7 s (Tritt, Krallen, Brüllen, Sterne): jede trägt ihren Klang, keine Sammel-Sperre
+  'tiger_blood',    // Blut-Spritzer bei der Heilung (Spritzer, Strahl, Schluck): gestaffelte Lagen, keine Sammel-Sperre
   // v1422 (Als Befund 25.9.: „den Sound hoere ich im Spiel nicht"): der
   // Doom-Tick kommt fast immer im selben Augenblick wie andere Effekt-
   // Klaenge (Rundenende, Besiegung) und wurde von der 'effect'-Sperre

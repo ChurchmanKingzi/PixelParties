@@ -18,6 +18,9 @@
 //  PIXELGRÖSSE: Rasterzelle S = Hero-Pixel der Zielreihe (`ppFxZelleGedeckelt`, Regel in app-fx-57). Handy: Teilchen 50 %, kein Shake/Kopfwackler.
 //  Rückfall (Animationen aus, Retro, `__ppFxAlt`, reduzierte Bewegung, `window.__ppFx63Aus`, fehlende Quelle/Zone/Homografie): die alte Fassung `explosion` + `tiger_impact` am Ziel.
 //  Klang: `ZONE_ANIM_SFX.tiger_kick` (app-shared.jsx, gestaffelt; `attack_ram` kommt vom Dash). Aufwärmen (Trockenlauf der Zeichenroutinen, Kopf-Zellenlisten) im Leerlauf (`window.__ppFx63KeinAufwaermen` schaltet ab).
+//  BLUT (`tiger_blood`, zweite Zonen-Animation am selben Ziel, `von` = Angreifer; nur beim 2. Angriff mit Heilung, die Engine sendet sie NACH dem Schaden): eigene Leinwand um Ziel UND Angreifer (z-index 10101), 26 Bilder — Blutfontäne am Treffer,
+//  dicker Strahl im Bogen zum Mund des Angreifers (der ihn trinkt, roter Dither-Flash auf seiner Silhouette), Heilung der Engine bei Bild 19 (`BLUT_HEAL_MS` in ferocious-tiger-kick.js). Klang `ZONE_ANIM_SFX.tiger_blood`. Handy: halbe Teilchenzahl.
+//  Rückfall (Animationen aus, Retro, reduzierte Bewegung, `__ppFx63Aus`, fehlende Quelle/Geometrie): KEIN Blut (die Heilung läuft trotzdem). Messung: `window.__ppFx63BlutZeiten` = [Bild, ms], `__ppFx63BlutT0`, `__ppFx63BlutGrund`.
 //  Messung (nur Tests): `window.__ppFx63Messen = true` → `window.__ppFx63Zeiten` = [Bild, ms] (Bild −1 = Geometrie, −2 = Maske), `window.__ppFx63T0` = Startzeit (Bild 0) in performance.now().
 // ═════════════════════════════════════════════════════════════════
 (function (root) {
@@ -212,6 +215,7 @@
     if (C) return;
     const B = root.PpFx57; B.ensure(); H = B.H; BAY = B.BAY; snapA = B.snap; C = {}; const s = snapA;
     C.white = [255, 255, 255]; C.cream = s('#fffbd2'); C.yel = s('#ffe23d'); C.orange = s('#ff9a1a'); C.orL = s('#ffd066'); C.tig1 = s('#ff8b1a'); C.tig2 = s('#f29a3e'); C.grau = s('#9aa3b6'); C.ink = s('#12101f');
+    C.bl0 = s('#3a0000'); C.bl1 = s('#780000'); C.bl2 = s('#be0e0e'); C.bl3 = s('#ef2929'); C.bl4 = s('#ff6666'); C.bl5 = s('#fe7476');   // Blut: dunkel → hell (Palette)
     C.dust0 = s('#c5b7a0'); C.dust1 = s('#a89370'); C.dust2 = s('#886c44'); C.dust3 = s('#ebdcc1');
     FX.C = C;
     headCells('zu'); headCells('halb'); headCells('auf');
@@ -325,6 +329,112 @@
       for (let f = 0; f < LEN; f += 3) { buf.fill(0); FX.draw(m, f, P, cam, { pile: () => {} }); }
     }
   };
+
+  // ═════════ BLUT-SPRITZER (Zonen-Animation `tiger_blood`, nur 2. Angriff der Runde MIT Heilung): Fontäne am Ziel, dicker Blutstrahl im Bogen zum Mund des Angreifers, der ihn „trinkt" ═════════
+  // Ablauf (Bild b nach dem Ereignis, 30/s): 0–2 Aufplatzen am Treffer (Dither-Stern, Fontänensäule), 0–12 Tropfen im Bogen mit Schwerkraft, am Boden Dither-Flecken (verblassen); 2–10 der Strahl wächst vom Ziel zum Mund
+  // (wellig, 3 Zellen breit, Perlen laufen mit, Tropfen lösen sich); 10 Strahl am Mund: Plopp-Kreuz, Spritzer, roter Dither-Flash auf dem Angreifer (10–15); 11–19 der Strahl wird vom Ziel her aufgesogen;
+  // 19 = HEILUNG (Engine `BLUT_HEAL_MS`, danach `heal_sparkle`); bis 25 klingen Flecken/Spritzer aus.
+  const BLUT_LEN = 26, BLUT_HEAL_F = 19; FX.BLUT_LEN = BLUT_LEN; FX.BLUT_HEAL_F = BLUT_HEAL_F;
+  const easeOut2 = (x) => 1 - (1 - clamp(x)) * (1 - clamp(x));
+  FX.blutPlan = (o) => {
+    const n = o.n == null ? 1 : o.n, sd = (o.seed || 1) * 53 + 7, Hc = mx(24, o.Hc || 40), K = o.K, M = o.M, gy = o.gy, sgn = o.sgn || 1;
+    const P = { n, phone: !!o.phone, sd, Hc, K, M, gy, sgn, drops: [], drips: [], mund: [], g: 1.5 * Hc / 40 };
+    const g = P.g, nd = mx(10, rd(34 * n));
+    for (let i = 0; i < nd; i++) {
+      const ang = (H(sd, i) - 0.5) * 1.7 + sgn * 0.22, v = (0.4 + 0.6 * H(sd + 1, i)) * 8.2 * sqrt(Hc / 40), vx = Math.sin(ang) * v * 0.8, vy = -Math.cos(ang) * v, gyj = gy + rd((H(sd + 2, i) - 0.4) * 6);
+      const dd = vy * vy - 2 * g * (K[1] - gyj), aL = dd > 0 ? (-vy + sqrt(dd)) / g : 0;
+      P.drops.push({ a0: (H(sd + 3, i) * (i < nd * 0.6 ? 3 : 9)) | 0, vx, vy, gyj, aL, big: H(sd + 4, i) < 0.6, splat: H(sd + 5, i) < 0.65, life: 8 + ((H(sd + 6, i) * 5) | 0) });
+    }
+    const dx = M[0] - K[0], dy = M[1] - K[1], d = hyp(dx, dy); P.C1 = [(K[0] + M[0]) / 2 + sgn * mx(0.3 * d, 1.0 * Hc) * (1 - Math.abs(dx) / (d || 1)), (K[1] + M[1]) / 2 - (0.3 * d + 0.3 * Hc)];   // seitliche Ausbuchtung, damit auch ein senkrechter Weg (Angreifer genau über/unter dem Ziel) einen Bogen zeigt
+    let L = 0, px = K[0], py = K[1];
+    for (let i = 1; i <= 32; i++) { const t = i / 32, u = 1 - t, x = u * u * K[0] + 2 * u * t * P.C1[0] + t * t * M[0], y = u * u * K[1] + 2 * u * t * P.C1[1] + t * t * M[1]; L += hyp(x - px, y - py); px = x; py = y; }
+    P.L = mx(8, L);
+    const ndr = mx(3, rd(7 * n)); for (let i = 0; i < ndr; i++) P.drips.push({ t: 0.3 + 0.5 * H(sd + 10, i), s: 5 + 2 * i, vx: (H(sd + 11, i) - 0.5) * 0.5 });
+    const nm = mx(4, rd(9 * n)); for (let i = 0; i < nm; i++) P.mund.push({ ang: -PI / 2 + (H(sd + 20, i) - 0.5) * 2.6, v: 1.4 + 3.2 * H(sd + 21, i), big: H(sd + 22, i) < 0.25 });
+    return P;
+  };
+  const sq = (m, x, y, w, c, lv) => { const o = (w - 1) >> 1; for (let j = 0; j < w; j++) for (let i = 0; i < w; i++) m.pd(x - o + i, y - o + j, c, lv == null ? 16 : lv); };
+  function blutTropfen(m, x, y, big, c0, c1, c2, c3) {
+    x = rd(x); y = rd(y);
+    if (big) { m.px(x, y, c2); m.px(x + 1, y, c1); m.px(x, y + 1, c1); m.px(x + 1, y + 1, c0); m.px(x, y, c3); } else m.px(x, y, c2);
+  }
+  /** m: Maler (Zellen); f: Bild; P: Plan; hook.aura(m, lvFlaeche, lvRing) tönt den Angreifer (Silhouette) rot. */
+  FX.blutDraw = (m, f, P, hook) => {
+    m.setZ(0);
+    const K = P.K, M = P.M, Hc = P.Hc, g = P.g, c0 = C.bl0, c1 = C.bl1, c2 = C.bl2, c3 = C.bl3, c4 = C.bl4, c5 = C.bl5;
+    // ───── Boden: Flecken der gelandeten Tropfen (Dither-Fleck, verblasst) ─────
+    for (const d of P.drops) {
+      const age = f - d.a0; if (age < d.aL || !d.splat) continue;
+      const s = age - d.aL, X = rd(K[0] + d.vx * d.aL), Y = d.gyj; if (s > d.life) continue;
+      const lv = s < 5 ? 16 : 16 * (1 - (s - 5) / (d.life - 5)), w = s < 1 ? 3 : s < 2 ? 2 : 2 + (d.big ? 1 : 0);
+      for (let i = -w; i <= w; i++) { m.pd(X + i, Y, Math.abs(i) >= w ? c0 : c1, lv); if (Math.abs(i) < w) m.pd(X + i, Y + 1, c0, lv * 0.7); }
+      if (s < 3) { m.px(X - 1, Y - 1, c2); m.px(X + 1, Y - 1, c3); }
+    }
+    // ───── Aufplatzen am Treffer (Bild 0–2): Dither-Stern + Fontänensäule ─────
+    if (f <= 2) {
+      const R0 = [9, 12, 8][f], X = rd(K[0]), Y = rd(K[1]);
+      for (let yy = -R0; yy <= R0; yy++) for (let xx = -R0; xx <= R0; xx++) { const d = hyp(xx, yy) / R0; if (d > 1) continue; m.pd(X + xx, Y + yy, d < 0.45 ? c4 : d < 0.75 ? c3 : c2, [16, 13, 8][f] * (1 - d * 0.55)); }
+      for (let q = 0; q < 8; q++) { const a = q * PI / 4 + 0.2 * f, l = (q & 1) ? R0 * 0.8 : R0 * 1.6; m.linie(X, Y, X + Math.cos(a) * l, Y + Math.sin(a) * l * 0.9, (q & 1) ? 1 : 2, (q & 1) ? c3 : c2, 16); }
+    }
+    if (f <= 8) {
+      // Fontäne: drei Strahlen im Bogen (Mitte kräftig, seitlich schwächer), Spitze wächst bis Bild 5, dann Dither-Zerfall
+      const lv = f <= 5 ? 16 : 16 * (1 - (f - 5) / 4), tm = mn(7.5, 0.6 + f * 1.5), vs = sqrt(Hc / 40);
+      if (lv > 0) for (const [vx, vy, th] of [[P.sgn * 0.5, -7.6, 3], [P.sgn * 0.5 - 2.7, -6.2, 2], [P.sgn * 0.5 + 2.9, -6.0, 2]]) {
+        const pts = []; for (let a = 0; a <= tm + 1e-6; a += 0.5) pts.push([K[0] + vx * vs * a, K[1] + vy * vs * a + 0.5 * g * a * a]);
+        for (let i = 1; i < pts.length; i++) m.linie(pts[i - 1][0], pts[i - 1][1], pts[i][0], pts[i][1], th + 2, c0, lv);
+        for (let i = 1; i < pts.length; i++) m.linie(pts[i - 1][0], pts[i - 1][1], pts[i][0], pts[i][1], th, i < 3 ? c3 : c2, lv);
+        for (let i = 1; i < pts.length; i += 2) m.px(rd(pts[i][0]) - 1, rd(pts[i][1]) - 1, c4);
+      }
+    }
+    // ───── Tropfen der Fontäne ─────
+    for (const d of P.drops) {
+      const age = f - d.a0; if (age < 0 || age >= d.aL) continue;
+      const x = K[0] + d.vx * age, y = K[1] + d.vy * age + 0.5 * g * age * age, X = rd(x), Y = rd(y);
+      if (age >= 1) { const a2 = age - 1, tx = K[0] + d.vx * a2, ty = K[1] + d.vy * a2 + 0.5 * g * a2 * a2; m.linie(tx, ty, x, y, 1, c2, 16); }
+      blutTropfen(m, X, Y, d.big, c1, c2, c3, c4);
+    }
+    // ───── Strahl: Bogen Ziel → Mund ─────
+    const ub = f < 2 ? 0 : easeOut2((f - 2) / 8), ua = f < 11 ? 0 : Math.pow(clamp((f - 11) / 8), 2);
+    const bez = (t) => { const u = 1 - t; return [u * u * K[0] + 2 * u * t * P.C1[0] + t * t * M[0], u * u * K[1] + 2 * u * t * P.C1[1] + t * t * M[1]]; };
+    if (ub - ua > 0.012 && f < BLUT_HEAL_F + 1) {
+      const ns = mx(4, Math.ceil(P.L * (ub - ua))), xs = [], ys = [], ws = [], amp = P.phone ? 1.2 : 1.7;
+      for (let i = 0; i <= ns; i++) {
+        const t = ua + (ub - ua) * i / ns, p = bez(t), q = bez(mn(1, t + 0.01)), q0 = bez(mx(0, t - 0.01));
+        let tx = q[0] - q0[0], ty = q[1] - q0[1]; const tl = hyp(tx, ty) || 1; tx /= tl; ty /= tl;
+        const env = Math.pow(Math.sin(PI * clamp(t)), 0.6), w = Math.sin(t * P.L / 5.5 - f * 1.15) * amp * env;
+        xs.push(rd(p[0] - ty * w)); ys.push(rd(p[1] + tx * w));
+        const dTail = i, dHead = ns - i; ws.push(mn(dTail, dHead) < 2 ? 2 : 3);
+      }
+      for (let i = 0; i <= ns; i++) sq(m, xs[i], ys[i], ws[i] + 2, c0);
+      for (let i = 0; i <= ns; i++) sq(m, xs[i], ys[i], ws[i], c2);
+      for (let i = 0; i <= ns; i++) { m.px(xs[i], ys[i], c3); if (ws[i] === 3) m.px(xs[i] - 1, ys[i] - 1, c3); if (i % 3 === 0 && ws[i] === 3) m.px(xs[i] - 1, ys[i] - 1, c4); }
+      // Perlen: 2×2 helle Tropfen laufen mit dem Fluss
+      const nb = mx(2, rd(5 * P.n));
+      for (let k = 0; k < nb; k++) { const t = ((k / nb + f * 0.075) % 1); if (t < ua || t > ub) continue; const j = mn(ns, rd((t - ua) / mx(1e-6, ub - ua) * ns)); const X = xs[j], Y = ys[j]; sq(m, X, Y, 4, c0); m.px(X - 1, Y - 1, c4); m.px(X, Y - 1, c3); m.px(X - 1, Y, c3); m.px(X, Y, c2); }
+      // Kopf des Strahls: gerundeter Tropfen
+      if (ub < 1) { const X = xs[ns], Y = ys[ns]; sq(m, X, Y, 5, c0); sq(m, X, Y, 3, c3); m.px(X - 1, Y - 1, c4); }
+      // Tropfen lösen sich vom Strahl und fallen
+      for (const dp of P.drips) {
+        const age = f - dp.s; if (age < 0 || age > 10) continue; const p = bez(dp.t), x = p[0] + dp.vx * age, y = p[1] + 0.5 * g * 0.7 * age * age, lv = age < 6 ? 16 : 16 * (1 - (age - 6) / 5);
+        m.pd(rd(x), rd(y), c2, lv); m.pd(rd(x), rd(y) - 1, c1, lv * 0.8);
+      }
+    }
+    // ───── Mund: Plopp-Kreuz, Spritzer, roter Flash auf dem Angreifer ─────
+    if (f >= 10 && f <= 15) {
+      const X = rd(M[0]), Y = rd(M[1]), a = f - 10;
+      if (a <= 2) { const L = [3, 5, 3][a]; for (let i = -L; i <= L; i++) { m.px(X + i, Y, i === 0 ? c5 : c4); m.px(X, Y + i, i === 0 ? c5 : c4); } m.px(X - 1, Y - 1, c3); m.px(X + 1, Y + 1, c3); m.px(X + 1, Y - 1, c3); m.px(X - 1, Y + 1, c3); }
+      for (const d of P.mund) { const x = M[0] + Math.cos(d.ang) * d.v * a, y = M[1] + Math.sin(d.ang) * d.v * a + 0.5 * 0.8 * a * a; if (a < 5 || BAY[rd(y) & 3][rd(x) & 3] < 16 - (a - 5) * 6) blutTropfen(m, x, y, d.big && a < 3, c1, c2, c3, c4); }
+      if (hook && hook.aura) hook.aura(m, [4, 7, 9, 7, 5, 2][a], [8, 13, 16, 12, 8, 4][a]);
+    }
+  };
+  /** Trockenlauf (Leerlauf): wärmt den Blut-Code. */
+  FX.blutTrocken = () => {
+    FX.init();
+    const gw = 260, gh = 260, buf = new Uint8ClampedArray(gw * gh * 4), tq = new Float32Array(gw * gh), m = maler(buf, gw, gh, tq, 0, 0);
+    const P = FX.blutPlan({ K: [160, 160], M: [60, 90], gy: 190, Hc: 40, n: 1, phone: false, seed: 3, sgn: 1 });
+    for (let f = 0; f < BLUT_LEN; f += 4) { buf.fill(0); FX.blutDraw(m, f, P, { aura: () => {} }); }
+  };
+
   root.PpFx63 = FX;
 })(window);
 
@@ -378,6 +488,7 @@ function ppFx63Geometrie(props) {
     // Leinwandrechteck (Fensterpixel): Ziel samt Figur plus Rand für Kopf (≈ 27 Zellen darüber, 21 breit, seitlich bis ≈ 40 Zellen), Krallen, Sterne, Ringe und Staub
     let l0 = zr.left, t0 = zr.top, r0 = zr.right, b0 = zr.bottom;
     if (tFig) { const cr = tFig.hp.cv.getBoundingClientRect(); l0 = Math.min(l0, cr.left); t0 = Math.min(t0, cr.top); r0 = Math.max(r0, cr.right); b0 = Math.max(b0, cr.bottom); }
+    if (props.blut) { const vb = vonEl.getBoundingClientRect(); l0 = Math.min(l0, vb.left); t0 = Math.min(t0, vb.top); r0 = Math.max(r0, vb.right); b0 = Math.max(b0, vb.bottom); }   // Blut: auch der Angreifer (Mund) gehört in die Leinwand
     const S0 = ppFxZelleFuer({ zelleS: props.zelleS, zoneEl, w, x, y }), padZ = 56;
     const S = ppFxZelleGedeckelt({ zelleS: props.zelleS, zoneEl, w, x, y }, { breite: r0 - l0 + 2 * padZ * S0, hoehe: b0 - t0 + 2 * padZ * S0 });
     const pad = padZ * S;
@@ -572,13 +683,97 @@ function PpFx63Effekt(props) {
 }
 if (typeof ANIM_REGISTRY !== 'undefined') ANIM_REGISTRY.tiger_kick = PpFx63Effekt;
 
+/** Blut-Spritzer (`tiger_blood`): eigene Leinwand um Ziel UND Angreifer; Fontäne am Treffer, Strahl zum Mund, roter Flash auf dem Angreifer. Rein Optik (Bild 19 = Heilung der Engine). */
+function PpFx63BlutLeinwand({ geo, zoneEl }) {
+  const cvs = useRef(null);
+  useEffect(() => {
+    const el = cvs.current, FX = geo.FX;
+    if (!el) return undefined;
+    const { S, P: TP, gw, gh, tFig, phone, proj, cell, vonEl } = geo;
+    const ctx = el.getContext('2d'), img = ctx.createImageData(gw, gh), buf = img.data, tq = new Float32Array(gw * gh);
+    const m = FX.maler(buf, gw, gh, tq, 0, 0), takt = window.ppTaktRaf || window.requestAnimationFrame, C = FX.C;
+    const hero = TP.hero, thu = TP.hu, k0 = proj(TP.T[0], TP.T[1], 0)[2];
+    const K = hero ? proj(TP.T[0], TP.T[1], 0.45 * thu) : proj(TP.T[0], TP.T[1], 6), M0 = proj(TP.A[0], TP.A[1], 0.84 * TP.huA);
+    const gy = Math.round(hero ? proj(TP.T[0], TP.T[1], 0)[1] : proj(TP.T[0], TP.T[1] + TP.hb * 0.4, 0)[1]);
+    const Hc = hero ? thu * k0 : TP.hb * k0 * 1.14;
+    const BP = FX.blutPlan({ K: [K[0], K[1]], M: [M0[0], M0[1]], gy, Hc, n: TP.n, phone, seed: TP.seed, sgn: K[0] >= M0[0] ? 1 : -1 });
+    if (window.__ppFx63Messen) window.__ppFx63BlutDbg = { K, M: M0, gy, Hc, huA: TP.huA, A: TP.A, S, gw, gh };
+    // Angreifer-Silhouette (einmal bei Bild 10 gemessen, wenn der Dash längst zurück ist): Zellen der Figur + Rand
+    let sil = null;
+    const messeSil = () => {
+      const out = { inn: [], rand: [] };
+      try {
+        // Figur direkt vom Platz lesen (nicht über `ppFx59Figur`: dessen Hero-Pixel-Plausibilitätsprüfung verwirft eine noch federnde Figur)
+        const platz = vonEl && vonEl._ppFigurPlatz, cv = platz && platz.querySelector && platz.querySelector('canvas.hero-idle-canvas'), eintrag = platz && platz._ppEintrag, s = eintrag && ppFx57SheetPixel(eintrag);   // `.hero-idle-canvas`: die Figur selbst (das erste `canvas` im Platz kann ein Nachbild des Dashs sein)
+        if (!cv || !(cv.width > 0) || !s) { if (window.__ppFx63Messen) window.__ppFx63BlutDbg.silFehler = 'keine Figur'; return out; }
+        const r = cv.getBoundingClientRect(), c0 = cell(r.left, r.top), cps = (r.width / cv.width) / S, fr = Math.max(0, Math.min((platz._ppFrame | 0), Math.max(1, (eintrag.meta.frames | 0)) - 1));
+        const sx0 = s.vert ? 0 : fr * s.fw, sy0 = s.vert ? fr * s.fh : 0, mk = new Uint8Array(gw * gh);
+        const x0 = Math.max(0, Math.floor(c0[0])), x1 = Math.min(gw - 1, Math.ceil(c0[0] + s.fw * cps)), y0 = Math.max(0, Math.floor(c0[1])), y1 = Math.min(gh - 1, Math.ceil(c0[1] + s.fh * cps));
+        for (let Y = y0; Y <= y1; Y++) for (let X = x0; X <= x1; X++) {
+          const col = Math.floor((X + 0.5 - c0[0]) / cps), row = Math.floor((Y + 0.5 - c0[1]) / cps); if (col < 0 || col >= s.fw || row < 0 || row >= s.fh) continue;
+          if (s.d[((sy0 + row) * s.w + sx0 + col) * 4 + 3] < 128) continue; mk[Y * gw + X] = 1; out.inn.push(X, Y);
+        }
+        for (let Y = Math.max(1, y0 - 1); Y <= Math.min(gh - 2, y1 + 1); Y++) for (let X = Math.max(1, x0 - 1); X <= Math.min(gw - 2, x1 + 1); X++) {
+          const k = Y * gw + X; if (mk[k]) continue; if (mk[k - 1] || mk[k + 1] || mk[k - gw] || mk[k + gw]) out.rand.push(X, Y);
+        }
+      } catch (e) { if (window.__ppFx63Messen) window.__ppFx63BlutDbg.silFehler = String(e && e.message); /* ohne Silhouette: nur Strahl und Spritzer */ }
+      return out;
+    };
+    const hook = { aura: (mm, lvF, lvR) => {
+      if (!sil) { sil = messeSil(); if (window.__ppFx63Messen) { let a0 = 1e9, a1 = -1e9, b0 = 1e9, b1 = -1e9; for (let i = 0; i < sil.inn.length; i += 2) { a0 = Math.min(a0, sil.inn[i]); a1 = Math.max(a1, sil.inn[i]); b0 = Math.min(b0, sil.inn[i + 1]); b1 = Math.max(b1, sil.inn[i + 1]); } window.__ppFx63BlutDbg.sil = [sil.inn.length / 2, sil.rand.length / 2, a0, a1, b0, b1]; } }
+      for (let i = 0; i < sil.inn.length; i += 2) mm.pd(sil.inn[i], sil.inn[i + 1], C.bl2, lvF);
+      for (let i = 0; i < sil.rand.length; i += 2) mm.pd(sil.rand[i], sil.rand[i + 1], C.bl3, lvR);
+    } };
+    const t0 = performance.now();
+    if (window.__ppFx63Messen) window.__ppFx63BlutT0 = t0;
+    let raf = 0, letzte = -1, ende = false;
+    const aufraeumen = () => { if (ende) return; ende = true; try { cancelAnimationFrame(raf); } catch (e) { /* weg */ } try { ctx.clearRect(0, 0, gw, gh); } catch (e) { /* weg */ } };
+    const schritt = (jetzt) => {
+      if (ende) return;
+      if (typeof jetzt !== 'number') jetzt = performance.now();
+      const ms = Math.max(0, jetzt - t0);
+      if (ms >= (FX.BLUT_LEN + 1) * PP_FX63_TAKT) { aufraeumen(); return; }
+      const fr = Math.floor(jetzt / PP_FX63_TAKT);
+      if (fr !== letzte) {
+        letzte = fr;
+        const mess = window.__ppFx63Messen ? performance.now() : 0, f = Math.min(FX.BLUT_LEN - 1, Math.floor(ms / PP_FX63_TAKT + 1e-4));
+        buf.fill(0); FX.blutDraw(m, f, BP, hook); ctx.putImageData(img, 0, 0);
+        if (mess) (window.__ppFx63BlutZeiten || (window.__ppFx63BlutZeiten = [])).push([f, +(performance.now() - mess).toFixed(3)]);
+      }
+      raf = takt(schritt);
+    };
+    raf = takt(schritt);
+    const netz = setTimeout(aufraeumen, (FX.BLUT_LEN + 1) * PP_FX63_TAKT + 2500);
+    return () => { clearTimeout(netz); aufraeumen(); };
+  }, []);
+  return (
+    <div aria-hidden="true" data-pp-px="aus" style={{ position: 'fixed', left: geo.lx, top: geo.ly, pointerEvents: 'none', zIndex: 10101 }}>
+      <canvas ref={cvs} width={geo.gw} height={geo.gh} style={{ width: geo.gw * geo.S, height: geo.gh * geo.S, imageRendering: 'pixelated', display: 'block' }} />
+    </div>
+  );
+}
+
+/** Registry-Komponente `tiger_blood`: ohne Quelle/Geometrie, im Rückfall (Animationen aus, Retro, reduzierte Bewegung, `__ppFx63Aus`) wird KEIN Blut gezeichnet (die Heilung kommt trotzdem). */
+function PpFx63BlutEffekt(props) {
+  const geo = useMemo(() => {
+    if (props.prewarm || !(props.zoneEl && props.zoneEl.isConnected) || !props.vonEl) { window.__ppFx63BlutGrund = 'kein Ziel/Quelle/Vorwärmen'; return null; }
+    if (ppFx63Rueckfall()) { window.__ppFx63BlutGrund = 'Rückfall'; return null; }
+    const g = ppFx63Geometrie({ ...props, blut: true });
+    window.__ppFx63BlutGrund = g ? 'neu' : ('Geometrie ' + window.__ppFx63Grund);
+    return g;
+  }, []);
+  if (props.prewarm || !geo) return null;
+  return <PpFx63BlutLeinwand geo={geo} zoneEl={props.zoneEl} />;
+}
+if (typeof ANIM_REGISTRY !== 'undefined') ANIM_REGISTRY.tiger_blood = PpFx63BlutEffekt;
+
 // Aufwärmen im Leerlauf: Trockenlauf der Zeichenroutinen (Hero und Karte, Kopf oben und seitlich), damit der erste Tritt nicht im kalten Code startet.
 (function ppFx63Aufwaermen() {
   const los = () => {
     try {
       if (ppFx63Rueckfall() || window.__ppFx63KeinAufwaermen) return;
       const ric = window.requestIdleCallback || ((f) => setTimeout(f, 60));
-      ric(() => { try { window.PpFx63.trocken(); } catch (e) { /* weg */ } }, { timeout: 2500 });
+      ric(() => { try { window.PpFx63.trocken(); window.PpFx63.blutTrocken(); } catch (e) { /* weg */ } }, { timeout: 2500 });
     } catch (e) { /* weg */ }
   };
   setTimeout(() => (window.requestIdleCallback ? window.requestIdleCallback(los, { timeout: 6000 }) : los()), 6500);
