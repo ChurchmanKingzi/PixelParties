@@ -4549,6 +4549,7 @@ function ShopScreen() {
   const [randomReveal, setRandomReveal] = useState(null); // { imgUrl, label, subtitle } or null
   // Das Ergebnis eines Pulls (Besitz, Kopien, Zähler) wird erst NACH der Pull-Animation angewendet — sonst verrät der Zähler im Hintergrund
   // schon vorher, dass etwas Neues gezogen wurde. Beim Schließen des Reveals (oder Verlassen des Shops) wird es nachgetragen.
+  const [countBump, setCountBump] = useState(0);   // Zähler für die „+1!“-Animation am Sammlungszähler
   const pendingPull = useRef(null);
   const flushPull = () => { const f = pendingPull.current; pendingPull.current = null; if (f) f(); };
   useEffect(() => () => { flushPull(); }, []);
@@ -4801,6 +4802,7 @@ function ShopScreen() {
     try {
       const data = await api('/shop/buy-random-skin', { method: 'POST' });
       pendingPull.current = () => {
+        if (data.isNew) setCountBump(n => n + 1);
         if (data.isNew) setOwned(prev => ({ ...prev, skin: [...prev.skin, data.skinName] }));
         else setDupes(prev => ({ ...prev, skin: { ...prev.skin, [data.skinName]: data.dupes } }));
       };
@@ -4828,6 +4830,7 @@ function ShopScreen() {
     try {
       const data = await api('/shop/buy-random', { method: 'POST', body: JSON.stringify({ itemType }) });
       pendingPull.current = () => {
+        if (data.isNew) setCountBump(n => n + 1);
         if (data.isNew) setOwned(prev => ({ ...prev, [itemType]: [...prev[itemType], data.itemId] }));
         else setDupes(prev => ({ ...prev, [itemType]: { ...prev[itemType], [data.itemId]: data.dupes } }));
         if (itemType === 'avatar') window.ppAvatarRankForget(user.username);   // Rang des getragenen Avatars kann gestiegen sein
@@ -5105,7 +5108,10 @@ function ShopScreen() {
         <div className="shop-coll-head">
           <div className="shop-coll-head-in">
             <div className="shop-coll-title">YOUR COLLECTION</div>
-            <div className="shop-coll-count">{ownedN} / {items.length}</div>
+            <div className="shop-coll-count">
+              <span key={'n' + countBump} className={countBump ? 'shop-coll-count-bump' : ''}>{ownedN} / {items.length}</span>
+              {countBump > 0 && <span key={'p' + countBump} className="shop-coll-plus" aria-hidden="true">+1!</span>}
+            </div>
             <div className="shop-coll-bar" role="progressbar" aria-valuemin={0} aria-valuemax={items.length} aria-valuenow={ownedN}>
               <span style={{ width: pct + '%' }} />
             </div>
