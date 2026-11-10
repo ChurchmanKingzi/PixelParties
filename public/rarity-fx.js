@@ -619,11 +619,13 @@
   }
   /** Lage des Streifens (Lauf-Koordinate) oder null in der Pause */
   const prisPos = (pre, t) => { const s = t % (PRIS_RUN + PRIS_PAUSE); return s >= PRIS_RUN ? null : pre.lo + (pre.hi - pre.lo) * (s / PRIS_RUN); };
+  const PRIS_RIM_PER = 3.6, PRIS_RIM_RUN = .75;   // Randglanz: Periode in s, Laufanteil (Standbild bei 1,7 s: Glanz mitten auf der Karte)
   FX.pris = {
     noText: true,
     prep: () => ({}),
     warm(E, st) { st.pre = prisPre(E); },
     frame(E, st, t, o) {
+      rimBand(E, o, glintU(t, PRIS_RIM_PER, PRIS_RIM_RUN), 5, [236, 242, 255], UD);   // Kartenrand glänzt wie bei Rare (Silberlauf, unabhängig vom Kachelstreifen)
       const pre = st.pre || (st.pre = prisPre(E)), pos = prisPos(pre, t); if (pos === null) return;
       const { start, cp, cb, cb2, ce, nt, cg, off, k0, fr, cov, WV } = pre;
       for (let f = 0; f < nt; f++) {
