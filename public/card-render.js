@@ -762,7 +762,7 @@
     if (t === 'spell' || t === 'summon') {
       if (spec.school && !textOnly) sprite(ctx, 'school.' + spec.school, 0, 550, 110, 110);
       // `lvOver`: aktuelle Stufe (Hand: Rabatt gruen, Zuschlag rot), mit dunkler Kontur. Sonst wie der Name; der Glanz (Foil) liegt in der Namensmaske.
-      if (!textOnly && (spec.level != null || spec.lvOver != null)) {
+      if (!textOnly && !spec.noLv && (spec.level != null || spec.lvOver != null)) {
         const ueber = spec.lvOver != null;
         drawLine(ctx, String(ueber ? spec.lvOver : spec.level), Object.assign({}, LEVEL_BOX, {
           color: ueber ? spec.lvColor : fillFor(LEVEL_BOX.top, LEVEL_BOX.height), outline: ueber ? OVER_OUTLINE : nameOut, outlineFactor: ueber ? 1 : nameOutF,
@@ -963,6 +963,7 @@
     if (o.noHp) spec.noHp = true;
     if (o.stufe >= 1 && o.stufe <= 3) spec.stufe = o.stufe;
     if (o.noAtk) spec.noAtk = true;
+    if (o.noNums) { spec.noHp = true; spec.noAtk = true; spec.noLv = true; }   // alle Zahlen weglassen (statsLayer)
     // aktuelle Stufe / Kosten (Hand): gruen, wenn niedriger als gedruckt, rot, wenn hoeher; gleich -> unveraendert gedruckt
     if (o.lv != null && card.level != null && o.lv !== card.level) { spec.lvOver = o.lv; spec.lvColor = o.lv < card.level ? OVER_GREEN : OVER_RED; }
     // Variable Kosten („4X"): das X bleibt dran (aus 4X wird 8X); ein reines „X" hat keine Zahl, die man ersetzen koennte.
@@ -998,33 +999,49 @@
     // Skin-Holo: der Name steht golden auf der Karte (siehe unten, HOLO-TEXTUR); die schillernden Schichten
     // darueber zeichnet das Spiel als eigene DOM-Lage (SkinHolo in app-shared.jsx).
     if (skin && holoOn(skin)) spec.nameGold = true;
-    const cv = draw(spec, art);
-    cv.keep = keepInfo(spec);                      // was bei einem Rang-Rahmen ÜBER dem Rahmen bleiben muss (keepOver)
-    return cv;
+    return draw(spec, art);
   }
 
   /**
-   * Rang-Rahmen (Duplikate, rank-frames.js) liegen über dem Kartenbild. Werte und Symbole, die am Kartenrand stehen, müssen aber
-   * ÜBER dem Rahmen bleiben: Name oben, Wertezeile unten (Herz/HP, Schwert/Angriff, Kosten), Zauberschule links, Stufe rechts, Kartenart-Symbol.
-   * Liefert die Rechtecke (Kartenpixel 750 × 1050), die aus der ungerahmten Karte zurückgelegt werden, und das Kartenart-Symbol.
+   * Rang-Rahmen (Duplikate, rank-frames.js) liegen über dem Kartenbild und können die Zahlen am Kartenrand verdecken. Darum werden die
+   * STAT-ZAHLEN (HP, Angriff, Kosten, Stufe) nach dem Einbacken noch einmal über den Rahmen gelegt — nur die Ziffern, mit dunkler Umrandung
+   * für die Lesbarkeit; Wertefelder, Symbole und Rahmen bleiben, wie sie sind.
+   * Die Ziffern entstehen als Unterschied zwischen der Karte `un` (renderCard, ungerahmt) und derselben Karte ohne Zahlen (`noNums`).
+   * @returns {Promise<HTMLCanvasElement|null>} 750 × 1050, durchsichtig bis auf Ziffern + Umrandung
    */
-  function keepInfo(spec) {
-    const t = spec.type, rects = [];
-    rects.push([100, 44, 550, 66]);                    // Name (oben): das dicke Band hoher Ränge würde ihn sonst anschneiden
-    if (hatHp(t) || isHero3(t) || t === 'summon' || isArti2(t)) rects.push([90, 982, 600, 66]);
-    if (t === 'spell' || t === 'summon') {
-      if (spec.school) rects.push([0, 550, 110, 110]);
-      if (spec.level != null || spec.lvOver != null) rects.push([650, 550, 100, 110]);
+  async function statsLayer(card, o, un) {
+    const base = await renderCard(card, Object.assign({}, o || {}, { noNums: true }));
+    if (!base || !un) return null;
+    const a = un.getContext('2d').getImageData(0, 0, W, H).data, b = base.getContext('2d').getImageData(0, 0, W, H).data;
+    const out = document.createElement('canvas'); out.width = W; out.height = H;
+    const g = out.getContext('2d'), img = g.createImageData(W, H), d = img.data, mask = new Uint8Array(W * H);
+    let any = false;
+    const zeilen = new Uint8Array(H);                // Zeilen mit Ziffern: die Umrandung wird nur dort (± R) gesucht
+    for (let i = 0; i < W * H; i++) {
+      const k = i * 4;
+      if (a[k] !== b[k] || a[k + 1] !== b[k + 1] || a[k + 2] !== b[k + 2] || a[k + 3] !== b[k + 3]) {
+        mask[i] = 1; any = true; zeilen[(i / W) | 0] = 1;
+        d[k] = a[k]; d[k + 1] = a[k + 1]; d[k + 2] = a[k + 2]; d[k + 3] = 255;
+      }
     }
-    const kind = spec.kind && (t === 'spell' || t === 'summon' || t === 'potion' || t === 'artifact') ? spec.kind : null;
-    return { rects, kind };
-  }
-  /** Legt die Werte/Symbole der ungerahmten Karte `un` (aus renderCard) über den Rahmen auf dem Canvas-Kontext `g` (gleiche Größe). */
-  function keepOver(un, g) {
-    const k = un && un.keep; if (!k) return;
-    g.imageSmoothingEnabled = false;
-    for (const [x, y, w, h] of k.rects) g.drawImage(un, x, y, w, h, x, y, w, h);
-    if (k.kind) sprite(g, 'kind.' + k.kind, 0, 950, 100, 100);
+    if (!any) return null;
+    // dunkle Umrandung (harte Kante, 3 px) um die Ziffern, damit sie auf jedem Rahmen lesbar bleiben
+    const R = 3, dark = [8, 6, 12];
+    for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+      let nah = false; for (let q = -R; q <= R; q++) if (y + q >= 0 && y + q < H && zeilen[y + q]) { nah = true; break; }
+      if (!nah) { x = W; continue; }
+      const i = y * W + x;
+      if (mask[i] || d[i * 4 + 3]) continue;
+      let hit = false;
+      for (let dy = -R; dy <= R && !hit; dy++) for (let dx = -R; dx <= R; dx++) {
+        if (Math.abs(dx) + Math.abs(dy) > R + 1) continue;
+        const xx = x + dx, yy = y + dy;
+        if (xx >= 0 && yy >= 0 && xx < W && yy < H && mask[yy * W + xx]) { hit = true; break; }
+      }
+      if (hit) { d[i * 4] = dark[0]; d[i * 4 + 1] = dark[1]; d[i * 4 + 2] = dark[2]; d[i * 4 + 3] = 255; }
+    }
+    g.putImageData(img, 0, 0);
+    return out;
   }
 
   // ═════════════ DAUERHAFTER CACHE (IndexedDB) ═════════════
@@ -1484,5 +1501,5 @@
   }
   function rimCached(rk) { return (rk && rimDone.get(rk.kind)) || null; }
 
-  root.CardRender = { OPT, last: {}, keepOver, meta_card: (n, r) => { meta.cards[n] = Object.assign(meta.cards[n] || {}, { r: r === 'common' ? undefined : r }); }, meta_set: (k, name) => { meta.skins[k] = Object.assign(meta.skins[k] || {}, { name }); }, init, draw, specFromCard, renderCard, holoLayers, holoFor, holoCached, textLayer, geometryOf, artGrid, textMasks, rarityBase, isFullart, hatchFor, hatchCached, hatchEligible, rimKind, rimFor, rimCached, openCache, cacheGet, cachePut, cacheDel, cacheStats, toBlob, HOLO, getArt, hasArt, loadMeta, loadArtIndex, W, H, _adv: adv, _unitsOf: unitsOf, _paragraphs: paragraphs, STATUS_TERMS, statusMatches, _statusDarstellung: statusDarstellung, _kontrast: kontrast, STATUS_OUTLINES: { dark: OUT_DARK, light: OUT_LIGHT } };
+  root.CardRender = { OPT, last: {}, statsLayer, meta_card: (n, r) => { meta.cards[n] = Object.assign(meta.cards[n] || {}, { r: r === 'common' ? undefined : r }); }, meta_set: (k, name) => { meta.skins[k] = Object.assign(meta.skins[k] || {}, { name }); }, init, draw, specFromCard, renderCard, holoLayers, holoFor, holoCached, textLayer, geometryOf, artGrid, textMasks, rarityBase, isFullart, hatchFor, hatchCached, hatchEligible, rimKind, rimFor, rimCached, openCache, cacheGet, cachePut, cacheDel, cacheStats, toBlob, HOLO, getArt, hasArt, loadMeta, loadArtIndex, W, H, _adv: adv, _unitsOf: unitsOf, _paragraphs: paragraphs, STATUS_TERMS, statusMatches, _statusDarstellung: statusDarstellung, _kontrast: kontrast, STATUS_OUTLINES: { dark: OUT_DARK, light: OUT_LIGHT } };
 })(typeof window !== 'undefined' ? window : globalThis);
