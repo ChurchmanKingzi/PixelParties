@@ -179,9 +179,12 @@
       if (!cv) return null;
       // Rang-Rahmen (Duplikate): fest in die Karte einbacken (public/rank-frames.js); ohne den Generator bleibt die Karte rahmenlos
       if (m.rahmen && window.ppRankFrames && window.ppRankFrames.rankOf(m.rahmen) != null) {
-        const un = cv;                                   // ungerahmte Karte: Werte und Symbole am Rand kommen von hier wieder ÜBER den Rahmen
+        const un = cv;                                   // ungerahmte Karte: nur die Stat-Zahlen (mit Umrandung) kommen von hier wieder ÜBER den Rahmen
         cv = window.ppRankFrames.bake(un, un.width, un.height, window.ppRankFrames.rankOf(m.rahmen), 'card');
-        if (CardRender.keepOver) CardRender.keepOver(un, cv.getContext('2d'));
+        try {
+          const layer = CardRender.statsLayer ? await CardRender.statsLayer(r.card, Object.keys(opts).length ? opts : null, un) : null;
+          if (layer) cv.getContext('2d').drawImage(layer, 0, 0);
+        } catch (e) { /* ohne Zahlen-Ebene bleibt die Karte gerahmt */ }
       }
       const blob = await CardRender.toBlob(cv);
       if (!blob) return null;
