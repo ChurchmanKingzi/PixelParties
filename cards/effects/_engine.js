@@ -55894,6 +55894,9 @@ this._deathWatch = (this._deathWatchStack || []).length
    * (ms) verschiebt die Wartezeiten der ENGINE gegenueber diesen
    * Animationszeiten (Mount-Vorlauf der Animation im Client). `einzel`
    * (Idas Einzelziel): nur ein Ziel, es faellt bei `delay` (auch ein Held).
+   * ★ `heldenZuerst: true` (Flame Avalanche, Lawine ab dem Wirker nach hinten): die Helden werden VOR den Kreaturen getroffen — Held i bei `heroAt`
+   * (Standard `delay`) `+ i * hitDelay`, danach ALLE Kreaturen gleichzeitig bei `creatureAt` (ms ab Wellenstart). Sonst wie `kreaturenZuerst`
+   * (Ereignisfelder `delay`/`heroAt`/`hitDelay`/`creatureAt`, `vorlauf`, `einzel`).
    * Rueckgabe: `{ t0 }` = Wellenstart (Date.now) fuer die absoluten Wartezeiten.
    */
   async _spieleWellenAnimation(config, cardInst, pi, heroIdx, ziele, opts) {
@@ -55928,15 +55931,17 @@ this._deathWatch = (this._deathWatchStack || []).length
       zoneType: 'board', owner: pi, heroIdx: -1, zoneSlot: -1,
       originOwner: (cardInst && cardInst.heroOwner != null) ? cardInst.heroOwner : pi,
       originHeroIdx: heroIdx,
-      ...(welle.kreaturenZuerst ? {
-        kreaturenZuerst: true,
+      ...((welle.kreaturenZuerst || welle.heldenZuerst) ? {
+        kreaturenZuerst: !!welle.kreaturenZuerst,
+        heldenZuerst: !!welle.heldenZuerst,
         delay: welle.delay != null ? welle.delay : 380,
         heroAt: (opts && opts.einzel) ? (welle.delay != null ? welle.delay : 380) : (welle.heroAt != null ? welle.heroAt : (welle.delay != null ? welle.delay : 380)),
         hitDelay: (opts && opts.einzel) ? 0 : (welle.hitDelay != null ? welle.hitDelay : 150),
+        creatureAt: (opts && opts.einzel) ? (welle.delay != null ? welle.delay : 380) : (welle.creatureAt != null ? welle.creatureAt : (welle.delay != null ? welle.delay : 380)),
       } : null),
     });
     const t0 = Date.now();
-    await this._delay((welle.delay != null ? welle.delay : 380) + (welle.kreaturenZuerst ? (welle.vorlauf || 0) : 0));
+    await this._delay((welle.delay != null ? welle.delay : 380) + ((welle.kreaturenZuerst || welle.heldenZuerst) ? (welle.vorlauf || 0) : 0));
     return { t0 };
   }
 
@@ -56342,7 +56347,7 @@ this._deathWatch = (this._deathWatchStack || []).length
         cardName: e.inst.name,   // v1347: fuer Wellen, die die Karte selbst bewegen
       })),
     ]);
-    const _kreaturenZuerst = !!(config.waveAnimation && config.waveAnimation.kreaturenZuerst);
+    const _kreaturenZuerst = !!(config.waveAnimation && config.waveAnimation.kreaturenZuerst), _heldenZuerst = !!(config.waveAnimation && config.waveAnimation.heldenZuerst);
     const _sog = this._sogBeginnen(config, creatureEntries.map(e => e.inst));
 
     if (animationType) {
@@ -56383,11 +56388,17 @@ this._deathWatch = (this._deathWatchStack || []).length
         // ★ `waveAnimation.kreaturenZuerst` (Flame Avalanche: die Lawine rollt von der Rueckkante auf den Wirker zu und ueberrollt zuerst die Kreaturenreihe, dann die Helden):
         // alle Kreaturen in EINEM Stapel (ohne Staffelung) im ersten Treffer-Augenblick, danach die Helden — jeder zu seinem ABSOLUTEN Zeitpunkt ab Wellenstart
         // (`heroAt` + Platz in der Zielliste * `hitDelay`, dieselbe Rechnung wie im Client, der daraus die Trefferbilder macht). Die Tode sind ohnehin bis zum Klammerende aufgeschoben.
-        if (_kreaturenZuerst) {
+        if (_kreaturenZuerst || _heldenZuerst) {
           const _w = config.waveAnimation, _t0 = _welle?.t0 ?? Date.now(), _vorl = _w.vorlauf || 0;
           const _hd = _w.hitDelay != null ? _w.hitDelay : hitDelay, _h0 = _w.heroAt != null ? _w.heroAt : (_w.delay != null ? _w.delay : 380);
           const _kr = creatureEntries.filter(e => e.amount > 0);
-          if (_kr.length > 0) { _kr._ohneStaffel = true; await this.processCreatureDamageBatch(_kr); }
+          // ★ `heldenZuerst`: die Kreaturen kommen NACH den Helden, alle gleichzeitig bei `creatureAt` (absolut ab Wellenstart).
+          const _kreaturen = async () => {
+            if (_kr.length === 0) return;
+            if (_heldenZuerst) { const _wk = (_t0 + _vorl + (_w.creatureAt != null ? _w.creatureAt : _h0)) - Date.now(); if (_wk > 0) await this._delay(_wk); }
+            _kr._ohneStaffel = true; await this.processCreatureDamageBatch(_kr);
+          };
+          if (!_heldenZuerst) await _kreaturen();
           let _slotZeit = _h0;
           for (const _e of hitHeroes) {
             const _slot = allHeroes.findIndex(a => a.owner === _e.owner && a.heroIdx === _e.heroIdx);
@@ -56404,6 +56415,7 @@ this._deathWatch = (this._deathWatchStack || []).length
             }
             this.sync();
           }
+          if (_heldenZuerst) await _kreaturen();
           if (typeof opts.wirkung === 'function') {
             await opts.wirkung({ heroes: hitHeroes, creatures: creatureEntries.map(e => e.inst) });
           }

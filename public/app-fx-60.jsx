@@ -1,18 +1,18 @@
-// app-fx-60: Flame Avalanche — eine Lawine aus Feuer rollt von der Rückkante der Gegnerhälfte auf den Wirker zu (Pixelart-Leinwand in der Weltschicht, Zelle = Hero-Pixel)
+// app-fx-60: Flame Avalanche — eine Lawine aus Feuer rollt vom Wirker weg über die Gegnerhälfte bis zur Rückkante (Pixelart-Leinwand in der Weltschicht, Zelle = Hero-Pixel)
 //
 // ═════════════════════════════════════════════════════════════════
 //  Vorlage: abgesegneter Prototyp „Flame Avalanche“ (Zeichenroutinen `PpFx60`, auf den Rasterpinseln von `PpFx57` aufgebaut: Hash / Bayer / Palette).
 //  Alles ist eine reine Funktion des Bildes f (30 Hz, 60 Bilder = 2,0 s), gezeichnet in Rasterzellen auf EINER Leinwand (nur das Rechteck der Gegnerhälfte plus Flammenhöhe, nicht das Vollfenster),
 //  feste Palettenfarben (`ppSnapRgb`), Bayer-Dither statt Alpha, nichts wird gedreht oder weich skaliert (Brocken: je 8 neu gerasterte Roll-Orientierungen).
 //  ABLAUF:
-//    0–4    Wand zündet an der RÜCKKANTE der Gegnerhälfte (ausgehend von der Spalte des Wirkers), wächst in 8 Bildern auf 2,1 Heldenhöhen; Feuerring + Funkensäule an den Füßen des Wirkers (Bild 0–9)
-//    3–37   Front rollt mit 26–30 Brett-Einheiten je Bild zur MITTELLINIE, also AUF den Wirker zu, und läuft dort aus (Höhe sinkt auf 40 %). 6 gestaffelte Flammenvorhänge (Alter 0/2/4/7/11/16),
+//    0–4    Wand zündet bei den Füßen des Wirkers (Spalte des Wirkers, breitet sich seitlich aus), wächst in 8 Bildern auf 2,1 Heldenhöhen; Feuerring + Funkensäule an den Füßen des Wirkers (Bild 0–9)
+//    3–40   Front rollt mit ~20–45 Brett-Einheiten je Bild VOM Wirker WEG zur Rückkante und läuft dort aus (Höhe sinkt auf 45 %). 6 gestaffelte Flammenvorhänge (Alter 0/2/4/7/11/16; der Kopf ist der fernste),
 //           anisotropes Rauschen, Rampe aus 13 Palettenfarben, heller Fußsaum, Staubkante, Rauchsaum (Handy aus); Felsbrocken (4 Größen), Flammenzungen als Schweif, Funken, Glut-Boden
 //    Treffer je Ziel (Bild h): Weiß-Blitz mit Quetschung (Held: Sprite zellenweise 0,80/1,14 auf der Leinwand, Karte: Weißfüllung), h+1 Creme-Blitz, h+2..h+3 Gelb-Dither, Stern + Druckring, Aufprallbrocken
 //           zerfällt in Splitter; danach verkohlt (Ruß-Dither) mit züngelnden Flammen an der Silhouette; Karten ruckeln nur in ganzen Zellen, Helden zittern vor dem Treffer ±1 Zelle
 //    Ausklingen ab Bild 39 per Bayer-Schwelle in 12 Bildern, Bild 59 leer, kein Rest.
-//  TREFFERBILDER kommen aus der Engine (`waveAnimation` in cards/effects/flame-avalanche.js, `kreaturenZuerst`): Kreaturen alle gleichzeitig bei `delay` (470 ms = Bild 14), Helden von links nach rechts bei
-//  `heroAt + i * hitDelay` (870 / 990 / 1110 ms = Bild 26 / 31 / 35). Die Engine fällt den Schaden zu denselben Zeitpunkten (`dealDamageToTargets`, `vorlauf` gleicht den Mount-Vorlauf der Animation aus).
+//  TREFFERBILDER kommen aus der Engine (`waveAnimation` in cards/effects/flame-avalanche.js, `heldenZuerst`): Helden von links nach rechts bei `heroAt + i * hitDelay` (590 / 710 / 830 ms = Bild 18 / 21 / 25),
+//  danach alle Kreaturen gleichzeitig bei `creatureAt` (1100 ms = Bild 33). Die Engine fällt den Schaden zu denselben Zeitpunkten (`dealDamageToTargets`, `vorlauf` gleicht den Mount-Vorlauf der Animation aus).
 //  BRETTABBILDUNG: Homografie Brettebene → Fenster aus den Mitten aller Zonen (Held/Fähigkeit/Support, beide Seiten; `.board-plane`-Layoutkette, ppFx60Homografie) — exakt für die geneigte Perspektive
 //  und das flache Handy-Brett. Einheit u des Prototyps: ein Sprite-Pixel = 4,84 u (aus dem Hero-Pixel geeicht). Silhouettenmaske: alle Karten (Viereck) und Heldenfiguren (Sprite-Pixel) mit Tiefe q; Wand und
 //  Boden liegen HINTER näheren Zielen (Zellen bleiben frei, das DOM-Ziel scheint durch) und VOR ferneren.
@@ -110,20 +110,22 @@
     const mq = (L, d) => (L.length ? L.reduce((a, t) => a + t.q, 0) / L.length : d);
     const rh = reg(heroes), rc = reg(cards);
     const qh = mq(heroes, o.qhDef != null ? o.qhDef : 105), qc = mq(cards, o.qcDef != null ? o.qcDef : 527);
-    let th = heroes.length ? rh.t0 : (cards.length ? rc.t0 + 12 : 26), tc = cards.length ? rc.t0 : th - 12;   // Die Front läuft zum Wirker: erst die Kreaturenreihe (hinten), 12 Bilder später die Helden
+    let th = heroes.length ? rh.t0 : (cards.length ? rc.t0 - 12 : 20), tc = cards.length ? rc.t0 : th + 12;   // Die Front läuft VOM Wirker weg: erst die Heldenreihe, ~12 Bilder später die Kreaturenreihe (hinten)
+    tc = mx(tc, th + 4);
     const sh = heroes.length ? rh.s : 0, sc = cards.length ? rc.s : 0;
-    // Die Front läuft von der Rückkante (großes q) auf den Wirker zu und endet an der Mittellinie (q = qE); T fällt mit q
+    // Die Front läuft vom Wirker (q = qE, bei seinen Füßen) weg nach hinten zur Rückkante (q = qB); T wächst mit q. Start ~Bild 2,5, Tempo am Anfang 19–45 Einheiten je Bild
     const qB = P.qB, qS = P.qS, qE = P.qE = o.qE == null ? -25 : o.qE;
-    const tauF = pchip([qE, qh, qc, qB, qB + 250], [th + (qh - qE) / 19, th, tc, tc - (qB - qc) / 29, tc - (qB + 250 - qc) / 31]);
+    const v0 = clamp((qh - qE) / mx(6, th - 2.5), 19, 45);
+    const tauF = pchip([qE, qh, qc, qB, qB + 250], [th - (qh - qE) / v0, th, tc, tc + (qB - qc) / 29, tc + (qB + 250 - qc) / 31]);
     const sigF = (q) => (q >= qc ? sc : q >= qh ? lerp(sh, sc, (qc - q) / (qc - qh)) : lerp(0.55 * sh, sh, clamp((q - qE) / (qh - qE))));
     P.qh = qh; P.qc = qc; P.tauF = tauF; P.sigF = sigF; const ripF = (bx) => { let w = 1; for (const t of P.T) w = mn(w, ab(bx - t.bx) / 120); return 1.5 * Math.sin(bx / 85 + 0.6) * clamp(w); };   // Front mit Wellen (an den Zielspalten gleich 0: dort gilt der Engine-Takt)
     P.Tf = (bx, q) => tauF(q) + sigF(q) * bx + ripF(bx);
-    P.solve = (bx, f) => { let a = -600, b = 1300; for (let i = 0; i < 16; i++) { const m = (a + b) / 2; if (P.Tf(bx, m) > f) a = m; else b = m; } return (a + b) / 2; };
+    P.solve = (bx, f) => { let a = -600, b = 1300; for (let i = 0; i < 16; i++) { const m = (a + b) / 2; if (P.Tf(bx, m) < f) a = m; else b = m; } return (a + b) / 2; };   // Tf wächst mit q
     // Spalten der Wand
     const NC = P.phone ? 41 : 61, NF = LEN + 10; P.NC = NC; P.NF = NF; P.bxj = new Float32Array(NC); P.ign = new Float32Array(NC); P.tend = new Float32Array(NC); P.bell = new Float32Array(NC); P.Qtab = new Float32Array(NC * NF);
     const bxc = o.caster ? o.caster.bx : 0; P.bxc = bxc; let fExit = 0;
     for (let j = 0; j < NC; j++) {
-      const bx = -P.Wd / 2 + j * P.Wd / (NC - 1); P.bxj[j] = bx; P.ign[j] = 0.5 + 3.5 * ab(bx - bxc) / (P.Wd / 2); P.tend[j] = P.Tf(bx, qE + 40); { const u = clamp(bx / (P.Wd / 2), -1, 1); P.bell[j] = (0.4 + 0.6 * Math.cos(u * 1.35)) * (0.28 + 0.72 * clamp((1 - ab(u)) / 0.07)); }
+      const bx = -P.Wd / 2 + j * P.Wd / (NC - 1); P.bxj[j] = bx; P.ign[j] = 0.5 + 3.5 * ab(bx - bxc) / (P.Wd / 2); P.tend[j] = P.Tf(bx, qB); { const u = clamp(bx / (P.Wd / 2), -1, 1); P.bell[j] = (0.4 + 0.6 * Math.cos(u * 1.35)) * (0.28 + 0.72 * clamp((1 - ab(u)) / 0.07)); }
       fExit = mx(fExit, P.tend[j]);
       for (let ff = -6; ff < NF - 6; ff++) P.Qtab[j * NF + ff + 6] = clamp(P.solve(bx, ff), qE - 5, qB + 330);
     }
@@ -146,7 +148,7 @@
     for (let cls = 3; cls >= 0; cls--) for (let r = 0; r < nF[cls]; r++) {
       let bx = 0, ok = false; for (let tries = 0; tries < 14 && !ok; tries++) { bx = (rnd(id, 1 + tries) - 0.5) * P.Wd * 0.94; ok = lane(bx, DIAM[cls] * 3.5); }
       const f0r = 1 + rnd(id, 20) * 24, qf = new Float32Array(NF); for (let ff = 0; ff < NF; ff++) qf[ff] = clamp(P.solve(bx, ff - 6), qE - 5, qB + 330);
-      rocks.push({ id: id++, cls, bx, f0: f0r | 0, qf, L0: lerp(-210, -30, rnd(id, 3)), A: lerp(60, 120, rnd(id, 4)) * (cls >= 2 ? 0.45 : 1), hop: lerp(110, 200, rnd(id, 5)), aim: -1, imp: 0 });
+      rocks.push({ id: id++, cls, bx, f0: f0r | 0, qf, L0: lerp(30, 210, rnd(id, 3)), A: lerp(60, 120, rnd(id, 4)) * (cls >= 2 ? 0.45 : 1), hop: lerp(110, 200, rnd(id, 5)), aim: -1, imp: 0 });
     }
     P.T.forEach((t, i) => {
       const defs = t.kind === 'hero' ? [[3, 0, 0], [1, -42, -1], [1, 38, -2]] : [[2, 0, 0]];
@@ -267,15 +269,15 @@
   function rockState(P, R, ff) {
     // Position des Brockens im Bild ff: { q, v (Brett-px Höhe), vis }
     const t = ff - R.f0; if (t < 0) return null;
-    if (R.aim < 0 && R.end == null) { R.end = 999; for (let g = R.f0; g < LEN; g++) { const q = R.qf[mn(P.NF - 1, g + 6)] + R.L0 * clamp((g - R.f0) / 12); if (q <= 34) { R.end = g; R.endQ = q; break; } } }
+    if (R.aim < 0 && R.end == null) { R.end = 999; for (let g = R.f0; g < LEN; g++) { const q = R.qf[mn(P.NF - 1, g + 6)] + R.L0 * clamp((g - R.f0) / 12); if (q >= P.qB + 20) { R.end = g; R.endQ = q; break; } } }
     const qf = R.qf[mn(P.NF - 1, mx(0, ff + 6))];
     if (R.aim >= 0) {
       const u = clamp((ff - R.f0) / (R.imp - R.f0)); if (ff > R.imp) return null;
-      const lead = -70 * (1 - u) * (1 - u), q = qf + lead, vT = R.vT;
+      const lead = 70 * (1 - u) * (1 - u), q = qf + lead, vT = R.vT;
       return { q, v: vT * u + R.A * 4 * u * (1 - u) * (R.cls >= 2 ? 1.0 : 0.8), u, bx: R.bx, d: q - (R.q0 || 0) };
     }
-    const lead = R.L0 * clamp(t / 12), q = qf + lead; if (q > P.qB + 260 || (R.end != null && ff > R.end)) return null;
-    const dist = q - qf0(P, R), ph = (dist / R.hop) % 1, v = R.A * 4 * ph * (1 - ph);
+    const lead = R.L0 * clamp(t / 12), q = qf + lead; if (q < P.qE - 260 || (R.end != null && ff > R.end)) return null;
+    const dist = qf0(P, R) - q, ph = (dist / R.hop) % 1, v = R.A * 4 * ph * (1 - ph);
     return { q, v, bx: R.bx, d: dist };
   }
   function qf0(P, R) { return R.qf[mn(P.NF - 1, R.f0 + 6)] + R.L0 * 0; }
@@ -289,16 +291,16 @@
       if (R.aim < 0 && R.f0 <= f && R.end < 999 && f > R.end) { rockBurst(m, f, P, R); continue; }
       m.setZ(R.aim >= 0 ? 0 : 1e8);
       const st = rockState(P, R, f); if (!st) continue;
-      // Schweif: eine Flammenzunge hinter dem Brocken (gleicher Flammenmaler wie die Wand: Rampe, Dither, Rauschen), Spitze zeigt gegen die Laufrichtung (nach oben)
+      // Schweif: eine Flammenzunge hinter dem Brocken (gleicher Flammenmaler wie die Wand: Rampe, Dither, Rauschen), Spitze zeigt gegen die Laufrichtung (zum Wirker hin)
       P.tab(st.q, tmp); const k0 = tmp[2], x0 = rd(tmp[0] + R.bx * k0), y0 = rd(tmp[1] - st.v * k0 - rrad);
       m.setZ(R.aim >= 0 ? 0 : P.dir * st.q + 5000);
       const cw = R.cls === 0 ? 2 : rd(rrad * 0.95);
       for (let X = x0 - cw; X <= x0 + cw; X++) { const edge = 1 - ab(X - x0) / (cw + 1); flameCol(m, X, y0 - rd(rrad * 0.5), mx(3, DIAM[R.cls] * 1.9 * (0.55 + 0.45 * edge)), f, R.id & 7, 0.1 + (1 - edge) * 0.25, false, 16, false, false); }
       const k = k0, x = x0, y = y0;
-      const ori = rd((st.q - (R.q0 != null ? R.q0 : qf0(P, R))) * k / (rrad * Math.PI / 4)) & 7;
+      const ori = rd(P.dir * (st.q - (R.q0 != null ? R.q0 : qf0(P, R))) * k / (rrad * Math.PI / 4)) & 7;
       drawRock(m, x, y, R.cls, ori);
       // Landestaub großer Brocken
-      if (R.cls >= 2 && R.aim < 0) { const ph = ((st.q - qf0(P, R)) / R.hop) % 1; if (ph < 0.1) m.disc(x, y + rd(rrad), 2 + R.cls, RAMP[1], 8); }
+      if (R.cls >= 2 && R.aim < 0) { const ph = ((qf0(P, R) - st.q) / R.hop) % 1; if (ph < 0.1) m.disc(x, y + rd(rrad), 2 + R.cls, RAMP[1], 8); }
     }
   }
   function rockBurst(m, f, P, R) {
@@ -358,7 +360,7 @@
       const bx = P.bxj[j], rise = clamp((ff - P.ign[j]) / 8);
       if (rise <= 0) { sH[j] = 0; continue; }
       const q = P.Qtab[j * P.NF + mn(P.NF - 1, mx(0, ff + 6))]; P.tab(q, tmp);
-      const fall = clamp(1 - (ff - P.tend[j]) / 6), er = 0.4 + 0.6 * clamp((q - P.qE) / (P.qh * 1.1 - P.qE));   // Höhe sinkt zur Mittellinie hin: die Lawine läuft aus
+      const fall = clamp(1 - (ff - P.tend[j]) / 6), er = 0.45 + 0.55 * clamp((P.qB + 60 - q) / (P.qB + 60 - P.qh * 1.1));   // volle Höhe bis zur Heldenreihe, dann läuft die Lawine zur Rückkante hin aus
       sX[j] = tmp[0] + bx * tmp[2]; sY[j] = tmp[1]; sQ[j] = q; sH[j] = P.Hb * tmp[2] * CH[ci] * P.bell[j] * (0.6 + 0.8 * NB[((((ff + 8) * 2) & 255) << 8) | ((j + ci * 50) & 255)] / 255) * (rise * (2 - rise)) * fall * er; if (sH[j] > 1.5) any = true;
     }
     if (!any) return;
@@ -382,10 +384,12 @@
     // Zielalter a = f − hitF. a < 0: nicht gemalt (das DOM-Ziel steht VOR der Wand, Tiefenmaske). 0–1: Blitz oben auf. 2–6: „umzüngelt“ — das Ziel steht zwischen den Vorhängen
     // (jüngere = nähere Vorhänge überdecken es). Ab 7: wieder oben auf (brennt vor der Glut).
     const paint = (i) => { const pose = FX.pose(f, P, i); m.setZ(0); sils[i] = hook.pile(m, i, pose); targetBurn(m, f, P, i, sils[i]); };
+    // Die Wand läuft vom Wirker weg: der Kopf (ci 0) ist der fernste Vorhang, die älteren bleiben nach vorn (zum Wirker) zurück → von fern nach nah = Alter aufsteigend.
+    // Ein Ziel liegt vor den Vorhängen, die es noch nicht erreicht haben (CA > a), und hinter denen, die schon darüber hinweg sind.
     const done = new Array(P.T.length).fill(false);
-    for (let ci = CA.length - 1; ci >= 0; ci--) {
+    for (let ci = 0; ci < CA.length; ci++) {
       if (P.phone && ci === 5) continue;
-      P.T.forEach((t, i) => { const a = f - t.hitF; if (!done[i] && a >= 2 && a <= 4 && CA[ci] <= a) { done[i] = true; paint(i); } });
+      P.T.forEach((t, i) => { const a = f - t.hitF; if (!done[i] && a >= 2 && a <= 4 && CA[ci] >= a) { done[i] = true; paint(i); } });
       if (dl > 0) curtain(m, f, ci, P, dl);
     }
     P.T.forEach((t, i) => { const a = f - t.hitF; if (!done[i] && a >= 0) paint(i); });
@@ -524,10 +528,10 @@ function ppFx60Geometrie(props) {
     const gw = Math.min(900, Math.ceil((bx1 - bx0) / S)), gh = Math.min(700, Math.ceil((by1 - by0) / S));
     const cell = (sx, sy) => [(sx + off.dx - lx) / S, (sy + off.dy - ly) / S];
     const gp = (bx, q) => { const g = gpPx(bx, q), c = cell(g[0], g[1]); return [c[0], c[1], g[2] / S]; };
-    // Ziele (Engine-Reihenfolge), Trefferbilder aus delay / heroAt / hitDelay
+    // Ziele (Engine-Reihenfolge), Trefferbilder aus heroAt / hitDelay (Helden) und creatureAt (Kreaturen, alle gleichzeitig)
     const tps = tps0.slice().sort((a, b) => (a.idx != null && b.idx != null ? a.idx - b.idx : 0));
     const raw = Array.isArray(props.targets) ? props.targets : [], isHero = (t) => t.zoneSlot == null || t.zoneSlot < 0;
-    const dMs = props.delay != null ? props.delay : 470, hA = props.heroAt != null ? props.heroAt : 870, hD = props.hitDelay != null ? props.hitDelay : 120;
+    const dMs = props.delay != null ? props.delay : 470, hA = props.heroAt != null ? props.heroAt : 470, hD = props.hitDelay != null ? props.hitDelay : 120, cA = props.creatureAt != null ? props.creatureAt : 1000;
     let heroN = 0;
     const targets = [], recs = [];
     for (const tp of tps) {
@@ -535,7 +539,7 @@ function ppFx60Geometrie(props) {
       const slot = (tp.idx != null && raw.length) ? raw.slice(0, tp.idx).filter(isHero).length : heroN;
       if (hero) heroN++;
       const fg = hero ? ppFx60Figur(el) : null, kind = fg ? 'hero' : 'card';
-      const hitF = Math.max(2, Math.min(52, Math.round((hero ? hA + slot * hD : dMs) * 30 / 1000)));
+      const hitF = Math.max(2, Math.min(52, Math.round((hero ? hA + slot * hD : cA) * 30 / 1000)));
       let bq, hb, wb = (el.offsetWidth || 68) * R;
       const karte = el.querySelector('.board-card');
       if (kind === 'hero') { const r = fg.hp.cv.getBoundingClientRect(), z = el.getBoundingClientRect(); bq = fromPx(z.left + z.width / 2, r.top + fg.y1 * fg.hp.px); hb = (fg.y1 - fg.y0) * 4.84; }
@@ -546,7 +550,8 @@ function ppFx60Geometrie(props) {
     if (!targets.length) return ppFx60Fehl(8);
     const nF = (window.ppFxN ? window.ppFxN(100) / 100 : 1) * (phone ? 0.5 : 1);
     const cc = cell(cFoot[0], cFoot[1]);
-    const P = FX.plan({ gp, G: S, n: nF, phone, seed: Math.floor(Math.random() * 1e6), Wd, qS: -60, qB, qE: -25, heroHb, caster: { bx: cq[0] }, casterFoot: cc, targets, dir, qhDef: qHeroRow, qcDef: qSupRow != null ? qSupRow : qHeroRow + 422 });
+    const qStart = Math.min(-25, cq[1] + 50);   // die Wand zündet bei den Füßen des Wirkers
+    const P = FX.plan({ gp, G: S, n: nF, phone, seed: Math.floor(Math.random() * 1e6), Wd, qS: -60, qB, qE: qStart, heroHb, caster: { bx: cq[0] }, casterFoot: cc, targets, dir, qhDef: qHeroRow, qcDef: qSupRow != null ? qSupRow : qHeroRow + 422 });
     // Beschreibung einer Figur in Leinwandzellen (Lage des Sprite-Canvas, Fußlinie, Mitte)
     const beschreibe = (fg, el) => {
       const r = fg.hp.cv.getBoundingClientRect(), z = el.getBoundingClientRect(), c0 = cell(r.left, r.top), ft = cell(z.left + z.width / 2, r.top + fg.y1 * fg.hp.px);

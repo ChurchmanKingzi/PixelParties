@@ -65,15 +65,13 @@ module.exports = {
         // dafuer weg — die Lawine IST das Bild, Flammen auf jedem Ziel
         // obendrauf waeren nur Rauch. Die Schadenszahlen laufen
         // unveraendert weiter.
-        // ★ Neue Lawine (app-fx-60, 60 Bilder = 2,0 s): eine Feuerwand zuendet an der
-        // RUECKKANTE der Gegnerhaelfte und rollt AUF den Wirker zu (Mittellinie) — sie ueberrollt
-        // also zuerst die Kreaturenreihe (alle gleichzeitig, Bild 14 = `delay` 470 ms), dann die Helden
-        // von links nach rechts (`heroAt` 870 ms ab Wellenstart, danach alle `hitDelay` 120 ms:
-        // Bild 26 / 31 / 35). `kreaturenZuerst` stellt die Engine-Reihenfolge darauf um
+        // ★ Neue Lawine (app-fx-60, 60 Bilder = 2,0 s): eine Feuerwand zuendet bei den Fuessen des Wirkers und rollt VON IHM WEG ueber die Gegnerhaelfte
+        // bis zur Rueckkante — sie ueberrollt also zuerst die Helden (von links nach rechts, `heroAt` 590 ms ab Wellenstart, danach alle `hitDelay` 120 ms:
+        // Bild 18 / 21 / 25), dann alle Kreaturen gleichzeitig (`creatureAt` 1100 ms = Bild 33). `heldenZuerst` stellt die Engine-Reihenfolge darauf um
         // (`dealDamageToTargets`); der Client rechnet aus denselben Zahlen die Trefferbilder.
         animationType: null,
         // `vorlauf` 150: Mount-Vorlauf der Animation im Client (100 ms Mount + Aufbau, gemessen ~155 ms) — Schaden und HP-Zahl kommen so im Trefferbild, nicht davor.
-        waveAnimation: { type: 'flame_avalanche', duration: 2000, delay: 470, heroAt: 870, hitDelay: 120, kreaturenZuerst: true, vorlauf: 150 },
+        waveAnimation: { type: 'flame_avalanche', duration: 2000, delay: 590, heroAt: 590, hitDelay: 120, creatureAt: 1100, heldenZuerst: true, vorlauf: 150 },
         singleTargetPrompt: {
           title: 'Flame Avalanche',
           description: 'Ida has to concentrate on one target — choose! Deal 150 damage.',

@@ -3980,22 +3980,24 @@ const ZONE_ANIM_SFX = {
   // Flame Avalanche (app-fx-60, 60 Bilder = 2,0 s): tiefes Anrollen, Kreaturen bei 470 ms (Bild 14), Helden bei 870 / 990 / 1110 ms (Bild 26 / 31 / 35), Knistern der Glut danach.
   // Zeiten animationsrelativ (der Mount-Vorlauf kommt von `playSFXForZoneAnim` dazu); spaetere Lagen ohne Kategorie und mit eigenem Dedupe, sonst schluckt die erste Lage sie (CARD_API ⑤).
   flame_avalanche: [
+    // Lawine vom Wirker weg: Zuendung @0, Helden-Treffer @590/710/830 (Bild 18/21/25), alle Kreaturen @1100 (Bild 33)
     { name: 'elem_fire',    opts: { rate: 0.55, volume: 1.0 } },
     { name: 'burn',         opts: { rate: 0.8,  volume: 0.55, delay: 100,  category: null, dedupe: 0 } },
     { name: 'elem_fire',    opts: { rate: 0.72, volume: 0.7,  delay: 300,  category: null, dedupe: 0 } },
-    { name: 'heavy_impact', opts: { rate: 0.78, volume: 0.8,  delay: 470,  category: null, dedupe: 0 } },
-    { name: 'attack_ram',   opts: { rate: 0.85, volume: 0.5,  delay: 470,  category: null, dedupe: 0 } },
-    { name: 'pull_crack',   opts: { rate: 0.9,  volume: 0.4,  delay: 470,  category: null, dedupe: 0 } },
-    { name: 'damage',       opts: { rate: 0.8,  volume: 0.45, delay: 470,  category: null, dedupe: 0 } },
-    { name: 'burn',         opts: { rate: 0.7,  volume: 0.45, delay: 730,  category: null, dedupe: 0 } },
-    { name: 'heavy_impact', opts: { rate: 0.78, volume: 0.8,  delay: 870,  category: null, dedupe: 0 } },
-    { name: 'pull_crack',   opts: { rate: 0.9,  volume: 0.4,  delay: 870,  category: null, dedupe: 0 } },
-    { name: 'heavy_impact', opts: { rate: 0.82, volume: 0.7,  delay: 990,  category: null, dedupe: 0 } },
-    { name: 'pull_crack',   opts: { rate: 0.95, volume: 0.4,  delay: 990,  category: null, dedupe: 0 } },
-    { name: 'heavy_impact', opts: { rate: 0.86, volume: 0.6,  delay: 1110, category: null, dedupe: 0 } },
-    { name: 'pull_crack',   opts: { rate: 1.0,  volume: 0.4,  delay: 1110, category: null, dedupe: 0 } },
-    { name: 'burn',         opts: { rate: 0.65, volume: 0.6,  delay: 1270, category: null, dedupe: 0 } },
+    { name: 'heavy_impact', opts: { rate: 0.78, volume: 0.8,  delay: 590,  category: null, dedupe: 0 } },
+    { name: 'attack_ram',   opts: { rate: 0.85, volume: 0.5,  delay: 590,  category: null, dedupe: 0 } },
+    { name: 'pull_crack',   opts: { rate: 0.9,  volume: 0.4,  delay: 590,  category: null, dedupe: 0 } },
+    { name: 'damage',       opts: { rate: 0.8,  volume: 0.45, delay: 590,  category: null, dedupe: 0 } },
+    { name: 'heavy_impact', opts: { rate: 0.82, volume: 0.7,  delay: 710,  category: null, dedupe: 0 } },
+    { name: 'pull_crack',   opts: { rate: 0.95, volume: 0.4,  delay: 710,  category: null, dedupe: 0 } },
+    { name: 'heavy_impact', opts: { rate: 0.86, volume: 0.6,  delay: 830,  category: null, dedupe: 0 } },
+    { name: 'pull_crack',   opts: { rate: 1.0,  volume: 0.4,  delay: 830,  category: null, dedupe: 0 } },
+    { name: 'burn',         opts: { rate: 0.7,  volume: 0.45, delay: 900,  category: null, dedupe: 0 } },
+    { name: 'heavy_impact', opts: { rate: 0.78, volume: 0.8,  delay: 1100, category: null, dedupe: 0 } },
+    { name: 'pull_crack',   opts: { rate: 0.9,  volume: 0.4,  delay: 1100, category: null, dedupe: 0 } },
+    { name: 'burn',         opts: { rate: 0.65, volume: 0.6,  delay: 1300, category: null, dedupe: 0 } },
   ],
+
   // ★★ v1346 — „Hole in the Sky": der Himmel reisst auf (tief und
   // dunkel), das Loch saugt (Wind, tief gestimmt), und der Schlag, mit
   // dem es zuschnappt (1900 ms — genau dann faellt der Schaden). Spaetere

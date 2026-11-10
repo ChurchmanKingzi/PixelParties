@@ -49,6 +49,21 @@ test('kreaturenZuerst: Kreaturen vor den Helden, Helden bei heroAt + i * hitDela
   assert.ok(kr.t < helden[0].t, 'Kreaturen zuerst');
 });
 
+test('heldenZuerst: Helden bei heroAt + i * hitDelay, danach alle Kreaturen gleichzeitig bei creatureAt', async (t) => {
+  t.mock.timers.enable({ apis: ['setTimeout', 'Date'] });
+  const { e, log, heroes } = engine();
+  const lauf = e.dealDamageToTargets(quelle, ziele(heroes), opts({ type: 'flame_avalanche', duration: 2000, delay: 590, heroAt: 590, hitDelay: 120, creatureAt: 1100, heldenZuerst: true }));
+  for (let i = 0; i < 60; i++) { await Promise.resolve(); t.mock.timers.tick(50); await Promise.resolve(); }
+  await lauf;
+  const welle = log.find((x) => x.ev === 'play_zone_animation');
+  assert.equal(welle.data.heldenZuerst, true); assert.equal(welle.data.creatureAt, 1100); assert.equal(welle.data.heroAt, 590); assert.equal(welle.data.hitDelay, 120);
+  const kr = log.find((x) => x.ev === 'kreaturen'), helden = log.filter((x) => x.ev === 'held');
+  assert.deepEqual(helden.map((h) => h.name), ['Held0', 'Held1', 'Held2']);
+  [590, 710, 830].forEach((soll, i) => assert.ok(helden[i].t >= soll - 5 && helden[i].t < soll + 100, `Held ${i} bei ~${soll} ms: ${helden[i].t}`));
+  assert.equal(kr.n, 3); assert.equal(kr.ohneStaffel, true);
+  assert.ok(kr.t >= 1095 && kr.t < 1200, 'Kreaturen bei ~1100 ms: ' + kr.t); assert.ok(kr.t > helden[2].t, 'Helden zuerst');
+});
+
 test('ohne Flag: alter Ablauf (Helden nacheinander im hitDelay-Takt, danach die Kreaturen), Welle sendet keine neuen Felder', async (t) => {
   t.mock.timers.enable({ apis: ['setTimeout', 'Date'] });
   const { e, log, heroes } = engine();
