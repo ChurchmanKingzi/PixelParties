@@ -13361,25 +13361,39 @@ input[type="checkbox"]:focus-visible, input[type="radio"]:focus-visible { outlin
                          Filter, kleiner Pull-Knopf), darunter das Raster.
    Pixelart: harte Ringe aus gestapelten box-shadows, keine Unschaerfe, Bewegung
    in ganzen Pixeln mit steps(). */
-.shop-gacha { display: grid; grid-template-columns: 250px minmax(0, 1fr); gap: 22px; max-width: 900px; margin: 8px auto 18px; padding: 14px 18px; box-sizing: border-box; background: var(--bg2); border: 3px solid color-mix(in srgb, var(--player-color, var(--accent)) 70%, #000000); box-shadow: 0 0 0 2px var(--pp-kontur), 0 0 0 4px color-mix(in srgb, var(--player-color, var(--accent)) 50%, #000000), 0 0 0 6px var(--pp-kontur), 8px 9px 0 0 #08060c; }
-.shop-gacha-machine { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; text-align: center; padding-right: 22px; border-right: 3px solid var(--bg4); }
-.shop-gacha-title { font-family: var(--font-display), sans-serif; font-size: 18px; letter-spacing: 2px; color: #fad54a; text-shadow: 2px 2px 0 #000000; }
-.shop-gacha-capsule { width: 84px; height: 84px; margin: 10px 0; display: flex; align-items: center; justify-content: center; font-family: var(--font-display), sans-serif; font-size: 46px; color: #fad54a; text-shadow: 3px 3px 0 #000000; background: var(--bg3); box-shadow: 0 0 0 3px var(--pp-kontur), 0 0 0 6px #fad54a, 0 0 0 9px var(--pp-kontur), 6px 7px 0 9px #08060c; }
-}
-.shop-gacha-btn { width: 100%; justify-content: center; }
-.shop-gacha-hint { font-size: 11px; color: var(--text2); }
-.shop-gacha-preview { min-width: 0; display: flex; flex-direction: column; gap: 8px; }
-.shop-gacha-preview-title { font-family: var(--font-display), sans-serif; font-size: 14px; letter-spacing: 2px; color: var(--text); text-shadow: 2px 2px 0 #000000; }
-.shop-gacha-rule { font-size: 11px; line-height: 1.5; color: var(--text2); margin-bottom: 4px; }
-.shop-pull-strip { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px; padding: 8px 8px 12px; }
-.shop-pull-tile { cursor: default; }
-.shop-pull-tile .shop-item-name { padding-bottom: 0; }
+.shop-gacha { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 18px; max-width: 900px; margin: 4px auto 8px; padding: 6px 14px; box-sizing: border-box; background: var(--bg2); border: 3px solid color-mix(in srgb, var(--player-color, var(--accent)) 70%, #000000); box-shadow: 0 0 0 2px var(--pp-kontur), 0 0 0 4px color-mix(in srgb, var(--player-color, var(--accent)) 50%, #000000), 0 0 0 6px var(--pp-kontur), 6px 7px 0 0 #08060c; }
+.shop-gacha-title { font-family: var(--font-display), sans-serif; font-size: 15px; letter-spacing: 2px; color: #fad54a; text-shadow: 2px 2px 0 #000000; }
+.shop-gacha-btn { flex: 0 0 auto; width: auto; justify-content: center; padding: 6px 22px; }
+.shop-gacha-hint { flex: 1 1 220px; min-width: 0; font-size: 11px; line-height: 1.4; color: var(--text2); }
 
 /* Kopfzeile der Sammlung — klebt oben, das Raster scrollt dahinter. */
-.shop-coll-head { position: sticky; top: -16px; z-index: 10; margin: 0 -16px 18px; padding: 12px 16px; background: var(--bg); border-bottom: 3px solid color-mix(in srgb, var(--player-color, var(--accent)) 25%, #1a1a2e); box-shadow: 0 2px 0 0 var(--pp-kontur); }
+.shop-coll-head { position: sticky; top: -16px; z-index: 10; margin: 0 -16px 18px; padding: 8px 16px; background: var(--bg); border-bottom: 3px solid color-mix(in srgb, var(--player-color, var(--accent)) 25%, #1a1a2e); box-shadow: 0 2px 0 0 var(--pp-kontur); }
 .shop-coll-head-in { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 16px; max-width: 900px; margin: 0 auto; }
 .shop-coll-title { font-family: var(--font-display), sans-serif; font-size: 15px; letter-spacing: 2px; color: var(--text); text-shadow: 2px 2px 0 #000000; }
-.shop-coll-count { font-family: var(--font-display), sans-serif; font-size: 15px; color: #fad54a; text-shadow: 2px 2px 0 #000000; }
+.shop-coll-count { position: relative; font-family: var(--font-display), sans-serif; font-size: 15px; color: #fad54a; text-shadow: 2px 2px 0 #000000; }
+/* „+1!“ nach dem Pull: der Zähler blinkt in ganzen Schritten, ein kleines +1! steigt in Pixelsprüngen auf und verschwindet blinkend */
+.shop-coll-count-bump { display: inline-block; animation: shop-count-bump .72s steps(1, end) both; }
+@keyframes shop-count-bump {
+  0%   { color: #ffffff; transform: translateY(-4px); }
+  16%  { color: #fad54a; transform: translateY(0); }
+  32%  { color: #ffffff; transform: translateY(-4px); }
+  48%  { color: #fad54a; transform: translateY(0); }
+  64%  { color: #ffffff; transform: translateY(-2px); }
+  80%  { color: #fad54a; transform: translateY(0); }
+}
+.shop-coll-plus { position: absolute; left: 100%; top: -2px; margin-left: 8px; white-space: nowrap; font-size: 15px; color: #4ceb70; text-shadow: 2px 0 0 #000000, -2px 0 0 #000000; pointer-events: none; animation: shop-plus-rise 1.3s steps(1, end) both; }
+@keyframes shop-plus-rise {
+  0%   { transform: translateY(6px); }
+  12%  { transform: translateY(0); }
+  24%  { transform: translateY(-6px); }
+  36%  { transform: translateY(-12px); }
+  48%  { transform: translateY(-12px); visibility: hidden; }
+  54%  { transform: translateY(-12px); visibility: visible; }
+  66%  { transform: translateY(-14px); visibility: hidden; }
+  72%  { transform: translateY(-14px); visibility: visible; }
+  84%  { transform: translateY(-16px); visibility: hidden; }
+  100% { transform: translateY(-16px); visibility: hidden; }
+}
 .shop-coll-bar { flex: 1 1 140px; min-width: 120px; height: 14px; background: var(--bg3); box-shadow: 0 0 0 2px var(--pp-kontur), 0 0 0 4px var(--bg4); }
 .shop-coll-bar > span { display: block; height: 100%; background: repeating-linear-gradient(90deg, #fad54a 0 6px, #a87c00 6px 8px); }
 .shop-coll-filters { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-left: auto; }
@@ -13393,11 +13407,6 @@ input[type="checkbox"]:focus-visible, input[type="radio"]:focus-visible { outlin
 .shop-coll-search::placeholder { color: var(--text2); }
 .shop-item.shop-missing { cursor: default; }
 
-@media (max-width: 760px) {
-  .shop-gacha { grid-template-columns: 1fr; gap: 16px; }
-  .shop-gacha-machine { padding-right: 0; border-right: 0; padding-bottom: 16px; border-bottom: 3px solid var(--bg4); }
-  .shop-pull-strip { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-}
 
 /* Angepinnt: Pull-Bereich + Kopfzeile der Sammlung bleiben stehen, NUR die Sammlung scrollt.
    Auf kleinen Fenstern (zu wenig Platz) bleibt es beim einfachen Scrollen der ganzen Seite. */
@@ -13410,10 +13419,6 @@ input[type="checkbox"]:focus-visible, input[type="radio"]:focus-visible { outlin
   .shop-gacha-pinned .shop-coll-head { position: static; margin-bottom: 0; }
   .shop-coll-scroll { flex: 1; min-height: 0; overflow-y: auto; margin: 0 -16px; padding: 16px 16px 30px; }
 }
-@media (max-height: 820px) {
-  .shop-pull-strip { grid-template-columns: repeat(4, minmax(0, 96px)); justify-content: start; padding-bottom: 6px; }
-  .shop-gacha-capsule { width: 56px; height: 56px; font-size: 30px; margin: 4px 0; box-shadow: 0 0 0 3px var(--pp-kontur), 0 0 0 5px #fad54a, 0 0 0 8px var(--pp-kontur); }
-  .shop-gacha-machine { gap: 8px; }
 }
 
 /* ═══ SHOP: KAUF-FANFARE (Boards, Structure Decks) ════════════════════
@@ -13539,9 +13544,6 @@ input[type="checkbox"]:focus-visible, input[type="radio"]:focus-visible { outlin
   75%  { opacity: 1; }
 }
 
-/* Das Fragezeichen der Kapsel ist ein Pixel-Sprite (5×7 Pixel, ganzzahlig vergrößert) und sitzt dadurch exakt mittig. */
-.shop-gacha-q { width: 35px; height: 49px; background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='5' height='7' viewBox='0 0 5 7' shape-rendering='crispEdges'%3E%3Cpath fill='%23fad54a' d='M1 0h3v1h-3zM0 1h1v1h-1zM4 1h1v1h-1zM4 2h1v1h-1zM3 3h1v1h-1zM2 4h1v1h-1zM2 6h1v1h-1z'/%3E%3C/svg%3E") center / 100% 100% no-repeat; image-rendering: pixelated; }
-@media (max-height: 820px) { .shop-gacha-q { width: 25px; height: 35px; } }
 
 /* ═══ SHOP: SAMMLUNG OHNE DAUER-ANIMATIONEN (Performance) ══════════════
    Bis hier lief auf JEDER Kachel der Sammlung ein Satz Endlosanimationen (Puls des Rings, Regenbogen-Ecken,
