@@ -248,6 +248,9 @@ function DeckBuilder() {
   const [collection, setCollection] = useState(null);
   // Rarity-Fenster (Linksklick auf eine Deckkarte): { name, sec, idx, field, items }
   const [rarPick, setRarPick] = useState(null);
+  // Rang-Rahmen der Skin-Karten (Duplikate aus dem Gacha): ohne sie fehlt der Rahmen an Skins im Deck-Editor
+  const [skinDupes, setSkinDupes] = useState(null);
+  useEffect(() => { let lebt = true; api('/shop/owned').then(d => { if (lebt) setSkinDupes((d && d.dupes && d.dupes.skin) || {}); }).catch(() => {}); return () => { lebt = false; }; }, []);
   const [activeIdx, setActiveIdx] = useState(0);
   const [unsaved, setUnsaved] = useState(_persistedUnsaved);
 
@@ -1256,7 +1259,7 @@ function DeckBuilder() {
   const validation = currentDeck ? isDeckLegal(currentDeck) : { legal: false, reasons: [] };
   const hasUnsaved = currentDeck && unsaved[currentDeck.id];
   // Profil → Skins: der gewählte Skin je Held ersetzt die Karte; ein Deck-Skin hat Vorrang.
-  const viewSkins = { ...(user?.heroSkins || {}), ...(currentDeck?.skins || {}) };
+  const viewSkins = window.ppSkinRanksSet({ ...(user?.heroSkins || {}), ...(currentDeck?.skins || {}) }, skinDupes);   // + Rang-Rahmen (`?rahmen=N`) der Skins
   escStateRef.current = { showLeaveConfirm, rarPick, skinGallery, ctxMenu, renaming, hasUnsaved, isSampleMode, deckDropdownOpen };
   const heroes = currentDeck?.heroes || [{ hero:null,ability1:null,ability2:null },{ hero:null,ability1:null,ability2:null },{ hero:null,ability1:null,ability2:null }];
   // ★ v992: Wie viele Helden verlangt diese Aufstellung? Mit

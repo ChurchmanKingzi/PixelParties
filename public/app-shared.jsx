@@ -7001,10 +7001,10 @@ function ppRarityOf(card, rarity) {
   const t = fx && fx.testRarity ? fx.testRarity(card && card.name) : null;
   return t != null ? t : (rarity || (card && card.rarity) || 'common');
 }
-/** Kartenbild-URL der Basiskarte dieser Rarity (`?rar=<id>`; Common = unverändert). Skin-Bilder bleiben unverändert (der Skin trägt sein eigenes Holo). */
+/** Kartenbild-URL der Basiskarte dieser Rarity (`?rar=<id>`; Common = unverändert). Skin-Bilder teilen die Rarity ihrer Base-Karte (der Karten-Shim backt auch für Skins die Basiskarte der Stufe). */
 function ppRarityUrl(url, rarity) {
   const fx = window.PpRarityFx;
-  if (!url || typeof url !== 'string' || !fx || !rarity || rarity === 'common' || url.startsWith('/cards/skins/') || /[?&]rar=/.test(url)) return url;
+  if (!url || typeof url !== 'string' || !fx || !rarity || rarity === 'common' || /[?&]rar=/.test(url)) return url;
   const q = fx.imageRarity(rarity);
   return q ? url + (url.includes('?') ? '&' : '?') + 'rar=' + q : url;
 }
@@ -7108,9 +7108,14 @@ function CardFoil({ card, skin, werte, rarity, animated }) {
   const klein = useContext(FoilKleinContext);
   const brett = useContext(FoilBrettContext);
   const reduziert = useContext(FoilReduziertContext);
-  const holoSkin = !!skin && skinHoloAktiv();
+  const holoSkin0 = !!skin && skinHoloAktiv();
   const r = ppRarityOf(card, rarity);
-  const effekt = !holoSkin && !!card && r !== 'common' && !!window.PpRarityFx && window.PpRarityFx.available(r);
+  const fxA = window.PpRarityFx;
+  // Skins teilen die Rarity-Effekte ihrer Base-Karte: auf dem Skin-Bild läuft derselbe Effekt wie auf der Base-Karte. Ausnahme: Stufen mit Motiv-Maske (Umbra, Stained, Storm) —
+  // für Skin-Sprites gibt es noch keine Masken; dort bleibt das Skin-Holo (wie bisher).
+  const effektMoeglich = !!card && r !== 'common' && !!fxA && fxA.available(r);
+  const effekt = effektMoeglich && !(holoSkin0 && fxA.SPEC && fxA.SPEC[r] && fxA.SPEC[r].mask);
+  const holoSkin = holoSkin0 && !effekt;   // ein Foil je Karte: der Rarity-Effekt ersetzt das Skin-Holo
   const fkey = holoSkin ? 'skin:' + skin : 'card:' + (card?.name || '');
   const schraffur = !holoSkin && !effekt && !klein && skinHoloAktiv() && window.CardRender.hatchEligible(card);
   const rahmen = !effekt && !klein && skinHoloAktiv() ? window.CardRender.rimKind(card, holoSkin ? skin : null) : null;
