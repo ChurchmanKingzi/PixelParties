@@ -742,7 +742,7 @@
     const supArtiGold = spec.rarity === 'super rare' && isArti2(t);
     const nameOut = OPT.nameOutline && !textOnly ? (supArtiGold ? 'rgb(112,28,0)' : isArti2(t) ? null : supGold ? 'rgb(182,38,0)' : nameOutlineColor(ctx, sup)) : null;
     const nameOutF = supArtiGold ? 0.7 : 0.5;
-    if (!textOnly) drawLine(ctx, spec.name, {
+    if (!textOnly && !spec.noName) drawLine(ctx, spec.name, {
       left: sup ? 48 : 103, top: 48, width: sup ? 654 : 544, height: 55, size: 50, min: 48,
       align: 'center', color: fillFor(48, 55), outline: nameOut, outlineFactor: nameOutF,
     });
@@ -963,7 +963,7 @@
     if (o.noHp) spec.noHp = true;
     if (o.stufe >= 1 && o.stufe <= 3) spec.stufe = o.stufe;
     if (o.noAtk) spec.noAtk = true;
-    if (o.noNums) { spec.noHp = true; spec.noAtk = true; spec.noLv = true; }   // alle Zahlen weglassen (statsLayer)
+    if (o.noNums) { spec.noHp = true; spec.noAtk = true; spec.noLv = true; spec.noName = true; }   // alle Zahlen und den Namen weglassen (statsLayer)
     // aktuelle Stufe / Kosten (Hand): gruen, wenn niedriger als gedruckt, rot, wenn hoeher; gleich -> unveraendert gedruckt
     if (o.lv != null && card.level != null && o.lv !== card.level) { spec.lvOver = o.lv; spec.lvColor = o.lv < card.level ? OVER_GREEN : OVER_RED; }
     // Variable Kosten („4X"): das X bleibt dran (aus 4X wird 8X); ein reines „X" hat keine Zahl, die man ersetzen koennte.
@@ -1004,9 +1004,9 @@
 
   /**
    * Rang-Rahmen (Duplikate, rank-frames.js) liegen über dem Kartenbild und können die Zahlen am Kartenrand verdecken. Darum werden die
-   * STAT-ZAHLEN (HP, Angriff, Kosten, Stufe) nach dem Einbacken noch einmal über den Rahmen gelegt — nur die Ziffern, mit dunkler Umrandung
+   * STAT-ZAHLEN (HP, Angriff, Kosten, Stufe) und den NAMEN (nur der Text) nach dem Einbacken noch einmal über den Rahmen gelegt — nur die Schrift, mit dunkler Umrandung
    * für die Lesbarkeit; Wertefelder, Symbole und Rahmen bleiben, wie sie sind.
-   * Die Ziffern entstehen als Unterschied zwischen der Karte `un` (renderCard, ungerahmt) und derselben Karte ohne Zahlen (`noNums`).
+   * Die Schrift entsteht als Unterschied zwischen der Karte `un` (renderCard, ungerahmt) und derselben Karte ohne Zahlen und Namen (`noNums`). Symbole (Schule, Kartenart) bleiben unter dem Rahmen — angeschnitten erkennt man sie trotzdem.
    * @returns {Promise<HTMLCanvasElement|null>} 750 × 1050, durchsichtig bis auf Ziffern + Umrandung
    */
   async function statsLayer(card, o, un) {
