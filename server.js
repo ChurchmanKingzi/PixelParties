@@ -14853,7 +14853,11 @@ async function setupGameState(room) {
       room._deckIdentity[idx] = playerProfile.deckIdentityOf(deck);
     }
 
-    const usr = await db.get('SELECT * FROM users WHERE id = ?', [p.userId]);
+    // Headless-Trainingsspiele (`runHeadlessTrainingGame`, userId `cpu-train-…`) haben kein Benutzerkonto und laufen laut Kopf des Trainingsmodus
+    // ohne Datenbank: kein Nachschlagen, die Tabelle muss nicht einmal existieren. (Vorher scheiterte jede Partie mit `SQLITE_ERROR: no such table:
+    // users`, sobald `data/pixel-parties.db` das Schema nicht trug — auf Entwicklungsrechnern, auf denen der Spielserver je lief, fiel das nie auf.)
+    // Auf einer Datenbank mit Schema liefert die Abfrage für diese Kennungen ohnehin nichts: das Ergebnis ist dasselbe.
+    const usr = String(p.userId).startsWith('cpu-train-') ? undefined : await db.get('SELECT * FROM users WHERE id = ?', [p.userId]);
     // Win/loss speech-bubble lines: a human uses their own profile messages;
     // a CPU (no user record) draws from the per-opponent CPU_MESSAGES table.
     const cpuMsgs = usr ? null : getCpuMessages(p.deckId);
@@ -21018,7 +21022,7 @@ async function collectTrainingSharded({ jobs, count, outPath }) {
   process.on('exit', killAll);
   for (const sig of ['SIGINT', 'SIGTERM']) process.on(sig, () => { killAll(); process.exit(130); });
 
-  let crashes = 0;
+  let crashes = 0, fatal = false;
   const maxRespawns = 2 * n;
   const startWorker = (k) => new Promise((resolve) => {
     const env = { ...process.env, PP_TRAIN_WORKER: '1', PP_TRAIN_JOBS: '1', PP_TRAIN_OUT: `${outPath}.w${k}`,
@@ -21029,6 +21033,7 @@ async function collectTrainingSharded({ jobs, count, outPath }) {
     kid.on('exit', async (code, signal) => {
       kids.delete(kid);
       if (code === 0) return resolve();
+      if (code === 4) { fatal = true; killAll(); return resolve(); }   // systematischer Fehler (siehe throwsInARow): kein Neustart, die übrigen Worker beenden
       crashes++;
       console.warn(`[train] parallel: Worker ${k} beendet mit ${code ?? signal}`);
       try { fs.copyFileSync(`${outPath}.w${k}.inflight.json`, outPath + '.inflight.json'); } catch { /* keine Brotkrume */ }
@@ -21048,7 +21053,7 @@ async function collectTrainingSharded({ jobs, count, outPath }) {
   const missing = count - [...after.keys()].filter(k => k < count).length;
   if (missing > 0) console.warn(`[train] parallel: ${missing} Spiel(e) fehlen (Worker-Absturz) — Wiederanlauf holt sie nach`);
   else { try { fs.unlinkSync(outPath + '.inflight.json'); } catch { /* war nie da */ } }
-  return { failed: missing > 0 };
+  return { failed: missing > 0, fatal };
 }
 
 async function runTrainingBatch() {
@@ -21239,6 +21244,7 @@ async function runTrainingBatch() {
   if (shardWorker) startIdx = 0;               // der Worker arbeitet über Claims, nicht über die Zeilenzahl seiner Datei
   if (jobsWanted > 1) {
     const r = await collectTrainingSharded({ jobs: jobsWanted, count, outPath });
+    if (r.fatal) { console.error('[train] Worker meldet einen systematischen Fehler (Exit-Code 4) — Abbruch ohne Wiederanlauf.'); process.exit(4); }
     parallelFailed = r.failed;
     wins = losses = ties = 0; resumedWins = resumedLosses = resumedTies = 0;
     try {
@@ -21250,6 +21256,7 @@ async function runTrainingBatch() {
     } catch { /* leere Datei */ }
     startIdx = count;                          // die Schleife unten läuft nicht — die Worker haben alles erledigt
   }
+  let throwsInARow = 0;      // Fehler hintereinander: ein systematischer Fehler (Schema fehlt, Konfiguration) soll nicht tausende Spiele lang durchlaufen
   for (let i = startIdx; i < count; i++) {
     if (shardWorker && (workerDone.has(i) || !workerClaim(i))) continue;   // fertig oder von einem anderen Worker beansprucht
     // Round-robin opponents so every archetype contributes equally;
@@ -21290,11 +21297,17 @@ async function runTrainingBatch() {
         : oppProfiles ? { profileAllowedSide: 1 - pinnedIdx } : {};
       gOpts.trailPath = inflightPath;
       gOpts.trailHead = trailHead;
+      if (process.env.PP_TRAIN_TEST_THROW === '1') throw new Error('Testfehler (PP_TRAIN_TEST_THROW=1)');   // nur für test/train-no-db.test.js
       record = await runHeadlessTrainingGame(pinned, opp, pinnedIdx, gOpts);
     } catch (err) {
       console.error(`[train] game ${i + 1} threw:`, err.message);
+      if (++throwsInARow >= 10) {
+        console.error('[train] 10 Spiele hintereinander mit einem Fehler abgebrochen — das ist kein Zufall, sondern ein Fehler im Aufbau/der Konfiguration. Abbruch (Exit-Code 4).');
+        process.exit(4);
+      }
       continue;
     }
+    throwsInARow = 0;
     // Stamp the hero trio as PLAIN NAMES — the runtime profile matcher
     // keys on sorted hero-name strings. Sample-deck hero entries are
     // objects ({ hero, ability1, ability2 }); unwrap them.

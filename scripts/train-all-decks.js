@@ -164,6 +164,7 @@ function sammle(deck, file, need, offset, netEnv) {
       { cwd: ROOT, env, stdio: 'inherit' });
     if (r.status === 0) break;
     if (r.status === 3) { console.error('[all] Ausgabedatei zu groß — Abbruch ohne Neustart (siehe Meldung oben).'); break; }
+    if (r.status === 4) { console.error('[all] Spiele brechen systematisch mit einem Fehler ab — Abbruch ohne Neustart (siehe Fehlermeldung oben).'); break; }
     console.error(`[all] server.js beendet mit Code ${r.status} — Neustart (Versuch ${attempts}/10, Resume greift)`);
   }
   return IO.countLines(file);
