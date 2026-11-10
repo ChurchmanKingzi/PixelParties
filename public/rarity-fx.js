@@ -1595,10 +1595,15 @@
   const dprNow = () => Math.min(2, root.devicePixelRatio || 1);
   const pickK = cssW => { const W = cssW * dprNow(); return W <= 300 ? 2 : W <= 450 ? 3 : W <= 600 ? 4 : 5; };
 
-  const io = typeof IntersectionObserver === 'function' ? new IntersectionObserver(es => { for (const e of es) { const i = e.target.__ppRar; if (i) { i.visible = e.isIntersecting; if (i.visible) i.wake(); } } }, { rootMargin: '120px' }) : null;
+  const io = typeof IntersectionObserver === 'function' ? new IntersectionObserver(es => { for (const e of es) { const i = e.target.__ppRar; if (i) { i.visible = e.isIntersecting; if (i.visible) i.wake(); else if (i.slot) { relSlot(i); i.animated = false; i.view = null; i.needs = true; } } } }, { rootMargin: '120px' }) : null;
   const ro = typeof ResizeObserver === 'function' ? new ResizeObserver(es => { for (const e of es) { const i = e.target.__ppRar; if (i) i.resized(e.contentRect.width); } }) : null;
 
   function animatedOk() { return root._playAnimations !== false && !root.PP_RETRO && !document.hidden; }
+  // Reduzierte Animation (`opts.reduced`, Deck-Editor): nur hoechstens REDUCED_MAX Karten laufen gleichzeitig animiert und nur mit REDUCED_FPS; alle anderen zeigen das Standbild.
+  // Ein Platz wird beim Aufbau einer sichtbaren Karte vergeben und gibt sich frei, wenn die Karte aus dem Sichtbereich scrollt oder entfernt wird.
+  const REDUCED_MAX = 12, REDUCED_FPS = 6;
+  let redActive = 0;
+  function relSlot(i) { if (i.slot) { i.slot = false; redActive--; } }
   let tickId = 0;
   function tick(now) {
     tickId = 0;
@@ -1606,7 +1611,7 @@
     if (animatedOk()) for (const i of instances) {
       if (!i.animated || !i.visible || !i.view) continue;
       any = true;
-      const fps = i.core.sp.fps, f = Math.floor(now / 1000 * fps);
+      const fps = i.opts.reduced ? Math.min(REDUCED_FPS, i.core.sp.fps) : i.core.sp.fps, f = Math.floor(now / 1000 * fps);
       if (f === i.lastF) continue;
       i.lastF = f; i.draw(f / fps + i.phase);
     }
@@ -1656,6 +1661,7 @@
         if (!this.canvas) this.mkCanvas();
         if (this.canvas.width !== tw || this.canvas.height !== th) { this.canvas.width = tw; this.canvas.height = th; this.g.imageSmoothingEnabled = false; }   // beide prüfen: eine frische Canvas ist 300 x 150, bei K = 2 stimmt die Breite schon
         this.K = K;
+        if (this.opts.reduced) { if (!this.slot && redActive < REDUCED_MAX) { this.slot = true; redActive++; } this.animated = this.slot; }   // reduziert: Platz im Animationsbudget oder Standbild
         if (!this.animated) {
           let still = lruGet(stillCache, sk);
           if (!still) {
@@ -1713,7 +1719,7 @@
         if (!SPEC[this.rarity]) { this.clear(); return; }
         this.refresh();
       },
-      destroy() { this.dead = true; this.token++; instances.delete(this); if (io) io.unobserve(this.host); if (ro) ro.unobserve(this.host); this.host.__ppRar = null; this.clear(); },
+      destroy() { this.dead = true; this.token++; relSlot(this); instances.delete(this); if (io) io.unobserve(this.host); if (ro) ro.unobserve(this.host); this.host.__ppRar = null; this.clear(); },
     };
     host.__ppRar = inst; instances.add(inst);
     if (io) io.observe(host); if (ro) ro.observe(host);

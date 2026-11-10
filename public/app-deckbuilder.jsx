@@ -1881,7 +1881,7 @@ function DeckBuilder() {
 
           {/* Scrollable deck body. Kleinansicht (FoilKleinContext): ein Cube mit 512 Karten trug sonst ~80 Foil-Karten mit voller
               Foil-Schicht (Baender, Funken, Staub, animierte Rahmen) — das war der Scroll-Lag (Als Befund 2.10.). */}
-          <FoilKleinContext.Provider value={true}>
+          <FoilKleinContext.Provider value={true}><FoilReduziertContext.Provider value={true}>
           <div style={{ flex: 1, overflowY: 'auto', padding: '8px 10px' }}>
 
             {isCube && (
@@ -2076,7 +2076,7 @@ function DeckBuilder() {
             </>}
 
           </div>
-          </FoilKleinContext.Provider>
+          </FoilReduziertContext.Provider></FoilKleinContext.Provider>
         </div>
 
         {/* ── RIGHT: CARD DATABASE ── */}
@@ -2126,7 +2126,7 @@ function DeckBuilder() {
           <div className="db-gallery-wrap" style={{ flex: 1, minHeight: 0, position: 'relative', display: 'flex' }}>
           <div className="db-gallery-scroll" ref={galerieScrollRef} style={{ flex: 1, minWidth: 0, overflowY: 'auto', padding: 6, ...(istTouch ? { paddingRight: 40, scrollbarWidth: 'none', WebkitOverflowScrolling: 'touch' } : {}) }}>
             {/* v1299: Kleinansicht — leichte Foil-Schicht (FoilKleinContext, app-shared). */}
-            <FoilKleinContext.Provider value={true}><div className="db-card-grid" ref={gridRef} style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 4 }}>
+            <FoilKleinContext.Provider value={true}><FoilReduziertContext.Provider value={true}><div className="db-card-grid" ref={gridRef} style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 4 }}>
               {pageCards.map((card, i) => {
                 const canMain = canAddCard(currentDeck || {}, card.name, 'main');
                 const canHero = canAddCard(currentDeck || {}, card.name, 'hero');
@@ -2144,7 +2144,7 @@ function DeckBuilder() {
                     style={{ width: '100%', height: 120 }} />
                 );
               })}
-            </div></FoilKleinContext.Provider>
+            </div></FoilReduziertContext.Provider></FoilKleinContext.Provider>
             {filteredCards.length === 0 && <div style={{ textAlign: 'center', color: 'var(--text2)', fontSize: 12, padding: 20 }}>No cards match filters</div>}
           </div>
           {istTouch && window.TouchScrollbar && <window.TouchScrollbar scrollRef={galerieScrollRef} />}
