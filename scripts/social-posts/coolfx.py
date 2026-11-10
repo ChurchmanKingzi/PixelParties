@@ -39,7 +39,7 @@ class CoolShow(CaptionMixin):
         (7.3, 11.1, 'Two cards? That is *160*. Talk to the hand!'),
         (11.2, 15.0, 'Three cards - *200* damage! No way! Way!'),
         (15.1, 18.7, 'Modnir on top? Booyah! Hammer time - *300*, and it is all *Coolness*!'),
-        (18.9, 21.3, 'Stay *cool*. Thorad is *all that*. Not!'),
+        (18.9, 21.3, 'Stay *cool*! Thorad is *all that* and a bag of chips!'),
     ]
     SND = {
         'open':   [('heavy_impact', -3), ('elem_lightning', -5)],
