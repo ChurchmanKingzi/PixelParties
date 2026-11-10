@@ -3804,9 +3804,9 @@ function ppFlugVerfolgen(fly, sourceEl, destEl, w0, ms, opEnd, farbe) {
  * erst nach 300–500 ms; Verschiebt sich das Brett dazwischen (Handy: Kamerafahrt), lag der naechste Treffer ploetzlich ueber einem anderen Helden.
  */
 // Einschlag-Animationen, die ihre Zielzone selbst quetschen (bzw. deren Silhouette/Karte sie beschichten: acid_splash): bekommen das Zonen-Element direkt (`zoneEl`)
-const PP_SQUASH_ANIMS = new Set(['stranglehold_squeeze', 'magic_hammer', 'heavy_hit_smash', 'hammer_skeleton_smash', 'hammer_throw', 'shattering_strike', 'spiked_club_smash', 'giant_dino_stomp', 'mammoth_stomp', 'ankylo_tail_smash', 'acid_splash', 'venom_strike']);
+const PP_SQUASH_ANIMS = new Set(['stranglehold_squeeze', 'magic_hammer', 'heavy_hit_smash', 'hammer_skeleton_smash', 'hammer_throw', 'shattering_strike', 'spiked_club_smash', 'giant_dino_stomp', 'mammoth_stomp', 'ankylo_tail_smash', 'acid_splash', 'venom_strike', 'ox_headbutt', 'tiger_kick']);
 // Mindestlebensdauer (ms) je Animationstyp: `options.duration` (Engine `animDuration`) ist oft kuerzer als die Animation selbst — die Hammer-Animationen (app-fx-57) laufen 1,2–1,8 s.
-const PP_ANIM_MINDAUER = { magic_hammer: 2000, heavy_hit_smash: 1700, hammer_skeleton_smash: 1450, hammer_throw: 1500, flame_avalanche: 2000, venom_strike: 1800 };   // hammer_throw (app-fx-59): 32 Bilder = 1070 ms + Vorlauf + Reserve; venom_strike (app-fx-61): 37 Bilder = 1230 ms + Vorlauf + Reserve
+const PP_ANIM_MINDAUER = { magic_hammer: 2000, heavy_hit_smash: 1700, hammer_skeleton_smash: 1450, hammer_throw: 1500, flame_avalanche: 2000, venom_strike: 1800, ox_headbutt: 2100, tiger_kick: 1500 };   // ox_headbutt (app-fx-62): 40 Bilder + 19 Bilder Anlauf = 1967 ms + Vorlauf + Reserve; hammer_throw (app-fx-59): 32 Bilder = 1070 ms + Vorlauf + Reserve; tiger_kick (app-fx-63): 34 Bilder = 1130 ms + Vorlauf + Reserve; venom_strike (app-fx-61): 37 Bilder = 1230 ms + Vorlauf + Reserve
 function ppZonenFrost() {
   const m = new Map();
   try { document.querySelectorAll('[data-hero-zone],[data-support-zone]').forEach(el => m.set(el, el.getBoundingClientRect())); } catch (e) { /* ohne Frost: live messen */ }
@@ -45011,6 +45011,21 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       // ENTIRE rendering side here — including the SFX-for-anim cue,
       // since it's gated on the visual.
       if (window._playAnimations === false) return;
+      // ★ Strong Ox Headbutt (app-fx-62): der Client entscheidet über den Rückfall. Geht der neue Sprung-Kopfstoß nicht (Retro, reduzierte Bewegung, Quelle ohne Figur …), spielt er die alte Kombination
+      // (Ramm-Anlauf + Explosion + Ochsen-Symbol) selbst — so, dass der Einschlag auf den Schadenszeitpunkt der Engine fällt (SCHADEN_MS 825 ms nach dem Ereignis: Anlauf 470 ms vorher + 150 ms Kontakt + 200 ms).
+      if (type === 'ox_headbutt' && window.ppFx62Pruefe && rest.von && (rest.von.owner === 0 || rest.von.owner === 1)) {
+        const hz = (o, hi) => document.querySelector(`[data-hero-zone][data-hero-owner="${ownerLbl(o, myIdx)}"][data-hero-idx="${hi}"]`);
+        const vEl = hz(rest.von.owner, rest.von.heroIdx);
+        const tEl = zoneSlot >= 0 ? document.querySelector(`[data-support-zone][data-support-owner="${ownerLbl(owner, myIdx)}"][data-support-hero="${heroIdx}"][data-support-slot="${zoneSlot}"]`) : hz(owner, heroIdx);
+        const grund = window.ppFx62Pruefe(vEl, tEl);
+        window.__ppFx62Grund = grund || 'neu';
+        if (grund) {
+          const ram = { sourceOwner: rest.von.owner, sourceHeroIdx: rest.von.heroIdx, targetOwner: owner, targetHeroIdx: heroIdx, cardName: rest.cardName, duration: 1200, ...(zoneSlot >= 0 ? { targetZoneSlot: zoneSlot } : null) };
+          setTimeout(() => onRamAnimation(ram), 470);
+          setTimeout(() => { onZoneAnim({ type: 'explosion', owner, heroIdx, zoneSlot }); onZoneAnim({ type: 'ox_impact', owner, heroIdx, zoneSlot }); }, 620);
+          return;
+        }
+      }
       if (window.playSFXForZoneAnim) window.playSFXForZoneAnim(type, rest);
       const ownerLabel = ownerLbl(owner, myIdx);
       // ── `zoneType: 'board'` — die ganze Kampfflaeche (v580) ─────────

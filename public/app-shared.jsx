@@ -4371,6 +4371,17 @@ const ZONE_ANIM_SFX = {
   // Blow of the Venom Snake (app-fx-61): Bild 0 = Kontakt des Dashs (`attack_ram` kommt vom Dash selbst, nicht von hier), Biss/Schaden bei Bild 5 (167 ms), Gift-Adern bis Bild 30. Zeiten animationsrelativ (Bild = 33,3 ms),
   // der Mount-Vorlauf kommt von `playSFXForZoneAnim` dazu. Funktion: Stufe 2/3 (`stacks`) legt zusätzliche Blubber- und Gift-Lagen darüber. Spätere Lagen sind `category: null, dedupe: 0` (eigene Töne, keine Sperre);
   // `damage` (Bild 5) deckt sich mit dem Schadensklang des Logs und wird per `dedupe: 250` mit ihm zusammengefasst.
+  // Ferocious Tiger Kick (app-fx-63): Bild 0 = Kontakt des Dashs (`attack_ram` kommt vom Dash selbst, nicht von hier); Schaden/Maul voll auf bei Bild 2 (67 ms), Krallen Bild 2–4, Brüllen 4–8 (Ersatz: `elem_fire` tief), Sterne ab 13.
+  // Zeiten animationsrelativ (Bild = 33,3 ms), der Mount-Vorlauf kommt von `playSFXForZoneAnim` dazu; die beiden Anlauf-Zischer (Bild −2/−1) liegen vor dem Start der Leinwand und kommen bei 1 ms.
+  // Alle Lagen `category: null, dedupe: 0` (eigene Töne, keine Sperre); `damage` (Bild 2) deckt sich mit dem Schadensklang des Logs und wird per `dedupe: 250` mit ihm zusammengefasst.
+  tiger_kick: (() => {
+    const e = (name, bild, volume, rate, extra) => ({ name, opts: { volume, rate, delay: Math.max(1, Math.round(bild * 1000 / 30)), category: null, dedupe: 0, ...(extra || null) } });
+    const L = [
+      e('booster_card_whoosh', -2, 0.35, 0.9), e('booster_card_whoosh', -1, 0.3, 1.5), e('slash', 0, 0.55, 0.8), e('heavy_impact', 0, 0.6, 1.0), e('elem_fire', 1, 0.5, 0.55), e('damage', 2, 0.55, 1.0, { dedupe: 250 }),
+      e('slash', 2, 0.55, 1.0), e('slash', 3, 0.5, 1.12), e('slash', 4, 0.45, 1.25), e('elem_fire', 6, 0.25, 0.5), e('debuff', 12, 0.35, 1.0), e('ping', 13, 0.2, 1.3), e('ping', 16, 0.18, 1.45), e('ping', 19, 0.15, 1.6),
+    ];
+    return L;
+  })(),
   venom_strike: (p) => {
     const st = Math.max(1, Math.min(3, (p && p.stacks) | 0 || 1));
     const e = (name, bild, volume, rate, extra) => ({ name, opts: { volume, rate, delay: Math.max(1, Math.round(bild * 1000 / 30)), category: null, dedupe: 0, ...(extra || null) } });
@@ -4381,6 +4392,20 @@ const ZONE_ANIM_SFX = {
     ];
     if (st >= 2) L.push(e('elem_acid', 12, 0.3, 0.9), e('poison', 19, 0.3, 1.3));
     if (st >= 3) L.push(e('poison', 14, 0.3, 0.9), e('elem_acid', 24, 0.25, 1.1));
+    return L;
+  },
+  // Strong Ox Headbutt (app-fx-62): Bild −19 = Animationsbeginn (Offset 0), Bild 0 = Kontakt (633 ms), Schaden Bild 2 (700 ms); Zeiten animationsrelativ (Bild f → (f + 19) · 33,3 ms), der Mount-Vorlauf kommt von
+  // `playSFXForZoneAnim` dazu. Hocke/Absprung/Scheitel/Absturz als Whoosh-Staffel, Kontakt = `attack_ram` + zwei `heavy_impact`, Schaden `damage` (per `dedupe: 250` mit dem Klang des Logs zusammengefasst), Landung/Rückweg.
+  // Funktion: ab `pow` 3 (3. Angriff der Runde) legt ein dritter, tiefer Stoß darüber. Alle Lagen `category: null, dedupe: 0` (eigene Töne, keine Sperre); der Rückfall (alter Ram + Explosion) kommt ohne diesen Eintrag aus.
+  ox_headbutt: (p) => {
+    const pw = Math.max(1, Math.min(3, (p && p.pow) | 0 || 1));
+    const e = (name, bild, volume, rate, extra) => ({ name, opts: { volume, rate, delay: Math.max(1, Math.round((bild + 19) * 1000 / 30)), category: null, dedupe: 0, ...(extra || null) } });
+    const L = [
+      e('booster_card_whoosh', -19, 0.25, 1.0), e('booster_card_whoosh', -15, 0.55, 0.55), e('booster_umpf', -15, 0.3, 0.8), e('booster_card_whoosh', -5, 0.5, 0.9), e('booster_card_whoosh', -3, 0.35, 1.3),
+      e('attack_ram', 0, 0.9, 0.85), e('heavy_impact', 0, 0.95, 1.0), e('heavy_impact', 1, 0.8, 0.6), e('pull_crack', 1, 0.35, 0.8), e('damage', 2, 0.6, 0.9, { dedupe: 250 }), e('elem_wind', 3, 0.2, 0.7),
+      e('booster_card_land', 5, 0.45, 0.9), e('creature_destroyed', 8, 0.12, 0.6), e('booster_card_whoosh', 9, 0.4, 0.8), e('booster_card_land', 13, 0.25, 1.0),
+    ];
+    if (pw >= 3) L.push(e('heavy_impact', 3, 0.5, 0.45));
     return L;
   },
   hammer_skeleton_smash: [
@@ -5212,7 +5237,9 @@ const ZONE_ANIM_NONEFFECT = new Set([
   'heavy_hit_smash',
   'hammer_skeleton_smash',
   'hammer_throw',   // Abwurf-Klang + Aufprall liegen ~0,5 s auseinander (wie die Hammer-Animationen)
+  'ox_headbutt',    // gestaffelte Lagen über 2 s (Absprung, Kontakt, Landung): jede trägt ihren Klang, keine Sammel-Sperre
   'venom_strike',   // gestaffelte Lagen über 1 s (Biss, Gift-Adern): jede trägt ihren Klang, keine Sammel-Sperre
+  'tiger_kick',     // gestaffelte Lagen über 0,7 s (Tritt, Krallen, Brüllen, Sterne): jede trägt ihren Klang, keine Sammel-Sperre
   // v1422 (Als Befund 25.9.: „den Sound hoere ich im Spiel nicht"): der
   // Doom-Tick kommt fast immer im selben Augenblick wie andere Effekt-
   // Klaenge (Rundenende, Besiegung) und wurde von der 'effect'-Sperre

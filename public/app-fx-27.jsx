@@ -326,6 +326,7 @@ function ppFx27Figur(srcEl, tgtEl, opt) {
     else {
       F.ruhe++; F.seitFahrt++;
       if (F.ruhe >= 0 && F.ruhe < PP_FX27_FEDER.length) { sx = PP_FX27_FEDER[F.ruhe][0]; sy = PP_FX27_FEDER[F.ruhe][1]; }
+      if (F.kick && (F.ruhe === 1 || F.ruhe === 2)) { sx = 1.2; sy = 0.96; }   // Tritt (Ferocious Tiger Kick, app-fx-63 setzt `F.kick`): der Angreifer streckt sich in Bild 1–2 nach dem Kontakt weiter
       else if (z.laden) { sx = PP_FX27_LADEN[0]; sy = PP_FX27_LADEN[1]; }
     }
     // Staubwolke beim Start jeder Fahrt und beim Halt (wie die Sprengpixel der Trailer-Dashes)
