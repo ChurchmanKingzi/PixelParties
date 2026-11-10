@@ -540,7 +540,7 @@ const BUFF_EFFECTS = {
   // next single-target Attack. Persists across turns until consumed.
   empowered_strike: { label: 'Empowered Strike', icon: '💪', tooltip: "The next time this Hero hits exactly 1 target with an Attack, that Attack's damage is increased by 150 and cannot be reduced or negated." },
   // Unreasonable Anger (24.10.): jeder Schaden, den der Held an EINEM einzelnen Ziel verursacht, +100 — bis zum Ende des nächsten Zuges des Wirkers (Engine `_applyAngerBonusIfApplicable`).
-  unreasonable_anger: { label: 'Unreasonable Anger', icon: '💢', tooltip: 'Any damage this Hero deals to single targets is increased by 100.' },
+  unreasonable_anger: { label: 'Unreasonable Anger', icon: '💢', tooltip: 'The next damage this Hero deals to a single target during its controller\'s next turn is increased by 100.' },
   // String of Fine — target takes 0 damage from any source for the
   // duration of the buff. `damageMultiplier: 0` is read by the
   // engine's standard buff-multiplier pass on hero & creature damage,

@@ -42849,9 +42849,12 @@ this._deathWatch = (this._deathWatchStack || []).length
   }
 
   /**
-   * Unreasonable Anger rider (24.10.): trägt die Quelle (ein Held) den Buff `unreasonable_anger`, steigt JEDER Schaden, den dieser Held an EINEM einzelnen Ziel verursacht, um 100.
+   * Unreasonable Anger rider (24.10.; neuer Text 10.11.): „The next damage the user deals to a single target during your next turn is increased by 100." Trägt die Quelle (ein Held) den
+   * Buff `unreasonable_anger`, steigt der NÄCHSTE Schaden, den dieser Held an EINEM einzelnen Ziel verursacht, um 100 — NUR im Zeitfenster (`buff.fenster = [{ runde, bonus }]`: die
+   * Zugnummer des nächsten eigenen Zuges; Schaden davor, etwa als Reaktion im Gegnerzug, zählt nicht) und nur EINMAL: der Treffer verbraucht seine Einträge (mehrere Kopien für denselben
+   * Zug summieren sich, der Bonus liegt dann auf demselben nächsten Schaden). Buffs OHNE `fenster` (Puzzle-Editor, alter Stand) wirken einmalig +100 ohne Zeitfenster.
    * Gleiche Auslegung wie bei Frog Race Boat: direkter Schaden des Helden (Attack, Spell, Effekt) — nicht Statusticks (kein Heldenindex) und nicht der Schaden einer Kreatur in seinen
-   * Zonen (`type === 'creature'` / Quelle in einer Support Zone). Kein Einzelziel (Mehrziel-Klammer mit 2+ Zielen, Batch mit 2+ Einträgen) → kein Bonus. Der Buff bleibt (Frist-Ablauf).
+   * Zonen (`type === 'creature'` / Quelle in einer Support Zone). Kein Einzelziel (Mehrziel-Klammer mit 2+ Zielen, Batch mit 2+ Einträgen) → kein Bonus UND kein Verbrauch („to a single target").
    * @param {object} hookCtx  { source, target, type, amount, … }
    * @param {number} [eintraege]  Anzahl der Ziele im Batch (Kreaturenpfad); Heldenpfad: 1
    */
@@ -42869,9 +42872,22 @@ this._deathWatch = (this._deathWatchStack || []).length
     const _mh = this._multiHitScope;
     if ((_mh?.total || 0) >= 2 && !_mh.ersterTrefferEinzel) return;
     if (eintraege > 1) return;
-    hookCtx.amount += ANGER_BONUS;
-    if (hookCtx._kBase !== undefined) hookCtx._kBase += ANGER_BONUS;
-    this.log('unreasonable_anger_bonus', { hero: srcHero.name, target: hookCtx.target?.name, bonus: ANGER_BONUS });
+    // Zeitfenster + Verbrauch: nur Einträge der AKTUELLEN Zugnummer zählen und werden aufgebraucht (Buff ohne `fenster`: einmalig +100, jederzeit).
+    const buff = srcHero.buffs.unreasonable_anger;
+    let bonus = ANGER_BONUS;
+    if (Array.isArray(buff.fenster)) {
+      const jetzt = this.gs.turn;
+      const treffer = buff.fenster.filter(f => f && f.runde === jetzt);
+      if (treffer.length === 0) return;                                 // nicht im nächsten eigenen Zug (noch nicht dran): kein Bonus, nichts verbraucht
+      bonus = treffer.reduce((a, f) => a + (Number(f.bonus) || ANGER_BONUS), 0);
+      buff.fenster = buff.fenster.filter(f => f && f.runde !== jetzt);
+      if (!buff.fenster.some(f => f.runde > jetzt)) delete srcHero.buffs.unreasonable_anger;   // nichts Späteres mehr vorgemerkt: der Buff ist verbraucht
+    } else {
+      delete srcHero.buffs.unreasonable_anger;
+    }
+    hookCtx.amount += bonus;
+    if (hookCtx._kBase !== undefined) hookCtx._kBase += bonus;
+    this.log('unreasonable_anger_bonus', { hero: srcHero.name, target: hookCtx.target?.name, bonus });
   }
 
   /**
