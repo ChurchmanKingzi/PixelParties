@@ -406,6 +406,26 @@
 // ═════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
 const PP_FX60_TAKT = 1000 / 30;
 
+/**
+ * Zwei Animationen gleichzeitig auf demselben DOM-Element (z. B. zwei Lawinen kurz nacheinander): der Ausgangswert eines Stils wird EINMAL gemerkt (`ppFxHalte`), und erst die LETZTE
+ * Animation stellt ihn wieder her (`ppFxLoese` → true). Sonst merkt sich die zweite den schon verstellten Wert („hidden“, Shake) der ersten und stellt DEN am Ende her — Held bleibt unsichtbar, Brett verschoben.
+ * `stil`: das `style`-Objekt des Elements, `schluessel`: z. B. 'visibility' / 'translate' / 'transform'. Gemeinsam für app-fx-60/61/62.
+ */
+function ppFxHalte(stil, schluessel) {
+  const reg = stil._ppFxHalte || (stil._ppFxHalte = {});
+  const r = reg[schluessel] || (reg[schluessel] = { n: 0, alt: stil[schluessel] });
+  r.n++;
+  return r.alt;
+}
+function ppFxLoese(stil, schluessel) {
+  const r = stil._ppFxHalte && stil._ppFxHalte[schluessel];
+  if (!r) return true;
+  if (--r.n > 0) return false;
+  delete stil._ppFxHalte[schluessel];
+  return true;
+}
+window.ppFxHalte = ppFxHalte; window.ppFxLoese = ppFxLoese;
+
 /** Rückfall auf die alte Salve (`ppR1FlameAvalanche`): Animationen aus, Retro, Test-Schalter, reduzierte Bewegung, keine Palette. */
 function ppFx60Rueckfall() {
   try {
@@ -659,15 +679,15 @@ function PpFx60Leinwand({ geo }) {
     const hook = { pile: (mm, i, pose) => (recs[i].kind === 'hero' ? pileHero(mm, i, pose) : pileCard(mm, i, pose)) };
     // DOM-Seite: Merker zum Zurücksetzen
     for (const rc of recs) {
-      rc.alt = { vis: rc.platz ? rc.platz.style.visibility : '', tr: rc.platz ? rc.platz.style.translate : '', kTr: rc.karte ? rc.karte.style.transform : '' };
+      rc.alt = { vis: rc.platz ? ppFxHalte(rc.platz.style, 'visibility') : '', tr: rc.platz ? ppFxHalte(rc.platz.style, 'translate') : '', kTr: rc.karte ? ppFxHalte(rc.karte.style, 'transform') : '' };
       rc.kx = 1; if (rc.karte) { const kr = rc.karte.getBoundingClientRect(); if (kr.width > 0) rc.kx = rc.karte.offsetWidth / kr.width; }
       rc.key = ''; rc.tot = false;
     }
-    const altBoard = board ? board.style.translate : '';
+    const altBoard = board ? ppFxHalte(board.style, 'translate') : '';
     const t0 = performance.now();
     let raf = 0, letzte = -1, ende = false, skey = '';
     const zuruecksetzen = () => {
-      try { for (const rc of recs) { if (rc.platz) { rc.platz.style.visibility = rc.alt.vis; rc.platz.style.translate = rc.alt.tr; } if (rc.karte) rc.karte.style.transform = rc.alt.kTr; } if (board) board.style.translate = altBoard; } catch (e) { /* weg */ }
+      try { for (const rc of recs) { if (rc.platz) { if (ppFxLoese(rc.platz.style, 'visibility')) rc.platz.style.visibility = rc.alt.vis; if (ppFxLoese(rc.platz.style, 'translate')) rc.platz.style.translate = rc.alt.tr; } if (rc.karte && ppFxLoese(rc.karte.style, 'transform')) rc.karte.style.transform = rc.alt.kTr; } if (board && ppFxLoese(board.style, 'translate')) board.style.translate = altBoard; } catch (e) { /* weg */ }
     };
     const aufraeumen = () => { if (ende) return; ende = true; try { cancelAnimationFrame(raf); } catch (e) { /* weg */ } zuruecksetzen(); try { ctx.clearRect(0, 0, gw, gh); } catch (e) { /* weg */ } };
     const schritt = (jetzt) => {

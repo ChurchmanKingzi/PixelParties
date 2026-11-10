@@ -607,7 +607,7 @@ function PpFx62Leinwand({ geo, zoneEl, vonEl }) {
     };
     const cam = { proj, cosT };
     // DOM-Seite: Karte ruckeln (ganze Zellen), Figuren ausblenden solange sie im Raster gemalt werden, Brett schütteln
-    const alt = { kTr: karte ? karte.style.transform : '', tr: board ? board.style.translate : '' };
+    const alt = { kTr: karte ? ppFxHalte(karte.style, 'transform') : '', tr: board ? ppFxHalte(board.style, 'translate') : '' };   // Ausgangswerte zählend merken: zwei gleichzeitige Animationen (app-fx-60 `ppFxHalte`)
     let kx = 1, ky = 1; if (karte) { const kr = karte.getBoundingClientRect(); if (kr.width > 0) kx = karte.offsetWidth / kr.width; if (kr.height > 0) ky = karte.offsetHeight / kr.height; }
     if (mess1) (window.__ppFx62Zeiten || (window.__ppFx62Zeiten = [])).push([-101, +(performance.now() - mess1).toFixed(3)]);
     const t0 = performance.now();
@@ -617,7 +617,7 @@ function PpFx62Leinwand({ geo, zoneEl, vonEl }) {
       try {
         if (wegV) { wegV = false; ppFx62Da(platzV); }
         if (wegT) { wegT = false; ppFx62Da(platzT); }
-        if (karte) karte.style.transform = alt.kTr; if (board) board.style.translate = alt.tr;
+        if (karte && ppFxLoese(karte.style, 'transform')) karte.style.transform = alt.kTr; if (board && ppFxLoese(board.style, 'translate')) board.style.translate = alt.tr;
       } catch (e) { /* weg */ }
     };
     const aufraeumen = () => { if (ende) return; ende = true; try { cancelAnimationFrame(raf); } catch (e) { /* weg */ } zuruecksetzen(); try { ctx.clearRect(0, 0, gw, gh); } catch (e) { /* weg */ } };

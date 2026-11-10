@@ -453,14 +453,14 @@ function PpFx61Leinwand({ geo, zoneEl }) {
     const hook = { onTarget: (X, Y) => X >= 0 && Y >= 0 && X < gw && Y < gh && tmask[Y * gw + X] === 1, pile };
     const cam = { proj };
     // DOM-Seite: Karte ruckeln (ganze Zellen), Held ausblenden solange er im Raster gemalt wird, Brett schütteln
-    const alt = { vis: platz ? platz.style.visibility : '', kTr: karte ? karte.style.transform : '', tr: board ? board.style.translate : '' };
+    const alt = { vis: platz ? ppFxHalte(platz.style, 'visibility') : '', kTr: karte ? ppFxHalte(karte.style, 'transform') : '', tr: board ? ppFxHalte(board.style, 'translate') : '' };   // Ausgangswerte zählend merken: zwei gleichzeitige Animationen (app-fx-60 `ppFxHalte`)
     let kx = 1; if (karte) { const kr = karte.getBoundingClientRect(); if (kr.width > 0) kx = karte.offsetWidth / kr.width; }
     if (mess1) (window.__ppFx61Zeiten || (window.__ppFx61Zeiten = [])).push([-2, +(performance.now() - mess1).toFixed(3)]);
     const t0 = performance.now();
     if (window.__ppFx61Messen) window.__ppFx61T0 = t0;
     let raf = 0, letzte = -1, ende = false, key = '', figurWeg = false, platzAkt = platz;
     const zuruecksetzen = () => {
-      try { if (platzAkt) platzAkt.style.visibility = alt.vis; if (karte) karte.style.transform = alt.kTr; if (board) board.style.translate = alt.tr; } catch (e) { /* weg */ }
+      try { if (platzAkt && ppFxLoese(platzAkt.style, 'visibility')) platzAkt.style.visibility = alt.vis; if (karte && ppFxLoese(karte.style, 'transform')) karte.style.transform = alt.kTr; if (board && ppFxLoese(board.style, 'translate')) board.style.translate = alt.tr; } catch (e) { /* weg */ }
     };
     const aufraeumen = () => { if (ende) return; ende = true; try { cancelAnimationFrame(raf); } catch (e) { /* weg */ } zuruecksetzen(); try { ctx.clearRect(0, 0, gw, gh); } catch (e) { /* weg */ } };
     const schritt = (jetzt) => {
