@@ -998,7 +998,33 @@
     // Skin-Holo: der Name steht golden auf der Karte (siehe unten, HOLO-TEXTUR); die schillernden Schichten
     // darueber zeichnet das Spiel als eigene DOM-Lage (SkinHolo in app-shared.jsx).
     if (skin && holoOn(skin)) spec.nameGold = true;
-    return draw(spec, art);
+    const cv = draw(spec, art);
+    cv.keep = keepInfo(spec);                      // was bei einem Rang-Rahmen ÜBER dem Rahmen bleiben muss (keepOver)
+    return cv;
+  }
+
+  /**
+   * Rang-Rahmen (Duplikate, rank-frames.js) liegen über dem Kartenbild. Werte und Symbole, die am Kartenrand stehen, müssen aber
+   * ÜBER dem Rahmen bleiben: Name oben, Wertezeile unten (Herz/HP, Schwert/Angriff, Kosten), Zauberschule links, Stufe rechts, Kartenart-Symbol.
+   * Liefert die Rechtecke (Kartenpixel 750 × 1050), die aus der ungerahmten Karte zurückgelegt werden, und das Kartenart-Symbol.
+   */
+  function keepInfo(spec) {
+    const t = spec.type, rects = [];
+    rects.push([100, 44, 550, 66]);                    // Name (oben): das dicke Band hoher Ränge würde ihn sonst anschneiden
+    if (hatHp(t) || isHero3(t) || t === 'summon' || isArti2(t)) rects.push([90, 982, 600, 66]);
+    if (t === 'spell' || t === 'summon') {
+      if (spec.school) rects.push([0, 550, 110, 110]);
+      if (spec.level != null || spec.lvOver != null) rects.push([650, 550, 100, 110]);
+    }
+    const kind = spec.kind && (t === 'spell' || t === 'summon' || t === 'potion' || t === 'artifact') ? spec.kind : null;
+    return { rects, kind };
+  }
+  /** Legt die Werte/Symbole der ungerahmten Karte `un` (aus renderCard) über den Rahmen auf dem Canvas-Kontext `g` (gleiche Größe). */
+  function keepOver(un, g) {
+    const k = un && un.keep; if (!k) return;
+    g.imageSmoothingEnabled = false;
+    for (const [x, y, w, h] of k.rects) g.drawImage(un, x, y, w, h, x, y, w, h);
+    if (k.kind) sprite(g, 'kind.' + k.kind, 0, 950, 100, 100);
   }
 
   // ═════════════ DAUERHAFTER CACHE (IndexedDB) ═════════════
@@ -1458,5 +1484,5 @@
   }
   function rimCached(rk) { return (rk && rimDone.get(rk.kind)) || null; }
 
-  root.CardRender = { OPT, last: {}, meta_card: (n, r) => { meta.cards[n] = Object.assign(meta.cards[n] || {}, { r: r === 'common' ? undefined : r }); }, meta_set: (k, name) => { meta.skins[k] = Object.assign(meta.skins[k] || {}, { name }); }, init, draw, specFromCard, renderCard, holoLayers, holoFor, holoCached, textLayer, geometryOf, artGrid, textMasks, rarityBase, isFullart, hatchFor, hatchCached, hatchEligible, rimKind, rimFor, rimCached, openCache, cacheGet, cachePut, cacheDel, cacheStats, toBlob, HOLO, getArt, hasArt, loadMeta, loadArtIndex, W, H, _adv: adv, _unitsOf: unitsOf, _paragraphs: paragraphs, STATUS_TERMS, statusMatches, _statusDarstellung: statusDarstellung, _kontrast: kontrast, STATUS_OUTLINES: { dark: OUT_DARK, light: OUT_LIGHT } };
+  root.CardRender = { OPT, last: {}, keepOver, meta_card: (n, r) => { meta.cards[n] = Object.assign(meta.cards[n] || {}, { r: r === 'common' ? undefined : r }); }, meta_set: (k, name) => { meta.skins[k] = Object.assign(meta.skins[k] || {}, { name }); }, init, draw, specFromCard, renderCard, holoLayers, holoFor, holoCached, textLayer, geometryOf, artGrid, textMasks, rarityBase, isFullart, hatchFor, hatchCached, hatchEligible, rimKind, rimFor, rimCached, openCache, cacheGet, cachePut, cacheDel, cacheStats, toBlob, HOLO, getArt, hasArt, loadMeta, loadArtIndex, W, H, _adv: adv, _unitsOf: unitsOf, _paragraphs: paragraphs, STATUS_TERMS, statusMatches, _statusDarstellung: statusDarstellung, _kontrast: kontrast, STATUS_OUTLINES: { dark: OUT_DARK, light: OUT_LIGHT } };
 })(typeof window !== 'undefined' ? window : globalThis);

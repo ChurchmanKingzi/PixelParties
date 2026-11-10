@@ -178,7 +178,11 @@
       let cv = await CardRender.renderCard(r.card, Object.keys(opts).length ? opts : null);
       if (!cv) return null;
       // Rang-Rahmen (Duplikate): fest in die Karte einbacken (public/rank-frames.js); ohne den Generator bleibt die Karte rahmenlos
-      if (m.rahmen && window.ppRankFrames && window.ppRankFrames.rankOf(m.rahmen) != null) cv = window.ppRankFrames.bake(cv, cv.width, cv.height, window.ppRankFrames.rankOf(m.rahmen), 'card');
+      if (m.rahmen && window.ppRankFrames && window.ppRankFrames.rankOf(m.rahmen) != null) {
+        const un = cv;                                   // ungerahmte Karte: Werte und Symbole am Rand kommen von hier wieder ÜBER den Rahmen
+        cv = window.ppRankFrames.bake(un, un.width, un.height, window.ppRankFrames.rankOf(m.rahmen), 'card');
+        if (CardRender.keepOver) CardRender.keepOver(un, cv.getContext('2d'));
+      }
       const blob = await CardRender.toBlob(cv);
       if (!blob) return null;
       CardRender.cachePut(key, blob, blob.size);          // fuer den naechsten Besuch (ohne zu warten)
