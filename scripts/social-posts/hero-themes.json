@@ -859,16 +859,6 @@
  "Thorad, Strength of Coolness": {
   "particles": [
    [
-    "bolt",
-    "spectral",
-    8
-   ],
-   [
-    "gas",
-    "storm_smoke",
-    28
-   ],
-   [
     "spark",
     "spectral",
     8
@@ -878,7 +868,11 @@
     "gold",
     4
    ]
-  ]
+  ],
+  "px": 14,
+  "coolshow": true,
+  "opener": "wind",
+  "showLoops": 5
  },
  "Toras, Master of all Weapons": {
   "particles": [
