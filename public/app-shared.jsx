@@ -4368,6 +4368,21 @@ const ZONE_ANIM_SFX = {
     { name: 'pull_crack', opts: { volume: 0.5, rate: 0.9, delay: 533 } },
     { name: 'booster_card_land', opts: { volume: 0.4, rate: 0.8, delay: 700 } },
   ],
+  // Blow of the Venom Snake (app-fx-61): Bild 0 = Kontakt des Dashs (`attack_ram` kommt vom Dash selbst, nicht von hier), Biss/Schaden bei Bild 5 (167 ms), Gift-Adern bis Bild 30. Zeiten animationsrelativ (Bild = 33,3 ms),
+  // der Mount-Vorlauf kommt von `playSFXForZoneAnim` dazu. Funktion: Stufe 2/3 (`stacks`) legt zusätzliche Blubber- und Gift-Lagen darüber. Spätere Lagen sind `category: null, dedupe: 0` (eigene Töne, keine Sperre);
+  // `damage` (Bild 5) deckt sich mit dem Schadensklang des Logs und wird per `dedupe: 250` mit ihm zusammengefasst.
+  venom_strike: (p) => {
+    const st = Math.max(1, Math.min(3, (p && p.stacks) | 0 || 1));
+    const e = (name, bild, volume, rate, extra) => ({ name, opts: { volume, rate, delay: Math.max(1, Math.round(bild * 1000 / 30)), category: null, dedupe: 0, ...(extra || null) } });
+    const L = [
+      e('slash', 0, 0.65, 0.75), e('heavy_impact', 0, 0.35, 0.9), e('pull_crack', 1, 0.25, 1.0),
+      e('booster_card_whoosh', 3, 0.3, 0.5), e('damage', 5, 0.5, 1.0, { dedupe: 250 }), e('slash', 5, 0.4, 0.55), e('booster_card_whoosh', 6, 0.25, 0.7),
+      e('elem_acid', 7, 0.5, 1.0), e('poison', 10, 0.5, 1.0), e('elem_acid', 16, 0.35, 1.2), e('poison', 22, 0.35, 1.1), e('elem_acid', 30, 0.2, 1.4),
+    ];
+    if (st >= 2) L.push(e('elem_acid', 12, 0.3, 0.9), e('poison', 19, 0.3, 1.3));
+    if (st >= 3) L.push(e('poison', 14, 0.3, 0.9), e('elem_acid', 24, 0.25, 1.1));
+    return L;
+  },
   hammer_skeleton_smash: [
     { name: 'booster_card_whoosh', opts: { volume: 0.35, rate: 0.85, delay: 700 } },
     { name: 'booster_card_whoosh', opts: { volume: 0.4, rate: 0.8, delay: 767 } },
@@ -5197,6 +5212,7 @@ const ZONE_ANIM_NONEFFECT = new Set([
   'heavy_hit_smash',
   'hammer_skeleton_smash',
   'hammer_throw',   // Abwurf-Klang + Aufprall liegen ~0,5 s auseinander (wie die Hammer-Animationen)
+  'venom_strike',   // gestaffelte Lagen über 1 s (Biss, Gift-Adern): jede trägt ihren Klang, keine Sammel-Sperre
   // v1422 (Als Befund 25.9.: „den Sound hoere ich im Spiel nicht"): der
   // Doom-Tick kommt fast immer im selben Augenblick wie andere Effekt-
   // Klaenge (Rundenende, Besiegung) und wurde von der 'effect'-Sperre

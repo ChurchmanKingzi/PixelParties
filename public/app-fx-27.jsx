@@ -23,7 +23,7 @@
 //  merkt der Takt das (`lebt()`), bindet sich an eine neu gemountete Figur oder beendet sich. Mehrere Rammen desselben Helden: die neue löst die laufende ab.
 // ═════════════════════════════════════════════════════════════════
 const PP_FX27_BILD = 1000 / 30;
-const PP_FX27_FARBE = { creme: '#fffbd2', blau: '#b3d8f9', orange: '#ff9a1a', gelb: '#ffe23d', rot: '#ff491a', grau: '#9aa3b6' };
+const PP_FX27_FARBE = { creme: '#fffbd2', blau: '#b3d8f9', orange: '#ff9a1a', gelb: '#ffe23d', rot: '#ff491a', grau: '#9aa3b6', gift1: '#b3f9b8', gift2: '#75f091', gift3: '#cbff66', gift4: '#4bcd7c' };
 const PP_FX27_FEDER = [[1.25, 0.8], [0.92, 1.12], [1.03, 0.97], [1, 1]];    // Aufprall-Federung (x/y-Streckung) in den ersten 4 Bildern nach dem Halt
 const PP_FX27_FAHRT = [1.5, 0.78];                                           // Streckung beim Fahren
 const PP_FX27_LADEN = [1.16, 0.88];                                          // Aufladen vor dem Start
@@ -227,7 +227,7 @@ function ppFx27KannFigur(zone) {
 /**
  * Steuerung der Figur einer Zone. `pose({ p, spiegel, wackeln, laden })` setzt sie in den Takt (höchstens ein Bild je 1/30 s, doppelte Aufrufe im selben Bild zählen nicht);
  * `opt.voll`: p bezieht sich auf die volle Strecke Zonenmitte → Zonenmitte (Duell), sonst endet der Weg etwas vor dem Ziel (die Figur landet VOR dem Ziel, nicht in ihm).
- * `opt.art`: 'std' | 'jet' | 'rueck' | 'duell' | 'sterne' (Farben der Nachbilder und Funken). Gibt `null`, wenn die Zone keine fahrbereite Figur hat.
+ * `opt.art`: 'std' | 'jet' | 'rueck' | 'duell' | 'sterne' | 'gift' (Farben der Nachbilder und Funken; 'gift' = `trailType: 'poison'`, giftgrüne Geister nur auf dem Hinweg). Gibt `null`, wenn die Zone keine fahrbereite Figur hat.
  */
 function ppFx27Figur(srcEl, tgtEl, opt) {
   opt = opt || {};
@@ -238,14 +238,17 @@ function ppFx27Figur(srcEl, tgtEl, opt) {
   if (srcEl._ppFigurFahrt) { try { srcEl._ppFigurFahrt.ende(); } catch (e) { /* weg */ } }
   const art = opt.art || 'std';
   const feuer = art === 'jet' || art === 'sterne';
-  const geister = feuer ? [PP_FX27_FARBE.creme, PP_FX27_FARBE.orange, PP_FX27_FARBE.gelb, PP_FX27_FARBE.orange] : [PP_FX27_FARBE.creme, PP_FX27_FARBE.blau, PP_FX27_FARBE.creme, PP_FX27_FARBE.blau];
+  const gift = art === 'gift';   // `trailType: 'poison'` (Blow of the Venom Snake): giftgrüne Nachbilder, NUR auf dem Hinweg (ab dem Kontakt keine neuen — die Rückfahrt bleibt ohne Geister)
+  const geister = feuer ? [PP_FX27_FARBE.creme, PP_FX27_FARBE.orange, PP_FX27_FARBE.gelb, PP_FX27_FARBE.orange]
+    : gift ? [PP_FX27_FARBE.gift1, PP_FX27_FARBE.gift2, PP_FX27_FARBE.gift3, PP_FX27_FARBE.gift4]
+    : [PP_FX27_FARBE.creme, PP_FX27_FARBE.blau, PP_FX27_FARBE.creme, PP_FX27_FARBE.blau];
   // Sprengpixel = Hero-Pixel in der Sprite-Ebene (Entwurfspixel der Figur = Canvas-Breite im Layout / Frame-Breite / --board-scale, normal 2,8125); einmal je Fahrt gelesen, nicht im Takt. Vorher fest 2.
   const heroPx = (() => { try { const cv = srcEl && srcEl._ppFigurPlatz && srcEl._ppFigurPlatz.querySelector('canvas'); const bs = parseFloat(document.documentElement.style.getPropertyValue('--board-scale')) || 1, q = cv && cv.width > 0 && cv.offsetWidth > 0 ? cv.offsetWidth / cv.width / bs : 0; return q > 1 && q < 8 ? q : 0; } catch (e) { return 0; } })();   // Entwurfspixel (die Wolke multipliziert mit --board-scale)
   const stauben = [PP_FX27_FARBE.creme, PP_FX27_FARBE.grau, PP_FX27_FARBE.creme, PP_FX27_FARBE.blau];
   const funken = [PP_FX27_FARBE.orange, PP_FX27_FARBE.gelb, PP_FX27_FARBE.creme, PP_FX27_FARBE.rot];
   const F = {
     platz: null, canvas: null, steher: null, geist: [], hist: [], beendet: false, bildNr: -1,
-    letzt: null, ruhe: 99, seitFahrt: 99, wasFahrt: false, anteil: 1,
+    letzt: null, ruhe: 99, seitFahrt: 99, wasFahrt: false, anteil: 1, pMax: 0, rueck: false,
   };
   srcEl._ppRammt = (srcEl._ppRammt || 0) + 1;
   srcEl._ppFigurFahrt = F;
@@ -316,6 +319,7 @@ function ppFx27Figur(srcEl, tgtEl, opt) {
     let x = Math.round(v.x * p + (z.wackeln || 0)), y = Math.round(v.y * p);
     const schritt = F.letzt ? Math.hypot(x - F.letzt.x, y - F.letzt.y) : 0;
     const fahrt = schritt >= Math.max(2, v.a.w * 0.045);
+    if (gift) { if (p > F.pMax) F.pMax = p; else if (p < F.pMax - 0.01) F.rueck = true; }   // Rückweg: p sinkt unter den bisherigen Höchstwert
     // Streckung: Fahrt → breit und flach; danach Federung in den ersten 4 Bildern; davor Aufladen
     let sx = 1, sy = 1;
     if (fahrt) { sx = PP_FX27_FAHRT[0]; sy = PP_FX27_FAHRT[1]; F.ruhe = -1; F.seitFahrt = 0; }
@@ -341,7 +345,7 @@ function ppFx27Figur(srcEl, tgtEl, opt) {
     const n = F.hist.length, abstand = Math.max(8, v.a.w * 0.17);
     for (let i = 0; i < F.geist.length; i++) {
       const G = F.geist[i], h = F.hist[n - 1 - 2 * (i + 1)];
-      const sichtbar = !!h && F.seitFahrt <= 3 && Math.hypot(h.x - x, h.y - y) > abstand;
+      const sichtbar = !!h && F.seitFahrt <= (gift ? 1 : 3) && !(gift && F.rueck) && Math.hypot(h.x - x, h.y - y) > abstand;
       if (!sichtbar) { if (G.da) { G.g.style.visibility = 'hidden'; G.da = false; } continue; }
       if (!G.da) { G.g.style.visibility = 'visible'; G.da = true; }
       G.g.style.translate = (h.x - x) + 'px ' + (h.y - y) + 'px';
@@ -396,7 +400,7 @@ window.ppFx27Durch = ppFx27Durch;
  */
 function ppFx27RammFigur(ev) {
   const dur = ev.dur || 1600;
-  const art = ev.rueckwaerts ? 'rueck' : (ev.trailType === 'fire' ? 'jet' : (ev.trailType === 'fire_stars' ? 'sterne' : 'std'));
+  const art = ev.rueckwaerts ? 'rueck' : (ev.trailType === 'fire' ? 'jet' : (ev.trailType === 'fire_stars' ? 'sterne' : (ev.trailType === 'poison' ? 'gift' : 'std')));
   const durch = ppFx27Durch(ev);
   const fig = ppFx27Figur(ev.srcEl, ev.tgtEl, { art, durch: durch && art !== 'jet' && art !== 'rueck' });
   if (!fig) return null;
