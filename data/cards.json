@@ -25200,7 +25200,7 @@
     "hp": null,
     "atk": null,
     "cost": null,
-    "effect": "Play this Spell immediately when a Hero that can use this Spell is hit by an opponent's Attack, Spell or Creature effect. Until the end of your next turn, any damage the user deals to single targets is increased by 100.",
+    "effect": "Play this Spell immediately when a Hero that can use this Spell is hit by an opponent's Attack, Spell or Creature effect. The next damage the user deals to a single target during your next turn is increased by 100.",
     "archetype": "",
     "setID": "PP ART",
     "banned": "",
