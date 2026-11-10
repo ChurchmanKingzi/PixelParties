@@ -9,9 +9,9 @@
 //  und setzt die Karte nach den Regeln des Karten-Templates (MSE) selbst
 //  zusammen: Rahmen, Kunst mit Maske, Namenszeile, Regeltext, Werte, Symbole,
 //  Seltenheits-Stempel und — bei Super Rares — die goldenen Rahmenelemente.
-//  Foils (Schimmer, Texturen, silberner Rand der Rares) gehoeren dem dynamischen
-//  Foil-Effekt des Spiels und werden hier bewusst NICHT gezeichnet; die Rahmen der
-//  Super Rares (Gold) und Diamonds (Cyan) bleiben.
+//  Die Effekte der Seltenheiten (Schimmer, Glanz, Glas ...) gehoeren dem Rarity-Effekt
+//  (public/rarity-fx.js) und werden hier NICHT gezeichnet; hier entstehen nur die Basiskarte der
+//  Stufe (Stempel, Gold-/Silber-/Cyan-Rahmen: `renderCard(karte, { rarity })`) und die Masken fuer den Effekt.
 //
 //  Massstab: Rahmen und Icons sind 10x-Pixel-Art und werden mit nearest
 //  neighbour auf 750x1050 gebracht; Bilder in Feldern werden gestreckt
@@ -868,12 +868,15 @@
   /**
    * @param {object} c     Karte aus cards.json
    * @param {object} [meta] reine Darstellungsdaten (data/card-render.json, cards[Name]): { r: Seltenheit, f: Rahmen, sb, sb2, soft: Zeilenumbrueche im Text sind nur Leerstellen }
-   * @param {object} [over] { name } — Skins ersetzen nur Namen (und Kunst)
+   * @param {object} [over] { name, rarity } — Skins ersetzen nur Namen (und Kunst); `rarity`: Rarity-ID der Karteninstanz (siehe rarityBase)
    */
-  // Das Foil-Kennzeichen aus cards.json ist die Seltenheit, die das Spiel kennt (Foil-Effekt, Rahmenfarbe):
-  // „diamond_rare“ -> Diamond, „secret_rare“ -> Super Rare. Es geht der aus alten Kartenbildern abgeleiteten
-  // Seltenheit (card-render.json `r`) vor.
-  const FOIL_RARITY = { diamond_rare: 'diamond', secret_rare: 'super rare' };
+  // Seltenheit je KARTEN-INSTANZ (Rarity-System): `over.rarity` ist die ID aus rarities.js (common … umbra). Die Basiskarte zeigt je Stufe
+  // Stempel, Rahmen und Namensfarbe der Vorlage (uncommon, rare, super rare); Prismatic, Storm, Spectral, Umbra und Stained tragen
+  // KEIN Stempel/Rahmen-Element ('none'), ihr Zeichen malt `public/rarity-fx.js` selbst. Ohne Angabe: Common (die alte, je Karte gedruckte
+  // Seltenheit `card-render.json` r gilt nicht mehr).
+  const RARITY_BASE = { common: 'common', uncommon: 'uncommon', rare: 'rare', prismatic: 'none', super: 'super rare', storm: 'none', spectral: 'none', umbra: 'none', stained: 'none',
+    'super rare': 'super rare', none: 'none' };
+  const rarityBase = r => RARITY_BASE[r] || 'common';
   /** W77b: zwei Ability-Boni („<Ability> N" in beiden Feldern) → „A or B" in einer Zeile; sonst null. */
   function ascBonusOder(c) {
     const a = String(c.startingAbility1 || '').trim(), b = String(c.startingAbility2 || '').trim();
@@ -898,7 +901,7 @@
     const asc = c.cardType === 'Ascended Hero';
     return {
       type,
-      rarity: FOIL_RARITY[c.foil] || meta.r || 'common',
+      rarity: rarityBase(over.rarity),
       name: (over.name != null ? over.name : c.name).replace(/\s*\[(?:B|W)\]$/, ''),
       text: c.effect || '',
       soft: !!meta.soft,
@@ -954,7 +957,7 @@
   }
 
   /** Abweichende Werte, die statt der gedruckten aufs Bild kommen (HP im Tooltip, Stufe/Kosten in der Hand, weggelassene Zahlen auf dem Brett).
-   *  Gemeinsam fuer das Kartenbild (`renderCard`) und die Namensmaske des Foils (`nameLayer`) — sonst glänzt die Schraffur auf dem gedruckten Wert. */
+   *  Gemeinsam fuer das Kartenbild (`renderCard`) und die Textmasken der Rarity-Effekte (`textMasks`) — sonst glänzt der Effekt auf dem gedruckten Wert. */
   function applyOverrides(spec, card, o) {
     if (o.hp != null) spec.hp = o.hp;
     if (o.noHp) spec.noHp = true;
@@ -976,6 +979,7 @@
    *                       { hp: Zahl } — druckt diese HP statt der aus cards.json (Tooltip: aktuelle max. HP)
    *                       { noHp, noAtk: true } — laesst die gedruckte HP bzw. ATK weg (Brett: Live-Werte darueber)
    *                       { lv, kost: Zahl } — druckt diese aktuelle Stufe / Kosten (Hand): gruen = verringert, rot = erhoeht
+   *                       { rarity: Rarity-ID } — Stempel/Rahmen/Namensfarbe der Seltenheit (Standard Common), siehe rarityBase
    *                       { stufe: 1–3 } — Fähigkeitskarte: hebt die Box dieser Stufe hervor, die anderen beiden grau (Brett, Tooltip)
    * @returns {Promise<HTMLCanvasElement|null>} null, wenn die Kunst fehlt
    */
@@ -989,7 +993,7 @@
     const skin = o.skin ? (meta.skins[o.skin] || {}) : null;
     const m = Object.assign({}, meta.cards[card.name]);
     if (skin) { if (skin.r) m.r = skin.r; if (skin.f) m.f = skin.f; }
-    const spec = specFromCard(card, m, skin ? { name: skin.name || o.skin } : null);
+    const spec = specFromCard(card, m, Object.assign({ rarity: o.rarity }, skin ? { name: skin.name || o.skin } : null));
     applyOverrides(spec, card, o);
     // Skin-Holo: der Name steht golden auf der Karte (siehe unten, HOLO-TEXTUR); die schillernden Schichten
     // darueber zeichnet das Spiel als eigene DOM-Lage (SkinHolo in app-shared.jsx).
@@ -1078,7 +1082,6 @@
     dark: 0.16,          // unterhalb dieser Helligkeit (0..1) liegt nichts auf einem Pixel (Umrisse, Schatten)
     full: 0.46,          // ab dieser Helligkeit volle Staerke
     neutral: 0.50,       // Staerke fuer Graustufen (Farben: bis 1,0, je nach Saettigung)
-    allText: true,       // Super/Diamond Rares: auch aller uebrige Text (nicht nur der Name) bekommt den Glanz (Grossansichten)
   };
   /** Gilt das Holo fuer diesen Skin? (`data/card-render.json` -> skins[Name].holo = false schaltet es ab) */
   function holoOn(skinMeta) { return HOLO.on && !(skinMeta && skinMeta.holo === false); }
@@ -1200,13 +1203,6 @@
     return { type: spec.type, box: geo.box, nameStrip: NAME_STRIP, all, nameMask: o.skin ? nameMaskCanvas(spec, geo) : null };
   }
 
-  /** Nur der Namensumriss einer Karte (Super Rare / Diamond Rare tragen den Namensglanz ebenfalls). */
-  function nameLayer(card, o) {
-    const spec = specFromCard(card, meta.cards[card.name], null);
-    if (o) applyOverrides(spec, card, o);
-    return { type: spec.type, nameStrip: NAME_STRIP, nameMask: nameMaskCanvas(spec, holoGeometry(spec.type)) };
-  }
-
   /**
    * Maske ALLEN Textes einer Karte AUSSER dem Namen (der hat seine eigene Maske): Faehigkeitsfelder, Stufe, Werte, Regeltext —
    * weiss auf durchsichtig, in voller Kartengroesse (750 x 1050). Eine halb so grosse Maske, weich gestreckt, liess die Glanzfarbe
@@ -1219,13 +1215,51 @@
     try { return draw(spec, null, null, true); } finally { TEXT_MASK = false; }
   }
 
+  // ═════════════ RARITY-EFFEKTE (public/rarity-fx.js) ═════════════
+  //  Die Effekte der Seltenheiten laufen auf dem 150 x 210-Raster der Karte (1 Rasterzelle = 5 Kartenpixel). Sie brauchen von hier:
+  //  die Geometrie je Kartentyp, die Bildfeld-Maske auf diesem Raster und die weissen Textmasken (Name/Werte und restlicher Text).
+  /** { type, full } der Karte (full = Vollbild-Held). Vor loadMeta ist der Typ der Held-Rahmen der Vorlage. */
+  function geometryOf(card) {
+    const type = specFromCard(card, meta.cards[card.name], null).type;
+    return { type, full: isFullart(type) };
+  }
+  const gridMaskMemo = new Map();
+  /** Bildfeld-Maske der Karte auf dem 150 x 210-Raster: 1 = Kunstflaeche (nur voll deckende Stellen; bei Vollbild-Karten ohne Textfelder). */
+  function artGrid(type) {
+    const key = isFullart(type) ? (type === 'superhero' ? 'mask.hero' : 'mask.fullart') : 'mask.art';
+    let m = gridMaskMemo.get(key);
+    if (m) return m;
+    const c = document.createElement('canvas'); c.width = 150; c.height = 210;
+    const g = c.getContext('2d', { willReadFrequently: true }); g.imageSmoothingEnabled = false;
+    if (isFullart(type)) artMaskSprite(g, key, 150, 210); else sprite(g, key, 14, 34, 122, 80);
+    const d = g.getImageData(0, 0, 150, 210).data;
+    m = new Uint8Array(150 * 210);
+    for (let p = 0; p < m.length; p++) m[p] = d[p * 4 + 3] >= 230 ? 1 : 0;
+    gridMaskMemo.set(key, m);
+    return m;
+  }
+  /**
+   * Weisse Textmasken in voller Kartengroesse (750 x 1050) fuer den Rarity-Effekt: `name` = Name, Stufe, Artifact-Kosten, HP und ATK (ohne
+   * Seltenheits-Stempel, der gehoert dem Effekt), `body` = aller uebrige Text (Faehigkeitsfelder, Regeltext, Symbole).
+   * `o`: wie `renderCard` ({ hp, noHp, noAtk, lv, kost, skin }) — die Maske deckt sich mit dem Text, der wirklich auf dem Bild steht.
+   */
+  function textMasks(card, o) {
+    o = o || {};
+    const skin = o.skin ? (meta.skins[o.skin] || {}) : null;
+    const spec = specFromCard(card, Object.assign({}, meta.cards[card.name]), Object.assign({ rarity: 'none' }, skin ? { name: skin.name || o.skin } : null));
+    applyOverrides(spec, card, o);
+    const name = nameMaskCanvas(spec, holoGeometry(spec.type));
+    TEXT_MASK = true;
+    let body; try { body = draw(spec, null, null, true); } finally { TEXT_MASK = false; }
+    return { type: spec.type, full: isFullart(spec.type), name, body };
+  }
+
   // Fertige Schichten fuers DOM: PNG-Blobs + die Lage in Prozent der Karte als CSS-Variablen. Je Skin einmal gerechnet
   // und gemerkt (LRU); zwei Skins gleichzeitig zu rechnen waere Verschwendung, darum reiht `holoFor` sie hintereinander ein
   // und laesst dem Browser zwischen zwei Skins Luft.
-  const HOLO_MAX = 40, NAME_MAX = 80;
+  const HOLO_MAX = 40;
   const holoDone = new Map();        // Skin -> { vars, urls } (fertig)
   const holoWait = new Map();        // Skin -> Promise (in Arbeit)
-  const nameDone = new Map();        // Kartenname -> { vars, urls }
   let holoChain = Promise.resolve();
   // PNG-Kodierung. `canvas.toBlob` kodiert im Leerlauf des Hauptthreads: auf einer belebten Seite (Animationen im Menue,
   // Deck-Editor beim Aufbauen) wartet jede Karte dadurch 1-6 s, obwohl die Kodierung selbst nur Millisekunden braucht — und
@@ -1294,7 +1328,6 @@
     if (o.noAtk) t.push('oa');
     return t.length ? '|' + t.join('|') : '';
   }
-  function nameCached(card, o) { return nameDone.get(card.name + nameVariant(card, o)) || null; }
   function holoFor(card, skin) {
     if (!HOLO.on || !card || !skin) return Promise.resolve(null);
     const hit = holoDone.get(skin);
@@ -1338,10 +1371,10 @@
     if (v === undefined) { v = isFullart(specFromCard(card, meta.cards[card.name]).type); fullartMemo.set(card.name, v); }
     return v;
   }
-  /** Bekommt die Karte die Schraffur? Fullart (nach Kartentyp) oder Super/Diamond Rare (Foil-Kennzeichen). Vor loadMeta: nein. */
+  /** Bekommt die Karte die Schraffur? Fullart-Karten (nach Kartentyp). Vor loadMeta: nein. */
   function hatchEligible(card) {
     if (!HOLO.on || !metaReady || !card || !card.name) return false;
-    return card.foil === 'secret_rare' || card.foil === 'diamond_rare' || isFullartCard(card);
+    return isFullartCard(card);
   }
   function hatchCached(card) { return hatchDone.get(card.name) || null; }
   function hatchFor(card) {
@@ -1385,14 +1418,11 @@
     if (rimMemo.has(id)) return rimMemo.get(id);
     const sk = skin ? (meta.skins[skin] || {}) : null;
     const m = Object.assign({}, meta.cards[card.name]);
-    if (sk) { if (sk.r) m.r = sk.r; if (sk.f) m.f = sk.f; }
+    if (sk) { if (sk.f) m.f = sk.f; }
     const spec = specFromCard(card, m, null);
+    // Nur die goldenen Rahmen der Vollbild-Helden glänzen hier; die Rahmen der Seltenheiten gehören dem Rarity-Effekt (rarity-fx.js).
     const goldType = spec.type === 'superhero' || spec.type === 'fullartHero';
-    let tone = null;
-    if (spec.rarity === 'diamond') tone = 'diamond';
-    else if (goldType || spec.rarity === 'super rare') tone = 'gold';
-    else if (OPT.silverRim && spec.rarity === 'rare') tone = 'silver';
-    const out = tone ? { kind: (goldType ? spec.type : 'n') + ':' + spec.rarity, tone, type: spec.type, rarity: spec.rarity } : null;
+    const out = goldType ? { kind: spec.type + ':common', tone: 'gold', type: spec.type, rarity: 'common' } : null;
     rimMemo.set(id, out);
     return out;
   }
@@ -1428,61 +1458,5 @@
   }
   function rimCached(rk) { return (rk && rimDone.get(rk.kind)) || null; }
 
-  /** Namensglanz fuer Karten mit Foil (Super Rare / Diamond Rare): Umriss der Buchstaben + Lage. */
-  function nameShimmerFor(card, o) {
-    if (!HOLO.on || !card) return Promise.resolve(null);
-    const sfx = nameVariant(card, o), nk = card.name + sfx;
-    const hit = nameDone.get(nk);
-    if (hit) return Promise.resolve(hit);
-    const key = 'n:' + nk;
-    if (holoWait.has(key)) return holoWait.get(key);
-    const job = holoChain.then(async () => {
-      await new Promise(r => setTimeout(r, 0));
-      let rec = await cacheGet(key);
-      if (!(rec && rec.name instanceof Blob && rec.strip)) {
-        const L = nameLayer(card, o), name = await toBlob(L.nameMask);
-        if (!name) return null;
-        rec = { name, strip: L.nameStrip };
-        cachePut(key, rec, name.size);
-      }
-      const url = urlOf(rec.name), strip = rec.strip;
-      return lru(nameDone, nk, {
-        vars: { '--sh-ny': pc(strip.y, H), '--sh-nh': pc(strip.h, H), '--sh-name': 'url(' + url + ')' },
-        urls: [url],
-      }, NAME_MAX);
-    }).catch(err => { console.warn('[card-render] Namensglanz', nk, err && err.message); return null; })
-      .finally(() => holoWait.delete(key));
-    holoChain = job.catch(() => {});
-    holoWait.set(key, job);
-    return job;
-  }
-
-  /** Textglanz fuer Karten mit Foil (Super Rare / Diamond Rare): Maske allen Textes ausser dem Namen, ueber die ganze Karte. */
-  const textDone = new Map();        // Kartenname -> { vars, urls }
-  function textCached(card) { return textDone.get(card.name) || null; }
-  function textShimmerFor(card) {
-    if (!HOLO.on || !HOLO.allText || !card) return Promise.resolve(null);
-    const hit = textDone.get(card.name);
-    if (hit) return Promise.resolve(hit);
-    const key = 't:' + card.name;
-    if (holoWait.has(key)) return holoWait.get(key);
-    const job = holoChain.then(async () => {
-      await new Promise(r => setTimeout(r, 0));
-      let rec = await cacheGet(key);
-      if (!(rec && rec.text instanceof Blob)) {
-        const text = await toBlob(textLayer(card));
-        if (!text) return null;
-        rec = { text };
-        cachePut(key, rec, text.size);
-      }
-      const url = urlOf(rec.text);
-      return lru(textDone, card.name, { vars: { '--sh-text': 'url(' + url + ')' }, urls: [url] }, NAME_MAX);
-    }).catch(err => { console.warn('[card-render] Textglanz', card.name, err && err.message); return null; })
-      .finally(() => holoWait.delete(key));
-    holoChain = job.catch(() => {});
-    holoWait.set(key, job);
-    return job;
-  }
-
-  root.CardRender = { OPT, last: {}, meta_card: (n, r) => { meta.cards[n] = Object.assign(meta.cards[n] || {}, { r: r === 'common' ? undefined : r }); }, meta_set: (k, name) => { meta.skins[k] = Object.assign(meta.skins[k] || {}, { name }); }, init, draw, specFromCard, renderCard, holoLayers, holoFor, holoCached, nameShimmerFor, nameCached, textShimmerFor, textCached, textLayer, hatchFor, hatchCached, hatchEligible, rimKind, rimFor, rimCached, openCache, cacheGet, cachePut, cacheDel, cacheStats, toBlob, HOLO, getArt, hasArt, loadMeta, loadArtIndex, W, H, _adv: adv, _unitsOf: unitsOf, _paragraphs: paragraphs, STATUS_TERMS, statusMatches, _statusDarstellung: statusDarstellung, _kontrast: kontrast, STATUS_OUTLINES: { dark: OUT_DARK, light: OUT_LIGHT } };
+  root.CardRender = { OPT, last: {}, meta_card: (n, r) => { meta.cards[n] = Object.assign(meta.cards[n] || {}, { r: r === 'common' ? undefined : r }); }, meta_set: (k, name) => { meta.skins[k] = Object.assign(meta.skins[k] || {}, { name }); }, init, draw, specFromCard, renderCard, holoLayers, holoFor, holoCached, textLayer, geometryOf, artGrid, textMasks, rarityBase, isFullart, hatchFor, hatchCached, hatchEligible, rimKind, rimFor, rimCached, openCache, cacheGet, cachePut, cacheDel, cacheStats, toBlob, HOLO, getArt, hasArt, loadMeta, loadArtIndex, W, H, _adv: adv, _unitsOf: unitsOf, _paragraphs: paragraphs, STATUS_TERMS, statusMatches, _statusDarstellung: statusDarstellung, _kontrast: kontrast, STATUS_OUTLINES: { dark: OUT_DARK, light: OUT_LIGHT } };
 })(typeof window !== 'undefined' ? window : globalThis);

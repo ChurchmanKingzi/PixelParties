@@ -572,7 +572,7 @@ const ppFx8Chomp = ppR1Leinwand((g, t, sz, teile) => {
   const tq = (t - w.lerp(400, 460)) / teile.schriftDauer;
   if (tq >= 0 && tq <= 1 && (gore || w.t > 0.6)) {
     const sc = ppFx8Kf(tq, [[0, 0.45], [0.22, 1.2], [0.6, 1], [1, 0.85]], ppFx8Aus), aa = ppFx8Kf(tq, [[0, 0], [0.22, 1], [0.6, 1], [1, 0]]);
-    const px = gore ? w.lerp(36, 62) : w.lerp(28, 60), m = Math.max(1, Math.round(3 * sc * px / 62));
+    const px = gore ? w.lerp(36, 62) : w.lerp(28, 60), m = Math.max(1, Math.round(9 * sc * px / 62 / S));   // Schriftpixel in BILDSCHIRMpixeln (9 · sc · px/62), in Zellen umgerechnet: bei S = 2 war der Schriftzug mit 3 Zellen je Schriftpixel um ein Drittel kleiner und mit der 1-Zellen-Kontur nicht mehr lesbar
     if (aa > 0.05) ppFx8Schrift(g, gore ? 'DEVOUR!' : 'CHOMP!', cx, cy, m, B.schrift[gore ? 'gore' : 'normal'][0], B.schrift[gore ? 'gore' : 'normal'][1], aa);
   }
 }, 1000, (p) => {

@@ -13,7 +13,7 @@
 //  Der Sprite macht das selbst: `HeroIdleSprite` fragt `ppFx33Pose(rolle, ms)` (Sichtbarkeit, Streckung, Hub, Blinkfarbe) und setzt sie auf `.hero-idle-holo`
 //  (statt der CSS-Überblendung `heroAufstiegAlt/Neu`, die nur noch als Rückfall läuft, wenn diese Datei fehlt).
 //
-//  Technik: eine Leinwand (Rasterpixel = 3 Bildschirmpixel, 30 Bilder/s auf dem globalen Takt, harte Kanten, kein Alpha) in der Welt-Hülle (`ppFxWeltSchicht`),
+//  Technik: eine Leinwand (Rasterpixel = Hero-Pixel der Figur, `ppFxZelle`; vorher 3 Bildschirmpixel, 30 Bilder/s auf dem globalen Takt, harte Kanten, kein Alpha) in der Welt-Hülle (`ppFxWeltSchicht`),
 //  deshalb bleibt sie beim Scrollen auf ihrer Zone; Aufruf `ppFx33Aufstieg({ key, x, y, w, h, t0 })` mit der Heldenzone in Fensterkoordinaten.
 //  Der Vollbild-Blitz ist ein fester Block aus 4x4-Bayer-Kacheln (CSS-Hintergrund, `image-rendering: pixelated`), neun Stufen.
 //  Mehrere Aufstiege: derselbe Held (`key`) löst den laufenden ab. Ton: wie bisher (macht der Aufrufer).
@@ -73,9 +73,12 @@ function ppFx33BlitzEl() {
 
 /** Kleiner Rastermaler (RGBA-Puffer), ganzzahlig, harte Kanten. */
 function ppFx33Maler(buf, gw, gh) {
+  const d = { x0: gw, y0: gh, x1: 0, y1: 0 };
   const rect = (x, y, w, h, c) => {
     let x0 = x, y0 = y, x1 = x + w, y1 = y + h;
     if (x0 < 0) x0 = 0; if (y0 < 0) y0 = 0; if (x1 > gw) x1 = gw; if (y1 > gh) y1 = gh;
+    if (x0 >= x1 || y0 >= y1) return;
+    if (x0 < d.x0) d.x0 = x0; if (y0 < d.y0) d.y0 = y0; if (x1 > d.x1) d.x1 = x1; if (y1 > d.y1) d.y1 = y1;      // Schmutzrechteck: je Bild nur das Berührte löschen/hochladen (Zelle = Hero-Pixel → mehr Zellen)
     for (let j = y0; j < y1; j++) {
       let i = (j * gw + x0) * 4;
       for (let q = x0; q < x1; q++, i += 4) { buf[i] = c[0]; buf[i + 1] = c[1]; buf[i + 2] = c[2]; buf[i + 3] = 255; }
@@ -109,7 +112,7 @@ function ppFx33Maler(buf, gw, gh) {
   };
   /** Rechteckrahmen (Außenmaß), Strichstärke 1. */
   const rahmen = (x0, y0, x1, y1, c) => { rect(x0, y0, x1 - x0 + 1, 1, c); rect(x0, y1, x1 - x0 + 1, 1, c); rect(x0, y0, 1, y1 - y0 + 1, c); rect(x1, y0, 1, y1 - y0 + 1, c); };
-  return { rect, linie, ring, scheibe, rahmen };
+  return { rect, linie, ring, scheibe, rahmen, d };
 }
 
 /** Ganzzahl-Hash → 0..1 (deterministisch). */
@@ -125,7 +128,7 @@ const PP_FX33_LAUF = {};
 function ppFx33Aufstieg(o) {
   try {
     if (!o || window._playAnimations === false || !isFinite(o.x) || !isFinite(o.y)) return null;
-    const S = 3, TAKT = PP_FX33_BILD, C = PP_FX33_C, X0 = PP_FX33_X / 1000, CH0 = PP_FX33_SAMMELN / 1000;
+    const S = (typeof ppFxZelle === 'function' ? ppFxZelle({ x: o.x, y: o.y }, o.w) : 3), TAKT = PP_FX33_BILD, C = PP_FX33_C, X0 = PP_FX33_X / 1000, CH0 = PP_FX33_SAMMELN / 1000;   // Rasterzelle = Hero-Pixel der aufsteigenden Figur (Phase 2; vorher fest 3)
     if (o.key && PP_FX33_LAUF[o.key]) { try { PP_FX33_LAUF[o.key](); } catch {} }
     const fo = window.ppFxScrollOffset ? window.ppFxScrollOffset() : { dx: 0, dy: 0 };
     const welt = !!window.ppFxWeltSchicht;
@@ -264,7 +267,7 @@ function ppFx33Aufstieg(o) {
     // ── Takt: 30 Bilder/s auf dem globalen Raster; Zeit in ganzen Bildern ──
     const takt = window.ppTaktRaf || window.requestAnimationFrame;
     const t0 = typeof o.t0 === 'number' ? o.t0 : performance.now();
-    let raf = 0, letzte = -1, fertig = false, blitzStufe = -1;
+    let raf = 0, letzte = -1, fertig = false, blitzStufe = -1, vor = null;
     let ruhig = false; try { ruhig = !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches); } catch {}   // kein Vollbild-Blitz bei „weniger Bewegung“
     const blitz = ppFx33BlitzEl();
     const ende = () => {
@@ -284,15 +287,19 @@ function ppFx33Aufstieg(o) {
       if (fr !== letzte) {
         letzte = fr;
         const t = Math.floor(Math.max(0, ms) / TAKT + 1e-6) / 30;
-        img.data.fill(0);
+        const dd = m.d, buf0 = img.data;
+        if (vor) for (let j = vor.y0; j < vor.y1; j++) buf0.fill(0, (j * gw + vor.x0) * 4, (j * gw + vor.x1) * 4);
+        dd.x0 = gw; dd.y0 = gh; dd.x1 = 0; dd.y1 = 0;
         malen(t);
-        ctx.putImageData(img, 0, 0);
+        const ux0 = Math.min(vor ? vor.x0 : gw, dd.x0), uy0 = Math.min(vor ? vor.y0 : gh, dd.y0), ux1 = Math.max(vor ? vor.x1 : 0, dd.x1), uy1 = Math.max(vor ? vor.y1 : 0, dd.y1);
+        if (ux1 > ux0 && uy1 > uy0) ctx.putImageData(img, 0, 0, ux0, uy0, ux1 - ux0, uy1 - uy0);
+        vor = dd.x1 > dd.x0 ? { x0: dd.x0, y0: dd.y0, x1: dd.x1, y1: dd.y1 } : null;
         // Vollbild-Blitz
         const bs = t >= X0 ? fl(t - X0) : -1, st = bs >= 0 && bs < PP_FX33_FLASH.length && !ruhig ? bs : -1;
         if (st !== blitzStufe) {
           blitzStufe = st;
           if (st < 0) blitz.style.display = 'none';
-          else { blitz.style.backgroundImage = ppFx33Kachel(st); blitz.style.display = 'block'; }
+          else { blitz.style.backgroundImage = ppFx33Kachel(st); blitz.style.backgroundSize = (4 * S) + 'px ' + (4 * S) + 'px'; blitz.style.display = 'block'; }   // Kachel 4x4 Zellen = Hero-Pixel-Zelle
         }
       }
       raf = takt(schritt);

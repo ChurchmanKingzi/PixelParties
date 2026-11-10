@@ -19,7 +19,9 @@ const PP_FX22_HERZ = [
 /** Herz in Bildschirmpixeln Größe `px` (Schriftgröße), Mitte (x, y), Farbsatz `farbe` { P, L, d }. */
 function ppFx22Herz(g, x, y, px, farbe, a = 1) {
   if (a <= 0.02 || px < 3) return;
-  g.spr(PP_FX22_HERZ[px < 10 ? 0 : px < 17 ? 1 : px < 24 ? 2 : 3], farbe, x, y, a);
+  // Stufe nach Bildschirmpixeln wie bei Zelle 3 (Sprite 9/15/21/27 px); die Spritebreite (3/5/7/9 Zellen) folgt der Zelle des Ziels, damit das Herz auch bei Zelle 2 (720p, Handy) ~gleich groß bleibt
+  const q = px < 10 ? 0 : px < 17 ? 1 : px < 24 ? 2 : 3;
+  g.spr(PP_FX22_HERZ[Math.max(0, Math.min(3, Math.round(((9 + 6 * q) / (g.S || 3) - 3) / 2)))], farbe, x, y, a);
 }
 
 // ═════════════════════════════════════════════════════════════════════════════════════════════════════════════════════

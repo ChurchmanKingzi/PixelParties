@@ -1,0 +1,19 @@
+{
+ "dateien": {
+  "data/animated_screen/layers2/angel.png": "6376f0687a003319fa9f43b31a5ddadce109232f1ac23e9abc80c2f53a270fec",
+  "data/animated_screen/layers2/background.png": "92ba4e433512677fe5a2bfad975e1181c43ac0b1d1953cb527bbfc324b7d2795",
+  "data/animated_screen/layers2/blonde.png": "59fcc60ac752ac2df72488efd1e2deb96de8db7cc503383f992c7d7ab7ab20bf",
+  "data/animated_screen/layers2/cat_bottom.png": "318d1bd01ce92b0fd1415a962aeea4d2843d8ccad968934def2c85f447c76826",
+  "data/animated_screen/layers2/cat_mid.png": "c694be6752038c8a84668d6ef91bf913d72cb680ec56aa1fa76e5f6a82cf33dd",
+  "data/animated_screen/layers2/cat_top.png": "840d63b435b82268956df2d3aa1f7670a8f5439d8992ae410e2f223bd100b821",
+  "data/animated_screen/layers2/explosion.png": "563edea3985e2d42aafd325b5b3dc4e3af68d20952f812ac66c337ed7100cdac",
+  "data/animated_screen/layers2/golem.png": "ca427f56d75fff249906c94c174df2b32a93f1e26e5800c45965224b2d37ae5d",
+  "data/animated_screen/layers2/hammer.png": "ac6fef27a4e705375bf98dca400fa856e9508e003988d947b205f57a8a3edb19",
+  "data/animated_screen/layers2/horned.png": "9e2c7e567177055fd3b331f71c7296c5fab9c8d4e223c765dd36d25296e95138",
+  "data/animated_screen/layers2/ninja.png": "2224e5ab73bc688b1f0e6cea18510c63772adf9f6cd7abd0e15dfa1018995a48",
+  "data/animated_screen/layers2/rabbit.png": "ae322482e82a01f87ec55ec97a5f35b900197cd4b56800f694734d336ab09e5d",
+  "electron/assets/title.png": "7f617ba9094c1ede0f3dd75e5f06106a2d44815dda036eae57cdcc5f894c1472",
+  "public/title.png": "ade46bd7f4c8fc621993ac916a24b4ab4dfca0244863e708a718997bfaedf476"
+ },
+ "hash": "01e1d795cda6abf9"
+}

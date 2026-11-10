@@ -19,7 +19,7 @@ const AUSLOESER_HOOKS = new Set([
   HOOKS.ON_CARD_ADDED_FROM_DISCARD_TO_HAND, HOOKS.BEFORE_CREATURE_DAMAGE_BATCH,
 ]);
 const { handSizeWithoutResolving, handIndicesWithoutResolving } = require('./_hand-resolve');   // v1288 (+ Z4: Handindizes ohne aufloesende Karte)
-const { loadCardEffect } = require('./_loader');
+const { loadCardEffect, nameToFile } = require('./_loader');
 const { isSeat, opponentOfGs, opponentsOfGs, playerCountGs } = require('./_opp');   // N-Spieler-Umbau
 const { gainedNames, heroScriptsOf, heroScriptOf, eigenesHeldenSkript } = require('./_gained-effects-shared');
 const { charges: ladungenLesen } = require('./_charges');
@@ -27,6 +27,7 @@ const ScTracking = require('./_sc-tracking');   // v1381
 const SpyShared = require('./_spy-shared');   // Spy in the Enemy's Camp: Spionage-Marke an der Kreatur
 const ZugFristen = require('./_zug-fristen');   // W68a: „nur echte Züge zählen"
 // ★ W63d: Ereignisse, die den Beginn einer Aktion ANKÜNDIGEN, aber noch keine sichtbare Wirkung sind: sie lösen den Commit des Auftritts nicht aus (nur Protokoll + Flug/Aktivierungsschein).
+const AUFTRITT_HALTE_MAX_MS = 4000;   // Fail-safe: so lange hält eine Vormerkung den Zustand höchstens zurück, wenn der Besitzer keine Frage offen hat (siehe `_auftrittWaechterStellen`)
 const AUFTRITT_HALTE_EREIGNISSE = new Set(['action_log', 'hand_to_board_fly', 'ability_activated', 'potion_resolved']);   // `potion_resolved`: der Server sendet es beim START der Auflösung — also VOR den abbrechbaren Fragen der Karte
 
 // Aufstiegs-Erlasse (Perilous Journey): `true` weitete das Fenster zum
@@ -2447,6 +2448,32 @@ class GameEngine {
   }
 
   /**
+   * Rarity-Identitaet (cards/effects/_rarity-track.js): HINWEIS, dass gleich `count` Karten ab `start` aus Zone `key` ('hand', 'dp', 'xp' …) von
+   * `pi` entfernt werden — VOR dem Entfernen aufrufen. Ohne Rarity-Ledger (alles Common) und in Simulationen ein No-op.
+   */
+  /** Wie `_rarityTake`, aus den Argumenten eines `splice(start, deleteCount, …)` auf einer Liste der Laenge `len`. */
+  _rarityTakeSplice(pi, key, len, args) {
+    if (!args.length) return;
+    let start = Math.trunc(Number(args[0])) || 0;
+    if (start < 0) start = Math.max(0, len + start); else start = Math.min(start, len);
+    const del = args.length < 2 ? len - start : Math.min(Math.max(0, Math.trunc(Number(args[1])) || 0), len - start);
+    if (del > 0) this._rarityTake(pi, key, start, del);
+  }
+
+  /** Ereignisdaten mit `rarity`/`rarities` der betroffenen Karten ergaenzen (nur wenn ein Spieler Nicht-Common-Karten im Deck hat). */
+  _rarityMitEreignis(event, data) {
+    if (!data || !this.gs?.players?.some(ps => ps && ps.rarityLedger)) return data;
+    try { return require('./_rarity-track').eventRarity(this.gs, event, data); } catch (e) { console.error('[rarity] event:', e.message); return data; }
+  }
+
+  _rarityTake(pi, key, start, count) {
+    if (this._fastMode || this._inMctsSim) return;
+    const ps = this.gs?.players?.[pi];
+    if (!ps || !ps.rarityLedger) return;
+    try { require('./_rarity-track').take(this.gs, pi, key, start, count); } catch (e) { console.error('[rarity] take:', e.message); }
+  }
+
+  /**
    * Monkey-patch `ps.hand.splice` so that every registered per-hand-index
    * field on `ps` stays consistent across hand mutations. Covers every
    * caller that already does `ps.hand.splice(i, 1)` — no refactor needed.
@@ -2541,6 +2568,7 @@ class GameEngine {
             }
           }
         }
+        if ((delCount ?? 0) > 0) engine._rarityTake(pi, 'hand', start, delCount);   // Rarity-Identitaet: die entfernte Kopie nimmt ihre Rarity mit
         const result = origSplice.call(this, start, delCount, ...items);
         // Rebase every registered field's map on `ps`.
         for (const [fieldName] of engine._handIndexedFields) {
@@ -14822,9 +14850,10 @@ class GameEngine {
     def('_stempelVerfolgt', true);
     def('push', function (...items) { stamps().push(...items.map(jetzt)); const r = Array.prototype.push.apply(this, items); engine._geloeschtMeldung(pi, items); return r; });
     def('unshift', function (...items) { stamps().unshift(...items.map(jetzt)); const r = Array.prototype.unshift.apply(this, items); engine._geloeschtMeldung(pi, items); return r; });
-    def('pop', function () { stamps().pop(); return Array.prototype.pop.call(this); });
-    def('shift', function () { stamps().shift(); return Array.prototype.shift.call(this); });
+    def('pop', function () { engine._rarityTake(pi, 'xp', this.length - 1, 1); stamps().pop(); return Array.prototype.pop.call(this); });
+    def('shift', function () { engine._rarityTake(pi, 'xp', 0, 1); stamps().shift(); return Array.prototype.shift.call(this); });
     def('splice', function (...args) {
+      engine._rarityTakeSplice(pi, 'xp', this.length, args);
       const sargs = args.length > 2 ? [args[0], args[1], ...args.slice(2).map(jetzt)] : args;
       Array.prototype.splice.apply(stamps(), sargs);
       return Array.prototype.splice.apply(this, args);
@@ -15018,9 +15047,10 @@ class GameEngine {
     umhuellen('unshift', function (n0) { const d = this.length - n0; if (d > 0) { angleichen(n0); stamps().unshift(...Array(d).fill(jetzt())); } });
     if (!arr._ablage_pop) {
       def('_ablage_pop', true);
-      def('pop', function () { stamps().pop(); return Array.prototype.pop.call(this); });
-      def('shift', function () { stamps().shift(); return Array.prototype.shift.call(this); });
+      def('pop', function () { engine._rarityTake(pi, 'dp', this.length - 1, 1); stamps().pop(); return Array.prototype.pop.call(this); });
+      def('shift', function () { engine._rarityTake(pi, 'dp', 0, 1); stamps().shift(); return Array.prototype.shift.call(this); });
       def('splice', function (...args) {
+        engine._rarityTakeSplice(pi, 'dp', this.length, args);
         Array.prototype.splice.apply(stamps(), args.length > 2 ? [args[0], args[1], ...Array(args.length - 2).fill(jetzt())] : args);
         return Array.prototype.splice.apply(this, args);
       });
@@ -42819,9 +42849,12 @@ this._deathWatch = (this._deathWatchStack || []).length
   }
 
   /**
-   * Unreasonable Anger rider (24.10.): trägt die Quelle (ein Held) den Buff `unreasonable_anger`, steigt JEDER Schaden, den dieser Held an EINEM einzelnen Ziel verursacht, um 100.
+   * Unreasonable Anger rider (24.10.; neuer Text 10.11.): „The next damage the user deals to a single target during your next turn is increased by 100." Trägt die Quelle (ein Held) den
+   * Buff `unreasonable_anger`, steigt der NÄCHSTE Schaden, den dieser Held an EINEM einzelnen Ziel verursacht, um 100 — NUR im Zeitfenster (`buff.fenster = [{ runde, bonus }]`: die
+   * Zugnummer des nächsten eigenen Zuges; Schaden davor, etwa als Reaktion im Gegnerzug, zählt nicht) und nur EINMAL: der Treffer verbraucht seine Einträge (mehrere Kopien für denselben
+   * Zug summieren sich, der Bonus liegt dann auf demselben nächsten Schaden). Buffs OHNE `fenster` (Puzzle-Editor, alter Stand) wirken einmalig +100 ohne Zeitfenster.
    * Gleiche Auslegung wie bei Frog Race Boat: direkter Schaden des Helden (Attack, Spell, Effekt) — nicht Statusticks (kein Heldenindex) und nicht der Schaden einer Kreatur in seinen
-   * Zonen (`type === 'creature'` / Quelle in einer Support Zone). Kein Einzelziel (Mehrziel-Klammer mit 2+ Zielen, Batch mit 2+ Einträgen) → kein Bonus. Der Buff bleibt (Frist-Ablauf).
+   * Zonen (`type === 'creature'` / Quelle in einer Support Zone). Kein Einzelziel (Mehrziel-Klammer mit 2+ Zielen, Batch mit 2+ Einträgen) → kein Bonus UND kein Verbrauch („to a single target").
    * @param {object} hookCtx  { source, target, type, amount, … }
    * @param {number} [eintraege]  Anzahl der Ziele im Batch (Kreaturenpfad); Heldenpfad: 1
    */
@@ -42839,9 +42872,22 @@ this._deathWatch = (this._deathWatchStack || []).length
     const _mh = this._multiHitScope;
     if ((_mh?.total || 0) >= 2 && !_mh.ersterTrefferEinzel) return;
     if (eintraege > 1) return;
-    hookCtx.amount += ANGER_BONUS;
-    if (hookCtx._kBase !== undefined) hookCtx._kBase += ANGER_BONUS;
-    this.log('unreasonable_anger_bonus', { hero: srcHero.name, target: hookCtx.target?.name, bonus: ANGER_BONUS });
+    // Zeitfenster + Verbrauch: nur Einträge der AKTUELLEN Zugnummer zählen und werden aufgebraucht (Buff ohne `fenster`: einmalig +100, jederzeit).
+    const buff = srcHero.buffs.unreasonable_anger;
+    let bonus = ANGER_BONUS;
+    if (Array.isArray(buff.fenster)) {
+      const jetzt = this.gs.turn;
+      const treffer = buff.fenster.filter(f => f && f.runde === jetzt);
+      if (treffer.length === 0) return;                                 // nicht im nächsten eigenen Zug (noch nicht dran): kein Bonus, nichts verbraucht
+      bonus = treffer.reduce((a, f) => a + (Number(f.bonus) || ANGER_BONUS), 0);
+      buff.fenster = buff.fenster.filter(f => f && f.runde !== jetzt);
+      if (!buff.fenster.some(f => f.runde > jetzt)) delete srcHero.buffs.unreasonable_anger;   // nichts Späteres mehr vorgemerkt: der Buff ist verbraucht
+    } else {
+      delete srcHero.buffs.unreasonable_anger;
+    }
+    hookCtx.amount += bonus;
+    if (hookCtx._kBase !== undefined) hookCtx._kBase += bonus;
+    this.log('unreasonable_anger_bonus', { hero: srcHero.name, target: hookCtx.target?.name, bonus });
   }
 
   /**
@@ -45447,6 +45493,7 @@ this._deathWatch = (this._deathWatchStack || []).length
       // verlangen (Shamanic Curse: der Zauber müsste in den Ablagestapel gehen), schließen solche Glieder aus.
       zaehltAlsArt: cardInfo.zaehltAlsArt || null,
       goldCost: goldCost || 0,
+      handFlug: cardInfo.handFlug || null,   // Handkarte des Initialglieds: { handIdx, to, toOwner } — Flug beim Aufloesen des Glieds (`_resolveReactionChain`)
       isInitialCard: true,
       negated: false,
       chainClosed: false,
@@ -45492,6 +45539,7 @@ this._deathWatch = (this._deathWatchStack || []).length
           fizzled: !initialLink.negated && !!initialLink.fizzled,
           fizzleReason: initialLink.fizzleReason || null,
           chainFormed: true,
+          initialFlug: !!initialLink._flugFrueh,   // die Handkarte ist beim Aufloesen schon geflogen (Aufrufer schickt den Flug nicht noch einmal)
           resolveResult: initialLink.resolveResult || null,
           // Lunar Eclipse flags a negated card for deletion instead of
           // discard — server play paths route via routeNegatedInitialCard.
@@ -46662,7 +46710,11 @@ this._deathWatch = (this._deathWatchStack || []).length
       };
 
       chain.push(link);
+      // Handgeist (nur Darstellung): die Karte hat die Hand verlassen, fliegt aber erst beim Aufloesen weg. Der Client haelt sie bis dahin ausgegraut
+      // an ihrem Platz (`fromHandIdx`). Der Zustand MIT der kleineren Hand geht VOR dem Kettenupdate raus, damit der Client die Karte nie doppelt zeigt.
+      this.sync();
       if (chain.length >= 2) this._broadcastChainUpdate(chain);
+      else this._broadcastEvent('reaction_chain_geister', { geister: this._kettenGeister(chain) });
 
       // Fire onReactionActivated hook (for board passives)
       await this.runHooks('onReactionActivated', {
@@ -46725,6 +46777,33 @@ this._deathWatch = (this._deathWatchStack || []).length
     return this.wirkerHandlungsunfaehig(link.casterOwner ?? link.owner, hi);
   }
 
+  /**
+   * ★ KETTEN-TEMPO (Nutzer 4.11.): Takt der Kettenaufloesung in Bildern (30 Hz) — passend zur Pixelart-Leiste (`app-fx-53.jsx`, gleiche Zahlen dort).
+   * Je Glied P Bilder (10 bis 4 Glieder, darueber `max(6, round(40/n))`), aufgeteilt in Gluehen G, Flug-Wartezeit Fl (Landung der Karte) und Nachlauf R.
+   * Start 4, Ende 8 Bilder, Negation +8 Bilder. Fruehere Werte: Start 500, Gluehen 400, Vorlauf 250, Flug 650, Nachlauf 300, Negation 600, Ende 400 ms
+   * (= 1600 ms je Reaktions-Glied). In `_fastMode` (KI-Simulationen) gibt `_delay` weiterhin sofort zurueck.
+   */
+  _kettenTakt(n) {
+    const F = 1000 / 30, P = n <= 4 ? 10 : Math.max(6, Math.round(40 / n));
+    const G = Math.round(P * 0.3), R = Math.max(1, Math.round(P * 0.2)), Fl = Math.max(3, P - G - R);
+    return { P, start: 4 * F, G: G * F, Fl: Fl * F, R: R * F, neg: 4 * F, negRest: (P + 8 - 4) * F - Fl * F, ende: 8 * F, flugMs: Math.round(Fl * F * 1.25) };
+  }
+
+  /** Darf die Handkarte des Initialglieds beim Aufloesen SOFORT in die Ablage fliegen? Nein, wenn ihr Skript (oder ein Held des Wirkers) sie auf das Brett / zurueck in die Hand legen koennte. */
+  _initialFlugSicher(pi, cardName) {
+    const cache = this._flugQuellCache || (this._flugQuellCache = new Map());
+    const unsicher = (n) => {
+      if (!n) return false;
+      if (cache.has(n)) return cache.get(n);
+      let r = true;
+      try { r = /_spellReturnToHand|_spellPlacedOnBoard|aufloesenderSpellInDieAblage|_spellKeepInstance|_buddyTicket|neuesBuddyTicket/.test(require('fs').readFileSync(require('path').join(__dirname, nameToFile(n) + '.js'), 'utf8')); } catch (e) { r = false; }
+      cache.set(n, r); return r;
+    };
+    if (unsicher(cardName)) return false;
+    for (const h of (this.gs.players[pi]?.heroes || [])) if (h?.name && unsicher(h.name)) return false;
+    return true;
+  }
+
   async _resolveReactionChain(chain) {
     // ── HAND-SPERRE WAEHREND DER GANZEN KETTE (Als Befund 5.8.) ──────
     // Die Abwurf-Sperre aus v203 deckte nur die Stapelabfrage selbst
@@ -46737,10 +46816,11 @@ this._deathWatch = (this._deathWatchStack || []).length
     const prevChainLock = this.gs._chainResolvingLock;
     this.gs._chainResolvingLock = true;
     try {
-    this._broadcastEvent('reaction_chain_resolving_start', {});
+    const TK = this._kettenTakt(chain.length);
+    this._broadcastEvent('reaction_chain_resolving_start', { takt: TK.P, n: chain.length });
     // SC (v1382, Chain Reaction): Laenge der Kette, die jetzt aufloest.
     if (this.gs._scTracking) ScTracking.kette(this.gs._scTracking, chain);
-    await this._delay(500);
+    await this._delay(TK.start);
 
     for (let i = chain.length - 1; i >= 0; i--) {
       const link = chain[i];
@@ -46787,7 +46867,8 @@ this._deathWatch = (this._deathWatchStack || []).length
           try { link._equipRefund(); }
           catch (err) { console.error(`[Engine] equipReactionRefund for ${link.cardName} failed:`, err.message); }
         }
-        await this._delay(600);
+        await this._delay(TK.neg);
+        let _fl = false;
 
         // Negated non-initial cards go to discard — or the deleted
         // pile when the negator flagged deletion (Lunar Eclipse).
@@ -46818,10 +46899,11 @@ this._deathWatch = (this._deathWatchStack || []).length
             cardName: link.cardName, from: 'hand', to: 'hand',
             fromOwner: link.owner, toOwner: dieb,
             toHandIdx: zielIdx, finalHandSize: diebPs.hand.length,
+            ...(Number.isInteger(link.fromHandIdx) ? { fromHandIdx: link.fromHandIdx, chainLinkId: link.id } : {}),
           });
           this.log('negated_card_stolen', { card: link.cardName, from: oppPs?.username, to: diebPs.username });
           this.sync();
-          await this._delay(650);
+          _fl = true; await this._delay(TK.Fl);
         } else if (!link.isInitialCard
             && !loadCardEffect(link.cardName)?.skipPostResolveDiscard) {
           const ps = this.gs.players[link.owner];
@@ -46841,16 +46923,18 @@ this._deathWatch = (this._deathWatchStack || []).length
             this._broadcastEvent('play_pile_transfer', {
               owner: link.owner, cardName: link.cardName,
               from: link.fromDeck ? 'deck' : 'hand', to: toDeleted ? 'deleted' : 'discard',
-              ...(Number.isInteger(link.fromHandIdx) ? { fromHandIdx: link.fromHandIdx } : {}),
+              ...(Number.isInteger(link.fromHandIdx) ? { fromHandIdx: link.fromHandIdx, chainLinkId: link.id } : {}),
+              flugMs: TK.flugMs,
             });
             // 3. Landung ERST NACH der Animation.
-            await this._delay(650);
+            _fl = true; await this._delay(TK.Fl);
             const _kettenPs = link.fromDeck ? ps : this.handKartenBesitzerPs(ps, link.cardName);   // W63c: Stapel des permanenten Besitzers
             if (!_kettenPs[pile]) _kettenPs[pile] = [];
             _kettenPs[pile].push(link.cardName);
             this.sync();
           }
         }
+        await this._delay(_fl ? TK.negRest : TK.negRest + TK.Fl);   // Rest des Negations-Takts (die Leiste zerbroeselt das Glied, siehe app-fx-53)
         // „Whenever you negate an opponent's card or effect" (Natas).
         if (link.negated) {
           await this._meldeNegation({
@@ -46863,7 +46947,7 @@ this._deathWatch = (this._deathWatchStack || []).length
         this._broadcastEvent('reaction_chain_link_resolving', {
           linkIndex: i, cardName: link.cardName, owner: link.owner,
         });
-        await this._delay(400);
+        await this._delay(TK.G);
 
         if (link.resolve) {
           try {
@@ -46961,7 +47045,6 @@ this._deathWatch = (this._deathWatchStack || []).length
           const spellPlaced = this.gs._spellPlacedOnBoard === true || !!_kettenBuddy?.token;   // W67a: Inyas Token ersetzt die Ablage
           if (this.gs._spellPlacedOnBoard) delete this.gs._spellPlacedOnBoard;
           if (!linkScript?.skipPostResolveDiscard && !spellPlaced) {
-            await this._delay(250);
             const ps = this.gs.players[link.owner];
             // ★ v1327: „Delete this card" (`deleteOnUse`) — bisher kannte
             // nur jedes HAND-Reaktionsfenster das Feld, die Kette legte
@@ -46976,13 +47059,14 @@ this._deathWatch = (this._deathWatchStack || []).length
               this._broadcastEvent('play_pile_transfer', {
                 owner: link.owner, cardName: link.cardName,
                 from: link.fromDeck ? 'deck' : 'hand', to: zumLoeschen ? 'deleted' : 'discard',
-                ...(Number.isInteger(link.fromHandIdx) ? { fromHandIdx: link.fromHandIdx } : {}),
+                ...(Number.isInteger(link.fromHandIdx) ? { fromHandIdx: link.fromHandIdx, chainLinkId: link.id } : {}),
+                flugMs: TK.flugMs,
               });
               // Push ERST NACH dem Flug: es gibt clientseitig kein
               // "Karte im Stapel verstecken, bis sie landet", also
               // erschiene sie sonst schon beim START der Animation.
               // Gleiche Reihenfolge wie routeNegatedInitialCard.
-              await this._delay(650);
+              await this._delay(TK.Fl);
               const _kettenPs = link.fromDeck ? ps : this.handKartenBesitzerPs(ps, link.cardName);   // W63c: Stapel des permanenten Besitzers
               if (zumLoeschen) { if (!_kettenPs.deletedPile) _kettenPs.deletedPile = []; _kettenPs.deletedPile.push(link.cardName); }
               else _kettenPs.discardPile.push(link.cardName);
@@ -46991,17 +47075,27 @@ this._deathWatch = (this._deathWatchStack || []).length
           }
         }
 
+        // ★ Initialkarte (Attack/Spell aus der Hand): ihre Handkarte fliegt, sobald das Glied aufloest (in der Leiste zerbroeselt) — nicht erst nach der ganzen Aufloesung.
+        // `handFlug` kommt vom Aufrufer (server.js `doPlaySpell`); die Karte bleibt im Zustand, bis der Zauber fertig ist (nur der FLUG wird vorgezogen, `chainResult.initialFlug`
+        // sagt dem Aufrufer, dass er ihn nicht zweimal schickt). Nur wenn das Ziel sicher feststeht (`_initialFlugSicher`).
+        if (link.isInitialCard && link.handFlug && !this._inMctsSim && this._initialFlugSicher(link.owner, link.cardName)) {
+          this._broadcastEvent('play_pile_transfer', {
+            fromOwner: link.owner, toOwner: link.handFlug.toOwner, cardName: link.cardName, from: 'hand', to: link.handFlug.to,
+            fromHandIdx: link.handFlug.handIdx, flugMs: TK.flugMs, halten: true,
+          });
+          link._flugFrueh = true;
+        }
         this._broadcastEvent('reaction_chain_link_resolved', {
           linkIndex: i, cardName: link.cardName, owner: link.owner,
         });
-        await this._delay(300);
+        await this._delay(TK.R);
       }
 
       this.sync();
     }
 
     this._broadcastEvent('reaction_chain_done', {});
-    await this._delay(400);
+    await this._delay(TK.ende);
 
     // Surprise reactions (Lunar Eclipse) stayed face-up in their
     // Surprise Zone for the entire chain. NOW — after the negated
@@ -47428,11 +47522,29 @@ this._deathWatch = (this._deathWatchStack || []).length
   }
 
   /** Broadcast chain state to both clients */
+  /** Handgeister (nur Darstellung): Reaktionsglieder, deren Karte die Hand schon verlassen hat, aber erst beim Aufloesen wegfliegt. */
+  _kettenGeister(chain) {
+    return chain
+      .filter(l => !l.isInitialCard && Number.isInteger(l.fromHandIdx) && !l.fromHero && !l.fromCreature && !l.fromDeck && !l.fromSurprise)
+      .map(l => ({ id: l.id, cardName: l.cardName, owner: l.owner, fromHandIdx: l.fromHandIdx }));
+  }
+
+  /** Rarity der Karte eines Kettenglieds, einmal beim ersten Mal festgehalten (die Karte hat die Hand dann meist schon verlassen). */
+  _rarityFuerKettenglied(l) {
+    if (l._rarity !== undefined) return l._rarity || undefined;
+    if (!this.gs?.players?.some(ps => ps && ps.rarityLedger)) return undefined;
+    let r = null;
+    try { r = require('./_rarity-track').rarityOf(this.gs, l.owner, l.cardName, ['hand', 'dp', 'S*', 'cz'], { idx: l.fromHandIdx, idxZone: 'hand' }); } catch {}
+    l._rarity = r;
+    return r || undefined;
+  }
+
   _broadcastChainUpdate(chain) {
     this._broadcastEvent('reaction_chain_update', {
       vorlauf: this._chainVorlauf || null,
+      geister: this._kettenGeister(chain),
       links: chain.map(l => ({
-        id: l.id, cardName: l.cardName, owner: l.owner,
+        id: l.id, cardName: l.cardName, owner: l.owner, rarity: this._rarityFuerKettenglied(l),
         cardType: l.cardType, isInitialCard: l.isInitialCard,
         negated: l.negated, negationStyle: l.negationStyle || null, chainClosed: l.chainClosed,
       })),
@@ -55772,8 +55884,22 @@ this._deathWatch = (this._deathWatchStack || []).length
    * `originOwner`/`originHeroIdx` und rechnet daraus ihre Richtung.
    * `delay` haelt den Ablauf so lange an, bis die Front bei den Zielen
    * ist — ohne das faellt der Schaden, bevor die Welle ankommt.
+   *
+   * ★ `kreaturenZuerst: true` (Flame Avalanche, Lawine von der Rueckkante
+   * auf den Wirker zu): die Kreaturen werden VOR den Helden getroffen
+   * (`dealDamageToTargets`). Dazu sendet die Welle `delay` (Kreaturen),
+   * `heroAt` (erster Held, ABSOLUT ab Wellenstart) und `hitDelay` (Abstand
+   * der Helden) mit — der Client rechnet daraus die Trefferbilder der
+   * Animation (Kreaturen: delay, Held i: heroAt + i * hitDelay). `vorlauf`
+   * (ms) verschiebt die Wartezeiten der ENGINE gegenueber diesen
+   * Animationszeiten (Mount-Vorlauf der Animation im Client). `einzel`
+   * (Idas Einzelziel): nur ein Ziel, es faellt bei `delay` (auch ein Held).
+   * ★ `heldenZuerst: true` (Flame Avalanche, Lawine ab dem Wirker nach hinten): die Helden werden VOR den Kreaturen getroffen — Held i bei `heroAt`
+   * (Standard `delay`) `+ i * hitDelay`, danach ALLE Kreaturen gleichzeitig bei `creatureAt` (ms ab Wellenstart). Sonst wie `kreaturenZuerst`
+   * (Ereignisfelder `delay`/`heroAt`/`hitDelay`/`creatureAt`, `vorlauf`, `einzel`).
+   * Rueckgabe: `{ t0 }` = Wellenstart (Date.now) fuer die absoluten Wartezeiten.
    */
-  async _spieleWellenAnimation(config, cardInst, pi, heroIdx, ziele) {
+  async _spieleWellenAnimation(config, cardInst, pi, heroIdx, ziele, opts) {
     const welle = config && config.waveAnimation;
     if (!welle || !welle.type) return;
     // ★★ v1346 — KULISSE ZUR WELLE (`waveAnimation.backdrop`, „Hole in
@@ -55805,8 +55931,18 @@ this._deathWatch = (this._deathWatchStack || []).length
       zoneType: 'board', owner: pi, heroIdx: -1, zoneSlot: -1,
       originOwner: (cardInst && cardInst.heroOwner != null) ? cardInst.heroOwner : pi,
       originHeroIdx: heroIdx,
+      ...((welle.kreaturenZuerst || welle.heldenZuerst) ? {
+        kreaturenZuerst: !!welle.kreaturenZuerst,
+        heldenZuerst: !!welle.heldenZuerst,
+        delay: welle.delay != null ? welle.delay : 380,
+        heroAt: (opts && opts.einzel) ? (welle.delay != null ? welle.delay : 380) : (welle.heroAt != null ? welle.heroAt : (welle.delay != null ? welle.delay : 380)),
+        hitDelay: (opts && opts.einzel) ? 0 : (welle.hitDelay != null ? welle.hitDelay : 150),
+        creatureAt: (opts && opts.einzel) ? (welle.delay != null ? welle.delay : 380) : (welle.creatureAt != null ? welle.creatureAt : (welle.delay != null ? welle.delay : 380)),
+      } : null),
     });
-    await this._delay(welle.delay != null ? welle.delay : 380);
+    const t0 = Date.now();
+    await this._delay((welle.delay != null ? welle.delay : 380) + ((welle.kreaturenZuerst || welle.heldenZuerst) ? (welle.vorlauf || 0) : 0));
+    return { t0 };
   }
 
   async actionAoeHit(cardInst, config = {}) {
@@ -55880,7 +56016,7 @@ this._deathWatch = (this._deathWatchStack || []).length
       await this._spieleWellenAnimation(config, cardInst, pi, heroIdx, [{
         owner: target.owner, heroIdx: target.heroIdx,
         zoneSlot: target.type === 'hero' ? -1 : target.slotIdx,
-      }]);
+      }], { einzel: true });
 
       // Animation on single target
       if (animationType) {
@@ -56204,13 +56340,14 @@ this._deathWatch = (this._deathWatchStack || []).length
       });
     }
 
-    await this._spieleWellenAnimation(config, quelle || quellObjekt, pi, heroIdx, [
+    const _welle = await this._spieleWellenAnimation(config, quelle || quellObjekt, pi, heroIdx, [
       ...allHeroes.map(e => ({ owner: e.owner, heroIdx: e.heroIdx, zoneSlot: -1 })),
       ...creatureEntries.map(e => ({
         owner: this.physicalSide(e.inst), heroIdx: e.inst.heroIdx, zoneSlot: e.inst.zoneSlot,
         cardName: e.inst.name,   // v1347: fuer Wellen, die die Karte selbst bewegen
       })),
     ]);
+    const _kreaturenZuerst = !!(config.waveAnimation && config.waveAnimation.kreaturenZuerst), _heldenZuerst = !!(config.waveAnimation && config.waveAnimation.heldenZuerst);
     const _sog = this._sogBeginnen(config, creatureEntries.map(e => e.inst));
 
     if (animationType) {
@@ -56248,6 +56385,41 @@ this._deathWatch = (this._deathWatchStack || []).length
       // (Die Klammer schiebt auch die Heldentode bis nach dem Schlag auf,
       // s. `_heldKoMelden`.)
       try {
+        // ★ `waveAnimation.kreaturenZuerst` (Flame Avalanche: die Lawine rollt von der Rueckkante auf den Wirker zu und ueberrollt zuerst die Kreaturenreihe, dann die Helden):
+        // alle Kreaturen in EINEM Stapel (ohne Staffelung) im ersten Treffer-Augenblick, danach die Helden — jeder zu seinem ABSOLUTEN Zeitpunkt ab Wellenstart
+        // (`heroAt` + Platz in der Zielliste * `hitDelay`, dieselbe Rechnung wie im Client, der daraus die Trefferbilder macht). Die Tode sind ohnehin bis zum Klammerende aufgeschoben.
+        if (_kreaturenZuerst || _heldenZuerst) {
+          const _w = config.waveAnimation, _t0 = _welle?.t0 ?? Date.now(), _vorl = _w.vorlauf || 0;
+          const _hd = _w.hitDelay != null ? _w.hitDelay : hitDelay, _h0 = _w.heroAt != null ? _w.heroAt : (_w.delay != null ? _w.delay : 380);
+          const _kr = creatureEntries.filter(e => e.amount > 0);
+          // ★ `heldenZuerst`: die Kreaturen kommen NACH den Helden, alle gleichzeitig bei `creatureAt` (absolut ab Wellenstart).
+          const _kreaturen = async () => {
+            if (_kr.length === 0) return;
+            if (_heldenZuerst) { const _wk = (_t0 + _vorl + (_w.creatureAt != null ? _w.creatureAt : _h0)) - Date.now(); if (_wk > 0) await this._delay(_wk); }
+            _kr._ohneStaffel = true; await this.processCreatureDamageBatch(_kr);
+          };
+          if (!_heldenZuerst) await _kreaturen();
+          let _slotZeit = _h0;
+          for (const _e of hitHeroes) {
+            const _slot = allHeroes.findIndex(a => a.owner === _e.owner && a.heroIdx === _e.heroIdx);
+            if (_slot >= 0) _slotZeit = _h0 + _slot * _hd;
+            const _warte = (_t0 + _vorl + _slotZeit) - Date.now();
+            if (_warte > 0) await this._delay(_warte);
+            if (_e.hero.hp <= 0 || !(_e.amount > 0)) continue;
+            if (hatInstanz || !opts.attrappenQuelle) {
+              await this.actionDealDamage(quelle || quellObjekt, _e.hero, _e.amount, damageType, trefferOpts);
+            } else {
+              const tmp = this._trackCard(sourceName, pi, 'hand', -1, -1);
+              try { await this.actionDealDamage(tmp, _e.hero, _e.amount, damageType, trefferOpts); }
+              finally { this._untrackCard(tmp.id); }
+            }
+            this.sync();
+          }
+          if (_heldenZuerst) await _kreaturen();
+          if (typeof opts.wirkung === 'function') {
+            await opts.wirkung({ heroes: hitHeroes, creatures: creatureEntries.map(e => e.inst) });
+          }
+        } else {
         for (const { hero, amount } of hitHeroes) {
           if (hero.hp <= 0 || !(amount > 0)) continue; // May have died from a previous hit this loop
           if (hatInstanz || !opts.attrappenQuelle) {
@@ -56265,6 +56437,7 @@ this._deathWatch = (this._deathWatchStack || []).length
         // ── SCHRITT 3b: Zusatzwirkung (Status, Sperren …) — noch VOR der Todesauswertung ──
         if (typeof opts.wirkung === 'function') {
           await opts.wirkung({ heroes: hitHeroes, creatures: creatureEntries.map(e => e.inst) });
+        }
         }
       } finally {
         // Vorgemerkte Heldentode JETZT — nach dem letzten Treffer.
@@ -56513,6 +56686,9 @@ this._deathWatch = (this._deathWatchStack || []).length
 
   async _processCreatureDamageBatchKern(entries) {
     if (!entries || entries.length === 0) return;
+    // ★ Welle mit `kreaturenZuerst` (Flame Avalanche): die Animation gibt den Takt vor, alle Kreaturen werden im selben Augenblick getroffen —
+    // keine 200 ms Staffelung je ueberlebender Kreatur (der Aufrufer setzt `entries._ohneStaffel`; die Filter unten bauen neue Arrays).
+    const ohneStaffel = !!entries._ohneStaffel;
 
     // Filter out face-down surprise creatures — they cannot be damaged
     entries = entries.filter(e => !e.inst?.faceDown);
@@ -57440,7 +57616,7 @@ this._deathWatch = (this._deathWatchStack || []).length
         sterbende.push(e);
       } else {
         this.sync();
-        await this._delay(200);
+        if (!ohneStaffel) await this._delay(200);
       }
     }
 
@@ -59348,6 +59524,7 @@ this._deathWatch = (this._deathWatchStack || []).length
   _broadcastEvent(event, data, opts) {
     if (this._aborted) return;
     if (this._fastMode) return; // Silent during MCTS simulations.
+    data = this._rarityMitEreignis(event, data);   // Rarity der fliegenden/aufgedeckten Karte mitgeben (Identitaetsverfolgung, _rarity-track.js)
     // Pfeilsalve: die Standard-Animationen einer Attack mit Pfeilen werden zurueckgehalten und reisen mit `play_arrow_salvo` (Fallback fuer Clients ohne Salve).
     if (event === 'reaction_chain_done' && this._pfeilSchild && !this._pfeilSchild.aktiv && !this._pfeilSchild.fertig) this._pfeilSchild.aktiv = true;   // Pfeilsalve: ab Kettenende scharf
     if (this._pfeilSchild && this._pfeilSchild.aktiv && require('./_arrows-shared').PFEIL_SCHILD_EVENTE.has(event)) { this._pfeilSchild.puffer.push([event, data, opts, Date.now()]); return; }
@@ -59532,6 +59709,23 @@ this._deathWatch = (this._deathWatchStack || []).length
   //  `gs._holdCardReveal = true` hält den Auftritt weiterhin zurück, bis die Karte ihn selbst freigibt (ältere Muster bleiben gültig).
   // ═══════════════════════════════════════════════════════════════════════════
 
+  /**
+   * FAIL-SAFE gegen hängende Spiele: hält die Vormerkung den Zustand zurück, wacht ein Zeitgeber darüber. Nach `AUFTRITT_HALTE_MAX_MS` ohne offene Frage des Besitzers (= nichts wartet auf eine Antwort,
+   * die den Commit auslösen könnte) oder wenn das Spiel zu Ende ist, wird der Auftritt ausgeliefert — samt zurückgehaltenem Zustand. Mit offener Frage (der Besitzer überlegt noch) läuft er weiter.
+   */
+  _auftrittWaechterStellen(pend) {
+    if (this._inMctsSim || this._fastMode || (this._auftrittWaechter && this._auftrittWaechter.pend === pend)) return;
+    if (this._auftrittWaechter) clearTimeout(this._auftrittWaechter.t);
+    const w = this._auftrittWaechter = { pend, t: null };   // bewusst NICHT im Spielzustand (gs wird kopiert/serialisiert)
+    const pruefen = () => {
+      if (this._auftrittWaechter === w) this._auftrittWaechter = null;
+      if (this._aborted || this.gs._pendingCardReveal !== pend) return;   // schon committet oder abgebrochen
+      if (this.gs.result || !this._auftrittFrageOffen(pend.ownerIdx)) { this.gs._holdCardReveal = false; this._firePendingCardReveal(); return; }
+      w.t = setTimeout(pruefen, AUFTRITT_HALTE_MAX_MS); if (w.t.unref) w.t.unref(); this._auftrittWaechter = w;
+    };
+    w.t = setTimeout(pruefen, AUFTRITT_HALTE_MAX_MS); if (w.t.unref) w.t.unref();
+  }
+
   /** Hat der Besitzer gerade eine Frage offen (Prompt, Zielwahl)? Dann kann er noch abbrechen. */
   _auftrittFrageOffen(ownerIdx) {
     const gs = this.gs;
@@ -59547,6 +59741,7 @@ this._deathWatch = (this._deathWatchStack || []).length
   _auftrittEntscheide(event) {
     const pend = this.gs._pendingCardReveal;
     if (!pend || this._inMctsSim || this._fastMode || this._auftrittFlush) return null;
+    if (this.gs.result) { this.gs._holdCardReveal = false; this._firePendingCardReveal(); return null; }   // Spielende: nichts mehr zurückhalten (siehe `_auftrittZustandHalten`)
     // Liegengebliebener Auftritt aus einem früheren Zug (Fehlerfall): lieber nachliefern als Sendungen verschlucken.
     if (pend._turn == null) pend._turn = this.gs.turn;
     else if (pend._turn !== this.gs.turn) { this._firePendingCardReveal(); return this.gs._pendingCardReveal || null; }
@@ -59646,9 +59841,13 @@ this._deathWatch = (this._deathWatchStack || []).length
     const pend = this.gs && this.gs._pendingCardReveal;
     if (!pend || this._inMctsSim || this._fastMode || this._auftrittFlush) return false;
     if (empfaengerIdx === pend.ownerIdx) return false;
+    // ENDE-SICHERUNG: ein Spielergebnis (Aufgabe, Heldentod, Ausscheiden, Verbindungsabbruch …) darf NIE zurückgehalten werden — danach kommt kein Commit mehr, der Zustand mit `result` ginge sonst verloren
+    // (der Spieler bliebe ohne Ergebnis im Brett hängen). Die Vormerkung wird jetzt ausgeliefert (Auftritt + Puffer), das Ergebnis geht sofort hinterher.
+    if (this.gs.result) { this.gs._holdCardReveal = false; this._firePendingCardReveal(); return false; }
     if (pend._turn == null) pend._turn = this.gs.turn;
     else if (pend._turn !== this.gs.turn) { this._firePendingCardReveal(); return false; }   // liegengebliebene Vormerkung: nie Zustände verschlucken
     pend.zustandGehalten = true;
+    this._auftrittWaechterStellen(pend);
     return this._auftrittFrageOffen(pend.ownerIdx) ? 'huelle' : 'halten';   // 'huelle': nur die Hülle der Frage ist neu, der Rest bleibt der Zustand von vor der Karte
   }
 

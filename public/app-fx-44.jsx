@@ -51,6 +51,38 @@ function ppFx44Stufen(breite, hoch) {
 }
 window.ppFx44Stufen = ppFx44Stufen;
 
+/**
+ * Handkarten-Highlight (Tutorial): die vergrößerte Karte steht nur in ganzzahligen Kartenpixeln (`ppKarteGanz`, app-shared.jsx): jede Stufe hat eine Breite aus ganzen Vielfachen von
+ * 75 Gerätepixeln, Ecke und Größe liegen auf ganzen Bildschirmpixeln, die Karte steht aufrecht. Vorher: `scale` 1,5 auf die Ruhegröße (z. B. 123 → 184,5 px = 2,46 Pixel je Kartenpixel) plus
+ * Fächerdrehung. `scale`/`transform` streckt die schon gezeichnete 123-px-Ebene des Browsers (Compositor, bilinear): jede Kartenpixelkante bekam Mischfarben („weich"), Drehung dazu. Jetzt
+ * vergrößert `zoom` die HÜLLE im Layout: das Kartenbild wird gleich in Zielgröße gezeichnet (nächster Nachbar, `image-rendering: pixelated`) — ganzzahlig und scharf.
+ * Nur `zoom`-Faktor und Versatz ändern sich je Stufe; Versatz in Einheiten VOR dem Zoom (`translate` wird mitgezoomt), Hülle liegt bei links/oben 0.
+ * `rect` = Layout-Box der Handkarte (links/oben/Breite/Höhe in Bildschirmpixeln), `fensterH` = Fensterhöhe (unterer Rand bleibt 8 px im Bild).
+ * Liefert Inline-Variablen: --tbs1..4 (Zoom), --tbx0..4 / --tbt0..4 (Versatz; 0 = Ruhelage, 4 = Endzustand). Nur Rechnung, kein Layout lesen.
+ */
+function ppFx44HandStufen(rect, fensterH) {
+  const w0 = rect.width, h0 = rect.height;
+  const ganz = window.ppKarteGanz || ((w) => w);
+  let wEnd = ganz(w0 * 1.5);
+  if (wEnd < w0 * 1.3) wEnd = ganz(w0 * 1.3, 'auf');           // mindestens deutlich größer als die Ruhekarte
+  const cx = rect.left + w0 / 2, cy = rect.top + h0 / 2;
+  const hEnd = wEnd * 1.4, hoch = Math.min(0, fensterH - 8 - (cy + hEnd / 2));
+  const r = { '--tbx0': rect.left + 'px', '--tbt0': rect.top + 'px' };
+  const rd = (v) => Math.round(v * 10000) / 10000;
+  let vorher = w0;
+  for (let k = 1; k <= 4; k++) {
+    let w = k === 4 ? wEnd : ganz(w0 + (wEnd - w0) * k / 4);
+    w = Math.max(vorher, Math.min(wEnd, w)); vorher = w;
+    const h = w * 1.4, z = w / w0;
+    const links = Math.round(cx - w / 2), oben = Math.round(cy - h / 2 + hoch * k / 4);
+    r['--tbs' + k] = String(rd(z));
+    r['--tbx' + k] = rd(links / z) + 'px';
+    r['--tbt' + k] = rd(oben / z) + 'px';
+  }
+  return r;
+}
+window.ppFx44HandStufen = ppFx44HandStufen;
+
 // ───────────────────────── 1. Mischen ─────────────────────────
 const PP_FX44_RUECKEN = new Map();                  // Schlüssel → { grid: Uint8Array(W·H·3) | null, W, H, laedt }
 /** Rückenbild als Zellgitter (RGB, auf die Palette eingerastet). Gibt das Gitter zurück oder null, solange das Bild lädt / nicht lesbar ist. */
@@ -87,7 +119,7 @@ function ppFx44Ruecken(url, W, H) {
 window.ppFx44Vorladen = function (url, w, h) {
   try {
     const breite = Math.max(w || 44, 30), hoehe = Math.max(h || 62, 40);
-    ppFx44Ruecken(url || '/cardback.png', Math.max(4, Math.round(breite / PP_FX44_S)), Math.max(4, Math.round(hoehe / PP_FX44_S)));
+    { const Sv = typeof ppFxZelle === 'function' ? ppFxZelle(null) : PP_FX44_S; ppFx44Ruecken(url || '/cardback.png', Math.max(4, Math.round(breite / Sv)), Math.max(4, Math.round(hoehe / Sv))); }
   } catch (e) { /* optional */ }
 };
 
@@ -128,14 +160,13 @@ const ppFx44Mischen = ppR1Leinwand((g, t, sz, teile) => {
   }
 }, 640, (p) => {
   const breite = Math.max(p.w || 44, 30), hoehe = Math.max(p.h || 62, 40);
-  const rx = Math.ceil((breite * 0.55 + breite * 0.52 + hoehe * 0.12 + 6) / PP_FX44_S) * PP_FX44_S;
-  const ry = Math.ceil((hoehe * 0.52 + breite * 0.12 + 6) / PP_FX44_S) * PP_FX44_S;
+  const rx = Math.ceil(breite * 0.55 + breite * 0.52 + hoehe * 0.12 + 6), ry = Math.ceil(hoehe * 0.52 + breite * 0.12 + 6);   // in Bildschirmpixeln (ppR1Leinwand rundet auf ganze Zellen)
   return { breite: rx * 2, hoehe: ry * 2 };
 }, {
   z: 10100,
   vorbereiten: (sz) => {
     const p = sz.props, breite = Math.max(p.w || 44, 30), hoehe = Math.max(p.h || 62, 40);
-    const W = Math.max(4, Math.round(breite / PP_FX44_S)), H = Math.max(4, Math.round(hoehe / PP_FX44_S));
+    const W = Math.max(4, Math.round(breite / sz.S)), H = Math.max(4, Math.round(hoehe / sz.S));   // Zelle = Hero-Pixel (sz.S)
     const url = p.cardbackUrl || '/cardback.png';
     ppFx44Ruecken(url, W, H);
     return { W, H, url, bl: PP_FX44_BLAETTER(breite) };
@@ -160,7 +191,7 @@ function ppFx44Farbe(c) {
 window.ppFx44Funken = function (box, liste, farbe, zusatz) {
   try {
     if (!box || !liste || !liste.length || window._playAnimations === false || window.__ppFxAlt) return false;
-    const S = PP_FX44_S, TAKT = PP_FX44_TAKT;
+    const S = (zusatz && zusatz.S > 0) ? zusatz.S : (typeof ppFxZelle === 'function' ? ppFxZelle(box) : PP_FX44_S), TAKT = PP_FX44_TAKT;   // Zelle = Hero-Pixel
     let R = 0, ende = 0;
     for (const f of liste) { R = Math.max(R, Math.abs(f.dx), Math.abs(f.dy), 0); ende = Math.max(ende, f.delay + f.dur); }
     R = Math.ceil((R + 20) / S) * S;

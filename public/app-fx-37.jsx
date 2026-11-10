@@ -91,9 +91,9 @@ function ppFx37Start(cv, name) {
     W = w; H = h;
     const bw = Math.max(1, Math.round(w * d)), bh = Math.max(1, Math.round(h * d));
     dpr = d;
-    // Zelle: ganze Bildschirmpixel, ~2,4 je Skala-Einheit (Pixelraster des Spiels), mindestens 2
+    // Zelle: ganze Pixel, 2,8125 je Skala-Einheit = Hero-Pixel (Pixelraster des Spiels), mindestens 2
     const bs = parseFloat(getComputedStyle(cv).getPropertyValue('--board-scale')) || 1;
-    zelle = Math.max(2, Math.round(2.4 * bs * d));
+    zelle = Math.max(2, Math.round(2.8125 * bs * d));   // Hero-Pixel in der Brettebene (2,8125 · --board-scale; vorher 2,4)
     if (bw !== cv.width || bh !== cv.height) { cv.width = bw; cv.height = bh; if (bereit) zeichnen(performance.now()); }
   }
   function zeichnen(t) {

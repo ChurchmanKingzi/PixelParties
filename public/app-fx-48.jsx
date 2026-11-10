@@ -38,11 +38,13 @@ function ppFx48Rgb(hex) {
 }
 /** Feste Farben des Trailers (Creme, Tinte, Dunkel, Gold), einmal auf die Palette gerastet. */
 function ppFx48Fest() {
-  return PP_FX48_FARBEN || (PP_FX48_FARBEN = { creme: ppFx48Rgb('#fffbd2'), tinte: ppFx48Rgb('#12101f'), dunkel: ppFx48Rgb('#08060c'), gold: ppFx48Rgb('#fad54a') });
+  // ★ Ability-BLAU: Fähigkeiten tragen die Zonenfarbe Blau — statt Creme/Gold/Heldenfarbe: helles Blau (Ringe, Kern), mittleres Blau (Kugeln) und das Ability-Blau der Karte (alle Palette).
+  return PP_FX48_FARBEN || (PP_FX48_FARBEN = { creme: ppFx48Rgb('#b4cff8'), tinte: ppFx48Rgb('#12101f'), dunkel: ppFx48Rgb('#08060c'), gold: ppFx48Rgb('#3866f0') });
 }
 /** Heldenfarben [Haupt, Zweit] als RGB; aus dem Cache von app-fx-37, sonst einmal aus dem Sheet der Figur; ohne Figur: Kartentypfarbe. */
 function ppFx48Held(heroName, abilName) {
   const fest = ppFx48Fest();
+  return [ppFx48Rgb('#4580f6'), ppFx48Rgb('#89abdc')];      // Ability-Blau (Haupt, Zweit) statt der Figurenfarbe; die Figurenfarbe unten bleibt als Rückfall-Code erhalten, wird aber nicht mehr erreicht
   try {
     const HA = window.HeroIdleAnims, slug = HA && HA.slug && heroName ? HA.slug(heroName) : null;
     if (slug && typeof PP_FX37_FARBEN !== 'undefined') {
@@ -183,7 +185,7 @@ function ppFx48Geometrie(el, heroEl) {
   const r = el.getBoundingClientRect(), hr = heroEl.getBoundingClientRect();
   if (!r.width || !r.height || !hr.width || !hr.height) return null;
   const fo = window.ppFxScrollOffset ? window.ppFxScrollOffset() : { dx: 0, dy: 0 };
-  const Hz = r.height, S = Math.max(2, Math.min(4, Math.round(Hz / 35)));
+  const Hz = r.height, S = (typeof ppFxZelle === 'function') ? ppFxZelle(el) : Math.max(2, Math.min(4, Math.round(Hz / 35)));   // Rasterzelle = Hero-Pixel (ppFxZelle)
   const rc = Hz / (35 * S), rch = hr.height / (35 * S);
   const cardX = r.left + r.width / 2 + fo.dx, cardY = r.top + r.height / 2 + fo.dy, heroX = hr.left + hr.width / 2 + fo.dx, feetY = hr.top + hr.height / 2 + fo.dy;
   const p = Math.max(1, Math.round(2 * rc)), M = Math.max(40, Math.ceil(95 * Math.max(rc, rch))), up = Math.max(M, 56 * p + 4);

@@ -68,7 +68,7 @@ module.exports = {
   // laeuft ihr Effekt-Rumpf nie — die Engine spielt dann diese Bilder.
   // Im normalen Weg bleibt es bei den Broadcasts im Effekt selbst.
   spellVisual: {
-    impact: { type: 'magic_hammer' }, impactMs: 260,
+    impact: { type: 'hammer_skeleton_smash' }, impactMs: 800,   // Treffer des kleinen Hammers (app-fx-57: Bild 24 bei 30 Hz)
   },
 
   activeIn: ['support'],
@@ -99,41 +99,26 @@ module.exports = {
     const sel = targets.find(t => t.id === picked[0]);
     if (!sel?._cardInstance) return false;
 
-    // Reuse Magic Hammer's existing animation — same hammer-strike
-    // visual the player already associates with smashing things. The
-    // play_zone_animation handler resolves the target by zoneType:
-    // 'support' (default for an equip target) → support slot at
-    // (owner, heroIdx, zoneSlot); 'area' → the player's Area zone.
-    //
-    // For area targets we override `h` to a smaller value than the
-    // actual zone rect (the rect is the same `--zone-h` as a hero
-    // zone, but the magic_hammer effect's drop offset assumes the
-    // hammer hits the TOP edge of the target — which visually
-    // floats above an area card sitting alone in mid-board). A
-    // smaller `h` reduces `marginTop = -h/2 - hammerH`, so the
-    // hammer lands further down — overlapping the upper portion of
-    // the area card instead of hovering above it. The override is
-    // forwarded by `play_zone_animation` → `playAnimation` via
-    // `...rest`, which spreads after the DOM-rect defaults so it
-    // wins.
+    // Eigene Hammer-Animation (app-fx-57, `hammer_skeleton_smash`): kleiner rostiger Hammer mit Knochenstiel, von rechts, Heftigkeit 0,35 — gleiche Nagel-Mechanik
+    // wie Magic Hammer (untere Zonenkante = Bodenlinie). Das Ziel (Support-Slot bzw. Area-Zone) löst `play_zone_animation` über (owner, heroIdx, zoneSlot) bzw. `zoneType: 'area'` auf.
+    // (Der frühere `h: 40`-Kniff für Areas entfällt: die Animation setzt auf der Oberkante des Ziels auf.)
     if (sel.type === 'area') {
       engine._broadcastEvent('play_zone_animation', {
-        type: 'magic_hammer',
+        type: 'hammer_skeleton_smash',
         owner: sel.owner,
         heroIdx: -1, zoneSlot: -1,
         zoneType: 'area',
-        h: 40,
       });
     } else {
       engine._broadcastEvent('play_zone_animation', {
-        type: 'magic_hammer',
+        type: 'hammer_skeleton_smash',
         owner: sel.owner,
         heroIdx: sel.heroIdx,
         zoneSlot: sel.slotIdx,
       });
     }
-    // Match Magic Hammer's timing — the strike lands ~900ms in.
-    await engine._delay(900);
+    // Der Schlag landet bei ca. 0,8 s, danach der Hit-Stop: Schaden/Zerstörung bei ca. 1,0 s (inkl. Vorlauf des Mountens).
+    await engine._delay(1000);
 
     // Area protection window — Wowhalla & any future Area protector
     // gets a chance to negate before the destroy lands.

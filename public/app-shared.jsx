@@ -466,6 +466,31 @@ function _ppAlphaStufe(a, x, y) {
 
 /** Pixelgroesse in Bildschirmpunkten (v1446: 2 statt 3 — mehr, feinere Pixel). */
 const PP_PX_GROESSE = 2;
+/** Zelle der Pixelbilder (Rahmen, Scheine, Ellipsen, Verlaeufe): im Kampf das Hero-Pixel (pixel-anim.js `standardRaster`: 1080p 3, 720p/Handy 2), sonst PP_PX_GROESSE. */
+function ppPxZelle() {
+  try { const pa = window.PPPixelAnim; return (pa && pa.standardRaster && pa.KONFIG.aktiv) ? pa.standardRaster() : PP_PX_GROESSE; } catch (e) { return PP_PX_GROESSE; }
+}
+
+// ═════ KARTENPIXEL-RASTER: vergrößerte Karten nur mit ganzzahligem Faktor ═════
+// Eine Karte (750 x 1050) ist 75 x 105 Kartenpixel: ein Rahmenpixel = 10 Bildpunkte (die Schrift ~5, das Kunstfeld ~8). Der Browser zeichnet das Bild mit `image-rendering: pixelated`
+// (nächster Nachbar) — bei einem Faktor wie 2,46 oder 5,51 Bildschirmpixel je Kartenpixel sind aber manche Kartenpixel 2, andere 3 (bzw. 5, andere 6) Pixel breit: Rahmen, Schrift und
+// Kanten wirken ungleichmäßig und „weich". Große Karten (Tutorial-Highlight, Aufdeck-Anzeige, Tooltip, Flug) bekommen deshalb eine Breite, die ein GANZES Vielfaches von 75 Gerätepixeln
+// ist (jedes Kartenpixel exakt N x N Gerätepixel). `--pp-k75` = 75 Gerätepixel in CSS-px (`round(…, var(--pp-k75, 75px))` in style.css); `ppKarteGanz` ist dieselbe Rechnung in JS.
+// Nur Rechnung, kein Layout-Lesen: die Variable wird beim Laden und bei Größen-/Zoomänderung gesetzt.
+const PP_KARTE_PX = 75;
+/** 75 Gerätepixel in CSS-px (bei devicePixelRatio 1: 75, bei 2: 37,5 — kleinere Stufen auf hochauflösenden Geräten). */
+function ppKarteEinheit() { const d = window.devicePixelRatio || 1; return PP_KARTE_PX / (d > 0 ? d : 1); }
+/** CSS-Breite `w` auf ein ganzes Vielfaches der Karteneinheit: `modus` 'ab' (abrunden, passt sicher hinein), 'auf' oder sonst nächstes; mindestens eine Einheit. */
+function ppKarteGanz(w, modus) {
+  const u = ppKarteEinheit(), q = w / u;
+  const n = modus === 'ab' ? Math.floor(q + 1e-6) : modus === 'auf' ? Math.ceil(q - 1e-6) : Math.round(q);
+  return Math.max(1, n) * u;
+}
+function ppKarteVarSetzen() { try { document.documentElement.style.setProperty('--pp-k75', ppKarteEinheit() + 'px'); } catch (e) { /* ohne Variable gilt der Rückfall 75px */ } }
+ppKarteVarSetzen();
+window.addEventListener('resize', ppKarteVarSetzen);
+window.ppKarteGanz = ppKarteGanz;
+window.ppKarteEinheit = ppKarteEinheit;
 
 /** Pixelzahl fuer eine Seite: ~PP_PX_GROESSE px pro Pixel, schmale Baender (Ringe) bekommen mehr. */
 function _ppAufloesung(v, laengePx) {
@@ -475,7 +500,7 @@ function _ppAufloesung(v, laengePx) {
     if (d > 0.001 && d < minLuecke) minLuecke = d;
   }
   const fuerRinge = Math.min(96, Math.ceil(2.2 / (minLuecke * 0.707)));
-  const fuerGroesse = laengePx > 0 ? Math.round(laengePx / PP_PX_GROESSE) : 32;
+  const fuerGroesse = laengePx > 0 ? Math.round(laengePx / ppPxZelle()) : 32;
   return Math.max(2, Math.min(160, Math.max(fuerGroesse, laengePx > 0 && laengePx < 24 ? 0 : fuerRinge)));
 }
 
@@ -1423,7 +1448,7 @@ function ppPxPartikelUrl(farbe) {
  */
 function ppPxRahmenUrl(farbe, dicke, w, h, radius) {
   const f = ppFarbe(farbe);
-  const P = PP_PX_GROESSE;
+  const P = ppPxZelle();
   const nx = Math.max(2, Math.round(w / P)), ny = Math.max(2, Math.round(h / P));
   const d = Math.max(1, Math.round(dicke / P));
   const rund = radius >= Math.min(w, h) / 2 - 0.5;
@@ -1460,11 +1485,11 @@ function ppPxRahmenUrl(farbe, dicke, w, h, radius) {
  */
 function ppPxHaloUrl(farbe, w, h, rand, rund) {
   const f = ppFarbe(farbe);
-  const P = PP_PX_GROESSE;
+  const P = ppPxZelle();
   const W = w + 2 * rand, H = h + 2 * rand;
   const nx = Math.max(2, Math.round(W / P)), ny = Math.max(2, Math.round(H / P));
   const qr = Math.max(1, Math.round(rand / 2) * 2);
-  return ppPxBild(`hl:${f.join(',')}:${Math.round(w / 4)}x${Math.round(h / 4)}:${qr}:${rund ? 1 : 0}`, nx, ny, (setze) => {
+  return ppPxBild(`hl:${f.join(',')}:${Math.round(w / 4)}x${Math.round(h / 4)}:${qr}:${rund ? 1 : 0}:${P}`, nx, ny, (setze) => {
     for (let y = 0; y < ny; y++) for (let x = 0; x < nx; x++) {
       const u = (x + 0.5) * P - W / 2, v = (y + 0.5) * P - H / 2;   // px relativ zur Mitte
       let abstand;
@@ -1485,7 +1510,7 @@ function ppPxHaloUrl(farbe, w, h, rand, rund) {
 
 /** Pixelige Ellipse als Maske in Elementgroesse (runde Flaechen behalten ihre Form). */
 function ppPxEllipseUrl(w, h) {
-  const P = PP_PX_GROESSE;
+  const P = ppPxZelle();
   const nx = Math.max(2, Math.round(w / P / 2) * 2), ny = Math.max(2, Math.round(h / P / 2) * 2);
   return ppPxBild('el:' + nx + 'x' + ny, nx, ny, (setze) => {
     for (let y = 0; y < ny; y++) for (let x = 0; x < nx; x++) {
@@ -1956,6 +1981,123 @@ function ppPixelPartikel(canvas, teile, opt) {
   return () => { aus = true; if (id) caf(id); };
 }
 window.ppPixelPartikel = ppPixelPartikel;
+
+// ═══ RANG-RAHMEN (Duplikate) ═══════════════════════════════════════════
+// Zieht man ein Item mehrfach, bekommt es dauerhaft einen Rahmen (public/rank-frames.js): 1 Kopie über das Original = Silber … 8 = Obsidian.
+// Es gibt EINE Rahmenstufe, überall gleich. Der Rahmen liegt innerhalb der Bildkante und wird FEST IN DAS BILD EINGEBACKEN, darum zeigt jedes
+// `<img>` ihn ohne weiteren Aufwand:
+//   Avatar / Sleeve   ppRankFrames.bakeUrl(url, kind, rank) → data-URL;  Hook useFramedSrc / <FramedImg>;  im Duell useFramedPlayer(p)
+//   Skin-Karten       `?rahmen=<Kopien>` an der Karten-URL (card-image-shim.js backt ihn beim Zeichnen der Karte ein);
+//                     cardImageUrl(held, skins) hängt ihn selbst an, wenn dem Skin-Objekt Ränge zugeordnet sind (ppSkinRanksSet / ppSkinMerge)
+/** Karten-URL ohne `?rahmen=N` (Tooltips zeigen den Rang-Rahmen nie). */
+function ppOhneRahmen(url) { return url ? url.replace(/[?&]rahmen=\d+/, '') : url; }
+/** Item-Id eines Avatars/Sleeves aus seiner URL (wie frame-ids.js im Server): Shop-Item → Id, Standard-Avatar → 'std:<Name>', Standard-Sleeve → 'default'. */
+function ppShopIdOfUrl(url, subdir) {
+  const u = String(url || '').split('?')[0];
+  const dec = (x) => { try { return decodeURIComponent(x); } catch { return x; } };
+  let m = new RegExp('^/data/shop/' + subdir + '/([^/]+)\\.[a-z]+$', 'i').exec(u);
+  if (m) return dec(m[1]);
+  if (subdir === 'avatars') { m = /^\/avatars\/([^/]+)\.[a-z]+$/i.exec(u); if (m) return 'std:' + dec(m[1]); }
+  if (subdir === 'sleeves' && (!u || u === '/cardback.png')) return 'default';
+  return null;
+}
+function ppFrameRank(dupes) { return window.ppRankFrames ? window.ppRankFrames.rankOf(dupes) : null; }
+const _ppSkinRanks = new WeakMap();           // Skin-Zuordnung { Held: Skin } → { Held: Kopien }
+/** Ordnet einer Skin-Zuordnung (Held → Skin) die Ränge zu (`ranksBySkin`: Skin → Kopien, so schickt sie der Server). Liefert dieselbe Zuordnung zurück. */
+function ppSkinRanksSet(skins, ranksBySkin) {
+  if (!skins || typeof skins !== 'object') return skins;
+  const byHero = {};
+  for (const [hero, skin] of Object.entries(skins)) { const d = ranksBySkin && ranksBySkin[skin]; if (d) byHero[hero] = d; }
+  if (Object.keys(byHero).length) _ppSkinRanks.set(skins, byHero); else _ppSkinRanks.delete(skins);
+  return skins;
+}
+/** Wie `{ ...a, ...b }` für Skin-Zuordnungen, nimmt aber die Ränge mit (der Spätere gewinnt je Held). */
+function ppSkinMerge(...parts) {
+  const out = {}, ranks = {};
+  for (const o of parts) {
+    if (!o) continue;
+    Object.assign(out, o);
+    const r = _ppSkinRanks.get(o);
+    for (const h of Object.keys(o)) { if (r && r[h]) ranks[h] = r[h]; else delete ranks[h]; }
+  }
+  if (Object.keys(ranks).length) _ppSkinRanks.set(out, ranks);
+  return out;
+}
+/** Quelle mit eingebackenem Rahmen: gibt zuerst die Original-URL, sobald der Rahmen fertig ist die gebackene zurück. */
+function useFramedSrc(src, kind, dupes) {
+  const rank = ppFrameRank(dupes);
+  const [baked, setBaked] = useState(null);
+  useEffect(() => {
+    setBaked(null);
+    if (rank == null || !src) return undefined;
+    let live = true;
+    window.ppRankFrames.bakeUrl(src, kind, rank).then(u => { if (live) setBaked(u); });
+    return () => { live = false; };
+  }, [src, kind, rank]);
+  return (rank != null && baked) || src;
+}
+/** <img> mit Rahmen nach Kopienzahl (`dupes` 0 / fehlt: ohne Rahmen). */
+function FramedImg({ src, kind = 'card', dupes, ...rest }) {
+  return <img src={useFramedSrc(src, kind, dupes)} {...rest} />;
+}
+/** Spieler im Duell: Avatar und Sleeve mit Rahmen (nach avatarRank / cardbackRank), sonst unverändert dasselbe Objekt. */
+function useFramedPlayer(p) {
+  const aR = p ? ppFrameRank(p.avatarRank) : null, cR = p ? ppFrameRank(p.cardbackRank) : null;
+  const avatar = p && p.avatar, cardback = p && p.cardback;
+  const av = useFramedSrc(aR != null ? avatar : null, 'avatar', p && p.avatarRank);
+  const cb = useFramedSrc(cR != null ? cardback : null, 'sleeve', p && p.cardbackRank);
+  return useMemo(() => {
+    if (!p || ((aR == null || !av || av === avatar) && (cR == null || !cb || cb === cardback))) return p;
+    return { ...p, avatar: (aR != null && av) || p.avatar, cardback: (cR != null && cb) || p.cardback };
+  }, [p, av, cb, aR, cR]);
+}
+// ── Avatar-Rahmen für Spieler überall (Menü, Chat, Spielerlisten …) ──
+// Der Rang hängt am Spieler (Name): bekannt aus dem Spielzustand (explizit übergeben) oder per Sammelabfrage /players/avatar-ranks.
+const _ppAv = { ranks: new Map(), asked: new Map(), pending: new Set(), subs: new Set(), timer: null };
+const PP_AV_TTL = 90000;
+function _ppAvNotify() { _ppAv.subs.forEach(f => { try { f(); } catch {} }); }
+function ppAvatarRankSet(name, dupes) {
+  if (!name) return;
+  _ppAv.ranks.set(name, dupes || 0); _ppAv.asked.set(name, Date.now()); _ppAvNotify();
+}
+function _ppAvFlush() {
+  _ppAv.timer = null;
+  const names = [..._ppAv.pending]; _ppAv.pending.clear();
+  if (!names.length) return;
+  fetch('/api/players/avatar-ranks?' + names.map(n => 'n=' + encodeURIComponent(n)).join('&'))
+    .then(r => r.json()).catch(() => ({ ranks: {} }))
+    .then(j => { for (const n of names) { _ppAv.ranks.set(n, (j.ranks && j.ranks[n]) || 0); _ppAv.asked.set(n, Date.now()); } _ppAvNotify(); });
+}
+function _ppAvAsk(name) {
+  const t = _ppAv.asked.get(name);
+  if ((t && Date.now() - t < PP_AV_TTL) || _ppAv.pending.has(name)) return;
+  _ppAv.pending.add(name);
+  if (!_ppAv.timer) _ppAv.timer = setTimeout(_ppAvFlush, 40);
+}
+/** Avatar oder Rang eines Spielers hat sich geändert (Pull, Avatarwechsel): beim nächsten Zeichnen neu erfragen. */
+function ppAvatarRankForget(name) {
+  if (!name) return;
+  _ppAv.asked.delete(name); _ppAv.pending.add(name);
+  if (!_ppAv.timer) _ppAv.timer = setTimeout(_ppAvFlush, 40);
+}
+function usePlayerAvatarRank(name, explicit) {
+  const [, bump] = useState(0);
+  useEffect(() => {
+    const f = () => bump(n => n + 1);
+    _ppAv.subs.add(f);
+    return () => { _ppAv.subs.delete(f); };
+  }, []);
+  useEffect(() => { if (explicit == null && name) _ppAvAsk(name); }, [name, explicit]);
+  return explicit != null ? explicit : (_ppAv.ranks.get(name) || 0);
+}
+/** Spieler-Avatar mit Rang-Rahmen. `rank` (Kopien) ist optional: ohne ihn wird er über den Namen erfragt. */
+function PlayerAvatar({ name, src, rank, className, ...rest }) {
+  const d = usePlayerAvatarRank(name, rank);
+  return <FramedImg src={src} kind="avatar" dupes={d} className={(className || '') + (d > 0 ? ' pp-av-ranked' : '')} {...rest} />;
+}
+window.ppAvatarRankSet = ppAvatarRankSet; window.ppAvatarRankForget = ppAvatarRankForget; window.usePlayerAvatarRank = usePlayerAvatarRank; window.PlayerAvatar = PlayerAvatar;
+window.ppOhneRahmen = ppOhneRahmen; window.ppShopIdOfUrl = ppShopIdOfUrl; window.ppFrameRank = ppFrameRank; window.ppSkinRanksSet = ppSkinRanksSet; window.ppSkinMerge = ppSkinMerge;
+window.useFramedSrc = useFramedSrc; window.FramedImg = FramedImg; window.useFramedPlayer = useFramedPlayer;
 
 window.PxZeichen = PxZeichen;
 window.PxIcon = PxIcon;
@@ -3835,7 +3977,27 @@ const ZONE_ANIM_SFX = {
   weapon_unleashing:       { name: 'buff', opts: { rate: 1.1, delay: 200 } },
   // Fire
   fireball:                { name: 'elem_fire' },
-  flame_avalanche:         { name: 'elem_fire' },
+  // Flame Avalanche (app-fx-60, 60 Bilder = 2,0 s): tiefes Anrollen, Kreaturen bei 470 ms (Bild 14), Helden bei 870 / 990 / 1110 ms (Bild 26 / 31 / 35), Knistern der Glut danach.
+  // Zeiten animationsrelativ (der Mount-Vorlauf kommt von `playSFXForZoneAnim` dazu); spaetere Lagen ohne Kategorie und mit eigenem Dedupe, sonst schluckt die erste Lage sie (CARD_API ⑤).
+  flame_avalanche: [
+    // Lawine vom Wirker weg: Zuendung @0, Helden-Treffer @590/710/830 (Bild 18/21/25), alle Kreaturen @1100 (Bild 33)
+    { name: 'elem_fire',    opts: { rate: 0.55, volume: 1.0 } },
+    { name: 'burn',         opts: { rate: 0.8,  volume: 0.55, delay: 100,  category: null, dedupe: 0 } },
+    { name: 'elem_fire',    opts: { rate: 0.72, volume: 0.7,  delay: 300,  category: null, dedupe: 0 } },
+    { name: 'heavy_impact', opts: { rate: 0.78, volume: 0.8,  delay: 590,  category: null, dedupe: 0 } },
+    { name: 'attack_ram',   opts: { rate: 0.85, volume: 0.5,  delay: 590,  category: null, dedupe: 0 } },
+    { name: 'pull_crack',   opts: { rate: 0.9,  volume: 0.4,  delay: 590,  category: null, dedupe: 0 } },
+    { name: 'damage',       opts: { rate: 0.8,  volume: 0.45, delay: 590,  category: null, dedupe: 0 } },
+    { name: 'heavy_impact', opts: { rate: 0.82, volume: 0.7,  delay: 710,  category: null, dedupe: 0 } },
+    { name: 'pull_crack',   opts: { rate: 0.95, volume: 0.4,  delay: 710,  category: null, dedupe: 0 } },
+    { name: 'heavy_impact', opts: { rate: 0.86, volume: 0.6,  delay: 830,  category: null, dedupe: 0 } },
+    { name: 'pull_crack',   opts: { rate: 1.0,  volume: 0.4,  delay: 830,  category: null, dedupe: 0 } },
+    { name: 'burn',         opts: { rate: 0.7,  volume: 0.45, delay: 900,  category: null, dedupe: 0 } },
+    { name: 'heavy_impact', opts: { rate: 0.78, volume: 0.8,  delay: 1100, category: null, dedupe: 0 } },
+    { name: 'pull_crack',   opts: { rate: 0.9,  volume: 0.4,  delay: 1100, category: null, dedupe: 0 } },
+    { name: 'burn',         opts: { rate: 0.65, volume: 0.6,  delay: 1300, category: null, dedupe: 0 } },
+  ],
+
   // ★★ v1346 — „Hole in the Sky": der Himmel reisst auf (tief und
   // dunkel), das Loch saugt (Wind, tief gestimmt), und der Schlag, mit
   // dem es zuschnappt (1900 ms — genau dann faellt der Schaden). Spaetere
@@ -4174,7 +4336,46 @@ const ZONE_ANIM_SFX = {
   // zum Animationsstart (ZONE_ANIM_MOUNT_DELAY_MS) rechnet
   // `playSFXForZoneAnim` selbst dazu, damit die beiden Zahlen nicht
   // auseinanderlaufen koennen.
-  magic_hammer:            { name: 'heavy_impact', opts: { delay: 340 } },
+  // Hammer-Animationen (app-fx-57): geschwungene Waffe, EIN Schlag; die Zeiten sind die Bilder der Animation (30 Hz) ab Mount — Treffer MH bei Bild 33 (1100 ms), HH bei Bild 28 (933 ms), HS bei Bild 24 (800 ms).
+  // Heftigkeit: Magic Hammer 1,0 (tief gepitcht, mehrfach geschichtet) · Heavy Hit 0,6 · Hammer Skeleton 0,35 (hoch, leise). Der Schaden-Klang (`damage`) kommt wie bisher mit dem Zustandsvergleich.
+  magic_hammer: [
+    { name: 'booster_card_whoosh', opts: { volume: 0.5, rate: 0.5, delay: 1 } },
+    { name: 'booster_card_whoosh', opts: { volume: 0.65, rate: 0.55, delay: 967 } },
+    { name: 'booster_card_whoosh', opts: { volume: 0.85, rate: 0.5, delay: 1033 } },
+    { name: 'heavy_impact', opts: { volume: 1.0, rate: 0.6, delay: 1100 } },
+    { name: 'heavy_impact', opts: { volume: 0.6, rate: 0.85, delay: 1100 } },
+    { name: 'attack_ram', opts: { volume: 0.75, rate: 0.6, delay: 1100 } },
+    { name: 'pull_crack', opts: { volume: 0.9, rate: 0.7, delay: 1133 } },
+    { name: 'heavy_impact', opts: { volume: 0.5, rate: 0.45, delay: 1200 } },
+    { name: 'booster_card_whoosh', opts: { volume: 0.5, rate: 0.6, delay: 1500 } },
+    { name: 'booster_card_land', opts: { volume: 0.5, rate: 0.5, delay: 1433 } },
+    { name: 'booster_card_land', opts: { volume: 0.35, rate: 0.45, delay: 1533 } },
+  ],
+  heavy_hit_smash: [
+    { name: 'booster_card_whoosh', opts: { volume: 0.55, rate: 0.65, delay: 800 } },
+    { name: 'booster_card_whoosh', opts: { volume: 0.7, rate: 0.6, delay: 867 } },
+    { name: 'heavy_impact', opts: { volume: 0.75, rate: 0.95, delay: 933 } },
+    { name: 'attack_ram', opts: { volume: 0.45, rate: 1.0, delay: 933 } },
+    { name: 'pull_crack', opts: { volume: 0.5, rate: 1.0, delay: 967 } },
+    { name: 'booster_card_land', opts: { volume: 0.35, rate: 0.6, delay: 1133 } },
+    { name: 'booster_card_whoosh', opts: { volume: 0.4, rate: 0.7, delay: 1200 } },
+  ],
+  // Hammer Throw (app-fx-59): Abwurf bei Bild 0 (EIN Standard-`projectile`), Aufprall bei Bild 15 (500 ms). Zeiten animationsrelativ (30 Hz), der Mount-Vorlauf kommt von `playSFXForZoneAnim` dazu.
+  hammer_throw: [
+    { name: 'projectile', opts: { delay: 40 } },
+    { name: 'heavy_impact', opts: { volume: 0.85, rate: 0.8, delay: 500 } },
+    { name: 'attack_ram', opts: { volume: 0.45, rate: 0.9, delay: 500 } },
+    { name: 'pull_crack', opts: { volume: 0.5, rate: 0.9, delay: 533 } },
+    { name: 'booster_card_land', opts: { volume: 0.4, rate: 0.8, delay: 700 } },
+  ],
+  hammer_skeleton_smash: [
+    { name: 'booster_card_whoosh', opts: { volume: 0.35, rate: 0.85, delay: 700 } },
+    { name: 'booster_card_whoosh', opts: { volume: 0.4, rate: 0.8, delay: 767 } },
+    { name: 'heavy_impact', opts: { volume: 0.45, rate: 1.25, delay: 800 } },
+    { name: 'pull_crack', opts: { volume: 0.4, rate: 1.3, delay: 833 } },
+    { name: 'booster_card_land', opts: { volume: 0.3, rate: 0.9, delay: 933 } },
+    { name: 'booster_card_whoosh', opts: { volume: 0.25, rate: 0.9, delay: 967 } },
+  ],
   // Shattering Strike (v814): kleinerer Hammer, dumpferer Einschlag mit Erde.
   shattering_strike:       { name: 'heavy_impact', opts: { rate: 1.15, volume: 0.85, delay: 300 } },
   tiger_impact:            { name: 'heavy_impact' },
@@ -4993,6 +5194,9 @@ const ZONE_ANIM_NONEFFECT = new Set([
   // belegt und der Thud fiel komplett aus; der erste Klang NACH dem
   // sichtbaren Aufprall war dann der `damage`-Cue bei ~900ms.
   'magic_hammer',
+  'heavy_hit_smash',
+  'hammer_skeleton_smash',
+  'hammer_throw',   // Abwurf-Klang + Aufprall liegen ~0,5 s auseinander (wie die Hammer-Animationen)
   // v1422 (Als Befund 25.9.: „den Sound hoere ich im Spiel nicht"): der
   // Doom-Tick kommt fast immer im selben Augenblick wie andere Effekt-
   // Klaenge (Rundenende, Besiegung) und wurde von der 'effect'-Sperre
@@ -5801,7 +6005,8 @@ window.matchesStartingAbilities = matchesStartingAbilities;
 function cardImageUrl(cardName, skinOverrides) {
   // If a skin is selected for this card, use the skin image
   if (skinOverrides && skinOverrides[cardName]) {
-    return '/cards/skins/' + encodeURIComponent(skinOverrides[cardName]) + '.png';
+    const dupes = (_ppSkinRanks.get(skinOverrides) || {})[cardName];   // Rang-Rahmen des Skins (Duplikate), vom Karten-Shim eingebacken
+    return '/cards/skins/' + encodeURIComponent(skinOverrides[cardName]) + '.png' + (dupes ? '?rahmen=' + dupes : '');
   }
   const file = window.AVAILABLE_MAP[cardName];
   return file ? '/cards/' + encodeURIComponent(file) : null;
@@ -6484,26 +6689,6 @@ function Notification({ message, type, onClose }) {
 // (tooltip dimensions defined inside CardMini)
 window.activeDragData = null; // shared drag tracker (cross-file)
 
-// Shine band gradient palettes
-const BAND_GRADIENTS = [
-  'linear-gradient(to right, transparent 0%, rgba(255,255,255,.06) 8%, rgba(252,105,198,.4) 18%, rgba(109,155,248,.5) 28%, rgba(255,235,26,.4) 38%, rgba(102,255,162,.5) 48%, rgba(169,82,255,.45) 58%, rgba(255,155,58,.35) 68%, rgba(255,255,255,.06) 82%, transparent 100%)',
-  'linear-gradient(to right, transparent 0%, rgba(255,255,255,.04) 10%, rgba(248,116,32,.35) 25%, rgba(251,30,169,.4) 40%, rgba(255,198,28,.35) 55%, rgba(254,81,84,.3) 70%, rgba(255,255,255,.04) 85%, transparent 100%)',
-  'linear-gradient(to right, transparent 0%, rgba(255,255,255,.05) 12%, rgba(26,198,255,.35) 25%, rgba(104,253,193,.35) 40%, rgba(169,82,255,.3) 55%, rgba(102,182,255,.3) 70%, rgba(255,255,255,.05) 85%, transparent 100%)',
-  'linear-gradient(to right, transparent 0%, transparent 20%, rgba(255,255,255,.5) 45%, rgba(255,255,255,.65) 50%, rgba(255,255,255,.5) 55%, transparent 80%, transparent 100%)',
-  'linear-gradient(to right, transparent 0%, rgba(251,200,106,.05) 10%, rgba(250,213,74,.35) 25%, rgba(249,172,32,.4) 40%, rgba(254,255,102,.3) 55%, rgba(255,198,28,.25) 70%, rgba(251,200,106,.05) 85%, transparent 100%)',
-  'linear-gradient(to right, transparent 0%, rgba(184,102,255,.05) 10%, rgba(160,64,255,.3) 25%, rgba(248,33,227,.35) 40%, rgba(117,31,249,.3) 55%, rgba(184,102,255,.25) 70%, rgba(184,102,255,.05) 85%, transparent 100%)',
-];
-
-// ★ v1205 — Bandpalette der Diamond Rares (Als Vorgabe 18.9.:
-// „tuerkis-blaues Theming"). Bewusst KEINE Regenbogenverlaeufe wie bei
-// der Secret Rare: Diamond bleibt in Tuerkis/Aqua/Tiefblau mit weissem
-// Glanz, sonst sind die beiden Seltenheiten nicht auseinanderzuhalten.
-const DIAMOND_BAND_GRADIENTS = [
-  'linear-gradient(to right, transparent 0%, rgba(255,255,255,.05) 10%, rgba(58,223,203,.42) 26%, rgba(124,233,220,.5) 40%, rgba(119,200,238,.42) 56%, rgba(57,158,223,.3) 72%, rgba(255,255,255,.05) 86%, transparent 100%)',
-  'linear-gradient(to right, transparent 0%, transparent 22%, rgba(178,238,238,.5) 44%, rgba(255,255,255,.7) 50%, rgba(178,238,238,.5) 56%, transparent 78%, transparent 100%)',
-  'linear-gradient(to right, transparent 0%, rgba(107,233,250,.06) 12%, rgba(7,174,197,.36) 28%, rgba(124,233,220,.44) 44%, rgba(104,198,253,.36) 60%, rgba(124,233,220,.26) 74%, transparent 100%)',
-];
-
 // ═══════════════════════════════════════════════════════════════
 //  ★ GLEICHE KARTE = GLEICHER FOIL-ZUSTAND
 //
@@ -6594,253 +6779,19 @@ if (typeof CSSAnimation !== 'undefined' && typeof document.getAnimations === 'fu
   }).observe(document.body, { attributes: true, attributeFilter: ['class'] });
 }
 
-// Sparkle positions — secret rare (warm)
-const SPARKLE_POSITIONS = [
-  { x: 15, y: 20, color: '#fbe181', dur: 2.2, delay: 0 },
-  { x: 75, y: 12, color: '#77c8ee', dur: 2.5, delay: 0.4 },
-  { x: 45, y: 65, color: '#fc69c6', dur: 2.0, delay: 0.9 },
-  { x: 85, y: 50, color: '#66ffa2', dur: 2.7, delay: 1.3 },
-  { x: 25, y: 80, color: '#c98aff', dur: 2.3, delay: 1.7 },
-  { x: 60, y: 35, color: '#ffffff', dur: 1.9, delay: 0.6 },
-  { x: 10, y: 50, color: '#f4ae64', dur: 2.6, delay: 2.0 },
-  { x: 90, y: 85, color: '#66d9ff', dur: 2.1, delay: 1.1 },
-  { x: 50, y: 10, color: '#fe6794', dur: 2.4, delay: 0.2 },
-  { x: 35, y: 90, color: '#cbff66', dur: 2.8, delay: 1.5 },
-  { x: 70, y: 70, color: '#ffffff', dur: 2.0, delay: 0.8 },
-  { x: 20, y: 40, color: '#f9ecb3', dur: 2.3, delay: 1.9 },
-];
-
-// Sparkle positions — diamond rare. ★ v1205: durchgehend tuerkis-blau,
-// weisse Glanzpunkte nur noch als Akzent dazwischen.
-const DIAMOND_SPARKLE_POSITIONS = [
-  { x: 15, y: 10, color: '#ffffff', dur: 1.5, delay: 0.0 },
-  { x: 80, y: 8,  color: '#3adfcb', dur: 1.7, delay: 0.4 },
-  { x: 45, y: 28, color: '#7ce9dc', dur: 1.4, delay: 0.9 },
-  { x: 8,  y: 45, color: '#6be9fa', dur: 1.6, delay: 0.2 },
-  { x: 70, y: 42, color: '#ffffff', dur: 1.3, delay: 1.1 },
-  { x: 35, y: 55, color: '#66d9ff', dur: 1.8, delay: 0.6 },
-  { x: 88, y: 58, color: '#7ce9dc', dur: 1.5, delay: 1.4 },
-  { x: 20, y: 75, color: '#3adfcb', dur: 1.4, delay: 0.3 },
-  { x: 60, y: 72, color: '#ffffff', dur: 1.7, delay: 1.0 },
-  { x: 50, y: 90, color: '#7ce9dc', dur: 1.6, delay: 0.7 },
-];
-
 // ═══════════════════════════════════════════════════════════════
-//  ★ v1204 — WIE DIE BAENDER LAUFEN
-//
-//  Bis v1203 schob ein JS-Zeitgeber je Foil-Karte alle 150-850 ms ein
-//  frisches Band in den React-Zustand. Das ist fuer reine Deko teuer:
-//  bei 20 Foil-Karten auf dem Schirm sind das Dutzende Re-Renders je
-//  Sekunde, und jede kostet auf Als Handy genau dort, wo das Brett
-//  ohnehin schon ruckelt.
-//
-//  Jetzt bekommt jede Karte EINMAL fuenf Bandbeschreibungen; laufen
-//  tun sie danach allein per CSS (`foilSweepLoop`, endlos). Jedes Band
-//  belegt nur die ersten 40 % seines Taktes und wartet den Rest
-//  unsichtbar ab. Weil die fuenf Laufzeiten nicht ineinander aufgehen,
-//  ergibt das dieselbe unregelmaessige Dichte wie der Zufallszeitgeber
-//  vorher — im Mittel ein bis zwei Baender gleichzeitig — aber nach
-//  dem ersten Render KEINE React-Arbeit mehr.
-// ═══════════════════════════════════════════════════════════════
-
-// ★ Skin-Holo/Rahmenglanz (neu): der alte Diagonalglanz laeuft deutlich seltener — 2 statt 5 Baender (Diamond 1 statt 3),
-// jedes mit rund dreimal so langem Takt. Das gleicht die neuen Effekte aus und spart je Karte drei Ebenen.
-const FOIL_BAND_COUNT = 2;
-const FOIL_DIAMOND_BAND_COUNT = 1;
-// ★ DIAGONALGLANZ AUS. Der urspruengliche Lichtstreifen, der diagonal ueber die GANZE Foil-Karte laeuft (`.foil-band`), wird
-// nicht mehr angewendet: die neuen Schichten (Schraffur, Glanzband auf dem Bild, Rahmen- und Namensglanz) sind schoener,
-// und jedes Band war eine eigene animierte Ebene mit Blend-Modus je Karte — Leistung, die der alte Effekt nicht mehr
-// verdient. Code, Paletten und CSS bleiben unveraendert stehen; `true` schaltet den Effekt wieder ein (Takt und
-// Bandzahl: siehe oben und makeFoilBands). Funken, Staub, Schimmer und Rahmen-Ringe der Foil-Karten sind davon nicht betroffen.
-const FOIL_DIAGONALGLANZ = false;
-const FOIL_MOTE_COUNT = 6;
-
-/**
- * Baender einer Karte. Secret Rare: fuenf schmale, schnelle,
- * regenbogenfarbene Streifen. Diamond Rare: drei breite, deutlich
- * langsamere in Tuerkis — Licht, das ueber eine geschliffene Flaeche
- * GLEITET, statt Folie, die blitzt. ★ v1205: dass Diamond ueberhaupt
- * Baender bekommt, ist neu (vorher nur Schimmer und Funken).
- */
-function makeFoilBands(isDiamond, rnd = Math.random) {
-  if (!FOIL_DIAGONALGLANZ) return [];   // abgestellt, siehe FOIL_DIAGONALGLANZ
-  const palette = isDiamond ? DIAMOND_BAND_GRADIENTS : BAND_GRADIENTS;
-  const anzahl = isDiamond ? FOIL_DIAMOND_BAND_COUNT : FOIL_BAND_COUNT;
-  return Array.from({ length: anzahl }, (_, i) => {
-    const w = isDiamond ? 26 + rnd() * 30 : 14 + rnd() * 26;
-    return {
-      w,
-      grad: Math.floor(rnd() * palette.length),
-      o: isDiamond ? 0.45 + rnd() * 0.3 : 0.35 + rnd() * 0.35,
-      // Gestaffelt statt frei gewuerfelt: so kann kein Satz entstehen,
-      // in dem alle fuenf fast gleich schnell sind und im Pulk laufen.
-      dur: isDiamond ? 12 + i * 3 + rnd() * 3
-                     : 7 + i * 3.4 + rnd() * 1.6,
-      delay: -rnd() * 12,                    // Phase verwuerfeln
-      rot: isDiamond ? 8 + rnd() * 8 : 16 + rnd() * 11,
-      from: -200 - rnd() * 100,              // in % der BANDbreite
-      to: Math.ceil(10000 / w) + 200 + rnd() * 100,
-    };
-  });
-}
-
-/** Staubkoerner, die langsam durch das Licht steigen. */
-function makeFoilMotes(isDiamond, rnd = Math.random) {
-  return Array.from({ length: FOIL_MOTE_COUNT }, (_, i) => ({
-    x: 5 + rnd() * 90,
-    y: 30 + rnd() * 65,                      // starten unten
-    color: isDiamond ? (i % 2 ? '#7ce9dc' : '#7fdfff') : (i % 2 ? '#f9ecb3' : '#f3bad3'),
-    size: 1.5 + rnd() * 1.5,
-    dur: 4.5 + rnd() * 4.5,
-    delay: -rnd() * 9,
-    dx: -14 + rnd() * 28,
-    dy: -50 + rnd() * 32,
-    o: 0.45 + rnd() * 0.5,
-  }));
-}
-
-/** Reiner Zeichner — bekommt alles Gewuerfelte von CardFoil gereicht. */
-function FoilOverlay({ bands, motes, sparkles, shimmerOffset, foilType, klein, fkey, teilchen }) {
-  const isDiamond = foilType === 'diamond_rare';
-  const posn = isDiamond ? DIAMOND_SPARKLE_POSITIONS : SPARKLE_POSITIONS;
-  // Brett mit vielen Foil-Karten: nur so viele Funken + Staubkoerner, wie `teilchen` erlaubt (siehe `foilBrettTeilchen`).
-  const { funken: nFunken, staub: nStaub } = foilTeilchenAnteil(posn.length, (motes || []).length, teilchen);
-  // app-fx-35: Funken + Staub als EINE Leinwand (statt ~18 DOM-Elemente mit Endlos-Animation); Kleinansicht/Telefon/ohne Pipeline: wie bisher.
-  const cvFoil = !klein && !!window.PpFx35Foil && !!window.ppFx35FoilAn && window.ppFx35FoilAn();
-  return (
-    <div className={'foil-shine-overlay' + (isDiamond ? ' foil-shine-diamond' : '') + (klein ? ' foil-klein' : '')} data-foil-key={fkey}>
-      {/* 1) Die Praegung der Folie. Fuer sich genommen kaum zu sehen —
-             sie ist die Oberflaeche, auf der das Licht der Baender
-             etwas zu tun hat. */}
-      <div className="foil-texture" />
-      {/* 2) Farbige Interferenz der ganzen Karte. */}
-      <div className={isDiamond ? 'foil-iridescent-diamond' : 'foil-iridescent'}
-        style={{ '--shimmer-offset': shimmerOffset }} />
-      {/* 3) Wandernde Lichtstreifen — seit v1205 in BEIDEN Seltenheiten,
-             bei Diamond breiter, flacher geneigt und rund doppelt so
-             langsam (Palette und Takt kommen aus makeFoilBands). */}
-      {(bands || []).map((b, i) => (
-        <div key={'b' + i} className="foil-band" style={{
-          '--band-w': b.w + '%',
-          '--band-o': b.o,
-          '--band-dur': b.dur + 's',
-          '--band-delay': b.delay + 's',
-          '--band-rot': b.rot + 'deg',
-          '--band-from': b.from + '%',
-          '--band-to': b.to + '%',
-          backgroundImage: (isDiamond ? DIAMOND_BAND_GRADIENTS : BAND_GRADIENTS)[b.grad],
-        }} />
-      ))}
-      {/* 4) Glanzpunkte und Staub. */}
-      {cvFoil ? <window.PpFx35Foil posn={posn} sparkles={sparkles} motes={motes} nFunken={nFunken} nStaub={nStaub} diamond={isDiamond} fkey={fkey} /> : <>
-      {posn.map((sp, i) => {
-        if (klein && i % FOIL_KLEIN_FUNKEN_JEDER !== 0) return null;   // v1298
-        if (!foilBehalten(i, posn.length, nFunken)) return null;
-        const f = (sparkles && sparkles[i]) || null;
-        return (
-          <div key={'s' + i} className="foil-sparkle"
-            style={{
-              left: sp.x + '%', top: sp.y + '%', color: sp.color,
-              '--sp-dur': sp.dur + 's',
-              '--sp-delay': (f ? f.delay : sp.delay) + 's',
-              '--sp-size': (f ? f.size : 4.5) + 'px',
-            }} />
-        );
-      })}
-      {(motes || []).map((m, i) => i >= nStaub ? null : (
-        <div key={'m' + i} className="foil-mote" style={{
-          left: m.x + '%', top: m.y + '%', color: m.color,
-          '--mote-size': m.size.toFixed(1) + 'px',
-          '--mote-dur': m.dur.toFixed(1) + 's',
-          '--mote-delay': m.delay.toFixed(1) + 's',
-          '--mote-dx': m.dx.toFixed(0) + 'px',
-          '--mote-dy': m.dy.toFixed(0) + 'px',
-          '--mote-o': m.o.toFixed(2),
-        }} />
-      ))}
-      </>}
-    </div>
-  );
-}
-
-// ═══════════════════════════════════════════════════════════════
-//  ★ v1203 — CardFoil: EINE Stelle fuer die komplette Foil-Schicht
-//
-//  Vorher trug JEDE Anzeigestelle ihre eigene Kopie der immer gleichen
-//  sechs Zeilen (Typ lesen → isFoil → useFoilBands → Zufallsmetadaten
-//  in einem Ref → FoilOverlay). Vier Kopien, und beim Herausloesen des
-//  grossen Tooltips in `CardTooltipContent` fiel die Band-Quelle weg:
-//  dort stand `bands={[]}`, `sparkleDelays={[]}`. Die Karte funkelte
-//  (reine CSS-Animation), aber KEIN Glanzband lief je ueber sie —
-//  genau Als Befund.
-//
-//  Die Bauform dagegen: eine Komponente, die den ganzen Zustand selbst
-//  haelt. Aufrufer schreiben nur noch `<CardFoil card={card} />`; ist
-//  die Karte keine Foil-Karte, rendert sie nichts. Damit kann eine
-//  einzelne Stelle nicht mehr „halb\" angeschlossen sein.
-//
-//  ★ v1204: Es gibt hier keinen Zeitgeber und keinen Zustand mehr —
-//  alles Gewuerfelte entsteht EINMAL je Karte, danach laeuft die
-//  Schicht allein per CSS.
-// ═══════════════════════════════════════════════════════════════
-// ★ v1298 — KLEINANSICHT (Als Befund 23.9.: „grosse Piles ruckeln, wenn
-// viele Foil-Karten darin sind"). Gemessen mit 120 Foil-Karten in einer
-// Pile-Ansicht: 3600 DOM-Knoten, rund 25 animierte Schichten je Karte,
-// davon die teuersten jeden Frame neu GEMALT statt nur verschoben
-// (`background-position`, `filter: drop-shadow`, `box-shadow` am Rahmen,
-// Mischmodi auf jeder Lage). Wer Karten in Masse zeigt (Pile-Ansicht,
-// Galerien), stellt `FoilKleinContext` auf `true`; die Karten zeichnen
-// dann eine leichte Foil-Schicht: 2 Baender (Diamond 1), ein Drittel der
-// Funken, kein Staub, und nur Animationen, die der Compositor allein
-// schafft (transform/opacity). Die grosse Ansicht (Tooltip) bleibt voll.
-// ═══════════════════════════════════════════════════════════════
-//  ★ FOIL-DICHTE AUF DEM BRETT (Kampf-Stresstest 28.10.: „das ganze Board voller Foil-Karten")
-//
-//  Jede Foil-Karte traegt ~22 laufende CSS-Animationen (Funken, Staub, Schimmer, Rahmen-Ringe); mit 36 Foil-Karten auf dem Brett sind das
-//  rund 800 — und jeder Hauptthread-Frame wertet ALLE erneut aus. Statt einer harten Schwelle teilen sich die Foil-Karten AUF DEM BRETT
-//  ein festes Teilchen-Budget (`FOIL_BRETT_BUDGET` Funken + Staubkoerner zusammen): bis ~16 Karten bleibt alles wie es ist, danach bekommt
-//  jede Karte stetig etwas weniger Teilchen (mindestens `FOIL_BRETT_MIN`). Schimmer, Rahmen-Ringe und alles Uebrige bleiben unberuehrt.
-//  Nur Karten im `FoilBrettContext` (Kampfbrett-Ebene, Editor-Brett) zaehlen und werden ausgeduennt; Tooltip, Hand und Galerien nie.
+//  KONTEXTE DER KARTENANZEIGE
+//  `FoilKleinContext` (Kleinansichten: Pile, Galerien, Deck-Listen) und `FoilBrettContext` (Kampfbrett, Editor-Brett) bleiben unter ihren
+//  alten Namen bestehen (Aufrufer in app-deckbuilder/app-board/app-puzzle): Karten darin zeigen ihre Rarity nur als Standbild.
+//  Die Rarity-Effekte selbst: public/rarity-fx.js (`PpRarityFx`, Canvas), Anbindung unten (`RarityLayer`, `CardFoil`).
 // ═══════════════════════════════════════════════════════════════
 const FoilBrettContext = React.createContext(false);
 window.FoilBrettContext = FoilBrettContext;
-const FOIL_BRETT_BUDGET = 300;
-const FOIL_BRETT_MIN = 5;
-const foilBrettKarten = new Set();
-const foilBrettHoerer = new Set();
-/** Erlaubte Teilchen je Karte bei `n` Foil-Karten auf dem Brett (Infinity = alles). */
-function foilBrettTeilchen(n) {
-  return n > 0 ? Math.max(FOIL_BRETT_MIN, Math.floor(FOIL_BRETT_BUDGET / n)) : Infinity;
-}
-const foilBrettAbo = (f) => { foilBrettHoerer.add(f); return () => { foilBrettHoerer.delete(f); }; };
-const foilBrettStand = () => foilBrettTeilchen(foilBrettKarten.size);
-/** Melden sich Karten an/ab, wird nur neu gezeichnet, wenn sich die erlaubte Teilchenzahl wirklich aendert (Schnappschuss = Zahl). */
-function useFoilBrettTeilchen(aktiv) {
-  const ich = useRef(null);
-  if (!ich.current) ich.current = {};
-  useEffect(() => {
-    if (!aktiv) return undefined;
-    const marke = ich.current;
-    foilBrettKarten.add(marke);
-    foilBrettHoerer.forEach(f => f());
-    return () => { foilBrettKarten.delete(marke); foilBrettHoerer.forEach(f => f()); };
-  }, [aktiv]);
-  const erlaubt = React.useSyncExternalStore(foilBrettAbo, foilBrettStand, () => Infinity);
-  return aktiv ? erlaubt : undefined;
-}
-/** Wie viele Funken / Staubkoerner von `funken` + `staub` bei `max` Teilchen bleiben (im Verhaeltnis, Funken mindestens 1). */
-function foilTeilchenAnteil(funken, staub, max) {
-  const gesamt = funken + staub;
-  if (max === undefined || max >= gesamt) return { funken, staub };
-  const f = Math.min(funken, Math.max(1, Math.round(max * funken / gesamt)));
-  return { funken: f, staub: Math.max(0, Math.min(staub, max - f)) };
-}
-/** Gleichmaessig verteilte Auswahl: bleibt Element `i` von `gesamt`, wenn nur `k` bleiben? */
-const foilBehalten = (i, gesamt, k) => k >= gesamt || Math.floor((i + 1) * k / gesamt) > Math.floor(i * k / gesamt);
-
 const FoilKleinContext = React.createContext(false);
 window.FoilKleinContext = FoilKleinContext;
-const FOIL_KLEIN_BAENDER = { secret: 2, diamond: 1 };
+// Deck-Editor: Kleinansichten zeigen die Rarity-Effekte reduziert animiert (wenige Karten gleichzeitig, niedrige Bildrate, Rest als Standbild)
+const FoilReduziertContext = React.createContext(false);
+window.FoilReduziertContext = FoilReduziertContext;
 
 /**
  * Das Kartenraster der Pile-Ansicht und der Galerien (`.deck-viewer-grid`)
@@ -6877,8 +6828,6 @@ function HintergrundPause() {
   return null;
 }
 window.HintergrundPause = HintergrundPause;
-
-const FOIL_KLEIN_FUNKEN_JEDER = 3;   // jeder dritte Funke bleibt
 
 // ═══════════════════════════════════════════════════════════════
 //  ★ SKIN-HOLO — das Foil exklusiv fuer Skin-Karten
@@ -6979,62 +6928,8 @@ function SkinHolo({ skin, fkey }) {
 window.SkinHolo = SkinHolo;
 
 /**
- * Namensglanz der Karten mit Foil (Super Rare = gold, Diamond Rare = tuerkis): dieselbe Schicht wie der Name der
- * Skin-Karten (`.skin-holo-name`), ohne Bild-Foil; in Grossansichten (>= 240 px) zusaetzlich als zweite Schicht der Glanz
- * auf allem uebrigen Text (`.skin-holo-text`). In Kleinansichten entfaellt sie — dort ist der Name nicht lesbar.
- */
-function FoilName({ card, tone, fkey, werte }) {
-  const [ref, breit] = useEffektHuelle(ppEffektMin());
-  // `werte`: Zahlen, die statt der gedruckten aufs Kartenbild kommen ({ hp, lv, kost, noHp, noAtk }) — die Maske des Glanzes bekommt dieselben,
-  // sonst glänzt die Schraffur auf dem gedruckten Wert statt auf dem sichtbaren.
-  const wk = werte ? JSON.stringify(werte) : '';
-  const [daten, setDaten] = useState(() => (card && window.CardRender && window.CardRender.nameCached(card, werte)) || null);
-  useEffect(() => {
-    let lebt = true;
-    if (!card || !breit) return undefined;
-    const fertig = window.CardRender.nameCached(card, werte);
-    if (fertig) { setDaten(fertig); return undefined; }
-    setDaten(null);
-    window.CardImageShim.boot()
-      .then(() => window.CardRender.nameShimmerFor(card, werte))
-      .then(d => { if (lebt) setDaten(d || null); });
-    return () => { lebt = false; };
-  }, [card?.name, breit, wk]);
-  fkey = fkey || 'card:' + (card?.name || '');
-  const phase = usePhase(fkey);
-  // Auch der ÜBRIGE Text der Karte (Fähigkeitsfelder, Werte, Regeltext) bekommt den Glanz (Als Vorgabe 12.10.). Eigene Hülle mit
-  // höherer Schwelle: die Maske umfasst die ganze Karte (375 x 525), das lohnt erst in Tooltip und Grossansichten. Gleiche Phase
-  // und Farbe wie der Name, damit beides als ein Glanz über die Karte läuft.
-  const textAn = !!(window.CardRender && window.CardRender.HOLO && window.CardRender.HOLO.allText);
-  const [refT, breitT] = useEffektHuelle(ppEffektMin() * 2);
-  const [datenT, setDatenT] = useState(() => (card && window.CardRender && window.CardRender.textCached(card)) || null);
-  useEffect(() => {
-    let lebt = true;
-    if (!card || !breitT || !textAn) return undefined;
-    const fertig = window.CardRender.textCached(card);
-    if (fertig) { setDatenT(fertig); return undefined; }
-    window.CardImageShim.boot()
-      .then(() => window.CardRender.textShimmerFor(card))
-      .then(d => { if (lebt) setDatenT(d || null); });
-    return () => { lebt = false; };
-  }, [card?.name, breitT, textAn]);
-  return (
-    <>
-      <div ref={ref} className={'skin-holo skin-holo-nur-name foil-name-' + tone} data-foil-key={fkey} style={daten ? { ...daten.vars, '--sh-phase': phase } : undefined} aria-hidden="true">
-        {daten && breit && <div className="skin-holo-name"><i className="sh-rb" /><div className="sh-ht"><i /></div><i className="sh-gl" /></div>}
-      </div>
-      {textAn && (
-        <div ref={refT} className={'skin-holo skin-holo-nur-name foil-name-' + tone} data-foil-key={fkey + '|text'} style={datenT ? { ...datenT.vars, '--sh-phase': phase } : undefined} aria-hidden="true">
-          {datenT && breitT && <div className="skin-holo-name skin-holo-text"><i className="sh-rb" /><i className="sh-gl" /></div>}
-        </div>
-      )}
-    </>
-  );
-}
-
-/**
- * Bild-Foil fuer Karten OHNE Skin: Fullart-Karten sowie Super und Diamond Rares — Schraffur UND Glanzband, nur auf dem
- * Bild (dieselben Schichten wie beim Skin-Holo, ohne Namen; der Namensglanz der Rares kommt von FoilName). Bei Fullarts
+ * Bild-Foil fuer Karten OHNE Skin: Fullart-Karten sowie Super Rares — Schraffur UND Glanzband, nur auf dem
+ * Bild (dieselben Schichten wie beim Skin-Holo, ohne Namen; der Rarity-Effekt kommt von RarityLayer). Bei Fullarts
  * liegt beides auf der ganzen Flaeche ausser den Textfeldern (hart ausgeschnittene Maske, card-render.js `artMask`).
  */
 function FoilHatch({ card, fkey }) {
@@ -7091,66 +6986,143 @@ function FoilRim({ rim, fkey }) {
   );
 }
 
-function CardFoil({ card, foilType, skin, werte }) {
-  const type = foilType || card?.foil || null;
-  const isFoil = type === 'secret_rare' || type === 'diamond_rare';
-  const klein = useContext(FoilKleinContext);
-  const aufDemBrett = useContext(FoilBrettContext);
-  const teilchen = useFoilBrettTeilchen(aufDemBrett && isFoil && !klein);
-  // Je KARTE (nicht je Kopie) gewuerfelt: Baender, Staub, Schimmerphase und der Versatz der Funken kommen aus einem Zufallsstrom,
-  // der vom Schluessel der Karte abhaengt — alle Exemplare derselben Karte (Hand, Deck-Editor, Tooltip ...) sehen gleich aus und
-  // laufen auf der gemeinsamen Foil-Uhr (siehe `foilUhrStellen`); verschiedene Karten unterscheiden sich weiterhin. `klein` aendert
-  // nur, was gezeigt wird (weniger Baender/Funken, kein Staub), nicht die Zahlenfolge davor.
-  const holoSkin = !!skin && skinHoloAktiv();
-  const fkey = holoSkin ? 'skin:' + skin : 'card:' + (card?.name || '');
-  const meta = useMemo(() => {
-    if (!isFoil) return null;
-    const isDiamond = type === 'diamond_rare';
-    const posn = isDiamond ? DIAMOND_SPARKLE_POSITIONS : SPARKLE_POSITIONS;
-    const rnd = foilZufall(fkey + '|' + type);
-    return {
-      shimmerOffset: `${-rnd() * 5000}ms`,
-      // Groesse je Funken streuen: ein paar grosse Glanzpunkte zwischen
-      // vielen kleinen liest sich als Lichtbrechung, zwoelf gleich
-      // grosse Punkte als Raster.
-      // NEGATIVE Verzoegerung = Phase im Takt: ein Exemplar, das spaeter dazukommt, funkelt sofort mit (eine positive Verzoegerung
-      // wuerde es bis zu 4 s warten lassen, waehrend die schon laufenden Kopien funkeln, und die gemeinsame Foil-Uhr greift erst
-      // mit `animationstart`, also nach dieser Wartezeit).
-      sparkles: posn.map(sp => ({
-        delay: -(sp.delay + rnd() * 2),
-        size: 3 + rnd() * 4,
-      })),
-      bands: makeFoilBands(isDiamond, rnd).slice(0, klein ? FOIL_KLEIN_BAENDER[isDiamond ? 'diamond' : 'secret'] : undefined),
-      motes: klein ? [] : makeFoilMotes(isDiamond, rnd),
+// ═══════════════════════════════════════════════════════════════
+//  RARITY-SCHICHT — EINE Stelle für alles, was eine Karte über ihrem Bild trägt
+//
+//  Jede Karteninstanz hat eine Rarity (String-ID aus rarities.js: common, uncommon, rare, prismatic, super, storm, spectral, umbra, stained;
+//  Feld `rarity` der Karte bzw. Prop). Das Kartenbild selbst zeigt die Basiskarte der Stufe (`?rar=` in der Bild-URL, `ppRarityUrl`: Stempel, Rahmen,
+//  Namensfarbe); darüber legt `RarityLayer` EINE Canvas (public/rarity-fx.js). Standbild (kein Dauerlauf) überall außer in Großansichten:
+//  `animated` nur im Tooltip, in der Großansicht und im Rarity-Auswahlfeld des Deckbuilders. Common: nichts. Test-Schalter: ?rarity=<id|mix>
+//  in der Adresse oder window.__ppTestRarity (setzt die Rarity ALLER Karten).
+// ═══════════════════════════════════════════════════════════════
+/** Wirksame Rarity einer Karte: Test-Schalter vor Prop vor card.rarity, sonst Common. */
+function ppRarityOf(card, rarity) {
+  const fx = window.PpRarityFx;
+  const t = fx && fx.testRarity ? fx.testRarity(card && card.name) : null;
+  return t != null ? t : (rarity || (card && card.rarity) || 'common');
+}
+/** Kartenbild-URL der Basiskarte dieser Rarity (`?rar=<id>`; Common = unverändert). Skin-Bilder teilen die Rarity ihrer Base-Karte (der Karten-Shim backt auch für Skins die Basiskarte der Stufe). */
+function ppRarityUrl(url, rarity) {
+  const fx = window.PpRarityFx;
+  if (!url || typeof url !== 'string' || !fx || !rarity || rarity === 'common' || /[?&]rar=/.test(url)) return url;
+  const q = fx.imageRarity(rarity);
+  return q ? url + (url.includes('?') ? '&' : '?') + 'rar=' + q : url;
+}
+window.ppRarityOf = ppRarityOf;
+window.ppRarityUrl = ppRarityUrl;
+
+/** Canvas-Ebene der Rarity über dem Kartenbild (dünner Wrapper um PpRarityFx.attach). `werte`: abweichende Zahlen auf dem Bild ({ hp, noHp, noAtk, lv, kost }). */
+function RarityLayer({ card, rarity, animated, werte, reduced }) {
+  const ref = useRef(null);
+  const wk = werte ? JSON.stringify(werte) : '';
+  const name = card && card.name;
+  useEffect(() => {
+    const el = ref.current, fx = window.PpRarityFx;
+    if (!el || !card || !fx || !fx.available(rarity)) return undefined;
+    const variant = werte ? { hp: werte.hp, noHp: werte.noHp, noAtk: werte.noAtk, lv: werte.lv, kost: werte.kost } : undefined;
+    const inst = fx.attach(el, { card, rarity, animated: !!animated, reduced: !!reduced && !animated, variant });
+    return () => inst.destroy();
+  }, [name, rarity, !!animated, !!reduced, wk]);
+  return <div ref={ref} className="pp-rarity-layer" data-rarity={rarity} aria-hidden="true" />;
+}
+window.RarityLayer = RarityLayer;
+
+/**
+ * Rarity einer fliegenden/aufgedeckten Karte aus dem zuletzt bekannten Zustand (`window.ppRarityMem`, vom Brett gepflegt: { jetzt, vorher } =
+ * players-Listen der letzten beiden Zustände), wenn das Ereignis keine `rarity` mitbringt. Erster Treffer des Namens (Hand, Brett, Ablage …);
+ * `owner` (Spielerindex) engt ein, sonst zählen beide Seiten. Gibt undefined für Common/unbekannt zurück.
+ */
+function ppRarityLookup(name, owner) {
+  const m = window.ppRarityMem;
+  if (!m || !name) return undefined;
+  const flatSuche = (p, r, zone) => {
+    const a = p[zone], b = r[zone];
+    if (!Array.isArray(a) || !Array.isArray(b)) return -1;
+    return zone === 'hand' || zone === 'creationZone' ? a.indexOf(name) : a.lastIndexOf(name);   // Stapel: die zuletzt hinzugekommene Kopie liegt oben
+  };
+  for (const lst of [m.jetzt, m.vorher]) {
+    if (!lst) continue;
+    for (let pi = 0; pi < lst.length; pi++) {
+      if (owner != null && pi !== owner) continue;
+      const p = lst[pi], r = p && p.rarity;
+      if (!r) continue;
+      for (const z of ['hand', 'creationZone', 'discardPile', 'deletedPile', 'coolnessStack']) {
+        const i = flatSuche(p, r, z);
+        if (i >= 0) return (r[z] && r[z][i]) || undefined;
+      }
+      for (const z of ['supportZones', 'abilityZones']) {
+        const zz = p[z], rz = r[z];
+        if (!Array.isArray(zz) || !Array.isArray(rz)) continue;
+        for (let h = 0; h < zz.length; h++) for (let s = 0; s < (zz[h] || []).length; s++) {
+          const i = (zz[h][s] || []).indexOf(name);
+          if (i >= 0) return (rz[h] && rz[h][s] && rz[h][s][i]) || undefined;
+        }
+      }
+      const hi = (p.heroes || []).findIndex(h => h && h.name === name);
+      if (hi >= 0) return (r.heroes && r.heroes[hi]) || undefined;
+    }
+  }
+  return undefined;
+}
+window.ppRarityLookup = ppRarityLookup;
+
+/**
+ * Rarity für ein fliegendes Kartenbild (vanilla DOM): setzt die Basiskarte der Stufe (`?rar=`) und legt EINE Standbild-Canvas darüber
+ * (`PpRarityFx.attach`, animated: false — kein Dauerlauf; Common und unbekannte Karten: nichts). Aufruf direkt nach `img.src = …`; die Ebene
+ * kommt, sobald das Bild einen Elternknoten hat, und endet mit dem Flug (`lebenMs`).
+ * @param {HTMLImageElement} img @param {string} cardName @param {string} [rarity] vom Server mitgegeben @param {number} [owner] Spielerindex
+ */
+function ppFlugRarity(img, cardName, rarity, owner, lebenMs) {
+  try {
+    const fx = window.PpRarityFx;
+    const card = window.CARDS_BY_NAME && window.CARDS_BY_NAME[cardName];
+    if (!img || !fx || !card) return;
+    const r = ppRarityOf(card, rarity || ppRarityLookup(cardName, owner));
+    if (r === 'common' || !fx.available(r)) return;
+    const roh = img.getAttribute('src');
+    if (roh) img.src = ppRarityUrl(roh, r);
+    const los = () => {
+      const host = img.parentElement;
+      if (!host) return false;
+      if (getComputedStyle(host).position === 'static') host.style.position = 'relative';
+      const layer = document.createElement('div');
+      layer.className = 'pp-rarity-layer';
+      layer.setAttribute('data-rarity', r);
+      layer.setAttribute('aria-hidden', 'true');
+      host.appendChild(layer);
+      const inst = fx.attach(layer, { card, rarity: r, animated: false, img });
+      setTimeout(() => { try { inst.destroy(); layer.remove(); } catch {} }, lebenMs || 9000);
+      return true;
     };
-  }, [type, isFoil, fkey, klein]);
-  // Schraffur: Fullart-Karten sowie Super/Diamond Rares; Rahmenglanz: Gold-/Silber-/Diamant-Rahmen. Beides nur in der
-  // grossen Ansicht; die Entscheidung nach Kartentyp und Seltenheit trifft card-render.js.
-  const schraffur = !holoSkin && !klein && skinHoloAktiv() && window.CardRender.hatchEligible(card);
-  const rahmen = !klein && skinHoloAktiv() ? window.CardRender.rimKind(card, holoSkin ? skin : null) : null;
-  const foilSchicht = !holoSkin && isFoil && !!meta;
-  // Rahmen-Ringe (Seltenheit) bleiben auch auf einer Skin-Karte, deren Basiskarte Super/Diamond Rare ist: ohne sie
-  // faellt das CSS auf den alten Rahmenpuls (`foilBorderPulse`, animiertes `box-shadow`) zurueck — gemessen der teuerste
-  // Dauerlaeufer einer Foil-Karte (v1403 hat ihn genau dafuer durch die Ringe ersetzt).
-  const ringe = isFoil && !klein;
-  if (!holoSkin && !foilSchicht && !schraffur && !rahmen && !ringe) return null;
-  // ★ v1403: Rahmen-Ringe (Kreuzblende per Deckkraft statt animiertem
-  // box-shadow). Sie greifen nur, wo die Karte selbst die Foil-Klasse
-  // traegt (CSS `.foil-…-rare > .foil-rahmen`) — im Tooltip-Bild, das
-  // keinen pulsierenden Rahmen hat, bleiben sie unsichtbar. Die
-  // Kleinansicht hat einen festen Rahmen (`foil-ruhig`) und keine Ringe.
+    Promise.resolve().then(() => { if (!los()) setTimeout(los, 40); });
+  } catch (e) { /* Flug ohne Rarity ist besser als kein Flug */ }
+}
+window.ppFlugRarity = ppFlugRarity;
+
+/**
+ * Alles über dem Kartenbild: Rarity-Effekt (`RarityLayer`), Skin-Holo (Skin-Karten), Schraffur und Rahmenglanz der Vollbild-Helden.
+ * Aufrufer schreiben `<CardFoil card={card} skin={…} werte={…} rarity={…} animated />`; ohne Rarity/Skin/Vollbild rendert sie nichts.
+ * Ein Skin ersetzt den Rarity-Effekt (zwei Effekte übereinander wären unruhig); Kleinansichten und das Brett zeigen nur Standbilder.
+ */
+function CardFoil({ card, skin, werte, rarity, animated }) {
+  const klein = useContext(FoilKleinContext);
+  const brett = useContext(FoilBrettContext);
+  const reduziert = useContext(FoilReduziertContext);
+  const holoSkin0 = !!skin && skinHoloAktiv();
+  const r = ppRarityOf(card, rarity);
+  const fxA = window.PpRarityFx;
+  // Skins teilen die Rarity-Effekte ihrer Base-Karte: auf dem Skin-Bild läuft derselbe Effekt wie auf der Base-Karte. Ausnahme: Stufen mit Motiv-Maske (Umbra, Stained, Storm) —
+  // für Skin-Sprites gibt es noch keine Masken; dort bleibt das Skin-Holo (wie bisher).
+  const effektMoeglich = !!card && r !== 'common' && !!fxA && fxA.available(r);
+  const effekt = effektMoeglich && !(holoSkin0 && fxA.SPEC && fxA.SPEC[r] && fxA.SPEC[r].mask);
+  const holoSkin = holoSkin0 && !effekt;   // ein Foil je Karte: der Rarity-Effekt ersetzt das Skin-Holo
+  const fkey = holoSkin ? 'skin:' + skin : 'card:' + (card?.name || '');
+  const schraffur = !holoSkin && !effekt && !klein && skinHoloAktiv() && window.CardRender.hatchEligible(card);
+  const rahmen = !effekt && !klein && skinHoloAktiv() ? window.CardRender.rimKind(card, holoSkin ? skin : null) : null;
+  if (!holoSkin && !schraffur && !rahmen && !effekt) return null;
   return (
     <>
-      {ringe && (
-        <div className={'foil-rahmen ' + (type === 'diamond_rare' ? 'foil-rahmen-diamond' : 'foil-rahmen-secret')} data-foil-key={fkey} aria-hidden="true">
-          <i /><i /><i /><i />
-        </div>
-      )}
-      {foilSchicht && (
-        <FoilOverlay foilType={type} bands={meta.bands} motes={meta.motes}
-          sparkles={meta.sparkles} shimmerOffset={meta.shimmerOffset} klein={klein} fkey={fkey} teilchen={teilchen} />
-      )}
-      {foilSchicht && !klein && skinHoloAktiv() && <FoilName card={card} tone={type === 'diamond_rare' ? 'diamond' : 'gold'} fkey={fkey} werte={werte} />}
+      {effekt && <RarityLayer card={card} rarity={r} animated={!!animated && !klein && !brett} reduced={reduziert && klein && !brett} werte={werte} />}
       {holoSkin && <SkinHolo skin={skin} fkey={fkey} />}
       {schraffur && <FoilHatch card={card} fkey={fkey} />}
       {rahmen && <FoilRim rim={rahmen} fkey={fkey} />}
@@ -7763,7 +7735,7 @@ function spawnZoneLandFx(el, opts) {
   box.style.cssText = mitte + masse;
 
   // Schockringe + Aufleuchten (app-fx-49) laufen auf der Funken-Leinwand; ohne sie (Notbremse `__ppFxAlt`, Animationen aus, Modul fehlt) bleiben Ring und Schein als CSS-Knoten.
-  const zusatz = (!!window.ppFx49Einschlag && !!window.ppFx44Funken && !window.__ppFxAlt) ? window.ppFx49Einschlag(r.width, r.height, farbe) : null;
+  const zusatz = (!!window.ppFx49Einschlag && !!window.ppFx44Funken && !window.__ppFxAlt) ? window.ppFx49Einschlag(r.width, r.height, farbe, window.ppFxZelle ? window.ppFxZelle(el) : 0) : null;
   const teile = zusatz ? funkenHtml(n) : ['<i class="zone-land-glow"></i>', '<i class="zone-land-ring"></i>', ...funkenHtml(n)];
   box.innerHTML = teile.join('');
   schicht().appendChild(box);
@@ -8316,7 +8288,8 @@ function zoneLandStyle(cardName) {
   if (!c) return { color: '#fbe181', variant: null };
   const t = c.cardType || '';
   const istKreatur = t.includes('Creature') || (t === 'Token' && c.hp != null);
-  return { color: typeColor(t), variant: istKreatur ? 'summon' : null };
+  // ★ Ability = BLAU (Zonenfarbe der Fähigkeiten, wie Hero lila / Surprise rot / Support gelb): Landung, Kartenflug und Stufenaufstieg zeigen dieses Blau (app-fx-49/48); alle anderen Typen unverändert.
+  return { color: t === 'Ability' ? '#4580f6' : typeColor(t), variant: istKreatur ? 'summon' : null };
 }
 
 // Gallery panel dimensions
@@ -8336,17 +8309,15 @@ const TOP_BAR_H = 41; // top bar approximate height
 //   • `onTouchDragStart(e)`: Haken fuer den Aufrufer, der eine Karte per
 //     Finger ziehbar machen will (Deck-Editor-Galerie: [[app-deckbuilder]]).
 //     Wird zusaetzlich zum Langdruck-Timer bei `touchstart` gerufen.
-function CardMini({ card, onClick, onRightClick, count, maxCount, dimmed, style, dragData, inGallery, isCover, skins, onTouchDragStart, noTooltip }) {
+function CardMini({ card, onClick, onRightClick, count, maxCount, dimmed, style, dragData, inGallery, isCover, skins, onTouchDragStart, noTooltip, rarity: rarityProp }) {
   const [tt, setTT] = useState(null);
   const tapRef = useRef({ at: 0, timer: null });
   useEffect(() => () => clearTimeout(tapRef.current.timer), []);
-  const imgUrl = cardImageUrl(card.name, skins);
-  const foilType = card.foil; // 'secret_rare' | 'diamond_rare' | null
-  // v1299: in Kleinansichten (FoilKleinContext) leuchtet der Rahmen fest,
-  // statt jeden Frame einen neuen `box-shadow` zu malen.
-  const foilKlein = useContext(FoilKleinContext);
-  const foilClass = (foilType === 'diamond_rare' ? 'foil-diamond-rare' : foilType === 'secret_rare' ? 'foil-secret-rare' : '')
-    + (foilType && foilKlein ? ' foil-ruhig' : '');
+  // Rarity der Karteninstanz (Prop vor card.rarity, Test-Schalter vor beidem): das Bild zeigt die Basiskarte der Stufe, CardFoil legt den Effekt darüber.
+  const rar = ppRarityOf(card, rarityProp);
+  const imgUrl0 = cardImageUrl(card.name, skins);
+  const imgUrl = ppRarityUrl(imgUrl0, rar);
+  const ttCard = rar !== 'common' && card.rarity !== rar ? { ...card, rarity: rar } : card;   // Tooltip trägt dieselbe Rarity (animiert)
 
   // Use shared board tooltip if available (game context), otherwise inline tooltip
   const useSharedTooltip = !!window._boardTooltipSetter;
@@ -8368,7 +8339,7 @@ function CardMini({ card, onClick, onRightClick, count, maxCount, dimmed, style,
     if (window.activeDragData || window.deckDragState) return;
     if (useSharedTooltip) {
       // Gewählter Skin gilt auch im Tooltip (CardTooltipContent liest `_skinUrl`).
-      window._boardTooltipSetter(skins && skins[card.name] ? { ...card, _skinUrl: imgUrl } : card);
+      window._boardTooltipSetter(skins && skins[card.name] ? { ...ttCard, _skinUrl: imgUrl0 } : ttCard);
     } else {
       setTT(true);
     }
@@ -8423,7 +8394,7 @@ function CardMini({ card, onClick, onRightClick, count, maxCount, dimmed, style,
       window._longPressFired = true;
       if (noTooltip) return;
       setTapTooltip(card.name);
-      if (useSharedTooltip) window._boardTooltipSetter(card); else setTT(true);
+      if (useSharedTooltip) window._boardTooltipSetter(ttCard); else setTT(true);
     }, LONG_PRESS_MS);
     if (onTouchDragStart) onTouchDragStart(e);
   };
@@ -8448,7 +8419,7 @@ function CardMini({ card, onClick, onRightClick, count, maxCount, dimmed, style,
   const onDragEnd = () => { window.activeDragData = null; };
   return (
     <>
-      <div ref={cardElRef} className={'card-mini ' + typeClass(card.cardType) + (dimmed ? ' dimmed' : '') + (foilClass ? ' ' + foilClass : '') + (isCover ? ' card-mini-cover' : '')}
+      <div ref={cardElRef} className={'card-mini ' + typeClass(card.cardType) + (dimmed ? ' dimmed' : '') + (isCover ? ' card-mini-cover' : '')}
         style={style}
         draggable={!!dragData}
         onDragStart={onDragStart}
@@ -8458,7 +8429,7 @@ function CardMini({ card, onClick, onRightClick, count, maxCount, dimmed, style,
         onContextMenu={handleContextMenu}
         onMouseEnter={show} onMouseLeave={hide}
         data-card-mini={card.name} data-in-gallery={inGallery ? '1' : undefined}>
-        <CardFoil card={card} skin={skinOfUrl(imgUrl)} />
+        <CardFoil card={card} rarity={rar} skin={skinOfUrl(imgUrl)} />
         {imgUrl ? (
           <img src={imgUrl} alt={card.name} loading="lazy" decoding="async"
             style={{ position:'absolute', inset:0, width:'100%', height:'100%', objectFit:'cover', borderRadius:1 }}
@@ -8486,7 +8457,7 @@ function CardMini({ card, onClick, onRightClick, count, maxCount, dimmed, style,
           </div>
         )}
       </div>
-      {tt && !useSharedTooltip && <CardSideTooltip card={card} imgUrl={imgUrl} inGallery={inGallery} />}
+      {tt && !useSharedTooltip && <CardSideTooltip card={ttCard} imgUrl={imgUrl0} inGallery={inGallery} />}
     </>
   );
 }
@@ -8549,14 +8520,14 @@ function TouchScrollbar({ scrollRef }) {
 }
 window.TouchScrollbar = TouchScrollbar;
 
-function CardSideTooltip({ card, imgUrl, inGallery }) {
+function CardSideTooltip({ card, imgUrl: imgUrl0, inGallery }) {
   if (!card) return null;
-  const foilType = card.foil;
+  const rar = ppRarityOf(card, null);
+  const imgUrl = ppRarityUrl(ppOhneRahmen(imgUrl0), rar);   // Tooltips zeigen nie den Rang-Rahmen (er würde Werte/Text der Karte verdecken)
   const bonus = ascensionBonusText(card);
   const effectText = ttEffectText(card.effect, bonus);
-  const ttBorderColor = foilType === 'diamond_rare' ? '2px solid rgba(104,198,253,.6)' : foilType === 'secret_rare' ? '2px solid rgba(250,213,74,.5)' : '1px solid var(--bg4)';
-  // v1298: der grosse Tooltip zeigt IMMER die volle Foil-Schicht, auch
-  // wenn er aus einer Kleinansicht (PileGrid) heraus aufgeht.
+  const ttBorderColor = '1px solid var(--bg4)';
+  // Der grosse Tooltip zeigt die Rarity IMMER animiert, auch wenn er aus einer Kleinansicht (PileGrid) heraus aufgeht.
   return (
     <FoilKleinContext.Provider value={false}>
     <div className={'tooltip card-tooltip' + (inGallery ? ' card-tooltip-gallery' : '')} style={{
@@ -8577,7 +8548,7 @@ function CardSideTooltip({ card, imgUrl, inGallery }) {
             width: '100%', aspectRatio: '750/1050', objectFit: 'cover', display: 'block',
             border: ttBorderColor
           }} />
-          <CardFoil card={card} skin={skinOfUrl(imgUrl)} />
+          <CardFoil card={card} rarity={rar} animated skin={skinOfUrl(imgUrl)} />
         </div>
       )}
       <div className="card-tooltip-info" style={{ flex: 1, overflowY: 'auto', padding: 0 }}>
@@ -9577,7 +9548,7 @@ function BuffColumn({ buffs, cardName, statuses }) {
     let txt = `Blessed: This Hero can have up to ${remaining} more additional Abilities attached to it this turn!`;
     if (data?.locked) txt += ' But it cannot act this turn.';
     return txt;
-  } }, cloudy: { icon: '☁️', tooltip: 'Takes half damage from all sources!' }, doomed: { icon: '☠️', tooltip: 'Doomed: This Hero\'s Attack stat is 0 and cannot be increased in any way (Doomed Pirate).' }, dark_gear_negated: { icon: '⚙️', tooltip: 'Effects negated by Dark Gear!' }, diplomacy_negated: { icon: '🕊️', tooltip: 'Effects negated due to Diplomacy!' }, necromancy_negated: { icon: '💀', tooltip: 'Effects negated due to Necromancy!' }, animal_training_negated: { icon: '🪢', tooltip: 'Effects negated due to Animal Training until the end of the turn!' }, mao_negated: { icon: '🐈', tooltip: 'Mao-negated: This Creature\'s effects were re-fired by Mao and are now suppressed until the start of the activator\'s next turn.' }, freeze_immune: { icon: '🔥', tooltip: 'Cannot be Frozen!' }, immortal: { icon: '✨', tooltip: 'Cannot have its HP dropped below 1.' }, combo_locked: { icon: '🔒', tooltip: 'Cannot perform Actions this turn.' }, submerged: { icon: '🌊', tooltip: 'Unaffected by all cards and effects while other possible targets exist!' }, negative_status_immune: { icon: '😎', tooltip: 'Immune to all negative status effects!' }, charmed: { icon: '💕', tooltip: 'Charmed! Under opponent control and immune to all effects.' }, golden_wings: { icon: '🪽', tooltip: 'Golden Wings: Fully immune to opponent effects until end of this turn.' }, anti_magic_enchanted: { icon: '🛡️', tooltip: 'Anti Magic Enchantment: Once per turn, the controlling player may negate a Spell that hits this Artifact\'s equipped Hero.' }, forcesTargeting: { icon: '🎯', tooltip: 'Taunt: The opponent must target this with Attacks, Spells, and Creature effects if possible. When multiple targets have Taunt, the opponent may pick any.' }, forcesTargeting_creaturesOnly: { icon: '🛡️', tooltip: "Guarding: Your opponent cannot choose your other Creatures while this Creature stands. Your Heroes can still be chosen." }, niu_enhanced: { icon: '🐃', tooltip: (data) => `This Hero's next Attack will deal ${data?.totalDamage || 0} additional damage.` }, gou_protected: { icon: '🐕', tooltip: (data) => `Protected by Guardian Beast Gou — takes no damage from any source until the start of the activator's next turn.${(data?.grants?.length || 0) > 1 ? ` (${data.grants.length}× layered)` : ''}` }, calm: { icon: '🌙', tooltip: 'Calm: Next turn, this Hero may perform a second Action during its controller\'s Action Phase (counts as an additional Action). Stays even if the Hero is defeated.' }, calm_ready: { icon: '🕊️', tooltip: 'Calm: This Hero may perform a second Action during THIS Action Phase (counts as an additional Action). Fades at the end of the Action Phase if unused — even if the Hero is defeated.' }, second_action_grant: { icon: '🌑', tooltip: 'Second Action: This Hero may perform a second Action during the Action Phase this turn. The bonus is wasted if a different Hero performs the second Action first.' }, cold_strike: { icon: '❄️', tooltip: "Cold Strike: This Hero's Attacks and Spells Freeze each target they hit for 1 turn. Wears off at the end of this turn." }, empowered_strike: { icon: '💪', tooltip: "Empowered Strike: The next time this Hero hits exactly 1 target with an Attack, that Attack's damage is increased by 150 and cannot be reduced or negated." }, unreasonable_anger: { icon: '💢', tooltip: 'Unreasonable Anger: Any damage this Hero deals to single targets is increased by 100. Lasts until the end of its controller\'s next turn.' }, sparkfly_gift_architect: { icon: '📐', tooltip: "Architect's Gift: You may once per turn draw cards until you have the same number of cards in your hand as your opponent." }, sparkfly_gift_attendant: { icon: '🪶', tooltip: "Attendant's Gift: This Creature is unaffected by your opponent's cards and effects, except damage." }, sparkfly_gift_worker: { icon: '🪲', tooltip: "Worker's Gift: You may once per turn make your opponent choose any card on their side of the board that is not a Hero and add it to your hand." }, damage_immune: { icon: '💠', tooltip: 'Takes no damage from any sources.' }, disrupted: { icon: '☢️', tooltip: 'Disrupted: Takes double damage from all sources.' }, magic_immune: { icon: '🛡️', tooltip: (data) => `The Hero is immune to Spells up to level ${data?.level ?? '?'}.` }, // v886 (Summoning Instructions): zeigt das beim Ausruesten gewaehlte X.
+  } }, cloudy: { icon: '☁️', tooltip: 'Takes half damage from all sources!' }, doomed: { icon: '☠️', tooltip: 'Doomed: This Hero\'s Attack stat is 0 and cannot be increased in any way (Doomed Pirate).' }, dark_gear_negated: { icon: '⚙️', tooltip: 'Effects negated by Dark Gear!' }, diplomacy_negated: { icon: '🕊️', tooltip: 'Effects negated due to Diplomacy!' }, necromancy_negated: { icon: '💀', tooltip: 'Effects negated due to Necromancy!' }, animal_training_negated: { icon: '🪢', tooltip: 'Effects negated due to Animal Training until the end of the turn!' }, mao_negated: { icon: '🐈', tooltip: 'Mao-negated: This Creature\'s effects were re-fired by Mao and are now suppressed until the start of the activator\'s next turn.' }, freeze_immune: { icon: '🔥', tooltip: 'Cannot be Frozen!' }, immortal: { icon: '✨', tooltip: 'Cannot have its HP dropped below 1.' }, combo_locked: { icon: '🔒', tooltip: 'Cannot perform Actions this turn.' }, submerged: { icon: '🌊', tooltip: 'Unaffected by all cards and effects while other possible targets exist!' }, negative_status_immune: { icon: '😎', tooltip: 'Immune to all negative status effects!' }, charmed: { icon: '💕', tooltip: 'Charmed! Under opponent control and immune to all effects.' }, golden_wings: { icon: '🪽', tooltip: 'Golden Wings: Fully immune to opponent effects until end of this turn.' }, anti_magic_enchanted: { icon: '🛡️', tooltip: 'Anti Magic Enchantment: Once per turn, the controlling player may negate a Spell that hits this Artifact\'s equipped Hero.' }, forcesTargeting: { icon: '🎯', tooltip: 'Taunt: The opponent must target this with Attacks, Spells, and Creature effects if possible. When multiple targets have Taunt, the opponent may pick any.' }, forcesTargeting_creaturesOnly: { icon: '🛡️', tooltip: "Guarding: Your opponent cannot choose your other Creatures while this Creature stands. Your Heroes can still be chosen." }, niu_enhanced: { icon: '🐃', tooltip: (data) => `This Hero's next Attack will deal ${data?.totalDamage || 0} additional damage.` }, gou_protected: { icon: '🐕', tooltip: (data) => `Protected by Guardian Beast Gou — takes no damage from any source until the start of the activator's next turn.${(data?.grants?.length || 0) > 1 ? ` (${data.grants.length}× layered)` : ''}` }, calm: { icon: '🌙', tooltip: 'Calm: Next turn, this Hero may perform a second Action during its controller\'s Action Phase (counts as an additional Action). Stays even if the Hero is defeated.' }, calm_ready: { icon: '🕊️', tooltip: 'Calm: This Hero may perform a second Action during THIS Action Phase (counts as an additional Action). Fades at the end of the Action Phase if unused — even if the Hero is defeated.' }, second_action_grant: { icon: '🌑', tooltip: 'Second Action: This Hero may perform a second Action during the Action Phase this turn. The bonus is wasted if a different Hero performs the second Action first.' }, cold_strike: { icon: '❄️', tooltip: "Cold Strike: This Hero's Attacks and Spells Freeze each target they hit for 1 turn. Wears off at the end of this turn." }, empowered_strike: { icon: '💪', tooltip: "Empowered Strike: The next time this Hero hits exactly 1 target with an Attack, that Attack's damage is increased by 150 and cannot be reduced or negated." }, unreasonable_anger: { icon: '💢', tooltip: 'Unreasonable Anger: The next damage this Hero deals to a single target during its controller\'s next turn is increased by 100.' }, sparkfly_gift_architect: { icon: '📐', tooltip: "Architect's Gift: You may once per turn draw cards until you have the same number of cards in your hand as your opponent." }, sparkfly_gift_attendant: { icon: '🪶', tooltip: "Attendant's Gift: This Creature is unaffected by your opponent's cards and effects, except damage." }, sparkfly_gift_worker: { icon: '🪲', tooltip: "Worker's Gift: You may once per turn make your opponent choose any card on their side of the board that is not a Hero and add it to your hand." }, damage_immune: { icon: '💠', tooltip: 'Takes no damage from any sources.' }, disrupted: { icon: '☢️', tooltip: 'Disrupted: Takes double damage from all sources.' }, magic_immune: { icon: '🛡️', tooltip: (data) => `The Hero is immune to Spells up to level ${data?.level ?? '?'}.` }, // v886 (Summoning Instructions): zeigt das beim Ausruesten gewaehlte X.
   summoningInstructionsX: { icon: '📘', tooltip: (data) => `Summoning Instructions: X = ${data?.level ?? '?'} — the equipped Hero may summon Creatures up to ${data?.level ?? '?'} levels above its Summoning Magic level (level 3 Creatures at most).` } };
   // medusa_petrified is surfaced through the Stunned status badge (as the
   // "Petrified" variant), so don't also render it as a separate buff icon —
@@ -10093,10 +10064,10 @@ function TooltipCardImage(props) {
   }
   return <TooltipCardImageHp {...props} />;
 }
-function TooltipCardImageHp({ card, src, hp, stufe, style }) {
+function TooltipCardImageHp({ card, src, hp, stufe, style, rarity }) {
   const skin = skinOfUrl(src);
   // `hp`: aktuelle max. HP; `stufe`: aktuelle Stufe einer Ability auf dem Brett (ihre Box ist hervorgehoben, die anderen grau)
-  const key = (hp != null || stufe != null) ? `${card.name}|${skin || ''}|${hp ?? ''}|${stufe ?? ''}` : null;
+  const key = (hp != null || stufe != null) ? `${card.name}|${skin || ''}|${hp ?? ''}|${stufe ?? ''}|${rarity || ''}` : null;
   const [alt, setAlt] = useState(() => (key && _ttHpKarten.get(key)) || null);
   useEffect(() => {
     if (key == null) { setAlt(null); return; }
@@ -10110,7 +10081,7 @@ function TooltipCardImageHp({ card, src, hp, stufe, style }) {
       try {
         // Kanonische Kartendaten wie beim normalen Bild — nur die HP weicht ab.
         const basis = window.CARDS_BY_NAME?.[card.name] || card;
-        const cv = await CR.renderCard(basis, { skin: skin || undefined, hp: hp != null ? hp : undefined, stufe: stufe != null ? stufe : undefined });
+        const cv = await CR.renderCard(basis, { skin: skin || undefined, hp: hp != null ? hp : undefined, stufe: stufe != null ? stufe : undefined, rarity: skin ? undefined : rarity });
         if (!cv || tot) return;
         const blob = await new Promise(res => cv.toBlob(res, 'image/png'));
         if (!blob || tot) return;
@@ -10131,7 +10102,7 @@ function TooltipCardImageHp({ card, src, hp, stufe, style }) {
 
 /**
  * Pure rendering component for card tooltip content.
- * Displays card image (with foil overlay), name, type, effect, stats
+ * Displays card image (with rarity layer, animated), name, type, effect, stats
  * and spell schools. Ascended Heroes show their Ascension Bonus as a
  * full sentence (no label) above the effect; Heroes list no Abilities (they sit on
  * the board). Pass extra context-specific info via `children`.
@@ -10146,8 +10117,9 @@ function CardTooltipContent({ card, children, imageUrl }) {
   // imageUrl prop forces a specific asset (used by the shop to show a
   // skin portrait in the hover preview while still listing the base
   // hero's stats).
-  const imgUrl = imageUrl || card._skinUrl || cardImageUrl(card.name);
-  const foilType = card.foil || null;
+  // Rang-Rahmen (`?rahmen=N`) gehören nicht in den Tooltip: dort würden sie Werte und Details der Karte verdecken.
+  const rar = ppRarityOf(card, null);
+  const imgUrl = ppRarityUrl(ppOhneRahmen(imageUrl || card._skinUrl || cardImageUrl(card.name)), rar);
   const displayName = card.displayName || card.name;
   // Die HP AUF DER KARTE zeigen die aktuelle max. HP, sobald sie von der
   // gedruckten abweicht (Als Vorgabe 12.10.). `_liveMaxHp` setzt BoardCard.
@@ -10157,16 +10129,15 @@ function CardTooltipContent({ card, children, imageUrl }) {
   const effectText = ttEffectText(card.effect, bonus);
   // Ability auf dem Brett: aktuelle Stufe (1 = oberes, 2 = mittleres, 3 = unteres Feld) — im Bild und im Text hervorgehoben
   const stufe = card.cardType === 'Ability' && card._abilityLevel >= 1 && card._abilityLevel <= 3 ? card._abilityLevel : null;
+  // Kartenbreite im Tooltip = ganzes Vielfaches von 75 Gerätepixeln (abgerundet, passt in die Spalte, mittig): jedes Kartenpixel exakt N x N Pixel statt z. B. 5,5 (`round`, `--pp-k75`, siehe PP_KARTE_PX).
   return (
     <>
       {imgUrl && (
-        <div style={{ position: 'relative', width: '100%', flexShrink: 0 }}>
-          <TooltipCardImage card={card} src={imgUrl} hp={bildHp} stufe={stufe} style={{
+        <div style={{ position: 'relative', width: 'round(down, 100%, var(--pp-k75, 75px))', marginInline: 'auto', flexShrink: 0 }}>
+          <TooltipCardImage card={card} src={imgUrl} hp={bildHp} stufe={stufe} rarity={rar} style={{
             width: '100%', aspectRatio: '750/1050', objectFit: 'cover', display: 'block',
-            border: foilType === 'diamond_rare' ? '2px solid rgba(104,198,253,.6)'
-                 : foilType === 'secret_rare' ? '2px solid rgba(250,213,74,.5)' : 'none'
           }} />
-          <CardFoil card={card} skin={skinOfUrl(imgUrl)} werte={bildHp != null ? { hp: bildHp } : null} />
+          <CardFoil card={card} rarity={rar} animated skin={skinOfUrl(imgUrl)} werte={bildHp != null ? { hp: bildHp } : null} />
         </div>
       )}
       <div>
@@ -11381,7 +11352,8 @@ function TextBox() {
   if (rechtsFarbe) farbStil['--tb-rechts'] = rechtsFarbe;
 
   return (
-    <div className={'textbox-overlay' + (fading ? ' textbox-fading' : '') + (highlightRects.some(h => h.pulse) ? ' textbox-puls' : '')}>
+    <div className={'textbox-overlay' + (fading ? ' textbox-fading' : '') + (highlightRects.some(h => h.pulse) ? ' textbox-puls' : '')}
+      style={{ '--tb-dz': (window.ppTbDimmerZelle ? window.ppTbDimmerZelle() : 2) + 'px' }}>
       {highlightRects.map((h, i) => {
         const gedreht = h.flat && (h.drehung != null || h.handkarte);
         const inner = (
@@ -11407,14 +11379,19 @@ function TextBox() {
             position: 'fixed',
             left: h.rect.left, top: h.rect.top,
             width: h.rect.width, height: h.rect.height,
-            transform: `rotate(${h.drehung || 0}deg) scale(${h.skala || 1})`,
-            // Gehighlightete HANDKARTE: waehrend des Highlights ~50 % groesser (eigene Eigenschaften `scale`/`translate`, damit Faecherdrehung und Hover-Massstab darunter bleiben);
-            // nach oben versetzt, damit die Karte nicht unten aus dem Bild waechst. Gestuft statt stufenlos (Pixelart).
-            ...(h.handkarte ? { '--tb-hoch': `${Math.round(Math.min(0, window.innerHeight - 8 - (h.rect.top + h.rect.height * 1.25)))}px`,   // unterer Rand nach dem Wachsen (Mitte + 0,75·Hoehe) bleibt im Bild
-             // Größen/Versatz je Stufe vorgerechnet (app-fx-44): die Schlüsselbilder wechseln nur Hilfsvariablen, gebacken wird zur Laufzeit nichts
-             ...(window.ppFx44Stufen ? window.ppFx44Stufen(h.rect.width, Math.round(Math.min(0, window.innerHeight - 8 - (h.rect.top + h.rect.height * 1.25)))) : null),
-             scale: 'var(--tbs, 1)', translate: '0 var(--tbt, 0px)',
-             animation: 'tbHandGross .24s steps(1, end) both' } : null),
+            // Handkarte: KEINE Drehung/Hover-Skalierung des Kartenbilds (Pixelart: Fächerwinkel und Hover-Maßstab würden das Bild schief/ungleichmäßig sampeln), sie steht aufrecht
+            transform: (h.handkarte && window.ppFx44HandStufen) ? 'none' : `rotate(${h.drehung || 0}deg) scale(${h.skala || 1})`,
+            // Gehighlightete HANDKARTE: waehrend des Highlights ~50 % groesser (eigene Eigenschaften `scale`/`translate`);
+            // nach oben versetzt, damit die Karte nicht unten aus dem Bild waechst. Gestuft statt stufenlos (Pixelart), jede Stufe in GANZEN Kartenpixeln (`ppFx44HandStufen`, app-fx-44).
+            ...(h.handkarte ? (window.ppFx44HandStufen
+             ? { ...window.ppFx44HandStufen(h.rect, window.innerHeight),
+                 // `zoom` statt `scale`: die Karte wird im Layout vergrößert und in Zielgröße gezeichnet (kein bilineares Strecken einer fertigen Ebene); Hülle bei 0/0, Lage per `translate`
+                 left: 0, top: 0, zoom: 'var(--tbs, 1)', translate: 'var(--tbx, 0px) var(--tbt, 0px)',
+                 animation: 'tbHandGross .24s steps(1, end) both' }
+             : { '--tb-hoch': `${Math.round(Math.min(0, window.innerHeight - 8 - (h.rect.top + h.rect.height * 1.25)))}px`,   // Rückfall (ohne app-fx-44): unterer Rand nach dem Wachsen (Mitte + 0,75·Hoehe) bleibt im Bild
+                 ...(window.ppFx44Stufen ? window.ppFx44Stufen(h.rect.width, Math.round(Math.min(0, window.innerHeight - 8 - (h.rect.top + h.rect.height * 1.25)))) : null),
+                 scale: 'var(--tbs, 1)', translate: '0 var(--tbt, 0px)',
+                 animation: 'tbHandGross .24s steps(1, end) both' }) : null),
             pointerEvents: 'none', zIndex: 90001 + h.stapel + (h.hover ? 1000 : 0) + (h.handkarte ? 500 : 0),
           }}>{inner}</div>
         );
@@ -12023,11 +12000,7 @@ window.shuffleArray = shuffleArray;
 window.AppContext = AppContext;
 window.Notification = Notification;
 window.CardMini = CardMini;
-window.FoilOverlay = FoilOverlay;
-// ★ v1203: Die EINE Anschlussstelle fuer Foil-Karten. `FoilOverlay`
-// bleibt exportiert (Rohteil), angeschlossen wird aber ueber CardFoil —
-// `scripts/check-foil.js` haelt das fest. `useFoilBands` ist mit v1204
-// entfallen: die Baender laufen jetzt per CSS, es gibt keinen Hook mehr.
+// Die EINE Anschlussstelle für alles über dem Kartenbild (Rarity-Effekt, Skin-Holo, Vollbild-Schraffur): CardFoil → RarityLayer.
 window.CardFoil = CardFoil;
 window.GlanzBand = GlanzBand;      // v1264
 window.LotsenGlanz = LotsenGlanz;  // v1264
@@ -12259,10 +12232,6 @@ window.tutorialErsterSprecher = tutorialErsterSprecher;
 // Tutorial: Helden-Figuren erst nach dem Gespraech (s. `setTutorialFigurenGesperrt`).
 window.setTutorialFigurenGesperrt = setTutorialFigurenGesperrt;
 window.useTutorialFigurenGesperrt = useTutorialFigurenGesperrt;
-// v809: bisher nur ueber die zufaellige Sichtbarkeit oberster
-// Deklarationen zwischen den Bundles erreichbar. Ausdruecklich
-// weiterreichen, damit die Abhaengigkeit sichtbar und pruefbar ist.
-window.SPARKLE_POSITIONS = SPARKLE_POSITIONS;
 window.setTapTooltip = setTapTooltip;
 // v1166: Doppelschulen-Filter fuer Deck-Builder und Puzzle-Macher.
 window.istDoppelKarte = istDoppelKarte;

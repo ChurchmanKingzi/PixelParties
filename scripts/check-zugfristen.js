@@ -53,11 +53,15 @@ const SPEICHER = [
   { datei: 'open-invitation.js', stichwort: '_identityExpiresTurn', handler: '_identityExpiresTurn' },
   { datei: 'the-shapeshifter.js', stichwort: '_identityExpiresTurn', handler: '_identityExpiresTurn' },
   { datei: 'perfect-disguise.js', stichwort: 'gegnerZug', handler: 'gegnerZug' },
+  { datei: 'unreasonable-anger.js', stichwort: 'fenster', handler: 'unreasonable_anger' },   // Zeitfenster `fenster[].runde` = der nächste eigene Zug
 ];
 // Beginn-Fristen mit eigenem Speicher (Stempel + `activePlayer`-Prüfung), die ohne `fristBeginn` auskommen.
 const EIGENER_BEGINN = new Set(['guardian-beast-gou']);
 // Begründete Zugnummern-Rechnungen ohne eigenen Fristnamen.
-const AUSNAHMEN = [{ datei: 'the-shapeshifter.js', muster: /return gs\.turn \+ 1;/ }];
+const AUSNAHMEN = [
+  { datei: 'the-shapeshifter.js', muster: /return gs\.turn \+ 1;/ },
+  { datei: 'unreasonable-anger.js', muster: /const runde = gs\.activePlayer === pi \? gs\.turn \+ 2 : gs\.turn \+ 1;/ },   // Zeitfenster des Bonus, Skip-Handler: `fristenNachSkip` (`fenster[].runde`)
+];
 
 let fehler = 0;
 const melde = (m) => { fehler++; console.log('✗ ' + m); };

@@ -122,7 +122,7 @@ function ppFx27Wolke(ebene, x, y, n, farben, opt) {
   const hoch = opt.hoch || 0, streu = opt.streu || 26, dauer = opt.dauer || 380;
   const teile = [];
   for (let i = 0; i < n; i++) {
-    const an = Math.random() * Math.PI * 2, r = 0.35 + Math.random() * 0.65, g = (Math.random() < 0.3 ? 2 : 1) * (opt.pixel || 2);
+    const an = Math.random() * Math.PI * 2, r = 0.35 + Math.random() * 0.65, g = (Math.random() < 0.3 ? 2 : 1) * (opt.pixel || 2);   // `opt.pixel` = Hero-Pixel der Sprite-Ebene
     teile.push({
       x0: Math.round((Math.random() - 0.5) * (opt.breit || 16)), y0: Math.round(-hoch - Math.random() * (opt.tief || 10)), g, c: farben[Math.floor(Math.random() * farben.length)],
       dx: Math.round(Math.cos(an) * streu * r), dy: Math.round(Math.sin(an) * streu * r * 0.6 + (opt.auf ? -opt.auf * r : 0)), d: Math.round(dauer * (0.6 + Math.random() * 0.4)),
@@ -239,6 +239,8 @@ function ppFx27Figur(srcEl, tgtEl, opt) {
   const art = opt.art || 'std';
   const feuer = art === 'jet' || art === 'sterne';
   const geister = feuer ? [PP_FX27_FARBE.creme, PP_FX27_FARBE.orange, PP_FX27_FARBE.gelb, PP_FX27_FARBE.orange] : [PP_FX27_FARBE.creme, PP_FX27_FARBE.blau, PP_FX27_FARBE.creme, PP_FX27_FARBE.blau];
+  // Sprengpixel = Hero-Pixel in der Sprite-Ebene (Entwurfspixel der Figur = Canvas-Breite im Layout / Frame-Breite / --board-scale, normal 2,8125); einmal je Fahrt gelesen, nicht im Takt. Vorher fest 2.
+  const heroPx = (() => { try { const cv = srcEl && srcEl._ppFigurPlatz && srcEl._ppFigurPlatz.querySelector('canvas'); const bs = parseFloat(document.documentElement.style.getPropertyValue('--board-scale')) || 1, q = cv && cv.width > 0 && cv.offsetWidth > 0 ? cv.offsetWidth / cv.width / bs : 0; return q > 1 && q < 8 ? q : 0; } catch (e) { return 0; } })();   // Entwurfspixel (die Wolke multipliziert mit --board-scale)
   const stauben = [PP_FX27_FARBE.creme, PP_FX27_FARBE.grau, PP_FX27_FARBE.creme, PP_FX27_FARBE.blau];
   const funken = [PP_FX27_FARBE.orange, PP_FX27_FARBE.gelb, PP_FX27_FARBE.creme, PP_FX27_FARBE.rot];
   const F = {
@@ -325,9 +327,9 @@ function ppFx27Figur(srcEl, tgtEl, opt) {
     // Staubwolke beim Start jeder Fahrt und beim Halt (wie die Sprengpixel der Trailer-Dashes)
     const ebene = HA.ebene();
     const fuss = { x: v.a.x + v.a.w / 2, y: v.a.y + v.a.h / 2 };
-    if (fahrt && !F.wasFahrt) ppFx27Wolke(ebene, fuss.x + x, fuss.y + y, feuer ? 7 : 6, stauben, { streu: 22, breit: 18, tief: 6, dauer: 330 });
-    if (!fahrt && F.wasFahrt) ppFx27Wolke(ebene, fuss.x + x, fuss.y + y, feuer ? 12 : 9, stauben, { streu: 34, breit: 20, tief: 6, dauer: 420 });
-    if (art === 'sterne' && fahrt) ppFx27Wolke(ebene, fuss.x + x, fuss.y + y, 3, funken, { streu: 16, breit: 18, hoch: v.a.h * 0.25, tief: 18, dauer: 360, auf: 12 });
+    if (fahrt && !F.wasFahrt) ppFx27Wolke(ebene, fuss.x + x, fuss.y + y, feuer ? 7 : 6, stauben, { streu: 22, breit: 18, tief: 6, dauer: 330, pixel: heroPx });
+    if (!fahrt && F.wasFahrt) ppFx27Wolke(ebene, fuss.x + x, fuss.y + y, feuer ? 12 : 9, stauben, { streu: 34, breit: 20, tief: 6, dauer: 420, pixel: heroPx });
+    if (art === 'sterne' && fahrt) ppFx27Wolke(ebene, fuss.x + x, fuss.y + y, 3, funken, { streu: 16, breit: 18, hoch: v.a.h * 0.25, tief: 18, dauer: 360, auf: 12, pixel: heroPx });
     F.wasFahrt = fahrt;
     F.letzt = { x, y };
     const sp = z.spiegel == null ? 1 : z.spiegel;

@@ -711,6 +711,14 @@ Die Zuordnung ist zentral — kein Karten-Code ruft `playSFX` selbst auf:
   auf das gesendete `play_zone_animation`.
 
 
+* **Hammer-Animationen** (`public/app-fx-57.jsx`; Pixelart-Leinwand, eine geschwungene Waffe treibt das Ziel mit EINEM Schlag wie einen Nagel in die Bodenlinie = untere Zonenkante):
+  `magic_hammer` (Magic Hammer, Heftigkeit 1,0, Schaden nach ca. 1450 ms) · `heavy_hit_smash` (Heavy Hit, 0,6, `animDuration: 1200`) · `hammer_skeleton_smash` (Hammer Skeleton, 0,35, `_delay(1000)`,
+  Ziel: Support-Slot oder Area). Alle drei erwarten das Zonen-Element des Ziels (`PP_SQUASH_ANIMS` in app-board.jsx reicht `zoneEl`) und kommen mit `play_zone_animation`-Standardfeldern (`owner`, `heroIdx`, `zoneSlot`,
+  `zoneType`) aus; ein `h`-/Größen-Kniff ist nicht nötig. Der Schaden folgt erst NACH dem Hit-Stop (`_delay`/`animDuration` wie oben, Vorlauf des Mountens ≈ 110 ms eingerechnet); `PP_ANIM_MINDAUER`
+  (app-board.jsx) hält die Animation länger am Leben als ein kürzeres `animDuration`. Negiert: `spellVisual.impact` mit dem passenden Typ und `impactMs` (1100 / 930 / 800). Die Pixelgröße der Effekt-Zelle
+  folgt der Hero-Pixelgröße des Ziels (Regel in der Kopfzeile von app-fx-57.jsx). Kamera-Shake nur am Desktop; Rückfall auf den alten Hammer bei Retro / `__ppFxAlt` / reduzierter Bewegung.
+* **Hammer Throw** (`hammer_throw`, `public/app-fx-59.jsx`; 32 Bilder ≈ 1,07 s, Aufprall = Bild 15 bei 500 ms ab Animationsstart): EIN `play_zone_animation` am Ziel (Hero oder Support-Slot) mit `von: { owner, heroIdx, el: true }` = der werfende Held (Brettseite; `onZoneAnim` löst es zu `vonDx/vonDy/vonEl` auf). Der Wurf-Klang `projectile` steckt in `ZONE_ANIM_SFX.hammer_throw` (kein eigener Projektil-Broadcast). Schaden nach ca. 550 ms `_delay` (Mount-Vorlauf + Aufbau + 500 ms, gemessen), danach 200 ms Nachbeben. Negation: `spellVisual` ist eine Funktion (Tabellen-`impact` kann `von` nicht tragen).
+
 ## ★ SCHADENSTYPEN — DAS VOLLSTÄNDIGE VOKABULAR
 
 Der `type`-Parameter jedes Schadensaufrufs. **Es gibt keine
@@ -1001,77 +1009,27 @@ Eine Area ohne Overlay ist unfertig. Board of Kings: Schachbrett in
 leichter Perspektive mit Walnuss-Rahmen, Holzmaserung, Vignette und
 aufsteigenden Figuren-Silhouetten.
 
-## ★ FOIL-KARTEN: EIN ANSCHLUSS, `<CardFoil card={…} />` (v1203)
+## ★ RARITY-KARTEN: EIN ANSCHLUSS, `<CardFoil card={…} rarity={…} />`
 
-`foil` steht in cards.json auf der Karte selbst (`secret_rare` |
-`diamond_rare`) und ist damit eine Eigenschaft der KARTE, nicht des
-einzelnen Exemplars. Die Schicht darüber hat seit v1204 **vier Lagen**:
+Jede Karteninstanz hat eine **Rarity** (ID aus `rarities.js`: common, uncommon, rare, prismatic, super, storm, spectral, stained, umbra (aufsteigend, Umbra ist die höchste; `storm` = Storm Rare, ersetzt Diamond Rare — Maskenpflicht wie Umbra/Stained, Sturm mit Pixel-Blitzen hinter dem Motiv; Altdaten `diamond` migriert `rarity-migrate.js` beim Serverstart);
+Feld `rarity` der Karte oder Prop, Standard Common). Der alte Foil (`card.foil`, FoilOverlay, CSS-Schimmer) ist ersetzt.
 
-1. **Textur** — die Prägung der Folie. Secret Rare: feine Schrägrillen;
-   Diamond Rare: breite 45°-Facetten (ein feines Gitter beißt sich mit
-   dem Pixelraster der Karten). Bewusst fast unsichtbar.
-   **★ v1205 (Als Befund 18.9.): ab 120 px Kartenbreite fällt die
-   Prägung weg** — Rillen haben eine feste Breite und werden auf einer
-   groß gezeichneten Karte zu gemalten Balken. Das gilt für die Lage
-   selbst UND für die Rillen im Band (`.foil-band::after`), die dieselbe
-   Prägung nur beleuchtet zeigen. Umgesetzt als Größenregel, nicht als
-   Liste von Stellen: `.foil-shine-overlay` ist `container-type:
-   inline-size`, die Lagen hängen an `@container (min-width: 120px)`.
-   Damit greift es automatisch im großen Tooltip, in den Helden-Plätzen
-   des Deck-Editors, im Karten-Auftritt und in allem, was später
-   dazukommt; Brett, Hand und Galerien liegen mit 64–100 px darunter.
-2. **Schimmer** — farbige Interferenz über die ganze Karte.
-3. **Bänder** — wandernde Lichtstreifen, `mix-blend-mode: screen`, mit
-   heißem weißem Kern (`::before`) und den Rillen der Prägung als
-   Schatten IM Licht (`::after`, multiply). Dass die Textur beleuchtet
-   statt aufgemalt wird, ist das, was sie physisch wirken lässt.
-   **★ v1205: Diamond Rare hat jetzt ebenfalls Bänder** (vorher keine) —
-   drei statt fünf, deutlich breiter, flacher geneigt und rund doppelt
-   so langsam, in Türkis/Aqua/Tiefblau mit weißem Kern. Licht, das über
-   eine geschliffene Fläche GLEITET, statt Folie, die blitzt; die
-   Palette steht in `DIAMOND_BAND_GRADIENTS`.
-4. **Funken + Staub** — Lichtkreuze mit langen Spitzen und Bloom, dazu
-   langsam aufsteigende Staubkörner.
-
-**Alles läuft per CSS.** Bis v1203 schob ein JS-Zeitgeber je Karte alle
-150–850 ms ein Band in den React-Zustand — Dutzende Re-Renders je
-Sekunde für reine Deko. Seit v1204 bekommt jede Karte EINMAL fünf
-Bandbeschreibungen mit gestaffelten Laufzeiten; jedes Band belegt nur
-40 % seines Taktes und wartet den Rest unsichtbar ab. Gleiche
-unregelmäßige Dichte, null React-Arbeit nach dem ersten Render.
-
-Jede animierte Lage hat einen Grundzustand, der ohne Animation richtig
-aussieht (`opacity: 0` bei Funken/Bändern/Staub, `.18` beim Schimmer) —
-sonst stünden bei „Play Animations: aus" starre Lichtkreuze auf der
-Karte.
-
-Genau das war die Bruchstelle: jede Anzeigestelle trug ihre eigene
-Kopie derselben sechs Anschlusszeilen, und eine davon (der große
-Tooltip, beim Herauslösen aus BoardCard) stand auf `bands={[]}` — die
-Karte funkelte weiter, aber kein Band lief je über sie. Eine zweite
-rechnete `isFoil` aus und zeichnete gar nichts, eine dritte (die
-Handkarten des Puzzle-Creators) hatte nie eine Schicht bekommen.
-
-**Deshalb gilt: wer ein Kartenbild zeigt, hängt `<CardFoil card={…} />`
-als Geschwister direkt daneben — mehr nicht.** Die Komponente
-(app-shared, per `window.CardFoil`) hält Bänder, Schimmerphase und
-Funkenversatz selbst und rendert bei Nicht-Foil-Karten `null`. Der
-Elternknoten braucht `position: relative` (die Schicht liegt absolut
-auf `inset: 0`) — sonst hängt sie sich an den nächsten positionierten
-Vorfahren, im Zweifel die ganze Leiste.
-
-`FoilOverlay` bleibt exportiert, ist aber ein Rohteil:
-`scripts/check-foil.js` lässt `<FoilOverlay>` nur noch im Rumpf von
-`CardFoil` stehen und meldet jede neue Kopie. `useFoilBands` ist mit
-v1204 entfallen.
-
-**Diamond Rare ist durchgehend türkis-blau gehalten** (Als Vorgabe
-18.9.): Rahmenpuls, Schimmerfolie, Facetten, Bänder, Funken und Staub
-ziehen alle an derselben Palette. Die Trennung zur Secret Rare ist
-bewusst farblich UND im Takt — Regenbogen/schnell gegen Türkis/langsam;
-sonst sind die beiden Seltenheiten auf einen Blick nicht zu
-unterscheiden.
-
+* **Bild:** `ppRarityUrl(url, rarity)` hängt `?rar=<id>` an die Kartenbild-URL; der Karten-Shim rendert dann die Basiskarte der Stufe
+  (Stempel, Gold-/Silber-/Cyan-Rahmen, Namensfarbe: `CardRender.rarityBase`). Ohne Angabe: Common.
+* **Effekt:** `<CardFoil card={card} rarity={r} animated? werte? skin? />` als Geschwister direkt neben dem Bild (Elternknoten `position: relative`).
+  Dahinter steckt `RarityLayer` → `PpRarityFx.attach` (`public/rarity-fx.js`): EINE Canvas je Karte auf dem 150 x 210-Raster, Palette, kein CSS-Dauerlauf.
+  `animated` (nur Tooltip, Großansicht, Rarity-Auswahl im Deckbuilder): 20-Bilder-Takt, nur sichtbar. Sonst ein Standbild ohne Takt (Brett, Hand, Listen,
+  `FoilBrettContext`/`FoilKleinContext`). Umbra und Stained brauchen eine Motiv-Maske (`public/cardgen/masks.bin`, `scripts/build-masks.js`); ohne Maske
+  zeigt die Karte den Effekt nicht (der Server würfelt solche Karten nie als Umbra/Stained).
+* **Test-Schalter:** `?rarity=<id>` (oder `mix` = je Kartenname eine andere Stufe) in der Adresse bzw. `window.__ppTestRarity` setzt die Rarity ALLER Karten.
+* Skin-Karten behalten ihr eigenes Holo (`SkinHolo`) statt des Rarity-Effekts.
+* **Kopien-Identität im Duell (`cards/effects/_rarity-track.js`):** Die Engine kennt Karten nur als Namen; jede PHYSISCHE Kopie behält ihre Rarity trotzdem über
+  alle Zonenwechsel (Deck, Hand, Brett, Ablage, Gelöscht, Permanents). Je Spieler mit Nicht-Common-Karten gibt es `ps.rarityShadow` (parallele Rarity-Arrays je Zone),
+  das beim Senden gegen die echten Zonen abgeglichen wird. **Skripte müssen dafür nichts tun** — Karten dürfen Zonen direkt mutieren. Zwei gleichnamige Kopien
+  mit verschiedener Rarity in EINER Zone löst die Hand-Splice-Überlagerung, die Ablage-/Gelöscht-Überlagerung (`splice`/`pop`/`shift`) und `reorder_hand` über
+  `engine._rarityTake` auf; eigene Karten-Datenstrukturen, die Karten aus Zonen nehmen, ohne dass der Name in einer anderen Zone auftaucht, brauchen nichts.
+  Ereignisse (`play_pile_transfer`, `card_reveal`, `deck_to_discard_animation` …) tragen `rarity`/`rarities`, wenn die Karte eine hat (`_broadcastEvent`); der Client
+  fällt sonst auf `ppRarityLookup(name, owner)` zurück. Fliegende Kartenbilder (vanilla DOM): `ppFlugRarity(img, name, rarity, owner)` direkt nach `img.src = …`.
 
 ## ★ ZONEN-EINSCHLAG: JEDE PLATZIERUNG WIRD SICHTBAR (v1206 — Als Vorgabe 18.9.)
 
@@ -1305,6 +1263,10 @@ NEGIERTEN Guss zeigt `spellVisual` weiter etwas Kleines auf den Zielen
 (Flame Avalanche: `flame_strike`): eine Lawine, die über alles
 hinwegrollt und dann nichts tut, wäre das falsche Bild.
 
+★ **`waveAnimation.kreaturenZuerst`** (Flame Avalanche, neue Lawine `app-fx-60`; 11.2026): optionales Flag samt `{ delay, heroAt, hitDelay, vorlauf? }` — `delay` = Zeitpunkt der Kreaturen-Treffer (alle gleichzeitig, ohne die 200-ms-Staffelung des Kreaturen-Stapels), `heroAt` = erster Held (ABSOLUT ab Wellenstart), `hitDelay` = Abstand der Helden (Platz i der Zielliste → `heroAt + i * hitDelay`). `dealDamageToTargets` fällt den Schaden dann zu genau diesen Zeitpunkten (Kreaturen VOR den Helden); `_spieleWellenAnimation` sendet `kreaturenZuerst`/`delay`/`heroAt`/`hitDelay` im Ereignis mit, der Client rechnet daraus die Trefferbilder (Kreaturen `delay`, Held i `heroAt + i * hitDelay`, in Bildern zu 33,3 ms). `vorlauf` (ms) verschiebt nur die Engine-Wartezeiten gegenüber den Animationszeiten (Mount-Vorlauf der Animation). Idas Einzelziel: ein Ziel bei `delay` (auch ein Held). Ohne das Flag bleibt der alte Ablauf (Helden nacheinander im `hitDelay`-Takt, danach die Kreaturen) unverändert.
+
+★ **`waveAnimation.heldenZuerst`** (Flame Avalanche, Lawine ab dem Wirker nach hinten): Gegenstück dazu — die Helden werden zuerst getroffen (Held i bei `heroAt` (Standard `delay`) `+ i * hitDelay`), danach ALLE Kreaturen gleichzeitig bei `creatureAt` (ms ab Wellenstart). Das Ereignis trägt zusätzlich `creatureAt`; `vorlauf` und `einzel` wirken wie bei `kreaturenZuerst`.
+
 ## ★ HANDKARTE UNTER DEM ZEIGER (v1214 — Als Vorgabe 18.9.)
 
 Die gehoverte Handkarte wird **1,42× größer**, bekommt eine Umrandung
@@ -1444,6 +1406,15 @@ Brett neu; den Editor auf dieselbe Mechanik zu heben hieße, genau diese
 Schwäche in die Oberfläche zu tragen, die heute sauber läuft — und der
 Editor zieht mehr als Hände (Galerie → Brett, Zone → Zone), er bekäme
 also zwei Mechaniken statt einer.
+
+## ★ HANDGEIST: REAKTIONSKARTEN BLEIBEN IN DER HAND, BIS SIE WEGFLIEGEN (Kette)
+
+Die Engine nimmt eine Hand-Reaktion beim ANKETTEN aus `ps.hand` (Regelreihenfolge unverändert); ihr Flug in die Ablage passiert erst beim AUFLÖSEN.
+Damit sie bis dahin nicht verschwindet, zeigt der Client einen rein visuellen **Handgeist** (ausgegraut im Bayer-Raster, Ketten-Sprite, kein
+Hover/Ziehen) an ihrem alten Platz. Vertrag: `reaction_chain_update` / `reaction_chain_geister` tragen `geister: [{ id, cardName, owner, fromHandIdx }]`
+(`_kettenGeister`); der Flug des Glieds trägt `chainLinkId` (= Glied-`id`) und startet am Geist, der Geist geht in genau diesem Moment. Glieder ohne Flug
+(`skipPostResolveDiscard`: Reaktions-Creature, Magic Topaz …) geben den Geist spätestens bei `reaction_chain_link_resolved` frei; `reaction_chain_done`
+räumt alles. Wer neue Hand-Wege ins Kettenglied baut, setzt `fromHandIdx` am Glied und schickt beim Wegfliegen `chainLinkId` mit.
 
 ## ★ NACH DEM HAND-FLUG SOFORT ABGLEICHEN (v1221)
 
@@ -25612,7 +25583,7 @@ Fünf Karten, Kunst im echten Raster 76×51, Tests `docs/niche-tests/repro/W74/`
 
 Fünf Karten (alle `skilltestLegal: true`), Kunst im echten Raster 76×51 (Quellbilder 21–25), Tests `docs/niche-tests/repro/W75/` (a-01 Anger, b-01 Prank, c-01 Reverse Trap, d-01 Toss, e-01 Deadly Poison). Alle fünf standen schon in `cards.json`; geändert: Unreasonable Anger (Text, Schulen jetzt Destruction + Support Magic), Reverse Trap (Text: „Reaction Attack, Spell or Creature"), „Deadly Poison" (Schulen Magic Arts + Support Magic, Untertyp **Normal** statt Reaction — der Text hat keinen Auslöser; Text jetzt mit „This counts as an additional Action." = inhärente Zusatzaktion).
 
-* **Unreasonable Anger** (Spell Reaction Lv1): `isPostTargetReaction` (Bauform Test Flight), Quelle des GEGNERS: Attack-/Spell-Karte, Creature-Karte/-Effekt oder als Attack/Spell geltender Heldeneffekt; Wirker = der getroffene eigene Held (`reactionCasterAllowed`). Der Treffer läuft normal durch; der Wirker bekommt den Buff `unreasonable_anger` (`BUFF_EFFECTS`, 💢). Engine `_applyAngerBonusIfApplicable` (Heldenpfad + Kreaturen-Batch, neben Elixir of Strength): +100 an JEDEM direkten Schaden des Helden an EINEM einzelnen Ziel (nicht Statusticks, nicht Schaden einer Creature in seinen Zonen, nicht Mehrziel-Klammer ≥ 2, kein Verbrauch). Frist: „until the end of your next turn" → Zug des Gegners (T): Ablauf zu Beginn von T+2, im eigenen Zug T+3. Animation `unreasonable_steam` (Dampfwolken aus beiden Seiten des Kopfes, pochende Zornader).
+* **Unreasonable Anger** (Spell Reaction Lv1): `isPostTargetReaction` (Bauform Test Flight), Quelle des GEGNERS: Attack-/Spell-Karte, Creature-Karte/-Effekt oder als Attack/Spell geltender Heldeneffekt; Wirker = der getroffene eigene Held (`reactionCasterAllowed`). Der Treffer läuft normal durch; der Wirker bekommt den Buff `unreasonable_anger` (`BUFF_EFFECTS`, 💢). Engine `_applyAngerBonusIfApplicable` (Heldenpfad + Kreaturen-Batch, neben Elixir of Strength): **Text seit 10.11.: „The next damage the user deals to a single target during your next turn is increased by 100."** — der Bonus liegt auf EINER Instanz: +100 am NÄCHSTEN direkten Schaden des Helden an EINEM einzelnen Ziel (nicht Statusticks, nicht Schaden einer Creature in seinen Zonen; eine Mehrziel-Klammer ≥ 2 bekommt ihn nicht und verbraucht ihn nicht), und nur im nächsten EIGENEN Zug: der Buff trägt `fenster: [{ runde, bonus }]` (`runde` = Zugnummer des nächsten eigenen Zuges: gespielt im Gegnerzug T → T+1, im eigenen Zug T → T+2; Schaden davor bekommt nichts). Der erste passende Treffer verbraucht den Eintrag (Buff-Objekt wird gelöscht, wenn nichts Späteres vorgemerkt ist); mehrere Kopien für denselben Zug summieren sich (+100 je Kopie) auf diesen einen Schaden. Ein Buff OHNE `fenster` (Puzzle-Editor) wirkt einmalig +100 ohne Zeitfenster. Unbenutzt läuft der Buff zu Beginn des gegnerischen Zuges nach dem Fenster aus (T+2 bzw. T+3). Fällt der nächste eigene Zug aus (Guardian Beast Zhu, Hand of Death), rückt `fenster[].runde` mit `fristenNachSkip` (`_zug-fristen.js`, „nur echte Züge zählen") um 2 weiter; Wächter `check-zugfristen` kennt den Speicher. Animation `unreasonable_steam` (Dampfwolken aus beiden Seiten des Kopfes, pochende Zornader).
 * **Nasty Prank** (Spell Reaction Lv0, Magic Arts): **seit 25.10. Hand-Fenster NACH der Auflösung** (`isSpellPerformedReaction`, `engine._checkSpellPerformedHandReactions(info)`, Vertrag `spellPerformedCondition(gs, pi, engine, info)` / `spellPerformedResolve(engine, pi, info, { casterIdx, casterSeite })`, `info` = `{ spellName, cardType, cardData, performerOwner, heroOwner, heroIdx }`), gerufen in `server.js` `doPlaySpell` und im Sofort-Guss der Engine direkt hinter `afterSpellResolved` — also erst, wenn die Attack/der Spell weder negiert noch abgebrochen noch verpufft ist („nicht mehr abbrechbar", Al 25.10.); Zweitgüsse (Bartas) öffnen es nicht. Keine Kette mehr (früher ein Kettenglied auf der Karte, dort war sie noch negierbar): Reverse Trap greift über das Reaktionsfenster der gespielten Karte (`_reaktionGespielt`, Weg ③). Wirker-Wahl wie in allen Hand-Fenstern über `_rxCastWirkerWaehlen` (die CPU wählt selbst). Ziel: gegnerischer HELD (nicht `zaehltAlsArt`). Status **`pranked`** (`STATUS_EFFECTS`, 🤡, negativ + heilbar, `immuneKey: prank_immune`): ein Eintrag je Held, `names = { [Kartenname]: { expiresAtTurn, expiresForPlayer, permanent, opponent } }` — jeder Name läuft für sich ab. Engine `heroPranked(hero, name)` sperrt in `validateActionPlay`, den Hand-Grau-Schleifen, dem Reaktions-/Surprise-Gate und `heroKannZaubern` (Attacks UND Spells gleichen Namens, auch als Reaktion/Surprise). Dauer: bis zum Ende des nächsten Zuges des Gegners (Streich im Gegnerzug T → Ablauf T+3; sonst T+2); hat der WIRKER Magic Arts ≥ 1: `permanent` („for the rest of the game"). Ablauf je Name in `_processBuffExpiry`, Zug-Skips über `fristenNachSkip`. Client: Tooltip „This Hero cannot use [Name] until the end of [Gegner]'s (next) turn." / „for the rest of the game." (Abzeichen `pranked`). Animation `prank_bucket` (25.10. überarbeitet: schattierter Dither-Eimer mit Bändern, Nieten, Henkel und Wasserspiegel; Fall mit Fahrtstreifen und Schwapp-Tropfen, Aufschlag mit Spritzkrone und Funkeln, Kippen in Stufen mit Wasserstrahl, wellige Wasserfront mit Schaumlinie, Tropfen am Kartenrand, Pfütze mit Ringwellen). **Puzzle-CPU (Meldung 25.10.: „nutzt Prank nur mit EINEM lebenden Helden"):** mit dem echten CPU-Gehirn (`installCpuBrain`) nicht reproduzierbar — Kettenversion und Hand-Fenster spielen Prank mit 1–3 Helden; Sollverhalten in `W75/b-02` festgehalten, das Puzzle-Setup ist beim Nutzer erfragt. Achtung Harness: dort zählt JEDER Sitz als CPU (`_isSelfPlay`), und die Engine-Fallback-Antwort lehnt abbrechbare Picker ab — das ist kein Spielfehler. Tests `W75/b-01` (E/F), `W75/b-02`.
 * **Explosion Toss** (Spell Reaction Lv1, Destruction Magic): neues Hand-Fenster **`isCreatureMovedReaction`** (`engine._checkCreatureMovedHandReactions(inst, info)`, Vertrag `creatureMovedCondition` / `creatureMovedResolve` / optional `reactionCasterAllowed`), gerufen am Ende von `actionTransferCreature` (Dark Gear, Diplomacy, Capture, Jumper Spider …; Opt-out `opts.skipMovedWindow`) und nach dem Weiterreichen der Hot Skull Potato (NACH dem Zurücksetzen ihres Schildes). Nur der bisherige Kontrolleur; die Zone gehörte einem seiner Helden, die Zielzone gehört einem Helden, den ein Gegner kontrolliert. Wirkung: Kreatur besiegen (`actionDestroyCard`) und dem Gastgeber-Helden der Zielzone 100/200/300 (Stufe ≤ 1 / 2 / ≥ 3, Typ `destruction_spell`) — beide Teile getrennt (der Schaden fällt auch, wenn die Kreatur sich dem Besiegen entzieht). Animation `explosion_toss_blast` (dieselbe große Pixel-Explosion wie die Hot Skull Potato, zentriert auf der Kreatur). Log `creature_moved_window_reaction`. CPU: `cpuMeta.keepOnDiscardFor: ['Hot Skull Potato']` — die CPU wirft die Karte nicht als Kosten der Kartoffel ab (neuer Mechanismus im Abwurf-Scoring von `_cpu.js`, Test `W75/d-02`).
 * **„Deadly Poison"** (Spell Normal Lv1, Magic Arts + Support Magic, **inhärente Zusatzaktion** — `inherentAction: true`, Text „This counts as an additional Action."): Marke `deadly` am Giftstatus (`hero.statuses.poisoned.deadly`). `processPoisonDamage` heilt mit dem Gift-Tick statt zu schaden (gedeckelt auf die Max-HP; ein voller Held bekommt weder Heilung noch Schaden, die Marke bleibt). **„until it is healed": „it" = das GIFT (Al, 24.10.)** — die Marke gilt, bis das Gift entfernt wird (Beer, Cure, Juice …); mit dem Status verschwindet die Marke, neu verteiltes Gift schadet wieder normal. Weitere Stapel erhöhen nur den Heilbetrag. Der Status bleibt `poisoned` (negativ, heilbar). Untertyp bleibt **Normal** (Reaktionen ohne Auslöser sind in der Simulation nicht erlaubt; deshalb die inhärente Zusatzaktion statt Reaction). Spielbar nur mit einem Giftopfer (`spellPlayCondition`). Tooltip des Gift-Abzeichens passt sich an (`poisonTooltipText(…, deadly)`). Animation `deadly_poison_heal` (lila Giftschwaden kippen per Dither zu grüner Heilung, Heilkreuze) bei Wirkung und bei jedem Heil-Tick.
@@ -26565,7 +26536,7 @@ Repro (lokal, `docs/niche-tests/repro/W85/d-01`): Edge/Journal/Stone mit und ohn
 |---|---|
 | Takt | gehaltene Bilder, 30/s (lange Schleifen: höchstens 90 Bilder je Durchlauf, also langsamer) |
 | `opacity` | **Dither** statt Alpha: `opacity` 0/1 plus Bayer-4×4-Maske (8 Stufen, Zelle 2 px, `mask-image` aus SVG-Kacheln). Elemente < 20 × 20 px blenden nur ein/aus (`KONFIG.ditherMin`). Elemente mit Kindern geben ihre Malerei an ein Körper-Kind `i.pp-px-body` ab und steuern die Masken der Blätter über eine vererbte Variable `--pp-dmN` (eine Maske schneidet sonst überstehende Kinder ab) |
-| `transform`/`translate`/`scale` | Verschiebung auf Kunstpixel (Vielfache des Rasters, 2 px); Skalierung auf Vielfache von `1/raster` (Kunstpixel = 1, 2, 3 … ganze Bildschirmpixel; unter 0,25 ausgeblendet); Scherung entfällt. Oberfläche (dokumentweit): Skalierung stattdessen auf ganze Kunstpixel-**Größen** (Hover 1,05 bleibt sichtbar) |
+| `transform`/`translate`/`scale` | Verschiebung auf Kunstpixel (Vielfache des Rasters: im Kampf das Hero-Pixel der eigenen Reihe = 3 px ab ca. 1600×900, sonst 2 px — `PPPixelAnim.standardRaster()`; Dither-Zellen und Ring-/Halo-Pixelbilder folgen); Skalierung auf Vielfache von `1/raster` (Kunstpixel = 1, 2, 3 … ganze Bildschirmpixel; unter 0,25 ausgeblendet); Scherung entfällt. Oberfläche (dokumentweit): Skalierung stattdessen auf ganze Kunstpixel-**Größen** (Hover 1,05 bleibt sichtbar) |
 | Drehung | Blattelement aus Pixelbildern/Farbflächen, `position: absolute/fixed`: **Sprite** — das Element wird einmal ins Kunstpixelraster gemalt und je Winkelstufe (15° bei animierten, 1° bei ruhenden Drehungen) mit Supersampling neu gesampelt (`PPPixelAnim.drehen`, RotSprite-artig; Kanten bleiben hart, Farben bleiben Palettenfarben); alles andere (Text, SVG, Elemente mit bewegten Kindern, Karten): nur **Viertelschritte** (0/90/180/270°, verlustfrei) |
 | Farben | `ppSnapCss` (Palette) auf `color`/`background-color`/`border-*-color`/`fill`/…; weiche `box-shadow`/`text-shadow` in Keyframes → harte Ringe, `filter: blur()/drop-shadow()` fällt weg |
 | Layout (`left/top/width/height/margin…`) | Größen auf Vielfache von 4, Lagen auf gerade Pixel, Rest ganze px |
@@ -26682,3 +26653,5 @@ Hängen an der Attack eines Helden ein oder mehr Pfeile (`isArrow: true` UND „
 * **Dauer-Statusanzeige:** Burn/Poison/Bleed stehen im Status-Abzeichen (`StatusBadges`, `PpStatusSpr` in `app-shared.jsx`) als Pixel-Symbole aus `PpFx52.iconUrl` (statisches Bild, Gift mit Zähler „xN", Blutung `bleeding` = boolescher Status wie Burn). Die Stapelzahl-Anzeige auf der Karte (`poison-stack-count`) entfällt, solange die Symbole laufen. Unheilbares Gift bleibt Emoji (💀).
 * **Allgemeine HP-Anzeige:** der Zustandsvergleich in `app-board.jsx` ruft bei JEDER HP-Änderung eines Helden/einer Kreatur `ppFx52Hp` (Balken + aktuelle HP über der Zone, ca. 1,25 s, höchstens 8 gleichzeitig, Handy 4; Leinwand nur solange Einträge laufen). Für ein Ziel mit laufender Salve schweigt sie.
 
+* **Archer-Pfeil:** Der Archer-Schuss spielt statt des Blitzes (`electric_strike`) einen einzelnen Holzpfeil (`archerPfeil` in `_arrows-shared.js`, Event `play_arrow_salvo` mit `einzel: true`, Sprite `holz` in `app-fx-52.jsx`). Der Server wartet den Flug (780 ms) und wendet danach den Schaden an; Schadenszahl, HP-Anzeige und Treffer-Blitz kommen wie immer aus dem Zustandsvergleich beim Einschlag. Clients ohne Pfeil bekommen den alten Blitz als `ersatz`. **Creatures sind noch nicht animiert:** der Pfeil startet von der Support-Zone des Archers (`srcKind: 'creature'`); sobald es animierte Creature-Sprites gibt, die Quelle auf deren Sprite umstellen (Vermerk an `archer.js` und `ppFx52Salve`).
+* **Animierter HP-Balken:** `PF.hpAnim` (reine Funktion der Zeit) + `PF.hpBar2`: Schaden = Balken schrumpft in 9 Stufen (300 ms), dunkelroter Verlustteil bleibt 250 ms stehen und rutscht dann in 8 Stufen nach; Heilung = dunkelgrüner Zuwachs, Zahl zählt mit. Gilt für die allgemeine HP-Anzeige (`ppFx52Hp`, `prev` = alter Wert) und je Pfeil-Einschlag in der Salve. Die Zahl der Karte (`ZaehlZahl` in `app-board.jsx`) zählt im selben Takt von ALT auf NEU (nur beim Wechsel, ohne Animationen/Retro springt sie).

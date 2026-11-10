@@ -7,7 +7,8 @@ const { api, socket, AppContext, CardMini, cardImageUrl,
         typeColor, skinImageUrl, CardTooltipContent, isDeckLegal } = window;
 const { ALL_CARDS, CARDS_BY_NAME, AVAILABLE_CARDS, AVAILABLE_MAP, SKINS_DB } = window;
 const { useAntoniaPresent, setAntoniaPresent, tutorialStartsWithAntonia } = window;
-const { GlanzBand, LotsenGlanz, PpVerlauf } = window;   // v1264: Glanzband + Lotsen-Schein; W86u2: Pixel-Schleier (Dither)
+const { GlanzBand, LotsenGlanz, PpVerlauf } = window;
+const { FramedImg, useFramedSrc } = window;   // Rang-Rahmen durch Duplikate (app-shared.jsx, public/rank-frames.js)   // v1264: Glanzband + Lotsen-Schein; W86u2: Pixel-Schleier (Dither)
 
 // Eye / eye-off sprites for the password show/hide toggle (PixelIcon sprites `auge` / `augeZu` in app-shared.jsx; 11x7 sprite pixels at 2 px, colour = currentColor).
 const EyeIcon = () => <PixelIcon name="auge" style={{ width: 22, height: 14 }} />;
@@ -291,6 +292,13 @@ function TutorialBrowserModal({ onClose, tutorialList, onStart, onViewRules }) {
 // ═══════════════════════════════════════════
 const ANIM_LAYERS_DIR = window.PP_RETRO ? '/data/animated_screen/layers2-retro/' : '/data/animated_screen/layers2/';
 
+// ★ TITELKULISSE VORGEBACKEN (Pixelart, Raster 3 px, Bayer-Mischdither, 256-Farben-Palette): `data/animated_screen/layers2/*.png` und `public/title.png` sind das Ergebnis von
+// `python3 scripts/title-pixel/bake.py` (Originale: scripts/title-pixel/originals/). Zur Laufzeit wird NICHTS pixelisiert; die Bilder werden nur noch mit `image-rendering: pixelated`
+// gezeichnet (Canvas: `imageSmoothingEnabled = false`) — jede Glaettung wuerde das Dither-Muster zu Mischfarben/Moire verwischen. Der Hintergrund ist schon 4,06 % ueberstreckt
+// gebacken (1998x1125 = 666x375 Zellen), liegt also 1:1 statt per `inset: -2%`-Streckung (ungleiche Zellbreiten): bei 1920x1080 sind alle Zellen genau 3 px.
+// Retro (layers2-retro) bleibt bei der alten Streckung (1920x1080, 4x-Zellen).
+const ANIM_BG_INSET = window.PP_RETRO ? '-2%' : '-2.0833% -2.03125%';
+
 // ── ZUSCHNITT DER KULISSEN-EBENEN (v1265, Al 22.9.: „der Login-Screen
 // ruckelt") ─────────────────────────────────────────────────────────────
 // Jede Figur liegt als eigenes 1920×1080-Bild vor, fast ganz transparent,
@@ -333,7 +341,7 @@ function AnimatedTitleBackdrop() {
     <div className="anim-backdrop" aria-hidden="true">
       <div className="anim-shake">
         {/* 0 — background plate (overscanned so shake never reveals edges) */}
-        <div style={{ position: 'absolute', inset: '-2%', background: "url('" + ANIM_LAYERS_DIR + "background.png') center / 100% 100% no-repeat" }} />
+        <div style={{ position: 'absolute', inset: ANIM_BG_INSET, background: "url('" + ANIM_LAYERS_DIR + "background.png') center / 100% 100% no-repeat", imageRendering: 'pixelated' }} />
         {/* Impact flash + lightning FLASHES render BELOW the characters
             (screen-blended onto the background plate only) so they never light the
             laser beams baked into golem/rabbit. That keeps both beams at their
@@ -427,9 +435,12 @@ function TapBackdropCanvas({ hostRef }) {
         list.forEach((im, i) => {
           const n = NAMES[i], rf = ANIM_SPRITE_RAHMEN[n + '.png'];
           // Figuren auf ihren sichtbaren Kasten zuschneiden (wie die DOM-Kulisse): nur dieser Teil wird pro Bild gezeichnet
-          const x0 = rf ? Math.max(0, rf[0] - 2) : 0, y0 = rf ? Math.max(0, rf[1] - 2) : 0, x1 = rf ? Math.min(1920, rf[2] + 2) : 1920, y1 = rf ? Math.min(1080, rf[3] + 2) : 1080;
+          const bgv = n === 'background';   // Hintergrund: ganzes (ueberstrecktes) Bild, nicht auf die Buehne zugeschnitten
+          const Z = window.PP_RETRO ? 4 : 3;   // Zellgroesse der Kulisse: Zuschnitt auf Zellgrenzen, damit die Vorskalierung keine Zelle zerschneidet
+          const x0 = rf ? Math.max(0, Math.floor((rf[0] - 2) / Z) * Z) : 0, y0 = rf ? Math.max(0, Math.floor((rf[1] - 2) / Z) * Z) : 0,
+            x1 = rf ? Math.min(1920, Math.ceil((rf[2] + 2) / Z) * Z) : (bgv ? im.naturalWidth : 1920), y1 = rf ? Math.min(1080, Math.ceil((rf[3] + 2) / Z) * Z) : (bgv ? im.naturalHeight : 1080);
           const c = document.createElement('canvas'); c.width = Math.max(1, Math.round((x1 - x0) * sc)); c.height = Math.max(1, Math.round((y1 - y0) * sc));
-          const g = c.getContext('2d'); g.imageSmoothingEnabled = true; g.imageSmoothingQuality = 'high'; g.drawImage(im, x0, y0, x1 - x0, y1 - y0, 0, 0, c.width, c.height);   // Vorskalieren GEGLAETTET: 1920 px auf Handybreite per Naechster-Nachbar zerreisst das Motiv (Tap-Bildschirm sah kaputt aus)
+          const g = c.getContext('2d'); g.imageSmoothingEnabled = false; g.drawImage(im, x0, y0, x1 - x0, y1 - y0, 0, 0, c.width, c.height);   // Vorskalieren per Naechster-Nachbar: die Bilder sind vorgebackene Pixelart (3-px-Zellen, ab Buehnenmass 1/3 trifft jede Zelle mind. einen Bildpunkt); Glaetten wuerde Dither zu Mischfarben verwischen
           imgs[n] = { c, x0, y0, w: x1 - x0, h: y1 - y0 };
         });
         imgs._sc = sc;
@@ -474,7 +485,7 @@ function TapBackdropCanvas({ hostRef }) {
       g.setTransform(1, 0, 0, 1, 0, 0); g.fillStyle = '#12101f'; g.fillRect(0, 0, W, H);
       // Versatz der ganzen Buehne nur in ganzen Pixeln
       g.setTransform(S * zoom, 0, 0, S * zoom, Math.round(W / 2 - 960 * S * zoom + camX * S * zoom + sh[0] * S * zoom), Math.round(H / 2 - 540 * S * zoom + camY * S * zoom + sh[1] * S * zoom));
-      g.drawImage(imgs.background.c, -38.4, -21.6, 1996.8, 1123.2);
+      { const B = imgs.background; if (B.w > 1920) g.drawImage(B.c, -(B.w - 1920) / 2, -(B.h - 1080) / 2, B.w, B.h); else g.drawImage(B.c, -38.4, -21.6, 1996.8, 1123.2); }   // vorgebacken ueberstreckt (1998x1125) 1:1; Retro: alte 4-%-Streckung
       const aI = kfLin(KF_STRIKE, pc), aA = kfLin(KF_AMB, ((tau % 13) / 13) * 100);
       // Schein: fuenf Pixelringe, Dichte nach aussen abnehmend (Bayer-Dither) — Bildschirmpixel, daher ohne Buehnen-Transformation
       const glow = (cx, cy, R, a, col) => {
@@ -2147,7 +2158,7 @@ function MainMenu() {
             boxShadow: '0 0 18px ' + (user.color || 'var(--accent)') + '55',
           }}>
           {user.avatar
-            ? <img src={user.avatar} style={{ width: '100%', height: '100%', objectFit: 'cover', imageRendering: 'pixelated' }} />
+            ? <window.PlayerAvatar name={user.username} src={user.avatar} style={{ width: '100%', height: '100%', objectFit: 'cover', imageRendering: 'pixelated' }} />
             : <span className="menu-profile-avatar-fallback">👤</span>}
         </div>
       </div>
@@ -2762,6 +2773,7 @@ function ProfileScreen() {
   const [uploadedCardbacks, setUploadedCardbacks] = useState([]);
   const [ownedSleeves, setOwnedSleeves] = useState([]);
   const [sleeveNames, setSleeveNames] = useState({});
+  const [frameDupes, setFrameDupes] = useState({ avatar: {}, sleeve: {}, skin: {} });   // Rang-Rahmen (Duplikate) je Item
 
   // Battle-Track: gewählter Kampf-Track (der Gegner hört ihn). Allgemeine
   // Tracks stehen offen, CPU-Themen werden nach 10 Siegen gegen die CPU frei.
@@ -2876,6 +2888,7 @@ function ProfileScreen() {
       setSleeveNames(d.names?.sleeve || {});
       setOwnedBoards(d.owned?.board || []);
       setOwnedSkinIds(d.owned?.skin || []);
+      setFrameDupes({ avatar: {}, sleeve: {}, skin: {}, ...(d.dupes || {}) });
     }).catch(() => {});
   }, []);
   const selectHeroSkin = async (hero, skin) => {
@@ -3028,6 +3041,7 @@ function ProfileScreen() {
         color: user.color || '#66b6ff', avatar: newAvatar, cardback: user.cardback, bio: user.bio || ''
       })});
       setUser(data.user);
+      window.ppAvatarRankForget(user.username);   // neuer Avatar → sein Rang-Rahmen im Menü/Chat
     } catch (e) { notify(e.message, 'error'); }
   };
 
@@ -3095,6 +3109,11 @@ function ProfileScreen() {
     return '/cards/' + AVAILABLE_MAP[cardName];
   };
 
+  // Rang-Rahmen (Duplikate aus dem Gacha) der gewählten Items; FramedImg backt den Rahmen ins Bild
+  const avatarDupes = (url) => frameDupes.avatar[window.ppShopIdOfUrl(url, 'avatars')] || 0;
+  const sleeveDupes = (url) => frameDupes.sleeve[window.ppShopIdOfUrl(url, 'sleeves')] || 0;
+  window.ppSkinRanksSet(user.heroSkins, frameDupes.skin);   // Top-Helden: Skin-Karten mit Rahmen
+
   // Display URL for current cardback (show default if none selected)
   const displayCardback = cardback || '/cardback.png';
 
@@ -3122,7 +3141,7 @@ function ProfileScreen() {
                 onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setShowAvatarGallery(true); } }}>
                 <div className="profile-avatar-inner">
                   {avatar
-                    ? <img src={avatar} style={{ width: '100%', height: '100%', objectFit: 'cover', imageRendering: 'pixelated' }} />
+                    ? <FramedImg src={avatar} kind="avatar" dupes={avatarDupes(avatar)} style={{ width: '100%', height: '100%', objectFit: 'cover', imageRendering: 'pixelated' }} />
                     : <span style={{ fontSize: 56, opacity: 0.5 }}>👤</span>}
                 </div>
                 <div className="profile-avatar-upload-overlay">
@@ -3255,7 +3274,7 @@ function ProfileScreen() {
               {/* Sleeve — large preview */}
               <div className="profile-sleeve-col">
                 <div className="profile-cardback-preview profile-cardback-xl profile-cardback-clickable" role="button" tabIndex={0} onClick={() => setShowSleeveGallery(true)}>
-                  <img src={displayCardback} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                  <FramedImg src={displayCardback} kind="sleeve" dupes={sleeveDupes(cardback)} style={{ width: '100%', height: '100%', objectFit: 'cover', imageRendering: 'pixelated' }} />
                   <div className="profile-cardback-hover-overlay">CHANGE</div>
                 </div>
                 <button className="btn" style={{ padding: '6px 16px', fontSize: 11, width: '100%' }}
@@ -3359,7 +3378,7 @@ function ProfileScreen() {
                 ) : (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 10, flex: 1 }}>
                     {topHeroes.map((h, i) => {
-                      const heroImg = (user.heroSkins && user.heroSkins[h.name]) ? skinImageUrl(user.heroSkins[h.name]) : getCardImage(h.name);
+                      const heroImg = (user.heroSkins && user.heroSkins[h.name]) ? cardImageUrl(h.name, user.heroSkins) : getCardImage(h.name);
                       const medal = ['🥇', '🥈', '🥉'][i];
                       return (
                         <div key={h.name} className="profile-top-hero"
@@ -3480,7 +3499,7 @@ function ProfileScreen() {
                     {/* Default sleeve */}
                     <div className={'profile-cb-gallery-item' + (!cardback ? ' active' : '')} role="button" tabIndex={0} onClick={() => quickSaveSleeve(null)}>
                       <div className="profile-cb-gallery-card">
-                        <img src="/cardback.png" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                        <FramedImg src="/cardback.png" kind="sleeve" dupes={frameDupes.sleeve.default} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                       </div>
                       <div className="profile-cb-gallery-label">Default</div>
                     </div>
@@ -3489,7 +3508,7 @@ function ProfileScreen() {
                       <div key={sleeveId} className={'profile-cb-gallery-item' + (cardback === '/data/shop/sleeves/' + sleeveId + '.png' ? ' active' : '')} role="button" tabIndex={0}
                         onClick={() => quickSaveSleeve('/data/shop/sleeves/' + sleeveId + '.png')}>
                         <div className="profile-cb-gallery-card">
-                          <img src={'/data/shop/sleeves/' + encodeURIComponent(sleeveId) + '.png'} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                          <FramedImg src={'/data/shop/sleeves/' + encodeURIComponent(sleeveId) + '.png'} kind="sleeve" dupes={frameDupes.sleeve[sleeveId]} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                         </div>
                         <div className="profile-cb-gallery-label">{sleeveNames[sleeveId] || sleeveId}</div>
                       </div>
@@ -3531,7 +3550,7 @@ function ProfileScreen() {
                         <div key={file} className={'profile-avatar-gallery-item' + (avatar === url ? ' active' : '')} role="button" tabIndex={0}
                           onClick={() => quickSaveAvatar(url)} {...avatarTipProps(ppCamelSpaces(file.replace(/\.[^.]+$/, '')))}>
                           <div className="profile-avatar-gallery-img">
-                            <img src={url} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                            <FramedImg src={url} kind="avatar" dupes={frameDupes.avatar['std:' + file.replace(/\.[^.]+$/, '')]} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                           </div>
                         </div>
                       );
@@ -3543,7 +3562,7 @@ function ProfileScreen() {
                         <div key={avatarId} className={'profile-avatar-gallery-item' + (avatar === url ? ' active' : '')} role="button" tabIndex={0}
                           onClick={() => quickSaveAvatar(url)} {...avatarTipProps(avatarNames[avatarId] || ppCamelSpaces(avatarId))}>
                           <div className="profile-avatar-gallery-img">
-                            <img src={url} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                            <FramedImg src={url} kind="avatar" dupes={frameDupes.avatar[avatarId]} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                           </div>
                         </div>
                       );
@@ -3727,38 +3746,6 @@ function PurchaseCelebration({ cx, cy, onDone }) {
 
 // „Mögliche Pulls“: ein Streifen mit Beispielen aus dem Pool (nur, was der Spieler noch NICHT besitzt —
 // genau das kann der nächste Pull ergeben). Wechselt alle paar Sekunden hart (kein Überblenden: Pixelart).
-function ShopPullPreview({ pool, type, count = 4, onHover }) {
-  const sig = pool.map(p => p.id).join('|');
-  const order = useMemo(() => {
-    const a = pool.slice();
-    for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; }
-    return a;
-  }, [sig]);
-  const [start, setStart] = useState(0);
-  useEffect(() => {
-    setStart(0);
-    if (order.length <= count) return undefined;
-    const t = setInterval(() => setStart(s => (s + count) % order.length), 3500);
-    return () => clearInterval(t);
-  }, [order, count]);
-  const shown = Array.from({ length: Math.min(count, order.length) }, (_, i) => order[(start + i) % order.length]);
-  return (
-    <div className="shop-pull-strip">
-      {shown.map(it => (
-        <div key={it.id} className="shop-item shop-unowned-skin shop-pull-tile"
-          onMouseEnter={() => onHover && onHover(it)} onMouseLeave={() => onHover && onHover(null)}>
-          <span className="shop-item-zier" aria-hidden="true" />
-          <div className="shop-item-img-wrap">
-            <img src={it.src} draggable={false} />
-          </div>
-          {it.name && <div className="shop-item-name" title={it.name}>{it.name}</div>}
-        </div>
-      ))}
-    </div>
-  );
-}
-
-
 // Gemeinsame Partikel-Salve für Shop-Effekte (Kauf-Fanfare und Pull-Reveal): bunte Pixelsprites in Palettenfarben
 // plus ein Funkenring. Gezeichnet von `ppPixelPartikel` (app-shared.jsx): ganze Kunstpixel, Dither statt Alpha.
 function shopBurstParticles(ox, oy, n, speedMul) {
@@ -3898,6 +3885,48 @@ function shopSealedArt() {
 }
 
 // Mosaik-Auflösung: das Avatar-Bild setzt sich aus groben Blöcken zu voller Schärfe zusammen (Pixelart-typisch, in harten Stufen).
+// Rang-Aufstieg: das alte Bild (alter Rahmen) wird Zelle für Zelle durch das neue ersetzt — Dither + Diagonale wie ein Scanner, die Kante
+// blitzt golden/weiß. Reine Pixelzellen auf der virtuellen Uhr der Inszenierung (`vt`), kein Alpha, kein Weichzeichnen.
+function ShopRankSwap({ oldSrc, newSrc, t0Ref, vt, dur, sq }) {
+  const ref = useRef(null);
+  useEffect(() => {
+    const cv = ref.current; if (!cv || !oldSrc || !newSrc) return undefined;
+    let dead = false, timer = 0;
+    const A = new Image(), B = new Image();
+    let loaded = 0;
+    const go = () => {
+      if (dead || ++loaded < 2) return;
+      const w = A.naturalWidth || 200, h = A.naturalHeight || 200;
+      cv.width = w; cv.height = h;
+      const g = cv.getContext('2d'); g.imageSmoothingEnabled = false;
+      g.drawImage(A, 0, 0, w, h);
+      const cs = Math.max(2, Math.round(w / 40)), nx = Math.ceil(w / cs), ny = Math.ceil(h / cs);
+      const thr = new Float32Array(nx * ny), st = new Uint8Array(nx * ny);
+      const bayer = (x, y) => SHOP_BAYER[(y & 3) * 4 + (x & 3)] / 16;
+      for (let y = 0; y < ny; y++) for (let x = 0; x < nx; x++) thr[y * nx + x] = 0.72 * ((x / nx + y / ny) / 2) + 0.28 * bayer(x, y) * 0.94;
+      const edge = ['#ffffff', '#fad54a', '#f7f7ad'].map(c => (window.ppSnap ? window.ppSnap(c) : c));
+      const tick = () => {
+        if (dead) return;
+        const t0 = t0Ref.current;
+        const p = t0 == null ? 0 : Math.max(0, Math.min(1, (vt.current - t0) / dur));
+        if (p > 0) {
+          for (let i = 0; i < thr.length; i++) {
+            if (st[i] === 2) continue;
+            const x = (i % nx) * cs, y = ((i / nx) | 0) * cs;
+            if (p >= 1 || thr[i] <= p) { g.drawImage(B, x * B.naturalWidth / w, y * B.naturalHeight / h, cs * B.naturalWidth / w, cs * B.naturalHeight / h, x, y, cs, cs); st[i] = 2; }
+            else if (thr[i] <= p + 0.07 && st[i] === 0) { g.fillStyle = edge[(i + ((i / nx) | 0)) % edge.length]; g.fillRect(x, y, cs, cs); st[i] = 1; }
+          }
+        }
+        if (p < 1) timer = setTimeout(tick, 33);
+      };
+      tick();
+    };
+    A.onload = go; B.onload = go; A.src = oldSrc; B.src = newSrc;
+    return () => { dead = true; clearTimeout(timer); };
+  }, [oldSrc, newSrc]);
+  return <canvas ref={ref} className={'pull-fx-swap' + (sq ? ' pull-fx-swap-sq' : '')} />;
+}
+
 function ShopMosaic({ src, fast }) {
   const ref = useRef(null);
   useEffect(() => {
@@ -3938,6 +3967,17 @@ function ShopMosaic({ src, fast }) {
 // Klick überspringt. Der Reveal öffnet sofort beim Drücken von PULL (`reveal.pending`) und wartet am Höhepunkt auf den Server.
 function ShopPullReveal({ reveal, onClose, fast, onToggleFast }) {
   const AV = (reveal && reveal.kind) === 'avatar';
+  // Bei einem Duplikat trägt das Bild schon den neuen Rahmen (Avatar/Sleeve: useFramedSrc; Skin-Karten: `?rahmen=N` in der URL)
+  const frontSrc = useFramedSrc(reveal && !reveal.pending ? reveal.imgUrl : null, (reveal && reveal.frameKind) || 'card', reveal && reveal.frameKind ? reveal.dupes : 0);
+  // Rang-Aufstieg (Kopie): erst das Bild mit dem ALTEN Rahmen, dann wird der Rahmen mit Funken und Partikeln aufgewertet (ShopRankSwap)
+  const rankUp = !!(reveal && reveal.isNew === false);
+  const oldDupes = rankUp ? Math.max(0, (reveal.dupes || 1) - 1) : 0;
+  const oldFramed = useFramedSrc(rankUp && !reveal.pending && reveal.frameKind ? reveal.imgUrl : null, (reveal && reveal.frameKind) || 'card', reveal && reveal.frameKind ? oldDupes : 0);
+  const oldSrc = (!rankUp || reveal.pending) ? null
+    : (reveal.frameKind ? oldFramed : String(reveal.imgUrl || '').replace(/\?rahmen=\d+/, oldDupes > 0 ? '?rahmen=' + oldDupes : ''));
+  const swapT0 = useRef(null);                     // virtuelle Zeit, zu der der Rahmentausch beginnt (null: noch nicht)
+  const SWAP_DUR = 900;
+  const [upDone, setUpDone] = useState(false);
   const reduced = useMemo(() => { try { return window.matchMedia('(prefers-reduced-motion: reduce)').matches; } catch { return false; } }, []);
   const [phase, setPhase] = useState('charge');   // 'charge' | 'shatter' | 'reveal'
   const [overload, setOverload] = useState(false); // letzte Stufe vor dem Einschlag: das Siegel zittert dauernd
@@ -3976,6 +4016,7 @@ function ShopPullReveal({ reveal, onClose, fast, onToggleFast }) {
   }), []);
   const sealedUrl = useMemo(() => (AV ? shopSealedArt() : null), []);
   const backUrl = AV ? sealedUrl : '/cardback.png';
+  const rankUpRef = useRef(rankUp); rankUpRef.current = rankUp;
   const later = (fn, ms) => { ev.current.push({ at: vt.current + ms, fn }); };
   const clearLater = () => { ev.current = []; };
 
@@ -3986,6 +4027,21 @@ function ShopPullReveal({ reveal, onClose, fast, onToggleFast }) {
     for (let i = 0; i < a.length; i++) if (a[i].life > 0) a[w++] = a[i];
     a.length = w;
     for (const p of list) a.push(p);
+  };
+
+  // Funken entlang des Kartenrands (Rahmen-Upgrade): sprühen nach außen, ganze Pixel in Palettenfarben
+  const rimSparks = (n, sp) => {
+    const el = slotRef.current; if (!el) return;
+    const r = el.getBoundingClientRect(), cols = ['#ffffff', '#f7f7ad', '#fad54a', '#1aedff', '#f9ac20'], out = [];
+    for (let i = 0; i < n; i++) {
+      const t = Math.random() * 4, side = Math.floor(t) % 4, f = t - Math.floor(t);
+      const x = side === 0 ? r.left + r.width * f : side === 2 ? r.right - r.width * f : side === 1 ? r.right : r.left;
+      const y = side === 1 ? r.top + r.height * f : side === 3 ? r.bottom - r.height * f : side === 0 ? r.top : r.bottom;
+      const nxv = side === 1 ? 1 : side === 3 ? -1 : 0, nyv = side === 0 ? -1 : side === 2 ? 1 : 0, k = (1 + Math.random() * 3) * sp;
+      out.push({ x, y, vx: nxv * k + (Math.random() - 0.5) * 1.5, vy: nyv * k + (Math.random() - 0.5) * 1.5 - 0.4, size: 4 + Math.random() * 8,
+        color: cols[i % cols.length], shape: Math.random() < 0.5 ? 'star' : 'spark', life: 1, decay: 0.016 + Math.random() * 0.02, rotation: 0, rotSpeed: 0, gravity: 0.03 });
+    }
+    emit(out);
   };
 
   // cue = Klang + Bild. c: { sound | sounds: [[name, opts], …], stage, lit, crack, overload, ripple, blast, tremor, quake (true | 2 = stark),
@@ -4025,7 +4081,15 @@ function ShopPullReveal({ reveal, onClose, fast, onToggleFast }) {
     later(() => cue({ sound: 'pull_sparkle', stars: 28, sheen: true }), 200);                          // Sternenring + Lichtstreifen über dem Banner
     later(() => cue({ sound: 'gold_gain', coins: 90, burst: [0.3, 0.5, 100, 0.9] }), 520);              // Münzregen
     later(() => emit(shopBurstParticles(window.innerWidth * 0.7, window.innerHeight * 0.5, 100, 0.9)), 530);
-    later(() => setCanClose(true), 1000);
+    if (!rankUpRef.current) { later(() => setCanClose(true), 1000); return; }
+    if (abortRef.current) { swapT0.current = -1e9; setUpDone(true); later(() => setCanClose(true), 1000); return; }   // Escape: gleich das neue Bild
+    // Rahmen-Upgrade: das alte Bild steht kurz da, dann tauscht ein Scan den Rahmen aus (Klang steigt, Funken laufen am Rand entlang)
+    const T = 1500;
+    later(() => { swapT0.current = vt.current; cue({ sounds: [['pull_swell', { rate: 1.1 }], ['pull_crack', { rate: 1.25 }]], quake: true, burst: [0.5, 0.5, 70, 0.8] }); rimSparks(46, 0.7); }, T);
+    [[0, 250], [7, 500], [12, 750]].forEach(([semis, dt], k) => later(() => { cue({ sound: 'pull_note', opt: { rate: Math.pow(2, semis / 12), volume: 0.75 }, burst: [0.5, 0.5, 26 + k * 10, 0.7 + k * 0.15] }); rimSparks(22, 0.8 + k * 0.2); }, T + dt));
+    later(() => { cue({ sounds: [['ascension'], ['pull_sparkle']], quake: 2, stars: 32, sheen: true, burst: [0.5, 0.5, 240, 1.5] }); rimSparks(90, 1.3); setUpDone(true); }, T + SWAP_DUR);
+    later(() => emit(shopBurstParticles(window.innerWidth * 0.5, window.innerHeight * 0.5, 120, 1.1)), T + SWAP_DUR + 250);
+    later(() => setCanClose(true), T + SWAP_DUR + 600);
   };
 
   // Höhepunkt: wartet, bis die Antwort des Servers da ist; dann bricht es frei — eine Explosion.
@@ -4369,7 +4433,7 @@ function ShopPullReveal({ reveal, onClose, fast, onToggleFast }) {
         {phase === 'reveal' && (
           <div className="pull-fx-banner">
             <span key={sheen} className={'pull-fx-sheen ' + ab(sheen, 'pull-fx-sheen')} />
-            <span className="pull-fx-banner-text">NEW PULL!</span>
+            <span className="pull-fx-banner-text">{reveal.isNew === false ? 'RANK UP!' : 'NEW PULL!'}</span>
           </div>
         )}
         <div ref={slotRef} className={'pull-fx-cardslot' + (AV ? ' pull-fx-slot-sq' : '')}>
@@ -4389,9 +4453,11 @@ function ShopPullReveal({ reveal, onClose, fast, onToggleFast }) {
           )}
           {phase === 'reveal' && (
             <React.Fragment>
-              {AV
-                ? <div className="pull-fx-front pull-fx-front-sq"><ShopMosaic src={reveal.imgUrl} fast={fast} /></div>
-                : <div className="pull-fx-front"><img src={reveal.imgUrl} draggable={false} /></div>}
+              {rankUp && oldSrc
+                ? <div className={'pull-fx-front' + (AV ? ' pull-fx-front-sq' : '')}><ShopRankSwap oldSrc={oldSrc} newSrc={frontSrc} t0Ref={swapT0} vt={vt} dur={SWAP_DUR} sq={AV} /></div>
+                : AV
+                ? <div className="pull-fx-front pull-fx-front-sq"><ShopMosaic src={frontSrc} fast={fast} /></div>
+                : <div className="pull-fx-front"><img src={frontSrc} draggable={false} /></div>}
               {STARS.map((s, i) => (
                 <span key={i} className="pull-fx-star" style={{ left: s[0] + '%', top: s[1] + '%', animationDelay: (i * 160) + 'ms' }} />
               ))}
@@ -4401,7 +4467,7 @@ function ShopPullReveal({ reveal, onClose, fast, onToggleFast }) {
         {phase === 'reveal' && (
           <React.Fragment>
             {reveal.label && <div className="pull-fx-label">{reveal.label}</div>}
-            {reveal.subtitle && <div className="pull-fx-subtitle">{reveal.subtitle}</div>}
+            {reveal.subtitle && (!rankUp || upDone) && <div className="pull-fx-subtitle">{reveal.subtitle}</div>}
             <button className={'btn pull-fx-btn' + (canClose ? ' pull-fx-btn-on' : '')} disabled={!canClose}
               onClick={(e) => { e.stopPropagation(); onClose(); }}>NICE!</button>
           </React.Fragment>
@@ -4457,11 +4523,19 @@ function ShopScreen() {
 
   const [catalog, setCatalog] = useState(null);
   const [owned, setOwned] = useState({ avatar: [], sleeve: [], board: [], skin: [] });
+  // Kopien über das Original hinaus = Rang des Rahmens (1 Silber … maxDupes Obsidian), je Item; Duplikate beim Ziehen steigern ihn
+  const [dupes, setDupes] = useState({ avatar: {}, sleeve: {}, skin: {} });
+  // Besessene Items außerhalb des Shop-Pools (Standard-/Gegner-Avatare, Standard-/Gegner-Sleeves, exklusive Skins): nur als Kopie ziehbar
+  const [extras, setExtras] = useState({ avatar: [], sleeve: [], skin: [] });
+  const [maxDupes, setMaxDupes] = useState(8);
   const [structureCatalog, setStructureCatalog] = useState(null); // { decks, price, randomPrice, defaultDeckId }
   // Gegner-Sleeves (cpu-sleeves.js): nicht käuflich, fünf Siege gegen die CPU schalten sie frei.
   const [cpuSleeves, setCpuSleeves] = useState({ need: 5, sleeves: [] });
   // Gegner-Avatare (cpu-avatars.js): nicht käuflich, der erste Sieg gegen die CPU schaltet das Portrait frei.
   const [cpuAvatars, setCpuAvatars] = useState({ need: 1, avatars: [] });
+  // Boosterpacks (app-booster.jsx): Katalog aus GET /api/boosters, offenes (gekauftes, noch nicht eingefordertes) Pack aus GET /api/boosters/pending
+  const [boosters, setBoosters] = useState(null);      // { price, packs: [{ id, name, tagline, variants }] }
+  const [pendingPacks, setPendingPacks] = useState(null); // [{ id, packId, variantId, cards: [{ name, rarity }], sold }] (alle offenen Packs, Kaufreihenfolge) | null
   const [loading, setLoading] = useState(true);
   const [buying, setBuying] = useState(false);
   const [tab, setTab] = useState('skins');
@@ -4473,6 +4547,12 @@ function ShopScreen() {
   const [selected, setSelected] = useState(null); // { type, id }
   const [celebration, setCelebration] = useState(null); // { cx, cy } or null
   const [randomReveal, setRandomReveal] = useState(null); // { imgUrl, label, subtitle } or null
+  // Das Ergebnis eines Pulls (Besitz, Kopien, Zähler) wird erst NACH der Pull-Animation angewendet — sonst verrät der Zähler im Hintergrund
+  // schon vorher, dass etwas Neues gezogen wurde. Beim Schließen des Reveals (oder Verlassen des Shops) wird es nachgetragen.
+  const [countBump, setCountBump] = useState(0);   // Zähler für die „+1!“-Animation am Sammlungszähler
+  const pendingPull = useRef(null);
+  const flushPull = () => { const f = pendingPull.current; pendingPull.current = null; if (f) f(); };
+  useEffect(() => () => { flushPull(); }, []);
   const [hoverDeckCard, setHoverDeckCard] = useState(null); // cover card name being previewed
   const [hoverSkin, setHoverSkin] = useState(null); // { skinName, heroName } being previewed
   // Skin ids currently flipped to show the original Hero art instead of the
@@ -4499,15 +4579,24 @@ function ShopScreen() {
   useEffect(() => {
     (async () => {
       try {
-        const [catData, ownData, structData, cpuData, cpuAvData] = await Promise.all([
+        const [catData, ownData, structData, cpuData, cpuAvData, boosterData, pendData] = await Promise.all([
           api('/shop/catalog'),
           api('/shop/owned'),
           api('/shop/structure-decks'),
           api('/shop/cpu-sleeves').catch(() => null),
           api('/shop/cpu-avatars').catch(() => null),
+          api('/boosters').catch(() => null),
+          api('/boosters/pending').catch(() => null),
         ]);
+        if (boosterData) setBoosters(boosterData);
+        // Wiederaufnahme: ein gekauftes, noch nicht eingefordertes Pack liegt offen -> Pack-Ansicht sofort fortsetzen
+        const pendList = pendData && (pendData.packs && pendData.packs.length ? pendData.packs : (pendData.pending ? [pendData.pending] : null));
+        if (pendList) { setPendingPacks(pendList); setTab('boosters'); }
         setCatalog(catData);
         setOwned(ownData.owned);
+        setDupes({ avatar: {}, sleeve: {}, skin: {}, ...(ownData.dupes || {}) });
+        if (ownData.maxDupes) setMaxDupes(ownData.maxDupes);
+        setExtras({ avatar: [], sleeve: [], skin: [], ...(ownData.extras || {}) });
         setStructureCatalog(structData);
         if (cpuData) setCpuSleeves(cpuData);
         if (cpuAvData) setCpuAvatars(cpuAvData);
@@ -4657,6 +4746,7 @@ function ShopScreen() {
         color: user.color || '#66b6ff', avatar, cardback, bio: user.bio || '', board,
       })});
       setUser(data.user);
+      if (type === 'avatar') window.ppAvatarRankForget(user.username);
       if (window.playSFX) window.playSFX('ui_click');
     } catch (e) { notify(e.message, 'error'); }
   };
@@ -4699,6 +4789,9 @@ function ShopScreen() {
     setBuying(false);
   };
 
+  // Text zum Rang einer Kopienzahl: „Gold Frame“ usw.
+  const frameName = (d) => { const i = window.ppRankFrames ? window.ppRankFrames.rankOf(d) : null; return i == null ? '' : window.ppRankFrames.RANKS[i].name + ' Frame'; };
+
   const buyRandomSkin = async (e) => {
     if (buying) return;
     const rp = catalog?.randomPrices?.skin;
@@ -4708,15 +4801,21 @@ function ShopScreen() {
     setRandomReveal({ pending: true, kind: 'card' });
     try {
       const data = await api('/shop/buy-random-skin', { method: 'POST' });
-      setOwned(prev => ({ ...prev, skin: [...prev.skin, data.skinName] }));
+      pendingPull.current = () => {
+        if (data.isNew) setCountBump(n => n + 1);
+        if (data.isNew) setOwned(prev => ({ ...prev, skin: [...prev.skin, data.skinName] }));
+        else setDupes(prev => ({ ...prev, skin: { ...prev.skin, [data.skinName]: data.dupes } }));
+      };
       setUser(u => ({ ...u, sc: data.sc }));
       triggerPurchaseFanfare(pos, { pull: true });
       setRandomReveal({
-        imgUrl: '/cards/skins/' + encodeURIComponent(data.skinName) + '.png',
+        // Skin-Karten bekommen den Rahmen über `?rahmen=N` (der Karten-Shim backt ihn ein)
+        imgUrl: '/cards/skins/' + encodeURIComponent(data.skinName) + '.png' + (data.dupes > 0 ? '?rahmen=' + data.dupes : ''),
         label: data.skinName,
-        subtitle: data.heroName
+        subtitle: data.isNew ? data.heroName : data.heroName + ' · ' + frameName(data.dupes) + '!',
+        kind: 'card', isNew: data.isNew, dupes: data.dupes,
       });
-    } catch (e) { setRandomReveal(null); notify(e.message, 'error'); }
+    } catch (e) { flushPull(); setRandomReveal(null); notify(e.message, 'error'); }
     setBuying(false);
   };
 
@@ -4730,17 +4829,44 @@ function ShopScreen() {
     setRandomReveal({ pending: true, kind });
     try {
       const data = await api('/shop/buy-random', { method: 'POST', body: JSON.stringify({ itemType }) });
-      setOwned(prev => ({ ...prev, [itemType]: [...prev[itemType], data.itemId] }));
+      pendingPull.current = () => {
+        if (data.isNew) setCountBump(n => n + 1);
+        if (data.isNew) setOwned(prev => ({ ...prev, [itemType]: [...prev[itemType], data.itemId] }));
+        else setDupes(prev => ({ ...prev, [itemType]: { ...prev[itemType], [data.itemId]: data.dupes } }));
+        if (itemType === 'avatar') window.ppAvatarRankForget(user.username);   // Rang des getragenen Avatars kann gestiegen sein
+      };
       setUser(u => ({ ...u, sc: data.sc }));
       triggerPurchaseFanfare(pos, { pull: true });
       const subdir = itemType === 'avatar' ? 'avatars' : 'sleeves';
+      const noun = itemType === 'avatar' ? 'Avatar' : 'Sleeve';
       setRandomReveal({
-        imgUrl: '/data/shop/' + subdir + '/' + encodeURIComponent(data.itemId) + '.png',
-        label: itemType === 'sleeve' ? ((catalog.sleeves || []).find(s => s.id === data.itemId)?.name || null) : null,
-        subtitle: itemType === 'avatar' ? 'New Avatar!' : 'New Sleeve!',
-        kind,
+        // Start-/Gegner-Items kommen mit ihrer eigenen Bild-URL und ihrem Namen vom Server (`data.extra`)
+        imgUrl: data.extra && data.extra.src ? data.extra.src : '/data/shop/' + subdir + '/' + encodeURIComponent(data.itemId) + '.png',
+        label: data.extra && data.extra.name ? data.extra.name : (itemType === 'sleeve' ? ((catalog.sleeves || []).find(s => s.id === data.itemId)?.name || null) : null),
+        subtitle: data.isNew ? 'New ' + noun + '!' : frameName(data.dupes) + '! (' + data.dupes + '/' + maxDupes + ')',
+        kind, isNew: data.isNew, dupes: data.dupes, frameKind: itemType,        // Rahmen wird beim Anzeigen eingebacken (useFramedSrc)
       });
-    } catch (e) { setRandomReveal(null); notify(e.message, 'error'); }
+    } catch (e) { flushPull(); setRandomReveal(null); notify(e.message, 'error'); }
+    setBuying(false);
+  };
+
+  // Boosterpacks kaufen (20 SC je Pack, `count` Stück in einer Buchung): der Server würfelt je Pack die 9 Karten und speichert sie als offene Packs; danach öffnet
+  // die Vollbild-Ansicht (BoosterOpening) alle auf einmal. Sind schon Packs offen, liefert die Antwort diese (kaufen ist dann nicht erlaubt) und die Ansicht wird fortgesetzt.
+  const buyBooster = async (packId, count) => {
+    if (buying || pendingPacks) return;
+    const price = boosters && boosters.price != null ? boosters.price : 20;
+    const n = count > 0 ? count : 1;
+    if (!((user.sc || 0) >= price * n)) { notify('Not enough 🪙!', 'error'); return; }
+    setBuying(true);
+    try {
+      const r = await window.ppBoosterApi.buy(packId, n);
+      const got = r.data && (r.data.packs && r.data.packs.length ? r.data.packs : (r.data.pending ? [r.data.pending] : null));
+      if (got) setPendingPacks(got);
+      if (r.ok) {
+        if (r.data.sc != null) setUser(u => ({ ...u, sc: r.data.sc }));
+        triggerPurchaseFanfare({ cx: window.innerWidth / 2, cy: window.innerHeight / 2 }, { pull: true });
+      } else if (!got) notify((r.data && r.data.error) || 'Purchase failed', 'error');
+    } catch (e) { notify(e.message, 'error'); }
     setBuying(false);
   };
 
@@ -4801,16 +4927,18 @@ function ShopScreen() {
   // Gegner-Sleeves: Trophäen aus dem Singleplayer. Freigeschaltete lassen sich
   // ausrüsten wie gekaufte; gesperrte zeigen den Fortschritt gegen ihre CPU.
   // Noch unbekannte Gegner bleiben verdeckt, damit nichts vorweggenommen wird.
+  // Sie erscheinen im Filter-Reiter „OPPONENTS“ neben ALL / OWNED / MISSING (Reiter „Sleeves“ bzw. „Avatars“).
   const renderCpuSleeves = () => {
-    const list = cpuSleeves.sleeves || [];
-    if (list.length === 0) return <div className="shop-empty">No opponent sleeves available yet</div>;
+    const all = cpuSleeves.sleeves || [];
+    const list = all;
+    if (all.length === 0) return <div className="shop-empty">No opponent sleeves available yet</div>;
     const need = cpuSleeves.need || 5;
-    const earned = list.filter(it => it.unlocked).length;
+    const earned = all.filter(it => it.unlocked).length;
     return (
       <React.Fragment>
-        <div className="shop-random-wrap">
+        <div className="shop-random-wrap shop-cpu-embedded">
           <div className="shop-cpu-sleeves-intro">🏆 Every CPU opponent plays with its own sleeve. Defeat an opponent {need} times to claim it!</div>
-          <span className="shop-random-hint">{earned} / {list.length} earned</span>
+          <span className="shop-random-hint">{earned} / {all.length} earned</span>
         </div>
         <div className="shop-grid">
           {list.map(item => {
@@ -4818,12 +4946,13 @@ function ShopScreen() {
             const equipped = isOwned && isEquipped('sleeve', item.id);
             const hidden = !isOwned && !item.opponentKnown;
             return (
-              <div key={item.id} className={'shop-item shop-cpu-sleeve' + (isOwned ? ' shop-owned' : ' shop-unowned-skin') + (equipped ? ' shop-equipped' : '') + (hidden ? ' shop-cpu-sleeve-hidden' : '')}
+              <div key={item.id} className={'shop-item shop-cpu-sleeve' + (isOwned && dupes.sleeve[item.id] > 0 ? ' shop-item-ranked' : '') + (isOwned ? ' shop-owned' : ' shop-unowned-skin') + (equipped ? ' shop-equipped' : '') + (hidden ? ' shop-cpu-sleeve-hidden' : '')}
                 onClick={() => isOwned && !equipped && equipItem('sleeve', item.id)}>
                 <span className="shop-item-zier" aria-hidden="true" />
                 <div className="shop-item-img-wrap">
-                  <img src={'/data/shop/sleeves/' + encodeURIComponent(item.file)} draggable={false}
-                    className={isOwned ? '' : 'shop-skin-locked'} />
+                  {isOwned && dupes.sleeve[item.id] > 0
+                    ? <FramedImg src={'/data/shop/sleeves/' + encodeURIComponent(item.file)} kind="sleeve" dupes={dupes.sleeve[item.id]} draggable={false} title={frameName(dupes.sleeve[item.id])} />
+                    : <img src={'/data/shop/sleeves/' + encodeURIComponent(item.file)} draggable={false} className={isOwned ? '' : 'shop-skin-locked'} />}
                   {equipped ? <div className="shop-owned-badge shop-equipped-badge">EQUIPPED</div>
                     : isOwned ? <div className="shop-owned-badge">OWNED</div> : (
                       <div className="shop-lock-overlay">
@@ -4848,15 +4977,16 @@ function ShopScreen() {
   };
 
   const renderCpuAvatars = () => {
-    const list = cpuAvatars.avatars || [];
-    if (list.length === 0) return <div className="shop-empty">No opponent avatars available yet</div>;
+    const all = cpuAvatars.avatars || [];
+    const list = all;
+    if (all.length === 0) return <div className="shop-empty">No opponent avatars available yet</div>;
     const need = cpuAvatars.need || 1;
-    const earned = list.filter(it => it.unlocked).length;
+    const earned = all.filter(it => it.unlocked).length;
     return (
       <React.Fragment>
-        <div className="shop-random-wrap">
+        <div className="shop-random-wrap shop-cpu-embedded">
           <div className="shop-cpu-sleeves-intro">🏆 Every CPU opponent has a portrait. Defeat an opponent {need === 1 ? 'once' : need + ' times'} to claim it as your avatar!</div>
-          <span className="shop-random-hint">{earned} / {list.length} earned</span>
+          <span className="shop-random-hint">{earned} / {all.length} earned</span>
         </div>
         <div className="shop-grid">
           {list.map(item => {
@@ -4864,12 +4994,13 @@ function ShopScreen() {
             const equipped = isOwned && isEquipped('avatar', item.id);
             const hidden = !isOwned && !item.opponentKnown;
             return (
-              <div key={item.id} className={'shop-item shop-avatar-item shop-cpu-sleeve' + (isOwned ? ' shop-owned' : ' shop-unowned-skin') + (equipped ? ' shop-equipped' : '') + (hidden ? ' shop-cpu-sleeve-hidden' : '')}
+              <div key={item.id} className={'shop-item shop-avatar-item shop-sq-item shop-cpu-sleeve' + (isOwned && dupes.avatar[item.id] > 0 ? ' shop-item-ranked' : '') + (isOwned ? ' shop-owned' : ' shop-unowned-skin') + (equipped ? ' shop-equipped' : '') + (hidden ? ' shop-cpu-sleeve-hidden' : '')}
                 onClick={() => isOwned && !equipped && equipItem('avatar', item.id)}>
                 <span className="shop-item-zier" aria-hidden="true" />
                 <div className="shop-item-img-wrap">
-                  <img src={'/data/shop/avatars/' + encodeURIComponent(item.file)} draggable={false}
-                    className={isOwned ? '' : 'shop-skin-locked'} />
+                  {isOwned && dupes.avatar[item.id] > 0
+                    ? <FramedImg src={'/data/shop/avatars/' + encodeURIComponent(item.file)} kind="avatar" dupes={dupes.avatar[item.id]} draggable={false} title={frameName(dupes.avatar[item.id])} />
+                    : <img src={'/data/shop/avatars/' + encodeURIComponent(item.file)} draggable={false} className={isOwned ? '' : 'shop-skin-locked'} />}
                   {equipped ? <div className="shop-owned-badge shop-equipped-badge">EQUIPPED</div>
                     : isOwned ? <div className="shop-owned-badge">OWNED</div> : (
                       <div className="shop-lock-overlay">
@@ -4933,55 +5064,54 @@ function ShopScreen() {
     const missing = items.filter(it => !ownedSet[type].has(it.id));
     const ownedN = items.length - missing.length;
     const pct = Math.round(100 * ownedN / items.length);
-    const canPull = !buying && missing.length > 0 && (user.sc || 0) >= price;
+    const dp = dupes[type] || {};
+    // Pool = Katalog + schon besessene Extras (Start-/Gegner-Items, exklusive Skins); Extras sind nur als Kopie ziehbar
+    const extraItems = (extras[type] || []).map(x => ({ id: x.id, name: x.name, sub: x.heroName, heroName: x.heroName, extra: true,
+      src: x.src || ('/cards/skins/' + encodeURIComponent(x.id) + '.png') }));
+    const eligible = [...items, ...extraItems].filter(it => (dp[it.id] || 0) < maxDupes);          // alles, was noch nicht auf dem Maximum-Rang ist
+    const canPull = !buying && eligible.length > 0 && (user.sc || 0) >= price;
     const pull = (e) => (type === 'skin' ? buyRandomSkin(e) : buyRandom(type, e));
     const pullLabel = (
       <React.Fragment>🎲 PULL — <img src="/data/sc.png" className="shop-sc-icon" /> {price ?? '?'}</React.Fragment>
     );
 
     const heroQuery = skinFilter.trim().toLowerCase();
+    const cpuList = type === 'sleeve' ? (cpuSleeves.sleeves || []) : type === 'avatar' ? (cpuAvatars.avatars || []) : null;
+    const opponentsView = !!cpuList && collFilter === 'opponents';       // Reiter „OPPONENTS“: statt der Sammlung die Gegner-Items
     const filtered = items.filter(it => {
       if (type === 'skin' && heroQuery && !String(it.heroName).toLowerCase().includes(heroQuery)) return false;
       const own = ownedSet[type].has(it.id);
-      return collFilter === 'owned' ? own : collFilter === 'missing' ? !own : true;
+      return collFilter === 'owned' ? own : collFilter === 'missing' ? !own : true;       // 'opponents' (nur Avatare/Sleeves) zeigt eine eigene Liste, bei Skins gilt es wie ALL
     });
     const chips = [
       { id: 'all', label: 'ALL', n: items.length },
       { id: 'owned', label: 'OWNED', n: ownedN },
       { id: 'missing', label: 'MISSING', n: missing.length },
+      ...(cpuList ? [{ id: 'opponents', label: 'OPPONENTS', n: cpuList.length }] : []),
     ];
 
     return (
       <div className="shop-gacha-page">
         <div className="shop-gacha-pinned">
+        {/* Flache Pull-Leiste: Titel, Pull-Knopf, Tempo-Schalter und ein Hinweis in EINER Zeile — den Platz bekommt die Sammlung */}
         <div className="shop-gacha">
-          <div className="shop-gacha-machine">
-            <div className="shop-gacha-title">{def.title}</div>
-            <div className="shop-gacha-capsule" aria-hidden="true"><span className="shop-gacha-q" /></div>
-            <button className="btn shop-random-btn shop-gacha-btn" disabled={!canPull} onClick={pull}>{pullLabel}</button>
-            {speedToggle}
-            <div className="shop-gacha-hint">
-              {missing.length > 0
-                ? missing.length + ' ' + (missing.length === 1 ? def.noun.toLowerCase() : def.plural) + ' still to discover'
-                : 'Collection complete!'}
-            </div>
-          </div>
-          <div className="shop-gacha-preview">
-            <div className="shop-gacha-preview-title">
-              {missing.length > 0 ? 'POSSIBLE PULLS' : 'YOU HAVE THEM ALL'}
-            </div>
-            <div className="shop-gacha-rule">No buying — every pull unlocks a random {def.noun.toLowerCase()} you don’t own yet.</div>
-            {missing.length > 0 && (
-              <ShopPullPreview pool={missing} type={type}
-                onHover={type === 'skin' ? (it => setHoverSkin(it ? { skinName: it.name, heroName: it.heroName } : null)) : null} />
-            )}
+          <div className="shop-gacha-title">{def.title}</div>
+          <button className="btn shop-random-btn shop-gacha-btn" disabled={!canPull} onClick={pull}>{pullLabel}</button>
+          {speedToggle}
+          <div className="shop-gacha-hint" title="Every pull is random. Pull one you own again and its frame ranks up!">
+            {missing.length > 0
+              ? missing.length + ' ' + (missing.length === 1 ? def.noun.toLowerCase() : def.plural) + ' still to discover · copies rank up frames'
+              : eligible.length > 0 ? 'Collection complete — copies rank up frames!' : 'Everything is at maximum rank!'}
           </div>
         </div>
 
         <div className="shop-coll-head">
           <div className="shop-coll-head-in">
             <div className="shop-coll-title">YOUR COLLECTION</div>
-            <div className="shop-coll-count">{ownedN} / {items.length}</div>
+            <div className="shop-coll-count">
+              <span key={'n' + countBump} className={countBump ? 'shop-coll-count-bump' : ''}>{ownedN} / {items.length}</span>
+              {countBump > 0 && <span key={'p' + countBump} className="shop-coll-plus" aria-hidden="true">+1!</span>}
+            </div>
             <div className="shop-coll-bar" role="progressbar" aria-valuemin={0} aria-valuemax={items.length} aria-valuenow={ownedN}>
               <span style={{ width: pct + '%' }} />
             </div>
@@ -5003,7 +5133,7 @@ function ShopScreen() {
 
         <div className="shop-coll-scroll">
 
-        {filtered.length === 0 ? (
+        {opponentsView ? (type === 'sleeve' ? renderCpuSleeves() : renderCpuAvatars()) : filtered.length === 0 ? (
           <div className="shop-empty">
             {collFilter === 'owned'
               ? 'Nothing here yet — pull to start your ' + def.noun.toLowerCase() + ' collection!'
@@ -5018,9 +5148,10 @@ function ShopScreen() {
               const showHero = type === 'skin' && skinShowHero.has(it.id);
               const imgSrc = showHero ? (cardImageUrl(it.heroName) || '/cardback.png') : it.src;
               const cls = 'shop-item'
-                + (type === 'avatar' ? ' shop-avatar-item' : '')
+                + (type === 'avatar' ? ' shop-avatar-item shop-sq-item' : '')
                 + (type === 'skin' ? ' shop-skin-item' : '')
                 + (isOwned ? ' shop-owned' : ' shop-unowned-skin shop-missing')
+                + (isOwned && !showHero && (dp[it.id] || 0) > 0 ? ' shop-item-ranked' : '')   // Rang-Rahmen ersetzt den Zierrahmen der Kachel
                 + (equipped ? ' shop-equipped' : '');
               return (
                 <div key={it.id} className={cls}
@@ -5029,7 +5160,13 @@ function ShopScreen() {
                   onClick={type === 'skin' ? undefined : () => { if (isOwned && !equipped) equipItem(type, it.id); }}>
                   <span className="shop-item-zier" aria-hidden="true" />
                   <div className="shop-item-img-wrap">
-                    <img src={imgSrc} draggable={false} loading="lazy" decoding="async" className={isOwned || showHero ? '' : 'shop-skin-locked'} />
+                    {(() => {
+                      // Rahmen nach Kopien (Duplikate): Skin-Karten über `?rahmen=N` (Karten-Shim), Avatare und Sleeves eingebacken
+                      const d = isOwned && !showHero ? (dp[it.id] || 0) : 0;
+                      return (d > 0 && type !== 'skin')
+                        ? <FramedImg src={imgSrc} kind={type} dupes={d} draggable={false} loading="lazy" decoding="async" title={frameName(d)} />
+                        : <img src={d > 0 ? imgSrc + '?rahmen=' + d : imgSrc} draggable={false} loading="lazy" decoding="async" title={d > 0 ? frameName(d) : undefined} className={isOwned || showHero ? '' : 'shop-skin-locked'} />;
+                    })()}
                     {equipped ? <div className="shop-owned-badge shop-equipped-badge">EQUIPPED</div>
                       : isOwned ? <div className="shop-owned-badge">OWNED</div> : showHero ? null : (
                         <div className="shop-lock-overlay">
@@ -5142,8 +5279,7 @@ function ShopScreen() {
     { id: 'skins', label: '🎨 Skins', count: tabCount('skin') },
     { id: 'avatars', label: '👤 Avatars', count: tabCount('avatar') },
     { id: 'sleeves', label: '🃏 Sleeves', count: tabCount('sleeve') },
-    { id: 'cpuSleeves', label: '🏆 Opponent Sleeves', count: (cpuSleeves.sleeves || []).length },
-    { id: 'cpuAvatars', label: '🏆 Opponent Avatars', count: (cpuAvatars.avatars || []).length },
+    { id: 'boosters', label: '📦 Boosterpacks', count: ((boosters && boosters.packs) || []).length },
     { id: 'boards', label: '🎮 Boards', count: (catalog.boards || []).length },
     { id: 'structures', label: '📜 Structure Decks', count: (structureCatalog?.decks || []).length },
   ];
@@ -5170,7 +5306,23 @@ function ShopScreen() {
         </span>
       </div>
       {celebration && <PurchaseCelebration cx={celebration.cx} cy={celebration.cy} onDone={() => setCelebration(null)} />}
-      {randomReveal && <ShopPullReveal reveal={randomReveal} fast={fastPull} onToggleFast={() => setFastPull(v => !v)} onClose={() => setRandomReveal(null)} />}
+      {pendingPacks && window.BoosterOpening && (
+        <window.BoosterOpening key={pendingPacks[0].id + ':' + pendingPacks.length} packs={pendingPacks} boosters={boosters} sc={user.sc || 0}
+          onSc={(n) => setUser(u => ({ ...u, sc: n }))}
+          onClaimed={(data, info) => {
+            // „Add and rip one more!“ ohne genug SC: das Pack ist trotzdem eingelöst (Server), der Kontostand steht in der Antwort
+            if (data && data.sc != null) setUser(u => ({ ...u, sc: data.sc }));
+            setPendingPacks(null);
+            if (info && info.ripFailed) notify('Cards added to your collection! ' + info.ripFailed + '.', 'error');
+            else notify('Cards added to your collection!', 'success');
+          }}
+          onRipMore={(data) => {
+            // Alte Packs eingelöst + gleich viele neue gekauft: die Ansicht wechselt (key) sofort zu den neuen Packs und ihrer Öffnungsanimation
+            if (data.sc != null) setUser(u => ({ ...u, sc: data.sc }));
+            setPendingPacks(data.packs && data.packs.length ? data.packs : [data.pending]);
+          }} />
+      )}
+      {randomReveal && <ShopPullReveal reveal={randomReveal} fast={fastPull} onToggleFast={() => setFastPull(v => !v)} onClose={() => { flushPull(); setRandomReveal(null); }} />}
       <div className="top-bar">
         <button className="btn" onClick={() => setScreen('menu')}>← BACK</button>
         <h2 className="orbit-font" style={{ fontSize: 22, fontWeight: 800, color: 'var(--player-color)' }}>SHOP</h2>
@@ -5191,8 +5343,8 @@ function ShopScreen() {
         {tab === 'skins' && renderGachaPage('skin')}
         {tab === 'avatars' && renderGachaPage('avatar')}
         {tab === 'sleeves' && renderGachaPage('sleeve')}
-        {tab === 'cpuSleeves' && renderCpuSleeves()}
-        {tab === 'cpuAvatars' && renderCpuAvatars()}
+        {tab === 'boosters' && window.BoosterShop && <window.BoosterShop boosters={boosters} sc={user.sc || 0} busy={buying || !!pendingPacks} onBuy={buyBooster}
+          onSc={(n) => setUser(u => ({ ...u, sc: n }))} notify={notify} />}
         {tab === 'boards' && renderItemGrid(catalog.boards || [], 'board', '/data/shop/boards/')}
         {tab === 'structures' && renderStructureDecks()}
       </div>

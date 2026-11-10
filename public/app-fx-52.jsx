@@ -52,9 +52,10 @@
     gold: '#ffb91a', goldH: '#ffe469', goldD: '#a87c00', goldM: '#f8ca21',
     bombe: '#222222', bombeH: '#535353', glutG: '#ffeb1a', glutD: '#c79e05',
     rbR: '#ef2929', rbO: '#ff8b1a', rbY: '#ffeb1a', rbG: '#20ac37', rbC: '#08d3ef', rbB: '#4580f6', rbP: '#702db3',
-    zahl: '#ff1a1a', zahlD: '#8b0d0d', bluD: '#780000', bluR: '#c80000', bluH: '#fe5154', blau: '#3866f0', rosa: '#f8b4df',
+    zahl: '#ff1a1a', zahlD: '#8b0d0d', bluD: '#780000', blauK: '#4580f6', blauH: '#b3d8f9', bluR: '#c80000', bluH: '#fe5154', blau: '#3866f0', rosa: '#f8b4df',
   };
   const LET = { // Buchstaben der Sprite-Zeilen → Farbname
+    v: 'blauK', V: 'blauH',
     K: 'tinte', k: 'dunkelgrau', g: 'mittel', l: 'hell', w: 'creme', W: 'weiss', D: 'holzD', S: 'holz', s: 'holzH',
     R: 'blut', r: 'rotD', o: 'org', y: 'gelb', c: 'creme', G: 'gruenDD', h: 'gruenD', H: 'gruenM', E: 'gruen', e: 'gruenM', P: 'lilaDD', p: 'lila',
     a: 'gold', A: 'goldH', Q: 'goldD', m: 'goldM', b: 'bombe', B: 'bombeH', j: 'glutG', J: 'glutD', '1': 'rbR', '2': 'rbO', '3': 'rbY', '4': 'rbG', '5': 'rbC', '6': 'rbB', '7': 'rbP', x: 'blut', z: 'rot', u: 'grau',
@@ -112,9 +113,15 @@
     'H': ['#...#', '#...#', '#...#', '#####', '#...#', '#...#', '#...#'], 'P': ['####.', '#...#', '#...#', '####.', '#....', '#....', '#....'], '/': ['....#', '....#', '...#.', '..#..', '.#...', '#....', '#....'],
     '=': ['.....', '.....', '#####', '.....', '#####', '.....', '.....'], ' ': ['.....', '.....', '.....', '.....', '.....', '.....', '.....'] };
   /** Ziffernfolge mit Kontur (Tinte), Schatten, Füllung; (x,y) = obere linke Ecke der Füllung; sc = Zellen je Schriftpixel */
+  const GLYPH_ZEILEN = new Map();
   function glyph(m, str, x, y, sc, fill, shadow, outline) {
-    const rows = [];
-    [...str].forEach((ch, k) => { const g = GLYPH[ch]; if (g) g.forEach((row, yy) => [...row].forEach((v, xx) => { if (v === '#') rows.push([k * 6 + xx, yy]); })); });
+    let rows = GLYPH_ZEILEN.get(str);                                       // Pixelliste je Zeichenfolge einmalig (keine Allokation je Bild)
+    if (!rows) {
+      rows = [];
+      [...str].forEach((ch, k) => { const g = GLYPH[ch]; if (g) g.forEach((row, yy) => [...row].forEach((v, xx) => { if (v === '#') rows.push([k * 6 + xx, yy]); })); });
+      if (GLYPH_ZEILEN.size > 400) GLYPH_ZEILEN.clear();
+      GLYPH_ZEILEN.set(str, rows);
+    }
     const bits = (ox, oy, c) => { for (const [gx, gy] of rows) m.rect(x + (gx + ox) * sc, y + (gy + oy) * sc, sc, sc, c); };
     if (outline) for (const [dx, dy] of [[-1, -1], [0, -1], [1, -1], [-1, 0], [1, 0], [-1, 1], [0, 1], [1, 1], [2, 1], [2, 2], [1, 2], [0, 2]]) bits(dx, dy, outline);
     if (shadow) bits(1, 1, shadow);
@@ -158,6 +165,10 @@
       [6, 3, ['QQQQQQQQQQQQ', 'aAAmAAAmAAAm', 'QQQQQQQQQQQQ']], [18, 1, ['Q......', 'QaQ....', 'QAaQQ..', 'QAAAaQA', 'QAaQQ..', 'QaQ....', 'Q......']]] },
     // Racket Arrow: goldene Glocke/Trichter als Spitze
     racket: { h: 9, glow: 'gold', ol: 'tinte', layers: [] },
+    // Holzpfeil (Archer, Card Art: Holzbogen, blaue Spitzen): cremefarbene Federn, Holzschaft, blaue Stahlspitze
+    holz: { h: 7, glow: 'hell', ol: 'tinte', layers: [
+      [0, 1, ['.wwww', 'wwlww', 'wwwww', 'wwlww', '.wwww']], [5, 2, ['DDDDDDDDDD', 'SSsssssSSS', 'DDDDDDDDDD']],
+      [15, 0, ['v......', 'vvv....', 'vVVvv..', 'vVVVvvv', 'vVVvv..', 'vvv....', 'v......']]] },
   };
   // Trichter der Racket-Pfeil-Spitze (Glocke, nach vorn aufgeweitet) programmatisch
   (function () {
@@ -171,9 +182,9 @@
     ARTS.racket.layers = [[0, 3, ['DDDDDDDDD', 'SSsssssSS', 'DDDDDDDDD']], [9, 0, rows.map((r) => r.join(''))]];
   })();
   const GOLD = [];   // feste Gold-Palette des Spielgestalters (data/palette-fest.json): hell, orange, dunkelorange, Kontur, Glanz
-  const KINDS = ['angel', 'bomb', 'flame', 'golden', 'hydra', 'poison', 'racket', 'rainbow'];
+  const KINDS = ['angel', 'bomb', 'flame', 'golden', 'hydra', 'poison', 'racket', 'rainbow', 'holz'];
   FX.KINDS = KINDS;
-  FX.NAMES = { angel: 'Angelfeather Arrow', bomb: 'Bomb Arrow', flame: 'Flame Arrow', golden: 'Golden Arrow', hydra: 'Hydra Blood Arrow', poison: 'Poisoned Arrow', racket: 'Racket Arrow', rainbow: "Rainbow's Arrow" };
+  FX.NAMES = { angel: 'Angelfeather Arrow', bomb: 'Bomb Arrow', flame: 'Flame Arrow', golden: 'Golden Arrow', hydra: 'Hydra Blood Arrow', poison: 'Poisoned Arrow', racket: 'Racket Arrow', rainbow: "Rainbow's Arrow", holz: 'Archer Arrow' };
   const STATUS = { flame: 'burn', poison: 'poison', hydra: 'poison' };
   FX.STATUS = STATUS;
 
@@ -379,12 +390,12 @@
     // gemeinsamer Treffer: Blitzstern (2 Bilder), Ring (flach), Splitter
     if (dt < 0.034) { m.disc(hx, hy, R(4), C.creme); for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) m.linie(hx + dx * 3, hy + dy * 3, hx + dx * R(9), hy + dy * R(9) * 0.8, 1, C.creme); }
     else if (dt < 0.067) { m.disc(hx, hy, R(3), C.gelb); m.disc(hx, hy, R(1), C.creme); }
-    const ringCol = { flame: C.org, poison: C.gruen, hydra: C.gruenD, bomb: C.gelb, angel: C.creme, rainbow: C.creme, golden: C.goldH, racket: C.goldH }[kind];
+    const ringCol = { flame: C.org, poison: C.gruen, hydra: C.gruenD, bomb: C.gelb, angel: C.creme, rainbow: C.creme, golden: C.goldH, racket: C.goldH, holz: C.creme }[kind];
     if (dt > 0.03 && dt < 0.30) { const u = (dt - 0.03) / 0.27, r = 2 + rd(easeOut(u) * (lod ? 9 : 13)); m.ell(hx, hy + 1, r, r * fr, 1, ringCol, u > 0.55); if (!lod && dt > 0.07 && dt < 0.26) m.ell(hx, hy + 1, rd(r * 0.6), rd(r * 0.6 * fr), 1, C.creme, true); }
     // Holzsplitter / Splitter (nicht bei Gift/Hydra/Bombe)
-    if (!lod && (kind === 'angel' || kind === 'flame' || kind === 'golden' || kind === 'rainbow' || kind === 'racket')) sparks(m, hx, hy, dt, 4, [C.holzH, C.holz, C.holzD], 38, 0.34, 150, sd + 11, true);
+    if (!lod && (kind === 'angel' || kind === 'flame' || kind === 'golden' || kind === 'rainbow' || kind === 'racket' || kind === 'holz')) sparks(m, hx, hy, dt, 4, [C.holzH, C.holz, C.holzD], 38, 0.34, 150, sd + 11, true);
     const cols = {
-      angel: [C.weiss, C.creme, C.goldH, C.hell], flame: [C.gelb, C.org, C.rot, C.dunkel], poison: [C.gruenH, C.gruen, C.gruenM, C.gruenD], hydra: [C.gruen, C.gruenM, C.lila, C.gruenD],
+      holz: [C.creme, C.hell, C.holzH, C.holz], angel: [C.weiss, C.creme, C.goldH, C.hell], flame: [C.gelb, C.org, C.rot, C.dunkel], poison: [C.gruenH, C.gruen, C.gruenM, C.gruenD], hydra: [C.gruen, C.gruenM, C.lila, C.gruenD],
       bomb: [C.creme, C.gelb, C.org, C.rauch], rainbow: [C.rbR, C.rbY, C.rbG, C.rbB], golden: [C.creme, C.goldH, C.goldM, C.gold], racket: [C.goldH, C.rot, C.gold, C.rotD],
     }[kind];
     if (kind === 'rainbow') { const sc = [C.rbR, C.rbO, C.rbY, C.rbG, C.rbC, C.rbB, C.rbP]; for (let j = 0; j < nS + 2; j++) { const lf = 0.42; if (dt > lf) continue; const an = -Math.PI * (0.02 + 0.96 * H(sd, j * 3 + 2)), sp = 62 * (0.5 + 0.5 * H(sd, j * 3 + 3)); const X = hx + Math.cos(an) * sp * dt, Y = hy + Math.sin(an) * sp * dt * 0.8 + 0.5 * 130 * dt * dt; spark(m, rd(X), rd(Y), sc[(j + fl(dt * 30)) % 7], dt < 0.12); } }
@@ -496,7 +507,7 @@
     // Zahlen (nach allen Einschlägen, damit sie oben liegen). Reeller Schaden 0 (Hydra Blood Arrow): statt einer Null-Wand EINE gedämpfte „0“ beim letzten Einschlag.
     const top = ctx.proj(B.x, B.y, B.zTop || 90), nullFall = plan.arrows.every((a) => !a.dmg), nZ = nullFall ? 1 : nTot, cols = nZ <= 5 ? nZ : (nZ <= 8 ? 4 : 5), sc = ctx.numSc || (nZ > 8 ? 1 : 2), digitW = (s) => FX.glyphW(s, sc) + 2 * sc + 2;
     const txtOf = (a) => (ctx.numText ? ctx.numText(a) : '' + a.dmg);
-    const zahlHits = nullFall ? [plan.hits[plan.hits.length - 1]] : plan.hits;
+    const zahlHits = ctx.keineZahlen ? [] : (nullFall ? [plan.hits[plan.hits.length - 1]] : plan.hits);
     zahlHits.forEach((a, jj) => {
       const dt = t - a.tHit - 0.02; if (dt < 0) return;
       const j = nullFall ? 0 : a.hitIdx, row = Math.floor(j / cols), cc = j % cols, rowCount = Math.min(cols, nZ - row * cols);
@@ -553,6 +564,50 @@
     const s = '' + num; glyph(m, s, cx - Math.floor(FX.glyphW(s, 1) / 2), y - 11, 1, C.creme, null, C.tinte);
     void label;
   };
+  // ── Animierter Lebensbalken (Kampfspiel-Art) ──
+  //  Schaden: der Balken schrumpft in 9 Stufen (je ein 30-Hz-Bild, RAMPE = 300 ms) von ALT auf NEU; der verlorene Teil bleibt als dunkelroter „Verlustteil" (weiße Kante, gedithert) stehen,
+  //  bleibt nach der Rampe HALTEN (250 ms) und rutscht dann in 8 Stufen (DRAIN = 270 ms) nach. Heilung: der Zuwachs füllt sich in 9 Stufen, der neue Teil steht dunkelgrün (bis HALTEN endet), die
+  //  Zahl zählt in denselben Stufen mit. Reine Funktion der Zeit: `ev` = [{ t (ms), to (HP) }] in Reihenfolge, `hp0` = Anfangswert; mehrere Änderungen (Pfeile der Salve, schnelle Ticks) laufen
+  //  aus dem jeweils gerade gezeigten Wert weiter und zählen mit.
+  const RAMPE = 300, HALTEN = 250, DRAIN = 270, STUFEN = 9, DSTUFEN = 8, BILD_MS = 1000 / 30;
+  const qRampe = (dt) => (dt <= -1e8 ? 1 : clamp((Math.floor(dt / BILD_MS) + 1) / STUFEN));
+  const qDrain = (dt) => (dt <= 0 ? 0 : clamp(Math.floor(dt / BILD_MS) / DSTUFEN));
+  FX.hpAnim = (ev, hp0, t) => {
+    let from0 = hp0, to0 = hp0, ta0 = -1e9, chipTop = null, gainBase = null, ts = -1e9;
+    const shownAt = (tt) => from0 + (to0 - from0) * qRampe(tt - ta0);
+    const chipAt = (tt) => (chipTop == null ? null : (tt < ts ? chipTop : chipTop + (shownAt(tt) - chipTop) * qDrain(tt - ts)));
+    for (const e of ev) {
+      if (e.t > t) break;
+      const cur = shownAt(e.t), chip = chipAt(e.t);
+      if (chip != null && chip > cur + 0.5 && e.t < ts + DRAIN) chipTop = chip; else if (e.t >= ts + DRAIN) chipTop = null;
+      if (e.t >= ts) gainBase = null;
+      if (e.to < cur) { chipTop = Math.max(chipTop == null ? cur : chipTop, cur); gainBase = null; }
+      else if (e.to > cur) { gainBase = Math.min(gainBase == null ? cur : gainBase, cur); chipTop = null; }
+      from0 = cur; to0 = e.to; ta0 = e.t; ts = e.t + RAMPE + HALTEN;
+    }
+    const shown = shownAt(t);
+    let chip = chipAt(t); if (chip != null && (chip <= shown + 0.5 || (t >= ts + DRAIN))) chip = null;
+    const gain = (gainBase != null && t < ts && gainBase < shown - 0.5) ? gainBase : null;
+    return { shown, chip, gain, ziel: to0 };
+  };
+  /** Balken mit Verlust-/Zuwachsteil. o = { max, shown, chip (obere Grenze des Verlustteils | null), gain (untere Grenze des Zuwachsteils | null), ziel, flash }; Zahl = gerundeter gezeigter Wert. */
+  FX.hpBar2 = (m, cx, y, w, o) => {
+    const x = cx - Math.floor(w / 2), h = 5, mx = Math.max(1, o.max), frac = clamp(o.ziel / mx);
+    m.rect(x - 2, y - 2, w + 4, h + 4, C.creme); m.rect(x - 1, y - 1, w + 2, h + 2, C.tinte);
+    const fw = rd(w * clamp(o.shown / mx)), flash = !!o.flash;
+    const c = frac > 0.5 ? C.gruen : (frac > 0.25 ? C.gelb : C.rot), cd = frac > 0.5 ? C.gruenM : (frac > 0.25 ? C.org : C.rotD), ch = frac > 0.5 ? C.gruenH : C.creme;
+    m.rect(x, y, fw, h, flash ? C.weiss : c); m.rect(x, y + h - 1, fw, 1, flash ? C.creme : cd); m.rect(x, y, fw, 1, flash ? C.weiss : ch);
+    if (o.gain != null) {                                                   // Zuwachs: dunkelgrüner Teil
+      const gl = rd(w * clamp(o.gain / mx));
+      if (fw > gl) { m.rect(x + gl, y, fw - gl, h, C.gruenD); m.rect(x + gl, y, fw - gl, 1, C.gruenM); }
+    }
+    if (o.chip != null) {                                                   // Verlustteil: dunkelrot mit weißer, gedithert Kante
+      const cw = rd(w * clamp(o.chip / mx));
+      if (cw > fw) { m.rect(x + fw, y, cw - fw, h, C.rotD); m.rect(x + fw, y + h - 1, cw - fw, 1, C.dunkel); for (let yy = 0; yy < h; yy++) if (!(yy & 1)) m.px(x + cw - 1, y + yy, C.weiss); else if (cw - fw > 1) m.px(x + cw - 2, y + yy, C.hell); }
+    }
+    for (let i = 1; i < 5; i++) { const gx = x + rd(w * i / 5); m.rect(gx, y, 1, h, C.tinte); }
+    const sNum = '' + rd(o.shown); glyph(m, sNum, cx - Math.floor(FX.glyphW(sNum, 1) / 2), y - 11, 1, C.creme, null, C.tinte);
+  };
   /** Klangliste relativ zum Salvenstart: [t, name, { volume, rate }] — Lautstärke wurzelskaliert mit der Pfeilzahl; Racket Arrow: zwei gleichzeitige Pings (Rate 1,0 und 1,09 = dissonant). */
   FX.sfxPlan = (plan) => {
     const ev = [], n = plan.n, vs = 1 / Math.sqrt(Math.max(1, n / 2));
@@ -579,9 +634,10 @@
   const PF = window.PpFx52;
   const ZELLEN_JE_KARTE = 36;                     // Heldenkarte ≈ 36–43 Rasterzellen hoch (Prototyp: Zelle = 1 Art-Pixel)
   const WELT_JE_KARTE = 170;                      // Prototyp-Weltmaß: Kartenhöhe 170 Einheiten
-  const KIND = { 'Angelfeather Arrow': 'angel', 'Bomb Arrow': 'bomb', 'Flame Arrow': 'flame', 'Golden Arrow': 'golden', 'Hydra Blood Arrow': 'hydra', 'Poisoned Arrow': 'poison', 'Racket Arrow': 'racket', "Rainbow's Arrow": 'rainbow' };
+  const KIND = { 'Angelfeather Arrow': 'angel', 'Bomb Arrow': 'bomb', 'Flame Arrow': 'flame', 'Golden Arrow': 'golden', 'Hydra Blood Arrow': 'hydra', 'Poisoned Arrow': 'poison', 'Racket Arrow': 'racket', "Rainbow's Arrow": 'rainbow', 'Archer Arrow': 'holz' };
   const kl = (v, a, b) => Math.max(a, Math.min(b, v));
   const rd = Math.round;
+  const clamp = (v, a = 0, b = 1) => Math.max(a, Math.min(b, v));
 
   // ── Geschluckte Standard-Anzeigen (Zustandsvergleich des Bretts, app-board.jsx) ──
   const schluck = new Map();
@@ -658,13 +714,16 @@
       const arrows = P.arrows.filter((a) => KIND[a.n]);
       if (!arrows.length) return false;
       PF.init();
-      const srcEl = zone({ kind: 'hero', owner: P.srcOwner, heroIdx: P.srcHeroIdx }, myIdx), tgtEl = zone(P.tgt, myIdx);
+      const einzel = !!P.einzel;                                               // Archer: ein einzelner Pfeil von der Zone der Kreatur (ohne HUD/Zahlen: Schaden, HP-Anzeige und Blitz kommen vom Zustandsvergleich beim Einschlag)
+      // ★ VERMERK: Creatures sind noch nicht animiert — der Pfeil startet von der Support-Zone des Archers. Sobald es animierte Creature-Sprites gibt, die Quelle auf deren Sprite umstellen.
+      const srcEl = P.srcKind === 'creature' ? zone({ kind: 'creature', owner: P.srcOwner, heroIdx: P.srcHeroIdx, zoneSlot: P.srcZoneSlot }, myIdx) : zone({ kind: 'hero', owner: P.srcOwner, heroIdx: P.srcHeroIdx }, myIdx), tgtEl = zone(P.tgt, myIdx);
       if (!srcEl || !tgtEl) return false;
       const sr = srcEl.getBoundingClientRect(), tr = tgtEl.getBoundingClientRect();
       if (!(sr.width > 8 && sr.height > 8 && tr.width > 8 && tr.height > 8)) return false;
       const phone = (() => { try { return !!(window.ppIsPhone && window.ppIsPhone()); } catch (e) { return false; } })();
       const n = arrows.length, lod = (n > 8 || phone) ? 1 : 0;
-      const zoneH = Math.max(sr.height, 40), S = kl(rd(zoneH / ZELLEN_JE_KARTE), 2, 6), u = zoneH / WELT_JE_KARTE;   // u: Bildschirmpixel je Welteinheit
+      const hzEl0 = (einzel || P.srcKind === 'creature') ? document.querySelector('[data-hero-zone]') : null;
+      const zoneH = Math.max(hzEl0 ? hzEl0.getBoundingClientRect().height : sr.height, 40), S = (typeof ppFxZelle === 'function' ? ppFxZelle(tgtEl) : kl(rd(zoneH / ZELLEN_JE_KARTE), 2, 6)), u = zoneH / WELT_JE_KARTE;   // Rasterzelle = Hero-Pixel des Ziels (vorher aus der Zonenhöhe)   // u: Bildschirmpixel je Welteinheit
       const fo = window.ppFxScrollOffset ? window.ppFxScrollOffset() : { dx: 0, dy: 0 };
       const welt = !!window.ppFxWeltSchicht;
       const sx0 = sr.left + fo.dx, sy0 = sr.top + fo.dy, tx0 = tr.left + fo.dx, ty0 = tr.top + fo.dy;
@@ -692,9 +751,9 @@
       const dir = bcx > acx ? 1 : -1;
       const per = verteilung(P.total, n);
       const plan = PF.plan({
-        kinds: arrows.map((a) => KIND[a.n]), total: P.total, perArrow: per, seed: (P.seed || 1) + 1, windup: 0.26,
-        A: { x: acx + dir * 22, y: acy + 34, z: 58 }, B: { x: bcx, y: bcy + feet, z: zHit, rx: Math.min(60, wzU * 0.36), ry: Math.min(14, hzU * 0.09), zr: Math.min(30, hzU * 0.18), zTop },
-        fMin: n > 8 ? 0.58 : 0.55, fMax: n > 8 ? 0.85 : 0.82, fan: n > 8 ? 85 : 62,
+        kinds: arrows.map((a) => KIND[a.n]), total: P.total, perArrow: per, seed: (P.seed || 1) + 1, windup: einzel ? 0.1 : 0.26,
+        A: { x: acx + dir * (P.srcKind === 'creature' ? 8 : 22), y: acy + (P.srcKind === 'creature' ? 6 : 34), z: P.srcKind === 'creature' ? 26 : 58 }, B: { x: bcx, y: bcy + feet, z: zHit, rx: Math.min(60, wzU * 0.36), ry: Math.min(14, hzU * 0.09), zr: Math.min(30, hzU * 0.18), zTop },
+        fMin: einzel ? 0.62 : (n > 8 ? 0.58 : 0.55), fMax: einzel ? 0.62 : (n > 8 ? 0.85 : 0.82), fan: einzel ? 20 : (n > 8 ? 85 : 62),
       });
       // Anzeige-Status je Pfeil (Engine-Daten) statt Prototyp-Annahme
       plan.arrows.forEach((a, i) => { const pa = arrows[i]; a.burn = pa.burn ? 1 : 0; a.poisonN = pa.poison || 0; a.status = a.burn ? 'burn' : (a.poisonN ? 'poison' : null); a.stacks = a.poisonN; a.dmg = per[i]; });
@@ -713,14 +772,15 @@
       const C = PF.C;
       const hpVor = Math.max(0, P.hpVor | 0), maxHp = Math.max(1, P.maxHp | 0);
       const hits = plan.hits;
-      const cum = []; { let c = 0; for (const h of hits) { c += h.dmg; cum.push(c); } }   // kumulativ angezeigter Schaden in Einschlagsreihenfolge
+      const cum = []; { let c = 0; for (const h of hits) { c += h.dmg; cum.push(c); } }
+      const hpEv = hits.map((h, j) => ({ t: h.tHit * 1000, to: Math.max(0, hpVor - cum[j]) }));   // kumulativ angezeigter Schaden in Einschlagsreihenfolge
       const bw = Math.max(18, rd(tr.width / S)), barP = proj(bcx, bcy + feet, zTop + 12), bx = rd(barP[0]), by = rd(barP[1]);
       const zielKey = P.tgt.kind === 'creature' ? `c:${P.tgt.owner}-${P.tgt.heroIdx}-${P.tgt.zoneSlot}` : `h:${P.tgt.owner}-${P.tgt.heroIdx}`;
       const hatBrand = arrows.some((a) => a.burn);
-      window.ppFx52Schlucken(zielKey, P.hpNach, hatBrand && !P.vorBurn);
-      window.ppFx52SalveAktiv(zielKey, performance.now() + (Math.max(plan.tEnd, Math.max(plan.tLast + 0.45, 1.7)) + 0.9) * 1000);   // die allgemeine HP-Anzeige schweigt für dieses Ziel (kein Doppelbild)
-      const tHud = Math.max(plan.tLast + 0.45, 1.7);                          // Balken/Status bleiben, bis der echte Zustand da ist
-      const ctx = { m, plan, proj, flat: 0.72, lod, G: S, numSc, numLift: 9 };
+      if (!einzel) window.ppFx52Schlucken(zielKey, P.hpNach, hatBrand && !P.vorBurn);
+      if (!einzel) window.ppFx52SalveAktiv(zielKey, performance.now() + (Math.max(plan.tEnd, Math.max(plan.tLast + 0.9, 1.7)) + 0.9) * 1000);   // die allgemeine HP-Anzeige schweigt für dieses Ziel (kein Doppelbild)
+      const tHud = Math.max(plan.tLast + 0.9, 1.7);                          // Balken/Status bleiben, bis der echte Zustand da ist
+      const ctx = { m, plan, proj, flat: 0.72, lod, G: S, numSc, numLift: 9, keineZahlen: einzel };
 
       const t0 = performance.now();
       let letzte = -1, vor = null, aus = false, raf = 0;
@@ -729,8 +789,8 @@
         // HUD: HP-Balken und Status wachsen mit den Einschlägen
         let j = -1; for (let k = 0; k < hits.length; k++) if (hits[k].tHit <= t + 1e-6) j = k;
         const dmgNow = j >= 0 ? cum[j] : 0, hpNow = Math.max(0, hpVor - dmgNow), q = j >= 0 ? Math.floor((t - hits[j].tHit) * 30 + 1e-4) : 99;
-        if (!(t > tHud && (Math.floor(t * 30) & 1))) {
-          PF.hpBar(m, bx, by, bw, hpNow / maxHp, hpNow, q >= 0 && q < 2);
+        if (!einzel && !(t > tHud && (Math.floor(t * 30) & 1))) {
+          PF.hpBar2(m, bx, by, bw, Object.assign(PF.hpAnim(hpEv, hpVor, t * 1000), { max: maxHp, flash: q >= 0 && q < 2 }));   // Balken schrumpft/steigt je Pfeil-Einschlag in Stufen (Verlustteil, Zahl zählt mit)
           let ix = bx + Math.floor(bw / 2) + 3; const sy_ = by + 6;
           let burn = P.vorBurn ? 1 : 0, poison = P.vorPoison | 0, popB = false, popP = false;
           for (let k = 0; k <= j; k++) { const a = hits[k], pq = Math.floor((t - a.tHit) * 30 + 1e-4); if (a.burn) { burn = 1; if (pq < 4) popB = true; } if (a.poisonN) { poison += a.poisonN; if (pq < 4) popP = true; } }
@@ -739,23 +799,29 @@
         }
       };
       const stopp = () => { if (aus) return; aus = true; try { cancelAnimationFrame(raf); } catch (e) { /* weg */ } wurzel.remove(); };
+      /** Ein Bild zur Effektzeit t (s) zeichnen und hochladen (Schmutzrechteck). */
+      const bildBei = (t) => {
+        const d = m.d, buf = img.data;
+        if (vor) { for (let jj = vor.y0; jj < vor.y1; jj++) buf.fill(0, (jj * gw + vor.x0) * 4, (jj * gw + vor.x1) * 4); }
+        d.x0 = gw; d.y0 = gh; d.x1 = 0; d.y1 = 0;
+        malen(Math.max(0, t));
+        const ux0 = Math.min(vor ? vor.x0 : gw, d.x0), uy0 = Math.min(vor ? vor.y0 : gh, d.y0), ux1 = Math.max(vor ? vor.x1 : 0, d.x1), uy1 = Math.max(vor ? vor.y1 : 0, d.y1);
+        if (ux1 > ux0 && uy1 > uy0) g2.putImageData(img, 0, 0, ux0, uy0, ux1 - ux0, uy1 - uy0);
+        vor = d.x1 > d.x0 ? { x0: d.x0, y0: d.y0, x1: d.x1, y1: d.y1 } : null;
+      };
+      if (o && o.manuell) { (welt ? window.ppFxWeltSchicht() : document.body).appendChild(wurzel); return { bildBei, stopp, plan, ende: einzel ? plan.tLast + 0.95 : Math.max(plan.tEnd, tHud + 0.25), sfx: einzel ? [[0.04, 'projectile'], [plan.tLast, 'damage']] : null }; }   // Testhaken: Bilder einzeln zeichnen (Frame-genaue Aufnahme)
       const takt = window.ppTaktRaf || window.requestAnimationFrame;
       const schritt = (jetzt) => {
         if (aus) return;
         if (typeof jetzt !== 'number') jetzt = performance.now();
         const t = (jetzt - t0) / 1000;
-        if (t > Math.max(plan.tEnd, tHud + 0.25)) { stopp(); return; }
+        if (t > (einzel ? plan.tLast + 0.95 : Math.max(plan.tEnd, tHud + 0.25))) { stopp(); return; }
         const fr = Math.floor(t * 30 + 1e-4);
         if (fr !== letzte) {
           letzte = fr;
           const mess = window.__ppFx52Messen ? performance.now() : 0;
-          const d = m.d, buf = img.data;
-          if (vor) { for (let jj = vor.y0; jj < vor.y1; jj++) buf.fill(0, (jj * gw + vor.x0) * 4, (jj * gw + vor.x1) * 4); }
-          d.x0 = gw; d.y0 = gh; d.x1 = 0; d.y1 = 0;
-          malen(Math.max(0, t));
-          const ux0 = Math.min(vor ? vor.x0 : gw, d.x0), uy0 = Math.min(vor ? vor.y0 : gh, d.y0), ux1 = Math.max(vor ? vor.x1 : 0, d.x1), uy1 = Math.max(vor ? vor.y1 : 0, d.y1);
-          if (ux1 > ux0 && uy1 > uy0) g2.putImageData(img, 0, 0, ux0, uy0, ux1 - ux0, uy1 - uy0);
-          vor = d.x1 > d.x0 ? { x0: d.x0, y0: d.y0, x1: d.x1, y1: d.y1 } : null;
+          if (mess && einzel) (window.__ppFx52Takte || (window.__ppFx52Takte = [])).push([+jetzt.toFixed(2), fr, +(jetzt - t0).toFixed(1)]);   // Messung: Zeitpunkt jedes gezeichneten Takts (Archer-Pfeil)
+          bildBei(t);
           if (mess) (window.__ppFx52Zeiten || (window.__ppFx52Zeiten = [])).push(+(performance.now() - mess).toFixed(3));
         }
         raf = takt(schritt);
@@ -764,9 +830,9 @@
       raf = takt(schritt);
       setTimeout(stopp, (Math.max(plan.tEnd, tHud) + 2.5) * 1000);          // Notnagel (Tab im Hintergrund: rAF ruht)
       // Heldenfigur: bei jedem Einschlag ein kurzer dunkelroter Blitz (Treffer-Reaktion der Figur, app-fx-31), zeitgleich mit dem Pfeil
-      if (isHero && window.ppFx31Treffer) for (const h of hits) if (h.dmg > 0) setTimeout(() => { try { window.ppFx31Treffer(tgtEl, h.dmg); } catch (e) { /* weg */ } }, Math.max(0, rd(h.tHit * 1000)));
+      if (!einzel && isHero && window.ppFx31Treffer) for (const h of hits) if (h.dmg > 0) setTimeout(() => { try { window.ppFx31Treffer(tgtEl, h.dmg); } catch (e) { /* weg */ } }, Math.max(0, rd(h.tHit * 1000)));
       // Klang zeitgenau zum Einschlag (Lautstärke wurzelskaliert mit der Pfeilzahl)
-      if (window.playSFX) for (const [t, name, op] of PF.sfxPlan(plan)) window.playSFX(name, Object.assign({ dedupe: 0, category: null, delay: Math.max(0, rd(t * 1000)) }, op));
+      if (window.playSFX) for (const [t, name, op] of (einzel ? [[0.04, 'projectile', { volume: 0.5 }], [plan.tLast, 'damage', { volume: 0.55 }]] : PF.sfxPlan(plan))) window.playSFX(name, Object.assign({ dedupe: 0, category: null, delay: Math.max(0, rd(t * 1000)) }, op));
       window.__ppFx52Letzte = { plan, S, u, gw, gh, per, zielKey };
       return true;
     } catch (e) { try { console.warn('ppFx52Salve', e); } catch (e2) { /* still */ } return false; }
@@ -779,22 +845,21 @@
   //  in der Haltephase wird NICHTS gezeichnet oder hochgeladen (nur Zeitprüfung), beim Ausblinken schaltet nur `visibility`. Die Lage der Zone wird einmal beim Start des Eintrags gelesen
   //  (alle neuen Einträge eines Bildes zusammen: ein einziges erzwungenes Layout). Die Schleife (`ppTaktRaf`) läuft nur, solange Einträge laufen. Die native HP-Anzeige der Karte bleibt unberührt;
   //  der Balken liegt über der Oberkante der Zone. Läuft gerade die Salve für dasselbe Ziel, zeigt nur sie (kein Doppelbild).
-  const HP_LEBEN = 1250, HP_FLASH = 3, HP_BLINK = 260;
+  const HP_LEBEN = 1250, HP_FLASH = 3, HP_BLINK = 260, ANIM_ENDE = 300 + 250 + 270 + 80;   // Rampe + Halten + Nachrutschen
   const hpMap = new Map(), salveBis = new Map(), hpCache = new Map(), hpPool = [];
   let hpRaf = 0, hpLetzte = -1, hpS = 0;
   const hpMax = () => { try { return (window.ppIsPhone && window.ppIsPhone()) ? 4 : 8; } catch (e) { return 8; } };
   window.ppFx52SalveAktiv = (key, bis) => { salveBis.set(key, bis); const e = hpMap.get(key); if (e) { hpFrei(e); hpMap.delete(key); } };
   const hpMessen = (name, ms) => { if (window.__ppFx52Messen) (window[name] || (window[name] = [])).push(+ms.toFixed(3)); };
-  /** Bitmap (ImageData, auf den Inhalt beschnitten) des Balkens: { id, w, h, ox, oy } mit ox/oy = Versatz der Bitmap zur Balkenmitte/-oberkante (Zellen). */
-  function hpBitmap(hp, max, bw, flash) {
-    const key = hp + '|' + max + '|' + bw + '|' + (flash ? 1 : 0), hit = hpCache.get(key);
+  /** Bitmap (ImageData, auf den Inhalt beschnitten) des Balkens; Schlüssel = alles, was das Bild bestimmt (Zellenbreiten von Füllung/Verlust/Zuwachs, Zahl, Farbband, Blitz). */
+  function hpBitmap(smp, max, bw, flash) {
+    const w2 = (v) => (v == null ? -1 : rd(bw * clamp(v / max))), fq = clamp(smp.ziel / Math.max(1, max)), band = fq > 0.5 ? 2 : (fq > 0.25 ? 1 : 0);
+    const key = w2(smp.shown) + '|' + w2(smp.chip) + '|' + w2(smp.gain) + '|' + rd(smp.shown) + '|' + bw + '|' + band + '|' + (flash ? 1 : 0), hit = hpCache.get(key);
     if (hit) return hit;
-    const W = Math.max(bw, 30) + 10, H = 24, buf = new Uint8ClampedArray(W * H * 4), m = PF.maler(buf, W, H), cx = rd(W / 2), by = 14;
-    PF.hpBar(m, cx, by, bw, hp / max, hp, flash);
-    const d = m.d, w = Math.max(1, d.x1 - d.x0), h = Math.max(1, d.y1 - d.y0), out = new ImageData(w, h);
-    for (let j = 0; j < h; j++) out.data.set(buf.subarray(((d.y0 + j) * W + d.x0) * 4, ((d.y0 + j) * W + d.x0 + w) * 4), j * w * 4);
-    const r = { id: out, w, h, ox: d.x0 - cx, oy: d.y0 - by };
-    if (hpCache.size > 80) hpCache.clear();
+    const W = Math.max(bw + 8, 48), H = 20, cx = rd(W / 2), by = 12, out = new ImageData(W, H), m = PF.maler(out.data, W, H);   // feste Größe je Breite: die Leinwand wird nie neu dimensioniert
+    PF.hpBar2(m, cx, by, bw, { max, shown: smp.shown, chip: smp.chip, gain: smp.gain, ziel: smp.ziel, flash });
+    const r = { id: out, w: W, h: H, ox: -cx, oy: -by, key };
+    if (hpCache.size > 160) hpCache.clear();
     hpCache.set(key, r); return r;
   }
   function hpFrei(e) { if (e.cv) { e.cv.remove(); hpPool.push({ cv: e.cv, g: e.g }); e.cv = null; e.g = null; e.bw = e.bh = 0; } }
@@ -806,11 +871,15 @@
     return { cv, g: cv.getContext('2d') };
   }
   /** Warmlauf im Leerlauf: Leinwände vorbereiten, den Bitmap-Zeichner einmal heiß laufen lassen (kein erstes kaltes Bild beim ersten Treffer). */
-  window.ppFx52HpWarm = function () { try { PF.init(); while (hpPool.length < 8) hpPool.push(hpNeueLeinwand()); for (const [hp, mx, bw] of [[700, 800, 24], [64, 400, 20], [1234, 2000, 24], [0, 90, 16], [9, 10, 22]]) { hpBitmap(hp, mx, bw, true); hpBitmap(hp, mx, bw, false); } hpCache.clear(); } catch (e) { /* weg */ } };
+  window.ppFx52HpWarm = function () { try { PF.init(); if (window.ppFxWeltSchicht) window.ppFxWeltSchicht(); if (hpPool.length < 8) {                                                // Leinwände vorab anlegen UND einmal sichtbar bemalen (das erste Zeichnen in eine frische Leinwand kostet sonst 10–40 ms)
+          const lay = window.ppFxWeltSchicht ? window.ppFxWeltSchicht() : document.body, neu = [];
+          while (hpPool.length + neu.length < 8) { const pe = hpNeueLeinwand(); pe.cv.width = 48; pe.cv.height = 20; pe.cv.style.width = '96px'; pe.cv.style.height = '40px'; pe.cv.style.visibility = 'hidden'; pe.cv.style.left = '0px'; pe.cv.style.top = '0px'; lay.appendChild(pe.cv); pe.g.putImageData(new ImageData(48, 20), 0, 0); neu.push(pe); }
+          setTimeout(() => { for (const pe of neu) { pe.cv.remove(); hpPool.push(pe); } }, 200);
+        } for (const [hp, mx, bw] of [[700, 800, 24], [64, 400, 20], [1234, 2000, 24], [0, 90, 16], [9, 10, 22]]) { for (const t of [0, 40, 120, 260, 400, 700]) { const sm = PF.hpAnim([{ t: 0, to: hp }], Math.min(mx, hp + 60), t); hpBitmap(sm, mx, bw, t < 100); } const sg = PF.hpAnim([{ t: 0, to: Math.min(mx, hp + 90) }], hp, 80); hpBitmap(sg, mx, bw, false); } hpCache.clear(); } catch (e) { /* weg */ } };
   /** Bitmap in die Leinwand des Eintrags schreiben (Größe nur bei Änderung neu setzen: das löscht die Fläche). */
-  function hpMalen(e, flash) {
+  function hpMalen(e, smp, flash) {
     const t0 = window.__ppFx52Messen ? performance.now() : 0;
-    const bmp = hpBitmap(e.hp, e.max, e.rc.bw, flash);
+    const bmp = hpBitmap(smp, e.max, e.rc.bw, flash);
     if (!e.cv) {
       const pe = hpPool.pop() || hpNeueLeinwand();
       (window.ppFxWeltSchicht ? window.ppFxWeltSchicht() : document.body).appendChild(pe.cv);
@@ -820,7 +889,7 @@
     if (e.bw !== bmp.w || e.bh !== bmp.h) { e.cv.width = bmp.w; e.cv.height = bmp.h; e.cv.style.width = bmp.w * S + 'px'; e.cv.style.height = bmp.h * S + 'px'; e.bw = bmp.w; e.bh = bmp.h; }
     e.g.putImageData(bmp.id, 0, 0);
     e.cv.style.left = e.rc.x + bmp.ox * S + 'px'; e.cv.style.top = e.rc.y + bmp.oy * S + 'px';
-    e.flashAn = flash;
+    e.sig = bmp.key;
     if (t0) hpMessen('__ppFx52HpMalen', performance.now() - t0);
   }
   function hpSchritt(jetzt) {
@@ -834,7 +903,7 @@
       if (pending) {                                                        // Lage neuer Einträge: einmal lesen (ein erzwungenes Layout für alle)
         const tr0 = t0 ? performance.now() : 0;
         const fo = window.ppFxScrollOffset ? window.ppFxScrollOffset() : { dx: 0, dy: 0 };
-        let S = hpS; if (!S) { const he = document.querySelector('[data-hero-zone]'), hh = he ? he.getBoundingClientRect().height : 60; S = hpS = kl(rd(Math.max(hh, 40) / ZELLEN_JE_KARTE), 2, 6); }
+        let S = hpS; if (!S) { const he = document.querySelector('[data-hero-zone]'), hh = he ? he.getBoundingClientRect().height : 60; S = hpS = (typeof ppFxZelle === 'function' ? ppFxZelle(he) : kl(rd(Math.max(hh, 40) / ZELLEN_JE_KARTE), 2, 6)); }   // Zelle = Hero-Pixel
         for (const [key, e] of hpMap) {
           if (e.rc) continue;
           const el = zone({ kind: e.kind, owner: e.owner, heroIdx: e.heroIdx, zoneSlot: e.zoneSlot }, e.myIdx), r = el && el.getBoundingClientRect();
@@ -842,7 +911,7 @@
           const kt = e.kind === 'hero' ? kopfOben(el) : null;                // Balken über dem Kopf der Figur (sonst über der Zone)
           let top = (kt != null ? Math.min(kt, r.top) : r.top) - 11 * S; if (top < 13 * S) top = 13 * S;
           e.rc = { S, bw: Math.max(16, rd(r.width / S)), x: rd(r.left + r.width / 2 + fo.dx), y: rd(top + fo.dy) };
-          e.t = performance.now();                                          // Lebensdauer ab dem ersten sichtbaren Bild
+          { const dt = performance.now() - e.t; e.t += dt; for (const v of e.ev) v.t += dt; }   // Lebensdauer und Animation beginnen mit dem ersten sichtbaren Bild
         }
         if (t0) hpMessen('__ppFx52HpRect', performance.now() - tr0);
         if (t0) hpMessen('__ppFx52HpZeiten', performance.now() - t0);
@@ -850,13 +919,17 @@
         return;
       }
       const jetztP = performance.now();
-      let gemalt = 0;                                                       // höchstens 2 Bitmaps je Bild (8 neue Ziele verteilen sich über 4 Bilder statt ein Bild zu sprengen)
+      let gemalt = 0, neuAn = 0;                                            // höchstens 4 Bitmaps je Bild (viele Ziele verteilen sich über mehrere Bilder statt ein Bild zu sprengen)
       for (const [key, e] of hpMap) {
         if (!e.rc) continue;
         const alt = jetztP - e.t;
         if (alt > HP_LEBEN) { hpFrei(e); hpMap.delete(key); continue; }
-        const flash = alt < HP_FLASH * (1000 / 30);
-        if ((e.neu || e.flashAn !== flash) && gemalt < 2) { hpMalen(e, flash); e.neu = false; gemalt++; }   // nur bei neuem Wert oder beim Ende des Blitzes
+        // Animation (Rampe, Halten, Nachrutschen, Zahl zählt) nur solange sie läuft; danach steht das Bild (nichts zeichnen, nichts hochladen)
+        if (alt < ANIM_ENDE || !e.cv) {
+          const flash = alt < HP_FLASH * (1000 / 30), smp = PF.hpAnim(e.ev, e.hp0, jetztP);
+          const w2 = (v) => (v == null ? -1 : rd(e.rc.bw * clamp(v / e.max))), sig = w2(smp.shown) + '|' + w2(smp.chip) + '|' + w2(smp.gain) + '|' + rd(smp.shown) + '|' + (flash ? 1 : 0);
+          if (sig !== e.sigV && ((e.cv && gemalt < 4) || (!e.cv && neuAn < 1))) { if (!e.cv) neuAn++; hpMalen(e, smp, flash); e.sigV = sig; gemalt++; }   // höchstens 1 neue Leinwand je Bild
+        }
         if (e.cv) { const aus = alt > HP_LEBEN - HP_BLINK && (fr & 1); if (e.aus !== aus) { e.cv.style.visibility = aus ? 'hidden' : 'visible'; e.aus = aus; } }
       }
       if (t0) hpMessen('__ppFx52HpZeiten', performance.now() - t0);
@@ -875,9 +948,12 @@
       PF.init();
       const alt = hpMap.get(o.key);
       if (!alt && hpMap.size >= hpMax()) { let ae = null, ak = null; for (const [k, v] of hpMap) if (ae == null || v.t < ae) { ae = v.t; ak = k; } if (ak != null) { hpFrei(hpMap.get(ak)); hpMap.delete(ak); } }
-      const hp = Math.max(0, o.hp | 0), max = Math.max(1, o.max | 0);
-      if (alt && alt.rc) { alt.hp = hp; alt.max = max; alt.t = performance.now(); alt.neu = true; alt.myIdx = o.myIdx; }   // Lage bleibt (die Zone ändert sich in 1,25 s nicht)
-      else hpMap.set(o.key, { kind: o.kind, owner: o.owner, heroIdx: o.heroIdx, zoneSlot: o.zoneSlot, hp, max, myIdx: o.myIdx, t: performance.now(), neu: true, rc: null });
+      const hp = Math.max(0, o.hp | 0), max = Math.max(1, o.max | 0), jetzt = performance.now();
+      if (alt) {                                                            // weitere Änderung: läuft aus dem gerade gezeigten Wert weiter, die Anzeige verlängert sich
+        alt.ev.push({ t: jetzt, to: hp }); if (alt.ev.length > 6) { const v = PF.hpAnim(alt.ev, alt.hp0, alt.ev[1].t - 1).shown; alt.hp0 = v; alt.ev.shift(); }
+        alt.max = max; alt.t = jetzt; alt.myIdx = o.myIdx; alt.sigV = null; alt.hp = hp;
+        if (!alt.rc) alt.t = jetzt;
+      } else hpMap.set(o.key, { kind: o.kind, owner: o.owner, heroIdx: o.heroIdx, zoneSlot: o.zoneSlot, hp, max, myIdx: o.myIdx, t: jetzt, hp0: (o.prev != null ? Math.max(0, o.prev | 0) : hp), ev: [{ t: jetzt, to: hp }], rc: null, sigV: null });
       if (!hpRaf) { hpLetzte = -1; hpRaf = (window.ppTaktRaf || window.requestAnimationFrame)(hpSchritt); }
       return true;
     } catch (e) { return false; }

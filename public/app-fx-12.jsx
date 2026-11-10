@@ -20,12 +20,12 @@ function ppFx12Fit(verzug, dauer, ende = 960) {
 }
 /** Quadrat mit Seitenlänge aus Bildschirmpixeln (mind. 1 Rasterpixel), zentriert. */
 function ppFx12Punkt(g, x, y, px, c, a) {
-  const n = Math.max(1, Math.round(px / 3));
+  const n = Math.max(1, Math.round(px / (g.S || 3)));
   g.block(x - n / 2, y - n / 2, n, n, c, a);
 }
 /** Funke: Punkt mit kurzem, dunklerem Schweif darunter (steigende Glut). */
 function ppFx12Glut(g, x, y, px, c, schweif, a) {
-  const n = Math.max(1, Math.round(px / 3));
+  const n = Math.max(1, Math.round(px / (g.S || 3)));
   const X = Math.round(x - n / 2), Y = Math.round(y - n / 2);
   if (schweif && n >= 2) g.block(X, Y + n, n, Math.max(1, n - 1), schweif, a * 0.5);
   g.block(X, Y, n, n, c, a);
@@ -213,7 +213,7 @@ const ppFx12Boulder = ppR1Leinwand((g, t, sz, te) => {
   vorbereiten: (sz) => {
     const ww = Math.max(sz.props.w || 80, 80), hh = Math.max(sz.props.h || 110, 110), gross = ww * 0.74;
     return {
-      ww, hh, gross, gr: gross / 3, schwarz: ppHex('#000000'), staub: ppFx12Farben(['#929292', '#c5b7a0']), geroellFarbe: ppFx12Farben(['#929292', '#535353']),
+      ww, hh, gross, gr: gross / sz.S, schwarz: ppHex('#000000'), staub: ppFx12Farben(['#929292', '#c5b7a0']), geroellFarbe: ppFx12Farben(['#929292', '#535353']),
       geroell: Array.from({ length: ppFxN(9) }, () => {
         const w = -Math.PI * (0.1 + Math.random() * 0.8), weite = ww * (0.35 + Math.random() * 0.5), [, dauer] = ppFx12Fit(470, 420 + Math.random() * 260);
         return { dx: Math.cos(w) * weite, dy: Math.sin(w) * weite * 0.5, groesse: 3 + Math.random() * 6, dauer };

@@ -3,7 +3,7 @@
 // Effekte: acid_splash, angel_revival, aquatic_arrow_rain, arrow_impact, arrow_rain, baby_spider_opfer, battery_charge, biomancy_bloom, biomancy_vines, black_flame_strike, boiling_oil,
 // bomblebee_blast.
 // Alle laufen auf EINER Leinwand je Effekt (`ppR1Leinwand`, app-board.jsx; 1 Rasterpixel = 3 Bildschirmpixel, 30 Bilder/s): keine weichen Schatten, Scheine oder Verlaeufe — Schein =
-// Dither-Stufen (`ppFx9Schein`), Deckung = Bayer-Raster, Symbole (Blumen, Blaetter, Engel, Flamme, Reagenzglas, Spinne) = kleine Pixelbilder bzw. aus Pixeln berechnete
+// Dither-Stufen (`ppFx9Schein`), Deckung = Bayer-Raster, Symbole (Blumen, Blaetter, Engel, Flamme, Spinne) = kleine Pixelbilder bzw. aus Pixeln berechnete
 // Formen (nie ein gedrehtes Bild). Zeiten, Anker und Streuung folgen den DOM-Fassungen (ANIM_REGISTRY, Keyframes in style.css). Wo die Teilchen laenger liefen, als die Zonen-Animation
 // lebt (`duration` des Aufrufers, sonst 1000 ms), werden Verzoegerung und Dauer des einzelnen Teilchens gekuerzt (`ppFx9Fit`), damit der Effekt vor dem Abraeumen ausklingt statt abgeschnitten zu werden.
 
@@ -198,61 +198,267 @@ const ppFx9BlackFlame = ppR1Leinwand((g, t, sz, te) => {
 });
 
 // ═════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
-//  Acid Splash (`acid_splash`; Acid Vial, Boiling Oil-Karte) — PIXELART. Ein roter Schein (500 ms: .3 → 1,3 → 1,6 mal 60 px) und 22 Saeureblasen, die vom unteren Rand der Zone aufsteigen
-//  (wackeln seitlich, wachsen .5 → 1,1, schrumpfen und verblassen; 500–1100 ms ab 0–120 ms), dazu 6 dunkle Spritzer mit Reagenzglas (die gleiche Bahn, 600–1000 ms ab 50–250 ms).
+//  Acid Splash (`acid_splash`; Acid Vial, Boiling Oil) — PIXELART. KEINE Flaeschchen, KEINE Blasen: nur rote Saeure, die wie aus einem ausgekippten Eimer VON OBEN auf das Ziel trifft.
+//  Ziel = der Held (Silhouette des Sprites auf der Heldenkarte) bzw. die Karte in der Zone (Kreatur, Artefakt). Alles auf der Hero-Pixel-Zelle (`ppR1Leinwand`), Bewegung in ganzen Zellen im 30-Hz-Takt.
+//    0–230 ms     GUSS: eine breite, dicke Masse faellt von ueber der Leinwand-Oberkante herab (Eimer, leicht gekippt: eine Seite zuerst). Die Unterkante reisst in Straehnen (1–3 Zellen breit, eigene
+//                 Fallgeschwindigkeit, hell/dunkel abgesetzt), die Oberkante ("Lippe") bleibt als heller, ausgefranster Rand haengen; ausserhalb des Ziels zerfallen die Straehnen in Tropfenketten.
+//    ~215–330 ms  AUFPRALL (Kontakt je Spalte nach Hoehe der Silhouette; Hauptmasse ~250 ms): die Masse sitzt als Kappe auf dem Ziel, sinkt ein, eine helle Lippe bleibt an der Oberkante.
+//                 Die Beschichtung = ganze Zellen in der Silhouette (Dither-Maske, das Ziel bleibt sichtbar): dichter auf dem Sprite, duenner Film auf der Kartenflaeche, helle/dunkle Randzellen
+//                 entlang der Silhouette. Dazu Spritzer in drei Stufen (1, 2x2, Klecks), ballistisch nach aussen (Aufwaertsimpuls, dann Fall) bis zum Boden der Zone.
+//    300–700 ms   ABLAUFEN: die Beschichtung laeuft spaltenweise nach unten (Straehnen unterschiedlich schnell, Spitze hell); wo sie die Unterkante erreicht, haengt ein Tropfen, waechst
+//                 (1 → 3 Zellen) und loest sich, faellt auf den Boden und spritzt (zwei Mini-Tropfen). Am Boden waechst eine flache Pfuetze (3 Zeilen) samt Flecken der gelandeten Spritzer.
+//    620–850 ms   AUSKLINGEN per Bayer-Dither in Viertelstufen (nie Alpha), bis die Zonen-Animation (`duration`, 900 ms) abgeraeumt wird.
+//  Palette: nur #780000 #c80000 #ef2929 + Glanz #ff6666. Kein Verlauf, kein Weichzeichner, keine Drehung, keine Reagenzglaeser/Kolben/Blasen. Jedes Ziel (Acid Vial: eins, Boiling Oil: mehrere) bekommt seine eigene Leinwand.
+//  Das Ziel liest die Huelle EINMAL beim Start (`zoneEl` von playAnimation, `PP_SQUASH_ANIMS`): Zonen-/Kartenrechteck, bei Helden die Sprite-Silhouette je Frame (`ppFx57SheetPixel`); im Takt wird kein Layout gelesen.
+//  Ohne Zonenelement (oder `prefers-reduced-motion`, Retro): dieselbe Beschichtung auf dem Rechteck (x, y, w, h) ohne Guss und Spritzer ("ruhig"). `__ppFxAlt`: DOM-Fassung (ANIM_REGISTRY in app-board.jsx).
 // ═════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
-const PP_FX9_SAEURE = ppFx9H(['#c80000', '#ef2929', '#ef2929', '#c80000', '#be0e0e', '#e92f38', '#ff1a1a', '#c80000']);
-const PP_FX9_SAEURE_SCHEIN = ppFx9H(['#780000', '#be0e0e', '#c80000']);
-const PP_FX9_KOLBEN = ['..ccc..', '..owo..', '..owo..', '.owwwo.', '.oRRRo.', 'oRRrRRo', 'oRRRRRo', '.oRRRo.', '..ooo..'];
-const PP_FX9_KOLBEN_PAL = { c: ppHex('#9d612f'), o: ppHex('#59606e'), w: ppHex('#e5edfa'), R: ppHex('#e92f38'), r: ppHex('#ff6666') };
-/** Bahn einer aufsteigenden Blase (`animBeerBubble`, ease-out je Abschnitt): u 0..1 → Versatz (px), Massstab, Deckung. */
-function ppFx9Blase(u, wob) {
-  return {
-    x: ppFx9Kf(u, [[0, 0], [0.2, wob], [0.6, -wob / 2], [1, wob]], PP_FX9_AUS),
-    y: ppFx9Kf(u, [[0, 0], [0.2, -15], [0.6, -45], [1, -80]], PP_FX9_AUS),
-    sc: ppFx9Kf(u, [[0, 0.5], [0.2, 1], [0.6, 1.1], [1, 0.4]], PP_FX9_AUS),
-    a: ppFx9Kf(u, [[0, 0], [0.2, 0.9], [0.6, 0.7], [1, 0]], PP_FX9_AUS),
-  };
+const PP_FX9_ROT = ppFx9H(['#780000', '#c80000', '#ef2929', '#ff6666']);   // 0 Rand/Schatten, 1 dunkel, 2 Koerper, 3 Glanz/Kante
+const PP_FX9_KLECKS = [['h'], ['hb', 'bd'], ['.hb', 'hbb', 'bdd']];            // Spritzer-Stufen (Zellen): h Glanz, b Koerper, d Schatten
+const PP_FX9_KLECKS_PAL = { h: PP_FX9_ROT[3], b: PP_FX9_ROT[2], d: PP_FX9_ROT[1], o: PP_FX9_ROT[0] };
+const PP_FX9_GUSS = { treffer: 215, schw: 0.0009, ablauf: 220, fadeVon: 620 };   // mittlere Fallzeit bis zur Zieloberkante (ms), Spritzer-Schwerkraft (Zellen/ms²), Anlauf der Beschichtung, Ausklingen ab
+const ppFx9Ruhig = () => { try { return !!(window.PP_RETRO || (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches)); } catch (e) { return false; } };
+
+/** Ziel einmal vermessen (Rechtecke relativ zum Anker = Mitte der Zone, Bildschirmpixel): Karte, bei Helden zusaetzlich Sprite (Sheet-Pixel, Frame). Je Props-Objekt gemerkt (Masse + Plan lesen dasselbe). */
+const _ppFx9GussGeo = new WeakMap();
+function ppFx9GussGeo(props) {
+  let G = _ppFx9GussGeo.get(props);
+  if (G) return G;
+  const S = ppFxZelleFuer(props), w0 = props.w || 64, h0 = props.h || 90;
+  let z = props.zoneEl && props.zoneEl.isConnected ? props.zoneEl : null, zr = null;
+  try { if (z) zr = z.getBoundingClientRect(); } catch (e) { zr = null; }
+  if (!zr || !(zr.width > 0) || !(zr.height > 0)) { z = null; zr = null; }
+  const zcx = zr ? zr.left + zr.width / 2 : 0, zcy = zr ? zr.top + zr.height / 2 : 0;
+  const rel = (r) => ({ l: r.left - zcx, t: r.top - zcy, r: r.right - zcx, b: r.bottom - zcy });
+  let karte = { l: -w0 / 2, t: -h0 / 2, r: w0 / 2, b: h0 / 2 }, fig = null;
+  if (zr) {
+    karte = rel(zr);
+    try {
+      if (z.hasAttribute('data-hero-zone')) {
+        if (typeof ppFx57SheetPixel === 'function') {
+          const hp = ppFxHeldPixel(z, zr.width);
+          const px = hp && hp.cv && hp.eintrag && hp.platz ? ppFx57SheetPixel(hp.eintrag) : null;
+          if (px) { const cr = hp.cv.getBoundingClientRect(); if (cr.width > 0) fig = { px, platz: hp.platz, eintrag: hp.eintrag, pxs: hp.px, rect: rel(cr) }; }
+        }
+      } else {
+        const kr = z.querySelector('.board-card') && z.querySelector('.board-card').getBoundingClientRect();
+        if (kr && kr.width > 0 && kr.height > 0) karte = rel(kr);
+      }
+    } catch (e) { fig = null; }
+  }
+  const bb = { l: karte.l, t: karte.t, r: karte.r, b: karte.b };
+  if (fig) { bb.l = Math.min(bb.l, fig.rect.l); bb.t = Math.min(bb.t, fig.rect.t); bb.r = Math.max(bb.r, fig.rect.r); bb.b = Math.max(bb.b, fig.rect.b); }
+  const padX = 30 * S, padTop = Math.min(56, Math.max(34, Math.round((bb.b - bb.t) / S * 0.9) + 8)) * S, padBot = 14 * S;
+  G = { S, karte, fig, bb, mass: { breite: bb.r - bb.l + 2 * padX, hoehe: bb.b - bb.t + padTop + padBot, ankerX: padX - bb.l, ankerY: padTop - bb.t } };
+  _ppFx9GussGeo.set(props, G);
+  return G;
 }
-const ppFx9Saeure = ppR1Leinwand((g, t, sz, te) => {
-  const S = sz.S, cx = sz.cx, cy = sz.cy;
-  const fk = t / 500;
-  if (fk < 1) {
-    const sc = ppFx9Kf(fk, [[0, 0.3], [0.5, 1.3], [1, 1.6]], PP_FX9_AUS), a = ppFx9Kf(fk, [[0, 1], [0.5, 0.6], [1, 0]], PP_FX9_AUS), r = (60 * sc) / S;
-    ppFx9Schein(g, cx, cy, r, r, PP_FX9_SAEURE_SCHEIN, a, [0.3, 0.6, 0.95]);
+
+/** Plan: Masken (Zielzellen: 1 Sprite, 2 Karte, je Held-Frame), Spalten (Oberkante, Unterkante, Treffer), Straehnen, Spritzer, Tropfen — alles einmal gewuerfelt. */
+function ppFx9GussPlan(sz) {
+  const geo = ppFx9GussGeo(sz.props), S = sz.S, gw = sz.gw, gh = sz.gh, cx = sz.cx, cy = sz.cy, R = Math.random;
+  const ruhig = ppFx9Ruhig() || !sz.props.zoneEl;
+  const cxp = (px) => cx + px / S, cyp = (py) => cy + py / S;
+  const base = new Uint8Array(gw * gh), k = geo.karte;
+  const kx0 = Math.max(0, Math.round(cxp(k.l))), kx1 = Math.min(gw, Math.round(cxp(k.r))), ky0 = Math.max(0, Math.round(cyp(k.t))), ky1 = Math.min(gh, Math.round(cyp(k.b)));
+  for (let Y = ky0; Y < ky1; Y++) for (let X = kx0; X < kx1; X++) base[Y * gw + X] = 2;
+  // Held: Silhouette je Frame (Naechster-Nachbar aus dem Sheet, wie die Hammer-Animationen)
+  const masks = [base];
+  let frames = 1;
+  const fig = geo.fig;
+  if (fig) {
+    const s = fig.px, meta = fig.eintrag.meta;
+    frames = Math.max(1, meta.frames | 0);
+    const fr = fig.rect, X0 = Math.max(0, Math.floor(cxp(fr.l))), X1 = Math.min(gw - 1, Math.ceil(cxp(fr.r))), Y0 = Math.max(0, Math.floor(cyp(fr.t))), Y1 = Math.min(gh - 1, Math.ceil(cyp(fr.b)));
+    masks.length = 0;
+    for (let f = 0; f < frames; f++) {
+      const m = base.slice(), sx0 = s.vert ? 0 : f * s.fw, sy0 = s.vert ? f * s.fh : 0;
+      for (let Y = Y0; Y <= Y1; Y++) {
+        const row = Math.floor(((Y + 0.5 - cy) * S - fr.t) / fig.pxs);
+        if (row < 0 || row >= s.fh) continue;
+        for (let X = X0; X <= X1; X++) {
+          const col = Math.floor(((X + 0.5 - cx) * S - fr.l) / fig.pxs);
+          if (col < 0 || col >= s.fw) continue;
+          if (s.d[((sy0 + row) * s.w + sx0 + col) * 4 + 3] >= 128) m[Y * gw + X] = 1;
+        }
+      }
+      masks.push(m);
+    }
   }
-  for (const d of te.tropfen) {
-    const u = (t - d.delay) / d.dur;
-    if (u < 0 || u > 1) continue;
-    const b = ppFx9Blase(u, d.wobble), x = cx + (d.xOff + d.size / 2 + b.x) / S, y = cy + (10 - d.size / 2 + b.y) / S, n = (d.size * b.sc) / S;
-    if (n < 0.8) continue;
-    ppFx9Punkt(g, x, y, n, d.farbe, ppFx9Fest(b.a));
-    if (n >= 3.4) g.put(x - n * 0.22, y - n * 0.22, PP_FX9_KOLBEN_PAL.w, ppFx9Fest(b.a) * 0.7);
+  // Spalten: Oberkante / Unterkante ueber alle Frames
+  const ty = new Int16Array(gw).fill(-1), by = new Int16Array(gw).fill(-1);
+  for (const m of masks) for (let X = 0; X < gw; X++) {
+    for (let Y = 0; Y < gh; Y++) if (m[Y * gw + X]) { if (ty[X] < 0 || Y < ty[X]) ty[X] = Y; break; }
+    for (let Y = gh - 1; Y >= 0; Y--) if (m[Y * gw + X]) { if (Y > by[X]) by[X] = Y; break; }
   }
-  for (const s of te.spritzer) {
-    const u = (t - s.delay) / s.dur;
-    if (u < 0 || u > 1) continue;
-    const b = ppFx9Blase(u, 0), x = cx + (s.links + s.size / 2 + b.x) / S, y = cy + (10 - s.size / 2 + b.y) / S, n = (s.size * b.sc) / S;
-    if (n < 1.2) continue;
-    ppFx9Punkt(g, x, y, n, PP_FX9_SAEURE_SCHEIN[0], ppFx9Fest(b.a));
-    if (n >= 5.6) ppFx9Bild(g, PP_FX9_KOLBEN, PP_FX9_KOLBEN_PAL, x, y, ppFx9Fest(b.a));
-  }
-}, 1100, { breite: 213, hoehe: 213 }, {
-  z: 10100,
-  vorbereiten: (sz) => {
-    const ende = ppFx9Ende(sz);
-    return {
-      tropfen: Array.from({ length: ppFxN(22) }, () => {
-        const [delay, dur] = ppFx9Fit(Math.random() * 120, 500 + Math.random() * 600, ende);
-        return { xOff: -50 + Math.random() * 100, size: 8 + Math.random() * 16, wobble: -20 + Math.random() * 40, farbe: ppFx9Pick(PP_FX9_SAEURE), delay, dur };
-      }),
-      spritzer: Array.from({ length: ppFxN(6) }, () => {
-        const [delay, dur] = ppFx9Fit(50 + Math.random() * 200, 600 + Math.random() * 400, ende);
-        return { links: -15 + Math.random() * 30, size: 18 + Math.random() * 8, delay, dur };   // wie vorher: `left` = der Zufallswert yOff (-15…15)
-      }),
+  let xa = gw, xb = -1, tySum = 0, tyN = 0, byMax = 0;
+  for (let X = 0; X < gw; X++) if (ty[X] >= 0) { xa = Math.min(xa, X); xb = Math.max(xb, X); tySum += ty[X]; tyN++; byMax = Math.max(byMax, by[X]); }
+  if (xb < xa) { xa = Math.round(cx) - 6; xb = Math.round(cx) + 6; tySum = cy * 13; tyN = 13; byMax = Math.round(cy) + 10; }
+  const yG = Math.min(gh - 2, byMax + 3), xm = (xa + xb) / 2, halfW = Math.max(4, (xb - xa) / 2 + 2);
+  const tyMean = tySum / Math.max(1, tyN), Gr = (2 * Math.max(8, tyMean)) / (PP_FX9_GUSS.treffer * PP_FX9_GUSS.treffer);   // Zellen/ms²
+  // Straehnen: Gruppen aus 1–3 Spalten ueber die Breite des Ziels (+2 Zellen), ausserhalb der Silhouette duenne Tropfenketten
+  const X0 = Math.max(0, xa - 2), X1 = Math.min(gw - 1, xb + 2), tilt = R() < 0.5 ? -1 : 1;
+  const sOf = new Int16Array(gw).fill(-1), strands = [];
+  for (let X = X0; X <= X1;) {
+    const draussen = ty[X] < 0;
+    const w = draussen ? 1 : [1, 2, 2, 3, 3][Math.floor(R() * 5)];
+    const xc = X + (w - 1) / 2, u = Math.max(-1, Math.min(1, (xc - xm) / halfW)), env = Math.sqrt(Math.max(0, 1 - u * u * 0.9));
+    const st = {
+      x0: X, w, thin: draussen, ph: Math.floor(R() * 4),
+      ts: tilt * u * 9 + 16 + R() * 8, m: R() < 0.35 ? 1.06 + R() * 0.2 : 0.975 + R() * 0.05, dens: [-2, 0, 0, 2, 4][Math.floor(R() * 5)],
+      L0: (13 + R() * 3) * (0.4 + 0.6 * env) * (draussen ? 1.3 : 1), rf: draussen ? 0.5 + R() * 0.15 : 0.7 + R() * 0.1,
+      vC: 0.085 + R() * 0.085, lead: false,
     };
-  },
-});
+    for (let q = 0; q < w; q++) if (X + q < gw) sOf[X + q] = strands.length;
+    strands.push(st);
+    X += w;
+  }
+  const byV = strands.slice().sort((a, b) => b.vC - a.vC);
+  for (let i = 0; i < Math.ceil(byV.length * 0.28); i++) byV[i].lead = true;
+  // Treffer je Spalte (ms): Zieloberkante bzw. Boden
+  const hit = new Float32Array(gw).fill(1e9);
+  for (let X = X0; X <= X1; X++) { const s = strands[sOf[X]]; if (!s) continue; const stop = ty[X] >= 0 ? ty[X] : yG; hit[X] = ruhig ? -1000 : s.ts + Math.sqrt((2 * stop) / (Gr * s.m)); }
+  // Tropfen am Unterrand: Spalten, in denen die Beschichtung den Boden der Silhouette erreicht (bevorzugt Spitzen-Straehnen)
+  const drips = [];
+  if (!ruhig) {
+    const kand = [];
+    for (let X = X0; X <= X1; X++) if (ty[X] >= 0 && by[X] - ty[X] >= 6) kand.push(X);
+    kand.sort((a, b) => (strands[sOf[b]].lead ? 1 : 0) - (strands[sOf[a]].lead ? 1 : 0) + (R() - 0.5) * 0.9);
+    const n = Math.min(kand.length, Math.max(3, Math.round(ppFxN(7))));
+    const used = [];
+    for (const X of kand) {
+      if (drips.length >= n) break;
+      if (used.some(u => Math.abs(u - X) < 3)) continue;
+      used.push(X);
+      const s = strands[sOf[X]], len = by[X] - ty[X];
+      let age = 0; while (age < 1500 && s.vC * age * (0.55 + 0.45 * Math.min(1, age / PP_FX9_GUSS.ablauf)) < len) age += 4;
+      drips.push({ x: X, y: by[X] + 1, td: hit[X] + age, hang: 70 + R() * 90 });
+    }
+  }
+  // Spritzer: von den Aufprallstellen nach aussen, ballistisch (Zellen/ms), Stufe 0/1/2
+  const spritzer = [];
+  if (!ruhig) {
+    const n = ppFxN(26);
+    for (let i = 0; i < n; i++) {
+      const X = X0 + Math.floor(R() * (X1 - X0 + 1)), s = strands[sOf[X]];
+      if (!s) continue;
+      const y0 = (ty[X] >= 0 ? ty[X] : yG) - 1, u = (X - xm) / halfW, dir = (R() < 0.85 ? (u < 0 ? -1 : 1) : -(u < 0 ? -1 : 1));
+      const vx = dir * (0.012 + R() * 0.055 + Math.abs(u) * 0.03), vy = -(0.025 + R() * 0.085) * (ty[X] >= 0 ? 1 : 0.55), g = PP_FX9_GUSS.schw;
+      const t0 = hit[X] + R() * 25, T = (-vy + Math.sqrt(vy * vy + 2 * g * Math.max(1, yG - 1 - y0))) / g;
+      spritzer.push({ x0: X + 0.5, y0, vx, vy, t0, T, stufe: R() < 0.45 ? 0 : R() < 0.64 ? 1 : 2 });
+    }
+    spritzer.sort((a, b) => b.stufe - a.stufe);   // grosse zuerst: kleine bleiben obenauf sichtbar
+  }
+  const fadeBis = Math.max(PP_FX9_GUSS.fadeVon + 120, Math.min(850, (sz.props.duration || 900) - 60));
+  return { masks, frames, fig, ty, by, sOf, hit, strands, drips, spritzer, X0, X1, yG, xm, halfW, Gr, ruhig, fadeBis, pfuetzeT0: ruhig ? -1000 : 250, rx: Math.max(5, halfW * 0.9) };
+}
+
+const ppFx9Saeure = ppR1Leinwand((g, t, sz, te) => {
+  const R = PP_FX9_ROT, gw = sz.gw, gh = sz.gh, tt = te.ruhig ? t + 330 : t;
+  // Ausklingen: Bayer-Deckung in Viertelstufen (gilt fuer alles, was gezeichnet wird)
+  const fa = t < PP_FX9_GUSS.fadeVon ? 1 : Math.max(0, Math.ceil((1 - (t - PP_FX9_GUSS.fadeVon) / (te.fadeBis - PP_FX9_GUSS.fadeVon)) * 4) / 4);
+  if (fa <= 0) return;
+  const put = (X, Y, c) => { if (X >= 0 && Y >= 0 && X < gw && Y < gh) g.put(X, Y, c, fa); };
+  let fi = 0;
+  if (te.fig) { try { fi = Math.max(0, Math.min(te.frames - 1, te.fig.platz._ppFrame | 0)); } catch (e) { fi = 0; } }
+  const mk = te.masks[fi] || te.masks[0];
+  const pcB = (tt < 420 ? 10 : tt < 600 ? 9 : 8) / 16, pcF = (tt < 420 ? 6 : tt < 600 ? 5 : 4) / 16;
+  const yG = te.yG;
+  // ── Pfuetze am Boden: flach (3 Zeilen), waechst von der Mitte, Flecken der gelandeten Spritzer ─────────────────────────────────
+  if (t > te.pfuetzeT0 || te.ruhig) {
+    const e = te.ruhig ? 1 : Math.min(1, (t - te.pfuetzeT0) / 260), rx = Math.round(te.rx * (1 - (1 - e) * (1 - e)));
+    const xm = Math.round(te.xm);
+    for (let i = -rx; i <= rx; i++) {
+      const f = Math.abs(i) / Math.max(1, rx);
+      if (f > 0.97 && rx > 3) continue;
+      put(xm + i, yG, ((i + 100) % 5 === 0) ? R[3] : R[2]);                       // Wasserlinie mit Glanzpunkten
+      if (f < 0.88) put(xm + i, yG + 1, ((i + 100) & 1) ? R[1] : R[0]);           // Unterkante
+      if (f < 0.6 && e > 0.4 && ppBayer(xm + i, yG - 1) < 0.5) put(xm + i, yG - 1, R[1]);   // hintere Zeile, nur gedithert
+    }
+  }
+  // ── Beschichtung: ganze Zellen in der Zielmaske, Spalte fuer Spalte von oben nach unten ──────────────────────────────────────────
+  for (let X = te.X0; X <= te.X1; X++) {
+    const top = te.ty[X], s = te.strands[te.sOf[X]];
+    if (top < 0 || !s) continue;
+    const age = tt - te.hit[X];
+    if (age < 0) continue;
+    const run = s.vC * age * (0.55 + 0.45 * Math.min(1, age / PP_FX9_GUSS.ablauf)), front = top + run, ymax = Math.min(Math.floor(front), te.by[X]);
+    const streak = s.lead || s.w >= 3;
+    for (let Y = top; Y <= ymax; Y++) {
+      const c = mk[Y * gw + X];
+      if (!c) continue;
+      const nU = Y > 0 ? mk[(Y - 1) * gw + X] : 0, nD = Y < gh - 1 ? mk[(Y + 1) * gw + X] : 0, nL = X > 0 ? mk[Y * gw + X - 1] : 0, nR = X < gw - 1 ? mk[Y * gw + X + 1] : 0;
+      const sprite = c === 1;
+      const kante = sprite ? (nU !== 1 || nL !== 1) : (nU === 0);
+      const rand = sprite ? (nD !== 1 || nR !== 1) : (nD === 0 && Y >= te.by[X]);
+      const d = front - Y;
+      let col;
+      if (d < 1 && Y < te.by[X]) col = s.lead ? R[3] : R[2];                          // nasse Spitze der Straehne
+      else if (kante && (sprite || age < 560 || ((X + Y) & 1) === 0)) col = ((X + Y) & 1) ? R[3] : R[2];   // helle Rand-/Lippenzellen
+      else if (rand) col = R[0];                                                      // dunkle Unter-/Seitenkante
+      else if (Y - top < 2 && !sprite && age < 560) col = R[2];                       // Lippe an der Kartenoberkante
+      else {
+        const pc = Math.max(0.1, ((sprite || streak) ? pcB : pcF) + s.dens / 16), v = ppBayer(X, Y);
+        if (v >= pc) continue;
+        col = v > pc * 0.9 ? R[0] : v < pc * 0.55 ? R[2] : R[1];
+      }
+      put(X, Y, col);
+    }
+  }
+  if (te.ruhig) return;
+  // ── Guss: Straehnen von oben bis zur Zieloberkante (Kappe) bzw. zum Boden ──────────────────────────────────────────────────────
+  for (let i = 0; i < te.strands.length; i++) {
+    const s = te.strands[i], tau = t - s.ts;
+    if (tau <= 0) continue;
+    const half = 0.5 * te.Gr * s.m * tau * tau, front = -1 + half, rear = -1 - s.L0 + half * s.rf;
+    for (let q = 0; q < s.w; q++) {
+      const X = s.x0 + q;
+      if (X >= gw) break;
+      const stop = (te.ty[X] >= 0 ? te.ty[X] : yG) - 1;
+      const r0 = Math.max(0, Math.ceil(rear + ((X * 7 + i) % 3 === 0 ? 1 : 0))), r1 = Math.min(Math.floor(front), stop);
+      for (let Y = r0; Y <= r1; Y++) {
+        if (s.thin && ((Y + s.ph) & 3) === 3) continue;                              // Tropfenkette: Luecken
+        let col = R[2];
+        if (s.w >= 2 && q === s.w - 1) col = R[1];                                    // Schattenspalte rechts je Straehne
+        else if ((X * 5 + Y * 3) % 11 === 0) col = R[3];                              // vereinzelte Glanzzellen
+        if (Y - rear < 1.6) col = R[3];                                               // helle Lippe oben
+        else if (Y > front - 1.2) col = (q === 0 || q === s.w - 1) && s.w >= 2 ? R[0] : R[1];   // dunkle, gerundete Spitze
+        put(X, Y, col);
+      }
+    }
+  }
+  // ── Tropfen am Unterrand: haengen, wachsen, loesen sich, fallen, spritzen ─────────────────────────────────────────────────────
+  for (const dr of te.drips) {
+    const a = t - dr.td;
+    if (a < 0) continue;
+    if (a < dr.hang) {
+      const n = 1 + Math.floor((a / dr.hang) * 2.99);
+      for (let j = 0; j < n; j++) put(dr.x, dr.y + j, j === n - 1 ? R[3] : R[2]);
+      if (n === 3) put(dr.x + 1, dr.y + 2, R[1]);
+      continue;
+    }
+    const f = a - dr.hang, yy = dr.y + 2 + 0.5 * 0.0017 * f * f;
+    if (yy < yG - 1) { put(dr.x, Math.round(yy), R[2]); put(dr.x, Math.round(yy) - 1, R[1]); continue; }
+    const l = f - Math.sqrt((2 * (yG - 3 - dr.y)) / 0.0017);                        // seit dem Aufschlag
+    if (l >= 0 && l < 140) {
+      const h = Math.round(Math.sin((l / 140) * Math.PI) * 3), w = 1 + Math.floor(l / 45);
+      put(dr.x - w, yG - 1 - h, R[2]); put(dr.x + w, yG - 1 - h, R[2]);
+    }
+  }
+  // ── Spritzer: Bahn in ganzen Zellen, Landung = Fleck am Boden ──────────────────────────────────────────────────────────────────
+  for (const sp of te.spritzer) {
+    const a = t - sp.t0;
+    if (a < 0) continue;
+    if (a < sp.T) {
+      const x = sp.x0 + sp.vx * a, y = sp.y0 + sp.vy * a + 0.5 * PP_FX9_GUSS.schw * a * a;
+      const st = sp.stufe === 2 && sp.T - a < 70 ? 1 : sp.stufe === 1 && sp.T - a < 40 ? 0 : sp.stufe;   // vor der Landung eine Stufe kleiner (Sprite-Wechsel, kein stufenloses Skalieren)
+      const bild = PP_FX9_KLECKS[st], h = bild.length, w = bild[0].length, x0 = Math.round(x - w / 2), y0 = Math.round(y - h / 2);
+      for (let j = 0; j < h; j++) for (let i = 0; i < w; i++) { const c = PP_FX9_KLECKS_PAL[bild[j][i]]; if (c) put(x0 + i, y0 + j, c); }
+    } else {
+      const x = Math.round(sp.x0 + sp.vx * sp.T), w = sp.stufe + 1;
+      for (let i = 0; i < w; i++) put(x + i, yG - ((i & 1) && sp.stufe === 2 ? 0 : 1) + (sp.stufe === 0 ? 1 : 0), i === 0 ? R[3] : R[1]);
+    }
+  }
+}, 900, (props) => ppFx9GussGeo(props).mass, { z: 10100, vorbereiten: ppFx9GussPlan });
 
 // ═════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
 //  Boiling Oil (`boiling_oil`) — PIXELART. 22 rote Oeltropfen (Tropfenform, strecken sich beim Fallen .65 → 1,15) fallen beschleunigend von 0,65 Kartenhoehen ueber der Mitte bis auf das

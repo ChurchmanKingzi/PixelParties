@@ -84,6 +84,8 @@ const funnelModule = require('./funnel');   // Spieler-Trichter (Besucher -> Gas
 const skillTest = require('./skilltest');   // Modus „Skill Test" (Lobby, Vorbereitung, Rounds)
 const { K: ELO_K, placementDelta } = require('./placement-elo');   // Ranked-Elo nach Platzierung (Draft + Skill Test)
 const { isSeat, opponentOfGs, playerCountGs, emitToOpponentsGs } = require('./cards/effects/_opp');
+const RarityTrack = require('./cards/effects/_rarity-track');   // Rarity je physischer Kartenkopie (Identitaetsverfolgung ueber Zonenwechsel)
+const RARITIES = require('./rarities');   // Seltenheiten (UMD, auch im Browser): Namen, Gewichte, Würfeln, Pack-Pools, Deck-Rechnung
 
 /**
  * Enrich a puzzle-authored buffs object so each entry carries the
@@ -953,6 +955,12 @@ app.get('/sitemap.xml', (req, res) => {
 // zu 7 Tage einplanen — oder den Dateinamen aendern.
 // Pixel-Emoji-Schrift: der Dateiname traegt einen Inhalts-Hash (`?v=…`, scripts/pixel-emoji/build_font.py) — ein Jahr cachen, ohne Rueckfrage.
 app.use('/fonts', express.static(path.join(__dirname, 'public', 'fonts'), { maxAge: '365d', immutable: true }));
+// Rarity-Modul (UMD, Repo-Wurzel): derselbe Quelltext laeuft im Server (require) und im Browser (window.PpRarities).
+app.get('/rarities.js', (req, res) => {
+  res.setHeader('Content-Type', 'text/javascript; charset=UTF-8');
+  res.setHeader('Cache-Control', 'public, max-age=0, must-revalidate');
+  res.sendFile(path.join(__dirname, 'rarities.js'), { etag: true, lastModified: true });
+});
 app.use(express.static(path.join(__dirname, 'public'), { maxAge: 0, etag: true }));
 app.use('/data', express.static(path.join(__dirname, 'data')));
 // Card art (~730 immutable-ish PNGs). A long cache lifetime means a full
@@ -1001,6 +1009,8 @@ async function initDatabase() {
   try { await db.execute('ALTER TABLE users ADD COLUMN losses INTEGER DEFAULT 0'); } catch {}
   try { await db.execute("ALTER TABLE decks ADD COLUMN cover_card TEXT DEFAULT ''"); } catch {}
   try { await db.execute("ALTER TABLE decks ADD COLUMN skins TEXT DEFAULT '{}'"); } catch {}
+  // Rarity je Kartenkopie im Deck (JSON, Form siehe rarities.js: { main, potion, side, heroes }). Leer = alles Common.
+  try { await db.execute("ALTER TABLE decks ADD COLUMN rarities TEXT DEFAULT '{}'"); } catch {}
   // Cube Draft mode: a deck row with mode='cube' is a 512-card cube list
   // (single section, no heroes / potions / side). Default 'standard' keeps
   // every existing row unchanged.
@@ -1257,6 +1267,45 @@ async function initDatabase() {
   await db.execute('CREATE INDEX IF NOT EXISTS idx_sc_log_user ON sc_log(user_id)');
   await db.execute('CREATE INDEX IF NOT EXISTS idx_sc_log_user_date ON sc_log(user_id, created_at)');
 
+  // Rarity-Sammlung: gesammelte Kopien je (Karte, Rarity) — Common gehört jedem unbegrenzt und steht nicht in der Tabelle.
+  await db.execute(`CREATE TABLE IF NOT EXISTS user_card_rarities (
+    user_id TEXT NOT NULL,
+    card TEXT NOT NULL,
+    rarity TEXT NOT NULL,
+    count INTEGER NOT NULL DEFAULT 0,
+    PRIMARY KEY (user_id, card, rarity)
+  )`);
+  // Offene (gekaufte, noch nicht eingelöste) Booster-Packs: mehrere je Nutzer möglich (Mengenkauf, bis BOOSTER_MAX_BUY je Kauf).
+  await db.execute(`CREATE TABLE IF NOT EXISTS pending_booster (
+    id TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL,
+    pack_id TEXT NOT NULL,
+    variant_id TEXT NOT NULL,
+    cards_json TEXT NOT NULL,
+    created_at INTEGER DEFAULT (unixepoch())
+  )`);
+  // Sell Back: Index der aus diesem Pack zurückgegebenen Karte (-1 = noch keine). Je Pack nur eine; bestehende Zeilen bekommen den Default.
+  try { await db.execute('ALTER TABLE pending_booster ADD COLUMN sold_idx INTEGER NOT NULL DEFAULT -1'); } catch {}
+  // Rarity-Umbenennung Diamond → Storm Rare in Sammlung, Decks und offenen Packs (idempotent, siehe rarity-migrate.js)
+  try {
+    const rm = await require('./rarity-migrate').migrateRarityRenames(db);
+    if (rm.collection || rm.decks || rm.packs) console.log(`[rarity] Umbenennung Diamond → Storm: Sammlung ${rm.collection}, Decks ${rm.decks}, offene Packs ${rm.packs}`);
+  } catch (err) { console.error('[rarity] Umbenennung Diamond → Storm fehlgeschlagen:', err.message); }
+  // seq: Laufnummer des Packs innerhalb eines Kaufs (0 … n-1) — stabile Reihenfolge der Packs (created_at hat nur Sekundenauflösung).
+  try { await db.execute('ALTER TABLE pending_booster ADD COLUMN seq INTEGER NOT NULL DEFAULT 0'); } catch {}
+  // Früher: UNIQUE INDEX auf user_id (höchstens ein offenes Pack). Der Index wird entfernt (bestehende Zeilen bleiben unverändert gültig) und durch einen
+  // gewöhnlichen ersetzt. Die Doppelkauf-Sperre liegt jetzt in der Kauf-Transaktion (BEGIN IMMEDIATE: Prüfung „kein offenes Pack“ + Einfügen sind atomar).
+  await db.execute('DROP INDEX IF EXISTS idx_pending_booster_user');
+  await db.execute('CREATE INDEX IF NOT EXISTS idx_pending_booster_user_order ON pending_booster(user_id, created_at, seq)');
+
+  // Auslage: je Stunde und Platz kann jeder Spieler die Karte nur EINMAL kaufen (danach ausgegraut bis zum nächsten Wechsel).
+  await db.execute(`CREATE TABLE IF NOT EXISTS display_buys (
+    user_id TEXT NOT NULL,
+    hour INTEGER NOT NULL,
+    slot INTEGER NOT NULL,
+    PRIMARY KEY (user_id, hour, slot)
+  )`);
+
   // Shop purchases table
   await db.execute(`CREATE TABLE IF NOT EXISTS user_shop_items (
     id TEXT PRIMARY KEY,
@@ -1268,6 +1317,8 @@ async function initDatabase() {
     UNIQUE(user_id, item_type, item_id)
   )`);
   await db.execute('CREATE INDEX IF NOT EXISTS idx_shop_items_user ON user_shop_items(user_id)');
+  // Kopien über das Original hinaus (Rahmen-Rang): 0 = keine, 1 = Silber … 8 = Obsidian (MAX_DUPES)
+  try { await db.execute('ALTER TABLE user_shop_items ADD COLUMN dupes INTEGER DEFAULT 0'); } catch {}
   // Sleeves heißen nicht mehr "sleeveN", sondern tragen englische Namen
   // (data/shop/sleeve-names.json). Gekaufte und ausgerüstete Sleeves auf die
   // neue ID umschreiben — idempotent, läuft bei jedem Start ohne Wirkung weiter.
@@ -2025,7 +2076,7 @@ async function purgeGuest(userId) {
   if (!userId) return;
   const row = await db.get('SELECT is_guest FROM users WHERE id = ?', [userId]);
   if (!row || !row.is_guest) return;
-  for (const t of ['decks', 'unlocked_opponents', 'npc_stats', 'user_shop_items']) {
+  for (const t of ['decks', 'unlocked_opponents', 'npc_stats', 'user_shop_items', 'user_card_rarities', 'pending_booster']) {
     try { await db.run(`DELETE FROM ${t} WHERE user_id = ?`, [userId]); } catch {}
   }
   await db.run('DELETE FROM users WHERE id = ? AND is_guest = 1', [userId]);
@@ -2478,9 +2529,17 @@ app.post('/api/profile/import', authMiddleware, express.text({ limit: '20mb' }),
 
   // Restore decks — delete existing, insert from backup
   await db.run('DELETE FROM decks WHERE user_id = ?', [req.user.userId]);
+  const eigeneRarities = await ownedRarities(req.user.userId);
   for (const d of (data.decks || [])) {
-    await db.run('INSERT INTO decks (id, user_id, name, main_deck, heroes, potion_deck, side_deck, is_default, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-      [uuidv4(), req.user.userId, d.name, d.main_deck, d.heroes, d.potion_deck, d.side_deck, d.is_default ? 1 : 0, Math.floor(Date.now()/1000), Math.floor(Date.now()/1000)]);
+    // Rarities aus dem Backup nur soweit, wie sie dem Konto gehoeren.
+    let rarityJson = '{}';
+    try {
+      const zonen = { mainDeck: JSON.parse(d.main_deck || '[]'), heroes: JSON.parse(d.heroes || '[]'), potionDeck: JSON.parse(d.potion_deck || '[]'), sideDeck: JSON.parse(d.side_deck || '[]') };
+      const r = RARITIES.downgradeToOwned(zonen, JSON.parse(d.rarities || '{}'), eigeneRarities);
+      if (RARITIES.hasAnyRarity(r)) rarityJson = JSON.stringify(r);
+    } catch { /* kaputtes Backup-Deck: ohne Rarities */ }
+    await db.run('INSERT INTO decks (id, user_id, name, main_deck, heroes, potion_deck, side_deck, is_default, rarities, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+      [uuidv4(), req.user.userId, d.name, d.main_deck, d.heroes, d.potion_deck, d.side_deck, d.is_default ? 1 : 0, rarityJson, Math.floor(Date.now()/1000), Math.floor(Date.now()/1000)]);
   }
 
   // Restore hero stats
@@ -3080,9 +3139,27 @@ app.post('/api/decks', authMiddleware, async (req, res) => {
 });
 
 app.put('/api/decks/:id', authMiddleware, async (req, res) => {
-  const { name, mainDeck, heroes, potionDeck, sideDeck, isDefault, coverCard, skins } = req.body;
+  const { name, mainDeck, heroes, potionDeck, sideDeck, isDefault, coverCard, skins, rarities } = req.body;
   const deckRow = await db.get('SELECT * FROM decks WHERE id = ? AND user_id = ?', [req.params.id, req.user.userId]);
   if (!deckRow) return res.status(404).json({ error: 'Deck not found' });
+
+  // Rarity je Kartenkopie: die Zonen, wie sie nach dem Speichern aussehen, und die zugehoerigen Rarities.
+  // Ohne `rarities` im Body bleiben die gespeicherten nur, wenn sich keine Kartenliste aendert (sonst passten die Positionen nicht mehr) — sonst alles Common.
+  const neueZonen = {
+    mainDeck: mainDeck || JSON.parse(deckRow.main_deck),
+    heroes: heroes || JSON.parse(deckRow.heroes),
+    potionDeck: potionDeck || JSON.parse(deckRow.potion_deck),
+    sideDeck: sideDeck || JSON.parse(deckRow.side_deck),
+  };
+  const zonenGeaendert = !!(mainDeck || heroes || potionDeck || sideDeck);
+  let rarityRoh = rarities;
+  if (rarityRoh === undefined) { try { rarityRoh = zonenGeaendert ? {} : JSON.parse(deckRow.rarities || '{}'); } catch { rarityRoh = {}; } }
+  const neueRarities = RARITIES.normalizeDeckRarities(neueZonen, rarityRoh);
+  if (deckRow.mode !== 'drafted' && deckRow.mode !== 'cube') {
+    // Sicherung gegen kaputte/gefaelschte Clients: pro (Karte, Rarity) ueber ALLE Zonen hoechstens so viele Kopien wie besessen (Common unbegrenzt).
+    const verstoss = RARITIES.firstOwnershipViolation(neueZonen, neueRarities, await ownedRarities(req.user.userId));
+    if (verstoss) return res.status(400).json({ error: `You only own ${verstoss.have} ${RARITIES.label(verstoss.rarity)} ${verstoss.have === 1 ? 'copy' : 'copies'} of "${verstoss.card}" (deck uses ${verstoss.need}).`, card: verstoss.card, rarity: verstoss.rarity });
+  }
 
   if (isDefault) await db.run('UPDATE decks SET is_default = 0 WHERE user_id = ?', [req.user.userId]);
 
@@ -3098,7 +3175,7 @@ app.put('/api/decks/:id', authMiddleware, async (req, res) => {
     }
   }
 
-  await db.run('UPDATE decks SET name=?, main_deck=?, heroes=?, potion_deck=?, side_deck=?, is_default=?, cover_card=?, skins=?, updated_at=unixepoch() WHERE id=? AND user_id=?', [
+  await db.run('UPDATE decks SET name=?, main_deck=?, heroes=?, potion_deck=?, side_deck=?, is_default=?, cover_card=?, skins=?, rarities=?, updated_at=unixepoch() WHERE id=? AND user_id=?', [
     name || deckRow.name,
     JSON.stringify(mainDeck || JSON.parse(deckRow.main_deck)),
     JSON.stringify(heroes || JSON.parse(deckRow.heroes)),
@@ -3107,6 +3184,7 @@ app.put('/api/decks/:id', authMiddleware, async (req, res) => {
     isDefault ? 1 : (isDefault === false ? 0 : deckRow.is_default),
     coverCard !== undefined ? (coverCard || '') : (deckRow.cover_card || ''),
     skinsClean !== undefined ? JSON.stringify(skinsClean) : (deckRow.skins || '{}'),
+    JSON.stringify(RARITIES.hasAnyRarity(neueRarities) ? neueRarities : {}),
     req.params.id, req.user.userId
   ]);
 
@@ -3244,10 +3322,10 @@ app.post('/api/decks/:id/saveas', authMiddleware, async (req, res) => {
 
     const newId = uuidv4();
     await db.run(
-      'INSERT INTO decks (id, user_id, name, main_deck, heroes, potion_deck, side_deck, is_default, cover_card, skins, mode, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?, unixepoch(), unixepoch())',
+      'INSERT INTO decks (id, user_id, name, main_deck, heroes, potion_deck, side_deck, is_default, cover_card, skins, mode, rarities, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?, ?, unixepoch(), unixepoch())',
       [newId, req.user.userId, name || original.name + ' (Copy)',
        original.main_deck, original.heroes, original.potion_deck, original.side_deck,
-       original.cover_card || '', original.skins || '{}', original.mode || 'standard']
+       original.cover_card || '', original.skins || '{}', original.mode || 'standard', original.rarities || '{}']
     );
 
     const newDeck = await db.get('SELECT * FROM decks WHERE id = ? AND user_id = ?', [newId, req.user.userId]);
@@ -3989,6 +4067,23 @@ async function unlockCpuSkin(userId, skinName) {
   return true;
 }
 
+/**
+ * Skin aus einem CPU-Skin-Spiel: neu freischalten – oder, wenn man ihn schon hat, den Rahmen-Rang erhöhen (Kopie, wie beim Gacha-Pull).
+ * Liefert { isNew, dupes } oder null, wenn der Skin schon das Maximum (MAX_DUPES Kopien) erreicht hat.
+ */
+async function rankUpCpuSkin(userId, skinName) {
+  if (!userId || !skinName) return null;
+  const row = await db.get("SELECT dupes FROM user_shop_items WHERE user_id = ? AND item_type = 'skin' AND item_id = ?", [userId, skinName]);
+  if (!row) {
+    await db.run('INSERT INTO user_shop_items (id, user_id, item_type, item_id, dupes) VALUES (?, ?, ?, ?, 0)', [uuidv4(), userId, 'skin', skinName]);
+    return { isNew: true, dupes: 0 };
+  }
+  const have = Number(row.dupes) || 0;
+  if (have >= MAX_DUPES) return null;
+  await db.run("UPDATE user_shop_items SET dupes = ? WHERE user_id = ? AND item_type = 'skin' AND item_id = ?", [have + 1, userId, skinName]);
+  return { isNew: false, dupes: have + 1 };
+}
+
 const SHOP_PRICES = { avatar: 50, sleeve: 50, board: 50, skin: 50 };
 const RANDOM_PRICES = { skin: 25, avatar: 25, sleeve: 25 };
 // Nur per Pull (Zufall) erhältlich, nicht gezielt kaufbar.
@@ -4183,10 +4278,12 @@ app.get('/api/shop/catalog', (req, res) => {
 
 // GET /api/shop/owned — user's purchased items
 app.get('/api/shop/owned', authMiddleware, async (req, res) => {
-  const rows = await db.all('SELECT item_type, item_id FROM user_shop_items WHERE user_id = ?', [req.user.userId]);
+  const rows = await db.all('SELECT item_type, item_id, dupes FROM user_shop_items WHERE user_id = ?', [req.user.userId]);
   const owned = { avatar: [], sleeve: [], board: [], skin: [] };
+  const dupes = { avatar: {}, sleeve: {}, skin: {} };          // Kopien über das Original hinaus = Rahmen-Rang (1 … MAX_DUPES)
   for (const r of rows) {
     if (owned[r.item_type]) owned[r.item_type].push(r.item_id);
+    if (dupes[r.item_type] && r.dupes > 0) dupes[r.item_type][r.item_id] = Math.min(MAX_DUPES, r.dupes);
   }
   // Freigeschaltete Gegner-Sleeves gehören dem Spieler wie gekaufte.
   const cpuOwned = await cpuSleeves.ownedIds(req.user.userId);
@@ -4201,7 +4298,9 @@ app.get('/api/shop/owned', authMiddleware, async (req, res) => {
     sleeve: Object.fromEntries(owned.sleeve.map(id => [id, cpuSleeves.nameOf(id) || sleeveDisplayName(id)])),
     avatar: Object.fromEntries(owned.avatar.map(id => [id, cpuAvatars.nameOf(id) || avatarDisplayName(id)])),
   };
-  res.json({ owned, names });
+  // Besessene Items außerhalb des Shop-Pools (Standard-/Gegner-Avatare, Standard-/Gegner-Sleeves, exklusive Skins): als Kopie ziehbar
+  const extras = { avatar: await extraPullItems(req.user.userId, 'avatar'), sleeve: await extraPullItems(req.user.userId, 'sleeve'), skin: await extraPullItems(req.user.userId, 'skin') };
+  res.json({ owned, names, dupes, maxDupes: MAX_DUPES, extras });
 });
 
 // GET /api/shop/cpu-sleeves — Gegner-Sleeves mit Fortschritt (cpu-sleeves.js)
@@ -4267,28 +4366,497 @@ app.post('/api/shop/buy', authMiddleware, async (req, res) => {
   res.json({ ok: true, sc: updated.sc });
 });
 
-// POST /api/shop/buy-random-skin — buy a random unowned skin
+// ═══════════════════════════════════════════
+//  RARITIES — Sammlung, Booster-Packs, Draft-Würfeln (Gemeinsames Modul: rarities.js)
+//  Alle Karten gehören jedem unbegrenzt als Common. Höhere Rarities sind gesammelte Kopien (user_card_rarities).
+//  Ein Booster-Pack wird beim KAUF serverseitig gewürfelt und als offenes Pack gespeichert (pending_booster, mehrere je Nutzer bei Mengenkauf, höchstens BOOSTER_MAX_BUY je Kauf);
+//  erst /api/boosters/claim bucht die Karten in die Sammlung. So überlebt ein Neuladen mitten in der Öffnung.
+// ═══════════════════════════════════════════
+const BOOSTER_DIR = path.join(__dirname, 'data', 'shop', 'Boosterpacks');
+const BOOSTER_URL_DIR = '/data/shop/Boosterpacks/';
+// Obergrenze je Kauf: 20 Packs = 180 Karten = 400 SC. Hält die Öffnungsansicht (ein Kartenblock je Pack, Rarity-Ebene je sichtbarer Karte), die Antwort (~10 KB JSON)
+// und die Kauf-Transaktion (je Pack ein Insert + ein Log-Eintrag) klein; mehr kauft man mit „Add and rip one more!“ oder einem zweiten Kauf.
+const BOOSTER_MAX_BUY = 20;
+const BOOSTER_SC_REASON = 'shop:booster';   // sc_log.reward_id des Packkaufs (Betrag negativ = Ausgabe)
+const BOOSTER_SELLBACK_REASON = 'shop:booster_sellback';   // Gutschrift für „Sell Back!“ (Betrag positiv)
+const BOOSTER_DISPLAY_REASON = 'shop:display';             // Kauf aus der Auslage (Betrag negativ)
+
+let _boosterCache = null;
+function boosterManifest() {
+  if (!_boosterCache) _boosterCache = JSON.parse(fs.readFileSync(path.join(BOOSTER_DIR, 'boosters.json'), 'utf8'));
+  return _boosterCache;
+}
+
+/** Motiv-Masken (data/subject-masks.json): nur die Kartennamen werden gebraucht (Umbra/Stained/Storm setzen eine Maske voraus). */
+let _maskNames = null;
+function maskNameSet() {
+  if (!_maskNames) {
+    try { _maskNames = new Set(Object.keys(JSON.parse(fs.readFileSync(path.join(__dirname, 'data', 'subject-masks.json'), 'utf8')).cards || {})); }
+    catch (err) { console.error('[rarity] subject-masks.json nicht lesbar:', err.message); _maskNames = new Set(); }
+  }
+  return _maskNames;
+}
+function cardHasMask(name) { return maskNameSet().has(name); }
+
+let _artIndex = null;
+function cardArtIndex() {
+  if (!_artIndex) {
+    try { _artIndex = JSON.parse(fs.readFileSync(path.join(__dirname, 'data', 'card-art', 'index.json'), 'utf8')); }
+    catch { _artIndex = null; }
+  }
+  return _artIndex;
+}
+
+/** Pack-Pool (Kartenobjekte) — Tokens und Karten ohne Motiv sind nie darin. */
+const _packPools = {};
+function packPool(packId) {
+  if (!_packPools[packId]) _packPools[packId] = RARITIES.cardsOfPack(packId, getCardArray(), cardArtIndex() || undefined);
+  return _packPools[packId];
+}
+
+/** Besitz eines Nutzers: { "<Karte>": { rare: n, … } } — nur Nicht-Common, nur count > 0. */
+async function ownedRarities(userId, dbh) {
+  const rows = await (dbh || db).all('SELECT card, rarity, count FROM user_card_rarities WHERE user_id = ? AND count > 0', [userId]);
+  const out = {};
+  for (const r of rows) {
+    if (!RARITIES.isRarity(r.rarity) || r.rarity === 'common') continue;
+    (out[r.card] || (out[r.card] = {}))[r.rarity] = Number(r.count);
+  }
+  return out;
+}
+
+/** Bucht Kopien in die Sammlung: items = [{ name, rarity }] (Common wird ignoriert). */
+async function addRarityCopies(userId, items, dbh) {
+  const h = dbh || db;
+  for (const it of items) {
+    if (!it || !it.name || !RARITIES.isRarity(it.rarity) || it.rarity === 'common') continue;
+    await h.run(
+      'INSERT INTO user_card_rarities (user_id, card, rarity, count) VALUES (?, ?, ?, 1) ON CONFLICT(user_id, card, rarity) DO UPDATE SET count = count + 1',
+      [userId, it.name, it.rarity]);
+  }
+}
+
+function pendingBoosterView(row) {
+  let cards = [];
+  try { cards = JSON.parse(row.cards_json); } catch { /* leer */ }
+  const sold = Number.isInteger(Number(row.sold_idx)) ? Number(row.sold_idx) : -1;
+  return { id: row.id, packId: row.pack_id, variantId: row.variant_id, cards, sold: sold >= 0 && sold < cards.length ? sold : -1 };
+}
+
+// GET /api/collection — gesammelte Rarities { rarities: { "<Karte>": { uncommon: n, … } } } (Common implizit unbegrenzt)
+app.get('/api/collection', authMiddleware, async (req, res) => {
+  try { res.json({ rarities: await ownedRarities(req.user.userId) }); }
+  catch (err) { console.error('[collection]', err.message); res.status(500).json({ error: 'Failed to load collection' }); }
+});
+
+// GET /api/boosters — Packs mit Cover-Varianten (Pack-Bild `base`, Schimmer-Streifen `shimmer`; relativ zu `dir`, dazu fertige URLs)
+//  `sellback`: Gutschrift je Rarity für „Sell Back!“ (eine Karte je Pack)
+app.get('/api/boosters', authMiddleware, (req, res) => {
+  try {
+    const man = boosterManifest();
+    res.json({
+      price: RARITIES.PACK_PRICE, maxCount: BOOSTER_MAX_BUY, sellback: RARITIES.SELLBACK, size: man.size, frames: man.frames, frameMs: man.frameMs, dir: BOOSTER_URL_DIR,
+      packs: man.packs.map(p => ({
+        id: p.id, name: p.name, tagline: p.tagline || man.tagline,
+        variants: p.variants.map(v => ({
+          id: v.id, theme: v.theme, base: v.base, shimmer: v.shimmer,
+          baseUrl: BOOSTER_URL_DIR + v.base, shimmerUrl: BOOSTER_URL_DIR + v.shimmer,
+        })),
+      })),
+    });
+  } catch (err) { console.error('[boosters]', err.message); res.status(500).json({ error: 'Failed to load boosters' }); }
+});
+
+// GET /api/boosters/pending — offene Packs (Wiederaufnahme nach Neuladen), in Kaufreihenfolge.
+//  { pending: <erstes offenes Pack | null> (altes Format), packs: [pending …] }; `sold` = Index der zurückgegebenen Karte oder -1
+app.get('/api/boosters/pending', authMiddleware, async (req, res) => {
+  try {
+    const rows = await pendingBoosterRows(db, req.user.userId);
+    const packs = rows.map(pendingBoosterView);
+    res.json({ pending: packs[0] || null, packs });
+  } catch (err) { console.error('[boosters/pending]', err.message); res.status(500).json({ error: 'Failed to load pack' }); }
+});
+
+/** Offene Packs eines Nutzers in stabiler Kaufreihenfolge; `ids` (Array) schränkt ein. */
+async function pendingBoosterRows(dbh, userId, ids) {
+  const rows = await dbh.all('SELECT * FROM pending_booster WHERE user_id = ? ORDER BY created_at, seq, rowid', [userId]);
+  return Array.isArray(ids) ? rows.filter(r => ids.includes(r.id)) : rows;
+}
+
+/**
+ * Kauf von Packs: `packIds` = eine Pack-Art je zu kaufendem Pack (Mengenkauf: dieselbe Art n-mal). Je Pack 20 SC ab, Karten würfeln, als offenes Pack speichern —
+ * alles in EINER Transaktion (SC-Prüfung für die Gesamtsumme; entweder alle Packs oder keins). Gemeinsam für /buy und /rip-more.
+ * Liefert { status, body } — 200 { pending (erstes), packs, sc } · 402 { error, sc } · 404 · 409 { error, pending, packs } · 500.
+ */
+async function buyBoosterPacks(userId, packIds) {
+  const man = boosterManifest();
+  const n = packIds.length;
+  const packs = packIds.map(id => man.packs.find(p => p.id === id));
+  if (!n || packs.some(p => !p)) return { status: 404, body: { error: 'Unknown booster pack' } };
+  const rolled = [];
+  for (const pack of packs) {
+    const pool = packPool(pack.id);
+    if (!pool.length) return { status: 500, body: { error: 'This pack is empty right now.' } };
+    const variant = pack.variants[Math.floor(Math.random() * pack.variants.length)];
+    rolled.push({ id: uuidv4(), packId: pack.id, variantId: variant.id, cards: RARITIES.rollPack(pool, { hasMask: cardHasMask }) });
+  }
+  const price = RARITIES.PACK_PRICE, total = price * n;
+  let nichtGenug = false, offen = null;
+  try {
+    await db.transaction(async (tx) => {
+      // BEGIN IMMEDIATE: ab hier schreibt niemand sonst. Liegen noch offene Packs, wird nicht gekauft (die Antwort liefert sie; doppelter Klick / zweites Fenster).
+      const liegen = await pendingBoosterRows(tx, userId);
+      if (liegen.length) { offen = liegen; throw new Error('open-packs'); }
+      // Atomar: SC nur abziehen, wenn für die Gesamtsumme genug da sind; Packs und Buchungen gehen mit oder gar nicht.
+      const upd = await tx.run('UPDATE users SET sc = sc - ? WHERE id = ? AND sc >= ?', [total, userId, total]);
+      if (!upd.rowsAffected) { nichtGenug = true; throw new Error('not-enough-sc'); }
+      for (let i = 0; i < n; i++) {
+        const r = rolled[i];
+        await tx.run('INSERT INTO pending_booster (id, user_id, pack_id, variant_id, cards_json, seq) VALUES (?, ?, ?, ?, ?, ?)',
+          [r.id, userId, r.packId, r.variantId, JSON.stringify(r.cards), i]);
+        await tx.run('INSERT INTO sc_log (id, user_id, reward_id, opponent_id, amount) VALUES (?, ?, ?, ?, ?)',
+          [uuidv4(), userId, BOOSTER_SC_REASON, r.packId, -price]);   // ein Eintrag je Pack (wie beim Einzelkauf)
+      }
+    });
+  } catch (err) {
+    if (nichtGenug) {
+      const u = await db.get('SELECT sc FROM users WHERE id = ?', [userId]);
+      return { status: 402, body: { error: 'Not enough SC', sc: u?.sc || 0 } };
+    }
+    if (offen) { const views = offen.map(pendingBoosterView); return { status: 409, body: { error: 'You still have an unopened pack.', pending: views[0], packs: views } }; }
+    throw err;
+  }
+  const u = await db.get('SELECT sc FROM users WHERE id = ?', [userId]);
+  const views = rolled.map(r => ({ id: r.id, packId: r.packId, variantId: r.variantId, cards: r.cards, sold: -1 }));
+  return { status: 200, body: { pending: views[0], packs: views, sc: u?.sc || 0 } };
+}
+
+/**
+ * Einlösen offener Packs: die Karten in die Sammlung (+1 je (Karte, Rarity)), je Pack die zurückverkaufte Karte (sold_idx) NICHT, Packs löschen.
+ * `ids` = nur diese Packs, sonst ALLE offenen des Nutzers. Auswahl, Löschen und Buchen laufen in einer Transaktion (kein Verkauf dazwischen).
+ * Liefert { status, body } — 200 { ok, added (alle Packs), sold (erste verkaufte Karte | null), soldCards, packs: [{ id, packId, added, sold }], count, packId, rarities } · 404.
+ */
+async function claimBoosterPacks(userId, ids) {
+  const done = [];
+  await db.transaction(async (tx) => {
+    const rows = await pendingBoosterRows(tx, userId, ids);
+    for (const row of rows) {
+      const view = pendingBoosterView(row);
+      const del = await tx.run('DELETE FROM pending_booster WHERE id = ? AND user_id = ?', [row.id, userId]);
+      if (!del.rowsAffected) continue;   // doppelter Klick: nur einmal buchen
+      const added = view.cards.filter((c, i) => i !== view.sold);
+      await addRarityCopies(userId, added, tx);
+      done.push({ id: row.id, packId: view.packId, added, sold: view.sold >= 0 ? view.cards[view.sold] : null });
+    }
+  });
+  if (!done.length) return { status: 404, body: { error: 'No such open pack' } };
+  const soldCards = done.map(d => d.sold).filter(Boolean);
+  return { status: 200, body: {
+    ok: true, added: done.flatMap(d => d.added), sold: soldCards[0] || null, soldCards, packs: done, count: done.length, packId: done[0].packId,
+    rarities: await ownedRarities(userId),
+  } };
+}
+
+/** `ids` aus dem Request: `ids` (Array) oder `id` (String); leer/fehlend = alle offenen Packs (undefined). */
+function boosterIdsFromBody(body) {
+  if (Array.isArray(body?.ids)) return body.ids.map(String);
+  const id = body?.id != null ? String(body.id) : '';
+  return id ? [id] : undefined;
+}
+
+// POST /api/boosters/buy { packId, count = 1 } — count Packs (1 … BOOSTER_MAX_BUY) für je 20 SC in EINER Transaktion kaufen, würfeln und als offene Packs speichern.
+//  400 { error, max }: count ungültig (nur Ganzzahlen 1 … max) · 402 { error, sc }: zu wenig SC für die Gesamtsumme · 404: Pack unbekannt
+//  409 { error, pending, packs }: es liegen noch offene Packs (Antwort liefert sie) · 200 { pending (erstes Pack), packs: [alle], sc }
+app.post('/api/boosters/buy', authMiddleware, async (req, res) => {
+  try {
+    const raw = req.body?.count;
+    const count = raw === undefined ? 1 : raw;
+    if (!Number.isInteger(count) || count < 1 || count > BOOSTER_MAX_BUY) return res.status(400).json({ error: 'Invalid pack count (1 to ' + BOOSTER_MAX_BUY + ')', max: BOOSTER_MAX_BUY });
+    const packId = String(req.body?.packId || '');
+    const r = await buyBoosterPacks(req.user.userId, Array(count).fill(packId));
+    res.status(r.status).json(r.body);
+  } catch (err) { console.error('[boosters/buy]', err.message); res.status(500).json({ error: 'Failed to buy pack' }); }
+});
+
+// POST /api/boosters/claim { ids? | id? } — die Karten (ohne die je Pack zurückverkaufte) in die Sammlung, die Packs löschen. Ohne ids: ALLE offenen Packs.
+//  Antwort { ok, added: [{ name, rarity }] (alle Packs), sold (erste verkaufte Karte | null), soldCards, packs: [{ id, packId, added, sold }], count, rarities }
+app.post('/api/boosters/claim', authMiddleware, async (req, res) => {
+  try {
+    const r = await claimBoosterPacks(req.user.userId, boosterIdsFromBody(req.body));
+    res.status(r.status).json(r.body);
+  } catch (err) { console.error('[boosters/claim]', err.message); res.status(500).json({ error: 'Failed to add cards' }); }
+});
+
+// POST /api/boosters/rip-more { ids? | id? } — „Add and rip one more!“: ALLE offenen Packs einlösen UND sofort dieselbe Anzahl Packs derselben Art(en) kaufen
+//  (ids/id dienen nur der Absicherung: passt keines zu einem offenen Pack → 404). Zwei getrennte Transaktionen, damit die alten Packs nie verloren gehen:
+//  erst wird eingelöst (bleibt eingelöst, was danach auch passiert), dann gekauft (alle oder keins, Gesamtsumme n × 20 SC).
+//  Antwort 200 { ok, added, sold, soldCards, rarities, pending (erstes neues Pack), packs: [neue Packs], sc } · 402 { error, sc, claimed: true, added, rarities } (zu wenig SC: die Packs
+//  sind trotzdem eingelöst, neue gibt es nicht) · 404 (kein offenes Pack) · 5xx { error, claimed } (Kauf gescheitert; `claimed`: alte Packs schon eingelöst).
+//  Eine Gutschrift aus „Sell Back!“ steht schon im Kontostand (sie wird beim Verkauf gebucht) und zählt damit für den Preis.
+app.post('/api/boosters/rip-more', authMiddleware, async (req, res) => {
+  const userId = req.user.userId;
+  let claimed = null;
+  try {
+    const ids = boosterIdsFromBody(req.body);
+    if (ids) {
+      const offen = await pendingBoosterRows(db, userId, ids);
+      if (!offen.length) return res.status(404).json({ error: 'No such open pack' });
+    }
+    const c = await claimBoosterPacks(userId, undefined);
+    if (c.status !== 200) return res.status(c.status).json(c.body);
+    claimed = c.body;
+    const b = await buyBoosterPacks(userId, claimed.packs.map(p => p.packId));
+    const carry = { added: claimed.added, sold: claimed.sold, soldCards: claimed.soldCards, rarities: claimed.rarities };
+    if (b.status === 200) return res.json({ ok: true, ...carry, pending: b.body.pending, packs: b.body.packs, sc: b.body.sc });
+    const u = await db.get('SELECT sc FROM users WHERE id = ?', [userId]);
+    return res.status(b.status === 404 || b.status === 409 ? 500 : b.status).json({
+      ...b.body, sc: b.body.sc != null ? b.body.sc : (u?.sc || 0), claimed: true, ...carry,
+    });
+  } catch (err) {
+    console.error('[boosters/rip-more]', err.message);
+    res.status(500).json({
+      error: claimed ? 'Your cards were added, but the next pack could not be bought.' : 'Failed to add cards', claimed: !!claimed,
+      ...(claimed ? { added: claimed.added, sold: claimed.sold, soldCards: claimed.soldCards, rarities: claimed.rarities } : {}),
+    });
+  }
+});
+
+// POST /api/boosters/sell { id, index } — „Sell Back!“: EINE Karte dieses offenen Packs zurückgeben, Gutschrift in SC nach Rarity
+//  (RARITIES.SELLBACK). Je Pack unabhängig; idempotent: ein zweiter Verkauf im selben Pack (auch einer anderen Karte) → 409. Die Karte kommt beim Einlösen nicht in die Sammlung.
+//  Ohne id gilt das einzige offene Pack (liegen mehrere, ist die id Pflicht → 404).
+//  Antwort 200 { ok, sold: index, amount, sc } · 400 (Index / Common) · 404 (kein offenes Pack) · 409 { error, sold }
+app.post('/api/boosters/sell', authMiddleware, async (req, res) => {
+  const userId = req.user.userId;
+  try {
+    const id = req.body?.id != null ? String(req.body.id) : '';
+    const index = req.body?.index;
+    const rows = await pendingBoosterRows(db, userId);
+    const row = id ? rows.find(r => r.id === id) : (rows.length === 1 ? rows[0] : null);
+    if (!row) return res.status(404).json({ error: 'No such open pack' });
+    const view = pendingBoosterView(row);
+    if (!Number.isInteger(index) || index < 0 || index >= view.cards.length) return res.status(400).json({ error: 'No such card' });
+    if (view.sold >= 0) return res.status(409).json({ error: 'You already sold a card from this pack.', sold: view.sold });
+    const amount = RARITIES.sellbackValue(view.cards[index].rarity);
+    if (!(amount > 0)) return res.status(400).json({ error: 'This card cannot be sold back.' });
+    let schonVerkauft = false;
+    await db.transaction(async (tx) => {
+      // Atomar: nur der erste Verkauf setzt die Markierung (sold_idx < 0); er bucht die Gutschrift im selben Zug.
+      const upd = await tx.run('UPDATE pending_booster SET sold_idx = ? WHERE id = ? AND user_id = ? AND sold_idx < 0', [index, row.id, userId]);
+      if (!upd.rowsAffected) { schonVerkauft = true; return; }
+      await tx.run('UPDATE users SET sc = sc + ? WHERE id = ?', [amount, userId]);
+      await tx.run('INSERT INTO sc_log (id, user_id, reward_id, opponent_id, amount) VALUES (?, ?, ?, ?, ?)',
+        [uuidv4(), userId, BOOSTER_SELLBACK_REASON, view.cards[index].rarity + ':' + view.cards[index].name, amount]);
+    });
+    if (schonVerkauft) {
+      const jetzt = await db.get('SELECT * FROM pending_booster WHERE id = ? AND user_id = ?', [row.id, userId]);
+      if (!jetzt) return res.status(404).json({ error: 'No such open pack' });
+      return res.status(409).json({ error: 'You already sold a card from this pack.', sold: pendingBoosterView(jetzt).sold });
+    }
+    const u = await db.get('SELECT sc FROM users WHERE id = ?', [userId]);
+    res.json({ ok: true, sold: index, amount, sc: u?.sc || 0 });
+  } catch (err) { console.error('[boosters/sell]', err.message); res.status(500).json({ error: 'Failed to sell the card' }); }
+});
+
+// ── Auslage (Showcase): je Rarity eine Karte, wechselt jede volle Stunde (UTC), für alle gleich ──
+// Pool = alle Pack-Pools zusammen (sammelbare Karten: keine Tokens, nur Karten mit Kartenbild); Umbra/Stained/Storm nur mit Motiv-Maske.
+let _displayPool = null;
+function displayPool() {
+  if (!_displayPool) {
+    const seen = new Set(), out = [];
+    for (const id of RARITIES.PACK_IDS) for (const c of packPool(id)) if (!seen.has(c.name)) { seen.add(c.name); out.push(c.name); }
+    _displayPool = out;
+  }
+  return _displayPool;
+}
+const _displayCache = { hour: null, cards: null };
+/** Auslage der Stunde `hour` (zwischengespeichert für die jeweils letzte Stunde). */
+function displayForHour(hour) {
+  if (_displayCache.hour !== hour) { _displayCache.cards = RARITIES.rollDisplay(hour, displayPool(), cardHasMask); _displayCache.hour = hour; }
+  return _displayCache.cards;
+}
+async function displayView(userId, now) {
+  const t = typeof now === 'number' ? now : Date.now();
+  const hour = RARITIES.displayHourIndex(t);
+  const own = userId ? await ownedRarities(userId) : {};
+  const bought = userId ? (await db.all('SELECT slot FROM display_buys WHERE user_id = ? AND hour = ?', [userId, hour])).map(r => r.slot) : [];
+  return {
+    bought, hour, msLeft: RARITIES.msToNextHour(t), nextAt: (hour + 1) * RARITIES.HOUR_MS, serverTime: t,
+    cards: displayForHour(hour).map(c => ({ ...c, owned: (own[c.name] && own[c.name][c.rarity]) || 0 })),
+  };
+}
+
+// GET /api/boosters/display — aktuelle Auslage { hour, msLeft, nextAt, serverTime, cards: [{ rarity, name, price, owned, special? , fullPrice? }] }
+//  Plätze 0–7: je Rarity eine Karte (aufsteigend); Platz 8: Sonderangebot (`special: true`, halber Preis aufgerundet, `fullPrice` = Normalpreis)
+app.get('/api/boosters/display', authMiddleware, async (req, res) => {
+  try { res.json(await displayView(req.user.userId)); }
+  catch (err) { console.error('[boosters/display]', err.message); res.status(500).json({ error: 'Failed to load the showcase' }); }
+});
+
+// POST /api/boosters/display/buy { slot, rarity?, hour?, name?, price?, special? } — eine Karte der aktuellen Auslage kaufen (je Spieler, Stunde und
+//  Platz nur EINMAL: danach 409 „already bought“, `bought` in der Auslage nennt die gekauften Plätze):
+//  SC ab (sc_log 'shop:display'), Karte+Rarity +1 in user_card_rarities. `slot` = Platz in `cards` (0–7 je Rarity, 8 = Sonderangebot zum halben
+//  Preis); ohne `slot` zählt der reguläre Platz der Rarity. Der PREIS kommt immer vom Server (Platz der aktuellen Stunde). Weicht etwas vom Platz ab,
+//  was der Client mitschickt (Stunde, Name, Rarity, Sonderangebot, Preis — Wechsel an der Stundengrenze), antwortet der Server 409 mit der
+//  aktuellen Auslage und bucht nichts.
+//  Antwort 200 { ok, card, owned, sc, display } · 400 · 402 { error, sc } · 409 { error, display }
+app.post('/api/boosters/display/buy', authMiddleware, async (req, res) => {
+  const userId = req.user.userId;
+  try {
+    const body = req.body || {};
+    const now = Date.now(), hour = RARITIES.displayHourIndex(now);
+    const cards = displayForHour(hour);
+    let idx;
+    if (body.slot != null) idx = body.slot;
+    else {
+      if (!RARITIES.DISPLAY_PRICE[String(body.rarity || '')]) return res.status(400).json({ error: 'Unknown rarity' });
+      idx = cards.findIndex(c => c.rarity === body.rarity && !c.special);
+    }
+    if (!Number.isInteger(idx) || idx < -1 || idx >= RARITIES.DISPLAY_RARITIES.length + 1) return res.status(400).json({ error: 'Unknown slot' });
+    const slot = cards[idx];
+    const stale = !slot
+      || (body.hour != null && Number(body.hour) !== hour)
+      || (body.name != null && String(body.name) !== slot.name)
+      || (body.rarity != null && String(body.rarity) !== slot.rarity)
+      || (body.special != null && !!body.special !== !!slot.special)
+      || (body.price != null && Number(body.price) !== slot.price);
+    if (stale) return res.status(409).json({ error: 'The showcase just changed. Take a look at the new cards!', display: await displayView(userId, now) });
+    let nichtGenug = false, schonGekauft = false;
+    try {
+      await db.transaction(async (tx) => {
+        const ins = await tx.run('INSERT OR IGNORE INTO display_buys (user_id, hour, slot) VALUES (?, ?, ?)', [userId, hour, idx]);
+        if (!ins.rowsAffected) { schonGekauft = true; throw new Error('already-bought'); }
+        const upd = await tx.run('UPDATE users SET sc = sc - ? WHERE id = ? AND sc >= ?', [slot.price, userId, slot.price]);
+        if (!upd.rowsAffected) { nichtGenug = true; throw new Error('not-enough-sc'); }
+        await tx.run('INSERT INTO sc_log (id, user_id, reward_id, opponent_id, amount) VALUES (?, ?, ?, ?, ?)',
+          [uuidv4(), userId, BOOSTER_DISPLAY_REASON, slot.rarity + ':' + slot.name + (slot.special ? ':special' : ''), -slot.price]);
+        await addRarityCopies(userId, [{ name: slot.name, rarity: slot.rarity }], tx);
+      });
+    } catch (err) {
+      if (schonGekauft) return res.status(409).json({ error: 'You already bought this card. New cards arrive with the next rotation.', display: await displayView(userId, now) });
+      if (nichtGenug) {
+        const u = await db.get('SELECT sc FROM users WHERE id = ?', [userId]);
+        return res.status(402).json({ error: 'Not enough SC', sc: u?.sc || 0 });
+      }
+      throw err;
+    }
+    db.run('DELETE FROM display_buys WHERE hour < ?', [hour - 48]).catch(() => {});
+    const u = await db.get('SELECT sc FROM users WHERE id = ?', [userId]);
+    const own = await ownedRarities(userId);
+    res.json({ ok: true, card: { name: slot.name, rarity: slot.rarity, price: slot.price, special: !!slot.special }, owned: (own[slot.name] && own[slot.name][slot.rarity]) || 0, sc: u?.sc || 0, display: await displayView(userId, now) });
+  } catch (err) { console.error('[boosters/display/buy]', err.message); res.status(500).json({ error: 'Failed to buy the card' }); }
+});
+
+// ───── Duplikate: Rahmen-Ränge ─────
+// Zieht man ein Item, das man schon hat, wird es „geupgradet“: `dupes` zählt die Kopien über das Original hinaus und bestimmt den Rahmen
+// (public/rank-frames.js): 1 = Silber, 2 = Gold, 3 = Platin, 4 = Diamant, 5 = Rubin, 6 = Saphir, 7 = Smaragd, 8 = Obsidian (Maximum).
+// Items auf dem Maximum scheiden aus dem Pull-Pool aus.
+const MAX_DUPES = 8;
+
+/** Id eines Shop-Bildes aus seiner URL (/data/shop/<subdir>/<id>.png), sonst null. */
+const { itemIdOfUrl } = require('./frame-ids');
+function shopIdOfUrl(url, subdir) { return itemIdOfUrl(url, subdir); }
+
+/**
+ * Items, die man schon besitzt, aber nicht im Shop-Pool stehen: sie kommen als DUPLIKATE in den Gacha-Pool (Rahmen-Rang).
+ *   Avatare  Standard-Avatare von Anfang an ('std:<Name>'), freigeschaltete Gegner-Avatare
+ *   Sleeves  Standard-Sleeve ('default'), freigeschaltete Gegner-Sleeves
+ *   Skins    freischaltbare/exklusive Skins, sobald man sie besitzt (die erste Kopie)
+ * Liefert [{ id, src?, name, heroName? }]; `src` fehlt bei Skins (der Client baut die Karten-URL selbst).
+ */
+async function extraPullItems(userId, itemType) {
+  const out = [];
+  if (!userId) return out;
+  if (itemType === 'avatar') {
+    try {
+      for (const f of fs.readdirSync(path.join(__dirname, 'public', 'avatars'), { withFileTypes: true })) {
+        if (!f.isFile() || !IMAGE_EXTS.has(path.extname(f.name).toLowerCase())) continue;
+        const stem = path.basename(f.name, path.extname(f.name));
+        out.push({ id: 'std:' + stem, src: '/avatars/' + encodeURIComponent(f.name), name: stem });
+      }
+    } catch {}
+    for (const id of await cpuAvatars.ownedIds(userId)) {
+      if (shopIds('avatars').has(id)) out.push({ id, src: '/data/shop/avatars/' + encodeURIComponent(id) + '.png', name: cpuAvatars.nameOf(id) || avatarDisplayName(id) });
+    }
+  } else if (itemType === 'sleeve') {
+    out.push({ id: 'default', src: '/cardback.png', name: 'Default Sleeve' });
+    for (const id of await cpuSleeves.ownedIds(userId)) {
+      if (shopIds('sleeves').has(id)) out.push({ id, src: '/data/shop/sleeves/' + encodeURIComponent(id) + '.png', name: cpuSleeves.nameOf(id) || sleeveDisplayName(id) });
+    }
+  } else if (itemType === 'skin') {
+    const rows = await db.all("SELECT item_id FROM user_shop_items WHERE user_id = ? AND item_type = 'skin'", [userId]);
+    for (const r of rows) {
+      if (!isUnlockableSkin(r.item_id)) continue;
+      const heroName = heroOfSkin(r.item_id);
+      if (heroName) out.push({ id: r.item_id, name: r.item_id, heroName });
+    }
+  }
+  return out;
+}
+
+/** Kopien-Zähler des Spielers je Typ: { avatar: {id: n}, sleeve: {...}, skin: {...} } (nur Items mit n > 0). */
+async function shopDupes(userId) {
+  const out = { avatar: {}, sleeve: {}, skin: {} };
+  if (!userId || String(userId).startsWith('cpu-')) return out;
+  const rows = await db.all('SELECT item_type, item_id, dupes FROM user_shop_items WHERE user_id = ? AND dupes > 0', [userId]);
+  for (const r of rows) if (out[r.item_type]) out[r.item_type][r.item_id] = Math.min(MAX_DUPES, r.dupes || 0);
+  return out;
+}
+
+/** Rahmen-Ränge eines Spielers für den Spielzustand: Avatar, Sleeve und die im Deck benutzten Skins. */
+async function framesForPlayer(userId, usr, deckSkins) {
+  const none = { avatarRank: 0, cardbackRank: 0, skinRanks: {} };
+  if (!usr) return none;
+  try {
+    const d = await shopDupes(userId);
+    const skinRanks = {};
+    for (const sk of Object.values(deckSkins || {})) if (d.skin[sk]) skinRanks[sk] = d.skin[sk];
+    return { avatarRank: d.avatar[shopIdOfUrl(usr.avatar, 'avatars')] || 0, cardbackRank: d.sleeve[shopIdOfUrl(usr.cardback, 'sleeves')] || 0, skinRanks };
+  } catch (err) { console.error('[frames] Ränge nicht ermittelt:', err.message); return none; }
+}
+
+/**
+ * Zieht ein zufälliges Item aus `pool` (Ids): der ganze Pool, außer was schon das Maximum erreicht hat. Besitzt der Spieler es schon,
+ * steigt `dupes` um 1 (Upgrade), sonst wird es neu eingetragen. Liefert { id, isNew, dupes } oder null, wenn alles auf dem Maximum ist.
+ */
+async function pullFromPool(userId, itemType, pool, preowned = []) {
+  const rows = await db.all('SELECT item_id, dupes FROM user_shop_items WHERE user_id = ? AND item_type = ?', [userId, itemType]);
+  const have = new Map(rows.map(r => [r.item_id, r.dupes || 0]));
+  // `preowned`: schon besessene Items außerhalb des Shop-Pools (Standard-/Gegner-Avatare und -Sleeves, exklusive Skins) –
+  // sie sind NUR als Duplikat ziehbar; ohne eigene Zeile zählt der erste Treffer als erste Kopie (Rang 1).
+  const extra = preowned.filter(id => !pool.includes(id));
+  const eligible = [...pool, ...extra].filter(id => !have.has(id) || have.get(id) < MAX_DUPES);
+  if (!eligible.length) return null;
+  const id = eligible[Math.floor(Math.random() * eligible.length)];
+  if (!have.has(id) && extra.includes(id)) {
+    await db.run('INSERT INTO user_shop_items (id, user_id, item_type, item_id, dupes) VALUES (?, ?, ?, ?, 1)', [uuidv4(), userId, itemType, id]);
+    return { id, isNew: false, dupes: 1 };
+  }
+  if (have.has(id)) {
+    const dupes = have.get(id) + 1;
+    await db.run('UPDATE user_shop_items SET dupes = ? WHERE user_id = ? AND item_type = ? AND item_id = ?', [dupes, userId, itemType, id]);
+    return { id, isNew: false, dupes };
+  }
+  await db.run('INSERT INTO user_shop_items (id, user_id, item_type, item_id, dupes) VALUES (?, ?, ?, ?, 0)', [uuidv4(), userId, itemType, id]);
+  return { id, isNew: true, dupes: 0 };
+}
+
+// POST /api/shop/buy-random-skin — pull a random skin (a duplicate upgrades its frame)
 app.post('/api/shop/buy-random-skin', authMiddleware, async (req, res) => {
   const user = await db.get('SELECT sc FROM users WHERE id = ?', [req.user.userId]);
   if ((user.sc || 0) < RANDOM_PRICES.skin) return res.status(400).json({ error: 'Not enough SC' });
 
-  const allSkins = getAvailableSkins();
-  const ownedRows = await db.all("SELECT item_id FROM user_shop_items WHERE user_id = ? AND item_type = 'skin'", [req.user.userId]);
-  const ownedSet = new Set(ownedRows.map(r => r.item_id));
-
-  const unowned = allSkins.filter(s => !ownedSet.has(s.skinName));
-  if (unowned.length === 0) return res.status(400).json({ error: 'You already own all available skins!' });
-
-  const pick = unowned[Math.floor(Math.random() * unowned.length)];
-
+  const heroOf = new Map(getAvailableSkins().map(s => [s.skinName, s.heroName]));
+  const extras = await extraPullItems(req.user.userId, 'skin');           // exklusive Skins, die man schon besitzt: ab jetzt als Kopie ziehbar
+  for (const x of extras) heroOf.set(x.id, x.heroName);
+  const got = await pullFromPool(req.user.userId, 'skin', getAvailableSkins().map(s => s.skinName), extras.map(x => x.id));
+  if (!got) return res.status(400).json({ error: 'All skins are at maximum rank!' });
   await db.run('UPDATE users SET sc = sc - ? WHERE id = ?', [RANDOM_PRICES.skin, req.user.userId]);
-  await db.run('INSERT INTO user_shop_items (id, user_id, item_type, item_id) VALUES (?, ?, ?, ?)', [uuidv4(), req.user.userId, 'skin', pick.skinName]);
 
   const updated = await db.get('SELECT * FROM users WHERE id = ?', [req.user.userId]);
-  res.json({ ok: true, sc: updated.sc, skinName: pick.skinName, heroName: pick.heroName });
+  res.json({ ok: true, sc: updated.sc, skinName: got.id, heroName: heroOf.get(got.id), isNew: got.isNew, dupes: got.dupes });
 });
 
-// POST /api/shop/buy-random — buy a random unowned item of a given type (avatar or sleeve)
+// POST /api/shop/buy-random — pull a random avatar or sleeve (a duplicate upgrades its frame)
 app.post('/api/shop/buy-random', authMiddleware, async (req, res) => {
   const { itemType } = req.body;
   if (!itemType || !RANDOM_PRICES[itemType]) return res.status(400).json({ error: 'Invalid item type for random buy' });
@@ -4302,19 +4870,14 @@ app.post('/api/shop/buy-random', authMiddleware, async (req, res) => {
   const allItems = scanShopDir(subdir).map(f => path.basename(f, path.extname(f)))
     .filter(id => itemType !== 'sleeve' || !cpuSleeves.isCpuSleeve(id))
     .filter(id => itemType !== 'avatar' || !cpuAvatars.isCpuAvatar(id));
-  const ownedRows = await db.all('SELECT item_id FROM user_shop_items WHERE user_id = ? AND item_type = ?', [req.user.userId, itemType]);
-  const ownedSet = new Set(ownedRows.map(r => r.item_id));
-
-  const unowned = allItems.filter(id => !ownedSet.has(id));
-  if (unowned.length === 0) return res.status(400).json({ error: 'You already own all available ' + subdir + '!' });
-
-  const pick = unowned[Math.floor(Math.random() * unowned.length)];
-
+  const extras = await extraPullItems(req.user.userId, itemType);         // Start-/Gegner-Items: nur als Kopie ziehbar
+  const got = await pullFromPool(req.user.userId, itemType, allItems, extras.map(x => x.id));
+  if (!got) return res.status(400).json({ error: 'All ' + subdir + ' are at maximum rank!' });
+  const extra = extras.find(x => x.id === got.id) || null;
   await db.run('UPDATE users SET sc = sc - ? WHERE id = ?', [price, req.user.userId]);
-  await db.run('INSERT INTO user_shop_items (id, user_id, item_type, item_id) VALUES (?, ?, ?, ?)', [uuidv4(), req.user.userId, itemType, pick]);
 
   const updated = await db.get('SELECT * FROM users WHERE id = ?', [req.user.userId]);
-  res.json({ ok: true, sc: updated.sc, itemId: pick, itemType });
+  res.json({ ok: true, sc: updated.sc, itemId: got.id, itemType, isNew: got.isNew, dupes: got.dupes, extra: extra ? { src: extra.src, name: extra.name } : null });
 });
 
 // ───── Structure decks (shop-gated sample decks) ─────
@@ -4474,18 +5037,23 @@ function parseDeck(row) {
   try { skins = JSON.parse(row.skins || '{}'); } catch {}
   let cubeDraftMeta = null;
   try { cubeDraftMeta = row.cube_draft_meta ? JSON.parse(row.cube_draft_meta) : null; } catch {}
+  const mainDeck = JSON.parse(row.main_deck), heroes = JSON.parse(row.heroes);
+  const potionDeck = JSON.parse(row.potion_deck), sideDeck = JSON.parse(row.side_deck);
   return {
     id: row.id,
     name: row.name,
-    mainDeck: JSON.parse(row.main_deck),
-    heroes: JSON.parse(row.heroes),
-    potionDeck: JSON.parse(row.potion_deck),
-    sideDeck: JSON.parse(row.side_deck),
+    mainDeck,
+    heroes,
+    potionDeck,
+    sideDeck,
     isDefault: !!row.is_default,
     coverCard: row.cover_card || '',
     skins,
     mode: row.mode || 'standard',
     cubeDraftMeta,
+    rarities: RARITIES.normalizeDeckRarities(
+      { mainDeck, heroes, potionDeck, sideDeck },
+      (() => { try { return JSON.parse(row.rarities || '{}'); } catch { return {}; } })()),
   };
 }
 
@@ -4724,6 +5292,24 @@ app.get('/api/stats/live', (req, res) => {
 });
 
 // ===== PLAYER PROFILE (v1289) =====
+// Rang-Rahmen (Duplikate) der Spieler-Avatare für Listen, Chat und Menü: GET /api/players/avatar-ranks?n=Name&n=Name (öffentlich wie das Profil).
+// Antwort: { ranks: { Name: Kopien } } – nur Spieler, deren getragener Avatar einen Rahmen hat.
+app.get('/api/players/avatar-ranks', async (req, res) => {
+  try {
+    const raw = [].concat(req.query.n || []).map(x => String(x).trim()).filter(Boolean);
+    const names = [...new Set(raw)].slice(0, 60);
+    const ranks = {};
+    for (const n of names) {
+      const u = await db.get('SELECT id, avatar FROM users WHERE username = ?', [n]);
+      if (!u) continue;
+      const d = await shopDupes(u.id);
+      const r = d.avatar[shopIdOfUrl(u.avatar, 'avatars')];
+      if (r) ranks[n] = r;
+    }
+    res.json({ ranks });
+  } catch (err) { console.error('[avatar-ranks]', err.message); res.json({ ranks: {} }); }
+});
+
 // Oeffentliches Profil fuer das Top-Players-Popup — Logik in
 // player-profile.js. Hier nur die Anbindung an Laufzeitdaten des
 // Servers (Sitzungen, laufende Partien), deshalb neben `activeGames`.
@@ -4818,6 +5404,31 @@ function revealedMitStufe(ps, liste, engine, pi) {
     if (stufe === cd.level) return e;
     return { ...e, handLevel: stufe };
   });
+}
+
+/**
+ * Rarity je Karte in den Client-Zustand: `players[i].rarity` (fehlt = alles Common) hat dieselbe Form wie die Zonen
+ * (heroes, abilityZones, supportZones, surpriseZones, hand, creationZone, coolnessStack, discardPile, deletedPile; area = areaZones[i]),
+ * mit Rarity-Id oder null je Karte; aufgedeckte Gegner-Handkarten tragen `rarity` direkt. Gerechnet auf der bereits verborgenen
+ * Spielersicht — verdeckte Karten ('?') bleiben Common, nichts Verstecktes verraet sich. Zuordnung: siehe rarities.js (Kopienvorrat).
+ */
+function attachRarityToState(gs, state) {
+  try {
+    if (!(gs.players || []).some(ps => ps && ps.rarityLedger)) return;
+    RarityTrack.reconcile(gs);   // Identitaet je Kartenkopie: Schattenzustand gegen die echten Zonen abgleichen (cards/effects/_rarity-track.js)
+    (state.players || []).forEach((pv, i) => {
+      const ps = gs.players?.[i];
+      if (!ps || !ps.rarityLedger) return;
+      const r = RarityTrack.annotate(ps, pv, (state.areaZones || [])[i]);
+      if (r) pv.rarity = r;
+      if (pv.revealedHandCards && pv.revealedHandCards.length) {
+        pv.revealedHandCards = pv.revealedHandCards.map(c => {
+          const rr = c && Number.isInteger(c.index) ? RarityTrack.at(ps, 'hand', c.index, c.name) : null;
+          return rr ? { ...c, rarity: rr } : c;
+        });
+      }
+    });
+  } catch (err) { console.error('[rarity] Zustand nicht beschriftbar:', err.message); }
 }
 
 function sendGameState(room, playerIdx, extra) {
@@ -4934,6 +5545,7 @@ function sendGameState(room, playerIdx, extra) {
     myIndex: playerIdx, roomId: room.id,
     players: gs.players.map((ps, pi) => ({
       username: ps.username, color: ps.color, avatar: bildRef(ps.avatar), cardback: bildRef(ps.cardback) || null, board: bildRef(ps.board) || null,   // v1374
+      avatarRank: ps.avatarRank || 0, cardbackRank: ps.cardbackRank || 0, skinRanks: ps.skinRanks || {},   // Rahmen-Ränge (Duplikate)
       victoryMsg: ps.victoryMsg || '', defeatMsg: ps.defeatMsg || '',
       // ★ Teilt dieser Spieler seine Support-Zonen („Alice, the Transfer
       // Student")? Gehoert HIERHER, in den pro-Spieler-Block neben
@@ -6202,6 +6814,7 @@ function sendGameState(room, playerIdx, extra) {
   //    Zustand. `extra` (challengeStart, reconnected) erzwingt ebenfalls.
   //  • `stateSeq` zaehlt nur noch tatsaechlich gesendete Zustaende.
   //  • Abschalten: PP_STATE_DEDUPE=0.
+  attachRarityToState(gs, state);   // Rarity je Karte (nur Spieler mit Nicht-Common-Karten im Deck)
   let sig = null;
   // ★ W64b: Frage des Besitzers offen, Karte noch nicht gezeigt → der Gegner sieht den Zustand von VOR der Karte, nur die Hülle der Frage ist neu
   // (eine Karte, die vor einer abbrechbaren Frage schon etwas verändert hat, verriete sich sonst im Zustand).
@@ -6270,6 +6883,7 @@ function sendSpectatorGameState(room) {
     roomId: room.id,
     players: gs.players.map((ps, spi) => ({
       username: ps.username, color: ps.color, avatar: bildRef(ps.avatar), cardback: bildRef(ps.cardback) || null, board: bildRef(ps.board) || null,   // v1374
+      avatarRank: ps.avatarRank || 0, cardbackRank: ps.cardbackRank || 0, skinRanks: ps.skinRanks || {},   // Rahmen-Ränge (Duplikate)
       victoryMsg: ps.victoryMsg || '', defeatMsg: ps.defeatMsg || '',
       // ★ Teilt dieser Spieler seine Support-Zonen („Alice, the Transfer
       // Student")? Gehoert HIERHER, in den pro-Spieler-Block neben
@@ -6610,6 +7224,7 @@ function sendSpectatorGameState(room) {
     },
   };
 
+  attachRarityToState(gs, state);
   if (_auftrittHalt === 'huelle' && room._zuschauerSig) {   // W64b: Zustand von vor der Karte, nur die Hülle der Frage ist neu (s. sendGameState)
     try { state = { ...JSON.parse(room._zuschauerSig), effectPrompt: state.effectPrompt, potionTargeting: state.potionTargeting }; } catch { /* aktueller Zustand */ }
   }
@@ -7125,12 +7740,13 @@ function endCpuBattle(room, winnerIdx, reason) {
             io.to(humanSid).emit('opponents_unlocked', { opponents: newlyUnlocked });
           }
         }
-        // Skin-Game gewonnen → Skin des mittleren Gegner-Helden freischalten (falls noch nicht im
-        // Besitz). Das Popup kommt wie bei neuen Gegnern als eigenes Socket-Ereignis.
+        // Skin-Game gewonnen → Skin des mittleren Gegner-Helden freischalten; besitzt man ihn schon, steigt sein
+        // Rahmen-Rang um eine Stufe (Kopie, bis MAX_DUPES). Das Popup kommt wie bei neuen Gegnern als eigenes Socket-Ereignis.
         if (humanWon && room._cpuSkin) {
           try {
-            if (await unlockCpuSkin(humanUserId, room._cpuSkin.skinName) && humanSid) {
-              io.to(humanSid).emit('skin_unlocked', { skinName: room._cpuSkin.skinName, heroName: room._cpuSkin.heroName });
+            const got = await rankUpCpuSkin(humanUserId, room._cpuSkin.skinName);
+            if (got && humanSid) {
+              io.to(humanSid).emit('skin_unlocked', { skinName: room._cpuSkin.skinName, heroName: room._cpuSkin.heroName, isNew: got.isNew, dupes: got.dupes });
             }
           } catch (err) { console.error('[CPU battle] Skin-Freischaltung fehlgeschlagen:', err.message); }
         }
@@ -8709,6 +9325,15 @@ async function doPlaySpell(room, pi, { cardName, handIndex, heroIdx, charmedOwne
     chainResult = _kostenAbbruch ? { negated: false, chainFormed: true, fizzled: false } : await room.engine.executeCardWithChain({
       cardName, owner: pi, cardType: cardData.cardType, goldCost: 0, heroIdx: heroIdxPub,
       resolve: null,
+      // Handkarte des Initialglieds: fliegt beim AUFLOESEN des Glieds (nicht erst nach der ganzen Aufloesung). Nur eigene Karten aus der Hand (keine Creation-Karte, keine fremde Herkunft).
+      handFlug: (() => {
+        if (fromCreation) return null;
+        const _hi = getResolvingHandIndex(ps);
+        if (!(_hi >= 0)) return null;
+        const _o = room.engine._handOriginAt ? room.engine._handOriginAt(ps, _hi) : null;
+        if (_o != null && _o !== pi) return null;
+        return { handIdx: _hi, to: ((script && script.deleteOnUse) || _attaLoescht) ? 'deleted' : 'discard', toOwner: pi };
+      })(),
       // W74b (Flesh-Eating Swarm Trap): ein Attachment waehlt seinen Helden beim Spielen.
       chosenHero: (attachHeroIdx != null && attachHeroIdx >= 0) ? { owner: isSeat(gs, attachOwner) ? attachOwner : pi, heroIdx: attachHeroIdx } : null,
       // ★ v1328: Wirker-Seite (bezauberter Held) fuer die Handlungs-
@@ -9153,7 +9778,7 @@ async function doPlaySpell(room, pi, { cardName, handIndex, heroIdx, charmedOwne
     // Herkunft schon verbraucht — nicht ein zweites Mal ziehen.
     const spellPileOwner = resolveHi >= 0 ? room.engine._consumeHandCardOrigin(pi, cardName, fromCreation ? undefined : resolveHi) : pi;
     const _buddyToken = _buddyTicket?.token || null;   // W67a: Inya hat die Karte als Fantasy Buddy aufs Brett gestellt — statt Ablage, nie beides
-    if (resolveHi >= 0 && !gs._spellPlacedOnBoard && !gs._spellReturnToHand && !_buddyToken) {
+    if (resolveHi >= 0 && !gs._spellPlacedOnBoard && !gs._spellReturnToHand && !_buddyToken && !(chainResult && chainResult.initialFlug)) {   // initialFlug: der Flug ging schon beim Aufloesen des Kettenglieds raus
       room.engine._broadcastEvent('play_pile_transfer', {
         fromOwner: pi, toOwner: spellPileOwner, cardName,
         from: fromCreation ? 'creation' : 'hand',
@@ -13290,15 +13915,10 @@ function cubeShuffle(arr) {
 /**
  * Draft-Packs bauen: 32 Packs a 16 Karten, jede Karte genau einmal.
  *
- * Drei "Toepfe" werden moeglichst GLEICHMAESSIG auf alle Packs verteilt:
- *   1) Heroes (cardType 'Hero')
- *   2) Rare       (foil 'rare')            — Heroes dieser Seltenheit zaehlen mit
- *   3) Ueber Rare (secret_rare, diamond_rare, alles andere mit Foil) — ein grosser
- *      Topf, ebenfalls inkl. der bereits verteilten Heroes dieser Seltenheit
- * Je Topf geht die naechste Karte in das Pack mit der bisher geringsten Anzahl
- * dieses Topfes (Gleichstand: das Pack mit weniger Karten, dann Zufall). Danach
- * fuellen die uebrigen Karten die freien Plaetze. Gibt es nicht genau
- * packCount*packSize Karten, bleibt es beim reinen Zufallsschnitt.
+ * Nur der Helden-Topf wird moeglichst GLEICHMAESSIG auf alle Packs verteilt (cardType 'Hero'): die naechste Karte geht in das Pack
+ * mit der bisher geringsten Heldenzahl (Gleichstand: das Pack mit weniger Karten, dann Zufall). Danach fuellen die uebrigen Karten
+ * die freien Plaetze. Gibt es nicht genau packCount*packSize Karten, bleibt es beim reinen Zufallsschnitt.
+ * (Die frueheren Foil-Toepfe sind mit dem Rarity-System entfallen: Rarities werden pro Karte gewuerfelt, siehe cubeRollDraftRarities.)
  */
 function cubeBuildPacks(cubeCards, cardDB, packCount = CUBE_PACKS_PER_ROUND * CUBE_ROUNDS, packSize = CUBE_PACK_SIZE) {
   const shuffled = cubeShuffle(cubeCards);
@@ -13307,36 +13927,44 @@ function cubeBuildPacks(cubeCards, cardDB, packCount = CUBE_PACKS_PER_ROUND * CU
     for (let i = 0; i < packCount; i++) packs[i] = shuffled.slice(i * packSize, (i + 1) * packSize);
     return packs;
   }
-  const info = (name) => {
-    const cd = cardDB[name] || {};
-    return { hero: cd.cardType === 'Hero', tier: cd.foil === 'rare' ? 1 : (cd.foil ? 2 : 0) };
-  };
-  // Zaehler je Topf und Pack: [heroes, rare, ueberRare]
-  const cnt = packs.map(() => [0, 0, 0]);
-  const place = (name, potIdx) => {
+  const isHero = (name) => (cardDB[name] || {}).cardType === 'Hero';
+  const heroCount = packs.map(() => 0);
+  const place = (name, hero) => {
     let best = [], bestKey = null;
     for (let i = 0; i < packCount; i++) {
       if (packs[i].length >= packSize) continue;
-      const key = potIdx == null ? [-(packSize - packs[i].length)] : [cnt[i][potIdx], packs[i].length];
+      const key = hero ? [heroCount[i], packs[i].length] : [-(packSize - packs[i].length)];
       if (bestKey == null || key[0] < bestKey[0] || (key[0] === bestKey[0] && (key[1] ?? 0) < (bestKey[1] ?? 0))) { bestKey = key; best = [i]; }
       else if (key[0] === bestKey[0] && (key[1] ?? 0) === (bestKey[1] ?? 0)) best.push(i);
     }
     const pick = best[Math.floor(Math.random() * best.length)];
     packs[pick].push(name);
-    const inf = info(name);
-    if (inf.hero) cnt[pick][0]++;
-    if (inf.tier === 1) cnt[pick][1]++;
-    if (inf.tier === 2) cnt[pick][2]++;
+    if (hero) heroCount[pick]++;
   };
-  const heroes = shuffled.filter(n => info(n).hero);
-  const rares = shuffled.filter(n => !info(n).hero && info(n).tier === 1);
-  const supers = shuffled.filter(n => !info(n).hero && info(n).tier === 2);
-  const rest = shuffled.filter(n => !info(n).hero && info(n).tier === 0);
-  for (const n of heroes) place(n, 0);
-  for (const n of rares) place(n, 1);
-  for (const n of supers) place(n, 2);
-  for (const n of rest) place(n, null);
+  for (const n of shuffled.filter(isHero)) place(n, true);
+  for (const n of shuffled.filter(n => !isHero(n))) place(n, false);
   return packs.map(pk => cubeShuffle(pk));
+}
+
+/**
+ * Draft-Rarities: JEDE Karte des Cubes bekommt serverseitig eine Rarity aus RARITIES.DRAFT_TABLE (Umbra/Stained/Storm nur mit Motiv-Maske,
+ * sonst wird neu gewuerfelt). Karten sind im Draft einmalig, darum genuegt eine Abbildung Name → Rarity; Common steht nicht darin.
+ * Die Rarities sind TEMPORAER: sie leben nur im Draft-Deck, nie in der Sammlung (Ausnahme: der Siegbonus, cubeAwardWinnerBonus).
+ */
+function cubeRollDraftRarities(cubeCards) {
+  const out = {};
+  for (const name of new Set(cubeCards)) {
+    const r = RARITIES.rollDraftRarity(name, Math.random, cardHasMask);
+    if (r !== 'common') out[name] = r;
+  }
+  return out;
+}
+
+/** Abbildung Name → Rarity (nur Nicht-Common) fuer die Namen einer Liste. */
+function cubeRaritiesOf(map, names) {
+  const out = {};
+  for (const n of names || []) if (n && map && map[n]) out[n] = map[n];
+  return out;
 }
 
 /**
@@ -13407,6 +14035,8 @@ async function cubeDraftStart(room, db, parseDeck, io) {
   // cubeDraftFinalize for the "0 heroes drafted" auto-assign rule
   // (need the cube contents to know which heroes are NOT in the cube).
   cd.cubeCards = [...cubeCards];
+  // Rarity jeder Draft-Karte (temporaer, nur fuer diesen Draft)
+  cd.draftRarities = cubeRollDraftRarities(cubeCards);
 
   // Ring order (0..7 → seat indices) — governs which seat passes to which
   // during the snake. Menschen sitzen GLEICHMAESSIG verteilt im Ring (nie ein
@@ -13479,6 +14109,8 @@ function cubeDraftPlayerView(room, seatIdx) {
     direction: draft.direction,
     myPack: draft.currentPacks[seatIdx] || [],
     myPool: draft.pools[seatIdx] || [],
+    // Rarity der Karten in meinem Pack, Pool und der gerade gewaehlten Karte: { Name: Rarity } (fehlt = Common). Temporaer, nur fuer diesen Draft.
+    rarities: cubeRaritiesOf(cd.draftRarities, [...(draft.currentPacks[seatIdx] || []), ...(draft.pools[seatIdx] || []), draft.pendingPicks[seatIdx]]),
     myPicked: draft.pendingPicks[seatIdx] != null,
     // Bereits gewaehlte, aber noch nicht aufgeloeste Karte — der Client zeigt sie sofort im Pool.
     myPendingPick: draft.pendingPicks[seatIdx] || null,
@@ -13819,6 +14451,7 @@ function cubeBuildBroadcast(room, io) {
       phase: cd.phase,
       seatIdx,
       pool,
+      rarities: cubeRaritiesOf(cd.draftRarities, pool),   // Draft-Rarities der Pool-Karten: { Name: Rarity } (fehlt = Common)
       assignedHero: cd.assignedHeroes?.[seatIdx] || null,
       swapHeroes: require('./cards/effects/_cube-swap-shared').tauschHelden(pool, getCardDB()),   // W77 (Cuberto): Helden im Pool, die Karten tauschen dürfen → max. Anzahl
       cubeName: cd.cubeName,
@@ -14544,6 +15177,11 @@ async function cubeFinalizeTournament(room, io) {
         if (player.socketId) io.to(player.socketId).emit('cube_sc_award', { amount: scAward, placement: s.placement });
       } catch (err) { console.error('[cubeFinalize] SC error:', err.message); }
     }
+    // Draft-Sieg-Bonus: EINE Kopie der hoechsten Rarity aus dem eigenen Draft-Deck wandert dauerhaft in die Sammlung (samt Popup).
+    if (s.placement === 1) {
+      try { await cubeAwardWinnerBonus(room, s.seat, io); }
+      catch (err) { console.error('[cubeFinalize] Rarity-Bonus error:', err.message); }
+    }
     // Ranked-Elo (nur Ranked-Draft): einfacher K-Faktor nach Platzierung auf die NORMALE `elo`
     // (keine eigene Draft-Wertung); ein Turnier zaehlt als ein Ranked-Spiel (`ranked_games`, Bestenliste).
     // Higher placement = bigger gain; lowest = biggest loss.
@@ -14573,6 +15211,32 @@ async function cubeFinalizeTournament(room, io) {
   if (eloGeaendert) io.emit('leaderboard_updated');
   cubeTournamentBroadcast(room, io);
   console.log(`[cube_tournament] room ${room.id} complete — winner ${standings[0]?.username}`);
+}
+
+/**
+ * Draft-Sieg-Bonus (Rarity-System): der Sieger bekommt EINE zufaellige Karte mit der hoechsten Rarity aus seinem Draft-Deck
+ * (Main, Potion, Side, Helden samt Faehigkeiten) als dauerhafte Kopie (Karte, Rarity) in seine Sammlung. Hat sein Deck nur Common,
+ * gibt es nichts. Der Client bekommt `rarity_bonus` { card, rarity, source: 'draft', placement } fuer das Popup (Vorbild: `skin_unlocked`).
+ * @returns {Promise<{card:string, rarity:string}|null>}
+ */
+async function cubeAwardWinnerBonus(room, seat, io) {
+  const cd = room.cubeDraft;
+  const player = room.players[seat];
+  const deck = cd?.builtDecks?.[seat];
+  if (!player || !deck || !player.userId || player.isBot) return null;
+  const copies = RARITIES.deckCopies(
+    { mainDeck: deck.mainDeck || [], potionDeck: deck.potionDeck || [], sideDeck: deck.sideDeck || [], heroes: deck.heroes || [] },
+    cubeDeckRarities(deck, cd.draftRarities));
+  let best = 0;
+  for (const c of copies) best = Math.max(best, RARITIES.rank(c.rarity));
+  if (best <= 0) return null;
+  const top = [...new Set(copies.filter(c => RARITIES.rank(c.rarity) === best).map(c => c.name))];
+  const card = top[Math.floor(Math.random() * top.length)];
+  const rarity = RARITIES.ORDER[best];
+  await addRarityCopies(player.userId, [{ name: card, rarity }]);
+  if (player.socketId) io.to(player.socketId).emit('rarity_bonus', { card, rarity, source: 'draft', placement: 1 });
+  console.log(`[cube_tournament] room ${room.id} winner ${player.username} bonus: ${card} (${rarity})`);
+  return { card, rarity };
 }
 
 /** Auto-build a legal-ish deck from a player's drafted pool. Used by
@@ -14732,7 +15396,7 @@ async function cubeBuildAutoFillNonReady(room, io) {
     const deckName = `${p.username}'s ${cd.cubeName} Draft (auto)`;
     const deck = cubeAutoBuildDeck(pool, cardDB, deckName);
     try {
-      await cubeSaveDraftedDeck(p.userId, deck, cd.cubeName, room.id);
+      await cubeSaveDraftedDeck(p.userId, deck, cd.cubeName, room.id, cd.draftRarities);
     } catch (err) {
       console.error('[cubeBuildAutoFillNonReady] save error:', err.message);
       continue;
@@ -14752,19 +15416,49 @@ async function cubeBuildAutoFillNonReady(room, io) {
 }
 
 /** Save a finalized cube-drafted deck to the player's deck list. */
-async function cubeSaveDraftedDeck(userId, deck, cubeName, roomId) {
+/** Rarity-Form eines gedrafteten Decks aus der Abbildung Name → Rarity (serverseitig bestimmt, nie vom Client uebernommen). */
+function cubeDeckRarities(deck, rarityMap) {
+  const zonen = { mainDeck: deck.mainDeck || [], heroes: deck.heroes || [], potionDeck: deck.potionDeck || [], sideDeck: deck.sideDeck || [] };
+  const m = (n) => (n && rarityMap && rarityMap[n]) || 'common';
+  return RARITIES.normalizeDeckRarities(zonen, {
+    main: zonen.mainDeck.map(m), potion: zonen.potionDeck.map(m), side: zonen.sideDeck.map(m),
+    heroes: zonen.heroes.map(h => ({ hero: m(h && h.hero), ability1: m(h && h.ability1), ability2: m(h && h.ability2) })),
+  });
+}
+
+async function cubeSaveDraftedDeck(userId, deck, cubeName, roomId, rarityMap) {
   const newId = uuidv4();
   const meta = JSON.stringify({ cubeName, draftedAt: new Date().toISOString(), roomId });
+  const rarities = cubeDeckRarities(deck, rarityMap);
   await db.run(
-    "INSERT INTO decks (id, user_id, name, main_deck, heroes, potion_deck, side_deck, is_default, cover_card, skins, mode, cube_draft_meta, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, 0, '', '{}', 'drafted', ?, unixepoch(), unixepoch())",
+    "INSERT INTO decks (id, user_id, name, main_deck, heroes, potion_deck, side_deck, is_default, cover_card, skins, mode, cube_draft_meta, rarities, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, 0, '', '{}', 'drafted', ?, ?, unixepoch(), unixepoch())",
     [newId, userId, deck.name || `Drafted Deck`,
      JSON.stringify(deck.mainDeck || []),
      JSON.stringify(deck.heroes || []),
      JSON.stringify(deck.potionDeck || []),
      JSON.stringify(deck.sideDeck || []),
-     meta]
+     meta, JSON.stringify(RARITIES.hasAnyRarity(rarities) ? rarities : {})]
   );
   return newId;
+}
+
+/**
+ * Kopienvorrat eines Decks fuer den Spielzustand: { Kartenname: [Rarity, …] } (nur Nicht-Common, absteigend) oder null.
+ * Menschliche Decks werden gegen den Besitz geprueft (zu viele Kopien einer Rarity → Common); gedraftete Decks (temporaere Rarities),
+ * CPU- und Beispiel-Decks sind ausgenommen. Bricht nie ab.
+ */
+async function rarityLedgerFor(userId, deck) {
+  try {
+    if (!deck || !deck.rarities || !RARITIES.hasAnyRarity(deck.rarities)) return null;
+    let r = RARITIES.normalizeDeckRarities(deck, deck.rarities);
+    if (!deck.rarityTemp && deck.mode !== 'drafted' && userId && !isCpuUserId(userId)) {
+      r = RARITIES.downgradeToOwned(deck, r, await ownedRarities(userId));
+    }
+    return { ledger: RARITIES.deckLedger(deck, r), zones: RARITIES.deckZoneInfo(deck, r) };
+  } catch (err) {
+    console.error('[rarity] Kopienvorrat nicht berechenbar:', err.message);
+    return null;
+  }
 }
 
 /** Set up fresh game state: decks, hands, heroes — but don't start the engine or turns. */
@@ -14835,6 +15529,11 @@ async function setupGameState(room) {
       }
 
       deck = await withProfileHeroSkins(p.userId, deck);
+      // Rarity je Kartenkopie: Besitz-Konsistenz pruefen (Fallback: auf Common herabstufen, nie abbrechen) und als Kopienvorrat je Name festhalten.
+      const rarityInfo = await rarityLedgerFor(p.userId, deck);
+      const rarityLedger = rarityInfo ? rarityInfo.ledger : null;
+      const rarityZones = rarityInfo ? rarityInfo.zones : null;
+      if (deck) deck = { ...deck, rarityLedger, rarityZones };
 
       // Save original deck state at match start (for side-deck reset)
       if (!room._originalDecks) room._originalDecks = [{}, {}];
@@ -14842,6 +15541,8 @@ async function setupGameState(room) {
         mainDeck: deck?.mainDeck || [], heroes: deck?.heroes || [],
         potionDeck: deck?.potionDeck || [], sideDeck: deck?.sideDeck || [],
         skins: deck?.skins || {},
+        rarityLedger,   // Name → Rarities der Kopien (bleibt beim Seitendeck-Tausch gueltig, anders als Positionen)
+        rarityZones,    // dieselben Kopien nach Zone (Hauptdeck/Traenke/Seitendeck/Helden) — Ausgangszuordnung der Identitaetsverfolgung
       }));
       if (!room._currentDecks) room._currentDecks = [null, null];
       room._currentDecks[idx] = JSON.parse(JSON.stringify(room._originalDecks[idx]));
@@ -14884,6 +15585,9 @@ async function setupGameState(room) {
     });
     const mainDeck = shuffle(deck?.mainDeck||[]);
     const potionDeck = shuffle(deck?.potionDeck||[]);
+    // Kopienvorrat (Rarity je Kartenname) dieses Spielers: aus dem Deck-Schnappschuss, sonst frisch berechnet (voreingestellte Decks von CPU-Duellen).
+    const spielerInfo = deck && deck.rarityLedger !== undefined ? { ledger: deck.rarityLedger, zones: deck.rarityZones || null } : await rarityLedgerFor(p.userId, deck);
+    const spielerLedger = spielerInfo ? spielerInfo.ledger : null;
     // Side Deck snapshot at game start. The pre-game side-deck phase has
     // already finalized swaps (room._currentDecks reflects post-swap state),
     // so the remaining names are the truly out-of-game pool. Effects like
@@ -14891,6 +15595,7 @@ async function setupGameState(room) {
     const sideDeck = (room._currentDecks?.[idx]?.sideDeck || []).slice();
     playerStates.push({ userId:p.userId, username:(usr?.username||p.username), socketId:p.socketId,
       color:usr ? (usr.color||STANDARD_FARBE) : NICHT_MENSCH_FARBE, avatar:liveShopRef(usr?.avatar,'avatars'), cardback:liveShopRef(usr?.cardback,'sleeves'), board:usr?.board||null,
+      ...(await framesForPlayer(p.userId, usr, deck?.skins)),   // Rahmen-Ränge von Avatar, Sleeve und benutzten Skins
       // Gewählter Battle-Track (geprüft: nur Freigeschaltetes); der GEGNER hört ihn.
       battleTrack: usr ? await battleTracks.resolveForBattle(p.userId, usr.battle_track) : null,
       victoryMsg, defeatMsg, heroKilledMsg, middleHeroKilledMsg, greetingMsg, barkBounce,
@@ -14907,7 +15612,8 @@ async function setupGameState(room) {
       hand:[], mainDeck, potionDeck, sideDeck, discardPile:[], deletedPile:[], disconnected:false, left:false, gold:0,
       abilityGivenThisTurn:[false,false,false], islandZoneCount:[0,0,0],
       damageLocked:false, itemLocked:false, dealtDamageToOpponent:false, potionLocked:false, potionsUsedThisTurn:0,
-      permanents:[], coolnessStack:[], creationZone:[], _oncePerGameUsed: new Set(), _resolvingCard: null, deckSkins: deck?.skins || {} });
+      permanents:[], coolnessStack:[], creationZone:[], _oncePerGameUsed: new Set(), _resolvingCard: null, deckSkins: deck?.skins || {},
+      rarityLedger: spielerLedger || null, rarityZones: spielerLedger ? (spielerInfo.zones || null) : null });
   }
   room.gameState = { players:playerStates, areaZones:[[],[]], turn:0, activePlayer:0, currentPhase:0, result:null, rematchRequests:[], awaitingFirstChoice:true,
     _gameStartTime: Date.now(),
@@ -14921,6 +15627,7 @@ async function setupGameState(room) {
       return sock ? getSocketIP(sock) : 'unknown';
     }),
   };
+  RarityTrack.reconcile(room.gameState);   // Rarity je Kartenkopie: Ausgangszuordnung (Helden, Faehigkeiten, Deck) vor dem ersten Ziehen festlegen
   room.status = 'playing';
   room.players.forEach(p => activeGames.set(p.userId, room.id));
 }
@@ -15696,7 +16403,7 @@ io.on('connection', (socket) => {
     // Save the deck to the user's deck list under "Drafted Decks".
     try {
       const newDeckId = await cubeSaveDraftedDeck(
-        currentUser.userId, deck, room.cubeDraft.cubeName, roomId
+        currentUser.userId, deck, room.cubeDraft.cubeName, roomId, room.cubeDraft.draftRarities
       );
       console.log(`[cube_draft] seat ${seatIdx} (${currentUser.username}) saved drafted deck ${newDeckId}`);
     } catch (err) {
@@ -16019,6 +16726,7 @@ io.on('connection', (socket) => {
         }
       }
     }
+    if (validMap) RarityTrack.permute(room.gameState, pi, 'hand', validMap);   // Rarity je Kopie: folgt der Kopie durch das Umsortieren
     ps.hand = hand;
     // Array reassignment wiped the splice interceptor — re-install.
     if (room.engine) room.engine._installHandRevealInterceptor(pi);
@@ -17369,6 +18077,7 @@ io.on('connection', (socket) => {
     if (usr) {
       p0.color = usr.color || STANDARD_FARBE; p0.avatar = liveShopRef(usr.avatar, 'avatars');
       p0.cardback = liveShopRef(usr.cardback, 'sleeves'); p0.board = usr.board;
+      Object.assign(p0, await framesForPlayer(currentUser.userId, usr, null));
       // Apply the player's chosen board skin to the CPU side too so the
       // whole puzzle playfield — including the opponent's Area Zone —
       // uses the same skin as a normal game instead of the default.
@@ -18304,6 +19013,7 @@ io.on('connection', (socket) => {
       mainDeck: d.mainDeck || [], heroes: d.heroes || [],
       potionDeck: d.potionDeck || [], sideDeck: d.sideDeck || [],
       skins: d.skins || {},
+      rarities: d.rarities || null, rarityTemp: d.mode === 'drafted',   // Rarity je Kopie (setupGameState prueft sie gegen den Besitz)
     }));
 
     // CPU-Skin-System: ggf. traegt der mittlere Gegner-Held einen Skin.

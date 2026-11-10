@@ -9,6 +9,7 @@
 //  Jetzt: EINE Leinwand je Ebene, im 30-Hz-Takt (`ppTaktRaf`) gezeichnet. Das Aussehen ist das der gebackenen Animation, Schritt für Schritt
 //  nachgebaut (Quelle: `pixel-anim.js`, `backenProbeVorbereiten` / `frameBauen`; gegen echte Mote per Bildvergleich geprüft):
 //    • Dauer und Verzögerung auf ganze Takte (1/30 s); je Durchlauf höchstens 40 gehaltene Bilder (`globalMaxBilder`), also Schritt = ceil(Bilder/40) Takte
+//    • (Phase 2: Kantenlänge und Verschiebung in Zellen = Hero-Pixel statt 2 px, siehe `ppFx34Zelle`.)
 //    • Bewegung = `hand-mote-float`: translate(0,0) scale(.5) → bei 50 % translate(dx,dy) scale(1) → bei 100 % translate(dx2,dy2) scale(.5),
 //      je Teilstück ease-in-out (cubic-bezier(.42,0,.58,1)); Verschiebung auf gerade Pixel (`snapPx`), Skalierung auf Vielfache von 1/2 (Kantenlänge 2/4 px → 1/2 oder 2/4 px)
 //    • Deckkraft 0 → 1 (bis 18 %), 1 (bis 82 %), → 0 (bis 100 %), kleine Teilchen nur ein/aus (Dither-Stufe ≥ 8 von 16, wie `frameBauen`)
@@ -39,8 +40,11 @@ function ppFx34Ease(x) {
   }
   return 3 * (1 - t) * t * t + t * t * t;
 }
-const ppFx34SnapPx = (v) => (v < 0 ? -1 : 1) * Math.round(Math.abs(v) / 2) * 2 || 0;   // pixel-anim.js snapPx (raster 2)
-const ppFx34Gerade = (v) => Math.round(v / 2) * 2;                                      // wie ppAmbGerade (app-board.jsx)
+// Rasterzelle der Motes = Hero-Pixel der eigenen Reihe (`ppFxZelle`, app-board.jsx; Phase 2). Vorher fest 2 (Kunstpixel von pixel-anim.js). Kantenlänge 1 oder 2 Zellen, Verschiebung in ganzen Zellen.
+// Anzahl der Motes und Zeichenaufrufe bleiben gleich (136 × fillRect je Bild): die Dauerlast steigt nicht. Bei 720p und auf dem Handy (Hero-Pixel 2) ist das Bild unverändert bis auf die kleinste Stufe (1 px → 1 Zelle).
+const ppFx34Zelle = () => { try { if (typeof ppFxZelle === 'function') return ppFxZelle(null); } catch (e) { /* Rückfall */ } return 2; };
+const ppFx34SnapPx = (v, Z) => (v < 0 ? -1 : 1) * Math.round(Math.abs(v) / (Z || 2)) * (Z || 2) || 0;   // pixel-anim.js snapPx, hier mit Raster Z
+const ppFx34Gerade = (v, Z) => Math.round(v / (Z || 2)) * (Z || 2);                                      // wie ppAmbGerade (app-board.jsx), mit Raster Z
 
 // Deckkraft → an/aus nach `frameBauen` (ditherStufe, Schritt 2, Schwelle 8)
 function ppFx34Sichtbar(a) {
@@ -53,14 +57,15 @@ function ppFx34Sichtbar(a) {
 }
 
 /** Bildfolge einer Mote: gehaltene Schritte (Verschiebung, Kantenlänge, an/aus) — einmal gerechnet. */
-function ppFx34Tafel(p) {
+function ppFx34Tafel(p, Z) {
+  Z = Z || 2;
   const T = PP_FX34_TAKT;
   const D2 = Math.max(T, Math.round(p.dur * 1000 / T) * T);
   const delay2 = Math.round(p.delay * 1000 / T) * T;
   const stride = Math.max(1, Math.ceil(Math.round(D2 / T) / PP_FX34_MAX_BILDER));
   const schritt = stride * T;
   const K = Math.max(1, Math.ceil((D2 - 1e-6) / schritt));
-  const dx = p.dx, dy = p.dy, dx2 = ppFx34Gerade(p.dx * 1.6), dy2 = ppFx34Gerade(p.dy * 1.8);
+  const dx = p.dx, dy = p.dy, dx2 = ppFx34Gerade(p.dx * 1.6, Z), dy2 = ppFx34Gerade(p.dy * 1.8, Z);
   const tx = new Int16Array(K), ty = new Int16Array(K), px = new Uint8Array(K), an = new Uint8Array(K);
   for (let k = 0; k < K; k++) {
     const u = k * schritt / D2;
@@ -68,8 +73,8 @@ function ppFx34Tafel(p) {
     let x, y, s;
     if (u < 0.5) { const e = ppFx34Ease(u / 0.5); x = dx * e; y = dy * e; s = 0.5 + 0.5 * e; }
     else { const e = ppFx34Ease((u - 0.5) / 0.5); x = dx + (dx2 - dx) * e; y = dy + (dy2 - dy) * e; s = 1 - 0.5 * e; }
-    tx[k] = ppFx34SnapPx(x); ty[k] = ppFx34SnapPx(y);
-    px[k] = Math.max(1, Math.round(s * 2)) * p.size / 2;       // Kantenlänge in CSS-px: 2 px → 1/2, 4 px → 2/4
+    tx[k] = ppFx34SnapPx(x, Z); ty[k] = ppFx34SnapPx(y, Z);
+    px[k] = Math.max(1, Math.round(Math.max(1, Math.round(s * 2)) * p.size / 4)) * Z;       // Kantenlänge in CSS-px: 1 oder 2 Zellen (kleine Motes immer 1, große 1 → 2)
     an[k] = ppFx34Sichtbar(a) ? 1 : 0;
   }
   return { D2, delay2, schritt, K, tx, ty, px, an };
@@ -105,22 +110,30 @@ function ppFx34Start(cv, o) {
   try { ruhig = !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches); } catch (e) { /* bewegt */ }
   const raf = window.ppTaktRaf || window.requestAnimationFrame;
   // Motes + Farbgruppen (eine Füllfarbe je Gruppe; Zeichenreihenfolge innerhalb der Gruppe wie im DOM)
+  let Z = ppFx34Zelle();                                              // Rasterzelle (CSS-px); bei Fenstergröße neu gelesen
   const M = o.motes.map((p) => {
     const schl = /--amb-board-opp/.test(p.color) ? 'opp' : /var\(/.test(p.color) ? 'me' : 'weiss';
     const rgb = schl === 'weiss' ? ppFx34Rgb(p.color) : farbe[schl];
     const hex = ruhig ? ppFx34Misch(rgb, p.max * p.max * 0.5) : ppFx34Misch(rgb, p.max);   // ruhig: deckend gemischt, dann mit Deckkraft max·0,5 über dem dunklen Grund
-    return { L: p.left, T: p.top, S: p.size, hex, t: ruhig ? null : ppFx34Tafel(p) };
+    return { L: p.left, T: p.top, S: p.size, hex, p, t: ruhig ? null : ppFx34Tafel(p, Z) };
   });
   const gruppen = [];
   { const byHex = new Map(); M.forEach((m) => { let g = byHex.get(m.hex); if (!g) { g = { hex: m.hex, m: [] }; byHex.set(m.hex, g); gruppen.push(g); } g.m.push(m); }); }
   let W = 0, H = 0, dpr = 1, gestoppt = false, sichtbar = false, bereit = false, id = 0, t0 = -1, idleId = 0;
   const OX = o.ox || 0, OY = o.oy || 0;     // Ursprung der Ebene innerhalb der Leinwand (Hand: Leinwand ragt über die Leiste hinaus)
 
+  function zelleNeu() {            // Zelle geändert (Fenstergröße, Brettskala) → Bildfolgen neu rechnen
+    const z = ppFx34Zelle();
+    if (z === Z) return false;
+    Z = z; if (!ruhig) for (const m of M) m.t = ppFx34Tafel(m.p, Z);
+    return true;
+  }
   function groesse(w, h) {          // nur bei Größenänderung (ResizeObserver) — nie im Takt
+    const zn = zelleNeu();
     const d = window.devicePixelRatio || 1;
     W = w - 2 * OX; H = h - OY - (o.unten || 0);
     const bw = Math.max(1, Math.round(w * d)), bh = Math.max(1, Math.round(h * d));
-    if (bw === cv.width && bh === cv.height && d === dpr) return;
+    if (bw === cv.width && bh === cv.height && d === dpr) { if (zn && bereit) zeichnen(performance.now()); return; }
     dpr = d; cv.width = bw; cv.height = bh;     // setzt die Leinwand zurück → neu zeichnen
     if (bereit) zeichnen(performance.now());
   }
@@ -141,9 +154,9 @@ function ppFx34Start(cv, o) {
           let k = (l / ta.schritt) | 0; if (k >= ta.K) k = ta.K - 1;
           if (!ta.an[k]) continue;
           s = ta.px[k];
-          x = OX + m.L * W / 100 + m.S / 2 + ta.tx[k] - s / 2;
-          y = OY + m.T * H / 100 + m.S / 2 + ta.ty[k] - s / 2;
-        } else { s = m.S; x = OX + m.L * W / 100; y = OY + m.T * H / 100; }
+          x = OX + Math.round(m.L * W / 100 / Z) * Z + ta.tx[k];
+          y = OY + Math.round(m.T * H / 100 / Z) * Z + ta.ty[k];
+        } else { s = Math.max(1, Math.round(m.S / 2)) * Z; x = OX + Math.round(m.L * W / 100 / Z) * Z; y = OY + Math.round(m.T * H / 100 / Z) * Z; }
         const px = Math.round(x * dpr), py = Math.round(y * dpr), ps = Math.max(1, Math.round(s * dpr));
         ctx.fillRect(px, py, ps, ps);
       }
@@ -167,7 +180,7 @@ function ppFx34Start(cv, o) {
     io = new IntersectionObserver((es) => { sichtbar = es[es.length - 1].isIntersecting; if (sichtbar) anwerfen(); });
     io.observe(cv);
   } catch (e) { sichtbar = true; }
-  const aufResize = () => { const d = window.devicePixelRatio || 1; if (d !== dpr && cv.isConnected) groesse(cv.clientWidth, cv.clientHeight); };
+  const aufResize = () => { const d = window.devicePixelRatio || 1; if ((d !== dpr || ppFx34Zelle() !== Z) && cv.isConnected) groesse(cv.clientWidth, cv.clientHeight); };
   window.addEventListener('resize', aufResize);
   // Erstes Zeichnen im Leerlauf: legt die Leinwand-Ressourcen an, bevor sie im Takt gebraucht werden
   const los = () => {
@@ -191,7 +204,7 @@ function ppFx34Start(cv, o) {
     const ta = m.t; let l = lauf - ta.delay2; l -= Math.floor(l / ta.D2) * ta.D2;
     let k = (l / ta.schritt) | 0; if (k >= ta.K) k = ta.K - 1;
     const sz = ta.px[k];
-    return { an: ta.an[k], k, x: OX + m.L * W / 100 + m.S / 2 + ta.tx[k] - sz / 2, y: OY + m.T * H / 100 + m.S / 2 + ta.ty[k] - sz / 2, s: sz };
+    return { an: ta.an[k], k, x: OX + Math.round(m.L * W / 100 / Z) * Z + ta.tx[k], y: OY + Math.round(m.T * H / 100 / Z) * Z + ta.ty[k], s: sz };
   });
   stopp.pruef = { modell, zeichnen, halt: (v) => { gestoppt = v; }, t0: (v) => { t0 = v; }, info: () => ({ W, H, dpr, gruppen: gruppen.length }) };   // Pruefhaken fuer Bildvergleiche (Testskripte)
   return stopp;
@@ -204,10 +217,10 @@ function PpFx34AmbienteInnen({ art, motes, farbeMe, farbeOpp }) {
     if (art !== 'hand') return { ox: 0, oy: 0, unten: 0 };
     let ox = 0, oy = 0;
     for (const p of motes) {
-      ox = Math.max(ox, Math.abs(p.dx), Math.abs(ppFx34Gerade(p.dx * 1.6)));
-      oy = Math.max(oy, -p.dy, -ppFx34Gerade(p.dy * 1.8));
+      ox = Math.max(ox, Math.abs(p.dx), Math.abs(ppFx34Gerade(p.dx * 1.6, 3)));
+      oy = Math.max(oy, -p.dy, -ppFx34Gerade(p.dy * 1.8, 3));
     }
-    return { ox: Math.ceil(ox) + 6, oy: Math.ceil(oy) + 6, unten: 6 };
+    return { ox: Math.ceil(ox) + 9, oy: Math.ceil(oy) + 9, unten: 9 };   // Rand: Drift + 2 Zellen (bis Zelle 3 → 6 px) + Rundung
   }, [art, motes]);
   React.useEffect(() => {
     if (!ref.current) return undefined;

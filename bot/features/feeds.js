@@ -184,9 +184,10 @@ module.exports = function register(ctx) {
   // Anzeigenamen der Felder in cards.json, die sich ändern können
   const FIELD_LABELS = { effect: 'effect text', hp: 'HP', atk: 'ATK', cost: 'cost', costLabel: 'cost', level: 'level', cardType: 'type', subtype: 'subtype',
     archetype: 'archetype', startingAbility1: 'starting ability', startingAbility2: 'starting ability', spellSchool1: 'school', spellSchool2: 'school',
-    banned: 'ban status', foil: 'rarity' };
-  // Felder ohne Bedeutung für Spielerinnen und Spieler (z. B. interne Test-Markierungen) lösen keine Meldung aus
-  const IGNORED_FIELDS = new Set(['skilltestLegal', 'setID']);
+    banned: 'ban status' };
+  // Felder ohne Bedeutung für Spielerinnen und Spieler (z. B. interne Test-Markierungen) lösen keine Meldung aus.
+  // `foil`: das alte Feld ist mit dem Rarity-System aus cards.json verschwunden (Rarities stehen nicht mehr auf der Karte) — sein Wegfall ist keine Änderung.
+  const IGNORED_FIELDS = new Set(['skilltestLegal', 'setID', 'foil']);
 
   /**
    * Karten, die in BEIDEN Ständen vorkommen, deren Eintrag sich aber verändert hat. Neue Karten (nur im neuen Stand) gehören in den

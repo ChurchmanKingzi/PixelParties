@@ -216,7 +216,7 @@ function StWall() {
 }
 
 /** Hintergrund der Heimbasis (Dielen, Steinrahmen, Fackellicht) — füllt seinen Elternknoten, neu gemalt bei Größenänderung. */
-function StBoardBackdrop() {
+function StBoardBackdrop({ roomId, sitze, seat }) {
   const ref = useRef(null);
   useEffect(() => {
     const A = window.SkillTestArt, cv = ref.current;
@@ -225,6 +225,12 @@ function StBoardBackdrop() {
     let raf = 0, last = '';
     const paint = () => {
       raf = 0;
+      // ★ Heimbasen (app-fx-56): der Boden ist die Basis des EIGENEN Sitzes (statt des Holzbretts); Fackeln, Banner, Recycler und Layout bleiben.
+      if (window.ppHbPrepMalen && window.ppHbPrepMalen.length >= 5 && roomId && seat >= 0 && !window.PP_RETRO && window.__ppHbForce !== 'aus') {
+        const k = host.clientWidth + 'x' + host.clientHeight; if (k === last) return; last = k;
+        window.ppHbPrepMalen(cv, host, roomId, sitze, seat).then((ok) => { if (!ok) { last = ''; } });
+        return;
+      }
       const sc = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--board-scale')) || 1;
       const P = Math.max(2, Math.round(3 * sc));
       const w = Math.max(60, Math.round(host.clientWidth / P)), h = Math.max(40, Math.round(host.clientHeight / P));
@@ -385,6 +391,7 @@ function SkillTestPrepScreen({ lobby, user, leaveRoom, notify }) {
   const offsetRef = useRef(0);
   const mainRef = useRef(null);
   const dragRef = useRef(null);
+  useEffect(() => { if (window.ppHbVorladen) window.ppHbVorladen(lobby.id, lobby.players.length); }, [lobby.id, lobby.players.length]);   // Heimbasen (app-fx-56) vorladen
   const flyRef = useRef(null);
   const recArtRef = useRef(null);
   const dropRef = useRef(null);                     // wo die zuletzt in den Recycler geworfene Karte losgelassen wurde
@@ -881,7 +888,7 @@ function SkillTestPrepScreen({ lobby, user, leaveRoom, notify }) {
 
         <div className="st-base-wrap" onDragOver={onWrapDragOver} onDrop={onWrapDrop}>
           <div className="st-base">
-            <StBoardBackdrop />
+            <StBoardBackdrop roomId={lobby.id} sitze={lobby.players.length} seat={lobby.players.findIndex(p => (p && p.username ? p.username : p) === user.username)} />
             <StTorch side="left" />
             <StTorch side="right" />
             <div className="st-base-banner orbit-font">{user.username}'s Home Base</div>

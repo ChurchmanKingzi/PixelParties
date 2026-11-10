@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
-# Retro-Fassung der Titel-Kulisse (data/animated_screen/layers2 → layers2-retro):
+# Retro-Fassung der Titel-Kulisse (scripts/title-pixel/originals/layers2 → data/animated_screen/layers2-retro; die Auslieferungsebenen layers2 sind seit dem Titel-Backen schon Pixelart):
 # auf ein Viertel verkleinert, mit geordnetem Dithering (Bayer 4x4) auf die 256 Spielfarben gerastet, ohne weiche Alpha-Kanten,
 # dann ganzzahlig (4x) wieder aufgezogen — jede Figur wird zu grobem Pixelart. Nur fuer den Retro-Modus (?retro=1).
 import json, sys, os
 import numpy as np
 from PIL import Image
 FAKTOR = int(sys.argv[1]) if len(sys.argv) > 1 else 4
-SRC = 'data/animated_screen/layers2'; DST = 'data/animated_screen/layers2-retro'
+SRC = 'scripts/title-pixel/originals/layers2'; DST = 'data/animated_screen/layers2-retro'
 os.makedirs(DST, exist_ok=True)
 pal = np.array([[int(p['hex'][i:i+2], 16) for i in (1, 3, 5)] for p in json.load(open('data/palette.json'))['farben']], float)
 BAYER = np.array([[0, 8, 2, 10], [12, 4, 14, 6], [3, 11, 1, 9], [15, 7, 13, 5]], float) / 16.0 - 0.5

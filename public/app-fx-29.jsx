@@ -115,7 +115,7 @@ function ppFx29Maler(buf, gw, gh) {
 function ppFx29Strahl(o) {
   try {
     if (!o || window._playAnimations === false || window.__ppFxAlt) return null;
-    const S = 3, TAKT = 1000 / 30, T0 = PP_FX29_T0, LT = PP_FX29_LT, HIT = T0 + LT;
+    const S = ppFxZelleFuer({ x: o.bx, y: o.by }), TAKT = 1000 / 30, T0 = PP_FX29_T0, LT = PP_FX29_LT, HIT = T0 + LT;
     if (![o.ax, o.ay, o.bx, o.by].every(isFinite)) return null;
     const welt = !!window.ppFxWeltSchicht;
     const tw = o.tw > 0 ? o.tw : 64, thh = o.th > 0 ? o.th : 90, sw = o.sw > 0 ? o.sw : 64, shh = o.sh > 0 ? o.sh : 90;

@@ -214,10 +214,10 @@ function ppFx38Art(ev) {
 const PP_FX38_STANDARD_FS = { kugel: 46, geschoss: 26, bombe: 32, schaedel: 40, taube: 22, hammer: 28, fels: 26, faust: 42, waschbaer: 72, herz: 96, liebespfeil: 44, pfeil: 28, schwert: 30, dolch: 28, axt: 28, dreizack: 28 };
 const PP_FX38_FAKTOR = { kugel: 0.5, geschoss: 0.55, bombe: 0.6, schaedel: 0.6, taube: 1.15, hammer: 0.95, fels: 0.55, faust: 0.62, waschbaer: 0.55, herz: 0.45, liebespfeil: 0.8, pfeil: 0.85, schwert: 0.8, dolch: 0.75, axt: 0.7, dreizack: 0.75 };
 /** Halbgröße in Zellen aus der Schriftgröße des Emojis. */
-function ppFx38R(art, fs) {
+function ppFx38R(art, fs, S) {
   const f = typeof fs === 'string' ? parseFloat(fs) : fs;
   const px = f > 0 ? f : PP_FX38_STANDARD_FS[art] || 40;
-  return ppFx38Kl(Math.round(px * (PP_FX38_FAKTOR[art] || 0.6) / PP_FX38_S), 2, 16);
+  return ppFx38Kl(Math.round(px * (PP_FX38_FAKTOR[art] || 0.6) / (S || PP_FX38_S)), 2, 16);
 }
 
 /**
@@ -227,7 +227,7 @@ function ppFx38R(art, fs) {
 function ppFx38(o) {
   try {
     if (!o || !o.s || !o.s.length || window._playAnimations === false) return null;
-    const S = PP_FX38_S, rd = Math.round, H = ppFx38Hash;
+    const S = ppFxZelleFuer({ x: o.s[0].tx, y: o.s[0].ty }), rd = Math.round, H = ppFx38Hash;   // Rasterzelle = Hero-Pixel des Ziels (ppFxZelle)
     const fo = window.ppFxScrollOffset ? window.ppFxScrollOffset() : { dx: 0, dy: 0 };
     const welt = !!window.ppFxWeltSchicht;
     const salz = Math.floor(Math.random() * 1e6);
@@ -237,7 +237,7 @@ function ppFx38(o) {
       const p = o.s[i];
       if (![p.sx, p.sy, p.tx, p.ty].every(isFinite)) continue;
       const art = p.art;
-      const R = art === 'blase' ? ppFx38Kl(Math.round((parseFloat(p.fs) || 14) / 5.5), 2, 4) : (art === 'sand' ? 8 : ppFx38R(art, p.fs));
+      const R = art === 'blase' ? ppFx38Kl(Math.round((parseFloat(p.fs) || 14) / 5.5), 2, 4) : (art === 'sand' ? 8 : ppFx38R(art, p.fs, S));
       const ax = p.sx + fo.dx, ay = p.sy + fo.dy, bx = p.tx + fo.dx, by = p.ty + fo.dy;
       const wi = rd(p.ang != null ? p.ang : Math.atan2(by - ay, bx - ax) * 180 / Math.PI);
       const dur = Math.max(120, p.dur || 600);

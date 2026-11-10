@@ -103,6 +103,7 @@
       position: fixed; inset: 0; z-index: 9999;
       display: flex; align-items: center; justify-content: center;
       background-image: url('/title.png');
+      image-rendering: pixelated;   /* title.png ist vorgebackene Pixelart (3-px-Zellen, Dither): nie glaetten */
       background-size: 100% 100%;
       background-position: center center;
       background-repeat: no-repeat;
@@ -175,11 +176,16 @@
   <script defer src="/potion-deck-clauses.js"></script>
   <!-- Karten entstehen zur Laufzeit (Rahmen + Kunst-Atlas + Schrift) statt als 1.200 fertige PNGs.
        card-render.js zeichnet, card-image-shim.js haengt es an die <img>-Quellen /cards/…. -->
+  <!-- Rang-Rahmen (Silber … Obsidian, Duplikate) für Karten, Sleeves und Avatare: Pixelart-Generator, setzt window.ppRankFrames; vor dem Karten-Shim, der ihn in Skin-Karten einbackt -->
+  <script defer src="/rank-frames.js"></script>
+  <script defer src="/rarities.js"></script>
+  <script defer src="/rarity-fx.js"></script>
   <script defer src="/card-render.js"></script>
   <script defer src="/card-image-shim.js"></script>
   <script defer src="/dist/app-shared.js"></script>
   <script defer src="/dist/app-areas.js"></script>
   <script defer src="/dist/app-screens.js"></script>
+  <script defer src="/dist/app-booster.js"></script>
   <script defer src="/dist/app-player-profile.js"></script>
   <script defer src="/dist/app-social.js"></script>
   <script defer src="/dist/app-puzzle.js"></script>
@@ -220,7 +226,6 @@
   <script defer src="/dist/app-fx-32.js"></script>
   <script defer src="/dist/app-fx-33.js"></script>
   <script defer src="/dist/app-fx-34.js"></script>
-  <script defer src="/dist/app-fx-35.js"></script>
   <script defer src="/dist/app-fx-36.js"></script>
   <script defer src="/dist/app-fx-37.js"></script>
   <script defer src="/dist/app-fx-38.js"></script>
@@ -236,6 +241,14 @@
   <script defer src="/dist/app-fx-50.js"></script>
   <script defer src="/dist/app-fx-51.js"></script>
   <script defer src="/dist/app-fx-52.js"></script>
+  <script defer src="/dist/app-fx-53.js"></script>
+  <script defer src="/dist/app-fx-54.js"></script>
+  <script defer src="/dist/app-fx-55.js"></script>
+  <script defer src="/dist/app-fx-56.js"></script>
+  <script defer src="/dist/app-fx-57.js"></script>
+  <script defer src="/dist/app-fx-58.js"></script>
+  <script defer src="/dist/app-fx-59.js"></script>
+  <script defer src="/dist/app-fx-60.js"></script>
   <script defer src="/dist/app-campaign.js"></script>
   <script defer src="/skilltest-rules.js"></script>
   <script defer src="/skilltest-art.js"></script>
