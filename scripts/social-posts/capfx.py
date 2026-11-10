@@ -55,6 +55,22 @@ class CaptionMixin:
         self._cache[key] = res
         return res
 
+    def _put(self, canvas, text, sc, x, y, color):
+        """Ein Textstück zeichnen. Reine Satzzeichen (, . ! ? : ;) würden als eigener Text auf Zeilenmitte zentriert (die Maske wird auf die Tinte beschnitten) und stünden zu hoch:
+        sie werden mit einem „H“ davor gesetzt (gleiche Grundlinie) und das „H“ wieder abgeschnitten."""
+        punct = text and not any(ch.isalnum() for ch in text) and text != '-'
+        if not punct:
+            self.draw_text(canvas, text, sc, (x, y), color=color, outline=None, shadow=(20, 10, 30), anchor='lm')
+            return
+        wh = self._tw('H', sc)
+        tmp = Image.new('RGBA', (self._tw('H' + text, sc) + 8 * sc, 24 * sc), (0, 0, 0, 0))
+        bx, by, bw, bh = self.draw_text(tmp, 'H' + text, sc, (0, 12 * sc), color=color, outline=None, shadow=(20, 10, 30), anchor='lm')
+        rest = tmp.crop((bx + sc + wh, 0, tmp.width, tmp.height))
+        bb = rest.getbbox()
+        if not bb:
+            return
+        canvas.paste(rest.crop(bb), (int(x), int(y - 12 * sc + bb[1])), rest.crop(bb))
+
     def _draw_caption(self, canvas, d, t):
         for idx, (t0, t1, text) in enumerate(self.CAPTIONS):
             if not (t0 <= t < t1):
@@ -75,5 +91,5 @@ class CaptionMixin:
             for li, x, p, g, ci in L['items']:
                 if ci >= n:
                     break
-                self.draw_text(canvas, p[:n - ci], sc, (cx + x, ty + li * lh), color=GOLD_HL if g else (255, 255, 255), outline=None, shadow=(20, 10, 30), anchor='lm')
+                self._put(canvas, p[:n - ci], sc, cx + x, ty + li * lh, GOLD_HL if g else (255, 255, 255))
             return
