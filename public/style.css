@@ -26159,10 +26159,39 @@ input[type="checkbox"]:focus-visible, input[type="radio"]:focus-visible { outlin
   text-shadow: 2px 2px 0 #000;
 }
 .shop-coll-count {
+  position: relative;
   font-family: var(--font-display), sans-serif;
   font-size: 15px;
   color: #fad54a;
   text-shadow: 2px 2px 0 #000;
+}
+/* „+1!“ nach dem Pull: der Zähler blinkt in ganzen Schritten, ein kleines +1! steigt in Pixelsprüngen auf und verschwindet blinkend */
+.shop-coll-count-bump { display: inline-block; animation: shop-count-bump .72s steps(1, end) both; }
+@keyframes shop-count-bump {
+  0%   { color: #ffffff; transform: translateY(-4px); }
+  16%  { color: #fad54a; transform: translateY(0); }
+  32%  { color: #ffffff; transform: translateY(-4px); }
+  48%  { color: #fad54a; transform: translateY(0); }
+  64%  { color: #ffffff; transform: translateY(-2px); }
+  80%  { color: #fad54a; transform: translateY(0); }
+}
+.shop-coll-plus {
+  position: absolute; left: 100%; top: -2px; margin-left: 8px; white-space: nowrap;
+  font-size: 15px; color: #4ceb70; text-shadow: 2px 0 0 #000, -2px 0 0 #000, 0 2px 0 #000, 0 -2px 0 #000;
+  pointer-events: none;
+  animation: shop-plus-rise 1.3s steps(1, end) both;
+}
+@keyframes shop-plus-rise {
+  0%   { transform: translateY(6px); }
+  12%  { transform: translateY(0); }
+  24%  { transform: translateY(-6px); }
+  36%  { transform: translateY(-12px); }
+  48%  { transform: translateY(-12px); visibility: hidden; }
+  54%  { transform: translateY(-12px); visibility: visible; }
+  66%  { transform: translateY(-14px); visibility: hidden; }
+  72%  { transform: translateY(-14px); visibility: visible; }
+  84%  { transform: translateY(-16px); visibility: hidden; }
+  100% { transform: translateY(-16px); visibility: hidden; }
 }
 .shop-coll-bar {
   flex: 1 1 140px;
