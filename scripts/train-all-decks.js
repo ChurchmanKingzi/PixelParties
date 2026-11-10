@@ -22,6 +22,7 @@
 //                                                       (Default: 1 = reduziert,
 //                                                       3-4× Durchsatz)
 //
+//    node scripts/train-all-decks.js --collect-only   → nur sammeln (kein Profiltraining, nichts in data/cpu-profiles)
 //    node scripts/train-all-decks.js --net 0          → Datensammlung mit dem alten Evaluator
 //                                                       (Standard: Wertnetz, siehe scripts/train-net.js;
 //                                                       Ausnahmeliste je Deck: data/cpu-value/net-aus.json)
@@ -78,6 +79,7 @@ const SEGMENT = Math.max(2, parseInt(getArg('--segment', '1000'), 10) || 1000); 
 const GZIP = getArg('--gzip', '1') !== '0';
 const MAX_GAMES = getArg('--max-games', null);                // an den Trainer durchgereicht (Standard dort: 8000)
 const TRAINER_HEAP_MB = process.env.PP_TRAIN_TRAINER_HEAP_MB || '4096';
+const COLLECT_ONLY = args.includes('--collect-only');         // nur sammeln, kein Profil trainieren (schreibt nichts nach data/cpu-profiles)
 const LIST_ONLY = args.includes('--list');
 const only = getArg('--only', null);
 const skip = getArg('--skip', null);
@@ -227,7 +229,7 @@ for (const deck of decks) {
     }
     if (abgebrochen) console.error(`[all] "${deck}": Segmentsammlung unvollständig (${have}/${GAMES}) — Wiederanlauf setzt fort.`);
   }
-  if (have < 20) {
+  if (have < 20 && !COLLECT_ONLY) {
     // Der Trainer verweigert unter 20 entschiedenen Spielen (zu Recht).
     console.error(`[all] "${deck}": nur ${have} Spiele — zu wenig für ein Profil (min. 20), Training übersprungen. Sammlung ist gespeichert und wird beim nächsten Lauf fortgesetzt.`);
     failed.push(deck);
@@ -235,6 +237,7 @@ for (const deck of decks) {
   }
 
   // ── Schritt 2: Profil trainieren ──
+  if (COLLECT_ONLY) { console.log(`[all] "${deck}": ${have} Spiele gesammelt (--collect-only, kein Profiltraining) in ${((Date.now() - t0) / 60000).toFixed(1)} min`); continue; }
   const trainerArgs = [`--max-old-space-size=${TRAINER_HEAP_MB}`, path.join(ROOT, 'scripts', 'train-deck-profile.js'), eingabe];
   if (MAX_GAMES != null) trainerArgs.push('--max-games', String(MAX_GAMES));
   const t = spawnSync(process.execPath, trainerArgs, { cwd: ROOT, stdio: 'inherit' });
@@ -290,7 +293,8 @@ try {
   }
 } catch {}
 
-console.log(`\n═══ FERTIG: ${decks.length - failed.length}/${decks.length} Decks trainiert ═══`);
+console.log(`\n═══ FERTIG: ${decks.length - failed.length}/${decks.length} Decks ${COLLECT_ONLY ? 'gesammelt (ohne Profiltraining)' : 'trainiert'} ═══`);
 if (failed.length) console.log(`Fehlgeschlagen/übersprungen: ${failed.join(', ')}`);
+if (COLLECT_ONLY) { console.log('Daten liegen unter data/training/' + (NET_FLAG === '0' ? 'all' : 'all-net') + '/ (je Deck ein Segmentordner); Profile unverändert.'); process.exit(failed.length ? 1 : 0); }
 console.log('Profile liegen in data/cpu-profiles/ und sind nach dem nächsten Serverstart aktiv.');
 console.log('Empfehlung: Stichproben-Eval pro wichtigem Deck — set PP_TRAIN_EVAL=1 und denselben Deck-Batch nochmal laufen lassen, Win-Rate mit dem Trainer-Report vergleichen.');
