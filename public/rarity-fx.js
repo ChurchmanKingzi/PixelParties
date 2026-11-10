@@ -50,7 +50,7 @@
     prismatic: { fx: 'pris', stamp: 'prismatic', fps: 20, still: 1.7 },
     super: { fx: 'sr', stamp: 'srstar', fps: 20, still: 1.4 },
     storm: { fx: 'storm', stamp: 'storm', fps: 20, still: 1.05, cut: true, mask: true },
-    spectral: { fx: 'spec', stamp: 'spectral', fps: 20, still: 1.3 },
+    spectral: { fx: 'spec', stamp: 'spectral', fps: 20, still: 1.9 },   // Standbild: Glanzband mitten im Bild
     umbra: { fx: 'umbra', stamp: 'umbra', fps: 20, still: 1.2, cut: true, mask: true },
     stained: { fx: 'stain', stamp: 'stained', fps: 15, still: 3.0, cut: true, mask: true },
   };
@@ -383,7 +383,10 @@
     }
   }
   /** Geist-Schrift (Spectral): jedes Tintenpixel jedes Bild neu — Farbe nur nach Spalte und Zeilenband, daher je Bild zwei kleine Tabellen */
-  function ghostName(E, t) {
+  /** Spectral: Glanzband (diagonal, Lauf-Koordinate x + .9 y), unter dem die normale Karte zu sehen ist. Lage der Bandmitte oder null in der Pause. */
+  const SPEC_HW = 28, SPEC_RUN = 4.1, SPEC_PAUSE = .7;   // halbe Breite (Zellen in Lauf-Koordinate, Band ca. 42 Zellen breit), Lauf- und Pausensekunden
+  const specBand = t => { const s = t % (SPEC_RUN + SPEC_PAUSE); return s >= SPEC_RUN ? null : -SPEC_HW + (340 + 2 * SPEC_HW) * (s / SPEC_RUN); };
+  function ghostName(E, t, band) {
     const F = Math.floor(t * 5);
     for (const lay of E.layers) {
       const pre = layPre(lay), d32 = lay.d32, U = lay.U, W = lay.w;
@@ -396,6 +399,11 @@
       }
       const { pidx, fgy } = pre, L = lay.list;
       for (let k = 0; k < pre.n; k++) { const x = L[k * 2]; d32[pidx[k]] = (fgy[k] + F) % 4 === 0 ? tab1[x] : tab0[x]; }
+      if (band !== null) {   // unter dem Glanzband erscheint der Text normal (die Basiskarte darunter): Tinte der Ebene raus
+        if (!pre.uc) { pre.uc = new Float64Array(pre.n); for (let k = 0; k < pre.n; k++) pre.uc[k] = Math.floor(pre.gx[k]) + .9 * fgy[k]; }
+        const bk = layBuckets(lay, 'uc'), span = bucketSpan(bk, band - SPEC_HW - 1, band + SPEC_HW + 1);
+        if (span) for (let j = span[0]; j < span[1]; j++) { const k = bk.ord[j]; if (Math.abs(pre.uc[k] - band) < SPEC_HW) d32[pidx[k]] = 0; }
+      }
     }
   }
   /** Umbra-Schrift: Name und Werte schwarz und glaenzend. Je Ebene (und Ansicht) einmal vorberechnet (`umbraLayerPre`): fertiger Grundpuffer mit schwarzen Buchstaben,
@@ -530,7 +538,7 @@
   // die Kachel in der Streifenmitte blitzt kurz auf (Weiss-Violett, Bayer-Stufen). Ausserhalb des Streifens bleibt die Karte unveraendert. Name, Werte, Regeltext und Symbole
   // (Textzone) werden nie beruehrt; keine Text-Ebenen noetig. Je Karte einmal: Kachelraster, Zellen je Kachel zusammenhaengend (je Bild nur die sichtbaren Kacheln), Glasfarben je Farbstufe (traege).
   const PRIS_TILE_W = 32, PRIS_TILE_H = 40, PRIS_MERGE = .45, PRIS_JIT = .25;          // Kachelgroesse (Zellen), Anteil Rauten, Versatz der Gitterpunkte
-  const PRIS_HALF = 11, PRIS_EDGE = 9, PRIS_RUN = 3.4, PRIS_PAUSE = 3.8, PRIS_HUE = 14;   // Streifen: Kacheln mit Mittelpunkt bis HALF Lauf-Einheiten von der Streifenmitte sind ganz da, bis HALF + EDGE in Stufen, Lauf- und Pausensekunden, Sekunden je Farbkreis
+  const PRIS_HALF = 11, PRIS_EDGE = 9, PRIS_RUN = 3.4, PRIS_PAUSE = .3, PRIS_HUE = 14;   // Streifen: Kacheln mit Mittelpunkt bis HALF Lauf-Einheiten von der Streifenmitte sind ganz da, bis HALF + EDGE in Stufen, Lauf- und Pausensekunden, Sekunden je Farbkreis
   const PRIS_LIFT = .32, PRIS_WV = [236, 226, 255], PRIS_FLASH = [.28, .5, .28];
   /** wie hsv(), schreibt r, g, b (0..255, Rohwerte) nach out[j..j+2] — ohne Zwischenfelder */
   function hsvOut(h, s, v, out, j) {
@@ -596,9 +604,12 @@
     const fill = start.slice(0, nt); for (let q = 0; q < n; q++) ord[fill[ct[q]]++] = q;   // Zellen je Kachel zusammenhaengend
     const pick = (src, T) => { const o = new T(n); for (let j = 0; j < n; j++) o[j] = src[ord[j]]; return o; };
     for (let f = 0; f < nt; f++) { cg[f] = sn_[f] ? sx[f] / sn_[f] : 1e9; off[f] = r(); }
-    let lo = 1e9, hi = -1e9; for (let f = 0; f < nt; f++) if (sn_[f]) { if (cg[f] < lo) lo = cg[f]; if (cg[f] > hi) hi = cg[f]; }
-    return { B, nt, start, cp: pick(cp, Int32Array), cb: pick(cb, Float32Array), cb2: pick(cb2, Float32Array), ce: pick(ce, Uint8Array), cg, off,
-      lo: lo - PRIS_HALF - PRIS_EDGE, hi: hi + PRIS_HALF + PRIS_EDGE, tab: new Array(12).fill(null), k0: new Int32Array(nt), fr: new Float32Array(nt), cov: new Float32Array(nt), WV: sn(PRIS_WV[0], PRIS_WV[1], PRIS_WV[2]) };
+    let lo = 1e9, hi = -1e9; const cs = []; for (let f = 0; f < nt; f++) if (sn_[f]) { if (cg[f] < lo) lo = cg[f]; if (cg[f] > hi) hi = cg[f]; cs.push(cg[f]); }
+    // Luecken zwischen den Kachelmitten (Vollbild-Karten, Textzonen): der Streifen wird so breit, dass er nie ueber eine leere Strecke laeuft (immer Kacheln sichtbar)
+    cs.sort((a, b) => a - b); let gap = 0; for (let i = 1; i < cs.length; i++) gap = Math.max(gap, cs[i] - cs[i - 1]);
+    const kw = Math.max(1, (gap / 2 + 2) / (PRIS_HALF + PRIS_EDGE)), PH = PRIS_HALF * kw, PE = PRIS_EDGE * kw;
+    return { B, PH, PE, nt, start, cp: pick(cp, Int32Array), cb: pick(cb, Float32Array), cb2: pick(cb2, Float32Array), ce: pick(ce, Uint8Array), cg, off,
+      lo: lo - PH - PE, hi: hi + PH + PE, tab: new Array(12).fill(null), k0: new Int32Array(nt), fr: new Float32Array(nt), cov: new Float32Array(nt), WV: sn(PRIS_WV[0], PRIS_WV[1], PRIS_WV[2]) };
   }
   /** Glasfarben aller Kachelzellen bei Farbstufe k (beim ersten Bedarf) */
   function prisTab(pre, k) {
@@ -616,7 +627,7 @@
       const pre = st.pre || (st.pre = prisPre(E)), pos = prisPos(pre, t); if (pos === null) return;
       const { start, cp, cb, cb2, ce, nt, cg, off, k0, fr, cov, WV } = pre;
       for (let f = 0; f < nt; f++) {
-        const dd = Math.abs(cg[f] - pos), c = Math.floor(clamp((PRIS_HALF + PRIS_EDGE - dd) / PRIS_EDGE) * 4) / 4; cov[f] = c; if (!c) continue;
+        const dd = Math.abs(cg[f] - pos), c = Math.floor(clamp((pre.PH + pre.PE - dd) / pre.PE) * 4) / 4; cov[f] = c; if (!c) continue;
         const kf = fract(t / PRIS_HUE + off[f]) * 12; k0[f] = Math.floor(kf) % 12; fr[f] = kf - Math.floor(kf);   // Farbstufe mit Uebergang
         const ka = k0[f], kb = (ka + 1) % 12, tabA = pre.tab[ka] || prisTab(pre, ka), tabB = pre.tab[kb] || prisTab(pre, kb);
         const fl = dd < 5 ? PRIS_FLASH[1] : dd < 10 ? PRIS_FLASH[0] : 0, fk = fr[f];   // Blitz: die Kachel nahe der Streifenmitte
@@ -866,7 +877,7 @@
     textFull: true,
     prep(E) { const r = rng(31), w = []; for (let k = 0; k < 11; k++) w.push({ x: AX0 + 6 + r() * (AW - 12), sp: .07 + r() * .08, ph: r(), amp: 2 + r() * 3 }); return { w }; },
     frame(E, st, t, o) {
-      const { B, A } = E, ev = specEvent(t), gi = ev.fr, on = ev.on, big = ev.big;
+      const { B, A } = E, ev = specEvent(t), gi = ev.fr, on = ev.on, big = ev.big, band = specBand(t), rimW = sn(255, 255, 255), rimC = sn(150, 240, 255);
       const dx = Math.round(4 * Math.sin(t * .8)), dy = Math.round(1.4 * Math.cos(t * 1.1));
       const AX1 = AX0 + AW - 1, AY1 = AY0 + AH - 1, cl = (v, a, b) => (v < a ? a : v > b ? b : v);
       const rects = [];
@@ -881,6 +892,7 @@
         const rowE = cl(y - dy, AY0, AY1) * GW, rowE2 = cl(y + dy * 2, AY0, AY1) * GW, dark = on && big && (y + gi) % 4 === 0, yb = (y & 3) * 4, rowY = y * GW;
         for (let x = AX0; x <= AX1; x++) {
           const p = rowY + x; if (!A[p]) continue;
+          if (band !== null) { const uu = x + y * .9, v = SPEC_HW - Math.abs(uu - band); if (v > 1.2) continue; if (v > 0) { o[p] = uu > band ? rimW : rimC; continue; } }   // im Band: normale Karte; 1 Zelle heller Saum an den Kanten
           let sx = sxr, split = splitr, inRect = false;
           for (let q = 0; q < nr; q++) { const rc = rects[q]; if (x >= rc.x && x < rc.x + rc.w && y >= rc.y && y < rc.y + rc.h) { sx += rc.sx; if (rc.mode < .4) split = 2; } }
           let r, g, b;
@@ -896,12 +908,13 @@
       }
       for (const w of st.w) {
         const life = fract(t * w.sp + w.ph), y = Math.round(AY0 + AH - 2 - life * (AH + 6)), x = Math.round(w.x + w.amp * Math.sin(life * 9 + w.ph * 6));
+        if (band !== null && Math.abs(x + y * .9 - band) < SPEC_HW + 3) continue;
         if (bay(x, y) < 1 - Math.abs(life - .5) * 1.6) { for (let k = 0; k < 3; k++) putXY(o, x, y + k, k === 0 ? [255, 255, 255] : [206, 232, 255]); putXY(o, x + 1, y + 1, [190, 170, 255]); }
       }
       const pc = on && gi % 2 ? [255, 60, 160] : Math.floor(t * 4) % 6 < 3 ? [120, 90, 220] : [70, 60, 160];
-      for (let x = AX0; x < AX0 + AW; x++) { if (E.A[AY0 * GW + x]) putXY(o, x, AY0, pc); if (E.A[(AY0 + AH - 1) * GW + x]) putXY(o, x, AY0 + AH - 1, pc); }
-      sparkles(o, t, 7, 1.9, .5, (k, s) => [AX0 + 5 + Math.floor(hash(k, s, 71) * (AW - 10)), AY0 + 5 + Math.floor(hash(k, s, 72) * (AH - 10))], BLACK_ARM, BLACK_CORE, 1.9);
-      ghostName(E, t);
+      for (let x = AX0; x < AX0 + AW; x++) { if (E.A[AY0 * GW + x] && (band === null || Math.abs(x + AY0 * .9 - band) >= SPEC_HW)) putXY(o, x, AY0, pc); if (E.A[(AY0 + AH - 1) * GW + x] && (band === null || Math.abs(x + (AY0 + AH - 1) * .9 - band) >= SPEC_HW)) putXY(o, x, AY0 + AH - 1, pc); }
+      sparkles(o, t, 7, 1.9, .5, (k, s) => { const sx = AX0 + 5 + Math.floor(hash(k, s, 71) * (AW - 10)), sy = AY0 + 5 + Math.floor(hash(k, s, 72) * (AH - 10)); return band !== null && Math.abs(sx + sy * .9 - band) < SPEC_HW + 4 ? null : [sx, sy]; }, BLACK_ARM, BLACK_CORE, 1.9);
+      ghostName(E, t, band);
     },
   };
 
