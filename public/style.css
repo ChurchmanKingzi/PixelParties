@@ -16009,10 +16009,11 @@ body:has(.textbox-overlay) .tooltip {
    gemeinsamen Takt `--tb-puls` des Overlays, also immer synchron. */
 .textbox-highlight-pulse {
   animation: none;
-  /* ★ W86u2 (Pixelart): harte Ringe (4/6 px und 8/10 px) im Blinktakt statt Skalierung ±3,5 % und Weichzeichner-Schein. */
+  /* ★ W86u2 (Pixelart): harte Ringe im Blinktakt statt Skalierung ±3,5 % und Weichzeichner-Schein. Dicke in RASTERZELLEN (Hero-Pixel, `--tb-dz` am Overlay,
+     im Tutorial-Zoom das gezoomte Hero-Pixel): türkiser Ring 1 ↔ 2 Zellen, grauer Außenring immer 1 Zelle. */
   box-shadow:
-    0 0 0 calc(4px + 2px * var(--tb-puls)) #1aedff,
-    0 0 0 calc(8px + 2px * var(--tb-puls)) #59606e;
+    0 0 0 calc(var(--tb-dz, 2px) * (1 + var(--tb-puls))) #1aedff,
+    0 0 0 calc(var(--tb-dz, 2px) * (2 + var(--tb-puls))) #59606e;
 }
 /* ── Responsive ── */
 @media (max-height: 500px) {
