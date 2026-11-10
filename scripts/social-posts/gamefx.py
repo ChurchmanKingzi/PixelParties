@@ -9,6 +9,8 @@ Die Zufallszahlen sind (wie im Spiel) ein Ganzzahl-Hash; das `salt` ist hier fes
 Alle Funktionen malen ein Bild zur Zeit t (Sekunden seit Start der Animation) mit einem `Cells`-Maler auf ein PIL-Bild."""
 import math
 
+import numpy as np
+
 from PIL import ImageDraw
 
 
@@ -1037,3 +1039,143 @@ class Geschoss:
                 k = g['c'][y][x]
                 if k:
                     m.rect(X - e + x, Y - e + y, 1, 1, C38['tinte'] if k == 255 else g['pal'][k - 1])
+
+
+# ═════════════════════════════ Heldentod (app-fx-32): die Figur zerspringt in ihre Pixel ═════════════════════════════
+def _bayer8():
+    def bay(n):
+        if n == 1:
+            return [[0]]
+        m, s = bay(n // 2), n // 2
+        return [[4 * m[y % s][x % s] + [[0, 2], [3, 1]][y // s][x // s] for x in range(n)] for y in range(n)]
+    return bay(8)
+
+
+BAY8 = _bayer8()
+C32 = dict(creme=hexc('#fffbd2'), grau=hexc('#9aa3b6'), asche=hexc('#59606e'), rauch=hexc('#3e3e51'), dunkel=hexc('#08060c'), orange=hexc('#ff9a1a'), gelb=hexc('#ffe23d'), rot=hexc('#ff491a'))
+HALT32, DAUER32 = 4 / 30.0, 0.95
+WACKELN32 = [1, -1, 0.6, -0.8]
+
+
+class HeroDeath:
+    """Nachbau von `ppFx32` (Heldentod): Anhalten und Aufblitzen, dann zerfällt die Figur von unten nach oben, jedes Sprite-Pixel fliegt in seiner Farbe auseinander;
+    Bodenringe, Funken, Rauch. Eine Zelle = ein Sprite-Pixel (Raster der Figur). frame = RGBA-Bild des Sprite-Frames (PIL), Maße im Frame-Raster."""
+
+    def __init__(self, frame, mitte_x, fuss_y, zw=20, salt=5):
+        arr = np.asarray(frame.convert('RGBA'))
+        fh, fw = arr.shape[:2]
+        ys, xs = np.where(arr[..., 3] >= 96)
+        self.y0, self.y1 = int(ys.min()), int(ys.max()) + 1
+        self.mx, self.fy, self.zw = mitte_x, fuss_y, zw
+        mag = max(0.7, min(2.5, fh / 45.0))
+        self.mag = mag
+        grav = 100 * mag
+        hoehe = max(1, self.y1 - self.y0)
+        self.P = []
+        ende = 0.0
+        for i, (y, x) in enumerate(zip(ys.tolist(), xs.tolist())):
+            hy = kl((y + 0.5 - self.y0) / hoehe, 0, 1)
+            sc = 0.6 * (1 - hy) + 0.4 * BAY8[y & 7][x & 7] / 64.0
+            ts = HALT32 + sc * DAUER32
+            vx = ((x + 0.5 - mitte_x) * 0.25 + (H(salt, i * 5 + 1) - 0.5) * 16) * mag
+            vy = -(6 + H(salt, i * 5 + 2) * 45) * mag
+            flo = max(fuss_y + 1 - 1, y)
+            dis = max(0.0, vy * vy + 2 * grav * (flo - y))
+            tl = (-vy + math.sqrt(dis)) / grav
+            life = min(0.7 + H(salt, i * 5 + 3) * 0.7, tl + 0.16)
+            r = H(salt, i * 5 + 4)
+            sz = max(1, rd(0.5 if r < 0.45 else (1 if r < 0.9 else 1.5)))
+            c = tuple(int(v) for v in arr[y, x, :3])
+            self.P.append((x, y, c, ts, vx, vy, flo, tl, life, sz))
+            ende = max(ende, ts + life)
+        self.grav = grav
+        self.rauch = []
+        nR = rd(18 * (1 if len(self.P) > 300 else 0.7))
+        for i in range(nR):
+            t0 = HALT32 + (i / float(nR)) * (DAUER32 + 0.15) + H(salt, 900 + i) * 0.04
+            life = 1.0 + H(salt, 950 + i) * 0.8
+            self.rauch.append(dict(t0=t0, life=life, x=mitte_x + (H(salt, 1000 + i) - 0.5) * zw * 0.8, y=fuss_y - H(salt, 1050 + i) * fh * 0.25,
+                                   vx=(H(salt, 1100 + i) - 0.5) * 8, vy=-(3 + H(salt, 1150 + i) * 6), sz=3 if H(salt, 1200 + i) < 0.5 else 2))
+            ende = max(ende, t0 + life)
+        self.funken = []
+        nF = rd(16 * min(1.5, mag))
+        for i in range(nF):
+            an = H(salt, 1300 + i) * math.pi * 2
+            sp = (30 + H(salt, 1350 + i) * 70) * mag
+            self.funken.append(dict(t0=HALT32 + H(salt, 1400 + i) * 0.16, life=0.32 + H(salt, 1450 + i) * 0.32, x=mitte_x + (H(salt, 1500 + i) - 0.5) * zw * 0.5,
+                                    y=self.y0 + hoehe * (0.2 + H(salt, 1550 + i) * 0.6), vx=math.cos(an) * sp, vy=math.sin(an) * sp * 0.8 - 20 * mag, plus=H(salt, 1600 + i) < 0.3))
+            ende = max(ende, HALT32 + 0.16 + 0.64)
+        self.ende = ende + 1 / 30.0
+
+    def draw(self, m, t, tint=None):
+        if t < 0 or t >= self.ende:
+            return
+        f = Fl(t)
+        C = C32
+        cx, cy = rd(self.mx), rd(self.fy)
+        for k in range(4):
+            dt = t - (HALT32 + k * 0.25)
+            if dt < 0 or dt >= 0.45:
+                continue
+            R = self.zw * (0.8 + 0.06 * k)
+            r1 = rd(ease(dt / 0.45) * R)
+            self._ell(m, cx, cy, r1, rd(r1 * 0.3), C["grau"], False)
+            if dt > 0.08:
+                r2 = rd(ease((dt - 0.08) / 0.4) * R * 0.75)
+                self._ell(m, cx, cy, r2, rd(r2 * 0.3), C['asche'], True)
+        for r in self.rauch:
+            dt = t - r['t0']
+            if dt < 0 or dt >= r['life']:
+                continue
+            u = dt / r['life']
+            px, py = rd(r['x'] + r['vx'] * dt), rd(r['y'] + r['vy'] * dt)
+            if u > 0.6 and BAY8[py & 7][px & 7] < ((u - 0.6) / 0.4) * 64:
+                continue
+            m.rect(px, py, r['sz'], r['sz'], [C['grau'], C['asche'], C['rauch'], C['dunkel']][min(3, int(u * 4))])
+        du = kl((t - HALT32) / DAUER32, 0, 1)
+        ox = rd(([1, -1, 2, -2][f] if f < 4 else WACKELN32[f % 4] * 2 * (1 - du)))
+        blitz = f < 2
+        for (x, y, c, ts, vx, vy, flo, tl, life, sz) in self.P:
+            dt = t - ts
+            if dt < 0:
+                m.rect(x + ox, y, 1, 1, C['creme'] if blitz else (tint or c))
+                continue
+            if dt >= life:
+                continue
+            ds = tl if dt > tl else dt
+            fx = x + vx * ds
+            fy = min(flo, y + vy * ds + 0.5 * self.grav * ds * ds)
+            px = rd(fx + 0.5 - sz / 2.0 + ox * (1 - min(1.0, dt / 0.2)))
+            py = rd(fy + 0.5 - sz / 2.0)
+            u = dt / life
+            if u > 0.62 and BAY8[py & 7][px & 7] < ((u - 0.62) / 0.38) * 64:
+                continue
+            m.rect(px, py, sz, sz, tint or c)
+        for s in self.funken:
+            dt = t - s['t0']
+            if dt < 0 or dt >= s['life']:
+                continue
+            u = dt / s['life']
+            if u > 0.5 and ((f + int(s['x'] * 7)) & 1):
+                continue
+            px, py = rd(s['x'] + s['vx'] * dt), rd(s['y'] + s['vy'] * dt + 60 * dt * dt)
+            col = [C['creme'], C['gelb'], C['orange'], C['rot']][min(3, int(u * 4))]
+            if s['plus']:
+                m.rect(px - 1, py, 3, 1, col); m.rect(px, py - 1, 1, 3, col)
+            else:
+                m.rect(px, py, 1, 1, col)
+
+    def _ell(self, m, cx, cy, rx, ry, col, schach):
+        if rx < 1:
+            return
+        n = max(12, int(math.ceil(rx * 5)))
+        lx = ly = None
+        for i in range(n):
+            a = i / float(n) * math.pi * 2
+            x, y = cx + rd(math.cos(a) * rx), cy + rd(math.sin(a) * ry)
+            if (x, y) == (lx, ly):
+                continue
+            lx, ly = x, y
+            if schach and ((x + y) & 1):
+                continue
+            m.rect(x, y, 1, 1, col)
