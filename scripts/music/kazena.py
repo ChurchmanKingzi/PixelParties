@@ -14,7 +14,7 @@ Ihr Theme ist **Wind** (Card Art: grünhaariges Mädchen in Grün auf einer Wies
 Form (64 Takte ≈ 1:44): Intro 4 · Frei A 8 · A' 8 · Abenteuer B 8 · Verfolgung C 8 · Jagd D 8 · Eingeholt 8 · Finale +2 8 · Coda 4
 Ausklang auf G (Dominante) → Wind der C-Lydisch-Intro.
 """
-import os, sys, random
+import os, sys, random, math
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from lib import *
 
@@ -36,6 +36,7 @@ song.inst('timp', 'timp', vol=96, pan=64)
 song.inst('glock', 'glock', vol=62, pan=88)
 song.inst('wind', 'sweep', vol=56, pan=64)
 song.inst('oohs', 'oohs', vol=70, pan=70)
+song.inst('swirl', 'strings', vol=80, pan=28)           # Sturm-Schicht: Streicher-16tel (Version 2)
 
 NAMES = {'C': 0, 'D': 2, 'E': 4, 'F': 5, 'G': 7, 'A': 9, 'B': 11}
 def pn(s):
@@ -211,6 +212,39 @@ def call_block(bar0, shift=0, vel=96, inst_low=True, bars=None):
     mel('horn', bar0, bars, shift=shift, vel=vel, octave=0, legato=.88)
     if inst_low: mel('trombone', bar0, bars, shift=shift, vel=vel - 6, octave=-1, legato=.88)
 
+
+def swirl(bar0, chords, shift=0, vel=70, level=1.0):
+    """Sturm-Schicht: Streicher-Sechzehntel (spiccato) als Arpeggio über zwei Oktaven, auf und ab — der Wind fegt über das Feld."""
+    order = (0, 1, 2, 3, 4, 5, 6, 5, 4, 3, 2, 1, 0, 1, 2, 1)
+    for k, ch in enumerate(chords):
+        T = tones(ch, 4, shift)
+        ext = [T[0], T[1], T[2], T[0] + 12, T[1] + 12, T[2] + 12, T[0] + 24]
+        t = song.bar(bar0 + k)
+        for i, ix in enumerate(order):
+            song.add('swirl', t + i * 0.25, 0.2, ext[ix], hv(int((vel + (14 if i % 4 == 0 else (6 if i % 2 == 0 else 0))) * level)))
+
+def windbed(bar0, nbars, shift=0, vel=44):
+    """Wind-Teppich: langer Wind-Pad-Ton über je zwei Takte, Tonhöhe schwebt langsam (±3 Halbtöne) wie Böen."""
+    ch = song.ch['wind'][0]
+    for k in range(0, nbars, 2):
+        beat = song.bar(bar0 + k)
+        dur = 8.0
+        song.add('wind', beat, dur, pn('G4') + shift, vel)
+        for i in range(33):
+            f = i / 32
+            semis = 3.0 * math.sin(2 * math.pi * (f * 1.5 + (k % 4) / 4.0)) * min(1.0, f * 4, (1 - f) * 4 + 0.2)
+            song.ev.append((int(round((beat + dur * f) * TPB)), 0, mido.Message('pitchwheel', channel=ch, pitch=int(max(-8192, min(8191, semis / 12.0 * 8192))))))
+        song.ev.append((int(round((beat + dur + 0.1) * TPB)), 0, mido.Message('pitchwheel', channel=ch, pitch=0)))
+
+def runs(bar0, nbars, inst, every=2, shift=0, vel=64):
+    """Böen-Läufe: lydische 16tel-Skala aufwärts am Taktende (Beat 3 bis 4)."""
+    scale = [pn(n) for n in ('C5', 'D5', 'E5', 'F#5', 'G5', 'A5', 'B5', 'C6', 'D6')]
+    for k in range(0, nbars, every):
+        t = song.bar(bar0 + k) + 3.0
+        st = rng.randint(0, 3)
+        for i in range(4):
+            song.add(inst, t + i * 0.25, 0.25, scale[st + i] + shift, hv(vel + 4 * i))
+
 # ═══ Arrangement ══════════════════════════════════════════════════════════════════════════════════
 b = 0
 # ── Intro (4): Wind zieht auf, Böen, Pfeife, Schritte; Flötenauftakt ─────────────────────────────────────────
@@ -233,6 +267,9 @@ pizz_off(b, A_CH)
 drums(b, 8, level=0.95)
 sparkle(b, 8, vel=54)
 pad(b, A_CH, vel=34)
+swirl(b, A_CH, vel=58, level=0.9)
+windbed(b, 8, vel=40)
+runs(b, 8, 'clarinet', vel=58)
 b += 8
 
 # ── A' (8): Pfeife, Klarinette, Fiedel kommen dazu; schließt auf C ──────────────────────────────────────────────
@@ -244,6 +281,10 @@ drums(b, 8, level=1.05)
 sparkle(b, 8, vel=60, density=3)
 pad(b, A_CH2, vel=42)
 timp_beat(b, A_CH2, vel=84)
+swirl(b, A_CH2, vel=66)
+windbed(b, 6, vel=44)
+pad(b, A_CH2, vel=40, inst='oohs', oct_=4)
+runs(b, 8, 'whistle', vel=60)
 whoosh(song.bar(b + 7) + 1.0, 3.0, pitch=pn('G5'), vel=58)
 b += 8
 
@@ -258,6 +299,9 @@ pizz_off(b, B_CH, vel=74)
 pad(b, B_CH, vel=44)
 sparkle(b, 8, vel=62, density=3)
 timp_beat(b, B_CH, vel=88)
+swirl(b, B_CH, vel=74, level=1.05)
+windbed(b, 8, vel=46)
+pad(b, B_CH, vel=42, inst='oohs', oct_=4)
 drums(b, 8, level=1.1)
 roll(b + 7, 2, 4, 50, 112)
 b += 8
@@ -272,6 +316,8 @@ for k, ch in enumerate(C_CH):
     for beat in (0, 1, 2, 3): song.add('bass', t + beat, 0.9, r, hv(100 if beat in (0, 2) else 88))
 pad(b, C_CH, vel=50)
 timp_beat(b, C_CH, vel=102)
+swirl(b, C_CH, vel=64, level=0.95)
+windbed(b, 8, vel=46)
 drums(b, 8, level=1.1, style='march')
 roll(b + 7, 1, 4, 60, 124)
 b += 8
@@ -289,6 +335,8 @@ for blk in range(2):
     pizz_off(bb, B_CH[:4], shift=sh, vel=76)
     pad(bb, B_CH[:4], shift=sh, vel=48)
     timp_beat(bb, B_CH[:4], shift=sh, vel=104)
+    swirl(bb, B_CH[:4], shift=sh, vel=80, level=1.1)
+    pad(bb, B_CH[:4], shift=sh, vel=44, inst='oohs', oct_=4)
 drums(b, 8, level=1.15, style='march')
 sparkle(b, 8, vel=66, density=3)
 whoosh(song.bar(b + 3), 4.0, pitch=pn('E5'), vel=64)
@@ -326,6 +374,8 @@ pizz_off(b, A_CH2, shift=S, vel=78)
 pad(b, A_CH2, shift=S, vel=50)
 sparkle(b, 8, shift=S, vel=66, density=4)
 timp_beat(b, A_CH2, shift=S, vel=104)
+swirl(b, A_CH2, shift=S, vel=82, level=1.15)
+pad(b, A_CH2, shift=S, vel=44, inst='oohs', oct_=4)
 drums(b, 8, level=1.15)
 whoosh(song.bar(b + 7), 4.0, pitch=pn('E5'), vel=64)
 b += 8
@@ -341,6 +391,7 @@ drums(b, 2, level=1.0, fills=False)
 whoosh(song.bar(b + 2), 8.0, pitch=pn('G5'), vel=66, lo=6.0, hi=-9.0, steps=32)
 gusts(b + 2, ['G', 'G'], vel=50, up=False)
 timp_roll(song.bar(b + 3), 4.0, pn('G2') + 12, 40, 96)
+swirl(b, ['G', 'G'], vel=56, level=0.9)
 b += 4
 assert b == BARS, (b, BARS)
 
