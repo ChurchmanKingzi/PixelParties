@@ -119,6 +119,23 @@ module.exports = {
     // Splice the Crystal out of hand and route to deleted pile. Use
     // the live hand index from ctx.handIndex; defensively re-locate
     // by name in case the hand mutated mid-prompt.
+    // ★ Aus Crestinas Vorrat (Extra-Hand, `ctx.fromCreation`): `handIndex` zaehlt dort. Vorher suchte dieser Weg nur in der HAND — der Held nahm die 200 Selbstschaden,
+    //   aber die Karte im Vorrat wurde nicht geloescht (oder es traf eine namensgleiche Handkopie). Jetzt wird die Vorratskarte geloescht.
+    if (ctx.fromCreation) {
+      const vorrat = ps.creationZone || [];
+      let vi = handIndex;
+      if (vorrat[vi] !== CARD_NAME) vi = vorrat.indexOf(CARD_NAME);
+      if (vi >= 0) {
+        const inst = engine._findHandInstanceAt(pi, vi, true);
+        engine._broadcastEvent('play_pile_transfer', { owner: pi, cardName: CARD_NAME, from: 'creation', to: 'deleted', fromHandIdx: vi });
+        vorrat.splice(vi, 1);
+        ps.deletedPile.push(CARD_NAME);
+        if (inst) engine._untrackCard(inst.id);
+      }
+      engine.log('mana_absorbing_crystal_delete', { player: ps.username, hero: hero.name, damage: SELF_DAMAGE });
+      engine.sync();
+      return true;
+    }
     let idx = handIndex;
     if (ps.hand[idx] !== CARD_NAME) idx = ps.hand.indexOf(CARD_NAME);
     if (idx >= 0) {
