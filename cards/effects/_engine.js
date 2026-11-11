@@ -507,6 +507,10 @@ class CardInstance {
         && this.counters?.treatAsEquip
         && !this.counters?._suppressEquipHooks
         && script.activeIn.includes('hero')) return true;
+    // ★ 11.11. (Vorgabe: „alle Reaktionen auch aus der Crestina-Hand"): Hook-Reaktionen aus der Hand (Doomed Town Guard, Front Soldier …) hoeren auch als Karte in Crestinas
+    // Vorrat (`ZONES.CREATION`) mit — NUR mit dem Opt-in `reactFromCreation: true` am Skript. Reine Hand-PASSIVE (Magic Gems, Play Money …) bleiben aussen vor: eine Vorratskarte
+    // gilt nicht als Handkarte (Ruling 28.8.). Ob der Vorrat gerade benutzbar ist (Crestina da, nicht eingefroren …), prueft das Skript ueber `engine._rxQuelleFuer`.
+    if (z === ZONES.CREATION && script.reactFromCreation && script.activeIn.includes('hand')) return true;
     return script.activeIn.includes(z);
   }
 
@@ -15454,7 +15458,7 @@ class GameEngine {
         for (let runde = 0; runde < 8; runde++) {
           if (this.gs.result) return;
           let gespielt = false;
-          for (const cardName of [...new Set(ps.hand || [])]) {
+          for (const cardName of this._rxNamen(ps)) {
             if (abgelehnt.has(cardName)) continue;
             if (this._handPlayLockedFor(ps, cardName)) continue;
             const script = loadCardEffect(cardName);
@@ -15536,7 +15540,7 @@ class GameEngine {
       for (let runde = 0; runde < 8; runde++) {
         if (this.gs.result || !(hero.hp > 0)) return;
         let gespielt = false;
-        for (const cardName of [...new Set(ps.hand || [])]) {
+        for (const cardName of this._rxNamen(ps)) {
           if (abgelehnt.has(cardName)) continue;
           if (this._handPlayLockedFor(ps, cardName)) continue;
           const script = loadCardEffect(cardName);
@@ -15610,7 +15614,7 @@ class GameEngine {
     if (!ps || !target || target.hp > 0) return false;
     const heroIdx = ((this.gs.players[phys]?.heroes) || []).indexOf(target);
     if (heroIdx < 0) return false;
-    const kandidaten = (ps.hand || []).filter(n => { const sc = loadCardEffect(n); return sc?.isHeroDefeatedReaction && (!kontrollPass || sc.heroDefeatedFuerKontrolleur); });
+    const kandidaten = this._rxNamen(ps).filter(n => { const sc = loadCardEffect(n); return sc?.isHeroDefeatedReaction && (!kontrollPass || sc.heroDefeatedFuerKontrolleur); });
     if (kandidaten.length === 0) return false;
 
     const roh = source?.controller ?? source?.owner;
@@ -15621,7 +15625,7 @@ class GameEngine {
     const allCards = this._getCardDB();
 
     const seen = new Set();
-    for (const cardName of [...ps.hand]) {
+    for (const cardName of this._rxNamen(ps)) {
       if (seen.has(cardName)) continue;
       seen.add(cardName);
       if (this._handPlayLockedFor(ps, cardName)) continue;
@@ -15683,8 +15687,7 @@ class GameEngine {
     const info = { ...roh, sourceOwner: verursacher, cardData: allCards[roh.cardName] || null };
 
     const seen = new Set();
-    for (let hi = 0; hi < (ps.hand || []).length; hi++) {
-      const cardName = ps.hand[hi];
+    for (const { cardName, ausVorrat: _av, idx: hi } of this._rxKandidaten(ps)) {
       if (this._handPlayLockedFor(ps, cardName)) continue;
       if (seen.has(cardName)) continue;
       seen.add(cardName);
@@ -18626,7 +18629,7 @@ this._deathWatch = (this._deathWatchStack || []).length
       for (let runde = 0; runde < 4; runde++) {
         if (this.gs.result) return;
         let gespielt = false;
-        for (const cardName of [...new Set(ps.hand || [])]) {
+        for (const cardName of this._rxNamen(ps)) {
           if (abgelehnt.has(cardName)) continue;
           if (this._handPlayLockedFor(ps, cardName)) continue;
           const script = loadCardEffect(cardName);
@@ -18737,7 +18740,7 @@ this._deathWatch = (this._deathWatchStack || []).length
         for (let runde = 0; runde < 4; runde++) {
           if (this.gs.result) return;
           let gespielt = false;
-          for (const cardName of [...new Set(ps.hand || [])]) {
+          for (const cardName of this._rxNamen(ps)) {
             if (abgelehnt.has(cardName)) continue;
             if (this._handPlayLockedFor(ps, cardName)) continue;
             const script = loadCardEffect(cardName);
@@ -23295,6 +23298,44 @@ this._deathWatch = (this._deathWatchStack || []).length
   }
 
   /**
+   * ★ 11.11. (Vorgabe: „alle Reaktionen auch aus der Crestina-Hand"): Kreatur aus CRESTINAS VORRAT (Extra-Hand) BESCHWOEREN — Schwester von `summonFromPile(…, 'hand', …)`
+   * fuer Hand-Reaktionen, die sich selbst beschwoeren (Wendy, Front Soldier, Albrecht …). Gleiche Reihenfolge: Karte raus, Kosten VOR dem sichtbaren Flug (Abbruch → zurueck an
+   * ihren Platz), Flug vom Vorratsplatz, echte Beschwoerung; scheitert sie, liegt die Karte wieder im Vorrat. Der Vorrat muss benutzbar sein (`isCreationZoneUsable`).
+   * @returns {CardInstance|null}
+   */
+  async summonFromCreation(pi, cardName, heroIdx, slotIdx, opts = {}) {
+    pi = this._resolvePi(pi);
+    if (loadCardEffect(cardName)?.summonOnlyViaOwnEffect) return null;   // wie summonFromPile
+    const ps = this.gs.players[pi];
+    if (!ps || !this.isCreationZoneUsable(pi)) return null;
+    const liste = ps.creationZone || [];
+    const idx = liste.indexOf(cardName);
+    if (idx < 0) return null;
+    const feld = opts.heldSeite ?? pi;
+    const flight = { toHeroIdx: heroIdx, toSlotIdx: slotIdx, fromHandIdx: idx, ...(feld !== pi ? { toOwner: feld } : {}) };
+    this._rxAbgang(ps, { liste, ausVorrat: true, idx });
+    const zurueck = () => {   // an den alten Platz zurueck (der Vorrat behaelt seine Reihenfolge)
+      liste.splice(Math.min(idx, liste.length), 0, cardName);
+      this._trackCard(cardName, pi, ZONES.CREATION);
+      this.sync();
+      return null;
+    };
+    const kernOpts = {
+      source: opts.source || 'summonFromCreation', hookExtras: { _summonedFromPile: 'hand', ...(opts.hookExtras || {}) },   // eine Vorratskarte spielt „als waere sie auf der Hand"
+      alsZusatzaktion: !!opts.alsZusatzaktion,
+      ...(opts.summonOpts || {}),
+      ...(feld !== pi ? { controller: pi } : {}),
+    };
+    if (!(await this._beschwoerungKostenVorAuftritt(cardName, feld, heroIdx, slotIdx, kernOpts))) return zurueck();
+    kernOpts._sperrenGeprueft = true; kernOpts._kostenGezahlt = true;
+    this._auftrittSchrittNachKosten('summonFromPile');
+    if (opts.flug !== false) this._pileFlight(pi, cardName, 'creation', 'support', flight);
+    const summon = await this.summonCreatureWithHooks(cardName, feld, heroIdx, slotIdx, kernOpts);
+    if (!summon?.inst) return zurueck();
+    return summon.inst;
+  }
+
+  /**
    * Kreatur aus Hand/Deck/Ablage PLATZIEREN (regardless of level, keine
    * Aktion, auch zu toten/Frozen/Stunned/Negated Helden). Hand und
    * Ablage laufen durch `actionPlaceCreature` (Lethe-Stempel dort);
@@ -24299,6 +24340,65 @@ this._deathWatch = (this._deathWatchStack || []).length
     if (!fromCreation) return ps.hand;
     if (!this.isCreationZoneUsable(playerIdx)) return null;
     return ps.creationZone;
+  }
+
+  // ═══════════════════════════════════════════════════════════════
+  //  HAND-REAKTIONEN AUS CRESTINAS VORRAT (Extra-Hand) — Vorgabe 11.11.
+  // ═══════════════════════════════════════════════════════════════
+  // „Auch alle Reaktionen, inklusive des Bone-Dog-Beispiels, sollen von der Crestina-Hand funktionieren." Alle Hand-Reaktionsfenster (und die Reaktionskette)
+  // lesen ihre Kandidaten ueber `_rxKandidaten` / `_rxNamen` (Hand ZUERST, dann der benutzbare Vorrat) und nehmen die Karte ueber `_rxQuelleFuer` + `q.liste`
+  // heraus. Der Index zaehlt je Quelle (`q.ausVorrat`); Fluege nutzen `from: 'creation'`. Eine Vorratskarte gilt nicht als Handkarte (Ruling 28.8.): keine
+  // Herkunfts-Stempel gestohlener Handkarten, keine Hand-Abwurf-Haken.
+
+  /** Kandidaten fuer Hand-Reaktionen: `[{ cardName, ausVorrat, idx }]` — erst die Hand, dann (nur wenn benutzbar) Crestinas Vorrat. `idx` zaehlt in der jeweiligen Liste. */
+  _rxKandidaten(ps) {
+    const pi = this.gs.players.indexOf(ps);
+    const out = (ps?.hand || []).map((cardName, idx) => ({ cardName, ausVorrat: false, idx }));
+    if (pi >= 0 && this.isCreationZoneUsable(pi)) {
+      (ps.creationZone || []).forEach((cardName, idx) => out.push({ cardName, ausVorrat: true, idx }));
+    }
+    return out;
+  }
+
+  /** Namen aller Reaktions-Kandidaten (Hand + Vorrat), ohne Duplikate. */
+  _rxNamen(ps) {
+    return [...new Set(this._rxKandidaten(ps).map(k => k.cardName))];
+  }
+
+  /** Erste Kopie von `cardName` in Hand, sonst im benutzbaren Vorrat: `{ liste, ausVorrat, idx }` oder `null`. */
+  _rxQuelleFuer(ps, cardName) {
+    const hi = (ps?.hand || []).indexOf(cardName);
+    if (hi >= 0) return { liste: ps.hand, ausVorrat: false, idx: hi };
+    const pi = this.gs.players.indexOf(ps);
+    if (pi >= 0 && this.isCreationZoneUsable(pi)) {
+      const vi = (ps.creationZone || []).indexOf(cardName);
+      if (vi >= 0) return { liste: ps.creationZone, ausVorrat: true, idx: vi };
+    }
+    return null;
+  }
+
+  /** Die Karte verlaesst ihre Quelle. Hand: reiner Splice (wie bisher); Vorrat: Splice + die Vorrats-Instanz wird abgeraeumt. */
+  _rxAbgang(ps, q, mitInstanz = q.ausVorrat) {
+    let inst = null;
+    if (mitInstanz) inst = this._findHandInstanceAt(this.gs.players.indexOf(ps), q.idx, q.ausVorrat);
+    q.liste.splice(q.idx, 1);
+    if (inst) this._untrackCard(inst.id);
+  }
+
+  /** Die Reaktionskarte verlaesst ihre Quelle: Hand ueber die Stapel-Schicht (wie bisher), Vorrat per Splice + Instanz weg. Fuer Karten, die sich per Hook selbst einsetzen. */
+  rxNimm(ps, q) {
+    if (q.ausVorrat) return this._rxAbgang(ps, q);
+    return this.takeFromPileSync(ps, 'hand', q.idx);
+  }
+
+  /** Stapel-Besitzer fuer die Ablage der Reaktionskarte: Hand = Herkunft des Platzes (gestohlene Karten), Vorrat = der Spieler selbst. */
+  _rxAblagePs(ps, cardName, q) {
+    return q?.ausVorrat ? ps : this.handKartenBesitzerPs(ps, cardName);
+  }
+
+  /** `fromOwner/toOwner` fuer den Ablage-Flug einer Reaktionskarte (nur Handkarten koennen gestohlen sein). */
+  _rxPileOwnerFlug(holder, cardName, q) {
+    return q?.ausVorrat ? {} : this._pileOwnerFlug(holder, cardName, q?.idx);
   }
 
   /**
@@ -35616,8 +35716,7 @@ this._deathWatch = (this._deathWatchStack || []).length
 
     // Scan hand for redirect cards
     const seen = new Set();
-    for (let hi = 0; hi < (_nurNegation ? 0 : ps.hand.length); hi++) {
-      const cardName = ps.hand[hi];
+    for (const { cardName } of (_nurNegation ? [] : this._rxKandidaten(ps))) {   // Hand + Crestinas Vorrat
       if (this._handPlayLockedFor(ps, cardName)) continue;   // v818 Hand-Spielsperre
       if (seen.has(cardName)) continue;
       seen.add(cardName);
@@ -35662,17 +35761,19 @@ this._deathWatch = (this._deathWatchStack || []).length
       const result = await script.onRedirect(this, targetOwnerIdx, selected, validTargets, config, sourceCard);
       if (!result?.redirectTo) continue; // Redirect was cancelled
 
-      // Consume the card from hand
-      const removeIdx = ps.hand.indexOf(cardName);
-      if (removeIdx >= 0) {
-        ps.hand.splice(removeIdx, 1);
+      // Consume the card from hand (oder aus Crestinas Vorrat — 11.11.: alle Hand-Reaktionen auch aus der Extra-Hand)
+      const _q = this._rxQuelleFuer(ps, cardName);
+      if (_q) {
+        this._rxAbgang(ps, _q);
         this._meldeHandPlay(cardName, targetOwnerIdx);   // 23.10.: Umleiter (Challenge, Martyry, Anti-Magnet …) melden sonst keinen Play (Luck, Liquid Luck)
-        this.handKartenBesitzerPs(ps, cardName).discardPile.push(cardName);
-        // Untrack hand instance
-        const inst = this.cardInstances.find(c =>
-          c.owner === targetOwnerIdx && c.zone === 'hand' && c.name === cardName
-        );
-        if (inst) this._untrackCard(inst.id);
+        this._rxAblagePs(ps, cardName, _q).discardPile.push(cardName);
+        // Untrack hand instance (die Vorrats-Instanz raeumt `_rxAbgang` selbst ab)
+        if (!_q.ausVorrat) {
+          const inst = this.cardInstances.find(c =>
+            c.owner === targetOwnerIdx && c.zone === 'hand' && c.name === cardName
+          );
+          if (inst) this._untrackCard(inst.id);
+        }
       }
 
       // Reveal to other player + spectators
@@ -38741,8 +38842,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     if (this.gs.firstTurnProtectedPlayer === targetOwner) return NULL_RESULT;
 
     const seen = new Set();
-    for (let hi = 0; hi < ps.hand.length; hi++) {
-      const cardName = ps.hand[hi];
+    for (const { cardName, ausVorrat: _av, idx: hi } of this._rxKandidaten(ps)) {
       if (this._handPlayLockedFor(ps, cardName)) continue;   // v818 Hand-Spielsperre
       if (seen.has(cardName)) continue;
       seen.add(cardName);
@@ -38849,8 +38949,9 @@ this._deathWatch = (this._deathWatchStack || []).length
           if (ps.hand[k] === cardName) { actualIdx = k; break; }
         }
       }
-      if (actualIdx < 0) actualIdx = ps.hand.indexOf(cardName);
-      if (actualIdx < 0) continue;
+      let _q = actualIdx >= 0 ? { liste: ps.hand, ausVorrat: false, idx: actualIdx } : this._rxQuelleFuer(ps, cardName);   // Hand, sonst Crestinas Vorrat
+      if (!_q) continue;
+      actualIdx = _q.idx;
       // Reveal VOR dem Konterfenster (v693, Als Wunsch): der Gegner
       // soll die Reaktion angezeigt bekommen, als wuerde sie aufloesen,
       // BEVOR er gefragt wird, ob Key sie stiehlt. Frueher kam das
@@ -38867,9 +38968,7 @@ this._deathWatch = (this._deathWatchStack || []).length
           cardName, cardType: cardData?.cardType, goldCost: cost,
         });
         if (konter?.negated) {
-          const consumedInst = this._findHandInstanceAt(targetOwner, actualIdx);
-          ps.hand.splice(actualIdx, 1);
-          if (consumedInst) this._untrackCard(consumedInst.id);
+          this._rxAbgang(ps, _q, true);
           if (Number.isInteger(konter.stolenBy) && this.gs.players[konter.stolenBy]) {
             const diebPs = this.gs.players[konter.stolenBy];
             const zielIdx = diebPs.hand.length;
@@ -38878,14 +38977,14 @@ this._deathWatch = (this._deathWatchStack || []).length
             // URSPRUENGLICHEN Besitzers zurueck.
             this._tagHandCardOrigin(konter.stolenBy, cardName, targetOwner);
             this._broadcastEvent('play_pile_transfer', {
-              cardName, from: 'hand', to: 'hand',
+              cardName, from: _q.ausVorrat ? 'creation' : 'hand', to: 'hand',
               fromOwner: targetOwner, toOwner: konter.stolenBy,
               fromHandIdx: actualIdx, toHandIdx: zielIdx, finalHandSize: diebPs.hand.length,
             });
             this.log('negated_card_stolen', { card: cardName, from: ps.username, to: diebPs.username });
           } else {
-            this._broadcastEvent('play_pile_transfer', { owner: targetOwner, cardName, from: 'hand', to: 'discard', fromHandIdx: actualIdx });
-            this.handKartenBesitzerPs(ps, cardName).discardPile.push(cardName);
+            this._broadcastEvent('play_pile_transfer', { owner: targetOwner, cardName, from: _q.ausVorrat ? 'creation' : 'hand', to: 'discard', fromHandIdx: actualIdx });
+            this._rxAblagePs(ps, cardName, _q).discardPile.push(cardName);
           }
           this.sync();
           await this._delay(650);
@@ -38908,16 +39007,14 @@ this._deathWatch = (this._deathWatchStack || []).length
 // glaubt — Escape (Attack) und Spectral Armor (Spell) waren
 // dadurch trotz echter Feuerungen unsichtbar. `sole` heißt
 // "einziges Play-Signal dieser Karte" und zählt typunabhängig.
-          from: 'hand', to: destPile, asPlay: true,   // v1157: Spell/Attack zaehlt afterSpellResolved (_rxAufgeloest)
+          from: _q.ausVorrat ? 'creation' : 'hand', to: destPile, asPlay: true,   // v1157: Spell/Attack zaehlt afterSpellResolved (_rxAufgeloest)
           fromHandIdx: actualIdx,
-          ...this._pileOwnerFlug(targetOwner, cardName, actualIdx),   // W63c: gestohlene Handkarte fliegt in den Stapel des Besitzers
+          ...this._rxPileOwnerFlug(targetOwner, cardName, _q),   // W63c: gestohlene Handkarte fliegt in den Stapel des Besitzers
         });
       }
       // Untrack the matching inst at this hand index (computed BEFORE
       // splice, since splice would shift the rank-by-name mapping).
-      const consumedInst = this._findHandInstanceAt(targetOwner, actualIdx);
-      ps.hand.splice(actualIdx, 1);
-      if (consumedInst) this._untrackCard(consumedInst.id);
+      this._rxAbgang(ps, _q, true);
       // Route to destination pile IMMEDIATELY (alongside the splice,
       // BEFORE resolve runs). The next sync covers BOTH the hand
       // removal and the pile addition, so the client's
@@ -38926,9 +39023,9 @@ this._deathWatch = (this._deathWatchStack || []).length
       // the board when long resolves push the pile delta outside
       // the 700ms pending-entry window.
       if (cardData?.cardType === 'Potion' || script?.deleteOnUse) {
-        this.handKartenBesitzerPs(ps, cardName).deletedPile.push(cardName);
+        this._rxAblagePs(ps, cardName, _q).deletedPile.push(cardName);
       } else {
-        this.handKartenBesitzerPs(ps, cardName).discardPile.push(cardName);
+        this._rxAblagePs(ps, cardName, _q).discardPile.push(cardName);
       }
       await this._rxPay(ps, cost, { cardName });
       await this._rxPayWisdom(ps, rxCast);
@@ -39031,8 +39128,7 @@ this._deathWatch = (this._deathWatchStack || []).length
 
     const allCards = this._getCardDB();
     const seen = new Set();
-    for (let hi = 0; hi < ps.hand.length; hi++) {
-      const cardName = ps.hand[hi];
+    for (const { cardName, ausVorrat: _av, idx: hi } of this._rxKandidaten(ps)) {
       if (this._handPlayLockedFor(ps, cardName)) continue;   // v818 Hand-Spielsperre
       if (seen.has(cardName)) continue;
       seen.add(cardName);
@@ -39084,8 +39180,9 @@ this._deathWatch = (this._deathWatchStack || []).length
       // v1155: 2+ moegliche Wirker → Auswahl (Abbruch = keine Reaktion)
       if (!(await this._rxCastWirkerWaehlen(ps, cardName, script, rxCast))) continue;
 
-      const actualIdx = ps.hand.indexOf(cardName);
-      if (actualIdx < 0) continue;
+      const _q = this._rxQuelleFuer(ps, cardName);
+      if (!_q) continue;
+      const actualIdx = _q.idx;
       // Hand → discard/deleted flight animation (broadcast before splice).
       {
         const destPile = (cardData?.cardType === 'Potion' || script?.deleteOnUse)
@@ -39099,21 +39196,19 @@ this._deathWatch = (this._deathWatchStack || []).length
 // glaubt — Escape (Attack) und Spectral Armor (Spell) waren
 // dadurch trotz echter Feuerungen unsichtbar. `sole` heißt
 // "einziges Play-Signal dieser Karte" und zählt typunabhängig.
-          from: 'hand', to: destPile, asPlay: true,   // v1157: Spell/Attack zaehlt afterSpellResolved (_rxAufgeloest)
+          from: _q.ausVorrat ? 'creation' : 'hand', to: destPile, asPlay: true,   // v1157: Spell/Attack zaehlt afterSpellResolved (_rxAufgeloest)
           fromHandIdx: actualIdx,
-          ...this._pileOwnerFlug(pi, cardName, actualIdx),   // W63c: gestohlene Handkarte fliegt in den Stapel des Besitzers
+          ...this._rxPileOwnerFlug(pi, cardName, _q),   // W63c: gestohlene Handkarte fliegt in den Stapel des Besitzers
         });
       }
-      const consumedInst = this._findHandInstanceAt(pi, actualIdx);
-      ps.hand.splice(actualIdx, 1);
-      if (consumedInst) this._untrackCard(consumedInst.id);
+      this._rxAbgang(ps, _q, true);
       // Route to destination pile alongside the splice (see post-target
       // handler for the rationale — keeps the flight + pile-grow
       // deltas in the same diff cycle).
       if (cardData?.cardType === 'Potion' || script?.deleteOnUse) {
-        this.handKartenBesitzerPs(ps, cardName).deletedPile.push(cardName);
+        this._rxAblagePs(ps, cardName, _q).deletedPile.push(cardName);
       } else {
-        this.handKartenBesitzerPs(ps, cardName).discardPile.push(cardName);
+        this._rxAblagePs(ps, cardName, _q).discardPile.push(cardName);
       }
       await this._rxPay(ps, cost, { cardName });
       await this._rxPayWisdom(ps, rxCast);
@@ -39200,8 +39295,7 @@ this._deathWatch = (this._deathWatchStack || []).length
 
     const allCards = this._getCardDB();
     const seen = new Set();
-    for (let hi = 0; hi < ps.hand.length; hi++) {
-      const cardName = ps.hand[hi];
+    for (const { cardName, ausVorrat: _av, idx: hi } of this._rxKandidaten(ps)) {
       if (this._handPlayLockedFor(ps, cardName)) continue;   // v818 Hand-Spielsperre
       if (seen.has(cardName)) continue;
       seen.add(cardName);
@@ -39251,8 +39345,9 @@ this._deathWatch = (this._deathWatchStack || []).length
       // v1155: 2+ moegliche Wirker → Auswahl (Abbruch = keine Reaktion)
       if (!(await this._rxCastWirkerWaehlen(ps, cardName, script, rxCast))) continue;
 
-      const actualIdx = ps.hand.indexOf(cardName);
-      if (actualIdx < 0) continue;
+      const _q = this._rxQuelleFuer(ps, cardName);
+      if (!_q) continue;
+      const actualIdx = _q.idx;
       // Hand → discard/deleted flight animation (broadcast before splice).
       {
         const destPile = (cardData?.cardType === 'Potion' || script?.deleteOnUse)
@@ -39266,18 +39361,18 @@ this._deathWatch = (this._deathWatchStack || []).length
 // glaubt — Escape (Attack) und Spectral Armor (Spell) waren
 // dadurch trotz echter Feuerungen unsichtbar. `sole` heißt
 // "einziges Play-Signal dieser Karte" und zählt typunabhängig.
-          from: 'hand', to: destPile, asPlay: true,   // v1157: Spell/Attack zaehlt afterSpellResolved (_rxAufgeloest)
+          from: _q.ausVorrat ? 'creation' : 'hand', to: destPile, asPlay: true,   // v1157: Spell/Attack zaehlt afterSpellResolved (_rxAufgeloest)
           fromHandIdx: actualIdx,
-          ...this._pileOwnerFlug(ownerIdx, cardName, actualIdx),   // W63c: gestohlene Handkarte fliegt in den Stapel des Besitzers
+          ...this._rxPileOwnerFlug(ownerIdx, cardName, _q),   // W63c: gestohlene Handkarte fliegt in den Stapel des Besitzers
         });
       }
-      ps.hand.splice(actualIdx, 1);
+      this._rxAbgang(ps, _q);
       // Route to destination pile alongside the splice (see post-target
       // handler for the rationale).
       if (cardData?.cardType === 'Potion' || script?.deleteOnUse) {
-        this.handKartenBesitzerPs(ps, cardName).deletedPile.push(cardName);
+        this._rxAblagePs(ps, cardName, _q).deletedPile.push(cardName);
       } else {
-        this.handKartenBesitzerPs(ps, cardName).discardPile.push(cardName);
+        this._rxAblagePs(ps, cardName, _q).discardPile.push(cardName);
       }
       await this._rxPay(ps, cost, { cardName });
       await this._rxPayWisdom(ps, rxCast);
@@ -39359,8 +39454,7 @@ this._deathWatch = (this._deathWatchStack || []).length
 
     const allCards = this._getCardDB();
     const seen = new Set();
-    for (let hi = 0; hi < ps.hand.length; hi++) {
-      const cardName = ps.hand[hi];
+    for (const { cardName, ausVorrat: _av, idx: hi } of this._rxKandidaten(ps)) {
       if (this._handPlayLockedFor(ps, cardName)) continue;   // v818 Hand-Spielsperre
       if (seen.has(cardName)) continue;
       seen.add(cardName);
@@ -39408,8 +39502,9 @@ this._deathWatch = (this._deathWatchStack || []).length
       // v1155: 2+ moegliche Wirker → Auswahl (Abbruch = keine Reaktion)
       if (!(await this._rxCastWirkerWaehlen(ps, cardName, script, rxCast))) continue;
 
-      const actualIdx = ps.hand.indexOf(cardName);
-      if (actualIdx < 0) continue;
+      const _q = this._rxQuelleFuer(ps, cardName);
+      if (!_q) continue;
+      const actualIdx = _q.idx;
       // Hand → discard/deleted flight animation (broadcast before splice).
       {
         const destPile = (cardData?.cardType === 'Potion' || script?.deleteOnUse)
@@ -39423,17 +39518,17 @@ this._deathWatch = (this._deathWatchStack || []).length
 // glaubt — Escape (Attack) und Spectral Armor (Spell) waren
 // dadurch trotz echter Feuerungen unsichtbar. `sole` heißt
 // "einziges Play-Signal dieser Karte" und zählt typunabhängig.
-          from: 'hand', to: destPile, asPlay: true,   // v1157: Spell/Attack zaehlt afterSpellResolved (_rxAufgeloest)
+          from: _q.ausVorrat ? 'creation' : 'hand', to: destPile, asPlay: true,   // v1157: Spell/Attack zaehlt afterSpellResolved (_rxAufgeloest)
           fromHandIdx: actualIdx,
-          ...this._pileOwnerFlug(pi, cardName, actualIdx),   // W63c: gestohlene Handkarte fliegt in den Stapel des Besitzers
+          ...this._rxPileOwnerFlug(pi, cardName, _q),   // W63c: gestohlene Handkarte fliegt in den Stapel des Besitzers
         });
       }
-      ps.hand.splice(actualIdx, 1);
+      this._rxAbgang(ps, _q);
       // Route to destination pile alongside the splice.
       if (cardData?.cardType === 'Potion' || script?.deleteOnUse) {
-        this.handKartenBesitzerPs(ps, cardName).deletedPile.push(cardName);
+        this._rxAblagePs(ps, cardName, _q).deletedPile.push(cardName);
       } else {
-        this.handKartenBesitzerPs(ps, cardName).discardPile.push(cardName);
+        this._rxAblagePs(ps, cardName, _q).discardPile.push(cardName);
       }
       await this._rxPay(ps, cost, { cardName });
       await this._rxPayWisdom(ps, rxCast);
@@ -39562,8 +39657,7 @@ this._deathWatch = (this._deathWatchStack || []).length
 
     const allCards = this._getCardDB();
     const seen = new Set();
-    for (let hi = 0; hi < ps.hand.length; hi++) {
-      const cardName = ps.hand[hi];
+    for (const { cardName, ausVorrat: _av, idx: hi } of this._rxKandidaten(ps)) {
       if (this._handPlayLockedFor(ps, cardName)) continue;   // v818 Hand-Spielsperre
       if (seen.has(cardName)) continue;
       seen.add(cardName);
@@ -39611,9 +39705,10 @@ this._deathWatch = (this._deathWatchStack || []).length
       // v1155: 2+ moegliche Wirker → Auswahl (Abbruch = keine Reaktion)
       if (!(await this._rxCastWirkerWaehlen(ps, cardName, script, rxCast))) continue;
 
-      const actualIdx = ps.hand.indexOf(cardName);
-      if (actualIdx < 0) continue;
-      ps.hand.splice(actualIdx, 1);
+      const _q = this._rxQuelleFuer(ps, cardName);
+      if (!_q) continue;
+      const actualIdx = _q.idx;
+      this._rxAbgang(ps, _q);
       await this._rxPay(ps, cost, { cardName });
       await this._rxPayWisdom(ps, rxCast);
       this.notePlayedFromHand(ownerIdx);
@@ -39645,9 +39740,9 @@ this._deathWatch = (this._deathWatchStack || []).length
       // Same routing as the other hand-reaction windows.
       if (_buddyErsetzt) { /* W67a: Inyas Fantasy Buddy ersetzt die Ablage */ }
       else if (cardData?.cardType === 'Potion' || script?.deleteOnUse) {
-        this.handKartenBesitzerPs(ps, cardName).deletedPile.push(cardName);
+        this._rxAblagePs(ps, cardName, _q).deletedPile.push(cardName);
       } else {
-        this.handKartenBesitzerPs(ps, cardName).discardPile.push(cardName);
+        this._rxAblagePs(ps, cardName, _q).discardPile.push(cardName);
       }
       this.sync();
       return saved;
@@ -40250,8 +40345,7 @@ this._deathWatch = (this._deathWatchStack || []).length
       if (this.gs.firstTurnProtectedPlayer === ownerIdx) continue;
       if (this.darkOceanBlocksReaction(ownerIdx, null)) continue;   // W34a: Dark Ocean nur gegen Effekte GEGNERISCHER Creatures (eigene: erlaubt)
       const seen = new Set();
-      for (let hi = 0; hi < (ps.hand || []).length; hi++) {
-        const cardName = ps.hand[hi];
+      for (const { cardName, ausVorrat: _av, idx: hi } of this._rxKandidaten(ps)) {
         if (this._handPlayLockedFor(ps, cardName)) continue;
         if (seen.has(cardName)) continue;
         seen.add(cardName);
@@ -40418,17 +40512,18 @@ this._deathWatch = (this._deathWatchStack || []).length
     const ps = this.gs.players[ownerIdx];
     const cardData = this._getCardDB()[cardName];
     const cost = cardData?.cost || 0;
-    const actualIdx = ps?.hand?.indexOf(cardName) ?? -1;
-    if (actualIdx < 0) return false;
+    const _q = this._rxQuelleFuer(ps, cardName);   // Hand, sonst Crestinas Vorrat (11.11.: alle Hand-Reaktionen auch aus der Extra-Hand)
+    if (!_q) return false;
+    const actualIdx = _q.idx;
     const inDieLoeschung = cardData?.cardType === 'Potion' || !!script?.deleteOnUse;
     this._broadcastEvent('play_pile_transfer', {
-      owner: ownerIdx, cardName, from: 'hand', to: inDieLoeschung ? 'deleted' : 'discard', asPlay: true,
+      owner: ownerIdx, cardName, from: _q.ausVorrat ? 'creation' : 'hand', to: inDieLoeschung ? 'deleted' : 'discard', asPlay: true,
       fromHandIdx: actualIdx,
-      ...this._pileOwnerFlug(ownerIdx, cardName, actualIdx),   // W63c: gestohlene Handkarte fliegt in den Stapel des Besitzers
+      ...this._rxPileOwnerFlug(ownerIdx, cardName, _q),   // W63c: gestohlene Handkarte fliegt in den Stapel des Besitzers
     });
-    ps.hand.splice(actualIdx, 1);
-    if (inDieLoeschung) this.handKartenBesitzerPs(ps, cardName).deletedPile.push(cardName);
-    else this.handKartenBesitzerPs(ps, cardName).discardPile.push(cardName);
+    this._rxAbgang(ps, _q);
+    if (inDieLoeschung) this._rxAblagePs(ps, cardName, _q).deletedPile.push(cardName);
+    else this._rxAblagePs(ps, cardName, _q).discardPile.push(cardName);
     await this._rxPay(ps, cost + (extra.zusatzKosten || 0), { cardName });   // N5-04: Cute Camera „increase this Artifact's Cost by 3"
     await this._rxPayWisdom(ps, rxCast);
     this.notePlayedFromHand(ownerIdx);
@@ -40810,8 +40905,7 @@ this._deathWatch = (this._deathWatchStack || []).length
 
     const allCards = this._getCardDB();
     const seen = new Set();
-    for (let hi = 0; hi < (ps.hand || []).length; hi++) {
-      const cardName = ps.hand[hi];
+    for (const { cardName, ausVorrat: _av, idx: hi } of this._rxKandidaten(ps)) {
       if (this._handPlayLockedFor(ps, cardName)) continue;   // v818 Hand-Spielsperre
       if (seen.has(cardName)) continue;
       seen.add(cardName);
@@ -40932,8 +41026,7 @@ this._deathWatch = (this._deathWatchStack || []).length
       if (this.gs.firstTurnProtectedPlayer === reactorIdx) continue;
 
       const seen = new Set();
-      for (let hi = 0; hi < ps.hand.length; hi++) {
-        const cardName = ps.hand[hi];
+      for (const { cardName, ausVorrat: _av, idx: hi } of this._rxKandidaten(ps)) {
         if (this._handPlayLockedFor(ps, cardName)) continue;   // v818 Hand-Spielsperre
       if (this._handPlayLockedFor(ps, cardName)) continue;   // v818 Hand-Spielsperre
         if (seen.has(cardName)) continue;
@@ -40990,25 +41083,26 @@ this._deathWatch = (this._deathWatchStack || []).length
         if (!(await this._rxCastWirkerWaehlen(ps, cardName, script, rxCast, { targetHeroIdx: _adZielIdx, targetSeite: zielPhys }))) continue;
 
         // Activate: remove from hand, deduct gold
-        const actualIdx = ps.hand.indexOf(cardName);
-        if (actualIdx < 0) continue;
+        const _q = this._rxQuelleFuer(ps, cardName);
+        if (!_q) continue;
+        const actualIdx = _q.idx;
         // Hand → discard/deleted flight animation (broadcast before splice).
         {
           const destPile = (cardData?.cardType === 'Potion' || script?.deleteOnUse)
             ? 'deleted' : 'discard';
           this._broadcastEvent('play_pile_transfer', {
             owner: reactorIdx, cardName,
-            from: 'hand', to: destPile, asPlay: true,
+            from: _q.ausVorrat ? 'creation' : 'hand', to: destPile, asPlay: true,
             fromHandIdx: actualIdx,
-            ...this._pileOwnerFlug(reactorIdx, cardName, actualIdx),   // W63c: gestohlene Handkarte fliegt in den Stapel des Besitzers
+            ...this._rxPileOwnerFlug(reactorIdx, cardName, _q),   // W63c: gestohlene Handkarte fliegt in den Stapel des Besitzers
           });
         }
-        ps.hand.splice(actualIdx, 1);
+        this._rxAbgang(ps, _q);
         // Route to destination pile alongside the splice.
         if (cardData?.cardType === 'Potion' || script?.deleteOnUse) {
-          this.handKartenBesitzerPs(ps, cardName).deletedPile.push(cardName);
+          this._rxAblagePs(ps, cardName, _q).deletedPile.push(cardName);
         } else {
-          this.handKartenBesitzerPs(ps, cardName).discardPile.push(cardName);
+          this._rxAblagePs(ps, cardName, _q).discardPile.push(cardName);
         }
         await this._rxPay(ps, cost, { cardName });
         await this._rxPayWisdom(ps, rxCast);   // v1155: wie in den uebrigen Hand-Reaktionen
@@ -41152,8 +41246,7 @@ this._deathWatch = (this._deathWatchStack || []).length
       if (this.darkOceanBlocksReaction(ownerIdx, null)) continue;   // W34a: Dark Ocean nur gegen Effekte GEGNERISCHER Creatures (eigene: erlaubt)
 
       const seen = new Set();
-      for (let hi = 0; hi < ps.hand.length; hi++) {
-        const cardName = ps.hand[hi];
+      for (const { cardName, ausVorrat: _av, idx: hi } of this._rxKandidaten(ps)) {
         if (this._handPlayLockedFor(ps, cardName)) continue;   // v818 Hand-Spielsperre
       if (this._handPlayLockedFor(ps, cardName)) continue;   // v818 Hand-Spielsperre
         if (seen.has(cardName)) continue;
@@ -41200,8 +41293,9 @@ this._deathWatch = (this._deathWatchStack || []).length
       // v1155: 2+ moegliche Wirker → Auswahl (Abbruch = keine Reaktion)
       if (!(await this._rxCastWirkerWaehlen(ps, cardName, script, rxCast))) continue;
 
-        const actualIdx = ps.hand.indexOf(cardName);
-        if (actualIdx < 0) continue;
+        const _q = this._rxQuelleFuer(ps, cardName);
+        if (!_q) continue;
+        const actualIdx = _q.idx;
 
         // Hand → discard/deleted flight (broadcast before the splice so
         // the source slot is still rendered; index-anchored).
@@ -41209,13 +41303,13 @@ this._deathWatch = (this._deathWatchStack || []).length
           ? 'deleted' : 'discard';
         this._broadcastEvent('play_pile_transfer', {
           owner: ownerIdx, cardName,
-          from: 'hand', to: destPile, asPlay: true,
+          from: _q.ausVorrat ? 'creation' : 'hand', to: destPile, asPlay: true,
           fromHandIdx: actualIdx,
-          ...this._pileOwnerFlug(ownerIdx, cardName, actualIdx),   // W63c: gestohlene Handkarte fliegt in den Stapel des Besitzers
+          ...this._rxPileOwnerFlug(ownerIdx, cardName, _q),   // W63c: gestohlene Handkarte fliegt in den Stapel des Besitzers
         });
-        ps.hand.splice(actualIdx, 1);
-        if (destPile === 'deleted') this.handKartenBesitzerPs(ps, cardName).deletedPile.push(cardName);
-        else this.handKartenBesitzerPs(ps, cardName).discardPile.push(cardName);
+        this._rxAbgang(ps, _q);
+        if (destPile === 'deleted') this._rxAblagePs(ps, cardName, _q).deletedPile.push(cardName);
+        else this._rxAblagePs(ps, cardName, _q).discardPile.push(cardName);
         await this._rxPay(ps, cost, { cardName });
         await this._rxPayWisdom(ps, rxCast);
         this.notePlayedFromHand(ownerIdx);
@@ -41339,8 +41433,7 @@ this._deathWatch = (this._deathWatchStack || []).length
 
     const allCards = this._getCardDB();
     const seen = new Set();
-    for (let hi = 0; hi < ps.hand.length; hi++) {
-      const cardName = ps.hand[hi];
+    for (const { cardName, ausVorrat: _av, idx: hi } of this._rxKandidaten(ps)) {
       if (this._handPlayLockedFor(ps, cardName)) continue;   // v818 Hand-Spielsperre
       if (seen.has(cardName)) continue;
       seen.add(cardName);
@@ -41376,8 +41469,9 @@ this._deathWatch = (this._deathWatchStack || []).length
       if (!(await this._rxCastWirkerWaehlen(ps, cardName, script, rxCast))) continue;
 
       // Activate: remove from hand, deduct gold
-      const actualIdx = ps.hand.indexOf(cardName);
-      if (actualIdx < 0) continue;
+      const _q = this._rxQuelleFuer(ps, cardName);
+      if (!_q) continue;
+      const actualIdx = _q.idx;
       // Hand → discard/deleted flight animation (broadcast before splice).
       {
         const destPile = (cardData?.cardType === 'Potion' || script?.deleteOnUse)
@@ -41391,17 +41485,17 @@ this._deathWatch = (this._deathWatchStack || []).length
 // glaubt — Escape (Attack) und Spectral Armor (Spell) waren
 // dadurch trotz echter Feuerungen unsichtbar. `sole` heißt
 // "einziges Play-Signal dieser Karte" und zählt typunabhängig.
-          from: 'hand', to: destPile, asPlay: true,   // v1157: Spell/Attack zaehlt afterSpellResolved (_rxAufgeloest)
+          from: _q.ausVorrat ? 'creation' : 'hand', to: destPile, asPlay: true,   // v1157: Spell/Attack zaehlt afterSpellResolved (_rxAufgeloest)
           fromHandIdx: actualIdx,
-          ...this._pileOwnerFlug(playerIdx, cardName, actualIdx),   // W63c: gestohlene Handkarte fliegt in den Stapel des Besitzers
+          ...this._rxPileOwnerFlug(playerIdx, cardName, _q),   // W63c: gestohlene Handkarte fliegt in den Stapel des Besitzers
         });
       }
-      ps.hand.splice(actualIdx, 1);
+      this._rxAbgang(ps, _q);
       // Route to destination pile alongside the splice.
       if (cardData?.cardType === 'Potion' || script?.deleteOnUse) {
-        this.handKartenBesitzerPs(ps, cardName).deletedPile.push(cardName);
+        this._rxAblagePs(ps, cardName, _q).deletedPile.push(cardName);
       } else {
-        this.handKartenBesitzerPs(ps, cardName).discardPile.push(cardName);
+        this._rxAblagePs(ps, cardName, _q).discardPile.push(cardName);
       }
       await this._rxPay(ps, cost, { cardName });
       await this._rxPayWisdom(ps, rxCast);
@@ -41460,8 +41554,8 @@ this._deathWatch = (this._deathWatchStack || []).length
     while (rest > 0 && gespielt) {
       gespielt = false;
       const seen = new Set();
-      for (let hi = 0; hi < ps.hand.length && !gespielt; hi++) {
-        const cardName = ps.hand[hi];
+      for (const { cardName, ausVorrat: _av, idx: hi } of this._rxKandidaten(ps)) {
+        if (gespielt) break;
         if (seen.has(cardName)) continue;
         seen.add(cardName);
         if (this._handPlayLockedFor(ps, cardName)) continue;
@@ -41484,16 +41578,17 @@ this._deathWatch = (this._deathWatchStack || []).length
         });
         if (!ja || ja.cancelled || ja.confirmed === false) continue;
         if (!(await this._rxCastWirkerWaehlen(ps, cardName, script, rxCast))) continue;
-        const idx = ps.hand.indexOf(cardName);
-        if (idx < 0) continue;
+        const _q = this._rxQuelleFuer(ps, cardName);   // Hand, sonst Crestinas Vorrat
+        if (!_q) continue;
+        const idx = _q.idx;
 
         const zumLoeschen = cardData?.cardType === 'Potion' || script?.deleteOnUse;
         this._broadcastEvent('play_pile_transfer', {
-          owner: playerIdx, cardName, from: 'hand', to: zumLoeschen ? 'deleted' : 'discard',
+          owner: playerIdx, cardName, from: _q.ausVorrat ? 'creation' : 'hand', to: zumLoeschen ? 'deleted' : 'discard',
           asPlay: true, fromHandIdx: idx,
         });
-        ps.hand.splice(idx, 1);
-        (zumLoeschen ? this.handKartenBesitzerPs(ps, cardName).deletedPile : this.handKartenBesitzerPs(ps, cardName).discardPile).push(cardName);   // W63c: Stapel des permanenten Besitzers
+        this._rxAbgang(ps, _q);
+        (zumLoeschen ? this._rxAblagePs(ps, cardName, _q).deletedPile : this._rxAblagePs(ps, cardName, _q).discardPile).push(cardName);   // W63c: Stapel des permanenten Besitzers
         await this._rxPay(ps, cost, { cardName });
         await this._rxPayWisdom(ps, rxCast);
         this.notePlayedFromHand(playerIdx);
@@ -41548,8 +41643,7 @@ this._deathWatch = (this._deathWatchStack || []).length
 
     const allCards = this._getCardDB();
     const seen = new Set();
-    for (let hi = 0; hi < ps.hand.length; hi++) {
-      const cardName = ps.hand[hi];
+    for (const { cardName, ausVorrat: _av, idx: hi } of this._rxKandidaten(ps)) {
       if (this._handPlayLockedFor(ps, cardName)) continue;   // v818 Hand-Spielsperre
       if (seen.has(cardName)) continue;
       seen.add(cardName);
@@ -41595,9 +41689,10 @@ this._deathWatch = (this._deathWatchStack || []).length
         castingSeite = _plan.casterSeite ?? summoningPi;
       }
 
-      const actualIdx = ps.hand.indexOf(cardName);
-      if (actualIdx < 0) continue;
-      ps.hand.splice(actualIdx, 1);
+      const _q = this._rxQuelleFuer(ps, cardName);
+      if (!_q) continue;
+      const actualIdx = _q.idx;
+      this._rxAbgang(ps, _q);
       await this._rxPay(ps, cost, { cardName });
       this.notePlayedFromHand(summoningPi);
 
@@ -41632,9 +41727,9 @@ this._deathWatch = (this._deathWatchStack || []).length
 
       if (_buddyErsetzt) { /* W67a */ }
       else if (cardData?.cardType === 'Potion' || script?.deleteOnUse) {
-        this.handKartenBesitzerPs(ps, cardName).deletedPile.push(cardName);
+        this._rxAblagePs(ps, cardName, _q).deletedPile.push(cardName);
       } else {
-        this.handKartenBesitzerPs(ps, cardName).discardPile.push(cardName);
+        this._rxAblagePs(ps, cardName, _q).discardPile.push(cardName);
       }
       this.sync();
       return; // Only one post-summon reaction per window
@@ -41750,8 +41845,7 @@ this._deathWatch = (this._deathWatchStack || []).length
       // Bedingung / Lock / Prompt abgelehnt.)
       const _bwOut = !this._inMctsSim ? this._batchWindowStats?.outcomes : null; // Sim-Guard: Rollouts kontaminierten die Zähler (fired=8320 bei 0 echten Plays)
       let _bwHadCard = false;
-      for (let hi = 0; hi < ps.hand.length; hi++) {
-        const cardName = ps.hand[hi];
+      for (const { cardName, ausVorrat: _av, idx: hi } of this._rxKandidaten(ps)) {
         if (this._handPlayLockedFor(ps, cardName)) continue;   // v818 Hand-Spielsperre
       if (this._handPlayLockedFor(ps, cardName)) continue;   // v818 Hand-Spielsperre
         if (seen.has(cardName)) continue;
@@ -41792,8 +41886,9 @@ this._deathWatch = (this._deathWatchStack || []).length
         // CC-Lauf in JEDEM Report unsichtbar ("nie eingesetzt").
         this.log('batch_reaction_fired', { player: ps.username, card: cardName });
 
-        const actualIdx = ps.hand.indexOf(cardName);
-        if (actualIdx < 0) continue;
+        const _q = this._rxQuelleFuer(ps, cardName);
+        if (!_q) continue;
+        const actualIdx = _q.idx;
         // ★★ v1185 (Als Befund 18.9.: „Deepsea Idol fehlt der visuelle
         // Weg Hand → Discard Pile"). Dieses Fenster war das letzte der
         // Hand-Reaktionsfenster ohne `play_pile_transfer`: es spliced
@@ -41811,18 +41906,18 @@ this._deathWatch = (this._deathWatchStack || []).length
           const destPile = script?.deleteOnUse ? 'deleted' : 'discard';
           this._broadcastEvent('play_pile_transfer', {
             owner: pi, cardName,
-            from: 'hand', to: destPile,
+            from: _q.ausVorrat ? 'creation' : 'hand', to: destPile,
             fromHandIdx: actualIdx,
-            ...this._pileOwnerFlug(pi, cardName, actualIdx),   // W63c: gestohlene Handkarte fliegt in den Stapel des Besitzers
+            ...this._rxPileOwnerFlug(pi, cardName, _q),   // W63c: gestohlene Handkarte fliegt in den Stapel des Besitzers
           });
         }
-        ps.hand.splice(actualIdx, 1);
+        this._rxAbgang(ps, _q);
         // Ablage-Routing SOFORT neben dem Splice (Muster der uebrigen
         // Hand-Reaktionsfenster): sonst steht die Karte waehrend des
         // ganzen Resolve nirgends, und der Flug oben landet auf einem
         // Stapel, der sie noch nicht enthaelt.
-        if (script?.deleteOnUse) this.handKartenBesitzerPs(ps, cardName).deletedPile.push(cardName);
-        else this.handKartenBesitzerPs(ps, cardName).discardPile.push(cardName);
+        if (script?.deleteOnUse) this._rxAblagePs(ps, cardName, _q).deletedPile.push(cardName);
+        else this._rxAblagePs(ps, cardName, _q).discardPile.push(cardName);
         // ★★ v1222: Abgleich nach dem Hand-Abgang UND dem Ablage-Routing.
         // Beides in EINEM Abgleich, sonst sieht der Client zwei Schritte
         // und startet einen zweiten Flug (Vertrag der Zeilen darunter).
@@ -41916,8 +42011,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     }
 
     const seen = new Set();
-    for (let hi = 0; hi < ps.hand.length; hi++) {
-      const cardName = ps.hand[hi];
+    for (const { cardName, ausVorrat: _av, idx: hi } of this._rxKandidaten(ps)) {
       if (this._handPlayLockedFor(ps, cardName)) continue;   // v818 Hand-Spielsperre
       if (seen.has(cardName)) continue;
       seen.add(cardName);
@@ -41961,9 +42055,10 @@ this._deathWatch = (this._deathWatchStack || []).length
         castingSeite = _plan.casterSeite ?? victimOwner;
       }
 
-      const actualIdx = ps.hand.indexOf(cardName);
-      if (actualIdx < 0) continue;
-      ps.hand.splice(actualIdx, 1);
+      const _q = this._rxQuelleFuer(ps, cardName);
+      if (!_q) continue;
+      const actualIdx = _q.idx;
+      this._rxAbgang(ps, _q);
       await this._rxPay(ps, cost, { cardName });
       this.notePlayedFromHand(victimOwner);
 
@@ -41984,9 +42079,9 @@ this._deathWatch = (this._deathWatchStack || []).length
           ? 'deleted' : 'discard';
         this._broadcastEvent('play_pile_transfer', {
           owner: victimOwner, cardName,
-          from: 'hand', to: destPile, asPlay: true,   // v1157: Spell/Attack zaehlt afterSpellResolved (_rxAufgeloest)
+          from: _q.ausVorrat ? 'creation' : 'hand', to: destPile, asPlay: true,   // v1157: Spell/Attack zaehlt afterSpellResolved (_rxAufgeloest)
           fromHandIdx: actualIdx,
-          ...this._pileOwnerFlug(victimOwner, cardName, actualIdx),   // W63c: gestohlene Handkarte fliegt in den Stapel des Besitzers
+          ...this._rxPileOwnerFlug(victimOwner, cardName, _q),   // W63c: gestohlene Handkarte fliegt in den Stapel des Besitzers
         });
       }
       this._broadcastEvent('card_reveal', { cardName, playerIdx: victimOwner });
@@ -42024,9 +42119,9 @@ this._deathWatch = (this._deathWatchStack || []).length
       // so it goes to deletedPile. Scripts opt in via deleteOnUse.
       if (_buddyErsetzt) { /* W67a */ }
       else if (cardData?.cardType === 'Potion' || script?.deleteOnUse) {
-        this.handKartenBesitzerPs(ps, cardName).deletedPile.push(cardName);
+        this._rxAblagePs(ps, cardName, _q).deletedPile.push(cardName);
       } else {
-        this.handKartenBesitzerPs(ps, cardName).discardPile.push(cardName);
+        this._rxAblagePs(ps, cardName, _q).discardPile.push(cardName);
       }
       this.sync();
       return cancelOp;
@@ -42064,8 +42159,7 @@ this._deathWatch = (this._deathWatchStack || []).length
 
     const allCards = this._getCardDB();
     const seen = new Set();
-    for (let hi = 0; hi < ps.hand.length; hi++) {
-      const cardName = ps.hand[hi];
+    for (const { cardName, ausVorrat: _av, idx: hi } of this._rxKandidaten(ps)) {
       if (this._handPlayLockedFor(ps, cardName)) continue;   // v818 Hand-Spielsperre
       if (seen.has(cardName)) continue;
       seen.add(cardName);
@@ -42112,9 +42206,10 @@ this._deathWatch = (this._deathWatchStack || []).length
         castingSeite = _plan.casterSeite ?? reactorIdx;
       }
 
-      const actualIdx = ps.hand.indexOf(cardName);
-      if (actualIdx < 0) continue;
-      ps.hand.splice(actualIdx, 1);
+      const _q = this._rxQuelleFuer(ps, cardName);
+      if (!_q) continue;
+      const actualIdx = _q.idx;
+      this._rxAbgang(ps, _q);
       await this._rxPay(ps, cost, { cardName });
       this.notePlayedFromHand(reactorIdx);
 
@@ -42150,9 +42245,9 @@ this._deathWatch = (this._deathWatchStack || []).length
       // Routing matches the resource-phase reaction handler.
       if (_buddyErsetzt) { /* W67a */ }
       else if (cardData?.cardType === 'Potion' || script?.deleteOnUse) {
-        this.handKartenBesitzerPs(ps, cardName).deletedPile.push(cardName);
+        this._rxAblagePs(ps, cardName, _q).deletedPile.push(cardName);
       } else {
-        this.handKartenBesitzerPs(ps, cardName).discardPile.push(cardName);
+        this._rxAblagePs(ps, cardName, _q).discardPile.push(cardName);
       }
       this.sync();
       return; // Only one reaction per window
@@ -43347,8 +43442,8 @@ this._deathWatch = (this._deathWatchStack || []).length
       // Gift of Rain den 3-Headed Giant trotz Ocean (Als Befund 5.8.).
       if (this.darkOceanBlocksReaction(pi, null)) continue;
 
-      for (let hi = 0; hi < ps.hand.length; hi++) {
-        const cardName = ps.hand[hi];
+      for (let _k = 0; _k < this._rxKandidaten(ps).length; _k++) {   // Kandidaten je Runde frisch: der Abgang einer Karte verschiebt die folgenden Plaetze
+        const { cardName, ausVorrat: _av, idx: hi } = this._rxKandidaten(ps)[_k];
         if (this._handPlayLockedFor(ps, cardName)) continue;   // v818 Hand-Spielsperre
       if (this._handPlayLockedFor(ps, cardName)) continue;   // v818 Hand-Spielsperre
         const script = loadCardEffect(cardName);
@@ -43452,12 +43547,14 @@ this._deathWatch = (this._deathWatchStack || []).length
         // not whichever matching name happens to sit at hand[hi].
         // Mirror of the pre-damage handler's same fix.
         let consumeIdx = hi;
+        let _qListe = _av ? ps.creationZone : ps.hand, _qVorrat = _av;   // Quelle der Kopie (Hand oder Crestinas Vorrat)
         if (cost < baseCost && ps._permanentlyRevealedHandIndices) {
           for (const kStr of Object.keys(ps._permanentlyRevealedHandIndices)) {
             const k = +kStr;
-            if (ps.hand[k] === cardName) { consumeIdx = k; break; }
+            if (ps.hand[k] === cardName) { consumeIdx = k; _qListe = ps.hand; _qVorrat = false; break; }
           }
         }
+        const _q = { liste: _qListe, ausVorrat: _qVorrat, idx: consumeIdx };
 
         // Hand → discard/deleted flight animation. Broadcast BEFORE
         // the splice so the client's pile-transfer handler can pin
@@ -43472,13 +43569,14 @@ this._deathWatch = (this._deathWatchStack || []).length
           ? 'deleted' : 'discard';
         this._broadcastEvent('play_pile_transfer', {
           owner: pi, cardName,
-          from: 'hand', to: destPile, asPlay: true,
+          from: _q.ausVorrat ? 'creation' : 'hand', to: destPile, asPlay: true,
           fromHandIdx: consumeIdx,
         });
 
         // Activate: remove from hand, route to destination pile,
         // deduct gold.
-        ps.hand.splice(consumeIdx, 1);
+        const _handLaengeVorher = ps.hand.length;
+        this._rxAbgang(ps, _q);
         // ★★ v1222: Abgleich SOFORT nach dem Hand-Abgang. Der Client verdeckt den
         // Startplatz der abfliegenden Karte nur, solange die Hand noch so
         // gross ist wie beim Abflug — bleibt der `sync` aus, taucht sie
@@ -43489,7 +43587,7 @@ this._deathWatch = (this._deathWatchStack || []).length
         // previously at hi+1 or at consumeIdx+1). When the splice was at
         // an index < hi, shift the iterator back one as well so the
         // loop doesn't skip a card.
-        if (consumeIdx <= hi) hi--;
+        if ((_q.ausVorrat ? _handLaengeVorher + consumeIdx : consumeIdx) <= _k) _k--;
         // Route to destination pile IMMEDIATELY (alongside the splice
         // and BEFORE resolve runs). Two reasons:
         //   1. Visual: the next sync covers BOTH the hand removal and
@@ -43505,9 +43603,9 @@ this._deathWatch = (this._deathWatchStack || []).length
         //      any hook reading `discardPile` / `deletedPile` during
         //      resolve sees the post-state.
         if (cardData?.cardType === 'Potion' || script?.deleteOnUse) {
-          this.handKartenBesitzerPs(ps, cardName).deletedPile.push(cardName);
+          this._rxAblagePs(ps, cardName, _q).deletedPile.push(cardName);
         } else {
-          this.handKartenBesitzerPs(ps, cardName).discardPile.push(cardName);
+          this._rxAblagePs(ps, cardName, _q).discardPile.push(cardName);
         }
         await this._rxPay(ps, cost, { cardName });
         this.notePlayedFromHand(pi);
@@ -43742,8 +43840,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     const ascendedHero = this.gs.players[heroOwner]?.heroes?.[ascendedHeroIdx];
     const ascendedName = ascendedHero?.name || 'Your Hero';
 
-    for (let hi = 0; hi < ps.hand.length; hi++) {
-      const cardName = ps.hand[hi];
+    for (const { cardName, ausVorrat: _av, idx: hi } of this._rxKandidaten(ps)) {
       if (this._handPlayLockedFor(ps, cardName)) continue;   // v818 Hand-Spielsperre
       const script = loadCardEffect(cardName);
       if (!script?.isAscensionReaction) continue;
@@ -43809,14 +43906,15 @@ this._deathWatch = (this._deathWatchStack || []).length
       const _aszAblegen = async (mitVorlauf) => {
         if (_aszAbgelegt) return;
         _aszAbgelegt = true;
-        const idx = ps.hand[hi] === cardName ? hi : ps.hand.indexOf(cardName);
+        const _liste = _av ? (ps.creationZone || []) : ps.hand;   // Quelle: Hand oder Crestinas Vorrat
+        const idx = _liste[hi] === cardName ? hi : _liste.indexOf(cardName);
         if (idx < 0) return;   // während der Aktion schon aus der Hand verschwunden (abgeworfen, gestohlen …)
-        const besitzer = this._consumeHandCardOrigin(pi, cardName, idx);   // VOR dem Splice
+        const besitzer = _av ? pi : this._consumeHandCardOrigin(pi, cardName, idx);   // VOR dem Splice (eine Vorratskarte kann nicht gestohlen sein)
         this._broadcastEvent('play_pile_transfer', {
-          owner: pi, cardName, from: 'hand', to: 'discard', fromHandIdx: idx,
+          owner: pi, cardName, from: _av ? 'creation' : 'hand', to: 'discard', fromHandIdx: idx,
           ...(besitzer !== pi ? { fromOwner: pi, toOwner: besitzer } : {}),
         });
-        ps.hand.splice(idx, 1);
+        this._rxAbgang(ps, { liste: _liste, ausVorrat: _av, idx });
         (this.gs.players[besitzer] || ps).discardPile.push(cardName);
         this.sync();   // sofort abgleichen: die Hand rückt auf, während die Karte fliegt (Wächter `check-hand-flight-sync`)
         if (mitVorlauf) await this._delay(ASCENSION_REAKTION_ABLAGE_VORLAUF_MS);
@@ -46043,15 +46141,14 @@ this._deathWatch = (this._deathWatchStack || []).length
       const chainCtx = { chain, eventDesc, hookName, hookCtx };
       const eligibleByName = new Map();
       const countByName = new Map();
-      for (let hi = 0; hi < ps.hand.length; hi++) {
-        const cardName = ps.hand[hi];
+      for (const { cardName, ausVorrat: _av, idx: hi } of this._rxKandidaten(ps)) {
         if (this._handPlayLockedFor(ps, cardName)) continue;   // v818 Hand-Spielsperre
       if (this._handPlayLockedFor(ps, cardName)) continue;   // v818 Hand-Spielsperre
         // Skip the card currently being played/resolved (prevents self-
         // chaining, e.g. a Reaction Spell trying to chain onto itself
         // while it's still in hand mid-play).
-        if (ps._resolvingCard) {
-          const nth = ps.hand.slice(0, hi + 1).filter(c => c === ps._resolvingCard.name).length;
+        if (ps._resolvingCard && !!ps._resolvingCard.fromCreation === !!_av) {   // der Rang (`nth`) zaehlt in der Liste, aus der die Karte spielt (Hand ODER Vorrat)
+          const nth = (_av ? (ps.creationZone || []) : ps.hand).slice(0, hi + 1).filter(c => c === ps._resolvingCard.name).length;
           if (cardName === ps._resolvingCard.name && nth === ps._resolvingCard.nth) continue;
         }
         const script = loadCardEffect(cardName);
@@ -46163,7 +46260,7 @@ this._deathWatch = (this._deathWatchStack || []).length
         // tally the count for the ×N badge in the gallery.
         if (!eligibleByName.has(cardName)) {
           eligibleByName.set(cardName, {
-            handIdx: hi, cost, script, cardData, cardName,
+            handIdx: hi, ausVorrat: _av, cost, script, cardData, cardName,
             eligibleHeroIdxs: reactionEligibleHeroIdxs,
             wisdomCost: reactionWisdomCost,
           });
@@ -46608,7 +46705,10 @@ this._deathWatch = (this._deathWatchStack || []).length
 
       // Re-lookup hand index (defensive — hand may have shifted between
       // eligibility scan and consumption if a hook ran in between).
-      const actualHandIdx = ps.hand.indexOf(chosenName);
+      // ★ Quelle = die der gewaehlten Kopie (Hand ODER Crestinas Vorrat, 11.11.): in DERSELBEN Liste neu suchen.
+      const _kAusVorrat = !!info.ausVorrat;
+      const _kListe = () => (_kAusVorrat ? (ps.creationZone || []) : ps.hand);
+      const actualHandIdx = _kListe().indexOf(chosenName);
       if (actualHandIdx < 0) continue;
 
       // Recompute Wisdom cost for the actually-picked hero — the
@@ -46627,15 +46727,15 @@ this._deathWatch = (this._deathWatchStack || []).length
       let kostenWahl = null;
       if (typeof script.reactionKostenWahl === 'function') {
         kostenWahl = await script.reactionKostenWahl(this, pi, chainCtx, {
-          handIdx: actualHandIdx, casterHeroIdx: reactionCasterHeroIdx, casterSeite: reactionCasterSeite, wisdomCost,
+          handIdx: _kAusVorrat ? -1 : actualHandIdx, ausVorrat: _kAusVorrat, casterHeroIdx: reactionCasterHeroIdx, casterSeite: reactionCasterSeite, wisdomCost,   // `handIdx` -1: eine Vorratskarte belegt keinen Handplatz
         });
         if (!kostenWahl) continue;
         // Die Hand kann sich während der Frage geändert haben (Hook, Zeitablauf): die Karte muss noch da sein.
-        if (ps.hand[actualHandIdx] !== chosenName && ps.hand.indexOf(chosenName) < 0) continue;
+        if (_kListe()[actualHandIdx] !== chosenName && _kListe().indexOf(chosenName) < 0) continue;
       }
-      const actualHandIdxNachWahl = ps.hand[actualHandIdx] === chosenName ? actualHandIdx : ps.hand.indexOf(chosenName);
+      const actualHandIdxNachWahl = _kListe()[actualHandIdx] === chosenName ? actualHandIdx : _kListe().indexOf(chosenName);
 
-      await this._rxPay(ps, cost, { cardName: chosenName, inHandIdx: actualHandIdxNachWahl });   // inHandIdx: die Karte liegt hier noch in der Hand (Item-Lock-Kosten duerfen sie nicht treffen)
+      await this._rxPay(ps, cost, { cardName: chosenName, inHandIdx: _kAusVorrat ? undefined : actualHandIdxNachWahl });   // inHandIdx: die Karte liegt hier noch in der Hand (Item-Lock-Kosten duerfen sie nicht treffen)
 
       // KEIN Eintrag und KEIN Flug an dieser Stelle.
       // v202 hat hier den Flug abgeschickt, v204 zusaetzlich den
@@ -46645,7 +46745,7 @@ this._deathWatch = (this._deathWatchStack || []).length
       // (Card Game Player Inya) entscheiden sich erst beim Aufloesen
       // der Kette. Flug UND Eintrag passieren deshalb jetzt gemeinsam
       // dort, wo das Ziel bekannt ist — siehe _resolveReactionChain.
-      ps.hand.splice(actualHandIdxNachWahl, 1);
+      this._rxAbgang(ps, { liste: _kListe(), ausVorrat: _kAusVorrat, idx: actualHandIdxNachWahl });
 
       // ★ v1031: … und die Partie-Grenze verbrauchen. Der Stempel sitzt
       // hier, wo die Karte die Hand verlaesst. ★ Z7b (Als Entscheidung,
@@ -46682,6 +46782,7 @@ this._deathWatch = (this._deathWatchStack || []).length
         // Master's Plan": die Karte flog aus der Handmitte statt von
         // ihrem Platz.
         fromHandIdx: actualHandIdxNachWahl,
+        ...(_kAusVorrat ? { fromCreation: true } : {}),   // Flug aus Crestinas Vorrat statt aus der Hand
         _opgNeu,   // Z7b: Partie-Stempel dieser Aktivierung (Rueckgabe bei ganzer Negation)
         casterHeroIdx: reactionCasterHeroIdx,
         heroIdx: reactionCasterHeroIdx,
@@ -46896,7 +46997,7 @@ this._deathWatch = (this._deathWatchStack || []).length
             this._broadcastEvent('gold_change', { owner: link.owner, amount: link.goldCost });
           }
           this._broadcastEvent('play_pile_transfer', {
-            cardName: link.cardName, from: 'hand', to: 'hand',
+            cardName: link.cardName, from: link.fromCreation ? 'creation' : 'hand', to: 'hand',
             fromOwner: link.owner, toOwner: dieb,
             toHandIdx: zielIdx, finalHandSize: diebPs.hand.length,
             ...(Number.isInteger(link.fromHandIdx) ? { fromHandIdx: link.fromHandIdx, chainLinkId: link.id } : {}),
@@ -46922,13 +47023,13 @@ this._deathWatch = (this._deathWatchStack || []).length
             // Handmitte.
             this._broadcastEvent('play_pile_transfer', {
               owner: link.owner, cardName: link.cardName,
-              from: link.fromDeck ? 'deck' : 'hand', to: toDeleted ? 'deleted' : 'discard',
+              from: link.fromDeck ? 'deck' : (link.fromCreation ? 'creation' : 'hand'), to: toDeleted ? 'deleted' : 'discard',
               ...(Number.isInteger(link.fromHandIdx) ? { fromHandIdx: link.fromHandIdx, chainLinkId: link.id } : {}),
               flugMs: TK.flugMs,
             });
             // 3. Landung ERST NACH der Animation.
             _fl = true; await this._delay(TK.Fl);
-            const _kettenPs = link.fromDeck ? ps : this.handKartenBesitzerPs(ps, link.cardName);   // W63c: Stapel des permanenten Besitzers
+            const _kettenPs = (link.fromDeck || link.fromCreation) ? ps : this.handKartenBesitzerPs(ps, link.cardName);   // W63c: Stapel des permanenten Besitzers
             if (!_kettenPs[pile]) _kettenPs[pile] = [];
             _kettenPs[pile].push(link.cardName);
             this.sync();
@@ -47058,7 +47159,7 @@ this._deathWatch = (this._deathWatchStack || []).length
               // bisherige generische Startpunkt.
               this._broadcastEvent('play_pile_transfer', {
                 owner: link.owner, cardName: link.cardName,
-                from: link.fromDeck ? 'deck' : 'hand', to: zumLoeschen ? 'deleted' : 'discard',
+                from: link.fromDeck ? 'deck' : (link.fromCreation ? 'creation' : 'hand'), to: zumLoeschen ? 'deleted' : 'discard',
                 ...(Number.isInteger(link.fromHandIdx) ? { fromHandIdx: link.fromHandIdx, chainLinkId: link.id } : {}),
                 flugMs: TK.flugMs,
               });
@@ -47067,7 +47168,7 @@ this._deathWatch = (this._deathWatchStack || []).length
               // erschiene sie sonst schon beim START der Animation.
               // Gleiche Reihenfolge wie routeNegatedInitialCard.
               await this._delay(TK.Fl);
-              const _kettenPs = link.fromDeck ? ps : this.handKartenBesitzerPs(ps, link.cardName);   // W63c: Stapel des permanenten Besitzers
+              const _kettenPs = (link.fromDeck || link.fromCreation) ? ps : this.handKartenBesitzerPs(ps, link.cardName);   // W63c: Stapel des permanenten Besitzers
               if (zumLoeschen) { if (!_kettenPs.deletedPile) _kettenPs.deletedPile = []; _kettenPs.deletedPile.push(link.cardName); }
               else _kettenPs.discardPile.push(link.cardName);
               this.sync();
@@ -47209,7 +47310,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     const traegt = (n) => !!loadCardEffect(n)?.reactsToSurpriseActivation;
     for (let i = 0; i < this.playerCount(); i++) {
       if (i === steuerer) continue;
-      if ((this.gs.players[i]?.hand || []).some(traegt)) return true;
+      if (this._rxNamen(this.gs.players[i]).some(traegt)) return true;   // Hand + Crestinas Vorrat
       // 24.10. (Reverse Trap): auch eine VERDECKTE Surprise des Gegners kann auf die Aktivierung antworten (`isSurprise` + `isReaction`, wie Lunar Eclipse im Kettenfenster).
       try { if (this._getAllSurpriseEntries(i).some(e => traegt(e.cardName))) return true; } catch { /* ignore */ }
     }
@@ -47220,7 +47321,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     const opp = this.gs.players[this.opponentOf(playerIdx)];
     if (!opp) return false;
     const traegt = (n) => !!loadCardEffect(n)?.reactsToPlacement;
-    if ((opp.hand || []).some(traegt)) return true;
+    if (this._rxNamen(opp).some(traegt)) return true;   // Hand + Crestinas Vorrat
     return (opp.surpriseZones || []).some(z => (z || []).some(traegt));
   }
 
@@ -47525,7 +47626,7 @@ this._deathWatch = (this._deathWatchStack || []).length
   /** Handgeister (nur Darstellung): Reaktionsglieder, deren Karte die Hand schon verlassen hat, aber erst beim Aufloesen wegfliegt. */
   _kettenGeister(chain) {
     return chain
-      .filter(l => !l.isInitialCard && Number.isInteger(l.fromHandIdx) && !l.fromHero && !l.fromCreature && !l.fromDeck && !l.fromSurprise)
+      .filter(l => !l.isInitialCard && Number.isInteger(l.fromHandIdx) && !l.fromHero && !l.fromCreature && !l.fromDeck && !l.fromSurprise && !l.fromCreation)
       .map(l => ({ id: l.id, cardName: l.cardName, owner: l.owner, fromHandIdx: l.fromHandIdx }));
   }
 
@@ -47534,7 +47635,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     if (l._rarity !== undefined) return l._rarity || undefined;
     if (!this.gs?.players?.some(ps => ps && ps.rarityLedger)) return undefined;
     let r = null;
-    try { r = require('./_rarity-track').rarityOf(this.gs, l.owner, l.cardName, ['hand', 'dp', 'S*', 'cz'], { idx: l.fromHandIdx, idxZone: 'hand' }); } catch {}
+    try { r = require('./_rarity-track').rarityOf(this.gs, l.owner, l.cardName, ['hand', 'dp', 'S*', 'cz'], { idx: l.fromHandIdx, idxZone: l.fromCreation ? 'cz' : 'hand' }); } catch {}
     l._rarity = r;
     return r || undefined;
   }
@@ -47869,7 +47970,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     const srcName = (typeof source === 'string') ? source : (source?.name || info.sourceName || null);
 
     const gesehen = new Set();
-    for (const cardName of [...(ps.hand || [])]) {
+    for (const cardName of this._rxNamen(ps)) {   // Hand + Crestinas Vorrat
       if (gesehen.has(cardName)) continue;
       gesehen.add(cardName);
       if (this._handPlayLockedFor(ps, cardName)) continue;

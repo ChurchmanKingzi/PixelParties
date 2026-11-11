@@ -50,6 +50,7 @@ module.exports = {
   // Trap listens only from hand. No proactive / chain entry points by
   // design (see header) — this is the card's sole behaviour.
   activeIn: ['hand'],
+  reactFromCreation: true,   // 11.11.: Hook-Reaktion aus der Hand gilt auch aus Crestinas Vorrat (Extra-Hand)
 
   hooks: {
     onSurpriseActivated: async (ctx) => {
@@ -71,9 +72,9 @@ module.exports = {
       // hand (defends against a discarded/relocated copy whose tracked
       // instance lingered a tick).
       const bootsInst = ctx.card;
-      if (!bootsInst || bootsInst.zone !== 'hand') return;
+      if (!bootsInst || !['hand', 'creationZone'].includes(bootsInst.zone)) return;
       const ps = gs.players[bootsOwner];
-      if (!ps || ps.hand.indexOf(CARD_NAME) < 0) return;
+      if (!ps || !engine._rxQuelleFuer(ps, CARD_NAME)) return;
       // Z6 (F01-13): Boots geht an den Engine-Fenstern vorbei - das gemeinsame
       // Hand-Spielsperren-Prädikat (inkl. Artefakt-Sperre Boomerang) selbst fragen.
       if (engine._handPlayLockedFor(ps, CARD_NAME)) return;
@@ -102,7 +103,7 @@ module.exports = {
       // Re-validate after the async prompt: still in hand, still not
       // negated by something resolved during the prompt.
       if (ctx._surpriseNegated) return;
-      if (ps.hand.indexOf(CARD_NAME) < 0) return;
+      if (!engine._rxQuelleFuer(ps, CARD_NAME)) return;
 
       // ── Activation visual #1: stream Boots' card image to BOTH
       // players + spectators as an activated effect. `_broadcastEvent`
@@ -120,8 +121,9 @@ module.exports = {
       // during the delay since we're mid surprise-resolution, but the
       // splice + flight below must target the slot that's actually
       // rendered right now, including its exact index).
-      const handIdx = ps.hand.indexOf(CARD_NAME);
-      if (handIdx < 0) return;
+      const q = engine._rxQuelleFuer(ps, CARD_NAME);   // Hand oder Crestinas Vorrat
+      if (!q) return;
+      const handIdx = q.idx;
 
       // ── Activation visual #2: physical hand → discard flight,
       // anchored at Boots' EXACT hand index. Broadcast BEFORE the hand
@@ -141,7 +143,7 @@ module.exports = {
       // Klasse wie Divine Gift of the Guardian.
       engine._broadcastEvent('play_pile_transfer', {
         owner: bootsOwner, cardName: CARD_NAME,
-        from: 'hand', to: 'discard', asPlay: 'sole', fromHandIdx: handIdx,
+        from: q.ausVorrat ? 'creation' : 'hand', to: 'discard', asPlay: 'sole', fromHandIdx: handIdx,
       });
 
       // Commit: Boots leaves hand → discard. Cost is 0, so no gold is
@@ -149,8 +151,8 @@ module.exports = {
       // spent-Surprise / spent-Spell consumption — Boots is played &
       // spent, not discarded. Untrack the hand instance so no orphan
       // listener lingers in the hand zone.
-      engine.takeFromPileSync(ps, 'hand', handIdx);
-      engine.handKartenBesitzerPs(ps, CARD_NAME).discardPile.push(CARD_NAME);   // W3/W5a: Stapel des permanenten Besitzers
+      engine.rxNimm(ps, q);
+      engine._rxAblagePs(ps, CARD_NAME, q).discardPile.push(CARD_NAME);   // W3/W5a: Stapel des permanenten Besitzers
       if (bootsInst.id != null) engine._untrackCard(bootsInst.id);
 
       // Negate the Surprise — engine reads these after this hook.

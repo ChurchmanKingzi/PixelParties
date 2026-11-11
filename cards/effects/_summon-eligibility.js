@@ -183,7 +183,8 @@ function kopieFuerHeld(engine, pi, name, ziel) {
 async function sofortAusHandBeschwoeren(engine, pi, name, opts = {}) {
   const { source, zonenFilter, nachZonenwahl } = opts;
   const ps = engine.gs.players[pi];
-  if (!ps || !(ps.hand || []).includes(name)) return false;
+  const _q = ps ? engine._rxQuelleFuer(ps, name) : null;   // Hand ODER Crestinas Vorrat (11.11.: alle Hand-Reaktionen auch aus der Extra-Hand)
+  if (!ps || !_q) return false;
   // Kontrolle statt Seite (Styx 28.9.): auch ueber uebernommene Helden.
   let zonen = eligibleSummonZones(engine, pi, name, { nachKontrolle: true });
   if (typeof zonenFilter === 'function') zonen = zonen.filter(zonenFilter);
@@ -203,13 +204,16 @@ async function sofortAusHandBeschwoeren(engine, pi, name, opts = {}) {
   if (typeof nachZonenwahl === 'function') await nachZonenwahl(ziel);
   // Als Ruling (Al 26.10.): „Rocky Slime reduziert nur das Level einer einzelnen Kopie!" — `eligibleSummonZones` fragt namensweit („irgendeine Kopie genügt"), BESCHWOREN wird aber GENAU EINE Kopie:
   // die günstigste (niedrigste Handstufe), die der gewählte Held wirklich spielen darf — nicht die erste nach Namen (sonst käme eine ungesenkte Kopie durch das Tor der gesenkten).
-  const _kopie = kopieFuerHeld(engine, pi, name, ziel);
-  const inst = await engine.summonFromPile(pi, 'hand', name, ziel.heroIdx, ziel.slotIdx, {
+  const _kopie = _q.ausVorrat ? -1 : kopieFuerHeld(engine, pi, name, ziel);
+  const _beschwoerOpts = {
     source: source || name, hookExtras: { _isNormalSummon: false },
     ...(_kopie >= 0 ? { handIdx: _kopie } : {}),
     alsZusatzaktion: true,   // v1349: „as an additional Action" ist eine Aktion
     ...((ziel.owner ?? pi) !== pi ? { heldSeite: ziel.owner } : {}),
-  });
+  };
+  const inst = _q.ausVorrat
+    ? await engine.summonFromCreation(pi, name, ziel.heroIdx, ziel.slotIdx, _beschwoerOpts)
+    : await engine.summonFromPile(pi, 'hand', name, ziel.heroIdx, ziel.slotIdx, _beschwoerOpts);
   return !!inst;
 }
 

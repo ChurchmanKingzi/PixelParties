@@ -26,6 +26,7 @@ module.exports = {
   isReaction: true,
   isTargetingArtifact: true,
   activeIn: ['hand'],   // N5-04: Hand-Hook `onReactionPlayed`
+  reactFromCreation: true,   // 11.11.: Hook-Reaktion aus der Hand gilt auch aus Crestinas Vorrat (Extra-Hand)
 
   /** CPU: die Hand-Fenster-Frage (②) bejahen wie Front Soldier; das +3-Gold-Angebot nicht. */
   cpuResponse(engine, kind, payload) {
@@ -46,9 +47,9 @@ module.exports = {
       // (z. B. Tod-Fenster ohne bekannten Verursacher), gibt es kein Angebot.
       if (!Number.isInteger(ctx.sourceOwner) || ctx.sourceOwner !== pi) return;   // „in reaction to YOUR card or effect"
       const inst = ctx.card;
-      if (!inst || inst.zone !== 'hand') return;
+      if (!inst || !['hand', 'creationZone'].includes(inst.zone)) return;   // Hand oder Crestinas Vorrat
       const ps = gs.players[pi];
-      if (!ps || ps.hand.indexOf(CARD_NAME) < 0) return;
+      if (!ps || !engine._rxQuelleFuer(ps, CARD_NAME)) return;
       // Dieselben Tore wie die Hand-Reaktionsfenster: Erst-Zug-Schutz, Dark Ocean, Hand-Spielsperre (Reaktions-/Artefaktsperre), Gold.
       if (gs.firstTurnProtectedPlayer === pi) return;
       if (engine.darkOceanBlocksReaction(pi, null)) return;
@@ -71,7 +72,7 @@ module.exports = {
       });
       if (!engine._confirmSaidYes(antwort)) return;
       if (ctx._reactionNegated) return;                                     // nach der Abfrage neu prüfen
-      if (ps.hand.indexOf(CARD_NAME) < 0) return;
+      if (!engine._rxQuelleFuer(ps, CARD_NAME)) return;
 
       // „You may increase this Artifact's Cost by 3 …"
       let zusatz = 0;
@@ -84,7 +85,7 @@ module.exports = {
         });
         if (engine._confirmSaidYes(zu)) zusatz = EXTRA;
       }
-      if (ps.hand.indexOf(CARD_NAME) < 0) return;
+      if (!engine._rxQuelleFuer(ps, CARD_NAME)) return;
 
       const rxCast = engine._rxCastPlan(ps, CARD_NAME, script);
       if (!rxCast) return;
