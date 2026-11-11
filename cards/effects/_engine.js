@@ -50005,7 +50005,9 @@ this._deathWatch = (this._deathWatchStack || []).length
       catch { return false; }
     }
     try {
-      const ctx = this._createContext(realInst, { event: 'handActivate', handIndex });
+      // `fromCreation`: die Karte liegt in Crestinas Vorrat (Extra-Hand), `handIndex` zaehlt dort — Karten, die sich dabei selbst abwerfen (Stormkissed Waflav), muessen
+      // aus DER Liste nehmen, sonst traefe der Abwurf eine namensgleiche Handkopie (oder gar nichts).
+      const ctx = this._createContext(realInst, { event: 'handActivate', handIndex, fromCreation: !!fromCreation });
       const result = await script.onHandActivate(ctx);
       // Engine stamps the per-turn reveal on success — script doesn't
       // need to manage it. Cancellable prompts that returned false leave
@@ -60053,7 +60055,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     // ein Zustandsversand dazwischen haette sie dort kurz gezeigt. Der
     // Index wird hier selbst gesucht; entnommen wird ueber die
     // Stapel-Schicht (Sperren, Deckkopf, Mischen), nicht per Splice.
-    const quelle = opts.fromDeck ? (ps.mainDeck || []) : this.handSourceList(pi, opts.fromCreation);
+    let quelle = opts.fromDeck ? (ps.mainDeck || []) : this.handSourceList(pi, opts.fromCreation);
     if (!quelle) return { success: false };
     if (opts.fromDeck) handIndex = quelle.indexOf(cardName);
     if (handIndex < 0 || handIndex >= quelle.length || quelle[handIndex] !== cardName) return { success: false };
@@ -60115,7 +60117,7 @@ this._deathWatch = (this._deathWatchStack || []).length
       // Attachment erlaesst die Zusatzbedingung, nicht die Zugehoerigkeit.
     } else if (opts.cheat) {
       if (oldHeroScript?.cheatAscensionBlocked) return { success: false };
-    } else if ((_ascGrant = (!opts.cheat && !opts.fromDeck   // Erlass haengt an einer HANDkopie
+    } else if ((_ascGrant = (!opts.cheat && !opts.fromDeck && !opts.fromCreation   // Erlass haengt an einer HANDkopie (die Stempel zaehlen Handindizes — nie eine Karte aus Crestinas Vorrat)
                              && this._handAscensionGrantFor(pi, cardName, handIndex)
                              && !this.isAscensionConditionUnskippable(cardName)
                              && this.getAscendedFormsFor(hero.name).includes(cardName)
@@ -60194,9 +60196,11 @@ this._deathWatch = (this._deathWatchStack || []).length
         resolve: async () => true,
       });
       if (ascendChain?.negated) {
-        const hIdx = ps.hand.indexOf(cardName);
-        if (hIdx >= 0) ps.hand.splice(hIdx, 1);
-        await this.routeNegatedInitialCard(pi, cardName, ascendChain, hIdx);
+        // ★ Quelle = Hand ODER Crestinas Vorrat: `ps.hand.indexOf` fand eine Vorratskarte nie (und nahm bei einer namensgleichen Handkopie die FALSCHE Karte).
+        const negQuelle = opts.fromCreation ? (ps.creationZone || []) : ps.hand;
+        const hIdx = negQuelle.indexOf(cardName);
+        if (hIdx >= 0) negQuelle.splice(hIdx, 1);
+        await this.routeNegatedInitialCard(pi, cardName, ascendChain, hIdx, opts.fromCreation ? { fromZone: 'creation' } : {});
         this.log('ascension_negated', {
           player: ps.username, card: cardName, hero: hero.name,
         });
@@ -60223,7 +60227,11 @@ this._deathWatch = (this._deathWatchStack || []).length
         if (!frisch) return { success: false };
         freshIdx = frisch.idx;
       } else {
-        freshIdx = ps.hand.indexOf(cardName);
+        // ★ Aus Crestinas Vorrat (`opts.fromCreation`) in DER Liste suchen — `ps.hand.indexOf` lieferte dort -1 (Karte nur im Vorrat) und der Aufstieg brach NACH dem
+        //   Reaktionsfenster still ab; mit einer namensgleichen Handkopie traf der Index die falsche Karte. Die Liste frisch holen (Umsortieren ersetzt das Array),
+        //   ohne erneute Benutzbarkeitspruefung: der Zug ist beschlossen, eine Reaktion darf ihn nicht halb zuruecknehmen (wie bei Zaubern aus dem Vorrat).
+        if (opts.fromCreation) quelle = ps.creationZone || [];
+        freshIdx = quelle.indexOf(cardName);
       }
       if (freshIdx < 0) return { success: false };
       handIndex = freshIdx;
@@ -60246,7 +60254,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     } else {
     if (!this._fastMode && !this._inMctsSim) {
       this._broadcastEvent('attach_hero_fly', {
-        ownerIdx: pi, source: opts.fromCreation ? 'coolnessStack' : 'hand',
+        ownerIdx: pi, source: opts.fromCreation ? 'creation' : 'hand',   // 'coolnessStack' war hier falsch: der Flug startete am Coolness-Stapel und blendete dessen oberste Karte aus
         handIndex, cardName,
         destOwner: hs, destHeroIdx: heroIdx, destZoneSlot: -1,
       });

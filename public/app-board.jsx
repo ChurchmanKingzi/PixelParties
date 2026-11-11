@@ -41174,7 +41174,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       // Gray out Ascended Heroes if no eligible base hero exists
       // (v704: Helden-Formen wie Tri Ad ebenso)
       if (card.cardType === 'Ascended Hero' || (gameState.plainHeroForms || []).includes(cardName)) {
-        return !irgendeinAufstieg(cardName, handIdx);
+        return !irgendeinAufstieg(cardName, fromCreation ? null : handIdx);   // Erlasse (Perilous Journey) zaehlen Handindizes — nie fuer eine Vorratskarte
       }
       return false;
     } else if (currentPhase === 3) {
@@ -42545,7 +42545,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         || (card.cardType === 'Creature' && (gameState.bakhmSurpriseSlots || []).some(b => b.freeSlots.length > 0)));
     const isAscensionPlayable = !dimmed && isMyTurn && (currentPhase === 2 || currentPhase === 4) && card
       && (card.cardType === 'Ascended Hero' || (gameState.plainHeroForms || []).includes(cardName)) // v704: Helden-Formen (Tri Ad)
-      && irgendeinAufstieg(cardName, idx);
+      && irgendeinAufstieg(cardName, fromCreation ? null : idx);
     const _startPt = window.getPointerXY(e);
     const startX = _startPt.x, startY = _startPt.y;
     // ★★ v1225 (Als Befund 18.9.: „die Kopie der Karte haelt man
@@ -43461,7 +43461,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
             if (el.dataset.heroOwner === 'me') {
               const hi = parseInt(el.dataset.heroIdx);
               const hero = me.heroes[hi];
-              if (heroCanAscendTo(hero, hi, cardName, idx)) {
+              if (heroCanAscendTo(hero, hi, cardName, fromCreation ? null : idx)) {
                 targetHero = hi; targetHeroOwner = undefined;
               }
             } else if (el.dataset.heroOwner === 'opp') {
@@ -43962,7 +43962,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
             const eligible = [];
             for (let hi = 0; hi < (me.heroes || []).length; hi++) {
               const h = me.heroes[hi];
-              if (heroCanAscendTo(h, hi, cardName, idx)) {
+              if (heroCanAscendTo(h, hi, cardName, fromCreation ? null : idx)) {
                 eligible.push({ idx: hi, name: h.name });
               }
             }
@@ -45689,6 +45689,9 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         sourceEl = ownerIdx === myIdx
           ? document.querySelector(`.game-hand-me [data-hand-idx="${handIndex}"]`)
           : document.querySelector(`.game-hand-opp [data-hand-idx="${handIndex}"]`);
+      } else if (source === 'creation') {
+        // Crestinas Vorrat („Extra-Hand"): Aufstieg aus dem Vorrat (`performAscension`, `fromCreation`) — der Flug startet am Vorratsplatz, nicht am Coolness-Stapel.
+        sourceEl = document.querySelector(`[data-creation-owner="${ownerIdx === myIdx ? 'me' : 'opp'}"] [data-creation-idx="${handIndex}"]`);
       } else if (source === 'coolnessStack') {
         // Stack-equip path (Modnir / Swellpnir / Swagdri free-play /
         // Glorious Rebirth / Hipdall self-summon). Source is the
@@ -56929,7 +56932,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           const surpriseTarget = isDraggingSurpriseCard && playDrag?.isSurprise && playDrag.targetHero === i;
           const ascensionIneligible = playDrag?.isAscension && (isOpp
             ? (hero?.charmedBy === myIdx && !kannFremdAufsteigen(i, playDrag.cardName))   // 29.9.: geliehener Held
-            : !heroCanAscendTo(heroes[i], i, playDrag.cardName, playDrag.idx));
+            : !heroCanAscendTo(heroes[i], i, playDrag.cardName, playDrag.fromCreation ? null : playDrag.idx));
           const ascensionTarget = playDrag?.isAscension && playDrag.targetHero === i
             && (isOpp ? playDrag.targetHeroOwner === oppIdx : playDrag.targetHeroOwner == null);
           // v673: pickHandCard-Drag auf HELDEN-Zonen (Open Invitation).
