@@ -30,7 +30,7 @@ async function ausDerHand(ctx, gezogen) {
   if (gs._albrechtHandAngebot === schluessel) return;          // nur EINE Kopie fragt
   gs._albrechtHandAngebot = schluessel;
   const ps = gs.players[pi];
-  if (!(ps.hand || []).includes(CARD_NAME) || !(ps.hand || []).includes(gezogen)) return;
+  if (!engine._rxQuelleFuer(ps, CARD_NAME) || !(ps.hand || []).includes(gezogen)) return;   // Albrecht: Hand oder Crestinas Vorrat; die gezogene Karte liegt in der Hand
   if (kontrolliert(engine, pi, CARD_NAME)) return;
   if (require('./_summon-eligibility').eligibleSummonZones(engine, pi, CARD_NAME).length === 0) return;
   const ja = await engine.promptGeneric(pi, {
@@ -77,6 +77,7 @@ async function aufDemBrett(ctx, name) {
 
 module.exports = {
   activeIn: ['hand', 'support'],
+  reactFromCreation: true,   // 11.11.: Hook-Trigger aus der Hand gilt auch aus Crestinas Vorrat (Extra-Hand)
 
   async beforeSummon(ctx) { return !kontrolliert(ctx._engine, ctx.cardOwner, CARD_NAME); },
 
@@ -85,7 +86,7 @@ module.exports = {
       if (ctx.playerIdx !== ctx.cardOwner) return;
       const name = ctx.drawnCardName;
       if (!istDoppelSpell(ctx._engine._getCardDB()[name])) return;
-      if (ctx.card.zone === 'hand') return ausDerHand(ctx, name);
+      if (ctx.card.zone === 'hand' || ctx.card.zone === 'creationZone') return ausDerHand(ctx, name);
       if (ctx.card.zone === 'support') return aufDemBrett(ctx, name);
     },
     onCardAddedToHand: async (ctx) => {

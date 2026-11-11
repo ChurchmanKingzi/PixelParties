@@ -510,7 +510,8 @@ class CardInstance {
     // ★ 11.11. (Vorgabe: „alle Reaktionen auch aus der Crestina-Hand"): Hook-Reaktionen aus der Hand (Doomed Town Guard, Front Soldier …) hoeren auch als Karte in Crestinas
     // Vorrat (`ZONES.CREATION`) mit — NUR mit dem Opt-in `reactFromCreation: true` am Skript. Reine Hand-PASSIVE (Magic Gems, Play Money …) bleiben aussen vor: eine Vorratskarte
     // gilt nicht als Handkarte (Ruling 28.8.). Ob der Vorrat gerade benutzbar ist (Crestina da, nicht eingefroren …), prueft das Skript ueber `engine._rxQuelleFuer`.
-    if (z === ZONES.CREATION && script.reactFromCreation && script.activeIn.includes('hand')) return true;
+    // Dasselbe gilt fuer Stufensenker der Hand (`reduceCardLevel`): eine Karte im Vorrat senkt ihre Stufe wie eine Handkopie (sonst waere sie dort teurer als in der Hand).
+    if (z === ZONES.CREATION && script.activeIn.includes('hand') && (script.reactFromCreation || typeof script.reduceCardLevel === 'function')) return true;
     return script.activeIn.includes(z);
   }
 
@@ -50044,7 +50045,7 @@ this._deathWatch = (this._deathWatchStack || []).length
       // Welle 12: Sperre je KOPIE (Lawn Gnome: Stufenaenderung dieses Zuges schon verbraucht, auch ueber Brett und Rueckkehr).
       if (typeof script.canHandActivateAt === 'function') {
         let okAt;
-        try { okAt = !!script.canHandActivateAt(this.gs, playerIdx, handIndex, this); } catch { okAt = false; }
+        try { okAt = !!script.canHandActivateAt(this.gs, playerIdx, handIndex, this, ausVorrat); } catch { okAt = false; }   // 5. Argument: Index zaehlt im Vorrat (Crestina)
         if (!okAt) continue;
       }
       result.push({
@@ -50102,7 +50103,7 @@ this._deathWatch = (this._deathWatchStack || []).length
       catch { return false; }
     }
     if (typeof script.canHandActivateAt === 'function') {
-      try { if (!script.canHandActivateAt(this.gs, playerIdx, handIndex, this)) return false; }
+      try { if (!script.canHandActivateAt(this.gs, playerIdx, handIndex, this, !!fromCreation)) return false; }
       catch { return false; }
     }
     try {

@@ -44,7 +44,7 @@ module.exports = {
 
   reduceCardLevel(cardData, engine, ownerIdx, inst, heroIdx) {
     if (!cardData || cardData.name !== CARD_NAME) return 0;
-    if (!inst || inst.zone !== 'hand') return 0;
+    if (!inst || !['hand', 'creationZone'].includes(inst.zone)) return 0;   // Hand oder Crestinas Vorrat
     if (!require('./_hooks').selbstsenkungZaehlt(engine, inst, CARD_NAME, ownerIdx, { zone: 'hand' })) return 0;   // v1293
     if (typeof heroIdx !== 'number' || heroIdx < 0) return 0;
     return engine.effectiveSchoolLevelForCaster('Singing', ownerIdx, heroIdx, ownerIdx);   // W4a: harte Negierung -> Stufe 0; W16g (S02-18): + Xals Support-Zonen-Stapel

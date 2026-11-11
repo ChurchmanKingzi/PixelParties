@@ -59,6 +59,7 @@ module.exports = {
   // Hooks need to fire from the hand (trigger) AND from the hero
   // zone (loss-on-defeat).
   activeIn: ['hand', 'hero'],
+  reactFromCreation: true,   // 11.11.: Hook-Trigger aus der Hand gilt auch aus Crestinas Vorrat (Extra-Hand)
 
   // Never proactively playable. The card enters play only through
   // its reactive descent trigger; until then it sits dimmed in
@@ -75,7 +76,7 @@ module.exports = {
       if (ctx.cardZone === 'hero') {
         return handleLossOnDefeat(ctx);
       }
-      if (ctx.cardZone === 'hand') {
+      if (ctx.cardZone === 'hand' || ctx.cardZone === 'creationZone') {   // Hand oder Crestinas Vorrat
         return handleHandTrigger(ctx);
       }
     },
@@ -190,8 +191,9 @@ async function performDescent(engine, pi, dyingHero, handInst) {
   const fremdUebernommen = kontrolliert.filter(e => e.physOwner !== pi);
 
   // ── 1. Pull Quetzahuitl out of hand. ──
-  const handIdx = ps.hand.indexOf(CARD_NAME);
-  if (handIdx < 0) return;
+  const q = engine._rxQuelleFuer(ps, CARD_NAME);   // Hand oder Crestinas Vorrat
+  if (!q) return;
+  const handIdx = q.idx;
   // Einsatz-Beleg für den Trainings-Recorder. Als Verdachtsfall
   // "Quetzahuitl 0% — lehnt die CPU ab?": nein, hier gibt es gar keinen
   // Prompt, der Abstieg läuft vollautomatisch und funktioniert (gegen
@@ -205,11 +207,11 @@ async function performDescent(engine, pi, dyingHero, handInst) {
   // eigene play_zone_animation des Abstiegs.
   engine._broadcastEvent('play_pile_transfer', {
     owner: pi, cardName: CARD_NAME,
-    from: 'hand', to: 'hero',
+    from: q.ausVorrat ? 'creation' : 'hand', to: 'hero',
     fromHandIdx: handIdx, toHeroIdx: targetHeroIdx,
     asPlay: 'sole',
   });
-  engine.takeFromPileSync(ps, 'hand', handIdx);
+  engine.rxNimm(ps, q);
   // ★★ v1222: Abgleich SOFORT nach dem Hand-Abgang. Der Client verdeckt den
   // Startplatz der abfliegenden Karte nur, solange die Hand noch so
   // gross ist wie beim Abflug — bleibt der `sync` aus, taucht sie

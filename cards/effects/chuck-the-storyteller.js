@@ -147,6 +147,7 @@ module.exports = {
   // 'hand': der erzwungene Aufstieg feuert, waehrend die Karte noch auf
   // der Hand liegt. 'hero': Schaden-Schild und Zieh-Trigger wirken vom Brett.
   activeIn: ['hand', 'hero'],
+  reactFromCreation: true,   // 11.11.: Hook-Trigger aus der Hand gilt auch aus Crestinas Vorrat (Extra-Hand)
 
   // Aufstieg aus dem Tod heraus (v718).
   ascendsFromDefeat: true,
@@ -254,7 +255,7 @@ module.exports = {
       const engine = ctx._engine;
       const gs = engine.gs;
       // Nur aus der Hand — die Brettform hat hier nichts zu tun.
-      if (ctx.cardZone !== 'hand') return;
+      if (ctx.cardZone !== 'hand' && ctx.cardZone !== 'creationZone') return;   // Hand oder Crestinas Vorrat
       const pi = ctx.cardOwner;
 
       const gefallen = ctx.hero;
@@ -278,7 +279,7 @@ module.exports = {
       // „while you still control other undefeated Heroes".
       if (!hatAndereLebende(engine, pi, gefallen, false)) return;
 
-      if ((gs.players[pi]?.hand || []).indexOf(CARD_NAME) < 0) return;
+      if (!gs.players[pi] || !engine._rxQuelleFuer(gs.players[pi], CARD_NAME)) return;
 
       // Als Vorgabe: der Spieler wird GEFRAGT, bevor Chuck aufsteigt.
       // Ablehnen = Chuck faellt normal, die Karte bleibt auf der Hand.
@@ -291,16 +292,17 @@ module.exports = {
       });
       if (!antwort || antwort.cancelled || antwort.confirmed === false) return;
       if (gefallen.hp > 0) return;                    // waehrend der Frage gerettet
-      if ((gs.players[pi]?.hand || []).indexOf(CARD_NAME) < 0) return;
+      if (!engine._rxQuelleFuer(gs.players[pi], CARD_NAME)) return;
 
       if (!gs._chuckAscendReady) gs._chuckAscendReady = {};
       gs._chuckAscendReady[stempelKey(owner, heroIdx)] = gs.turn;
       try {
         await engine.showTriggeredEffect(CARD_NAME);
         // Index frisch: die Frage kann die Hand veraendert haben.
-        const handIdx = (gs.players[pi]?.hand || []).indexOf(CARD_NAME);
-        await engine.performAscension(pi, heroIdx, CARD_NAME, handIdx,
-          owner !== pi ? { heroOwner: owner } : {});
+        const q = engine._rxQuelleFuer(gs.players[pi], CARD_NAME);
+        if (!q) return;
+        await engine.performAscension(pi, heroIdx, CARD_NAME, q.idx,
+          { ...(owner !== pi ? { heroOwner: owner } : {}), ...(q.ausVorrat ? { fromCreation: true } : {}) });
       } finally {
         delete gs._chuckAscendReady[stempelKey(owner, heroIdx)];
       }
