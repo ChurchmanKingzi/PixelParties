@@ -70,7 +70,7 @@ function istReactionAttackSpellOderCreature(engine, name) {
 /** Eine eigene Reaction wurde gespielt: jede Handkopie um 1 Stufe senken (Handindex-Feld, nur in der Hand wirksam). */
 async function senkeStufe(ctx, gespielt, spieler) {
   const inst = ctx.card;
-  if (inst?.zone !== 'hand') return;
+  if (inst?.zone !== 'hand' && inst?.zone !== 'creationZone') return;   // Hand oder Crestinas Vorrat (Extra-Hand)
   const engine = ctx._engine;
   const pi = inst.controller ?? inst.owner;
   if (spieler !== pi) return;                                                   // nur EIGENE Reactions
@@ -88,11 +88,23 @@ async function senkeStufe(ctx, gespielt, spieler) {
     engine.log('hand_level_reduced', { player: ps.username, card: CARD_NAME, by: gespielt, offset: ps._handLevelOffsetsTransient[idx] });
     n++;
   }
+  // Kopien in Crestinas Vorrat (Extra-Hand): die Senkung haengt an der INSTANZ (`counters._vorratStufe`, Engine: `_vorratStufenAbzug`) — das Handindex-Feld kennt nur die Hand.
+  // „Reveal this card while it is in your hand": der Vorrat liegt ohnehin offen auf dem Tisch (auch der Gegner sieht ihn).
+  if (engine.isCreationZoneUsable(pi)) {
+    for (const vi of engine.cardInstances) {
+      if (vi.owner !== pi || vi.zone !== 'creationZone' || vi.name !== CARD_NAME) continue;
+      vi.counters = vi.counters || {};
+      vi.counters._vorratStufe = (vi.counters._vorratStufe || 0) - 1;
+      engine.log('hand_level_reduced', { player: ps.username, card: CARD_NAME, by: gespielt, offset: vi.counters._vorratStufe, where: 'creation' });
+      n++;
+    }
+  }
   if (n > 0) engine.sync();
 }
 
 module.exports = {
   activeIn: ['hand', 'support'],
+  reactFromCreation: true,   // 12.11.: die Senkung durch eigene Reactions gilt auch fuer Kopien in Crestinas Vorrat
   revealOnEnterHand: true,
   revealAlwaysInHand: true,
   requiresTarget: true,

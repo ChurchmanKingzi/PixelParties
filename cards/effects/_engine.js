@@ -24386,6 +24386,23 @@ this._deathWatch = (this._deathWatchStack || []).length
     if (inst) this._untrackCard(inst.id);
   }
 
+  /**
+   * ★ 12.11.: Instanzgebundene Stufensenkung fuer Karten in Crestinas Vorrat (Extra-Hand) — Gegenstueck zu den Handindex-Feldern (`_handLevelOffsets*`), die nur die Hand kennt.
+   * Eine Vorratskarte traegt ihre Senkung als `inst.counters._vorratStufe` (negativ; Great Vanguard Demon: „reduce this card's level in your hand by 1"). Namensweit gilt wie in der Hand
+   * die am staerksten gesenkte Kopie; nur bei benutzbarem Vorrat. Der Eintrag faellt mit der Instanz weg, sobald die Karte den Vorrat verlaesst (Ausspielen, Abwurf …).
+   */
+  _vorratStufenAbzug(playerIdx, cardName) {
+    const ps = this.gs.players[playerIdx];
+    if (!ps || !cardName || !(ps.creationZone || []).includes(cardName) || !this.isCreationZoneUsable(playerIdx)) return 0;
+    let best = 0;
+    for (const inst of this.cardInstances) {
+      if (inst.owner !== playerIdx || inst.zone !== ZONES.CREATION || inst.name !== cardName) continue;
+      const v = Number(inst.counters?._vorratStufe) || 0;
+      if (v < best) best = v;
+    }
+    return best;
+  }
+
   /** Die Reaktionskarte verlaesst ihre Quelle: Hand ueber die Stapel-Schicht (wie bisher), Vorrat per Splice + Instanz weg. Fuer Karten, die sich per Hook selbst einsetzen. */
   rxNimm(ps, q) {
     if (q.ausVorrat) return this._rxAbgang(ps, q);
@@ -30606,7 +30623,9 @@ this._deathWatch = (this._deathWatchStack || []).length
     const toPi = this.opponentOf(fromPi);
     const toPs = this.gs.players[toPi];
     if (!toPs) return false;
-    if (handIdx < 0 || handIdx >= (fromPs.hand?.length || 0)) return false;
+    // ★ 12.11.: `opts.fromCreation` — die Karte liegt in Crestinas Vorrat (Extra-Hand), `handIdx` zaehlt dort (Crystal Well & Co.: „add a card from your hand").
+    const _quelleListe = opts.fromCreation ? this.handSourceList(fromPi, true) : fromPs.hand;
+    if (!_quelleListe || handIdx < 0 || handIdx >= (_quelleListe.length || 0)) return false;
     if (this._isSearchBlocked(toPi, opts, 'deck')) return false;   // v1068
 
     // Reaktionsfenster (Ambush the Scout), Kategorie 'insert':
@@ -30619,7 +30638,7 @@ this._deathWatch = (this._deathWatchStack || []).length
       return false;
     }
 
-    const cardName = fromPs.hand[handIdx];
+    const cardName = _quelleListe[handIdx];
 
     // Locate the inst BEFORE the splice so we can preserve identity
     // (originalOwner, counters) across the move. Match by zone+owner
@@ -30630,14 +30649,14 @@ this._deathWatch = (this._deathWatchStack || []).length
     {
       // W16d (A08-04): die Instanz an POSITION `handIdx` (k-te Karte dieses Namens, wie Crystal Well/Mary rechnen),
       // nicht der erste Namens-Treffer – sonst wandert bei gleichnamigen Handkarten die falsche (originalOwner vertauscht).
-      inst = this._findHandInstanceAt(fromPi, handIdx)
+      inst = this._findHandInstanceAt(fromPi, handIdx, !!opts.fromCreation)
         // Fallback (alter Weg): keine Rang-Zuordnung möglich -> erste Instanz dieses Namens, sonst entstünde eine Geister-Instanz.
-        || this.cardInstances.find(c => c.owner === fromPi && c.zone === ZONES.HAND && c.name === cardName) || null;
+        || this.cardInstances.find(c => c.owner === fromPi && c.zone === (opts.fromCreation ? ZONES.CREATION : ZONES.HAND) && c.name === cardName) || null;
     }
 
     // W63c: Herkunft VOR dem Splice (Marke dieses Platzes, sonst die Instanz): eine verschenkte Karte bleibt Eigentum ihres Besitzers.
-    const herkunft = this._handOriginAt(fromPs, handIdx) ?? (inst && Number.isInteger(inst.originalOwner) ? inst.originalOwner : fromPi);
-    fromPs.hand.splice(handIdx, 1);
+    const herkunft = (opts.fromCreation ? null : this._handOriginAt(fromPs, handIdx)) ?? (inst && Number.isInteger(inst.originalOwner) ? inst.originalOwner : fromPi);
+    _quelleListe.splice(handIdx, 1);
     if (!toPs.hand) toPs.hand = [];
     const toHandIdx = toPs.hand.length;
     toPs.hand.push(cardName);
@@ -30673,7 +30692,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     // since the broadcast goes out before the next sync).
     this._broadcastEvent('play_pile_transfer', {
       fromOwner: fromPi, toOwner: toPi, cardName,
-      from: 'hand', to: 'hand',
+      from: opts.fromCreation ? 'creation' : 'hand', to: 'hand',
       fromHandIdx: handIdx, toHandIdx,
       // `opts.finalHandSize` (Live Show): mehrere Karten fliegen nacheinander in dieselbe Hand — jede wird gegen die Endgröße der Hand projiziert.
       ...(opts.finalHandSize ? { finalHandSize: opts.finalHandSize, zielLayout: true } : null),
@@ -53517,6 +53536,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     const offMap_lvr = ps_lvr?._handLevelOffsets;
     const transMap_lvr = ps_lvr?._handLevelOffsetsTransient;
     const filterMap_lvr = ps_lvr?._handLevelOffsetHeroFilter;
+    let _handBest_lvr = 0;   // bester Handabzug (fuer den namensweiten Vergleich mit Vorratskopien)
     if (cardData.name && handArr_lvr && (offMap_lvr || transMap_lvr)) {
       let bestOffset = 0;
       // ★ W15b (Al, C2: „exakt die geklickte/ausgewählte Karte"): kommt `opts.handIdx` mit, zählt bei Spells/Attacks NUR der
@@ -53540,6 +53560,13 @@ this._deathWatch = (this._deathWatchStack || []).length
         if (v < bestOffset) bestOffset = v;
       }
       if (bestOffset < 0) rawLevel = Math.max(0, rawLevel + bestOffset);
+      _handBest_lvr = bestOffset;
+    }
+    // ★ Karte in Crestinas Vorrat (Extra-Hand): namensweit zaehlt auch die am staerksten gesenkte VORRATSkopie (`_vorratStufenAbzug`). Eine bestimmte Handkopie (`opts.handIdx`) ist
+    // davon nicht beruehrt; ein Stapel (`pileSide`) auch nicht.
+    if (cardData.name && !Number.isInteger(opts.handIdx) && !opts.pileSide) {
+      const _vo = this._vorratStufenAbzug(lvlPi, cardData.name);
+      if (_vo < _handBest_lvr) rawLevel = Math.max(0, rawLevel + (_vo - _handBest_lvr));
     }
     // Karten-Skript `levelOffsetForHero` (You are the Chosen One!!!): die Stufe hängt vom NUTZER ab — Änderung JE Held, nie unter 0.
     {
@@ -54157,6 +54184,11 @@ this._deathWatch = (this._deathWatchStack || []).length
         best = ((ps._handLevelOffsets && ps._handLevelOffsets[k]) || 0) + ((ps._handLevelOffsetsTransient && ps._handLevelOffsetsTransient[k]) || 0);
       }
       if (best < 0) raw = Math.max(0, raw + best);
+    }
+    // (2a) ★ 12.11.: Vorratskopie (Crestinas Extra-Hand) — ohne bestimmte Handkopie und ohne Stapel zaehlt der Abzug der am staerksten gesenkten Vorratskopie.
+    if (handIdx == null && !pileSide && cardData.name) {
+      const _vo2 = this._vorratStufenAbzug(playerIdx, cardData.name);
+      if (_vo2 < 0) raw = Math.max(0, raw + _vo2);
     }
 
     // (2b) Karten-Skript `levelOffsetForHero` — Stufe je NUTZER (You are the Chosen One!!!), nie unter 0.
