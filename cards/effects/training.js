@@ -268,10 +268,13 @@ async function doDeckSearch(engine, playerIdx, heroIdx, level, trainingOrt, feld
 
   // Level 2: require a discard first (cancellable)
   if (level === 2) {
-    if ((ps.hand || []).length === 0) return false;
+    // ★ 12.11. (Al: „Crestina-Karten werden immer behandelt wie echte Handkarten“): auch Karten aus Crestinas Vorrat (Extra-Hand) lassen sich als Kosten abwerfen.
+    const vorratWahl = engine.isCreationZoneUsable(playerIdx) ? (ps.creationZone || []).map((_, i) => i) : [];
+    if ((ps.hand || []).length === 0 && vorratWahl.length === 0) return false;
 
     const discardResult = await engine.promptGeneric(playerIdx, {
       type: 'forceDiscardCancellable',
+      creationEligibleIndices: vorratWahl,
       costFor: 'Training',          // ★ v1041: Kosten-Abwurf-Lernkanal
       costKind: 'tutor',
       title: 'Training — Discard Cost',
@@ -284,11 +287,14 @@ async function doDeckSearch(engine, playerIdx, heroIdx, level, trainingOrt, feld
     // Execute the discard
     const { cardName: discardName, handIndex } = discardResult;
     if (discardName === undefined || handIndex === undefined) return false;
-    if (handIndex < 0 || handIndex >= ps.hand.length || ps.hand[handIndex] !== discardName) return false;
+    const ausVorrat = !!discardResult.fromCreation;
+    const quelleListe = ausVorrat ? (ps.creationZone || []) : ps.hand;
+    if (ausVorrat && !vorratWahl.includes(handIndex)) return false;
+    if (handIndex < 0 || handIndex >= quelleListe.length || quelleListe[handIndex] !== discardName) return false;
 
     // v1394: Abwurf über die zentrale Funktion. ★ W74c: Boris darf diese Abwurf-Kosten ignorieren — die Karte bleibt, der Effekt läuft weiter.
     if (!(await engine.borisVerzicht(playerIdx, 1, { source: 'Training' }))
-        && !(await engine.actionDiscardHandCard(playerIdx, discardName, handIndex, { source: 'Training', _noGlow: true }))) return false;
+        && !(await engine.actionDiscardHandCard(playerIdx, discardName, handIndex, { source: 'Training', _noGlow: true, ...(ausVorrat ? { fromCreation: true } : {}) }))) return false;
 
     // Lv2: Training resolves when discard cost is paid → flash Training zone now
     engine._broadcastEvent('ability_activated', {

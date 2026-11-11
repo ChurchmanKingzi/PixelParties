@@ -157,53 +157,16 @@ module.exports = {
     const vorratIndices = _vorratIndices(engine, pi);
     if (eligibleIndices.length === 0 && vorratIndices.length === 0) return false;
 
-    let quelle = eligibleIndices.length > 0 ? 'hand' : 'creation';
-    if (eligibleIndices.length > 0 && vorratIndices.length > 0) {
-      const wahl = await engine.promptGeneric(pi, {
-        type: 'optionPicker',
-        title: CARD_NAME,
-        description: 'Give a card from your hand or from your Creation Zone (Extra-Hand)?',
-        options: [
-          { id: 'hand', label: 'From my hand', description: 'Choose one of your originally-owned hand cards.', color: '#66ccff' },
-          { id: 'creation', label: 'From my Creation Zone', description: 'Choose one of your originally-owned Creation Zone cards.', color: '#66ccff' },
-        ],
-        cancellable: true,
-      });
-      if (!wahl || wahl.cancelled || !wahl.optionId) return false;
-      quelle = wahl.optionId === 'creation' ? 'creation' : 'hand';
-    }
-
-    let ok, cardName;
-    if (quelle === 'creation') {
-      const antwort = await engine.promptGeneric(pi, {
-        type: 'creationDiscard',
-        count: 1,
-        title: CARD_NAME,
-        description: 'Choose one of your originally-owned Creation Zone cards to give to your opponent. You then draw 1 card.',
-        instruction: 'Click a card in your Creation Zone to give it to your opponent.',
-        opponentTitle: 'Opponent is choosing a card to give away...',
-        opponentSubtitle: 'Waiting for the opponent to choose a card from their Creation Zone...',
-        eligibleIndices: vorratIndices,
-        cancellable: false,
-      });
-      const ci = antwort?.creationIndex;
-      if (!Number.isInteger(ci) || !vorratIndices.includes(ci)) return false;
-      cardName = ps.creationZone[ci];
-      ok = await engine.actionTransferCardToOppHand(pi, ci, { source: CARD_NAME, fromCreation: true });
-    } else {
-      const result = await engine.promptGeneric(pi, {
-        type: 'pickHandCard',
-        title: CARD_NAME,
-        description: 'Choose one of your originally-owned cards to give to your opponent. You then draw 1 card.',
-        eligibleIndices,
-        cancellable: true,
-      });
-      if (!result || result.cancelled || result.handIndex == null) return false;
-      cardName = result.cardName;
-      ok = await engine.actionTransferCardToOppHand(pi, result.handIndex, {
-        source: CARD_NAME,
-      });
-    }
+    const wahl = await engine.promptKarteAusHandOderVorrat(pi, {
+      title: CARD_NAME,
+      description: 'Choose one of your originally-owned cards to give to your opponent. You then draw 1 card.',
+      instruction: 'Click a card in your Creation Zone to give it to your opponent.',
+      opponentTitle: 'Opponent is choosing a card to give away...',
+      handIndices: eligibleIndices, vorratIndices,
+    });
+    if (!wahl) return false;
+    const cardName = wahl.cardName;
+    const ok = await engine.actionTransferCardToOppHand(pi, wahl.index, wahl.ausVorrat ? { source: CARD_NAME, fromCreation: true } : { source: CARD_NAME });
     if (!ok) return false;
 
     await engine.actionDrawCards(pi, 1);

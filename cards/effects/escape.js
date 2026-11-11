@@ -119,8 +119,9 @@ module.exports = {
     // condition-check time, Escape itself is still in hand — so
     // `hand.length >= 2` means there's at least one OTHER card
     // available once Escape is consumed.
+    // ★ 12.11.: Crestinas Vorrat (Extra-Hand) zaehlt wie die Hand — Abwurfmaterial = Hand + nutzbarer Vorrat ohne Escape selbst (`handFodderFor`).
     const ps = gs.players[ownerIdx];
-    if (!ps || (ps.hand?.length || 0) < 2) return false;
+    if (!ps || engine.handFodderFor(ownerIdx, CARD_NAME) < 1) return false;
 
     return true;
   },
@@ -138,7 +139,7 @@ module.exports = {
     // a parallel effect drained the hand between the prompt and
     // resolution, fall through to negation regardless rather than
     // letting the Hero die after the player committed.
-    if (ps && (ps.hand?.length || 0) >= 1) {
+    if (ps && ((ps.hand?.length || 0) >= 1 || (engine.isCreationZoneUsable(ownerIdx) && (ps.creationZone?.length || 0) >= 1))) {
       await engine.actionPromptForceDiscard(ownerIdx, 1, {
         title: CARD_NAME, source: CARD_NAME, selfInflicted: true,
       });

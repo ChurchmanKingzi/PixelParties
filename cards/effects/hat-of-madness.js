@@ -79,26 +79,26 @@ module.exports = {
       const oi = engine.opponentOf(seite);
       const ops = gs.players[oi];
       if (!ps || !ops) return;
-      if (!(ps.hand || []).length) return;               // leere Hand: nichts zu geben
+      const vorratKarten = engine.isCreationZoneUsable(seite) ? (ps.creationZone || []).length : 0;   // 12.11.: Crestinas Vorrat zaehlt wie die Hand
+      if (!(ps.hand || []).length && vorratKarten === 0) return;   // leere Hand: nichts zu geben
       if (ops.handLocked) return;                        // Gegnerhand gesperrt
-
-      const eligibleIndices = ps.hand.map((_, i) => i);
 
       // ★ Grundregel (CARD_API): ein Effekt, der aus einem HOOK heraus
       // feuert, streamt seine Karte an BEIDE Spieler — hier VOR dem
       // Prompt, weil es nichts abzubrechen gibt („must").
       await engine.showTriggeredEffect(CARD_NAME, { playerIdx: seite });
 
-      const wahl = await engine.promptGeneric(seite, {
-        type: 'pickHandCard',
+      const wahl = await engine.promptKarteAusHandOderVorrat(seite, {
         title: CARD_NAME,
         description: `${CARD_NAME}: you must give a card from your hand to ${ops.username}.`,
-        eligibleIndices,
+        instruction: `Click a card in your Creation Zone to give it to ${ops.username}.`,
+        opponentTitle: 'Opponent is choosing a card to give away...',
         cancellable: false,
       });
-      if (!wahl || wahl.handIndex == null) return;
+      if (!wahl) return;
 
-      const ok = await engine.actionTransferCardToOppHand(seite, wahl.handIndex, { source: CARD_NAME });
+      const ok = await engine.actionTransferCardToOppHand(seite, wahl.index, wahl.ausVorrat
+        ? { source: CARD_NAME, fromCreation: true } : { source: CARD_NAME });
       if (!ok) return;
 
       engine.log('hat_of_madness_gift', {

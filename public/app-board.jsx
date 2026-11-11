@@ -40938,10 +40938,10 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       // this hand index, the card is clickable instead of dimmed.
       const pt = gameState.potionTargeting;
       if (pt.ownerIdx === myIdx && Number.isInteger(handIdx)) {
-        // Ziel-Eintraege vom Typ 'hand' meinen die HAND. Eine
-        // Vorratskarte mit demselben Index ist nicht gemeint.
-        const isHandTarget = !fromCreation && (pt.validTargets || []).some(
-          t => t?.type === 'hand' && t?.owner === myIdx && t?.handIndex === handIdx
+        // Ziel-Eintraege vom Typ 'hand' meinen die HAND — und, mit `fromCreation: true`, genau die Karte im Vorrat (Extra-Hand) mit diesem Index
+        // (12.11.: Crestinas Vorrat gilt wie die Hand, z. B. Cool Presents).
+        const isHandTarget = (pt.validTargets || []).some(
+          t => t?.type === 'hand' && t?.owner === myIdx && t?.handIndex === handIdx && !!t?.fromCreation === !!fromCreation
         );
         if (isHandTarget) return false;
       }
@@ -40982,11 +40982,14 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
 
     // Force Discard mode (Wheels) — all cards are selectable
     const forceDiscardPrompt = gameState.effectPrompt?.type === 'forceDiscard' && gameState.effectPrompt.ownerIdx === myIdx;
-    if (forceDiscardPrompt) return false;
+    // ★ 12.11.: Vorratskarten (Extra-Hand) sind abwerfbar, wenn der Prompt sie anbietet (`creationEligibleIndices`) — sonst ausgegraut.
+    if (forceDiscardPrompt) return fromCreation ? !(gameState.effectPrompt.creationEligibleIndices || []).includes(handIdx) : false;
 
     // Cancellable Force Discard mode (Training, etc.) — all cards are selectable
     const forceDiscardCancellable = gameState.effectPrompt?.type === 'forceDiscardCancellable' && gameState.effectPrompt.ownerIdx === myIdx;
     if (forceDiscardCancellable) {
+      // 12.11.: Vorratskarten nur, wenn der Skript-Prompt sie ausdruecklich anbietet (`creationEligibleIndices`, z. B. Magic Gems).
+      if (fromCreation) return !(gameState.effectPrompt.creationEligibleIndices || []).includes(handIdx);
       // Optional: `eligibleCards` (Namen) graut alle anderen Handkarten aus (Dante) — ohne Liste ist alles waehlbar.
       const namen = gameState.effectPrompt.eligibleCards;
       return Array.isArray(namen) ? !namen.includes(cardName) : false;
@@ -41006,7 +41009,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     // Hand Pick mode (Shard of Chaos) — dim ineligible cards
     const handPickActive = gameState.effectPrompt?.type === 'handPick' && gameState.effectPrompt.ownerIdx === myIdx;
     if (handPickActive) {
-      if (fromCreation) return true;   // siehe oben
+      if (fromCreation) return !(gameState.effectPrompt.creationEligibleIndices || []).includes(handIdx);   // 12.11.: Vorrat nur, wenn der Prompt ihn ausdruecklich anbietet
       const eligible = gameState.effectPrompt.eligibleIndices || [];
       return !eligible.includes(handIdx);
     }
@@ -42312,15 +42315,12 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     // hand slot, route the click through `togglePotionTarget` so it
     // shares the same auto-confirm / max-total / cancellable plumbing
     // as board target clicks.
-    // ★ Alle folgenden Zweige bis zum Ziehstart betreffen HANDkarten:
-    // Handzugriff-Zielwahl, Abwurfzwang, blinde Auswahl, Ability-
-    // Anlegen, Namenssperren. Eine Vorratskarte ist ausdruecklich
-    // KEINE Handkarte (Als Rulings 28.8.) und ueberspringt sie
-    // deshalb geschlossen — sonst koennte ein Abwurfzwang sie
-    // treffen, was der Text verbietet.
-    if (!fromCreation && gameState.potionTargeting?.ownerIdx === myIdx) {
+    // ★ 12.11. (Al: „Crestina-Karten werden immer behandelt wie echte Handkarten — einzige Ausnahme: sie zaehlen nicht gegen das Handlimit“):
+    // Die Handzugriff-Zielwahl (Cool Presents) gilt deshalb auch fuer den Vorrat. Die folgenden Zweige (Abwurfzwang, blinde Auswahl, Ability-
+    // Anlegen, Namenssperren) sind noch HAND-gebunden — der Vorrat hat fuer den Abwurf einen eigenen Prompt (`creationDiscard`).
+    if (gameState.potionTargeting?.ownerIdx === myIdx) {
       const handTarget = (gameState.potionTargeting.validTargets || []).find(
-        t => t?.type === 'hand' && t?.owner === myIdx && t?.handIndex === idx
+        t => t?.type === 'hand' && t?.owner === myIdx && t?.handIndex === idx && !!t?.fromCreation === !!fromCreation
       );
       if (handTarget) {
         if (e.cancelable) e.preventDefault();
@@ -42329,6 +42329,13 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       }
     }
 
+    // ★ 12.11.: Abwurf (Force Discard) aus Crestinas Vorrat — nur die vom Prompt angebotenen Plaetze (`creationEligibleIndices`).
+    if (fromCreation && (gameState.effectPrompt?.type === 'forceDiscard' || gameState.effectPrompt?.type === 'forceDiscardCancellable') && gameState.effectPrompt.ownerIdx === myIdx) {
+      if (!(gameState.effectPrompt.creationEligibleIndices || []).includes(idx)) return;
+      if (e.cancelable) e.preventDefault();
+      ppSendePromptAntwort(gameState, { cardName, handIndex: idx, fromCreation: true });
+      return;
+    }
     // Force Discard mode — any card in hand can be discarded EXCEPT the specific resolving card
     const forceDiscardActive = !fromCreation && gameState.effectPrompt?.type === 'forceDiscard' && gameState.effectPrompt.ownerIdx === myIdx;
     if (forceDiscardActive) {
@@ -42393,6 +42400,20 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     }
 
     // Hand Pick mode (Shard of Chaos, Leadership) — toggle card selection
+    // ★ 12.11.: Vorratskarten (`creationEligibleIndices`) wechseln ihre Auswahl in `handPickSelectedCz` (gleiche Obergrenze `maxSelect` fuer beide zusammen).
+    if (fromCreation && gameState.effectPrompt?.type === 'handPick' && gameState.effectPrompt.ownerIdx === myIdx) {
+      if (!(gameState.effectPrompt.creationEligibleIndices || []).includes(idx)) return;
+      if (e.cancelable) e.preventDefault();
+      const maxSelectCz = gameState.effectPrompt.maxSelect || 3;
+      if (!handPickSelectedCz.has(idx) && handPickSelected.size + handPickSelectedCz.size >= maxSelectCz) return;
+      if (window.playSFX) window.playSFX('ui_click');
+      setHandPickSelectedCz(prev => {
+        const next = new Set(prev);
+        if (next.has(idx)) next.delete(idx); else next.add(idx);
+        return next;
+      });
+      return;
+    }
     const handPickPrompt = !fromCreation && gameState.effectPrompt?.type === 'handPick' && gameState.effectPrompt.ownerIdx === myIdx;
     if (handPickPrompt) {
       const eligible = gameState.effectPrompt.eligibleIndices || [];
@@ -42423,7 +42444,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         willChange = true; // Deselection always succeeds.
       } else if (nameLockActive && me.hand[idx] !== lockedName) {
         willChange = false; // Different name — locked out.
-      } else if (handPickSelected.size >= maxSelect) {
+      } else if (handPickSelected.size + handPickSelectedCz.size >= maxSelect) {
         willChange = false;
       } else if (thisType && typeLimits[thisType] !== undefined) {
         let selectedOfType = 0;
@@ -42438,7 +42459,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       setHandPickSelected(prev => {
         const next = new Set(prev);
         if (next.has(idx)) { next.delete(idx); return next; }
-        if (next.size >= maxSelect) return prev;
+        if (next.size + handPickSelectedCz.size >= maxSelect) return prev;
         // Re-check the name lock inside the updater since `prev` may
         // differ from the closure-captured `handPickSelected` under
         // StrictMode/double-invocation. Same lookup pattern: peek any
@@ -44557,6 +44578,8 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
   const setPileViewer = useCallback((v) => { if (v && window.playSFX) window.playSFX('ui_prompt_open', { volume: 0.7 }); _setPileViewerRaw(v); }, []);
   const [hoveredPileCard, setHoveredPileCard] = useState(null); // card name for pile tooltip
   const [handPickSelected, setHandPickSelected] = useState(new Set()); // hand indices selected for handPick prompt
+  // ★ 12.11.: Crestinas Vorrat (Extra-Hand) gilt wie die Hand — Auswahl dort (`creationEligibleIndices` des Prompts), zaehlt gegen dasselbe `maxSelect`.
+  const [handPickSelectedCz, setHandPickSelectedCz] = useState(new Set());
   const [blindPickSelected, setBlindPickSelected] = useState(new Set()); // opp hand indices selected for blindHandPick prompt
   const [stealMarkedMe, setStealMarkedMe] = useState(new Set()); // own hand indices marked for stealing (victim's screen)
   const [stealHiddenMe, setStealHiddenMe] = useState(new Set()); // own hand indices hidden during steal flight (victim)
@@ -44639,7 +44662,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
   const stealExpectedMeCountRef = useRef(-1); // my hand count when stealHiddenMe was set
   const [stealHighlightMe, setStealHighlightMe] = useState(new Set()); // hand indices highlighted by opponent's blind pick selection
   // Clear stale hoveredPileCard when force-discard prompt ends
-  useEffect(() => { setHoveredPileCard(null); setHandPickSelected(new Set()); setBlindPickSelected(new Set()); setStealHighlightMe(new Set()); }, [gameState.effectPrompt]);
+  useEffect(() => { setHoveredPileCard(null); setHandPickSelected(new Set()); setHandPickSelectedCz(new Set()); setBlindPickSelected(new Set()); setStealHighlightMe(new Set()); }, [gameState.effectPrompt]);
   // Broadcast blind-pick selection to opponent so they see highlighted cards
   useEffect(() => {
     if (gameState.effectPrompt?.type === 'blindHandPick' && gameState.effectPrompt?.ownerIdx === myIdx) {
@@ -60736,7 +60759,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                   }
                   return selectedOfType >= typeLimits[thisType];
                 })();
-                const isHandPickMaxed = isHandPick && !isHandPickSelected && handPickSelected.size >= (gameState.effectPrompt.maxSelect || 3);
+                const isHandPickMaxed = isHandPick && !isHandPickSelected && handPickSelected.size + handPickSelectedCz.size >= (gameState.effectPrompt.maxSelect || 3);
                 // Heinz-style name lock — once a card is picked, all
                 // hand cards with a different name are dimmed and
                 // un-clickable. Already-selected cards stay highlighted
@@ -60790,7 +60813,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                 // see in handPick / pickHandCard modes.
                 const potionHandTargetEntry = gameState.potionTargeting?.ownerIdx === myIdx
                   ? (gameState.potionTargeting.validTargets || []).find(
-                      t => t?.type === 'hand' && t?.owner === myIdx && t?.handIndex === item.origIdx
+                      t => t?.type === 'hand' && t?.owner === myIdx && t?.handIndex === item.origIdx && !t?.fromCreation
                     )
                   : null;
                 const isPotionHandTarget = !!potionHandTargetEntry;
@@ -60964,11 +60987,35 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                   // einzige indexbasierte Regel, deshalb blieb eine
                   // aktivierbare Luna Kiai im Vorrat ausgegraut.
                   const czDimmed = getCardDimmed(cardName, item.origIdx, true);
+                  // ★ 12.11.: Vorratskarten gelten wie Handkarten — AKTUELLE Stufe und Kosten stehen auf der Karte (gruen = verringert, rot = erhoeht), wie in der Hand. Stufe vom Server
+                  // (`creationLevels`, nur bei Abweichung vom Druck); Kosten: Rusting-Crystal-Aufschlag (`applyCrystalCostMods`), sonst gedruckt.
+                  const czLevel = (me.creationLevels || {})[item.origIdx] ?? null;
+                  const czKosten = (() => {
+                    if (czCard?.cost == null || czCard.costLabel) return null;
+                    const k = applyCrystalCostMods(me, cardName, czCard.cost);
+                    return k !== czCard.cost ? Math.max(0, k) : null;
+                  })();
+                  const czNotes = [];
+                  if (czLevel != null) czNotes.push({ color: czLevel > (czCard?.level ?? 0) ? '#fe5154' : '#75f091', text: `Level ${czLevel} in your Creation Zone (printed ${czCard?.level}).` });
+                  if (czKosten != null) czNotes.push({ color: czKosten > czCard.cost ? '#fe5154' : '#75f091', text: `Cost ${czKosten} in your Creation Zone (printed ${window.cardCostText ? window.cardCostText(czCard) : czCard.cost}).` });
                   // ★ 28.8.: Abwurf-Prompt DIREKT IN DER ZONE, nach dem
                   // Muster des Handabwurfs — statt einer zweiten
                   // Galerie. Waehlbar ist nur, was der Server
                   // freigegeben hat; die gerade aufloesende Karte ist
                   // dort nicht dabei.
+                  // ★ 12.11.: Ziel-Auswahl mit Handzugriff (Cool Presents: „Karten aus deiner Hand verschenken“) bietet auch Vorratskarten an
+                  // (`type: 'hand'` + `fromCreation: true`) — gleiche Hervorhebung wie in der Hand.
+                  const czPotionZiel = gameState.potionTargeting?.ownerIdx === myIdx
+                    ? (gameState.potionTargeting.validTargets || []).find(
+                        t => t?.type === 'hand' && t?.owner === myIdx && t?.handIndex === item.origIdx && !!t?.fromCreation
+                      )
+                    : null;
+                  const czPotionGewaehlt = !!czPotionZiel && potionSelection.includes(czPotionZiel.id);
+                  const czHandPick = gameState.effectPrompt?.type === 'handPick' && gameState.effectPrompt?.ownerIdx === myIdx;
+                  const czHandPickWaehlbar = czHandPick && (gameState.effectPrompt.creationEligibleIndices || []).includes(item.origIdx);
+                  const czHandPickGewaehlt = czHandPick && handPickSelectedCz.has(item.origIdx);
+                  const czHandPickVoll = czHandPickWaehlbar && !czHandPickGewaehlt
+                    && handPickSelected.size + handPickSelectedCz.size >= (gameState.effectPrompt.maxSelect || 3);
                   const czPrompt = gameState.effectPrompt?.type === 'creationDiscard'
                     && gameState.effectPrompt?.ownerIdx === myIdx;
                   const czWaehlbar = czPrompt
@@ -60976,6 +61023,12 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                   return (
                     <div key={'cz' + item.origIdx}
                       className={'creation-slot' + (item.isDragged ? ' hand-dragging' : '')
+                        + (czPotionGewaehlt ? ' hand-pick-selected' : (czPotionZiel ? ' hand-pick-eligible' : ''))
+                        + ((gameState.effectPrompt?.type === 'forceDiscard' || gameState.effectPrompt?.type === 'forceDiscardCancellable') && gameState.effectPrompt?.ownerIdx === myIdx && (gameState.effectPrompt.creationEligibleIndices || []).includes(item.origIdx) ? ' hand-discard-target' : '')
+                        + (czHandPickGewaehlt ? ' hand-pick-selected' : '')
+                        + (czHandPick && gameState.effectPrompt.highlightStyle === 'strong' ? ' hand-pick-stark' + (!czHandPickWaehlbar ? ' hand-card-dimmed' : '') : '')
+                        + (czHandPickWaehlbar && !czHandPickGewaehlt && !czHandPickVoll ? ' hand-pick-eligible' : '')
+                        + (czHandPickVoll ? ' hand-card-dimmed' : '')
                         + (czPrompt
                             ? (czWaehlbar ? ' hand-discard-target' : ' hand-card-dimmed')
                             : (czDimmed ? ' hand-card-dimmed' : ''))}
@@ -60996,7 +61049,8 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                         onHandMouseDown(e, item.origIdx, true);
                       }}
                       onTouchStart={(e) => { if (!czPrompt) onHandMouseDown(e, item.origIdx, true); }}>
-                      <BoardCard cardName={cardName} skins={gameSkins} rarity={me.rarity?.creationZone?.[item.origIdx] || undefined} />
+                      <BoardCard cardName={cardName} skins={gameSkins} rarity={me.rarity?.creationZone?.[item.origIdx] || undefined}
+                        handLevel={czLevel} handCost={czKosten} handNotes={czNotes} />
                     </div>
                   );
                 })}
@@ -63259,27 +63313,32 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       {/* ── Hand Pick Prompt (Shard of Chaos) ── */}
       {isMyEffectPrompt && ep.type === 'handPick' && (() => {
         const minSel = ep.minSelect ?? 1;
-        const canConfirm = handPickSelected.size >= minSel;
+        const handPickGesamt = handPickSelected.size + handPickSelectedCz.size;
+        const canConfirm = handPickGesamt >= minSel;
         // When `nameLockOnFirstSelect` is set, the confirm label
         // suffixes the current selection count (e.g. "Discard 3").
         // Heinz uses this — the count can vary 1..maxSelect on the
         // fly as the player toggles copies.
         const baseLabel = ep.confirmLabel || 'Confirm';
         const dynamicLabel = ep.nameLockOnFirstSelect
-          ? `${baseLabel} ${handPickSelected.size}`
+          ? `${baseLabel} ${handPickGesamt}`
           : baseLabel;
         return (
           <DraggablePanel className="first-choice-panel animate-in" style={{ borderColor: 'rgba(184,102,255,.85)' }}>
             <div className="orbit-font" style={{ fontSize: 13, color: '#b866ff', marginBottom: 4 }}>{ep.title || 'Select Cards'}</div>
             <div style={{ fontSize: 12, color: 'var(--text2)', marginBottom: 10 }}>{ep.description}</div>
             <div style={{ fontSize: 11, color: '#b866ff', opacity: .8, marginBottom: 8 }}>
-              Selected: {handPickSelected.size}/{ep.maxSelect || 3} (min {minSel})
+              Selected: {handPickGesamt}/{ep.maxSelect || 3} (min {minSel})
             </div>
             <div style={{ display: 'flex', gap: 8, justifyContent: 'center' }}>
               <button className="btn" style={{ padding: '6px 16px', fontSize: 11, borderColor: canConfirm ? '#b866ff' : '#535353', color: canConfirm ? '#b866ff' : '#535353' }}
                 disabled={!canConfirm}
                 onClick={() => {
-                  const selected = [...handPickSelected].map(idx => ({ handIndex: idx, cardName: me.hand[idx] }));
+                  const selected = [
+                    ...[...handPickSelected].map(idx => ({ handIndex: idx, cardName: me.hand[idx] })),
+                    // Vorratskarten (Extra-Hand): gleicher Eintrag, zusaetzlich `fromCreation: true`
+                    ...[...handPickSelectedCz].map(idx => ({ handIndex: idx, cardName: (me.creationZone || [])[idx], fromCreation: true })),
+                  ];
                   respondToPrompt({ selectedCards: selected });
                 }}>{dynamicLabel}</button>
               {ep.cancellable !== false && (
