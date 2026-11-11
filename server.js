@@ -6086,6 +6086,22 @@ function sendGameState(room, playerIdx, extra) {
       // client renders an effective-cost badge on each tagged hand
       // card, and the play-from-hand path uses the same map to compute
       // what the owner actually pays.
+      // ★ 12.11. (Vorgabe: Crestina-Karten gelten wie Handkarten): wirksame STUFE der Karten in Crestinas Vorrat, nur wo sie vom Druck abweicht (Great Vanguard Demon, Stufensenker der Hand,
+      // Mana Absorbing Crystal …) — Index = Platz im Vorrat. Owner-only wie die Hand-Abzuege; die Engine rechnet dieselbe Stufe fuer die Spielbarkeit (`effectiveCardLevel`).
+      creationLevels: pi === playerIdx ? (() => {
+        const out = {};
+        if (!room.engine || !(ps.creationZone || []).length) return out;
+        const cardDB = getCardDB();
+        for (let i = 0; i < ps.creationZone.length; i++) {
+          const cd = cardDB[ps.creationZone[i]];
+          if (!cd || typeof cd.level !== 'number' || cd.level <= 0 && cd.cardType !== 'Spell') continue;
+          try {
+            const eff = room.engine.effectiveCardLevel(cd, pi, {});
+            if (Number.isFinite(eff) && eff !== cd.level) out[i] = eff;
+          } catch { /* ohne Anzeige weiter */ }
+        }
+        return out;
+      })() : {},
       handCostReductions: pi === playerIdx ? (() => {
         // Per-hand-index reduction the client renders/affordability-
         // checks against = the per-turn map (Play Money) PLUS the
@@ -7046,6 +7062,7 @@ function sendSpectatorGameState(room) {
       handZusatzaktion: {},
       handLevelOffsetHeroFilter: {},
       handLevelOffsetsDynamic: {},
+      creationLevels: {},
       handCostReductions: {},
       comboLockHeroIdx: ps.comboLockHeroIdx ?? null,
       comboLockHeroOwner: ps.comboLockHeroOwner ?? null,
@@ -12782,7 +12799,7 @@ async function doConfirmPotion(room, pi, { selectedIds }) {
     // set; harmless no-op otherwise.
     delete gs._pendingCardReveal;
     delete gs._pendingPlayLog;
-    const freshTargets = script.getValidTargets ? script.getValidTargets(gs, pi, room.engine, handIndex) : validTargets;
+    const freshTargets = script.getValidTargets ? script.getValidTargets(gs, pi, room.engine, handIndex, fromCreation) : validTargets;
     // `room.engine` als 4. Parameter (16.8.): Karten mit VARIABLEN
     // Kosten rechnen sich aus dem Budget aus, wie viele Ziele sie
     // anbieten duerfen — und dafuer brauchen sie den Kreditrahmen
@@ -13653,7 +13670,7 @@ async function doUseArtifactEffect(room, pi, { cardName, handIndex, fromCreation
         : 99;
     }
     const validTargets = normalizeValidTargets(
-      script.getValidTargets(gs, pi, room.engine, handIndex), pi, room.engine, config, cardName,
+      script.getValidTargets(gs, pi, room.engine, handIndex, fromCreation), pi, room.engine, config, cardName,
     );
     gs.potionTargeting = {
       potionName: cardName, handIndex,

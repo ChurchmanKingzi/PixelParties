@@ -63,7 +63,9 @@ module.exports = {
     // At least 2 cards in hand (Cool Presents + one to give) — though
     // sibling-copy plays can technically count the OTHER copy too, so
     // 2 cards is the floor either way.
-    return (ps.hand?.length || 0) >= 2;
+    // ★ 12.11.: Karten in Crestinas Vorrat (Extra-Hand) zaehlen wie Handkarten (Al: „Crestina-Karten werden immer behandelt wie echte Handkarten“).
+    const vorrat = engine && engine.isCreationZoneUsable?.(pi) ? (ps.creationZone?.length || 0) : 0;
+    return (ps.hand?.length || 0) + vorrat >= 2;
   },
 
   /**
@@ -73,13 +75,13 @@ module.exports = {
    * the in-game outcome is identical regardless of which copy is
    * gifted, so the picker stays uncluttered.
    */
-  getValidTargets(gs, pi, _engine, handIndex) {
+  getValidTargets(gs, pi, engine, handIndex, fromCreation = false) {
     const ps = gs.players?.[pi];
     if (!ps) return [];
     const seen = new Set();
     const out = [];
     for (let i = 0; i < (ps.hand || []).length; i++) {
-      if (i === handIndex) continue;
+      if (!fromCreation && i === handIndex) continue;
       const name = ps.hand[i];
       if (!name) continue;
       if (seen.has(baseCardName(name))) continue;
@@ -91,6 +93,25 @@ module.exports = {
         handIndex: i,
         cardName: name,
       });
+    }
+    // ★ 12.11.: Crestinas Vorrat (Extra-Hand) gilt wie die Hand. Ziel gleicher Form (`type: 'hand'`), nur mit `fromCreation: true` und eigener Id; ein Name,
+    // der schon in der Hand steht, wird dort verschenkt (gleiches Ergebnis, die Auswahl bleibt aufgeraeumt). Ist die Zone nicht nutzbar (Crestina weg/eingefroren …), fehlt sie.
+    if (engine && engine.isCreationZoneUsable?.(pi)) {
+      for (let i = 0; i < (ps.creationZone || []).length; i++) {
+        if (fromCreation && i === handIndex) continue;
+        const name = ps.creationZone[i];
+        if (!name) continue;
+        if (seen.has(baseCardName(name))) continue;
+        seen.add(baseCardName(name));
+        out.push({
+          id: `creation-${pi}-${i}`,
+          type: 'hand',
+          owner: pi,
+          handIndex: i,
+          fromCreation: true,
+          cardName: name,
+        });
+      }
     }
     return out;
   },
@@ -156,7 +177,8 @@ module.exports = {
     // Presents' own slot may shift as gifted cards leave hand — the
     // engine's standard post-resolve cleanup uses `getResolvingHandIndex`
     // (name lookup), so the artifact's discard still lands correctly.
-    const sorted = [...targets].sort((a, b) => b.handIndex - a.handIndex);
+    // Hand und Vorrat sind getrennte Listen mit je eigenen Indizes: erst die Hand (absteigend), dann der Vorrat (absteigend).
+    const sorted = [...targets].sort((a, b) => (!!a.fromCreation - !!b.fromCreation) || (b.handIndex - a.handIndex));
     // W16d (A08-31): EIN Hand-Interaktionsfenster (Ambush the Scout) für das ganze Geben, wie Live Show – ein Effekt, eine Frage.
     // Wird er negiert, ist der Preis bezahlt und nichts wird verschenkt.
     if (await engine.checkHandInteractionReaction(oi, 'insert',
@@ -169,6 +191,7 @@ module.exports = {
       const ok = await engine.actionTransferCardToOppHand(pi, t.handIndex, {
         source: CARD_NAME,
         windowChecked: true,
+        ...(t.fromCreation ? { fromCreation: true } : {}),
       });
       if (!ok) break; // opp.handLocked mid-loop — bail.
       await engine._delay(150);

@@ -30,7 +30,7 @@ module.exports = {
     // Opp must be able to receive (`actionTransferCardToOppHand`
     // refuses while opp.handLocked).
     if (ops.handLocked) return false;
-    return (ps.hand?.length || 0) >= 1;
+    return (ps.hand?.length || 0) >= 1 || (engine.isCreationZoneUsable(pi) && (ps.creationZone?.length || 0) >= 1);   // 12.11.: auch Karten in Crestinas Vorrat
   },
 
   async onCreatureEffect(ctx) {
@@ -46,22 +46,17 @@ module.exports = {
     // Any card in hand qualifies — no originally-owned filter here
     // (Crystal Well's text uses "originally owned by them"; Chatty's
     // text just says "a card", so any hand slot is fair game).
-    const eligibleIndices = [];
-    for (let i = 0; i < (ps.hand || []).length; i++) eligibleIndices.push(i);
-    if (eligibleIndices.length === 0) return false;
-
-    const result = await engine.promptGeneric(pi, {
-      type: 'pickHandCard',
+    // 12.11.: Karten aus Crestinas Vorrat zaehlen wie Handkarten — Hand ODER Vorrat waehlbar.
+    const result = await engine.promptKarteAusHandOderVorrat(pi, {
       title: CARD_NAME,
       description: `Choose a card from your hand to give to ${ops.username}.`,
-      eligibleIndices,
-      cancellable: true,
+      instruction: `Click a card in your Creation Zone to give it to ${ops.username}.`,
+      opponentTitle: 'Opponent is choosing a card to give away...',
     });
-    if (!result || result.cancelled || result.handIndex == null) return false;
+    if (!result) return false;
 
-    const ok = await engine.actionTransferCardToOppHand(pi, result.handIndex, {
-      source: CARD_NAME,
-    });
+    const ok = await engine.actionTransferCardToOppHand(pi, result.index, result.ausVorrat
+      ? { source: CARD_NAME, fromCreation: true } : { source: CARD_NAME });
     if (!ok) return false;
 
     engine.log('chatty_town_guard_gift', {

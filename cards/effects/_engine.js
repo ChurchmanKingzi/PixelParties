@@ -24387,6 +24387,64 @@ this._deathWatch = (this._deathWatchStack || []).length
   }
 
   /**
+   * ★ 12.11. (Vorgabe: „Crestina-Karten werden immer wie echte Handkarten behandelt — einzige Ausnahme: das Handlimit"): EINE Auswahl „eine Karte aus meiner Hand" fuer Effekte, die der
+   * Spieler SELBST waehlt (Geben, Abwerfen als Kosten …). Gibt es Karten in Hand UND Vorrat, fragt zuerst ein `optionPicker`, aus welcher Quelle; die Karte selbst waehlt dann der jeweilige Prompt
+   * (`pickHandCard` fuer die Hand, `creationDiscard` fuer den Vorrat). Rueckgabe: `{ ausVorrat, index, cardName }` oder `null` (abgebrochen / nichts waehlbar).
+   * @param {object} cfg { title, description, instruction?, cancellable?, handIndices?, vorratIndices?, opponentTitle?, opponentSubtitle? }
+   *   `handIndices` / `vorratIndices`: waehlbare Plaetze (Standard: alle; der Vorrat nur, wenn benutzbar).
+   */
+  async promptKarteAusHandOderVorrat(pi, cfg = {}) {
+    const ps = this.gs.players[pi];
+    if (!ps) return null;
+    const handIdx = Array.isArray(cfg.handIndices) ? cfg.handIndices : (ps.hand || []).map((_, i) => i);
+    const vorratIdx = Array.isArray(cfg.vorratIndices)
+      ? cfg.vorratIndices
+      : (this.isCreationZoneUsable(pi) ? (ps.creationZone || []).map((_, i) => i) : []);
+    if (handIdx.length === 0 && vorratIdx.length === 0) return null;
+    const cancellable = cfg.cancellable !== false;
+    let quelle = handIdx.length > 0 ? 'hand' : 'creation';
+    if (handIdx.length > 0 && vorratIdx.length > 0) {
+      const wahl = await this.promptGeneric(pi, {
+        type: 'optionPicker',
+        title: cfg.title,
+        description: `${cfg.description || 'Choose a card.'} From your hand or from your Creation Zone?`,
+        options: [
+          { id: 'hand', label: 'From my hand', description: 'Choose one of your hand cards.', color: '#66ccff' },
+          { id: 'creation', label: 'From my Creation Zone', description: 'Choose one of your Creation Zone cards (it counts as a hand card).', color: '#66ccff' },
+        ],
+        cancellable,
+      });
+      if (!wahl || wahl.cancelled || !wahl.optionId) return null;
+      quelle = wahl.optionId === 'creation' ? 'creation' : 'hand';
+    }
+    if (quelle === 'creation') {
+      const antwort = await this.promptGeneric(pi, {
+        type: 'creationDiscard',
+        count: 1,
+        title: cfg.title,
+        description: cfg.description,
+        instruction: cfg.instruction || 'Click a card in your Creation Zone.',
+        opponentTitle: cfg.opponentTitle || 'Opponent is choosing a card...',
+        opponentSubtitle: cfg.opponentSubtitle || 'Waiting for the opponent to choose a card from their Creation Zone...',
+        eligibleIndices: vorratIdx,
+        cancellable: false,
+      });
+      const ci = antwort?.creationIndex;
+      if (!Number.isInteger(ci) || !vorratIdx.includes(ci) || !ps.creationZone?.[ci]) return null;
+      return { ausVorrat: true, index: ci, cardName: ps.creationZone[ci] };
+    }
+    const antwort = await this.promptGeneric(pi, {
+      type: 'pickHandCard',
+      title: cfg.title,
+      description: cfg.description,
+      eligibleIndices: handIdx,
+      cancellable,
+    });
+    if (!antwort || antwort.cancelled || antwort.handIndex == null) return null;
+    return { ausVorrat: false, index: antwort.handIndex, cardName: antwort.cardName ?? ps.hand[antwort.handIndex] };
+  }
+
+  /**
    * ★ 12.11.: Instanzgebundene Stufensenkung fuer Karten in Crestinas Vorrat (Extra-Hand) — Gegenstueck zu den Handindex-Feldern (`_handLevelOffsets*`), die nur die Hand kennt.
    * Eine Vorratskarte traegt ihre Senkung als `inst.counters._vorratStufe` (negativ; Great Vanguard Demon: „reduce this card's level in your hand by 1"). Namensweit gilt wie in der Hand
    * die am staerksten gesenkte Kopie; nur bei benutzbarem Vorrat. Der Eintrag faellt mit der Instanz weg, sobald die Karte den Vorrat verlaesst (Ausspielen, Abwurf …).
