@@ -41835,6 +41835,30 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
   const irgendeinAufstieg = (cardName, handIdx) =>
     (me.heroes || []).some((h, hi) => heroCanAscendTo(h, hi, cardName, handIdx))
     || ((gameState.fremdAufstiegZiele || {})[cardName] || []).length > 0;
+  // Alle Helden (eigene + geliehene der Gegnerspalte), auf die diese Karte jetzt aufsteigen kann. Ein EINZIGER Ort fuer Klick-Aufstieg und die Wahl „Discard / Ascend"
+  // (Karten mit Abwurf-Handeffekt wie Stormkissed Waflav). Erlasse je Handkopie zaehlen Handindizes — fuer eine Vorratskarte (`fromCreation`) nie.
+  const aufstiegsHelden = (cardName, handIdx, fromCreation) => {
+    const eligible = [];
+    for (let hi = 0; hi < (me.heroes || []).length; hi++) {
+      const h = me.heroes[hi];
+      if (heroCanAscendTo(h, hi, cardName, fromCreation ? null : handIdx)) eligible.push({ idx: hi, name: h.name });
+    }
+    // 29.9.: geliehene Helden (Gegnerspalte)
+    for (let hi = 0; hi < (opp.heroes || []).length; hi++) {
+      if (kannFremdAufsteigen(hi, cardName)) eligible.push({ idx: hi, name: opp.heroes[hi].name, heroOwner: oppIdx });
+    }
+    return eligible;
+  };
+  // Aufstieg von einer Karte aus Hand/Vorrat starten: ein Held → sofort, mehrere → Heldenwahl.
+  const aufstiegStarten = ({ cardName, handIndex, fromCreation, card, eligible }) => {
+    if (eligible.length === 1) {
+      hideGameTooltip(); socket.emit('ascend_hero', { roomId: gameState.roomId, heroIdx: eligible[0].idx, cardName, handIndex, fromCreation: fromCreation || undefined,
+        heroOwner: eligible[0].heroOwner,
+      });
+    } else if (eligible.length > 1) {
+      setSpellHeroPick({ cardName, handIndex, fromCreation, card, eligible, isAscension: true });
+    }
+  };
 
   const canHeroPlayCard = (playerData, heroIdx, card, handIdx) => {
     const isOwn = playerData === me;
@@ -43552,14 +43576,17 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
               summonEligible.push({ idx: hi, name: me.heroes[hi].name, zoneSlot: slot });
             }
           }
-          if (summonEligible.length > 0) {
+          // ★ 11.11. (Als Vorgabe): eine ASCENDED-Karte mit Abwurf-Handeffekt (Stormkissed Waflav: „discard this card … 1 Evolution Counter" ODER Aufstieg) bietet beim Klick
+          // die Wahl „Discard / Ascend", sobald der Aufstieg JETZT moeglich ist (Hand und Vorrat); sonst gilt der Handeffekt allein (Standard = Discard).
+          const ascendEligible = isAscensionPlayable ? aufstiegsHelden(cardName, idx, fromCreation) : [];
+          if (summonEligible.length > 0 || ascendEligible.length > 0) {
             // ★ 28.8., Als Befund: „Luna Kiai ist gehighlightet, aber der
             // Klick tut nichts." Luna Kiai ist eine CREATURE, der Klick
             // landet also in diesem Waehler — und der trug die Herkunft
             // nicht weiter. Beide Knoepfe sendeten danach einen
             // Vorrats-Index als HAND-Index; der Server lehnte ab, und
             // sichtbar passierte nichts.
-            setSummonOrRevealPick({ cardName, handIndex: idx, fromCreation, card, summonEligible });
+            setSummonOrRevealPick({ cardName, handIndex: idx, fromCreation, card, summonEligible, ascendEligible });
           } else {
             if (window.playSFX) window.playSFX('ui_click');
             socket.emit('activate_hand_card', {
@@ -43959,24 +43986,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
             }
           } else if (isAscensionPlayable) {
             // Click on Ascended Hero — find eligible base heroes
-            const eligible = [];
-            for (let hi = 0; hi < (me.heroes || []).length; hi++) {
-              const h = me.heroes[hi];
-              if (heroCanAscendTo(h, hi, cardName, fromCreation ? null : idx)) {
-                eligible.push({ idx: hi, name: h.name });
-              }
-            }
-            // 29.9.: geliehene Helden (Gegnerspalte)
-            for (let hi = 0; hi < (opp.heroes || []).length; hi++) {
-              if (kannFremdAufsteigen(hi, cardName)) eligible.push({ idx: hi, name: opp.heroes[hi].name, heroOwner: oppIdx });
-            }
-            if (eligible.length === 1) {
-              hideGameTooltip(); socket.emit('ascend_hero', { roomId: gameState.roomId, heroIdx: eligible[0].idx, cardName, handIndex: idx, fromCreation: fromCreation || undefined,
-            heroOwner: eligible[0].heroOwner,
-          });
-            } else if (eligible.length > 1) {
-              setSpellHeroPick({ cardName, handIndex: idx, fromCreation, card, eligible, isAscension: true });
-            }
+            aufstiegStarten({ cardName, handIndex: idx, fromCreation, card, eligible: aufstiegsHelden(cardName, idx, fromCreation) });
           } else if (isSurprisePlayable) {
             // Click on a Surprise card — find heroes with empty surprise zones
             const eligible = [];
@@ -63158,6 +63168,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
               Choose an action:
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              {(p.summonEligible || []).length > 0 && (
               <button className="btn" style={{ padding: '8px 16px', fontSize: 12, borderColor: 'var(--accent)', color: 'var(--accent)', textAlign: 'left' }}
                 onClick={() => {
                   const { cardName: cn, handIndex: hi, fromCreation: fc, card: c, summonEligible } = p;
@@ -63177,6 +63188,18 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                 }}>
                 🐾 Summon
               </button>
+              )}
+              {/* ★ 11.11.: Ascended-Karte mit Abwurf-Handeffekt (Stormkissed Waflav) — Aufstieg ODER Handeffekt (Discard). Nur angeboten, wenn der Aufstieg jetzt moeglich ist. */}
+              {(p.ascendEligible || []).length > 0 && (
+              <button className="btn" style={{ padding: '8px 16px', fontSize: 12, borderColor: 'var(--accent)', color: 'var(--accent)', textAlign: 'left' }}
+                onClick={() => {
+                  const { cardName: cn, handIndex: hi, fromCreation: fc, card: c, ascendEligible } = p;
+                  setSummonOrRevealPick(null);
+                  aufstiegStarten({ cardName: cn, handIndex: hi, fromCreation: fc, card: c, eligible: ascendEligible });
+                }}>
+                ✨ Ascend
+              </button>
+              )}
               <button className="btn" style={{ padding: '8px 16px', fontSize: 12, borderColor: '#fad54a', color: '#fad54a', textAlign: 'left' }}
                 onClick={() => {
                   const { cardName: cn, handIndex: hi, fromCreation: fc } = p;
