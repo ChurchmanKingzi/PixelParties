@@ -153,25 +153,62 @@ module.exports = {
     for (let i = 0; i < (ps.hand || []).length; i++) {
       if (_isOriginallyOwnedHandSlot(engine, pi, i)) eligibleIndices.push(i);
     }
-    if (eligibleIndices.length === 0) return false;
+    // ★ 12.11.: auch Karten aus Crestinas Vorrat (Extra-Hand) lassen sich geben („add a card from your hand" — alles, was aus der Hand heraus geht, geht auch von dort).
+    const vorratIndices = _vorratIndices(engine, pi);
+    if (eligibleIndices.length === 0 && vorratIndices.length === 0) return false;
 
-    const result = await engine.promptGeneric(pi, {
-      type: 'pickHandCard',
-      title: CARD_NAME,
-      description: 'Choose one of your originally-owned cards to give to your opponent. You then draw 1 card.',
-      eligibleIndices,
-      cancellable: true,
-    });
-    if (!result || result.cancelled || result.handIndex == null) return false;
+    let quelle = eligibleIndices.length > 0 ? 'hand' : 'creation';
+    if (eligibleIndices.length > 0 && vorratIndices.length > 0) {
+      const wahl = await engine.promptGeneric(pi, {
+        type: 'optionPicker',
+        title: CARD_NAME,
+        description: 'Give a card from your hand or from your Creation Zone (Extra-Hand)?',
+        options: [
+          { id: 'hand', label: 'From my hand', description: 'Choose one of your originally-owned hand cards.', color: '#66ccff' },
+          { id: 'creation', label: 'From my Creation Zone', description: 'Choose one of your originally-owned Creation Zone cards.', color: '#66ccff' },
+        ],
+        cancellable: true,
+      });
+      if (!wahl || wahl.cancelled || !wahl.optionId) return false;
+      quelle = wahl.optionId === 'creation' ? 'creation' : 'hand';
+    }
 
-    const ok = await engine.actionTransferCardToOppHand(pi, result.handIndex, {
-      source: CARD_NAME,
-    });
+    let ok, cardName;
+    if (quelle === 'creation') {
+      const antwort = await engine.promptGeneric(pi, {
+        type: 'creationDiscard',
+        count: 1,
+        title: CARD_NAME,
+        description: 'Choose one of your originally-owned Creation Zone cards to give to your opponent. You then draw 1 card.',
+        instruction: 'Click a card in your Creation Zone to give it to your opponent.',
+        opponentTitle: 'Opponent is choosing a card to give away...',
+        opponentSubtitle: 'Waiting for the opponent to choose a card from their Creation Zone...',
+        eligibleIndices: vorratIndices,
+        cancellable: false,
+      });
+      const ci = antwort?.creationIndex;
+      if (!Number.isInteger(ci) || !vorratIndices.includes(ci)) return false;
+      cardName = ps.creationZone[ci];
+      ok = await engine.actionTransferCardToOppHand(pi, ci, { source: CARD_NAME, fromCreation: true });
+    } else {
+      const result = await engine.promptGeneric(pi, {
+        type: 'pickHandCard',
+        title: CARD_NAME,
+        description: 'Choose one of your originally-owned cards to give to your opponent. You then draw 1 card.',
+        eligibleIndices,
+        cancellable: true,
+      });
+      if (!result || result.cancelled || result.handIndex == null) return false;
+      cardName = result.cardName;
+      ok = await engine.actionTransferCardToOppHand(pi, result.handIndex, {
+        source: CARD_NAME,
+      });
+    }
     if (!ok) return false;
 
     await engine.actionDrawCards(pi, 1);
     engine.log('crystal_well_use', {
-      player: ps.username, transferred: result.cardName,
+      player: ps.username, transferred: cardName,
     });
     engine.sync();
     return true;
@@ -186,7 +223,19 @@ function _hasOriginallyOwnedHandCard(engine, pi) {
   for (let i = 0; i < (ps.hand || []).length; i++) {
     if (_isOriginallyOwnedHandSlot(engine, pi, i)) return true;
   }
-  return false;
+  return _vorratIndices(engine, pi).length > 0;   // 12.11.: auch Karten in Crestinas Vorrat
+}
+
+/** Vorrats-Indizes (Crestinas Extra-Hand, nur wenn benutzbar), deren Karte dem Spieler urspruenglich gehoert. */
+function _vorratIndices(engine, pi) {
+  const ps = engine.gs.players[pi];
+  if (!ps || !engine.isCreationZoneUsable(pi)) return [];
+  const out = [];
+  (ps.creationZone || []).forEach((name, i) => {
+    const inst = engine._findHandInstanceAt(pi, i, true);
+    if (!inst || (inst.originalOwner ?? pi) === pi) out.push(i);   // ohne Instanz: wie in der Hand zulassen
+  });
+  return out;
 }
 
 /**
