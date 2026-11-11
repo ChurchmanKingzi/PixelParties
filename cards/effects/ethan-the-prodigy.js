@@ -75,6 +75,7 @@ function darfUeberHeld(engine, pi, feld, hi) {
 
 module.exports = {
   activeIn: ['hand', 'support'],
+  reactFromCreation: true,   // 11.11.: Hook-Trigger aus der Hand gilt auch aus Crestinas Vorrat (Extra-Hand)
 
   // ② Die Senkung gilt fuer BEIDE Seiten — ohne dieses Flag beliefert
   // der Motor nur die eigene.
@@ -101,7 +102,7 @@ module.exports = {
     afterSpellResolved: async (ctx) => {
       const engine = ctx._engine;
       const inst = ctx.card;
-      if (!inst || inst.zone !== 'hand') return;      // nur aus der Hand
+      if (!inst || (inst.zone !== 'hand' && inst.zone !== 'creationZone')) return;      // nur aus der Hand (oder Crestinas Vorrat)
       const pi = ctx.cardOwner;
       if (ctx.casterIdx !== pi) return;               // „when YOU use"
 
@@ -111,7 +112,7 @@ module.exports = {
       if ((cd.level || 0) < AUSLOESE_STUFE) return;
 
       const ps = engine.gs.players[pi];
-      if (!ps || !(ps.hand || []).includes(CARD_NAME)) return;
+      if (!ps || !engine._rxQuelleFuer(ps, CARD_NAME)) return;
       if (hatEthan(engine, pi)) return;               // ③ nur einer
       const zonen = freieZonen(engine, pi);
       if (zonen.length === 0) return;
@@ -129,7 +130,7 @@ module.exports = {
 
       // Nach der Abfrage neu pruefen — das Brett kann sich waehrend des
       // Ueberlegens geaendert haben.
-      if (!(ps.hand || []).includes(CARD_NAME)) return;
+      if (!engine._rxQuelleFuer(ps, CARD_NAME)) return;
       if (hatEthan(engine, pi)) return;
       const zonenJetzt = freieZonen(engine, pi);
       if (zonenJetzt.length === 0) return;
@@ -150,12 +151,14 @@ module.exports = {
       }
       const feld = ziel.owner ?? pi;   // Kontrolle statt Seite (Styx 28.9.)
 
-      const handIdx = ps.hand.indexOf(CARD_NAME);
-      engine.takeFromPileSync(ps, 'hand', handIdx);
+      const q = engine._rxQuelleFuer(ps, CARD_NAME);
+      if (!q) return;
+      const handIdx = q.idx;
+      engine.rxNimm(ps, q);
       const res = await engine.summonCreatureWithHooks(
         CARD_NAME, feld, ziel.heroIdx, ziel.slotIdx,
         {
-          source: CARD_NAME, fromHandIdx: handIdx, ...(feld !== pi ? { controller: pi } : {}),
+          source: CARD_NAME, ...(q.ausVorrat ? {} : { fromHandIdx: handIdx }), ...(feld !== pi ? { controller: pi } : {}),
           // Kontrolle statt Seite (Styx 28.9.): `beforeSummon` sieht als
           // `cardOwner` die Feldseite — der Beschwoerer kommt extra mit.
           hookExtras: { _isNormalSummon: false, ethanKontrolleur: pi },

@@ -1183,7 +1183,7 @@ function selbstsenkungZaehlt(engine, inst, cardName, ownerIdx, opts = {}) {
   // selbst 0 liefert, und die Handkarte bekaeme gar nichts.
   const kopien = (engine.cardInstances || []).filter(c =>
     c.name === cardName
-    && (!opts.zone || c.zone === opts.zone)
+    && (!opts.zone || c.zone === opts.zone || (opts.zone === 'hand' && c.zone === 'creationZone'))   // 11.11.: eine Karte in Crestinas Vorrat (Extra-Hand) zaehlt als Handkopie
     && (c.controller ?? c.owner) === ownerIdx
     && !c.faceDown
     && (typeof c.isActiveIn !== 'function' || c.isActiveIn()));
