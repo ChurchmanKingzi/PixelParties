@@ -17465,7 +17465,7 @@ io.on('connection', (socket) => {
     }
     // Reject force-discard of the specific resolving card instance
     const epType = room.gameState.effectPrompt.type;
-    if ((epType === 'forceDiscard' || epType === 'forceDiscardCancellable') && response?.handIndex != null) {
+    if ((epType === 'forceDiscard' || epType === 'forceDiscardCancellable') && response?.handIndex != null && !response?.fromCreation) {   // Vorrats-Antwort (12.11.): `handIndex` ist ein Vorrats-Index
       const ps = room.gameState.players[pi];
       if (ps._resolvingCard && response.handIndex === getResolvingHandIndex(ps)) return;
     }

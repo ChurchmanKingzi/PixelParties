@@ -122,6 +122,12 @@ function wisdomFor(engine, pi, heroIdx, cd, k, zonesAtCast, actor = pi) {
  * `handFree` = Karten, die neben der Karte selbst noch in der Hand
  * liegen (im Fenster ist die Karte noch drin, im Resolve schon raus).
  */
+/** ★ 12.11.: Abwurfmaterial fuer den Wisdom-Abwurf — Hand UND nutzbarer Vorrat (Crestinas Extra-Hand gilt wie die Hand). */
+function handPlusVorrat(engine, pi) {
+  const ps = engine.gs.players[pi];
+  return (ps?.hand || []).length + (engine.isCreationZoneUsable?.(pi) ? (ps?.creationZone || []).length : 0);
+}
+
 function plan(engine, pi, heroIdx, opts = {}) {
   const gs = engine.gs;
   const ps = gs.players[pi];
@@ -132,7 +138,7 @@ function plan(engine, pi, heroIdx, opts = {}) {
   const actor = opts.actor ?? pi;   // W20c: Kontrolleur eines uebernommenen Helden (Hand fuer den Wisdom-Abwurf)
   const { abilities, equips } = sendables(engine, pi, heroIdx);
   const total = abilityCardCount(abilities);
-  const handFree = Math.max(0, (gs.players[actor]?.hand || []).length - (opts.cardStillInHand ? 1 : 0));
+  const handFree = Math.max(0, handPlusVorrat(engine, actor) - (opts.cardStillInHand ? 1 : 0));
   let minFree = -1, minPaid = -1;
   for (let k = 0; k <= total; k++) {
     if (!meetsWith(engine, pi, heroIdx, cd, k, undefined, actor)) continue;
@@ -241,7 +247,7 @@ module.exports = {
       if (sent === 0) return false;             // nichts geschickt = nichts geheilt
       const w = remainingWisdom();
       if (w < 0) return false;
-      return w === 0 || (ps.hand || []).length >= w;
+      return w === 0 || handPlusVorrat(engine, ownerIdx) >= w;
     };
 
     // Schleifenkappe: eine Karte je Durchlauf, hoechstens 3 Ability-Slots
@@ -275,7 +281,7 @@ module.exports = {
         _abilityCost: {
           cardName: CARD_NAME, heroIdx, heroSeite: seite, sent, abilitiesSent, amount: amount || 0,
           // Luecke NICHT durch Aufhoeren schliessbar → es MUSS eine Ability kommen
-          needMore: w < 0 || (w > 0 && (ps.hand || []).length < w),
+          needMore: w < 0 || (w > 0 && handPlusVorrat(engine, ownerIdx) < w),
           // Aufhoeren ginge, kostet aber Wisdom-Abwuerfe
           wisdomPending: w > 0,
         },

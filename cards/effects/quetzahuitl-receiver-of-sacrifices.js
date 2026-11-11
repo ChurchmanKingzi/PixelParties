@@ -401,6 +401,9 @@ function pullDivinityFromAnySource(ps, engine) {
   // user wants strict left-to-right text ordering.
   const fromHand = ps.hand.indexOf(DIVINITY);
   if (fromHand >= 0) { engine.takeFromPileSync(ps, 'hand', fromHand); return 'hand'; }
+  // ★ 12.11. (Al: „Crestina-Karten werden immer behandelt wie echte Handkarten“): auch eine Divinity aus Crestinas Vorrat (Extra-Hand) zaehlt als „from your hand“.
+  const q = engine._rxQuelleFuer(ps, DIVINITY);
+  if (q && q.ausVorrat) { engine._rxAbgang(ps, q); return 'creation'; }
   const _taken_fromDeck = engine.takeFromPileSync(ps, 'deck', DIVINITY, { source: CARD_NAME });   // v820: Stapel-Schicht
   if (_taken_fromDeck) {
     return 'deck';
@@ -416,6 +419,7 @@ function refundDivinity(engine, pi, source) {
   const ps = engine.gs.players[pi];
   if (!ps) return;
   if (source === 'hand') engine.handZugangSync(ps, DIVINITY, { von: 'rueckgabe', source: CARD_NAME, ohneInstanz: true });
+  else if (source === 'creation') { ps.creationZone.push(DIVINITY); engine._trackCard(DIVINITY, pi, 'creationZone'); }
   else if (source === 'deck') { ps.mainDeck.push(DIVINITY); engine.shuffleDeck(pi, 'main'); }
   else if (source === 'discard') ps.discardPile.push(DIVINITY);
 }

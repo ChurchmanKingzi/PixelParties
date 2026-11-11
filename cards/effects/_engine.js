@@ -16746,19 +16746,23 @@ this._deathWatch = (this._deathWatchStack || []).length
     if (!opts._noPace) await this._paceHandDiscard();
     // Nach dem Reaktionsfenster kann die Hand geschrumpft sein — Index
     // erst jetzt auflösen (wie zuvor).
+    // ★ 12.11. (Al: „Crestina-Karten werden immer behandelt wie echte Handkarten“): `opts.fromCreation` — `handIdx` ist dann ein Index in Crestinas Vorrat (Extra-Hand).
+    const ausVorrat = !!opts.fromCreation && this.isCreationZoneUsable(playerIdx);
+    const quellListe = ausVorrat ? (ps.creationZone || []) : ps.hand;
     let idx = handIdx;
-    if (idx == null || idx < 0 || idx >= ps.hand.length || ps.hand[idx] !== cardName) {
-      idx = ps.hand.indexOf(cardName);
+    if (idx == null || idx < 0 || idx >= quellListe.length || quellListe[idx] !== cardName) {
+      idx = quellListe.indexOf(cardName);
       if (idx < 0) return false;
     }
-    ps.hand.splice(idx, 1);
+    const vorratInst = ausVorrat ? (this._findHandInstanceAt(playerIdx, idx, true) || null) : null;   // VOR dem Spleissen (Rang unter gleichnamigen Kopien haengt am Platz)
+    quellListe.splice(idx, 1);
     // ── ABLAGE-ROUTING FÜR GESTOHLENE KARTEN (1.8., Als Ruling) ──────
     // Eine gestohlene Karte gehört beim Ablegen ins Deck ihres
     // URSPRÜNGLICHEN Besitzers, nicht in die Ablage des Diebs. Der Flug
     // geht entsprechend von der Hand des Halters zur fremden Ablage —
     // der Client kann das seit jeher (`fromOwner`/`toOwner` im
     // play_pile_transfer-Handler), es wurde nur nie genutzt.
-    const pileOwner = this._handCardPileOwner(playerIdx, cardName);
+    const pileOwner = ausVorrat ? playerIdx : this._handCardPileOwner(playerIdx, cardName);
     const pilePs = this.gs.players[pileOwner] || ps;
     const _ablageLaenge = pilePs.discardPile.length;
     pilePs.discardPile.push(cardName);
@@ -16773,7 +16777,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     // Render packte. Gestohlene Karten fliegen weiter zur fremden Ablage.
     if (!opts._noFlight) {
       this._broadcastEvent('play_pile_transfer', {
-        owner: playerIdx, cardName, from: 'hand', to: 'discard', fromHandIdx: idx,
+        owner: playerIdx, cardName, from: ausVorrat ? 'creation' : 'hand', to: 'discard', fromHandIdx: idx,
         flightStyle: opts.flightStyle,
         ...(pileOwner !== playerIdx ? { fromOwner: playerIdx, toOwner: pileOwner } : {}),
       });
@@ -16785,7 +16789,7 @@ this._deathWatch = (this._deathWatchStack || []).length
         to: this.gs.players[pileOwner]?.username, via: 'discard',
       });
     }
-    const inst = this._pickHandInstByOrigin(playerIdx, cardName, pileOwner !== playerIdx);
+    const inst = ausVorrat ? vorratInst : this._pickHandInstByOrigin(playerIdx, cardName, pileOwner !== playerIdx);
     if (inst) { inst.zone = ZONES.DISCARD; inst.owner = pileOwner; }
     // Participate in the forced-discard batch counter when an outer
     // `withDiscardBatch` wrapper has opened one. This lets effects
@@ -19818,7 +19822,21 @@ this._deathWatch = (this._deathWatchStack || []).length
       return;
     }
     const ps = this.gs.players[playerIdx];
-    if (!ps || (ps.hand || []).length === 0) return;
+    // ★ 12.11. (Al: „Crestina-Karten werden immer behandelt wie echte Handkarten — einzige Ausnahme: das Handlimit“): Karten in Crestinas Vorrat (Extra-Hand) sind
+    // ebenfalls abwerfbar. Ohne eigene `opts.eligibleIndices` (der Normalfall: „discard a card“) sind ALLE nutzbaren Vorratskarten wählbar — außer der gerade
+    // aufgelösten, stammt sie aus dem Vorrat. Karten mit eigener Handauswahl (`eligibleIndices`, z. B. „discard a Spell“) bieten den Vorrat nur an, wenn sie
+    // `opts.eligibleCreation` (Array oder Funktion der Vorrats-Indizes) mitgeben — die Prüfung der Hand lässt sich nicht auf den Vorrat übertragen.
+    const vorratWahl = () => {
+      if (!this.isCreationZoneUsable(playerIdx)) return [];
+      const vorrat = ps?.creationZone || [];
+      let liste;
+      if (opts.eligibleCreation !== undefined) liste = typeof opts.eligibleCreation === 'function' ? opts.eligibleCreation() : opts.eligibleCreation;
+      else if (opts.eligibleIndices === undefined) liste = vorrat.map((_, i) => i);
+      else return [];
+      if (!Array.isArray(liste)) return [];
+      return liste.filter(i => Number.isInteger(i) && vorrat[i] && !this._istAufloesendeHandkarte(ps, i, true));
+    };
+    if (!ps || ((ps.hand || []).length === 0 && vorratWahl().length === 0)) return;
     // ★ Z4 (A06-16, F03-19, M01-13): Ohne eigene `opts.eligibleIndices` ist die Auswahl die Hand OHNE die gerade aufloesende
     // Karte — sie liegt bis zum Ende ihrer Aufloesung noch in `ps.hand`, ist aber keine Handkarte mehr (kein Abwurf der eigenen
     // Zauber-/Artefaktkarte als „Kosten"). `undefined` = alle Plaetze, solange keine Karte aufloest (Verhalten wie bisher).
@@ -19826,7 +19844,7 @@ this._deathWatch = (this._deathWatchStack || []).length
       const l = this._handIndizesOhneAufloesende(ps);
       return l.length === (ps.hand || []).length ? undefined : l;
     };
-    const effektiveHand = () => (opts.eligibleIndices === undefined ? this.handSizeWithoutResolving(playerIdx) : (ps.hand || []).length);
+    const effektiveHand = () => (opts.eligibleIndices === undefined ? this.handSizeWithoutResolving(playerIdx) : (ps.hand || []).length) + vorratWahl().length;
     if (effektiveHand() === 0) return;
 
     // Reaktionsfenster (Ambush the Scout). Hier ist der richtige
@@ -19925,6 +19943,7 @@ this._deathWatch = (this._deathWatchStack || []).length
           : (typeof opts.eligibleIndices === 'function' ? opts.eligibleIndices() : undefined);   // B1/S1: eine Auswahl-FUNKTION (Wisdom, Item Lock …) gilt auch für die Antwort — außerhalb zahlt nicht
         // N3-18 (W24): `opts.cancelOnlyFirst` — Kosten „ganz oder gar nicht": nur die ERSTE Wahl ist abbrechbar (= „Nein"), danach ist die Zahlung Pflicht.
         const kannAbbrechen = !!opts.cancellable && !(opts.cancelOnlyFirst && i > 0);
+        let vorratPlatz = null;         // ★ 12.11.: Platz der Karte in Crestinas Vorrat, wenn diese Runde aus dem Vorrat abgeworfen wird
         let result = await this.promptGeneric(playerIdx, {
           type: 'forceDiscard',
           // ★ v1041: Kosten-Marken durchreichen — so bedient auch
@@ -19946,6 +19965,7 @@ this._deathWatch = (this._deathWatchStack || []).length
           eligibleIndices: typeof opts.eligibleIndices === 'function'
             ? opts.eligibleIndices()
             : (opts.eligibleIndices === undefined ? ohneAufl() : opts.eligibleIndices),
+          creationEligibleIndices: vorratWahl(),   // ★ 12.11.: Vorratskarten wählbar (Client: Klick auf die Karte in der Creation Zone)
           // `cancellable` ist opt-in: ein ERZWUNGENER Abwurf darf nicht
           // abgebrochen werden, ein freiwilliger als Kosten sehr wohl
           // („You MAY discard a card…" — Cute Nerd Magenta).
@@ -19962,9 +19982,19 @@ this._deathWatch = (this._deathWatchStack || []).length
         // Antwort ohne Namen, nicht nur bei gesetztem `cancelled`.
         if (kannAbbrechen && (!result || result.cancelled || result.cardName == null)) break;
 
+        // ★ 12.11.: Antwort aus Crestinas Vorrat (`fromCreation: true`, `handIndex` = Vorrats-Index). Ungültiger Platz: erste wählbare Vorratskopie desselben Namens;
+        // gibt es keine, gilt die Antwort wie eine ohne Karte (Abbruch bei freiwilligen Kosten, sonst Notbremse).
+        if (result && result.fromCreation && result.cardName != null) {
+          const liste = vorratWahl();
+          const vi = Number.isInteger(result.handIndex) ? result.handIndex : -1;
+          const platz = (liste.includes(vi) && ps.creationZone[vi] === result.cardName) ? vi : liste.find(k => ps.creationZone[k] === result.cardName);
+          if (platz === undefined) { if (kannAbbrechen) break; result = null; }
+          else vorratPlatz = platz;
+        }
+
         // ★ Z4: eine Antwort AUSSERHALB der von der Engine festgelegten Auswahl (die aufloesende Karte) gilt nicht — sie wird wie
         // eine Antwort ohne Karte behandelt (Notbremse unten: letzte waehlbare Karte). Falscher/fehlender Platz: erste waehlbare Kopie desselben Namens.
-        if (standardListe && result && result.cardName != null) {
+        if (vorratPlatz == null && standardListe && result && result.cardName != null) {
           const platz = (Number.isInteger(result.handIndex) && standardListe.includes(result.handIndex) && ps.hand[result.handIndex] === result.cardName)
             ? result.handIndex
             : standardListe.find(i => ps.hand[i] === result.cardName);
@@ -19972,7 +20002,7 @@ this._deathWatch = (this._deathWatchStack || []).length
         }
         // B1/S1: eine Antwort mit einer Karte, die gar nicht (mehr) auf der Hand liegt, zählt NICHT als bezahlt (vorher: `continue` weiter unten — der Abwurf galt als erledigt, ohne dass
         // etwas abgeworfen wurde). Sie gilt wie eine Antwort ohne Karte: Notbremse (letzte wählbare Handkarte); bei freiwilligen Kosten ist sie ein Abbruch.
-        if (result && result.cardName != null && !ps.hand.includes(result.cardName)) {
+        if (vorratPlatz == null && result && result.cardName != null && !ps.hand.includes(result.cardName)) {
           if (kannAbbrechen) break;
           result = null;
         }
@@ -19988,6 +20018,16 @@ this._deathWatch = (this._deathWatchStack || []).length
         // produced "card flies from middle of the hand" visuals).
         let resolvedHandIdx = -1;
 
+        // ★ 12.11.: Notbremse mit leerer Handauswahl, aber wählbarem Vorrat → die letzte wählbare Vorratskarte (sonst würde unten ins Leere gegriffen).
+        if ((!result || result.cardName == null) && vorratPlatz == null) {
+          const _hl = opts.eligibleIndices === undefined ? ohneAufl() : (typeof opts.eligibleIndices === 'function' ? opts.eligibleIndices() : undefined);
+          const handLeer = _hl ? _hl.length === 0 : (ps.hand || []).length === 0;
+          const _vl = vorratWahl();
+          if (handLeer && _vl.length > 0) {
+            vorratPlatz = _vl[_vl.length - 1];
+            result = { cardName: ps.creationZone[vorratPlatz], handIndex: vorratPlatz, fromCreation: true };
+          }
+        }
         if (!result || result.cardName == null) {
           // Safety fallback: auto-pop the LAST hand slot. Index of the
           // popped slot (pre-pop) = post-pop length, captured BEFORE
@@ -20029,7 +20069,12 @@ this._deathWatch = (this._deathWatchStack || []).length
           }
         } else {
           const handIdx = result.handIndex;
-          if (handIdx != null && handIdx >= 0 && handIdx < ps.hand.length && ps.hand[handIdx] === result.cardName) {
+          if (vorratPlatz != null) {
+            // ★ 12.11.: aus Crestinas Vorrat — die Instanz VOR dem Spleißen holen (Rang unter gleichnamigen Kopien hängt am Platz)
+            resolvedHandIdx = vorratPlatz;
+            resolvedInst = this._findHandInstanceAt(playerIdx, vorratPlatz, true) || null;
+            ps.creationZone.splice(vorratPlatz, 1);
+          } else if (handIdx != null && handIdx >= 0 && handIdx < ps.hand.length && ps.hand[handIdx] === result.cardName) {
             resolvedHandIdx = handIdx;
             ps.hand.splice(handIdx, 1);
           } else {
@@ -20040,16 +20085,16 @@ this._deathWatch = (this._deathWatchStack || []).length
             } else continue;
           }
           resolvedCardName = result.cardName;
-          resolvedInst = this.findCards({ owner: playerIdx, zone: ZONES.HAND, name: result.cardName })[0] || null;
+          if (vorratPlatz == null) resolvedInst = this.findCards({ owner: playerIdx, zone: ZONES.HAND, name: result.cardName })[0] || null;
           if (deleteMode) {
             rescuedFromDelete = await this._tryBeforeDelete(result.cardName, playerIdx, {
-              fromZone: ZONES.HAND, fromInstance: resolvedInst,
+              fromZone: vorratPlatz != null ? ZONES.CREATION : ZONES.HAND, fromInstance: resolvedInst,
               source: opts.source || 'forced-delete',
             });
           }
           if (!rescuedFromDelete) {
-            // Gestohlene Karten zurück ins Ursprungs-Deck (1.8.).
-            const _po = this._handCardPileOwner(playerIdx, result.cardName);
+            // Gestohlene Karten zurück ins Ursprungs-Deck (1.8.). Vorratskarten gehören immer ihrem Spieler.
+            const _po = vorratPlatz != null ? playerIdx : this._handCardPileOwner(playerIdx, result.cardName);
             (this.gs.players[_po] || ps)[pileKey].push(result.cardName);
             if (_po !== playerIdx) {
               this._broadcastEvent('play_pile_transfer', {
@@ -20111,7 +20156,7 @@ this._deathWatch = (this._deathWatchStack || []).length
           this._broadcastEvent('play_pile_transfer', {
             owner:       playerIdx,
             cardName:    resolvedCardName,
-            from:        'hand',
+            from:        vorratPlatz != null ? 'creation' : 'hand',
             to:          deleteMode ? 'deleted' : 'discard',
             // `fromHandIdx` lets the client locate the EXACT hand slot
             // the card lived in (resolved via the
@@ -54757,8 +54802,10 @@ this._deathWatch = (this._deathWatchStack || []).length
     const ps = this.gs.players[playerIdx];
     const hand = ps?.hand || [];
     const vorrat = this.isCreationZoneUsable(playerIdx) ? (ps?.creationZone || []) : [];
-    const nurHand = hand.includes(cardName) && !vorrat.includes(cardName);
-    return hand.length - (nurHand ? 1 : 0);
+    // ★ 12.11. (Al: „Crestina-Karten werden immer behandelt wie echte Handkarten“): Abwurfmaterial = Hand UND nutzbarer Vorrat. Die gewirkte Karte selbst (liegt sie in Hand
+    // oder Vorrat) zählt nie mit (−1); liegt sie in beiden, ist es dieselbe eine Karte, die abgeht (die andere Kopie bleibt Material).
+    const selbst = hand.includes(cardName) || vorrat.includes(cardName);
+    return hand.length + vorrat.length - (selbst ? 1 : 0);
   }
 
   /** v1288: Handgroesse ohne die gerade aufloesende Karte (siehe _hand-resolve.js). */

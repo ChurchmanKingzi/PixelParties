@@ -40982,11 +40982,14 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
 
     // Force Discard mode (Wheels) — all cards are selectable
     const forceDiscardPrompt = gameState.effectPrompt?.type === 'forceDiscard' && gameState.effectPrompt.ownerIdx === myIdx;
-    if (forceDiscardPrompt) return false;
+    // ★ 12.11.: Vorratskarten (Extra-Hand) sind abwerfbar, wenn der Prompt sie anbietet (`creationEligibleIndices`) — sonst ausgegraut.
+    if (forceDiscardPrompt) return fromCreation ? !(gameState.effectPrompt.creationEligibleIndices || []).includes(handIdx) : false;
 
     // Cancellable Force Discard mode (Training, etc.) — all cards are selectable
     const forceDiscardCancellable = gameState.effectPrompt?.type === 'forceDiscardCancellable' && gameState.effectPrompt.ownerIdx === myIdx;
     if (forceDiscardCancellable) {
+      // 12.11.: Vorratskarten nur, wenn der Skript-Prompt sie ausdruecklich anbietet (`creationEligibleIndices`, z. B. Magic Gems).
+      if (fromCreation) return !(gameState.effectPrompt.creationEligibleIndices || []).includes(handIdx);
       // Optional: `eligibleCards` (Namen) graut alle anderen Handkarten aus (Dante) — ohne Liste ist alles waehlbar.
       const namen = gameState.effectPrompt.eligibleCards;
       return Array.isArray(namen) ? !namen.includes(cardName) : false;
@@ -42326,6 +42329,13 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       }
     }
 
+    // ★ 12.11.: Abwurf (Force Discard) aus Crestinas Vorrat — nur die vom Prompt angebotenen Plaetze (`creationEligibleIndices`).
+    if (fromCreation && (gameState.effectPrompt?.type === 'forceDiscard' || gameState.effectPrompt?.type === 'forceDiscardCancellable') && gameState.effectPrompt.ownerIdx === myIdx) {
+      if (!(gameState.effectPrompt.creationEligibleIndices || []).includes(idx)) return;
+      if (e.cancelable) e.preventDefault();
+      ppSendePromptAntwort(gameState, { cardName, handIndex: idx, fromCreation: true });
+      return;
+    }
     // Force Discard mode — any card in hand can be discarded EXCEPT the specific resolving card
     const forceDiscardActive = !fromCreation && gameState.effectPrompt?.type === 'forceDiscard' && gameState.effectPrompt.ownerIdx === myIdx;
     if (forceDiscardActive) {
@@ -61014,6 +61024,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                     <div key={'cz' + item.origIdx}
                       className={'creation-slot' + (item.isDragged ? ' hand-dragging' : '')
                         + (czPotionGewaehlt ? ' hand-pick-selected' : (czPotionZiel ? ' hand-pick-eligible' : ''))
+                        + ((gameState.effectPrompt?.type === 'forceDiscard' || gameState.effectPrompt?.type === 'forceDiscardCancellable') && gameState.effectPrompt?.ownerIdx === myIdx && (gameState.effectPrompt.creationEligibleIndices || []).includes(item.origIdx) ? ' hand-discard-target' : '')
                         + (czHandPickGewaehlt ? ' hand-pick-selected' : '')
                         + (czHandPick && gameState.effectPrompt.highlightStyle === 'strong' ? ' hand-pick-stark' + (!czHandPickWaehlbar ? ' hand-card-dimmed' : '') : '')
                         + (czHandPickWaehlbar && !czHandPickGewaehlt && !czHandPickVoll ? ' hand-pick-eligible' : '')
