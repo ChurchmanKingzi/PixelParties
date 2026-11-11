@@ -75,7 +75,7 @@ async function reagiereAufTod(ctx, opferName) {
   const gs = engine.gs;
   const pi = ctx.cardController ?? ctx.cardOwner;
   const ps = gs.players[pi];
-  if (!ps || !(ps.hand || []).includes(CARD_NAME)) return;
+  if (!ps || !engine._rxQuelleFuer(ps, CARD_NAME)) return;   // Hand oder Crestinas Vorrat
 
   let zonen = beschwoerbareZonen(engine, pi);
   if (zonen.length === 0) return;
@@ -93,7 +93,7 @@ async function reagiereAufTod(ctx, opferName) {
 
   // Nach dem Prompt neu pruefen — waehrend der Spieler ueberlegt, kann
   // sich das Brett geaendert haben (Kettenreaktionen).
-  if (!(ps.hand || []).includes(CARD_NAME)) return;
+  if (!engine._rxQuelleFuer(ps, CARD_NAME)) return;
   zonen = beschwoerbareZonen(engine, pi);
   if (zonen.length === 0) return;
 
@@ -120,13 +120,15 @@ async function reagiereAufTod(ctx, opferName) {
     source: `drone:${gs.turn}:${opferName}`,
   });
 
-  const handIdx = ps.hand.indexOf(CARD_NAME);
-  engine.takeFromPileSync(ps, 'hand', handIdx);
+  const q = engine._rxQuelleFuer(ps, CARD_NAME);
+  if (!q) return;
+  const handIdx = q.idx;
+  engine.rxNimm(ps, q);
   const res = await engine.summonCreatureWithHooks(
     CARD_NAME, feld, ziel.heroIdx, ziel.slotIdx,
     // `fromHandIdx` laesst die Karte sichtbar von der Hand in die Zone
     // fliegen — ohne das erscheint sie dort einfach (v933).
-    { source: CARD_NAME, fromHandIdx: handIdx, summonWindow: true, ...(feld !== pi ? { controller: pi } : {}) },
+    { source: CARD_NAME, ...(q.ausVorrat ? {} : { fromHandIdx: handIdx }), summonWindow: true, ...(feld !== pi ? { controller: pi } : {}) },
   );
   if (res?.negated) return;   // Off Duty & co.: Karte ist schon geroutet
   if (!res?.inst) { engine.handZugangSync(ps, CARD_NAME, { von: 'rueckgabe', ohneInstanz: true }); return; }   // v1395
@@ -144,6 +146,7 @@ module.exports = {
   },
 
   activeIn: ['hand', 'support'],
+  reactFromCreation: true,   // 11.11.: Hook-Reaktion aus der Hand gilt auch aus Crestinas Vorrat (Extra-Hand)
 
   // CPU: beide Prompts sind fuer sie gut — die Drohne kostet keine
   // Aktion und droht dem Gegner mit 150. Ohne diesen Eintrag lehnt der
@@ -198,7 +201,7 @@ module.exports = {
         await eigenerTod(ctx);
         return;
       }
-      if (ctx.cardZone !== 'hand') return;
+      if (ctx.cardZone !== 'hand' && ctx.cardZone !== 'creationZone') return;   // Hand oder Crestinas Vorrat (11.11.)
       const pi = ctx.cardController ?? ctx.cardOwner;
       const tot = ctx.creature;
       if (!tot) return;
@@ -210,7 +213,7 @@ module.exports = {
     // ── Ausloeser B: eigener Held stirbt durch den Gegner ────────────
     // „a target you control" schliesst Helden ein.
     onHeroKO: async (ctx) => {
-      if (ctx.cardZone !== 'hand') return;
+      if (ctx.cardZone !== 'hand' && ctx.cardZone !== 'creationZone') return;   // Hand oder Crestinas Vorrat (11.11.)
       const engine = ctx._engine;
       const pi = ctx.cardController ?? ctx.cardOwner;
       const held = ctx.hero;

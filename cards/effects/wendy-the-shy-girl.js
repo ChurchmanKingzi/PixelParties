@@ -29,7 +29,7 @@ const riegelBenutzt = (gs, pi) => gs.hoptUsed?.[riegel(pi)] === gs.turn;
 async function handAngebot(ctx) {
   const engine = ctx._engine;
   const gs = engine.gs;
-  if (ctx.cardZone !== 'hand') return;
+  if (ctx.cardZone !== 'hand' && ctx.cardZone !== 'creationZone') return;   // Hand oder Crestinas Vorrat
   const pi = ctx.card.owner;
   if (ctx.handSeite !== pi || ctx.vonSeite !== pi) return;
   if (ctx.quelleSeite != null && ctx.quelleSeite !== pi) return;   // when YOU add: ein Effekt des Gegners, der meine Karte zurueckschickt, ist kein eigenes Hinzufuegen      // „your side of the board" → „your hand"
@@ -38,7 +38,7 @@ async function handAngebot(ctx) {
   if (ctx._wendyAngebot) return;
   ctx._wendyAngebot = true;
   const ps = gs.players[pi];
-  if (!ps || !(ps.hand || []).includes(CARD_NAME)) return;
+  if (!ps || !engine._rxQuelleFuer(ps, CARD_NAME)) return;
   if (kontrolliert(engine, pi, CARD_NAME)) return;
 
   const ja = await engine.promptGeneric(pi, {
@@ -56,6 +56,7 @@ async function handAngebot(ctx) {
 
 module.exports = {
   activeIn: ['hand', 'support'],
+  reactFromCreation: true,   // 11.11.: Hook-Reaktion aus der Hand gilt auch aus Crestinas Vorrat (Extra-Hand)
   creatureEffect: true,
 
   // „You can only control 1" — für jede Beschwörung.

@@ -107,7 +107,7 @@ async function doJumpCascade(engine, pi) {
     if (eligible.length === 0) break;
 
     // ── Check: a Jump copy exists in hand? ──
-    if (!ps.hand.includes('Jump in the River')) break;
+    if (!engine._rxQuelleFuer(ps, 'Jump in the River')) break;   // Hand oder Crestinas Vorrat
 
     // ── Prompt: "Evade danger this turn?" ──
     const wantsJump = await engine.promptGeneric(pi, {
@@ -157,8 +157,9 @@ async function doJumpCascade(engine, pi) {
     if (!hero?.name) break;
 
     // ── Remove one copy from hand (committed) ──
-    const removeIdx = ps.hand.indexOf('Jump in the River');
-    if (removeIdx < 0) break;
+    const q = engine._rxQuelleFuer(ps, 'Jump in the River');
+    if (!q) break;
+    const removeIdx = q.idx;
     // Einsatz-Beleg + Hand→Discard-Flug. Gleiche Lücke wie bei Cosmic
     // Malfunction (v81), Demon's Gate (v86), Quetzahuitl (v87) und
     // Divine Gift of Time (v90): die Karte spielt sich in ihrem eigenen
@@ -172,14 +173,14 @@ async function doJumpCascade(engine, pi) {
     // auch dann, wenn die Kette die Karte später negiert: sie ist
     // verbraucht und wandert so oder so in den Discard — negiert
     // eingesetzt bleibt eingesetzt.
-    const _besitzer = engine._handCardPileOwner(pi, 'Jump in the River', removeIdx);   // W63c: Ablage des permanenten Besitzers
+    const _besitzer = q.ausVorrat ? pi : engine._handCardPileOwner(pi, 'Jump in the River', removeIdx);   // W63c: Ablage des permanenten Besitzers
     engine._broadcastEvent('play_pile_transfer', {
       owner: pi, cardName: 'Jump in the River',
-      from: 'hand', to: 'discard',
+      from: q.ausVorrat ? 'creation' : 'hand', to: 'discard',
       fromHandIdx: removeIdx, asPlay: 'sole',
       ...(_besitzer !== pi ? { fromOwner: pi, toOwner: _besitzer } : {}),
     });
-    engine.takeFromPileSync(ps, 'hand', removeIdx);
+    engine.rxNimm(ps, q);
     // ★ v1262 (Als Befund 21.9.: „als der Gegner Jump in the River
     // spielte, wurde die Karte nicht links neben dem Feld gezeigt").
     // Die Karte laeuft ueber ihren Hand-Hook, nicht ueber die
@@ -195,7 +196,7 @@ async function doJumpCascade(engine, pi) {
     engine.sync();
 
     // Untrack the consumed card instance
-    const inst = engine.cardInstances.find(c =>
+    const inst = q.ausVorrat ? null : engine.cardInstances.find(c =>
       c.owner === pi && c.zone === 'hand' && c.name === 'Jump in the River'
     );
     if (inst) engine._untrackCard(inst.id);
@@ -237,7 +238,7 @@ async function doJumpCascade(engine, pi) {
     });
 
     // Card always goes to discard (whether negated or not)
-    engine.handKartenBesitzerPs(ps, 'Jump in the River').discardPile.push('Jump in the River');   // W63c
+    engine._rxAblagePs(ps, 'Jump in the River', q).discardPile.push('Jump in the River');   // W63c
 
     if (chainResult.negated) {
       engine.log('jump_negated', { player: ps.username, hero: hero.name });
@@ -279,6 +280,7 @@ module.exports = {
   // ^ Tagged for Blinded gating — see cards/effects/_hooks.js (blinded status).
   // Fire hooks ONLY from hand zone
   activeIn: ['hand'],
+  reactFromCreation: true,   // 11.11.: Hook-Reaktion aus der Hand gilt auch aus Crestinas Vorrat (Extra-Hand)
 
   // NOTE: deliberately NO isReaction flag!
   // isReaction hooks into the chain-reaction system and would cause
