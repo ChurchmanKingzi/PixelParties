@@ -52,20 +52,23 @@ function eligibleHandCards(engine, pi) {
   const db = engine._getCardDB();
   const counts = new Map();
   const firstIdx = new Map();
-  const hand = ps?.hand || [];
+  // ★ 12.11. (Al: „Effekte, die Karten aus der Hand benutzen, auch aus der Extra-Hand“): erst die Hand (je Handindex), dann Crestinas Vorrat (Index `null` = Vorratskopie).
+  const hand = [...(ps?.hand || []), ...(engine.isCreationZoneUsable(pi) ? (ps?.creationZone || []) : [])];
+  const handLaenge = (ps?.hand || []).length;
   for (let i = 0; i < hand.length; i++) {
     const name = hand[i];
+    const vorrat = i >= handLaenge;
     const cd = db[name];
     if (!cd || !isSummonablePileCreature(cd)) continue;
-    if (typeof cd.level !== 'number' || engine.effectiveCardLevel(cd, pi, { handIdx: i }) > MAX_LEVEL) continue;   // N3-15: Handstufe nach Senkung
+    if (typeof cd.level !== 'number' || engine.effectiveCardLevel(cd, pi, vorrat ? {} : { handIdx: i }) > MAX_LEVEL) continue;   // N3-15: Handstufe nach Senkung
     // N3-08 (Al, Welle 25: „Korrekt"): Elusive Hind / Plant Golem („Summon this card into a free Support Zone of a Hero your opponent controls")
     // werden bei vollem Gegnerbrett gar nicht erst angeboten (wie Psychic Scout / Slave Trader) - nur dieser Teil von `canSummon` gilt beim Platzieren.
     if (loadCardEffect(name)?.playOnOppSideOnly && !engine.isCreatureSummonable(name, pi)) continue;
     if (engine.nurEinerSchonKontrolliert(pi, name)) continue;   // W16d (C02-04): „You can only control 1" - nicht anbieten
     counts.set(name, (counts.get(name) || 0) + 1);
-    if (!firstIdx.has(name)) firstIdx.set(name, i);
+    if (!firstIdx.has(name)) firstIdx.set(name, vorrat ? -1 : i);   // -1: nur die Vorratskopie ist geeignet
   }
-  return [...counts.entries()].map(([name, count]) => ({ name, source: 'hand', count, handIdx: firstIdx.get(name) }));
+  return [...counts.entries()].map(([name, count]) => ({ name, source: 'hand', count, handIdx: firstIdx.get(name) >= 0 ? firstIdx.get(name) : undefined, ausVorrat: firstIdx.get(name) < 0 }));
 }
 
 /** Freie Support Zones (inkl. Insel) des Helden, unter dem der Sergeant liegt (Brettseite `seite`, Q74). */
@@ -111,7 +114,7 @@ module.exports = {
     });
     if (!picked || picked.cancelled || !picked.cardName) return false;
     const cardName = picked.cardName;
-    if ((ps.hand || []).indexOf(cardName) < 0) return false;
+    if (!engine._rxQuelleFuer(ps, cardName)) return false;   // Hand oder Crestinas Vorrat
     const zones = targetZones(engine, seite, heroIdx, pi, cardName);   // W62a: Zonen der gewaehlten Karte
     if (zones.length === 0) return false;
 
@@ -138,6 +141,7 @@ module.exports = {
     const placed = await engine.actionPlaceCreature(cardName, pi, dest.heroIdx, dest.slotIdx, {
       source: 'hand',
       sourceIdx: jetzt.handIdx,   // N3-15: genau die Kopie, deren Handstufe <= 1 ist
+      ...(jetzt.ausVorrat ? { ausVorrat: true } : {}),   // 12.11.: nur die Kopie in Crestinas Vorrat ist geeignet
       sourceName: CARD_NAME,
       ...(seite !== pi ? { heldSeite: seite } : {}),   // Q74: gestohlener Sergeant -> Zone auf der Gegnerseite, Kontrolle beim Dieb
     });

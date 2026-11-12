@@ -183,7 +183,8 @@ module.exports = {
       // number rather than the static DB row.
       const effLvl = (cd) => engine.effectiveCardLevel(cd, pi);
       const eligibleCards = [];
-      for (const name of (ps.hand || [])) {
+      // ★ 12.11. (Al: „Effekte, die Karten aus der Hand benutzen, auch aus der Extra-Hand“): Hand + Crestinas Vorrat.
+      for (const name of engine.handUndVorratListe(pi)) {
         const c = cardDB[name];
         if (c && isSummonablePileCreature(c) && effLvl(c) <= 1 && canPlaceOnHere(name)) {
           if (!eligibleCards.some(e => e.name === name && e.source === 'hand')) {
@@ -292,8 +293,8 @@ module.exports = {
         // Execute: remove from source, place into support zone
         const cardName = selected.cardName;
         if (selected.source === 'hand') {
-          const idx = ps.hand.indexOf(cardName);
-          if (idx >= 0) engine.takeFromPileSync(ps, 'hand', idx);
+          const handQuelle = engine._rxQuelleFuer(ps, cardName);   // Hand oder Crestinas Vorrat
+          if (handQuelle) engine.rxNimm(ps, handQuelle);
         } else {
           await engine.deckEntnahme(ps,  cardName, { source: 'barker-the-monster-tamer' });   // v820: Stapel-Schicht
         }
