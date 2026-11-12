@@ -12224,9 +12224,11 @@ class GameEngine {
     const accepted = script?.attachableHeroes;
     if (!Array.isArray(accepted) || !accepted.includes(heroName)) return false;
 
-    const handIdx = (ps.hand || []).indexOf(heroName);
+    // ★ 12.11. (Vorgabe: Effekte, die Karten aus der Hand BENUTZEN, greifen auch auf Crestinas Extra-Hand zu): „from your hand“ = Hand zuerst, dann benutzbarer Vorrat.
+    const heroQuelle = this._rxQuelleFuer(ps, heroName);
+    const handIdx = heroQuelle ? heroQuelle.idx : -1;
     const deckIdx = (ps.mainDeck || []).indexOf(heroName);
-    const inHand = handIdx >= 0;
+    const inHand = !!heroQuelle;
     const inDeck = deckIdx >= 0;
     if (!inHand && !inDeck) return false;
 
@@ -12257,18 +12259,21 @@ class GameEngine {
     } else {
       sourceLabel = inHand ? 'hand' : 'deck';
     }
+    if (sourceLabel === 'hand' && heroQuelle?.ausVorrat) sourceLabel = 'creation';   // Flug und Abgang vom Vorratsplatz
 
     // Snapshot the source location BEFORE we mutate hand / deck — the
     // client's attach-fly animation needs the original handIndex so it
     // can find the right hand-card DOM source. After the splice, the
     // card is gone and indices shift.
-    const sourceHandIndex = sourceLabel === 'hand' ? handIdx : -1;
+    const sourceHandIndex = (sourceLabel === 'hand' || sourceLabel === 'creation') ? handIdx : -1;
     // W64c (Al 23.10.2026: Karten gehen IMMER in die Stapel ihres permanenten Besitzers): der angelegte Held ist die Karte des Spielers, der ihn anlegt
     // (bei einer gestohlenen Handkarte: ihres Besitzers) - NICHT zwingend die des Kreatur-Besitzers (uebernommene Kreatur, eigene Karte darunter).
     // Beim Abgang der Traeger-Kreatur folgt der Held in den Stapel DIESES Besitzers (`counters.attachedHeroOwner`).
     const _heldBesitzer = (sourceLabel === 'hand' ? this._handOriginAt(ps, handIdx) : null) ?? playerIdx;
 
-    if (sourceLabel === 'hand') {
+    if (sourceLabel === 'creation') {
+      this._rxAbgang(ps, heroQuelle);
+    } else if (sourceLabel === 'hand') {
       ps.hand.splice(handIdx, 1);
     } else {
       // Re-resolve the deck index in case it shifted (defensive — the

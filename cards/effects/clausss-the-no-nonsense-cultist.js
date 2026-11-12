@@ -78,7 +78,7 @@ module.exports = {
     if (!ctx.card.counters?.attachedHero) {
       // Mode A: attach Klaus. Requires a Klaus accessible from hand
       // or deck.
-      return (ps.hand || []).includes(ATTACHABLE)
+      return engine.handUndVorratListe(ctx.cardOwner).includes(ATTACHABLE)   /* 12.11.: Hand + Crestinas Vorrat */
         || (ps.mainDeck || []).includes(ATTACHABLE);
     }
 

@@ -96,8 +96,14 @@ async function playCooldinArea(engine, pi, heroIdx, cardName, fromDeck) {
     if (!ok) return false;
   }
 
-  const handIndex = ps.hand.lastIndexOf(cardName);
+  let handIndex = ps.hand.lastIndexOf(cardName);
+  let vorratQ = null;   // ★ 12.11. (Vorgabe: Effekte, die Karten aus der Hand BENUTZEN, greifen auch auf Crestinas Extra-Hand zu): Hand + Vorrat.
+  if (handIndex < 0 && !fromDeck) {
+    const q = engine._rxQuelleFuer(ps, cardName);
+    if (q && q.ausVorrat) { vorratQ = q; handIndex = q.idx; }
+  }
   if (handIndex < 0) return false;
+  const areaNehmen = () => (vorratQ ? engine.rxNimm(ps, vorratQ) : engine.takeFromPileSync(ps, 'hand', handIndex));
 
   // Real card type — Area Attacks (Blood Rock) must chain as 'Attack'
   // so reaction cards that gate on Spell-vs-Attack and the chain UI
@@ -118,8 +124,8 @@ async function playCooldinArea(engine, pi, heroIdx, cardName, fromDeck) {
   // ★ v1328: gefizzelt (Cooldin waehrend der Kette handlungsunfaehig) —
   // derselbe Ausgang wie eine Negation; die Logzeile schreibt die Engine.
   if (chainResult.negated || chainResult.fizzled) {
-    engine.takeFromPileSync(ps, 'hand', handIndex);
-    engine.handKartenBesitzerPs(ps, cardName).discardPile.push(cardName);   // W3/W5a: Stapel des permanenten Besitzers
+    areaNehmen();
+    (vorratQ ? ps : engine.handKartenBesitzerPs(ps, cardName)).discardPile.push(cardName);   // W3/W5a: Stapel des permanenten Besitzers
     if (chainResult.negated) engine.log('cooldin_area_negated', { player: ps.username, card: cardName });
     return true;
   }
@@ -136,12 +142,12 @@ async function playCooldinArea(engine, pi, heroIdx, cardName, fromDeck) {
   // typunabhängig, hier nötig, weil Areas als Spell-Kartentyp geführt
   // werden und die einfache Fenster-Regel Spells überspringt.
   engine._broadcastEvent('play_pile_transfer', {
-    owner: pi, cardName, from: 'hand', to: 'area',
+    owner: pi, cardName, from: vorratQ ? 'creation' : 'hand', to: 'area',
     asPlay: 'sole', fromHandIdx: handIndex,
   });
-  engine.takeFromPileSync(ps, 'hand', handIndex);
+  areaNehmen();
   const inst = engine._trackCard(cardName, pi, 'hand', heroIdx, -1);
-  { const _hk = fromDeck ? pi : engine._consumeHandCardOrigin(pi, cardName); if (_hk !== pi) inst.originalOwner = _hk; }   // W63c: gestohlene Handkarte — die Area gehoert ihrem Besitzer
+  { const _hk = (fromDeck || vorratQ) ? pi : engine._consumeHandCardOrigin(pi, cardName); if (_hk !== pi) inst.originalOwner = _hk; }   // W63c: gestohlene Handkarte — die Area gehoert ihrem Besitzer
   // ★★ v1222: Abgleich SOFORT nach dem Hand-Abgang — sonst taucht die
   // abgeflogene Karte nach dem Flug wieder in der Hand auf (Als
   // Befund 18.9. zu „Dive Down").
@@ -221,7 +227,7 @@ module.exports = {
     if (engine.areaSpielGesperrt(pi)) return false;
 
     const cardDB = engine._getCardDB();
-    const fromHand = collectAreasFromSource(ps.hand || [], cardDB, 'hand', engine, pi);
+    const fromHand = collectAreasFromSource(engine.handUndVorratListe(pi), cardDB, 'hand', engine, pi);
     if (fromHand.length > 0) return true;
     const fromDeck = collectAreasFromSource(ps.mainDeck || [], cardDB, 'deck', engine, pi);
     return fromDeck.length > 0;
@@ -236,7 +242,7 @@ module.exports = {
     if (!ps) return false;
 
     const cardDB = engine._getCardDB();
-    const fromHand = collectAreasFromSource(ps.hand || [], cardDB, 'hand', engine, pi);
+    const fromHand = collectAreasFromSource(engine.handUndVorratListe(pi), cardDB, 'hand', engine, pi);
     const fromDeck = collectAreasFromSource(ps.mainDeck || [], cardDB, 'deck', engine, pi);
     const all = [...fromHand, ...fromDeck];
     if (all.length === 0) return false;

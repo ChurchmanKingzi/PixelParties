@@ -47,7 +47,7 @@ module.exports = {
     if (ctx.card.counters?.attachedHero) return false;
     const ps = ctx._engine.gs.players[ctx.cardOwner];
     if (!ps) return false;
-    const hasGon = (ps.hand || []).includes(ATTACHABLE)
+    const hasGon = ctx._engine.handUndVorratListe(ctx.cardOwner).includes(ATTACHABLE)   /* 12.11.: Hand + Crestinas Vorrat */
       || (ps.mainDeck || []).includes(ATTACHABLE);
     return hasGon;
   },

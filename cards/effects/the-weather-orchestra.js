@@ -173,7 +173,7 @@ module.exports = {
         if (cards.some(c => c.name === name && c.source === source)) return;
         cards.push({ name, source, cost: cd.cost || 0 });
       };
-      for (const n of (ps.hand || [])) add(n, 'hand');
+      for (const n of engine.handUndVorratListe(pi)) add(n, 'hand');   // 12.11.: Hand + Crestinas Vorrat
       for (const n of (ps.discardPile || [])) add(n, 'discard');
       for (const n of (ps.mainDeck || [])) add(n, 'deck');
       cards.sort((a, b) => a.name.localeCompare(b.name) || a.source.localeCompare(b.source));

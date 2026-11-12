@@ -46,6 +46,23 @@ function heroCanHost(engine, pi, heroIdx, cd, name, feld = pi, handIdx = null) {
   return true;
 }
 
+/** ★ 12.11. (Vorgabe: Effekte, die Karten aus der Hand BENUTZEN, greifen auch auf Crestinas Extra-Hand zu): dieselbe Wahl fuer die Vorratsplaetze (`creationEligibleIndices`). */
+function summonableVorratIndices(engine, pi, heroIdx, feld) {
+  const ps = engine.gs.players[pi];
+  const cardDB = engine._getCardDB();
+  const out = [];
+  if (!ps || !engine.isCreationZoneUsable(pi)) return out;
+  (ps.creationZone || []).forEach((cn, i) => {
+    const cd = cardDB[cn];
+    if (!cd || !isSummonablePileCreature(cd, cn)) return;
+    if (engine.effectiveCardLevel(cd, pi, {}) !== 0) return;
+    if (!heroCanHost(engine, pi, heroIdx, cd, cn, feld, null)) return;
+    if (freeSlots(engine, feld, heroIdx, cn, pi).length === 0) return;
+    out.push(i);
+  });
+  return out;
+}
+
 /** Handindizes der Level-0-Kreaturen, die der Held beschwoeren darf. */
 function summonableHandIndices(engine, pi, heroIdx, feld) {
   const ps = engine.gs.players[pi];
@@ -87,7 +104,7 @@ module.exports = {
     const engine = ctx._engine;
     const feld = ctx.cardHeroOwner ?? ctx.cardOwner;   // Spalte der Kreatur
     const heroIdx = ctx.cardHeroIdx;
-    return summonableHandIndices(engine, ctx.cardOwner, heroIdx, feld).length > 0;
+    return summonableHandIndices(engine, ctx.cardOwner, heroIdx, feld).length > 0 || summonableVorratIndices(engine, ctx.cardOwner, heroIdx, feld).length > 0;
   },
 
   async onCreatureEffect(ctx) {
@@ -107,27 +124,32 @@ module.exports = {
     const automat = engine.isCpuPlayer(pi) || engine._inMctsSim || engine._fastMode;
 
     let chosenName = null;
+    let chosenVorrat = false;   // 12.11.: die gewaehlte Karte liegt in Crestinas Vorrat
     let dest = null;
     let rueck = 0;
     while (!dest) {
       const eligible = summonableHandIndices(engine, pi, heroIdx, feld);
-      if (eligible.length === 0) return false;
-      const einzige = eligible.length === 1;
+      const eligibleVorrat = summonableVorratIndices(engine, pi, heroIdx, feld);
+      if (eligible.length + eligibleVorrat.length === 0) return false;
+      const einzige = eligible.length + eligibleVorrat.length === 1;
       let idx;
-      if (einzige) idx = eligible[0];
+      if (einzige) { chosenVorrat = eligible.length === 0; idx = chosenVorrat ? eligibleVorrat[0] : eligible[0]; }
       else {
         const picked = await engine.promptGeneric(pi, {
           type: 'pickHandCard',
           title: CARD_NAME,
           description: 'Click a Level 0 Creature in your hand to summon with the corresponding Hero.',
           eligibleIndices: eligible,
+          creationEligibleIndices: eligibleVorrat,
           confirmLabel: '🔮 Summon!',
           cancellable: true,
         });
         if (!picked || picked.cancelled || picked.handIndex == null) return false;
+        chosenVorrat = !!picked.fromCreation;
+        if (chosenVorrat && !eligibleVorrat.includes(picked.handIndex)) return false;
         idx = picked.handIndex;
       }
-      chosenName = ps.hand[idx];
+      chosenName = chosenVorrat ? ps.creationZone[idx] : ps.hand[idx];
       if (!chosenName) return false;
 
       const slots = freeSlots(engine, feld, heroIdx, chosenName, pi);   // W63a: Zonen der gewaehlten Karte (geteilte zuerst)
@@ -155,16 +177,18 @@ module.exports = {
     if (savedReveal) engine.gs._pendingCardReveal = savedReveal;
     if (savedPlayLog) engine.gs._pendingPlayLog = savedPlayLog;
 
-    const handIdx = ps.hand.indexOf(chosenName);
+    const vorratIdx = chosenVorrat ? (ps.creationZone || []).indexOf(chosenName) : -1;
+    const handIdx = chosenVorrat ? vorratIdx : ps.hand.indexOf(chosenName);
     if (handIdx < 0) return false;
-    engine.takeFromPileSync(ps, 'hand', handIdx);
+    const scoutQuelle = chosenVorrat ? { liste: ps.creationZone, ausVorrat: true, idx: vorratIdx } : null;
+    if (scoutQuelle) engine.rxNimm(ps, scoutQuelle); else engine.takeFromPileSync(ps, 'hand', handIdx);
     const kernOpts = {
       source: CARD_NAME,
       ...(feld !== pi ? { controller: pi } : {}),   // Kontrolle statt Seite (Styx 28.9.)
     };
     if (!(await engine._beschwoerungKostenVorAuftritt(chosenName, dest.owner, dest.heroIdx, dest.slotIdx, kernOpts))) {
       delete engine.gs._pendingCardReveal; delete engine.gs._pendingPlayLog;
-      engine.returnToPile(ps, 'hand', chosenName, handIdx);   // Kosten abgebrochen / Sperre: Karte zurueck
+      if (scoutQuelle) engine.handkarteZurueck(pi, chosenName, scoutQuelle); else engine.returnToPile(ps, 'hand', chosenName, handIdx);   // Kosten abgebrochen / Sperre: Karte zurueck
       engine.sync();
       return false;
     }
@@ -172,7 +196,7 @@ module.exports = {
     engine._firePendingCardReveal();
     const res = await engine.summonCreatureWithHooks(chosenName, dest.owner, dest.heroIdx, dest.slotIdx, kernOpts);
     if (!res?.inst) {
-      engine.returnToPile(ps, 'hand', chosenName, handIdx);   // Beschwoerung abgelehnt: Karte zurueck
+      if (scoutQuelle) engine.handkarteZurueck(pi, chosenName, scoutQuelle); else engine.returnToPile(ps, 'hand', chosenName, handIdx);   // Beschwoerung abgelehnt: Karte zurueck
       return false;
     }
     engine.log('psychic_scout_summon', { player: ps.username, summoned: chosenName, heroIdx: dest.heroIdx, slotIdx: dest.slotIdx });
