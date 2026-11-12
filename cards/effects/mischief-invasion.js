@@ -127,8 +127,10 @@ function _buildHandCopies(engine, pi, slots) {
   if (!ps?.hand) return [];
   const cardDB = engine._getCardDB();
   const copies = [];
-  for (let handIdx = 0; handIdx < ps.hand.length; handIdx++) {
-    const name = ps.hand[handIdx];
+  // ★ 12.11. (Vorgabe: Effekte, die Karten aus der Hand BENUTZEN, greifen auch auf Crestinas Extra-Hand zu): erst die Hand, dann Crestinas Vorrat (`vorrat: true`, `handIdx` = Vorrats-Index).
+  const vorratListe = engine.isCreationZoneUsable(pi) ? (ps.creationZone || []) : [];
+  const quellen = [...ps.hand.map((n, i) => ({ name: n, handIdx: i, vorrat: false })), ...vorratListe.map((n, i) => ({ name: n, handIdx: i, vorrat: true }))];
+  for (const { name, handIdx, vorrat } of quellen) {
     const cd = cardDB[name];
     if (!_isMmCreature(cd)) continue;
     const eligibleSlotIdxs = [];
@@ -140,7 +142,7 @@ function _buildHandCopies(engine, pi, slots) {
     // W63a: eine GETEILTE Zone (Alice) braucht keinen freien Platz — ein privater Zusatzknoten je Kopie im Matching (Index ab `slots.length`).
     if (_hatGeteilteZone(engine, pi, cd)) eligibleSlotIdxs.push(slots.length + copies.length);
     if (eligibleSlotIdxs.length === 0) continue; // un-summonable copy — drop
-    copies.push({ name, cd, handIdx, eligibleSlotIdxs });
+    copies.push({ name, cd, handIdx, vorrat, eligibleSlotIdxs });
   }
   return copies;
 }
@@ -184,10 +186,10 @@ function _maxMatching(cards, slotCount) {
  */
 function _pickSelectedCopies(selectedEntries, allCopies) {
   const byIdx = new Map();
-  for (const c of allCopies) byIdx.set(c.handIdx, c);
+  for (const c of allCopies) byIdx.set((c.vorrat ? 'v' : 'h') + c.handIdx, c);
   const picked = [];
   for (const sel of selectedEntries) {
-    const c = byIdx.get(sel.handIndex);
+    const c = byIdx.get((sel.fromCreation ? 'v' : 'h') + sel.handIndex);
     if (c && c.name === sel.cardName) picked.push(c);
   }
   return picked;
@@ -267,11 +269,12 @@ module.exports = {
       // remaining Bear Riders dim. Global `maxSelect = cap` (max
       // matching) closes the picker once total picks fill, dimming
       // every still-eligible MM Creature.
-      const eligibleIndices = copies.map(c => c.handIdx);
+      const eligibleIndices = copies.filter(c => !c.vorrat).map(c => c.handIdx);
+      const vorratIndices = copies.filter(c => c.vorrat).map(c => c.handIdx);   // 12.11.: Vorratskarten (Klick im Vorrat; die Namens-Grenze `typeLimits` prueft hier der Server beim Beschwoeren)
       const cardTypes = {};
       const typeLimits = {};
       for (const c of copies) {
-        cardTypes[c.handIdx] = c.name;
+        if (!c.vorrat) cardTypes[c.handIdx] = c.name;
         // Same-name copies share `eligibleSlotIdxs.length` (eligibility
         // is determined by card data, not by the in-hand position).
         // Last write wins — they're all equal.
@@ -287,6 +290,7 @@ module.exports = {
         title: CARD_NAME,
         description: `Click "Mischief Militia" Creatures in your hand to summon them as additional Actions. Up to ${cap} total. Click a selected card to deselect.`,
         eligibleIndices,
+        creationEligibleIndices: vorratIndices,
         cardTypes,
         typeLimits,
         // Summon button stays disabled at 0 — confirming requires at
@@ -339,7 +343,7 @@ module.exports = {
         const c = summonOrder[i];
         // Re-resolve hand index — prior summons spliced their copies
         // out so positions have shifted. Re-find by name.
-        const handIdx = ps.hand.indexOf(c.name);
+        const handIdx = c.vorrat ? (ps.creationZone || []).indexOf(c.name) : ps.hand.indexOf(c.name);
         if (handIdx < 0) continue; // race
 
         // Re-compute eligible host slots from current board state.
@@ -355,8 +359,8 @@ module.exports = {
         // by name, skipping the current index and any already-claimed
         // queued slot so duplicate-name copies map to distinct hand
         // positions.
-        const remainingNames = summonOrder.slice(i + 1).map(x => x.name);
-        const claimed = new Set([handIdx]);
+        const remainingNames = summonOrder.slice(i + 1).filter(x => !x.vorrat).map(x => x.name);   // Hervorhebung nur fuer Handplaetze
+        const claimed = new Set(c.vorrat ? [] : [handIdx]);
         const queuedHandIdxs = [];
         for (const remName of remainingNames) {
           for (let h = 0; h < ps.hand.length; h++) {
@@ -392,7 +396,7 @@ module.exports = {
             title: CARD_NAME,
             description: `Place ${c.name} into a Support Zone. Click a highlighted Hero or Support Zone.`,
             cancellable: false,
-            highlightHandIdx: handIdx,
+            highlightHandIdx: c.vorrat ? undefined : handIdx,
             queuedHandIdxs,
           });
           chosenSlot = (zp && hosts.find(h => h.heroIdx === zp.heroIdx && h.slotIdx === zp.slotIdx
@@ -405,20 +409,30 @@ module.exports = {
         // Splice AFTER successful summon — pre-splicing has been known
         // to confuse the client-side hand diff detector (see Raptoren's
         // matching comment block).
-        const nth = ps.hand.slice(0, handIdx + 1).filter(x => x === c.name).length;
+        const nth = c.vorrat ? 1 : ps.hand.slice(0, handIdx + 1).filter(x => x === c.name).length;
         const prevResolving = ps._resolvingCard;
-        ps._resolvingCard = { name: c.name, nth };
+        if (!c.vorrat) ps._resolvingCard = { name: c.name, nth };
 
         let summonResult = null;
         try {
-          summonResult = await engine.summonCreatureWithHooks(
-            c.name, chosenSlot.owner, chosenSlot.heroIdx, chosenSlot.slotIdx,
-            {
+          if (c.vorrat) {
+            // 12.11.: aus Crestinas Vorrat — `summonFromCreation` uebernimmt Kosten-Abfrage, Flug und Abgang (scheitert sie, liegt die Karte wieder im Vorrat).
+            const vInst = await engine.summonFromCreation(pi, c.name, chosenSlot.heroIdx, chosenSlot.slotIdx, {
               source: CARD_NAME,
-              controller: pi,   // Kontrolle statt Seite (Styx 28.9.): Feldseite + Kontrolleur
               hookExtras: { _summonedBy: CARD_NAME, _summonedAsAdditional: true },
-            },
-          );
+              ...(chosenSlot.owner !== pi ? { heldSeite: chosenSlot.owner } : {}),
+            });
+            summonResult = vInst ? { inst: vInst } : null;
+          } else {
+            summonResult = await engine.summonCreatureWithHooks(
+              c.name, chosenSlot.owner, chosenSlot.heroIdx, chosenSlot.slotIdx,
+              {
+                source: CARD_NAME,
+                controller: pi,   // Kontrolle statt Seite (Styx 28.9.): Feldseite + Kontrolleur
+                hookExtras: { _summonedBy: CARD_NAME, _summonedAsAdditional: true },
+              },
+            );
+          }
         } finally {
           ps._resolvingCard = prevResolving;
         }
@@ -428,9 +442,9 @@ module.exports = {
         // Splice the consumed copy + untrack the hand inst, then play
         // the canonical hand→board flight animation so the visual
         // matches a normal-summon drag-and-drop.
-        const realIdx = ps.hand.indexOf(c.name);
+        const realIdx = c.vorrat ? -1 : ps.hand.indexOf(c.name);
         if (realIdx >= 0) engine.takeFromPileSync(ps, 'hand', realIdx);
-        const handInst = engine.cardInstances.find(ci =>
+        const handInst = c.vorrat ? null : engine.cardInstances.find(ci =>
           ci.owner === pi && ci.zone === 'hand' && ci.name === c.name,
         );
         if (handInst) engine._untrackCard(handInst.id);
