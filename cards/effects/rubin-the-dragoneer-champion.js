@@ -62,10 +62,13 @@ function isDestructionSpell(cd) {
  * Prüfkette wie `learning.js` — das ist die kanonische Antwort auf
  * „darf dieser Held diesen Zauber aus der Hand spielen?".
  */
-function eligibleHandIndices(engine, pi, heroIdx, feld = pi) {
+function eligibleHandIndices(engine, pi, heroIdx, feld = pi, vorrat = false) {
   const gs = engine.gs;
   const ps = gs.players[pi];
   if (!ps) return [];
+  // ★ 12.11. (Vorgabe: Effekte, die Karten aus der Hand BENUTZEN, greifen auch auf Crestinas Extra-Hand zu): `vorrat` = dieselbe Pruefung fuer Crestinas Vorrat; der Zauber liegt dann nicht in der Hand, der Wisdom-Pool ist die volle Hand.
+  if (vorrat && !engine.isCreationZoneUsable(pi)) return [];
+  const liste = vorrat ? (ps.creationZone || []) : (ps.hand || []);
   const cardDB = engine._getCardDB();
   // Als Vorgabe 29.9.: `feld` = Brettseite eines geliehenen Rubin — Stufe,
   // Wisdom und Heldensperren am Helden, Hand beim Kontrolleur `pi`.
@@ -73,12 +76,12 @@ function eligibleHandIndices(engine, pi, heroIdx, feld = pi) {
   const heroScript = hero?.name ? loadCardEffect(hero.name) : null;
   // Der gewählte Zauber verlässt die Hand, BEVOR seine Wisdom-Kosten
   // bezahlt werden — er kann seinen eigenen Abwurf also nicht finanzieren.
-  const wisdomPool = Math.max(0, (ps.hand || []).length - 1);
+  const wisdomPool = Math.max(0, (ps.hand || []).length - (vorrat ? 0 : 1));
 
   const cache = new Map();
   const out = [];
-  for (let i = 0; i < (ps.hand || []).length; i++) {
-    const name = ps.hand[i];
+  for (let i = 0; i < liste.length; i++) {
+    const name = liste[i];
     let ok = cache.get(name);
     if (ok === undefined) {
       ok = false;
@@ -116,7 +119,7 @@ function eligibleHandIndices(engine, pi, heroIdx, feld = pi) {
  * learning.js, ohne jede Aktions-Buchhaltung (Rubins Zusatz-Aktion
  * verbraucht keine Aktion, also wird auch keine gezählt).
  */
-async function performSpell(engine, pi, heroIdx, cardName, feld = pi) {
+async function performSpell(engine, pi, heroIdx, cardName, feld = pi, ausVorrat = false) {
   const gs = engine.gs;
   const ps = gs.players[pi];
   const cardDB = engine._getCardDB();
@@ -126,8 +129,16 @@ async function performSpell(engine, pi, heroIdx, cardName, feld = pi) {
   const hero = gs.players[feld]?.heroes?.[heroIdx];   // Als Vorgabe 29.9.: Brettseite
   if (!hero?.name || hero.hp <= 0) return false;
 
+  // ★ 12.11. (Vorgabe: Effekte, die Karten aus der Hand BENUTZEN, greifen auch auf Crestinas Extra-Hand zu): liegt der Zauber in Crestinas Vorrat, wird er fuer die Dauer dieses Gusses STILL ans Ende der Hand gelegt — Kette, onPlay, Ablage und Wisdom laufen danach wie fuer eine Handkarte. Bricht der Guss ab und die Karte bleibt „auf der Hand“, geht sie zurueck in den Vorrat.
+  let vorratHandel = null;
+  if (ausVorrat) {
+    vorratHandel = engine.vorratStillInDieHand(pi, cardName);
+    if (!vorratHandel) return false;
+  }
+  const zurueckInDenVorrat = () => { if (vorratHandel) vorratHandel.zurueck(); };
+
   const findInHand = () => (ps.hand || []).indexOf(cardName);
-  if (findInHand() < 0) return false;
+  if (findInHand() < 0) { zurueckInDenVorrat(); return false; }
 
   // Die getrackte Handinstanz an Rubin binden — Zauber, die
   // `ctx.cardHeroIdx` lesen (Burning Finger & Co.), fizzeln sonst still.
@@ -230,6 +241,7 @@ async function performSpell(engine, pi, heroIdx, cardName, feld = pi) {
   if (abgebrochen && !placedOnBoard) {
     heldenSperreFreigeben(gs, 'rubin-dragoneer', pi);
     engine.log('rubin_perform_cancelled', { player: ps.username, spell: cardName });
+    zurueckInDenVorrat();
     engine.sync();
     return true;
   }
@@ -290,29 +302,32 @@ module.exports = {
       if (!heldenSperreFrei(gs, 'rubin-dragoneer', pi)) return;   // v1275: pro Spieler (Ruling 22.9.)
 
       const eligible = eligibleHandIndices(engine, pi, heroIdx, feld);
-      if (eligible.length === 0) return;
+      const eligibleVorrat = eligibleHandIndices(engine, pi, heroIdx, feld, true);
+      if (eligible.length === 0 && eligibleVorrat.length === 0) return;
 
       const pick = await engine.promptGeneric(pi, {
         type: 'pickHandCard',
         title: CARD_NAME,
         description: `Choose a Destruction Spell from your hand to perform with ${hero.name} as an additional Action.`,
         eligibleIndices: eligible,
+        creationEligibleIndices: eligibleVorrat,
         cancellable: true,
       });
       // Abgelehnt verbraucht die Nutzung NICHT — „you may … perform"
       // begrenzt die Ausführungen, nicht die Angebote (Muster Ralzish).
       if (!pick || pick.cancelled || pick.handIndex == null) return;
 
-      const pickedName = pick.cardName || gs.players[pi]?.hand?.[pick.handIndex];
+      const ausVorrat = !!pick.fromCreation;
+      const pickedName = pick.cardName || (ausVorrat ? gs.players[pi]?.creationZone?.[pick.handIndex] : gs.players[pi]?.hand?.[pick.handIndex]);
       if (!pickedName) return;
 
       // Gegenprüfung am LEBENDEN Zustand: die Abfrage ist asynchron, die
       // Hand kann sich zwischenzeitlich geändert haben.
-      const live = eligibleHandIndices(engine, pi, heroIdx, feld);
-      if (!live.some(i => gs.players[pi].hand[i] === pickedName)) return;
+      const live = eligibleHandIndices(engine, pi, heroIdx, feld, ausVorrat);
+      if (!live.some(i => (ausVorrat ? gs.players[pi].creationZone : gs.players[pi].hand)[i] === pickedName)) return;
 
       heldenSperreSetzen(gs, 'rubin-dragoneer', pi);
-      await performSpell(engine, pi, heroIdx, pickedName, feld);
+      await performSpell(engine, pi, heroIdx, pickedName, feld, ausVorrat);
     },
   },
 };

@@ -171,21 +171,28 @@ module.exports = {
       for (let i = 0; i < (ps.hand || []).length; i++) {
         if (eligibleNames.has(ps.hand[i])) eligibleIndices.push(i);
       }
+      // ★ 12.11. (Vorgabe: Effekte, die Karten aus der Hand BENUTZEN, greifen auch auf Crestinas Extra-Hand zu): auch Plaetze in Crestinas Vorrat (`creationEligibleIndices`).
+      const vorratIndices = [];
+      if (engine.isCreationZoneUsable(pi)) {
+        (ps.creationZone || []).forEach((n, i) => { if (eligibleNames.has(n)) vorratIndices.push(i); });
+      }
       const rpick = await engine.promptGeneric(pi, {
         type: 'pickHandCard',
         title: `${CARD_NAME} — Swap In`,
         description: `Pick a different-named Creature with level ${chosenLevel} or lower to take ${chosenName}'s place.`,
         instruction: 'Click a highlighted card in your hand.',
         eligibleIndices,
+        creationEligibleIndices: vorratIndices,
         cancellable: true,
       });
       if (!rpick || rpick.cancelled) { gs._spellCancelled = true; return; }
+      if (rpick.fromCreation && !vorratIndices.includes(rpick.handIndex)) { gs._spellCancelled = true; return; }
       const newName = rpick.cardName;
       if (!newName) { gs._spellCancelled = true; return; }
       // Read the replacement's effective level from its hand index when
       // available (so per-slot offsets like Rocky Slime count). Falls
       // back to a pi-scoped read otherwise.
-      const newHandIdx = (ps.hand || []).indexOf(newName);
+      const newHandIdx = rpick.fromCreation ? -1 : (ps.hand || []).indexOf(newName);
       const newLevel = engine.effectiveCardLevel(
         cardDB[newName], pi,
         newHandIdx >= 0 ? { handIdx: newHandIdx } : {},

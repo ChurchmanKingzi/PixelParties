@@ -171,6 +171,11 @@ module.exports = {
     for (let i = 0; i < (ps.hand || []).length; i++) {
       if (eligibleNames.has(ps.hand[i])) eligibleIndices.push(i);
     }
+    // ★ 12.11. (Vorgabe: Effekte, die Karten aus der Hand BENUTZEN, greifen auch auf Crestinas Extra-Hand zu): auch Plaetze in Crestinas Vorrat (`creationEligibleIndices`).
+    const vorratIndices = [];
+    if (engine.isCreationZoneUsable(activator)) {
+      (ps.creationZone || []).forEach((n, i) => { if (eligibleNames.has(n)) vorratIndices.push(i); });
+    }
 
     const rpick = await engine.promptGeneric(activator, {
       type: 'pickHandCard',
@@ -178,16 +183,18 @@ module.exports = {
       description: `Pick a different-named Creature with level ${chosenLevel} or lower to take ${chosenName}'s place.`,
       instruction: 'Click a highlighted card in your hand.',
       eligibleIndices,
+      creationEligibleIndices: vorratIndices,
       cancellable: true,
     });
     if (!rpick || rpick.cancelled) return false;
+    if (rpick.fromCreation && !vorratIndices.includes(rpick.handIndex)) return false;
     const newName = rpick.cardName;
     if (!newName) return false;
 
     // Sanity re-verify the replacement's level + name gate (guards
     // against stale state if anything raced in between prompts).
     // Effective level via hand index so per-slot offsets are respected.
-    const newHandIdx = (ps.hand || []).indexOf(newName);
+    const newHandIdx = rpick.fromCreation ? -1 : (ps.hand || []).indexOf(newName);
     const newLevel = engine.effectiveCardLevel(
       cardDB[newName], activator,
       newHandIdx >= 0 ? { handIdx: newHandIdx } : {},

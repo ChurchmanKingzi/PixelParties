@@ -24401,6 +24401,36 @@ this._deathWatch = (this._deathWatchStack || []).length
     return q;
   }
 
+  /**
+   * ★ 12.11. (Vorgabe: Effekte, die Karten aus der Hand BENUTZEN, greifen auch auf Crestinas Extra-Hand zu): legt eine Karte aus Crestinas Vorrat fuer die Dauer
+   * eines Gusses STILL ans Ende der Hand (keine Hand-Zugangs-Hooks, kein Log) — die Aufloesung (Kette, onPlay, Ablage, Wisdom) laeuft danach wie fuer eine
+   * Handkarte. Rueckgabe `{ zurueck() }` oder `null` (Karte nicht im benutzbaren Vorrat). `zurueck()` bringt sie in den Vorrat zurueck, falls sie noch „auf der
+   * Hand“ liegt (Guss abgebrochen); hat sie die Hand schon verlassen (Ablage/Brett), tut es nichts.
+   */
+  vorratStillInDieHand(playerIdx, cardName) {
+    const ps = this.gs.players[playerIdx];
+    if (!ps || !this.isCreationZoneUsable(playerIdx)) return null;
+    const vi = (ps.creationZone || []).indexOf(cardName);
+    if (vi < 0) return null;
+    const inst = this._findHandInstanceAt(playerIdx, vi, true) || null;
+    ps.creationZone.splice(vi, 1);
+    ps.hand.push(cardName);
+    if (inst) inst.zone = ZONES.HAND;
+    let offen = true;
+    return {
+      zurueck: () => {
+        if (!offen) return;
+        offen = false;
+        const hi = ps.hand.lastIndexOf(cardName);
+        if (hi < 0) return;                       // die Karte hat die Hand schon verlassen (Ablage / Brett)
+        this.takeFromPileSync(ps, 'hand', hi);    // Stapel-Schicht: verschiebt Handindex-Daten korrekt mit
+        ps.creationZone.push(cardName);
+        const i2 = inst || this.cardInstances.find(c => c.owner === playerIdx && c.zone === ZONES.HAND && c.name === cardName);
+        if (i2) i2.zone = ZONES.CREATION;
+      },
+    };
+  }
+
   /** Gegenstueck zu `handkarteNehmen` (Rennen: die Karte ging doch nicht in den Einsatz): zurueck an ihre Quelle — Vorrat statt Hand, wenn sie von dort kam. */
   handkarteZurueck(playerIdx, cardName, q, opts = {}) {
     const ps = this.gs.players[playerIdx];
