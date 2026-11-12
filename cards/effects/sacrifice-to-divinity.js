@@ -105,7 +105,8 @@ module.exports = {
       // Build a gallery of all available "Divinity" copies, tagged by
       // source so the player sees where each one is coming from.
       const sources = [];
-      const handCount    = (ps.hand        || []).filter(n => n === DIVINITY).length;
+      // ★ 12.11. (Al: „Effekte, die Abilities von der Hand anlegen, auch aus der Extra-Hand“): „from your hand“ = Hand + Crestinas Vorrat.
+      const handCount    = engine.handUndVorratListe(pi).filter(n => n === DIVINITY).length;
       const deckCount    = (ps.mainDeck    || []).filter(n => n === DIVINITY).length;
       const discardCount = (ps.discardPile || []).filter(n => n === DIVINITY).length;
       if (handCount    > 0) sources.push({ name: DIVINITY, source: 'hand',    count: handCount });
@@ -236,7 +237,8 @@ module.exports = {
         return false;
       };
       let pulled = false;
-      if (pickedSource === 'hand')    pulled = removeFromPile(ps.hand);
+      let handQuelle = null;   // Hand oder Vorrat — fuer die Rueckgabe unten
+      if (pickedSource === 'hand')  { handQuelle = engine.handkarteNehmen(pi, DIVINITY); pulled = !!handQuelle; }
       if (pickedSource === 'deck')    pulled = !!(await engine.takeFromPile(ps, 'deck', DIVINITY, { source: CARD_NAME }));
       if (pickedSource === 'discard') pulled = !!(await engine.takeFromPile(ps, 'discard', DIVINITY, { source: CARD_NAME }));
       if (!pulled) {
@@ -256,7 +258,7 @@ module.exports = {
       if (!ort) {
         // Race: zones filled between check and now. Refund Divinity
         // back to its source so it isn't silently lost.
-        if (pickedSource === 'hand')    engine.handZugangSync(ps, DIVINITY, { von: 'rueckgabe', source: CARD_NAME, ohneInstanz: true });
+        if (pickedSource === 'hand')    engine.handkarteZurueck(pi, DIVINITY, handQuelle, { source: CARD_NAME });
         if (pickedSource === 'deck')  { ps.mainDeck.push(DIVINITY); engine.shuffleDeck(pi, 'main'); }
         if (pickedSource === 'discard') ps.discardPile.push(DIVINITY);
         engine.log('sacrifice_to_divinity_attach_failed', { player: ps.username, reason: 'no_target_zone' });

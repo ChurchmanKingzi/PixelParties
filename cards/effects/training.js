@@ -37,13 +37,15 @@ const { pickAusQuellen } = require('./_source-pick-shared');
  * Get ability card names in hand that can be attached to a specific hero.
  * @returns {string[]} deduplicated list of eligible ability names
  */
-function getEligibleHandAbilities(engine, playerIdx, heroIdx, feld = playerIdx) {
+function getEligibleHandAbilities(engine, playerIdx, heroIdx, feld = playerIdx, nurHand = (feld !== playerIdx)) {
   const ps = engine.gs.players[playerIdx];
   if (!ps) return [];
   const cardDB = engine._getCardDB();
   const seen = new Set();
   const result = [];
-  for (const cardName of (ps.hand || [])) {
+  // ★ 12.11. (Al: „Effekte, die Abilities von der Hand anlegen, auch aus der Extra-Hand“): Hand + Crestinas Vorrat. `nurHand`: der Handpick-Weg fuer GELIEHENE Helden waehlt
+  // ueber Handindizes (kennt den Vorrat nicht).
+  for (const cardName of (nurHand ? (ps.hand || []) : engine.handUndVorratListe(playerIdx))) {
     if (seen.has(cardName)) continue;
     const cd = cardDB[cardName];
     if (!cd || !hasCardType(cd, 'Ability')) continue;
@@ -84,7 +86,7 @@ function getHandAbilityEntries(engine, playerIdx, heroIdx, feld = playerIdx) {
   if (!ps) return [];
   const cardDB = engine._getCardDB();
   const result = [];
-  for (const cardName of (ps.hand || [])) {
+  for (const cardName of (feld !== playerIdx ? (ps.hand || []) : engine.handUndVorratListe(playerIdx))) {   // 12.11.: Hand + Crestinas Vorrat (geliehene Helden: nur Hand)
     const cd = cardDB[cardName];
     if (!cd || !hasCardType(cd, 'Ability')) continue;
     if (!engine.canAttachAbilityToHero(feld, cardName, heroIdx)) continue;
@@ -102,7 +104,7 @@ async function handAnlegenGewaehlt(engine, playerIdx, heroIdx, names, trainingOr
   let attached = 0;
   let blockiert = false;
   for (const cardName of names) {
-    if (!(ps.hand || []).includes(cardName)) break;
+    if (!engine._rxQuelleFuer(ps, cardName)) break;   // Hand oder Crestinas Vorrat
     if (!engine.canAttachAbilityToHero(feld, cardName, heroIdx)) break;
     const attachResult = await engine.attachAbilityFromHand(playerIdx, cardName, heroIdx, {
       skipAbilityGivenCheck: true,
@@ -217,7 +219,7 @@ async function doHandAttachFremd(engine, playerIdx, heroIdx, maxAttach, training
   let attached = 0;
   let blockiert = false;   // ★ W16a (Al, Frage 3): von Resistance abgefangen → Einmal-Einsatz verbraucht
   for (let i = 0; i < maxAttach; i++) {
-    const eligible = getEligibleHandAbilities(engine, playerIdx, heroIdx, feld);
+    const eligible = getEligibleHandAbilities(engine, playerIdx, heroIdx, feld, true);
     if (eligible.length === 0) break;
     const indices = (ps.hand || []).map((n, idx) => (eligible.includes(n) ? idx : -1)).filter(idx => idx >= 0);
     const result = await engine.promptGeneric(playerIdx, {
