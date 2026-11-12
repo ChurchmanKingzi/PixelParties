@@ -153,25 +153,25 @@ module.exports = {
     for (let i = 0; i < (ps.hand || []).length; i++) {
       if (_isOriginallyOwnedHandSlot(engine, pi, i)) eligibleIndices.push(i);
     }
-    // ★ 12.11.: auch Karten aus Crestinas Vorrat (Extra-Hand) lassen sich geben („add a card from your hand" — alles, was aus der Hand heraus geht, geht auch von dort).
-    const vorratIndices = _vorratIndices(engine, pi);
-    if (eligibleIndices.length === 0 && vorratIndices.length === 0) return false;
+    if (eligibleIndices.length === 0) return false;
 
-    const wahl = await engine.promptKarteAusHandOderVorrat(pi, {
+    const result = await engine.promptGeneric(pi, {
+      type: 'pickHandCard',
       title: CARD_NAME,
       description: 'Choose one of your originally-owned cards to give to your opponent. You then draw 1 card.',
-      instruction: 'Click a card in your Creation Zone to give it to your opponent.',
-      opponentTitle: 'Opponent is choosing a card to give away...',
-      handIndices: eligibleIndices, vorratIndices,
+      eligibleIndices,
+      cancellable: true,
     });
-    if (!wahl) return false;
-    const cardName = wahl.cardName;
-    const ok = await engine.actionTransferCardToOppHand(pi, wahl.index, wahl.ausVorrat ? { source: CARD_NAME, fromCreation: true } : { source: CARD_NAME });
+    if (!result || result.cancelled || result.handIndex == null) return false;
+
+    const ok = await engine.actionTransferCardToOppHand(pi, result.handIndex, {
+      source: CARD_NAME,
+    });
     if (!ok) return false;
 
     await engine.actionDrawCards(pi, 1);
     engine.log('crystal_well_use', {
-      player: ps.username, transferred: cardName,
+      player: ps.username, transferred: result.cardName,
     });
     engine.sync();
     return true;
@@ -186,19 +186,7 @@ function _hasOriginallyOwnedHandCard(engine, pi) {
   for (let i = 0; i < (ps.hand || []).length; i++) {
     if (_isOriginallyOwnedHandSlot(engine, pi, i)) return true;
   }
-  return _vorratIndices(engine, pi).length > 0;   // 12.11.: auch Karten in Crestinas Vorrat
-}
-
-/** Vorrats-Indizes (Crestinas Extra-Hand, nur wenn benutzbar), deren Karte dem Spieler urspruenglich gehoert. */
-function _vorratIndices(engine, pi) {
-  const ps = engine.gs.players[pi];
-  if (!ps || !engine.isCreationZoneUsable(pi)) return [];
-  const out = [];
-  (ps.creationZone || []).forEach((name, i) => {
-    const inst = engine._findHandInstanceAt(pi, i, true);
-    if (!inst || (inst.originalOwner ?? pi) === pi) out.push(i);   // ohne Instanz: wie in der Hand zulassen
-  });
-  return out;
+  return false;
 }
 
 /**

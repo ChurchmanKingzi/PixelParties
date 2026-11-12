@@ -75,15 +75,10 @@ async function maybeKeepGemInHand(engine, pi, gemName) {
   // resolve), so 1 means "only the gem", which is also unpayable.
   // ★ W77b (Al: „Eine Karte selbst zählt NIE als legales Abwurf-Material für ihre eigenen Kosten"): die Wahl trägt die Plätze OHNE die aufzulösende Karte
   // (`_handIndizesOhneAufloesende`) — vorher verließ sie sich auf die Sperre im Client; ein anderer Client / eine Antwort ohne Prüfung hätte das Juwel selbst abwerfen können.
-  // ★ 12.11. (Al: „Crestina-Karten werden immer behandelt wie echte Handkarten“): auch Karten in Crestinas Vorrat (Extra-Hand) lassen sich als Kosten abwerfen
-  // (ausser der gerade aufloesenden, stammt das Juwel selbst aus dem Vorrat).
-  const vorratErlaubt = engine.isCreationZoneUsable(pi)
-    ? (ps.creationZone || []).map((_, i) => i).filter(i => !engine._istAufloesendeHandkarte(ps, i, true))
-    : [];
   const minHand = gemName === 'Magic Topaz' ? 1 : 2;
-  if ((ps.hand || []).length + (engine.isCreationZoneUsable(pi) ? (ps.creationZone || []).length : 0) < minHand) return { keepInHand: false };
+  if ((ps.hand || []).length < minHand) return { keepInHand: false };
   const erlaubt = engine._handIndizesOhneAufloesende(ps);
-  if (erlaubt.length === 0 && vorratErlaubt.length === 0) return { keepInHand: false };
+  if (erlaubt.length === 0) return { keepInHand: false };
 
   const result = await engine.promptGeneric(pi, {
     type: 'forceDiscardCancellable',
@@ -97,15 +92,13 @@ async function maybeKeepGemInHand(engine, pi, gemName) {
     description: `You may discard a card to keep ${gemName} in your hand. Click a card to pay, or cancel to send ${gemName} to the discard pile.`,
     cancelLabel: 'Send to Discard',
     eligibleIndices: erlaubt,
-    creationEligibleIndices: vorratErlaubt,
     cancellable: true,
   });
 
   if (!result || result.cancelled) return { keepInHand: false };
   const { cardName, handIndex } = result;
-  const ausVorrat = !!result.fromCreation;
   if (cardName == null) return { keepInHand: false };
-  if (ausVorrat ? !vorratErlaubt.includes(handIndex) : (Number.isInteger(handIndex) && !erlaubt.includes(handIndex))) return { keepInHand: false };   // nie die eigene (aufzulösende) Karte
+  if (Number.isInteger(handIndex) && !erlaubt.includes(handIndex)) return { keepInHand: false };   // nie die eigene (aufzulösende) Karte
 
   // ★ W74c: Boris darf auch diese Abwurf-KOSTEN ignorieren — der Edelstein bleibt trotzdem auf der Hand, es wird nichts abgeworfen.
   if (await engine.borisVerzicht(pi, 1, { source: gemName })) {
@@ -118,7 +111,7 @@ async function maybeKeepGemInHand(engine, pi, gemName) {
   // prompt is authoritative when it points at the requested card name;
   // fall back to indexOf if the indices have shifted.
   // v1394: Abwurf über die zentrale Funktion.
-  if (!(await engine.actionDiscardHandCard(pi, cardName, handIndex, { source: gemName, _noGlow: true, ...(ausVorrat ? { fromCreation: true } : {}) }))) {
+  if (!(await engine.actionDiscardHandCard(pi, cardName, handIndex, { source: gemName, _noGlow: true }))) {
     return { keepInHand: false };
   }
 
