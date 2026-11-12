@@ -45,12 +45,15 @@ module.exports = {
       // Find lv 0 Creatures in hand (excluding the just-summoned Cloudy Slime itself)
       const eligibleCards = [];
       const seen = new Set();
-      for (let hi2 = 0; hi2 < (ps.hand || []).length; hi2++) {
-        const name = ps.hand[hi2];
+      // ★ 12.11. (Al: „Effekte, die Karten aus der Hand benutzen, auch aus der Extra-Hand“): erst die Hand, dann Crestinas Vorrat (ohne Handindex).
+      const handKopien = engine.handUndVorratListe(pi);
+      const handLaenge = (ps.hand || []).length;
+      for (let hi2 = 0; hi2 < handKopien.length; hi2++) {
+        const name = handKopien[hi2];
         if (seen.has(name)) continue;
         const c = cardDB[name];
         // W24d (N4-11): „level 0" nach WIRKSAMER Stufe der Handkarte (Rocky Slime & Co.), wie Psychic Scout.
-        if (c && isSummonablePileCreature(c) && engine.effectiveCardLevel(c, pi, { handIdx: hi2 }) === 0) {
+        if (c && isSummonablePileCreature(c) && engine.effectiveCardLevel(c, pi, hi2 < handLaenge ? { handIdx: hi2 } : {}) === 0) {
           seen.add(name);
           eligibleCards.push({ name, source: 'hand' });
         }
@@ -128,12 +131,14 @@ module.exports = {
         // Recompute eligible cards (hand may have changed if multiple effects)
         const currentEligible = [];
         const currentSeen = new Set();
-        for (let hi2 = 0; hi2 < (ps.hand || []).length; hi2++) {
-          const name = ps.hand[hi2];
+        const handKopienJetzt = engine.handUndVorratListe(pi);
+        const handLaengeJetzt = (ps.hand || []).length;
+        for (let hi2 = 0; hi2 < handKopienJetzt.length; hi2++) {
+          const name = handKopienJetzt[hi2];
           if (currentSeen.has(name)) continue;
           if (ohneZone.has(name)) continue;
           const c = cardDB[name];
-          if (c && isSummonablePileCreature(c) && engine.effectiveCardLevel(c, pi, { handIdx: hi2 }) === 0) {
+          if (c && isSummonablePileCreature(c) && engine.effectiveCardLevel(c, pi, hi2 < handLaengeJetzt ? { handIdx: hi2 } : {}) === 0) {
             currentSeen.add(name);
             currentEligible.push({ name, source: 'hand' });
           }
@@ -167,9 +172,15 @@ module.exports = {
         // W24d (N4-11): die Kopie mit wirksamer Stufe 0 (nicht blind die erste gleichnamige).
         let idx = ps.hand.findIndex((n, i2) => n === cardName && cardDB[n]
           && engine.effectiveCardLevel(cardDB[n], pi, { handIdx: i2 }) === 0);
-        if (idx < 0) idx = ps.hand.indexOf(cardName);
-        if (idx < 0) { await engine.summonEffektFizzelt(ctx.card, 'Cloudy Slime', { stumm: true }); return; } // Card no longer in hand   // W24d (N4-14)
-        engine.takeFromPileSync(ps, 'hand', idx);
+        // 12.11.: keine passende Handkopie → die Stufe-0-Kopie in Crestinas Vorrat (Extra-Hand)
+        let vorratQuelle = null;
+        if (idx < 0 && engine.isCreationZoneUsable(pi)) {
+          const vi = (ps.creationZone || []).findIndex(n => n === cardName && cardDB[n] && engine.effectiveCardLevel(cardDB[n], pi, {}) === 0);
+          if (vi >= 0) vorratQuelle = { liste: ps.creationZone, ausVorrat: true, idx: vi };
+        }
+        if (idx < 0 && !vorratQuelle) idx = ps.hand.indexOf(cardName);
+        if (idx < 0 && !vorratQuelle) { await engine.summonEffektFizzelt(ctx.card, 'Cloudy Slime', { stumm: true }); return; } // Card no longer in hand   // W24d (N4-14)
+        if (vorratQuelle) engine.rxNimm(ps, vorratQuelle); else engine.takeFromPileSync(ps, 'hand', idx);
 
         // Place into support zone (eigene Spalte wie bisher; uebernommener Held der Gegenspalte: seitenfremd, kontrolliert von `pi`)
         const hi = zone.heroIdx;

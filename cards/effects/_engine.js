@@ -23268,6 +23268,12 @@ this._deathWatch = (this._deathWatchStack || []).length
       });
       return res?.inst || null;
     }
+    // ★ 12.11. (Al: „Effekte, die Karten aus der Hand benutzen — hier: beschwoeren —, greifen auch auf die Extra-Hand zu“): liegt die Karte nicht in der Hand, wohl aber in Crestinas
+    // (benutzbarem) Vorrat, wird sie von dort beschworen (`summonFromCreation`).
+    if (pile === 'hand' && (opts.ausVorrat || (opts.handIdx == null && !(this.gs.players[pi]?.hand || []).includes(cardName)))
+        && this.isCreationZoneUsable(pi) && (this.gs.players[pi]?.creationZone || []).includes(cardName)) {
+      return this.summonFromCreation(pi, cardName, heroIdx, slotIdx, opts);
+    }
     // Als Ruling (Al 26.10.): `opts.handIdx` (nur Pile `hand`) benennt die KOPIE, die beschworen wird — das Heldenstufen-Tor gilt je Handkopie (Rocky Slime reduziert nur eine einzelne Kopie);
     // ohne Index die erste Kopie wie bisher.
     const _kopie = (pile === 'hand' && Number.isInteger(opts.handIdx) && this.gs.players[pi]?.hand?.[opts.handIdx] === cardName) ? opts.handIdx : cardName;
@@ -23338,6 +23344,8 @@ this._deathWatch = (this._deathWatchStack || []).length
     if (!(await this._beschwoerungKostenVorAuftritt(cardName, feld, heroIdx, slotIdx, kernOpts))) return zurueck();
     kernOpts._sperrenGeprueft = true; kernOpts._kostenGezahlt = true;
     this._auftrittSchrittNachKosten('summonFromPile');
+    // W66b (wie `summonFromPile`): Limit/Auftritt HINTER der letzten Abbruchstelle; `false` = abgebrochen, die Karte geht an ihren Vorratsplatz zurueck.
+    if (typeof opts.nachKostenAnim === 'function' && (await opts.nachKostenAnim({ name: cardName })) === false) return zurueck();
     if (opts.flug !== false) this._pileFlight(pi, cardName, 'creation', 'support', flight);
     const summon = await this.summonCreatureWithHooks(cardName, feld, heroIdx, slotIdx, kernOpts);
     if (!summon?.inst) return zurueck();
@@ -31552,6 +31560,12 @@ this._deathWatch = (this._deathWatchStack || []).length
 
     const source = opts.source || 'hand';
     const sourceName = opts.sourceName || 'Placement';
+    // ★ 12.11. (Al: „Effekte, die Karten aus der Hand benutzen — hier: platzieren —, greifen auch auf die Extra-Hand zu“): liegt die Karte nicht in der Hand, wohl aber in Crestinas
+    // (benutzbarem) Vorrat, kommt sie von dort. Gilt nur ohne ausdrueckliche Hand-Position (`opts.sourceIdx`).
+    // `opts.ausVorrat: true` erzwingt den Vorrat (der Aufrufer weiss, dass genau DIESE Kopie zaehlt, auch wenn die Hand eine gleichnamige hat).
+    const _ausVorrat = source === 'hand' && (opts.ausVorrat || (opts.sourceIdx == null && !(ps.hand || []).includes(cardName)))
+      && this.isCreationZoneUsable(playerIdx) && (ps.creationZone || []).includes(cardName);
+    if (_ausVorrat) opts = { ...opts, _ausVorrat: true };
 
     // ── PLATZIERUNG NEGIEREN (Off Duty, Ruling 3.10.: „summons" gilt auch
     // fuer das PLATZIEREN per Effekt) ────────────────────────────────────
@@ -31587,7 +31601,23 @@ this._deathWatch = (this._deathWatchStack || []).length
 
     let _handFlug = false;
     let _ablage = null;   // v1389: Entnahme-Beleg bei source 'discard'
-    if (source === 'hand') {
+    if (source === 'hand' && _ausVorrat) {
+      // Crestinas Vorrat (Extra-Hand): Flug vom Vorratsplatz, Abgang samt Instanz.
+      const vi = (ps.creationZone || []).indexOf(cardName);   // direkt im Vorrat suchen (die Hand kann eine gleichnamige Karte haben)
+      if (vi < 0) return null;
+      const q = { liste: ps.creationZone, ausVorrat: true, idx: vi };
+      if (!opts.skipPileTransfer && !this._fastMode && !this._inMctsSim) {
+        this._broadcastEvent('play_pile_transfer', {
+          owner: playerIdx, cardName,
+          from: 'creation', to: 'support', fromHandIdx: q.idx,
+          toHeroIdx: heroIdx, toSlotIdx: slotIdx,
+          ...(feld !== playerIdx ? { toOwner: feld } : {}),
+        });
+        _handFlug = true;
+      }
+      this._rxAbgang(ps, q);
+      this.sync();
+    } else if (source === 'hand') {
       const idx = opts.sourceIdx != null ? opts.sourceIdx : (ps.hand || []).indexOf(cardName);
       if (idx < 0) return null;
       // ── SICHTBARER FLUG Hand → Support Zone (v700, Als Befund:
@@ -31679,7 +31709,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     inst.counters = inst.counters || {};
     if (feld !== playerIdx) this.markiereSeitenfremd(inst, playerIdx);
     inst.counters.isPlacement = 1;
-    if (source === 'hand') this._drainHandIndexedPending(ps, cardName, inst);   // Elephant-Counter bleiben erhalten
+    if (source === 'hand' && !_ausVorrat) this._drainHandIndexedPending(ps, cardName, inst);   // Elephant-Counter bleiben erhalten
     inst.turnPlayed = gs.turn || 0;
     if (_letheBonus > 0) inst.counters._letheLevelBonus = _letheBonus;
     // v1389: aus der Ablage → Lethe, Heimkehr, SC, Signal (EINE Stelle).
@@ -47413,6 +47443,11 @@ this._deathWatch = (this._deathWatchStack || []).length
       this.sync();
     } else if (source === 'none') {
       von = null;
+    } else if (source === 'hand' && opts._ausVorrat) {
+      // 12.11.: Karte aus Crestinas Vorrat — Abflug vom Vorratsplatz
+      const vi = (ps.creationZone || []).indexOf(cardName);
+      von = 'creation';
+      if (vi >= 0) { handIdx = vi; this._rxAbgang(ps, { liste: ps.creationZone, ausVorrat: true, idx: vi }); }
     } else if (source === 'hand') {
       handIdx = opts.sourceIdx != null ? opts.sourceIdx : (ps.hand || []).indexOf(cardName);
       if (handIdx >= 0 && ps.hand[handIdx] === cardName) ps.hand.splice(handIdx, 1);
@@ -47428,7 +47463,7 @@ this._deathWatch = (this._deathWatchStack || []).length
       this._broadcastEvent('play_pile_transfer', {
         owner: playerIdx, cardName, from: von,
         to: nachDeck ? 'deck' : (nachGeloescht ? 'deleted' : 'discard'),
-        ...(von === 'hand' && Number.isInteger(handIdx) && handIdx >= 0 ? { fromHandIdx: handIdx } : {}),
+        ...((von === 'hand' || von === 'creation') && Number.isInteger(handIdx) && handIdx >= 0 ? { fromHandIdx: handIdx } : {}),
         ...(von === 'surprise' && Number.isInteger(vonHeld) ? { fromHeroIdx: vonHeld } : {}),
         ...(von === 'support' && Number.isInteger(vonHeld) ? { fromHeroIdx: vonHeld, fromSlotIdx: opts.slotIdx } : {}),
       });

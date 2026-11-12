@@ -121,7 +121,8 @@ module.exports = {
       if (zones.length === 0) return;
 
       // Kandidaten aus Hand UND Deck, Hand zuerst.
-      const inHand = (ps.hand || []).filter(n => n === CARD_NAME).length;
+      // ★ 12.11. (Al: „Effekte, die Karten aus der Hand benutzen, auch aus der Extra-Hand“): Hand + Crestinas Vorrat.
+      const inHand = engine.handUndVorratListe(pi).filter(n => n === CARD_NAME).length;
       const inDeck = (ps.mainDeck || []).filter(n => n === CARD_NAME).length;
       if (inHand === 0 && inDeck === 0) return;
       const cards = [];
@@ -142,7 +143,7 @@ module.exports = {
       // Nachpruefen: die gewaehlte Quelle muss die Karte wirklich noch
       // fuehren (zwischen Abfrage und Aufloesung kann sich etwas
       // verschoben haben).
-      const pool = source === 'deck' ? ps.mainDeck : ps.hand;
+      const pool = source === 'deck' ? ps.mainDeck : engine.handUndVorratListe(pi);
       if (!Array.isArray(pool) || pool.indexOf(CARD_NAME) < 0) return;
 
       // Zielzone waehlen — bei nur einer freien Zone ohne Rueckfrage.
