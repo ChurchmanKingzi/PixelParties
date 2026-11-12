@@ -40996,9 +40996,8 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     // the rest so the player's eye lands on the legal picks.
     const pickHandCard = gameState.effectPrompt?.type === 'pickHandCard' && gameState.effectPrompt.ownerIdx === myIdx;
     if (pickHandCard) {
-      // Handzugriffs-Effekte meinen die HAND — Vorratskarten sind
-      // keine legalen Ziele (Als Ruling), also immer ausgegraut.
-      if (fromCreation) return true;
+      // 12.11.: Vorratskarten nur, wenn der Prompt sie anbietet (`creationEligibleIndices`) — „Karte aus der Hand benutzen“ gilt auch fuer Crestinas Vorrat.
+      if (fromCreation) return !(gameState.effectPrompt.creationEligibleIndices || []).includes(handIdx);
       const eligible = gameState.effectPrompt.eligibleIndices;
       return !(!eligible || eligible.includes(handIdx));
     }
@@ -41006,7 +41005,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     // Hand Pick mode (Shard of Chaos) — dim ineligible cards
     const handPickActive = gameState.effectPrompt?.type === 'handPick' && gameState.effectPrompt.ownerIdx === myIdx;
     if (handPickActive) {
-      if (fromCreation) return true;   // siehe oben
+      if (fromCreation) return !(gameState.effectPrompt.creationEligibleIndices || []).includes(handIdx);   // 12.11.: Vorrat nur, wenn der Prompt ihn anbietet
       const eligible = gameState.effectPrompt.eligibleIndices || [];
       return !eligible.includes(handIdx);
     }
@@ -42366,6 +42365,13 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     // `targetHeroIdx` + `targetSlotIdx` in the response so the
     // script can skip its zone-pick prompt. Plain clicks behave
     // identically to the existing flow.
+    // ★ 12.11.: Klick auf eine Vorratskarte, die der Prompt anbietet (`creationEligibleIndices`) — die Antwort tragt `fromCreation: true` (Ziehen auf eine Zone gibt es dort nicht).
+    if (fromCreation && gameState.effectPrompt?.type === 'pickHandCard' && gameState.effectPrompt.ownerIdx === myIdx
+        && (gameState.effectPrompt.creationEligibleIndices || []).includes(idx)) {
+      if (e.cancelable) e.preventDefault();
+      ppSendePromptAntwort(gameState, { cardName, handIndex: idx, fromCreation: true });
+      return;
+    }
     const pickHandCardActive = !fromCreation && gameState.effectPrompt?.type === 'pickHandCard' && gameState.effectPrompt.ownerIdx === myIdx;
     const pickHandCardPrompt = pickHandCardActive ? gameState.effectPrompt : null;
     const pickHandCardHosts = pickHandCardPrompt?.eligibleHostsByCardName?.[cardName] || null;
@@ -42393,6 +42399,20 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     }
 
     // Hand Pick mode (Shard of Chaos, Leadership) — toggle card selection
+    // ★ 12.11.: Vorratskarten (`creationEligibleIndices`) wechseln ihre Auswahl in `handPickSelectedCz` (gleiche Obergrenze `maxSelect` fuer beide zusammen).
+    if (fromCreation && gameState.effectPrompt?.type === 'handPick' && gameState.effectPrompt.ownerIdx === myIdx) {
+      if (!(gameState.effectPrompt.creationEligibleIndices || []).includes(idx)) return;
+      if (e.cancelable) e.preventDefault();
+      const maxSelectCz = gameState.effectPrompt.maxSelect || 3;
+      if (!handPickSelectedCz.has(idx) && handPickSelected.size + handPickSelectedCz.size >= maxSelectCz) return;
+      if (window.playSFX) window.playSFX('ui_click');
+      setHandPickSelectedCz(prev => {
+        const next = new Set(prev);
+        if (next.has(idx)) next.delete(idx); else next.add(idx);
+        return next;
+      });
+      return;
+    }
     const handPickPrompt = !fromCreation && gameState.effectPrompt?.type === 'handPick' && gameState.effectPrompt.ownerIdx === myIdx;
     if (handPickPrompt) {
       const eligible = gameState.effectPrompt.eligibleIndices || [];
@@ -42423,7 +42443,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         willChange = true; // Deselection always succeeds.
       } else if (nameLockActive && me.hand[idx] !== lockedName) {
         willChange = false; // Different name — locked out.
-      } else if (handPickSelected.size >= maxSelect) {
+      } else if (handPickSelected.size + handPickSelectedCz.size >= maxSelect) {
         willChange = false;
       } else if (thisType && typeLimits[thisType] !== undefined) {
         let selectedOfType = 0;
@@ -42438,7 +42458,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       setHandPickSelected(prev => {
         const next = new Set(prev);
         if (next.has(idx)) { next.delete(idx); return next; }
-        if (next.size >= maxSelect) return prev;
+        if (next.size + handPickSelectedCz.size >= maxSelect) return prev;
         // Re-check the name lock inside the updater since `prev` may
         // differ from the closure-captured `handPickSelected` under
         // StrictMode/double-invocation. Same lookup pattern: peek any
@@ -44557,6 +44577,8 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
   const setPileViewer = useCallback((v) => { if (v && window.playSFX) window.playSFX('ui_prompt_open', { volume: 0.7 }); _setPileViewerRaw(v); }, []);
   const [hoveredPileCard, setHoveredPileCard] = useState(null); // card name for pile tooltip
   const [handPickSelected, setHandPickSelected] = useState(new Set()); // hand indices selected for handPick prompt
+  // ★ 12.11. (Vorgabe: Effekte, die Karten aus der Hand BENUTZEN, greifen auch auf Crestinas Vorrat zu): Auswahl im Vorrat (`creationEligibleIndices` des Prompts), zaehlt gegen dasselbe `maxSelect`.
+  const [handPickSelectedCz, setHandPickSelectedCz] = useState(new Set());
   const [blindPickSelected, setBlindPickSelected] = useState(new Set()); // opp hand indices selected for blindHandPick prompt
   const [stealMarkedMe, setStealMarkedMe] = useState(new Set()); // own hand indices marked for stealing (victim's screen)
   const [stealHiddenMe, setStealHiddenMe] = useState(new Set()); // own hand indices hidden during steal flight (victim)
@@ -44639,7 +44661,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
   const stealExpectedMeCountRef = useRef(-1); // my hand count when stealHiddenMe was set
   const [stealHighlightMe, setStealHighlightMe] = useState(new Set()); // hand indices highlighted by opponent's blind pick selection
   // Clear stale hoveredPileCard when force-discard prompt ends
-  useEffect(() => { setHoveredPileCard(null); setHandPickSelected(new Set()); setBlindPickSelected(new Set()); setStealHighlightMe(new Set()); }, [gameState.effectPrompt]);
+  useEffect(() => { setHoveredPileCard(null); setHandPickSelected(new Set()); setHandPickSelectedCz(new Set()); setBlindPickSelected(new Set()); setStealHighlightMe(new Set()); }, [gameState.effectPrompt]);
   // Broadcast blind-pick selection to opponent so they see highlighted cards
   useEffect(() => {
     if (gameState.effectPrompt?.type === 'blindHandPick' && gameState.effectPrompt?.ownerIdx === myIdx) {
@@ -60739,7 +60761,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                   }
                   return selectedOfType >= typeLimits[thisType];
                 })();
-                const isHandPickMaxed = isHandPick && !isHandPickSelected && handPickSelected.size >= (gameState.effectPrompt.maxSelect || 3);
+                const isHandPickMaxed = isHandPick && !isHandPickSelected && handPickSelected.size + handPickSelectedCz.size >= (gameState.effectPrompt.maxSelect || 3);
                 // Heinz-style name lock — once a card is picked, all
                 // hand cards with a different name are dimmed and
                 // un-clickable. Already-selected cards stay highlighted
@@ -60983,6 +61005,13 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                   // Galerie. Waehlbar ist nur, was der Server
                   // freigegeben hat; die gerade aufloesende Karte ist
                   // dort nicht dabei.
+                  // ★ 12.11.: Hand-Auswahl-Prompts (`pickHandCard`/`handPick`) bieten Vorratskarten ueber `creationEligibleIndices` an — gleiche Hervorhebung wie in der Hand.
+                  const czEp = gameState.effectPrompt && gameState.effectPrompt.ownerIdx === myIdx ? gameState.effectPrompt : null;
+                  const czWaehlbarPick = !!czEp && (czEp.type === 'pickHandCard' || czEp.type === 'handPick')
+                    && (czEp.creationEligibleIndices || []).includes(item.origIdx);
+                  const czPickGewaehlt = !!czEp && czEp.type === 'handPick' && handPickSelectedCz.has(item.origIdx);
+                  const czPickVoll = czWaehlbarPick && czEp.type === 'handPick' && !czPickGewaehlt
+                    && handPickSelected.size + handPickSelectedCz.size >= (czEp.maxSelect || 3);
                   const czPrompt = gameState.effectPrompt?.type === 'creationDiscard'
                     && gameState.effectPrompt?.ownerIdx === myIdx;
                   const czWaehlbar = czPrompt
@@ -60990,6 +61019,10 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                   return (
                     <div key={'cz' + item.origIdx}
                       className={'creation-slot' + (item.isDragged ? ' hand-dragging' : '')
+                        + (czPickGewaehlt ? ' hand-pick-selected' : '')
+                        + (czEp && czEp.type === 'handPick' && czEp.highlightStyle === 'strong' ? ' hand-pick-stark' + (!czWaehlbarPick ? ' hand-card-dimmed' : '') : '')
+                        + (czWaehlbarPick && !czPickGewaehlt && !czPickVoll ? (czEp.highlightStyle === 'urgent' ? ' hand-pick-eligible hand-pick-eligible-urgent' : ' hand-pick-eligible') : '')
+                        + (czPickVoll ? ' hand-card-dimmed' : '')
                         + (czPrompt
                             ? (czWaehlbar ? ' hand-discard-target' : ' hand-card-dimmed')
                             : (czDimmed ? ' hand-card-dimmed' : ''))}
@@ -63274,27 +63307,32 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       {/* ── Hand Pick Prompt (Shard of Chaos) ── */}
       {isMyEffectPrompt && ep.type === 'handPick' && (() => {
         const minSel = ep.minSelect ?? 1;
-        const canConfirm = handPickSelected.size >= minSel;
+        const handPickGesamt = handPickSelected.size + handPickSelectedCz.size;
+        const canConfirm = handPickGesamt >= minSel;
         // When `nameLockOnFirstSelect` is set, the confirm label
         // suffixes the current selection count (e.g. "Discard 3").
         // Heinz uses this — the count can vary 1..maxSelect on the
         // fly as the player toggles copies.
         const baseLabel = ep.confirmLabel || 'Confirm';
         const dynamicLabel = ep.nameLockOnFirstSelect
-          ? `${baseLabel} ${handPickSelected.size}`
+          ? `${baseLabel} ${handPickGesamt}`
           : baseLabel;
         return (
           <DraggablePanel className="first-choice-panel animate-in" style={{ borderColor: 'rgba(184,102,255,.85)' }}>
             <div className="orbit-font" style={{ fontSize: 13, color: '#b866ff', marginBottom: 4 }}>{ep.title || 'Select Cards'}</div>
             <div style={{ fontSize: 12, color: 'var(--text2)', marginBottom: 10 }}>{ep.description}</div>
             <div style={{ fontSize: 11, color: '#b866ff', opacity: .8, marginBottom: 8 }}>
-              Selected: {handPickSelected.size}/{ep.maxSelect || 3} (min {minSel})
+              Selected: {handPickGesamt}/{ep.maxSelect || 3} (min {minSel})
             </div>
             <div style={{ display: 'flex', gap: 8, justifyContent: 'center' }}>
               <button className="btn" style={{ padding: '6px 16px', fontSize: 11, borderColor: canConfirm ? '#b866ff' : '#535353', color: canConfirm ? '#b866ff' : '#535353' }}
                 disabled={!canConfirm}
                 onClick={() => {
-                  const selected = [...handPickSelected].map(idx => ({ handIndex: idx, cardName: me.hand[idx] }));
+                  const selected = [
+                    ...[...handPickSelected].map(idx => ({ handIndex: idx, cardName: me.hand[idx] })),
+                    // Vorratskarten (Extra-Hand): gleicher Eintrag, zusaetzlich `fromCreation: true`
+                    ...[...handPickSelectedCz].map(idx => ({ handIndex: idx, cardName: (me.creationZone || [])[idx], fromCreation: true })),
+                  ];
                   respondToPrompt({ selectedCards: selected });
                 }}>{dynamicLabel}</button>
               {ep.cancellable !== false && (

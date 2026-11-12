@@ -5839,7 +5839,7 @@ function sendGameState(room, playerIdx, extra) {
       // v657: Handkarten mit selbstgerechneten Kosten (manualGoldCost)
       // bleiben beim Gratis-Kauf grau — nur fuer den Besitzer relevant.
       manualCostArtifactsInHand: (pi === playerIdx && room.engine?.freeArtifactArmed(pi))
-        ? (ps.hand || []).filter(n => !!loadCardEffect(n)?.manualGoldCost) : [],
+        ? [...(ps.hand || []), ...(ps.creationZone || [])].filter(n => !!loadCardEffect(n)?.manualGoldCost) : [],   // 12.11.: auch Vorratskarten (Gratis-Kauf gilt dort wie in der Hand)
       dealtDamageToOpponent: ps.dealtDamageToOpponent || false,
       potionLocked: room.engine ? room.engine.arePotionsLockedFor(pi) : (ps.potionLocked || false),
       poisonDamagePerStack: room.engine ? room.engine.getPoisonDamagePerStack(pi) : 30,

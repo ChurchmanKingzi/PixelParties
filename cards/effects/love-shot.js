@@ -362,7 +362,14 @@ module.exports = {
           eligibleIndices.push(i);
         }
 
-        if (eligibleIndices.length === 0) {
+        // ★ 12.11. (Vorgabe: Effekte, die Karten aus der Hand BENUTZEN, greifen auch auf Crestinas Extra-Hand zu): die Namensliste des Engine-Sammlers enthaelt den Vorrat schon —
+        // hier die passenden Vorratsplaetze (`creationEligibleIndices`, Klick auf die Karte im Vorrat).
+        const vorratIndices = [];
+        if (engine.isCreationZoneUsable(pi)) {
+          (ps.creationZone || []).forEach((n, i) => { if (eligibleNames.has(n)) vorratIndices.push(i); });
+        }
+
+        if (eligibleIndices.length === 0 && vorratIndices.length === 0) {
           engine.log('love_shot_no_action', {
             player: ps.username, target: targetHero.name,
           });
@@ -377,6 +384,7 @@ module.exports = {
           title: CARD_NAME,
           description: `Click a Spell or Attack in your hand to perform with ${targetHero.name}.`,
           eligibleIndices,
+          creationEligibleIndices: vorratIndices,
           minSelect: 0,
           maxSelect: 1,
           cancellable: true,
@@ -389,16 +397,21 @@ module.exports = {
         }
 
         const { handIndex, cardName: chosenName } = result.selectedCards[0];
-        if (handIndex < 0 || handIndex >= ps.hand.length
-            || ps.hand[handIndex] !== chosenName) return;
-        if (!eligibleIndices.includes(handIndex)) return;   // W19c: der Server prüft nach — nur angebotene Handplätze
+        const ausVorrat = !!result.selectedCards[0].fromCreation;
+        if (ausVorrat) {
+          if (!vorratIndices.includes(handIndex) || (ps.creationZone || [])[handIndex] !== chosenName) return;
+        } else {
+          if (handIndex < 0 || handIndex >= ps.hand.length
+              || ps.hand[handIndex] !== chosenName) return;
+          if (!eligibleIndices.includes(handIndex)) return;   // W19c: der Server prüft nach — nur angebotene Handplätze
+        }
         const chosenCd = cardDB[chosenName];
         if (!chosenCd) return;
         // W19c (Al: „Hand des aktuellen Kontrolleurs"): Wisdom-Abwurfkosten nach den Schulen/Stufen des HELDEN (`heroSeite`), aber Hand, Rabatte
         // und Ermäßigungen vom KONTROLLEUR (`pi`, `levelSourcePi`) und der konkreten Kopie (`handIndex`). Gerechnet VOR dem Entnehmen der Karte
         // (danach fehlt die rabattierte Kopie in der Hand); bezahlt wird wie bisher erst nach dem Guss.
         const wisdomCostVorab = chosenCd.cardType === 'Spell'
-          ? engine.getWisdomDiscardCost(heroSeite, sel.heroIdx, chosenCd, handIndex, heroSeite !== pi ? pi : undefined)
+          ? engine.getWisdomDiscardCost(heroSeite, sel.heroIdx, chosenCd, ausVorrat ? undefined : handIndex, heroSeite !== pi ? pi : undefined)
           : 0;
 
         // ── Resolve the inner cast (charmedOwner semantics) ──
@@ -407,7 +420,8 @@ module.exports = {
         // onPlay + afterSpellResolved with _skipReactionCheck (we
         // are inside Love Shot's resolution — its own reaction
         // window already fired).
-        engine.takeFromPileSync(ps, 'hand', handIndex);
+        const loveQuelle = ausVorrat ? { liste: ps.creationZone, ausVorrat: true, idx: handIndex } : null;
+        if (loveQuelle) engine.rxNimm(ps, loveQuelle); else engine.takeFromPileSync(ps, 'hand', handIndex);
         const inst = engine._trackCard(chosenName, pi, 'hand', sel.heroIdx, -1);
         if (heroSeite !== pi) inst.heroOwner = heroSeite;   // W17d: eigene Spalte = ganz normaler eigener Guss (wie in doPlaySpell)
 
@@ -484,11 +498,15 @@ module.exports = {
         }
         if (innerCancelled) {
           const _retIdx = ps.hand.length;
-          engine._broadcastEvent('play_pile_transfer', {
-            owner: pi, cardName: chosenName, from: 'hand', to: 'hand',
-            fromHandIdx: _retIdx, toHandIdx: _retIdx,
-          });
-          engine.handZugangRueckgabe(ps, chosenName, { source: CARD_NAME, ohneInstanz: true });   // W63c: Herkunft (gestohlene Handkarte) bleibt
+          if (loveQuelle) {
+            engine.handkarteZurueck(pi, chosenName, loveQuelle);   // zurueck in Crestinas Vorrat
+          } else {
+            engine._broadcastEvent('play_pile_transfer', {
+              owner: pi, cardName: chosenName, from: 'hand', to: 'hand',
+              fromHandIdx: _retIdx, toHandIdx: _retIdx,
+            });
+            engine.handZugangRueckgabe(ps, chosenName, { source: CARD_NAME, ohneInstanz: true });   // W63c: Herkunft (gestohlene Handkarte) bleibt
+          }
           engine._untrackCard(inst.id);
         } else {
           // Als Fix (Al 27.10.): legt sich eine AREA aus diesem Nachguss selbst aufs Brett, hat ihre Instanz die Hand verlassen (`zone` ≠ 'hand'; `placeArea` stempelt `_spellPlacedOnBoard` nur fuer die gerade

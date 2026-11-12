@@ -61,7 +61,7 @@ module.exports = {
     const ps = engine.gs.players[pi];
     if (!ps) return false;
     // Need a Fireball in hand to perform, and a legal Chaorc sacrifice.
-    if (!(ps.hand || []).includes(FIREBALL)) return false;
+    if (!engine.handUndVorratListe(pi).includes(FIREBALL)) return false;
     return chaorcFreshSacCandidates(engine, pi, ctx.card.id).length > 0;
   },
 
@@ -71,7 +71,7 @@ module.exports = {
     const pi = ctx.cardOwner;
     const ps = gs.players[pi];
     const heroIdx = ctx.cardHeroIdx;
-    if (!ps || !(ps.hand || []).includes(FIREBALL)) return false;
+    if (!ps || !engine.handUndVorratListe(pi).includes(FIREBALL)) return false;
 
     // ★ Als Ruling (Al 26.10.): „Ja, zuerst Ziel wählen, Commit soll Opfer und Feuerball gleichzeitig committen." — erst Fireball-Ziel(e) wählen und bestätigen
     // (abbrechbar), DANN das Opfer bezahlen (`nachZielwahl`, Fireballs `promptMultiTarget`) und den Fireball wirken/löschen. Ein Abbruch irgendwo davor
@@ -113,7 +113,7 @@ module.exports = {
       bezahlt = true;
       // A Fireball could in theory have left the hand during the
       // sacrifice's reaction window — dann ist das Opfer bezahlt, der Fireball aber nicht mehr zu wirken.
-      return (ps.hand || []).includes(FIREBALL);
+      return engine.handUndVorratListe(pi).includes(FIREBALL);
     };
 
     // ── Perform the Fireball from hand, ignoring its level. ──
@@ -131,7 +131,7 @@ module.exports = {
         // Kein `_forcePerform` mehr: bis zur Bestätigung (und der Opferwahl) ist die Zielwahl abbrechbar.
         _nachZielwahl: nachZielwahl,
       });
-      if (bezahlt && (ps.hand || []).includes(FIREBALL)) {
+      if (bezahlt && engine.handUndVorratListe(pi).includes(FIREBALL)) {
         const uniqueTargets = [];
         const seenIds = new Set();
         for (const t of (gs._spellDamageLog || [])) {
@@ -165,7 +165,7 @@ module.exports = {
       return false;
     }
     // Der Fireball verschwand während des Opfer-Fensters aus der Hand: Opfer bezahlt, nichts mehr zu wirken.
-    if (!(ps.hand || []).includes(FIREBALL)) {
+    if (!engine.handUndVorratListe(pi).includes(FIREBALL)) {
       delete gs._spellDamageLog; delete gs._spellExcludeTargets; delete gs._spellPlacedOnBoard; delete gs._spellCancelled; delete gs._spellNegatedByEffect;
       engine.sync();
       return true;
@@ -182,19 +182,21 @@ module.exports = {
     // text it is DELETED, not discarded.
     // (Fireball never places itself on the board, but guard anyway.)
     if (!placedOnBoard) {
-      const finalHandIdx = (ps.hand || []).indexOf(FIREBALL);
+      // ★ 12.11. (Vorgabe: Effekte, die Karten aus der Hand BENUTZEN, greifen auch auf Crestinas Extra-Hand zu): der Fireball kann aus der Hand ODER dem Vorrat kommen.
+      const fireQuelle = engine._rxQuelleFuer(ps, FIREBALL);
+      const finalHandIdx = fireQuelle ? fireQuelle.idx : -1;
       if (finalHandIdx >= 0) {
         // Stolen copies land in their ORIGINAL owner's deleted pile —
         // the engine's hand→pile routing contract. Resolved BEFORE the
         // splice / re-home, since the helper looks up a hand instance.
-        const pileOwner = engine._handCardPileOwner(pi, FIREBALL);
+        const pileOwner = fireQuelle.ausVorrat ? pi : engine._handCardPileOwner(pi, FIREBALL);
         const pilePs = gs.players[pileOwner] || ps;
 
         // Splice first, then the rescue gate — the engine's own delete
         // paths (actionPromptForceDiscard, enforceHandLimit) do it in
         // this order: the card leaves the hand either way (it WAS
         // performed), a rescue only cancels the deleted-pile landing.
-        engine.takeFromPileSync(ps, 'hand', finalHandIdx);
+        if (fireQuelle.ausVorrat) engine._rxAbgang(ps, fireQuelle); else engine.takeFromPileSync(ps, 'hand', finalHandIdx);   // Vorrat: die Vorrats-Instanz wird abgeraeumt, die Unter-Instanz `subInst` bleibt
 
         const rescued = await engine._tryBeforeDelete(FIREBALL, pi, {
           fromZone: 'hand', fromInstance: subInst, source: CARD_NAME,
@@ -212,7 +214,7 @@ module.exports = {
           // hand slot and pins the flight's source rect to it.
           engine._broadcastEvent('play_pile_transfer', {
             owner: pi, cardName: FIREBALL,
-            from: 'hand', to: 'deleted', fromHandIdx: finalHandIdx,
+            from: fireQuelle.ausVorrat ? 'creation' : 'hand', to: 'deleted', fromHandIdx: finalHandIdx,
             ...(pileOwner !== pi ? { fromOwner: pi, toOwner: pileOwner } : {}),
           });
           // Re-home the instance instead of untracking it: cards that
