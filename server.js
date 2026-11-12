@@ -6086,7 +6086,7 @@ function sendGameState(room, playerIdx, extra) {
       // client renders an effective-cost badge on each tagged hand
       // card, and the play-from-hand path uses the same map to compute
       // what the owner actually pays.
-      // ★ 12.11. (Vorgabe: Crestina-Karten gelten wie Handkarten): wirksame STUFE der Karten in Crestinas Vorrat, nur wo sie vom Druck abweicht (Great Vanguard Demon, Stufensenker der Hand,
+      // ★ 12.11. (Vorgabe: Karten in Crestinas Vorrat werden wie Handkarten GESPIELT): wirksame STUFE der Karten in Crestinas Vorrat, nur wo sie vom Druck abweicht (Great Vanguard Demon, Stufensenker der Hand,
       // Mana Absorbing Crystal …) — Index = Platz im Vorrat. Owner-only wie die Hand-Abzuege; die Engine rechnet dieselbe Stufe fuer die Spielbarkeit (`effectiveCardLevel`).
       creationLevels: pi === playerIdx ? (() => {
         const out = {};
@@ -12799,7 +12799,7 @@ async function doConfirmPotion(room, pi, { selectedIds }) {
     // set; harmless no-op otherwise.
     delete gs._pendingCardReveal;
     delete gs._pendingPlayLog;
-    const freshTargets = script.getValidTargets ? script.getValidTargets(gs, pi, room.engine, handIndex, fromCreation) : validTargets;
+    const freshTargets = script.getValidTargets ? script.getValidTargets(gs, pi, room.engine, handIndex) : validTargets;
     // `room.engine` als 4. Parameter (16.8.): Karten mit VARIABLEN
     // Kosten rechnen sich aus dem Budget aus, wie viele Ziele sie
     // anbieten duerfen — und dafuer brauchen sie den Kreditrahmen
@@ -13670,7 +13670,7 @@ async function doUseArtifactEffect(room, pi, { cardName, handIndex, fromCreation
         : 99;
     }
     const validTargets = normalizeValidTargets(
-      script.getValidTargets(gs, pi, room.engine, handIndex, fromCreation), pi, room.engine, config, cardName,
+      script.getValidTargets(gs, pi, room.engine, handIndex), pi, room.engine, config, cardName,
     );
     gs.potionTargeting = {
       potionName: cardName, handIndex,
@@ -17465,7 +17465,7 @@ io.on('connection', (socket) => {
     }
     // Reject force-discard of the specific resolving card instance
     const epType = room.gameState.effectPrompt.type;
-    if ((epType === 'forceDiscard' || epType === 'forceDiscardCancellable') && response?.handIndex != null && !response?.fromCreation) {   // Vorrats-Antwort (12.11.): `handIndex` ist ein Vorrats-Index
+    if ((epType === 'forceDiscard' || epType === 'forceDiscardCancellable') && response?.handIndex != null) {
       const ps = room.gameState.players[pi];
       if (ps._resolvingCard && response.handIndex === getResolvingHandIndex(ps)) return;
     }

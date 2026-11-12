@@ -62,27 +62,6 @@ function andereIndizes(engine, ps) {
   return eigene >= 0 ? alle.filter(i => i !== eigene) : alle;
 }
 
-/**
- * ★ 12.11. (Al: „Crestina-Karten werden immer behandelt wie echte Handkarten — einzige Ausnahme: sie zählen nicht gegen das Handlimit“): Crestinas Vorrat (Extra-Hand) ist
- * eine zweite Quelle zum Verschenken. Indizes der NUTZBAREN Vorratskarten ohne die gerade aufgelöste Live Show (stammt sie aus dem Vorrat) — vor der Auflösung zählt eine
- * Kopie dieses Namens als „die gespielte“, aber nur, wenn die Hand keine hat (dort wird sie schon in `andereIndizes` ausgenommen).
- */
-function vorratIndizes(engine, ps, pi) {
-  if (!engine.isCreationZoneUsable?.(pi)) return [];
-  const vorrat = ps?.creationZone || [];
-  const alle = vorrat.map((_, i) => i);
-  const rc = ps?._resolvingCard;
-  if (rc) return rc.fromCreation ? alle.filter(i => !engine._istAufloesendeHandkarte(ps, i, true)) : alle;
-  if ((ps?.hand || []).includes(CARD_NAME)) return alle;
-  const eigene = vorrat.indexOf(CARD_NAME);
-  return eigene >= 0 ? alle.filter(i => i !== eigene) : alle;
-}
-
-/** Zahl der WEITEREN Karten, die der Spieler verschenken könnte (Hand + nutzbarer Vorrat). */
-function andereAnzahl(engine, ps, pi) {
-  return andereIndizes(engine, ps).length + vorratIndizes(engine, ps, pi).length;
-}
-
 /** Kann die Karte überhaupt etwas bewirken? (Spielbarkeit UND zweite Prüfung beim Auflösen) */
 function wirkbar(engine, pi, oi) {
   const gs = engine.gs;
@@ -90,7 +69,7 @@ function wirkbar(engine, pi, oi) {
   if (!ps || !ops) return false;
   if (gs.firstTurnProtectedPlayer === oi) return false;                    // Erstrunden-Schutz: die Hand ist tabu
   if (ps._oppHandInteractionLockedTurn === gs.turn) return false;          // Spreading Rumor
-  return (ops.hand || []).length > 0 || andereAnzahl(engine, ps, pi) > 0;
+  return (ops.hand || []).length > 0 || andereIndizes(engine, ps).length > 0;
 }
 
 /** Grober Kartenwert für die CPU (Stufe, Kosten, Art). */
@@ -147,7 +126,7 @@ module.exports = {
   // „You may play this card as an additional Action": nur mit mindestens zwei WEITEREN Karten auf der Hand (sonst nie additional — dann kostet sie die Aktion).
   inherentAction(gs, pi, heroIdx, engine) {
     if (!engine) return false;
-    return andereAnzahl(engine, gs.players[pi], pi) >= MINDEST_ZUSATZ;
+    return andereIndizes(engine, gs.players[pi]).length >= MINDEST_ZUSATZ;
   },
 
   // Wirkt die Karte nicht, bleibt sie ausgegraut (Hand tabu oder beide Seiten ohne Karten).
@@ -174,7 +153,7 @@ module.exports = {
       if (gs._pendingCardReveal) engine._firePendingCardReveal();
 
       // ── 1. Zusatzaktion? Nur wenn die Engine sie als inherente (gratis) Karte behandelt hat, also mit mindestens zwei weiteren Karten — sonst hat sie die Aktion schon gekostet ──
-      const zusatz = andereAnzahl(engine, ps, pi) >= MINDEST_ZUSATZ
+      const zusatz = andereIndizes(engine, ps).length >= MINDEST_ZUSATZ
         ? await zusatzaktionKlaeren(engine, pi, heroIdx)
         : false;
 
@@ -195,12 +174,9 @@ module.exports = {
 
       // ── 3.+4. Die Hand liegt offen, der Spieler wählt, was er verschenkt ──
       const kandidaten = andereIndizes(engine, ps);
-      const vorratKand = vorratIndizes(engine, ps, pi);          // Crestinas Vorrat (Extra-Hand) gilt wie die Hand
-      const kandidatenGesamt = kandidaten.length + vorratKand.length;
       let gewaehlt = [];
-      let gewaehltVorrat = [];
-      if (kandidatenGesamt > 0) {
-        const minSel = zusatz ? Math.min(MINDEST_ZUSATZ, kandidatenGesamt) : 0;
+      if (kandidaten.length > 0) {
+        const minSel = zusatz ? Math.min(MINDEST_ZUSATZ, kandidaten.length) : 0;
         const wahl = await mitOffenerGegnerhand(engine, ops, () => engine.promptGeneric(pi, {
           type: 'handPick',
           title: CARD_NAME,
@@ -209,20 +185,17 @@ module.exports = {
             ? `Choose at least ${minSel} card${minSel === 1 ? '' : 's'} from your hand to add to ${ops.username}'s hand. You may then take up to that many minus ${UEBERSCHUSS} cards from theirs.`
             : `Choose any number of cards from your hand to add to ${ops.username}'s hand. You may then take up to that many cards from theirs.`,
           eligibleIndices: kandidaten,
-          creationEligibleIndices: vorratKand,
           highlightStyle: 'strong',       // deutliche Hervorhebung der wählbaren/gewählten Karten (Client: `hand-pick-stark`)
           minSelect: minSel,
-          maxSelect: kandidatenGesamt,
+          maxSelect: kandidaten.length,
           confirmLabel: '🎭 Give!',
           // pflichtwahl: nach dem Ansehen der Gegnerhand und dem Zahlen der Aktion gibt es keinen Rückzieher (0 Karten zu geben ist ohnehin erlaubt)
           cancellable: false,
         }));
         const roh = Array.isArray(wahl?.selectedCards) ? wahl.selectedCards : [];
-        gewaehlt = [...new Set(roh.filter(s => !s?.fromCreation).map(s => s?.handIndex).filter(i => Number.isInteger(i) && kandidaten.includes(i)))];
-        gewaehltVorrat = [...new Set(roh.filter(s => s?.fromCreation).map(s => s?.handIndex).filter(i => Number.isInteger(i) && vorratKand.includes(i)))];
+        gewaehlt = [...new Set(roh.map(s => s?.handIndex).filter(i => Number.isInteger(i) && kandidaten.includes(i)))];
         // Defensiv: der Server erzwingt die Untergrenze selbst (die Oberfläche tut es schon).
-        for (const i of kandidaten) { if (gewaehlt.length + gewaehltVorrat.length >= minSel) break; if (!gewaehlt.includes(i)) gewaehlt.push(i); }
-        for (const i of vorratKand) { if (gewaehlt.length + gewaehltVorrat.length >= minSel) break; if (!gewaehltVorrat.includes(i)) gewaehltVorrat.push(i); }
+        for (const i of kandidaten) { if (gewaehlt.length >= minSel) break; if (!gewaehlt.includes(i)) gewaehlt.push(i); }
       }
 
       // Live Show verlässt JETZT die Hand in die Ablage (Bauform Shooting Star): sie fliegt, während die Karten zur Gegnerhand fliegen, und die Hand richtet sich schon so aus,
@@ -236,19 +209,13 @@ module.exports = {
 
       // Geben: EIN Fenster (`insert`) für das ganze Geben, die Karten fliegen dann von hinten nach vorn (stabile Indizes), je Karte mit eigenem Flug.
       let gegeben = 0;
-      const zuGeben = gewaehlt.length + gewaehltVorrat.length;
-      if (zuGeben > 0 && !(await engine.checkHandInteractionReaction(oi, 'insert',
-            { byPi: pi, count: zuGeben, sourceName: CARD_NAME }))) {
+      if (gewaehlt.length > 0 && !(await engine.checkHandInteractionReaction(oi, 'insert',
+            { byPi: pi, count: gewaehlt.length, sourceName: CARD_NAME }))) {
         // Jede Karte fliegt an IHREN neuen Platz am Ende der Gegnerhand, und die Hand rückt erst beim EINTREFFEN dieser Karte zusammen: Ziel = Platz in einer Hand, die bis dahin genau
         // diese Karte mehr hat (`finalHandSize` = Platz + 1), die früheren Karten sind dann schon gelandet.
-        // Hand und Vorrat sind getrennte Listen: erst die Hand, dann der Vorrat, je von hinten nach vorn (stabile Indizes).
-        const reihe = [
-          ...[...gewaehlt].sort((a, b) => b - a).map(idx => ({ idx, vorrat: false })),
-          ...[...gewaehltVorrat].sort((a, b) => b - a).map(idx => ({ idx, vorrat: true })),
-        ];
-        for (const { idx, vorrat } of reihe) {
-          if (await engine.actionTransferCardToOppHand(pi, idx, { source: CARD_NAME, windowChecked: true, finalHandSize: (ops.hand || []).length + 1, ...(vorrat ? { fromCreation: true } : {}) })) gegeben++;
-          if (gegeben < zuGeben) await engine._delay(GEBEN_ABSTAND_MS);
+        for (const idx of [...gewaehlt].sort((a, b) => b - a)) {
+          if (await engine.actionTransferCardToOppHand(pi, idx, { source: CARD_NAME, windowChecked: true, finalHandSize: (ops.hand || []).length + 1 })) gegeben++;
+          if (gegeben < gewaehlt.length) await engine._delay(GEBEN_ABSTAND_MS);
         }
       }
 
@@ -294,12 +261,9 @@ module.exports = {
     const ops = engine.gs.players?.[engine.opponentOf(me)];
     if (promptData._lsPhase === 'additional') return { optionId: 'regular' };
     if (promptData._lsPhase === 'give') {
-      const kand = [
-        ...(promptData.eligibleIndices || []).map(i => ({ handIndex: i, cardName: ps.hand[i] })),
-        ...(promptData.creationEligibleIndices || []).map(i => ({ handIndex: i, cardName: (ps.creationZone || [])[i], fromCreation: true })),
-      ].sort((a, b) => kartenWert(engine, a.cardName) - kartenWert(engine, b.cardName));
+      const idxs = (promptData.eligibleIndices || []).slice().sort((a, b) => kartenWert(engine, ps.hand[a]) - kartenWert(engine, ps.hand[b]));
       const n = promptData.minSelect || 0;
-      return { selectedCards: kand.slice(0, n) };
+      return { selectedCards: idxs.slice(0, n).map(i => ({ handIndex: i, cardName: ps.hand[i] })) };
     }
     if (promptData._lsPhase === 'take') {
       const hand = ops?.hand || [];
