@@ -45573,7 +45573,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     // Hand-to-board card-fly animation. The server fires this right before
     // the sendGameState that removes the card from the owner's hand, so the
     // source cardback is still in the DOM at the handIndex we were told.
-    const onHandToBoard = ({ ownerIdx, cardName, handIndex, zoneType, heroIdx, slotIdx, faceDown, _forceOwnerAnim, destOwner }) => {
+    const onHandToBoard = ({ ownerIdx, cardName, handIndex, zoneType, heroIdx, slotIdx, faceDown, _forceOwnerAnim, destOwner, fromCreation }) => {
       // Don't animate for the owner — they already saw their own
       // drag/drop. `_forceOwnerAnim: true` opts the owner back in,
       // used for card-effect chain summons (Raptoren's bonus summon)
@@ -45582,9 +45582,12 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       // server-side flight is the ONLY visual cue.
       const ownerIsMe = ownerIdx === myIdx;
       if (ownerIsMe && !_forceOwnerAnim) return;
-      const sourceEl = ownerIsMe
-        ? document.querySelector(`.game-hand-me [data-hand-idx="${handIndex}"]`)
-        : document.querySelector(`.game-hand-opp [data-hand-idx="${handIndex}"]`);
+      // ★ 12.11.: `fromCreation` — die Karte kommt aus Crestinas Vorrat (Extra-Hand); `handIndex` zaehlt dort.
+      const sourceEl = fromCreation
+        ? document.querySelector(`[data-creation-owner="${ownerIsMe ? 'me' : 'opp'}"] [data-creation-idx="${handIndex}"]`)
+        : (ownerIsMe
+          ? document.querySelector(`.game-hand-me [data-hand-idx="${handIndex}"]`)
+          : document.querySelector(`.game-hand-opp [data-hand-idx="${handIndex}"]`));
       // For cross-side placement (Powder Keg etc.), the destination is
       // on the OPPOSITE side from the playing player — `destOwner` (if
       // provided by the server) points at the host side, not the

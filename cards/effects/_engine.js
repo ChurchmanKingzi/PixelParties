@@ -24370,6 +24370,32 @@ this._deathWatch = (this._deathWatchStack || []).length
     return out;
   }
 
+  /**
+   * ★ 12.11. (Al: „Effekte/Ascension-Boni, die Abilities von der Hand anlegen, auch aus der Extra-Hand“): Karten, die ein Anlege-Effekt „aus deiner Hand“ nehmen darf —
+   * die Hand und Crestinas Vorrat (nur benutzbar), MIT Duplikaten, Hand zuerst. Zum Lesen der Kandidaten; entnommen wird per `handkarteNehmen` (Hand zuerst, dann Vorrat).
+   */
+  handUndVorratListe(playerIdx) {
+    const ps = this.gs.players[playerIdx];
+    return [...(ps?.hand || []), ...(this.isCreationZoneUsable(playerIdx) ? (ps?.creationZone || []) : [])];
+  }
+
+  /** Entnimmt die erste Kopie von `cardName` aus Hand, sonst benutzbarem Vorrat. @returns {{liste,ausVorrat,idx}|null} die Quelle (fuer `handkarteZurueck`) oder `null`. */
+  handkarteNehmen(playerIdx, cardName) {
+    const ps = this.gs.players[playerIdx];
+    const q = this._rxQuelleFuer(ps, cardName);
+    if (!q) return null;
+    this.rxNimm(ps, q);
+    return q;
+  }
+
+  /** Gegenstueck zu `handkarteNehmen` (Rennen: die Karte ging doch nicht in den Einsatz): zurueck an ihre Quelle — Vorrat statt Hand, wenn sie von dort kam. */
+  handkarteZurueck(playerIdx, cardName, q, opts = {}) {
+    const ps = this.gs.players[playerIdx];
+    if (!ps) return;
+    if (q?.ausVorrat) { ps.creationZone.push(cardName); this._trackCard(cardName, playerIdx, ZONES.CREATION); return; }
+    this.handZugangSync(ps, cardName, { von: 'rueckgabe', ohneInstanz: true, ...opts });
+  }
+
   /** Namen aller Reaktions-Kandidaten (Hand + Vorrat), ohne Duplikate. */
   _rxNamen(ps) {
     return [...new Set(this._rxKandidaten(ps).map(k => k.cardName))];
@@ -52324,8 +52350,9 @@ this._deathWatch = (this._deathWatchStack || []).length
     const hero = hps.heroes?.[heroIdx];
     if (!hero?.name || hero.hp <= 0) return { success: false };
 
-    const handIdx = ps.hand.indexOf(cardName);
-    if (handIdx < 0) return { success: false };
+    // ★ 12.11. (Al: „Effekte/Ascension-Boni, die Abilities von der Hand anlegen, auch aus der Extra-Hand“): Quelle = Hand zuerst, dann Crestinas Vorrat (nur benutzbar).
+    const quelle0 = this._rxQuelleFuer(ps, cardName);
+    if (!quelle0) return { success: false };
     // v1356: ohne „additional" muss der Held sein Anlegen noch frei haben.
     if (!opts.skipAbilityGivenCheck && !this.kannAbilityAnlegen(playerIdx, heroIdx)) return { success: false };
     // ★ Welle 14 (Al, Q5 aus W13b): Resistance blockt auch EIGENE Effekte auf den Träger — „allerdings z.B. beim Anlegen von Abilities NICHT die normale
@@ -52351,9 +52378,10 @@ this._deathWatch = (this._deathWatchStack || []).length
 
     if (!ort) return { success: false };
 
-    // Defensive: re-verify card is still in hand at expected position
-    const verifyIdx = ps.hand.indexOf(cardName);
-    if (verifyIdx < 0) return { success: false };
+    // Defensive: re-verify card is still in hand (or Crestina's Creation Zone) at expected position
+    const quelle = this._rxQuelleFuer(ps, cardName);
+    if (!quelle) return { success: false };
+    const verifyIdx = quelle.idx;
 
     // Hand -> Ability-Zone-Flug. Muss VOR dem Splice raus, damit der
     // Client den Hand-Slot noch findet (`[data-hand-idx]`), und mit
@@ -52370,17 +52398,18 @@ this._deathWatch = (this._deathWatchStack || []).length
         ownerIdx: playerIdx, cardName, handIndex: verifyIdx,
         zoneType: ort.art === 'support' ? 'support' : 'ability', heroIdx, slotIdx: ort.slot,
         ...(fremd ? { destOwner: feld } : {}),
+        ...(quelle.ausVorrat ? { fromCreation: true } : {}),
         _forceOwnerAnim: true,
       });
     }
 
     // Kartenbesitzer (Ablage-Ziel) wie in `doPlayAbilityFremd` — vor dem Splice.
     const kartenBesitzer = fremd
-      ? (typeof this._handCardPileOwner === 'function' ? this._handCardPileOwner(playerIdx, cardName, verifyIdx) : playerIdx)
+      ? ((typeof this._handCardPileOwner === 'function' && !quelle.ausVorrat) ? this._handCardPileOwner(playerIdx, cardName, verifyIdx) : playerIdx)
       : null;
 
-    // Execute: remove from hand, add to zone
-    ps.hand.splice(verifyIdx, 1);
+    // Execute: remove from hand (or Crestina's Creation Zone), add to zone
+    if (quelle.ausVorrat) this._rxAbgang(ps, quelle); else ps.hand.splice(verifyIdx, 1);
 
     // Consume abilityGivenThisTurn unless opted out (v1356: zentral,
     // mit Bonus-Plaetzen von Divine Gift of Skill wie im Server-Handweg)

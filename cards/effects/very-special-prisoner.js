@@ -43,7 +43,8 @@ const CARD_NAME = 'Very Special Prisoner';
 function _availableDivinitySources(ps, engine, pi) {
   if (!ps) return [];
   const out = [];
-  const handCount = (ps.hand || []).filter(n => n === DIVINITY).length;
+  // ★ 12.11. (Al: „Effekte, die Abilities von der Hand anlegen, auch aus der Extra-Hand“): „from your hand“ = Hand + Crestinas Vorrat.
+  const handCount = engine ? engine.handUndVorratListe(pi).filter(n => n === DIVINITY).length : (ps.hand || []).filter(n => n === DIVINITY).length;
   // R02-19: das Deck ist nur Quelle, solange der Stapel-Abgang nicht gesperrt ist
   // (Knight of Kings [B]) — der Splice unten geht an der Stapel-Schicht vorbei.
   const deckGesperrt = !!engine && !engine.pileOutAllowed(pi, 'deck', { sourceOwner: pi, source: CARD_NAME });
@@ -218,7 +219,8 @@ module.exports = {
       return false;
     };
     let pulled = false;
-    if (pickedSource === 'hand') pulled = removeFromPile(ps.hand);
+    let handQuelle = null;   // Hand oder Vorrat — fuer die Rueckgabe unten
+    if (pickedSource === 'hand') { handQuelle = engine.handkarteNehmen(pi, DIVINITY); pulled = !!handQuelle; }
     if (pickedSource === 'deck') pulled = removeFromPile(ps.mainDeck);
     if (!pulled) {
       engine.log('very_special_prisoner_attach_failed', {
@@ -240,7 +242,7 @@ module.exports = {
     if (!ort) {
       // Race: zones filled between the canAttach check and the splice.
       // Refund the Divinity back to its source pile so it isn't lost.
-      if (pickedSource === 'hand') engine.handZugangSync(ps, DIVINITY, { von: 'rueckgabe', source: CARD_NAME, ohneInstanz: true });
+      if (pickedSource === 'hand') engine.handkarteZurueck(pi, DIVINITY, handQuelle, { source: CARD_NAME });
       if (pickedSource === 'deck') { ps.mainDeck.push(DIVINITY); engine.shuffleDeck(pi, 'main'); }
       engine.log('very_special_prisoner_attach_failed', {
         player: ps.username, reason: 'no_target_zone',

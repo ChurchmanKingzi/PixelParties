@@ -30,8 +30,10 @@ function kannAufnehmen(engine, hs, hi) {
   return engine.abilityZielOrt(hs, hi, ABILITY) != null;   // 24.10.: auch Support Zonen (Xal)
 }
 
-function kopien(ps, quelle) {
-  return (quelle === 'hand' ? (ps.hand || []) : (ps.mainDeck || [])).filter(n => n === ABILITY).length;
+// ★ 12.11. (Al: „Effekte, die Abilities von der Hand anlegen, auch aus der Extra-Hand“): 'hand' zählt Hand + nutzbaren Vorrat (Crestinas Extra-Hand).
+function kopien(ps, quelle, engine) {
+  const hand = engine ? engine.handUndVorratListe(engine.gs.players.indexOf(ps)) : (ps.hand || []);
+  return (quelle === 'hand' ? hand : (ps.mainDeck || [])).filter(n => n === ABILITY).length;
 }
 
 module.exports = {
@@ -47,7 +49,7 @@ module.exports = {
   spellPlayCondition(gs, pi, engine) {
     const ps = gs.players[pi];
     if (!ps) return false;
-    if (kopien(ps, 'hand') + kopien(ps, 'deck') === 0) return false;
+    if (kopien(ps, 'hand', engine) + kopien(ps, 'deck', engine) === 0) return false;
     if (!engine) return true;
     for (const { physOwner, heroIdx: hi, hero } of engine.heroesControlledBy(pi)) {
       if (hero?.name && hero.hp > 0 && kannAufnehmen(engine, physOwner, hi)) return true;
@@ -88,7 +90,7 @@ module.exports = {
       for (let n = 0; n < MAX; n++) {
         if (!kannAufnehmen(engine, hs, heroIdx)) break;
         const galerie = [];
-        const h = kopien(ps, 'hand'), d = kopien(ps, 'deck');
+        const h = kopien(ps, 'hand', engine), d = kopien(ps, 'deck', engine);
         if (h > 0) galerie.push({ name: ABILITY, source: 'hand', count: h });
         if (d > 0) galerie.push({ name: ABILITY, source: 'deck', count: d });
         if (galerie.length === 0) break;
@@ -99,7 +101,7 @@ module.exports = {
           cards: galerie, confirmLabel: '📖 Attach', cancellable: true,
         });
         if (!wahl || wahl.cancelled || !wahl.cardName) break;
-        const quelle = (wahl.source === 'hand' || wahl.source === 'deck') && kopien(ps, wahl.source) > 0
+        const quelle = (wahl.source === 'hand' || wahl.source === 'deck') && kopien(ps, wahl.source, engine) > 0
           ? wahl.source : galerie[0].source;
 
         if (quelle === 'deck') {

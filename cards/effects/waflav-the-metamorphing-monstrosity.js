@@ -63,7 +63,8 @@ function effectAvailable(engine, id, pi, heroIdx, hs = pi) {
   const ps = engine.gs.players[pi];
   if (!ps) return false;
   if (id === 'deck') return W.attachableAbilitiesIn(engine, pi, heroIdx, ps.mainDeck, hs).length > 0;
-  if (id === 'hand') return W.attachableAbilitiesIn(engine, pi, heroIdx, ps.hand, hs).length > 0;
+  // ★ 12.11. (Al: „Effekte, die Abilities von der Hand anlegen, auch aus der Extra-Hand“): „from your hand“ = Hand + Crestinas Vorrat.
+  if (id === 'hand') return W.attachableAbilitiesIn(engine, pi, heroIdx, engine.handUndVorratListe(pi), hs).length > 0;
   if (id === 'attach') return ATTACH_QUELLEN.some(q => effectAvailable(engine, q, pi, heroIdx, hs));
   return !drawBlockedFor(engine, pi, DRAW_COUNT);   // 'draw' - D1 (Regel von Al): reiner Zug, unter Hand-/Zieh-Sperre keine Wahl (Counter nicht fuer nichts); mit Menge, damit auch Tuscan Artist (genau 2/3) sperrt
 }
@@ -164,7 +165,7 @@ async function doHandAttach(engine, pi, heroIdx, hs = pi, vorgewaehlt = null) {
   // `vorgewaehlt`: die (bis zu 3) Abilities kamen schon aus dem gemeinsamen Quellen-Picker — der Reihe nach anlegen, ohne weitere Galerie.
   const reihe = Array.isArray(vorgewaehlt) ? vorgewaehlt.slice(0, MAX_HAND_ATTACH) : null;
   for (let i = 0; i < MAX_HAND_ATTACH; i++) {
-    const names = abilityNamesIn(engine, pi, heroIdx, ps.hand, hs);
+    const names = abilityNamesIn(engine, pi, heroIdx, engine.handUndVorratListe(pi), hs);
     if (names.length === 0) break;
     let picked;
     if (reihe) {
@@ -208,8 +209,9 @@ async function doAttach(engine, pi, heroIdx, hs = pi) {
     for (const n of deckNamen) cards.push({ name: n, source: 'deck', count: ps.mainDeck.filter(x => x === n).length });
   }
   if (effectAvailable(engine, 'hand', pi, heroIdx, hs)) {
-    const handNamen = new Set(abilityNamesIn(engine, pi, heroIdx, ps.hand, hs));
-    for (const n of ps.hand) if (handNamen.has(n)) cards.push({ name: n, source: 'hand' });
+    const handListe = engine.handUndVorratListe(pi);
+    const handNamen = new Set(abilityNamesIn(engine, pi, heroIdx, handListe, hs));
+    for (const n of handListe) if (handNamen.has(n)) cards.push({ name: n, source: 'hand' });
   }
   if (cards.length === 0) return false;
   const wahl = await pickAusQuellen(engine, pi, {

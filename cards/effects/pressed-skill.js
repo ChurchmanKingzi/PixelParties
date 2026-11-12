@@ -44,8 +44,9 @@ const CARD_NAME = 'Pressed Skill';
 const PILES = ['hand', 'deck', 'discard'];
 
 /** Pile array for a given source key. */
-function pileArr(ps, source) {
-  if (source === 'hand') return ps.hand || [];
+// ★ 12.11. (Al: „Effekte, die Abilities von der Hand anlegen, auch aus der Extra-Hand“): 'hand' = Hand + nutzbarer Vorrat (Crestinas Extra-Hand).
+function pileArr(ps, source, engine) {
+  if (source === 'hand') return engine ? engine.handUndVorratListe(engine.gs.players.indexOf(ps)) : (ps.hand || []);
   if (source === 'deck') return ps.mainDeck || [];
   if (source === 'discard') return ps.discardPile || [];
   return [];
@@ -83,7 +84,7 @@ function buildGallery(engine, pi) {
   const entries = [];
   for (const source of PILES) {
     const counts = {};
-    for (const name of pileArr(ps, source)) {
+    for (const name of pileArr(ps, source, engine)) {
       const cd = cardDB[name];
       if (!cd || cd.cardType !== 'Ability') continue;
       counts[name] = (counts[name] || 0) + 1;
@@ -138,8 +139,8 @@ module.exports = {
     // piles; honour the one the player picked, else fall back to the
     // first pile that actually holds it.
     let source = choice.source;
-    if (!source || pileArr(ps, source).indexOf(abilityName) < 0) {
-      source = PILES.find(s => pileArr(ps, s).indexOf(abilityName) >= 0) || null;
+    if (!source || pileArr(ps, source, engine).indexOf(abilityName) < 0) {
+      source = PILES.find(s => pileArr(ps, s, engine).indexOf(abilityName) >= 0) || null;
     }
     if (!source) return { cancelled: true };
 
@@ -220,8 +221,8 @@ module.exports = {
       if (!_taken_idx) return { cancelled: true };
       engine.handZugangSync(ps, abilityName, { von: 'transit', source: CARD_NAME });   // v1395: Durchgang zur Anlage, keine Suche
     } else { // hand
-      if (ps.hand.indexOf(abilityName) < 0) return { cancelled: true };
-      // Already in hand — attachAbilityFromHand consumes it from there.
+      if (!engine._rxQuelleFuer(ps, abilityName)) return { cancelled: true };
+      // Already in hand (or Crestina's Creation Zone) — attachAbilityFromHand consumes it from there.
     }
 
     // ── Step 4: attach as an ADDITIONAL attachment ──
