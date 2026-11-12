@@ -3223,6 +3223,14 @@ class GameEngine {
   }
 
   async runHooks(hookName, hookCtx = {}) {
+    // ★ 12.11. (Al: „Reaktionen, z. B. Quetzahuitl, sollen unbedingt auch aus der Crestina-Zone feuern“): Fällt Crestina SELBST (typisch: als letzter Held — genau dann zieht
+    // Quetzahuitl ein), laufen die Todes-Reaktionen ihrer Vorratskarten noch im Augenblick ihres Falls. Ohne diese Marke gälte der Vorrat schon als nicht nutzbar (Crestina tot,
+    // `isCreationZoneUsable`) und die Karte feuerte nie. Die Marke gilt nur für die Dauer dieser Meldung (`_heldImKO`).
+    if (hookName === HOOKS.ON_HERO_KO && hookCtx?.hero && this._heldImKO !== hookCtx.hero) {
+      const _vorherKO = this._heldImKO;
+      this._heldImKO = hookCtx.hero;
+      try { return await this.runHooks(hookName, hookCtx); } finally { this._heldImKO = _vorherKO; }
+    }
     // ★ W71b (Al, 25.10.2026 — Cool Rescuer Monia reagiert auf JEDEN Effekt auf Kreaturen): das Schutzfenster `beforeCreatureAffected` fragt je Kreatur, Effektart und Karte/Effekt in EINER Auflösung
     // nur EINMAL — auch wenn der Effekt es vorab für alle seine Kreaturen geöffnet hat (`kreaturenVorab`: Iceage und Medusa's Curse treffen erst die Helden, Monia könnte sonst nicht mehr reagieren).
     // Das Ergebnis (erlaubt / negiert) wird gemerkt und von allen späteren Fenstern derselben Kreatur/Art/Quelle übernommen; die Buchführung endet mit der Auflösung (`endeEffektImmunitaeten`).
@@ -24320,7 +24328,8 @@ this._deathWatch = (this._deathWatchStack || []).length
       if (hero?.name !== CRESTINA_ASCENDED) continue;
       // tot — ausser `opts.schadensberechnung` und der Tod ist im laufenden
       // Flaechenschlag nur vorgemerkt (Todes-Aufschub 28.9.)
-      if (hero.hp <= 0 && !(opts.schadensberechnung && this.heldTodAufgeschoben(hero))) continue;
+      // … und ausser dieser Crestina fällt gerade (`_heldImKO`, Todes-Reaktionen ihrer Vorratskarten — Quetzahuitl).
+      if (hero.hp <= 0 && hero !== this._heldImKO && !(opts.schadensberechnung && this.heldTodAufgeschoben(hero))) continue;
       const st = hero.statuses || {};
       if (st.frozen || st.stunned || st.webbed || st.negated || st.bound) continue;
       return true;
