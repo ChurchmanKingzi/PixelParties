@@ -34,6 +34,8 @@ RUNDE 3 (Nutzerfeedback: „darf sich gerne ein bisschen herumbewegen und laufen
 * Beine (acht, je mit Pfad Wurzel → Spitze, anim_spinne-Stil: Gelenke verschoben, dazwischen 8er-Linie, Wurzel bleibt am Körper): Tetrapod-Gang — Gruppe A (L1, R2, L3, R4) und B (R1, L2, R3, L4) schwingen
   gegenphasig; die Spitze schwingt bis ±2 px entlang der Körperachse (L4/R4 ±1) und hebt sich dabei 1–2 px zum Körper hin. Beim Laufen Periode 6 Frames, im Stand langsam (Periode 12, je Bein versetzt) — die Beine sind
   immer in Bewegung (vorher: ein 1-px-Schnipp alle 28 Frames).
+RUNDE 4 (Nutzerfeedback: „sollte nicht so lange an einem Punkt stillstehen“): der Laufweg füllt jetzt die ganze Schleife (siehe SCHRITTE: Runde ±3 px waagerecht, ±1 px senkrecht, 22 Schritte), die Pausen
+sind höchstens 5 Frames lang (vorher 48 Frames Stillstand am Stück); die Glitzerwelle (Frames 12–22) läuft während des Gehens mit.
 Ergänzungen: zwei verdeckte Beinwurzeln (3,5) in (31,32,30) und (11,5) in (40,41,39): im Bild liegen dort die Arme der weißen Sterne (die Beine L1/R1 hängen sonst nur diagonal-lückig am Körper, wenn die Sterne
 unsichtbar sind); die Sterne liegen weiter darüber.
 """
@@ -98,8 +100,11 @@ STAND_START = {'L1': 0, 'L2': 1, 'L3': 4, 'L4': 6, 'R1': 4, 'R2': 0, 'R3': 6, 'R
 
 
 # Laufweg (Körperversatz in Sprite-Pixeln): (Frame, x, y)-Haltepunkte, dazwischen springt der Versatz (ein Schritt = 1 px)
-SCHRITTE = [(26, 1, 0), (29, 2, 0), (33, 2, -1), (40, 1, -1), (43, 0, -1), (46, -1, -1), (49, -2, -1), (53, -2, 0), (57, -1, 0), (60, 0, 0)]
-LAUF_FENSTER = [(23, 33), (37, 51), (51, 62)]                                               # Frames, in denen die Beine laufen (Periode 6)
+# Runde 4 (Nutzerfeedback: „sollte nicht so lange an einem Punkt stillstehen“): vorher stand die Spinne 48 Frames am Stück (Frames 62–25). Jetzt läuft sie fast die ganze Schleife in einer Runde umher
+# (±3 px waagerecht, ±1 px senkrecht, ein Schritt alle 3–4 Frames) und hält nur noch kurz an (höchstens 5 Frames ≈ 0,35 s am selben Punkt).
+SCHRITTE = [(3, 1, 0), (6, 2, 0), (9, 3, 0), (15, 3, -1), (18, 2, -1), (21, 1, -1), (24, 0, -1), (27, -1, -1), (33, -1, 0), (36, -2, 0), (39, -3, 0),
+            (45, -3, 1), (48, -2, 1), (51, -1, 1), (54, 0, 1), (57, 1, 1), (60, 2, 1), (66, 2, 0), (70, 1, 0), (74, 0, 0), (79, 0, -1), (82, 0, 0)]
+LAUF_FENSTER = [(1, 10), (13, 28), (31, 40), (43, 61), (64, 75), (77, 83)]                  # Frames, in denen die Beine laufen (Periode 6)
 
 
 def zustand(i):
