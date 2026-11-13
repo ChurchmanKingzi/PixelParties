@@ -48,13 +48,13 @@ def _laeufe(m):
 
 
 def _linie(z, a, b):
-    """Maske: Pixel von z, die deutlich dunkler sind als die Zeilen a UND b (darüber/darunter) → waagerechte dunkle Linie. Fehlt a oder b
-    (None/transparent), zählt nur die andere Seite."""
+    """Maske: Pixel von z, die deutlich dunkler sind als die Zeilen a UND b (darüber/darunter) → waagerechte dunkle Linie. Ist eine Seite
+    dort transparent, zählt nur die andere; ist eine Seite unbekannt (None), gilt nichts als Linie."""
     lz = _lum(z)
     m = z[:, 3] > 0
     for n in (a, b):
         if n is None:
-            continue
+            return np.zeros(len(z), bool)
         op = n[:, 3] > 0
         m &= ~op | (lz + D_LINIE < _lum(n))
     return m
@@ -98,7 +98,7 @@ def _mische(basis, quelle, ok, k, nur_kurz=False):
     return neu, lang
 
 
-def zwischenzeile(form, nah, fern=None, nah2=None, k=1):
+def zwischenzeile(form, nah, fern=None, nah2=None, k=1, fern2=None):
     """Neue Zeile mit der Silhouette von `form` (der gestreckten Zeile), die zwischen `form` und `nah` zu liegen kommt.
     fern = Nachbarzeile von `form` auf der anderen Seite, nah2 = Zeile hinter `nah` (beide dürfen None sein). k = Nummer der Kopie (Phase)."""
     if nah is None:
@@ -107,7 +107,7 @@ def zwischenzeile(form, nah, fern=None, nah2=None, k=1):
     if inn.sum() < 2:
         return form.copy()
     ok_nah = inn & _innen(nah) & ~_linie(nah, nah2, form)
-    ok_fern = (inn & _innen(fern) & ~_linie(fern, form, None)) if fern is not None else np.zeros(len(form), bool)
+    ok_fern = (inn & _innen(fern) & ~_linie(fern, form, fern2)) if fern is not None else np.zeros(len(form), bool)
     # 1. kurze Abweichungen zur Zeile, an die die Kopie grenzt: Schattierungsgrenze auf halbem Weg
     neu, lang = _mische(form, nah, ok_nah, k, nur_kurz=True)
     # 2. lange Abweichungen (anderes Muster): Muster der gestreckten Zeile mit ihrer anderen Nachbarzeile fortsetzen
@@ -136,7 +136,7 @@ def zwischenzeile(form, nah, fern=None, nah2=None, k=1):
             for q in quellen:
                 if q is None:
                     continue
-                okq = inn & _innen(q) & ~_linie(q, None, gegen)
+                okq = inn & _innen(q) & ~(_lum(q) + D_LINIE < _lum(neu))        # hier nichts deutlich Dunkleres einmischen
                 okq[:x0] = False; okq[x1:] = False
                 if not (okq & _ungleich(neu, q)).any():
                     continue
@@ -147,12 +147,12 @@ def zwischenzeile(form, nah, fern=None, nah2=None, k=1):
     return neu
 
 
-def kopien(form, nah, fern=None, nah2=None, n=1):
+def kopien(form, nah, fern=None, nah2=None, n=1, fern2=None):
     """n eingefügte Zeilen zwischen `nah` und `form`, Reihenfolge von `nah` nach `form` (die erste grenzt an `nah`)."""
     out = []
     grenze = form
     for k in range(1, n + 1):                                         # von form aus nach außen bauen
-        z = zwischenzeile(grenze if k > 1 else form, nah, fern if k == 1 else form, nah2, k)
+        z = zwischenzeile(grenze if k > 1 else form, nah, fern if k == 1 else form, nah2, k, fern2 if k == 1 else fern)
         if k > 1:
             # Silhouette bleibt die der gestreckten Zeile
             rand = (form[:, 3] > 0) & ~_innen(form)
@@ -175,7 +175,8 @@ def streck_zeile(a, zeile, n=1):
     nah = a[zeile - 1] if zeile >= 1 else None
     nah2 = a[zeile - 2] if zeile >= 2 else None
     fern = a[zeile + 1] if zeile + 1 < h else None
-    for j, z in enumerate(kopien(form, nah, fern, nah2, n)):
+    fern2 = a[zeile + 2] if zeile + 2 < h else None
+    for j, z in enumerate(kopien(form, nah, fern, nah2, n, fern2)):
         out[zeile - n + j] = z                                         # Ausgabezeilen zeile-n … zeile-1 sind die Kopien, `zeile` das Original
     return out
 
@@ -207,7 +208,8 @@ def entkopiere_zeilen(out, quelle):
             nah = out[e + 1] if e + 1 < n else None
             nah2 = out[e + 2] if e + 2 < n else None
             fern = out[j - 1] if j >= 1 else None
-            neu = kopien(form, nah, fern, nah2, e - j)                # Reihenfolge nah → form, hier also von unten nach oben
+            fern2 = out[j - 2] if j >= 2 else None
+            neu = kopien(form, nah, fern, nah2, e - j, fern2)                # Reihenfolge nah → form, hier also von unten nach oben
             for t, z in enumerate(neu[::-1]):
                 out[j + 1 + t] = z
         j = e + 1
