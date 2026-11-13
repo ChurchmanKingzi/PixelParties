@@ -1,0 +1,15 @@
+{
+  "creature": "Gigantisaur Spinor",
+  "sheet": "gigantisaur-spinor.png",
+  "frameWidth": 79,
+  "frameHeight": 48,
+  "frames": 60,
+  "frameMs": 80,
+  "loop": true,
+  "layout": "horizontal",
+  "padTop": 2,
+  "padLeft": 2,
+  "padRight": 2,
+  "padBottom": 2,
+  "faceX": 39.5
+}
