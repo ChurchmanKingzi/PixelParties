@@ -44,6 +44,9 @@ Ablauf (72 Frames à 66 ms = 4,75 s, nahtlos; Frame 0 = Ruhepose mit Klingen OBE
 * Frames 36–55 Klingen unten (20 Frames): Kopfnicken in die Schale (Frames 40–49), Blinzeln, Haarsträhnen.
 * Frames 56–62 Klingen heben sich wieder (kein Streifen): Länge 6 → 11 → 17 → 23 → 28 → 31 → 33 → 32 px, die Arme steigen mit.
 * DURCHGEHEND: Atmen (2 Atemzüge je Schleife, Oberkörper 1 px, Zeile 27 doppelt/entfernt, mit Texturmischung), Blinzeln (Frames 8–10 und 50–52), Haarspitzen pendeln 1 px nach innen (Periode 24, links/rechts gegenläufig).
+RUNDE 5 (Nutzer: „wenn Nius Klingen am Boden ankommen, sollte das einen spürbaren Impact haben“): im Aufschlag-Frame (Takt 7) fährt die ganze Klinge 1 px in den Boden, prallt im nächsten Frame 1 px zurück und liegt dann auf;
+der Körper sackt im selben Frame ein (Zeile 27 entfernt, 3 Frames), kommt hoch und federt ein zweites Mal nach (Takt 11–12); an beiden Seiten jeder Klingenspitze stieben Staubwölkchen auf (2×2 → 3×3 → 2×2, Grau (123,123,123)
+mit einem weißen Glanzpixel, treiben 5 Frames lang seitlich weg und steigen; hinter der Figur). Streckzeilen über anim_textur (Regel 49).
 Alle Bewegungen laufen auf der vollen Leinwand (anim_lib wirft ClipError). Nur ganze Pixel, nur Farben der Quelle (alle Klingenfarben stehen im Sprite).
 Ergänzungen (neu gezeichnet statt Sprite-Pixel): Klingen in den Oben-Posen und den Schwungposen, weißer Schwungstreifen in allen Längen; die Arme werden unter dem Schulterband weitergeführt (verschoben, nicht verlängert), dadurch
 keine Lücken. Arme/Hände/Klingenkappe: Randpixel werden nicht geändert; Umriss nie dicker als im Original (1 px).
@@ -55,9 +58,10 @@ import numpy as np
 
 import anim_humanoide as Hm
 import anim_lib as L
+import anim_textur as TX   # texturierte Streckzeilen statt Zeilenkopien (Regel 43/49)
 
 N, MS = 72, 66
-PAD_L, PAD_R, PAD_T, PAD_B = 4, 4, 3, 3
+PAD_L, PAD_R, PAD_T, PAD_B = 7, 7, 3, 3         # Runde 5: seitlich 7 (Staubwölkchen des Aufschlags treiben bis 5 px neben die Klingen)
 
 spr = L.lade('guardian-beast-niu')
 sh, sw = spr.shape[:2]
@@ -118,7 +122,33 @@ ZYKLUS = {
 }
 zeitplan = {i: ZYKLUS.get(i % TAKT, OBEN) for i in range(N)}
 # Körperfeder (zusätzlich zum Atmen): +1 beim Ausholen, −1 nach dem Schlag
-_EX = {2: 1, 3: 1, 4: 1, 5: 1, 9: -1, 10: -1, 11: -1, 12: -1, 13: -1}
+# Runde 5 („wenn die Klingen am Boden ankommen, sollte das einen spürbaren Impact haben“): der Körper sackt GENAU im Aufschlag-Frame (Takt 7) ein, kommt kurz hoch und federt ein zweites Mal nach.
+_EX = {2: 1, 3: 1, 4: 1, 5: 1, 7: -1, 8: -1, 9: -1, 11: -1, 12: -1}
+# Aufschlag der Klingen (Takt-Frame → Versatz der ganzen Klinge in px nach unten): Takt 7 schlägt die Spitze 1 px in den Boden, Takt 8 prallt sie 1 px zurück, ab Takt 9 liegt sie auf.
+KLINGE_DY = {7: 1, 8: -1}
+# Staub-/Schlagwölkchen an beiden Seiten jeder Klingenspitze (Takt-Frame → Pixel (Abstand von der Klingenmitte nach außen/innen, Zeile, Farbe-Index)); ≥ 2×2, treiben seitlich weg und steigen, hinter der Figur.
+STAUB_C = [(123, 123, 123), (249, 254, 255)]      # Grau des Schulterbands, Weiß der Schwungspur (beides Quellfarben)
+STAUB = {
+    7: [(2, 43, 1), (3, 43, 0), (2, 44, 0), (3, 44, 0)],
+    8: [(2, 42, 0), (3, 42, 1), (4, 42, 0), (2, 43, 0), (3, 43, 0), (4, 43, 0), (3, 44, 0), (4, 44, 0)],
+    9: [(3, 41, 0), (4, 41, 1), (5, 41, 0), (3, 42, 0), (4, 42, 0), (5, 42, 0), (4, 43, 0)],
+    10: [(4, 40, 0), (5, 40, 0), (4, 41, 0), (5, 41, 0)],
+    11: [(5, 39, 0), (6, 39, 0), (5, 40, 0), (6, 40, 0)],
+}
+
+
+def staub_ebene(i):
+    a = L.leer(H, W)
+    for (u, y, ci) in STAUB.get(i % TAKT, ()):
+        for c in (1, 24):
+            for sgn in (-1, 1):
+                X, Y = PAD_L + c + sgn * u, PAD_T + y
+                if not (2 <= X < W - 2 and 2 <= Y < H - 2):
+                    raise L.ClipError(f'Staubpixel ({X},{Y}) zu nah am Rand')
+                a[Y, X, :3] = STAUB_C[ci]
+                a[Y, X, 3] = 255
+    return a
+
 EXTRA = {i: _EX[i % TAKT] for i in range(N) if i % TAKT in _EX}
 
 
@@ -230,7 +260,7 @@ def frame(i):
     nick = 0                                                             # Runde 4: kein Kopfnicken mehr (die lange Phase „Klingen unten“ gibt es nicht mehr; der Körper federt nach jedem Schlag ein)
     # ── Körper (Schulterband abwärts): Atmen durch eine eingefügte/entfernte Zeile 27 ──
     rumpf = ebene(rumpf_m)
-    rumpf = L.streck_zeile(rumpf, PAD_T + 27, brust)
+    rumpf = TX.streck_zeile(rumpf, PAD_T + 27, brust)
     # ── Arme: kommen unter dem Schulterband hervor; beim Heben wandern sie nach oben unter das Band (Band liegt darüber) ──
     al, ar = ebene(arm_l, 0, arm_dy), ebene(arm_r, 0, arm_dy)
     # ── Kopf ──
@@ -246,11 +276,15 @@ def frame(i):
     kopf = L.versetze(kopf, 0, -brust + nick)
     # ── Klingen (neu gezeichnet) ──
     yb = (38 + arm_dy) if richtung == 'hoch' else (34 + arm_dy)
+    if KLINGE_DY.get(i % TAKT, 0) > 0 and isinstance(streifen, tuple):
+        streifen = (streifen[0], streifen[1], streifen[2] + KLINGE_DY[i % TAKT])   # Schwungstreifen reicht bis an die tiefer stehende Klinge (keine Lücke)
+    yb += KLINGE_DY.get(i % TAKT, 0)                                     # Runde 5: Aufschlag (1 px in den Boden) und Rückprall (1 px hoch); die Klinge bleibt starr (ganze Klinge versetzt)
     pl, ys_l = klinge_pixel(True, richtung, laenge, yb, streifen)
     pr, ys_r = klinge_pixel(False, richtung, laenge, yb, streifen)
     kl, kr = auf_ebene(pl), auf_ebene(pr)
     fig = L.zusammen(H, W, [(al, 0, 0), (ar, 0, 0), (rumpf, 0, 0), (kl, 0, 0), (kr, 0, 0), (kopf, 0, 0)])
     Hm.kontur_schliessen(fig, ERLAUBT, UMRISS)
+    fig = L.zusammen(H, W, [(staub_ebene(i), 0, 0), (fig, 0, 0)])        # Staub hinter der Figur
     if richtung == 'hoch' and not streifen:
         glanz(fig, i, True, ys_l, 0)
         glanz(fig, i, False, ys_r, 23)

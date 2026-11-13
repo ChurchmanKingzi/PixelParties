@@ -65,7 +65,7 @@ BALL = [_F(36.0, 7.0, 15, 7.2, richtung=(-1, 0.18), fuss=6.6, phase=0.0, bauch=0
         _F(33.0, 3.6, 10, 3.2, richtung=(-1, -0.02), phase=0.35, welle=9),
         _F(32.5, 9.6, 12, 3.4, richtung=(-1, 0.3), phase=0.6, welle=9),
         _F(33.0, 11.6, 9, 2.8, richtung=(-1, 0.45), phase=0.15, welle=8)]
-FEUER = F3.Feuer(H, W, BALL, [ROT, ORANGE, GELB, HELL], posen=8, halten=2)
+FEUER = F3.Feuer(H, W, BALL, [ROT, ORANGE, GELB, HELL], posen=16, halten=1)
 
 
 def teil(maske):

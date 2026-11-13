@@ -19,7 +19,8 @@ Was ist was (x/y im Sprite):
 Fest bleiben: Kopfform, Maul/Zähne, Nase, Brauen, Radkörper. Der Kopf bewegt sich nie seitlich.
 
 Ablauf (48 Frames à 65 ms = 3,12 s, nahtlos; Frame 0 = Original):
-* Fahr-Rütteln (Nutzerwunsch wie beim Coreling: „da er permanent fährt, soll er sich auch leicht auf und ab bewegen“): der ganze Aufbau (Kristall, Kopf, Brücke, Streben) wird in unregelmäßigen kurzen Stößen
+* [Runde 5: ERSETZT — die ganze Figur samt Rädern und Spikes hebt/senkt sich jetzt gleichmäßig 0–2 px (Periode 16 Frames, weich über eine Zwischenstufe), siehe GANZ_HUB; kein Rütteln des Aufbaus mehr]
+  Früher: Fahr-Rütteln (Nutzerwunsch wie beim Coreling: „da er permanent fährt, soll er sich auch leicht auf und ab bewegen“): der ganze Aufbau (Kristall, Kopf, Brücke, Streben) wird in unregelmäßigen kurzen Stößen
   (2–3 Frames, sechsmal je Schleife) als starres Stück 1 px angehoben und fällt zurück; Räder und Spikes bleiben am Boden.
 * Räder drehen sich (wie beim Coreling): die zwei Spikes je Rad wandern am Radrand von oben nach unten (1 Zeile alle 2 Frames, 6 Zeilen = 1 Umlauf = 12 Frames, 4 Umläufe je Schleife); oben knospt ein Spike
   (2 Pixel), unten taucht er ein (2 Pixel). Die Spike-Pixel sind die des Originals (Hauptzeile C-F-D-M, Nebenzeile E-M), verankert am Radrand der jeweiligen Zeile.
@@ -32,6 +33,7 @@ ERGÄNZUNGEN (Farben der Quelle):
 * Naht Aufbau/Rad im angehobenen Zustand: die frei werdenden Zellen an der Naht (x 5–7 bzw. 25–27) behalten die Pixel der Ruhepose (links (5,22), (6,22), (7,24); rechts (25,24), (26,21)) — keine Lücke zwischen Rad und Aufbau.
 Keine Partikel, kein Feuer. Frame: Sprite plus 2 px links/rechts/unten, 3 px oben (1 px Hub). Nur ganze Pixel, nur Farben der Quelle.
 """
+import math
 import sys
 
 import numpy as np
@@ -39,7 +41,7 @@ import numpy as np
 import anim_lib as L
 
 N, MS = 48, 65
-PAD_L, PAD_R, PAD_T, PAD_B = 2, 2, 3, 2
+PAD_L, PAD_R, PAD_T, PAD_B = 2, 2, 4, 2   # oben 4: 2 px Hub der ganzen Figur (Runde 5) + 2 px Rand
 
 spr = L.lade('spirit-of-the-ultimate-gun')
 sh, sw = spr.shape[:2]
@@ -123,7 +125,10 @@ PULS = set(range(20, 26)) | set(range(42, 47))
 
 # ── Fahr-Rütteln ──
 HUB_FRAMES = {4, 5, 6, 11, 12, 18, 19, 20, 26, 27, 32, 33, 34, 40, 41}
-HUB = [1 if i in HUB_FRAMES else 0 for i in range(N)]
+HUB = [0] * N                                                                          # Runde 5: kein Rütteln des Aufbaus mehr (Aufbau und Räder bleiben zueinander starr)
+# ── Runde 5 (Nutzer: „sollten *als Ganze* auf und ab bewegt werden, nicht nur ‚wackeln‘ (also inklusive ihrer Reifen)“): die GANZE Figur samt Rädern und Spikes hebt und senkt sich gleichmäßig
+# (weich über eine Zwischenstufe: 0 → 1 → 2 → 1 → 0 px, Periode 16 Frames, dreimal je Schleife); Frame 0 = Ruhe (Original).
+GANZ_HUB = [int(round(1 - math.cos(2 * math.pi * i / 16))) for i in range(N)]
 NAHT = AUFBAU & (yy >= 21) & (((xx >= 5) & (xx <= 7)) | ((xx >= 25) & (xx <= 27)))
 
 
@@ -168,7 +173,7 @@ def figur(i):
     for y, x in zip(*np.nonzero(sk[..., 3])):
         if tuple(int(v) for v in fig[y, x, :3]) == CM and any(not fig[y + dy, x + dx, 3] for dx, dy in ((1, 0), (-1, 0), (0, 1), (0, -1))):
             fig[y, x, :3] = CD
-    return fig
+    return L.versetze(fig, 0, -GANZ_HUB[i])                         # Runde 5: die ganze Figur (samt Rädern) hebt/senkt sich
 
 
 def frame(i, nur=None):

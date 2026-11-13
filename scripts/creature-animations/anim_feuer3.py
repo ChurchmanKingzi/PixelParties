@@ -279,3 +279,66 @@ def bogen(pfad, feuer, zoom=12, hintergrund=(40, 30, 70), box=None, unter=None, 
         o.paste(im, (zoom + j * (bw * zoom + zoom), zoom), im)
     o.save(pfad)
     return pfad
+
+
+# ── Kleine Flammen von Hand (Runde 5) ──────────────────────────────────────────────────────────────────────────────────
+# Für Kerzen, Lunten, Dochte (Halbbreite < 3 px) taugt das Feldverfahren nicht (zu wenige Pixel). Dafür handgezeichnete 8-Bilder-Zyklen als kleine Sprites:
+# Ziffern = Farbband (1 außen/rot … 3 Kern/hell; hat die Quelle weniger Farben, fallen die inneren Bänder auf die hellste zusammen). Unterste Zeile = Fuß (sitzt direkt
+# auf Docht/Luntenende, Fußpixel in der Spaltenmitte). Ablauf: Bauch wandert hoch, Spitze neigt sich, reißt ab, steigt als Funke, Flamme sackt kurz und wächst zur anderen Seite.
+KLEIN = {
+    # Kerze/Fackel: Tropfen, 5 px breit, bis 7 px hoch
+    'kerze': ["""
+..1..|...1.|...1.|....1|.....|.1...|.1...|1....
+..1..|..11.|...1.|.....|.....|.11..|.1...|.....
+.121.|.121.|..11.|..1..|..1..|.121.|.11..|..1..
+.121.|1221.|.1221|.121.|.121.|.1221|1221.|.121.
+12321|12321|.2321|12321|12321|12321|1232.|12321
+12321|12321|12321|12321|12331|12321|12321|12321
+.232.|.232.|.232.|.232.|.232.|.232.|.232.|.232.
+"""],
+    # Lunte: kürzer, unruhiger, Funken springen ab
+    'lunte': ["""
+.....|....1|.....|1....|.....|...1.|.....|.1...
+..1..|...1.|.1...|.....|.11..|.....|..11.|.....
+.121.|.121.|.121.|..1..|.121.|.12..|.121.|..11.
+12321|.2321|1232.|.121.|.2321|1232.|12321|.1321
+.232.|.232.|.232.|.232.|.232.|.232.|.232.|.232.
+"""],
+    # Docht: winzig (3 px breit) für sehr kleine Figuren
+    'docht': ["""
+...|..1|...|1..|...|.1.|...|..1
+.1.|.1.|.11|...|.1.|.1.|11.|...
+.2.|.21|.2.|.1.|12.|.2.|.2.|.1.
+.3.|.3.|.3.|.3.|.3.|.3.|.3.|.3.
+"""],
+}
+
+
+def _klein_posen(art):
+    zeilen = [z for z in KLEIN[art][0].strip().split('\n')]
+    posen = list(zip(*[z.split('|') for z in zeilen]))                 # je Pose die Zeilen von oben nach unten
+    return [np.array([[int(c) if c != '.' else 0 for c in z] for z in p], np.uint8) for p in posen]
+
+
+def klein(h, w, x, y, i, farben, art='kerze', halten=1, richtung='oben', spiegel=False, versatz=0):
+    """Handgezeichnete kleine Flamme als RGBA-Ebene h×w. (x, y) = Leinwandpixel des Fußes (unterste Zeile, mittlere Spalte des Sprites; bei richtung 'links'/'rechts'/'unten' entsprechend
+    gedreht — Vierteldrehungen sind pixelgenau). farben = von außen nach innen (1–3 Quellfarben). Pose = (i // halten + versatz) % 8; Pixel außerhalb der Leinwand → ClipError."""
+    posen = _klein_posen(art)
+    p = posen[(i // halten + versatz) % len(posen)]
+    if spiegel:
+        p = p[:, ::-1]
+    ph, pw = p.shape
+    fy, fx = ph - 1, pw // 2
+    k = {'oben': 0, 'links': 1, 'unten': 2, 'rechts': 3}[richtung]
+    out = np.zeros((h, w, 4), np.uint8)
+    farben = [tuple(int(v) for v in c) for c in farben]
+    for yy_, xx_ in zip(*np.nonzero(p)):
+        dy, dx = yy_ - fy, xx_ - fx                                   # relativ zum Fuß (dy ≤ 0 = nach oben)
+        for _ in range(k):
+            dy, dx = -dx, dy                                           # Vierteldrehung gegen den Uhrzeigersinn: oben → links → unten → rechts
+        py, px = int(y + dy), int(x + dx)
+        if not (0 <= py < h and 0 <= px < w):
+            raise L.ClipError('kleine Flamme ragt aus der Leinwand (%d, %d)' % (px, py))
+        out[py, px, :3] = farben[min(int(p[yy_, xx_]), len(farben)) - 1]
+        out[py, px, 3] = 255
+    return out

@@ -55,7 +55,7 @@ import anim_amorph as A
 N, MS = 48, 65
 SWING = 16                                                 # Frames je Schwenk (hin und her), 3 pro Schleife
 A_SW = 3.0                                                 # Ausschlag der Gitarre (px)
-PAD_L, PAD_R, PAD_T, PAD_B = 9, 9, 16, 2
+PAD_L, PAD_R, PAD_T, PAD_B = 12, 12, 26, 2
 
 spr = L.lade('metal-harpyformer')                          # Ebene 165 (Ruhepose / Referenz für den Randpixel-Test)
 sh, sw = spr.shape[:2]
@@ -119,7 +119,7 @@ FLAMMEN3 = [_F(13.5, 14.5, 8, 9.5, bauch=0.22, schlag=0.35, phase=0.2, fuss=5.5)
             _F(14.0, 11.0, 17, 4.0, phase=0.3),
             _F(18.0, 11.5, 13, 3.4, phase=0.85, richtung=(0.12, -1)),
             _F(21.5, 13.5, 10, 3.0, phase=0.45, richtung=(0.3, -1))]
-FEUER = F3.Feuer(H, W, FLAMMEN3, FLAMMEN, posen=8, halten=2)
+FEUER = F3.Feuer(H, W, FLAMMEN3, FLAMMEN, posen=16, halten=1)
 
 
 # ── Schwenk ─────────────────────────────────────────────────────────────────────────────────────────────────────────

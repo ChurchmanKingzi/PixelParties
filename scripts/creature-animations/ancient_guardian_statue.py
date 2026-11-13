@@ -20,7 +20,8 @@ Ablauf (48 Frames à 62 ms = 2,98 s, nahtlos):
 * Helm hebt sich (Periode 24): die Bandzeile 12 wird einmal doppelt eingefügt, der Helm steigt 1 px über das Gesicht, Gesicht und Kinn bleiben stehen: 0 → 1 → 0 px.
 * Helm gleitet seitlich: der Helm (Zeilen 0–13) schiebt sich 1 px nach rechts (Frames 10–21) und später 1 px nach links (Frames 34–45), das Gesicht darunter bleibt — Stein, der aneinander reibt.
 * Kamm wackelt: der Kamm (Zeilen 0–5) rückt 1 px nach rechts (Frames 24–29), getrennt vom Gleiten (kein Stapeln).
-* Blick: beide Augen wandern gemeinsam 1 px nach rechts (Frames 3–8) und 1 px nach links (Frames 26–31), jeweils innerhalb der dunklen Augenhöhle.
+* Blick (Runde 5: Gold bleibt IN den Augen): in Frames 3–8 wandert der helle Kern jedes Auges 1 px nach rechts, in Frames 26–31 1 px nach links — nur die Farben innerhalb der 14 Augenpixel ändern sich,
+  kein goldenes Pixel liegt je außerhalb der Original-Augen (früher wurde die ganze Augenform in die dunkle Höhle geschoben).
 * Blinzeln (Frames 19–21 und 41–43): beide Augen schließen sich — die 14 Goldpixel nehmen die Höhlenfarbe (51,43,45) an (Lid = umgebende Körperfarbe). Kein Farbtausch, kein Leuchten.
 Frame 0 = Original (Ruhepose). Kontrolle: anim_humanoide.ruhepose / eckkontakt_typen / Randpixel-Test (Regel 16).
 Alle Bewegungen laufen auf der vollen Leinwand (anim_lib wirft ClipError). Nur ganze Pixel, nur Farben der Quelle.
@@ -63,10 +64,18 @@ def ebene(m):
     return L.platz(t, H, W, PAD_L, PAD_T)
 
 
+# Runde 5 (Nutzer: „das Gelbe der Augen soll NICHT über die eigentlichen Augen hinausragen“): der Blick verschiebt nicht mehr die ganze Augenform in die dunkle Höhle hinein, sondern nur die helle
+# „Pupille“ (heller Kern + helle Spalte darüber) INNERHALB der 14 Augenpixel; die Menge der goldenen Pixel ist in jedem Frame exakt die des Originals (oder beim Blinzeln leer).
+_D, _G, _B = (147, 122, 30), (205, 170, 42), (230, 209, 135)
+_AUGEN_PIX = [[(4, 15), (5, 15), (6, 15), (7, 15), (5, 16), (6, 16), (7, 16)], [(12, 15), (13, 15), (14, 15), (15, 15), (12, 16), (13, 16), (14, 16)]]
+BLICK = {1: [[_D, _D, _D, _G, _G, _G, _B], [_D, _D, _G, _D, _G, _G, _B]],          # nach rechts: Kern an den rechten Augenrand
+         -1: [[_D, _G, _D, _D, _B, _G, _G], [_G, _D, _D, _D, _B, _G, _G]]}         # nach links
+assert sorted(p for a in _AUGEN_PIX for p in a) == sorted(AUGEN)
+
+
 def augen_setzen(a, dx):
-    """Augen um dx px verschoben (dx = 0: Original); der alte Platz wird Höhlenfarbe."""
-    Hm.setze(a, {p: HOEHLE for p in AUGEN}, OFF)
-    Hm.setze(a, {(x + dx, y): c for (x, y), c in AUGEN.items()}, OFF)
+    """Blick um dx (±1): nur die Farben innerhalb der Augenpixel wandern, kein Goldpixel außerhalb der Augen."""
+    Hm.setze(a, {p: c for pix, farben in zip(_AUGEN_PIX, BLICK[dx]) for p, c in zip(pix, farben)}, OFF)
 
 
 def frame(i):

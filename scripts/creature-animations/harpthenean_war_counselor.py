@@ -46,6 +46,7 @@ import anim_krieger as K
 import anim_lib as L
 import anim_flieger as F
 import anim_flieger_r3 as R3
+import anim_r5_fluegel2 as R5
 
 N, MS = 48, 62
 sz = K.Szene('harpthenean-war-counselor', (12, 6, 12, 4))     # Flügelschlag bis ≈ 10 px neben das Sprite, Schweben 2 px, Busch ±2 px
@@ -75,6 +76,14 @@ m_gold = sz.farben_in(sz.rechteck(13, 21, 18, 25), set(GOLD_R))
 # (aber weiter hinter Kopf, Ohren, Rumpf, Schild und Schurz): Flügelpixel, die auf ein Haarpixel fallen, werden darüber gezeichnet — der Flügelumriss bleibt so in jeder Pose vollständig.
 HAAR_F = {(0, 0, 0), (32, 32, 32), (41, 41, 41), (46, 46, 46), (56, 56, 56)}
 m_haar = sz.farben_in(sz.rechteck(3, 18, 6, 20), HAAR_F) | sz.farben_in(sz.rechteck(2, 21, 3, 21), HAAR_F) | sz.farben_in(sz.rechteck(18, 18, 23, 25), HAAR_F)
+# Runde 5 (Nutzer: „Hat bei gesenkten Flügeln noch immer schwarze Linien auf den Flügeln.“). Ursachen und Abhilfe:
+# (1) Der Randpixel-Durchlauf (K.kontur) färbte Federpixel am Flügelrand SCHWARZ, wenn ihre Farbe im Original nie am Rand lag — die Flügel haben aber gar keinen Umriss. Federfarben sind jetzt alle als
+#     Randfarbe erlaubt (ERLAUBT_F), der Flügel bekommt in keiner Pose Schwarz.
+# (2) Die Schichtung ist jetzt echt dreilagig: HAARE (hinten) → FLÜGEL → übrige Figur (Kopf, Ohren, Rumpf, Schild, Schurz, Bein). Vorher wurden Flügelpixel nachträglich über Haarpixel kopiert; in jeder
+#     Kerbe/jedem Loch des gedrehten Flügels blieb Haar-Schwarz stehen. Der gedrehte Flügel wird zuerst zu einer geschlossenen Fläche gemacht (R5.schliessen, nur Federfarben).
+# (3) Die braunen Pixel (7,19)/(18,19) unter dem Flügelansatz zählen zur Haar-Lage (hinter dem Flügel). Löcher an Nähten werden bevorzugt mit Federfarbe geschlossen (R5.loecher_fuellen).
+m_haar |= sz.rechteck(7, 19, 7, 19) | sz.rechteck(18, 19, 18, 19)
+ERLAUBT_F = set(sz.ERLAUBT) | FEDER
 HAAR0 = np.zeros((H, W), bool)
 HAAR0[OFF[1]:OFF[1] + sz.sh, OFF[0]:OFF[0] + sz.sw] = m_haar
 
@@ -130,6 +139,22 @@ def winkel(t):
     return -HUB * (welle(t) - welle(0))
 
 
+ANS0 = sz.ebene(ans_l | ans_r)[..., 3] > 0                      # stehender Flügelansatz (Leinwand)
+VORN0 = sz.ebene(rest & ~m_haar)[..., 3] > 0                    # vordere Lage (verdeckt den Flügel zu Recht)
+_fp = {}
+
+
+def fluegel_pose(ang):
+    """Beide Flügel in der Pose `ang` (Leinwand, ohne Schweben): um den Ansatz gedreht und zu einer geschlossenen Fläche in Federfarben gemacht."""
+    if ang not in _fp:
+        fl = F.drehen(WING_ROT['l'], OFF[0] + PIV_L[0], OFF[1] + PIV_L[1], ang, glatt=True)
+        fr = F.drehen(WING_ROT['r'], OFF[0] + PIV_R[0], OFF[1] + PIV_R[1], -ang, glatt=True)
+        if abs(ang) > 1e-6:
+            fl, fr = R5.schliessen(fl), R5.schliessen(fr)
+        _fp[ang] = (fl, fr)
+    return _fp[ang]
+
+
 def hub_koerper(t):
     """Schweben: Körper steigt beim Abschlag (1,5 Frames nachlaufend) bis 2 px; Frame 0 = 0."""
     return -int(round(2.0 * (welle(t - 1.5) - welle(-1.5))))
@@ -137,7 +162,8 @@ def hub_koerper(t):
 
 def frame(i, nur=None):
     ebenen = nur if nur is not None else ('figur', 'glitzer')
-    k = sz.ebene(rest | ans_l | ans_r)
+    k = sz.ebene((rest & ~m_haar) | ans_l | ans_r)                 # vordere Lage: alles außer Haaren und schlagenden Flügeln
+    haar = sz.ebene(m_haar)                                        # hintere Lage: die schwarzen Haare
     # --- Blinzeln ---
     lid = Hm.folge(i, 19, [1, 2, 1], N) or Hm.folge(i, 41, [1, 2, 1], N)
     if lid:
@@ -157,14 +183,12 @@ def frame(i, nur=None):
     # --- Flügel: Schlag um die Schulter (Runde 3) ---
     ang = winkel(i)
     body = hub_koerper(i)
-    fl = F.drehen(WING_ROT['l'], OFF[0] + PIV_L[0], OFF[1] + PIV_L[1], ang, glatt=True)
-    fr = F.drehen(WING_ROT['r'], OFF[0] + PIV_R[0], OFF[1] + PIV_R[1], -ang, glatt=True)
-    fig = L.zusammen(H, W, [(fl, 0, 0), (fr, 0, 0), (k, 0, 0)])
-    fig = R3.luecken_fuellen(fig, 5, ausser=LOCH0)
-    for w_ in (fl, fr):                                         # Runde 4: Flügel strikt VOR den schwarzen Haaren
-        vorn = HAAR0 & (w_[..., 3] > 0)
-        fig[vorn] = w_[vorn]
-    K.kontur(fig, sz.ERLAUBT, lambda c, x, y: (156, 0, 0) if (c[1] == 0 and c[2] == 0 and c[0] > 0) else (0, 0, 0))    # Regel 16
+    fl, fr = fluegel_pose(round(ang, 5))
+    fig = L.zusammen(H, W, [(haar, 0, 0), (fl, 0, 0), (fr, 0, 0), (k, 0, 0)])                # Runde 5: Haare hinten, Flügel davor, Rest der Figur ganz vorn
+    fig = R5.loecher_fuellen(fig, FEDER, 5, ausser=LOCH0)
+    if abs(ang) > 1e-6:                                         # Flügelfläche schließen: Taschen zwischen stehendem Ansatz und geschwenktem Flügel, in denen sonst Haar-Schwarz stünde
+        fig = R5.flaeche_schliessen(fig, (fl[..., 3] > 0) | (fr[..., 3] > 0) | ANS0, VORN0, FEDER)
+    K.kontur(fig, ERLAUBT_F, lambda c, x, y: (156, 0, 0) if (c[1] == 0 and c[2] == 0 and c[0] > 0) else (0, 0, 0))    # Regel 16 (Federn haben keinen Umriss und bleiben, wie sie sind)
     fig = L.versetze(fig, 0, body)                              # Schweben: ganze Figur starr
     out = fig if 'figur' in ebenen else sz.leer()
     if 'glitzer' in ebenen:

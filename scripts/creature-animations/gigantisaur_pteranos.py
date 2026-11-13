@@ -66,8 +66,8 @@ import anim_flieger as F
 import anim_r4_fluegel as R4
 
 N, MS = 48, 60
-BEAT, DOWN, UP = 16, 5, 11                                     # Frames je Flügelschlag (nur noch für den Schwebe-Bob; die Flügel laufen über die Posenfolge FOLGE)
-P0 = 2.0                                                       # oberer Umkehrpunkt 2 Frames vor Frame 0 (Frame 0 = Originalpose, schon im Abschlag)
+BEAT, DOWN, UP = 24, 10, 14                                    # Frames je Flügelschlag (nur noch für den Schwebe-Bob; die Flügel laufen über die Posenfolge FOLGE)
+P0 = 4.5                                                       # oberer Umkehrpunkt 2 Frames vor Frame 0 (Frame 0 = Originalpose, schon im Abschlag)
 PAD_L, PAD_R, PAD_T, PAD_B = 14, 26, 18, 40                    # Arbeitsleinwand (am Ende zugeschnitten); rechts Platz für den abgesenkten Flügel
 
 spr = L.lade('gigantisaur-pteranos')
@@ -133,9 +133,11 @@ def welle(t):
 # Querschnitt wie im Original: Umriss · dunkles Vorderkantenband · Innenlinie · Haut · helle Hinterkante (2 px) · Umriss; Spitze läuft zu; Flügelkralle an der Vorderkante bei s ≈ 30–34.
 HAUT_D, HAUT_M, HAUT_H, BAND_D = (111, 67, 66), (122, 84, 73), (151, 100, 81), (77, 46, 43)
 G_NAH, L_NAH = (39.0, 32.0), 45.5
-G_FERN, ELLE, SPITZE = (26.0, 34.0), (17.2, 25.5), (18.2, 10.8)   # ferner Flügel: Gelenk hinter dem Hals verdeckt, „Handgelenk“ hinter dem Kopf, Spitze des sichtbaren Blatts
-L_ARM = math.hypot(ELLE[0] - G_FERN[0], ELLE[1] - G_FERN[1])
-L_BLATT = math.hypot(SPITZE[0] - ELLE[0], SPITZE[1] - ELLE[1])
+# RUNDE 5: ferner Flügel = gerader Flügel wie der nahe (Arm · Handgelenk mit kleinem Krallenhöcker · Finger), von dem in der Ruhepose nur das äußere Stück hinter dem Kopf hervorschaut.
+# Gelenk G_FERN liegt weit unten, verdeckt hinter Schnabelansatz/Hals; der GANZE Flügel dreht sich um dieses Gelenk — im selben Takt und um denselben Winkel wie der nahe Flügel (gespiegelt: Spitze nach links/unten).
+G_FERN, SPITZE = (17.0, 36.0), (18.2, 10.8)
+L_FERN = math.hypot(SPITZE[0] - G_FERN[0], SPITZE[1] - G_FERN[1])
+S_KNICK = 13.0                                                 # ab hier läuft die Spitze weich nach (wie beim nahen Flügel)
 
 
 def _halb_nah(s):
@@ -174,11 +176,12 @@ def nah_pose(a_wurzel, a_spitze=None):
 
 
 def _halb_fern(s):
-    if s <= L_ARM:
-        return 2.6
-    t = s - L_ARM
-    hw = min(3.3, 2.6 + 0.35 * t)
-    rest = L_BLATT - t
+    """Halbe Breite des fernen Flügels: schmaler Arm (verdeckt bzw. dicht am Kopf), ab dem Handgelenk das breite Blatt, zur Spitze zulaufend (wie die Quelle: 4 → 7 → 3 px)."""
+    if s <= 10.5:
+        hw = 2.1
+    else:
+        hw = min(3.3, 2.1 + 0.45 * (s - 10.5))
+    rest = L_FERN - s
     if rest < 8:
         hw = min(hw, 1.0 + 2.3 * (max(rest, 0.0) / 8) ** 0.7)
     return hw
@@ -191,14 +194,17 @@ def _farbe_fern(s, d=None, schritt=None, k=None):
 
 
 def fern_pose(phi, nach=0.0):
-    """Ferner Flügel: Arm + Blatt als Ganzes um G_FERN gedreht NEU gezeichnet (phi > 0 = Abschlag, gegen den Uhrzeigersinn); nach = Zusatzwinkel des Blatts am Handgelenk (Spitze hängt nach)."""
-    def dreh(p, um, w):
-        dx, dy = p[0] - um[0], p[1] - um[1]
+    """Ferner Flügel NEU gezeichnet: als Ganzes um G_FERN gedreht (phi > 0 = Abschlag, auf dem Bild gegen den Uhrzeigersinn, Spitze nach links unten); nach = Zusatzwinkel der Spitze (weicher Bogen ab S_KNICK)."""
+    def richt(w):                                              # Richtung G_FERN → SPITZE, um w gegen den Uhrzeigersinn gedreht
+        dx, dy = (SPITZE[0] - G_FERN[0]) / L_FERN, (SPITZE[1] - G_FERN[1]) / L_FERN
         c, s_ = math.cos(w), math.sin(w)
-        return (um[0] + dx * c + dy * s_, um[1] - dx * s_ + dy * c)
-    e = dreh(ELLE, G_FERN, phi)
-    t = dreh(dreh(SPITZE, G_FERN, phi), e, nach)
-    pts = [(PAD_L + q[0], PAD_T + q[1]) for q in (G_FERN, e, t)]
+        return (dx * c + dy * s_, -dx * s_ + dy * c)
+    pts = [(PAD_L + G_FERN[0], PAD_T + G_FERN[1])]
+    stuecke = [(L_FERN, phi)] if nach == 0.0 else [(S_KNICK, phi)] + [((L_FERN - S_KNICK) / 4, phi + nach * (j + 1) / 4) for j in range(4)]
+    for ln, w in stuecke:
+        x, y = pts[-1]
+        rx, ry = richt(w)
+        pts.append((x + ln * rx, y + ln * ry))
     a = R4.band_fluegel(H, W, pts, _halb_fern, _farbe_fern)
     a[~FERN_SICHTBAR] = 0                                      # der ferne Flügel verschwindet hinter der Oberkante von Kopf und Schnabel (auch nicht durch den offenen Schnabel/unter dem Hals sichtbar)
     # Winzige Hintergrundtaschen (≤ 2 px), die zwischen Flügel und Kopf/Schnabel eingeschlossen wären, gehören zum Flügel (er läuft dort hinter dem Kopf weiter)
@@ -227,44 +233,53 @@ _frei0 = (~(L.zusammen(H, W, [(q, 0, 0) for q in (P_FL, P_BLATT, P_RUMPF, P_FUSS
 _n0, _lab0 = cv2.connectedComponents(_frei0, connectivity=4)
 ORIG_LOCH = (_lab0 != _lab0[0, 0]) & (_frei0 > 0)               # Hintergrundpixel, die schon in der Quelle eingeschlossen sind (offener Schnabel …) — bleiben frei
 
-W63, W56, W45, W34, W27, W18 = math.atan(2), math.atan(1.5), math.atan(1), math.atan(2 / 3), math.atan(0.5), math.atan(1 / 3)     # pixelsaubere Steigungen 2:1, 3:2, 1:1, 2:3, 1:2, 1:3
-GRAD = math.radians
-#        Name    naher Flügel (Wurzel, Spitze)     ferner Flügel (phi, Nachhängen)
-POSEN = {'O': None,                                                    # Original (45°) — Pixel der Quelle
-         'M': ((W27, W27 + GRAD(10)), (GRAD(12), GRAD(-6))),           # Abschlag: Spitze hängt nach oben nach
-         'H': ((0.0, GRAD(10)), (GRAD(27), GRAD(-6))),
-         'D': ((-W18, -W18), (GRAD(42), 0.0)),                         # unten (18° unter der Waagerechten: der Flügel bleibt frei von den Füßen)
-         'a1': ((GRAD(-9), GRAD(-19)), (GRAD(38), GRAD(6))),           # Aufschlag: Spitze hängt nach unten nach
-         'a2': ((0.0, GRAD(-10)), (GRAD(30), GRAD(8))),
-         'a3': ((W18, W18 - GRAD(10)), (GRAD(20), GRAD(8))),
-         'a4': ((W27, W27 - GRAD(8)), (GRAD(13), GRAD(6))),
-         'a5': ((W34, W34 - GRAD(6)), (GRAD(7), GRAD(4))),
-         'a6': ((W45, W45 - GRAD(4)), (GRAD(2), GRAD(2))),
-         'a7': ((W56, W56), (0.0, 0.0)),
-         'U': ((W63, W63), (0.0, 0.0))}                                # oben
-FOLGE = ['O', 'M', 'H', 'D', 'D', 'a1', 'a2', 'a3', 'a4', 'a5', 'a6', 'a7', 'U', 'U', 'U', 'a7']      # 16 Frames je Schlag: Abschlag 4 Frames, Aufschlag 8, oben/unten kurz gehalten
-assert len(FOLGE) == BEAT
+# ── RUNDE 5: EIN Schlagplan für BEIDE Flügel ───────────────────────────────────────────────────────────────────────────────────────────────────────────────
+# 3D-Pose: das Tier kommt schräg von vorn (Kopf/Schnabel links unten, Rumpf nach rechts hinten), die Flügel stehen als V nach oben: der nahe nach rechts oben (45°), der ferne – perspektivisch verkürzt und zum
+# größten Teil hinter Kopf/Schnabel – steil nach oben. Beim Abschlag klappt das V auf: der nahe Flügel schwenkt im Uhrzeigersinn nach rechts unten, der ferne spiegelbildlich gegen den Uhrzeigersinn nach links unten.
+# Jeder Frame hat EINEN Flügelwinkel th (Grad über der Waagerechten, naher Flügel) und EIN Nachlaufen der Spitzen; der ferne Flügel bekommt daraus phi = 45° − th (oberhalb der Ruhelage nur 60 %, er stünde sonst
+# ganz hinter dem Horn). Beide sind also immer gleichzeitig oben, in der Mitte und unten.
+def _st(z, n):                                                 # pixelsaubere Steigung z:n in Grad
+    return math.degrees(math.atan2(z, n))
+
+
+#        th (Wurzel)   Nachlauf der Spitze (Grad; + = hängt nach oben nach, − = nach unten)
+PLAN = [(None, 0),                                             # 0  Ruhepose = Original (45°), schon im Abschlag
+        (_st(2, 3), 6), (_st(1, 3), 10), (0.0, 10), (-_st(1, 5), 6), (-_st(1, 3), 2),          # 1–5  Abschlag (schnell)
+        (-_st(1, 3), -4),                                                                       # 6    unten: die Spitzen schwingen durch
+        (-_st(1, 4), -8), (-_st(1, 6), -10), (0.0, -10), (_st(1, 6), -10), (_st(1, 3), -10),    # 7–11 Aufschlag (langsamer), Spitzen hängen nach unten nach
+        (_st(1, 2), -9), (_st(2, 3), -8), (_st(4, 5), -6), (45.0, -5), (_st(5, 4), -4), (_st(3, 2), -2),      # 12–17
+        (_st(5, 3), 0), (_st(5, 3), 0), (_st(5, 3), 0),                                         # 18–20 oben kurz gehalten
+        (_st(5, 3), 1), (_st(3, 2), 2), (_st(5, 4), 3)]                                         # 21–23 Ansatz zum Abschlag
+assert len(PLAN) == BEAT
+
+
+def phi_fern(th):
+    return math.radians((45.0 - th) if th <= 45.0 else 0.6 * (45.0 - th))
 
 
 def posen_bauen():
-    nah, fern = {'O': L.zusammen(H, W, [(P_FL, 0, 0), (P_ANSATZ, 0, 0)])}, {'O': P_BLATT}
-    for name, wert in POSEN.items():
-        if wert is None:
+    nah, fern, grad = [], [], []
+    for th, nl in PLAN:
+        if th is None:
+            nah.append(L.zusammen(H, W, [(P_FL, 0, 0), (P_ANSATZ, 0, 0)]))
+            fern.append(P_BLATT)
+            grad.append(45.0)
             continue
-        nah[name] = nah_pose(*wert[0])
-        fern[name] = P_BLATT if wert[1] == (0.0, 0.0) else fern_pose(*wert[1])
-    return nah, fern
+        nah.append(nah_pose(math.radians(th), math.radians(th + nl)))
+        fern.append(fern_pose(phi_fern(th), math.radians(-nl * 0.8)))
+        grad.append(th)
+    return nah, fern, grad
 
 
-NAH, FERN = posen_bauen()
+NAH, FERN, GRAD = posen_bauen()
 
 
 def frame(i, partikel=True, effekte=True):
     ph = L.sinus(i, BEAT)
-    bob = -int(round(3.0 * (welle(i - 1.5) - welle(-1.5))))      # bis 3 px nach oben (zweistufig), hebt sich kurz nach dem Abschlag; Frame 0 = Original
+    bob = -int(round(2.0 * (welle(i - 1.5) - welle(-1.5))))      # bis 3 px nach oben (zweistufig), hebt sich kurz nach dem Abschlag; Frame 0 = Original
 
-    name = R4.takt(FOLGE, i)
-    fl, blatt = NAH[name], FERN[name]
+    k = i % BEAT
+    fl, blatt = NAH[k], FERN[k]
     kopf = P_KOPF.copy()
     if effekte and i in BLINZ:
         for y, x in zip(*np.nonzero(m_auge)):
@@ -280,7 +295,7 @@ def frame(i, partikel=True, effekte=True):
     vorn = L.zusammen(H, W, [(rumpf, 0, 0), (fuss, 0, 0), (kopf, 0, 0), (horn, 0, 0)])
     F.umranden(vorn, [rumpf, fuss, horn], UMRISS, AUSSEN, AUSSEN, AUSSEN)                   # Randpixel-Test (Regel 16) für pendelnde Füße/Horn
     ebenen = [(blatt, 0, bob), (fl, 0, bob), (vorn, 0, bob)]
-    if name == 'O':
+    if PLAN[k][0] is None:
         ebenen.append((P_ANSATZ, 0, bob))                                                   # Originalpose: der Flügelansatz liegt wie in der Quelle über der Rückenlinie (Frame 0 = Quelle)
     f = L.zusammen(H, W, ebenen)
     # einzelne Hintergrundpixel, die zwischen abgesenktem Flügel, Rumpf und Fuß eingeschlossen wären, schließt die Umrissfarbe (keine Löcher in der Figur)

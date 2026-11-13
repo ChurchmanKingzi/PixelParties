@@ -2,14 +2,14 @@
   "creature": "Night Mare",
   "sheet": "night-mare.png",
   "frameWidth": 46,
-  "frameHeight": 48,
+  "frameHeight": 62,
   "frames": 48,
   "frameMs": 65,
   "loop": true,
   "layout": "horizontal",
   "padTop": 1,
-  "padLeft": 4,
+  "padLeft": 3,
   "padRight": 1,
-  "padBottom": 4,
+  "padBottom": 8,
   "faceX": 23.0
 }

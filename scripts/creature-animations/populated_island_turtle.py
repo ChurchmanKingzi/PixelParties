@@ -24,8 +24,8 @@ Bleibt fest: Kopf (bis auf die Augen), Panzer, Burg, totes Bäumchen, Baumstämm
 Ablauf (56 Frames à 66 ms = 3,7 s), alle Bewegungen unabhängig:
 * Atmen (Periode 28, 2× pro Schleife; oben in Frames 3–16 und 31–44): Zeile 20 wird eingefügt — Insel, Panzer und Kopf heben sich 1 px, die Flossen bleiben im Wasser.
 * Bäume wiegen sich: die Kronen (Zeilen 0–13, x 11–25) neigen sich als wandernde Welle bis ±1 px nach links/rechts (2 Wellen pro Schleife), die Stämme bleiben.
-* Vorderflossen paddeln: zweimal pro Schleife (Frames 4–19 und 32–47) schwingen die Flossenzeilen 22–30 zweimal bis ±2 px hin und her, die Spitze mehr als der Ansatz.
-* Hinterflosse schlägt: zweimal pro Schleife (Frames 14–29 und 42–55) wandern die Flossenspalten x 36–49 auf und ab (bis ±2 px an der Spitze).
+* Runde 5 (Nutzer: „bewegt ihre Flossen zu hektisch, sie soll gleichmäßig schwimmen“): Vorderflossen (Zeilen 22–30, waagerecht) und Hinterflosse (Spalten x 36–49, senkrecht) schwingen DURCHGEHEND in einem
+  langsamen, runden Sinus (Periode 28 Frames = 1,85 s, bis ±2 px an der Spitze, Spitze hinkt dem Ansatz nach); keine Paddel-Fenster/Doppelschläge mehr. Hinterflosse eine Viertelperiode versetzt.
 * Blinzeln (Frames 12–15 und 38–41): die Augen (3–4 und 6–7, 16–17) verschwinden in der Kopffarbe C: erst die oberen Pixel, dann ganz, dann wieder die oberen.
 Alle Bewegungen laufen auf der vollen Leinwand (anim_lib wirft ClipError). Nur ganze Pixel, nur Farben der Quelle.
 
@@ -87,7 +87,9 @@ def zustand(i):
     for s in (12, 38):
         if 0 <= i - s < 4:
             lid = (1, 2, 2, 1)[i - s]
-    return atem, lid, burst(i, FENSTER_V), burst(i, FENSTER_H)
+    # Runde 5 („bewegt ihre Flossen zu hektisch, sie soll gleichmäßig schwimmen“): keine Paddel-Fenster mehr — beide Flossen schwingen DURCHGEHEND in einem langsamen Sinus
+    # (Periode 28 Frames = 1,85 s, zwei Züge je Schleife), die Hinterflosse eine Viertelperiode versetzt.
+    return atem, lid, (i % 28) / 28.0, ((i + 7) % 28) / 28.0
 
 
 def flosse_v(t, u):
@@ -100,7 +102,7 @@ def flosse_v(t, u):
         if not len(xs_):
             continue
         f = (y - 22) / 8.0
-        dx = int(round(2.2 * f * math.sin(math.pi * u) * math.sin(4 * math.pi * u - 0.8 * f)))
+        dx = int(round(2.2 * f * math.sin(2 * math.pi * u - 0.6 * f)))                     # Runde 5: ein runder, gleichmäßiger Zug je Periode (keine Hüllkurve, kein Doppelschlag)
         if xs_.min() + dx < 0 or xs_.max() + dx >= W:
             raise L.ClipError(f'Flossenzeile {y} würde aus der Leinwand geschoben')
         for x in xs_:
@@ -118,7 +120,7 @@ def flosse_h(t, u):
         if not len(ys_):
             continue
         f = (x - (PAD_L + 36)) / 13.0
-        dy = int(round(2.4 * f * math.sin(math.pi * u) * math.sin(4 * math.pi * u - 0.6 * f)))
+        dy = int(round(2.2 * f * math.sin(2 * math.pi * u - 0.6 * f)))                     # Runde 5: gleichmäßig, eine Schwingung je Periode
         for y in ys_:
             out[y + dy, x] = t[y, x]
     return out

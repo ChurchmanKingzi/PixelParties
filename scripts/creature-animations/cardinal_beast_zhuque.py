@@ -27,6 +27,10 @@ Ablauf (48 Frames à 70 ms = 3,36 s, nahtlos) — RUNDE 3:
   RUNDE 4 (Nutzer: „Die Flügel beginnen näher am Körper.“): Das Gelenk sitzt jetzt direkt am Körperrand ((25,27) links, (33,27) rechts; Körper x 26–33) und nur noch ein 3-px-Gelenkkern (statt 9 px Schulter) sowie der
   2 px breite Ansatzstreifen am Rumpf (x 24–25 / 34–35, y ≥ 24) bleiben stehen — der GANZE Flügel ab Körperansatz schlägt (Regel 46). Die beiden Fänge (Farben (55,59,70)/(68,73,79)/(90,90,92)/(35,12,0)) und der Unterleib
   zwischen ihnen (x 22–37, y ≥ 33) gehören zum Körper und schlagen nicht mit. Die Angaben „(24,27)/(34,27)“ und „Umkreis 9 px“ oben sind damit überholt.
+  RUNDE 5 (Nutzer: „Unten entstehen jetzt sehr große Lücken zwischen Flügeln und Körper.“): KEINE starre Drehung mehr (alles oben zu Drehung/Schulterkern ist überholt). Die Flügel werden GEFÄCHERT
+  (anim_r5_fluegel2.faechern): Gelenk (25,5|24) / (32,5|24) am oberen Ende des Flügelansatzes, die Körperkante des Flügels bleibt stehen, die Vorderkante schwingt als Ganzes um das Gelenk (25° über bis 55° unter
+  die Ruhelage), alle Federn dazwischen folgen anteilig — der Flügel liegt in jeder Pose auf ganzer Länge am Rumpf an. Rechter Flügel = exaktes Spiegelbild (Sprite ist um x = 29 spiegelgleich).
+  Federn hinter Unterleib/Fängen stehen zusätzlich im Flügel-Layer; Kerben neben dem Unterleib werden geschlossen. Schweben: Hub 2 px (±1 um die Ruhelage).
 * SCHWEBEN: der ganze Vogel hebt sich beim Abschlag um bis zu 2 px (Schulter, Körper, Krallen), zweistufig, Krallen schwingen dabei ein Frame nach.
 * Keine Flammen, keine Partikel, kein Glanz.
 Ergänzungen: nur Umrisspixel (Dunkelrot) an der freigelegten Schulterkante; Randpixel (Regel 16): anim_flieger.umranden. Alle Bewegungen laufen auf der vollen Leinwand (anim_lib / F.drehen werfen ClipError). Nur Farben der Quelle.
@@ -136,8 +140,17 @@ def frame_gross(i, nur=None):
     wl, wr, kp = L.versetze(wl, 0, b), L.versetze(wr, 0, b), L.versetze(KP0, 0, b)
     f = L.zusammen(H, W, [(wl, 0, 0), (wr, 0, 0), (kp, 0, 0)])
     f = R3.luecken_fuellen(f, 8, ausser=np.roll(ORIG_LOECHER, b, axis=0))
+    # Kerben zwischen Flügelunterkante und Unterleib (Zeilen y 24–39): Hintergrundpixel, die in ihrer Zeile links und rechts Figur haben, mit der Farbe des äußeren Nachbarn schließen
+    cx = GPL + ACHSE2 // 2
+    sp = R5.zeilen_luecken(f, cx - 14, cx + 14)
+    sp[:GPT + b + 24] = False
+    sp[GPT + b + 40:] = False
+    sp &= ~np.roll(ORIG_LOECHER, b, axis=0)
+    for y, x in sorted(zip(*np.nonzero(sp)), key=lambda q: abs(q[1] - cx), reverse=True):
+        xa = x - 1 if x < cx else x + 1
+        f[y, x] = f[y, xa]
     if faktor(i) != 1.0:
-        F.umranden(f, [wl, wr], UMRISS, BRAUN, DUNKEL, DUNKEL)
+        F.umranden(f, [wl, wr, f * sp[..., None]], UMRISS, BRAUN, DUNKEL, DUNKEL)
     return f
 
 

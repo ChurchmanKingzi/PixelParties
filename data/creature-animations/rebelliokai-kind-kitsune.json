@@ -1,15 +1,15 @@
 {
   "creature": "Rebelliokai Kind Kitsune",
   "sheet": "rebelliokai-kind-kitsune.png",
-  "frameWidth": 48,
-  "frameHeight": 45,
+  "frameWidth": 54,
+  "frameHeight": 52,
   "frames": 60,
   "frameMs": 70,
   "loop": true,
   "layout": "horizontal",
-  "padTop": 2,
-  "padLeft": 4,
-  "padRight": 7,
-  "padBottom": 3,
-  "faceX": 24.0
+  "padTop": 4,
+  "padLeft": 7,
+  "padRight": 8,
+  "padBottom": 4,
+  "faceX": 27.0
 }

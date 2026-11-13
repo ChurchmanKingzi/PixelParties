@@ -36,6 +36,8 @@ import sys
 import numpy as np
 
 import anim_lib as L
+import anim_textur as TX   # texturierte Streckzeilen statt Zeilenkopien (Regel 43/49)
+TX.umleiten()               # auch Streckaufrufe innerhalb der Gruppenmodule liefern texturierte Zeilen
 import anim_tiere as T
 
 N, MS = 56, 66
@@ -123,8 +125,8 @@ def frame(i, nur=None):
     for n in wahl:
         e = ebenen[n]
         if n in ('koerper', 'schwanz'):
-            e = L.streck_zeile(e, PAD_T + ZEILE_B, b)
-            e = L.streck_zeile(e, PAD_T + ZEILE_A, a)
+            e = TX.streck_zeile(e, PAD_T + ZEILE_B, b)
+            e = TX.streck_zeile(e, PAD_T + ZEILE_A, a)
         teile.append((e, 0, 0))
     ganz = L.zusammen(H, W, teile)
     ganz = T.umriss_schliessen(ganz, RAND, REGEL)                  # Randpixel-Test (Regel 16)

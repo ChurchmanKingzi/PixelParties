@@ -2,7 +2,7 @@
   "creature": "Spirit of the Ultimate Gun",
   "sheet": "spirit-of-the-ultimate-gun.png",
   "frameWidth": 37,
-  "frameHeight": 39,
+  "frameHeight": 40,
   "frames": 48,
   "frameMs": 65,
   "loop": true,

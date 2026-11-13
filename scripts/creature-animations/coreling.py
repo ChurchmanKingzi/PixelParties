@@ -35,7 +35,8 @@ Ablauf (48 Frames à 65 ms = 3,12 s, nahtlos):
   Die Spike-Pixel sind die des Originals (obere Form bei Zeilen ≤ 20, untere Form bei Zeilen ≥ 21); die Radkante (6,19) bzw. (19,19), die im Original zum oberen Spike gehört, wird ohne Spike mit dem Reifengrau K gefüllt.
 * Blinzeln: beide Augen (Frames 16–18 und 40–42, das linke einen Frame früher): rot → halb zu → zu; die Lidfarbe ist die umgebende Körperfarbe
   (je Pixel die häufigste Graustufe in 2 px Umkreis außerhalb der Augen). Kein Farbwechsel der Augen sonst.
-* Fahr-Rütteln (Runde 4, Nutzerwunsch „da er permanent fährt, soll er sich auch leicht auf und ab bewegen“): der ganze Aufbau (Kopf, Arme, Rumpf, Streben zwischen den Rädern) wird in unregelmäßigen kurzen Stößen (2–3 Frames,
+* [Runde 5: ERSETZT — die ganze Figur samt Rädern und Spikes hebt/senkt sich jetzt gleichmäßig 0–2 px (Periode 16 Frames, weich über eine Zwischenstufe), siehe GANZ_HUB; kein Rütteln des Aufbaus mehr]
+  Früher: Fahr-Rütteln (Runde 4, Nutzerwunsch „da er permanent fährt, soll er sich auch leicht auf und ab bewegen“): der ganze Aufbau (Kopf, Arme, Rumpf, Streben zwischen den Rädern) wird in unregelmäßigen kurzen Stößen (2–3 Frames,
   sechsmal je Schleife) als starres Stück 1 px angehoben; die Räder und Spikes bleiben am Boden, die Blitze gehen mit den Armen mit.
 * Stahlglanz (Regel 14): zweimal pro Schleife (Frames 4–15 und 28–39) zieht ein schmales diagonales Lichtband über die grauen Panzerflächen (eine Stufe
   heller auf der Grau-Rampe F→E→D→B→C); Umrisse, Schwarz, Augen, Schlitz und Zahn bleiben.
@@ -54,7 +55,7 @@ import anim_lib as L
 import anim_amorph as A
 
 N, MS = 48, 65
-PAD_L, PAD_R, PAD_T, PAD_B = 15, 15, 3, 3
+PAD_L, PAD_R, PAD_T, PAD_B = 15, 15, 4, 3                                              # oben 4: 2 px Hub der ganzen Figur (Runde 5) + 2 px Rand
 GLANZ = True
 
 spr = L.lade('coreling')
@@ -338,7 +339,10 @@ def _radkanten(sp):
 RAEDER = BODY & (yy >= 18) & ((xx <= 8) | (xx >= 17))
 AUFBAU = BODY & ~RAEDER
 HUB_FRAMES = {4, 5, 6, 11, 12, 18, 19, 20, 26, 27, 32, 33, 34, 40, 41}
-HUB = [1 if i in HUB_FRAMES else 0 for i in range(N)]
+HUB = [0] * N                                                                          # Runde 5: kein Rütteln des Aufbaus mehr (Aufbau und Räder bleiben zueinander starr)
+# ── Runde 5 (Nutzer: „sollten *als Ganze* auf und ab bewegt werden, nicht nur ‚wackeln‘ (also inklusive ihrer Reifen)“): die GANZE Figur samt Rädern und Spikes hebt und senkt sich gleichmäßig
+# (weich über eine Zwischenstufe: 0 → 1 → 2 → 1 → 0 px, Periode 16 Frames, dreimal je Schleife); Frame 0 = Ruhe (Original).
+GANZ_HUB = [int(round(1 - math.cos(2 * math.pi * i / 16))) for i in range(N)]
 
 
 def figur(i):
@@ -350,6 +354,7 @@ def figur(i):
     fig, neu = A.umriss_ergaenzen(fig, RAND_FARBEN, lambda x, y: CA)
     fig, brueck2 = A.verbinde4(fig)
     fig, pfad, offen = A.verbinde_luecken(fig, 3)
+    fig = L.versetze(fig, 0, -GANZ_HUB[i])                                              # Runde 5: die ganze Figur (samt Rädern) hebt/senkt sich
     return dict(fig=fig, neu=neu, brueck=brueck + brueck2, pfad=pfad, offen=offen)
 
 
@@ -361,7 +366,7 @@ def frame(i, nur=None):
     if nur:
         return f['fig']
     # Blitz über die Figur (er überdeckt die Armspitze und leuchtet im Loch)
-    return L.zusammen(H, W, [(f['fig'], 0, 0), (blitz_ebene(i), 0, -HUB[i])])
+    return L.zusammen(H, W, [(f['fig'], 0, 0), (blitz_ebene(i), 0, -GANZ_HUB[i])])
 
 
 if __name__ == '__main__':

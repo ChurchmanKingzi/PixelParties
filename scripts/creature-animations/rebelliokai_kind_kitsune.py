@@ -42,7 +42,7 @@ import anim_lib as L
 import anim_rebel as R
 
 N, MS = 60, 70
-PAD_L, PAD_R, PAD_T, PAD_B = 4, 7, 6, 3
+PAD_L, PAD_R, PAD_T, PAD_B = 7, 10, 12, 4
 
 spr = L.lade('rebelliokai-kind-kitsune')
 fuchs = L.lade('rebelliokai-kind-kitsune-fuchs')
@@ -128,7 +128,7 @@ def frame(i, nur=None):
         e = fe.ebene(i, dx=dx, dy=dy)
         hinten.append((e, 'schweif'))
         vorn.append((L.versetze(an, dx, dy) if (dx or dy) else an, 'schweif'))
-    fig, etik = R.schichten(H, W, vorn + [(k, 'fuchs'), (ol, 'fuchs'), (orr, 'fuchs')] + hinten)
+    fig, etik = R.schichten(H, W, hinten + [(k, 'fuchs'), (ol, 'fuchs'), (orr, 'fuchs')] + vorn)        # Flammen hinter dem Fuchs, Flammenfuß über der Schweifspitze
     fig, _br = R.verbinde(fig)                                       # Teile, die nur über eine Pixelecke hängen (dünne Schweifspitzen), werden 4-verbunden
     R.neue_loecher_fuellen(fig, LOCH0, ERLAUBT, max_groesse=4)
     R.kontur_je_teil(fig, etik, ERLAUBT, {'fuchs': UMRISS_FUCHS, 'schweif': UMRISS_SCHWEIF}, standard=UMRISS_SCHWEIF)

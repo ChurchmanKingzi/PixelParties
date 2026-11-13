@@ -84,7 +84,7 @@ SCHWEIF = [F3.Flamme(GPL + 9.5, GPT + 21.5, 18, 5.2, richtung=(-0.2, 1), phase=0
            F3.Flamme(GPL + 7.5, GPT + 23.0, 7, 2.6, richtung=(-1, -0.75), phase=0.0),
            F3.Flamme(GPL + 6.5, GPT + 28.0, 6, 2.4, richtung=(-1, -0.55), phase=0.45),
            F3.Flamme(GPL + 6.0, GPT + 33.0, 5, 2.0, richtung=(-1, -0.4), phase=0.8)]
-FEUER = F3.Feuer(H, W, MAEHNE + SCHWEIF, [ROT, ORANGE, GELB, CREME], posen=8, halten=2, sperre=SPERRE)
+FEUER = F3.Feuer(H, W, MAEHNE + SCHWEIF, [ROT, ORANGE, GELB, CREME], posen=16, halten=1, sperre=SPERRE)
 
 
 def teil(maske):

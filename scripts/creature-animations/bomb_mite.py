@@ -17,7 +17,7 @@ Was ist was (x/y im Sprite):
 Fest bleiben: Bombenform, Lunte (starr), Kopf- und Beinform.
 
 Ablauf (48 Frames à 65 ms = 3,12 s; Frame 0 = Original, Funken und Glanz ausgenommen):
-* Brennende Lunte (Regel 15) mit anim_feuer.py NEU gezeichnet: eine kleine Flamme (Gelb (255,255,0) mit weißem Kern (255,255,255); mehr Farben hat der Sprite nicht, deshalb Rand, Rot, Orange und Gelb
+* Brennende Lunte: seit Runde 5 handgezeichneter Zyklus aus anim_feuer3 (F3.klein 'lunte', 8 Posen à 1 Frame); zuvor mit anim_feuer.py gezeichnet: eine kleine Flamme (Gelb (255,255,0) mit weißem Kern (255,255,255); mehr Farben hat der Sprite nicht, deshalb Rand, Rot, Orange und Gelb
   im Modul gleich Gelb), zwei Zungen, Fuß fest auf dem Lunten-Ende; Spitzen reißen als runde Funken ab. Frame 0 weicht in der Flamme vom Original ab (Funkenstern → kleine Flamme); der Rest ist exakt das Original.
 * Lunte wippt starr (Periode 12, ±1 px senkrecht, 4× pro Schleife) und steigt mit dem Pumpen mit; der Funken sitzt am Lunten-Ende.
 * Pumpen der Bombe (Periode 16, 0/1 px, dreimal pro Schleife): die Zeile y 6 der Kugel wird eingefügt, die obere Bombenhälfte samt Lunte hebt sich 1 px; Kopf und Beine bleiben stehen.
@@ -38,7 +38,7 @@ import numpy as np
 import anim_lib as L
 import anim_textur as TX   # texturierte Streckzeilen statt Zeilenkopien (Regel 43)
 import anim_untote as U
-import anim_feuer as FEU
+import anim_feuer3 as F3
 
 N, MS = 48, 65
 GPL, GPR, GPT, GPB = 6, 6, 10, 4
@@ -67,8 +67,8 @@ assert (funke_alt | lunte | kopf | bein_l | bein_r | koerper).sum() == vorhanden
 RAMPE = {'rand': GELB, 'rot': GELB, 'orange': GELB, 'gelb': GELB, 'hell': WEISS}
 SPERRE = np.zeros((H, W), bool)
 SPERRE[GPT:GPT + sh, GPL:GPL + sw] = lunte & (xx >= 19)                  # die Lunte selbst bleibt (zählt als festes Material), die Flamme sitzt dahinter/darüber
-ZUNGEN = [FEU.Zunge(23.0 + GPL, 8 + GPT, 3.5, 1.5), FEU.Zunge(25.0 + GPL, 8 + GPT, 3.0, 1.2)]
-FEUER = FEU.Feuer(H, W, ZUNGEN, RAMPE, n=N, seed=4, posen=12, amplitude=0.6, sperre=SPERRE)
+# Runde 5 (neues Feuer-System anim_feuer3): die Luntenflamme ist zu klein für das Feldverfahren → handgezeichneter 8-Bilder-Zyklus F3.klein('lunte') (Tropfen, Spitze neigt sich/reißt ab, Funken springen),
+# Fuß bei (25,8) (Fußzeile x 24–26) direkt am Lunten-Ende (23,8); die Flamme liegt HINTER der Lunte (lückenloser Anschluss), Gelb außen, weißer Kern (einzige Feuerfarben der Quelle).
 
 # --- Glanz auf der Bombe (Eisen) ---
 KUGEL = (xx >= 1) & (xx <= 15) & (yy >= 2) & (yy <= 12) & koerper
@@ -113,13 +113,12 @@ def frame_gross(i, nur=None):
                             kb[GPT + y, GPL + x, :3] = RAMPE_B[c]
     kb = TX.streck_zeile(kb, GPT + 6, pump)
     lu = teil(lunte)
-    fl = FEUER.ebene(i)
+    fl = F3.klein(H, W, GPL + 25, GPT + 8, i, [GELB, GELB, WEISS], 'lunte')
     dy_l = -pump + wipp
     koerper_ges = L.zusammen(H, W, [(teil(bein_l), 0, -bl), (teil(bein_r), 0, -br), (teil(kopf), 0, nick), (kb, 0, 0), (lu, 0, dy_l)])
     koerper_ges = U.kontur_schliessen(koerper_ges, UMRISS, KONTUR)
     fl = L.versetze(fl, 0, dy_l)
-    funken = FEUER.funken(i, dy=dy_l, leben=8)
-    figur = L.zusammen(H, W, [(koerper_ges, 0, 0), (fl, 0, 0), (funken, 0, 0)])
+    figur = L.zusammen(H, W, [(fl, 0, 0), (koerper_ges, 0, 0)])
     if nur == 'koerper':
         return figur
     sterne = L.leer(H, W)
