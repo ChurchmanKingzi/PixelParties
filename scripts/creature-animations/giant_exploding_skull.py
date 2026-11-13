@@ -102,8 +102,8 @@ AUGEN = [AUGE_L, AUGE_R]
 #   Bein 4: Hüfte unter dem Schädel (20–25, 42–44, fest), Bein x 20–24 Zeilen 45–52 (zeigt nach vorn/unten)
 # Schritt (Tippeln): der Oberschenkel schwenkt starr um die Hüfte nach oben (Spaltenversatz, Gefälle ≤ 1 px je Spalte, Hüftspalten bleiben am Schädel), Knie und Unterschenkel gehen als Ganzes mit (Fuß hebt sich
 # 2–3 px vom Boden), am höchsten Punkt schwenkt die Fußspitze 1 px nach außen (Zeilenversatz der untersten Zeilen), dann setzt der Fuß wieder auf. Nichts wird gestreckt oder gestaucht: jede Spalte/Zeile
-# behält ihre Pixel, das Bein bleibt überall so dick wie gemalt. Bein 4 (senkrecht, kein Bogen) beugt stattdessen das Knie nach außen (Zeilen 47 ff. weichen 1–2 px aus, der Fuß hebt sich 1–2 px; Beinlänge
-# entlang des Knicks bleibt ≈ gleich). Frame 0 = Original (alle acht Füße am Boden).
+# behält ihre Pixel, das Bein bleibt überall so dick wie gemalt. Bein 4 (senkrecht, kein Bogen, zeigt zum Betrachter) winkelt stattdessen ab Zeile 47 schräg nach außen ab (Zeilenversatz 1–2 px, weiter 3 px dick) und hebt
+# den Fuß 1–2 px (das nach vorn gehobene Bein erscheint entsprechend kürzer). Frame 0 = Original (alle acht Füße am Boden).
 SCHWARZ = _farbmaske(CA)
 _BEIN_L = {
     1: SCHWARZ & (((yy >= 17) & (yy <= 24) & (xx <= 16)) | ((yy >= 25) & (yy <= 31) & (xx <= 2))),
@@ -137,7 +137,7 @@ for _w, _folge in enumerate(FOLGE_BEINE):
         for _t in range(6):
             SCHRITT[_k][_w * 24 + 1 + 2 * _j + _t] = (_hub[_t], SCHRITT_AUS[_t])
 assert all(max(v) < N and 0 not in v for v in SCHRITT.values())
-BEIN4_KNICK = {0: None, 1: [0, 1, 1, 1, 0], 2: [1, 2, 2, 1]}                           # Ausweichen der 3-px-Zeilen ab Zeile 47 nach außen (Liste = verbleibende Zeilen; Fuß 1 bzw. 2 px höher)
+BEIN4_KNICK = {0: None, 1: [0, 1, 1, 1, 1], 2: [1, 1, 2, 2]}                           # Ausweichen der 3-px-Zeilen ab Zeile 47 nach außen (Liste = verbleibende Zeilen; Fuß 1 bzw. 2 px höher)
 
 
 def bein_pixel(nr, d, aus):
