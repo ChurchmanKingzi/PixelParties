@@ -1,0 +1,15 @@
+{
+  "creature": "Spirit of the Barbarian Sword",
+  "sheet": "spirit-of-the-barbarian-sword.png",
+  "frameWidth": 28,
+  "frameHeight": 42,
+  "frames": 48,
+  "frameMs": 65,
+  "loop": true,
+  "layout": "horizontal",
+  "padTop": 2,
+  "padLeft": 2,
+  "padRight": 2,
+  "padBottom": 2,
+  "faceX": 14.0
+}

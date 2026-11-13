@@ -138,3 +138,19 @@ def haupt(mod, karte, erlaubt=(), spalten=12, zoom=6):
     if prev:
         L.streifen(os.path.join(prev, fig.slug + '-strip.png'), frames, spalten=spalten, scale=zoom)
     return frames
+
+
+def schwenk(ebene, gelenk_x, s, maxd):
+    """Flügel (Ebene auf der Leinwand) als Ganzes um das Gelenk bei Leinwandspalte gelenk_x schwenken: jede Spalte wandert senkrecht um
+    round(s · min(1, Abstand/maxd)) px (positiv = abwärts). Spalten bleiben in sich ganz (kein Strecken, kein Knick); ClipError, wenn etwas herausragt."""
+    h, w = ebene.shape[:2]
+    out = L.leer(h, w)
+    for x in range(w):
+        ys = np.nonzero(ebene[:, x, 3])[0]
+        if not len(ys):
+            continue
+        dy = int(round(s * min(1.0, abs(x - gelenk_x) / float(maxd))))
+        if ys.min() + dy < 0 or ys.max() + dy >= h:
+            raise L.ClipError('Spalte %d würde um %d px aus der Leinwand geschoben' % (x, dy))
+        out[ys + dy, x] = ebene[ys, x]
+    return out

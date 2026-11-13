@@ -1,0 +1,15 @@
+{
+  "creature": "Yolomungandr, Ender of Coolness",
+  "sheet": "yolomungandr-ender-of-coolness.png",
+  "frameWidth": 88,
+  "frameHeight": 62,
+  "frames": 72,
+  "frameMs": 80,
+  "loop": true,
+  "layout": "horizontal",
+  "padTop": 2,
+  "padLeft": 4,
+  "padRight": 2,
+  "padBottom": 2,
+  "faceX": 44.0
+}

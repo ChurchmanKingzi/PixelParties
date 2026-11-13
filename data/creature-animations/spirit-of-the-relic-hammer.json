@@ -1,0 +1,15 @@
+{
+  "creature": "Spirit of the Relic Hammer",
+  "sheet": "spirit-of-the-relic-hammer.png",
+  "frameWidth": 44,
+  "frameHeight": 40,
+  "frames": 60,
+  "frameMs": 80,
+  "loop": true,
+  "layout": "horizontal",
+  "padTop": 2,
+  "padLeft": 2,
+  "padRight": 2,
+  "padBottom": 2,
+  "faceX": 22.0
+}

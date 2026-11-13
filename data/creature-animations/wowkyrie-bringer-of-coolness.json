@@ -1,0 +1,15 @@
+{
+  "creature": "Wowkyrie, Bringer of Coolness",
+  "sheet": "wowkyrie-bringer-of-coolness.png",
+  "frameWidth": 49,
+  "frameHeight": 39,
+  "frames": 48,
+  "frameMs": 70,
+  "loop": true,
+  "layout": "horizontal",
+  "padTop": 2,
+  "padLeft": 2,
+  "padRight": 2,
+  "padBottom": 2,
+  "faceX": 24.5
+}

@@ -1,0 +1,15 @@
+{
+  "creature": "The Spawn Mother",
+  "sheet": "the-spawn-mother.png",
+  "frameWidth": 33,
+  "frameHeight": 36,
+  "frames": 64,
+  "frameMs": 75,
+  "loop": true,
+  "layout": "horizontal",
+  "padTop": 2,
+  "padLeft": 2,
+  "padRight": 2,
+  "padBottom": 2,
+  "faceX": 16.5
+}

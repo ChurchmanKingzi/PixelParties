@@ -1,0 +1,15 @@
+{
+  "creature": "Haressassin",
+  "sheet": "haressassin.png",
+  "frameWidth": 44,
+  "frameHeight": 33,
+  "frames": 64,
+  "frameMs": 70,
+  "loop": true,
+  "layout": "horizontal",
+  "padTop": 3,
+  "padLeft": 2,
+  "padRight": 2,
+  "padBottom": 2,
+  "faceX": 22.0
+}

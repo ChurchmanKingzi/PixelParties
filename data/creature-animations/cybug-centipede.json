@@ -1,0 +1,15 @@
+{
+  "creature": "Cybug CENTIPEDE",
+  "sheet": "cybug-centipede.png",
+  "frameWidth": 78,
+  "frameHeight": 51,
+  "frames": 48,
+  "frameMs": 70,
+  "loop": true,
+  "layout": "horizontal",
+  "padTop": 2,
+  "padLeft": 2,
+  "padRight": 2,
+  "padBottom": 2,
+  "faceX": 39.0
+}

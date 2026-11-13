@@ -7,7 +7,7 @@ nach rechts gedrehtem Kopf und offenem Schnabel (nicht verwendet: Köpfe drehen 
 
 Was ist was (x/y im Sprite):
 * Geier, stehend, Flügel angelegt: dunkelviolette Flügel links und rechts (x 0–5 und 14–19, y 3–23) mit rosa Krallen an den Flügelenden (x 2–4 bzw. 15–17, y 20–21).
-* Kahler rosa Kopf (x 5–14, y 3–14) mit Schopffedern (y 0–3, dunkel), schwarzen Brauen, Augen (hellrosa/weiß (6, 8) und (13, 8), gelbe Iris (6, 9) und (13, 9), rot daneben (7, 9), (12, 9)),
+* Kahler rosa Kopf (x 5–14, y 3–14) mit Schopffedern (y 0–3, dunkel), schwarzen Brauen, Augen (hellrosa/weiß (6, 8) und (13, 8), gelbe Iris (6, 9) und (12, 9), rot daneben (7, 9), (13, 9)),
   orangefarbenem Hakenschnabel (x 9–10, y 11–14), darunter rosa Hals (x 9–10, y 15–17).
 * Weißlich-rosa Halskrause (x 6–13, y 15–18), dunkler olivgrauer Rumpf (x 3–16, y 15–27), dunkelrote Krallenfüße (y 26–30).
 
@@ -39,7 +39,7 @@ KOPF = FIG.op & ~FLUEGEL & (yy <= 14) & (xx >= 5) & (xx <= 14)
 REST = FIG.op & ~KOPF
 HAUT = FIG.f(8, 9)
 SPALT = FIG.f(9, 0)
-AUGEN = [(6, 8), (6, 9), (13, 8), (13, 9)]
+AUGEN = [(6, 8), (6, 9), (7, 9), (13, 8), (12, 9), (13, 9)]
 FEDERN = [(9, 0), (9, 1), (12, 0), (12, 1)]
 
 # Zellen, die der gereckte Kopf unten freigibt und unter denen etwas liegt → Fortsetzung

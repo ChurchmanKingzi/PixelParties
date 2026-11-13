@@ -1,0 +1,15 @@
+{
+  "creature": "Lamenting Knight",
+  "sheet": "lamenting-knight.png",
+  "frameWidth": 51,
+  "frameHeight": 35,
+  "frames": 72,
+  "frameMs": 75,
+  "loop": true,
+  "layout": "horizontal",
+  "padTop": 2,
+  "padLeft": 3,
+  "padRight": 2,
+  "padBottom": 2,
+  "faceX": 25.5
+}

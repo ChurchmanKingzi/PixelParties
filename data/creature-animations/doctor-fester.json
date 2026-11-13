@@ -1,0 +1,15 @@
+{
+  "creature": "Doctor Fester",
+  "sheet": "doctor-fester.png",
+  "frameWidth": 20,
+  "frameHeight": 27,
+  "frames": 48,
+  "frameMs": 75,
+  "loop": true,
+  "layout": "horizontal",
+  "padTop": 3,
+  "padLeft": 2,
+  "padRight": 2,
+  "padBottom": 2,
+  "faceX": 10.0
+}
