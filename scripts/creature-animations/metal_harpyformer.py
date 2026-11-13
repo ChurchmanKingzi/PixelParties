@@ -11,7 +11,7 @@ Aufruf:   python3 metal_harpyformer.py [--preview <ordner>]
 Ausgabe:  ../../data/creature-animations/metal-harpyformer.png + .json  (auf die Figur zugeschnitten, um die Ruhefigur zentriert)
 
 Identifikation (Sprite-Koordinaten x, y; die Teile trennt das Skript per Farbe und Bereich):
-* Feuerball (x 3–24, y 0–20; Rot (202,44,41), Orange (244,123,34), Gelb (246,231,14), Creme (247,245,184)): umhüllt das obere Gitarrenende; heller Kern in der Mitte. Wird NEU mit anim_feuer3.py gezeichnet (Runde 4).
+* Feuerball (x 3–24, y 0–20; Rot (202,44,41), Orange (244,123,34), Gelb (246,231,14), Creme (247,245,184)): umhüllt das obere Gitarrenende; heller Kern in der Mitte. Wird von Hand neu gezeichnet (Runde 6, `FEUER_ZYKLUS`).
 * Gitarre (x 8–23, y 14–28): rote Korpus-/Halsfläche (233,0,1) (210,0,1) (153,2,0) mit rosa Lichtpixeln (233,114,114); ein diagonaler Hals/Griffbrett-Streifen mit Schwarz-Weiß-Muster (26,33,39) (242,255,255)
   (172,177,179) läuft vom Feuer nach rechts unten zur rechten Hand; rotes Teil rechts (x 17–23, y 19–22); eine rote Säule (x 12–15, y 20–26) endet auf dem Kopf der Harpyie. Ohne Glanz (Saiten sind
   Schwarz-Weiß-Muster, kein erkennbares Metallglanz-Detail; im Zweifel weggelassen).
@@ -31,9 +31,9 @@ Ablauf (48 Frames à 65 ms = 3,12 s; Frame 0 = Ruhepose bis auf das neu gezeichn
 * Haarsträhnen unten (Runde 3, Rückmeldung „die Haare zucken seltsam“): statt Pixel zu stauchen/verdoppeln (das ließ sie zucken) pendeln sie jetzt ruhig als Ganzes nach außen und zurück (`strang_schwingen`): jede Zeile (Umriss, Füllung und die einzelnen
   Haarfransen außen) wandert starr um 0 … 2 px, die Auslenkung wächst gleichmäßig zur Spitze und folgt der Bewegung mit Nachlauf (Welle), das innerste Pixel bleibt am Körper, die Lücke füllt die Füllfarbe der Strähne. Links Periode 24,
   rechts Periode 16 (gegeneinander versetzt), nach innen nie über die Ruhelage hinaus; Änderungen höchstens 1 px je Zeile und alle 2–4 Frames.
-* Feuer (Runde 4, Rückmeldung „sehen die Flammen noch nicht wie richtige, sauber animierte Flammen aus“): klassischer Flammenzyklus mit Aufwärtsfluss aus `anim_feuer3` — eine breite, ruhige Glutbasis um den
-  Gitarrenkopf und 5 phasenversetzte Zungen (Tropfen mit verschachtelten Farbbändern Rot → Orange → Gelb → Creme), 8 Posen à 2 Frames (3 Zyklen je Schleife): Bäuche wandern von der Basis zur Spitze, die Spitzen
-  schnüren sich ab und steigen als kleine Fetzen weiter. Die Flamme neigt sich entgegen der Schwenkrichtung (Fahrtwind, ganzzahlig) und folgt dem Kippen der Gitarre. Die früheren Einzelfunken entfallen.
+* Feuer (Runde 6, Rückmeldung „sieht noch immer unnatürlich aus, animier die einmal ganz neu“): von Hand gezeichneter Frame-für-Frame-Zyklus (`FEUER_ZYKLUS`, 8 Bilder à 2 Frames, 3 Zyklen je Schleife), keine Formel mehr:
+  eine zusammenhängende Flammenmasse mit breiter Basis um den Gitarrenkopf und vier Zungen, die zeitversetzt wachsen, sich einschnüren und als Fetzen abreißen; verschachtelte Bänder Rot → Orange → Gelb → Creme.
+  Die Flamme geht starr mit dem Gitarrenkopf mit (ein ganzzahliger Versatz für das ganze Bild) und liegt hinter ihm.
 * Blinzeln: Frames 19–21 und 41–42, Lid = Hautfarbe (114,63,63) auf Iris und Pupille.
 
 Ergänzungen (Sprite-Koordinaten): Haaransatz unter dem Gitarrenfuß, den die Gitarre sonst verdeckt: (13,25) (14,25) (15,25) = Umrissfarbe (19,10,10), (14,26) = Haarfarbe (168,97,97). Das Feuer wird komplett neu gezeichnet
@@ -49,7 +49,6 @@ import numpy as np
 import anim_lib as L
 import anim_textur as TX   # texturierte Streckzeilen statt Zeilenkopien (Regel 43/49)
 import anim_flieger_b as B
-import anim_feuer3 as F3
 import anim_harpyb as HB
 import anim_amorph as A
 
@@ -108,19 +107,57 @@ UMRISS = {1: (45, 45, 45), 2: (45, 45, 45), 3: (19, 10, 10), 4: (19, 10, 10), 5:
 # 1/2 Flügel, 3/4 Strähnen, 5 Körper, 6 Gitarre (rot), 7 Feuer, 8 Gitarrenhals (Schwarz-Weiß-Muster/grau)
 HALS_FARBEN = [(242, 255, 255), (172, 177, 179), (26, 33, 39), (62, 56, 50), (102, 81, 74)]
 
-# ── Feuer (anim_feuer3.py: klassischer Flammenzyklus mit Aufwärtsfluss) ───────────────────────────────────────────────
-RAMPE = {'rand': ROT, 'rot': ROT, 'orange': ORANGE, 'gelb': GELB, 'hell': CREME}
-SPERRE = np.zeros((H, W), bool)
-SPERRE[PAD_T:PAD_T + sh, PAD_L:PAD_L + sw] = M_GITARRE & (yy <= 21)
-# Runde 4: klassischer Flammenzyklus mit Aufwärtsfluss (anim_feuer3): breite ruhige Glutbasis um den Gitarrenkopf + 5 phasenversetzte Zungen, 8 Posen à 2 Frames (3 Zyklen je Schleife)
-_F = lambda x, y, l, b, **k: F3.Flamme(PAD_L + x, PAD_T + y, l, b, **k)
-FLAMMEN3 = [_F(13.5, 14.5, 8, 9.5, bauch=0.22, schlag=0.35, phase=0.2, fuss=5.5),
-            _F(6.0, 13.0, 11, 3.2, phase=0.05, richtung=(-0.3, -1)),
-            _F(10.0, 11.0, 14, 3.4, phase=0.6, richtung=(-0.1, -1)),
-            _F(14.0, 11.0, 17, 4.0, phase=0.3),
-            _F(18.0, 11.5, 13, 3.4, phase=0.85, richtung=(0.12, -1)),
-            _F(21.5, 13.5, 10, 3.0, phase=0.45, richtung=(0.3, -1))]
-FEUER = F3.Feuer(H, W, FLAMMEN3, FLAMMEN, posen=16, halten=1)
+# ── Feuer (Runde 6): von Hand gezeichneter 8-Bilder-Zyklus, keine Formel ─────────────────────────────────────────────
+# Je Bild 28 Spalten (= Sprite-x 0…27) × 23 Zeilen (Sprite-y −4…18); r = Rot (außen), o = Orange, y = Gelb, w = Creme (Kern). Bilder durch | getrennt, Bild 1 = Ruhepose (nah am gemalten Feuer).
+# Vier Zungen (links x 2–8, Mitte-links x 7–13, Mitte x 11–17, rechts x 17–23) durchlaufen zeitversetzt denselben Lebenslauf: wachsen → neigen sich nach links → Hals schnürt sich ein →
+# Fetzen reißt ab, steigt 2 Bilder weiter und verschwindet → Stumpf wächst nach (Abriss: links Bild 2, Mitte Bild 4, Mitte-links Bild 6, rechts Bild 8). An beiden Flanken wandert je ein
+# 1-px-Bauch nach oben und geht in die äußere Zunge über; der Kern streckt sich mit der Mittelzunge. Unter dem Gitarrenkopf ist die Flamme durchgezeichnet (keine Lücke, wenn er kippt).
+FEUER_ZYKLUS = """
+............................|............................|............................|............................|...........rr...............|............................|.....rr.....................|............................
+.................rr.........|............................|.rr.........................|............................|...........rr...............|............................|.....rr.....................|............................
+.................rr.........|............r...............|.rr.........r...............|...........rrr..............|............................|......rr....................|............................|............................
+..rr.........r..............|.rrr........rr..............|............rr..............|...........rorr.............|.......rr...................|......rrr...................|............................|..................rr........
+..rrr........rr.............|.rorr.......ror.............|............ror.............|........rr..rrr.............|.......rrr..................|.......rrr.........r........|..................rr........|..rr..............ror.......
+..rorr.......ror............|..rrr.......roor............|.........r..roor............|........rrr.................|.......roor..........r......|...................rr.......|....r.............rrr.......|..rrr.........r...rrr.......
+...roor.....roor............|............roor............|.........rr..ror............|.........ror................|........ror.........rr......|...................ror......|....rr............roor......|...ror.......rrr............
+...roor.....rooor...........|..........r.rooor...........|..........rr.rr.............|.........ror.........r......|.........rr.........ror.....|.....r.............ror......|....ror.......r....ror......|...roor......roor...........
+....ror.....royor...........|..........rrroyor...........|..........rorror............|..........rorrr.....rr......|..........rr........ror.....|.....rr............roor.....|....roor.....rrr....rr......|...roor.....rooor...........
+.....ror..rrooyyor..........|......rr..rooyyyor..........|..........roooyor...rr......|..........rorror....ror.....|......rr..rorrrr...roor.....|.....ror..rr.rrr...roor.....|....roor....rooor...ror.....|....roor....royyor..rr......
+.....roor.rooyyyor..rr......|.....ror..royyyyor..........|......rr..royyyor...ror.....|..........rooyoor..roor.....|.....ror..rooooor..rooor....|.....roor.rooooor..rooor....|....rooor.rooyyyor.roor.....|....rooor..royyyor..ror.....
+....rooor.royyyyor.roor.....|.....roor.royyyyor..rrr.....|.....roor.royyyyor.roor.....|......rrr.royyyyor.rooor....|.....roor.royyyyor.royor....|....rooor.royyyyor.royor....|....royor.royyyyor.rooor....|....royor.royyyyor.roor.....
+.....roor.royyyyor.roor.....|.....roor.roywwyor.roor.....|.....roor.royyyyor.rooor....|.....roor.royyyyor.roor.....|....rooor.royyyyor.roor.....|....rooor.royyyyor.roor.....|.....roor.royyyyor.roor.....|.....roor.royyyyor.roor.....
+....royyoroyywwyyoroyor.....|....royyoroywwwyyoroyyor....|....royyoroyywwyyoroyyor....|...royyyoroyyyyyyyoroyor....|...royyyoroyyyyyyyoroyor....|....royyoroyyyyyyyoroyor....|....royyoroyyyyyyyoroyor....|....royyoroyyyyyyyoroyor....
+...royyyyoyyywwwyyoyyyor....|...royyyyoyywwwwyyoyyyor....|..royyyyyoyyywwwyyoyyor.....|..royyyyyoyyywwwyyoyyor.....|...royyyyoyyyyyyyyoyyor.....|...royyyyoyyyyyyyyoyyor.....|...royyyyoyyywwyyyoyyor.....|...royyyyoyyywwwyyoyyor.....
+....royyyyyywwwwwyyyyyyor...|...royyyyyyywwwwwyyyyyor....|...royyyyyyywwwwwyyyyyor....|....royyyyyywwwwwyyyyyor....|....royyyyyyywwwyyyyyyor....|....royyyyyywwwwwyyyyyor....|....royyyyyywwwwwyyyyyor....|....royyyyyywwwwwyyyyyyor...
+...royyyyyywwwwwwwyyyyor....|...royyyyyywwwwwwwyyyyor....|....royyyyywwwwwwwyyyyor....|....royyyyywwwwwwwyyyyor....|....royyyyywwwwwwwyyyyor....|....royyyywwwwwwwwwyyyor....|....royyyyywwwwwwwyyyyyor...|....royyyyywwwwwwwyyyyyor...
+....royyyywwwwwwwwwyyyor....|.....royyywwwwwwwwwyyyor....|.....royyywwwwwwwwwyyyor....|.....royyywwwwwwwwwyyyor....|.....royyywwwwwwwwwyyyor....|.....royyywwwwwwwwwyyyyor...|.....royywwwwwwwwwwyyyyor...|....royyyywwwwwwwwwyyyor....
+......royywwwwwwwwwwyyor....|......royywwwwwwwwwwyyor....|......royywwwwwwwwwwyyor....|......royywwwwwwwwwwyyor....|......royywwwwwwwwwwyyyor...|......royywwwwwwwwwwyyyor...|......royywwwwwwwwwwyyor....|......royywwwwwwwwwwyyor....
+.......royywwwwwwwwwyyor....|.......royywwwwwwwwwyyor....|.......royywwwwwwwwwyyor....|.......royywwwwwwwwwyyyor...|.......royywwwwwwwwwyyyor...|.......royywwwwwwwwwyyor....|.......royywwwwwwwwwyyor....|.......royywwwwwwwwwyyor....
+........royyyyyyyyyyyyor....|........royyyyyyyyyyyyor....|........royyyyyyyyyyyyor....|........royyyyyyyyyyyyor....|........royyyyyyyyyyyyor....|........royyyyyyyyyyyyor....|........royyyyyyyyyyyyor....|........royyyyyyyyyyyyor....
+.........roooooooooooor.....|.........roooooooooooor.....|.........roooooooooooor.....|.........roooooooooooor.....|.........roooooooooooor.....|.........roooooooooooor.....|.........roooooooooooor.....|.........roooooooooooor.....
+..........rrrrrrrrrrrr......|..........rrrrrrrrrrrr......|..........rrrrrrrrrrrr......|..........rrrrrrrrrrrr......|..........rrrrrrrrrrrr......|..........rrrrrrrrrrrr......|..........rrrrrrrrrrrr......|..........rrrrrrrrrrrr......
+"""
+FEUER_Y0 = -4                                              # Sprite-Zeile der obersten Rasterzeile
+_FARBE = {'r': ROT, 'o': ORANGE, 'y': GELB, 'w': CREME}
+
+
+def _feuer_bilder():
+    zeilen = [z.split('|') for z in FEUER_ZYKLUS.strip().split('\n')]
+    out = []
+    for k in range(8):
+        e = np.zeros((H, W, 4), np.uint8)
+        for r, z in enumerate(zeilen):
+            assert len(z) == 8 and len(z[k]) == sw
+            for x, c in enumerate(z[k]):
+                if c != '.':
+                    e[PAD_T + FEUER_Y0 + r, PAD_L + x] = _FARBE[c] + (255,)
+        out.append(e)
+    return out
+
+
+FEUER_BILDER = _feuer_bilder()
+FEUER_HALTEN = 2                                           # je Zyklusbild 2 Animationsframes (16 Frames = 1,04 s je Zyklus, 3 Zyklen je Schleife)
+Y_KOPF = 16                                                # Sprite-Zeile des Gitarrenkopfs: dessen Versatz übernimmt die ganze Flamme (starr)
 
 
 # ── Schwenk ─────────────────────────────────────────────────────────────────────────────────────────────────────────
@@ -246,9 +283,7 @@ def frame(i, partikel=True, nur=None):
         fl_r = HB.zeilen_schub(FL_R, arm_dx(a, 26, 31))
         str_l = strang_schwingen(STR_L, True, i, 24.0, 2.2)
         str_r = strang_schwingen(STR_R, False, i, 16.0, 2.0, lag=1.5)
-        feuer = FEUER.ebene(i, neigung=round(wind(i)))
-        feuer[SPERRE] = 0
-        feuer = A.verbinde4(HB.zeilen_schub(feuer, schub_fn(a, kippen(i), 16)))[0]
+        feuer = L.versetze(FEUER_BILDER[(i // FEUER_HALTEN) % 8], schub_fn(a, kippen(i))(PAD_T + Y_KOPF), 0)      # starr mit dem Gitarrenkopf
         gitarre = A.verbinde4(HB.zeilen_schub(GITARRE, schub_fn(a, kippen(i))))[0]
         m_hals = L.farbmaske(gitarre, HALS_FARBEN)
         hals = np.where(m_hals[..., None], gitarre, 0).astype(np.uint8)                 # Hals getrennt: eigene Umrissfarbe beim Randpixel-Test
@@ -257,7 +292,7 @@ def frame(i, partikel=True, nur=None):
         teile = [atmen_ebene(e, n1, n2) for e in (UNTER_L, UNTER_R, fl_l, fl_r, str_l, str_r, rest, gitarre, hals, feuer)]
         un_l, un_r, fl_l, fl_r, str_l, str_r, rest, gitarre, hals, feuer = teile
         schichten += [(un_l, 0, 0, 1), (un_r, 0, 0, 2), (fl_l, 0, 0, 1), (fl_r, 0, 0, 2), (str_l, 0, 0, 3), (str_r, 0, 0, 4), (rest, 0, 0, 5),
-                      (gitarre, 0, 0, 6), (hals, 0, 0, 8), (feuer, 0, 0, 7)]
+                      (feuer, 0, 0, 7), (gitarre, 0, 0, 6), (hals, 0, 0, 8)]                 # Feuer HINTER dem Gitarrenkopf (durchgezeichnet)
     f, karte = B.zusammen_mit_karte(H, W, schichten)
     B.umriss_je_ebene(f, karte, ERLAUBT, UMRISS)
     return f
