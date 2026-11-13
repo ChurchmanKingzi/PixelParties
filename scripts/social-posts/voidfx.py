@@ -41,7 +41,7 @@ class VoidShow(CaptionMixin):
         (7.0, 10.9, 'No effects, no *spells*. Try again, mage!'),
         (11.0, 14.8, 'An *area spell*? His *Interference* halves it. His allies? Not so lucky.'),
         (14.9, 18.3, 'One more cut, and the whole team of *mages* is *silenced*.'),
-        (18.5, 20.8, 'Null: *zero* spells, *zero* problems!'),
+        (18.4, 20.1, 'Null: *zero* spells, *zero* problems!'),
     ]
     SND = {
         'open':   [('elem_dark', -5), ('heavy_impact', -4)],
