@@ -74,7 +74,7 @@ _X, _Y = PL + FX + 12.5, PT + FY
 KEGEL = F3.Strahl(_X, _Y, 27, 0.9, 9.6, richtung=(0, 1), welle=13, bauch=0.13, schlag=0.7)
 # fünf Zungen am unteren Kegelende (Füße bei Zeile ~22–25 der Flammenebene), phasenversetzt, fließen nach unten und leicht nach außen; mittlere am längsten
 ENDE = [F3.Flamme(_X + dx, _Y + fy, l, b, richtung=(rx, 1), phase=ph, fuss=0, welle=11)
-        for (dx, fy, l, b, rx, ph) in [(-7.2, 23, 10, 3.0, -0.22, 0.0), (-3.8, 24, 13, 3.3, -0.1, 0.55), (0.0, 25, 15, 3.6, 0.0, 0.25), (3.8, 24, 13, 3.3, 0.1, 0.8), (7.2, 23, 10, 3.0, 0.22, 0.4)]]
+        for (dx, fy, l, b, rx, ph) in [(-7.6, 21, 11, 3.0, -0.25, 0.0), (-3.8, 24, 13, 3.3, -0.1, 0.55), (0.0, 25, 15, 3.6, 0.0, 0.25), (3.8, 24, 13, 3.3, 0.1, 0.8), (7.6, 21, 11, 3.0, 0.25, 0.4)]]
 FEUER = F3.Feuer(H, W, [KEGEL] + ENDE, [ROT, ORANGE, GELB, CREME], posen=8, halten=2)
 
 

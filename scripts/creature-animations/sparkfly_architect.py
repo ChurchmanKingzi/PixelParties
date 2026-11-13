@@ -21,6 +21,7 @@ Identifikation (Sprite-Koordinaten x, y; Fliege von vorn, spiegelsymmetrisch um 
 Ablauf (48 Frames à 60 ms = 2,88 s):
 * Kräftiger Flügelschlag: achtmal pro Schleife (Periode 6); jede Flügelspalte wandert senkrecht, je weiter außen desto mehr (Spitze etwa −4 … +4 px, hinkt nach), Textur bleibt,
   Spalten bleiben ganz (F.fluegel_welle, Zusammenhang erzwungen). Die Wurzelspalte steht fest, beide Flügel schlagen gleichzeitig (spiegelsymmetrisch).
+* Fühler (Runde 4): die dunkelgelben Pixel direkt am Kopf — (4,10),(5,10),(8,10),(7,11) links, (15,10),(16,10),(12,10),(13,11) rechts — sind die Fühler; sie bleiben fest am Kopf und schlagen NICHT mit den Flügeln.
 * Schwebe-Bob zweistufig bis 2 px nach oben (0 → 1 → 2 → 1 → 0, Periode 12) — die Biene schwebt als Ganzes.
 * Die Spitzhacke ist FEST mit der Biene verbunden (Nutzerfeedback Runde 2: „soll NICHT unabhängig von der Biene sein“): sie wird von der rechten unteren Beinspitze gehalten (Beinspitze (17,14) berührt
   den Stiel bei (18,15)) und bekommt in jedem Frame EXAKT denselben Versatz wie Körper, Beine und Flügelwurzeln (Bob), kein eigener Nachlauf, kein Klopfen, kein Seitenschwingen. Hand (Bein) und Werkzeug
@@ -56,8 +57,10 @@ werkzeug = L.farbmaske(spr, [ROT, ROT_D, GRAU, GRAU_D]) & (xx >= 17)
 # in (58,56,6) gehören noch zum Flügel (Alpha 179 in der Kunst) und wandern jetzt mit — vorher blieben sie bei gehobenen Flügeln über den Beinen stehen.
 SPITZE_L = (yy == 10) & (xx >= 4) & (xx <= 5)
 SPITZE_R = (yy == 10) & (xx >= 15) & (xx <= 16)
-wing_l = vorhanden & ~werkzeug & (((xx <= 6) & (yy <= 9)) | SPITZE_L)
-wing_r = vorhanden & ~werkzeug & (((xx >= 14) & (xx <= 20) & (yy <= 9)) | SPITZE_R)
+# Runde 4 (Nutzerfeedback: „die dunkelgelben Pixel direkt am Kopf sind die Fühler — die NICHT mit den Flügeln mitbewegen“): die Pixel (4,10),(5,10) / (15,10),(16,10) in (58,56,6) und die dunkelgelben
+# Pixel (8,10),(7,11) / (12,10),(13,11) sind die FÜHLER. Sie gehören zum Kopf (Körper-Ebene), bleiben in jedem Frame unverändert an ihm und machen nur den Schwebe-Bob mit. Die Flügel sind nur noch x ≤ 6 bzw. 14–20, y ≤ 9.
+wing_l = vorhanden & ~werkzeug & (xx <= 6) & (yy <= 9)
+wing_r = vorhanden & ~werkzeug & (xx >= 14) & (xx <= 20) & (yy <= 9)
 koerper = vorhanden & ~werkzeug & ~wing_l & ~wing_r
 assert int((wing_l | wing_r | koerper | werkzeug).sum()) == int(vorhanden.sum())
 
@@ -89,10 +92,6 @@ def frame(i, partikel=True, effekte=True):
     # Flügelschlag: Spitze etwa −4 … +4 px
     wl = F.fluegel_welle(wl, PAD_L + 6, 4.4, ph, potenz=1.0, nur_rechts=False, lauf=0.12, zusammenhang=True)
     wr = F.fluegel_welle(wr, PAD_L + 14, 4.4, ph, potenz=1.0, nur_rechts=True, lauf=0.12, zusammenhang=True)
-    if not (wl[PAD_T + 10, PAD_L + 4, 3] or wl[PAD_T + 10, PAD_L + 5, 3]):        # Flügelspitze links nicht mehr über dem Bein → Einfärbung weg
-        F.setze(kp, PAD_L, PAD_T, {p: SCHWARZ for p in TINT_L})
-    if not (wr[PAD_T + 10, PAD_L + 15, 3] or wr[PAD_T + 10, PAD_L + 16, 3]):
-        F.setze(kp, PAD_L, PAD_T, {p: SCHWARZ for p in TINT_R})
     wl, wr, kp = (L.versetze(a, 0, bob) for a in (wl, wr, kp))
     # Werkzeug: starr (Drehung zerreißt die dünnen Diagonalen) und fest mit der Biene verbunden: derselbe Versatz wie der Körper (die Hand ist die rechte untere Beinspitze)
     wz = L.versetze(wz, 0, bob)

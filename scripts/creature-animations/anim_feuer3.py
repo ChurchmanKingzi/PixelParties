@@ -90,6 +90,7 @@ class Strahl:
         vc = np.clip(v, 0, 1)
         th = 2 * math.pi * (a / self.welle - self.umlauf * tau + self.phase)
         hw = (self.b0 + (self.b1 - self.b0) * vc) * (1.0 + self.bauch * np.minimum(1.0, 2.5 * vc) * np.cos(th))
+        hw = hw * np.sqrt(np.clip(1.0 - (np.clip((vc - 0.8) / 0.2, 0, 1)) ** 2, 0, 1))     # Ende abgerundet (keine Ecken neben den Endzungen)
         mitte = self.schlag * vc * np.sin(th + 1.0) + neigung * vc ** 1.5
         einzug = self.einzug or [0.0, 1.1, 2.4, 3.9, 5.2][:nb]
         d = hw - np.abs(c - mitte)
