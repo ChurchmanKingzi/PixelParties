@@ -715,7 +715,8 @@
       if (!arrows.length) return false;
       PF.init();
       const einzel = !!P.einzel;                                               // Archer: ein einzelner Pfeil von der Zone der Kreatur (ohne HUD/Zahlen: Schaden, HP-Anzeige und Blitz kommen vom Zustandsvergleich beim Einschlag)
-      // ★ VERMERK: Creatures sind noch nicht animiert — der Pfeil startet von der Support-Zone des Archers. Sobald es animierte Creature-Sprites gibt, die Quelle auf deren Sprite umstellen.
+      // Creature als Quelle (Archer): steht ihre Idle-Figur auf der Zone (`zone._ppFigurPlatz`, Creature-Idle-Animationen), startet der Pfeil an der FIGUR — Standpunkt Zonenmitte,
+      // Höhe ≈ 60 % der Figurenhöhe (`figZ`, unten); ohne Figur (keine Animation, Figuren aus, eingefahren) wie bisher knapp über der Karte der Support-Zone.
       const srcEl = P.srcKind === 'creature' ? zone({ kind: 'creature', owner: P.srcOwner, heroIdx: P.srcHeroIdx, zoneSlot: P.srcZoneSlot }, myIdx) : zone({ kind: 'hero', owner: P.srcOwner, heroIdx: P.srcHeroIdx }, myIdx), tgtEl = zone(P.tgt, myIdx);
       if (!srcEl || !tgtEl) return false;
       const sr = srcEl.getBoundingClientRect(), tr = tgtEl.getBoundingClientRect();
@@ -724,6 +725,18 @@
       const n = arrows.length, lod = (n > 8 || phone) ? 1 : 0;
       const hzEl0 = (einzel || P.srcKind === 'creature') ? document.querySelector('[data-hero-zone]') : null;
       const zoneH = Math.max(hzEl0 ? hzEl0.getBoundingClientRect().height : sr.height, 40), S = (typeof ppFxZelle === 'function' ? ppFxZelle(tgtEl) : kl(rd(zoneH / ZELLEN_JE_KARTE), 2, 6)), u = zoneH / WELT_JE_KARTE;   // Rasterzelle = Hero-Pixel des Ziels (vorher aus der Zonenhöhe)   // u: Bildschirmpixel je Welteinheit
+      const figZ = (() => {
+        if (P.srcKind !== 'creature') return null;
+        try {
+          const pl = srcEl._ppFigurPlatz;
+          if (!pl || !pl.isConnected || pl.style.display === 'none' || pl.classList.contains('hero-idle-weg') || pl.classList.contains('hero-idle-unsichtbar')) return null;
+          const cv = pl.querySelector('canvas.hero-idle-canvas'), e = pl._ppEintrag;
+          if (!cv || !e || !e.kern || !e.meta) return null;
+          const r = cv.getBoundingClientRect(), fuss = typeof e.meta.footY === 'number' ? e.meta.footY : e.kern.y1;
+          const h = (fuss - e.kern.y0) * (r.height / e.meta.frameHeight);
+          return h > 0 ? kl(0.6 * h / u, 10, 80) : null;
+        } catch (err) { return null; }
+      })();
       const fo = window.ppFxScrollOffset ? window.ppFxScrollOffset() : { dx: 0, dy: 0 };
       const welt = !!window.ppFxWeltSchicht;
       const sx0 = sr.left + fo.dx, sy0 = sr.top + fo.dy, tx0 = tr.left + fo.dx, ty0 = tr.top + fo.dy;
@@ -752,7 +765,7 @@
       const per = verteilung(P.total, n);
       const plan = PF.plan({
         kinds: arrows.map((a) => KIND[a.n]), total: P.total, perArrow: per, seed: (P.seed || 1) + 1, windup: einzel ? 0.1 : 0.26,
-        A: { x: acx + dir * (P.srcKind === 'creature' ? 8 : 22), y: acy + (P.srcKind === 'creature' ? 6 : 34), z: P.srcKind === 'creature' ? 26 : 58 }, B: { x: bcx, y: bcy + feet, z: zHit, rx: Math.min(60, wzU * 0.36), ry: Math.min(14, hzU * 0.09), zr: Math.min(30, hzU * 0.18), zTop },
+        A: { x: acx + dir * (P.srcKind === 'creature' ? 8 : 22), y: acy + (P.srcKind === 'creature' ? (figZ != null ? 0 : 6) : 34), z: P.srcKind === 'creature' ? (figZ != null ? figZ : 26) : 58 }, B: { x: bcx, y: bcy + feet, z: zHit, rx: Math.min(60, wzU * 0.36), ry: Math.min(14, hzU * 0.09), zr: Math.min(30, hzU * 0.18), zTop },
         fMin: einzel ? 0.62 : (n > 8 ? 0.58 : 0.55), fMax: einzel ? 0.62 : (n > 8 ? 0.85 : 0.82), fan: einzel ? 20 : (n > 8 ? 85 : 62),
       });
       // Anzeige-Status je Pfeil (Engine-Daten) statt Prototyp-Annahme

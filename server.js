@@ -4029,6 +4029,37 @@ app.get('/api/hero-animations', async (req, res) => {
   res.json({ animations });
 });
 
+// ===== CREATURE-IDLE-ANIMATIONEN =====
+// Gegenstück zu `/api/hero-animations` für `data/creature-animations/`. Schlüssel ist der Slug des KARTENNAMENS aus dem Feld `creature`
+// (nicht der Dateiname: `demons-gate.json` gehört zu „Demon's Gate" = `demon-s-gate`, `fruit-bat.json` zu „Fruit Bat, Nosferapple").
+// Einträge ohne Sheet kommen nur durch, wenn sie `kopiert` tragen (Clone zeigt die Figur des Heroes seiner Spalte).
+const CREATURE_ANIM_DIR = path.join(__dirname, 'data', 'creature-animations');
+const animSlug = (n) => String(n || '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+app.get('/api/creature-animations', async (req, res) => {
+  const animations = {};
+  try {
+    const files = (await fs.promises.readdir(CREATURE_ANIM_DIR)).filter(f => f.endsWith('.json'));
+    await Promise.all(files.map(async (f) => {
+      try {
+        const meta = JSON.parse(await fs.promises.readFile(path.join(CREATURE_ANIM_DIR, f), 'utf-8'));
+        const key = animSlug(meta.creature) || f.replace(/\.json$/, '');
+        if (typeof meta.sheet !== 'string' || !meta.sheet) {
+          if (meta.kopiert) animations[key] = { creature: meta.creature, sheet: null, kopiert: meta.kopiert };
+          return;
+        }
+        const st = await fs.promises.stat(path.join(CREATURE_ANIM_DIR, meta.sheet));
+        if (!(meta.frameWidth > 0 && meta.frameHeight > 0 && meta.frames > 0)) return;
+        animations[key] = {
+          ...meta,
+          sheetUrl: '/data/creature-animations/' + encodeURIComponent(meta.sheet) + '?v=' + Math.floor(st.mtimeMs),
+        };
+      } catch {}
+    }));
+  } catch {}
+  res.set('Cache-Control', 'no-cache');
+  res.json({ animations });
+});
+
 // ===== SHOP SYSTEM =====
 // ★ v1384 (Als Vorgabe 24.9.): alle Shop-Preise auf das FUENFFACHE —
 // Gegenstueck zum Wegfall der SC-Tageskappe und den vielen neuen

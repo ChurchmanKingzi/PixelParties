@@ -26701,3 +26701,12 @@ Humanoiden-Köpfe nie seitlich; nichts schwebt, was nicht fliegt; Helme/Masken b
 The Master's Spy. Für sie gibt es weder Kunst in `data/card-art/native` / `public/cardgen/art` noch einen Eintrag in `data/subject-masks.json` noch eine passend benannte
 Motiv-Ebene. Vorgehen dann: Maske × Kunst = Sprite (`rle` beginnt mit Hintergrund; nennt `src` eine Motiv-Ebene, lieber die ganze Figur aus der Ebene nehmen),
 am Kartenrand Abgeschnittenes im Stil der Figur fertigzeichnen, Skript wie oben. Der Client muss ohne Animation auf das Kartenbild zurückfallen.
+
+**Anbindung im Spiel:** Server `GET /api/creature-animations` (`server.js`, wie `/api/hero-animations`; Schlüssel = Slug des Feldes `creature`, nicht der Dateiname;
+Einträge ohne Sheet nur mit `kopiert`). Client `public/app-board.jsx`: dieselbe Maschine wie die Helden — `HeroIdleAnims` (Liste `ladeKreaturListe`, Cache-Schlüssel `c:<slug>`,
+`hatKreaturAnimation`, `kopiertHeld`) und `HeroIdleSprite` mit `kreatur` (gleiche Sprite-Ebene, gleicher Maßstab 2,8125 × `--board-scale`, gleicher Takt). Platzierung: Mitte `faceX`,
+Standlinie `frameHeight − padBottom`; mit `kern` Mitte `kern.x + kern.w/2` und Standlinie `kern.y + kern.h` (`kreaturMeta`). `deckkraft` < 1 wird beim Laden per Bayer-Raster
+ausgedünnt (`ausduennen`). Eine Figur bekommt nur die offene Einzelkreatur einer Support-Zone (nicht: verdeckt, `_dying`, Rammflug/Abflug, Stapel, Nest, angelegter Held, Mimik/Kopie,
+Illusion) sowie die Kreatur auf einem Helden (Hulijing, `hero.heldKreatur`); sonst bleibt die Karte. Die Karte behält ihre Status-Overlays, die Figur zeigt Stillstand, Eis, Stein und
+Tönungen. Clone zeigt die Figur des Heroes seiner Spalte (`heldFigurName`, samt Skin). Figuren in Support-Zonen fahren ein, wenn der Zeiger auf ihrer oder einer von ihnen verdeckten
+belegten Zone steht. Die Zone kennt ihre Figur wie bei Helden (`zone._ppFigurPlatz`, Klasse `hero-idle-platz hero-idle-kreatur`, `data-kreatur`).
