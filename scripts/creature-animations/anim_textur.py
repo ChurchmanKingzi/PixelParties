@@ -14,6 +14,7 @@ import numpy as np
 import anim_lib as L
 
 D_LINIE = 22          # Helligkeitsabstand, ab dem ein Pixel als „dunkle Linie“ gegenüber den Zeilen darüber/darunter gilt
+D_AEHNLICH = 64       # bis zu diesem Helligkeitsabstand gelten zwei Pixel als „gleiches Material“ (Schattierungsstufen)
 LANG = 5              # ab dieser Lauflänge gilt eine Abweichung als „anderes Muster“ (und eine Übereinstimmung als Kopie)
 
 
@@ -114,10 +115,32 @@ def zwischenzeile(form, nah, fern=None, nah2=None, k=1, fern2=None):
     ok_fern = (inn & _innen(fern) & ~_linie(fern, form, fern2)) if fern is not None else np.zeros(len(form), bool)
     # 1. kurze Abweichungen zur Zeile, an die die Kopie grenzt: Schattierungsgrenze auf halbem Weg
     neu, lang = _mische(form, nah, ok_nah, k, nur_kurz=True)
-    # 2. lange Abweichungen (anderes Muster): Muster der gestreckten Zeile mit ihrer anderen Nachbarzeile fortsetzen
-    if fern is not None and lang.any():
-        m2, _ = _mische(form, fern, ok_fern & lang, k)
-        neu[lang] = m2[lang]
+    # 2. lange Abweichungen: (a) Schattierung zur angrenzenden Zeile hin verjüngen – die Enden jedes Farbabschnitts der gestreckten Zeile
+    #    nehmen die Farbe der angrenzenden Zeile an (nur bei ähnlicher Helligkeit, also gleichem Material); (b) wo danach noch ≥ LANG px
+    #    gemusterte Kopie stehen (Schuppen, Dither: kurze Abschnitte), das Muster mit der anderen Nachbarzeile fortsetzen (2-px-Wechsel)
+    lf = _lum(form)
+    aehn_nah = ok_nah & (np.abs(_lum(nah) - lf) <= D_AEHNLICH)
+    for x0, x1 in _laeufe(lang):
+        s0 = x0
+        while s0 < x1:
+            s1 = s0
+            while s1 < x1 and not (form[s1, :3] != form[s0, :3]).any():
+                s1 += 1
+            n = s1 - s0
+            e = 0 if n < 3 else (1 if n < 6 else 2)
+            for x in list(range(s0, s0 + e)) + list(range(s1 - e, s1)):
+                if aehn_nah[x]:
+                    neu[x] = nah[x]
+            s0 = s1
+        if fern is not None:
+            rest = np.zeros(len(form), bool)
+            rest[x0:x1] = ~_ungleich(neu[x0:x1], form[x0:x1])
+            for r0, r1 in _laeufe(rest):
+                if r1 - r0 >= LANG and len({tuple(p) for p in form[r0:r1, :3].tolist()}) >= 2:
+                    okf = ok_fern & (np.abs(_lum(fern) - lf) <= D_AEHNLICH)
+                    okf[:r0] = False; okf[r1:] = False
+                    m2, _ = _mische(form, fern, okf, k)
+                    neu[r0:r1] = m2[r0:r1]
     # 3. dunkle waagerechte Linien der gestreckten Zeile nicht verdoppeln (außer sie laufen schräg in die Nachbarzeile weiter)
     lin = _linie(form, nah, fern) & inn
     if lin.any():
