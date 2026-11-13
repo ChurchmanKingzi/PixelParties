@@ -41,6 +41,8 @@ import sys
 import numpy as np
 
 import anim_lib as L
+import anim_textur as TX   # texturierte Streckzeilen statt Zeilenkopien (Regel 43/49)
+TX.umleiten()               # auch Streckaufrufe innerhalb der Gruppenmodule liefern texturierte Zeilen
 import anim_tiere as T
 import anim_tier as G
 
@@ -110,7 +112,7 @@ def bein_ebene(maske, i, versatz, hub):
     t = G.zeilen_versatz(t, rows)
     if lift:
         t = L.heben_unten(t, PAD_T + 19, lift)
-    return L.streck_zeile(t, PAD_T + 19, hub) if hub else t           # Rumpf höher → Beine länger, Füße bleiben am Boden
+    return TX.streck_zeile(t, PAD_T + 19, hub) if hub else t           # Rumpf höher → Beine länger, Füße bleiben am Boden
 
 
 def glanz(f, i):

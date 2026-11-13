@@ -42,6 +42,8 @@ import numpy as np
 import anim_gbb as G
 import anim_humanoide as Hm
 import anim_lib as L
+import anim_textur as TX   # texturierte Streckzeilen statt Zeilenkopien (Regel 43/49)
+TX.umleiten()               # auch Streckaufrufe innerhalb der Gruppenmodule liefern texturierte Zeilen
 
 N, MS = 48, 80
 PAD_L, PAD_R, PAD_T, PAD_B = 4, 4, 5, 3
@@ -105,7 +107,7 @@ def frame(i):
     k = Hm.folge(i, 22, [1, 2, 1], N)
     if k:
         Hm.setze(kp, {p: GESICHT for p in (AUGEN['o'] + (AUGEN['u'] if k == 2 else []))}, OFF)
-    kp = L.streck_zeile(kp, PAD_T + 27, r)
+    kp = TX.streck_zeile(kp, PAD_T + 27, r)
     # ── Arme: Hände heben/senken 1 px ──
     al, ar = ebene(arm_l), ebene(arm_r)
     dl = int(round(np.sin(L.sinus(i, 24)) * 1.2))

@@ -35,6 +35,8 @@ from PIL import Image
 
 import anim_humanoide as Hm
 import anim_lib as L
+import anim_textur as TX   # texturierte Streckzeilen statt Zeilenkopien (Regel 43/49)
+TX.umleiten()               # auch Streckaufrufe innerhalb der Gruppenmodule liefern texturierte Zeilen
 import anim_schach as Sc
 
 N, MS = 72, 62
@@ -87,7 +89,7 @@ def frame(i, nur=None):
     unterarm = L.versetze(eb(E22), 0, arm_dy)
     faust = L.versetze(eb(E20, FAUST), 0, arm_dy)
     # Rumpf + Kopf: Atmen über die Hosenzeile 24
-    rumpf = Hm.atmen(eb(E20, RUMPF), OFF[1] + 22, OFF[1] + 12, hub, 0)
+    rumpf = TX.atmen(eb(E20, RUMPF), OFF[1] + 22, OFF[1] + 12, hub, 0)
     arm_r = L.versetze(eb(E20, ARM_R), 0, -hub)
     maske = L.versetze(eb(E19), 0, -hub)
     fl, fr = eb(E20, FUSS_L), eb(E20, FUSS_R)       # Runde 4: Füße stehen fest (kein Fußtippen/-wippen mehr)

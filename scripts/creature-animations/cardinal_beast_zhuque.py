@@ -40,12 +40,15 @@ import numpy as np
 import anim_flieger as F
 import anim_lib as L
 import anim_flieger_r3 as R3
+import anim_r4_fluegel as AR
+import anim_r5_fluegel2 as R5
 
 N, MS = 48, 70
 BEAT, DOWN, UP = 16, 6, 10
-P0 = DOWN + 0.60 * UP                                   # Frame 0: Aufschlag bei 26 % des Hubs (Originalpose)
-HUB = math.radians(95.0)                                # Gesamthub (oben 25° über der Ruhelage, unten 70° darunter)
-GPL, GPR, GPT, GPB = 16, 16, 12, 26
+AUF, AB = 25.0, 55.0                                    # Runde 5: Vorderkante hebt sich bis 25° über die Ruhelage und senkt sich bis 55° darunter (dann etwa waagerecht)
+HUB = AUF + AB
+P0 = DOWN + (math.acos(2.0 * AUF / HUB - 1.0) / math.pi) * UP    # Frame 0: Aufschlag an der Stelle, an der der Fächer genau die Originalpose ist
+GPL, GPR, GPT, GPB = 16, 16, 14, 8
 
 spr = L.lade('cardinal-beast-zhuque')
 sh, sw = spr.shape[:2]
@@ -55,15 +58,20 @@ vorhanden = L.deckend(spr)
 UMRISS = F.umriss_farben(spr)
 DUNKEL, BRAUN = (111, 19, 8), (123, 62, 0)
 
+# Runde 5 (Nutzer: „Unten entstehen jetzt sehr große Lücken zwischen Flügeln und Körper.“): Die Flügel werden nicht mehr starr um die Schulter gedreht (dabei schwenkte der untere, am Rumpf
+# angewachsene Flügelteil vom Körper weg), sondern GEFÄCHERT (anim_r5_fluegel2.faechern): Gelenk am oberen Ende des Flügelansatzes ((25,5|24) links, (32,5|24) rechts; der Sprite ist um x = 29
+# spiegelgleich, Körper x 26–32), die Körperkante des Flügels (vom Gelenk senkrecht nach unten) bleibt stehen, die Vorderkante schwingt als Ganzes um das Gelenk, alle Federn dazwischen folgen
+# anteilig. So liegt der Flügel in JEDER Pose auf ganzer Länge am Rumpf an. Die Federn hinter Unterleib/Fängen (x 22–36, y ≥ 33) stehen zusätzlich im Flügel-Layer (Federtextur des Originals),
+# damit auch dort nie Hintergrund frei wird.
+ACHSE2 = sw - 1                                          # Spiegelachse x = 29
 wing_l = vorhanden & (xx <= 25)
-wing_r = vorhanden & (xx >= 34)
+wing_r = vorhanden & (xx >= ACHSE2 - 25)
 koerper_m = vorhanden & ~wing_l & ~wing_r
-PIV_L, PIV_R = (25.0, 27.0), (33.0, 27.0)                # Schultergelenke (Sprite) — Runde 4: direkt am Körperrand (Körper x 26–33)
-R_SCHULTER = 3.0                                         # Runde 4 („Die Flügel beginnen näher am Körper“): nur noch ein 3-px-Gelenkkern bleibt stehen (vorher 9 px), der ganze Flügel ab Körperansatz schlägt
-KRALLE_M = L.farbmaske(spr, [(55, 59, 70), (68, 73, 79), (90, 90, 92), (35, 12, 0)]) | (vorhanden & (xx >= 22) & (xx <= 37) & (yy >= 33))   # Fänge + Unterleib dazwischen: gehören zum Körper, schlagen nie mit
-sch_l = wing_l & ((xx - PIV_L[0]) ** 2 + (yy - PIV_L[1]) ** 2 <= R_SCHULTER ** 2) | (wing_l & (xx >= 24) & (yy >= 24)) | (wing_l & KRALLE_M)
-sch_r = wing_r & ((xx - PIV_R[0]) ** 2 + (yy - PIV_R[1]) ** 2 <= R_SCHULTER ** 2) | (wing_r & (xx <= 35) & (yy >= 24)) | (wing_r & KRALLE_M)
-fl_l_m, fl_r_m = wing_l & ~sch_l, wing_r & ~sch_r
+PIV_L, PIV_R = (25.5, 24.0), (ACHSE2 - 25.5, 24.0)
+KRALLE_F = L.farbmaske(spr, [(55, 59, 70), (68, 73, 79), (90, 90, 92), (35, 12, 0)])
+UNTERLEIB = vorhanden & (xx >= 22) & (xx <= ACHSE2 - 22) & (yy >= 33)
+fl_l_m, fl_r_m = wing_l & ~KRALLE_F, wing_r & ~KRALLE_F
+WINKEL0 = math.degrees(math.atan2(25.5 - 8.0, 24.0 - 1.0)) + 90.0     # Winkel der Vorderkante zur Körperkante in der Ruhelage (≈ 127°)
 
 
 def teil(m):
@@ -71,7 +79,7 @@ def teil(m):
     return L.platz(t, H, W, GPL, GPT)
 
 
-FL_L, FL_R, KP0 = teil(fl_l_m), teil(fl_r_m), teil(koerper_m | sch_l | sch_r)
+FL_L, FL_R, KP0 = teil(fl_l_m), teil(fl_r_m), teil(koerper_m | KRALLE_F | UNTERLEIB)
 assert (L.zusammen(H, W, [(FL_L, 0, 0), (FL_R, 0, 0), (KP0, 0, 0)])[GPT:GPT + sh, GPL:GPL + sw] == spr).all()
 
 
@@ -94,27 +102,42 @@ def welle(t):
 
 
 def winkel(t):
-    """Drehwinkel des LINKEN Flügels (rad; negativ = gegen den Uhrzeigersinn = Flügel schlägt nach unten); 0 bei Frame 0."""
-    return -HUB * (welle(t) - welle(0))
+    """Auslenkung der Flügelvorderkante in Grad (positiv = gehoben, negativ = gesenkt); 0 bei Frame 0."""
+    return AUF - HUB * welle(t)
+
+
+def faktor(t):
+    """Fächerfaktor: Winkel jeder Feder zur Körperkante × faktor (1 = Original)."""
+    w = winkel(t)
+    return 1.0 if abs(w) < 0.5 else (WINKEL0 + w) / WINKEL0
 
 
 def bob(t):
-    """Körper hebt sich kurz nach dem Abschlag (bis 2 px, ganzzahlig, nur nach oben); Frame 0 = 0."""
-    return -int(round(2.0 * (welle(t - 1.5) - welle(-1.5)) / (1.0 - welle(-1.5))))
+    """Schweben: der ganze Vogel steigt kurz nach dem Abschlag und sinkt beim Aufschlag (Hub 2 px, ganzzahlig); Frame 0 = 0."""
+    return int(round(2.0 * welle(-1.5))) - int(round(2.0 * welle(t - 1.5)))
 
 
-def schwebe_kralle(t):
-    return -int(round(2.0 * (welle(t - 2.5) - welle(-2.5)) / (1.0 - welle(-2.5))))
+_fl_cache = {}
+
+
+def fluegel(t):
+    k = round(faktor(t), 4)
+    if k not in _fl_cache:
+        wl = R5.faechern(FL_L, GPL + PIV_L[0], GPT + PIV_L[1], k, 1)
+        if k != 1.0:
+            wl = R5.glatt(wl)
+        _fl_cache[k] = (wl, AR.spiegeln(wl, 2 * GPL + ACHSE2))            # rechter Flügel = exaktes Spiegelbild
+    return _fl_cache[k]
 
 
 def frame_gross(i, nur=None):
-    ang = winkel(i)
-    wl = F.drehen(FL_L, GPL + PIV_L[0], GPT + PIV_L[1], ang, glatt=True)
-    wr = F.drehen(FL_R, GPL + PIV_R[0], GPT + PIV_R[1], -ang, glatt=True)
+    wl, wr = fluegel(i)
     b = bob(i)
-    f = L.zusammen(H, W, [(L.versetze(wl, 0, b), 0, 0), (L.versetze(wr, 0, b), 0, 0), (L.versetze(KP0, 0, b), 0, 0)])
-    f = R3.luecken_fuellen(f, 8, ausser=np.roll(ORIG_LOECHER, b, axis=0))                          # Nähte zwischen starrer Schulter und gedrehtem Flügel: keine Hintergrundpixel in der Figur
-    F.umranden(f, [L.versetze(wl, 0, b), L.versetze(wr, 0, b), L.versetze(KP0, 0, b)], UMRISS, BRAUN, DUNKEL, DUNKEL)
+    wl, wr, kp = L.versetze(wl, 0, b), L.versetze(wr, 0, b), L.versetze(KP0, 0, b)
+    f = L.zusammen(H, W, [(wl, 0, 0), (wr, 0, 0), (kp, 0, 0)])
+    f = R3.luecken_fuellen(f, 8, ausser=np.roll(ORIG_LOECHER, b, axis=0))
+    if faktor(i) != 1.0:
+        F.umranden(f, [wl, wr], UMRISS, BRAUN, DUNKEL, DUNKEL)
     return f
 
 

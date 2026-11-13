@@ -56,6 +56,8 @@ import sys
 import numpy as np
 
 import anim_lib as L
+import anim_textur as TX   # texturierte Streckzeilen statt Zeilenkopien (Regel 43/49)
+TX.umleiten()               # auch Streckaufrufe innerhalb der Gruppenmodule liefern texturierte Zeilen
 import anim_tiere as T
 import anim_tier as G
 
@@ -134,9 +136,9 @@ def frame(i, nur=None):
     spitze_s = L.spalten_welle(spitze_s, PAD_L + 5, 1.4, 2 * np.pi * i / 27.0 + 0.6, potenz=1.0, nur_rechts=False, lauf=0.6)
     schal = L.zusammen(H, W, [(rumpf_s, 0, 0), (spitze_s, 0, 0)])   # Frame 0 = Original
     # Atmen: Zeile 12 einfügen, alles darüber steigt
-    hund = L.streck_zeile(hund, PAD_T + ZEILE, atem)
-    schal = L.streck_zeile(schal, PAD_T + ZEILE, atem)
-    kdet = L.streck_zeile(kdet, PAD_T + ZEILE, atem)
+    hund = TX.streck_zeile(hund, PAD_T + ZEILE, atem)
+    schal = TX.streck_zeile(schal, PAD_T + ZEILE, atem)
+    kdet = TX.streck_zeile(kdet, PAD_T + ZEILE, atem)
     cols = np.arange(W)[None, :]
     rows = np.arange(H)[:, None]
     # Pfoten: die Fußzeile (Zeile 15) des Standbeins entfällt, die Fußlinie rückt hoch

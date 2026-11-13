@@ -39,6 +39,8 @@ from PIL import Image
 
 import anim_humanoide as Hm
 import anim_lib as L
+import anim_textur as TX   # texturierte Streckzeilen statt Zeilenkopien (Regel 43/49)
+TX.umleiten()               # auch Streckaufrufe innerhalb der Gruppenmodule liefern texturierte Zeilen
 import anim_schach as Sc
 
 N, MS = 48, 70
@@ -112,7 +114,7 @@ def frame(i, nur=None):
     hub = Hm.stufe(i, 16, 1)
     dh, dt = BOGEN.get(i % N, (0, 0))
     # Rumpf (ohne Kopf): Atmen über die Hosenzeile 26
-    kb = Hm.atmen(eb(E29, RUMPF), OFF[1] + 26, OFF[1] + 12, hub, 0)
+    kb = TX.atmen(eb(E29, RUMPF), OFF[1] + 26, OFF[1] + 12, hub, 0)
     # Ärmel: Enden (y 21–24) pendeln einwärts
     al, ar = eb(E29, ARM_L), eb(E29, ARM_R)
     if Hm.folge(i, 34, [1] * 10, N):
@@ -122,7 +124,7 @@ def frame(i, nur=None):
     al, ar = L.versetze(al, 0, -hub), L.versetze(ar, 0, -hub)
     rumpf = L.zusammen(H, W, [(kb, 0, 0), (al, 0, 0), (ar, 0, 0)])
     if dt:
-        rumpf = L.streck_zeile(rumpf, OFF[1] + 23 - hub, -dt)          # Zeile 23 entfällt: Schultern, Arme und die Hand vor der Brust sinken starr um 1 px
+        rumpf = TX.streck_zeile(rumpf, OFF[1] + 23 - hub, -dt)          # Zeile 23 entfällt: Schultern, Arme und die Hand vor der Brust sinken starr um 1 px
     # Kopfgruppe: ein starrer Block
     kopf = eb(E29, KOPF)
     for s_, m in ([] if nur else ((30, GOLD_L), (40, GOLD_R), (3, GOLD_R), (44, GOLD_L))):

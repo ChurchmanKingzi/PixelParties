@@ -44,6 +44,8 @@ import sys
 import numpy as np
 
 import anim_lib as L
+import anim_textur as TX   # texturierte Streckzeilen statt Zeilenkopien (Regel 43/49)
+TX.umleiten()               # auch Streckaufrufe innerhalb der Gruppenmodule liefern texturierte Zeilen
 import anim_tiere as T
 
 N, MS = 56, 65
@@ -114,7 +116,7 @@ def frame(i, nur=None):
     if glanz >= 0:
         x, y = HALSBAND[glanz]
         k[PAD_T + y, PAD_L + x, :3] = HELL
-    r = L.streck_zeile(k, PAD_T + FUSSZEILE, atem)
+    r = TX.streck_zeile(k, PAD_T + FUSSZEILE, atem)
     cols = np.arange(W)[None, :]
     fuss = (np.arange(H)[:, None] >= PAD_T + FUSSZEILE) & (cols >= PAD_L + 2) & (cols <= PAD_L + 9)
     # die beiden Innenumrisse zwischen den Beinen (5,11) und (6,11) bleiben am Körper: sie sind der Umriss unter dem Halsband

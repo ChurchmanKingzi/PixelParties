@@ -40,6 +40,8 @@ import sys
 import numpy as np
 
 import anim_lib as L
+import anim_textur as TX   # texturierte Streckzeilen statt Zeilenkopien (Regel 43/49)
+TX.umleiten()               # auch Streckaufrufe innerhalb der Gruppenmodule liefern texturierte Zeilen
 import anim_untote as U
 import anim_untote2 as V
 
@@ -98,7 +100,7 @@ def frame(i, nur=None):
     d = -3 + SPITZE + 2 * (i % 24) if (i % 24) < 14 else None                # Band läuft in Frames 0–13 (d startet vor dem Sprite)
     if d is not None and i % 24 >= 1:
         V.glanz_band(k, GOLD_PTS, GOLD, d, 3, OFF)
-    kb = L.streck_zeile(k, OFF[1] + SPITZE + 6, n)                          # Zeile 6 des Körpers = unter den Augen (Zeilen 4–5 des Körpers), siehe Docstring
+    kb = TX.streck_zeile(k, OFF[1] + SPITZE + 6, n)                          # Zeile 6 des Körpers = unter den Augen (Zeilen 4–5 des Körpers), siehe Docstring
     up_l = V.fenster(i, N, 8, 12) | V.fenster(i, N, 32, 12)
     up_r = V.fenster(i, N, 20, 12) | V.fenster(i, N, 44, 4)
     ebenen = [(kb, 0, 0), (teil(hand_l), 0, -up_l), (teil(hand_r), 0, -up_r)]

@@ -33,6 +33,8 @@ import sys
 import numpy as np
 
 import anim_lib as L
+import anim_textur as TX   # texturierte Streckzeilen statt Zeilenkopien (Regel 43/49)
+TX.umleiten()               # auch Streckaufrufe innerhalb der Gruppenmodule liefern texturierte Zeilen
 import anim_flieger as F
 import anim_flieger_b as B
 
@@ -136,7 +138,7 @@ def frame(i, partikel=True, nur=None):
                 oben[PAD_T + y, PAD_L + x, :3] = SCHWARZ              # Lid = Körperfarbe
         krallen = KRALLEN
         if dy_k - dy_u > 0:
-            krallen = L.streck_zeile(krallen, PAD_T + CUT + 1, dy_k - dy_u)
+            krallen = TX.streck_zeile(krallen, PAD_T + CUT + 1, dy_k - dy_u)
         schichten += [(oben, 0, dy_u, 3), (krallen, 0, dy_k, 3)]
     f, karte = B.zusammen_mit_karte(H, W, schichten)
     B.umriss_je_ebene(f, karte, ERLAUBT, EBENEN_FARBE)

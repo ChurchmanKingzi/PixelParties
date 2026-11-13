@@ -33,6 +33,8 @@ import sys
 import numpy as np
 
 import anim_lib as L
+import anim_textur as TX   # texturierte Streckzeilen statt Zeilenkopien (Regel 43/49)
+TX.umleiten()               # auch Streckaufrufe innerhalb der Gruppenmodule liefern texturierte Zeilen
 import anim_tiere as T
 import anim_drache as D
 
@@ -80,7 +82,7 @@ def frame(i, nur=None):
     if bl:
         for (x, y) in AUGEN_OBEN + (AUGEN_REST if bl == 2 else []):
             k[PAD_T + y, PAD_L + x, :3] = LID
-    k = L.streck_zeile(k, PAD_T + ZEILE, atem)
+    k = TX.streck_zeile(k, PAD_T + ZEILE, atem)
     sw_ = L.zeilen_welle(teil(schwanz_m), PAD_T + 27, 2.0, L.sinus(i, N / 3))
     hl = T.zucken_zeilen(teil(horn_l), PAD_T + 3, -ha, anteile={PAD_T: 1.0, PAD_T + 1: 1.0, PAD_T + 2: 0.0})
     hr = T.zucken_zeilen(teil(horn_r), PAD_T + 3, hb, anteile={PAD_T: 1.0, PAD_T + 1: 1.0, PAD_T + 2: 0.0})

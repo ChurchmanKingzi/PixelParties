@@ -52,6 +52,8 @@ import sys
 import numpy as np
 
 import anim_lib as L
+import anim_textur as TX   # texturierte Streckzeilen statt Zeilenkopien (Regel 43/49)
+TX.umleiten()               # auch Streckaufrufe innerhalb der Gruppenmodule liefern texturierte Zeilen
 import anim_untote as U
 
 N, MS = 40, 65
@@ -126,8 +128,8 @@ def frame_gross(i, nur=None):
         zeile = hb0[GPT, :, :].copy()
         hb0[GPT, :, :] = 0
         hb0[GPT, GPL + tip:GPL + sw + tip, :] = zeile[GPL:GPL + sw, :]
-    hb = L.streck_zeile(hb0, GPT + 5, r_c)
-    ri = L.streck_zeile(teil(rippen), GPT + 16, r_b)
+    hb = TX.streck_zeile(hb0, GPT + 5, r_c)
+    ri = TX.streck_zeile(teil(rippen), GPT + 16, r_b)
     al = L.spalten_welle(teil(aermel_l), GPL + 5, 1.6 * hump, ph, bias=-4.0 * hump, lauf=1.0, nur_rechts=False)
     ar = L.spalten_welle(teil(aermel_r), GPL + 14, 1.6 * hump, ph, bias=-4.0 * hump, lauf=1.0, nur_rechts=True)
     # Loch fest am Boden (mit schwarzer Ergänzung hinter dem Arm), Arm wächst aus dem Loch
@@ -135,8 +137,8 @@ def frame_gross(i, nur=None):
     for (x, y) in LOCH_ERG:
         lo[GPT + y, GPL + x, :3] = SCHWARZ
         lo[GPT + y, GPL + x, 3] = 255
-    am = L.streck_zeile(teil(arm), GPT + 26, griff)                     # Faustzeile y 26 wird eingefügt: Faust öffnet sich (1 px höher)
-    am = L.streck_zeile(am, GPT + 29, n_arm)                            # Unterarmzeile y 29 wird eingefügt: Arm wird länger, Faust steigt
+    am = TX.streck_zeile(teil(arm), GPT + 26, griff)                     # Faustzeile y 26 wird eingefügt: Faust öffnet sich (1 px höher)
+    am = TX.streck_zeile(am, GPT + 29, n_arm)                            # Unterarmzeile y 29 wird eingefügt: Arm wird länger, Faust steigt
     koerper = L.zusammen(H, W, [(lo, 0, 0), (am, 0, 0), (ri, 0, 0), (hb, 0, -r_b), (al, 0, -r_b), (ar, 0, -r_b)])
     koerper = U.kontur_schliessen(koerper, UMRISS, SCHWARZ)               # Regel 16: Umriss an Ärmeln/Armkanten in jeder Pose geschlossen
     if nur == 'koerper':

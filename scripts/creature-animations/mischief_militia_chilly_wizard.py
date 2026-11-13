@@ -39,6 +39,8 @@ import numpy as np
 
 import anim_humanoide as Hm
 import anim_lib as L
+import anim_textur as TX   # texturierte Streckzeilen statt Zeilenkopien (Regel 43/49)
+TX.umleiten()               # auch Streckaufrufe innerhalb der Gruppenmodule liefern texturierte Zeilen
 
 N, MS = 48, 62
 PAD_L, PAD_R, PAD_T, PAD_B = 8, 8, 8, 3
@@ -141,7 +143,7 @@ def frame(i, funken=True):
     # --- Auf und ab: Körper zuerst (graue Zeile 20), Hut 3 Frames später (Schattenzeile 15) ---
     brust = Hm.stufe(i, N / 2, 1)
     kopf = Hm.stufe(i - 3, N / 2, 1)
-    k = Hm.atmen(k, PAD_T + 20, PAD_T + 15, brust, kopf)
+    k = TX.atmen(k, PAD_T + 20, PAD_T + 15, brust, kopf)
     hub = brust + kopf
     Hm.kontur_schliessen(k, ERLAUBT, CC)                          # Regel 16: Außenkante in jeder Pose in Umrissfarbe
     ebenen = []

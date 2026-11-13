@@ -39,6 +39,8 @@ import numpy as np
 import anim_eis as E
 import anim_humanoide as Hm
 import anim_lib as L
+import anim_textur as TX   # texturierte Streckzeilen statt Zeilenkopien (Regel 43/49)
+TX.umleiten()               # auch Streckaufrufe innerhalb der Gruppenmodule liefern texturierte Zeilen
 
 N, MS = 48, 70
 PAD_L, PAD_R, PAD_T, PAD_B = 8, 9, 5, 3
@@ -102,7 +104,7 @@ def koerper(i):
     k = L.zusammen(H, W, [(pole, 0, 0), (k, 0, 0), (fl, 0, 0)])
     # Atmen: Zeile 27 des Schneeballs einmal doppelt
     brust = E.verlauf3(i, 24, 0.0, 1)
-    k = Hm.atmen(k, PAD_T + 27, PAD_T + 20, brust, 0)
+    k = TX.atmen(k, PAD_T + 27, PAD_T + 20, brust, 0)
     Hm.kontur_schliessen(k, ERLAUBT, E_)
     return k
 

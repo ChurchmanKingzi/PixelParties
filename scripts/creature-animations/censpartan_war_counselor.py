@@ -40,6 +40,8 @@ import numpy as np
 
 import anim_humanoide as Hm
 import anim_lib as L
+import anim_textur as TX   # texturierte Streckzeilen statt Zeilenkopien (Regel 43/49)
+TX.umleiten()               # auch Streckaufrufe innerhalb der Gruppenmodule liefern texturierte Zeilen
 
 N, MS = 48, 62
 PAD_L, PAD_R, PAD_T, PAD_B = 3, 3, 3, 2          # Figur knapp zugeschnitten: Verlagerung ±1 px seitlich, Speerhub 1 px oben (Helm: 2 px bei 1 px tieferem Busch), Randabstand ≥ 2
@@ -104,8 +106,8 @@ def frame(i):
     # --- Auf und ab: Beinzeile 27 = Brust (Speer: Schaftzeile 22), Kinnzeile 16 läuft 3 Frames nach (nur Körper) ---
     brust = Hm.stufe(i, N / 2, 1)
     kopf = Hm.stufe(i - 3, N / 2, 1)
-    k = Hm.atmen(k, PAD_T + 27, PAD_T + 16, brust, kopf)
-    sp = Hm.atmen(sp, PAD_T + 22, PAD_T + 16, brust, 0)
+    k = TX.atmen(k, PAD_T + 27, PAD_T + 16, brust, kopf)
+    sp = TX.atmen(sp, PAD_T + 22, PAD_T + 16, brust, 0)
     # --- Fußtippen (die Stiefel liegen hinter den Beinlingen) ---
     pat = [1, 1, 0, 0, 1, 1, 0, 0]
     ul = 1 if Hm.folge(i, 12, pat, N) else 0

@@ -43,6 +43,8 @@ import sys
 import anim_gb as G
 import anim_humanoide as Hm
 import anim_lib as L
+import anim_textur as TX   # texturierte Streckzeilen statt Zeilenkopien (Regel 43/49)
+TX.umleiten()               # auch Streckaufrufe innerhalb der Gruppenmodule liefern texturierte Zeilen
 
 N, MS = 48, 64
 sz = G.Szene('guardian-beast-hou', (2, 2, 2, 2))
@@ -120,7 +122,7 @@ def frame(i):
     sz.zeilen(h, {6 + j: dx for j, dx in enumerate(pose)})
     # --- Atmen ---
     brust = Hm.stufe(i, N / 2, 1)
-    k, h = sz.atmen([k, h], 26, brust)
+    k, h = TX.szene_atmen(sz, [k, h], 26, brust)
     # --- Fußtippen ---
     pat = [1, 1, 0, 0, 1, 1, 0, 0]
     ul = 1 if Hm.folge(i, 8, pat, N) else 0

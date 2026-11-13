@@ -37,6 +37,8 @@ import numpy as np
 
 import anim_humanoide as Hm
 import anim_lib as L
+import anim_textur as TX   # texturierte Streckzeilen statt Zeilenkopien (Regel 43/49)
+TX.umleiten()               # auch Streckaufrufe innerhalb der Gruppenmodule liefern texturierte Zeilen
 import anim_untote as U
 
 N, MS = 48, 70
@@ -101,7 +103,7 @@ def frame_gross(i, nur=None):
         Hm.setze(r, {p: DUNKEL_I for p in AUGEN}, OFF)
     b = 1 if Hm.welle01(i, 24) > 0.5 else 0
     if b:
-        r = L.streck_zeile(r, GP + 22, b)
+        r = TX.streck_zeile(r, GP + 22, b)
     # Knochenhut (beide Schädel samt Krone) sitzt am Kopf: er hebt sich EXAKT mit dem Kopf der Robe (kein eigenes Schweben, Nutzerkorrektur Runde 3)
     sk = -b
     s = L.versetze(teil(schaedel), 0, sk)

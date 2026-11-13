@@ -37,6 +37,8 @@ import sys
 import numpy as np
 
 import anim_lib as L
+import anim_textur as TX   # texturierte Streckzeilen statt Zeilenkopien (Regel 43/49)
+TX.umleiten()               # auch Streckaufrufe innerhalb der Gruppenmodule liefern texturierte Zeilen
 import anim_tiere as T
 
 N, MS = 48, 65
@@ -93,7 +95,7 @@ def frame(i, nur=None):
         if lid == 2:
             for (x, y) in ((3, 4), (4, 4), (7, 4), (8, 4)):
                 k[PAD_T + y, PAD_L + x, :3] = KNOCHEN
-    r = L.streck_zeile(k, PAD_T + BEINZEILE, atem)
+    r = TX.streck_zeile(k, PAD_T + BEINZEILE, atem)
     cols = np.arange(W)[None, :]
     fuss = (np.arange(H)[:, None] >= PAD_T + 13) & (cols >= PAD_L + 2) & (cols <= PAD_L + 9)
     # Innenumrisse (4,12) / (7,12) und alles oberhalb von Zeile 13 bleibt am Körper

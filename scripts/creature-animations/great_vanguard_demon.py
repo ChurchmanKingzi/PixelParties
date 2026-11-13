@@ -40,6 +40,8 @@ import sys
 import numpy as np
 
 import anim_lib as L
+import anim_textur as TX   # texturierte Streckzeilen statt Zeilenkopien (Regel 43/49)
+TX.umleiten()               # auch Streckaufrufe innerhalb der Gruppenmodule liefern texturierte Zeilen
 import anim_untote as U
 import anim_flieger as F
 import anim_daemon as D
@@ -138,7 +140,7 @@ def frame_gross(i, nur=None):
     al_dy = lambda f: 1.6 * math.sin(ph) * f
     al = F.fluegel_welle(al, GPL + 10, 1.6, ph, potenz=1.0, nur_rechts=False, lauf=0.0, zusammenhang=True)
     ar = F.fluegel_welle(ar, GPL + 29, 1.6, ph, potenz=1.0, nur_rechts=True, lauf=0.0, zusammenhang=True)       # synchron mit dem linken Arm (Nutzer-Feedback Runde 3)
-    tr = L.streck_zeile(T_TORSO, GPT + 42, n)
+    tr = TX.streck_zeile(T_TORSO, GPT + 42, n)
     bl, br = T_BL.copy(), T_BR.copy()
     if 20 <= i <= 25:
         band(bl, PT_BL, STIEFEL_RAMPE, 51 + 2 * (i - 20) + 0)

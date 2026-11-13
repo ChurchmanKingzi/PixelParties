@@ -38,6 +38,8 @@ import sys
 import numpy as np
 
 import anim_lib as L
+import anim_textur as TX   # texturierte Streckzeilen statt Zeilenkopien (Regel 43/49)
+TX.umleiten()               # auch Streckaufrufe innerhalb der Gruppenmodule liefern texturierte Zeilen
 import anim_tiere as T
 
 N, MS = 44, 70
@@ -131,7 +133,7 @@ def frame(i, nur=None):
     ol = L.versetze(T.ohr_haengend(teil(ohr_l), ohr_profil(ohr_li, -1), 'links'), 0, -atem)
     orr = L.versetze(T.ohr_haengend(teil(ohr_r), ohr_profil(ohr_re, 1), 'rechts'), 0, -atem)
     # Rumpf: Brustzeile 11 einfügen, danach die Füße (Zeilen ≥ 11 an den Beinen) einzeln heben
-    r = L.streck_zeile(teil(unten), PAD_T + BRUSTZEILE, atem)
+    r = TX.streck_zeile(teil(unten), PAD_T + BRUSTZEILE, atem)
     fuss = (np.arange(H)[:, None] >= PAD_T + BRUSTZEILE) & ((np.arange(W)[None, :] <= PAD_L + 5) | (np.arange(W)[None, :] >= PAD_L + 8))
     fl, rest = L.trenne(r, fuss & (np.arange(W)[None, :] <= PAD_L + 5))
     fr_, rest = L.trenne(rest, fuss & (np.arange(W)[None, :] >= PAD_L + 8))

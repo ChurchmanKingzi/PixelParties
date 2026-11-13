@@ -58,7 +58,7 @@ SOCKEL = [(1.0, 1.0), (0.86, 0.76), (0.72, 0.52), (0.56, 0.3)]          # Bände
 
 
 class Flamme:
-    def __init__(self, x, y, laenge, breite, richtung=(0, -1), phase=0.0, welle=None, bauch=0.55, schlag=1.0, kern=1.0, fuss=None, baender=None, pot=1.25, umlauf=1, hals=0.6, fetzen=True):
+    def __init__(self, x, y, laenge, breite, richtung=(0, -1), phase=0.0, welle=None, bauch=0.7, schlag=1.4, kern=1.0, fuss=None, baender=None, pot=1.25, umlauf=2, hals=0.6, fetzen=True, puls=0.2, wiegen=0.5):
         self.x, self.y, self.laenge, self.breite = float(x), float(y), float(laenge), float(breite)
         n = math.hypot(*richtung)
         self.r = (richtung[0] / n, richtung[1] / n)
@@ -67,6 +67,7 @@ class Flamme:
         self.bauch, self.schlag, self.kern, self.pot, self.umlauf, self.hals = bauch, schlag, kern, pot, int(umlauf), hals
         self.fuss = 0.6 * self.breite if fuss is None else float(fuss)
         self.fetzen = fetzen                                     # False: Spitze schnürt sich nicht ab (hängende Schweife u. Ä.)
+        self.puls, self.wiegen = puls, wiegen                    # Runde 5: Länge pulsiert (Anteil), Spitze wiegt seitlich (Anteil der Halbbreite) — je 1× pro Zyklus, je Flamme versetzt
         self.baender = baender
 
     def stufen(self, tau, yy, xx, nb, neigung=0.0):
@@ -78,7 +79,7 @@ class Strahl:
     Schlängeln wandern mit dem Fluss vom Ursprung weg; die Farbbänder liegen als Mantel um den Kern (`einzug` = Abstand der Bandgrenzen vom Rand in px, von außen nach innen).
     Das offene Ende schließt man mit Flammen (`Flamme(..., richtung=<Flussrichtung>)`), deren Füße kurz vor dem Kegelende sitzen: sie laufen als Zungen aus und schnüren Fetzen ab."""
 
-    def __init__(self, x, y, laenge, breite0, breite1, richtung=(0, 1), phase=0.0, welle=None, bauch=0.12, schlag=0.6, einzug=None, umlauf=1):
+    def __init__(self, x, y, laenge, breite0, breite1, richtung=(0, 1), phase=0.0, welle=None, bauch=0.18, schlag=1.0, einzug=None, umlauf=2):
         self.x, self.y, self.laenge, self.b0, self.b1 = float(x), float(y), float(laenge), float(breite0), float(breite1)
         n = math.hypot(*richtung)
         self.r = (richtung[0] / n, richtung[1] / n)
@@ -148,13 +149,17 @@ def _stufen(fl, tau, yy, xx, nb, neigung=0.0):
     c = -dx * ry + dy * rx                                   # quer
     baender = fl.baender or BAENDER[nb]
     out = np.zeros(a.shape, np.uint8)
+    # Runde 5 („zu langsam/zu wenig“): zusätzlich zur schnellen Welle (umlauf=2 Durchläufe je Zyklus) wechselt jede Zunge 1× je Zyklus sichtbar ihre Länge (puls) und Neigung (wiegen),
+    # je Flamme über `phase` versetzt (nicht gleichphasig mit der Welle → kein Bild des Zyklus wiederholt sich).
+    lang = 1.0 + fl.puls * math.sin(2 * math.pi * (tau + 1.7 * fl.phase + 0.13))
+    neigung = neigung + fl.wiegen * fl.breite * math.sin(2 * math.pi * (tau + 2.3 * fl.phase + 0.55))
     for k, (lf, wf) in enumerate(baender):
-        lk, wk = fl.laenge * lf, fl.breite * wf
+        lk, wk = fl.laenge * lf * lang, fl.breite * wf
         fk = fl.fuss * wf
         v = a / lk
         nach = 0.06 * k                                       # innere Bänder eilen leicht nach
         th = 2 * math.pi * (a / fl.welle - fl.umlauf * tau + fl.phase + nach)
-        g = np.clip(v, 0, 1.3)
+        g = np.clip(v, 0, 1.55)
         ruhe = 1.0 if k < nb - 1 or nb < 3 else fl.kern * 0.5    # Kern fast ruhig
         seit = fl.schlag * ruhe * wk * 0.45 * g ** 1.4 * np.sin(th) + neigung * g ** 1.5
         # Bäuche: unten kaum, zur Spitze kräftig (dort schnürt die Einschnürung bis 0 ab)
@@ -166,8 +171,8 @@ def _stufen(fl, tau, yy, xx, nb, neigung=0.0):
         fak = np.where((fak < fl.hals) & (bw > 0.45) & fl.fetzen, 0.0, fak)            # Hals unter dem obersten Bauch: nicht zum Faden ausdünnen, sondern abschnüren
         breite = wk * _profil(v, fl.pot) * fak
         # jenseits der Spitze (v > 1) lebt nur der abgelöste Fetzen weiter: steigt, schrumpft, verschwindet
-        aus = np.clip((1.3 - v) / 0.3, 0, 1)
-        breite = np.where(v > 1.0, np.minimum(wk * 0.34, 1.7) * aus * np.clip(0.1 + 1.5 * np.cos(th + 0.9), 0, None) * (1.0 if fl.fetzen else 0.0), breite)
+        aus = np.clip((1.55 - v) / 0.55, 0, 1)
+        breite = np.where(v > 1.0, np.minimum(wk * 0.4, 1.9) * aus * np.clip(0.1 + 1.5 * np.cos(th + 0.9), 0, None) * (1.0 if fl.fetzen and k == 0 else 0.0), breite)   # Fetzen nur in der Außenfarbe
         innen = (np.abs(c - seit) <= breite - 0.25) & (v >= 0) & (breite > 0.3)
         if fk > 0:                                            # runder Fuß unter der Basis
             innen |= (a < 0) & ((a / fk) ** 2 + (c / wk) ** 2 <= 1.0)

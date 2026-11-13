@@ -3,7 +3,7 @@
   "sheet": "monster-nest.png",
   "frameWidth": 45,
   "frameHeight": 39,
-  "frames": 60,
+  "frames": 144,
   "frameMs": 75,
   "loop": true,
   "layout": "horizontal",

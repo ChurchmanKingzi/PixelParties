@@ -30,6 +30,8 @@ import sys
 import numpy as np
 
 import anim_lib as L
+import anim_textur as TX   # texturierte Streckzeilen statt Zeilenkopien (Regel 43/49)
+TX.umleiten()               # auch Streckaufrufe innerhalb der Gruppenmodule liefern texturierte Zeilen
 import anim_untote as U
 import anim_untote2 as V
 
@@ -74,7 +76,7 @@ def frame(i, nur=None):
         neu[neu_w & ~weiss, :3] = (38, 23, 24)                                                 # (wanderte ein Zahn auf einen dunklen Platz: Kehlenfarbe)
         neu[weiss] = reg[weiss]
         k[OFF[1] + y0:OFF[1] + y1 + 1, OFF[0] + x0:OFF[0] + x1 + 1] = neu
-    kb = L.streck_zeile(k, OFF[1] + ZEILE_STRECK, n)
+    kb = TX.streck_zeile(k, OFF[1] + ZEILE_STRECK, n)
     f = V.zeilen_versatz4(kb, offs(i, kb))
     return U.kontur_schliessen(f, UMRISS, KONTUR)
 

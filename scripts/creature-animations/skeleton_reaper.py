@@ -45,6 +45,8 @@ import sys
 import numpy as np
 
 import anim_lib as L
+import anim_textur as TX   # texturierte Streckzeilen statt Zeilenkopien (Regel 43/49)
+TX.umleiten()               # auch Streckaufrufe innerhalb der Gruppenmodule liefern texturierte Zeilen
 import anim_untote as U
 
 N, MS = 56, 65
@@ -306,9 +308,9 @@ def koerper_ebene(i):
                     kb[GPT + y, x if (x - GPL, y) in GRIFF_SET else x + dx] = row[x]
     zk = GPT + 14
     if n:
-        kb = L.streck_zeile(kb, zk, n)
+        kb = TX.streck_zeile(kb, zk, n)
     if r_c:
-        kb = L.streck_zeile(kb, GPT + 6 - n, r_c)
+        kb = TX.streck_zeile(kb, GPT + 6 - n, r_c)
     kb = U.kontur_schliessen(kb, UMRISS, SCHWARZ)                # Regel 16
     return kb
 

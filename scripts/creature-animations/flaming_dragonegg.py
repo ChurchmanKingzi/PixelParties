@@ -25,6 +25,9 @@ Nutzerwunsch (Runde 4): „Bei den ganzen Eiern sollten die Risse verschwinden, 
 → STAND RUNDE 4 (ersetzt die Rissbeschreibung oben): 11 Glutrisse, Hauptast 4–14 Pixel, die größeren mit 1–2 Seitenästen (2–4 Pixel) und 1–4 Stellen, an denen der Riss 2 px dick ist; weiter hell (Cremeweiß C, Astenden Gelb B),
   jetzt auf Fugen (A) UND roten Schuppenrändern (E). Sie wachsen Pixel für Pixel, stehen 4–8 Frames in voller Form und BLEICHEN dann AUS (= die Glut kühlt ab): alle Pixel bleiben stehen, die Farbe geht in 4 Stufen à 3 Frames
   über Gelb → Orange → Rot zur Farbe darunter, letzte Stufe Schachbrett-Dither (kein Alpha, kein Schrumpfen; nur Farben des Sprites).
+Nutzerwunsch (Runde 5): „Bei den Eiern verschwinden die Risse noch zu schnell, nachdem sie erschienen sind.“
+→ STAND RUNDE 5 (nur die Zeiten; Rissformen, Wachstum unverändert): Schleife 144 Frames à 75 ms = 10,8 s (vorher 72 = 5,4 s). Jeder Riss steht nach dem vollständigen Wachsen 20–28 Frames (1,5–2,1 s; vorher 4–8 Frames) in voller Stärke und bleicht erst dann aus,
+  und zwar langsamer: 5 Stufen (4 Farbstufen + Schachbrett-Dither) à 5 Frames = 1,9 s (vorher à 3 Frames = 1,1 s). Gleich viele Risse wie bisher, über die längere Schleife verteilt (im Mittel nicht mehr gleichzeitig sichtbar als vorher).
 Ergänzungen: keine. Nur ganze Pixel, nur Quellfarben, kein Alpha.
 Frame: Sprite plus 3 px Rand rundum — Figur zentriert.
 """
@@ -35,7 +38,7 @@ import numpy as np
 import anim_lib as L
 import anim_eier as E
 
-N, MS = 72, 75
+N, MS = 144, 75
 PAD = 3
 
 spr = L.lade('flaming-dragonegg')
@@ -63,9 +66,9 @@ _SITES = [
     dict(h=[(17, 22), (16, 21), (15, 20), (16, 19)], z=[], d=[(16, 20)]),
     dict(h=[(16, 28), (15, 27), (15, 26), (16, 25)], z=[], d=[]),
 ]
-_HALTEN = [4, 7, 5, 8, 4, 6, 5, 7]
+_HALTEN = [20, 26, 22, 28, 21, 25, 23, 27]                                                # Frames in voller Stärke: 1,5–2,1 s (Runde 5)
 _kw = [dict(haupt=f['h'], zweige=f['z'], dick=f['d'], halten=_HALTEN[k % len(_HALTEN)], tempo=1 if len(f['h']) >= 6 else 2,
-            stufen=4, stufe_frames=3, farbe=CC, spitze=CB) for k, f in enumerate(_SITES)]
+            stufen=4, stufe_frames=5, farbe=CC, spitze=CB) for k, f in enumerate(_SITES)]
 _st = E.plane_starts([E.BleichRiss(start=0, **kw).leben for kw in _kw], N, basis=1, seed=5)
 RISSE = [E.BleichRiss(start=s, **kw) for s, kw in zip(_st, _kw)]
 E.pruefe_risse(RISSE, N, ERLAUBT)
@@ -86,4 +89,4 @@ if __name__ == '__main__':
     n = L.pruefe(frames, quelle=spr)
     L.speichern('flaming-dragonegg', 'Flaming Dragonegg', frames, MS, prev)
     if prev:
-        L.streifen(prev + '/flaming-dragonegg-strip.png', frames[::3], spalten=10, scale=6)
+        L.streifen(prev + '/flaming-dragonegg-strip.png', frames[::6], spalten=12, scale=6)

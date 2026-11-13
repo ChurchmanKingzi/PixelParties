@@ -60,6 +60,8 @@ import sys
 import numpy as np
 
 import anim_lib as L
+import anim_textur as TX   # texturierte Streckzeilen statt Zeilenkopien (Regel 43/49)
+TX.umleiten()               # auch Streckaufrufe innerhalb der Gruppenmodule liefern texturierte Zeilen
 import anim_flieger as F
 import anim_flieger_b as B
 import anim_harpyA as A
@@ -219,7 +221,7 @@ def frame(i, partikel=True, nur=None):
             koerper = koerper.copy()
             for (x, y), c in AUGEN.items():
                 koerper[PAD_T + y, PAD_L + x, :3] = c
-        koerper = L.streck_zeile(koerper, ATEM_ZEILE, n)
+        koerper = TX.streck_zeile(koerper, ATEM_ZEILE, n)
         ohr = OHRRING.copy()
         # Geige: Saiten bekommen bei jedem halben Bogenstrich ein Lichtband (abwechselnd abwärts/aufwärts)
         geige = GEIGE.copy()

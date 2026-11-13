@@ -38,6 +38,10 @@ eine Schraubbewegung aus drei eigenen, STARREN Posen des Schlüssels (SCHL_POSEN
 Pose ist als Skelett (helle Pixel) gezeichnet, der dunkle 1-px-Umriss wird wie im Original darum gelegt (4-Nachbarn + je ein Eckpixel an den Maulspitzen; für O ergibt das pixelgenau den Originalschlüssel).
 Takt: drei Züge (O M D D M O, je 6 Frames) → 6 Frames Pause → drei Züge → Pause. Der Schlüssel geht beim Auf und ab starr mit (versetzt, nicht gestreckt). Lichtband läuft über die jeweilige Pose; der Glitzerstern
 am Maul blitzt in der Pause (Frames 19–22). Leinwand rechts 2 px breiter (waagerechte Pose reicht bis x = 28).
+
+RUNDE 5 (Nutzer: „es bewegt sich jetzt nur der Schraubenschlüssel, ohne dass sich die Hand/der Arm bewegen würde“): der ausgestreckte Unterarm (goldener Balken x 14–20, y 19–22) senkt sich jetzt bei jedem Zug mit
+(Pose M: Hand 1 px, Pose D: Hand 2 px tiefer; starrer Spaltenversatz um den Ellbogen, siehe arm_senken), der Schlüssel sitzt starr in der Hand und dreht zusätzlich aus dem Handgelenk. Ergänzt: unter dem Bart
+freigelegte Pixel (16–18,19) in Bartschatten (156,156,156), (19,19)/(19,20) in Bartkante (106,106,106). Atmen jetzt über anim_textur (Regel 49).
 """
 import math
 import sys
@@ -47,6 +51,7 @@ import numpy as np
 import anim_dwarf as Dw
 import anim_humanoide as Hm
 import anim_lib as L
+import anim_textur as TX   # texturierte Streckzeilen statt Zeilenkopien (Regel 43/49)
 
 N, MS = 48, 62
 PAD_L, PAD_R, PAD_T, PAD_B = 7, 5, 10, 2         # Dampf links/oben (folgt den Rohren schräg nach links oben), Rohrzittern ±1 px, Schlüssel ±1 px
@@ -145,6 +150,35 @@ SCHL_FOLGE = (_ZUG * 3 + ['O'] * 6) * 2                                         
 assert len(SCHL_FOLGE) == N
 
 
+# --- Runde 5: der ARM führt die Schraubbewegung aus (Nutzer: „es bewegt sich nur der Schraubenschlüssel, ohne dass sich die Hand/der Arm bewegen würde“) ---
+# Der ausgestreckte Unterarm ist der goldene Balken x 14–20, y 19–22 (obere Kontur Zeile 19, Füllung Zeilen 20–21, untere Kontur Zeile 22, Handkante (20,20)/(20,21)); die Hand (helles Ende (19,20)) hält den Griff.
+# Je Schlüsselpose senkt sich der Arm starr um den Ellbogen (x 14–15 bleiben): Spaltenversatz nach unten mit Gefälle ≤ 1 px je Spalte, nichts wird gestreckt. Der Schlüssel sitzt starr in der Hand (gleicher Versatz
+# wie die Handspalte x 20). Freigelegt wird nur die Zeile unter dem Bart: dort wird der Bart fertiggezeichnet (Schattenstufe D (156,156,156); in der Randspalte x 19 läuft die Bartkante N (106,106,106) weiter).
+# Unten liegt der Arm VOR der Metallplatte (verdeckt deren oberste Zeile[n]).
+ARM_X = (16, 20)
+ARM_ZEILEN = (19, 22)
+ARM_SENK = {'O': {}, 'M': {17: 1, 18: 1, 19: 1, 20: 1}, 'D': {16: 1, 17: 1, 18: 1, 19: 2, 20: 2}}          # Spalte → Versatz nach unten
+BART_SCHATTEN, BART_KANTE = (156, 156, 156), (106, 106, 106)
+
+
+def arm_senken(k, pose):
+    """Arm auf der Leinwand k (vor dem Atmen) in die Pose bringen; liefert den Versatz der Hand (= Versatz des Schlüssels)."""
+    senk = ARM_SENK[pose]
+    for x, d in senk.items():
+        X = PAD_L + x
+        spalte = [k[PAD_T + y, X].copy() for y in range(ARM_ZEILEN[0], ARM_ZEILEN[1] + 1)]
+        for n_, y in enumerate(range(ARM_ZEILEN[0], ARM_ZEILEN[1] + 1)):
+            if spalte[n_][3]:
+                k[PAD_T + y + d, X] = spalte[n_]
+        for y in range(ARM_ZEILEN[0], ARM_ZEILEN[0] + d):                       # freigelegt: Bart fertigzeichnen (x 20: dort war nur der Schlüsselgriff → frei)
+            if x == 20:
+                k[PAD_T + y, X] = 0
+            else:
+                k[PAD_T + y, X, :3] = BART_KANTE if x == 19 else BART_SCHATTEN
+                k[PAD_T + y, X, 3] = 255
+    return senk.get(20, 0)
+
+
 def frame(i, dampf=True, nur=None):
     if nur:
         dampf = False
@@ -167,9 +201,10 @@ def frame(i, dampf=True, nur=None):
         if a:
             Hm.bereich_versatz(k, OFF, {y: a for y in zeilen}, x0, x1)
     # --- Auf und ab: Westenzeile 21 wird einmal doppelt eingefügt; Körper und Schlüssel gleichermaßen ---
+    hand = arm_senken(k, SCHL_FOLGE[i])                                         # Runde 5: Arm/Hand führen den Zug aus, der Schlüssel sitzt starr in der Hand
     brust = Hm.stufe(i, N / 2, 1)
-    k = Hm.atmen(k, PAD_T + 21, PAD_T + 14, brust, 0)
-    sc = L.versetze(sc, 0, -brust)                                              # Schlüssel starr mit dem Oberkörper (nicht strecken)
+    k = TX.atmen(k, PAD_T + 21, PAD_T + 14, brust, 0)
+    sc = L.versetze(sc, 0, hand - brust)                                        # Schlüssel starr mit Hand und Oberkörper (nicht strecken)
     fig = L.zusammen(H, W, [(k, 0, 0), (sc, 0, 0)])
     Hm.kontur_schliessen(fig, ERLAUBT, UMRISS)
     # --- Glitzer-Sterne (nur Metall): Schlüsselmaul, Plattenecke ---

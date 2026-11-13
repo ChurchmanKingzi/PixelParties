@@ -44,6 +44,8 @@ import numpy as np
 import anim_gb as G
 import anim_humanoide as Hm
 import anim_lib as L
+import anim_textur as TX   # texturierte Streckzeilen statt Zeilenkopien (Regel 43/49)
+TX.umleiten()               # auch Streckaufrufe innerhalb der Gruppenmodule liefern texturierte Zeilen
 
 N, MS = 48, 64
 sz = G.Szene('guardian-beast-gou', (2, 2, 4, 2))                 # Rand: Antenne +1, Atem −1, Randabstand ≥ 2
@@ -106,7 +108,7 @@ def frame(i):
         sz.setze(ol, {(4, 7): PLATTE})
     if zuck_r:
         sz.setze(orr, {(15, 7): PLATTE})
-    k, ol, orr = sz.atmen([k, ol, orr], 20, brust)
+    k, ol, orr = TX.szene_atmen(sz, [k, ol, orr], 20, brust)
     # --- Antenne wird länger ---
     if Hm.folge(i, 6, [1] * 4, N) or Hm.folge(i, 30, [1] * 4, N):
         sz.setze(k, {(10, -1 - brust): DUNKELBLAU})

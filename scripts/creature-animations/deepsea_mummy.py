@@ -38,6 +38,8 @@ import sys
 import numpy as np
 
 import anim_lib as L
+import anim_textur as TX   # texturierte Streckzeilen statt Zeilenkopien (Regel 43/49)
+TX.umleiten()               # auch Streckaufrufe innerhalb der Gruppenmodule liefern texturierte Zeilen
 import anim_untote as U
 
 N, MS = 48, 70
@@ -167,7 +169,7 @@ def frame_gross(i, nur=None):
     oben = L.zusammen(H, W, [(kb, 0, 0), (teil(AL), 0, dyl), (teil(AR), 0, dyr), (teil(P1), dx1, 0), (teil(P0), dx0, 0)])
     oben = wiegen(oben, aus)
     if i in AUF:
-        oben = L.streck_zeile(oben, GPT + 9, 1)
+        oben = TX.streck_zeile(oben, GPT + 9, 1)
     koerper = L.zusammen(H, W, [(oben, 0, 0), (teil(TT), 0, tip)])
     koerper = U.kontur_schliessen(koerper, UMRISS, KONTUR)
     if nur == 'koerper':

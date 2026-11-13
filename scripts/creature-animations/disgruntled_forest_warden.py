@@ -31,6 +31,8 @@ import numpy as np
 
 import anim_humanoide as Hm
 import anim_lib as L
+import anim_textur as TX   # texturierte Streckzeilen statt Zeilenkopien (Regel 43/49)
+TX.umleiten()               # auch Streckaufrufe innerhalb der Gruppenmodule liefern texturierte Zeilen
 import anim_untote as U
 
 N, MS = 48, 66
@@ -62,12 +64,12 @@ def frame_gross(i, nur=None):
         Hm.setze(k, {p: HAAR for p in AUGEN}, OFF)
     al, ar = teil(arm_l), teil(arm_r)                            # Arme hängen still (Nutzer-Feedback: kein Schlackern); sie atmen nur mit dem Oberkörper
     if Hm.folge(i, 14, [1] * 6, N) or Hm.folge(i, 38, [1] * 6, N):
-        k = L.streck_zeile(k, GP + 11, -1)
+        k = TX.streck_zeile(k, GP + 11, -1)
     b = 1 if Hm.welle01(i, 24) > 0.5 else 0
     if b:
-        k = L.streck_zeile(k, GP + 19, b)
-        al = L.streck_zeile(al, GP + 19, b)
-        ar = L.streck_zeile(ar, GP + 19, b)
+        k = TX.streck_zeile(k, GP + 19, b)
+        al = TX.streck_zeile(al, GP + 19, b)
+        ar = TX.streck_zeile(ar, GP + 19, b)
     fr = L.zusammen(H, W, [(k, 0, 0), (al, 0, 0), (ar, 0, 0)])
     return Hm.kontur_schliessen(fr, ERLAUBT, UMRISS)
 

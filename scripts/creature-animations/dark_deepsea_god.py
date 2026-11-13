@@ -42,6 +42,8 @@ import cv2
 import numpy as np
 
 import anim_lib as L
+import anim_textur as TX   # texturierte Streckzeilen statt Zeilenkopien (Regel 43/49)
+TX.umleiten()               # auch Streckaufrufe innerhalb der Gruppenmodule liefern texturierte Zeilen
 import anim_tiefsee as T
 import anim_untote as U
 
@@ -167,9 +169,9 @@ def koerper_ebene(i):
     n_rumpf = U.stufe(i, 48, 1)
     n_hals = U.stufe(i, 48, 1, versatz=-L.sinus(6, 48))               # Kopf hinkt 6 Frames hinterher
     if n_hals:
-        kb = L.streck_zeile(kb, GPT + 27, n_hals)
+        kb = TX.streck_zeile(kb, GPT + 27, n_hals)
     if n_rumpf:
-        kb = L.streck_zeile(kb, GPT + 36, n_rumpf)
+        kb = TX.streck_zeile(kb, GPT + 36, n_rumpf)
     return kb, n_hals + n_rumpf, dx
 
 

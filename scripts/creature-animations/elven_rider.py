@@ -41,6 +41,8 @@ import numpy as np
 
 import anim_humanoide as Hm
 import anim_lib as L
+import anim_textur as TX   # texturierte Streckzeilen statt Zeilenkopien (Regel 43/49)
+TX.umleiten()               # auch Streckaufrufe innerhalb der Gruppenmodule liefern texturierte Zeilen
 import anim_orks as O
 import anim_untote as U
 
@@ -149,7 +151,7 @@ def frame_gross(i, nur=None):
     ha = Hm.zeilen_versatz(ha, OFF, dxz)
     # Atmen: Rumpf + Reiterin (ohne Beine/Schweif)
     if b:
-        r = L.streck_zeile(r, GP + 23, b)
+        r = TX.streck_zeile(r, GP + 23, b)
     # Schweif und Mähne = dunkler Nebel (anim_orks.nebel): Strömungsfeld statt starrer Welle
     sc = O.nebel(teil(schweif), (GP + 17, GP + 22), (-1.0, 0.1), 17.0, i, N, **SCHWEIF_NEBEL,
                  zusatz=lambda x, y, u: (0, -b * max(0.0, 1.0 - 1.5 * u) if y < GP + 23 else 0))

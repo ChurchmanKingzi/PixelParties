@@ -32,6 +32,8 @@ import numpy as np
 
 import anim_humanoide as Hm
 import anim_lib as L
+import anim_textur as TX   # texturierte Streckzeilen statt Zeilenkopien (Regel 43/49)
+TX.umleiten()               # auch Streckaufrufe innerhalb der Gruppenmodule liefern texturierte Zeilen
 import anim_untote as U
 
 N, MS = 48, 66
@@ -76,7 +78,7 @@ def frame_gross(i, nur=None):
     if Hm.folge(i, 19, [1, 1, 1], N) or Hm.folge(i, 40, [1, 1, 1], N):
         Hm.setze(k, {p: FELL for p in AUGE_WARG}, OFF)
     if b:
-        k = L.streck_zeile(k, GP + 22, b)
+        k = TX.streck_zeile(k, GP + 22, b)
     # --- Schwanz wedelt (Gelenk x = 10), bleibt am Rumpf angewachsen ---
     s = platz_teil(warg, schwanz_m, 0, 0)
     s = L.spalten_welle(s, GP + 10, 2.4, L.sinus(i, 24))

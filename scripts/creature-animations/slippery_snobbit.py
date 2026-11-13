@@ -34,6 +34,8 @@ import numpy as np
 import anim_eis as E
 import anim_humanoide as Hm
 import anim_lib as L
+import anim_textur as TX   # texturierte Streckzeilen statt Zeilenkopien (Regel 43/49)
+TX.umleiten()               # auch Streckaufrufe innerhalb der Gruppenmodule liefern texturierte Zeilen
 import anim_rutsch as R
 
 N, MS = 48, 66
@@ -64,9 +66,9 @@ R_, SL, SR = teil(rest), teil(links), teil(rechts)
 
 def saeule(a, lev):
     if lev > 0:
-        return L.streck_zeile(a, PAD_T + 5, 1)
+        return TX.streck_zeile(a, PAD_T + 5, 1)
     if lev < 0:
-        return L.streck_zeile(a, PAD_T + 5, -1)
+        return TX.streck_zeile(a, PAD_T + 5, -1)
     return a
 
 

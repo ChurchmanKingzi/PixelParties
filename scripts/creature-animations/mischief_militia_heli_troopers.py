@@ -32,6 +32,8 @@ import numpy as np
 import anim_eis as E
 import anim_humanoide as Hm
 import anim_lib as L
+import anim_textur as TX   # texturierte Streckzeilen statt Zeilenkopien (Regel 43/49)
+TX.umleiten()               # auch Streckaufrufe innerhalb der Gruppenmodule liefern texturierte Zeilen
 
 N, MS = 48, 62
 PAD_L, PAD_R, PAD_T, PAD_B = 8, 8, 6, 5
@@ -67,7 +69,7 @@ def koerper(i):
     if brust:
         for (x, y) in ARM_UEBER_NAHT:
             k[PAD_T + y, PAD_L + x, :3] = k[PAD_T + 16, PAD_L + x, :3]
-    k = Hm.atmen(k, PAD_T + 16, PAD_T + 12, brust, 0)
+    k = TX.atmen(k, PAD_T + 16, PAD_T + 12, brust, 0)
     if brust:
         Hm.setze(k, {(x, y - brust): ZWEIG for (x, y) in ARM_UEBER_NAHT}, OFF)
     # Schweben: ganze Figur

@@ -38,6 +38,8 @@ import sys
 import numpy as np
 
 import anim_lib as L
+import anim_textur as TX   # texturierte Streckzeilen statt Zeilenkopien (Regel 43/49)
+TX.umleiten()               # auch Streckaufrufe innerhalb der Gruppenmodule liefern texturierte Zeilen
 import anim_untote as U
 import anim_daemon as D
 
@@ -123,7 +125,7 @@ def frame_gross(i, nur=None):
         for (x, y) in AUGEN:
             kp[GPT + y, GPL + x, :3] = GESICHT
     # Körper
-    br = L.streck_zeile(T_BRUST, GPT + 25, n)
+    br = TX.streck_zeile(T_BRUST, GPT + 25, n)
     koerper_teile = [(rl, 0, -n), (rr, 0, -n), (T_BEINE, 0, 0), (T_DL, 0, 0), (T_DR, 0, 0), (br, 0, 0), (kp, 0, -n_kopf), (fl, 0, -n_kopf), (fr, 0, -n_kopf)]
     # Fühler/Kopf lösen sich beim Heben nicht vom Hals: Kopf ist maximal so hoch wie die Brust, Fühler gehören zum Kopf
     f = L.zusammen(H, W, koerper_teile)

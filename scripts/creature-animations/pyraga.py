@@ -19,7 +19,7 @@ Was ist was (x/y im Sprite):
 Fest bleiben: Körperform, Beine/Klauen, Hauer, Zunge, Maul, Nüstern.
 
 Ablauf (48 Frames à 65 ms = 3,12 s; Frame 0 = Original, die Flammen sind ausgenommen):
-* Feuer (Runde 4, „richtige Feuer-Animation“, Modul anim_feuer3.py): klassischer Flammenzyklus mit Aufwärtsfluss, 8 Posen à 2 Frames (3 Zyklen je Schleife). Beide Flammen sitzen dort, wo sie gemalt sind, und haben deren Größe
+* Feuer (Runde 4, „richtige Feuer-Animation“, Modul anim_feuer3.py): klassischer Flammenzyklus mit Aufwärtsfluss; Runde 5: schneller und lebhafter (16 Posen à 1 Frame, Welle läuft 2× je Zyklus ≈ 0,5 s, Zungen wechseln Länge/Neigung), 3 Zyklen je Schleife; die Rückenflamme schlägt aus dem Loch im Rücken (siehe FL_R). Beide Flammen sitzen dort, wo sie gemalt sind, und haben deren Größe
   und Farben (Rot außen → Orange → Gelb → Creme-Kern am Fuß): links (Nacken) ein ruhiger Glutsockel auf dem Oliv-Balken + drei phasenversetzte Zungen nach oben; rechts (Hinterteil) Sockel auf dem Rücken + drei Zungen, die wie
   gemalt nach rechts oben fließen. Bäuche wandern vom Fuß zur Spitze, Spitzen schnüren sich ab und steigen als kleine Fetzen weiter. Die Flammen heben sich beim Atmen mit dem Körper. Keine Einzelfunken mehr.
 * Atmen zweistufig 0-1-2-1-0 px (Periode 24, zweimal pro Schleife): die Hautzeile y 22 (reine Haut, ohne Nüstern/Augen) wird 1–2× eingefügt (anim_lib.streck_zeile mit Texturmischung); alles darüber (Rücken, Kopf, Flammen) steigt,
@@ -75,16 +75,33 @@ def flamm_vorlage(maske):
 # Runde 4 (anim_feuer3: klassischer Flammenzyklus mit Aufwärtsfluss, 8 Posen à 2 Frames, 3 Zyklen je Schleife; Lage/Größe/Farben nach der gemalten Flamme)
 _F = lambda x, y, l, b, **k: F3.Flamme(x + GPL, y + GPT, l, b, **k)
 # linke Flamme (Mähne im Nacken): flacher Fuß auf dem Oliv-Balken (y 12), ruhiger Glutsockel + zwei phasenversetzte Zungen (Spitzen der Quelle bei (10,0) und (14,1))
-FL_L = [_F(11.5, 12.6, 6, 4.6, fuss=0, bauch=0.2, schlag=0.3, phase=0.2, baender=F3.SOCKEL),
+FL_L = [_F(11.5, 12.6, 6, 4.6, fuss=0, bauch=0.2, schlag=0.3, phase=0.2, baender=F3.SOCKEL, puls=0.08, wiegen=0.1),
         _F(11.6, 11.5, 8, 2.6, phase=0.72),
         _F(9.6, 11.5, 12, 3.0, phase=0.0, richtung=(-0.06, -1)),
         _F(13.6, 11.5, 11, 3.0, phase=0.5, richtung=(0.08, -1))]
-# rechte Flamme (Hinterteil): Fuß auf dem Rücken, fließt wie gemalt nach rechts oben (Spitze der Quelle bei (52,12))
-FL_R = [_F(41.0, 16.0, 6, 4.6, richtung=(1, -0.3), fuss=2.5, bauch=0.2, schlag=0.3, phase=0.6, baender=F3.SOCKEL),
-        _F(42.0, 15.4, 8, 2.6, richtung=(1, -0.28), phase=0.35),
-        _F(41.5, 13.6, 12, 3.0, richtung=(1, -0.42), phase=0.1),
-        _F(42.5, 17.2, 10, 2.8, richtung=(1, -0.12), phase=0.6)]
-FEUER = F3.Feuer(H, W, FL_L + FL_R, [ROT, ORANGE, GELB, CREME], posen=8, halten=2, sperre=SPERRE)
+# rechte Flamme (Runde 5: „soll AUS dem Loch im Rücken kommen“). Das Loch ist die Öffnung im Umriss zwischen (36,14) und (41,21); sein dunkler Grund ist der Oliv-Streifen (36,15)…(41,20).
+# Die Flammenfüße sitzen jetzt AUF diesem Streifen (im Loch, vom Körper verdeckt), der Sockel ist so breit wie das Loch, die Zungen schlagen wie gemalt nach rechts oben heraus.
+# Links/oberhalb der Lochkante (x − y ≤ 21) wird nichts gezeichnet (nichts schwebt über dem Rücken), der Oliv-Streifen bleibt als Öffnung sichtbar.
+FL_R = [_F(38.3, 17.3, 6, 4.2, richtung=(1, -0.55), fuss=2.5, bauch=0.2, schlag=0.3, phase=0.6, baender=F3.SOCKEL, puls=0.08, wiegen=0.1),
+        _F(39.0, 17.6, 10, 2.8, richtung=(1, -0.4), phase=0.35),
+        _F(37.6, 15.6, 15, 3.2, richtung=(1, -0.5), phase=0.1),
+        _F(40.0, 19.0, 13, 3.0, richtung=(1, -0.22), phase=0.6)]
+FEUER = F3.Feuer(H, W, FL_L, [ROT, ORANGE, GELB, CREME], posen=16, halten=1, sperre=SPERRE)
+SPERRE_R = SPERRE.copy()
+_yy, _xx = np.mgrid[0:H, 0:W]
+SPERRE_R |= ((_xx - GPL) - (_yy - GPT) <= 21)
+FEUER_R = F3.Feuer(H, W, FL_R, [ROT, ORANGE, GELB, CREME], posen=16, halten=1, sperre=None)
+# fester Flammenfuß: die Pixel direkt an der Lochkante brennen in jedem Frame (gelb/creme = heißer Kern im Loch), damit nie Hintergrund zwischen Loch und Flamme steht
+FUSS_R = [((37, 15), ORANGE), ((38, 15), ORANGE), ((38, 16), GELB), ((39, 16), GELB), ((39, 17), CREME), ((40, 17), CREME), ((40, 18), CREME), ((41, 18), GELB), ((41, 19), GELB), ((42, 19), ORANGE), ((42, 20), ROT), ((38, 14), ROT), ((37, 14), ROT)]
+
+
+def feuer_rechts(i, n):
+    e = FEUER_R.ebene(i)
+    for (x, y), c in FUSS_R:
+        if e[GPT + y, GPL + x, 3] == 0 or (c != ROT and tuple(e[GPT + y, GPL + x, :3]) in (ROT, ORANGE) and c in (GELB, CREME)):
+            e[GPT + y, GPL + x] = c + (255,)
+    e[SPERRE_R] = 0
+    return L.versetze(e, 0, -n) if n else e
 
 
 def teil(maske):
@@ -111,7 +128,7 @@ def frame_gross(i, nur=None):
         kp[GPT + y, GPL + x, :3] = lava_farbe(k, i)
     kp = L.streck_zeile(kp, GPT + 22, n)
     kp = U.kontur_schliessen(kp, UMRISS, KONTUR)
-    fl = FEUER.ebene(i, dy=-n)
+    fl = L.zusammen(H, W, [(FEUER.ebene(i, dy=-n), 0, 0), (feuer_rechts(i, n), 0, 0)])
     f = U.kontur_schliessen(L.zusammen(H, W, [(fl, 0, 0), (kp, 0, 0)]), UMRISS, ROT)
     if nur == 'koerper':
         return f

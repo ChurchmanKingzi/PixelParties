@@ -42,6 +42,8 @@ import numpy as np
 import anim_humanoide as Hm
 import anim_krieger as K
 import anim_lib as L
+import anim_textur as TX   # texturierte Streckzeilen statt Zeilenkopien (Regel 43/49)
+TX.umleiten()               # auch Streckaufrufe innerhalb der Gruppenmodule liefern texturierte Zeilen
 
 N, MS = 48, 62
 sz = K.Szene('priest-of-tempeste', (4, 4, 4, 2))              # Hutspitze ±2 px, Hut 2 px nach oben, Randabstand ≥ 2

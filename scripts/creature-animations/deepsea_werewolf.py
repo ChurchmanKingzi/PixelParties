@@ -40,6 +40,8 @@ import cv2
 import numpy as np
 
 import anim_lib as L
+import anim_textur as TX   # texturierte Streckzeilen statt Zeilenkopien (Regel 43/49)
+TX.umleiten()               # auch Streckaufrufe innerhalb der Gruppenmodule liefern texturierte Zeilen
 import anim_untote as U
 
 N, MS = 48, 70
@@ -196,7 +198,7 @@ def frame_gross(i, nur=None):
     oben = L.zusammen(H, W, [(ranken(i), 0, 0), (kb, 0, 0), (OHRL_A, dl, 0), (OHRR_A, dr, 0)])
     # Atmen: alles oberhalb der Hüfte hebt sich 1 px (Zeile y 28 wird einmal wiederholt)
     if U.stufe(i, 24, 1) == 1:
-        oben = L.streck_zeile(oben, GPT + 28, 1)
+        oben = TX.streck_zeile(oben, GPT + 28, 1)
     bl_ = 1 if (i % 16) in (3, 4, 5) else 0
     br_ = 1 if (i % 16) in (11, 12, 13) else 0
     koerper = L.zusammen(H, W, [(oben, 0, 0), (BEINL_A, 0, -bl_), (BEINR_A, 0, -br_)])

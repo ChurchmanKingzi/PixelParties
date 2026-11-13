@@ -38,6 +38,8 @@ import numpy as np
 
 import anim_humanoide as Hm
 import anim_lib as L
+import anim_textur as TX   # texturierte Streckzeilen statt Zeilenkopien (Regel 43/49)
+TX.umleiten()               # auch Streckaufrufe innerhalb der Gruppenmodule liefern texturierte Zeilen
 
 N, MS = 48, 62
 PAD_L, PAD_R, PAD_T, PAD_B = 3, 3, 4, 2          # Arm schlägt höchstens 1 px nach links aus (+2 Rand), Kopfhub 1 px oben (+3), Randabstand ≥ 2
@@ -114,7 +116,7 @@ def frame(i, nur=None):
         Hm.setze(k, {(8, 8): HAUT, (9, 8): HAUT, (8, 9): LIPPE, (9, 9): LIPPE}, OFF)
     # --- Auf und ab: Anzugzeile 20 = Brust (nur senkrecht, Kopf bleibt in der Mitte) ---
     brust = Hm.stufe(i, N / 2, 1)
-    k = Hm.atmen(k, PAD_T + 20, PAD_T + 7, brust, 0)
+    k = TX.atmen(k, PAD_T + 20, PAD_T + 7, brust, 0)
     # Regel 16: Randpixel in Nicht-Umrissfarbe werden Umriss (Kopf → Braun, Körper → Dunkelgrau)
     kk = Hm.kantenmaske(k)
     for y, x in zip(*np.nonzero(kk)):

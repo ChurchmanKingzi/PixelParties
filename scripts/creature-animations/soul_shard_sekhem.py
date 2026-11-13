@@ -18,7 +18,7 @@ Was im Sprite ist (Koordinaten im Sprite 19×25, x/y ab 0):
   (9,11)=P (111,0,5) und (10,11)=Q (196,0,9) oben, (9,12)=(10,12)=P unten. Darüber liegt die dunkelbraune Maullinie H (49,24,0) bei (9–10,10), darunter Mähne C (59,11,11).
 * Roter Orb über dem Kopf (Nutzer-Feedback Runde 4: „der rote Orb über dem Kopf fehlt“): eigene Ebene „Ebene #9“ (MotiveEgypt.xcf, Ebene 225, 14×14 px, 5 Rot-/Rosatöne, konzentrische Ringe: Kern (194,57,20),
   (227,67,23), (252,74,26), (252,91,64), Rand (252,194,185)); liegt in der xcf bei (522,94), die Figur bei (519,110) → im Sprite bei (3,−16), 2 Zeilen Abstand zum Scheitel (deckt sich mit der Kartenkunst: Sonnenscheibe bei (31–44,1–14)).
-  Die Pixel stehen als ORB_MAP im Skript (src/soul-shard-sekhem.png bleibt die Figur allein). Er schwebt 1 px auf/ab (Periode 16 Frames), folgt dem Kopf beim Atmen und pulsiert (Kern glimmt in zwei Stufen auf, Periode 12 Frames);
+  Die Pixel stehen als ORB_MAP im Skript (src/soul-shard-sekhem.png bleibt die Figur allein). Runde 5 („der rote Orb soll stationär sein“): er steht fest an seinem Platz (kein Schweben, folgt NICHT dem Atmen des Kopfes) und pulsiert nur (Kern glimmt in zwei Stufen auf, Periode 12 Frames);
   Größe und Rand bleiben fest. Kein Glanz/Glitzerstern.
 Fest bleiben: Umriss, Kopfform, Gesicht, Mähne, Zähne (Zunge/Zähne bleiben starr; nur die rote Öffnung wird dunkel gefüllt).
 
@@ -41,6 +41,7 @@ import numpy as np
 import anim_lib as L
 import anim_amorph as A
 import anim_shard as SH
+import anim_textur as TX   # texturierte Streckzeilen statt Zeilenkopien (Regel 43/49)
 
 N, MS = 48, 65
 PAD_L, PAD_R, PAD_T, PAD_B = 3, 3, 21, 2                                                       # oben: 16 px Orb + 1 px Schweben + 2 px Atmen + 2 px Rand
@@ -87,7 +88,6 @@ def orb(stufe):
 spr = L.leer(sh - ORB_Y, sw)
 L.einsetzen(spr, FIG, 0, -ORB_Y)
 L.einsetzen(spr, orb(0), ORB_X, 0)
-ORB_HUB = [1 if math.sin(2 * math.pi * _i / 16 - 0.6) >= 0.3 else 0 for _i in range(48)]                 # Schweben: 1 px auf/ab, Periode 16 Frames (unabhängig vom Atmen)
 ORB_STUFE = [(0, 0, 0, 1, 1, 2, 2, 2, 2, 1, 1, 0)[_i % 12] for _i in range(48)]                          # Pulsieren: Periode 12 Frames, weich über die Zwischenstufe
 RAND_FARBEN = A.umrissfarben(FIG)
 UMRISS = (12, 12, 12)
@@ -147,7 +147,7 @@ BLINK = {13: 2, 14: 2, 37: 2, 38: 2}                                            
 
 
 def figur(i):
-    ebene, top, quelle = SH.ebene_atmung(KOERPER, POSEN[S[i]], H, W, PAD_L, PAD_T, BODEN)
+    ebene, top, quelle = TX.ebene_atmung(KOERPER, POSEN[S[i]], H, W, PAD_L, PAD_T, BODEN)
     teile = L.leer(H, W)
     for k, pix in TEILE.items():
         for (y, x) in pix:
@@ -169,7 +169,7 @@ def figur(i):
 def frame(i):
     f = figur(i)
     out = f['fig'].copy()                                                                                # der Orb schwebt frei (nicht mit der Figur verbunden) → erst NACH Umriss-/Verbindungslogik einsetzen
-    L.einsetzen(out, orb(ORB_STUFE[i]), PAD_L + ORB_X, f['top'] + ORB_Y - ORB_HUB[i])                   # folgt dem Kopf (Atmen) und schwebt zusätzlich 0/1 px
+    L.einsetzen(out, orb(ORB_STUFE[i]), PAD_L + ORB_X, PAD_T + ORB_Y)                                  # Runde 5: der Orb steht FEST (kein Schweben, folgt nicht dem Atmen); nur der Kern pulsiert
     return out
 
 

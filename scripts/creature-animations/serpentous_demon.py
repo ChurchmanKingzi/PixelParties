@@ -34,6 +34,8 @@ import sys
 import numpy as np
 
 import anim_lib as L
+import anim_textur as TX   # texturierte Streckzeilen statt Zeilenkopien (Regel 43/49)
+TX.umleiten()               # auch Streckaufrufe innerhalb der Gruppenmodule liefern texturierte Zeilen
 import anim_untote as U
 import anim_daemon as D
 
@@ -76,7 +78,7 @@ def frame_gross(i, nur=None):
     orr = D.oben_pendel(T_OR, GPT + 9, 2.2, -L.sinus(i, 16), potenz=1.0, lauf=3.2)
     al = D.unten_pendel(T_AL, GPT + 17, 1.8, L.sinus(i, 24), potenz=1.0, lauf=2.6)
     ar = D.schlange_aussen(T_AR, GPT + 17, 1.9, i, 24, lauf=2.4, potenz=1.5)      # rechter Arm: gleichmäßige Wellenbewegung nach außen und zurück (kein Zucken)
-    rp = L.streck_zeile(T_RUMPF, GPT + 23, n)
+    rp = TX.streck_zeile(T_RUMPF, GPT + 23, n)
     bl = 1 if (i % 24) in (17, 18, 19) else 0
     br = 1 if (i % 24) in (5, 6, 7) else 0
     fl_ = L.heben_unten(T_FUSS_L, GPT + 27, bl) if bl else T_FUSS_L

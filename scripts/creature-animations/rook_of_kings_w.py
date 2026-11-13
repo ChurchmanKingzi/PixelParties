@@ -28,6 +28,8 @@ import sys
 
 import anim_humanoide as Hm
 import anim_lib as L
+import anim_textur as TX   # texturierte Streckzeilen statt Zeilenkopien (Regel 43/49)
+TX.umleiten()               # auch Streckaufrufe innerhalb der Gruppenmodule liefern texturierte Zeilen
 import anim_schach as Sc
 
 SLUG, KARTE = 'rook-of-kings-w', 'Rook of Kings [W]'

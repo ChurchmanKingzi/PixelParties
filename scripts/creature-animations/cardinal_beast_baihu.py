@@ -42,6 +42,8 @@ import anim_flieger_b as FB
 import anim_gbb as G
 import anim_humanoide as Hm
 import anim_lib as L
+import anim_textur as TX   # texturierte Streckzeilen statt Zeilenkopien (Regel 43/49)
+TX.umleiten()               # auch Streckaufrufe innerhalb der Gruppenmodule liefern texturierte Zeilen
 
 N, MS = 48, 80
 PAD_L, PAD_R, PAD_T, PAD_B = 5, 5, 6, 3
@@ -134,7 +136,7 @@ def frame(i):
                 pix.update({p: LID for p in A_['u']})
                 pix.update({p: AUGE_DUNKEL for p in A_['m']})
             Hm.setze(kp, pix, OFF)
-    kp = L.streck_zeile(kp, PAD_T + 25, r)
+    kp = TX.streck_zeile(kp, PAD_T + 25, r)
     # ── Ohren ──
     ol, orr = ebene(ohr_l), ebene(ohr_r)
     for lay, vorz, start in ((ol, -1, 8), (orr, 1, 30)):

@@ -27,6 +27,9 @@ Nutzerwunsch (Runde 4): „Bei den ganzen Eiern sollten die Risse verschwinden, 
 → STAND RUNDE 4 (ersetzt die Rissbeschreibung oben; Lichtband und Sparkles unverändert): 10 Risse, Hauptast 4–14 Pixel, die größeren mit 1–2 Seitenästen (2–4 Pixel) und 1–4 Stellen, an denen der Riss 2 px dick ist.
   Sie wachsen Pixel für Pixel, stehen 4–8 Frames in voller Form und BLEICHEN dann AUS: alle Pixel bleiben stehen, die Farbe geht in 4 Stufen à 3 Frames entlang der Gold-Rampe (F → D → A → C → B) zur Farbe darunter
   (einschließlich des gerade durchlaufenden Lichtbands), letzte Stufe Schachbrett-Dither (kein Alpha, kein Schrumpfen; nur Farben des Sprites). Mindestens 3 Pixel vom Rand, nie auf einem Sparkle-Arm.
+Nutzerwunsch (Runde 5): „Bei den Eiern verschwinden die Risse noch zu schnell, nachdem sie erschienen sind.“
+→ STAND RUNDE 5 (nur die Zeiten; Rissformen, Wachstum, Lichtband und Sparkles unverändert): Schleife 144 Frames à 65 ms = 9,4 s (vorher 72 = 4,7 s; Lichtband und Sparkles laufen im alten 72-Frame-Takt weiter, also zweimal je Schleife). Jeder Riss steht nach dem vollständigen Wachsen 24–31 Frames (1,5–2,0 s; vorher 4–8 Frames) in voller Stärke und bleicht erst dann aus,
+  und zwar langsamer: 5 Stufen (4 Farbstufen + Schachbrett-Dither) à 6 Frames = 1,95 s (vorher à 3 Frames = 1,0 s). Gleich viele Risse wie bisher, über die längere Schleife verteilt (im Mittel nicht mehr gleichzeitig sichtbar als vorher).
 Ergänzungen: keine (der Rand wird nie verändert).
 Frame: Sprite plus 3 px Rand rundum — Figur zentriert; die Sterne liegen in den freien Ecken innerhalb des Sprite-Rechtecks.
 Nur ganze Pixel, nur Farben der Quelle.
@@ -40,7 +43,8 @@ import anim_lib as L
 import anim_amorph as A
 import anim_eier as E
 
-N, MS = 72, 65
+N, MS = 144, 65
+TAKT = 72                                                                                # Lichtband und Sparkles wiederholen sich wie bisher alle 72 Frames (unverändert)
 PAD_L, PAD_R, PAD_T, PAD_B = 3, 3, 3, 3
 GLANZ = True
 
@@ -68,7 +72,7 @@ INNEN = OPAK & ~RAND0
 GOLD = INNEN & _maske(CA, CC, CB)                                                       # Rampe A→C→B→E (Weiß E bleibt)
 HELLER = {CA: CC, CC: CB, CB: CE}
 STERN_FARBEN = {'m': CE, 'a': CB, 's': CC}
-SWEEPS = [4, 40]
+SWEEPS = [4, 40, 76, 112]
 SWEEP_N = 16
 
 # ── Sparkles: kurze Sterne (Regel 34), immer nur einer zur Zeit ──
@@ -81,7 +85,7 @@ for _k in ('e1', 'e2', 'e3', 'e4'):
         assert INNEN[_y + _dy, _x + _dx], (_k, _dx, _dy)
 for _k in ('c1', 'c2', 'c3', 'c4'):
     assert not OPAK[ORTE[_k][1], ORTE[_k][0]], _k
-STERNE = [(3, 'c1'), (13, 'e1'), (23, 'c2'), (33, 'e3'), (43, 'e4'), (52, 'c3'), (62, 'e2')]
+STERNE = [(s + t, o) for t in (0, 72) for (s, o) in [(3, 'c1'), (13, 'e1'), (23, 'c2'), (33, 'e3'), (43, 'e4'), (52, 'c3'), (62, 'e2')]]
 
 
 def aktive_sterne(i):
@@ -101,9 +105,9 @@ _SITES = [
     dict(h=[(23, 27), (24, 28), (23, 29), (23, 30)], z=[[(25, 29), (26, 29)]], d=[(23, 28)]),
     dict(h=[(12, 33), (11, 33), (10, 33), (9, 32), (8, 32)], z=[], d=[(11, 32), (10, 32)]),
 ]
-_HALTEN = [4, 7, 5, 8, 4, 6, 5, 7]
+_HALTEN = [24, 30, 26, 31, 23, 28, 25, 29]                                                # Frames in voller Stärke: 1,5–2,0 s (Runde 5)
 _kw = [dict(haupt=f['h'] if k % 2 == 0 else list(reversed(f['h'])), zweige=f['z'], dick=f['d'], halten=_HALTEN[k % len(_HALTEN)], tempo=1 if len(f['h']) >= 6 else 2,
-            stufen=4, stufe_frames=3) for k, f in enumerate(_SITES)]
+            stufen=4, stufe_frames=6) for k, f in enumerate(_SITES)]
 _st = E.plane_starts([E.BleichRiss(start=0, **kw).leben for kw in _kw], N, basis=1, seed=7)
 RISSE = [E.BleichRiss(start=s, **kw) for s, kw in zip(_st, _kw)]
 ERLAUBT = E.sicher(spr, [CA, CB, CC, CD, CE], sorted(_farben), rand_abstand=3)
@@ -164,4 +168,4 @@ if __name__ == '__main__':
     print('Frames mit Befund:', [(k, n_, offen) for (k, n_, offen) in schlecht][:6])
     L.speichern('shimmering-dragonegg', 'Shimmering Dragonegg', frames, MS, prev)
     if prev:
-        L.streifen(prev + '/shimmering-dragonegg-strip.png', frames[::3], spalten=12, scale=4)
+        L.streifen(prev + '/shimmering-dragonegg-strip.png', frames[::6], spalten=12, scale=4)

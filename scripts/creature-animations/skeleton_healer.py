@@ -43,6 +43,8 @@ import sys
 import numpy as np
 
 import anim_lib as L
+import anim_textur as TX   # texturierte Streckzeilen statt Zeilenkopien (Regel 43/49)
+TX.umleiten()               # auch Streckaufrufe innerhalb der Gruppenmodule liefern texturierte Zeilen
 import anim_untote as U
 
 N, MS = 48, 65
@@ -120,7 +122,7 @@ def frame_gross(i, nur=None):
         for (x, y) in AUGEN:
             pk[GPT + y, GPL + x, :3] = WEISS
     if n_a:
-        pk = L.streck_zeile(pk, GPT + ZEILE_STRECK, n_a)
+        pk = TX.streck_zeile(pk, GPT + ZEILE_STRECK, n_a)
     # --- Federbusch: hebt sich starr mit dem Kopf; die Spitze (2×2) wippt seitlich ---
     pp = teil(A_SP, plume)
     if tip:

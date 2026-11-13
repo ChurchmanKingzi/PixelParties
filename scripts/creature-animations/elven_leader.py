@@ -43,6 +43,8 @@ import numpy as np
 
 import anim_humanoide as Hm
 import anim_lib as L
+import anim_textur as TX   # texturierte Streckzeilen statt Zeilenkopien (Regel 43/49)
+TX.umleiten()               # auch Streckaufrufe innerhalb der Gruppenmodule liefern texturierte Zeilen
 
 N, MS = 48, 62
 PAD_L, PAD_R, PAD_T, PAD_B = 10, 10, 6, 3
@@ -142,7 +144,7 @@ def frame(i, blaetter=True):
     # --- Auf und ab: Brust zuerst (Hosenzeile 20), Kopf 3 Frames später (Halszeile 14) ---
     brust = Hm.stufe(i, N / 2, 1)
     kopf = Hm.stufe(i - 3, N / 2, 1)
-    k = Hm.atmen(k, PAD_T + 20, PAD_T + 14, brust, kopf)
+    k = TX.atmen(k, PAD_T + 20, PAD_T + 14, brust, kopf)
     # --- Saum wedelt (Zeilen 20–23 liegen nach dem Atmen an ihrem Platz) ---
     for seite, liste in SAUM.items():
         for (r, xe, pixel) in liste:

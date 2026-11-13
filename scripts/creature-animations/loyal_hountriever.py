@@ -41,6 +41,8 @@ import sys
 import numpy as np
 
 import anim_lib as L
+import anim_textur as TX   # texturierte Streckzeilen statt Zeilenkopien (Regel 43/49)
+TX.umleiten()               # auch Streckaufrufe innerhalb der Gruppenmodule liefern texturierte Zeilen
 import anim_tiere as T
 
 N, MS = 58, 62
@@ -116,7 +118,7 @@ def frame(i, nur=None):
         x, y = MARKE[glanz]
         k[PAD_T + y, PAD_L + x, :3] = HELL
     z = PAD_T + BEINZEILE
-    r = L.streck_zeile(k, z, atem)
+    r = TX.streck_zeile(k, z, atem)
     cols = np.arange(W)[None, :]
     fuss = (np.arange(H)[:, None] >= PAD_T + 13) & (cols >= PAD_L + 2) & (cols <= PAD_L + 9)
     # Innenumrisse (5,13) (6,13) zwischen den Beinen bleiben am Körper (Umriss unter dem Bein-/Brustansatz)
@@ -124,8 +126,8 @@ def frame(i, nur=None):
     fr_, rest = L.trenne(rest, fuss & (cols >= PAD_L + 7))
     fl = L.heben_unten(fl, PAD_T + 13, tipp_l)
     fr_ = L.heben_unten(fr_, PAD_T + 13, tipp_r)
-    ol = L.streck_zeile(T.ohr_haengend(teil(ohr_l), ohr_profil(ohr_li, -1), 'links'), z, atem)
-    orr = L.streck_zeile(T.ohr_haengend(teil(ohr_r), ohr_profil(ohr_re, 1), 'rechts'), z, atem)
+    ol = TX.streck_zeile(T.ohr_haengend(teil(ohr_l), ohr_profil(ohr_li, -1), 'links'), z, atem)
+    orr = TX.streck_zeile(T.ohr_haengend(teil(ohr_r), ohr_profil(ohr_re, 1), 'rechts'), z, atem)
     ebenen = {'rumpf': rest, 'fuss_l': fl, 'fuss_r': fr_, 'ohr_l': ol, 'ohr_r': orr}
     wahl = nur or ('rumpf', 'fuss_l', 'fuss_r', 'ohr_l', 'ohr_r')
     return L.zusammen(H, W, [(ebenen[n], 0, 0) for n in wahl])

@@ -46,6 +46,8 @@ import sys
 import numpy as np
 
 import anim_lib as L
+import anim_textur as TX   # texturierte Streckzeilen statt Zeilenkopien (Regel 43/49)
+TX.umleiten()               # auch Streckaufrufe innerhalb der Gruppenmodule liefern texturierte Zeilen
 import anim_tiere as T
 
 N, MS = 50, 70
@@ -135,15 +137,15 @@ def frame(i, nur=None):
         x, y = HALSBAND[glanz]
         alt = tuple(int(v) for v in spr[y, x, :3])
         k[PAD_T + y, PAD_L + x, :3] = MITTEL if alt == HELL else HELL
-    r = L.streck_zeile(k, PAD_T + BAUCHZEILE, atem)
+    r = TX.streck_zeile(k, PAD_T + BAUCHZEILE, atem)
     cols = np.arange(W)[None, :]
     fuss = (np.arange(H)[:, None] >= PAD_T + 14) & (cols >= PAD_L + 3) & (cols <= PAD_L + 10)
     fl, rest = L.trenne(r, fuss & (cols <= PAD_L + 5))
     fr_, rest = L.trenne(rest, fuss & (cols >= PAD_L + 8))
     fl = L.heben_unten(fl, PAD_T + 14, tipp_l)
     fr_ = L.heben_unten(fr_, PAD_T + 14, tipp_r)
-    ol = L.streck_zeile(T.ohr_haengend(teil(ohr_l), ohr_profil(ohr_li, -1), 'links'), PAD_T + BAUCHZEILE, atem)
-    orr = L.streck_zeile(T.ohr_haengend(teil(ohr_r), ohr_profil(ohr_re, 1), 'rechts'), PAD_T + BAUCHZEILE, atem)
+    ol = TX.streck_zeile(T.ohr_haengend(teil(ohr_l), ohr_profil(ohr_li, -1), 'links'), PAD_T + BAUCHZEILE, atem)
+    orr = TX.streck_zeile(T.ohr_haengend(teil(ohr_r), ohr_profil(ohr_re, 1), 'rechts'), PAD_T + BAUCHZEILE, atem)
     lo = L.leer(H, W)
     for x, m in locke.items():
         lo = L.zusammen(H, W, [(lo, 0, 0), (L.versetze(teil(m), 0, -atem), 0, 0)])

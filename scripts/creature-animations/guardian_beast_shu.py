@@ -39,6 +39,8 @@ import anim_amorph as A
 import anim_gbb as G
 import anim_humanoide as Hm
 import anim_lib as L
+import anim_textur as TX   # texturierte Streckzeilen statt Zeilenkopien (Regel 43/49)
+TX.umleiten()               # auch Streckaufrufe innerhalb der Gruppenmodule liefern texturierte Zeilen
 
 N, MS = 48, 80
 PAD_L, PAD_R, PAD_T, PAD_B = 4, 5, 4, 3
@@ -116,7 +118,7 @@ def frame(i):
             lay[:] = G.zeilen_dx(lay, dxs)
     # Zusammensetzen: Kopf + Ohren einmal gemeinsam atmen lassen
     oben = L.zusammen(H, W, [(ol, 0, 0), (orr, 0, 0), (kopf, 0, 0)])
-    oben = L.streck_zeile(oben, PAD_T + 13, r)
+    oben = TX.streck_zeile(oben, PAD_T + 13, r)
     # ── Körper (Goldplatte, Pfoten, Füße): Gold-Lichtband + Stern ──
     unten = ebene(unten_m)
     Hm.lichtband(unten, GOLD_M, OFF, i, N, 4, 14, GOLD, stufen=1, breite=3.0, achse=(1.0, 1.0))

@@ -36,6 +36,8 @@ import numpy as np
 
 import anim_humanoide as Hm
 import anim_lib as L
+import anim_textur as TX   # texturierte Streckzeilen statt Zeilenkopien (Regel 43/49)
+TX.umleiten()               # auch Streckaufrufe innerhalb der Gruppenmodule liefern texturierte Zeilen
 import anim_rebel as R
 
 N, MS = 48, 75
@@ -124,7 +126,7 @@ def frame(i):
         Hm.setze(a_, {p: f(*p) for p in pts[FREI + 1:]}, OFF)
     # Atmen: Kern dehnen (Zeile 21), obere Teile starr 1 px hoch
     if b:
-        k = L.streck_zeile(k, PAD_T + 21, 1)
+        k = TX.streck_zeile(k, PAD_T + 21, 1)
         al, ar, bol, bor, bl, br = (L.versetze(e, 0, -1) for e in (al, ar, bol, bor, bl, br))
     fig, etik = R.schichten(H, W, [(k, 'kern'), (bul, 'blatt'), (bur, 'blatt'), (bol, 'blatt'), (bor, 'blatt'), (bl, 'band'), (br, 'band'), (al, 'geweih'), (ar, 'geweih')])
     R.neue_loecher_fuellen(fig, LOCH0, ERLAUBT)

@@ -43,6 +43,8 @@ import sys
 import numpy as np
 
 import anim_lib as L
+import anim_textur as TX   # texturierte Streckzeilen statt Zeilenkopien (Regel 43/49)
+TX.umleiten()               # auch Streckaufrufe innerhalb der Gruppenmodule liefern texturierte Zeilen
 import anim_untote as U
 
 N, MS = 48, 60
@@ -110,7 +112,7 @@ def frame_gross(i, nur=None):
         for (x, y) in HOEHLE:
             kp[GPT + y, GPL + x, :3] = rot
             kp[GPT + y, GPL + x, 3] = 255
-    rp = L.streck_zeile(teil(rumpf), GPT + 12, atem)             # Zeile y 12 wird eingefügt: Schultern/Kopf heben sich über Becken und Beine
+    rp = TX.streck_zeile(teil(rumpf), GPT + 12, atem)             # Zeile y 12 wird eingefügt: Schultern/Kopf heben sich über Becken und Beine
     al, ar = teil(arm_l), teil(arm_r)
     al = L.spalten_welle(al, GPL + 4, 1.0 * hump, ph, lauf=1.0, nur_rechts=False)     # Unterarmwelle (Periode 12)
     ar = L.spalten_welle(ar, GPL + 15, 1.0 * hump, ph, lauf=1.0, nur_rechts=True)

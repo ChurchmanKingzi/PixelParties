@@ -40,6 +40,8 @@ import numpy as np
 import anim_humanoide as Hm
 import anim_krieger as K
 import anim_lib as L
+import anim_textur as TX   # texturierte Streckzeilen statt Zeilenkopien (Regel 43/49)
+TX.umleiten()               # auch Streckaufrufe innerhalb der Gruppenmodule liefern texturierte Zeilen
 
 N, MS = 48, 62
 sz = K.Szene('cykyran-war-counselor', (3, 4, 3, 2))          # Plume ±2 px, Wippen 1 px nach oben, Randabstand ≥ 2

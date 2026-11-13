@@ -37,6 +37,8 @@ import sys
 import numpy as np
 
 import anim_lib as L
+import anim_textur as TX   # texturierte Streckzeilen statt Zeilenkopien (Regel 43/49)
+TX.umleiten()               # auch Streckaufrufe innerhalb der Gruppenmodule liefern texturierte Zeilen
 import anim_untote as U
 
 N, MS = 48, 65
@@ -114,7 +116,7 @@ def frame_gross(i, nur=None):
                         c = col(x, y)
                         if c in RAMPE and c not in VISIER_FARBEN:
                             fg[GPT + y, GPL + x, :3] = RAMPE[c]
-    fg = L.streck_zeile(fg, GPT + ZEILE_ATMEN, n)
+    fg = TX.streck_zeile(fg, GPT + ZEILE_ATMEN, n)
     ri = teil(risse)
     koerper = L.zusammen(H, W, [(ri, 0, 0), (fg, 0, 0)])
     koerper = U.kontur_schliessen(koerper, UMRISS, SCHWARZ)

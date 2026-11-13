@@ -50,6 +50,8 @@ import numpy as np
 
 import anim_humanoide as Hm
 import anim_lib as L
+import anim_textur as TX   # texturierte Streckzeilen statt Zeilenkopien (Regel 43/49)
+TX.umleiten()               # auch Streckaufrufe innerhalb der Gruppenmodule liefern texturierte Zeilen
 
 N, MS = 48, 62
 PAD_L, PAD_R, PAD_T, PAD_B = 4, 5, 6, 3
@@ -156,7 +158,7 @@ def frame(i):
     # --- Auf und ab: Brust zuerst, Kopf 3 Frames später ---
     brust = Hm.stufe(i, N / 2, 1)
     kopf = Hm.stufe(i - 3, N / 2, 1)
-    k = Hm.atmen(k, PAD_T + 18, PAD_T + 14, brust, kopf)
+    k = TX.atmen(k, PAD_T + 18, PAD_T + 14, brust, kopf)
     if brust:
         # Unter der Hand (x 5–7) soll nicht der dunkle Handumriss (Zeile 18) doppelt stehen, sondern der Saum (Zeile 19) —
         # die eingefügte Zeile 18 wird dort mit der Zeile 19 überschrieben (Hand bleibt einfach hoch, Umriss einfach dick).

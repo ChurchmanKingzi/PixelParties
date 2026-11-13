@@ -41,6 +41,8 @@ import sys
 import numpy as np
 
 import anim_lib as L
+import anim_textur as TX   # texturierte Streckzeilen statt Zeilenkopien (Regel 43/49)
+TX.umleiten()               # auch Streckaufrufe innerhalb der Gruppenmodule liefern texturierte Zeilen
 import anim_tiere as T
 
 N, MS = 48, 66
@@ -124,7 +126,7 @@ def frame(i, nur=None):
     if zunge:                                                      # Zunge 1 px nach links (bleibt unter dem dunklen Mund (12–14, 10))
         setze(k, 12, 11, Q)
         setze(k, 14, 11, E_RE)
-    k = L.streck_zeile(k, ZEILE_STRECK, streck)                    # Hocke (−1) / Strecken (+1); alles darüber bewegt sich, die Füße bleiben
+    k = TX.streck_zeile(k, ZEILE_STRECK, streck)                    # Hocke (−1) / Strecken (+1); alles darüber bewegt sich, die Füße bleiben
     ol = ohr_biegen(teil(ohr_l), PAD_L + 10, 2.0 * ohr_li) if ohr_li else teil(ohr_l)
     orr = ohr_biegen(teil(ohr_r), PAD_L + 17, 2.0 * ohr_re) if ohr_re else teil(ohr_r)
     al = biegen(teil(arm_l), PAD_L + 9, 3.0, ph)

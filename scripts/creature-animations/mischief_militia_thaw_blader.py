@@ -42,6 +42,8 @@ import numpy as np
 import anim_eis as E
 import anim_humanoide as Hm
 import anim_lib as L
+import anim_textur as TX   # texturierte Streckzeilen statt Zeilenkopien (Regel 43/49)
+TX.umleiten()               # auch Streckaufrufe innerhalb der Gruppenmodule liefern texturierte Zeilen
 
 N, MS = 48, 66
 PAD_L, PAD_R, PAD_T, PAD_B = 8, 12, 20, 4
@@ -107,7 +109,7 @@ def koerper(i):
     if ty != 25:
         E.zweig_loeschen(k, OFF, ARM_L)
         E.zweig_zeichnen(k, OFF, (2, 27), (0, ty), ZWEIG, nur_leer=False)
-    k = Hm.atmen(k, PAD_T + 31, PAD_T + 22, E.verlauf3(i, 24, 0.0, 1), 0)
+    k = TX.atmen(k, PAD_T + 31, PAD_T + 22, E.verlauf3(i, 24, 0.0, 1), 0)
     Hm.kontur_schliessen(k, ERLAUBT, (85, 117, 169))
     return k
 

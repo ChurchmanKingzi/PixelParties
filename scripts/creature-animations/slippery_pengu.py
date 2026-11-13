@@ -38,6 +38,8 @@ import numpy as np
 import anim_eis as E
 import anim_humanoide as Hm
 import anim_lib as L
+import anim_textur as TX   # texturierte Streckzeilen statt Zeilenkopien (Regel 43/49)
+TX.umleiten()               # auch Streckaufrufe innerhalb der Gruppenmodule liefern texturierte Zeilen
 import anim_rutsch as R
 
 N, MS = 48, 62
@@ -76,7 +78,7 @@ def koerper(i):
     k = L.zusammen(H, W, [(sw_, 0, 0), (R_, 0, 0), (fl, 0, 0)])
     if Hm.folge(i, 26, [1, 1], N):
         Hm.setze(k, AUGE, OFF)
-    k = Hm.atmen(k, PAD_T + 12, PAD_T + 8, E.verlauf3(i, 24, 0.0, 1), 0)
+    k = TX.atmen(k, PAD_T + 12, PAD_T + 8, E.verlauf3(i, 24, 0.0, 1), 0)
     Hm.kontur_schliessen(k, ERLAUBT, (23, 23, 23))
     return k
 

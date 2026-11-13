@@ -38,6 +38,8 @@ import sys
 import numpy as np
 
 import anim_lib as L
+import anim_textur as TX   # texturierte Streckzeilen statt Zeilenkopien (Regel 43/49)
+TX.umleiten()               # auch Streckaufrufe innerhalb der Gruppenmodule liefern texturierte Zeilen
 import anim_tiere as T
 
 N, MS = 54, 65
@@ -103,7 +105,7 @@ def frame(i, nur=None):
             if lid == 2:
                 k[PAD_T + 4, PAD_L + x, :3] = HELL
     z = PAD_T + BAUCHZEILE
-    r = L.streck_zeile(k, z, atem)
+    r = TX.streck_zeile(k, z, atem)
     cols = np.arange(W)[None, :]
     fuss = (np.arange(H)[:, None] >= PAD_T + 9) & (cols >= PAD_L + 3) & (cols <= PAD_L + 10)
     # Innenumrisse (6,9) und (7,9) zwischen den Beinen bleiben am Körper (Umriss unter der Brust)
@@ -111,7 +113,7 @@ def frame(i, nur=None):
     fr_, rest = L.trenne(rest, fuss & (cols >= PAD_L + 8))
     fl = L.heben_unten(fl, PAD_T + 9, tipp_l)
     fr_ = L.heben_unten(fr_, PAD_T + 9, tipp_r)
-    sz = L.versetze(L.streck_zeile(teil(schwanz), z, atem), 0, wedel)
+    sz = L.versetze(TX.streck_zeile(teil(schwanz), z, atem), 0, wedel)
     ol = L.versetze(T.zucken_zeilen(teil(ohr_l), PAD_T + 2, -1.2 * ohr_li, {PAD_T + 0: 1.0, PAD_T + 1: 1.0}, innen='rechts'), 0, -atem)
     orr = L.versetze(T.zucken_zeilen(teil(ohr_r), PAD_T + 2, 1.2 * ohr_re, {PAD_T + 0: 1.0, PAD_T + 1: 1.0}, innen='links'), 0, -atem)
     ebenen = {'schwanz': sz, 'rumpf': rest, 'fuss_l': fl, 'fuss_r': fr_, 'ohr_l': ol, 'ohr_r': orr}

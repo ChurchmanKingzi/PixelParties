@@ -29,6 +29,11 @@ Nutzerwunsch (Runde 4): „Bei den ganzen Eiern sollten die Risse verschwinden, 
   an denen der Riss 2 px dick ist; sie dürfen jetzt auch das feste Lichtband des Eis kreuzen. Sie wachsen Pixel für Pixel, stehen 3–6 Frames in voller Form und BLEICHEN dann AUS: alle Pixel bleiben stehen, die Farbe geht
   in 4 Stufen à 2 Frames entlang der Gold-Rampe des Sprites (D → E → C → B → A → …) zur Farbe darunter, letzte Stufe Schachbrett-Dither (kein Alpha, kein Schrumpfen). Mindestens 3 Pixel vom Rand; ein Riss läuft nie,
   während an seiner Stelle ein Sparkle sitzt (die Startframes weichen aus, das Skript prüft es).
+Nutzerwunsch (Runde 5): „Bei den Eiern verschwinden die Risse noch zu schnell, nachdem sie erschienen sind.“
+→ STAND RUNDE 5 (nur die Zeiten; Rissformen, Wachstum, Lichtband und Sparkles unverändert): Schleife 144 Frames à 65 ms = 9,4 s (vorher 48 = 3,1 s; Lichtband und Sparkles laufen im alten 48-Frame-Takt weiter, also dreimal je Schleife). Jeder Riss steht nach dem vollständigen Wachsen 24–31 Frames (1,5–2,0 s; vorher 3–6 Frames) in voller Stärke und bleicht erst dann aus,
+  und zwar langsamer: 5 Stufen (4 Farbstufen + Schachbrett-Dither) à 5 Frames = 1,6 s (vorher à 2 Frames = 0,65 s). Gleich viele Risse wie bisher, über die längere Schleife verteilt (im Mittel nicht mehr gleichzeitig sichtbar als vorher).
+  Weil ein Riss jetzt länger lebt als die Pause zwischen zwei Sparkles an derselben Stelle (Sparkles unverändert), kann er ihnen zeitlich nicht mehr ausweichen: ein Sparkle blitzt jetzt VOR dem Riss auf
+  (liegt in der Schichtung darüber, verdeckt für 1–3 Frames ein bis zwei Risspixel an seinen Armspitzen); die frühere Sperre/Prüfung „nie unter einem Sparkle“ entfällt.
 Ergänzungen: keine (der Rand wird nie verändert).
 Frame: Sprite plus 4 px links/rechts, 5 px oben/unten (Eck-Sterne) — Figur zentriert.
 Nur ganze Pixel, nur Farben der Quelle.
@@ -42,7 +47,7 @@ import anim_lib as L
 import anim_amorph as A
 import anim_eier as E
 
-N, MS = 48, 65
+N, MS = 144, 65
 PAD_L, PAD_R, PAD_T, PAD_B = 4, 4, 5, 5
 GLANZ = True
 
@@ -72,7 +77,7 @@ def _maske(*cs):
 GOLD = INNEN & _maske(CA, CB, CC, CH)
 HELLER = {CC: CB, CB: CA, CA: CH, CH: CI}
 STERN_FARBEN = {'m': CG, 'a': CK, 's': CJ}
-SWEEPS = [2, 26]
+SWEEPS = [2, 26, 50, 74, 98, 122]                                                    # wie bisher alle 24 Frames (alter 48-Frame-Takt, dreimal je Schleife)
 SWEEP_N = 15
 
 # ── Sterne ──
@@ -89,7 +94,7 @@ for _k in ('c1', 'c2'):
     for (_dx, _dy) in [(d, 0) for d in range(-2, 3)] + [(0, d) for d in (-2, -1, 1, 2)]:
         _X, _Y = _x + _dx, _y + _dy
         assert not (0 <= _Y < sh and 0 <= _X < sw and OPAK[_Y, _X]), (_k, _dx, _dy)
-STERNE = [(3, 'c1'), (17, 'e1'), (26, 'c2'), (35, 'e2'), (43, 'e3')]
+STERNE = [(s + t, o) for t in (0, 48, 96) for (s, o) in [(3, 'c1'), (17, 'e1'), (26, 'c2'), (35, 'e2'), (43, 'e3')]]
 
 
 def aktive_sterne(i):
@@ -111,12 +116,12 @@ _SITES = [
     dict(h=[(8, 17), (7, 16), (6, 16)], z=[], d=[]),
 ]
 TOENE = E.toene_rampe([CD, CE_, CC, CB, CA, CH, CJ, CI, CG])                             # Ausbleichen entlang der Gold-Rampe des Sprites (dunkel → hell), je Pixel bis zur Farbe darunter
-_HALTEN = [6, 5, 3, 4, 5]
+_HALTEN = [30, 26, 24, 28, 31]                                                              # Frames in voller Stärke: 1,5–2,0 s (Runde 5)
 _ev = []
 for _k, _f in enumerate(_SITES):
     for _rev in ((False, True) if len(_f['h']) <= 4 else (False,)):                        # der kleine Riss zweimal je Schleife (einmal von jeder Seite her wachsend), die großen einmal
         _ev.append((_k, dict(haupt=list(reversed(_f['h'])) if _rev else _f['h'], zweige=_f['z'], dick=_f['d'], halten=_HALTEN[len(_ev) % len(_HALTEN)], tempo=1 if len(_f['h']) >= 5 else 2,
-                             stufen=4, stufe_frames=2)))
+                             stufen=4, stufe_frames=5)))
 _probe = [E.BleichRiss(start=0, **kw) for (_, kw) in _ev]
 
 
@@ -129,7 +134,7 @@ def _sparkle_im_weg(i, s):
     return False
 
 
-_st = E.plane_starts([r.leben for r in _probe], N, konflikt=lambda i, j: _ev[i][0] == _ev[j][0], basis=1, seed=2, sperre=_sparkle_im_weg)
+_st = E.plane_starts([r.leben for r in _probe], N, konflikt=lambda i, j: _ev[i][0] == _ev[j][0], basis=1, seed=2)                                # Runde 5: keine Sparkle-Sperre mehr (siehe Dateikopf); _sparkle_im_weg bleibt nur als Hilfsfunktion stehen
 RISSE = [E.BleichRiss(start=s, **kw) for s, (_, kw) in zip(_st, _ev)]
 ERLAUBT = E.sicher(spr, [c for c in sorted(_farben) if c != CD], sorted(_farben), rand_abstand=3)
 for _r in RISSE:
@@ -186,12 +191,14 @@ if __name__ == '__main__':
     z = E.zaehle(RISSE, N)
     print('Frame 0 weicht vom Original in', int((figs[0] != REF).any(axis=2).sum()), 'Pixeln ab |', len(RISSE), 'Risse | gleichzeitig höchstens', z['max'], ', Mittel', z['mittel'], '| Frames ohne Riss:', z['leer'])
     print('Sparkles gleichzeitig höchstens', max(len(aktive_sterne(i)) for i in range(N)), '| Frames mit Sparkle:', sum(1 for i in range(N) if aktive_sterne(i)), 'von', N)
-    for i in range(N):                                                                     # ein Sparkle darf nie auf einem gerade sichtbaren Riss liegen
+    for i in range(N):                                                                     # Runde 5: nur noch Anzeige, wo ein Sparkle kurz vor einem Riss liegt
         rm = (E.bleich_risse(REF, i, N, RISSE, CD, TOENE, PAD_L, PAD_T) != REF).any(axis=2)
         e = L.leer(H, W)
         for ort, stufe in aktive_sterne(i):
             A.stern(e, PAD_L + ORTE[ort][0], PAD_T + ORTE[ort][1], stufe, STERN_FARBEN)
-        assert not (rm & (e[..., 3] > 0)).any(), ('Sparkle auf Riss in Frame', i)
+        ueber = int((rm & (e[..., 3] > 0)).sum())
+        if ueber:
+            print('Sparkle liegt vor', ueber, 'Risspixel(n) in Frame', i)
     # Eck-Sterne dürfen das Ei nie berühren (auch nicht über die Ecke)
     for i in range(N):
         e = L.leer(H, W)
@@ -212,4 +219,4 @@ if __name__ == '__main__':
     print('Frames mit Befund:', [(k, n_, offen) for (k, n_, offen) in schlecht][:6])
     L.speichern('the-egg-of-god', 'The Egg of God', frames, MS, prev)
     if prev:
-        L.streifen(prev + '/the-egg-of-god-strip.png', frames[::2], spalten=12, scale=6)
+        L.streifen(prev + '/the-egg-of-god-strip.png', frames[::6], spalten=12, scale=6)

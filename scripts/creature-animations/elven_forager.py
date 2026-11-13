@@ -35,6 +35,8 @@ import numpy as np
 
 import anim_humanoide as Hm
 import anim_lib as L
+import anim_textur as TX   # texturierte Streckzeilen statt Zeilenkopien (Regel 43/49)
+TX.umleiten()               # auch Streckaufrufe innerhalb der Gruppenmodule liefern texturierte Zeilen
 import anim_untote as U
 
 N, MS = 48, 62
@@ -137,10 +139,10 @@ def frame_gross(i, nur=None):
         Hm.setze(k, AUGE_ZU, OFF)
     # --- Nicker (Kinnzeile 10 entfällt) und Atmen (Saumzeile 14 doppelt) ---
     if Hm.folge(i, 27, [1] * 6, N):
-        k = L.streck_zeile(k, GP + 10, -1)
+        k = TX.streck_zeile(k, GP + 10, -1)
     b = 1 if Hm.welle01(i, 24) > 0.5 else 0
     if b:
-        k = L.streck_zeile(k, GP + 14, b)
+        k = TX.streck_zeile(k, GP + 14, b)
     dx, dy = arm_pose(i)
     arm = L.versetze(arm_ebene(dx, dy), 0, -b)                   # der Arm hebt sich starr mit der Brust
     k = L.zusammen(H, W, [(k, 0, 0), (arm, 0, 0)])

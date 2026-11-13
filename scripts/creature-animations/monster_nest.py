@@ -28,6 +28,9 @@ Nutzerwunsch (Runde 4): „Bei den ganzen Eiern sollten die Risse verschwinden, 
 → STAND RUNDE 4 (ersetzt die Rissbeschreibung oben): 11 Rissstellen (2–3 je Ei), 3–8 Pixel lang, an 1–3 Stellen 2 px dick; die kleinen kommen zweimal je Schleife (17 Risse). Ein Riss wächst Pixel für Pixel, steht 3–6 Frames
   in voller Form und BLEICHT dann AUS: alle Pixel bleiben stehen, die Farbe geht in 4 Stufen à 2 Frames von Schwarz über Grau zur Schalenfarbe darunter, letzte Stufe Schachbrett-Dither (kein Alpha, kein Schrumpfen).
   Zwischentöne: Schattengrau F des Sprites plus vier Grautöne der Spielpalette (#323232, #535353, #a8a8a8, #b9b9b9; in L.pruefe freigegeben). Abstand zu Umriss/Raute wie bisher (alle 4 Nachbarn jedes Risspixels sind Schale).
+Nutzerwunsch (Runde 5): „Bei den Eiern verschwinden die Risse noch zu schnell, nachdem sie erschienen sind.“
+→ STAND RUNDE 5 (nur die Zeiten; Rissformen, Wachstum unverändert): Schleife 144 Frames à 75 ms = 10,8 s (vorher 60 = 4,5 s). Jeder Riss steht nach dem vollständigen Wachsen 20–28 Frames (1,5–2,1 s; vorher 3–6 Frames) in voller Stärke und bleicht erst dann aus,
+  und zwar langsamer: 5 Stufen (4 Farbstufen + Schachbrett-Dither) à 4 Frames = 1,5 s (vorher à 2 Frames = 0,75 s). Gleich viele Risse wie bisher, über die längere Schleife verteilt (im Mittel nicht mehr gleichzeitig sichtbar als vorher).
 Ergänzungen: keine. Nur ganze Pixel, nur Quellfarben (Risse = Umrissschwarz A des Sprites), kein Alpha.
 Frame: Sprite plus 3 px Rand rundum — Figur zentriert.
 """
@@ -38,7 +41,7 @@ import numpy as np
 import anim_lib as L
 import anim_eier as E
 
-N, MS = 60, 75
+N, MS = 144, 75
 PAD = 3
 
 spr = L.lade('monster-nest')
@@ -72,7 +75,7 @@ EIER = [
 # Spielpalette (data/palette.json: #323232, #535353, #a8a8a8, #b9b9b9) dazu — bewusst freigegeben (L.pruefe(erlaubt=…)).
 PAL_GRAU = [(50, 50, 50), (83, 83, 83), (168, 168, 168), (185, 185, 185)]
 TOENE = E.toene_auto(PAL_GRAU + [GRAU], quer=8)
-HALTEN = [3, 5, 4, 6, 3, 4, 5, 3, 6, 4]
+HALTEN = [20, 26, 22, 28, 21, 25, 23, 20, 27, 24]                                        # Frames in voller Stärke: 1,5–2,1 s (Runde 5)
 RISSE, GRUPPEN, STELLE = [], [], []
 _ev = []
 for _g, _sites in enumerate(EIER):
@@ -81,7 +84,7 @@ for _g, _sites in enumerate(EIER):
         for _rev in ((False, True) if len(_f['h']) <= 5 else (_g % 2 == 1,)):               # kleine Risse zweimal je Schleife (einmal von jeder Seite her wachsend), große einmal
             _ids.append(len(_ev))
             _ev.append((_g, _k, dict(haupt=list(reversed(_f['h'])) if _rev else _f['h'], zweige=_f['z'], dick=_f['d'], halten=HALTEN[(len(_ev) * 3 + _g) % len(HALTEN)],
-                                     tempo=1 if len(_f['h']) >= 5 else 2, stufen=4, stufe_frames=2)))
+                                     tempo=1 if len(_f['h']) >= 5 else 2, stufen=4, stufe_frames=4)))
     GRUPPEN.append(_ids)
 _probe = [E.BleichRiss(start=0, **kw) for (_, _, kw) in _ev]
 _st = E.plane_starts([r.leben for r in _probe], N, konflikt=lambda i, j: _ev[i][:2] == _ev[j][:2], basis=1, seed=4)
@@ -116,4 +119,4 @@ if __name__ == '__main__':
     n = L.pruefe(frames, quelle=spr, erlaubt=PAL_GRAU)
     L.speichern('monster-nest', 'Monster Nest', frames, MS, prev)
     if prev:
-        L.streifen(prev + '/monster-nest-strip.png', frames[::3], spalten=10, scale=6)
+        L.streifen(prev + '/monster-nest-strip.png', frames[::6], spalten=12, scale=6)

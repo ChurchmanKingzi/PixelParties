@@ -36,6 +36,8 @@ import numpy as np
 
 import anim_humanoide as Hm
 import anim_lib as L
+import anim_textur as TX   # texturierte Streckzeilen statt Zeilenkopien (Regel 43/49)
+TX.umleiten()               # auch Streckaufrufe innerhalb der Gruppenmodule liefern texturierte Zeilen
 
 N, MS = 48, 62
 PAD_L, PAD_R, PAD_T, PAD_B = 3, 3, 4, 2          # Figur knapp zugeschnitten: Gewichtsverlagerung ±1 px seitlich, Kopfhub 2 px oben, Randabstand ≥ 2
@@ -85,7 +87,7 @@ def frame(i):
     # --- Auf und ab: Gürtelzeile 17 = Brust (die Kiste hebt sich starr mit), Halszeile 10 läuft 3 Frames nach ---
     brust = Hm.stufe(i, N / 2, 1)
     kopf = Hm.stufe(i - 3, N / 2, 1)
-    pe = Hm.atmen(pe, PAD_T + 17, PAD_T + 10, brust, kopf)
+    pe = TX.atmen(pe, PAD_T + 17, PAD_T + 10, brust, kopf)
     if brust:
         ki = L.versetze(ki, 0, -brust)
     # --- Glitzer-Sterne an den Schildecken (mit der Kiste mitbewegt) ---

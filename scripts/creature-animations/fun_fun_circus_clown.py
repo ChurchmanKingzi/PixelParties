@@ -39,6 +39,8 @@ import numpy as np
 
 import anim_humanoide as Hm
 import anim_lib as L
+import anim_textur as TX   # texturierte Streckzeilen statt Zeilenkopien (Regel 43/49)
+TX.umleiten()               # auch Streckaufrufe innerhalb der Gruppenmodule liefern texturierte Zeilen
 import anim_schach as Sc
 import anim_zirkus as Z
 
@@ -173,7 +175,7 @@ def frame(i, nur=None):
     un = eb(spr, UNTEN)
     Z.kugel_drehen_fest(un, OFF, BALL_INNEN & UNTEN, FEST, i / float(N))
     # Rumpf mit Hut/Gesicht: Atmen über Jackenzeile 31
-    rumpf = Hm.atmen(eb(spr, RUMPF), OFF[1] + 31, OFF[1] + 20, hub, 0)
+    rumpf = TX.atmen(eb(spr, RUMPF), OFF[1] + 31, OFF[1] + 20, hub, 0)
     bein = BEIN_FOLGE[i % 18]
     if bein:
         Hm.zeilen_versatz(rumpf, OFF, {y: bein for y in range(31 - hub, 33)})

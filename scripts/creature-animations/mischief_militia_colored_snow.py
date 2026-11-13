@@ -47,6 +47,8 @@ import numpy as np
 import anim_eis as E
 import anim_humanoide as Hm
 import anim_lib as L
+import anim_textur as TX   # texturierte Streckzeilen statt Zeilenkopien (Regel 43/49)
+TX.umleiten()               # auch Streckaufrufe innerhalb der Gruppenmodule liefern texturierte Zeilen
 
 N, MS = 48, 66
 PAD_L, PAD_R, PAD_T, PAD_B = 8, 10, 6, 4
@@ -154,7 +156,7 @@ def koerper(i):
                 Hm.setze(k, {pix: None}, OFF)
             arme.append((basis, tip))
     if atem:
-        k = L.streck_zeile(k, PAD_T + ATEMZEILE, atem)
+        k = TX.streck_zeile(k, PAD_T + ATEMZEILE, atem)
     up = -atem
     for basis, tip in arme:
         bx, by = basis[0], basis[1] + up

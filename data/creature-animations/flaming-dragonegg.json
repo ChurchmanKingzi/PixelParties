@@ -3,7 +3,7 @@
   "sheet": "flaming-dragonegg.png",
   "frameWidth": 40,
   "frameHeight": 47,
-  "frames": 72,
+  "frames": 144,
   "frameMs": 75,
   "loop": true,
   "layout": "horizontal",

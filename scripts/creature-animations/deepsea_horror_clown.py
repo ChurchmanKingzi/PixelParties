@@ -42,6 +42,8 @@ import sys
 import numpy as np
 
 import anim_lib as L
+import anim_textur as TX   # texturierte Streckzeilen statt Zeilenkopien (Regel 43/49)
+TX.umleiten()               # auch Streckaufrufe innerhalb der Gruppenmodule liefern texturierte Zeilen
 import anim_tiefsee as T
 import anim_untote as U
 
@@ -140,9 +142,9 @@ def frame_gross(i, nur=None):
             if st == 2 or y <= 27:
                 cl[GPT + y, GPL + x, :3] = FACE
     if n2:
-        cl = L.streck_zeile(cl, GPT + 31, n2)
+        cl = TX.streck_zeile(cl, GPT + 31, n2)
     if n1:
-        cl = L.streck_zeile(cl, GPT + 36, n1)
+        cl = TX.streck_zeile(cl, GPT + 36, n1)
     hub = n1 + n2
     # Ballontraube: Atem + zusätzlich 0/1 px höher
     up = U.stufe(i, 16, 1)

@@ -40,6 +40,8 @@ import numpy as np
 
 import anim_humanoide as Hm
 import anim_lib as L
+import anim_textur as TX   # texturierte Streckzeilen statt Zeilenkopien (Regel 43/49)
+TX.umleiten()               # auch Streckaufrufe innerhalb der Gruppenmodule liefern texturierte Zeilen
 import anim_untote as U
 
 N, MS = 48, 70
@@ -142,7 +144,7 @@ def frame_gross(i, nur=None):
     c = L.zusammen(H, W, [(rumpf, 0, 0), (kopf, 0, 0)])
     # --- Atmen: Oberkörper (Kopf + Körper + Leichenteil) hebt sich starr, die Unterarmzeile 13 schließt die Lücke ---
     if Hm.welle01(i, 24) > 0.5:
-        c = L.streck_zeile(c, GP + 13, 1)
+        c = TX.streck_zeile(c, GP + 13, 1)
     c = Hm.kontur_schliessen(c, ERLAUBT, UMRISS)
     # --- Leiche (fest) mit glänzendem Eisenhelm ---
     l = teil(leiche)

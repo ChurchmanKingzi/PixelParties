@@ -13,6 +13,8 @@ Es entstehen nur Pixel, die in derselben Spalte in einer der Nachbarzeilen schon
 import numpy as np
 import anim_lib as L
 
+_L_STRECK_ZEILE = L.streck_zeile      # das Original (umleiten() ersetzt L.streck_zeile zur Laufzeit durch die texturierte Fassung)
+
 D_LINIE = 22          # Helligkeitsabstand, ab dem ein Pixel als „dunkle Linie“ gegenüber den Zeilen darüber/darunter gilt
 D_AEHNLICH = 64       # bis zu diesem Helligkeitsabstand (heller) gelten zwei Pixel als „gleiches Material“ (Schattierungsstufen)
 D_DUNKLER = 36        # … und höchstens so viel DUNKLER darf ein übernommenes Pixel sein (keine Umriss-/Mund-/Augenfarben in helle Flächen ziehen)
@@ -220,7 +222,7 @@ def streck_zeile(a, zeile, n=1, sperre=()):
     """Wie L.streck_zeile (Zeile `zeile` n-mal zusätzlich einfügen, alles darüber rückt hoch; n < 0 → L.streck_zeile), aber die eingefügten
     Zeilen sind texturiert statt kopiert (siehe Modulkopf). Silhouette und Bewegung sind identisch zu L.streck_zeile."""
     if n <= 0:
-        return L.streck_zeile(a, zeile, n)
+        return _L_STRECK_ZEILE(a, zeile, n)
     h = a.shape[0]
     if a[:n, :, 3].any():
         raise L.ClipError(f'streck_zeile würde {n} belegte Zeile(n) am oberen Rand abschneiden')
@@ -250,6 +252,7 @@ def koerper_pose(*args, funktion=None, **kw):
         sperre = kw.pop('sperre', ())
     else:
         sperre = kw.get('sperre', ())
+    funktion = getattr(funktion, '_tx_original', funktion)          # nach umleiten(): nicht doppelt texturieren
     out, quelle = funktion(*args, **kw)
     return entkopiere_zeilen(out, quelle, sperre), quelle
 
@@ -308,3 +311,26 @@ def ebene_atmung(teil, doppeln, h, w, pad_l, pad_t, boden):
     z, quelle = koerper_pose(k, doppeln=doppeln, x0=pad_l)
     ebene, top = A.auf_leinwand(z, h, boden, 0)
     return ebene, top, quelle
+
+
+def umleiten():
+    """Leitet die Streckfunktionen der gemeinsamen Module für den laufenden Prozess auf dieses Modul um (die Moduldateien bleiben unverändert):
+    L.streck_zeile, anim_amorph.koerper_pose und anim_slime.koerper_pose liefern danach texturierte statt kopierter Einfügezeilen – auch dort,
+    wo ein Gruppenmodul sie intern aufruft (Hm.atmen, Szene.atmen, K.bob, U2.streck_teil, SH.ebene_atmung, HP.hupf_figur, anim_eis.schleim_koerper …).
+    Einmal direkt nach den Importen eines Figurenskripts aufrufen. Mehrfachaufrufe sind unschädlich."""
+    import anim_amorph as A
+    import anim_slime as SL
+    if getattr(L.streck_zeile, '_tx_original', None) is None:
+        def _streck(a, zeile, n=1):
+            return streck_zeile(a, zeile, n)
+        _streck._tx_original = _L_STRECK_ZEILE
+        L.streck_zeile = _streck
+    for modul in (A, SL):
+        orig = modul.koerper_pose
+        if getattr(orig, '_tx_original', None) is not None:
+            continue
+
+        def _pose(*args, _orig=orig, **kw):
+            return koerper_pose(*args, funktion=_orig, **kw)
+        _pose._tx_original = orig
+        modul.koerper_pose = _pose

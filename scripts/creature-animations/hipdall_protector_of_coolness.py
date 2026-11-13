@@ -36,6 +36,8 @@ import numpy as np
 import anim_cool as C
 import anim_humanoide as Hm
 import anim_lib as L
+import anim_textur as TX   # texturierte Streckzeilen statt Zeilenkopien (Regel 43/49)
+TX.umleiten()               # auch Streckaufrufe innerhalb der Gruppenmodule liefern texturierte Zeilen
 
 N, MS = 48, 70
 PAD_L, PAD_R, PAD_T, PAD_B = 6, 6, 9, 3
@@ -78,7 +80,7 @@ def frame(i, nur=None):
         Hm.setze(k, AUGE, OFF)
     # --- Atmen: Jackenzeile 16 (Brust, Arme, Kopf und Horn steigen starr mit) ---
     n1 = Hm.stufe(i, N, 2)
-    k = Hm.atmen(k, PAD_T + 16, PAD_T + 13, n1, 0)
+    k = TX.atmen(k, PAD_T + 16, PAD_T + 13, n1, 0)
     if nur == 'koerper':
         return k
     return L.zusammen(H, W, [(k, 0, 0), (C.wolken(H, W, i, N, WOLKEN, WOLKE, OFF), 0, 0)])

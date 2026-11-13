@@ -39,6 +39,8 @@ import sys
 import numpy as np
 
 import anim_lib as L
+import anim_textur as TX   # texturierte Streckzeilen statt Zeilenkopien (Regel 43/49)
+TX.umleiten()               # auch Streckaufrufe innerhalb der Gruppenmodule liefern texturierte Zeilen
 import anim_tiere as T
 
 N, MS = 48, 66
@@ -100,7 +102,7 @@ def frame(i, nur=None):
     k = teil(koerper)
     if i in BLINK:
         setze(k, AUGE[0], AUGE[1], GESICHT)
-    k = L.streck_zeile(k, PAD_T + 21, heben)                       # Beinansatz verlängern → Oberkörper hebt sich, Füße bleiben
+    k = TX.streck_zeile(k, PAD_T + 21, heben)                       # Beinansatz verlängern → Oberkörper hebt sich, Füße bleiben
     kf = kiefer_biegen(teil(kiefer), PAD_L + 39, 3.0, L.sinus(i, 24))
     sw_ = T.biegen_spalten(teil(schwanz), PAD_L + 18, 3.2, L.sinus(i, 16))
     sp = T.scherung_zeilen(teil(spross), PAD_T + 7, PAD_T + 9, PAD_T + 10, 1.4, math.sin(L.sinus(i, 12)))

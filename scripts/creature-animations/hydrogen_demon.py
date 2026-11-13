@@ -35,6 +35,8 @@ import sys
 import numpy as np
 
 import anim_lib as L
+import anim_textur as TX   # texturierte Streckzeilen statt Zeilenkopien (Regel 43/49)
+TX.umleiten()               # auch Streckaufrufe innerhalb der Gruppenmodule liefern texturierte Zeilen
 import anim_untote as U
 import anim_daemon as D
 
@@ -99,7 +101,7 @@ def frame_gross(i, nur=None):
     n_kopf = max(min(n, U.stufe(i - 2, 24, 2)), n - 1)
     ol = D.oben_pendel(T_OL, GPT + 10, 2.0, L.sinus(i, 24), potenz=1.0, lauf=1.2)
     orr = D.oben_pendel(T_OR, GPT + 10, 2.0, -L.sinus(i, 16), potenz=1.0, lauf=1.2)
-    rp = L.streck_zeile(T_RUMPF, GPT + 23, n)
+    rp = TX.streck_zeile(T_RUMPF, GPT + 23, n)
     bl = 1 if (i % 24) in (17, 18, 19) else 0                      # Füße wippen starr im Wechsel (linker Fuß Frame 17–19, rechter 5–7)
     br = 1 if (i % 24) in (5, 6, 7) else 0
     fl_ = L.heben_unten(T_FUSS_L, GPT + 27, bl) if bl else T_FUSS_L

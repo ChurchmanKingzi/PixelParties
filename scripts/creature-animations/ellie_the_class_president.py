@@ -35,6 +35,8 @@ import numpy as np
 
 import anim_humanoide as Hm
 import anim_lib as L
+import anim_textur as TX   # texturierte Streckzeilen statt Zeilenkopien (Regel 43/49)
+TX.umleiten()               # auch Streckaufrufe innerhalb der Gruppenmodule liefern texturierte Zeilen
 
 N, MS = 48, 62
 PAD_L, PAD_R, PAD_T, PAD_B = 3, 3, 4, 2          # Figur knapp zugeschnitten: Gewichtsverlagerung/Armspreizung ±1 px seitlich, Kopfhub 2 px oben, Randabstand ≥ 2
@@ -104,9 +106,9 @@ def frame(i):
     # --- Auf und ab: Shirtzeile 18 = Brust (Rumpf und Arme), Haarzeile 10 läuft 3 Frames nach (nur Rumpf) ---
     brust = Hm.stufe(i, N / 2, 1)
     kopf = Hm.stufe(i - 3, N / 2, 1)
-    k = Hm.atmen(k, PAD_T + 18, PAD_T + 10, brust, kopf)
-    al = Hm.atmen(al, PAD_T + 18, PAD_T + 10, brust, 0)
-    ar = Hm.atmen(ar, PAD_T + 18, PAD_T + 10, brust, 0)
+    k = TX.atmen(k, PAD_T + 18, PAD_T + 10, brust, kopf)
+    al = TX.atmen(al, PAD_T + 18, PAD_T + 10, brust, 0)
+    ar = TX.atmen(ar, PAD_T + 18, PAD_T + 10, brust, 0)
     # --- Fußtippen: der Fuß liegt hinter dem Rock und hebt sich 1 px ---
     pat = [1, 1, 0, 0, 1, 1, 0, 0]
     hl = 1 if Hm.folge(i, 12, pat, N) else 0

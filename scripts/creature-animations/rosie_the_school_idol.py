@@ -39,6 +39,8 @@ import numpy as np
 
 import anim_humanoide as Hm
 import anim_lib as L
+import anim_textur as TX   # texturierte Streckzeilen statt Zeilenkopien (Regel 43/49)
+TX.umleiten()               # auch Streckaufrufe innerhalb der Gruppenmodule liefern texturierte Zeilen
 
 N, MS = 48, 62
 PAD_L, PAD_R, PAD_T, PAD_B = 3, 3, 4, 2          # Figur knapp zugeschnitten: Verlagerung/Mähne ±1 px seitlich, Kopfhub 2 px oben, Randabstand ≥ 2
@@ -122,9 +124,9 @@ def frame(i):
     # --- Auf und ab: Rockzeile 18 = Brust, Halszeile 11 läuft 3 Frames nach (Mähne steigt mit dem Kopf) ---
     brust = Hm.stufe(i, N / 2, 1)
     kopf = Hm.stufe(i - 3, N / 2, 1)
-    k = Hm.atmen(k, PAD_T + 18, PAD_T + 11, brust, kopf)
-    hl = Hm.atmen(hl, PAD_T + 18, PAD_T + 11, brust, kopf)
-    hr = Hm.atmen(hr, PAD_T + 18, PAD_T + 11, brust, kopf)
+    k = TX.atmen(k, PAD_T + 18, PAD_T + 11, brust, kopf)
+    hl = TX.atmen(hl, PAD_T + 18, PAD_T + 11, brust, kopf)
+    hr = TX.atmen(hr, PAD_T + 18, PAD_T + 11, brust, kopf)
     # --- Fußtippen (die Stiefel liegen hinter den Beinen) ---
     pat2 = [1, 1, 0, 0, 1, 1, 0, 0]
     ul = 1 if Hm.folge(i, 12, pat2, N) else 0

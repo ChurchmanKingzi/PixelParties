@@ -34,6 +34,8 @@ import numpy as np
 
 import anim_humanoide as Hm
 import anim_lib as L
+import anim_textur as TX   # texturierte Streckzeilen statt Zeilenkopien (Regel 43/49)
+TX.umleiten()               # auch Streckaufrufe innerhalb der Gruppenmodule liefern texturierte Zeilen
 
 N, MS = 48, 62
 PAD_L, PAD_R, PAD_T, PAD_B = 3, 3, 4, 2          # Figur knapp zugeschnitten: Gewichtsverlagerung/Armspreizung ±1 px seitlich, Kopfhub 2 px oben, Randabstand ≥ 2
@@ -90,9 +92,9 @@ def frame(i):
     # --- Auf und ab: Hemdzeile 16 = Brust (alle Ebenen), Halszeile 10 läuft 3 Frames nach (nur Rumpf) ---
     brust = Hm.stufe(i, N / 2, 1)
     kopf = Hm.stufe(i - 3, N / 2, 1)
-    k = Hm.atmen(k, PAD_T + 16, PAD_T + 10, brust, kopf)
-    al = Hm.atmen(al, PAD_T + 16, PAD_T + 10, brust, 0)
-    ar = Hm.atmen(ar, PAD_T + 16, PAD_T + 10, brust, 0)
+    k = TX.atmen(k, PAD_T + 16, PAD_T + 10, brust, kopf)
+    al = TX.atmen(al, PAD_T + 16, PAD_T + 10, brust, 0)
+    ar = TX.atmen(ar, PAD_T + 16, PAD_T + 10, brust, 0)
     fig = L.zusammen(H, W, [(al, 0, 0), (ar, 0, 0), (k, 0, 0)])
     # Regel 16: Randpixel in Nicht-Umrissfarbe werden Umriss (Kopf → C, Körper → A)
     kk = Hm.kantenmaske(fig)

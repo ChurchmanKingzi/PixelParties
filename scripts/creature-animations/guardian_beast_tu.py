@@ -42,6 +42,8 @@ import anim_amorph as A
 import anim_gbb as G
 import anim_humanoide as Hm
 import anim_lib as L
+import anim_textur as TX   # texturierte Streckzeilen statt Zeilenkopien (Regel 43/49)
+TX.umleiten()               # auch Streckaufrufe innerhalb der Gruppenmodule liefern texturierte Zeilen
 
 N, MS = 72, 70
 PAD_L, PAD_R, PAD_T, PAD_B = 5, 5, 21, 3
@@ -149,7 +151,7 @@ def arm_scher(a, pivot_x, hub, links):
 
 def streck_bein(kp, n):
     """Beinzeile 25 (aEa..aEa) n-mal einfügen: die Beine werden länger, alles darüber (auch bereits gestreckt) rückt hoch. Wird NACH dem Kleid angewendet (Zeile 25 liegt darunter, bleibt am Platz)."""
-    return L.streck_zeile(kp, PAD_T + 25, n) if n else kp
+    return TX.streck_zeile(kp, PAD_T + 25, n) if n else kp
 
 
 def frame(i):
@@ -167,11 +169,11 @@ def frame(i):
         Hm.setze(kp, {p: GESICHT for p in (AUGEN['o'] + (AUGEN['u'] if k == 2 else []))}, OFF)
     s_k = max(-4, s)                                                              # Kleid: bis 4 Zeilen weniger
     s_dress = min(s, 2)
-    kp = L.streck_zeile(kp, PAD_T + 17, r)                                        # Atmen
+    kp = TX.streck_zeile(kp, PAD_T + 17, r)                                        # Atmen
     if s_k < 0:
-        kp = L.streck_zeile(kp, PAD_T + 22, s_k)
+        kp = TX.streck_zeile(kp, PAD_T + 22, s_k)
     elif s_dress > 0:
-        kp = L.streck_zeile(kp, PAD_T + 22, s_dress)
+        kp = TX.streck_zeile(kp, PAD_T + 22, s_dress)
     if s > 2:
         kp = streck_bein(kp, s - 2)
     hub = r + s                                                                   # Verschiebung der oberen Hälfte (+ = hoch)
@@ -185,8 +187,8 @@ def frame(i):
     al, ar = ebene(arm_l), ebene(arm_r)
     s_l = w * (0.5 - 0.5 * np.cos(L.sinus(i, 24))) + aus * (1 - w)             # Idle: Schlackern; Hocke/Landung: Arme seitlich aus
     s_r = w * (0.5 - 0.5 * np.cos(L.sinus(i, 18))) + aus * (1 - w)
-    al = L.streck_zeile(al, PAD_T + 17, r)
-    ar = L.streck_zeile(ar, PAD_T + 17, r)
+    al = TX.streck_zeile(al, PAD_T + 17, r)
+    ar = TX.streck_zeile(ar, PAD_T + 17, r)
     dl = G.kappe({PAD_T + y: -int(round(2.0 * s_l * (y - 17) / 3.0)) for y in range(17, 21)})
     dr = G.kappe({PAD_T + y: int(round(2.0 * s_r * (y - 17) / 3.0)) for y in range(17, 21)})
     al, ar = G.zeilen_dx(al, dl), G.zeilen_dx(ar, dr)
