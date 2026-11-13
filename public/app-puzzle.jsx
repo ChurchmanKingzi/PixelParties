@@ -576,7 +576,8 @@ function PuzzleCreator() {
   });
   // Collapse the filter sidebar to reclaim its width for a wider card
   // grid (3 → 5 columns), mirroring the deck builder's collapsible filters.
-  const [puzzleFiltersCollapsed, setPuzzleFiltersCollapsed] = useState(false);
+  // Handy quer: die Galerie bekommt den Platz der Filter (5 statt 3 Spalten); ▾ FILTERS klappt sie auf (Als Befund 2.11.).
+  const [puzzleFiltersCollapsed, setPuzzleFiltersCollapsed] = useState(() => !!(window.matchMedia && window.matchMedia('(max-height: 500px)').matches));
   // Geometrie des Suchpanels, gespiegelt aus style.css:
   //   .pz-search-panel   width: 580px
   //   .pz-filter-sidebar width: 200px + 1px border-right
@@ -5344,7 +5345,7 @@ function PuzzleCreator() {
                         style={{ flex: 1, padding: '10px 0', fontSize: 12, borderColor: active ? '#4ceb70' : 'var(--bg4)' }}
                         onClick={() => setEditAntiMagicLevel(lv)}>
                         Level {lv}
-                        <div style={{ fontSize: 10, opacity: 0.8, marginTop: 2 }}>Immune to ≤ Lv{lv} Spells</div>
+                        <div style={{ fontSize: 10, opacity: 0.8, marginTop: 2 }}>Immune to Lv{lv} or lower Spells</div>
                       </button>
                     );
                   })}

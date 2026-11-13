@@ -305,9 +305,12 @@ test('!help zeigt Admin-Befehle nur Admins', async () => {
   assert.ok(!msg.replies[0].content.includes('!setupReaction'));
   assert.ok(msg.replies[0].content.includes('!show'));
   msg = message({ guild: g, member: boss, content: '!help' }); await ctx.handleMessage(msg);
-  assert.ok(!/[äöüß]|\b(Karte|Kartenname|Nachricht|Fehler|zeigt|Rolle|Kanal|nicht|oder|und)\b/.test(msg.replies[0].content), 'die Hilfe ist durchgehend Englisch:\n' + msg.replies[0].content);
-  assert.ok(msg.replies[0].content.includes('!setupReaction'));
-  assert.ok(msg.replies[0].content.includes('!addsc'));
+  const all = msg.replies.map(r => r.content).join('\n');
+  assert.ok(msg.replies.every(r => r.content.length <= 2000), 'Discord erlaubt höchstens 2000 Zeichen je Nachricht (Längen: ' + msg.replies.map(r => r.content.length) + ')');
+  assert.ok(!/[äöüß]|\b(Karte|Kartenname|Nachricht|Fehler|zeigt|Rolle|Kanal|nicht|oder|und)\b/.test(all), 'die Hilfe ist durchgehend Englisch:\n' + all);
+  assert.ok(all.includes('!setupReaction'));
+  assert.ok(all.includes('!addsc'));
+  assert.ok(all.includes('!duel') && all.includes('/bug'), 'nichts geht beim Aufteilen verloren');
 });
 
 test('Rollenabgleich: eine von Hand vergebene gleichnamige Rolle bleibt unangetastet, solange sie nicht übernommen wurde', async () => {

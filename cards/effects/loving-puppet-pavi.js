@@ -43,7 +43,8 @@ const CARD_NAME = PAVI;
 function creatureInHand(engine, pi) {
   const ps = engine.gs.players[pi];
   const cardDB = engine._getCardDB();
-  return (ps?.hand || []).some(n => hasCardType(cardDB[n], 'Creature'));
+  // ★ 12.11. (Vorgabe: Effekte, die Karten aus der Hand BENUTZEN, greifen auch auf Crestinas Extra-Hand zu): Hand + Vorrat.
+  return engine.handUndVorratListe(pi).some(n => hasCardType(cardDB[n], 'Creature'));
 }
 
 module.exports = {

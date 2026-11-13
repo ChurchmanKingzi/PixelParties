@@ -228,6 +228,31 @@ function getEligibleHandIndices(engine, ps, pi, heroIdx, level, triggeringName, 
 }
 
 /**
+ * ★ 12.11. (Vorgabe: Effekte, die Karten aus der Hand BENUTZEN, greifen auch auf Crestinas Extra-Hand zu): Vorratsplaetze (Crestinas Extra-Hand), deren Spell Learning als Zusatzaktion wirken darf. Der gewaehlte Spell liegt nicht in der Hand,
+ * der Wisdom-Pool ist deshalb die volle effektive Hand (nicht `-1`).
+ */
+function getEligibleVorratIndices(engine, ps, pi, heroIdx, level, triggeringName, triggeringCd, hs = pi) {
+  if (!engine.isCreationZoneUsable(pi)) return [];
+  const cardDB = engine._getCardDB();
+  const hero = ps.heroes?.[heroIdx];
+  const heroScript = hero?.name ? loadCardEffect(hero.name) : null;
+  const requireMagicArts = level <= 1;
+  const wisdomPool = Math.max(0, effectiveHandSize(engine, ps, pi, heroIdx, triggeringName, triggeringCd, hs));
+  const cache = new Map();
+  const out = [];
+  (ps.creationZone || []).forEach((name, i) => {
+    if (baseCardName(name) === baseCardName(triggeringName)) return;
+    let ok = cache.get(name);
+    if (ok === undefined) {
+      ok = isNameEligibleForLearning(engine, ps, pi, heroIdx, name, requireMagicArts, wisdomPool, heroScript, cardDB, hs);
+      cache.set(name, ok);
+    }
+    if (ok) out.push(i);
+  });
+  return out;
+}
+
+/**
  * Indices in the player's hand that are valid Wisdom-payment fodder
  * for a Learning cast. Excludes the still-resolving triggering Spell
  * (its instance is owned by the outer doPlaySpell handler — letting
@@ -257,12 +282,21 @@ function wisdomPayableIndices(ps, triggeringName) {
  * the triggering Spell's hand index excluded so it can't be siphoned
  * away from the outer handler that owns its lifecycle.
  */
-async function castLearningSpell(engine, pi, heroIdx, hero, cardName, abilityZoneSlot, triggeringName, hs = pi, abilityZoneKind = 'ability') {
+async function castLearningSpell(engine, pi, heroIdx, hero, cardName, abilityZoneSlot, triggeringName, hs = pi, abilityZoneKind = 'ability', ausVorrat = false) {
   const gs = engine.gs;
   const ps = gs.players[pi];
   const cardDB = engine._getCardDB();
   const cd = cardDB[cardName];
   if (!cd) return false;
+
+  // ★ 12.11. (Vorgabe: Effekte, die Karten aus der Hand BENUTZEN, greifen auch auf Crestinas Extra-Hand zu): liegt der gewaehlte Spell in Crestinas Vorrat, wird er fuer die Dauer dieses Gusses STILL ans Ende der Hand gelegt (keine „add to hand“-Hooks, keine Limit-Pruefung) —
+  // die ganze Auflösung (Kette, onPlay, Ablage, Wisdom) laeuft danach wie fuer eine Handkarte. Bricht der Guss ab und die Karte bleibt „auf der Hand“, geht sie zurueck in den Vorrat.
+  let vorratHandel = null;
+  if (ausVorrat) {
+    vorratHandel = engine.vorratStillInDieHand(pi, cardName);
+    if (!vorratHandel) return false;
+  }
+  const zurueckInDenVorrat = () => { if (vorratHandel) vorratHandel.zurueck(); };
 
   // ── Locate the chosen Spell in hand ──
   // Skip the triggering Spell's hand position so a same-name copy of
@@ -276,7 +310,7 @@ async function castLearningSpell(engine, pi, heroIdx, hero, cardName, abilityZon
     if (i === triggerIdx) continue;
     if (ps.hand[i] === cardName) { handIdx = i; break; }
   }
-  if (handIdx < 0) return false;
+  if (handIdx < 0) { zurueckInDenVorrat(); return false; }
 
   // ── Action-Phase action-counter bookkeeping ──
   // Learning is gated to the Action Phase, so the chained Spell is
@@ -454,6 +488,7 @@ async function castLearningSpell(engine, pi, heroIdx, hero, cardName, abilityZon
     if (gs.hoptUsed) delete gs.hoptUsed[`learning:${pi}:${heroIdx}:${abilityZoneSlot}`];
     ps._actionsPlayedThisPhase = _zaehlerVorher.n; ps._bonusMainActions = _zaehlerVorher.bonus;   // die Aktion wurde nicht verbraucht
     engine.log('learning_cast_cancelled', { player: ps.username, spell: cardName, hero: hero.name, heroIdx });
+    zurueckInDenVorrat();   // 12.11.: die Karte bleibt „auf der Hand“ — stammte sie aus Crestinas Vorrat, geht sie dorthin zurueck
     engine.sync();
     return true;
   }
@@ -561,7 +596,8 @@ module.exports = {
 
       const hs = ctx.cardHeroOwner ?? pi;   // Als Befund 29.9.: Brettseite
       const eligibleIndices = getEligibleHandIndices(engine, ps, pi, heroIdx, level, triggeringName, sd, hs);
-      if (eligibleIndices.length === 0) return;
+      const eligibleVorrat = getEligibleVorratIndices(engine, ps, pi, heroIdx, level, triggeringName, sd, hs);
+      if (eligibleIndices.length === 0 && eligibleVorrat.length === 0) return;
 
       // Claim HOPT BEFORE the prompt — when Learning is stacked in this
       // slot, every copy is its own listener and would otherwise re-prompt
@@ -581,11 +617,13 @@ module.exports = {
         title: CARD_NAME,
         description: `Choose a Spell from your hand to cast as an additional Action with ${hero.name}.`,
         eligibleIndices,
+        creationEligibleIndices: eligibleVorrat,   // 12.11.: Klick auf eine Vorratskarte
         cancellable: true,
       });
       if (!result || result.cancelled || result.handIndex == null) return;
 
-      const pickedName = result.cardName || ps.hand[result.handIndex];
+      const ausVorrat = !!result.fromCreation;
+      const pickedName = result.cardName || (ausVorrat ? (ps.creationZone || [])[result.handIndex] : ps.hand[result.handIndex]);
       if (!pickedName) return;
 
       // Re-validate against live state (the prompt is async — the
@@ -594,11 +632,12 @@ module.exports = {
       // set and confirm the picked Spell is still in it; this catches
       // both "slot vanished" and "Wisdom no longer affordable" with
       // one check and stays in sync with the picker's filter logic.
-      const liveEligible = getEligibleHandIndices(engine, ps, pi, heroIdx, level, triggeringName, sd, hs);
-      const stillEligible = liveEligible.some(i => ps.hand[i] === pickedName);
+      const stillEligible = ausVorrat
+        ? getEligibleVorratIndices(engine, ps, pi, heroIdx, level, triggeringName, sd, hs).some(i => ps.creationZone[i] === pickedName)
+        : getEligibleHandIndices(engine, ps, pi, heroIdx, level, triggeringName, sd, hs).some(i => ps.hand[i] === pickedName);
       if (!stillEligible) return;
 
-      await castLearningSpell(engine, pi, heroIdx, hero, pickedName, abilityZoneSlot, triggeringName, hs, abilityZoneKind);
+      await castLearningSpell(engine, pi, heroIdx, hero, pickedName, abilityZoneSlot, triggeringName, hs, abilityZoneKind, ausVorrat);
     },
   },
 };

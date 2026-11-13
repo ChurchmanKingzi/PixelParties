@@ -65,6 +65,7 @@ function summonableZones(engine, pi) {
 
 module.exports = {
   activeIn: ['hand', 'support'],
+  reactFromCreation: true,   // 11.11.: Hook-Reaktion aus der Hand gilt auch aus Crestinas Vorrat (Extra-Hand)
 
   // ── CPU: Confirm-Prompts pauschal bejahen (Barker-Bugklasse) ──────
   // Kern-Trigger "defeated by opponent" ist IMMER plan-los; der Discard-1-Confirm kauft den Sacrificed-Status — im Opferdeck durchweg positiv (Cute-Bird-Muster mit Kosten).
@@ -82,7 +83,7 @@ module.exports = {
   hooks: {
     // ── Part A: react to an ally Creature defeated by the opponent. ──
     onCreatureDeath: async (ctx) => {
-      if (ctx.cardZone !== 'hand') return;
+      if (ctx.cardZone !== 'hand' && ctx.cardZone !== 'creationZone') return;   // Hand oder Crestinas Vorrat (11.11.)
       const engine = ctx._engine;
       const gs = engine.gs;
       const pi = ctx.cardController ?? ctx.cardOwner;
@@ -97,7 +98,7 @@ module.exports = {
       if (srcOwner == null || srcOwner === pi) return;
 
       const ps = gs.players[pi];
-      if (!ps || !(ps.hand || []).includes(CARD_NAME)) return;
+      if (!ps || !engine._rxQuelleFuer(ps, CARD_NAME)) return;   // Hand oder Crestinas Vorrat
       let zones = summonableZones(engine, pi);
       if (zones.length === 0) return;
 
@@ -113,7 +114,7 @@ module.exports = {
       if (!confirmed) return;
 
       // Re-validate post-prompt.
-      if (!(ps.hand || []).includes(CARD_NAME)) return;
+      if (!engine._rxQuelleFuer(ps, CARD_NAME)) return;
       zones = summonableZones(engine, pi);
       if (zones.length === 0) return;
 
@@ -135,14 +136,16 @@ module.exports = {
       }
       const seite = dest.owner ?? pi;   // Kontrolle statt Seite (Styx 28.9.)
 
-      const handIdx = ps.hand.indexOf(CARD_NAME);
-      engine.takeFromPileSync(ps, 'hand', handIdx);
+      const q = engine._rxQuelleFuer(ps, CARD_NAME);
+      if (!q) return;
+      const handIdx = q.idx;
+      engine.rxNimm(ps, q);
       // Flug Hand → Zone (auch in die Gegenspalte, Styx 28.9.) und das Abwarten des
       // Flugs vor Hooks/Fenstern erledigt `summonCreatureWithHooks` zentral ueber
       // `fromHandIdx` + `controller` — kein eigener Flug-Broadcast mehr.
       const res = await engine.summonCreatureWithHooks(
         CARD_NAME, seite, dest.heroIdx, dest.slotIdx, // `fromHandIdx`: Flug von der Hand in die Zone (v933)
-        { source: CARD_NAME, fromHand: true, fromHandIdx: handIdx, summonWindow: true, ...(seite !== pi ? { controller: pi } : {}) },
+        { source: CARD_NAME, fromHand: true, ...(q.ausVorrat ? {} : { fromHandIdx: handIdx }), summonWindow: true, ...(seite !== pi ? { controller: pi } : {}) },
       );
       if (res?.negated) return;   // Off Duty & co.: Karte ist schon geroutet
       if (!res?.inst) { engine.handZugangSync(ps, CARD_NAME, { von: 'rueckgabe', ohneInstanz: true }); return; }   // v1395

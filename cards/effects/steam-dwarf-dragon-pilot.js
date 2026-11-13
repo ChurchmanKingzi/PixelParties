@@ -72,7 +72,7 @@ function makeSacrificeSpec(engine) {
     filter: notSummonedThisTurn(engine),
     showFilteredAsIneligible: true,
     title: CARD_NAME,
-    description: 'Sacrifice 2 or more of your Creatures (not summoned this turn) with combined max HP ≥ 300.',
+    description: 'Sacrifice 2 or more of your Creatures (not summoned this turn) with combined max HP of 300 or more.',
     confirmLabel: '🐉 Sacrifice!',
     confirmClass: 'btn-danger',
     cancellable: true,
@@ -88,7 +88,7 @@ function makeLv1SacrificeSpec(engine) {
   return {
     ...makeSacrificeSpec(engine),
     filter: (c) => notFresh(c) && c.hasLevel && (c.level || 0) <= 1,   // Artifact Creatures haben kein Level (Als Ruling 9.10.)
-    description: 'Sacrifice 2 or more Level 1 or lower Creatures (not summoned this turn) with combined max HP ≥ 300.',
+    description: 'Sacrifice 2 or more Level 1 or lower Creatures (not summoned this turn) with combined max HP of 300 or more.',
   };
 }
 

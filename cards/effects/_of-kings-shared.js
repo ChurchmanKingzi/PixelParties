@@ -271,7 +271,8 @@ function collectHandAndDeck(engine, pi, filter, opts = {}) {
     seen.add(key);
     out.push({ name, source });
   };
-  if (opts.hand !== false) for (const n of (ps.hand || [])) take(n, 'hand');
+  // ★ 12.11. (Al: „Effekte, die Karten aus der Hand benutzen, auch aus der Extra-Hand“): Hand + Crestinas Vorrat.
+  if (opts.hand !== false) for (const n of engine.handUndVorratListe(pi)) take(n, 'hand');
   if (opts.deck !== false && (typeof engine.pileOutAllowed !== 'function' || engine.pileOutAllowed(pi, 'deck'))) {
     for (const n of (ps.mainDeck || [])) take(n, 'deck');
   }
@@ -284,6 +285,11 @@ function collectHandAndDeck(engine, pi, filter, opts = {}) {
  * damit die 16 Karten eine Aufrufform behalten. Kein Splice hier.
  */
 async function takeFromPile(engine, pi, source, name) {
+  // 12.11.: liegt die „Handkarte“ nur in Crestinas Vorrat, kommt sie von dort.
+  if (source === 'hand' && !(engine.gs.players[pi]?.hand || []).includes(name)) {
+    const q = engine._rxQuelleFuer(engine.gs.players[pi], name);
+    if (q && q.ausVorrat) { engine.rxNimm(engine.gs.players[pi], q); return q.idx; }
+  }
   const taken = await engine.takeFromPile(pi, source, name, { sourceOwner: pi, shuffle: source === 'deck' });
   return taken ? taken.idx : -1;
 }

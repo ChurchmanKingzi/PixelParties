@@ -127,6 +127,7 @@ module.exports = {
     await engine.actionDestroyCard(
       { name: CARD_NAME, owner: pi, heroIdx: ownHeroIdx },
       sacrificed,
+      { einaescherung: true },   // Opfer: verbrennt (Client: app-fx-66)
     );
 
     // ★ v1360 (Audit „same Support Zone"): Opfer gerettet oder Platz von

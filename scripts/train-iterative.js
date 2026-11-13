@@ -28,6 +28,19 @@ const { spawnSync } = require('child_process');
 const fs = require('fs');
 const path = require('path');
 const { autoJobs } = require('./train-jobs');
+const { netFuer, beschreibung: netBeschreibung } = require('./train-net');
+
+// `--net 0|1` (an beliebiger Stelle) aus den Positionsargumenten herauslösen. 0 = alter Evaluator, 1 = Wertnetz erzwingen; ohne Angabe gilt der
+// Standard (Netz, außer PP_TRAIN_NET=0 oder das Deck steht in data/cpu-value/net-aus.json) — Näheres in scripts/train-net.js.
+let NET_FLAG = null;
+{
+  const ni = process.argv.indexOf('--net');
+  if (ni >= 0) {
+    const v = process.argv[ni + 1];
+    if (v === '0' || v === '1') { NET_FLAG = v; process.argv.splice(ni, 2); }
+    else { NET_FLAG = '1'; process.argv.splice(ni, 1); }
+  }
+}
 
 const [, , deckName, arg3, arg4, arg5] = process.argv;
 if (!deckName) {
@@ -110,6 +123,9 @@ for (let it = 1; it <= iterations; it++) {
     PP_TRAIN_JOBS: String(autoJobs()),
   };
   if (it === 1) console.log(`  Parallele Sammlung: ${env.PP_TRAIN_JOBS} Worker (PP_TRAIN_JOBS=1 schaltet ab)`);
+  const netR = netFuer(deckName, { flag: NET_FLAG });
+  Object.assign(env, netR.env);                      // Wertnetz als Blattbewertung (nur Sammlung; jede Partie trägt `valueNet`)
+  if (it === 1) console.log('  ' + netBeschreibung(deckName, netR) + (netR.on ? ' — alle Iterationen dieses Laufs spielen mit demselben System' : ''));
   if (withProfile) env.PP_TRAIN_EVAL = '1';
   else delete env.PP_TRAIN_EVAL;
   // Neues Schema: exakte Rotations-Vielfache via server.js-MULT-Modus.

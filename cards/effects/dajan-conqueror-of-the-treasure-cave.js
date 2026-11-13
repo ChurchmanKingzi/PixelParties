@@ -35,8 +35,11 @@ const BASE_FORM = 'Legendary Explorer Dajan';
 const ASCEND_GOLD = 60;
 
 /** Gibt es ein Artefakt auf der Hand? (Sonst ist Scharfstellen sinnlos.) */
-function artifactInHand(ps, cardDB) {
-  return (ps.hand || []).some(n => hasCardType(cardDB[n], 'Artifact'));
+function artifactInHand(ps, cardDB, engine) {
+  // ★ 12.11. (Vorgabe: Effekte, die Karten aus der Hand BENUTZEN, greifen auch auf Crestinas Extra-Hand zu): Hand + Vorrat.
+  const pi = engine?.gs?.players?.indexOf(ps);
+  const liste = (engine && pi >= 0) ? engine.handUndVorratListe(pi) : (ps.hand || []);
+  return liste.some(n => hasCardType(cardDB[n], 'Artifact'));
 }
 
 /** Styx 28.9.: Gehoert der scharfe Riegel DIESEM Dajan (Seite + Index)? */
@@ -130,7 +133,7 @@ module.exports = {
     if (armed && istDieser(armed, ctx)) return true;
     if (armed) return false;
     const ps = engine.gs.players[pi];
-    return !!ps && artifactInHand(ps, engine._getCardDB());
+    return !!ps && artifactInHand(ps, engine._getCardDB(), engine);
   },
 
   /**
@@ -152,7 +155,7 @@ module.exports = {
       return false;
     }
     if (armed) return false;
-    if (!artifactInHand(ps, engine._getCardDB())) return false;
+    if (!artifactInHand(ps, engine._getCardDB(), engine)) return false;
 
     engine.armFreeArtifact(pi, heroIdx, CARD_NAME);
     // Styx 28.9.: Brettseite dazu — geliehener und eigener Held koennen

@@ -78,8 +78,14 @@ async function equipArtifactToHero(engine, pi, cardName, ownerOfHero, heroIdx, s
   const hps = gs.players[ownerOfHero];
   if (!ps || !hps) return null;
   const from = opts.from || 'hand';
+  // ★ 12.11. (Vorgabe: Effekte, die Karten aus der Hand BENUTZEN, greifen auch auf Crestinas Extra-Hand zu): „aus der Hand“ = Hand zuerst, dann benutzbarer Vorrat.
+  let vorratQ = null;
   const pool = from === 'deck' ? ps.mainDeck : from === 'discard' ? ps.discardPile : ps.hand;
-  const idx = (pool || []).indexOf(cardName);
+  let idx = (pool || []).indexOf(cardName);
+  if (from === 'hand' && idx < 0) {
+    const q = engine._rxQuelleFuer(ps, cardName);
+    if (q && q.ausVorrat) { vorratQ = q; idx = q.idx; }
+  }
   if (idx < 0) return null;
   // ★ Darion: Pflicht-Platz im Equip-Stapel des Helden (statt eines freien Platzes).
   const _stapelPlatz = engine.equipPflichtPlatz ? engine.equipPflichtPlatz(ownerOfHero, heroIdx, cardName) : -1;
@@ -91,7 +97,7 @@ async function equipArtifactToHero(engine, pi, cardName, ownerOfHero, heroIdx, s
   // ★ W16a (Al, Frage 3): `opts.blockiert` = von Resistance abgefangen (Einmal-Einsatz des Aufrufers zählt als gewirkt, siehe `_lolek-shared.chooseAndEquip`).
   if (!opts.resistanzGeprueft && await engine.heroNonDamageEffectBlocked(ownerOfHero, heroIdx, 'equip', { sourceOwner: pi, source: opts.source })) { opts.blockiert = true; return null; }
   if (from === 'discard' && !(await engine._discardOutAllowed(pi, opts))) return null;
-  pool.splice(idx, 1);
+  if (vorratQ) engine._rxAbgang(ps, vorratQ); else pool.splice(idx, 1);
   if (from === 'deck') engine._broadcastEvent('deck_search_add', { cardName, playerIdx: pi });
   if (!hps.supportZones[heroIdx]) hps.supportZones[heroIdx] = [[], [], []];
   if (!hps.supportZones[heroIdx][slotIdx]) hps.supportZones[heroIdx][slotIdx] = [];

@@ -58,7 +58,7 @@ module.exports = {
   /** „This Attack's level is reduced by 1 for each of your defeated Heroes." */
   reduceCardLevel(cardData, engine, ownerIdx, inst) {
     if (!cardData || cardData.name !== CARD_NAME) return 0;
-    if (!inst || inst.zone !== 'hand') return 0;
+    if (!inst || !['hand', 'creationZone'].includes(inst.zone)) return 0;   // Hand oder Crestinas Vorrat
     if (!selbstsenkungZaehlt(engine, inst, CARD_NAME, ownerIdx, { zone: 'hand' })) return 0;
     return besiegteHelden(engine, ownerIdx);
   },

@@ -21,6 +21,13 @@ const { PHASES, getCleansableStatuses, hasCardType, baseCardName } = require('./
 // Learned per-deck profiles (ML-trained via scripts/train-deck-profile.js).
 // No-ops when no profile matches the piloted lineup or when
 // PP_DISABLE_PROFILES=1 (training data collection).
+const _v8Heap = require('v8');   // Heap-Messung je Rollout (siehe mctsRunOneRollout)
+// Ab welchem `heapUsed` der erzwungene Vollaufräumlauf in mctsRunOneRollout läuft (Vorgabe: ein Viertel des V8-Limits; PP_GC_FORCE_MB=0 = immer).
+const GC_ERZWINGEN_AB_BYTES = (() => {
+  const mb = parseInt(process.env.PP_GC_FORCE_MB || '', 10);
+  if (Number.isFinite(mb) && mb >= 0) return mb * 1048576;
+  try { return _v8Heap.getHeapStatistics().heap_size_limit * 0.25; } catch { return 0; }
+})();
 const deckProfile = require('./_deck-profile');
 const KreaturenBilanz = require('./_kreaturen-bilanz');
 
@@ -5635,6 +5642,11 @@ async function attachAbilities(engine, helpers) {
         // school, so the copy is always better placed elsewhere).
         if (heroRejectsAbility(engine, cpuIdx, hi, cardName, cd)) continue;
 
+        // ── Anlegeschaden (`cpuMeta.attachDamage`, Performance: 50 an den Träger) ──
+        // Tödlich (HP <= Schaden) ist nie erlaubt: die CPU legte Performance an einen eigenen Helden mit 50 HP an und verlor ihn.
+        const anlegeSchaden = attachDamageOf(engine, cpuIdx, hi, cardName);
+        if (anlegeSchaden > 0 && hero.hp <= anlegeSchaden) continue;
+
         // ── Per-card placement biases (generic — driven by each
         //    Ability's `cpuMeta.cpuPlacementBias`) ──
         const bias = getBias(cardName);
@@ -5661,6 +5673,10 @@ async function attachAbilities(engine, helpers) {
         } else if (bias?.supportSlotByHero?.has(hi)) {
           place = { zoneSlot: -1, supportSlot: bias.supportSlotByHero.get(hi) };   // 24.10.: Stapel in einer Support Zone (Xal, Xalibur)
         }
+
+        // Der Anlegeschaden muss sich lohnen: ohne Nutzen (gesättigter oder toter Stapel, Bewertung 0) bleibt die Karte auf der Hand — außer
+        // der Held gehört zur Vorzugsmenge der Karte (`cpuPlacementBias`, Performance: Divinity-Stapel).
+        if (anlegeSchaden > 0 && !bias?.allowedHeroes?.has(hi) && !(scoreAbilityPlacement(engine, cpuIdx, hi, cardName) > 0)) continue;
 
         const entry = { handIdx, cardName, fromCreation: ausVorrat, heroIdx: hi, zoneSlot: place.zoneSlot, supportSlot: place.supportSlot };
         const thisHeroHasIt = heroHasAbility(ps, hi, cardName);
@@ -5731,6 +5747,35 @@ async function attachAbilities(engine, helpers) {
  *   supportSlot >= 0  : eine bestimmte Support Zone (Xal, Xalibur) — Performance auf einen Support-Stapel
  *   zoneSlot === -1   : `doPlayAbility` wählt selbst (vorhandener Stapel, sonst erste freie Zone — echte vor Support Zonen)
  */
+/** Schaden, den der Träger beim Anlegen der Ability nimmt (`cpuMeta.attachDamage` der Karte; 0 = keiner). */
+function attachDamageOf(engine, pi, hi, cardName) {
+  try {
+    const v = loadCardEffect(cardName)?.cpuMeta?.attachDamage;
+    const n = typeof v === 'function' ? v(engine, pi, hi) : v;
+    return Number.isFinite(Number(n)) && Number(n) > 0 ? Number(n) : 0;
+  } catch { return 0; }
+}
+
+/**
+ * Joker-Abilities (Performance) legen sich AUF einen vorhandenen Stapel und heben ihn um eine Stufe — welcher Stapel das ist, entscheidet
+ * der Nutzen: Bewertung = die der Basis-Ability des Stapels (`scoreAbilityPlacement`, als käme eine weitere Kopie dazu). Vorher wählte
+ * die CPU unter allen erlaubten Stapeln ZUFÄLLIG (Befund 31.10.: Performance hob eine unwichtige Ability, obwohl die Bewertung den besten
+ * Stapel meinte). Gleichstand: zufällig unter den besten.
+ */
+function besterJokerStapel(engine, pi, hi, cardName, candidates) {
+  const ps = engine.gs.players[pi];
+  let besteWerte = -Infinity, beste = [];
+  for (const c of candidates) {
+    const stapel = c.zoneSlot >= 0 ? (ps.abilityZones?.[hi]?.[c.zoneSlot] || []) : (ps.supportZones?.[hi]?.[c.supportSlot] || []);
+    const basis = stapel.find(n => n && n !== cardName && !loadCardEffect(n)?.isWildcardAbility);
+    let wert = 0;
+    if (basis) { try { wert = scoreAbilityPlacement(engine, pi, hi, basis, 1) || 0; } catch { wert = 0; } }
+    else wert = -1;   // Stapel ohne echte Basis (nur Joker): nie vorziehen
+    if (wert > besteWerte) { besteWerte = wert; beste = [c]; } else if (wert === besteWerte) beste.push(c);
+  }
+  return beste.length ? beste[Math.floor(Math.random() * beste.length)] : null;
+}
+
 function resolveAbilityPlace(engine, pi, hi, cardName) {
   const gs = engine.gs;
   const ps = gs.players[pi];
@@ -5757,6 +5802,7 @@ function resolveAbilityPlace(engine, pi, hi, cardName) {
       }
     }
     if (!candidates.length) return null;
+    if (script.isWildcardAbility) return besterJokerStapel(engine, pi, hi, cardName, candidates) || candidates[0];
     return candidates[Math.floor(Math.random() * candidates.length)];
   }
 
@@ -8680,9 +8726,15 @@ function cpuGenericChoice(engine, promptData, promptedPlayerIdx) {
     const maxSelect = promptData.maxSelect || 1;
     const minSelect = promptData.minSelect != null ? promptData.minSelect : 1;
     const cardDB = engine._getCardDB();
+    // Erzwungen (genau eine wählbare Karte, mindestens eine ist zu wählen): kein Wert fließt ins Ergebnis, die Bewertung entfällt.
+    if (eligible.length === 1 && minSelect >= 1 && maxSelect >= 1) {
+      return { selectedCards: [{ cardName: ps.hand[eligible[0]], handIndex: eligible[0] }] };
+    }
     const baseScore = (() => {
       try { return evaluateState(engine, cpuIdx); } catch { return 0; }
     })();
+    // Gleiche Namen ergeben denselben Verlust (der Evaluator zählt die Handkarten als Menge) — je Name nur einmal rechnen.
+    const verlustJeName = new Map();
     const scored = eligible.map(idx => {
       const name = ps.hand[idx];
       const cd = cardDB[name];
@@ -8692,12 +8744,17 @@ function cpuGenericChoice(engine, promptData, promptedPlayerIdx) {
       if (copiesLeft === 1) value += 100;
       else if (copiesLeft === 2) value += 25;
       if (cd?.cardType === 'Ascended Hero') value += 200;
-      const removed = ps.hand[idx];
-      ps.hand.splice(idx, 1);
-      let scoreWithout = baseScore;
-      try { scoreWithout = evaluateState(engine, cpuIdx); } catch {}
-      ps.hand.splice(idx, 0, removed);
-      value += Math.max(0, baseScore - scoreWithout);
+      let verlust = verlustJeName.get(name);
+      if (verlust === undefined) {
+        const removed = ps.hand[idx];
+        ps.hand.splice(idx, 1);
+        let scoreWithout = baseScore;
+        try { scoreWithout = evaluateState(engine, cpuIdx); } catch {}
+        ps.hand.splice(idx, 0, removed);
+        verlust = Math.max(0, baseScore - scoreWithout);
+        verlustJeName.set(name, verlust);
+      }
+      value += verlust;
       return { idx, name, value };
     });
     scored.sort((a, b) => a.value - b.value);
@@ -8794,10 +8851,16 @@ function cpuGenericChoice(engine, promptData, promptedPlayerIdx) {
     }
     if (!eligible.length) return null;
     const cardDB = engine._getCardDB();
-    const baseScore = (() => {
-      try { return evaluateState(engine, cpuIdx); } catch { return 0; }
-    })();
-    const scored = eligible.map(idx => {
+    // ★ Abwurfwahl in drei Schritten, Ergebnis wie vorher Karte für Karte durchgerechnet (Bewertung je Handkarte = ein voller Evaluator-Lauf,
+    //   in der Netz-Suche rund 10 Prozent der Spielzeit):
+    //   (1) Statischer Teil je Karte (Seltenheit, Aufgestiegener Held, Behalte-Hinweis) — kostet nichts.
+    //   (2) Der Evaluator-Verlust beim Abwurf ist >= 0, der Wert einer Karte also >= ihr statischer Teil. Wer schon über dem besten
+    //       bisher berechneten Wert liegt, kann nicht mehr gewinnen und wird nicht bewertet; bei Gleichstand gewinnt die frühere
+    //       Position (stabile Sortierung wie bisher).
+    //   (3) Gleiche Namen ergeben denselben Verlust (der Evaluator zählt die Handkarten als Menge), die späteren Kopien fallen
+    //       durch (2) heraus: gleicher Wert, spätere Position.
+    //   Ist die Wahl erzwungen (eine Karte, der Wert fließt nirgends ein), entfällt die Bewertung ganz.
+    const cand = eligible.map((idx, pos) => {
       const name = ps.hand[idx];
       const cd = cardDB[name];
       let value = 0;
@@ -8808,6 +8871,17 @@ function cpuGenericChoice(engine, promptData, promptedPlayerIdx) {
       else if (copiesLeft === 2) value += 25;
       // Ascended Hero cards are critical win-condition pieces
       if (cd?.cardType === 'Ascended Hero') value += 200;
+      // ★ 25.10. (Explosion Toss): eine Hand-Reaktion, die genau auf den Effekt wartet, dessen KOSTE dieser Abwurf ist (Hot Skull Potato → Explosion Toss), nicht als Kosten verheizen.
+      // `cpuMeta.keepOnDiscardFor`: Namen der Quellen, bei denen die Karte auf der Hand bleiben soll.
+      let keep = 0;
+      try {
+        const keepFor = loadCardEffect(name)?.cpuMeta?.keepOnDiscardFor;
+        const quelle = promptData.costFor || promptData.source;
+        if (Array.isArray(keepFor) && quelle && keepFor.includes(quelle)) keep = 150;
+      } catch { /* Beiwerk */ }
+      return { idx, name, pos, stat: value, keep, lb: value + keep };
+    });
+    const wertEinerKarte = (c, baseScore) => {
       // Evaluator delta — tentatively MOVE the card from hand to
       // discard pile and re-score. Pushing to discardPile (not just
       // splicing out of hand) lets the evaluator see post-discard
@@ -8817,25 +8891,44 @@ function cpuGenericChoice(engine, promptData, promptedPlayerIdx) {
       // so the brain prefers to feed Phoenix when armed instead of
       // burning Spells. Mirror the move via splice + push, then
       // restore both halves afterwards.
-      const removed = ps.hand[idx];
-      ps.hand.splice(idx, 1);
+      const removed = ps.hand[c.idx];
+      ps.hand.splice(c.idx, 1);
       ps.discardPile.push(removed);
       let scoreWithout = baseScore;
       try { scoreWithout = evaluateState(engine, cpuIdx); } catch {}
       ps.discardPile.pop();
-      ps.hand.splice(idx, 0, removed);
-      value += Math.max(0, baseScore - scoreWithout);
-      // ★ 25.10. (Explosion Toss): eine Hand-Reaktion, die genau auf den Effekt wartet, dessen KOSTE dieser Abwurf ist (Hot Skull Potato → Explosion Toss), nicht als Kosten verheizen.
-      // `cpuMeta.keepOnDiscardFor`: Namen der Quellen, bei denen die Karte auf der Hand bleiben soll.
-      try {
-        const keepFor = loadCardEffect(name)?.cpuMeta?.keepOnDiscardFor;
-        const quelle = promptData.costFor || promptData.source;
-        if (Array.isArray(keepFor) && quelle && keepFor.includes(quelle)) value += 150;
-      } catch { /* Beiwerk */ }
-      return { idx, name, value };
-    });
-    scored.sort((a, b) => a.value - b.value);
-    const pick = scored[0];
+      ps.hand.splice(c.idx, 0, removed);
+      return (c.stat + Math.max(0, baseScore - scoreWithout)) + c.keep;
+    };
+    let pick;
+    if (cand.length === 1 && (type === 'forceDiscard' || promptData.costFor)) {
+      pick = { idx: cand[0].idx, name: cand[0].name, value: NaN };   // erzwungen; der Wert wird unten nicht gelesen
+    } else {
+      const baseScore = (() => {
+        try { return evaluateState(engine, cpuIdx); } catch { return 0; }
+      })();
+      const order = cand.slice().sort((a, b) => (a.lb - b.lb) || (a.pos - b.pos));
+      const vomNamen = new Map();
+      let best = null, ungueltig = false;
+      for (const c of order) {
+        if (best) {
+          if (c.lb > best.value) break;
+          if (c.lb === best.value && c.pos > best.pos) continue;
+          if (vomNamen.has(c.name)) continue;
+        }
+        const v = wertEinerKarte(c, baseScore);
+        vomNamen.set(c.name, v);
+        if (!Number.isFinite(v)) { ungueltig = true; break; }
+        if (!best || v < best.value || (v === best.value && c.pos < best.pos)) best = { idx: c.idx, name: c.name, pos: c.pos, value: v };
+      }
+      if (ungueltig) {
+        // Nicht endliche Bewertung (sollte nie vorkommen): alles wie vorher durchrechnen und sortieren.
+        const scored = cand.map(c => ({ idx: c.idx, name: c.name, value: wertEinerKarte(c, baseScore) }));
+        scored.sort((a, b) => a.value - b.value);
+        best = scored[0];
+      }
+      pick = best;
+    }
     // For forceDiscardCancellable ("discard a card OR take the effect"),
     // refuse the discard if the least-bad card is still too precious to
     // lose. Threshold 150 ≈ "this card is more valuable than ~150 HP
@@ -9934,6 +10027,9 @@ function getRolloutBrain() { return _rolloutBrain; }
 // the last few points of decision quality out of each turn. Read once at
 // module load; live games simply don't set them.
 const MCTS_RANK_BUDGET_MS = parseInt(process.env.PP_MCTS_BUDGET_MS || '20000', 10);
+// Unter Last (Verzoegerung der Ereignisschleife) schrumpft das Budget bis auf ein Viertel — siehe _cpu-last.js.
+const { budgetFaktor: _lastFaktor } = require('./_cpu-last');
+const mctsRankBudgetMs = (engine) => Math.round(MCTS_RANK_BUDGET_MS * _lastFaktor(engine));
 // UCB1 total-pull cap per decision. Hard ceiling on how many rollouts a
 // single decision can burn; typically cut short by the wall-clock budget.
 const MCTS_UCB1_TOTAL_PULLS = parseInt(process.env.PP_MCTS_PULLS || '80', 10);
@@ -11714,12 +11810,30 @@ function brettwertNeuFuer(engine, cpuIdx) {
   return nur == null ? OPT_KREATUR_BRETTWERT : nur === cpuIdx;
 }
 
+// Wertnetz im Schattenmodus (`PP_VALUE_NET=shadow`): rechnet bei jeder Bewertung mit und ändert nichts. Ohne den Schalter wird das Modul nicht geladen.
+const VALUE_SHADOW = process.env.PP_VALUE_NET === 'shadow' ? require('./_value-shadow') : null;
+// Stufe 3 (PP_VALUE_NET=leaf): das Wertnetz bewertet die BLÄTTER der Suche (Rollout-Ende, Gates, Optionswahl). Alle anderen Aufrufer von
+// evaluateState (Handwahl, Karten-Skripte) bleiben beim Evaluator. Stufe 4 (PP_VALUE_NET=greedy): zusätzlich die Eval-Greedy-Auswahl in den
+// Rollouts. `score` gibt null zurück, wenn das Netz für diese Stellung/diesen Sitz nicht zuständig ist (Sitz-Maske `engine._valueLeafSide`,
+// Partieende) — dann gilt der Evaluator.
+const VALUE_LEAF = (process.env.PP_VALUE_NET === 'leaf' || process.env.PP_VALUE_NET === 'greedy') ? require('./_value-leaf') : null;
+function leafScore(engine, cpuIdx, site) {
+  if (VALUE_LEAF) {
+    const v = VALUE_LEAF.score(engine, cpuIdx, site);
+    if (v !== null) return VALUE_LEAF.BLEND < 1 ? VALUE_LEAF.BLEND * v + (1 - VALUE_LEAF.BLEND) * evaluateState(engine, cpuIdx) : v;
+  }
+  return evaluateState(engine, cpuIdx);
+}
+
 function evaluateState(engine, cpuIdx) {
   // Auswertungs-Scope: Die Bewertung ist synchron und schreibt nichts — reine Regelabfragen (Stufenprüfung, Handwerte …) werden
   // innerhalb EINES Aufrufs nur einmal gerechnet (siehe `GameEngine._scoped`).
   const prevScope = engine._evalScopeOpen();
-  try { return evaluateStateRoh(engine, cpuIdx); }
+  let v;
+  try { v = evaluateStateRoh(engine, cpuIdx); }
   finally { engine._evalScopeClose(prevScope); }
+  if (VALUE_SHADOW) VALUE_SHADOW.observe(engine, cpuIdx, v);
+  return v;
 }
 function evaluateStateRoh(engine, cpuIdx) {
   const gs = engine.gs;
@@ -13063,7 +13177,8 @@ async function rolloutRestOfTurn(engine, helpers) {
   // greedy depending on _rolloutBrain.
   const savedCpuIdx = engine._cpuPlayerIdx;
   try {
-    for (let t = 1; t <= _rolloutHorizon; t++) {
+    const horizon = VALUE_LEAF ? VALUE_LEAF.horizonFor(engine, savedCpuIdx, _rolloutHorizon) : _rolloutHorizon;
+    for (let t = 1; t <= horizon; t++) {
       if (engine.gs.result) break;
       if (engine.gs.currentPhase !== 2) break; // not in Main 1, can't invoke
       engine._cpuPlayerIdx = engine.gs.activePlayer;
@@ -13106,7 +13221,13 @@ async function mctsRunOneRollout(engine, helpers, candidate, { plan = null, reco
   // ~10-50ms per call, so amortized ~0.5ms per rollout. If self-play
   // is launched WITHOUT --expose-gc this is a no-op and the heap
   // pressure is managed by the per-turn snapshot cap and heap checks.
-  if (typeof global.gc === 'function' && (engine._snapshotsTaken || 0) % 100 === 0) {
+  //
+  // ★ NUR BEI SPEICHERDRUCK (gemessen, 4.11.): Der Aufruf kostete im Trainingsspiel ~36 ms je Lauf bei ~45 MB lebendem Heap — 92 Läufe in
+  // einer 53-s-Partie = 6,3 % der Rechenzeit, obwohl der Heap weit unter jeder Schwelle lag (die übliche Aufräumarbeit erledigen die
+  // Scavenges). Jetzt nur noch, wenn `heapUsed` über `GC_ERZWINGEN_AB_BYTES` liegt (Vorgabe ein Viertel des V8-Limits, also weit unter der
+  // Wächter-Schwelle bei 60 %); dort wirkt er wie bisher. `PP_GC_FORCE_MB=0` stellt „immer alle 100 Schnappschüsse" wieder her.
+  if (typeof global.gc === 'function' && (engine._snapshotsTaken || 0) % 100 === 0
+      && _v8Heap.getHeapStatistics().used_heap_size >= GC_ERZWINGEN_AB_BYTES) {
     try { global.gc(); } catch {}
   }
   // Per-candidate heap-delta tracking. Sample heapUsed BEFORE snapshot
@@ -13114,7 +13235,8 @@ async function mctsRunOneRollout(engine, helpers, candidate, { plan = null, reco
   // reclaim. Steady-state ~0; in a death spiral, accumulates per
   // rollout. Heap-trip diagnostics surface the top offenders so the
   // user can see "Steam Dwarf Brewer leaked 12MB/rollout × 200 calls".
-  const heapBefore = process.memoryUsage().heapUsed;
+  // `used_heap_size` der V8-Statistik ist exakt `process.memoryUsage().heapUsed`, kostet aber kein RSS-Lesen (zwei Aufrufe je Rollout).
+  const heapBefore = _v8Heap.getHeapStatistics().used_heap_size;
   // Capture hook state PRE-rollout. Diffed against the post-rollout state
   // (read just before engine.restore() puts it back) to attribute hook
   // fires to THIS rollout — independent of who the candidate is. When
@@ -13181,7 +13303,7 @@ async function mctsRunOneRollout(engine, helpers, candidate, { plan = null, reco
     delete engine._mctsTargetPlan;
     if (recordBuf) delete engine._mctsTargetRecord;
     if (applied) await rolloutRestOfTurn(engine, helpers);
-    score = evaluateState(engine, cpuIdx);
+    score = leafScore(engine, cpuIdx, 'rollout');
     completed = true;
   } catch (err) {
     _cpuLogSilent = prevSilent;
@@ -13207,7 +13329,7 @@ async function mctsRunOneRollout(engine, helpers, candidate, { plan = null, reco
     // transient. Death-spiral signature: per-rollout deltas in the MB
     // range that accumulate across hundreds of rollouts before V8
     // can keep up. Surfaced via `_describeHeapTripDiagnostics`.
-    const heapAfter = process.memoryUsage().heapUsed;
+    const heapAfter = _v8Heap.getHeapStatistics().used_heap_size;
     const deltaMb = (heapAfter - heapBefore) / 1024 / 1024;
     if (!engine._candidateHeapDelta) engine._candidateHeapDelta = Object.create(null);
     const cur = engine._candidateHeapDelta[candidateName] || { calls: 0, totalMb: 0 };
@@ -13643,7 +13765,7 @@ async function mctsGatedActivation(engine, helpers, desc, actionFn, options = {}
     _cpuLogSilent = true;
     try {
       try { await rolloutRestOfTurn(engine, helpers); } catch {}
-      skipScore = evaluateState(engine, cpuIdx);
+      skipScore = leafScore(engine, cpuIdx, 'gate');
     } finally {
       _cpuLogSilent = prevSilentSkip;
       engine.exitFastMode();
@@ -13653,7 +13775,7 @@ async function mctsGatedActivation(engine, helpers, desc, actionFn, options = {}
       engine._mctsRolloutStartT = prevRolloutStartTSkip;
     }
   } else {
-    skipScore = evaluateState(engine, cpuIdx);
+    skipScore = leafScore(engine, cpuIdx, 'gate');
   }
 
   // ── Recon rollout ──
@@ -13683,7 +13805,7 @@ async function mctsGatedActivation(engine, helpers, desc, actionFn, options = {}
     if (evaluateThroughTurnEnd) {
       try { await rolloutRestOfTurn(engine, helpers); } catch {}
     }
-    reconScore = evaluateState(engine, cpuIdx);
+    reconScore = leafScore(engine, cpuIdx, 'gate');
     reconCompleted = true;
   } catch (err) {
     // Action threw during recon — treat as unable-to-activate.
@@ -13730,7 +13852,7 @@ async function mctsGatedActivation(engine, helpers, desc, actionFn, options = {}
         if (evaluateThroughTurnEnd) {
           try { await rolloutRestOfTurn(engine, helpers); } catch {}
         }
-        variation.score = evaluateState(engine, cpuIdx);
+        variation.score = leafScore(engine, cpuIdx, 'gate');
       } catch {}
       delete engine._mctsTargetPlan;
       _cpuLogSilent = prevSilent2;
@@ -13931,6 +14053,7 @@ async function mctsGatedActivation(engine, helpers, desc, actionFn, options = {}
 async function rankCandidatesEvalGreedy(engine, helpers, candidates) {
   const cpuIdx = engine._cpuPlayerIdx;
   const scored = [];
+  const probe = VALUE_LEAF && VALUE_LEAF.PROBE ? [] : null;      // Beobachtung der Netz-Köpfe (PP_VALUE_GREEDY_PROBE=1), ändert nichts
   for (const cand of candidates) {
     if (engine._mctsKilledThisTurn) {
       scored.push({ cand, score: -Infinity });
@@ -13950,10 +14073,13 @@ async function rankCandidatesEvalGreedy(engine, helpers, candidates) {
       }
       throw err;
     }
-    let score = -Infinity;
+    let score = -Infinity, pr = null;
     try {
       const applied = await applyActionCandidate(engine, helpers, cand);
-      if (applied) score = evaluateState(engine, cpuIdx);
+      if (applied) {
+        score = leafScore(engine, cpuIdx, 'greedy');
+        if (probe) pr = VALUE_LEAF.probeScores(engine, cpuIdx);
+      }
     } catch {
       // Throwing candidates are scored -Infinity → sorted last.
     } finally {
@@ -13961,9 +14087,14 @@ async function rankCandidatesEvalGreedy(engine, helpers, candidates) {
       resetPromptCycle(engine);
     }
     // Aktions-Cheat-Bonus (Als Auftrag 5.10.) — auch die Rollout-Politik soll diese Effekte bevorzugen.
-    if (Number.isFinite(score)) score += candidateCheatBonus(engine, cand);
+    if (Number.isFinite(score)) {
+      const bonus = candidateCheatBonus(engine, cand);
+      score += bonus;
+      if (pr) probe.push({ ev: score, logit: pr.logit + bonus, head: pr.ev + bonus });
+    }
     scored.push({ cand, score });
   }
+  if (probe) VALUE_LEAF.probeDone(engine, probe);
   // Noise-tolerant Attack tiebreak — same rationale as the main MCTS
   // ranking sort. Single-rollout evals in nested simulations are even
   // noisier than the ~3-rollout outer loop, so the epsilon band is a
@@ -14051,13 +14182,14 @@ async function mctsRankCandidates(engine, helpers, candidates, rollouts = MCTS_R
   // collecting between top-level candidates lets V8 reclaim transient
   // rollout allocation that its incremental GC otherwise lets pile up
   // until Mark-Compact thrashes. A big help on heavy-allocation decks.
+  // ★ Wie in mctsRunOneRollout nur noch bei Speicherdruck (`GC_ERZWINGEN_AB_BYTES`): sonst ein 36-ms-Vollaufräumlauf vor JEDEM Kandidaten.
   const gcBetweenCandidates = () => {
-    if (typeof global.gc === 'function') {
+    if (typeof global.gc === 'function' && _v8Heap.getHeapStatistics().used_heap_size >= GC_ERZWINGEN_AB_BYTES) {
       try { global.gc(); } catch {}
     }
   };
   for (const candidate of candidates) {
-    if ((Date.now() - t0) >= MCTS_RANK_BUDGET_MS || cpuPastDeadline(engine)) {
+    if ((Date.now() - t0) >= mctsRankBudgetMs(engine) || cpuPastDeadline(engine)) {
       budgetExceeded = true;
       break;
     }
@@ -14125,7 +14257,7 @@ async function mctsRankCandidates(engine, helpers, candidates, rollouts = MCTS_R
   // ── Ensure-min-pulls phase: pull each zero-visit arm once ──
   for (const arm of arms) {
     if (arm.visits > 0) continue;
-    if ((Date.now() - t0) >= MCTS_RANK_BUDGET_MS || cpuPastDeadline(engine)) {
+    if ((Date.now() - t0) >= mctsRankBudgetMs(engine) || cpuPastDeadline(engine)) {
       budgetExceeded = true;
       break;
     }
@@ -14182,8 +14314,10 @@ async function mctsRankCandidates(engine, helpers, candidates, rollouts = MCTS_R
   // where N is the sum of visits across all arms. Unvisited arms get
   // infinite UCB (they'd have been pulled in the min-pulls phase — this
   // is defensive).
-  while (ucb1Lohnt && !budgetExceeded && totalRollouts < MCTS_UCB1_TOTAL_PULLS) {
-    if ((Date.now() - t0) >= MCTS_RANK_BUDGET_MS || cpuPastDeadline(engine)) {
+  // Wertnetz-Messung (PP_VALUE_LEAF_PULLS): die Seite, die mit dem Netz sucht, darf mehr Rollouts ziehen (die gesparte Rechenzeit).
+  const pullsCap = VALUE_LEAF ? VALUE_LEAF.pullsFor(engine, engine._cpuPlayerIdx, MCTS_UCB1_TOTAL_PULLS) : MCTS_UCB1_TOTAL_PULLS;
+  while (ucb1Lohnt && !budgetExceeded && totalRollouts < pullsCap) {
+    if ((Date.now() - t0) >= mctsRankBudgetMs(engine) || cpuPastDeadline(engine)) {
       budgetExceeded = true;
       break;
     }
@@ -14227,7 +14361,7 @@ async function mctsRankCandidates(engine, helpers, candidates, rollouts = MCTS_R
   // truly-equal case without spending more pulls on it.
   let extensionPulls = 0;
   while (!budgetExceeded && extensionPulls < MCTS_EXT_PULLS_MAX) {
-    if ((Date.now() - t0) >= MCTS_RANK_BUDGET_MS || cpuPastDeadline(engine)) {
+    if ((Date.now() - t0) >= mctsRankBudgetMs(engine) || cpuPastDeadline(engine)) {
       budgetExceeded = true;
       break;
     }
@@ -14585,7 +14719,7 @@ async function mctsPickFromOptions(engine, options, applyFn, opts = {}) {
             const helpers = engine._cpuHelpers || null;
             if (helpers) await rolloutRestOfTurn(engine, helpers);
           } catch { /* swallow — partial state still scores */ }
-          score = evaluateState(engine, cpuIdx);
+          score = leafScore(engine, cpuIdx, 'pick');
         }
       } catch { /* score stays -Infinity */ }
       finally { engine.restore(snap); resetPromptCycle(engine); }
@@ -14665,7 +14799,7 @@ async function areaWhatIf(engine, helpers, cpuIdx, horizon, seed, applyFn) {
       const ok = await applyFn();
       if (ok !== false) {
         await rolloutRestOfTurn(engine, helpers);
-        score = evaluateState(engine, cpuIdx);
+        score = leafScore(engine, cpuIdx, 'pick');
       }
     } finally {
       engine.restore(snap);
@@ -14783,4 +14917,4 @@ async function measureAreaValues(engine, helpers, cpuIdx) {
 // Gold-Bedarfsrechnung, die an zwei Stellen gepflegt wird, laeuft
 // garantiert auseinander. Rein additiv, kein Aufrufer geaendert.
 module.exports = { CPU_META_HELPERS, runCpuTurn, installCpuBrain, runTurbo, shouldMulliganStartingHand, setCpuVerbose, getCpuVerbose, setCpuTranscribeFn, setRolloutHorizon, getRolloutHorizon, setRolloutBrain, getRolloutBrain, mctsValueGoldVsDraw, mctsPickFromOptions, rolloutRestOfTurn, seedExploreAttempts, computeGoldDemand, mctsOpponentGoldEconomy,
-  _test: { evaluateState, pickEnemyTargets, pickHeroForEquip, activateCreatureEffects, activateHeroEffects, cpuGenericChoice, heroCheatBonusByName, heroEffectGateCheatBonus, candidateCheatBonus, heuristicCandidateCmp, ACTION_CHEAT_BONUS, pickCreatureZoneSlot, listEligibleHeroesForActionCard, resolveAbilityPlace, alleAbilityStapel, scoreAbilityPlacement, isAbilityStackSaturated, activateFreeAbilities, tryActionCostingAbility } };
+  _test: { attachAbilities, evaluateState, pickEnemyTargets, pickHeroForEquip, activateCreatureEffects, activateHeroEffects, cpuGenericChoice, heroCheatBonusByName, heroEffectGateCheatBonus, candidateCheatBonus, heuristicCandidateCmp, ACTION_CHEAT_BONUS, pickCreatureZoneSlot, listEligibleHeroesForActionCard, resolveAbilityPlace, alleAbilityStapel, scoreAbilityPlacement, isAbilityStackSaturated, activateFreeAbilities, tryActionCostingAbility } };

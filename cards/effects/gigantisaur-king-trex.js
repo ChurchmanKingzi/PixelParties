@@ -233,6 +233,7 @@ async function _opfereTribut(engine, pi, heroIdx, onHero) {
     });
     await engine.actionDestroyCard(source, tribute, {
       fireCreatureDeath: true,
+      einaescherung: true,   // Opfer: verbrennt (Client: app-fx-66)
     });
   } catch (err) {
     console.error(`[${CARD_NAME}] auto-tribute failed:`, err.message);

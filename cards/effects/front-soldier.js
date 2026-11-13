@@ -90,9 +90,9 @@ async function handfalle(ctx, { gegnerKarte, gegnerName, art, schon, negiere }) 
   if (gegnerKarte == null || gegnerKarte === pi) return false;     // nur auf den GEGNER reagieren
   if (schon()) return false;                                        // schon negiert (frühere Kopie / anderer Effekt)
   const inst = ctx.card;
-  if (!inst || inst.zone !== 'hand') return false;
+  if (!inst || !['hand', 'creationZone'].includes(inst.zone)) return false;   // Hand oder Crestinas Vorrat
   const ps = gs.players[pi];
-  if (!ps || ps.hand.indexOf(CARD_NAME) < 0) return false;
+  if (!ps || !engine._rxQuelleFuer(ps, CARD_NAME)) return false;
   if (zonen(engine, pi).length === 0) return false;                 // kein tauglicher Beschwörer / Platz → nicht einsetzbar
 
   const antwort = await engine.promptGeneric(pi, {
@@ -108,7 +108,7 @@ async function handfalle(ctx, { gegnerKarte, gegnerName, art, schon, negiere }) 
   });
   if (!antwort || antwort.cancelled) return false;
   if (schon()) return false;                                        // nach der Abfrage neu prüfen
-  if (ps.hand.indexOf(CARD_NAME) < 0) return false;
+  if (!engine._rxQuelleFuer(ps, CARD_NAME)) return false;
 
   engine._broadcastEvent('card_reveal', { cardName: CARD_NAME, playerIdx: pi });
   await engine._delay(800);
@@ -134,6 +134,7 @@ module.exports = {
   // Der Soldat beschwört sich in `resolve` selbst aufs Brett — kein Nachwurf in die Ablage.
   skipPostResolveDiscard: true,
   activeIn: ['hand'],
+  reactFromCreation: true,   // 11.11.: Hook-Reaktion aus der Hand gilt auch aus Crestinas Vorrat (Extra-Hand)
   canSummon: () => true,
 
   cpuMeta: {

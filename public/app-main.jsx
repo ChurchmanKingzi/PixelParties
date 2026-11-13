@@ -27,6 +27,23 @@ function cubeDraftOverallPick(draft) {
   return draft.round * perRound + draft.pickInRound + 1;
 }
 
+/** Anzeigename einer Rarity (rarities.js → window.PpRarities.LABEL; Rueckfall, falls das Modul nicht geladen ist). */
+const PP_RAR_LABEL_FALLBACK = { common: 'Common', uncommon: 'Uncommon', rare: 'Rare', prismatic: 'Prismatic', super: 'Super Rare', storm: 'Storm Rare', spectral: 'Spectral', umbra: 'Umbra', stained: 'Stained Rare' };
+function ppRarLabel(r) { return ((window.PpRarities && window.PpRarities.LABEL) || PP_RAR_LABEL_FALLBACK)[r] || r; }
+
+/** Kleines Namensschild der Draft-Rarity (Pixelrahmen, Schrift) unten links an der Karte; Common zeigt nichts. */
+function DraftRarityTag({ rarity }) {
+  if (!rarity || rarity === 'common') return null;
+  const label = ppRarLabel(rarity);
+  return (
+    <div data-draft-rarity={rarity} style={{
+      position: 'absolute', left: 2, bottom: 2, zIndex: 3, pointerEvents: 'none', padding: '1px 3px',
+      background: 'var(--bg)', color: 'var(--text)', border: '1px solid var(--accent)',
+      fontSize: 8, lineHeight: 1.1, fontWeight: 700, whiteSpace: 'nowrap', fontFamily: 'var(--font-body), sans-serif',
+    }}>{label}</div>
+  );
+}
+
 function CubeDraftScreen({ lobby, draft, leaveRoom, notify }) {
   // Eigene Draft-Musik, solange der Screen steht (Deck-Bau danach bekommt wieder die Menümusik).
   const { setBgmMode } = useContext(AppContext);
@@ -208,6 +225,9 @@ function CubeDraftScreen({ lobby, draft, leaveRoom, notify }) {
     );
   }
 
+  // Draft-Rarities (temporaer, serverseitig gewuerfelt): { Kartenname: Rarity }, fehlt = Common. Karte im Draft in ihrer Rarity zeigen.
+  const draftRar = draft.rarities || {};
+  const rcD = (n) => (window.cardWithRarity ? window.cardWithRarity(n, draftRar[n]) : window.CARDS_BY_NAME?.[n]);
   const canPick = !draft.myPicked && !optimisticPick && !draft.suspended && draft.myPack.length > 0;
   // Angezeigtes Pack = Server-Pack ohne die bereits gewaehlte Karte (eine Kopie).
   const shownPack = (() => {
@@ -396,8 +416,9 @@ function CubeDraftScreen({ lobby, draft, leaveRoom, notify }) {
                 {/* Abdunkeln an der Karte selbst, NICHT am Raster: `opacity` < 1 an einem Vorfahren macht einen eigenen
                     Stapelkontext auf, und der fixe Tooltip (z-index 9999) landete dann UNTER dem Vorschau-Beschriftungsfeld
                     der rechten Spalte ("CARD PREVIEW — hover a card"). */}
-                <CardMini card={window.CARDS_BY_NAME?.[cardName]} onClick={() => {}}
+                <CardMini card={rcD(cardName)} onClick={() => {}}
                   style={{ width: '100%', height: '100%', opacity: draft.myPicked ? 0.45 : 1, transition: 'opacity .25s' }} />
+                <DraftRarityTag rarity={draftRar[cardName]} />
               </div>
             ))}
           </div>
@@ -436,7 +457,7 @@ function CubeDraftScreen({ lobby, draft, leaveRoom, notify }) {
                   borderRadius: 4,
                 }}>
                 {/* Filter an der Karte selbst, nicht an einem Vorfahren (sonst haengt der fixe Tooltip im gefilterten Kasten). */}
-                <CardMini card={window.CARDS_BY_NAME?.[name]} onClick={() => {}}
+                <CardMini card={rcD(name)} onClick={() => {}}
                   style={{ width: '100%', height: '100%', filter: gray ? 'grayscale(1) brightness(.5)' : 'none', opacity: dragSrc === idx ? .35 : (gray ? .6 : 1), transition: 'filter .15s, opacity .15s' }} />
               </div>
             ))}
@@ -450,7 +471,7 @@ function CubeDraftScreen({ lobby, draft, leaveRoom, notify }) {
       </div>
       {dragSrc != null && dragPos && poolOrder[dragSrc] && (
         <div style={{ position: 'fixed', left: dragPos.x - 32, top: dragPos.y - 45, width: 64, height: 90, pointerEvents: 'none', zIndex: 10000, opacity: .9, transform: 'rotate(3deg)' }}>
-          <CardMini noTooltip card={window.CARDS_BY_NAME?.[poolOrder[dragSrc].name]} onClick={() => {}} style={{ width: '100%', height: '100%' }} />
+          <CardMini noTooltip card={rcD(poolOrder[dragSrc].name)} onClick={() => {}} style={{ width: '100%', height: '100%' }} />
         </div>
       )}
     </div>
@@ -480,6 +501,9 @@ function CubeDraftBuildScreen({ lobby, build, leaveRoom, notify, user }) {
     return () => setBgmMode('menu');
   }, [setBgmMode]);
   const cardDB = window.CARDS_BY_NAME || {};
+  // Draft-Rarities der gedrafteten Karten ({ Name: Rarity }, temporaer; fehlt = Common) — die Karte behaelt sie im Draft-Deck.
+  const buildRar = build?.rarities || {};
+  const rcB = (n) => (window.cardWithRarity ? window.cardWithRarity(n, buildRar[n]) : cardDB[n]);
   const allCards = window.AVAILABLE_CARDS || [];
 
   // 5-minute auto-ready timer — server starts it on the first Ready,
@@ -869,7 +893,7 @@ function CubeDraftBuildScreen({ lobby, build, leaveRoom, notify, user }) {
                   }}
                     onClick={() => h?.hero && removeHero(i)}>
                     {h?.hero ? (
-                      <CardMini card={cardDB[h.hero]} onClick={() => {}} style={{ width: '100%', height: '100%' }} />
+                      <CardMini card={rcB(h.hero)} onClick={() => {}} style={{ width: '100%', height: '100%' }} />
                     ) : (
                       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '100%', height: '100%', color: 'var(--text2)', fontSize: 11 }}>
                         Hero {i + 1}
@@ -891,7 +915,7 @@ function CubeDraftBuildScreen({ lobby, build, leaveRoom, notify, user }) {
                   style={{ aspectRatio: '5 / 7', cursor: 'pointer' }}
                   onClick={() => removeMain(i)}
                   title="Click to remove">
-                  <CardMini card={cardDB[name]} onClick={() => {}} style={{ width: '100%', height: '100%' }} />
+                  <CardMini card={rcB(name)} onClick={() => {}} style={{ width: '100%', height: '100%' }} />
                 </div>
               ))}
               {/* Pad to 60 with empty slots */}
@@ -921,7 +945,7 @@ function CubeDraftBuildScreen({ lobby, build, leaveRoom, notify, user }) {
                     {sec.cards.map((name, i) => (
                       <div key={i + '-' + name} style={{ aspectRatio: '5 / 7', cursor: 'pointer' }}
                         onClick={() => sec.remove(i)} title="Click to remove">
-                        <CardMini card={cardDB[name]} onClick={() => {}} style={{ width: '100%', height: '100%' }} />
+                        <CardMini card={rcB(name)} onClick={() => {}} style={{ width: '100%', height: '100%' }} />
                       </div>
                     ))}
                     {sec.cards.length === 0 && (
@@ -984,7 +1008,7 @@ function CubeDraftBuildScreen({ lobby, build, leaveRoom, notify, user }) {
                     }}>
                     {/* `filter` NICHT am Wrapper: ein Vorfahre mit `filter` wird zum Bezugsrahmen fuer `position: fixed` und
                         liess den Tooltip riesig im Kasten statt in der rechten Leiste erscheinen. Der Filter sitzt an der Karte. */}
-                    <CardMini card={cardDB[name]} onClick={() => {}} style={{ width: '100%', height: '100%', filter: dimmed ? 'grayscale(.8) brightness(.6)' : 'none' }} />
+                    <CardMini card={rcB(name)} onClick={() => {}} style={{ width: '100%', height: '100%', filter: dimmed ? 'grayscale(.8) brightness(.6)' : 'none' }} />
                     {isNonStartingHero(name) && (
                       <div style={{
                         position: 'absolute', top: 2, left: 2, background: 'rgba(249,172,32,.9)', color: '#27180c',
@@ -1042,7 +1066,7 @@ function CubeDraftBuildScreen({ lobby, build, leaveRoom, notify, user }) {
             <div style={{ flex: 1, overflowY: 'auto', display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(96px, 1fr))', gap: 6, alignContent: 'start' }}>
               {!swapVon && vonListe.map(n => (
                 <div key={n} style={{ aspectRatio: '5 / 7', cursor: 'pointer' }} onClick={() => { setSwapVon(n); setSwapFilter(''); }} title={n}>
-                  <CardMini card={cardDB[n]} onClick={() => {}} style={{ width: '100%', height: '100%' }} />
+                  <CardMini card={rcB(n)} onClick={() => {}} style={{ width: '100%', height: '100%' }} />
                 </div>
               ))}
               {swapVon && zuListe.map(c => (
@@ -1507,8 +1531,8 @@ function PlayScreen() {
     const onPlayerJoined = (data) => setPlayerJoined(data.username);
     // Ein Cube-Match (Kindraum) darf den Turnierraum nicht als `lobby` ablösen — sonst fällt
     // der Spieler nach dem Match in eine tote Lobby statt zurück ins Bracket.
-    const onGameStarted = (r) => { setLobby(prev => (prev?.cubeDraft && prev.id !== r?.id) ? prev : r); if (window.playSFX) window.playSFX('match_found'); };
-    const onGameState = (state) => { if (window.ppZustandVeraltet?.(state)) return; setGameState(state); };
+    const onGameStarted = (r) => { setLobby(prev => (prev?.cubeDraft && prev.id !== r?.id) ? prev : r); if (window.playSFX) window.playSFX('match_found'); if (r?.id && window.ppBfVorladen) window.ppBfVorladen(r.id, false); };   // Kampffeld (app-fx-55) schon vor dem Brett laden
+    const onGameState = (state) => { if (window.ppZustandVeraltet?.(state)) return; if (state?.roomId) { if (state.skillTest) { if (window.ppHbVorladen) window.ppHbVorladen(state.roomId, (state.players || []).length); } else if (window.ppBfVorladen) window.ppBfVorladen(state.roomId, !!state.isTutorial); } setGameState(state); };
     const onCubeDraftState = (state) => { setCubeDraftState(state); };
     const onCubeBuildState = (state) => { setCubeBuildState(state); };
     const onCubeTournamentState = (state) => { setCubeTournamentStateLocal(state); };
@@ -2629,6 +2653,12 @@ for (const t of Object.values(_bgmTracks)) {
   }
 }
 
+// Musikstueck vorab laden + dekodieren (Web Audio): das erste Umschalten auf ein ungeladenes Stueck dekodiert 1,5 MB Ogg zu ~30 MB PCM — auf Handys ein Ruckler
+// genau in dem Moment, in dem es umschaltet (Tutorial 5: Antonia crasht Monia Bot aus dem Bild). Aufruf vor dem Auftritt, in einer ruhigen Textseite.
+window.ppBgmVorwaermen = (modus) => {
+  try { const t = _bgmTracks[modus]; if (t && typeof t._ensureBuffer === 'function') t._ensureBuffer().catch(() => {}); } catch (e) { /* optional */ }
+};
+
 // Volume control bridge — VolumeControl sets this
 window._ppSetMusicVolume = (vol) => {
   let cur = null;
@@ -3112,21 +3142,46 @@ function ppUnlockRingUrl() {
   }, 1);
 }
 
+/** Kartenbild mit voll animierter Rarity-Ebene (PpRarityFx.attach, animated:true) fuer das Draft-Bonus-Popup. */
+function RarityBonusCard({ card, rarity, width }) {
+  const hostRef = useRef(null);
+  useEffect(() => {
+    const fx = window.PpRarityFx;
+    if (!fx || !hostRef.current || !rarity || rarity === 'common') return undefined;
+    let h = null;
+    try { h = fx.attach(hostRef.current, { card: window.CARDS_BY_NAME && window.CARDS_BY_NAME[card], rarity, animated: true }); } catch (e) { h = null; }
+    return () => { try { h && h.destroy && h.destroy(); } catch (e) {} };
+  }, [card, rarity]);
+  return (
+    <div ref={hostRef} data-rarity-bonus-card={card} style={{ position: 'relative', width, aspectRatio: '5 / 7' }}>
+      <img src={window.cardImageUrl ? window.cardImageUrl(card) : ''} alt={card} draggable={false}
+        style={{ display: 'block', width: '100%', height: '100%', imageRendering: 'pixelated' }} />
+    </div>
+  );
+}
+
 function OpponentUnlockPopup() {
   const [queue, setQueue] = useState([]);
 
   useEffect(() => {
     const onUnlocked = (data) => {
       const list = (data && data.opponents) || [];
+      list.forEach(o => o && window.ppDeckVorwaermen && window.ppDeckVorwaermen(o.warm, true));
       if (list.length) setQueue(q => [...q, ...list]);
     };
     // Skin-Game gewonnen: derselbe Popup-Rahmen, nur mit Skin-Bild und -Text.
     const onSkinUnlocked = (data) => {
-      if (data && data.skinName) setQueue(q => [...q, { kind: 'skin', id: 'skin:' + data.skinName, skinName: data.skinName, heroName: data.heroName }]);
+      if (data && data.skinName) setQueue(q => [...q, { kind: 'skin', id: 'skin:' + data.skinName + ':' + (data.dupes || 0), skinName: data.skinName, heroName: data.heroName, rankUp: data.isNew === false, dupes: data.dupes || 0 }]);
+    };
+    // Cube-Draft gewonnen: EINE Kopie der hoechsten Rarity aus dem Draft-Deck ist jetzt dauerhaft in der Sammlung (Server: `rarity_bonus`
+    // { card, rarity, source: 'draft', placement }) — derselbe Popup-Rahmen, mit der Karte in ihrer Rarity.
+    const onRarityBonus = (data) => {
+      if (data && data.card) setQueue(q => [...q, { kind: 'rarity', id: 'rarity:' + data.card + ':' + data.rarity + ':' + Date.now(), card: data.card, rarity: data.rarity }]);
     };
     socket.on('opponents_unlocked', onUnlocked);
     socket.on('skin_unlocked', onSkinUnlocked);
-    return () => { socket.off('opponents_unlocked', onUnlocked); socket.off('skin_unlocked', onSkinUnlocked); };
+    socket.on('rarity_bonus', onRarityBonus);
+    return () => { socket.off('opponents_unlocked', onUnlocked); socket.off('skin_unlocked', onSkinUnlocked); socket.off('rarity_bonus', onRarityBonus); };
   }, []);
 
   const current = queue.length ? queue[0] : null;
@@ -3189,7 +3244,7 @@ function OpponentUnlockPopup() {
       `}</style>
 
       {/* Tam-Tam: Pixel-Konfetti (harte Quadrate, ganze Pixel pro Schritt) fuer freigeschaltete Gegner — fest verteilt, damit nichts neu gewuerfelt wird */}
-      {current.kind !== 'skin' && (
+      {current.kind !== 'skin' && current.kind !== 'rarity' && (
         <div style={{ position: 'absolute', inset: 0, overflow: 'hidden', pointerEvents: 'none' }}>
           {Array.from({ length: 36 }, (_, i) => {
             const farben = ['#fad54a', '#fc1c5f', '#4ceb70', '#1ca9fd', '#ff8b1a', '#a952ff'];
@@ -3235,7 +3290,7 @@ function OpponentUnlockPopup() {
           <div className="orbit-font pp-unlock-titel" style={{
             fontSize: 15, fontWeight: 800, letterSpacing: 3, color: '#ffd966',
             marginBottom: 18, animation: 'ppUnlockTitle 2.2s ease-in-out infinite',
-          }}>{current.kind === 'skin' ? '✦ NEW SKIN UNLOCKED ✦' : '✦ NEW OPPONENT UNLOCKED ✦'}</div>
+          }}>{current.kind === 'rarity' ? '✦ DRAFT WINNER BONUS ✦' : current.kind === 'skin' ? (current.rankUp ? '✦ SKIN RANK UP ✦' : '✦ NEW SKIN UNLOCKED ✦') : '✦ NEW OPPONENT UNLOCKED ✦'}</div>
 
           {/* Hero portrait in a gold frame */}
           <div className="pp-unlock-bild" style={{
@@ -3243,19 +3298,37 @@ function OpponentUnlockPopup() {
             border: '2px solid #fad54a', background: '#08060c',
             boxShadow: '0 0 0 4px #72541d', marginBottom: 18,
           }}>
-            {heroArt
+            {current.kind === 'rarity'
+              ? <RarityBonusCard card={current.card} rarity={current.rarity} width={(window.ppIsPhone && window.ppIsPhone()) ? 130 : 210} />
+              : current.kind === 'skin' && current.rankUp
+              // Rang-Aufstieg: die ganze Karte mit dem neuen Rahmen (der Karten-Shim backt `?rahmen=N` ein)
+              ? <img src={'/cards/skins/' + encodeURIComponent(current.skinName) + '.png?rahmen=' + current.dupes} alt={current.skinName} draggable={false}
+                  style={{ display: 'block', width: (window.ppIsPhone && window.ppIsPhone()) ? 130 : 210, height: 'auto', imageRendering: 'pixelated' }} />
+              : heroArt
               ? <HeroArtCrop heroName={current.kind === 'skin' ? current.heroName : current.middleHero} skinName={current.kind === 'skin' ? current.skinName : null} width={(window.ppIsPhone && window.ppIsPhone()) ? 190 : 300} />
               : <div style={{ width: 300, height: 200, background: '#1a1a2e' }} />}
           </div>
 
+          {current.kind === 'rarity' ? (
           <div className="pp-unlock-satz" style={{ fontSize: 16, color: 'var(--text)', lineHeight: 1.5, marginBottom: 22 }}>
-            You unlocked{' '}
+            You won a <b data-rarity-bonus-label={current.rarity}>{ppRarLabel(current.rarity)}</b> copy of{' '}
+            <span className="orbit-font" style={{ color: '#fbe181', fontWeight: 800, fontSize: 20, textShadow: '2px 2px 0 #72541d' }}>{current.card}</span>
+            {' '}— it was added to your collection!
+          </div>
+          ) : (
+          <div className="pp-unlock-satz" style={{ fontSize: 16, color: 'var(--text)', lineHeight: 1.5, marginBottom: 22 }}>
+            {current.kind === 'skin' && current.rankUp ? 'You won a copy of' : 'You unlocked'}{' '}
             <span className="orbit-font" style={{
               color: '#fbe181', fontWeight: 800, fontSize: 20,
               textShadow: '2px 2px 0 #72541d',
             }}>{current.kind === 'skin' ? current.skinName : (current.middleHero || current.name)}</span>{' '}
-            {current.kind === 'skin' ? <>as a new skin for <b>{current.heroName}</b>!</> : 'as a new opponent!'}
+            {current.kind === 'skin'
+              ? (current.rankUp
+                ? <>— its frame ranked up to <b>{(window.ppRankFrames && window.ppRankFrames.RANKS[window.ppRankFrames.rankOf(current.dupes)] || {}).name || 'a new rank'}</b>!</>
+                : <>as a new skin for <b>{current.heroName}</b>!</>)
+              : 'as a new opponent!'}
           </div>
+          )}
 
           {current.deckAdded && (
             <div className="pp-unlock-deck" style={{ margin: '-8px 0 22px', padding: '10px 12px', border: '2px solid #4ceb70', background: '#08060c', color: '#4ceb70', fontSize: 14, lineHeight: 1.5 }}>
@@ -3353,6 +3426,12 @@ function RotateOverlay() {
   // getippt wurde — wer das Handy von Hand kippt, kommt NICHT am Tippen vorbei (das Tippen startet Vollbild + Querformat).
   const phoneLike = !!(window.matchMedia && matchMedia('(pointer: coarse)').matches && Math.min(window.screen.width, window.screen.height) <= 700);
   const gate = canAuto && phoneLike && !tapped;
+  // Schalter fuer das CSS (`body[data-rotate-gate]`) — bewusst KEIN `body:has(.rotate-gate)`, siehe style.css.
+  useEffect(() => {
+    if (!gate) return undefined;
+    document.body.setAttribute('data-rotate-gate', '');
+    return () => document.body.removeAttribute('data-rotate-gate');
+  }, [gate]);
   const enter = () => {
     if (!auto) return;
     window._ppTapStarted = true; setTapped(true);
@@ -3557,6 +3636,9 @@ function App() {
       // `challengeStart`: eine angenommene Herausforderung (social.js) schickt beide Spieler aus dem Menü ins Spiel.
       if (state.reconnected || state.challengeStart) {
         // Puzzle games are ephemeral — don't reconnect, just clean up
+        // Ausnahme: ein LAUFENDES Tutorial dieser Seitensitzung (`_currentTutorialNum`) bleibt — ein kurzer Netz-/App-Wechsel am Handy darf es nicht beenden;
+        // der Tutorial-Hook (app-screens) nimmt den frisch gesendeten Zustand selbst entgegen. Nach einem Neuladen (keine Tutorialnummer) wird wie bisher geraeumt.
+        if (state.isPuzzle && state.isTutorial && window._currentTutorialNum && !window._tutorialGaveUp) return;
         if (state.isPuzzle) {
           socket.emit('leave_game', { roomId: state.roomId });
           return;

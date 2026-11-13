@@ -29,6 +29,7 @@
   // der IntersectionObserver meldet ihn nie als sichtbar, und die Karte würde nie gezeichnet).
   const PLACEHOLDER = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="750" height="1050"/>');
   const MAX_CACHE = 400;
+  const RARITY_IDS = new Set(['common', 'uncommon', 'rare', 'prismatic', 'super', 'storm', 'spectral', 'umbra', 'stained']);
 
   // Dateinamen verlieren Satzzeichen („Hello, World“ -> „Hello World.png“): gleiche Regel wie card-images.js
   const strippedKey = n => String(n || '').replace(/[^a-zA-Z0-9 ]/g, '').replace(/\s+/g, ' ').trim();
@@ -90,38 +91,42 @@
     // Varianten per Query: `?ohne=hp,atk` (Karte ohne gedruckte HP/ATK — Brett, dort liegen die Live-Werte darueber) und
     // `?lv=2&kost=3` (aktuelle Stufe / Kosten auf die Karte gedruckt — Hand: gruen = verringert, rot = erhoeht) und
     // `?stufe=2` (Faehigkeitskarte: die Box der aktuellen Stufe hervorgehoben, die anderen grau — Brett).
-    const query = url.split('#')[0].split('?').slice(1).join('?');
+    const query = url.split('#')[0].split('?').slice(1).join('&');       // `?a=1?b=2` (zwei angehaengte Anfragen) gilt wie `?a=1&b=2`
     const qm = /(?:^|&)ohne=([a-z,]*)/.exec(query);
     const ohne = qm ? ['atk', 'hp'].filter(k => qm[1].split(',').includes(k)).join(',') : '';
     const zahl = name => { const m = new RegExp('(?:^|&)' + name + '=(\\d{1,3})(?:&|$)').exec(query); return m ? parseInt(m[1], 10) : null; };
-    const lv = zahl('lv'), kost = zahl('kost'), stufe = zahl('stufe');
+    const lv = zahl('lv'), kost = zahl('kost'), stufe = zahl('stufe'), rahmen = zahl('rahmen');   // rahmen = Rang-Rahmen (Duplikate), 1 … 8
+    // `?rar=<Rarity-ID>`: Basiskarte der Seltenheit (Stempel, Rahmen, Namensfarbe; Common = Standard und ohne Parameter), siehe rarities.js / CardRender.rarityBase
+    const rm = /(?:^|&)rar=([a-z]{3,12})(?:&|$)/.exec(query), rar = rm && RARITY_IDS.has(rm[1]) && rm[1] !== 'common' ? rm[1] : '';
     path = path.split(/[?#]/)[0];
     if (!path.startsWith('/cards/') || path.startsWith('/cards/effects/')) return null;
     let rel;
     try { rel = decodeURIComponent(path.slice(7)); } catch (e) { return null; }
     if (!/\.(png|webp|jpe?g)$/i.test(rel)) return null;
     const stem = rel.replace(/\.[a-z]+$/i, '');
-    const sfx = variantKey({ ohne, lv, kost, stufe });
+    const sfx = variantKey({ ohne, lv, kost, stufe, rahmen, rar });
     if (stem.startsWith('skins/')) {
       const file = stem.replace(/^skins\/(?:unlockable\/)?/, '');
-      return { kind: 'skin', stem: file, ohne, lv, kost, stufe, id: 'skin:' + file + sfx };
+      return { kind: 'skin', stem: file, ohne, lv, kost, stufe, rahmen, rar, id: 'skin:' + file + sfx };
     }
     if (stem.includes('/')) return null;
-    return { kind: 'card', stem, ohne, lv, kost, stufe, id: 'card:' + stem + sfx };
+    return { kind: 'card', stem, ohne, lv, kost, stufe, rahmen, rar, id: 'card:' + stem + sfx };
   }
   /** Die Variante als Anhang der Karten-ID: `|o=hp,atk|l=2|k=3` (leer ohne Variante). */
   function variantKey(v) {
-    return (v.ohne ? '|o=' + v.ohne : '') + (v.lv != null ? '|l=' + v.lv : '') + (v.kost != null ? '|k=' + v.kost : '') + (v.stufe != null ? '|s=' + v.stufe : '');
+    return (v.ohne ? '|o=' + v.ohne : '') + (v.lv != null ? '|l=' + v.lv : '') + (v.kost != null ? '|k=' + v.kost : '') + (v.stufe != null ? '|s=' + v.stufe : '') + (v.rahmen != null ? '|r=' + v.rahmen : '') + (v.rar ? '|q=' + v.rar : '');
   }
   /** Karten-ID (`card:Stem` / `skin:Stem`, optional mit Variante) -> wie `parse`; fuer das Vorwaermen aus der gemerkten Liste. */
   function fromId(id) {
     const teile = id.split('|');
-    const m = { kind: id.startsWith('skin:') ? 'skin' : 'card', stem: teile[0].slice(5), ohne: '', lv: null, kost: null, stufe: null, id };
+    const m = { kind: id.startsWith('skin:') ? 'skin' : 'card', stem: teile[0].slice(5), ohne: '', lv: null, kost: null, stufe: null, rahmen: null, rar: '', id };
     for (const t of teile.slice(1)) {
       if (t.startsWith('o=')) m.ohne = t.slice(2);
       else if (t.startsWith('l=')) m.lv = parseInt(t.slice(2), 10);
       else if (t.startsWith('k=')) m.kost = parseInt(t.slice(2), 10);
       else if (t.startsWith('s=')) m.stufe = parseInt(t.slice(2), 10);
+      else if (t.startsWith('r=')) m.rahmen = parseInt(t.slice(2), 10);
+      else if (t.startsWith('q=')) m.rar = t.slice(2);
     }
     return m;
   }
@@ -169,8 +174,18 @@
       if (m.lv != null) opts.lv = m.lv;
       if (m.kost != null) opts.kost = m.kost;
       if (m.stufe != null) opts.stufe = m.stufe;
-      const cv = await CardRender.renderCard(r.card, Object.keys(opts).length ? opts : null);
+      if (m.rar) opts.rarity = m.rar;
+      let cv = await CardRender.renderCard(r.card, Object.keys(opts).length ? opts : null);
       if (!cv) return null;
+      // Rang-Rahmen (Duplikate): fest in die Karte einbacken (public/rank-frames.js); ohne den Generator bleibt die Karte rahmenlos
+      if (m.rahmen && window.ppRankFrames && window.ppRankFrames.rankOf(m.rahmen) != null) {
+        const un = cv;                                   // ungerahmte Karte: nur die Stat-Zahlen (mit Umrandung) kommen von hier wieder ÜBER den Rahmen
+        cv = window.ppRankFrames.bake(un, un.width, un.height, window.ppRankFrames.rankOf(m.rahmen), 'card');
+        try {
+          const layer = CardRender.statsLayer ? await CardRender.statsLayer(r.card, Object.keys(opts).length ? opts : null, un) : null;
+          if (layer) cv.getContext('2d').drawImage(layer, 0, 0);
+        } catch (e) { /* ohne Zahlen-Ebene bleibt die Karte gerahmt */ }
+      }
       const blob = await CardRender.toBlob(cv);
       if (!blob) return null;
       CardRender.cachePut(key, blob, blob.size);          // fuer den naechsten Besuch (ohne zu warten)
@@ -341,7 +356,7 @@
   // Hintergrund bereitgelegt (Blob-URL im Speicher + dekodiert) — der Wechsel ist dann ein Cache-Treffer. Als Handkarte ohne Stufe zählt das
   // schon im Voraus: bis sie auf dem Brett liegt, sind alle drei Varianten fertig.
   function waermeStufen(m) {
-    if (m.kind !== 'card' || m.ohne || m.lv != null || m.kost != null) return;
+    if (m.kind !== 'card' || m.ohne || m.lv != null || m.kost != null || m.rar) return;
     const r = resolve(m);
     const c = r && r.card;
     if (!c || c.cardType !== 'Ability' || !/^\s*1\)/m.test(c.effect || '') || !/^\s*2\)/m.test(c.effect || '') || !/^\s*3\)/m.test(c.effect || '')) return;
@@ -436,15 +451,55 @@
       for (const id of variants) {
         if (warming.has(id) || keepPinned.has(id)) continue;
         warming.add(id); n++;
-        enqueue({ warm: true, keep: true, m: fromId(id) }, 3);
+        enqueue({ warm: true, keep: opts.keep !== false, m: fromId(id) }, 3);
       }
     }
     return n;
   }
 
+  /** Wie warmCards, aber TROPFENWEISE: je Takt eine Karte, und nur, wenn nichts Sichtbares auf Rendern wartet und der Tab im Vordergrund ist —
+   *  das Vorwaermen selbst darf nie ruckeln (auf schwachen Handys kostet jede Karte einige 10 ms Zeichnen + Dekodieren). `opts.keep` falsch:
+   *  nur zeichnen und im dauerhaften Cache ablegen, nicht dauerhaft dekodiert im Speicher halten (fuer Gegner-Decks). Doppelte Namen werden verworfen. */
+  const dripQueue = [], dripSeen = new Set(); let dripTimer = 0;
+  function warmDrip(names, opts) {
+    opts = opts || {};
+    const heroes = new Set(opts.heroes || []), abilities = new Set(opts.abilities || []);
+    const neu = [];
+    for (const name of names || []) {
+      const key = (opts.keep === false ? 'c:' : 'k:') + name;
+      if (typeof name !== 'string' || dripSeen.has(key)) continue;
+      dripSeen.add(key);
+      neu.push({ name, keep: opts.keep !== false, heroes: heroes.has(name) ? [name] : [], abilities: abilities.has(name) ? [name] : [] });
+    }
+    if (opts.front) dripQueue.unshift(...neu); else dripQueue.push(...neu);   // `front`: vor die wartenden (z. B. Deck der naechsten Partie vor die Tutorial-Karten)
+    dripPlane(opts.delay || 800);
+  }
+  function dripPlane(ms) { if (dripTimer || !dripQueue.length) return; dripTimer = setTimeout(dripSchritt, ms); }
+  // Eingaben der letzten Sekunde: waehrenddessen wird nicht gezeichnet (Tippen, Wischen, Scrollen sollen nie auf eine Karte warten).
+  let letzteEingabe = 0, dripBusy = 0;
+  for (const ev of ['pointerdown', 'pointermove', 'touchstart', 'touchmove', 'keydown', 'wheel', 'scroll']) addEventListener(ev, () => { letzteEingabe = performance.now(); }, { passive: true, capture: true });
+  function dripSchritt() {
+    dripTimer = 0;
+    if (!dripQueue.length) return;
+    const frei = !document.hidden && queues.every(q => q.length === 0) && workers === 0 && performance.now() - letzteEingabe > 1000;
+    if (!frei) { dripPlane(700); return; }
+    // Nur in einer ECHTEN Leerlaufluecke anfangen (>= 25 ms am Stueck frei) — eine Karte kostet auf schwachen Handys einige 10 ms.
+    const los = () => {
+      if (!dripQueue.length) return;
+      const it = dripQueue.shift();
+      warmCards([it.name], { heroes: it.heroes, abilities: it.abilities, keep: it.keep }).finally(() => {
+        const weiter = () => dripPlane(260);          // naechste Karte frueh genug, aber mit Mindestabstand
+        if (window.requestIdleCallback) requestIdleCallback(weiter, { timeout: 1500 }); else weiter();
+      });
+    };
+    // Auf einer animierten Seite gibt es nie 25 ms am Stueck — nach drei Fehlversuchen (je 400 ms Pause) faengt eine Karte trotzdem an.
+    if (window.requestIdleCallback) requestIdleCallback((d) => { if (!d.didTimeout && d.timeRemaining() < 25 && dripBusy++ < 3) dripPlane(400); else { dripBusy = 0; los(); } }, { timeout: 2000 });
+    else los();
+  }
+
   // Für Hintergrund-Aufwärmer: Kunstindex und Rahmen schon vor den ersten Karten holen
   // Skin -> Basiskarte (fuer das Skin-Holo: es braucht den Kartentyp des Helden). Wartet auf boot().
   async function skinBase(skin) { await boot(); return (window.__cardShimSkinBase && window.__cardShimSkinBase[skin]) || null; }
-  window.CardImageShim = { boot, skinBase, parse, warmCards, cacheSize: () => cache.size, stats, cacheStats: () => CardRender.cacheStats(), queued: () => queues.reduce((n, q) => n + q.length, 0) };
+  window.CardImageShim = { boot, skinBase, parse, warmCards, warmDrip, cacheSize: () => cache.size, stats, cacheStats: () => CardRender.cacheStats(), queued: () => queues.reduce((n, q) => n + q.length, 0) };
   boot();
 })();

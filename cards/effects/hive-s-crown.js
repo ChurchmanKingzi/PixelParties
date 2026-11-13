@@ -37,8 +37,11 @@ const CARD_NAME = "Hive's Crown";
  * available only when there's a Queen in deck AND the candidate
  * creature wasn't summoned this turn.
  */
-function queenSourcesFor(gs, ps, candidateInst) {
-  const inHand = (ps?.hand || []).includes(QUEEN_NAME);
+function queenSourcesFor(gs, ps, candidateInst, engine) {
+  // ★ 12.11. (Al: „Effekte, die Karten aus der Hand benutzen, auch aus der Extra-Hand“): „from your hand“ = Hand + Crestinas Vorrat.
+  const pi = gs?.players?.indexOf(ps);
+  const inHand = (ps?.hand || []).includes(QUEEN_NAME)
+    || (!!engine && pi >= 0 && engine.isCreationZoneUsable(pi) && (ps?.creationZone || []).includes(QUEEN_NAME));
   const inDeck = (ps?.mainDeck || []).includes(QUEEN_NAME);
   const wasSummonedThisTurn = candidateInst?.turnPlayed === (gs.turn || 0);
   return {
@@ -75,7 +78,7 @@ async function zahleOpfer(engine, pi, selectedIds, validTargets) {
   // Re-validate Queen sources against live state — the player could
   // have lost their hand Queen between targeting and resolve via a
   // chained reaction.
-  const sources = queenSourcesFor(gs, ps, sacInst);
+  const sources = queenSourcesFor(gs, ps, sacInst, engine);
   if (!sources.hand && !sources.deck) {
     engine.log('hives_crown_fizzle', {
       player: ps.username,
@@ -114,6 +117,7 @@ async function zahleOpfer(engine, pi, selectedIds, validTargets) {
   await engine.actionDestroyCard(
     { name: CARD_NAME, owner: pi, heroIdx: sacInst.heroIdx },
     sacInst,
+    { einaescherung: true },   // Opfer: verbrennt (Client: app-fx-66)
   );
 
   // ★ v1360 (Audit „same Support Zone"): ab hier ist das Opfer BEZAHLT.
@@ -220,7 +224,7 @@ module.exports = {
 
     if (findControlledQueen(engine, pi)) return [];
 
-    const queenInHand = (ps.hand || []).includes(QUEEN_NAME);
+    const queenInHand = engine.handUndVorratListe(pi).includes(QUEEN_NAME);
     const queenInDeck = (ps.mainDeck || []).includes(QUEEN_NAME);
     if (!queenInHand && !queenInDeck) return [];
 
@@ -229,7 +233,7 @@ module.exports = {
     for (const inst of candidates) {
       // W20b (Al, 20.10.2026: Opfer-Zonen-Regel gilt für jede Opfer-Beschwörung): die Queen kommt in die Zone des Opfers - nur Zonen, die das EINE Opfer leert (kein Alice-Stapel).
       if (!engine.zoneFreiNachKostenzahlung(engine.physicalSide(inst), inst.heroIdx, inst.zoneSlot, inst)) continue;
-      const sources = queenSourcesFor(gs, ps, inst);
+      const sources = queenSourcesFor(gs, ps, inst, engine);
       if (!sources.hand && !sources.deck) continue;
       out.push({
         id: `equip-${inst.owner}-${inst.heroIdx}-${inst.zoneSlot}`,
@@ -285,7 +289,7 @@ module.exports = {
     }
 
     // Quellen frisch gegen den Live-Stand pruefen (die Queen kann im Fenster die Hand verlassen haben).
-    const sources = queenSourcesFor(gs, ps, { turnPlayed: k.turnPlayed });
+    const sources = queenSourcesFor(gs, ps, { turnPlayed: k.turnPlayed }, engine);
 
     // ── Step 1: pick the Queen source (hand vs deck). ──
     // EIN Picker mit Herkunfts-Label (CARD_API „Mehrere Quellen = ein Picker"): sind beide Quellen möglich, zeigt die Galerie die Queen zweimal — HAND und DECK; mit nur
@@ -311,19 +315,21 @@ module.exports = {
 
     // ── Step 3: pull the Queen from the chosen pile. ──
     if (queenSource === 'hand') {
-      const handIdx = (ps.hand || []).indexOf(QUEEN_NAME);
-      if (handIdx < 0) {
+      const queenQuelle = engine._rxQuelleFuer(ps, QUEEN_NAME);   // Hand oder Crestinas Vorrat
+      if (!queenQuelle) {
         engine.log('hives_crown_fizzle', { player: ps.username, reason: 'queen_left_hand' });
         await engine.zeigeFizzle(CARD_NAME, { playerIdx: pi, grund: 'queen_left_hand' });   // v1360
         return true;
       }
-      engine.takeFromPileSync(ps, 'hand', handIdx);
+      engine.rxNimm(ps, queenQuelle);
       // Untrack the matching hand instance so the support track is clean
-      // (mirrors divine-gift-of-the-deepsea's hand-pull pattern).
-      const handInst = engine.cardInstances.find(c =>
-        c.owner === pi && c.zone === 'hand' && c.name === QUEEN_NAME,
-      );
-      if (handInst) engine._untrackCard(handInst.id);
+      // (mirrors divine-gift-of-the-deepsea's hand-pull pattern). Vorratskarten raeumt `rxNimm` selbst ab.
+      if (!queenQuelle.ausVorrat) {
+        const handInst = engine.cardInstances.find(c =>
+          c.owner === pi && c.zone === 'hand' && c.name === QUEEN_NAME,
+        );
+        if (handInst) engine._untrackCard(handInst.id);
+      }
     } else {
       const deckIdx = (ps.mainDeck || []).indexOf(QUEEN_NAME);
       if (deckIdx < 0) {

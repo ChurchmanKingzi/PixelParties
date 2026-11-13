@@ -45,7 +45,8 @@ function entsprechenderHeld(engine, inst) {
 function handAbilities(engine, pi, feld, heroIdx) {
   const db = engine._getCardDB();
   const seen = new Set(), out = [];
-  for (const n of (engine.gs.players[pi]?.hand || [])) {
+  // ★ 12.11. (Al: „Effekte, die Abilities von der Hand anlegen, auch aus der Extra-Hand“): Hand + Crestinas Vorrat.
+  for (const n of engine.handUndVorratListe(pi)) {
     if (seen.has(n)) continue;
     const cd = db[n];
     if (!cd || !hasCardType(cd, 'Ability')) continue;

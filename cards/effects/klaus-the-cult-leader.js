@@ -94,14 +94,17 @@ module.exports = {
       if (spellLevel <= 0) return; // Lv0 spell -> nothing qualifies.
       const seen = new Set();
       const eligible = [];
-      for (let i = 0; i < (ps.hand || []).length; i++) {
-        const cn = ps.hand[i];
+      // ★ 12.11. (Al: „Effekte, die Karten aus der Hand benutzen, auch aus der Extra-Hand“): erst die Hand (je Handindex), dann Crestinas Vorrat.
+      const handKopien = engine.handUndVorratListe(pi);
+      const handLaenge = (ps.hand || []).length;
+      for (let i = 0; i < handKopien.length; i++) {
+        const cn = handKopien[i];
         if (seen.has(cn)) continue;
         seen.add(cn);
         const cd = cardDB[cn];
         if (!cd || !isSummonablePileCreature(cd)) continue;
         // Effective level (Whoolmoth-style reducers, per-slot offsets).
-        const lvl = engine.effectiveCardLevel(cd, pi, { handIdx: i });
+        const lvl = engine.effectiveCardLevel(cd, pi, i < handLaenge ? { handIdx: i } : {});
         if (lvl >= spellLevel) continue;
         if (zonenFuer(cn).length === 0) continue;   // W63a: frei oder (Alice) geteilt
         eligible.push(cn);
@@ -112,14 +115,14 @@ module.exports = {
         type: 'cardGallery',
         cards: eligible.map(cn => ({ name: cn, source: 'hand' })),
         title: CARD_NAME,
-        description: `Place a Creature from your hand (level < ${spellLevel}) onto ${hero.name}.`,
+        description: `Place a Creature from your hand (level below ${spellLevel}) onto ${hero.name}.`,
         cancellable: true,
       });
       if (!picked || picked.cancelled || !picked.cardName) return;
 
       const chosenName = picked.cardName;
       // Re-verify hand presence — async prompt could have shifted state.
-      if ((ps.hand || []).indexOf(chosenName) < 0) return;
+      if (!engine._rxQuelleFuer(ps, chosenName)) return;   // Hand oder Crestinas Vorrat
       // Re-verify free slot.
       const slotNow = zonenFuer(chosenName)[0]?.slotIdx ?? -1;   // W63a: geteilte Zone (Alice) zuerst, dann die erste freie
       if (slotNow < 0) return;

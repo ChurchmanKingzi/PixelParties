@@ -25,6 +25,7 @@
 //  eigene Trio-Gruppe. Neue Runden sind damit exakt, alte bestmöglich.
 // ═══════════════════════════════════════════════════════════════
 'use strict';
+const { itemIdOfUrl } = require('./frame-ids');
 
 // Glättung wie bei den Top-Heroes (`HERO_RANK_PRIOR_*` in server.js):
 // jedes Deck startet mit 5 Phantom-Spielen à 50 %, damit ein 1-0-Deck
@@ -185,7 +186,7 @@ function parseJson(text, fallback) {
 async function buildPlayerProfile(deps, username, viewerId) {
   const { db, loadSampleDecks, isInGame } = deps;
   const user = await db.get(
-    'SELECT id, username, elo, color, avatar, bio, victory_msg, wins, losses, sc, ranked_games, created_at, default_sample_deck_id, is_guest FROM users WHERE username = ?',
+    'SELECT id, username, elo, color, avatar, cardback, bio, victory_msg, wins, losses, sc, ranked_games, created_at, default_sample_deck_id, is_guest FROM users WHERE username = ?',
     [username]
   );
   if (!user || user.is_guest) return null;
@@ -241,10 +242,22 @@ async function buildPlayerProfile(deps, username, viewerId) {
     headToHead = { games, wins: games - targetWins, losses: targetWins };
   }
 
+  // Rang-Rahmen (Duplikate aus dem Gacha): Kopien je Avatar/Sleeve/Skin, höchstens 8
+  const dupes = { avatar: {}, sleeve: {}, skin: {} };
+  try {
+    const rows = await db.all('SELECT item_type, item_id, dupes FROM user_shop_items WHERE user_id = ? AND dupes > 0', [user.id]);
+    for (const r of rows) if (dupes[r.item_type]) dupes[r.item_type][r.item_id] = Math.min(8, Number(r.dupes) || 0);
+  } catch {}
+  const shopId = (url, dir) => itemIdOfUrl(url, dir);
+
   return {
     username: user.username,
     color: user.color || '#00f0ff',
     avatar: user.avatar || null,
+    cardback: user.cardback || null,
+    avatarRank: dupes.avatar[shopId(user.avatar, 'avatars')] || 0,
+    cardbackRank: dupes.sleeve[shopId(user.cardback, 'sleeves')] || 0,
+    skinRanks: dupes.skin,
     bio: user.bio || '',
     motto: user.victory_msg || '',
     elo: Number(user.elo) || 0,

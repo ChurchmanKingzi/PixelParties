@@ -50,7 +50,8 @@ function eligibleHand(engine, pi) {
   const ps = engine.gs.players[pi];
   const cardDB = engine._getCardDB();
   const out = [];
-  for (const n of new Set(ps?.hand || [])) {
+  // ★ 12.11. (Vorgabe: Effekte, die Karten aus der Hand BENUTZEN, greifen auch auf Crestinas Extra-Hand zu): Hand + Vorrat.
+  for (const n of new Set(engine.handUndVorratListe(pi))) {
     const cd = cardDB[n];
     if (!cd || !(cd.cardType === 'Creature' || String(cd.cardType || '').split('/').includes('Creature'))) continue;
     if (loadCardEffect(n)?.summonOnlyViaOwnEffect) continue;   // A09-20: Elven Rider („except with its own effect")
@@ -135,7 +136,7 @@ module.exports = {
         ctx.lockSummons();
         if (inst.zone === 'support') {
           inst._redirectToDeleted = true;
-          await engine.actionDestroyCard({ name: CARD_NAME, owner: pi }, inst, { source: CARD_NAME });
+          await engine.actionDestroyCard({ name: CARD_NAME, owner: pi }, inst, { source: CARD_NAME, einaescherung: true });   // verbrennt zum Gelöscht-Stapel (Client: app-fx-66)
         }
       }
       engine.sync();

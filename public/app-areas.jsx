@@ -122,7 +122,7 @@ function buildFrayedSeam(steps = 30) {
 // (v825: Crystal Well unsichtbar hinter dem Schachbrett). Ein eigener
 // Stapelkontext je Schicht haelt das innere z-Index innen; die Reihen-
 // folge der Schichten ist die DOM-Reihenfolge.
-function AreaBackgrounds({ areaZones, myIdx, oppIdx, spielstand }) {
+function AreaBackgrounds({ areaZones, myIdx, oppIdx, spielstand, halbiert }) {
   // ★ v1420: Szenen duerfen den Spielstand lesen (Doom Clock zeigt ihre
   // Doom Counter). Jede Komponente bekommt `besitzer` (Indizes der
   // Spieler, deren Area-Zone die Area enthaelt) und `spielstand` (ein
@@ -146,6 +146,14 @@ function AreaBackgrounds({ areaZones, myIdx, oppIdx, spielstand }) {
       const b = theirsT[theirsT.length - 1];
       const zwei = !!(a && b && a !== b);
       ppAreaDichte = zwei ? PP_AREA_ZWEI : 1;     // wird von den Szenen beim Einhaengen gelesen (`ppAreaN`)
+      if (halbiert) {
+        // ★ Skill Test (Heimbasen, app-fx-56): jede Area deckt nur die Brett-HÄLFTE ihres Sitzes (b = obere Hälfte = Fokus-Gegner, a = untere = eigene); die Schnittkanten (`--hb-naht-o/u`,
+        // je 7 Kunstpixel Mittelweg bleiben frei) setzt der Basen-Baustein am Clip. Keine Diagonale, kein Rand zwischen den Szenen: die Naht sind die Basen.
+        ppAreaDichte = (a && b) ? PP_AREA_ZWEI : 1;
+        if (b) layers.push(<div key={`op-${b}-oben`} style={{ position: 'absolute', inset: 0, pointerEvents: 'none', isolation: 'isolate', clipPath: 'inset(0 0 calc(100% - var(--hb-naht-o, 45%)) 0)' }}>{szene(b)}</div>);
+        if (a) layers.push(<div key={`op-${a}-unten`} style={{ position: 'absolute', inset: 0, pointerEvents: 'none', isolation: 'isolate', clipPath: 'inset(var(--hb-naht-u, 55%) 0 0 0)' }}>{szene(a)}</div>);
+        continue;
+      }
       if (zwei) {
         const diag = seam.map(p => `${p.x.toFixed(2)}% ${p.y.toFixed(2)}%`).join(', ');
         const clipMine = `polygon(${diag}, 0% 100%)`;          // links/unten
@@ -153,15 +161,7 @@ function AreaBackgrounds({ areaZones, myIdx, oppIdx, spielstand }) {
         layers.push(
           <div key={`op-${b}-zwei`} style={{ position: 'absolute', inset: 0, pointerEvents: 'none', isolation: 'isolate', clipPath: clipTheirs }}>{szene(b)}</div>,
           <div key={`op-${a}-zwei`} style={{ position: 'absolute', inset: 0, pointerEvents: 'none', isolation: 'isolate', clipPath: clipMine }}>{szene(a)}</div>,
-          <svg key="op-seam" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', pointerEvents: 'none' }}
-            viewBox="0 0 100 100" preserveAspectRatio="none">
-            <polyline points={seam.map(p => `${p.x},${p.y}`).join(' ')} fill="none"
-              stroke="rgba(0,0,0,0.55)" strokeWidth="0.9" strokeLinejoin="round" vectorEffect="non-scaling-stroke"
-              style={{ filter: 'blur(1.2px)' }} />
-            <polyline points={seam.map(p => `${p.x},${p.y}`).join(' ')} fill="none"
-              stroke="rgba(255,248,232,0.35)" strokeWidth="0.25" strokeLinejoin="round"
-              strokeDasharray="1.2 0.7 0.4 0.9" vectorEffect="non-scaling-stroke" />
-          </svg>,
+          <PpFx40Naht key="op-seam" seam={seam} />,   // Pixelart-Leinwand (app-fx-40.jsx): gezackte Pixellinie statt SVG-Polylinie mit Weichzeichner
         );
       } else {
         const only = a || b;

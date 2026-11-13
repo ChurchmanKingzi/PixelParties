@@ -95,7 +95,7 @@ module.exports = attachSteamEngine({
       type: 'cardGallery',
       cards: galleryCards,
       title: CARD_NAME,
-      description: `Sacrifice this Creature to summon any Creature from your deck with max HP ≤ ${curHp} (this Creature's current HP). Additional sacrifice costs are negated.`,
+      description: `Sacrifice this Creature to summon any Creature from your deck with max HP of ${curHp} or lower (this Creature's current HP). Additional sacrifice costs are negated.`,
       confirmClass: 'btn-info',
       cancellable: true,
     });
@@ -121,7 +121,7 @@ module.exports = attachSteamEngine({
 
     // Sacrifice the Engineer — actionDestroyCard fires the proper
     // onCreatureDeath hooks and clears the zone.
-    await engine.actionDestroyCard({ name: CARD_NAME, owner: pi, heroIdx }, inst);
+    await engine.actionDestroyCard({ name: CARD_NAME, owner: pi, heroIdx }, inst, { einaescherung: true });   // Opfer: verbrennt (Client: app-fx-66)
     await engine._delay(200);
 
     // Summon the chosen Creature into the freed slot. `skipBeforeSummon`

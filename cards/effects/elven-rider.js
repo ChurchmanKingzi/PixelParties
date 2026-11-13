@@ -258,7 +258,7 @@ async function riderAngebot(engine, pi, riderId, death) {
   // Frische Prüfung VOR dem Prompt: kein Rider auf der Hand, kein
   // Prompt. Mehrere Kopien prompten weiterhin je Tod (per Als
   // Einordnung korrekt so).
-  if (!ps.hand.includes(CARD_NAME)) return;
+  if (!engine._rxQuelleFuer(ps, CARD_NAME)) return;   // Hand oder Crestinas Vorrat
 
   // Als Ruling (Al 26.10.): derselbe Abgang kann über mehrere Hooks gemeldet werden (Tod + Abgangs-Schiene) — je Rider-Kopie und abgehende
   // Instanz wird nur EINMAL gefragt.
@@ -281,8 +281,9 @@ async function riderAngebot(engine, pi, riderId, death) {
 
   // Still have a Rider in hand? (The player could, in theory, have
   // lost it between the prompt and confirm via another effect.)
-  const handIdx = ps.hand.indexOf(CARD_NAME);
-  if (handIdx < 0) return;
+  const q = engine._rxQuelleFuer(ps, CARD_NAME);
+  if (!q) return;
+  const handIdx = q.idx;
 
   // W22a: waehrend der Abfrage kann der Held Status/Schule verloren haben (Kettenreaktionen) — wie Doomed Town Guard neu pruefen.
   if (!heldBeschwoertRider(engine, death, pi)) return;
@@ -304,7 +305,7 @@ async function riderAngebot(engine, pi, riderId, death) {
   try {
     // Consume the hand copy NOW — before summonCreatureWithHooks
     // can fire hooks that might inspect the hand.
-    engine.takeFromPileSync(ps, 'hand', handIdx);
+    engine.rxNimm(ps, q);
 
     engine._broadcastEvent('card_reveal', { cardName: CARD_NAME });
 
@@ -317,7 +318,7 @@ async function riderAngebot(engine, pi, riderId, death) {
       // das erscheint die Kreatur ohne Bewegung im Slot — der
       // HOOK-Weg sendet den Flug nicht von selbst, anders als der
       // regulaere Spielweg im Server.
-      { source: `${CARD_NAME} reaction`, skipBeforeSummon: false, fromHandIdx: handIdx, summonWindow: true,
+      { source: `${CARD_NAME} reaction`, skipBeforeSummon: false, ...(q.ausVorrat ? {} : { fromHandIdx: handIdx }), summonWindow: true,
         ...(seite !== pi ? { controller: pi } : {}) }   // W4: seitenfremd, vom Kontrolleur gefuehrt
     );
     if (res?.negated) return;   // Off Duty & co.: Karte ist schon geroutet
@@ -345,6 +346,7 @@ module.exports = {
   // Must listen while in hand AND act like a normal Elven while on the
   // board. Hook bodies gate on `ctx.cardZone` to split behaviour.
   activeIn: ['hand', 'support'],
+  reactFromCreation: true,   // 11.11.: Hook-Reaktion aus der Hand gilt auch aus Crestinas Vorrat (Extra-Hand)
 
   // „You cannot summon this Creature, except with its own effect." – `engine.summonFromPile` weist fremde
   // Effekt-Beschwoerungen (Tamed Primordium & Co.) damit ab; der eigene Weg nutzt `summonCreatureWithHooks`.
@@ -354,14 +356,14 @@ module.exports = {
     // ── Reaction trigger: an Elven Creature we control leaves the board ──
     // Tod (Schaden, Zerstören, Opfer, Löschen): der Platz ist im Hook schon frei.
     onCreatureDeath: async (ctx) => {
-      if (ctx.cardZone !== 'hand') return;
+      if (ctx.cardZone !== 'hand' && ctx.cardZone !== 'creationZone') return;   // Hand oder Crestinas Vorrat (11.11.)
       await riderAngebot(ctx._engine, ctx.cardOwner, ctx.card.id, ctx.creature);
     },
 
     // Zentrale Abgangs-Schiene: Bounce auf die Hand, Mischen ins Deck, Löschen/Zerstören über `actionMoveCard`, Mass Routing, Staff-Illusionen …
     // (Als Ruling Al 26.10.: JEDER Abgang vom Brett; Kontrollwechsel/Umzug auf dem Brett NICHT.)
     onCardLeaveZone: async (ctx) => {
-      if (ctx.cardZone !== 'hand') return;
+      if (ctx.cardZone !== 'hand' && ctx.cardZone !== 'creationZone') return;   // Hand oder Crestinas Vorrat (11.11.)
       if (ctx.fromZone !== 'support' || ctx.isTransfer || ctx._supportSchlaeft) return;
       const inst = ctx.leavingCard;   // der Deepsea-Bounce meldet keinen `leavingCard` → `onCardsReturnedToHand` unten
       if (!inst || inst.id == null || inst.id === ctx.card.id) return;
@@ -387,7 +389,7 @@ module.exports = {
 
     // Deepsea-Bounce (Racket Arrow, Chasing the Legend, Deepsea-Karten …): kommt ohne `leavingCard`; der Platz ist schon frei.
     onCardsReturnedToHand: async (ctx) => {
-      if (ctx.cardZone !== 'hand') return;
+      if (ctx.cardZone !== 'hand' && ctx.cardZone !== 'creationZone') return;   // Hand oder Crestinas Vorrat (11.11.)
       const engine = ctx._engine;
       const insts = ctx.returnedInsts || [];
       for (let i = 0; i < insts.length; i++) {

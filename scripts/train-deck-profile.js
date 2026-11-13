@@ -33,6 +33,7 @@
 
 const fs = require('fs');
 const path = require('path');
+const IO = require('./train-io');
 const { clusterOfFingerprint } = require('../cards/effects/_deck-profile');
 // Karten-Skripte für Designer-Verträge (cpuMeta.cardValueFloor). Defensiv:
 // scheitert das Laden, bleibt der gelernte Wert unverändert.
@@ -116,8 +117,19 @@ function loadCardDB() {
   return _cardDB;
 }
 
-function loadGames(files) {
+function loadGames(inputs, maxGames = 0) {
+  // Eine Eingabe = eine Iteration. Ein Ordner mit Segmenten (`seg-0000.jsonl[.gz]` …, siehe train-all-decks.js --segment) zählt als EINE
+  // Eingabe, seine Segmente also als dieselbe Iteration. Gelesen wird zeilenweise (scripts/train-io.js), nie eine ganze Datei als Zeichenkette.
+  // `maxGames` > 0 dünnt gleichmäßig zufällig (fester Startwert, wiederholbar, ohne Raster) auf so viele Zeilen aus, bevor irgendetwas
+  // geparst wird: eine geladene Partie belegt rund das 2,5-fache ihrer Dateigröße im Speicher (gemessen 172 KB bei 69 KB).
+  const groups = inputs.map(p => IO.expandInput(p));
+  let total = 0;
+  if (maxGames > 0) for (const g of groups) for (const f of g) total += IO.countLines(f);
+  const keep = maxGames > 0 ? IO.thinMask(total, maxGames) : null;
+  if (keep) console.log(`Ausgedünnt: ${maxGames} von ${total} Spielen (gleichmäßig zufällig, wiederholbar; --max-games 0 = alles laden)`);
   const games = [];
+  const herkunft = Object.create(null);
+  let pos = 0;
   // ── HERKUNFTSMARKE JE DAgger-ITERATION ────────────────────────────
   // Der Aufruf ist `train-deck-profile.js <deck>-iter1.jsonl
   // <deck>-iter2.jsonl …` — der argv-Index IST die Iteration, sie kostet
@@ -127,19 +139,23 @@ function loadGames(files) {
   // Einsatzquote einer Karte zwischen den Iterationen mit, misst das
   // gepoolte winlift den Unterschied ZWISCHEN den Iterationen statt die
   // Wirkung der Karte INNERHALB einer.
-  for (let fi = 0; fi < files.length; fi++) {
-    const f = files[fi];
-    const raw = fs.readFileSync(f, { encoding: 'utf-8' });
-    for (const line of raw.split('\n')) {
-      const t = line.trim();
-      if (!t) continue;
-      try {
-        const g = JSON.parse(t);
-        if (g.abMode) continue; // A/B-Messläufe sind NIE Trainingsdaten
-        if (g.outcome === 0 || g.outcome === 1) { g._iter = fi; games.push(g); } // skip ties
-      } catch { /* corrupt line → skip */ }
+  groups.forEach((files, fi) => {
+    for (const f of files) {
+      IO.forEachLine(f, (line) => {
+        const i = pos++;
+        if (keep && !keep[i]) return;
+        const t = line.trim();
+        if (!t) return;
+        try {
+          const g = JSON.parse(t);
+          if (g.abMode) return; // A/B-Messläufe sind NIE Trainingsdaten
+          if (g.outcome === 0 || g.outcome === 1) { g._iter = fi; games.push(g); herkunft[g.valueNet || 'ohne Vermerk'] = (herkunft[g.valueNet || 'ohne Vermerk'] || 0) + 1; } // skip ties
+        } catch { /* corrupt line → skip */ }
+      });
     }
-  }
+  });
+  const hk = Object.entries(herkunft).map(([k, v]) => `${v}× ${k === 'off' ? 'Evaluator' : k === 'leaf' ? 'Wertnetz' : k}`).join(', ');
+  if (hk) console.log(`Herkunft der Spiele: ${hk}${Object.keys(herkunft).length > 1 ? '  ⚠ gemischt: Netz- und Evaluator-Spiele in einem Training' : ''}`);
   return games;
 }
 
@@ -2877,12 +2893,17 @@ function main() {
     argOutDir = argv[oi + 1] || null;
     argv.splice(oi, argOutDir ? 2 : 1);
   }
+  // `--max-games N`: höchstens so viele Spiele laden (Standard 8000 bzw. PP_TRAIN_MAX_GAMES; 0 = alle).
+  let maxGames = parseInt(process.env.PP_TRAIN_MAX_GAMES || '8000', 10);
+  const mi = argv.indexOf('--max-games');
+  if (mi >= 0) { maxGames = parseInt(argv[mi + 1], 10); argv.splice(mi, 2); }
+  if (!Number.isFinite(maxGames) || maxGames < 0) maxGames = 0;
   const files = argv;
   if (files.length === 0) {
-    console.error('Usage: node scripts/train-deck-profile.js <training-log.jsonl> [...]');
+    console.error('Usage: node scripts/train-deck-profile.js <training-log.jsonl | Segmentordner> [...] [--max-games N] [--out-dir <pfad>]');
     process.exit(1);
   }
-  const games = loadGames(files);
+  const games = loadGames(files, maxGames);
   if (games.length < 20) {
     console.error(`Only ${games.length} decided games — too few to learn anything. Aborting.`);
     process.exit(1);

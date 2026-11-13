@@ -94,7 +94,7 @@ async function handAngebot(ctx) {
   // Eine Runde je Kopie auf der Hand; Obergrenze nur als Schleifenriegel.
   for (let runde = 0; runde < 12; runde++) {
     const ps = gs.players[pi];
-    if (!(ps?.hand || []).includes(CARD_NAME)) return;
+    if (!ps || !engine._rxQuelleFuer(ps, CARD_NAME)) return;   // Hand oder Crestinas Vorrat
     let zonen = eligibleSummonZones(engine, pi, CARD_NAME);
     if (filter) zonen = zonen.filter(filter);
     if (zonen.length === 0) return;
@@ -190,6 +190,7 @@ async function resourceBonus(ctx) {
 
 module.exports = {
   activeIn: ['hand', 'support'],
+  reactFromCreation: true,   // 11.11.: Hook-Trigger aus der Hand gilt auch aus Crestinas Vorrat (Extra-Hand)
 
   // CPU-Bedrohungsbild: im Schnitt eine Einkommens-Stufe je Zug.
   supportYield() {
@@ -199,7 +200,7 @@ module.exports = {
   hooks: {
     onSurpriseActivated: async (ctx) => {
       const inst = ctx.card;
-      if (!inst || inst.zone !== 'hand') return;
+      if (!inst || (inst.zone !== 'hand' && inst.zone !== 'creationZone')) return;   // Hand oder Crestinas Vorrat
       // „when YOU activate" — Als Vorgabe 29.9.: der Ausloeser, nicht die Brettseite.
       if ((ctx.surpriseController ?? ctx.surpriseOwner) !== inst.owner) return;
       if (ctx._goldenLadybugAngebot) return;               // eine Runde je Aktivierung

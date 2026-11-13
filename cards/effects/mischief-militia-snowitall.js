@@ -62,6 +62,23 @@ function _isFreezableOnSummon(cardName) {
  * physical copies (matches Saint Nicolas's pattern — see
  * cards/effects/saint-nicolas.js).
  */
+/** ★ 12.11. (Vorgabe: Effekte, die Karten aus der Hand BENUTZEN, greifen auch auf Crestinas Extra-Hand zu): dieselbe Wahl fuer die Vorratsplaetze (`creationEligibleIndices`). */
+function _getSummonableVorratIndices(engine, pi) {
+  const ps = engine.gs.players[pi];
+  if (!ps || !engine.isCreationZoneUsable(pi)) return [];
+  const cardDB = engine._getCardDB();
+  const out = [];
+  (ps.creationZone || []).forEach((cn, i) => {
+    const cd = cardDB[cn];
+    if (!cd || !isSummonablePileCreature(cd, cn)) return;
+    if (engine.effectiveCardLevel(cd, pi, {}) > 1) return;
+    if (!_isFreezableOnSummon(cn)) return;
+    if (_findFreeOwnSupportSlots(engine, pi, cn).length === 0) return;
+    out.push(i);
+  });
+  return out;
+}
+
 function _getSummonableHandIndices(engine, pi) {
   const ps = engine.gs.players[pi];
   if (!ps?.hand) return [];
@@ -148,7 +165,7 @@ module.exports = {
     const pi = ctx.cardOwner;
 
     // Must have at least one Lv≤1 freezable Creature in hand.
-    if (_getSummonableHandIndices(engine, pi).length === 0) return false;
+    if (_getSummonableHandIndices(engine, pi).length === 0 && _getSummonableVorratIndices(engine, pi).length === 0) return false;
     // (Freie Zone eines tauglichen Beschwoerers ist schon Teil der Handauswahl.)
 
     // Summon-turn gate: a Frozen target must already exist for the
@@ -207,6 +224,7 @@ module.exports = {
     let rueckspruenge = 0;
 
     let chosenName = null;
+    let chosenVorrat = false;   // 12.11.: die gewaehlte Karte liegt in Crestinas Vorrat
     let dest = null;
     while (!dest) {
       // ── Step 1: pick the Creature to summon ──
@@ -215,24 +233,29 @@ module.exports = {
       // Pattern mirrors Saint Nicolas / Freshya — see
       // cards/effects/saint-nicolas.js and freshya-beauty-of-coolness.js.
       const eligibleIndices = _getSummonableHandIndices(engine, pi);
-      if (eligibleIndices.length === 0) return false;
+      const eligibleVorrat = _getSummonableVorratIndices(engine, pi);
+      if (eligibleIndices.length + eligibleVorrat.length === 0) return false;
       let chosenIdx;
-      const kartenwahlAutomatisch = eligibleIndices.length === 1;
+      const kartenwahlAutomatisch = eligibleIndices.length + eligibleVorrat.length === 1;
       if (kartenwahlAutomatisch) {
-        chosenIdx = eligibleIndices[0];
-        chosenName = ps.hand[chosenIdx];
+        chosenVorrat = eligibleIndices.length === 0;
+        chosenIdx = chosenVorrat ? eligibleVorrat[0] : eligibleIndices[0];
+        chosenName = chosenVorrat ? ps.creationZone[chosenIdx] : ps.hand[chosenIdx];
       } else {
         const picked = await engine.promptGeneric(pi, {
           type: 'pickHandCard',
           title: CARD_NAME,
-          description: 'Click a Level ≤ 1 Creature in your hand to summon. SnowItAll will Freeze it for 2 turns.',
+          description: 'Click a Level 1 or lower Creature in your hand to summon. SnowItAll will Freeze it for 2 turns.',
           eligibleIndices,
+          creationEligibleIndices: eligibleVorrat,
           confirmLabel: '❄️ Summon!',
           cancellable: true,
         });
         if (!picked || picked.cancelled || picked.handIndex == null) return false;
+        chosenVorrat = !!picked.fromCreation;
+        if (chosenVorrat && !eligibleVorrat.includes(picked.handIndex)) return false;
         chosenIdx = picked.handIndex;
-        chosenName = ps.hand[chosenIdx];
+        chosenName = chosenVorrat ? ps.creationZone[chosenIdx] : ps.hand[chosenIdx];
       }
       if (!chosenName) return false;
 
@@ -289,15 +312,17 @@ module.exports = {
     if (savedReveal) engine.gs._pendingCardReveal = savedReveal;
     if (savedPlayLog) engine.gs._pendingPlayLog = savedPlayLog;
 
-    const handIdx = ps.hand.indexOf(chosenName);
+    const vorratIdx = chosenVorrat ? (ps.creationZone || []).indexOf(chosenName) : -1;
+    const handIdx = chosenVorrat ? vorratIdx : ps.hand.indexOf(chosenName);
     if (handIdx < 0) return false;
-    engine.takeFromPileSync(ps, 'hand', handIdx);
+    const snowQuelle = chosenVorrat ? { liste: ps.creationZone, ausVorrat: true, idx: vorratIdx } : null;
+    if (snowQuelle) engine.rxNimm(ps, snowQuelle); else engine.takeFromPileSync(ps, 'hand', handIdx);
 
     const kernOpts = { source: CARD_NAME, controller: pi };   // Kontrolle statt Seite (Styx 28.9.): Feldseite + Kontrolleur
     if (!(await engine._beschwoerungKostenVorAuftritt(chosenName, dest.owner, dest.heroIdx, dest.slotIdx, kernOpts))) {
       // Kosten abgebrochen / Sperre: Karte zurueck auf die Hand, der Effekt gilt als nicht benutzt, der Gegner hat nichts gesehen.
       delete engine.gs._pendingCardReveal; delete engine.gs._pendingPlayLog;
-      engine.returnToPile(ps, 'hand', chosenName, handIdx);   // v1394
+      if (snowQuelle) engine.handkarteZurueck(pi, chosenName, snowQuelle); else engine.returnToPile(ps, 'hand', chosenName, handIdx);   // v1394
       engine.sync();
       return false;
     }
@@ -307,7 +332,7 @@ module.exports = {
     const summonResult = await engine.summonCreatureWithHooks(chosenName, dest.owner, dest.heroIdx, dest.slotIdx, kernOpts);
     if (!summonResult?.inst) {
       // Race / cancelled by a beforeSummon cost — refund the hand card.
-      engine.returnToPile(ps, 'hand', chosenName, handIdx);   // v1394
+      if (snowQuelle) engine.handkarteZurueck(pi, chosenName, snowQuelle); else engine.returnToPile(ps, 'hand', chosenName, handIdx);   // v1394
       return false;
     }
 

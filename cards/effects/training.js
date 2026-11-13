@@ -37,13 +37,15 @@ const { pickAusQuellen } = require('./_source-pick-shared');
  * Get ability card names in hand that can be attached to a specific hero.
  * @returns {string[]} deduplicated list of eligible ability names
  */
-function getEligibleHandAbilities(engine, playerIdx, heroIdx, feld = playerIdx) {
+function getEligibleHandAbilities(engine, playerIdx, heroIdx, feld = playerIdx, nurHand = false) {
   const ps = engine.gs.players[playerIdx];
   if (!ps) return [];
   const cardDB = engine._getCardDB();
   const seen = new Set();
   const result = [];
-  for (const cardName of (ps.hand || [])) {
+  // ★ 12.11. (Al: „Effekte, die Abilities von der Hand anlegen, auch aus der Extra-Hand“): Hand + Crestinas Vorrat. `nurHand`: der Handpick-Weg fuer GELIEHENE Helden waehlt
+  // ueber Handindizes (kennt den Vorrat nicht).
+  for (const cardName of (nurHand ? (ps.hand || []) : engine.handUndVorratListe(playerIdx))) {
     if (seen.has(cardName)) continue;
     const cd = cardDB[cardName];
     if (!cd || !hasCardType(cd, 'Ability')) continue;
@@ -84,7 +86,7 @@ function getHandAbilityEntries(engine, playerIdx, heroIdx, feld = playerIdx) {
   if (!ps) return [];
   const cardDB = engine._getCardDB();
   const result = [];
-  for (const cardName of (ps.hand || [])) {
+  for (const cardName of engine.handUndVorratListe(playerIdx)) {   // 12.11.: Hand + Crestinas Vorrat (auch bei geliehenen Helden)
     const cd = cardDB[cardName];
     if (!cd || !hasCardType(cd, 'Ability')) continue;
     if (!engine.canAttachAbilityToHero(feld, cardName, heroIdx)) continue;
@@ -102,7 +104,7 @@ async function handAnlegenGewaehlt(engine, playerIdx, heroIdx, names, trainingOr
   let attached = 0;
   let blockiert = false;
   for (const cardName of names) {
-    if (!(ps.hand || []).includes(cardName)) break;
+    if (!engine._rxQuelleFuer(ps, cardName)) break;   // Hand oder Crestinas Vorrat
     if (!engine.canAttachAbilityToHero(feld, cardName, heroIdx)) break;
     const attachResult = await engine.attachAbilityFromHand(playerIdx, cardName, heroIdx, {
       skipAbilityGivenCheck: true,
@@ -219,16 +221,31 @@ async function doHandAttachFremd(engine, playerIdx, heroIdx, maxAttach, training
   for (let i = 0; i < maxAttach; i++) {
     const eligible = getEligibleHandAbilities(engine, playerIdx, heroIdx, feld);
     if (eligible.length === 0) break;
-    const indices = (ps.hand || []).map((n, idx) => (eligible.includes(n) ? idx : -1)).filter(idx => idx >= 0);
-    const result = await engine.promptGeneric(playerIdx, {
-      type: 'handPick', title: 'Training',
-      description: maxAttach === 1
-        ? `Attach an Ability to ${heroName}.`
-        : `Attach an Ability to ${heroName} (${attached + 1}/${maxAttach}).`,
-      eligibleIndices: indices, minSelect: 1, maxSelect: 1,
-      cancellable: true, confirmLabel: '📚 Attach!', pickIntent: 'use',
-    });
-    const pick = result && !result.cancelled && Array.isArray(result.selectedCards) ? result.selectedCards[0] : null;
+    const nurHandNamen = getEligibleHandAbilities(engine, playerIdx, heroIdx, feld, true);
+    const beschreibung = maxAttach === 1
+      ? `Attach an Ability to ${heroName}.`
+      : `Attach an Ability to ${heroName} (${attached + 1}/${maxAttach}).`;
+    let pick;
+    // ★ 12.11. (Al: „Training bei geliehenen Heroes soll auch klappen — auch mit der Extra-Hand“): liegt eine geeignete Ability nur in Crestinas Vorrat, waehlt der Spieler ueber
+    // eine Namens-Galerie (Hand + Vorrat); sonst bleibt es beim Handpick ueber die Handplaetze.
+    if (eligible.every(n => nurHandNamen.includes(n))) {
+      const indices = (ps.hand || []).map((n, idx) => (eligible.includes(n) ? idx : -1)).filter(idx => idx >= 0);
+      const result = await engine.promptGeneric(playerIdx, {
+        type: 'handPick', title: 'Training',
+        description: beschreibung,
+        eligibleIndices: indices, minSelect: 1, maxSelect: 1,
+        cancellable: true, confirmLabel: '📚 Attach!', pickIntent: 'use',
+      });
+      pick = result && !result.cancelled && Array.isArray(result.selectedCards) ? result.selectedCards[0] : null;
+    } else {
+      const result = await engine.promptGeneric(playerIdx, {
+        type: 'cardGallery', title: 'Training', source: 'Training',
+        description: beschreibung + ' (from your hand or Creation Zone)',
+        cards: eligible.map(n => ({ name: n, source: 'hand' })),
+        confirmLabel: '📚 Attach!', cancellable: true,
+      });
+      pick = result && !result.cancelled && result.cardName ? { cardName: result.cardName } : null;
+    }
     if (!pick?.cardName || !eligible.includes(pick.cardName)) break;
     const attachResult = await engine.attachAbilityFromHand(playerIdx, pick.cardName, heroIdx, {
       skipAbilityGivenCheck: true, heroOwner: feld,

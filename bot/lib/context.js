@@ -33,7 +33,16 @@ function createContext({ client, config, db, game }) {
       lines.push((c.staff ? '🔒 ' : '') + c.help);
     }
     lines.push('`[[card name]]` — anywhere in a message: shows the card (up to 3)', '`/bug` — report a bug in the game');
-    return msg.reply({ content: '**MoniaBot**\n' + lines.join('\n'), allowedMentions: { parse: [] } });
+    // Discord erlaubt höchstens 2000 Zeichen je Nachricht; mit den Mod-Befehlen ist die Übersicht länger → in Päckchen aufteilen (an Zeilengrenzen).
+    const parts = [];
+    let cur = '**MoniaBot**';
+    for (const l of lines) {
+      if (cur.length + 1 + l.length > 1900) { parts.push(cur); cur = ''; }
+      cur += (cur ? '\n' : '') + l;
+    }
+    parts.push(cur);
+    await msg.reply({ content: parts[0], allowedMentions: { parse: [] } });
+    for (const p of parts.slice(1)) await msg.channel.send({ content: p, allowedMentions: { parse: [] } });
   });
 
   /** Eine Servernachricht verarbeiten: Moderation → Befehl → Inline-Handler. */

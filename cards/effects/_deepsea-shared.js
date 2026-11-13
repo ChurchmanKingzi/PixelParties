@@ -690,7 +690,16 @@ async function tryBouncePlace(ctx) {
   //     coordinate for the hand→support pile-transfer animation so the
   //     inbound flying card originates where the card sat in hand.
   let newCardFromHandIdx = -1;
-  if (ps._resolvingCard) {
+  if (ps._resolvingCard && ps._resolvingCard.fromCreation) {
+    // ★ 12.11.: die gespielte Kopie stammt aus Crestinas Vorrat (Extra-Hand) — dort entnehmen, nicht eine gleichnamige Handkarte.
+    const vi = require('./_hand-resolve').getResolvingHandIndex(ps);
+    if (vi >= 0 && (ps.creationZone || [])[vi] === ps._resolvingCard.name) {
+      newCardFromHandIdx = vi;
+      engine._rxAbgang(ps, { liste: ps.creationZone, ausVorrat: true, idx: vi });
+      engine.notePlayedFromHand(pi);
+    }
+    ps._resolvingCard = null;
+  } else if (ps._resolvingCard) {
     const { name, nth } = ps._resolvingCard;
     let seen = 0, handRemoveIdx = -1;
     for (let i = 0; i < ps.hand.length; i++) {
@@ -965,7 +974,16 @@ async function landeNachBounce(ctx, data) {
 
   // (C) Entnahme der gespielten Kopie aus der Hand (`_resolvingCard`, nth-Treffer; die zurueckgegebene Karte liegt am Ende).
   let newCardFromHandIdx = -1;
-  if (ps._resolvingCard) {
+  if (ps._resolvingCard && ps._resolvingCard.fromCreation) {
+    // ★ 12.11.: die gespielte Kopie stammt aus Crestinas Vorrat (Extra-Hand) — dort entnehmen, nicht eine gleichnamige Handkarte.
+    const vi = require('./_hand-resolve').getResolvingHandIndex(ps);
+    if (vi >= 0 && (ps.creationZone || [])[vi] === ps._resolvingCard.name) {
+      newCardFromHandIdx = vi;
+      engine._rxAbgang(ps, { liste: ps.creationZone, ausVorrat: true, idx: vi });
+      engine.notePlayedFromHand(pi);
+    }
+    ps._resolvingCard = null;
+  } else if (ps._resolvingCard) {
     const { name, nth } = ps._resolvingCard;
     let seen = 0, handRemoveIdx = -1;
     for (let i = 0; i < ps.hand.length; i++) {
@@ -1214,15 +1232,18 @@ function eligibleSwapReplacements(engine, pi, excludeName, maxLevel) {
   const cardDB = engine._getCardDB();
   const seen = new Set();
   const out = [];
-  for (let i = 0; i < (ps.hand || []).length; i++) {
-    const n = ps.hand[i];
+  // ★ 12.11. (Vorgabe: Effekte, die Karten aus der Hand BENUTZEN, greifen auch auf Crestinas Extra-Hand zu): erst die Hand (je Handindex), dann Crestinas Vorrat.
+  const swapKopien = engine.handUndVorratListe(pi);
+  const swapHandLaenge = (ps.hand || []).length;
+  for (let i = 0; i < swapKopien.length; i++) {
+    const n = swapKopien[i];
     if (seen.has(n)) continue;
     if (n === excludeName) continue;
     const cd = cardDB[n];
     if (!cd || !isSummonablePileCreature(cd)) continue;
     // Effective level — per-slot offsets + active `reduceCardLevel`
     // hooks (Whoolmoth, etc.) flow through here.
-    const lvl = engine.effectiveCardLevel(cd, pi, { handIdx: i });
+    const lvl = engine.effectiveCardLevel(cd, pi, i < swapHandLaenge ? { handIdx: i } : {});
     if (lvl > maxLevel) continue;
     // canSummon gate — e.g. Dragon Pilot / DDG's sacrifice-or-tribute
     // requirement. isCreatureSummonable returns true when no script
@@ -1325,8 +1346,9 @@ async function atomicSwap(engine, pi, bouncedInst, newCardName, sourceName) {
   // (C) Splice the replacement from hand. Capture its hand index
   //     BEFORE splicing so the hand→support flying-card animation
   //     anchors at the card's original hand slot.
-  const newCardFromHandIdx = (ps.hand || []).indexOf(newCardName);
-  if (newCardFromHandIdx >= 0) engine.takeFromPileSync(ps, 'hand', newCardFromHandIdx);
+  const newCardQuelle = engine._rxQuelleFuer(ps, newCardName);   // Hand oder Crestinas Vorrat
+  const newCardFromHandIdx = newCardQuelle ? newCardQuelle.idx : -1;
+  if (newCardQuelle) engine.rxNimm(ps, newCardQuelle);
 
   // (D) Push the bounced creature to hand.
   if (!ps.hand) ps.hand = [];
@@ -1342,7 +1364,7 @@ async function atomicSwap(engine, pi, bouncedInst, newCardName, sourceName) {
     toHandIdx,
   });
   engine._broadcastEvent('play_pile_transfer', {
-    owner: pi, cardName: newCardName, from: 'hand', to: 'support',
+    owner: pi, cardName: newCardName, from: newCardQuelle?.ausVorrat ? 'creation' : 'hand', to: 'support',
     fromHandIdx: newCardFromHandIdx,
     toHeroIdx: bouncedHeroIdx, toSlotIdx: bouncedSlotIdx,
     ...(seite !== pi ? { fromOwner: pi, toOwner: seite } : {}),   // Styx 28.9.

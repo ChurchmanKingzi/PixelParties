@@ -203,7 +203,7 @@ module.exports = {
           description: 'Place 2 Pollution Tokens, then choose how to reincarnate.',
           options: [
             { id: 'revive',  label: '👼 Revive Hero',     description: 'Bring one of your defeated Heroes back at full HP.' },
-            { id: 'restore', label: '🔮 Revive Creature', description: 'Return a Lv≤4 Creature from your discard pile.' },
+            { id: 'restore', label: '🔮 Revive Creature', description: 'Return a Level 4 or lower Creature from your discard pile.' },
           ],
           cancellable: !vorab,
           gerrymanderEligible: true, // Hero revive vs Creature restore are distinct effects.

@@ -694,8 +694,25 @@ function waflavHeroTargets(engine, pi) {
  * Discard-Hooks. Selbst spleissen wuerde all das umgehen — genau der
  * Fehler, den die frueheren Direkt-Pushes gemacht haben.
  */
-async function discardFromHand(engine, pi, cardName, handIndex, source) {
+async function discardFromHand(engine, pi, cardName, handIndex, source, opts = {}) {
   const ps = engine.gs.players[pi];
+  // ★ Karte aus Crestinas Vorrat (Extra-Hand, `handActivatedEffect` gilt dort „als waeren sie auf der Hand"): der Index zaehlt in DER Liste. Vorher suchte dieser Weg
+  //   nur in `ps.hand` — der Abwurf traf eine namensgleiche HANDkopie (die Vorratskarte blieb liegen) oder schlug ohne Handkopie still fehl.
+  //   Die Karte fliegt aus dem Vorrat in die Ablage; Hand-Abwurf-Haken feuern nicht (eine Vorratskarte gilt nicht als Handkarte, Ruling 28.8.).
+  if (opts.fromCreation) {
+    const vorrat = ps?.creationZone;
+    if (!Array.isArray(vorrat)) return false;
+    const vi = (typeof handIndex === 'number' && vorrat[handIndex] === cardName) ? handIndex : vorrat.indexOf(cardName);
+    if (vi < 0) return false;
+    if (await engine.borisVerzicht(pi, 1, { source: source || cardName })) return true;
+    const inst = engine._findHandInstanceAt(pi, vi, true);
+    engine._broadcastEvent('play_pile_transfer', { owner: pi, cardName, from: 'creation', to: 'discard', fromHandIdx: vi });
+    vorrat.splice(vi, 1);
+    ps.discardPile.push(cardName);
+    if (inst) inst.zone = 'discard';
+    engine.sync();
+    return true;
+  }
   if (!ps || !Array.isArray(ps.hand)) return false;
   const idx = (typeof handIndex === 'number' && ps.hand[handIndex] === cardName)
     ? handIndex : ps.hand.indexOf(cardName);

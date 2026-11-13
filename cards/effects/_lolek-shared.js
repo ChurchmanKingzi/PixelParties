@@ -68,7 +68,8 @@ function equippableEntries(engine, pi, sources, filter) {
   const cardDB = engine._getCardDB();
   const out = [];
   for (const source of sources) {
-    const pool = source === 'deck' ? ps.mainDeck : source === 'discard' ? ps.discardPile : ps.hand;
+    // 12.11.: „aus der Hand“ = Hand + Crestinas Vorrat (Vorgabe: Effekte, die Karten aus der Hand BENUTZEN, greifen auch auf die Extra-Hand zu)
+    const pool = source === 'deck' ? ps.mainDeck : source === 'discard' ? ps.discardPile : engine.handUndVorratListe(pi);
     const seen = new Set();
     for (const name of (pool || [])) {
       if (seen.has(name)) continue;

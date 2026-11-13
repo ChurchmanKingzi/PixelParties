@@ -78,7 +78,7 @@ module.exports = {
     if (!cardData || cardData.name !== CARD_NAME) return 0;
     if (evalOpts?.pileSide) return 0;                                   // Deck / Ablage / Gelöscht: gedruckte Stufe
     // Wird eine Karte AUF DEM BRETT geprüft (Instanz kommt mit), gilt die Senkung nicht — nur „in your hand".
-    if (evalOpts?.inst && evalOpts.inst.zone !== 'hand') return 0;
+    if (evalOpts?.inst && !['hand', 'creationZone'].includes(evalOpts.inst.zone)) return 0;   // Hand oder Crestinas Vorrat
     if (!selbstsenkungZaehlt(engine, inst, CARD_NAME, ownerIdx)) return 0;
     const deckel = Math.max(0, (Number(cardData.level) || 0) - 1);      // Mindeststufe 1
     return Math.min(brettStufen(engine), deckel);

@@ -6,8 +6,18 @@
 //  inflict Poison (1 stack, 2 if 2nd Attack,
 //  3 if 3rd Attack this turn).
 //
-//  Animation: ram + 🐍 + impact particles.
+//  Animation (Pixelart, public/app-fx-61.jsx): Der Held DASHT mit der Ramm-Figur BIS ZUM Ziel (`play_ram_animation`, `durch: false`,
+//  `trailType: 'poison'` = giftgrüne Nachbilder nur auf dem Hinweg); im Moment des Kontakts (Bild 0 der Zonen-Animation) stoßen zwei
+//  Finger-Zähne ins Ziel, ein kleiner Schlangenkopf schnappt bei Bild 5 zu (= SCHADEN) und Gift-Adern kriechen über das Ziel
+//  (`venom_strike`, Stufe = `stacks` 1–3, Quelle = `von`). 37 Bilder (30 Hz) ≈ 1,23 s; der Poison-Rider (`poison_splash`) folgt erst danach.
 // ═══════════════════════════════════════════
+
+// Zeiten (ms) der Zonen-Animation `venom_strike` (app-fx-61.jsx, 30 Hz). `VORLAUF`: Mount-Vorlauf der Animation im Client (ZONE_ANIM_MOUNT_DELAY_MS 100 + Aufbau,
+// gemessen im Spiel) — die Engine-Wartezeiten sind Animationszeit + Vorlauf (wie `vorlauf` bei Flame Avalanche), damit HP-Zahl im Biss-Bild (5) und der Rider nach dem Ende (36) kommen.
+const BILD_MS = 1000 / 30;
+const VORLAUF_MS = 120;
+const SCHADEN_MS = Math.round(5 * BILD_MS) + VORLAUF_MS;       // Bild 5 = Zuschnappen
+const ENDE_MS = Math.round(36 * BILD_MS) + VORLAUF_MS;         // Bild 36 = leer
 
 module.exports = {
   // ★★ v1182 — ENTKOPPELTE BILDER (CARD_API): wird die Karte NEGIERT,
@@ -68,20 +78,24 @@ module.exports = {
       const attackSource = { name: 'Blow of the Venom Snake', owner: pi, heroIdx, controller: pi, heroOwner: ctx.cardHeroOwner ?? pi, usesHeroAtk: true };   // Als Befund 29.9.: Brettseite des Angreifers
       const finalDmg = await engine._fireAttackDeclare(attackSource, target, baseAtk);
 
-      // Ram animation
+      // Ram animation: der Held rast BIS ZUM Ziel (`durch: false`), giftgrüne Nachbilder nur auf dem Hinweg. Kontakt nach 12 % der Dauer (144 ms, `rammeBisKontakt`-Anteil).
       engine._broadcastEvent('play_ram_animation', {
         sourceOwner: ctx.cardHeroOwner, sourceHeroIdx: heroIdx,
         targetOwner: tgtOwner, targetHeroIdx: tgtHeroIdx,
         targetZoneSlot: tgtZoneSlot,
-        cardName: hero.name, duration: 1200,
+        cardName: hero.name, duration: 1200, durch: false, trailType: 'poison',
       });
-      await engine._delay(150);
 
-      // Impact
+      // Giftstoß am Ziel: EIN Ereignis, sofort nach dem Ramm-Ereignis — der Mount-Vorlauf (~150 ms) entspricht dem Weg bis zum Kontakt (144 ms), Bild 0 = Kontakt.
+      // `von`: der angreifende Held (Brettseite), `stacks`: 1./2./3. Angriff der Runde = Stufe 1–3.
       const impactSlot = target.type === 'hero' ? -1 : target.slotIdx;
-      engine._broadcastEvent('play_zone_animation', { type: 'explosion', owner: tgtOwner, heroIdx: tgtHeroIdx, zoneSlot: impactSlot });
-      engine._broadcastEvent('play_zone_animation', { type: 'snake_impact', owner: tgtOwner, heroIdx: tgtHeroIdx, zoneSlot: impactSlot });
-      await engine._delay(200);
+      const _zoneT0 = Date.now();
+      engine._broadcastEvent('play_zone_animation', {
+        type: 'venom_strike', owner: tgtOwner, heroIdx: tgtHeroIdx, zoneSlot: impactSlot,
+        von: { owner: ctx.cardHeroOwner ?? pi, heroIdx, el: true },
+        stacks: poisonStacks,
+      });
+      await engine._delay(SCHADEN_MS);
 
       // Deal base ATK damage. Capture cancellation so the poison
       // rider below skips when the hit was fully negated (Idej
@@ -110,8 +124,8 @@ module.exports = {
         }
       }
 
-      // Wait for ram return
-      await engine._delay(500);
+      // Poison-Rider erst nach dem Ende der Zonen-Animation (Bild 36): Rest der Animationszeit abwarten (Schaden-Verarbeitung zählt mit).
+      await engine._delay(Math.max(0, ENDE_MS - (Date.now() - _zoneT0)));
 
       // Skip the poison rider when the damage was fully negated by a
       // reaction — "negate that damage AND all associated effects".

@@ -46,7 +46,8 @@ function kandidaten(engine, pi, heroIdx, ausserName, seite = pi) {
   const out = [];
   for (const quelle of ['hand', 'discard']) {
     if (quelle === 'discard' && !engine.pileOutAllowed(pi, 'discard', { source: CARD_NAME })) continue;
-    const pool = quelle === 'hand' ? (ps?.hand || []) : (ps?.discardPile || []);
+    // ★ 12.11. (Al: „Effekte, die Karten aus der Hand benutzen — hier: beschwoeren —, auch aus der Extra-Hand“): Hand + Crestinas Vorrat.
+    const pool = quelle === 'hand' ? engine.handUndVorratListe(pi) : (ps?.discardPile || []);
     const zaehler = new Map();
     for (const n of pool) {
       if (n === ausserName) continue;

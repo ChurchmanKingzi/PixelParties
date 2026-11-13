@@ -6,8 +6,20 @@
 //  Attack this turn). If 3rd Attack and target
 //  is a Hero with Abilities, may remove one.
 //
-//  Animation: ram + 𖤍 + impact particles.
+//  Animation (Pixelart, public/app-fx-62.jsx): Der Held springt hoch (Hocke, Absprung, Scheitel) und stürzt im Bogen KOPF VORAN
+//  aufs Ziel (`ox_headbutt`, Quelle = `von`, Stärke = `pow` 1–3 = 1./2./3. Angriff der Runde). Kontakt = Bild 0, der Anlauf beginnt
+//  19 Bilder (633 ms) davor; der SCHADEN fällt bei Bild 2 (Kontakt + 67 ms, nach dem Hit-Stop = 21 Bilder ≈ 700 ms nach Animationsbeginn).
+//  Discard-/Ability-Rider erst nach dem Ende der Zielanimation (Bild 38). Der Client entscheidet über den Rückfall (Retro, Animationen aus,
+//  Quelle ohne Figur …) und spielt dann selbst die alte Kombination Ram-Anlauf + Explosion + Ochsen-Symbol auf denselben Schadenszeitpunkt.
 // ═══════════════════════════════════════════
+
+// Zeiten (ms) der Zonen-Animation `ox_headbutt` (app-fx-62.jsx, 30 Hz, Bild 0 = Kontakt, Beginn bei Bild −19). `VORLAUF`: Mount-Vorlauf der Animation im Client (ZONE_ANIM_MOUNT_DELAY_MS 100 + Aufbau,
+// gemessen im Spiel) — die Engine-Wartezeiten sind Animationszeit + Vorlauf (wie bei Blow of the Venom Snake / Flame Avalanche), damit HP-Zahl im Schadensbild (2) und der Rider nach dem Ende (38) kommen.
+const BILD_MS = 1000 / 30;
+const ANLAUF_BILDER = 19;
+const VORLAUF_MS = 125;
+const SCHADEN_MS = Math.round((ANLAUF_BILDER + 2) * BILD_MS) + VORLAUF_MS;       // Bild 2 = nach dem Hit-Stop
+const ENDE_MS = Math.round((ANLAUF_BILDER + 38) * BILD_MS) + VORLAUF_MS;         // Bild 38 = Ziel gefedert, Anwender zurück am Platz
 
 module.exports = {
   // ★★ v1182 — ENTKOPPELTE BILDER (CARD_API): wird die Karte NEGIERT,
@@ -65,20 +77,16 @@ module.exports = {
       const attackSource = { name: 'Strong Ox Headbutt', owner: pi, heroIdx, controller: pi, heroOwner: ctx.cardHeroOwner ?? pi, usesHeroAtk: true };   // Als Befund 29.9.: Brettseite des Angreifers
       const finalDmg = await engine._fireAttackDeclare(attackSource, target, baseAtk);
 
-      // Ram animation
-      engine._broadcastEvent('play_ram_animation', {
-        sourceOwner: ctx.cardHeroOwner, sourceHeroIdx: heroIdx,
-        targetOwner: tgtOwner, targetHeroIdx: tgtHeroIdx,
-        targetZoneSlot: tgtZoneSlot,
-        cardName: hero.name, duration: 1200,
-      });
-      await engine._delay(150);
-
-      // Impact
+      // Sprung-Kopfstoß: EIN Ereignis (kein Ram-Anlauf, keine Explosion mehr). `von`: der angreifende Held (Brettseite), `pow`: 1./2./3. Angriff der Runde.
+      // `cardName`: nur für den Rückfall im Client (alter Ram-Anlauf). Der Schaden fällt bei Bild 2 der Animation (Hit-Stop vorbei), Mount-Vorlauf eingerechnet.
       const impactSlot = target.type === 'hero' ? -1 : target.slotIdx;
-      engine._broadcastEvent('play_zone_animation', { type: 'explosion', owner: tgtOwner, heroIdx: tgtHeroIdx, zoneSlot: impactSlot });
-      engine._broadcastEvent('play_zone_animation', { type: 'ox_impact', owner: tgtOwner, heroIdx: tgtHeroIdx, zoneSlot: impactSlot });
-      await engine._delay(200);
+      const _zoneT0 = Date.now();
+      engine._broadcastEvent('play_zone_animation', {
+        type: 'ox_headbutt', owner: tgtOwner, heroIdx: tgtHeroIdx, zoneSlot: impactSlot,
+        von: { owner: ctx.cardHeroOwner ?? pi, heroIdx, el: true },
+        pow: Math.max(1, Math.min(3, attackNumber)), cardName: hero.name,
+      });
+      await engine._delay(SCHADEN_MS);
 
       // Deal base ATK damage
       if (target.type === 'hero') {
@@ -99,8 +107,8 @@ module.exports = {
         }
       }
 
-      // Wait for ram return
-      await engine._delay(500);
+      // Discard-/Ability-Rider erst nach dem Ende der Zonen-Animation (Bild 38, Rückweg + Federung): Rest der Animationszeit abwarten (Schaden-Verarbeitung zählt mit).
+      await engine._delay(Math.max(0, ENDE_MS - (Date.now() - _zoneT0)));
 
       // Force opponent to discard (1 normally, 2 if 2nd Attack)
       const discardCount = is2nd ? 2 : 1;

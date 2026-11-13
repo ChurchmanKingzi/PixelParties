@@ -40,7 +40,8 @@ function kandidaten(engine, pi) {
   const ps = engine.gs.players[pi];
   const db = engine._getCardDB();
   const zaehler = new Map();
-  for (const n of (ps?.hand || [])) {
+  // ★ 12.11. (Vorgabe: Effekte, die Karten aus der Hand BENUTZEN, greifen auch auf Crestinas Extra-Hand zu): Hand + Vorrat.
+  for (const n of engine.handUndVorratListe(pi)) {
     const cd = db[n];
     if (!cd || !hasCardType(cd, 'Creature') || isArtifactCreature(cd)) continue;
     if (!isOwnSideSummonableCreature(cd, n)) continue;

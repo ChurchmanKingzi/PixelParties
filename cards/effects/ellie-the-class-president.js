@@ -47,6 +47,7 @@ function wirkbar(engine, pi, hi, hs = pi) {
 
 module.exports = {
   activeIn: ['hand', 'support'],
+  reactFromCreation: true,   // 11.11.: Hook-Trigger aus der Hand gilt auch aus Crestinas Vorrat (Extra-Hand)
   creatureEffect: true,
 
   async beforeSummon(ctx) { return !kontrolliert(ctx._engine, ctx.cardOwner, CARD_NAME); },
@@ -55,7 +56,7 @@ module.exports = {
     afterSpellResolved: async (ctx) => {
       const engine = ctx._engine;
       const gs = engine.gs;
-      if (ctx.card?.zone !== 'hand') return;
+      if (ctx.card?.zone !== 'hand' && ctx.card?.zone !== 'creationZone') return;   // Hand oder Crestinas Vorrat
       const pi = ctx.cardOwner;
       if (ctx.casterIdx !== pi) return;
       if (!istDoppelSpell(ctx.spellCardData)) return;
@@ -69,7 +70,7 @@ module.exports = {
         engine._ellieLetzterSpell = ctx.spellCardData; gs._ellieLetzterZug = gs.turn;
       }
       const ps = gs.players[pi];
-      if (!(ps.hand || []).includes(CARD_NAME) || kontrolliert(engine, pi, CARD_NAME)) return;
+      if (!engine._rxQuelleFuer(ps, CARD_NAME) || kontrolliert(engine, pi, CARD_NAME)) return;
       if (require('./_summon-eligibility').eligibleSummonZones(engine, pi, CARD_NAME).length === 0) return;
       const ja = await engine.promptGeneric(pi, {
         type: 'confirm', title: CARD_NAME, showCard: CARD_NAME,

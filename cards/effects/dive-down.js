@@ -137,6 +137,7 @@ module.exports = {
 
   requiresTarget: true,
   activeIn: ['hand'],
+  reactFromCreation: true,   // 11.11.: Hook-Reaktion aus der Hand gilt auch aus Crestinas Vorrat (Extra-Hand)
 
   // Nie normal spielbar — nur ueber das eigene Fenster im Gegnerzug.
   spellPlayCondition() { return false; },
@@ -183,7 +184,7 @@ module.exports = {
       // „while there's at least 1 Area in play"
       if (!areaImSpiel(gs)) return;
 
-      while (ps.hand.includes(CARD_NAME)) {
+      while (engine._rxQuelleFuer(ps, CARD_NAME)) {   // Hand oder Crestinas Vorrat
         // Als Vorgabe 29.9. (Runde 3) / W20c (Al 20.10.: alle Reactions): alle Helden, die ich kontrolliere — eigene und uebernommene
         // (dauerhaft oder temporaer) — als { seite, hi }.
         const waehlbar = [];
@@ -239,18 +240,19 @@ module.exports = {
         // „Delete this card\" — der Flug geht in den GELOESCHT-Stapel,
         // und er wird VOR dem Splice gesendet, damit der Startplatz
         // noch existiert (CARD_API „FLUG-ZIELFELDER\").
-        const handIdx = ps.hand.indexOf(CARD_NAME);
-        if (handIdx < 0) break;
-        const _besitzer = engine._handCardPileOwner(pi, CARD_NAME, handIdx);   // W63c: Loeschstapel des permanenten Besitzers
+        const q = engine._rxQuelleFuer(ps, CARD_NAME);
+        if (!q) break;
+        const handIdx = q.idx;
+        const _besitzer = q.ausVorrat ? pi : engine._handCardPileOwner(pi, CARD_NAME, handIdx);   // W63c: Loeschstapel des permanenten Besitzers
         engine._broadcastEvent('play_pile_transfer', {
           owner: pi, cardName: CARD_NAME,
-          from: 'hand', to: 'deleted',
+          from: q.ausVorrat ? 'creation' : 'hand', to: 'deleted',
           fromHandIdx: handIdx, asPlay: 'sole',
           sfx: 'discard',
           ...(_besitzer !== pi ? { fromOwner: pi, toOwner: _besitzer } : {}),
         });
-        engine.takeFromPileSync(ps, 'hand', handIdx);
-        const inst = engine.cardInstances.find(c =>
+        engine.rxNimm(ps, q);
+        const inst = q.ausVorrat ? null : engine.cardInstances.find(c =>
           c.owner === pi && c.zone === 'hand' && c.name === CARD_NAME);
         if (inst) engine._untrackCard(inst.id);
         // ★★ v1221 (Als Befund 18.9.): SOFORT abgleichen. Der Client

@@ -84,7 +84,9 @@ function zulaessigePaare(engine, pi) {
   const raus = [];
   const gesehen = new Set();
 
-  for (const name of (ps.hand || [])) {
+  // ★ 12.11. (Vorgabe: Effekte, die Karten aus der Hand BENUTZEN, greifen auch auf Crestinas Extra-Hand zu): auch Ascended Heroes in Crestinas Vorrat.
+  const kandidaten = [...(ps.hand || []), ...(engine.isCreationZoneUsable(pi) ? (ps.creationZone || []) : [])];
+  for (const name of kandidaten) {
     if (gesehen.has(name)) continue;
     gesehen.add(name);
     const cd = cardDB[name];
@@ -166,7 +168,12 @@ module.exports = {
     (ps.hand || []).forEach((cn, i) => {
       if (eligibleHostsByCardName[cn]) eligibleIndices.push(i);
     });
-    if (eligibleIndices.length === 0) return { cancelled: true };
+    // ★ 12.11. (Vorgabe: Effekte, die Karten aus der Hand BENUTZEN, greifen auch auf Crestinas Extra-Hand zu): auch Ascended Heroes in Crestinas Vorrat (Klick; Ziehen auf den Helden gibt es dort nicht).
+    const vorratIndices = [];
+    if (engine.isCreationZoneUsable(pi)) {
+      (ps.creationZone || []).forEach((cn, i) => { if (eligibleHostsByCardName[cn]) vorratIndices.push(i); });
+    }
+    if (eligibleIndices.length === 0 && vorratIndices.length === 0) return { cancelled: true };
 
     const pick = await engine.promptGeneric(pi, {
       type: 'pickHandCard',
@@ -174,6 +181,7 @@ module.exports = {
       description: 'Place an Ascended Hero, ignoring its Ascension Conditions.',
       instruction: 'Click a highlighted Ascended Hero in your hand — or drag it onto the Hero it joins.',
       eligibleIndices,
+      creationEligibleIndices: vorratIndices,
       eligibleHostsByCardName,
       dragSummonMode: true,
       hostZoneKind: 'hero',
@@ -188,11 +196,13 @@ module.exports = {
     //   der Hand genommen haben. `ps.hand[pick.handIndex]` waere dann
     //   eine andere Karte oder `undefined`. (Dieselbe Lehre wie bei
     //   Copy Device, v573.)
-    const zielName = pick.cardName || ps.hand[pick.handIndex];
+    const ausVorrat = !!pick.fromCreation;
+    if (ausVorrat && !vorratIndices.includes(pick.handIndex)) return { cancelled: true };
+    const zielName = pick.cardName || (ausVorrat ? (ps.creationZone || [])[pick.handIndex] : ps.hand[pick.handIndex]);
     const eintrag = paare.find(p => p.name === zielName);
     if (!eintrag) return { cancelled: true };
     // Und die Karte muss noch da sein.
-    if (!ps.hand.includes(zielName)) return { cancelled: true };
+    if (!(ausVorrat ? (ps.creationZone || []).includes(zielName) : ps.hand.includes(zielName))) return { cancelled: true };
 
     // ── ② Wirt aufloesen ──────────────────────────────────────────
     // Drag-Abkuerzung: hat der Spieler auf einen Helden gezogen, traegt
@@ -229,7 +239,7 @@ module.exports = {
 
     // Index frisch suchen: der Picker liefert den Index vom Zeitpunkt
     // der Abfrage, und dazwischen liegt eine Spielerantwort.
-    const handIndex = ps.hand.indexOf(zielName);
+    const handIndex = ausVorrat ? (ps.creationZone || []).indexOf(zielName) : ps.hand.indexOf(zielName);
     if (handIndex < 0) return { cancelled: true };
     const basisForm = ps.heroes?.[heroIdx]?.name || null;
 
@@ -247,6 +257,7 @@ module.exports = {
       // Ohne Formstapel faende der Rueckweg die Basisform nicht; die
       // Zielkarten fuehren `formsAscensionStack` nicht.
       forceFormStack: true,
+      ...(ausVorrat ? { fromCreation: true } : {}),
     });
     if (!res?.success) return { cancelled: true };
 

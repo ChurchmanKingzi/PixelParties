@@ -10,8 +10,24 @@
 //  3rd Attack this turn: Stun bypasses the
 //    Immune status (post-CC immunity).
 //
-//  Animation: ram into target + 🐯 fade.
+//  Animation (Pixelart, public/app-fx-63.jsx): Der Held DASHT mit der Ramm-Figur BIS ZUM Ziel (`play_ram_animation`, `durch: false`, Standard-Nachbilder);
+//  im Moment des Kontakts (Bild 0 der Zonen-Animation `tiger_kick`, Quelle = `von`) tritt er zu: Schlagstern, ein brüllender Tigerkopf über dem Ziel
+//  (Maul voll auf bei Bild 2 = SCHADEN, Engine `_delay`), drei Krallenstreifen, danach kreisen drei Sterne um das Ziel (ab Bild 12 = Stun). 34 Bilder (30 Hz) ≈ 1,13 s.
+//  Die Sterne ersetzen die alte Betäubungs-Optik `electric_strike` (kein Blitzbündel mehr obendrauf).
+//  2. Angriff mit Heilung: nach dem Schaden zusätzlich `tiger_blood` (Blutfontäne am Ziel, Blutstrahl zum Mund des Angreifers, er trinkt); die Heilung (HP-Zahl, `heal_sparkle`) folgt erst nach dem Trinken
+//  (BLUT_HEAL_MS), also nach der Betäubung — Menge, Negation und Heilsperren sind unverändert (Heilen läuft weiter über `actionHealHero`).
 // ═══════════════════════════════════════════
+
+// Zeiten (ms) der Zonen-Animation `tiger_kick` (app-fx-63.jsx, 30 Hz). `VORLAUF`: Mount-Vorlauf der Animation im Client (ZONE_ANIM_MOUNT_DELAY_MS 100 + Aufbau,
+// gemessen im Spiel: Bild 0 ≈ 127 ms nach dem Ereignis) — die Engine-Wartezeiten sind Animationszeit + Vorlauf (wie bei Blow of the Venom Snake), damit die HP-Zahl im Maul-auf-Bild (2),
+// die Betäubung beim Erscheinen der Sterne (12) und der Rest nach dem Ende (33) kommen.
+const BILD_MS = 1000 / 30;
+const VORLAUF_MS = 120;
+const SCHADEN_MS = Math.round(2 * BILD_MS) + VORLAUF_MS;       // Bild 2 = Maul voll auf
+const STUN_MS = Math.round(12 * BILD_MS) + VORLAUF_MS;         // Bild 12 = die Sterne erscheinen
+const ENDE_MS = Math.round(33 * BILD_MS) + VORLAUF_MS;         // Bild 33 = leer
+// Blut-Zonen-Animation `tiger_blood` (app-fx-63.jsx, 26 Bilder; nur beim 2. Angriff MIT Heilung, gesendet nach dem Schaden): Der Angreifer „trinkt" den Strahl bis Bild 19 — dann erst setzt die Heilung ein.
+const BLUT_HEAL_MS = Math.round(19 * BILD_MS) + VORLAUF_MS;     // ab dem Blut-Ereignis
 
 module.exports = {
   // ★★ v1182 — ENTKOPPELTE BILDER (CARD_API): wird die Karte NEGIERT,
@@ -75,20 +91,23 @@ module.exports = {
       const attackSource = { name: 'Ferocious Tiger Kick', owner: pi, heroIdx, controller: pi, heroOwner: ctx.cardHeroOwner ?? pi, usesHeroAtk: true };   // Als Befund 29.9.: Brettseite des Angreifers
       const finalDmg = await engine._fireAttackDeclare(attackSource, target, baseAtk);
 
-      // Ram animation: hero charges to target and back
+      // Ram animation: der Held rast BIS ZUM Ziel (`durch: false`), Standard-Nachbilder. Kontakt nach 12 % der Dauer (144 ms).
       engine._broadcastEvent('play_ram_animation', {
         sourceOwner: ctx.cardHeroOwner, sourceHeroIdx: heroIdx,
         targetOwner: tgtOwner, targetHeroIdx: tgtHeroIdx,
         targetZoneSlot: tgtZoneSlot,
-        cardName: hero.name, duration: 1200,
+        cardName: hero.name, duration: 1200, durch: false,
       });
-      await engine._delay(150); // Hero reaches target
 
-      // Impact effect on target at moment of contact
+      // Tigertritt am Ziel: EIN Ereignis, sofort nach dem Ramm-Ereignis — der Mount-Vorlauf (~130 ms) entspricht dem Weg bis zum Kontakt (144 ms), Bild 0 = Kontakt.
+      // `von`: der tretende Held (Brettseite).
       const impactZoneSlot = target.type === 'hero' ? -1 : target.slotIdx;
-      engine._broadcastEvent('play_zone_animation', { type: 'explosion', owner: tgtOwner, heroIdx: tgtHeroIdx, zoneSlot: impactZoneSlot });
-      engine._broadcastEvent('play_zone_animation', { type: 'tiger_impact', owner: tgtOwner, heroIdx: tgtHeroIdx, zoneSlot: impactZoneSlot });
-      await engine._delay(200);
+      const _zoneT0 = Date.now();
+      engine._broadcastEvent('play_zone_animation', {
+        type: 'tiger_kick', owner: tgtOwner, heroIdx: tgtHeroIdx, zoneSlot: impactZoneSlot,
+        von: { owner: ctx.cardHeroOwner ?? pi, heroIdx, el: true },
+      });
+      await engine._delay(SCHADEN_MS);
 
       // Deal base ATK damage with type 'attack' (equipment hooks fire).
       // Capture cancellation so the stun + heal riders both skip when
@@ -131,7 +150,46 @@ module.exports = {
         return;
       }
 
-      // 2nd Attack bonus: heal attacker for damage dealt
+      // 2nd Attack bonus: heal attacker for damage dealt. Mit Blut-Optik: der Angreifer trinkt zuerst (`tiger_blood`), die Heilung selbst folgt BLUT_HEAL_MS später (siehe unten).
+      // Das Blut-Ereignis geht nur raus, wenn die Heilung nach dem Stand JETZT einsetzt (Schaden nicht negiert, `dealt` > 0, Angreifer lebt und hat Platz zum Heilen).
+      let blutT0 = 0;
+      if (is2nd && dealt > 0 && hero.hp > 0 && Math.min(dealt, hero.maxHp - hero.hp) > 0) {
+        blutT0 = Date.now();
+        engine._broadcastEvent('play_zone_animation', {
+          type: 'tiger_blood', owner: tgtOwner, heroIdx: tgtHeroIdx, zoneSlot: impactZoneSlot,
+          von: { owner: ctx.cardHeroOwner ?? pi, heroIdx, el: true },
+        });
+      }
+
+      // Betäubung erst, wenn die Sterne erscheinen (Bild 12) — die Sterne der Animation sind die Betäubungs-Optik (kein `electric_strike` mehr)
+      await engine._delay(Math.max(0, STUN_MS - (Date.now() - _zoneT0)));
+
+      // Apply Stun to target
+      if (target.type === 'hero') {
+        const targetHero = gs.players[tgtOwner]?.heroes?.[tgtHeroIdx];
+        if (targetHero && targetHero.hp > 0) {
+          await engine.addHeroStatus(tgtOwner, tgtHeroIdx, 'stunned', {
+            appliedBy: pi,
+            bypassImmune: is3rd, // 3rd Attack: bypass Immune status
+          });
+        }
+      } else if (target.type === 'equip') {
+        const inst = target.cardInstance || engine.cardInstances.find(c =>
+          c.owner === tgtOwner && c.zone === 'support' &&
+          c.heroIdx === tgtHeroIdx && c.zoneSlot === target.slotIdx
+        );
+        if (inst) {
+          // Der Tritt samt Sternen läuft ohnehin unbedingt (auch bei Cardinal-immunen / geschützten Kreaturen, deren Stun-Zähler nicht greift).
+          const applied = await engine.applyCreatureStatus(inst, 'stunned', {
+            sourceOwner: ctx.cardOwner,
+            source: 'Ferocious Tiger Kick',
+          });
+          if (applied) engine.log('stun', { target: inst.name, by: 'Ferocious Tiger Kick', type: 'creature' });
+        }
+      }
+
+      // Heilung nach dem Trinken (mit Blut) bzw. wie bisher direkt (ohne Blut-Ereignis: gleicher Zweig, keine Wartezeit)
+      if (blutT0) await engine._delay(Math.max(0, BLUT_HEAL_MS - (Date.now() - blutT0)));
       if (is2nd && dealt > 0 && hero.hp > 0) {
         const healAmount = Math.min(dealt, hero.maxHp - hero.hp);
         if (healAmount > 0) {
@@ -143,43 +201,15 @@ module.exports = {
           if (hero.hp > vorher) {
             engine._broadcastEvent('play_zone_animation', { type: 'heal_sparkle', owner: ctx.cardHeroOwner, heroIdx, zoneSlot: -1 });
             engine.log('tiger_kick_heal', { hero: hero.name, amount: hero.hp - vorher });
+            // Zustand (HP-Zahl +Heilung) erst jetzt senden: sonst käme er erst mit dem Schluss-Sync (≈ 8 Bilder nach dem Heilbild). Die Heilanimation hängt ~100 ms Mount-Vorlauf an, der Sync folgt knapp danach.
+            await engine._delay(80);
+            engine.sync();
           }
         }
       }
 
-      // Apply Stun to target
-      if (target.type === 'hero') {
-        const targetHero = gs.players[tgtOwner]?.heroes?.[tgtHeroIdx];
-        if (targetHero && targetHero.hp > 0) {
-          await engine.addHeroStatus(tgtOwner, tgtHeroIdx, 'stunned', {
-            appliedBy: pi,
-            animationType: 'electric_strike',
-            bypassImmune: is3rd, // 3rd Attack: bypass Immune status
-          });
-        }
-      } else if (target.type === 'equip') {
-        const inst = target.cardInstance || engine.cardInstances.find(c =>
-          c.owner === tgtOwner && c.zone === 'support' &&
-          c.heroIdx === tgtHeroIdx && c.zoneSlot === target.slotIdx
-        );
-        if (inst) {
-          // Animation plays unconditionally so the kick visibly lands
-          // on Cardinal-immune / shielded creatures even when the stun
-          // counter doesn't actually apply.
-          engine._broadcastEvent('play_zone_animation', {
-            type: 'electric_strike', owner: tgtOwner,
-            heroIdx: tgtHeroIdx, zoneSlot: target.slotIdx,
-          });
-          const applied = await engine.applyCreatureStatus(inst, 'stunned', {
-            sourceOwner: ctx.cardOwner,
-            source: 'Ferocious Tiger Kick',
-          });
-          if (applied) engine.log('stun', { target: inst.name, by: 'Ferocious Tiger Kick', type: 'creature' });
-        }
-      }
-
-      // Wait for ram return animation
-      await engine._delay(600);
+      // Rest der Animationszeit abwarten (Ende bei Bild 33 samt Rückfahrt des Dashs; Schaden-Verarbeitung zählt mit)
+      await engine._delay(Math.max(0, ENDE_MS - (Date.now() - _zoneT0)));
 
       engine.log('tiger_kick', {
         player: ps.username, target: target.cardName,

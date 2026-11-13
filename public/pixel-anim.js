@@ -8,7 +8,7 @@
 //    Takt         Bewegung in festen Bildern (30/s, global im Gleichschritt), jedes Bild ein gehaltener Wert (`steps(1)`).
 //    Fade         Deckkraft (`opacity`) wird ein Bayer-Dither (4x4, Zellen aus Kunstpixeln, 8 Stufen): Maske statt Alpha.
 //    Skalierung   `scale` landet auf Vielfachen von 1/raster (Kunstpixel = ganze Bildschirmpixel), an der Oberflaeche auf ganzen Groessen.
-//    Verschiebung `translate` landet auf ganzen Kunstpixeln (PX = 2 CSS-px, wie `PP_PX_GROESSE` des Pixelierers; Szenen: `--pp-raster`).
+//    Verschiebung `translate` landet auf ganzen Kunstpixeln (Kampfbrett: Hero-Pixel der eigenen Reihe, 2 oder 3 CSS-px, `standardRaster`; Menues: 2 = `PP_PX_GROESSE`; Szenen: `--pp-raster`).
 //    Drehung      Blattelemente aus Pixelbildern werden je Winkelstufe ins Kunstpixelraster neu gesampelt (RotSprite-artig,
 //                 siehe `drehen`); alles andere dreht nur in Viertelschritten (0/90/180/270 Grad: verlustfrei).
 //    Farbe        Farben der Bildfolge rasten auf die 256er-Palette (window.ppSnapCss, palette.js); Schein-Schatten werden harte Ringe.
@@ -32,7 +32,8 @@
 (function (root) {
   const KONFIG = {
     takt: 30,            // Bilder pro Sekunde
-    px: 2,               // Kunstpixel in CSS-px (== PP_PX_GROESSE in app-shared.jsx); Szenen mit eigenem Raster: Variable --pp-raster
+    px: 2,               // Kunstpixel in CSS-px ausserhalb des Kampfbretts (Menues, Titel; == PP_PX_GROESSE in app-shared.jsx); Szenen mit eigenem Raster: Variable --pp-raster
+    brettRaster: true,   // Kampfbrett: Kunstpixel = Hero-Pixel der eigenen Reihe (ganzzahlig, 2..4; `standardRaster`); false = immer `px` (Notbremse); `window.__ppRasterFest = n` erzwingt n (Test)
     maxBilder: 90,       // Obergrenze gehaltener Bilder je Animation und Durchlauf (lange Schleifen laufen dann langsamer als 30 Hz)
     budget: 7000,        // Abtastungen je backenAlle()-Aufruf (Schutz fuer Szenen mit hunderten Elementen)
     drehStufe: 15,       // Winkelraster (Grad) fuer ANIMIERTE Drehungen mit Sprite; ruhende Drehungen: 1 Grad
@@ -48,6 +49,10 @@
     stufenMax: 800,      // Szenen: reine Stufenfolgen (`steps(n)`) bis zu so vielen Stufen je Durchlauf werden exakt an den Stufengrenzen gebacken
     globalMaxDauer: 8000,// dokumentweit (Oberflaeche) werden nur Animationen/Uebergaenge bis zu dieser Dauer (ms) gebacken (Countdown-Balken u. ae. bleiben)
     direkt: true,        // Blaetter ohne Kinder animieren `mask-image` selbst statt ueber eine vererbte Variable
+    hauptfaden: true,    // W86p: gebackene Animationen mit einer wirkungslosen, nicht kompositierbaren Eigenschaft (scroll-margin-top, wechselt je Bild) auf den Hauptthread zwingen —
+                         // Compositor-Animationen malen die Ebene mit festem Raster und skalieren/verschieben sie bilinear: Mischfarben und Halbalpha an jeder Kante (Palettenverstoss)
+    messen: false,       // Messung: Backzeit je Animationsname in `stat.proName` (nur Tests)
+    ergebnisCache: true, // Ergebnis-Cache reiner Animationen (s. `reinSchluessel`); false = Messung/Notbremse
     aktiv: true,
   };
   const TAKT_MS = () => 1000 / KONFIG.takt;
@@ -90,7 +95,7 @@
   const _farbKachelCache = new Map();
   /** `url(...)` einer Dither-Kachel in fester Farbe `farbe` (CSS-Farbtext, schon auf die Palette gerastet) — fuer halbdurchsichtige Hintergrundfarben. */
   function ditherFarbe(stufe, farbe) {
-    const k = stufe + '|' + farbe;
+    const k = stufe + '|' + farbe + '|' + KONFIG.ditherPx;
     let u = _farbKachelCache.get(k);
     if (!u) {
       u = 'url("data:image/svg+xml,' + encodeURIComponent(ditherKachelSvg(stufe, KONFIG.ditherPx, farbe)) + '")';
@@ -215,6 +220,37 @@
     if (q.rot) t.push(`rotate(${zk(q.rot)}deg)`);
     if (q.sx !== 1 || q.sy !== 1) t.push(q.sx === q.sy ? `scale(${rund4(q.sx)})` : `scale(${rund4(q.sx)}, ${rund4(q.sy)})`);
     return t.length ? t.join(' ') : 'none';
+  }
+
+  // ── Kartenflug (Pixelart): fliegende Kartenbilder werden nie stufenlos skaliert oder gekippt ──
+  // Das Kartenbild (750 x 1050, nächster Nachbar) bleibt nur scharf, solange sein Maßstab gleich bleibt: jede Zwischengröße (123 → 128,9 → 131,9 … 95,9 px) sampelt das Bild neu und
+  // ungleichmäßig (manche Kartenpixel 1, andere 2 px breit, Schrift und Rahmen flimmern); eine `rotateX`-Neigung (Brettebene → Stapel) verzerrt es zusätzlich. Flug-Elemente bekommen deshalb
+  // nur ZWEI Größen — die der Startkarte und die der Zielkarte, wie sie im Spiel ruhend stehen — mit einem einzigen Wechsel kurz vor der Landung, KEINE Neigung, Drehung nur in
+  // Viertelschritten (verlustfrei), Bewegung in ganzen Kunstpixeln. Zugriff: `istKartenflug(el)`; die Rechnung steht in `kartenflugBilder`.
+  const KARTENFLUG = '.card-flight, .card-flight-tilt, .draw-anim-card, .discard-anim-card, .transfer-anim-card, .hand-to-board-fly';
+  const KARTENFLUG_WECHSEL = 0.55;       // Anteil der Flugzeit, ab dem die Zielgröße gilt
+  const istKartenflug = (el) => !!(el && el.matches && el.matches(KARTENFLUG));
+  /** `transform` eines Flug-Elements als flache 2D-Matrix: `matrix3d` mit reiner X-Achsen-Drehung (Neigung) wird entkippt (Längen bleiben, Neigungswinkel entfällt); sonst null. */
+  function kartenflugMatrix(t) {
+    const m2 = matrixLesen(t);
+    if (m2) return m2;
+    const m = /^matrix3d\(([^)]*)\)$/.exec(t || '');
+    if (!m) return null;
+    const v = m[1].split(',').map(parseFloat);
+    if (v.length !== 16 || !v.every(Number.isFinite)) return null;
+    if (Math.abs(v[2]) + Math.abs(v[3]) + Math.abs(v[4]) + Math.abs(v[7]) + Math.abs(v[8]) + Math.abs(v[11]) > 1e-3) return null;     // nur Drehung um die X-Achse
+    return [v[0], v[1], 0, Math.hypot(v[5], v[6]) * (v[5] < 0 ? -1 : 1), v[12], Math.hypot(v[13], v[14]) * (v[13] < 0 ? -1 : 1)];
+  }
+  /** Quantisierte `transform`-Werte je Bild für ein Flug-Element (null: nicht lesbar → normaler Weg). */
+  function kartenflugBilder(roh, breite, hoehe, raster, weich) {
+    const n = roh.length, zs = [];
+    for (let j = 0; j < n; j++) { const m = kartenflugMatrix(roh[j].transform || 'none'); const z = m && zerlegen(m); if (!z) return null; zs.push(z); }
+    const sk = weich ? snapScaleGroesse : snapScale;
+    const sA = sk(Math.abs(zs[0].sx), breite, raster), sE = sk(Math.abs(zs[n - 1].sx), breite, raster);
+    return zs.map((z, j) => {
+      const s = (n < 2 || j / (n - 1) < KARTENFLUG_WECHSEL) ? sA : sE;
+      return transformCss({ tx: snapPx(z.tx, raster), ty: snapPx(z.ty, raster), rot: winkelSnap(z.rot, 90), sx: s, sy: s, sch: 0 });
+    });
   }
 
   /** Laengen (`12.4px`) in einem Wert auf Vielfache von `schritt` px runden (Layout-Eigenschaften; Groessen 4, Lagen 2, sonst 1). */
@@ -373,7 +409,7 @@
   //  4) ANIMATIONEN BACKEN
   // ════════════════════════════════════════════════════════════════════════
   const gebacken = new WeakSet();            // Animation-Objekte
-  const stat = { gebacken: 0, uebersprungen: 0, bilder: 0, ms: 0, sprites: 0, rueckfall: 0, t_probe: 0, t_bauen: 0, t_setzen: 0, t_maske: 0, t_groesse: 0 };
+  const stat = { raster: {}, gebacken: 0, uebersprungen: 0, bilder: 0, ms: 0, sprites: 0, rueckfall: 0, t_probe: 0, t_bauen: 0, t_setzen: 0, t_maske: 0, t_groesse: 0 };
   const META = new Set(['offset', 'computedOffset', 'easing', 'composite']);
   const kebab = (k) => k === 'cssFloat' ? 'float' : k === 'cssOffset' ? 'offset' : k.replace(/^webkit/, '-webkit').replace(/[A-Z]/g, (m) => '-' + m.toLowerCase());
   const camel = (k) => k === 'float' ? 'cssFloat' : k.replace(/^-webkit-/, 'webkit-').replace(/-([a-z])/g, (_, c) => c.toUpperCase());
@@ -394,7 +430,32 @@
   }
   function rasterVon(cs) {
     const v = parseFloat(cs.getPropertyValue('--pp-raster'));
-    return v > 0 ? v : KONFIG.px;
+    return v > 0 ? v : standardRaster();
+  }
+  /**
+   * Standard-Kunstpixel (CSS-px) der Oberflaeche. Menues/Titel: `KONFIG.px` (2). Waehrend das Kampfbrett steht: das Hero-Pixel der EIGENEN Reihe
+   * (`ppFxHeldPixel`, app-board.jsx: Figuren-Canvas / Frame-Breite, folgt `--board-scale`, Brettneigung und Fenstergroesse), ganzzahlig gerundet, mindestens 2,
+   * hoechstens 4 — dieselbe Zelle wie die Effekt-Leinwaende (`ppFxZelle`), also haben Karten-Fluege, Ringe, Zahlen, Markierungen und Dither-Zellen die Pixelgroesse
+   * der Heroes (1080p: 3, 720p und Handy: 2). Im Tutorial-Zoom gilt der Wert OHNE Zoom (der Zoom skaliert Brettebene und Figuren gemeinsam, die Elemente darin
+   * liegen im Ausgangsmass). Gemerkt fuer 200 ms (Resize/--board-scale ziehen so nach, ohne je Animation zu messen); die Schluessel des Ergebnis-Caches tragen das Raster.
+   * Dithermasken (`ditherPx`) folgen dem Raster; die vorgebackenen Stylesheets (style.hart.css) enthalten KEIN Raster und bleiben unberuehrt.
+   */
+  let _stdR = 0, _stdT = -1e9, _stdOhneZoom = 0;
+  function standardRaster() {
+    if (!KONFIG.brettRaster || !KONFIG.aktiv) return KONFIG.px;
+    const jetzt = performance.now();
+    if (_stdR && jetzt - _stdT < 200) return _stdR;
+    _stdT = jetzt;
+    let r = KONFIG.px;
+    try {
+      if (root.__ppRasterFest > 0) r = Math.round(root.__ppRasterFest);
+      else if (typeof root.ppFxHeldPixel === 'function' && document.querySelector('.board-center')) {
+        if (document.querySelector('.board-center.tut-zoom')) r = _stdOhneZoom || KONFIG.px;
+        else { const px = root.ppFxHeldPixel(null).px; if (px > 0) r = _stdOhneZoom = clamp(Math.round(px), KONFIG.px, 4); }
+      }
+    } catch (e) { r = KONFIG.px; }
+    _stdR = r; KONFIG.ditherPx = r;
+    return r;
   }
   function ursprungVon(cs, w, h) {
     const p = String(cs.transformOrigin || '').split(/\s+/).map(parseFloat);
@@ -439,6 +500,7 @@
           if (Math.abs(z.sx * 2 - Math.round(z.sx * 2)) > 0.02 || Math.abs(z.sy * 2 - Math.round(z.sy * 2)) > 0.02) return false;
           continue;
         }
+        if ((p === 'boxShadow' || p === 'textShadow') && schattenKonform(String(v))) continue;      // harte Ringe (Unschaerfe 0, volle Deckkraft) sind schon Pixelart — nicht neu abtasten
         if (p === 'rotate' || p === 'scale' || p === 'filter' || p === 'boxShadow' || p === 'textShadow' || p === 'backdropFilter') {
           if (String(v) !== 'none' && !(p === 'rotate' && /^(0|90|180|270|-90)deg$/.test(String(v)))) return false;
         }
@@ -460,6 +522,18 @@
     if (!v || v === 'none') return v;
     const rest = v.replace(/drop-shadow\((?:[^()]|\([^()]*\))*\)/g, '').replace(/blur\([^)]*\)/g, '').replace(/\s+/g, ' ').trim();
     return rest || 'none';
+  }
+  /** Besteht der Schatten nur aus harten Anteilen (Unschaerfe 0) mit voller Deckkraft (oder `none`)? Dann gibt es nichts zu backen. */
+  function schattenKonform(v) {
+    if (!v || v === 'none') return true;
+    for (const teil of listeTeilen(v)) {
+      const farbe = /(rgba?\([^)]*\)|#[0-9a-fA-F]{3,8})/.exec(teil);
+      if (!farbe) return false;                                  // Farbname/var(): nicht beurteilbar
+      const nums = (teil.replace(/rgba?\([^)]*\)/g, '').match(/-?[\d.]+(?:px)?/g) || []).map(parseFloat);
+      if (nums.length < 2 || nums.length > 4 || (nums[2] || 0) !== 0) return false;
+      if (/^rgba/.test(farbe[1])) { const a = parseFloat(farbe[1].replace(/^rgba\(|\)$/g, '').split(',')[3]); if (!(a >= 0.97)) return false; }
+    }
+    return true;
   }
   /** `box-shadow`/`text-shadow` mit Unschaerfe → harter Ring (Kunstpixel breit) bzw. weg; Alpha < 0,35 faellt weg. */
   function schattenHart(v, raster) {
@@ -590,7 +664,8 @@
 
   /** Breite/Hoehe eines absolut positionierten Elements auf Vielfache von 4 legen (Mitte bleibt) — Voraussetzung fuer saubere Kanten beim Skalieren. */
   const _groesseGemacht = new WeakSet();
-  function groesseAusrichten(el, cs) {
+  function groesseAusrichten(el, cs, gitter) {
+    const g2 = 2 * (gitter || KONFIG.px);                          // Raster 2: Vielfache von 4 (Faktor n/2); Raster 3: Vielfache von 6 (Faktor n/3) — Kanten bleiben ganzzahlig
     if (_groesseGemacht.has(el) || !(el instanceof HTMLElement) || spriteZustand.has(el)) return;
     _groesseGemacht.add(el);
     if (cs.position !== 'absolute' && cs.position !== 'fixed') return;
@@ -604,7 +679,7 @@
     const ex = border ? 0 : (parseFloat(cs.paddingLeft) || 0) + (parseFloat(cs.paddingRight) || 0) + (parseFloat(cs.borderLeftWidth) || 0) + (parseFloat(cs.borderRightWidth) || 0);
     const ey = border ? 0 : (parseFloat(cs.paddingTop) || 0) + (parseFloat(cs.paddingBottom) || 0) + (parseFloat(cs.borderTopWidth) || 0) + (parseFloat(cs.borderBottomWidth) || 0);
     const Wx = cw + ex, Hx = ch + ey;
-    const W4 = Math.max(4, Math.round(Wx / 4) * 4), H4 = Math.max(4, Math.round(Hx / 4) * 4);
+    const W4 = Math.max(g2, Math.round(Wx / g2) * g2), H4 = Math.max(g2, Math.round(Hx / g2) * g2);
     const st = el.style;
     if (Math.abs(W4 - Wx) < 1e-3 && Math.abs(H4 - Hx) < 1e-3 && Number.isInteger(l) && Number.isInteger(t)) return;
     st.setProperty('width', zk(W4 - ex) + 'px'); st.setProperty('height', zk(H4 - ey) + 'px');
@@ -632,30 +707,30 @@
     setTimeout(_arbeiten, 24);                 // ~6 ms Arbeit je ~30 ms: rund ein Fuenftel eines Kerns, Titelbild in ~3 s fertig
   }
 
-  function backen(anim, budget, weich, sofort) {
-    if (!KONFIG.aktiv || (gebacken.has(anim) && !sofort)) return false;
+  function backenPruefen(anim, budget, weich, sofort) {
+    if (!KONFIG.aktiv || (gebacken.has(anim) && !sofort)) return null;
     gebacken.add(anim);
     let eff;
-    try { eff = anim.effect; } catch (e) { return false; }
-    if (!eff || typeof eff.getKeyframes !== 'function' || !eff.target) return false;   // W86u1: ::before/::after (eff.pseudoElement) werden mitgebacken
+    try { eff = anim.effect; } catch (e) { return null; }
+    if (!eff || typeof eff.getKeyframes !== 'function' || !eff.target) return null;   // W86u1: ::before/::after (eff.pseudoElement) werden mitgebacken
     const el = eff.target;
-    if (!(el instanceof Element) || !el.isConnected) return false;
-    if (el.closest('[data-pp-px="aus"]')) { stat.uebersprungen++; return false; }
+    if (!(el instanceof Element) || !el.isConnected) return null;
+    if (el.closest('[data-pp-px="aus"]')) { stat.uebersprungen++; return null; }
     let kfs, t;
-    try { kfs = eff.getKeyframes(); t = eff.getComputedTiming(); } catch (e) { return false; }
+    try { kfs = eff.getKeyframes(); t = eff.getComputedTiming(); } catch (e) { return null; }
     const dauer = +t.duration;
-    if (!(dauer > 0) || !Number.isFinite(dauer) || kfs.length < 2) return false;
-    if (weich && dauer > KONFIG.globalMaxDauer) { stat.uebersprungen++; return false; }
+    if (!(dauer > 0) || !Number.isFinite(dauer) || kfs.length < 2) return null;
+    if (weich && dauer > KONFIG.globalMaxDauer) { stat.uebersprungen++; return null; }
     if (weich && !sofort && Math.min(KONFIG.globalMaxBilder, Math.ceil(dauer / TAKT_MS())) > KONFIG.globalSofort) {
       // W86u1: einmalige Animationen (Schadensblitz, Ringe, Zielmarkierungen …) sofort backen — sie sind vorbei, bevor eine Warteschlange voller Schleifen
       // (Umgebungsteilchen) sie erreicht, und liefen sonst ganz weich. Nur ein Zeitfenster von ~10 ms je Takt; der Rest wartet (einmalige vorn).
       const jetzt = performance.now();
       if (jetzt - _fenster > TAKT_MS()) { _fenster = jetzt; _verbraucht = 0; }
       const schleife = !(+t.iterations <= 1);
-      if (schleife || _verbraucht > KONFIG.sofortMs) { _warte.unshift([anim, weich]); _planen(); return false; }   // zuletzt gestartet = zuerst gebacken (Zielmarkierung vor 100 Umgebungsteilchen)
+      if (schleife || _verbraucht > KONFIG.sofortMs) { _warte.unshift([anim, weich]); _planen(); return null; }   // zuletzt gestartet = zuerst gebacken (Zielmarkierung vor 100 Umgebungsteilchen)
     }
     const props = eigenschaften(kfs);
-    if (!props.length) return false;
+    if (!props.length) return null;
     const strikt = !!(el.closest && el.closest('.pp-pixel-scene'));       // Szenen (Areas): strengere Pruefung, Stufenfolgen exakt (W86a)
     if (istKonform(kfs, props, dauer, strikt)) {
       // Schon gehaltene Bilder: nicht neu abtasten, aber Delay/Start aufs Raster legen (Spriteschleifen mit Dauern wie 200/400/800 ms
@@ -665,15 +740,62 @@
         if (Math.abs(d2 - d0) > 1e-3) eff.updateTiming({ delay: d2 });
         startAusrichten(anim);
       } catch (e) { /* bleibt */ }
-      stat.uebersprungen++; return false;
+      stat.uebersprungen++; return null;
     }
+    return { anim, eff, el, kfs, props, dauer, budget, weich, strikt };
+  }
+  /** Eine Animation backen (Einzelweg: Pruefen, Abtasten, Bauen). Der Stapelweg (`backenAlle`) tastet viele Animationen gemeinsam ab. */
+  function backen(anim, budget, weich, sofort) {
+    const v = backenPruefen(anim, budget, weich, sofort);
+    if (!v) return false;
     const t0 = performance.now();
     let ok = false;
-    try { ok = backenInnen(anim, eff, el, kfs, props, dauer, budget, weich, strikt); } catch (e) { if (KONFIG.debug) console.warn('[PPPixelAnim]', e); }
+    try { ok = backenInnen(v.anim, v.eff, v.el, v.kfs, v.props, v.dauer, v.budget, v.weich, v.strikt); } catch (e) { if (KONFIG.debug) console.warn('[PPPixelAnim]', e); }
     stat.ms += performance.now() - t0;
     if (weich && !sofort) _verbraucht += performance.now() - t0;
     if (ok) stat.gebacken++;
+    if (KONFIG.messen) messe(v.anim, performance.now() - t0);
     return ok;
+  }
+  function messe(anim, ms) {
+    const n = (anim && anim.animationName) || 'waapi', m = stat.proName || (stat.proName = {}), e = m[n] || (m[n] = { n: 0, ms: 0 });
+    e.n++; e.ms += ms;
+  }
+  /**
+   * ★ Stapel: viele Animationen GEMEINSAM backen. Jede Abtastung (`probe.currentTime` setzen, `getPropertyValue` lesen) erzwingt einen
+   * Stil-Neuaufbau; je Animation und Zeitpunkt nacheinander kostet das N x Bilder Neuaufbauten. Hier wird je ZEITPUNKT erst jede Probe gesetzt und
+   * dann gelesen — ein Neuaufbau fuer alle (gemessen: 200 Animationen 730 ms -> 56 ms, gleiche Werte). Auch die Schreibzugriffe des Bauens
+   * (Groessen, Keyframes) kommen erst danach, sie verwerfen die Stile nicht mehr zwischen den Proben.
+   */
+  function backenStapel(liste, budget) {
+    const t0 = performance.now();
+    const ctxs = [];
+    for (const a of liste) {
+      const v = backenPruefen(a, budget, false, false);
+      if (!v) continue;
+      let c = false;
+      try { c = backenProbeVorbereiten(v.anim, v.eff, v.el, v.kfs, v.props, v.dauer, v.budget, v.weich, v.strikt); } catch (e) { if (KONFIG.debug) console.warn('[PPPixelAnim]', e); }
+      if (c) ctxs.push(c);
+    }
+    if (!ctxs.length) return 0;
+    const tp0 = performance.now();
+    let maxN = 0;
+    for (const c of ctxs) if (c.zeiten.length > maxN) maxN = c.zeiten.length;
+    for (let j = 0; j <= maxN; j++) {
+      for (const c of ctxs) if (j <= c.zeiten.length) backenProbeSetzen(c, j);
+      for (const c of ctxs) if (j <= c.zeiten.length) backenProbeLesen(c, j);
+    }
+    for (const c of ctxs) if (c.probe) c.probe.cancel();
+    stat.t_probe += performance.now() - tp0;
+    let n = 0;
+    for (const c of ctxs) {
+      let ok = false;
+      try { ok = backenProbeFertig(c); } catch (e) { if (KONFIG.debug) console.warn('[PPPixelAnim]', e); }
+      if (ok) { stat.gebacken++; n++; }
+    }
+    stat.ms += performance.now() - t0;
+    if (KONFIG.messen && ctxs.length) { const je = (performance.now() - t0) / ctxs.length; for (const c of ctxs) messe(c.anim, je); }
+    return n;
   }
 
   /**
@@ -723,11 +845,44 @@
     try { anim.ready.then(tun, () => {}); } catch (e) { /* ohne */ }
   }
 
-  function backenInnen(anim, eff, el, kfs, props, dauer, budget, weich, strikt) {
+  // ── Ergebnis-Cache „reiner“ Animationen ─────────────────────────────────────────────────────────────────────────────────
+  // Viele Animationen starten hundertfach mit denselben Keyframes und Zeiten (Tutorial-Text: `textbox-char-shake` je Zeichen, Hervorhebungs-Pulse je Zone …). Abtasten (Probe + Stil-Neuaufbau je Bild) und
+  // Bauen ergeben dort immer dasselbe — das erste Backen merkt sich die fertigen Keyframes, jeder weitere Start setzt sie nur noch ein. „Rein“ heisst: das Ergebnis haengt nur von Keyframes, Zeiten und Raster ab, nicht von
+  // der Elementgroesse oder -ausstattung: keine Transformation (Skalierung/Quantisierung nach Groesse), keine Deckkraft (Dither-Maske, Flaeche, Kinder), keine Groessen-Eigenschaften (Ringe), kein Hintergrundbild/keine Maske
+  // (Eingriffe am Element); jede Eigenschaft hat an Anfang UND Ende einen eigenen Wert (sonst gaelte der Ausgangswert des Elements); alles Relative (var(), %, em, calc, currentColor …) geht mit seinem aufgeloesten
+  // Kontext in den Schluessel. Gespeichert wird nur nach erfolgreichem Setzen.
+  const _backCache = new Map(), BACK_CACHE_MAX = 400;
+  const REIN_NICHT = /^(opacity|transform|translate|scale|rotate|width|height|min-width|min-height|max-width|max-height|mask.*|-webkit-mask.*|background-image|background-size|background-repeat|background-attachment|content|d)$/;
+  const RELATIV = /var\(|%|\b(?:em|rem|ex|ch|vw|vh|vmin|vmax)\b|calc\(|currentcolor|inherit|initial|unset|env\(|attr\(/i;
+  function reinSchluessel(kfs, props, cs, pe, weich, strikt, svgInnen, raster, D2, delay2, zeiten, probeZeiten, groesse) {
+    if (!KONFIG.ergebnisCache) return null;
+    for (const p of props) if (REIN_NICHT.test(kebab(p))) return null;
+    const erst = kfs[0], letzt = kfs[kfs.length - 1];
+    let rel = false;
+    const vars = [];
+    const zeilen = kfs.map((k) => {
+      if (k.composite && k.composite !== 'replace' && k.composite !== 'auto') rel = null;
+      return [k.computedOffset != null ? k.computedOffset : k.offset, k.easing, props.map((p) => k[p] == null ? null : String(k[p]))];
+    });
+    if (rel === null) return null;
+    for (const p of props) if (erst[p] == null || letzt[p] == null) return null;
+    for (const z of zeilen) for (const v of z[2]) if (v != null && RELATIV.test(v)) { rel = true; for (const m of v.matchAll(/var\(\s*(--[\w-]+)/g)) vars.push(m[1]); }
+    const ctx = [];
+    if (rel) { const [W, H] = groesse(); ctx.push(cs.fontSize, cs.color, W, H, root.innerWidth, root.innerHeight); for (const v of vars) ctx.push(cs.getPropertyValue(v)); }
+    return JSON.stringify([zeilen, D2, delay2, zeiten.length, zeiten[1] || 0, probeZeiten ? probeZeiten.length : 0, weich, strikt, pe || '', svgInnen, raster, ctx]);
+  }
+
+  function backenProbeVorbereiten(anim, eff, el, kfs, props, dauer, budget, weich, strikt) {
     const pe = eff.pseudoElement || null;                       // W86u1: Animation auf ::before/::after — gleiche Pipeline, nur ohne Inline-Eingriffe am Wirt
     const cs = pe ? getComputedStyle(el, pe) : getComputedStyle(el);
-    const [W, H] = pe ? pseudoGroesse(cs, el) : groesseVon(el);
-    const raster = rasterVon(cs);
+    // Groesse (Layout!) erst, wenn gebraucht: Treffer im Ergebnis-Cache brauchen sie nur bei relativen Werten — sonst erzwingt jeder Start (Tutorial-Text: je Zeichen) ein Layout.
+    const groesse = () => (pe ? pseudoGroesse(cs, el) : groesseVon(el));
+    // Raster: nur Szenen (Areas) setzen `--pp-raster` (Inline-Stil) — sonst gilt der Standard, ohne den Stil zu lesen (das erzwingt einen Neuaufbau je Start)
+    const szene = !!(el.closest && el.closest('[style*="--pp-raster"]'));
+    const raster = szene ? rasterVon(cs) : standardRaster();
+    const gitter = szene ? KONFIG.px : raster;                   // ganzzahliges Raster fuer Layout-Rundung (Szenen: Szenenpixel sind Bruchzahlen)
+    if (szene) KONFIG.ditherPx = KONFIG.px;                      // Szenen dithern weiter in 2-px-Zellen (die Dithermaske des Bretts folgt `standardRaster`)
+    stat.raster[raster] = (stat.raster[raster] || 0) + 1;
     const svgInnen = istSvgInnen(el);
     const T = TAKT_MS();
     const delay0 = +t0Timing(eff).delay || 0;
@@ -746,36 +901,75 @@
       if (sz && (!budget || budget.rest === undefined || sz.grid.length <= Math.max(zeiten.length * 3, budget.rest / 4))) { zeiten = sz.grid; probeZeiten = sz.probe; }
     }
     if (budget && budget.rest !== undefined) { budget.rest -= zeiten.length + 1; budget.offen = Math.max(1, budget.offen - 1); }
+    // ── Ergebnis-Cache: schon gebacken (gleiche Keyframes/Zeiten) → nicht abtasten ──
+    const reinKey = reinSchluessel(kfs, props, cs, pe, weich, strikt, svgInnen, raster, D2, delay2, zeiten, probeZeiten, groesse);
+    if (reinKey) {
+      const hit = _backCache.get(reinKey);
+      if (hit) return { hit, anim, eff, el, props, dauer, weich, strikt, pe, cs, W: 0, H: 0, raster, gitter, svgInnen, T, delay0, delay2, D2, zeiten, probeZeiten, probe: null, kProps: [], roh: [] };
+    }
+    const [W, H] = groesse();
     // ── Probe: gleiche Keyframes als eigene WAAPI-Animation → abtasten ──
     const probeKfs = kfs.map(k => { const o = Object.assign({}, k); o.offset = k.computedOffset != null ? k.computedOffset : k.offset; delete o.computedOffset; return o; });
     let probe;
     try { probe = new Animation(new KeyframeEffect(el, probeKfs, Object.assign({ duration: D2, fill: 'both', easing: 'linear' }, pe ? { pseudoElement: pe } : {})), document.timeline); }
     catch (e) { return false; }
-    const tp0 = performance.now();
     probe.pause();
-    const kProps = props.map(kebab);
-    const roh = [];
-    for (let j = 0; j <= zeiten.length; j++) {
-      probe.currentTime = j < zeiten.length ? (probeZeiten ? probeZeiten[j] : zeiten[j]) : D2 - 1e-3;
-      const w = {};
-      for (let q = 0; q < kProps.length; q++) w[props[q]] = cs.getPropertyValue(kProps[q]);
-      roh.push(w);
+    return { anim, eff, el, props, dauer, weich, strikt, pe, cs, W, H, raster, gitter, svgInnen, T, delay0, delay2, D2, zeiten, probeZeiten, probe, kProps: props.map(kebab), roh: [], reinKey };
+  }
+  /** Probe auf den j-ten Zeitpunkt stellen. */
+  function backenProbeSetzen(c, j) {
+    if (c.hit) return;
+    c.probe.currentTime = j < c.zeiten.length ? (c.probeZeiten ? c.probeZeiten[j] : c.zeiten[j]) : c.D2 - 1e-3;
+  }
+  /** Werte der Probe zum eingestellten Zeitpunkt lesen. */
+  function backenProbeLesen(c, j) {
+    if (c.hit) return;
+    const w = {};
+    for (let q = 0; q < c.kProps.length; q++) w[c.props[q]] = c.cs.getPropertyValue(c.kProps[q]);
+    c.roh.push(w);
+  }
+  /** Einzelweg: eine Animation vorbereiten, abtasten, fertig bauen. */
+  function backenInnen(anim, eff, el, kfs, props, dauer, budget, weich, strikt) {
+    const c = backenProbeVorbereiten(anim, eff, el, kfs, props, dauer, budget, weich, strikt);
+    if (!c) return false;
+    const tp0 = performance.now();
+    if (!c.hit) for (let j = 0; j <= c.zeiten.length; j++) { backenProbeSetzen(c, j); backenProbeLesen(c, j); }
+    if (c.probe) c.probe.cancel();
+    stat.t_probe += performance.now() - tp0;
+    return backenProbeFertig(c);
+  }
+  /** Aus den gelesenen Rohwerten die gebackenen Keyframes bauen und einsetzen. */
+  function backenProbeFertig(c) {
+    if (c.hit) {                                                  // Ergebnis-Cache: fertige Keyframes einsetzen
+      try {
+        c.eff.setKeyframes(c.hit.frames.map((f) => Object.assign({}, f)));
+        const neu = {};
+        if (Math.abs(c.D2 - c.dauer) > 1e-3) neu.duration = c.D2;
+        if (Math.abs(c.delay2 - c.delay0) > 1e-3) neu.delay = c.delay2;
+        if (neu.duration !== undefined || neu.delay !== undefined) c.eff.updateTiming(neu);
+      } catch (e) { return false; }
+      startAusrichten(c.anim);
+      stat.bilder += c.hit.frames.length; stat.cacheTreffer = (stat.cacheTreffer || 0) + 1;
+      return true;
     }
-    probe.cancel();
-    const tp1 = performance.now(); stat.t_probe += tp1 - tp0;
+    const { anim, eff, el, props, weich, pe, cs, W, H, raster, gitter, svgInnen, delay0, delay2, D2, zeiten, roh } = c, dauer = c.dauer;
+    const tp1 = performance.now();
     // ── Quantisieren ──
-    const rahmen = frameBauen(roh, props, el, cs, W, H, raster, svgInnen, weich, anim, pe);
+    const rahmen = frameBauen(roh, props, el, cs, W, H, raster, svgInnen, weich, anim, pe, gitter);
     const tp2 = performance.now(); stat.t_bauen += tp2 - tp1;
     if (!rahmen) return false;
     // ── Gleiche Bilder zusammenfassen, Keyframes setzen ──
     const offs = zeiten.map(z => z / D2).concat([1]);
     const frames = [];
     let letzte = null;
+    // W86p: nur Animationen, die skalieren (Faktor != 1): Ebenen mit reiner Verschiebung ganzer Pixel bleiben auch als Compositor-Animation scharf
+    const hauptfaden = KONFIG.hauptfaden && (roh.some(w => { const m = matrixLesen(w.transform || 'none'); const z = m && zerlegen(m); return z && (Math.abs(Math.abs(z.sx) - 1) > 0.02 || Math.abs(Math.abs(z.sy) - 1) > 0.02); })
+      || roh.some(w => w.scale && w.scale !== 'none' && w.scale !== '1') || roh.some(w => w.rotate && w.rotate !== 'none' && w.rotate !== '0deg'));
     for (let j = 0; j < rahmen.length; j++) {
       const s = JSON.stringify(rahmen[j]);
       const ende = j === rahmen.length - 1;
       if (s === letzte && !ende) continue;
-      frames.push(Object.assign({ offset: offs[j], easing: 'steps(1, end)', composite: 'replace' }, rahmen[j]));
+      frames.push(Object.assign({ offset: offs[j], easing: 'steps(1, end)', composite: 'replace' }, hauptfaden ? { scrollMarginTop: (frames.length % 2) + 'px' } : null, rahmen[j]));
       letzte = s;
     }
     if (frames.length < 2) frames.push(Object.assign({}, frames[0], { offset: 1 }));
@@ -790,12 +984,14 @@
     startAusrichten(anim);
     stat.t_setzen += performance.now() - tp2;
     stat.bilder += frames.length;
+    if (c.reinKey) { if (_backCache.size >= BACK_CACHE_MAX) _backCache.delete(_backCache.keys().next().value); _backCache.set(c.reinKey, { frames: frames.map((f) => Object.assign({}, f)) }); }
     return true;
   }
   const t0Timing = (eff) => eff.getTiming();
 
   /** Rohwerte je Bild → quantisierte Keyframe-Eigenschaften (camelCase). */
-  function frameBauen(roh, props, el, cs, W, H, raster, svgInnen, weich, anim, pe) {
+  function frameBauen(roh, props, el, cs, W, H, raster, svgInnen, weich, anim, pe, gitter) {
+    gitter = gitter || KONFIG.px;
     const n = roh.length;
     const aus = roh.map(() => ({}));
     const hatT = props.includes('transform');
@@ -821,10 +1017,13 @@
     if (!sprite && props.some(p => TRANSFORM.has(p))) {
       // Skaliert das Element irgendwann (Faktor != 1)? Dann Groesse auf Vielfache von 4 (ganze Pixelkanten, s. groesseAusrichten)
       if ((roh.some(w => { const m = matrixLesen(w.transform || 'none'); const z = m && zerlegen(m); return z && (Math.abs(Math.abs(z.sx) - 1) > 0.02 || Math.abs(Math.abs(z.sy) - 1) > 0.02); })
-          || roh.some(w => w.scale && w.scale !== 'none' && w.scale !== '1')) && !weich && !pe) { const tg = performance.now(); groesseAusrichten(el, cs); stat.t_groesse += performance.now() - tg; }
+          || roh.some(w => w.scale && w.scale !== 'none' && w.scale !== '1')) && !weich && !pe) { const tg = performance.now(); groesseAusrichten(el, cs, gitter); stat.t_groesse += performance.now() - tg; }
+      // Kartenflug: zwei Größen, keine Neigung (siehe `kartenflugBilder`)
+      const flugT = (hatT && !pe && !svgInnen && !props.includes('scale') && !props.includes('rotate') && istKartenflug(el)) ? kartenflugBilder(roh, W, H, raster, weich) : null;
       for (let j = 0; j < n; j++) {
         const w = roh[j];
-        if (hatT) {
+        if (hatT && flugT) aus[j].transform = flugT[j];
+        else if (hatT) {
           const m = matrixLesen(w.transform);
           if (!m) aus[j].transform = w.transform;
           else {
@@ -877,7 +1076,7 @@
       for (let j = 0; j < n; j++) {
         let v = roh[j][p];
         if (v == null) continue;
-        if (LAYOUT.test(k)) v = laengenRunden(v, /^(width|height|min-|max-)/.test(k) ? 4 : /^(left|top|right|bottom|margin|inset)/.test(k) ? 2 : 1);
+        if (LAYOUT.test(k)) v = laengenRunden(v, /^(width|height|min-|max-)/.test(k) ? 2 * gitter : /^(left|top|right|bottom|margin|inset)/.test(k) ? gitter : 1);
         else if (k === 'filter' || k === '-webkit-filter') v = root.PPPixelHart ? root.PPPixelHart.filter(v) : filterBereinigen(v);   // W86u1: harte drop-shadows bleiben, Weichzeichner weg
         else if (k === 'backdrop-filter' || k === '-webkit-backdrop-filter') v = 'none';
         else if (k === 'box-shadow') v = root.PPPixelHart ? root.PPPixelHart.box(v) : schattenHart(v, raster);
@@ -886,7 +1085,65 @@
         aus[j][p] = v;
       }
     }
+    if (!pe && !svgInnen && (props.includes('width') || props.includes('height'))) { try { ringBacken(el, cs, aus, raster, n); } catch (e) { if (KONFIG.debug) console.warn('[PPPixelAnim.ring]', e); } }
     return aus;
+  }
+
+  /**
+   * ★ W86p: Ring mit animierter GROESSE (`border-radius: 50 %` + `border`, durchsichtige Flaeche — Druckwellen, Zielringe): der Browser malt den Bogen als
+   * Vektor, jede Randpixel bekommt Teildeckkraft (Mischfarben ausserhalb der Palette). Je Bild wird der Ring stattdessen als Pixelbild gemalt (Kunstpixel-
+   * Raster, Palettenfarbe, deckend) und der Rand durchsichtig gesetzt; die Groesse (Layout) bleibt unveraendert.
+   */
+  const _ringCache = new Map();
+  function ringBild(nx, ny, d, rgb) {
+    const key = nx + 'x' + ny + ':' + d + ':' + rgb.join(',');
+    let u = _ringCache.get(key);
+    if (u !== undefined) return u;
+    const [cv, g] = neuesCanvas(nx, ny);
+    const id = g.createImageData(nx, ny), dat = id.data;
+    const ax = nx / 2, ay = ny / 2, bx = Math.max(0.0001, ax - d), by = Math.max(0.0001, ay - d);
+    for (let y = 0; y < ny; y++) for (let x = 0; x < nx; x++) {
+      const ux = x + 0.5 - ax, uy = y + 0.5 - ay;
+      const aussen = (ux * ux) / (ax * ax) + (uy * uy) / (ay * ay) <= 1;
+      const innen = ax - d > 0.5 && ay - d > 0.5 && (ux * ux) / (bx * bx) + (uy * uy) / (by * by) < 1;
+      if (aussen && !innen) { const i = (y * nx + x) * 4; dat[i] = rgb[0]; dat[i + 1] = rgb[1]; dat[i + 2] = rgb[2]; dat[i + 3] = 255; }
+    }
+    g.putImageData(id, 0, 0);
+    try { u = cv.toDataURL('image/png'); } catch (e) { u = ''; }
+    if (_ringCache.size > 300) _ringCache.clear();
+    _ringCache.set(key, u);
+    return u;
+  }
+  function ringBacken(el, cs, aus, raster, n) {
+    const bw = parseFloat(cs.borderTopWidth) || 0;
+    if (!(bw > 0) || cs.borderTopStyle !== 'solid') return;
+    const bc = farbeRgba(cs.borderTopColor);
+    if (!bc || bc[3] < 0.5) return;
+    const bg = farbeRgba(cs.backgroundColor);
+    if ((bg && bg[3] > 0.03) || (cs.backgroundImage && cs.backgroundImage !== 'none')) return;
+    const rr = cs.borderTopLeftRadius || '0px';
+    const rund = /%/.test(rr) ? parseFloat(rr) >= 45 : parseFloat(rr) >= Math.min(el.offsetWidth, el.offsetHeight) / 2 - 1;
+    if (!rund) return;
+    if (!(raster > 0)) raster = KONFIG.px;
+    const rgb = root.ppSnapRgb ? root.ppSnapRgb(bc[0] | 0, bc[1] | 0, bc[2] | 0) : [bc[0] | 0, bc[1] | 0, bc[2] | 0];
+    const bb = cs.boxSizing === 'border-box';
+    const mass = (v, fallback) => { const f = parseFloat(v); return f >= 0 ? f : fallback; };
+    const W0 = el.offsetWidth, H0 = el.offsetHeight;
+    const d = Math.max(1, Math.round(bw / raster));
+    const bilder = [];
+    for (let j = 0; j < n; j++) {
+      const w = mass(aus[j].width, bb ? W0 : W0 - 2 * bw), h = mass(aus[j].height, bb ? H0 : H0 - 2 * bw);
+      const AW = bb ? w : w + 2 * bw, AH = bb ? h : h + 2 * bw;
+      const nx = Math.max(2, Math.round(AW / raster)), ny = Math.max(2, Math.round(AH / raster));
+      const u = ringBild(nx, ny, d, rgb);
+      if (!u) return;
+      bilder.push(u);
+    }
+    for (let j = 0; j < n; j++) { aus[j].backgroundImage = `url("${bilder[j]}")`; aus[j].borderColor = 'transparent'; }
+    const st = el.style;
+    st.setProperty('background-size', '100% 100%'); st.setProperty('background-origin', 'border-box'); st.setProperty('background-repeat', 'no-repeat');
+    st.setProperty('image-rendering', 'pixelated');
+    stat.ringe = (stat.ringe || 0) + 1;
   }
 
   // ════════════════════════════════════════════════════════════════════════
@@ -1051,6 +1308,8 @@
     const pos = cs.position;
     if (pos !== 'absolute' && pos !== 'fixed') return false;
     if (cs.display === 'none' || cs.display === 'contents') return false;
+    // `malen` malt nur Hintergruende/Rahmen, nie <img>/<canvas>/<video>-Inhalt — ein Element mit Kartenbild darin (fliegende Karten: Ziehen, Suchen) wuerde zum leeren Sprite und seine echten Kinder verschwaenden.
+    if (el.querySelector('img, canvas, video')) return false;
     return true;
   }
 
@@ -1153,7 +1412,7 @@
     try {
       const alle = animationenUnter(wurzel).filter(a => !gebacken.has(a));
       const budget = { rest: KONFIG.budget, offen: alle.length };
-      for (const a of alle) if (backen(a, budget)) n++;
+      n = backenStapel(alle, budget);
     } catch (e) { if (KONFIG.debug) console.warn('[PPPixelAnim]', e); }
     return n;
   }
@@ -1208,6 +1467,11 @@
       if (!cs.backgroundImage || cs.backgroundImage === 'none') {
         const bc = farbeRgba(cs.backgroundColor);
         if (bc && bc[3] > 0.03 && bc[3] < 0.97) a.bg = bc;
+      } else {
+        // ★ W86p: Bild UND halbdurchsichtige Grundfarbe (z. B. Partikel-Regel `background: url(schatten), var(--color) !important` mit rgba-Farbe): die Farbe
+        // mischte sich mit dem Untergrund (Farbe ausserhalb der Palette). Wie bei SVG-Formen: ab 50 % deckend in der Farbe, darunter weg.
+        const bc = farbeRgba(cs.backgroundColor);
+        if (bc && bc[3] > 0.03 && bc[3] < 0.97) a.bgUnter = bc;
       }
       if (animTr.has(el)) {
         // Die Animation uebernimmt die Transformation — der ruhende Inline-Wert vor ihrem Start (Delay) darf trotzdem nicht gedreht stehen.
@@ -1235,7 +1499,7 @@
         if (mm && bildVon(mm[2]) && bcol && bcol[3] >= 0.5) a.maskBild = { url: mm[2], farbe: bcol, groesse: cs.maskSize, lage: cs.maskPosition, wdh: cs.maskRepeat };
       }
       if (el.classList.contains('pp-px') && cs.display === 'inline-block' && /em\)?$|calc\(/.test((el.getAttribute('style') || '').match(/width:\s*([^;]*)/) ? el.getAttribute('style').match(/width:\s*([^;]*)/)[1] : '')) a.pxBox = [el.offsetWidth, el.offsetHeight];
-      if (a.opa !== undefined || a.bg || a.tr || a.basis || a.maskBild || a.pxBox || a.misch || a.farbFilter) auftraege.push(a);
+      if (a.opa !== undefined || a.bg || a.bgUnter || a.tr || a.basis || a.maskBild || a.pxBox || a.misch || a.farbFilter) auftraege.push(a);
     }
     let n = 0;
     for (const a of auftraege) {                                 // ── Schreiben ──
@@ -1296,6 +1560,11 @@
           const z = maskeVorbereiten(el, cs);
           el.style.setProperty('opacity', stufe === 0 ? '0' : '1');
           el.style.setProperty(z.vn, ditherMaske(stufe === 0 ? 1 : stufe));
+          n++;
+        }
+        if (a.bgUnter) {
+          const c = a.bgUnter;
+          el.style.setProperty('background-color', c[3] >= 0.5 ? snapFarben(`rgb(${Math.round(c[0])},${Math.round(c[1])},${Math.round(c[2])})`) : 'transparent', 'important');
           n++;
         }
         if (a.bg) {
@@ -1482,7 +1751,7 @@
   }
 
   const api = {
-    rein, KONFIG, stat, backen, backenAlle, anhaengen, statisch, geometrieRunden, global, taktRaf, drehSpriteUrl, canvasDither, ditherMaske, ditherStufe, bildRegistrieren, bildVon, cssHilfsset,
+    rein, KONFIG, stat, standardRaster, backen, backenAlle, anhaengen, statisch, geometrieRunden, global, taktRaf, drehSpriteUrl, canvasDither, ditherMaske, ditherStufe, bildRegistrieren, bildVon, cssHilfsset,
     _test: { malen, eigeneMalerei, spriteBilder }, snapPx, snapScale, drehen, aus: (el) => el && el.setAttribute && el.setAttribute('data-pp-px', 'aus'),
   };
   root.PPPixelAnim = api;

@@ -106,8 +106,22 @@ module.exports = {
         return out;
       };
 
+      // ★ 12.11. (Vorgabe: Effekte, die Karten aus der Hand BENUTZEN, auch aus Crestinas Extra-Hand): dieselbe Wahl fuer die Vorratsplaetze (`creationEligibleIndices`).
+      const buildEligibleVorratIndices = () => {
+        const out = [];
+        if (!engine.isCreationZoneUsable(pi)) return out;
+        (ps.creationZone || []).forEach((cn, i) => {
+          if (!isGigantisaurCreature(cn, engine)) return;
+          const cd = cardDB[cn];
+          if (!cd || eligibleHostSlots(engine, pi, cd).length === 0) return;
+          out.push(i);
+        });
+        return out;
+      };
+      const anzahlWahl = () => buildEligibleHandIndices().length + buildEligibleVorratIndices().length;
+
       let initialEligible = buildEligibleHandIndices();
-      if (initialEligible.length === 0) return ctx._engine.summonEffektFizzelt(ctx.card, ctx.cardName, { stumm: true });   // W11/R4: wirkt nicht → Blob stumm
+      if (initialEligible.length === 0 && buildEligibleVorratIndices().length === 0) return ctx._engine.summonEffektFizzelt(ctx.card, ctx.cardName, { stumm: true });   // W11/R4: wirkt nicht → Blob stumm
 
       // No upfront Yes/No confirm — the player goes straight into the
       // picker. Cancelling the picker is the opt-out.
@@ -122,7 +136,8 @@ module.exports = {
       // prompting the same picker would be pointless, so we exit.
       while (true) {
         const eligibleIndices = buildEligibleHandIndices();
-        if (eligibleIndices.length === 0) return; // nothing legal left
+        const vorratIndices = buildEligibleVorratIndices();
+        if (eligibleIndices.length === 0 && vorratIndices.length === 0) return; // nothing legal left
 
         // Per-card host map. The client uses this to highlight valid
         // drop zones while a Gigantisaur is being dragged from hand;
@@ -132,8 +147,7 @@ module.exports = {
         // (no drag) returns just `{cardName, handIndex}` — same
         // path the click-only picker uses.
         const eligibleHostsByCardName = {};
-        for (const idx of eligibleIndices) {
-          const cn = ps.hand[idx];
+        for (const cn of [...eligibleIndices.map(i => ps.hand[i]), ...vorratIndices.map(i => ps.creationZone[i])]) {
           if (eligibleHostsByCardName[cn]) continue;
           const cd = cardDB[cn];
           if (!cd) continue;
@@ -148,13 +162,16 @@ module.exports = {
           description: 'Summon another Gigantisaur from your hand as an additional Action.',
           instruction: 'Click a highlighted Gigantisaur — or drag it onto a Support Zone — to summon it.',
           eligibleIndices,
+          creationEligibleIndices: vorratIndices,   // 12.11.: Klick auf eine Vorratskarte (Ziehen auf eine Zone gibt es dort nicht)
           eligibleHostsByCardName,
           dragSummonMode: true,
           cancellable: true,
         });
         if (!pick || pick.cancelled || pick.handIndex == null) return;
         const chosenHandIdx = pick.handIndex;
-        const chosenName = ps.hand[chosenHandIdx];
+        const ausVorrat = !!pick.fromCreation;
+        if (ausVorrat && !vorratIndices.includes(chosenHandIdx)) return;
+        const chosenName = ausVorrat ? ps.creationZone[chosenHandIdx] : ps.hand[chosenHandIdx];
         const chosenCd = cardDB[chosenName];
         if (!chosenCd) return;
 
@@ -165,7 +182,7 @@ module.exports = {
         // click-only path falls through to the existing zone-pick.
         const hosts = eligibleHostSlots(engine, pi, chosenCd);
         if (hosts.length === 0) {
-          if (buildEligibleHandIndices().length >= 2) continue;
+          if (anzahlWahl() >= 2) continue;
           return;
         }
         let slot = null;
@@ -191,7 +208,7 @@ module.exports = {
               cancellable: true,
             });
             if (!zp || zp.cancelled) {
-              if (buildEligibleHandIndices().length >= 2) continue;
+              if (anzahlWahl() >= 2) continue;
               return;
             }
             slot = hosts.find(h => h.heroIdx === zp.heroIdx && h.slotIdx === zp.slotIdx) || hosts[0];
@@ -206,22 +223,30 @@ module.exports = {
         // diff-detector animation bug where a rollback fired a
         // "fly in from opp's side" effect on whichever card the
         // hand-length diff happened to point at.
-        const nth = ps.hand.slice(0, chosenHandIdx + 1).filter(c => c === chosenName).length;
+        const nth = ausVorrat ? 1 : ps.hand.slice(0, chosenHandIdx + 1).filter(c => c === chosenName).length;
         const prevResolving = ps._resolvingCard;
-        ps._resolvingCard = { name: chosenName, nth };
+        if (!ausVorrat) ps._resolvingCard = { name: chosenName, nth };
 
         let placed = null;
         try {
-          placed = await engine.summonCreatureWithHooks(
-            chosenName, pi, slot.heroIdx, slot.slotIdx,
-            {
+          if (ausVorrat) {
+            // 12.11.: aus Crestinas Vorrat — `summonFromCreation` uebernimmt Kosten-Abfrage, Flug und Abgang (scheitert sie, liegt die Karte wieder im Vorrat).
+            placed = await engine.summonFromCreation(pi, chosenName, slot.heroIdx, slot.slotIdx, {
               source: CARD_NAME,
-              hookExtras: {
-                _summonedBy: CARD_NAME,
-                _summonedAsAdditional: true,
+              hookExtras: { _summonedBy: CARD_NAME, _summonedAsAdditional: true },
+            });
+          } else {
+            placed = await engine.summonCreatureWithHooks(
+              chosenName, pi, slot.heroIdx, slot.slotIdx,
+              {
+                source: CARD_NAME,
+                hookExtras: {
+                  _summonedBy: CARD_NAME,
+                  _summonedAsAdditional: true,
+                },
               },
-            },
-          );
+            );
+          }
         } finally {
           ps._resolvingCard = prevResolving;
         }
@@ -230,7 +255,7 @@ module.exports = {
           // Summon refused (beforeSummon cancelled, full zone, …).
           // No state to roll back — we never spliced. Re-prompt the
           // target picker if the player still has 2+ legal picks.
-          if (buildEligibleHandIndices().length >= 2) continue;
+          if (anzahlWahl() >= 2) continue;
           return;
         }
 
@@ -239,9 +264,9 @@ module.exports = {
         // creature's beforeSummon discards) and untrack the hand inst.
         // Capture the post-splice hand index AS-WAS so the hand→board
         // flight animation below targets the correct source slot.
-        const realIdx = ps.hand.indexOf(chosenName);
+        const realIdx = ausVorrat ? -1 : ps.hand.indexOf(chosenName);
         if (realIdx >= 0) engine.takeFromPileSync(ps, 'hand', realIdx);
-        const handInst = engine.cardInstances.find(c =>
+        const handInst = ausVorrat ? null : engine.cardInstances.find(c =>
           c.owner === pi && c.zone === 'hand' && c.name === chosenName,
         );
         if (handInst) engine._untrackCard(handInst.id);

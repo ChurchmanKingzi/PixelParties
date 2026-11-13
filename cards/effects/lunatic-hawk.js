@@ -106,7 +106,8 @@ function handLunaticCreatures(engine, pi) {
   const ps = engine.gs.players[pi];
   const out = [];
   const seen = new Set();
-  for (const n of (ps?.hand || [])) {
+  // ★ 12.11. (Vorgabe: Effekte, die Karten aus der Hand BENUTZEN, greifen auch auf Crestinas Extra-Hand zu): Hand + Vorrat.
+  for (const n of engine.handUndVorratListe(pi)) {
     if (seen.has(n)) continue;
     if (isLunaticCreature(cardDB[n])) { seen.add(n); out.push(n); }
   }
