@@ -8,6 +8,7 @@
     farbtausch(a, maske, abbild)     Farben nur innerhalb einer Maske ersetzen (Blinzeln)
     funkel(e, x, y, stufe, farbe)    kurzes Sparkle (Punkt → Kreuz → Punkt), nur für Metall/Gold/Edelstein
     brocken(...)                     geworfene 2×2-Brocken auf einer Wurfbahn (Erde, Staub)
+    dampf(...)                       aufsteigende Dampfwölkchen (2×2 → 5×3 → 2×2, nie 1 px)
     loecher(frame)                   Hintergrundpixel, die ganz von der Figur umschlossen sind (Lückensuche)
     fertig(...)                      prüfen, zuschneiden, speichern, GIF + Kontaktbogen
 """
@@ -165,6 +166,26 @@ def lochbericht(frames, ruhe=0):
             aus[k] = neu
     print('neue Löcher:', aus if aus else 'keine')
     return aus
+
+
+def dampf(h, w, i, n, puffs, farben, leben=None):
+    """Aufsteigende Dampfwölkchen ohne 1-px-Stufe: klein (2×2) → Wölkchen (5×3) → klein (2×2) → weg. puffs: dict(x, y, vx, vy, off, wackeln=0, leben=n).
+    `leben` muss n teilen (nahtlos). farben = {'c': Kern, 'r': Rand}."""
+    e = L.leer(h, w)
+    for pf in puffs:
+        lb = pf.get('leben', leben or n)
+        t = ((i + pf.get('off', 0)) % lb) / lb
+        if t >= 0.9:
+            continue
+        cx = int(round(pf['x'] + pf.get('vx', 0) * t + pf.get('wackeln', 0) * math.sin(2 * math.pi * t)))
+        cy = int(round(pf['y'] + pf.get('vy', 0) * t))
+        form = 'm' if 0.25 <= t < 0.7 else 's'
+        for dx, dy, k in L.PUFF_FORMEN[form]:
+            x, y = cx + dx, cy + dy
+            if not (0 <= y < h and 0 <= x < w):
+                raise L.ClipError('Dampf außerhalb')
+            e[y, x, :3] = farben[k]; e[y, x, 3] = 255
+    return e
 
 
 def zuschneiden(frames, rand=2):
