@@ -37,7 +37,7 @@ import numpy as np
 import anim_humanoide as Hm
 import anim_lib as L
 import anim_textur as TX   # texturierte Streckzeilen statt Zeilenkopien (Regel 43/49)
-TX.umleiten()               # auch Streckaufrufe innerhalb der Gruppenmodule liefern texturierte Zeilen
+TX.umleiten(sperre=[(0, 0, 0), (24, 24, 24), (65, 0, 0)])   # dunkle Umriss-/Nahtfarben: werden beim Texturieren weder übernommen noch überschrieben (keine verdickten Linien)
 
 N, MS = 48, 62
 PAD_L, PAD_R, PAD_T, PAD_B = 3, 3, 4, 2          # Figur knapp zugeschnitten: Verlagerung/Zopfschwung ±1 px seitlich, Kopfhub 2 px oben, Randabstand ≥ 2

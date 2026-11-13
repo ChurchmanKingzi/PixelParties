@@ -41,7 +41,7 @@ import numpy as np
 
 import anim_lib as L
 import anim_textur as TX   # texturierte Streckzeilen statt Zeilenkopien (Regel 43/49)
-TX.umleiten()               # auch Streckaufrufe innerhalb der Gruppenmodule liefern texturierte Zeilen
+TX.umleiten(sperre=[(0, 0, 0), (4, 0, 0), (8, 4, 1), (31, 9, 1), (38, 14, 12), (43, 0, 0)])   # dunkle Umriss-/Nahtfarben: werden beim Texturieren weder übernommen noch überschrieben (keine verdickten Linien)
 import anim_untote as U
 import anim_flieger as F
 import anim_daemon as D

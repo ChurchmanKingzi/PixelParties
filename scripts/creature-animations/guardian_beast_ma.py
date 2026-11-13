@@ -36,7 +36,7 @@ import anim_gb as G
 import anim_humanoide as Hm
 import anim_lib as L
 import anim_textur as TX   # texturierte Streckzeilen statt Zeilenkopien (Regel 43/49)
-TX.umleiten()               # auch Streckaufrufe innerhalb der Gruppenmodule liefern texturierte Zeilen
+TX.umleiten(sperre=[(21, 14, 22), (24, 12, 34), (37, 28, 55), (78, 8, 19)])   # dunkle Umriss-/Nahtfarben: werden beim Texturieren weder übernommen noch überschrieben (keine verdickten Linien)
 
 N, MS = 60, 70
 sz = G.Szene('guardian-beast-ma', (2, 2, 3, 2))
