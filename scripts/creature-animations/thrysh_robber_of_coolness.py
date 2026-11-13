@@ -32,6 +32,7 @@ import numpy as np
 import anim_cool as C
 import anim_humanoide as Hm
 import anim_lib as L
+import anim_textur as TX   # texturierte Streckzeilen statt Zeilenkopien (Regel 43)
 
 N, MS = 60, 80
 PAD_L, PAD_R, PAD_T, PAD_B = 4, 4, 5, 3
@@ -69,9 +70,9 @@ def frame(i, nur=None):
     # --- Atmen: Brust (Schienbeinzeile 35), danach Kopf/Schultern (Zeile 14) ---
     n1 = Hm.stufe(i, N, 2)
     n2 = Hm.stufe(i - 6, N, 1)
-    g = L.streck_zeile(g, PAD_T + 35, n1)
+    g = TX.streck_zeile(g, PAD_T + 35, n1)
     if n2:
-        g = L.streck_zeile(g, PAD_T + 14 - n1, n2)
+        g = TX.streck_zeile(g, PAD_T + 14 - n1, n2)
     fig = L.zusammen(H, W, [(t, 0, 0), (g, 0, 0)])
     if nur == 'koerper':
         return fig

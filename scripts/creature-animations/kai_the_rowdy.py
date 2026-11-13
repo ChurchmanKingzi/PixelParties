@@ -40,6 +40,7 @@ import numpy as np
 
 import anim_humanoide as Hm
 import anim_lib as L
+import anim_textur as TX   # texturierte Streckzeilen statt Zeilenkopien (Regel 43)
 
 N, MS = 48, 62
 PAD_L, PAD_R, PAD_T, PAD_B = 3, 3, 4, 2          # Figur knapp zugeschnitten: Verlagerung ±1 px seitlich, Kopfhub 2 px oben, Randabstand ≥ 2
@@ -101,7 +102,7 @@ def frame(i):
     # --- Auf und ab: Jackensaum 23 = Brust (Brecheisen starr mit), Hals 13 läuft 3 Frames nach (nur Rumpf) ---
     brust = Hm.stufe(i, N / 2, 1)
     kopf = Hm.stufe(i - 3, N / 2, 1)
-    k = Hm.atmen(k, PAD_T + 23, PAD_T + 13, brust, kopf)
+    k = TX.atmen(k, PAD_T + 23, PAD_T + 13, brust, kopf)
     if brust:
         st = L.versetze(st, 0, -brust)
     # --- Glitzer-Sterne am Brecheisen (mit Eisen mitbewegt) ---

@@ -36,6 +36,7 @@ import anim_amorph as A
 import anim_gbb as G
 import anim_humanoide as Hm
 import anim_lib as L
+import anim_textur as TX   # texturierte Streckzeilen statt Zeilenkopien (Regel 43)
 
 N, MS = 48, 80
 PAD_L, PAD_R, PAD_T, PAD_B = 3, 3, 5, 3
@@ -70,7 +71,7 @@ def ebene(m, dx=0, dy=0):
 def frame(i):
     r = int(round(2 * (0.5 - 0.5 * np.cos(L.sinus(i, N)))))                      # Atemhub 0…2
     kp = ebene(koerper_m)
-    kp = L.streck_zeile(kp, PAD_T + 9, r)
+    kp = TX.streck_zeile(kp, PAD_T + 9, r)
     ohr = ebene(ohr_m)
     hoch = 1 if (Hm.folge(i, 14, [1] * 6, N) or Hm.folge(i, 36, [1] * 6, N)) else 0
     if hoch:

@@ -36,6 +36,7 @@ import numpy as np
 
 import anim_humanoide as Hm
 import anim_lib as L
+import anim_textur as TX   # texturierte Streckzeilen statt Zeilenkopien (Regel 43)
 
 N, MS = 72, 83
 PAD_L, PAD_R, PAD_T, PAD_B = 3, 3, 4, 2          # Figur knapp zugeschnitten: Verlagerung/Ohr/Arm ±1 px seitlich, Kopfhub 2 px oben, Randabstand ≥ 2
@@ -101,12 +102,12 @@ def frame(i):
     # --- Atmen (Brustzeile 20) und gesenkter Kopf ---
     brust = 1 if Hm.folge(i, 6, [1] * 12, N) else 0
     sink = 1 if Hm.folge(i, 27, [1] * 33, N) else 0
-    k = Hm.atmen(k, PAD_T + 20, PAD_T + 11, brust, 0)
-    ol = Hm.atmen(ol, PAD_T + 20, PAD_T + 11, brust, 0)
-    orr = Hm.atmen(orr, PAD_T + 20, PAD_T + 11, brust, 0)
-    kopf = Hm.atmen(kopf, PAD_T + 20, PAD_T + 11, brust, 0)
-    al = Hm.atmen(al, PAD_T + 20, PAD_T + 11, brust, 0)
-    ar = Hm.atmen(ar, PAD_T + 20, PAD_T + 11, brust, 0)
+    k = TX.atmen(k, PAD_T + 20, PAD_T + 11, brust, 0)
+    ol = TX.atmen(ol, PAD_T + 20, PAD_T + 11, brust, 0)
+    orr = TX.atmen(orr, PAD_T + 20, PAD_T + 11, brust, 0)
+    kopf = TX.atmen(kopf, PAD_T + 20, PAD_T + 11, brust, 0)
+    al = TX.atmen(al, PAD_T + 20, PAD_T + 11, brust, 0)
+    ar = TX.atmen(ar, PAD_T + 20, PAD_T + 11, brust, 0)
     if sink:
         ol, orr, kopf = L.versetze(ol, 0, 1), L.versetze(orr, 0, 1), L.versetze(kopf, 0, 1)
     fl, fr = ebene(fuss_l), ebene(fuss_r)

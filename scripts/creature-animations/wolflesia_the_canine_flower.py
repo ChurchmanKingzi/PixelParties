@@ -36,6 +36,7 @@ import sys
 import numpy as np
 
 import anim_lib as L
+import anim_textur as TX   # texturierte Streckzeilen statt Zeilenkopien (Regel 43)
 import anim_amorph as A
 
 N, MS = 48, 65
@@ -158,14 +159,14 @@ def _lid(fig, top, stufe):
 def figur(i):
     rest_sp = np.where(HAAR[..., None], 0, spr).astype(np.uint8)
     koerper = A.zeilen_von(rest_sp, 0, sh - 1, H, W, PAD_L, PAD_T)
-    z, quelle = A.koerper_pose(koerper, doppeln=POSEN[S[i]], x0=PAD_L)
+    z, quelle = TX.koerper_pose(koerper, doppeln=POSEN[S[i]], x0=PAD_L)
     dxq = A.dx_zeilen(GEWICHT, AMP, 2 * math.pi * i / 24)
     z = A.verschiebe_zeilen(z, quelle, dxq)
     fig_rest, top = A.auf_leinwand(z, H, BODEN, 0)
     ebenen = []
     for seite, maske in ((0, HAAR_L), (1, HAAR_R)):                                          # untere Haare: eigene Ebene je Seite, dieselbe Atmung, eigener Versatz
         hsp = np.where(maske[..., None], spr, 0).astype(np.uint8)
-        hz, hq = A.koerper_pose(A.zeilen_von(hsp, 0, sh - 1, H, W, PAD_L, PAD_T), doppeln=POSEN[S[i]], x0=PAD_L)
+        hz, hq = TX.koerper_pose(A.zeilen_von(hsp, 0, sh - 1, H, W, PAD_L, PAD_T), doppeln=POSEN[S[i]], x0=PAD_L)
         hdx = haar_dx_liste(i, seite)
         hz = A.verschiebe_ausgabezeilen(hz, [hdx[q] for q in hq])
         he, _ = A.auf_leinwand(hz, H, BODEN, 0)

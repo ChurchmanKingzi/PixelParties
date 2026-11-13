@@ -39,6 +39,7 @@ import numpy as np
 
 import anim_humanoide as Hm
 import anim_lib as L
+import anim_textur as TX   # texturierte Streckzeilen statt Zeilenkopien (Regel 43)
 
 N, MS = 48, 62
 PAD_L, PAD_R, PAD_T, PAD_B = 2, 2, 3, 2          # Figuren knapp zugeschnitten: Hellebarden stehen fest (Oberkante y 0), Kopf hebt sich innerhalb ihrer Höhe
@@ -113,10 +114,10 @@ def seite(i, s, gl):
     # --- Auf und ab: Rockzeile 28 = Brust, Kinnzeile 18 läuft 3 Frames nach ---
     brust = Hm.stufe(i, p['atem'], 1)
     kopf = Hm.stufe(i - 3, p['atem'], 1)
-    g = Hm.atmen(g, PAD_T + 28, PAD_T + 18, brust, kopf)
+    g = TX.atmen(g, PAD_T + 28, PAD_T + 18, brust, kopf)
     # Nutzer-Feedback: die Waffe bewegt sich mit der haltenden Hand mit (Schaftzeile 28 wird eingefügt: Blatt und Hand steigen
     # gemeinsam, der Schaftfuß bleibt am Boden)
-    hb = Hm.atmen(hb, PAD_T + 28, PAD_T + 18, brust, 0)
+    hb = TX.atmen(hb, PAD_T + 28, PAD_T + 18, brust, 0)
     # --- Glitzer-Stern an der Blattspitze (steigt mit der Hellebarde) ---
     sx, sy, sstart = p['stern']
     st = Hm.folge(i, sstart, [0, 1, 2, 1], N)

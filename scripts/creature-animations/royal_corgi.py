@@ -54,6 +54,7 @@ import sys
 import numpy as np
 
 import anim_lib as L
+import anim_textur as TX   # texturierte Streckzeilen statt Zeilenkopien (Regel 43)
 import anim_tiere as T
 
 N, MS = 60, 65
@@ -181,8 +182,8 @@ def frame(i, nur=None):
             setze(k, 5, 10, ZUNGE)
             setze(k, 6, 10, ZUNGE)
     # Atmen in zwei Stufen: erst Kopf-Zeile (oben), dann Brust-Zeile; die Füße bleiben am Boden
-    r = L.streck_zeile(k, PAD_T + KOPF_Z, b)
-    r = L.streck_zeile(r, PAD_T + BEIN_Z, a)
+    r = TX.streck_zeile(k, PAD_T + KOPF_Z, b)
+    r = TX.streck_zeile(r, PAD_T + BEIN_Z, a)
     lift = a + b
     cols = np.arange(W)[None, :]
     fuss = (np.arange(H)[:, None] >= PAD_T + FUSS_Z) & (cols >= PAD_L + 2) & (cols <= PAD_L + 9)

@@ -32,6 +32,7 @@ import numpy as np
 
 import anim_humanoide as Hm
 import anim_lib as L
+import anim_textur as TX   # texturierte Streckzeilen statt Zeilenkopien (Regel 43)
 
 N, MS = 48, 62
 PAD_L, PAD_R, PAD_T, PAD_B = 2, 2, 4, 2          # Figur knapp zugeschnitten: Kopfhub 2 px (oben), Randabstand 2
@@ -60,7 +61,7 @@ def frame(i):
     # --- Auf und ab: Jackensaum (Zeile 17) = Brust, Hals (Zeile 10) läuft 3 Frames nach ---
     brust = Hm.stufe(i, N / 2, 1)
     kopf = Hm.stufe(i - 3, N / 2, 1)
-    k = Hm.atmen(k, PAD_T + 17, PAD_T + 10, brust, kopf)
+    k = TX.atmen(k, PAD_T + 17, PAD_T + 10, brust, kopf)
     # --- Fußtippen: der Schuh liegt hinter dem Saum und hebt sich 1 px ---
     hoch = 1 if (Hm.folge(i, 24, [1, 1, 0, 0, 1, 1, 0, 0, 1, 1, 0, 0], N)) else 0
     f, _ = L.trenne(spr, fuss)

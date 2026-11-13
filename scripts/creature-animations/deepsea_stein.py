@@ -44,6 +44,7 @@ import sys
 import numpy as np
 
 import anim_lib as L
+import anim_textur as TX   # texturierte Streckzeilen statt Zeilenkopien (Regel 43)
 import anim_untote as U
 import anim_misc as M
 
@@ -190,7 +191,7 @@ def frame_gross(i, bolts=True):
     oben = L.zusammen(H, W, [(oben, 0, 0), (ARMR_A, dxr, 0)])
     c = -1 if i in SCHOCK else U.stufe(i, 24, 1)                      # Atmen 0/1; Zusammenzucken −1
     if c:
-        oben = L.streck_zeile(oben, GPT + 16, c)
+        oben = TX.streck_zeile(oben, GPT + 16, c)
     bl_ = 1 if (i % 16) in (3, 4, 5) else 0
     br_ = 1 if (i % 16) in (11, 12, 13) else 0
     koerper = L.zusammen(H, W, [(oben, 0, 0), (FUSSL_A, 0, -bl_), (FUSSR_A, 0, -br_)])

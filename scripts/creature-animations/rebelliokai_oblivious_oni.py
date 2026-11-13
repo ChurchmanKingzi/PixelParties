@@ -40,6 +40,7 @@ import numpy as np
 
 import anim_humanoide as Hm
 import anim_lib as L
+import anim_textur as TX   # texturierte Streckzeilen statt Zeilenkopien (Regel 43)
 import anim_rebel as R
 
 N, MS = 72, 80
@@ -105,9 +106,9 @@ def frame(i):
         Hm.setze(k, {p: HAUT_LICHT for p in AUGEN_L + AUGEN_R}, OFF)
     # obere Brustzeile zuerst (alles darüber steigt), danach die untere
     if b2:
-        k = L.streck_zeile(k, PAD_T + 37, 1)
+        k = TX.streck_zeile(k, PAD_T + 37, 1)
     if b1:
-        k = L.streck_zeile(k, PAD_T + 41, 1)
+        k = TX.streck_zeile(k, PAD_T + 41, 1)
     # Keule + Glanz
     ke = ebene(keule)
     for start in (8, 44):

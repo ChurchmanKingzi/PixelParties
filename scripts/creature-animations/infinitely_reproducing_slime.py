@@ -30,6 +30,7 @@ import sys
 import numpy as np
 
 import anim_lib as L
+import anim_textur as TX   # texturierte Streckzeilen statt Zeilenkopien (Regel 43)
 import anim_amorph as A
 
 N, MS = 48, 65
@@ -130,7 +131,7 @@ def figur(i):
     pose, dy = ABLAUF[i]
     loeschen, doppeln, p = POSEN[pose]
     koerper = A.zeilen_von(spr, 0, sh - 1, H, W, PAD_L, PAD_T)
-    z, quelle = A.koerper_pose(koerper, loeschen=loeschen, doppeln=doppeln, p=p, paare_je_zeile=PAARE_ZEILE, x0=PAD_L)
+    z, quelle = TX.koerper_pose(koerper, loeschen=loeschen, doppeln=doppeln, p=p, paare_je_zeile=PAARE_ZEILE, x0=PAD_L)
     fig, top = A.auf_leinwand(z, H, BODEN, dy)
     fig, neu = A.umriss_ergaenzen(fig, RAND_FARBEN, lambda x, y: UMRISS)
     return dict(fig=fig, top=top, neu=neu)

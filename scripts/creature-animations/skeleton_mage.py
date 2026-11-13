@@ -44,6 +44,7 @@ import sys
 import numpy as np
 
 import anim_lib as L
+import anim_textur as TX   # texturierte Streckzeilen statt Zeilenkopien (Regel 43)
 import anim_untote as U
 
 N, MS = 40, 65
@@ -129,8 +130,8 @@ def frame(i):
             ob[PAD_T + y, PAD_L + x, :3] = DUNKEL_VIOLETT if stufe_aug == 1 else SCHWARZ
     # Kiefer
     U.kiefer(ob, ZAEHNE, KIEFER_FARBE, MUND_INNEN, kiefer, PAD_L, PAD_T)
-    ob = L.streck_zeile(ob, PAD_T + 4, r_c)                      # Kapuze atmet (Kuppe hebt sich)
-    ob = L.streck_zeile(ob, PAD_T + 14, r_b)                     # Oberkörper steigt (Zeile y 14 eingefügt)
+    ob = TX.streck_zeile(ob, PAD_T + 4, r_c)                      # Kapuze atmet (Kuppe hebt sich)
+    ob = TX.streck_zeile(ob, PAD_T + 14, r_b)                     # Oberkörper steigt (Zeile y 14 eingefügt)
 
     # Ärmel SYNCHRON: gleiche Funktion, gleiche Phase, gespiegelt
     amp, bias = 2.4 * hump, -2.0 * hump

@@ -43,6 +43,7 @@ import sys
 import numpy as np
 
 import anim_lib as L
+import anim_textur as TX   # texturierte Streckzeilen statt Zeilenkopien (Regel 43)
 import anim_untote as U
 
 N, MS = 48, 70
@@ -187,7 +188,7 @@ def frame_gross(i, nur=None):
     oben = L.zusammen(H, W, [(hl, 0, 0), (hr, 0, 0), (kb, 0, 0)])
     # Atmen: alles oberhalb der Hüfte hebt sich 1 px (Zeile y 21 wird einmal wiederholt)
     if U.stufe(i, 24, 1) == 1:
-        oben = L.streck_zeile(oben, GPT + 21, 1)
+        oben = TX.streck_zeile(oben, GPT + 21, 1)
     # Beine heben abwechselnd, Besenborsten pendeln
     bl_ = 1 if (i % 16) in (3, 4, 5) else 0
     br_ = 1 if (i % 16) in (11, 12, 13) else 0

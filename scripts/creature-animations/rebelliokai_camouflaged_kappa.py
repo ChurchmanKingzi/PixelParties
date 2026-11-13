@@ -46,6 +46,7 @@ import numpy as np
 
 import anim_humanoide as Hm
 import anim_lib as L
+import anim_textur as TX   # texturierte Streckzeilen statt Zeilenkopien (Regel 43)
 import anim_rebel as R
 
 N, MS = 48, 70
@@ -149,8 +150,8 @@ def frame(i):
     fl = R.spalten_pendel(fl, PAD_L + 7, 1.1, L.sinus(i, N / 2), lauf=1.0, ruhe0=True)
     # Atmen: Zeile 12 (Kern + Flosse), Hand + Klinge starr hoch
     if b:
-        k = L.streck_zeile(k, PAD_T + 12, 1)
-        fl = L.streck_zeile(fl, PAD_T + 12, 1)
+        k = TX.streck_zeile(k, PAD_T + 12, 1)
+        fl = TX.streck_zeile(fl, PAD_T + 12, 1)
         ha = L.versetze(ha, 0, -1)
         kl = L.versetze(kl, 0, -1)
     fig = L.zusammen(H, W, [(fl, 0, 0), (bl, 0, 0), (br, 0, 0), (k, 0, 0), (ha, 0, 0), (kl, 0, 0)])

@@ -32,6 +32,7 @@ import sys
 import numpy as np
 
 import anim_lib as L
+import anim_textur as TX   # texturierte Streckzeilen statt Zeilenkopien (Regel 43)
 import anim_flieger as F
 
 N, MS = 48, 60
@@ -84,7 +85,7 @@ def frame(i, partikel=True, effekte=True):
 
     # Flügeldecken öffnen: unten (ab Zeile 9) rückt nach unten, oben (bis Zeile 5) nach oben; die Naht-Zeilen werden verdoppelt
     kp = streck_unten(kp, Y_NAHT_U, s)
-    kp = L.streck_zeile(kp, Y_NAHT_O, s)
+    kp = TX.streck_zeile(kp, Y_NAHT_O, s)
 
     # Hinterflügel strecken sich: bei geöffneten Decken werden die zwei Linien links um 2 px länger (Umrissfarbe, bleiben 4-verbunden)
     if s:

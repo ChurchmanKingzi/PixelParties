@@ -40,6 +40,7 @@ Zuschnitt: Frame auf die Figur zugeschnitten (symmetrisch um die Ruhefigur, Blas
 import numpy as np
 
 import anim_lib as L
+import anim_textur as TX   # texturierte Streckzeilen statt Zeilenkopien (Regel 43)
 import anim_tiefsee as T
 import anim_untote as U
 
@@ -107,7 +108,7 @@ def frame_gross(i, nur=None):
     f = L.zusammen(H, W, [(oben, 0, 0), (arm, 0, 0), (BL_A, 0, -bl_), (BR_A, 0, -br_)])
     # Atmen: alles oberhalb der Schulterzeile y 12 hebt sich 1 px
     if U.stufe(i, 24, 1) == 1:
-        f = L.streck_zeile(f, GPT + 12, 1)
+        f = TX.streck_zeile(f, GPT + 12, 1)
     f = U.kontur_schliessen(f, UMRISS, KONTUR)
     if nur == 'koerper':
         return f

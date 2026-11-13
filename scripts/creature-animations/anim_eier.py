@@ -493,9 +493,10 @@ def beruehren(a, b, abstand=1):
     return any(max(abs(p[0] - q[0]), abs(p[1] - q[1])) <= abstand for p in a for q in b)
 
 
-def plane_starts(leben, n, konflikt=None, basis=1, seed=1, sperre=None):
+def plane_starts(leben, n, konflikt=None, basis=1, seed=1, sperre=None, streu=1.0):
     """Startframes für Risse mit den Lebensdauern `leben` (Frames): jeder Riss ist vor dem Schleifenende fertig (Frame 0 bleibt rissfrei), Risse mit konflikt(i, j) == True
-    (gleiche Stelle/berühren sich) laufen nie gleichzeitig, und die Starts werden so gelegt, dass möglichst gleichmäßig viele Risse zugleich sichtbar sind.
+    (gleiche Stelle/berühren sich) laufen nie gleichzeitig, und die Starts werden so gelegt, dass möglichst gleichmäßig viele Risse zugleich sichtbar sind
+    und weder Starts noch Enden sich häufen (streu = Gewicht dafür).
     sperre(i, s) → True verbietet Start s für Riss i (z. B. weil dort gerade ein Sparkle säße)."""
     import random
     rnd = random.Random(seed)
@@ -510,7 +511,8 @@ def plane_starts(leben, n, konflikt=None, basis=1, seed=1, sperre=None):
                 continue
             if konflikt and any(st[j] is None and j != i and konflikt(i, j) and s - basis < leben[j] and n - s - leben[i] < leben[j] for j in range(len(leben))):
                 continue                                                             # Platz für den noch nicht gesetzten Riss an derselben Stelle lassen
-            wert = sum(last[s:s + leben[i]]) / leben[i] + sum(0.6 for j in range(len(leben)) if st[j] is not None and (abs(st[j] - s) < 2 or abs(st[j] + leben[j] - s - leben[i]) < 2)) + rnd.random() * 0.3
+            wert = (sum(last[s:s + leben[i]]) / leben[i] + rnd.random() * 0.3
+                    + sum(streu * max(0.0, 1 - abs(st[j] - s) / 5.0) + streu * max(0.0, 1 - abs(st[j] + leben[j] - s - leben[i]) / 5.0) for j in range(len(leben)) if st[j] is not None))
             if best is None or wert < best[0]:
                 best = (wert, s)
         assert best is not None, ('kein freier Startframe für Riss', i)

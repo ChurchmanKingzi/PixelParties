@@ -41,6 +41,7 @@ import cv2
 import numpy as np
 
 import anim_lib as L
+import anim_textur as TX   # texturierte Streckzeilen statt Zeilenkopien (Regel 43)
 import anim_amorph as A
 
 N, MS = 48, 65
@@ -182,7 +183,7 @@ def _fuss_ebene(fig, seite):
 def figur(i):
     sp = sprite_mit_effekten(i)
     koerper = A.zeilen_von(sp, 0, sh - 1, DH, DW, DPL, DPT)
-    z, quelle = A.koerper_pose(koerper, doppeln=POSEN[S[i]], p=0, x0=DPL)
+    z, quelle = TX.koerper_pose(koerper, doppeln=POSEN[S[i]], p=0, x0=DPL)
     fig, top = A.auf_leinwand(z, DH, BODEN, 0)
     rest, teile = fig, []
     for seite in ('l', 'r'):

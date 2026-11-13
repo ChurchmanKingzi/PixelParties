@@ -31,6 +31,7 @@ import numpy as np
 import anim_eis as E
 import anim_humanoide as Hm
 import anim_lib as L
+import anim_textur as TX   # texturierte Streckzeilen statt Zeilenkopien (Regel 43)
 
 N, MS = 48, 75
 PAD_L, PAD_R, PAD_T, PAD_B = 4, 4, 4, 2
@@ -60,9 +61,9 @@ def koerper(i):
     brust = E.verlauf3(i, 16, 0.0, 1)
     kopf = E.verlauf3(i, 16, -0.45, 1)
     if brust:
-        k = L.streck_zeile(k, PAD_T + 16, brust)
+        k = TX.streck_zeile(k, PAD_T + 16, brust)
     if kopf:
-        k = L.streck_zeile(k, PAD_T + 4 - brust, kopf)
+        k = TX.streck_zeile(k, PAD_T + 4 - brust, kopf)
     Hm.kontur_schliessen(k, ERLAUBT, (28, 23, 16))
     return k
 

@@ -46,6 +46,7 @@ import numpy as np
 from PIL import Image
 
 import anim_lib as L
+import anim_textur as TX   # texturierte Streckzeilen statt Zeilenkopien (Regel 43)
 import anim_amorph as A
 
 N, MS = 48, 65
@@ -238,7 +239,7 @@ def figur(i):
             marken[ort] = (m, tuple(int(v) for v in kb_sp[y, x, :3]))
             kb_sp[y, x, :3] = m
     zeilen = A.zeilen_von(kb_sp, KOERPER_Y0, sh - 1, H, W, PAD_L, PAD_T)
-    z, quelle = A.koerper_pose(zeilen, loeschen=loesch, doppeln=dopp, p=p,
+    z, quelle = TX.koerper_pose(zeilen, loeschen=loesch, doppeln=dopp, p=p,
                                paare=PAARE_UNTEN if p >= 0 else PAARE_SCHMAL,
                                paare_je_zeile=PAARE_OBEN, x0=PAD_L, p_je_zeile=breiten(p))
     # Versatz je AUSGABEZEILE: Kopfblock (Zeilen 5–11) voll, erste Wangenzeile halb, letzte Wangenzeile und Pfütze 0 — die letzte

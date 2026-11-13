@@ -31,6 +31,7 @@ Zuschnitt: Frame auf die Figur zugeschnitten (symmetrisch um die Ruhefigur, Blas
 import numpy as np
 
 import anim_lib as L
+import anim_textur as TX   # texturierte Streckzeilen statt Zeilenkopien (Regel 43)
 import anim_tiefsee as T
 import anim_untote as U
 
@@ -104,9 +105,9 @@ def frame_gross(i, nur=None):
                 lz[GPT + y, GPL + x, :3] = ROT if c == WEISS else WEISS
     li, mi = layers['li'], layers['mi']
     if hebt(i, WELLEN['li']):
-        li = L.streck_zeile(li, GPT + 8, 1)
+        li = TX.streck_zeile(li, GPT + 8, 1)
     if hebt(i, WELLEN['mi']):
-        mi = L.streck_zeile(mi, GPT + 7, 1)
+        mi = TX.streck_zeile(mi, GPT + 7, 1)
     dre = -hebt(i, WELLEN['re'])
     # Schwanzspitze neigt sich
     s = T.sinz(i, 16)

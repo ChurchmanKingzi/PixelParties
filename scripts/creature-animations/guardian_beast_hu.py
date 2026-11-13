@@ -37,6 +37,7 @@ import sys
 import anim_gb as G
 import anim_humanoide as Hm
 import anim_lib as L
+import anim_textur as TX   # texturierte Streckzeilen statt Zeilenkopien (Regel 43)
 
 N, MS = 48, 64
 sz = G.Szene('guardian-beast-hu', (2, 2, 3, 2))                 # oben 3 px: der Stab hebt sich beim Atmen 1 px mit dem Arm
@@ -85,7 +86,7 @@ def frame(i):
     w = Hm.welle01(i, N / 2)
     brust = Hm.stufe(i, N / 2, 1)
     krone_tief = 1 if (brust and w <= 0.8) else 0
-    k, ol, orr, kr = sz.atmen([k, ol, orr, kr], 26, brust)
+    k, ol, orr, kr = TX.szene_atmen(sz, [k, ol, orr, kr], 26, brust)
     kr = L.versetze(kr, 0, krone_tief)
     sb = L.versetze(sb, 0, -brust)                               # Stab samt Faust folgt dem Arm (Atemhub)
     fig = L.zusammen(H, W, [(ol, 0, 0), (orr, 0, 0), (k, 0, 0), (kr, 0, 0), (sb, 0, 0)])
