@@ -58,7 +58,7 @@ def bein(ebene, phase):
     vers = {}
     for y in range(KNIE, sz.sh):
         j = y - KNIE
-        d = 0 if j == 0 else (dx if j >= 2 or abs(dx) == 1 else dx // abs(dx))
+        d = 0 if j == 0 or dx == 0 else (dx if j >= 2 or abs(dx) == 1 else dx // abs(dx))
         vers[sz.PT + y] = d
     out = L.leer(sz.H, sz.W)
     for y, d in vers.items():
