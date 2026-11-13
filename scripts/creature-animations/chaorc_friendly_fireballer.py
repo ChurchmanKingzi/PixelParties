@@ -33,6 +33,7 @@ import numpy as np
 import anim_feuer3 as F3
 import anim_humanoide as Hm
 import anim_lib as L
+import anim_textur as TX   # texturierte Streckzeilen statt Zeilenkopien (Regel 43/49)
 import anim_orks as O
 import anim_untote as U
 
@@ -61,10 +62,10 @@ OHR = {(-1, 7): UMRISS, (0, 7): HAUTROT, (0, 6): UMRISS, (0, 8): UMRISS}
 
 # --- Feuerball (Runde 4, anim_feuer3): Kugel wie gemalt (Mitte ≈ (35,7), Radius ≈ 7) als runder, ruhiger Flammenfuß; der Schweif fließt in Flugrichtung nach hinten (links, leicht abwärts wie in Ebene 102) ---
 _F = lambda x, y, l, b, **k: F3.Flamme(GP + x, GP + y, l, b, **k)
-BALL = [_F(36.0, 7.0, 15, 7.2, richtung=(-1, 0.18), fuss=6.6, phase=0.0, bauch=0.4, schlag=0.6, welle=11, baender=[(1.0, 1.0), (0.8, 0.82), (0.6, 0.64), (0.42, 0.44)]),
-        _F(33.0, 3.6, 10, 3.2, richtung=(-1, -0.02), phase=0.35, welle=9),
-        _F(32.5, 9.6, 12, 3.4, richtung=(-1, 0.3), phase=0.6, welle=9),
-        _F(33.0, 11.6, 9, 2.8, richtung=(-1, 0.45), phase=0.15, welle=8)]
+BALL = [_F(36.0, 7.0, 15, 7.2, richtung=(-1, 0.18), fuss=6.6, phase=0.0, bauch=0.4, schlag=0.6, welle=11, flug=0.25, baender=[(1.0, 1.0), (0.8, 0.82), (0.6, 0.64), (0.42, 0.44)]),
+        _F(33.0, 3.6, 10, 3.2, richtung=(-1, -0.02), phase=0.35, welle=9, flug=0.3),
+        _F(32.5, 9.6, 12, 3.4, richtung=(-1, 0.3), phase=0.6, welle=9, flug=0.3),
+        _F(33.0, 11.6, 9, 2.8, richtung=(-1, 0.45), phase=0.15, welle=8, flug=0.3)]
 FEUER = F3.Feuer(H, W, BALL, [ROT, ORANGE, GELB, HELL], posen=16, halten=1)
 
 
@@ -81,7 +82,7 @@ def frame_gross(i, nur=None):
         Hm.setze(c, {p: HAUT_DUNKEL for p in AUGE}, OFF)
     b = 1 if Hm.welle01(i, 24) > 0.5 else 0
     if b:
-        c = L.streck_zeile(c, GP + 14, b)
+        c = TX.streck_zeile(c, GP + 14, b)
     c = Hm.kontur_schliessen(c, ERLAUBT, UMRISS)
     if nur == 'koerper':
         return c

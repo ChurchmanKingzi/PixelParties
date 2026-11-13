@@ -16,7 +16,7 @@ Was ist was (x/y im Sprite):
 Fest bleiben: Beine (außer dem anhebbaren Vorderhuf), Körperform.
 
 Ablauf (48 Frames à 65 ms = 3,12 s; Frame 0 = Original, die Flammen sind ausgenommen):
-* Feuer (Runde 4, „richtige Feuer-Animation“, Modul anim_feuer3.py): klassischer Flammenzyklus mit Aufwärtsfluss, 8 Posen à 2 Frames (3 Zyklen je Schleife), Farben und Lage nach dem gemalten Feuer (Creme-Kern am Körper → Gelb → Orange → Rot außen).
+* Feuer (Runde 4, „richtige Feuer-Animation“, Modul anim_feuer3.py): klassischer Flammenzyklus mit Aufwärtsfluss, Runde 5: 16 Posen à 1 Frame, schneller und lebhafter (3 Zyklen je Schleife), Farben und Lage nach dem gemalten Feuer (Creme-Kern am Körper → Gelb → Orange → Rot außen).
   MÄHNE: Flammensaum aus phasenversetzten Zungen entlang Rücken, Hals, Scheitel und Nasenrücken (Längen wie gemalt: Rücken 8–9, Hals 12–13, Kopf 9 px, zur Nase kurz); die Zungen steigen und wehen leicht nach hinten, Bäuche wandern vom Körper zur
   Spitze, Spitzen schnüren sich ab und steigen als kleine Fetzen weiter. SCHWEIF: hängt wie gemalt schräg nach unten links und läuft spitz aus (Welle vom Ansatz zur Spitze), außen lecken drei kurze Zungen nach links oben. Keine Einzelfunken mehr.
 * Atmen zweistufig 0-1-2-1-0 px (Periode 24, zweimal pro Schleife): die Bauchzeile y 25 wird 1–2× eingefügt (anim_lib.streck_zeile mit Texturmischung); Rücken, Hals, Kopf, Mähne und Schweifansatz steigen, Beine und Hufe bleiben am Boden.
@@ -33,6 +33,7 @@ import sys
 import numpy as np
 
 import anim_lib as L
+import anim_textur as TX   # texturierte Streckzeilen statt Zeilenkopien (Regel 43/49)
 import anim_untote as U
 import anim_feuer3 as F3
 import anim_daemon as D
@@ -80,10 +81,10 @@ MAEHNE = GLUT + F3.saum(_LINIE, 4.6,
                         breite=F3.stuetz((0, 3.6), (0.75, 3.6), (1, 2.2)),
                         richtung=lambda t: (-0.5 + 0.3 * t, -1), versatz=V, fuss=1.5)
 # SCHWEIF: hängt wie gemalt vom Hinterteil (9,21) schräg nach unten links bis (6,38) und läuft spitz aus — die Welle läuft vom Ansatz zur Spitze; an der Außenseite lecken drei kurze Zungen nach links oben.
-SCHWEIF = [F3.Flamme(GPL + 9.5, GPT + 21.5, 18, 5.2, richtung=(-0.2, 1), phase=0.1, fuss=2.0, bauch=0.4, schlag=0.8, pot=1.0, welle=11, fetzen=False),
-           F3.Flamme(GPL + 7.5, GPT + 23.0, 7, 2.6, richtung=(-1, -0.75), phase=0.0),
-           F3.Flamme(GPL + 6.5, GPT + 28.0, 6, 2.4, richtung=(-1, -0.55), phase=0.45),
-           F3.Flamme(GPL + 6.0, GPT + 33.0, 5, 2.0, richtung=(-1, -0.4), phase=0.8)]
+SCHWEIF = [F3.Flamme(GPL + 9.5, GPT + 21.5, 18, 5.2, richtung=(-0.2, 1), phase=0.1, fuss=2.0, bauch=0.4, schlag=0.8, pot=1.0, welle=11, fetzen=False, wiegen=0.25, puls=0.06),
+           F3.Flamme(GPL + 7.5, GPT + 23.0, 7, 2.6, richtung=(-1, -0.75), phase=0.0, fetzen=False, wiegen=0.2),
+           F3.Flamme(GPL + 6.5, GPT + 28.0, 6, 2.4, richtung=(-1, -0.55), phase=0.45, fetzen=False, wiegen=0.2),
+           F3.Flamme(GPL + 6.0, GPT + 33.0, 5, 2.0, richtung=(-1, -0.4), phase=0.8, fetzen=False, wiegen=0.2)]
 FEUER = F3.Feuer(H, W, MAEHNE + SCHWEIF, [ROT, ORANGE, GELB, CREME], posen=16, halten=1, sperre=SPERRE)
 
 
@@ -121,7 +122,7 @@ def frame_gross(i, nur=None):
     if i in (14, 15, 16, 38, 39, 40):
         for (x, y) in AUGE:
             kp[GPT + y, GPL + x, :3] = KOPFGRAU
-    kp = L.streck_zeile(kp, GPT + 25, n)
+    kp = TX.streck_zeile(kp, GPT + 25, n)
     bein = T_BEIN1
     if (18 <= i <= 22) or (42 <= i <= 46):
         bein = L.heben_unten(T_BEIN1, GPT + 36, 1)

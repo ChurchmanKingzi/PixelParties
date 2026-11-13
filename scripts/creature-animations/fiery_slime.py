@@ -50,6 +50,7 @@ import sys
 import numpy as np
 
 import anim_lib as L
+import anim_textur as TX   # texturierte Streckzeilen statt Zeilenkopien (Regel 43/49)
 import anim_amorph as A
 
 N, MS = 48, 65
@@ -132,9 +133,9 @@ def figur(i):
     loesch, dopp, p = POSEN[s]
     koerper = A.zeilen_von(sp, KOERPER_Y0, sh - 1, H, W, PAD_L, PAD_T)
     if p >= 0:
-        z, quelle = A.koerper_pose(koerper, loeschen=loesch, doppeln=dopp, p=p, paare=PAARE_BREIT, x0=PAD_L)
+        z, quelle = TX.koerper_pose(koerper, loeschen=loesch, doppeln=dopp, p=p, paare=PAARE_BREIT, x0=PAD_L)
     else:
-        z, quelle = A.koerper_pose(koerper, loeschen=loesch, doppeln=dopp, p=p, paare=PAARE_SCHMAL, x0=PAD_L)
+        z, quelle = TX.koerper_pose(koerper, loeschen=loesch, doppeln=dopp, p=p, paare=PAARE_SCHMAL, x0=PAD_L)
     kb, top = A.auf_leinwand(z, H, BODEN, LIFT.get(i, 0))
     dy = top - KOERPER_Y0 - PAD_T
     flamme = FEUER.ebene(i)

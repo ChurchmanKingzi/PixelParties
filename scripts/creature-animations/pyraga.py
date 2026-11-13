@@ -36,6 +36,7 @@ import sys
 import numpy as np
 
 import anim_lib as L
+import anim_textur as TX   # texturierte Streckzeilen statt Zeilenkopien (Regel 43/49)
 import anim_untote as U
 import anim_feuer3 as F3
 import anim_daemon as D
@@ -126,7 +127,7 @@ def frame_gross(i, nur=None):
             kp[GPT + y, GPL + x, :3] = HAUT
     for k, (x, y) in enumerate(LAVA):
         kp[GPT + y, GPL + x, :3] = lava_farbe(k, i)
-    kp = L.streck_zeile(kp, GPT + 22, n)
+    kp = TX.streck_zeile(kp, GPT + 22, n)
     kp = U.kontur_schliessen(kp, UMRISS, KONTUR)
     fl = L.zusammen(H, W, [(FEUER.ebene(i, dy=-n), 0, 0), (feuer_rechts(i, n), 0, 0)])
     f = U.kontur_schliessen(L.zusammen(H, W, [(fl, 0, 0), (kp, 0, 0)]), UMRISS, ROT)

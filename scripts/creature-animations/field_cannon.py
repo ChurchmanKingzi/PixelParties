@@ -38,6 +38,7 @@ import numpy as np
 import anim_lib as L
 import anim_untote as U
 import anim_flieger_b as B
+import anim_feuer3 as F3
 
 N, MS = 48, 65
 GPL, GPR, GPT, GPB = 7, 7, 10, 5
@@ -88,7 +89,10 @@ FL_Y7 = 7
 
 
 def flamme_ebene(i):
-    """Flamme in Leinwandkoordinaten (ohne Lunten-Versatz): Pose des Frames."""
+    """Flamme in Leinwandkoordinaten (ohne Lunten-Versatz): Pose des Frames.
+    Runde 5 („Flammen zu langsam/zu wenig animiert“): gemeinsamer handgezeichneter 8-Bilder-Zyklus F3.klein('kerze') (1 Frame je Pose, Tropfen 5 px breit, Bauch wandert hoch, Spitze neigt sich
+    und reißt ab); Fußzeile (14–16, 7) direkt auf dem Lunten-Ende (15,8). Die alten 10 Posen (FL_POSEN) bleiben ungenutzt stehen."""
+    return F3.klein(H, W, GPL + 15, GPT + 7, i, [GELB, HELL, HELL], 'kerze')
     e = L.leer(H, W)
     pose = FL_POSEN[FL_FRAME[i]]
     y0 = FL_Y7 - (len(pose) - 1)
@@ -116,6 +120,7 @@ for _i in range(N):
 
 def funken_ebene(i, dy=0):
     e = L.leer(H, W)
+    return e                                                     # Runde 5: der abgerissene Funke ist Teil des Flammenzyklus
     for (f, x, y) in FUNKEN:
         a = (i - f) % N
         if a < 4:

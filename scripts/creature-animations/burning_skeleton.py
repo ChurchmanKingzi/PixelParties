@@ -46,6 +46,7 @@ import sys
 import numpy as np
 
 import anim_lib as L
+import anim_textur as TX   # texturierte Streckzeilen statt Zeilenkopien (Regel 43/49)
 import anim_untote as U
 import anim_feuer3 as F3
 
@@ -278,7 +279,7 @@ def frame_gross(i, nur=None):
     for (x, y) in AUGEN:
         kp[GPT + y, GPL + x, :3] = B_ if blink == 2 else (AUGENFARBE[0] if blink == 1 else AUGENFARBE[glut])
     # --- Rumpf, Arme, Beine (Beine intakt, jeder Frame vollständig und deckend) ---
-    rp = L.streck_zeile(teil(rumpf), GPT + 20, r_b)
+    rp = TX.streck_zeile(teil(rumpf), GPT + 20, r_b)
     al = U.haengen(teil(arm_l), GPT + 18, -aus)
     ar = U.haengen(teil(arm_r), GPT + 18, aus)
     bn = teil(beine)

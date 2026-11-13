@@ -40,8 +40,9 @@ import sys
 import numpy as np
 
 import anim_lib as L
+import anim_textur as TX   # texturierte Streckzeilen statt Zeilenkopien (Regel 43/49)
 import anim_flieger as F
-import anim_feuer as FEU
+import anim_feuer3 as F3
 import anim_amorph as A
 
 N, MS = 36, 70
@@ -80,9 +81,11 @@ SPERRE[PAD_T:PAD_T + sh, PAD_L:PAD_L + sw] = BASIS
 FAECHER = [(11.0, 9), (13.7, 17), (16.4, 12), (19.1, 11), (21.8, 16), (24.5, 9)]
 FLUEGEL_L = [(0.8, 10), (3.4, 7), (6.0, 6), (8.6, 8)]
 FLUEGEL_R = [(35 - x, h) for x, h in FLUEGEL_L]
-ZUNGEN = ([FEU.Zunge(PAD_L + x, PAD_T + BASIS_FAECHER - 1, h, 2.3) for x, h in FAECHER]
-          + [FEU.Zunge(PAD_L + x, PAD_T + BASIS_FLUEGEL - 1, h, 2.0) for x, h in FLUEGEL_L + FLUEGEL_R])
-FEUER = FEU.Feuer(H, W, ZUNGEN, RAMPE, n=N, seed=5, posen=12, amplitude=0.95, sperre=SPERRE)
+# Runde 5 (neues Feuer-System anim_feuer3, klassischer Flammenzyklus mit Aufwärtsfluss, 12 Posen à 1 Frame = 3 Zyklen je Schleife): dieselben Zungen (Lage/Höhe wie zuvor), jetzt als
+# Tropfenflammen mit wandernden Bäuchen, wechselnder Länge/Neigung und abreißenden Fetzen; Füße flach auf der festen Basis, phasenversetzt, die Flügelzungen leicht nach außen geneigt.
+ZUNGEN = ([F3.Flamme(PAD_L + x, PAD_T + BASIS_FAECHER - 0.3, h + 1, 2.9, fuss=0, phase=(0.37 * k) % 1.0, richtung=((x - 17.5) * 0.02, -1)) for k, (x, h) in enumerate(FAECHER)]
+          + [F3.Flamme(PAD_L + x, PAD_T + BASIS_FLUEGEL - 0.3, h + 1, 2.6, fuss=0, phase=(0.2 + 0.41 * k) % 1.0, richtung=((x - 17.5) * 0.012, -1)) for k, (x, h) in enumerate(FLUEGEL_L + FLUEGEL_R)])
+FEUER = F3.Feuer(H, W, ZUNGEN, [ROT, ORANGE, GELB], posen=12, halten=1, sperre=SPERRE)
 
 BAND = L.leer(H, W)                                          # festes Körperband auf der Leinwand
 BAND[PAD_T:PAD_T + sh, PAD_L:PAD_L + sw][BASIS] = spr[BASIS]
@@ -159,14 +162,14 @@ def frame(i, partikel=True):
     wr = F.fluegel_welle(wr, PAD_L + 25, 8.0, ph, potenz=1.1, nur_rechts=True, lauf=0.1, zusammenhang=True)
 
     # Bob: Zeile 25 gleichmäßig an allen Ebenen strecken/kürzen, dann alles um die Gesichtsbewegung verschieben
-    kp, wl, wr = (L.versetze(L.streck_zeile(a, ZEILE, n_str), 0, kopf) for a in (kp, wl, wr))
+    kp, wl, wr = (L.versetze(TX.streck_zeile(a, ZEILE, n_str), 0, kopf) for a in (kp, wl, wr))
 
     f = L.zusammen(H, W, [(kp, 0, 0), (wl, 0, 0), (wr, 0, 0)])
     # Randpixel-Test (Regel 16): Spaltenversatz legt an den Flügelrändern Innenfarbe frei → Kante in Umrissfarbe
     F.umranden(f, [wl, wr], UMRISS, ORANGE, GELB, GELB)
     f, _ = A.verbinde4(f)                                     # eine Flammenspitze, die der Flügelschlag nur über eine Pixelecke hält, bekommt ein Brückenpixel (Außenhautfarbe)
     if partikel:
-        f = L.zusammen(H, W, [(funken_ebene(i), 0, 0), (f, 0, 0)])
+        pass                                                  # Runde 5: abgerissene Fetzen gehören zur Flammen-Ebene (funken_ebene des alten Moduls entfällt)
     return f
 
 

@@ -20,6 +20,7 @@ D_AEHNLICH = 64       # bis zu diesem Helligkeitsabstand (heller) gelten zwei Pi
 D_DUNKLER = 36        # … und höchstens so viel DUNKLER darf ein übernommenes Pixel sein (keine Umriss-/Mund-/Augenfarben in helle Flächen ziehen)
 LANG = 5              # ab dieser Lauflänge gilt eine Abweichung als „anderes Muster“ (und eine Übereinstimmung als Kopie)
 STANDARD_SPERRE = ()  # Sperrfarben für Aufrufe ohne eigenes `sperre` (setzt umleiten(sperre=…) je Figurenskript)
+SPALTEN_TEXTUR = False  # True (umleiten(spalten=True)): koerper_pose texturiert auch die beim Stauchen verdoppelten Spalten
 NICHT_HOLEN = ()      # Farben, die nie aus einer Nachbarzeile in eine eingefügte Zeile geholt werden (setzt umleiten(nicht_holen=…));
                       # anders als Sperrfarben dürfen sie in der eingefügten Zeile aber durch hellere Nachbarpixel ersetzt werden
 
@@ -297,9 +298,10 @@ def misch_kopie(roh, nachbarn, k=1, sperre=()):
     return zwischenzeile(roh, nb[0], nb[1], None, k, None, sperre)
 
 
-def koerper_pose(*args, funktion=None, **kw):
+def koerper_pose(*args, funktion=None, spalten=None, **kw):
     """Wie A.koerper_pose (oder `funktion`, z. B. anim_slime.koerper_pose mit `sperre`), aber die gedoppelten Zeilen werden nach diesem Modul
-    texturiert (sie liegen UNTER ihrer Quellzeile). `sperre`-Farben werden auch hier weder übernommen noch überschrieben."""
+    texturiert (sie liegen UNTER ihrer Quellzeile). `sperre`-Farben werden auch hier weder übernommen noch überschrieben.
+    spalten=True (oder umleiten(spalten=True)): auch die beim Stauchen verdoppelten SPALTEN (p > 0) werden texturiert statt kopiert."""
     if funktion is None:
         import anim_amorph as A
         funktion = A.koerper_pose
@@ -308,7 +310,57 @@ def koerper_pose(*args, funktion=None, **kw):
         sperre = kw.get('sperre', ())
     funktion = getattr(funktion, '_tx_original', funktion)          # nach umleiten(): nicht doppelt texturieren
     out, quelle = funktion(*args, **kw)
-    return entkopiere_zeilen(out, quelle, sperre), quelle
+    out = entkopiere_zeilen(out, quelle, sperre)
+    if SPALTEN_TEXTUR if spalten is None else spalten:
+        import inspect
+        b = inspect.signature(funktion).bind(*args, **kw)
+        b.apply_defaults()
+        a = b.arguments
+        out = entkopiere_spalten(out, quelle, a['zeilen'], a['p'], a['paare'], a.get('paare_je_zeile'), a.get('x0', 0), a.get('p_je_zeile'), sperre)
+    return out, quelle
+
+
+def entkopiere_spalten(out, quelle, zeilen, p, paare, paare_je_zeile=None, x0=0, p_je_zeile=None, sperre=()):
+    """Die von anim_amorph.zeile_umbauen bei p > 0 verdoppelten Spalten (Stauchen: der Körper wird breiter) neu texturieren: von jedem
+    Spaltenpaar bleibt die innere (zur Körpermitte gelegene) Kopie, die äußere wird wie eine Streckzeile aus ihren Nachbarspalten gebaut
+    (zwischenzeile, senkrecht angewandt). Silhouette und Breite bleiben unverändert; `sperre`-Farben (Gesicht) bleiben unangetastet."""
+    paare_je_zeile = paare_je_zeile or {}
+    p_je_zeile = p_je_zeile or {}
+    n, w = out.shape[:2]
+    dup = np.zeros((n, w), bool)
+    for j, k in enumerate(quelle):
+        pk = p_je_zeile.get(k, p)
+        if pk <= 0:
+            continue
+        spalten = {c + x0 for pr in list(paare_je_zeile.get(k, paare))[:pk] for c in pr}
+        t = -pk
+        for x in range(w):
+            if x in spalten:
+                if zeilen[k][x, 3] and 0 <= t + 1 < w:
+                    dup[j, t + 1] = True                              # Kopien stehen in den Ausgabespalten t und t+1
+                t += 2
+            else:
+                t += 1
+    if not dup.any():
+        return out
+    out = out.copy()
+    xs = np.nonzero(out[..., 3].any(axis=0))[0]
+    mitte = (xs.min() + xs.max()) / 2.0
+
+    def sp(x):
+        return np.ascontiguousarray(out[:, x]) if 0 <= x < w else None
+    for t in np.nonzero(dup.any(axis=0))[0]:
+        rows = dup[:, t]
+        if t - 0.5 <= mitte:                                          # linke Körperhälfte: äußere Kopie = Spalte t-1
+            ziel, form, nah, fern, nah2, fern2 = t - 1, sp(t), sp(t - 2), sp(t + 1), sp(t - 3), sp(t + 2)
+        else:                                                         # rechte Körperhälfte: äußere Kopie = Spalte t
+            ziel, form, nah, fern, nah2, fern2 = t, sp(t - 1), sp(t + 1), sp(t - 2), sp(t + 2), sp(t - 3)
+        if nah is None:
+            continue
+        v = zwischenzeile(form, nah, fern, nah2, 1 + int(t) % 2, fern2, sperre)
+        ok = rows & (out[:, ziel, 3] > 0) & (v[:, 3] > 0)
+        out[ok, ziel] = v[ok]
+    return out
 
 
 def entkopiere_zeilen(out, quelle, sperre=()):
@@ -367,7 +419,7 @@ def ebene_atmung(teil, doppeln, h, w, pad_l, pad_t, boden):
     return ebene, top, quelle
 
 
-def umleiten(sperre=(), nicht_holen=()):
+def umleiten(sperre=(), nicht_holen=(), spalten=False):
     """Leitet die Streckfunktionen der gemeinsamen Module für den laufenden Prozess auf dieses Modul um (die Moduldateien bleiben unverändert):
     L.streck_zeile, anim_amorph.koerper_pose und anim_slime.koerper_pose liefern danach texturierte statt kopierter Einfügezeilen – auch dort,
     wo ein Gruppenmodul sie intern aufruft (Hm.atmen, Szene.atmen, K.bob, U2.streck_teil, SH.ebene_atmung, HP.hupf_figur, anim_eis.schleim_koerper …).
@@ -376,7 +428,9 @@ def umleiten(sperre=(), nicht_holen=()):
     überschrieben werden, sofern der Aufruf kein eigenes `sperre` mitbringt.
     nicht_holen: Farben (die dunklen Umriss-/Nahtfarben der Figur), die nie aus einer Nachbarzeile in eine eingefügte Zeile geholt werden –
     für Figuren, bei denen sonst eine dunkle Naht dicker würde (Regel 43: dunkle Linien werden durch Strecken nie dicker)."""
-    global STANDARD_SPERRE, NICHT_HOLEN
+    global STANDARD_SPERRE, NICHT_HOLEN, SPALTEN_TEXTUR
+    if spalten:
+        SPALTEN_TEXTUR = True                                         # spalten=True: koerper_pose texturiert auch die beim Stauchen verdoppelten Spalten
     if nicht_holen:
         NICHT_HOLEN = tuple(tuple(int(v) for v in c[:3]) for c in nicht_holen)
     if sperre:

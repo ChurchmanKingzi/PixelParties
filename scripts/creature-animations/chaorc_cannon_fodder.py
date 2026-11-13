@@ -42,6 +42,7 @@ import numpy as np
 import anim_feuer3 as F3
 import anim_humanoide as Hm
 import anim_lib as L
+import anim_textur as TX   # texturierte Streckzeilen statt Zeilenkopien (Regel 43/49)
 
 N, MS = 48, 62
 GPL, GPR, GPT, GPB = 8, 6, 12, 4            # große Arbeitsleinwand (Flamme/Funken links oben, Kopf steigt bis 2 px); am Ende wird auf die Figur zugeschnitten
@@ -97,7 +98,7 @@ def kopf_frame(i):
     zittern = (Hm.folge(i, 14, [1] * 6, N) or Hm.folge(i, 38, [1] * 6, N)) and i % 2 == 1
     n_ = Hm.stufe(i, N / 2, 1) + (1 if zittern else 0)
     if n_:
-        k = L.streck_zeile(k, GPT + HY + 9, n_)
+        k = TX.streck_zeile(k, GPT + HY + 9, n_)
     Hm.kontur_schliessen(k, ERLAUBT, UMRISS)
     return k
 

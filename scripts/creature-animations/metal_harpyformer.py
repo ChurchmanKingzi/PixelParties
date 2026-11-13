@@ -47,6 +47,7 @@ import sys
 import numpy as np
 
 import anim_lib as L
+import anim_textur as TX   # texturierte Streckzeilen statt Zeilenkopien (Regel 43/49)
 import anim_flieger_b as B
 import anim_feuer3 as F3
 import anim_harpyb as HB
@@ -213,9 +214,9 @@ def atem(i):
 def atmen_ebene(a, n1, n2):
     """Anwendung auf eine Ebene: Zeilen oberhalb der Bauchzeilen rücken um n1 + n2 hoch (die Zeilen y 39/41 werden mit Texturmischung `L.streck_zeile` eingefügt), darunter bleibt alles stehen."""
     if n2:
-        a = L.streck_zeile(a, ATEM_Y2, n2)
+        a = TX.streck_zeile(a, ATEM_Y2, n2)
     if n1:
-        a = L.streck_zeile(a, ATEM_Y1 - n2, n1)
+        a = TX.streck_zeile(a, ATEM_Y1 - n2, n1)
     return a
 
 

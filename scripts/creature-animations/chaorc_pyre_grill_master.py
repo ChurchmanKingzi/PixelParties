@@ -38,12 +38,14 @@ import sys
 
 import numpy as np
 
-import anim_feuer as FEU
+import anim_feuer as FEU   # nur noch für die ungenutzte Altklasse FeuerKompakt
+import anim_feuer3 as F3
 import anim_humanoide as Hm
 import anim_lib as L
+import anim_textur as TX   # texturierte Streckzeilen statt Zeilenkopien (Regel 43/49)
 
 N, MS = 48, 62
-PAD_L, PAD_R, PAD_T, PAD_B = 6, 6, 6, 3
+PAD_L, PAD_R, PAD_T, PAD_B = 8, 8, 16, 4
 
 spr = L.lade('chaorc-pyre-grill-master')                     # zusammengesetzte Ruhepose (Referenz, Randpixel-Test)
 FEUER0 = L.lade('chaorc-pyre-grill-master-feuer')
@@ -221,7 +223,16 @@ class FeuerKompakt(FEU.Feuer):
         return self._verbinden(out)
 
 
-FEUER = FeuerKompakt(H, W, ZUNGEN, RAMPE, n=N, seed=5, posen=12, amplitude=1.0, sperre=sperre)
+# Runde 5 (neues Feuer-System anim_feuer3, klassischer Flammenzyklus mit Aufwärtsfluss, 16 Posen à 1 Frame = 3 Zyklen je Schleife). Der gemalte Feuerschwall ist eine frei stehende
+# Feuerwolke (Unterkante unregelmäßig, y 22–32): je Profilstelle (10 Stück, Lage/Höhe aus dem Original) ein ruhiger, runder Glutkörper (heller Kern, runder Fuß an der Unterkante
+# des Originals) + eine phasenversetzte Zunge darüber, außen leicht nach außen geneigt; Bäuche wandern nach oben, Spitzen reißen ab.
+_FL = []
+for _k, _z in enumerate(ZUNGEN):
+    _x, _u, _h = _z.x, _z.basis, _z.hoehe
+    _n = ((_x - PAD_L) - 37.0) * 0.012
+    _FL.append(F3.Flamme(_x, _u - 4.0, 0.6 * _h, 5.6, richtung=(_n * 0.5, -1), fuss=4.0, bauch=0.2, schlag=0.3, phase=(0.29 * _k) % 1.0, baender=F3.SOCKEL, puls=0.08, wiegen=0.1))
+    _FL.append(F3.Flamme(_x, _u - 0.4 * _h, 0.72 * _h, 3.7, richtung=(_n, -1), phase=(0.37 * _k + 0.15) % 1.0))
+FEUER = F3.Feuer(H, W, _FL, [ROT, ORANGE, GELB, CREME], posen=16, halten=1, sperre=sperre)
 
 
 def bruecken(fig):
@@ -282,13 +293,13 @@ def frame(i, funken=True):
     kopf = Hm.stufe(i - 3, N / 2, 1)
     # --- Koch: auf der vollen Leinwand, zweistufiges Auf und ab (Robenzeile 12, Kapuzenzeile 8 des Kochs) ---
     koch = L.platz(KOCH, H, W, PAD_L + KOCH_POS[0], PAD_T + KOCH_POS[1])
-    koch = Hm.atmen(koch, PAD_T + KOCH_POS[1] + 12, PAD_T + KOCH_POS[1] + 8, brust, kopf)
+    koch = TX.atmen(koch, PAD_T + KOCH_POS[1] + 12, PAD_T + KOCH_POS[1] + 8, brust, kopf)
     Hm.kontur_schliessen(koch, ERLAUBT_KOCH, KOCH_UMRISS)       # Regel 16
     # --- Spieß gleitet entlang seiner Achse (2 px rechts, 1 px hoch je Schritt), steigt mit der Brust ---
     s = int(round(2.0 * Hm.welle01(i - 6, N / 2)))              # 0 … 2 Schritte
     sp = spiess_ebene(2 * s, -s - brust)
     fig = L.zusammen(H, W, [(FEUER.ebene(i), 0, 0), (koch, 0, 0), (sp, 0, 0)])
-    fig = bruecken(fig)
+    # (Runde 5: `bruecken` entfällt — abgerissene Fetzen sollen frei aufsteigen, das neue Feuer hat keine Fäden)
     # Regel 16: Randpixel in Nicht-Umrissfarbe (z. B. Flammenpixel, die an den hochgehobenen Koch grenzen) werden Umriss: Flamme → Rot, sonst Kochumriss
     kk = Hm.kantenmaske(fig)
     for y, x in zip(*np.nonzero(kk)):
@@ -296,7 +307,7 @@ def frame(i, funken=True):
         if c not in ERLAUBT:
             fig[y, x, :3] = ROT if c in FEUERFARBEN else KOCH_UMRISS
     if funken:
-        return L.zusammen(H, W, [(fig, 0, 0), (FEUER.funken(i), 0, 0)])
+        return fig                                           # Runde 5: abgerissene Fetzen gehören zur Flammen-Ebene
     return fig
 
 

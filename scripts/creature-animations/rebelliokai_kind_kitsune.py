@@ -39,6 +39,7 @@ from PIL import Image
 import anim_feuer3 as F3
 import anim_humanoide as Hm
 import anim_lib as L
+import anim_textur as TX   # texturierte Streckzeilen statt Zeilenkopien (Regel 43/49)
 import anim_rebel as R
 
 N, MS = 60, 70
@@ -120,7 +121,7 @@ def frame(i, nur=None):
     s3 = math.sin(L.sinus(i, N / 3) - 1.0)
     orr = R.spalten_staffel(orr, PAD_L + 21, [0, 0, 1, 1, 1, 1, 1, 1, 1], -1 if s3 > 0.5 else 0)
     if b:
-        k = L.streck_zeile(k, PAD_T + 28, 1)
+        k = TX.streck_zeile(k, PAD_T + 28, 1)
         ol, orr = (L.versetze(e, 0, -1) for e in (ol, orr))
     vers = [(1 if s1 > 0.5 else 0, -b), (0, -b - (1 if s3 > 0.5 else 0)), (0, -b)]            # (dx, dy) je Schweif: oben, rechts, links
     hinten, vorn = [], []

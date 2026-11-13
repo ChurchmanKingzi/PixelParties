@@ -35,6 +35,7 @@ import sys
 import numpy as np
 
 import anim_lib as L
+import anim_textur as TX   # texturierte Streckzeilen statt Zeilenkopien (Regel 43/49)
 import anim_untote as U
 import anim_feuer3 as F3
 import anim_daemon as D
@@ -107,7 +108,7 @@ def frame_gross(i, nur=None):
     if i in (9, 10, 11, 33, 34, 35):
         for (x, y) in AUGEN:
             kp[GPT + y, GPL + x, :3] = GESICHT
-    rp = L.streck_zeile(T_RUMPF, GPT + 17, n)
+    rp = TX.streck_zeile(T_RUMPF, GPT + 17, n)
     al = U.haengen(T_AL, GPT + 18, -1.0 * U.buckel(i, 0, 24, n=24), 1.0)
     ar = U.haengen(T_AR, GPT + 18, 1.0 * U.buckel(i, 0, 16, n=16), 1.0)
     f = L.zusammen(H, W, [(rp, 0, 0), (al, 0, -n), (ar, 0, -n), (kp, 0, -n)])

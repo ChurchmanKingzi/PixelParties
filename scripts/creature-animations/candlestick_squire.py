@@ -39,6 +39,7 @@ import sys
 import numpy as np
 
 import anim_lib as L
+import anim_textur as TX   # texturierte Streckzeilen statt Zeilenkopien (Regel 43/49)
 import anim_untote as U
 import anim_feuer3 as F3
 
@@ -134,7 +135,7 @@ def frame_gross(i, nur=None):
                         if c in RAMPE_HELM:
                             kb[GPT + y, GPL + x, :3] = RAMPE_HELM[c]
     if n:
-        kb = L.streck_zeile(kb, GPT + 26, n)
+        kb = TX.streck_zeile(kb, GPT + 26, n)
     stab = teil(STAB)
     f1 = FEUER1.ebene(i)
     f2 = FEUER2.ebene(i)

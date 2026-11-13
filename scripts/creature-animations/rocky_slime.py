@@ -49,6 +49,7 @@ import numpy as np
 
 import anim_lib as L
 import anim_textur as TX   # texturierte Streckzeilen statt Zeilenkopien (Regel 43)
+TX.umleiten(spalten=True)   # auch beim Stauchen verdoppelte Spalten werden texturiert statt kopiert
 import anim_amorph as A
 
 N, MS = 48, 65

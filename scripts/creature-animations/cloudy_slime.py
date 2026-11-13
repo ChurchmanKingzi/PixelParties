@@ -42,6 +42,7 @@ import numpy as np
 
 import anim_lib as L
 import anim_textur as TX   # texturierte Streckzeilen statt Zeilenkopien (Regel 43)
+TX.umleiten(spalten=True, nicht_holen=[(12, 116, 107), (27, 130, 137), (36, 137, 121), (66, 100, 96), (76, 108, 103)])   # auch beim Stauchen verdoppelte Spalten werden texturiert statt kopiert
 import anim_amorph as A
 
 N, MS = 48, 65

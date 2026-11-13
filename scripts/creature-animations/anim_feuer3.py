@@ -13,7 +13,13 @@ und der helle Kern liegt unten. Bewegung entsteht NUR durch eine Welle, die den 
 * **Züngeln** (Seitenwelle): dieselbe Welle biegt die Flamme abwechselnd nach links und rechts; am Fuß 0 (Basis ruhig), zur Spitze hin stärker.
 * Die Farbbänder machen dieselbe Welle mit (leicht nacheilend), der Kern bleibt fast ruhig.
 
-Ein Zyklus hat `posen` (Standard 8) verschiedene Bilder und schließt nahtlos (Welle = ganze Zahl von Durchläufen je Zyklus). Benachbarte Flammen bekommen verschiedene
+Runde 5 (Nutzer: „Flammen etwas zu langsam/zu wenig animiert“): empfohlen `posen=16, halten=1` (jedes Frame ein neues Bild). Die Welle läuft jetzt `umlauf=2`-mal je Zyklus
+(≈ 0,5 s je Durchlauf bei 65 ms), Bäuche (`bauch=0.7`) und Züngeln (`schlag=1.4`) sind kräftiger; zusätzlich wechselt jede Zunge 1× je Zyklus sichtbar ihre Länge (`puls`, ±20 %)
+und Neigung (`wiegen`, Spitze ± 0,5 Halbbreiten), je Flamme über `phase` versetzt. Fetzen steigen weiter (bis 1,55 × Länge) und nur in der Außenfarbe. Ruhige Glutsockel:
+`bauch=0.2, schlag=0.3, puls=0.08, wiegen=0.1`. Die Außenhaut ist immer geschlossen (kein inneres Band am Hintergrund; flache Füße `fuss=0` ausgenommen, sie sitzen auf der Figur).
+Sehr kleine Flammen (Kerze, Lunte, Docht; Halbbreite < 3 px): handgezeichnete 8-Bilder-Zyklen, `F3.klein(h, w, x, y, i, farben, art='kerze'|'lunte'|'docht')` (siehe unten).
+
+Ein Zyklus hat `posen` verschiedene Bilder und schließt nahtlos (Welle = ganze Zahl von Durchläufen je Zyklus). Benachbarte Flammen bekommen verschiedene
 `phase` (phasenversetzt). Gerichtetes Feuer (Strahl nach unten, Schweif nach links, Feuerball-Schweif): `richtung=(dx, dy)` — die Welle läuft immer in Flussrichtung.
 Es wird nichts gedreht oder skaliert: jedes Bild wird als Feld direkt im Pixelraster ausgewertet (nur ganze Pixel, Alpha 0/255, nur die übergebenen Farben), danach
 aufgeräumt (keine Einzelpixel, keine 1-px-Löcher, Bänder verschachtelt).
@@ -32,7 +38,7 @@ Weitere Bausteine: `Strahl` (Kegel, der in Flussrichtung BREITER wird: Feueratem
 einer Kante, z. B. brennende Mähne; `stuetz((t, wert), …)` für Längen entlang der Linie), `SOCKEL` (Bänder für einen kurzen, breiten, ruhigen Glutsockel unter den Zungen), `fetzen=False`
 (Spitze schnürt sich nicht ab: hängende Schweife). Bewährter Aufbau eines größeren Feuers: ein breiter Sockel (bauch≈0.2, schlag≈0.3) + 2–5 Zungen mit verschiedenen `phase`.
 
-Flamme(x, y, laenge, breite, richtung=(0,-1), phase=0, welle=None, bauch=0.55, schlag=1.0, kern=1.0, fuss=None, baender=None, pot=1.25, hals=0.6, fetzen=True)
+Flamme(x, y, laenge, breite, richtung=(0,-1), phase=0, welle=None, bauch=0.7, schlag=1.4, kern=1.0, fuss=None, baender=None, pot=1.25, umlauf=2, hals=0.6, fetzen=True, puls=0.2, wiegen=0.5)
     x, y      Fußmitte (Leinwandpixel, darf gebrochen sein); die Flamme wächst von dort `laenge` px in `richtung`; `breite` = Halbbreite am dicksten Punkt
     welle     Wellenlänge in px (Standard ≈ 0,75·laenge, mind. 6): so weit wandert ein Bauch je Zyklus
     bauch     Stärke der Breitenwelle (0 = keine, > 0,5 → Spitze schnürt sich ab), schlag = Stärke der Seitenwelle (px an der Spitze ≈ schlag·breite·0,45)
@@ -58,7 +64,7 @@ SOCKEL = [(1.0, 1.0), (0.86, 0.76), (0.72, 0.52), (0.56, 0.3)]          # Bände
 
 
 class Flamme:
-    def __init__(self, x, y, laenge, breite, richtung=(0, -1), phase=0.0, welle=None, bauch=0.7, schlag=1.4, kern=1.0, fuss=None, baender=None, pot=1.25, umlauf=2, hals=0.6, fetzen=True, puls=0.2, wiegen=0.5):
+    def __init__(self, x, y, laenge, breite, richtung=(0, -1), phase=0.0, welle=None, bauch=0.7, schlag=1.4, kern=1.0, fuss=None, baender=None, pot=1.25, umlauf=2, hals=0.6, fetzen=True, puls=0.2, wiegen=0.5, flug=0.55):
         self.x, self.y, self.laenge, self.breite = float(x), float(y), float(laenge), float(breite)
         n = math.hypot(*richtung)
         self.r = (richtung[0] / n, richtung[1] / n)
@@ -67,6 +73,7 @@ class Flamme:
         self.bauch, self.schlag, self.kern, self.pot, self.umlauf, self.hals = bauch, schlag, kern, pot, int(umlauf), hals
         self.fuss = 0.6 * self.breite if fuss is None else float(fuss)
         self.fetzen = fetzen                                     # False: Spitze schnürt sich nicht ab (hängende Schweife u. Ä.)
+        self.flug = float(flug)                                  # so weit (Anteil der Länge) steigt ein abgerissener Fetzen über die Spitze hinaus
         self.puls, self.wiegen = puls, wiegen                    # Runde 5: Länge pulsiert (Anteil), Spitze wiegt seitlich (Anteil der Halbbreite) — je 1× pro Zyklus, je Flamme versetzt
         self.baender = baender
 
@@ -159,7 +166,7 @@ def _stufen(fl, tau, yy, xx, nb, neigung=0.0):
         v = a / lk
         nach = 0.06 * k                                       # innere Bänder eilen leicht nach
         th = 2 * math.pi * (a / fl.welle - fl.umlauf * tau + fl.phase + nach)
-        g = np.clip(v, 0, 1.55)
+        g = np.clip(v, 0, 1.0 + fl.flug)
         ruhe = 1.0 if k < nb - 1 or nb < 3 else fl.kern * 0.5    # Kern fast ruhig
         seit = fl.schlag * ruhe * wk * 0.45 * g ** 1.4 * np.sin(th) + neigung * g ** 1.5
         # Bäuche: unten kaum, zur Spitze kräftig (dort schnürt die Einschnürung bis 0 ab)
@@ -171,7 +178,7 @@ def _stufen(fl, tau, yy, xx, nb, neigung=0.0):
         fak = np.where((fak < fl.hals) & (bw > 0.45) & fl.fetzen, 0.0, fak)            # Hals unter dem obersten Bauch: nicht zum Faden ausdünnen, sondern abschnüren
         breite = wk * _profil(v, fl.pot) * fak
         # jenseits der Spitze (v > 1) lebt nur der abgelöste Fetzen weiter: steigt, schrumpft, verschwindet
-        aus = np.clip((1.55 - v) / 0.55, 0, 1)
+        aus = np.clip((1.0 + fl.flug - v) / fl.flug, 0, 1)
         breite = np.where(v > 1.0, np.minimum(wk * 0.4, 1.9) * aus * np.clip(0.1 + 1.5 * np.cos(th + 0.9), 0, None) * (1.0 if fl.fetzen and k == 0 else 0.0), breite)   # Fetzen nur in der Außenfarbe
         innen = (np.abs(c - seit) <= breite - 0.25) & (v >= 0) & (breite > 0.3)
         if fk > 0:                                            # runder Fuß unter der Basis
@@ -200,7 +207,7 @@ def _oeffnen(m, spitze):
     return out
 
 
-def _aufraeumen(st, nb, spitze=2):
+def _aufraeumen(st, nb, spitze=2, frei=None):
     """Saubere Bänder: keine Fäden/Einzelpixel (außen 1-px-Spitzen bis `spitze` px erlaubt, innen 1 px), 1-px-Löcher zu, Bänder bleiben verschachtelt."""
     st = st.copy()
     for k in range(1, nb + 1):
@@ -222,6 +229,8 @@ def _aufraeumen(st, nb, spitze=2):
     # Runde 5: geschlossene Außenhaut — kein inneres Band liegt direkt am Hintergrund (jedes Randpixel der Silhouette ist Außenfarbe)
     leer = np.pad(st == 0, 1)
     am_rand = leer[:-2, 1:-1] | leer[2:, 1:-1] | leer[1:-1, :-2] | leer[1:-1, 2:]
+    if frei is not None:
+        am_rand &= ~frei                                          # flache Füße (sitzen auf einer Kante der Figur) und Strahl-Ursprünge bekommen keinen Saum
     st[(st > 1) & am_rand] = 1
     return st
 
@@ -239,9 +248,16 @@ class Feuer:
             yy, xx = np.mgrid[0:self.h, 0:self.w].astype(float)
             nb = len(self.farben)
             st = np.zeros((self.h, self.w), np.uint8)
+            frei = np.zeros((self.h, self.w), bool)
             for fl in self.flammen:
                 st = np.maximum(st, fl.stufen(key[0] / float(self.posen), yy, xx, nb, key[1]))
-            self._cache[key] = _aufraeumen(st, nb)
+                a = (xx - fl.x) * fl.r[0] + (yy - fl.y) * fl.r[1]
+                c = -(xx - fl.x) * fl.r[1] + (yy - fl.y) * fl.r[0]
+                if isinstance(fl, Strahl):
+                    frei |= (a < 1.5) & (np.abs(c) <= fl.b0 + 1.5)
+                elif fl.fuss == 0:
+                    frei |= (a < 1.0) & (np.abs(c) <= fl.breite + 0.5)
+            self._cache[key] = _aufraeumen(st, nb, frei=frei)
         return self._cache[key]
 
     def pose(self, i):
