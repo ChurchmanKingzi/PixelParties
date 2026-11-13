@@ -219,6 +219,10 @@ def _aufraeumen(st, nb, spitze=2):
         x, y, bw_, bh_, fl_ = s[j]
         if fl_ <= 5 and x > 0 and y > 0 and x + bw_ < ww and y + bh_ < hh:
             st[lab == j] = 1
+    # Runde 5: geschlossene Außenhaut — kein inneres Band liegt direkt am Hintergrund (jedes Randpixel der Silhouette ist Außenfarbe)
+    leer = np.pad(st == 0, 1)
+    am_rand = leer[:-2, 1:-1] | leer[2:, 1:-1] | leer[1:-1, :-2] | leer[1:-1, 2:]
+    st[(st > 1) & am_rand] = 1
     return st
 
 
