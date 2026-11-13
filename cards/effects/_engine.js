@@ -14816,7 +14816,7 @@ class GameEngine {
         }
         // ★ EINÄSCHERUNG: die Karte zerstört SICH SELBST (Quelle == Ziel, z. B. `ctx.destroyCard(inst)`) oder das Kartenskript verlangt es (`opts.einaescherung`: Doomed Town Guard, Tamed Hell Fox, …).
         // Nur Kreaturen im Support-Slot, keine Wiederbelebung (Extra Life) und keine Token (eigener Zerfall). Karten mit eigener Zerstörungs-Animation setzen `skipPileTransfer` oder senden ihr eigenes Ereignis.
-        const _selbst = !!opts.einaescherung || (!!source && (source === targetCard || (source.id != null && source.id === targetCard.id)));
+        const _selbst = !!opts.einaescherung || !!opts.isSacrifice || (!!source && (source === targetCard || (source.id != null && source.id === targetCard.id)));
         if (_selbst && isCreatureTarget && fromZone === ZONES.SUPPORT && !_istToken && !targetCard._reviveAfterDeath) {
           payload.flightStyle = 'einaescherung';
           _eaT0 = Date.now();
@@ -14847,7 +14847,8 @@ class GameEngine {
       _cdChecked: true,
     });
     // ★ EINÄSCHERUNG: warten, bis die Essenz den Stapel erreicht hat (Animationszeit des Clients, abzüglich der schon vergangenen Zeit)
-    if (_eaT0) { const rest = EINAESCHERUNG_MS - (Date.now() - _eaT0); if (rest > 0) await this._delay(rest); }
+    // (`opts.einaescherungOhneWarten`: Mehrfach-Tribut — nur das LETZTE Opfer wartet, die Einäscherungen laufen gestaffelt überlappend; s. `resolveSacrificeCost`)
+    if (_eaT0 && !opts.einaescherungOhneWarten) { const rest = EINAESCHERUNG_MS - (Date.now() - _eaT0); if (rest > 0) await this._delay(rest); }
   }
 
   /**
@@ -32942,7 +32943,12 @@ this._deathWatch = (this._deathWatchStack || []).length
       : 550;
     const sacAnimExtra = spec.sacrificeAnimationExtras || {};
 
+    // Mehrfach-Tribut: die Einäscherungen (je ~2 s bis zur Landung) laufen überlappend — nur das letzte Brett-Opfer wartet auf die Landung der Essenz (sonst 2 s je Tribut nacheinander).
+    let _letztesBrettOpfer = -1;
+    picked.forEach((t, i) => { if (t.cardInstance && t.type !== 'hand' && t.cardInstance.zone !== 'hand') _letztesBrettOpfer = i; });
+    let _opferNr = -1;
     for (const t of picked) {
+      _opferNr++;
       try {
         // Played BEFORE the hook + destroy so the visual lands while
         // the creature is still rendered in its zone. Brief delay
@@ -33033,7 +33039,7 @@ this._deathWatch = (this._deathWatchStack || []).length
             // ★ 26.9.: `spec.skipPileTransfer` — die Karte zeigt den Weg
             // des Opfers zur Ablage selbst (Chaorc Interception wirft es
             // aufs Ziel und laesst es von DORT abfliegen).
-            { isSacrifice: true, ...(spec.skipPileTransfer ? { skipPileTransfer: true } : {}) },
+            { isSacrifice: true, ...(spec.skipPileTransfer ? { skipPileTransfer: true } : {}), ...(_opferNr < _letztesBrettOpfer ? { einaescherungOhneWarten: true } : {}) },
           );
         }
       } catch (err) {

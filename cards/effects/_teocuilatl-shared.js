@@ -419,6 +419,7 @@ async function sacrificeSelf(engine, inst, pi) {
   } else {
     await engine.actionDestroyCard(
       { name: inst.name, owner: pi, heroIdx: inst.heroIdx }, inst,
+      { einaescherung: true },   // Opfer: verbrennt (Client: app-fx-66)
     );
   }
 }

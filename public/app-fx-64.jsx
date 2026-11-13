@@ -13,13 +13,15 @@
 //  PIXELGRÖSSE: die Leinwand hat das Raster des Heldensprites (1 Leinwandpunkt = 1 Sprite-Pixel, `image-rendering: pixelated`, gleiche Skalierung wie `.hero-idle-canvas`) — Rasterzelle = Hero-Pixel
 //    exakt, Bewegung in ganzen Sprite-Pixeln im Bildtakt. Palette: feste Palettenfarben (`ppSnapRgb`).
 //  KOSTEN: ALLE Leinwände teilen EINEN Takt (`ppTaktRaf`, ein Rückruf je 1/30 s); gemalt wird nur, solange die Leinwand sichtbar ist (IntersectionObserver); je Bild ein `clearRect` und
-//    vier `drawImage` kleiner Vorlagen (7×7) — kein Layout lesen, kein DOM anfassen, nichts im Leerlauf ohne betäubten Helden (Takt hält an, sobald keine Leinwand mehr hängt).
+//    vier `drawImage` kleiner Vorlagen (9×9) — kein Layout lesen, kein DOM anfassen, nichts im Leerlauf ohne betäubten Helden (Takt hält an, sobald keine Leinwand mehr hängt).
 //  Rückfall auf die alten Blitze (`hfx-blitz`): Retro (`PP_RETRO`), reduzierte Bewegung, Animationen aus (`_playAnimations === false`), `window.__ppFxAlt`, Kill-Switch `window.__ppFx64Aus`, keine Palette.
 //  Messung (nur Tests): `window.__ppFx64Messen = true` → `window.__ppFx64Zeiten` = Dauer je Takt in ms, `window.__ppFx64Anzahl` = Zahl der Leinwände.
 // ═════════════════════════════════════════════════════════════════
 (function (root) {
   const TAKT = 1000 / 30;
   const STAR7 = ['...Y...', '..YWY..', 'YYYWYYy', '.YWWWy.', '..YYYy.', '.YYyYy.', '.Yy.yy.'];        // identisch mit STAR7 in app-fx-63.jsx
+  // Nutzer-Feedback (13.11.): die 7×7-Sterne waren zu groß → hier 5×5 (Tigertritt, app-fx-63, behält sein 7×7-Sprite; `window.__ppFx64Gross = true` schaltet die 7×7 wieder ein)
+  const STAR5 = ['..Y..', '.YWY.', 'YYWYy', '.YYy.', '.Y.y.'];
   const PLUS = ['.......', '...Y...', '...Y...', '.YYWYY.', '...Y...', '...Y...', '.......'];                // Trailer: Kreuz aus 5 × 1 + 1 × 5 Gelb, Kern Cremeweiß; die dunkle Kontur kommt aus `mach`
   const W_RAD = 5.5;                                // rad/s (Trailer: w = dt · 5,5)
   const INTRO = 10;                                 // Bilder des Auslöse-Auftritts
@@ -40,12 +42,12 @@
     } : {
       vorn: { Y, y: O, W: Wh }, hinten: { Y: Yb, y: Ob, W: Cr }, blitz: { Y: Cr, y: Y, W: Wh },
     };
-    const rows = plus ? PLUS : STAR7;
-    const mach = (pal) => {                                                    // 9×9: das 7×7-Sprite in der Mitte, rundum 1 Zelle dunkle Kontur (wie im Trailer: lesbar auf jedem Untergrund)
+    const rows = plus ? PLUS : (root.__ppFx64Gross ? STAR7 : STAR5), RN = rows.length, RO = (9 - RN) >> 1;
+    const mach = (pal) => {                                                    // 9×9: das 5×5-Sprite (7×7 nur mit `__ppFx64Gross`) in der Mitte, rundum 1 Zelle dunkle Kontur (wie im Trailer: lesbar auf jedem Untergrund)
       const cv = document.createElement('canvas'); cv.width = 9; cv.height = 9;
       const g = cv.getContext('2d'), id = g.createImageData(9, 9), has = new Uint8Array(81);
       const put = (x, y, c) => { const i = (y * 9 + x) * 4; id.data[i] = c[0]; id.data[i + 1] = c[1]; id.data[i + 2] = c[2]; id.data[i + 3] = 255; has[y * 9 + x] = 1; };
-      for (let y = 0; y < 7; y++) for (let x = 0; x < 7; x++) { const c = pal[rows[y][x]]; if (c) put(x + 1, y + 1, c); }
+      for (let y = 0; y < RN; y++) for (let x = 0; x < RN; x++) { const c = pal[rows[y][x]]; if (c) put(x + RO, y + RO, c); }
       for (let y = 0; y < 9; y++) for (let x = 0; x < 9; x++) {
         if (has[y * 9 + x]) continue;
         let nb = false; for (let dy = -1; dy <= 1 && !nb; dy++) for (let dx = -1; dx <= 1; dx++) { const xx = x + dx, yy = y + dy; if (xx >= 0 && yy >= 0 && xx < 9 && yy < 9 && has[yy * 9 + xx] === 1) { nb = true; break; } }
@@ -74,11 +76,11 @@
   function geometrie(kern, mitteX) {
     const cx = rd(mitteX);
     const kopfHalb = mn(14, mx(4, ((kern.kopfX1 || 0) > cx ? kern.kopfX1 - cx : (kern.x1 - kern.x0) * 0.25)));
-    const rx = mn(22, mx(9, rd(kopfHalb * 1.3 + 4)));
+    const rx = mn(19, mx(8, rd(kopfHalb * 1.15 + 3)));                    // mit den 5×5-Sternen etwas enger als vorher (1,3·+4, min. 9): die Bahn bleibt am Kopf
     const ry = mx(3, rd(rx * 0.3));
     // Mitte über dem Kopf: Oberkante der Figur — hat das Sheet eine Gesichtshöhe (`faceY`, z. B. Medea mit Gas, Brackle mit Katapult, Flügel-Helden), über dem Gesicht statt über den Aufbauten
     const hoehe = mx(1, kern.y1 - kern.y0), kopfR = mn(12, mx(5, rd(hoehe * 0.1)));
-    const cy = rd(typeof kern.kopfY === 'number' ? mx(kern.y0, kern.kopfY - kopfR) : kern.y0) - 4;
+    const cy = rd(typeof kern.kopfY === 'number' ? mx(kern.y0, kern.kopfY - kopfR) : kern.y0) - 3;
     const hb = rd(rx * 1.9) + 6, hh = rd(ry * 1.9) + 6;                  // Platz für den Auftritt (1,9 × Radius) samt halber Sternbreite
     return { cx, cy, rx, ry, w: 2 * hb + 1, h: 2 * hh + 1, ox: hb, oy: hh, links: cx - hb, oben: cy - hh };
   }
