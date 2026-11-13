@@ -42,6 +42,7 @@ import numpy as np
 
 import anim_lib as L
 import anim_flieger as F
+import anim_feuer3 as F3
 
 N, MS = 48, 60
 PAD_L, PAD_R, PAD_T, PAD_B = 9, 9, 18, 9
@@ -109,19 +110,18 @@ PUFFS2 = puffs([(4, 7, 0, -11, 5, 'k', 1), (31, 8, 0, -11, 15, 'k', 1), (3, 0, -
                 (5, 9, -1, -10, 19, 'k', 1), (32, 8, 1, -10, 27, 'k', 1)])
 
 
+# Runde 7: die Lunten-Flammen sind jetzt die handgezeichnete kleine Flamme aus anim_feuer3 (F3.klein 'lunte', 8 Posen à 2 Frames, wie bei bomb_mite.py) statt der zufälligen Spaltenzungen.
+# Je Bombe eine Flamme: Fuß (x, y) = Mitte des gelben Sternfunkens (heller Kern), Versatz im Zyklus, gespiegelt ja/nein. Der Sternfunke bleibt als Glutpunkt darunter stehen.
+# Farben der Quelle: Orange (228,147,40) außen, Gelb (255,255,0), heller Kern (255,255,203).
+LUNTEN_FLAMMEN = {'L1': (4, 2, 0, False), 'L2': (4, 10, 5, True), 'R1': (36, 4, 3, True), 'R2': (32, 9, 6, False)}
+
+
 def lunten_feuer(ebene, name, i):
-    """Brennende Lunten (Regel 15) auf einer Bomben-Ebene: über der Marke wachsen Flammenzungen 0…3 px, Farbe wandert mit (unten hellgold, Mitte gold,
-    Spitze orange); bei hohen Zungen blitzt die Marke hellgelb. Die Marke bleibt als Basis stehen."""
-    for (nm, x), (tab, off, y0) in FLAMMEN.items():
-        if nm != name:
-            continue
-        e = tab[((i // 4) + off) % _K]
-        farben = {0: [], 1: [G_R], 2: [G_O, G_R], 3: [G_O, G_M, G_R]}[e]
-        for k, c in enumerate(farben):
-            ebene[PAD_T + y0 - 1 - k, PAD_L + x, :3] = c
-            ebene[PAD_T + y0 - 1 - k, PAD_L + x, 3] = 255
-        if e == 3:
-            ebene[PAD_T + y0, PAD_L + x, :3] = GELB_HELL
+    """Brennende Lunten (Regel 15/40) auf einer Bomben-Ebene: handgezeichneter Flammenzyklus F3.klein auf dem Sternfunken (Flamme vor der Bombe)."""
+    x, y, versatz, spiegel = LUNTEN_FLAMMEN[name]
+    fl = F3.klein(H, W, PAD_L + x, PAD_T + y, i, [G_R, GELB, GELB_HELL], 'lunte', halten=2, spiegel=spiegel, versatz=versatz)
+    m = fl[..., 3] > 0
+    ebene[m] = fl[m]
 
 
 def schwirren(ebene, maske, xs, wurzel_x, s):

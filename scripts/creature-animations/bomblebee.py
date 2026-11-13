@@ -43,6 +43,7 @@ import anim_lib as L
 import anim_textur as TX   # texturierte Streckzeilen statt Zeilenkopien (Regel 43/49)
 TX.umleiten()               # auch Streckaufrufe innerhalb der Gruppenmodule liefern texturierte Zeilen
 import anim_flieger as F
+import anim_feuer3 as F3
 
 N, MS = 48, 60
 PAD_L, PAD_R, PAD_T, PAD_B = 8, 8, 17, 10
@@ -96,26 +97,18 @@ PUFFS1 = puffs([(22, 5, -1, -11, 0, 'k', 1), (31, 0, 0, -12, 4, 's', 1), (39, 4,
 PUFFS2 = puffs([(21, 6, -1, -10, 14, 'k', 1), (30, 1, 0, -12, 16, 'k', 1), (38, 5, 1, -10, 20, 'k', 1),
                 (24, 4, 0, -11, 40, 'k', 1), (31, 0, 0, -10, 44, 'k', 1), (39, 4, 0, -11, 36, 'k', 1)])
 
-# Flammen der Lunten: je Spalte eigene Pose-Tabelle (Zungenhöhe 0…3 px über der Marke, Posen à 4 Frames, nahtlos)
-_rng = np.random.RandomState(5)
-_K = N // 4
-FLAMMEN = {}
-for _c, _spalten in enumerate(LUNTEN):
-    for _x, _y in _spalten:
-        FLAMMEN[(_x, _y)] = ([int(_rng.randint(0, 4)) for _ in range(_K)], int(_rng.randint(0, _K)))
+# Runde 7: die Lunten-Flammen sind jetzt die handgezeichnete kleine Flamme aus anim_feuer3 (F3.klein 'lunte', 8 Posen à 2 Frames, wie bei bomb_mite.py) statt der zufälligen Spaltenzungen.
+# Je Marke eine Flamme: Fuß (x, y) = Mitte der gelben Marke (ihr heller Kern), Versatz im Zyklus, gespiegelt ja/nein — die drei Flammen flackern nicht im Gleichtakt. Die Marke bleibt als Glutpunkt darunter stehen
+# (keine Löcher im Kopf). Farben der Quelle: Orange (236,163,60) außen, Gelb (255,255,0), heller Kern (255,255,203).
+LUNTEN_FLAMMEN = [(23, 7, 0, False), (31, 3, 3, True), (39, 7, 5, False)]
 
 
 def lunten_feuer(kp, i):
-    """Brennende Lunten (Regel 15): über der gelben Marke wachsen Flammenzungen, Farbe wandert mit: unten hellgold, Mitte gold, Spitze orange, Spitze dunkleres Orange;
-    der Kern (die Marke selbst) flackert gelb ↔ hellgelb. Alles in Farben des Sprites; die Marke bleibt als Basis stehen (keine Löcher im Körper)."""
-    for (x, y0), (tab, off) in FLAMMEN.items():
-        e = tab[((i // 4) + off) % _K]
-        farben = {0: [], 1: [ORANGE], 2: [HELLGOLD, ORANGE], 3: [HELLGOLD, GOLD, ORANGE]}[e]
-        for k, c in enumerate(farben):
-            kp[PAD_T + y0 - 1 - k, PAD_L + x, :3] = c
-            kp[PAD_T + y0 - 1 - k, PAD_L + x, 3] = 255
-        if e == 3:                                             # heiß: Kern blitzt hellgelb
-            kp[PAD_T + y0, PAD_L + x, :3] = GELB_HELL
+    """Brennende Lunten (Regel 15/40): handgezeichneter Flammenzyklus F3.klein auf jeder Marke; liefert die Körper-Ebene mit Flammen (Flammen vor dem Kopf)."""
+    ebenen = [(kp, 0, 0)]
+    for (x, y, versatz, spiegel) in LUNTEN_FLAMMEN:
+        ebenen.append((F3.klein(H, W, PAD_L + x, PAD_T + y, i, [ORANGE, GELB, GELB_HELL], 'lunte', halten=2, spiegel=spiegel, versatz=versatz), 0, 0))
+    return L.zusammen(H, W, ebenen)
 
 
 def frame(i, partikel=True, effekte=True):
@@ -133,7 +126,7 @@ def frame(i, partikel=True, effekte=True):
     # ── Glanz nur am goldenen Ring (Metall, dezent) und brennende Lunten ───────────────────────────────────────────────────
     if effekte:
         F.lichtband(kp, ring, PAD_L, PAD_T, i, N // 2, 10, 9, RINGR, stufen=1, breite=3.0, achse=(1.0, 0.8))
-        lunten_feuer(kp, i)
+        kp = lunten_feuer(kp, i)
 
     # ── Bewegung: Beine/Hinterleib pendeln, Flügel surren ────────────────────────────────────────────────────────────
     kp = F.zeilen_pendel(kp, PAD_T + 18, 2.4, L.sinus(i, N / 2), 1.0)

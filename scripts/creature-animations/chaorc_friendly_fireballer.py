@@ -28,6 +28,12 @@ Ergänzungen: Ohrspitze (−1,7), (0,6), (0,8) in (26,0,0) (siehe oben), sonst k
 
 RUNDE 6 (Nutzer: „der Feuerball sollte etwas mehr herumfliegen, auch nach links und rechts, aber ihn nie berühren“): statt ±1 px Schweben fliegt der Ball eine liegende Acht (6 px waagerecht, 4 px senkrecht, 1 Umlauf je
 Schleife, siehe bahn()); der Schweif neigt sich mit der senkrechten Flugrichtung; Abstand Feuer (inkl. Fetzen) ↔ Chaorc in jedem Frame ≥ 2 px (assert).
+
+RUNDE 7 (Nutzer: „der Arm darf gerne bewegt werden, um den Feuerball zu ‚dirigieren‘, aber er sollte nicht einfach dicker werden“): Ursache des Dickerwerdens war das Atmen — die eingefügte Zeile 14 lief mitten durch
+den nach rechts (zum Ball) ausgestreckten Arm (Balken x 7–14, y 12–15: Kontur, zwei Zeilen Füllung, Kontur; am Handende der graue Ring (14,15) mit Randpixel (15,15)) und machte ihn drei statt zwei Zeilen dick.
+Der Arm ist jetzt eine eigene STARRE Ebene (ARM_PIXEL): der Körper atmet ohne ihn, der Arm geht nur ganzzahlig mit der Brust mit. Dazu DIRIGIERT er den Ball in drei Posen (arm_pose): Hand 1 px gehoben (Ball oben),
+Original (Ball auf Mittelhöhe), Hand 1 px gesenkt (Ball unten) — starrer Spaltenversatz der Handspalten x 12–15, jede Spalte behält ihre Höhe (der Arm ist in jeder Pose genau so dick wie im Original). Der Ring
+sitzt am Handgelenk und geht mit. Unter dem Arm fertiggezeichnet (ARM_DARUNTER): Brust in Dunkelrot (51,0,0)/(84,0,0), Körperkante (14,13)/(14,14)/(15,15) und Kinnschatten (7–12,12) in Umrissfarbe (26,0,0).
 """
 import sys
 
@@ -62,6 +68,45 @@ AUGE = [(9, 10), (10, 11), (11, 11)]
 for p in AUGE:
     assert tuple(int(v) for v in spr[p[1], p[0], :3]) == (255, 255, 255)
 OHR = {(-1, 7): UMRISS, (0, 7): HAUTROT, (0, 6): UMRISS, (0, 8): UMRISS}
+
+# --- Runde 7: der Arm als starre Ebene (wird nie gestreckt) ---
+ARM_PIXEL = [(x, 12) for x in range(7, 14)] + [(x, y) for y in (13, 14) for x in range(7, 15)] + [(x, 15) for x in range(7, 16)]
+_C, _D = (51, 0, 0), (84, 0, 0)
+ARM_DARUNTER = {(x, 12): UMRISS for x in range(7, 13)}                           # Kinnschatten/Halskontur; (13,12) bleibt frei
+for _y in (13, 14, 15):
+    for _x in range(7, 14):
+        ARM_DARUNTER[(_x, _y)] = _D if (_x + _y) % 3 == 0 else _C
+ARM_DARUNTER.update({(14, 13): UMRISS, (14, 14): UMRISS, (14, 15): _C, (15, 15): UMRISS})
+HAND_SPALTEN = (12, 13, 14, 15)
+
+
+def arm_pose(i):
+    """−1 = Hand gehoben (Ball fliegt oben), 0 = Original, +1 = Hand gesenkt (Ball unten); folgt der senkrechten Bahn des Balls (dy = 2·sin(2φ)), Frame 0 = Original."""
+    s_ = np.sin(4 * np.pi * i / N)
+    return 1 if s_ > 0.3 else (-1 if s_ < -0.3 else 0)
+
+
+def arm_trennen(c):
+    """Arm aus der Leinwand c lösen und den Körper darunter fertigzeichnen; liefert die Arm-Ebene."""
+    arm = L.leer(H, W)
+    for (x, y) in ARM_PIXEL:
+        arm[GP + y, GP + x] = c[GP + y, GP + x]
+        c[GP + y, GP + x] = 0
+    for (x, y), col in ARM_DARUNTER.items():
+        c[GP + y, GP + x, :3] = col
+        c[GP + y, GP + x, 3] = 255
+    return arm
+
+
+def arm_stellen(arm, v):
+    """Handspalten starr um v Pixel versetzen (jede Spalte behält ihre Höhe)."""
+    if not v:
+        return arm
+    out = arm.copy()
+    for x in HAND_SPALTEN:
+        out[:, GP + x] = np.roll(arm[:, GP + x], v, axis=0)
+    return out
+
 
 # --- Feuerball (Runde 4, anim_feuer3): Kugel wie gemalt (Mitte ≈ (35,7), Radius ≈ 7) als runder, ruhiger Flammenfuß; der Schweif fließt in Flugrichtung nach hinten (links, leicht abwärts wie in Ebene 102) ---
 _F = lambda x, y, l, b, **k: F3.Flamme(GP + x, GP + y, l, b, **k)
@@ -113,9 +158,11 @@ def frame_gross(i, nur=None):
         Hm.setze(c, OHR, OFF)
     if Hm.folge(i, 20, [1, 1, 1], N) or Hm.folge(i, 41, [1, 1, 1], N):
         Hm.setze(c, {p: HAUT_DUNKEL for p in AUGE}, OFF)
+    arm = arm_stellen(arm_trennen(c), arm_pose(i))                              # Runde 7: Arm starr, dirigiert den Ball
     b = 1 if Hm.welle01(i, 24) > 0.5 else 0
     if b:
         c = TX.streck_zeile(c, GP + 14, b)
+    c = L.zusammen(H, W, [(c, 0, 0), (L.versetze(arm, 0, -b), 0, 0)])           # Arm geht starr mit der Brust mit
     c = Hm.kontur_schliessen(c, ERLAUBT, UMRISS)
     if nur == 'koerper':
         return c

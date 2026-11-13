@@ -46,6 +46,7 @@ import numpy as np
 
 import anim_lib as L
 import anim_flieger as F
+import anim_feuer3 as F3
 
 N, MS = 48, 60
 PAD_L, PAD_R, PAD_T, PAD_B = 14, 14, 12, 10               # Arbeitsleinwand (am Ende zugeschnitten)
@@ -120,16 +121,19 @@ def malen(f, x, y, c):
         f[py, px_, 3] = 255
 
 
+# Runde 7: die Lunten-Flammen sind jetzt die handgezeichnete kleine Flamme aus anim_feuer3 (F3.klein, 8 Posen à 2 Frames, wie bei bomb_mite.py) statt der zufälligen Spaltenzungen.
+# Je Funke eine Flamme: Fuß (x, y) = Mitte des gelben Funkens (heller Kern), Art ('lunte' 5 px breit für die Bomben und den großen Fühlerfunken, 'docht' 3 px breit für die beiden kleinen Funken),
+# Versatz im Zyklus, gespiegelt ja/nein. Der Funke bleibt als Glutpunkt darunter stehen. Farben der Quelle: Orange (236,163,60) außen, Gelb (255,255,0), heller Kern (255,255,203).
+LUNTEN_FLAMMEN = {'stern': (47, 2, 'docht', 1, False), 'kopf_oben': (35, 5, 'docht', 4, True), 'kopf_links': (27, 9, 'lunte', 6, False),
+                  'bombe_ol': (15, 9, 'lunte', 0, False), 'bombe_ul': (14, 38, 'lunte', 3, True), 'bombe_ur': (47, 38, 'lunte', 5, False)}
+
+
 def lunten_feuer(f, i, dys):
-    for (name, x, y0), (tab, off, emax) in FLAMMEN.items():
-        dy = dys[LUNTEN[name][2]]
-        e = tab[((i // 4) + off) % _K]
-        for k, c in enumerate({0: [], 1: [ORANGE], 2: [GOLD, ORANGE], 3: [HELLGOLD, GOLD, ORANGE]}[e]):
-            malen(f, x, y0 - 1 - k + dy, c)
-        if e == emax and emax >= 2:                             # heiß: Kern blitzt hellgelb
-            py, px_ = PAD_T + y0 + dy, PAD_L + x
-            if tuple(int(v) for v in f[py, px_, :3]) == GELB:
-                f[py, px_, :3] = GELB_HELL
+    """Brennende Lunten (Regel 15/40): handgezeichneter Flammenzyklus F3.klein auf jedem Funken (Flamme vor der Figur), geht mit dem Teil mit, an dem der Funke sitzt."""
+    for name, (x, y, art, versatz, spiegel) in LUNTEN_FLAMMEN.items():
+        fl = F3.klein(H, W, PAD_L + x, PAD_T + y + dys[LUNTEN[name][2]], i, [ORANGE, GELB, GELB_HELL], art, halten=2, spiegel=spiegel, versatz=versatz)
+        m = fl[..., 3] > 0
+        f[m] = fl[m]
 
 
 def px(x, y):

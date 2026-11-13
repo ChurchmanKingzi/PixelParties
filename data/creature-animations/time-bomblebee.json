@@ -2,7 +2,7 @@
   "creature": "Time Bomblebee",
   "sheet": "time-bomblebee.png",
   "frameWidth": 74,
-  "frameHeight": 59,
+  "frameHeight": 58,
   "frames": 48,
   "frameMs": 60,
   "loop": true,

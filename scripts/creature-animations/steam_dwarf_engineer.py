@@ -165,22 +165,40 @@ ARM_SENK = {'O': {}, 'M': {17: 1, 18: 1, 19: 1, 20: 1}, 'D': {16: 1, 17: 1, 18: 
 BART_SCHATTEN, BART_KANTE = (156, 156, 156), (106, 106, 106)
 
 
-def arm_senken(k, pose):
-    """Arm auf der Leinwand k (vor dem Atmen) in die Pose bringen; liefert den Versatz der Hand (= Versatz des Schlüssels)."""
+# RUNDE 7 (Nutzer: „der Arm wird immer noch dicker; der sollte nicht in der Breite gestretcht werden“): Ursache war das Atmen — die eingefügte Zeile 21 lief mitten durch den Unterarm (Füllung Zeilen 20–21 → drei
+# statt zwei Zeilen dick, Frames 7–18 und 31–42). Der Arm ist jetzt eine EIGENE, STARRE Ebene (x 14–19, y 19–22 und Handkante (20,20)/(20,21)): der Körper atmet OHNE ihn, der Arm wird danach nur ganzzahlig
+# versetzt (mit dem Oberkörper 1 px hoch, Zug: Handspalten 1 px tiefer) und ist in jeder Pose genau 4 Zeilen hoch (Kontur, 2 Zeilen Füllung, Kontur). Unter dem Arm fertiggezeichnet (ARM_DARUNTER): Zeile 19 = Bart
+# (Schatten (156,156,156), Randspalte x 19 Bartkante (106,106,106)), Zeile 22 = oberer Rand der Metallplatte (106,106,106) wie ihr linker/unterer Rand, außen (14,22)/(19,22) Umriss (74,57,14); Zeilen 20–21 bleiben immer verdeckt.
+ARM_PIXEL = [(x, y) for y in range(19, 23) for x in range(14, 20)] + [(20, 20), (20, 21)]
+WESTE_DUNKEL = (109, 84, 20)
+ARM_DARUNTER = {}
+for _x in range(14, 20):
+    ARM_DARUNTER[(_x, 19)] = BART_KANTE if _x == 19 else BART_SCHATTEN
+    ARM_DARUNTER[(_x, 20)] = ARM_DARUNTER[(_x, 21)] = WESTE_DUNKEL
+    ARM_DARUNTER[(_x, 22)] = UMRISS if _x in (14, 19) else BART_KANTE
+
+
+def arm_trennen(k):
+    """Arm aus der Leinwand k lösen (eigene Ebene) und den Körper darunter fertigzeichnen."""
+    arm = L.leer(H, W)
+    for (x, y) in ARM_PIXEL:
+        arm[PAD_T + y, PAD_L + x] = k[PAD_T + y, PAD_L + x]
+        k[PAD_T + y, PAD_L + x] = 0
+    for (x, y), c in ARM_DARUNTER.items():
+        k[PAD_T + y, PAD_L + x, :3] = c
+        k[PAD_T + y, PAD_L + x, 3] = 255
+    return arm
+
+
+def arm_senken(arm, pose):
+    """Arm-Ebene in die Pose bringen (starrer Spaltenversatz um den Ellbogen, jede Spalte behält ihre Höhe); liefert die Ebene und den Versatz der Hand (= Versatz des Schlüssels)."""
     senk = ARM_SENK[pose]
+    out = arm.copy()
     for x, d in senk.items():
         X = PAD_L + x
-        spalte = [k[PAD_T + y, X].copy() for y in range(ARM_ZEILEN[0], ARM_ZEILEN[1] + 1)]
-        for n_, y in enumerate(range(ARM_ZEILEN[0], ARM_ZEILEN[1] + 1)):
-            if spalte[n_][3]:
-                k[PAD_T + y + d, X] = spalte[n_]
-        for y in range(ARM_ZEILEN[0], ARM_ZEILEN[0] + d):                       # freigelegt: Bart fertigzeichnen (x 20: dort war nur der Schlüsselgriff → frei)
-            if x == 20:
-                k[PAD_T + y, X] = 0
-            else:
-                k[PAD_T + y, X, :3] = BART_KANTE if x == 19 else BART_SCHATTEN
-                k[PAD_T + y, X, 3] = 255
-    return senk.get(20, 0)
+        out[:, X] = 0
+        out[d:, X] = arm[:H - d, X]
+    return out, senk.get(20, 0)
 
 
 def frame(i, dampf=True, nur=None):
@@ -203,11 +221,13 @@ def frame(i, dampf=True, nur=None):
         if a:
             Hm.bereich_versatz(k, OFF, {y: a for y in zeilen}, x0, x1)
     # --- Auf und ab: Westenzeile 21 wird einmal doppelt eingefügt; Körper und Schlüssel gleichermaßen ---
-    hand = arm_senken(k, SCHL_FOLGE[i])                                         # Runde 5: Arm/Hand führen den Zug aus, der Schlüssel sitzt starr in der Hand
+    arm = arm_trennen(k)                                                        # Runde 7: Arm als starre Ebene, der Körper atmet ohne ihn (der Arm wird nie gestreckt)
+    arm, hand = arm_senken(arm, SCHL_FOLGE[i])                                  # Runde 5: Arm/Hand führen den Zug aus, der Schlüssel sitzt starr in der Hand
     brust = Hm.stufe(i, N / 2, 1)
     k = TX.atmen(k, PAD_T + 21, PAD_T + 14, brust, 0)
+    arm = L.versetze(arm, 0, -brust)                                            # Arm starr mit dem Oberkörper
     sc = L.versetze(sc, 0, hand - brust)                                        # Schlüssel starr mit Hand und Oberkörper (nicht strecken)
-    fig = L.zusammen(H, W, [(k, 0, 0), (sc, 0, 0)])
+    fig = L.zusammen(H, W, [(k, 0, 0), (arm, 0, 0), (sc, 0, 0)])
     Hm.kontur_schliessen(fig, ERLAUBT, UMRISS)
     # --- Glitzer-Sterne (nur Metall): Schlüsselmaul, Plattenecke ---
     for (sx, sy, start, dx_) in (() if nur else ((25, 14, 19, 0), (16, 23, 38, 0))):

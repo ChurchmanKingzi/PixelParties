@@ -1,0 +1,15 @@
+{
+  "creature": "Smug Mastermind Antonia",
+  "sheet": "smug-mastermind-antonia.png",
+  "frameWidth": 28,
+  "frameHeight": 33,
+  "frames": 60,
+  "frameMs": 70,
+  "loop": true,
+  "layout": "horizontal",
+  "padTop": 3,
+  "padLeft": 2,
+  "padRight": 2,
+  "padBottom": 2,
+  "faceX": 14.0
+}

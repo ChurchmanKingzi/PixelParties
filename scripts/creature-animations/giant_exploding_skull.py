@@ -38,6 +38,10 @@ Ergänzungen: Durch den Drahtversatz entstehen Lücken zwischen den 1-px-Drähte
 gezeichnet (nur auf freien Feldern, nie über Schnur oder Schädel), daher weicht Frame 0 nur bei Pose 0 nicht ab.
 Frame: Sprite plus 3 px links/rechts, 4 px oben (Garbe + Hüpfer), 2 px unten — Figur zentriert; Funken liegen in der 2-px-Zone um die Figur.
 Alle Bewegungen laufen auf der vollen Leinwand (anim_lib/anim_amorph werfen ClipError). Nur ganze Pixel, nur Farben der Quelle.
+
+RUNDE 7 (Nutzer: „sollte sich auch passend zu den Beinbewegungen leicht auf der Stelle oder hin und her bewegen“): Schädel samt Lunte, Flamme, Funken und Drähten verlagert sich im Takt der beiden Schrittwellen
+(KOERPER_X/KOERPER_Y): je Welle 1 px zur einen Seite, zurück, 1 px zur anderen, zurück (zweite Welle gespiegelt), dazu sackt er in der Mitte jeder Vierergruppe 1 px ab (Wippen). Die Füße am Boden bleiben stehen:
+die Hüften gehen mit dem Schädel, die Beine gleichen aus (Oberschenkel schwenkt um das Knie; seitlich wird der schwarze Oberschenkelbalken 1 Spalte länger/kürzer — Dicke unverändert; Bein 4 knickt unter dem Schädel).
 """
 import math
 import random
@@ -127,6 +131,11 @@ BEWEGT = FUNKE | DRAHT_B | DRAHT_M | DRAHT_O | _alle
 BASIS = OPAK & ~BEWEGT
 
 # Schrittfolge (Tetrapod-Welle: es heben nie zwei Nachbarbeine derselben Seite zugleich; je Bein 6 Frames, 2 Frames versetzt, zwei Wellen je Schleife, dazwischen kurze Ruhe)
+# Runde 7: Verlagerung des Schädels im Takt der Schrittwellen (je Welle 24 Frames: hin – Mitte – her – Mitte; zweite Welle gespiegelt; in der Mitte jeder Vierergruppe sackt er 1 px ab)
+_WX = [0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, -1, -1, -1, -1, -1, -1, -1, -1, 0, 0]
+_WY = [0, 0, 0, 0, 0, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 0, 0, 0, 0]
+KOERPER_X = _WX + [-v for v in _WX]
+KOERPER_Y = _WY + _WY
 SCHRITT_HUB = {3: [1, 2, 3, 3, 2, 1], 2: [1, 2, 2, 2, 2, 1]}
 SCHRITT_AUS = [0, 0, 1, 1, 0, 0]
 FOLGE_BEINE = [['l1', 'r2', 'l3', 'r4', 'r1', 'l2', 'r3', 'l4'], ['r1', 'l2', 'r3', 'l4', 'l1', 'r2', 'l3', 'r4']]
@@ -140,26 +149,41 @@ assert all(max(v) < N and 0 not in v for v in SCHRITT.values())
 BEIN4_KNICK = {0: None, 1: [0, 1, 1, 1, 1], 2: [1, 1, 2, 2]}                           # Ausweichen der 3-px-Zeilen ab Zeile 47 nach außen (Liste = verbleibende Zeilen; Fuß 1 bzw. 2 px höher)
 
 
-def bein_pixel(nr, d, aus):
-    """Pixel (x, y im Sprite, LINKE Seite) von Bein nr beim Hub d (Fuß d px über dem Boden) und Ausschwenken der Fußspitze um `aus` px."""
+# Runde 7: Spalte, ab der (zur Hüfte hin) der Oberschenkel die seitliche Körperverlagerung mitmacht; davor (Knie, Unterschenkel, Fuß) bleibt das Bein stehen
+_BEIN_TEILUNG = {1: 10, 2: 12, 3: 17}
+
+
+def bein_pixel(nr, d, aus, bx=0, by=0):
+    """Pixel (x, y im Sprite, LINKE Seite) von Bein nr beim Hub d (Fuß d px über dem Boden) und Ausschwenken der Fußspitze um `aus` px; (bx, by) = Verlagerung des Schädels (Hüfte geht mit, Fuß bleibt stehen)."""
     ys, xs = np.nonzero(_BEIN_L[nr])
     pts = list(zip(xs.tolist(), ys.tolist()))
-    if not d:
+    if not d and not bx and not by:
         return pts
     out = []
     if nr == 4:
-        knick = BEIN4_KNICK[d]
-        for (x, y) in pts:
-            if y <= 46:
-                out.append((x, y))
-            elif y - 47 < len(knick):
-                out.append((x - knick[y - 47], y))
+        if d:                                                                         # Fuß in der Luft: das ganze Bein geht mit dem Schädel
+            knick = BEIN4_KNICK[d]
+            for (x, y) in pts:
+                if y <= 46:
+                    out.append((x + bx, y + by))
+                elif y - 47 < len(knick):
+                    out.append((x - knick[y - 47] + bx, y + by))
+            return out
+        for (x, y) in pts:                                                            # Fuß am Boden: die oberen Zeilen (bis 47) gehen mit, darunter steht das Bein (Knick; sackt der Schädel, überdecken sich die Zeilen)
+            out.append((x + bx, y + by) if y <= 47 else (x, y))
         return out
     par = _BEIN_PAR[nr]
+    teil = _BEIN_TEILUNG[nr]
     for (x, y) in pts:
-        s = int(round(d * min(1.0, max(0.0, (par['x0'] - x) / float(par['spann'])))))
+        w = min(1.0, max(0.0, (par['x0'] - x) / float(par['spann'])))
+        s = int(math.floor(d * w - by * (1.0 - w) + 0.5))
         nx = x - (aus if (x <= par['us'][0] and y >= par['spitze']) else 0)
-        out.append((nx, y - s))
+        if x >= teil:
+            out.append((nx + bx, y - s))
+            if x == teil and bx > 0:                                                  # Hüfte rückt vom Fuß weg: der Balken wird eine Spalte länger (gleiche Dicke)
+                out.append((nx, y - s))
+        else:
+            out.append((nx, y - s))
     return out
 
 
@@ -167,7 +191,7 @@ def _bein(name, i):
     maske, nr, spiegel = BEINE[name]
     d, aus = SCHRITT[name].get(i, (0, 0))
     out = L.leer(H, W)
-    for (x, y) in bein_pixel(nr, d, aus):
+    for (x, y) in bein_pixel(nr, d, aus, -KOERPER_X[i] if spiegel else KOERPER_X[i], KOERPER_Y[i]):
         X, Y = PAD_L + (sw - 1 - x if spiegel else x), PAD_T + y
         if not (0 <= X < W and 0 <= Y < H):
             raise L.ClipError(f'Bein {name}: Pixel ({X},{Y}) außerhalb der Leinwand')
@@ -257,14 +281,15 @@ def sprite_mit_effekten(i):
 
 def figur(i):
     sp = sprite_mit_effekten(i)
-    dyb = HOP[i]
-    ebenen = [(L.platz(np.where(BASIS[..., None], sp, 0).astype(np.uint8), H, W, PAD_L, PAD_T), 0, dyb)]
+    dyb = HOP[i] + KOERPER_Y[i]
+    dxb = KOERPER_X[i]
+    ebenen = [(L.platz(np.where(BASIS[..., None], sp, 0).astype(np.uint8), H, W, PAD_L, PAD_T), dxb, dyb)]
     for name in BEINE:
-        ebenen.append((_bein(name, i), 0, dyb))
+        ebenen.append((_bein(name, i), 0, HOP[i]))                                   # Beine: Verlagerung steckt schon in bein_pixel (Füße bleiben stehen)
     for name in DRAEHTE:
-        ebenen.append((_draht(sp, name, i), 0, dyb))
+        ebenen.append((_draht(sp, name, i), dxb, dyb))
     neu = FUNKE | (~OPAK & (sp[..., 3] > 0))                                      # Funkengarbe (Original und neu gesetzte Pixel)
-    ebenen.append((L.platz(np.where(neu[..., None], sp, 0).astype(np.uint8), H, W, PAD_L, PAD_T), 0, dyb))
+    ebenen.append((L.platz(np.where(neu[..., None], sp, 0).astype(np.uint8), H, W, PAD_L, PAD_T), dxb, dyb))
     fig = L.zusammen(H, W, ebenen)
     fig, pfad, offen = A.verbinde_luecken8(fig, 3)                                  # nur wenn ein Teil auch über eine Ecke nicht mehr hängt (das Original ist nur 8-verbunden)
     brueck = []
@@ -279,14 +304,14 @@ FLAMME3 = F3.Feuer(H, W, [F3.Flamme(PAD_L + 16.5, PAD_T + 9.5, 6, 4.6, fuss=2.6,
 
 
 def flamme_ebene(i):
-    return FLAMME3.ebene(i, dy=HOP[i])
+    return FLAMME3.ebene(i, dx=KOERPER_X[i], dy=HOP[i] + KOERPER_Y[i])
 
 
 def funken_ebene(i):
     e = L.leer(H, W)
 
     def pix(x, y, c):
-        X, Y = PAD_L + x, PAD_T + y + HOP[i]
+        X, Y = PAD_L + x + KOERPER_X[i], PAD_T + y + HOP[i] + KOERPER_Y[i]
         if not (2 <= X < W - 2 and 2 <= Y < H - 2):
             return
         e[Y, X, :3] = c

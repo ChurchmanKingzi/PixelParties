@@ -1,0 +1,15 @@
+{
+  "creature": "Traveler from the Future",
+  "sheet": "traveler-from-the-future.png",
+  "frameWidth": 30,
+  "frameHeight": 30,
+  "frames": 48,
+  "frameMs": 75,
+  "loop": true,
+  "layout": "horizontal",
+  "padTop": 2,
+  "padLeft": 2,
+  "padRight": 2,
+  "padBottom": 2,
+  "faceX": 15.0
+}

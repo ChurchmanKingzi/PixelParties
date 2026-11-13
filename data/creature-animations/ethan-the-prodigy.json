@@ -1,0 +1,15 @@
+{
+  "creature": "Ethan, the Prodigy",
+  "sheet": "ethan-the-prodigy.png",
+  "frameWidth": 20,
+  "frameHeight": 34,
+  "frames": 64,
+  "frameMs": 70,
+  "loop": true,
+  "layout": "horizontal",
+  "padTop": 3,
+  "padLeft": 2,
+  "padRight": 2,
+  "padBottom": 2,
+  "faceX": 10.0
+}

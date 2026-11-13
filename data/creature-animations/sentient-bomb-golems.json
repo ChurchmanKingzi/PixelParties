@@ -1,0 +1,15 @@
+{
+  "creature": "Sentient Bomb Golems",
+  "sheet": "sentient-bomb-golems.png",
+  "frameWidth": 77,
+  "frameHeight": 39,
+  "frames": 64,
+  "frameMs": 80,
+  "loop": true,
+  "layout": "horizontal",
+  "padTop": 2,
+  "padLeft": 2,
+  "padRight": 2,
+  "padBottom": 2,
+  "faceX": 38.5
+}

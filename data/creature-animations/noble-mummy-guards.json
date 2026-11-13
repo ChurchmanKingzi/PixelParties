@@ -1,0 +1,15 @@
+{
+  "creature": "Noble Mummy Guards",
+  "sheet": "noble-mummy-guards.png",
+  "frameWidth": 64,
+  "frameHeight": 39,
+  "frames": 64,
+  "frameMs": 70,
+  "loop": true,
+  "layout": "horizontal",
+  "padTop": 2,
+  "padLeft": 2,
+  "padRight": 2,
+  "padBottom": 2,
+  "faceX": 32.0
+}

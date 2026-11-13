@@ -1,0 +1,15 @@
+{
+  "creature": "Weapon Collecting Wight",
+  "sheet": "weapon-collecting-wight.png",
+  "frameWidth": 56,
+  "frameHeight": 44,
+  "frames": 48,
+  "frameMs": 75,
+  "loop": true,
+  "layout": "horizontal",
+  "padTop": 2,
+  "padLeft": 2,
+  "padRight": 3,
+  "padBottom": 2,
+  "faceX": 28.0
+}
