@@ -14,7 +14,7 @@ Feuer: unter jeder Flügeldecke ein nach unten gerichteter Strahl (rot → orang
 
 Ablauf (64 Frames à 65 ms ≈ 4,2 s):
 * Schweben: Käfer samt Feuer hebt/senkt sich weich um 1 px (er fliegt auf den Strahlen), zwei Hübe je Schleife.
-* Feuerstrahlen: anim_feuer3 (F3.Flamme, lebhafte Einstellung posen=16, halten=1), je Seite ein breiter ruhiger Sockel + zwei Zungen nach unten,
+* Feuerstrahlen: anim_feuer3 (F3.Flamme, lebhafte Einstellung posen=16, halten=1), je Seite ein breiter ruhiger Sockel + drei Zungen nach unten,
   Fuß lückenlos hinter der Flügeldecke; links und rechts phasenversetzt. Farben = die vier Farben des Quellfeuers.
 * Hinterbeine baumeln (untere Zeilen ±1 px), Augen glühen kurz auf (nur Augenpixel).
 * Ankh schwebt für sich (±1 px, langsamer, gegenläufig); kurzes Funkeln am Gold: die fünf Sterne der Quelle blitzen einzeln auf
@@ -49,9 +49,10 @@ FARBEN = [(202, 44, 41), (244, 123, 34), (246, 231, 14), (247, 245, 184)]
 
 def strahl(cx, ph):
     x, y = B.pl + cx, B.pt + 28.5
-    return [F3.Flamme(x, y, 11, 7.6, richtung=(0, 1), fuss=0, bauch=0.2, schlag=0.3, phase=ph + 0.3, baender=F3.SOCKEL, puls=0.08, wiegen=0.1),
-            F3.Flamme(x - 1.5, y, 25, 6.2, richtung=(0.02, 1), fuss=0, phase=ph, wiegen=0.35),
-            F3.Flamme(x + 2.5, y, 17, 4.6, richtung=(-0.03, 1), fuss=0, phase=ph + 0.5, wiegen=0.35)]
+    return [F3.Flamme(x, y, 10, 7.6, richtung=(0, 1), fuss=0, bauch=0.2, schlag=0.3, phase=ph + 0.3, baender=F3.SOCKEL, puls=0.08, wiegen=0.1),
+            F3.Flamme(x, y, 24, 7.0, richtung=(0, 1), fuss=0, phase=ph, bauch=0.5, schlag=0.7, wiegen=0.25, flug=0.22),
+            F3.Flamme(x - 3.0, y, 15, 4.2, richtung=(0, 1), fuss=0, phase=ph + 0.4, schlag=0.8, wiegen=0.25, flug=0.2),
+            F3.Flamme(x + 3.0, y, 13, 4.0, richtung=(0, 1), fuss=0, phase=ph + 0.7, schlag=0.8, wiegen=0.25, flug=0.2)]
 
 
 FEUER = F3.Feuer(H, W, strahl(7.0, 0.0) + strahl(34.0, 0.37), FARBEN, posen=16, halten=1)
@@ -78,9 +79,8 @@ def sterne(i, a):
     return a
 
 
-def frame(i, fx=True):
-    bob = G.pose(i, N / 2, 1, scharf=1.0)
-    bob = int(round(0.5 - 0.5 * np.cos(2 * np.pi * i / (N / 2)) - 1e-9)) if True else bob      # 0 → 1 px tiefer → 0 (weich, zwei Hübe)
+def bild(i, fx=True):
+    bob = int(round(0.5 - 0.5 * np.cos(2 * np.pi * i / (N / 2)) - 1e-9))      # 0 → 1 px tiefer → 0 (weich, zwei Hübe)
     ab = -int(round(0.5 - 0.5 * np.cos(2 * np.pi * (i - 10) / N))) + int(round(0.5 - 0.5 * np.cos(2 * np.pi * (-10) / N)))
     r = BK.teil(rumpf)
     if i % 32 in (12, 13, 14, 15):
@@ -93,5 +93,9 @@ def frame(i, fx=True):
     return sterne(i, f) if fx else f
 
 
+def frame(i):
+    return bild(i, fx=False)                 # ohne Feuer/Sterne (Randpixel-Test)
+
+
 if __name__ == '__main__':
-    G.fertig('cybug-scarab', 'Cybug SCARAB', frame, N, MS, QUELLE, sys.argv)
+    G.fertig('cybug-scarab', 'Cybug SCARAB', bild, N, MS, QUELLE, sys.argv)

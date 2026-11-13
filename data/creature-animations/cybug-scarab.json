@@ -1,0 +1,15 @@
+{
+  "creature": "Cybug SCARAB",
+  "sheet": "cybug-scarab.png",
+  "frameWidth": 46,
+  "frameHeight": 66,
+  "frames": 64,
+  "frameMs": 65,
+  "loop": true,
+  "layout": "horizontal",
+  "padTop": 2,
+  "padLeft": 2,
+  "padRight": 2,
+  "padBottom": 2,
+  "faceX": 23.0
+}

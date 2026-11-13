@@ -1,0 +1,15 @@
+{
+  "creature": "Inverted Centaur",
+  "sheet": "inverted-centaur.png",
+  "frameWidth": 34,
+  "frameHeight": 26,
+  "frames": 48,
+  "frameMs": 75,
+  "loop": true,
+  "layout": "horizontal",
+  "padTop": 2,
+  "padLeft": 2,
+  "padRight": 2,
+  "padBottom": 2,
+  "faceX": 17.0
+}
