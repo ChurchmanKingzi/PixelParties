@@ -10,13 +10,15 @@ Was im Sprite ist (x, y im 23×28-Sprite), Figur im Profil nach rechts:
   helle/graue Pixel (5–7, 11–12) = Brille/Schnurrbart, nicht sicher deutbar → fest, kein Blinzeln.
 * SPITZHACKE: Stiel (3 px breit „dunkel–braun–dunkel“ (24,16,13)/(47,28,24)/(80,48,41)) vom Griffende (10,13) schräg nach oben rechts; Metallkopf (Umriss (45,45,45), Licht (160…201))
   als rechter Winkel: waagerechter Schenkel (y 0–2), senkrechter Schenkel (x 20–22), Scheitel bei (20,2).
-* HAND (8–9, 13–14) am Griffende, Umriss (10,14). Der Arm selbst ist im Original nicht zu sehen (Mantel = Umrissfarbe, alles eine dunkle Fläche).
-* MANTEL (y 15–22) dunkelbraun (49,24,0), gelb-oranger SCHAL (x 5–8, y 15–20), Gürteltasche grau (y 20–21), Hose (y 23–24), STIEFEL rotbraun (y 25–27), schwarzer Schuh/Schatten (7–10, 26).
+* HAND (8–9, 13–14) am Griffende, Umriss (10,14).
+* ARM (Nutzer, Runde 9): der gelb-orange karierte Streifen unter der Hand (x 5–8, y 15–20) IST der Arm, der die Hacke hält (kein Schal): angewinkelt, Schulter oben
+  ((7,15)/(8,15)), Ellbogen unten, 2 px stark, Karo aus (255,246,172)/(255,179,24)/(230,131,16)/(255,221,90).
+* MANTEL (y 15–22) dunkelbraun (49,24,0), Gürteltasche grau (y 20–21), Hose (y 23–24), STIEFEL rotbraun (y 25–27), schwarzer Schuh/Schatten (7–10, 26).
   (9,16) dunkelgrauer Einzelpixel am Mantel: unklar → geht starr mit dem Oberkörper.
 Metall: nur der Hackenkopf → dort (und nur dort) ein kurzes Aufblitzen beim Ausholen.
 
 Idee: ER SCHLÄGT ZU (Nutzerwunsch Runde 8). 48 Frames à 75 ms = 3,6 s, zwei Schläge je Schleife (alle 1,8 s). Jeder Schlag (24 Frames) besteht aus von Hand gebauten SCHLÜSSELPOSEN;
-in jeder Pose werden Hacke, Hand und Arm als starre Teile gleicher Dicke neu gesetzt (nichts wird gestreckt oder verbogen):
+in jeder Pose werden Hacke, Hand und der KARIERTE ARM (Schulter fest, führt die Hacke) als Teile gleicher Dicke neu gesetzt (nichts wird gestreckt oder verbogen):
   A   Ruhe = Original (Hacke aufrecht vor der Schulter)                                    Frames 0–2, 22–23
   A2  anheben: Hacke unverändert, Griff 2 px höher/vor dem Gesicht                          3–4
   B   Stiel senkrecht, Hände vor der Stirn                                                 5–6
@@ -27,7 +29,7 @@ in jeder Pose werden Hacke, Hand und Arm als starre Teile gleicher Dicke neu ges
   E   AUFPRALL: Stiel waagerecht in Hüfthöhe, untere Hackenspitze im Boden (y 27) vor den
       Füßen; Oberkörper 1 px, Kopf 2 px vor und 1 px tiefer; 3 Frames Halt, Steinsplitter   14–16 (Splitter 14–19)
   R1  hochziehen (Stiel schräg), Oberkörper noch 1 px vorgebeugt                            17–18
-  R2  fast in Ruhe (Original-Hacke 1 px tiefer/weiter vorn)                                 19–21
+  R2  fast in Ruhe (Original-Hacke 1 px tiefer/weiter vorn, Arm wie Original)                                 19–21
 Steinsplitter: drei 2×2-Brocken (Grau der Tasche/Hose (131,126,121)/(90,92,80)) springen vom Aufprallpunkt in flachen Bögen weg und fallen zurück auf den Boden (6 Frames).
 
 HACKE ALS STARRES TEIL: Die Schräglagen sind verlustfreie Spiegelungen/Transponierungen der Original-Hacke (jedes Pixel bleibt erhalten): 51° (Original), 39° (an der Nebendiagonale
@@ -37,7 +39,10 @@ um 90° gedreht): Stiel wie im Original als Band dunkel–braun–dunkel, Kopf a
 SELBST FERTIGGEZEICHNET (Seitenansicht vervollständigt):
 * Körper ohne Hand/Hacke: Hand (8–9, 13–14) und ihr Umriss (10,14) entfernt; (8,14) Umriss (49,24,0) schließt die Oberkante des Schals, wo die Hand lag. Kinnlinie (7,13)/(7,14)
   und Halsansatz sind im Original schon vollständig.
-* ARM: in jeder Pose ein 2 px starker Ärmel in Mantelfarbe (49,24,0) von der Schulter (8,15/16 am Mantelrand) zur Hand, als Pixelkette ARME[…] je Pose von Hand gesetzt;
+* ARM: in jeder Schlag-Pose wird der karierte Arm von der festen Schulterzeile ((7,15)/(8,15)) bis zur Hand neu gesetzt (ARME[…]: Pixelpaare, 2 px stark, Farben = Zeilen des
+  Original-Arms in ihrer Reihenfolge), 1 px Umriss in Mantelfarbe gegen den Hintergrund. Kein erfundener Ärmel mehr (Runde 8 hatte einen dunkelbraunen gezeichnet).
+  Wo der Arm in der Ruhepose lag ((6–7,16), (5–6,17), (5,18), (7,18), (6–7,19), (7,20)), ist der Körper darunter fertiggezeichnet: Mantel (49,24,0), in Zeile 20 die helle
+  Kante der Gürteltasche (131,126,121) wie (7,21). Ruhe (A) und R2 zeigen den Original-Arm.
   HAND: 2×2 Haut wie im Original (oben (213,164,98)/(246,189,123), unten (180,123,49)) am Griffende, liegt VOR dem Stiel.
 * Über dem Kopf (C, C2) liegt die Hacke HINTER dem Kopf (der hintere Schenkel verschwindet hinter dem Haar), sonst vor dem Körper.
 Frame 0 = Original. Der Kopf bewegt sich nur zusammen mit dem vorgebeugten Oberkörper (Schlagbewegung, vom Nutzer verlangt).

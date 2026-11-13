@@ -113,7 +113,7 @@ ABLAUF = ['R'] * 4 + ['H'] * 2 + ['G'] * 2 + ['S'] * 5 + ['G'] * 2 + ['L1'] * 2 
 assert len(ABLAUF) == N
 WURF = [k for k in range(N) if ABLAUF[k] == 'L2' and ABLAUF[k - 1] != 'L2']
 BROCKEN = [dict(x=sz.PL + 23, y=sz.PT + 9, vx=0.55, vy=-1.0, g=0.17, start=s + 1, dauer=11) for s in WURF] + \
-          [dict(x=sz.PL + 21, y=sz.PT + 10, vx=0.30, vy=-1.2, g=0.18, start=s + 2, dauer=11) for s in WURF] + \
+          [dict(x=sz.PL + 22, y=sz.PT + 8, vx=0.30, vy=-1.2, g=0.18, start=s + 2, dauer=11) for s in WURF] + \
           [dict(x=sz.PL + 24, y=sz.PT + 10, vx=0.85, vy=-0.7, g=0.15, start=s + 2, dauer=10) for s in WURF]
 BLINZELN = (53, 54)
 KOPF = (slice(0, sz.PT + 11), slice(0, sz.PL + 15))

@@ -14,11 +14,17 @@ Maske blinzelt nicht (Regel), Augen bleiben fest. Kein Glanz (Sand/Knochen).
 Ablauf (72 Frames à 75 ms = 5,4 s, schweres Wesen → langsam). Frame 0 = Original:
 * Atmen (Periode 36): unterhalb des Mundes (Zeile 39) wird eine texturierte Zeile eingefügt (TX.streck_zeile); Pyramide, Maske, Schultern heben sich 1 px. Der Unterarm (x ≥ 40, y ≥ 44)
   und die Hand bleiben am Boden, ebenso die Unterkante des linken Arms.
-* Hand heben und fallen lassen (Periode 36, also zweimal je Schleife): der rechte Unterarm mit der Klauenhand (x ≥ 40, y ≥ 44) hebt sich als EINE starre Einheit langsam um 5 px
-  (1 px je 3 Bilder), verharrt und fällt in zwei Bildern schwer zu Boden (Aufprall Bild 26 der Periode). Beim Aufprall: vier Staubwölkchen (2×2 → 5×3 → 2×2, Sandfarben) und
-  kurzes Nachbeben – der Körper sackt zweimal 1 px zusammen (Zeile 39 entfällt, TX.streck_zeile mit −1). Kein Streicheln/Scharren mehr.
+* Arm heben und fallen lassen (Periode 36, also zweimal je Schleife): der rechte Arm trägt die Klauenhand. Er ist die rechte untere Ecke der Pyramide: Unterkante = Falte
+  (37,40)–(39,43) und weiter (40,44)–(44,47), Oberkante = die Flanke ab (45,33). Sechs Schlüsselposen (0 = Original … 5 = ganz oben): der Arm schwenkt um den festen
+  Ansatz (Schulterlinie = Schräge x+y = 77, von der Faltenspitze (37,40) zur Flanke) nach oben außen. Jede Schräge x+y = c des Arms wird dazu ALS GANZES entlang
+  ihrer selbst um n(c) Schritte (1,−1) verschoben; n wächst vom Ansatz (0) bis zum Handgelenk (c = 90) auf die Posenstufe k, die Hand (c ≥ 90) ist starr (k rechts, k hoch –
+  ein Bogen um die Schulter, Armlänge 14,7 → 15,2 px). Das ist eine reine Gitter-Scherung: kein Pixel entsteht doppelt, keins fehlt, die Armdicke (Länge jeder
+  Schräge) und die Sandschraffur bleiben erhalten und folgen der Pose; nichts wird in den Körper geschoben, Hand und Arm überlappen nicht.
+  Zeitablauf wie bisher: langsam heben (1 Stufe je 3 Bilder), verharren, in zwei Bildern schwer fallen (Aufprall Bild 26 der Periode). Beim Aufprall: vier Staubwölkchen
+  (2×2 → 5×3 → 2×2, Sandfarben) und kurzes Nachbeben – der Körper sackt zweimal 1 px zusammen (Zeile 39 entfällt, TX.streck_zeile mit −1).
 * Sand rieselt: 2×2-Körner in Sandfarben gleiten hinter der Figur die beiden Pyramidenflanken hinab (je Flanke 3, versetzt; sie liegen HINTER dem Körper, treten also am Rand aus).
-Ergänzungen: bei gehobenem Arm bekommen die frei werdende Körperunterkante (y 43, x 40–49) und die Oberkante des Arms die Umrissfarbe (80,66,27).
+Ergänzungen: unter dem gehobenen Arm wird die Körperecke fertiggezeichnet (Sand (214,201,167) dort, wo die Falte lag; die Achselkerbe (39,44) öffnet sich als Keil);
+frei liegende Sandpixel an Körperecke, Armunterkante und Schulter bekommen die Umrissfarbe (80,66,27), überstehende Umriss-Einzelpixel an den Scherstufen entfallen.
 """
 import numpy as np
 
@@ -34,9 +40,44 @@ xx, yy = sz.xx, sz.yy
 PL, PT = sz.PL, sz.PT
 UMRISS = (80, 66, 27)
 SAND, SAND2, HELL = (214, 201, 167), (192, 178, 131), (230, 217, 192)
-M_HAND = (xx >= 40) & (yy >= 44)
-HAND = sz.teil(M_HAND)
-KOERPER = sz.teil(~M_HAND)
+# --- rechter Arm: Schrägen x+y = c rechts der Falte; FALTE_X[c] = erste Spalte des Arms auf der Schräge c (ab c = 91: alles ab Spalte 43 = Hand)
+C0, C1 = 77, 90                                                             # Schulterlinie … Handgelenk
+FALTE_X = {77: 37, 78: 37, 79: 37, 80: 38, 81: 38, 82: 39, 83: 40, 84: 40, 85: 41, 86: 41, 87: 42, 88: 42, 89: 43, 90: 44}
+cc = xx + yy
+M_ARM = np.zeros(spr.shape[:2], bool)
+for c_, x_ in FALTE_X.items():
+    M_ARM |= (cc == c_) & (xx >= x_)
+M_ARM |= (cc > C1) & (xx >= 43)
+M_ARM &= sz.da
+KERBE = 84                                                                  # ab dieser Schräge liegt unter dem Arm kein Körper mehr (Achselkerbe (39,44) / Boden)
+# Körper ohne Arm; unter dem Armansatz (c < KERBE) bleibt Sand stehen (Falte und Schraffur dort durch die Sandfarbe ersetzt) = fertiggezeichnete Körperecke
+_k = spr.copy()
+_k[M_ARM & (cc >= KERBE)] = 0
+_m = M_ARM & (cc < KERBE) & ~L.farbmaske(spr, [SAND, HELL])
+_k[_m, :3] = SAND
+KOERPER = L.platz(_k, sz.H, sz.W, PL, PT)
+STUFEN = 5
+
+
+def schritte(k):
+    """n(c) für die Pose k: 0 am Ansatz, k ab dem Handgelenk, dazwischen gleichmäßig gestuft (monoton, höchstens 1 Stufe je Schräge)."""
+    return {c: (k if c >= C1 else int(np.floor(k * (c - C0 + 1) / (C1 - C0 + 1) + 0.5))) for c in range(C0, 120)}
+
+
+def arm_pose(k):
+    """Arm-Ebene der Pose k (volle Leinwand) und Maske der starren Hand."""
+    e = L.leer(sz.H, sz.W)
+    n = schritte(k)
+    for y, x in zip(*np.nonzero(M_ARM)):
+        d = n[int(cc[y, x])]
+        e[PT + y - d, PL + x + d] = spr[y, x]
+    return e
+
+
+ARM = [arm_pose(k) for k in range(STUFEN + 1)]
+ARMZONE = sz.voll((xx >= 34) & (yy >= 26))
+ARMZONE[:, PL + sz.sw:] = True
+ARMZONE[:PT + 26] = False
 ATEMZEILE = 39
 TEST_EBENEN = ('figur',)
 
@@ -73,6 +114,13 @@ def staub(i):
     return e
 
 
+def sauber(f):
+    """Umriss nach der Scherung schließen: frei liegende Sandpixel → Umrissfarbe; danach überstehende Umriss-Einzelpixel (nur ein deckender 4er-Nachbar, der selbst
+    Umriss ist, und kein diagonaler Anschluss nach außen) entfernen. Nur in der Armzone."""
+    f = N8.kontur_schliessen(f, RAND_F, UMRISS, maske=ARMZONE)
+    return f
+
+
 def frame(i, nur=None):
     n = N8.stufe(i, 36, 6, 16)
     n = BEBEN.get(i % 36, n)
@@ -81,11 +129,9 @@ def frame(i, nur=None):
     eb = []
     if not nur:
         eb.append((N8.koerner(sz.H, sz.W, i, RIESEL), 0, 0))
-    figur = L.zusammen(sz.H, sz.W, [(koerper, 0, 0), (HAND, 0, -k)])       # Arm + Klauenhand starr als Einheit, vor dem Körper
-    if k:                                           # Umriss schließen: frei gewordene Körperunterkante und Oberkante des gehobenen Arms (die Hand selbst bleibt unverändert)
-        hand = L.versetze(HAND, 0, -k)[..., 3] > 0
-        m = (~hand & sz.voll((xx >= 38) & (yy >= 40))) | (hand & (np.arange(sz.H)[:, None] == PT + 44 - k))
-        figur = N8.kontur_schliessen(figur, RAND_F, UMRISS, maske=m)
+    figur = L.zusammen(sz.H, sz.W, [(koerper, 0, 0), (ARM[k], 0, 0)])       # Arm mit Klauenhand als Pose vor dem Körper
+    if k or n:
+        figur = sauber(figur)
     eb.append((figur, 0, 0))
     if not nur:
         eb.append((staub(i), 0, 0))
@@ -93,4 +139,4 @@ def frame(i, nur=None):
 
 
 if __name__ == '__main__':
-    N8.fertig('ankhota-the-burier', 'Ankhota, the Burier', frame, N, MS, spr, check=[0, 10, 22, 25, 26, 29], zoom=8)
+    N8.fertig('ankhota-the-burier', 'Ankhota, the Burier', frame, N, MS, spr, check=[0, 8, 11, 14, 17, 22, 25, 26], zoom=16, box=(30, 24, 67, 59), spalten=4)
