@@ -11,7 +11,7 @@ hautfarben). Dünne braune Rankenarme hängen seitlich herab (x 5–20 und 44–
 Riesig und schwer → langsam. Holz/Laub → kein Glanz.
 
 Ablauf (64 Frames à 85 ms = 5,4 s). Frame 0 = Original:
-* Laub rauscht: eine langsame Welle läuft von oben nach unten durch die Büsche – jede Laubzeile wandert 1 px nach links/rechts und zurück (nur der Umriss kräuselt sich; darunter liegt
+* Laub rauscht in einer Windbö (schwillt an und klingt zum Schleifenende ab): eine langsame Welle läuft von oben nach unten durch die Büsche – jede Laubzeile wandert 1 px nach links/rechts und zurück (nur der Umriss kräuselt sich; darunter liegt
   das unbewegte Original, so dass nirgends Hintergrund durchscheint). Gesicht/Stamm (x 24–39, y 10–26) und Wurzelfüße (y ≥ 44) bleiben vollkommen still, die Ranken gehen mit ihrem Laub mit.
 * Blinzeln (Frames 30–32): die blauen Augen nehmen die Rindenfarbe (136,95,49) an.
 * Drei Blätter (2×2, Laubgrün (145,169,47)) lösen sich nacheinander und trudeln neben dem Rumpf zu Boden.
@@ -42,7 +42,8 @@ TEST_EBENEN = ('figur',)
 def rauschen(a, i):
     out = np.zeros_like(a)
     for y in range(a.shape[0]):
-        d = int(math.floor(1.3 * math.sin(2 * math.pi * (i / 64.0 - (y - sz.PT) / 26.0)) + 0.5))
+        boe = min(1.0, 2.2 * math.sin(math.pi * i / 64.0))                    # Windbö: schwillt an und ab, Frame 0 = Original
+        d = int(math.floor(1.3 * boe * math.sin(2 * math.pi * (i / 32.0 - (y - sz.PT) / 26.0)) + 0.5))
         d = max(-1, min(1, d))
         out[y] = np.roll(a[y], d, axis=0)
     return out
