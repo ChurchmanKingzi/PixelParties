@@ -63,6 +63,20 @@ def schieb(a, dx=0, dy=0):
     return L.versetze(a, dx, dy) if (dx or dy) else a
 
 
+def goldrampe(spr, maske, spitze=None):
+    """Farben der Maske, dunkel → hell sortiert (Summe der Kanäle); `spitze` (z. B. Augenweiß der Quelle) als hellste Stufe für den Kern des Lichtbands."""
+    fs = sorted({tuple(int(v) for v in spr[y, x, :3]) for y, x in zip(*np.nonzero(maske))}, key=sum)
+    return fs + ([tuple(spitze)] if spitze else [])
+
+
+def goldglanz(a, maske, off, i, n, starts, dauer, rampe, breite=3.0):
+    """Regelmäßiges Gold-Lichtband (Runde 8): wandert in `dauer` Frames schräg über ALLE Pixel von `maske` (ganzer Arm), Start in jedem Frame aus `starts`.
+    Im Band 1 Stufe heller, im Kern 2 Stufen (bis zur Spitze der Rampe). Bearbeitet `a` an Ort und Stelle; `off` = Lage der Maske auf der Leinwand."""
+    for st in starts:
+        Hm.lichtband(a, maske, off, i, n, st, dauer, rampe, stufen=1, breite=breite, achse=(1.0, 1.0), kern=2)
+    return a
+
+
 def randfehler(frames, umriss):
     """Frames mit Außenkantenpixeln, deren Farbe keine Umrissfarbe der Quelle ist (Regel 16)."""
     bad = {}

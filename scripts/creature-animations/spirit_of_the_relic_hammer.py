@@ -9,18 +9,19 @@ Was ist was (x/y im Sprite):
 * Drei Reliktenhämmer aus hellem Stahl (Grau (78,80,77) Umriss, (154,155,152), (209,211,208)), jeder mit türkisem Edelstein in der Mitte des Kopfes:
   links (Kopf x 0–12, y 6–14, Stein x 4–8, y 8–12; brauner Stiel schräg nach unten x 6–11, y 13–24), rechts gespiegelt (x 27–39), der dritte sitzt als Helm auf dem Kopf der Figur
   (Kopf x 14–25, y 7–14, Stiel senkrecht nach oben x 19–20, y 0–9, Stein x 18–21, y 10–13).
-* Figur darunter: Gesicht im Hammerhelm (x 16–22, y 11–16; winzig, Augen nicht sicher erkennbar → kein Blinzeln), türkis-weiße Rüstung (y 15–21) mit waagerecht ausgestreckten gepanzerten Armen
+* Figur darunter: Gesicht im Hammerhelm (x 16–22, y 11–16; Augen = türkis (17, 13)/(22, 13) mit Weiß darunter (y 14), rosa Wangen y 15), türkis-weiße Rüstung (y 15–21) mit waagerecht ausgestreckten gepanzerten Armen
   (x 8–31, y 18–21), deren Fäuste die beiden Stiele umfassen; orange Hose (y 22–31), braune Stiefel (y 32–34).
 Starr: alle drei Hämmer (Kopf + Stiel), sie gehen nur als Einheit mit dem Oberkörper/den Fäusten mit.
 
 Ablauf (60 Frames à 80 ms = 4,8 s, nahtlos, schwer und langsam; Frame 0 = Original):
 * Schweres Wippen unter der Last: Hosenzeile 27 wird texturiert eingefügt (0–1 px, Periode 30) – Oberkörper, Arme, Kopf und alle drei Hämmer heben sich starr als Einheit, Stiefel bleiben am Boden.
-* Die beiden seitlichen Hämmer wiegen gegenläufig: jeder gleitet als starre Einheit (Kopf + ganzer Stiel) 1 px auf und ab durch die Faust (Periode 30, links/rechts entgegengesetzt);
-  die Fäuste und Arme bleiben, nichts wird gestreckt.
+* Die beiden seitlichen Hämmer wiegen gegenläufig, und zwar MIT den Armen (Runde 8): Hammer (Kopf + ganzer Stiel) und Faust heben/senken sich gemeinsam um bis zu 2 px (Periode 30, links/rechts
+  entgegengesetzt); der Unterarm folgt halb, an der Schulterplatte ruht der Arm – der Arm schwenkt als Pose um die Schulter (Spaltenversatz; nichts wird gestreckt oder dicker).
+* Blinzeln (Runde 8; Frames 26–28 und 47–49): die türkisen Augen (17, 13) und (22, 13) → Hautfarbe, die weißen Pixel darunter → dunkle Wimpernlinie.
 * Stahlglanz (Metall): ein diagonales Lichtband wandert nacheinander über den linken, den mittleren und den rechten Hammerkopf (je 10 Frames, Start 2/22/42; eine Stufe heller, Umriss bleibt).
 * Edelsteine (Regel 12c): pulsieren nacheinander eine Stufe heller (je 4 Frames, unmittelbar nach dem Lichtband ihres Hammers), der Stein des Helms zusätzlich in der Schleifenmitte.
 * Kurzer Sparkle (3 Frames) an einer Ecke des linken (Frame 14) und des rechten Hammerkopfs (Frame 54).
-ERGÄNZUNG: die hinter den Armen verdeckten Stielstücke (y 18–21; links x 8–11, rechts gespiegelt) in den zwei Holzfarben der Stiele, damit beim Heben/Senken keine Lücke zwischen Stiel und Faust entsteht. Nur ganze Pixel, nur Farben der Quelle.
+ERGÄNZUNGEN: (11–12, 18) und (27–28, 18) Umrissfarbe = Unterkante der Schulterplatte hinter dem gesenkten Unterarm. Außerdem die hinter den Armen verdeckten Stielstücke (y 18–21; links x 8–11, rechts gespiegelt) in den zwei Holzfarben der Stiele, damit beim Heben/Senken keine Lücke zwischen Stiel und Faust entsteht. Nur ganze Pixel, nur Farben der Quelle.
 """
 import numpy as np
 
@@ -64,6 +65,30 @@ ML = L.platz(np.dstack([HAMMER_L] * 4).astype(np.uint8) * 255, FIG.H, FIG.W, PL,
 MR = L.platz(np.dstack([HAMMER_R] * 4).astype(np.uint8) * 255, FIG.H, FIG.W, PL, PT)[..., 3] > 0
 
 
+# Arme (Runde 8: Hämmer nicht unabhängig von den Armen): Faust (x 8–10) geht voll mit dem Hammer, der Unterarm (x 11–12) halb, ab x 13 (Schulterplatte) ruht der Arm –
+# der Arm schwenkt als Pose um die Schulter (Spaltenversatz, Spalten bleiben ganz, nichts wird dicker).
+ARM_L = {x: (1.0 if x <= 10 else 0.5) for x in range(8, 13)}
+ARM_R = {39 - x: f for x, f in ARM_L.items()}
+RAND = FIG.f(8, 18)
+UNTER_ARM = {(11, 18): RAND, (12, 18): RAND, (28, 18): RAND, (27, 18): RAND}       # Unterkante der Schulterplatte, frei, wenn der Unterarm 1 px sinkt
+HAUT, LINIE = FIG.f(18, 15), FIG.f(18, 13)
+for _p in ((17, 13), (22, 13)):
+    assert FIG.f(*_p) == (0, 251, 255), _p
+ZU = {(17, 13): HAUT, (22, 13): HAUT, (17, 14): LINIE, (22, 14): LINIE}
+
+
+def arm(ko, spalten, d):
+    """Armspalten (Zeilen 18–21) aus dem Körper lösen und je Spalte um round(d · Faktor) px senkrecht versetzen. Gibt (arm, körper_ohne_arm) zurück."""
+    out = L.leer(FIG.H, FIG.W)
+    ko = ko.copy()
+    for x, f in spalten.items():
+        X = x + PL
+        dy = int(round(abs(d) * f)) * (1 if d > 0 else -1)
+        out[PT + 18 + dy:PT + 22 + dy, X] = ko[PT + 18:PT + 22, X]
+        ko[PT + 18:PT + 22, X] = 0
+    return out, ko
+
+
 def frame(i, nur=None):
     a = FIG.platz()
     for k, start in enumerate((2, 22, 42)):
@@ -77,8 +102,13 @@ def frame(i, nur=None):
     N2.setze(hr, OFF, VERDECKT_R, neu=True)
     N2.funke(hl, OFF, 1, 7, N2.fenster(i, N, 14, [0, 1, 0]), WEISS, STAHL[2])
     N2.funke(hr, OFF, 38, 7, N2.fenster(i, N, 54, [0, 1, 0]), WEISS, STAHL[2])
-    d = N2.schwing(i, 30, 1)
-    fig = L.zusammen(FIG.H, FIG.W, [(hl, 0, d), (hr, 0, -d), (ko, 0, 0)])
+    if N2.fenster(i, N, 26, [1, 1, 1]) or N2.fenster(i, N, 47, [1, 1, 1]):                 # Blinzeln: Lid in Hautfarbe, darunter die dunkle Wimpernlinie
+        N2.setze(ko, OFF, ZU)
+    d = N2.schwing(i, 30, 2)
+    al, ko = arm(ko, ARM_L, d)
+    ar, ko = arm(ko, ARM_R, -d)
+    N2.setze(ko, OFF, UNTER_ARM, neu=True)
+    fig = L.zusammen(FIG.H, FIG.W, [(hl, 0, d), (hr, 0, -d), (ko, 0, 0), (al, 0, 0), (ar, 0, 0)])
     return TX.streck_zeile(fig, FIG.pt + 27, N2.hub(i, 30, 1, versatz=4))
 
 

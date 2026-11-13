@@ -42,7 +42,7 @@ SPROSS = sz.teil(M_SPROSS)
 # Runde 8: Unterkiefer und Arme als eigene Posen-Ebenen
 M_KIEFER = (xx <= 13) & (yy >= 14) & (yy <= 19) & (xx >= 2)
 M_KIEFER |= (xx == 14) & (yy >= 15) & (yy <= 18)
-M_ARM = ((yy >= 27) & (yy <= 31) & (xx <= 17)) | ((yy >= 32) & (yy <= 45) & (xx <= 19)) | ((yy >= 34) & (yy <= 42) & (xx <= 21))
+M_ARM = ((yy == 26) & (xx >= 13) & (xx <= 14)) | ((yy >= 27) & (yy <= 31) & (xx <= 17)) | ((yy >= 32) & (yy <= 45) & (xx <= 19)) | ((yy >= 34) & (yy <= 42) & (xx <= 21))
 KIEFER = sz.teil(M_KIEFER)
 ARM = sz.teil(M_ARM & ~M_BEIN)
 OBEN = sz.teil(~M_BEIN & ~M_SCHWANZ & ~M_KIEFER & ~M_ARM)

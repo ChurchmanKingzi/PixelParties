@@ -14,15 +14,17 @@ Was im Sprite ist (x, y im 28×31-Sprite):
   Seine Unterkante (y 30) liegt 1 px unter den Füßen → der Schild steht auf dem Boden und bleibt völlig still (Regel 44).
 Gold: Faust und Schildband → dort je ein kurzes Aufblitzen. Kein Feuer, keine Partikel.
 
-Ablauf (48 Frames à 75 ms = 3,6 s, nahtlos); Idee: Wächter hinter dem Schild — er atmet schwer und wiegt die Keule in der Faust.
+Ablauf (48 Frames à 75 ms = 3,6 s, nahtlos); Idee: Wächter hinter dem Schild — er atmet schwer, die goldene Faust mit der Keule glänzt regelmäßig.
 * Atmen (Periode 24): Rockzeile 24 wird einmal texturiert eingefügt (TX; nur Körperebene) — Kopf und Oberkörper heben sich 1 px HINTER dem stehenden Schild (Frames 4–15, 28–39).
-* Keule wiegen: Keule + goldene Faust (starre Einheit) gehen mit dem Atemzug 1 px hoch und zucken dabei zweimal 1 px weiter (Frames 8–10 und 13–15 jedes Atemzugs).
+* Goldener Arm/Faust + Keule gehen FEST mit dem Oberkörper mit (gleicher Versatz in jedem Frame): der Arm sitzt immer exakt wie im Original an der Schulter
+  (Runde 8: „Arm wirkt disjointed“ — das frühere zusätzliche Zucken von Faust/Keule gegenüber der Schulter ist entfernt).
+* GOLD GLÄNZT (Runde 8): alle 1,8 s (Start Frame 16 und 40, je 8 Frames) wandert ein Lichtband schräg über den GANZEN goldenen Arm (1 Stufe heller auf der Goldrampe,
+  im Kern 2 Stufen bis Augenweiß (246,255,255)); am Ende ein kurzer Sparkle an der Faust (Mitte → kleines Kreuz → weg, 3 Frames).
 * Blinzeln (Frames 20–22, 44–46): Iris und Augenweiß nehmen die Hautfarbe an.
-* Aufblitzen: am goldenen Schildband (Frames 18–21) und an der goldenen Faust (Frames 42–45): Mitte → kleines Kreuz → weg.
+* Aufblitzen am goldenen Schildband (Frames 8–10): Mitte → kleines Kreuz → weg.
 Frame 0 = Original. Kopf bewegt sich nur senkrecht.
 Ergänzungen (Körperebene, im Original verdeckt):
 * hinter der Schildkante, sichtbar wenn der Körper 1 px steigt: (17,13) und (18,12) Umriss (49,24,0) (Wangen-/Kinnlinie), (16,14), (15,15), (14,16), (13,17) Haut (180,123,49) (Schulter/Brust).
-* unter der goldenen Faust, sichtbar wenn sie 1 px höher steht als der Körper: (9,14) Umriss (49,24,0), (8,15) Hautschatten (164,98,41).
 """
 import numpy as np
 
@@ -45,25 +47,29 @@ for y in range(12, 31):
     schild[y, KANTE.get(y, 13):] = True
 schild &= F.da
 rumpf = F.da & ~arm & ~keule & ~schild
-HAUT, UMRISS, SCHATTEN = F.f(13, 10), F.f(10, 14), F.f(9, 15)
+HAUT, UMRISS = F.f(13, 10), F.f(10, 14)
 WEISS, HELLGOLD, BAND = F.f(11, 12), F.f(5, 16), F.f(19, 15)
 ATEM = [0] * 4 + [1] * 12 + [0] * 8
-ZUCK = [0] * 8 + [1] * 3 + [0] * 2 + [1] * 3 + [0] * 8
+RAMPE = G.goldrampe(spr, arm, F.f(11, 12))
+GLANZ, GLANZ_DAUER = (16, 40), 8
 TEST_EBENEN = ('koerper',)
 
 
 def frame(i, nur=None):
     at = ATEM[i % 24]
-    ke = at + ZUCK[i % 24]
     k = F.ebene(rumpf)
-    F.setze(k, {(17, 13): UMRISS, (18, 12): UMRISS, (16, 14): HAUT, (15, 15): HAUT, (14, 16): HAUT, (13, 17): HAUT, (9, 14): UMRISS, (8, 15): SCHATTEN})
+    F.setze(k, {(17, 13): UMRISS, (18, 12): UMRISS, (16, 14): HAUT, (15, 15): HAUT, (14, 16): HAUT, (13, 17): HAUT})
     if i in (20, 21, 22, 44, 45, 46):
         F.setze(k, {(11, 11): HAUT, (11, 12): HAUT, (16, 11): HAUT, (16, 12): HAUT})
     k = F.streck(k, 24, at)
-    fig = G.ueber(G.ueber(G.ueber(k, F.ebene(schild)), F.ebene(arm, 0, -ke)), F.ebene(keule, 0, -ke))
+    ar = F.ebene(arm, 0, -at)                                        # Arm und Keule immer mit dem Oberkörper (kein eigener Hub → keine Stufe an der Schulter)
     if not nur:
-        Hm.stern4(fig, 23, 18, Hm.folge(i, 18, [0, 1, 1, 0], N), WEISS, BAND, off=F.OFF)
-        Hm.stern4(fig, 6, 17, Hm.folge(i, 42, [0, 1, 1, 0], N), WEISS, HELLGOLD, off=F.OFF)
+        G.goldglanz(ar, arm, (F.pl, F.pt - at), i, N, GLANZ, GLANZ_DAUER, RAMPE)
+    fig = G.ueber(G.ueber(G.ueber(k, F.ebene(schild)), ar), F.ebene(keule, 0, -at))
+    if not nur:
+        Hm.stern4(fig, 23, 18, Hm.folge(i, 8, [0, 1, 0], N), WEISS, BAND, off=F.OFF)
+        for st in GLANZ:
+            Hm.stern4(fig, 6, 17 - at, Hm.folge(i, st + GLANZ_DAUER - 2, [0, 1, 0], N), WEISS, HELLGOLD, off=F.OFF)
     return fig
 
 
