@@ -21,9 +21,9 @@ Was im Sprite ist (x, y im 37×36-Sprite):
 Kein Metall/Gold/Edelstein → KEIN Glanz. Keine Partikel.
 
 Ablauf (60 Frames à 70 ms = 4,2 s, nahtlos; Frame 0 = Original; ein Bodenwesen: die Füße bleiben am Boden):
-* DREI SCHWEIF-FLAMMEN (Feuer von Hand, anim_feuer2: die gemalte Flamme der Quelle ist die Vorlage, Zunge für Zunge animiert, Körper/Gesicht wie gehabt): oberer Schweif (Flamme nach oben, vier Zungen: Spitzen bei (10,0), (14,1), (5,2), (8,2)),
-  rechter Schweif (Flamme nach rechts, drei Zungen auf Zeile 19/21/23), linker Schweif (Flamme nach unten, drei Zungen: Spitzen (5,31), (9,30), (0,29)). Jede Zunge: Fuß ruhig, Länge, Neigung, S-Kurve und Kernhub wechseln nach eigener Folge handgesetzter Posen
-  (12 Posen à 2–3 Frames), zeitversetzt; der helle Kern (245,125,74) steigt und fällt, Spitzen reißen ab und steigen als kleine Funken (Flammenfarben der Quelle) auf. Randpixel der Flamme sind immer der dunkle Umriss (110,39,39).
+* DREI SCHWEIF-FLAMMEN (Runde 4, „richtige Feuer-Animation“, anim_feuer3): klassischer Flammenzyklus, 10 Posen à 2 Frames (3 Zyklen je Schleife). Jeder Schweif = eine große Hauptflamme + zwei phasenversetzte Seitenzungen, Fluss vom Ansatz
+  zur Spitze wie gemalt (oben nach oben, rechts nach rechts, links nach unten links); Farbbänder der Quelle: dunkler Umriss (110,39,39) außen → (179,56,49) → (234,79,54) → heller Kern (245,125,74) am Ansatz. Bäuche wandern zur Spitze,
+  Spitzen schnüren sich ab und fliegen als kleine Fetzen weiter. Keine Einzelfunken mehr.
 * OHREN: das linke Ohr wippt die Spitze (Zeilen y 7–12) 1 px seitlich (zweimal je Schleife), das rechte Ohr hebt/senkt seine Außenhälfte (Spalten x ≥ 22) bis 1 px (dreimal je Schleife, andere Phase).
 * ATMEN (3× je Schleife, je 10 Frames oben): die Rumpfzeile 28 wird einmal doppelt eingefügt (Texturmischung): Kopf, Ohren und die Schweif-Ansätze steigen 1 px (Schweife starr mit), die Beine bleiben am Boden.
 Fest: Gesicht (die „^“-Augen und Nase), Beine, Brustband. Alle Bewegungen laufen auf der vollen Leinwand (ClipError statt Abschneiden). Nur ganze Pixel, nur Quellfarben.
@@ -36,7 +36,7 @@ import cv2
 import numpy as np
 from PIL import Image
 
-import anim_feuer2 as FE2
+import anim_feuer3 as F3
 import anim_humanoide as Hm
 import anim_lib as L
 import anim_rebel as R
@@ -77,14 +77,17 @@ def lay0(quelle, maske):
 
 FUCHS_M = np.zeros((H, W), bool)
 FUCHS_M[OFF[1]:OFF[1] + sh, OFF[0]:OFF[0] + sw] = fox
-Zk = lambda f_, s_, **k: FE2.Zunge((f_[0] + OFF[0], f_[1] + OFF[1]), (s_[0] + OFF[0], s_[1] + OFF[1]), **k)
-ZT_O = [Zk((10, 10), (10, 0), fuss_anteil=0.2), Zk((13, 10), (14, 1), fuss_anteil=0.2), Zk((6, 10), (5, 2), fuss_anteil=0.2, amp=0.9), Zk((8, 9), (8, 2), fuss_anteil=0.2, amp=0.7)]
-ZT_R = [Zk((25, 19), (34, 19), fuss_anteil=0.12, amp=1.2), Zk((25, 21), (36, 21), fuss_anteil=0.12, amp=1.4), Zk((26, 23), (35, 23), fuss_anteil=0.12, amp=1.2)]
-ZT_L = [Zk((5, 22), (5, 31), fuss_anteil=0.12, amp=1.4), Zk((8, 22), (9, 30), fuss_anteil=0.12, amp=1.2), Zk((2, 22), (0, 29), fuss_anteil=0.12, amp=1.2)]
-VL_O = FE2.Vorlage(lay0(schweife, t_oben), ZT_O, 'hoch', rand_farbe=UMRISS_SCHWEIF, sperre=FUCHS_M, faden=2)
-VL_R = FE2.Vorlage(lay0(schweife, t_rechts), ZT_R, 'rechts', rand_farbe=UMRISS_SCHWEIF, sperre=FUCHS_M, faden=2)
-VL_L = FE2.Vorlage(lay0(schweife, t_links), ZT_L, 'runter', rand_farbe=UMRISS_SCHWEIF, sperre=FUCHS_M, faden=2)
-FEUER = FE2.Feuer([VL_O, VL_R, VL_L], n=N, seed=41, bank='zunge', amp=1.0, weich=0.8, abriss=1.0, max_funken=7, funken_abstand=5, funken_leben=8)
+# Runde 4 (anim_feuer3): jeder Schweif ist eine Fuchsfeuer-Flamme — eine große Hauptflamme + zwei phasenversetzte Seitenzungen, Fluss vom Ansatz zur Spitze (wie gemalt: oben nach oben, rechts nach rechts, links nach unten links)
+RAMPE_S = [UMRISS_SCHWEIF, (179, 56, 49), (234, 79, 54), (245, 125, 74)]
+_F = lambda x, y, l, b, **k: F3.Flamme(OFF[0] + x, OFF[1] + y, l, b, **k)
+_B = [(1.0, 1.0), (0.9, 0.8), (0.62, 0.52), (0.36, 0.28)]              # dünner dunkler Rand (1 px), kräftiger roter Körper, heller Kern am Ansatz — wie die gemalten Schweife
+S_OBEN = [_F(10.3, 11.0, 12, 5.2, richtung=(-0.08, -1), fuss=1.0, bauch=0.4, schlag=0.7, phase=0.0, baender=_B, welle=9),
+          _F(6.8, 8.5, 8, 2.8, richtung=(-0.35, -1), phase=0.4, baender=_B), _F(13.4, 8.5, 9, 2.8, richtung=(0.15, -1), phase=0.7, baender=_B)]
+S_RECHTS = [_F(24.0, 19.5, 13, 5.2, richtung=(1, 0.18), fuss=1.0, bauch=0.4, schlag=0.7, phase=0.35, baender=_B, welle=9),
+            _F(27.0, 16.6, 8, 2.8, richtung=(1, -0.05), phase=0.75, baender=_B), _F(26.5, 22.5, 9, 2.8, richtung=(1, 0.4), phase=0.05, baender=_B)]
+S_LINKS = [_F(8.5, 20.0, 13, 5.2, richtung=(-0.55, 1), fuss=1.0, bauch=0.4, schlag=0.7, phase=0.65, baender=_B, welle=9),
+           _F(4.5, 21.5, 8, 2.8, richtung=(-0.8, 1), phase=0.05, baender=_B), _F(8.6, 23.5, 8, 2.6, richtung=(-0.1, 1), phase=0.35, baender=_B)]
+FEUER = F3.Feuer(H, W, S_OBEN + S_RECHTS + S_LINKS, RAMPE_S, posen=10, halten=2, sperre=FUCHS_M)
 
 
 def lay(quelle, maske, dy=0):
@@ -105,17 +108,14 @@ def frame(i, nur=None):
     if b:
         k = L.streck_zeile(k, PAD_T + 28, 1)
         ol, orr = (L.versetze(e, 0, -1) for e in (ol, orr))
-    feu = FEUER.ebene(i)
-    fk = FEUER.funken(i, dy=lambda f_: -(1 if Hm.takt(f_, N / 3, 4, 10) else 0))
-    if b:
-        feu = L.versetze(feu, 0, -1)
+    feu = FEUER.ebene(i, dy=-b)
     fig, etik = R.schichten(H, W, [(k, 'fuchs'), (ol, 'fuchs'), (orr, 'fuchs'), (feu, 'schweif')])
     fig, _br = R.verbinde(fig)                                       # Teile, die nur über eine Pixelecke hängen (dünne Schweifspitzen), werden 4-verbunden
     R.neue_loecher_fuellen(fig, LOCH0, ERLAUBT, max_groesse=4)
     R.kontur_je_teil(fig, etik, ERLAUBT, {'fuchs': UMRISS_FUCHS, 'schweif': UMRISS_SCHWEIF}, standard=UMRISS_SCHWEIF)
     if nur == 'koerper':
         return fig
-    return L.zusammen(H, W, [(fig, 0, 0), (fk, 0, 0)])
+    return fig
 
 
 TEST_EBENEN = 'koerper'

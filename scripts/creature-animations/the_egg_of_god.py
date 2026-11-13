@@ -96,18 +96,47 @@ def aktive_sterne(i):
     return out
 
 
-# ── Risse (zwei bis drei Pixel in der Umrissfarbe D; nur auf Goldpixeln, ≥ 3 Pixel vom Rand) — Stellen mit E.sicher/E.pfade ausgesucht und festgeschrieben ──
-CD = (122, 18, 0)
-assert CD in _farben
-_SITES = [[(8, 10), (8, 11), (9, 12)], [(4, 10), (5, 9), (5, 8)], [(12, 14), (13, 13), (13, 12)], [(8, 15), (8, 16), (9, 17)], [(10, 7), (11, 8), (11, 9)],
-          [(4, 13), (4, 14), (5, 15)], [(7, 6), (7, 7)], [(6, 12), (7, 13)]]
-_ORD = [0, 4, 2, 6, 5, 1, 7, 3]
-_HALTEN = [3, 5, 2, 4]
-_prof = [E.profil(len(_SITES[j]), _HALTEN[k % len(_HALTEN)]) for k, j in enumerate(_ORD)]
-_st = E.starts(len(_SITES), N, [len(q) for q in _prof], basis=2, versatz=0.1)
-RISSE = [E.Riss(_SITES[j] if k % 2 == 0 else list(reversed(_SITES[j])), start=_st[k], profil=_prof[k]) for k, j in enumerate(_ORD)]
-ERLAUBT = E.sicher(spr, [CA, CB, CC, CH], sorted(_farben), rand_abstand=3)
-E.pruefe_risse(RISSE, N, ERLAUBT)
+CD, CE_ = (122, 18, 0), (201, 45, 0)
+assert CD in _farben and CE_ in _farben
+# ── Risse (x, y im Sprite): h = Hauptast in Wachstumsrichtung, z = Seitenäste, d = Pixel, die den Riss dort 2 px dick machen — mit E.wachse_riss entworfen und festgeschrieben ──
+_SITES = [
+    dict(h=[(13, 10), (12, 9), (12, 8), (11, 7), (10, 6), (10, 5), (9, 4), (8, 4)], z=[[(11, 10), (10, 11)]], d=[(11, 6), (9, 5)]),
+    dict(h=[(5, 8), (5, 9), (6, 10), (6, 11), (7, 12)], z=[], d=[(5, 10)]),
+    dict(h=[(9, 16), (9, 15), (10, 14), (11, 14), (12, 14), (13, 13)], z=[], d=[(11, 15)]),
+    dict(h=[(6, 16), (5, 15), (4, 14)], z=[], d=[]),
+]
+TOENE = E.toene_rampe([CD, CE_, CC, CB, CA, CH, CJ, CI, CG])                             # Ausbleichen entlang der Gold-Rampe des Sprites (dunkel → hell), je Pixel bis zur Farbe darunter
+_HALTEN = [3, 5, 4, 6, 3, 4]
+_ev = []
+for _k, _f in enumerate(_SITES):
+    for _rev in ((False, True) if len(_f['h']) <= 6 else (False,)):                        # kleinere Risse zweimal je Schleife (einmal von jeder Seite her wachsend), der große einmal
+        _ev.append((_k, dict(haupt=list(reversed(_f['h'])) if _rev else _f['h'], zweige=_f['z'], dick=_f['d'], halten=_HALTEN[len(_ev) % len(_HALTEN)], tempo=1 if len(_f['h']) >= 5 else 2,
+                             stufen=4, stufe_frames=2)))
+_probe = [E.BleichRiss(start=0, **kw) for (_, kw) in _ev]
+
+
+def _sparkle_im_weg(i, s):
+    """Ein Riss darf nie unter einem gerade sichtbaren Sparkle liegen (Sparkles bleiben unverändert → der Riss weicht zeitlich aus)."""
+    for (s0, o) in STERNE:
+        if o.startswith('e') and any((f - s0) % N < len(STERN_LAUF) for f in range(s, s + _probe[i].leben)):
+            if any((x == ORTE[o][0] and abs(y - ORTE[o][1]) <= 2) or (y == ORTE[o][1] and abs(x - ORTE[o][0]) <= 2) for (x, y) in _probe[i].pix):
+                return True
+    return False
+
+
+_st = E.plane_starts([r.leben for r in _probe], N, konflikt=lambda i, j: _ev[i][0] == _ev[j][0], basis=1, seed=2, sperre=_sparkle_im_weg)
+RISSE = [E.BleichRiss(start=s, **kw) for s, (_, kw) in zip(_st, _ev)]
+ERLAUBT = E.sicher(spr, [c for c in sorted(_farben) if c != CD], sorted(_farben), rand_abstand=3)
+for _r in RISSE:
+    for (_x, _y) in _r.pix:
+        assert ERLAUBT[_y, _x], ('Rissspixel nicht erlaubt', _x, _y)
+for _i in range(len(RISSE)):
+    for _j in range(_i + 1, len(RISSE)):
+        if _ev[_i][0] == _ev[_j][0]:
+            assert not any(RISSE[_i].stufe(f, N) and RISSE[_j].stufe(f, N) for f in range(N)), ('Stelle doppelt belegt', _ev[_i][0])
+        else:
+            assert not E.beruehren(RISSE[_i].pix, RISSE[_j].pix), 'Risse berühren sich'
+assert all(r.stufe(0, N) == 0 for r in RISSE) and all(r.start + r.leben <= N for r in RISSE)
 REF = L.platz(spr, H, W, PAD_L, PAD_T)
 
 
@@ -123,7 +152,7 @@ def sprite_mit_effekten(i):
 
 def figur(i):
     fig = L.platz(sprite_mit_effekten(i), H, W, PAD_L, PAD_T)
-    return dict(fig=E.auf_figur(fig, E.risse_ebene(H, W, i, N, RISSE, CD, PAD_L, PAD_T, gueltig=OPAK)))
+    return dict(fig=E.bleich_risse(fig, i, N, RISSE, CD, TOENE, PAD_L, PAD_T, gueltig=OPAK))
 
 
 def sterne_ebene(i):
@@ -153,7 +182,7 @@ if __name__ == '__main__':
     print('Frame 0 weicht vom Original in', int((figs[0] != REF).any(axis=2).sum()), 'Pixeln ab |', len(RISSE), 'Risse | gleichzeitig höchstens', z['max'], ', Mittel', z['mittel'], '| Frames ohne Riss:', z['leer'])
     print('Sparkles gleichzeitig höchstens', max(len(aktive_sterne(i)) for i in range(N)), '| Frames mit Sparkle:', sum(1 for i in range(N) if aktive_sterne(i)), 'von', N)
     for i in range(N):                                                                     # ein Sparkle darf nie auf einem gerade sichtbaren Riss liegen
-        rm = E.risse_ebene(H, W, i, N, RISSE, CD, PAD_L, PAD_T)[..., 3] > 0
+        rm = (E.bleich_risse(REF, i, N, RISSE, CD, TOENE, PAD_L, PAD_T) != REF).any(axis=2)
         e = L.leer(H, W)
         for ort, stufe in aktive_sterne(i):
             A.stern(e, PAD_L + ORTE[ort][0], PAD_T + ORTE[ort][1], stufe, STERN_FARBEN)

@@ -47,15 +47,12 @@ import anim_amorph as A
 import anim_drache as D
 import anim_flieger as F
 import anim_flieger_r3 as R3
+import anim_r4_fluegel as R4
 import math
 
 N, MS = 60, 70
 PAD_L, PAD_R, PAD_T, PAD_B = 3, 3, 8, 3
-BEAT, DOWN, UP = 20, 7, 13                         # Flügelschlag (3 pro Schleife)
-HUB = math.radians(80.0)                           # Gesamthub: oben +30° (im Uhrzeigersinn, links), unten −50°
-P0 = DOWN + 0.62 * UP                              # Frame 0 = Aufschlag bei 38 % des Hubs (Originalpose)
-PIV_L, PIV_R = (11.5, 2.5), (26.5, 2.5)            # Schultergelenke (Sprite)
-R_WURZEL = 3.2                                     # Schulteransatz bleibt stehen
+BEAT = 15                                          # Flügelschlag: 15 Frames = 1,05 s (4 pro Schleife)
 
 spr = L.lade('black-thorn-dragon')
 l5, l4, l3 = (L.lade(f'black-thorn-dragon_{k}') for k in ('l5', 'l4', 'l3'))
@@ -69,10 +66,12 @@ for (x, y) in ((15, 5), (22, 5)):
     assert v3[y, x], 'unter dem Horn'
     l5[y, x, :3] = SCHWARZ                                    # verdeckte hellgraue Pixel (Ergänzung)
 
-fl_l = v5 & (xx <= 12) & (yy <= 13)
-fl_r = v5 & (xx >= 26) & (yy <= 13)
-wurzel_l = fl_l & ((xx - PIV_L[0]) ** 2 + (yy - PIV_L[1]) ** 2 <= R_WURZEL ** 2)
-wurzel_r = fl_r & ((xx - PIV_R[0]) ** 2 + (yy - PIV_R[1]) ** 2 <= R_WURZEL ** 2)
+# RUNDE 4: beweglicher Flügelteil (wird je Pose neu gezeichnet) = Flügelknochen + Flughaut bis zur Schulter (x ≤ 12, y ≤ 8). Der schmale Hautstreifen am Rumpf entlang (x 10–14, y 9–15) ist am Körper
+# angewachsen und bleibt Teil des Rumpfs; dort schließt jede Pose pixelgenau an ((9,8) → (10,9)).
+fl_l = v5 & (xx <= 12) & (yy <= 8)
+fl_r = fl_l[:, 37::-1]
+fl_r = np.concatenate([fl_r, np.zeros((sh, sw - fl_r.shape[1]), bool)], axis=1)
+assert (l5[:, 37::-1][fl_l[:, :38]] == l5[:, :38][fl_l[:, :38]]).all() and (fl_r <= v5).all(), 'Flügel nicht spiegelgleich'
 tail_m = v5 & (xx >= 26) & (yy >= 14)
 torso_m = v5 & ~fl_l & ~fl_r & ~tail_m
 kopf_m = v3 & (xx <= 26)
@@ -95,17 +94,71 @@ def teil(quelle, maske):
     return L.platz(t, H, W, PAD_L, PAD_T)
 
 
-def welle(t):
-    """0 = Flügel ganz oben … 1 = ganz unten (Abschlag in DOWN Frames, Aufschlag in UP Frames, Cosinus-weich)."""
-    u = (t + P0) % BEAT
-    if u < DOWN:
-        return 0.5 - 0.5 * math.cos(math.pi * u / DOWN)
-    return 0.5 + 0.5 * math.cos(math.pi * (u - DOWN) / UP)
+# ── RUNDE 4 (Nutzer: „Flügelbewegungen katastrophal, komplett neu machen“): handgezeichnete Schlüsselposen statt gedrehter Flügel ─────────────────────────────
+# Anatomie: Der graue Flügelknochen läuft von der Schulter (12,4) unter der schwarzen Oberkante zur schwarzen Spitze; darunter hängt die blaue Flughaut, deren Hinterkante von der Spitze schräg zum Rumpf läuft.
+# Der Knochen schlägt als Ganzes um die Schulter: U (35° hoch) → O (Original, fast waagerecht) → DM (15° tief) → D (35° tief); Aufschlag mit nachhängender Spitze: A1 (Ansatz schon angehoben, Spitze noch unten) → A2 → U.
+# Zeichen = Farben der Körperebene; linkes oberes Zeichen = Sprite-Koordinate (−2, y0). Rechter Flügel = Spiegelbild (Achse x = 18,5).
+FARBE = {'A': (0, 0, 0), 'C': (41, 41, 66), 'D': (45, 45, 45), 'E': (49, 49, 82), 'F': (83, 83, 83), 'G': (90, 90, 132), 'H': (112, 112, 112)}
+POSEN_TXT = {
+    'U': (-5, ["..AA...........",
+               "..ADA..........",
+               "...AFAA........",
+               "....AHFA.......",
+               ".....AGHA......",
+               ".....AEGFAA....",
+               "......AGEFDA...",
+               ".......AGHGDAA.",
+               ".......AEGECFDA",
+               "........AEGHEDD",
+               ".........AGEGFD",
+               "..........AGGHG",
+               "...........AHGE",
+               "...........AGEG"]),
+    'DM': (3, [".............AA",
+               ".........AAAAFD",
+               ".....AAAAFDDDGD",
+               ".AAAAHHFFGEGEHG",
+               "...AAGEGGEGEHGE",
+               ".....AAEGHEGGEG",
+               ".......AAAAA..."]),
+    'D': (3, ["..............A",
+              "............AAD",
+              "...........ADDD",
+              "..........AFGHG",
+              "........AAFEHGE",
+              ".......AFFGGGEG",
+              ".....AAHEGEA...",
+              "....AHHGGAA....",
+              "...AAAAAA......",
+              "..A............"]),
+    'A1': (3, [".............AA",
+               "..........AAADD",
+               "........AADDDFD",
+               "......AAFFGEGHG",
+               ".....AHFGEGGHGE",
+               "....AHGEGEHEGEG",
+               "....AEAAAAAA...",
+               "...A.A.........",
+               "..A............"]),
+    'A2': (1, ["......AAAAAA...",
+               "...AAAHHFFDDAA.",
+               ".AA...AAGGECFDA",
+               "........AEGHEDD",
+               ".........AGEGFD",
+               "..........AGGHG",
+               "...........AHGE",
+               "...........AGEG"]),
+}
+FOLGE = ['O', 'O', 'DM', 'DM', 'D', 'D', 'D', 'A1', 'A1', 'A2', 'A2', 'U', 'U', 'U', 'U']      # Abschlag U→O→DM→D zügig, unten kurz halten, Aufschlag mit nachhängender Spitze
+assert len(FOLGE) == BEAT
 
 
-def winkel(t):
-    """Drehwinkel des LINKEN Flügels (rad, negativ = gegen den Uhrzeigersinn = Flügel schlägt nach unten); 0 bei Frame 0."""
-    return -HUB * (welle(t) - welle(0))
+def fluegel_posen():
+    links = {'O': teil(l5, fl_l)}
+    for name, (y0, zeilen) in POSEN_TXT.items():
+        links[name] = R4.pose(zeilen, FARBE, -2, y0, H, W, PAD_L, PAD_T)
+    rechts = {n: R4.spiegeln(a, 2 * PAD_L + 37) for n, a in links.items()}
+    return links, rechts
 
 
 def zustand(i):
@@ -122,7 +175,7 @@ def zustand(i):
 
 def frame(i, nur=None):
     ph, atem, nick, bl, fl_, fr_ = zustand(i)
-    torso = teil(l5, torso_m | wurzel_l | wurzel_r)
+    torso = teil(l5, torso_m)
     schwanz = L.zusammen(H, W, [(teil(l5, tail_m), 0, 0), (teil(l3, dorn_m), 0, 0)])
     arme = teil(l4, arme_m)
     kopf = teil(l3, kopf_m)
@@ -134,27 +187,27 @@ def frame(i, nur=None):
     schwanz = L.streck_zeile(schwanz, PAD_T + ZEILE, atem)
     # Schwanz biegt sich (Pivot x = 26)
     schwanz = D.schwanz_biegen(schwanz, PAD_L + 26, 3.0, L.sinus(i, N / 3, 0.0), lauf=1.2, richtung=1)
-    ang = winkel(i)
-    wl = F.drehen(teil(l5, fl_l & ~wurzel_l), PAD_L + PIV_L[0], PAD_T + PIV_L[1], ang, glatt=True)
-    wr = F.drehen(teil(l5, fl_r & ~wurzel_r), PAD_L + PIV_R[0], PAD_T + PIV_R[1], -ang, glatt=True)
-    wl = L.versetze(wl, 0, -atem)
-    wr = L.versetze(wr, 0, -atem)
+    name = R4.takt(FOLGE, i)
+    wl = L.versetze(FL_L[name], 0, -atem)
+    wr = L.versetze(FL_R[name], 0, -atem)
     arme = L.versetze(arme, 0, -atem)
     kopf = L.versetze(kopf, 0, -atem + nick)
     bl_ = L.heben_unten(teil(l4, bein_l), PAD_T + BEIN_ZEILE, fl_)
     br_ = L.heben_unten(teil(l4, bein_r), PAD_T + BEIN_ZEILE, fr_)
-    ebenen = {'schwanz': schwanz, 'torso': torso, 'fluegel_l': wl, 'fluegel_r': wr, 'bein_l': bl_, 'bein_r': br_, 'arme': arme, 'kopf': kopf}
-    wahl = nur or tuple(ebenen)
-    ganz = L.zusammen(H, W, [(ebenen[n], 0, 0) for n in wahl])
+    vorn = {'schwanz': schwanz, 'torso': torso, 'bein_l': bl_, 'bein_r': br_, 'arme': arme, 'kopf': kopf}
+    wahl = nur or ('fluegel_l', 'fluegel_r') + tuple(vorn)
+    ganz = L.zusammen(H, W, [(vorn[n], 0, 0) for n in vorn if n in wahl])
     ganz = R3.luecken_fuellen(ganz, 6, ausser=ORIG_LOECHER)
     ganz, _, _ = A.verbinde_luecken8(ganz, max_len=3)            # ein Dorn, der um eine Ecke weggerutscht wäre, wird kurz wieder angehängt (nur 8er-getrennte Teile)
-    return T.umriss_schliessen(ganz, RAND, REGEL)                  # Randpixel-Test (Regel 16)
+    ganz = T.umriss_schliessen(ganz, RAND, REGEL)                  # Randpixel-Test (Regel 16) für Körper/Schwanz/Beine; die Flügelposen sind fertig gezeichnet und bleiben unberührt
+    return L.zusammen(H, W, [(e, 0, 0) for n, e in (('fluegel_l', wl), ('fluegel_r', wr)) if n in wahl] + [(ganz, 0, 0)])
 
 
 TEST_EBENEN = None
 _m0 = np.zeros((H, W), bool)
 _m0[PAD_T:PAD_T + sh, PAD_L:PAD_L + sw] = L.deckend(spr)
 ORIG_LOECHER = R3.eingeschlossen(_m0)
+FL_L, FL_R = fluegel_posen()
 
 
 if __name__ == '__main__':

@@ -108,7 +108,7 @@ def zwischenzeile(form, nah, fern=None, nah2=None, k=1, fern2=None):
     fern = Nachbarzeile von `form` auf der anderen Seite, nah2 = Zeile hinter `nah` (beide dürfen None sein). k = Nummer der Kopie (Phase)."""
     if nah is None:
         nah = _leer_wie(form)
-    inn = _innen(form)
+    inn = _innen(form) & (nah[:, 3] > 0)          # wo die angrenzende Zeile fehlt, liegt die neue Zeile frei (Umriss) → bleibt wie die gestreckte
     if inn.sum() < 2:
         return form.copy()
     ok_nah = inn & _innen(nah) & ~_linie(nah, nah2, form)

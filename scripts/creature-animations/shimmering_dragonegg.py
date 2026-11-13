@@ -84,17 +84,26 @@ def aktive_sterne(i):
     return [(o, STERN_LAUF[(i - s) % N]) for (s, o) in STERNE if (i - s) % N < len(STERN_LAUF)]
 
 
-# ── Risse (vier Pixel, F = dunkelste Eifarbe; nur auf Rasterpixeln, mindestens 3 Pixel vom Rand) — Stellen mit E.sicher/E.pfade ausgesucht und festgeschrieben ──
-_SITES = [[(17, 16), (18, 16), (19, 17), (19, 18)], [(11, 28), (11, 29), (12, 30), (13, 30)], [(9, 16), (10, 17), (11, 17), (12, 16)], [(12, 8), (11, 9), (11, 10), (12, 11)],
-          [(23, 30), (24, 31), (24, 32), (23, 33)], [(23, 13), (23, 14), (24, 15), (25, 15)], [(17, 27), (17, 28), (18, 29), (19, 29)], [(18, 7), (19, 8), (19, 9), (18, 10)],
-          [(26, 23), (26, 24), (27, 25), (28, 25)], [(6, 23), (5, 24), (5, 25), (6, 26)], [(17, 33), (18, 34), (18, 35), (17, 36)], [(19, 23), (20, 22), (21, 22), (22, 23)],
-          [(10, 23), (11, 24), (12, 24), (13, 23)]]
-_ORD = [0, 7, 3, 10, 5, 12, 1, 8, 4, 11, 2, 9, 6]                                           # Reihenfolge der Starts (benachbarte Stellen nicht hintereinander)
-_HALTEN = [3, 5, 2, 4, 3, 2, 5, 4]
-_prof = [E.profil(4, _HALTEN[k % len(_HALTEN)]) for k in range(len(_SITES))]
-_st = E.starts(len(_SITES), N, [len(q) for q in _prof], basis=2, versatz=0.45)
-RISSE = [E.Riss(_SITES[j] if k % 2 == 0 else list(reversed(_SITES[j])), start=_st[k], profil=_prof[k]) for k, j in enumerate(_ORD)]
+# ── Risse (x, y im Sprite): h = Hauptast in Wachstumsrichtung, z = Seitenäste, d = Pixel, die den Riss dort 2 px dick machen — mit E.wachse_riss entworfen und festgeschrieben ──
+_SITES = [
+    dict(h=[(22, 18), (21, 19), (20, 19), (19, 20), (18, 20), (17, 21), (16, 22), (16, 23), (17, 24), (18, 24), (19, 23), (20, 24)], z=[[(16, 20), (15, 19), (15, 18)], [(15, 24), (14, 25), (13, 25), (12, 26)]], d=[(21, 18), (20, 20), (19, 19)]),
+    dict(h=[(10, 19), (11, 19), (12, 18), (12, 17), (12, 16), (11, 15), (11, 14), (11, 13), (10, 12), (9, 13), (8, 13)], z=[[(11, 20), (12, 21), (12, 22)]], d=[(12, 14), (10, 13), (9, 12)]),
+    dict(h=[(25, 15), (25, 14), (26, 13), (25, 12), (25, 11), (24, 10), (23, 10), (22, 9), (21, 8), (20, 8), (19, 9), (19, 10), (18, 11)], z=[[(22, 11), (22, 12), (21, 13), (20, 13)], [(24, 14), (23, 14)]], d=[(23, 9), (22, 8), (21, 7)]),
+    dict(h=[(5, 20), (4, 21), (3, 22), (3, 23), (4, 24), (5, 25), (6, 25), (7, 26), (8, 26)], z=[[(6, 24), (7, 23), (7, 22)]], d=[(3, 21), (4, 22), (4, 23)]),
+    dict(h=[(20, 31), (19, 31), (18, 30), (17, 29), (16, 30), (15, 30), (14, 30)], z=[[(16, 31), (15, 32)]], d=[(20, 30), (19, 30), (18, 29)]),
+    dict(h=[(25, 24), (26, 23), (26, 22), (27, 21), (28, 20), (27, 19), (26, 19)], z=[[(29, 20), (30, 21)]], d=[(26, 24), (27, 23), (27, 22)]),
+    dict(h=[(12, 9), (13, 8), (12, 7), (13, 6), (14, 5), (15, 5), (16, 5), (17, 5), (18, 5)], z=[[(16, 6), (15, 7), (16, 8)]], d=[(12, 8), (13, 7)]),
+    dict(h=[(17, 36), (18, 36), (19, 35), (20, 34)], z=[], d=[(18, 35)]),
+    dict(h=[(23, 27), (24, 28), (23, 29), (23, 30)], z=[[(25, 29), (26, 29)]], d=[(23, 28)]),
+    dict(h=[(12, 33), (11, 33), (10, 33), (9, 32), (8, 32)], z=[], d=[(11, 32), (10, 32)]),
+]
+_HALTEN = [4, 7, 5, 8, 4, 6, 5, 7]
+_kw = [dict(haupt=f['h'] if k % 2 == 0 else list(reversed(f['h'])), zweige=f['z'], dick=f['d'], halten=_HALTEN[k % len(_HALTEN)], tempo=1 if len(f['h']) >= 6 else 2,
+            stufen=4, stufe_frames=3) for k, f in enumerate(_SITES)]
+_st = E.plane_starts([E.BleichRiss(start=0, **kw).leben for kw in _kw], N, basis=1, seed=7)
+RISSE = [E.BleichRiss(start=s, **kw) for s, kw in zip(_st, _kw)]
 ERLAUBT = E.sicher(spr, [CA, CB, CC, CD, CE], sorted(_farben), rand_abstand=3)
+TOENE = E.toene_rampe([CF, CD, CA, CC, CB, CE])                                         # Ausbleichen entlang der Gold-Rampe des Sprites: Rissfarbe F → D → A → C → B → E, je Pixel bis zur Farbe darunter
 E.pruefe_risse(RISSE, N, ERLAUBT)
 for _r in RISSE:
     for (_x, _y) in _r.pix:
@@ -115,7 +124,7 @@ def sprite_mit_effekten(i):
 
 def figur(i):
     fig = L.platz(sprite_mit_effekten(i), H, W, PAD_L, PAD_T)
-    return dict(fig=E.auf_figur(fig, E.risse_ebene(H, W, i, N, RISSE, CF, PAD_L, PAD_T, gueltig=OPAK)))
+    return dict(fig=E.bleich_risse(fig, i, N, RISSE, CF, TOENE, PAD_L, PAD_T, gueltig=OPAK))
 
 
 def sterne_ebene(i):

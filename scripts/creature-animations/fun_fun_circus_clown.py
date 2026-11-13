@@ -24,12 +24,13 @@ Stoff/Ball/Hut: kein Metall/Gold/Edelstein → KEIN Glanz (Regel 14). Konfetti u
 Ablauf (72 Frames à 62 ms = 4,46 s, nahtlos):
 * BALL ROLLT: in jeder Ballzeile (y 36–48) kreisen die Innenpixel zyklisch waagerecht, je Zeile um round(Phase · Zeilenbreite) — eine Umdrehung je Schleife (schmale Zeilen oben/unten kommen langsamer vorbei: wie eine sich drehende Kugel).
   Runde 3: die Kontur der Schuhsohle (12–14, 36) und der türkise Fußschatten auf dem Ball ((11,36), (15,36), (12–14,37)) gehören zum Clown und bleiben FEST; die Ballfarben laufen unter ihnen durch (`Z.kugel_drehen_fest`, verdeckte Texturstellen aus dem Nachbarpixel ergänzt).
-* JONGLIEREN (Runde 3): jede Hand hält vier Bälle in der Luft: die Bälle kreisen auf einer Kreisbahn (Radius 4, Mitte (4,15) links / (26,15) rechts, 24 Frames je Umlauf = drei Umläufe je Schleife, ein Fang/Wurf je Hand alle 6 Frames);
-  links gegen den Uhrzeigersinn, rechts im Uhrzeigersinn (innen hoch, außen herunter), rechts um 3 Frames versetzt (die Hände fangen abwechselnd). Die tiefste Stelle der Bahn liegt über dem Handschuh; die Bahnmitte folgt dem Handschuh und dem Atemhub. Bälle hinter dem Clown.
-* ATMEN/BALANCIEREN (Periode 36, bis 2 px): die Jackenzeile 31 wird bis zu 2× eingefügt (Texturmischung): Hut, Gesicht, Arme und Strahlen steigen, Ball und Schuhe bleiben unten.
-* ARME: beim Jonglieren fangen/werfen die Hände im Takt (Periode 12, rechts um 3 Frames versetzt): jede Spalte der Arme (links x ≤ 10, rechts x ≥ 21, y 20–31) wandert um round(±2 · Abstand/6) senkrecht (starr, Gefälle ≤ 1 px je Spalte); die Handschuhe bewegen sich am meisten.
-* STRAHLEN BLITZEN: die weißen Strahlen schrumpfen von außen (zuerst die Spitzen, dann ganz) und kehren zurück (Frames 20–29 und 52–61), alles pixelweise.
-Frame 0 = Original auf der linken Seite (die rechte Hand ist 3 Frames versetzt, die Arme stehen im Takt schon in Bewegung). Ergänzungen: der vierte Ball rechts oben ist voll deckend (3 Pixel); Ballfarben unter dem Fußschatten zum Durchlaufen aus dem Nachbarpixel.
+* JONGLIEREN (Runde 4, mit Handkontakt): je Hand vier Bälle, alle 6 Frames landet einer im Handschuh ((8,20) links / (22,20) rechts: in der Handschuh-Öffnung, VOR dem Handschuh gezeichnet), liegt dort 3 Frames und geht mit der Hand mit,
+  dann wirft ihn die Hand hoch: Tropfenschleife (innen hoch, außen herunter, Wurfparabel 9 px hoch, 21 Flugframes, hinter dem Clown). 24 Frames je Umlauf, rechts um 3 Frames versetzt (die Hände fangen abwechselnd).
+* ARME/HÄNDE: im Takt der Bälle (6 Frames ab dem Fang: Hand gibt nach +1, +1, Mitte, wirft −1, Mitte, Mitte); der Handschuh bewegt sich starr um ±1 px, der Arm kippt dazu (Gefälle ≤ 1 px je Spalte).
+* ATMEN (Periode 36, bis 2 px): die Jackenzeile 31 wird bis zu 2× eingefügt (Texturmischung): Hut, Gesicht, Arme und Strahlen steigen, Ball und Schuhe bleiben unten.
+* BEINE BALANCIEREN (Runde 4, Periode 18): die Unterschenkel (Zeilen 31–32 direkt über den Schuhen) weichen kurz 1 px nach rechts, später 1 px nach links aus; Schuhe (stehen auf dem Ball) und Oberkörper bleiben.
+* STRAHLEN (Runde 4, „Freude/Aufregung“): Mittelstrahl und die beiden Schrägstrahlen poppen abwechselnd auf (Periode 12, um 6 Frames versetzt): Stummel → halb → voll → 1 px nach außen gesprungen → voll → halb → Stummel; nur ganze Pixel.
+Frame 0: Körper = Original; die Bälle sind auf der neuen Wurfbahn (nicht mehr die Rauten der Quelle), die Strahlen im Pop-Takt. Ergänzungen: der vierte Ball rechts oben ist voll deckend (3 Pixel); Ballfarben unter dem Fußschatten zum Durchlaufen aus dem Nachbarpixel.
 """
 import math
 import sys
@@ -109,37 +110,61 @@ def arm(a, links, dy_spitze):
     return out
 
 
+# Runde 4 — STRAHLEN („Freude/Aufregung“): der Mittelstrahl und die beiden Schrägstrahlen poppen ABWECHSELND auf (Periode 12, um 6 Frames versetzt): Stummel → halb → voll → 1 px nach außen gesprungen → voll → halb → Stummel.
+STRAHL_FOLGE = ['k', 'm', 'F', 'P', 'P', 'F', 'm', 'k', 'k', 'k', 'k', 'k']
+SCHRAEG_L, SCHRAEG_R = schraeg & (xx <= 14), schraeg & (xx >= 17)
+
+
 def strahlen_ebene(i, hub):
-    k = None
-    for s0 in (20, 52):
-        k = Hm.folge(i, s0, ['m', 'm', 'k', 'x', 'x', 'x', 'x', 'k', 'm', 'm'], N) or k
-    if k == 'x':
-        return L.leer(H, W)
-    keep = strahlen.copy()
-    if k == 'm':
-        keep = (senkrecht & (yy >= 3)) | (schraeg & (yy >= 7))
-    elif k == 'k':
-        keep = (senkrecht & (yy >= 6)) | (schraeg & (yy >= 9))
-    return L.versetze(eb(spr, keep), 0, -hub)
-
-
-def baelle_ebene(i, dy_l, dy_r):
-    """Jonglieren: je Hand vier Bälle auf einer Kreisbahn (links gegen den Uhrzeigersinn, rechts im Uhrzeigersinn: innen hoch, außen herunter); die Bahnmitte
-    folgt der Hand (dy_l/dy_r in px). Die unterste Stelle der Bahn liegt über dem Handschuh (Fang), die Bälle liegen hinter dem Clown. Rechts um 3 Frames versetzt,
-    damit die Hände abwechselnd fangen."""
     a = L.leer(H, W)
+    for teil, versatz, aussen, grenzen in ((senkrecht, 0, (0, -1), (3, 6)), (SCHRAEG_L, 6, (-1, -1), (7, 9)), (SCHRAEG_R, 6, (1, -1), (7, 9))):
+        k = STRAHL_FOLGE[(i + versatz) % 12]
+        keep = teil & (yy >= grenzen[0]) if k == 'm' else teil & (yy >= grenzen[1]) if k == 'k' else teil
+        dx, dy = aussen if k == 'P' else (0, 0)
+        L.einsetzen(a, L.trenne(spr, keep)[0], OFF[0] + dx, OFF[1] + dy - hub)
+    return a
+
+
+# Runde 4 — JONGLIEREN MIT HANDKONTAKT: jeder Ball landet wirklich im Handschuh, liegt dort 3 Frames (geht mit der Hand mit) und wird von dort wieder hochgeworfen.
+# Je Hand vier Bälle, alle 6 Frames ein Fang (UMLAUF 24). Hand-Takt (6 Frames, ab dem Fang): gibt nach (+1, +1), Mitte (0), wirft (−1), Mitte (0, 0).
+HAND_TAKT = [1, 1, 0, -1, 0, 0]
+HAND_L, HAND_R = (8, 20), (22, 20)          # Ball (obere linke Ecke) im Handschuh: er sitzt in der Handschuh-Öffnung (über dem Grün (8–9,22) bzw. (22–23,22))
+FLUGHOEHE = 9
+
+
+def hand_dy(i, links):
+    return HAND_TAKT[(i if links else i + 3) % 6]
+
+
+def ball_ort(i, links, b):
+    """(x, y, in_der_hand) des Balls b (0–3) einer Hand. Flugbahn: Tropfenschleife mit der Spitze in der Hand — innen (kopfseitig) hoch, außen herunter, Wurfparabel (unten schnell, oben langsam)."""
+    k = ((i if links else i + 3) - 6 * b) % UMLAUF
+    hx, hy = HAND_L if links else HAND_R
+    if k <= 2:
+        return hx, hy + hand_dy(i, links), True
+    s = (k - 2) / 22.0
+    aus = 2.0 * math.sin(math.pi * s) - 3.0 * math.sin(2 * math.pi * s)          # nach außen positiv
+    x = hx + (-1 if links else 1) * aus
+    y = hy - FLUGHOEHE * 4 * s * (1 - s)
+    return Z.rund(x), Z.rund(y), False
+
+
+def baelle_ebenen(i, hub):
+    """(hinten, vorn): fliegende Bälle liegen hinter dem Clown, der gerade gehaltene Ball liegt vor dem Handschuh."""
+    hinten, vorn = L.leer(H, W), L.leer(H, W)
     for k, (x0, y0, cols) in enumerate(STUECK):
         links = k < 4
-        w0 = BALL_WINKEL[LINKS.index((x0, y0)) if links else RECHTS.index((x0, y0))]
-        t = (i if links else i + 3) / float(UMLAUF)
-        ang = w0 - 2 * math.pi * t if links else w0 + 2 * math.pi * t
-        (mx, my) = BAHN_L if links else BAHN_R
-        x, y = Z.kreisbahn(mx, my + (dy_l if links else dy_r), RADIUS, ang)
+        x, y, gehalten = ball_ort(i, links, k % 4)
+        a = vorn if gehalten else hinten
         for dy in (0, 1):
             for dx in (0, 1):
-                a[y + dy + OFF[1], x + dx + OFF[0], :3] = cols[dy][dx]
-                a[y + dy + OFF[1], x + dx + OFF[0], 3] = 255
-    return a
+                a[y + dy + OFF[1] - hub, x + dx + OFF[0], :3] = cols[dy][dx]
+                a[y + dy + OFF[1] - hub, x + dx + OFF[0], 3] = 255
+    return hinten, vorn
+
+
+# Runde 4 — BEINE balancieren: die Unterschenkel (Zeilen 31–32 über den Schuhen; Schuhe und Oberkörper bleiben) weichen kurz 1 px nach rechts bzw. links aus (Periode 18).
+BEIN_FOLGE = [0, 0, 0, 1, 1, 1, 1, 0, 0, 0, 0, 0, -1, -1, -1, -1, 0, 0]
 
 
 def frame(i, nur=None):
@@ -149,17 +174,18 @@ def frame(i, nur=None):
     Z.kugel_drehen_fest(un, OFF, BALL_INNEN & UNTEN, FEST, i / float(N))
     # Rumpf mit Hut/Gesicht: Atmen über Jackenzeile 31
     rumpf = Hm.atmen(eb(spr, RUMPF), OFF[1] + 31, OFF[1] + 20, hub, 0)
-    # Arme: die Hände fangen/werfen (kurzer Takt), Bahnmitte der Bälle folgt dem Handschuh
-    dl = Z.rund(2.0 * math.sin(L.sinus(i, 12)))
-    dr = Z.rund(2.0 * math.sin(L.sinus(i, 12, math.pi / 2)))
-    al = L.versetze(arm(eb(spr, ARM_L), True, dl), 0, -hub)
-    ar = L.versetze(arm(eb(spr, ARM_R), False, dr), 0, -hub)
+    bein = BEIN_FOLGE[i % 18]
+    if bein:
+        Hm.zeilen_versatz(rumpf, OFF, {y: bein for y in range(31 - hub, 33)})
+    # Arme: die Hände fangen/werfen im Takt der Bälle (Handschuh starr ±1 px)
+    al = L.versetze(arm(eb(spr, ARM_L), True, 1.5 * hand_dy(i, True)), 0, -hub)
+    ar = L.versetze(arm(eb(spr, ARM_R), False, 1.5 * hand_dy(i, False)), 0, -hub)
     fig = L.zusammen(H, W, [(un, 0, 0), (rumpf, 0, 0), (al, 0, 0), (ar, 0, 0)])
     fig = Hm.kontur_schliessen(fig, ERLAUBT, UMRISS)
     if nur:
         return fig
-    bl = baelle_ebene(i, Z.rund(0.45 * dl) - hub, Z.rund(0.45 * dr) - hub)
-    return L.zusammen(H, W, [(bl, 0, 0), (fig, 0, 0), (strahlen_ebene(i, hub), 0, 0)])
+    hinten, vorn = baelle_ebenen(i, hub)
+    return L.zusammen(H, W, [(hinten, 0, 0), (fig, 0, 0), (vorn, 0, 0), (strahlen_ebene(i, hub), 0, 0)])
 
 
 TEST_EBENEN = ('koerper',)          # Randpixel-Test (randtest.py) ohne Konfetti und Strahlen

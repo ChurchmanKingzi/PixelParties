@@ -41,27 +41,36 @@ OPAK = spr[..., 3] > 0
 CA, CB, CC = (48, 0, 0), (246, 231, 14), (247, 245, 184)
 _farben = {tuple(int(v) for v in p[:3]) for p in spr.reshape(-1, 4) if p[3]}
 assert all(c in _farben for c in (CA, CB, CC))
-ERLAUBT = E.sicher(spr, [CA], sorted(_farben), rand_abstand=2)                          # helle Risse liegen auf dunklen Fugenpixeln, mindestens 2 Pixel vom Rand
+CD, CE = (244, 123, 34), (202, 44, 41)
+ERLAUBT = E.sicher(spr, [CA, CE], sorted(_farben), rand_abstand=2)                      # helle Risse liegen auf dunklen Fugenpixeln (A) und roten Schuppenrändern (E), mindestens 2 Pixel vom Rand
+TOENE = E.toene_rampe([CA, CE, CD, CB, CC])                                              # Ausbleichen = Abkühlen der Glut: Cremeweiß → Gelb → Orange → Rot → Dunkelbraun (alles Farben des Sprites)
 
-# ── Risse (x, y im Sprite; Pixel 1 wächst zuerst) — Stellen mit E.sicher/E.pfade ausgesucht und festgeschrieben ──
-_SITES = [[(22, 19), (22, 20), (22, 21), (23, 22), (24, 22)], [(3, 22), (4, 23), (5, 24), (6, 24), (7, 25)], [(9, 12), (10, 12), (11, 13), (12, 14), (13, 15)],
-          [(16, 5), (17, 6), (18, 7), (19, 8), (19, 9)], [(20, 28), (21, 29), (22, 30), (23, 31), (23, 32)], [(24, 9), (25, 10), (25, 11), (25, 12), (24, 13)],
-          [(24, 26), (25, 27), (26, 27), (27, 28), (27, 29)], [(10, 26), (11, 25), (12, 25), (13, 26), (14, 27)], [(12, 5), (12, 6), (12, 7), (13, 8), (14, 9)],
-          [(18, 35), (19, 35), (20, 36), (21, 36), (22, 35)], [(6, 13), (6, 14), (7, 15), (7, 16), (8, 17)], [(9, 34), (9, 33), (10, 32), (11, 31), (12, 30)],
-          [(27, 21), (28, 22), (29, 23), (29, 24), (29, 25)], [(12, 21), (13, 21), (14, 20), (14, 19), (15, 18)], [(12, 36), (13, 35), (14, 34), (14, 33), (15, 32)],
-          [(19, 12), (20, 13), (20, 14), (20, 15), (19, 16)]]
-_ORD = [0, 8, 3, 12, 6, 14, 1, 10, 4, 15, 9, 2, 13, 5, 11, 7]                              # Reihenfolge der Starts (benachbarte Stellen nicht hintereinander)
-_HALTEN = [3, 5, 2, 4, 3, 2, 5, 4]
-_prof = [E.profil(5, _HALTEN[k % len(_HALTEN)]) for k in range(len(_SITES))]
-_st = E.starts(len(_SITES), N, [len(q) for q in _prof], basis=2, versatz=0.3)
-RISSE = [E.Riss(_SITES[j], start=_st[k], profil=_prof[k], farbe=CC, spitze=CB) for k, j in enumerate(_ORD)]
+# ── Risse (x, y im Sprite): h = Hauptast in Wachstumsrichtung, z = Seitenäste, d = Pixel, die den Riss dort 2 px dick machen — mit E.wachse_riss entworfen und festgeschrieben ──
+_SITES = [
+    dict(h=[(22, 23), (21, 23), (20, 24), (20, 25), (20, 26), (20, 27), (20, 28), (21, 29), (21, 30), (22, 31), (22, 32), (23, 33), (24, 33), (25, 34)], z=[[(19, 29), (19, 30), (18, 31)]], d=[(22, 29), (22, 30), (23, 31), (23, 32)]),
+    dict(h=[(12, 23), (11, 24), (11, 25), (10, 26), (9, 27), (8, 27), (7, 27), (6, 26), (5, 25), (5, 24), (6, 23)], z=[[(11, 27), (11, 28), (12, 29), (12, 30)], [(8, 28), (7, 29), (7, 30)]], d=[(8, 26), (7, 26), (6, 25), (4, 25)]),
+    dict(h=[(16, 5), (16, 6), (17, 7), (18, 8), (19, 9), (19, 10), (19, 11), (19, 12), (18, 13), (17, 13), (16, 13), (15, 13), (14, 14)], z=[[(20, 11), (21, 12), (22, 11)]], d=[(17, 6), (18, 7), (19, 8)]),
+    dict(h=[(26, 11), (25, 12), (25, 13), (24, 14), (24, 15), (24, 16), (23, 17), (22, 18), (21, 18)], z=[[(25, 16), (26, 16), (27, 17)]], d=[(25, 11), (26, 12)]),
+    dict(h=[(27, 22), (28, 23), (29, 24), (29, 25), (28, 26), (28, 27), (27, 28), (26, 29), (27, 30)], z=[[(26, 27), (25, 27), (24, 26)]], d=[(28, 24), (29, 26)]),
+    dict(h=[(6, 16), (7, 16), (8, 17), (9, 18), (9, 19), (10, 20), (11, 20)], z=[[(7, 15), (6, 14), (6, 13)]], d=[(9, 17), (10, 18)]),
+    dict(h=[(11, 10), (12, 9), (12, 8), (12, 7), (13, 6), (13, 5), (13, 4)], z=[[(13, 9), (14, 9)]], d=[(12, 6)]),
+    dict(h=[(17, 37), (17, 36), (18, 35), (19, 35)], z=[], d=[]),
+    dict(h=[(14, 33), (14, 34), (13, 35), (12, 36)], z=[], d=[]),
+    dict(h=[(17, 22), (16, 21), (15, 20), (16, 19)], z=[], d=[(16, 20)]),
+    dict(h=[(16, 28), (15, 27), (15, 26), (16, 25)], z=[], d=[]),
+]
+_HALTEN = [4, 7, 5, 8, 4, 6, 5, 7]
+_kw = [dict(haupt=f['h'], zweige=f['z'], dick=f['d'], halten=_HALTEN[k % len(_HALTEN)], tempo=1 if len(f['h']) >= 6 else 2,
+            stufen=4, stufe_frames=3, farbe=CC, spitze=CB) for k, f in enumerate(_SITES)]
+_st = E.plane_starts([E.BleichRiss(start=0, **kw).leben for kw in _kw], N, basis=1, seed=5)
+RISSE = [E.BleichRiss(start=s, **kw) for s, kw in zip(_st, _kw)]
 E.pruefe_risse(RISSE, N, ERLAUBT)
 
 REF = L.platz(spr, H, W, PAD, PAD)
 
 
 def frame(i):
-    return E.auf_figur(REF, E.risse_ebene(H, W, i, N, RISSE, CC, PAD, PAD, gueltig=OPAK))
+    return E.bleich_risse(REF, i, N, RISSE, CC, TOENE, PAD, PAD, gueltig=OPAK)
 
 
 if __name__ == '__main__':
