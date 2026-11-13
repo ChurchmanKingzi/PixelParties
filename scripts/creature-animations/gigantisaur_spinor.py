@@ -20,7 +20,9 @@ Bleibt fest: Segel, Zähne (nur starr mit dem Kiefer), Füße.
 
 Idle-Idee: der Fischjäger lauert – schnappt mit dem Maul, greift mit den Krallen, der Schwanz pendelt.
 Ablauf (60 Frames à 80 ms = 4,8 s), alle Bewegungen unabhängig:
-* Schnappen (Frames 10–15 und 40–45, je zwei Bisse): die Kieferspitze (x ≤ 7, ab Zeile 20, samt der unteren Zähne (3, 19–20) (5, 19–20)) hebt sich als Pose 1 px – die Zähne greifen ineinander.
+* Maul (ab Frame 6 und 36, je 24 Frames): der UNTERKIEFER öffnet sich langsam als Pose ums Gelenk (12, 20) – Spitze 1 → 2 → 3 px nach unten (Spalten x 3–5 am weitesten,
+  x 6–7, x 8–10 gestuft; untere Zähne (3), (5), (7) starr mit), der Rachen dahinter ist dunkel (Quellfarbe (97,72,55)), keine Lücke am Gelenk; hält 10 Frames offen,
+  schließt, dann zwei Bisse: die Kieferspitze (x ≤ 7, ab Zeile 20, samt der unteren Zähne (3, 19–20) (5, 19–20)) hebt sich 1 px – die Zähne greifen ineinander. (Runde 12: weiter öffnen.)
 * Krallen greifen (Frames 20–29 und 50–59): erst der vordere, dann der hintere Arm hebt sich als starre Pose 1 px (eine Armzeile entfällt, Hand und Krallen unverändert).
 * Schwanz pendelt (2× je Schleife): spaltenweise Biegung ab x 60 (Gefälle ≤ 1 px, Raster wird fortgeführt), Spitze ±2 px.
 * Atmen (2× je Schleife, oben in Frames 3–15 und 33–45): Zeile 33 (nur die Beine) wird texturiert eingefügt (anim_textur) – der ganze Körper hebt sich 1 px, die Füße bleiben stehen.
@@ -60,7 +62,46 @@ arm2_m = vorhanden & (yy >= 24) & (yy <= 30) & (((yy == 24) & (xx >= 26) & (xx <
 schwanz_m = vorhanden & (xx >= 60) & (yy >= 22)
 koerper = vorhanden & ~kiefer_m & ~arm1_m & ~arm2_m & ~schwanz_m
 
-BISS = [1, 1, 0, 0, 1, 1]
+# Maul: > 0 = Unterkiefer um so viele px an der Spitze geöffnet (Pose ums Gelenk), −1 = Biss (Kieferspitze 1 px gehoben, Zähne greifen ineinander)
+MAUL = [1, 1, 1, 2, 2, 2, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 2, 1, -1, -1, 0, 0, -1, -1]
+RACHEN = (97, 72, 55)                                            # dunkles Maulinnere der Quelle (614837)
+RASTER_K = {0: (160, 116, 87), 1: (136, 89, 60)}                 # Hautraster am Kiefer: (x + y) gerade = hell
+#  Unterkiefer je Spalte: oberste Zeile des beweglichen Teils (untere Zähne x 3, 5, 7 gehören dazu) und „Band“ (Abstand vom Gelenk: Spalte senkt sich um auf − Band)
+KIEFER_AB = {3: 19, 4: 21, 5: 19, 6: 20, 7: 18, 8: 20, 9: 20, 10: 20}
+BAND = {3: 0, 4: 0, 5: 0, 6: 1, 7: 1, 8: 2, 9: 2, 10: 2}
+
+
+def maul_offen(auf):
+    """Sprite mit geöffnetem Unterkiefer (auf = 1…3 px an der Spitze): starre Pose ums Gelenk bei (12, 20) – die Kieferspalten senken sich gestuft (Spitze x 3–5 am
+    weitesten, dann x 6–7, dann x 8–10; Gefälle ≤ 1 px je Stufe, die Unterkante bleibt eine geschlossene Schräge). Der frei werdende Keil wird ab x 6 mit dem dunklen
+    Rachen der Quelle gefüllt; vorn zwischen den Zähnen bleibt das Maul offen (wie im Original). Keine Lücke am Gelenk: Spalte 11 wird um 1 Hautpixel verlängert."""
+    a = spr.copy()
+    for x, ab in KIEFER_AB.items():
+        d = max(0, auf - BAND[x])
+        if not d:
+            continue
+        ys = [y for y in range(ab, sh) if vorhanden[y, x] and y <= 22]
+        teil_ = a[ys, x].copy()
+        a[ys, x] = 0
+        for y, pxl in zip(ys, teil_):
+            a[y + d, x] = pxl
+        if x >= 6:                                               # Rachen: alles zwischen Oberkiefer/Zähnen und dem gesenkten Kiefer wird dunkel
+            for y in range(17, ys[0] + d):
+                if not a[y, x, 3]:
+                    a[y, x, :3] = RACHEN; a[y, x, 3] = 255
+    if auf >= 3:
+        for (x, y) in ((9, 19), (10, 18), (10, 19)):             # Maulwinkel: der Rachen reicht tiefer in die Wange
+            a[y, x, :3] = RACHEN
+        a[20, 10, :3] = RASTER_K[0]; a[20, 10, 3] = 255          # Kieferansatz am Gelenk bleibt Haut (Spalte 10 ein Hautpixel länger)
+        a[22, 11] = a[21, 11]                                    # Spalte 11: Umrisspixel 1 px tiefer, darüber Haut – schließt die Stufe zum Gelenk
+        a[21, 11, :3] = RASTER_K[0]
+        for x in (8, 9, 10):                                     # Schachbrett-Raster der gesenkten Hautpixel fortführen
+            for y in (20, 21, 22):
+                if a[y, x, 3] and tuple(int(v) for v in a[y, x, :3]) in ((160, 116, 87), (136, 89, 60), (161, 116, 88)):
+                    a[y, x, :3] = RASTER_K[(x + y) % 2]
+    return a
+
+
 GRIFF = [1, 1, 1, 1, 1, 1]
 
 
@@ -71,7 +112,7 @@ def teil(maske):
 
 def zustand(i):
     atem = 1 if (i % 30) in range(3, 16) else 0
-    biss = Z.hub(i, [10, 40], BISS)
+    biss = Z.hub(i, [6, 36], MAUL)
     arm1 = Z.hub(i, [20, 50], GRIFF)
     arm2 = Z.hub(i, [24, 54], GRIFF)
     bl = D.blinzeln(i, 34)
@@ -81,7 +122,11 @@ def zustand(i):
 
 def frame(i, nur=None):
     atem, biss, arm1, arm2, bl, schwanz = zustand(i)
-    k = teil(koerper)
+    if biss > 0:                                                 # Maul offen: Kopf samt gesenktem Unterkiefer als eine Pose
+        offen = maul_offen(biss)
+        k = L.platz(np.where((L.deckend(offen) & ~arm1_m & ~arm2_m & ~schwanz_m)[..., None], offen, 0).astype(np.uint8), H, W, PAD_L, PAD_T)
+    else:
+        k = teil(koerper)
     if bl:
         for x, y in AUGEN_GELB:
             k[PAD_T + y, PAD_L + x, :3] = LID
@@ -89,7 +134,7 @@ def frame(i, nur=None):
     a2 = L.heben_unten(teil(arm2_m), PAD_T + 24, arm2)
     dys = Z.biegung(PAD_L + 60, PAD_L + 74, PAD_L + 74, schwanz, 1.0)
     sw_ = Z.biegen(teil(schwanz_m), dys, [(Q_, F_)])
-    ebenen = {'koerper': (k, 0), 'schwanz': (sw_, 0), 'arm2': (a2, 0), 'arm1': (a1, 0), 'kiefer': (teil(kiefer_m), -biss)}
+    ebenen = {'koerper': (k, 0), 'schwanz': (sw_, 0), 'arm2': (a2, 0), 'arm1': (a1, 0), 'kiefer': (teil(kiefer_m) if biss <= 0 else L.leer(H, W), -1 if biss < 0 else 0)}
     wahl = nur or tuple(ebenen)
     ganz = L.zusammen(H, W, [(ebenen[n][0], 0, ebenen[n][1]) for n in wahl])
     ganz = T.umriss_schliessen(ganz, UMRISS, REGEL)

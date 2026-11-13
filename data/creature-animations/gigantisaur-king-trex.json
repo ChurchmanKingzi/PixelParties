@@ -2,7 +2,7 @@
   "creature": "Gigantisaur King Trex",
   "sheet": "gigantisaur-king-trex.png",
   "frameWidth": 84,
-  "frameHeight": 80,
+  "frameHeight": 72,
   "frames": 64,
   "frameMs": 85,
   "loop": true,

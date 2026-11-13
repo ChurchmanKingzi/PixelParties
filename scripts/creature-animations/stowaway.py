@@ -7,17 +7,17 @@ PICK: [["MotiveIndia", 390, "Ebene „The Thing in the Hull“: die zwei kleinen
 ZUSAMMENGESETZT (Nutzer: „mit dem Schwarzen aus dem Schiff selbst zusammensetzen“): In der Kunst sieht man nur Riss, Augen und zwei Haken – einer hängt direkt
 am Riss (unten rechts), der andere liegt 14 px weiter links oben frei auf dem Rumpf. Daraus EINE Figur: der Riss ist zu einem rundlichen Schattenleib ergänzt
 (Zeilen 20–34, Schwarz der Kunst, die Maskenpixel des Risses sind vollständig enthalten), die Augen sitzen an ihren Kunstpositionen (40,25) und (41,29) (schräg
-übereinander, wie in der Kunst), und zwei schwarze Tentakel verbinden den Leib mit den Haken an ihren Kunstpositionen. Lage und Form der Haken = Kunst/Ebene.
+übereinander, wie in der Kunst); ein kurzer schwarzer Tentakel verbindet den Leib mit dem unteren rechten Haken (hängt in der Kunst direkt am Riss). Der linke
+obere Haken steht FREI für sich (wie in der Kunst; die früher gezeichnete Verbindung zum Leib hat der Nutzer in Runde 12 gestrichen). Lage und Form der Haken = Kunst/Ebene.
 src/stowaway.png ist die so gebaute Ruhepose (python3 stowaway.py --src schreibt sie neu).
 
 Identifikation (Koordinaten der Kartenkunst; Sprite = Ausschnitt ab (16,11)): Haken 1 oben links (x 18–25, y 13–22; Ansatz unten rechts bei (24,21)),
 Haken 2 unten rechts (x 40–47, y 33–42; Ansatz oben bei (44,33)); Hakenfarben: Umriss (56,22,49), Fläche (88,57,68), Lichtkante (135,103,116), Glanzpunkt
-(189,165,173) – Horn/Chitin, kein Metall → kein Sparkle. Leib und Tentakel einfarbig schwarz (10,17,10). Augen (173,0,0).
+(189,165,173) – Horn/Chitin, kein Metall → kein Sparkle. Leib und der kurze Tentakel einfarbig schwarz (10,17,10). Augen (173,0,0).
 
 Ablauf (64 Frames à 75 ms = 4,8 s). Frame 0 = Ruhepose:
 * Schattenleib wabert: linker und rechter Rand jeder Zeile wandern um 0/1 px als nach unten laufende Welle (zwei Umläufe je Schleife); Fläche bleibt geschlossen.
-* Haken 1 tastet: starr auf einer kleinen liegenden Acht (±2 px waagerecht, ±1 px senkrecht, ein Umlauf je Schleife); sein Tentakel wird je Frame als 2–3 px dicke
-  Kette vom Leib zum Hakenansatz neu gezeichnet (hängt leicht durch, der Durchhang atmet mit).
+* Haken 1 tastet als eigenes, freies Teil: starr auf einer kleinen liegenden Acht (±2 px waagerecht, ±1 px senkrecht, ein Umlauf je Schleife); keine Verbindung zum Leib.
 * Haken 2 pendelt starr ±1 px waagerecht (zwei Umläufe), sein kurzer Tentakel folgt.
 * Augen blinzeln einzeln und gemeinsam (Auge für 2 Frames schwarz): Frames 20–21 (beide), 44–45 (oberes), 50–51 (unteres). Kein Glühen außerhalb der Augenpixel.
 """
@@ -76,7 +76,7 @@ def frame(i, nur=None):
     h1 = (int(round(2 * math.sin(ph))), int(round(math.sin(2 * ph + math.pi)) * 1))          # liegende Acht: ±2 px waagerecht, ±1 px senkrecht
     h2 = int(round(math.sin(2 * ph)))
     # Tentakel (unter Leib und Haken)
-    kette(f, (37, 28), (25 + h1[0], 22 + h1[1]), 3 + int(round(math.sin(2 * ph))), lambda t: 3 if t < 0.4 else 2)
+    # (Runde 12: der selbst gezeichnete Tentakel vom Leib zu Haken 1 ist entfernt – der linke Haken steht frei, wie in der Kunst)
     kette(f, (44, 31), (44 + h2, 35), 0, lambda t: 3)
     for d in (-1, 0, 1):
         kette(f, (44 + d, 31), (44 + h2 + (d if d < 1 else 0), 34), 0, lambda t: 1)

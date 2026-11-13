@@ -4,14 +4,16 @@ bei jedem zweiten Atemzug hebt sie den Bogen kurz an und stellt ihn wieder ab.
 
 PICK: [["MotiveDeri", 185, "Ebene mit fünf Bogenschützinnen hinter einer Mauerbrüstung; genommen: die erste (x 0–13, y 0–19, alles oberhalb der Mauerkrone)"]]
 Abgleich mit der Kartenkunst (public/cardgen/art/Archer.webp; data/card-art/native hat keine Datei): dieselbe Reihe hinter der Mauer.
-Quelle UNVOLLSTÄNDIG: ab der Mauerkrone (y 20) fehlen Rocksaum, Beine und unteres Bogenende. ERGÄNZT (Zeilen 20–26, nur Farben der Figur, Stil der Motivfamilie
-wie bei spearman.py – kurze Beine mit schwarzem Umriss und dunklen Stiefeln):
-  y 20–21 Rock (Weiß/Grau des Rocks, brauner Rand), y 22–23 zwei Beine in Hautfarbe (x 3–4 und x 7–8, Umriss (26,14,0)), y 24–26 dunkle Stiefel mit schwarzem
-  Umriss; Bogen x 11–13 gespiegelt zur oberen Hälfte bis zur Spitze (12,25) weitergeführt (Griff liegt bei y 14–15).
+Quelle UNVOLLSTÄNDIG: ab der Mauerkrone (y 20) fehlen Rocksaum, Beine und unteres Bogenende. ERGÄNZT nach der REFERENZ DES NUTZERS (Runde 12,
+„archer-beine-referenz.png“, 10×7 px): Rock, Beine und Stiefel sind diese Referenz, pixel- und farbgenau übernommen an x 2–11, y 18–24 (ihre oberste Zeile
+deckt sich mit der Rockzeile 18 der Ebene; ihre rechte Randspalte x 11 liegt hinter dem Bogen). Zeilen 0–3 der Referenz = weißer Rock, 4–5 = dunkle Beine/Stiefel
+mit hellem Glanzpixel, 6 = braune Sohlenlinie. Die zwei grünen Pixel (32,156,0) in der Sohlenzeile zwischen den Füßen sind als Hintergrund (Gras) gewertet und
+TRANSPARENT. Farben der Referenz, die die Ebene nicht hat ((201,213,210), (41,41,41), (65,65,65), (123,123,123), (49,8,0)), sind damit Quellfarben.
+Bogen x 11–13 (selbst ergänzt): gespiegelt zur oberen Hälfte bis zur Spitze (12,24) weitergeführt – steht auf Sohlenhöhe (Griff liegt bei y 14–15).
 
-Identifikation (14×27): blaue Feder (x 8–12, y 0–3) an dunkelgrauer Kappe (x 4–9, y 1–4), weißblondes Haar (x 0–11, y 2–13), Gesicht nach bildrechts gewandt:
+Identifikation (14×25): blaue Feder (x 8–12, y 0–3) an dunkelgrauer Kappe (x 4–9, y 1–4), weißblondes Haar (x 0–11, y 2–13), Gesicht nach bildrechts gewandt:
 großes Auge (x 8–9, y 8–10: Lidstrich, Blau, Glanz), zweites Auge am Rand (5,8)/(5,10); schwarzes Lederwams mit hellem Beschlag (x 3–5, y 15–16), Hand
-(10,15–16) am Bogengriff, Langbogen senkrecht (x 11–13, y 5–25, Holz – kein Glanz), weißer Rock.
+(10,15–16) am Bogengriff, Langbogen senkrecht (x 11–13, y 5–24, Holz – kein Glanz), weißer Rock.
 
 Ablauf (48 Frames à 80 ms = 3,8 s). Frame 0 = Original:
 * Atmen (Periode 24): texturierte Zeile im Wams (y 17, nur Spalten ≤ 10, TX.streck_zeile); Kopf, Schultern und die Hand heben sich 1 px. Kopf nie seitlich.

@@ -1,9 +1,9 @@
 # -*- coding: utf-8 -*-
-"""Idle-Animation für „Gigantisaur King Trex“ (Creature) — riesiger Tyrannosaurus mit Flammenkrone: langsam, schwer; Feuer über anim_feuer3.
+"""Idle-Animation für „Gigantisaur King Trex“ (Creature) — riesiger Tyrannosaurus mit goldener Juwelenkrone: langsam, schwer.
 
-PICK: [["MotiveGrailWar", 513, "ganze Ebene „Trex“ (80×59 px, nur Alpha 0/255)"], ["MotiveGrailWar", 512, "Flammenkrone (Ebene #335, 25×27 px, Pixel mit Alpha ≥ 128 deckend gemacht)"]]
-Quelle: src/gigantisaur-king-trex.png (80×68 px) — Trex (24 Farben) mit der gemalten Flammenkrone (294 Farbtöne) an ihrer Stelle im Bild. Die Ebene zeigt die ganze Figur samt Beinen/Füßen
-(die Kartenkunst schneidet sie ab). In der Kartenkunst liegt die Flamme ÜBER dem Hinterkopf – so auch hier.
+PICK: [["MotiveGrailWar", 513, "ganze Ebene „Trex“ (80×59 px, nur Alpha 0/255)"], ["MotiveGrailWar", 512, "Krone (Ebene #335, 25×27 px, Pixel mit Alpha ≥ 128 deckend gemacht)"]]
+Quelle: src/gigantisaur-king-trex.png (80×68 px) — Trex (24 Farben) mit der gemalten Krone (294 Farbtöne) an ihrer Stelle im Bild. Die Ebene zeigt die ganze Figur samt Beinen/Füßen
+(die Kartenkunst schneidet sie ab). In der Kartenkunst liegt die Krone ÜBER dem Hinterkopf – so auch hier.
 
 Aufruf:   python3 gigantisaur_king_trex.py [--preview <ordner>]
 Ausgabe:  ../../data/creature-animations/gigantisaur-king-trex.png + .json
@@ -15,16 +15,16 @@ Identifikation (x, y im Sprite):
   dunkelrotes Maulinneres (C/F), Zunge (rosa P/I/T, 66–72, 35–39), Unterkiefer (x 60–79, ab der schwarzen Lippenlinie y 34…43) mit Zähnen (X/D, y 37–43).
 * Ärmchen (x 39–49, y 46–55) mit Krallenhand (43–48, 52–55): hängt starr am Rumpf.
 * Nahes Bein (Unterschenkel x 18–24, y 47–61; Fuß mit drei Krallen 14–28, 61–67), fernes Bein (x 34–40, y 47–60; Fuß 37–48, 59–66).
-* Flammenkrone (x 40–63, y 1–27): gemaltes Feuer mit zwei leuchtend roten Kernen samt rosa Lichtpunkt (55–57, 17–19) und (51–52, 20–22) – als Glutkerne/Juwelen der Krone gedeutet: sie bleiben
-  als feste Pixel (starr am Kopf) über dem animierten Feuer stehen.
+* KRONE (x 40–64, y 1–26; Ebene 512): goldene Zackenkrone, rot-orange gemalt, mit roten JUWELEN samt rosa Lichtpunkt (55–57, 17–19), (51–52, 20–22) und (60–62, 14–16).
+  Der Nutzer (Runde 12): „Das auf dem Kopf ist eine Krone, kein Feuer!“ – sie ist ein starres Original-Teil: alle Pixel der Ebene unverändert, starr mit dem Kopf.
 
-Idle-Idee: der König steht schwer atmend da, lässt den Kiefer langsam zuklappen und reißt ihn wieder auf, stampft abwechselnd mit den Beinen, die Flammenkrone lodert.
+Idle-Idee: der König steht schwer atmend da, lässt den Kiefer langsam zuklappen und reißt ihn wieder auf, stampft abwechselnd mit den Beinen, die Krone glänzt kurz auf.
 Ablauf (64 Frames à 85 ms = 5,44 s), alle Bewegungen unabhängig:
-* Flammenkrone: anim_feuer3 (posen=16, halten=1), fünf Zungen + Glutsockel, Fuß lückenlos auf Hinterkopf/Nacken; vier Farbtöne der gemalten Flamme (61,6,0)/(157,43,0)/(188,79,14)/(236,130,57).
-  Das gemalte Feuer selbst wird nicht gezeigt (Frame 0 weicht dadurch vom Original ab – wie bei allen Feuer-Figuren).
+* Krone: starr auf dem Kopf (hebt sich nur mit dem Kopf beim Atmen). Kurzer Glanz (Punkt → Kreuz → Punkt, 4 Frames, hellstes Kronengold (255,177,90), nur auf
+  Kronenpixeln): mittleres Juwel ab Frame 18, linke Goldzacke ab Frame 38, rechtes Juwel ab Frame 54. Frame 0 = Original.
 * Unterkiefer (Pose, starr): der ganze Unterkiefer samt Zähnen und Zunge schwenkt um sein Gelenk (x 62) nach oben – spaltenweise Scherung mit Gefälle ≤ 1 px auf 2 Spalten, vorn bis 7 px –
   und klappt wieder auf (Frames 8–29); ein zweites, kleines Schnappen in Frames 44–53. Das Schachbrett-Raster wird an den Stufen fortgeführt (Z.raster_tausch).
-* Atmen (2× je Schleife, oben in Frames 4–17 und 36–49): Rumpf, Schwanz, Kopf, Ärmchen und Flammenkrone heben sich 1 px; die Beine werden dafür in Zeile 49 texturiert um eine Zeile verlängert (anim_textur), die Füße bleiben stehen.
+* Atmen (2× je Schleife, oben in Frames 4–17 und 36–49): Rumpf, Schwanz, Kopf, Ärmchen und Krone heben sich 1 px; die Beine werden dafür in Zeile 49 texturiert um eine Zeile verlängert (anim_textur), die Füße bleiben stehen.
 * Schwanz pendelt (2× je Schleife): spaltenweise Biegung, Spitze ±2 px.
 * Stampfen: nahes Bein Frames 2–11, fernes Bein 34–43 (Hub 1-1-1-2-2-2-2-1-1-1 px: zwei glatte Zeilen des Unterschenkels entfallen, Fuß samt Krallen rückt unverändert hoch).
 * Blinzeln (Frames 30–33 und 60–63): Lid im Hautraster über dem Auge, die unterste Augenzeile bleibt als Lidstrich.
@@ -35,14 +35,14 @@ import sys
 import numpy as np
 
 import anim_drache as D
-import anim_feuer3 as F3
 import anim_lib as L
 import anim_n10 as Z
+import anim_n9 as N9
 import anim_textur as TX
 import anim_tiere as T
 
 N, MS = 64, 85
-PAD_L, PAD_R, PAD_T, PAD_B = 3, 3, 14, 3
+PAD_L, PAD_R, PAD_T, PAD_B = 3, 3, 4, 3
 
 quelle = L.lade('gigantisaur-king-trex')
 sh, sw = quelle.shape[:2]
@@ -56,19 +56,21 @@ TREX_FARBEN = [(24, 8, 7), (25, 20, 22), (41, 16, 15), (38, 18, 15), (37, 27, 21
                (79, 68, 56), (97, 67, 54), (87, 72, 56), (118, 81, 82), (124, 95, 28), (139, 106, 31), (161, 124, 32), (149, 118, 124), (169, 136, 64), (183, 140, 36), (184, 148, 66), (184, 162, 144)]
 flamme_m = L.deckend(quelle) & ~L.farbmaske(quelle, TREX_FARBEN)
 spr = quelle.copy()
-spr[flamme_m] = 0                                              # Trex ohne die gemalte Flamme (unter der Flamme liegt in der Quelle nichts Verdecktes: Ebene 513 ist dort leer)
+spr[flamme_m] = 0                                              # Trex ohne die Krone (unter der Krone liegt in der Quelle nichts Verdecktes: Ebene 513 ist dort leer)
 vorhanden = L.deckend(spr)
 UMRISS = [A_, H_, L_, (52, 33, 12)]
 REGEL = T.umriss_regeln(spr, UMRISS)[2]
 RASTER = [(V_, S_), (Q_, R_), (U_, W_)]
 HAUT = [V_, S_, Q_, R_, U_, W_]
 
-# Glutkerne der Krone (leuchtend rot + rosa Lichtpunkt): feste Pixel über dem Feuer
-r, g, b = (quelle[..., k].astype(int) for k in range(3))
-kern_m = flamme_m & (((r > 150) & (g < 60)) | ((r > 160) & (b > 60) & (g < 115))) & (((xx >= 54) & (xx <= 58) & (yy >= 16) & (yy <= 20)) | ((xx >= 50) & (xx <= 53) & (yy >= 20) & (yy <= 23)))
-
-FEUER_FARBEN = [(61, 6, 0), (157, 43, 0), (188, 79, 14), (236, 130, 57)]
-assert all(L.farbmaske(quelle, [c]).any() for c in FEUER_FARBEN)
+# KRONE (Nutzer, Runde 12: „eine Krone, kein Feuer“): alle Pixel der Ebene 512 bleiben als starres Original-Teil auf dem Kopf (kein anim_feuer3 mehr)
+KRONE = L.platz(L.trenne(quelle, flamme_m)[0], H, W, PAD_L, PAD_T)
+KRONE_M = L.deckend(KRONE)
+GLANZ = (255, 177, 90)                                          # hellstes Gold der Krone (Quellfarbe, Pixel (59, 8))
+assert L.farbmaske(quelle, [GLANZ]).any()
+#          x,  y, Startframe      – Juwel Mitte, Goldzacke links, Juwel rechts
+FUNKEL = [(56, 17, 18), (45, 11, 38), (61, 15, 54)]
+FUNKEL_FOLGE = (1, 2, 2, 1)
 
 schwanz_m = vorhanden & (xx <= 18) & (yy <= 30)
 arm_m = vorhanden & (yy >= 47) & (yy <= 55) & (((yy == 47) & (xx >= 41)) | ((yy == 48) & (xx >= 40)) | ((yy >= 49) & (yy <= 51) & (xx >= 39)) | ((yy == 52) & (xx >= 41)) | ((yy >= 53) & (xx >= 43)))
@@ -103,30 +105,9 @@ LID_C = tuple(int(v) for v in spr[21, 65, :3])
 LID = {0: LID_C, 1: S_ if LID_C == V_ else V_}
 
 
-AUGE_SPERRE = np.zeros((H, W), bool)                                   # das Feuer deckt das Auge nie zu (Auge + 1 px Rand)
-for _x in range(58, 66):
-    for _y in range(20, 26):
-        if any((ax - _x) ** 2 + (ay - _y) ** 2 <= 2 for ax in range(59, 65) for ay in range(21, 25) if vorhanden[ay, ax] and tuple(int(v) for v in spr[ay, ax, :3]) not in HAUT + [L_]):
-            AUGE_SPERRE[PAD_T + _y, PAD_L + _x] = True
-
-
 def teil(maske):
     t, _ = L.trenne(spr, maske)
     return L.platz(t, H, W, PAD_L, PAD_T)
-
-
-def _fl(x, y, laenge, breite, richtung, phase, **kw):
-    return F3.Flamme(x=PAD_L + x, y=PAD_T + y, laenge=laenge, breite=breite, richtung=richtung, phase=phase, **kw)
-
-
-FEUER = F3.Feuer(H, W, [
-    _fl(53, 24.5, 9, 5.5, (0, -1), 0.0, bauch=0.2, schlag=0.3, puls=0.08, wiegen=0.1, baender=F3.SOCKEL),      # Glutsockel auf Hinterkopf/Nacken
-    _fl(55.5, 21, 19, 3.6, (0.05, -1), 0.10),
-    _fl(51.5, 21.5, 18, 3.4, (-0.15, -1), 0.55),
-    _fl(49.5, 22, 15, 3.2, (-0.55, -1), 0.30),
-    _fl(47.5, 23.5, 12, 3.0, (-1, -0.75), 0.80),
-    _fl(58.5, 19, 10, 2.4, (0.45, -1), 0.65),
-], FEUER_FARBEN, posen=16, halten=1, sperre=AUGE_SPERRE)
 
 
 def zustand(i):
@@ -137,7 +118,7 @@ def zustand(i):
     return atem, kiefer, bl, schwanz
 
 
-def frame(i, nur=None, feuer=True):
+def frame(i, nur=None):
     atem, kiefer, bl, schwanz = zustand(i)
     k = teil(koerper)
     if bl:
@@ -158,10 +139,15 @@ def frame(i, nur=None, feuer=True):
     wahl = nur or tuple(ebenen)
     ganz = L.zusammen(H, W, [(ebenen[n][0], 0, ebenen[n][1]) for n in wahl])
     ganz = Z.umriss_faerben(ganz, HAUT, REGEL, H_)
-    if feuer and nur is None:
-        fe = FEUER.ebene(i, dy=-atem)
-        kern = L.platz(L.trenne(quelle, kern_m)[0], H, W, PAD_L, PAD_T)
-        ganz = L.zusammen(H, W, [(ganz, 0, 0), (fe, 0, 0), (kern, 0, -atem)])
+    if nur is None:
+        krone = KRONE.copy()
+        for x, y, start in FUNKEL:                              # kurzer Glanz auf Gold/Juwelen, nur innerhalb der Kronenpixel
+            st = N9.funkel_folge(i, N, start, FUNKEL_FOLGE)
+            if st:
+                e = N9.funkel(L.leer(H, W), PAD_L + x, PAD_T + y, st, GLANZ)
+                m = L.deckend(e) & KRONE_M
+                krone[m] = e[m]
+        ganz = L.zusammen(H, W, [(ganz, 0, 0), (krone, 0, -atem)])  # die Krone geht starr mit dem Kopf mit
     return ganz
 
 

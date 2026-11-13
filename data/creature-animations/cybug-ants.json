@@ -1,9 +1,9 @@
 {
   "creature": "Cybug ANTS",
   "sheet": "cybug-ants.png",
-  "frameWidth": 117,
+  "frameWidth": 123,
   "frameHeight": 23,
-  "frames": 48,
+  "frames": 64,
   "frameMs": 70,
   "loop": true,
   "layout": "horizontal",
@@ -11,5 +11,5 @@
   "padLeft": 2,
   "padRight": 2,
   "padBottom": 2,
-  "faceX": 58.5
+  "faceX": 61.5
 }
