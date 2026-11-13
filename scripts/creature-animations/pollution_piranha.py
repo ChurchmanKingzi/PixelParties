@@ -20,9 +20,9 @@ Ablauf (48 Frames à 70 ms ≈ 3,4 s) — kleiner, flinker Fisch:
 Starr: Kopf, obere Zähne, Kiemen, Rückenflosse. Nur ganze Pixel, nur Quellfarben; keine Ergänzungen.
 
 RUNDE 8 (Nutzer: „Sollten BEIDE Kiefer bewegen und ihre Mäuler ganz schließen können“): Ober- UND Unterkiefer sind jetzt Posen um das Kiefergelenk (Spalte x = 8 bleibt stehen):
-der Oberkiefer samt Stirn (x ≤ 7, y ≤ 13) senkt sich bis 3 px, der Unterkiefer (x ≤ 7, y ≥ 16) hebt sich bis 3 px, je Spalte starr (G.spalten_pose, Zieltabellen OBER_ZU/UNTER_ZU,
-vier Posen 0…3 = offen … zu). In der Pose „zu“ ist das Maul vollständig geschlossen: zwischen Ober- und Unterlippe bleibt nur das zwei Zeilen hohe Gebiss, in dem die oberen Zähne
-(x 1/3/5/7) und die unteren (x 2/4/6) lückenlos ineinandergreifen – kein Hintergrundpixel im Maul, keine Lücke am Gelenk. Bissfolge (Doppelbiss + einzelner Biss) wie bisher.
+der Oberkiefer samt Stirn (x ≤ 7, y ≤ 13) senkt sich bis 3 px, der Unterkiefer (x ≤ 7, y ≥ 16) hebt sich bis 4 px, je Spalte starr (G.spalten_pose, Zieltabellen OBER_ZU/UNTER_ZU,
+vier Posen 0…3 = offen … zu). In der Pose „zu“ ist das Maul vollständig geschlossen: zwischen Ober- und Unterlippe bleibt nur eine Zeile Gebiss; die oberen Zähne
+(x 1/3/5/7) stehen mit ihrer Spitze vor der Unterlippe, die unteren (x 2/4/6) vor der Oberlippe – ein lückenlos verzahntes Sägezahn-Gebiss – kein Hintergrundpixel im Maul, keine Lücke am Gelenk. Bissfolge (Doppelbiss + einzelner Biss) wie bisher.
 """
 import sys
 
@@ -45,7 +45,7 @@ zaehne = maul & L.farbmaske(spr, [ZAHN])
 kiefer = maul & (yy >= 16) & ~zaehne                      # Unterkiefer
 oberkiefer = maul & (yy <= 13) & ~zaehne                 # Oberkiefer mit Stirn (das Auge x 8–11 bleibt stehen)
 OBER_ZU = {7: 1, 6: 2, 5: 3, 4: 3, 3: 3, 2: 3, 1: 3, 0: 3}
-UNTER_ZU = {7: -2, 6: -2, 5: -3, 4: -3, 3: -3, 2: -3, 1: -3, 0: -3}
+UNTER_ZU = {7: -2, 6: -3, 5: -4, 4: -4, 3: -4, 2: -4, 1: -4, 0: -4}
 MAUL_STUFEN = 3
 flosse = B.da & L.farbmaske(spr, [(88, 172, 172)])
 flosse |= B.da & (yy >= 20) & (xx >= 13)

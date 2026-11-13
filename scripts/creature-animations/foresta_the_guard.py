@@ -96,7 +96,7 @@ def frame(i, nur=None):
         spross = N8.zeilen_versatz(SPROSS, {PT + 18: 1, PT + 19: 1})
     schwanz = L.zusammen(sz.H, sz.W, [(N8.spalten_versatz(SCHWANZ, f), 0, 0), (N8.spalten_versatz(spross, f), 0, 0)])
     mk = MAUL_F[(i // 2) % 36] if i < 40 else MAUL_F[20 + (i - 40) % 16] if i < 72 else 0
-    ak = ARM_F[i % 36]
+    ak = ARM_F[(i + 18) % 36]                      # Arme heben sich in der Ausatem-Phase (nicht gleichzeitig mit dem Atemhub)
     kopf = L.zusammen(sz.H, sz.W, [(kiefer(mk), 0, 0), (oben, 0, 0), (ARM, 0, -ak)])      # Kiefer HINTER den oberen Zähnen, Arme VOR dem Körper
     if mk == 2:                                      # Maul zu: verbliebene Zahnlücken sind dunkle Fugen (kein Hintergrund zwischen den Zähnen)
         luecke = ~(kopf[..., 3] > 0) & sz.voll((xx >= 3) & (xx <= 13) & (yy >= 12) & (yy <= 14))
