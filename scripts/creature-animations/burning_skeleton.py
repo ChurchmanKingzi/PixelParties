@@ -47,6 +47,7 @@ import numpy as np
 
 import anim_lib as L
 import anim_untote as U
+import anim_feuer3 as F3
 
 
 _OHNE_PARTIKEL = [False]
@@ -254,6 +255,15 @@ def stufe2(i):
     return int(round(2 * (1 - abs(2 * t - 1))))                  # 0-1-2-1-0
 
 
+# Runde 5 (neues Feuer-System anim_feuer3, klassischer Flammenzyklus mit Aufwärtsfluss, 16 Posen à 1 Frame = 3 Zyklen je Schleife): ruhiger Glutsockel flach auf dem Schädeldach (Zeile 9)
+# in der Breite der gemalten Flammenbasis (x 7–12) + drei phasenversetzte Zungen (Mitte hoch wie gemalt bis y ≈ 0–4); Farben der Quelle Rot → Orange → Gelb (Kern am Fuß).
+_F3 = lambda x, y, l, b, **k: F3.Flamme(GPL + x, GPT + y, l, b, **k)
+FEUER3 = F3.Feuer(H, W, [_F3(10.0, 8.7, 4.5, 3.1, fuss=0, baender=[(1.0, 1.0), (0.9, 0.84), (0.72, 0.6)], bauch=0.2, schlag=0.3, phase=0.2, puls=0.08, wiegen=0.1),
+                         _F3(9.3, 8.2, 16, 2.4, phase=0.0, richtung=(-0.05, -1)),
+                         _F3(11.4, 8.2, 11, 2.1, phase=0.5, richtung=(0.12, -1)),
+                         _F3(7.9, 8.4, 8, 1.8, phase=0.75, richtung=(-0.2, -1))], [E_, G_, P_], posen=16, halten=1)
+
+
 def frame_gross(i, nur=None):
     r_b = stufe2(i)
     r_k = max(min(r_b, stufe2(i - 2)), r_b - 1)                   # Schädel + Flamme folgen der Brust, nie höher
@@ -262,10 +272,7 @@ def frame_gross(i, nur=None):
     blink = {18: 1, 19: 2, 20: 1, 42: 1, 43: 2, 44: 1}.get(i, 0)
 
     # --- Feuer: Basis, Zungen, abreißende Funken (alle Pixel aus E/G/P) ---
-    fl = L.leer(H, W)
-    for (x, y), col in flamme_pixel(i).items():
-        fl[GPT + y, GPL + x, :3] = col
-        fl[GPT + y, GPL + x, 3] = 255
+    fl = FEUER3.ebene(i)                                           # Runde 5: neues Feuer-System (anim_feuer3) statt der Spaltenflamme (flamme_pixel bleibt ungenutzt stehen)
     # --- Schädel mit Glutaugen ---
     kp = teil(kopf)
     for (x, y) in AUGEN:

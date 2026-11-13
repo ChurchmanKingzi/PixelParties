@@ -41,7 +41,7 @@ import numpy as np
 import anim_humanoide as Hm
 import anim_lib as L
 import anim_textur as TX   # texturierte Streckzeilen statt Zeilenkopien (Regel 43/49)
-TX.umleiten(sperre=[(0, 0, 0), (23, 21, 22)])   # dunkle Umriss-/Nahtfarben: werden beim Texturieren weder übernommen noch überschrieben (keine verdickten Linien)
+TX.umleiten(nicht_holen=[(0, 0, 0), (23, 21, 22)])   # dunkle Umriss-/Nahtfarben werden nie in eine eingefügte Zeile geholt (keine verdickten Linien)
 
 N, MS = 48, 62
 PAD_L, PAD_R, PAD_T, PAD_B = 3, 4, 3, 2
@@ -90,7 +90,7 @@ def arm_senken(k):
     obere[:x0] = 0
     nachbar = k[y0].copy()
     nachbar[:x0] = 0
-    out[y0, x0:] = L.misch_kopie(obere, [nachbar, None], 1)[x0:]
+    out[y0, x0:] = TX.misch_kopie(obere, [nachbar, None], 1)[x0:]
     # alte Pixel der Zeile y1 + 1 links von x0 bleiben (Körper); die verschobenen Armpixel überschreiben nur x ≥ x0
     return out
 

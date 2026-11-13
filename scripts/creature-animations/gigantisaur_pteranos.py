@@ -10,6 +10,12 @@ Quelle: src/gigantisaur-pteranos.png — der ganze Flugsaurier (73×49 px, 14 Fa
   der Figur gerastet: (25,4,3)/(77,46,43)/(57,27,25)/(111,67,66)/(122,84,73) stammen aus Ebene 239, dazu aus der Kunst die Haut-Lichtfarbe (151,100,81) und die Augenfarben (158,82,80)/(86,14,12) (bei der Prüfung `erlaubt`:
   Farben der Kartenkunst). Danach: Löcher gefüllt (5 px), 3 verstreute Pixel entfernt, die Flügelspitze am Kartenrand mit zwei Umrisspixeln (71–72, 0) geschlossen.
 
+RUNDE 5 (Nutzer: „Die Bewegungen der zwei Flügel passen noch nicht zusammen. Hier kannst du auch gerne einmal von Grund auf neu ansetzen.“): Flügelschlag von Grund auf neu geplant (siehe PLAN weiter unten).
+3D-Pose: das Tier kommt schräg von vorn, die Flügel bilden ein V. EIN Schlagplan (24 Frames = 1,44 s, zweimal je Schleife) steuert BEIDE Flügel mit demselben Winkel: gleichzeitig oben (59°), in der Mitte, unten (−18°);
+der nahe Flügel schwenkt im Uhrzeigersinn um (39,32), der ferne spiegelbildlich um sein tief hinter Schnabelansatz/Hals verdecktes Gelenk (17,36) — er ist ein gerader, perspektivisch kürzerer Flügel (25 px), von dem in
+der Ruhepose nur das Blatt hinter dem Kopf hervorschaut, und schwenkt beim Abschlag als Ganzes nach links über den Schnabel. Die Spitzen beider Flügel laufen gleich nach. Der Körper steigt beim Abschlag bis 2 px und
+sinkt beim Aufschlag. Die Abschnitte RUNDE 2–4 beschreiben beim Flügelschlag frühere Stände (Zeichentechnik band_fluegel aus Runde 4 bleibt).
+
 RUNDE 4 (Nutzer: „Flug-Animation sieht immer noch sehr schlecht aus … der linke Flügel müsste KOMPLETT bewegt werden, da schaut nur die Spitze raus, das Gelenk sitzt viel weiter unten, und der andere Flügel hat
 sein Gelenk beim Übergang zum Körper; aktuell knickt dieser mitten drin ab“): Beide Flügel werden nicht mehr gebogen/umgetastet, sondern je Schlüsselpose NEU GEZEICHNET (anim_r4_fluegel.band_fluegel: Fläche um die
 Mittellinie, Umriss immer 1 px, Längsstreifen wie im Original). 12 Posen je Schlag (16 Frames = 960 ms, Abschlag 4 Frames, Aufschlag 8):

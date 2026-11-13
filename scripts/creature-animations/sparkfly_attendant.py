@@ -39,6 +39,8 @@ import sys
 import numpy as np
 
 import anim_lib as L
+import anim_textur as TX   # texturierte Streckzeilen statt Zeilenkopien (Regel 43/49)
+TX.umleiten()               # auch Streckaufrufe innerhalb der Gruppenmodule liefern texturierte Zeilen
 import anim_flieger as F
 
 N, MS = 48, 60
@@ -72,8 +74,7 @@ def streck_unten(a, zeile, n):
     h = a.shape[0]
     if a[h - n:, :, 3].any():
         raise L.ClipError('streck_unten würde belegte Zeilen am unteren Rand abschneiden')
-    rows = list(range(zeile + 1)) + [zeile] * n + list(range(zeile + 1, h - n))
-    return a[rows].copy()
+    return TX.streck_unten(a, zeile, n)                         # texturierte Einfügezeilen statt Zeilenkopien (Regel 43/49)
 
 
 def frame(i, partikel=True, effekte=True):

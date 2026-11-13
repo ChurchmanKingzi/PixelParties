@@ -51,6 +51,8 @@ import anim_amorph as A
 import anim_gbb as G
 import anim_humanoide as Hm
 import anim_lib as L
+import anim_textur as TX   # texturierte Streckzeilen statt Zeilenkopien (Regel 43/49)
+TX.umleiten()               # auch Streckaufrufe innerhalb der Gruppenmodule liefern texturierte Zeilen
 
 N, MS = 48, 80
 PAD_L, PAD_R, PAD_T, PAD_B = 6, 8, 6, 4
@@ -139,7 +141,7 @@ def frame(i):
     if k:
         Hm.setze(kopf, {p: LID for p in AUGEN if k == 2 or p[1] == 12}, OFF)
     r = int(round(2 * (0.5 - 0.5 * np.cos(L.sinus(i, 24)))))                    # 0…2 px, zweimal je Schleife
-    kopf = L.streck_zeile(kopf, PAD_T + 25, r)
+    kopf = TX.streck_zeile(kopf, PAD_T + 25, r)
     D = int(round(2.0 * np.sin(L.sinus(i, N))))                                      # Haube als Ganzes ±2 px, nur der Hals biegt sich (S-Kurve über 6 Zeilen)
     kd = {y: int(round(D * min(1.0, (PAD_T + 27 - y) / 6.0))) for y in range(PAD_T + 3 - r, PAD_T + 28)}
     kopf = G.zeilen_dx(kopf, kd)

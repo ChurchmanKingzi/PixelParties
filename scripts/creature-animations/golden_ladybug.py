@@ -67,8 +67,7 @@ def streck_unten(a, zeile, n):
     h = a.shape[0]
     if a[h - n:, :, 3].any():
         raise L.ClipError('streck_unten würde belegte Zeilen am unteren Rand abschneiden')
-    rows = list(range(zeile + 1)) + [zeile] * n + list(range(zeile + 1, h - n))
-    return a[rows].copy()
+    return TX.streck_unten(a, zeile, n)                         # texturierte Einfügezeilen statt Zeilenkopien (Regel 43/49)
 
 
 def frame(i, partikel=True, effekte=True):

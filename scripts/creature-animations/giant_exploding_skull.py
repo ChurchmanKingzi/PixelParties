@@ -47,9 +47,10 @@ import numpy as np
 
 import anim_lib as L
 import anim_amorph as A
+import anim_feuer3 as F3
 
 N, MS = 48, 65
-PAD_L, PAD_R, PAD_T, PAD_B = 5, 5, 4, 2
+PAD_L, PAD_R, PAD_T, PAD_B = 5, 5, 12, 2
 
 spr = L.lade('giant-exploding-skull')
 sh, sw = spr.shape[:2]
@@ -184,9 +185,9 @@ def _draht(sp_ebene, name, i):
 
 def sprite_mit_effekten(i):
     sp = spr.copy()
-    if FOLGE_F[i]:
+    if True:                                                                       # Runde 5: Funkengarbe → Flamme (siehe flamme_ebene)
         sp[FUNKE] = 0
-        for (x, y), c in FUNKEN_POSE[FOLGE_F[i]].items():
+        for (x, y), c in {}.items():
             if 0 <= x < sw and 0 <= y < sh and not (OPAK[y, x] and not FUNKE[y, x]):
                 sp[y, x, :3] = c
                 sp[y, x, 3] = 255
@@ -224,6 +225,17 @@ def figur(i):
     return dict(fig=fig, brueck=brueck, pfad=pfad, offen=offen)
 
 
+# Runde 5 (neues Feuer-System anim_feuer3): statt der zufälligen Funkengarbe brennt am Schnurende (19,7) eine Flamme mit Aufwärtsfluss (Sockel + zwei phasenversetzte Zungen, 16 Posen à 1 Frame);
+# Farben der Quelle: Gelb (255,255,0) außen → Hellgelb (250,255,127) → weißer Kern. Fuß am Schnurende, die Flamme liegt HINTER der Schnur (lückenloser Anschluss).
+FLAMME3 = F3.Feuer(H, W, [F3.Flamme(PAD_L + 16.5, PAD_T + 9.5, 6, 4.6, fuss=2.6, bauch=0.2, schlag=0.3, phase=0.3, puls=0.08, wiegen=0.1),
+                          F3.Flamme(PAD_L + 15.0, PAD_T + 8.0, 12, 3.2, richtung=(-0.15, -1), phase=0.0),
+                          F3.Flamme(PAD_L + 18.0, PAD_T + 8.0, 10, 3.0, richtung=(0.1, -1), phase=0.55)], [CG, CH, CL], posen=16, halten=1)
+
+
+def flamme_ebene(i):
+    return FLAMME3.ebene(i, dy=HOP[i])
+
+
 def funken_ebene(i):
     e = L.leer(H, W)
 
@@ -246,7 +258,7 @@ def funken_ebene(i):
 
 def frame(i):
     f = figur(i)
-    return L.zusammen(H, W, [(f['fig'], 0, 0), (funken_ebene(i), 0, 0)])
+    return L.zusammen(H, W, [(flamme_ebene(i), 0, 0), (f['fig'], 0, 0), (funken_ebene(i), 0, 0)])
 
 
 if __name__ == '__main__':

@@ -39,7 +39,7 @@ import sys
 
 import numpy as np
 
-import anim_feuer as FEU
+import anim_feuer3 as F3
 import anim_humanoide as Hm
 import anim_lib as L
 
@@ -75,8 +75,8 @@ RAMPE = {'rand': GELB, 'rot': GELB, 'orange': GELB, 'gelb': GELB, 'hell': HELL}
 SPERRE = np.zeros((H, W), bool)
 SPERRE[GPT + 12, GPL + 1] = True                      # nur dieses eine Zündschnur-Pixel trägt die Flamme (die schräge Schnur darunter bleibt unberührt)
 assert kanone_ohne[12, 1, 3] > 0
-ZUNGEN = [FEU.Zunge(1.4 + GPL, 11 + GPT, 5.5, 1.7)]
-FEUER = FEU.Feuer(H, W, ZUNGEN, RAMPE, n=N, seed=3, posen=12, amplitude=0.7, sperre=SPERRE)
+# Runde 5 (neues Feuer-System anim_feuer3): die Luntenflamme ist für das Feldverfahren zu klein → handgezeichneter 8-Bilder-Zyklus F3.klein('kerze') (Tropfen 5 px breit, Bauch wandert hoch, Spitze neigt sich und reißt ab),
+# Fußzeile (0–2, 11) sitzt direkt auf dem obersten Zündschnur-Pixel (1,12); Gelb außen, helles Gelb als Kern (einzige Feuerfarben der Quelle).
 
 
 def kopf_frame(i):
@@ -105,7 +105,7 @@ def kopf_frame(i):
 def frame_gross(i, flamme=True):
     ebenen = [(KANONE, 0, 0), (kopf_frame(i), 0, 0)]
     if flamme:
-        ebenen += [(FEUER.ebene(i), 0, 0), (FEUER.funken(i, dy=0, leben=8), 0, 0)]
+        ebenen += [(F3.klein(H, W, GPL + 1, GPT + 11, i, [GELB, HELL, HELL], 'kerze'), 0, 0)]
     return L.zusammen(H, W, ebenen)
 
 

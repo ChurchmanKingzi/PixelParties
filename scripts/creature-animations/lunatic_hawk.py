@@ -44,6 +44,8 @@ import sys
 import numpy as np
 
 import anim_lib as L
+import anim_textur as TX   # texturierte Streckzeilen statt Zeilenkopien (Regel 43/49)
+TX.umleiten()               # auch Streckaufrufe innerhalb der Gruppenmodule liefern texturierte Zeilen
 import anim_flieger as F
 import anim_flieger_b as B
 
@@ -193,7 +195,7 @@ def frame(i, partikel=True, nur=None):
     if 'koerper' in ebenen:
         beine = BEINE
         if dy_f - dy_u > 0:
-            beine = L.streck_zeile(beine, PAD_T + CUT, dy_f - dy_u)          # schmale Zeile 34 (Schwanzansatz) doppelt: Fänge hängen tiefer
+            beine = TX.streck_zeile(beine, PAD_T + CUT, dy_f - dy_u)          # schmale Zeile 34 (Schwanzansatz) doppelt: Fänge hängen tiefer
         schichten += [(KOERPER, 0, dy_u, 3), (beine, 0, dy_f, 4)]
     if 'fluegel' in ebenen:
         for name in ('tl', 'sl', 'sr', 'tr'):

@@ -2,7 +2,7 @@
   "creature": "Giant Exploding Skull",
   "sheet": "giant-exploding-skull.png",
   "frameWidth": 74,
-  "frameHeight": 59,
+  "frameHeight": 67,
   "frames": 48,
   "frameMs": 65,
   "loop": true,

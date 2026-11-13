@@ -38,7 +38,7 @@ import numpy as np
 
 import anim_lib as L
 import anim_flieger as F
-import anim_feuer as FEU
+import anim_feuer3 as F3
 
 N, MS = 48, 60
 PAD_L, PAD_R, PAD_T, PAD_B = 8, 8, 6, 14                     # Arbeitsleinwand (am Ende zugeschnitten); unten Platz für Düsenflammen und Funken
@@ -65,8 +65,12 @@ RAMPE = {'rand': (202, 44, 41), 'rot': (202, 44, 41), 'orange': (244, 123, 34), 
 FUSS = 2                                                     # Fußzeile der Flammen im Sprite (direkt unter dem grauen Querband)
 fest = np.zeros((H, W), bool)
 fest[PAD_T:PAD_T + sh, PAD_L:PAD_L + sw] = koerper
-FEUER = FEU.Feuer(H, W, [FEU.Zunge(PAD_L + 3.5, (H - 1) - (PAD_T + FUSS), 6.5, 3.0)],        # nur die LINKE Flamme; die rechte ist ihr Spiegelbild
-                  RAMPE, n=N, seed=5, posen=12, amplitude=1.0, sperre=fest[::-1].copy())
+# Runde 5 (neues Feuer-System anim_feuer3): Düsenflamme mit Fluss NACH UNTEN (richtung=(0, 1)) — breiter, flacher Fuß unter dem Querband, eine lange und eine kurze phasenversetzte Zunge,
+# Bäuche wandern vom Gehäuse weg, Spitzen schnüren sich ab und fallen als Fetzen; 16 Posen à 1 Frame (3 Zyklen je Schleife). Keine gespiegelte Leinwand mehr nötig.
+FEUER = F3.Feuer(H, W, [F3.Flamme(PAD_L + 3.5, PAD_T + FUSS - 0.4, 4, 3.3, richtung=(0, 1), fuss=0, bauch=0.2, schlag=0.3, phase=0.3, baender=F3.SOCKEL, puls=0.08, wiegen=0.1),
+                        F3.Flamme(PAD_L + 3.2, PAD_T + FUSS, 8, 2.6, richtung=(0.05, 1), fuss=0, phase=0.0, wiegen=0.35),
+                        F3.Flamme(PAD_L + 4.4, PAD_T + FUSS, 5.5, 2.0, richtung=(0.1, 1), fuss=0, phase=0.5, wiegen=0.35)],        # nur die LINKE Düse; die rechte ist ihr Spiegelbild
+                 FLAMME_FARBEN, posen=16, halten=1, sperre=fest)
 MITTE = PAD_L + 8                                            # Spiegelachse (Gehäusemitte, Leinwandspalte); W = 2·PAD_L + 17 → Spiegeln = ::-1 über die ganze Breite
 assert W == 2 * MITTE + 1
 
@@ -125,12 +129,12 @@ def frame(i, partikel=True, effekte=True, nur=None):
                 kp[PAD_T + y, PAD_L + x, :3] = F.heller(kp[PAD_T + y, PAD_L + x, :3], ROT_RAMPE, st)
         F.lichtband(kp, metall_maske, PAD_L, PAD_T, i, N // 2, 6, 9, METALL, stufen=1, breite=3.0, achse=(1.0, 0.7))
     kp = L.versetze(kp, 0, bob)
-    flammen = fuss_festlegen(spiegeln_paar(linke_haelfte(FEUER.ebene(i)[::-1].copy())))   # zurückgespiegelt: Flamme brennt nach unten; rechts = Spiegelbild von links
+    flammen = fuss_festlegen(spiegeln_paar(linke_haelfte(FEUER.ebene(i))))   # zurückgespiegelt: Flamme brennt nach unten; rechts = Spiegelbild von links
     flammen = L.versetze(flammen, 0, bob)
     f = L.zusammen(H, W, [(flammen, 0, 0), (kp, 0, 0)])
     F.umranden(f, [flammen], UMRISS, RAND, RAND, RAND)                          # Randpixel-Test (Regel 16): freie Flammenkanten = Außenhaut
     if partikel:
-        funken = spiegeln_paar(linke_haelfte(FEUER.funken(i, dy=lambda fr: -bob_von(fr))[::-1].copy()))
+        funken = spiegeln_paar(linke_haelfte(L.leer(H, W)))
         f = L.zusammen(H, W, [(f, 0, 0), (funken, 0, 0)])
     return f
 
@@ -138,8 +142,8 @@ def frame(i, partikel=True, effekte=True, nur=None):
 def synchron_test(frames_arbeit):
     """SYNCHRON-Test: in jedem Frame ist die Flamme (und der Funkenflug) rechts der Mitte das exakte Spiegelbild der linken (Alpha und Farbe, Pixel für Pixel), ohne Gehäuse."""
     for k in range(N):
-        fl = fuss_festlegen(spiegeln_paar(linke_haelfte(FEUER.ebene(k)[::-1].copy())))
-        fu = spiegeln_paar(linke_haelfte(FEUER.funken(k, dy=lambda fr: -bob_von(fr))[::-1].copy()))
+        fl = fuss_festlegen(spiegeln_paar(linke_haelfte(FEUER.ebene(k))))
+        fu = spiegeln_paar(linke_haelfte(L.leer(H, W)))
         for e in (fl, fu):
             assert (e == e[:, ::-1]).all(), f'Frame {k}: Flammen/Funken nicht spiegelsymmetrisch'
     print('SYNCHRON-Test bestanden: linke und rechte Flamme (samt Funken) sind in allen', N, 'Frames exakte Spiegelbilder')

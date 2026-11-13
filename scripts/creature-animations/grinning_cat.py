@@ -36,6 +36,8 @@ import sys
 import numpy as np
 
 import anim_lib as L
+import anim_textur as TX   # texturierte Streckzeilen statt Zeilenkopien (Regel 43/49)
+TX.umleiten()               # auch Streckaufrufe innerhalb der Gruppenmodule liefern texturierte Zeilen
 
 N, MS = 48, 70
 PAD_L, PAD_R, PAD_T, PAD_B = 3, 3, 3, 3
@@ -92,7 +94,7 @@ def frame(i, nur=None):
             for (x, y) in AUGEN_UNTEN:
                 setze(x, y, GESICHTSFARBE)
     if duck:
-        g = L.streck_zeile(g, PAD_T + 14, -1)
+        g = TX.streck_zeile(g, PAD_T + 14, -1)
     ebenen = {'gesicht': g, 'ecken': e}
     wahl = nur or ('gesicht', 'ecken')
     return L.zusammen(H, W, [(ebenen[n], 0, 0) for n in wahl])

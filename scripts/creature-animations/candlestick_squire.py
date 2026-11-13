@@ -40,7 +40,7 @@ import numpy as np
 
 import anim_lib as L
 import anim_untote as U
-import anim_feuer as FEU
+import anim_feuer3 as F3
 
 N, MS = 48, 65
 GPL, GPR, GPT, GPB = 8, 8, 14, 4
@@ -73,10 +73,15 @@ assert vorhanden[8, 10] and vorhanden[13, 17]
 # Zungen (x, Fußzeile, Höhe, Halbbreite am Fuß): breite Basis wie im Original (Helmflamme ~8 px, Fackelflamme ~7 px), je drei Zungen mit Halbbreite ≥ 1,5 (Fuß ≥ 3 px);
 # Seeds und Amplitude sind so gewählt, dass in allen 48 Frames (a) kein Flammenteil dünner als 2 px über 2 px Länge hinausgeht, (b) die beiden Flammen sich nie berühren (auch nicht diagonal),
 # (c) die Flamme im Frame 0 dem Original möglichst nahe liegt (Überdeckung ~0,75).
-Z1 = [FEU.Zunge(7.6 + GPL, 7 + GPT, 6.0, 1.7), FEU.Zunge(9.8 + GPL, 7 + GPT, 7.5, 2.0), FEU.Zunge(12.0 + GPL, 7 + GPT, 5.5, 1.7)]
-Z2 = [FEU.Zunge(17.0 + GPL, 12 + GPT, 7.0, 1.7), FEU.Zunge(19.2 + GPL, 12 + GPT, 10.0, 2.0), FEU.Zunge(21.0 + GPL, 11 + GPT, 6.5, 1.5)]
-FEUER1 = FEU.Feuer(H, W, Z1, RAMPE, n=N, seed=26, posen=12, amplitude=0.6, sperre=SPERRE1)
-FEUER2 = FEU.Feuer(H, W, Z2, RAMPE, n=N, seed=28, posen=12, amplitude=0.6, sperre=SPERRE2)
+# Runde 5 (neues Feuer-System anim_feuer3, klassischer Flammenzyklus mit Aufwärtsfluss, 16 Posen à 1 Frame): je Flamme ein ruhiger Glutsockel (Fuß auf Dornspitze (10,8) bzw. Stabkappe (17,13))
+# + drei phasenversetzte Zungen in Lage/Größe der gemalten Flammen (Helm x 7–14, y 0–7; Fackel x 16–22, y 2–12). Die Zeilen oben (Z1/Z2 des alten Moduls) sind ersetzt.
+_F = lambda x, y, l, b, **k: F3.Flamme(x + GPL, y + GPT, l, b, wiegen=0.3, **k)
+Z1 = [_F(10.5, 7.2, 5, 3.4, fuss=1.3, bauch=0.2, schlag=0.3, phase=0.2, baender=F3.SOCKEL, puls=0.08),
+      _F(9.0, 6.0, 8, 2.3, phase=0.0, richtung=(-0.1, -1)), _F(11.6, 6.0, 9, 2.4, phase=0.5, richtung=(0.08, -1)), _F(10.3, 6.5, 6, 2.0, phase=0.25)]
+Z2 = [_F(18.4, 12.2, 5, 3.2, fuss=1.3, bauch=0.2, schlag=0.3, phase=0.7, baender=F3.SOCKEL, puls=0.08),
+      _F(17.6, 11.0, 9, 2.3, phase=0.35, richtung=(-0.05, -1)), _F(19.6, 11.0, 11, 2.4, phase=0.85, richtung=(0.12, -1)), _F(18.5, 11.5, 7, 2.0, phase=0.6)]
+FEUER1 = F3.Feuer(H, W, Z1, [ROT, ORANGE, GELB, HELL], posen=16, halten=1, sperre=SPERRE1)
+FEUER2 = F3.Feuer(H, W, Z2, [ROT, ORANGE, GELB, HELL], posen=16, halten=1, sperre=SPERRE2)
 
 HAUT = (187, 104, 49)
 AUGEN = [(6, 19), (10, 19), (6, 20), (10, 20)]
@@ -134,7 +139,7 @@ def frame_gross(i, nur=None):
     f1 = FEUER1.ebene(i)
     f2 = FEUER2.ebene(i)
     f1 = L.versetze(f1, 0, -n)                                   # Kerzenflamme steigt mit dem Helm
-    funken = L.zusammen(H, W, [(FEUER1.funken(i, dy=-n, leben=8), 0, 0), (FEUER2.funken(i, leben=8), 0, 0)])
+    funken = L.leer(H, W)                                        # abgerissene Fetzen gehören seit Runde 5 zur Flammen-Ebene
     koerper = L.zusammen(H, W, [(stab, 0, 0), (kb, 0, 0)])
     koerper = U.kontur_schliessen(koerper, UMRISS, (26, 26, 26))
     figur = L.zusammen(H, W, [(koerper, 0, 0), (f2, 0, 0), (f1, 0, 0), (funken, 0, 0)])

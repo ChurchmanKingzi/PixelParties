@@ -1,7 +1,7 @@
 {
   "creature": "Chaorc Cannon Fodder",
   "sheet": "chaorc-cannon-fodder.png",
-  "frameWidth": 49,
+  "frameWidth": 50,
   "frameHeight": 31,
   "frames": 48,
   "frameMs": 62,
@@ -11,5 +11,5 @@
   "padLeft": 2,
   "padRight": 2,
   "padBottom": 2,
-  "faceX": 24.5
+  "faceX": 25.0
 }

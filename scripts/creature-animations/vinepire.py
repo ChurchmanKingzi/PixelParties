@@ -34,7 +34,7 @@ import numpy as np
 
 import anim_lib as L
 import anim_textur as TX   # texturierte Streckzeilen statt Zeilenkopien (Regel 43/49)
-TX.umleiten(sperre=[(0, 0, 0), (26, 0, 6), (51, 1, 11)])   # dunkle Umriss-/Nahtfarben: werden beim Texturieren weder übernommen noch überschrieben (keine verdickten Linien)
+TX.umleiten(nicht_holen=[(0, 0, 0), (26, 0, 6), (51, 1, 11)])   # dunkle Umriss-/Nahtfarben werden nie in eine eingefügte Zeile geholt (keine verdickten Linien)
 import anim_amorph as A
 
 N, MS = 48, 65

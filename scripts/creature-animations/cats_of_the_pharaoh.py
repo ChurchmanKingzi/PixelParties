@@ -40,6 +40,8 @@ import sys
 import numpy as np
 
 import anim_lib as L
+import anim_textur as TX   # texturierte Streckzeilen statt Zeilenkopien (Regel 43/49)
+TX.umleiten()               # auch Streckaufrufe innerhalb der Gruppenmodule liefern texturierte Zeilen
 import anim_tiere as T
 
 N, MS = 48, 70
@@ -90,7 +92,7 @@ def biegen(a, pivot, amp, phase):
 def frame(i, nur=None):
     atmen = ATMEN[i % 24]
     amp = 1.6 + 0.8 * (0.5 - 0.5 * math.cos(2 * math.pi * i / N))               # Hub ±1 … ±2 px, nahtlos
-    k = T.spalten_hub(teil(koerper), PAD_T + ATEM_ZEILE, lambda x: atmen if x >= PAD_L + 9 else 0)   # nur Scheitel/Ohr (Kopfspalten) heben sich 1 px; Rumpf bleibt
+    k = TX.spalten_hub(teil(koerper), PAD_T + ATEM_ZEILE, lambda x: atmen if x >= PAD_L + 9 else 0)   # nur Scheitel/Ohr (Kopfspalten) heben sich 1 px; Rumpf bleibt
     o = teil(ohr)
     if i in OHR:
         o = T.zucken_zeilen(o, PAD_T + 2, -1.0, {PAD_T + 0: 1.0, PAD_T + 1: 1.0})

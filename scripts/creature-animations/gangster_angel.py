@@ -45,6 +45,8 @@ import sys
 import numpy as np
 
 import anim_lib as L
+import anim_textur as TX   # texturierte Streckzeilen statt Zeilenkopien (Regel 43/49)
+TX.umleiten()               # auch Streckaufrufe innerhalb der Gruppenmodule liefern texturierte Zeilen
 import anim_flieger as F
 
 N, MS = 40, 70
@@ -154,7 +156,7 @@ def frame(i, partikel=True, effekte=True):
             F.setze(kp, PAD_L, PAD_T, {GLAS_R[j]: FL_D})
     if effekte:
         F.lichtband(kp, bauch, PAD_L, PAD_T, i, N // 2, 6, 6, GOLDR, stufen=1, breite=2.0, achse=(0.0, 1.0), kern_stufen=2)
-    kp = L.versetze(L.streck_zeile(kp, zeile, n_str), 0, low)
+    kp = L.versetze(TX.streck_zeile(kp, zeile, n_str), 0, low)
 
     # ── Flügel: ECHTER Schlag — jeder Flügel dreht sich als Ganzes um den Schulteransatz (am Körperumriss); der Oberkörper trägt ihn (Versatz `up`) ───────
     wl = F.drehen(F.ebene(spr_f, fl_links, H, W, PAD_L, PAD_T), PAD_L + 9, PAD_T + 10, theta, glatt=True)

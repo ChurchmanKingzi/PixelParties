@@ -97,7 +97,7 @@ def koerper_dy(i):
 
 
 # ── Feuer: verschachtelte Flammenzungen (anim_feuer) ──
-import anim_feuer as FEU
+import anim_feuer3 as F3
 
 # Zungen in Sprite-Koordinaten (x, Fußzeile, Höhe, Halbbreite am Fuß); Höhe/Lage entsprechen den Zungen des Originals
 ZUNGEN_SPRITE = [(1.2, 12, 11, 2.0), (3.4, 12, 14, 2.0), (4.8, 11, 11, 1.6), (6.8, 10, 11, 2.0), (9.0, 10, 10, 2.0),
@@ -107,8 +107,11 @@ KUPPEL = (((yy_ >= 11) & (yy_ <= 12) & (xx_ >= 4) & (xx_ <= 13)) | ((yy_ == 10) 
 KUPPEL_C = np.zeros((H, W), bool)
 KUPPEL_C[PAD_T:PAD_T + sh, PAD_L:PAD_L + sw] = KUPPEL
 RAMPE = {'rand': FA, 'rot': FC, 'orange': FB, 'gelb': FG, 'hell': FI}
-FEUER = FEU.Feuer(H, W, [FEU.Zunge(x + PAD_L, b + PAD_T, h, w) for (x, b, h, w) in ZUNGEN_SPRITE], RAMPE, n=N, seed=11, posen=12,
-                  amplitude=1.0, sperre=KUPPEL_C)
+# Runde 5 (neues Feuer-System anim_feuer3, klassischer Flammenzyklus mit Aufwärtsfluss, 16 Posen à 1 Frame = 3 Zyklen je Schleife): ein ruhiger Glutsaum über die ganze Kuppelbreite
+# (Fuß in Zeile 12–13) + die neun Zungen des Originals (Lage/Höhe aus ZUNGEN_SPRITE), phasenversetzt, die äußeren leicht nach außen geneigt. Farben der Quelle (Rand → Orange → Gelb → Hell).
+_FL = F3.saum([(1.5, 12.6), (16.5, 12.6)], 3.0, laenge=5, breite=2.7, versatz=(PAD_L, PAD_T), fuss=1.0, bauch=0.15, schlag=0.2, baender=F3.SOCKEL, puls=0.08, wiegen=0.1)
+_FL += [F3.Flamme(x + PAD_L, b + PAD_T + 0.6, h, w * 1.25, richtung=((x - 9.0) * 0.022, -1), phase=(0.37 * k) % 1.0, fuss=1.0) for k, (x, b, h, w) in enumerate(ZUNGEN_SPRITE)]
+FEUER = F3.Feuer(H, W, _FL, [RAMPE['rand'], RAMPE['orange'], RAMPE['gelb'], RAMPE['hell']], posen=16, halten=1, sperre=KUPPEL_C)
 
 
 def sprite_mit_effekten(i):
@@ -134,7 +137,7 @@ def figur(i):
         z, quelle = A.koerper_pose(koerper, loeschen=loesch, doppeln=dopp, p=p, paare=PAARE_SCHMAL, x0=PAD_L)
     kb, top = A.auf_leinwand(z, H, BODEN, LIFT.get(i, 0))
     dy = top - KOERPER_Y0 - PAD_T
-    flamme = FEUER.ebene(i, hoehen_bonus=int(round(0.6 * s)))
+    flamme = FEUER.ebene(i)
     kuppel = L.platz(np.where(KUPPEL[..., None], sp, 0).astype(np.uint8), H, W, PAD_L, PAD_T)
     fe = L.versetze(L.zusammen(H, W, [(flamme, 0, 0), (kuppel, 0, 0)]), 0, dy)
     fig = L.zusammen(H, W, [(kb, 0, 0), (fe, 0, 0)])
@@ -143,7 +146,7 @@ def figur(i):
 
 def frame(i):
     f = figur(i)
-    funken = FEUER.funken(i, dy=koerper_dy)
+    funken = L.leer(H, W)                                        # abgerissene Fetzen gehören seit Runde 5 zur Flammen-Ebene
     return L.zusammen(H, W, [(f['fig'], 0, 0), (funken, 0, 0)])
 
 
@@ -172,7 +175,7 @@ if __name__ == '__main__':
     print('Pixel je Frame:', n)
     offen = [(i, koerper_offen(fs[i])) for i in range(N) if koerper_offen(fs[i])]
     print('offene Körperkanten (Frame, [(x, y, Farbe)]):', offen if offen else 'keine')
-    print('Zungen:', len(FEUER.zungen), '| Funken pro Schleife:', len(FEUER.ereignisse))
+    print('Flammen:', len(FEUER.flammen))
     A.ausdruck_pruefen(figs, spr, 'fiery-slime')
     L.speichern('fiery-slime', 'Fiery Slime', frames, MS, prev)
     if prev:

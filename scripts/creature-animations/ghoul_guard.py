@@ -39,6 +39,8 @@ import sys
 import numpy as np
 
 import anim_lib as L
+import anim_textur as TX   # texturierte Streckzeilen statt Zeilenkopien (Regel 43/49)
+TX.umleiten()               # auch Streckaufrufe innerhalb der Gruppenmodule liefern texturierte Zeilen
 import anim_untote as U
 import anim_untote2 as V
 
@@ -83,7 +85,7 @@ assert [int(spr[13, x, 0]) for x in range(15)] == [0, 41, 65, 0, 41, 41, 156, 15
 
 def strecken(k, n):
     """Brust n px strecken: alles oberhalb von y 13 rückt n px hoch, dazwischen stehen die handgezeichneten Zeilen (B oben, A unten) statt Kopien."""
-    out = L.streck_zeile(k, OFF[1] + 13, n)
+    out = TX.streck_zeile(k, OFF[1] + 13, n)
     zeilen = [STRECK_A] if n == 1 else [STRECK_B, STRECK_A][:n]
     for j, werte in enumerate(zeilen):
         y = OFF[1] + 13 - len(zeilen) + j

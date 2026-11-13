@@ -38,6 +38,8 @@ import sys
 import numpy as np
 
 import anim_lib as L
+import anim_textur as TX   # texturierte Streckzeilen statt Zeilenkopien (Regel 43/49)
+TX.umleiten()               # auch Streckaufrufe innerhalb der Gruppenmodule liefern texturierte Zeilen
 import anim_flieger as F
 import anim_insekt as I
 
@@ -116,7 +118,7 @@ def frame(i, partikel=True, effekte=True, nur=None):
     wr = rotor_zeichnen(wr, PAD_L, PAD_T, INNEN_R, ROTOR_R, (-st) % 8, -1)
 
     kp = F.zeilen_pendel(kp, PAD_T + 18, 2.0, L.sinus(i, N / 2), 1.0)          # Beine pendeln
-    kp, wl, wr = (L.versetze(L.streck_zeile(a, ZEILE, n_str), 0, lag) for a in (kp, wl, wr))
+    kp, wl, wr = (L.versetze(TX.streck_zeile(a, ZEILE, n_str), 0, lag) for a in (kp, wl, wr))
     f = L.zusammen(H, W, [(wl, 0, 0), (wr, 0, 0), (kp, 0, 0)])
     F.umranden(f, [kp], UMRISS, METALLRAND, METALLRAND, METALLRAND)
     if effekte:                                                # zwei Glitzersterne im Amethyst

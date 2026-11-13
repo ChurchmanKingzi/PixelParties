@@ -2,7 +2,7 @@
   "creature": "Candlestick Squire",
   "sheet": "candlestick-squire.png",
   "frameWidth": 25,
-  "frameHeight": 46,
+  "frameHeight": 54,
   "frames": 48,
   "frameMs": 65,
   "loop": true,
@@ -10,6 +10,6 @@
   "padTop": 1,
   "padLeft": 1,
   "padRight": 1,
-  "padBottom": 5,
+  "padBottom": 9,
   "faceX": 12.5
 }

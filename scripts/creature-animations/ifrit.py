@@ -36,7 +36,7 @@ import numpy as np
 
 import anim_lib as L
 import anim_untote as U
-import anim_feuer as FEU
+import anim_feuer3 as F3
 import anim_daemon as D
 
 N, MS = 48, 65
@@ -70,9 +70,13 @@ fixiert = np.zeros((H, W), bool)
 fixiert[GPT:GPT + sh, GPL:GPL + sw] = koerper
 SPERRE = fixiert[::-1].copy()
 BASIS = fy(GPT + 22)
-ZUNGEN = [FEU.Zunge(GPL + 3.8, BASIS, 5.0, 1.9), FEU.Zunge(GPL + 5.9, BASIS, 8.5, 2.2), FEU.Zunge(GPL + 8.0, BASIS, 12.0, 2.6),
-          FEU.Zunge(GPL + 10.1, BASIS, 8.5, 2.2), FEU.Zunge(GPL + 12.2, BASIS, 5.0, 1.9)]
-FEUER = FEU.Feuer(H, W, ZUNGEN, RAMPE, n=N, seed=9, posen=12, amplitude=0.9, sperre=SPERRE)
+# Runde 5 (neues Feuer-System anim_feuer3; keine gespiegelte Leinwand mehr): der Feuerschweif fließt vom Gürtel (Zeile 22, x 2–13) NACH UNTEN und läuft wie gemalt bei (8,34) spitz aus —
+# ein großer Schweif (Bäuche wandern vom Gürtel zur Spitze, die Spitze schlängelt und wechselt die Länge) + zwei phasenversetzte Seitenzungen; 16 Posen à 1 Frame (3 Zyklen je Schleife).
+# fetzen=False: die Spitze schnürt sich nicht ab (nichts „tropft“ nach unten).
+_F3 = lambda x, y, l, b, **k: F3.Flamme(GPL + x, GPT + y, l, b, fuss=0, fetzen=False, **k)
+FEUER = F3.Feuer(H, W, [_F3(8.0, 21.6, 13.5, 6.0, richtung=(0, 1), pot=1.0, bauch=0.45, schlag=1.0, welle=10, phase=0.1, wiegen=0.25),
+                        _F3(5.0, 21.6, 9, 2.8, richtung=(-0.12, 1), phase=0.45),
+                        _F3(11.0, 21.6, 9, 2.8, richtung=(0.12, 1), phase=0.8)], [ROT, ORANGE, GELB, CREME], posen=16, halten=1, sperre=fixiert)
 
 HORN = [(253, 237, 115), (255, 140, 63)]
 assert all(c in {col(x, y) for y in range(sh) for x in range(sw) if vorhanden[y, x]} for c in HORN)
@@ -109,8 +113,8 @@ def frame_gross(i, nur=None):
     f = L.zusammen(H, W, [(rp, 0, 0), (al, 0, -n), (ar, 0, -n), (kp, 0, -n)])
     f = U.kontur_schliessen(f, UMRISS, KONTUR)
     # Feuer: Pixel der Flamme liegen auf der gespiegelten Leinwand → zurückspiegeln
-    fl = D.flip_v(FEUER.ebene(i))
-    fk = D.flip_v(FEUER.funken(i, leben=10))
+    fl = FEUER.ebene(i)
+    fk = L.leer(H, W)
     f = U.kontur_schliessen(L.zusammen(H, W, [(fl, 0, 0), (f, 0, 0)]), UMRISS, ROT)       # Randpixel-Test auch für Flammenpixel am Körper
     ebenen = [(f, 0, 0)]
     if nur != 'koerper':

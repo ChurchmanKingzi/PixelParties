@@ -1,8 +1,8 @@
 {
   "creature": "Future Tech Drone",
   "sheet": "future-tech-drone.png",
-  "frameWidth": 23,
-  "frameHeight": 22,
+  "frameWidth": 21,
+  "frameHeight": 19,
   "frames": 48,
   "frameMs": 60,
   "loop": true,
@@ -11,5 +11,5 @@
   "padLeft": 2,
   "padRight": 2,
   "padBottom": 2,
-  "faceX": 11.5
+  "faceX": 10.5
 }

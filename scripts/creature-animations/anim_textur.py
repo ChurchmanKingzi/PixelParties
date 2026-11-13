@@ -20,6 +20,8 @@ D_AEHNLICH = 64       # bis zu diesem Helligkeitsabstand (heller) gelten zwei Pi
 D_DUNKLER = 36        # … und höchstens so viel DUNKLER darf ein übernommenes Pixel sein (keine Umriss-/Mund-/Augenfarben in helle Flächen ziehen)
 LANG = 5              # ab dieser Lauflänge gilt eine Abweichung als „anderes Muster“ (und eine Übereinstimmung als Kopie)
 STANDARD_SPERRE = ()  # Sperrfarben für Aufrufe ohne eigenes `sperre` (setzt umleiten(sperre=…) je Figurenskript)
+NICHT_HOLEN = ()      # Farben, die nie aus einer Nachbarzeile in eine eingefügte Zeile geholt werden (setzt umleiten(nicht_holen=…));
+                      # anders als Sperrfarben dürfen sie in der eingefügten Zeile aber durch hellere Nachbarpixel ersetzt werden
 
 
 def _lum(z):
@@ -116,11 +118,14 @@ def zwischenzeile(form, nah, fern=None, nah2=None, k=1, fern2=None, sperre=()):
         nah = _leer_wie(form)
     sp = {tuple(int(v) for v in c[:3]) for c in sperre}
 
-    def frei(z):
-        if not sp or z is None:
+    spq = sp | set(NICHT_HOLEN)
+
+    def frei(z, menge=None):
+        menge = spq if menge is None else menge
+        if not menge or z is None:
             return np.ones(len(form), bool)
-        return np.array([tuple(int(v) for v in p[:3]) not in sp for p in z])
-    inn = _innen(form) & (nah[:, 3] > 0) & frei(form)          # wo die angrenzende Zeile fehlt, liegt die neue Zeile frei (Umriss) → bleibt wie die gestreckte
+        return np.array([tuple(int(v) for v in p[:3]) not in menge for p in z])
+    inn = _innen(form) & (nah[:, 3] > 0) & frei(form, sp)          # wo die angrenzende Zeile fehlt, liegt die neue Zeile frei (Umriss) → bleibt wie die gestreckte
     if inn.sum() < 2:
         return form.copy()
     ok_nah = inn & _innen(nah) & ~_linie(nah, nah2, form) & frei(nah)
@@ -245,6 +250,53 @@ def streck_spalte(a, spalte, n=1):
     return np.ascontiguousarray(streck_zeile(np.ascontiguousarray(a.transpose(1, 0, 2)), spalte, n).transpose(1, 0, 2))
 
 
+def streck_unten(a, zeile, n=1, sperre=()):
+    """Gegenstück zu streck_zeile für hängende Teile (Hinterleib, Fänge): Zeile `zeile` n-mal zusätzlich einfügen, alles OBERHALB bleibt stehen,
+    alles darunter rückt nach unten. Ersetzt die handgeschriebenen `streck_unten`-Kopierfunktionen der Figurenskripte (gleiche Silhouette, gleiche
+    Bewegung), die eingefügten Zeilen sind texturiert statt kopiert."""
+    if n <= 0:
+        return a.copy()
+    if a[a.shape[0] - n:, :, 3].any():
+        raise L.ClipError(f'streck_unten würde {n} belegte Zeile(n) am unteren Rand abschneiden')
+    return np.ascontiguousarray(streck_zeile(np.ascontiguousarray(a[::-1]), a.shape[0] - 1 - zeile, n, sperre)[::-1])
+
+
+def spalten_hub(a, zeile, k_von_x, sperre=()):
+    """Wie anim_tiere.spalten_hub (in jeder Spalte x werden bei `zeile` k_von_x(x) Zeilen eingefügt bzw. bei k < 0 entfernt – der Rumpf hebt/neigt
+    sich, die Füße bleiben), aber die eingefügten Pixel stammen aus texturierten Zwischenzeilen statt aus Kopien der Zeile `zeile`.
+    Silhouette und Bewegung jeder Spalte sind identisch zum Original."""
+    h, w = a.shape[:2]
+    ks = [int(k_von_x(x)) if a[:, x, 3].any() else 0 for x in range(w)]
+    out = np.zeros_like(a)
+    kmax = max([k for k in ks if k > 0], default=0)
+    hoch = np.concatenate([np.zeros((kmax, w, 4), a.dtype), a]) if kmax else a          # oben Platz, damit die Ganzzeilen-Streckung nie abschneidet
+    voll = {}
+    for x in range(w):
+        k = ks[x]
+        if not a[:, x, 3].any():
+            continue
+        if k <= 0:
+            out[:, x:x + 1] = _L_STRECK_ZEILE(a[:, x:x + 1], zeile, k)
+            continue
+        if a[:k, x, 3].any():
+            raise L.ClipError(f'spalten_hub würde in Spalte {x} {k} belegte Zeile(n) am oberen Rand abschneiden')
+        if k not in voll:
+            voll[k] = streck_zeile(hoch, zeile + kmax, k, sperre)[kmax:]
+        out[:, x] = voll[k][:, x]
+    return out
+
+
+def misch_kopie(roh, nachbarn, k=1, sperre=()):
+    """Ersatz für L.misch_kopie(roh, [nachbar1, nachbar2], k): eine einzelne eingefügte Zeile mit der Silhouette von `roh`, die an `nachbarn[0]`
+    grenzt (nachbarn[1] = Zeile auf der anderen Seite von `roh`, darf None sein bzw. fehlen) – texturiert nach diesem Modul."""
+    nb = list(nachbarn) + [None, None]
+    if nb[0] is None:
+        nb[0], nb[1] = nb[1], None
+    if nb[0] is None:
+        return roh.copy()
+    return zwischenzeile(roh, nb[0], nb[1], None, k, None, sperre)
+
+
 def koerper_pose(*args, funktion=None, **kw):
     """Wie A.koerper_pose (oder `funktion`, z. B. anim_slime.koerper_pose mit `sperre`), aber die gedoppelten Zeilen werden nach diesem Modul
     texturiert (sie liegen UNTER ihrer Quellzeile). `sperre`-Farben werden auch hier weder übernommen noch überschrieben."""
@@ -315,14 +367,18 @@ def ebene_atmung(teil, doppeln, h, w, pad_l, pad_t, boden):
     return ebene, top, quelle
 
 
-def umleiten(sperre=()):
+def umleiten(sperre=(), nicht_holen=()):
     """Leitet die Streckfunktionen der gemeinsamen Module für den laufenden Prozess auf dieses Modul um (die Moduldateien bleiben unverändert):
     L.streck_zeile, anim_amorph.koerper_pose und anim_slime.koerper_pose liefern danach texturierte statt kopierter Einfügezeilen – auch dort,
     wo ein Gruppenmodul sie intern aufruft (Hm.atmen, Szene.atmen, K.bob, U2.streck_teil, SH.ebene_atmung, HP.hupf_figur, anim_eis.schleim_koerper …).
     Einmal direkt nach den Importen eines Figurenskripts aufrufen. Mehrfachaufrufe sind unschädlich.
     sperre: Farben (z. B. die dunklen Umriss-/Nahtfarben der Figur), die in KEINER texturierten Zeile dieses Prozesses übernommen oder
-    überschrieben werden, sofern der Aufruf kein eigenes `sperre` mitbringt – für Figuren, bei denen sonst eine dunkle Naht dicker würde."""
-    global STANDARD_SPERRE
+    überschrieben werden, sofern der Aufruf kein eigenes `sperre` mitbringt.
+    nicht_holen: Farben (die dunklen Umriss-/Nahtfarben der Figur), die nie aus einer Nachbarzeile in eine eingefügte Zeile geholt werden –
+    für Figuren, bei denen sonst eine dunkle Naht dicker würde (Regel 43: dunkle Linien werden durch Strecken nie dicker)."""
+    global STANDARD_SPERRE, NICHT_HOLEN
+    if nicht_holen:
+        NICHT_HOLEN = tuple(tuple(int(v) for v in c[:3]) for c in nicht_holen)
     if sperre:
         STANDARD_SPERRE = tuple(tuple(int(v) for v in c[:3]) for c in sperre)
     import anim_amorph as A

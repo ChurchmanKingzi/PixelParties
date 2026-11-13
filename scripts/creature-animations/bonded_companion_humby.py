@@ -47,6 +47,8 @@ import sys
 import numpy as np
 
 import anim_lib as L
+import anim_textur as TX   # texturierte Streckzeilen statt Zeilenkopien (Regel 43/49)
+TX.umleiten()               # auch Streckaufrufe innerhalb der Gruppenmodule liefern texturierte Zeilen
 import anim_tiere as T
 import anim_tier as G
 
@@ -168,7 +170,7 @@ def frame(i, nur=None):
     hub = WIPPEN[i % 6]
     kopf = KOPF[i % 24]
     amp = 3.2 + 0.6 * (0.5 - 0.5 * math.cos(2 * math.pi * i / N))
-    k = T.spalten_hub(teil(koerper), PAD_T + 11, lambda x: kopf if x >= PAD_L + 9 else 0)
+    k = TX.spalten_hub(teil(koerper), PAD_T + 11, lambda x: kopf if x >= PAD_L + 9 else 0)
     s = wiegen(teil(schwanz), PAD_T + 8, amp, L.sinus(i, 16))
     ebenen = {'koerper': k, 'schwanz': s, 'bein_hn': bein_ebene(bein_hn, i, 0.0), 'bein_hf': bein_ebene(bein_hf, i, 0.5),
               'bein_vn': bein_ebene(bein_vn, i, 0.5), 'bein_vf': bein_ebene(bein_vf, i, 0.0)}

@@ -34,6 +34,8 @@ import sys
 import numpy as np
 
 import anim_lib as L
+import anim_textur as TX   # texturierte Streckzeilen statt Zeilenkopien (Regel 43/49)
+TX.umleiten()               # auch Streckaufrufe innerhalb der Gruppenmodule liefern texturierte Zeilen
 import anim_flieger as F
 
 N, MS = 48, 60
@@ -93,7 +95,7 @@ def frame(i, partikel=True, effekte=True):
     wr = F.fluegel_welle(wr, PAD_L + 40, fl_amp, ph, potenz=fl_pot, nur_rechts=True, lauf=lauf, zusammenhang=True)
 
     # Bob zweistufig (an allen Ebenen gleich)
-    kp, wl, wr = (L.versetze(L.streck_zeile(a, ZEILE, n_str), 0, lag) for a in (kp, wl, wr))
+    kp, wl, wr = (L.versetze(TX.streck_zeile(a, ZEILE, n_str), 0, lag) for a in (kp, wl, wr))
 
     f = L.zusammen(H, W, [(wl, 0, 0), (wr, 0, 0), (kp, 0, 0)])
     F.umranden(f, [wl, wr], UMRISS, FLUEGELRAND, FLUEGELRAND, FLUEGELRAND)       # Randpixel-Test (Regel 16)

@@ -46,9 +46,10 @@ import numpy as np
 
 import anim_lib as L
 import anim_amorph as A
+import anim_feuer3 as F3
 
 N, MS = 48, 65
-PAD_L, PAD_R, PAD_T, PAD_B = 3, 3, 4, 2
+PAD_L, PAD_R, PAD_T, PAD_B = 3, 3, 7, 2
 
 spr = L.lade('hot-skull-potato')
 sh, sw = spr.shape[:2]
@@ -133,9 +134,9 @@ assert HOP[0] == 0 and FOLGE_F[0] == 0 and 0 not in ZITTERN
 ZUENDFUNKEN = [(3, -1), (9, 0), (15, 1), (21, -1), (27, 0), (33, 1), (39, -1), (45, 0)]      # Startframe, seitlicher Weg
 def sprite_mit_effekten(i):
     sp = spr.copy()
-    if FOLGE_F[i]:
+    if True:                                                                       # Runde 5: Funkengruppe → Flamme (siehe flamme_ebene)
         sp[FUNKE_MASKE] = 0
-        for (x, y), c in FUNKEN_POSE[FOLGE_F[i]].items():
+        for (x, y), c in {}.items():
             if 0 <= x < sw and 0 <= y < sh and not (OPAK[y, x] and not FUNKE_MASKE[y, x]):
                 sp[y, x, :3] = c
                 sp[y, x, 3] = 255
@@ -154,6 +155,12 @@ def figur(i):
     rest = L.platz(np.where(SCHAEDEL[..., None], 0, sp).astype(np.uint8), H, W, PAD_L, PAD_T)
     fig = L.zusammen(H, W, [(rest, 0, dyb), (schaedel, dxs, dyb)])
     return dict(fig=fig)
+
+
+# Runde 5 (neues Feuer-System anim_feuer3): statt der zufälligen Funkenposen brennt am Schnurende eine kleine handgezeichnete Flamme (8-Bilder-Zyklus, Tropfen, Spitze neigt sich/reißt ab, Funken springen);
+# Fuß direkt am Schnurende, die Flamme liegt HINTER der Schnur (lückenloser Anschluss), Gelb außen, weißer Kern (einzige Feuerfarben der Quelle). Die gemalte Funkengruppe wird dafür entfernt.
+def flamme_ebene(i):
+    return F3.klein(H, W, PAD_L + 2, PAD_T + 2 + HOP[i], i, [(255, 255, 0), (255, 255, 0), (242, 242, 242)], 'lunte')
 
 
 def funken_ebene(i):
@@ -183,7 +190,7 @@ def frame(i, nur=None):
     f = figur(i)
     if nur is not None:
         return f['fig']
-    return L.zusammen(H, W, [(f['fig'], 0, 0), (funken_ebene(i), 0, 0)])
+    return L.zusammen(H, W, [(flamme_ebene(i), 0, 0), (f['fig'], 0, 0), (funken_ebene(i), 0, 0)])
 
 
 if __name__ == '__main__':

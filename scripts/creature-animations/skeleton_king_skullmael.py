@@ -45,6 +45,8 @@ import sys
 import numpy as np
 
 import anim_lib as L
+import anim_textur as TX   # texturierte Streckzeilen statt Zeilenkopien (Regel 43/49)
+TX.umleiten()               # auch Streckaufrufe innerhalb der Gruppenmodule liefern texturierte Zeilen
 import anim_untote as U
 import anim_untote2 as V
 
@@ -149,7 +151,7 @@ def zeilen_einfuegen(a, zeilen_n):
     """Jede Zeile (Sprite-Zeile → Anzahl zusätzlicher Kopien) von oben nach unten einfügen (Textur gemischt, L.streck_zeile); die Zeilen darunter bleiben stehen."""
     for y in sorted(zeilen_n):
         if zeilen_n[y]:
-            a = L.streck_zeile(a, OFF[1] + y, zeilen_n[y])
+            a = TX.streck_zeile(a, OFF[1] + y, zeilen_n[y])
     return a
 
 

@@ -40,6 +40,8 @@ import sys
 import numpy as np
 
 import anim_lib as L
+import anim_textur as TX   # texturierte Streckzeilen statt Zeilenkopien (Regel 43/49)
+TX.umleiten()               # auch Streckaufrufe innerhalb der Gruppenmodule liefern texturierte Zeilen
 import anim_flieger as F
 
 N, MS = 48, 60
@@ -140,7 +142,7 @@ def frame(i, partikel=True, effekte=True):
     wr = F.fluegel_welle(wr, PAD_L + 46, fl_amp, ph, potenz=fl_pot, nur_rechts=True, lauf=lauf, zusammenhang=True)
 
     # Bob zweistufig + seitliches Treiben (an allen Ebenen gleich)
-    kp, wl, wr = (L.versetze(L.streck_zeile(a, ZEILE, n_str), drift, lag) for a in (kp, wl, wr))
+    kp, wl, wr = (L.versetze(TX.streck_zeile(a, ZEILE, n_str), drift, lag) for a in (kp, wl, wr))
     main_eff = lag - n_str
 
     pol = L.zusammen(H, W, [(L.puff_ebene(H, W, i, N, PUFFS1, FUNKEN1), 0, 0), (L.puff_ebene(H, W, i, N, PUFFS2, FUNKEN2), 0, 0)]) \

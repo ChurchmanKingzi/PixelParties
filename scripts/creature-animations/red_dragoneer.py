@@ -4,6 +4,9 @@
 PICK: [["MotiveMoe", 6, 1]]   (Ebene „Red Dragoneer“, Figur 1 — einzige Ebene, in der Kartenkunst pixelgenau wiedergefunden; auf Nachbarebenen liegt nichts von der Figur)
 Quelle: src/red-dragoneer.png — roter Drache von vorn (32×27 px, 18 Farben) aus MotiveMoe.xcf. Die Karte zeigt ihn schwebend vor rotem Himmel (kein Boden).
 
+RUNDE 5 (Nutzer: „Schlägt jetzt nur mit der oberen Hälfte der Flügel statt mit den ganzen“): Der GANZE Flügel (Arm-Streifen x 7–10 bis zur Schulter, Flügelhand, Flughaut, heller Knauf) schlägt als starre Einheit um das
+Schultergelenk (9,5 | 12,5), +20° … −22° (siehe WINKEL); die handgezeichneten Posen aus Runde 4 (unterer Streifen blieb stehen) sind ersetzt. Ergänzt: Kopfumriss (11,5)/(20,5) unter dem Knauf. Atmen über anim_textur.
+
 RUNDE 4 (Nutzer: „Die helleren ‚Spitzen‘ gehören mit zu den Flügeln! Außerdem entstehen Lücken zwischen den Krallen und Händen?“): Die Flügel werden nicht mehr gedreht, sondern laufen über fünf handgezeichnete
 Schlüsselposen (U, O = Original, M, D, MA; siehe POSEN_TXT/FOLGE). Der helle Gelenkknauf (11–13, 3–5) ist jetzt Teil des Flügels (Drehpunkt des Flügelknochens). Die weißen Krallen sind fest mit den Händen verbunden
 (keine eigene Ebene mehr). Die Angaben zum Flügelschlag unter „Ablauf“ (Drehung, Krallen folgen) sind damit ersetzt; alles andere ist unverändert.
@@ -47,10 +50,11 @@ import anim_tiere as T
 import anim_drache as D
 import anim_flieger as F
 import anim_flieger_r3 as R3
-import anim_r4_fluegel as R4
+import anim_r5_fluegel as R5
+import anim_textur as TX
 
 N, MS = 48, 70
-PAD_L, PAD_R, PAD_T, PAD_B = 8, 8, 9, 3
+PAD_L, PAD_R, PAD_T, PAD_B = 10, 10, 9, 3
 BEAT, DOWN, UP = 12, 4, 8                            # Flügelschlag (4 pro Schleife)
 P0 = DOWN + 0.62 * UP                              # Frame 0 = Aufschlag bei 38 % des Hubs (Originalpose)
 
@@ -97,70 +101,33 @@ def welle(t):
     return 0.5 + 0.5 * math.cos(math.pi * (u - DOWN) / UP)
 
 
-# ── RUNDE 4: handgezeichnete Flügel-Schlüsselposen (linker Flügel; der rechte ist das Spiegelbild) ────────────────────────────
-# Anatomie: Der Flügelknochen läuft vom hellen Gelenkknauf neben dem Kopf ((11–13, 3–5), bleibt als Drehpunkt stehen) zur Spitze; darunter hängt die Flughaut mit den orangen Feldern, die unten an der
-# Schulter (8–9, 11) angewachsen ist. Der Knochen schlägt als Ganzes um den Knauf: U (35° über der Waagerechten) → O (Original, 17°) → M (waagerecht) → D (30° darunter); beim Aufschlag hängt die Spitze nach (MA).
-# Zeichen = Farben der Quelle; linkes oberes Zeichen = Sprite-Koordinate (−2, y0).
-FARBE = {'B': (49, 24, 0), 'C': (75, 24, 24), 'D': (130, 43, 43), 'E': (162, 54, 54), 'H': (192, 67, 67), 'I': (213, 98, 16), 'J': (202, 97, 97), 'K': (210, 121, 121), 'L': (230, 131, 16),
-         'M': (246, 164, 24), 'N': (232, 187, 187)}
-POSEN_TXT = {
-    'U': (-5, ["..BB............",
-               "..BCBB..........",
-               "...BCDB.........",
-               "...BIICBB.......",
-               "....BMLCDB......",
-               "....BDMLCCBB....",
-               ".....BCDCCCDB...",
-               "......BDCMLCJB..",
-               "......BCDMIDHJBB",
-               ".......BDCLDDHNK",
-               ".......BBMDCBH..",
-               "........BDCL....",
-               ".........BLM....",
-               ".........BMI....",
-               ".........BMC....",
-               ".........BDE....",
-               "..........BL...."]),
-    'M': (2, ["............BB..",
-              ".........BBBBJBB",
-              "....BBBBBDCDHHNK",
-              "BBBBCCDDCMLCBH..",
-              "BCCDIICDMLCL....",
-              ".BBMLDCCDCLM....",
-              "...BBMLDCDMI....",
-              ".....BBIDCMC....",
-              ".......BBDDE....",
-              ".........BBL...."]),
-    'D': (2, ["............BB..",
-              "............BJBB",
-              "...........BHHNK",
-              ".........BBDBH..",
-              "........BCCL....",
-              "......BBDMLM....",
-              ".....BCCIDMI....",
-              "...BBDMLCCMC....",
-              "..BCDIBBBDDE....",
-              "...BBB...BBL...."]),
-    'MA': (2, ["............BB..",
-               "..........BBBJBB",
-               ".......BBBCDHHNK",
-               "......BCDCMLBH..",
-               ".....BCMLDCL....",
-               "....BDILCDLM....",
-               "...BCDCCMCMI....",
-               "..BCIMBBBCMC....",
-               "...BBB..BDDE....",
-               ".........BBL...."]),
-}
-FOLGE = ['O', 'U', 'U', 'O', 'M', 'D', 'D', 'D', 'MA', 'MA', 'O', 'O']      # 12 Frames je Schlag: Abschlag schnell (U→O→M→D je 1 Frame), unten kurz halten, Aufschlag mit nachhängender Spitze
-assert len(FOLGE) == BEAT
+# ── RUNDE 5 (Nutzer: „schlägt jetzt nur mit der oberen Hälfte der Flügel statt mit den ganzen“) ──────────────────────────────────────────────────────────────
+# Anatomie (linker Flügel; der rechte ist das Spiegelbild): Der Flügelarm steigt von der Schulter (8–9, 12) als schmaler Streifen (x 7–10, y 5–11, orange Flughaut außen) nach oben; am Handgelenk (8, 5) knickt die
+# Flügelhand nach außen oben zur Spitze (0, 0) ab, nach innen zeigt der helle Daumen/Knauf (11–13, 3–5). Das GANZE (Arm + Hand + Flughaut bis zum unteren Ende + heller Knauf) schlägt als starre Einheit um das
+# Schultergelenk GELENK = (9,5 | 12,5); nichts bleibt stehen. Je Winkel wird der Flügel neu aufgebaut (anim_r5_fluegel.starr_gedreht: glatte Fläche, Innenfarben der Quelle) und sein Umriss neu gezogen (immer 1 px);
+# er liegt hinter Kopf/Körper (beim Aufschlag verschwindet der Knauf hinter dem Kopf, beim Abschlag löst er sich vom Kopf). Frame 0 = Originalpixel.
+GELENK = (9.5, 12.5)
+UMRISS_FL = (49, 24, 0)
+#          Winkel in Grad (+ = Spitze hebt sich); 12 Frames je Schlag: Abschlag Frames 3→7 (schnell), Aufschlag 7→3
+WINKEL = [None, 10, 17, 20, 10, -6, -18, -22, -21, -16, -10, -5]
+assert len(WINKEL) == BEAT
+ERG = [(11, 5), (20, 5)]                                       # Ergänzung: Kopfumriss unter dem Flügelknauf (verbindet Ohrspitze (11,6) und Stirnkante (12,5) über eine Kante, sobald der Flügel wegschwingt)
 
 
 def fluegel_posen():
-    links = {'O': D.abschnitt(spr, flügel_l, H, W, PAD_L, PAD_T)}
-    for name, (y0, zeilen) in POSEN_TXT.items():
-        links[name] = R4.pose(zeilen, FARBE, -2, y0, H, W, PAD_L, PAD_T)
-    rechts = {n: R4.spiegeln(a, 2 * PAD_L + sw - 1) for n, a in links.items()}
+    orig = D.abschnitt(spr, flügel_l, H, W, PAD_L, PAD_T)
+    vorn = np.zeros((H, W), bool)
+    vorn[PAD_T:PAD_T + sh, PAD_L:PAD_L + sw] = vorhanden & ~flügel_l & ~flügel_r
+    for (x, y) in ERG:
+        vorn[PAD_T + y, PAD_L + x] = True
+    links = []
+    for g in WINKEL:
+        if g is None:
+            links.append(orig)
+            continue
+        a = R5.starr_gedreht(orig, PAD_L + GELENK[0], PAD_T + GELENK[1], math.radians(g), UMRISS_FL)
+        links.append(R5.umriss_ziehen(a, vorn, UMRISS_FL))
+    rechts = [R5.spiegeln(a, 2 * PAD_L + sw - 1) for a in links]
     return links, rechts
 
 
@@ -194,19 +161,22 @@ def frame(i, nur=None):
             k[PAD_T + y, PAD_L + x, :3] = c
     # Bauchglut flackert
     k = D.glut_farben(k, bauch_m, BAUCH, i, N, periode=12)
-    k = L.streck_zeile(k, PAD_T + ZEILE, atem)
+    k = TX.streck_zeile(k, PAD_T + ZEILE, atem)                 # Runde 5: texturierte Streckzeile (anim_textur)
     fuss_a = L.heben_unten(teil(fuss_l), PAD_T + FUSS_ZEILE, fl_)
     fuss_b = L.heben_unten(teil(fuss_r), PAD_T + FUSS_ZEILE, fr_)
     # Flügel (beide Seiten): handgezeichnete Schlüsselpose des Frames, hinter dem Körper, hebt sich mit dem Atmen mit
-    name = R4.takt(FOLGE, i)
-    wl = L.versetze(FL_L[name], 0, -atem)
-    wr = L.versetze(FL_R[name], 0, -atem)
+    wl = L.versetze(FL_L[i % BEAT], 0, -atem)
+    wr = L.versetze(FL_R[i % BEAT], 0, -atem)
     vorn = {'fuss_l': fuss_a, 'fuss_r': fuss_b, 'koerper': k}
     wahl = nur or ('fluegel_l', 'fluegel_r') + tuple(vorn)
     ganz = L.zusammen(H, W, [(vorn[n], 0, bob) for n in vorn if n in wahl])
     ganz = R3.luecken_fuellen(ganz, 5, ausser=np.roll(ORIG_LOECHER, bob, axis=0))
     ganz = T.umriss_schliessen(ganz, RAND, REGEL)                  # Randpixel-Test (Regel 16) für Körper und Füße; die Flügelposen sind fertig gezeichnet und bleiben unberührt
-    return L.zusammen(H, W, [(e, 0, bob) for n, e in (('fluegel_l', wl), ('fluegel_r', wr)) if n in wahl] + [(ganz, 0, 0)])
+    erg = L.leer(H, W)
+    for (x, y) in ERG:
+        erg[PAD_T + y - atem, PAD_L + x] = UMRISS_FL + (255,)
+    f = L.zusammen(H, W, [(erg, 0, bob)] + [(e, 0, bob) for n, e in (('fluegel_l', wl), ('fluegel_r', wr)) if n in wahl] + [(ganz, 0, 0)])
+    return R5.loecher_schliessen(f, np.roll(ORIG_LOECHER, bob - atem, axis=0) | np.roll(ORIG_LOECHER, bob, axis=0), UMRISS_FL)      # schmale Schlitze (≤ 4 px) zwischen Flügelarm und Kopf schließen
 
 
 TEST_EBENEN = None

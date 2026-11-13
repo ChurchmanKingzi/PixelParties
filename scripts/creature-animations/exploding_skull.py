@@ -44,9 +44,10 @@ import numpy as np
 
 import anim_lib as L
 import anim_amorph as A
+import anim_feuer3 as F3
 
 N, MS = 48, 65
-PAD_L, PAD_R, PAD_T, PAD_B = 3, 3, 4, 2
+PAD_L, PAD_R, PAD_T, PAD_B = 3, 3, 8, 2
 
 spr = L.lade('exploding-skull')
 sh, sw = spr.shape[:2]
@@ -245,8 +246,7 @@ def sprite_mit_effekten(i):
         _setze(sp, FUSS_POSE_L[FOLGE_FL[i]], FUSS_L)
     if FOLGE_FR[i]:
         _setze(sp, FUSS_POSE_R[FOLGE_FR[i]], FUSS_R)
-    if FOLGE_F[i]:
-        _setze(sp, FUNKEN_POSE[FOLGE_F[i]], FUNKE)
+    sp[FUNKE] = 0                                                                  # Runde 5: Funkengruppe → Flamme (siehe flamme_ebene)
     for (y, x), c in zip(MUND, MUND_ZUSTAENDE[FOLGE_M[i]]):
         sp[y, x, :3] = c
     for k, a in enumerate(AUGEN):
@@ -263,6 +263,12 @@ def figur(i):
     sp = sprite_mit_effekten(i)
     fig = L.zusammen(H, W, [(L.platz(sp, H, W, PAD_L, PAD_T), 0, HOP[i])])
     return dict(fig=fig)
+
+
+# Runde 5 (neues Feuer-System anim_feuer3): statt der zufälligen Funkenposen brennt am Schnurende eine kleine handgezeichnete Flamme (8-Bilder-Zyklus, Tropfen, Spitze neigt sich/reißt ab, Funken springen);
+# Fuß direkt am Schnurende, die Flamme liegt HINTER der Schnur (lückenloser Anschluss), Gelb außen, weißer Kern (einzige Feuerfarben der Quelle). Die gemalte Funkengruppe wird dafür entfernt.
+def flamme_ebene(i):
+    return F3.klein(H, W, PAD_L + 10, PAD_T + 1 + HOP[i], i, [(255, 255, 0), (255, 255, 0), (255, 255, 255)], 'lunte')
 
 
 def funken_ebene(i):
@@ -292,7 +298,7 @@ def funken_ebene(i):
 
 def frame(i):
     f = figur(i)
-    return L.zusammen(H, W, [(f['fig'], 0, 0), (funken_ebene(i), 0, 0)])
+    return L.zusammen(H, W, [(flamme_ebene(i), 0, 0), (f['fig'], 0, 0), (funken_ebene(i), 0, 0)])
 
 
 if __name__ == '__main__':

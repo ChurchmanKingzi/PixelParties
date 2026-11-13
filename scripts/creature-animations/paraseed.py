@@ -34,6 +34,8 @@ import sys
 import numpy as np
 
 import anim_lib as L
+import anim_textur as TX   # texturierte Streckzeilen statt Zeilenkopien (Regel 43/49)
+TX.umleiten()               # auch Streckaufrufe innerhalb der Gruppenmodule liefern texturierte Zeilen
 import anim_amorph as A
 
 N, MS = 48, 65
@@ -116,7 +118,7 @@ def sprite_mit_effekten(i):
 def figur(i):
     sp = sprite_mit_effekten(i)
     koerper = A.zeilen_von(sp, 0, sh - 1, H, W, PAD_L, PAD_T)
-    z, quelle = A.koerper_pose(koerper, doppeln={4: 1} if STRECK[i] else {}, p=0, x0=PAD_L)
+    z, quelle = TX.koerper_pose(koerper, doppeln={4: 1} if STRECK[i] else {}, p=0, x0=PAD_L)
     dxs = [bluete_dx(i) if q <= KELCH_UNTEN else staengel_dx(i, q) for q in quelle]
     z = A.verschiebe_ausgabezeilen(z, dxs)
     fig, top = A.auf_leinwand(z, H, BODEN, 0)

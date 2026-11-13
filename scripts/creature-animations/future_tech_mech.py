@@ -34,6 +34,8 @@ import sys
 import numpy as np
 
 import anim_lib as L
+import anim_textur as TX   # texturierte Streckzeilen statt Zeilenkopien (Regel 43/49)
+TX.umleiten()               # auch Streckaufrufe innerhalb der Gruppenmodule liefern texturierte Zeilen
 import anim_untote as U
 
 N, MS = 96, 70                                                   # 96 Frames = 6,7 s: das Auge leuchtet nur „hin und wieder“ auf (zweimal pro Schleife, unterschiedlich lang)
@@ -141,7 +143,7 @@ def frame_gross(i, nur=None):
     sack = 1 if 8 <= i % 32 <= 19 else 0
     rumpf = L.zusammen(H, W, [(kb, 0, 0), (kopf, 0, 0), (beinl, 0, 0), (beinr, 0, 0)])
     if sack:
-        rumpf = L.streck_zeile(rumpf, GPT + 20, -1)
+        rumpf = TX.streck_zeile(rumpf, GPT + 20, -1)
     koerper = L.zusammen(H, W, [(rumpf, 0, 0), (arml, 0, dyl + sack), (armr, 0, dyr + sack)])
     koerper = U.kontur_schliessen(koerper, UMRISS, KONTUR)
     return koerper

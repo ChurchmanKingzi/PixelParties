@@ -36,6 +36,8 @@ from PIL import Image
 
 import anim_humanoide as Hm
 import anim_lib as L
+import anim_textur as TX   # texturierte Streckzeilen statt Zeilenkopien (Regel 43/49)
+TX.umleiten()               # auch Streckaufrufe innerhalb der Gruppenmodule liefern texturierte Zeilen
 import anim_zirkus as Z
 
 N, MS = 72, 70
@@ -125,7 +127,7 @@ def frame(i, nur=None):
     fuesse = L.platz(E15, H, W, OFF[0], OFF[1])
     if hub:
         # linkes Bein: die frei werdende Zeile 53 (x 11–21) bekommt die Beinzeile 53, mit Zeile 52 texturgemischt (Regel 43) — nur das Bein wird 1 px länger, der Rüssel bleibt starr
-        zeile = L.misch_kopie(BEIN53, [BEIN52], 1)
+        zeile = TX.misch_kopie(BEIN53, [BEIN52], 1)
         fuesse[OFF[1] + 53, OFF[0]:OFF[0] + sw][zeile[:, 3] > 0] = zeile[zeile[:, 3] > 0]
         # rechter Fuß: unter dem gehobenen Rüsselbogen wird Zeile 56 (x 25–33) frei → Schattenzeile in der dunklen Fußfarbe des linken Fußes (Zeile 55 der Ebene 15)
         for x in range(25, 34):

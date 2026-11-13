@@ -57,6 +57,8 @@ import sys
 import numpy as np
 
 import anim_lib as L
+import anim_textur as TX   # texturierte Streckzeilen statt Zeilenkopien (Regel 43/49)
+TX.umleiten()               # auch Streckaufrufe innerhalb der Gruppenmodule liefern texturierte Zeilen
 import anim_tiere as T
 
 N, MS = 48, 65
@@ -141,8 +143,8 @@ def k_von_x(kf, kr):
 def schwanz_ebene(i):
     kf, kr = hub(i)
     z = PAD_T + BAUCHZEILE
-    s = T.spalten_hub(teil(schwanz), z, lambda x: kr)
-    r = T.spalten_hub(teil(rumpf), z, k_von_x(kf, kr))
+    s = TX.spalten_hub(teil(schwanz), z, lambda x: kr)
+    r = TX.spalten_hub(teil(rumpf), z, k_von_x(kf, kr))
     env = min(1.0, min(i, N - i) / 5.0)                            # Schwanzamplitude: 0 bei Frame 0, nach 5 Frames voll
     ph = L.sinus(i, 8)                                              # Wedeln: 6× pro Schleife (freudiger Fuchs)
     # Pendel statt Dehnen: je weiter die Spitze ausschlägt, desto mehr steigt sie (Zeilen 24… entfallen) — der Schwanz behält seine Länge
