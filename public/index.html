@@ -3,8 +3,9 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-  <title>Pixel Parties TCG</title>
-  <meta name="description" content="Assemble your party of Heroes, shape their Abilities and powers - and eliminate the competition! Pixel Parties is a free online multiplayer trading card game.">
+  <title>Pixel Parties TCG – Free Online Trading Card Game in Your Browser</title>
+  <meta name="description" content="Pixel Parties is a free online trading card game: collect 1,300+ cards, build a party of Heroes, shape their Abilities and duel other players or the CPU – right in your browser, no download.">
+  <meta name="robots" content="index, follow, max-image-preview:large">
   <meta name="theme-color" content="#08060c">
 
   <!-- Icons / PWA -->
@@ -22,13 +23,16 @@
        previews resolve from both the live site and local test builds. -->
   <link rel="canonical" href="https://pixelpartiestcg.com/">
   <meta property="og:type" content="website">
+  <meta property="og:site_name" content="Pixel Parties TCG">
+  <meta property="og:locale" content="en_US">
   <meta property="og:url" content="https://pixelpartiestcg.com/">
-  <meta property="og:title" content="Pixel Parties TCG">
-  <meta property="og:description" content="Assemble your party of Heroes, shape their Abilities and powers - and eliminate the competition!">
+  <meta property="og:title" content="Pixel Parties TCG – Free Online Trading Card Game in Your Browser">
+  <meta property="og:description" content="Pixel Parties is a free online trading card game: collect 1,300+ cards, build a party of Heroes, shape their Abilities and duel other players or the CPU – right in your browser, no download.">
   <meta property="og:image" content="https://pixelpartiestcg.com/title.png">
+  <meta property="og:image:alt" content="Pixel Parties TCG key art">
   <meta name="twitter:card" content="summary_large_image">
-  <meta name="twitter:title" content="Pixel Parties TCG">
-  <meta name="twitter:description" content="Assemble your party of Heroes, shape their Abilities and powers - and eliminate the competition!">
+  <meta name="twitter:title" content="Pixel Parties TCG – Free Online Trading Card Game in Your Browser">
+  <meta name="twitter:description" content="Pixel Parties is a free online trading card game: collect 1,300+ cards, build a party of Heroes, shape their Abilities and duel other players or the CPU – right in your browser, no download.">
   <meta name="twitter:image" content="https://pixelpartiestcg.com/title.png">
 
   <!-- Warm up the connections the first paint depends on -->
@@ -58,7 +62,8 @@
     "alternateName": "Pixel Parties",
     "url": "https://pixelpartiestcg.com/",
     "image": "https://pixelpartiestcg.com/title.png",
-    "description": "Pixel Parties is a free online trading card game simulator. Build decks from over 1400 cards, duel live opponents in your browser, and climb the ranks.",
+    "description": "Pixel Parties is a free online trading card game. Build decks from over 1,300 cards, duel live opponents in your browser, and climb the ranks.",
+    "sameAs": ["https://discord.gg/K8PFRjr"],
     "genre": ["Trading Card Game", "Strategy"],
     "gamePlatform": "Web browser",
     "playMode": ["MultiPlayer", "SinglePlayer"],
@@ -119,7 +124,7 @@
       box-shadow: 0 0 0 4px #08060c, 8px 8px 0 4px rgba(0, 0, 0, .6);
     }
     #boot-splash .bs-title {
-      font-size: 24px; font-weight: 800; letter-spacing: 6px;
+      margin: 0; font-size: 24px; font-weight: 800; letter-spacing: 6px;
       text-transform: uppercase; color: #1aedff; text-shadow: 2px 2px 0 #405f8c;
     }
     #boot-splash .bs-sub { font-size: 12px; letter-spacing: 4px; color: #7e7d9b; }
@@ -276,11 +281,26 @@
   <div id="root">
     <div id="boot-splash">
       <div class="bs-panel">
-        <div class="bs-title">Pixel Parties</div>
+        <h1 class="bs-title">Pixel Parties</h1>
         <div class="bs-ring"></div>
         <div class="bs-sub">LOADING…</div>
       </div>
     </div>
+    <!-- SEO: echter Text im ausgelieferten HTML. Der Ladebildschirm (fixed, z-index 9999) deckt ihn ab; React ersetzt den Inhalt von #root beim Start.
+         Crawler ohne/vor JavaScript lesen hier, worum es geht, und finden die oeffentlichen Seiten (/cards, /card/<name>), siehe seo.js. -->
+    <main id="seo-content" style="max-width:720px;margin:0 auto;padding:24px 16px;color:#e6e6e6;background:#08060c">
+      <h2>Pixel Parties &ndash; a free online trading card game</h2>
+      <p>Pixel Parties TCG is a free multiplayer trading card game that runs right in your browser &ndash; no download, no install. Assemble your party of Heroes, shape their Abilities and powers &ndash; and eliminate the competition!</p>
+      <h2>What you can do</h2>
+      <ul>
+        <li>Collect and use more than 1,300 cards: Heroes, Abilities, Spells, Attacks, Creatures, Artifacts and Potions.</li>
+        <li>Build your own decks in the deck builder and open booster packs.</li>
+        <li>Duel other players online or practice against the CPU.</li>
+        <li>Learn the game with tutorials and puzzles, play through the campaign and climb the ranks.</li>
+      </ul>
+      <p><a href="/cards">Browse the full card list</a> &middot; <a href="https://discord.gg/K8PFRjr">Join the Discord community</a></p>
+      <noscript><p>Pixel Parties needs JavaScript to run the game. Please enable JavaScript and reload this page.</p></noscript>
+    </main>
   </div>
 </body>
 </html>
