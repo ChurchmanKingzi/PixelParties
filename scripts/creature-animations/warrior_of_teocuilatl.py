@@ -21,6 +21,10 @@ Ablauf (48 Frames à 75 ms = 3,6 s, nahtlos); Idee: Wachposten am Speer — er a
 * Blinzeln (Frames 20–22 und 44–46): Iris und Augenweiß nehmen die Hautfarbe an.
 * Aufblitzen an der Stahlspitze (Frames 8–10): Mitte → kleines Kreuz → weg.
 Frame 0 = Original. Kopf bewegt sich nur senkrecht.
+RUNDE 9 (Nutzer: „Sollten NICHT seitwärts blinzeln!“): Das Auge ist 1 px breit und 2 px hoch (Iris über Augenweiß) und sitzt zwischen dunklen Lidrand-Pixeln. Früher wurden beide Pixel hautfarben –
+übrig blieb ein SENKRECHTER heller Spalt zwischen den schwarzen Randpixeln (las sich wie seitlich zugekniffen). Jetzt senkt sich das Oberlid von oben nach unten: erst deckt der dunkle Lidrand die
+Iriszeile zu (Augenweiß darunter noch sichtbar), dann ist auch das Weiß vom Lid (Haut) bedeckt – geschlossen ist das Auge ein WAAGERECHTER dunkler Lidstrich; Öffnen in umgekehrter Reihenfolge.
+Frames 19–22 und 43–46 (halb, zu, zu, halb).
 """
 import numpy as np
 
@@ -40,6 +44,8 @@ speer = F.da & (F.xx <= 4) & ~arm
 rumpf = F.da & ~arm & ~speer
 HAUT = F.f(13, 11)
 WEISS, HELLGOLD = F.f(11, 12), F.f(5, 16)
+LIDRAND = F.f(10, 11)                                              # (0,0,0): dunkler Lidrand neben der Iris
+LID = {19: 1, 20: 2, 21: 2, 22: 1}
 ATEM = [0] * 4 + [1] * 12 + [0] * 8
 RAMPE = G.goldrampe(spr, arm, F.f(11, 12))
 GLANZ, GLANZ_DAUER = (14, 38), 9
@@ -49,8 +55,11 @@ TEST_EBENEN = ('koerper',)
 def frame(i, nur=None):
     at = ATEM[i % 24]
     k = F.ebene(rumpf)
-    if i in (20, 21, 22, 44, 45, 46):
-        F.setze(k, {(11, 11): HAUT, (11, 12): HAUT, (16, 11): HAUT, (16, 12): HAUT})
+    lid = LID.get(i % 24)                                            # 1 = Lid halb gesenkt, 2 = zu
+    if lid:
+        F.setze(k, {(11, 11): LIDRAND, (16, 11): LIDRAND})
+    if lid == 2:
+        F.setze(k, {(11, 12): HAUT, (16, 12): HAUT})
     k = F.streck(k, 24, at)
     ar = F.ebene(arm, 0, -at)                                        # Arm und Speer immer mit dem Oberkörper (kein eigener Hub → keine Stufe an der Schulter)
     if not nur:

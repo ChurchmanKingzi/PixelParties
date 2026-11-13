@@ -1,8 +1,8 @@
 {
   "creature": "Gravedigger",
   "sheet": "gravedigger.png",
-  "frameWidth": 36,
-  "frameHeight": 27,
+  "frameWidth": 38,
+  "frameHeight": 26,
   "frames": 60,
   "frameMs": 70,
   "loop": true,
@@ -11,5 +11,5 @@
   "padLeft": 2,
   "padRight": 2,
   "padBottom": 2,
-  "faceX": 18.0
+  "faceX": 19.0
 }

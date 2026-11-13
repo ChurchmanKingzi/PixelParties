@@ -1,23 +1,27 @@
 # -*- coding: utf-8 -*-
-"""Idle-Animation für „Gravedigger“ (Creature) — vermummter Totengräber, kniet nach rechts gewandt und sticht mit dem Spaten in die Erde.
+"""Idle-Animation für „Gravedigger“ (Creature) — vermummter, bärtiger Totengräber kniet nach rechts gewandt; er greift mit dem Arm zum Spaten, der neben ihm im Boden steckt,
+sticht ein, hebt Erde heraus und wirft sie weg.
 
 PICK: [["MotiveDeri", 161, "Ebene „Gravedigger“, nur die Figur mit Spaten (Ausschnitt x 0–24, y 5–26); die acht Grabkreuze derselben Ebene sind Beiwerk"]]
 Abgleich mit public/cardgen/art/Gravedigger.webp (Kartenkunst: dieselbe Figur links neben den Gräbern). Quelle vollständig.
 
-Identifikation (25×22): schwarze Kapuze (x 5–9, y 0–10), Gesicht im Profil nach rechts (Haut x 8–13, y 1–9), EIN sichtbares Auge (hellblau (11,6), weiß (11,7), Pupille (12,6)/(12,7),
-Braue (11,5)); graue Kutte, kniend (x 0–14, y 8–21, helle Faltenlichter); Spatenstiel dunkelbraun diagonal von der Kutte (15,11) nach rechts unten bis (19,16);
-Spatenblatt (Eisen, x 16–24, y 13–19). Hände sind nicht gezeichnet (der Stiel kommt aus der Kutte) → der Spaten ist eine starre Einheit, die sich nur entlang
-ihrer eigenen Diagonale verschiebt und dem Oberkörper folgt.
+Identifikation (25×22), nach Nutzer-Rückmeldung Runde 9 NEU gelesen:
+* schwarze Kapuze (x 5–9, y 0–10), Gesicht im Profil nach rechts (Haut x 8–13, y 1–9), EIN sichtbares Auge (hellblau (11,6), weiß (11,7), Pupille (12,6)/(12,7), Braue (11,5)).
+* BART: das Graue unter dem Gesicht ((13,8), (12–13,9), (12,10), Rand x 14) – gehört starr zum Kopf. KOPF UND BART BEWEGEN SICH NIE (alles mit y ≤ 10 bleibt in jedem Frame
+  pixelgleich; `assert` in frame()).
+* ARM: liegt darunter. Oberarm von der Schulter (Kragenband y 11–12) zum Ellbogen ((7–8, 13–14)), UNTERARM = das helle waagerechte Band auf dem Schoß (x 8–12, y 14–15,
+  2 px stark, oben (104)/(80) hell, unten (80)/(64)), Ärmelende = Umriss (13, 14–15). Eine Hand ist nicht gezeichnet (steckt im Ärmel).
+* graue Kutte, kniend (x 0–14, y 8–21). SPATEN: steckt in der Quelle NEBEN ihm im Boden (Stiel dunkelbraun diagonal (14,12) → (19,16), Blatt x 16–24, y 13–19) – er hält ihn nicht.
 
-Ablauf (60 Frames à 70 ms = 4,2 s; zwei Spatenstiche je Schleife, Periode 30). Frame 0 = Original:
-* Graben: Ausholen (Spaten 1 px zurück/hoch, Oberkörper streckt sich 1 px) → Stich (Spaten 1 px vor/runter, Oberkörper duckt sich 1 px: Zeile y 13 entfällt) →
-  halten → zurück → Aushub wegwerfen (Spaten 2 px zurück/hoch, Oberkörper gestreckt → Blatt 3 px über dem Boden und VOLLSTÄNDIG sichtbar), dabei fliegen drei Erdbrocken
-  (2×2) im Bogen nach rechts. Das Blatt wird an der Bodenlinie (y 19) abgeschnitten: beim Stich versinkt es, beim Herausziehen kommt das fertiggezeichnete Blattende zum Vorschein.
-* Oberkörper strecken = texturierte Zeile bei y 13 (TX.streck_zeile); Kopf geht nur senkrecht mit.
-* Blinzeln (das eine sichtbare Auge), Frames 28–29.
-Ergänzungen: Blattende (in der Quelle im Boden, nicht gezeichnet): Zeilen y 19–21 des Blatts (x 17–24 → Spitze x 19–22) in Blattfarben und Blattumriss fertiggezeichnet.
-Der Stiel ist unter der Kutte um 2 px nach links oben verlängert (Stielfarben (23,8,11)/(37,17,10)), damit beim Vorstoßen keine Lücke zur Kutte entsteht
-(liegt in Ruhe vollständig unter der Kutte). Erdbrocken in der Erdfarbe (63,31,15) der Grabhügel derselben Ebene (dokumentierte Ausnahme, erlaubt=…), Unterkante Stielfarbe.
+Ablauf (60 Frames à 70 ms = 4,2 s, zwei Spatenstiche je Schleife). Frame 0 = Original (Arm auf dem Schoß, Spaten steckt):
+  Ruhe → Unterarm hebt sich (H) → Ärmelende fasst das Stielende (G) → Stich (Spaten +1/+1 entlang des Stiels, Blatt versinkt) → zurück → herausheben (+1/−1, +2/−2: Blatt
+  VOLLSTÄNDIG über dem Boden) und Erde wegwerfen (drei 2×2-Brocken im Bogen nach rechts) → zurück in den Boden → zweiter Stich + Wurf → loslassen, Arm zurück auf den Schoß,
+  Ruhe mit Blinzeln. Der Spaten bewegt sich NUR, solange das Ärmelende am Stielende liegt, und immer als starre Einheit; der Unterarm ist in jeder Pose eine eigene Pose
+  (ARM_POSEN: 5 Spalten à 2 px + Ärmelende, gleiche Dicke und Farben wie im Original, 1 px Umriss), nichts wird gestreckt. Kein Atmen/Strecken des Oberkörpers mehr.
+Ergänzungen (selbst fertiggezeichnet):
+* Blattende (in der Quelle im Boden): Zeilen y 19–21 des Blatts in Blattfarben und Blattumriss (wie Runde 8). In Ruhe verdeckt der Boden (Zeilen > 19) das Ende.
+* Schoß unter dem Unterarm (x 8–13, y 14–15): Kuttenfläche (40,40,40) mit Faltenlicht (64,64,64) in Fortsetzung von Zeile 16, Kuttenrand (12, 14–15) als Umriss.
+Erdbrocken in der Erdfarbe (63,31,15) der Grabhügel derselben Ebene (dokumentierte Ausnahme, erlaubt=…), Unterkante Stielfarbe.
 """
 import numpy as np
 
@@ -38,13 +42,6 @@ HAUT, LID = (246, 189, 123), (0, 0, 0)
 TEST_EBENEN = ('figur',)
 
 _sp = np.where(SPATEN_M[..., None], spr, 0).astype(np.uint8)
-_ext = np.zeros_like(_sp)
-for k in (1, 2):                                   # Stiel unter der Kutte verlängern (Stielstück um k nach links oben wiederholt)
-    for y in range(11, 14):
-        for x in range(14, 18):
-            if STIEL[y, x] and not SPATEN_M[y - k, x - k] and not _ext[y - k, x - k, 3]:
-                _ext[y - k, x - k] = spr[y, x]
-_sp = np.where(_sp[..., 3:] > 0, _sp, _ext)
 # Blattende, das in der Quelle im Boden steckt (dort endet das Blatt mit der geraden Schnittlinie y 19): selbst fertiggezeichnet – Blattfläche bis y 20 fortgesetzt,
 # gerundete Spitze y 21, Umriss (18,18,16), Flächenfarben des Blatts. In Ruhe verdeckt der Boden (Zeilen > 19) das Ende wieder → Frame 0 = Original.
 _O, _A, _B, _C = (18, 18, 16), (62, 62, 53), (110, 111, 95), (44, 43, 38)
@@ -66,26 +63,78 @@ def spaten(dx, dy):
     return a
 KOERPER = sz.teil(~SPATEN_M)
 
-#           0  1  2  3   4   5   6  7  8  9 10 11 12 13 14 15 16 17 18 19 20  21  22  23  24  25 26 27 28 29
-D_FOLGE = [0, 0, 0, 0, -1, -1, -1, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, -1, -2, -2, -2, -2, -2, -1, 0, 0, 0]
-B_FOLGE = [0, 0, 0, 0, -1, -1, -1, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, -1, -1, -1, -1, -1, 0, 0, 0, 0]
-BROCKEN = [dict(x=sz.PL + 21, y=sz.PT + 11, vx=0.55, vy=-1.0, g=0.17, start=s + 21, dauer=11) for s in (0, 30)] + \
-          [dict(x=sz.PL + 19, y=sz.PT + 12, vx=0.30, vy=-1.2, g=0.18, start=s + 22, dauer=11) for s in (0, 30)] + \
-          [dict(x=sz.PL + 22, y=sz.PT + 12, vx=0.85, vy=-0.7, g=0.15, start=s + 22, dauer=10) for s in (0, 30)]
+# ---------------------------------------------------------------- Arm
+UMR, KUTTE, FALTE = (32, 32, 32), (40, 40, 40), (64, 64, 64)
+_ohne = spr.copy()                                  # Schoß unter dem Unterarm fertiggezeichnet
+for _y in (14, 15):
+    for _x in range(8, 12):
+        _ohne[_y, _x, :3] = KUTTE
+    _ohne[_y, 12, :3] = UMR
+    _ohne[_y, 13] = 0
+for _x in (9, 10):
+    _ohne[15, _x, :3] = FALTE
+KOERPER_OHNE_ARM = sz.teil(~SPATEN_M, quelle=_ohne)
+ARM_FARBEN = [((80, 80, 80), (64, 64, 64)), ((104, 104, 104), (80, 80, 80)), ((104, 104, 104), (80, 80, 80)), ((104, 104, 104), (80, 80, 80)), ((64, 64, 64), (64, 64, 64))]
+# Pose: (x der ersten Unterarm-Spalte, [obere Zeile je Spalte: 5 Unterarm-Spalten + Ärmelende]); jede Spalte ist 2 px hoch. Ellbogen wandert mit dem Oberarm leicht vor.
+ARM_POSEN = {
+    'H':  (8, [14, 14, 14, 13, 13, 13]),            # halb gehoben, noch nicht am Stiel
+    'G':  (9, [14, 14, 13, 13, 12, 12]),            # Ärmelende auf dem Stielende (14,12)
+    'S':  (10, [14, 14, 14, 13, 13, 13]),           # Stich: Spaten (+1,+1)
+    'L1': (10, [14, 13, 13, 12, 12, 11]),           # heben: Spaten (+1,−1)
+    'L2': (11, [13, 13, 12, 12, 11, 10]),           # herausgehoben: Spaten (+2,−2)
+}
+SPATEN_LAGE = {'R': (0, 0), 'H': (0, 0), 'G': (0, 0), 'S': (1, 1), 'L1': (1, -1), 'L2': (2, -2)}
+
+
+def arm(f, name):
+    """Unterarm-Pose über den fertigen Frame legen. Kopf und Bart (y ≤ 10, x ≤ 14) werden nie berührt."""
+    x0, tops = ARM_POSEN[name]
+    pix, rand = {}, set()
+    for k, t in enumerate(tops):
+        x = x0 + k
+        o, u = ARM_FARBEN[k] if k < 5 else (UMR, UMR)
+        pix[(x, t)], pix[(x, t + 1)] = o, u
+    for (x, y) in pix:
+        rand |= {(x, y - 1), (x, y + 2), (x + 1, y), (x - 1, y)}
+    for (x, y) in rand - set(pix):                  # 1 px Umriss: oben immer (wie im Original über dem Unterarm), sonst nur gegen den Hintergrund
+        if y <= 10 and x <= 14:
+            continue
+        Y, X = sz.PT + y, sz.PL + x
+        if not f[Y, X, 3] or ((x, y + 1) in pix and y >= 11):
+            f[Y, X] = UMR + (255,)
+    for (x, y), c in pix.items():
+        assert not (y <= 10 and x <= 14)
+        f[sz.PT + y, sz.PL + x] = c + (255,)
+    return f
+
+
+#        Ruhe      heben  fassen     Stich       zurück   heben     Wurf        senken    zurück   Stich       zurück   heben     Wurf        senken    los           Ruhe
+ABLAUF = ['R'] * 4 + ['H'] * 2 + ['G'] * 2 + ['S'] * 5 + ['G'] * 2 + ['L1'] * 2 + ['L2'] * 6 + ['L1'] * 2 + ['G'] * 2 + ['S'] * 5 + ['G'] * 2 + ['L1'] * 2 + ['L2'] * 6 + ['L1'] * 2 + ['G'] * 3 + ['H'] * 2 + ['R'] * 11
+assert len(ABLAUF) == N
+WURF = [k for k in range(N) if ABLAUF[k] == 'L2' and ABLAUF[k - 1] != 'L2']
+BROCKEN = [dict(x=sz.PL + 23, y=sz.PT + 9, vx=0.55, vy=-1.0, g=0.17, start=s + 1, dauer=11) for s in WURF] + \
+          [dict(x=sz.PL + 21, y=sz.PT + 10, vx=0.30, vy=-1.2, g=0.18, start=s + 2, dauer=11) for s in WURF] + \
+          [dict(x=sz.PL + 24, y=sz.PT + 10, vx=0.85, vy=-0.7, g=0.15, start=s + 2, dauer=10) for s in WURF]
+BLINZELN = (53, 54)
+KOPF = (slice(0, sz.PT + 11), slice(0, sz.PL + 15))
 
 
 def frame(i, nur=None):
-    d, b = D_FOLGE[i % 30], B_FOLGE[i % 30]
-    k = KOERPER
-    if 28 <= i <= 29:
+    name = ABLAUF[i % N]
+    d = SPATEN_LAGE[name]
+    k = KOERPER if name == 'R' else KOERPER_OHNE_ARM
+    if i in BLINZELN:
         k = k.copy()
         k[sz.PT + 6, sz.PL + 11, :3] = HAUT; k[sz.PT + 7, sz.PL + 11, :3] = LID; k[sz.PT + 6, sz.PL + 12, :3] = (221, 170, 110)
-    k = TX.streck_zeile(k, sz.PT + 13, -b)        # b = +1 ducken (Zeile entfällt), b = −1 strecken (texturierte Zeile)
-    f = L.zusammen(sz.H, sz.W, [(spaten(d, d + b), 0, 0), (k, 0, 0)])
+    f = L.zusammen(sz.H, sz.W, [(spaten(*d), 0, 0), (k, 0, 0)])
+    if name != 'R':
+        f = arm(f, name)
+    if i not in BLINZELN:                           # Kopf und Bart sind in jedem Frame pixelgleich mit der Quelle
+        assert np.array_equal(f[KOPF], KOERPER[KOPF])
     if not nur:
         f = L.zusammen(sz.H, sz.W, [(f, 0, 0), (N9.brocken(sz.H, sz.W, i, BROCKEN, ERDE, ERDE2), 0, 0)])
     return f
 
 
 if __name__ == '__main__':
-    N9.fertig('gravedigger', 'Gravedigger', frame, N, MS, spr, erlaubt=[ERDE], check=[0, 5, 13, 22, 24, 27, 29], zoom=14)
+    N9.fertig('gravedigger', 'Gravedigger', frame, N, MS, spr, erlaubt=[ERDE], check=[0, 4, 6, 9, 15, 17, 19, 22, 54], zoom=16)

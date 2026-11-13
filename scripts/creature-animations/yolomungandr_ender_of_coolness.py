@@ -12,7 +12,9 @@ Was im Sprite ist (x, y):
 * RÜCKEN: Schachbrett aus (112,133,152)/(40,58,70) (streng nach (x+y) gerade/ungerade), Umriss (28,29,33); drei große RÜCKENSTACHELN nach links (y 4–7, y 18–25, y 35–43) und Hörner am Kopf (x 64–76, y 4–10).
 * BAUCH: Schachbrett aus (239,208,188)/(145,112,71) mit braunen Segmentlinien (71,43,19).
 * KOPF (x 62–79, y 4–25): zwei gelbe AUGEN ((243,217,158)/(195,172,66)/(190,147,34), dunkelrot (54,7,0), Pupillen schwarz) bei (71–74, 15–17) und (74–76, 17–19); weiße ZÄHNE (255,255,255) im offenen Maul (x 67–73, y 19–24).
-* SCHWANZENDE: läuft unten links als dünne dunkle Linie aus (x 0–20, y 53–57), daneben ein flacher grauer Fleck (x 18–25, y 53–55). Liegt am Boden → völlig still.
+* SCHWANZENDE: flacher grauer Fleck unten links (x 18–25, y 53–56). Liegt am Boden → völlig still.
+  Runde 9 (Nutzer: „Die lange dunkle Linie unten links soll weg“): Die Quellebene lief hier als dünne dunkle Linie nach links aus (x 0–18, y 54–57, dazu der Stummel (19–20, 57)); sie ist aus
+  src/…png und src/…_leib.png ENTFERNT (nicht wieder aus der xcf-Ebene holen). Der Fleck ist dort mit drei Umrisspixeln geschlossen: (19,54), (19,55), (20,56) in (28,29,33).
 
 Ablauf (72 Frames à 80 ms = 5,76 s – riesiges Wesen, langsam; nahtlos, Frame 0 = Original):
 * KOPF WIEGEN (Idle-Idee: die Schlange wiegt ihren Kopf wie eine Kobra in einer liegenden Acht): der Leib schwingt seitlich (Zeilenversatz, unten y ≥ 50 fest, nach oben bis ±2 px, oberhalb y 26 einheitlich – Periode 72),

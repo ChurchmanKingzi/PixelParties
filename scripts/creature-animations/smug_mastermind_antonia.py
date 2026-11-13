@@ -16,11 +16,13 @@ Was ist was (x/y im Sprite):
 Ablauf (60 Frames à 70 ms = 4,2 s, nahtlos; Frame 0 = Original):
 * Atmen: Saumzeile 23 (unter der Schleife) wird texturiert eingefügt (0–1 px, Periode 30); Kopf und Goldwürfel heben sich starr mit, der Kopf bewegt sich nie seitlich.
 * FLUG (Runde 8: „trägt ein Jetpack und sollte mit diesem fliegen“): der ganze Sprite steigt und sinkt weich um 0–2 px (Periode 30).
-* Schubstrahlen: handgezeichneter 8-Bilder-Zyklus je Düse (jedes Frame ein neues Bild, rechts 3 Bilder versetzt), 3 px breit wie in der Quelle, nur deren vier Rot-Stufen; Fuß lückenlos unter der Hand.
-* Arme + Düsen heben und senken sich als starre Einheiten (Arm, Hand, Schubstrahl): Atemhub plus eigenes Anheben 0–1 px (Periode 20, rechter Arm 5 Frames versetzt) – nichts wird gestreckt.
-* Funkel-Kreuze unter den Strahlen: funkeln (Kreuz → Punkt → aus → Punkt → Kreuz), links und rechts versetzt.
+* Schubstrahlen: handgezeichneter 8-Bilder-Zyklus je Düse (jedes Frame ein neues Bild, links und rechts synchron), 3 px breit wie in der Quelle, nur deren vier Rot-Stufen; Fuß lückenlos unter der Hand.
+* Arme + Düsen heben und senken sich als starre Einheiten (Arm, Hand, Schubstrahl): Atemhub plus eigenes Anheben 0–1 px (Periode 20, beide Arme gleichzeitig) – nichts wird gestreckt.
+* Funkel-Kreuze unter den Strahlen: funkeln (Kreuz → Punkt → aus → Punkt → Kreuz), links und rechts gleichzeitig.
 * Goldwürfel (Gold): zweimal je Schleife ein diagonales Lichtband (eine Stufe heller auf der Gold-Rampe, der dunkle Goldrand bleibt), dazu ein kurzer Sparkle an seiner oberen Ecke (3 Frames).
 * Blinzeln beider Augen (Frames 24–26 und 50–52): Rot → dunkles Gesichtsgrau.
+RUNDE 9 (Nutzer: „Die zwei Seiten von Antonias Jetpack sollten synchron sein!“): linke und rechte Seite laufen jetzt in JEDEM Frame spiegelbildlich gleich – derselbe Schubstrahl-Zyklusschritt
+(vorher rechts 3 Bilder versetzt), dasselbe Anheben von Arm + Düse (vorher rechts 5 Frames versetzt), dasselbe Funkeln der Schubfunken (vorher rechts eigener 15er-Takt).
 ERGÄNZUNG: (4, 14) und (19, 14) – Umhangrand unter den Achseln in Umrissschwarz (0,2,0), sichtbar nur, wenn der Arm 1 px über der Schulter steht (sonst entstünde dort eine Lücke). Nur ganze Pixel, nur Farben der Quelle.
 """
 import numpy as np
@@ -86,7 +88,6 @@ def kreuz(x0, stufe):
 
 
 FUNKEL = [2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 1, 1, 0, 0, 1, 1, 2, 2]      # je 20 Frames
-FUNKEL_R = [2, 2, 2, 2, 2, 2, 2, 2, 2, 1, 1, 0, 0, 1, 1]                           # rechtes Kreuz: 15 Frames je Durchlauf
 
 
 def frame(i, nur=None):
@@ -102,14 +103,14 @@ def frame(i, nur=None):
     N2.funke(ko, OFF, 16, 1, N2.fenster(i, N, 17, [0, 1, 0]), WEISS, GOLD[-1])
     # Schubstrahlen der Düsen
     schub(al, 1, i)
-    schub(ar, 20, i + 3)
+    schub(ar, 20, i)                                                             # Runde 9: beide Düsen im selben Zyklusschritt (die Posen sind in sich spiegelsymmetrisch)
     # Bewegung
     b = N2.hub(i, 30, 1)
     ko = TX.streck_zeile(ko, FIG.pt + 23, b)
     al = L.versetze(al, 0, -b - N2.hub(i, 20, 1))
-    ar = L.versetze(ar, 0, -b - N2.hub(i, 20, 1, versatz=5))
+    ar = L.versetze(ar, 0, -b - N2.hub(i, 20, 1))                                 # Runde 9: beide Arme/Düsen heben sich gleichzeitig
     kl = kreuz(2, FUNKEL[i % 20])
-    kr = kreuz(21, FUNKEL_R[i % 15])
+    kr = kreuz(21, FUNKEL[i % 20])                                                # Runde 9: beide Schubfunken funkeln gleichzeitig
     fig = L.zusammen(FIG.H, FIG.W, [(kl, 0, 0), (kr, 0, 0), (ko, 0, 0), (al, 0, 0), (ar, 0, 0)])
     return L.versetze(fig, 0, -N2.hub(i, 30, 2))                                  # Flug: der ganze Sprite steigt und sinkt weich (0–2 px)
 

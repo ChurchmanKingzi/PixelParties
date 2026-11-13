@@ -25,6 +25,10 @@ Ablauf (48 Frames à 75 ms = 3,6 s, nahtlos); Idee: Wächter hinter dem Schild �
 Frame 0 = Original. Kopf bewegt sich nur senkrecht.
 Ergänzungen (Körperebene, im Original verdeckt):
 * hinter der Schildkante, sichtbar wenn der Körper 1 px steigt: (17,13) und (18,12) Umriss (49,24,0) (Wangen-/Kinnlinie), (16,14), (15,15), (14,16), (13,17) Haut (180,123,49) (Schulter/Brust).
+RUNDE 9 (Nutzer: „Sollten NICHT seitwärts blinzeln!“): Das Auge ist 1 px breit und 2 px hoch (Iris über Augenweiß) und sitzt zwischen dunklen Lidrand-Pixeln. Früher wurden beide Pixel hautfarben –
+übrig blieb ein SENKRECHTER heller Spalt zwischen den schwarzen Randpixeln (las sich wie seitlich zugekniffen). Jetzt senkt sich das Oberlid von oben nach unten: erst deckt der dunkle Lidrand die
+Iriszeile zu (Augenweiß darunter noch sichtbar), dann ist auch das Weiß vom Lid (Haut) bedeckt – geschlossen ist das Auge ein WAAGERECHTER dunkler Lidstrich; Öffnen in umgekehrter Reihenfolge.
+Frames 19–22 und 43–46 (halb, zu, zu, halb).
 """
 import numpy as np
 
@@ -49,6 +53,8 @@ schild &= F.da
 rumpf = F.da & ~arm & ~keule & ~schild
 HAUT, UMRISS = F.f(13, 10), F.f(10, 14)
 WEISS, HELLGOLD, BAND = F.f(11, 12), F.f(5, 16), F.f(19, 15)
+LIDRAND = F.f(10, 11)                                              # (0,0,0): dunkler Lidrand neben der Iris
+LID = {19: 1, 20: 2, 21: 2, 22: 1}
 ATEM = [0] * 4 + [1] * 12 + [0] * 8
 RAMPE = G.goldrampe(spr, arm, F.f(11, 12))
 GLANZ, GLANZ_DAUER = (14, 38), 8
@@ -59,8 +65,11 @@ def frame(i, nur=None):
     at = ATEM[i % 24]
     k = F.ebene(rumpf)
     F.setze(k, {(17, 13): UMRISS, (18, 12): UMRISS, (16, 14): HAUT, (15, 15): HAUT, (14, 16): HAUT, (13, 17): HAUT})
-    if i in (20, 21, 22, 44, 45, 46):
-        F.setze(k, {(11, 11): HAUT, (11, 12): HAUT, (16, 11): HAUT, (16, 12): HAUT})
+    lid = LID.get(i % 24)                                            # 1 = Lid halb gesenkt, 2 = zu
+    if lid:
+        F.setze(k, {(11, 11): LIDRAND, (16, 11): LIDRAND})
+    if lid == 2:
+        F.setze(k, {(11, 12): HAUT, (16, 12): HAUT})
     k = F.streck(k, 24, at)
     ar = F.ebene(arm, 0, -at)                                        # Arm und Keule immer mit dem Oberkörper (kein eigener Hub → keine Stufe an der Schulter)
     if not nur:

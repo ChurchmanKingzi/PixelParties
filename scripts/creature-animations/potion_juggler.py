@@ -31,6 +31,11 @@ RUNDE 8 (Nutzer: „Die Potions bleiben etwas zu lange in der Mitte in der Luft 
 6 Frames (vorher 10) auf derselben Parabel: Höhe je Frame 10 → 4 → 1 → 0 → 1 → 4 → (Hand) – schnell unten, genau EIN Frame am Scheitel, kein Plateau (vorher standen die Flaschen 3 Frames auf Scheitelhöhe).
 Außerdem war der seitliche Bahnversatz der beiden Wurfrichtungen (0,15 · sin) so groß, dass die Flasche am Scheitel waagerecht fast stehen blieb (Schritte 7, 3, 1, 1, 3, 7 px) – das war das eigentliche „Hängen“.
 Er ist jetzt 0,05 (höchstens ±1 px): die Flasche fliegt waagerecht praktisch gleichförmig (5, 3, 3, 3, 3, 5 px je Frame).
+RUNDE 9 (Nutzer: „Sollte noch die Arme beim Jonglieren bewegen“): Beide Arme sind jetzt Posen im Wurftakt (`arm_pose`, ARM_TAKT, Periode 6 = ein Wurf je Hand): trifft die Flasche die Hand, gibt die
+Hand 1 px nach unten nach (2 Frames, während die Flasche eintaucht), schnellt zum Abwurf zurück in die Ruhelage und schwingt 1 px nach oben nach, dann Ruhe bis zum nächsten Fang. Linke und rechte Hand
+laufen um einen halben Takt versetzt (wie die Flaschen). Bewegt wird Hand + äußerer Ärmel (Spalten 7–9 bzw. 22–24) als starre Einheit, die Schulter bleibt; nichts wird gestreckt oder dicker.
+Fertiggezeichnet: Hand unten → Haarumriss (9,25)/(22,25) in (140,34,10), Handschuhrand (10,28)/(21,28) grau; Hand oben → Ärmelkante (9,30)/(22,30) bleibt, Handschuhrand (10,25)/(21,25) grau,
+(10,27)/(21,27) Ärmelgrün. Flaschenbahnen, Federn, Mund unverändert.
 Schleife jetzt 54 Frames à 70 ms = 3,8 s (drei volle Umläufe à 18 Frames). In der Hand: 3 Frames (taucht 3 px ein). Federn des Clowns im Wurftakt (Periode 6), Mund schließt in den Frames 20–23 und 47–50.
 """
 import math
@@ -70,8 +75,43 @@ def bahn(t):
     return (XR if t < 3.0 else XL), int(round(YH + DIP * math.sin(math.pi * q))), True
 
 
+ARM_L = {(8, 25), (9, 25), (7, 26), (8, 26), (9, 26), (7, 27), (8, 27), (9, 27), (7, 28), (8, 28), (9, 28), (8, 29), (9, 29), (9, 30)}   # Hand + äußerer Ärmel (Spalten 7–9) des linken Arms
+HAAR_RAND, HANDSCHUH_RAND, AERMEL = f(9, 24), f(10, 26), f(10, 28)
+for (x_, y_) in ARM_L:
+    assert clown[y_, x_, 3] and clown[y_, 31 - x_, 3] and (clown[y_, x_] == clown[y_, 31 - x_]).all(), (x_, y_)   # beide Arme sind spiegelgleich (Achse x 15,5)
+# Wurftakt je Hand (Phase 0 = Flasche trifft die Hand): fangen → nachgeben (2 Frames unten) → Abwurf (Ruhe) → Nachschwung oben → Ruhe → Ruhe
+ARM_TAKT = (0, 1, 1, 0, -1, 0)
+
+
+def arm_pose(c, d, rechts):
+    """Arm als Pose im Clown-Sprite `c`: Hand + äußerer Ärmel (ARM_L) gehen starr um d px (+1 = unten beim Fangen, −1 = oben nach dem Wurf); die Schulter (Spalten ≥ 10) bleibt.
+    Gleiche Dicke (nur senkrechter Versatz), frei werdende/verdeckte Stellen fertiggezeichnet."""
+    if not d:
+        return c
+    X = (lambda x: 31 - x) if rechts else (lambda x: x)
+    teil = {(x, y): c[y, X(x)].copy() for (x, y) in ARM_L}
+    for (x, y) in ARM_L:
+        c[y, X(x)] = 0
+    for (x, y), v in teil.items():
+        c[y + d, X(x)] = v
+    def setz(x, y, farbe):
+        c[y, X(x), :3] = farbe
+        c[y, X(x), 3] = 255
+    if d > 0:
+        setz(9, 25, HAAR_RAND)                                       # Haarumriss, den der Handschuh verdeckt hatte
+        setz(10, 28, HANDSCHUH_RAND)                                 # rechter Handschuhrand geht mit nach unten
+    else:
+        setz(9, 30, f(9, 30))                                        # Ärmel-Unterkante bleibt an der Schulter geschlossen
+        setz(10, 25, HANDSCHUH_RAND)                                 # Handschuhrand geht mit nach oben (Hand vor dem Haar)
+        setz(10, 27, AERMEL)
+    return c
+
+
 def frame(i):
-    k = G.ebene(quelle=clown)
+    c = clown.copy()
+    c = arm_pose(c, ARM_TAKT[(i - 3) % 6], False)                    # linke Hand fängt in den Frames 3 (mod 6)
+    c = arm_pose(c, ARM_TAKT[i % 6], True)                           # rechte Hand fängt in den Frames 0 (mod 6)
+    k = G.ebene(quelle=c)
     if Hm.takt(i, 27, 20, 4):
         Hm.setze(k, {(15, 26): MUND_ZU, (16, 26): MUND_ZU}, OFF)
     if Hm.stufe(i, 6, 1):

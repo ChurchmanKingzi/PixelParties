@@ -58,6 +58,12 @@ hacke = F.da & (F.xx >= 10) & (F.yy <= 13) & ~((F.xx == 10) & (F.yy == 14))
 hand = F.punkte([(8, 13), (9, 13), (8, 14), (9, 14), (10, 14)])
 rumpf = F.da & ~hacke & ~hand
 MANTEL = F.f(2, 22)
+# Arm in der Ruhepose: karierter Streifen unter der Hand. Schulterzeile (7,15)/(8,15) bleibt in jeder Pose; der Rest wird beim Schlag durch den Körper darunter ersetzt.
+ARM_REST = [(6, 16), (7, 16), (5, 17), (6, 17), (5, 18), (7, 18), (6, 19), (7, 19), (7, 20)]
+ARM_FARBEN = [(F.f(7, 15), F.f(8, 15)), (F.f(6, 16), F.f(7, 16)), (F.f(5, 17), F.f(6, 17)), (F.f(5, 18), F.f(7, 18)), (F.f(6, 19), F.f(7, 19))]
+OHNE_ARM = spr.copy()                               # Körper unter dem Arm fertiggezeichnet: Mantel, in Zeile 20 die helle Kante der Gürteltasche (wie (7,21))
+for _x, _y in ARM_REST:
+    OHNE_ARM[_y, _x, :3] = F.f(7, 21) if _y == 20 else MANTEL
 H_O1, H_O2, H_U = F.f(8, 13), F.f(9, 13), F.f(8, 14)
 BLITZ = F.f(6, 11)
 STEIN1, STEIN2 = F.f(4, 20), F.f(3, 21)            # (131,126,121), (90,92,80)
@@ -123,15 +129,17 @@ P15, P90 = raster(HACKE_15), raster(HACKE_90)
 
 # ---------------------------------------------------------------- Posen
 # Name: (Hacke, Griffende (x, y), Hand-Ecke oben links (x, y), Ärmel-Pixel, Oberkörper-Versatz dx, Kopf-Zusatz (dx, dy), Strecken, Hacke hinter dem Körper)
+# ARM (Runde 9): Der gelb-orange karierte Streifen IST der Arm. In jeder Schlag-Pose wird er von der festen Schulter ((7,15)/(8,15), bleibt am Rumpf) bis zur Hand neu gesetzt:
+# Liste von Pixel-PAAREN (2 px stark wie im Original), von der Schulter zur Hand; Paar k bekommt die Farben der k-ten Originalzeile des Arms (ARM_FARBEN, Karomuster).
 ARME = {
-    'A2': [(9, 14), (10, 14), (10, 13), (11, 13)],
-    'B':  [(9, 14), (10, 14), (10, 13), (11, 13), (10, 12), (11, 12), (11, 11), (12, 11)],
-    'C':  [(9, 14), (10, 14), (10, 13), (11, 13), (10, 12), (11, 12), (11, 11), (12, 11), (11, 10), (12, 10)],
-    'D1': [(9, 14), (10, 14), (10, 13), (11, 13), (10, 12), (11, 12), (11, 11), (12, 11), (11, 10), (12, 10)],
-    'D2': [(10, 15), (11, 15), (11, 14), (12, 14)],
-    'E':  [(10, 17), (11, 17), (10, 18), (11, 18), (11, 19), (12, 19)],
-    'R1': [(10, 16), (11, 16), (11, 17), (12, 17)],
-    'R2': [],
+    'A2': [((8, 14), (9, 14)), ((9, 13), (10, 13))],
+    'B':  [((8, 14), (9, 14)), ((9, 13), (10, 13)), ((10, 12), (11, 12)), ((11, 11), (12, 11))],
+    'C':  [((8, 14), (9, 14)), ((9, 13), (10, 13)), ((10, 12), (11, 12)), ((11, 11), (12, 11)), ((11, 10), (12, 10))],
+    'D1': [((8, 14), (9, 14)), ((9, 13), (10, 13)), ((10, 12), (11, 12)), ((11, 11), (12, 11)), ((11, 10), (12, 10))],
+    'D2': [((9, 14), (10, 14)), ((10, 13), (11, 13))],
+    'E':  [((9, 16), (10, 16)), ((9, 17), (10, 17)), ((10, 18), (11, 18)), ((10, 19), (11, 19))],
+    'R1': [((10, 15), (10, 16)), ((11, 15), (11, 16))],
+    'R2': None,                                     # Arm wie im Original (Ellbogen unten), nur Hand + Hacke 1 px tiefer/weiter vorn
 }
 POSEN = {
     'A':  None,
@@ -162,10 +170,10 @@ BLITZ_XY = (1, -3)                                  # Ecke des Hackenkopfs in Po
 TEST_EBENEN = ('koerper',)
 
 
-def koerper(ob_dx, kopf, streck):
-    """Körper ohne Hand und Hacke; Oberkörper (Zeilen ≤ 21) um ob_dx vor, Kopf (Zeilen ≤ 14) zusätzlich um `kopf`."""
+def koerper(ob_dx, kopf, streck, q):
+    """Körper ohne Hand und Hacke (q = Quelle mit oder ohne Ruhe-Arm); Oberkörper (Zeilen ≤ 21) um ob_dx vor, Kopf (Zeilen ≤ 14) zusätzlich um `kopf`."""
     unten = F.ebene(rumpf & (F.yy >= 22))
-    ob = F.ebene(rumpf & (F.yy >= 15) & (F.yy <= 21), ob_dx, 0)
+    ob = F.ebene(rumpf & (F.yy >= 15) & (F.yy <= 21), ob_dx, 0, quelle=q)
     F.setze(ob, {(8 + ob_dx, 14): MANTEL})
     kf = F.ebene(rumpf & (F.yy <= 14), ob_dx + kopf[0], kopf[1])
     k = G.ueber(G.ueber(unten, ob), kf)
@@ -182,11 +190,18 @@ def pose(name, splitter=None, blitz=None):
         fig = F.ebene(F.da)
     else:
         hk, g, hd, arm, ob_dx, kopf, streck, hinten = POSEN[name]
-        k = koerper(ob_dx, kopf, streck)
+        k = koerper(ob_dx, kopf, streck, spr if arm is None else OHNE_ARM)
         h = teil(hk, g[0], g[1] - streck)
         fig = G.ueber(h, k) if hinten else G.ueber(k, h)
         hx, hy = hd[0], hd[1] - streck
-        F.setze(fig, {(x, y - streck): MANTEL for (x, y) in arm})
+        armpix = {}
+        for n, paar in enumerate(arm or []):
+            for (x, y), c in zip(paar, ARM_FARBEN[(n + 1) % len(ARM_FARBEN)]):
+                armpix[(x, y - streck)] = c
+        # Umriss in Mantelfarbe, wo der Arm an den Hintergrund grenzt (1 px, wie überall am Sprite); über Figur/Hacke wird nichts übermalt
+        rand = {(x + a, y + b) for (x, y) in armpix for a, b in ((1, 0), (-1, 0), (0, 1), (0, -1))} - set(armpix)
+        F.setze(fig, {p: MANTEL for p in rand if not fig[p[1] + F.pt, p[0] + F.pl, 3]})
+        F.setze(fig, armpix)
         F.setze(fig, {(hx, hy): H_O1, (hx + 1, hy): H_O2, (hx, hy + 1): H_U, (hx + 1, hy + 1): H_U})
         if blitz is not None:
             Hm.stern4(fig, BLITZ_XY[0], BLITZ_XY[1], blitz, BLITZ, BLITZ, off=F.OFF)

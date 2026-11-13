@@ -35,6 +35,10 @@ Ablauf (48 Frames à 62 ms = 2,98 s, nahtlos):
 Frame 0 = Original (Ruhepose). Kontrolle: anim_humanoide.ruhepose / eckkontakt_typen / Randpixel-Test (Regel 16).
 Alle Bewegungen laufen auf der vollen Leinwand (anim_lib wirft ClipError). Nur ganze Pixel, nur Farben der Quelle.
 Ergänzungen: keine (nichts Verdecktes wird freigelegt; der Stab wird nur gestreckt, Haarspitzen und Saum verschieben sich in ihrer eigenen Zeile).
+RUNDE 9 (Nutzer: „Sollten NICHT seitwärts blinzeln!“): Das Auge ist 1 px breit und 2 px hoch (Iris über Augenweiß) und sitzt zwischen dunklen Lidrand-Pixeln. Früher wurden beide Pixel hautfarben –
+übrig blieb ein SENKRECHTER heller Spalt zwischen den schwarzen Randpixeln (las sich wie seitlich zugekniffen). Jetzt senkt sich das Oberlid von oben nach unten: erst deckt der dunkle Lidrand die
+Iriszeile zu (Augenweiß darunter noch sichtbar), dann ist auch das Weiß vom Lid (Haut) bedeckt – geschlossen ist das Auge ein WAAGERECHTER dunkler Lidstrich; Öffnen in umgekehrter Reihenfolge.
+Frames 19–22 und 41–44 (halb, zu, zu, halb).
 """
 import math
 import sys
@@ -65,6 +69,8 @@ ERLAUBT = Hm.umrissfarben(spr)                                      # Farben der
 SCHWARZ, GRUEN = (0, 1, 0), (41, 65, 0)
 HAUT = f(10, 11)                                                    # (180,123,49): Hautfarbe neben dem Auge (Lidfarbe)
 GOLD = [(248, 142, 24), (249, 189, 24), (249, 202, 24), (249, 227, 24)]
+LIDRAND = f(8, 10)                                                 # (0,0,0): dunkler Lidrand links/rechts neben der Iris
+assert f(10, 10) == LIDRAND
 WEISS, HELL, MITTEL = f(9, 11), (249, 227, 24), (249, 189, 24)      # Stern: Augenweiß, Hellgold
 
 stab = vorhanden & (((xx >= 11) & (xx <= 13) & (yy >= 8)) | ((xx == 12) & (yy == 7)) | ((xx == 14) & (yy >= 15) & (yy <= 18)))
@@ -101,8 +107,11 @@ def frame(i):
     st = L.platz(ts, H, W, PAD_L, PAD_T)
     gl = L.leer(H, W)                                               # Glitzer-Sterne (Effekt über der Figur)
     # --- Blinzeln: Iris und Weiß nehmen die Hautfarbe an ---
-    if Hm.folge(i, 19, [1, 1, 1], N) or Hm.folge(i, 41, [1, 1, 1], N):
-        Hm.setze(k, {(9, 10): HAUT, (9, 11): HAUT}, OFF)
+    lid = Hm.folge(i, 19, [1, 2, 2, 1], N) or Hm.folge(i, 41, [1, 2, 2, 1], N)   # 1 = Lid halb gesenkt, 2 = zu
+    if lid:
+        Hm.setze(k, {(9, 10): LIDRAND}, OFF)
+    if lid == 2:
+        Hm.setze(k, {(9, 11): HAUT}, OFF)
     # --- Gold glänzt: Lichtband über das Brustband ---
     # (Lichtband über den ganzen goldenen Arm: nach dem Zusammensetzen, siehe unten)
     # --- Stachelhaare wehen ---

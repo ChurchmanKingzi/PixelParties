@@ -16,7 +16,8 @@ Ablauf (64 Frames à 70 ms = 4,5 s). Frame 0 = Original:
   und rechts der Schlagfläche 2×2-Steinkrümel (Grautöne der Quelle) weg; der Rumpf sackt beim Aufschlag nicht ein (Hufe bleiben am Boden).
 * Atmen (Periode 32, nur Rumpf-Ebene): Zeile 12 wird texturiert gestreckt (TX.streck_zeile), der Rücken hebt sich 1 px; Beine und Hammer bleiben stehen.
 * Schweif pendelt: die unteren drei Zeilen 1 px zum Körper hin (in den Pausen zwischen den Schlägen, Frames 27–32 und 57–62).
-* Blinzeln (Frames 29–31): das Lid (Kopffarbe (61,71,70)) schließt sich von oben über die hellen Augenpixel.
+* Blinzeln (Frames 28–31), SEITWÄRTS (Runde 9, Nutzer: „*Sollte* seitwärts blinzeln“ – das Auge sitzt auf dem senkrecht stehenden Hammerkopf): das Lid (Kopffarbe (61,71,70)) schiebt sich von links
+  nach rechts über das Auge (x 26–27, y 9–12, helle Pixel UND Pupille): erst Spalte 26, dann beide Spalten (2 Frames zu), dann wieder Spalte 26, offen. Vorher schloss es sich von oben.
 Ergänzungen: keine.
 """
 import numpy as np
@@ -56,10 +57,10 @@ def frame(i, nur=None):
     n = N8.stufe(i, 32, 2, 14)
     rumpf = TX.streck_zeile(RUMPF, PT + 12, n)
     hammer = HAMMER
-    if 29 <= i <= 31:
+    if 28 <= i <= 31:                                                # Lid schiebt sich SEITLICH (von links nach rechts) über das ganze Auge (y 9–12) und wieder zurück
         hammer = HAMMER.copy()
-        for y in ((9,), (9, 10), (9,))[i - 29]:
-            hammer[PT + y, PL + 26:PL + 28, :3] = LID
+        for x in ((26,), (26, 27), (26, 27), (26,))[i - 28]:
+            hammer[PT + 9:PT + 13, PL + x, :3] = LID
     pendel = 1 if (27 <= i <= 32) or (57 <= i <= 62) else 0
     f = L.zusammen(sz.H, sz.W, [(SCHWEIF, pendel, 0), (rumpf, 0, 0), (hammer, 0, -k)])
     if k:
