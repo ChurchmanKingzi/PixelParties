@@ -18,7 +18,7 @@ Ablauf (72 Frames à 75 ms = 5,4 s, nahtlos):
 * Vorderflügel (Periode 36, 2×): jeder Vorderflügel schwenkt als GANZER Flügel um den Schulteransatz nach außen – Zeilen bis y 41 bleiben, y 42–53 rücken 1 px, y 54–69 2 px nach außen
   (Zwischenstufe: 0/0/1). Starre Zeilenversätze (Gefälle ≤ 1 px), nichts wird gestreckt. Der dabei frei werdende Streifen des Hinterflügels wird mit dessen Bandfarbe der
   jeweiligen Zeile fertiggezeichnet (Verdecktes ergänzt); wo die Flügel schon im Original getrennt sind, öffnet sich nur der Spalt. Stufenecken im Umriss werden geschlossen (Regel 16).
-* Fühler (Periode 24, 3×): beide Fühler schwingen als Ketten seitlich – am Kopf fest, zur Spitze hin bis ±2 px, rechts um eine Drittelperiode versetzt.
+* Fühler (Periode 24, 3×): beide Fühler schwingen als Ketten seitlich – am Kopf fest, zur Spitze hin bis ±2 px, rechts gegenläufig.
 * Flügelstaub: 4 kleine Flocken (2×2, rosa-beige (223,186,164)/(214,173,154)) lösen sich beim Schließen von den Flügelunterkanten und sinken (je 18–20 Frames).
 Frame 0 = Original (bis auf die vier geschlossenen Löcher).
 """
@@ -42,7 +42,7 @@ BAND = f(28, 58)
 spr = G.spr.copy()
 for (x, y) in [(28, 59), (29, 59), (31, 60), (32, 60)]:            # Löcher der Quelle schließen
     spr[y, x, :3] = BAND; spr[y, x, 3] = 255
-G.spr = spr; G.da = L.deckend(spr)
+G.spr = spr; G.da = L.deckend(spr); G.erlaubt = Hm.umrissfarben(spr)
 
 
 def fluegelmaske(saat):
@@ -58,14 +58,10 @@ def fluegelmaske(saat):
 VF_L, VF_R = fluegelmaske((10, 50)), fluegelmaske((66, 50))
 FUEHLER_L = G.da & (G.yy <= 10) & (G.xx <= 38)
 FUEHLER_R = G.da & (G.yy <= 10) & (G.xx >= 39)
-STAUB = {'c': f(28, 58), 'r': f(40, 30)}
-FLOCKEN = [dict(x=14, y=70, vy=8, vx=-1, off=N - 20, form='s', dauer=20, wackeln=1), dict(x=70, y=71, vy=7, vx=1, off=N - 24, form='s', dauer=18),
-           dict(x=34, y=71, vy=7, vx=1, off=N - 56, form='s', dauer=20, wackeln=-1), dict(x=57, y=70, vy=8, vx=-1, off=N - 60, form='s', dauer=18)]
+STAUB = {'c': f(28, 58), 'r': f(32, 30)}
+FLOCKEN = [dict(x=14, y=70, vy=6, vx=-1, off=N - 20, form='s', dauer=20, wackeln=1), dict(x=70, y=70, vy=6, vx=1, off=N - 24, form='s', dauer=18),
+           dict(x=34, y=70, vy=6, vx=1, off=N - 50, form='s', dauer=20, wackeln=-1), dict(x=57, y=70, vy=6, vx=-1, off=N - 53, form='s', dauer=18)]
 TEST_EBENEN = 'koerper'
-
-
-def schwenk(st):
-    return {y: (0 if y < 42 else (st if y >= 54 else st // 2 + (1 if st == 2 else 0) - (0 if st else 0))) if st else 0 for y in range(24, 70)}
 
 
 def spreizen(a, maske, st, richtung):
@@ -98,7 +94,7 @@ def frame(i, nur=None):
     a = spreizen(a, VF_L, st, -1)
     a = spreizen(a, VF_R, st, 1)
     a = fuehler(a, FUEHLER_L, L.sinus(i, 24))
-    a = fuehler(a, FUEHLER_R, L.sinus(i, 24) - 2 * math.pi / 3 + (2 * math.pi / 3) * 0)
+    a = fuehler(a, FUEHLER_R, L.sinus(i, 24) + math.pi)
     a = G.schliessen(a, lambda x, y: UMRISS)
     if nur:
         return a

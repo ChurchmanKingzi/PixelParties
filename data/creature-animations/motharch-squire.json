@@ -1,0 +1,15 @@
+{
+  "creature": "Motharch Squire",
+  "sheet": "motharch-squire.png",
+  "frameWidth": 87,
+  "frameHeight": 81,
+  "frames": 72,
+  "frameMs": 75,
+  "loop": true,
+  "layout": "horizontal",
+  "padTop": 3,
+  "padLeft": 3,
+  "padRight": 3,
+  "padBottom": 3,
+  "faceX": 43.5
+}
