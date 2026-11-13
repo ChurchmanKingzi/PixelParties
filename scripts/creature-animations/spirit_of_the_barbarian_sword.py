@@ -6,7 +6,7 @@ Quelle: src/spirit-of-the-barbarian-sword.png (24×36 px, 34 Farben) = Ebene 698
 
 Was ist was (x/y im Sprite):
 * Flammenschopf (x 7–14, y 0–12): hohe Flamme aus dem Helm (Rot außen, Orange, Gelb, heller Kern).
-* Roter Helm/Kapuze (x 5–16, y 13–19) mit dunklem Sehschlitz und hellblauen Augen (y 17–18) – Helm → kein Blinzeln. Flammen-Emblem in der Helmmitte (x 9–12, y 13–15) bleibt fest.
+* Roter Helm/Kapuze (x 5–16, y 13–19) mit dunklem Sehschlitz und hellblauen Augen ((8, 17), (8–9, 18) und gespiegelt (13, 17), (12–13, 18)); sie blinzeln (Runde 8). Flammen-Emblem in der Helmmitte (x 9–12, y 13–15) bleibt fest.
 * Flammenbart (x 5–16, y 20–28): zwei nach unten züngelnde Flammen links und rechts (gelber Kern), dazwischen/dahinter die grüne Tunika, graue Gürtelschnalle (11–12, y 26–27).
 * Grüne Tunika (y 22–31), linker Arm (x 0–5, y 22–29) mit dunklem Handschuh/Faust (x 0–4, y 26–29), braune Stiefel (y 32–35).
 * Rechte Hand (x 16, y 23–25) hält das Barbarenschwert senkrecht (x 17–23, y 5–25): breite cremefarbene Klinge mit roter Hohlkehle, brauner Parierbalken (y 24) – starr.
@@ -17,6 +17,7 @@ Ablauf (48 Frames à 65 ms = 3,12 s, nahtlos):
 * Flammenbart flackert in sich: die gelben Kerne der beiden Bartflammen pulsieren (Kern ↔ Orange, je Seite versetzt, 8-Frame-Takt) – der Umriss des Barts bleibt (er liegt auf der Tunika).
 * Atmen: Tunikazeile 30 wird texturiert eingefügt (0–1 px, Periode 24) – Rumpf, Kopf, Arm und Schwert heben sich starr mit, Stiefel bleiben stehen; Kopf nie seitlich. Die Flamme sitzt auf dem Helm und geht mit.
 * Schwertarm: das Schwert (Klinge + Parierbalken, starre Einheit) wird langsam 0–2 px angehoben und gesenkt (Periode 48), die Hand bleibt am Parierbalken.
+* Blinzeln (Runde 8; Frames 14–16 und 37–39): die hellblauen Augenpixel → dunkles Grau des Sehschlitzes.
 * Klinge (Metall): einmal je Schleife ein diagonales Lichtband über die Klinge (Frames 30–41, eine Stufe heller auf der Klingen-Rampe); kein Sparkle.
 ERGÄNZUNG: Handkante (16, 24–25) wird Umrissgrün (8,41,0), sobald der angehobene Parierbalken sie freigibt. Nur ganze Pixel, nur Farben der Quelle.
 """
@@ -69,11 +70,15 @@ def bart(a, punkte, stufe):
 
 
 BARTTAKT = [0, 0, 1, 1, 2, 2, 1, 1]
+SCHLITZ = FIG.f(10, 17)
+AUGEN = [(8, 17), (8, 18), (9, 18), (13, 17), (13, 18), (12, 18)]
 
 
 def frame(i, nur=None):
     ko = FIG.platz(KOERPER)
     sw_ = FIG.platz(SCHWERT)
+    if N2.fenster(i, N, 14, [1, 1, 1]) or N2.fenster(i, N, 37, [1, 1, 1]):
+        N2.setze(ko, OFF, {p: SCHLITZ for p in AUGEN})
     bart(ko, BART_L, BARTTAKT[i % 8])
     bart(ko, BART_R, BARTTAKT[(i + 4) % 8])
     Hm.lichtband(sw_, M_KLINGE, OFF, i, N, 30, 12, KLINGE, stufen=1, breite=3.0, achse=(1.0, 1.0))

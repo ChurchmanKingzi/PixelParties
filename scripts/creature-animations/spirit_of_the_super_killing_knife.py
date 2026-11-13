@@ -6,7 +6,7 @@ Quelle: src/spirit-of-the-super-killing-knife.png (31×23 px, 27 Farben) = Ebene
 (Mauer, Wiese, Erdhaufen sind Szene).
 
 Was ist was (x/y im Sprite):
-* Gestalt mit blondem Pagenkopf (x 10–21, y 0–9), grauem, maskenhaftem Gesicht mit blauen Augen (x 13–14 und 17–18, y 7–8; Maske/unklar → kein Blinzeln), dunkelgrauem Gewand (x 11–20, y 9–22).
+* Gestalt mit blondem Pagenkopf (x 10–21, y 0–9), grauem, maskenhaftem Gesicht mit dunkelblauen Augen ((12, 8) und (17, 8)); sie blinzeln (Runde 8), dunkelgrauem Gewand (x 11–20, y 9–22).
 * Zwei Messer, überkreuz nach außen-oben gehalten: Klingen hellgrau/weiß diagonal von den Händen (x 9–10 bzw. 21–22, y 10–12) nach links oben (bis (3, 6)) und rechts oben (bis (28, 6)); weiße
   Schneidenkanten daneben. Starr.
 * Zwei blonde Zöpfe hängen links und rechts herab (x 6–9 und 22–27, y 12–19), oben mit weißer Manschette.
@@ -16,6 +16,7 @@ Ablauf (48 Frames à 70 ms = 3,36 s, nahtlos; Frame 0 = Original):
 * Sparkles blitzen einzeln und versetzt (voll → klein → aus → klein → voll; die kleinen Kreuze nur voll/aus, damit keine Einzelpunkte entstehen); sie bleiben an ihrem Platz.
 * Klingen (Metall): abwechselnd läuft ein Lichtband die linke (Frames 4–13) und die rechte Klinge (Frames 28–37) entlang (eine Stufe heller auf der Klingen-Rampe).
 * Zöpfe pendeln: die unteren Zeilen der Zöpfe schwingen 1 px nach links/rechts (Periode 24, beide Zöpfe gegenläufig); der Ansatz bleibt.
+* Blinzeln (Runde 8; Frames 20–22 und 42–44): Augen → Grau des Gesichts.
 * Atmen: Gewandzeile 20 wird texturiert eingefügt (0–1 px, Periode 24); Oberkörper, Kopf, Messer und Zöpfe heben sich starr mit. Kopf nie seitlich.
 ERGÄNZUNGEN (unter Sparkles, sichtbar wenn sie aus sind): Zopfumriss (6, 15), (23, 17), (22, 18) in Umrissbraun (55,29,6).
 Nur ganze Pixel, nur Farben der Quelle.
@@ -57,6 +58,8 @@ for inn, aus, _, _ in STERNE:
     for (x, y) in inn + aus:
         assert FIG.f(x, y) == WEISS, (x, y)
         M_STERN[y, x] = True
+GESICHT = FIG.f(13, 8)
+assert FIG.f(12, 8) == FIG.f(17, 8) == (38, 74, 87)
 UNTER = {(6, 15): BRAUN, (23, 17): BRAUN, (22, 18): BRAUN}
 
 ZOPF_L = FIG.op & ~M_STERN & (yy >= 13) & (xx <= 9) & (FIG.maske(BLOND) | FIG.maske([WEISS]))
@@ -68,6 +71,8 @@ M_KL_R = FIG.maske(KLINGE[:3]) & (xx >= 22) & (yy <= 12)
 
 def frame(i, nur=None):
     ko = FIG.platz(KOERPER)
+    if N2.fenster(i, N, 20, [1, 1, 1]) or N2.fenster(i, N, 42, [1, 1, 1]):
+        N2.setze(ko, OFF, {(12, 8): GESICHT, (17, 8): GESICHT})
     Hm.lichtband(ko, M_KL_L, OFF, i, N, 4, 10, KLINGE, stufen=1, breite=2.5, achse=(1.0, 1.0))
     Hm.lichtband(ko, M_KL_R, OFF, i, N, 28, 10, KLINGE, stufen=1, breite=2.5, achse=(-1.0, 1.0))
     zl, zr = FIG.platz(ZOPF_L), FIG.platz(ZOPF_R)

@@ -28,8 +28,10 @@ Ablauf (48 Frames à 62 ms = 2,98 s, nahtlos):
 * Gras-Rock weht: der linke Saum der zwei unteren Rockzeilen (24–25) spreizt sich zweimal pro Schleife sanft 1 px nach außen (Periode 24, `Hm.rand_dehnen`, Lücke in Grasfarbe), Randpixel in Umrissgrün geschlossen.
 * Der Stab steht fest in der Faust (ein Kippen würde die Spitze nur über die Pixelecke an die Haare hängen und ist deshalb weggelassen): nur Atmen, die Faust steigt mit der Brust.
 * Blinzeln (Frames 19–21 und 41–43): hellblaue Iris (9,10) und weißer Pixel (9,11) nehmen die umgebende Hautfarbe (180,123,49) an (Lid = Hautfarbe); kein Farbtausch, kein Augenglanz.
-* Gold glänzt (Regel 12/14: nur das Brustband): ein Lichtband läuft zweimal pro Schleife diagonal über das Band (Frames 5–18 und 29–42, 1–2 Stufen heller auf der Goldrampe des Sprites, nur Innenpixel), dazu je ein
-  vierzackiger Glitzer-Stern am linken Bandende (Frames 10–13) und am rechten Bandende (Frames 34–37), Weiß = Augenweiß (246,255,255), Arme = Hellgold.
+* GOLD GLÄNZT (Runde 8): Brustband + Faust sind EIN goldener Arm (er greift quer über die Brust zum Stab). Alle 1,5 s (Start Frame 5 und 29, je 10 Frames) wandert ein Lichtband
+  schräg von der Schulter über den GANZEN Arm bis in die Faust (1 Stufe heller auf der Goldrampe des Sprites, im Kern 2 Stufen bis Augenweiß (246,255,255); anim_n5.goldglanz),
+  am Ende je ein kurzer Sparkle (Mitte → kleines Kreuz → weg, 3 Frames) am linken bzw. rechten Armende.
+  Arm und Faust heben sich in jedem Frame gemeinsam mit der Brust (gleicher Versatz) — keine Stufe zwischen Schulter, Arm und Faust.
 Frame 0 = Original (Ruhepose). Kontrolle: anim_humanoide.ruhepose / eckkontakt_typen / Randpixel-Test (Regel 16).
 Alle Bewegungen laufen auf der vollen Leinwand (anim_lib wirft ClipError). Nur ganze Pixel, nur Farben der Quelle.
 Ergänzungen: keine (nichts Verdecktes wird freigelegt; der Stab wird nur gestreckt, Haarspitzen und Saum verschieben sich in ihrer eigenen Zeile).
@@ -41,6 +43,7 @@ import numpy as np
 
 import anim_humanoide as Hm
 import anim_lib as L
+import anim_n5 as G5
 import anim_textur as TX   # texturierte Streckzeilen statt Zeilenkopien (Regel 43)
 
 N, MS = 48, 62
@@ -68,6 +71,8 @@ stab = vorhanden & (((xx >= 11) & (xx <= 13) & (yy >= 8)) | ((xx == 12) & (yy ==
 koerper = vorhanden & ~stab
 KANTE0 = Hm.kantenmaske(spr)
 m_gold = np.array([[bool(koerper[y, x] and 15 <= y <= 19 and 1 <= x <= 10 and f(x, y) in GOLD and not KANTE0[y, x]) for x in range(sw)] for y in range(sh)])
+m_arm = np.array([[bool(vorhanden[y, x] and 15 <= y <= 19 and f(x, y) in GOLD) for x in range(sw)] for y in range(sh)])   # Band + Faust
+RAMPE = G5.goldrampe(spr, m_arm, WEISS)
 
 SPITZEN = [(x, y) for y in (0, 1) for x in range(sw) if koerper[y, x]]
 ZEILE1 = {x for (x, y) in SPITZEN if y == 1}
@@ -99,8 +104,7 @@ def frame(i):
     if Hm.folge(i, 19, [1, 1, 1], N) or Hm.folge(i, 41, [1, 1, 1], N):
         Hm.setze(k, {(9, 10): HAUT, (9, 11): HAUT}, OFF)
     # --- Gold glänzt: Lichtband über das Brustband ---
-    for start in (5, 29):
-        Hm.lichtband(k, m_gold, OFF, i, N, start, 14, GOLD, stufen=1, breite=3.0, achse=(1.0, 1.0), kern=2)
+    # (Lichtband über den ganzen goldenen Arm: nach dem Zusammensetzen, siehe unten)
     # --- Stachelhaare wehen ---
     s = -1 if (Hm.folge(i, 6, [1] * 6, N) or Hm.folge(i, 28, [1] * 6, N)) else (1 if (Hm.folge(i, 17, [1] * 6, N) or Hm.folge(i, 39, [1] * 6, N)) else 0)
     k = haare_wehen(k, s)
@@ -114,8 +118,8 @@ def frame(i):
     k = TX.atmen(k, PAD_T + 24, PAD_T + 14, brust, kopf)
     st = TX.atmen(st, PAD_T + 24, PAD_T + 14, brust, kopf)
     # --- Glitzer-Sterne an den Bandenden (mit der Brust gehoben) ---
-    for (sx, sy, start) in ((2, 16, 10), (9, 17, 34)):
-        sstufe = Hm.folge(i, start, [0, 1, 2, 1], N)
+    for (sx, sy, start) in ((2, 16, 13), (9, 17, 37)):
+        sstufe = Hm.folge(i, start, [0, 1, 0], N)
         Hm.stern4(gl, sx, sy - brust, sstufe, WEISS, HELL, MITTEL, OFF)
     fig = L.zusammen(H, W, [(st, 0, 0), (k, 0, 0)])
     # Regel 16: Randpixel in Nicht-Umrissfarbe werden Umriss: unten (Rock) Umrissgrün, oben (Haare, Gesicht) Schwarz
@@ -124,6 +128,7 @@ def frame(i):
         c = tuple(int(v) for v in fig[y, x, :3])
         if c not in ERLAUBT:
             fig[y, x, :3] = GRUEN if y - PAD_T >= 20 else SCHWARZ
+    G5.goldglanz(fig, m_arm, (PAD_L, PAD_T - brust), i, N, (5, 29), 10, RAMPE)      # ganzer Arm inkl. Faust, geht mit der Brust
     return L.zusammen(H, W, [(fig, 0, 0), (gl, 0, 0)])
 
 
