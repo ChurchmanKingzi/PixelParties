@@ -12,6 +12,8 @@ x 13–15, y 10–12), heller Bauch (x 6–11, y 12–14), Beinchen (y 15–17).
 Ablauf (48 Frames à 80 ms = 3,84 s). Frame 0 = Original:
 * Arme: beide Ärmchen heben sich zweimal zusammen 1 px (Frames 6–9, 12–15), später winkt nur der bildrechte Arm zweimal (Frames 30–33, 36–39) – starre Einheiten.
 * Atmen (Periode 24): texturierte Zeile im Bauch bei y 14 (TX.streck_zeile), Kopf und Arme heben sich 1 px; Füße bleiben am Boden.
+* Blinzeln (Frames 2–3 und 26–27, beide Augen): der rote Augenrand ((5,7), (6,8) bzw. (10,7), (11,8)) wird Fellfarbe, die beiden dunklen Pupillenpixel werden zur
+  geschlossenen Lidlinie in der Umrissfarbe (128,56,0).
 * Ohrzucken: linkes Ohr Frames 20–21, rechtes Ohr Frames 44–45 (die oberste Ohrzeile entfällt, die Zeile darunter wird Umriss).
 Ergänzungen: nur während des Ohrzuckens Umrissfarbe (128,56,0) auf (2–4,1) bzw. (13–15,1); bei gehobenem Arm Umrissfarbe in der Achsel (4,12) bzw. (13,12).
 """
@@ -31,6 +33,7 @@ ARM_R_M = ((xx >= 13) & (yy >= 10) & (yy <= 12)) | ((xx == 14) & (yy == 13))
 ARM_L, ARM_R = sz.teil(ARM_L_M), sz.teil(ARM_R_M)
 REST = sz.teil(sz.da & ~ARM_L_M & ~ARM_R_M)
 UMRISS = (128, 56, 0)
+FELL, FELL2 = (224, 169, 70), (184, 128, 40)
 TEST_EBENEN = ('figur',)
 
 
@@ -39,6 +42,11 @@ def frame(i, nur=None):
     beide = 1 if i in (6, 7, 8, 9, 12, 13, 14, 15) else 0
     rechts = 1 if i in (30, 31, 32, 33, 36, 37, 38, 39) else 0
     r = REST.copy()
+    if i in (2, 3, 26, 27):                          # Blinzeln: Lid in Fellfarbe, geschlossene Lidlinie in Umrissfarbe
+        for x0 in (4, 9):
+            r[sz.PT + 7, sz.PL + x0 + 1, :3] = FELL
+            r[sz.PT + 8, sz.PL + x0 + 2, :3] = FELL2
+            r[sz.PT + 8, sz.PL + x0:sz.PL + x0 + 2, :3] = UMRISS
     if i in (20, 21):
         r[sz.PT + 0, sz.PL + 2:sz.PL + 6] = 0
         r[sz.PT + 1, sz.PL + 2:sz.PL + 5] = UMRISS + (255,)
@@ -54,4 +62,4 @@ def frame(i, nur=None):
 
 
 if __name__ == '__main__':
-    N9.fertig('lovely-teddy', 'Lovely Teddy', frame, N, MS, spr, check=[0, 7, 18, 20, 31, 44], zoom=18)
+    N9.fertig('lovely-teddy', 'Lovely Teddy', frame, N, MS, spr, check=[0, 2, 7, 18, 20, 31, 44], zoom=18)

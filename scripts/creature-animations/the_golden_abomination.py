@@ -8,15 +8,20 @@ In der Kartenkunst (The_Golden_Abomination.png) ist die Figur gelblich überblen
   src/the-golden-abomination-koerper.png   ohne Sterne; die 30 Pixel, an denen ein Stern über dem Gold lag, sind mit der Farbe des Nachbarpixels gefüllt (Ergänzung, s. u.)
 
 Identifikation (40×28): alles Gold in Gelb-/Orange-/Brauntönen (211 leicht verrauschte Farben). Runder Klumpen links (x 0–9, y 6–16), Rumpf (x 10–25) mit Höcker oben (x 15–23, y 0–5),
-Ring/Öse rechts oben (x 26–37, y 4–12), zwei Beinstümpfe (x 8–17, y 17–25 und x 24–36, y 12–27). Im rechten Bein steckt ein dunkles, braun-olives Teil mit hellem Streifen
-(x 31–34, y 13–21) – nicht sicher zu deuten (Griff/Maske) → bleibt fest. Weiße Kreuze/Rauten = Funkelsterne der Kunst.
-Was Kopf und was Schwanz ist, lässt sich nicht sicher sagen → keine Gesichts-/Schwanzbewegung, nur „Atmen“ der Masse.
+Ring/Öse rechts oben (x 26–37, y 4–12), zwei Beinstümpfe (x 8–17, y 17–25 und x 24–36, y 12–27). Rechts hängt der KOPF herab (Runde 8, Angabe des Nutzers): das eine AUGE = 2×2
+dunkle Pupille (x 32–33, y 13–14) mit je einer Spalte rosa/roter Pixel außen daneben (x 31 und x 34, y 13–14); darunter das offene MAUL (x 31–34, y 15–21): dunkelbrauner Lippenrahmen
+(Zeile 15, Spalte 31, Zeile 21), helle Zähne (32, 16|17|19|20), dunkler Schlund (x 33–34), rote Zunge (33,20). Weiße Kreuze/Rauten = Funkelsterne der Kunst.
 
 Ablauf (64 Frames à 80 ms = 5,1 s, schweres Wesen → langsam). Frame 0 = Original ohne die Sterne (die Sterne blitzen jetzt einzeln auf):
 * Rumpf atmet (Periode 32): in den Spalten x 10–25 wird bei y 12 eine texturierte Zeile eingefügt (TX.streck_zeile), Höcker und Rücken heben sich 1 px; Beine, Ring bleiben stehen.
 * Der runde Klumpen links wippt starr ±1 px (Periode 32, versetzt) – er bleibt an der Nahtspalte x 10 angewachsen.
 * Gold-Lichtband: zweimal pro Schleife läuft ein schmales diagonales Band über die gelben Flächen (eine Stufe heller, Farben (224,212,79)/(224,216,124) der Quelle).
 * Sparkles (Gold → erlaubt): die neun Sterne der Kunst blitzen nacheinander je einmal pro Schleife kurz auf (Punkt → Kreuz → großes Kreuz → zurück, 6 Frames), sonst aus.
+* Auge blinzelt (Frames 6–8 und 44–46: halb zu, zu, halb zu): das Lid in der Hautfarbe (177,88,38) senkt sich über Pupille UND die rosa Spalten, geschlossen bleibt eine Lidlinie
+  im Rotbraun (131,65,38) des Augenrands. Nur die acht Augenpixel ändern sich.
+* Maul schließt und öffnet sich langsam (Frames 14–37: zu in 3 Stufen à 3 Frames, 8 Frames geschlossen, wieder auf): Ober- und Unterlippe (dunkler Rahmen) wandern aufeinander zu,
+  frei werdende Zeilen bekommen Hautfarbe ((176,88,37) am Rand, (209,124,61) innen), Zähne/Schlund/Zunge verschwinden; geschlossen bleibt die Lippenlinie in Zeile 18.
+  Die Silhouette ändert sich nicht (alles innerhalb x 31–34, y 15–21).
 Ergänzungen: 30 Pixel unter den Sternen (Liste: FILL im Skript), Farbe = Nachbarpixel.
 """
 import numpy as np
@@ -35,6 +40,51 @@ FILL = [(4, 6), (4, 8), (5, 7), (6, 6), (6, 8), (8, 21), (8, 22), (9, 20), (10, 
         (23, 12), (23, 13), (24, 11), (25, 11), (26, 23), (27, 22), (27, 24), (34, 5), (35, 4), (35, 6), (36, 5)]
 KLUMPEN = sz.teil(xx <= 9)
 RUMPF = sz.teil((xx >= 10) & (xx <= 25))
+HAUT, HAUT_H, LIPPE, LIDLINIE = (176, 88, 37), (209, 124, 61), (106, 64, 39), (131, 65, 38)
+LID = (177, 88, 38)
+ZAHN, SCHLUND1, SCHLUND2 = (169, 167, 140), (102, 70, 43), (86, 66, 40)
+
+
+def kopf(i):
+    """Sprite mit Blinzeln und Maulstellung (nur x 31–34, y 13–21)."""
+    a = spr
+    b = N7.funkel_folge(i, N, 6, (1, 2, 1)) or N7.funkel_folge(i, N, 44, (1, 2, 1))
+    k = (i - 14) % N
+    m = (1, 1, 1, 2, 2, 2, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 2, 2, 2, 1, 1, 1)[k] if k < 23 else 0
+    if not (b or m):
+        return a
+    a = a.copy()
+
+    def px(x, y, c):
+        if a[y, x, 3]:
+            a[y, x, :3] = c
+    if b:
+        for x in range(31, 35):
+            px(x, 13, LID)
+            if b == 2:
+                px(x, 14, LIDLINIE)
+    if m:
+        oben, unten = {1: (16, 20), 2: (17, 19), 3: (18, 18)}[m]
+        for y in range(15, 22):
+            for x in range(31, 35):
+                if y in (oben, unten):
+                    c = LIPPE
+                elif y < oben or y > unten:
+                    c = HAUT if (y in (15, 21) or x == 34) else HAUT_H
+                elif x == 31:
+                    c = LIPPE
+                elif x == 32:
+                    c = ZAHN
+                else:
+                    c = SCHLUND1 if y != 18 else SCHLUND2
+                px(x, y, c)
+    return a
+
+
+def rechts(i):
+    return sz.teil(xx >= 26, kopf(i))
+
+
 RECHTS = sz.teil(xx >= 26)
 WEISS = (255, 255, 255)
 HELL1, HELL2 = (224, 212, 79), (224, 216, 124)
@@ -66,7 +116,7 @@ def frame(i, nur=None):
     kd = N7.sinus_px(i + 20, 32, 1) - N7.sinus_px(20, 32, 1)
     kd = max(-1, min(1, kd))
     rumpf = TX.streck_zeile(RUMPF, sz.PT + 12, n)
-    f = L.zusammen(sz.H, sz.W, [(KLUMPEN, 0, kd), (rumpf, 0, 0), (RECHTS, 0, 0)])
+    f = L.zusammen(sz.H, sz.W, [(KLUMPEN, 0, kd), (rumpf, 0, 0), (rechts(i), 0, 0)])
     if nur:
         return f
     f = glanz(f, i)
@@ -79,4 +129,4 @@ def frame(i, nur=None):
 
 
 if __name__ == '__main__':
-    N7.fertig('the-golden-abomination', 'The Golden Abomination', frame, N, MS, quelle, check=[0, 4, 12, 14, 23, 38, 44, 58], zoom=9)
+    N7.fertig('the-golden-abomination', 'The Golden Abomination', frame, N, MS, quelle, check=[0, 6, 7, 14, 17, 20, 25, 34], zoom=9)

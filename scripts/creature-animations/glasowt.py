@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 """Idle-Animation für „Glasowt“ (Creature) — der fleischrosa Koloss mit Glashelm, breitem Zahnmaul, leuchtendem Kern in der Brust und langen Armen, die sich auf Glasklauen stützen.
+(Runde 8: Das runde Ding in der Brust ist ein BULLAUGE in den Ofen im Inneren, kein Auge → kein Blinzeln mehr; stattdessen flackert die Ofenglut hinter dem Glas.)
 
 Quelle: src/glasowt.png (35×38 px, 26 Farben).
 PICK: [["Motive", 837, 1]]   (Ebene „Glasowt“; 99,8 % Treffer mit der Kartenkunst, nur in dieser Karte; vollständig, Alpha nur 0/255. Nachbarebenen sind „Sichtbar“-Gesamtbilder.)
@@ -8,19 +9,21 @@ Was im Sprite ist (x, y):
 * GLASHELM (x 10–24, y 0–9): graublaue Kuppel (159,172,180)/(188,202,205) mit dunkelgrauem Rahmen (96,102,100); darunter ein gelbes Wesen/Gesicht (15–19, 5–7) mit dunklen
   Pixeln (17,6), (16,7), (18,7) – nicht eindeutig (Augen? Gehirn?) → bleibt fest, blinzelt nicht (Regel: Helm/Visier blinzelt nicht).
 * MAUL (x 10–24, y 9–14): rosa Lippen, dunkler Schlund (91,93,88), weiße ZÄHNE (224,219,215) bei (14,11), (16,11), (18,11), (20,11), (14,12), (20,12) – Zähne, keine Partikel.
-* RUMPF (x 9–25, y 15–27): rosa; in der Brust der KERN (x 15–19, y 19–23): dunkle Raute mit hellem Kreuz – (17,20), (15,21), (17,21), (19,21), (17,22).
+* RUMPF (x 9–25, y 15–27): rosa; in der Brust das BULLAUGE (x 15–19, y 19–23): dunkler Rahmen (82,72,63) mit zwei hellen Riegeln
+  (15,21) und (19,21) (bleiben fest), dahinter das 3×3-Fenster x 16–18, y 20–22 in den Ofen: helle Glutspalte in der Mitte (x 17), dunkel daneben (81,76,70).
 * ARME (links x 4–11, rechts x 23–30, y 19–30): lang, auf GLASKLAUEN gestützt (x 0–9 und x 25–34, y 31–36; graublau mit gelben Lichtern). Die Klauen stehen am Boden → völlig fest.
 * BEINE (x 10–15 und x 19–24, y 28–34), dunkle FÜSSE (y 34–37).
 Schwer → langsam (72 Frames à 80 ms = 5,8 s). Kein Feuer an der Figur (die Lava der Karte ist Szene).
 
-Idee: Der Koloss stützt sich schwer auf seine Klauen – der Brustkorb hebt und senkt sich zwischen den fest stehenden Armen, das Maul klappt knurrend auf, der Kern in der Brust
-blinzelt wie ein Auge (Doppelschlag).
+Idee: Der Koloss stützt sich schwer auf seine Klauen – der Brustkorb hebt und senkt sich zwischen den fest stehenden Armen, das Maul klappt knurrend auf, hinter dem Bullauge in der Brust
+flackert die Ofenglut.
 Ablauf (nahtlos):
 * Atmen (Periode 36, 2×): Rumpfmitte + Kopf (x 12–22 bis Zeile 26, darüber der ganze Kopf) heben sich 1 px – Zeile 26 wird texturiert eingefügt (anim_textur, nur diese Ebene).
   Arme, Klauen, Beine und Füße bleiben stehen. An der Schulternaht (Versatz 1 px) werden freiliegende Innenpixel zum Umriss (82,72,63) (Kontur bleibt geschlossen, Regel 16).
 * Maul (Frames 28–33 und 38–43): der Unterkiefer (Zeilen 12–14) senkt sich 1 px; die neue Zeile dazwischen ist HANDGEZEICHNET (dunkler Schlund (91,93,88) zwischen den
   Lippenrändern) – keine kopierte Zeile, die Zähne bleiben oben bzw. gehen mit dem Unterkiefer nach unten.
-* Kern (Periode 24, 3×, Doppelschlag): die vier Kreuzarme verlöschen kurz (→ Kern-Dunkel (81,76,70)) und leuchten wieder – nur innerhalb der Kernpixel.
+* Ofenglut (unregelmäßig, 12 Posen à 2 Frames, 3× je Schleife): NUR die neun Fensterpixel (x 16–18, y 20–22) wechseln zwischen dem Original, Glutgelb (216,218,155)/(223,210,168)
+  und dunkler Glut (174,165,122) – Farben des Sprites (Helm-Inneres/Klauenlichter). Rahmen und Riegel bleiben unverändert, kein Schein außerhalb des Bullauges.
 * Glashelm: ein kurzer Sparkle (Mitte → Kreuz → Mitte, Frames 56–58) rechts auf der Kuppel bei (21,6). Glas ist hier als glänzendes Material behandelt
   (Annahme – falls unerwünscht: Zeile mit N4.funkeln streichen).
 Frame 0 = Original.
@@ -43,7 +46,23 @@ f = G.f
 UMRISS, SCHLUND, KERN_DUNKEL = f(10, 10), f(14, 10), f(16, 20)
 GLAS_HELL, WEISS = f(21, 4), f(15, 11)
 MITTE = (G.yy <= 14) | ((G.xx >= 12) & (G.xx <= 22) & (G.yy <= 26))
-KREUZ = [(17, 20), (15, 21), (19, 21), (17, 22)]
+GELB, GELB2, GLUT = (216, 218, 155), (223, 210, 168), (174, 165, 122)
+HELL_A, HELL_B, HELL_C = f(17, 20), f(17, 21), f(17, 22)
+# Glut-Posen im Fenster x 16–18, y 20–22 (Zeilen von oben; None = Original): die Flamme züngelt in der Mittelspalte, Glut glimmt unten/seitlich.
+GLUTPOSEN = [
+    {},
+    {(17, 22): GELB, (17, 21): GELB2},
+    {(17, 22): GELB, (17, 21): GELB, (16, 22): GLUT},
+    {(17, 22): GELB2, (17, 21): GELB, (17, 20): GELB2, (18, 22): GLUT},
+    {(17, 22): GELB, (17, 21): GELB2, (18, 21): GLUT, (18, 22): GLUT},
+    {(17, 22): GELB, (16, 22): GLUT},
+    {},
+    {(17, 22): GELB2, (17, 21): GELB, (16, 21): GLUT, (16, 22): GLUT},
+    {(17, 22): GELB, (17, 21): GELB, (17, 20): GELB, (16, 22): GLUT, (18, 22): GLUT},
+    {(17, 22): GELB, (17, 21): GELB2, (18, 22): GLUT},
+    {(17, 22): GELB2, (17, 20): KERN_DUNKEL},
+    {(17, 22): GELB},
+]
 NAHT = np.zeros((H, W), bool); NAHT[OFF[1] + 14:OFF[1] + 27] = True
 
 
@@ -63,9 +82,7 @@ def maul_auf(m):
 def frame(i):
     mitte = G.ebene(MITTE & G.da)
     aussen = G.ebene(~MITTE & G.da)
-    beat = [0, 0, 0, 1, 1, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0][i % 24]
-    if beat:
-        Hm.setze(mitte, {p: KERN_DUNKEL for p in KREUZ}, OFF)
+    Hm.setze(mitte, GLUTPOSEN[(i // 2) % 12], OFF)
     N4.funkeln(mitte, 21, 6, Hm.folge(i, 56, [0, 1, 2], N), WEISS, GLAS_HELL, OFF)
     if Hm.takt(i, N, 28, 6) or Hm.takt(i, N, 38, 6):
         mitte = maul_auf(mitte)

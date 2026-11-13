@@ -14,12 +14,14 @@ Was ist was (x/y im Sprite):
 Annahme: Die Figur schwebt (Amor mit Flügeln; in der Karte sind keine stehenden Füße am Boden zu sehen) → ruhiger Schwebeflug.
 
 Ablauf (48 Frames à 70 ms = 3,36 s, nahtlos; Frame 0 = Original):
-* Flügelschlag (Periode 16, 3 Schläge je Schleife): jeder Flügel schlägt als Ganzes um sein Gelenk am Rücken (Spaltenversatz wächst vom Ansatz zur Spitze bis ±2 px, Ansatzspalten bleiben am Körper) –
-  kein Knick, nichts wird gestreckt.
-* Schweben: die ganze Figur (samt Bogen) hebt sich beim Abschlag 1 px und sinkt beim Aufschlag zurück (gleicher Takt, 4 Frames Nachlauf).
+* Flügelschlag (Runde 8: „mehr mit den Flügeln schlagen, damit es wirklich nach Fliegen aussieht“; Periode 12, 4 Schläge je Schleife): jeder Flügel schwingt als GANZES um sein Gelenk am Rücken
+  auf und zu (kleine Drehung −0,08 … +0,32 rad als Doppel-Scherung aus anim_r5_fluegel: nur ganze Zeilen-/Spaltenverschiebungen, nichts wird gestreckt, kein Knick): die Flügelspitzen oben schwenken
+  bis 4 px nach außen/unten und wieder zum Kopf hin, die unteren Federn gegenläufig hinter den Körper. Der Umriss wird nach dem Schwenk an den Treppenstufen neu geschlossen (1 px, Umrissfarbe der Quelle).
+  Der rechte Flügel ist jetzt vollständig beweglich (alle rosa Pixel ab x 16 außer dem Arm); eine ruhende Kopie seiner Innenseite liegt dahinter, damit am Rücken nie Hintergrund durchscheint.
+* Schweben: die ganze Figur (samt Bogen) steigt während des Abschlags 2 px und sinkt beim Aufschlag zurück (gleicher Takt, weich über 0/1/2 px).
 * Haarlocke wippt (Spitze 1 px nach links/rechts, Periode 24).
 * Bart/Brust: ruhig (kein Strecken – die Würfelung würde leiden).
-Keine Ergänzungen nötig (die innersten Flügelspalten bewegen sich nicht; alle Spalten bleiben in sich ganz). Kein Glanz, keine Partikel. Nur ganze Pixel, nur Farben der Quelle.
+ERGÄNZUNG: (4, 4–12) Umrissfarbe (116,33,116) hinter dem linken Flügel = linker Rand der Bogenspitze/Schulter, sichtbar, wenn der Flügel aufschwingt (sonst schiene dort Hintergrund durch). Hinter dem rechten Flügel liegt seine ruhende Innenseite. Kein Glanz, keine Partikel. Nur ganze Pixel, nur Farben der Quelle.
 """
 import math
 
@@ -27,47 +29,47 @@ import numpy as np
 
 import anim_lib as L
 import anim_n2 as N2
+import anim_r5_fluegel as R5
 
 N, MS = 48, 70
-FIG = N2.Figur('spirit-of-the-heart-bow', pad=(2, 2, 5, 2))
+FIG = N2.Figur('spirit-of-the-heart-bow', pad=(5, 5, 5, 4))
 spr = FIG.spr
 xx, yy = FIG.xx, FIG.yy
 OFF = FIG.off
 H, W = FIG.H, FIG.W
 
+ROSA = FIG.farbe((116, 33, 116), (188, 54, 189), (254, 192, 255), (147, 42, 147), (254, 73, 255), (254, 121, 255))
+UMRISS = ROSA[0]
 FL_L = FIG.op & (xx <= 4)
-FL_R = FIG.op & (xx >= 20)
+FL_R = FIG.maske(ROSA) & (xx >= 16)
 LOCKE = FIG.op & (yy <= 2) & (xx >= 10) & (xx <= 14)
 KOERPER = FIG.op & ~FL_L & ~FL_R & ~LOCKE
-VERSATZ = [0, 1, 1, 2, 2, 2]                                         # Spaltenversatz je Abstand vom Gelenk (Spitze = letzter Wert)
+INNEN_R = FL_R & (xx <= 19)                                          # ruhende Kopie der Flügelinnenseite (liegt hinter dem beweglichen Flügel)
+GEL_L = (FIG.pl + 5.0, FIG.pt + 13.0)                                # Gelenke (Leinwand): linker Flügel hinter Bogen/Schulter, rechter an der Innenseite am Rücken
+GEL_R = (FIG.pl + 19.0, FIG.pt + 12.0)
+PHI = math.asin(0.6)
 
 
-def fluegel(maske, gelenk, richtung, s):
-    """Flügel als Ganzes um das Gelenk schwenken: Spalte im Abstand d bekommt round(s · VERSATZ[d] / 2) px (s = −2 … 2, positiv = abwärts)."""
-    a = FIG.platz(maske)
-    out = L.leer(H, W)
-    for x in range(FIG.sw):
-        if not maske[:, x].any():
-            continue
-        d = min(len(VERSATZ) - 1, abs(x - gelenk))
-        dy = int(round(s * VERSATZ[d] / 2.0))
-        X = x + FIG.pl
-        col = a[:, X]
-        ys = np.nonzero(col[:, 3])[0]
-        out[ys + dy, X] = col[ys]
-    return out
+def winkel(i):
+    """Öffnungswinkel des rechten Flügels (links gespiegelt): 0 in Frame 0, −0,08 (zu) … +0,32 (offen)."""
+    return 0.12 + 0.2 * math.sin(2 * math.pi * i / 12.0 - PHI)
 
 
 def frame(i, nur=None):
-    s = 2.0 * math.sin(2 * math.pi * i / 16)
+    w = winkel(i)
     ko = FIG.platz(KOERPER)
     lo = FIG.platz(LOCKE)
     lo = L.versetze(lo, N2.schwing(i, 24, 1), 0)
-    fl = fluegel(FL_L, 5, -1, s)
-    fr = fluegel(FL_R, 19, 1, s)
-    fig = L.zusammen(H, W, [(fl, 0, 0), (fr, 0, 0), (ko, 0, 0), (lo, 0, 0)])
-    hub = 1 if math.sin(2 * math.pi * (i - 4) / 16) > 0.35 else 0
-    return L.versetze(fig, 0, -hub)
+    rand_l = N2.setze(L.leer(H, W), OFF, {(4, y): UMRISS for y in range(4, 13)}, neu=True)       # Ergänzung: linker Umriss der Bogenspitze, frei sobald der Flügel aufschwingt
+    vorn = L.zusammen(H, W, [(FIG.platz(INNEN_R), 0, 0), (rand_l, 0, 0), (ko, 0, 0)])
+    vm = vorn[..., 3] > 0
+    fl = R5.umriss_ziehen(R5.scher_drehung(FIG.platz(FL_L), GEL_L[0], GEL_L[1], -w), vm, UMRISS)
+    fr = R5.umriss_ziehen(R5.scher_drehung(FIG.platz(FL_R), GEL_R[0], GEL_R[1], w), vm, UMRISS)
+    if nur == 'fluegel':
+        return L.zusammen(H, W, [(fl, 0, 0), (fr, 0, 0)])
+    fig = L.zusammen(H, W, [(rand_l, 0, 0), (fl, 0, 0), (FIG.platz(INNEN_R), 0, 0), (fr, 0, 0), (ko, 0, 0), (lo, 0, 0)])
+    hub = lambda k: int(round(1.0 - math.cos(2 * math.pi * (k - 4) / 12.0)))      # 0 … 2, höchster Punkt am Ende des Abschlags
+    return L.versetze(fig, 0, hub(0) - hub(i))
 
 
 if __name__ == '__main__':

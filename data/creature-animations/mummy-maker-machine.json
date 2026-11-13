@@ -3,7 +3,7 @@
   "sheet": "mummy-maker-machine.png",
   "frameWidth": 60,
   "frameHeight": 72,
-  "frames": 60,
+  "frames": 72,
   "frameMs": 70,
   "loop": true,
   "layout": "horizontal",

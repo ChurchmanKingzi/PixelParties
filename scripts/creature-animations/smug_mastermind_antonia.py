@@ -10,14 +10,15 @@ Was ist was (x/y im Sprite):
   rosa Wangen (8 und 15, y 12), schwarzer Mund (11–12, y 12–13) mit roter Zunge (12–13, y 14). Gesicht bleibt bis aufs Blinzeln fest.
 * Goldener Würfel/Ornament rechts oben auf dem Kopf (x 12–21, y 0–9; Gold in vier Stufen, drei rote Punkte) – starr, geht mit dem Kopf.
 * Dunkelroter Umhang (x 4–19, y 12–24), darunter schwarzes Gewand mit weißgrauer Schleife/Gürtel (y 18–21), schwarze Füße (y 25).
-* Arme waagerecht ausgestreckt (schwarz, x 0–4 und 19–23, y 12–14), an jeder Hand hängt ein roter Kristall (x 1–3 bzw. 20–22, y 15–21: heller Kern oben, dunkle Spitze unten).
-* Unter jedem Kristall ein rotes Funkel-Kreuz am Boden (3×3, y 24–26) = Sparkle des Edelsteins (im Motiv der Partnerkarte Monia sind es weiße Sparkles).
+* Arme waagerecht ausgestreckt (schwarz, x 0–4 und 19–23, y 12–14), unter jeder Hand eine Düse des Jetpacks mit rotem Schubstrahl nach unten (x 1–3 bzw. 20–22, y 15–21: heller Kern oben, dunkle Spitze unten).
+* Unter jedem Schubstrahl ein rotes Funkel-Kreuz (3×3, y 24–26) = Schubfunke; gehört zum Sprite und fliegt mit.
 
 Ablauf (60 Frames à 70 ms = 4,2 s, nahtlos; Frame 0 = Original):
 * Atmen: Saumzeile 23 (unter der Schleife) wird texturiert eingefügt (0–1 px, Periode 30); Kopf und Goldwürfel heben sich starr mit, der Kopf bewegt sich nie seitlich.
-* Arme + Kristalle heben und senken sich als starre Einheiten (Arm, Hand, Kristall): Atemhub plus eigenes Anheben 0–1 px (Periode 20, rechter Arm 5 Frames versetzt) – nichts wird gestreckt.
-* Kristalle (Edelstein): der helle Kern wandert von oben nach unten durch den Kristall (5 Stellungen; links à 4 Frames = 3 Durchläufe, rechts à 3 Frames = 4 Durchläufe; nur die Rot-Stufen der Quelle).
-* Funkel-Kreuze am Boden: bleiben am Boden stehen und funkeln (Kreuz → Punkt → aus → Punkt → Kreuz), jeweils wenn der Kern unten ankommt; links und rechts versetzt.
+* FLUG (Runde 8: „trägt ein Jetpack und sollte mit diesem fliegen“): der ganze Sprite steigt und sinkt weich um 0–2 px (Periode 30).
+* Schubstrahlen: handgezeichneter 8-Bilder-Zyklus je Düse (jedes Frame ein neues Bild, rechts 3 Bilder versetzt), 3 px breit wie in der Quelle, nur deren vier Rot-Stufen; Fuß lückenlos unter der Hand.
+* Arme + Düsen heben und senken sich als starre Einheiten (Arm, Hand, Schubstrahl): Atemhub plus eigenes Anheben 0–1 px (Periode 20, rechter Arm 5 Frames versetzt) – nichts wird gestreckt.
+* Funkel-Kreuze unter den Strahlen: funkeln (Kreuz → Punkt → aus → Punkt → Kreuz), links und rechts versetzt.
 * Goldwürfel (Gold): zweimal je Schleife ein diagonales Lichtband (eine Stufe heller auf der Gold-Rampe, der dunkle Goldrand bleibt), dazu ein kurzer Sparkle an seiner oberen Ecke (3 Frames).
 * Blinzeln beider Augen (Frames 24–26 und 50–52): Rot → dunkles Gesichtsgrau.
 ERGÄNZUNG: (4, 14) und (19, 14) – Umhangrand unter den Achseln in Umrissschwarz (0,2,0), sichtbar nur, wenn der Arm 1 px über der Schulter steht (sonst entstünde dort eine Lücke). Nur ganze Pixel, nur Farben der Quelle.
@@ -31,7 +32,7 @@ import anim_textur as TX
 TX.umleiten()
 
 N, MS = 60, 70
-FIG = N2.Figur('smug-mastermind-antonia', pad=(2, 2, 4, 2))
+FIG = N2.Figur('smug-mastermind-antonia', pad=(2, 2, 6, 2))
 spr = FIG.spr
 xx, yy = FIG.xx, FIG.yy
 OFF = FIG.off
@@ -50,13 +51,28 @@ KOERPER = FIG.op & ~KREUZE & ~ARM_L & ~ARM_R
 M_GOLD = FIG.maske(GOLD) & (yy <= 9) & (xx >= 12)
 
 
-def kristall(a, x0, pos):
-    """Kristall (Spalten x0…x0+2, Zeilen 15–20): heller Kern (2 Zeilen) an Stellung pos (0 = oben = Original … 4)."""
-    for y in range(15, 20):
-        hell = y in (15 + pos, 16 + pos)
-        N2.setze(a, OFF, {(x0, y): R_MITTE if hell else R_ROT, (x0 + 1, y): R_HELL if hell else R_MITTE, (x0 + 2, y): R_MITTE if hell else R_ROT})
-    if pos == 4:
-        N2.setze(a, OFF, {(x0 + 1, 20): R_MITTE})
+# Schubflammen der Düsen (handgezeichneter 8-Bilder-Zyklus, 3 px breit, nach unten; Vorbild F3.klein, aber in Breite/Farben der Quelle):
+# 1 = Dunkelrot, 2 = Rot, 3 = Hellrot, 4 = Kern. Pose 0 = Original. Ein Bauch wandert nach unten, die Spitze reißt ab und der Strahl sackt kurz zusammen.
+SCHUB = [z.split('|') for z in """
+343|343|343|343|343|343|343|343
+343|343|333|343|343|333|343|343
+232|343|232|343|232|232|343|232
+232|232|232|232|232|232|232|232
+232|232|222|222|121|232|232|232
+121|222|121|121|.1.|222|232|121
+.1.|121|.1.|...|...|121|121|.1.
+...|.1.|...|.1.|...|.1.|.1.|...
+""".strip().split('\n')]
+SCHUBFARBE = {'1': R_DUNKEL, '2': R_ROT, '3': R_MITTE, '4': R_HELL}
+
+
+def schub(a, x0, pose):
+    """Schubflamme unter der Hand (Spalten x0…x0+2, ab Zeile 15) in Pose 0–7 zeichnen; die gemalte Flamme wird ersetzt."""
+    N2.loesche(a, OFF, [(x0 + dx, y) for dx in range(3) for y in range(15, 23)])
+    for r, zeile in enumerate(SCHUB):
+        for dx, c in enumerate(zeile[pose % 8]):
+            if c != '.':
+                N2.setze(a, OFF, {(x0 + dx, 15 + r): SCHUBFARBE[c]}, neu=True)
 
 
 def kreuz(x0, stufe):
@@ -69,8 +85,8 @@ def kreuz(x0, stufe):
     return a
 
 
-FUNKEL = [2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 1, 1, 0, 0, 1, 1, 2, 2]      # je 20 Frames (ein Kerndurchlauf)
-FUNKEL_R = [2, 2, 2, 2, 2, 2, 2, 2, 2, 1, 1, 0, 0, 1, 1]                           # rechter Kristall: 15 Frames je Durchlauf
+FUNKEL = [2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 1, 1, 0, 0, 1, 1, 2, 2]      # je 20 Frames
+FUNKEL_R = [2, 2, 2, 2, 2, 2, 2, 2, 2, 1, 1, 0, 0, 1, 1]                           # rechtes Kreuz: 15 Frames je Durchlauf
 
 
 def frame(i, nur=None):
@@ -84,9 +100,9 @@ def frame(i, nur=None):
     for start in (6, 36):
         Hm.lichtband(ko, M_GOLD, OFF, i, N, start, 12, GOLD[1:], stufen=1, breite=3.0, achse=(1.0, 1.0))
     N2.funke(ko, OFF, 16, 1, N2.fenster(i, N, 17, [0, 1, 0]), WEISS, GOLD[-1])
-    # Kristalle
-    kristall(al, 1, (i // 4) % 5)
-    kristall(ar, 20, (i // 3) % 5)
+    # Schubstrahlen der Düsen
+    schub(al, 1, i)
+    schub(ar, 20, i + 3)
     # Bewegung
     b = N2.hub(i, 30, 1)
     ko = TX.streck_zeile(ko, FIG.pt + 23, b)
@@ -94,7 +110,8 @@ def frame(i, nur=None):
     ar = L.versetze(ar, 0, -b - N2.hub(i, 20, 1, versatz=5))
     kl = kreuz(2, FUNKEL[i % 20])
     kr = kreuz(21, FUNKEL_R[i % 15])
-    return L.zusammen(FIG.H, FIG.W, [(kl, 0, 0), (kr, 0, 0), (ko, 0, 0), (al, 0, 0), (ar, 0, 0)])
+    fig = L.zusammen(FIG.H, FIG.W, [(kl, 0, 0), (kr, 0, 0), (ko, 0, 0), (al, 0, 0), (ar, 0, 0)])
+    return L.versetze(fig, 0, -N2.hub(i, 30, 2))                                  # Flug: der ganze Sprite steigt und sinkt weich (0–2 px)
 
 
 if __name__ == '__main__':

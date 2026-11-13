@@ -3,7 +3,7 @@
   "sheet": "potion-juggler.png",
   "frameWidth": 36,
   "frameHeight": 44,
-  "frames": 60,
+  "frames": 54,
   "frameMs": 70,
   "loop": true,
   "layout": "horizontal",

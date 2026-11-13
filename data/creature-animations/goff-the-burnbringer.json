@@ -1,8 +1,8 @@
 {
   "creature": "Goff, the Burnbringer",
   "sheet": "goff-the-burnbringer.png",
-  "frameWidth": 25,
-  "frameHeight": 37,
+  "frameWidth": 26,
+  "frameHeight": 45,
   "frames": 48,
   "frameMs": 65,
   "loop": true,
@@ -11,5 +11,5 @@
   "padLeft": 2,
   "padRight": 2,
   "padBottom": 2,
-  "faceX": 12.5
+  "faceX": 13.0
 }

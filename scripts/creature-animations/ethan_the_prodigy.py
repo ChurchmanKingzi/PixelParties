@@ -19,7 +19,8 @@ Kein Metall → kein Glanz. Kein Feuer, keine Partikel.
 
 Idee: Ethan liest – die Pupillen wandern Zeile für Zeile von links nach rechts, einmal je Schleife blättert er um (ein Blatt hebt sich rechts, steht am Falz hoch und legt sich links ab), er atmet und blinzelt.
 Ablauf (64 Frames à 70 ms = 4,5 s, nahtlos):
-* Lesen (16-Frame-Takt, Frames 0–47): Blick Original (2) → links (6: Pupille links nach (5,9)) → Original (2) → rechts (6: Pupille rechts nach (10,9)). Nur die schwarzen Pupillenpixel tauschen mit dem Augenweiß.
+* Lesen (Runde 8, Nutzer: „das Grüne in den Augen soll sich bewegen“; 12-Frame-Takt, Frames 0–47 = vier Zeilen): die GRÜNE IRIS wandert in der unteren Augenzeile von links (Original: (5,10) bzw. (9,10), Zeilenanfang, 6 Frames)
+  nach rechts ((6,10) bzw. (10,10), Zeilenende, 6 Frames) und springt zurück zum nächsten Zeilenanfang. Grün und Augenweiß tauschen nur innerhalb der Augenpixel; die schwarzen Pixel (6,9)/(9,9) bleiben fest (der alte Pupillen-Effekt ist entfernt).
 * Umblättern (Frames 48–59, je 2 Frames): Blatt als heller senkrechter Strich mit Schattenkante (Blattfarbe (252,231,214) = hellster Hautton der Quelle) bei x 11 → 10 → 9 → Falz (x 8, ragt 2 px über das Buch) → 6 → 4 (zwischen den Händen), dann liegt es wieder flach. Buch und Hände bleiben starr.
 * Atmen (Periode 32): Jackenzeile 17 (direkt über dem Buch) wird einmal texturiert eingefügt (anim_textur) – Oberkörper und Kopf steigen 1 px, das Buch und die Hände darauf bleiben liegen.
 * Blinzeln (Frames 20–22 und 60–62): obere Augenzeile → Haut, untere → brauner Lidstrich (49,24,0).
@@ -45,17 +46,17 @@ buch = L.lade('ethan-the-prodigy-buch')
 HAUT, LID, WEISS, PUPILLE = f(6, 8), f(2, 8), f(5, 9), f(6, 9)
 SEITE_H, SEITE, SCHATTEN = f(7, 10), f(6, 18), f(2, 24)      # (209,197,189) hell, (187,173,159), (129,114,100) Schatten
 HAAR_UMRISS, JACKE_UMRISS = f(6, 0), f(1, 14)
-LESEN = ['O', 'O', 'L', 'L', 'L', 'L', 'L', 'L', 'O', 'O', 'R', 'R', 'R', 'R', 'R', 'R']
+IRIS = f(5, 10)
+assert IRIS == f(9, 10) == (79, 108, 5) and f(6, 10) == f(10, 10) == WEISS
+LESEN = ['O'] * 6 + ['R'] * 6                                 # Zeile lesen: Iris links (Original) → rechts, dann Sprung zurück
 BLATT = [11, 10, 9, 8, 6, 4]                                   # Spalte des Blattes je Pose
 
 
 def frame(i):
     k = G.ebene(quelle=koerper)
-    blick = LESEN[i % 16] if i < 48 else 'O'
-    if blick == 'L':
-        Hm.setze(k, {(5, 9): PUPILLE, (6, 9): WEISS}, OFF)
-    elif blick == 'R':
-        Hm.setze(k, {(9, 9): WEISS, (10, 9): PUPILLE}, OFF)
+    blick = LESEN[i % 12] if i < 48 else 'O'
+    if blick == 'R':                                             # grüne Iris am Zeilenende (rechts), beide Augen gleich
+        Hm.setze(k, {(5, 10): WEISS, (6, 10): IRIS, (9, 10): WEISS, (10, 10): IRIS}, OFF)
     if Hm.folge(i, 20, [1] * 3, N) or Hm.folge(i, 60, [1] * 3, N):
         Hm.setze(k, {(5, 9): HAUT, (6, 9): HAUT, (9, 9): HAUT, (10, 9): HAUT, (5, 10): LID, (6, 10): LID, (9, 10): LID, (10, 10): LID}, OFF)
     if Hm.stufe(i, N / 2, 1):

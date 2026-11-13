@@ -2,7 +2,7 @@
   "creature": "Undead Guardian Angel",
   "sheet": "undead-guardian-angel.png",
   "frameWidth": 35,
-  "frameHeight": 63,
+  "frameHeight": 64,
   "frames": 72,
   "frameMs": 75,
   "loop": true,

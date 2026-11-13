@@ -2,7 +2,7 @@
   "creature": "Steam Dwarf Exterminator",
   "sheet": "steam-dwarf-exterminator.png",
   "frameWidth": 29,
-  "frameHeight": 66,
+  "frameHeight": 59,
   "frames": 64,
   "frameMs": 65,
   "loop": true,

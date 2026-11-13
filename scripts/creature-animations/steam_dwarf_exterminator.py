@@ -12,8 +12,9 @@ Identifikation (20×29): drei graue Dampfrohre (x 0–4, 8–11, 15–19, y 0–
 (ocker (6,16), (13,16), (7,14), (12,14), (9–10,15)) – Maske, blinzelt nicht; Maskenschnauze/Düse (x 8–11, y 17–20); dunkelroter Umhang (y 16–27), heller Metallbügel/Gürtel (x 3–16, y 24–26).
 
 Ablauf (64 Frames à 65 ms = 4,2 s). Frame 0 = Original (Körper; der Strahl ist eine Posenfolge):
-* Feuerstrahl (anim_feuer3, posen=16, halten=1 → 4 Zyklen): Kegel von der Düse (9–10,19) nach unten, bis ~15 px breit wie in der gemalten Ebene; Mantel Rot → Orange → Gelb
-  um den Creme-Kern; fünf phasenversetzte Endzungen, deren Spitzen sich abschnüren. Fuß lückenlos an der Düse. Farben nur aus der Flammenebene.
+* Feuerstrahl (anim_feuer3, posen=16, halten=1 → 4 Zyklen): EIN zusammenhängender Strahl von der Düse (9–10,19) nach unten (schlanker Kegel, ~11 px breit); Mantel Rot → Orange →
+  Gelb um den Creme-Kern; er läuft unten in drei eng beieinander liegenden Zungen aus (Auslauf des einen Strahls, keine seitlichen Nebenzungen, keine abgelösten Fetzen).
+  Fuß lückenlos an der Düse. Farben nur aus der Flammenebene.
 * Atmen (Periode 32): texturierte Zeile im Umhang bei y 22 (TX.streck_zeile); Kopf, Rohre und der Strahlansatz heben sich 1 px.
 * Dampf: aus jedem der drei Rohre steigt reihum alle 2,1 s ein Wölkchen (2×2 → 5×3 → 2×2, hellgrau aus dem Metallbügel) langsam auf.
 Ergänzungen: keine am Körper; der Strahl wird nach der gemalten Vorlage neu gezeichnet.
@@ -33,9 +34,11 @@ spr = sz.spr
 KOERPER = sz.teil(sz.da)
 ROT, ORANGE, GELB, CREME = (202, 44, 41), (244, 123, 34), (246, 231, 14), (247, 245, 184)      # Farben der Flammenebene 433
 _X, _Y = sz.PL + 9.5, sz.PT + 19
-KEGEL = F3.Strahl(_X, _Y, 16, 1.2, 7.6, richtung=(0, 1), welle=10, bauch=0.15, schlag=0.6)
-ENDE = [F3.Flamme(_X + dx, _Y + fy, l, b, richtung=(rx, 1), phase=ph, fuss=0, welle=9)
-        for (dx, fy, l, b, rx, ph) in [(-5.6, 11, 9, 2.4, -0.2, 0.0), (-2.8, 13, 11, 2.7, -0.08, 0.55), (0.0, 14, 13, 3.0, 0.0, 0.25), (2.8, 13, 11, 2.7, 0.08, 0.8), (5.6, 11, 9, 2.4, 0.2, 0.4)]]
+# EIN zusammenhängender Strahl (Nutzer: keine „Extra-Flammen“ links/rechts): schlanker Kegel, dessen Ende in drei eng beieinander liegenden Zungen ausläuft (Füße im Kegel,
+# keine seitlich abstehenden Zungen, fetzen=False → nichts schnürt sich ab und fliegt lose davon).
+KEGEL = F3.Strahl(_X, _Y, 15, 1.2, 5.4, richtung=(0, 1), welle=10, bauch=0.12, schlag=0.5)
+ENDE = [F3.Flamme(_X + dx, _Y + fy, l, b, richtung=(rx, 1), phase=ph, fuss=0, welle=9, fetzen=False, wiegen=0.3)
+        for (dx, fy, l, b, rx, ph) in [(-2.2, 11, 9, 2.6, -0.05, 0.55), (0.0, 10, 15, 4.8, 0.0, 0.25), (2.2, 11, 9, 2.6, 0.05, 0.9)]]
 FEUER = F3.Feuer(sz.H, sz.W, [KEGEL] + ENDE, [ROT, ORANGE, GELB, CREME], posen=16, halten=1)
 DAMPF = {'c': (213, 213, 213), 'r': (189, 189, 189)}
 PUFFS = [dict(x=sz.PL + x, y=sz.PT - 2, vx=vx, vy=-8, off=off, wackeln=1, leben=32)

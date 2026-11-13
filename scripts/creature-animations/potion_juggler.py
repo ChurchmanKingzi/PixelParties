@@ -26,6 +26,12 @@ Ablauf (60 Frames à 70 ms = 4,2 s, nahtlos; 1 Schlag = 5 Frames, jede Flasche b
 * Clown: federt im Wurftakt (Periode 10): Hosenzeile 34 wird einmal texturiert eingefügt (anim_textur) – Oberkörper, Arme, Hände und Kopf steigen 1 px, Schuhe bleiben. Der Kopf bewegt sich nicht seitlich.
 * Mund: der rote Mund (15–16, 26) schließt sich kurz (Frames 22–25 und 52–55 → Hautweiß wie daneben) – er pustet vor Anstrengung.
 Frame 0 = Original. Ergänzungen: keine (der Clown ist als eigene Ebene vollständig; die Flaschen fliegen vor freiem Hintergrund bzw. vor dem Hut).
+
+RUNDE 8 (Nutzer: „Die Potions bleiben etwas zu lange in der Mitte in der Luft hängen, das wirkt unnatürlich“): schnellerer Takt mit echtem Schwerkraft-Timing. 1 Schlag = 3 Frames (vorher 5), ein Wurf dauert
+6 Frames (vorher 10) auf derselben Parabel: Höhe je Frame 10 → 4 → 1 → 0 → 1 → 4 → (Hand) – schnell unten, genau EIN Frame am Scheitel, kein Plateau (vorher standen die Flaschen 3 Frames auf Scheitelhöhe).
+Außerdem war der seitliche Bahnversatz der beiden Wurfrichtungen (0,15 · sin) so groß, dass die Flasche am Scheitel waagerecht fast stehen blieb (Schritte 7, 3, 1, 1, 3, 7 px) – das war das eigentliche „Hängen“.
+Er ist jetzt 0,05 (höchstens ±1 px): die Flasche fliegt waagerecht praktisch gleichförmig (5, 3, 3, 3, 3, 5 px je Frame).
+Schleife jetzt 54 Frames à 70 ms = 3,8 s (drei volle Umläufe à 18 Frames). In der Hand: 3 Frames (taucht 3 px ein). Federn des Clowns im Wurftakt (Periode 6), Mund schließt in den Frames 20–23 und 47–50.
 """
 import math
 import sys
@@ -38,8 +44,8 @@ import anim_n4 as N4
 import anim_textur as TX
 TX.umleiten()
 
-N, MS = 60, 70
-BEAT = 5
+N, MS = 54, 70
+BEAT = 3
 G = N4.Figur('potion-juggler', 2, 2, 2, 2)
 spr, H, W, OFF = G.spr, G.H, G.W, G.OFF
 f = G.f
@@ -57,7 +63,7 @@ def bahn(t):
     if t < 2.0 or 3.0 <= t < 5.0:
         p = (t if t < 2.0 else t - 3.0) / 2.0
         y = YH - (YH - YT) * 4 * p * (1 - p)
-        w = 0.15 * math.sin(2 * math.pi * p)                           # Bahnen der beiden Wurfrichtungen gegeneinander versetzt → sie kreuzen sich nebeneinander statt deckungsgleich
+        w = 0.05 * math.sin(2 * math.pi * p)                           # Bahnen der beiden Wurfrichtungen gegeneinander versetzt → sie kreuzen sich nebeneinander statt deckungsgleich
         x = XL + (XR - XL) * (p + w) if t < 2.0 else XR - (XR - XL) * (p - w)
         return int(round(x)), int(round(y)), (p > 0.5)
     q = t - 2.0 if t < 3.0 else t - 5.0
@@ -66,9 +72,9 @@ def bahn(t):
 
 def frame(i):
     k = G.ebene(quelle=clown)
-    if Hm.takt(i, 30, 22, 4):
+    if Hm.takt(i, 27, 20, 4):
         Hm.setze(k, {(15, 26): MUND_ZU, (16, 26): MUND_ZU}, OFF)
-    if Hm.stufe(i, 10, 1):
+    if Hm.stufe(i, 6, 1):
         k = TX.streck_zeile(k, G.PT + 34, 1)
     k = G.schliessen(k, lambda x, y: (0, 0, 0))
     lagen = []

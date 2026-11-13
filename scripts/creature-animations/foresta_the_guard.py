@@ -39,7 +39,24 @@ M_SPROSS = (xx >= 66) & (yy <= 19)
 BEIN = sz.teil(M_BEIN)
 SCHWANZ = sz.teil(M_SCHWANZ & ~M_SPROSS)
 SPROSS = sz.teil(M_SPROSS)
-OBEN = sz.teil(~M_BEIN & ~M_SCHWANZ)
+# Runde 8: Unterkiefer und Arme als eigene Posen-Ebenen
+M_KIEFER = (xx <= 13) & (yy >= 14) & (yy <= 19) & (xx >= 2)
+M_KIEFER |= (xx == 14) & (yy >= 15) & (yy <= 18)
+M_ARM = ((yy >= 27) & (yy <= 31) & (xx <= 17)) | ((yy >= 32) & (yy <= 45) & (xx <= 19)) | ((yy >= 34) & (yy <= 42) & (xx <= 21))
+KIEFER = sz.teil(M_KIEFER)
+ARM = sz.teil(M_ARM & ~M_BEIN)
+OBEN = sz.teil(~M_BEIN & ~M_SCHWANZ & ~M_KIEFER & ~M_ARM)
+ZAHN = (209, 198, 178)
+#          0  1  2  3  4  5  6  7  8  9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30 31 32 33 34 35
+MAUL_F = (0, 0, 0, 0, 1, 1, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 1, 1, 0, 0, 0, 0, 0, 0, 1, 2, 2, 1, 0, 1, 2, 2, 1, 0)      # Kiefer-Hub je Bild (Periode 72: erste Hälfte lang zu, zweite Hälfte zweimal schnappen)
+ARM_F = (0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 2, 2, 2, 2, 2, 2, 2, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)       # Arme heben (Periode 36)
+
+
+def kiefer(k):
+    """Unterkiefer-Pose: vorn (x ≤ 11) k px hoch, hinten (x 12–13) höchstens 1 px, Gelenk (x 14) fest – starre Stufen, nichts gestreckt."""
+    if not k:
+        return KIEFER
+    return N8.spalten_versatz(KIEFER, lambda x: -(k if x - PL <= 11 else (1 if x - PL <= 13 else 0)))
 M_IRIS = sz.voll(sz.ist((170, 187, 151), (93, 96, 65), (131, 136, 106), (60, 63, 32)) & (yy >= 5) & (yy <= 7) & (xx <= 11))
 RAND_FARBEN = [UMRISS, (39, 54, 15), (68, 44, 20), (209, 198, 178), (192, 162, 124)]
 TEST_EBENEN = ('figur',)
@@ -78,7 +95,13 @@ def frame(i, nur=None):
     if N8.stufe(i, 24, 10, 6) and i < 48:
         spross = N8.zeilen_versatz(SPROSS, {PT + 18: 1, PT + 19: 1})
     schwanz = L.zusammen(sz.H, sz.W, [(N8.spalten_versatz(SCHWANZ, f), 0, 0), (N8.spalten_versatz(spross, f), 0, 0)])
-    figur = L.zusammen(sz.H, sz.W, [(bein, 0, 0), (schwanz, 0, -n), (oben, 0, -n)])
+    mk = MAUL_F[(i // 2) % 36] if i < 40 else MAUL_F[20 + (i - 40) % 16] if i < 72 else 0
+    ak = ARM_F[i % 36]
+    kopf = L.zusammen(sz.H, sz.W, [(kiefer(mk), 0, 0), (oben, 0, 0), (ARM, 0, -ak)])      # Kiefer HINTER den oberen Zähnen, Arme VOR dem Körper
+    if mk == 2:                                      # Maul zu: verbliebene Zahnlücken sind dunkle Fugen (kein Hintergrund zwischen den Zähnen)
+        luecke = ~(kopf[..., 3] > 0) & sz.voll((xx >= 3) & (xx <= 13) & (yy >= 12) & (yy <= 14))
+        kopf[luecke] = UMRISS + (255,)
+    figur = L.zusammen(sz.H, sz.W, [(bein, 0, 0), (schwanz, 0, -n), (kopf, 0, -n)])
     figur = N8.kontur_schliessen(figur, RAND_FARBEN, UMRISS, maske=sz.voll((xx >= 50) & (yy >= 16)))
     if nur:
         return figur

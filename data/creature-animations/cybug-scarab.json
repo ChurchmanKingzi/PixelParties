@@ -2,7 +2,7 @@
   "creature": "Cybug SCARAB",
   "sheet": "cybug-scarab.png",
   "frameWidth": 46,
-  "frameHeight": 66,
+  "frameHeight": 69,
   "frames": 64,
   "frameMs": 65,
   "loop": true,

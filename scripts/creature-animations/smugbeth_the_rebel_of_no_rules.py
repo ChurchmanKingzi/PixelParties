@@ -6,7 +6,8 @@ Quelle: src/smugbeth-the-rebel-of-no-rules.png (28×25 px, 24 Farben) = Ebene 20
 xcf/Kartenkunst. Gegen die Kartenkunst abgeglichen (obere Figur; die untere Figur ist „Lizbeth“ – Ebene 203 u. a. –, die blauen Sicheln und das Eis sind Szene).
 
 Was ist was (x/y im Sprite):
-* Figur (x 10–25, y 2–24): langes, welliges, cremefarbenes Haar bis zum Boden, lächelnd geschlossene Augen (schwarze Bögen, y 6–8 → kein Blinzeln), graue Schnauze/Mundpartie (x 15–20, y 8–13) mit rosa Wangen
+* Figur (x 10–25, y 2–24): langes, welliges, cremefarbenes Haar bis zum Boden, hochgezogene schwarze Brauen (Balken (15–16, 6) und (19–20, 6), äußere Enden (14, 7) und (21, 7)), darunter die halb geschlossenen Augen: schwarze Wimpernlinie (15–16, 8) und (19–20, 8), Auge in Zeile 9
+  (weiß (15, 9)/(19, 9), braune Iris (16, 9)/(20, 9) – Blick zur Seite; Aufbau wie bei Lizbeth, MotiveGrailWar 441), graue Schnauze/Mundpartie (x 15–20, y 8–13) mit rosa Wangen
   und roter Zunge (16–17, y 11–12), hellgrüne Hände/Manschetten links und rechts (x 10–11 und 24–25, y 13–15), dunkle Füße (y 23–24).
 * Weißes Funkel-Kreuz links am Kopf (x 10–14, y 8–12) = Sparkle (das „smug“-Blitzen; auf der Partnerkarte ebenfalls weiße Sparkles).
 * Sense HINTER der Figur: schwarzer Stiel diagonal von (6, 13) bis (27, 24), hinter dem Körper verdeckt; am linken Ende hängt die violette, leuchtende Klinge (x 3–8, y 12–23, dunkles Band y 13–14, schwarzer Fuß
@@ -18,6 +19,8 @@ Ablauf (48 Frames à 70 ms = 3,36 s, nahtlos; Frame 0 = Original):
 * Figur atmet und kichert: Haarzeile 20 wird texturiert eingefügt (0–1 px) – ein ruhiger Atemzug (Frames 4–15), dann drei kurze Kicher-Hüpfer des Oberkörpers (Frames 26–27, 30–31, 34–35); Füße bleiben am
   Boden, der Kopf bewegt sich nie seitlich.
 * Sparkle am Kopf blitzt: Kreuz → kleines Kreuz → aus → kleines Kreuz → Kreuz (zweimal je Schleife), sitzt am Kopf und geht mit ihm.
+* MIMIK (Runde 8): Blinzeln (Frames 8–10 und 40–42): die Wimpernlinie senkt sich über das Auge (Zeile 9 schwarz, Zeile 8 Lidfarbe Creme). Brauen: die rechte Braue hebt sich einzeln 1 px (Frames 16–21,
+  „na?“), beim Kichern wippen beide Brauen im Takt der Hüpfer 1 px hoch (26–27, 30–31, 34–35). Brauen bleiben 1 px dick (Balken und Ende wandern gemeinsam, darunter Lidfarbe).
 ERGÄNZUNGEN (Farben der Quelle):
 * Unter dem Sparkle (sichtbar, wenn er aus ist): Haar/Gesichtsrand gespiegelt von der rechten Kopfseite – (12, 8) Creme, (12, 9), (11, 10), (13, 10), (12, 11) Haarbraun, (14, 10) Dunkelbraun, (12, 12) Haar hell.
 * Stiel hinter der linken Hand: (10, 15) und (11, 15) Schwarz des Stiels (werden frei, wenn sich der Oberkörper 1 px hebt).
@@ -58,6 +61,12 @@ MUSTER = [[bool(STRAHL[y, x]) for x, y in b] for b in BAHNEN]
 assert sum(sum(m) for m in MUSTER) == int(STRAHL.sum()), (sum(sum(m) for m in MUSTER), int(STRAHL.sum()))
 
 BLITZ = [2] * 8 + [1] * 2 + [0] * 10 + [1] * 2 + [2] * 2                    # 24 Frames
+LID = FIG.f(15, 7)
+SCHWARZ = FIG.f(15, 6)
+BRAUE_L = {(15, 5): SCHWARZ, (16, 5): SCHWARZ, (14, 6): SCHWARZ, (15, 6): LID, (16, 6): LID, (14, 7): LID}
+BRAUE_R = {(19, 5): SCHWARZ, (20, 5): SCHWARZ, (21, 6): SCHWARZ, (19, 6): LID, (20, 6): LID, (21, 7): LID}
+ZU = {(15, 8): LID, (16, 8): LID, (19, 8): LID, (20, 8): LID, (15, 9): SCHWARZ, (16, 9): SCHWARZ, (19, 9): SCHWARZ, (20, 9): SCHWARZ}
+KICHER = (26, 27, 30, 31, 34, 35)
 HEBEN = {**{k: 1 for k in range(4, 16)}, 26: 1, 27: 1, 30: 1, 31: 1, 34: 1, 35: 1}
 
 
@@ -85,6 +94,12 @@ def frame(i, nur=None):
         N2.setze(fi, OFF, UNTER)
         if b == 1:
             N2.setze(fi, OFF, {(12, 10): WEISS, (12, 9): WEISS, (11, 10): WEISS, (13, 10): WEISS, (12, 11): WEISS})
+    if i in (8, 9, 10, 40, 41, 42):
+        N2.setze(fi, OFF, ZU)
+    if i in KICHER:
+        N2.setze(fi, OFF, BRAUE_L)
+    if i in KICHER or 16 <= i <= 21:
+        N2.setze(fi, OFF, BRAUE_R)
     fi = TX.streck_zeile(fi, FIG.pt + 20, HEBEN.get(i, 0))
     return L.zusammen(FIG.H, FIG.W, [(se, 0, 0), (fi, 0, 0)])
 

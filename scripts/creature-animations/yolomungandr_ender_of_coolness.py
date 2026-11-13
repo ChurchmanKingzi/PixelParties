@@ -1,10 +1,12 @@
 # -*- coding: utf-8 -*-
 """Idle-Animation für „Yolomungandr, Ender of Coolness“ (Creature) — die riesige Weltenschlange: Leib steigt unten auf, biegt sich im Bogen nach rechts, der Kopf blickt rechts herab.
 
-Quelle: src/yolomungandr-ender-of-coolness.png (80×58 px, 12 Farben).
-PICK: [["MotiveCoolhalla", 185, 1]]   (Ebene „Ebene #43“: die ganze Schlange in einem Stück, vollständig deckend)
-Die Kartenkunst zeigt dieselbe Schlange (vergrößerter Ausschnitt, Ebene 26) um das Coolhalla-Gebäude gewunden, mit Ketten (Ebene 175), Zahnreihe (176/178) und Schatten (173/177) – das ist Kulisse/Ausschnitt;
-als Creature-Sprite dient die vollständige Figur der Ebene 185 (Annahme, siehe Bericht).
+Quelle: src/yolomungandr-ender-of-coolness.png (80×58 px) = Leib + Cappy + Sonnenbrille + Goldketten zusammengesetzt; einzeln (gleiche Leinwand): …_leib.png, …_cappy.png, …_brille.png, …_ketten.png.
+PICK: [["MotiveCoolhalla", 185, 1], ["MotiveCoolhalla", 176, 1], ["MotiveCoolhalla", 174, 1], ["MotiveCoolhalla", 175, 1]]
+      185 „Ebene #43“ = die ganze Schlange; 176 „Ebene #46“ (= 178) = das Cappy mit hellem Schriftzug, sitzt auf dem Kopf (x 62–79, y 1–18, verdeckt die Hörner); 174 „Ebene #62“ = die schwarze
+      Sonnenbrille (zwei Gläser, x 69–76, y 12–21, über den Augen); 175 „Ebene #61“ = zwei Goldketten, die über den Bogen hängen (x 42–51, y 1–23 und x 54–61, y 4–26).
+      Lage jeweils wie in der Motiv-Datei (Runde 8, Nutzerwunsch: „Es fehlen sein Cappy, seine Sonnenbrille und sein Goldschmuck“); so zeigt es auch die Kartenkunst.
+      Schatten (173/177) und Blitz-/Stern-Ebenen (180–182) sind Kulisse, nicht übernommen.
 
 Was im Sprite ist (x, y):
 * RÜCKEN: Schachbrett aus (112,133,152)/(40,58,70) (streng nach (x+y) gerade/ungerade), Umriss (28,29,33); drei große RÜCKENSTACHELN nach links (y 4–7, y 18–25, y 35–43) und Hörner am Kopf (x 64–76, y 4–10).
@@ -18,7 +20,10 @@ Ablauf (72 Frames à 80 ms = 5,76 s – riesiges Wesen, langsam; nahtlos, Frame 
   Gefälle höchstens 1 px je mehrere Zeilen/Spalten, nichts wird gestreckt oder kopiert.
 * Das Schachbrett-Muster von Rücken und Bauch wird nach jeder Verschiebung wieder am festen Raster ausgerichtet (kein Flimmern/keine Doppelspalten an den Versatzstufen); Segmentlinien, Augen, Zähne wandern mit.
 * Wird an einer Versatzstufe ein Innenpixel zur Außenkante, bekommt es die Umrissfarbe (Umriss bleibt geschlossen, 1 px).
-Kein Blinzeln (keine Lider), keine Partikel, kein Glanz. Ergänzungen: keine. Farben: nur Quelle.
+* CAPPY + SONNENBRILLE gehen starr mit dem Kopf mit (gleicher Versatz wie der Kopf, liegen als eigene Ebenen über dem fertigen Leib – werden nie verbogen).
+* GOLDKETTEN: jede Kette ist eine starre Einheit und folgt dem Bogen an ihrer Auflagestelle (x 49 bzw. x 58). Kurzer Goldglanz: einmal je Schleife läuft ein schmales Lichtband über beide Ketten
+  (Frames 8–21; nur Goldpixel, eine Stufe heller auf der Goldrampe der Kette, dunkler Umriss bleibt), dazu je Kette ein 3-Frame-Sparkle am unteren Bogen (Frames 40–42 bzw. 58–60).
+Kein Blinzeln (Sonnenbrille), keine Partikel. Ergänzungen: keine. Farben: nur Quelle.
 """
 import math
 
@@ -32,10 +37,20 @@ import anim_n1 as N1
 N, MS = 72, 80
 SLUG = 'yolomungandr-ender-of-coolness'
 spr = L.lade(SLUG)
+LEIB, CAP, BRILLE, KETTEN = (L.lade(SLUG + '_' + t) for t in ('leib', 'cappy', 'brille', 'ketten'))
 S = N1.Szene(spr, (5, 6, 5, 3))
 H, W, OFF = S.H, S.W, S.OFF
 PL, PT = OFF
-BASIS = S.ebene()
+BASIS = L.platz(LEIB, H, W, PL, PT)
+E_KOPFZEUG = L.platz(np.where((BRILLE[..., 3:] > 0), BRILLE, CAP), H, W, PL, PT)
+# zwei Ketten (starr), Auflagespalte = oberstes Kettenglied
+KETTE = [(L.platz(np.where((S.xx <= 52)[..., None], KETTEN, 0).astype(np.uint8), H, W, PL, PT), 49),
+         (L.platz(np.where((S.xx > 52)[..., None], KETTEN, 0).astype(np.uint8), H, W, PL, PT), 58)]
+GOLD = {(160, 101, 0): (255, 216, 79), (255, 216, 79): (254, 245, 142)}
+HELL = (254, 245, 142)
+FUNKEL = [((43, 20), 40), ((60, 20), 58)]                  # (Sprite-Pixel am unteren Kettenbogen, Startframe)
+for (fx, fy), _ in FUNKEL:
+    assert tuple(int(v) for v in KETTEN[fy, fx, :3]) in ((255, 216, 79), HELL), KETTEN[fy, fx]
 B1, B2 = (112, 133, 152), (40, 58, 70)
 T1, T2 = (239, 208, 188), (145, 112, 71)
 UMRISS = (28, 29, 33)
@@ -120,6 +135,27 @@ def frame(i, nur=None):
             elif c in (T1, T2):
                 a[y, x, :3] = T1 if g else T2
     a[horn[0], horn[1], :3] = B1
+    # Schmuck und Kopfbedeckung: starre Ebenen über dem Leib
+    gs0 = GRENZEN[(abs(kopf), 1 if kopf > 0 else -1)] if kopf else ()
+    vz = 1 if kopf > 0 else -1
+    band = (i - 8) * 3 + 14 if 8 <= i <= 21 else None      # Lichtband: Diagonale x − y (Sprite), wandert von links nach rechts
+    for k, (e, ax_) in enumerate(KETTE):
+        e = e.copy()
+        if band is not None:
+            for y, x in zip(*np.nonzero(e[..., 3])):
+                c = tuple(int(v) for v in e[y, x, :3])
+                if c in GOLD and abs((x - PL) - (y - PT) - band) <= 1:
+                    e[y, x, :3] = GOLD[c]
+        dyk = vz * sum(1 for g in gs0 if PL + ax_ >= g)
+        e = L.versetze(e, dx_oben, dyk)
+        m = e[..., 3] > 0
+        a[m] = e[m]
+        (fx, fy), f0 = FUNKEL[k]
+        if f0 <= i < f0 + 3:
+            N1.funkel(a, PL + fx + dx_oben, PT + fy + dyk, (0, 1, 0)[i - f0], HELL, HELL)
+    e = L.versetze(E_KOPFZEUG, dx_oben, kopf)
+    m = e[..., 3] > 0
+    a[m] = e[m]
     return a
 
 

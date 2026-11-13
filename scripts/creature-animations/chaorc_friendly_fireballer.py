@@ -34,6 +34,9 @@ den nach rechts (zum Ball) ausgestreckten Arm (Balken x 7–14, y 12–15: Kontu
 Der Arm ist jetzt eine eigene STARRE Ebene (ARM_PIXEL): der Körper atmet ohne ihn, der Arm geht nur ganzzahlig mit der Brust mit. Dazu DIRIGIERT er den Ball in drei Posen (arm_pose): Hand 1 px gehoben (Ball oben),
 Original (Ball auf Mittelhöhe), Hand 1 px gesenkt (Ball unten) — starrer Spaltenversatz der Handspalten x 12–15, jede Spalte behält ihre Höhe (der Arm ist in jeder Pose genau so dick wie im Original). Der Ring
 sitzt am Handgelenk und geht mit. Unter dem Arm fertiggezeichnet (ARM_DARUNTER): Brust in Dunkelrot (51,0,0)/(84,0,0), Körperkante (14,13)/(14,14)/(15,15) und Kinnschatten (7–12,12) in Umrissfarbe (26,0,0).
+
+RUNDE 8 (Nutzer: „Der weiße Punkt vorn gehört zum Gürtel, nicht zum Arm, sollte sich also nicht mit dem Arm bewegen“): der helle Punkt (14,15) samt Randpixel (15,15) ist die Gürtelschnalle und gehört nicht mehr
+zur Arm-Ebene (GUERTEL_PUNKT): er steht in jedem Frame an der Originalstelle (weder Dirigieren noch Atmen bewegen ihn) und liegt vor der Hand.
 """
 import sys
 
@@ -70,13 +73,14 @@ for p in AUGE:
 OHR = {(-1, 7): UMRISS, (0, 7): HAUTROT, (0, 6): UMRISS, (0, 8): UMRISS}
 
 # --- Runde 7: der Arm als starre Ebene (wird nie gestreckt) ---
-ARM_PIXEL = [(x, 12) for x in range(7, 14)] + [(x, y) for y in (13, 14) for x in range(7, 15)] + [(x, 15) for x in range(7, 16)]
+ARM_PIXEL = [(x, 12) for x in range(7, 14)] + [(x, y) for y in (13, 14) for x in range(7, 15)] + [(x, 15) for x in range(7, 14)]
+GUERTEL_PUNKT = [(14, 15), (15, 15)]                                            # Runde 8: heller Punkt (14,15) + Randpixel (15,15) = Gürtelschnalle, NICHT Arm → bleibt mit dem Gürtel stehen, liegt vor der Hand
 _C, _D = (51, 0, 0), (84, 0, 0)
 ARM_DARUNTER = {(x, 12): UMRISS for x in range(7, 13)}                           # Kinnschatten/Halskontur; (13,12) bleibt frei
 for _y in (13, 14, 15):
     for _x in range(7, 14):
         ARM_DARUNTER[(_x, _y)] = _D if (_x + _y) % 3 == 0 else _C
-ARM_DARUNTER.update({(14, 13): UMRISS, (14, 14): UMRISS, (14, 15): _C, (15, 15): UMRISS})
+ARM_DARUNTER.update({(14, 13): UMRISS, (14, 14): UMRISS})
 HAND_SPALTEN = (12, 13, 14, 15)
 
 
@@ -163,6 +167,8 @@ def frame_gross(i, nur=None):
     if b:
         c = TX.streck_zeile(c, GP + 14, b)
     c = L.zusammen(H, W, [(c, 0, 0), (L.versetze(arm, 0, -b), 0, 0)])           # Arm geht starr mit der Brust mit
+    for (x, y) in GUERTEL_PUNKT:                                                # Runde 8: Gürtelschnalle bleibt fest (über der Hand)
+        c[GP + y, GP + x] = spr[y, x]
     c = Hm.kontur_schliessen(c, ERLAUBT, UMRISS)
     if nur == 'koerper':
         return c

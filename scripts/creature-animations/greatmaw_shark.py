@@ -21,6 +21,12 @@ Ablauf (64 Frames à 70 ms ≈ 4,5 s) — schwerer Hai, ruhig:
   ein langsames Schließen und ein schneller Biss je Schleife.
 * Auge glüht kurz auf (nur innerhalb der Augenpixel, eine Rotstufe heller), kein Blinzeln (Hai).
 Starr: Kopf, Zähne im Oberkiefer, Kiemen, Rückenflosse. Keine Partikel. Nur ganze Pixel, nur Quellfarben; keine Ergänzungen nötig.
+
+RUNDE 8 (Nutzer: „Sollten BEIDE Kiefer bewegen und ihre Mäuler ganz schließen können“): Ober- UND Unterkiefer sind jetzt Posen um das Kiefergelenk (Spalte x = 10 bleibt stehen):
+die Schnauze (x ≤ 9, y ≤ 17) senkt sich, der Unterkiefer (x ≤ 9, y ≥ 18) hebt sich, je Spalte starr (G.spalten_pose, Zieltabellen OBER_ZU/UNTER_ZU, fünf Posen 0…4 = offen … zu).
+In der Pose „zu“ liegen die Lippenlinien lückenlos aufeinander (Oberlippe Zeile 16, Unterlippe Zeile 17, x 3–9) und die Zähne greifen ineinander: die oberen Zähne (x 3/5/7/9) stehen
+vor der Unterlippe, die unteren (x 4/6/8) vor der Oberlippe – kein Hintergrundpixel mehr im Maul, keine Lücke am Gelenk (Spalte 9 schließt an Spalte 10 an). Zähne liegen immer zuoberst.
+Ablauf wie bisher: ein langsames Schließen (Frames 8–22, vier Frames ganz zu) und ein schneller Biss (Frames 41–46).
 """
 import sys
 
@@ -36,18 +42,26 @@ H, W = B.H, B.W
 xx, yy = B.xx, B.yy
 
 schwanz = B.da & (xx >= 36)
-kiefer = B.da & (xx <= 9) & (yy >= 18)
+ZAHN = (255, 255, 255)
+maul = B.da & (xx <= 9)
+zaehne = maul & L.farbmaske(spr, [ZAHN])
+kiefer = maul & (yy >= 18) & ~zaehne                      # Unterkiefer
+oberkiefer = maul & (yy <= 17) & ~zaehne                 # Schnauze/Oberkiefer
 flosse = B.da & (yy >= 23) & (xx >= 14)
-rumpf = B.da & ~schwanz & ~kiefer & ~flosse
+rumpf = B.da & ~schwanz & ~maul & ~flosse
 
 RAND = G.rand_farben(spr)
 UMRISS = (4, 13, 26)
 AUGE_HELLER = {(0x25, 0, 0): (0x7d, 0, 0), (0x7d, 0, 0): (0x9f, 0, 0), (0x9f, 0, 0): (0xc4, 0, 0)}
 AUGE = L.rechteck(spr, 10, 11, 14, 15)
-KIEFER = {}                                                      # Frame → Spitzenhub (negativ = zu)
-for k, v in enumerate([-1, -1, -2, -2, -3, -3, -3, -2, -2, -1, -1]):       # langsames Schließen
+# Runde 8: Kieferposen. Ziel-Versatz je Spalte in der Pose „zu“ (Sprite-x → dy): Schnauze senkt sich, Unterkiefer hebt sich; Gelenk = Spalte 10 (fest)
+OBER_ZU = {9: 1, 8: 2, 7: 3, 6: 3, 5: 4, 4: 5, 3: 5, 2: 5, 1: 5, 0: 5}
+UNTER_ZU = {9: -2, 8: -3, 7: -3, 6: -4, 5: -4, 4: -5, 3: -5}
+MAUL_STUFEN = 4
+KIEFER = {}                                                      # Frame → Pose 0 (offen, Original) … 4 (ganz zu)
+for k, v in enumerate([1, 1, 2, 2, 3, 3, 4, 4, 4, 4, 3, 3, 2, 1, 1]):       # langsames Schließen
     KIEFER[8 + k] = v
-for k, v in enumerate([-2, -3, -3, -2, -1]):                             # schneller Biss
+for k, v in enumerate([2, 4, 4, 4, 2, 1]):                               # schneller Biss
     KIEFER[41 + k] = v
 # Schwanzposen: Spalten, ab denen der Schwanz eine Stufe weiter wandert – auf die Stufen des Umrisses gelegt (Bauchkante stuft bei x = 41 und 49)
 SCHWANZ = {0: ([], 0), 1: ([41], 1), 2: ([41, 45], 1), -1: ([49], -1), -2: ([38, 49], -1)}
@@ -62,8 +76,13 @@ def frame(i):
     st, sign = SCHWANZ[G.pose(i, N / 2, 2, scharf=1.25)]
     s = G.stufen_spalten(B.teil(schwanz), [B.pl + x for x in st], sign)
     f = G.scher_zeilen(B.teil(flosse), B.pt + 22, G.pose(i, N / 2, 1, ph=-1.0, scharf=1.25), seite=1)
-    k = G.scher_spalten(B.teil(kiefer), B.pl + 10, KIEFER.get(i, 0), seite=-1, ende=B.pl + 3)
-    return G.umriss_flicken(L.zusammen(H, W, [(f, dx, dy), (s, dx, dy), (k, dx, dy), (r, dx, dy)]), RAND, UMRISS)
+    zu = KIEFER.get(i, 0) / MAUL_STUFEN
+    oz = {B.pl + x: v for x, v in OBER_ZU.items()}
+    uz = {B.pl + x: v for x, v in UNTER_ZU.items()}
+    zo, zu_ = B.teil(zaehne & (yy <= 17)), B.teil(zaehne & (yy >= 18))
+    k = L.zusammen(H, W, [(G.spalten_pose(B.teil(oberkiefer), oz, zu), 0, 0), (G.spalten_pose(B.teil(kiefer), uz, zu), 0, 0),
+                          (G.spalten_pose(zo, oz, zu), 0, 0), (G.spalten_pose(zu_, uz, zu), 0, 0)])        # Zähne zuoberst
+    return G.umriss_flicken(L.zusammen(H, W, [(f, dx, dy), (s, dx, dy), (r, dx, dy), (k, dx, dy)]), RAND, UMRISS)
 
 
 if __name__ == '__main__':

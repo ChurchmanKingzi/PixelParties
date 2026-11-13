@@ -17,7 +17,10 @@ Ablauf (72 Frames à 70 ms = 5,0 s). Frame 0 = Original (plus Feuer):
 * Der ganze Vogel hebt und senkt sich gegenläufig um 1 px (Abschlag → Körper steigt).
 * Feuer (anim_feuer3, posen=16, halten=1): Flammensaum HINTER den oberen Flügelkanten (Füße liegen 2 px im Flügel → lückenlos; der Saum macht den Flügelschlag spaltengenau mit),
   je eine größere Flamme hinter den beiden Kopfkämmen. Farben nur aus der Quelle (Rot, Orange, Gelb).
-Kein Glanz (Feuer/Federn). Augen bleiben fest (2–3 dunkle Pixel, kein Lid erkennbar).
+* Mimik: beide Köpfe blinzeln zweimal je Schleife (linker Kopf Frames 8–9, 44–45: Augen (33,12), (37,14); rechter Kopf Frames 11–12, 50–51: Augen (51,8) und (54–55,6–7)); Lid in der
+  Gefiederfarbe (210,113,24). Linker Schnabel (im Original leicht offen): schließt sich (Unterkiefer 1 px hoch, Frames 18–22, 54–59) und reißt weit auf (Unterkiefer 1 px tiefer,
+  dunkler Rachen 2 px, Frames 25–31). Rechter Schnabel (zeigt nach oben, im Original zu): öffnet sich (rechte Kante klappt 1 px auf, dunkler Rachen, Frames 36–42, 62–67).
+Kein Glanz (Feuer/Federn).
 Ergänzungen: keine.
 """
 import math
@@ -54,6 +57,44 @@ KAMM = F3.Feuer(sz.H, sz.W, [F3.Flamme(PL + 37, PT + 11, 11, 3.5, phase=0.2), F3
                 [ROT, ORANGE, GELB, HELL], posen=16, halten=1)
 
 
+# ---- Mimik (Runde 8): Blinzeln aller Augen, Schnäbel öffnen/schließen -------------------------------------------------------------------------------------
+C0, C1, C4, LID = (45, 4, 2), DUNKEL, (161, 47, 24), (210, 113, 24)
+AUGEN_L = [(33, 12), (37, 14)]                              # linker Kopf: zwei Einzelpixel-Augen beiderseits der Schnabelwurzel
+AUGEN_R = [(51, 8), (54, 6), (55, 6), (54, 7)]              # rechter Kopf: fernes Auge (1 px) und nahes Auge (3 px)
+# linker Schnabel (zeigt nach links unten): Unterkiefer = Füllung (161,47,24) + Umriss darunter, Mundspalt = (45,4,2) bei (34,17), (33,18) → im Original leicht geöffnet.
+SCHNABEL_L = {-1: {(34, 17): C4, (34, 18): C1, (34, 19): None, (33, 18): C4, (33, 19): None},                      # geschlossen: Unterkiefer 1 px hoch
+              1: {(34, 18): C0, (34, 19): C4, (34, 20): C1, (33, 19): C0, (33, 20): C4}}                          # weit offen: Unterkiefer 1 px tiefer, Spalt 2 px
+# rechter Schnabel (zeigt nach oben, im Original geschlossen): offen = die rechte Schnabelkante klappt 1 px nach rechts, dazwischen der dunkle Rachen
+SCHNABEL_R = {1: {(54, 0): None, (54, 1): C0, (55, 1): C4, (54, 2): C0, (55, 2): C4}}
+BLINK_L, BLINK_R = (8, 9, 44, 45), (11, 12, 50, 51)
+
+
+def schnabel_l(i):
+    k = i % 72
+    return -1 if (18 <= k <= 22 or 54 <= k <= 59) else (1 if 25 <= k <= 31 else 0)
+
+
+def schnabel_r(i):
+    k = i % 72
+    return 1 if (36 <= k <= 42 or 62 <= k <= 67) else 0
+
+
+def mimik(i):
+    r = RUMPF
+    aend = {}
+    if i % 72 in BLINK_L:
+        aend.update({p: LID for p in AUGEN_L})
+    if i % 72 in BLINK_R:
+        aend.update({p: LID for p in AUGEN_R})
+    aend.update(SCHNABEL_L.get(schnabel_l(i), {}))
+    aend.update(SCHNABEL_R.get(schnabel_r(i), {}))
+    if aend:
+        r = RUMPF.copy()
+        for (x, y), c in aend.items():
+            r[PT + y, PL + x] = (0, 0, 0, 0) if c is None else tuple(c) + (255,)
+    return r
+
+
 def schlag(i):
     return math.sin(L.sinus(i, 36))
 
@@ -75,11 +116,11 @@ def frame(i, nur=None):
     if not nur:
         eb.append((N8.spalten_versatz(SAUM.ebene(i), f), 0, hub))
         eb.append((KAMM.ebene(i), 0, hub))
-    vogel = L.zusammen(sz.H, sz.W, [(N8.spalten_versatz(FL_L, f), 0, 0), (N8.spalten_versatz(FL_R, f), 0, 0), (RUMPF, 0, 0)])
+    vogel = L.zusammen(sz.H, sz.W, [(N8.spalten_versatz(FL_L, f), 0, 0), (N8.spalten_versatz(FL_R, f), 0, 0), (mimik(i), 0, 0)])
     vogel = N8.kontur_schliessen(vogel, UMRISS, DUNKEL)            # Versatzstufen an den Flügelkanten schließen
     eb.append((vogel, 0, hub))
     return L.zusammen(sz.H, sz.W, eb)
 
 
 if __name__ == '__main__':
-    N8.fertig('duigno-the-flaming-phoenix', 'Duigno, the Flaming Phoenix', frame, N, MS, spr, check=[0, 5, 9, 14, 27, 31], zoom=5, spalten=3)
+    N8.fertig('duigno-the-flaming-phoenix', 'Duigno, the Flaming Phoenix', frame, N, MS, spr, check=[0, 8, 11, 20, 27, 38], zoom=5, spalten=3)

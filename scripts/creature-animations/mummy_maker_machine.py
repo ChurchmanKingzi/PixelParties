@@ -12,10 +12,13 @@ Was im Sprite ist (x, y):
 * ACHT SCHLÄUCHE (schwarz, je vier links/rechts): führen vom Kasten schräg nach außen oben, Mündungen (3×2 schwarz) bei (7–9,16), (44–46,16), (2–4,22), (49–51,22), (1–3,30), (50–52,30), (0–2,38), (51–53,38). Starr.
 * AUSWURFSCHACHT (x 21–32, y 40–51): schwarze Öffnung, darin graue BANDAGEN-Streifen (120/179). FÖRDERBAND (x 21–32, y 52–67): Lamellen im 3-Zeilen-Rhythmus.
 
-Ablauf (60 Frames à 70 ms = 4,2 s, nahtlos, Frame 0 = Original):
+Ablauf (72 Frames à 70 ms = 5,04 s, nahtlos, Frame 0 = Original):
 * FÖRDERBAND läuft: die Lamellen (y 53–66) wandern alle 2 Frames 1 px nach unten (zyklisch, Periode 3 px); Rahmenzeilen y 52/67 bleiben.
-* BANDAGEN laufen aus dem Schacht: die Zeilen y 42–51 im Schacht (x 22–31) wandern alle 2 Frames 1 px nach unten (zyklisch über 10 Zeilen).
-* LAMPEN-LAUFLICHT + GAS (Idle-Idee): alle 10 Frames leuchtet die nächste Lampe auf (beide Pixel hell, dann beide dunkel, dann normal), und aus dem zugehörigen Schlauch (violett oben links, gelb oben rechts,
+* BANDAGEN fahren das GANZE Band hinunter (Runde 8, Nutzerwunsch): das Bandagenknäuel der Quelle (die hellen Pixel 120/179 in x 22–31, y 43–50, starr als Einheit) taucht oben an der
+  Schachtoberkante (y 41) auf, fährt im Bandtempo (1 px je 2 Frames) durch den Schacht und über die ganze Länge der Lamellen bis zum Bandende (y 66) und verschwindet dort Zeile für Zeile
+  hinter der unteren Rahmenzeile; 4 Frames später kommt oben das nächste. Der Schacht dahinter ist leer nachgezeichnet (Schachtfarben 13/21/38 der Quelle, Zeilen 43–50). In Frame 0 liegt
+  das Knäuel genau an seinem Originalplatz.
+* LAMPEN-LAUFLICHT + GAS (Idle-Idee): alle 12 Frames leuchtet die nächste Lampe auf (beide Pixel hell, dann beide dunkel, dann normal), und aus dem zugehörigen Schlauch (violett oben links, gelb oben rechts,
   orange/blau zweite Reihe, grün/rot dritte Reihe) steigt ein Gaswölkchen in der Lampenfarbe (2×2 → 3×3 → 2×2, Kern hell, Rand dunkel – nur die zwei Farben der Lampe) langsam auf. Die untersten Schläuche gehören zu den „aus“-Lampen und bleiben still.
 * OPFER ruckt: im Takt jeder Lampe sackt die Figur im Trichter 3 Frames lang 1 px ab (starr, hinter dem Trichterrand) und kommt wieder hoch.
 Maschine selbst (Kasten, Trichter, Schläuche) ist starr und steht fest. Kein Glanz (mattes Blech), kein Feuer. Ergänzungen: keine (das Opfer sinkt nur hinter den schwarzen Trichterrand). Keine neuen Farben.
@@ -26,7 +29,7 @@ import anim_cool as C
 import anim_lib as L
 import anim_n1 as N1
 
-N, MS = 60, 70
+N, MS = 72, 70
 spr = L.lade('mummy-maker-machine')
 S = N1.Szene(spr, (3, 3, 3, 3))
 H, W, OFF = S.H, S.W, S.OFF
@@ -40,8 +43,13 @@ LAMPEN = [((14, 27), (13, 27), (8, 14)), ((40, 27), (39, 27), (45, 14)), ((11, 2
           ((42, 29), (42, 30), (50, 20)), ((11, 36), (11, 37), (2, 28)), ((42, 36), (42, 37), (51, 28))]
 for h_, d_, _ in LAMPEN:
     assert sum(S.col(*h_)) > sum(S.col(*d_)), (h_, d_)
-TAKT = 10
+TAKT = 12
 TEST_EBENEN = 'koerper'
+KN = E_M[PT + 43:PT + 51, PL + 22:PL + 32].copy()           # Bandagenknäuel (8 Zeilen)
+KN_M = KN[..., 0] >= 100
+LEER = KN.copy()
+LEER[KN_M, :3] = (21, 21, 21)
+assert tuple(LEER[7, 0, :3]) == (38, 38, 38)
 
 
 def frame(i, nur=None):
@@ -49,9 +57,13 @@ def frame(i, nur=None):
     s = (i // 2) % 3                                         # Förderband
     for y in range(53, 67):
         m[PT + y, PL + 21:PL + 33] = E_M[PT + 53 + (y - 53 - s) % 3, PL + 21:PL + 33]
-    b = (i // 2) % 10                                        # Bandagen im Schacht
-    for y in range(42, 52):
-        m[PT + y, PL + 22:PL + 32] = E_M[PT + 42 + (y - 42 - b) % 10, PL + 22:PL + 32]
+    m[PT + 43:PT + 51, PL + 22:PL + 32] = LEER                # Schacht ohne Knäuel
+    top = 33 + (10 + i // 2) % 36                            # Bandagenknäuel: oberste Zeile (Sprite-y), 43 in Frame 0
+    for r in range(8):
+        y = top + r
+        if 41 <= y <= 66:
+            zl = m[PT + y, PL + 22:PL + 32]
+            zl[KN_M[r]] = KN[r][KN_M[r]]
     puffs = []
     for k, (h_, d_, (mx, my)) in enumerate(LAMPEN):
         t = (i - 1 - k * TAKT) % N

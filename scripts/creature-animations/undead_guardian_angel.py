@@ -14,10 +14,10 @@ Herzstein (x 5–16, y 36–48), gehalten von zwei fahlen Händen (x 4–7 und 1
 Ablauf (72 Frames à 75 ms = 5,4 s). Frame 0 = Original. Die Figur steht (kein Schweben), die Statue ist Stein und bleibt starr:
 * Knochenflügel (Periode 24): die äußeren Flügelteile (x 0–2 und 19–21) senken sich als starre Einheit 1 px und heben sich wieder (zweimal je Periode, kurzes Zucken) (Flügel werden nur nach unten geschoben; die inneren
   Knochenstäbe am Gelenk und die Hände bleiben fest → keine Lücke, nichts wird gestreckt).
-* Herzstein pulsiert als Doppelschlag (alle 24 Frames: 2 Frames hell, 2 Pause, 2 Frames hell): die Rottöne des Steins rücken eine Stufe der Quell-Rampe heller (Edelstein → erlaubt).
-  Die roten Augen glimmen im selben Takt eine Stufe heller (nur die beiden Augenpixel).
+* Der rote Herzstein und die roten Augen leuchten NICHT auf (Nutzerwunsch) – sie bleiben unverändert.
 * Heiligenschein: ein heller Punkt (hellstes Ring-Violett der Quelle) läuft einmal je 24 Frames um den Ring.
-* Seelenfetzen: fünf 2×2-Wölkchen in den Aura-Violetttönen steigen langsam neben der Figur auf (hinter der Figur).
+  Der Ring selbst schwebt alle 36 Frames für 14 Frames 1 px höher (starr; die frei werdende Zeile darunter wird Aura (45,0,105)).
+* Seelenfetzen: sieben 2×2-Wölkchen in den Aura-Violetttönen steigen langsam neben der Figur auf (hinter der Figur).
 Ergänzungen: keine.
 """
 import numpy as np
@@ -31,39 +31,38 @@ spr = sz.spr
 xx, yy = sz.xx, sz.yy
 PL, PT = sz.PL, sz.PT
 AURA, AURA2, RING_HELL = (45, 0, 105), (70, 40, 149), (122, 94, 163)
-ROT = [(79, 1, 2), (115, 0, 0), (128, 3, 0), (142, 3, 0), (176, 3, 0), (209, 0, 0)]        # Rampe des Herzsteins (dunkel → hell); der Rand (66,0,5) bleibt
-AUGE, AUGE_HELL = (159, 0, 0), (209, 0, 0)
 M_FLUEGEL = ((xx <= 2) | (xx >= 19)) & (yy >= 11) & (yy <= 23)
 FLUEGEL = sz.teil(M_FLUEGEL)
-REST = sz.teil(~M_FLUEGEL)
-M_HERZ = sz.voll((yy >= 36) & (yy <= 48))
-M_AUGEN = sz.voll((yy == 12) & ((xx == 7) | (xx == 14)))
+M_RING = yy <= 3
+RING = sz.teil(M_RING)
+REST = sz.teil(~M_FLUEGEL & ~M_RING)
+SCHWEBE = (0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)     # Heiligenschein 1 px höher (Periode 36)
 RING_WEG = [(x, 1) for x in range(8, 14)] + [(14, 2)] + [(x, 3) for x in range(13, 7, -1)] + [(7, 2)]
 TEST_EBENEN = ('figur',)
 FETZEN = [dict(x=PL - 3, y=PT + 50, weg=-22, off=0, wackeln=1, leben=36), dict(x=PL + 23, y=PT + 44, weg=-24, off=13, wackeln=1, leben=36),
           dict(x=PL - 2, y=PT + 30, weg=-18, off=24, wackeln=1, leben=36), dict(x=PL + 22, y=PT + 20, weg=-16, off=30, wackeln=1, leben=36),
-          dict(x=PL + 24, y=PT + 56, weg=-20, off=6, wackeln=1, leben=36)]
+          dict(x=PL + 24, y=PT + 56, weg=-20, off=6, wackeln=1, leben=36),
+          dict(x=PL - 3, y=PT + 16, weg=-14, off=18, wackeln=1, leben=36), dict(x=PL + 23, y=PT + 34, weg=-18, off=33, wackeln=1, leben=36)]
 SENK = (0, 0, 0, 0, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 1, 1, 1, 0, 0, 0, 0, 0, 0)
 
 
 def frame(i, nur=None):
     a = SENK[i % 24]
-    rest = REST
-    k = (i - 6) % 24
-    if k in (0, 1, 4, 5):
-        rest = N8.farbtausch(REST, M_HERZ, {ROT[j]: ROT[j + 1] for j in range(len(ROT) - 1)})
-        rest = N8.farbtausch(rest, M_AUGEN, {AUGE: AUGE_HELL})
+    h = SCHWEBE[i % 36]
+    ring = RING
     if not nur:
-        if rest is REST:
-            rest = REST.copy()
+        ring = RING.copy()
         p = (i % 24) * len(RING_WEG) // 24
         x, y = RING_WEG[p]
-        rest[PT + y, PL + x, :3] = RING_HELL
+        ring[PT + y, PL + x, :3] = RING_HELL
     eb = []
     if not nur:
         eb.append((N8.blasen(sz.H, sz.W, i, N, FETZEN, AURA2), 0, 0))
-    eb += [(FLUEGEL, 0, a), (rest, 0, 0)]
-    return L.zusammen(sz.H, sz.W, eb)
+    eb += [(FLUEGEL, 0, a), (REST, 0, 0), (ring, 0, -h)]
+    f = L.zusammen(sz.H, sz.W, eb)
+    if h:                                           # frei gewordene Zeile unter dem Ring: Aura (wie die Zeile darunter)
+        f[PT + 3, PL + 7:PL + 15] = AURA + (255,)
+    return f
 
 
 if __name__ == '__main__':

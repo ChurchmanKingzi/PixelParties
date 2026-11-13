@@ -13,8 +13,8 @@ Die roten Augen des Baums (Ebene 184) sind in dieser Fassung von Kette/Mütze ü
 
 Ablauf (64 Frames à 75 ms = 4,8 s). Frame 0 = Original:
 * Lichterkette läuft: alle 8 Frames rückt jede Lampe eine Farbfamilie weiter (Rot → Gelb → Grün → Blau → Rot, je Helligkeitsstufe; nur Farben der Quelle, kein Schein).
-* Der Baum wiegt sich langsam (Periode 64): Zeilen oberhalb der Wurzeln (y < 47) wandern waagerecht, je höher desto mehr (Wipfel ±2 px, höchstens 1 px Unterschied zwischen
-  Nachbarzeilen); Mützen und Kette gehen mit ihren Ästen mit. Wurzeln, Maul bleiben stehen.
+* Der Baum wiegt sich kaum merklich (Periode 64 = 4,8 s; Runde 8: „bewegt sich zu sehr seitwärts“ → stark reduziert): nur der Wipfel (oberste ≈ 18 Zeilen samt Mütze) geht
+  höchstens 1 px zur Seite und zurück (ein einziger 1-px-Versatz, der langsam am Stamm hinauf- und hinabwandert); Äste, Stamm, Wurzeln, Maul bleiben stehen.
 * Zähneklappern (Frames 20–27 und 52–59): das Maul schließt sich im 2-Frame-Wechsel (Zahnreihen greifen in der Mittelzeile y 51 ineinander, Weiß der Zähne).
 Ergänzungen: keine.
 """
@@ -49,7 +49,7 @@ def wiegen(a, i):
     out = np.zeros_like(a)
     for y in range(a.shape[0]):
         yy = y - sz.PT
-        d = int(math.floor(2.3 * s * (max(0, PIVOT - yy) / PIVOT) ** 1.4 + 0.5)) if yy < PIVOT else 0
+        d = int(math.floor(1.0 * s * (max(0, PIVOT - yy) / PIVOT) ** 1.4 + 0.5)) if yy < PIVOT else 0
         out[y] = np.roll(a[y], d, axis=0)
     return out
 

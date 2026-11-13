@@ -1,7 +1,7 @@
 {
   "creature": "Gerrymander",
   "sheet": "gerrymander.png",
-  "frameWidth": 36,
+  "frameWidth": 48,
   "frameHeight": 25,
   "frames": 60,
   "frameMs": 70,
@@ -11,5 +11,5 @@
   "padLeft": 2,
   "padRight": 2,
   "padBottom": 2,
-  "faceX": 18.0
+  "faceX": 24.0
 }

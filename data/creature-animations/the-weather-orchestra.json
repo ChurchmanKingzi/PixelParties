@@ -1,7 +1,7 @@
 {
   "creature": "The Weather Orchestra",
   "sheet": "the-weather-orchestra.png",
-  "frameWidth": 63,
+  "frameWidth": 66,
   "frameHeight": 47,
   "frames": 48,
   "frameMs": 70,
@@ -9,7 +9,7 @@
   "layout": "horizontal",
   "padTop": 2,
   "padLeft": 2,
-  "padRight": 2,
+  "padRight": 4,
   "padBottom": 2,
-  "faceX": 31.5
+  "faceX": 33.0
 }

@@ -11,12 +11,12 @@ Hals (x 20–22, y 9–12) geht in den Kopf über. Der Kopf ist ein senkrecht st
 Kein Glanz (dunkles Tier, Stein/Eisen unklar → weggelassen).
 
 Ablauf (64 Frames à 70 ms = 4,5 s). Frame 0 = Original:
-* Hammerschlag, zweimal je Schleife (Frames 26–39 und 42–53): der Hammerkopf hebt sich als starre Einheit in Stufen um 3 px (beim zweiten Mal 2 px), verharrt kurz und fährt in einem
+* Hammerschlag, viermal je Schleife (Aufschlag in den Frames 13, 25, 43, 54; abwechselnd großer Schlag 3 px und kleiner 2 px): der Hammerkopf hebt sich als starre Einheit in Stufen, verharrt kurz und fährt in einem
   Bild auf den Boden zurück. Er bleibt am Hals angewachsen (Hals bleibt am Rumpf; frei werdende Innenpixel an der Halsnaht bekommen die Hammer-Umrissfarbe). Beim Aufschlag springen links
   und rechts der Schlagfläche 2×2-Steinkrümel (Grautöne der Quelle) weg; der Rumpf sackt beim Aufschlag nicht ein (Hufe bleiben am Boden).
 * Atmen (Periode 32, nur Rumpf-Ebene): Zeile 12 wird texturiert gestreckt (TX.streck_zeile), der Rücken hebt sich 1 px; Beine und Hammer bleiben stehen.
-* Schweif pendelt: die unteren drei Zeilen 1 px zum Körper hin (Periode 16, nicht während des Schlags).
-* Blinzeln (Frames 8–10): das Lid (Kopffarbe (61,71,70)) schließt sich von oben über die hellen Augenpixel.
+* Schweif pendelt: die unteren drei Zeilen 1 px zum Körper hin (in den Pausen zwischen den Schlägen, Frames 27–32 und 57–62).
+* Blinzeln (Frames 29–31): das Lid (Kopffarbe (61,71,70)) schließt sich von oben über die hellen Augenpixel.
 Ergänzungen: keine.
 """
 import numpy as np
@@ -40,9 +40,10 @@ SCHWEIF = sz.teil(M_SCHWEIF)
 RUMPF = sz.teil(~M_HAMMER & ~M_SCHWEIF)
 RAND = [(5, 5, 5), KONTUR_H]
 TEST_EBENEN = ('figur',)
-HUB = {26: 1, 27: 1, 28: 2, 29: 2, 30: 3, 31: 3, 32: 3, 33: 3, 34: 3, 35: 3, 36: 3, 37: 1,
-       42: 1, 43: 1, 44: 2, 45: 2, 46: 2, 47: 2, 48: 2, 49: 2, 50: 1}
-SCHLAG = (38, 51)                                           # Frames, in denen der Hammer aufschlägt
+GROSS, KLEIN = (1, 1, 2, 2, 3, 3, 3, 3, 1), (1, 1, 2, 2, 2, 2, 1)       # Hub je Bild; im Bild danach steht der Hammer wieder am Boden (Aufschlag)
+STARTS = ((4, GROSS), (18, KLEIN), (34, GROSS), (47, KLEIN))           # vier Schläge je Schleife (Nutzerwunsch: häufiger)
+HUB = {s0 + j: v for s0, folge in STARTS for j, v in enumerate(folge)}
+SCHLAG = tuple(s0 + len(folge) for s0, folge in STARTS)                # Frames, in denen der Hammer aufschlägt (13, 25, 43, 54)
 KRUEMEL = []
 for s0 in SCHLAG:
     KRUEMEL += [dict(x=PL + 20, y=PT + 19, dx=-4, dy=-5, fall=6, leben=7, periode=N, off=s0, farbe=KRUEMEL1),
@@ -55,11 +56,11 @@ def frame(i, nur=None):
     n = N8.stufe(i, 32, 2, 14)
     rumpf = TX.streck_zeile(RUMPF, PT + 12, n)
     hammer = HAMMER
-    if 8 <= i <= 10:
+    if 29 <= i <= 31:
         hammer = HAMMER.copy()
-        for y in ((9,), (9, 10), (9,))[i - 8]:
+        for y in ((9,), (9, 10), (9,))[i - 29]:
             hammer[PT + y, PL + 26:PL + 28, :3] = LID
-    pendel = 1 if (i < 24 or i >= 56) and (i % 16) >= 8 else 0
+    pendel = 1 if (27 <= i <= 32) or (57 <= i <= 62) else 0
     f = L.zusammen(sz.H, sz.W, [(SCHWEIF, pendel, 0), (rumpf, 0, 0), (hammer, 0, -k)])
     if k:
         f = N8.kontur_schliessen(f, RAND, KONTUR_H, maske=sz.voll((xx >= 22) & (xx <= 24) & (yy <= 14)))
@@ -69,4 +70,4 @@ def frame(i, nur=None):
 
 
 if __name__ == '__main__':
-    N8.fertig('hammer-horse', 'Hammer Horse', frame, N, MS, spr, check=[0, 9, 12, 28, 33, 38, 40, 47], zoom=12, spalten=4)
+    N8.fertig('hammer-horse', 'Hammer Horse', frame, N, MS, spr, check=[0, 6, 10, 13, 15, 22, 30, 45], zoom=12, spalten=4)

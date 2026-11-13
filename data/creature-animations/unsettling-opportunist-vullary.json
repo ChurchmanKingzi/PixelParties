@@ -1,15 +1,15 @@
 {
   "creature": "Unsettling Opportunist Vullary",
   "sheet": "unsettling-opportunist-vullary.png",
-  "frameWidth": 24,
-  "frameHeight": 37,
+  "frameWidth": 46,
+  "frameHeight": 45,
   "frames": 60,
   "frameMs": 75,
   "loop": true,
   "layout": "horizontal",
-  "padTop": 2,
-  "padLeft": 2,
-  "padRight": 2,
-  "padBottom": 2,
-  "faceX": 12.0
+  "padTop": 6,
+  "padLeft": 3,
+  "padRight": 3,
+  "padBottom": 3,
+  "faceX": 23.0
 }

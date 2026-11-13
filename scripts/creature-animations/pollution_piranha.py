@@ -18,6 +18,11 @@ Ablauf (48 Frames à 70 ms ≈ 3,4 s) — kleiner, flinker Fisch:
   und wieder auf; je Schleife ein Doppelbiss und ein einzelner Biss.
 * Auge glüht beim Biss auf (nur Augenpixel: dunkles Rot wird hellrot).
 Starr: Kopf, obere Zähne, Kiemen, Rückenflosse. Nur ganze Pixel, nur Quellfarben; keine Ergänzungen.
+
+RUNDE 8 (Nutzer: „Sollten BEIDE Kiefer bewegen und ihre Mäuler ganz schließen können“): Ober- UND Unterkiefer sind jetzt Posen um das Kiefergelenk (Spalte x = 8 bleibt stehen):
+der Oberkiefer samt Stirn (x ≤ 7, y ≤ 13) senkt sich bis 3 px, der Unterkiefer (x ≤ 7, y ≥ 16) hebt sich bis 3 px, je Spalte starr (G.spalten_pose, Zieltabellen OBER_ZU/UNTER_ZU,
+vier Posen 0…3 = offen … zu). In der Pose „zu“ ist das Maul vollständig geschlossen: zwischen Ober- und Unterlippe bleibt nur das zwei Zeilen hohe Gebiss, in dem die oberen Zähne
+(x 1/3/5/7) und die unteren (x 2/4/6) lückenlos ineinandergreifen – kein Hintergrundpixel im Maul, keine Lücke am Gelenk. Bissfolge (Doppelbiss + einzelner Biss) wie bisher.
 """
 import sys
 
@@ -34,12 +39,19 @@ xx, yy = B.xx, B.yy
 RAND = G.rand_farben(spr)
 UMRISS = (41, 83, 95)
 schwanz = B.da & (xx >= 22) & (yy >= 8)
-kiefer = B.da & (xx <= 8) & (yy >= 16)
+ZAHN = (255, 255, 255)
+maul = B.da & (xx <= 7) & ((yy <= 13) | (yy >= 16))
+zaehne = maul & L.farbmaske(spr, [ZAHN])
+kiefer = maul & (yy >= 16) & ~zaehne                      # Unterkiefer
+oberkiefer = maul & (yy <= 13) & ~zaehne                 # Oberkiefer mit Stirn (das Auge x 8–11 bleibt stehen)
+OBER_ZU = {7: 1, 6: 2, 5: 3, 4: 3, 3: 3, 2: 3, 1: 3, 0: 3}
+UNTER_ZU = {7: -2, 6: -2, 5: -3, 4: -3, 3: -3, 2: -3, 1: -3, 0: -3}
+MAUL_STUFEN = 3
 flosse = B.da & L.farbmaske(spr, [(88, 172, 172)])
 flosse |= B.da & (yy >= 20) & (xx >= 13)
-rumpf = B.da & ~schwanz & ~kiefer & ~flosse
+rumpf = B.da & ~schwanz & ~maul & ~flosse
 BISS = {}
-for s0, folge in ((8, [-1, -2, -3, -3, -1, 0, -2, -3, -3, -2, -1]), (32, [-1, -2, -3, -3, -2, -1])):
+for s0, folge in ((8, [-1, -2, -3, -3, -3, -1, 0, -2, -3, -3, -2, -1]), (32, [-1, -2, -3, -3, -3, -2, -1])):
     for k, v in enumerate(folge):
         BISS[s0 + k] = v
 
@@ -51,7 +63,11 @@ def frame(i):
         r = L.tausche(r, {(193, 0, 3): (254, 21, 25)})
     s = G.stufen_spalten(B.teil(schwanz), [B.pl + 22], G.pose(i, N / 4, 1, scharf=1.6))
     f = G.stufen_zeilen(B.teil(flosse), [B.pt + 20], G.pose(i - 3, N / 4, 1, scharf=1.6) - G.pose(-3, N / 4, 1, scharf=1.6) if i else 0)
-    k = G.scher_spalten(B.teil(kiefer), B.pl + 9, BISS.get(i, 0), seite=-1, ende=B.pl + 2)
+    zu = -BISS.get(i, 0) / MAUL_STUFEN
+    oz = {B.pl + x: v for x, v in OBER_ZU.items()}
+    uz = {B.pl + x: v for x, v in UNTER_ZU.items()}
+    k = L.zusammen(H, W, [(G.spalten_pose(B.teil(oberkiefer), oz, zu), 0, 0), (G.spalten_pose(B.teil(kiefer), uz, zu), 0, 0),
+                          (G.spalten_pose(B.teil(zaehne & (yy <= 13)), oz, zu), 0, 0), (G.spalten_pose(B.teil(zaehne & (yy >= 16)), uz, zu), 0, 0)])   # Zähne zuoberst
     ganz = L.zusammen(H, W, [(s, 0, 0), (r, 0, 0), (f, 0, 0), (k, 0, 0)])
     ganz = G.loecher_stopfen(ganz, RUHE)
     return L.versetze(G.umriss_flicken(ganz, RAND, UMRISS), dx, dy)

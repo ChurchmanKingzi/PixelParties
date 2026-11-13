@@ -15,6 +15,8 @@ Material: mattes graues Metall ohne Glanzlichter im Sprite → kein Glitzern. Ke
 Ablauf (48 Frames à 70 ms = 3,36 s, nahtlos); Idee: er steht mit laufendem Motor am Start — das Rad dreht durch, der Rumpf federt.
 * Rad dreht (Periode 16, Fahrtrichtung links → Drehung gegen den Uhrzeigersinn): der Glanzbogen der Felge wandert in 8 Schritten zu je 45° um die Radmitte (nur innerhalb der Felgenpixel,
   nur die zwei Felgenfarben). Der Reifen steht auf dem Boden und bleibt, wo er ist.
+* Seitensätze (Runde 8, Nutzerwunsch „sehr ruckartig und schnell seitwärts hin und her“): der GANZE Sprite springt in harten Sätzen von 5–13 px waagerecht hin und her
+  (Tabelle SATZ: jeder Satz dauert genau 1 Frame, kein Zwischenbild; dazwischen Halte von nur 2–3 Frames; Ausschlag ±7 px um die Mitte). Starr, nichts verformt sich.
 * Federn (Periode 12): das gerade Rumpfstück (Zeile 24) wird einmal texturiert eingefügt (TX) — Rumpf, Arm und Kopf heben sich als Ganzes 1 px über dem Rad und sinken zurück.
 Frame 0 = Original. Ergänzungen: keine.
 """
@@ -29,12 +31,17 @@ import anim_textur as TX
 TX.umleiten()
 
 N, MS = 48, 70
-F = G.Figur('zira-racer', (2, 2, 3, 2))
+F = G.Figur('zira-racer', (9, 9, 3, 2))
 spr = F.spr
 FELGE, GLANZ = (51, 47, 44), (74, 70, 67)
 felge = L.farbmaske(spr, [FELGE, GLANZ]) & (F.yy >= 29)
 glanz0 = L.farbmaske(spr, [GLANZ]) & (F.yy >= 29)
 CX, CY = 22.5, 32.5
+# Seitensätze: (Versatz in px, Haltedauer in Frames) — Summe der Halte = N; Frame 0 steht in der Mitte (Original).
+SATZ = [(0, 2), (-6, 2), (5, 2), (-7, 3), (7, 2), (-4, 2), (6, 3), (-7, 2), (3, 2), (-5, 2), (7, 3), (-6, 2), (6, 2), (-7, 3),
+        (4, 2), (-3, 2), (7, 2), (-6, 3), (5, 2), (-7, 2), (7, 3)]
+DX = [d for d, n in SATZ for _ in range(n)]
+assert len(DX) == N, len(DX)
 
 
 def rad(k, schritt):
@@ -52,7 +59,7 @@ def rad(k, schritt):
 def frame(i):
     k = F.ebene(F.da)
     rad(k, (i // 2) % 8)
-    return F.streck(k, 24, Hm.stufe(i, 12, 1))
+    return G.schieb(F.streck(k, 24, Hm.stufe(i, 12, 1)), DX[i])
 
 
 if __name__ == '__main__':

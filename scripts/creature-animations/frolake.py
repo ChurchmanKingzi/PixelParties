@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""Idle-Animation für „Frolake“ (Creature) — der knochige graue See-Drache mit der leuchtenden Angler-Laterne vor dem Maul, der an der Uferwand hängt (Schwanz im Wasser).
+"""Idle-Animation für „Frolake“ (Creature) — der knochige graue See-Drache mit der leuchtenden Angler-Laterne vor dem Maul, der über dem See FLIEGT (Runde 8: Flügelschlag + Auf- und Absteigen).
 
 Quelle: src/frolake.png (39×52 px, 20 Farben).
 PICK: [["Motive", 841, "Ausschnitt x 297–335 der Ebene „Frolake“ (die ganze Figur; links davon ist die Ebene leer)"]]
@@ -13,16 +13,22 @@ Was im Sprite ist (x, y):
 * KOPF (x 0–14, y 24–32): grauer Schädel, Blick nach links unten; Auge (3,27)/(6,27)/(3,28)/(6,28) dunkel (im Schädel, nicht eindeutig → bleibt fest, kein Blinzeln);
   weiße ZÄHNE (5,31), (7,31), (3,32) am Oberkiefer; UNTERKIEFER = beiger Span (6–9, 32–35) mit Zahn (6,34). Die weißen Pixel sind Zähne, keine Partikel.
 * RUMPF (x 11–29, y 17–36) mit beigen Flossenlappen (20–29, 29–33), SCHWANZ (y 36–51): Seitenflosse (20–30, 37–41), gegabelte Schwanzspitze (25–38, 42–51).
-Schwer und groß → langsam (72 Frames à 80 ms = 5,8 s).
+Schwer und groß → gemächlicher Schlag (72 Frames à 80 ms = 5,8 s; ein Flügelschlag = 12 Frames ≈ 1 s).
 
-Idee: Der Angler lauert – die Laterne wippt und pulsiert lockend, der Kiefer schnappt langsam zu, die Schwanzspitze pendelt im Wasser, die Flügel heben sich mit dem Atem.
+Idee: Der Angler FLIEGT lauernd auf der Stelle – der ganze Flügel schlägt um sein Gelenk am Rücken, der Körper steigt und sinkt im Takt, die Laterne wippt und pulsiert lockend,
+der Kiefer schnappt langsam zu, die Schwanzspitze pendelt.
 Ablauf (nahtlos):
+* FLÜGELSCHLAG (Periode 12, 6×): der GANZE Flügel (alles bis Zeile 17 und die Lappen-Unterkante in Zeile 18, x ≥ 26: Knochenarm, Streben, Flughaut) dreht sich als starre Einheit um das Gelenk am Körperansatz (20,5|18,5) –
+  fünf saubere Posen (−0,2 … +0,2 rad ≈ ±11,5°), gebaut als Doppel-Scherung (anim_r5_fluegel.scher_drehung: nur ganze Pixelversätze, Linien bleiben 1 px, kein Knick in der
+  Flügelmitte). Der Körper liegt vor dem Flügelansatz; die Pixel direkt am Gelenk bewegen sich nicht → keine Naht. Pose 0 = Original.
+* STEIGEN/SINKEN: der ganze Sprite hebt sich mit jedem Abschlag 1 px und sackt beim Aufschlag zurück (Periode 12, dem Flügel nachlaufend), überlagert von einem langsamen
+  Steigen und Sinken um ±2 px (Periode 72).
 * Laterne wippt (Periode 24, 3×): Leuchtkörper + vorderer Stiel (x ≤ 11) heben sich als starre Einheit 1 px, der Stielansatz (x 12–14) bleibt am Kopf. Die frei werdenden
   Pixel am Kopf werden mit dem Schädelumriss (61,62,64) fertiggezeichnet.
 * Laterne pulsiert (Periode 18, 4×): nur INNERHALB des Leuchtkörpers – Kern weiß → hautweiß, Hülle → gelb (eine Stufe dunkler auf der Rampe des Sprites) und zurück.
 * Kiefer (Frames 40–45 und 50–55): der Unterkiefer-Span (y 33–35) hebt sich als starres Teil 1 px (Maul schnappt zu), dann wieder auf.
 * Schwanz (Periode 36, 2×): die gegabelte Spitze pendelt – Zeilen 42–45 um ±1 px, Zeilen 46–51 um ±2 px (ganze Zeilen starr versetzt, Gefälle ≤ 1 px je Stufe).
-* Atmen (Periode 36, 2×): Zeile 16 (unter den Flügelstreben) wird einmal texturiert eingefügt (anim_textur) – der Flügelfächer hebt sich 1 px; Kopf, Laterne, Schwanz bleiben.
+(Das frühere „Atmen“ – eingefügte Zeile unter dem Flügelfächer – ist durch den Flügelschlag ersetzt.)
 Frame 0 = Original.
 """
 import math
@@ -34,11 +40,13 @@ import anim_humanoide as Hm
 import anim_lib as L
 import anim_n4 as N4
 import anim_n6 as N6
+import anim_n7 as N7
+import anim_r5_fluegel as R5
 import anim_textur as TX
 TX.umleiten()
 
 N, MS = 72, 80
-G = N4.Figur('frolake', 3, 5, 4, 3)
+G = N4.Figur('frolake', 9, 9, 10, 7)
 spr, H, W, OFF = G.spr, G.H, G.W, G.OFF
 f = G.f
 
@@ -74,11 +82,40 @@ def frame(i):
     Hm.zeilen_versatz(a, OFF, {**{y: int(round(1.2 * s)) for y in range(42, 46)}, **{y: int(round(2.2 * s)) for y in range(46, 52)}})
     unten = np.zeros((H, W), bool); unten[OFF[1] + 42:] = True
     a = G.schliessen(a, lambda x, y: UMRISS, unten)           # Stufen im Schwanz: helle Randpixel werden Umriss (Regel 16)
-    # Atmen: Flügelfächer hebt sich
-    if Hm.stufe(i, 36, 1, math.pi / 3) - Hm.stufe(0, 36, 1, math.pi / 3) > 0:
-        a = TX.streck_zeile(a, G.PT + 16, 1)
-    return a
+    # Flügelschlag: ganzer Flügel (bis Zeile 17) starr um das Gelenk, Körper davor
+    w = WINKEL[i % 12]
+    if w:
+        fl = np.where(FLUEGEL_M[..., None], a, 0).astype(np.uint8)
+        rumpf = np.where(FLUEGEL_M[..., None], 0, a).astype(np.uint8)
+        fl = R5.scher_drehung(fl, OFF[0] + 20.5, OFF[1] + 18.5, w)
+        a = L.zusammen(H, W, [(einzelne_weg(fl, rumpf), 0, 0), (rumpf, 0, 0)])
+    return L.versetze(a, 0, hub(i))
+
+
+WINKEL = [0, 0.1, 0.2, 0.2, 0.2, 0.1, 0, -0.1, -0.2, -0.2, -0.2, -0.1]      # + = aufgerichtet/zurück (Aufschlag), − = nach vorn-unten (Abschlag)
+FLUEGEL_M = np.zeros((H, W), bool); FLUEGEL_M[:OFF[1] + 18] = True
+FLUEGEL_M[OFF[1] + 18, OFF[0] + 26:] = True                                 # Unterkante des untersten Flughautlappens (Zeile 18, x ≥ 26) gehört zum Flügel
+
+
+def einzelne_weg(fl, rumpf):
+    """Pixel des gescherten Flügels ohne jeden 4er-Nachbarn (Abtastreste) entfernen."""
+    m = (fl[..., 3] > 0) | (rumpf[..., 3] > 0)
+    p = np.pad(m, 1)
+    n4 = p[:-2, 1:-1].astype(int) + p[2:, 1:-1] + p[1:-1, :-2] + p[1:-1, 2:]
+    out = fl.copy()
+    out[(fl[..., 3] > 0) & (n4 < 1)] = 0
+    return out
+
+
+def hub(i):
+    """Steigen/Sinken des ganzen Sprites (negativ = höher); Frame 0 → 0."""
+    schlag = [0, 0, 1, 1, 1, 0, 0, 0, -1, -1, -1, 0][(i - 2) % 12]         # läuft dem Flügel 2 Frames nach: Abschlag hebt, Aufschlag lässt sacken
+    return schlag + int(round(2 * math.sin(2 * math.pi * i / N)))
 
 
 if __name__ == '__main__':
-    N4.abschluss(G, 'Frolake', [frame(i) for i in range(N)], MS, sys.argv, scale=4)
+    roh = [frame(i) for i in range(N)]
+    frames, _ = N7.zuschneiden(roh, 2)
+    print(L.pruefe(frames, quelle=spr))
+    prev = sys.argv[sys.argv.index('--preview') + 1] if '--preview' in sys.argv else None
+    L.speichern('frolake', 'Frolake', frames, MS, prev)

@@ -95,6 +95,13 @@ P_HAND = L.leer(H, W)
 for (x, y) in HAND_PIX:
     P_HAND[PAD_T + y, PAD_L + x] = P_UHR[PAD_T + y, PAD_L + x]
     P_UHR_LEER[PAD_T + y, PAD_L + x, :3] = WEISS            # verdecktes Zifferblatt: weiß (Nachbarn links/rechts sind weiß)
+# Runde 8 (Nutzer: „Der Schatten des großen Zeigers überlagert teilweise den kleinen Zeiger“): Reihenfolge jetzt Zifferblatt → ALLE Zeigerschatten → beide Zeiger → Kappe.
+# Dazu der drehende Zeiger getrennt in Schatten-Ebene und rote Zeiger-Ebene; die roten Pixel des stehenden Stundenzeigers (x 29–34, y 30–31) werden nach dem gedrehten Schatten wieder obenauf gesetzt.
+P_HAND_SCHATTEN, P_HAND_ROT = L.leer(H, W), L.leer(H, W)
+for (x, y) in HAND_PIX:
+    (P_HAND_SCHATTEN if tuple(int(v) for v in spr[y, x, :3]) == SCHATTEN else P_HAND_ROT)[PAD_T + y, PAD_L + x] = P_UHR[PAD_T + y, PAD_L + x]
+STUNDE_ROT = [(x, y) for y in (30, 31) for x in range(27, 35) if tuple(int(v) for v in spr[y, x, :3]) in (ROT_H, ROT_D)]
+assert len(STUNDE_ROT) >= 8, STUNDE_ROT
 KAPPE = [(35, 30), (36, 30), (35, 31), (36, 31)]
 ZX, ZY = PAD_L + 35.5, PAD_T + 30.5                          # Drehpunkt = Mitte der Kappe
 
@@ -178,8 +185,10 @@ def frame(i, partikel=True, effekte=True):
 
     # Uhrzeiger: Minutenzeiger springt alle 2 Frames um 15° weiter (eine Runde pro Schleife)
     winkel = math.radians(15.0 * (i // 2))
-    hand = F.drehen(P_HAND, ZX, ZY, winkel)
-    uhr = L.zusammen(H, W, [(uhr, 0, 0), (hand, 0, 0)])
+    uhr = L.zusammen(H, W, [(uhr, 0, 0), (F.drehen(P_HAND_SCHATTEN, ZX, ZY, winkel), 0, 0)])      # erst der Schatten des drehenden Zeigers …
+    for (x, y) in STUNDE_ROT:                                  # … dann der Stundenzeiger darüber …
+        uhr[PAD_T + y, PAD_L + x] = P_UHR[PAD_T + y, PAD_L + x]
+    uhr = L.zusammen(H, W, [(uhr, 0, 0), (F.drehen(P_HAND_ROT, ZX, ZY, winkel), 0, 0)])           # … und der drehende Zeiger zuoberst
     for (x, y) in KAPPE:                                       # Kappe liegt über den Zeigern
         uhr[PAD_T + y, PAD_L + x] = P_UHR[PAD_T + y, PAD_L + x]
 

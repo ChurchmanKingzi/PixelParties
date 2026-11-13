@@ -9,6 +9,7 @@ Baut auf anim_lib auf, ändert es nicht. Alles Pixelart: nur ganze Pixel, kein A
                                                # jede Spalte bleibt, wie sie ist (nichts wird gestreckt, kein Umriss wird dicker)
     scher_zeilen(a, pivot_y, spitze, seite)    # dasselbe für hängende/aufragende Teile (Zeilen wandern waagerecht)
     pose(i, per, stufen, ph)               # gehaltene Posen statt Sinus-Gummi: Sinus auf ganze Stufen gerastet
+    spalten_pose(a, ziel, anteil)          # handgesetzte Pose: je Spalte ein fester senkrechter Versatz (Kiefer auf/zu)
     zuschneiden(frames, rand)              # alle Frames gemeinsam auf die Figur zuschneiden (Randabstand `rand`)
     loecher(frame, erlaubt)                # Testhilfe: von außen nicht erreichbare transparente Pixel (Lücken in der Figur)
 """
@@ -136,6 +137,23 @@ def scher_zeilen(a, pivot_y, spitze, seite=1, potenz=1.0, ende=None):
         if xs.min() + dx < 0 or xs.max() + dx >= w:
             raise L.ClipError(f'Zeile {y} würde um {dx} px aus der Leinwand geschoben')
         out[y, xs + dx] = a[y, xs]
+    return out
+
+
+def spalten_pose(a, ziel, anteil=1.0):
+    """Handgesetzte Kieferpose: `ziel` = {Leinwand-x: dy bei voller Pose}; jede genannte Spalte wandert starr um round(anteil · dy) (halbe Werte weg von 0),
+    alle anderen bleiben stehen. Nichts wird gestreckt."""
+    out = L.leer(*a.shape[:2])
+    h = a.shape[0]
+    for x in range(a.shape[1]):
+        ys = np.nonzero(a[:, x, 3])[0]
+        if not len(ys):
+            continue
+        v = anteil * ziel.get(x, 0)
+        dy = int(math.copysign(math.floor(abs(v) + 0.5), v))
+        if ys.min() + dy < 0 or ys.max() + dy >= h:
+            raise L.ClipError(f'Spalte {x} würde um {dy} px aus der Leinwand geschoben')
+        out[ys + dy, x] = a[ys, x]
     return out
 
 

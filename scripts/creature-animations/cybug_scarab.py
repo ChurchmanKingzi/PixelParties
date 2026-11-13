@@ -19,6 +19,8 @@ Ablauf (64 Frames à 65 ms ≈ 4,2 s):
 * Hinterbeine baumeln (untere Zeilen ±1 px), Augen glühen kurz auf (nur Augenpixel).
 * Ankh schwebt für sich (±1 px, langsamer, gegenläufig); kurzes Funkeln am Gold: die fünf Sterne der Quelle blitzen einzeln auf
   (Punkt → kleines Kreuz → Stern der Quelle → zurück, 6 Frames, lange Pausen).
+RUNDE 8 (Nutzer: „Sollte sich mehr auf- und abbewegen“): der Schwebe-Hub ist jetzt ±3 px (6 px Weg statt 1 px, Sinus, zwei Hübe je Schleife, höchstens 1 px je Frame);
+Käfer, Feuerstrahlen und Ankh gehen gemeinsam, das Ankh behält dazu sein eigenes langsames ±1 px. Sterne bleiben am Ankh (gehen mit).
 Frame 0 = Original ohne Sterne (das Feuer ist von Frame 0 an der animierte Zyklus). Starr: Zangenarme, Flügeldecken. Nur ganze Pixel, nur Quellfarben.
 """
 import sys
@@ -31,14 +33,15 @@ import anim_n3 as G
 import anim_feuer3 as F3
 
 N, MS = 64, 65
+HUB = 3                                  # Runde 8: Schwebe-Hub ±3 px (vorher 0…1 px)
 spr = L.lade('cybug-scarab')
 koerper = L.lade('cybug-scarab-koerper')
 ankh = L.lade('cybug-scarab-ankh')
 funkeln = L.lade('cybug-scarab-funkeln')
 QUELLE = np.concatenate([spr, koerper, ankh, funkeln, L.lade('cybug-scarab-feuer')], axis=0)
-B = G.Buehne(spr, 5, 5, 4, 12)
-BK = G.Buehne(koerper, 5, 5, 4, 12)
-BA = G.Buehne(ankh, 5, 5, 4, 12)
+B = G.Buehne(spr, 5, 5, 7, 16)
+BK = G.Buehne(koerper, 5, 5, 7, 16)
+BA = G.Buehne(ankh, 5, 5, 7, 16)
 H, W = B.H, B.W
 xx, yy = B.xx, B.yy
 RAND = G.rand_farben(koerper)
@@ -67,7 +70,7 @@ STERNE.sort(key=lambda s: (s[1], s[0]))
 START = [3, 17, 29, 42, 54]
 
 
-def sterne(i, a):
+def sterne(i, a, dy=0):
     for k, (cx, cy, pts) in enumerate(STERNE[:len(START)]):
         t = i - START[k]
         if not 0 <= t < 6:
@@ -75,12 +78,12 @@ def sterne(i, a):
         stufe = [0, 1, 2, 2, 1, 0][t]
         form = [(cx, cy)] if stufe == 0 else ([(cx, cy), (cx - 1, cy), (cx + 1, cy), (cx, cy - 1), (cx, cy + 1)] if stufe == 1 else pts + [(cx, cy)])
         for (x, y) in form:
-            a[B.pt + y, B.pl + x] = WEISS + (255,)
+            a[B.pt + y + dy, B.pl + x] = WEISS + (255,)
     return a
 
 
 def bild(i, fx=True):
-    bob = int(round(0.5 - 0.5 * np.cos(2 * np.pi * i / (N / 2)) - 1e-9))      # 0 → 1 px tiefer → 0 (weich, zwei Hübe)
+    bob = int(round(HUB * np.sin(2 * np.pi * i / (N / 2))))                   # Runde 8: 0 → 3 px tiefer → 0 → 3 px höher → 0 (weich, zwei Hübe je Schleife)
     ab = -int(round(0.5 - 0.5 * np.cos(2 * np.pi * (i - 10) / N))) + int(round(0.5 - 0.5 * np.cos(2 * np.pi * (-10) / N)))
     r = BK.teil(rumpf)
     if i % 32 in (12, 13, 14, 15):
@@ -88,9 +91,9 @@ def bild(i, fx=True):
     bn = G.stufen_zeilen(BK.teil(beine), [B.pt + 42], G.pose(i, N / 2, 1, scharf=1.3))
     kaefer = G.umriss_flicken(L.zusammen(H, W, [(bn, 0, 0), (r, 0, 0)]), RAND, UMRISS)
     ebenen = [(FEUER.ebene(i), 0, bob)] if fx else []
-    ebenen += [(kaefer, 0, bob), (BA.teil(BA.da), 0, ab)]
+    ebenen += [(kaefer, 0, bob), (BA.teil(BA.da), 0, bob + ab)]
     f = L.zusammen(H, W, ebenen)
-    return sterne(i, f) if fx else f
+    return sterne(i, f, bob + ab) if fx else f
 
 
 def frame(i):
