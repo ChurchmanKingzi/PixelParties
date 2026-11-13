@@ -38,7 +38,6 @@ import sys
 import numpy as np
 
 import anim_lib as L
-import anim_textur as TX   # texturierte Streckzeilen statt Zeilenkopien (Regel 43)
 import anim_amorph as A
 import anim_hupf as Hu
 

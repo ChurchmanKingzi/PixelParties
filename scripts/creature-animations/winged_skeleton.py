@@ -52,7 +52,6 @@ import sys
 import numpy as np
 
 import anim_lib as L
-import anim_textur as TX   # texturierte Streckzeilen statt Zeilenkopien (Regel 43)
 import anim_flieger as F
 import anim_flieger_b as B
 
@@ -153,8 +152,8 @@ def atem_stufe(i):
 def dehne(a, n):
     """Rippenkorb atmet: n = 1 → Zeile 13 doppelt; n = 2 → zusätzlich Zeile 14 doppelt (alles darüber hebt sich, Füße bleiben)."""
     if n >= 1:
-        a = TX.streck_zeile(a, PAD_T + 14, 1) if n >= 2 else a
-        a = TX.streck_zeile(a, PAD_T + (12 if n >= 2 else 13), 1)
+        a = L.streck_zeile(a, PAD_T + 14, 1) if n >= 2 else a
+        a = L.streck_zeile(a, PAD_T + (12 if n >= 2 else 13), 1)
     return a
 
 
@@ -180,7 +179,7 @@ def koerper_ebene(n, dy_u, dy_f):
     oben = full.copy(); oben[cut:] = 0
     beine = full.copy(); beine[:cut] = 0
     if dy_f - dy_u > 0:
-        beine = TX.streck_zeile(beine, cut + 1, dy_f - dy_u)
+        beine = L.streck_zeile(beine, cut + 1, dy_f - dy_u)
     return L.zusammen(H, W, [(oben, 0, dy_u), (beine, 0, dy_f)])
 
 

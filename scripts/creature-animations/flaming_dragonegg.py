@@ -21,6 +21,10 @@ Ablauf (72 Frames à 75 ms = 5,4 s, nahtlos):
 * Wie bisher HELL: das Schuppenraster dieses Eis ist selbst schon dunkelbraun (A) und kleinteilig — ein dunkler Riss ginge darin unter. Deshalb ist es das Glühen aus dem Inneren: die ersten Pixel Cremeweiß C, das letzte Gelb B
   (auslaufende Spitze); sie liegen auf dunkelbraunen Fugenpixeln (A) mindestens 2 Pixel vom Rand entfernt. Sie liegen dort, wo das Umfeld besonders dunkel ist (dichte dunkle Fugenhaufen), damit das helle Glühen lesbar bleibt. Die Risse ersetzen nur dunkle Fugenpixel durch helle (nie umgekehrt) — kein Umriss wird dadurch dicker,
   der Außenrand (Silhouette, 2 Pixel breit) bleibt unberührt.
+Nutzerwunsch (Runde 4): „Bei den ganzen Eiern sollten die Risse verschwinden, indem sie ausbleichen, statt indem sie sich einfach zurückbilden. Und die Risse sollten größer, auch dicker, werden können.“
+→ STAND RUNDE 4 (ersetzt die Rissbeschreibung oben): 11 Glutrisse, Hauptast 4–14 Pixel, die größeren mit 1–2 Seitenästen (2–4 Pixel) und 1–4 Stellen, an denen der Riss 2 px dick ist; weiter hell (Cremeweiß C, Astenden Gelb B),
+  jetzt auf Fugen (A) UND roten Schuppenrändern (E). Sie wachsen Pixel für Pixel, stehen 4–8 Frames in voller Form und BLEICHEN dann AUS (= die Glut kühlt ab): alle Pixel bleiben stehen, die Farbe geht in 4 Stufen à 3 Frames
+  über Gelb → Orange → Rot zur Farbe darunter, letzte Stufe Schachbrett-Dither (kein Alpha, kein Schrumpfen; nur Farben des Sprites).
 Ergänzungen: keine. Nur ganze Pixel, nur Quellfarben, kein Alpha.
 Frame: Sprite plus 3 px Rand rundum — Figur zentriert.
 """

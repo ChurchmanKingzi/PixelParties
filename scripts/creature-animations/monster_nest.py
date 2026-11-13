@@ -24,6 +24,10 @@ Ablauf (60 Frames à 75 ms = 4,5 s, nahtlos):
   verteilt, sodass auf jedem Ei immer wieder ZWEI (zeitweise drei) Risse gleichzeitig sichtbar sind; im ganzen Haufen meist 4–7. Frame 0 und die ersten Frames sind rissfrei (= Original).
 * Umrisse werden NIE dicker: jedes Rissspixel liegt mit allen vier Nachbarn (oben/unten/links/rechts) auf Schalenpixeln (B/C bzw. grauer Schatten F) — nie neben einem schwarzen Umriss, nie neben der roten Raute und
   mindestens 2 Pixel von der Silhouette; ein Riss berührt höchstens über die Ecke (nie über die Kante) eine Linie, und zwei Risse berühren sich nie (das Skript prüft alles).
+Nutzerwunsch (Runde 4): „Bei den ganzen Eiern sollten die Risse verschwinden, indem sie ausbleichen, statt indem sie sich einfach zurückbilden. Und die Risse sollten größer, auch dicker, werden können.“
+→ STAND RUNDE 4 (ersetzt die Rissbeschreibung oben): 11 Rissstellen (2–3 je Ei), 3–8 Pixel lang, an 1–3 Stellen 2 px dick; die kleinen kommen zweimal je Schleife (17 Risse). Ein Riss wächst Pixel für Pixel, steht 3–6 Frames
+  in voller Form und BLEICHT dann AUS: alle Pixel bleiben stehen, die Farbe geht in 4 Stufen à 2 Frames von Schwarz über Grau zur Schalenfarbe darunter, letzte Stufe Schachbrett-Dither (kein Alpha, kein Schrumpfen).
+  Zwischentöne: Schattengrau F des Sprites plus vier Grautöne der Spielpalette (#323232, #535353, #a8a8a8, #b9b9b9; in L.pruefe freigegeben). Abstand zu Umriss/Raute wie bisher (alle 4 Nachbarn jedes Risspixels sind Schale).
 Ergänzungen: keine. Nur ganze Pixel, nur Quellfarben (Risse = Umrissschwarz A des Sprites), kein Alpha.
 Frame: Sprite plus 3 px Rand rundum — Figur zentriert.
 """

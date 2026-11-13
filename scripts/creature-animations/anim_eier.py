@@ -8,6 +8,9 @@ nie mehr als ein paar gleichzeitig; Frame 0 ist immer rissfrei (= Original).
 
     risse = [Riss([(x, y), (x2, y2)], start=3), …]
     ebene = risse_ebene(h, w, i, n, risse, farbe, dx, dy)     # Ebene mit den Rissen von Frame i (dx, dy = Versatz des Sprites im Frame)
+
+Seit Runde 4 benutzen alle Eier BleichRiss/bleich_risse (unten): größere, verzweigte, stellenweise 2 px dicke Risse, die in Stufen ausbleichen statt zu schrumpfen.
+Riss/risse_ebene/profil (schrumpfende Risse) bleiben nur als alte Bausteine stehen.
 """
 import numpy as np
 

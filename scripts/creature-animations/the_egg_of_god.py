@@ -24,6 +24,11 @@ Ablauf (48 Frames à 65 ms = 3,12 s, nahtlos):
 * Goldschimmer (Regel 12a, Gold; bleibt aus der ersten Fassung, das Ei selbst bewegt sich nicht): zweimal pro Schleife (Frames 2–16 und 26–40) läuft ein breites diagonales Lichtband (x+y, 7 px breit) über das Ei (eine Stufe heller auf der Gold-Rampe C→B→A→H→I, nur Innenpixel).
 * Sparkles (Regel 34, Gold): fünf kurze Sparkles je Schleife (4 Frames: Mitte → kleines Kreuz → großes Kreuz → kleines Kreuz, dann weg), immer nur eines zur Zeit, mit Pausen (≥ 4 Frames) dazwischen; drei sitzen auf dem Ei
   (ganz im Inneren), zwei in den freien oberen Ecken außerhalb des Eis (Farben G, K, J des Sprites; die Eck-Sparkles berühren das Ei nie — das Skript prüft es in jedem Frame). Schalter `GLANZ = False` lässt Band und Sparkles weg.
+Nutzerwunsch (Runde 4): „Bei den ganzen Eiern sollten die Risse verschwinden, indem sie ausbleichen, statt indem sie sich einfach zurückbilden. Und die Risse sollten größer, auch dicker, werden können.“
+→ STAND RUNDE 4 (ersetzt die Rissbeschreibung oben; Lichtband und Sparkles unverändert): 4 Rissstellen (5 Risse je Schleife, der kleine zweimal): Hauptast 3–7 Pixel, zwei mit Seitenast (2–3 Pixel), drei mit 2–3 Pixeln,
+  an denen der Riss 2 px dick ist; sie dürfen jetzt auch das feste Lichtband des Eis kreuzen. Sie wachsen Pixel für Pixel, stehen 3–6 Frames in voller Form und BLEICHEN dann AUS: alle Pixel bleiben stehen, die Farbe geht
+  in 4 Stufen à 2 Frames entlang der Gold-Rampe des Sprites (D → E → C → B → A → …) zur Farbe darunter, letzte Stufe Schachbrett-Dither (kein Alpha, kein Schrumpfen). Mindestens 3 Pixel vom Rand; ein Riss läuft nie,
+  während an seiner Stelle ein Sparkle sitzt (die Startframes weichen aus, das Skript prüft es).
 Ergänzungen: keine (der Rand wird nie verändert).
 Frame: Sprite plus 4 px links/rechts, 5 px oben/unten (Eck-Sterne) — Figur zentriert.
 Nur ganze Pixel, nur Farben der Quelle.
