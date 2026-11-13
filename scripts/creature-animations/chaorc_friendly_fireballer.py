@@ -25,6 +25,9 @@ Ablauf (48 Frames à 62 ms = 2,98 s, nahtlos):
 Randpixel-Test (Regel 16): die Chaorc-Kontur bleibt in jeder Pose Umrissfarbe (Hm.kontur_schliessen); Feuerränder sind immer Rot (202,44,41) (Außenhaut der Quelle).
 Alle Bewegungen laufen auf der vollen Leinwand (anim_lib wirft ClipError). Nur ganze Pixel, nur Farben der Quelle.
 Ergänzungen: Ohrspitze (−1,7), (0,6), (0,8) in (26,0,0) (siehe oben), sonst keine; das Feuer wird neu gezeichnet.
+
+RUNDE 6 (Nutzer: „der Feuerball sollte etwas mehr herumfliegen, auch nach links und rechts, aber ihn nie berühren“): statt ±1 px Schweben fliegt der Ball eine liegende Acht (6 px waagerecht, 4 px senkrecht, 1 Umlauf je
+Schleife, siehe bahn()); der Schweif neigt sich mit der senkrechten Flugrichtung; Abstand Feuer (inkl. Fetzen) ↔ Chaorc in jedem Frame ≥ 2 px (assert).
 """
 import sys
 
@@ -69,6 +72,36 @@ BALL = [_F(36.0, 7.0, 15, 7.2, richtung=(-1, 0.18), fuss=6.6, phase=0.0, bauch=0
 FEUER = F3.Feuer(H, W, BALL, [ROT, ORANGE, GELB, HELL], posen=16, halten=1)
 
 
+# --- Runde 6 (Nutzer: „der Feuerball sollte etwas mehr herumfliegen, auch gerne nach links und rechts (aber ihn natürlich nie berühren)“) ---
+# Der Ball fliegt eine liegende Acht (1 Umlauf je Schleife, ganzzahlige Schritte ≤ 1 px je Frame): x = BAHN_X0 + BAHN_AX·sin(φ), y = BAHN_AY·sin(2φ) → 6 px Weg waagerecht, 4 px senkrecht.
+# Die Bahnmitte liegt BAHN_X0 px rechts der gemalten Lage, damit auch am linken Umkehrpunkt samt abgerissenen Schweiffetzen immer ≥ ABSTAND leere Pixel zwischen Feuer und Chaorc bleiben (assert je Frame in frame_gross).
+# Der Schweif folgt der Flugrichtung: steigt der Ball, hängen die Schweifspitzen nach unten durch, sinkt er, wehen sie nach oben (Parameter `neigung` des Feuermoduls, in Stufen von 0,5 px, bis ±BAHN_NEIG px an der Spitze).
+BAHN_AX, BAHN_AY, BAHN_X0, BAHN_NEIG, ABSTAND = 3, 2, 4, 1.5, 2
+
+
+def bahn(i):
+    ph = 2 * np.pi * i / N
+    dx = BAHN_X0 + int(round(BAHN_AX * np.sin(ph)))
+    dy = int(round(BAHN_AY * np.sin(2 * ph)))
+    vy = np.cos(2 * ph)                                                          # senkrechte Geschwindigkeit (−1 … 1; > 0 = sinkt)
+    return dx, dy, round(2 * BAHN_NEIG * vy) / 2.0                               # Schweifspitze: positiv = nach oben (Ball sinkt), negativ = nach unten (Ball steigt)
+
+
+def ball_ebene(i):
+    dx, dy, neig = bahn(i)
+    return FEUER.ebene(i, dx=dx, dy=dy, neigung=neig)
+
+
+def _dick(m, r):
+    """Maske um r Pixel in alle acht Richtungen erweitern (Abstandsprüfung)."""
+    p = np.pad(m, r)
+    out = np.zeros_like(m)
+    for ddy in range(2 * r + 1):
+        for ddx in range(2 * r + 1):
+            out |= p[ddy:ddy + m.shape[0], ddx:ddx + m.shape[1]]
+    return out
+
+
 def teil(maske):
     t, _ = L.trenne(spr, maske)
     return L.platz(t, H, W, GP, GP)
@@ -86,8 +119,10 @@ def frame_gross(i, nur=None):
     c = Hm.kontur_schliessen(c, ERLAUBT, UMRISS)
     if nur == 'koerper':
         return c
-    dy = int(round(1.0 * np.sin(2 * np.pi * i / N)))
-    ball = FEUER.ebene(i, dy=dy)
+    ball = ball_ebene(i)
+    if nur == 'ball':
+        return ball
+    assert not (ball[..., 3] > 0)[_dick(c[..., 3] > 0, ABSTAND)].any(), f'Frame {i}: Feuerball (inkl. Fetzen) näher als {ABSTAND} px am Chaorc'
     return L.zusammen(H, W, [(ball, 0, 0), (c, 0, 0)])
 
 

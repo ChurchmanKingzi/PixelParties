@@ -62,9 +62,13 @@ HAAR_UMRISS, KOERPER_UMRISS = f(2, 5), f(3, 18)                     # (91,57,0) 
 SCHWARZ, HAUT, HAARBRAUN = f(5, 7), f(9, 8), f(4, 7)                # (0,0,0), (247,188,151), (117,74,4)
 CYAN, TUERKIS, WEISS = f(5, 8), f(6, 9), f(5, 9)                    # (0,252,253), (13,206,179), (248,254,255)
 # Augenzustände (Spritekoordinaten). OFFEN = beide Augen offen (Pixel der Ebene 185), ZU = beide Augen zu (Muster des Zwinkerauges auf das offene Auge gespiegelt)
-OFFEN = {(6, 7): HAARBRAUN, (9, 7): HAARBRAUN, (4, 8): HAARBRAUN, (6, 8): SCHWARZ, (9, 8): SCHWARZ, (10, 8): CYAN,
-         (4, 9): HAUT, (9, 9): TUERKIS, (10, 9): WEISS, (11, 9): HAUT}
-ZU = {(5, 8): HAUT, (6, 8): HAUT, (5, 9): SCHWARZ, (6, 9): SCHWARZ, (4, 8): HAARBRAUN}
+# Runde 6 (Nutzer: „zwischen den einzelnen Frames ändern sich Haar-Pixel“): Frame-Diff ergab genau drei flackernde Pixel der Haarsträhnen am Gesichtsrand, alle durch die Augenzustände verursacht:
+# (4,9) und (11,9) wechselten zwischen Haarbraun (Original) und Haut (Ebene 185), (4,8) zwischen Schwarz (Zwinkerpose) und Haarbraun. Jetzt bleiben alle drei in JEDEM Frame Haarbraun (HAAR_FEST, wie ihr
+# Gegenstück (11,8)); die Augenzustände ändern nur noch Pixel der Augen selbst (x 5–6 und 9–10, y 7–9). Einzige Abweichung vom Original: (4,8) ist auch in der Zwinkerpose Haarbraun statt Schwarz.
+HAAR_FEST = {(4, 8): HAARBRAUN, (4, 9): HAARBRAUN, (11, 9): HAARBRAUN}
+OFFEN = {(6, 7): HAARBRAUN, (9, 7): HAARBRAUN, (6, 8): SCHWARZ, (9, 8): SCHWARZ, (10, 8): CYAN,
+         (9, 9): TUERKIS, (10, 9): WEISS}
+ZU = {(5, 8): HAUT, (6, 8): HAUT, (5, 9): SCHWARZ, (6, 9): SCHWARZ}
 
 haar_l = vorhanden & (((xx <= 3) & (yy >= 5) & (yy <= 12)) | ((xx <= 2) & (yy >= 13) & (yy <= 14)))
 haar_r = vorhanden & (((xx >= 12) & (yy >= 5) & (yy <= 12)) | ((xx >= 13) & (yy >= 13) & (yy <= 14)))
@@ -95,6 +99,7 @@ def frame(i):
     # --- Augen: zugekniffenes Auge geht auf (Frames 8–13, 40–44), Blinzeln (Frames 29–31) ---
     # Nutzer-Feedback: Rosie soll nicht böse gucken → Ruhezustand = beide Augen offen (freundlich); nur kurz zwinkert sie
     # (Frames 8–13, 40–44: das zugekniffene Auge der Karte), Blinzeln in den Frames 29–31
+    Hm.setze(k, HAAR_FEST, OFF)
     if Hm.folge(i, 29, [1] * 3, N):
         Hm.setze(k, ZU, OFF)
     elif not (Hm.folge(i, 8, [1] * 6, N) or Hm.folge(i, 40, [1] * 5, N)):

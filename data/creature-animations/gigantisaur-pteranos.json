@@ -1,15 +1,15 @@
 {
   "creature": "Gigantisaur Pteranos",
   "sheet": "gigantisaur-pteranos.png",
-  "frameWidth": 94,
-  "frameHeight": 60,
-  "frames": 48,
-  "frameMs": 60,
+  "frameWidth": 81,
+  "frameHeight": 56,
+  "frames": 64,
+  "frameMs": 80,
   "loop": true,
   "layout": "horizontal",
   "padTop": 2,
   "padLeft": 2,
   "padRight": 2,
   "padBottom": 2,
-  "faceX": 47.0
+  "faceX": 40.5
 }

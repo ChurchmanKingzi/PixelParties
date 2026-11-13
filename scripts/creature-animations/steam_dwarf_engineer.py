@@ -42,6 +42,9 @@ am Maul blitzt in der Pause (Frames 19–22). Leinwand rechts 2 px breiter (waag
 RUNDE 5 (Nutzer: „es bewegt sich jetzt nur der Schraubenschlüssel, ohne dass sich die Hand/der Arm bewegen würde“): der ausgestreckte Unterarm (goldener Balken x 14–20, y 19–22) senkt sich jetzt bei jedem Zug mit
 (Pose M: Hand 1 px, Pose D: Hand 2 px tiefer; starrer Spaltenversatz um den Ellbogen, siehe arm_senken), der Schlüssel sitzt starr in der Hand und dreht zusätzlich aus dem Handgelenk. Ergänzt: unter dem Bart
 freigelegte Pixel (16–18,19) in Bartschatten (156,156,156), (19,19)/(19,20) in Bartkante (106,106,106). Atmen jetzt über anim_textur (Regel 49).
+
+RUNDE 6 (Nutzer: „blinzelt aktuell mit seinem Monokel; schwingt den Schraubenschlüssel etwas zu viel“): das Blinzeln ist ENTFERNT (das einzige sichtbare Auge ist das Monokel); die Schraubbewegung ist kleiner und
+seltener: je Halbschleife ein Zug Original → Zwischenpose (≈ 22°, Hand 1 px tiefer, 4 Frames) → Original, dazwischen 20 Frames Pause; die waagerechte Pose wird nicht mehr benutzt.
 """
 import math
 import sys
@@ -145,8 +148,9 @@ def _schl(pose):
 SCHL_EBENE = {p: _schl(p) for p in SCHL_POSEN}
 _schl0, REST = L.trenne(spr, m_schluessel)
 assert (SCHL_EBENE['O'] == L.platz(_schl0, H, W, PAD_L, PAD_T)).all(), 'Pose O muss der Originalschlüssel sein'
-_ZUG = ['O', 'M', 'D', 'D', 'M', 'O']
-SCHL_FOLGE = (_ZUG * 3 + ['O'] * 6) * 2                                          # 48 Frames
+# Runde 6 (Nutzer: „schwingt den Schraubenschlüssel etwas zu viel“): nur noch ein kleiner Zug je Halbschleife (Original → Zwischenpose ≈ 22° → Original, Hand 1 px tiefer), dazwischen 20 Frames Pause;
+# die waagerechte Pose D wird nicht mehr angefahren.
+SCHL_FOLGE = (['O'] * 10 + ['M'] * 4 + ['O'] * 10) * 2                           # 48 Frames
 assert len(SCHL_FOLGE) == N
 
 
@@ -192,9 +196,7 @@ def frame(i, dampf=True, nur=None):
         Hm.lichtband(sc, sc[..., 3] > 0, (0, 0), i, N, start, 8, GRAU, stufen=1, breite=3.0, achse=(1.0, 1.0), kern=2)
     for start in (20, 30):
         Hm.lichtband(k, m_platte_glanz, OFF, i, N, start, 6, GRAU, stufen=1, breite=2.4, achse=(1.0, 1.0), kern=2)
-    # --- Blinzeln: das eine Auge schließt sich (Lid = Hautfarbe) ---
-    if Hm.folge(i, 20, [1, 1, 1], N) or Hm.folge(i, 41, [1, 1, 1], N):
-        Hm.setze(k, {(16, 14): HAUT, (17, 14): HAUT}, OFF)
+    # --- Runde 6: KEIN Blinzeln mehr. Das einzige sichtbare Auge (16–17,14) ist das MONOKEL (grau/weißes Glas) — ein Monokel blinzelt nicht (Regel 21); ein zweites Auge ist nicht sichtbar. ---
     # --- Rohrzittern (je Rohr eigener Takt) ---
     for name, (zeilen, (x0, x1), per, ph) in ROHR.items():
         a = rohr_stufe(i, name)

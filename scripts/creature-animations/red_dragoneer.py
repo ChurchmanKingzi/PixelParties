@@ -4,6 +4,10 @@
 PICK: [["MotiveMoe", 6, 1]]   (Ebene „Red Dragoneer“, Figur 1 — einzige Ebene, in der Kartenkunst pixelgenau wiedergefunden; auf Nachbarebenen liegt nichts von der Figur)
 Quelle: src/red-dragoneer.png — roter Drache von vorn (32×27 px, 18 Farben) aus MotiveMoe.xcf. Die Karte zeigt ihn schwebend vor rotem Himmel (kein Boden).
 
+RUNDE 6 (Nutzer: „Die gespreizten Flügel sind viel zu dünn / es entstehen zu große Lücken zum Körper“): Die starre Drehung aus Runde 5 ist ersetzt durch fünf handgezeichnete Schlüsselposen
+(POSEN_TXT: U2, U1, O = Original, D1, D2; Folge FOLGE). Die Flughaut bleibt in jeder Pose volle Fläche und an Kopfseite/Schulter angewachsen; beim Spreizen wird sie breiter. Die Abschnitte RUNDE 3–5 und „Ablauf“
+beschreiben beim Flügelschlag frühere Stände. Der Frame wird am Ende auf die Figur zugeschnitten (Vereinigung aller Frames + 2 px).
+
 RUNDE 5 (Nutzer: „Schlägt jetzt nur mit der oberen Hälfte der Flügel statt mit den ganzen“): Der GANZE Flügel (Arm-Streifen x 7–10 bis zur Schulter, Flügelhand, Flughaut, heller Knauf) schlägt als starre Einheit um das
 Schultergelenk (9,5 | 12,5), +20° … −22° (siehe WINKEL); die handgezeichneten Posen aus Runde 4 (unterer Streifen blieb stehen) sind ersetzt. Ergänzt: Kopfumriss (11,5)/(20,5) unter dem Knauf. Atmen über anim_textur.
 
@@ -54,7 +58,7 @@ import anim_r5_fluegel as R5
 import anim_textur as TX
 
 N, MS = 48, 70
-PAD_L, PAD_R, PAD_T, PAD_B = 10, 10, 9, 3
+PAD_L, PAD_R, PAD_T, PAD_B = 10, 10, 13, 3
 BEAT, DOWN, UP = 12, 4, 8                            # Flügelschlag (4 pro Schleife)
 P0 = DOWN + 0.62 * UP                              # Frame 0 = Aufschlag bei 38 % des Hubs (Originalpose)
 
@@ -101,32 +105,110 @@ def welle(t):
     return 0.5 + 0.5 * math.cos(math.pi * (u - DOWN) / UP)
 
 
-# ── RUNDE 5 (Nutzer: „schlägt jetzt nur mit der oberen Hälfte der Flügel statt mit den ganzen“) ──────────────────────────────────────────────────────────────
-# Anatomie (linker Flügel; der rechte ist das Spiegelbild): Der Flügelarm steigt von der Schulter (8–9, 12) als schmaler Streifen (x 7–10, y 5–11, orange Flughaut außen) nach oben; am Handgelenk (8, 5) knickt die
-# Flügelhand nach außen oben zur Spitze (0, 0) ab, nach innen zeigt der helle Daumen/Knauf (11–13, 3–5). Das GANZE (Arm + Hand + Flughaut bis zum unteren Ende + heller Knauf) schlägt als starre Einheit um das
-# Schultergelenk GELENK = (9,5 | 12,5); nichts bleibt stehen. Je Winkel wird der Flügel neu aufgebaut (anim_r5_fluegel.starr_gedreht: glatte Fläche, Innenfarben der Quelle) und sein Umriss neu gezogen (immer 1 px);
-# er liegt hinter Kopf/Körper (beim Aufschlag verschwindet der Knauf hinter dem Kopf, beim Abschlag löst er sich vom Kopf). Frame 0 = Originalpixel.
-GELENK = (9.5, 12.5)
 UMRISS_FL = (49, 24, 0)
-#          Winkel in Grad (+ = Spitze hebt sich); 12 Frames je Schlag: Abschlag Frames 3→7 (schnell), Aufschlag 7→3
-WINKEL = [None, 10, 17, 20, 10, -6, -18, -22, -21, -16, -10, -5]
-assert len(WINKEL) == BEAT
 ERG = [(11, 5), (20, 5)]                                       # Ergänzung: Kopfumriss unter dem Flügelknauf (verbindet Ohrspitze (11,6) und Stirnkante (12,5) über eine Kante, sobald der Flügel wegschwingt)
+
+# ── RUNDE 6 (Nutzer: „Die gespreizten Flügel sind viel zu dünn / es entstehen zu große Lücken zum Körper“) ──────────────────────────────────────────────────
+# Die starre Drehung aus Runde 5 ist ersetzt: fünf von Hand gezeichnete Schlüsselposen des linken Flügels (der rechte ist das Spiegelbild). Der Flügelarm setzt am hellen Knauf (11–13, 3–4) an der Kopfecke an,
+# die Flughaut ist zwischen Arm und Körper aufgespannt und bleibt in JEDER Pose an der Kopfseite (Spalte x = 9 neben dem Ohrumriss x = 10) bis hinunter zur Schulter (8–9, 12) angewachsen. Beim Senken/Spreizen
+# wandert die Spitze nach außen unten und die Hinterkante der Haut läuft von der Spitze schräg zur Schulter → die Fläche wird BREITER (kein Stiel, kein Keil zwischen Flügel und Kopf); beim Heben stellt sich der
+# Flügel steil auf, die Haut an der Kopfseite wird schmal. Es bewegt sich also der ganze Flügel (Spitze, Arm, Außenkante und Hautstreifen bis zur Schulter); fest bleibt nur der Ansatz am Knauf.
+# Raster: Spalte 0 = Sprite-x −4; Buchstaben = Quellfarben (FARBE). Zeilen = Sprite-y ab dem angegebenen Startwert. Pose O ist pixelgleich mit der Quelle (assert).
+FARBE = {'A': (49, 24, 0), 'B': (75, 24, 24), 'C': (130, 43, 43), 'D': (213, 98, 16), 'E': (202, 97, 97), 'F': (246, 164, 24), 'G': (230, 131, 16), 'H': (192, 67, 67), 'I': (232, 187, 187),
+         'J': (210, 121, 121), 'K': (162, 54, 54)}
+X0 = -4
+POSEN_TXT = {
+    'O': (0, ["....AAAAAAA.......",
+              ".....ABBCCCAAA....",
+              "......ADDBBBCEAA..",
+              ".......AFGCBBBHEAA",
+              "........ACBFGCCHIJ",
+              ".........AAFCBAH..",
+              "..........ACBG....",
+              "...........AGF....",
+              "...........AFD....",
+              "...........AFB....",
+              "...........ACK....",
+              "............AG...."]),
+    'U1': (-4, [".....AA...........",
+                ".....ABAA.........",
+                "......ABCAA.......",
+                "......ADBCCAA.....",
+                ".......ADBBCCAA...",
+                ".......AFDCBBCA...",
+                "........AFGCBBAA..",
+                "........AGFCBBHEAA",
+                ".........ACFGCCHIJ",
+                "..........AFCBAH..",
+                "..........ACBG....",
+                "...........AGF....",
+                "...........AFD....",
+                "...........AFB....",
+                "...........ACK....",
+                "............AG...."]),
+    'U2': (-7, [".......AAA........",
+                ".......ABBA.......",
+                ".......ADBCA......",
+                ".......ADBBA......",
+                "........ADBCA.....",
+                "........AGDBCA....",
+                "........AFGBCA....",
+                "........AFGDBCA...",
+                ".........AFGBCA...",
+                ".........ADGCBAA..",
+                "..........AFCBHEAA",
+                "..........AGFCCHIJ",
+                "..........AFCBAH..",
+                "..........ACBG....",
+                "...........AGF....",
+                "............AF....",
+                "............AB....",
+                "............AK....",
+                "............AG...."]),
+    'D1': (1, [".......AAAAA......",
+               "....AAABBCCCAAAA..",
+               "..AABBCCDDBBBCHEAA",
+               ".ABCCDDFGCBBFGCHIJ",
+               ".AACDFGFCBBFGCAH..",
+               "...AACGFCBDFGB....",
+               ".....AACCBGFGF....",
+               ".......AACBGFD....",
+               ".........ACKFB....",
+               "..........ACCK....",
+               "...........ACG...."]),
+    'D2': (2, [".........AAAAAAA..",
+               "......AAABBCCCHEAA",
+               "....AABBCCDDBBCHIJ",
+               "...ABBCDDGFCBFAH..",
+               "..ABCDDGFFCBFG....",
+               ".ABCDGFFGCBDFG....",
+               "AABCGFFGCBGFDF....",
+               ".AAACGGCCBKGFB....",
+               "....AAACCBKCCK....",
+               ".......AAACKCG....",
+               "..........AA......"]),
+}
+#        Aufschlag 9→4 (langsam), oben kurz gehalten, Abschlag 5→8 (schnell); Frame 0 = Original
+FOLGE = ['O', 'U1', 'U1', 'U2', 'U2', 'U1', 'O', 'D1', 'D2', 'D2', 'D1', 'D1']
+assert len(FOLGE) == BEAT
+
+
+def pose_ebene(name):
+    y0, zeilen = POSEN_TXT[name]
+    a = L.leer(H, W)
+    for r, z in enumerate(zeilen):
+        assert len(z) == 18, (name, r, len(z))
+        for c, ch in enumerate(z):
+            if ch != '.':
+                a[PAD_T + y0 + r, PAD_L + X0 + c] = FARBE[ch] + (255,)
+    return a
 
 
 def fluegel_posen():
     orig = D.abschnitt(spr, flügel_l, H, W, PAD_L, PAD_T)
-    vorn = np.zeros((H, W), bool)
-    vorn[PAD_T:PAD_T + sh, PAD_L:PAD_L + sw] = vorhanden & ~flügel_l & ~flügel_r
-    for (x, y) in ERG:
-        vorn[PAD_T + y, PAD_L + x] = True
-    links = []
-    for g in WINKEL:
-        if g is None:
-            links.append(orig)
-            continue
-        a = R5.starr_gedreht(orig, PAD_L + GELENK[0], PAD_T + GELENK[1], math.radians(g), UMRISS_FL)
-        links.append(R5.umriss_ziehen(a, vorn, UMRISS_FL))
+    posen = {n: pose_ebene(n) for n in POSEN_TXT}
+    assert (posen['O'] == orig).all(), 'Pose O weicht von der Quelle ab'
+    links = [posen[n] for n in FOLGE]
     rechts = [R5.spiegeln(a, 2 * PAD_L + sw - 1) for a in links]
     return links, rechts
 
@@ -188,6 +270,9 @@ FL_L, FL_R = fluegel_posen()
 
 if __name__ == '__main__':
     frames = [frame(i) for i in range(N)]
+    _a = np.stack([f[..., 3] > 0 for f in frames]).any(axis=0)
+    _ys, _xs = np.nonzero(_a)
+    frames = [f[_ys.min() - 2:_ys.max() + 3, _xs.min() - 2:_xs.max() + 3].copy() for f in frames]      # auf die Figur zugeschnitten (symmetrisch, 2 px Rand)
     n = L.pruefe(frames, quelle=spr, erlaubt=[])
     print('Pixel je Frame:', n)
     prev = sys.argv[sys.argv.index('--preview') + 1] if '--preview' in sys.argv else None
