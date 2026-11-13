@@ -27,6 +27,9 @@ const ScTracking = require('./_sc-tracking');   // v1381
 const SpyShared = require('./_spy-shared');   // Spy in the Enemy's Camp: Spionage-Marke an der Kreatur
 const ZugFristen = require('./_zug-fristen');   // W68a: „nur echte Züge zählen"
 // ★ W63d: Ereignisse, die den Beginn einer Aktion ANKÜNDIGEN, aber noch keine sichtbare Wirkung sind: sie lösen den Commit des Auftritts nicht aus (nur Protokoll + Flug/Aktivierungsschein).
+// Aufladen vor dem Dash (public/app-fx-68.jsx): 8 Bilder (30 Hz) Vorlauf, den der Client im Ramm-Ereignis (`lade`) bekommt; Folgedashes derselben Figur binnen RAMM_FOLGE_MS laden nicht neu.
+const RAMM_LADEN_MS = process.env.PP_RAMM_LADEN_MS != null && process.env.PP_RAMM_LADEN_MS !== '' ? Math.max(0, Math.min(600, Number(process.env.PP_RAMM_LADEN_MS) || 0)) : 267;   // `PP_RAMM_LADEN_MS=0` schaltet das Aufladen server-seitig ab (Messung vorher/nachher, Notbremse)
+const RAMM_FOLGE_MS = 1800;
 const AUFTRITT_HALTE_MAX_MS = 4000;   // Fail-safe: so lange hält eine Vormerkung den Zustand höchstens zurück, wenn der Besitzer keine Frage offen hat (siehe `_auftrittWaechterStellen`)
 const AUFTRITT_HALTE_EREIGNISSE = new Set(['action_log', 'hand_to_board_fly', 'ability_activated', 'potion_resolved']);   // `potion_resolved`: der Server sendet es beim START der Auflösung — also VOR den abbrechbaren Fragen der Karte
 
@@ -28110,6 +28113,9 @@ this._deathWatch = (this._deathWatchStack || []).length
   _delay(ms) {
     if (this._aborted) return Promise.resolve();
     if (this._fastMode) return Promise.resolve();
+    // Aufladen vor dem Dash (app-fx-68): das Ramm-Ereignis desselben Atemzugs hat dem Client `lade` ms Vorlauf gegeben, der Kontakt liegt also `lade` ms spaeter — die
+    // naechste Wartezeit des Skripts (`_delay`, `rammeBisKontakt`) verlaengert sich um genau diese Zeit, damit Zonen-Animationen und Schaden weiter im Kontakt-Moment landen.
+    if (this._rammLadeSchuld) { ms += this._rammLadeSchuld; this._rammLadeSchuld = 0; }
     // „Die Engine arbeitet noch": der Server zaehlt eine Aktion nur als stillschweigend
     // verworfen (`action_rejected`), wenn nach 2 s kein neuer Zustand kam UND die
     // Engine bis dahin nichts mehr getan hat (server.js, `AKTION_VERWORFEN_NACH_MS`).
@@ -32473,13 +32479,16 @@ this._deathWatch = (this._deathWatchStack || []).length
       await this.zeigeFizzle(reviveAfterDeath.by || reviveAfterDeath.name, { playerIdx: reviveAfterDeath.owner, grund: 'cannot_be_revived' });
       return false;
     } else {
+      // Eigene Wiederbelebungs-Animation (Cute Phoenix: Flammensammeln, Feuer-Ei, Explosion, `phoenix_rebirth`): der Stempel nennt Typ, Wartezeit (= Bild der Explosion + Mount-Vorlauf)
+      // und Lebensdauer der Leinwand; ohne Angabe das goldene `holy_revival` (Bone Dog, Extra Life ...).
       this._broadcastEvent('play_zone_animation', {
-        type: 'holy_revival',
+        type: reviveAfterDeath.animation || 'holy_revival',
         owner: reviveAfterDeath.owner,
         heroIdx: reviveAfterDeath.heroIdx,
         zoneSlot: reviveAfterDeath.zoneSlot,
+        ...(reviveAfterDeath.animationDauer ? { duration: reviveAfterDeath.animationDauer } : {}),
       });
-      await this._delay(620);
+      await this._delay(reviveAfterDeath.animationMs || 620);
       // Pop the just-discarded card from its original owner's
       // discard pile so the revived instance isn't a duplicate.
       // ★ v1389: ueber die EINE Ablage-Stelle (Lethe, Heimkehr-Besitzer).
@@ -34929,6 +34938,8 @@ this._deathWatch = (this._deathWatchStack || []).length
         }
       }
     }
+    // Der wirkende Held (Spell/Attack/Fähigkeit aus der Hand bzw. Zone) — Client: Hüpfer + Silhouetten-Flackern (app-fx-68). Nur Optik, an beide Seiten und die Zuschauer.
+    if (pending.wirker && !this._inMctsSim && !this._fastMode) this._broadcastEvent('hero_cast', { owner: pending.wirker.owner, heroIdx: pending.wirker.heroIdx, art: pending.wirker.art });
     // Fire any pending play log at the same time as the card reveal
     this._firePendingPlayLog();
     // ★ W66b (Al, 23.10.2026): Kosten und Limits/Zähler erst NACH dem Commit — was die Karte per `engine.beiCommit(fn)` vorgemerkt hat, läuft jetzt (nach dem Auftritt, vor dem ersten Effekt).
@@ -59798,6 +59809,29 @@ this._deathWatch = (this._deathWatchStack || []).length
     (this._playSignale || (this._playSignale = [])).push({ name, owner });
   }
 
+  /**
+   * ★ AUFLADEN VOR DEM DASH (Trailer-Look, `public/app-fx-68.jsx`): jedes Ramm-Ereignis eines HELDEN bekommt `lade` = `RAMM_LADEN_MS` — der Client haelt die Figur so lange in der Hocke
+   * (Bodenringe in Heldenfarben, Silhouetten-Flackern), DANN erst beginnt der Dash. Der Kontakt liegt damit `lade` ms nach dem Ereignis; die naechste Wartezeit des Skripts waechst um
+   * dieselbe Zeit (Schuld, wird im naechsten `_delay` desselben Atemzugs eingelöst — `rammeBisKontakt` und die Skripte mit `broadcast; await _delay(x)` brauchen keine Aenderung).
+   * Skripte, die NACH dem Ramm-Ereignis im selben Atemzug noch Zonen-Animationen senden (Venom Strike, Tiger Kick), warten vorher einmal `await engine._delay(0)`.
+   * KEIN Aufladen: Rueckwaerts-Rammen (Tail Slap), Jetpack (`trailType: 'fire'`), `fire_stars`, Rammer aus einer Support Zone (Kreaturen: `sourceZoneSlot`), ausdruecklich `lade: 0`,
+   * und der Folgedash derselben Figur binnen 1,8 s (Whirlwind Strike & Co.: einmal aufladen, dann in Serie).
+   */
+  _rammLadenAnmelden(data) {
+    if (!RAMM_LADEN_MS || data.lade != null) return data;                              // abgeschaltet bzw. das Skript legt es selbst fest (0 = nie)
+    if (data.rueckwaerts || data.trailType === 'fire' || data.trailType === 'fire_stars') return data;
+    if (data.sourceZoneSlot != null && data.sourceZoneSlot >= 0) return data;          // Kreatur rammt
+    if (!(data.sourceHeroIdx >= 0)) return data;
+    const key = data.sourceOwner + ':' + data.sourceHeroIdx, jetzt = Date.now();
+    const M = this._rammLadeLetzte || (this._rammLadeLetzte = new Map());
+    const vorher = M.get(key);
+    M.set(key, jetzt);
+    if (vorher != null && jetzt - vorher < RAMM_FOLGE_MS) return { ...data, lade: 0 };   // Serie: kein neues Aufladen
+    this._rammLadeSchuld = Math.max(this._rammLadeSchuld || 0, RAMM_LADEN_MS);
+    setImmediate(() => { this._rammLadeSchuld = 0; });                                // gilt nur im selben Atemzug (bis zum naechsten echten Warten)
+    return { ...data, lade: RAMM_LADEN_MS };
+  }
+
   _broadcastEvent(event, data, opts) {
     if (this._aborted) return;
     if (this._fastMode) return; // Silent during MCTS simulations.
@@ -59936,6 +59970,8 @@ this._deathWatch = (this._deathWatchStack || []).length
         outData = { ...outData, owner: akt.heroOwner };
       }
     }
+    // Aufladen vor dem Dash: das Ramm-Ereignis eines HELDEN bekommt `lade` (ms Vorlauf), die naechste Wartezeit waechst mit (`_delay`).
+    if (event === 'play_ram_animation' && outData && typeof outData === 'object') outData = this._rammLadenAnmelden(outData);
     // Optionale Empfaengerauswahl (12.8.). `opts.toPlayers` ist eine
     // Liste von Spielerindizes; ohne sie geht das Ereignis wie bisher an
     // BEIDE Spieler. Gebraucht vom Karten-Auftritt: eine von der Hand

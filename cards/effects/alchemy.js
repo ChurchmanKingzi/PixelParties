@@ -13,6 +13,7 @@
 // ═══════════════════════════════════════════
 
 const { drawBlockedFor } = require('./_draw-block-shared');   // D1: Regel von Al
+const ALCHEMY_VORLAUF_MS = 600;   // Kraftstrom-Kugeln Fähigkeit → Potion Deck, bevor die Potion abhebt (Client: app-fx-69)
 
 module.exports = {
   blockedByHandLock: true,
@@ -109,6 +110,16 @@ module.exports = {
 
     // Draw 1 from potion deck
     if (engine.deckLeer(pi, 'potion')) return false; // Safety
+    // Client (app-fx-69, Trailer-Look): die Fähigkeitskarte leuchtet in den Trankfarben, Kraftstrom-Kugeln fließen ins Potion Deck; die Potion hebt erst danach ab.
+    // Die Engine wartet dafür `ALCHEMY_VORLAUF_MS` (= PpFx69.ALCHEMY_VORLAUF_MS) — die einzige Wartezeit, die dieser Look verlängert.
+    {
+      const inst = ctx.card, abSeite = engine.physicalSide(inst);
+      engine._broadcastEvent('play_zone_animation', {
+        type: 'alchemy_kraftstrom', owner: pi, heroIdx: inst.heroIdx, zoneSlot: -1,
+        quelle: { owner: abSeite, heroIdx: inst.heroIdx, zoneIdx: inst.zoneSlot, zoneKind: inst.zone === 'support' ? 'support' : 'ability' },
+      });
+      await engine._delay(ALCHEMY_VORLAUF_MS);
+    }
     await engine.actionDrawFromPotionDeck(pi, 1);
 
     engine.sync();

@@ -405,7 +405,11 @@ function ppFx27RammFigur(ev) {
   const durch = ppFx27Durch(ev);
   const fig = ppFx27Figur(ev.srcEl, ev.tgtEl, { art, durch: durch && art !== 'jet' && art !== 'rueck' });
   if (!fig) return null;
-  const zl = ppFx27Zeitlinie(art, dur, fig.pZiel, durch);
+  const zl0 = ppFx27Zeitlinie(art, dur, fig.pZiel, durch);
+  // Aufladen vor dem Dash (app-fx-68; Server: `lade` im Ramm-Ereignis, die Engine wartet um dieselbe Zeit länger): die Figur bleibt `lade` ms in der Hocke (laden), erst dann läuft die
+  // Zeitlinie — Aufprall und Ende verschieben sich um genau `lade`. Nicht für Rückwärtsrammen, Jetpack und Funkenlauf (die laden nicht).
+  const lade = (ev.lade > 0 && art !== 'rueck' && art !== 'jet' && art !== 'sterne') ? ev.lade : 0;
+  const zl = lade ? { aufprall: zl0.aufprall + lade, ende: zl0.ende + lade, pose(t) { return t < lade ? { p: 0, spiegel: 1, wackeln: 0, laden: true } : zl0.pose(t - lade); } } : zl0;
   const raf = window.ppTaktRaf || window.requestAnimationFrame;
   const t0 = performance.now();
   const schritt = () => {

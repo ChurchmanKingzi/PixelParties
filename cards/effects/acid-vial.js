@@ -6,8 +6,19 @@
 //  EXCEPT turn-1 protection.
 //  Damage type: 'other'.
 //  Hard once per turn.
-//  Animation: red acid splash on target.
+//  Animation (Pixelart, public/app-fx-70.jsx): Spuckkugel wie im Trailer — die Kugel LÄDT am Ablagestapel des Spielers (0,7 s, Radius 2 → 7),
+//  fliegt 0,7 s im Bogen zum Ziel und schlägt dort ein (Ringe, Strahlen, Tropfen); der Schaden fällt erst beim Einschlag (SCHADEN_MS).
+//  Rückfall des Clients (Retro, reduzierte Bewegung, `window.__ppFx70Aus`): der bisherige Säure-GUSS von oben (`acid_splash`, app-fx-9) — er wird
+//  dann zum Einschlagszeitpunkt gezeigt. EINE Zeile zurück zum alten Guss-Look (sofort, ohne Wartezeit): `SPUCKKUGEL = false`.
 // ═══════════════════════════════════════════
+
+// Zeiten (ms) der Zonen-Animation `acid_spit` (app-fx-70.jsx, 30 Hz): Laden 700 + Flug 700 = Einschlag bei Bild 42 der Animation; `VORLAUF_MS` = Mount-Vorlauf im Client
+// (ZONE_ANIM_MOUNT_DELAY_MS 100 + Aufbau, wie bei Tiger Kick/Venom Snake). Engine-Wartezeit = Animationszeit + Vorlauf, damit Zahl und HP-Balken beim Einschlag erscheinen.
+const SPUCKKUGEL = true;   // false = der bisherige Säure-Guss von oben (`acid_splash`, Schaden sofort) — die einzige Stelle, die zwischen den beiden Looks umschaltet
+const SPUCK_LADE_MS = 700;
+const SPUCK_FLUG_MS = 700;
+const VORLAUF_MS = 120;
+const SCHADEN_MS = SPUCK_LADE_MS + SPUCK_FLUG_MS + VORLAUF_MS;
 
 module.exports = {
   // ★ Als Ruling (Al 26.10., Flame Avalanche: „Wenn du andere Schadenskarten unspielbar machst, müssen das Vial und Rockfall auch sein!"): die Karte richtet NUR Schaden an Zielen an —
@@ -77,7 +88,8 @@ module.exports = {
     return selectedIds && selectedIds.length === 1;
   },
 
-  animationType: 'acid_splash',
+  // ★ `'none'`: der Server schickt KEIN `potion_resolved` mit dem Guss mehr — die Spuckkugel (`acid_spit`) sendet `resolve` selbst (Quelle `von` = Ablagestapel, Ziel = gewähltes Ziel).
+  animationType: SPUCKKUGEL ? 'none' : 'acid_splash',
 
   async resolve(engine, pi, selectedIds, validTargets) {
     if (!selectedIds || selectedIds.length === 0) return;
@@ -93,9 +105,22 @@ module.exports = {
 
     const source = { name: 'Acid Vial', owner: pi, heroIdx: -1 };
 
+    // Spuckkugel: lädt am Ablagestapel des Spielers, fliegt zum Ziel (app-fx-70). Das Ziel wird VOR dem Senden geprüft (kein Flug ins Leere), der Schaden folgt beim Einschlag.
+    const spuck = async (zoneSlot) => {
+      if (!SPUCKKUGEL) return;
+      engine.sync();   // Zielwahl-Fenster schließen, bevor die Kugel fliegt (sonst steht „Splash!" über der Flugbahn)
+      engine._broadcastEvent('play_zone_animation', {
+        type: 'acid_spit', owner: target.owner, heroIdx: target.heroIdx, zoneSlot,
+        von: { owner: pi, pile: 'deleted' },
+      });
+      await engine._delay(SCHADEN_MS);
+    };
+
     if (target.type === 'hero') {
       const hero = gs.players[target.owner]?.heroes?.[target.heroIdx];
       if (!hero || hero.hp <= 0) return;
+
+      await spuck(-1);
 
       const { dealt } = await engine.actionDealTrueDamage(source, hero, DAMAGE, {
         type: 'potion',
@@ -113,6 +138,8 @@ module.exports = {
         c.heroIdx === target.heroIdx && c.zoneSlot === target.slotIdx
       );
       if (!inst) return;
+
+      await spuck(target.slotIdx);
 
       await engine.actionDealTrueDamage(source, inst, DAMAGE, { type: 'potion' });
     }

@@ -582,8 +582,12 @@ function BoardCard({ cardName, faceDown, flipped, label, hp, maxHp, atk, hpPosit
   );
 }
 
-function BoardZone({ type, cards, label, faceDown, flipped, stackLabel, children, onClick, onHoverCard, style, className, dataAttrs, ownerLetheStamps, badge, pileIdentities, renderStack, rarities }) {
+function BoardZone({ type, cards, label, faceDown, flipped, stackLabel, children, onClick, onHoverCard, style, className, dataAttrs, ownerLetheStamps, badge, pileIdentities, renderStack, rarities, stapelN }) {
   const cls = 'board-zone board-zone-' + type + (className ? ' ' + className : '') + ((cards?.length > 0) ? ' zone-has-card' : '');
+  // ★ Trailer-Look (app-fx-67.jsx): Deck, Potion-Deck und Ablage mit sichtbarer Dicke (Kanten unter der Karte) und Zähler-Pop der Ablage. `stapelN` = Kartenzahl (Deck/Potion-Deck; Ablage: aus `cards`).
+  const K67 = (type === 'deck' || type === 'potion' || type === 'discard') ? window.PpStapelKanten : null;
+  const kantenN = !K67 ? 0 : (stapelN != null ? stapelN : (type === 'discard' ? (cards ? cards.length : 0) : 0));
+  const kantenStil = kantenN > 0 && !window.__ppFx67KantenAus && !window.__ppFx67Aus && !window.PP_RETRO ? { ...(style || {}), overflow: 'visible' } : style;   // die Kanten ragen in die Lücke unter der Zone
   const topCardName = cards && cards.length > 0 && !faceDown ? cards[cards.length - 1] : null;
   const suppressChildTooltip = !!onClick && !!onHoverCard;
   // For discard/deleted zones, the top card's effective level is the
@@ -633,7 +637,7 @@ function BoardZone({ type, cards, label, faceDown, flipped, stackLabel, children
     : topCardName);
   return (
     <div className={cls + (onClick && cards?.length > 0 ? ' board-zone-clickable' : '')}
-      style={style}
+      style={kantenStil}
       {...(dataAttrs || {})}
       onClick={onClick && cards?.length > 0 ? onClick : undefined}
       onMouseEnter={() => hoverPayload && onHoverCard && !window.activeDragData && !window.deckDragState && onHoverCard(hoverPayload)}
@@ -667,6 +671,7 @@ function BoardZone({ type, cards, label, faceDown, flipped, stackLabel, children
       ) : children || (
         <div className="board-zone-empty">{label || ''}</div>
       )}
+      {kantenN > 0 ? <K67 n={kantenN} art={type} /> : null}
     </div>
   );
 }
@@ -772,13 +777,16 @@ function DamageNumber({ amount, ownerLabel, heroIdx }) {
       // ★ v1257: Mobile-Kamera auf die getroffene Zone (no-op am Desktop
       // und im eigenen Zug — siehe ppBattleCamFocus).
       if (window.ppBattleCamFocus) window.ppBattleCamFocus(el);
+      // ★ Trailer-Look (app-fx-67.jsx): aufrechte Pixelziffern statt Textschrift; läuft sie, zeichnet diese Komponente nichts.
+      const px67 = window.ppFx67Zahl && window.ppFx67Zahl({ el, amount, art: 'schaden' });
+      if (px67) { setPos({ pixel: true }); return () => { try { px67.stopp(); } catch (e) { /* weg */ } }; }
       const r = el.getBoundingClientRect();
       const _wo = window.ppFxWeltAnker ? window.ppFxWeltAnker(el) : { dx: 0, dy: 0 };  // ★ v1258 Weltverankerung
       setPos({ x: r.left + r.width / 2 + _wo.dx, y: r.top + r.height * 0.3 + _wo.dy });
     }
   }, [ownerLabel, heroIdx]);
 
-  if (!pos) return null;
+  if (!pos || pos.pixel) return null;
   // Damage absorbed to 0 → render the bare "0" (no minus sign), so
   // the player sees that the hit was absorbed rather than blocked
   // entirely. Matches the CreatureDamageNumber and HealNumber forms.
@@ -799,13 +807,15 @@ function HealNumber({ amount, ownerLabel, heroIdx }) {
       // ★ v1257: Mobile-Kamera auf die getroffene Zone (no-op am Desktop
       // und im eigenen Zug — siehe ppBattleCamFocus).
       if (window.ppBattleCamFocus) window.ppBattleCamFocus(el);
+      const px67 = window.ppFx67Zahl && window.ppFx67Zahl({ el, amount, art: 'heilung' });   // ★ Trailer-Look (app-fx-67.jsx), siehe DamageNumber
+      if (px67) { setPos({ pixel: true }); return () => { try { px67.stopp(); } catch (e) { /* weg */ } }; }
       const r = el.getBoundingClientRect();
       const _wo = window.ppFxWeltAnker ? window.ppFxWeltAnker(el) : { dx: 0, dy: 0 };  // ★ v1258 Weltverankerung
       setPos({ x: r.left + r.width / 2 + _wo.dx, y: r.top + r.height * 0.3 + _wo.dy });
     }
   }, [ownerLabel, heroIdx]);
 
-  if (!pos) return null;
+  if (!pos || pos.pixel) return null;
   // Heal-for-0 (full-HP target, or Nao's overheal blocked because the
   // target is already > maxHp) → plain "0", no plus sign. Mirrors the
   // CreatureDamageNumber's "0 damage absorbed" rendering.
@@ -829,13 +839,17 @@ function CreatureHealNumber({ amount, ownerLabel, heroIdx, zoneSlot, pixel }) {
     if (el) {
       // ★ v1257: Mobile-Kamera auf die getroffene Zone.
       if (window.ppBattleCamFocus) window.ppBattleCamFocus(el);
+      if (!pixel) {   // ★ Trailer-Look (app-fx-67.jsx); die grüne Steam-Zahl (`pixel`) bleibt wie sie ist
+        const px67 = window.ppFx67Zahl && window.ppFx67Zahl({ el, amount, art: 'heilung' });
+        if (px67) { setPos({ pixel67: true }); return () => { try { px67.stopp(); } catch (e) { /* weg */ } }; }
+      }
       const r = el.getBoundingClientRect();
       const _wo = window.ppFxWeltAnker ? window.ppFxWeltAnker(el) : { dx: 0, dy: 0 };  // ★ v1258 Weltverankerung
       setPos({ x: r.left + r.width / 2 + _wo.dx, y: r.top + r.height * 0.3 + _wo.dy });
     }
   }, [ownerLabel, heroIdx, zoneSlot]);
 
-  if (!pos) return null;
+  if (!pos || pos.pixel67) return null;
   const label = amount > 0 ? `+${amount}` : '0';
   // `pixel` = gruene Pixel-Zahl der Steam Dwarfs (Steam Engine, +10 HP je Karte).
   return (
@@ -853,13 +867,15 @@ function CreatureDamageNumber({ amount, ownerLabel, heroIdx, zoneSlot }) {
     if (el) {
       // ★ v1257: Mobile-Kamera auf die getroffene Zone.
       if (window.ppBattleCamFocus) window.ppBattleCamFocus(el);
+      const px67 = window.ppFx67Zahl && window.ppFx67Zahl({ el, amount, art: 'schaden' });   // ★ Trailer-Look (app-fx-67.jsx), siehe DamageNumber
+      if (px67) { setPos({ pixel: true }); return () => { try { px67.stopp(); } catch (e) { /* weg */ } }; }
       const r = el.getBoundingClientRect();
       const _wo = window.ppFxWeltAnker ? window.ppFxWeltAnker(el) : { dx: 0, dy: 0 };  // ★ v1258 Weltverankerung
       setPos({ x: r.left + r.width / 2 + _wo.dx, y: r.top + r.height * 0.3 + _wo.dy });
     }
   }, [ownerLabel, heroIdx, zoneSlot]);
 
-  if (!pos) return null;
+  if (!pos || pos.pixel) return null;
   // Damage absorbed to 0 → render the bare "0" (no minus sign), so
   // the player sees that the hit was absorbed rather than blocked
   // entirely. Anything > 0 keeps the standard `-N` form.
@@ -3956,6 +3972,7 @@ function HeroIdleSprite({ cardName, angehalten, versteinert, eingefroren, effekt
     zone._ppFigurPlatz = platz;
     platz._ppEintrag = eintrag;   // Sheet + aktueller Frame (`platz._ppFrame`, s. `male`) für die Nachbilder beim Rammen (app-fx-27.jsx)
     platz._ppZone = zone;         // Heldentod (app-fx-32.jsx): der Beobachter der Sprite-Ebene findet zum entfernten Platz seine Zone
+    platz._ppSchluessel = key;    // Slug des Helden (Todesstil „sturz“/„shatter“, app-fx-71.jsx)
     const ctx = cv.getContext('2d');
     const { meta, img } = eintrag;
     const fw = meta.frameWidth, fh = meta.frameHeight;
@@ -45064,6 +45081,12 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       // ENTIRE rendering side here — including the SFX-for-anim cue,
       // since it's gated on the visual.
       if (window._playAnimations === false) return;
+      // ★ Kraftstrom-Kugeln (app-fx-69): Biomancy-Token (`biomancy_bloom` mit `kraftstrom`) und Alchemy (`alchemy_kraftstrom`); true = erledigt, false = der normale Verteiler (Blumen) spielt.
+      if ((type === 'alchemy_kraftstrom' || (type === 'biomancy_bloom' && rest.kraftstrom === true)) && window.ppFx69Zone && window.ppFx69Zone({ type, owner, heroIdx, zoneSlot, ...rest }, myIdx)) {
+        if (type === 'biomancy_bloom' && window.playSFXForZoneAnim) window.playSFXForZoneAnim(type, rest);
+        return;
+      }
+      if (type === 'alchemy_kraftstrom') return;   // nur ein Kraftstrom-Ereignis, kein eigener Animationstyp
       // ★ Strong Ox Headbutt (app-fx-62): der Client entscheidet über den Rückfall. Geht der neue Sprung-Kopfstoß nicht (Retro, reduzierte Bewegung, Quelle ohne Figur …), spielt er die alte Kombination
       // (Ramm-Anlauf + Explosion + Ochsen-Symbol) selbst — so, dass der Einschlag auf den Schadenszeitpunkt der Engine fällt (SCHADEN_MS 825 ms nach dem Ereignis: Anlauf 470 ms vorher + 150 ms Kontakt + 200 ms).
       if (type === 'ox_headbutt' && window.ppFx62Pruefe && rest.von && (rest.von.owner === 0 || rest.von.owner === 1)) {
@@ -45072,6 +45095,8 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         const tEl = zoneSlot >= 0 ? document.querySelector(`[data-support-zone][data-support-owner="${ownerLbl(owner, myIdx)}"][data-support-hero="${heroIdx}"][data-support-slot="${zoneSlot}"]`) : hz(owner, heroIdx);
         const grund = window.ppFx62Pruefe(vEl, tEl);
         window.__ppFx62Grund = grund || 'neu';
+        // Aufladen vor dem Dash (app-fx-68): die Hocke des Kopfstoßes (Bild −19…−16, dazu der Absprung: 5 Bilder) bekommt Bodenringe — innerhalb des vorhandenen Anlaufs (125 ms Vorlauf), KEINE zusätzliche Zeit; Engine-Zeiten unverändert.
+        if (!grund && window.ppFx68Laden && vEl) setTimeout(() => { try { window.ppFx68Laden({ srcEl: vEl, ms: 150, nurRinge: true }); } catch (e) { /* ohne */ } }, 125);
         if (grund) {
           const ram = { sourceOwner: rest.von.owner, sourceHeroIdx: rest.von.heroIdx, targetOwner: owner, targetHeroIdx: heroIdx, cardName: rest.cardName, duration: 1200, ...(zoneSlot >= 0 ? { targetZoneSlot: zoneSlot } : null) };
           setTimeout(() => onRamAnimation(ram), 470);
@@ -45315,7 +45340,10 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         const v = rest.von;
         if (!v || !ankerEl || (v.owner !== 0 && v.owner !== 1)) return null;
         const lbl = ownerLbl(v.owner, myIdx);
-        const vSel = v.zoneType === 'surprise'
+        // `pile` ('deleted' | 'discard' | 'deck' | 'potion-deck'): ein Stapel des Besitzers als Quelle (Life Serum / Acid Vial, app-fx-70); Rückfall auf den Ablagestapel
+        const vSel = v.pile
+          ? `[data-${lbl === 'me' ? 'my' : 'opp'}-${/^(deleted|discard|deck|potion-deck)$/.test(v.pile) ? v.pile : 'discard'}]`
+          : v.zoneType === 'surprise'
           ? `[data-surprise-zone][data-surprise-owner="${lbl}"][data-surprise-hero="${v.heroIdx}"]`
           : (v.zoneSlot != null && v.zoneSlot >= 0)
             ? `[data-support-zone][data-support-owner="${lbl}"][data-support-hero="${v.heroIdx}"][data-support-slot="${v.zoneSlot}"]`
@@ -45408,6 +45436,8 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     // zu — das Ereignis verpuffte still. Jetzt wackelt die Spielflaeche
     // (`.game-layout`) kurz; die Klasse wird per Reflow neu gestartet.
     const onScreenShake = ({ intensity }) => {
+      // ★ Trailer-Look (app-fx-67.jsx): Wackeln in ganzen Pixeln auf Brett und Effektschichten statt der weichen CSS-Fassung auf dem ganzen Spielfeld (samt Hand); aus → alte Fassung unten
+      if (window.ppFx67EngineWackeln && window.ppFx67EngineWackeln(intensity)) return;
       const el = document.querySelector('.game-layout');
       if (!el) return;
       const klasse = intensity === 'heavy' ? 'pp-wackeln-stark' : 'pp-wackeln';
@@ -48851,8 +48881,10 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       }, 500);
     };
     socket.on('ability_zone_to_discard', onAbilityZoneToDiscard);
-    const onRamAnimation = ({ sourceOwner, sourceHeroIdx, sourceZoneSlot, targetOwner, targetHeroIdx, targetZoneSlot, targetZoneType, targetPermId, cardName, duration, trailType, rueckwaerts, durch }) => {
-      if (window.playSFX) window.playSFX('attack_ram', { category: 'effect' });
+    const onRamAnimation = ({ sourceOwner, sourceHeroIdx, sourceZoneSlot, targetOwner, targetHeroIdx, targetZoneSlot, targetZoneType, targetPermId, cardName, duration, trailType, rueckwaerts, durch, lade }) => {
+      // `lade` (ms): Aufladen vor dem Dash (app-fx-68, Server `_rammLadenAnmelden`) — der Dash beginnt erst nach dieser Zeit, der Server wartet entsprechend länger. Der Ton gehört zum Dash-Start.
+      const ladeMs = (lade > 0 && lade <= 600 && !rueckwaerts && trailType !== 'fire') ? lade : 0;   // (auch bei Kill-Switch/Retro/reduzierter Bewegung: die Wartezeit bleibt, nur Ringe und Flackern entfallen)
+      if (window.playSFX) { if (ladeMs) setTimeout(() => window.playSFX('attack_ram', { category: 'effect' }), ladeMs); else window.playSFX('attack_ram', { category: 'effect' }); }
       const srcLabel = ownerLbl(sourceOwner, myIdx);
       const tgtLabel = ownerLbl(targetOwner, myIdx);
       // If sourceZoneSlot is provided, originate from that support zone; otherwise from the hero zone.
@@ -48900,8 +48932,10 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       const _fo = window.ppFxScrollOffset ? window.ppFxScrollOffset() : { dx: 0, dy: 0 };
       // ★ Trailer-Look (app-fx-27.jsx): rammt ein HELD mit animierter Figur, fährt die FIGUR (Streckung, Nachbilder, Federung), und die Karte bleibt stehen. Dieselbe Dauer und dieselben
       // Aufprallanteile wie die Keyframes (`rammeBisKontakt` im Server wartet darauf). Ohne fahrbereite Figur (Kreatur, Held ohne Sheet, versteinert/gelähmt/unsichtbar, tot) → alter Kartenpfad.
-      if (!(sourceZoneSlot != null && sourceZoneSlot >= 0) && window.ppFx27RammFigur) {
-        const fahrt = window.ppFx27RammFigur({ srcEl, tgtEl, dur, trailType, rueckwaerts: !!rueckwaerts, cardName, durch });
+      const heldDash = !(sourceZoneSlot != null && sourceZoneSlot >= 0);
+      if (ladeMs && heldDash && window.ppFx68Laden) { try { window.ppFx68Laden({ srcEl, tgtEl, ms: ladeMs }); } catch (e) { /* ohne Aufladen */ } }
+      if (heldDash && window.ppFx27RammFigur) {
+        const fahrt = window.ppFx27RammFigur({ srcEl, tgtEl, dur, trailType, rueckwaerts: !!rueckwaerts, cardName, durch, lade: heldDash ? ladeMs : 0 });
         if (fahrt) {
           // Nur der Jetpack-Schweif (`MoniaJetTrail`) braucht einen Eintrag: auf Körperhöhe der Figur statt an den Füßen, bis dorthin, wo die Figur landet. `figur: true` → die Zone
           // blendet dabei NICHTS aus (`isRamming` ignoriert diese Einträge).
@@ -48917,6 +48951,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           return;
         }
       }
+      const _kartenFahrt = () => {
       // Rarity der rammenden Karte: die der Karte auf dem Quellplatz im jetzigen Zustand (Held: die des Helden), sonst aus dem Gedächtnis.
       const _ramRar = (() => {
         const pr = spielerLiveRef.current?.[sourceOwner]?.rarity;
@@ -48942,8 +48977,19 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       // deshalb unsichtbar, er hält nur die Ebene am Leben.
       setTimeout(() => setRamAnims(prev => prev.filter(a => a.id !== id)),
         dur + (trailType === 'fire' ? JET_TAIL_MS : 0));
+      };
+      if (ladeMs && heldDash) setTimeout(_kartenFahrt, ladeMs); else _kartenFahrt();   // Kartenpfad (Held ohne Figur): Aufladen = Wartezeit (die Ringe zeichnet ppFx68Laden)
     };
     socket.on('play_ram_animation', onRamAnimation);
+    // Der Held wirkt (Spell/Attack aus der Hand, Fähigkeit): Hüpfer + Silhouetten-Flackern (app-fx-68). Nur Optik; der Server sendet es beim Commit der Karte.
+    const onHeroCast = ({ owner, heroIdx, art }) => {
+      try {
+        if (!window.ppFx68Wirkt) return;
+        const el = document.querySelector(`[data-hero-zone][data-hero-owner="${ownerLbl(owner, myIdx)}"][data-hero-idx="${heroIdx}"]`);
+        if (el) window.ppFx68Wirkt(el, art);
+      } catch (e) { /* nur Optik */ }
+    };
+    socket.on('hero_cast', onHeroCast);
 
     // ★ 12.10. (Duel, Als Vorgabe): ZWEI HELDEN RAMMEN EINANDER — eine durchgehende Choreografie über alle Hits (Schlag auf Schlag): die Heldenkarten rasen aus ihren Zonen in
     // die Mitte, krachen ineinander (Hit 1), prallen zurück, krachen wieder (Hit 2, 3), und gehen erst nach dem letzten Hit heim. Jedes `play_hero_clash` mit Phase `hit` hängt der
@@ -53862,6 +53908,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       socket.off('surprise_flip', onSurpriseFlip);
       socket.off('surprise_reset', onSurpriseReset);
       socket.off('play_ram_animation', onRamAnimation);
+      socket.off('hero_cast', onHeroCast);
       socket.off('play_hero_clash', onHeroClash);
       socket.off('play_tharxian_charge', onTharxianCharge);
       socket.off('play_card_transfer', onCardTransfer);
@@ -60628,7 +60675,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
 
           <div className="board-util board-util-right">
             <div className="board-util-side">
-              <BoardZone type="deck" label="Deck" faceDown style={oppBoardZone('deck')}>
+              <BoardZone type="deck" label="Deck" faceDown style={oppBoardZone('deck')} stapelN={opp.deckCount}>
                 {opp.deckCount > 0 ? <div className="board-card face-down" data-opp-deck="1"
                   onMouseEnter={(e) => {
                     const top = opp.deckTopVisible?.[0];
@@ -60662,7 +60709,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                   <div className="board-card-label">{opp.deckCount}</div></div>
                 : <div className="board-card" data-opp-deck="1"><div className="deck-empty-label">0</div></div>}
               </BoardZone>
-              <BoardZone type="potion" label="Potions" faceDown style={oppBoardZone('potion')}>
+              <BoardZone type="potion" label="Potions" faceDown style={oppBoardZone('potion')} stapelN={opp.potionDeckCount}>
                 {opp.potionDeckCount > 0 ? <div className="board-card face-down" data-opp-potion-deck="1"><img src={opp.cardback || "/cardback.png"} style={{width:'100%',height:'100%',objectFit:'cover'}} draggable={false} /><div className="board-card-label">{opp.potionDeckCount}</div></div>
                 : <div className="board-card" data-opp-potion-deck="1"><div className="deck-empty-label">0</div></div>}
               </BoardZone>
@@ -60672,13 +60719,13 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
             <div className="board-util-side">
               <div className="board-util-spacer" />
               <div onClick={() => !isSpectator && me.potionDeckCount > 0 && setDeckViewer('potion')} style={{ cursor: !isSpectator && me.potionDeckCount > 0 ? 'pointer' : 'default' }} data-my-potion-deck="1">
-              <BoardZone type="potion" label="Potions" faceDown style={myBoardZone('potion')}>
+              <BoardZone type="potion" label="Potions" faceDown style={myBoardZone('potion')} stapelN={me.potionDeckCount}>
                 {me.potionDeckCount > 0 ? <div className="board-card face-down"><img src={me.cardback || "/cardback.png"} style={{width:'100%',height:'100%',objectFit:'cover'}} draggable={false} /><div className="board-card-label">{me.potionDeckCount}</div></div>
                 : <div className="board-card"><div className="deck-empty-label">0</div></div>}
               </BoardZone>
               </div>
               <div onClick={() => !isSpectator && me.deckCount > 0 && setDeckViewer('deck')} style={{ cursor: !isSpectator && me.deckCount > 0 ? 'pointer' : 'default' }} data-my-deck="1">
-              <BoardZone type="deck" label="Deck" faceDown style={myBoardZone('deck')}>
+              <BoardZone type="deck" label="Deck" faceDown style={myBoardZone('deck')} stapelN={me.deckCount}>
                 {me.deckCount > 0 ? <div className="board-card face-down"
                   onMouseEnter={(e) => {
                     const top = me.deckTopVisible?.[0];

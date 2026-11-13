@@ -85,6 +85,8 @@ module.exports = {
         targetZoneSlot: tgtZoneSlot,
         cardName: hero.name, duration: 1200, durch: false, trailType: 'poison',
       });
+      // Aufladen vor dem Dash (Ramm-Ereignis trägt `lade`, app-fx-68): das Zonen-Ereignis folgt erst zum Dash-Start, sonst läge der Kontakt (Bild 0) vor dem Aufprall. `_delay(0)` löst die Ladezeit ein.
+      await engine._delay(0);
 
       // Giftstoß am Ziel: EIN Ereignis, sofort nach dem Ramm-Ereignis — der Mount-Vorlauf (~150 ms) entspricht dem Weg bis zum Kontakt (144 ms), Bild 0 = Kontakt.
       // `von`: der angreifende Held (Brettseite), `stacks`: 1./2./3. Angriff der Runde = Stufe 1–3.

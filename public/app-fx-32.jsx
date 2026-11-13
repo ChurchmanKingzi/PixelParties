@@ -21,6 +21,7 @@
 //  Rechnung und Schreiben in einen Pixelpuffer (`Uint32Array` → `putImageData`) im 30-Hz-Takt (`ppTaktRaf`): ganze Pixel, harte Kanten, kein Alpha, keine CSS-Animation, kein
 //  Lesen von der Leinwand, keine DOM-Knoten je Teilchen. Die Farben der Splitter sind die der Figur selbst (Kunst des Gestalters, nicht Oberfläche); Rauch/Funken/Ringe stehen in der Palette.
 //
+//  ZWEITER STIL „sturz“ (Einsinken + Brocken + Staubwolke, Trailer Broghan/Kyli): app-fx-71.jsx liefert `ppFx71Stil/BaueSturz/ZeichneSturz`; Rahmen (Beobachter, Pool, Verdunklung, Aufräumen) ist derselbe. Rückfall auf dieses Zerspringen bei Retro/reduzierter Bewegung/`__ppFx71Aus`.
 //  Rückfall: Helden ohne Sheet haben keine Figur — dort bleibt alles beim Alten (Karte dunkelt ab). Auch ohne Animation (Figur unsichtbar/im Aufstiegs-Morph, Platz nicht
 //  sichtbar, Fehler) läuft der alte Pfad; eine durch Hover/Zielwahl eingefahrene Figur steht für den Tod wieder da. Wird der Held währenddessen wiederbelebt (neue Figur im selben Zonenplatz), bricht die Animation sofort ab; die neue Figur steigt wie immer auf.
 //  Das Gefallen-Aussehen der Zone setzt nur das Attribut `data-pp-stirbt` (1 = Karte hell, Schleier + Grabstein verborgen, 2 = Schachbrett-Schleier) zurück; Klassen fasst der Effekt nicht an.
@@ -261,6 +262,7 @@ function ppFx32Teilchen(e, D) {
 
 /** Rauch und Funken eines Todes anlegen (klein; einmal beim Start). */
 function ppFx32Baue(Z) {
+  if (Z.stil === 'sturz' && typeof ppFx71BaueSturz === 'function') { ppFx71BaueSturz(Z); return; }   // zweiter Stil „Einsinken“ (app-fx-71.jsx)
   const D = Z.D, g = Z.g, mag = g.mag, sub = g.sub;
   const hoehe = Math.max(1, g.y1 - g.y0);
   let ende = D.P.ende;
@@ -287,6 +289,7 @@ function ppFx32Baue(Z) {
 
 /** Ein Bild des Todes in den Puffer schreiben (t in ms seit Beginn). */
 function ppFx32Zeichne(Z, t, f) {
+  if (Z.stil === 'sturz' && typeof ppFx71ZeichneSturz === 'function') { ppFx71ZeichneSturz(Z, t, f); return; }   // zweiter Stil „Einsinken“ (app-fx-71.jsx)
   const pool = Z.pool, g = Z.g, buf = pool.buf, W = g.W, H = g.H, sub = g.sub, D = Z.D, P = Z.P, b = D.b, ML = g.ML, MT = g.MT;
   buf.fill(0);
   const cxm = Math.round((g.mitteX + ML) * sub), cyf = Math.round((g.fussY + MT) * sub);
@@ -370,7 +373,7 @@ function ppFx32Tod(platz) {
     const pool = ppFx32Pool(platz);
     if (!pool) return false;
     const g = pool.g;
-    const Z = { platz, zone, e, g, D, pool, fertig: false, t0: performance.now(), f: -1, veil: 0, zaehler: 0 };
+    const Z = { platz, zone, e, g, D, pool, stil: (typeof ppFx71Stil === 'function' && typeof PP_FX71_DAUER_S === 'number' ? ppFx71Stil(platz) : 'shatter'), fertig: false, t0: performance.now(), f: -1, veil: 0, zaehler: 0 };
     ppFx32Baue(Z);
     // Platz wieder einhängen: alte Kinder per CSS weg, nur die eigene Leinwand zeigen. Fx27-Pool nicht noch anlegen lassen.
     platz._ppFx32Tot = true;
@@ -397,7 +400,7 @@ function ppFx32Tod(platz) {
       const f = Math.floor(t / PP_FX32_BILD);
       if (f !== Z.f) {
         Z.f = f;
-        const v = t >= PP_FX32_HALT + PP_FX32_DAUER ? 0 : (t >= PP_FX32_HALT + PP_FX32_DAUER * 0.62 ? 2 : 1);   // Karte: hell → Schachbrett-Schleier → Gefallen-Verdunklung
+        const dz = Z.stil === 'sturz' ? PP_FX71_DAUER_S : PP_FX32_DAUER, v = t >= PP_FX32_HALT + dz ? 0 : (t >= PP_FX32_HALT + dz * 0.62 ? 2 : 1);   // Karte: hell → Schachbrett-Schleier → Gefallen-Verdunklung
         if (v !== Z.veil) {
           Z.veil = v;
           // Schachbrett-Schleier in Hero-Pixel-Zellen (vorher fest `4px · --board-scale`: gebrochene, gröbere Zelle als die Figur): Zelle dieser Zone = Rasterzelle der Effekte (`ppFxZelle`)

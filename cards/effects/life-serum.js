@@ -28,10 +28,24 @@
 //  waere Nachahmung der Vorlage statt ihrer Begruendung.
 //
 //  Kein HOPT: der Kartentext nennt keine Einsatzgrenze.
+//
+//  ── ANIMATION (Pixelart, public/app-fx-70.jsx, `life_serum_shot`) ──
+//  Trailer-Look: eine rosa Kugel LÄDT am Ablagestapel des Spielers (0,6 s, Radius 2 → 9, kreisende Herzen), fliegt 0,9 s im Bogen zum Ziel und löst
+//  beim Einschlag den Heilimpuls (`healing_hearts`, app-fx-50) samt Strahlen aus. Der HP-Gewinn (Zahl, Balken) fällt erst beim Einschlag (HEIL_MS).
+//  Rückfall des Clients (Retro, reduzierte Bewegung, `window.__ppFx70Aus`): `healing_hearts` zum Einschlagszeitpunkt (ohne Kugel).
+//  EINE Zeile zurück zum alten Look (Herzen sofort am Ziel, 180 ms Wartezeit): `KUGEL = false`.
 // ═══════════════════════════════════════════
 
 const CARD_NAME = 'Life Serum';
 const HP_GAIN = 150;   // v1065 (Als Balanceaenderung 14.9.): war 200
+
+// Zeiten (ms) der Zonen-Animation `life_serum_shot` (app-fx-70.jsx, 30 Hz): Laden 600 + Flug 900 = Einschlag; `VORLAUF_MS` = Mount-Vorlauf im Client
+// (ZONE_ANIM_MOUNT_DELAY_MS 100 + Aufbau, wie bei Tiger Kick/Venom Snake). Engine-Wartezeit = Animationszeit + Vorlauf (der Heilimpuls beginnt beim Einschlag).
+const KUGEL = true;   // false = der bisherige Look (`healing_hearts` sofort am Ziel, 180 ms) — die einzige Stelle, die zwischen den beiden Looks umschaltet
+const KUGEL_LADE_MS = 600;
+const KUGEL_FLUG_MS = 900;
+const VORLAUF_MS = 120;
+const HEIL_MS = KUGEL ? KUGEL_LADE_MS + KUGEL_FLUG_MS + VORLAUF_MS : 180;
 
 module.exports = {
   isPotion: true,
@@ -77,7 +91,8 @@ module.exports = {
   // Namens: ein Animationstyp, der nicht im Register von app-board.jsx
   // steht, tut still gar nichts — der Fehler faellt erst im Spiel auf.
   // `healing_hearts` ist registriert und passt (Lebenskraft steigt).
-  animationType: 'healing_hearts',
+  // Mit der Kugel (`life_serum_shot`) sendet `resolve` die Animation selbst (Quelle + Ziel) — kein zusaetzliches `potion_resolved` am Ziel.
+  animationType: KUGEL ? 'none' : 'healing_hearts',
 
   async resolve(engine, pi, selectedIds, validTargets) {
     if (!selectedIds || selectedIds.length === 0) return;
@@ -98,13 +113,15 @@ module.exports = {
     }
     if (!ziel) return;
 
+    if (KUGEL) engine.sync();   // Zielwahl-Fenster schließen, bevor die Kugel fliegt (sonst steht „Inject!" über der Flugbahn)
     engine._broadcastEvent('play_zone_animation', {
-      type: 'healing_hearts',
+      type: KUGEL ? 'life_serum_shot' : 'healing_hearts',
       owner: target.owner,
       heroIdx: target.heroIdx,
       zoneSlot: target.type === 'hero' ? -1 : target.slotIdx,
+      ...(KUGEL ? { von: { owner: pi, pile: 'deleted' } } : null),
     });
-    await engine._delay(180);
+    await engine._delay(HEIL_MS);
 
     // W13 (Q144, Al: Resistance blockt JEDEN Nicht-Schaden-Effekt): der Max-HP-Gewinn auf einen
     // Helden fragt den zentralen Pruefer (Animation lief schon).

@@ -2849,6 +2849,8 @@ function ProfileScreen() {
   // reads this on game start and gates every animation + transition
   // when off.
   const [playAnimations, setPlayAnimations] = useState(user.play_animations == null ? true : !!user.play_animations);
+  // Screen Shake & Flash (app-fx-67.jsx): nur dieses Gerät (Browserspeicher), kein Serverfeld.
+  const [screenShake, setScreenShake] = useState(() => (window.ppFx67WackelnOption ? window.ppFx67WackelnOption() : true));
   // v1463: animierte Helden (Display Heroes) und ihr Einklappen während
   // Zielwahl-Dialogen (Dynamic Heroes). Fehlt der Wert, gelten beide als an;
   // ohne Display gibt es kein Dynamic.
@@ -3627,6 +3629,11 @@ function ProfileScreen() {
               <ProfilSchalter an={playAnimations} onToggle={togglePlayAnimations}
                 label="Play Animations"
                 tipp="Disable to skip battle animations — faster gameplay on low-power devices."
+                zeigeTipp={zeigeTipp} versteckeTipp={versteckeTipp} />
+              <ProfilSchalter an={screenShake}
+                onToggle={() => { const neu = !screenShake; setScreenShake(neu); if (window.ppFx67SetzeWackelnOption) window.ppFx67SetzeWackelnOption(neu); }}
+                label="Screen Shake"
+                tipp="The board shakes and flashes briefly on heavy hits and landings. Disable if it bothers you (this device only)."
                 zeigeTipp={zeigeTipp} versteckeTipp={versteckeTipp} />
               {/* v1463: Helden-Anzeige */}
               <ProfilSchalter an={displayHeroes}

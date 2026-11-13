@@ -157,6 +157,8 @@ async function placeBiomancyToken(engine, pi, heroIdx, potionName, level, opts =
   engine._broadcastEvent('play_zone_animation', {
     type: 'biomancy_bloom',
     owner: feld, heroIdx, zoneSlot: actualSlot,
+    // Client (app-fx-69, Trailer-Look): Kraftstrom-Kugeln aus der Biomancy-Fähigkeitskarte (`quelle: 'ability'`) bzw. dem Helden (Kyli) in die Zone statt der Blumen; der Token landet nach `animationMs`.
+    kraftstrom: true, quelle: (opts.sourceName || 'Biomancy') === 'Biomancy' ? 'ability' : 'hero',
   });
   if (opts.animate !== false) await engine._delay(opts.animationMs ?? 600);
   // ERST JETZT synchronisieren — der Token soll erscheinen, wenn SEINE

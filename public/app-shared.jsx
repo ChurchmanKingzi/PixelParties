@@ -4094,6 +4094,17 @@ const ZONE_ANIM_SFX = {
   ],
   // Acid / poison (poison has its own sound per user)
   acid_splash:             { name: 'elem_acid' },
+  // Acid Vial / Life Serum als Projektil (app-fx-70): animationsrelativ — Laden bis 0,7 s / 0,6 s, Abschuss (`projectile`), Einschlag bei 1,4 s / 1,5 s (der Mount-Vorlauf kommt von `playSFXForZoneAnim` dazu).
+  // Der Heilklang des Life Serum kommt wie bisher von der HP-Änderung selbst (`healing_hearts` ist stumm).
+  acid_spit: [
+    { name: 'elem_acid',  opts: { rate: 1.6, volume: 0.25, delay: 1, category: null, dedupe: 0 } },
+    { name: 'projectile', opts: { rate: 0.75, volume: 0.55, delay: 700, category: null, dedupe: 0 } },
+    { name: 'elem_acid',  opts: { rate: 1.0, volume: 1.0, delay: 1400, category: null, dedupe: 0 } },
+  ],
+  life_serum_shot: [
+    { name: 'elem_holy',  opts: { rate: 1.5, volume: 0.22, delay: 1, category: null, dedupe: 0 } },
+    { name: 'projectile', opts: { rate: 1.1, volume: 0.5, delay: 600, category: null, dedupe: 0 } },
+  ],
   plague_smoke:            { name: 'poison' },
   poison_vial:             { name: 'poison' },
   poison_tick:             { name: 'poison' },
@@ -7658,6 +7669,8 @@ function spawnZoneLandFx(el, opts) {
   if (window.ppBattleCamFocus) window.ppBattleCamFocus(el);
   if (r.bottom < 0 || r.right < 0
       || r.top > window.innerHeight || r.left > window.innerWidth) return;   // ausserhalb des Bildes
+  // ★ Trailer-Look (app-fx-67.jsx): Bildschirmwackeln bei der Landung (Kreatur 10/0,4 s, sonst 6/0,22 s; aus bei Retro, reduzierter Bewegung und per Profil-Schalter)
+  if (window.ppFx67Landung) window.ppFx67Landung(el, opts.variant);
 
   // Auf Telefonen die halbe Funkenzahl — dieselbe Schwelle wie der
   // Lite-Modus in style.css.
@@ -7717,7 +7730,12 @@ function spawnZoneLandFx(el, opts) {
   //   OBEN   — Saeule, Schein, Glanzstreifen, Irrlichter und Funken auf
   //            der festen Schicht. Die highlighten die ganze Karte,
   //            statt nur unten herum zu leuchten.
+  // ★ app-fx-69: Biomancy-Token (steht als Potion-Name im Spielzustand, also ohne Variante 'summon'): das Kraftstrom-Ereignis hat die Zone gemerkt → Token-Look
+  if (opts.variant !== 'summon' && window.ppFx69BioLandung && window.ppFx69BioLandung(el)) return;
   if (opts.variant === 'summon') {
+    // ★ app-fx-69 (Trailer-Look): Beschwörungskreis in der Brettebene, gedithertes Kartenerscheinen, Lichtsäule, Kraftstrom vom Helden — Pixelart-Leinwand. Läuft der Look, entfällt der CSS-Kreis unten;
+    // Rückfall (Retro, reduzierte Bewegung, Schalter `__ppFx69Aus`, Zone nicht messbar): false → der alte Kreis.
+    if (window.ppFx69Beschwoerung && window.ppFx69Beschwoerung(el, { color: farbe })) return;
     const wirt = el.closest('.board-plane-clip') || el.closest('.pz-plane-clip');
     const ebene = wirt && wirt.querySelector(':scope > .board-plane, :scope > .pz-board-plane');
 

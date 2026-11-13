@@ -9291,7 +9291,7 @@ async function doPlaySpell(room, pi, { cardName, handIndex, heroIdx, charmedOwne
     // ★ W63d (Al, 22.10.2026): der Auftritt (Bild, Protokollzeile, Flug) wird SCHON JETZT vorgemerkt — Kostenwahl (`payActivationCost`), Reaktionsfenster und Zielwahl kommen danach,
     // und alles davon ist noch abbrechbar. Der Auftritts-Puffer der Engine hält zurück, was an Gegner/Zuschauer gehen würde, bis die Karte committed ist.
     if (gs._pendingCardReveal) room.engine._firePendingCardReveal();   // eine noch offene Vormerkung der AUSLOESENDEN Karte (Kreatur-Effekt, der einen Zauber wirkt) ist längst committed
-    gs._pendingCardReveal = { cardName, ownerIdx: pi };
+    gs._pendingCardReveal = { cardName, ownerIdx: pi, wirker: (heroless || _viaCreature) ? null : { owner: heroOwner, heroIdx: heroIdxPub, art: String(cardData.cardType || 'spell').toLowerCase() } };   // `wirker`: der Held, der wirkt (hero_cast, app-fx-68: Hüpfer + Flackern beim Commit)
     if ((cardData.subtype || '').toLowerCase() === 'attachment') {
       broadcastHandToBoard(room, pi, { cardName, handIndex, zoneType: 'hero', heroIdx });
     }
@@ -10834,7 +10834,7 @@ async function doActivateFreeAbility(room, pi, { heroIdx, zoneIdx, zoneKind, cha
       inst.heroOwner = borrowerOwner;
     }
 
-    gs._pendingCardReveal = { cardName: abilityName, ownerIdx: pi };
+    gs._pendingCardReveal = { cardName: abilityName, ownerIdx: pi, wirker: { owner: heroOwner, heroIdx, art: 'ability' } };
     room.engine._setPendingPlayLog('ability_activated', { player: gs.players[pi].username, card: abilityName, hero: hero.name, level });
 
     // Live CPU: stream the Ability AND play its activation flash BEFORE
@@ -11766,7 +11766,7 @@ async function doActivateAbility(room, pi, { heroIdx, zoneIdx, zoneKind, charmed
     // ★ W63d: der Auftritt wird VOR Reaktionsfenster und Handler vorgemerkt (die Aktivierung kann in ihren Fragen noch abbrechen); die Aktivierungs-Animation
     // (`ability_activated`) und alle Protokollzeilen halten sich im Auftritts-Puffer, bis die Fähigkeit committed ist. Das Reaktionsfenster des Gegners committet.
     if (gs._pendingCardReveal) room.engine._firePendingCardReveal();
-    gs._pendingCardReveal = { cardName: abilityName, ownerIdx: pi };
+    gs._pendingCardReveal = { cardName: abilityName, ownerIdx: pi, wirker: { owner: heroOwner, heroIdx, art: 'ability' } };
     // v353: Auftritt auch fuer Abilities MIT Aktionskosten. Bisher hatte
     // nur `doActivateFreeAbility` einen — dass eine Trade-Aktivierung die
     // Karte zeigt und eine Leadership-Aktivierung nicht, war eine
