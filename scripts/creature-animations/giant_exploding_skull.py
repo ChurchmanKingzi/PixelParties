@@ -24,8 +24,9 @@ Fest bleiben: Schädelform, Umriss, Augenform, Mundform, die starken Beinbögen.
 
 Ablauf (48 Frames à 65 ms = 3,12 s, nahtlos) — Konventionen der Basiskarte, langsamer wegen der Größe:
 * Schwerer Hüpfer: der ganze Riese hebt sich 1 px (Frames 4–20, ein langsamer Zyklus), sonst steht er (Frame 0 = Original).
-* Füße: die acht senkrechten Beinspitzen scharren abwechselnd 1 px nach außen und zurück (Zeilenversatz wächst zur Spitze, Periode 24, je Fuß andere Phase); der Ansatz bleibt fest, die
-  dicken Beine bleiben 4-verbunden.
+* Beine (Runde 6, ersetzt das frühere „Scharren“ der Fußspitzen): acht Spinnenbeine als eigene Ketten Hüfte → Knie → Fuß; sie tippeln in einer Tetrapod-Welle (je Bein 6 Frames: Oberschenkel schwenkt um die
+  Hüfte hoch, Fuß hebt sich 2–3 px, Fußspitze schwenkt 1 px aus, setzt wieder auf; 2 Frames Versatz von Bein zu Bein, zwei Wellen je Schleife). Hüften bleiben am Schädel, Beine überall so dick wie gemalt
+  (siehe BEINE/bein_pixel).
 * Zünddrähte: die drei Drähte schwingen im Luftzug (Zeilenversatz wächst zum freien Ende bis ±2 px, Nachlauf, Perioden 24/16/48 — die Brückenpixel gegen Lücken (verbinde_luecken8) kommen in der Farbe des Drahts).
 * Zündfunke: die Garbe am Schnurende flackert zwischen acht Posen (Pose 0 = Original, Posen 2–3 Frames; weißer Kern, unregelmäßige gelbe Strahlen von 2–6 px), dazu steigen zwölf
   1-px-Funken (Weiß → Gelb → Olivgelb) 3–5 px auf und kreiseln leicht (Partikel).
@@ -93,23 +94,86 @@ AUGE_R = [(int(y), int(x)) for y, x in _teile[1]]
 MUND = [(int(y), int(x)) for y, x in _teile[2]]
 assert len(_teile) == 3, [len(t) for t in _teile]
 AUGEN = [AUGE_L, AUGE_R]
-# Füße: (Name, Maske, y-Spanne für den Versatz (oben fest, unten maximal), Richtung nach außen (−1 links / +1 rechts), Phase)
-FUESSE = {
-    'l1': (OPAK & (xx <= 3) & (yy >= 21) & (yy <= 31) & _farbmaske(CA), (21, 31), -1, 0.0),
-    'l2': (OPAK & (xx >= 5) & (xx <= 7) & (yy >= 32) & (yy <= 37) & _farbmaske(CA), (32, 37), -1, 1.1),
-    'l3': (OPAK & (xx >= 12) & (xx <= 14) & (yy >= 38) & (yy <= 44) & _farbmaske(CA), (38, 44), -1, 2.2),
-    'r1': (OPAK & (xx >= 60) & (yy >= 21) & (yy <= 31) & _farbmaske(CA), (21, 31), 1, 3.3),
-    'r2': (OPAK & (xx >= 56) & (xx <= 58) & (yy >= 32) & (yy <= 37) & _farbmaske(CA), (32, 37), 1, 4.4),
-    'r3': (OPAK & (xx >= 49) & (xx <= 51) & (yy >= 38) & (yy <= 44) & _farbmaske(CA), (38, 44), 1, 5.5),
-    'bl': (OPAK & (xx >= 20) & (xx <= 22) & (yy >= 46) & _farbmaske(CA), (46, 52), -1, 0.7),
-    'br': (OPAK & (xx >= 41) & (xx <= 43) & (yy >= 46) & _farbmaske(CA), (46, 52), 1, 3.9),
+# ── Runde 6: ACHT SPINNENBEINE als eigene Ketten (Nutzer: „Anatomie einer Spinne mit den acht dicken schwarzen Beinen; die Beine sollen sich bewegen wie Spinnenbeine“) ──
+# Je Seite vier Beine (links; rechts spiegelbildlich, x → 63 − x), jedes = Hüfte (am Schädel, fest) → Oberschenkelbogen → Knie → Unterschenkel (senkrecht) → Fuß:
+#   Bein 1: Hüfte (15–16, 20–23), Bogen Zeilen 17–19 über x 3–15, Knie-Ecke (0–5, 17–22), Unterschenkel x 0–3 bis Fuß Zeile 31
+#   Bein 2: Hüfte (13–16, 26–28), Bogen Zeilen 25–28 über x 6–14, Unterschenkel x 5–9 bis Fuß Zeile 37
+#   Bein 3: Hüfte (18–22, 31–36), Bogen Zeilen 34–36 über x 13–21, Unterschenkel x 12–15 bis Fuß Zeile 44
+#   Bein 4: Hüfte unter dem Schädel (20–25, 42–44, fest), Bein x 20–24 Zeilen 45–52 (zeigt nach vorn/unten)
+# Schritt (Tippeln): der Oberschenkel schwenkt starr um die Hüfte nach oben (Spaltenversatz, Gefälle ≤ 1 px je Spalte, Hüftspalten bleiben am Schädel), Knie und Unterschenkel gehen als Ganzes mit (Fuß hebt sich
+# 2–3 px vom Boden), am höchsten Punkt schwenkt die Fußspitze 1 px nach außen (Zeilenversatz der untersten Zeilen), dann setzt der Fuß wieder auf. Nichts wird gestreckt oder gestaucht: jede Spalte/Zeile
+# behält ihre Pixel, das Bein bleibt überall so dick wie gemalt. Bein 4 (senkrecht, kein Bogen) beugt stattdessen das Knie nach außen (Zeilen 47 ff. weichen 1–2 px aus, der Fuß hebt sich 1–2 px; Beinlänge
+# entlang des Knicks bleibt ≈ gleich). Frame 0 = Original (alle acht Füße am Boden).
+SCHWARZ = _farbmaske(CA)
+_BEIN_L = {
+    1: SCHWARZ & (((yy >= 17) & (yy <= 24) & (xx <= 16)) | ((yy >= 25) & (yy <= 31) & (xx <= 2))),
+    2: SCHWARZ & (((yy >= 25) & (yy <= 28) & (xx >= 6) & (xx <= 16)) | ((yy >= 29) & (yy <= 37) & (xx >= 5) & (xx <= 9))),
+    3: SCHWARZ & (((yy >= 31) & (yy <= 36) & (xx >= 13) & (xx <= 22)) | ((yy >= 37) & (yy <= 44) & (xx >= 12) & (xx <= 15))),
+    4: SCHWARZ & (yy >= 45) & (xx >= 20) & (xx <= 24),
 }
-for _k, (_m, _sp, _d, _ph) in FUESSE.items():
-    assert int(_m.sum()) > 8, (_k, int(_m.sum()))
-BEWEGT = FUNKE | DRAHT_B | DRAHT_M | DRAHT_O
-for _m, _sp, _d, _ph in FUESSE.values():
-    BEWEGT = BEWEGT | _m
+# je Bein: Hüftspalte x0 (ab dort Versatz 0), Spannweite des Schwenks in Spalten, größter Hub, Unterschenkel (x ≤ …, y ≥ …), Fußspitze (y ≥ …: schwenkt 1 px nach außen)
+_BEIN_PAR = {1: dict(x0=15, spann=9, hub=3, us=(3, 22), spitze=27), 2: dict(x0=14, spann=5, hub=2, us=(9, 30), spitze=34), 3: dict(x0=17, spann=3, hub=2, us=(15, 38), spitze=41), 4: dict(hub=2)}
+BEINE = {}
+for _nr, _m in _BEIN_L.items():
+    BEINE['l%d' % _nr] = (_m, _nr, False)
+    BEINE['r%d' % _nr] = (_m[:, ::-1], _nr, True)
+_alle = np.zeros((sh, sw), bool)
+for _k, (_m, _nr, _sp) in BEINE.items():
+    assert int(_m.sum()) > 20 and not (_alle & _m).any(), _k
+    assert cv2.connectedComponents(_m.astype(np.uint8), connectivity=4)[0] == 2, ('Bein nicht 4-verbunden', _k)
+    _alle |= _m
+assert (_alle <= SCHWARZ).all() and int((SCHWARZ & (yy >= 45) & ~_alle).sum()) == 0
+BEWEGT = FUNKE | DRAHT_B | DRAHT_M | DRAHT_O | _alle
 BASIS = OPAK & ~BEWEGT
+
+# Schrittfolge (Tetrapod-Welle: es heben nie zwei Nachbarbeine derselben Seite zugleich; je Bein 6 Frames, 2 Frames versetzt, zwei Wellen je Schleife, dazwischen kurze Ruhe)
+SCHRITT_HUB = {3: [1, 2, 3, 3, 2, 1], 2: [1, 2, 2, 2, 2, 1]}
+SCHRITT_AUS = [0, 0, 1, 1, 0, 0]
+FOLGE_BEINE = [['l1', 'r2', 'l3', 'r4', 'r1', 'l2', 'r3', 'l4'], ['r1', 'l2', 'r3', 'l4', 'l1', 'r2', 'l3', 'r4']]
+SCHRITT = {k: {} for k in BEINE}                                                      # Bein → {Frame: (Hub, Ausschwenken)}
+for _w, _folge in enumerate(FOLGE_BEINE):
+    for _j, _k in enumerate(_folge):
+        _hub = SCHRITT_HUB[_BEIN_PAR[BEINE[_k][1]]['hub']]
+        for _t in range(6):
+            SCHRITT[_k][_w * 24 + 1 + 2 * _j + _t] = (_hub[_t], SCHRITT_AUS[_t])
+assert all(max(v) < N and 0 not in v for v in SCHRITT.values())
+BEIN4_KNICK = {0: None, 1: [0, 1, 1, 1, 0], 2: [1, 2, 2, 1]}                           # Ausweichen der 3-px-Zeilen ab Zeile 47 nach außen (Liste = verbleibende Zeilen; Fuß 1 bzw. 2 px höher)
+
+
+def bein_pixel(nr, d, aus):
+    """Pixel (x, y im Sprite, LINKE Seite) von Bein nr beim Hub d (Fuß d px über dem Boden) und Ausschwenken der Fußspitze um `aus` px."""
+    ys, xs = np.nonzero(_BEIN_L[nr])
+    pts = list(zip(xs.tolist(), ys.tolist()))
+    if not d:
+        return pts
+    out = []
+    if nr == 4:
+        knick = BEIN4_KNICK[d]
+        for (x, y) in pts:
+            if y <= 46:
+                out.append((x, y))
+            elif y - 47 < len(knick):
+                out.append((x - knick[y - 47], y))
+        return out
+    par = _BEIN_PAR[nr]
+    for (x, y) in pts:
+        s = int(round(d * min(1.0, max(0.0, (par['x0'] - x) / float(par['spann'])))))
+        nx = x - (aus if (x <= par['us'][0] and y >= par['spitze']) else 0)
+        out.append((nx, y - s))
+    return out
+
+
+def _bein(name, i):
+    maske, nr, spiegel = BEINE[name]
+    d, aus = SCHRITT[name].get(i, (0, 0))
+    out = L.leer(H, W)
+    for (x, y) in bein_pixel(nr, d, aus):
+        X, Y = PAD_L + (sw - 1 - x if spiegel else x), PAD_T + y
+        if not (0 <= X < W and 0 <= Y < H):
+            raise L.ClipError(f'Bein {name}: Pixel ({X},{Y}) außerhalb der Leinwand')
+        out[Y, X] = (0, 0, 0, 255)
+    return out
+
 
 # Drähte: (Maske, Pivot-Zeile (Ansatz), Amplitude, Periode, Phase)
 DRAEHTE = {'blau': (DRAHT_B, 11, 2.2, 24, 0.0), 'oliv': (DRAHT_O, 14, 2.2, 16, 1.7), 'rot': (DRAHT_M, 18, 2.2, 48, 3.0)}
@@ -144,24 +208,6 @@ FUNKEN_POSE = [None] + [A.strahlenfunke(_rnd, (16, 8), CL, CG, kern_pixel=[(-1, 
                                          n_strahlen=(8, 10), laenge=(3, 6), box=(7, 1, 22, 15), dick=0.85) for _ in range(7)]
 FOLGE_F = A.pose_folge(random.Random(21), 8, tempo=(2, 3))
 ZUENDFUNKEN = [(2, -1), (6, 0), (10, 1), (14, -1), (18, 0), (22, 1), (26, -1), (30, 0), (34, 1), (38, -1), (42, 0), (46, 1)]       # Startframe, seitlicher Weg
-
-
-def _fuss(sp_ebene, name, i):
-    """Fuß (Maske `name`): Zeilenversatz wächst von 0 (Ansatz, oberste Zeile) zur Spitze auf bis ±1 px nach außen; Frame 0 = Quellform."""
-    maske, (y0, y1), richtung, phi = FUESSE[name]
-    layer = L.platz(np.where(maske[..., None], sp_ebene, 0).astype(np.uint8), H, W, PAD_L, PAD_T)
-    out = L.leer(H, W)
-    for y in range(PAD_T + y0, PAD_T + y1 + 1):
-        xs = np.nonzero(layer[y, :, 3])[0]
-        if not len(xs):
-            continue
-        frac = (y - (PAD_T + y0)) / float(max(1, y1 - y0))
-        dx = richtung * int(round(1.5 * frac * (math.sin(2 * math.pi * i / 24 + phi) - math.sin(phi))))      # 0 in Frame 0
-        if xs.min() + dx < 0 or xs.max() + dx >= W:
-            raise L.ClipError(f'Fuß {name}: Zeile {y} würde um {dx} px aus der Leinwand')
-        for x in xs:
-            out[y, x + dx] = layer[y, x]
-    return out
 
 
 def _draht(sp_ebene, name, i):
@@ -213,8 +259,8 @@ def figur(i):
     sp = sprite_mit_effekten(i)
     dyb = HOP[i]
     ebenen = [(L.platz(np.where(BASIS[..., None], sp, 0).astype(np.uint8), H, W, PAD_L, PAD_T), 0, dyb)]
-    for name in FUESSE:
-        ebenen.append((_fuss(sp, name, i), 0, dyb))
+    for name in BEINE:
+        ebenen.append((_bein(name, i), 0, dyb))
     for name in DRAEHTE:
         ebenen.append((_draht(sp, name, i), 0, dyb))
     neu = FUNKE | (~OPAK & (sp[..., 3] > 0))                                      # Funkengarbe (Original und neu gesetzte Pixel)
@@ -263,7 +309,7 @@ def frame(i):
 
 if __name__ == '__main__':
     print('Augen:', [len(a) for a in AUGEN], 'Mund:', len(MUND), '| Lidfarben:', sorted(set(LID.values())), '| Funke:', int(FUNKE.sum()),
-          '| Drähte (blau/oliv/rot):', int(DRAHT_B.sum()), int(DRAHT_O.sum()), int(DRAHT_M.sum()), '| Füße:', {k: int(v[0].sum()) for k, v in FUESSE.items()})
+          '| Drähte (blau/oliv/rot):', int(DRAHT_B.sum()), int(DRAHT_O.sum()), int(DRAHT_M.sum()), '| Beine:', {k: int(v[0].sum()) for k, v in BEINE.items()})
     frames = [frame(i) for i in range(N)]
     fs = [figur(i) for i in range(N)]
     figs = [f['fig'] for f in fs]
