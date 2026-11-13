@@ -1,0 +1,15 @@
+{
+  "creature": "Dragsparov, the King of Dragons",
+  "sheet": "dragsparov-the-king-of-dragons.png",
+  "frameWidth": 31,
+  "frameHeight": 37,
+  "frames": 60,
+  "frameMs": 80,
+  "loop": true,
+  "layout": "horizontal",
+  "padTop": 2,
+  "padLeft": 2,
+  "padRight": 2,
+  "padBottom": 2,
+  "faceX": 15.5
+}

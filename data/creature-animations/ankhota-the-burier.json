@@ -1,0 +1,15 @@
+{
+  "creature": "Ankhota, the Burier",
+  "sheet": "ankhota-the-burier.png",
+  "frameWidth": 63,
+  "frameHeight": 60,
+  "frames": 72,
+  "frameMs": 75,
+  "loop": true,
+  "layout": "horizontal",
+  "padTop": 2,
+  "padLeft": 2,
+  "padRight": 2,
+  "padBottom": 2,
+  "faceX": 31.5
+}

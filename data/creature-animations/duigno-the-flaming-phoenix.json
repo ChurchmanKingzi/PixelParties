@@ -1,0 +1,15 @@
+{
+  "creature": "Duigno, the Flaming Phoenix",
+  "sheet": "duigno-the-flaming-phoenix.png",
+  "frameWidth": 99,
+  "frameHeight": 65,
+  "frames": 72,
+  "frameMs": 70,
+  "loop": true,
+  "layout": "horizontal",
+  "padTop": 2,
+  "padLeft": 2,
+  "padRight": 2,
+  "padBottom": 2,
+  "faceX": 49.5
+}

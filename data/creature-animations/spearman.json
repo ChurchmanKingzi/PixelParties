@@ -1,0 +1,15 @@
+{
+  "creature": "Spearman",
+  "sheet": "spearman.png",
+  "frameWidth": 30,
+  "frameHeight": 36,
+  "frames": 60,
+  "frameMs": 75,
+  "loop": true,
+  "layout": "horizontal",
+  "padTop": 2,
+  "padLeft": 2,
+  "padRight": 2,
+  "padBottom": 2,
+  "faceX": 15.0
+}

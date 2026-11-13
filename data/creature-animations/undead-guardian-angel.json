@@ -1,0 +1,15 @@
+{
+  "creature": "Undead Guardian Angel",
+  "sheet": "undead-guardian-angel.png",
+  "frameWidth": 35,
+  "frameHeight": 63,
+  "frames": 72,
+  "frameMs": 75,
+  "loop": true,
+  "layout": "horizontal",
+  "padTop": 2,
+  "padLeft": 2,
+  "padRight": 2,
+  "padBottom": 2,
+  "faceX": 17.5
+}
