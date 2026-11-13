@@ -11,9 +11,9 @@ Der Speer ist starr und folgt den Händen (bewegt sich hier gar nicht). Kopf nie
 
 Ablauf (48 Frames à 75 ms = 3,6 s). Frame 0 = Original:
 * Atmen (Periode 24): in der Brust (y 11) wird eine texturierte Zeile eingefügt (TX.streck_zeile), Kopf und Schultern heben sich 1 px; Hände, Speer, Beine bleiben.
-* Ohrenzucken: das linke Ohr (Frames 9–11) und das rechte Ohr (Frames 33–35) kippen 1 px nach außen (starr; das frei werdende Pixel am Ohransatz bekommt die Umrissfarbe).
+* Ohrenzucken: das linke Ohr (Frames 9–11) und das rechte Ohr (Frames 33–35) legen sich kurz 1 px an (die Spitzenzeile entfällt, die Zeile darunter wird zur Umrisskante).
 * Sparkle auf der großen Speerspitze (Eisen), Frames 20–23.
-Ergänzungen: (9,1) bzw. (14,1) Umrissfarbe (49,24,0), nur während das Ohr gekippt ist.
+Ergänzungen: (8,1) bzw. (15,1) Umrissfarbe (49,24,0) statt Ohr-Innenfarbe, nur während das Ohr angelegt ist.
 """
 import numpy as np
 
@@ -39,11 +39,13 @@ def frame(i, nur=None):
     oben = OBEN.copy()
     l = 1 if 9 <= i <= 11 else 0
     r = 1 if 33 <= i <= 35 else 0
-    if l:
-        oben[sz.PT + 1, sz.PL + 9] = UMRISS + (255,)
-    if r:
-        oben[sz.PT + 1, sz.PL + 14] = UMRISS + (255,)
-    kopf = L.zusammen(sz.H, sz.W, [(oben, 0, 0), (OHR_L, -l, 0), (OHR_R, r, 0)])
+    ebenen = [(oben, 0, 0)]
+    for zuck, ohr, x0 in ((l, OHR_L, 7), (r, OHR_R, 14)):
+        if zuck:                                     # Ohr legt sich an: die Spitzenzeile entfällt, die Zeile darunter wird zur Umrisskante
+            oben[sz.PT + 1, sz.PL + x0:sz.PL + x0 + 3] = UMRISS + (255,)
+        else:
+            ebenen.append((ohr, 0, 0))
+    kopf = L.zusammen(sz.H, sz.W, ebenen)
     # Atmen: die Zeile y 11 wird im Oberteil eingefügt (darunter steht alles)
     ganz = L.zusammen(sz.H, sz.W, [(UNTEN, 0, 0), (kopf, 0, 0)])
     ganz = TX.streck_zeile(ganz, sz.PT + 11, n)

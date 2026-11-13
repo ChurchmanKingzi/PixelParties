@@ -21,7 +21,7 @@ Idee: Der Assassine lauert mit vorgehaltenem Schwert – die Klinge wippt als st
 Ablauf (64 Frames à 70 ms = 4,5 s, nahtlos):
 * Schwertarm (Arm + Griff + Klinge, alles x ≥ 12 in y 14–17) als STARRE Einheit: 1 px hoch (Frames 3–13), Ruhe, 1 px tief (Frames 19–29), Ruhe … (Periode 32). Nichts wird gestreckt; die Schulter (x ≤ 11) bleibt.
 * Atmen (Periode 32, um 8 Frames versetzt): Beinzeile 22 wird einmal texturiert eingefügt (anim_textur) – Rumpf, Arme, Schwert und Kopf steigen 1 px, Stiefel bleiben.
-* Lichtband: läuft in den Frames 36–47 von der Parierstange zur Spitze über die Klinge (obere Zeile (204,204,196) → Weiß (240,240,240), untere (122,121,117) → (204,204,196)).
+* Lichtband: läuft in den Frames 36–47 von der Parierstange zur Spitze über die Klinge (die stahlgraue untere Zeile (122,121,117) wird auf 3 px Breite so hell wie die obere (204,204,196)).
 * Ohrzucken: rechtes Ohr (Spalten x 11–16) knickt in den Frames 8–10 und 50–52 an der Spitze 1 px nach unten (Spaltenversatz mit dem Abstand zum Ansatz, Ansatz fest); linkes Ohr (Zeilen 0–3) zuckt in den Frames
   22–24 um 1 px nach rechts (Zeilenversatz, Ansatz fest).
 * Blinzeln (Frames 30–32 und 58–60): nur das offene Auge (6–7, 10–11) nimmt die Fellfarbe (198,198,198)/(172,172,172) an.
@@ -44,7 +44,6 @@ spr, H, W, OFF = G.spr, G.H, G.W, G.OFF
 f = G.f
 FELL, FELL_D, UMRISS = f(5, 9), f(4, 9), f(0, 0)
 KL_H, KL_D, KL_W = f(20, 15), f(20, 16), f(8, 11)          # (204,204,196), (122,121,117), (240,240,240)
-G.erlaubt = G.erlaubt | {KL_W}                             # der Lichtreflex liegt an der Klingenoberkante (kein Umrissfehler)
 arm = G.da & (G.xx >= 12) & (G.yy >= 13) & (G.yy <= 18)
 klinge = G.da & (G.xx >= 20) & (G.yy >= 14)
 ohr_r = G.da & (G.xx >= 11) & (G.yy <= 5)
@@ -71,7 +70,7 @@ def frame(i):
                 for y in (15, 16):
                     if spr[y, x, 3]:
                         c = f(x, y)
-                        Hm.setze(a, {(x, y): KL_W if c == KL_H else KL_H if c == KL_D else c}, OFF)
+                        Hm.setze(a, {(x, y): KL_H if c == KL_D else c}, OFF)
     dy = -int(round(math.sin(L.sinus(i, 32))))
     fig = L.zusammen(H, W, [(o_l, 0, 0), (o_r, 0, 0), (k, 0, 0), (a, 0, dy)])
     if Hm.stufe(i - 8, 32, 1):
