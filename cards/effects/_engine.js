@@ -297,6 +297,11 @@ const MILL_CENTER_REVEAL_MS = 1100;
 const DECK_TO_DELETED_PACE_MS = 150;
 const DECK_TO_DELETED_FLIGHT_MS = 500;
 
+// ★ EINÄSCHERUNG (Client: public/app-fx-66.jsx): eine Karte, die sich selbst zerstört, brennt auf ihrem Platz und ihre Essenz fliegt zum Stapel. Das Ereignis `play_pile_transfer` trägt dann
+// `flightStyle: 'einaescherung'`; der Client braucht bis zur Landung der Essenz `EINAESCHERUNG_MS` (= `PP_FX66_LANDUNG_MS`, Bild 61 bei 30 Hz). Die Engine wartet nach der Zerstörung genau so lange
+// (abzüglich der seit dem Ereignis vergangenen Zeit), damit Folgeeffekte (Cute Cat: die drei gemillten Karten) erst NACH der Landung laufen. Spiellogik und Reihenfolge bleiben unverändert.
+const EINAESCHERUNG_MS = 2033;
+
 // ═══════════════════════════════════════════
 //  GENERIC TARGETING FILTER:
 //  Forced-target ("taunt") mechanic.
@@ -14751,6 +14756,7 @@ class GameEngine {
     }
     // Beanspruchter Kadaver: kein Flug zum Stapel — er geht gleich
     // von seiner Zone aus in die Hand oder in die neue Zone.
+    let _eaT0 = 0;   // Einäscherung: Sendezeit des Ereignisses (0 = keine)
     if (!opts.skipPileTransfer && !targetCard._deathClaim) {
       const fromZone = targetCard.zone;
       const isBoardZone = fromZone === ZONES.SUPPORT
@@ -14808,6 +14814,13 @@ class GameEngine {
         } else if (fromZone !== ZONES.SURPRISE) {
           payload.fromSlotIdx = targetCard.zoneSlot;
         }
+        // ★ EINÄSCHERUNG: die Karte zerstört SICH SELBST (Quelle == Ziel, z. B. `ctx.destroyCard(inst)`) oder das Kartenskript verlangt es (`opts.einaescherung`: Doomed Town Guard, Tamed Hell Fox, …).
+        // Nur Kreaturen im Support-Slot, keine Wiederbelebung (Extra Life) und keine Token (eigener Zerfall). Karten mit eigener Zerstörungs-Animation setzen `skipPileTransfer` oder senden ihr eigenes Ereignis.
+        const _selbst = !!opts.einaescherung || (!!source && (source === targetCard || (source.id != null && source.id === targetCard.id)));
+        if (_selbst && isCreatureTarget && fromZone === ZONES.SUPPORT && !_istToken && !targetCard._reviveAfterDeath) {
+          payload.flightStyle = 'einaescherung';
+          _eaT0 = Date.now();
+        }
         this._broadcastEvent('play_pile_transfer', payload);
       }
     }
@@ -14833,6 +14846,8 @@ class GameEngine {
       // geöffnet — hier nicht erneut (sonst zwei Prompts je Destroy).
       _cdChecked: true,
     });
+    // ★ EINÄSCHERUNG: warten, bis die Essenz den Stapel erreicht hat (Animationszeit des Clients, abzüglich der schon vergangenen Zeit)
+    if (_eaT0) { const rest = EINAESCHERUNG_MS - (Date.now() - _eaT0); if (rest > 0) await this._delay(rest); }
   }
 
   /**

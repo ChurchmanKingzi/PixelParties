@@ -255,7 +255,7 @@ module.exports = {
       engine.log('doomed_town_guard_expires', {
         player: engine.gs.players[owner]?.username,
       });
-      await engine.actionDestroyCard({ name: CARD_NAME, owner, controller: owner }, inst);
+      await engine.actionDestroyCard({ name: CARD_NAME, owner, controller: owner }, inst, { einaescherung: true });   // verbrennt (Client: app-fx-66)
       engine.sync();
     },
 

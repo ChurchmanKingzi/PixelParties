@@ -13,7 +13,7 @@
 //           Ist oben kein Platz (Kopf-Oberkante < 16 Zellen vom Fensterrand), rutscht er seitlich neben den Kopf des Ziels (`window.__ppFx63Kopfpos = 'seite'` erzwingt das, nur Tests).
 //           HUD: Der Kopf ist reine Effekt-Leinwand (z-index 10100) und verändert nichts am HUD; Zahlen (`.damage-number`, 10200) und Karten-/Brett-DOM bleiben davor bzw. darunter, wie bei allen Effekt-Leinwänden.
 //    2–4    KRALLEN  3 schmale diagonale Schlitze (dunkler 1-Zellen-Kern, weiß-gelbe Kante) bei Bild 2/3/4, verblassen per Bayer ab 5/6/7
-//    12–29  STERNE  3 handgezeichnete 5-zackige Sterne 7×7 (gelb, weißer Kern, oranger Schatten, Bayer-Blinken) kreisen Bild 13–23 um den Kopf des Ziels, lösen sich bei 24–29 auf (die Engine setzt Stun erst bei Bild 12)
+//    12–     STERNE  nicht mehr hier: der Stun-Status zeigt die kreisenden 7×7-Sterne (app-fx-64) ab Bild 12, solange der Stun aktiv ist (Engine setzt Stun bei Bild 12; bei Immunität keine Sterne)
 //  BRETTABBILDUNG: Homografie Brettebene → Fenster aus den Mitten aller Zonen (`ppFx60Homografie`, app-fx-60); Einheit u des Prototyps: ein Sprite-Pixel = 4,84 u. Tiefenmaske: stehende Helden (außer dem Ziel) mit Tiefe 1000 − y.
 //  PIXELGRÖSSE: Rasterzelle S = Hero-Pixel der Zielreihe (`ppFxZelleGedeckelt`, Regel in app-fx-57). Handy: Teilchen 50 %, kein Shake/Kopfwackler.
 //  Rückfall (Animationen aus, Retro, `__ppFxAlt`, reduzierte Bewegung, `window.__ppFx63Aus`, fehlende Quelle/Zone/Homografie): die alte Fassung `explosion` + `tiger_impact` am Ziel.
@@ -308,15 +308,7 @@
         const Lr = [24, 17, 19, 10][f];
         for (let q = 0; q < 8; q++) { const a = q * PI / 4, l = (q & 1) ? Lr * 0.6 : Lr; m.linie(X, Y, X + Math.cos(a) * l, Y + Math.sin(a) * l * 0.9, (f === 0 && !(q & 1)) ? 2 : 1, (q & 1) ? C.yel : C.white, 16); }
       }
-      // Sterne (Stun): 3 handgezeichnete 7×7-Sterne um den Kopf des Ziels (nicht bei gefallenem Ziel: `P.keineSterne`)
-      if (f >= 12 && f <= 29 && !P.keineSterne) {
-        const base = hero ? proj(T[0], T[1], 1.1 * thu) : proj(T[0], T[1] - hb * 0.476, 8), rx = 0.17 * thu * k0 + 5 + (hero ? 0 : 3), ry = rx * 0.38, vis = f <= 23 ? 16 : 16 * (1 - (f - 23) / 7); m.setZ(0);
-        for (let i = 0; i < 3; i++) {
-          const th = i * 2 * PI / 3 + (f - 13) * 0.62, X = rd(base[0] + Math.cos(th) * rx), Y = rd(base[1] - 4 + Math.sin(th) * ry), lv = ((f + i) % 3 === 2 ? 7 : 16) * vis / 16;
-          if (f < 13 && BAY[Y & 3][X & 3] >= (f - 11) * 8) continue;
-          star7(m, X, Y, lv);
-        }
-      }
+      // Sterne (Stun): kommen jetzt vom Status-Bild der betäubten Figur (app-fx-64, `PpFx64Sterne`) — erst wenn der Stun wirklich gesetzt ist (Engine, Bild 12), also nicht bei Immunität/Schild.
     }
   };
   /** Trockenlauf der Zeichenroutinen (Leerlauf): wärmt Code, Kopf-Zellenlisten und Wertetabellen, damit der erste Tritt nicht im kalten Code startet. */

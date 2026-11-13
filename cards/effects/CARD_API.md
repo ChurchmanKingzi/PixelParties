@@ -1033,6 +1033,9 @@ Feld `rarity` der Karte oder Prop, Standard Common). Der alte Foil (`card.foil`,
   `engine._rarityTake` auf; eigene Karten-Datenstrukturen, die Karten aus Zonen nehmen, ohne dass der Name in einer anderen Zone auftaucht, brauchen nichts.
   Ereignisse (`play_pile_transfer`, `card_reveal`, `deck_to_discard_animation` …) tragen `rarity`/`rarities`, wenn die Karte eine hat (`_broadcastEvent`); der Client
   fällt sonst auf `ppRarityLookup(name, owner)` zurück. Fliegende Kartenbilder (vanilla DOM): `ppFlugRarity(img, name, rarity, owner)` direkt nach `img.src = …`.
+  **Zeitvertrag der Pile-Flüge** (`deck_to_discard_animation`, `discard_to_deleted_animation`, `deleted_to_discard_animation`; Client `window.PpFx65.kartenFlug`, app-fx-65): Karte i startet i · 200 ms (Deck→Ablage/Gelöscht)
+  bzw. i · 160 ms (Ablage↔Gelöscht) nach dem Ereignis und LANDET nach 560 ms (mit `holdDuration` > 0: 700 ms Reise, `holdDuration` liegen, 300 ms ausblinken) — darauf beruhen `landAtMs` in
+  `_scheduleSelfDeleteTransit` und das Warten in `actionMillCards`. Wer die Dauer ändert, ändert beides. Eine Deck-Karte fliegt verdeckt los und dreht sich im Flug um (nur der Name der Karte, die in die öffentliche Ablage geht).
 
 ## ★ ZONEN-EINSCHLAG: JEDE PLATZIERUNG WIRD SICHTBAR (v1206 — Als Vorgabe 18.9.)
 
@@ -26658,6 +26661,8 @@ Hängen an der Attack eines Helden ein oder mehr Pfeile (`isArrow: true` UND „
 
 * **Archer-Pfeil:** Der Archer-Schuss spielt statt des Blitzes (`electric_strike`) einen einzelnen Holzpfeil (`archerPfeil` in `_arrows-shared.js`, Event `play_arrow_salvo` mit `einzel: true`, Sprite `holz` in `app-fx-52.jsx`). Der Server wartet den Flug (780 ms) und wendet danach den Schaden an; Schadenszahl, HP-Anzeige und Treffer-Blitz kommen wie immer aus dem Zustandsvergleich beim Einschlag. Clients ohne Pfeil bekommen den alten Blitz als `ersatz`. **Creatures sind noch nicht animiert:** der Pfeil startet von der Support-Zone des Archers (`srcKind: 'creature'`); sobald es animierte Creature-Sprites gibt, die Quelle auf deren Sprite umstellen (Vermerk an `archer.js` und `ppFx52Salve`).
 * **Animierter HP-Balken:** `PF.hpAnim` (reine Funktion der Zeit) + `PF.hpBar2`: Schaden = Balken schrumpft in 9 Stufen (300 ms), dunkelroter Verlustteil bleibt 250 ms stehen und rutscht dann in 8 Stufen nach; Heilung = dunkelgrüner Zuwachs, Zahl zählt mit. Gilt für die allgemeine HP-Anzeige (`ppFx52Hp`, `prev` = alter Wert) und je Pfeil-Einschlag in der Salve. Die Zahl der Karte (`ZaehlZahl` in `app-board.jsx`) zählt im selben Takt von ALT auf NEU (nur beim Wechsel, ohne Animationen/Retro springt sie).
+
+* **Einäscherung (Selbstzerstörer):** `actionDestroyCard` sendet `play_pile_transfer` mit `flightStyle: 'einaescherung'`, wenn sich eine Kreatur SELBST zerstört (Quelle == Ziel, z. B. `ctx.destroyCard(inst)` bei Cute Cat) oder das Skript `opts.einaescherung: true` übergibt (Doomed Town Guard, Tamed Hell Fox, Tamed Primordium). Der Client (`public/app-fx-66.jsx`, `ppFx66Starten`) lässt die Karte auf ihrem Platz verbrennen und die Essenz zum Ablage-/Gelöscht-Stapel fliegen; die Engine wartet danach `EINAESCHERUNG_MS` (= `PP_FX66_LANDUNG_MS`, ≈ 2033 ms bis zur Landung) abzüglich der schon vergangenen Zeit. Karten mit eigener Zerstörungs-Animation (Explosion, Zerspringen, Katapult, Jetpack, Bomb Mite …) setzen das Flag nicht. Kill-Switch: `window.__ppFx66Aus`.
 
 ## Extra-Hand (Crestinas Vorrat): Aufstieg und Handeffekte (11.11.2026)
 

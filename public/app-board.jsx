@@ -3655,10 +3655,11 @@ function HeroStatusPartikel({ effekte, kern, s, mitteX, fw, fh, saat }) {
   const px = (n) => `calc(${+n.toFixed(3)}px * var(--board-scale))`;
   const lage = (x, y) => ({ left: px(x * s), top: px(y * s) });
   const flaeche = cw * ch * s * s;
+  const sternModus = !!(window.ppFx64Aktiv && window.PpFx64Sterne && window.ppFx64Aktiv());
   const teile = useMemo(() => {
     const aus = [];
     const hat = (k) => effekte.includes(k);
-    if (hat('stunned')) {
+    if (hat('stunned') && !sternModus) {   // app-fx-64: mit den Stun-Sternen entfallen die Blitze (Rückfall: Retro, reduzierte Bewegung, Animationen aus)
       const z = heroFxZufall(saat + 'stun');
       // Anzahl und Größe wachsen mit der Figur (bei Bubbles sonst winzig)
       const breitePx = cw * s, mass = Math.max(1, Math.min(2, breitePx / 70));
@@ -3722,7 +3723,7 @@ function HeroStatusPartikel({ effekte, kern, s, mitteX, fw, fh, saat }) {
       }
     }
     return aus;
-  }, [effekte, kern, s, mitteX, saat]);
+  }, [effekte, kern, s, mitteX, saat, sternModus]);
   return (
     <>
       {effekte.includes('webbed') && (
@@ -3900,6 +3901,11 @@ function HeroIdleSprite({ cardName, angehalten, versteinert, eingefroren, effekt
   // Eisblock: 'da' solange Frozen, danach kurz 'schmilzt' (zerspringt),
   // dann 'weg'.
   const [eisPhase, setEisPhase] = useState(eingefroren ? 'da' : 'weg');
+  // Stun-Sterne (app-fx-64): `stunAuslosen` = der Status wechselte WÄHREND der Darstellung auf stunned (auffälliger Auftritt); beim ersten Aufbau eines schon betäubten Helden nicht.
+  const stunJetzt = !!(effekte && effekte.includes('stunned'));
+  const stunVorher = useRef(null);
+  const stunAuslosen = stunVorher.current === false && stunJetzt;
+  useEffect(() => { stunVorher.current = stunJetzt; });
   useEffect(() => {
     if (eingefroren) { setEisPhase('da'); return undefined; }
     setEisPhase(p => (p === 'da' ? 'schmilzt' : p));
@@ -4269,6 +4275,9 @@ function HeroIdleSprite({ cardName, angehalten, versteinert, eingefroren, effekt
               {statusIcons && (statusIcons.burn || statusIcons.poison || statusIcons.bleed) && (
                 <HeroStatusSymbole st={statusIcons} k={Math.max(1, Math.min(3, Math.round(s * (parseFloat(document.documentElement.style.getPropertyValue('--board-scale')) || 1) / 1.4)))}
                   links={`calc(${bs((kern.kopfX1 || kern.x1) * s + 3)})`} oben={`calc(${bs((kern.kopfY != null ? kern.kopfY - 4 : kern.y0 + ch * 0.18) * s)})`} />
+              )}
+              {stunJetzt && !versteinert && window.PpFx64Sterne && window.ppFx64Aktiv && window.ppFx64Aktiv() && (
+                <window.PpFx64Sterne kern={kern} mitteX={mitteX} s={s} intro={stunAuslosen} />
               )}
               {eisPhase !== 'weg' && (
                 <HeroEiskruste quelleRef={canvasRef} breite={fw} hoehe={fh} rand={EIS_RAND}
@@ -50332,6 +50341,8 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     // automatic hand → pile detector can't see — specifically
     // discard → deleted (Mass Multiplication's consumed source card).
     const onPileTransfer = ({ owner, cardName, from, to, fromOwner, toOwner, fromHeroIdx, fromSlotIdx, fromHandIdx, fromPermId, toHandIdx, toHeroIdx, toSlotIdx, finalHandSize, zielLayout, flightStyle, faceDown, sfx, landSfx, chainLinkId, flugMs, halten, rarity }) => {
+      // Einäscherung (app-fx-66): sich selbst zerstörende Karte vom Brett — brennt auf ihrem Platz, die Essenz fliegt zum Stapel (Rückfall: alter Flug)
+      const _ea = flightStyle === 'einaescherung' && from === 'support' && (to === 'discard' || to === 'deleted') && typeof window.ppFx66Moeglich === 'function' && window.ppFx66Moeglich();
       // ★ v1122 (Al 15.9.: „fuer die 4 Karten, die vom Discard ins Deck
       // fliegen, fehlt jeweils ein Woosh-Sound-Effect (wie beim Ziehen
       // von Karten)"). Ein Flug konnte bisher keinen Klang mitbringen —
@@ -50787,7 +50798,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
             next.delete(hideKey);
             return next;
           });
-        }, 720);
+        }, _ea ? (window.PP_FX66_LANDUNG_MS || 2033) + 600 : 720);   // Einäscherung: der Platz bleibt bis nach der Landung verborgen
       }
 
       // ★★ v1347: die eingesogene Kreatur hat ihre Zone verborgen
@@ -50955,6 +50966,8 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       const laneDelay = usesPileLane
         ? takePileFlightLane(1)
         : boardDelay;
+      // Einäscherung starten (misst Quelle/Ziel einmal, malt in eigene Leinwände); null → alter Flug unten
+      const _eaLauf = _ea ? window.ppFx66Starten({ srcEl, tgtEl, cardName, delayMs: laneDelay || 0 }) : null;
 
       const card = document.createElement('div');
       // `card-flight` opts the element out of the no-animations CSS
@@ -51004,7 +51017,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         : isWindstorm
           ? 'pileTransferWindstorm'
           : (isToHand || isToSupport ? 'pileTransferToHand' : 'pileTransfer');
-      const durationMs = _ausDemSog ? SOG_FLUG_MS : (isZickzack ? ZICKZACK_FLUG_MS : isSchleuder ? SCHLEUDER_FLUG_MS : (isWindstorm ? 1200 : (flugMs > 0 ? flugMs : 700)));   // flugMs: kurzer Kettenflug (Server `_kettenTakt`)
+      const durationMs = _eaLauf ? _eaLauf.landungMs : _ausDemSog ? SOG_FLUG_MS : (isZickzack ? ZICKZACK_FLUG_MS : isSchleuder ? SCHLEUDER_FLUG_MS : (isWindstorm ? 1200 : (flugMs > 0 ? flugMs : 700)));   // flugMs: kurzer Kettenflug (Server `_kettenTakt`)
       const easing = _ausDemSog ? 'cubic-bezier(.25,.6,.35,1)'
         : (isWindstorm ? 'cubic-bezier(.45,.05,.55,.95)' : 'ease-in-out');
 
@@ -51051,7 +51064,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         // Karte im Stapel stand — ein kurzes Loch (Als Befund, Diamond).
         // Die Kopie liegt in diesem Moment noch deckend ueber dem Platz.
         setTimeout(() => setHidden(prev => Math.max(0, prev - 1)),
-          Math.max(0, (laneDelay || 0) + Math.round(durationMs * 0.8) - PILE_AUFDECKEN_VORLAUF_MS));
+          Math.max(0, (laneDelay || 0) + Math.round(durationMs * (_eaLauf ? 1 : 0.8)) - PILE_AUFDECKEN_VORLAUF_MS));   // Einäscherung: die Essenz trifft zum Ende der Laufzeit
       }
       // ★ LANDEKLANG (Als Befund 26.9., Idej-Anlegen zu Spielbeginn war
       // stumm). Gegenstueck zu `sfx` (Abflug): ein Flug darf auch einen
@@ -51063,6 +51076,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         setTimeout(() => window.playSFX(landSfx, { dedupe: 0 }),
           (laneDelay || 0) + Math.round(durationMs * 0.8));
       }
+      if (_eaLauf) return;   // Einäscherung läuft in eigenen Leinwänden (app-fx-66): kein Flugkarten-Element
       // ★ v1062: Start UND Weg auf ganze Pixel runden. `srcX`/`srcY`
       // kommen aus `getBoundingClientRect()` und sind fast immer
       // gebrochen; zusammen mit der laufenden `scale()`-Fahrt muss die
@@ -52713,6 +52727,14 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       const tgtEl = document.querySelector(discardSel);
       if (!srcEl || !tgtEl || !cardNames || cardNames.length === 0) return;
 
+      // ★ app-fx-65 (Trailer-Look): Karte hebt verdeckt vom Deck ab, dreht sich im Flug um, Pixel-Schatten am Boden, Abhebe-Funken, Schweif, Schockringe bei der Landung.
+      // Zeitvertrag mit der Engine unveraendert (Start der Karte i = i · 200 ms, Landung 560 ms bzw. 700 ms bei Haltephase, Stapel waechst ueber die Zaehler oben).
+      // Gibt `kartenFlug` null zurueck (Retro, reduzierte Bewegung, Animationen aus, Notbremse `__ppFx65Aus`), laeuft die alte CSS-Fassung unten.
+      if (window.PpFx65 && window.PpFx65.kartenFlug({
+        von: srcEl, nach: tgtEl, owner, karten: cardNames.map((n, i) => ({ name: n, rarity: rarities && rarities[i] })),
+        versatz: 200, reise: (holdDuration || 0) > 0 ? 700 : 560, halten: holdDuration || 0, akzent: deleteMode ? 'rot' : 'violett', masse: flugMass('stapel'),
+      })) return;
+
       const sr  = srcEl.getBoundingClientRect();
       const tr  = tgtEl.getBoundingClientRect();
       const srcX = sr.left + sr.width  / 2;
@@ -52819,6 +52841,11 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       const srcEl = document.querySelector(srcSel);
       const tgtEl = document.querySelector(tgtSel);
       if (!srcEl || !tgtEl) return;
+      // ★ app-fx-65: derselbe Trailer-Flug wie Deck → Ablage (offen, rot); Landung 560 ms = `landAtMs` der Engine (Phase C), Versatz 160 ms je Karte. Rueckfall: alte CSS-Fassung unten.
+      if (window.PpFx65 && window.PpFx65.kartenFlug({
+        von: srcEl, nach: tgtEl, owner, karten: cardNames.map((n, i) => ({ name: n, rarity: rarities && rarities[i] })),
+        versatz: 160, reise: 560, akzent: 'rot', umdrehen: false, masse: flugMass('stapel'),
+      })) return;
       const sr = srcEl.getBoundingClientRect();
       const tr = tgtEl.getBoundingClientRect();
       const srcX = sr.left + sr.width / 2;
@@ -52902,6 +52929,11 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       const srcEl = document.querySelector(srcSel);
       const tgtEl = document.querySelector(tgtSel);
       if (!srcEl || !tgtEl) return;
+      // ★ app-fx-65: derselbe Trailer-Flug wie Deck → Ablage (offen, gruen wie der bisherige Schein „zurueck aus dem Nichts"); Landung 560 ms, Versatz 160 ms je Karte (`_scheduleSelfDeleteTransit`). Rueckfall: alte CSS-Fassung unten.
+      if (window.PpFx65 && window.PpFx65.kartenFlug({
+        von: srcEl, nach: tgtEl, owner, karten: cardNames.map((n, i) => ({ name: n, rarity: rarities && rarities[i] })),
+        versatz: 160, reise: 560, akzent: 'gruen', umdrehen: false, masse: flugMass('stapel'),
+      })) return;
       const sr = srcEl.getBoundingClientRect();
       const tr = tgtEl.getBoundingClientRect();
       const srcX = sr.left + sr.width / 2;

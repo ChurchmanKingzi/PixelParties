@@ -105,7 +105,7 @@ module.exports = {
       // direkt nach `deleted` (v833, Als Report: „erscheint einfach").
       if (inst.zone === 'support') {
         inst._redirectToDeleted = true;
-        await engine.actionDestroyCard({ name: CARD_NAME, owner: pi }, inst, { source: CARD_NAME });
+        await engine.actionDestroyCard({ name: CARD_NAME, owner: pi }, inst, { source: CARD_NAME, einaescherung: true });   // verbrennt zum Gelöscht-Stapel (Client: app-fx-66)
       }
       engine.sync();
     },
