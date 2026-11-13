@@ -20,7 +20,7 @@ Ablauf (72 Frames à 80 ms = 5,8 s, schweres Wesen → langsam). Frame 0 = Origi
   Gelenk (x 14) fest; die unteren Zähne (ungerade x) greifen in die Lücken der oberen (gerade x). Im geschlossenen Zustand werden die verbleibenden Zahnlücken (x 3–14, y 12–14)
   zu dunklen Fugen in der Umrissfarbe – kein Hintergrund zwischen den Zähnen. Ablauf: Frames 8–39 langsam zu und wieder auf (12–35 geschlossen), danach viermal kurzes Schnappen.
 * Arme (Runde 8): beide Hakenarme ab dem Ellbogen (y ≥ 26/27, links vom Rumpf) heben sich als EINE starre Einheit vor dem Oberarm/Rumpf um 1–2 px und senken sich wieder
-  (Periode 36, in der Ausatem-Phase: Frames 26–38 und 62–2) – nichts wird gestreckt, es wird nichts freigelegt (darunter liegt nur Hintergrund bzw. der überlappte Oberarm).
+  (Periode 36, in der Ausatem-Phase: Frames 24–35 und 60–71) – nichts wird gestreckt, es wird nichts freigelegt (darunter liegt nur Hintergrund bzw. der überlappte Oberarm).
 * Zwei 2×2-Blätter (Grüntöne der Büsche) lösen sich nacheinander vom Rücken und trudeln zu Boden.
 Ergänzungen: keine. An den Schwanzstufen freiliegende Innenpixel bekommen die Umrissfarbe (41,32,25).
 """
@@ -54,7 +54,7 @@ OBEN = sz.teil(~M_BEIN & ~M_SCHWANZ & ~M_KIEFER & ~M_ARM)
 ZAHN = (209, 198, 178)
 #          0  1  2  3  4  5  6  7  8  9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30 31 32 33 34 35
 MAUL_F = (0, 0, 0, 0, 1, 1, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 1, 1, 0, 0, 0, 0, 0, 0, 1, 2, 2, 1, 0, 1, 2, 2, 1, 0)      # Kiefer-Hub je Bild (Periode 72: erste Hälfte lang zu, zweite Hälfte zweimal schnappen)
-ARM_F = (0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 2, 2, 2, 2, 2, 2, 2, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)       # Arme heben (Periode 36)
+ARM_F = (0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 2, 2, 2, 2, 2, 2, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)       # Arme heben (Periode 36)
 
 
 def kiefer(k):
@@ -101,7 +101,7 @@ def frame(i, nur=None):
         spross = N8.zeilen_versatz(SPROSS, {PT + 18: 1, PT + 19: 1})
     schwanz = L.zusammen(sz.H, sz.W, [(N8.spalten_versatz(SCHWANZ, f), 0, 0), (N8.spalten_versatz(spross, f), 0, 0)])
     mk = MAUL_F[(i // 2) % 36] if i < 40 else MAUL_F[20 + (i - 40) % 16] if i < 72 else 0
-    ak = ARM_F[(i + 18) % 36]                      # Arme heben sich in der Ausatem-Phase (nicht gleichzeitig mit dem Atemhub)
+    ak = ARM_F[(i - 16) % 36]                      # Arme heben sich in der Ausatem-Phase (nicht gleichzeitig mit dem Atemhub)
     kopf = L.zusammen(sz.H, sz.W, [(kiefer(mk), 0, 0), (oben, 0, 0), (ARM, 0, -ak)])      # Kiefer HINTER den oberen Zähnen, Arme VOR dem Körper
     if mk == 2:                                      # Maul zu: verbliebene Zahnlücken sind dunkle Fugen (kein Hintergrund zwischen den Zähnen)
         luecke = ~(kopf[..., 3] > 0) & sz.voll((xx >= 3) & (xx <= 14) & (yy >= 12) & (yy <= 14))
