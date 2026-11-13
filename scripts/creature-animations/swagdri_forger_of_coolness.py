@@ -37,6 +37,8 @@ import numpy as np
 import anim_cool as C
 import anim_humanoide as Hm
 import anim_lib as L
+import anim_textur as TX   # texturierte Streckzeilen statt Zeilenkopien (Regel 43/49)
+TX.umleiten()               # auch Streckaufrufe innerhalb der Gruppenmodule liefern texturierte Zeilen
 
 N, MS = 48, 70
 PAD_L, PAD_R, PAD_T, PAD_B = 3, 3, 5, 3
@@ -99,7 +101,7 @@ def frame(i, nur=None):
     wieg = 1 if Hm.welle01(i - 6, 24) > 0.6 else 0
     if wieg:                                                        # Arm hebt sich: die Schulterkante (20,23) liegt frei und bekommt den Rüstungsumriss (32,32,32)
         Hm.setze(zwerg, {(20, 23): f(24, 27)}, OFF)
-    zwerg = L.streck_zeile(zwerg, PAD_T + 28, n)
+    zwerg = TX.streck_zeile(zwerg, PAD_T + 28, n)
     # --- Hammergruppe folgt der Hand: Atem + eigenes Wiegen ---
     dy = -(n + wieg)
     gruppe = L.versetze(gruppe, 0, dy) if dy else gruppe

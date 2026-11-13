@@ -47,6 +47,8 @@ import numpy as np
 import anim_dwarf as Dw
 import anim_humanoide as Hm
 import anim_lib as L
+import anim_textur as TX   # texturierte Streckzeilen statt Zeilenkopien (Regel 43/49)
+TX.umleiten()               # auch Streckaufrufe innerhalb der Gruppenmodule liefern texturierte Zeilen
 
 N, MS = 48, 62
 PAD_L, PAD_R, PAD_T, PAD_B = 3, 3, 9, 3          # Rohrzittern ±1 px, Dampf bis 4 px über den Rohren, Hammer drückt beim Rattern 1 px tiefer (Spitze: +1)
@@ -146,9 +148,9 @@ def frame(i, dampf=True, nur=None):
     # --- Auf und ab: Bartzeile 22 (hinter dem Hammer verborgen) wird einmal doppelt eingefügt; Ärmel gleichermaßen ---
     brust = Hm.stufe(i, N / 2, 1)
     if brust:
-        kp = L.streck_zeile(kp, PAD_T + 22, brust)
-        al = L.streck_zeile(al, PAD_T + 22, brust)
-        ar = L.streck_zeile(ar, PAD_T + 22, brust)
+        kp = TX.streck_zeile(kp, PAD_T + 22, brust)
+        al = TX.streck_zeile(al, PAD_T + 22, brust)
+        ar = TX.streck_zeile(ar, PAD_T + 22, brust)
     # --- Presslufthammer rattert: Hammer + Ärmel stoßen jeden zweiten Frame 1 px nach unten (Rüttelbewegung 0 / +1), der Zwerg selbst bleibt stehen ---
     if k is not None:
         dh = 1 if k % 2 else 0
@@ -157,8 +159,8 @@ def frame(i, dampf=True, nur=None):
             # Runde 4 (Nutzer: „teilweise Lücken zwischen Helm und Schultern“): früher rutschte der GANZE Ärmel 1 px tiefer und riss an der Schulter von der Kapuze ab.
             # Jetzt bleibt die Schulter (oberhalb der Ärmelzeile SCHULTER_ZEILE) an der Kapuze, nur der untere Ärmel geht mit dem Hammer: Ärmel 1 px tiefer, dann eine
             # (texturgemischte) Zeile einfügen, die den oberen Teil wieder an seinen Platz hebt.
-            al = L.streck_zeile(L.versetze(al, 0, dh), PAD_T + SCHULTER_ZEILE + dh, dh)
-            ar = L.streck_zeile(L.versetze(ar, 0, dh), PAD_T + SCHULTER_ZEILE + dh, dh)
+            al = TX.streck_zeile(L.versetze(al, 0, dh), PAD_T + SCHULTER_ZEILE + dh, dh)
+            ar = TX.streck_zeile(L.versetze(ar, 0, dh), PAD_T + SCHULTER_ZEILE + dh, dh)
         links = (k % 4) < 2                                                       # 0,1: links an / 2,3: rechts an
         Hm.setze(ha, {(2, 2): LAMPE if links else KASTEN, (3, 2): LAMPE if links else KASTEN,
                       (6, 2): KASTEN if links else LAMPE, (8, 2): KASTEN if links else LAMPE}, (PAD_L + HX, PAD_T + HY + dh))

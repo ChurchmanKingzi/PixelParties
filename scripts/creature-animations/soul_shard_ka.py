@@ -33,6 +33,8 @@ import sys
 import numpy as np
 
 import anim_lib as L
+import anim_textur as TX   # texturierte Streckzeilen statt Zeilenkopien (Regel 43/49)
+TX.umleiten()               # auch Streckaufrufe innerhalb der Gruppenmodule liefern texturierte Zeilen
 import anim_amorph as A
 import anim_shard as SH
 
@@ -79,7 +81,7 @@ BLINK = {22: 2, 23: 2, 46: 2, 47: 2}                                            
 
 
 def figur(i):
-    ebene, top, quelle = SH.ebene_atmung(KOERPER, POSEN[S[i]], H, W, PAD_L, PAD_T, BODEN)
+    ebene, top, quelle = TX.ebene_atmung(KOERPER, POSEN[S[i]], H, W, PAD_L, PAD_T, BODEN)
     horner = L.leer(H, W)
     for (y, x) in HORN_PIX:
         horner[top + y, PAD_L + x] = spr[y, x]                      # exakt dieselbe Verschiebung wie der Kopf (top)

@@ -40,6 +40,8 @@ import sys
 import numpy as np
 
 import anim_lib as L
+import anim_textur as TX   # texturierte Streckzeilen statt Zeilenkopien (Regel 43/49)
+TX.umleiten()               # auch Streckaufrufe innerhalb der Gruppenmodule liefern texturierte Zeilen
 import anim_flieger as F
 
 N, MS = 24, 70
@@ -94,7 +96,7 @@ def frame(i):
         F.setze(kp, PAD_L, PAD_T, {(29, 24): FEDER_U})
     if i in (14, 15):
         F.setze(kp, PAD_L, PAD_T, {(25, 28): STEIN_HELL, (26, 28): STEIN_WEISS})
-    kp = L.streck_zeile(kp, zeile, lift)
+    kp = TX.streck_zeile(kp, zeile, lift)
 
     # Helmzier: Lichtreflex an der Mittelfeder, dann zeilenweise zur Seite lehnen (Ansatz = Helmrand, Zeile 8, steht)
     zr = F.ebene(spr, zier, H, W, PAD_L, PAD_T)

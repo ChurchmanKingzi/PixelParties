@@ -33,6 +33,8 @@ import sys
 import numpy as np
 
 import anim_lib as L
+import anim_textur as TX   # texturierte Streckzeilen statt Zeilenkopien (Regel 43/49)
+TX.umleiten()               # auch Streckaufrufe innerhalb der Gruppenmodule liefern texturierte Zeilen
 import anim_amorph as A
 
 N, MS = 48, 65
@@ -113,7 +115,7 @@ def _fuss(fig, seite):
 def figur(i):
     doppeln = POSEN[S[i]]
     koerper = A.zeilen_von(spr, 0, sh - 1, H, W, PAD_L, PAD_T)
-    z, quelle = A.koerper_pose(koerper, doppeln=doppeln, x0=PAD_L)
+    z, quelle = TX.koerper_pose(koerper, doppeln=doppeln, x0=PAD_L)
     fig, top = A.auf_leinwand(z, H, BODEN, 0)
     if i in BLICK:
         fig = _kopf(fig, top, BLICK[i])

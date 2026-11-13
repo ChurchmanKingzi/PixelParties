@@ -42,6 +42,8 @@ import sys
 import numpy as np
 
 import anim_lib as L
+import anim_textur as TX   # texturierte Streckzeilen statt Zeilenkopien (Regel 43/49)
+TX.umleiten()               # auch Streckaufrufe innerhalb der Gruppenmodule liefern texturierte Zeilen
 import anim_flieger as F
 
 N, MS = 48, 70
@@ -106,7 +108,7 @@ def rueckenwelle(a, i):
             continue
         w = welle_an(i, x - PAD_L) - welle_an(0, x - PAD_L)             # relativ zur Ruhepose (Frame 0 = Original)
         if w:
-            out[:, x:x + 1] = L.streck_zeile(a[:, x:x + 1], PAD_T + Y_WELLE, w)
+            out[:, x:x + 1] = TX.streck_zeile(a[:, x:x + 1], PAD_T + Y_WELLE, w)
     return out
 
 
@@ -134,7 +136,7 @@ def frame(i, partikel=True):
     if kf:
         x0, x1 = PAD_L + FUSS_X0, PAD_L + FUSS_X1
         rumpf[:, x0:x1] = L.heben_unten(rumpf[:, x0:x1], PAD_T + Y_STRECK, kf)
-    rumpf = L.streck_zeile(rumpf, PAD_T + Y_STRECK, k1)
+    rumpf = TX.streck_zeile(rumpf, PAD_T + Y_STRECK, k1)
     kopf = L.versetze(L.zusammen(H, W, [(ln, 0, 0), (ru, 0, 0)]), 0, -k1)
 
     f = L.zusammen(H, W, [(rumpf, 0, 0), (kopf, 0, 0)])

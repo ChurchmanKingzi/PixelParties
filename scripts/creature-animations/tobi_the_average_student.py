@@ -37,6 +37,8 @@ import numpy as np
 
 import anim_humanoide as Hm
 import anim_lib as L
+import anim_textur as TX   # texturierte Streckzeilen statt Zeilenkopien (Regel 43/49)
+TX.umleiten()               # auch Streckaufrufe innerhalb der Gruppenmodule liefern texturierte Zeilen
 
 N, MS = 48, 62
 PAD_L, PAD_R, PAD_T, PAD_B = 3, 3, 3, 2          # Figur knapp zugeschnitten: Armspreizung/Verlagerung ±1 px seitlich, Randabstand ≥ 2
@@ -98,9 +100,9 @@ def frame(i):
     # --- Auf und ab: Jackensaum 36 = Brust (alle Ebenen), Hals 26 läuft 3 Frames nach (nur Rumpf) ---
     brust = Hm.stufe(i, N / 2, 1)
     kopf = Hm.stufe(i - 3, N / 2, 1)
-    k = Hm.atmen(k, PAD_T + 36, PAD_T + 26, brust, kopf)
-    al = Hm.atmen(al, PAD_T + 36, PAD_T + 26, brust, 0)
-    ar = Hm.atmen(ar, PAD_T + 36, PAD_T + 26, brust, 0)
+    k = TX.atmen(k, PAD_T + 36, PAD_T + 26, brust, kopf)
+    al = TX.atmen(al, PAD_T + 36, PAD_T + 26, brust, 0)
+    ar = TX.atmen(ar, PAD_T + 36, PAD_T + 26, brust, 0)
     # --- Fußtippen (der Schuh liegt hinter der Hose) ---
     pat = [1, 1, 0, 0, 1, 1, 0, 0]
     hl = 1 if Hm.folge(i, 12, pat, N) else 0

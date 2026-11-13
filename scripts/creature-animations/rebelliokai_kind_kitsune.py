@@ -81,13 +81,27 @@ FUCHS_M[OFF[1]:OFF[1] + sh, OFF[0]:OFF[0] + sw] = fox
 RAMPE_S = [UMRISS_SCHWEIF, (179, 56, 49), (234, 79, 54), (245, 125, 74)]
 _F = lambda x, y, l, b, **k: F3.Flamme(OFF[0] + x, OFF[1] + y, l, b, **k)
 _B = [(1.0, 1.0), (0.9, 0.8), (0.62, 0.52), (0.36, 0.28)]              # dünner dunkler Rand (1 px), kräftiger roter Körper, heller Kern am Ansatz — wie die gemalten Schweife
-S_OBEN = [_F(10.3, 11.0, 12, 5.2, richtung=(-0.08, -1), fuss=1.0, bauch=0.4, schlag=0.5, phase=0.0, baender=_B, welle=9),
+S_OBEN = [_F(10.3, 11.0, 12, 5.2, richtung=(-0.08, -1), fuss=1.0, bauch=0.5, schlag=0.9, phase=0.0, baender=_B, welle=9),
           _F(6.8, 8.5, 8, 2.8, richtung=(-0.35, -1), phase=0.4, baender=_B), _F(13.4, 8.5, 9, 2.8, richtung=(0.15, -1), phase=0.7, baender=_B)]
-S_RECHTS = [_F(24.0, 19.5, 13, 5.2, richtung=(1, 0.18), fuss=1.0, bauch=0.4, schlag=0.5, phase=0.35, baender=_B, fetzen=False, welle=9),
+S_RECHTS = [_F(24.0, 19.5, 13, 5.2, richtung=(1, 0.18), fuss=1.0, bauch=0.5, schlag=0.9, phase=0.35, baender=_B, fetzen=False, welle=9),
             _F(27.0, 16.6, 8, 2.8, richtung=(1, -0.05), phase=0.75, baender=_B, fetzen=False), _F(26.5, 22.5, 9, 2.8, richtung=(1, 0.4), phase=0.05, baender=_B, fetzen=False)]
-S_LINKS = [_F(8.5, 20.0, 13, 5.2, richtung=(-0.55, 1), fuss=1.0, bauch=0.4, schlag=0.5, phase=0.65, baender=_B, fetzen=False, welle=9),
+S_LINKS = [_F(8.5, 20.0, 13, 5.2, richtung=(-0.55, 1), fuss=1.0, bauch=0.5, schlag=0.9, phase=0.65, baender=_B, fetzen=False, welle=9),
            _F(4.5, 21.5, 8, 2.8, richtung=(-0.8, 1), phase=0.05, baender=_B, fetzen=False), _F(8.6, 23.5, 8, 2.6, richtung=(-0.1, 1), phase=0.35, baender=_B, fetzen=False)]
-FEUER = F3.Feuer(H, W, S_OBEN + S_RECHTS + S_LINKS, RAMPE_S, posen=10, halten=2, sperre=FUCHS_M)
+# Runde 5: schneller/lebhafter (15 Posen à 1 Frame, Welle 2× je Zyklus ≈ 0,5 s; 4 Zyklen je Schleife) und LÜCKENLOS an den Schweifspitzen („Lücken zwischen Schwanzspitzen und Flammen“):
+# Die drei weißen Teile sind die Schweife, die Flammen sitzen wie gemalt ÜBER ihren Spitzen. Je Schweif (a) eigene Feuer-Ebene, die jede Bewegung „ihres“ Schweifs ganzzahlig mitmacht
+# (oben: Spitze 1 px seitlich; rechts: Außenhälfte 1 px hoch; Atmen), und (b) ein fester Flammenfuß aus der gemalten Schweif-Ebene (ANSATZ: alle gemalten Flammenpixel über dem Fuchs
+# + die nicht umrissfarbenen im Umkreis von 2 px), der ÜBER die Schweifspitze gelegt wird wie im Original — die bewegte Flamme schließt dahinter in jedem Frame an.
+FEUER_T = [F3.Feuer(H, W, fl, RAMPE_S, posen=15, halten=1) for fl in (S_OBEN, S_RECHTS, S_LINKS)]
+
+
+def _ansatz(m_schweif):
+    ueber = m_schweif & fox
+    nah = cv2.dilate(ueber.astype(np.uint8), np.ones((5, 5), np.uint8)) > 0
+    hell = m_schweif & ~L.farbmaske(schweife, [UMRISS_SCHWEIF])
+    return lay0(schweife, ueber | (nah & hell))
+
+
+ANSATZ = [_ansatz(m) for m in (t_oben, t_rechts, t_links)]
 
 
 def lay(quelle, maske, dy=0):
@@ -108,8 +122,13 @@ def frame(i, nur=None):
     if b:
         k = L.streck_zeile(k, PAD_T + 28, 1)
         ol, orr = (L.versetze(e, 0, -1) for e in (ol, orr))
-    feu = FEUER.ebene(i, dy=-b)
-    fig, etik = R.schichten(H, W, [(k, 'fuchs'), (ol, 'fuchs'), (orr, 'fuchs'), (feu, 'schweif')])
+    vers = [(1 if s1 > 0.5 else 0, -b), (0, -b - (1 if s3 > 0.5 else 0)), (0, -b)]            # (dx, dy) je Schweif: oben, rechts, links
+    hinten, vorn = [], []
+    for fe, an, (dx, dy) in zip(FEUER_T, ANSATZ, vers):
+        e = fe.ebene(i, dx=dx, dy=dy)
+        hinten.append((e, 'schweif'))
+        vorn.append((L.versetze(an, dx, dy) if (dx or dy) else an, 'schweif'))
+    fig, etik = R.schichten(H, W, vorn + [(k, 'fuchs'), (ol, 'fuchs'), (orr, 'fuchs')] + hinten)
     fig, _br = R.verbinde(fig)                                       # Teile, die nur über eine Pixelecke hängen (dünne Schweifspitzen), werden 4-verbunden
     R.neue_loecher_fuellen(fig, LOCH0, ERLAUBT, max_groesse=4)
     R.kontur_je_teil(fig, etik, ERLAUBT, {'fuchs': UMRISS_FUCHS, 'schweif': UMRISS_SCHWEIF}, standard=UMRISS_SCHWEIF)

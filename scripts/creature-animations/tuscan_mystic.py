@@ -42,6 +42,8 @@ import numpy as np
 
 import anim_humanoide as Hm
 import anim_lib as L
+import anim_textur as TX   # texturierte Streckzeilen statt Zeilenkopien (Regel 43/49)
+TX.umleiten()               # auch Streckaufrufe innerhalb der Gruppenmodule liefern texturierte Zeilen
 import anim_rebel as R
 
 N, MS = 48, 80
@@ -96,7 +98,7 @@ def frame(i):
         sk = L.versetze(sk, 0, 1)
         Hm.setze(k, {(9, y): UMHANG_UMRISS for y in (8, 9, 10, 11)}, OFF)
     if b:
-        k, sk, left, right = (L.streck_zeile(e, PAD_T + 19, 1) for e in (k, sk, left, right))
+        k, sk, left, right = (TX.streck_zeile(e, PAD_T + 19, 1) for e in (k, sk, left, right))
         zk = L.versetze(zk, 0, -1)                                    # der Stoßzahn hebt sich exakt wie der Kopf (alle Zahnpixel liegen über der Atemzeile 19)
     fig, etik = R.schichten(H, W, [(left, 'umhang'), (right, 'umhang'), (k, 'umhang'), (sk, 'schaedel'), (zk, 'umhang')])
     fig, _br = R.verbinde(fig)

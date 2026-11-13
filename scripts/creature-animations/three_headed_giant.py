@@ -24,6 +24,8 @@ import sys
 import numpy as np
 
 import anim_lib as L
+import anim_textur as TX   # texturierte Streckzeilen statt Zeilenkopien (Regel 43/49)
+TX.umleiten()               # auch Streckaufrufe innerhalb der Gruppenmodule liefern texturierte Zeilen
 
 N, MS = 32, 90
 PAD_L, PAD_R, PAD_T, PAD_B = 8, 8, 10, 8
@@ -94,7 +96,7 @@ def frame(i):
     ar = L.heben_unten(teil(arm_r), PAD_T + 23, k)
     # Atmen nur am Körper (Zeile einfügen); Arme, Hauer und Keule steigen mit dem Brustkorb (Hände hängen an den Schultern) —
     # würde man die fertige Gesamtzeile duplizieren, vervielfachte sich z. B. die dunkle Unterkante des angehobenen Unterarms.
-    kb = L.streck_zeile(blinzeln(teil(koerper), i), PAD_T + BAUCHZEILE, atem)
+    kb = TX.streck_zeile(blinzeln(teil(koerper), i), PAD_T + BAUCHZEILE, atem)
     hauer_l = teil(weiss & (xx >= 8) & (xx <= 14) & (yy >= 17) & (yy <= 22))
     return L.zusammen(H, W, [(kl, 0, dyk - atem), (kb, 0, 0), (arm, 0, -atem), (hauer_l, 0, -atem), (ar, 0, -atem)])
 
