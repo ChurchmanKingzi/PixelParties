@@ -44,4 +44,21 @@ async function warteMitAbflug(engine, pi, cardName, gesamtMs, abflugMs) {
   if (gesamtMs - bis > 0) await engine._delay(gesamtMs - bis);
 }
 
-module.exports = { quelle, fruehAbflug, warteMitAbflug };
+/**
+ * Mindest-Sichtbarkeit der Handkarte nach Effektbeginn (Nutzer 13.11.: „Die Potion verlässt die Hand bereits, bevor die Animation zu sehen ist. Sie sollte für wenigstens
+ * ein Drittel der Animationszeit in der Hand verweilen"). Richtwert für Potions mit KURZEM Effekt: Mount-Vorlauf des Clients (120 ms) + 350 ms sichtbarer Effekt.
+ * Längere Effekte (Life Serum, Acid Vial, Skripte mit eigenen Wartezeiten) erfüllen das über ihre Auflösungszeit selbst: Abflug bei 1/3 der Gesamtanimation (`abflugNachDrittel`).
+ */
+const HAND_MIN_MS = 120 + 350;
+
+/** Abflugzeitpunkt (ms nach dem Ereignis) für einen Effekt mit Animationsdauer `animMs`: Vorlauf + ein Drittel der Animation (aufgerundet). */
+function abflugNachDrittel(vorlaufMs, animMs) { return vorlaufMs + Math.ceil(animMs / 3); }
+
+/** Der Standardweg (`doConfirmPotion`, server.js): hält die Karte in der Hand, bis seit Beginn der Auflösung (`t0`, Date.now()) `HAND_MIN_MS` vergangen sind. */
+async function haltBisSichtbar(engine, t0, minMs) {
+  if (!t0) return;
+  const rest = (minMs || HAND_MIN_MS) - (Date.now() - t0);
+  if (rest > 0) await engine._delay(rest);
+}
+
+module.exports = { quelle, fruehAbflug, warteMitAbflug, abflugNachDrittel, haltBisSichtbar, HAND_MIN_MS };

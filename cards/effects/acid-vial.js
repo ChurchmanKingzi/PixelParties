@@ -6,7 +6,7 @@
 //  EXCEPT turn-1 protection.
 //  Damage type: 'other'.
 //  Hard once per turn.
-//  Animation (Pixelart, public/app-fx-70.jsx): Spuckkugel wie im Trailer — die Kugel LÄDT über der Handkarte der gespielten Potion (0,7 s, Radius 2 → 7; die Karte fliegt nach 0,25 s in den Gelöscht-Stapel, `_potion-hand-flight.js`),
+//  Animation (Pixelart, public/app-fx-70.jsx): Spuckkugel wie im Trailer — die Kugel LÄDT über der Handkarte der gespielten Potion (0,7 s, Radius 2 → 7; die Karte fliegt nach einem Drittel der Animation (ca. 0,8 s) in den Gelöscht-Stapel, `_potion-hand-flight.js`),
 //  fliegt 0,7 s im Bogen zum Ziel und schlägt dort ein (Ringe, Strahlen, Tropfen); der Schaden fällt erst beim Einschlag (SCHADEN_MS).
 //  Rückfall des Clients (Retro, reduzierte Bewegung, `window.__ppFx70Aus`): der bisherige Säure-GUSS von oben (`acid_splash`, app-fx-9) — er wird
 //  dann zum Einschlagszeitpunkt gezeigt. EINE Zeile zurück zum alten Guss-Look (sofort, ohne Wartezeit): `SPUCKKUGEL = false`.
@@ -14,13 +14,13 @@
 
 // Zeiten (ms) der Zonen-Animation `acid_spit` (app-fx-70.jsx, 30 Hz): Laden 700 + Flug 700 = Einschlag bei Bild 42 der Animation; `VORLAUF_MS` = Mount-Vorlauf im Client
 // (ZONE_ANIM_MOUNT_DELAY_MS 100 + Aufbau, wie bei Tiger Kick/Venom Snake). Engine-Wartezeit = Animationszeit + Vorlauf, damit Zahl und HP-Balken beim Einschlag erscheinen.
-const { quelle: handQuelle, warteMitAbflug } = require('./_potion-hand-flight');
+const { quelle: handQuelle, warteMitAbflug, abflugNachDrittel } = require('./_potion-hand-flight');
 
 const SPUCKKUGEL = true;   // false = der bisherige Säure-Guss von oben (`acid_splash`, Schaden sofort) — die einzige Stelle, die zwischen den beiden Looks umschaltet
 const SPUCK_LADE_MS = 700;
 const SPUCK_FLUG_MS = 700;
 const VORLAUF_MS = 120;
-const ABFLUG_MS = VORLAUF_MS + 250;   // die Handkarte verlässt die Hand 250 ms nach dem Start des Ladens (Nutzer: erst nach Beginn der Animation, noch während sie läuft)
+const ABFLUG_MS = abflugNachDrittel(VORLAUF_MS, 2450);   // Animation 2,45 s (Laden 0,7 + Flug 0,7 + Nachspiel): die Handkarte verlässt die Hand erst nach einem Drittel davon (Nutzer 13.11.), also bei Ereignis + 120 + 817 ms
 const SCHADEN_MS = SPUCK_LADE_MS + SPUCK_FLUG_MS + VORLAUF_MS;
 
 module.exports = {

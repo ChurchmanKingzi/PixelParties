@@ -12716,6 +12716,7 @@ async function doConfirmPotion(room, pi, { selectedIds }) {
     return true;
   }
   let chainResult;
+  let _effektT0 = 0;
   try {
     chainResult = await room.engine.executeCardWithChain({
       cardName: potionName, owner: pi, cardType, goldCost: goldCost || 0,
@@ -12727,6 +12728,7 @@ async function doConfirmPotion(room, pi, { selectedIds }) {
         return (t && t.type === 'hero' && Number.isInteger(t.heroIdx)) ? { owner: t.owner, heroIdx: t.heroIdx } : null;
       })(),
       resolve: script.resolve ? async () => {
+        _effektT0 = Date.now();   // Beginn der sichtbaren Wirkung: die Handkarte bleibt danach mindestens HAND_MIN_MS in der Hand (cards/effects/_potion-hand-flight.js)
         if (broadcastPotionAnim) broadcastPotionAnim();
         // v353: `'hand'` — der Spieler setzt die Karte gerade selbst aus
         // der Hand ein (Book of Doom & Co). Nur der GEGNER sieht sie.
@@ -12853,6 +12855,8 @@ async function doConfirmPotion(room, pi, { selectedIds }) {
     room.engine._firePendingCardReveal();
   }
 
+  // Hand-Verweildauer (Nutzer 13.11.): die Karte fliegt erst, wenn ihre Wirkung schon sichtbar war (Mount-Vorlauf 120 ms + 350 ms); Karten mit frühem Abflug (Life Serum, Acid Vial) haben das schon.
+  if (_effektT0 && !(ps._resolvingCard && ps._resolvingCard.fruehFlug != null)) await require('./cards/effects/_potion-hand-flight').haltBisSichtbar(room.engine, _effektT0);
   const hi = getResolvingHandIndex(ps);
   const fruehFlug = ps._resolvingCard ? ps._resolvingCard.fruehFlug : undefined;   // Potion-Projektil (cards/effects/_potion-hand-flight.js): der Flug Hand → Gelöscht ging schon beim Laden raus
   ps._resolvingCard = null;
