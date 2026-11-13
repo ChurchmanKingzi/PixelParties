@@ -25,6 +25,9 @@ RUNDE 9 (Nutzer: „Sollten NICHT seitwärts blinzeln!“): Das Auge ist 1 px br
 übrig blieb ein SENKRECHTER heller Spalt zwischen den schwarzen Randpixeln (las sich wie seitlich zugekniffen). Jetzt senkt sich das Oberlid von oben nach unten: erst deckt der dunkle Lidrand die
 Iriszeile zu (Augenweiß darunter noch sichtbar), dann ist auch das Weiß vom Lid (Haut) bedeckt – geschlossen ist das Auge ein WAAGERECHTER dunkler Lidstrich; Öffnen in umgekehrter Reihenfolge.
 Frames 19–22 und 43–46 (halb, zu, zu, halb).
+RUNDE 10 (Nutzer: „Die Augen sind das Weiße UND das Goldene (weiße Sklera, goldene Iris/Pupille)!“): Das Auge ist 2 px breit – Sklera (hellblau beschattet oben, weiß unten) neben der GOLDENEN Iris
+(links (11,11)/(11,12) + Gold (12,12); rechts (16,11)/(16,12) + Gold (15,12); über dem Gold sitzt der schwarze Lidrand (12,11)/(15,11)). Das Gold ist KEINE Gesichtsbemalung. Blinzeln: das Lid senkt sich von oben über Sklera UND Iris – halb: die obere Augenzeile wird zum dunklen
+Lidrand (Weiß + Gold darunter noch sichtbar); zu: obere Zeile Lidhaut (180,123,49), untere Zeile (Weiß + Gold) ein waagerechter schwarzer Lidstrich (2 px). Frames wie zuvor (halb, zu, zu, halb).
 """
 import numpy as np
 
@@ -56,10 +59,11 @@ def frame(i, nur=None):
     at = ATEM[i % 24]
     k = F.ebene(rumpf)
     lid = LID.get(i % 24)                                            # 1 = Lid halb gesenkt, 2 = zu
-    if lid:
+    if lid == 1:                                                     # halb: Lidrand über der oberen Sklera, Weiß + goldene Iris noch sichtbar
         F.setze(k, {(11, 11): LIDRAND, (16, 11): LIDRAND})
-    if lid == 2:
-        F.setze(k, {(11, 12): HAUT, (16, 12): HAUT})
+    if lid == 2:                                                     # zu: Lidhaut oben, waagerechter Lidstrich über Weiß UND Gold
+        F.setze(k, {(11, 11): HAUT, (12, 11): HAUT, (15, 11): HAUT, (16, 11): HAUT,
+                    (11, 12): LIDRAND, (12, 12): LIDRAND, (15, 12): LIDRAND, (16, 12): LIDRAND})
     k = F.streck(k, 24, at)
     ar = F.ebene(arm, 0, -at)                                        # Arm und Speer immer mit dem Oberkörper (kein eigener Hub → keine Stufe an der Schulter)
     if not nur:

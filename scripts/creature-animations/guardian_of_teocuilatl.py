@@ -29,6 +29,9 @@ RUNDE 9 (Nutzer: „Sollten NICHT seitwärts blinzeln!“): Das Auge ist 1 px br
 übrig blieb ein SENKRECHTER heller Spalt zwischen den schwarzen Randpixeln (las sich wie seitlich zugekniffen). Jetzt senkt sich das Oberlid von oben nach unten: erst deckt der dunkle Lidrand die
 Iriszeile zu (Augenweiß darunter noch sichtbar), dann ist auch das Weiß vom Lid (Haut) bedeckt – geschlossen ist das Auge ein WAAGERECHTER dunkler Lidstrich; Öffnen in umgekehrter Reihenfolge.
 Frames 19–22 und 43–46 (halb, zu, zu, halb).
+RUNDE 10 (Nutzer: „Die Augen sind das Weiße UND das Goldene (weiße Sklera, goldene Iris/Pupille)!“): Das Auge ist 2 px breit – Sklera (hellblau beschattet oben, weiß unten) neben der GOLDENEN Iris
+(2×2: links Sklera (11,11)/(11,12) + Gold (12,11)/(12,12); rechts Gold (15,11)/(15,12) + Sklera (16,11)/(16,12)). Das Gold ist KEINE Gesichtsbemalung. Blinzeln: das Lid senkt sich von oben über Sklera UND Iris – halb: die obere Augenzeile wird zum dunklen
+Lidrand (Weiß + Gold darunter noch sichtbar); zu: obere Zeile Lidhaut (180,123,49), untere Zeile (Weiß + Gold) ein waagerechter schwarzer Lidstrich (2 px). Frames wie zuvor (halb, zu, zu, halb).
 """
 import numpy as np
 
@@ -66,10 +69,11 @@ def frame(i, nur=None):
     k = F.ebene(rumpf)
     F.setze(k, {(17, 13): UMRISS, (18, 12): UMRISS, (16, 14): HAUT, (15, 15): HAUT, (14, 16): HAUT, (13, 17): HAUT})
     lid = LID.get(i % 24)                                            # 1 = Lid halb gesenkt, 2 = zu
-    if lid:
-        F.setze(k, {(11, 11): LIDRAND, (16, 11): LIDRAND})
-    if lid == 2:
-        F.setze(k, {(11, 12): HAUT, (16, 12): HAUT})
+    if lid == 1:                                                     # halb: Lidrand über der oberen Augenzeile (Sklera + Iris), Weiß + Gold darunter noch sichtbar
+        F.setze(k, {(11, 11): LIDRAND, (12, 11): LIDRAND, (15, 11): LIDRAND, (16, 11): LIDRAND})
+    if lid == 2:                                                     # zu: Lidhaut oben, waagerechter Lidstrich über Weiß UND Gold
+        F.setze(k, {(11, 11): HAUT, (12, 11): HAUT, (15, 11): HAUT, (16, 11): HAUT,
+                    (11, 12): LIDRAND, (12, 12): LIDRAND, (15, 12): LIDRAND, (16, 12): LIDRAND})
     k = F.streck(k, 24, at)
     ar = F.ebene(arm, 0, -at)                                        # Arm und Keule immer mit dem Oberkörper (kein eigener Hub → keine Stufe an der Schulter)
     if not nur:

@@ -39,6 +39,9 @@ RUNDE 9 (Nutzer: „Sollten NICHT seitwärts blinzeln!“): Das Auge ist 1 px br
 übrig blieb ein SENKRECHTER heller Spalt zwischen den schwarzen Randpixeln (las sich wie seitlich zugekniffen). Jetzt senkt sich das Oberlid von oben nach unten: erst deckt der dunkle Lidrand die
 Iriszeile zu (Augenweiß darunter noch sichtbar), dann ist auch das Weiß vom Lid (Haut) bedeckt – geschlossen ist das Auge ein WAAGERECHTER dunkler Lidstrich; Öffnen in umgekehrter Reihenfolge.
 Frames 19–22 und 41–44 (halb, zu, zu, halb).
+RUNDE 10 (Nutzer: „Die Augen sind das Weiße UND das Goldene (weiße Sklera, goldene Iris/Pupille)!“): Das Auge ist 2 px breit – Sklera (hellblau beschattet oben, weiß unten) neben der GOLDENEN Iris
+(Sklera (9,10)/(9,11), goldene Iris (8,11) links daneben, darüber der schwarze Lidrand (8,10); das linke Auge ist nur ein schwarzer Strich (4–5,11) und bleibt). Das Gold ist KEINE Gesichtsbemalung. Blinzeln: das Lid senkt sich von oben über Sklera UND Iris – halb: die obere Augenzeile wird zum dunklen
+Lidrand (Weiß + Gold darunter noch sichtbar); zu: obere Zeile Lidhaut (180,123,49), untere Zeile (Weiß + Gold) ein waagerechter schwarzer Lidstrich (2 px). Frames wie zuvor (halb, zu, zu, halb).
 """
 import math
 import sys
@@ -108,10 +111,10 @@ def frame(i):
     gl = L.leer(H, W)                                               # Glitzer-Sterne (Effekt über der Figur)
     # --- Blinzeln: Iris und Weiß nehmen die Hautfarbe an ---
     lid = Hm.folge(i, 19, [1, 2, 2, 1], N) or Hm.folge(i, 41, [1, 2, 2, 1], N)   # 1 = Lid halb gesenkt, 2 = zu
-    if lid:
+    if lid == 1:                                                    # halb: Lidrand über der oberen Sklera, Weiß + goldene Iris noch sichtbar
         Hm.setze(k, {(9, 10): LIDRAND}, OFF)
-    if lid == 2:
-        Hm.setze(k, {(9, 11): HAUT}, OFF)
+    if lid == 2:                                                    # zu: Lidhaut oben, waagerechter Lidstrich über Gold UND Weiß (wie der Strich des linken Auges)
+        Hm.setze(k, {(8, 10): HAUT, (9, 10): HAUT, (8, 11): LIDRAND, (9, 11): LIDRAND}, OFF)
     # --- Gold glänzt: Lichtband über das Brustband ---
     # (Lichtband über den ganzen goldenen Arm: nach dem Zusammensetzen, siehe unten)
     # --- Stachelhaare wehen ---

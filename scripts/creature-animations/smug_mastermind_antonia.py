@@ -23,6 +23,8 @@ Ablauf (60 Frames à 70 ms = 4,2 s, nahtlos; Frame 0 = Original):
 * Blinzeln beider Augen (Frames 24–26 und 50–52): Rot → dunkles Gesichtsgrau.
 RUNDE 9 (Nutzer: „Die zwei Seiten von Antonias Jetpack sollten synchron sein!“): linke und rechte Seite laufen jetzt in JEDEM Frame spiegelbildlich gleich – derselbe Schubstrahl-Zyklusschritt
 (vorher rechts 3 Bilder versetzt), dasselbe Anheben von Arm + Düse (vorher rechts 5 Frames versetzt), dasselbe Funkeln der Schubfunken (vorher rechts eigener 15er-Takt).
+RUNDE 10 (Nutzer: „Sollte deutlich schneller auf und ab fliegen und weniger Squash-and-Stretch am Körper haben.“): Flug-Periode 30 → 12 Frames (0,84 s statt 2,1 s, fünfmal je Schleife, weiter 0–2 px);
+das Atmen (eingefügte Saumzeile) und das eigene Anheben der Arme sind ENTFERNT – Körper, Kopf, Arme und Düsen fliegen als eine starre Einheit. Schubstrahlen, Funkeln, Gold und Blinzeln unverändert.
 ERGÄNZUNG: (4, 14) und (19, 14) – Umhangrand unter den Achseln in Umrissschwarz (0,2,0), sichtbar nur, wenn der Arm 1 px über der Schulter steht (sonst entstünde dort eine Lücke). Nur ganze Pixel, nur Farben der Quelle.
 """
 import numpy as np
@@ -34,7 +36,8 @@ import anim_textur as TX
 TX.umleiten()
 
 N, MS = 60, 70
-FIG = N2.Figur('smug-mastermind-antonia', pad=(2, 2, 6, 2))
+FLUG = 12                                                                         # Runde 10: Schwebe-Periode in Frames (vorher 30)
+FIG = N2.Figur('smug-mastermind-antonia', pad=(2, 2, 4, 2))
 spr = FIG.spr
 xx, yy = FIG.xx, FIG.yy
 OFF = FIG.off
@@ -105,14 +108,11 @@ def frame(i, nur=None):
     schub(al, 1, i)
     schub(ar, 20, i)                                                             # Runde 9: beide Düsen im selben Zyklusschritt (die Posen sind in sich spiegelsymmetrisch)
     # Bewegung
-    b = N2.hub(i, 30, 1)
-    ko = TX.streck_zeile(ko, FIG.pt + 23, b)
-    al = L.versetze(al, 0, -b - N2.hub(i, 20, 1))
-    ar = L.versetze(ar, 0, -b - N2.hub(i, 20, 1))                                 # Runde 9: beide Arme/Düsen heben sich gleichzeitig
+    # Runde 10: kein Atmen/Strecken, kein eigener Armhub mehr – der Körper ist im Flug starr
     kl = kreuz(2, FUNKEL[i % 20])
     kr = kreuz(21, FUNKEL[i % 20])                                                # Runde 9: beide Schubfunken funkeln gleichzeitig
     fig = L.zusammen(FIG.H, FIG.W, [(kl, 0, 0), (kr, 0, 0), (ko, 0, 0), (al, 0, 0), (ar, 0, 0)])
-    return L.versetze(fig, 0, -N2.hub(i, 30, 2))                                  # Flug: der ganze Sprite steigt und sinkt weich (0–2 px)
+    return L.versetze(fig, 0, -N2.hub(i, FLUG, 2))                                  # Flug: der ganze Sprite steigt und sinkt weich (0–2 px)
 
 
 if __name__ == '__main__':

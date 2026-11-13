@@ -26,6 +26,12 @@ Ablauf (72 Frames à 80 ms = 5,76 s – riesiges Wesen, langsam; nahtlos, Frame 
 * GOLDKETTEN: jede Kette ist eine starre Einheit und folgt dem Bogen an ihrer Auflagestelle (x 49 bzw. x 58). Kurzer Goldglanz: einmal je Schleife läuft ein schmales Lichtband über beide Ketten
   (Frames 8–21; nur Goldpixel, eine Stufe heller auf der Goldrampe der Kette, dunkler Umriss bleibt), dazu je Kette ein 3-Frame-Sparkle am unteren Bogen (Frames 40–42 bzw. 58–60).
 Kein Blinzeln (Sonnenbrille), keine Partikel. Ergänzungen: keine. Farben: nur Quelle.
+RUNDE 10 (Nutzer: „Soll periodisch das Maul öffnen.“): Der Kopf blickt nach rechts unten; Oberkopf/Schnauze = der graublaue Teil mit den Augen (x 70–76, y 15–23), UNTERKIEFER = das helle Bauchstück
+(x 61–72, y 18–25) mit seinen Zähnen (68,20), (71,23), (72,24); obere Zähne (69,19), (71,20)+(70,21) (Fangzahn), (72,22), (73,23). Kiefergelenk = der Mundwinkel in Zeile 17 (Umriss x 67–69).
+Zweimal je Schleife (Start Frame 14 und 50, je 22 Frames) klappt der Unterkiefer als POSE um das Gelenk auf: seine Zeilen 18–25 wandern stufenweise vom Oberkiefer weg nach links (Zeile 18 nie, die Kieferspitze
+bis 4 px; Gefälle höchstens 1 px je Zeile, nichts wird gestreckt, die unteren Zähne gehen mit). Zeile 17/18 bleibt stehen → keine Lücke am Gelenk. Der frei werdende Rachen zwischen den Kiefern (Zeilen 18–23)
+wird im Dunkelrot (54,7,0) der Augen-Ebene gefüllt (Farbe der Leib-Quelle, im Komposit von der Brille verdeckt → in pruefe freigegeben); die weißen Zähne bleiben davor sichtbar. In der Ruhepose bleibt das
+Maul wie im Original (schmaler, durchsichtiger Spalt). Cappy und Sonnenbrille sitzen unverändert starr am Oberkopf. Die Pose wird VOR dem Wiegen auf den Leib gezeichnet und macht alle Kopfbewegungen mit.
 """
 import math
 
@@ -44,6 +50,34 @@ S = N1.Szene(spr, (5, 6, 5, 3))
 H, W, OFF = S.H, S.W, S.OFF
 PL, PT = OFF
 BASIS = L.platz(LEIB, H, W, PL, PT)
+# --- Maul (Runde 10): Unterkiefer als Pose um das Gelenk in Zeile 17 ---
+RACHEN = (54, 7, 0)
+KIEFER = {18: (61, 67), 19: (62, 67), 20: (63, 68), 21: (64, 68), 22: (65, 69), 23: (66, 71), 24: (68, 72), 25: (69, 71)}   # Zeile → Spalten (von, bis) des Unterkiefers samt unterer Zähne
+OBERKANTE = {18: 70, 19: 71, 20: 71, 21: 73, 22: 72, 23: 73}                # Zeile → erste Spalte des Oberkiefers (inkl. oberer Zähne außer den frei stehenden (69,19), (70,21))
+KLAPP = {1: (0, 0, 0, 0, 1, 1, 1, 1), 2: (0, 0, 1, 1, 1, 2, 2, 2), 3: (0, 1, 1, 2, 2, 2, 3, 3), 4: (0, 1, 1, 2, 2, 3, 3, 4)}   # Öffnung → Linksversatz der Zeilen 18…25
+MAUL = (1, 1, 2, 2, 3, 3, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 3, 3, 2, 2, 1, 1)
+MAUL_START = (14, 50)
+
+
+def maul_basis(k):
+    """Leib mit um k (0–4) geöffnetem Maul: Unterkieferzeilen nach links versetzt, Rachen dunkelrot gefüllt."""
+    if not k:
+        return BASIS
+    a = BASIS.copy()
+    for j, y in enumerate(range(18, 26)):
+        x0, x1 = KIEFER[y]
+        d = KLAPP[k][j]
+        stueck = BASIS[PT + y, PL + x0:PL + x1 + 1].copy()
+        a[PT + y, PL + x0:PL + x1 + 1] = 0
+        a[PT + y, PL + x0 - d:PL + x1 + 1 - d] = stueck
+        if y in OBERKANTE:
+            for x in range(x1 + 1 - d, OBERKANTE[y]):
+                if not a[PT + y, PL + x, 3]:
+                    a[PT + y, PL + x] = RACHEN + (255,)
+    return a
+
+
+BASEN = [maul_basis(k) for k in range(5)]
 E_KOPFZEUG = L.platz(np.where((BRILLE[..., 3:] > 0), BRILLE, CAP), H, W, PL, PT)
 # zwei Ketten (starr), Auflagespalte = oberstes Kettenglied
 KETTE = [(L.platz(np.where((S.xx <= 52)[..., None], KETTEN, 0).astype(np.uint8), H, W, PL, PT), 49),
@@ -118,7 +152,11 @@ def frame(i, nur=None):
     th = L.sinus(i, N)
     ax, ay = 2.0 * math.sin(th), 2.0 * math.sin(2 * th)
     dx_oben = r(ax)
-    a = N1.zeilen_dx(BASIS, lambda y: r(ax * glatt((50 - (y - PT)) / 24.0)))
+    maul = 0
+    for m0 in MAUL_START:
+        if m0 <= i < m0 + len(MAUL):
+            maul = MAUL[i - m0]
+    a = N1.zeilen_dx(BASEN[maul], lambda y: r(ax * glatt((50 - (y - PT)) / 24.0)))
     kopf = r(ay)
     if kopf:
         gs = [g + dx_oben for g in GRENZEN[(abs(kopf), 1 if kopf > 0 else -1)]]
@@ -163,4 +201,4 @@ def frame(i, nur=None):
 
 if __name__ == '__main__':
     frames = [frame(i) for i in range(N)]
-    C.abschluss(SLUG, 'Yolomungandr, Ender of Coolness', frames, MS, spr, OFF, C.vorschau_arg(), ecken=False)
+    C.abschluss(SLUG, 'Yolomungandr, Ender of Coolness', frames, MS, spr, OFF, C.vorschau_arg(), erlaubt=[RACHEN], ecken=False)

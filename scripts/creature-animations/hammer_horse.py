@@ -18,6 +18,7 @@ Ablauf (64 Frames à 70 ms = 4,5 s). Frame 0 = Original:
 * Schweif pendelt: die unteren drei Zeilen 1 px zum Körper hin (in den Pausen zwischen den Schlägen, Frames 27–32 und 57–62).
 * Blinzeln (Frames 28–31), SEITWÄRTS (Runde 9, Nutzer: „*Sollte* seitwärts blinzeln“ – das Auge sitzt auf dem senkrecht stehenden Hammerkopf): das Lid (Kopffarbe (61,71,70)) schiebt sich von links
   nach rechts über das Auge (x 26–27, y 9–12, helle Pixel UND Pupille): erst Spalte 26, dann beide Spalten (2 Frames zu), dann wieder Spalte 26, offen. Vorher schloss es sich von oben.
+  RUNDE 10 (Nutzer: „Das Augenlid muss von rechts kommen.“): Richtung umgedreht – das Lid schiebt sich von RECHTS nach links: erst Spalte 27, dann beide (2 Frames zu), dann wieder Spalte 27, offen.
 Ergänzungen: keine.
 """
 import numpy as np
@@ -57,9 +58,9 @@ def frame(i, nur=None):
     n = N8.stufe(i, 32, 2, 14)
     rumpf = TX.streck_zeile(RUMPF, PT + 12, n)
     hammer = HAMMER
-    if 28 <= i <= 31:                                                # Lid schiebt sich SEITLICH (von links nach rechts) über das ganze Auge (y 9–12) und wieder zurück
+    if 28 <= i <= 31:                                                # Lid schiebt sich SEITLICH (von RECHTS nach links, Runde 10) über das ganze Auge (y 9–12) und wieder zurück
         hammer = HAMMER.copy()
-        for x in ((26,), (26, 27), (26, 27), (26,))[i - 28]:
+        for x in ((27,), (26, 27), (26, 27), (27,))[i - 28]:
             hammer[PT + 9:PT + 13, PL + x, :3] = LID
     pendel = 1 if (27 <= i <= 32) or (57 <= i <= 62) else 0
     f = L.zusammen(sz.H, sz.W, [(SCHWEIF, pendel, 0), (rumpf, 0, 0), (hammer, 0, -k)])

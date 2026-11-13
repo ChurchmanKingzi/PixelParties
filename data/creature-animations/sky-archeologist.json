@@ -1,15 +1,15 @@
 {
   "creature": "Sky Archeologist",
   "sheet": "sky-archeologist.png",
-  "frameWidth": 36,
-  "frameHeight": 40,
+  "frameWidth": 27,
+  "frameHeight": 33,
   "frames": 48,
-  "frameMs": 75,
+  "frameMs": 80,
   "loop": true,
   "layout": "horizontal",
   "padTop": 2,
-  "padLeft": 3,
+  "padLeft": 2,
   "padRight": 2,
   "padBottom": 2,
-  "faceX": 11
+  "faceX": 13.5
 }

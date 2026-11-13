@@ -37,6 +37,13 @@ laufen um einen halben Takt versetzt (wie die Flaschen). Bewegt wird Hand + äu�
 Fertiggezeichnet: Hand unten → Haarumriss (9,25)/(22,25) in (140,34,10), Handschuhrand (10,28)/(21,28) grau; Hand oben → Ärmelkante (9,30)/(22,30) bleibt, Handschuhrand (10,25)/(21,25) grau,
 (10,27)/(21,27) Ärmelgrün. Flaschenbahnen, Federn, Mund unverändert.
 Schleife jetzt 54 Frames à 70 ms = 3,8 s (drei volle Umläufe à 18 Frames). In der Hand: 3 Frames (taucht 3 px ein). Federn des Clowns im Wurftakt (Periode 6), Mund schließt in den Frames 20–23 und 47–50.
+RUNDE 10 (Nutzer: „Soll beim Jonglieren auch mit den Händen tatsächlich die Potions berühren, wenn diese wieder hochgeworfen werden!“): Bisher endeten die Bahnen an den Originalplätzen der Tränke
+(0,10)/(22,10) – 3 px ÜBER und 4 px NEBEN den Handschuhen (x 7–10, y 25–27), die Flasche berührte die Hand nie. Jetzt liegen Fang- und Abwurfpunkt genau auf der Hand: Flasche bei (1,14) links bzw.
+(21,14) rechts, ihr Boden (Zeile y 25) sitzt auf der Oberkante des Handschuhs, der Handschuh wird VOR den Flaschenboden gezeichnet (er umfasst die Ecke des Bodens). Bahn je Flasche (18 Frames, `BAHN`):
+Abwurf aus der linken Hand (u 0) → 5 Flugbilder (Höhe 6, 2, 0, 2, 6 – ein Bild am Scheitel) → landet in der rechten Hand (u 6, Hand in Ruhe) → Hand gibt 1 px nach, Flasche geht mit (u 7, 8) →
+Abwurf aus der rechten Hand (u 9, Hand wieder in Ruhe, Flasche noch in der Hand) → Flug zurück; nach dem Abwurf schwingt die Hand 1 px nach oben nach. Solange die Flasche in der Hand liegt (4 Bilder),
+folgt sie der Hand pixelgenau (Nachgeben UND Federn des Clowns). Die Arme selbst sind unverändert (Posen aus Runde 9, gleiche Dicke).
+Frame 0: rot im Scheitel wie im Original; gelb und blau liegen in den Händen (4 px tiefer und 1 px weiter innen als im Original, wo sie frei über den Händen schwebten) – bewusste Abweichung.
 """
 import math
 import sys
@@ -50,29 +57,28 @@ import anim_textur as TX
 TX.umleiten()
 
 N, MS = 54, 70
-BEAT = 3
 G = N4.Figur('potion-juggler', 2, 2, 2, 2)
 spr, H, W, OFF = G.spr, G.H, G.W, G.OFF
 f = G.f
 clown = L.lade('potion-juggler-clown')
 TRANK = [L.lade('potion-juggler-trank%d' % k) for k in range(3)]     # 0 rot (Scheitel), 1 gelb (links), 2 blau (rechts)
-XL, XR, YH, YT, DIP = 0, 22, 10, 0, 3
-START = {1: 0.0, 0: 4.0, 2: 2.0}                                      # lokale Zeit (in Schlägen) in Frame 0: gelb wird links geworfen, rot im Scheitel (R→L), blau rechts gefangen
 G.erlaubt = G.erlaubt | {f(15, 25)}
 MUND_ZU = f(14, 26)
+# Flaschenbahn (Runde 10): u = 0 Abwurf aus der linken Hand, 1–5 Flug, 6–9 in der rechten Hand (6 landen, 7–8 Hand gibt nach, 9 Abwurf), 10–14 Flug zurück, 15–17 (+0) in der linken Hand.
+HAND_X, HAND_Y = 1, 14                                               # Flasche in der linken Hand (Boden = Zeile 25 = Oberkante des Handschuhs); rechts gespiegelt (22 − x)
+FLUG = ((5, 6), (9, 2), (11, 0), (13, 2), (17, 6))                   # links → rechts; zurück gespiegelt: steigende und fallende Flasche kreuzen sich nebeneinander
+START = {1: 0, 0: 12, 2: 6}                                          # u in Frame 0: gelb wird links geworfen, rot im Scheitel (R→L), blau landet rechts
 
 
-def bahn(t):
-    """Ort (x, y) der Flasche zur lokalen Zeit t (Schläge, Periode 6)."""
-    t %= 6.0
-    if t < 2.0 or 3.0 <= t < 5.0:
-        p = (t if t < 2.0 else t - 3.0) / 2.0
-        y = YH - (YH - YT) * 4 * p * (1 - p)
-        w = 0.05 * math.sin(2 * math.pi * p)                           # Bahnen der beiden Wurfrichtungen gegeneinander versetzt → sie kreuzen sich nebeneinander statt deckungsgleich
-        x = XL + (XR - XL) * (p + w) if t < 2.0 else XR - (XR - XL) * (p - w)
-        return int(round(x)), int(round(y)), (p > 0.5)
-    q = t - 2.0 if t < 3.0 else t - 5.0
-    return (XR if t < 3.0 else XL), int(round(YH + DIP * math.sin(math.pi * q))), True
+def bahn(u):
+    """(x, y, faellt, hand) der Flasche im Bahnschritt u (Periode 18); hand = None (fliegt), 'l' oder 'r' (liegt in dieser Hand, y dann ohne Handversatz)."""
+    u %= 18
+    h, v = divmod(u, 9)
+    if 1 <= v <= 5:
+        x, y = FLUG[v - 1]
+        return (22 - x if h else x), y, v >= 3, None
+    in_r = (v >= 6) != bool(h)                                       # v ≥ 6: in der Zielhand; v = 0: Abwurf aus der Starthand
+    return (22 - HAND_X if in_r else HAND_X), HAND_Y, True, 'r' if in_r else 'l'
 
 
 ARM_L = {(8, 25), (9, 25), (7, 26), (8, 26), (9, 26), (7, 27), (8, 27), (9, 27), (7, 28), (8, 28), (9, 28), (8, 29), (9, 29), (9, 30)}   # Hand + äußerer Ärmel (Spalten 7–9) des linken Arms
@@ -107,22 +113,34 @@ def arm_pose(c, d, rechts):
     return c
 
 
+HANDSCHUH = ((8, 25), (9, 25), (7, 26), (8, 26), (9, 26), (10, 26), (9, 27), (10, 27))   # linker Handschuh (rechts gespiegelt): liegt VOR dem Boden der gehaltenen Flasche
+
+
 def frame(i):
     c = clown.copy()
-    c = arm_pose(c, ARM_TAKT[(i - 3) % 6], False)                    # linke Hand fängt in den Frames 3 (mod 6)
-    c = arm_pose(c, ARM_TAKT[i % 6], True)                           # rechte Hand fängt in den Frames 0 (mod 6)
+    dl, dr = ARM_TAKT[(i - 3) % 6], ARM_TAKT[i % 6]
+    c = arm_pose(c, dl, False)                                       # linke Hand fängt in den Frames 3 (mod 6)
+    c = arm_pose(c, dr, True)                                        # rechte Hand fängt in den Frames 0 (mod 6)
     k = G.ebene(quelle=c)
     if Hm.takt(i, 27, 20, 4):
         Hm.setze(k, {(15, 26): MUND_ZU, (16, 26): MUND_ZU}, OFF)
-    if Hm.stufe(i, 6, 1):
+    fed = 1 if Hm.stufe(i, 6, 1) else 0
+    if fed:
         k = TX.streck_zeile(k, G.PT + 34, 1)
     k = G.schliessen(k, lambda x, y: (0, 0, 0))
     lagen = []
     for n, tr in enumerate(TRANK):
-        x, y, faellt = bahn(START[n] + i / BEAT)
+        x, y, faellt, hand = bahn(START[n] + i)
+        if hand:                                                     # in der Hand: die Flasche folgt der Hand (Nachgeben) und dem Federn des Clowns
+            y += (dl if hand == 'l' else dr) - fed
         lagen.append((faellt, tr, x, y))
     lagen.sort(key=lambda e: e[0])                                   # steigende Flasche hinten, fallende vorn
-    return L.zusammen(H, W, [(k, 0, 0)] + [(L.platz(tr, H, W, G.PL + x, G.PT + y), 0, 0) for _, tr, x, y in lagen])
+    bild = L.zusammen(H, W, [(k, 0, 0)] + [(L.platz(tr, H, W, G.PL + x, G.PT + y), 0, 0) for _, tr, x, y in lagen])
+    for d, X in ((dl, lambda x: x), (dr, lambda x: 31 - x)):         # Handschuhe wieder nach vorn: die Hand umfasst den Flaschenboden
+        for (x, y) in HANDSCHUH:
+            yy_, xx_ = G.PT + y + d - fed, G.PL + X(x)
+            bild[yy_, xx_] = k[yy_, xx_]
+    return bild
 
 
 if __name__ == '__main__':
