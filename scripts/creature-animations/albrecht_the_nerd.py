@@ -22,6 +22,8 @@ Ablauf (48 Frames à 62 ms = 2,98 s, nahtlos):
 * Kopfwiegen: der Kopf (Zeilen 0–9: Haar, Brille, Gesicht) neigt sich einmal pro Schleife 1 px nach rechts (Frames 6–13) und später 1 px nach links (Frames 30–37); Hals (Zeile 10) bleibt stehen, der Halsansatz
   bleibt 4-verbunden, Randpixel werden in Umrissfarbe geschlossen.
 * Fußtippen: der linke Turnschuh hebt sich dreimal um 1 px (Frames 24–35, je 2 Frames oben, 2 unten) hinter den Jackensaum und senkt sich wieder — wie ein ungeduldiges Warten.
+RUNDE 10 (Nutzer: gehaltene Gegenstände dürfen durch Atmen/Strecken nie dicker/höher werden): die Einfügezeile 17 lief durch das rote Buch (Rücken x 14–15 und Deckelkante) – es wurde beim Einatmen 1 px höher.
+Das Buch ist jetzt eine eigene starre Ebene (Maske `buch`, 41 Pixel) und hebt sich als Ganzes 1 px mit Hand/Brust; die Jacke atmet ohne das Buch. Unter dem Buch liegt nichts Verdecktes frei (rechts/unten vom Körper).
 Frame 0 = Original (Ruhepose). Kontrolle: anim_humanoide.ruhepose / eckkontakt_typen / Randpixel-Test (Regel 16).
 Alle Bewegungen laufen auf der vollen Leinwand (anim_lib wirft ClipError). Nur ganze Pixel, nur Farben der Quelle.
 Ergänzungen: keine (der Schuh wird nur hinter den Saum geschoben, der Hals bleibt; nichts Verdecktes wird freigelegt).
@@ -48,7 +50,11 @@ UMRISS = tuple(int(v) for v in spr[0, 4, :3])                      # A (0,2,0)
 ERLAUBT = Hm.umrissfarben(spr)                                      # Farben der Außenkante im Original (Regel 16)
 
 fuss = vorhanden & (xx >= 3) & (xx <= 7) & (yy >= 19)             # linker Turnschuh
-rumpf = vorhanden & ~fuss
+# Runde 10: das Buch als eigene STARRE Ebene (wird nie gestreckt): Rücken x 14–15 (y 11–18) mit Ecke (13,11), Deckel/Seiten y 17–20 (x 8–15) samt Handschatten (11–12,17)
+buch = vorhanden & (((xx >= 14) & (yy >= 11) & (yy <= 18)) | ((xx == 13) & (yy == 11)) | ((xx >= 9) & (yy == 17)) | ((xx >= 9) & (yy == 18))
+                    | ((xx >= 8) & (yy >= 19) & (yy <= 20)))
+assert buch.sum() == 41, buch.sum()
+rumpf = vorhanden & ~fuss & ~buch
 
 
 def frame(i):
@@ -62,11 +68,13 @@ def frame(i):
     brust = Hm.stufe(i, N / 2, 1)
     kopf = Hm.stufe(i - 3, N / 2, 1)
     k = TX.atmen(k, PAD_T + 17, PAD_T + 10, brust, kopf)
+    b, _ = L.trenne(spr, buch)
+    b = L.platz(b, H, W, PAD_L, PAD_T - brust)                    # Runde 10: das Buch geht starr mit der Hand/Brust mit (vorher lief die Einfügezeile 17 durch das Buch → es wurde 1 px höher)
     # --- Fußtippen: der Schuh liegt hinter dem Saum und hebt sich 1 px ---
     hoch = 1 if (Hm.folge(i, 24, [1, 1, 0, 0, 1, 1, 0, 0, 1, 1, 0, 0], N)) else 0
     f, _ = L.trenne(spr, fuss)
     f = L.platz(f, H, W, PAD_L, PAD_T - hoch)
-    fig = L.zusammen(H, W, [(f, 0, 0), (k, 0, 0)])
+    fig = L.zusammen(H, W, [(f, 0, 0), (k, 0, 0), (b, 0, 0)])
     Hm.kontur_schliessen(fig, ERLAUBT, UMRISS)                      # Regel 16: Außenkante in jeder Pose in Umrissfarbe
     return fig
 

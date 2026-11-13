@@ -22,6 +22,8 @@ Ablauf (48 Frames à 65 ms = 3,12 s; Frame 0 = Original):
   (der Wurm bleibt ein einziger 4-verbundener Körper, für alle 48 Frames geprüft). Der KOPF (y 0–16 samt Schlund und Hörnern) wird nicht geschert, sondern schwingt starr mit der obersten Körperzeile mit.
 * AUFRICHTEN (Periode 24, 0 → 1 → 2 → 1 → 0 px): die Ringzeile y 17 wird 0–2× eingefügt (Texturmischung): der Kopf hebt sich, der Wurm reckt sich, der Boden bleibt.
 * SCHLUND ARBEITET (Periode 48): die Kehle (x 20–23, y 7–13) dreht sich — das Dunkelrot der Kehle läuft zyklisch eine Zeile nach unten (alle ~7 Frames ein Schritt, nach einer Schleife zurück in der Ausgangslage); die weißen Zähne in der Kehle, die Zahnreihen, das Zahnfleisch und der Rand bleiben fest.
+RUNDE 10 (Nutzer: Stacheln/Hörner dürfen durch Strecken nie dicker/länger werden): die Einfügezeile lag auf y 17 und lief dort durch den Knochenstachel (2,17–19) – er wurde beim Aufrichten bis zu 2 px länger.
+Eingefügt wird jetzt bei y 22 (Ringzeile ohne Stachelpixel, zwischen den Stacheln (4,21) und (0,23)); Hub, Timing und Windung sind unverändert, alle Stacheln behalten ihre Form.
 Kein Glanz, kein Funkeln. Alle Bewegungen laufen auf der vollen Leinwand (anim_lib wirft ClipError). Nur ganze Pixel, nur Farben der Quelle.
 Ergänzungen: keine gemalten Pixel; Randpixel-Test (Regel 16) mit `U.kontur_schliessen` (Umrissfarbe (26,26,26)).
 """
@@ -47,7 +49,8 @@ KOMP0 = V.komp4(spr)
 UMRISS = U.umrissfarben(spr)
 KONTUR = (26, 26, 26)
 KEHLE = (20, 23, 7, 13)                                   # x0, x1, y0, y1 (einschließlich)
-ZEILE_STRECK = 17                                         # hier wird eingefügt; Zeilen darüber = Kopfblock
+ZEILE_STRECK = 17                                         # oberste Zeile der Windung; Zeilen darüber = Kopfblock
+ZEILE_EINFUEGEN = 22                                      # Runde 10: hier wird eingefügt (siehe Kopf) – die einzige Körperzeile ohne Stachelpixel
 BODEN_Y = [OFF[1] + y for y in range(27, ZEILE_STRECK - 1, -1)]          # Boden (y 27) → oben (y 17)
 TEST_EBENEN = 'koerper'
 
@@ -76,7 +79,7 @@ def frame(i, nur=None):
         neu[neu_w & ~weiss, :3] = (38, 23, 24)                                                 # (wanderte ein Zahn auf einen dunklen Platz: Kehlenfarbe)
         neu[weiss] = reg[weiss]
         k[OFF[1] + y0:OFF[1] + y1 + 1, OFF[0] + x0:OFF[0] + x1 + 1] = neu
-    kb = TX.streck_zeile(k, OFF[1] + ZEILE_STRECK, n)
+    kb = TX.streck_zeile(k, OFF[1] + ZEILE_EINFUEGEN, n)
     f = V.zeilen_versatz4(kb, offs(i, kb))
     return U.kontur_schliessen(f, UMRISS, KONTUR)
 
