@@ -510,7 +510,7 @@ def plane_starts(leben, n, konflikt=None, basis=1, seed=1, sperre=None):
                 continue
             if konflikt and any(st[j] is None and j != i and konflikt(i, j) and s - basis < leben[j] and n - s - leben[i] < leben[j] for j in range(len(leben))):
                 continue                                                             # Platz für den noch nicht gesetzten Riss an derselben Stelle lassen
-            wert = sum(last[s:s + leben[i]]) / leben[i] + sum(1.5 for j in range(len(leben)) if st[j] is not None and (abs(st[j] - s) < 3 or abs(st[j] + leben[j] - s - leben[i]) < 3)) + rnd.random() * 0.6
+            wert = sum(last[s:s + leben[i]]) / leben[i] + sum(0.6 for j in range(len(leben)) if st[j] is not None and (abs(st[j] - s) < 2 or abs(st[j] + leben[j] - s - leben[i]) < 2)) + rnd.random() * 0.3
             if best is None or wert < best[0]:
                 best = (wert, s)
         assert best is not None, ('kein freier Startframe für Riss', i)

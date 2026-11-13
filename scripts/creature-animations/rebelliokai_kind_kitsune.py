@@ -23,7 +23,7 @@ Kein Metall/Gold/Edelstein → KEIN Glanz. Keine Partikel.
 Ablauf (60 Frames à 70 ms = 4,2 s, nahtlos; Frame 0 = Original; ein Bodenwesen: die Füße bleiben am Boden):
 * DREI SCHWEIF-FLAMMEN (Runde 4, „richtige Feuer-Animation“, anim_feuer3): klassischer Flammenzyklus, 10 Posen à 2 Frames (3 Zyklen je Schleife). Jeder Schweif = eine große Hauptflamme + zwei phasenversetzte Seitenzungen, Fluss vom Ansatz
   zur Spitze wie gemalt (oben nach oben, rechts nach rechts, links nach unten links); Farbbänder der Quelle: dunkler Umriss (110,39,39) außen → (179,56,49) → (234,79,54) → heller Kern (245,125,74) am Ansatz. Bäuche wandern zur Spitze,
-  Spitzen schnüren sich ab und fliegen als kleine Fetzen weiter. Keine Einzelfunken mehr.
+  nur beim oberen Schweif schnüren sich die Spitzen ab und steigen als kleine Fetzen auf (seitlich/unten laufen die Zungen nur spitz aus, damit nichts „herabfällt“). Keine Einzelfunken mehr.
 * OHREN: das linke Ohr wippt die Spitze (Zeilen y 7–12) 1 px seitlich (zweimal je Schleife), das rechte Ohr hebt/senkt seine Außenhälfte (Spalten x ≥ 22) bis 1 px (dreimal je Schleife, andere Phase).
 * ATMEN (3× je Schleife, je 10 Frames oben): die Rumpfzeile 28 wird einmal doppelt eingefügt (Texturmischung): Kopf, Ohren und die Schweif-Ansätze steigen 1 px (Schweife starr mit), die Beine bleiben am Boden.
 Fest: Gesicht (die „^“-Augen und Nase), Beine, Brustband. Alle Bewegungen laufen auf der vollen Leinwand (ClipError statt Abschneiden). Nur ganze Pixel, nur Quellfarben.
@@ -81,12 +81,12 @@ FUCHS_M[OFF[1]:OFF[1] + sh, OFF[0]:OFF[0] + sw] = fox
 RAMPE_S = [UMRISS_SCHWEIF, (179, 56, 49), (234, 79, 54), (245, 125, 74)]
 _F = lambda x, y, l, b, **k: F3.Flamme(OFF[0] + x, OFF[1] + y, l, b, **k)
 _B = [(1.0, 1.0), (0.9, 0.8), (0.62, 0.52), (0.36, 0.28)]              # dünner dunkler Rand (1 px), kräftiger roter Körper, heller Kern am Ansatz — wie die gemalten Schweife
-S_OBEN = [_F(10.3, 11.0, 12, 5.2, richtung=(-0.08, -1), fuss=1.0, bauch=0.4, schlag=0.7, phase=0.0, baender=_B, welle=9),
+S_OBEN = [_F(10.3, 11.0, 12, 5.2, richtung=(-0.08, -1), fuss=1.0, bauch=0.4, schlag=0.5, phase=0.0, baender=_B, welle=9),
           _F(6.8, 8.5, 8, 2.8, richtung=(-0.35, -1), phase=0.4, baender=_B), _F(13.4, 8.5, 9, 2.8, richtung=(0.15, -1), phase=0.7, baender=_B)]
-S_RECHTS = [_F(24.0, 19.5, 13, 5.2, richtung=(1, 0.18), fuss=1.0, bauch=0.4, schlag=0.7, phase=0.35, baender=_B, welle=9),
-            _F(27.0, 16.6, 8, 2.8, richtung=(1, -0.05), phase=0.75, baender=_B), _F(26.5, 22.5, 9, 2.8, richtung=(1, 0.4), phase=0.05, baender=_B)]
-S_LINKS = [_F(8.5, 20.0, 13, 5.2, richtung=(-0.55, 1), fuss=1.0, bauch=0.4, schlag=0.7, phase=0.65, baender=_B, welle=9),
-           _F(4.5, 21.5, 8, 2.8, richtung=(-0.8, 1), phase=0.05, baender=_B), _F(8.6, 23.5, 8, 2.6, richtung=(-0.1, 1), phase=0.35, baender=_B)]
+S_RECHTS = [_F(24.0, 19.5, 13, 5.2, richtung=(1, 0.18), fuss=1.0, bauch=0.4, schlag=0.5, phase=0.35, baender=_B, fetzen=False, welle=9),
+            _F(27.0, 16.6, 8, 2.8, richtung=(1, -0.05), phase=0.75, baender=_B, fetzen=False), _F(26.5, 22.5, 9, 2.8, richtung=(1, 0.4), phase=0.05, baender=_B, fetzen=False)]
+S_LINKS = [_F(8.5, 20.0, 13, 5.2, richtung=(-0.55, 1), fuss=1.0, bauch=0.4, schlag=0.5, phase=0.65, baender=_B, fetzen=False, welle=9),
+           _F(4.5, 21.5, 8, 2.8, richtung=(-0.8, 1), phase=0.05, baender=_B, fetzen=False), _F(8.6, 23.5, 8, 2.6, richtung=(-0.1, 1), phase=0.35, baender=_B, fetzen=False)]
 FEUER = F3.Feuer(H, W, S_OBEN + S_RECHTS + S_LINKS, RAMPE_S, posen=10, halten=2, sperre=FUCHS_M)
 
 

@@ -167,7 +167,7 @@ def figur(i):
     doppeln, p = POSEN[s_]
     koerper = A.zeilen_von(sp, 0, sh - 1, H, W, PAD_L, PAD_T)
     z, quelle = TX.koerper_pose(koerper, loeschen=set(MUND_LOESCHEN[h]), doppeln=doppeln, p=p,
-                                paare_je_zeile={k: v for k, v in PAARE_ZEILE.items()}, x0=PAD_L, sperre={WEISS, SCHWARZ})
+                                paare_je_zeile={k: v for k, v in PAARE_ZEILE.items()}, x0=PAD_L, sperre={WEISS, SCHWARZ}, funktion=SL.koerper_pose)
     fig, top = A.auf_leinwand(z, H, BODEN, 0)
     fig, neu = A.umriss_ergaenzen(fig, UMRISS, lambda x, y: (125, 99, 45))             # Umrissstufen > 1 px (nur beim geschlossenen Maul an der Backe) schließen
     return dict(fig=fig, top=top, neu=neu)
