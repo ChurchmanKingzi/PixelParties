@@ -20,8 +20,8 @@
 //  2. KRAFTSTROM-EREIGNISSE (`window.ppFx69Zone(payload, myIdx)` → true, wenn gespielt; aus `onZoneAnim` in app-board.jsx, VOR dem normalen Verteiler):
 //       `biomancy_bloom` mit `kraftstrom: true` (Engine: `placeBiomancyToken`, _biomancy-shared.js): 16 Kugeln (0,02 s / 0,30 s; Lime, Grün, Creme) aus der Biomancy-Fähigkeitskarte (`quelle: 'ability'`)
 //                         bzw. dem Helden (`quelle: 'hero'`, Kyli) in die Zone, kleine Funken beim Eintreffen. Die Blumen entfallen dann. Der Token landet 600 ms später (Engine) mit dem Token-Look oben.
-//       `alchemy_kraftstrom` (Engine: alchemy.js, 600 ms vor dem Ziehen): die Fähigkeitskarte leuchtet 0,6 s (Punktringe R 32: 40 + 24 Punkte in 6 Trankfarben kreisen, Strahlenblitz, aufsteigende
-//                         Funken, einströmende Punkte), 14 Kugeln (0,02 s / 0,30 s, Bogen nach oben) fließen ins Potion Deck, dort Ringe (Creme, Orange) + 10 Strahlen. Die Engine wartet `ALCHEMY_VORLAUF_MS` = 600 ms.
+//       `alchemy_kraftstrom` (Engine: alchemy.js, 600 ms vor dem Ziehen): die Fähigkeitskarte leuchtet 0,3 s (Punktringe R 32: 40 + 24 Punkte in 6 Trankfarben kreisen, Strahlenblitz, aufsteigende
+//                         Funken, einströmende Punkte), 14 Kugeln (0,01 s / 0,22 s, Bogen nach oben) fließen ins Potion Deck, dort ab 0,2 s Ringe (Creme, Orange) + 10 Strahlen. Die Engine wartet `ALCHEMY_VORLAUF_MS` = 320 ms (vorher 600).
 //  Rückfall (Animationen aus, Retro, `__ppFxAlt`, reduzierte Bewegung, `window.__ppFx69Aus`, keine Palette, Zone nicht messbar): false → alter Kreis (CSS) bzw. Blumen / nichts.
 //  Handy (`ppIsPhone`): Teilchen 40 % (`ppFxN`), weniger Kugeln. Foil-Ebenen werden nicht berührt (die echte Karte samt Foil wird nur kurz ausgeblendet; gezeichnet wird das Kartenbild).
 //  Messung (nur Tests): `window.__ppFx69Messen = true` → `window.__ppFx69Zeiten` = [Art, Bild, ms]; `window.__ppFx69Manuell = true` → kein Takt, Bild für Bild über `window.__ppFx69Lauf.zeichne(f)` / `.ende()`.
@@ -38,7 +38,7 @@
   const TAKT = 1000 / 30;
   const fr = (s) => fl(s * 30 + 1e-4);
   FX.TAKT = TAKT;
-  FX.ALCHEMY_VORLAUF_MS = 600;
+  FX.ALCHEMY_VORLAUF_MS = 320;
 
   function H(a, b) {
     let h = Math.imul((a | 0) ^ 0x9e3779b9, 0x85ebca6b) ^ Math.imul((b | 0) + 0x7f4a7c15, 0xc2b2ae35);
@@ -637,16 +637,16 @@
     if (!quelle || !deck) return false;
     if (!sichtbar(quelle.getBoundingClientRect())) return false;
     if (root.ppBattleCamFocus) root.ppBattleCamFocus(quelle);
-    const F = farben(), salz = Math.floor(Math.random() * 1e6) % 9973, AL_DUR = 0.6, nF = nFaktor();
-    return strom([quelle, deck], AL_DUR + 0.35, (m, t, geo, plan) => {
+    const F = farben(), salz = Math.floor(Math.random() * 1e6) % 9973, AL_DUR = 0.3, nF = nFaktor();
+    return strom([quelle, deck], AL_DUR + 0.5, (m, t, geo, plan) => {
       const [a, b] = geo.cells, rot = fl(t * 30 + 1e-4), ac = F.alc;
       // Karte leuchtet: Punktringe in Trankfarben, Strahlenblitz
-      if (t < AL_DUR + 0.15) {
+      if (t < AL_DUR + 0.1) {
         const R = rd((32 + 5 * Math.sin(t * 14)) * a.rc * 0.85), cx = rd(a.x), cy = rd(a.y);
         const n1 = mx(16, rd(40 * mn(1, a.rc * 0.85))), n2 = mx(10, rd(24 * mn(1, a.rc * 0.85)));
         for (let k = 0; k < n1; k++) { if ((k + rot) % 3 === 2) continue; const an = k / n1 * PI * 2; m.rect(rd(cx + Math.cos(an) * R), rd(cy + Math.sin(an) * R * 1.15), 2, 2, ac[(k + rot) % ac.length]); }
         for (let k = 0; k < n2; k++) { if ((k - rot + 48) % 4 === 0) continue; const an = k / n2 * PI * 2; m.rect(rd(cx + Math.cos(an) * R * 0.66), rd(cy + Math.sin(an) * R * 0.66 * 1.15), 1, 1, ac[(k + 2) % ac.length]); }
-        if (t < 0.16) { const L = t < 0.08 ? easeOut(t / 0.08) : 1 - (t - 0.08) / 0.08; for (let r = 0; r < 14; r++) { const an = r * PI / 7 + 0.2, len = L * (r % 2 ? 26 : 48) * a.rc; m.linie(cx, cy, rd(cx + Math.cos(an) * len), rd(cy + Math.sin(an) * len * 0.9), r % 2 ? 2 : 3, r % 2 ? ac[r % ac.length] : F.cream); } }
+        if (t < 0.12) { const L = t < 0.06 ? easeOut(t / 0.06) : 1 - (t - 0.06) / 0.06; for (let r = 0; r < 14; r++) { const an = r * PI / 7 + 0.2, len = L * (r % 2 ? 26 : 48) * a.rc; m.linie(cx, cy, rd(cx + Math.cos(an) * len), rd(cy + Math.sin(an) * len * 0.9), r % 2 ? 2 : 3, r % 2 ? ac[r % ac.length] : F.cream); } }
       }
       orbsZeichnen(m, plan.O, t, F.cream);
       // Potion Deck: Ringe und Strahlen beim Eintreffen
@@ -661,13 +661,13 @@
     }, (geo) => {
       const [a, b] = geo.cells, T = [], ac = F.alc;
       const n = phoneJa() ? 8 : 14;
-      const O = orbsPlanen(n, 0.0, 0.02, 0.30, { x: a.x, y: a.y, sx: 60 * a.rc / 4.8, sy: 70 * a.rc / 4.8 }, { x: b.x, y: b.y, sx: 60 * b.rc / 4.8, sy: 70 * b.rc / 4.8 }, salz, ac, mx(0.5, a.rc / 4.8), true);
+      const O = orbsPlanen(n, 0.0, 0.01, 0.22, { x: a.x, y: a.y, sx: 60 * a.rc / 4.8, sy: 70 * a.rc / 4.8 }, { x: b.x, y: b.y, sx: 60 * b.rc / 4.8, sy: 70 * b.rc / 4.8 }, salz, ac, mx(0.5, a.rc / 4.8), true);
       // aufsteigende Funken und einströmende Punkte am Kartenplatz
       const R = (i, k) => H(salz + i, k);
-      for (let i = 0, N = mx(4, rd(42 * nF)); i < N; i++) T.push({ t0: i / N * AL_DUR, life: 0.5 + R(i, 1) * 0.4, x: a.x + (R(i, 2) - 0.5) * 100 / 4.8 * a.rc, y: a.y + (R(i, 3) - 0.5) * 130 / 4.8 * a.rc, vx: (R(i, 4) - 0.5) * 40 / 4.8 * a.rc, vy: -(70 + R(i, 5) * 200) / 4.8 * a.rc, ax: 0, ay: 0, kind: R(i, 6) < 0.3 ? 2 : 3, sz: 1, c: ac[fl(R(i, 7) * ac.length)] });
+      for (let i = 0, N = mx(4, rd(42 * nF)); i < N; i++) T.push({ t0: i / N * AL_DUR, life: 0.3 + R(i, 1) * 0.3, x: a.x + (R(i, 2) - 0.5) * 100 / 4.8 * a.rc, y: a.y + (R(i, 3) - 0.5) * 130 / 4.8 * a.rc, vx: (R(i, 4) - 0.5) * 40 / 4.8 * a.rc, vy: -(70 + R(i, 5) * 200) / 4.8 * a.rc, ax: 0, ay: 0, kind: R(i, 6) < 0.3 ? 2 : 3, sz: 1, c: ac[fl(R(i, 7) * ac.length)] });
       for (let i = 0, N = mx(4, rd(36 * nF)); i < N; i++) { const an = R(i + 99, 1) * PI * 2, r = (70 + R(i + 99, 2) * 60) / 4.8 * a.rc, life = 0.34;
-        T.push({ t0: R(i + 99, 3) * (AL_DUR - 0.2), life, x: a.x + Math.cos(an) * r, y: a.y + Math.sin(an) * r * 0.9, vx: -Math.cos(an) * r / life, vy: -Math.sin(an) * r * 0.9 / life, ax: 0, ay: 0, kind: 0, sz: R(i + 99, 4) < 0.3 ? 2 : 1, c: ac[fl(R(i + 99, 5) * ac.length)] }); }
-      return { O, T, tDeck: AL_DUR - 0.04 };
+        T.push({ t0: R(i + 99, 3) * (AL_DUR - 0.12), life, x: a.x + Math.cos(an) * r, y: a.y + Math.sin(an) * r * 0.9, vx: -Math.cos(an) * r / life, vy: -Math.sin(an) * r * 0.9 / life, ax: 0, ay: 0, kind: 0, sz: R(i + 99, 4) < 0.3 ? 2 : 1, c: ac[fl(R(i + 99, 5) * ac.length)] }); }
+      return { O, T, tDeck: 0.2 };
     });
   }
 

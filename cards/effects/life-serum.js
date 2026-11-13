@@ -30,7 +30,7 @@
 //  Kein HOPT: der Kartentext nennt keine Einsatzgrenze.
 //
 //  ── ANIMATION (Pixelart, public/app-fx-70.jsx, `life_serum_shot`) ──
-//  Trailer-Look: eine rosa Kugel LÄDT am Ablagestapel des Spielers (0,6 s, Radius 2 → 9, kreisende Herzen), fliegt 0,9 s im Bogen zum Ziel und löst
+//  Trailer-Look: eine rosa Kugel LÄDT über der Handkarte der gespielten Potion (0,6 s, Radius 2 → 9, kreisende Herzen; die Karte fliegt nach 0,25 s in den Gelöscht-Stapel, `_potion-hand-flight.js`), fliegt 0,9 s im Bogen zum Ziel und löst
 //  beim Einschlag den Heilimpuls (`healing_hearts`, app-fx-50) samt Strahlen aus. Der HP-Gewinn (Zahl, Balken) fällt erst beim Einschlag (HEIL_MS).
 //  Rückfall des Clients (Retro, reduzierte Bewegung, `window.__ppFx70Aus`): `healing_hearts` zum Einschlagszeitpunkt (ohne Kugel).
 //  EINE Zeile zurück zum alten Look (Herzen sofort am Ziel, 180 ms Wartezeit): `KUGEL = false`.
@@ -41,10 +41,12 @@ const HP_GAIN = 150;   // v1065 (Als Balanceaenderung 14.9.): war 200
 
 // Zeiten (ms) der Zonen-Animation `life_serum_shot` (app-fx-70.jsx, 30 Hz): Laden 600 + Flug 900 = Einschlag; `VORLAUF_MS` = Mount-Vorlauf im Client
 // (ZONE_ANIM_MOUNT_DELAY_MS 100 + Aufbau, wie bei Tiger Kick/Venom Snake). Engine-Wartezeit = Animationszeit + Vorlauf (der Heilimpuls beginnt beim Einschlag).
+const { quelle: handQuelle, warteMitAbflug } = require('./_potion-hand-flight');
 const KUGEL = true;   // false = der bisherige Look (`healing_hearts` sofort am Ziel, 180 ms) — die einzige Stelle, die zwischen den beiden Looks umschaltet
 const KUGEL_LADE_MS = 600;
 const KUGEL_FLUG_MS = 900;
 const VORLAUF_MS = 120;
+const ABFLUG_MS = VORLAUF_MS + 250;   // die Handkarte verlässt die Hand 250 ms nach dem Start des Ladens (Nutzer: erst nach Beginn der Animation, noch während sie läuft)
 const HEIL_MS = KUGEL ? KUGEL_LADE_MS + KUGEL_FLUG_MS + VORLAUF_MS : 180;
 
 module.exports = {
@@ -119,9 +121,10 @@ module.exports = {
       owner: target.owner,
       heroIdx: target.heroIdx,
       zoneSlot: target.type === 'hero' ? -1 : target.slotIdx,
-      ...(KUGEL ? { von: { owner: pi, pile: 'deleted' } } : null),
+      ...(KUGEL ? { von: handQuelle(engine, pi, CARD_NAME) } : null),   // Handplatz der Karte (Rückfall: Gelöscht-Stapel)
     });
-    await engine._delay(HEIL_MS);
+    if (KUGEL) await warteMitAbflug(engine, pi, CARD_NAME, HEIL_MS, ABFLUG_MS);
+    else await engine._delay(HEIL_MS);
 
     // W13 (Q144, Al: Resistance blockt JEDEN Nicht-Schaden-Effekt): der Max-HP-Gewinn auf einen
     // Helden fragt den zentralen Pruefer (Animation lief schon).

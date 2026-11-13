@@ -36,8 +36,8 @@ const { hasCardType, isOwnSideSummonableCreature, baseCardName } = require('./_h
 const { kontrolliert } = require('./_double-shared');
 
 const CARD_NAME = 'Cute Phoenix';
-const PHOENIX_REBIRTH_MS = 1800;      // = PP_FX71_REBIRTH_MS (public/app-fx-71.jsx)
-const PHOENIX_REBIRTH_LEBEN = 3500;   // = PP_FX71_REBIRTH_LEBEN
+const PHOENIX_REBIRTH_MS = 1150;      // = PP_FX71_REBIRTH_MS (public/app-fx-71.jsx)
+const PHOENIX_REBIRTH_LEBEN = 2900;   // = PP_FX71_REBIRTH_LEBEN
 
 /**
  * Count DISTINCT Creature card names in the discard pile. Duplicates
@@ -238,7 +238,7 @@ module.exports = {
 
       // Optik (app-fx-71.jsx): Flammenzerfall am Platz, parallel zum Kartenflug in die Ablage — jeder Tod der Phoenix, egal ob sie zurueckkehrt.
       ctx._engine._broadcastEvent('play_zone_animation', {
-        type: 'phoenix_zerfall', duration: 2400,
+        type: 'phoenix_zerfall', duration: 1600,
         owner: ctx.card.owner, heroIdx: ctx.card.heroIdx, zoneSlot: ctx.card.zoneSlot,
       });
 
@@ -290,7 +290,7 @@ module.exports = {
         zoneSlot: ctx.card.zoneSlot,
         by: CARD_NAME,
         // Optik (app-fx-71.jsx): Flammensammeln, Feuer-Ei mit Rissen, Explosion statt des goldenen Lichts. Die Engine
-        // wartet `animationMs` (Explosionsbild 1700 ms + Mount-Vorlauf 100 ms), die Leinwand lebt `animationDauer` ms.
+        // wartet `animationMs` (Explosionsbild 1050 ms + Mount-Vorlauf 100 ms), die Leinwand lebt `animationDauer` ms.
         animation: 'phoenix_rebirth', animationMs: PHOENIX_REBIRTH_MS, animationDauer: PHOENIX_REBIRTH_LEBEN,
         // „revive it and place it into the same Support Zone" — gilt als
         // Beschwoerung aus der Ablage (Als Ruling 25.9.): Signal + SC.

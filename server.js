@@ -12854,6 +12854,7 @@ async function doConfirmPotion(room, pi, { selectedIds }) {
   }
 
   const hi = getResolvingHandIndex(ps);
+  const fruehFlug = ps._resolvingCard ? ps._resolvingCard.fruehFlug : undefined;   // Potion-Projektil (cards/effects/_potion-hand-flight.js): der Flug Hand → Gelöscht ging schon beim Laden raus
   ps._resolvingCard = null;
   // Magic Gems' "discard another card to keep this in hand" rule —
   // mirrors the same flag in doUseArtifactEffect. Skip the splice +
@@ -12889,9 +12890,9 @@ async function doConfirmPotion(room, pi, { selectedIds }) {
     // der Flug nicht: er trug EINEN `owner` fuer beide Enden. Jetzt
     // wird die Herkunft VOR dem Flug gelesen und der Flug endet dort,
     // wo die Karte auch landet.
-    const pileOwner = room.engine._consumeHandCardOrigin(pi, potionName, fromCreation ? undefined : hi);
+    const pileOwner = fruehFlug != null ? fruehFlug : room.engine._consumeHandCardOrigin(pi, potionName, fromCreation ? undefined : hi);
     const pilePs = gs.players[pileOwner];
-    if (!_gestohlen) room.engine._broadcastEvent('play_pile_transfer', {
+    if (!_gestohlen && fruehFlug == null) room.engine._broadcastEvent('play_pile_transfer', {
       fromOwner: pi, toOwner: pileOwner, cardName: potionName,
       // ★ 28.8.: Fluganker folgt der HERKUNFT. Ohne das startete der
       // Flug einer Vorratskarte am gleichnamigen Platz der HAND.

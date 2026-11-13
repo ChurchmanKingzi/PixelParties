@@ -19,14 +19,14 @@
 //  TEIL 2 — PHÖNIX-WIEDERBELEBUNG (Trailer: Cute Phoenix, Zug 8a, l. 2230–2244, 1917–1925, 2513–2520; Q 64,5–67,0)
 //    Im Spiel stirbt Cute Phoenix normal (Karte fliegt in die Ablage, `creature_death`); die Wiederbelebung (`_reviveAfterDeath`, Engine `_wiederbelebungNachTod`) setzt sie nach der Frage „Revive?“ in IHREN Platz zurück.
 //    Die Sprites der Kreaturen gibt es im Spiel nicht — der Zyklus läuft darum kartenbasiert am Platz:
-//      `phoenix_zerfall`  (Zonen-Animation, gesendet vom Skript `cute-phoenix.js` im Todes-Hook, parallel zum Kartenflug in die Ablage): Flammenzerfall — 100 Flammenblöcke (50/s × 2) steigen auf, ~77 Funken/Herzen/Sterne
-//                         (70/s), Asche (24/s); ~2,2 s Lebensdauer, reine Optik.
-//      `phoenix_rebirth`  (Zonen-Animation, gesendet von `_wiederbelebungNachTod` anstelle von `holy_revival`, wenn der Stempel `animation` trägt): 0–1400 ms Flammensammeln (3 Ringe r 60 → 6 als Pixelringe, 160 Flämmchen/Herzen
-//                         ziehen sich zur Mitte), ab 250 ms wächst das FEUER-EI (Ellipse, Dither-Verlauf Creme → Gelb → Orange → Rot → Dunkelrot, Tinte-Kontur, Flammenzungen, Pulsieren; 12 Wachstumsstufen in 900 ms), ab 800 ms laufen
-//                         6 RISSE vom Mittelpunkt nach außen (Tinte 3 + Creme 1), ab 1150 ms wackelt das Ei, ab 1500 ms hellt es sich per Bayer-Dither auf — bei 1700 ms EXPLOSION: 5 Ringe (creme/gelb/orange/rosa/rot, 0,8 s), 32 Strahlen
-//                         (0,24 s), 8 Flammensäulen (1,6 s), Funkenstoß, Herzen, aufsteigende Funken, 5 Bilder Creme-Dither-Blitz über dem Platz (deckt das Erscheinen der Karte). Dann steht die Karte da.
-//    ENGINE-VERTRAG: `_wiederbelebungNachTod` wartet beim Phönix `reviveAfterDeath.animationMs` (= `PP_FX71_REBIRTH_MS` = 1800 ms: Explosionsbild 1700 ms + Mount-Vorlauf 100 ms) statt 620 ms, bevor die Karte wieder gesetzt wird; Gesamt-Lebensdauer
-//    der Leinwand 3500 ms läuft parallel zum Weiterspielen. Andere Wiederbelebungen (Loyal Bone Dog, Extra Life/Trial of Coolness) behalten `holy_revival`.
+//      `phoenix_zerfall`  (Zonen-Animation, gesendet vom Skript `cute-phoenix.js` im Todes-Hook, parallel zum Kartenflug in die Ablage): Flammenzerfall — 100 Flammenblöcke (50/s × 2) steigen auf, ~49 Funken/Herzen/Sterne
+//                         (70/s), Asche (24/s); ~1,5 s Lebensdauer (vorher 2,3 s), reine Optik.
+//      `phoenix_rebirth`  (Zonen-Animation, gesendet von `_wiederbelebungNachTod` anstelle von `holy_revival`, wenn der Stempel `animation` trägt): 0–800 ms Flammensammeln (3 Ringe r 60 → 6 als Pixelringe, 160 Flämmchen/Herzen
+//                         ziehen sich zur Mitte), ab 150 ms wächst das FEUER-EI (Ellipse, Dither-Verlauf Creme → Gelb → Orange → Rot → Dunkelrot, Tinte-Kontur, Flammenzungen, Pulsieren; 12 Wachstumsstufen in 550 ms), ab 450 ms laufen
+//                         6 RISSE vom Mittelpunkt nach außen (Tinte 3 + Creme 1), ab 650 ms wackelt das Ei, ab 900 ms hellt es sich per Bayer-Dither auf — bei 1050 ms EXPLOSION: 5 Ringe (creme/gelb/orange/rosa/rot, 0,8 s), 32 Strahlen
+//                         (0,24 s), 8 Flammensäulen (1,0 s), Funkenstoß, Herzen, aufsteigende Funken, 5 Bilder Creme-Dither-Blitz über dem Platz (deckt das Erscheinen der Karte). Dann steht die Karte da.
+//    ENGINE-VERTRAG: `_wiederbelebungNachTod` wartet beim Phönix `reviveAfterDeath.animationMs` (= `PP_FX71_REBIRTH_MS` = 1150 ms: Explosionsbild 1050 ms + Mount-Vorlauf 100 ms; vorher 1800 ms) statt 620 ms, bevor die Karte wieder gesetzt wird; Gesamt-Lebensdauer
+//    der Leinwand 2900 ms läuft parallel zum Weiterspielen. Andere Wiederbelebungen (Loyal Bone Dog, Extra Life/Trial of Coolness) behalten `holy_revival`.
 //    Rückfall: Retro, reduzierte Bewegung, `__ppFx71Aus`, keine Palette → `phoenix_rebirth` spielt das alte `holy_revival`; `phoenix_zerfall` fällt dann aus (es gab vorher keinen). Der Klang kommt in beiden Fällen aus `ZONE_ANIM_SFX`.
 //    Handy: Teilchenzahlen 40 %. Pixelgröße: Rasterzelle S = Hero-Pixel der Zonenreihe (`ppFxZelleGedeckelt`, Props `zelleS`).
 // ═════════════════════════════════════════════════════════════════
@@ -167,10 +167,10 @@ function ppFx71ZeichneSturz(Z, t, f) {
 // ═════════════════════════════════════════════════════════════════════════════════════
 //  TEIL 2: Phönix — Flammenzerfall (`phoenix_zerfall`) und Wiederbelebung (`phoenix_rebirth`)
 // ═════════════════════════════════════════════════════════════════════════════════════
-const PP_FX71_T_EXPLOSION = 1700;                              // Explosion (Bild 51) — die Engine setzt die Karte hier wieder
+const PP_FX71_T_EXPLOSION = 1050;                              // Explosion (Bild 31) — die Engine setzt die Karte hier wieder
 const PP_FX71_REBIRTH_MS = PP_FX71_T_EXPLOSION + 100;          // Engine-Wartezeit = Explosionsbild + Mount-Vorlauf (ZONE_ANIM_MOUNT_DELAY_MS)
-const PP_FX71_REBIRTH_LEBEN = 3500;                            // Lebensdauer der Leinwand (Explosionsreste, Flammensäulen 1,6 s)
-const PP_FX71_ZERFALL_LEBEN = 2300;
+const PP_FX71_REBIRTH_LEBEN = 2900;                            // Lebensdauer der Leinwand (Explosionsreste, Flammensäulen 1,0 s + Auslauf)
+const PP_FX71_ZERFALL_LEBEN = 1600;
 window.PP_FX71_REBIRTH_MS = PP_FX71_REBIRTH_MS;
 
 let PP_FX71_C = null;
@@ -217,21 +217,21 @@ function ppFx71ZerfallTeile(sz) {
   const C = ppFx71Farben(), S = sz.S, cw = sz.hw * 2, ch = sz.hh * 2, ks = 3 / S, rg = ppFx71Rng(Math.floor(Math.random() * 1e6) + 7);
   const nF = window.ppFxN ? window.ppFxN(100) / 100 : 1, parts = [];
   const P = (p) => parts.push(p);
-  // Flammen (2 je 1/50 s, 0,05 … 1,07 s): Blöcke 4/3 → 1, steigen auf, Rampe Gelb → Orange → Rot → Dunkelrot
-  for (let ti = 50; ti < 1070; ti += 20) for (let k = 0; k < 2; k++) {
+  // Flammen (2 je 1/50 s, 0,03 … 0,7 s): Blöcke 4/3 → 1, steigen auf, Rampe Gelb → Orange → Rot → Dunkelrot
+  for (let ti = 30; ti < 700; ti += 20) for (let k = 0; k < 2; k++) {
     if (nF < 1 && rg() >= nF) continue;
-    P({ t0: ti, life: 500 + rg() * 500, x0: (rg() - 0.5) * cw * 1.5, y0: ch * 0.5 - (0.1 + rg() * 0.7) * ch, vx: (rg() - 0.5) * 6 * ks, vy: -(8 + rg() * 16) * ks, kind: 'sq', sz: rg() < 0.5 ? 4 : 3, sz2: 1, ramp: C.flm });
+    P({ t0: ti, life: 350 + rg() * 350, x0: (rg() - 0.5) * cw * 1.5, y0: ch * 0.5 - (0.1 + rg() * 0.7) * ch, vx: (rg() - 0.5) * 6 * ks, vy: -(8 + rg() * 16) * ks, kind: 'sq', sz: rg() < 0.5 ? 4 : 3, sz2: 1, ramp: C.flm });
   }
-  // Funken / Herzen / Sterne (70/s bis 1,1 s)
-  for (let ti = 0; ti < 1100; ti += 1000 / 70) {
+  // Funken / Herzen / Sterne (70/s bis 0,7 s)
+  for (let ti = 0; ti < 700; ti += 1000 / 70) {
     if (nF < 1 && rg() >= nF) continue;
     const q = rg();
-    P({ t0: ti, life: 500 + rg() * 600, x0: (rg() - 0.5) * cw * 1.6, y0: ch * 0.5 - rg() * ch * 0.9, vx: (rg() - 0.5) * 12 * ks, vy: -(22 + rg() * 70) * ks, kind: q < 0.15 ? 'heart' : (q < 0.45 ? 'star' : 'sq'), sz: 1, ramp: C.fc });
+    P({ t0: ti, life: 400 + rg() * 400, x0: (rg() - 0.5) * cw * 1.6, y0: ch * 0.5 - rg() * ch * 0.9, vx: (rg() - 0.5) * 12 * ks, vy: -(22 + rg() * 70) * ks, kind: q < 0.15 ? 'heart' : (q < 0.45 ? 'star' : 'sq'), sz: 1, ramp: C.fc });
   }
-  // Asche (24/s, 0,12 … ~1,5 s)
-  for (let ti = 120; ti < 1500; ti += 1000 / 24) {
+  // Asche (24/s, 0,08 … 0,6 s)
+  for (let ti = 80; ti < 600; ti += 1000 / 24) {
     if (nF < 1 && rg() >= nF) continue;
-    P({ t0: ti, life: 900 + rg() * 700, x0: (rg() - 0.5) * cw * 1.3, y0: ch * 0.5 - (0.15 + rg() * 0.5) * ch, vx: (rg() - 0.5) * 3 * ks, vy: -(2 + rg() * 5) * ks, kind: 'sq', sz: 2, sz2: 1, ramp: C.asche });
+    P({ t0: ti, life: 500 + rg() * 400, x0: (rg() - 0.5) * cw * 1.3, y0: ch * 0.5 - (0.15 + rg() * 0.5) * ch, vx: (rg() - 0.5) * 3 * ks, vy: -(2 + rg() * 5) * ks, kind: 'sq', sz: 2, sz2: 1, ramp: C.asche });
   }
   return { parts };
 }
@@ -248,7 +248,7 @@ function ppFx71RebirthTeile(sz) {
   const f = cw / 22 * 0.9 + 0.1;                                     // Größenfaktor zur Karte (22 Zellen = Standardkarte bei Zelle 3)
   // Flammensammeln: Flämmchen/Herzen ziehen sich in 0,4 s zur Mitte (Trailer l. 1286: 220, Radius 60–190, Ellipse 0,6)
   for (let k = 0, n = Math.round(160 * nF); k < n; k++) {
-    const an = rg() * Math.PI * 2, r = (0.9 + rg() * 2.2) * cw, life = 400, t0 = rg() * (1400 - 100);
+    const an = rg() * Math.PI * 2, r = (0.9 + rg() * 2.2) * cw, life = 300, t0 = rg() * (800 - 100);
     P({ t0, life, x0: Math.cos(an) * r, y0: Math.sin(an) * r * 0.6, vx: -Math.cos(an) * r / (life / 1000), vy: -Math.sin(an) * r * 0.6 / (life / 1000) - 10 * ks, kind: rg() < 0.2 ? 'heart' : 'sq', sz: rg() < 0.3 ? 2 : 1, ramp: C.fc });
   }
   // Explosion: Funkenstoß (Trailer l. 1288/2518: 160 + 160 Funken, plus/sq, Rampe FL5), Herzen (30), aufsteigende Funken (200)
@@ -258,18 +258,18 @@ function ppFx71RebirthTeile(sz) {
   }
   for (let k = 0, n = Math.round(30 * nF); k < n; k++) {
     const an = rg() * Math.PI * 2, sp = (11 + rg() * 42) * ks * f;
-    P({ t0: TE + rg() * 150, life: 900 + rg() * 700, x0: 0, y0: 0, vx: Math.cos(an) * sp, vy: Math.sin(an) * sp * 0.7 - 8 * ks, ay: 11 * ks, kind: 'heart', sz: 1, ramp: C.herz });
+    P({ t0: TE + rg() * 150, life: 700 + rg() * 700, x0: 0, y0: 0, vx: Math.cos(an) * sp, vy: Math.sin(an) * sp * 0.7 - 8 * ks, ay: 11 * ks, kind: 'heart', sz: 1, ramp: C.herz });
   }
   for (let k = 0, n = Math.round(110 * nF); k < n; k++) {
-    P({ t0: TE + rg() * 600, life: 700 + rg() * 900, x0: (rg() - 0.5) * cw * 1.4, y0: (rg() - 0.3) * ch * 0.9, vx: (rg() - 0.5) * 18 * ks, vy: -(30 + rg() * 60) * ks, kind: 'sq', sz: 1, ramp: C.fc });
+    P({ t0: TE + rg() * 400, life: 500 + rg() * 600, x0: (rg() - 0.5) * cw * 1.4, y0: (rg() - 0.3) * ch * 0.9, vx: (rg() - 0.5) * 18 * ks, vy: -(30 + rg() * 60) * ks, kind: 'sq', sz: 1, ramp: C.fc });
   }
   // Flammensäulen (8 um den Platz, 1,6 s, ab 0,5 s ausdünnend; Trailer l. 2516)
   for (let c = 0; c < 8; c++) {
     const an = c / 8 * Math.PI * 2 + 0.2, cx = Math.cos(an) * cw * 1.15, cy = ch * 0.5 + Math.sin(an) * cw * 1.15 * 0.55;
-    for (let ti = 0; ti < 1600; ti += 1000 / 34) {
-      const keep = ti < 500 ? 1 : Math.max(0, 1 - (ti - 500) / 1100);
+    for (let ti = 0; ti < 1000; ti += 1000 / 34) {
+      const keep = ti < 350 ? 1 : Math.max(0, 1 - (ti - 350) / 650);
       if (rg() > keep * (nF < 1 ? nF + 0.2 : 1)) continue;
-      P({ t0: TE + ti, life: 500 + rg() * 400, x0: cx + (rg() - 0.5) * cw * 0.35, y0: cy, vx: (rg() - 0.5) * 5 * ks, vy: -(9 + rg() * 14) * ks, kind: 'sq', sz: rg() < 0.5 ? 4 : 3, sz2: 1, ramp: C.flm });
+      P({ t0: TE + ti, life: 450 + rg() * 350, x0: cx + (rg() - 0.5) * cw * 0.35, y0: cy, vx: (rg() - 0.5) * 5 * ks, vy: -(9 + rg() * 14) * ks, kind: 'sq', sz: rg() < 0.5 ? 4 : 3, sz2: 1, ramp: C.flm });
     }
   }
   return { parts, f };
@@ -277,9 +277,9 @@ function ppFx71RebirthTeile(sz) {
 
 /** Das Feuer-Ei (Trailer l. 2230–2244): Ellipse mit Dither-Verlauf, Flammenzungen, Rissen, Aufhellen. (cx, cy) Mitte in Zellen, rx/ry Halbachsen, hat = Zeit bis zur Explosion (s). */
 function ppFx71Ei(g, C, t, cx0, cy0, rx0, ry0) {
-  const egg0 = 250, hat = (PP_FX71_T_EXPLOSION - t) / 1000, f = Math.floor(t / (1000 / 30)), fr = f >> 1;
-  const gq = Math.round(ppFx71EaseOut(Math.min(1, (t - egg0) / 900)) * 12) / 12, pulse = 1 + 0.05 * Math.sin((t - egg0) / 1000 * 9);
-  const wob = hat < 0.55 ? Math.round([1, -1, 0.6, -0.8][f % 4] * (1 + (0.55 - hat) * 5)) : 0;
+  const egg0 = 150, hat = (PP_FX71_T_EXPLOSION - t) / 1000, f = Math.floor(t / (1000 / 30)), fr = f >> 1;
+  const gq = Math.round(ppFx71EaseOut(Math.min(1, (t - egg0) / 550)) * 12) / 12, pulse = 1 + 0.05 * Math.sin((t - egg0) / 1000 * 9);
+  const wob = hat < 0.4 ? Math.round([1, -1, 0.6, -0.8][f % 4] * (1 + (0.4 - hat) * 7)) : 0;
   const rx = Math.max(1, Math.round(rx0 * gq * pulse)), ry = Math.max(1, Math.round(ry0 * gq * pulse)), cx = Math.round(cx0) + wob, cy = Math.round(cy0 - ry0 * 0.15 * gq);
   // Flammenzungen auf dem Ei
   for (let k = -rx; k <= rx; k += 2) {
@@ -294,9 +294,9 @@ function ppFx71Ei(g, C, t, cx0, cy0, rx0, ry0) {
     const dd = d + (ppFx71Hash(x * 31 + y * 7, fr) - 0.5) * 0.28;
     g.put(cx + x, cy + y, d > 0.93 ? C.ink : (dd > 0.82 ? C.dred : (dd > 0.64 ? C.red : (dd > 0.42 ? C.org : (dd > 0.2 ? C.yel : C.cream)))));
   }
-  // Risse: laufen vom Eimittelpunkt nach außen und bleiben im Ei (die letzten 0,9 s)
-  if (hat < 0.9) {
-    const pr = ppFx71Cl(1 - hat / 0.9);
+  // Risse: laufen vom Eimittelpunkt nach außen und bleiben im Ei (die letzten 0,6 s)
+  if (hat < 0.6) {
+    const pr = ppFx71Cl(1 - hat / 0.6);
     const inEgg = (x, y) => { const ny = y / ry, w = 1 + 0.2 * ny; return Math.hypot(x / (rx * w), ny) < 0.9; };
     for (let c = 0; c < 6; c++) {
       let qx = Math.round((ppFx71Hash(c, 91) - 0.5) * rx * 0.3), qy = Math.round((ppFx71Hash(c, 92) - 0.5) * ry * 0.3), ang = c * Math.PI / 3 + 0.4 + (ppFx71Hash(c, 93) - 0.5) * 0.5;
@@ -310,9 +310,9 @@ function ppFx71Ei(g, C, t, cx0, cy0, rx0, ry0) {
       }
     }
   }
-  // Aufhellen: Bayer-Dither Creme (die letzten 0,2 s)
-  if (hat < 0.2) {
-    const lv = 24 + (0.2 - hat) * 150;
+  // Aufhellen: Bayer-Dither Creme (die letzten 0,15 s)
+  if (hat < 0.15) {
+    const lv = 24 + (0.15 - hat) * 200;
     for (let y = -ry; y <= ry; y++) for (let x = -rx - 3; x <= rx + 3; x++) {
       const ny = y / ry, w = 1 + 0.2 * ny; if (Math.hypot(x / (rx * w), ny) > 1) continue;
       if (PP_FX71_BAY8[((y + 64) & 7) * 8 + ((x + 64) & 7)] < lv) g.put(cx + x, cy + y, C.cream);
@@ -322,9 +322,9 @@ function ppFx71Ei(g, C, t, cx0, cy0, rx0, ry0) {
 
 function ppFx71RebirthMalen(g, t, sz, teile) {
   const C = ppFx71Farben(), f = Math.floor(t / (1000 / 30)), S = sz.S, cw = sz.hw * 2, ch = sz.hh * 2, fk = teile.f, cx = sz.cx, cy = sz.cy, TE = PP_FX71_T_EXPLOSION;
-  // 1) Flammensammeln: 3 Ringe r 60 → 6 (1,4 s, Schachbrett-Pixelringe in Flammenfarben)
-  if (t < 1400) {
-    const u = t / 1400, R0 = cw * 1.9, R1 = cw * 0.2;
+  // 1) Flammensammeln: 3 Ringe r 60 → 6 (0,8 s, Schachbrett-Pixelringe in Flammenfarben)
+  if (t < 800) {
+    const u = t / 800, R0 = cw * 1.9, R1 = cw * 0.2;
     for (let k = 0; k < 3; k++) {
       const ph = (u * 2 + k / 3) % 1, r = Math.round(R0 + (R1 - R0) * ph), col = C.flm[k];
       if (r < 1) continue;
@@ -340,7 +340,7 @@ function ppFx71RebirthMalen(g, t, sz, teile) {
   const vor = [], hinter = [];
   for (const p of teile.parts) (p.t0 < TE ? hinter : vor).push(p);
   ppFx71Teilchen(g, hinter, t, f, cx, cy);
-  if (t >= 250 && t < TE + 40) ppFx71Ei(g, C, Math.min(t, TE - 1), cx, cy, cw * 0.46, ch * 0.54);
+  if (t >= 150 && t < TE + 40) ppFx71Ei(g, C, Math.min(t, TE - 1), cx, cy, cw * 0.46, ch * 0.54);
   // 3) Explosion: Ringe (0,8 s), 32 Strahlen (0,24 s), Blitz über dem Platz
   const dt = (t - TE) / 1000;
   if (dt >= 0) {

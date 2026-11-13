@@ -13,7 +13,7 @@
 // ═══════════════════════════════════════════
 
 const { drawBlockedFor } = require('./_draw-block-shared');   // D1: Regel von Al
-const ALCHEMY_VORLAUF_MS = 600;   // Kraftstrom-Kugeln Fähigkeit → Potion Deck, bevor die Potion abhebt (Client: app-fx-69)
+const ALCHEMY_VORLAUF_MS = 320;   // Kraftstrom-Kugeln Fähigkeit → Potion Deck, bevor die Potion abhebt (Client: app-fx-69)
 
 module.exports = {
   blockedByHandLock: true,

@@ -44461,6 +44461,35 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
   // kippen behauptet einen Zusammenhang, den es nicht gibt.
   const handZieh = handDrag || playDrag || abilityDrag || null;
 
+  // ★ Beschwörung (app-fx-69, Bug „Kreatur springt nach dem Drop kurz wieder in die Hand"): Ab dem Drop (`play_creature`) bis der Server die Hand aktualisiert (je nach Engine-Vorlauf
+  // 0,3–0,6 s) war `playDrag` schon null, die Handkarte also wieder sichtbar, obwohl die Zone noch leer war. Jetzt bleibt SIE verborgen (Klasse `hand-dragging`, Platz eingeklappt wie beim Ziehen), bis sich
+  // die Hand ändert (Karte weg) oder `HAND_PLAY_WARTE_MS` um sind (Server lehnt ab / Frage abbricht: sie erscheint wieder). Zentral am Emit, damit Drop, Klick-Beschwörung und Touch-Drag gleich laufen.
+  const handPlayWartet = useRef(null), handLaengeRef = useRef(0);
+  handLaengeRef.current = hand.length;
+  const [, setHandPlayTick] = useState(0);
+  useEffect(() => {
+    if (!socket || typeof socket.emit !== 'function') return undefined;
+    const orig = socket.emit;
+    socket.emit = function (ev, d) {
+      try {
+        if (ev === 'play_creature' && d && Number.isInteger(d.handIndex) && !d.fromCreation && !window.__ppFx69HandAus) {
+          const alt = handPlayWartet.current;
+          if (alt && alt.timer) clearTimeout(alt.timer);
+          const w = { idx: d.handIndex, name: d.cardName, laenge: handLaengeRef.current, timer: setTimeout(() => { if (handPlayWartet.current === w) { handPlayWartet.current = null; setHandPlayTick(t => t + 1); } }, 1600) };
+          handPlayWartet.current = w;
+          Promise.resolve().then(() => setHandPlayTick(t => t + 1));
+        }
+      } catch (e) { /* ohne */ }
+      return orig.apply(this, arguments);
+    };
+    return () => { socket.emit = orig; if (handPlayWartet.current && handPlayWartet.current.timer) clearTimeout(handPlayWartet.current.timer); handPlayWartet.current = null; };
+  }, [socket]);
+  useEffect(() => {
+    const w = handPlayWartet.current;
+    if (!w) return;
+    if (hand[w.idx] !== w.name || hand.length !== w.laenge) { clearTimeout(w.timer); handPlayWartet.current = null; setHandPlayTick(t => t + 1); }
+  }, [hand]);
+
   // ★ v999: „Ist das eine der gerade erschienenen Karten?" — die
   // letzten `handFxPending` Plaetze der AKTUELLEN Hand. Neue Karten
   // werden hinten angehaengt, ihre `origIdx` sind also die hoechsten.
@@ -45341,14 +45370,18 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         if (!v || !ankerEl || (v.owner !== 0 && v.owner !== 1)) return null;
         const lbl = ownerLbl(v.owner, myIdx);
         // `pile` ('deleted' | 'discard' | 'deck' | 'potion-deck'): ein Stapel des Besitzers als Quelle (Life Serum / Acid Vial, app-fx-70); Rückfall auf den Ablagestapel
-        const vSel = v.pile
+        // `handIdx`: die Handkarte des Besitzers an diesem Platz als Quelle (Potions, app-fx-70: der Effekt beginnt ÜBER der gespielten Karte); fehlt der Platz im DOM → Rückfall auf die Hand (Mitte)
+        const handEl = (v.handIdx != null && v.handIdx >= 0)
+          ? (document.querySelector(`.game-hand-${lbl === 'me' ? 'me' : 'opp'} .hand-slot[data-hand-idx="${v.handIdx}"]`) || document.querySelector(`.game-hand-${lbl === 'me' ? 'me' : 'opp'} [data-hand-idx="${v.handIdx}"]`))
+          : null;
+        const vSel = handEl ? null : v.pile
           ? `[data-${lbl === 'me' ? 'my' : 'opp'}-${/^(deleted|discard|deck|potion-deck)$/.test(v.pile) ? v.pile : 'discard'}]`
           : v.zoneType === 'surprise'
           ? `[data-surprise-zone][data-surprise-owner="${lbl}"][data-surprise-hero="${v.heroIdx}"]`
           : (v.zoneSlot != null && v.zoneSlot >= 0)
             ? `[data-support-zone][data-support-owner="${lbl}"][data-support-hero="${v.heroIdx}"][data-support-slot="${v.zoneSlot}"]`
             : `[data-hero-zone][data-hero-owner="${lbl}"][data-hero-idx="${v.heroIdx}"]`;
-        const vEl = document.querySelector(vSel);
+        const vEl = handEl || document.querySelector(vSel);
         if (!vEl) return null;
         const a = ankerEl.getBoundingClientRect(), b = vEl.getBoundingClientRect();
         if (!b.width) return null;
@@ -45357,6 +45390,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           vonDx: (b.left + b.width / 2) - (a.left + a.width / 2),
           vonDy: (b.top + b.height / 2) - (a.top + a.height / 2),
           vonW: b.width, vonH: b.height,
+          ...(handEl ? { vonHand: true } : null),   // Quelle ist eine Handkarte (app-fx-70: Effekt beginnt über der Karte)
           ...(v.el === true ? { vonEl: vEl } : null),   // `von.el`: das Quell-Element selbst (Hammer Throw, app-fx-59: Fußlinie/Höhe der Figur des Werfers, Rückstoß)
         };
       };
@@ -60801,7 +60835,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                 // einen VORRATS-Index — der darf hier keine Handkarte
                 // treffen. `handDragEigen`/`playDragEigen` sind bereits
                 // auf die eigene Quelle gefiltert.
-                const isBeingDragged = (handDragEigen && handDragEigen.idx === item.origIdx) || (playDragEigen && playDragEigen.idx === item.origIdx) || (abilityDrag && abilityDrag.idx === item.origIdx);
+                const isBeingDragged = (handDragEigen && handDragEigen.idx === item.origIdx) || (playDragEigen && playDragEigen.idx === item.origIdx) || (abilityDrag && abilityDrag.idx === item.origIdx) || (handPlayWartet.current && handPlayWartet.current.idx === item.origIdx && handPlayWartet.current.name === item.card);
                 const dimmed = getCardDimmed(item.card, item.origIdx);
                 const isHandLockBlocked = dimmed && me.handLocked && (me.handLockBlockedCards || []).includes(item.card);
                 const isDrawAnim = drawAnimCards.some(a => a.origIdx === item.origIdx);

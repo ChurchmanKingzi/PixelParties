@@ -9,7 +9,8 @@
 //    0–560     FLUG      Mitte der Karte: lerp(Deck, Ablage, easeInOutCubic(u)) − sin(π u) · Bogen; Bogen = 0,92 Kartenbreiten (Trailer: 110 px bei 120 px Karte, höchstens 40 % des Weges)
 //              GRÖSSE    Trailer: 1 + round(sin(π · min(1, 1,1 u)) · 6) · 0,02 (bis 12 %). Hier drei feste Größen (Pixelart: kein stufenloses Skalieren der Kartenbilder) – Grundmaß, +1 Stufe, +2 Stufen;
 //                        eine Stufe = 2 · n Zellen Breite (n = max(1, round(0,04 · Kartenbreite / Zelle))), ändert die Größe des Elements, nie ein `scale()` (kein bilineares Skalieren auf der GPU)
-//              UMDREHEN  (Karte kommt verdeckt aus dem Deck) u < 0,10 Rücken · 0,10/0,17/0,24 Rücken 100/60/20 % breit · 0,24/0,31/0,38 Vorderseite 20/60/100 % breit (Breite in ganzen Zellen)
+//              UMDREHEN  (Karte kommt verdeckt aus dem Deck) Bild 0–1 Rücken voll · Bild 2–4 Rücken 75/50/25 % breit · Bild 5 Mindestbreite (2 Zellen) MIT Seitenwechsel · Bild 6–8 Vorderseite 25/50/75 % · ab Bild 9 voll;
+//                        Bild wird gestaucht (`object-fit: fill`, nie zugeschnitten/gespiegelt), bei ≤ 50 % Breite helle 1-Zellen-Kante links/rechts (harte Ringe). Trailer: 5 Bilder bei 0,10–0,38 u.
 //              SCHATTEN  Schachbrett-Raster (Dither statt Alpha, Zelle = Hero-Pixel), Kartengröße, Versatz (8 + 52 · sin(π u)) · Kartenbreite/120 nach rechts, · 1,2 nach unten: die Karte „schwebt"
 //              SCHWEIF   je Bild ein bis zwei Quadrate (Creme/Grau, 0,20–0,35 s, blinken in der zweiten Hälfte aus) um die Karte, 12 Bilder Tiefe
 //    560       LANDUNG   die Karte ist weg (der Ablagestapel wächst genau jetzt: `setXHidden`-Zähler in app-board.jsx), zwei Schockringe (Creme 2 → 1 Zelle dick, Akzent gedithert; Radius easeOutCubic 0 → 30 bzw. 20 Zellen
@@ -27,6 +28,8 @@
 // ═════════════════════════════════════════════════════════════════
 (function (root) {
   const TAKT = 1000 / 30, rd = Math.round, fl = Math.floor, mn = Math.min, mx = Math.max;
+  // Flip-Stufen [Vorderseite?, Breitenanteil]: Rücken 75/50/25 %, Mindestbreite (2 Zellen) mit Seitenwechsel, Vorderseite 25/50/75 %, dann voll (Trailer: 5 Bilder, hier 8 — lesbarer)
+  const FLIP = [[0, 0.75], [0, 0.5], [0, 0.25], [1, 0], [1, 0.25], [1, 0.5], [1, 0.75]];
   const kl = (v, a, b) => (v < a ? a : v > b ? b : v);
   const easeIO = (u) => (u < 0.5 ? 4 * u * u * u : 1 - Math.pow(-2 * u + 2, 3) / 2);
   const easeOut = (u) => 1 - Math.pow(1 - kl(u, 0, 1), 3);
@@ -111,7 +114,10 @@
     const n1 = mx(1, rd(0.04 * bB / S)), stufe = 2 * n1 * S;                                // eine Größenstufe: 2 · n Zellen Breite
     const reise = mx(200, o.reise > 0 ? o.reise : 560), versatz = o.versatz >= 0 ? o.versatz : 200, halten = o.halten > 0 ? o.halten : 0, aus = halten > 0 ? 300 : 0;
     const dist = Math.hypot(nach.x - von.x, nach.y - von.y);
-    const bogen = mn(0.92 * bB, 0.4 * dist);
+    // Bogen nach oben (Trailer); ist darüber kein Platz im Fenster (Handy: Gegner-Stapel am oberen Rand), flacher bzw. nach unten — die Karte verlässt den Bildschirm nie
+    let bogen = mn(0.92 * bB, 0.4 * dist);
+    { const hh = hB * 1.14 / 2, hoch = mn(von.y, nach.y) - hh - 2, tief = (root.innerHeight || 1080) - mx(von.y, nach.y) - hh - 2;
+      if (hoch < bogen * 0.6) bogen = -mn(bogen, mx(0, tief)); else bogen = mn(bogen, hoch); }
     const ak = AKZENT[o.akzent] || AKZENT.violett;
     const CR = creme(), GR = grau(), DK = dunkel(), AKF = ak.funken.map(pal), AKR = pal(ak.ring), AKS = pal(ak.schweif);
     const H = root.ppFx30H, salz = fl(Math.random() * 1e6) % 9973;
@@ -124,8 +130,8 @@
 
     // Fläche der Leinwand: Weg + Rand (Funken bis ~0,45 s · 210 px/s, Ringe bis 0,75 Kartenbreiten, Sterne bis ~120 px hoch)
     const M = rd(bB * 0.9 + 170 * fz + 40);
-    const lx = fl((mn(von.x, nach.x) - M) / S) * S, ly = fl((mn(von.y, nach.y) - M - bogen) / S) * S;
-    const gw = Math.ceil((mx(von.x, nach.x) + M - lx) / S), gh = Math.ceil((mx(von.y, nach.y) + M - ly) / S);
+    const lx = fl((mn(von.x, nach.x) - M) / S) * S, ly = fl((mn(von.y, nach.y) - M - mx(0, bogen)) / S) * S;
+    const gw = Math.ceil((mx(von.x, nach.x) + M - lx) / S), gh = Math.ceil((mx(von.y, nach.y) + M + mx(0, -bogen) - ly) / S);
     if (gw < 8 || gh < 8 || gw > 1100 || gh > 760) return null;
 
     const cv = document.createElement('canvas');
@@ -160,7 +166,7 @@
       if (url) {
         const im = document.createElement('img');
         im.src = url; im.draggable = false; im.alt = '';
-        im.style.cssText = 'width:100%;height:100%;display:block;object-fit:cover;';
+        im.style.cssText = 'width:100%;height:100%;display:block;object-fit:fill;';
         vorn.appendChild(im);
         try { if (root.ppFlugRarity) root.ppFlugRarity(im, k.name, k.rarity, o.owner, ende + 2000); } catch (e) { /* ohne Rarity-Rahmen */ }
       } else {
@@ -172,7 +178,7 @@
       if (umdrehen) {
         hinten = document.createElement('div'); hinten.style.cssText = 'position:absolute;inset:0;';
         const bi = document.createElement('img'); bi.src = o.rueckseite; bi.draggable = false; bi.alt = '';
-        bi.style.cssText = 'width:100%;height:100%;display:block;object-fit:cover;';
+        bi.style.cssText = 'width:100%;height:100%;display:block;object-fit:fill;';
         hinten.appendChild(bi); el.appendChild(hinten);
       }
       const blende = document.createElement('div');
@@ -198,7 +204,8 @@
       const lvl = q >= 0.8 ? 2 : q >= 0.25 ? 1 : 0;
       let vorn = true, sx = 1;
       if (c.flip) {
-        const st = u < 0.1 ? [0, 1] : u < 0.17 ? [0, 0.6] : u < 0.24 ? [0, 0.2] : u < 0.31 ? [1, 0.2] : u < 0.38 ? [1, 0.6] : [1, 1];
+        // Flip in ganzen Bildern (Zelle für Zelle schmaler, Seitenwechsel bei Mindestbreite, wieder breiter): Bild 0–1 Rücken voll, dann 8 Stufen
+        const k = fl(age / TAKT + 1e-4) - 2, st = k < 0 ? [0, 1] : k < FLIP.length ? FLIP[k] : [1, 1];
         vorn = !!st[0]; sx = st[1];
       }
       return { x: von.x + (nach.x - von.x) * e, y: von.y + (nach.y - von.y) * e - Math.sin(Math.PI * u) * bogen, lvl, sx, vorn, air: Math.sin(Math.PI * u), u, blende: age < TAKT };
@@ -305,6 +312,8 @@
         }
         const fa = p.vorn ? 'v' : 'h';
         if (L.face !== fa) { L.face = fa; c.vorn.style.display = p.vorn || !c.hinten ? 'block' : 'none'; if (c.hinten) c.hinten.style.display = p.vorn ? 'none' : 'block'; }
+        const ka = p.sx <= 0.5 ? '1' : '0';
+        if (L.ka !== ka) { L.ka = ka; c.el.style.boxShadow = p.sx <= 0.5 ? `inset ${S}px 0 0 0 rgb(${CR.join(',')}),inset ${-S}px 0 0 0 rgb(${CR.join(',')})` : 'none'; }   // helle Kante beim Flip (harte Ringe, kein Blur)
         const bl = p.blende ? '1' : '0';
         if (L.fl !== bl) { L.fl = bl; c.blende.style.display = p.blende ? 'block' : 'none'; }
         void w0;
