@@ -587,10 +587,11 @@ BILD = 1.0 / 30
 class Schnitt:
     """cx, cy = Mitte des Ziels (Zellen), hh = Höhe des Ziels in Zellen (Maßstab des Effekts). krit = dreifacher Schnitt (critical_slash), sonst Quick Slash."""
 
-    def __init__(self, cx, cy, hh, krit=True, direction=(-0.6, 0.8), salt=11):
+    def __init__(self, cx, cy, hh, krit=True, direction=(-0.6, 0.8), salt=11, pal=None):
+        self.pal = pal or C31
         self.cx, self.cy, self.hh, self.krit, self.dir, self.salt = cx, cy, hh, krit, direction, salt
         self.ende = 1.1 if krit else 0.52
-        C = C31
+        C = self.pal
         farben = [C['creme'], C['hblau'], C['blau'], C['creme']] if krit else [C['creme'], C['hblau'], C['creme'], C['gelb']]
         n = 46 if krit else 16
         self.sp = []
@@ -601,7 +602,7 @@ class Schnitt:
                                 plus=H(salt, i * 7 + 5) < 0.3, gross=2 if H(salt, i * 7 + 6) < 0.4 else 1, farbe=farben[int(H(salt, i * 7 + 7) * 4)]))
 
     def _band(self, g, ax, ay, bx, by, anteil, dick):
-        C = C31
+        C = self.pal
         D = math.hypot(bx - ax, by - ay)
         L = D * anteil
         if L < 1:
@@ -625,7 +626,7 @@ class Schnitt:
             g.ring(cx, cy, max(0, r - dicke), r, farbe, 0.5 if grob else 1)
 
     def _faecher(self, g, cx, cy, laenge, anzahl, dreh, kurz):
-        C = C31
+        C = self.pal
         for r in range(anzahl):
             an = r * math.pi * 2 / anzahl + dreh
             ln = laenge * (0.5 if r % 2 else 1)
@@ -637,7 +638,7 @@ class Schnitt:
         if t < 0 or t >= self.ende:
             return
         g = R1(m)
-        C = C31
+        C = self.pal
         q = int(math.floor(t / BILD + 1e-6))
         dt = t
         cx, cy, hh, krit = self.cx, self.cy, self.hh, self.krit
@@ -984,7 +985,8 @@ RAMPE_GLUT = [C38['creme'], C38['gelb'], C38['org'], C38['rot']]
 class Geschoss:
     """Ein Wurfgeschoss wie `ppFx38`: erst kurz sichtbar an der Quelle (10 %), dann anfahrend (ease-in) zum Ziel (bis 85 %), dort blinkt es aus. A, B in Zellen; dur in s."""
 
-    def __init__(self, art, A, B, dur, t0=0.0, R=8, schweif=True, salt=5, va=0):
+    def __init__(self, art, A, B, dur, t0=0.0, R=8, schweif=True, salt=5, va=0, pal=None, ramp=None):
+        self.pal, self.ramp = pal, ramp
         self.art, self.AX, self.AY, self.BX, self.BY = art, A[0], A[1], B[0], B[1]
         self.dur, self.t0, self.R, self.schweif, self.id, self.va = dur, t0, R, schweif, salt * 977, va
         self.wi = rd(math.degrees(math.atan2(self.BY - self.AY, self.BX - self.AX)))
@@ -1021,7 +1023,7 @@ class Geschoss:
                 py = rd(by2 + (H(s + self.id, 2) - 0.5) * self.R * 0.9 - uu * 3)
                 if uu > 0.65 and ((px + py + frame) & 1):
                     continue
-                m.rect(px, py, sz, sz, RAMPE_GLUT[min(3, int(uu * 4))])
+                m.rect(px, py, sz, sz, (self.ramp or RAMPE_GLUT)[min(3, int(uu * 4))])
         if u > 0.85 and (frame & 1):
             return
         if ms < 66 and (frame & 1):
@@ -1038,7 +1040,7 @@ class Geschoss:
             for x in range(N):
                 k = g['c'][y][x]
                 if k:
-                    m.rect(X - e + x, Y - e + y, 1, 1, C38['tinte'] if k == 255 else g['pal'][k - 1])
+                    m.rect(X - e + x, Y - e + y, 1, 1, C38['tinte'] if k == 255 else (self.pal or g['pal'])[k - 1])
 
 
 # ═════════════════════════════ Heldentod (app-fx-32): die Figur zerspringt in ihre Pixel ═════════════════════════════
@@ -1179,3 +1181,95 @@ class HeroDeath:
             if schach and ((x + y) & 1):
                 continue
             m.rect(x, y, 1, 1, col)
+
+
+# ═════════════════════════════ Flame Avalanche (app-board.jsx, `flame_avalanche`) ═════════════════════════════
+FLAMME = [hexc(h) for h in ('#fffbd2', '#ffd066', '#ff491a', '#8f0000', '#ff9a1a', '#cc2b00')]
+
+
+class FlameAvalanche:
+    """Flächenzauber: Flammenfunken schießen vom Wirker O auf alle Ziele (Kreuz aus vier Tönen, 2 × 9 Hüpfer), am Ziel schlagen drei Pixel-Sterne ein, am Wirker blitzt ein Mündungsfeuer
+    aus gestapelten Quadratringen, das Brett bebt. O und ziele in Zellen; ausgabe: .draw(m, t) mit t in Sekunden seit Start."""
+
+    def __init__(self, O, ziele, salt=3, dauer=1.6):
+        self.O, self.ziele, self.dauer = O, ziele, dauer
+        self.ende = 3.0
+        cnt = [0]
+
+        def r():
+            cnt[0] += 1
+            return H(salt, cnt[0])
+        flug = 520
+        je = max(4, min(9, 66 // len(ziele)))
+        self.bahnen, self.treffer = [], []
+        for zi, z in enumerate(ziele):
+            sp = math.hypot(z[0] - O[0], z[1] - O[1])
+            for i in range(je):
+                zx = z[0] + (r() - 0.5) * max(16, sp * 0.26)
+                zy = z[1] + (r() - 0.5) * max(11, sp * 0.17)
+                self.bahnen.append(dict(zx=zx, zy=zy, mx=(O[0] + zx) / 2 + (r() - 0.5) * sp * 0.22, my=(O[1] + zy) / 2 + (r() - 0.5) * sp * 0.18 - sp * 0.06, gross=r() > 0.55,
+                                        verzug=rd(zi * 20 + i * (r() * 40 + 18)), laenge=rd(flug * (0.75 + r() * 0.55))))
+            for k in range(3):
+                self.treffer.append(dict(zx=z[0] + (r() - 0.5) * 7, zy=z[1] + (r() - 0.5) * 7, at=rd(flug * 0.9 + zi * 20 + k * (je * 11))))
+
+    def draw(self, m, t):
+        if t < 0 or t >= self.ende:
+            return
+        ms = t * 1000.0
+        C = FLAMME
+        dauer = self.dauer * 1000.0
+        bx = by = 0
+        bk = (ms - 60) / (dauer * 0.5)
+        if 0 <= bk < 1:
+            bx, by = [(0, 0), (-1, 1), (1, -1), (-1, -1), (1, 1), (0, 0)][min(5, int(bk * 6))]
+        OX, OY = self.O[0] + bx, self.O[1] + by
+        mk = ms / (dauer * 0.6)
+        if 0 <= mk < 1:
+            def sq(q, c):
+                m.rect(OX - q, OY - q, 2 * q + 1, 2 * q + 1, c)
+            if mk < 0.85:
+                r1, r2, c2 = (5, 8, C[5]) if mk < 0.25 else (8, 12, C[5]) if mk < 0.55 else (7, 9, C[3])
+                sq(r2, c2); sq(r1, C[4])
+            else:
+                sq(4, C[2])
+            sq(3, C[0])
+        for b in self.bahnen:
+            k = (ms - b['verzug']) / float(b['laenge'])
+            if k < 0 or k >= 1:
+                continue
+            seg = 0 if k < 0.5 else 1
+            u = int(((k - seg * 0.5) / 0.5) * 9) / 9.0
+            if seg == 0:
+                x0, y0, x1, y1 = 0, 0, b['mx'] - self.O[0], b['my'] - self.O[1]
+            else:
+                x0, y0, x1, y1 = b['mx'] - self.O[0], b['my'] - self.O[1], b['zx'] - self.O[0], b['zy'] - self.O[1]
+            px, py = rd(OX + x0 + (x1 - x0) * u), rd(OY + y0 + (y1 - y0) * u)
+            z = 2 if b['gross'] else 1
+            m.rect(px - z, py - z, 2 * z + 1, 2 * z + 1, C[2])
+            m.rect(px - z, py, 2 * z + 1, 1, C[1]); m.rect(px, py - z, 1, 2 * z + 1, C[1])
+            m.rect(px, py, 1, 1, C[0])
+            for a, c in ((2 * z, 0), (-2 * z, 0), (0, 2 * z), (0, -2 * z)):
+                m.rect(px + a, py + c, 1, 1, C[3])
+        for e in self.treffer:
+            k = (ms - e['at']) / 360.0
+            if k < 0 or k >= 1:
+                continue
+            zx, zy = rd(e['zx'] + bx), rd(e['zy'] + by)
+            z = 2
+
+            def add(x, y, f):
+                m.rect(zx + x * z, zy + y * z, z, z, f)
+            if k < 0.34:
+                add(0, 0, C[0])
+                for x, y in ((1, 0), (-1, 0), (0, 1), (0, -1)):
+                    add(x, y, C[1])
+            elif k < 0.68:
+                add(0, 0, C[1])
+                for x, y in ((1, 0), (-1, 0), (0, 1), (0, -1)):
+                    add(x, y, C[4]); add(2 * x, 2 * y, C[2])
+                for x, y in ((1, 1), (-1, 1), (1, -1), (-1, -1)):
+                    add(x, y, C[2])
+            else:
+                for x, y in ((2, 1), (-2, 1), (1, -2), (-1, 2), (3, 0), (-3, 0), (0, 3), (0, -3)):
+                    add(x, y, C[3])
+                add(0, 0, C[2])

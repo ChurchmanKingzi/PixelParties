@@ -409,7 +409,11 @@
     "voidpurple",
     8
    ]
-  ]
+  ],
+  "px": 14,
+  "voidshow": true,
+  "opener": "wind",
+  "showLoops": 11
  },
  "Hel, the Bound Specter": {
   "particles": [
