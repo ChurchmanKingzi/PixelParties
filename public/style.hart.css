@@ -1,4 +1,4 @@
-/* PP-HART-GEBACKEN 53d48170ed938069 — ERZEUGT von scripts/hart/build-css.js aus style.css (pixel-hart.js vorab angewandt) — nicht von Hand ändern. */
+/* PP-HART-GEBACKEN 6441cd4d277d4cf4 — ERZEUGT von scripts/hart/build-css.js aus style.css (pixel-hart.js vorab angewandt) — nicht von Hand ändern. */
 .pp-hart-gebacken { --pp-hart: 1; }
 @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Rajdhani:wght@400;500;600;700&family=Orbitron:wght@400;500;600;700;800;900&display=swap');
 
@@ -3458,6 +3458,21 @@ body:has(.pz-layout) .pp-bg-particles { display: none; }
   perspective: var(--board-persp);
   perspective-origin: var(--board-anchor-x, 50%) 30%;
 }
+/* ★ 14.11. (Als Vorgabe: „Figuren sollen NICHT am oberen Brettrand abgeschnitten werden — gilt auch für Heroes"): `.board-center` und `.game-board` schneiden mit
+   `overflow: hidden`; hohe Figuren der hinteren gegnerischen Reihe verloren dort Kopf und Rumpf. Im Normalfall — Desktop mit geneigtem Brett, kein Scrollmodus, kein
+   Tutorial-Zoom — steht die Hülle deshalb `fixed` (entkommt dem Zuschnitt der Vorfahren; ihre Fensterlage setzt `ebeneAbgleichen`) und schneidet selbst nur noch links,
+   rechts und unten an ihrer Box (= Box des Clips); nach oben ist sie offen. Kein Layout ändert sich. Scrollmodus, Tutorial-Zoom und Handy behalten die alte Bauweise. */
+@media (min-width: 901px) and (min-height: 561px) {
+  .board-center:not(.can-scroll):not(.tut-zoom):not(.board-flat-measure) > .hero-sprite-huelle {
+    position: fixed;
+    clip-path: inset(-100vh 0 0 0);
+  }
+  /* Über der Brettoberkante liegt die Kopfzeile mit der Gegnerhand (`.game-hand-opp`). Sie war als GANZES eine Ebene (z-index 400, v1258: die Handkarten des Gegners müssen
+     über dem Brett liegen) und deckte mit ihrem Hintergrund alles zu, was vom Brett nach oben ragt. Jetzt trägt nur noch der Kartenfächer die 400; die Zeile selbst ist keine
+     eigene Ebene mehr — ihr Hintergrund liegt unter den Figuren (Hülle, z-index 51), die Handkarten des Gegners weiter darüber. */
+  .game-hand-opp { z-index: auto; }
+  .game-hand-opp .game-hand-cards { position: relative; z-index: 400; }
+}
 /* Ebene für Animationen UNTER den Heldenfiguren (`unterFiguren: true`, z. B. die Aura von You are the Chosen One!!!): derselbe z-index wie die Sprite-Hülle, im DOM aber davor — die Figuren
    malen darüber, Brett und Karten liegen darunter. Die Animationen selbst sitzen in einer `.fx-welt-lock`-Hülle (fixed, Scrollstand zurückgenommen). */
 .fx-unter-figuren {
@@ -3502,6 +3517,10 @@ body:has(.pz-layout) .pp-bg-particles { display: none; }
 @supports (width: round(up, 1.5px, 1px)) {
   .hero-idle-steher { filter: drop-shadow(0 round(up, calc(1px * var(--board-scale)), 1px) 0 #08060c); }
 }
+/* Creature-Figuren ohne den 1-px-Schlagschatten (14.11., Leerlaufmessung): der `filter` kostet je Figur eine eigene Effekt-Ebene, die bei jedem Sprite-Bild neu
+   zusammengesetzt wird — gemessen der einzige spürbare Posten einer Figur (16 Figuren, 4 s Leerlauf: PrePaint 48 → 31 ms, Paint 35 → 26 ms, Aufgaben gesamt −15 %).
+   Die Helden behalten ihn. */
+.hero-idle-kreatur .hero-idle-steher { filter: none; }
 .hero-idle-canvas {
   position: absolute;
   left: 0; top: 0;

@@ -26703,10 +26703,21 @@ Motiv-Ebene. Vorgehen dann: Maske × Kunst = Sprite (`rle` beginnt mit Hintergru
 am Kartenrand Abgeschnittenes im Stil der Figur fertigzeichnen, Skript wie oben. Der Client muss ohne Animation auf das Kartenbild zurückfallen.
 
 **Anbindung im Spiel:** Server `GET /api/creature-animations` (`server.js`, wie `/api/hero-animations`; Schlüssel = Slug des Feldes `creature`, nicht der Dateiname;
-Einträge ohne Sheet nur mit `kopiert`). Client `public/app-board.jsx`: dieselbe Maschine wie die Helden — `HeroIdleAnims` (Liste `ladeKreaturListe`, Cache-Schlüssel `c:<slug>`,
-`hatKreaturAnimation`, `kopiertHeld`) und `HeroIdleSprite` mit `kreatur` (gleiche Sprite-Ebene, gleicher Maßstab 2,8125 × `--board-scale`, gleicher Takt). Platzierung: Mitte `faceX`,
-Standlinie `frameHeight − padBottom`; mit `kern` Mitte `kern.x + kern.w/2` und Standlinie `kern.y + kern.h` (`kreaturMeta`). `deckkraft` < 1 wird beim Laden per Bayer-Raster
-ausgedünnt (`ausduennen`). Eine Figur bekommt nur die offene Einzelkreatur einer Support-Zone (nicht: verdeckt, `_dying`, Rammflug/Abflug, Stapel, Nest, angelegter Held, Mimik/Kopie,
-Illusion) sowie die Kreatur auf einem Helden (Hulijing, `hero.heldKreatur`); sonst bleibt die Karte. Die Karte behält ihre Status-Overlays, die Figur zeigt Stillstand, Eis, Stein und
-Tönungen. Clone zeigt die Figur des Heroes seiner Spalte (`heldFigurName`, samt Skin). Figuren in Support-Zonen fahren ein, wenn der Zeiger auf ihrer oder einer von ihnen verdeckten
-belegten Zone steht. Die Zone kennt ihre Figur wie bei Helden (`zone._ppFigurPlatz`, Klasse `hero-idle-platz hero-idle-kreatur`, `data-kreatur`).
+Einträge ohne Sheet nur mit `kopiert`; die Sheets selbst werden 30 Tage zwischengespeichert, die URL trägt `?v=mtime`). Client `public/app-board.jsx`: dieselbe Maschine wie die
+Helden — `HeroIdleAnims` (Liste `ladeKreaturListe`, Cache-Schlüssel `c:<slug>`, `hatKreaturAnimation`, `kopiertHeld`) und `HeroIdleSprite` mit `kreatur` (gleiche Sprite-Ebene, gleicher Takt).
+Platzierung: Mitte `faceX`, Standlinie `frameHeight − padBottom`; mit `kern` Mitte `kern.x + kern.w/2` und Standlinie `kern.y + kern.h` (`kreaturMeta`). `deckkraft` < 1 wird beim Laden
+per Bayer-Raster ausgedünnt (`ausduennen`).
+*Größe:* Maßstab wie die Helden (2,8125 × `--board-scale` je Sprite-Pixel), aber die Ruhefigur (`kern`, sonst Frame minus Leerrand) ist höchstens 64 × 68 Hero-Pixel groß; größere
+bekommen automatisch den größten passenden Faktor aus 3/4, 2/3, 3/5, 1/2, 2/5 (`KREATUR_STUFEN`, gleichmäßig, `pixelated`; ihr Sprite-Pixel ist dann kleiner als der Hero-Pixel).
+Ein `boardScale` im Sheet-JSON setzt den Faktor von Hand. Neue große Sheets also ruhig in voller Auflösung bauen.
+*Wer eine Figur bekommt:* nur die offene Einzelkreatur einer Support-Zone (nicht: verdeckt, `_dying`, Rammflug/Abflug, Stapel, Nest, angelegter Held, Mimik/Kopie, Illusion) sowie die
+Kreatur auf einem Helden (Hulijing, `hero.heldKreatur`); sonst bleibt die Karte. Die Karte behält ihre Status-Overlays, die Figur zeigt Stillstand, Eis, Stein und Tönungen (ohne den
+1-px-Schlagschatten der Helden — der `filter` war der teuerste Posten je Figur). Clone zeigt die Figur des Heroes seiner Spalte (`heldFigurName`, samt Skin). Figuren in Support-Zonen
+fahren ein, wenn der Zeiger auf ihrer oder einer von ihnen verdeckten belegten Zone steht. Die Zone kennt ihre Figur wie bei Helden (`zone._ppFigurPlatz`, Klasse
+`hero-idle-platz hero-idle-kreatur`, `data-kreatur`).
+*Schalter:* Profil „Display Creatures" (`users.display_creatures`, Unteroption von „Display Heroes", `PUT /api/profile/hero-display`); auf dem Handy (`ppIsPhone`) gibt es keine
+Creature-Figuren, dort werden weder Liste noch Sheets geladen.
+*Vorladen:* zu Spielbeginn lädt `HeroIdleAnims.kreaturenVorladen` ALLE Creature-Sheets (zuerst die im eigenen Spielstand genannten, den Rest einzeln im Leerlauf) — bewusst keine
+Liste „Creatures dieser Partie" vom Server, die verriete das Deck des Gegners.
+*Oberer Brettrand:* die Sprite-Hülle steht am Desktop `position: fixed` (style.css `.hero-sprite-huelle`), damit Figuren der hinteren Reihe nicht an `.board-center` abgeschnitten
+werden; die Kopfzeile `.game-hand-opp` ist dafür keine eigene Ebene mehr (nur ihr Kartenfächer trägt z-index 400).

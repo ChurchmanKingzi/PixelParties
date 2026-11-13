@@ -2853,6 +2853,8 @@ function ProfileScreen() {
   // Zielwahl-Dialogen (Dynamic Heroes). Fehlt der Wert, gelten beide als an;
   // ohne Display gibt es kein Dynamic.
   const [displayHeroes, setDisplayHeroes] = useState(user.display_heroes == null ? true : !!user.display_heroes);
+  const [displayCreatures, setDisplayCreatures] = useState(
+    (user.display_heroes == null ? true : !!user.display_heroes) && (user.display_creatures == null ? true : !!user.display_creatures));
   const [dynamicHeroes, setDynamicHeroes] = useState(
     (user.display_heroes == null ? true : !!user.display_heroes) && (user.dynamic_heroes == null ? true : !!user.dynamic_heroes));
 
@@ -3090,14 +3092,15 @@ function ProfileScreen() {
     } catch (e) { notify(e.message, 'error'); setPlayAnimations(!newVal); }
   };
 
-  const saveHeroDisplay = async (display, dynamic) => {
-    const vorher = [displayHeroes, dynamicHeroes];
-    const dyn = display && dynamic;
-    setDisplayHeroes(display); setDynamicHeroes(dyn);
+  // `kreaturen` (Display Creatures): Unteroption wie Dynamic; ohne Angabe bleibt die Wahl stehen, beim EINSCHALTEN von Display Heroes gehen beide Unteroptionen mit an.
+  const saveHeroDisplay = async (display, dynamic, kreaturen = displayCreatures) => {
+    const vorher = [displayHeroes, dynamicHeroes, displayCreatures];
+    const dyn = display && dynamic, kre = display && kreaturen;
+    setDisplayHeroes(display); setDynamicHeroes(dyn); setDisplayCreatures(kre);
     try {
-      const data = await api('/profile/hero-display', { method: 'PUT', body: JSON.stringify({ display_heroes: display, dynamic_heroes: dyn }) });
+      const data = await api('/profile/hero-display', { method: 'PUT', body: JSON.stringify({ display_heroes: display, dynamic_heroes: dyn, display_creatures: kre }) });
       setUser(data.user);
-    } catch (e) { notify(e.message, 'error'); setDisplayHeroes(vorher[0]); setDynamicHeroes(vorher[1]); }
+    } catch (e) { notify(e.message, 'error'); setDisplayHeroes(vorher[0]); setDynamicHeroes(vorher[1]); setDisplayCreatures(vorher[2]); }
   };
   const GameTooltipProfil = window.GameTooltip;
   const zeigeTipp = (e, text) => window.showGameTooltip && window.showGameTooltip(e, text);
@@ -3630,7 +3633,7 @@ function ProfileScreen() {
                 zeigeTipp={zeigeTipp} versteckeTipp={versteckeTipp} />
               {/* v1463: Helden-Anzeige */}
               <ProfilSchalter an={displayHeroes}
-                onToggle={() => saveHeroDisplay(!displayHeroes, !displayHeroes)}
+                onToggle={() => saveHeroDisplay(!displayHeroes, !displayHeroes, !displayHeroes)}
                 label="Display Heroes"
                 tipp="Shows animated Heroes standing on their cards on the board."
                 zeigeTipp={zeigeTipp} versteckeTipp={versteckeTipp} />
@@ -3640,6 +3643,13 @@ function ProfileScreen() {
                 tipp={displayHeroes
                   ? 'Heroes fold back into their cards while you choose a target, so nothing blocks your view.'
                   : 'Heroes fold back into their cards while you choose a target. Needs "Display Heroes".'}
+                zeigeTipp={zeigeTipp} versteckeTipp={versteckeTipp} />
+              <ProfilSchalter an={displayCreatures} gesperrt={!displayHeroes}
+                onToggle={() => saveHeroDisplay(displayHeroes, dynamicHeroes, !displayCreatures)}
+                label="Display Creatures"
+                tipp={displayHeroes
+                  ? 'Shows animated Creatures standing on their cards on the board. Turn off for a calmer board or on low-power devices. Never shown on phones.'
+                  : 'Shows animated Creatures standing on their cards on the board. Needs "Display Heroes".'}
                 zeigeTipp={zeigeTipp} versteckeTipp={versteckeTipp} />
             </div>
             {GameTooltipProfil && <GameTooltipProfil />}

@@ -962,6 +962,9 @@ app.get('/rarities.js', (req, res) => {
   res.sendFile(path.join(__dirname, 'rarities.js'), { etag: true, lastModified: true });
 });
 app.use(express.static(path.join(__dirname, 'public'), { maxAge: 0, etag: true }));
+// Creature-Sheets: die URL trägt den Zeitstempel der Datei (`?v=`, `/api/creature-animations`) — lange zwischenspeichern, damit das Vorladen aller Sheets zu Spielbeginn
+// nach dem ersten Mal ohne Netzanfragen auskommt.
+app.use('/data/creature-animations', express.static(path.join(__dirname, 'data', 'creature-animations'), { maxAge: '30d', immutable: true }));
 app.use('/data', express.static(path.join(__dirname, 'data')));
 // Card art (~730 immutable-ish PNGs). A long cache lifetime means a full
 // reload / re-login serves them straight from disk instead of re-fetching
@@ -1035,6 +1038,7 @@ async function initDatabase() {
   // Einklappen während Zielwahl-Dialogen (Dynamic Heroes) — beide an.
   try { await db.execute("ALTER TABLE users ADD COLUMN display_heroes INTEGER DEFAULT 1"); } catch {}
   try { await db.execute("ALTER TABLE users ADD COLUMN dynamic_heroes INTEGER DEFAULT 1"); } catch {}
+  try { await db.execute("ALTER TABLE users ADD COLUMN display_creatures INTEGER DEFAULT 1"); } catch {}   // Creature-Figuren auf dem Brett (Unteroption von display_heroes)
   // Ranked-games counter — incremented when a ranked SET (Bo1/Bo3/Bo5)
   // finishes. Used to filter the leaderboard to "actually competed"
   // players so fresh accounts at the default 1000 ELO don't pollute the
@@ -2186,7 +2190,7 @@ function parseHeroSkins(raw) {
   } catch { return {}; }
 }
 function sanitizeUser(u) {
-  return { id: u.id, username: u.username, elo: u.elo, color: u.color, avatar: liveShopRef(u.avatar, 'avatars'), cardback: liveShopRef(u.cardback, 'sleeves'), board: u.board || null, battleTrack: u.battle_track || null, heroSkins: parseHeroSkins(u.hero_skins), bio: u.bio || '', victoryMsg: u.victory_msg || '', defeatMsg: u.defeat_msg || '', wins: u.wins || 0, losses: u.losses || 0, sc: u.sc || 0, created_at: u.created_at, hide_tutorial: u.hide_tutorial || 0, play_animations: u.play_animations == null ? 1 : (u.play_animations ? 1 : 0), display_heroes: u.display_heroes == null ? 1 : (u.display_heroes ? 1 : 0), dynamic_heroes: (u.display_heroes === 0) ? 0 : (u.dynamic_heroes == null ? 1 : (u.dynamic_heroes ? 1 : 0)), defaultSampleDeckId: u.default_sample_deck_id || null, email: u.email || null, emailVerified: !!u.email_verified, isGuest: !!u.is_guest };
+  return { id: u.id, username: u.username, elo: u.elo, color: u.color, avatar: liveShopRef(u.avatar, 'avatars'), cardback: liveShopRef(u.cardback, 'sleeves'), board: u.board || null, battleTrack: u.battle_track || null, heroSkins: parseHeroSkins(u.hero_skins), bio: u.bio || '', victoryMsg: u.victory_msg || '', defeatMsg: u.defeat_msg || '', wins: u.wins || 0, losses: u.losses || 0, sc: u.sc || 0, created_at: u.created_at, hide_tutorial: u.hide_tutorial || 0, play_animations: u.play_animations == null ? 1 : (u.play_animations ? 1 : 0), display_heroes: u.display_heroes == null ? 1 : (u.display_heroes ? 1 : 0), dynamic_heroes: (u.display_heroes === 0) ? 0 : (u.dynamic_heroes == null ? 1 : (u.dynamic_heroes ? 1 : 0)), display_creatures: (u.display_heroes === 0) ? 0 : (u.display_creatures == null ? 1 : (u.display_creatures ? 1 : 0)), defaultSampleDeckId: u.default_sample_deck_id || null, email: u.email || null, emailVerified: !!u.email_verified, isGuest: !!u.is_guest };
 }
 
 // ===== PROFILE ROUTES =====
@@ -2320,6 +2324,10 @@ app.put('/api/profile/hero-display', authMiddleware, async (req, res) => {
   const display = req.body.display_heroes ? 1 : 0;
   const dynamic = display && req.body.dynamic_heroes ? 1 : 0;
   await db.run('UPDATE users SET display_heroes = ?, dynamic_heroes = ? WHERE id = ?', [display, dynamic, req.user.userId]);
+  // `display_creatures` (Creature-Figuren): Unteroption wie `dynamic_heroes`. Ein Client, der das Feld nicht schickt (alte Fassung), lässt die Wahl unberührt;
+  // ohne Heldenfiguren ist sie aus, beim Wiedereinschalten ohne Angabe wieder an.
+  if (req.body.display_creatures !== undefined) await db.run('UPDATE users SET display_creatures = ? WHERE id = ?', [display && req.body.display_creatures ? 1 : 0, req.user.userId]);
+  else if (display) await db.run('UPDATE users SET display_creatures = 1 WHERE id = ? AND display_creatures IS NULL', [req.user.userId]);
   const user = await db.get('SELECT * FROM users WHERE id = ?', [req.user.userId]);
   res.json({ user: sanitizeUser(user) });
 });
