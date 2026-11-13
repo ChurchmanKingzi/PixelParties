@@ -1,0 +1,15 @@
+{
+  "creature": "The Oracle of Heaven",
+  "sheet": "the-oracle-of-heaven.png",
+  "frameWidth": 24,
+  "frameHeight": 29,
+  "frames": 64,
+  "frameMs": 75,
+  "loop": true,
+  "layout": "horizontal",
+  "padTop": 2,
+  "padLeft": 2,
+  "padRight": 2,
+  "padBottom": 2,
+  "faceX": 12.0
+}

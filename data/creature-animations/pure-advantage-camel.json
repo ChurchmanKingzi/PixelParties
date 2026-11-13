@@ -1,0 +1,15 @@
+{
+  "creature": "Pure Advantage Camel",
+  "sheet": "pure-advantage-camel.png",
+  "frameWidth": 42,
+  "frameHeight": 31,
+  "frames": 64,
+  "frameMs": 75,
+  "loop": true,
+  "layout": "horizontal",
+  "padTop": 4,
+  "padLeft": 3,
+  "padRight": 3,
+  "padBottom": 2,
+  "faceX": 21.0
+}

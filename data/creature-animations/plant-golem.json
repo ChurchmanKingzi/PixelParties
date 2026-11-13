@@ -1,0 +1,15 @@
+{
+  "creature": "Plant Golem",
+  "sheet": "plant-golem.png",
+  "frameWidth": 70,
+  "frameHeight": 57,
+  "frames": 64,
+  "frameMs": 85,
+  "loop": true,
+  "layout": "horizontal",
+  "padTop": 2,
+  "padLeft": 2,
+  "padRight": 2,
+  "padBottom": 2,
+  "faceX": 35.0
+}
