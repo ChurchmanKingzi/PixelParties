@@ -16,6 +16,11 @@ Ablauf (72 Frames à 80 ms = 5,8 s, schweres Wesen → langsam). Frame 0 = Origi
 * Schwanz pendelt (Periode 72): die Glieder gehen starr in zwei Stufen mit (x ≥ 58: 1 px, Endglied x ≥ 66 samt Spross und Stachel: 2 px) auf und ab; Stufen an Gliedgrenzen (Umrissspalten).
 * Spross am Schwanzende wippt: die beiden obersten Blattzeilen 1 px zur Seite (Periode 24, nur zeitweise).
 * Blinzeln (Frames 20–22 und 56–58): Iris → Steinfarbe des Lids.
+* Maul schließen/öffnen (Runde 8): der Unterkiefer (x 2–14, y 14–19) ist eine eigene Ebene HINTER dem Oberkiefer. Pose „zu“: vorn (x ≤ 11) 2 px hoch, hinten (x 12–13) 1 px,
+  Gelenk (x 14) fest; die unteren Zähne (ungerade x) greifen in die Lücken der oberen (gerade x). Im geschlossenen Zustand werden die verbleibenden Zahnlücken (x 3–14, y 12–14)
+  zu dunklen Fugen in der Umrissfarbe – kein Hintergrund zwischen den Zähnen. Ablauf: Frames 8–39 langsam zu und wieder auf (12–35 geschlossen), danach viermal kurzes Schnappen.
+* Arme (Runde 8): beide Hakenarme ab dem Ellbogen (y ≥ 26/27, links vom Rumpf) heben sich als EINE starre Einheit vor dem Oberarm/Rumpf um 1–2 px und senken sich wieder
+  (Periode 36, in der Ausatem-Phase: Frames 26–38 und 62–2) – nichts wird gestreckt, es wird nichts freigelegt (darunter liegt nur Hintergrund bzw. der überlappte Oberarm).
 * Zwei 2×2-Blätter (Grüntöne der Büsche) lösen sich nacheinander vom Rücken und trudeln zu Boden.
 Ergänzungen: keine. An den Schwanzstufen freiliegende Innenpixel bekommen die Umrissfarbe (41,32,25).
 """
@@ -99,7 +104,7 @@ def frame(i, nur=None):
     ak = ARM_F[(i + 18) % 36]                      # Arme heben sich in der Ausatem-Phase (nicht gleichzeitig mit dem Atemhub)
     kopf = L.zusammen(sz.H, sz.W, [(kiefer(mk), 0, 0), (oben, 0, 0), (ARM, 0, -ak)])      # Kiefer HINTER den oberen Zähnen, Arme VOR dem Körper
     if mk == 2:                                      # Maul zu: verbliebene Zahnlücken sind dunkle Fugen (kein Hintergrund zwischen den Zähnen)
-        luecke = ~(kopf[..., 3] > 0) & sz.voll((xx >= 3) & (xx <= 13) & (yy >= 12) & (yy <= 14))
+        luecke = ~(kopf[..., 3] > 0) & sz.voll((xx >= 3) & (xx <= 14) & (yy >= 12) & (yy <= 14))
         kopf[luecke] = UMRISS + (255,)
     figur = L.zusammen(sz.H, sz.W, [(bein, 0, 0), (schwanz, 0, -n), (kopf, 0, -n)])
     figur = N8.kontur_schliessen(figur, RAND_FARBEN, UMRISS, maske=sz.voll((xx >= 50) & (yy >= 16)))
@@ -109,4 +114,4 @@ def frame(i, nur=None):
 
 
 if __name__ == '__main__':
-    N8.fertig('foresta-the-guard', 'Foresta, the Guard', frame, N, MS, spr, check=[0, 12, 18, 21, 54, 60], zoom=6, spalten=3)
+    N8.fertig('foresta-the-guard', 'Foresta, the Guard', frame, N, MS, spr, check=[0, 12, 21, 30, 47, 60], zoom=6, spalten=3)

@@ -16,7 +16,7 @@ Ablauf (48 Frames à 75 ms = 3,6 s, nahtlos); Idee: Wachposten am Speer — er a
 * Atmen (Periode 24): Rockzeile 24 wird einmal texturiert eingefügt (TX; nur Körperebene) — Oberkörper, Kopf und beide Arme heben sich 1 px (Frames 4–15 und 28–39).
 * Goldener Arm + Speer gehen FEST mit dem Oberkörper mit (gleicher Versatz in jedem Frame): der Arm sitzt in jedem Frame exakt wie im Original an der Schulter
   (Runde 8: „Arm wirkt disjointed“ — das frühere getrennte Anheben von Arm/Speer um 1–2 px gegenüber der Schulter ist entfernt). Der Speer wird starr von der Faust 1 px mitgenommen.
-* GOLD GLÄNZT (Runde 8): alle 1,8 s (Frames 0–9 und 24–33 … Start 16 und 40) wandert ein Lichtband schräg von der Faust bis zur Schulter über den GANZEN goldenen Arm
+* GOLD GLÄNZT (Runde 8): alle 1,8 s (Start Frame 14 und 38, je 9 Frames) wandert ein Lichtband schräg von der Faust bis zur Schulter über den GANZEN goldenen Arm
   (1 Stufe heller auf der Goldrampe des Sprites, im Kern 2 Stufen bis Augenweiß (246,255,255)); am Ende ein kurzer Sparkle an der Faust (Mitte → kleines Kreuz → weg, 3 Frames).
 * Blinzeln (Frames 20–22 und 44–46): Iris und Augenweiß nehmen die Hautfarbe an.
 * Aufblitzen an der Stahlspitze (Frames 8–10): Mitte → kleines Kreuz → weg.
@@ -42,7 +42,7 @@ HAUT = F.f(13, 11)
 WEISS, HELLGOLD = F.f(11, 12), F.f(5, 16)
 ATEM = [0] * 4 + [1] * 12 + [0] * 8
 RAMPE = G.goldrampe(spr, arm, F.f(11, 12))
-GLANZ, GLANZ_DAUER = (16, 40), 9
+GLANZ, GLANZ_DAUER = (14, 38), 9
 TEST_EBENEN = ('koerper',)
 
 

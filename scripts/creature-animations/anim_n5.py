@@ -63,17 +63,39 @@ def schieb(a, dx=0, dy=0):
     return L.versetze(a, dx, dy) if (dx or dy) else a
 
 
-def goldrampe(spr, maske, spitze=None):
-    """Farben der Maske, dunkel → hell sortiert (Summe der Kanäle); `spitze` (z. B. Augenweiß der Quelle) als hellste Stufe für den Kern des Lichtbands."""
+def goldrampe(spr, maske, spitze=None, abstand=24):
+    """Farbstufen der Maske, dunkel → hell (Summe der Kanäle); fast gleiche Farben (Summenabstand < `abstand`) bilden EINE Stufe.
+    `spitze` (z. B. Augenweiß der Quelle) als hellste Stufe für den Kern des Lichtbands. Ergebnis: Liste von Stufen, jede eine Liste von Farben."""
     fs = sorted({tuple(int(v) for v in spr[y, x, :3]) for y, x in zip(*np.nonzero(maske))}, key=sum)
-    return fs + ([tuple(spitze)] if spitze else [])
+    stufen = []
+    for f in fs:
+        if stufen and sum(f) - sum(stufen[-1][0]) < abstand:
+            stufen[-1].append(f)
+        else:
+            stufen.append([f])
+    return stufen + ([[tuple(spitze)]] if spitze else [])
 
 
-def goldglanz(a, maske, off, i, n, starts, dauer, rampe, breite=3.0):
+def goldglanz(a, maske, off, i, n, starts, dauer, rampe, breite=3.0, achse=(1.0, 1.0)):
     """Regelmäßiges Gold-Lichtband (Runde 8): wandert in `dauer` Frames schräg über ALLE Pixel von `maske` (ganzer Arm), Start in jedem Frame aus `starts`.
-    Im Band 1 Stufe heller, im Kern 2 Stufen (bis zur Spitze der Rampe). Bearbeitet `a` an Ort und Stelle; `off` = Lage der Maske auf der Leinwand."""
-    for st in starts:
-        Hm.lichtband(a, maske, off, i, n, st, dauer, rampe, stufen=1, breite=breite, achse=(1.0, 1.0), kern=2)
+    Im Band 1 Stufe heller, im Kern (mittlere Hälfte) 2 Stufen (bis zur Spitze der Rampe). Bearbeitet `a` an Ort und Stelle; `off` = Lage der Maske auf der Leinwand."""
+    ys, xs = np.nonzero(maske)
+    u = achse[0] * xs + achse[1] * ys
+    umin, umax = float(u.min()), float(u.max())
+    stufe = {f: k for k, st in enumerate(rampe) for f in st}
+    for start in starts:
+        k = (i - start) % n
+        if k >= dauer:
+            continue
+        mitte = umin - breite / 2 + (k + 0.5) / dauer * (umax - umin + breite)
+        for y, x, uu in zip(ys, xs, u):
+            d = abs(uu - mitte)
+            if d > breite / 2.0 + 0.001:
+                continue
+            Y, X = int(y) + off[1], int(x) + off[0]
+            f = tuple(int(v) for v in a[Y, X, :3])
+            if a[Y, X, 3] and f in stufe:
+                a[Y, X, :3] = rampe[min(len(rampe) - 1, stufe[f] + (2 if d <= breite / 4.0 else 1))][-1]
     return a
 
 
