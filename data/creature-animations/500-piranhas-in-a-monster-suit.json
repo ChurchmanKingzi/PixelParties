@@ -1,0 +1,15 @@
+{
+  "creature": "500 Piranhas in a Monster Suit",
+  "sheet": "500-piranhas-in-a-monster-suit.png",
+  "frameWidth": 25,
+  "frameHeight": 29,
+  "frames": 48,
+  "frameMs": 75,
+  "loop": true,
+  "layout": "horizontal",
+  "padTop": 2,
+  "padLeft": 2,
+  "padRight": 2,
+  "padBottom": 2,
+  "faceX": 12.5
+}
