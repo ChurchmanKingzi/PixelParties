@@ -3008,6 +3008,18 @@ const HeroIdleAnims = (() => {
       kopfX1 = kopfX1 ? Math.min(kopfX1, Math.round(kopfMitte + (x1 - x0) * 0.4)) : Math.round(kopfMitte + (x1 - x0) * 0.2);
       let punkte = [];
       const schwelle = Math.max(1, Math.round(frames * 0.6));
+      // ★ Stun-Sterne (app-fx-64): Oberkante des KOPFES = erste Zeile über der Gesichtsspalte (± Kopfbreite), die in mindestens der Hälfte der Bilder mindestens max(3, 18 % der Spaltenbreite) deckende Pixel hat.
+      // `y0` allein taugt nicht (ein einzelner Pixel setzt es zu hoch: Bubbles y0 = 3, Kopf erst bei ≈ 25; dünne Stangen/Fahnen bei den Idej-Helden), eine Mindestbreite und Bildanteil schließen sie aus; bei Sheets mit
+      // `alphaScale` (Medea: Gas über dem Kopf) zählen nur fast volle Pixel (≥ 250), sonst läge die Oberkante im Gas.
+      let obenKopf = y0;
+      { const hw = Math.max(4, Math.min(14, kopfX1 - kopfMitte)), xa = Math.max(0, kopfMitte - hw), xb = Math.min(fw - 1, kopfMitte + hw), nMin = Math.max(3, Math.round(0.18 * (xb - xa + 1)));
+        const aS = Number(meta.alphaScale), aSchw = aS > 0 && aS < 1 ? 250 : 160, bildMin = Math.ceil(frames * 0.5), zeilen = new Uint16Array(fh);
+        for (let fi = 0; fi < frames; fi++) for (let ly = y0; ly < y1; ly++) {
+          let n = 0;
+          for (let lx = xa; lx <= xb; lx++) { const px = vertikal ? lx : fi * fw + lx, py = vertikal ? fi * fh + ly : ly; if (px < w && py < h && d[(py * w + px) * 4 + 3] >= aSchw) n++; }
+          if (n >= nMin) zeilen[ly]++;
+        }
+        for (let ly = y0; ly < y1; ly++) if (zeilen[ly] >= bildMin) { obenKopf = ly; break; } }
       for (let i = 0; i < zaehler.length; i++) if (zaehler[i] >= schwelle) punkte.push([i % fw, Math.floor(i / fw)]);
       let saat = (fw * 2654435761) ^ (fh * 40503);
       for (let i = punkte.length - 1; i > 0; i--) {
@@ -3016,7 +3028,7 @@ const HeroIdleAnims = (() => {
         const t = punkte[i]; punkte[i] = punkte[j]; punkte[j] = t;
       }
       punkte = punkte.slice(0, 400);
-      return { x0, y0, x1, y1, kopfX: n ? summe / n : (x0 + x1) / 2, kopfX1, kopfY: gesichtY, punkte };
+      return { x0, y0, x1, y1, kopfX: n ? summe / n : (x0 + x1) / 2, kopfX1, kopfY: gesichtY, punkte, oben: obenKopf };
     } catch { return rueckfall; }
   }
 
@@ -4276,8 +4288,8 @@ function HeroIdleSprite({ cardName, angehalten, versteinert, eingefroren, effekt
                 <HeroStatusSymbole st={statusIcons} k={Math.max(1, Math.min(3, Math.round(s * (parseFloat(document.documentElement.style.getPropertyValue('--board-scale')) || 1) / 1.4)))}
                   links={`calc(${bs((kern.kopfX1 || kern.x1) * s + 3)})`} oben={`calc(${bs((kern.kopfY != null ? kern.kopfY - 4 : kern.y0 + ch * 0.18) * s)})`} />
               )}
-              {stunJetzt && !versteinert && window.PpFx64Sterne && window.ppFx64Aktiv && window.ppFx64Aktiv() && (
-                <window.PpFx64Sterne kern={kern} mitteX={mitteX} s={s} intro={stunAuslosen} />
+              {stunJetzt && !versteinert && !(aufstieg && aufstieg.rolle === 'alt') && window.PpFx64Sterne && window.ppFx64Aktiv && window.ppFx64Aktiv() && (
+                <window.PpFx64Sterne kern={kern} mitteX={mitteX} s={s} zf={Math.max(1, Math.round(2.8125 / s))} intro={stunAuslosen} />
               )}
               {eisPhase !== 'weg' && (
                 <HeroEiskruste quelleRef={canvasRef} breite={fw} hoehe={fh} rand={EIS_RAND}

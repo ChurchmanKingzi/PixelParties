@@ -292,8 +292,11 @@ function ppFx66Starten(o) {
     // Karte im Platz: die mit dem Namen im Bild, sonst die erste
     const karten = Array.from(srcEl.querySelectorAll('.board-card'));
     const enc = cardName ? encodeURIComponent(cardName) : '';
-    let karte = karten.find((k) => { const im = k.querySelector('img'); return im && enc && (im.src.indexOf(enc) >= 0 || im.src.indexOf(cardName) >= 0); }) || karten[0];
-    if (!karte) return ppFx66Fehl('keine Karte im Platz');
+    const dateiname = (u) => { try { return decodeURIComponent(String(u || '').split('?')[0].split('/').pop() || ''); } catch (e) { return ''; } };   // Namen mit Komma/Sonderzeichen: `cardImageUrl` bildet sie auf andere Dateinamen ab
+    const soll = cardName && window.cardImageUrl ? dateiname(window.cardImageUrl(cardName)) : '';
+    const gleich = (k) => { const im = k.querySelector('img'); return !!im && ((!!soll && dateiname(im.src) === soll) || (!!enc && (im.src.indexOf(enc) >= 0 || im.src.indexOf(cardName) >= 0))); };
+    const karte = karten.find(gleich) || (cardName ? null : karten[0]);   // nie eine fremde Karte verbrennen: ohne Namenstreffer Rückfall auf den alten Flug
+    if (!karte) return ppFx66Fehl('keine Karte mit diesem Namen im Platz');
     const img = karte.querySelector('img');
     if (!img || !img.complete || !(img.naturalWidth > 0)) return ppFx66Fehl('Kartenbild nicht geladen');
     const vq = ppFx66Viereck(karte); if (!vq) return ppFx66Fehl('kein Kartenviereck');

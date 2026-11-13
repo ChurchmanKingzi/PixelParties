@@ -117,6 +117,7 @@ async function zahleOpfer(engine, pi, selectedIds, validTargets) {
   await engine.actionDestroyCard(
     { name: CARD_NAME, owner: pi, heroIdx: sacInst.heroIdx },
     sacInst,
+    { einaescherung: true },   // Opfer: verbrennt (Client: app-fx-66)
   );
 
   // ★ v1360 (Audit „same Support Zone"): ab hier ist das Opfer BEZAHLT.

@@ -72,17 +72,23 @@
     return true;
   }
 
-  /** Maße der Leinwand im Sprite-Raster: Mitte über dem Kopf, Radius nach Kopfbreite. Einmal je Figur (`kern`, `mitteX` aus HeroIdleSprite). */
-  function geometrie(kern, mitteX) {
-    const cx = rd(mitteX);
-    const kopfHalb = mn(14, mx(4, ((kern.kopfX1 || 0) > cx ? kern.kopfX1 - cx : (kern.x1 - kern.x0) * 0.25)));
+  /**
+   * Maße der Leinwand: Mitte über dem Kopf, Radius nach Kopfbreite. Einmal je Figur (`kern`, `mitteX` aus HeroIdleSprite).
+   * Raster: `zf` Sprite-Pixel je Leinwandzelle. Normal 1 (Zelle = Sprite-Pixel = Hero-Pixel). Hat das Sheet einen kleineren Maßstab (`boardScale`, Bubbles 0,5), wäre ein Sprite-Pixel nur halb so groß wie
+   * der Standard-Hero-Pixel und die Sterne winzig: dann ist eine Zelle `zf` = round(1 / boardScale) Sprite-Pixel, also wieder genau ein Standard-Hero-Pixel (alle Sterne gleich groß).
+   * Kopfoberkante: `kern.oben` (HeroIdleAnims.kernRahmen: erste Zeile über der Gesichtsspalte, die in der Hälfte der Bilder eine Mindestbreite deckender Pixel hat), nicht `y0` (ein einzelner Pixel setzt es zu hoch) und nicht `faceY` (bei hohen Körpern mitten im Körper).
+   */
+  function geometrie(kern, mitteX, zf) {
+    zf = zf > 1 ? zf : 1;
+    const cx = rd(mitteX / zf);
+    const kopfHalb = mn(14, mx(4, ((kern.kopfX1 || 0) > mitteX ? (kern.kopfX1 - mitteX) / zf : (kern.x1 - kern.x0) * 0.25 / zf)));
     const rx = mn(19, mx(8, rd(kopfHalb * 1.15 + 3)));                    // mit den 5×5-Sternen etwas enger als vorher (1,3·+4, min. 9): die Bahn bleibt am Kopf
     const ry = mx(3, rd(rx * 0.3));
-    // Mitte über dem Kopf: Oberkante der Figur — hat das Sheet eine Gesichtshöhe (`faceY`, z. B. Medea mit Gas, Brackle mit Katapult, Flügel-Helden), über dem Gesicht statt über den Aufbauten
-    const hoehe = mx(1, kern.y1 - kern.y0), kopfR = mn(12, mx(5, rd(hoehe * 0.1)));
-    const cy = rd(typeof kern.kopfY === 'number' ? mx(kern.y0, kern.kopfY - kopfR) : kern.y0) - 3;
+    let oben = typeof kern.oben === 'number' ? kern.oben : kern.y0;
+    if (typeof kern.kopfY === 'number') oben = mn(oben, kern.kopfY - 4);      // die Kopfoberkante liegt über der Gesichtsmitte (`faceY`), nie darunter (Brackle: Kopf wippt)
+    const cy = rd(oben / zf) - 3;
     const hb = rd(rx * 1.9) + 6, hh = rd(ry * 1.9) + 6;                  // Platz für den Auftritt (1,9 × Radius) samt halber Sternbreite
-    return { cx, cy, rx, ry, w: 2 * hb + 1, h: 2 * hh + 1, ox: hb, oy: hh, links: cx - hb, oben: cy - hh };
+    return { cx, cy, rx, ry, w: 2 * hb + 1, h: 2 * hh + 1, ox: hb, oy: hh, links: cx - hb, oben: cy - hh, zf };
   }
 
   // ───────── gemeinsamer Takt ─────────
@@ -125,9 +131,10 @@
    * Die Sterne eines betäubten Helden. Props: `kern`, `mitteX` (Sprite-Raster, wie HeroIdleSprite), `s` (Kartenpixel je Sprite-Pixel), `intro` (Status wurde eben gesetzt).
    * Lage: absolut im Steher der Figur (links/oben in Sprite-Pixeln × `--board-scale`).
    */
-  function PpFx64Sterne({ kern, mitteX, s, intro }) {
+  function PpFx64Sterne({ kern, mitteX, s, intro, zf }) {
     const ref = React.useRef(null);
-    const g = React.useMemo(() => geometrie(kern, mitteX), [kern, mitteX]);
+    const g = React.useMemo(() => geometrie(kern, mitteX, zf), [kern, mitteX, zf]);
+    const px = (n) => `calc(${+(n * (g.zf || 1) * s).toFixed(3)}px * var(--board-scale))`;
     const introEinmal = React.useRef(!!intro);
     React.useEffect(() => {
       const cv = ref.current; if (!cv) return undefined;
@@ -136,11 +143,24 @@
       o.ctx.imageSmoothingEnabled = false;
       let io = null;
       try { if (typeof IntersectionObserver !== 'undefined') { io = new IntersectionObserver((es) => { for (const e of es) o.sichtbar = e.isIntersecting; }); io.observe(cv); } } catch (e) { io = null; }
+      // Ragt der Kopf über den oberen Rand der sichtbaren Fläche (Argos in der Gegnerreihe), rutscht die Leinwand nach unten, bis die obersten Sterne im Fenster liegen (einmal beim Aufbau und bei Größenänderung — kein Layout im Takt)
+      const halten = () => {
+        try {
+          cv.style.top = px(g.oben);
+          const r = cv.getBoundingClientRect(); if (!(r.height > 0)) return;
+          // obere Grenze = Fensterrand ODER die Oberkante des nächsten beschneidenden Vorfahren (die Sprite-Ebene endet an der Brettkante: Köpfe darüber werden abgeschnitten, auch die Sterne)
+          let grenze = 0;
+          for (let e = cv.parentElement; e && e !== document.body; e = e.parentElement) { const cs = getComputedStyle(e); if (cs.overflowY !== 'visible' || (cs.clipPath && cs.clipPath !== 'none' && !/inset\(-/.test(cs.clipPath))) grenze = mx(grenze, e.getBoundingClientRect().top); }
+          const zelle = r.height / g.h, hoch = r.top + (g.oy - g.ry - 4) * zelle, rand = grenze + 6;
+          if (hoch < rand) cv.style.top = px(g.oben + Math.ceil((rand - hoch) / zelle));
+        } catch (e) { /* ohne */ }
+      };
+      // Messen erst nach dem Auftauchen der Figur (`heroHoloAuftauchen` skaliert das Holo 0,36 s lang)
+      const tHalten = setTimeout(halten, 700); root.addEventListener('resize', halten);
       zeichne(o, performance.now());                                      // sofort ein erstes Bild (kein leeres Bild bis zum nächsten Takt)
       an(o);
-      return () => { ab(o); if (io) io.disconnect(); };
-    }, [g]);
-    const px = (n) => `calc(${+(n * s).toFixed(3)}px * var(--board-scale))`;
+      return () => { ab(o); clearTimeout(tHalten); root.removeEventListener('resize', halten); if (io) io.disconnect(); };
+    }, [g, s]);
     return <canvas ref={ref} width={g.w} height={g.h} aria-hidden="true" data-pp-px="aus" className="hero-idle-sterne"
       style={{ position: 'absolute', left: px(g.links), top: px(g.oben), width: px(g.w), height: px(g.h), imageRendering: 'pixelated', pointerEvents: 'none', display: 'block' }} />;
   }

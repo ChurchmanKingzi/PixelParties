@@ -14756,7 +14756,6 @@ class GameEngine {
     }
     // Beanspruchter Kadaver: kein Flug zum Stapel — er geht gleich
     // von seiner Zone aus in die Hand oder in die neue Zone.
-    let _eaT0 = 0;   // Einäscherung: Sendezeit des Ereignisses (0 = keine)
     if (!opts.skipPileTransfer && !targetCard._deathClaim) {
       const fromZone = targetCard.zone;
       const isBoardZone = fromZone === ZONES.SUPPORT
@@ -14818,10 +14817,15 @@ class GameEngine {
         // Nur Kreaturen im Support-Slot, keine Wiederbelebung (Extra Life) und keine Token (eigener Zerfall). Karten mit eigener Zerstörungs-Animation setzen `skipPileTransfer` oder senden ihr eigenes Ereignis.
         const _selbst = !!opts.einaescherung || !!opts.isSacrifice || (!!source && (source === targetCard || (source.id != null && source.id === targetCard.id)));
         if (_selbst && isCreatureTarget && fromZone === ZONES.SUPPORT && !_istToken && !targetCard._reviveAfterDeath) {
+          // Das Ereignis wird erst in `_actionMoveCardKern` gesendet, wenn das ZIEL feststeht (Löschumleitungen wie Greatmaw Remora / Vacarn / Ankhota setzen es erst in `onCardLeaveZone`):
+          // sonst flöge die Essenz zur Ablage, obwohl die Karte im Gelöscht-Stapel landet. Wird die Bewegung vorher abgebrochen, gibt es weder Animation noch Wartezeit.
           payload.flightStyle = 'einaescherung';
-          _eaT0 = Date.now();
+          // gestohlene/übernommene Kreatur: der Platz liegt auf der Brettseite des Kontrolleurs, die Karte geht in den Stapel ihres Besitzers (Client: `fromOwner`/`toOwner`)
+          { const _seite = this.physicalSide(targetCard), _besitzer = this.kartenBesitzerVon(targetCard); if (_seite !== payload.owner) payload.fromOwner = _seite; if (_besitzer !== payload.owner) payload.toOwner = _besitzer; }
+          targetCard._eaPending = payload; targetCard._eaPendingT = Date.now();
+        } else {
+          this._broadcastEvent('play_pile_transfer', payload);
         }
-        this._broadcastEvent('play_pile_transfer', payload);
       }
     }
 
@@ -14848,6 +14852,7 @@ class GameEngine {
     });
     // ★ EINÄSCHERUNG: warten, bis die Essenz den Stapel erreicht hat (Animationszeit des Clients, abzüglich der schon vergangenen Zeit)
     // (`opts.einaescherungOhneWarten`: Mehrfach-Tribut — nur das LETZTE Opfer wartet, die Einäscherungen laufen gestaffelt überlappend; s. `resolveSacrificeCost`)
+    const _eaT0 = targetCard._eaT0 || 0; delete targetCard._eaT0; delete targetCard._eaPending; delete targetCard._eaPendingT;   // Sendezeit des Einäscherungs-Ereignisses (0 = keines gesendet)
     if (_eaT0 && !opts.einaescherungOhneWarten) { const rest = EINAESCHERUNG_MS - (Date.now() - _eaT0); if (rest > 0) await this._delay(rest); }
   }
 
@@ -16101,6 +16106,15 @@ class GameEngine {
         toZone    = ZONES.DELETED;
         toHeroIdx = -1;
         toSlot    = -1;
+      }
+    }
+    // ★ EINÄSCHERUNG: das aus `_actionDestroyCardKern` zurückgehaltene Ereignis jetzt senden — Ziel (Ablage/Gelöscht) steht fest, der Zustand hat die Karte noch nicht verlassen.
+    if (cardInstance._eaPending) {
+      const _eaPl = cardInstance._eaPending; delete cardInstance._eaPending;
+      if (Date.now() - (cardInstance._eaPendingT || 0) < 15000 && fromZone === ZONES.SUPPORT && (toZone === ZONES.DISCARD || toZone === ZONES.DELETED)) {
+        _eaPl.to = toZone === ZONES.DELETED ? 'deleted' : 'discard';
+        cardInstance._eaT0 = Date.now();
+        this._broadcastEvent('play_pile_transfer', _eaPl);
       }
     }
     // M01-08: Tokens (Biomancy Token, Boulder in a Bottle, Mummy Token …) werden
