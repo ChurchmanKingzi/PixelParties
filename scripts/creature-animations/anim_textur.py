@@ -48,15 +48,19 @@ def _laeufe(m):
 
 
 def _linie(z, a, b):
-    """Maske: Pixel von z, die deutlich dunkler sind als die Zeilen a UND b (darüber/darunter) → waagerechte dunkle Linie. Ist eine Seite
-    dort transparent, zählt nur die andere; ist eine Seite unbekannt (None), gilt nichts als Linie."""
+    """Maske: Pixel von z, die deutlich dunkler sind als die Zeilen a UND b (darüber/darunter) → waagerechte dunkle Linie. Wo eine Seite
+    transparent ist (Ebenen- oder Figurenrand), zählt ein Pixel nur als Linie, wenn es so dunkel ist wie der Umriss der Zeile selbst;
+    ist eine Seite unbekannt (None), gilt nichts als Linie."""
     lz = _lum(z)
-    m = z[:, 3] > 0
+    op_z = z[:, 3] > 0
+    m = op_z.copy()
+    rand = op_z & ~_innen(z)
+    umriss = (lz <= lz[rand].min() + 6) if rand.any() else np.zeros(len(z), bool)
     for n in (a, b):
         if n is None:
             return np.zeros(len(z), bool)
         op = n[:, 3] > 0
-        m &= ~op | (lz + D_LINIE < _lum(n))
+        m &= np.where(op, lz + D_LINIE < _lum(n), umriss)
     return m
 
 

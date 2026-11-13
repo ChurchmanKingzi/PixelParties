@@ -31,6 +31,10 @@ KLINGENZEICHNUNG (alles Farben des Sprites): Rand (150,122,153) links/rechts, Mi
 Spitze (1 px, (197,160,201)); die Länge hängt von der Pose ab (oben 32 px, im Schwung 20 → 11 → 6 px zur Betrachterin gekippt, unten 11 px wie im Quell-Sprite). Der weiße Streifen (3 px) füllt den Raum zwischen alter
 Spitzenhöhe (y ≈ 10, oben 2 px Spitze) und der Klinge und wächst/schrumpft im Schwung (hinterher löst er sich von oben her auf).
 
+RUNDE 4 (Rückmeldung „sollte VIEL HÄUFIGER seine Klingen bewegen“): der unten beschriebene Schlag (Ausholen → Schwung → unten → Heben) läuft jetzt im 24-Frame-Takt dreimal je Schleife (alle 1,6 s) mit nur
+3–4 Frames Pause oben und unten; das Kopfnicken entfällt, Lichtband (links ab Frame 19, rechts ab 43) und Glitzersterne (Frames 70–72 bzw. 46–48) liegen in den kurzen Oben-Phasen. Die Frame-Nummern im folgenden Abschnitt
+beschreiben den alten Einzelschlag (Posen unverändert).
+
 Ablauf (72 Frames à 66 ms = 4,75 s, nahtlos; Frame 0 = Ruhepose mit Klingen OBEN — dort ist Frame 0 NICHT mehr der Quell-Sprite, denn der zeigt mitten im Schwung):
 * Frames 62–25 (Klingen oben, 36 Frames Ruhe): lange Klingen aufrecht, Arme etwas gehoben (die Hände steigen 2 px, die Unterarme verschwinden unter dem Schulterband); ein Lichtband läuft die linke (Frames 64–73) und die rechte
   Klinge (Frames 4–13) hinauf (Metall, Regel 12/14); ein Glitzerstern blitzt kurz auf (Mitte → Kreuz → Mitte, 3 Frames) an der linken (Frames 15–17) und der rechten Klinge (Frames 20–22).
@@ -89,31 +93,33 @@ AUGE_R = [(15, 18), (16, 18), (15, 19), (16, 19), (15, 20), (16, 20)]
 SP, BL = 8, 10                      # Streifen: Spitze ab y 8 (2 px), Block ab y 10
 OBEN = ('hoch', 32, -2, None)
 UNTEN = ('runter', 11, 0, None)
-zeitplan = {i: OBEN for i in range(N)}
-for i in range(36, 56):
-    zeitplan[i] = UNTEN
-zeitplan.update({
-    26: ('hoch', 33, -3, None),                 # Ausholen
-    27: ('hoch', 34, -3, None),
-    28: ('hoch', 20, -2, 'bis_spitze'),         # Schwung
-    29: ('hoch', 11, -1, 'bis_spitze'),
-    30: ('hoch', 6, 0, 'bis_spitze'),
-    31: ('runter', 11, 0, (SP, BL, 33)),
-    32: ('runter', 11, 0, (SP, BL, 33)),
-    33: ('runter', 11, 0, (12, 14, 33)),        # Streifen löst sich von oben her auf
-    34: ('runter', 11, 0, (20, 22, 33)),
-    35: ('runter', 11, 0, (28, 29, 33)),
-    56: ('hoch', 6, 0, None),                   # Klingen heben sich wieder
-    57: ('hoch', 11, -1, None),
-    58: ('hoch', 17, -1, None),
-    59: ('hoch', 23, -2, None),
-    60: ('hoch', 28, -2, None),
-    61: ('hoch', 31, -2, None),
-    62: ('hoch', 33, -2, None),                 # kleiner Überschwinger
-    63: ('hoch', 32, -2, None),
-})
+# Runde 4 (Rückmeldung: „Niu sollte VIEL HÄUFIGER seine Klingen bewegen“): statt eines Schlags je Schleife (mit 36 Frames Ruhe oben und 20 Frames unten) läuft der ganze Schlag jetzt in einem 24-Frame-Takt
+# (1,6 s) DREIMAL je Schleife, fast ohne Pause: Takt-Frame 0–1 oben, 2–3 Ausholen, 4–11 Schwung (Posen wie bisher), 12–14 unten, 15–22 Heben (Posen wie bisher), 23 oben.
+TAKT = 24
+ZYKLUS = {
+    2: ('hoch', 33, -3, None),                  # Ausholen
+    3: ('hoch', 34, -3, None),
+    4: ('hoch', 20, -2, 'bis_spitze'),          # Schwung
+    5: ('hoch', 11, -1, 'bis_spitze'),
+    6: ('hoch', 6, 0, 'bis_spitze'),
+    7: ('runter', 11, 0, (SP, BL, 33)),
+    8: ('runter', 11, 0, (SP, BL, 33)),
+    9: ('runter', 11, 0, (12, 14, 33)),         # Streifen löst sich von oben her auf
+    10: ('runter', 11, 0, (20, 22, 33)),
+    11: ('runter', 11, 0, (28, 29, 33)),
+    12: UNTEN, 13: UNTEN, 14: UNTEN,
+    15: ('hoch', 6, 0, None),                   # Klingen heben sich wieder
+    16: ('hoch', 11, -1, None),
+    17: ('hoch', 17, -1, None),
+    18: ('hoch', 23, -2, None),
+    19: ('hoch', 28, -2, None),
+    20: ('hoch', 31, -2, None),
+    21: ('hoch', 33, -2, None),                 # kleiner Überschwinger
+}
+zeitplan = {i: ZYKLUS.get(i % TAKT, OBEN) for i in range(N)}
 # Körperfeder (zusätzlich zum Atmen): +1 beim Ausholen, −1 nach dem Schlag
-EXTRA = {26: 1, 27: 1, 28: 1, 29: 1, 33: -1, 34: -1, 35: -1, 36: -1, 37: -1}
+_EX = {2: 1, 3: 1, 4: 1, 5: 1, 9: -1, 10: -1, 11: -1, 12: -1, 13: -1}
+EXTRA = {i: _EX[i % TAKT] for i in range(N) if i % TAKT in _EX}
 
 
 def brust_reihe():
@@ -191,7 +197,7 @@ def glanz(fig, i, links, ys, x0):
     if len(ys) < 25:
         return
     c = x0 + 1
-    start, dauer = (64, 10) if links else (4, 10)
+    start, dauer = (19, 10) if links else (43, 10)                       # Runde 4: in die kurzen Oben-Phasen gelegt (Heben → oben → Ausholen)
     k = (i - start) % N
     if k < dauer:
         u = (k + 0.5) / dauer
@@ -207,7 +213,7 @@ def glanz(fig, i, links, ys, x0):
                         if x != c:
                             st = 1
                         fig[Y, X, :3] = RAMPE[min(len(RAMPE) - 1, RAMPE.index(cur) + st)]
-    s0 = 15 if links else 20
+    s0 = 70 if links else 46
     st = Hm.folge(i, s0, [0, 1, 0], N)
     if st is not None:
         y = ys[0] + (ys[-1] - ys[0]) * (0.38 if links else 0.55)
@@ -221,7 +227,7 @@ def glanz(fig, i, links, ys, x0):
 def frame(i):
     richtung, laenge, arm_dy, streifen = zeitplan[i]
     brust = BRUST[i]
-    nick = 1 if Hm.folge(i, 40, [1] * 10, N) else 0                      # Kopf sinkt in der Phase „Klingen unten“
+    nick = 0                                                             # Runde 4: kein Kopfnicken mehr (die lange Phase „Klingen unten“ gibt es nicht mehr; der Körper federt nach jedem Schlag ein)
     # ── Körper (Schulterband abwärts): Atmen durch eine eingefügte/entfernte Zeile 27 ──
     rumpf = ebene(rumpf_m)
     rumpf = L.streck_zeile(rumpf, PAD_T + 27, brust)

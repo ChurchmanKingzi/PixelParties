@@ -16,6 +16,9 @@ Was im Sprite ist (x, y im 40×32-Sprite):
   der Schweif zieht als dunkelblaue Strähnen (18,28,63) nach links (x 0–17, y 18–30).
 Metall/Edelstein: nichts eindeutig (goldenes Pixelpaar am Pferdekopf = Auge → nur Blinzeln, kein Glanz; die hellen Pixel in der Mähne bleiben Teil der Mähne) → KEIN Glanz (Regel 14). Kein Feuer, keine Partikel.
 
+RUNDE 4: Das HORN des Einhorns (violetter Schrägstrich (34,12) … (39,7) mit hellen Lichtpixeln; bisher als „Sterne in der Mähne“ mit dem Nebel verformt) ist jetzt starr am Kopf (siehe `horn`); nur die
+dunkelblaue Mähne (18,28,63) dahinter fließt weiter als Nebel.
+
 Ablauf (48 Frames à 66 ms = 3,17 s, nahtlos):
 * Atmen des Pferdes (Periode 24, zweimal pro Schleife): die Rumpfzeile 23 von Pferd+Reiterin wird einmal doppelt eingefügt (L.streck_zeile, Texturmischung): Rumpf, Hals, Kopf, Reiterin steigen 1 px, die Beine/Hufe bleiben am Boden.
 * NEBEL (Nutzerkorrektur Runde 3: „die Mähne bis einschließlich Schweif des Pferds soll fließend animiert sein, als bestünde sie aus dunklem Nebel“): Schweif (die dunkelblauen Strähnen (18,28,63) bei y ≥ 18, x ≤ 17) und Mähne samt Stirnschopf
@@ -64,7 +67,11 @@ HAARF = [(8, 18, 0), (97, 102, 79), (151, 149, 110), (66, 70, 53)]
 
 schweif = L.farbmaske(spr, [NAVY_A]) & (yy >= 18) & (xx <= 17)
 # Mähne samt Stirnschopf: alle dunklen Nebelpixel oben rechts am Pferdekopf (Marineblau/Violett und die zwei Sternpixel); Ohr und Kopf des Pferdes (Fellfarben, Umriss (26,45,81)) bleiben fest
-maehne = L.farbmaske(spr, [NAVY_A, NAVY_O, NAVY_Y, STERN1, STERN2]) & (xx >= 28) & (yy <= 12)
+# Runde 4 (Nutzer: „Das Horn des Einhorns sollte nicht so schlackern“): der violette Schrägstrich von der Stirn nach rechts oben ((34,12) … (39,7), Farben (30,23,69)/(67,66,119) mit den hellen
+# Pixeln (212,213,247)) ist das HORN, kein Nebel. Es gehört nicht mehr zur Nebel-Mähne, sondern bleibt im starren Kopf (`rest`): es hebt sich nur mit dem Atmen des Pferdes, sonst völlig starr.
+horn = L.farbmaske(spr, [NAVY_O, NAVY_Y, STERN1, STERN2]) & (xx >= 33) & (yy <= 12)
+assert horn.sum() >= 15
+maehne = L.farbmaske(spr, [NAVY_A, NAVY_O, NAVY_Y, STERN1, STERN2]) & (xx >= 28) & (yy <= 12) & ~horn
 haar = L.farbmaske(spr, HAARF) & (xx <= 21) & (yy >= 12) & (yy <= 16)
 bein_v = vorhanden & (xx >= 31) & (xx <= 33) & (yy >= 26)
 bein_h = vorhanden & (xx >= 15) & (xx <= 17) & (yy >= 26) & ~schweif

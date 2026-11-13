@@ -65,6 +65,42 @@ class Flamme:
         self.fetzen = fetzen                                     # False: Spitze schnürt sich nicht ab (hängende Schweife u. Ä.)
         self.baender = baender
 
+    def stufen(self, tau, yy, xx, nb, neigung=0.0):
+        return _stufen(self, tau, yy, xx, nb, neigung)
+
+
+class Strahl:
+    """Feuerstrahl/Kegel (Feueratem, Düsenflamme): beginnt schmal bei (x, y) (Halbbreite breite0) und wird in `richtung` über `laenge` px breiter (breite1). Bäuche und ein leichtes
+    Schlängeln wandern mit dem Fluss vom Ursprung weg; die Farbbänder liegen als Mantel um den Kern (`einzug` = Abstand der Bandgrenzen vom Rand in px, von außen nach innen).
+    Das offene Ende schließt man mit Flammen (`Flamme(..., richtung=<Flussrichtung>)`), deren Füße kurz vor dem Kegelende sitzen: sie laufen als Zungen aus und schnüren Fetzen ab."""
+
+    def __init__(self, x, y, laenge, breite0, breite1, richtung=(0, 1), phase=0.0, welle=None, bauch=0.12, schlag=0.6, einzug=None, umlauf=1):
+        self.x, self.y, self.laenge, self.b0, self.b1 = float(x), float(y), float(laenge), float(breite0), float(breite1)
+        n = math.hypot(*richtung)
+        self.r = (richtung[0] / n, richtung[1] / n)
+        self.phase, self.bauch, self.schlag, self.umlauf, self.einzug = float(phase), bauch, schlag, int(umlauf), einzug
+        self.welle = float(welle) if welle else max(6.0, 0.5 * self.laenge)
+
+    def stufen(self, tau, yy, xx, nb, neigung=0.0):
+        rx, ry = self.r
+        dx, dy = xx - self.x, yy - self.y
+        a = dx * rx + dy * ry
+        c = -dx * ry + dy * rx
+        v = a / self.laenge
+        vc = np.clip(v, 0, 1)
+        th = 2 * math.pi * (a / self.welle - self.umlauf * tau + self.phase)
+        hw = (self.b0 + (self.b1 - self.b0) * vc) * (1.0 + self.bauch * np.minimum(1.0, 2.5 * vc) * np.cos(th))
+        mitte = self.schlag * vc * np.sin(th + 1.0) + neigung * vc ** 1.5
+        einzug = self.einzug or [0.0, 1.1, 2.4, 3.9, 5.2][:nb]
+        d = hw - np.abs(c - mitte)
+        ok = (v >= 0) & (v <= 1)
+        out = np.zeros(a.shape, np.uint8)
+        skal = np.clip(hw / (einzug[-1] + 1.6), 0, 1)                 # schmale Stellen: Bänder rücken zusammen
+        for k in range(nb):
+            out[ok & (d >= einzug[k] * skal + 0.25) & (out == k)] = k + 1
+        out[ok & (d >= 0.25) & (hw < 1.6)] = nb                       # Ursprung (Maul/Düse): reiner Kern
+        return out
+
 
 def saum(punkte, abstand, laenge, breite, richtung=(0, -1), phase=0.0, dphase=0.37, versatz=(0, 0), **kw):
     """Flammensaum: Flammen im Abstand `abstand` px entlang eines Linienzugs `punkte` [(x, y), …] (z. B. Rückenkante eines brennenden Tiers). `laenge`, `breite` und `richtung` sind
@@ -190,7 +226,7 @@ class Feuer:
             nb = len(self.farben)
             st = np.zeros((self.h, self.w), np.uint8)
             for fl in self.flammen:
-                st = np.maximum(st, _stufen(fl, key[0] / float(self.posen), yy, xx, nb, key[1]))
+                st = np.maximum(st, fl.stufen(key[0] / float(self.posen), yy, xx, nb, key[1]))
             self._cache[key] = _aufraeumen(st, nb)
         return self._cache[key]
 

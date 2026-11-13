@@ -2,7 +2,7 @@
 """Idle-Animation für „Guardian Beast Long“ (Creature, Archetyp Guardian Beasts) — der Drachen-Wächter (Zeichen „Long“ = Drache): grüner Schuppenkopf mit goldenem Geweih, goldene Schulterplatten, Klauen und ein Feuerstrahl aus dem Maul.
 
 Quelle: src/guardian-beast-long.png (26×37 px, 38 Farben) — die Figur ohne Flamme; src/guardian-beast-long-flamme.png (23×48 px, vier Farben) = die gemalte Feuerstrahl-Ebene 104 der xcf-Datei. Der Körper steht FEST (kein Schweben/Atmen),
-nur das Feuer lebt: die gemalte Flamme wird mit anim_feuer2.py (Feuer von Hand, Zunge für Zunge) animiert, nicht neu erfunden.
+nur das Feuer lebt (Runde 4: anim_feuer3.py, klassischer Flammenzyklus in Flussrichtung nach der gemalten Vorlage).
 PICK: [["MotiveGuardianBeasts", 105, "Ganze Ebene"], ["MotiveGuardianBeasts", 104, "Flamme (nur Farben/Form als Vorlage)"]]      (Ebene „Long-Kopie“ = Drache mit Geweih und Klauen, Ebene „Long #1“ = Feuerstrahl; die Ebene „Long“ (106) ist eine
 andere Pose desselben Wächters mit geschlossenem Maul und Helm, ohne Geweih; Ebene 102 „Ebene #10“ ist eine Reihe kleiner Flammen, die zu anderen Karten gehört)
 Abgleich mit der Kartenkunst Guardian_Beast_Long.png (76×51): die Karte zeigt Ebene 105 (Geweih, Klauen) mit dem Feuerstrahl (Ebene 104) vom Maul bis zum Kartenrand, die Flamme liegt vor dem Körper. Die Suche fand für diese Karte keinen
@@ -27,12 +27,12 @@ Gold im Sprite: Schulterplatten und Bauchplatte → nur sie glänzen (Regel 12/1
 Ablauf (48 Frames à 64 ms = 3,07 s, nahtlos):
 * Körper steht fest (Nutzerkorrektur: nicht den ganzen Sprite samt Feuer schweben lassen): kein Atmen, kein Heben. Erhalten bleiben die kleinen Details der früheren Fassung: Blinzeln (Frames 19–21, 41–43), Gold glänzt
   (Lichtband/Glitzer nur an Schulterplatten und Bauchplatte), Geweihzacken zucken, Klauen spielen — alles ohne dass sich der Körper verschiebt.
-* FEUERSTRAHL (anim_feuer2): die gemalte Flamme (Ebene 104: Kegel mit cremefarbenem Kern, gelbem und orangem Mantel, rotem Rand, Stiel am Maul) bleibt am Maul und im oberen Kegel (Zeilen 0–~12) ruhig stehen. Der untere Kegel besteht
-  aus fünf Zungen (Fächer vom Maul nach unten, Zungenspitzen von Hand als Zähne in den Kegel geschnitten und nach Tiefe gefärbt: roter Rand → orange → gelb → cremefarben), jede Zunge mit eigener Folge handgesetzter Posen (Länge, Neigung,
-  S-Kurve, Kernhub; 12 Posen, je 2–3 Frames), gegeneinander versetzt; die Spitzen reißen ab und fliegen als Funken mit dem Strahl nach unten davon. Alles Pixel der gemalten Ebene (rote Randpixel immer in (202,44,41)).
+* FEUERSTRAHL (Runde 4, „richtige Feuer-Animation“, anim_feuer3): klassischer Flammenzyklus, 8 Posen à 2 Frames (3 Zyklen je Schleife), Fluss vom Maul weg nach UNTEN. Ein Kegel wie in der gemalten Ebene 104 (am Maul schmal und
+  cremefarben, nach unten bis ~19 px breit; Mantel Rot → Orange → Gelb um den Creme-Kern), an dessen Rändern Bäuche nach unten wandern und der leicht schlängelt; das untere Ende läuft in fünf phasenversetzten Zungen aus (mittlere am
+  längsten), deren Spitzen sich abschnüren und als kleine Fetzen weiter nach unten fliegen. Farben nur aus der Flammenebene.
 Frame 0 = Original (Körper); die Flamme ist ausgenommen (Posenfolge). Kontrolle: Ruhepose/Eckkontakte/Randpixel-Test (nur Körperebenen).
 Alle Bewegungen laufen auf der vollen Leinwand (anim_lib wirft ClipError). Nur ganze Pixel, nur Farben der Quelle bzw. der Flammenvorlage.
-Ergänzungen: Zähne/Zungenspitzen des Strahls (aus dem gemalten Kegel herausgeschnitten, Farben nach Tiefe aus der Flammenrampe); keine für den Körper.
+Ergänzungen: keine für den Körper; der Strahl wird nach der gemalten Vorlage neu gezeichnet.
 """
 import sys
 
@@ -40,13 +40,13 @@ import cv2
 import numpy as np
 from PIL import Image
 
-import anim_feuer2 as FE2
+import anim_feuer3 as F3
 import anim_gb as G
 import anim_humanoide as Hm
 import anim_lib as L
 
 N, MS = 48, 64
-PAD = (3, 3, 3, 19)
+PAD = (4, 3, 4, 25)
 sz = G.Szene('guardian-beast-long', PAD)
 spr, OFF, H, W, f = sz.spr, sz.off, sz.H, sz.W, sz.f
 PL, PT = sz.PL, sz.PT
@@ -67,47 +67,15 @@ klauen_r = sz.vorhanden & L.farbmaske(spr, [klauen_farbe]) & (sz.xx >= 17) & (sz
 koerper = sz.vorhanden & ~geweih_l & ~geweih_r & ~klauen_l & ~klauen_r
 m_gold = sz.vorhanden & L.farbmaske(spr, GOLD) & (sz.yy >= 18) & (sz.yy <= 30)
 
-# --- Feuerstrahl: die gemalte Flamme (Ebene 104) als Vorlage, Zähne von Hand hineingeschnitten ---
-FLAMME = np.array(Image.open(L.os.path.join(L.SRC, 'guardian-beast-long-flamme.png')).convert('RGBA'))
-FX, FY = 0, 13                                                   # Lage der Flammenebene im Sprite (Stiel x 12–13 liegt im Maul, Ebene 105 x0 = Ebene 104 x0)
-ZAEHNE = [(6.0, 26), (9.4, 28), (12.8, 31), (16.2, 28), (19.4, 25)]     # (Zungenmitte x, Spitzenzeile) in Flammenebene — von Hand gesetzt, mittlere Zunge am längsten
-STEIL = 1.35                                                     # Zahnflanke: je Pixel Abstand von der Zungenmitte verliert die Zunge so viele Zeilen
-
-
-def zaehne_schneiden(fl):
-    """Die unteren Zeilen des Kegels in Zungen (Zähne) schneiden und die neuen Kanten nach Tiefe färben (roter Rand → orange → gelb → cremefarbener Kern)."""
-    a = fl.copy()
-    a[40:] = 0                                                   # der dünne Tropfenfaden unterhalb des Kegels entfällt (die Zungen laufen in Spitzen aus)
-    m = a[..., 3] > 0
-    for x in range(a.shape[1]):
-        k = int(np.argmin([abs(x - zx) for (zx, _) in ZAEHNE]))
-        zx, zy = ZAEHNE[k]
-        spitze = zy - STEIL * abs(x - zx)                        # tiefste erlaubte Zeile in dieser Spalte
-        for y in range(a.shape[0]):
-            if y > spitze:
-                a[y, x] = 0
-    m2 = a[..., 3] > 0
-    d = cv2.distanceTransform(np.pad(m2, 1).astype(np.uint8), cv2.DIST_L1, 3)[1:-1, 1:-1]
-    for y, x in zip(*np.nonzero(m2)):
-        if y >= 22 and tuple(a[y, x, :3]) == CREME and d[y, x] <= 3:
-            a[y, x, :3] = (ROT, ORANGE, GELB)[int(d[y, x]) - 1]
-    return a
-
-
-FL_GESCHNITTEN = zaehne_schneiden(FLAMME)
-
-
-def flamme_ebene():
-    return L.platz(FL_GESCHNITTEN, H, W, PL + FX, PT + FY)
-
-
-RGBA_F = flamme_ebene()
-Z = lambda f_, s_, **k: FE2.Zunge((f_[0] + PL + FX, f_[1] + PT + FY), (s_[0] + PL + FX, s_[1] + PT + FY), **k)
-ZUNGEN = [Z((12.5 + (zx - 12.5) * 0.4, 5), (zx, zy), fuss_anteil=0.38) for (zx, zy) in ZAEHNE]
-STIEL = np.zeros((H, W), bool)
-STIEL[PT + FY:PT + FY + 5, PL + FX + 10:PL + FX + 16] = True      # der Stiel am Maul hat keinen roten Rand (er liegt auf dem Maul)
-VL = FE2.Vorlage(RGBA_F, ZUNGEN, 'runter', rand_farbe=ROT, faden=2, rand_frei=STIEL, puls=(1.0, 24, 2))
-FEUER = FE2.Feuer([VL], n=N, seed=5, bank='strahl', amp=1.0, funken_modus='fliessen', max_funken=7, funken_abstand=4, funken_leben=10)
+# --- Feuerstrahl (Runde 4, anim_feuer3): Kegel vom Maul nach unten wie in der gemalten Ebene 104 (Maul (12–13,13) → unten x 1–22 breit), der Fluss läuft vom Maul weg nach UNTEN ---
+FLAMME = np.array(Image.open(L.os.path.join(L.SRC, 'guardian-beast-long-flamme.png')).convert('RGBA'))      # nur noch Vorlage für Form/Lage/Farben
+FX, FY = 0, 13                                                   # Lage der Flammenebene im Sprite (Stiel x 12–13 liegt im Maul)
+_X, _Y = PL + FX + 12.5, PT + FY
+KEGEL = F3.Strahl(_X, _Y, 27, 0.9, 9.6, richtung=(0, 1), welle=13, bauch=0.13, schlag=0.7)
+# fünf Zungen am unteren Kegelende (Füße bei Zeile ~22–25 der Flammenebene), phasenversetzt, fließen nach unten und leicht nach außen; mittlere am längsten
+ENDE = [F3.Flamme(_X + dx, _Y + fy, l, b, richtung=(rx, 1), phase=ph, fuss=0, welle=11)
+        for (dx, fy, l, b, rx, ph) in [(-7.2, 23, 10, 3.0, -0.22, 0.0), (-3.8, 24, 13, 3.3, -0.1, 0.55), (0.0, 25, 15, 3.6, 0.0, 0.25), (3.8, 24, 13, 3.3, 0.1, 0.8), (7.2, 23, 10, 3.0, 0.22, 0.4)]]
+FEUER = F3.Feuer(H, W, [KEGEL] + ENDE, [ROT, ORANGE, GELB, CREME], posen=8, halten=2)
 
 
 def frame(i, nur=None):
@@ -137,7 +105,7 @@ def frame(i, nur=None):
     fig = sz.kontur(fig, UMRISS)
     if nur == 'koerper':
         return fig
-    return L.zusammen(H, W, [(fig, 0, 0), (FEUER.ebene(i), 0, 0), (FEUER.funken(i), 0, 0)])
+    return L.zusammen(H, W, [(fig, 0, 0), (FEUER.ebene(i), 0, 0)])
 
 
 TEST_EBENEN = 'koerper'
