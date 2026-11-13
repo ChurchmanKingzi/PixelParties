@@ -350,6 +350,7 @@
       const dok = document.body;
       dok.appendChild(b.wurzel); dok.appendChild(b.oben);
       AKTIV.add(b);
+      try { b.tick(b.t0); } catch (e) { /* erstes Bild kommt mit dem Takt */ }   // erstes Bild SOFORT: die Handkarte wird im selben Augenblick verdeckt (Potion-Abflug, app-fx-70) — sonst bis zu 33 ms leer
       lauf();
       setTimeout(() => b.stopp(), b.ende + 2500);                            // Notnagel (Tab im Hintergrund: der Takt ruht)
       return { stopp: b.stopp, ende: b.ende };

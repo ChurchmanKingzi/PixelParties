@@ -51216,6 +51216,17 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       const mZiel = STAPEL_ORTE[to] ? kartenMassAmBildschirm(tgtEl, 'stapel')
         : BRETT_ZIELE[to] ? kartenMassInZone(tgtEl)
         : massFuer(to);
+      // ★ app-fx-70 (Nutzer 13.11.: „die Potion wird weg TELEPORTIERT"): Handkarten, die in den GELÖSCHT-Stapel gehen (Potions), fliegen über den Kartenflug-Baustein (app-fx-65): Bogen, Abhebe-Funken,
+      // Pixel-Schatten, Schweif, Landeringe in Rot — offen (kein Umdrehen), ca. 0,56 s, 30 Bilder/s auf dem globalen Takt (der alte CSS-Flug hing an der Dokumentuhr). Der Stapel wächst bei 560 ms
+      // (die `setHidden`-Zähler oben rechnen mit 0,8 · 700 ms). Quelle gemessen im selben Augenblick (der Handplatz klappt erst danach zusammen). Rückfall (`null`): Retro, reduzierte Bewegung,
+      // `__ppFx65Aus`, `window.__ppFx70FlugAus`, Reihe (laneDelay > 0) → der CSS-Flug darunter.
+      if (from === 'hand' && to === 'deleted' && cardName && !faceDown && !chainLinkId && !halten && !flightStyle && !laneDelay && !window.__ppFx70FlugAus && window.PpFx65 && window.PpFx65.kartenFlug) {
+        const kf = window.PpFx65.kartenFlug({
+          von: srcEl, nach: tgtEl, owner: tgtOwner, karten: [{ name: cardName, rarity }], versatz: 0, reise: 560, akzent: 'rot', umdrehen: false,
+          start: { b: mQuelle.b, h: mQuelle.h }, masse: { b: mZiel.b, h: mZiel.h },
+        });
+        if (kf) return;
+      }
       // Zickzack-Flug: die Karte hebt gleich im Mass ihres Ziels ab (keine stufenlose Skalierung eines Kartenbildes).
       const flugB = (isZickzack || isSchleuder) ? mZiel.b : mQuelle.b, flugH = (isZickzack || isSchleuder) ? mZiel.h : mQuelle.h;
       const ptScale = (!isZickzack && !isSchleuder && mQuelle.b > 0) ? (mZiel.b / mQuelle.b) : 1;
