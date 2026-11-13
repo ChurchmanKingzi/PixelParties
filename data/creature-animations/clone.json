@@ -1,0 +1,6 @@
+{
+  "creature": "Clone",
+  "sheet": null,
+  "kopiert": "host-hero",
+  "hinweis": "Sonderfall: Clone hat keinen eigenen Sprite. Der Player zeigt für Clone immer exakt den Sprite (und dessen Animation) des Host-Heroes, an dem die Creature hängt."
+}
