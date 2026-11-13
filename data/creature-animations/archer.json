@@ -1,0 +1,15 @@
+{
+  "creature": "Archer",
+  "sheet": "archer.png",
+  "frameWidth": 18,
+  "frameHeight": 32,
+  "frames": 48,
+  "frameMs": 80,
+  "loop": true,
+  "layout": "horizontal",
+  "padTop": 2,
+  "padLeft": 2,
+  "padRight": 2,
+  "padBottom": 2,
+  "faceX": 9.0
+}

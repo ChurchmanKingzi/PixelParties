@@ -1,0 +1,15 @@
+{
+  "creature": "Trident Spirit - Hammer Absorbed",
+  "sheet": "trident-spirit-hammer-absorbed.png",
+  "frameWidth": 38,
+  "frameHeight": 41,
+  "frames": 48,
+  "frameMs": 70,
+  "loop": true,
+  "layout": "horizontal",
+  "padTop": 2,
+  "padLeft": 2,
+  "padRight": 2,
+  "padBottom": 2,
+  "faceX": 19.0
+}

@@ -1,0 +1,15 @@
+{
+  "creature": "Enhanced Guard Dog",
+  "sheet": "enhanced-guard-dog.png",
+  "frameWidth": 27,
+  "frameHeight": 35,
+  "frames": 48,
+  "frameMs": 70,
+  "loop": true,
+  "layout": "horizontal",
+  "padTop": 2,
+  "padLeft": 4,
+  "padRight": 5,
+  "padBottom": 2,
+  "faceX": 13.5
+}
