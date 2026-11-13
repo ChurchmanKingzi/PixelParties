@@ -42,6 +42,7 @@ import numpy as np
 import anim_cool as C
 import anim_humanoide as Hm
 import anim_lib as L
+import anim_textur as TX   # texturierte Streckzeilen statt Zeilenkopien (Regel 43)
 
 N, MS = 48, 70
 PAD_L, PAD_R, PAD_T, PAD_B = 5, 5, 6, 3
@@ -141,7 +142,7 @@ def frame(i, nur=None):
     z = PAD_T + 23
     vorher = k[z].copy()
     n = Hm.stufe(i, N, 2)
-    k = Hm.atmen(k, z, z, n, 0)
+    k = TX.atmen(k, z, z, n, 0)
     if n:                                                                               # die Kette läuft durch die Einfügezeilen: dort pixelgenau kopieren (keine Texturmischung → keine Lücken)
         for j in range(z - n, z + 1):
             for x in np.nonzero(KETTE[23] & (vorher[OFF[0]:OFF[0] + sw, 3] > 0))[0]:

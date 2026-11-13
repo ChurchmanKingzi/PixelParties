@@ -40,6 +40,7 @@ import sys
 import numpy as np
 
 import anim_lib as L
+import anim_textur as TX   # texturierte Streckzeilen statt Zeilenkopien (Regel 43)
 import anim_tiere as T
 
 N, MS = 48, 70
@@ -115,9 +116,9 @@ def frame(i, nur=None):
             k[PAD_T + 3, PAD_L + x, :3] = LID
             if lid == 2:
                 k[PAD_T + 4, PAD_L + x, :3] = LID
-    k = L.streck_zeile(k, z, atem)
-    ol = L.streck_zeile(T.ohr_haengend(teil(ohr_l), ohr_profil(ohr_li, -1), 'links'), z, atem)
-    orr = L.streck_zeile(T.ohr_haengend(teil(ohr_r), ohr_profil(ohr_re, 1), 'rechts'), z, atem)
+    k = TX.streck_zeile(k, z, atem)
+    ol = TX.streck_zeile(T.ohr_haengend(teil(ohr_l), ohr_profil(ohr_li, -1), 'links'), z, atem)
+    orr = TX.streck_zeile(T.ohr_haengend(teil(ohr_r), ohr_profil(ohr_re, 1), 'rechts'), z, atem)
     pr = L.heben_unten(teil(pfote_r), PAD_T + 14, tipp_r)
     pl = L.heben_unten(teil(pfote_l), PAD_T + 14, tipp_l)
     ebenen = {'koerper': k, 'ohr_l': ol, 'ohr_r': orr, 'pfote_r': pr, 'pfote_l': pl}

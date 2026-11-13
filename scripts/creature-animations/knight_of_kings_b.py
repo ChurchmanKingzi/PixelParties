@@ -22,20 +22,20 @@ Ablauf (48 Frames à 62 ms = 2,98 s, nahtlos) — eigene Zeitfenster, damit [B] 
 * Atmen (Periode 16, also 3 Atemzüge je Schleife; schwerer als [W]): Hüftzeile 16 bis 2× eingefügt, Oberkörper/Kopf/Arm steigen bis 2 px, Stiefel bleiben.
 * Schwertwippen (Periode 48, gegenläufig zu [W]: erst nach oben): Spitze ±2 px um die Hand.
 * Lichtband über die Klinge (Frames 26–39); SPARKLE-PARTIKEL (Runde 3, ersetzen die Dauer-Glitzerformen der Quelle): je ein kurzer Sparkle (Mitte → Kreuz → Mitte → weg) an der Schwertspitze (Frames 26–30, mit dem Lichtband), über der Klinge (Frames 8–10) und unter der Klinge (Frames 18–21); sonst nichts.
-* Blinzeln (Frames 6–7, 30–31), Fußtippen links (Frames 26–31), rechts (Frames 10–15).
+* KRABBENGANG (Runde 4, statt Blinzeln und Fußtippen — Ritterhelm, nichts blinzelt): die ganze Figur trippelt seitlich ±3 px um die Ruhelage (1 px je Schritt, 4 Frames je Schritt; zuerst nach links): der vorausgehende Stiefel hebt sich 1 px und setzt seitwärts, der Körper mit Schwert rückt starr nach, der zweite Stiefel zieht nach (anim_r4_zirkus.KrabbenRitter).
 Frame 0 = Original ohne die drei Dauer-Glitzerformen (Runde 3: der Nutzer fand die Sparkles „viel zu lange sichtbar“). Ergänzungen: keine.
 """
 import sys
 
 import anim_humanoide as Hm
 import anim_lib as L
+import anim_r4_zirkus as R4
 import anim_schach as Sc
 
 SLUG, KARTE = 'knight-of-kings-b', 'Knight of Kings [B]'
 spr = L.lade(SLUG)
 RAMPE = Sc.rampe_aus(spr, [(26, 26, 26), (51, 51, 51), (77, 77, 77), (102, 102, 102), (128, 128, 128)])
-A = Sc.Ritter(spr, brust_per=16, kipp_zyklen=1, kipp_vz=-1, blink=(6, 30), band=26, g_plus=(26,), g_ring1=(8,), g_ring2=(18,),
-              tap_l=26, tap_r=10, rampe=RAMPE)
+A = R4.KrabbenRitter(spr, start_richtung=-1, brust_per=16, kipp_zyklen=1, kipp_vz=-1, band=26, g_plus=(26,), g_ring1=(8,), g_ring2=(18,), rampe=RAMPE)
 N, MS, OFF = A.N, A.MS, A.OFF
 frame = A.frame
 

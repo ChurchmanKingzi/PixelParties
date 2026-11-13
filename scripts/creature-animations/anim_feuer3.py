@@ -28,7 +28,11 @@ Schnittstelle
     ebene = feuer.ebene(i, neigung=1.5)          # Fahrtwind: Spitzen um ±px seitlich versetzt (quer zur Flussrichtung, wächst mit der Höhe)
     F3.bogen(pfad, feuer, zoom=12)               # Kontaktbogen: alle Posen nebeneinander
 
-Flamme(x, y, laenge, breite, richtung=(0,-1), phase=0, welle=None, bauch=0.55, schlag=1.0, kern=1.0, fuss=None, baender=None, pot=1.25)
+Weitere Bausteine: `Strahl` (Kegel, der in Flussrichtung BREITER wird: Feueratem/Düse; Ende mit Flammen in Flussrichtung schließen), `saum(punkte, abstand, laenge, breite, …)` (Flammen entlang
+einer Kante, z. B. brennende Mähne; `stuetz((t, wert), …)` für Längen entlang der Linie), `SOCKEL` (Bänder für einen kurzen, breiten, ruhigen Glutsockel unter den Zungen), `fetzen=False`
+(Spitze schnürt sich nicht ab: hängende Schweife). Bewährter Aufbau eines größeren Feuers: ein breiter Sockel (bauch≈0.2, schlag≈0.3) + 2–5 Zungen mit verschiedenen `phase`.
+
+Flamme(x, y, laenge, breite, richtung=(0,-1), phase=0, welle=None, bauch=0.55, schlag=1.0, kern=1.0, fuss=None, baender=None, pot=1.25, hals=0.6, fetzen=True)
     x, y      Fußmitte (Leinwandpixel, darf gebrochen sein); die Flamme wächst von dort `laenge` px in `richtung`; `breite` = Halbbreite am dicksten Punkt
     welle     Wellenlänge in px (Standard ≈ 0,75·laenge, mind. 6): so weit wandert ein Bauch je Zyklus
     bauch     Stärke der Breitenwelle (0 = keine, > 0,5 → Spitze schnürt sich ab), schlag = Stärke der Seitenwelle (px an der Spitze ≈ schlag·breite·0,45)

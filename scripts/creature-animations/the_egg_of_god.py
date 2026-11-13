@@ -100,16 +100,16 @@ CD, CE_ = (122, 18, 0), (201, 45, 0)
 assert CD in _farben and CE_ in _farben
 # ── Risse (x, y im Sprite): h = Hauptast in Wachstumsrichtung, z = Seitenäste, d = Pixel, die den Riss dort 2 px dick machen — mit E.wachse_riss entworfen und festgeschrieben ──
 _SITES = [
-    dict(h=[(13, 10), (12, 9), (12, 8), (11, 7), (10, 6), (10, 5), (9, 4), (8, 4)], z=[[(11, 10), (10, 11)]], d=[(11, 6), (9, 5)]),
-    dict(h=[(5, 8), (5, 9), (6, 10), (6, 11), (7, 12)], z=[], d=[(5, 10)]),
-    dict(h=[(9, 16), (9, 15), (10, 14), (11, 14), (12, 14), (13, 13)], z=[], d=[(11, 15)]),
-    dict(h=[(6, 16), (5, 15), (4, 14)], z=[], d=[]),
+    dict(h=[(8, 4), (9, 5), (9, 6), (10, 7), (11, 7), (12, 8), (12, 9)], z=[[(10, 8), (10, 9), (9, 10)]], d=[(9, 4), (10, 5), (10, 6)]),
+    dict(h=[(10, 13), (11, 14), (12, 14), (13, 13), (13, 12)], z=[[(12, 15), (11, 16)]], d=[(10, 14), (11, 13)]),
+    dict(h=[(6, 13), (5, 13), (4, 12), (4, 11), (4, 10), (5, 9)], z=[], d=[(6, 12), (5, 12)]),
+    dict(h=[(8, 17), (7, 16), (6, 16)], z=[], d=[]),
 ]
 TOENE = E.toene_rampe([CD, CE_, CC, CB, CA, CH, CJ, CI, CG])                             # Ausbleichen entlang der Gold-Rampe des Sprites (dunkel → hell), je Pixel bis zur Farbe darunter
-_HALTEN = [3, 5, 4, 6, 3, 4]
+_HALTEN = [6, 5, 3, 4, 5]
 _ev = []
 for _k, _f in enumerate(_SITES):
-    for _rev in ((False, True) if len(_f['h']) <= 6 else (False,)):                        # kleinere Risse zweimal je Schleife (einmal von jeder Seite her wachsend), der große einmal
+    for _rev in ((False, True) if len(_f['h']) <= 4 else (False,)):                        # der kleine Riss zweimal je Schleife (einmal von jeder Seite her wachsend), die großen einmal
         _ev.append((_k, dict(haupt=list(reversed(_f['h'])) if _rev else _f['h'], zweige=_f['z'], dick=_f['d'], halten=_HALTEN[len(_ev) % len(_HALTEN)], tempo=1 if len(_f['h']) >= 5 else 2,
                              stufen=4, stufe_frames=2)))
 _probe = [E.BleichRiss(start=0, **kw) for (_, kw) in _ev]

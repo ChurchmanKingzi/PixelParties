@@ -24,8 +24,7 @@ Ablauf (48 Frames à 62 ms = 2,98 s, nahtlos):
 * Lichtband (Frames 8–21): Metallglanz wandert von der Spitze zur Hand über die Klinge (2 Stufen heller auf der Farbrampe der Klinge).
 * SPARKLE-PARTIKEL (Runde 3, ersetzen die drei Dauer-Glitzerformen der Quelle — der Nutzer fand sie „viel zu lange sichtbar“): je ein kurzer normaler Sparkle (Mitte → kleines Kreuz → [großes Kreuz] → kleines Kreuz → Mitte → weg) an der Schwertspitze (Frames 8–12, zugleich mit dem Lichtband),
   über der Klinge (Frames 26–28) und unter der Klinge (Frames 40–43); dazwischen lange Pausen (≥ 11 Frames), nie mehr als einer zugleich. Sie folgen dem Schwert (Kippen) und dem Oberkörper und liegen über der Kontur.
-* Blinzeln (Frames 14–15, 38–39): beide Augenschlitze nehmen die Farbe der Gesichtspixel daneben an (Lid = Körperfarbe).
-* Fußtippen: linker Stiefel (Frames 18–23) und rechter (Frames 36–41) heben sich je zweimal 1 px hinter den Saum.
+* KRABBENGANG (Runde 4, statt Blinzeln und Fußtippen — Ritterhelm, nichts blinzelt): die ganze Figur trippelt seitlich ±3 px um die Ruhelage (1 px je Schritt, 4 Frames je Schritt; zuerst nach rechts): der vorausgehende Stiefel hebt sich 1 px und setzt seitwärts, der Körper mit Schwert rückt starr nach, der zweite Stiefel zieht nach (anim_r4_zirkus.KrabbenRitter).
 * Kein Kopfwiegen seitlich (Regel 17), kein Schweben (Regel 18): die Stiefel stehen fest.
 Frame 0 = Original ohne die drei Dauer-Glitzerformen. Ergänzungen: keine (Stiefel liegen beim Heben hinter dem Saum, Sparkles sitzen vor leerem Grund).
 """
@@ -33,12 +32,13 @@ import sys
 
 import anim_humanoide as Hm
 import anim_lib as L
+import anim_r4_zirkus as R4
 import anim_schach as Sc
 
 SLUG, KARTE = 'knight-of-kings-w', 'Knight of Kings [W]'
 spr = L.lade(SLUG)
 RAMPE = Sc.rampe_aus(spr, [(153, 153, 153), (179, 179, 179), (204, 204, 204), (230, 230, 230), (255, 255, 255)])
-A = Sc.Ritter(spr, rampe=RAMPE)
+A = R4.KrabbenRitter(spr, start_richtung=1, rampe=RAMPE)
 N, MS, OFF = A.N, A.MS, A.OFF
 frame = A.frame
 

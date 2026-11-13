@@ -11,7 +11,7 @@ Aufruf:   python3 metal_harpyformer.py [--preview <ordner>]
 Ausgabe:  ../../data/creature-animations/metal-harpyformer.png + .json  (auf die Figur zugeschnitten, um die Ruhefigur zentriert)
 
 Identifikation (Sprite-Koordinaten x, y; die Teile trennt das Skript per Farbe und Bereich):
-* Feuerball (x 3–24, y 0–20; Rot (202,44,41), Orange (244,123,34), Gelb (246,231,14), Creme (247,245,184)): umhüllt das obere Gitarrenende; heller Kern in der Mitte. Wird NEU mit anim_feuer.py gezeichnet (Regel 15).
+* Feuerball (x 3–24, y 0–20; Rot (202,44,41), Orange (244,123,34), Gelb (246,231,14), Creme (247,245,184)): umhüllt das obere Gitarrenende; heller Kern in der Mitte. Wird NEU mit anim_feuer3.py gezeichnet (Runde 4).
 * Gitarre (x 8–23, y 14–28): rote Korpus-/Halsfläche (233,0,1) (210,0,1) (153,2,0) mit rosa Lichtpixeln (233,114,114); ein diagonaler Hals/Griffbrett-Streifen mit Schwarz-Weiß-Muster (26,33,39) (242,255,255)
   (172,177,179) läuft vom Feuer nach rechts unten zur rechten Hand; rotes Teil rechts (x 17–23, y 19–22); eine rote Säule (x 12–15, y 20–26) endet auf dem Kopf der Harpyie. Ohne Glanz (Saiten sind
   Schwarz-Weiß-Muster, kein erkennbares Metallglanz-Detail; im Zweifel weggelassen).
@@ -48,7 +48,6 @@ import numpy as np
 
 import anim_lib as L
 import anim_flieger_b as B
-import anim_feuer as FEU
 import anim_feuer3 as F3
 import anim_harpyb as HB
 import anim_amorph as A
@@ -108,7 +107,7 @@ UMRISS = {1: (45, 45, 45), 2: (45, 45, 45), 3: (19, 10, 10), 4: (19, 10, 10), 5:
 # 1/2 Flügel, 3/4 Strähnen, 5 Körper, 6 Gitarre (rot), 7 Feuer, 8 Gitarrenhals (Schwarz-Weiß-Muster/grau)
 HALS_FARBEN = [(242, 255, 255), (172, 177, 179), (26, 33, 39), (62, 56, 50), (102, 81, 74)]
 
-# ── Feuer (anim_feuer.py, eigene Windvariante) ────────────────────────────────────────────────────────────────────────
+# ── Feuer (anim_feuer3.py: klassischer Flammenzyklus mit Aufwärtsfluss) ───────────────────────────────────────────────
 RAMPE = {'rand': ROT, 'rot': ROT, 'orange': ORANGE, 'gelb': GELB, 'hell': CREME}
 SPERRE = np.zeros((H, W), bool)
 SPERRE[PAD_T:PAD_T + sh, PAD_L:PAD_L + sw] = M_GITARRE & (yy <= 21)
