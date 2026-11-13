@@ -19,6 +19,7 @@ D_LINIE = 22          # Helligkeitsabstand, ab dem ein Pixel als „dunkle Linie
 D_AEHNLICH = 64       # bis zu diesem Helligkeitsabstand (heller) gelten zwei Pixel als „gleiches Material“ (Schattierungsstufen)
 D_DUNKLER = 36        # … und höchstens so viel DUNKLER darf ein übernommenes Pixel sein (keine Umriss-/Mund-/Augenfarben in helle Flächen ziehen)
 LANG = 5              # ab dieser Lauflänge gilt eine Abweichung als „anderes Muster“ (und eine Übereinstimmung als Kopie)
+STANDARD_SPERRE = ()  # Sperrfarben für Aufrufe ohne eigenes `sperre` (setzt umleiten(sperre=…) je Figurenskript)
 
 
 def _lum(z):
@@ -110,6 +111,7 @@ def zwischenzeile(form, nah, fern=None, nah2=None, k=1, fern2=None, sperre=()):
     """Neue Zeile mit der Silhouette von `form` (der gestreckten Zeile), die zwischen `form` und `nah` zu liegen kommt.
     fern = Nachbarzeile von `form` auf der anderen Seite, nah2 = Zeile hinter `nah` (beide dürfen None sein). k = Nummer der Kopie (Phase).
     sperre: Farben (Augen, Mund, Glanzpunkte …), die weder übernommen noch überschrieben werden."""
+    sperre = sperre or STANDARD_SPERRE
     if nah is None:
         nah = _leer_wie(form)
     sp = {tuple(int(v) for v in c[:3]) for c in sperre}
@@ -313,11 +315,16 @@ def ebene_atmung(teil, doppeln, h, w, pad_l, pad_t, boden):
     return ebene, top, quelle
 
 
-def umleiten():
+def umleiten(sperre=()):
     """Leitet die Streckfunktionen der gemeinsamen Module für den laufenden Prozess auf dieses Modul um (die Moduldateien bleiben unverändert):
     L.streck_zeile, anim_amorph.koerper_pose und anim_slime.koerper_pose liefern danach texturierte statt kopierter Einfügezeilen – auch dort,
     wo ein Gruppenmodul sie intern aufruft (Hm.atmen, Szene.atmen, K.bob, U2.streck_teil, SH.ebene_atmung, HP.hupf_figur, anim_eis.schleim_koerper …).
-    Einmal direkt nach den Importen eines Figurenskripts aufrufen. Mehrfachaufrufe sind unschädlich."""
+    Einmal direkt nach den Importen eines Figurenskripts aufrufen. Mehrfachaufrufe sind unschädlich.
+    sperre: Farben (z. B. die dunklen Umriss-/Nahtfarben der Figur), die in KEINER texturierten Zeile dieses Prozesses übernommen oder
+    überschrieben werden, sofern der Aufruf kein eigenes `sperre` mitbringt – für Figuren, bei denen sonst eine dunkle Naht dicker würde."""
+    global STANDARD_SPERRE
+    if sperre:
+        STANDARD_SPERRE = tuple(tuple(int(v) for v in c[:3]) for c in sperre)
     import anim_amorph as A
     import anim_slime as SL
     if getattr(L.streck_zeile, '_tx_original', None) is None:
