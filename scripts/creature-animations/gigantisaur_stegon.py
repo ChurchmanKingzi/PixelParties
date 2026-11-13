@@ -42,6 +42,7 @@ import numpy as np
 
 import anim_gbb as G
 import anim_lib as L
+import anim_textur as TX   # texturierte Streckzeilen statt Zeilenkopien (Regel 43)
 import anim_tiere as T
 import anim_drache as D
 
@@ -128,9 +129,9 @@ def frame(i, nur=None):
     if bl:
         for (x, y), c in AUGE.items():
             kopf[PAD_T + y, PAD_L + x, :3] = c
-    schwanz = L.streck_zeile(teil(schwanz_m), PAD_T + ZEILE, atem)
-    faecher = L.streck_zeile(teil(faecher_m), PAD_T + ZEILE, atem)
-    k = L.streck_zeile(k, PAD_T + ZEILE, atem)
+    schwanz = TX.streck_zeile(teil(schwanz_m), PAD_T + ZEILE, atem)
+    faecher = TX.streck_zeile(teil(faecher_m), PAD_T + ZEILE, atem)
+    k = TX.streck_zeile(k, PAD_T + ZEILE, atem)
     schwanz, dy_f = schwanz_biegen(schwanz, PAD_L + 56, PAD_L + 60, SCHWANZ_AMP, L.sinus(i, N / 2), lauf=1.0)       # Stummel biegt sich, ab x 60 starr
     faecher = L.versetze(faecher, 0, dy_f)                                                                                 # Fächer wandert starr mit der Schwanzspitze
     sn = np.sin(L.sinus(i, N / 3) - 0.8)

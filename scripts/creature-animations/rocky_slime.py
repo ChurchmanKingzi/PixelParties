@@ -48,6 +48,7 @@ import sys
 import numpy as np
 
 import anim_lib as L
+import anim_textur as TX   # texturierte Streckzeilen statt Zeilenkopien (Regel 43)
 import anim_amorph as A
 
 N, MS = 48, 65
@@ -133,10 +134,10 @@ def figur(i):
     if p >= 0:
         # Beim Stauchen (Zeilen entfallen) wächst die Umrissstufe zwischen Nachbarzeilen; Zeile 7 bleibt deshalb schmal, die Zeilen darunter
         # werden breiter (Stufe ≤ 1 px, unten breiter = Gel quillt)
-        z, quelle = A.koerper_pose(koerper, loeschen=loesch, doppeln=dopp, p=p, paare=PAARE_BREIT, x0=PAD_L,
+        z, quelle = TX.koerper_pose(koerper, loeschen=loesch, doppeln=dopp, p=p, paare=PAARE_BREIT, x0=PAD_L,
                                    p_je_zeile={0: 0} if loesch else None)
     else:
-        z, quelle = A.koerper_pose(koerper, loeschen=loesch, doppeln=dopp, p=p, paare=((9, 10),), paare_je_zeile=PAARE_SCHMAL, x0=PAD_L)
+        z, quelle = TX.koerper_pose(koerper, loeschen=loesch, doppeln=dopp, p=p, paare=((9, 10),), paare_je_zeile=PAARE_SCHMAL, x0=PAD_L)
     lean = lehnen(i)
     # Der Körper schwankt als Ganzes (kein Zeilenscher: die Seitensteine haben waagerechte Umrisskanten, die sonst aufrissen); der Kopfblock
     # lehnt sich gegen ihn um höchstens 1 px (Steine wackeln auf dem Gel) — Eckpixel ohne Unterkante werden unten ergänzt (siehe Ergänzungen).

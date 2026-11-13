@@ -39,6 +39,7 @@ import sys
 import numpy as np
 
 import anim_lib as L
+import anim_textur as TX   # texturierte Streckzeilen statt Zeilenkopien (Regel 43)
 import anim_tiere as T
 
 N, MS = 48, 70
@@ -118,10 +119,10 @@ def frame(i, nur=None):
                 d[PAD_T + y, PAD_L + x, :3] = SCHWARZ_K
     ebenen = {'torso': torso(), 'fluegel': fl, 'hund': d, 'schwanz': ta}
     if n2:
-        ebenen['hund'] = L.streck_zeile(ebenen['hund'], PAD_T + 12, n2)
+        ebenen['hund'] = TX.streck_zeile(ebenen['hund'], PAD_T + 12, n2)
     if n1:
         for k in ebenen:
-            ebenen[k] = L.streck_zeile(ebenen[k], PAD_T + 15, n1)
+            ebenen[k] = TX.streck_zeile(ebenen[k], PAD_T + 15, n1)
     wahl = nur or ('torso', 'fluegel', 'hund', 'schwanz')
     ganz = L.zusammen(H, W, [(ebenen[n], 0, 0) for n in wahl])
     return T.umriss_schliessen(ganz, RAND, REGEL)

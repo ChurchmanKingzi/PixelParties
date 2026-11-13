@@ -27,6 +27,7 @@ import sys
 import numpy as np
 
 import anim_lib as L
+import anim_textur as TX   # texturierte Streckzeilen statt Zeilenkopien (Regel 43)
 import anim_amorph as A
 
 N, MS = 48, 65
@@ -107,7 +108,7 @@ def _ohr(fig, top, seite, dx):
 
 def figur(i):
     koerper = A.zeilen_von(spr, 0, sh - 1, H, W, PAD_L, PAD_T)
-    z, quelle = A.koerper_pose(koerper, doppeln=POSEN[S[i]], x0=PAD_L)
+    z, quelle = TX.koerper_pose(koerper, doppeln=POSEN[S[i]], x0=PAD_L)
     fig, top = A.auf_leinwand(z, H, BODEN, 0)
     if i in OHR_L:
         fig = _ohr(fig, top, 'l', 1)

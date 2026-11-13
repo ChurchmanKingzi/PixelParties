@@ -33,6 +33,7 @@ import sys
 import numpy as np
 
 import anim_lib as L
+import anim_textur as TX   # texturierte Streckzeilen statt Zeilenkopien (Regel 43)
 import anim_untote as U
 
 N, MS = 48, 65
@@ -90,7 +91,7 @@ def frame_gross(i, nur=None):
     dx_a = FAUST.get(i, 0)
     bl = 1 if (i % 24) in (17, 18, 19) else 0
     br = 1 if (i % 24) in (5, 6, 7) else 0
-    rp = L.streck_zeile(teil(rumpf), GPT + 25, n)
+    rp = TX.streck_zeile(teil(rumpf), GPT + 25, n)
     koerper = L.zusammen(H, W, [(teil(risse), 0, 0), (teil(bein_l), 0, -bl), (teil(bein_r), 0, -br), (rp, 0, 0), (teil(arm), dx_a, -n), (kp, 0, -n + nick)])
     koerper = U.kontur_schliessen(koerper, UMRISS, KONTUR)
     if nur == 'koerper':

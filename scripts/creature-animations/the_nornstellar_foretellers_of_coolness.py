@@ -36,6 +36,7 @@ import numpy as np
 import anim_cool as C
 import anim_humanoide as Hm
 import anim_lib as L
+import anim_textur as TX   # texturierte Streckzeilen statt Zeilenkopien (Regel 43)
 
 N, MS = 48, 75
 PAD_L, PAD_R, PAD_T, PAD_B = 3, 3, 3, 3
@@ -85,7 +86,7 @@ def norn(name, zeile, n_atem, saum_zeilen, saum_dx):
     a = L.platz(LAGEN[name], H, W, PAD_L, PAD_T)
     if saum_dx:
         Hm.zeilen_versatz(a, OFF, {y: saum_dx for y in saum_zeilen})
-    return L.streck_zeile(a, PAD_T + zeile, n_atem) if n_atem else a
+    return TX.streck_zeile(a, PAD_T + zeile, n_atem) if n_atem else a
 
 
 def frame(i, nur=None):

@@ -30,6 +30,8 @@ Ablauf (48 Frames à 70 ms = 3,36 s; Frame 0 = Original, Blasen ausgenommen):
 * Blinzeln beider Kreuz-Augen (Lid = Gesichtsfarbe (21,39,49)): zweimal (Frame 14–17 und 38–41).
 * Geisterfigur: sanftes Schweben ±1 px (Periode 32), Schwanzflosse flattert (Spaltenwelle bis ±2 px, Periode 12, hinkt der Wurzel x 57 nach), die Lampe leuchtet gleichmäßig (Runde 3: kein Pulsieren/„Blinzeln“ des Lichts mehr),
   das weiße Auge blinzelt (Lid = (55,98,122)) bei Frame 20–22.
+* SCHWEBEN (Runde 4, Nutzer: „als Ganzes auf und ab schweben, über seinem Schatten, ähnlich wie die Figur rechts“): der ganze Clown (Körper, Hut, Ballontraube, rechter Ballon, Schnur) schwebt starr −2 … +1 px (Periode 24);
+  der schwarze Bodenschatten (y 46–48) bleibt fest am Boden, der Abstand Fuß–Schatten ist immer ≥ 1 px. Die Kartenkunst zeigt ihn schwebend (Lücke zwischen Fußkante y 43 und Schatten y 46).
 * Partikel (hinter den Figuren): drei Blasen steigen über der Lampe auf (Kern (159,222,211), Rand (77,137,154)), zwei Blasen links vom Clown (Kern (77,137,154), Rand (51,93,119)); runde Wölkchen 2×2 → 3×3 → 2×2 (`U.wolke_ebene`).
 Kein Glanz (Regel 14: Gummi, Stoff, Haut), kein Feuer (die Lampe ist ein Leuchtorgan wie bei Deepsea Skeleton). Randpixel-Test (Regel 16): `U.kontur_schliessen` in jeder Pose.
 Ergänzungen: Ballonfüllung (57,124,194) in den Zeilen 19–24 unter der Hutkrone (x 6–24, nur dort, wo die Hutkrone Pixel hat; im Ruhebild verdeckt) und bis zu 2 zusätzliche Schnurpixel in den Posen, in denen sich Ballon/Hand
@@ -45,7 +47,7 @@ import anim_untote as U
 
 N, MS = 48, 70
 spr = L.lade('deepsea-horror-clown')
-S = T.Szene('deepsea-horror-clown', 'Deepsea Horror Clown', spr, N, MS, rand=(5, 5, 6, 5))
+S = T.Szene('deepsea-horror-clown', 'Deepsea Horror Clown', spr, N, MS, rand=(5, 5, 9, 5))
 sh, sw, H, W = S.sh, S.sw, S.H, S.W
 xx, yy, vorhanden, UMRISS = S.xx, S.yy, S.vorhanden, S.UMRISS
 GPL, GPT = S.GPL, S.GPT
@@ -81,12 +83,16 @@ for x in range(6, 25):
             ext[y, x] = True
             ERG.append((x, y))
 BAL_L_ext = BAL_L.copy()
-CLOWN_REST = CL & ~BAL_L
+SCHATTEN = CL & (yy >= 45)                     # schwarzer Bodenschatten (y 46–48): bleibt am Boden fest, der Clown schwebt darüber
+CLOWN_REST = CL & ~BAL_L & ~SCHATTEN
+schatten = None
 bal_l = S.teil(BAL_L)
 for (x, y) in ERG:
     bal_l[GPT + y, GPL + x, :3] = BALLON
     bal_l[GPT + y, GPL + x, 3] = 255
 clown_rest = S.teil(CLOWN_REST)
+schatten = S.teil(SCHATTEN)
+SCHWEBEN = [0, 0, -1, -1, -1, -2, -2, -2, -2, -1, -1, -1, 0, 0, 0, 1, 1, 1, 1, 1, 1, 0, 0, 0]          # Runde 4: der Clown schwebt als Ganzes (Periode 24), nie tiefer als 1 px über dem Schatten
 bal_r = S.teil(BAL_R)
 
 # Geister-Teile
@@ -161,7 +167,8 @@ def frame_gross(i, nur=None):
     fl = T.fluegel(fl_ebene, GPL + 57, 2.0, i, 12, lag=1.0, potenz=1.0)
     geist = L.zusammen(H, W, [(fl, 0, gdy), (gk, 0, gdy)])
     # Clown-Körper liegt über den Ballons (Hutkrone vor der Traube)
-    f = L.zusammen(H, W, [(bl, 0, 0), (br, 0, 0), (sn, 0, 0), (geist, 0, 0), (cl, 0, 0)])
+    cdy = SCHWEBEN[i % 24]                                   # Clown samt Ballontraube, rechtem Ballon und Schnur schwebt starr auf und ab; der Schatten bleibt
+    f = L.zusammen(H, W, [(schatten, 0, 0), (bl, 0, cdy), (br, 0, cdy), (sn, 0, cdy), (geist, 0, 0), (cl, 0, cdy)])
     f = U.kontur_schliessen(f, UMRISS, KONTUR)
     if nur == 'koerper':
         return f

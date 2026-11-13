@@ -34,6 +34,7 @@ import numpy as np
 import anim_eis as E
 import anim_humanoide as Hm
 import anim_lib as L
+import anim_textur as TX   # texturierte Streckzeilen statt Zeilenkopien (Regel 43)
 
 N, MS = 48, 70
 PAD_L, PAD_R, PAD_T, PAD_B = 11, 11, 6, 3
@@ -74,9 +75,9 @@ def koerper(i):
     # Atmen: Bär (Zeile 34) und Reiter (Zeile 16) mit Nachlauf
     brust = E.verlauf3(i, 24, 0.0, 1)
     reiter = Hm.stufe(i - 3, 24, 1)
-    k = L.streck_zeile(k, PAD_T + 34, brust) if brust else k
+    k = TX.streck_zeile(k, PAD_T + 34, brust) if brust else k
     if reiter:
-        k = L.streck_zeile(k, PAD_T + 16 - brust, reiter)
+        k = TX.streck_zeile(k, PAD_T + 16 - brust, reiter)
     Hm.kontur_schliessen(k, ERLAUBT, (27, 20, 18))
     return k
 
