@@ -23944,7 +23944,7 @@ body[data-tb-hl] .hero-idle-platz.hero-idle-hover { scale: none; }
 }
 /* Nicht am Zug: Rahmen gedaempft, das Bild behaelt sein Grau. */
 .pp-portraet:has(> .avatar-inactive) { filter: saturate(.55) brightness(.8); }
-@media (prefers-reduced-motion: reduce) {
+@media (prefers-reduced-motion: reduce), (pointer: coarse) and (max-height: 600px) {
   .pp-portraet:has(> .avatar-active) .pp-portraet-zier::before { animation: none; opacity: .8; }
 }
 /* Telefon: die Bildverkleinerung (scale) der Heldenausschnitte gilt
@@ -25832,6 +25832,13 @@ input[type="checkbox"]:focus-visible, input[type="radio"]:focus-visible { outlin
   100% { background-position: 0% 0; }
 }
 @media (prefers-reduced-motion: reduce) { .game-gold-icon::after { animation: none; } }
+/* Handy (battle-lite): Gold-Schiller und Porträt-Puls stehen still. Das sind Dauer-Animationen auf dem Hauptfaden (Hintergrundverschiebung hinter fünf Konturfiltern bzw. ein
+   weicher Schein mit wechselnder Deckkraft): jede löst im Takt Style-Neuaufbau + Neuzeichnen aus. Messung 13.11. (Tutorial 1, Handy-Emulation, CPU 6× gedrosselt): ohne sie
+   sinkt die Hauptfaden-Auslastung im Leerlauf von ~35 % auf ~15-20 %. Der Ruhestand ist der Zustand „Band außerhalb" der Animation (Gold) bzw. 80 % Deckkraft (wie bei reduzierter Bewegung). */
+@media (pointer: coarse) and (max-height: 600px) {
+  .pp-gold-zahl, .game-gold-value { animation: none; }
+  .game-gold-icon::after { animation: none; }
+}
 
 /* ═══ Zeichen und Abzeichen dürfen den Rand der Zone überragen (Al, 23.10.) ═══
    `.board-zone { overflow: hidden }` schnitt die Bereit-Zeichen (⚡ ⚔ ⚙ ✦ 💚 ⚖: `::after` bei top/right −8…−10 px, dazu springend und bis 1,35-fach) und die

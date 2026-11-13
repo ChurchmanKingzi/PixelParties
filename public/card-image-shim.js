@@ -481,6 +481,11 @@
   function dripSchritt() {
     dripTimer = 0;
     if (!dripQueue.length) return;
+    // Waehrend ein Kampfbrett steht (Tutorial, Partie), wird gar nicht vorgewaermt: dort laufen ohnehin Dauer-Animationen, es gibt nie eine echte
+    // Leerlaufluecke, und der Fallback unten (nach drei Fehlversuchen faengt eine Karte trotzdem an) liess auf dem Handy alle ~1-2 s einen Ruckler
+    // (Karte zeichnen + dekodieren, einige 10 ms) mitten in die Mission fallen (Messung Tutorial 1, Handy-Emulation, CPU 6x gedrosselt: 5-7 Bilder
+    // > 33 ms je 8 s, ohne Vorwaermen 0). Sichtbare Karten kommen weiter sofort ueber die normalen Warteschlangen; der Rest der Liste laeuft im Menue weiter.
+    if (document.querySelector('.board-center')) { dripPlane(1500); return; }
     const frei = !document.hidden && queues.every(q => q.length === 0) && workers === 0 && performance.now() - letzteEingabe > 1000;
     if (!frei) { dripPlane(700); return; }
     // Nur in einer ECHTEN Leerlaufluecke anfangen (>= 25 ms am Stueck frei) — eine Karte kostet auf schwachen Handys einige 10 ms.

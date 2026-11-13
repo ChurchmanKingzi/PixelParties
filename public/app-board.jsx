@@ -39136,19 +39136,40 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     const sc = boardCenterRef.current;
     if (!sc) return;
     const root = document.documentElement;
-    const sync = () => {
-      root.style.setProperty('--fx-dx', (-sc.scrollLeft) + 'px');
-      root.style.setProperty('--fx-dy', (-sc.scrollTop) + 'px');
+    // ★ Messung 13.11. (Tutorial 1, Handy-Emulation, CPU 6× gedrosselt): zwei Custom Properties auf `<html>` machen die Stilrechnung des GANZEN Dokuments
+    // ungültig — bei jedem Scroll-Ereignis, also in jedem Bild der Kamerafahrt und jedes Fingerwischs (Schwenk ≈ 70–100 ms je Bild, 13 Neuberechnungen à ~28 ms
+    // in 7 Bildern). Die Hüllen sind aber fast immer leer. Darum: nur noch schreiben, wenn eine Hülle gerade Kinder trägt (laufender Effekt), plus einmal kurz
+    // nach dem Scrollen (damit der Ruhestand stimmt, wenn danach ein Effekt startet). Startet ein Effekt mitten im Scrollen, holt `ppFxWeltAnker` /
+    // `ppFxScrollOffset` den Stand über `window.ppFxWeltSync` sofort nach (einmal je Effektstart statt je Bild).
+    let letzter = null, nachlauf = 0;
+    const schreibe = () => {
+      const dx = -sc.scrollLeft, dy = -sc.scrollTop, k = dx + '|' + dy;
+      if (k === letzter) return;
+      letzter = k;
+      root.style.setProperty('--fx-dx', dx + 'px');
+      root.style.setProperty('--fx-dy', dy + 'px');
     };
-    sync();
-    sc.addEventListener('scroll', sync, { passive: true });
-    window.addEventListener('resize', sync);
-    const ro = new ResizeObserver(sync);
+    const gebraucht = () => {
+      const l = document.getElementsByClassName('fx-welt-lock');
+      for (let i = 0; i < l.length; i++) if (l[i].firstChild) return true;
+      return false;
+    };
+    const aufScroll = () => {
+      if (gebraucht()) schreibe();
+      clearTimeout(nachlauf); nachlauf = setTimeout(schreibe, 120);
+    };
+    schreibe();
+    window.ppFxWeltSync = schreibe;
+    sc.addEventListener('scroll', aufScroll, { passive: true });
+    window.addEventListener('resize', schreibe);
+    const ro = new ResizeObserver(schreibe);
     ro.observe(sc);
     return () => {
-      sc.removeEventListener('scroll', sync);
-      window.removeEventListener('resize', sync);
+      sc.removeEventListener('scroll', aufScroll);
+      window.removeEventListener('resize', schreibe);
       ro.disconnect();
+      clearTimeout(nachlauf);
+      if (window.ppFxWeltSync === schreibe) window.ppFxWeltSync = null;
       root.style.removeProperty('--fx-dx');
       root.style.removeProperty('--fx-dy');
     };

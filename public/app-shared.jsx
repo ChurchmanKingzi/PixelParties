@@ -7584,6 +7584,7 @@ const _zoneFxLetzte = new Map();
 function _ppFxScroller() { return document.querySelector('.board-center'); }
 function ppFxWeltAnker(el) {
   const sc = _ppFxScroller();
+  if (window.ppFxWeltSync) window.ppFxWeltSync();   // Wurzelvariablen aktuell halten (GameBoard schreibt sie beim Scrollen nur noch bei laufenden Effekten)
   // ★★ v1348 (Als Befund zu „Hole in the Sky": die Kreaturen „erscheinen
   // einfach" in der Ablage). Flugenden sind nicht immer echte Knoten:
   // der Flughandler baut fuer die Brettmitte (`boardCenter`) und fuer
@@ -7600,6 +7601,7 @@ function ppFxWeltAnker(el) {
 // grundsaetzlich Welt sind (Zonen-Zahlen, Strahlen).
 function ppFxScrollOffset() {
   const sc = _ppFxScroller();
+  if (window.ppFxWeltSync) window.ppFxWeltSync();
   return sc ? { dx: sc.scrollLeft, dy: sc.scrollTop } : { dx: 0, dy: 0 };
 }
 function _ppFxWeltSchicht() {
