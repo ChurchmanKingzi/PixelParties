@@ -2,7 +2,7 @@
   "creature": "Fun-Fun Circus Director",
   "sheet": "fun-fun-circus-director.png",
   "frameWidth": 20,
-  "frameHeight": 37,
+  "frameHeight": 35,
   "frames": 48,
   "frameMs": 70,
   "loop": true,

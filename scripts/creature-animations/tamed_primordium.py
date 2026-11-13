@@ -38,6 +38,7 @@ import cv2
 import numpy as np
 
 import anim_lib as L
+import anim_textur as TX   # texturierte Streckzeilen statt Zeilenkopien (Regel 43)
 import anim_tiefsee as T
 import anim_untote as U
 
@@ -125,7 +126,7 @@ def frame_gross(i, nur=None):
     d = DEMON_A.copy()
     n = n_brust + n_kopf
     if n:
-        d = L.streck_zeile(d, GPT + 22, n)
+        d = TX.streck_zeile(d, GPT + 22, n)
     hub = n
     # Waffe folgt der Hand, Endglieder pendeln, Lichtband
     w = WAFFE_A.copy()
@@ -153,9 +154,9 @@ def frame_gross(i, nur=None):
                         lz[GPT + y, GPL + x, :3] = haut(x, y)
     li, mi = layers['li'], layers['mi']
     if hebt(i, WELLEN['li']):
-        li = L.streck_zeile(li, GPT + Z_LI, 1)
+        li = TX.streck_zeile(li, GPT + Z_LI, 1)
     if hebt(i, WELLEN['mi']):
-        mi = L.streck_zeile(mi, GPT + Z_MI, 1)
+        mi = TX.streck_zeile(mi, GPT + Z_MI, 1)
     dre = -hebt(i, WELLEN['re'])
     s = T.sinz(i, 16)
     tail = T.gruppen_scher(layers['sw'], [(GPT + 17, GPT + 18), (GPT + 19, GPT + 20), (GPT + 21, GPT + 22)],

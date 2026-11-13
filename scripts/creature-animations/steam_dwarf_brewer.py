@@ -46,6 +46,7 @@ import numpy as np
 import anim_dwarf as Dw
 import anim_humanoide as Hm
 import anim_lib as L
+import anim_textur as TX   # texturierte Streckzeilen statt Zeilenkopien (Regel 43)
 
 N, MS = 48, 62
 PAD_L, PAD_R, PAD_T, PAD_B = 4, 4, 11, 2
@@ -177,9 +178,9 @@ def frame(i, dampf=True, nur=None):
     # --- Auf und ab: Bartzeile 21 wird einmal doppelt eingefügt (Spritzer steigen mit) ---
     brust = Hm.stufe(i, N / 2, 1)
     if brust:
-        kp = L.streck_zeile(kp, PAD_T + 21, brust)
-        al = L.streck_zeile(al, PAD_T + 21, brust)
-        ar = L.streck_zeile(ar, PAD_T + 21, brust)
+        kp = TX.streck_zeile(kp, PAD_T + 21, brust)
+        al = TX.streck_zeile(al, PAD_T + 21, brust)
+        ar = TX.streck_zeile(ar, PAD_T + 21, brust)
     # --- rechter Ärmel (Hand am Fass) hebt sich 1 px; das Fass darunter ist vollständig ---
     if Hm.folge(i, 6, [1] * 6, N) or Hm.folge(i, 30, [1] * 6, N):
         ar = L.versetze(ar, 0, -1)

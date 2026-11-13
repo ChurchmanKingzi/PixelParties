@@ -39,6 +39,7 @@ import sys
 import numpy as np
 
 import anim_lib as L
+import anim_textur as TX   # texturierte Streckzeilen statt Zeilenkopien (Regel 43)
 import anim_untote as U
 
 N, MS = 48, 60
@@ -159,7 +160,7 @@ def frame(i):
     for (x, y) in gold_e:
         if i % N and 13 <= y <= 20 and (i + (3 * x + 5 * y)) % 12 < 2 and tuple(rp[PAD_T + y, PAD_L + x, :3]) == E_:
             rp[PAD_T + y, PAD_L + x, :3] = D_
-    rp = L.streck_zeile(rp, PAD_T + 16, r_b)
+    rp = TX.streck_zeile(rp, PAD_T + 16, r_b)
     al, ar = teil(arm_l), teil(arm_r)
     glanz(al, [p for p in gold if p[0] <= 4 and p[1] >= 15], k)
     glanz(ar, [p for p in gold if p[0] >= 15 and p[1] >= 15], k)

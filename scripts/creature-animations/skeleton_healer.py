@@ -28,6 +28,7 @@ Ablauf (48 Frames à 65 ms = 3,12 s; Frame 0 = Original, Partikel ausgenommen):
 * Federbuschspitze (2×2 bei (9–10, 8–9)) wippt seitlich 0/−1/−2 px nach links (Periode 16, hängt an der Buschbasis, wandert mit dem Kopf; nach rechts würde sie unter dem Helm verschwinden).
 * Blinzeln des Heilers (Lidfarbe = umgebendes Knochenweiß (246,255,255)): beide grünen Augen werden 3 Frames weiß, zweimal pro Schleife (Frame 13–15 und 37–39).
 * Erhobene Hand (rechts) winkt/segnet: Handschuh + Handgelenk heben sich 0-1-2-1-0 px (Periode 16, 3× pro Schleife; das Handgelenk wird dabei nur länger, nicht dicker) zusätzlich zum Atmen.
+* Runde 4: Der gehaltene Helmkopf B blinzelt ebenfalls (Frame 3–5 und 27–29, siehe B_LID_*).
 * Helmkopf B hebt sich starr mit dem Kopf des Heilers (gleiche 0–1 px; ein eigener Hub würde Federbuschpixel unter dem Helmrand freilegen); KEIN seitliches Treiben. Das Blatt wippt (die Spitze (22,0) springt für 4 Frames nach (21,0), Frame 10–13 und 34–37).
   B liegt über A; die unter B verdeckten Pixel von A sind aus der Ebene vorhanden (nichts neu gemalt).
 * Heilwölkchen (Partikel, hinter den Figuren, 5 Stück, Lebensdauer 48 Frames, langsam aufsteigend, 2×2 → 3×3 → 2×2): grün (Kern Handschuhgrün (0,135,0), Rand (0,90,0) / (20,130,17)), steigen von der erhobenen Hand,
@@ -67,6 +68,13 @@ BLATT = (22, 0)
 assert col(B_SP, *BLATT) == (0, 90, 0)
 BLINZ = {13, 14, 15, 37, 38, 39}
 BLATT_FRAMES = {10, 11, 12, 13, 34, 35, 36, 37}
+# Runde 4 (Nutzer: „der gehaltene Kopf darf ruhig auch blinzeln"): Augenhöhlen des Helmkopfs B = (14–15,10)+(14,11) mit Lichtpunkt (15,11) und (18–19,10)+(18,11) mit Lichtpunkt (19,11).
+# Lid in umgebender Knochenfarbe: obere Augenzeile → Knochen (213,213,213), untere → schmaler grauer Lidspalt (123,123,123); 3 Frames, zweimal pro Schleife, versetzt zum Heiler.
+B_LID_OBEN = [(14, 10), (15, 10), (18, 10), (19, 10)]
+B_LID_UNTEN = [(14, 11), (15, 11), (18, 11), (19, 11)]
+B_KNOCHEN, B_SPALT = (213, 213, 213), (123, 123, 123)
+assert col(B_SP, 14, 10) == (0, 0, 0) and col(B_SP, 19, 11) == (255, 255, 255) and col(B_SP, 16, 10) == B_KNOCHEN and col(B_SP, 13, 10) == B_SPALT
+B_BLINZ = {3, 4, 5, 27, 28, 29}
 SCHWARZ_AUSSEN = (26, 26, 26)
 assert SCHWARZ_AUSSEN in {tuple(int(v) for v in p[:3]) for p in spr.reshape(-1, 4) if p[3]}
 
@@ -131,6 +139,11 @@ def frame_gross(i, nur=None):
         ph[GPT + WRIST_Y - n_a - wink + k] = np.where(wrist[:, 3:4] > 0, wrist, ph[GPT + WRIST_Y - n_a - wink + k])
     # --- B: Helmkopf ---
     pb = teil(B_SP, L.deckend(B_SP))
+    if i in B_BLINZ:
+        for (x, y) in B_LID_OBEN:
+            pb[GPT + y, GPL + x, :3] = B_KNOCHEN
+        for (x, y) in B_LID_UNTEN:
+            pb[GPT + y, GPL + x, :3] = B_SPALT
     if i in BLATT_FRAMES:
         pb[GPT + BLATT[1], GPL + BLATT[0] - 1] = pb[GPT + BLATT[1], GPL + BLATT[0]]
         pb[GPT + BLATT[1], GPL + BLATT[0]] = 0

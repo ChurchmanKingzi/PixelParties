@@ -25,8 +25,9 @@ Ablauf (48 Frames à 80 ms = 3,84 s, nahtlos):
 * ATMEN (zweistufig): Kopf, Ohren und beide Fächerwurzeln steigen in zwei Stufen um bis zu 2 px (Kragenzeile 25 wird 1–2× eingefügt, mit Nachbartextur gemischt); Beine/Krallen bleiben am Boden.
 * SCHMUCKFÄCHER (Runde 3: „die Schnurrhaare bewegen sich viel zu sehr“): vier unabhängige, jetzt sanfte Bewegungen — jedes Bündel kippt um seine Wurzel, die Spitze höchstens ±1 px (nur die äußere Hälfte rückt
   überhaupt um 1 px, Amplitude 1,2 statt 1,7): oben links Periode 48, unten links 24 (gegenläufig), oben rechts 24, unten rechts 48 (gegenläufig) — Wurzeln (x 14–17 / 30–33) bleiben stehen, nie kopiert.
-* VORDERBEINE (Runde 3: „die Beine bewegen sich gar nicht“): jedes Bein (Zeilen ab 29, samt Krallenstrichen) wiegt sich gegenläufig in der Hüfte (Zeilenversatz wächst zur Pfote hin bis ±2 px, Gefälle ≤ 1 px je Zeile,
-  Periode 24) und hebt zeitweise die Pfote um bis zu 2 px (links Frames 6–15, rechts 30–39; die Zeilen 31–32 des Beins fallen dabei weg, nichts wird gedehnt). Die Brustfell-Unterkante (Zeilen 26–28) bleibt fest.
+* VORDERBEINE (Runde 4: „Der Unterkörper soll nicht wabern wie bei einem Dschinn. Er stellt einen riesigen Tiger dar!“): KEIN Wiegen mehr — beide Beine stehen fest (kein Zeilenversatz). Einzige Beinbewegung:
+  seltenes, langsames Pfotenheben, je Pfote einmal pro Schleife (links Frames 5–16, rechts 29–40; Hub 1 px, dann 2 px, langsam zurück; die Zeilen 31–32 des Beins fallen dabei weg, nichts wird gedehnt,
+  kein seitlicher Versatz). Die Brustfell-Unterkante (Zeilen 26–28) bleibt fest.
 * OHRZUCKEN: linkes Ohr (Frames 8–13) und rechtes Ohr (Frames 30–35) klappen mit der oberen Hälfte 1 px nach außen und zurück (Zeilenversatz, Umriss wandert mit).
 * BLINZELN: Frames 20–22 und 42–44 (Augenschlitz schließt sich zu einer dunklen Linie, Lid = Fellgrau (165,164,185)).
 Frame 0 = Ruhepose (Original). Alle Bewegungen laufen auf der vollen Leinwand (anim_lib wirft ClipError). Nur ganze Pixel, nur Farben der Quelle.
@@ -103,8 +104,8 @@ def fach(m, i, periode, vorz, pivot_x):
     return FB.spalten_schub_4verbunden(a, PAD_L + pivot_x, dy)
 
 
-BEIN_AMP = 2.0                                                                    # Wiegen der Beine: Zehen bis ±2 px, Gefälle ≤ 1 px je Zeile
-HEB_L = [1, 2, 2, 2, 2, 2, 2, 2, 2, 1]                                           # Pfote hebt sich (Hub in px je Frame des Fensters)
+BEIN_AMP = 0.0                                                                    # Runde 4: kein Wiegen mehr (Tiger steht fest, „wabert“ nicht)
+HEB_L = [1, 1, 1, 2, 2, 2, 2, 2, 2, 1, 1, 1]                                           # Pfote hebt sich (Hub in px je Frame des Fensters)
 HEB_R = HEB_L
 
 
@@ -147,7 +148,7 @@ def frame(i):
     a_or = L.versetze(fach(fl_or, i, 24, 1, 33), 0, -r)
     a_ur = L.versetze(fach(fl_ur, i, 48, -1, 33), 0, -r)
     bn = ebene(bein_fest)
-    bl, br = bein(bein_l, i, -1, 6), bein(bein_r, i, 1, 30)
+    bl, br = bein(bein_l, i, -1, 5), bein(bein_r, i, 1, 29)
     fig = L.zusammen(H, W, [(a_ol, 0, 0), (a_ul, 0, 0), (a_or, 0, 0), (a_ur, 0, 0), (bn, 0, 0), (bl, 0, 0), (br, 0, 0), (kp, 0, 0), (ol, 0, 0), (orr, 0, 0)])
     G.rand_schliessen(fig, ERLAUBT, UMRISS)
     return fig

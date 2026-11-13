@@ -15,6 +15,12 @@ Was im Sprite ist (x, y im 32×26-Sprite):
 * LEICHE (x 0–14, y 14–25): Kopf/Oberkörper einer toten Gestalt mit Eisenhelm links (Grautöne (52,52,52)/(74,74,74)/(121,121,121), x 1–4, y 15–23), olivfarbenem Polster (131,123,65)/(82,74,8) und Haut; Blutlache (dunkle Rottöne bis (21,0,0), x 6–17, y 19–25).
 Metall: nur der Eisenhelm der Leiche (Grautöne) glänzt (Regel 14); Haut, Blut, Stoff nicht. Kein Feuer, keine Partikel.
 
+RUNDE 4 (Nutzer: „sollte *durchgehend* kauen, außerdem müsste bei der Leiche links das Blut fließen“) — gilt vor dem Ablauf unten:
+* KAUEN läuft jetzt DURCHGEHEND über alle 48 Frames: Takt 6 Frames (3 Frames Kopf 1 px unten, 3 oben), 8 Bisse pro Schleife, Frame 0 = Kopf oben (Original). Ohrzucken und Blinzeln laufen daneben weiter.
+* BLUT FLIESST: drei Rinnsale laufen nacheinander aus der Wunde der Leiche durch die Blutlache nach unten (RINNSALE: Pfade in Sprite-Koordinaten, 1 px Schritt alle 2 Frames, Start Frame 1, 16, 30): heller Kopf (88,0,0),
+  dahinter zwei dunklere Schwanzpixel (63,0,0) und (51,0,0) — alles Rottöne der Quelle, nur auf Blutpixeln und nur dort, wo sie heller sind als der Untergrund. Kommt ein Rinnsal am unteren Rand der Lache an,
+  hellt der Rand dort 2 Frames lang auf ((74,0,0), Nachbarn (65,0,0)). Die Lache selbst ändert ihre Form nicht.
+
 Ablauf (48 Frames à 70 ms = 3,36 s, nahtlos; Ebenen: Leiche (starr), Chaorc-KÖRPER samt gehaltenem Leichenteil (Zeilen ≥ 7 des Chaorc, starr), Chaorc-KOPF (Zeilen 0–6 samt Ohren)):
 * Nutzerkorrektur Runde 3: Das Leichenteil, das der Chaorc hält und frisst (der blutige Streifen/Bissrest und die Hände davor, Zeilen 7–13), wird NIE gestreckt oder bewegt sich gegen den Körper — nur der Kopf kaut.
 * Kauen (Frames 12–19 und 36–43): NUR der Kopf (Zeilen 0–6 mit Ohren und Augen) taucht im Takt von 4 Frames je 2 Frames um 1 px nach unten (er beißt in das Leichenteil, Kinnzeile überdeckt dessen Oberkante, nur innerhalb von dessen Umriss)
@@ -65,6 +71,45 @@ helm = L.farbmaske(spr, GRAU) & leiche & (xx <= 9)
 assert helm.sum() >= 12
 
 
+# ── Runde 4: Blut fließt (Rinnsale durch die Lache) ──
+blut = leiche & (spr[..., 1] == 0) & (spr[..., 2] == 0) & (spr[..., 0] <= 74)
+RINNSALE = [
+    (1, [(11, 17), (11, 18), (12, 19), (12, 20), (12, 21), (12, 22), (12, 23), (12, 24), (12, 25)]),
+    (16, [(10, 18), (10, 19), (10, 20), (10, 21), (10, 22), (10, 23), (10, 24), (10, 25)]),
+    (30, [(12, 18), (13, 19), (13, 20), (13, 21), (14, 22), (14, 23), (14, 24), (14, 25)]),
+]
+assert all(blut[y, x] for (_s, pf) in RINNSALE for (x, y) in pf)
+BLUT_KOPF, BLUT_SCHWANZ, BLUT_RAND = (88, 0, 0), [(63, 0, 0), (51, 0, 0)], [(74, 0, 0), (65, 0, 0)]
+_alle = {tuple(int(v) for v in q[:3]) for q in spr.reshape(-1, 4) if q[3]}
+assert all(c in _alle for c in [BLUT_KOPF] + BLUT_SCHWANZ + BLUT_RAND)
+
+
+_RAND = U.kanten(spr)
+assert all(c in ERLAUBT for c in BLUT_RAND)
+
+
+def blut_fliesst(l, i):
+    def heller(x, y, c):
+        if 0 <= x < sw and 0 <= y < sh and blut[y, x] and _RAND[y, x] and c not in ERLAUBT:
+            c = BLUT_RAND[0] if c == BLUT_KOPF else BLUT_RAND[1]      # am Außenrand der Lache nur Randfarben der Quelle (Regel 16)
+        if 0 <= x < sw and 0 <= y < sh and blut[y, x] and c[0] > int(l[GP + y, GP + x, 0]):
+            l[GP + y, GP + x, :3] = c
+    for (start, pfad) in RINNSALE:
+        j = i - start
+        if j < 0:
+            continue
+        k = j // 2
+        if k < len(pfad):
+            heller(*pfad[k], BLUT_KOPF)
+            for d, c in enumerate(BLUT_SCHWANZ, 1):
+                if k - d >= 0:
+                    heller(*pfad[k - d], c)
+        elif k == len(pfad):                      # angekommen: der Rand der Lache hellt kurz auf
+            x, y = pfad[-1]
+            heller(x, y, BLUT_RAND[0]); heller(x - 1, y, BLUT_RAND[1]); heller(x + 1, y, BLUT_RAND[1])
+            heller(*pfad[-2], BLUT_SCHWANZ[1])
+
+
 def teil(maske):
     t, _ = L.trenne(spr, maske)
     return L.platz(t, H, W, GP, GP)
@@ -72,20 +117,17 @@ def teil(maske):
 
 def kauen(i):
     """0 oder 1: Kopf 1 px tiefer (nur in den Kau-Fenstern, Takt 4 Frames)."""
-    for start in (12, 36):
-        j = i - start
-        if 0 <= j < 8 and (j // 2) % 2 == 0:
-            return 1
-    return 0
+    return 1 if (i % 6) >= 3 else 0                # Runde 4: durchgehend, Takt 6 Frames
 
 
 def frame_gross(i, nur=None):
     kopf = teil(kopf_m)
     rumpf = teil(rumpf_m)
     # --- Ohrzucken, Blinzeln (auf dem Kopf, Spritekoordinaten) ---
-    if Hm.folge(i, 6, [1] * 4, N) or Hm.folge(i, 30, [1] * 4, N):
+    # Runde 4: das Kauen läuft durchgehend → die Ohren zucken je 3 Frames genau in einer „Kopf oben“-Phase (Frames 6–8, 30–32 bzw. 24–26, 42–44)
+    if Hm.folge(i, 6, [1] * 3, N) or Hm.folge(i, 30, [1] * 3, N):
         Hm.setze(kopf, OHR_R, OFF)
-    if Hm.folge(i, 22, [1] * 4, N) or Hm.folge(i, 44, [1] * 4, N):
+    if Hm.folge(i, 24, [1] * 3, N) or Hm.folge(i, 42, [1] * 3, N):
         Hm.setze(kopf, OHR_L, OFF)
     if Hm.folge(i, 19, [1, 1, 1], N) or Hm.folge(i, 35, [1, 1, 1], N):
         Hm.setze(kopf, {p: HAUT for p in AUGEN}, OFF)
@@ -104,6 +146,7 @@ def frame_gross(i, nur=None):
     c = Hm.kontur_schliessen(c, ERLAUBT, UMRISS)
     # --- Leiche (fest) mit glänzendem Eisenhelm ---
     l = teil(leiche)
+    blut_fliesst(l, i)
     for start in (4, 28):
         Hm.lichtband(l, helm, OFF, i, N, start, 12, GRAU, stufen=1, breite=2.6, achse=(1.0, 1.0), kern=2)
     return L.zusammen(H, W, [(l, 0, 0), (c, 0, 0)])

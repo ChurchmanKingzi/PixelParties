@@ -25,14 +25,16 @@ Identifikation (Drache, x/y im 64×54-Sprite; die Leinwand der Karte beginnt 7 p
 Metall/Gold/Edelsteine: keine (Knochenschädel) → kein Glanz (Regel 14).
 
 Ablauf (48 Frames à 70 ms = 3,36 s, nahtlos):
-* DER DRACHE SCHWEBT UND SCHLÄNGELT: der ganze Drache hebt/senkt sich ±1 px (Periode 24); darüber läuft eine Welle vom Kopf zum Schweif: jede Spalte rechts vom Hals (x ≥ 22) wandert senkrecht
-  um bis zu ±3 px am Schweifende (Periode 24, Wellenlauf, Spalten 4-verbunden), Kopf und Schädel bleiben als Block beisammen. Der Drache fliegt, deshalb darf er schweben.
-* SCHWEIFSPITZE: die oberen Zeilen des Schweifs (y 0–18) schwenken zusätzlich waagerecht bis ±2 px (Periode 16, Gefälle ≤ 1 px je Zeile), die ausgezogene Spitze peitscht mit.
-* GELBER BLITZ (Runde 3: „gehört fest zum Sprite und soll permanent bleiben“): liegt wie in der Kartenkunst VOR dem Kopf, ist in JEDEM Frame sichtbar, folgt dem Schweben des Kopfes (±1 px) und bekommt zweimal je
+* KÖRPER (Runde 4: „Oben das ‚Ende‘ des Körpers, das eigentlich aus den Wolken ragt, stellt den Ankerpunkt dar!“): das obere Körperende (senkrechter Schweif samt Bogen x ≥ 44 und die ausgezogene Spitze x 30–43, y ≤ 16)
+  steht völlig still (kein Schweben, kein Schwenken der Spitze mehr). Von dort nimmt die Bewegung zum Kopf hin zu: die Spalten x 43 … 22 wandern senkrecht mit wachsender Amplitude (Hebel um den Anker, ±3 px am Hals,
+  Periode 24, dazu eine kleine Gegenwelle in der Leibmitte, Spalten 4-verbunden); der Kopf (x ≤ 22) geht starr mit dem Hals mit, Schädel, Bart und gelber Blitz hängen an ihm.
+* AUGEN (Runde 4: „Er soll mit allen vier Augen blinzeln“): alle vier Winkel-Augen (oben x 8–10 / 17–19, y 29–31; unten x 9–11 / 16–18, y 33–35) blinzeln gleichzeitig, Frames 9–12 und 31–34 (Lid = Körperblau (197,211,219),
+  geschlossen = Lidlinie (93,82,90) in der unteren Augenzeile). Die frühere Angabe „kein Blinzeln“ oben ist überholt.
+* GELBER BLITZ (Runde 3: „gehört fest zum Sprite und soll permanent bleiben“): liegt wie in der Kartenkunst VOR dem Kopf, ist in JEDEM Frame sichtbar, folgt dem Kopf und bekommt zweimal je
   Schleife einen Leuchtpuls (ein 5 Zeilen hohes Band läuft von der Spitze zum Kopf, Farben eine Stufe heller auf der Rampe des Blitzes).
-* RAUSCHEBART (Runde 3: „nach unten selbstständig weiterzeichnen, ein langer weißer Rauschebart“): die graue Kinnspitze des Schädels ist der Bart; ab Sprite-Zeile 51 (statt Abschlussumriss + Stiel) wird er
-  25 Zeilen lang weitergezeichnet (zottiger, leicht S-förmiger Strang, erst breiter, dann zur Spitze auslaufend, wellige Strähnenlinien, 1 px Außenumriss, Farben nur aus dem Schädel) und weht: eine Welle läuft vom Kinn
-  zur Spitze (bis ±3 px, Gefälle ≤ 1 px je Zeile) plus eine schnellere in der unteren Hälfte. Der Bart folgt dem Schweben des Kopfes.
+* BART (Runde 4: „nahtlos zu dem, was schon an Bart da ist – das Graue ist schon ein Bart, kein Kinn; nur nach unten weiterführen und nach und nach verjüngen“): der vorhandene graue Bart (Zeilen 45–50, zuletzt 8 px breit,
+  x 10–17, Aufbau Umriss | Schatten | Fläche | Schatten | Umriss) wird ab Zeile 51 (statt Abschlussumriss + Stiel) in genau diesem Aufbau 26 Zeilen weitergeführt und läuft allmählich spitz zu (siehe BART_ZEILEN); keine
+  Verbreiterung, keine neuen Strähnenlinien/Lichter. Er weht: eine Welle läuft vom Ansatz (dort 0) zur Spitze (bis ±3 px, Gefälle ≤ 1 px je Zeile). Der Bart folgt dem Kopf.
 * BLITZE (Regel 15 gilt nur für Feuer; Blitze sind harte Ein/Aus-Blitze in Pixelart): die drei cyanfarbenen Blitzstämme leuchten nur kurz in zuckenden Schüben auf und sind sonst aus — links Frames 0–3, 5–6, 27–30;
   Mitte 0–3, 15–17, 36–40; rechts 0–4, 21–24, 43–46; die kleinen Cyan-Funken beim gelben Blitz 0–2, 4–5, 31–34. In Frame 0 sind alle Blitze an (Original).
 Keine zusätzlichen Partikel. Alle Bewegungen laufen auf der vollen Leinwand (anim_lib wirft ClipError). Nur ganze Pixel, nur Farben der Quellen.
@@ -109,47 +111,20 @@ AN = {1: {0, 1, 2, 3, 5, 6, 27, 28, 29, 30},
 # (Sprite-Zeilen 51–75, erst breiter, dann zur Spitze auslaufend) mit welligen Strähnenlinien. Farben nur aus dem Schädel (Umriss (128,128,128), Schatten (179,179,179), Fläche (204,204,204),
 # Licht (242,242,242)); Umriss nur außen (1 px, nie doppelt). Er weht: eine Welle läuft vom Kinn zur Spitze (Zeilenversatz, Gefälle ≤ 1 px je Zeile), die Strähnen hängen an den Zeilen.
 BART_J, BART_K, BART_L, BART_I = (128, 128, 128), (179, 179, 179), (204, 204, 204), (242, 242, 242)
-BART_W = [8, 8, 9, 9, 10, 11, 12, 12, 13, 13, 12, 12, 11, 10, 10, 9, 9, 8, 7, 6, 5, 4, 3, 2, 1]        # Breite je Zeile (mit Umriss)
-BART_M = [0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, -1, -1, -1, -1, -1, -1, -1, 0, 0]          # Ruhe-Schwung der Mitte (S-Kurve) gegenüber x = 13,5
-BART_R = len(BART_W)
+# Runde 4 („Der neue Bart muss nahtlos zu dem passen, was schon an Bart da ist – das Graue ist schon ein Bart, kein Kinn, du musst ihn nur nach unten weiterführen und nach und nach verjüngen“):
+# Der vorhandene graue Bart endet in den Sprite-Zeilen 49–50 als 8 px breiter Strang x 10–17 mit dem Aufbau Umriss (128) | Schatten (179, links 2 px, rechts 1 px) | Fläche (204) | Schatten | Umriss.
+# Genau dieser Aufbau wird ab Zeile 51 Zeile für Zeile fortgesetzt (keine neuen Strähnenlinien, keine Lichter, keine Verbreiterung) und verjüngt sich allmählich: je 4 Zeilen 8/7/6/5 px, je 3 Zeilen 4/3 px,
+# dann 2 Zeilen 2 px und 2 Zeilen 1 px (Spitze in Umrissgrau wie der alte Stiel (11,52–53)). Abwechselnd rechts und links fällt 1 px weg, die Mitte bleibt bei x ≈ 13.
+_J, _K, _L = BART_J, BART_K, BART_L
+BART_ZEILEN = ([(10, (_J, _K, _K, _L, _L, _L, _K, _J))] * 4 + [(10, (_J, _K, _K, _L, _L, _K, _J))] * 4 + [(11, (_J, _K, _L, _L, _K, _J))] * 4 + [(11, (_J, _K, _L, _K, _J))] * 4
+               + [(12, (_J, _K, _L, _J))] * 3 + [(12, (_J, _K, _J))] * 3 + [(13, (_J, _J))] * 2 + [(13, (_J,))] * 2)
+BART_R = len(BART_ZEILEN)
 
 
 def bart_zeile(r, dx):
-    """Pixel (x, Farbe) der Bartzeile r, um dx verschoben. Strähnenlinien (Schatten) laufen an der Mitte entlang und rücken zur Spitze hin zusammen (Abstand ∝ geglättete Breite), daneben links
-    ein Lichtstreifen in Dreier-Blöcken (kein Schachbrett)."""
-    w = BART_W[r]
-    ws = sum(BART_W[max(0, min(BART_R - 1, r + d))] for d in (-1, 0, 1)) / 3.0
-    c = 13.5 + BART_M[r] + dx
-    xl = int(math.floor(c - w / 2.0 + 0.5))
-    if ws >= 9.5:
-        offs = (-0.27 * ws, 0.0, 0.27 * ws)
-    elif ws >= 6.0:
-        offs = (-0.2 * ws, 0.2 * ws)
-    elif ws >= 3.5:
-        offs = (0.0,)
-    else:
-        offs = ()
-    linien = [int(math.floor(c + o + 0.5)) for o in offs]
-    out = []
-    for p in range(w):
-        x = xl + p
-        if w == 1:
-            col = BART_K
-        elif w == 2:
-            col = BART_J if p == 0 else BART_K
-        elif p == 0:
-            col = BART_J
-        elif p == w - 1:
-            col = BART_J if w >= 5 else BART_K
-        else:
-            col = BART_L
-            for k, lx in enumerate(linien):
-                if x == lx:
-                    col = BART_K
-                elif x == lx - 1 and col != BART_K and ((r // 3) + k) % 2 == 0:
-                    col = BART_I
-        out.append((x, col))
-    return out
+    """Pixel (x, Farbe) der Bartzeile r (Sprite-Zeile 51 + r), um dx verschoben."""
+    x0, cs = BART_ZEILEN[r]
+    return [(x0 + dx + p, c) for p, c in enumerate(cs)]
 
 
 def bart_dx(i):
@@ -161,21 +136,43 @@ def bart_dx(i):
         f = (r + 1) / BART_R
         v = 2.4 * f ** 1.3 * math.sin(ph - 0.20 * r) + 0.9 * max(0.0, f - 0.4) * math.sin(ph2 - 0.45 * r + 1.0)
         d[r] = int(round(v))
-    return G.kappe(d)
+    d[0] = 0                                                                    # nahtloser Anschluss an den vorhandenen Bart (Zeile 50 steht)
+    for r in range(1, BART_R):                                                  # Gefälle ≤ 1 px je Zeile; wo der Strang schmaler wird, kein zusätzlicher Versatz (Umriss bleibt wie im Original diagonal geschlossen, 1 px)
+        lim = 0 if len(BART_ZEILEN[r][1]) != len(BART_ZEILEN[r - 1][1]) else 1
+        d[r] = max(d[r - 1] - lim, min(d[r - 1] + lim, d[r]))
+    return d
+
+
+BART_MUSTER = {len(cs): cs for _, cs in BART_ZEILEN}                            # Zeilenaufbau je Breite (Umriss | Schatten | Fläche | Schatten | Umriss)
 
 
 def bart_ebene(i):
-    """Rauschebart als Ebene auf der großen Leinwand (ohne Kopfbewegung `bob`)."""
+    """Rauschebart als Ebene auf der großen Leinwand (ohne Kopfbewegung `bob`). Je Zeile linker/rechter Rand aus Ruheform + Wellenversatz; einzelne Zeilen, die dadurch 1 px über BEIDE Nachbarzeilen
+    hinausstünden (Zacke am Umriss), werden an dieser Seite um 1 px gekürzt — der Umriss bleibt glatt und 1 px stark."""
     a = L.leer(H, W)
     ox, oy = GPL + DX, GPT + DY + BART_Y0
     dxs = bart_dx(i)
+    xl = [BART_ZEILEN[r][0] + dxs[r] for r in range(BART_R)]
+    xr = [xl[r] + len(BART_ZEILEN[r][1]) - 1 for r in range(BART_R)]
+    xl0, xr0 = [10] + xl, [17] + xr                                             # Zeile 50 des Sprites als oberer Nachbar
+    for r in range(BART_R - 1):
+        if xl[r] < min(xl0[r], xl[r + 1]) and xr[r] > xl[r]:
+            xl[r] += 1
+        if xr[r] > max(xr0[r], xr[r + 1]) and xr[r] > xl[r]:
+            xr[r] -= 1
+    for r in range(BART_R - 1):                                                 # ebenso Kerben (Zeile 1 px schmaler als beide Nachbarn) schließen
+        xl0, xr0 = [10] + xl, [17] + xr
+        if xl[r] > max(xl0[r], xl[r + 1]) and xr[r] - xl[r] + 2 in BART_MUSTER:
+            xl[r] -= 1
+        if xr[r] < min(xr0[r], xr[r + 1]) and xr[r] - xl[r] + 2 in BART_MUSTER:
+            xr[r] += 1
     for r in range(BART_R):
-        for (x, c) in bart_zeile(r, dxs[r]):
+        for p_, c in enumerate(BART_MUSTER[xr[r] - xl[r] + 1]):
+            x = xl[r] + p_
             if not (0 <= oy + r < H and 0 <= ox + x < W):
                 raise L.ClipError(f'Bartpixel ({x},{r}) außerhalb der Leinwand')
             a[oy + r, ox + x, :3] = c
             a[oy + r, ox + x, 3] = 255
-    a, _ = A.verbinde4(a)
     return a
 
 
@@ -199,34 +196,49 @@ def gelb_ebene(i):
     return a
 
 
-def welle_dy(i):
+# ── Körper (Runde 4: „Oben das ‚Ende‘ des Körpers, das eigentlich aus den Wolken ragt, stellt den Ankerpunkt dar!“) ──
+# Das obere Körperende (der senkrechte Schweif samt Bogen, x ≥ 44, und die nach links ausgezogene Spitze x 30–43, y ≤ 16) steht völlig still. Von dort nimmt die Bewegung zum Kopf hin zu:
+# die Spalten x 43 … 22 wandern senkrecht mit wachsender Amplitude (0 am Anker, ±3 px am Hals, laufende Welle Richtung Kopf), der Kopf (x ≤ 22) geht als starrer Block mit dem Hals mit;
+# Schädel, Bart und gelber Blitz hängen am Kopf und folgen ihm um denselben Betrag.
+ANKER_X = 44
+FEST_M = KOERPER & ((xx >= ANKER_X) | ((yy <= 16) & (xx >= 30)))
+BEWEGT_M = KOERPER & ~FEST_M
+FEST0, BEWEGT0 = teil(FEST_M), teil(BEWEGT_M)
+C_, D_, E_ = (197, 211, 219), (131, 170, 195), (93, 82, 90)
+# Vier Augen (Runde 4: „Er soll mit allen vier Augen blinzeln“): je ein kleines Winkelzeichen; (obere Zeilen → Lid in Körperfarbe, untere Zeile → geschlossene Lidlinie)
+AUGEN = [([(8, 29)], [(8, 30), (9, 30)], [(8, 31), (9, 31), (10, 31)]), ([(19, 29)], [(19, 30), (18, 30)], [(19, 31), (18, 31), (17, 31)]),
+         ([(9, 33)], [(9, 34), (10, 34)], [(9, 35), (10, 35), (11, 35)]), ([(18, 33)], [(18, 34), (17, 34)], [(18, 35), (17, 35), (16, 35)])]
+BLINK = [(9, [1, 2, 2, 1]), (31, [1, 2, 2, 1])]
+
+
+def kopf_dy(i, fr=1.0):
     ph = L.sinus(i, 24)
-    bob = int(round(1.0 * math.sin(ph + 0.0)))
-    return ph, bob
-
-
-KOPF_M = KOERPER & (xx <= HALS_X)
-RUMPF_M = KOERPER & (xx > HALS_X)
-KOPF0, RUMPF0 = teil(KOPF_M), teil(RUMPF_M)
+    fr = min(1.0, fr)
+    return 3.0 * fr ** 1.3 * math.sin(ph) + 0.7 * math.sin(math.pi * fr) * math.sin(2 * ph)   # Hebel um den Anker (±3 px am Kopf) + kleine Gegenwelle in der Leibmitte; Frame 0 überall 0
 
 
 def drache(i):
-    ph, bob = welle_dy(i)
-    rp = RUMPF0
-    # Schweifspitze schwenkt (Zeilen y 0–18 des Sprites), vor der Welle
-    s = math.sin(L.sinus(i, 16))
-    dxs = G.kappe({GPT + DY + y: int(round(2.0 * s * (18 - y) / 18.0)) for y in range(0, 19)})
-    rp = G.zeilen_dx(rp, dxs)
-
-    def dy(fr):
-        return 3.0 * fr * (math.sin(ph - 1.1 * fr) + math.sin(1.1 * fr))
-    rp = FB.spalten_schub_4verbunden(rp, GPL + DX + HALS_X, dy, maxd=sw - 1 - HALS_X)
-    return L.zusammen(H, W, [(KOPF0, 0, 0), (rp, 0, 0)]), SCHAEDEL0, bob
+    bw = BEWEGT0
+    k = None
+    for st_, w in BLINK:
+        k = k or Hm.folge(i, st_, w, N)
+    if k:
+        bw = bw.copy()
+        pix = {}
+        for (o, m, u) in AUGEN:
+            pix.update({p_: C_ for p_ in o})
+            if k == 2:
+                pix.update({p_: C_ for p_ in m})
+                pix.update({p_: E_ for p_ in u})
+        Hm.setze(bw, pix, (GPL + DX, GPT + DY))
+    bw = FB.spalten_schub_4verbunden(bw, GPL + DX + ANKER_X, lambda fr: kopf_dy(i, fr), maxd=ANKER_X - HALS_X)
+    bob = int(round(kopf_dy(i, 1.0)))
+    return L.zusammen(H, W, [(FEST0, 0, 0), (bw, 0, 0)]), SCHAEDEL0, bob
 
 
 def frame_gross(i, nur=None):
     kp, sk, bob = drache(i)
-    dr = L.zusammen(H, W, [(sk, 0, bob), (bart_ebene(i), 0, bob), (kp, 0, bob)])
+    dr = L.zusammen(H, W, [(sk, 0, bob), (bart_ebene(i), 0, bob), (kp, 0, 0)])
     G.rand_schliessen(dr, ERLAUBT, UMRISS)                                      # Regel 16: Spaltenstufen legen Füllfarbe an der Kante frei → Umrissschwarz (Bart/Schädel: nur Grau-Umrisse)
     ebenen = []
     if not nur:

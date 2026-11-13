@@ -1,0 +1,15 @@
+{
+  "creature": "Spirit of the Ultimate Gun",
+  "sheet": "spirit-of-the-ultimate-gun.png",
+  "frameWidth": 37,
+  "frameHeight": 39,
+  "frames": 48,
+  "frameMs": 65,
+  "loop": true,
+  "layout": "horizontal",
+  "padTop": 2,
+  "padLeft": 2,
+  "padRight": 2,
+  "padBottom": 2,
+  "faceX": 18.5
+}

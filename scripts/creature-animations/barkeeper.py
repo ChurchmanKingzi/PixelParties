@@ -26,7 +26,7 @@ Ablauf (48 Frames à 62 ms = 2,98 s, nahtlos):
   (siehe Ergänzungen). Der Arm liegt als eigene Ebene (ein Abbild der Ärmelzeilen, verschoben) über dem Körper, der darunter vollständig stehen bleibt — nichts wird aufgerissen.
 * Auf und ab (zweistufig, Periode 24 = zweimal pro Schleife): Brust 1 px (Anzugzeile 20 wird einmal doppelt eingefügt: Rumpf, Arm, Tuch, Krug, Hände und Kopf steigen, Schuhe bleiben). Der Kopf bewegt sich NICHT seitlich (Regel 17).
 * Blinzeln (Frames 19–21 und 41–43): beide Augen schließen sich — Iris und Weiß (6,4), (6,5) und die Iris (10,5) nehmen die umgebende Hautfarbe (247,190,123) an; die Brauen und die braune Wimper (11,5) bleiben.
-* Sprechen: der „Oh“-Mund (schwarz, 2×2) wird zeitweise nur 1 px hoch (obere Mundzeile (8–9, 8) nimmt Hautfarbe an): Frames 8–15 und 31–38 im Wechsel (offen, halb, halb, offen, halb, offen, halb, halb).
+* [Runde 4: ersetzt durch durchgehendes Sprechmuster MAUL, siehe frame()] Sprechen: der „Oh“-Mund (schwarz, 2×2) wird zeitweise nur 1 px hoch (obere Mundzeile (8–9, 8) nimmt Hautfarbe an): Frames 8–15 und 31–38 im Wechsel (offen, halb, halb, offen, halb, offen, halb, halb).
 Frame 0 = Original (Ruhepose). Kontrolle: anim_humanoide.ruhepose / eckkontakt_typen / Randpixel-Test (Regel 16).
 Alle Bewegungen laufen auf der vollen Leinwand (anim_lib wirft ClipError). Nur ganze Pixel, nur Farben der Quelle.
 Ergänzungen (Quellfarben, von mir festgelegt): unter dem Tuch liegt der Krug — (10,12) → Lavendel (107,81,148), (10,13) und (10,14) → Lavendel hell (156,125,198), (10,15) → Lavendel (107,81,148) (das Glas reicht hinter dem Tuch bis x 10,
@@ -72,6 +72,12 @@ ARM_X = 5
 TAKT = [0, 0, 1, 1, 1, 0, 0, -1, -1, -2, -2, -2, -1, 0, 0, 0]
 
 
+LIPPE = f(6, 9)                                                     # (181,121,49) dunkler Hautton der Kinnzeile = geschlossene Lippen
+MAUL = [0, 0, 1, 2, 2, 1, 0, 0, 1, 1, 0, 1, 2, 1, 0, 0, 0, 1, 2, 2, 1, 0, 1, 2,
+        1, 0, 0, 1, 2, 1, 0, 0, 0, 1, 1, 2, 2, 1, 0, 1, 2, 1, 0, 0, 1, 2, 1, 0]
+assert len(MAUL) == N
+
+
 def frame(i, nur=None):
     dx = TAKT[i % 16]
     a = max(-1, min(0, dx))                                          # der Arm geht nur nach links hinaus, wenn das Tuch nach links wandert — Runde 3: höchstens 1 px (Nutzer: „die Seite bewegt sich zu weit nach links“)
@@ -99,8 +105,13 @@ def frame(i, nur=None):
     if Hm.folge(i, 19, [1, 1, 1], N) or Hm.folge(i, 41, [1, 1, 1], N):
         Hm.setze(k, {p: HAUT for p in AUGEN}, OFF)
     # --- Sprechen: obere Mundzeile wird zeitweise Haut (Mund nur 1 px hoch) ---
-    if Hm.folge(i, 8, [0, 1, 1, 0, 1, 0, 1, 1], N) or Hm.folge(i, 31, [0, 1, 1, 0, 1, 0, 1, 1], N):
+    # Runde 4 (Nutzer: „Der Barkeeper sollte mehr reden“): statt zweier kurzer Fenster redet er jetzt DURCHGEHEND in einem unregelmäßigen Sprechmuster (MAUL, 48 Frames,
+    # Vorlage chatty_town_guard.py): 0 = offen (Original, 2×2), 1 = halb (obere Mundzeile Haut), 2 = zu (obere Zeile Haut, untere = dunklerer Hautton (181,121,49) als Lippenlinie).
+    st = MAUL[i % len(MAUL)]
+    if st == 1:
         Hm.setze(k, {(8, 8): HAUT, (9, 8): HAUT}, OFF)
+    elif st == 2:
+        Hm.setze(k, {(8, 8): HAUT, (9, 8): HAUT, (8, 9): LIPPE, (9, 9): LIPPE}, OFF)
     # --- Auf und ab: Anzugzeile 20 = Brust (nur senkrecht, Kopf bleibt in der Mitte) ---
     brust = Hm.stufe(i, N / 2, 1)
     k = Hm.atmen(k, PAD_T + 20, PAD_T + 7, brust, 0)

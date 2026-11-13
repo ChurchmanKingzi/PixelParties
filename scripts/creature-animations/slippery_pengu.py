@@ -20,7 +20,7 @@ Bleibt fest: Kopf mit Schnabel, Bauchfedern, Halsfleck. Material: Federn — KEI
 
 Ablauf (48 Frames à 62 ms = 2,98 s, nahtlos), alle Bewegungen unabhängig:
 * RUTSCHEN (neu): der GANZE Pinguin samt Flügel, Schweif und Schneestaub gleitet ganzzahlig über das Eis — Frames 0–11 nach links (bis −8 px, sanft anfahrend/bremsend, er blickt nach links = Originalrichtung), kurzer
-  Halt, dann (Frame 13) wird der Sprite horizontal gespiegelt und er gleitet Frames 15–30 nach rechts (bis +8 px; der Schweif/Staub liegt jetzt links, also wieder HINTER ihm), Halt, Rückspiegeln (Frame 33) und
+  [Runde 4: KEINE Spiegelung mehr, siehe BAHN unten; der folgende Text beschreibt Runde 3] Halt, dann (Frame 13) wird der Sprite horizontal gespiegelt und er gleitet Frames 15–30 nach rechts (bis +8 px; der Schweif/Staub liegt jetzt links, also wieder HINTER ihm), Halt, Rückspiegeln (Frame 33) und
   Frames 34–47 zurück zur Mitte (links gerichtet). Frame 0 = Original. Die Leinwand ist links/rechts gleich breit (Spiegeln um die Mitte). Keine Gehbewegung, nichts verformt sich dabei.
 * Flügel schlägt (Periode 16): die Flügelspalten (y ≤ 8, x ≥ 21) heben/senken sich bis ±2 px (am Ende am stärksten, Spalten am Körper bleiben), die Lücke zum Rücken wird durch `fuell` gefüllt (Flügel bleibt am Rumpf).
 * Schweif wedelt (Periode 12): die Schweifspalten (x ≥ 31, y ≥ 8) wandern bis ±1 px senkrecht; die Bauchunterkante bleibt am Boden (Zeile 17).
@@ -86,9 +86,8 @@ STAUB = [dict(x=PAD_L + x, y=PAD_T + 16 + dy, vx=vx, vy=-9, off=o, form=f, wacke
 STAUB_FARBEN = {'c': D_, 'r': C_}
 
 
-# Rutschen: Pinguin blickt nach links (Original); links 0 → −8, Halt, spiegeln, rechts −8 → +8 (blickt nach rechts), Halt, zurückspiegeln, 8 → 0
-BAHN, SPIEGEL = R.pfad(N, [('fahrt', -8, 12), ('halt', 1), ('flip',), ('halt', 2), ('fahrt', 8, 16), ('halt', 2), ('flip',),
-                           ('halt', 1), ('fahrt', 0, 14)])
+# Rutschen (Runde 4, Regel 47: NICHT spiegeln): Pinguin blickt immer nach links (Original); 0 → −8, Halt, −8 → +8 (gleitet rückwärts zurück), Halt, +8 → 0
+BAHN, _SPIEGEL = R.pfad(N, [('fahrt', -8, 13), ('halt', 2), ('fahrt', 8, 17), ('halt', 2), ('fahrt', 0, 14)])
 
 
 def frame(i, nur=None):
@@ -96,7 +95,7 @@ def frame(i, nur=None):
     if nur is None or 'dunst' in nur:
         ebenen.append((E.dunst_ebene(H, W, i, N, STAUB, STAUB_FARBEN), 0, 0))
     ebenen.append((koerper(i), 0, 0))
-    return R.verschieben(L.zusammen(H, W, ebenen), BAHN[i], SPIEGEL[i])
+    return R.verschieben(L.zusammen(H, W, ebenen), BAHN[i], False)
 
 
 if __name__ == '__main__':
@@ -104,7 +103,7 @@ if __name__ == '__main__':
     prev = sys.argv[sys.argv.index('--preview') + 1] if '--preview' in sys.argv else None
     ohne = [frame(i, nur=('koerper',)) for i in range(N)]
     print('Ruhepose weicht vom Original ab bei:', Hm.ruhepose(ohne[0], spr, OFF) or 'nichts')
-    print('Position je Frame:', BAHN, '\nGespiegelt:', [int(x) for x in SPIEGEL])
+    print('Position je Frame:', BAHN)
     L.pruefe(frames, quelle=spr)
     print('Pixel je Frame (Figur):', [int((f[..., 3] > 0).sum()) for f in ohne])
     L.speichern('slippery-pengu', 'Slippery Pengu', frames, MS, prev)

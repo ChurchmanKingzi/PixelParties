@@ -19,10 +19,9 @@ Was ist was (x/y im Sprite):
 Fest bleiben: Körperform, Beine/Klauen, Hauer, Zunge, Maul, Nüstern.
 
 Ablauf (48 Frames à 65 ms = 3,12 s; Frame 0 = Original, die Flammen sind ausgenommen):
-* Feuer (Regel 15/40, Modul anim_feuer2.py — Feuer von Hand, Nutzerkorrektur Runde 3): die GEMALTE Pyraga-Flamme der xcf-Ebene (beide Flammen im Sprite, Ebene „Pyraga“ in Motive.xcf = Quelle der Kartenkunst) ist die Vorlage und wird nicht mehr neu erfunden.
-  Linke Flamme (Nacken): drei Zungen (Spitzen (10,0), (12,3), (14,1), Fuß auf dem Oliv-Balken); rechte Flamme (Hinterteil, zeigt nach rechts): fünf waagerechte Zungen auf den Zeilen 10/12/14/16/18 (Spitzen u. a. (52,12), (50,14)).
-  Jede Zunge läuft ihre eigene Folge von 12 handgesetzten Posen (Länge, Neigung, S-Kurve, Kernhub) à 2–3 Frames, zeitversetzt; der Fuß bleibt breit und ruhig, die Spitzen laufen spitz zu und reißen ab (Funken 1 px: gelb → orange → rot).
-  Alle Pixel stammen aus der gemalten Flamme (Rot-Außenhaut (202,44,41), Orange, Gelb, Creme-Kern); die Flammen heben sich beim Atmen mit dem Körper.
+* Feuer (Runde 4, „richtige Feuer-Animation“, Modul anim_feuer3.py): klassischer Flammenzyklus mit Aufwärtsfluss, 8 Posen à 2 Frames (3 Zyklen je Schleife). Beide Flammen sitzen dort, wo sie gemalt sind, und haben deren Größe
+  und Farben (Rot außen → Orange → Gelb → Creme-Kern am Fuß): links (Nacken) ein ruhiger Glutsockel auf dem Oliv-Balken + drei phasenversetzte Zungen nach oben; rechts (Hinterteil) Sockel auf dem Rücken + drei Zungen, die wie
+  gemalt nach rechts oben fließen. Bäuche wandern vom Fuß zur Spitze, Spitzen schnüren sich ab und steigen als kleine Fetzen weiter. Die Flammen heben sich beim Atmen mit dem Körper. Keine Einzelfunken mehr.
 * Atmen zweistufig 0-1-2-1-0 px (Periode 24, zweimal pro Schleife): die Hautzeile y 22 (reine Haut, ohne Nüstern/Augen) wird 1–2× eingefügt (anim_lib.streck_zeile mit Texturmischung); alles darüber (Rücken, Kopf, Flammen) steigt,
   die Beine/Klauen/Hinterlauf bleiben am Boden.
 * Blinzeln beider Augen (Lid = Hautfarbe (195,138,131); Wimpern bleiben): Frame 9–11 und 33–35.
@@ -38,7 +37,7 @@ import numpy as np
 
 import anim_lib as L
 import anim_untote as U
-import anim_feuer2 as FE2
+import anim_feuer3 as F3
 import anim_daemon as D
 
 N, MS = 48, 65
@@ -73,13 +72,19 @@ def flamm_vorlage(maske):
     return L.platz(t, H, W, GPL, GPT)
 
 
-Z = lambda f, s, **k: FE2.Zunge((f[0] + GPL, f[1] + GPT), (s[0] + GPL, s[1] + GPT), **k)
-# linke Flamme (Mähne im Nacken): drei Zungen, Fuß auf dem Oliv-Balken (y 12); rechte Flamme (Hinterteil): waagerecht nach rechts, fünf Zungen (Zeilen 10/12/14/16/18)
-ZL = [Z((10, 10), (10, 0)), Z((12.5, 10), (12, 3), amp=0.8), Z((15, 10), (14, 1))]
-ZR = [Z((41, 10), (47, 9), amp=0.8), Z((43, 12), (52, 12)), Z((43, 14), (50, 14)), Z((43, 16), (48, 16), amp=0.8), Z((42, 18), (47, 18), amp=0.7)]
-VL_L = FE2.Vorlage(flamm_vorlage(flamme_alt & (xx < 30)), ZL, 'hoch', rand_farbe=ROT, sperre=SPERRE)
-VL_R = FE2.Vorlage(flamm_vorlage(flamme_alt & (xx >= 34)), ZR, 'rechts', rand_farbe=ROT, sperre=SPERRE)
-FEUER = FE2.Feuer([VL_L, VL_R], n=N, seed=21, bank='zunge', amp=1.0)
+# Runde 4 (anim_feuer3: klassischer Flammenzyklus mit Aufwärtsfluss, 8 Posen à 2 Frames, 3 Zyklen je Schleife; Lage/Größe/Farben nach der gemalten Flamme)
+_F = lambda x, y, l, b, **k: F3.Flamme(x + GPL, y + GPT, l, b, **k)
+# linke Flamme (Mähne im Nacken): flacher Fuß auf dem Oliv-Balken (y 12), ruhiger Glutsockel + zwei phasenversetzte Zungen (Spitzen der Quelle bei (10,0) und (14,1))
+FL_L = [_F(11.5, 12.6, 6, 4.6, fuss=0, bauch=0.2, schlag=0.3, phase=0.2, baender=F3.SOCKEL),
+        _F(11.6, 11.5, 8, 2.6, phase=0.72),
+        _F(9.6, 11.5, 12, 3.0, phase=0.0, richtung=(-0.06, -1)),
+        _F(13.6, 11.5, 11, 3.0, phase=0.5, richtung=(0.08, -1))]
+# rechte Flamme (Hinterteil): Fuß auf dem Rücken, fließt wie gemalt nach rechts oben (Spitze der Quelle bei (52,12))
+FL_R = [_F(41.0, 16.0, 6, 4.6, richtung=(1, -0.3), fuss=2.5, bauch=0.2, schlag=0.3, phase=0.6, baender=F3.SOCKEL),
+        _F(42.0, 15.4, 8, 2.6, richtung=(1, -0.28), phase=0.35),
+        _F(41.5, 13.6, 12, 3.0, richtung=(1, -0.42), phase=0.1),
+        _F(42.5, 17.2, 10, 2.8, richtung=(1, -0.12), phase=0.6)]
+FEUER = F3.Feuer(H, W, FL_L + FL_R, [ROT, ORANGE, GELB, CREME], posen=8, halten=2, sperre=SPERRE)
 
 
 def teil(maske):
@@ -106,12 +111,11 @@ def frame_gross(i, nur=None):
         kp[GPT + y, GPL + x, :3] = lava_farbe(k, i)
     kp = L.streck_zeile(kp, GPT + 22, n)
     kp = U.kontur_schliessen(kp, UMRISS, KONTUR)
-    fl = L.versetze(FEUER.ebene(i), 0, -n)
+    fl = FEUER.ebene(i, dy=-n)
     f = U.kontur_schliessen(L.zusammen(H, W, [(fl, 0, 0), (kp, 0, 0)]), UMRISS, ROT)
     if nur == 'koerper':
         return f
-    fk = FEUER.funken(i, dy=lambda f: -U.stufe(f, 24, 2))
-    return L.zusammen(H, W, [(fk, 0, 0), (f, 0, 0)])
+    return f
 
 
 BOX = U.zuschnitt([frame_gross(i) for i in range(N)], [frame_gross(i) for i in range(N)], (GPL, GPT, GPL + sw, GPT + sh))

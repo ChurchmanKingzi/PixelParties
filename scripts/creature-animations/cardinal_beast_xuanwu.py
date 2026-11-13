@@ -39,6 +39,7 @@ import numpy as np
 import anim_gbb as G
 import anim_humanoide as Hm
 import anim_lib as L
+import anim_textur as TX   # texturierte Streckzeilen statt Zeilenkopien (Regel 43)
 import anim_untote as U
 
 N, MS = 64, 80
@@ -73,7 +74,7 @@ def ohr_dx(i, start, vorz):
 
 def frame_gross(i, nur=None):
     r = int(round(2 * (0.5 - 0.5 * np.cos(L.sinus(i, N)))))                      # Atemhub 0…2 (langsam)
-    ob = L.streck_zeile(ebene(oben_m), GPT + 18, r)
+    ob = TX.streck_zeile(ebene(oben_m), GPT + 18, r)
     ol, orr = ebene(ohr_l), ebene(ohr_r)
     for lay, vorz, start in ((ol, -1, 14), (orr, 1, 42)):
         d = ohr_dx(i, start, vorz)

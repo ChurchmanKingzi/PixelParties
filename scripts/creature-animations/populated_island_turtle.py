@@ -37,6 +37,7 @@ import sys
 import numpy as np
 
 import anim_lib as L
+import anim_textur as TX   # texturierte Streckzeilen statt Zeilenkopien (Regel 43)
 import anim_tiere as T
 
 N, MS = 56, 66
@@ -157,7 +158,7 @@ def frame(i, nur=None):
     for n in wahl:
         e = ebenen[n]
         if n not in ('flosse_v', 'flosse_h'):
-            e = L.streck_zeile(e, PAD_T + ZEILE, atem)
+            e = TX.streck_zeile(e, PAD_T + ZEILE, atem)
         teile.append((e, 0, 0))
     ganz = L.zusammen(H, W, teile)
     return T.umriss_schliessen(ganz, RAND, REGEL)                  # Randpixel-Test (Regel 16)

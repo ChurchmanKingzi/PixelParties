@@ -70,6 +70,14 @@ m_rand = sz.farben_in(sz.rechteck(1, 21, 14, 35), set(RAND_R))
 m_silber = sz.farben_in(sz.rechteck(1, 21, 14, 35), set(SILBER_R))
 m_gold = sz.farben_in(sz.rechteck(13, 21, 18, 25), set(GOLD_R))
 
+# Runde 4 (Nutzer: „Haare und Flügel ‚verlaufen‘, wenn sie gerade gesenkt sind, ungünstig ineinander und überlagern sich. Die Flügel sollen strikt vor den schwarzen Haaren sein.“):
+# Die schwarzen Massen links (x 2–6, y 18–21) und rechts (x 18–23, y 18–25) neben dem Rumpf sind die langen schwarzen HAARE (Zöpfe), keine Arme/Handschuhe. Die Flügel liegen überall VOR ihnen
+# (aber weiter hinter Kopf, Ohren, Rumpf, Schild und Schurz): Flügelpixel, die auf ein Haarpixel fallen, werden darüber gezeichnet — der Flügelumriss bleibt so in jeder Pose vollständig.
+HAAR_F = {(0, 0, 0), (32, 32, 32), (41, 41, 41), (46, 46, 46), (56, 56, 56)}
+m_haar = sz.farben_in(sz.rechteck(3, 18, 6, 20), HAAR_F) | sz.farben_in(sz.rechteck(2, 21, 3, 21), HAAR_F) | sz.farben_in(sz.rechteck(18, 18, 23, 25), HAAR_F)
+HAAR0 = np.zeros((H, W), bool)
+HAAR0[OFF[1]:OFF[1] + sz.sh, OFF[0]:OFF[0] + sz.sw] = m_haar
+
 BEAT, DOWN, UP = 12, 5, 7                                       # Flügelschlag: 4 pro Schleife
 HUB = math.radians(110.0)                                       # Gesamthub: oben +25° über der Ruhelage, unten −85°
 P0 = DOWN + 0.685 * UP                                          # Frame 0 = Aufschlag bei 23 % des Hubs (Originalpose)
@@ -153,6 +161,9 @@ def frame(i, nur=None):
     fr = F.drehen(WING_ROT['r'], OFF[0] + PIV_R[0], OFF[1] + PIV_R[1], -ang, glatt=True)
     fig = L.zusammen(H, W, [(fl, 0, 0), (fr, 0, 0), (k, 0, 0)])
     fig = R3.luecken_fuellen(fig, 5, ausser=LOCH0)
+    for w_ in (fl, fr):                                         # Runde 4: Flügel strikt VOR den schwarzen Haaren
+        vorn = HAAR0 & (w_[..., 3] > 0)
+        fig[vorn] = w_[vorn]
     K.kontur(fig, sz.ERLAUBT, lambda c, x, y: (156, 0, 0) if (c[1] == 0 and c[2] == 0 and c[0] > 0) else (0, 0, 0))    # Regel 16
     fig = L.versetze(fig, 0, body)                              # Schweben: ganze Figur starr
     out = fig if 'figur' in ebenen else sz.leer()

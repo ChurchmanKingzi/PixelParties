@@ -16,9 +16,9 @@ Was ist was (x/y im Sprite):
 Fest bleiben: Beine (außer dem anhebbaren Vorderhuf), Körperform.
 
 Ablauf (48 Frames à 65 ms = 3,12 s; Frame 0 = Original, die Flammen sind ausgenommen):
-* Feuer (Regel 15/40, Modul anim_feuer2.py — Feuer von Hand, Nutzerkorrektur Runde 3): das gemalte Feuer des Standard-Sprites (Mähne und Schweif) ist die Vorlage, jede Zunge wird einzeln animiert statt neu erfunden.
-  MÄHNE (Flamme zeigt nach oben): Streifen von 3 px Breite entlang Rücken, Hals und Kopf (Fuß = Körperkante, Spitze = höchstes Pixel), die Posenfolgen laufen als Welle vom Kopf zum Rücken; SCHWEIF (Zeilen y ≥ 20, zeigt nach links): Streifen von 3 Zeilen,
-  Fuß am Hinterteil. Je Zunge 12 handgesetzte Posen (Länge, Neigung, S-Kurve, Kernhub) à 2–3 Frames, zeitversetzt; Spitzen reißen ab und steigen als Funken auf (Mähne nach oben, Schweif: erst nach links, dann aufwärts).
+* Feuer (Runde 4, „richtige Feuer-Animation“, Modul anim_feuer3.py): klassischer Flammenzyklus mit Aufwärtsfluss, 8 Posen à 2 Frames (3 Zyklen je Schleife), Farben und Lage nach dem gemalten Feuer (Creme-Kern am Körper → Gelb → Orange → Rot außen).
+  MÄHNE: Flammensaum aus phasenversetzten Zungen entlang Rücken, Hals, Scheitel und Nasenrücken (Längen wie gemalt: Rücken 8–9, Hals 12–13, Kopf 9 px, zur Nase kurz); die Zungen steigen und wehen leicht nach hinten, Bäuche wandern vom Körper zur
+  Spitze, Spitzen schnüren sich ab und steigen als kleine Fetzen weiter. SCHWEIF: hängt wie gemalt schräg nach unten links und läuft spitz aus (Welle vom Ansatz zur Spitze), außen lecken drei kurze Zungen nach links oben. Keine Einzelfunken mehr.
 * Atmen zweistufig 0-1-2-1-0 px (Periode 24, zweimal pro Schleife): die Bauchzeile y 25 wird 1–2× eingefügt (anim_lib.streck_zeile mit Texturmischung); Rücken, Hals, Kopf, Mähne und Schweifansatz steigen, Beine und Hufe bleiben am Boden.
 * Kopf nickt (je ein Nicken Frame 6–9 und 30–33, +1 px): Hals-/Kopfspalten x ≥ 29 oberhalb y 21 (samt Flamme) sinken 1 px; der Kopf bewegt sich nie seitlich. Keine Ohren im Sprite (von der Mähne verdeckt).
 * Blinzeln (Lid = Kopfgrau (46,46,46)): das rote Auge Frame 14–16 und 38–40.
@@ -34,7 +34,7 @@ import numpy as np
 
 import anim_lib as L
 import anim_untote as U
-import anim_feuer2 as FE2
+import anim_feuer3 as F3
 import anim_daemon as D
 
 N, MS = 48, 65
@@ -69,12 +69,22 @@ def flamm_vorlage(maske):
     return L.platz(t, H, W, GPL, GPT)
 
 
-RGBA_M, RGBA_T = flamm_vorlage(flamme_alt & (yy <= 19)), flamm_vorlage(flamme_alt & (yy >= 20))
-# Mähne: Streifen von 3 px Breite (Fuß = Körperkante, Spitze = höchstes Pixel), die Posen laufen als Welle vom Kopf zum Rücken (negative Verzögerung);
-# Schweif: waagerechte Streifen von 3 Zeilen, die Zungen zeigen vom Hinterteil nach links (Fuß an der Körperkante), zucken auf und ab.
-VL_M = FE2.Vorlage(RGBA_M, FE2.zungen_baender(RGBA_M, 'hoch', breite=3, versatz=0), 'hoch', rand_farbe=ROT, sperre=SPERRE, welle=(-1.3, 1.0), faden=2)
-VL_T = FE2.Vorlage(RGBA_T, FE2.zungen_baender(RGBA_T, 'links', breite=3, versatz=0), 'links', rand_farbe=ROT, sperre=SPERRE, welle=(1.5, 1.0), faden=2)
-FEUER = FE2.Feuer([VL_M, VL_T], n=N, seed=31, bank='zunge', amp=1.0, max_funken=9)
+# Runde 4 (anim_feuer3: klassischer Flammenzyklus mit Aufwärtsfluss, 8 Posen à 2 Frames, 3 Zyklen je Schleife; Lage/Größe/Farben nach dem gemalten Feuer)
+V = (GPL, GPT)
+# MÄHNE: Flammensaum entlang Rücken (y 20), Hals (25,20)→(31,9), Scheitel und Nasenrücken (34,9)→(40,15); die Zungen steigen wie gemalt nach oben und wehen leicht nach hinten (links).
+# Längen nach der Quelle: Rücken 8–9 px, Hals 12–13 px, über dem Kopf 9 px, zur Nase hin kurz.
+_LINIE = [(10, 20), (25, 20), (28, 14), (31, 9), (34, 9), (40, 15)]
+GLUT = F3.saum(_LINIE, 2.5, laenge=F3.stuetz((0, 4.5), (0.8, 4.5), (1, 3)), breite=2.6, richtung=(-0.2, -1), versatz=V, fuss=1.5, bauch=0.12, schlag=0.2, baender=F3.SOCKEL)   # ruhige Glutbasis
+MAEHNE = GLUT + F3.saum(_LINIE, 4.6,
+                        laenge=F3.stuetz((0, 10), (0.3, 11), (0.42, 14), (0.62, 15), (0.75, 12), (0.85, 8), (1, 4)),
+                        breite=F3.stuetz((0, 3.6), (0.75, 3.6), (1, 2.2)),
+                        richtung=lambda t: (-0.5 + 0.3 * t, -1), versatz=V, fuss=1.5)
+# SCHWEIF: hängt wie gemalt vom Hinterteil (9,21) schräg nach unten links bis (6,38) und läuft spitz aus — die Welle läuft vom Ansatz zur Spitze; an der Außenseite lecken drei kurze Zungen nach links oben.
+SCHWEIF = [F3.Flamme(GPL + 9.5, GPT + 21.5, 18, 5.2, richtung=(-0.2, 1), phase=0.1, fuss=2.0, bauch=0.4, schlag=0.8, pot=1.0, welle=11, fetzen=False),
+           F3.Flamme(GPL + 7.5, GPT + 23.0, 7, 2.6, richtung=(-1, -0.75), phase=0.0),
+           F3.Flamme(GPL + 6.5, GPT + 28.0, 6, 2.4, richtung=(-1, -0.55), phase=0.45),
+           F3.Flamme(GPL + 6.0, GPT + 33.0, 5, 2.0, richtung=(-1, -0.4), phase=0.8)]
+FEUER = F3.Feuer(H, W, MAEHNE + SCHWEIF, [ROT, ORANGE, GELB, CREME], posen=8, halten=2, sperre=SPERRE)
 
 
 def teil(maske):
@@ -115,7 +125,7 @@ def frame_gross(i, nur=None):
     bein = T_BEIN1
     if (18 <= i <= 22) or (42 <= i <= 46):
         bein = L.heben_unten(T_BEIN1, GPT + 36, 1)
-    fl = L.versetze(FEUER.ebene(i), 0, -n)
+    fl = FEUER.ebene(i, dy=-n)
     f = L.zusammen(H, W, [(bein, 0, 0), (kp, 0, 0)])
     f = L.zusammen(H, W, [(fl, 0, 0), (f, 0, 0)])
     nick = 1 if (6 <= i <= 9 or 30 <= i <= 33) else 0
@@ -123,8 +133,7 @@ def frame_gross(i, nur=None):
     f = U.kontur_schliessen(f, UMRISS, KONTUR)
     if nur == 'koerper':
         return f
-    fk = FEUER.funken(i, dy=lambda f: -U.stufe(f, 24, 2))
-    return L.zusammen(H, W, [(fk, 0, 0), (f, 0, 0)])
+    return f
 
 
 BOX = U.zuschnitt([frame_gross(i) for i in range(N)], [frame_gross(i) for i in range(N)], (GPL, GPT, GPL + sw, GPT + sh))

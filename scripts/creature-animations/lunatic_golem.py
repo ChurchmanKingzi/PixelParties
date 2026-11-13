@@ -39,6 +39,7 @@ import sys
 import numpy as np
 
 import anim_lib as L
+import anim_textur as TX   # texturierte Streckzeilen statt Zeilenkopien (Regel 43)
 import anim_flieger as F
 import anim_humanoide as H_
 
@@ -142,7 +143,7 @@ def frame(i, partikel=True, effekte=True, nur=None):
         kugeln_dimmen(koerper, i)
         F.lichtband(koerper, glanz_maske, PAD_L, PAD_T, i, N, 8, 26, RAMPE, stufen=1, kern_stufen=2, breite=4.0, achse=(1.0, 0.7))
     if c:
-        koerper = L.streck_zeile(koerper, PAD_T + ZEILE, c)
+        koerper = TX.streck_zeile(koerper, PAD_T + ZEILE, c)
     f = arme_versetzen(koerper, c, d)
     F.umranden(f, [f], UMRISS, UMRISS_GOLD, UMRISS_GOLD, UMRISS_GOLD)                    # Randpixel-Test (Regel 16)
     return f

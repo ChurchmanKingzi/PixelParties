@@ -35,6 +35,8 @@ Ablauf (48 Frames à 65 ms = 3,12 s, nahtlos):
   Die Spike-Pixel sind die des Originals (obere Form bei Zeilen ≤ 20, untere Form bei Zeilen ≥ 21); die Radkante (6,19) bzw. (19,19), die im Original zum oberen Spike gehört, wird ohne Spike mit dem Reifengrau K gefüllt.
 * Blinzeln: beide Augen (Frames 16–18 und 40–42, das linke einen Frame früher): rot → halb zu → zu; die Lidfarbe ist die umgebende Körperfarbe
   (je Pixel die häufigste Graustufe in 2 px Umkreis außerhalb der Augen). Kein Farbwechsel der Augen sonst.
+* Fahr-Rütteln (Runde 4, Nutzerwunsch „da er permanent fährt, soll er sich auch leicht auf und ab bewegen“): der ganze Aufbau (Kopf, Arme, Rumpf, Streben zwischen den Rädern) wird in unregelmäßigen kurzen Stößen (2–3 Frames,
+  sechsmal je Schleife) als starres Stück 1 px angehoben; die Räder und Spikes bleiben am Boden, die Blitze gehen mit den Armen mit.
 * Stahlglanz (Regel 14): zweimal pro Schleife (Frames 4–15 und 28–39) zieht ein schmales diagonales Lichtband über die grauen Panzerflächen (eine Stufe
   heller auf der Grau-Rampe F→E→D→B→C); Umrisse, Schwarz, Augen, Schlitz und Zahn bleiben.
 Ergänzungen: Kopfversatz/Spikes können Füllpixel frei am Rand legen — sie bekommen den Umriss A (umriss_ergaenzen, Regel 16); schräge Teile, die nur über
@@ -330,9 +332,19 @@ def _radkanten(sp):
     return out
 
 
+# ── Fahr-Rütteln (Runde 4: „da er permanent fährt, soll er sich auch leicht auf und ab bewegen“) ──
+# Die Räder (Zeilen ≥ 18, x ≤ 8 bzw. x ≥ 17) und ihre Spikes bleiben am Boden; der ganze Aufbau (Kopf, Arme, Rumpf und die Streben x 9–16 zwischen den Rädern) hüpft als starres Stück in unregelmäßigen
+# kurzen Stößen 1 px hoch (2–3 Frames) und fällt zurück. Die Blitze gehen mit den Armlöchern mit. Frame 0 = Ruhe (Original).
+RAEDER = BODY & (yy >= 18) & ((xx <= 8) | (xx >= 17))
+AUFBAU = BODY & ~RAEDER
+HUB_FRAMES = {4, 5, 6, 11, 12, 18, 19, 20, 26, 27, 32, 33, 34, 40, 41}
+HUB = [1 if i in HUB_FRAMES else 0 for i in range(N)]
+
+
 def figur(i):
     sp = sprite_mit_effekten(i)
-    ebenen = [(_platz(sp, BODY), 0, 0), (_radkanten(sp), 0, 0), (_kopf(sp, i), 0, 0), (spikes_ebene(i), 0, 0)]
+    dy = -HUB[i]
+    ebenen = [(_platz(sp, RAEDER), 0, 0), (_radkanten(sp), 0, 0), (_platz(sp, AUFBAU), 0, dy), (_kopf(sp, i), 0, dy), (spikes_ebene(i), 0, 0)]
     fig = L.zusammen(H, W, ebenen)
     fig, brueck = A.verbinde4(fig)
     fig, neu = A.umriss_ergaenzen(fig, RAND_FARBEN, lambda x, y: CA)
@@ -349,7 +361,7 @@ def frame(i, nur=None):
     if nur:
         return f['fig']
     # Blitz über die Figur (er überdeckt die Armspitze und leuchtet im Loch)
-    return L.zusammen(H, W, [(f['fig'], 0, 0), (blitz_ebene(i), 0, 0)])
+    return L.zusammen(H, W, [(f['fig'], 0, 0), (blitz_ebene(i), 0, -HUB[i])])
 
 
 if __name__ == '__main__':

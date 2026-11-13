@@ -245,3 +245,276 @@ def pruefe_risse(risse, n, erlaubt=None, abstand=1):
                 continue
             if max(abs(p[0] - q[0]), abs(p[1] - q[1])) <= abstand:
                 assert not any(risse[i].stufe(f, n) and risse[j].stufe(f, n) for f in range(n)), ('Risse berühren sich gleichzeitig', p, q)
+
+
+# ── Runde 4: größere, verzweigte, stellenweise 2 px dicke Risse, die AUSBLEICHEN statt zu schrumpfen ───────────────────
+# Nutzer: „Bei den ganzen Eiern sollten die Risse verschwinden, indem sie ausbleichen, statt indem sie sich einfach zurückbilden. Und die Risse sollten größer,
+# auch dicker, werden können.“ → Ein BleichRiss wächst Pixel für Pixel (Hauptast, davon abzweigende Seitenäste, danach an einzelnen Stellen ein zweites Pixel
+# daneben = 2 px dick), steht in voller Form und bleicht dann in Stufen aus: ALLE Pixel bleiben stehen, ihre Farbe wandert über Zwischentöne (Farben des Sprites
+# bzw. der Spielpalette zwischen Rissfarbe und der Farbe des Untergrunds an genau dieser Stelle) zum Untergrund; letzte Stufe = Schachbrett-Dither. Kein Alpha.
+class BleichRiss:
+    """haupt: Pixel des Hauptasts in Wachstumsrichtung; zweige: Liste von Seitenästen (jeder beginnt neben einem Hauptast-Pixel); dick: Pixel direkt (über die Kante) neben
+    Hauptast-Pixeln, die den Riss dort 2 px dick machen. tempo = Frames je neuem Pixel, halten = Frames in voller Form, stufen × stufe_frames = Ausbleichen,
+    dither = zusätzliche letzte Stufe als Schachbrett. spitze = Farbe der Astenden (z. B. Gelb als auslaufende Glut)."""
+
+    def __init__(self, haupt, start, zweige=(), dick=(), halten=4, tempo=1, stufen=4, stufe_frames=2, dither=True, farbe=None, spitze=None):
+        self.haupt = [tuple(p) for p in haupt]
+        self.zweige = [[tuple(p) for p in z] for z in zweige]
+        self.dick = [tuple(p) for p in dick]
+        self.start, self.halten, self.tempo, self.stufen, self.stufe_frames, self.dither = start, halten, tempo, stufen, stufe_frames, dither
+        self.farbe, self.spitze = farbe, spitze
+        zeit = {p: j * tempo for j, p in enumerate(self.haupt)}
+        for z in self.zweige:
+            nah = [j for j, p in enumerate(self.haupt) if max(abs(p[0] - z[0][0]), abs(p[1] - z[0][1])) <= 1]
+            assert nah, ('Seitenast hängt nicht am Hauptast', z)
+            for m, p in enumerate(z):
+                assert p not in zeit, ('Pixel doppelt', p)
+                zeit[p] = (min(nah) + 1 + m) * tempo
+        for p in self.dick:
+            nah = [j for j, q in enumerate(self.haupt) if abs(q[0] - p[0]) + abs(q[1] - p[1]) == 1]
+            assert nah and p not in zeit, ('Dick-Pixel liegt nicht neben dem Hauptast', p)
+            zeit[p] = (max(nah) + 2) * tempo                                         # der Riss klafft erst auf, wenn die Spitze schon weiter ist
+        self.zeit = zeit
+        self.pix = sorted(zeit, key=lambda p: zeit[p])
+        self.enden = {self.haupt[-1]} | {z[-1] for z in self.zweige}
+        self.wachsen = max(zeit.values()) + tempo
+        self.bleichen = stufen * stufe_frames + (stufe_frames if dither else 0)
+        self.leben = self.wachsen + halten + self.bleichen
+        self.profil = (1,) * self.leben                                              # für zaehle()/pruefe_risse()
+
+    def stufe(self, i, n):
+        return 1 if (i - self.start) % n < self.leben else 0
+
+    def phase(self, i, n):
+        """None = nicht sichtbar; ('w', t) = wächst (Pixel mit zeit <= t sichtbar); ('v', 0) = volle Form; ('b', k) = Bleichstufe k (0 … stufen-1); ('d', 0) = Dither-Stufe."""
+        t = (i - self.start) % n
+        if t >= self.leben:
+            return None
+        if t < self.wachsen:
+            return ('w', t)
+        t -= self.wachsen
+        if t < self.halten:
+            return ('v', 0)
+        k = (t - self.halten) // self.stufe_frames
+        return ('b', k) if k < self.stufen else ('d', 0)
+
+
+def toene_rampe(rampe):
+    """Zwischentöne aus einer geordneten Farbrampe (dunkel → hell): alle Rampenfarben echt zwischen Rissfarbe und Untergrund (Untergrund außerhalb der Rampe → nächste Rampenfarbe)."""
+    rampe = [tuple(c) for c in rampe]
+    cache = {}
+
+    def idx(c):
+        return rampe.index(c) if c in rampe else min(range(len(rampe)), key=lambda k: sum((rampe[k][j] - c[j]) ** 2 for j in range(3)))
+
+    def f(c, u):
+        if (c, u) not in cache:
+            a, b = idx(c), idx(u)
+            cache[(c, u)] = rampe[a + 1:b] if b > a else rampe[b + 1:a][::-1]
+            cache[(c, u)] = [t for t in cache[(c, u)] if t != u and t != c]
+        return cache[(c, u)]
+    return f
+
+
+def toene_auto(kandidaten, quer=45.0):
+    """Zwischentöne ohne feste Rampe: alle Kandidatenfarben, die (im RGB-Raum) nahe der Strecke Rissfarbe → Untergrund liegen (Abstand zur Strecke <= quer) und echt dazwischen
+    (Anteil 0.12 … 0.88), nach ihrem Anteil geordnet. Für Sprites mit vielen Farbtönen (Icy Dragonegg) und für Palettengrau (Monster Nest)."""
+    kandidaten = [tuple(c) for c in kandidaten]
+    cache = {}
+
+    def f(c, u):
+        if (c, u) not in cache:
+            v = np.array(u, float) - np.array(c, float)
+            ll = float(v @ v)
+            res = []
+            for k in kandidaten:
+                if ll == 0 or k == c or k == u:
+                    continue
+                w = np.array(k, float) - np.array(c, float)
+                t = float(w @ v) / ll
+                d = float(np.linalg.norm(w - t * v))
+                if 0.12 <= t <= 0.88 and d <= quer:
+                    res.append((t, k))
+            cache[(c, u)] = [k for t, k in sorted(res)]
+        return cache[(c, u)]
+    return f
+
+
+def bleich_farbe(r, p, ph, c, u, toene):
+    """Farbe des Risspixels p in Phase ph (c = Rissfarbe, u = Untergrund); None = Untergrund zeigt sich (Dither-Lücke)."""
+    if ph[0] in 'wv':
+        return c
+    tl = toene(c, u)
+    if ph[0] == 'd':
+        if (p[0] + p[1]) % 2:
+            return None
+        return tl[-1] if tl else c
+    return tl[ph[1] * len(tl) // r.stufen] if tl else c
+
+
+def bleich_risse(fig, i, n, risse, farbe, toene, dx=0, dy=0, gueltig=None):
+    """Figur (Frame, RGBA) mit allen BleichRissen von Frame i; (dx, dy) = Lage des Sprites im Frame. Die Untergrundfarbe wird je Pixel aus `fig` gelesen (also einschließlich
+    eines gerade durchlaufenden Lichtbands), Risse ersetzen nur vorhandene Pixel (nie neue Fläche, kein Alpha)."""
+    out = fig.copy()
+    for r in risse:
+        ph = r.phase(i, n)
+        if ph is None:
+            continue
+        for p in r.pix:
+            if ph[0] == 'w' and r.zeit[p] > ph[1]:
+                continue
+            x, y = p
+            if gueltig is not None:
+                assert gueltig[y, x], f'Riss-Pixel ({x},{y}) liegt nicht auf dem Ei'
+            assert fig[y + dy, x + dx, 3] == 255, 'Riss ragt über den Rand des Eis hinaus'
+            c = r.spitze if (r.spitze and p in r.enden) else (r.farbe or farbe)
+            col = bleich_farbe(r, p, ph, tuple(c), tuple(int(v) for v in fig[y + dy, x + dx, :3]), toene)
+            if col is not None:
+                out[y + dy, x + dx, :3] = col
+    return out
+
+
+def wachse_riss(maske, rnd, laenge, zweige=(), dick=0, versuche=400):
+    """Hilfe zum EINMALIGEN Entwerfen einer Rissform (die Koordinaten werden danach im Skript festgeschrieben): zufälliger zackiger Hauptast aus `laenge` Pixeln auf der Maske
+    (Richtungswechsel höchstens 45° je Schritt, berührt sich nie selbst), Seitenäste mit den Längen `zweige` (zweigen quer ab, berühren den Hauptast nur an ihrer Wurzel) und
+    `dick` Pixel, die ein zusammenhängendes Stück des Hauptasts auf 2 px verdicken. Gibt dict(h=…, z=…, d=…) oder None zurück."""
+    h, w = maske.shape
+
+    def ok(q):
+        return 0 <= q[0] < w and 0 <= q[1] < h and maske[q[1], q[0]]
+
+    def cheb(a, b):
+        return max(abs(a[0] - b[0]), abs(a[1] - b[1]))
+    ys, xs = np.nonzero(maske)
+    for _ in range(versuche):
+        k0 = rnd.randrange(len(xs))
+        pf = [(int(xs[k0]), int(ys[k0]))]
+        g = rnd.randrange(8)                                                         # Grundrichtung; die Schritte zacken um sie herum (g-1, g, g+1), sie selbst dreht nur selten
+        dirs = []
+        while len(pf) < laenge:
+            if dirs and rnd.random() < 0.18:
+                g = (g + rnd.choice([1, -1])) % 8
+            opt = [(g + 1) % 8, (g - 1) % 8, g]
+            rnd.shuffle(opt)
+            if len(dirs) >= 2 and dirs[-1] == dirs[-2]:                              # nie drei gleiche Schritte hintereinander (kein gerader Strich)
+                opt = [k for k in opt if k != dirs[-1]] + [dirs[-1]]
+            for k in opt:
+                q = (pf[-1][0] + _RICHT[k][0], pf[-1][1] + _RICHT[k][1])
+                if ok(q) and q not in pf and all(cheb(q, o) > 1 for o in pf[:-1]):
+                    pf.append(q); dirs.append(k)
+                    break
+            else:
+                break
+        if len(pf) < laenge:
+            continue
+        zw, gut = [], True
+        for zl in zweige:
+            for _v in range(40):
+                a = rnd.randrange(1, max(2, laenge - 2))
+                kd = (dirs[min(a, len(dirs) - 1)] + rnd.choice([2, -2, 3, -3])) % 8
+                z, cur, dd = [], pf[a], kd
+                for m in range(zl):
+                    opt = [(kd + 1) % 8, (kd - 1) % 8, kd] if m else [dd]
+                    rnd.shuffle(opt)
+                    if m >= 2:
+                        opt = [k for k in opt if k != dd] + [dd]
+                    for k in opt:
+                        q = (cur[0] + _RICHT[k][0], cur[1] + _RICHT[k][1])
+                        if not ok(q) or q in pf or q in z or any(q in o for o in zw):
+                            continue
+                        if m == 0:
+                            if any(cheb(q, o) <= 1 for j, o in enumerate(pf) if abs(j - a) > 1) or any(abs(q[0] - pf[j][0]) + abs(q[1] - pf[j][1]) == 1 for j in (a - 1, a + 1) if 0 <= j < laenge):
+                                continue
+                        elif any(cheb(q, o) <= 1 for o in pf) or any(cheb(q, o) <= 1 for o in z[:-1]):
+                            continue
+                        if any(cheb(q, o) <= 1 for oz in zw for o in oz):
+                            continue
+                        z.append(q); cur = q; dd = k
+                        break
+                    else:
+                        break
+                if len(z) == zl:
+                    zw.append(z)
+                    break
+            else:
+                gut = False
+                break
+        if not gut:
+            continue
+        dk = []
+        if dick:
+            for _v in range(40):
+                s = rnd.randrange(0, max(1, laenge - dick - 1))
+                seite = rnd.choice([0, 1])
+                dk = []
+                for j in range(s, s + dick):
+                    p, q = pf[j], pf[j + 1]
+                    sx, sy = q[0] - p[0], q[1] - p[1]
+                    if sx and sy:
+                        c = (p[0] + sx, p[1]) if seite else (p[0], p[1] + sy)
+                    elif sx:
+                        c = (p[0], p[1] + (1 if seite else -1))
+                    else:
+                        c = (p[0] + (1 if seite else -1), p[1])
+                    if not ok(c) or c in pf or any(c in o for o in zw) or any(cheb(c, o) <= 1 for oz in zw for o in oz):
+                        dk = None
+                        break
+                    if any(cheb(c, o) <= 1 for i2, o in enumerate(pf) if i2 < j - 1 or i2 > j + 2):
+                        dk = None
+                        break
+                    if c not in dk:
+                        dk.append(c)
+                if dk:
+                    break
+            if not dk:
+                continue
+        return dict(h=pf, z=zw, d=dk)
+    return None
+
+
+def riss_pixel(form):
+    return list(form['h']) + [p for z in form['z'] for p in z] + list(form['d'])
+
+
+def waehle_formen(kand, n, wert, abstand=2):
+    """n Rissformen aus `kand` (Liste von dict), absteigend nach wert(form), die sich gegenseitig nicht näher als `abstand` + 1 Pixel (Chebyshev) kommen."""
+    gew = []
+    for f in sorted(kand, key=lambda f: -wert(f)):
+        if len(gew) >= n:
+            break
+        pf = riss_pixel(f)
+        if all(min(max(abs(a[0] - b[0]), abs(a[1] - b[1])) for a in pf for b in riss_pixel(g)) > abstand for g in gew):
+            gew.append(f)
+    return gew
+
+
+def beruehren(a, b, abstand=1):
+    """Liegen zwei Risse (Pixel-Listen) irgendwo näher als `abstand` + 1 Pixel (Chebyshev) beieinander?"""
+    return any(max(abs(p[0] - q[0]), abs(p[1] - q[1])) <= abstand for p in a for q in b)
+
+
+def plane_starts(leben, n, konflikt=None, basis=1, seed=1, sperre=None):
+    """Startframes für Risse mit den Lebensdauern `leben` (Frames): jeder Riss ist vor dem Schleifenende fertig (Frame 0 bleibt rissfrei), Risse mit konflikt(i, j) == True
+    (gleiche Stelle/berühren sich) laufen nie gleichzeitig, und die Starts werden so gelegt, dass möglichst gleichmäßig viele Risse zugleich sichtbar sind.
+    sperre(i, s) → True verbietet Start s für Riss i (z. B. weil dort gerade ein Sparkle säße)."""
+    import random
+    rnd = random.Random(seed)
+    last = [0] * n
+    st = [None] * len(leben)
+    for i in sorted(range(len(leben)), key=lambda i: -leben[i]):
+        best = None
+        for s in range(basis, n - leben[i] + 1):
+            if sperre and sperre(i, s):
+                continue
+            if konflikt and any(st[j] is not None and konflikt(i, j) and s < st[j] + leben[j] and st[j] < s + leben[i] for j in range(len(leben))):
+                continue
+            if konflikt and any(st[j] is None and j != i and konflikt(i, j) and s - basis < leben[j] and n - s - leben[i] < leben[j] for j in range(len(leben))):
+                continue                                                             # Platz für den noch nicht gesetzten Riss an derselben Stelle lassen
+            wert = sum(last[s:s + leben[i]]) / leben[i] + sum(1.5 for j in range(len(leben)) if st[j] is not None and (abs(st[j] - s) < 3 or abs(st[j] + leben[j] - s - leben[i]) < 3)) + rnd.random() * 0.6
+            if best is None or wert < best[0]:
+                best = (wert, s)
+        assert best is not None, ('kein freier Startframe für Riss', i)
+        st[i] = best[1]
+        for f in range(best[1], best[1] + leben[i]):
+            last[f] += 1
+    return st

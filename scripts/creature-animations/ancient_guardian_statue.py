@@ -32,6 +32,7 @@ import numpy as np
 
 import anim_humanoide as Hm
 import anim_lib as L
+import anim_textur as TX   # texturierte Streckzeilen statt Zeilenkopien (Regel 43)
 
 N, MS = 48, 62
 PAD_L, PAD_R, PAD_T, PAD_B = 3, 3, 3, 2          # Figur knapp zugeschnitten: Helmgleiten ±1 px seitlich, Helmhub 1 px oben, Randabstand ≥ 2
@@ -83,7 +84,7 @@ def frame(i):
     if gv:
         Hm.bereich_versatz(hl, OFF, {y: gv for y in range(0, 14)}, -2, sw + 1)
     # --- Helm hebt sich: Bandzeile 12 doppelt, Gesicht bleibt ---
-    hl = Hm.atmen(hl, PAD_T + 12, PAD_T + 5, Hm.stufe(i, N / 2, 1), 0)
+    hl = TX.atmen(hl, PAD_T + 12, PAD_T + 5, Hm.stufe(i, N / 2, 1), 0)
     fig = L.zusammen(H, W, [(gs, 0, 0), (hl, 0, 0)])
     # Regel 16: Randpixel in Nicht-Umrissfarbe werden Umriss
     kk = Hm.kantenmaske(fig)

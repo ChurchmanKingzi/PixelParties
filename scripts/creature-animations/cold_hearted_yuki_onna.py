@@ -41,6 +41,7 @@ import sys
 import numpy as np
 
 import anim_lib as L
+import anim_textur as TX   # texturierte Streckzeilen statt Zeilenkopien (Regel 43)
 import anim_untote as U
 
 N, MS = 48, 65
@@ -165,7 +166,7 @@ def frame_gross(i, nur=None):
     n = U.stufe(i, 24, 1)                                        # Atmen 0/1 Rasterpixel
     d_al, d_ar = pend(i, 1.0, 0, 16), pend(i, 0.5, 5, 24)         # Hände (rechts 0…1 px nach außen; bei 2 px risse ein Handpixel vom Ärmel ab)
     d_s = pend(i, 1.0, 3, 16)                                    # Saum
-    bs = L.streck_zeile(teil(basis_m), GPT + 13, n)
+    bs = TX.streck_zeile(teil(basis_m), GPT + 13, n)
     koerper = L.zusammen(H, W, [(teil(saum), d_s, 0), (teil(hand_l), d_al, 0), (teil(hand_r), d_ar, 0), (haar_ebene(i, n), 0, 0), (bs, 0, 0)])
     koerper = U.kontur_schliessen(koerper, UMRISS, KONTUR)
     if nur == 'koerper':

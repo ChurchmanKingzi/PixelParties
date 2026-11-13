@@ -45,55 +45,61 @@ SCHWARZ = (0, 0, 0)
 HELL = [(208, 208, 208), (237, 237, 237)]                                                # Schalenfarben B, C (nur dort liegen Risse)
 GRAU = (129, 129, 129)                                                                   # Schattenstreifen F (darf neben einem Riss liegen)
 
-# ── Risse je Ei (x, y im Sprite; Pixel 1 wächst zuerst) — Stellen mit der Skript-Hilfe E.sicher/E.pfade ausgesucht und hier festgeschrieben ──
+# ── Risse je Ei (x, y im Sprite): h = Hauptast in Wachstumsrichtung, z = Seitenäste, d = Pixel, die den Riss dort 2 px dick machen — mit E.wachse_riss entworfen und festgeschrieben ──
 EIER = [
     # 0 oben rechts
-    [[(29, 5), (30, 4), (31, 4)], [(34, 7), (35, 8), (35, 9)], [(26, 8), (27, 7), (27, 6)], [(33, 11), (34, 11)]],
+    [dict(h=[(33, 11), (34, 11), (35, 10), (36, 9), (36, 8), (35, 7), (34, 7)], z=[], d=[(34, 10), (35, 9)]),
+     dict(h=[(26, 8), (26, 7), (27, 6), (28, 6)], z=[], d=[(26, 6)])],
     # 1 oben Mitte
-    [[(18, 15), (18, 14), (19, 13)], [(14, 8), (15, 7), (16, 7)], [(19, 10), (20, 11), (21, 11)], [(12, 9), (12, 10)]],
+    [dict(h=[(21, 11), (20, 10), (19, 10), (18, 9), (17, 8), (16, 7)], z=[], d=[(20, 11)]),
+     dict(h=[(13, 9), (12, 9), (11, 9)], z=[], d=[])],
     # 2 links
-    [[(7, 13), (8, 13), (9, 14)], [(11, 16), (12, 17), (13, 17)], [(3, 17), (3, 18), (4, 19)], [(4, 15), (5, 15)], [(10, 20), (11, 19)]],
+    [dict(h=[(7, 13), (8, 13), (9, 14), (10, 15), (11, 16), (12, 17), (12, 18), (11, 19)], z=[], d=[(12, 16), (13, 17)]),
+     dict(h=[(4, 16), (3, 17), (3, 18), (4, 19)], z=[], d=[(3, 16)])],
     # 3 Mitte rechts
-    [[(27, 22), (28, 21), (29, 21)], [(22, 16), (23, 16), (24, 15)], [(30, 18), (30, 19), (31, 20)], [(26, 14), (27, 15), (28, 16)], [(24, 22), (25, 23)]],
+    [dict(h=[(30, 17), (31, 18), (30, 19), (30, 20), (29, 21), (28, 22), (27, 23), (26, 23)], z=[], d=[(30, 18), (31, 19), (29, 20)]),
+     dict(h=[(21, 17), (22, 16), (23, 16), (24, 15), (25, 14)], z=[], d=[(21, 16)])],
     # 4 unten
-    [[(21, 27), (21, 26), (22, 25)], [(12, 26), (12, 25), (13, 24)], [(15, 22), (16, 21), (17, 21)], [(18, 29), (19, 28)], [(13, 28), (14, 28)], [(19, 23), (20, 24)]],
+    [dict(h=[(21, 24), (21, 25), (22, 26), (21, 27), (20, 28), (19, 29), (18, 30), (17, 30)], z=[], d=[(22, 25), (21, 26)]),
+     dict(h=[(13, 24), (12, 25), (12, 26), (13, 27)], z=[], d=[(12, 24)]),
+     dict(h=[(16, 21), (17, 21), (18, 22)], z=[], d=[])],
 ]
-HALTEN = [2, 4, 3, 5, 2, 3, 4, 2, 5, 3]
+# Zwischentöne beim Ausbleichen: Schwarz → Grau → Schale. Das Sprite hat dazwischen nur das Schattengrau F; damit das Ausbleichen mehrere Stufen hat, kommen vier Grautöne der
+# Spielpalette (data/palette.json: #323232, #535353, #a8a8a8, #b9b9b9) dazu — bewusst freigegeben (L.pruefe(erlaubt=…)).
+PAL_GRAU = [(50, 50, 50), (83, 83, 83), (168, 168, 168), (185, 185, 185)]
+TOENE = E.toene_auto(PAL_GRAU + [GRAU], quer=8)
+HALTEN = [3, 5, 4, 6, 3, 4, 5, 3, 6, 4]
 RISSE, GRUPPEN, STELLE = [], [], []
+_ev = []
 for _g, _sites in enumerate(EIER):
-    _ev = [(list(p) if (k % 2 == 0) else list(reversed(p))) for k, p in enumerate(_sites)]
-    _stelle = list(range(len(_ev)))
-    while len(_ev) < 5:                                                                    # Eier mit wenig Platz: erste Stelle ein zweites Mal, von der anderen Seite her
-        _stelle.append(len(_ev) - len(_sites))
-        _ev.append(list(reversed(_sites[len(_ev) - len(_sites)])))
-    _pr = [E.profil(len(p), HALTEN[(_g * 3 + k) % len(HALTEN)]) for k, p in enumerate(_ev)]
-    _st = E.starts(len(_ev), N, [len(q) for q in _pr], basis=1 + _g, versatz=_g * 0.37 + 0.2)
-    GRUPPEN.append(list(range(len(RISSE), len(RISSE) + len(_ev))))
-    STELLE += [(_g, k) for k in _stelle]
-    RISSE += [E.Riss(p, start=st, profil=q) for p, st, q in zip(_ev, _st, _pr)]
+    _ids = []
+    for _k, _f in enumerate(_sites):
+        for _rev in ((False, True) if len(_f['h']) <= 5 else (_g % 2 == 1,)):               # kleine Risse zweimal je Schleife (einmal von jeder Seite her wachsend), große einmal
+            _ids.append(len(_ev))
+            _ev.append((_g, _k, dict(haupt=list(reversed(_f['h'])) if _rev else _f['h'], zweige=_f['z'], dick=_f['d'], halten=HALTEN[(len(_ev) * 3 + _g) % len(HALTEN)],
+                                     tempo=1 if len(_f['h']) >= 5 else 2, stufen=4, stufe_frames=2)))
+    GRUPPEN.append(_ids)
+_probe = [E.BleichRiss(start=0, **kw) for (_, _, kw) in _ev]
+_st = E.plane_starts([r.leben for r in _probe], N, konflikt=lambda i, j: _ev[i][:2] == _ev[j][:2], basis=1, seed=4)
+RISSE = [E.BleichRiss(start=s, **kw) for s, (_, _, kw) in zip(_st, _ev)]
+STELLE = [e[:2] for e in _ev]
 _sich = E.sicher(spr, HELL, [GRAU], rand_abstand=1)
 for _r in RISSE:
     for (_x, _y) in _r.pix:
-        assert OPAK[_y, _x] and tuple(int(v) for v in spr[_y, _x, :3]) in HELL, (_x, _y)
-        for (_dx, _dy) in ((1, 0), (-1, 0), (0, 1), (0, -1)):                              # nie über die Kante neben einem Umriss/der Raute
-            _q = spr[_y + _dy, _x + _dx]
-            assert _q[3] and tuple(int(v) for v in _q[:3]) in HELL + [GRAU], ('Riss neben Umriss', _x, _y)
-_pix = [(i, p) for i, r in enumerate(RISSE) for p in r.pix]
-for _a in range(len(_pix)):
-    for _b in range(_a + 1, len(_pix)):
-        (_i, _p), (_j, _q) = _pix[_a], _pix[_b]
+        assert _sich[_y, _x], ('Riss neben Umriss/Raute', _x, _y)                           # Schalenpixel, alle 4 Nachbarn Schale: nie über die Kante neben einem Umriss/der Raute
+for _i in range(len(RISSE)):
+    for _j in range(_i + 1, len(RISSE)):
         if STELLE[_i] == STELLE[_j]:                                                       # dieselbe Stelle zweimal: die Zeiträume dürfen sich nicht überlappen
-            if _i != _j:
-                assert not any(RISSE[_i].stufe(f, N) and RISSE[_j].stufe(f, N) for f in range(N)), ('Stelle doppelt belegt', STELLE[_i])
+            assert not any(RISSE[_i].stufe(f, N) and RISSE[_j].stufe(f, N) for f in range(N)), ('Stelle doppelt belegt', STELLE[_i])
         else:
-            assert max(abs(_p[0] - _q[0]), abs(_p[1] - _q[1])) > 1, ('Risse berühren sich', _p, _q)
-assert all(r.stufe(0, N) == 0 for r in RISSE) and all(r.start + len(r.profil) <= N for r in RISSE)
+            assert not E.beruehren(RISSE[_i].pix, RISSE[_j].pix), ('Risse berühren sich', STELLE[_i], STELLE[_j])
+assert all(r.stufe(0, N) == 0 for r in RISSE) and all(r.start + r.leben <= N for r in RISSE)
 
 REF = L.platz(spr, H, W, PAD, PAD)
 
 
 def frame(i):
-    return E.auf_figur(REF, E.risse_ebene(H, W, i, N, RISSE, SCHWARZ, PAD, PAD, gueltig=OPAK))
+    return E.bleich_risse(REF, i, N, RISSE, SCHWARZ, TOENE, PAD, PAD, gueltig=OPAK)
 
 
 if __name__ == '__main__':
@@ -103,7 +109,7 @@ if __name__ == '__main__':
     print('Frame 0 weicht vom Original in', int((frames[0] != REF).any(axis=2).sum()), 'Pixeln ab |', len(RISSE), 'Risse | gleichzeitig höchstens', z['max'], ', Mittel', z['mittel'], '| Frames ohne Riss:', z['leer'])
     print('je Ei (höchstens gleichzeitig, Mittel, Frames mit >= 2):', z['gruppen'])
     print('Pixel, die sich je Frame vom Original unterscheiden:', [int((f != REF).any(axis=2).sum()) for f in frames])
-    n = L.pruefe(frames, quelle=spr)
+    n = L.pruefe(frames, quelle=spr, erlaubt=PAL_GRAU)
     L.speichern('monster-nest', 'Monster Nest', frames, MS, prev)
     if prev:
         L.streifen(prev + '/monster-nest-strip.png', frames[::3], spalten=10, scale=6)

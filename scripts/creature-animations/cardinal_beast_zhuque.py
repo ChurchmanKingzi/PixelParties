@@ -24,6 +24,9 @@ Ablauf (48 Frames à 70 ms = 3,36 s, nahtlos) — RUNDE 3:
   (25° über der Ruhelage) bis weit nach unten außen (70° unter die Ruhelage: Spitze zeigt dann waagerecht nach außen, der Flügel hängt dabei). Vorher nur ein Spaltenversatz um ±5 px. Technik wie beim Lunatic Hawk: Rückwärtsabbildung (Nächster-Nachbar,
   `F.drehen(glatt=True)`), keine Mischfarben, keine Löcher. Die SCHULTER (Flügelpixel im Umkreis von 9 px um (24,27)/(34,27) sowie der Flügelansatz am Körper) bleibt als Teil des Körpers stehen und hebt sich nur mit ihm — so reißt der Flügel
   nie vom Rumpf ab (keine Lücke); am frei liegenden Rand der Schulter werden fehlende Umrisspixel in Dunkelrot (111,19,8) ergänzt. Frame 0 liegt auf dem Aufschlag bei 26 % des Hubs und ist exakt die Originalpose.
+  RUNDE 4 (Nutzer: „Die Flügel beginnen näher am Körper.“): Das Gelenk sitzt jetzt direkt am Körperrand ((25,27) links, (33,27) rechts; Körper x 26–33) und nur noch ein 3-px-Gelenkkern (statt 9 px Schulter) sowie der
+  2 px breite Ansatzstreifen am Rumpf (x 24–25 / 34–35, y ≥ 24) bleiben stehen — der GANZE Flügel ab Körperansatz schlägt (Regel 46). Die beiden Fänge (Farben (55,59,70)/(68,73,79)/(90,90,92)/(35,12,0)) und der Unterleib
+  zwischen ihnen (x 22–37, y ≥ 33) gehören zum Körper und schlagen nicht mit. Die Angaben „(24,27)/(34,27)“ und „Umkreis 9 px“ oben sind damit überholt.
 * SCHWEBEN: der ganze Vogel hebt sich beim Abschlag um bis zu 2 px (Schulter, Körper, Krallen), zweistufig, Krallen schwingen dabei ein Frame nach.
 * Keine Flammen, keine Partikel, kein Glanz.
 Ergänzungen: nur Umrisspixel (Dunkelrot) an der freigelegten Schulterkante; Randpixel (Regel 16): anim_flieger.umranden. Alle Bewegungen laufen auf der vollen Leinwand (anim_lib / F.drehen werfen ClipError). Nur Farben der Quelle.
@@ -55,10 +58,11 @@ DUNKEL, BRAUN = (111, 19, 8), (123, 62, 0)
 wing_l = vorhanden & (xx <= 25)
 wing_r = vorhanden & (xx >= 34)
 koerper_m = vorhanden & ~wing_l & ~wing_r
-PIV_L, PIV_R = (24.0, 27.0), (34.0, 27.0)                # Schultergelenke (Sprite)
-R_SCHULTER = 9.0                                         # Umkreis, der als Schulter am Körper bleibt
-sch_l = wing_l & ((xx - PIV_L[0]) ** 2 + (yy - PIV_L[1]) ** 2 <= R_SCHULTER ** 2) | (wing_l & (xx >= 22) & (yy >= 24))
-sch_r = wing_r & ((xx - PIV_R[0]) ** 2 + (yy - PIV_R[1]) ** 2 <= R_SCHULTER ** 2) | (wing_r & (xx <= 36) & (yy >= 24))
+PIV_L, PIV_R = (25.0, 27.0), (33.0, 27.0)                # Schultergelenke (Sprite) — Runde 4: direkt am Körperrand (Körper x 26–33)
+R_SCHULTER = 3.0                                         # Runde 4 („Die Flügel beginnen näher am Körper“): nur noch ein 3-px-Gelenkkern bleibt stehen (vorher 9 px), der ganze Flügel ab Körperansatz schlägt
+KRALLE_M = L.farbmaske(spr, [(55, 59, 70), (68, 73, 79), (90, 90, 92), (35, 12, 0)]) | (vorhanden & (xx >= 22) & (xx <= 37) & (yy >= 33))   # Fänge + Unterleib dazwischen: gehören zum Körper, schlagen nie mit
+sch_l = wing_l & ((xx - PIV_L[0]) ** 2 + (yy - PIV_L[1]) ** 2 <= R_SCHULTER ** 2) | (wing_l & (xx >= 24) & (yy >= 24)) | (wing_l & KRALLE_M)
+sch_r = wing_r & ((xx - PIV_R[0]) ** 2 + (yy - PIV_R[1]) ** 2 <= R_SCHULTER ** 2) | (wing_r & (xx <= 35) & (yy >= 24)) | (wing_r & KRALLE_M)
 fl_l_m, fl_r_m = wing_l & ~sch_l, wing_r & ~sch_r
 
 

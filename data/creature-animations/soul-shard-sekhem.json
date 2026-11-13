@@ -2,7 +2,7 @@
   "creature": "Soul Shard Sekhem",
   "sheet": "soul-shard-sekhem.png",
   "frameWidth": 25,
-  "frameHeight": 31,
+  "frameHeight": 48,
   "frames": 48,
   "frameMs": 65,
   "loop": true,

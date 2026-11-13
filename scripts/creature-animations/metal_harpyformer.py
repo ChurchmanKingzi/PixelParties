@@ -31,9 +31,9 @@ Ablauf (48 Frames à 65 ms = 3,12 s; Frame 0 = Ruhepose bis auf das neu gezeichn
 * Haarsträhnen unten (Runde 3, Rückmeldung „die Haare zucken seltsam“): statt Pixel zu stauchen/verdoppeln (das ließ sie zucken) pendeln sie jetzt ruhig als Ganzes nach außen und zurück (`strang_schwingen`): jede Zeile (Umriss, Füllung und die einzelnen
   Haarfransen außen) wandert starr um 0 … 2 px, die Auslenkung wächst gleichmäßig zur Spitze und folgt der Bewegung mit Nachlauf (Welle), das innerste Pixel bleibt am Körper, die Lücke füllt die Füllfarbe der Strähne. Links Periode 24,
   rechts Periode 16 (gegeneinander versetzt), nach innen nie über die Ruhelage hinaus; Änderungen höchstens 1 px je Zeile und alle 2–4 Frames.
-* Feuer (Regel 15, `anim_harpyb.WindFeuer` = anim_feuer.Feuer + Fahrtwind): 7 verschachtelte Zungen mit je 5 Farbschichten, je Zunge eigene Posenfolge (12 Posen à 2–3 Frames); Basis ruhig und breit am Gitarrenkopf, Spitzen
-  züngeln; die Flamme neigt sich entgegen der Schwenkrichtung (Fahrtwind ±2,6 px an der Spitze) und folgt dem Kippen der Gitarre. Zungenspitzen reißen ab und steigen als Funken auf (1 px, gelb → orange → rot,
-  12 pro Schleife, bleiben beim Aufsteigen in der Luft stehen, während die Fackel weiterzieht).
+* Feuer (Runde 4, Rückmeldung „sehen die Flammen noch nicht wie richtige, sauber animierte Flammen aus“): klassischer Flammenzyklus mit Aufwärtsfluss aus `anim_feuer3` — eine breite, ruhige Glutbasis um den
+  Gitarrenkopf und 5 phasenversetzte Zungen (Tropfen mit verschachtelten Farbbändern Rot → Orange → Gelb → Creme), 8 Posen à 2 Frames (3 Zyklen je Schleife): Bäuche wandern von der Basis zur Spitze, die Spitzen
+  schnüren sich ab und steigen als kleine Fetzen weiter. Die Flamme neigt sich entgegen der Schwenkrichtung (Fahrtwind, ganzzahlig) und folgt dem Kippen der Gitarre. Die früheren Einzelfunken entfallen.
 * Blinzeln: Frames 19–21 und 41–42, Lid = Hautfarbe (114,63,63) auf Iris und Pupille.
 
 Ergänzungen (Sprite-Koordinaten): Haaransatz unter dem Gitarrenfuß, den die Gitarre sonst verdeckt: (13,25) (14,25) (15,25) = Umrissfarbe (19,10,10), (14,26) = Haarfarbe (168,97,97). Das Feuer wird komplett neu gezeichnet
@@ -49,6 +49,7 @@ import numpy as np
 import anim_lib as L
 import anim_flieger_b as B
 import anim_feuer as FEU
+import anim_feuer3 as F3
 import anim_harpyb as HB
 import anim_amorph as A
 
@@ -111,15 +112,15 @@ HALS_FARBEN = [(242, 255, 255), (172, 177, 179), (26, 33, 39), (62, 56, 50), (10
 RAMPE = {'rand': ROT, 'rot': ROT, 'orange': ORANGE, 'gelb': GELB, 'hell': CREME}
 SPERRE = np.zeros((H, W), bool)
 SPERRE[PAD_T:PAD_T + sh, PAD_L:PAD_L + sw] = M_GITARRE & (yy <= 21)
-ZUNGEN = [FEU.Zunge(PAD_L + x, PAD_T + b, h, br) for (x, b, h, br) in
-          [(4, 12, 7, 2.0), (7, 15, 12, 2.7), (10, 15, 14, 2.8), (13, 14, 15, 3.0), (16, 15, 13, 2.8), (19, 17, 12, 2.7), (22, 16, 9, 2.2)]]
-FEUER = HB.WindFeuer(H, W, ZUNGEN, RAMPE, n=N, seed=3, posen=12, amplitude=1.1, sperre=SPERRE)
-ABRISSE = HB.abrisse(FEUER)
-_gew = []
-for ziel in range(2, N, 4):                                 # 12 Funken je Schleife, gleichmäßig über die Schleife verteilt (je Viertelzehntel der nächste hohe Abriss)
-    frei = [e for e in ABRISSE if e not in _gew]
-    _gew.append(min(frei, key=lambda e: (min((e[0] - ziel) % N, (ziel - e[0]) % N), e[2])))
-ABRISSE = _gew
+# Runde 4: klassischer Flammenzyklus mit Aufwärtsfluss (anim_feuer3): breite ruhige Glutbasis um den Gitarrenkopf + 5 phasenversetzte Zungen, 8 Posen à 2 Frames (3 Zyklen je Schleife)
+_F = lambda x, y, l, b, **k: F3.Flamme(PAD_L + x, PAD_T + y, l, b, **k)
+FLAMMEN3 = [_F(13.5, 14.5, 8, 9.5, bauch=0.22, schlag=0.35, phase=0.2, fuss=5.5),
+            _F(6.0, 13.0, 11, 3.2, phase=0.05, richtung=(-0.3, -1)),
+            _F(10.0, 11.0, 14, 3.4, phase=0.6, richtung=(-0.1, -1)),
+            _F(14.0, 11.0, 17, 4.0, phase=0.3),
+            _F(18.0, 11.5, 13, 3.4, phase=0.85, richtung=(0.12, -1)),
+            _F(21.5, 13.5, 10, 3.0, phase=0.45, richtung=(0.3, -1))]
+FEUER = F3.Feuer(H, W, FLAMMEN3, FLAMMEN, posen=8, halten=2)
 
 
 # ── Schwenk ─────────────────────────────────────────────────────────────────────────────────────────────────────────
@@ -245,7 +246,8 @@ def frame(i, partikel=True, nur=None):
         fl_r = HB.zeilen_schub(FL_R, arm_dx(a, 26, 31))
         str_l = strang_schwingen(STR_L, True, i, 24.0, 2.2)
         str_r = strang_schwingen(STR_R, False, i, 16.0, 2.0, lag=1.5)
-        feuer = FEUER.ebene(i, wind=wind(i))
+        feuer = FEUER.ebene(i, neigung=round(wind(i)))
+        feuer[SPERRE] = 0
         feuer = A.verbinde4(HB.zeilen_schub(feuer, schub_fn(a, kippen(i), 16)))[0]
         gitarre = A.verbinde4(HB.zeilen_schub(GITARRE, schub_fn(a, kippen(i))))[0]
         m_hals = L.farbmaske(gitarre, HALS_FARBEN)
@@ -258,9 +260,6 @@ def frame(i, partikel=True, nur=None):
                       (gitarre, 0, 0, 6), (hals, 0, 0, 8), (feuer, 0, 0, 7)]
     f, karte = B.zusammen_mit_karte(H, W, schichten)
     B.umriss_je_ebene(f, karte, ERLAUBT, UMRISS)
-    if partikel:
-        fk = HB.funken_welt(FEUER, ABRISSE, i, lambda fr: (int(round(schwenk(fr) + kippen(fr) * 12)) + int(round(0.8 * wind(fr))), -sum(atem(fr))), leben=12, steigen=0.5, farben=[GELB, ORANGE, ORANGE, ROT])
-        f = L.zusammen(H, W, [(fk, 0, 0), (f, 0, 0)])
     return f
 
 

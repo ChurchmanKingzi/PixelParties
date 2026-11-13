@@ -1,8 +1,8 @@
 {
   "creature": "Cardinal Beast Zhuque",
   "sheet": "cardinal-beast-zhuque.png",
-  "frameWidth": 87,
-  "frameHeight": 57,
+  "frameWidth": 85,
+  "frameHeight": 58,
   "frames": 48,
   "frameMs": 70,
   "loop": true,
@@ -11,5 +11,5 @@
   "padLeft": 2,
   "padRight": 2,
   "padBottom": 2,
-  "faceX": 43.5
+  "faceX": 42.5
 }

@@ -23,7 +23,7 @@ Metall: Hantelgewichte und Kette → nur dort Lichtband/Glitzer (Regel 14); Haut
 Ablauf (72 Frames à 62 ms = 4,46 s, nahtlos):
 * HANTEL STEMMEN (Periode 24, drei Hübe je Schleife): Faust + Unterarm + Hantel (starr, Ebenen 20-Faust/22/21 gemeinsam) heben sich zusätzlich zum Körper (Atmen) um höchstens 1 px relativ zu Kopf und Rumpf (Runde 3: vorher bis 2 px → Lücke zwischen oberem Gewicht und Kopf; bei 1 px wird nur die verdeckte unterste Gewichtszeile frei, das Gewicht berührt den Kopf weiter); die Stange bleibt in der Faust, der Unterarm taucht hinter den Rumpf.
 * ATMEN (Periode 36, bis 2 px): die Hosenzeile 22 wird bis zu 2× eingefügt (Texturmischung); Kopf mit Maske, Brust und der rechte Arm (starr) steigen, Hose/Füße bleiben; die Hantel steigt mit, die Kette am rechten Arm (samt Kettenende bis y 25) folgt dem Arm komplett (Runde 3: die untersten Endpixel blieben zurück).
-* FUSSTIPPEN: linker Stiefel (Frames 14–19) und rechter (Frames 46–51) heben sich je zweimal 1 px hinter die Hose.
+* FÜSSE: stehen völlig fest (Runde 4: das frühere Fußtippen ist auf Nutzerwunsch entfernt).
 * METALL: ein Lichtband läuft über das obere Hantelgewicht (Frames 6–15) und das untere (Frames 36–45), ein Lichtband über die Kette am Boden (Frames 56–67); je ein Glitzerstern am oberen Gewicht (Frames 22–26) und am unteren (Frames 52–56) — sie sitzen am Eisen und gehen mit der Hantel.
 * Kein Kopfwiegen seitlich (Regel 17), kein Schweben (Regel 18).
 Frame 0 = Original (Ruhepose). Ergänzungen: keine (die Ebenen liegen vollständig vor; der Arm taucht hinter den Rumpf, der unter der Faust ungezeichnete Teil der Stange ist in Ebene 21 vorhanden).
@@ -90,11 +90,7 @@ def frame(i, nur=None):
     rumpf = Hm.atmen(eb(E20, RUMPF), OFF[1] + 22, OFF[1] + 12, hub, 0)
     arm_r = L.versetze(eb(E20, ARM_R), 0, -hub)
     maske = L.versetze(eb(E19), 0, -hub)
-    # Füße tippen
-    pat = [1, 1, 0, 0, 1, 1]
-    ul = 1 if Hm.folge(i, 14, pat, N) else 0
-    ur = 1 if Hm.folge(i, 46, pat, N) else 0
-    fl, fr = eb(E20, FUSS_L, 0, -ul), eb(E20, FUSS_R, 0, -ur)
+    fl, fr = eb(E20, FUSS_L), eb(E20, FUSS_R)       # Runde 4: Füße stehen fest (kein Fußtippen/-wippen mehr)
     # Kette: obere Hälfte folgt der Hand, Bodenkette fest; Lichtband über die Bodenkette
     kr = eb(E18, KETTE_REST)
     Hm.lichtband(kr, KETTE_REST, OFF, i, N, 56, 12, RAMPE_KETTE, stufen=1, breite=3.0, achse=(1.0, 0.0), kern=2)

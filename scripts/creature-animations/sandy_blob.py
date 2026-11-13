@@ -37,6 +37,7 @@ import sys
 import numpy as np
 
 import anim_lib as L
+import anim_textur as TX   # texturierte Streckzeilen statt Zeilenkopien (Regel 43)
 import anim_amorph as A
 import anim_slime as SL
 
@@ -165,7 +166,7 @@ def figur(i):
     s_ = S[i] if h == 8 else min(S[i], 0)                                            # Strecken nur bei offenem Maul
     doppeln, p = POSEN[s_]
     koerper = A.zeilen_von(sp, 0, sh - 1, H, W, PAD_L, PAD_T)
-    z, quelle = SL.koerper_pose(koerper, loeschen=set(MUND_LOESCHEN[h]), doppeln=doppeln, p=p,
+    z, quelle = TX.koerper_pose(koerper, loeschen=set(MUND_LOESCHEN[h]), doppeln=doppeln, p=p,
                                 paare_je_zeile={k: v for k, v in PAARE_ZEILE.items()}, x0=PAD_L, sperre={WEISS, SCHWARZ})
     fig, top = A.auf_leinwand(z, H, BODEN, 0)
     fig, neu = A.umriss_ergaenzen(fig, UMRISS, lambda x, y: (125, 99, 45))             # Umrissstufen > 1 px (nur beim geschlossenen Maul an der Backe) schließen

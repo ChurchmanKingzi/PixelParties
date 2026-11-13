@@ -1,5 +1,9 @@
 # -*- coding: utf-8 -*-
-"""Idle-Animation für „Mischief Militia - Colored Snow“ (Creature) — der Schneemann, auf den die Tränke (rot, grün, gelb) gelandet sind.
+"""Idle-Animation für „Mischief Militia - Colored Snow“ (Creature) — der Schneemann, auf den die Tränke (rot, gelb) gelandet sind.
+
+RUNDE 4 (Nutzer-Feedback): „Bei Colored Snow kannst du das Grüne weglassen.“ — der grüne Strahl (44 Pixel, x 16–26, y 0–10) ist aus src/mischief-militia-colored-snow.png entfernt. Wo er den Schneemann verdeckte
+(20 Pixel: rechte Kopfseite, Kopfumriss, schwarze Haar-/Zweigstriche oben rechts), stehen jetzt die Originalpixel des Schneemanns aus Ebene 84 (MotiveRussia, Lage (7,4) im Sprite); die übrigen 24 Strahlpixel sind leer.
+Die Strahl-Animation entfällt; alles andere (Atmen, Pfütze, rote Tropfen, Zweigarme, Dunst, Frame-Maße) ist unverändert. Die Abschnitte unten, die den grünen Strahl beschreiben, gelten nur noch historisch.
 
 RUNDE 3 (Nutzer-Feedback): „Colored Snow ist die Figur, auf der die Potions gelandet sind.“ — der bisherige Rotor-Schneemann war FALSCH. Gemeint ist der Schneemann in der Kartenmitte
 (Schneemann mit geschlossenen X-Augen, Schal und Zweigarmen), über den ein roter Farbklecks (Kopf), ein grüner Strahl (von rechts oben) und eine gelbe Pfütze (unten/links) gespritzt sind.
@@ -65,6 +69,7 @@ E_, D_ = (223, 224, 246), (204, 204, 242)
 ERLAUBT |= set(GELB) | {GRUEN_HELL, GRUEN_MITTEL, GRUEN_DUNKEL, ROT_DUNKEL, ROT, ROT_HELL}      # Farbspritzer dürfen am Rand stehen (Strahl: hell/mittel wechseln)
 PFUETZE = L.farbmaske(spr, GELB)
 GRUEN = L.farbmaske(spr, [GRUEN_HELL, GRUEN_MITTEL, GRUEN_DUNKEL])
+assert not GRUEN.any()                                                         # Runde 4: der grüne Strahl ist aus dem Sprite entfernt (Nutzer: „das Grüne weglassen“)
 ROTM = L.farbmaske(spr, [ROT_DUNKEL, ROT, ROT_HELL])
 KOERPER = (spr[..., 3] > 0) & ~PFUETZE & ~GRUEN & ~ROTM
 ATEMZEILE = 15                                                                 # Zeile des Schneeballs, die beim Atmen doppelt eingefügt wird (keine Zweigpixel darin)
@@ -133,7 +138,6 @@ def koerper(i):
     pf = spr.copy()
     pf[~PFUETZE] = 0
     # Strahl fließt, Pfütze wellt (Frame 0 = Original)
-    umschalten(oben, GRUEN, GRUEN_HELL, GRUEN_MITTEL, S_STROM, 3, 12.0 * i / N)
     umschalten(pf, PFUETZE, GELB[1], GELB[2], S_PFUETZE, 4, 16.0 * i / N)
     k = L.platz(oben, H, W, PAD_L, PAD_T)
     pfk = L.platz(pf, H, W, PAD_L, PAD_T)

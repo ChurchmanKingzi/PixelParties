@@ -1,7 +1,7 @@
 {
   "creature": "Dark Deepsea God",
   "sheet": "dark-deepsea-god.png",
-  "frameWidth": 77,
+  "frameWidth": 79,
   "frameHeight": 63,
   "frames": 96,
   "frameMs": 70,
@@ -11,5 +11,5 @@
   "padLeft": 1,
   "padRight": 1,
   "padBottom": 4,
-  "faceX": 38.5
+  "faceX": 39.5
 }

@@ -27,8 +27,7 @@ Material: Schnee, Holz-Helm, heiße Klinge (Metall, aber KEIN Glanz-/Sparkle-Eff
 
 Ablauf (48 Frames à 66 ms = 3,17 s, nahtlos), alle Bewegungen unabhängig:
 * Hitzewelle in der Klinge (Periode 24, läuft nach oben): Rotanteil des Klingeninneren 35 → 80 %.
-* Hitzeflimmern der Klingenform (Periode 12, Wellenlauf von unten nach oben): die langen Zackenspitzen verlängern/verkürzen sich um 1 px (x 22…23), die kurzen Zacken wachsen gegenphasig um 1 px (x 20); eingezogen werden sie nicht (der helle Zackenkern bliebe offen).
-* Schwert wiegt sich (Periode 24): die Klingenzeilen y 0–19 neigen sich bis ±1 px, Griffbereich (y ≥ 20) bleibt in der Hand; Zeilenversatz ≤ 1 px je Zeile (Klinge bleibt zusammenhängend).
+* Runde 4: Die Klinge ist starr (kein Wiegen, kein Zackenflimmern mehr — Nutzer: „die Klinge wackelt zu sehr“); sie folgt nur der Hand (Atmen).
 * Atmen (Periode 24): die Zeile 31 des Schneeballs wird einmal doppelt eingefügt — Helm, Schwert (in der Hand) und Zweigarm steigen 1 px mit.
 * Linker Zweigarm schlenkert (Periode 32): Spitze zwischen y 21 und 27, Linie 4-verbunden von der Schulter (2,27).
 * Heiß: gedithertes rotes Glühen um die Klinge (pulsiert mit der Hitzewelle) + 7 aufsteigende orange/gelbe Hitzewölkchen. Kalt: 2 Wölkchen kalter Dunst am Fuß des Schneemanns (links).
@@ -101,32 +100,8 @@ def klinge_heizen(k, i):
 def koerper(i):
     k = L.platz(spr, H, W, PAD_L, PAD_T)
     klinge_heizen(k, i)
-    # Hitzeflimmern: lange Spitzen ±1 px (x 21…23), kurze Zacken x 19 ±1 gegenphasig
-    for y in LANG:
-        d = int(round(lauf(i, y) / 1.2))
-        if d >= 1:
-            Hm.setze(k, {(23, y): UMRISS_KL}, OFF)
-        elif d <= -1:
-            Hm.setze(k, {(22, y): None}, OFF)
-    for y in KURZ:
-        d = int(round(-lauf(i, y) / 1.2))
-        if d >= 1:
-            Hm.setze(k, {(20, y): UMRISS_KL}, OFF)
-        # (kein Einziehen der kurzen Zacken: das Ende (19, y) liegt über/unter dem hellen Kern der langen Zacke — er würde als offene Kante sichtbar)
-    # Schwert wiegt sich: Klingenzeilen kippen (Griff ab y 20 bleibt)
-    amp = 1.5
-    dx = {}
-    for y in range(0, 20):
-        yy = BLOCK.get(y, y)                      # alle drei Zeilen eines Zackenblocks kippen gleich: sonst liegt der Umriss (Zeile darüber/darunter) neben dem Zackenkern → offene Kante
-        f = (20 - yy) / 20.0
-        dx[y] = int(round(amp * f * math.sin(L.sinus(i, 24))))
-    for y, d in dx.items():
-        Y = y + OFF[1]
-        xs = [x for x in range(W) if k[Y, x, 3]]
-        if d and xs:
-            row = k[Y].copy(); k[Y] = 0
-            for x in xs:
-                k[Y, x + d] = row[x]
+    # Runde 4 (Nutzer: „die Klinge wackelt zu sehr“): KEIN Wiegen der Klingenzeilen und KEIN Längenflimmern der Zacken mehr — die Klinge ist starr und bewegt sich nur noch
+    # als Ganzes mit der Hand (1 px mit dem Atmen). Hitze zeigt sich allein über die Farbwelle im Klingeninneren, den Dither-Schein und die Wölkchen.
     # Zweigarm
     ty = 25 + int(round(2.6 * math.sin(L.sinus(i, 32))))
     if ty != 25:
@@ -169,8 +144,8 @@ def halo(k, i):
             if belegt[y, x] or y >= PAD_T + 20 or x < PAD_L + 12:
                 continue
             v = hitze_stufe(i, min(19, max(0, y - PAD_T)))
-            if d1[y, x] and v >= 3 and (x + y + i // 2) % 2 == 0:
-                e[y, x, :3] = GLUT_1; e[y, x, 3] = 255
+            if d1[y, x] and v >= 3 and (x + y + i // 4) % 2 == 0:               # Runde 4: Schein flackert halb so schnell und in der dunkleren Glutfarbe (nicht mehr in der Umrissfarbe der Klinge → liest sich nicht als wackelnde Klingenkontur)
+                e[y, x, :3] = GLUT_2; e[y, x, 3] = 255
     return e
 
 

@@ -17,6 +17,10 @@ Was ist was (x, y im Sprite):
 * ARME: links hängt der Arm (x 0–3, y 10–14) und die Hand (x 0–3, y 15–16: hell (217,217,217)/(228,228,228) mit braunen Fingerrändern (49,24,0)); rechts ragt die Hand (x 15–17, y 10–13) mit brauner Kontur (49,24,0) nach rechts — sie steigt nur mit der Brust (starr, nicht gedehnt).
 Metall/Gold: die goldene Schnalle (Gold = Metall → Glanz erlaubt, Regel 12/14). Sonst Haut/Stoff/Knochen: kein Glanz. Kein Feuer.
 
+RUNDE 4 (Nutzer: „hat beim Stretching einfach kopierte Zeilen. Hier solltest du etwas passende Textur/Schattierung hinzufügen!“, Regel 43): die beim Atmen über der Brustzeile y 13 eingefügten Zeilen sind jetzt
+HANDGEZEICHNET (STRECK_A direkt über y 13, STRECK_B darüber bei 2 px): die helle Brustplatte läuft nach oben schmaler und dunkler aus (156 → 123 → 65), der Oberarm bekommt wechselnde Schattierung; keine Zeile ist mehr
+Kopie ihrer Nachbarin. Hub, Takt und alles andere unverändert.
+
 Ablauf (48 Frames à 65 ms = 3,12 s; Frame 0 = Original):
 * ATMEN (Periode 24, 0 → 1 → 2 → 1 → 0 px): die Brustzeile y 13 wird 0–2× eingefügt (Texturmischung mit der Nachbarzeile); Schultern, Hals, Kopf, linker Oberarm steigen (die ausgestreckte rechte Hand starr mit), Gürtel, Beine und Stiefel bleiben am Boden.
 * LINKE HAND (Runde 3, Nutzer: „teilweise Lücken, wenn er ganz nach links gestretcht wird“): die Hand besteht nur noch aus ihren 6 Pixeln ((0–3,15), (1–2,16): Knochen mit brauner Kontur). Vorher maskierte `xx <= 3 & yy >= 15` auch den linken
@@ -68,6 +72,27 @@ hand_r = vorhanden & (xx >= 15) & (yy <= 13)
 rest = vorhanden & ~hand_l & ~hand_r
 TEST_EBENEN = 'koerper'
 
+# Runde 4: handgezeichnete Einfügezeilen (Grauwerte der Quelle, x 0–14); Reihenfolge von oben: y 12, [B], A, y 13
+_G = lambda v: (v, v, v)
+STRECK_A = [0, 65, 41, 0, 41, 41, 123, 156, 156, 123, 41, 41, 41, 24, 0]
+STRECK_B = [0, 41, 123, 0, 41, 65, 41, 123, 123, 41, 65, 41, 65, 24, 0]
+_farben = {col(x, y) for y in range(sh) for x in range(sw) if vorhanden[y, x]}
+assert all(_G(v) in _farben for v in STRECK_A + STRECK_B)
+assert [int(spr[13, x, 0]) for x in range(15)] == [0, 41, 65, 0, 41, 41, 156, 156, 156, 156, 41, 41, 41, 24, 0]
+
+
+def strecken(k, n):
+    """Brust n px strecken: alles oberhalb von y 13 rückt n px hoch, dazwischen stehen die handgezeichneten Zeilen (B oben, A unten) statt Kopien."""
+    out = L.streck_zeile(k, OFF[1] + 13, n)
+    zeilen = [STRECK_A] if n == 1 else [STRECK_B, STRECK_A][:n]
+    for j, werte in enumerate(zeilen):
+        y = OFF[1] + 13 - len(zeilen) + j
+        out[y] = 0
+        for x, v in enumerate(werte):
+            out[y, OFF[0] + x] = _G(v) + (255,)
+    out[OFF[1] + 13] = k[OFF[1] + 13]
+    return out
+
 
 def teil(m):
     return V.ebene(spr, m, H, W, OFF)
@@ -88,7 +113,7 @@ def frame(i, nur=None):
         V.setze(k, {SCHNALLE[1]: HELL}, OFF)
     elif g == 2:
         V.setze(k, {SCHNALLE[0]: DUNKEL, SCHNALLE[1]: HELL}, OFF)
-    kb = L.streck_zeile(k, OFF[1] + 13, n)
+    kb = strecken(k, n) if n else k
     f = L.zusammen(H, W, [(kb, 0, 0), (teil(hand_r), 0, -n), (teil(hand_l), pendel(i), 0)])
     f = U.kontur_schliessen(f, UMRISS, KONTUR)
     if nur is None:

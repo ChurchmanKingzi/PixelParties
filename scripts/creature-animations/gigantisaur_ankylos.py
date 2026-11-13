@@ -43,6 +43,7 @@ import sys
 import numpy as np
 
 import anim_lib as L
+import anim_textur as TX   # texturierte Streckzeilen statt Zeilenkopien (Regel 43)
 import anim_tiere as T
 
 N, MS = 60, 66
@@ -139,8 +140,8 @@ def frame(i, nur=None):
     bh = L.heben_unten(teil(bein_h), PAD_T + BEIN_ZEILE['h'], tipp_h)
     ba = L.heben_unten(teil(bein_a), PAD_T + BEIN_ZEILE['a'], tipp_a)
     bb = L.heben_unten(teil(bein_b), PAD_T + BEIN_ZEILE['b'], tipp_b)
-    k = L.streck_zeile(k, PAD_T + ZEILE, atem)
-    sw_ = L.streck_zeile(sw_, PAD_T + ZEILE, atem)
+    k = TX.streck_zeile(k, PAD_T + ZEILE, atem)
+    sw_ = TX.streck_zeile(sw_, PAD_T + ZEILE, atem)
     ebenen = {'koerper': k, 'schwanz': sw_, 'bein_h': bh, 'bein_a': ba, 'bein_b': bb, 'kopf': kp}
     wahl = nur or tuple(ebenen)
     ganz = L.zusammen(H, W, [(ebenen[n], 0, 0) for n in wahl])

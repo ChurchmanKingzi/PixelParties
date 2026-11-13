@@ -50,6 +50,7 @@ import cv2
 import numpy as np
 
 import anim_lib as L
+import anim_textur as TX   # texturierte Streckzeilen statt Zeilenkopien (Regel 43)
 import anim_amorph as A
 
 N, MS = 48, 65
@@ -206,7 +207,7 @@ def figur(i):
     sp = sprite_mit_effekten(i)
     doppeln, p = POSEN[S[i]]
     korper = A.zeilen_von(KOERPER, ORB_Y0, ORB_Y1, H, W, PAD_L, PAD_T)
-    z, quelle = A.koerper_pose(korper, doppeln=doppeln, p=p, paare_je_zeile=PAARE_ZEILE, x0=PAD_L)
+    z, quelle = TX.koerper_pose(korper, doppeln=doppeln, p=p, paare_je_zeile=PAARE_ZEILE, x0=PAD_L)
     kb, top = A.auf_leinwand(z, H, BODEN, BOB[i])
 
     def pos(row):

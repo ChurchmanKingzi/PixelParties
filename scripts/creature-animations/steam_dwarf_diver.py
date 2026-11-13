@@ -28,7 +28,7 @@ Ablauf (48 Frames à 62 ms = 2,98 s, nahtlos) — RUNDE 3 (Nutzer: „zwischendu
   in den Schultern).
 * Umhangzipfel wehen (eigener Rhythmus je Seite): der Saum (Zeilen 22–23) pendelt ±1 px waagerecht (links Periode 16, rechts Periode 12, gegenphasig); in den Fenstern links Frames 6–13 und 30–37, rechts 14–21 und 38–45 rückt
   der Saum um 1 Zeile hoch (die Zeile 21 des Zipfels entfällt — der Zipfel wird kürzer, nichts wird gestreckt oder kopiert) und bleibt über Kante 4-verbunden.
-* Dampfrohre zittern (Dampfdruck): die obersten drei Rohrzeilen (0–2) jedes Rohrs schlagen gemeinsam ±1 px seitlich aus (links Periode 12, rechts Periode 16, gegenphasig), jedes Rohr bleibt 4-verbunden.
+* [Runde 4: ABGESCHALTET — Rohre bewegen sich nur noch starr mit dem Helm] Dampfrohre zittern (Dampfdruck): die obersten drei Rohrzeilen (0–2) jedes Rohrs schlagen gemeinsam ±1 px seitlich aus (links Periode 12, rechts Periode 16, gegenphasig), jedes Rohr bleibt 4-verbunden.
 * Dampf: aus beiden Rohrspitzen steigen kleine runde Dampfwölkchen (Form 'm', Wachsen/Schrumpfen 2×2 → 5×3 → 2×2 über anim_dwarf.puff, kein 1-px-Punkt, Farben H/Rohrgrau aus dem Sprite) langsam bis 4 px auf, je Rohr zwei Wölkchen um eine
   halbe Periode versetzt (Periode 24 Frames), hinter der Figur.
 * Metall glänzt (Regel 12/14, unverändert): ein Lichtband läuft zweimal pro Schleife diagonal von links oben nach rechts unten — zuerst über die Rohre (Frames 2–9 und 26–33), dann über den Helm
@@ -91,6 +91,7 @@ zv = L.deckend(zwerg)
 m_zl = np.array([[bool(zv[y, x] and y >= 15 and x <= 5 and tuple(int(v) for v in zwerg[y, x, :3]) in STOFF) for x in range(sw)] for y in range(sh)])
 m_zr = np.array([[bool(zv[y, x] and y >= 15 and x >= sw - 6 and tuple(int(v) for v in zwerg[y, x, :3]) in STOFF) for x in range(sw)] for y in range(sh)])
 
+ROHR_ZITTERN = False                             # Runde 4: Rohre fast still (nur starr mit dem Helm)
 ROHRE = {'l': (8, 14), 'r': (15, 21)}            # x-Bereich je Rohr für das Zittern (Zeilen 0–2)
 
 
@@ -142,8 +143,10 @@ def frame(i, dampf=True, nur=None):
         Hm.lichtband(hl, m_helm, OFF, i, N, start, 14, OLIV, stufen=1, breite=3.0, achse=(1.0, 1.0), kern=2)
         Hm.lichtband(hl, m_helm, OFF, i, N, start, 14, GLAS, stufen=1, breite=3.0, achse=(1.0, 1.0), kern=1)
     # --- Rohrzittern (Zeilen 0–2 gemeinsam ±1 px) ---
+    # Runde 4 (Nutzer: „die Auspuffrohre bewegen sich viel zu sehr“): das Zittern ist ABGESCHALTET. Die Rohre sind starr am Helm und gehen nur noch
+    # mit dessen 1-px-Sinken mit (ROHR_ZITTERN = False).
     for name, (x0, x1) in ROHRE.items():
-        a = rohr_stufe(i, name)
+        a = rohr_stufe(i, name) if ROHR_ZITTERN else 0
         if a:
             Hm.bereich_versatz(hl, OFF, {y: a for y in (0, 1, 2)}, x0, x1)
     # --- Helm + Rohre sinken starr (nichts wird gestreckt) ---

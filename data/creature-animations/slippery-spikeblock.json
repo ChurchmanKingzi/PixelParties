@@ -1,15 +1,15 @@
 {
   "creature": "Slippery Spikeblock",
   "sheet": "slippery-spikeblock.png",
-  "frameWidth": 61,
+  "frameWidth": 60,
   "frameHeight": 31,
   "frames": 48,
   "frameMs": 66,
   "loop": true,
   "layout": "horizontal",
-  "padTop": 4,
+  "padTop": 5,
   "padLeft": 3,
-  "padRight": 3,
+  "padRight": 5,
   "padBottom": 2,
-  "faceX": 30.5
+  "faceX": 30.0
 }

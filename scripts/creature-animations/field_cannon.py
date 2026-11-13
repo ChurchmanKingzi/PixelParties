@@ -17,6 +17,7 @@ Was ist was (x/y im Sprite):
 Fest bleiben: Rad, Lauf-Rumpf (x 18–38), Schaftform des Wischers, Lunten-Form (starr als Ganzes).
 
 Ablauf (48 Frames à 65 ms = 3,12 s; Frame 0 = Original, Flamme ausgenommen) — Runde 3 (Rückmeldung: „sollte sich ALS GANZES neigen/bewegen, nicht nur vorne das Kanonenrohr wie aus Gummi; die Lunte soll nicht wackeln, nur brennen“):
+* RUNDE 4: Das Rohr kippt NICHT mehr (Rückmeldung „Frontseite schlackert immer noch zu stark“; `muendung` = 0), die Kanone ist starr; der folgende Punkt beschreibt nur noch den (abgeschalteten) Mechanismus.
 * Rohr kippt STARR um die Achse (Periode 48, einmal pro Schleife): das ganze Rohr samt Heck und Lunte wird als gerade Linie geschert (jede Spalte wandert als Ganzes um round(a·(x−28)/19) Zeilen; a = Weg der Mündung,
   bis +2 px hoch, bis −1 px runter); das Heck sinkt dabei entsprechend, das Rad (Achse) steht. Nichts wird gedehnt oder kopiert, die Kontur bleibt 1 px dick (Randpixel in Nicht-Umrissfarbe werden auf die Umrissfarbe (26,26,26) gesetzt, nichts angebaut).
 * Die ganze Kanone (Rohr, Rad, Lunte, Flamme) rollt zusätzlich als starres Stück um 1 px zurück, wenn die Mündung steigt, und wieder vor, wenn sie sinkt (Rad = Kreis, die Drehung ist unsichtbar).
@@ -209,8 +210,8 @@ def kippen(a, dy_fn):
 
 def muendung(i):
     """Neigung des Rohrs (Mündung relativ zur Ruhe in px, positiv = hoch): langsam, eine Periode pro Schleife; nach oben bis 2 px, nach unten bis 1 px."""
-    s = sinz(i, 48)
-    return 2.0 * s if s > 0 else 1.0 * s
+    # Runde 4 (Rückmeldung: „die Frontseite schlackert immer noch zu stark“): das Rohr kippt gar nicht mehr, die Kanone ist starr (nur das 1-px-Rollen des ganzen Stücks, Flamme, Wischer und Glanz bleiben).
+    return 0.0
 
 
 def frame_gross(i, nur=None):

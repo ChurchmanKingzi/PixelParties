@@ -21,7 +21,7 @@ Was im Sprite ist (x, y im 48×69-Sprite):
 Metall/Gold/Edelstein: nur die Goldkante am Podest (zu klein, Regel 14 → kein Glanz); Elfenbein/Stein/Ballons glänzen nicht. Partikel: keine (nur die schon vorhandenen Tropfen laufen). Augenhöhlen/Maske bleiben fest (Regel 21: nicht raten).
 
 Ablauf (72 Frames à 70 ms = 5,04 s, nahtlos; schwere Figur → langsam):
-* Atmen (Periode 36, bis 2 px): die Mundzeile 54 wird bis zu 2× eingefügt (Texturmischung): Kopf, Ohren, Stoßzähne und das ganze Ballonbündel steigen 1–2 px; Kiefer mit Zähnen und Podest bleiben stehen.
+* Atmen (Periode 36, 1 px; Runde 4): Kopf, Ohren, Stoßzähne, RÜSSEL (starr, als Einheit; er hängt in der Mitte herab und biegt unten nach rechts, y 38–57) und das Ballonbündel heben sich starr um 1 px; die FÜSSE mit Zehennägeln (Ebene 15, y 54–59, liegt hinter dem Rüssel; src/…-L15.png) und das Podest bleiben stehen. Keine kopierte Zeile mehr quer durch den Rüsselbogen (vorher wurde Zeile 54 bis zu 2× eingefügt → der untere Bogen wurde dick). Freigelegt und fertiggezeichnet: Zeile 53, x 11–21 (linkes Bein, aus den Beinzeilen 52/53 gemischt) und Zeile 56, x 25–33 (Schatten unter dem Rüsselbogen in der dunklen Fußfarbe).
 * Ohren schlagen (links Periode 24, rechts Periode 36 — unabhängig): jede Spalte der äußeren Ohrhälfte (x ≤ 9 bzw. x ≥ 38) wandert um round(±2 · Abstand/10) senkrecht (starres Kippen um die Ohrmitte, Gefälle ≤ 1 px je Spalte; der Kopfansatz bleibt), die Blutspuren am Ohr gehen mit.
 * Ballonbündel schwankt (Periode 72): jede Zeile oberhalb von y 18 rückt waagerecht bis ±2 px (oben am meisten, unten bleibt es am Faden), die oberen Fadenstücke gehen mit.
 * Blut tropft: in jeder Tropfenspur (x 5–9, 38–43; y 34 bis zum letzten Tropfen) laufen die Tropfen zyklisch abwärts (eine volle Spurlänge je Schleife, je Spur andere Länge → andere Geschwindigkeit), oben erscheinen sie wieder an der Ohrkante; die Lachen bleiben.
@@ -32,6 +32,7 @@ Frame 0 = Original (Ruhepose). Ergänzungen: keine (nichts Verdecktes wird freig
 import sys
 
 import numpy as np
+from PIL import Image
 
 import anim_humanoide as Hm
 import anim_lib as L
@@ -59,10 +60,17 @@ _nb[1:] |= _fest[:-1]; _nb[:-1] |= _fest[1:]; _nb[:, 1:] |= _fest[:, :-1]; _nb[:
 tropfen = BLUT & (yy >= 34) & (yy <= 66) & ((xx <= 9) | (xx >= 38)) & ~_nb           # frei hängende Tropfen (kein Körperpixel daneben: die Blutpixel am Stoßzahnrand bleiben stehen)
 pfuetze = BLUT & (yy >= 67)
 rest = vor & ~buendel & ~podest & ~tropfen & ~pfuetze
+# Runde 4: FÜSSE (Ebene 15 „Fun-Fun Elephant #5“, liegt HINTER dem Kopf/Rüssel) als eigene, feste Ebene; sie liegt vollständig vor (auch der vom Rüsselbogen verdeckte Teil)
+E15 = np.array(Image.open(L.SRC + '/fun-fun-circus-elephant-L15.png').convert('RGBA'))
+fuss_sichtbar = L.deckend(E15) & (E15[..., :3] == spr[..., :3]).all(axis=2) & rest & (yy >= 54) & ~((yy <= 57) & (xx >= 21) & (xx <= 25))   # Rüsselende (x 21–25) gehört zum Kopf
+rest = rest & ~fuss_sichtbar
+_k = L.trenne(spr, rest)[0]
+BEIN53, BEIN52 = _k[53].copy(), _k[52].copy()
+BEIN53[22:] = 0; BEIN52[22:] = 0
 ohr_l = rest & (xx <= 14) & (yy <= 33)
 ohr_r = rest & (xx >= 33) & (yy <= 33)
 kopf = rest & ~ohr_l & ~ohr_r
-ERLAUBT = Hm.umrissfarben(L.trenne(spr, kopf | ohr_l | ohr_r)[0])          # Umrissfarben von Kopf + Ohren (Regel 16)
+ERLAUBT = Hm.umrissfarben(L.trenne(spr, kopf | ohr_l | ohr_r | fuss_sichtbar)[0])          # Umrissfarben von Kopf + Ohren (Regel 16)
 UMRISS = (23, 21, 22)
 GLANZ_ZU_BASIS = {(223, 116, 116): (212, 67, 67), (196, 229, 150): (158, 212, 80), (188, 164, 229): (144, 104, 212), (147, 208, 235): (75, 177, 223), (255, 210, 102): (255, 180, 0)}
 
@@ -100,7 +108,7 @@ def versetze_ohr(a, links, dy_spitze):
 
 def frame(i, nur=None):
     import math
-    hub = Hm.stufe(i, 36, 2)
+    hub = Hm.stufe(i, 36, 1)                      # Runde 4: starres Heben um höchstens 1 px (vorher Zeile 54 bis zu 2× kopiert → Rüsselbogen wurde dick)
     # Podest: STATISCH (Runde 3: die Streifen liefen wie ein Film). Nur einzelne Glühbirnen der Goldkante blitzen kurz auf (1 px, dunkelgold → gold → hellgold → gold → dunkelgold)
     pod = ebene(podest)
     for (lx, ly), start in LICHTER:
@@ -113,7 +121,17 @@ def frame(i, nur=None):
     Z.spalten_ring(tr, OFF, SPUREN, 34, 66, schritt)
     pf = ebene(pfuetze)
     # Kopf: Atmen (Mundzeile 54)
-    k = Hm.atmen(ebene(kopf), OFF[1] + 54, OFF[1] + 40, hub, 0)
+    k = L.versetze(ebene(kopf), 0, -hub)
+    fuesse = L.platz(E15, H, W, OFF[0], OFF[1])
+    if hub:
+        # linkes Bein: die frei werdende Zeile 53 (x 11–21) bekommt die Beinzeile 53, mit Zeile 52 texturgemischt (Regel 43) — nur das Bein wird 1 px länger, der Rüssel bleibt starr
+        zeile = L.misch_kopie(BEIN53, [BEIN52], 1)
+        fuesse[OFF[1] + 53, OFF[0]:OFF[0] + sw][zeile[:, 3] > 0] = zeile[zeile[:, 3] > 0]
+        # rechter Fuß: unter dem gehobenen Rüsselbogen wird Zeile 56 (x 25–33) frei → Schattenzeile in der dunklen Fußfarbe des linken Fußes (Zeile 55 der Ebene 15)
+        for x in range(25, 34):
+            if not E15[56, x, 3] and not (kopf[57, x]) and E15[57, x, 3]:
+                fuesse[OFF[1] + 56, OFF[0] + x] = E15[55, 15]
+        fuesse[OFF[1] + 55, OFF[0] + 34] = UMRISS + (255,)          # Fußspitze rechts: Umriss schließt die 1-px-Kerbe unter dem gehobenen Körperrand
     # Ohren: starr kippen, steigen mit dem Kopf
     dl = Z.rund(2.0 * math.sin(L.sinus(i, 24)))
     dr = Z.rund(2.0 * math.sin(L.sinus(i, 36)))
@@ -124,7 +142,7 @@ def frame(i, nur=None):
     amp = 2.0 * math.sin(L.sinus(i, 72))
     b = Z.zeilen_scherung(b, OFF, 18, amp, 0)
     b = L.versetze(b, 0, -hub)
-    kopf_ohren = Hm.kontur_schliessen(L.zusammen(H, W, [(k, 0, 0), (ol, 0, 0), (orr, 0, 0)]), ERLAUBT, UMRISS)      # Regel 16: Kontur schließen
+    kopf_ohren = Hm.kontur_schliessen(L.zusammen(H, W, [(fuesse, 0, 0), (k, 0, 0), (ol, 0, 0), (orr, 0, 0)]), ERLAUBT, UMRISS)      # Regel 16: Kontur schließen
     fig = L.zusammen(H, W, [(pod, 0, 0), (pf, 0, 0), (tr, 0, 0), (kopf_ohren, 0, 0), (b, 0, 0)])
     # Regel 16: freigelegte Glanzpunkte der Ballons am Außenrand (durch das Pendeln) bekommen die Grundfarbe ihres Ballons
     kk = Hm.kantenmaske(fig)

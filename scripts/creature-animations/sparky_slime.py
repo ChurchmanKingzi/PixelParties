@@ -34,6 +34,7 @@ import sys
 import numpy as np
 
 import anim_lib as L
+import anim_textur as TX   # texturierte Streckzeilen statt Zeilenkopien (Regel 43)
 import anim_amorph as A
 
 N, MS = 48, 65
@@ -216,8 +217,8 @@ def _lid(fig, marke, stufe):
 def figur(i):
     loeschen, doppeln, p = POSEN[S[i]]
     koerper = A.zeilen_von(spr, 0, sh - 1, H, W, PAD_L, PAD_T)
-    z, quelle = A.koerper_pose(koerper, loeschen=loeschen, doppeln=doppeln, p=p, paare_je_zeile=PAARE_ZEILE, x0=PAD_L)
-    m, _ = A.koerper_pose(A.zeilen_von(_mark, 0, sh - 1, H, W, PAD_L, PAD_T), loeschen=loeschen, doppeln=doppeln, p=p, paare_je_zeile=PAARE_ZEILE, x0=PAD_L)
+    z, quelle = TX.koerper_pose(koerper, loeschen=loeschen, doppeln=doppeln, p=p, paare_je_zeile=PAARE_ZEILE, x0=PAD_L)
+    m, _ = TX.koerper_pose(A.zeilen_von(_mark, 0, sh - 1, H, W, PAD_L, PAD_T), loeschen=loeschen, doppeln=doppeln, p=p, paare_je_zeile=PAARE_ZEILE, x0=PAD_L)
     fig, top = A.auf_leinwand(z, H, BODEN, 0)
     marke, _ = A.auf_leinwand(m, H, BODEN, 0)
     ist_auge = (marke[..., 3] > 0) & (marke[..., 0] == 250) & (marke[..., 1] == 1)

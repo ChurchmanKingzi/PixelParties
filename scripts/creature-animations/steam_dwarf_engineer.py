@@ -25,13 +25,19 @@ Ablauf (48 Frames à 62 ms = 2,98 s, nahtlos):
 * Rohre zittern (Dampfdruck, je Rohr eigener Takt): die obersten drei Rohrzeilen jedes Rohrs schlagen ±1 px seitlich aus (A Periode 12, B Periode 16, C Periode 24, gegenphasig), jedes Rohr bleibt 4-verbunden; Ausschlag nur, wenn der Sinus > 0,55 bzw. < −0,55 ist (sonst Ruhe, Frame 0 = Ruhe).
 * Dampf: aus allen drei Rohrschlitzen steigen kleine runde Wölkchen (5×3, wachsen aus 2×2, schrumpfen wieder; Farben P (213,213,213)/N (162,162,162) aus dem Sprite) langsam bis 4 px auf, je Rohr zwei Wölkchen um eine
   halbe Periode versetzt (Periode 24, Rohr B und C um 8 bzw. 16 Frames gegeneinander versetzt).
-* Schraubenschlüssel tippt (der Zwerg dreht an einer Schraube): der Schlüssel hebt sich starr 1 px (je 3 Frames, alle 12 Frames); die untersten Griffzeilen (y ≥ 19, in der verdeckten Hand) bleiben stehen, damit der Griff am Körper 4-verbunden bleibt (der Griff wirkt 1 px länger).
+* [Runde 4: ersetzt durch die Schraubbewegung, siehe unten] Schraubenschlüssel tippt (der Zwerg dreht an einer Schraube): der Schlüssel hebt sich starr 1 px (je 3 Frames, alle 12 Frames); die untersten Griffzeilen (y ≥ 19, in der verdeckten Hand) bleiben stehen, damit der Griff am Körper 4-verbunden bleibt (der Griff wirkt 1 px länger).
 * Blinzeln (Frames 20–22 und 41–43): das Auge schließt sich — (16,14) und (17,14) nehmen die umgebende Hautfarbe Q an (nur dieses eine Auge).
 * Metall glänzt (Regel 12/14, nur Rohre, Schlüssel, Metallplatte): ein Lichtband läuft diagonal von links oben nach rechts unten — erst über die Rohre (Frames 2–11 und 26–35), dann über den Schlüssel
   (Frames 12–19 und 38–45), dann die Platte (Frames 20–25 und 30–35); dazu ein vierzackiger Glitzer-Stern am Schlüsselmaul (Frames 14–17) und an der Plattenecke (Frames 38–41).
 Frame 0 = Original (Ruhepose), Dampf/Glitzer ausgenommen. Kontrolle: anim_humanoide.ruhepose / eckkontakt_typen / Randpixel-Test (Regel 16).
 Alle Bewegungen laufen auf der vollen Leinwand (anim_lib wirft ClipError). Nur ganze Pixel, nur Farben der Quelle.
 Ergänzungen: keine (der Schlüssel liegt über Körper und Hintergrund; nichts Verdecktes wird freigelegt).
+
+RUNDE 4 (Nutzer: „der ausgestreckte Arm mit dem Schraubenschlüssel soll sich bewegen und wirklich ‚arbeiten‘, statt gestretcht zu werden“): das frühere „Tippen“ (Schlüssel 1 px hoch, Griff gedehnt) ist ERSETZT durch
+eine Schraubbewegung aus drei eigenen, STARREN Posen des Schlüssels (SCHL_POSEN): O = Original (45° nach rechts oben), M = Zwischenpose (≈ 22°), D = waagerecht (0°). Drehpunkt = die Hand am Griffende (21,19); jede
+Pose ist als Skelett (helle Pixel) gezeichnet, der dunkle 1-px-Umriss wird wie im Original darum gelegt (4-Nachbarn + je ein Eckpixel an den Maulspitzen; für O ergibt das pixelgenau den Originalschlüssel).
+Takt: drei Züge (O M D D M O, je 6 Frames) → 6 Frames Pause → drei Züge → Pause. Der Schlüssel geht beim Auf und ab starr mit (versetzt, nicht gestreckt). Lichtband läuft über die jeweilige Pose; der Glitzerstern
+am Maul blitzt in der Pause (Frames 19–22). Leinwand rechts 2 px breiter (waagerechte Pose reicht bis x = 28).
 """
 import math
 import sys
@@ -43,7 +49,7 @@ import anim_humanoide as Hm
 import anim_lib as L
 
 N, MS = 48, 62
-PAD_L, PAD_R, PAD_T, PAD_B = 7, 3, 10, 2         # Dampf links/oben (folgt den Rohren schräg nach links oben), Rohrzittern ±1 px, Schlüssel ±1 px
+PAD_L, PAD_R, PAD_T, PAD_B = 7, 5, 10, 2         # Dampf links/oben (folgt den Rohren schräg nach links oben), Rohrzittern ±1 px, Schlüssel ±1 px
 
 spr = L.lade('steam-dwarf-engineer')
 sh, sw = spr.shape[:2]
@@ -107,18 +113,49 @@ def quelle_von(name):
     return q
 
 
+# --- Schraubenschlüssel: drei starre Posen (Skelett = helle Pixel relativ zum Griffende (21,19); Umriss automatisch) ---
+SCHL_G, SCHL_N = (85, 85, 85), (162, 162, 162)
+SCHL_BASIS = (21, 19)
+SCHL_POSEN = {                                                                  # (helle Pixel, zusätzliche Eck-Umrisspixel der Maulspitzen)
+    'O': ([(0, 0), (1, -1), (2, -2), (2, -3), (2, -4), (3, -5), (3, -2), (4, -2), (5, -3)], [(4, -6), (6, -4)]),
+    'M': ([(0, 0), (1, 0), (2, -1), (3, -1), (3, -2), (3, -3), (4, -4), (4, -1), (5, 0), (6, 0)], [(5, -5), (7, -1), (5, -2)]),
+    'D': ([(0, 0), (1, 0), (2, 0), (3, 0), (4, -1), (4, -2), (5, -2), (4, 1), (4, 2), (5, 2)], []),
+}
+
+
+def _schl(pose):
+    hell, ecken = SCHL_POSEN[pose]
+    hs = set(hell)
+    rand = {(x + dx, y + dy) for (x, y) in hs for dx, dy in ((1, 0), (-1, 0), (0, 1), (0, -1))} - hs
+    rand |= set(ecken)
+    a = L.leer(H, W)
+    for pts, c in ((rand, SCHL_G), (hs, SCHL_N)):
+        for (x, y) in pts:
+            X, Y = PAD_L + SCHL_BASIS[0] + x, PAD_T + SCHL_BASIS[1] + y
+            a[Y, X, :3] = c
+            a[Y, X, 3] = 255
+    return a
+
+
+SCHL_EBENE = {p: _schl(p) for p in SCHL_POSEN}
+_schl0, REST = L.trenne(spr, m_schluessel)
+assert (SCHL_EBENE['O'] == L.platz(_schl0, H, W, PAD_L, PAD_T)).all(), 'Pose O muss der Originalschlüssel sein'
+_ZUG = ['O', 'M', 'D', 'D', 'M', 'O']
+SCHL_FOLGE = (_ZUG * 3 + ['O'] * 6) * 2                                          # 48 Frames
+assert len(SCHL_FOLGE) == N
+
+
 def frame(i, dampf=True, nur=None):
     if nur:
         dampf = False
-    schl, rest = L.trenne(spr, m_schluessel)
-    k = L.platz(rest, H, W, PAD_L, PAD_T)
-    sc = L.platz(schl, H, W, PAD_L, PAD_T)
+    k = L.platz(REST, H, W, PAD_L, PAD_T)
+    sc = SCHL_EBENE[SCHL_FOLGE[i]].copy()
     gl = L.leer(H, W)
     # --- Glanz (nur Metall): Lichtband über Rohre, Schlüssel, Platte ---
     for start in (2, 26):
         Hm.lichtband(k, m_rohr_glanz, OFF, i, N, start, 10, GRAU, stufen=1, breite=3.0, achse=(1.0, 1.0), kern=2)
     for start in (12, 38):
-        Hm.lichtband(sc, m_schl_glanz, OFF, i, N, start, 8, GRAU, stufen=1, breite=3.0, achse=(1.0, 1.0), kern=2)
+        Hm.lichtband(sc, sc[..., 3] > 0, (0, 0), i, N, start, 8, GRAU, stufen=1, breite=3.0, achse=(1.0, 1.0), kern=2)
     for start in (20, 30):
         Hm.lichtband(k, m_platte_glanz, OFF, i, N, start, 6, GRAU, stufen=1, breite=2.4, achse=(1.0, 1.0), kern=2)
     # --- Blinzeln: das eine Auge schließt sich (Lid = Hautfarbe) ---
@@ -129,19 +166,14 @@ def frame(i, dampf=True, nur=None):
         a = rohr_stufe(i, name)
         if a:
             Hm.bereich_versatz(k, OFF, {y: a for y in zeilen}, x0, x1)
-    # --- Schlüssel tippt (der Zwerg dreht an einer Schraube): der ganze Schlüssel hebt sich starr 1 px mit der Hand (zweimal drei Frames je Takt von 12) ---
-    if Hm.takt(i, 12, 6, 3):
-        unten = sc.copy()
-        unten[:PAD_T + 19] = 0                                                  # die untersten Griffzeilen (y ≥ 19) bleiben in der Hand → Griff bleibt am Körper 4-verbunden
-        sc = L.zusammen(H, W, [(unten, 0, 0), (L.versetze(sc, 0, -1), 0, 0)])
     # --- Auf und ab: Westenzeile 21 wird einmal doppelt eingefügt; Körper und Schlüssel gleichermaßen ---
     brust = Hm.stufe(i, N / 2, 1)
     k = Hm.atmen(k, PAD_T + 21, PAD_T + 14, brust, 0)
-    sc = Hm.atmen(sc, PAD_T + 21, PAD_T + 14, brust, 0)
+    sc = L.versetze(sc, 0, -brust)                                              # Schlüssel starr mit dem Oberkörper (nicht strecken)
     fig = L.zusammen(H, W, [(k, 0, 0), (sc, 0, 0)])
     Hm.kontur_schliessen(fig, ERLAUBT, UMRISS)
     # --- Glitzer-Sterne (nur Metall): Schlüsselmaul, Plattenecke ---
-    for (sx, sy, start, dx_) in (() if nur else ((25, 14, 14, 0), (16, 23, 38, 0))):
+    for (sx, sy, start, dx_) in (() if nur else ((25, 14, 19, 0), (16, 23, 38, 0))):
         st = Hm.folge(i, start, [0, 1, 2, 1], N)
         Hm.stern4(gl, sx, sy - brust, st, (246, 255, 255), (213, 213, 213), (189, 189, 189), OFF)
     ebenen = []

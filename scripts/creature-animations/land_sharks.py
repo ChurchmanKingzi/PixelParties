@@ -1,5 +1,8 @@
 # -*- coding: utf-8 -*-
-"""Idle-Animation für „Land Sharks“ (Creature) — Runde 3: er GRÄBT AKTIV — der ganze Hai pflügt hin und her (und spiegelt sich dabei), die Erde wird weiter aufgewühlt.
+"""Idle-Animation für „Land Sharks“ (Creature) — Runde 4: er GRÄBT AKTIV — der ganze Hai pflügt hin und her (OHNE Spiegeln, vorwärts = nach rechts), die Erde wird weiter aufgewühlt.
+
+Nutzerkorrektur Runde 4 (wörtlich): „Land Shark bewegt sich aktuell immer rückwärts, das noch umdrehen.“ + „nicht spiegeln, einfach hin und her sliden“ → siehe Abschnitt „Pflügen“ vor frame()
+(der Absatz PFLÜGEN unten im Ablauf beschreibt noch den Stand der Runde 3 mit Spiegelung und ist dadurch ersetzt).
 
 Nutzerkorrektur Runde 2 (wörtlich): „stellt die Rückenflosse eines Hais dar, die soll nicht so gummiartig sein! Stattdessen soll die Erde rundrum durchgehend aufgewühlt werden.“
 Nutzerkorrektur Runde 3 (wörtlich): „Land Shark: sollte sich hin und her bewegen, als würde er aktiv graben.“
@@ -168,16 +171,22 @@ def klumpen_ebene(i):
     return out
 
 
-# Pflügen: Flosse zeigt nach links (Original) → links 0 → −3, spiegeln, rechts −3 → +3 (Flosse nach rechts), zurückspiegeln, +3 → 0; zweimal je Schleife
-_ZYKLUS = [('fahrt', -3, 6), ('halt', 1), ('flip',), ('fahrt', 3, 10), ('halt', 1), ('flip',), ('fahrt', 0, 6)]     # 24 Frames, zweimal je Schleife
-BAHN, SPIEGEL = R.pfad(N, _ZYKLUS + _ZYKLUS)
+# Pflügen (Runde 4): KEINE Spiegelung mehr. Die Rückenflosse ist nach hinten gepfeilt (Spitze zeigt nach links oben) → der Hai schwimmt nach RECHTS. Vorwärts (nach rechts, −3 → +3) stößt er
+# zügig in 8 Frames, zurück (+3 → −3) treibt er langsam in 16 Frames; zweimal je Schleife (Periode 24). Frame 0 = Mitte (Original) im Vorwärtsstoß.
+def _ease(a, b, u):
+    return int(math.floor(a + (b - a) * (0.5 - 0.5 * math.cos(math.pi * u)) + 0.5))
+
+
+_ZYKLUS = [_ease(-3, 3, j / 8.0) for j in range(8)] + [_ease(3, -3, j / 16.0) for j in range(16)]
+assert _ZYKLUS[4] == 0
+BAHN = [_ZYKLUS[(i + 4) % 24] for i in range(N)]
 
 
 def frame(i, nur=None):
     ebenen = {'schollen': klumpen_ebene(i), 'flosse': FLOSSE_EBENE, 'erde': erde_ebene(i)}
     wahl = nur or ('schollen', 'flosse', 'erde')
     ganz = L.zusammen(H, W, [(ebenen[n], 0, 0) for n in ('schollen', 'flosse', 'erde') if n in wahl])
-    return R.verschieben(ganz, BAHN[i], SPIEGEL[i])
+    return R.verschieben(ganz, BAHN[i], False)
 
 
 TEST_EBENEN = ['flosse', 'erde']
@@ -187,7 +196,7 @@ if __name__ == '__main__':
     frames = [frame(i) for i in range(N)]
     n = L.pruefe(frames, quelle=spr, erlaubt=[])
     print('Pixel je Frame:', n)
-    print('Position je Frame:', BAHN, '\nGespiegelt:', [int(x) for x in SPIEGEL])
+    print('Position je Frame:', BAHN)
     prev = sys.argv[sys.argv.index('--preview') + 1] if '--preview' in sys.argv else None
     L.speichern('land-sharks', 'Land Sharks', frames, MS, prev)
     if prev:

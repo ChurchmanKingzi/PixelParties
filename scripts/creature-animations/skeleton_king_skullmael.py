@@ -20,6 +20,11 @@ Was ist was (x, y im 29×23-Sprite):
   (255,255,255) diagonal nach rechts unten bis (17, 18).
 Glanz/Glitzer (Regel 12/14) NUR bei Gold und Metall: Krone, Schulterstücke, Stiefel, Knauf (Gold), Klinge (Stahl), roter Edelstein im Knauf. Knochen, Schädel und Rippen glänzen nicht. Kein Feuer.
 
+RUNDE 4 (Nutzer: „das Schwert, das hinter ihm im Boden steht, soll NICHT gestretcht werden. Außerdem ist sein eigenes Squash-and-Stretch zu extrem und führt zu dicken dunklen Linien im Körper“) — gilt vor dem Ablauf unten:
+* Das SCHWERT (Knauf, Griff, Klinge) steht in allen 48 Frames PIXELGENAU STILL (nur Lichtband/Glitzerstern laufen darüber); es wird weder gestreckt noch gehoben. Der König bewegt sich davor; was er freigibt, stammt aus der Schwert-Ebene.
+* Der König dehnt sich höchstens noch um 1 px (vorher bis 3): eingefügt wird EINE handgezeichnete Zeile zwischen Taille (y 15) und Beckenoberkante (y 16) — hell, mit eigener Schattierung (STRECK_NEU, weder Kopie von y 15 noch
+  von y 16); keine der dunklen Rippen-/Schulterzeilen (y 10–14) wird mehr verdoppelt. Atmen = 0/1 px (Frame 18–28 und 42–47), der Lachruck („HA“) benutzt dieselbe Zeile (Frame 6–17 und 30–41 liegen in den Atempausen).
+
 Ablauf (48 Frames à 65 ms = 3,12 s; Frame 0 = Original):
 * ATMEN (Periode 24, zweimal pro Schleife, 0 → 1 → 2 → 1 → 0 Stufen; Runde 3: VERTEILT statt an einer einzigen Stelle): je Stufe werden Zeilen an verschiedenen Stellen eingefügt (Texturmischung, L.streck_zeile) —
   Stufe 1: Rippenzeile y 13; Stufe 2: Zeile y 11 (Schultern/Arme) und y 16 (untere Rippen). Alles darüber hebt sich (Krone, Schädel, Pauldrons, Arme), Beine/Füße bleiben; jedes Pixel wandert nur monoton mit der Stufe.
@@ -102,7 +107,27 @@ def stern_folge(i, start):
 
 # Runde 3: Dehnung VERTEILT statt an einer einzigen Zeile. Zeilen (Sprite-Koordinaten), an denen beim Atmen je eine Zeile zusätzlich eingefügt wird;
 # alles darüber hebt sich, alles darunter (Beine, Klingenspitze im Boden) bleibt stehen. Jedes Pixel wandert monoton mit der Atemstufe (kein Flackern).
-STRECK_ZEILEN = {0: (), 1: (13,), 2: (11, 16)}
+STRECK_Y = 16                                                               # Runde 4: einzige Einfügestelle — über der hellen Beckenoberkante y 16 (keine dunkle Zeile wird gedoppelt)
+# handgezeichnete Zwischenzeile (König-Ebene, x 6–13): Umriss, Knochen heller werdend zur Mitte, dunkle Wirbelkerbe der Taillenzeile y 15 läuft weiter
+STRECK_NEU = {6: (31, 31, 31), 7: (169, 169, 169), 8: (217, 217, 217), 9: (89, 89, 89), 10: (89, 89, 89), 11: (217, 217, 217), 12: (169, 169, 169), 13: (31, 31, 31)}
+_kfarben = {tuple(int(v) for v in p[:3]) for p in koenig.reshape(-1, 4) if p[3]}
+assert all(c in _kfarben for c in STRECK_NEU.values())
+
+
+def atem_stufe(i):
+    return 1 if (18 <= i < 29 or i >= 42) else 0
+
+
+def koenig_heben(a):
+    """König 1 px strecken: alles oberhalb von y 16 rückt 1 px hoch, an die frei werdende Zeile y 15 kommt die handgezeichnete Zwischenzeile."""
+    out = a.copy()
+    y0 = OFF[1] + STRECK_Y
+    assert not a[0, :, 3].any()
+    out[:y0 - 1] = a[1:y0]
+    out[y0 - 1] = 0
+    for x, c in STRECK_NEU.items():
+        out[y0 - 1, OFF[0] + KOENIG_OFF[0] + x] = c + (255,)
+    return out
 MUND_ROT = {'u': (79, 0, 0), 'w': (102, 0, 0)}                              # Farben des offenen Mundes im Sprite
 ZAHN, KINN = (169, 169, 169), (144, 144, 144)                               # Zahn-/Wangenknochen, die der Mund beim Lachen überdeckt bzw. freigibt
 assert col(18, 9) == MUND_ROT['u'] and col(19, 9) == MUND_ROT['w'] and col(17, 9) == ZAHN and col(18, 10) == KINN and col(19, 10) == KINN
@@ -129,7 +154,7 @@ def zeilen_einfuegen(a, zeilen_n):
 
 
 def frame(i, nur=None):
-    n = V.stufen(i, 24, 2)
+    n = atem_stufe(i)
     m = mund_stufe(i)
     k = ebene(koenig, KOENIG_OFF)
     s_knauf, s_klinge = ebene(KNAUF, SCHWERT_OFF), ebene(KLINGE, SCHWERT_OFF)
@@ -148,26 +173,16 @@ def frame(i, nur=None):
                     (18, 10): MUND_ROT['u'], (19, 10): MUND_ROT['w']}, OFF)
     elif m < 0:                                                              # Lachen: Mund fast zu (untere Mundzeile wird Zahn)
         V.setze(k, {(18, 9): ZAHN, (19, 9): KINN}, OFF)
-    zn = dict.fromkeys(STRECK_ZEILEN[n], 1)
-    if m > 0:                                                                # Lachruck: Kopf, Schultern, Arme (und der Schwertgriff in der Hand) heben sich 1 px mehr (Halszeile 11)
-        zn[11] = zn.get(11, 0) + 1
-    kb = zeilen_einfuegen(k, zn)
-    # Das SCHWERT (Runde 3): Knauf/Griff steigt STARR mit der haltenden Hand (um die Summe aller eingefügten Zeilen); die Klinge hängt oben starr am Griff und streckt sich unterhalb
-    # (Zeilen ≥ 12) an denselben Stellen wie der Körper; ihre Spitze im Boden (die schwarzen Pixel (11–12, 18)) bleibt unbewegt. Kein Pendeln mehr: eine im Boden steckende Klinge schlenkert nicht.
-    gesamt = sum(zn.values())
-    zk = {}
-    for y, c in zn.items():
-        zk[max(y, KLINGE_AB)] = zk.get(max(y, KLINGE_AB), 0) + c
-    sb = zeilen_einfuegen(s_klinge, zk)
-    sk = L.versetze(s_knauf, 0, -gesamt)
-    f = L.zusammen(H, W, [(sk, 0, 0), (sb, 0, 0), (kb, 0, 0)])
+    hub = 1 if (n or m > 0) else 0                                           # Runde 4: höchstens 1 px (Atmen ODER Lachruck)
+    kb = koenig_heben(k) if hub else k
+    # Das SCHWERT steckt hinter ihm im Boden: völlig starr und still (Runde 4), nur Glanz läuft darüber.
+    f = L.zusammen(H, W, [(s_knauf, 0, 0), (s_klinge, 0, 0), (kb, 0, 0)])
     f = U.kontur_schliessen(f, UMRISS, KONTUR)
     if nur is None:                                                          # Glitzersterne am Gold (nach der Figur, am Objekt)
-        hub = sum(zn.values())                                               # alles oberhalb der Zeile 10 hebt sich um die Summe aller eingefügten Zeilen
         for (sx, sy, st0) in ((22, 2, 4), (11, 4, 16), (4, 5, 26), (27, 5, 36), (15, 21, 9), (23, 21, 41)):
             st = stern_folge(i, st0)
             if st:
-                V.stern(f, sx, sy - (hub if sy < 11 else 0), st, (255, 255, 255), (255, 222, 90), OFF)
+                V.stern(f, sx, sy - (hub if (sy < 11 and sx > 9) else 0), st, (255, 255, 255), (255, 222, 90), OFF)
     return f
 
 

@@ -2,7 +2,7 @@
   "creature": "Fun-Fun Circus Elephant",
   "sheet": "fun-fun-circus-elephant.png",
   "frameWidth": 52,
-  "frameHeight": 75,
+  "frameHeight": 74,
   "frames": 72,
   "frameMs": 70,
   "loop": true,

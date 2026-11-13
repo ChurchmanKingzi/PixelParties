@@ -27,7 +27,8 @@ Kein Metall/Gold/Edelstein sicher erkennbar (die grauen Teile könnten Eisen sei
 Ablauf (48 Frames à 80 ms = 3,84 s, nahtlos; Frame 0 = Original; Bodenwesen: die Stiefel bleiben am Boden):
 * ATMEN (2× je Schleife): die Umhangzeile 19 wird einmal doppelt eingefügt (Texturmischung): Kapuze, Schädel, Hände und Brust steigen 1 px, Saum und Stiefel bleiben.
 * SAUM WEHT: die Umhangzeilen 17–21 (x 8–19) pendeln waagerecht, je weiter unten, desto mehr (bis ±1 px), links und rechts gegenläufig; die Stiefel (y 22–23) stehen fest.
-* SCHÄDEL WIPPT: der Schädel samt Hand sinkt zweimal je Schleife für je 3 Frames um 1 px und kommt zurück (die frei werdende Rahmenspalte (9,8–11) wird mit dem Umhangumriss (41,22,42) gefüllt).
+* RUNDE 4: Das Orange/Gelbliche unter dem Schädel ((8,13), (8–9,14), (8–9,15)) ist der STOSSZAHN der Figur (nicht ihre Hand). Er sitzt starr am Kopf (bewegt sich nur mit dem Atmen des Kopfes) und macht das Schädelwippen nicht mehr mit.
+* SCHÄDEL WIPPT (seit Runde 4 OHNE den Stoßzahn): der Schädel sinkt zweimal je Schleife für je 3 Frames um 1 px und kommt zurück (die frei werdende Rahmenspalte (9,8–11) wird mit dem Umhangumriss (41,22,42) gefüllt).
 * BLINZELN (Frames 20–22 und 40–42): die roten Augenpixel werden schwarz (24,22,22) und kommen zurück — kein Glühen, kein Farbspiel.
 Fest: Gesicht, Hörner, Bogen, Ärmel, die ergänzte rechte Hand (sie hebt sich beim Atmen mit dem Oberkörper), Stiefel. Alle Bewegungen laufen auf der vollen Leinwand (ClipError statt Abschneiden). Nur ganze Pixel, nur Quellfarben.
 Ergänzungen: (1) die Rahmenspalte (9,8–11) neben dem Schädel (Umhangumriss (41,22,42)), wenn der Schädel sinkt. (2) RUNDE 3, rechte Hand (16 Pixel, nur Quellfarben, Stil der linken Hand): Ärmelende/Umriss (25,10) und (25,15) (41,22,42);
@@ -63,8 +64,16 @@ skull = vorhanden & (xx <= 8) & (yy >= 5) & (yy <= 16)
 for p in [(9, 8), (9, 9), (9, 10), (9, 11), (9, 14), (9, 15)]:
     skull[p[1], p[0]] = True
 skull &= vorhanden
+# Runde 4 (Nutzer: „das Gelbliche ist sein Stoßzahn, nicht sein Arm; er darf sich NICHT unabhängig vom Kopf bewegen“): die orange/braunen Pixel (8,13), (8–9,14), (8–9,15) unter dem Schädel sind der linke STOSSZAHN.
+# Er gehört zum Kopf/Körper (nicht mehr zur Schädel-Gruppe) und bleibt starr am Kopf, wenn der Schädel wippt; er liegt vor dem Schädel.
+ZAHN_FARBEN = {(156, 105, 62), (239, 161, 95), (245, 203, 161)}
+zahn = np.zeros_like(vorhanden)
+for p in [(8, 13), (8, 14), (9, 14), (8, 15), (9, 15)]:
+    assert f(*p) in ZAHN_FARBEN, (p, f(*p))
+    zahn[p[1], p[0]] = True
+skull &= ~zahn
 hem = vorhanden & (xx >= 8) & (xx <= 19) & (yy >= 17) & (yy <= 21)
-koerper = vorhanden & ~skull & ~hem
+koerper = vorhanden & ~skull & ~hem & ~zahn
 LOCH0 = R.loecher(L.platz(spr, H, W, *OFF))
 
 
@@ -72,6 +81,7 @@ def frame(i):
     b = Hm.stufe(i, N / 2, 1)
     k = R.teil(spr, koerper, H, W, OFF)
     sk = R.teil(spr, skull, H, W, OFF)
+    zk = R.teil(spr, zahn, H, W, OFF)
     sa = R.teil(spr, hem, H, W, OFF)
     # Blinzeln
     if Hm.folge(i, 20, [1, 1, 1], N) or Hm.folge(i, 40, [1, 1, 1], N):
@@ -87,7 +97,8 @@ def frame(i):
         Hm.setze(k, {(9, y): UMHANG_UMRISS for y in (8, 9, 10, 11)}, OFF)
     if b:
         k, sk, left, right = (L.streck_zeile(e, PAD_T + 19, 1) for e in (k, sk, left, right))
-    fig, etik = R.schichten(H, W, [(left, 'umhang'), (right, 'umhang'), (k, 'umhang'), (sk, 'schaedel')])
+        zk = L.versetze(zk, 0, -1)                                    # der Stoßzahn hebt sich exakt wie der Kopf (alle Zahnpixel liegen über der Atemzeile 19)
+    fig, etik = R.schichten(H, W, [(left, 'umhang'), (right, 'umhang'), (k, 'umhang'), (sk, 'schaedel'), (zk, 'umhang')])
     fig, _br = R.verbinde(fig)
     R.neue_loecher_fuellen(fig, LOCH0, ERLAUBT, max_groesse=6)
     R.kontur_je_teil(fig, etik, ERLAUBT, {'schaedel': f(0, 5), 'umhang': UMHANG_UMRISS}, standard=UMRISS)

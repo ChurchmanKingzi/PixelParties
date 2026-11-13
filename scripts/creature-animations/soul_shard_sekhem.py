@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """Idle-Animation für „Soul Shard Sekhem“ (Creature).
 
-PICK: [["MotiveEgypt", 226, 1]]   Ebene „Sekhem“ (MotiveEgypt.xcf, Ebene 226, 19×25 px, 25 Farben, nur Alpha 0/255, ein einziges 4-verbundenes Teil) → src/soul-shard-sekhem.png.
+PICK: [["MotiveEgypt", 226, 1], ["MotiveEgypt", 225, 1]]   Ebene „Sekhem“ (MotiveEgypt.xcf, Ebene 226, 19×25 px, 25 Farben, nur Alpha 0/255, ein einziges 4-verbundenes Teil) → src/soul-shard-sekhem.png.
 Per Pixelvergleich gegen die Kartenkunst (data/card-art/native/Soul_Shard_Sekhem.png, 76×51) abgeglichen: die Ebene sitzt dort bei (28,17); der Kopf trifft zu 100 %, im Körper liegt in der Kartenkunst über Brust und Armen
 ein rötliches, halbtransparentes Lavalicht, das die grauen Knochen rosa färbt — dieses Licht gehört nicht zur Figur und wird nicht übernommen; die Ebene selbst ist pixelsauber.
 
@@ -16,6 +16,10 @@ Was im Sprite ist (Koordinaten im Sprite 19×25, x/y ab 0):
 * Material: Knochen, Stoff, Fell/Schuppen — KEIN Glanz und keine Glitzersterne (Regel 14); kein Feuer (Regel 15). Keine Partikel.
 * Das rote Maul (Nutzer-Feedback Runde 3: „sollte periodisch das rote Maul schließen und öffnen“): zwischen den beiden Reißzähnen (links (8,11)/(8,12), rechts (11,11)/(11,12); Grau O bzw. Weiß R) liegt eine rote 2×2-Öffnung:
   (9,11)=P (111,0,5) und (10,11)=Q (196,0,9) oben, (9,12)=(10,12)=P unten. Darüber liegt die dunkelbraune Maullinie H (49,24,0) bei (9–10,10), darunter Mähne C (59,11,11).
+* Roter Orb über dem Kopf (Nutzer-Feedback Runde 4: „der rote Orb über dem Kopf fehlt“): eigene Ebene „Ebene #9“ (MotiveEgypt.xcf, Ebene 225, 14×14 px, 5 Rot-/Rosatöne, konzentrische Ringe: Kern (194,57,20),
+  (227,67,23), (252,74,26), (252,91,64), Rand (252,194,185)); liegt in der xcf bei (522,94), die Figur bei (519,110) → im Sprite bei (3,−16), 2 Zeilen Abstand zum Scheitel (deckt sich mit der Kartenkunst: Sonnenscheibe bei (31–44,1–14)).
+  Die Pixel stehen als ORB_MAP im Skript (src/soul-shard-sekhem.png bleibt die Figur allein). Er schwebt 1 px auf/ab (Periode 16 Frames), folgt dem Kopf beim Atmen und pulsiert (Kern glimmt in zwei Stufen auf, Periode 12 Frames);
+  Größe und Rand bleiben fest. Kein Glanz/Glitzerstern.
 Fest bleiben: Umriss, Kopfform, Gesicht, Mähne, Zähne (Zunge/Zähne bleiben starr; nur die rote Öffnung wird dunkel gefüllt).
 
 Ablauf (48 Frames à 65 ms = 3,12 s, nahtlos):
@@ -26,7 +30,7 @@ Ablauf (48 Frames à 65 ms = 3,12 s, nahtlos):
 * Maul schließen/öffnen (zweimal je Schleife, Periode 24 Frames, ab Frame 4 bzw. 28): Frame +0 offen (Original), +1 halb zu (untere rote Zeile (9–10,12) wird zur Mähnenfarbe C), +2…+7 geschlossen (obere rote Zeile (9–10,11) wird
   zur dunkelbraunen Maullinie H, untere Zeile C — die Zähne bleiben stehen), +8 halb auf, +9 offen. Nur Pixel im Gesicht; das Maul bewegt sich mit dem Kopf (Atmen). Nur Quellfarben (C, H).
 * Blinzeln (zweimal je Schleife, Frames 13–14 und 37–38, je 2 Frames zu): die gelben Augenpixel (je 2×1) werden zur Gesichts-/Mähnenfarbe. Lidfarbe = umgebende Körperfarbe.
-Frame: Sprite plus 3 px links/rechts, 4 px oben (Atmen), 2 px unten, Figur zentriert.
+Frame: Sprite plus 3 px links/rechts, 21 px oben (Orb 16 + Schweben 1 + Atmen 2 + Rand 2), 2 px unten, Figur zentriert.
 Alle Bewegungen laufen auf der vollen Leinwand (anim_lib/anim_amorph werfen ClipError). Nur ganze Pixel, nur Farben der Quelle.
 """
 import math
@@ -39,14 +43,53 @@ import anim_amorph as A
 import anim_shard as SH
 
 N, MS = 48, 65
-PAD_L, PAD_R, PAD_T, PAD_B = 3, 3, 4, 2
+PAD_L, PAD_R, PAD_T, PAD_B = 3, 3, 21, 2                                                       # oben: 16 px Orb + 1 px Schweben + 2 px Atmen + 2 px Rand
 
-spr = L.lade('soul-shard-sekhem')
-sh, sw = spr.shape[:2]
+FIG = L.lade('soul-shard-sekhem')
+sh, sw = FIG.shape[:2]
 H, W = sh + PAD_T + PAD_B, sw + PAD_L + PAD_R
 BODEN = PAD_T + sh - 1
-OPAK = spr[..., 3] > 0
-RAND_FARBEN = A.umrissfarben(spr)
+OPAK = FIG[..., 3] > 0
+
+# ── Roter Orb über dem Kopf (Runde 4): Ebene „Ebene #9“ (MotiveEgypt.xcf, Ebene 225, 14×14, bbox (522,94)); die Figur liegt bei (519,110) → Orb bei Sprite-(3,−16), 2 Zeilen Luft zum Kopf ──
+ORB_FARBEN = {'A': (194, 57, 20), 'B': (227, 67, 23), 'C': (252, 74, 26), 'D': (252, 91, 64), 'E': (252, 194, 185)}
+ORB_MAP = ['....EEEEEE....',
+           '...EDDDDDDE...',
+           '..EDDCCCCDDE..',
+           '.EDDCCBBCCDDE.',
+           'EDDCCBBBBCCDDE',
+           'EDCCBBAABBCCDE',
+           'EDCBBAAAABBCDE',
+           'EDCBBAAAABBCDE',
+           'EDCCBBAABBCCDE',
+           'EDDCCBBBBCCDDE',
+           '.EDDCCBBCCDDE.',
+           '..EDDCCCCDDE..',
+           '...EDDDDDDE...',
+           '....EEEEEE....']
+ORB_X, ORB_Y = 3, -16
+# Pulsieren: der dunkle Kern glimmt auf (Ringe wandern eine Stufe nach innen) — nur Orbfarben, Umriss (E) und Größe bleiben fest
+ORB_PULS = [{}, {'A': 'B'}, {'A': 'B', 'B': 'C'}]
+
+
+def orb(stufe):
+    o = np.zeros((14, 14, 4), np.uint8)
+    ab = ORB_PULS[stufe]
+    for y, z in enumerate(ORB_MAP):
+        for x, c in enumerate(z):
+            if c != '.':
+                o[y, x, :3] = ORB_FARBEN[ab.get(c, c)]
+                o[y, x, 3] = 255
+    return o
+
+
+# Quelle für Prüfungen (L.pruefe, randtest): Figur + Orb in Ruhelage
+spr = L.leer(sh - ORB_Y, sw)
+L.einsetzen(spr, FIG, 0, -ORB_Y)
+L.einsetzen(spr, orb(0), ORB_X, 0)
+ORB_HUB = [1 if math.sin(2 * math.pi * _i / 16 - 0.6) >= 0.3 else 0 for _i in range(48)]                 # Schweben: 1 px auf/ab, Periode 16 Frames (unabhängig vom Atmen)
+ORB_STUFE = [(0, 0, 0, 1, 1, 2, 2, 2, 2, 1, 1, 0)[_i % 12] for _i in range(48)]                          # Pulsieren: Periode 12 Frames, weich über die Zwischenstufe
+RAND_FARBEN = A.umrissfarben(FIG)
 UMRISS = (12, 12, 12)
 MAHNE_UMRISS = (14, 2, 2)
 
@@ -59,7 +102,7 @@ TEILE = {'l': ARM_L + BAND_L, 'r': ARM_R + BAND_R}
 for _k, _p in TEILE.items():
     for (_y, _x) in _p:
         assert OPAK[_y, _x], (_k, _y, _x)
-KOERPER = spr.copy()
+KOERPER = FIG.copy()
 for _p in TEILE.values():
     for (_y, _x) in _p:
         KOERPER[_y, _x] = 0
@@ -86,8 +129,8 @@ for _k, _starts in (('l', (6, 30)), ('r', (18, 42))):
 MUND_C, MUND_H = (59, 11, 11), (49, 24, 0)
 MUND_ROT = {(11, 9): (111, 0, 5), (11, 10): (196, 0, 9), (12, 9): (111, 0, 5), (12, 10): (111, 0, 5)}
 for (_y, _x), _c in MUND_ROT.items():
-    assert tuple(int(v) for v in spr[_y, _x, :3]) == _c, (_y, _x)
-assert tuple(int(v) for v in spr[13, 9, :3]) == MUND_C and tuple(int(v) for v in spr[10, 9, :3]) == MUND_H
+    assert tuple(int(v) for v in FIG[_y, _x, :3]) == _c, (_y, _x)
+assert tuple(int(v) for v in FIG[13, 9, :3]) == MUND_C and tuple(int(v) for v in FIG[10, 9, :3]) == MUND_H
 MUND_POSE = {1: {(12, 9): MUND_C, (12, 10): MUND_C},                                                    # halb: untere Zeile dunkel
              2: {(11, 9): MUND_H, (11, 10): MUND_H, (12, 9): MUND_C, (12, 10): MUND_C}}              # zu
 MUND = [0] * N                                                                                          # Frame → Stufe (0 offen, 1 halb, 2 zu)
@@ -108,7 +151,7 @@ def figur(i):
     teile = L.leer(H, W)
     for k, pix in TEILE.items():
         for (y, x) in pix:
-            teile[top + y - HUB[k][i], PAD_L + x] = spr[y, x]
+            teile[top + y - HUB[k][i], PAD_L + x] = FIG[y, x]
     # Arm über dem Umhang (Arm liegt vor der Mähnenkante); Körper darunter
     fig = L.zusammen(H, W, [(ebene, 0, 0), (teile, 0, 0)])
     for (y, x), c in MUND_POSE.get(MUND[i], {}).items():
@@ -124,7 +167,10 @@ def figur(i):
 
 
 def frame(i):
-    return figur(i)['fig']
+    f = figur(i)
+    out = f['fig'].copy()                                                                                # der Orb schwebt frei (nicht mit der Figur verbunden) → erst NACH Umriss-/Verbindungslogik einsetzen
+    L.einsetzen(out, orb(ORB_STUFE[i]), PAD_L + ORB_X, f['top'] + ORB_Y - ORB_HUB[i])                   # folgt dem Kopf (Atmen) und schwebt zusätzlich 0/1 px
+    return out
 
 
 if __name__ == '__main__':
@@ -132,13 +178,13 @@ if __name__ == '__main__':
     figs = [f['fig'] for f in fs]
     frames = [frame(i) for i in range(N)]
     prev = sys.argv[sys.argv.index('--preview') + 1] if '--preview' in sys.argv else None
-    ref = L.platz(spr, H, W, PAD_L, PAD_T)
-    print('Frame 0 weicht vom Original in', int((figs[0] != ref).any(axis=2).sum()), 'Pixeln ab')
+    ref = L.platz(FIG, H, W, PAD_L, PAD_T)
+    print('Frame 0 weicht vom Original in', int((figs[0] != ref).any(axis=2).sum()), 'Pixeln ab (Figur);', int((frames[0] != L.platz(spr, H, W, PAD_L, PAD_T + ORB_Y)).any(axis=2).sum()), 'mit Orb')
     print('ergänzte Umrisspixel je Frame:', [len(f['neu']) for f in fs])
     print('Brückenpixel je Frame:', [len(f['brueck']) for f in fs], '| Pfadpixel:', [len(f['pfad']) for f in fs], '| unverbundene Teile:', [f['offen'] for f in fs if f['offen']])
     n = L.pruefe(frames, quelle=spr)
     print('Pixel je Frame:', n)
-    schlecht = A.ausdruck_pruefen(figs, spr, 'soul-shard-sekhem')
+    schlecht = A.ausdruck_pruefen(figs, FIG, 'soul-shard-sekhem')
     L.speichern('soul-shard-sekhem', 'Soul Shard Sekhem', frames, MS, prev)
     if prev:
         L.streifen(prev + '/soul-shard-sekhem-strip.png', frames[::2], spalten=12, scale=6)

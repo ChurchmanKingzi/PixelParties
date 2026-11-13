@@ -42,6 +42,7 @@ import numpy as np
 
 import anim_humanoide as Hm
 import anim_lib as L
+import anim_textur as TX   # texturierte Streckzeilen statt Zeilenkopien (Regel 43)
 import anim_rebel as R
 
 N, MS = 60, 70
@@ -129,9 +130,9 @@ def frame(i):
     u = 0.7 * u + 0.3 * 0.5 * (1 - math.cos(L.sinus(i, N / 5)))
     sw_ = R.zeilen_pendel(sw_, PAD_T + SCHWANZ_PIVOT, 2.0 * min(1.0, u), math.pi / 2, richtung=-1)
     if b:
-        k = L.streck_zeile(k, PAD_T + 22, 1)
+        k = TX.streck_zeile(k, PAD_T + 22, 1)
         al, ar, ol, orr = (L.versetze(e, 0, -1) for e in (al, ar, ol, orr))
-        sw_ = L.streck_zeile(sw_, PAD_T + 22, 1)
+        sw_ = TX.streck_zeile(sw_, PAD_T + 22, 1)
     fig, etik = R.schichten(H, W, [(sw_, 'schwanz'), (k, 'rumpf'), (al, 'arm'), (ar, 'arm'), (ol, 'rumpf'), (orr, 'rumpf')])
     R.luecken_fuellen(fig, etik, 'rumpf', 'schwanz', maxbreite=3)         # Schwanz schwingt weg: freigelegte Körperflanke mit Flankenfell ergänzen
     fig, _br = R.verbinde(fig)

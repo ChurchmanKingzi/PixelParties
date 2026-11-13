@@ -43,14 +43,12 @@ import anim_tiere as T
 import anim_drache as D
 import anim_flieger as F
 import anim_flieger_r3 as R3
+import anim_r4_fluegel as R4
 
 N, MS = 48, 70
-PAD_L, PAD_R, PAD_T, PAD_B = 8, 8, 6, 3
+PAD_L, PAD_R, PAD_T, PAD_B = 8, 8, 9, 3
 BEAT, DOWN, UP = 12, 4, 8                            # Flügelschlag (4 pro Schleife)
-HUB = math.radians(65.0)                           # Gesamthub: oben +25° (im Uhrzeigersinn, links), unten −40°
 P0 = DOWN + 0.62 * UP                              # Frame 0 = Aufschlag bei 38 % des Hubs (Originalpose)
-PIV_L, PIV_R = (9.5, 12.0), (21.5, 12.0)           # Schultergelenke (Sprite)
-R_WURZEL = 3.3                                     # Flügelansatz am Körper (px um das Gelenk) bleibt stehen
 
 spr = L.lade('red-dragoneer')
 sh, sw = spr.shape[:2]
@@ -60,21 +58,19 @@ vorhanden = L.deckend(spr)
 
 KRALLEN_FARBEN = [(213, 213, 213), (255, 255, 255), (230, 238, 238)]
 weiss = L.farbmaske(spr, KRALLEN_FARBEN)
-flügel_l = vorhanden & (xx <= 10) & (yy <= 12)
-flügel_r = vorhanden & (xx >= 21) & (yy <= 12)
-klauen_l = weiss & (xx <= 9) & (yy >= 14) & (yy <= 16)
-klauen_r = weiss & (xx >= 22) & (yy >= 14) & (yy <= 16)
-fuss_l = vorhanden & (xx <= 12) & (yy >= 22) & ~klauen_l
-fuss_r = vorhanden & (xx >= 19) & (yy >= 22) & ~klauen_r
-koerper = vorhanden & ~flügel_l & ~flügel_r & ~klauen_l & ~klauen_r & ~fuss_l & ~fuss_r
+# RUNDE 4: Zum Flügel gehören auch die hellen „Spitzen“ am inneren Ende des Flügelknochens (links (11,3)(11,4)(11,5)(12,4)(13,4) samt Umriss (10–11,2)(12–13,3)) — sie blieben vorher wie Ohren am Kopf stehen.
+# Die Spalte x = 10 ab y = 6 ist der Umriss des Ohrs (x 11–12, y 6–10) und bleibt am Kopf, ebenso die Schulterzeile y = 12.
+flügel_l = vorhanden & (((xx <= 9) & (yy <= 11)) | ((xx == 10) & (yy <= 5)) | ((xx >= 11) & (xx <= 13) & (yy <= 3)) | ((xx >= 11) & (xx <= 13) & (yy == 4)) | ((xx == 11) & (yy == 5)))
+flügel_r = flügel_l[:, ::-1].copy()
+assert (spr[:, ::-1][flügel_l] == spr[flügel_l]).all(), 'Flügel nicht spiegelgleich'
+fuss_l = vorhanden & (xx <= 12) & (yy >= 22)
+fuss_r = vorhanden & (xx >= 19) & (yy >= 22)
+koerper = vorhanden & ~flügel_l & ~flügel_r & ~fuss_l & ~fuss_r      # RUNDE 4: die weißen Krallen gehören zu den Händen und bleiben fest an ihnen (keine eigene Ebene mehr → keine Lücke Kralle/Hand)
 
-wurzel_l = flügel_l & ((xx - PIV_L[0]) ** 2 + (yy - PIV_L[1]) ** 2 <= R_WURZEL ** 2)
-wurzel_r = flügel_r & ((xx - PIV_R[0]) ** 2 + (yy - PIV_R[1]) ** 2 <= R_WURZEL ** 2)
 RAND = T.rand_farben(spr)
 REGEL = T.umriss_regeln(spr, RAND)[2]
 ZEILE = 20                                         # Bauchmitte: hier wird beim Atmen eine Zeile eingefügt
 FUSS_ZEILE = 22                                    # hier entfällt beim Fußheben eine Zeile
-WAND_L, WAND_R = PAD_L + 11, PAD_L + 20            # Flügelgelenke (Leinwandspalten)
 
 # Gesicht
 AUGEN_L = [(13, 11), (14, 11), (13, 12), (14, 12), (13, 13), (14, 13)]
@@ -90,16 +86,78 @@ bauch_m[PAD_T + 18:PAD_T + 26, PAD_L + 14:PAD_L + 18] = True
 
 
 def welle(t):
-    """0 = Flügel ganz oben … 1 = ganz unten (Abschlag in DOWN Frames, Aufschlag in UP Frames, Cosinus-weich)."""
+    """0 = Flügel ganz oben … 1 = ganz unten (nur noch für den Schwebe-Bob; der Flügel selbst läuft über die Posenfolge)."""
     u = (t + P0) % BEAT
     if u < DOWN:
         return 0.5 - 0.5 * math.cos(math.pi * u / DOWN)
     return 0.5 + 0.5 * math.cos(math.pi * (u - DOWN) / UP)
 
 
-def winkel(t):
-    """Drehwinkel des LINKEN Flügels (rad, negativ = gegen den Uhrzeigersinn = Flügel schlägt nach unten); 0 bei Frame 0."""
-    return -HUB * (welle(t) - welle(0))
+# ── RUNDE 4: handgezeichnete Flügel-Schlüsselposen (linker Flügel; der rechte ist das Spiegelbild) ────────────────────────────
+# Anatomie: Der Flügelknochen läuft vom hellen Gelenkknauf neben dem Kopf ((11–13, 3–5), bleibt als Drehpunkt stehen) zur Spitze; darunter hängt die Flughaut mit den orangen Feldern, die unten an der
+# Schulter (8–9, 11) angewachsen ist. Der Knochen schlägt als Ganzes um den Knauf: U (35° über der Waagerechten) → O (Original, 17°) → M (waagerecht) → D (30° darunter); beim Aufschlag hängt die Spitze nach (MA).
+# Zeichen = Farben der Quelle; linkes oberes Zeichen = Sprite-Koordinate (−2, y0).
+FARBE = {'B': (49, 24, 0), 'C': (75, 24, 24), 'D': (130, 43, 43), 'E': (162, 54, 54), 'H': (192, 67, 67), 'I': (213, 98, 16), 'J': (202, 97, 97), 'K': (210, 121, 121), 'L': (230, 131, 16),
+         'M': (246, 164, 24), 'N': (232, 187, 187)}
+POSEN_TXT = {
+    'U': (-5, ["..BB............",
+               "..BCBB..........",
+               "...BCDB.........",
+               "...BIICBB.......",
+               "....BMLCDB......",
+               "....BDMLCCBB....",
+               ".....BCDCCCDB...",
+               "......BDCMLCJB..",
+               "......BCDMIDHJBB",
+               ".......BDCLDDHNK",
+               ".......BBMDCBH..",
+               "........BDCL....",
+               ".........BLM....",
+               ".........BMI....",
+               ".........BMC....",
+               ".........BDE....",
+               "..........BL...."]),
+    'M': (2, ["............BB..",
+              ".........BBBBJBB",
+              "....BBBBBDCDHHNK",
+              "BBBBCCDDCMLCBH..",
+              "BCCDIICDMLCL....",
+              ".BBMLDCCDCLM....",
+              "...BBMLDCDMI....",
+              ".....BBIDCMC....",
+              ".......BBDDE....",
+              ".........BBL...."]),
+    'D': (2, ["............BB..",
+              "............BJBB",
+              "...........BHHNK",
+              ".........BBDBH..",
+              "........BCCL....",
+              "......BBDMLM....",
+              ".....BCCIDMI....",
+              "...BBDMLCCMC....",
+              "..BCDIBBBDDE....",
+              "...BBB...BBL...."]),
+    'MA': (2, ["............BB..",
+               "..........BBBJBB",
+               ".......BBBCDHHNK",
+               "......BCDCMLBH..",
+               ".....BCMLDCL....",
+               "....BDILCDLM....",
+               "...BCDCCMCMI....",
+               "..BCIMBBBCMC....",
+               "...BBB..BDDE....",
+               ".........BBL...."]),
+}
+FOLGE = ['O', 'U', 'U', 'O', 'M', 'D', 'D', 'D', 'MA', 'MA', 'O', 'O']      # 12 Frames je Schlag: Abschlag schnell (U→O→M→D je 1 Frame), unten kurz halten, Aufschlag mit nachhängender Spitze
+assert len(FOLGE) == BEAT
+
+
+def fluegel_posen():
+    links = {'O': D.abschnitt(spr, flügel_l, H, W, PAD_L, PAD_T)}
+    for name, (y0, zeilen) in POSEN_TXT.items():
+        links[name] = R4.pose(zeilen, FARBE, -2, y0, H, W, PAD_L, PAD_T)
+    rechts = {n: R4.spiegeln(a, 2 * PAD_L + sw - 1) for n, a in links.items()}
+    return links, rechts
 
 
 def teil(maske):
@@ -125,7 +183,7 @@ def zustand(i):
 def frame(i, nur=None):
     ph, bob, atem, fl_, fr_, blink = zustand(i)
     bob = -int(round(1.0 * (welle(i - 1.0) - welle(-1.0)) / (1.0 - welle(-1.0))))      # Bob folgt dem Abschlag (Frame 0 = 0)
-    k = teil(koerper | wurzel_l | wurzel_r)
+    k = teil(koerper)
     if blink:
         pix = {p: LID[p] for p in (AUGEN_L + AUGEN_R) if (blink == 2 or p[1] >= 12)}
         for (x, y), c in pix.items():
@@ -135,27 +193,23 @@ def frame(i, nur=None):
     k = L.streck_zeile(k, PAD_T + ZEILE, atem)
     fuss_a = L.heben_unten(teil(fuss_l), PAD_T + FUSS_ZEILE, fl_)
     fuss_b = L.heben_unten(teil(fuss_r), PAD_T + FUSS_ZEILE, fr_)
-    # Flügel (beide Seiten), schwingen als Ganzes um die Schulter und heben sich mit dem Atmen mit
-    ang = winkel(i)
-    wl = F.drehen(teil(flügel_l & ~wurzel_l), PAD_L + PIV_L[0], PAD_T + PIV_L[1], ang, glatt=True)
-    wr = F.drehen(teil(flügel_r & ~wurzel_r), PAD_L + PIV_R[0], PAD_T + PIV_R[1], -ang, glatt=True)
-    spitze_dy = (PIV_L[1] + (-10.0) * math.cos(ang) + (-8.5) * math.sin(ang)) - (PIV_L[1] - 10.0)      # senkrechter Weg der Flügelspitze (Spitze liegt bei (−8,5|−10) zum Gelenk)
-    kdy = int(round(0.25 * spitze_dy)) - atem
-    kl = L.versetze(teil(klauen_l), 0, kdy)
-    kr = L.versetze(teil(klauen_r), 0, kdy)
-    wl = L.versetze(wl, 0, -atem)
-    wr = L.versetze(wr, 0, -atem)
-    ebenen = {'fuss_l': fuss_a, 'fuss_r': fuss_b, 'koerper': k, 'fluegel_l': wl, 'fluegel_r': wr, 'klauen_l': kl, 'klauen_r': kr}
-    wahl = nur or tuple(ebenen)
-    ganz = L.zusammen(H, W, [(ebenen[n], 0, bob) for n in wahl])
+    # Flügel (beide Seiten): handgezeichnete Schlüsselpose des Frames, hinter dem Körper, hebt sich mit dem Atmen mit
+    name = R4.takt(FOLGE, i)
+    wl = L.versetze(FL_L[name], 0, -atem)
+    wr = L.versetze(FL_R[name], 0, -atem)
+    vorn = {'fuss_l': fuss_a, 'fuss_r': fuss_b, 'koerper': k}
+    wahl = nur or ('fluegel_l', 'fluegel_r') + tuple(vorn)
+    ganz = L.zusammen(H, W, [(vorn[n], 0, bob) for n in vorn if n in wahl])
     ganz = R3.luecken_fuellen(ganz, 5, ausser=np.roll(ORIG_LOECHER, bob, axis=0))
-    return T.umriss_schliessen(ganz, RAND, REGEL)                  # Randpixel-Test (Regel 16)
+    ganz = T.umriss_schliessen(ganz, RAND, REGEL)                  # Randpixel-Test (Regel 16) für Körper und Füße; die Flügelposen sind fertig gezeichnet und bleiben unberührt
+    return L.zusammen(H, W, [(e, 0, bob) for n, e in (('fluegel_l', wl), ('fluegel_r', wr)) if n in wahl] + [(ganz, 0, 0)])
 
 
 TEST_EBENEN = None
 _m0 = np.zeros((H, W), bool)
 _m0[PAD_T:PAD_T + sh, PAD_L:PAD_L + sw] = vorhanden
 ORIG_LOECHER = R3.eingeschlossen(_m0)
+FL_L, FL_R = fluegel_posen()
 
 
 if __name__ == '__main__':

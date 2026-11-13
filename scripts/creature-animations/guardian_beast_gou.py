@@ -25,7 +25,8 @@ Gold im Sprite: Stirnband, Schulterplatten, Gürtelschnalle → nur sie glänzen
 Ablauf (48 Frames à 64 ms = 3,07 s, nahtlos):
 * Atmen (Periode 24, zwei Atemzüge): die Zeile 20 (Hosenfalte) wird einmal doppelt eingefügt, Rumpf, Arme, Schultern und Kopf steigen 1 px, Beine/Stiefel bleiben.
 * Antenne zuckt: der Kamm wird 1 px länger (Frames 6–9 und 30–33); sonst unverändert.
-* Ohrplatten zucken (links Frames 10–15, rechts Frames 34–39): die Platte rutscht 1 px nach unten und wieder hoch (zweimal, ruckhaft); sie bleibt am Helm.
+* Ohrplatten zucken (links Frames 10–15, rechts Frames 34–39; Runde 4: ohne Lücke zum Helm): nur die zwei äußeren Spalten der Platte klappen 1 px nach unten und wieder hoch (zweimal, ruckhaft); die zwei Spalten am Helm
+  bleiben stehen, der freigelegte helle Pixel (4,7)/(15,7) wird Plattenumriss (74,77,64).
 * Blinzeln (Frames 19–21 und 41–43): die vier hellen Augenpixel (Weiß/Rotbraun) nehmen die Schlitzfarbe (17,13,14) an.
 * MAUL (Runde 3, Nutzerwunsch „das offene rote Maul periodisch schließen und öffnen“): vier Pixel (9–10, 11–12). Zyklus offen (Original) → halb (obere Maulzeile wird Nasenfarbe, nur die untere Zeile bleibt rot) →
   zu (obere Zeile Nasenfarbe, untere Zeile dunkelstes Rot (44,10,10) = Maulnaht) → halb → offen; zwei Zyklen je Schleife (Frames 9–15 und 33–39), dazwischen jeweils länger offen. Nur Quellfarben, Fangzähne fest.
@@ -64,6 +65,9 @@ MAUL = {
 MAUL_FOLGE = [1, 2, 2, 2, 2, 2, 1]                               # halb, zu ×5, halb
 ohr_l = sz.maske(2, 6, 5, 9)
 ohr_r = sz.maske(14, 6, 17, 9)
+ohr_l_aussen, ohr_l_innen = sz.maske(2, 6, 3, 9), sz.maske(4, 6, 5, 9)
+ohr_r_aussen, ohr_r_innen = sz.maske(16, 6, 17, 9), sz.maske(14, 6, 15, 9)
+PLATTE = f(4, 6)                                                 # (74,77,64) Umriss der Ohrplatte
 fuss_l = sz.maske(0, 23, 9, 25)
 fuss_r = sz.maske(10, 23, 19, 25)
 rumpf = sz.vorhanden & ~ohr_l & ~ohr_r & ~fuss_l & ~fuss_r
@@ -94,8 +98,14 @@ def frame(i):
     # --- Ohrplatten zucken (1 px nach unten, ruckhaft), liegen hinter dem Kopf ---
     zuck_l = 1 if Hm.folge(i, 10, [1, 1, 0, 1, 1, 0], N) else 0
     zuck_r = 1 if Hm.folge(i, 34, [1, 1, 0, 1, 1, 0], N) else 0
-    ol = sz.ebene(ohr_l, 0, zuck_l)
-    orr = sz.ebene(ohr_r, 0, zuck_r)
+    # Runde 4 (Rückmeldung: „auf manchen Frames entstehen Lücken zwischen den Ohren und dem Helm“): die Platte rutscht nicht mehr als Ganzes (dabei öffnete sich oben neben dem Helm eine Kerbe), sondern nur ihre
+    # äußeren zwei Spalten klappen 1 px herunter; die zwei Spalten am Helm bleiben stehen (Ohr bleibt am Helm angewachsen). Der dabei freigelegte helle Pixel (4,7) bzw. (15,7) wird Plattenumriss.
+    ol = L.zusammen(H, W, [(sz.ebene(ohr_l_aussen, 0, zuck_l), 0, 0), (sz.ebene(ohr_l_innen), 0, 0)])
+    orr = L.zusammen(H, W, [(sz.ebene(ohr_r_aussen, 0, zuck_r), 0, 0), (sz.ebene(ohr_r_innen), 0, 0)])
+    if zuck_l:
+        sz.setze(ol, {(4, 7): PLATTE})
+    if zuck_r:
+        sz.setze(orr, {(15, 7): PLATTE})
     k, ol, orr = sz.atmen([k, ol, orr], 20, brust)
     # --- Antenne wird länger ---
     if Hm.folge(i, 6, [1] * 4, N) or Hm.folge(i, 30, [1] * 4, N):

@@ -20,6 +20,10 @@ Was ist was (x/y im Sprite, linke Seite; die rechte ist gespiegelt x ↔ 19 − 
   mit Membran) — nach der Korrektur des Nutzers. Sie liegen hinter Arm und Körper und werden hier ausgebreitet neu gezeichnet. Das Schulterstück (4,5), (4,10)–(4,12) bleibt am Körper.
 Fest bleiben: Schädelform, Hörner, Rippenmuster, Umrisse.
 
+RUNDE 4 (Nutzer: „wirkt beim Fliegen noch sehr erratisch“) — gilt vor dem folgenden Ablauf: Schlag = 16 Frames (3 pro Schleife), symmetrisch und gleichmäßig (weit → mitte → unten → mitte),
+beide Flügel spiegelgleich, kein Spitzenflattern; Bob = glatte Sinus-Bahn ±2 px im Takt (höchster Punkt 1 Frame nach dem Abschlag unten); Beine starr am Körper; Atmen nur 1 Zeile im Takt,
+ausgeglichen (Kopf bleibt auf der Sinus-Bahn); Arme pendeln beide mit Periode 24 und kleinerem Ausschlag, die Faust schließt sich nur noch farblich (kein 1-px-Sprung).
+
 Ablauf (48 Frames à 65 ms = 3,12 s; die Figur FLIEGT, Frame 0 ist eine Flugpose):
 * FLÜGEL schlagen durchgehend und gleichmäßig wie beim Winged Skeleton: ein Schlag = 12 Frames (780 ms), 4 Schläge pro Schleife, keine Pause. Abschlag (oben → waagerecht → unten) schnell, etwa 3,5 Frames; Aufschlag/Rückholen
   (Flügel heben sich, ziehen sich ein, Finger krümmen sich, öffnen sich wieder) etwa 8,5 Frames. Dieselben Schlüsselposen (Spline, Finger hinken 0,4 Frames je Finger nach, kleines Flattern der Spitzen; rechter Flügel 0,4 Frames später).
@@ -49,7 +53,7 @@ import anim_skel2 as K2
 import anim_untote as U
 
 N, MS = 48, 65
-BEAT = 12.0                                               # Frames pro Flügelschlag (4 Schläge pro Schleife)
+BEAT = 16.0                                               # Frames pro Flügelschlag (Runde 4: 3 ruhige Schläge pro Schleife statt 4 hastiger)
 PAD_L, PAD_R, PAD_T, PAD_B = 17, 17, 11, 5
 
 spr = L.lade('skeleton-demon')
@@ -116,10 +120,12 @@ def _v(name):
     return B.pose_vektor(POSEN[name])
 
 
-SCHLAG = [(0, 'oben'), (1.5, 'mitte'), (3.5, 'unten'), (5.5, 'halb'), (7.5, 'ein'), (9.5, 'halb'), (11, 'weit')]
+# Runde 4 (Nutzer: „wirkt beim Fliegen noch sehr erratisch“): gleichmäßiger, symmetrischer Schlag — oben → Mitte → unten → Mitte, je 4 Frames, Tangente 0 an den Umkehrpunkten
+# (weiches Abbremsen), kein schneller Abschlag, kein Einziehen/Krümmen, kein Flattern der Spitzen, beide Flügel exakt spiegelgleich.
+SCHLAG = [(0, 'weit'), (4, 'mitte'), (8, 'unten'), (12, 'mitte')]
 SCHLUESSEL = [(z, _v(nm), False) for (z, nm) in SCHLAG]
 FINGER_LAG = 0.4
-RECHTS_LAG = 0.4
+RECHTS_LAG = 0.0
 
 
 def pose_zu(t, finger_phase=0.0):
@@ -128,15 +134,13 @@ def pose_zu(t, finger_phase=0.0):
     for k in range(4):
         v = B.vektor_pose(B.spline(SCHLUESSEL, t - FINGER_LAG * k, BEAT), KEY)
         basis['ang'][k] = v['ang'][k]
-    for k in range(4):
-        basis['ang'][k] += 2.0 * math.sin(L.sinus(t, N / 3.0, 1.1 * k + finger_phase))
     return basis
 
 
 def atem_stufe(i):
     """0 / 1 / 2 Zeilen Rippenkorb-Dehnung: dreimal pro Schleife (Periode 16), unabhängig vom Flügelschlag."""
-    s = math.cos(2 * math.pi * (i - 4) / 16.0)
-    return 2 if s > 0.55 else (1 if s > -0.45 else 0)
+    # Runde 4: nur noch 1 Zeile, im Takt des Flugs (Periode = BEAT); der Hub wird in frame_gross ausgeglichen (Kopf/Flügel bleiben auf der Sinus-Bahn, Becken/Beine sinken 1 px)
+    return 1 if (i - 5) % 16 < 8 else 0                    # Phase so gewählt, dass auch die Beine (Bob + Atemzeile) monoton steigen/sinken
 
 
 def dehne(a, n):
@@ -148,8 +152,8 @@ def dehne(a, n):
 
 
 # ── Flug: die ganze Figur hebt und senkt sich im Takt der Schläge ────────────────────────────────────────────────────────
-BOB_AMP = 2.6
-BOB_MAX_T = 5.0
+BOB_AMP = 2.0                                             # Runde 4: glatte Sinus-Bahn ±2 px über 16 Frames (vorher ±3 px in 12 Frames)
+BOB_MAX_T = 9.0
 
 
 def bob(t):
@@ -159,7 +163,7 @@ def bob(t):
 
 def fuss_versatz(t):
     """Füße baumeln nach: sie folgen dem Körper verzögert und nur zu 60 % (nie höher als der Körper)."""
-    return max(bob(t), int(round(0.6 * bob(t - 1.5))))
+    return bob(t)                                          # Runde 4: Beine starr am Körper (das verzögerte Nachbaumeln mit Zeilendopplung zappelte)
 
 
 def koerper_ebene(n, dy_u, dy_f):
@@ -174,8 +178,8 @@ def koerper_ebene(n, dy_u, dy_f):
 
 
 # ── Arme: eigene, vom Flügelschlag unabhängige Pendelbewegung (hängen am Körper und fliegen mit ihm) ────────────────────
-ARM_PERIODE = {True: 16.0, False: 24.0}
-ARM_AMP = {True: 2.4, False: 2.0}
+ARM_PERIODE = {True: 24.0, False: 24.0}                   # Runde 4: beide Arme gleich und ruhiger
+ARM_AMP = {True: 1.5, False: 1.5}
 ZUCKEN_START = {True: (7, 31), False: (18, 41)}
 ZUCKEN_FOLGE = (1, 1, 0, 1)
 
@@ -221,8 +225,6 @@ def arm_ebene(links, i, n, dy_u):
         hand[m, :3] = ROT_D
     rohr = arm_pendel(rohr, pivot, ymax, aus, links)
     hand = arm_pendel(hand, pivot, ymax, aus, links)
-    if z:
-        hand = L.versetze(hand, 0, -1)                     # Faust hebt sich 1 px
     return L.zusammen(H, W, [(rohr, 0, dy_u), (hand, 0, dy_u)])        # ganzer Arm fliegt mit dem Körper
 
 
@@ -259,10 +261,12 @@ TEST_EBENEN = ('koerper', 'arme', 'fluegel')               # für den Randpixel-
 def frame_gross(i, nur=None):
     ebenen = nur if nur is not None else ('koerper', 'arme', 'fluegel', 'partikel')
     n = atem_stufe(i)
-    dy_u, dy_f = bob(i), fuss_versatz(i)
+    dy_k = bob(i)                                          # Bahn von Kopf, Schultern und Flügelansatz: reine Sinus-Bahn
+    dy_u = dy_k + n                                        # die Atemzeile hebt alles darüber um n → Ausgleich, damit der Kopf nicht zusätzlich ruckt
+    dy_f = dy_u
     schichten = []
     if 'fluegel' in ebenen:
-        schichten += [(fluegel_ebene(i, True, dy_u, n), 0, 0), (fluegel_ebene(i - RECHTS_LAG, False, bob(i - RECHTS_LAG), n), 0, 0)]   # Flügel hinten
+        schichten += [(fluegel_ebene(i, True, dy_u, n), 0, 0), (fluegel_ebene(i - RECHTS_LAG, False, dy_u, n), 0, 0)]   # Flügel hinten
     if 'koerper' in ebenen:
         schichten.append((koerper_ebene(n, dy_u, dy_f), 0, 0))
     if 'arme' in ebenen:

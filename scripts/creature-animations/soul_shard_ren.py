@@ -29,6 +29,7 @@ import sys
 import numpy as np
 
 import anim_lib as L
+import anim_textur as TX   # texturierte Streckzeilen statt Zeilenkopien (Regel 43)
 import anim_amorph as A
 import anim_shard as SH
 
@@ -133,7 +134,7 @@ def sterne_ebene(i, f):
 
 def figur(i):
     koerper = A.zeilen_von(sprite_mit_effekten(i), 0, sh - 1, H, W, PAD_L, PAD_T)
-    z, quelle = A.koerper_pose(koerper, doppeln=POSEN[S[i]], x0=PAD_L)
+    z, quelle = TX.koerper_pose(koerper, doppeln=POSEN[S[i]], x0=PAD_L)
     fig, top = A.auf_leinwand(z, H, BODEN, 0)
     if i in BLINK:
         pix = [(top + y, PAD_L + x) for (y, x) in AUGEN if BLINK[i] == 2 or y <= 23]

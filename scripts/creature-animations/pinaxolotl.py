@@ -38,6 +38,7 @@ import sys
 import numpy as np
 
 import anim_lib as L
+import anim_textur as TX   # texturierte Streckzeilen statt Zeilenkopien (Regel 43)
 import anim_tiere as T
 import anim_tier as G
 
@@ -106,7 +107,7 @@ def frame(i, nur=None):
     bl = L.spalten_welle(teil(blatt), PAD_L + 26, 2.4, 2 * math.pi * i / 15.0 + 0.2, potenz=1.0, nur_rechts=True, lauf=0.4)
     ebenen = {'koerper': k, 'krone': kr, 'blatt': bl}
     wahl = nur or ('koerper', 'krone', 'blatt')
-    teile = [(L.streck_zeile(ebenen[n], PAD_T + ZEILE, atem), 0, 0) for n in wahl]
+    teile = [(TX.streck_zeile(ebenen[n], PAD_T + ZEILE, atem), 0, 0) for n in wahl]
     ganz = L.zusammen(H, W, teile)
     return T.umriss_schliessen(ganz, RAND, REGEL)                  # Randpixel-Test (Regel 16)
 

@@ -91,6 +91,7 @@ m_hammer = np.array([[bool(hammer[y, x, 3] and y >= 5 and tuple(int(v) for v in 
                      for y in range(hammer.shape[0])])
 
 ROHRE = {'l': (0, 6), 'm': (8, 13), 'r': (15, 21)}               # x-Bereich je Rohr für das Zittern (Zeilen 0–2)
+SCHULTER_ZEILE = 20                                               # Ärmelzeile, an der sich der Ärmel beim Rattern um 1 px längt (Schulter darüber bleibt an der Kapuze)
 BURSTS = (4, 28)                                                  # Beginn der Rattern-Fenster (je 12 Frames)
 
 
@@ -151,11 +152,26 @@ def frame(i, dampf=True, nur=None):
     # --- Presslufthammer rattert: Hammer + Ärmel stoßen jeden zweiten Frame 1 px nach unten (Rüttelbewegung 0 / +1), der Zwerg selbst bleibt stehen ---
     if k is not None:
         dh = 1 if k % 2 else 0
-        ha, al, ar = L.versetze(ha, 0, dh), L.versetze(al, 0, dh), L.versetze(ar, 0, dh)
+        ha = L.versetze(ha, 0, dh)
+        if dh:
+            # Runde 4 (Nutzer: „teilweise Lücken zwischen Helm und Schultern“): früher rutschte der GANZE Ärmel 1 px tiefer und riss an der Schulter von der Kapuze ab.
+            # Jetzt bleibt die Schulter (oberhalb der Ärmelzeile SCHULTER_ZEILE) an der Kapuze, nur der untere Ärmel geht mit dem Hammer: Ärmel 1 px tiefer, dann eine
+            # (texturgemischte) Zeile einfügen, die den oberen Teil wieder an seinen Platz hebt.
+            al = L.streck_zeile(L.versetze(al, 0, dh), PAD_T + SCHULTER_ZEILE + dh, dh)
+            ar = L.streck_zeile(L.versetze(ar, 0, dh), PAD_T + SCHULTER_ZEILE + dh, dh)
         links = (k % 4) < 2                                                       # 0,1: links an / 2,3: rechts an
         Hm.setze(ha, {(2, 2): LAMPE if links else KASTEN, (3, 2): LAMPE if links else KASTEN,
                       (6, 2): KASTEN if links else LAMPE, (8, 2): KASTEN if links else LAMPE}, (PAD_L + HX, PAD_T + HY + dh))
     fig = L.zusammen(H, W, [(al, 0, 0), (ar, 0, 0), (kp, 0, 0), (ha, 0, 0)])
+    if k is not None and k % 2:
+        # Runde 4: beim Stoß nach unten bleiben einzelne feste Pixel (Bart-/Umhangrand der Kopfebene) stehen, darunter riss 1 px Hintergrund auf → mit der Farbe des Pixels darunter schließen.
+        dicht = fig[..., 3] > 0
+        for Y in range(PAD_T + 16, H - 1):
+            for X in range(1, W - 1):
+                if not dicht[Y, X] and ((dicht[Y - 1, X] and dicht[Y + 1, X]) or (dicht[Y, X - 1] and dicht[Y, X + 1] and dicht[Y + 1, X])):
+                    fig[Y, X] = fig[Y + 1, X]
+                elif not dicht[Y, X] and dicht[Y, X - 1] and dicht[Y, X + 1] and dicht[Y - 1, X]:
+                    fig[Y, X] = fig[Y - 1, X]                              # 1-px-Kerbe neben dem Hammerkragen (fester Umhangzipfel darüber)
     Hm.kontur_schliessen(fig, ERLAUBT, (0, 0, 0))                  # Regel 16: Außenkante in jeder Pose in Umrissfarbe
     # --- Glitzer-Sterne an den Rohrspitzen (Effekt über der Figur) ---
     for (sx, sy, start) in (() if nur else ((2, 1, 10), (19, 1, 26), (10, 1, 40))):

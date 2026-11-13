@@ -20,6 +20,9 @@ Fest bleiben: Gesichtsform, Augenform im Ruhebild, Flügelrippen-Muster, Stirnkr
 RUNDE 3 (Nutzer-Feedback): „unten die Linien unter der harten Schlusskante noch entfernen und seine Bewegungen langsamer machen; er ist riesig und furchteinflößend.“
   * Die dünnen Tentakelfäden (1 px, Zeilen y 52–56 unter der harten Unterkante y 51) sind aus dem Sprite entfernt (`spr[52:] = 0`); die Unterkante y 51 ist jetzt der Abschluss in jeder Pose.
   * ALLE Bewegungen sind halb so schnell: 96 Frames à 70 ms = 6,72 s (vorher 48 Frames, 3,36 s); Perioden verdoppelt (Flügel 48, Atmen 48, Tentakel 32/48, Hörner 16 Frames, Blinzelwelle 2 Frames je Schritt, Blasen 96).
+RUNDE 4 (Nutzer-Feedback): „soll UNTEN verankert sein, nicht oben: die obere Körperseite bewegt sich (wenig), der Unterkörper ist fix.“
+  * Das Wehen der Tentakel (Zeilen y ≥ 30, Ausschlag wuchs nach unten) ist ENTFERNT: Tentakelbart/Unterkörper stehen völlig still (Anker = Unterkante).
+  * Dafür wiegt sich der Oberkörper (y < 30: Kopf, Hörner, Hals) zusammen mit beiden Flügeln starr um ±1 px seitlich (Periode 32 Frames); das Atmen hebt wie bisher nur den oberen Teil (Unterkante fest).
 Ablauf (96 Frames à 70 ms = 6,72 s; Frame 0 = Original, Blasen ausgenommen; Angaben im Folgenden für die ALTE Geschwindigkeit, jetzt jeweils doppelt so lange):
 * Flügelschlag: beide Flügel schlagen als Wellen (Periode 24, zweimal pro Schleife; spaltenweise Versatz wächst mit dem Abstand zur Wurzel (x 28/46), bis ±4 px an der Spitze; die Spitze hinkt der Wurzel nach, die Wurzel bleibt am Körper).
 * Atmen in zwei Schritten (Brust zuerst, Kopf hinterher): eine Zeile im Rumpf (y 36) und eine am Hals (y 27) werden eingefügt, Periode 24 mit 3 Frames Nachlauf für den Kopf; die Flügel heben sich mit (bis 2 px).
@@ -125,6 +128,12 @@ def horn_bump(i, start, dauer=16):
     return U.buckel(i, start, dauer)
 
 
+def wiegen(i):
+    """Seitliches Wiegen des Oberkörpers: −1/0/+1 px, Periode 32 Frames (langsam, 2,2 s), Frame 0 = 0."""
+    v = np.sin(L.sinus(i, 32))
+    return 1 if v >= 0.5 else -1 if v <= -0.5 else 0
+
+
 def koerper_ebene(i):
     kb = KO.copy()
     kb = blinz(kb, BLINZ.get(i, (0, 0, 0)))
@@ -150,9 +159,10 @@ def koerper_ebene(i):
     unten[:GPT + 30] = 0
     oben = kb.copy()
     oben[GPT + 30:] = 0
-    w1 = T.wehen(unten, GPT + 29, 1.5, i, 32, lag=1.2, potenz=1.3)
-    w2 = T.wehen(w1, GPT + 29, 1.0, i, 48, lag=-0.8, potenz=1.5)
-    kb = L.zusammen(H, W, [(oben, 0, 0), (w2, 0, 0)])
+    # Runde 4 (Nutzer: „UNTEN verankert, nicht oben: die obere Körperseite bewegt sich (wenig), der Unterkörper ist fix“): die Tentakel (y ≥ 30) stehen völlig still;
+    # stattdessen wiegt sich der Oberkörper (Kopf, Hörner, Hals, y < 30, samt Flügeln) als starre Einheit um 1 px nach links/rechts.
+    dx = wiegen(i)
+    kb = L.zusammen(H, W, [(L.versetze(oben, dx, 0) if dx else oben, 0, 0), (unten, 0, 0)])
     # Atmen in zwei Schritten: Hals (y 27) mit Nachlauf, Rumpf (y 36) zuerst
     n_rumpf = U.stufe(i, 48, 1)
     n_hals = U.stufe(i, 48, 1, versatz=-L.sinus(6, 48))               # Kopf hinkt 6 Frames hinterher
@@ -160,7 +170,7 @@ def koerper_ebene(i):
         kb = L.streck_zeile(kb, GPT + 27, n_hals)
     if n_rumpf:
         kb = L.streck_zeile(kb, GPT + 36, n_rumpf)
-    return kb, n_hals + n_rumpf
+    return kb, n_hals + n_rumpf, dx
 
 
 # freie Bahnen für die Blasen (unten links / rechts neben den Tentakeln), ≥ 3 px unter den Flügelspitzen
@@ -175,9 +185,11 @@ BLASE = {'c': (49, 104, 72), 'r': (27, 58, 41)}
 
 
 def frame_gross(i, nur=None):
-    kb, hub = koerper_ebene(i)
+    kb, hub, dx = koerper_ebene(i)
     fl = T.fluegel(FL_L, PIVOT_L, 4.4, i, 48, lag=1.0, potenz=1.15, dy0=-hub)
     fr = T.fluegel(FL_R, PIVOT_R, 4.4, i, 48, lag=1.0, potenz=1.15, dy0=-hub)
+    if dx:                                                                  # die Flügel hängen am Oberkörper (Wurzel y 24–26) und wiegen sich mit
+        fl, fr = L.versetze(fl, dx, 0), L.versetze(fr, dx, 0)
     f = L.zusammen(H, W, [(fl, 0, 0), (fr, 0, 0), (kb, 0, 0)])
     f = U.kontur_schliessen(f, UMRISS, KONTUR)
     if nur == 'koerper':

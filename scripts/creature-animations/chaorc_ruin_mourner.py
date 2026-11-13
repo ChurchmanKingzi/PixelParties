@@ -16,6 +16,8 @@ Was im Sprite ist (x, y im 32×33-Sprite):
 * KNOCHEN: ein Knochenstück hängt links unten von der Robe (x 2–6, y 23–28), ein gekreuztes Knochenpaar schwebt darunter (x 8–16, y 27–32, eigene Insel).
 Metall/Edelstein: nichts → KEIN Glanz (Knochen, Stoff; Regel 14). Kein Feuer, keine Partikel.
 
+RUNDE 4: Das Knochenstück links unten (x 2–6, y 23–28) liegt am Boden und ist NICHT mehr animiert (vorher pendelte es); der Kreuzknochen darunter bleibt ebenfalls still.
+
 Ablauf (48 Frames à 70 ms = 3,36 s, nahtlos; Ebenen: Robe, Schädelgruppe, Wirbel, linkes Knochenstück, Kreuzknochen):
 * Atmen der Robe (Periode 24, zweimal pro Schleife): die Robenzeile 22 wird einmal doppelt eingefügt (L.streck_zeile, Texturmischung): Kopf, Brust und Gürtel steigen 1 px, der Saum (y 23–25) bleibt.
 * Knochenhut (beide Schädel samt Krone/Knochenstück, `schaedel`) sitzt starr am Kopf: er hebt und senkt sich EXAKT gleichzeitig mit dem Kopf der Robe (b = 0/1 des Atmens, Hut −b) und hat keine eigene Bewegung mehr
@@ -69,8 +71,17 @@ kreuz &= vorhanden & grau | (kreuz & vorhanden & ~robe)
 kreuz &= vorhanden
 knochen_l = vorhanden & ~robe & (xx <= 6) & (yy >= 23) & (yy <= 28)
 wirbel = vorhanden & ~robe & ~kreuz & (xx >= 20) & (xx <= 24) & (yy >= 20) & (yy <= 23)
-schaedel = vorhanden & ~robe & ~kreuz & ~knochen_l & ~wirbel
-assert (robe | kreuz | knochen_l | wirbel | schaedel).sum() == vorhanden.sum()
+# Runde 4: das Umrisspixel (7,25) gehört zum liegenden Knochen (es wanderte bisher mit dem Schädel hoch); die braun/grauen Saumstücke (11–12, 23–24) und (18, 21–23) liegen unter der
+# Atemzeile 22 bzw. am Saum und bleiben stehen (bisher hoben sie sich mit dem Schädel und rissen bei (18,23) ein Loch in die Robe); siehe `strebe`.
+knochen_l[25, 7] = True
+saum = np.zeros((sh, sw), bool)
+for (_x, _y) in [(11, 23), (11, 24), (12, 23), (12, 24), (18, 21), (18, 22), (18, 23)]:
+    saum[_y, _x] = True
+assert (saum & vorhanden & ~robe & ~kreuz & ~knochen_l & ~wirbel).sum() == 7 and vorhanden[25, 7] and not robe[25, 7]
+strebe = np.zeros((sh, sw), bool)                # der braune Strich (18, 21–23) kreuzt die Atemzeile: er hebt sich mit dem Oberkörper, sein unterstes Pixel bleibt zusätzlich stehen (wird 1 px länger, kein Loch)
+strebe[21:24, 18] = True
+schaedel = vorhanden & ~robe & ~kreuz & ~knochen_l & ~wirbel & ~saum
+assert (robe | kreuz | knochen_l | wirbel | schaedel | saum).sum() == vorhanden.sum()
 assert not (robe & schaedel).any() and not (robe & knochen_l).any() and not (kreuz & robe).any()
 
 AUGEN = [(9, 12), (9, 13), (16, 12)]
@@ -98,10 +109,11 @@ def frame_gross(i, nur=None):
     sw_ = math.sin(L.sinus(i, 12))
     w = L.versetze(teil(wirbel), 1 if sw_ > 0.5 else (-1 if sw_ < -0.5 else 0), sk)
     # linkes Knochenstück an der Robe: pendelt
-    kl = L.zeilen_welle(teil(knochen_l), GP + 23, 1.6, L.sinus(i, 16, 0.0))
+    # Runde 4 (Nutzer: „der untere linke Knochen soll nicht animiert sein, der liegt am Boden“): das Knochenstück links unten (x 2–6, y 23–28) bleibt völlig still
+    kl = teil(knochen_l)
     # unten liegender Kreuzknochen: bewegt sich gar nicht (Nutzerkorrektur Runde 3)
     kz = teil(kreuz)
-    fr = L.zusammen(H, W, [(r, 0, 0), (kz, 0, 0), (kl, 0, 0), (s, 0, 0), (w, 0, 0)])
+    fr = L.zusammen(H, W, [(r, 0, 0), (teil(saum), 0, 0), (L.versetze(teil(strebe), 0, sk), 0, 0), (kz, 0, 0), (kl, 0, 0), (s, 0, 0), (w, 0, 0)])
     return Hm.kontur_schliessen(fr, ERLAUBT, UMRISS)
 
 

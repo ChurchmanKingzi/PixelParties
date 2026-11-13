@@ -24,6 +24,7 @@ Ablauf (48 Frames à 70 ms = 3,36 s; Frame 0 = Original, Partikel ausgenommen):
 * Brüste bouncen (RUNDE 3, Nutzer: „aktuell bewegt sich der komplette Oberkörper hoch und runter, statt dass nur die Brüste bouncen“): das Schweben des ganzen Körpers (±1 px) ist ENTFALLEN — Kopf, Rumpf, Flügelansätze und Füße
   stehen fest. Nur die beiden Brusthügel (links x 19–22, rechts x 23–26, je y 15–20; Lichtpunkte (21,17)/(25,17) mit Schatten darunter) federn als Blöcke um −2…+2 px (Periode 16 Frames, zwei Harmonische für das Nachschwingen: dy = round(1,5·sin φ + 0,7·sin 2φ));
   die frei werdenden Zeilen oben/unten werden mit den Hautzeilen darüber/darunter gefüllt (Quellfarben, nichts gestreckt, kein Umriss verdickt). Frame 0 = Original.
+  RUNDE 4 (Nutzer: „die Brustbewegungen sind jetzt ZU exaggerated“): der Bounce ist dezent — die Brusthügel senken sich nur noch um 1 px und kehren zurück (0 ↔ +1 px, Periode 24 Frames, kein Nachschwingen, kein Ausschlag nach oben).
 * Füße baumeln: die beiden Fußzeilen (y 26) versetzen sich abwechselnd 1 px zur Seite (Periode 16).
 * Blinzeln (Lid = dunkle Umgebungsfarbe (13,16,49)): NUR das weiße Auge (das einzige Auge) blinzelt — erst die obere Zeile, dann alles; zweimal (Frame 11–13 und 35–37). Das rosa Herz (26–28, 9–11) ist kein Auge und bleibt IMMER offen/unverändert (Nutzer: „das Herz soll nicht blinzeln, sie hat nur ein offenes Auge“).
 * Edelstein im Haar glitzert (Regel 14: nur Edelstein): ein weißer Lichtpunkt läuft diagonal über die 2×2-Fläche, dann die Gegendiagonale; zweimal pro Schleife (Frame 20–22 und 44–46).
@@ -132,8 +133,9 @@ def brust(kb, dy, x0_, x1_):
 
 def brust_dy(i):
     """Brust-Bounce (RUNDE 3): nur die Brüste federn (Periode 16 Frames, zwei Harmonische → Nachschwingen), Rumpf/Kopf/Flügelansatz bleiben stehen; Frame 0 = 0."""
-    ph = 2 * math.pi * i / FL_PERIODE
-    return int(round(1.5 * math.sin(ph) + 0.7 * math.sin(2 * ph)))
+    # RUNDE 4 (Nutzer: „Brustbewegungen sind jetzt ZU exaggerated“): nur noch 1 px Weg (0 ↔ +1 px), langsamer (Periode 24 Frames = 1,68 s statt 16) und ohne Nachschwingen:
+    # 9 Frames gesenkt, 15 Frames in Ruhelage. Frame 0 = 0.
+    return 1 if math.sin(2 * math.pi * i / 24) >= 0.4 else 0
 
 
 def set_px(a, x, y, farbe):

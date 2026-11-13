@@ -18,7 +18,9 @@ Ablauf (96 Frames à 70 ms = 6,7 s; Frame 0 = Original) — Runde 3 (Rückmeldun
 * Der Kopf steht jetzt still (kein Block-Versatz) und das Auge wandert nicht mehr im Visier hin und her (der frühere Scannerblick las sich als seitliche Kopfbewegung).
 * Auge leuchtet hin und wieder auf (zweimal pro Schleife: Frames 20–29 lang, 66–75 als kurzes Flackern mit zweitem Impuls): Stufe 1 = beide Augenspalten in hellem Quellrot (190,0,0); Stufe 2 = Spitze in Palettenrot (255,26,26)
   (einzige Farbe, die nicht im Sprite steht, aus data/palette.json, in L.pruefe freigegeben) plus zwei Visierpixel (7,6) und (10,7) in dunklem Quellrot (130,0,0) als Glutsaum. Kein Blinzeln (Rückmeldung des Spielgestalters).
-* Arme: Fäuste/Kolben (x ≤ 4 bzw. ≥ 13, y ≥ 9) heben und senken sich im Gegentakt ±1 px (Periode 16, sechsmal pro Schleife) — wie Servos (unverändert).
+* Arme (Runde 4: „Arme synchron“): Fäuste/Kolben (x ≤ 4 bzw. ≥ 13, y ≥ 9) heben und senken sich GLEICHZEITIG ±1 px (Periode 16, sechsmal pro Schleife) — wie Servos.
+* Körper (Runde 4: „etwas Animation im Körper“): mechanisches Einfedern — dreimal pro Schleife (Periode 32, Frames 8–19) sackt der Oberkörper samt Kopf und Armen 1 px ein; dafür entfällt die Unterschenkel-Zeile y 20
+  (Beine 1 px kürzer, Füße stehen). Der Kopf bewegt sich nur senkrecht mit.
 * KEIN Fußheben (Rückmeldung des Spielgestalters): beide Füße bleiben am Boden.
 * Metallglanz (Regel 14: der ganze Roboter ist Metall): ein diagonales Lichtband läuft über den Körper (viermal pro Schleife, Start Frame 6, 30, 54 und 78, 14 Frames, zwei Stufen heller auf der Rampe der Grautöne); Umrisspixel am Rand,
   das Visier und das Auge glänzen nicht.
@@ -132,10 +134,15 @@ def frame_gross(i, nur=None):
         for (x, y) in SAUM:
             set_px(kopf, x, y, ROT_D)
     # Arme (Servos im Gegentakt)
-    dyl = int(round(sinz(i, 16)))
-    dyr = -dyl
-    bl_ = br_ = 0                                                # kein Fußheben (Rückmeldung: beide Füße bleiben am Boden)
-    koerper = L.zusammen(H, W, [(kb, 0, 0), (kopf, 0, 0), (arml, 0, dyl), (armr, 0, dyr), (beinl, 0, -bl_), (beinr, 0, -br_)])
+    # Runde 4 (Rückmeldung: „die Arme sollen sich synchron bewegen, und er soll etwas Animation im Körper haben“): beide Arme heben/senken sich GLEICHZEITIG (±1 px, Periode 16);
+    # der Körper federt mechanisch: dreimal pro Schleife (Periode 32, 12 Frames lang) sackt der ganze Oberkörper samt Kopf und Armen 1 px ein — die Beine werden dabei 1 px kürzer
+    # (die Unterschenkel-Zeile y 20 entfällt, alles darüber rückt 1 px herunter; Füße y 21–22 stehen). Nichts wird gestreckt/kopiert, der Kopf geht nur senkrecht mit.
+    dyl = dyr = int(round(sinz(i, 16)))
+    sack = 1 if 8 <= i % 32 <= 19 else 0
+    rumpf = L.zusammen(H, W, [(kb, 0, 0), (kopf, 0, 0), (beinl, 0, 0), (beinr, 0, 0)])
+    if sack:
+        rumpf = L.streck_zeile(rumpf, GPT + 20, -1)
+    koerper = L.zusammen(H, W, [(rumpf, 0, 0), (arml, 0, dyl + sack), (armr, 0, dyr + sack)])
     koerper = U.kontur_schliessen(koerper, UMRISS, KONTUR)
     return koerper
 
