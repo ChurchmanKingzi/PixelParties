@@ -33,6 +33,7 @@ import cv2
 import numpy as np
 
 import anim_lib as L
+import anim_textur as TX   # texturierte Streckzeilen statt Zeilenkopien (Regel 43)
 import anim_tiefsee as T
 import anim_untote as U
 
@@ -101,7 +102,7 @@ def ghost_frame(g, i):
     # Strecken
     n = 1 if max(U.buckel(i, g['st'][0], 12, N), U.buckel(i, g['st'][1], 12, N)) >= 0.5 else 0
     if n:
-        a = L.streck_zeile(a, GPT + g['streck'], n)
+        a = TX.streck_zeile(a, GPT + g['streck'], n)
     # Schweben
     dy = int(round(2.0 * math.sin(L.sinus(i, g['per_bob'], g['ph'])))) - int(round(2.0 * math.sin(g['ph'])))
     dx = int(round(1.0 * math.sin(L.sinus(i, 48, g['dph'])))) - int(round(1.0 * math.sin(g['dph'])))

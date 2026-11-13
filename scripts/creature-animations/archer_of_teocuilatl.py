@@ -41,6 +41,7 @@ import numpy as np
 
 import anim_humanoide as Hm
 import anim_lib as L
+import anim_textur as TX   # texturierte Streckzeilen statt Zeilenkopien (Regel 43)
 
 N, MS = 48, 62
 PAD_L, PAD_R, PAD_T, PAD_B = 2, 2, 4, 2          # Figur knapp zugeschnitten: Kopfhub 2 px (oben), Randabstand 2
@@ -110,8 +111,8 @@ def frame(i):
     # --- Auf und ab: Rockzeile 24 = Brust, Halszeile 14 läuft 3 Frames nach (Stab: auch der obere Teil steigt mit dem Kopf, die Faust nur mit der Brust) ---
     brust = Hm.stufe(i, N / 2, 1)
     kopf = Hm.stufe(i - 3, N / 2, 1)
-    k = Hm.atmen(k, PAD_T + 24, PAD_T + 14, brust, kopf)
-    st = Hm.atmen(st, PAD_T + 24, PAD_T + 14, brust, kopf)
+    k = TX.atmen(k, PAD_T + 24, PAD_T + 14, brust, kopf)
+    st = TX.atmen(st, PAD_T + 24, PAD_T + 14, brust, kopf)
     # --- Glitzer-Sterne an den Bandenden (mit der Brust gehoben) ---
     for (sx, sy, start) in ((2, 16, 10), (9, 17, 34)):
         sstufe = Hm.folge(i, start, [0, 1, 2, 1], N)

@@ -41,6 +41,7 @@ import sys
 import numpy as np
 
 import anim_lib as L
+import anim_textur as TX   # texturierte Streckzeilen statt Zeilenkopien (Regel 43)
 import anim_flieger as F
 import anim_flieger_b as B
 
@@ -184,7 +185,7 @@ def frame(i, partikel=True, nur=None):
         schichten += [(bein(BEIN_L, ks['l']), 0, 0, 3), (bein(BEIN_R, ks['r']), 0, 0, 3)]
     if 'koerper' in ebenen:
         z = PAD_T + 11
-        schichten += [(L.streck_zeile(KOERPER, z, n), 0, 0, 1), (L.streck_zeile(SCHWANZ_W(i), z, n), 0, 0, 1)]
+        schichten += [(TX.streck_zeile(KOERPER, z, n), 0, 0, 1), (TX.streck_zeile(SCHWANZ_W(i), z, n), 0, 0, 1)]
     if 'hals' in ebenen:
         sch = lambda a: B.spalten_schub(a, PAD_L + 18, lambda f: dy * min(1.0, f * 11 / 7.0), 11)   # Hals/Kopf senken: Spalten x 19–25 verformen den Bogen, Kopf und Schnabel (x ≥ 25) wandern starr um dy
         schichten += [(sch(HALS), 0, -n, 2), (sch(SCHNABEL[schnabel_stufe(i)]), 0, -n, 2)]

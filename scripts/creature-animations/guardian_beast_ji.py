@@ -37,6 +37,7 @@ import sys
 import anim_gb as G
 import anim_humanoide as Hm
 import anim_lib as L
+import anim_textur as TX   # texturierte Streckzeilen statt Zeilenkopien (Regel 43)
 
 N, MS = 48, 64
 sz = G.Szene('guardian-beast-ji', (2, 2, 3, 2))
@@ -104,7 +105,7 @@ def frame(i):
         wr = schlag(wr, 16.5, 2.0, ur)
     # --- Atmen ---
     brust = Hm.stufe(i, N / 2, 1)
-    k, wl, wr, km = sz.atmen([k, wl, wr, km], 21, brust)
+    k, wl, wr, km = TX.szene_atmen(sz, [k, wl, wr, km], 21, brust)
     # --- Fußtippen ---
     pat = [1, 1, 0, 0, 1, 1, 0, 0]
     ul_f = 1 if Hm.folge(i, 26, pat, N) else 0

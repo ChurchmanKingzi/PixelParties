@@ -32,6 +32,7 @@ import numpy as np
 
 import anim_humanoide as Hm
 import anim_lib as L
+import anim_textur as TX   # texturierte Streckzeilen statt Zeilenkopien (Regel 43)
 import anim_untote as U
 
 N, MS = 48, 62
@@ -92,7 +93,7 @@ def frame_gross(i, nur=None):
         Hm.setze(k, {p: HAUT for p in AUGEN}, OFF)
     b = 1 if Hm.welle01(i, 24) > 0.5 else 0
     if b:
-        k = L.streck_zeile(k, GP + 22, b)
+        k = TX.streck_zeile(k, GP + 22, b)
     s = teil(stab)
     kugel_farben(s, i)
     fr = L.zusammen(H, W, [(k, 0, 0), (s, 0, 0)])
