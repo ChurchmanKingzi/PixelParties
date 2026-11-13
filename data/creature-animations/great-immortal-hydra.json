@@ -1,0 +1,15 @@
+{
+  "creature": "Great Immortal Hydra",
+  "sheet": "great-immortal-hydra.png",
+  "frameWidth": 105,
+  "frameHeight": 75,
+  "frames": 72,
+  "frameMs": 80,
+  "loop": true,
+  "layout": "horizontal",
+  "padTop": 2,
+  "padLeft": 2,
+  "padRight": 2,
+  "padBottom": 2,
+  "faceX": 52.5
+}
