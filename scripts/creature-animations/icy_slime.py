@@ -33,6 +33,7 @@ import anim_eis as E
 import anim_humanoide as Hm
 import anim_hupf as Hu
 import anim_lib as L
+import anim_textur as TX   # texturierte Streckzeilen statt Zeilenkopien (Regel 43)
 
 N, MS = 48, 65
 TEST_EBENEN = ('koerper',)
@@ -72,7 +73,7 @@ BODEN = PAD_T + sh - 1
 
 def koerper(i):
     pose, dy = ABLAUF[i]
-    k, top, quelle = Hu.hupf_figur(spr, pose, dy, POSEN, {}, SPERRE, H, W, PAD_L, PAD_T, BODEN)
+    k, top, quelle = TX.hupf_figur(spr, pose, dy, POSEN, {}, SPERRE, H, W, PAD_L, PAD_T, BODEN)
     Hm.kontur_schliessen(k, ERLAUBT, (5, 114, 121))
     return k
 

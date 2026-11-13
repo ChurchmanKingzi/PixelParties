@@ -7,6 +7,9 @@ Arme/Beine „Black-Thorn Dragon #2“ (Ebene 4, Figuren 1+2) bei (27,23), Kopf 
 Hintergrundpixel; die Ebene 2 „Black-Thorn Dragon #…“ ist nur der weiche Schattenfleck unter dem Drachen und gehört nicht zur Figur). Die drei Ebenen liegen einzeln als src/black-thorn-dragon_l5.png / _l4.png / _l3.png
 (gleiche 46×32-Leinwand, Quellkoordinaten); Übereinanderlegen (3 über 4 über 5) ergibt exakt src/black-thorn-dragon.png.
 
+RUNDE 4 (Nutzer: „Flügelbewegungen katastrophal, komplett neu machen“): Die Flügel werden nicht mehr gedreht, sondern laufen über sechs handgezeichnete Schlüsselposen (U, O = Original, DM, D, A1, A2; siehe
+POSEN_TXT/FOLGE; Schlag 15 Frames = 1,05 s, viermal pro Schleife). Der Hautstreifen am Rumpf (x 10–14, y 9–15) bleibt angewachsen. Die Angaben zum Flügelschlag unter „Ablauf“ sind damit ersetzt; alles andere ist unverändert.
+
 Aufruf:   python3 black_thorn_dragon.py [--preview <ordner>]
 Ausgabe:  ../../data/creature-animations/black-thorn-dragon.png + .json
 

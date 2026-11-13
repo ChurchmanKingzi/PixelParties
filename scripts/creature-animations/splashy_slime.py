@@ -38,6 +38,7 @@ import sys
 import numpy as np
 
 import anim_lib as L
+import anim_textur as TX   # texturierte Streckzeilen statt Zeilenkopien (Regel 43)
 import anim_amorph as A
 import anim_hupf as Hu
 
@@ -163,8 +164,8 @@ def _lid(fig, marke, stufe):
 
 def figur(i):
     pose, dy = ABLAUF[i]
-    fig, top, quelle = Hu.hupf_figur(spr, pose, dy, POSEN, PAARE_ZEILE, SPERRE, H, W, PAD_L, PAD_T, BODEN)
-    marke, _, _ = Hu.hupf_figur(_mark, pose, dy, POSEN, PAARE_ZEILE, SPERRE, H, W, PAD_L, PAD_T, BODEN)
+    fig, top, quelle = TX.hupf_figur(spr, pose, dy, POSEN, PAARE_ZEILE, SPERRE, H, W, PAD_L, PAD_T, BODEN)
+    marke, _, _ = TX.hupf_figur(_mark, pose, dy, POSEN, PAARE_ZEILE, SPERRE, H, W, PAD_L, PAD_T, BODEN)
     # die Markierfarben sind keine Quellfarben: Augenpixel aus dem Markierungsbild sind in `fig` echte Farben (gleiche Umformung)
     ist_auge = (marke[..., 3] > 0) & (marke[..., 0] == 250) & (marke[..., 1] == 1)
     assert (fig[ist_auge][:, 3] > 0).all()

@@ -40,6 +40,7 @@ import sys
 import numpy as np
 
 import anim_lib as L
+import anim_textur as TX   # texturierte Streckzeilen statt Zeilenkopien (Regel 43)
 import anim_amorph as A
 import anim_shard as SH
 
@@ -189,7 +190,7 @@ _CACHE = {}
 def figur_voll(i):
     if i in _CACHE:
         return _CACHE[i]
-    ebene, top, quelle = SH.ebene_atmung(KOERPER, POSEN[S[i]], H, W, PAD_L, PAD_T, BODEN)
+    ebene, top, quelle = TX.ebene_atmung(KOERPER, POSEN[S[i]], H, W, PAD_L, PAD_T, BODEN)
     fig = L.zusammen(H, W, [(baender(i, top, quelle), 0, 0), (ebene, 0, 0)])
     fig = maul(fig, top, KIEFER[i])
     if i in BLINK:

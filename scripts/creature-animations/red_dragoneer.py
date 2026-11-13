@@ -4,6 +4,10 @@
 PICK: [["MotiveMoe", 6, 1]]   (Ebene „Red Dragoneer“, Figur 1 — einzige Ebene, in der Kartenkunst pixelgenau wiedergefunden; auf Nachbarebenen liegt nichts von der Figur)
 Quelle: src/red-dragoneer.png — roter Drache von vorn (32×27 px, 18 Farben) aus MotiveMoe.xcf. Die Karte zeigt ihn schwebend vor rotem Himmel (kein Boden).
 
+RUNDE 4 (Nutzer: „Die helleren ‚Spitzen‘ gehören mit zu den Flügeln! Außerdem entstehen Lücken zwischen den Krallen und Händen?“): Die Flügel werden nicht mehr gedreht, sondern laufen über fünf handgezeichnete
+Schlüsselposen (U, O = Original, M, D, MA; siehe POSEN_TXT/FOLGE). Der helle Gelenkknauf (11–13, 3–5) ist jetzt Teil des Flügels (Drehpunkt des Flügelknochens). Die weißen Krallen sind fest mit den Händen verbunden
+(keine eigene Ebene mehr). Die Angaben zum Flügelschlag unter „Ablauf“ (Drehung, Krallen folgen) sind damit ersetzt; alles andere ist unverändert.
+
 Aufruf:   python3 red_dragoneer.py [--preview <ordner>]
 Ausgabe:  ../../data/creature-animations/red-dragoneer.png + .json
 

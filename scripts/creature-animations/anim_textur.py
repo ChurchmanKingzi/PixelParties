@@ -14,7 +14,8 @@ import numpy as np
 import anim_lib as L
 
 D_LINIE = 22          # Helligkeitsabstand, ab dem ein Pixel als „dunkle Linie“ gegenüber den Zeilen darüber/darunter gilt
-D_AEHNLICH = 64       # bis zu diesem Helligkeitsabstand gelten zwei Pixel als „gleiches Material“ (Schattierungsstufen)
+D_AEHNLICH = 64       # bis zu diesem Helligkeitsabstand (heller) gelten zwei Pixel als „gleiches Material“ (Schattierungsstufen)
+D_DUNKLER = 36        # … und höchstens so viel DUNKLER darf ein übernommenes Pixel sein (keine Umriss-/Mund-/Augenfarben in helle Flächen ziehen)
 LANG = 5              # ab dieser Lauflänge gilt eine Abweichung als „anderes Muster“ (und eine Übereinstimmung als Kopie)
 
 
@@ -120,13 +121,19 @@ def zwischenzeile(form, nah, fern=None, nah2=None, k=1, fern2=None, sperre=()):
         return form.copy()
     ok_nah = inn & _innen(nah) & ~_linie(nah, nah2, form) & frei(nah)
     ok_fern = (inn & _innen(fern) & ~_linie(fern, form, fern2) & frei(fern)) if fern is not None else np.zeros(len(form), bool)
+    lf = _lum(form)
+
+    def aehnlich(q):
+        d = _lum(q) - lf
+        return (d <= D_AEHNLICH) & (d >= -D_DUNKLER)
     # 1. kurze Abweichungen zur Zeile, an die die Kopie grenzt: Schattierungsgrenze auf halbem Weg
-    neu, lang = _mische(form, nah, ok_nah, k, nur_kurz=True)
+    lang_alle = _mische(form, nah, ok_nah, k, nur_kurz=True)[1]
+    neu, _ = _mische(form, nah, ok_nah & aehnlich(nah), k, nur_kurz=True)
+    lang = lang_alle
     # 2. lange Abweichungen: (a) Schattierung zur angrenzenden Zeile hin verjüngen – die Enden jedes Farbabschnitts der gestreckten Zeile
     #    nehmen die Farbe der angrenzenden Zeile an (nur bei ähnlicher Helligkeit, also gleichem Material); (b) wo danach noch ≥ LANG px
     #    gemusterte Kopie stehen (Schuppen, Dither: kurze Abschnitte), das Muster mit der anderen Nachbarzeile fortsetzen (2-px-Wechsel)
-    lf = _lum(form)
-    aehn_nah = ok_nah & (np.abs(_lum(nah) - lf) <= D_AEHNLICH)
+    aehn_nah = ok_nah & aehnlich(nah)
     for x0, x1 in _laeufe(lang):
         s0 = x0
         while s0 < x1:
@@ -144,7 +151,7 @@ def zwischenzeile(form, nah, fern=None, nah2=None, k=1, fern2=None, sperre=()):
             rest[x0:x1] = ~_ungleich(neu[x0:x1], form[x0:x1])
             for r0, r1 in _laeufe(rest):
                 if r1 - r0 >= LANG and len({tuple(p) for p in form[r0:r1, :3].tolist()}) >= 2:
-                    okf = ok_fern & (np.abs(_lum(fern) - lf) <= D_AEHNLICH)
+                    okf = ok_fern & aehnlich(fern)
                     okf[:r0] = False; okf[r1:] = False
                     m2, _ = _mische(form, fern, okf, k)
                     neu[r0:r1] = m2[r0:r1]
@@ -178,6 +185,20 @@ def zwischenzeile(form, nah, fern=None, nah2=None, k=1, fern2=None, sperre=()):
                 # nichts übernehmen, was die jeweils andere Nachbarzeile kopieren würde
                 neu[x0:x1] = m4[x0:x1]
                 break
+    # 5. Steht danach immer noch ein gemusterter Abschnitt (≥ LANG px, ≥ 3 Farben) als reine Kopie der gestreckten Zeile da, weil die
+    #    Nachbarzeilen dort zu verschieden sind: gelockert mischen – beliebig HELLERE Pixel der Nachbarzeilen sind erlaubt (dunkle Details
+    #    der Kopie werden so eher dünner als dicker), deutlich dunklere weiterhin nicht.
+    for q in (nah, fern):
+        if q is None:
+            continue
+        gleich = inn & ~_ungleich(neu, form)
+        for x0, x1 in _laeufe(gleich):
+            if x1 - x0 < LANG or len({tuple(p) for p in form[x0:x1, :3].tolist()}) < 3:
+                continue
+            okq = inn & _innen(q) & frei(q) & (_lum(q) - lf >= -D_DUNKLER)
+            okq[:x0] = False; okq[x1:] = False
+            m5, _ = _mische(neu, q, okq, k)
+            neu[x0:x1] = m5[x0:x1]
     return neu
 
 
@@ -266,3 +287,24 @@ def szene_atmen(sz, layers, naht, n):
     if not n:
         return layers
     return [streck_zeile(a, sz.PT + naht, n) for a in layers]
+
+
+def hupf_figur(spr, pose, dy, posen, paare_je_zeile, sperre, h, w, pad_l, pad_t, boden, paare=((8, 9),)):
+    """Wie anim_hupf.hupf_figur (Squash-&-Stretch-Pose eines hüpfenden Wesens), aber mit texturierten statt kopierten Streckzeilen."""
+    import anim_amorph as A
+    import anim_slime as SL
+    loeschen, doppeln, p = posen[pose]
+    koerper = A.zeilen_von(spr, 0, spr.shape[0] - 1, h, w, pad_l, pad_t)
+    z, quelle = koerper_pose(koerper, loeschen=loeschen, doppeln=doppeln, p=p, paare=paare,
+                             paare_je_zeile=paare_je_zeile, x0=pad_l, sperre=sperre, funktion=SL.koerper_pose)
+    fig, top = A.auf_leinwand(z, h, boden, dy)
+    return fig, top, quelle
+
+
+def ebene_atmung(teil, doppeln, h, w, pad_l, pad_t, boden):
+    """Wie anim_shard.ebene_atmung (Teilebene mit eingefügten Atemzeilen auf die Leinwand), aber mit texturierten Einfügezeilen."""
+    import anim_amorph as A
+    k = A.zeilen_von(teil, 0, teil.shape[0] - 1, h, w, pad_l, pad_t)
+    z, quelle = koerper_pose(k, doppeln=doppeln, x0=pad_l)
+    ebene, top = A.auf_leinwand(z, h, boden, 0)
+    return ebene, top, quelle

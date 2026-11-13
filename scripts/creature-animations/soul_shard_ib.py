@@ -26,6 +26,7 @@ import sys
 import numpy as np
 
 import anim_lib as L
+import anim_textur as TX   # texturierte Streckzeilen statt Zeilenkopien (Regel 43)
 import anim_amorph as A
 import anim_shard as SH
 
@@ -111,7 +112,7 @@ def figur(i):
     sp = sprite_mit_effekten(i)
     ohne = sp.copy(); ohne[ANKH] = 0
     ankh = sp.copy(); ankh[~ANKH] = 0
-    ebene, top, quelle = SH.ebene_atmung(ohne, POSEN[S[i]], H, W, PAD_L, PAD_T, BODEN)
+    ebene, top, quelle = TX.ebene_atmung(ohne, POSEN[S[i]], H, W, PAD_L, PAD_T, BODEN)
     ankh_ebene = L.platz(ankh, H, W, PAD_L, top)                          # starr: so hoch wie die Hand
     fig = L.zusammen(H, W, [(ebene, 0, 0), (ankh_ebene, 0, 0)])
     fig, neu = A.umriss_ergaenzen(fig, RAND_FARBEN, lambda x, y: UMRISS)

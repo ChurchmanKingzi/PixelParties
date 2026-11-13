@@ -31,6 +31,7 @@ import sys
 import numpy as np
 
 import anim_lib as L
+import anim_textur as TX   # texturierte Streckzeilen statt Zeilenkopien (Regel 43)
 import anim_amorph as A
 import anim_shard as SH
 
@@ -72,7 +73,7 @@ LID_AUS = {(255, 249, 249), UMRISS}                                             
 BLINK = {19: 1, 20: 2, 21: 1, 43: 1, 44: 2, 45: 1}                                                                      # Frame → Stufe (1: obere Augenzeile, 2: alle)
 
 def figur(i):
-    ebene, top, quelle = SH.ebene_atmung(KOERPER, POSEN[S[i]], H, W, PAD_L, PAD_T, BODEN)
+    ebene, top, quelle = TX.ebene_atmung(KOERPER, POSEN[S[i]], H, W, PAD_L, PAD_T, BODEN)
     # Stab: starr, um genau so viel angehoben wie Hand/Arm (obere Körperhälfte; top = PAD_T − eingefügte Zeilen)
     fig = L.zusammen(H, W, [(L.platz(STAB, H, W, PAD_L, top), 0, 0), (ebene, 0, 0)])
     if i in BLINK:

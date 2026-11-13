@@ -37,6 +37,7 @@ import sys
 import numpy as np
 
 import anim_lib as L
+import anim_textur as TX   # texturierte Streckzeilen statt Zeilenkopien (Regel 43)
 import anim_amorph as A
 import anim_hupf as Hu
 
@@ -105,7 +106,7 @@ BODEN = PAD_T + sh - 1
 
 def figur(i):
     pose, dy = ABLAUF[i]
-    fig, top, quelle = Hu.hupf_figur(spr, pose, dy, POSEN, PAARE_ZEILE, (), H, W, PAD_L, PAD_T, BODEN)
+    fig, top, quelle = TX.hupf_figur(spr, pose, dy, POSEN, PAARE_ZEILE, (), H, W, PAD_L, PAD_T, BODEN)
     fig, neu = A.umriss_ergaenzen(fig, RAND_FARBEN, lambda x, y: UMRISS)
     return dict(fig=fig, top=top, neu=neu)
 
