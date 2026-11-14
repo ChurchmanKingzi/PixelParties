@@ -24,16 +24,16 @@ def ease_out(x):
 
 
 class StormShow(CaptionMixin):
-    T1, T2, T3 = 3.0, 8.4, 13.8
+    T1, T2, T3 = 1.0, 6.0, 11.0
     HW, HH = 130, 182                                                                  # Handkarte
     HX0, HDX, HY = 165, 125, 1745                                                      # Slots: x_i = 165 + 125 i (Mitte 540)
     DECK = (965, 700)
     BORD = (540, 780)                                                                  # gespielte Karten fliegen zum Helden
     CAPTIONS = [
-        (3.0, 8.2, 'Once per turn she draws until her hand is *full* - *7 cards*!'),
-        (8.4, 13.6, 'But then the *storm* sweeps around her hand - no more drawing this turn!'),
-        (13.8, 19.0, 'Next turn - play some cards, and *draw until 7* again!'),
-        (19.2, 23.3, '*Kazena*, the *storming* rebel - a full hand and no worries!'),
+        (1.0, 5.8, 'Once per turn she draws until her hand is *full* - *7 cards*!'),
+        (6.0, 10.8, 'But then the *storm* sweeps around her hand - no more drawing this turn!'),
+        (11.0, 15.8, 'Next turn - play some cards, and *draw until 7* again!'),
+        (16.0, 20.0, '*Kazena*, the *storming* rebel - a full hand and no worries!'),
     ]
     SND = {
         'wind':   [('elem_wind', -7)],
@@ -57,7 +57,7 @@ class StormShow(CaptionMixin):
         self.back = c.resize((w * U, h * U), Image.NEAREST)
         self.rng = np.random.default_rng(seed)
         # Zeitplan der Hand: je Slot Intervalle (von, bis), bis=None: bleibt
-        self.fill = [[(0.7, None)] for _ in range(7)]
+        self.fill = [[(0.2, None)] for _ in range(7)]
         self.fill[2] = []
         for i in range(2, 7):
             self.fill[i] = []
@@ -236,10 +236,10 @@ class StormShow(CaptionMixin):
             x0, y0 = int(x - self.HW / 2), int(y - self.HH / 2)
             filled = any(a <= t and (b is None or t < b) for a, b in self.fill[i])
             if filled:
-                if t < 0.7 + 0.3 and i < 2:
+                if t < 0.2 + 0.3 and i < 2:
                     continue
                 canvas.paste(self.back, (int(round(x0 / U) * U), int(round(y0 / U) * U)), self.back)
-            elif t >= 0.7:
+            elif t >= 0.2:
                 if int(t * 3) % 2 == 0 or True:
                     for k in range(0, self.HW, 28):
                         self.pix_rect(d, x0 + k, y0, x0 + k + 13, y0 + 3, (110, 140, 150)); self.pix_rect(d, x0 + k, y0 + self.HH - 4, x0 + k + 13, y0 + self.HH - 1, (110, 140, 150))

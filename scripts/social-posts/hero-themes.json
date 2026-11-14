@@ -1406,7 +1406,7 @@
   "px": 14,
   "stormshow": true,
   "opener": "wind",
-  "showLoops": 7,
+  "showLoops": 6,
   "music": "scripts/social-posts/music/bgm_kazena.ogg",
   "particles": [
    [
@@ -1420,6 +1420,6 @@
     8
    ]
   ],
-  "musicHit": 44.0
+  "musicHit": 44.7
  }
 }
