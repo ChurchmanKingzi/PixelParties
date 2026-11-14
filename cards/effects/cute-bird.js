@@ -94,7 +94,7 @@ module.exports = {
         type: 'confirm',
         title: CARD_NAME,
         message: `${CARD_NAME} was defeated! Discard ${DISCARD_COST} cards to place a "${TUTOR_TARGET}" from your deck into the same Support Zone?`,
-        confirmLabel: '🔥 Tutor!',
+        confirmLabel: '🔥 Summon!',
         cancelLabel: 'No',
         cancellable: true,
         gerrymanderEligible: true, // True "you may" — opt-in tutor.
