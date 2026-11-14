@@ -7,7 +7,7 @@ GOLD_HL = (255, 244, 170)
 
 
 class CaptionMixin:
-    CPS = 38.0
+    CPS = 55.0
     CAP_Y = 1150
 
     def _tw(self, text, scale):

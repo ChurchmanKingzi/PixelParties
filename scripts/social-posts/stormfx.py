@@ -24,18 +24,16 @@ def ease_out(x):
 
 
 class StormShow(CaptionMixin):
-    T1, T2, T3 = 3.4, 7.2, 11.4
+    T1, T2, T3 = 3.0, 8.4, 13.8
     HW, HH = 130, 182                                                                  # Handkarte
     HX0, HDX, HY = 165, 125, 1745                                                      # Slots: x_i = 165 + 125 i (Mitte 540)
     DECK = (965, 700)
     BORD = (540, 780)                                                                  # gespielte Karten fliegen zum Helden
     CAPTIONS = [
-        (0.9, 3.3, 'Kazena left her strict family in the dead of night - *free as the wind*.'),
-        (3.4, 7.1, 'Once per turn she draws until her hand is *full* - *7 cards*!'),
-        (7.2, 11.3, 'But then the *storm* sweeps around her hand - no more drawing this turn!'),
-        (11.4, 15.1, 'Next turn - play some cards, and *draw until 7* again!'),
-        (15.2, 18.5, '*Kazena* gives you a full hand - and the wind keeps the rest out.'),
-        (18.6, 20.0, 'A *storming* rebel. Totally *free*!'),
+        (3.0, 8.2, 'Once per turn she draws until her hand is *full* - *7 cards*!'),
+        (8.4, 13.6, 'But then the *storm* sweeps around her hand - no more drawing this turn!'),
+        (13.8, 19.0, 'Next turn - play some cards, and *draw until 7* again!'),
+        (19.2, 23.3, '*Kazena*, the *storming* rebel - a full hand and no worries!'),
     ]
     SND = {
         'wind':   [('elem_wind', -7)],
@@ -248,7 +246,7 @@ class StormShow(CaptionMixin):
                     for k in range(0, self.HH, 28):
                         self.pix_rect(d, x0, y0 + k, x0 + 3, y0 + k + 13, (110, 140, 150)); self.pix_rect(d, x0 + self.HW - 4, y0 + k, x0 + self.HW - 1, y0 + k + 13, (110, 140, 150))
         # Deck
-        if t >= 2.4:
+        if t >= self.T1 - 0.6:
             for k in range(3):
                 canvas.paste(self.back, (int(self.DECK[0] - self.back.width / 2 + 4 * k), int(self.DECK[1] - self.back.height / 2 - 4 * k)), self.back)
             self.draw_text(canvas, 'DECK', 2, (self.DECK[0], self.DECK[1] + self.back.height / 2 + 24), color=(255, 255, 255), outline=None, shadow=(20, 10, 30))
