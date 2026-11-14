@@ -855,6 +855,14 @@ function serveIndexHtml(req, res) {
     // Expose the public Google OAuth client id to the front-end. Empty string
     // when unset, which hides the "Sign in with Google" button client-side.
     html = html.split('__GOOGLE_CLIENT_ID__').join(process.env.GOOGLE_CLIENT_ID || '');
+    // Google Search Console: Bestaetigung per Meta-Tag (Umgebungsvariable GOOGLE_SITE_VERIFICATION = nur der Inhalt/„content"-Wert).
+    const gsv = String(process.env.GOOGLE_SITE_VERIFICATION || '').replace(/[^A-Za-z0-9_\-]/g, '');
+    if (gsv) html = html.replace('</title>', `</title>\n  <meta name="google-site-verification" content="${gsv}">`);
+    if (!isCanonicalHost(req)) {
+      // Test-/Vorschau-Host: nicht indexieren, und der Canonical zeigt auf die Produktionsseite (keine Dubletten).
+      res.setHeader('X-Robots-Tag', 'noindex, nofollow');
+      html = html.replace(/<link rel="canonical" href="[^"]*">/, `<link rel="canonical" href="${canonicalOrigin()}/">`);
+    }
     res.setHeader('Content-Type', 'text/html; charset=UTF-8');
     res.setHeader('Cache-Control', 'no-cache');
     // 12.8.: index.html ging als einzige Seite ungepackt raus (die
@@ -877,60 +885,30 @@ function serveIndexHtml(req, res) {
 app.get(['/', '/index.html'], serveIndexHtml);
 
 // ───────────────────────────────────────────────────────────────
-//  SUCHMASCHINEN: robots.txt + sitemap.xml
+//  SUCHMASCHINEN (SEO): robots.txt, sitemap.xml, Kartenliste, Kartenseiten
 //
-//  Beide fehlten bis v485 — und weil der SPA-Auffangpfad ganz unten
-//  (`app.get('*')`) JEDEN Pfad mit der index.html beantwortet, kam
-//  auf `/robots.txt` bisher HTML mit Status 200 zurueck statt einer
-//  Robots-Datei. Googles Crawler behandelt Unlesbares zwar als
-//  „alles erlaubt", aber eine HTML-Seite unter /robots.txt ist ein
-//  Fehlsignal, und /sitemap.xml war gar nicht erst zu finden.
+//  Die App selbst hat nur EINE URL ("/") und darunter nur einen Ladebildschirm –
+//  fuer Google gab es also nichts zu finden. Darum rendert seo.js oeffentliche,
+//  ohne JavaScript lesbare Seiten (`/cards`, `/card/<name>`) samt Sitemap.
+//  Details und Regeln: seo.js. Die Routen stehen VOR `express.static`, damit sie
+//  auch dann gewinnen, wenn spaeter eine gleichnamige Datei in `public/` landet.
 //
-//  Beide Routen stehen VOR `express.static`, damit sie auch dann
-//  gewinnen, wenn spaeter einmal eine gleichnamige Datei in
-//  `public/` landet — und sie bauen ihre URLs aus `resolveOrigin`,
-//  genau wie die Share-Vorschau. Damit stimmt der Host automatisch,
-//  egal ob die Seite unter der eigenen Domain oder unter der
-//  Render-Adresse ausgeliefert wird.
-//
-//  Die Sitemap fuehrt heute genau EINEN Eintrag, weil die App genau
-//  eine URL hat („/"). Das ist kein Versehen: Client-Routen gibt es
-//  nicht (kein pushState im ganzen Frontend). Kommen oeffentliche
-//  Seiten dazu (Kartenliste, Regeln), gehoeren sie hier hinein.
+//  Nur der Produktionshost darf in den Index (siehe isCanonicalHost): `neu.…`,
+//  Vorschau- und Testadressen liefern `X-Robots-Tag: noindex` und zeigen mit ihrem
+//  Canonical auf die echte Seite, damit keine Dubletten entstehen.
 // ───────────────────────────────────────────────────────────────
-app.get('/robots.txt', (req, res) => {
-  const origin = resolveOrigin(req);
-  res.setHeader('Content-Type', 'text/plain; charset=UTF-8');
-  res.setHeader('Cache-Control', 'public, max-age=3600');
-  res.send([
-    'User-agent: *',
-    'Allow: /',
-    // Nichts von Wert fuer den Index, aber viel Crawl-Budget:
-    // Kartenkunst und Klaenge sind ~800 Dateien.
-    'Disallow: /api/',
-    'Disallow: /sounds/',
-    'Disallow: /music/',
-    '',
-    `Sitemap: ${origin}/sitemap.xml`,
-    '',
-  ].join('\n'));
-});
-
-app.get('/sitemap.xml', (req, res) => {
-  const origin = resolveOrigin(req);
-  res.setHeader('Content-Type', 'application/xml; charset=UTF-8');
-  res.setHeader('Cache-Control', 'public, max-age=3600');
-  res.send([
-    '<?xml version="1.0" encoding="UTF-8"?>',
-    '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">',
-    '  <url>',
-    `    <loc>${origin}/</loc>`,
-    '    <changefreq>weekly</changefreq>',
-    '    <priority>1.0</priority>',
-    '  </url>',
-    '</urlset>',
-    '',
-  ].join('\n'));
+function canonicalOrigin() { return (process.env.PUBLIC_BASE_URL || SHARE_BASE_DEFAULT).replace(/\/+$/, ''); }
+function hostOf(u) { try { return new URL(u).host.toLowerCase(); } catch { return ''; } }
+/** true, wenn die Anfrage ueber den Produktionshost kam (Schema egal: hinter Caddy kann `http` ankommen). */
+function isCanonicalHost(req) { return hostOf(resolveOrigin(req)) === hostOf(canonicalOrigin()); }
+require('./seo').registerSeoRoutes(app, {
+  resolveOrigin,
+  isIndexable: isCanonicalHost,
+  canonicalOrigin,
+  getCardArray,
+  hasCardEffect,
+  cardNamesWithImage: (cards) => require('./card-images').cardNamesWithImage(cards),
+  cardsJsonMtime: () => fs.statSync(path.join(__dirname, 'data', 'cards.json')).mtimeMs,
 });
 
 // ── AUSGEHENDE BANDBREITE / AKTUALITAET (v350, angepasst v351) ──────
