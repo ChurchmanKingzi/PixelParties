@@ -1401,5 +1401,24 @@
   "musicHit": 6.65,
   "uiText": "#e01c34",
   "blood": true
+ },
+ "Kazena, the Storming Rebel": {
+  "px": 14,
+  "stormshow": true,
+  "opener": "wind",
+  "showLoops": 6,
+  "music": "scripts/social-posts/music/bgm_kazena.ogg",
+  "particles": [
+   [
+    "leaf",
+    "leafgreen",
+    12
+   ],
+   [
+    "spark",
+    "holy_white",
+    8
+   ]
+  ]
  }
 }

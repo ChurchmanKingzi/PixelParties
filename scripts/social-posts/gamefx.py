@@ -1273,3 +1273,114 @@ class FlameAvalanche:
                 for x, y in ((2, 1), (-2, 1), (1, -2), (-1, 2), (3, 0), (-3, 0), (0, 3), (0, -3)):
                     add(x, y, C[3])
                 add(0, 0, C[2])
+
+
+# ═════════════════════════════ Kartenzug (app-fx-49): Schweif der gezogenen Karte, Abheb-Funken, Schockringe ═════════════════════════════
+C49 = dict(creme=hexc('#fffbd2'), grau=hexc('#9aa3b6'), weiss=hexc('#ffffff'))
+
+
+def _bez(x1, y1, x2, y2):
+    cx, bx = 3 * x1, 3 * (x2 - x1) - 3 * x1
+    ax = 1 - cx - bx
+    cy, by = 3 * y1, 3 * (y2 - y1) - 3 * y1
+    ay = 1 - cy - by
+
+    def f(x):
+        if x <= 0:
+            return 0.0
+        if x >= 1:
+            return 1.0
+        lo, hi, s = 0.0, 1.0, x
+        for _ in range(20):
+            v = ((ax * s + bx) * s + cx) * s
+            if abs(v - x) < 1e-4:
+                break
+            if v < x:
+                lo = s
+            else:
+                hi = s
+            s = (lo + hi) / 2
+        return ((ay * s + by) * s + cy) * s
+    return f
+
+
+EASE_AUS = _bez(0, 0, 0.58, 1)
+
+
+class Zug:
+    """Kartenzug: Schweif (je Bild zwei Quadrate Creme/Grau hinter der Karte, 0,22–0,37 s sichtbar), 14 Abheb-Funken am Start, Schockringe beim Einschlag.
+    von, nach = Mitte der Karte in Zellen, dauer in s, cw = Kartenbreite in Zellen (Maß für Streuung und Ringe); farbe = Kartenfarbe (Ringe)."""
+
+    def __init__(self, von, nach, dauer=0.5, cw=10.0, bogen=0.0, salt=3, farbe=None, funken=True, ringe=True):
+        self.von, self.nach, self.dauer, self.cw, self.bogen = von, nach, dauer, cw, bogen
+        self.salt, self.farbe, self.funken, self.ringe = salt % 9973, farbe or hexc('#fbe181'), funken, ringe
+        self.cf = cw / 21.3 / 3.0                                                       # Spielpixel → Zellen (Spielkarte 64 px = 21 Zellen zu 3 px)
+        self.ende = dauer + 0.45
+
+    def pos(self, t):
+        u = kl(t / self.dauer, 0, 1)
+        e = EASE_AUS(u)
+        return (self.von[0] + (self.nach[0] - self.von[0]) * e, self.von[1] + (self.nach[1] - self.von[1]) * e - self.bogen * math.sin(math.pi * e))
+
+    def _richtung(self, t):
+        a, b = self.pos(t - 0.04), self.pos(t)
+        dx, dy = b[0] - a[0], b[1] - a[1]
+        l = math.hypot(dx, dy)
+        if l < 0.02:
+            s = math.hypot(self.nach[0] - self.von[0], self.nach[1] - self.von[1]) or 1.0
+            return (self.nach[0] - self.von[0]) / s, (self.nach[1] - self.von[1]) / s
+        return dx / l, dy / l
+
+    def draw(self, m, t):
+        """Zeichnet Schweif, Funken und (nach der Landung) Ringe. t = Sekunden seit Abflug. Die Karte selbst malt der Aufrufer an pos(t)."""
+        if t < 0 or t >= self.ende:
+            return
+        fr = Fl(t)
+        tq = fr / 30.0
+        C = C49
+        cf, salt = self.cf, self.salt
+        last = int(math.floor(self.dauer * 0.8 * 30))
+        for s in range(max(0, fr - 12), min(fr, last) + 1):
+            ts = s / 30.0
+            alter = tq - ts
+            for p in range(2):
+                i = s * 2 + p
+                leben = 0.22 + 0.15 * H(i, salt + 1)
+                if alter >= leben:
+                    continue
+                if alter > leben * 0.72 and ((fr - s) & 1):
+                    continue
+                q = self.pos(ts)
+                ux, uy = self._richtung(ts)
+                hinten = (-30 + (H(i, salt + 2) - 0.5) * 40) * 0.7 * 3 * cf
+                quer = (H(i, salt + 3) - 0.5) * 70 * 0.7 * 3 * cf
+                x, y = q[0] + ux * hinten - uy * quer, q[1] + uy * hinten + ux * quer
+                m.rect(rd(x), rd(y), 2 if alter < leben * 0.5 else 1, 2 if alter < leben * 0.5 else 1, C['creme'] if H(i, salt + 4) < 0.5 else C['grau'])
+        if self.funken:
+            for i in range(14):
+                w = H(i, salt + 11) * math.pi * 2
+                sp = (60 + H(i, salt + 12) * 150) * 0.7 * 3 * cf
+                leben = 0.25 + 0.2 * H(i, salt + 13)
+                if tq >= leben or (tq > leben * 0.72 and (fr & 1)):
+                    continue
+                x, y = rd(self.von[0] + math.cos(w) * sp * tq), rd(self.von[1] + math.sin(w) * sp * tq)
+                c = C['creme'] if (i & 1) else C['grau']
+                if H(i, salt + 14) < 0.3:
+                    m.rect(x - 1, y, 3, 1, c); m.rect(x, y - 1, 1, 3, c)
+                else:
+                    m.rect(x, y, 1, 1, c)
+        if self.ringe:
+            dt = t - self.dauer
+            if 0 <= dt < 0.34:
+                k = self.cw / 40.0
+                R1_ = rd(ease(dt / 0.34) * 26 * k)
+                R2_ = rd(ease(dt / 0.34) * 18 * k)
+                cx, cy = rd(self.nach[0]), rd(self.nach[1])
+                th = 2 if dt < 0.1 else 1
+                self._ring(m, cx, cy, R1_, th, C['creme'])
+                self._ring(m, cx, cy, R2_, 1, self.farbe)
+
+    def _ring(self, m, cx, cy, r, th, c):
+        if r < 1:
+            return
+        R1(m).ring(cx, cy, max(0, r - th), r, c, 1.0)
