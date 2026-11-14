@@ -12921,10 +12921,13 @@ async function doConfirmPotion(room, pi, { selectedIds }) {
       // the next card play.
       delete gs._spellPlacedOnBoard;
     } else if (cardType === 'Potion') {
-      const potionHookCtx = { potionName, potionOwner: pi, placed: false, _skipReactionCheck: true, flugMs: (fruehFlug == null && !_gestohlen) ? 560 : 0 };   // flugMs: der Handflug nach Gelöscht läuft gerade (Biomancy wartet ihn ab, bevor ihr Fenster/Reveal aufgeht)
+      const potionHookCtx = { potionName, potionOwner: pi, placed: false, _skipReactionCheck: true, flugMs: (fruehFlug == null && !_gestohlen) ? 560 : 0, pileOwner };   // flugMs: der Handflug nach Gelöscht läuft gerade (Biomancy wartet ihn ab, bevor ihr Fenster/Reveal aufgeht); pileOwner/imStapel: Biomancy legt die Potion schon VOR der Rückfrage sichtbar in den Gelöscht-Stapel (biomancy.js)
       await room.engine.runHooks('afterPotionUsed', potionHookCtx);
       _markOncePerGamePotion(ps, loadCardEffect(potionName), potionName);   // ★ v1028
-      if (!potionHookCtx.placed) pilePs.deletedPile.push(potionName);
+      if (potionHookCtx.imStapel) {
+        // Biomancy hat die Potion schon in den Stapel gelegt (und NICHT zum Token gemacht): übernimmt danach ein späterer Listener die Potion (`placed`, z. B. Saint Nicolas), nimmt sie hier wieder heraus
+        if (potionHookCtx.placed) room.engine.takeFromPileSync(pileOwner, 'deleted', potionName, { last: true, _verwahrungFreigabe: true, source: 'afterPotionUsed' });
+      } else if (!potionHookCtx.placed) pilePs.deletedPile.push(potionName);
       checkPotionLock(ps, gs, pi);
     } else {
       // ── ★ 28.8., Als Befund: FLUG UND STAPEL WAREN UNEINIG ────────
@@ -13444,10 +13447,14 @@ async function doUsePotion(room, pi, { cardName, handIndex, fromCreation }) {
           potionName: cardName, potionOwner: pi,
           fromHandIndex: currentIdx,
           placed: false, _skipReactionCheck: true,
+          pileOwner,   // Biomancy legt die Potion schon VOR der Rückfrage sichtbar in den Gelöscht-Stapel (`imStapel`, biomancy.js)
         };
         await room.engine.runHooks('afterPotionUsed', potionHookCtx);
         _markOncePerGamePotion(ps, script, cardName);      // ★ v1028
-        if (potionHookCtx.placed) {
+        if (potionHookCtx.imStapel) {
+          if (potionHookCtx.placed) room.engine.takeFromPileSync(pileOwner, 'deleted', cardName, { last: true, _verwahrungFreigabe: true, source: 'afterPotionUsed' });
+          checkPotionLock(ps, gs, pi);
+        } else if (potionHookCtx.placed) {
           checkPotionLock(ps, gs, pi);
         } else {
           pilePs.deletedPile.push(cardName);

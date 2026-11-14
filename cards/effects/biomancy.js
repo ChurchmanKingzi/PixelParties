@@ -93,6 +93,16 @@ module.exports = {
 
       // Der Handflug der Potion (Hand → Gelöscht, 560 ms, `ctx.flugMs`) läuft gerade: die Rückfrage und der Biomancy-Reveal erscheinen erst NACH der Landung — sonst steht das Fenster über der
       // fliegenden Karte und der Reveal verdeckt den Gelöscht-Stapel, auf dem sie landet (Befund 14.11., Nutzer-Prüfung Biomancy). Bei frühem Flug (Life Serum, Acid Vial) ist `flugMs` 0.
+      // ★ 14.11. (Nutzer: Gelöscht-Zone und Biomancy): die Potion liegt ab HIER sichtbar im Gelöscht-Stapel (Stapel +1, wie bei jeder gelöschten Karte) — auch wenn Biomancy abgelehnt wird; `doConfirmPotion`
+      // bucht sie dann nicht noch einmal (`ctx.imStapel`). Bestätigt der Spieler, nimmt `placeBiomancyToken` (`vonStapel`) sie wieder vom Stapel und bewegt sie als Token in die Zone. Nur im Hand-Potion-Weg
+      // (`ctx.pileOwner` kommt aus `doConfirmPotion`/`doUsePotion`); andere Aufrufer behalten den alten Kraftstrom-Weg.
+      let imStapel = false;   // lokal gemerkt: der Hook-Kontext (`ctx`) liefert selbst gesetzte Felder nicht zurück — der Server liest sie über `setFlag`
+      if (ctx.pileOwner != null && gs.players[ctx.pileOwner]) {
+        (gs.players[ctx.pileOwner].deletedPile || (gs.players[ctx.pileOwner].deletedPile = [])).push(ctx.potionName);
+        ctx.setFlag('imStapel', true);
+        imStapel = true;
+        engine.sync();
+      }
       if (ctx.flugMs > 0) await engine._delay(ctx.flugMs);
 
       // Prompt each in order until one is accepted or all declined
@@ -132,7 +142,7 @@ module.exports = {
         // unveraendert, nur nicht mehr doppelt gepflegt.
         const placed = await placeBiomancyToken(
           engine, pi, entry.heroIdx, ctx.potionName, entry.level,
-          { sourceName: 'Biomancy', feld: entry.feld },
+          { sourceName: 'Biomancy', feld: entry.feld, ...(imStapel ? { vonStapel: ctx.pileOwner, onStapelGenommen: () => { imStapel = false; ctx.setFlag('imStapel', false); } } : null) },
         );
         if (!placed) continue;
 

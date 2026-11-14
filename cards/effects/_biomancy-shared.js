@@ -142,10 +142,57 @@ function isPotionCardName(engine, cardName) {
  * @returns {Promise<object|null>} { inst, slot } oder null, wenn keine
  *          Zone frei war
  */
+/**
+ * Platz, den `safePlaceInSupport` für einen Token ohne Wunschplatz wählen würde (gleiche Reihenfolge: Pflichtplatz → geteilte Zone → erste freie), damit der Flug schon VOR der Platzierung
+ * sein Ziel kennt (Potion vom Gelöscht-Stapel → Zone). -1 = keine Zone.
+ */
+function vorschauSlot(engine, pi, feld, heroIdx, tokenName) {
+  try { const pf = engine.equipPflichtPlatz ? engine.equipPflichtPlatz(feld, heroIdx, tokenName) : -1; if (pf >= 0) return pf; } catch { /* kein Pflichtplatz */ }
+  const frei = (z) => !engine.supportSlotBelegt(feld, heroIdx, z);
+  try {
+    const { canShareInto } = require('./_alice-shared');
+    for (let z = 0; z < SUPPORT_SLOTS; z++) if (!frei(z) && canShareInto(engine, pi, heroIdx, z, tokenName, feld)) return z;
+  } catch { /* keine Teilung */ }
+  for (let z = 0; z < SUPPORT_SLOTS; z++) if (frei(z)) return z;
+  return -1;
+}
+
 async function placeBiomancyToken(engine, pi, heroIdx, potionName, level, opts = {}) {
   // Styx 28.9.: `opts.feld` = Brettseite des Helden (geliehener Held); der
   // Token gehoert dem Beschwoerer `pi` (seitenfremd).
   const feld = opts.feld ?? pi;
+  // ★ 14.11. (Nutzer: „Wenn Biomancy sich aktiviert, wird die Potion VON DER DELETED-ZONE AUS beschworen und sichtbar von dort in die Support Zone bewegt"): `opts.vonStapel` = Besitzer des Gelöscht-
+  // Stapels, in dem die Potion schon sichtbar liegt (Biomancy-Hook, `_potion-hand-flight`-Pfad in server.js `doConfirmPotion`). Ablauf: Potion vom Stapel nehmen (Stapel −1, die EINE Potion IST der Token;
+  // `takeFromPileSync` wie bei Elixir of Quickness) → Kartenflug Stapel → Zone (`play_pile_transfer`, `flightStyle: 'biomancy'`, `biomancy_bloom` mit `quelle: 'stapel'` merkt die Zone für den Token-Look)
+  // → ERST bei der Landung (`opts.flugMs`, Standard 700) wird der Token gesetzt und synchronisiert. Ohne `vonStapel` (Kyli, Puzzle-Lader, andere Aufrufer): der alte Weg mit Kraftstrom.
+  if (opts.vonStapel != null) {
+    const slot = opts.slot ?? vorschauSlot(engine, pi, feld, heroIdx, potionName);
+    if (slot < 0) return null;
+    const weg = engine.takeFromPileSync(opts.vonStapel, 'deleted', potionName, { last: true, _verwahrungFreigabe: true, source: opts.sourceName || 'Biomancy' });
+    if (typeof opts.onStapelGenommen === 'function') opts.onStapelGenommen();
+    engine._broadcastEvent('biomancy_bloom', { owner: feld, heroIdx, zoneSlot: slot, kraftstrom: true, quelle: 'stapel' });
+    engine._broadcastEvent('play_pile_transfer', {
+      fromOwner: opts.vonStapel, toOwner: feld, cardName: potionName, from: 'deleted', to: 'support', toHeroIdx: heroIdx, toSlotIdx: slot, flightStyle: 'biomancy',
+    });
+    engine.sync();   // Stapel −1; der Token steht noch NICHT in der Zone
+    await engine._delay(opts.flugMs ?? 700);
+    const platz = engine.safePlaceInSupport(potionName, feld, heroIdx, slot, feld !== pi ? { controller: pi } : {});
+    if (!platz) {   // Zone unterwegs belegt: die Potion bleibt, wo sie war (im Stapel)
+      if (weg) engine.returnToPile(opts.vonStapel, 'deleted', potionName);
+      engine.sync();
+      return null;
+    }
+    const { inst: tokenInst, actualSlot } = platz;
+    Object.assign(tokenInst.counters, biomancyTokenCounters(engine._getCardDB()[potionName], level));
+    engine.sync();   // der Token erscheint mit der Landung (Zone war bis dahin verborgen)
+    const st = tokenStatsForLevel(level);
+    engine.log('biomancy_token_created', {
+      player: engine.gs.players[pi]?.username, hero: engine.gs.players[feld]?.heroes?.[heroIdx]?.name, potion: potionName,
+      level: st.level, hp: st.hp, damage: st.damage, source: opts.sourceName || 'Biomancy',
+    });
+    await engine.runHooks('onCardEnterZone', { enteringCard: tokenInst, toZone: 'support', toHeroIdx: heroIdx, _skipReactionCheck: true });
+    return { inst: tokenInst, slot: actualSlot };
+  }
   const placeResult = engine.safePlaceInSupport(potionName, feld, heroIdx, opts.slot ?? -1,
     feld !== pi ? { controller: pi } : {});
   if (!placeResult) return null;

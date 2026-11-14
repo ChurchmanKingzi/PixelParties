@@ -677,6 +677,8 @@
       if (!pl) return false;
       const art = pl.type === 'alchemy_kraftstrom' ? 'alchemy' : (pl.type === 'biomancy_bloom' && pl.kraftstrom === true ? 'bio' : null);
       if (!art) return false;
+      // Biomancy aus dem Gelöscht-Stapel (`quelle: 'stapel'`, app-fx-70): kein Kraftstrom — der Kartenflug Stapel → Zone ist der Hauptakt; hier wird nur die Zone für den Token-Look der Landung gemerkt
+      if (art === 'bio' && pl.quelle === 'stapel' && !rueckfall()) { BIO.set(bioSchluessel(ownerLbl(pl.owner, myIdx), pl.heroIdx, pl.zoneSlot), performance.now()); return true; }
       if (rueckfall()) return art === 'alchemy';                                      // Alchemy hat keinen alten Look: still weglassen; Biomancy → Blumen
       return (art === 'alchemy' ? zoneAlchemy(pl, myIdx) : zoneBiomancy(pl, myIdx)) || art === 'alchemy';
     } catch (e) { try { console.warn('[fx69] Zone', e); } catch (e2) { /* still */ } return pl && pl.type === 'alchemy_kraftstrom'; }

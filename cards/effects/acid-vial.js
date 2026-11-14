@@ -20,8 +20,10 @@ const SPUCKKUGEL = true;   // false = der bisherige Säure-Guss von oben (`acid_
 const SPUCK_LADE_MS = 700;
 const SPUCK_FLUG_MS = 700;
 const VORLAUF_MS = 120;
-const ABFLUG_MS = abflugNachDrittel(VORLAUF_MS, 2450);   // Animation 2,45 s (Laden 0,7 + Flug 0,7 + Nachspiel): die Handkarte verlässt die Hand erst nach einem Drittel davon (Nutzer 13.11.), also bei Ereignis + 120 + 817 ms
 const SCHADEN_MS = SPUCK_LADE_MS + SPUCK_FLUG_MS + VORLAUF_MS;
+// Abflug der Handkarte: frühestens nach einem Drittel der Animation (2,45 s, Nutzer 13.11.), und so spät, dass ihre Landung (560 ms) auf das Ende der Auflösung fällt (+60 ms) — dann bucht der Server die Potion
+// im selben Augenblick in den Gelöscht-Stapel, in dem die Karte dort ankommt (Nutzer 14.11.: „direkt sichtbar, wenn sie dort landet").
+const ABFLUG_MS = Math.max(abflugNachDrittel(VORLAUF_MS, 2450), SCHADEN_MS + 60 - 560);
 
 module.exports = {
   // ★ Als Ruling (Al 26.10., Flame Avalanche: „Wenn du andere Schadenskarten unspielbar machst, müssen das Vial und Rockfall auch sein!"): die Karte richtet NUR Schaden an Zielen an —

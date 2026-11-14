@@ -50906,14 +50906,18 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       }
       const sr = srcEl.getBoundingClientRect();
       const tr = tgtEl.getBoundingClientRect();
-      if (halten && from === 'hand' && fromHandIdx != null && fromHandIdx >= 0) {
+      // ★ app-fx-70 (Nutzer 14.11.: „die anderen Handkarten rücken noch nicht auf"): auch der Abflug einer Potion Hand → Gelöscht lässt ihren Platz sofort aus dem Hand-Layout fallen (kein unsichtbarer
+      // Platzhalter, die übrigen Karten rücken mit dem Hand-Übergang nach), solange der Zustand die Karte noch in der Hand führt (früher Flug von Life Serum / Acid Vial: erst das Ende der Auflösung
+      // nimmt sie heraus). Kommt der Zustand, passt `len` nicht mehr → kein zweites Springen. Notnagel 6 s (bleibt die Karte aus irgendeinem Grund in der Hand, klappt der Platz wieder auf).
+      const _potionAbflug = !halten && from === 'hand' && to === 'deleted' && !chainLinkId && !window.__ppFx70FlugAus && !window.__ppFx70HandAus;
+      if ((halten || _potionAbflug) && from === 'hand' && fromHandIdx != null && fromHandIdx >= 0) {
         const _lp = spielerLiveRef.current?.[srcOwner];
         const _len = srcIsMe ? (_lp?.hand?.length ?? null) : (_lp?.handCount ?? null);
         if (_len != null) {
           const rec = { owner: srcOwner, idx: fromHandIdx, card: cardName, len: _len };
           handFlipRef.current = performance.now();
           setHandFrueh(prev => [...prev, rec]);
-          setTimeout(() => setHandFrueh(prev => prev.filter(r => r !== rec)), 60000);
+          setTimeout(() => setHandFrueh(prev => prev.filter(r => r !== rec)), halten ? 60000 : 6000);
         }
       }
       if (chainLinkId) geisterFreigeben(chainLinkId);   // Maße sind genommen: der Geist darf aus der Hand (die Kopie fliegt von seinem Platz los)
@@ -51223,6 +51227,15 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       if (from === 'hand' && to === 'deleted' && cardName && !faceDown && !chainLinkId && !halten && !flightStyle && !laneDelay && !window.__ppFx70FlugAus && window.PpFx65 && window.PpFx65.kartenFlug) {
         const kf = window.PpFx65.kartenFlug({
           von: srcEl, nach: tgtEl, owner: tgtOwner, karten: [{ name: cardName, rarity }], versatz: 0, reise: 560, akzent: 'rot', umdrehen: false,
+          start: { b: mQuelle.b, h: mQuelle.h }, masse: { b: mZiel.b, h: mZiel.h },
+        });
+        if (kf) return;
+      }
+      // ★ app-fx-70 (Nutzer 14.11., Biomancy): die Potion wird VOM GELÖSCHT-STAPEL als Token in die Support Zone bewegt (`flightStyle: 'biomancy'`): derselbe Kartenflug in Grün, 700 ms (die Zone ist bis 720 ms
+      // verborgen, der Token erscheint mit der Landung; seine Landung zeigt `ppFx69BioLandung`, das `biomancy_bloom`-Ereignis hat die Zone gemerkt). Rückfall: der CSS-Flug darunter.
+      if (from === 'deleted' && to === 'support' && flightStyle === 'biomancy' && cardName && !faceDown && !laneDelay && !window.__ppFx70FlugAus && window.PpFx65 && window.PpFx65.kartenFlug) {
+        const kf = window.PpFx65.kartenFlug({
+          von: srcEl, nach: tgtEl, owner: tgtOwner, karten: [{ name: cardName, rarity }], versatz: 0, reise: 700, akzent: 'gruen', umdrehen: false,
           start: { b: mQuelle.b, h: mQuelle.h }, masse: { b: mZiel.b, h: mZiel.h },
         });
         if (kf) return;

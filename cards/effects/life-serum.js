@@ -46,8 +46,10 @@ const KUGEL = true;   // false = der bisherige Look (`healing_hearts` sofort am 
 const KUGEL_LADE_MS = 600;
 const KUGEL_FLUG_MS = 900;
 const VORLAUF_MS = 120;
-const ABFLUG_MS = abflugNachDrittel(VORLAUF_MS, 2250);   // Animation 2,25 s (Laden 0,6 + Flug 0,9 + Heilimpuls): die Handkarte verlässt die Hand erst nach einem Drittel davon (Nutzer 13.11.), also bei Ereignis + 120 + 750 ms
 const HEIL_MS = KUGEL ? KUGEL_LADE_MS + KUGEL_FLUG_MS + VORLAUF_MS : 180;
+// Abflug der Handkarte: frühestens nach einem Drittel der Animation (2,25 s, Nutzer 13.11.), und so spät, dass ihre Landung (560 ms) auf das Ende der Auflösung fällt (+60 ms) — dann bucht der Server die Potion
+// im selben Augenblick in den Gelöscht-Stapel, in dem die Karte dort ankommt (Nutzer 14.11.: „direkt sichtbar, wenn sie dort landet").
+const ABFLUG_MS = Math.max(abflugNachDrittel(VORLAUF_MS, 2250), HEIL_MS + 60 - 560);
 
 module.exports = {
   isPotion: true,
