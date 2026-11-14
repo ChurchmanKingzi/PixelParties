@@ -126,7 +126,7 @@ module.exports = {
         cards: gallery,
         title: CARD_NAME,
         description: 'Choose a Creature from your deck or discard pile to reveal and add to your hand.',
-        confirmLabel: '🌊 Tutor!',
+        confirmLabel: '🌊 Add to Hand!',
         confirmClass: 'btn-info',
         cancellable: true,
       });
