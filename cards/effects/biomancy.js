@@ -91,6 +91,10 @@ module.exports = {
       // Sort by level descending (highest first)
       eligible.sort((a, b) => b.level - a.level);
 
+      // Der Handflug der Potion (Hand → Gelöscht, 560 ms, `ctx.flugMs`) läuft gerade: die Rückfrage und der Biomancy-Reveal erscheinen erst NACH der Landung — sonst steht das Fenster über der
+      // fliegenden Karte und der Reveal verdeckt den Gelöscht-Stapel, auf dem sie landet (Befund 14.11., Nutzer-Prüfung Biomancy). Bei frühem Flug (Life Serum, Acid Vial) ist `flugMs` 0.
+      if (ctx.flugMs > 0) await engine._delay(ctx.flugMs);
+
       // Prompt each in order until one is accepted or all declined
       for (const entry of eligible) {
         if (ctx.placed) break;

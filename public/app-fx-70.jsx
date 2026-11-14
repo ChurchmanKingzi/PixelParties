@@ -3,7 +3,7 @@
 // ═════════════════════════════════════════════════════════════════
 //  Vorlage: Trailer (shot01.js, `pinkProj` / `acidOverlay`, Zug „Life Serum“ und „Säure“). Beide Karten waren im Spiel nur ein Zieleffekt (Life Serum: Herzen am Ziel; Acid Vial: Säure-GUSS von oben,
 //  app-fx-9 — die Entscheidung vom 9.11.: „Acid Splash: Säure-Guss von oben statt Blasen und Fläschchen“). Jetzt der Trailer-Ablauf: Quelle LÄDT, das Projektil fliegt im Bogen, am Ziel der Einschlag.
-//  Quelle = die HANDKARTE der gespielten Potion (`von: { owner, handIdx, pile: 'deleted' }`, app-board.jsx `vonAufloesen` → `vonHand`; die Kugel lädt über der Karte, Nutzer-Vorgabe 13.11.; die Karte fliegt serverseitig nach 250 ms Laden in den „Gelöscht"-Stapel, `_potion-hand-flight.js`). Fehlt der Handplatz: der „Gelöscht"-Stapel des Spielers. Im Spiel gibt es keinen
+//  Quelle = die HANDKARTE der gespielten Potion (Eigene Hand unten: Kugel 0,3 Kartenhöhen über der Mitte; Gegnerhand oben: darunter, ZUM Ziel hin — oben läge sie außerhalb des Bildes) (`von: { owner, handIdx, pile: 'deleted' }`, app-board.jsx `vonAufloesen` → `vonHand`; die Kugel lädt über der Karte, Nutzer-Vorgabe 13.11.; die Karte fliegt serverseitig nach 250 ms Laden in den „Gelöscht"-Stapel, `_potion-hand-flight.js`). Fehlt der Handplatz: der „Gelöscht"-Stapel des Spielers. Im Spiel gibt es keinen
 //  Potion-Token auf dem Brett, der schießt (ein Biomancy-Token macht nur Schaden mit `biomancy_vines`). Ziel = Zonenmitte (Helden: Brusthöhe, 0,2 Zonenhöhe über der Mitte).
 //
 //  life_serum_shot  (Life Serum)   Laden 0,6 s: rosa Kugel wächst von Radius 2 auf 9 (Rand Tinte, Rosa, Hellrosa, Creme-Kern), ein Ring läuft von 28 auf 12 Zellen zusammen, drei Herzen kreisen;
@@ -53,7 +53,7 @@ function ppFx70Plan(props, art) {
     const w = props.w > 0 ? props.w : 64, h = props.h > 0 ? props.h : 90;
     const held = !!(props.zoneEl && props.zoneEl.hasAttribute && props.zoneEl.hasAttribute('data-hero-zone'));
     const rc = kl(h / (35 * S), 0.75, 1.5), ro = kl(rc, 0.8, 1.3);
-    const ax = props.x + props.vonDx, ay = props.y + props.vonDy - (props.vonHand ? 0.3 * (props.vonH || 90) : 0), bx = props.x, by = props.y - (held ? 0.2 * h : 0);
+    const ax = props.x + props.vonDx, ay = props.y + props.vonDy + (props.vonHand ? (props.vonDy < 0 ? 1 : -1) * 0.3 * (props.vonH || 90) : 0), bx = props.x, by = props.y - (held ? 0.2 * h : 0);
     const dist = Math.hypot(bx - ax, by - ay) / S;
     const arcH = Math.round((art === 'saeure' ? 0.3 : 0.2) * dist + 8 * rc);          // Bogenhöhe in Zellen (Trailer: Säure 200, Life Serum 130 Welteinheiten)
     const M = Math.ceil(72 * rc) * S, Mo = M + arcH * S;

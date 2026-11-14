@@ -12921,7 +12921,7 @@ async function doConfirmPotion(room, pi, { selectedIds }) {
       // the next card play.
       delete gs._spellPlacedOnBoard;
     } else if (cardType === 'Potion') {
-      const potionHookCtx = { potionName, potionOwner: pi, placed: false, _skipReactionCheck: true };
+      const potionHookCtx = { potionName, potionOwner: pi, placed: false, _skipReactionCheck: true, flugMs: (fruehFlug == null && !_gestohlen) ? 560 : 0 };   // flugMs: der Handflug nach Gelöscht läuft gerade (Biomancy wartet ihn ab, bevor ihr Fenster/Reveal aufgeht)
       await room.engine.runHooks('afterPotionUsed', potionHookCtx);
       _markOncePerGamePotion(ps, loadCardEffect(potionName), potionName);   // ★ v1028
       if (!potionHookCtx.placed) pilePs.deletedPile.push(potionName);
