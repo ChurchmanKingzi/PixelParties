@@ -74,7 +74,7 @@
 
   // ═════════════════════════════ ① SCHADENSZAHLEN ═════════════════════════════
   const POP = [0.5, 1.7, 1.35, 1.1, 1.0];
-  const FARBEN = { schaden: ['#ff1a1a', '#8b0d0d'], heilung: ['#f8b4c8', '#fe6794'], null: ['#d2d2db', '#686868'] };
+  const FARBEN = { schaden: ['#ff1a1a', '#8b0d0d'], heilung: ['#3ddc57', '#167927'], null: ['#d2d2db', '#686868'] };
   const KONTUR = '#12101f';
   const spriteCache = new Map();
   /** Sprite (Leinwand, 1 Pixel = 1 Ziffernpixel, Rand 2) für Text und Art, einmal gezeichnet. */

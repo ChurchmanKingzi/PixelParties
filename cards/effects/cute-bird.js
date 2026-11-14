@@ -36,6 +36,8 @@
 const CARD_NAME    = 'Cute Bird';
 const TUTOR_TARGET = 'Cute Phoenix';
 const DISCARD_COST = 2;
+const PHOENIX_REBIRTH_MS = 1150;      // = PP_FX71_REBIRTH_MS (public/app-fx-71.jsx), wie cute-phoenix.js
+const PHOENIX_REBIRTH_LEBEN = 2900;   // = PP_FX71_REBIRTH_LEBEN
 
 module.exports = {
   activeIn: ['support'],
@@ -113,6 +115,13 @@ module.exports = {
         await engine.zeigeFizzle(CARD_NAME, { playerIdx: pi, grund: 'zone_taken' });   // v1360
         return;
       }
+      // Auch Einzigkeit und Gastgeber koennen sich waehrend der Abwurf-Kosten geaendert haben (Abwurf-Trigger): dann gar nicht erst die Rebirth-Animation zeigen.
+      const hostJetzt = engine.gs.players[feld]?.heroes?.[heroIdx];
+      if (engine.nurEinerSchonKontrolliert(pi, TUTOR_TARGET) || !hostJetzt?.name || hostJetzt.hp <= 0) {
+        engine.log('cute_bird_fizzle', { player: ps.username, reason: 'place_refused' });
+        await engine.zeigeFizzle(CARD_NAME, { playerIdx: pi, grund: 'place_refused' });
+        return;
+      }
       // Re-verify Phoenix is still in deck (a discard hook MIGHT have
       // moved it — defensive). If gone, fizzle; cost is paid.
       const deckIdx = (ps.mainDeck || []).indexOf(TUTOR_TARGET);
@@ -129,6 +138,25 @@ module.exports = {
         return;
       }
       engine._broadcastEvent('deck_search_add', { cardName: TUTOR_TARGET, playerIdx: pi });
+
+      // Optik (app-fx-71.jsx): Der Vogel wird zum Phönix — dieselbe Rebirth-Animation wie bei der Wiederbelebung (Flammensammeln, Feuer-Ei, Explosion). Die Engine wartet bis
+      // zur Explosion (+ Mount-Vorlauf), dann erscheint die Karte unter dem Creme-Blitz. Konstanten = cute-phoenix.js / PP_FX71_REBIRTH_*.
+      engine._broadcastEvent('play_zone_animation', {
+        type: 'phoenix_rebirth', duration: PHOENIX_REBIRTH_LEBEN,
+        owner: feld, heroIdx, zoneSlot,
+      });
+      await engine._delay(PHOENIX_REBIRTH_MS);
+
+      // Die Wartezeit (1,15 s) liegt zwischen den Pruefungen und der Beschwoerung: Platz, Einzigkeit und Gastgeber nochmal pruefen. Praktisch kann hier nichts dazwischenkommen
+      // (die Engine loest die Todes-Trigger nacheinander auf, niemand zieht dazwischen) — Phoenix geht sonst zurueck ins Deck, die Kosten bleiben bezahlt.
+      const hostNach = engine.gs.players[feld]?.heroes?.[heroIdx];
+      if (engine.supportSlotBelegt(feld, heroIdx, zoneSlot) || engine.nurEinerSchonKontrolliert(pi, TUTOR_TARGET) || !hostNach?.name || hostNach.hp <= 0) {
+        engine.returnToPile(ps, 'deck', TUTOR_TARGET);
+        engine.shuffleDeck(pi, 'main');
+        engine.log('cute_bird_fizzle', { player: ps.username, reason: 'zone_taken_after_animation' });
+        await engine.zeigeFizzle(CARD_NAME, { playerIdx: pi, grund: 'zone_taken' });
+        return;
+      }
 
       // Summon with full hooks. summonCreatureWithHooks handles slot-
       // occupied fallback via summonCreature → safePlaceInSupport, runs
@@ -155,7 +183,8 @@ module.exports = {
         return;
       }
 
-      // Reveal the searched card to the opponent (gallery animation).
+      // Reveal the searched card to the opponent (gallery animation). Erst nach dem Explosionsbild der Rebirth-Animation (Ringe/Strahlen ~0,8 s), damit das Fenster sie nicht abdunkelt.
+      await engine._delay(700);
       const oi = engine.opponentOf(pi);
       await engine.promptGeneric(oi, {
         type: 'deckSearchReveal',
