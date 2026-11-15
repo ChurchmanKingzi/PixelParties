@@ -7162,9 +7162,9 @@ function ppFlugRarity(img, cardName, rarity, owner, lebenMs) {
 window.ppFlugRarity = ppFlugRarity;
 
 /**
- * Alles über dem Kartenbild: Rarity-Effekt (`RarityLayer`), Skin-Holo (Skin-Karten), Schraffur und Rahmenglanz der Vollbild-Helden.
- * Aufrufer schreiben `<CardFoil card={card} skin={…} werte={…} rarity={…} animated />`; ohne Rarity/Skin/Vollbild rendert sie nichts.
- * Ein Skin ersetzt den Rarity-Effekt (zwei Effekte übereinander wären unruhig); Kleinansichten und das Brett zeigen nur Standbilder.
+ * Alles über dem Kartenbild: der Rarity-Effekt (`RarityLayer`) — mehr nicht (kein Skin-Holo, kein Fullart-Foil).
+ * Aufrufer schreiben `<CardFoil card={card} skin={…} werte={…} rarity={…} animated />`; ohne Rarity rendert sie nichts.
+ * Skins teilen die Rarity ihrer Base-Karte; Kleinansichten und das Brett zeigen nur Standbilder (im Deck-Editor reduziert animiert).
  */
 function CardFoil({ card, skin, werte, rarity, animated }) {
   const klein = useContext(FoilKleinContext);
@@ -7177,17 +7177,11 @@ function CardFoil({ card, skin, werte, rarity, animated }) {
   // für Skin-Sprites gibt es noch keine Masken; dort zeigt der Skin das Standbild ohne Effekt.
   const effektMoeglich = !!card && r !== 'common' && !!fxA && fxA.available(r);
   const effekt = effektMoeglich && !(holoSkin0 && fxA.SPEC && fxA.SPEC[r] && fxA.SPEC[r].mask);
-  // Skins teilen die Foils ihrer Base-Karte: es gibt kein eigenes Skin-Holo mehr (weder Schraffur/Glanzband noch goldener Name); die Karte zeigt nur, was ihre Rarity
-  // (und ggf. ihr Kartentyp: Vollbild-Schraffur, goldener Heldenrahmen) vorsieht.
-  const fkey = 'card:' + (card?.name || '');
-  const schraffur = !effekt && !klein && skinHoloAktiv() && window.CardRender.hatchEligible(card);
-  const rahmen = !effekt && !klein && skinHoloAktiv() ? window.CardRender.rimKind(card, holoSkin0 ? skin : null) : null;
-  if (!schraffur && !rahmen && !effekt) return null;
+  // Foils kommen nur noch von der Rarity der Karteninstanz: kein eigenes Skin-Holo und auch kein altes Fullart-Foil (Schraffur, Glanzband, glänzender Goldrahmen) mehr.
+  if (!effekt) return null;
   return (
     <>
       {effekt && <RarityLayer card={card} rarity={r} animated={!!animated && !klein && !brett} reduced={reduziert && klein && !brett} werte={werte} />}
-      {schraffur && <FoilHatch card={card} fkey={fkey} />}
-      {rahmen && <FoilRim rim={rahmen} fkey={fkey} />}
     </>
   );
 }
