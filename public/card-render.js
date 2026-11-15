@@ -88,9 +88,19 @@
   // nie allein am Zeilenende steht („Support Spell“, „Decay or Support Spells“). Laeuft NACH dem Ersetzen der Namen durch Symbolzeichen,
   // damit mehrteilige Namen („Support Magic“) vorher noch normal erkannt werden.
   const GLUE_SYM_RE = /[\uE000-\uE0FF](?:(?:\s*,\s*|\s+(?:or|and)\s+)[\uE000-\uE0FF])*\s+Spells?\b/g;
+  // ── Deutsch: „[Schul-Symbol]-Zauber“ ──
+  // Quelltext (data/i18n/de-cards.json) schreibt „Zerstörungsmagie-Zauber“, „Verfalls- oder Unterstützungsmagie-Zauber“, „Kampfkunst-Angriffe“;
+  // das Symbol ersetzt den Schulnamen (auch Kurzform „Zerstörungs-“), „-Zauber“/„-Angriff“ bleibt Text. Nur bei gewählter Sprache DE.
+  const DE_SYMBOLS = [['Zerstörungsmagie', 'destruction'], ['Beschwörungsmagie', 'summoning'], ['Magiekunst', 'arts'], ['Unterstützungsmagie', 'support'],
+    ['Verfallsmagie', 'decay'], ['Zerstörungs', 'destruction'], ['Beschwörungs', 'summoning'], ['Unterstützungs', 'support'], ['Verfalls', 'decay']];
+  DE_SYMBOLS.forEach(([name, key]) => { SYM_CH[name] = String.fromCharCode(0xE000 + SYM_KEYS.indexOf(key)); });
+  const DE_ALT = DE_SYMBOLS.map(x => x[0]).join('|');
+  const DE_RE2 = new RegExp('(?<![\\wäöüÄÖÜß])(' + DE_ALT + ')(?=-?(?:(?:\\s*,\\s*|\\s+(?:oder|und)\\s+)(?:' + DE_ALT + ')-?)*-?Zauber)', 'g');
+  const symbolizeDe = t => t.replace(DE_RE2, m => SYM_CH[m]).replace(/\bKampfkunst(?=-Angriff)/g, SYM_CH['Fighting']);
   const symbolize = t => {
     t = String(t == null ? '' : t);
     if (OPT.symMode === 'none') return t;
+    if (window.PP_I18N && window.PP_I18N.get() === 'de') return symbolizeDe(t);
     t = t.replace(OPT.symMode === 'all' ? SYM_RE_ALL : SYM_RE, m => SYM_CH[m]);
     if (OPT.symMode === 'all') return t;
     t = t.replace(SYM_FIGHT_RE, SYM_CH['Fighting']).replace(SYM_FIGHT_USE_RE, '$1' + SYM_CH['Fighting'] + ' ');

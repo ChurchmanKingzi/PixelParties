@@ -54,5 +54,6 @@
   "Blinded": "Geblendet",
   "once per turn (Kartenname)": "Du kannst nur 1 \"Kartenname\" pro Zug spielen.",
   "reveal it and add it to your hand": "offen deiner Hand hinzufügen",
-  "_regel_namen": "Kartennamen in Anführungszeichen werden nie dekliniert: einen \"Süßer Phönix\"."
+  "_regel_namen": "Kartennamen in Anführungszeichen werden nie dekliniert: einen \"Süßer Phönix\".",
+  "_regel_schulsymbole": "Schreibweise im Quelltext: \"Zerstörungsmagie-Zauber\", \"Verfalls- oder Unterstützungsmagie-Zauber\", \"Kampfkunst-Angriffe\". Der Renderer macht daraus \"[Symbol]-Zauber\". Fähigkeiten selbst bleiben Text (\"Magiekunst 1\")."
 }
