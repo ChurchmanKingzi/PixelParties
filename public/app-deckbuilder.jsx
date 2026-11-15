@@ -2236,7 +2236,7 @@ function DeckBuilder() {
               {skinGallery.options.map(skinName => (
                 <div key={skinName} className={'skin-gallery-item' + (currentDeck?.skins?.[skinGallery.cardName] === skinName ? ' skin-selected' : '')}
                   onClick={() => { setSkin(skinGallery.cardName, skinName); setSkinGallery(null); }}>
-                  {/* Skin-Karten tragen ihr eigenes Holo-Foil (CardFoil → SkinHolo): hier sieht man es vor der Wahl. */}
+                  {/* Skin-Karten teilen die Foils ihrer Base-Karte (CardFoil): ohne eigenes Skin-Holo. */}
                   <div style={{ position: 'relative' }}>
                     <img src={skinImageUrl(skinName)} draggable={false} />
                     {window.CardFoil && <window.CardFoil card={window.CARDS_BY_NAME[skinGallery.cardName]} skin={skinName} />}
