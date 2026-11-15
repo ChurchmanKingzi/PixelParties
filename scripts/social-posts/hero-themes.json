@@ -1424,5 +1424,11 @@
    ]
   ],
   "musicHit": 44.7
+ },
+ "Key, the Cursed Thief": {
+  "px": 16,
+  "thiefshow": true,
+  "opener": "wind",
+  "showLoops": 5
  }
 }
