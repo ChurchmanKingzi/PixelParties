@@ -9,7 +9,7 @@
   P.set = (l) => { try { localStorage.setItem('pp-lang', l); } catch (e) {} location.reload(); };
   P.toggle = () => P.set(lang === 'en' ? 'de' : 'en');
   // Anzeigename einer Karte (Fallback: englischer Name)
-  P.ui = {}; P.miss = new Set();   // Texte ohne Uebersetzung (zur Kontrolle: window.PP_I18N.miss)
+  P.ui = {}; P.imgs = new Set(); P.miss = new Set();   // Texte ohne Uebersetzung (zur Kontrolle: window.PP_I18N.miss)
   // UI-Begriff uebersetzen (Kartentyp, Untertyp, Schule, Archetyp, Startfaehigkeit, ...); ohne Eintrag oder auf Englisch: Original
   P.archetypes = {};
   P.cardName = (n) => (P.cards[n] && P.cards[n].name) || n;
@@ -20,6 +20,7 @@
     if (lang === 'en') return;
     try {
       try { P.ui = await (await fetch('/data/i18n/' + lang + '-ui.json')).json(); } catch (e) { P.ui = {}; }
+      try { P.imgs = new Set(await (await fetch('/data/i18n/' + lang + '-images.json')).json()); } catch (e) { P.imgs = new Set(); }
       const j = await (await fetch('/data/i18n/' + lang + '-cards.json')).json();
       P.names = Object.assign({}, j._names || {}); P.archetypes = j._archetypes || {}; delete j._names; delete j._archetypes; P.cards = j; for (const k in j) P.names[k] = j[k].name;
     } catch (e) { /* ohne Datei: englisch */ }
@@ -116,8 +117,15 @@
     if (r !== t) { if (!skipped(n)) n.nodeValue = m[1] + r + m[3]; }
     else if (/[A-Za-z]{2}/.test(t) && !skipped(n)) P.miss.add(t);
   };
-  const ATTRS = ['title', 'placeholder', 'alt', 'aria-label'];
-  const attrs = (e) => { for (const a of ATTRS) { const v = e.getAttribute && e.getAttribute(a); if (v && /[A-Za-z]{2}/.test(v)) { const r = lookup(v.replace(/\s+/g, ' ').trim()); if (r !== v && !skipped(e)) e.setAttribute(a, r); } } };
+  const ATTRS = ['title', 'placeholder', 'alt', 'aria-label', 'src'];
+  // Bilder mit eingemalter Schrift (public/rules/*.png): deutsche Fassung unter /rules/de/<Name>, falls in data/i18n/de-images.json aufgefuehrt
+  const imgSrc = (e) => {
+    if (e.tagName !== 'IMG') return;
+    const v = e.getAttribute('src'); const m = v && /^\/rules\/([^\/?#]+\.png)(.*)$/.exec(v);
+    if (m && P.imgs.has(m[1])) e.setAttribute('src', '/rules/de/' + m[1] + m[2]);
+  };
+  const attrs = (e) => {
+    imgSrc(e); for (const a of ATTRS) { if (a === 'src') continue; const v = e.getAttribute && e.getAttribute(a); if (v && /[A-Za-z]{2}/.test(v)) { const r = lookup(v.replace(/\s+/g, ' ').trim()); if (r !== v && !skipped(e)) e.setAttribute(a, r); } } };
   const walk = (root) => {
     if (root.nodeType === 3) return textNode(root);
     if (root.nodeType !== 1 || SKIP_TAG[root.tagName]) return;
