@@ -1,12 +1,13 @@
 #!/usr/bin/env python3
-"""Deutsche Fassungen der Regelbilder (public/rules/*.png -> public/rules/de/*.png).
+"""Regelbilder neu beschriften (Quellen: scripts/i18n/rules-originals/*.png -> public/rules/<name>.png (EN) und public/rules/de/<name>.png (DE)).
 
 Die Bilder bestehen aus einer eingebetteten Karte (750x1050, 1:1) vor einem unscharfen Pixel-Hintergrund und Beschriftungen mit
 Hilfslinien. Fuer die deutsche Fassung:
   1. die englischen Beschriftungen entfernen (Text = reines Weiss/Schwarz; die Luecke wird zellenweise mit der Hintergrundfarbe gefuellt),
   2. die Karte durch ihre deutsche Darstellung ersetzen (Render aus dem Spiel: card-de-<Name>.png, siehe regel-bilder.js),
   3. deutsche Beschriftungen in der Kartenschrift (public/cardgen/glyphs.json) mit weisser Kontur zeichnen (schwarze Schrift, wie im Original).
-Aufruf: python3 scripts/i18n/regel-bilder.py <spell|ability|...> <Ordner mit card-de-*.png/card-en-*.png> [Ausgabeordner]
+Beide Sprachen nutzen dieselbe Schrift (Kartenschrift, schwarz mit weisser Kontur).
+Aufruf: python3 scripts/i18n/regel-bilder.py <spell|ability|...|alle> <Ordner mit card-de-*.png> [Ausgabeordner]
 """
 import json, sys, os
 import numpy as np
@@ -84,9 +85,20 @@ def components(mask):
                 out.append(pts)
     return out
 
-def erase(img_rgb, box, gx, gy):
-    """Reines Weiss/Schwarz in box entfernen (ausser langen, duennen Linien) und mit der Zellenfarbe des Hintergrunds fuellen.
-    gx(k)/gy(k): Zellgrenzen des Hintergrundrasters (Spalten/Zeilen)."""
+def _kanten(sig, off, thr=10, luecke=3):
+    pos = [i for i, v in enumerate(sig) if v > thr]
+    out = []
+    for i in pos:
+        if out and i - out[-1][-1] <= luecke: out[-1].append(i)
+        else: out.append([i])
+    return [off + int(round(np.mean(g))) + 1 for g in out]     # Grenze liegt vor dem Pixel
+
+def erase(img_rgb, box):
+    """Reines Weiss/Schwarz (Beschriftung samt Kontur) in box entfernen, Verbindungslinien bleiben; die Luecke wird zellenweise mit der
+    Hintergrundfarbe gefuellt (der Hintergrund ist ein vergroessertes Pixelbild: Zellgrenzen werden lokal aus den Streifen neben dem Feld bestimmt).
+    Rueckgabe: Rahmen der entfernten Schrift (x0, y0, x1, y1) oder None."""
+    import bisect
+    H, W = img_rgb.shape[:2]
     x0, y0, x1, y1 = box
     sub = img_rgb[y0:y1, x0:x1]
     m = ((sub == 255).all(2)) | ((sub == 0).all(2))
@@ -95,41 +107,86 @@ def erase(img_rgb, box, gx, gy):
         ys = [p[0] for p in pts]; xs = [p[1] for p in pts]
         w, h = max(xs) - min(xs) + 1, max(ys) - min(ys) + 1
         beruehrt = min(ys) == 0 or max(ys) == m.shape[0] - 1 or min(xs) == 0 or max(xs) == m.shape[1] - 1
-        if (w > 60 and h < 14) or (h > 60 and w < 14) or (beruehrt and (w < 14 or h < 14)): keep[tuple(zip(*pts))] = True   # Verbindungslinien (auch angeschnittene Enden) bleiben
+        schwarz = int((sub[tuple(zip(*pts))] == 0).all(1).sum())
+        if schwarz < 10:                           # nur Weiss (ohne schwarze Buchstaben): Hintergrundzelle, keine Schrift
+            m[tuple(zip(*pts))] = False; continue
+        diagonal = max(w, h) > 55 and len(pts) < 0.25 * w * h      # schraege Verbindungslinie
+        if (w > 60 and h < 14) or (h > 60 and w < 14) or (beruehrt and (w < 14 or h < 14)) or diagonal: keep[tuple(zip(*pts))] = True
     m &= ~keep
+    ys_, xs_ = np.nonzero(m)
+    if not len(ys_): return None
+    bbox = (x0 + int(xs_.min()), y0 + int(ys_.min()), x0 + int(xs_.max()), y0 + int(ys_.max()))
     m = dilate(m, 1) & ~keep
-    # Zellgrenzen
-    import bisect
-    xs_b = [gx(k) for k in range(-1, 100)]; ys_b = [gy(k) for k in range(-1, 100)]
-    def cell(v, b): return bisect.bisect_right(b, v) - 1
+    pure = ((img_rgb == 255).all(2)) | ((img_rgb == 0).all(2))
+    def med(sig_rows): return np.median(np.array(sig_rows), axis=0)
+    # x-Grenzen aus Streifen ueber/unter dem Feld (reine Hintergrundzeilen), y-Grenzen aus Streifen links/rechts
+    rows = [r for r in list(range(max(0, y0 - 40), y0)) + list(range(y1, min(H, y1 + 40))) if not pure[r, x0:x1].any()]
+    cols = [c for c in list(range(max(0, x0 - 40), x0)) + list(range(x1, min(W, x1 + 40))) if c < 484 and not pure[y0:y1, c].any()]
+    xe = _kanten(med([np.abs(np.diff(img_rgb[r, x0 - 1:x1 + 1].astype(int), axis=0)).sum(1) for r in rows]), x0 - 1) if rows else []
+    ye = _kanten(med([np.abs(np.diff(img_rgb[y0 - 1:y1 + 1, c].astype(int), axis=0)).sum(1) for c in cols]), y0 - 1) if cols else []
+    xb = [-10**6] + xe + [10**6]; yb = [-10**6] + ye + [10**6]
+    cell = lambda v, b: bisect.bisect_right(b, v) - 1
     cells = {}
-    H, W = m.shape
-    for y in range(H):
-        for x in range(W):
-            if m[y, x]: cells.setdefault((cell(x0 + x, xs_b), cell(y0 + y, ys_b)), []).append((y, x))
+    for y in range(m.shape[0]):
+        for x in range(m.shape[1]):
+            if m[y, x]: cells.setdefault((cell(x0 + x, xb), cell(y0 + y, yb)), []).append((y, x))
     for (cx, cy), pts in cells.items():
-        xa, xb = xs_b[cx], xs_b[cx + 1]; ya, yb = ys_b[cy], ys_b[cy + 1]
-        vals = []
-        for yy in range(max(ya, y0 - 0), min(yb, y1)):
-            for xx in range(max(xa, x0), min(xb, x1)):
-                if not m[yy - y0, xx - x0] and not keep[yy - y0, xx - x0]: vals.append(tuple(img_rgb[yy, xx]))
-        if not vals:    # ganze Zelle verdeckt: Nachbarzelle links/rechts/oben/unten ausserhalb der Maske
-            for ddx, ddy in ((-1, 0), (1, 0), (0, -1), (0, 1), (-1, -1), (1, 1)):
-                xa2, xb2 = xs_b[cx + ddx], xs_b[cx + ddx + 1]; ya2, yb2 = ys_b[cy + ddy], ys_b[cy + ddy + 1]
-                vv = [tuple(img_rgb[yy, xx]) for yy in range(ya2, yb2) for xx in range(xa2, xb2)
-                      if not (x0 <= xx < x1 and y0 <= yy < y1 and (m[yy - y0, xx - x0]))]
-                vv = [v for v in vv if v not in ((0, 0, 0), (255, 255, 255))]
-                if vv: vals = vv; break
-        if not vals: continue
-        col = max(set(vals), key=vals.count)
-        for y, x in pts: img_rgb[y0 + y, x0 + x] = col
+        xa, xe_ = max(xb[cx], 0), min(xb[cx + 1], W); ya, ye_ = max(yb[cy], 0), min(yb[cy + 1], H)
+        # Zelle begrenzen (Fenster um das Feld), unmaskierte Hintergrundpixel sammeln
+        xa, xe_ = max(xa, x0 - 60), min(xe_, x1 + 60); ya, ye_ = max(ya, y0 - 60), min(ye_, y1 + 60)
+        blk = img_rgb[ya:ye_, xa:xe_]
+        ok = ~pure[ya:ye_, xa:xe_]
+        # Pixel, die selbst in der Maske liegen, ausschliessen
+        mm = np.zeros((ye_ - ya, xe_ - xa), bool)
+        for yy in range(max(ya, y0), min(ye_, y1)):
+            for xx in range(max(xa, x0), min(xe_, x1)):
+                if m[yy - y0, xx - x0]: mm[yy - ya, xx - xa] = True
+        ok &= ~mm
+        if ok.sum() >= 12: col = tuple(int(v) for v in np.median(blk[ok], axis=0))
+        else:   # ganze Zelle verdeckt: naechste unverdeckte Zelle ueber/unter/links/rechts
+            col = None
+            for dx_, dy_ in ((0, -1), (0, 1), (-1, 0), (1, 0)):
+                xx = int(np.clip((xa + xe_) // 2 + dx_ * (xe_ - xa), 0, W - 1)); yy = int(np.clip((ya + ye_) // 2 + dy_ * (ye_ - ya), 0, H - 1))
+                if not pure[yy, xx] and not (x0 <= xx < x1 and y0 <= yy < y1): col = tuple(int(v) for v in img_rgb[yy, xx]); break
+            if col is None: continue
+        for y, x in pts:
+            img_rgb[y0 + y, x0 + x] = col; m[y, x] = False
+    # Rest: noch nicht gefuellte Pixel (ganze Zellen verdeckt, keine Nachbarzelle gefunden) -> naechstes unverdecktes Hintergrundpixel
+    for y, x in zip(*np.nonzero(m)):
+        for r in range(2, 120, 2):
+            found = None
+            for dy in range(-r, r + 1, 2):
+                for dx in (-r, r) if abs(dy) != r else range(-r, r + 1, 2):
+                    yy, xx = y0 + y + dy, x0 + x + dx
+                    if 0 <= yy < H and 0 <= xx < W and not pure[yy, xx] and not (x0 <= xx < x1 and y0 <= yy < y1 and m[yy - y0, xx - x0]): found = img_rgb[yy, xx]; break
+                if found is not None: break
+            if found is not None: img_rgb[y0 + y, x0 + x] = found; break
+    return bbox
 
-def run(name, folder, outdir):
-    cfg = CONFIG[name]
-    src = Image.open(os.path.join(ROOT, 'public/rules', name + '.png')).convert('RGBA')
+CONFIG = {}
+def cfg(name, card, labels): CONFIG[name] = {'card': card, 'labels': labels}
+NAME = dict(box=(655, 10, 1115, 75), align='center', en=['Card Name'], de=['Kartenname'])
+EFFECT = dict(box=(10, 835, 310, 900), align='left', en=['Effect'], de=['Effekt'])
+SUB = dict(box=(5, 1035, 412, 1125), align='left', en=['Sub-Type'], de=['Untertyp'])
+cfg('spell', 'Invisibility', [NAME, dict(box=(5, 630, 310, 750), align='left', en=['Spell', 'School'], de=['Zauber-', 'schule']), EFFECT, SUB,
+    dict(box=(1005, 1138, 1258, 1215), align='right', en=['Level'], de=['Level'])])
+cfg('ability', 'Magic_Arts', [NAME, dict(box=(10, 795, 415, 925), align='left', en=['Effects', 'by level'], de=['Level-', 'Effekte'])])
+cfg('artifact', 'The_Sun_Sword', [NAME, EFFECT, SUB, dict(box=(700, 1138, 1010, 1240), align='center', en=['Cost'], de=['Kosten'])])
+cfg('ascended', 'Monia_Bot_the_Foretold_Rescuer_of_Coolness', [NAME, dict(box=(10, 670, 458, 795), align='left', en=['Ascension', 'Bonus'], de=['Aufstiegs-', 'bonus'], c=6), EFFECT,
+    dict(box=(600, 1138, 800, 1245), align='center', en=['HP'], de=['LP']), dict(box=(860, 1138, 1235, 1245), align='center', en=['Attack'], de=['Angriff'])])
+cfg('creature', 'Doomed_Town_Guard', [NAME, dict(box=(5, 630, 310, 750), align='left', en=['Spell', 'School'], de=['Zauber-', 'schule']), EFFECT, SUB,
+    dict(box=(660, 1138, 830, 1215), align='center', en=['HP'], de=['LP']), dict(box=(1005, 1138, 1258, 1215), align='right', en=['Level'], de=['Level'])])
+cfg('hero', 'Treasure_Huntress_Semi', [NAME, dict(box=(10, 575, 455, 715), align='left', en=['Starting', 'Abilities'], de=['Start-', 'Fähigkeiten'], c=6, c_de=5),
+    dict(box=(36, 915, 330, 990), align='left', en=['Effect'], de=['Effekt']), dict(box=(590, 1138, 760, 1235), align='center', en=['HP'], de=['LP']), dict(box=(850, 1138, 1200, 1240), align='center', en=['Attack'], de=['Angriff'])])
+cfg('potion', 'Cloud_in_a_Bottle', [NAME, EFFECT, SUB])
+
+SRC_DIR = os.path.join(ROOT, 'scripts/i18n/rules-originals')
+
+def run(name, lang, folder, outdir):
+    cf = CONFIG[name]
+    src = Image.open(os.path.join(SRC_DIR, name + '.png')).convert('RGBA')
     rgb = np.array(src.convert('RGB'))
-    for box in cfg['erase']: erase(rgb, box, lambda k: int(round(24.8 * k)), lambda k: int(round(364.5 + 24.25 * (k - 15))))
-    # Hilfslinien (lang, duenn, reines Schwarz) aus dem Original merken: sie liegen teils ueber der Karte und muessen nach dem Einsetzen zurueck
+    # Hilfslinien (lang, duenn, reines Schwarz) merken: sie liegen teils ueber der Karte und muessen nach dem Einsetzen zurueck
     blk = (np.array(src.convert('RGB')) == 0).all(2)
     linien = np.zeros_like(blk)
     for pts in components(blk):
@@ -137,30 +194,24 @@ def run(name, folder, outdir):
         w, h = max(xs) - min(xs) + 1, max(ys) - min(ys) + 1
         if (w > 40 and h < 14) or (h > 40 and w < 14): linien[tuple(zip(*pts))] = True
     linien = dilate(linien, 1)
+    boxes = [erase(rgb, lb['box']) for lb in cf['labels']]
     img = Image.fromarray(rgb).convert('RGBA')
-    card = Image.open(os.path.join(folder, 'card-de-%s.png' % cfg['card'])).convert('RGBA')
-    img.alpha_composite(card, cfg['card_pos'])
-    orig = np.array(src); res = np.array(img); res[linien] = orig[linien]; img = Image.fromarray(res, 'RGBA')
-    for lb in cfg['labels']: draw_label(img, **lb)
+    if lang == 'de':
+        img.alpha_composite(Image.open(os.path.join(folder, 'card-de-%s.png' % cf['card'])).convert('RGBA'), (488, 85))
+        res = np.array(img); res[linien] = np.array(src)[linien]; img = Image.fromarray(res, 'RGBA')
+    for lb, bb in zip(cf['labels'], boxes):
+        if bb is None: continue
+        c = lb.get('c_' + lang, lb.get('c', 7)); outline = 3
+        lines = lb[lang]
+        top = bb[1] - 1                                   # Oberkante der alten Schrift (samt Konturrand)
+        baseline = top + outline + 1 + 7 * c
+        x = {'left': bb[0] + 1, 'right': bb[2], 'center': (bb[0] + bb[2]) // 2}[lb['align']]
+        draw_label(img, lines, x, baseline, align=lb['align'], c=c, outline=outline)
     os.makedirs(outdir, exist_ok=True)
-    img.save(os.path.join(outdir, name + '.png'))
-    return os.path.join(outdir, name + '.png')
-
-CONFIG = {
-  'spell': {
-    'card': 'Invisibility', 'card_pos': (488, 85),
-    'erase': [(655, 10, 1115, 75), (5, 630, 310, 750), (10, 835, 310, 900), (5, 1035, 412, 1105), (1005, 1140, 1258, 1215)],
-    'labels': [
-      dict(lines=['Kartenname'], x=883, baseline=67, align='center'),
-      dict(lines=['Zauber-', 'schule'], x=10, baseline=690, align='left'),
-      dict(lines=['Effekt'], x=15, baseline=894, align='left'),
-      dict(lines=['Untertyp'], x=10, baseline=1098, align='left'),
-      dict(lines=['Level'], x=1250, baseline=1198, align='right'),
-    ],
-  },
-}
+    out = os.path.join(outdir, name + '.png'); img.save(out); return out
 
 if __name__ == '__main__':
-    name, folder = sys.argv[1], sys.argv[2]
-    out = sys.argv[3] if len(sys.argv) > 3 else os.path.join(ROOT, 'public/rules/de')
-    print(run(name, folder, out))
+    which = sys.argv[1]; folder = sys.argv[2]; outbase = sys.argv[3] if len(sys.argv) > 3 else os.path.join(ROOT, 'public/rules')
+    for name in (list(CONFIG) if which == 'alle' else [which]):
+        for lang in ('en', 'de'):
+            print(run(name, lang, folder, outbase if lang == 'en' else os.path.join(outbase, 'de')))
