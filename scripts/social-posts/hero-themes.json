@@ -655,9 +655,12 @@
     18
    ]
   ],
-  "px": 10,
+  "px": 6,
   "feet": 470,
-  "logoFront": true
+  "logoFront": true,
+  "bootshow": true,
+  "opener": "wind",
+  "showLoops": 5
  },
  "Orthos, the Loyal Guard Dog": {
   "particles": [
