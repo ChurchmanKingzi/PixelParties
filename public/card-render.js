@@ -823,6 +823,8 @@
     const stamp = STAMP[spec.rarity];
     if (stamp && !textOnly) {
       const white = isArti2(t) && (stamp !== 'diamond' && stamp !== 'sapphire');
+      // noStamp: die Rarity-Ebene malt den Stempel selbst — ausser auf hellen Artifact-Karten (braunes Zeichen, dort malt sie keinen): der gedruckte bleibt
+      if (spec.noStamp && !white) return cv;
       sprite(ctx, (white ? 'cornerW.' : 'corner.') + stamp, 689, 989, 45, 45);
     }
     return cv;
@@ -877,6 +879,26 @@
   const RARITY_BASE = { common: 'common', uncommon: 'uncommon', rare: 'rare', prismatic: 'none', super: 'super rare', storm: 'none', spectral: 'none', umbra: 'none', stained: 'none',
     'super rare': 'super rare', none: 'none' };
   const rarityBase = r => RARITY_BASE[r] || 'common';
+  /**
+   * Der Stempel der Basiskarte dieser Rarity als 45x45-Canvas (genau so, wie `draw` ihn unten rechts einsetzt; durchsichtig um die Zeichnung) — oder null,
+   * wenn die Stufe keinen hat (Common ausgenommen: dessen Stempel ist der gedruckte) oder die Karte das braune Artifact-Zeichen trägt (das bleibt gedruckt). Die Rarity-Ebene (rarity-fx.js) liest daraus die 5x5-Zellen ihres
+   * eigenen Stempels; die Basiskarte mit Rarity (`renderCard(…, { noStamp: true })`, Karten-Shim `?rar=`) druckt ihn dann NICHT mehr mit, damit sich
+   * beide nicht ueberlagern.
+   */
+  const stampMemo = new Map();
+  function stampSprite(card, rarity) {
+    const spec = specFromCard(card, meta.cards[card && card.name], { rarity });
+    const stamp = STAMP[spec.rarity];
+    if (!stamp) return null;
+    if (isArti2(spec.type) && (stamp !== 'diamond' && stamp !== 'sapphire')) return null;
+    const key = stamp;
+    if (stampMemo.has(key)) return stampMemo.get(key);
+    const c = document.createElement('canvas'); c.width = 45; c.height = 45;
+    const g = c.getContext('2d', { willReadFrequently: true });
+    const out = sprite(g, 'corner.' + stamp, 0, 0, 45, 45) ? c : null;
+    if (out) stampMemo.set(key, out);
+    return out;
+  }
   /** W77b: zwei Ability-Boni („<Ability> N" in beiden Feldern) → „A or B" in einer Zeile; sonst null. */
   function ascBonusOder(c) {
     const a = String(c.startingAbility1 || '').trim(), b = String(c.startingAbility2 || '').trim();
@@ -902,6 +924,7 @@
     return {
       type,
       rarity: rarityBase(over.rarity),
+      noStamp: !!over.noStamp,   // ohne Seltenheits-Stempel (die Rarity-Ebene malt ihn selbst, siehe stampSprite)
       name: (over.name != null ? over.name : c.name).replace(/\s*\[(?:B|W)\]$/, ''),
       text: c.effect || '',
       soft: !!meta.soft,
@@ -994,7 +1017,7 @@
     const skin = o.skin ? (meta.skins[o.skin] || {}) : null;
     const m = Object.assign({}, meta.cards[card.name]);
     if (skin) { if (skin.r) m.r = skin.r; if (skin.f) m.f = skin.f; }
-    const spec = specFromCard(card, m, Object.assign({ rarity: o.rarity }, skin ? { name: skin.name || o.skin } : null));
+    const spec = specFromCard(card, m, Object.assign({ rarity: o.rarity, noStamp: o.noStamp }, skin ? { name: skin.name || o.skin } : null));
     applyOverrides(spec, card, o);
     // Skin-Holo: der Name steht golden auf der Karte (siehe unten, HOLO-TEXTUR); die schillernden Schichten
     // darueber zeichnet das Spiel als eigene DOM-Lage (SkinHolo in app-shared.jsx).
@@ -1522,5 +1545,5 @@
   }
   function rimCached(rk) { return (rk && rimDone.get(rk.kind)) || null; }
 
-  root.CardRender = { OPT, last: {}, statsLayer, meta_card: (n, r) => { meta.cards[n] = Object.assign(meta.cards[n] || {}, { r: r === 'common' ? undefined : r }); }, meta_set: (k, name) => { meta.skins[k] = Object.assign(meta.skins[k] || {}, { name }); }, init, draw, specFromCard, renderCard, holoLayers, holoFor, holoCached, textLayer, geometryOf, artGrid, textMasks, rarityBase, isFullart, hatchFor, hatchCached, hatchEligible, rimKind, rimFor, rimCached, openCache, cacheGet, cachePut, cacheDel, cacheStats, toBlob, HOLO, getArt, hasArt, loadMeta, loadArtIndex, W, H, _adv: adv, _unitsOf: unitsOf, _paragraphs: paragraphs, STATUS_TERMS, statusMatches, _statusDarstellung: statusDarstellung, _kontrast: kontrast, STATUS_OUTLINES: { dark: OUT_DARK, light: OUT_LIGHT } };
+  root.CardRender = { OPT, last: {}, statsLayer, meta_card: (n, r) => { meta.cards[n] = Object.assign(meta.cards[n] || {}, { r: r === 'common' ? undefined : r }); }, meta_set: (k, name) => { meta.skins[k] = Object.assign(meta.skins[k] || {}, { name }); }, init, draw, specFromCard, renderCard, holoLayers, holoFor, holoCached, textLayer, geometryOf, artGrid, textMasks, rarityBase, stampSprite, isFullart, hatchFor, hatchCached, hatchEligible, rimKind, rimFor, rimCached, openCache, cacheGet, cachePut, cacheDel, cacheStats, toBlob, HOLO, getArt, hasArt, loadMeta, loadArtIndex, W, H, _adv: adv, _unitsOf: unitsOf, _paragraphs: paragraphs, STATUS_TERMS, statusMatches, _statusDarstellung: statusDarstellung, _kontrast: kontrast, STATUS_OUTLINES: { dark: OUT_DARK, light: OUT_LIGHT } };
 })(typeof window !== 'undefined' ? window : globalThis);

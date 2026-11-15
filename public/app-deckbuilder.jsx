@@ -134,7 +134,7 @@ function RarityOptionCard({ name, rarity, skins, selected, disabled, countText, 
       style={disabled ? { opacity: .5, cursor: 'default' } : undefined}
       onClick={() => { if (!disabled) onPick(rarity); }}>
       <div ref={hostRef} style={{ position: 'relative' }}>
-        <img src={cardImageUrl(name, skins)} draggable={false} />
+        <img src={window.ppRarityUrl ? window.ppRarityUrl(cardImageUrl(name, skins), rarity) : cardImageUrl(name, skins)} draggable={false} />
       </div>
       <div className="skin-gallery-label" style={{ color: selected ? 'var(--text)' : undefined }}>
         {rarLabel(rarity)} <span data-rarity-count={rarity}>{countText}</span>

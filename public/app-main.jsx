@@ -3154,7 +3154,7 @@ function RarityBonusCard({ card, rarity, width }) {
   }, [card, rarity]);
   return (
     <div ref={hostRef} data-rarity-bonus-card={card} style={{ position: 'relative', width, aspectRatio: '5 / 7' }}>
-      <img src={window.cardImageUrl ? window.cardImageUrl(card) : ''} alt={card} draggable={false}
+      <img src={window.cardImageUrl ? (window.ppRarityUrl && rarity && rarity !== 'common' ? window.ppRarityUrl(window.cardImageUrl(card), rarity) : window.cardImageUrl(card)) : ''} alt={card} draggable={false}
         style={{ display: 'block', width: '100%', height: '100%', imageRendering: 'pixelated' }} />
     </div>
   );
