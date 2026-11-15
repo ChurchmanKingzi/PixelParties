@@ -1627,6 +1627,8 @@ def main():
             print(f'Musik: Start auf den Schlag bei {m_start:.2f} s' + (f' (Schlag bei Einschlag/Detonation, t = {t_hit} s)' if opener_on else ''))
         sfx_src = show if show_on else wind if windshow_on else None
         sfx = sfx_src.sfx_events() if (sfx_src is not None and not args.no_sfx) else []
+        if sfx and hasattr(sfx_src, 'CAPTIONS'):                          # Textboxen erscheinen mit einem leisen Ton
+            sfx = sorted(list(sfx) + [(c[0], 'ui_prompt_open', -18) for c in sfx_src.CAPTIONS])
         if sfx:                                                         # Musik + Soundeffekte vorab zu einer Tonspur mischen
             audio_file = mix_audio(music, m_start, dur, sfx, out / 'audio.m4a')
             print(f'Soundeffekte: {len(sfx)} Einsätze aus public/sounds')
