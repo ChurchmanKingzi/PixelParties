@@ -49,6 +49,7 @@ class BootShow(CaptionMixin):
         'zap':    [('elem_lightning', -4), ('damage', -7)],
         'ko':     [('creature_destroyed', -5)],
         'enemy':  [('placement', -10)],
+        'alarm':  [('ui_error', -9)],
     }
 
     def __init__(self, W, H, U, fps, loop, geom, D, seed=8):
@@ -358,5 +359,9 @@ class BootShow(CaptionMixin):
         add(self.t_online, 'online')
         add(self.T_ATTACK - 0.5, 'enemy')
         add(self.t_imp, 'zap'); add(self.t_ko, 'ko')
+        a, b = self.t_ko + 0.2, self.t_ko + 2.0                                         # jedes Aufblinken von CHECKMATE bekommt einen Alarmton
+        for k in range(int(math.floor(a * 6)), int(math.ceil(b * 6)) + 1):
+            if k % 2 == 0 and max(a, k / 6.0) < b:
+                add(max(a, k / 6.0), 'alarm')
         ev.append((D - 1.0, 'ascension', -9, 1.2))
         return sorted(ev)
