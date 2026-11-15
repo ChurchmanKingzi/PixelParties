@@ -346,7 +346,7 @@ class BootShow(CaptionMixin):
             for item in self.SND[kind]:
                 e = (t + (item[2] if len(item) > 2 else 0.0), item[0], item[1])
                 if rate and item[0] in ('buff',):
-                    e = e + (0.0, rate)
+                    e = e + (rate,)
                 else:
                     e = e + tuple(item[3:])
                 ev.append(e)
