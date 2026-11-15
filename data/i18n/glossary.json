@@ -43,7 +43,7 @@
   "corresponding Hero": "zugehöriger Held",
   "once per turn": "einmal pro Zug",
   "Gold": "Gold",
-  "level": "Stufe",
+  "level": "Level",
   "Destruction Magic": "Zerstörungsmagie",
   "Summoning Magic": "Beschwörungsmagie",
   "Magic Arts": "Magiekunst",
@@ -129,5 +129,6 @@
     "Main Phase": "Hauptphase",
     "Action Phase": "Aktionsphase",
     "End Phase": "Endphase"
-  }
+  },
+  "_regel_level": "Im Deutschen immer \"Level\", nie \"Stufe\" (das Level, Plural Level)."
 }
