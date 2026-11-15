@@ -5931,6 +5931,7 @@ async function loadCardDB() {
   // Load full card database (needed for rule lookups on existing decks)
   const res = await fetch('/data/cards.json');
   const cards = await res.json();
+  if (window.PP_I18N) { await window.PP_I18N.load(); window.PP_I18N.apply(cards); }
   // Mutate in-place so destructured references from other files stay valid
   window.ALL_CARDS.length = 0;
   window.ALL_CARDS.push(...cards.sort((a, b) => a.name.localeCompare(b.name)));
@@ -12311,3 +12312,28 @@ window.doppelFilterAnwenden = doppelFilterAnwenden;
 function ppCamelSpaces(s) {
   return String(s == null ? '' : s).replace(/([a-z0-9])([A-Z])/g, '$1 $2').replace(/([A-Z]+)([A-Z][a-z])/g, '$1 $2').replace(/([A-Za-z])(\d)/g, '$1 $2');
 }
+
+
+// ═══ Sprach-Flagge (Login + Hauptmenü): Pixelart-Sprites, Klick wechselt EN <-> DE ═══
+function LangFlag() {
+  const lang = (window.PP_I18N && window.PP_I18N.get()) || 'en';
+  const next = lang === 'en' ? 'de' : 'en';
+  const stripes = [];
+  if (lang === 'en') {
+    // US-Flagge 19×10 Zellen: 7 rote/6 weisse Streifen (vereinfacht auf 10 Reihen), blaues Feld oben links
+    for (let y = 0; y < 10; y++) stripes.push(<rect key={'s' + y} x="0" y={y} width="19" height="1" fill={y % 2 === 0 ? '#b22234' : '#ffffff'} />);
+    stripes.push(<rect key="c" x="0" y="0" width="8" height="5" fill="#3c3b6e" />);
+    [[1,1],[3,1],[5,1],[2,3],[4,3],[6,3]].forEach(([x, y]) => stripes.push(<rect key={'t' + x + y} x={x} y={y} width="1" height="1" fill="#ffffff" />));
+  } else {
+    stripes.push(<rect key="a" x="0" y="0" width="19" height="3.34" fill="#000000" />);
+    stripes.push(<rect key="b" x="0" y="3.34" width="19" height="3.33" fill="#dd0000" />);
+    stripes.push(<rect key="c" x="0" y="6.67" width="19" height="3.33" fill="#ffce00" />);
+  }
+  return (
+    <button className="lang-flag-btn" data-pp-px="aus" onClick={() => { if (window.playSFX) window.playSFX('ui_click'); window.PP_I18N.toggle(); }}
+      title={lang === 'en' ? 'Language: English (click for Deutsch)' : 'Sprache: Deutsch (Klick für English)'} aria-label={'Language ' + next}>
+      <svg viewBox="0 0 19 10" width="38" height="20" shapeRendering="crispEdges" style={{ imageRendering: 'pixelated', display: 'block' }}>{stripes}</svg>
+    </button>
+  );
+}
+window.LangFlag = LangFlag;

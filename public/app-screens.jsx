@@ -814,6 +814,7 @@ function AuthScreen() {
   // erreichbar.
   const Header = (
     <div className="auth-header">
+      <LangFlag />
       {/* ★ W86u2 (Pixelart): die Glut hinter dem Logo als Dither-Pixelbild statt Radialverlauf mit Alpha (Ebene hinter dem Inhalt, `.auth-header` ist ein Stapelkontext) */}
       <PpVerlauf className="auth-header-glut" px={4} gradient="radial-gradient(ellipse 46% 58% at 50% 46%, rgba(251,200,106,.5), rgba(227,116,53,.2) 38%, rgba(240,50,50,.06) 64%, transparent 92%)"
         style={{ position: 'absolute', inset: 0, zIndex: -1, pointerEvents: 'none' }} />
@@ -2129,6 +2130,7 @@ function MainMenu() {
           halb aus dem Bild"). Alle Layout-Masse stehen in style.css unter
           `.menu-stats` / `.menu-profile-gutter` / `.menu-corner`; Inline
           bleibt nur, was vom Spieler abhaengt (Farbe, Bild, Messwerte). */}
+      <LangFlag />
       <div className="menu-topleft">
       <div className="menu-stats">
         <div className="menu-stats-row">

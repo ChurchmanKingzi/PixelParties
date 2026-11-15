@@ -26710,3 +26710,8 @@ input[type="checkbox"]:focus-visible, input[type="radio"]:focus-visible { outlin
   .bp-hudbar .bp-hud-row { gap: 8px; }
 }
 @supports not selector(::-webkit-scrollbar) { .bp-scroll { scrollbar-color: #fad54a #12101f; } }
+
+/* Sprach-Flagge (Login + Hauptmenue), oben links; harter Pixelrahmen */
+.lang-flag-btn { position: fixed; top: 10px; left: 12px; z-index: 60; padding: 0; border: 0; background: none; cursor: pointer;
+  box-shadow: 0 0 0 2px #000, 0 0 0 4px #fff; line-height: 0; }
+.lang-flag-btn:hover { box-shadow: 0 0 0 2px #000, 0 0 0 4px #fbc86a; }

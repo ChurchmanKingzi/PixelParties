@@ -1,0 +1,92 @@
+{
+ "_names": {
+  "Cute Phoenix": "Süßer Phönix",
+  "Leadership": "Führungsstärke",
+  "Necromancy": "Nekromantie",
+  "Pollution Token": "Verschmutzungs-Token"
+ },
+ "Fireball": {
+  "name": "Feuerball",
+  "effect": "Wähle bis zu 2 Ziele, die dein Gegner kontrolliert, und füge ihnen 150 Schaden zu."
+ },
+ "Cute Bird": {
+  "name": "Süßer Vogel",
+  "effect": "Wenn diese Kreatur besiegt wird, darfst du 2 Karten aus deiner Hand abwerfen, um sofort einen \"Süßen Phönix\" aus deinem Deck in dieselbe Unterstützungszone zu platzieren."
+ },
+ "Slippery Narw": {
+  "name": "Glitschiger Narw",
+  "effect": "Zu Beginn jedes deiner Züge platzierst du diese Kreatur, wenn möglich, in die freie Unterstützungszone eines benachbarten Helden. Wenn diese Kreatur in die Unterstützungszone eines anderen Helden bewegt wird, darfst du eine beliebige Kreatur auf dem Spielfeld wählen und sie besiegen. War es eine Kreatur, die du kontrollierst, darfst du eine beliebige Kreatur aus deinem Deck oder Ablagestapel wählen, sie aufdecken und deiner Hand hinzufügen."
+ },
+ "Critical Strike": {
+  "name": "Kritischer Treffer",
+  "effect": "Wähle ein Ziel und füge ihm Schaden in Höhe des doppelten Angriffswerts des Angreifers zu."
+ },
+ "Decapitating Strike": {
+  "name": "Enthauptender Schlag",
+  "effect": "Spiele diese Karte sofort aus, wenn ein Ziel nach erlittenem Schaden bei 50 oder weniger LP verbleibt. Besiege dieses Ziel."
+ },
+ "Divine Gift of Rain": {
+  "name": "Göttliche Gabe des Regens",
+  "effect": "Du kannst pro Spiel nur 1 \"Göttliche Gabe\"-Karte aktivieren.\nSpiele diese Karte sofort aus, wenn ein oder mehrere Ziele, die du kontrollierst, von der Karte oder dem Effekt eines Gegners betroffen würden.\nNegiere alle Effekte, die diese Karte oder dieser Effekt auf Ziele, die du kontrollierst, hätte."
+ },
+ "Experimentation": {
+  "name": "Experimentieren",
+  "effect": "Decke die oberste Karte deines Decks auf. Ist sie ein Artefakt, spiele sie sofort aus, ohne ihre Kosten zu bezahlen, falls möglich. Andernfalls lege sie oben oder unten auf dein Deck (deine Wahl). Hat der Anwender mindestens Magische Künste 1, zählt dies als zusätzliche Aktion. Du kannst pro Zug nur 1 \"Experimentieren\" ausspielen."
+ },
+ "Goldify": {
+  "name": "Vergolden",
+  "effect": "Platziere 1 Verschmutzungs-Token in deine freie Unterstützungszone, um diesen Zauber zu verwenden. Wähle eine Kreatur und besiege sie. Erhalte Gold in Höhe des 5-Fachen ihrer Stufe. Hast du eine Kreatur der Stufe 1 oder niedriger gewählt, zählt dies als zusätzliche Aktion."
+ },
+ "Intrude": {
+  "name": "Eindringen",
+  "effect": "Hefte diesen Zauber an den Anwender an. Solange diese Karte an einem Helden angeheftet ist, darfst du einmal pro Zug, während des Zuges deines Gegners, wenn dein Gegner durch einen Effekt 1 oder mehr Karten zieht, diesen Effekt negieren ODER dieselbe Anzahl Karten vom selben Deck ziehen. Du kannst nur ein \"Eindringen\" gleichzeitig an deinen Helden angeheftet haben."
+ },
+ "Magic Topaz": {
+  "name": "Magischer Topas",
+  "effect": "Spiele diese Karte sofort aus, wenn einer deiner Helden einen Angriff ausführt.\nErhöhe den Schaden dieses Angriffs um 60. Du darfst eine Karte aus deiner Hand abwerfen, um diese Karte nach dem Ausspielen auf der Hand zu behalten, statt sie auf deinen Ablagestapel zu legen.\nDu kannst pro Zug nur 1 \"Magischen Topas\" ausspielen."
+ },
+ "Mummy Token": {
+  "name": "Mumien-Token",
+  "effect": "Der Effekt des zugehörigen Helden wird durch diesen Effekt ersetzt:\nDu darfst einmal pro Zug einen Mumien-Token in die freie Unterstützungszone eines Helden platzieren, den dein Gegner kontrolliert und der noch keine Mumien-Token in seinen Unterstützungszonen hat."
+ },
+ "Pillage": {
+  "name": "Plündern",
+  "effect": "1) Du darfst einmal pro Zug die oberste Karte des Decks deines Gegners auf den Ablagestapel legen.\n2) Du darfst einmal pro Zug die obersten 3 Karten des Decks deines Gegners auf den Ablagestapel legen.\n3) Du darfst einmal pro Zug die obersten 5 Karten des Decks deines Gegners auf den Ablagestapel legen."
+ },
+ "Search for the Leader": {
+  "name": "Suche nach dem Anführer",
+  "effect": "Hefte bis zu 3 Exemplare von Führungsstärke aus deiner Hand als zusätzliche Anheftungen an einen Helden an, der nicht der Anwender ist. Dies zählt als zusätzliche Aktion. Ist das Ziel Gefroren, darfst du Führungsstärke stattdessen aus deinem Deck anheften."
+ },
+ "Slippery Fridge": {
+  "name": "Glitschiger Kühlschrank",
+  "effect": "Wähle beliebig viele Artefakte, die an einen Helden ausgerüstet sind, und rüste sie an einen anderen Helden desselben Spielers aus (ohne ihre Kosten erneut zu bezahlen)."
+ },
+ "Spy in the Enemy's Camp": {
+  "name": "Spion im feindlichen Lager",
+  "effect": "Spiele diese Karte sofort aus, wenn dein Gegner eine Kreatur beschwört. Du darfst den aktiven Effekt dieser Kreatur während deines Zuges aktivieren, als würdest du sie kontrollieren."
+ },
+ "Telekinesis": {
+  "name": "Telekinese",
+  "effect": "Wähle eine verdeckte Überraschung, die du kontrollierst, und aktiviere sie. Hängt ihr Ziel von ihrer Aktivierungsbedingung ab, darfst du ein beliebiges Ziel dafür wählen. Hat der Anwender mindestens Magische Künste 1, zählt dies als zusätzliche Aktion."
+ },
+ "The Yeeting": {
+  "name": "Das Yeeten",
+  "effect": "Wähle einen Helden, den du kontrollierst, und füge ihm 150 Schaden zu. Wähle eine beliebige Karte auf dem Spielfeld, die kein Held ist, und lege sie auf den Ablagestapel. Du kannst pro Zug nur 1 \"Das Yeeten\" ausspielen."
+ },
+ "Undead Guardian Angel": {
+  "name": "Untoter Schutzengel",
+  "effect": "Wird diese Kreatur durch den Effekt von Nekromantie beschworen, erhält sie folgenden Effekt:\nWenn der zugehörige Held das nächste Mal besiegt würde, während sich diese Kreatur in seiner Unterstützungszone befindet, heile stattdessen seine LP vollständig, und wenn du das tust, verliert diese Kreatur diesen Effekt. Dieser Effekt wird nicht durch den Effekt von Nekromantie negiert."
+ },
+ "You! Help!": {
+  "name": "Du! Hilf!",
+  "effect": "Wähle einen anderen Helden, den du kontrollierst. Wenn der Anwender in diesem Zug das nächste Mal angreift, wird sein Angriffswert um den Basis-Angriffswert des gewählten Helden erhöht."
+ },
+ "Assault Eagle": {
+  "name": "Sturmadler",
+  "effect": "Du darfst einmal pro Zug bis zu 3 verschiedene Ziele auf dem Spielfeld wählen und ihnen 100 Schaden zufügen. Danach darf dein Gegner bis zu dieselbe Anzahl an Zielen auf dem Spielfeld wählen und ihnen 50 Schaden zufügen."
+ },
+ "\"Deadly Poison\"": {
+  "name": "\"Tödliches Gift\"",
+  "effect": "Wähle einen vergifteten Helden. Das Gift heilt diesen Helden, statt ihm Schaden zuzufügen, bis er geheilt ist. Es zählt weiterhin als negativer Statuseffekt. Dies zählt als zusätzliche Aktion."
+ }
+}

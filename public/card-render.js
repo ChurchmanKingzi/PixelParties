@@ -902,7 +902,7 @@
     return {
       type,
       rarity: rarityBase(over.rarity),
-      name: (over.name != null ? over.name : c.name).replace(/\s*\[(?:B|W)\]$/, ''),
+      name: (over.name != null ? over.name : (c.displayName || c.name)).replace(/\s*\[(?:B|W)\]$/, ''),
       text: c.effect || '',
       soft: !!meta.soft,
       glue: Array.isArray(meta.glue) ? meta.glue : null,   // Wendungen, die im Umbruch zusammenbleiben („Support Spell“ -> [Symbol] Spell in einer Zeile)
