@@ -7,7 +7,7 @@ Hilfslinien. Fuer die deutsche Fassung:
   2. die Karte durch ihre deutsche Darstellung ersetzen (Render aus dem Spiel: card-de-<Name>.png, siehe regel-bilder.js),
   3. deutsche Beschriftungen in der Kartenschrift (public/cardgen/glyphs.json) mit weisser Kontur zeichnen (schwarze Schrift, wie im Original).
 Beide Sprachen nutzen dieselbe Schrift (Kartenschrift, schwarz mit weisser Kontur).
-Aufruf: python3 scripts/i18n/regel-bilder.py <spell|ability|...|alle> <Ordner mit card-de-*.png> [Ausgabeordner]
+Aufruf: python3 scripts/i18n/regel-bilder.py <spell|ability|...|alle> <Ordner mit card-en-*.png und card-de-*.png> [Ausgabeordner]
 """
 import json, sys, os
 import numpy as np
@@ -196,8 +196,8 @@ def run(name, lang, folder, outdir):
     linien = dilate(linien, 1)
     boxes = [erase(rgb, lb['box']) for lb in cf['labels']]
     img = Image.fromarray(rgb).convert('RGBA')
-    if lang == 'de':
-        img.alpha_composite(Image.open(os.path.join(folder, 'card-de-%s.png' % cf['card'])).convert('RGBA'), (488, 85))
+    if True:    # in beiden Sprachen die aktuelle Kartendarstellung einsetzen (Render aus dem Spiel: card-<sprache>-<Karte>.png)
+        img.alpha_composite(Image.open(os.path.join(folder, 'card-%s-%s.png' % (lang, cf['card']))).convert('RGBA'), (488, 85))
         res = np.array(img); res[linien] = np.array(src)[linien]; img = Image.fromarray(res, 'RGBA')
     for lb, bb in zip(cf['labels'], boxes):
         if bb is None: continue
