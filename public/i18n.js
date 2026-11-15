@@ -56,6 +56,14 @@
       (tplByHead[head] = tplByHead[head] || []).push({ re, to: P.ui[k] });
     }
   };
+  // Platzhalter einsetzen: {k} = Wert (Namen/Begriffe werden mituebersetzt), {k:suffix} = Plural-Endung: suffix nur, wenn der englische Wert ein Plural-s ist
+  const PLURAL = { s: 1, es: 1, ies: 1 };
+  const fill = (to, get) => to.replace(/\{(\d+)(?::([^}]*))?\}/g, (_, i, suf) => {
+    const g = get(i);
+    if (g == null) return '';
+    if (suf !== undefined) return PLURAL[g] ? suf : '';
+    return (typeof g === 'string' && (P.ui[g] || P.names[g])) || g;
+  });
   const lookup = (t) => {
     if (cache.has(t)) return cache.get(t);
     let r = P.ui[t];
@@ -65,7 +73,7 @@
       const cand = (tplByHead[t.charAt(0)] || []).concat(tplByHead['*'] || []);
       for (const c of cand) {
         const m = c.re.exec(t);
-        if (m) { r = c.to.replace(/\{(\d+)\}/g, (_, i) => { const g = m[+i + 1]; return P.ui[g] || P.names[g] || g; }); break; }
+        if (m) { r = fill(c.to, (i) => m[+i + 1]); break; }
       }
     }
     if (cache.size > 5000) cache.clear();
@@ -73,6 +81,24 @@
     return r == null ? t : r;
   };
   P.t = (s) => (lang === 'en' || s == null) ? s : lookup(String(s));
+  // Satz-Uebersetzung fuer zusammengesetzten JSX-Text (der Build setzt ppTrans("Vorlage {0} …", [werte]) ein, scripts/i18n/jsx-template.js).
+  // Englisch: dieselben Kinder wie im Quelltext. Deutsch: Vorlage nachschlagen, Platzhalter (Elemente/Werte) an ihre neue Stelle setzen.
+  const piecesOf = (tpl, vals) => {
+    const parts = tpl.split(/\{(\d+)(?::([^}]*))?\}/), out = [];
+    for (let k = 0; k < parts.length; k += 3) {
+      if (parts[k]) out.push(parts[k]);
+      if (k + 1 < parts.length) {
+        const v = vals[+parts[k + 1]], suf = parts[k + 2];
+        if (suf !== undefined) { if (typeof v === 'string' && PLURAL[v]) out.push(suf); }
+        else if (v != null && v !== false && v !== true) out.push(typeof v === 'string' ? (lang === 'en' ? v : (P.ui[v] || P.names[v] || v)) : window.React.createElement(window.React.Fragment, { key: 'pp' + k }, v));
+      }
+    }
+    return out;
+  };
+  P.trans = (tpl, vals) => {
+    if (lang !== 'en') { const de = P.ui[tpl] || P.ui[tpl.trim()]; if (de) return piecesOf(de, vals); }
+    return piecesOf(tpl, vals);
+  };
   const SKIP_TAG = { SCRIPT: 1, STYLE: 1, TEXTAREA: 1, CANVAS: 1, NOSCRIPT: 1 };
   const skipped = (n) => { for (let e = n.nodeType === 1 ? n : n.parentNode; e && e.nodeType === 1; e = e.parentNode) { if (SKIP_TAG[e.tagName] || (e.hasAttribute && e.hasAttribute('data-i18n-skip'))) return true; } return false; };
   const textNode = (n) => {
@@ -107,6 +133,7 @@
   };
   window.PP_I18N = P;
   window.ppT = P.t;
+  window.ppTrans = P.trans;
   document.documentElement.lang = lang;
   if (lang !== 'en') {
     const go = () => P.load().then(() => P.startDom());

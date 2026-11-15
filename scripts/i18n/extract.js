@@ -4,6 +4,9 @@
 // und Argumente von notify()/setError()/setInfo()/alert()/confirm(). Templates: ${..} -> {0}, {1} ...
 const fs = require('fs');
 const Babel = require('../vendor/babel.min.js');
+const { jsxTemplate } = require('./jsx-template');
+const types = Babel.packages.types;
+const seen = new WeakSet();   // schon als Ganzsatz-Vorlage erfasste Knoten
 const file = process.argv[2];
 const from = +process.argv[3] || 0, to = +process.argv[4] || 1e9;
 const src = fs.readFileSync(file, 'utf8');
@@ -44,8 +47,14 @@ function strs(n, kind, cb) {   // alle String-Zweige eines Ausdrucks (Bedingunge
   }
 }
 Babel.transform(src, { presets: ['react'], plugins: [() => ({ visitor: {
-  JSXText(p) { add(p.node.value, p.node, 'jsx'); },
+  'JSXElement|JSXFragment'(p) {
+    const r = jsxTemplate(types, p.node); if (!r) return;
+    add(r.tpl, p.node, 'jsx-sentence');
+    p.node.children.forEach(c => { if (c.type === 'JSXText') seen.add(c); if (c.type === 'JSXExpressionContainer') { seen.add(c); const e = c.expression; if (e && (e.type === 'StringLiteral' || e.type === 'TemplateLiteral')) seen.add(e); } });
+  },
+  JSXText(p) { if (!seen.has(p.node)) add(p.node.value, p.node, 'jsx'); },
   JSXExpressionContainer(p) {
+    if (seen.has(p.node)) return;
     if (p.parent.type === 'JSXAttribute' && SKIP_ATTR.has(p.parent.name.name)) return;
     strs(p.node.expression, 'jsx-expr', (s, n) => add(s, n, 'jsx-expr'));
   },

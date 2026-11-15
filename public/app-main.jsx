@@ -3808,7 +3808,8 @@ function App() {
 // they're focused. The boot splash (Segoe UI) covers this brief wait; a
 // timeout guarantees we mount even if the font load stalls or fails.
 (function mountApp() {
-  const mount = () => ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+  // Sprachdateien zuerst laden (ppTrans/Laufzeit-Uebersetzer brauchen das Woerterbuch schon beim ersten Zeichnen)
+  const mount = () => Promise.resolve(window.PP_I18N && window.PP_I18N.ready).catch(() => {}).then(() => ReactDOM.createRoot(document.getElementById('root')).render(<App />));
   try {
     if (document.fonts && document.fonts.load) {
       let done = false;
