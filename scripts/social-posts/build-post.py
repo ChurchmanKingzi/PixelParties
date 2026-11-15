@@ -1586,7 +1586,7 @@ def main():
     if first_on:
         for f in range(loop * first_loops):
             render(f, intro_on, punch_on, opener_on).save(fdir / f'i{f:03d}.png')
-    cover = Image.open(fdir / ('i%03d.png' % int((17.4 if show_on else 17.3 if iceshow_on else 14.6 if rootshow_on else 15.0 if rockshow_on else 11.0 if hopshow_on else 14.6 if webshow_on else 16.2 if armsshow_on else 16.6 if coolshow_on else 18.5 if ghostshow_on else 17.0 if voidshow_on else 8.6 if stormshow_on else 12.0 if bootshow_on else 17.6 if cosmosshow_on else 16.8) * float(fps)))) if (show_on or windshow_on) else Image.open(fdir / ('f%03d.png' % (min(loop - 1, per * 3))) if reel else fdir / 'f000.png')
+    cover = Image.open(fdir / ('i%03d.png' % int((17.4 if show_on else 17.3 if iceshow_on else 14.6 if rootshow_on else 15.0 if rockshow_on else 11.0 if hopshow_on else 14.6 if webshow_on else 16.2 if armsshow_on else 16.6 if coolshow_on else 18.5 if ghostshow_on else 17.0 if voidshow_on else 8.6 if stormshow_on else 2.3 if bootshow_on else 17.6 if cosmosshow_on else 16.8) * float(fps)))) if (show_on or windshow_on) else Image.open(fdir / ('f%03d.png' % (min(loop - 1, per * 3))) if reel else fdir / 'f000.png')
     cover_path = out / ('reel-cover.png' if reel else 'post.png')
     cover.save(cover_path)
     print('Standbild', cover_path)
