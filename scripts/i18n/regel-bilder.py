@@ -5,7 +5,7 @@ Die Bilder bestehen aus einer eingebetteten Karte (750x1050, 1:1) vor einem unsc
 Hilfslinien. Fuer die deutsche Fassung:
   1. die englischen Beschriftungen entfernen (Text = reines Weiss/Schwarz; die Luecke wird zellenweise mit der Hintergrundfarbe gefuellt),
   2. die Karte durch ihre deutsche Darstellung ersetzen (Render aus dem Spiel: card-de-<Name>.png, siehe regel-bilder.js),
-  3. deutsche Beschriftungen in der Kartenschrift (public/cardgen/glyphs.json) mit schwarzer Kontur zeichnen.
+  3. deutsche Beschriftungen in der Kartenschrift (public/cardgen/glyphs.json) mit weisser Kontur zeichnen (schwarze Schrift, wie im Original).
 Aufruf: python3 scripts/i18n/regel-bilder.py <spell|ability|...> <Ordner mit card-de-*.png/card-en-*.png> [Ausgabeordner]
 """
 import json, sys, os
@@ -67,7 +67,7 @@ def draw_label(img, lines, x, baseline, align='left', c=7, outline=3, line_h=Non
         px = x if align == 'left' else (x - W if align == 'right' else x - W // 2)
         py = baseline + i * line_h - base
         layer = np.zeros(big.shape + (4,), np.uint8)
-        layer[edge] = (0, 0, 0, 255); layer[big] = (255, 255, 255, 255)
+        layer[edge] = (255, 255, 255, 255); layer[big] = (0, 0, 0, 255)   # wie im Original: schwarze Schrift mit weisser Kontur
         img.alpha_composite(Image.fromarray(layer, 'RGBA'), (px - pad, py - pad))
 
 def components(mask):
@@ -94,7 +94,8 @@ def erase(img_rgb, box, gx, gy):
     for pts in components(m):
         ys = [p[0] for p in pts]; xs = [p[1] for p in pts]
         w, h = max(xs) - min(xs) + 1, max(ys) - min(ys) + 1
-        if (w > 60 and h < 14) or (h > 60 and w < 14): keep[tuple(zip(*pts))] = True   # Verbindungslinien bleiben
+        beruehrt = min(ys) == 0 or max(ys) == m.shape[0] - 1 or min(xs) == 0 or max(xs) == m.shape[1] - 1
+        if (w > 60 and h < 14) or (h > 60 and w < 14) or (beruehrt and (w < 14 or h < 14)): keep[tuple(zip(*pts))] = True   # Verbindungslinien (auch angeschnittene Enden) bleiben
     m &= ~keep
     m = dilate(m, 1) & ~keep
     # Zellgrenzen
@@ -154,7 +155,7 @@ CONFIG = {
       dict(lines=['Zauber-', 'schule'], x=10, baseline=690, align='left'),
       dict(lines=['Effekt'], x=15, baseline=894, align='left'),
       dict(lines=['Untertyp'], x=10, baseline=1098, align='left'),
-      dict(lines=['Stufe'], x=1250, baseline=1198, align='right'),
+      dict(lines=['Level'], x=1250, baseline=1198, align='right'),
     ],
   },
 }
