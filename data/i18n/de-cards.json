@@ -11,11 +11,11 @@
  },
  "Cute Bird": {
   "name": "Süßer Vogel",
-  "effect": "Wenn diese Kreatur besiegt wird, darfst du 2 Karten aus deiner Hand abwerfen, um sofort einen \"Süßen Phönix\" aus deinem Deck in dieselbe Unterstützungszone zu platzieren."
+  "effect": "Wenn diese Kreatur besiegt wird, darfst du 2 Karten aus deiner Hand abwerfen, um sofort einen \"Süßer Phönix\" aus deinem Deck in dieselbe Unterstützungszone zu platzieren."
  },
  "Slippery Narw": {
   "name": "Glitschiger Narw",
-  "effect": "Zu Beginn jedes deiner Züge platzierst du diese Kreatur, wenn möglich, in die freie Unterstützungszone eines benachbarten Helden. Wenn diese Kreatur in die Unterstützungszone eines anderen Helden bewegt wird, darfst du eine beliebige Kreatur auf dem Spielfeld wählen und sie besiegen. War es eine Kreatur, die du kontrollierst, darfst du eine beliebige Kreatur aus deinem Deck oder Ablagestapel wählen, sie aufdecken und deiner Hand hinzufügen."
+  "effect": "Zu Beginn jedes deiner Züge platzierst du diese Kreatur, wenn möglich, in die freie Unterstützungszone eines benachbarten Helden. Wenn diese Kreatur in die Unterstützungszone eines anderen Helden bewegt wird, darfst du eine beliebige Kreatur auf dem Spielfeld wählen und sie besiegen. War es eine Kreatur, die du kontrollierst, darfst du eine beliebige Kreatur aus deinem Deck oder Ablagestapel wählen und sie offen deiner Hand hinzufügen."
  },
  "Critical Strike": {
   "name": "Kritischer Treffer",
@@ -23,15 +23,15 @@
  },
  "Decapitating Strike": {
   "name": "Enthauptender Schlag",
-  "effect": "Spiele diese Karte sofort aus, wenn ein Ziel nach erlittenem Schaden bei 50 oder weniger LP verbleibt. Besiege dieses Ziel."
+  "effect": "Spiele diese Karte sofort, wenn ein Ziel nach erlittenem Schaden bei 50 oder weniger LP verbleibt. Besiege dieses Ziel."
  },
  "Divine Gift of Rain": {
   "name": "Göttliche Gabe des Regens",
-  "effect": "Du kannst pro Spiel nur 1 \"Göttliche Gabe\"-Karte aktivieren.\nSpiele diese Karte sofort aus, wenn ein oder mehrere Ziele, die du kontrollierst, von der Karte oder dem Effekt eines Gegners betroffen würden.\nNegiere alle Effekte, die diese Karte oder dieser Effekt auf Ziele, die du kontrollierst, hätte."
+  "effect": "Du kannst nur 1 \"Göttliche Gabe\"-Karte pro Spiel aktivieren.\nSpiele diese Karte sofort, wenn ein oder mehrere Ziele, die du kontrollierst, von der Karte oder dem Effekt eines Gegners betroffen würden.\nNegiere alle Effekte, die diese Karte oder dieser Effekt auf Ziele, die du kontrollierst, hätte."
  },
  "Experimentation": {
   "name": "Experimentieren",
-  "effect": "Decke die oberste Karte deines Decks auf. Ist sie ein Artefakt, spiele sie sofort aus, ohne ihre Kosten zu bezahlen, falls möglich. Andernfalls lege sie oben oder unten auf dein Deck (deine Wahl). Hat der Anwender mindestens Magische Künste 1, zählt dies als zusätzliche Aktion. Du kannst pro Zug nur 1 \"Experimentieren\" ausspielen."
+  "effect": "Decke die oberste Karte deines Decks auf. Ist sie ein Artefakt, spiele sie sofort, ohne ihre Kosten zu bezahlen, falls möglich. Andernfalls lege sie oben oder unten auf dein Deck (deine Wahl). Hat der Anwender mindestens Magiekunst 1, zählt dies als zusätzliche Aktion. Du kannst nur 1 \"Experimentieren\" pro Zug spielen."
  },
  "Goldify": {
   "name": "Vergolden",
@@ -39,11 +39,11 @@
  },
  "Intrude": {
   "name": "Eindringen",
-  "effect": "Hefte diesen Zauber an den Anwender an. Solange diese Karte an einem Helden angeheftet ist, darfst du einmal pro Zug, während des Zuges deines Gegners, wenn dein Gegner durch einen Effekt 1 oder mehr Karten zieht, diesen Effekt negieren ODER dieselbe Anzahl Karten vom selben Deck ziehen. Du kannst nur ein \"Eindringen\" gleichzeitig an deinen Helden angeheftet haben."
+  "effect": "Lege diesen Zauber an den Anwender an. Solange diese Karte an einem Helden angelegt ist, darfst du einmal pro Zug, während des Zuges deines Gegners, wenn dein Gegner durch einen Effekt 1 oder mehr Karten zieht, diesen Effekt negieren ODER dieselbe Anzahl Karten vom selben Deck ziehen. Du kannst nur ein \"Eindringen\" gleichzeitig an deine Helden angelegt haben."
  },
  "Magic Topaz": {
   "name": "Magischer Topas",
-  "effect": "Spiele diese Karte sofort aus, wenn einer deiner Helden einen Angriff ausführt.\nErhöhe den Schaden dieses Angriffs um 60. Du darfst eine Karte aus deiner Hand abwerfen, um diese Karte nach dem Ausspielen auf der Hand zu behalten, statt sie auf deinen Ablagestapel zu legen.\nDu kannst pro Zug nur 1 \"Magischen Topas\" ausspielen."
+  "effect": "Spiele diese Karte sofort, wenn einer deiner Helden einen Angriff ausführt.\nErhöhe den Schaden dieses Angriffs um 60. Du darfst eine Karte aus deiner Hand abwerfen, um diese Karte nach dem Spielen auf der Hand zu behalten, statt sie auf deinen Ablagestapel zu legen.\nDu kannst nur 1 \"Magischer Topas\" pro Zug spielen."
  },
  "Mummy Token": {
   "name": "Mumien-Token",
@@ -55,7 +55,7 @@
  },
  "Search for the Leader": {
   "name": "Suche nach dem Anführer",
-  "effect": "Hefte bis zu 3 Exemplare von Führungsstärke aus deiner Hand als zusätzliche Anheftungen an einen Helden an, der nicht der Anwender ist. Dies zählt als zusätzliche Aktion. Ist das Ziel Gefroren, darfst du Führungsstärke stattdessen aus deinem Deck anheften."
+  "effect": "Lege bis zu 3 Exemplare von Führungsstärke aus deiner Hand als zusätzliche Anlagen an einen Helden an, der nicht der Anwender ist. Dies zählt als zusätzliche Aktion. Ist das Ziel Gefroren, darfst du Führungsstärke stattdessen aus deinem Deck anlegen."
  },
  "Slippery Fridge": {
   "name": "Glitschiger Kühlschrank",
@@ -63,15 +63,15 @@
  },
  "Spy in the Enemy's Camp": {
   "name": "Spion im feindlichen Lager",
-  "effect": "Spiele diese Karte sofort aus, wenn dein Gegner eine Kreatur beschwört. Du darfst den aktiven Effekt dieser Kreatur während deines Zuges aktivieren, als würdest du sie kontrollieren."
+  "effect": "Spiele diese Karte sofort, wenn dein Gegner eine Kreatur beschwört. Du darfst den aktiven Effekt dieser Kreatur während deines Zuges aktivieren, als würdest du sie kontrollieren."
  },
  "Telekinesis": {
   "name": "Telekinese",
-  "effect": "Wähle eine verdeckte Überraschung, die du kontrollierst, und aktiviere sie. Hängt ihr Ziel von ihrer Aktivierungsbedingung ab, darfst du ein beliebiges Ziel dafür wählen. Hat der Anwender mindestens Magische Künste 1, zählt dies als zusätzliche Aktion."
+  "effect": "Wähle eine verdeckte Überraschung, die du kontrollierst, und aktiviere sie. Hängt ihr Ziel von ihrer Aktivierungsbedingung ab, darfst du ein beliebiges Ziel dafür wählen. Hat der Anwender mindestens Magiekunst 1, zählt dies als zusätzliche Aktion."
  },
  "The Yeeting": {
   "name": "Das Yeeten",
-  "effect": "Wähle einen Helden, den du kontrollierst, und füge ihm 150 Schaden zu. Wähle eine beliebige Karte auf dem Spielfeld, die kein Held ist, und lege sie auf den Ablagestapel. Du kannst pro Zug nur 1 \"Das Yeeten\" ausspielen."
+  "effect": "Wähle einen Helden, den du kontrollierst, und füge ihm 150 Schaden zu. Wähle eine beliebige Karte auf dem Spielfeld, die kein Held ist, und lege sie auf den Ablagestapel. Du kannst nur 1 \"Das Yeeten\" pro Zug spielen."
  },
  "Undead Guardian Angel": {
   "name": "Untoter Schutzengel",
@@ -87,6 +87,6 @@
  },
  "\"Deadly Poison\"": {
   "name": "\"Tödliches Gift\"",
-  "effect": "Wähle einen vergifteten Helden. Das Gift heilt diesen Helden, statt ihm Schaden zuzufügen, bis er geheilt ist. Es zählt weiterhin als negativer Statuseffekt. Dies zählt als zusätzliche Aktion."
+  "effect": "Wähle einen vergifteten Helden. Das Gift heilt diesen Helden, statt ihm Schaden zuzufügen, bis es geheilt ist. Es zählt weiterhin als negativer Statuseffekt. Dies zählt als zusätzliche Aktion."
  }
 }

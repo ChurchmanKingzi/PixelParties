@@ -105,13 +105,13 @@
   // ihrer tatsaechlichen Farbe (`boxHintergrund`), nicht nach Kartentyp: so liest sich jedes Wort auf jedem Rahmen. `fest` (Blind, weiss)
   // behaelt seinen Ton immer. Die Tooltips des Spiels lesen dieselbe Tabelle (`CardRender.STATUS_TERMS` / `statusMatches`).
   const STATUS_TERMS = [
-    { key: 'poison', label: 'Poisoned', re: 'poison(?:s|ed|ing)?',        hell: '#c98aff', dunkel: '#7a2bd0' },
-    { key: 'burn',   label: 'Burned',  re: 'burn(?:s|ed|ing)?',          hell: '#ff9b3a', dunkel: '#cf5f00' },
-    { key: 'stun',   label: 'Stunned', re: 'stun(?:s|ned)?',             hell: '#ffe23d', dunkel: '#a87c00' },
-    { key: 'negate', label: 'Negate', re: 'negat(?:e|es|ed|ing|ion)',   hell: '#9aa3b6', dunkel: '#59606e' },
-    { key: 'bleed',  label: 'Bleeding', re: 'bleed(?:s|ing)?',            hell: '#ff5c5c', dunkel: '#c0141c' },
-    { key: 'freeze', label: 'Frozen',  re: 'freez(?:e|es|ing)|frozen',   hell: '#7fdfff', dunkel: '#1788bd' },
-    { key: 'blind',  label: 'Blinded', re: 'blind(?:s|ed)?',             hell: '#ffffff', dunkel: '#ffffff', fest: true },   // weiss (Als Vorgabe 20.10.), immer mit dunkler Kontur
+    { key: 'poison', label: 'Poisoned', re: 'poison(?:s|ed|ing)?|(?:ver)?gift(?:et|ete|eten|eter|etem|etes|es|s)?',        hell: '#c98aff', dunkel: '#7a2bd0' },
+    { key: 'burn',   label: 'Burned',  re: 'burn(?:s|ed|ing)?|verbrann(?:t|te|ten|ter|tem|tes)|verbrenn(?:en|t|ung|ungen)',          hell: '#ff9b3a', dunkel: '#cf5f00' },
+    { key: 'stun',   label: 'Stunned', re: 'stun(?:s|ned)?|bet.ub(?:t|te|ten|ter|tem|tes|en|ung|ungen)',             hell: '#ffe23d', dunkel: '#a87c00' },
+    { key: 'negate', label: 'Negate', re: 'negat(?:e|es|ed|ing|ion)|negier(?:e|st|t|en|te|ten|ung)',   hell: '#9aa3b6', dunkel: '#59606e' },
+    { key: 'bleed',  label: 'Bleeding', re: 'bleed(?:s|ing)?|blutung(?:en)?|blutend(?:e|en|er|em|es)?',            hell: '#ff5c5c', dunkel: '#c0141c' },
+    { key: 'freeze', label: 'Frozen',  re: 'freez(?:e|es|ing)|frozen|(?:ein)?gefroren(?:e|en|er|em|es)?|einfrier(?:en|t|e)',   hell: '#7fdfff', dunkel: '#1788bd' },
+    { key: 'blind',  label: 'Blinded', re: 'blind(?:s|ed)?|geblendet(?:e|en|er|em|es)?|blend(?:en|et|ung)',             hell: '#ffffff', dunkel: '#ffffff', fest: true },   // weiss (Als Vorgabe 20.10.), immer mit dunkler Kontur
   ];
   const STATUS_IDX = Object.create(null);
   STATUS_TERMS.forEach((t, i) => { STATUS_IDX[t.key] = i; });
@@ -131,6 +131,7 @@
       if (quoted.some(([x, y]) => a >= x && b <= y)) continue;
       // „… cannot be negated“ nennt einen Schutz, keinen Status: nicht hervorheben (Als Vorgabe 20.10.)
       if (/\b(?:cannot|can't|can not) be\s+$/i.test(t.slice(Math.max(0, a - 16), a)) && /^negat/i.test(m[0])) continue;
+      if (/\bnicht\s+$/i.test(t.slice(Math.max(0, a - 10), a)) && /^negier/i.test(m[0])) continue;   // „kann nicht negiert werden“ (DE)
       let k = 1;
       while (k < m.length && m[k] === undefined) k++;
       out.push({ start: a, end: b, key: STATUS_TERMS[k - 1].key });
