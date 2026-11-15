@@ -176,7 +176,7 @@ const PLAYER_DEBUFF_REGISTRY = [
   { key: 'actionLocked',      label: '🚫 Action-locked (no Actions, placing still works)', flagKey: 'actionLocked'  },
   { key: 'damageLocked',      label: '🛡️ Damage-locked',                              flagKey: 'damageLocked'        },
   { key: 'oppHandLocked',     label: '🫲 Opp-hand-locked',                            flagKey: 'oppHandLocked'       },
-  { key: 'itemLocked',        label: '🔨 Item-locked (must delete to play artifact)', flagKey: 'itemLocked'          },
+  { key: 'itemLocked',        label: '🔨 Artifact-locked (must delete 1 card to play an Artifact)', flagKey: 'itemLocked'          },
   { key: 'potionLocked',      label: '🧪 Potion-locked',                              flagKey: 'potionLocked'        },
   { key: 'supportSpellLocked',label: '💚 Support-spell-locked',                       flagKey: 'supportSpellLocked'  },
   { key: 'forsaken',          label: '🏴‍☠️ Forsaken (discards delete instead)',         flagKey: '_discardToDeleteActive' },

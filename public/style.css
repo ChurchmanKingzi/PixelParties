@@ -21712,7 +21712,7 @@ body[data-tb-hl] .hero-idle-platz.hero-idle-hover { scale: none; }
 }
 /* Beschriftung UEBER dem Glanzband — der Streifen laeuft hinter den
    Buchstaben durch, die Schrift bleibt jederzeit lesbar. */
-.auth-gast-titel { position: relative; z-index: 2; }
+.auth-gast-titel { position: relative; z-index: 2; white-space: pre-line; }   /* deutsche Fassung: zwei Zeilen („ALS GAST SPIELEN“ / „GEGEN CPU“) */
 .auth-gast-hinweis { text-align: center; }
 .auth-or--konto { margin: 14px 0 12px; }
 /* Ohne Google-Anmeldung bleibt die rechte Spalte leer — dann ganz weg,

@@ -1,4 +1,4 @@
-/* PP-HART-GEBACKEN 8c676726f86d4fb4 — ERZEUGT von scripts/hart/build-css.js aus style.css (pixel-hart.js vorab angewandt) — nicht von Hand ändern. */
+/* PP-HART-GEBACKEN 5d1f0b7c03afd114 — ERZEUGT von scripts/hart/build-css.js aus style.css (pixel-hart.js vorab angewandt) — nicht von Hand ändern. */
 .pp-hart-gebacken { --pp-hart: 1; }
 @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Rajdhani:wght@400;500;600;700&family=Orbitron:wght@400;500;600;700;800;900&display=swap');
 
@@ -21565,7 +21565,7 @@ body[data-tb-hl] .hero-idle-platz.hero-idle-hover { scale: none; }
 }
 /* Beschriftung UEBER dem Glanzband — der Streifen laeuft hinter den
    Buchstaben durch, die Schrift bleibt jederzeit lesbar. */
-.auth-gast-titel { position: relative; z-index: 2; }
+.auth-gast-titel { position: relative; z-index: 2; white-space: pre-line; }   /* deutsche Fassung: zwei Zeilen („ALS GAST SPIELEN“ / „GEGEN CPU“) */
 .auth-gast-hinweis { text-align: center; }
 .auth-or--konto { margin: 14px 0 12px; }
 /* Ohne Google-Anmeldung bleibt die rechte Spalte leer — dann ganz weg,
