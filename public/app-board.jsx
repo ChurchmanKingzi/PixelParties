@@ -46948,7 +46948,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         sm.set(suppressKey, (sm.get(suppressKey) || 0) + 1);
       }
       const stop = ppKartenWurf({
-        mode, cardUrl: window.cardImageUrl ? ppRarityUrl(window.cardImageUrl(cardName), ppRarityOf(CARDS_BY_NAME[cardName], rarity || ppRarityLookup(cardName, fromOwner))) : null, dauer,   // Basiskarte der Rarity (Rahmen/Stempel); der Wurf ist Pixelwerk ohne Funkenebene
+        mode, cardUrl: window.cardImageUrl ? ppRarityUrl(window.cardImageUrl(cardName), ppRarityOf(CARDS_BY_NAME[cardName], rarity || ppRarityLookup(cardName, fromOwner)), true) : null, dauer,   // Basiskarte der Rarity (Rahmen/Stempel); der Wurf ist Pixelwerk ohne Funkenebene
         A: { x: sr.left + sr.width / 2, y: sr.top + sr.height / 2, w: sr.width, h: sr.height },
         B: { x: dr.left + dr.width / 2, y: dr.top + dr.height / 2, w: dr.width, h: dr.height },
       });

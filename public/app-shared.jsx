@@ -7063,11 +7063,12 @@ function ppRarityOf(card, rarity) {
   return t != null ? t : (rarity || (card && card.rarity) || 'common');
 }
 /** Kartenbild-URL der Basiskarte dieser Rarity (`?rar=<id>`; Common = unverändert). Skin-Bilder teilen die Rarity ihrer Base-Karte (der Karten-Shim backt auch für Skins die Basiskarte der Stufe). */
-function ppRarityUrl(url, rarity) {
+function ppRarityUrl(url, rarity, mitStempel) {
   const fx = window.PpRarityFx;
   if (!url || typeof url !== 'string' || !fx || !rarity || rarity === 'common' || /[?&]rar=/.test(url)) return url;
   const q = fx.imageRarity(rarity);
-  return q ? url + (url.includes('?') ? '&' : '?') + 'rar=' + q : url;
+  // Die Basiskarte mit `?rar=` druckt den Rarity-Stempel NICHT mit (die Rarity-Ebene malt ihn); `mitStempel` für Bilder ganz ohne Ebene (Kartenwurf).
+  return q ? url + (url.includes('?') ? '&' : '?') + 'rar=' + q + (mitStempel ? '&stempel=1' : '') : url;
 }
 window.ppRarityOf = ppRarityOf;
 window.ppRarityUrl = ppRarityUrl;

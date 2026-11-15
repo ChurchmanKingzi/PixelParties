@@ -1380,13 +1380,16 @@
   const variantKey = v => (v.noHp ? 'oh' : '') + (v.noAtk ? 'oa' : '') + (v.lv != null ? 'l' + v.lv : '') + (v.kost != null ? 'k' + v.kost : '') + (v.hp != null ? 'h' + v.hp : '') + (v.skin ? 's' + v.skin : '');
 
   const coreCache = new Map();     // Schlüssel -> core (LRU)
-  function stampInfo(img) {
-    const [c, g] = cv2d(45, 45, true); g.imageSmoothingEnabled = false; g.drawImage(img, 689 * img.naturalWidth / 750, 989 * img.naturalWidth / 750, 45 * img.naturalWidth / 750, 45 * img.naturalWidth / 750, 0, 0, 45, 45);
-    const d = g.getImageData(0, 0, 45, 45).data, mask = [], star = { mask: [], col: [] };
+  // Zellen des Stempels (5x5 zu 9 Kartenpixeln) aus dem Sprite der Basiskarte (CardRender.stampSprite) — NICHT aus dem Kartenbild: die Basiskarte mit
+  // Rarity (`?rar=`) druckt den Stempel nicht mehr mit, die Ebene malt ihn allein (vorher lagen zwei Zeichen uebereinander: Randpixel des gedruckten
+  // schauten unter den Zellen hervor, in Kleinansichten verwischten beide). Karten ohne Sprite (helle Artifact-Karten: gedrucktes braunes Zeichen): leer.
+  function stampInfo(card, rarity) {
+    const mask = [], star = { mask: [], col: [] }, cv = root.CardRender.stampSprite ? root.CardRender.stampSprite(card, rarity) : null;
+    const d = cv ? cv.getContext('2d', { willReadFrequently: true }).getImageData(0, 0, 45, 45).data : null;
     for (let j = 0; j < 5; j++) for (let i = 0; i < 5; i++) {
-      const q = ((j * 9 + 4) * 45 + i * 9 + 4) * 4, r = d[q], gg = d[q + 1], b = d[q + 2];
-      mask.push(r + gg + b < 90 ? 1 : 0);
-      const gold = r > 200 && gg > 150 && b < 170 && r - b > 90; star.mask.push(gold ? 1 : 0); star.col.push([r, gg, b]);
+      const q = ((j * 9 + 4) * 45 + i * 9 + 4) * 4, r = d ? d[q] : 0, gg = d ? d[q + 1] : 0, b = d ? d[q + 2] : 0, on = !!d && d[q + 3] > 127;
+      mask.push(on && r + gg + b < 90 ? 1 : 0);
+      const gold = on && r > 200 && gg > 150 && b < 170 && r - b > 90; star.mask.push(gold ? 1 : 0); star.col.push([r, gg, b]);
     }
     return { mask, star };
   }
@@ -1417,7 +1420,7 @@
     setGeo(geo.full);
     const B = readGrid(img), L = new Float32Array(NPX);
     for (let p = 0; p < NPX; p++) L[p] = (0.299 * B[p * 4] + 0.587 * B[p * 4 + 1] + 0.114 * B[p * 4 + 2]) / 255;
-    const core = { rarity, sp, full: geo.full, type: geo.type, A, B, L, S: null, e, st: null, stamp: stampInfo(img), card, variant };
+    const core = { rarity, sp, full: geo.full, type: geo.type, A, B, L, S: null, e, st: null, stamp: stampInfo(card, rarity), card, variant };
     // Text-Ebenen (K-unabhängige Masken in Kartengröße)
     core.masks = CR.textMasks(card, variant);
     if (sp.mask) {
@@ -1522,7 +1525,7 @@
   }
   const FILL_CSS = Object.create(null);
   function makeE(core, view) { const E = Object.create(core); E.layers = view.layers; E.layers0 = view.layers; return E; }
-  function render(core, view, g, t) {
+  function render(core, view, g, t, skipStamp) {
     const sp = core.sp, K = view.K, W = view.W, H = view.H, E = view.E || (view.E = makeE(core, view));
     setGeo(core.full);
     if (!core.st && FX[sp.fx].prep) { core.st = FX[sp.fx].prep(E); }
@@ -1540,9 +1543,14 @@
     // 2) Text-Ebenen (neu gefärbte Tinte)
     for (const l of view.layers) { l.cx.putImageData(l.im, 0, 0); g.drawImage(l.cv, l.x0, l.y0); }
     // 3) Stempel / Icon unten rechts (5x5 Zellen zu 9 Kartenpixeln)
-    const gp = FX[sp.fx].glint ? FX[sp.fx].glint(t) : [], k5 = K / 5;
+    if (!skipStamp) stampPass(core, g, t, K / 5);
+  }
+  /** Stempel / Icon: 5x5 Zellen zu 9 Kartenpixeln. `k5` = Leinwandpixel je 5 Kartenpixel (K auf der K-Leinwand, tw / 150 in der verkleinerten): in Kleinansichten
+   *  malt `draw` den Stempel erst NACH dem glatten Verkleinern in Zielgroesse — Zellen bleiben scharf (mindestens 1 Pixel), statt zu verwischen. */
+  function stampPass(core, g, t, k5) {
+    const sp = core.sp, gp = FX[sp.fx].glint ? FX[sp.fx].glint(t) : [];
     let lastV = -1;   // fillStyle nur setzen, wenn sich die Farbe aendert (jedes Setzen laeuft durch den Palettenfilter)
-    const cell = (i, j, c) => { const x0 = Math.round((689 + 9 * i) * k5), x1 = Math.round((689 + 9 * (i + 1)) * k5), y0 = Math.round((989 + 9 * j) * k5), y1 = Math.round((989 + 9 * (j + 1)) * k5); const v = sn(c[0], c[1], c[2]); if (v !== lastV) { lastV = v; g.fillStyle = FILL_CSS[v] || (FILL_CSS[v] = 'rgb(' + (v & 255) + ',' + ((v >> 8) & 255) + ',' + ((v >> 16) & 255) + ')'); } g.fillRect(x0, y0, x1 - x0, y1 - y0); };
+    const cell = (i, j, c) => { const x0 = Math.round((689 + 9 * i) * k5), x1 = Math.max(x0 + 1, Math.round((689 + 9 * (i + 1)) * k5)), y0 = Math.round((989 + 9 * j) * k5), y1 = Math.max(y0 + 1, Math.round((989 + 9 * (j + 1)) * k5)); const v = sn(c[0], c[1], c[2]); if (v !== lastV) { lastV = v; g.fillStyle = FILL_CSS[v] || (FILL_CSS[v] = 'rgb(' + (v & 255) + ',' + ((v >> 8) & 255) + ',' + ((v >> 16) & 255) + ')'); } g.fillRect(x0, y0, x1 - x0, y1 - y0); };
     const s = sp.stamp;
     const px = s === 'silver' ? silverStampPixels(core.stamp.mask, t, gp) : s === 'rainbow' ? rainbowStampPixels(core.stamp.mask, t, gp) : s === 'srstar' ? starStampPixels(core.stamp.star, t, gp) : iconPixels(s, t);
     for (const [i, j, c] of px) cell(i, j, c);
@@ -1601,17 +1609,24 @@
   function animatedOk() { return root._playAnimations !== false && !root.PP_RETRO && !document.hidden; }
   // Reduzierte Animation (`opts.reduced`, Deck-Editor): nur hoechstens REDUCED_MAX Karten laufen gleichzeitig animiert und nur mit REDUCED_FPS; alle anderen zeigen das Standbild.
   // Ein Platz wird beim Aufbau einer sichtbaren Karte vergeben und gibt sich frei, wenn die Karte aus dem Sichtbereich scrollt oder entfernt wird.
-  const REDUCED_MAX = 12, REDUCED_FPS = 6;
-  let redActive = 0;
+  // Bildrate: REDUCED_FPS muss 30 teilen (der Takt `ppTaktRaf` ist 30 Hz) — 15 = jeder zweite Takt, gleichmaessig. Eine Zeitrechnung wie floor(t * fps) ergibt bei 12/20 Bildern/s
+  // abwechselnd kurze und lange Abstaende (Ruckeln). Die Karten teilen sich gerade/ungerade Takte (je Takt nur die halbe Last, keine Spitzen).
+  const REDUCED_MAX = 10, REDUCED_FPS = 15, TAKT_HZ = 30;
+  let redActive = 0, parSeq = 0;
   function relSlot(i) { if (i.slot) { i.slot = false; redActive--; } }
   let tickId = 0;
   function tick(now) {
     tickId = 0;
     let any = false;
+    const tk = Math.floor(now / 1000 * TAKT_HZ), stepT = TAKT_HZ / REDUCED_FPS;
     if (animatedOk()) for (const i of instances) {
       if (!i.animated || !i.visible || !i.view) continue;
       any = true;
-      const fps = i.opts.reduced ? Math.min(REDUCED_FPS, i.core.sp.fps) : i.core.sp.fps, f = Math.floor(now / 1000 * fps);
+      if (i.opts.reduced) {
+        if (tk === i.lastTk || (tk + i.par) % stepT !== 0) continue;
+        i.lastTk = tk; i.draw(tk / TAKT_HZ + i.phase); continue;
+      }
+      const fps = i.core.sp.fps, f = Math.floor(now / 1000 * fps);
       if (f === i.lastF) continue;
       i.lastF = f; i.draw(f / fps + i.phase);
     }
@@ -1623,7 +1638,7 @@
   function attach(host, opts) {
     opts = opts || {};
     const inst = {
-      host, canvas: null, g: null, opts, card: null, rarity: 'common', animated: false, visible: !io, needs: false, core: null, view: null, K: 0, lastF: -1, phase: 0, dead: false, token: 0, imgEl: null, width: 0, key: '',
+      host, canvas: null, g: null, opts, card: null, rarity: 'common', animated: false, visible: !io, needs: false, core: null, view: null, K: 0, lastF: -1, lastTk: -1, par: (parSeq++) % 2, phase: 0, dead: false, token: 0, imgEl: null, width: 0, key: '',
       wake() { if (this.animated && this.view) schedule(); else if (this.needs) { this.needs = false; this.refresh(); } },
       resized(w) { if (Math.abs(w - this.width) < 1) return; this.width = w; if (this.rarity !== 'common') this.refresh(); },
       refresh() {
@@ -1668,7 +1683,7 @@
             const view = buildView(core, img, K), [c, g] = cv2d(W, H);
             await yieldMain(); if (my !== this.token || this.dead) return;
             if (!(await ensureSt(core, view, () => !this.dead && my === this.token)) || !(await warmView(core, view, () => !this.dead && my === this.token))) return;
-            render(core, view, g, SPEC[rarity].still); still = tw === W ? c : downscale(c, tw, th); stats.stills++;
+            render(core, view, g, SPEC[rarity].still, tw !== W); still = tw === W ? c : downscale(c, tw, th); if (tw !== W) stampPass(core, still.getContext('2d'), SPEC[rarity].still, tw / (GW * 5)); stats.stills++;
             lruSet(stillCache, sk, still, STILL_MAX);
           }
           this.g.clearRect(0, 0, tw, th); this.g.drawImage(still, 0, 0); this.view = null; this.drawn = true;
@@ -1686,7 +1701,7 @@
       },
       draw(t) {
         const t0 = performance.now();
-        if (this.off) { render(this.core, this.view, this.og, t); this.g.clearRect(0, 0, this.tw, this.th); blitSmooth(this.g, this.off, this.tw, this.th); }
+        if (this.off) { render(this.core, this.view, this.og, t, true); this.g.clearRect(0, 0, this.tw, this.th); blitSmooth(this.g, this.off, this.tw, this.th); stampPass(this.core, this.g, t, this.tw / (GW * 5)); }
         else render(this.core, this.view, this.g, t);
         stats.frames++; stats.frameMs += performance.now() - t0;
       },

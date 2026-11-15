@@ -98,23 +98,26 @@
     const lv = zahl('lv'), kost = zahl('kost'), stufe = zahl('stufe'), rahmen = zahl('rahmen');   // rahmen = Rang-Rahmen (Duplikate), 1 … 8
     // `?rar=<Rarity-ID>`: Basiskarte der Seltenheit (Stempel, Rahmen, Namensfarbe; Common = Standard und ohne Parameter), siehe rarities.js / CardRender.rarityBase
     const rm = /(?:^|&)rar=([a-z]{3,12})(?:&|$)/.exec(query), rar = rm && RARITY_IDS.has(rm[1]) && rm[1] !== 'common' ? rm[1] : '';
+    // `&stempel=1`: die Basiskarte behaelt ihren gedruckten Rarity-Stempel (nur fuer Bilder OHNE Rarity-Ebene, z. B. der Kartenwurf). Mit `?rar=` allein
+    // fehlt der Stempel auf der Karte — die Rarity-Ebene (rarity-fx.js) malt ihn selbst; zwei Zeichen uebereinander gaebe Geisterbilder.
+    const stempel = !!rar && /(?:^|&)stempel=1(?:&|$)/.test(query);
     path = path.split(/[?#]/)[0];
     if (!path.startsWith('/cards/') || path.startsWith('/cards/effects/')) return null;
     let rel;
     try { rel = decodeURIComponent(path.slice(7)); } catch (e) { return null; }
     if (!/\.(png|webp|jpe?g)$/i.test(rel)) return null;
     const stem = rel.replace(/\.[a-z]+$/i, '');
-    const sfx = variantKey({ ohne, lv, kost, stufe, rahmen, rar });
+    const sfx = variantKey({ ohne, lv, kost, stufe, rahmen, rar, stempel });
     if (stem.startsWith('skins/')) {
       const file = stem.replace(/^skins\/(?:unlockable\/)?/, '');
-      return { kind: 'skin', stem: file, ohne, lv, kost, stufe, rahmen, rar, id: 'skin:' + file + sfx };
+      return { kind: 'skin', stem: file, ohne, lv, kost, stufe, rahmen, rar, stempel, id: 'skin:' + file + sfx };
     }
     if (stem.includes('/')) return null;
-    return { kind: 'card', stem, ohne, lv, kost, stufe, rahmen, rar, id: 'card:' + stem + sfx };
+    return { kind: 'card', stem, ohne, lv, kost, stufe, rahmen, rar, stempel, id: 'card:' + stem + sfx };
   }
   /** Die Variante als Anhang der Karten-ID: `|o=hp,atk|l=2|k=3` (leer ohne Variante). */
   function variantKey(v) {
-    return (v.ohne ? '|o=' + v.ohne : '') + (v.lv != null ? '|l=' + v.lv : '') + (v.kost != null ? '|k=' + v.kost : '') + (v.stufe != null ? '|s=' + v.stufe : '') + (v.rahmen != null ? '|r=' + v.rahmen : '') + (v.rar ? '|q=' + v.rar : '');
+    return (v.ohne ? '|o=' + v.ohne : '') + (v.lv != null ? '|l=' + v.lv : '') + (v.kost != null ? '|k=' + v.kost : '') + (v.stufe != null ? '|s=' + v.stufe : '') + (v.rahmen != null ? '|r=' + v.rahmen : '') + (v.rar ? '|q=' + v.rar : '') + (v.stempel ? '|t=1' : '');
   }
   /** Karten-ID (`card:Stem` / `skin:Stem`, optional mit Variante) -> wie `parse`; fuer das Vorwaermen aus der gemerkten Liste. */
   function fromId(id) {
@@ -127,6 +130,7 @@
       else if (t.startsWith('s=')) m.stufe = parseInt(t.slice(2), 10);
       else if (t.startsWith('r=')) m.rahmen = parseInt(t.slice(2), 10);
       else if (t.startsWith('q=')) m.rar = t.slice(2);
+      else if (t === 't=1') m.stempel = true;
     }
     return m;
   }
@@ -174,7 +178,7 @@
       if (m.lv != null) opts.lv = m.lv;
       if (m.kost != null) opts.kost = m.kost;
       if (m.stufe != null) opts.stufe = m.stufe;
-      if (m.rar) opts.rarity = m.rar;
+      if (m.rar) { opts.rarity = m.rar; if (!m.stempel) opts.noStamp = true; }
       let cv = await CardRender.renderCard(r.card, Object.keys(opts).length ? opts : null);
       if (!cv) return null;
       // Rang-Rahmen (Duplikate): fest in die Karte einbacken (public/rank-frames.js); ohne den Generator bleibt die Karte rahmenlos
