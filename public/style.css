@@ -16905,6 +16905,14 @@ body[data-rotate-gate] .pp-bg-particles * { animation: none !important; }
 .menu-nav-btn--half .menu-nav-label {
   white-space: normal;
   line-height: 1.15;
+  padding-top: 6px;   /* die Pixelschrift sitzt im Zeilenkasten oben: ohne den Ausgleich wirkt das Label ~3 px zu hoch (Kappenhoehe optisch zentrieren) */
+}
+/* Daily-Knopf: der deutsche Text („TÄGLICHE HERAUSFORDERUNG“) ist lang – umbrechen, etwas kleiner, optisch zentriert */
+.menu-nav-btn--daily .menu-nav-label {
+  white-space: normal;
+  line-height: 1.15;
+  font-size: 13px;
+  padding-top: 6px;
 }
 
 /* ═══ Daily challenge button ═══ */

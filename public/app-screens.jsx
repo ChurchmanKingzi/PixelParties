@@ -2211,7 +2211,7 @@ function MainMenu() {
           <button className="btn btn-big menu-nav-btn" onClick={() => setScreen('singleplayer')}>
             <span className="menu-nav-label">VS CPU</span>
             <PixelIcon name="pfeil" className="menu-nav-pfeil" /></button>
-          <button className="btn btn-big menu-nav-btn" onClick={openDaily} title="Daily Challenge">
+          <button className="btn btn-big menu-nav-btn menu-nav-btn--daily" onClick={openDaily} title="Daily Challenge">
             <span className="menu-nav-label">DAILY{daily?.active && daily?.claimedBig ? ' ✓' : ''}</span>
             <PixelIcon name="pfeil" className="menu-nav-pfeil" />
             {/* Heute noch nicht gestartet → kleines NEW-Schild an der Ecke. */}
