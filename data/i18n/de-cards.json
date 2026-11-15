@@ -129,7 +129,7 @@
 "effect": "Spiele diese Karte, wenn ein Held, den du kontrollierst, einen Angriff ausführt. Erhöhe den Schaden dieses Angriffs um 10 und füge dem Ziel 1 Giftstapel zu."
 },
 "Racket Arrow": {
-"name": "Schlägerpfeil",
+"name": "Krach-Pfeil",
 "effect": "Spiele diese Karte, wenn ein Held, den du kontrollierst, einen Angriff ausführt. Wähle eine Kreatur, die dein Gegner kontrolliert, und gib sie auf die Hand ihres ursprünglichen Besitzers zurück."
 },
 "Rainbow's Arrow": {
@@ -349,7 +349,7 @@
 "effect": "Spiele diese Karte sofort, wenn dein Gegner den Effekt einer Fähigkeit aktiviert, indem du die oberste Karte deines Coolness-Stapels löschst. Negiere diese Fähigkeit bis zum Ende des Zuges und wirf die oberste Kopie davon von dem Helden ab, der sie aktiviert hat."
 },
 "String of Fine": {
-"name": "Strafzettelkette",
+"name": "Feiner Faden",
 "effect": "Diese Karte hat keinen Effekt, außer du spielst sie aus deinem Coolness-Stapel. Ist dies die oberste Karte deines Coolness-Stapels, darfst du sie von dort als zusätzliche Aktion spielen, indem du sie löschst. Wähle ein Ziel, das du kontrollierst. Jeder Schaden, den dieses Ziel bis zum Beginn deines nächsten Zuges erleiden würde, wird zu 0. Ein Ziel kann nur einmal pro Spiel von diesem Effekt betroffen sein."
 },
 "Swagdri, Forger of Coolness": {
@@ -361,7 +361,7 @@
 "effect": "Diese Karte hat keinen Effekt, außer du spielst sie aus deinem Coolness-Stapel. Ist dies die oberste Karte deines Coolness-Stapels, darfst du sie von dort an einen deiner Helden ausrüsten. Der ausgerüstete Held darf in jedem Zug während deiner Aktionsphase eine zweite Aktion ausführen, kann diese Aktion aber nur für einen Angriff nutzen."
 },
 "The Nornstellar, Foretellers of Coolness": {
-"name": "Die Nornstellar, Vorhersager der Coolness",
+"name": "Die Nornsteile, Vorhersager der Coolness",
 "effect": "Immer wenn ein anderes Ziel, das du kontrollierst, besiegt wird, platziere die oberste Karte deines Decks oben auf deinen Coolness-Stapel. Wenn diese Kreatur besiegt wird, darfst du eine Karte aus deiner Hand oben auf deinen Coolness-Stapel platzieren, um 2 Karten zu ziehen."
 },
 "Thorad, Strength of Coolness": {
@@ -381,7 +381,7 @@
 "effect": "Wenn diese Karte ins Spiel kommt, platziere die oberste Karte deines Decks offen vor dir. Sie wird dein Coolness-Stapel. Am Ende jedes deiner Züge platzierst du die oberste Karte deines Decks offen auf deinen Coolness-Stapel. Würde diese Karte von der Karte oder dem Effekt eines Gegners betroffen, darfst du die oberste Karte deines Coolness-Stapels löschen, um alle Effekte zu negieren, die diese Karte bzw. dieser Effekt auf diese Karte hätte. Wird diese Karte vom Spielfeld entfernt, lösche alle Karten in deinem Coolness-Stapel."
 },
 "Wowkyrie, Bringer of Coolness": {
-"name": "Wowkyrie, Bringerin der Coolness",
+"name": "Wowküre, Bringerin der Coolness",
 "effect": "Du darfst einmal pro Zug die oberste Karte deines Decks oben auf deinen Coolness-Stapel platzieren. Solange sich mindestens 3 Karten in deinem Coolness-Stapel befinden, wird jeder Schaden, den diese Kreatur erleiden würde, negiert."
 },
 "Yolomungandr, Ender of Coolness": {
@@ -685,7 +685,7 @@
 "effect": "Du darfst eine \"Tiefsee\"-Kreatur, die in diesem Zug nicht beschworen wurde, aus einer Unterstützungszone deiner Helden auf deine Hand nehmen, um diese Kreatur in dieselbe Unterstützungszone zu platzieren. Wenn du diese Kreatur beschwörst, stiehl 6 Gold von deinem Gegner.\nDu kannst nur 1 \"Tiefsee-Pirat\" pro Zug beschwören."
 },
 "Deepsea Poltergeister": {
-"name": "Tiefsee-Poltergeist",
+"name": "Tiefsee-Poltergeister",
 "effect": "Du darfst eine \"Tiefsee\"-Kreatur, die in diesem Zug nicht beschworen wurde, aus einer Unterstützungszone deiner Helden auf deine Hand nehmen, um diese Kreatur in dieselbe Unterstützungszone zu platzieren. Wenn du diese Kreatur beschwörst, darfst du ein beliebiges Artefakt auf dem Spielfeld wählen und es auf den Ablagestapel legen.\nDu kannst nur 1 \"Tiefsee-Poltergeist\" pro Zug beschwören."
 },
 "Deepsea Primordium": {
@@ -849,7 +849,7 @@
 "effect": "Während deines Zuges darf dieser Held die Fähigkeiten aller Helden, die dein Gegner kontrolliert, verwenden, sowohl aktive Effekte als auch passive Vorteile, als wären sie an ihn angelegt. Zähigkeit ist ausgenommen. Bei Kampfkunst trägt nur die Kampfkunst des gegnerischen Helden mit der höchsten Stufe zum Angriffswert bei und ersetzt den Angriffswert aus der eigenen Kampfkunst dieses Helden, falls er größer ist."
 },
 "Smug Mastermind Antonia": {
-"name": "Eitle Drahtzieherin Antonia",
+"name": "Smug-Drahtzieherin Antonia",
 "effect": "Du darfst einmal pro Zug einen \"Coole Retterin Monia\" von deiner Hand oder aus deinem Deck unter diese Kreatur legen. Solange an dieser Kreatur \"Coole Retterin Monia\" angelegt ist, erhält sie 200 LP und diesen Effekt: Bis zu 2-mal pro Zug darfst du, wenn eine Kreatur, die du kontrollierst, Schaden erleidet, eine Karte abwerfen, um eine beliebige Karte auf dem Spielfeld, die kein Held ist, zu wählen und auf den Ablagestapel zu legen."
 },
 "Smugbeth, the Rebel of no Rules": {
@@ -1369,11 +1369,11 @@
 "effect": "Wenn diese Kreatur besiegt wird, darfst du ein Ziel auf dem Spielfeld wählen und es für 1 Zug einfrieren."
 },
 "Mischief Militia - SnowItAll": {
-"name": "Unfug-Miliz - Schneealleswisser",
+"name": "Unfug-Miliz - SnowItAll",
 "effect": "Diese Kreatur kann nicht eingefroren werden. Du darfst einmal pro Zug eine Kreatur der Stufe 1 oder niedriger aus deiner Hand als zusätzliche Aktion beschwören, aber wenn du das tust, friere sie für 2 Züge ein. Befindet sich mindestens 1 gefrorenes Ziel auf dem Spielfeld, darfst du diesen Effekt in dem Zug aktivieren, in dem diese Kreatur beschworen wurde."
 },
 "Mischief Militia - Thaw Blader": {
-"name": "Unfug-Miliz - Tau-Klingenträger",
+"name": "Unfug-Miliz - Auftau-Klinge",
 "effect": "Du darfst einmal pro Zug ein gefrorenes Ziel wählen und ihm 200 Schaden zufügen. Wenn du das tust, heile es von seinem Einfrieren. Du darfst diesen Effekt in dem Zug aktivieren, in dem diese Kreatur beschworen wurde."
 },
 "Sculpture Guards": {
@@ -1458,10 +1458,10 @@
 },
 "\"Bloom\", the Continent Corruptor": {
 "name": "\"Bloom\", der Kontinentverderber",
-"effect": "Du musst diesen Helden sofort aus deiner Hand auf einen \"Bloom, der wahnsinnige Botaniker\" spielen, den du kontrollierst, wenn dieser durch das Gift eines \"Parasaat\" besiegt wird. Diese Bedingung kann nicht negiert oder ersetzt werden. Das Aufsteigen dieses Helden beendet deinen Zug nicht. Wenn dieser Held aufsteigt, werden seine aktuellen und maximalen LP zu 500. Schaden, den dieser Held durch Gift erleiden würde, wird stattdessen als Heilung angewendet. Bevor ein Held mit einem \"Parasaat\" in seinen Unterstützungszonen Giftschaden erleidet, erhöhe den Schaden dieses Gifts um 100."
+"effect": "Du musst diesen Helden sofort aus deiner Hand auf einen \"Bloom, die wahnsinnige Botanikerin\" spielen, den du kontrollierst, wenn dieser durch das Gift eines \"Parasaat\" besiegt wird. Diese Bedingung kann nicht negiert oder ersetzt werden. Das Aufsteigen dieses Helden beendet deinen Zug nicht. Wenn dieser Held aufsteigt, werden seine aktuellen und maximalen LP zu 500. Schaden, den dieser Held durch Gift erleiden würde, wird stattdessen als Heilung angewendet. Bevor ein Held mit einem \"Parasaat\" in seinen Unterstützungszonen Giftschaden erleidet, erhöhe den Schaden dieses Gifts um 100."
 },
 "Bloom, the Maniacal Botanist": {
-"name": "Bloom, der wahnsinnige Botaniker",
+"name": "Bloom, die wahnsinnige Botanikerin",
 "effect": "Bevor ein Held mit einer \"Parasaat\"-Kreatur in seinen Unterstützungszonen Giftschaden erleidet, erhöhe den Schaden dieses Gifts um das 50-Fache der Anzahl der \"Parasaat\"-Kreaturen in seinen Unterstützungszonen."
 },
 "Paraseed": {
@@ -3358,7 +3358,7 @@
 "effect": "Wähle eine Kreatur der Stufe 1/2/3 oder niedriger aus deinem Ablagestapel und platziere sie in eine freie Unterstützungszone des Anwenders. Der Anwender erleidet dann Schaden in Höhe der maximalen LP der Kreatur.\nDiese Kreatur darf in diesem Zug ihren aktiven Effekt aktivieren."
 },
 "Foresta, the Guard": {
-"name": "Foresta, die Wächterin",
+"name": "Foresta, der Wächter",
 "effect": "Du kannst diese Kreatur nur beschwören, indem du 2 Kreaturen opferst, die du kontrollierst und die in diesem Zug nicht beschworen wurden, und die aktuellen LP des zugehörigen Helden halbierst (abgerundet). Du darfst einmal pro Zug ein Ziel wählen und ihm 500 Schaden zufügen."
 },
 "Friedhelm, the Misled Avenger": {
@@ -4918,11 +4918,11 @@
 "effect": "Alle Helden, die dein Gegner kontrolliert, sind bis zum Ende deines nächsten Zuges geblendet."
 },
 "Smug Coin": {
-"name": "Eitle Münze",
-"effect": "Rüste diese Karte an einen Helden aus, den du kontrollierst. Würden die LP des ausgerüsteten Helden durch Schaden von der Karte oder dem Effekt eines Gegners oder durch einen negativen Statuseffekt auf 0 sinken, fallen sie stattdessen auf 1. Lösche danach diese Karte. Du kannst nur 1 \"Eitle Münze\" pro Spiel spielen."
+"name": "Smug-Münze",
+"effect": "Rüste diese Karte an einen Helden aus, den du kontrollierst. Würden die LP des ausgerüsteten Helden durch Schaden von der Karte oder dem Effekt eines Gegners oder durch einen negativen Statuseffekt auf 0 sinken, fallen sie stattdessen auf 1. Lösche danach diese Karte. Du kannst nur 1 \"Smug-Münze\" pro Spiel spielen."
 },
 "Smugness": {
-"name": "Eitelkeit",
+"name": "Smugness",
 "effect": "1) Du kannst diese Fähigkeit nur an einen Aufgestiegenen Helden anlegen. Wann immer dieser Held Schaden von der Karte oder dem Effekt eines Gegners erleidet, darfst du ein Ziel wählen und ihm die Hälfte dieses Schadens zufügen.\n2) Du kannst diese Fähigkeit nur an einen Aufgestiegenen Helden anlegen. Wann immer dieser Held Schaden von der Karte oder dem Effekt eines Gegners erleidet, darfst du ein Ziel wählen und ihm denselben Schaden zufügen.\n3) Du kannst diese Fähigkeit nur an einen Aufgestiegenen Helden anlegen. Wann immer dieser Held Schaden von der Karte oder dem Effekt eines Gegners erleidet, darfst du ein Ziel wählen und ihm den doppelten Schaden zufügen."
 },
 "Snow Cannon": {
