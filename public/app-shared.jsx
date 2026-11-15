@@ -10938,7 +10938,7 @@ function TextBox() {
     if (opts.speaker === ANTONIA_PORTRAIT) setAntoniaPresent(true);
 
     if (opts.pages && Array.isArray(opts.pages)) {
-      setPages(opts.pages);
+      setPages(window.ppTx ? opts.pages.map(pg => typeof pg === 'string' ? window.ppTx(pg) : (pg && typeof pg.text === 'string' ? { ...pg, text: window.ppTx(pg.text) } : pg)) : opts.pages);   // Sprachumschaltung
       setPageIdx(0);
       onShowFiredRef.current = new Set();
       return;

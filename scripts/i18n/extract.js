@@ -22,11 +22,11 @@ function textLike(s) {
   if (/[<>{};]/.test(s) && /\b(px|em|rgb|calc|var)\b/.test(s)) return false;
   return true;
 }
-function add(s, node, kind) {
+function add(s, node, kind, einWortOk) {
   const line = node.loc && node.loc.start.line;
   if (line < from || line > to) return;
   const t = s.replace(/\s+/g, ' ').trim();
-  if (!textLike(t)) return;
+  if (!textLike(t) && !(einWortOk && /^[A-Za-z][A-Za-z'\-]{2,}[.,:;!?]?$/.test(t))) return;
   if (!out.has(t)) out.set(t, { text: t, kind, lines: [] });
   out.get(t).lines.push(line);
 }
@@ -52,7 +52,7 @@ Babel.transform(src, { presets: ['react'], plugins: [() => ({ visitor: {
     add(r.tpl, p.node, 'jsx-sentence');
     p.node.children.forEach(c => { if (c.type === 'JSXText') seen.add(c); if (c.type === 'JSXExpressionContainer') { seen.add(c); const e = c.expression; if (e && (e.type === 'StringLiteral' || e.type === 'TemplateLiteral')) seen.add(e); } });
   },
-  JSXText(p) { if (!seen.has(p.node)) add(p.node.value, p.node, 'jsx'); },
+  JSXText(p) { if (!seen.has(p.node)) add(p.node.value, p.node, 'jsx', true); },
   JSXExpressionContainer(p) {
     if (seen.has(p.node)) return;
     if (p.parent.type === 'JSXAttribute' && SKIP_ATTR.has(p.parent.name.name)) return;
