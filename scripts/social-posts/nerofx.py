@@ -31,13 +31,14 @@ class BootShow(CaptionMixin):
     OW, OH = 176, 246
     ATK0, PER = 70, 30
     # Zug k: (Zeit, Slot, opfert die Figur im Slot?)
-    PLACE = [(1.0, 0, False), (2.4, 1, False), (3.8, 2, False), (6.8, 0, True), (8.4, 1, True)]
-    T_ATTACK = 11.0
+    PLACE = [(1.0, 0, False), (2.4, 1, False), (3.8, 2, False), (7.2, 0, True), (8.8, 1, True)]
+    T_ATTACK = 11.4
     CAPTIONS = [
-        (1.0, 6.0, 'Every *Creature* he places is a chess piece - and speeds up his *booting process*.'),
-        (6.2, 10.6, '*+30 Attack* each, permanently - up to *5 times* per turn, even if he has to *sacrifice* a piece.'),
-        (10.8, 14.4, 'Boot complete. Attack *220*. Checkmate.'),
-        (14.6, 20.6, '*Nero Zira*, the Mastermind - no feelings, only *correct decisions*.'),
+        (0.2, 2.6, '*Nero Zira* is booting...'),
+        (2.8, 7.0, 'Every *Creature* he places is a chess piece - and speeds up his *booting process*.'),
+        (7.2, 11.2, '*+30 Attack* each, permanently. Up to *5 times* a turn - sacrifices included.'),
+        (11.4, 14.6, 'Boot complete. Attack *220*. Checkmate.'),
+        (14.8, 20.8, '*Nero Zira*, the Mastermind - no feelings, only *correct decisions*.'),
     ]
     SND = {
         'whoosh': [('booster_card_whoosh', -8)],
