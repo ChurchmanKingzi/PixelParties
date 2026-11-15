@@ -16,7 +16,7 @@
     if (lang === 'en') return;
     try {
       const j = await (await fetch('/data/i18n/' + lang + '-cards.json')).json();
-      P.names = Object.assign({}, j._names || {}); delete j._names; P.cards = j; for (const k in j) P.names[k] = j[k].name;
+      P.names = Object.assign({}, j._names || {}); P.archetypes = j._archetypes || {}; delete j._names; delete j._archetypes; P.cards = j; for (const k in j) P.names[k] = j[k].name;
     } catch (e) { /* ohne Datei: englisch */ }
   };
   // Faehigkeits-Bonus ("Leadership 3", "Fighting") -> Namensliste; sonst Freitext aus der Uebersetzung der Karte
@@ -30,7 +30,7 @@
   P.apply = (cards) => {
     for (const c of cards) {
       const t = P.cards[c.name];
-      if (c.startingAbility1 || c.startingAbility2) { c.sa1De = saDe(c.startingAbility1, t, 'startingAbility1'); c.sa2De = saDe(c.startingAbility2, t, 'startingAbility2');   // Anzeige; die Originalfelder bleiben (Logik) }
+      if (c.startingAbility1 || c.startingAbility2) { c.sa1De = saDe(c.startingAbility1, t, 'startingAbility1'); c.sa2De = saDe(c.startingAbility2, t, 'startingAbility2'); }   // Anzeige; die Originalfelder bleiben (Logik)
       if (t) { c.nameEn = c.name; c.effectEn = c.effect; c.effect = t.effect; c.displayName = t.name; }
     }
   };

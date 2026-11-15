@@ -12321,13 +12321,13 @@ function LangFlag() {
   const stripes = [];
   if (lang === 'en') {
     // US-Flagge 19×10 Zellen: 7 rote/6 weisse Streifen (vereinfacht auf 10 Reihen), blaues Feld oben links
-    for (let y = 0; y < 10; y++) stripes.push(<rect key={'s' + y} x="0" y={y} width="19" height="1" fill={y % 2 === 0 ? '#b22234' : '#ffffff'} />);
-    stripes.push(<rect key="c" x="0" y="0" width="8" height="5" fill="#3c3b6e" />);
+    for (let y = 0; y < 10; y++) stripes.push(<rect key={'s' + y} x="0" y={y} width="19" height="1" fill={y % 2 === 0 ? '#b21a29' : '#ffffff'} />);
+    stripes.push(<rect key="c" x="0" y="0" width="8" height="5" fill="#2b457e" />);
     [[1,1],[3,1],[5,1],[2,3],[4,3],[6,3]].forEach(([x, y]) => stripes.push(<rect key={'t' + x + y} x={x} y={y} width="1" height="1" fill="#ffffff" />));
   } else {
     stripes.push(<rect key="a" x="0" y="0" width="19" height="3.34" fill="#000000" />);
-    stripes.push(<rect key="b" x="0" y="3.34" width="19" height="3.33" fill="#dd0000" />);
-    stripes.push(<rect key="c" x="0" y="6.67" width="19" height="3.33" fill="#ffce00" />);
+    stripes.push(<rect key="b" x="0" y="3.34" width="19" height="3.33" fill="#c80000" />);
+    stripes.push(<rect key="c" x="0" y="6.67" width="19" height="3.33" fill="#ffd61a" />);
   }
   return (
     <button className="lang-flag-btn" data-pp-px="aus" onClick={() => { if (window.playSFX) window.playSFX('ui_click'); window.PP_I18N.toggle(); }}
