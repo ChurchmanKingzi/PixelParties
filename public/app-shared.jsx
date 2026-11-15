@@ -7174,18 +7174,18 @@ function CardFoil({ card, skin, werte, rarity, animated }) {
   const r = ppRarityOf(card, rarity);
   const fxA = window.PpRarityFx;
   // Skins teilen die Rarity-Effekte ihrer Base-Karte: auf dem Skin-Bild läuft derselbe Effekt wie auf der Base-Karte. Ausnahme: Stufen mit Motiv-Maske (Umbra, Stained, Storm) —
-  // für Skin-Sprites gibt es noch keine Masken; dort bleibt das Skin-Holo (wie bisher).
+  // für Skin-Sprites gibt es noch keine Masken; dort zeigt der Skin das Standbild ohne Effekt.
   const effektMoeglich = !!card && r !== 'common' && !!fxA && fxA.available(r);
   const effekt = effektMoeglich && !(holoSkin0 && fxA.SPEC && fxA.SPEC[r] && fxA.SPEC[r].mask);
-  const holoSkin = holoSkin0 && !effekt;   // ein Foil je Karte: der Rarity-Effekt ersetzt das Skin-Holo
-  const fkey = holoSkin ? 'skin:' + skin : 'card:' + (card?.name || '');
-  const schraffur = !holoSkin && !effekt && !klein && skinHoloAktiv() && window.CardRender.hatchEligible(card);
-  const rahmen = !effekt && !klein && skinHoloAktiv() ? window.CardRender.rimKind(card, holoSkin ? skin : null) : null;
-  if (!holoSkin && !schraffur && !rahmen && !effekt) return null;
+  // Skins teilen die Foils ihrer Base-Karte: es gibt kein eigenes Skin-Holo mehr (weder Schraffur/Glanzband noch goldener Name); die Karte zeigt nur, was ihre Rarity
+  // (und ggf. ihr Kartentyp: Vollbild-Schraffur, goldener Heldenrahmen) vorsieht.
+  const fkey = 'card:' + (card?.name || '');
+  const schraffur = !effekt && !klein && skinHoloAktiv() && window.CardRender.hatchEligible(card);
+  const rahmen = !effekt && !klein && skinHoloAktiv() ? window.CardRender.rimKind(card, holoSkin0 ? skin : null) : null;
+  if (!schraffur && !rahmen && !effekt) return null;
   return (
     <>
       {effekt && <RarityLayer card={card} rarity={r} animated={!!animated && !klein && !brett} reduced={reduziert && klein && !brett} werte={werte} />}
-      {holoSkin && <SkinHolo skin={skin} fkey={fkey} />}
       {schraffur && <FoilHatch card={card} fkey={fkey} />}
       {rahmen && <FoilRim rim={rahmen} fkey={fkey} />}
     </>

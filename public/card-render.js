@@ -1019,9 +1019,8 @@
     if (skin) { if (skin.r) m.r = skin.r; if (skin.f) m.f = skin.f; }
     const spec = specFromCard(card, m, Object.assign({ rarity: o.rarity, noStamp: o.noStamp }, skin ? { name: skin.name || o.skin } : null));
     applyOverrides(spec, card, o);
-    // Skin-Holo: der Name steht golden auf der Karte (siehe unten, HOLO-TEXTUR); die schillernden Schichten
-    // darueber zeichnet das Spiel als eigene DOM-Lage (SkinHolo in app-shared.jsx).
-    if (skin && holoOn(skin)) spec.nameGold = true;
+    // Skins teilen die Foils ihrer Base-Karte: kein eigenes Skin-Holo und kein goldener Name mehr — Namensfarbe, Stempel und Effekt richten sich allein
+    // nach der Rarity der Karteninstanz (Common = schlichter Name), siehe CardFoil in app-shared.jsx.
     const cv = draw(spec, art);
     cv.statType = spec.type;                       // statsLayer: welche Symbole (Herz, Schwert) die Wertezeile dieses Kartentyps trägt
     return cv;
