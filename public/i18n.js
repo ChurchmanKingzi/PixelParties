@@ -99,6 +99,12 @@
     if (lang !== 'en') { const de = P.ui[tpl] || P.ui[tpl.trim()]; if (de) return piecesOf(de, vals); }
     return piecesOf(tpl, vals);
   };
+  // Langtexte mit Markup (Tutorial-Textbox): ganzen Text nachschlagen, danach Kartennamen in **fett**/{farbe:**…**}/"…" durch die deutschen Namen ersetzen
+  P.tx = (s) => {
+    if (lang === 'en' || !s) return s;
+    let r = lookup(s.trim()); if (r === s.trim()) r = s;
+    return r.replace(/(\*\*)([^*\n]+)(\*\*)|"([^"\n]+)"/g, (m, a, b, c, q) => { const n = b != null ? b : q, de = P.names[n.trim()]; if (!de) return m; return b != null ? a + de + c : '"' + de + '"'; });
+  };
   const SKIP_TAG = { SCRIPT: 1, STYLE: 1, TEXTAREA: 1, CANVAS: 1, NOSCRIPT: 1 };
   const skipped = (n) => { for (let e = n.nodeType === 1 ? n : n.parentNode; e && e.nodeType === 1; e = e.parentNode) { if (SKIP_TAG[e.tagName] || (e.hasAttribute && e.hasAttribute('data-i18n-skip'))) return true; } return false; };
   const textNode = (n) => {
@@ -122,6 +128,7 @@
   P.startDom = () => {
     if (lang === 'en') return;
     if (!document.body) { document.addEventListener('DOMContentLoaded', P.startDom, { once: true }); return; }
+    try { const tt = document.title, de = lookup(tt); if (de !== tt) document.title = de; } catch (e) { /* ohne Titel */ }
     walk(document.body);
     new MutationObserver((muts) => {
       for (const m of muts) {
@@ -134,6 +141,7 @@
   window.PP_I18N = P;
   window.ppT = P.t;
   window.ppTrans = P.trans;
+  window.ppTx = P.tx;
   document.documentElement.lang = lang;
   if (lang !== 'en') {
     const go = () => P.load().then(() => P.startDom());

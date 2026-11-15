@@ -10944,7 +10944,7 @@ function TextBox() {
       return;
     }
 
-    const text = (opts.text || '').trim();
+    const text = (window.ppTx ? window.ppTx(opts.text || '') : (opts.text || '')).trim();   // Sprachumschaltung (data/i18n)
     if (!text) { setPages([]); return; }
     const body = bodyRef.current;
     if (!body) { setPages([{ text }]); return; }

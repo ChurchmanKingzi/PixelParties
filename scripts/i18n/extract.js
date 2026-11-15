@@ -18,7 +18,7 @@ function textLike(s) {
   s = s.trim();
   if (s.length < 2 || !/[A-Za-z]{2}/.test(s)) return false;
   if (/^[a-z0-9_.:\/#-]+$/.test(s) && !/\s/.test(s)) return false;       // Bezeichner, Klassen, Pfade
-  if (/^(https?:|\/|#|\.|\{|rgba?\(|var\()/.test(s)) return false;
+  if (/^(https?:|\/|#|\.|\{(?!\d+\})|rgba?\(|var\()/.test(s)) return false;
   if (/[<>{};]/.test(s) && /\b(px|em|rgb|calc|var)\b/.test(s)) return false;
   return true;
 }

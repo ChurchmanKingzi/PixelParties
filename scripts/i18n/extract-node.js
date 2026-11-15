@@ -7,7 +7,7 @@ const seen = new WeakSet();
 function ok(s) {
   const t = s.trim();
   if (t.length < 4 || !/[A-Za-z]{3}/.test(t) || !/\s/.test(t) && !/^[A-Z][a-z]+[.!?]?$/.test(t)) return false;
-  if (/^(https?:|\/|\.|#|\{|SELECT |INSERT |UPDATE |DELETE |CREATE |ALTER |DROP |PRAGMA |function |const |return |\$\{)/i.test(t)) return false;
+  if (/^(https?:|\/|\.|#|\{(?!\d+\})|SELECT |INSERT |UPDATE |DELETE |CREATE |ALTER |DROP |PRAGMA |function |const |return |\$\{)/i.test(t)) return false;
   if (/[{};=<>]/.test(t) && /\b(px|rgb|var|function|=>)\b/.test(t)) return false;
   if (/\.(js|json|png|jpg|webp|css|mp3|ogg)\b/.test(t)) return false;
   return true;
