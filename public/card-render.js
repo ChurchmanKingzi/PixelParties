@@ -890,9 +890,9 @@
   const rarityBase = r => RARITY_BASE[r] || 'common';
   /** W77b: zwei Ability-Boni („<Ability> N" in beiden Feldern) → „A or B" in einer Zeile; sonst null. */
   function ascBonusOder(c) {
-    const a = String(c.startingAbility1 || '').trim(), b = String(c.startingAbility2 || '').trim();
+    const a = String(c.sa1De || c.startingAbility1 || '').trim(), b = String(c.sa2De || c.startingAbility2 || '').trim();
     const abilityBonus = t => /^[^\n]+ \d+$/.test(t);
-    return abilityBonus(a) && abilityBonus(b) ? a + ' or ' + b : null;
+    return abilityBonus(a) && abilityBonus(b) ? a + (window.PP_I18N && window.PP_I18N.get() === 'de' ? ' oder ' : ' or ') + b : null;
   }
   function specFromCard(c, meta, over) {
     meta = meta || {}; over = over || {};
@@ -920,8 +920,8 @@
       abilities: type === 'skill3' ? abilityTexts(c.effect) : null,
       // Ascended Heroes: die Bonus-Felder (`startingAbility1/2`) sind ALTERNATIVEN (W71a, Al: „bei zwei Ability-Boni immer ODER") — zwei Ability-Boni stehen in EINER Zeile mit „or"
       // („Fighting 3 or Destruction Magic 3", wie Taio; die Box fasst nur eine Zeile). Alle anderen Boni (Text-Boni mit Zeilenumbruch) bleiben wie gedruckt.
-      skillBox: meta.sb != null ? meta.sb : hero ? (c.startingAbility1 || '/') : asc ? (ascBonusOder(c) || [c.startingAbility1, c.startingAbility2].filter(Boolean).join('\n')) : '',
-      skillBox2: meta.sb2 != null ? meta.sb2 : (hero ? (c.startingAbility2 || '/') : ''),   // Helden ohne Start-Abilities (Quetzahuitl): Schrägstrich = „nicht vorhanden“
+      skillBox: meta.sb != null ? meta.sb : hero ? (c.sa1De || c.startingAbility1 || '/') : asc ? (ascBonusOder(c) || [c.sa1De || c.startingAbility1, c.sa2De || c.startingAbility2].filter(Boolean).join('\n')) : '',
+      skillBox2: meta.sb2 != null ? meta.sb2 : (hero ? (c.sa2De || c.startingAbility2 || '/') : ''),   // Helden ohne Start-Abilities (Quetzahuitl): Schrägstrich = „nicht vorhanden“
       // Artifacts: die Kosten stehen im Wertefeld der Mitte. Variable Kosten tragen `costLabel` („4X", „5X", „X") — es wird gedruckt
       // statt der Zahl in `cost` (die der Server weiter rechnet).
       hp: c.hp, atk: type === 'artifact' || type === 'artifactCreature' ? (c.costLabel || c.cost) : c.atk,

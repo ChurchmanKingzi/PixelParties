@@ -16,11 +16,23 @@
     if (lang === 'en') return;
     try {
       const j = await (await fetch('/data/i18n/' + lang + '-cards.json')).json();
-      P.names = j._names || {}; delete j._names; P.cards = j;
+      P.names = Object.assign({}, j._names || {}); delete j._names; P.cards = j; for (const k in j) P.names[k] = j[k].name;
     } catch (e) { /* ohne Datei: englisch */ }
   };
+  // Faehigkeits-Bonus ("Leadership 3", "Fighting") -> Namensliste; sonst Freitext aus der Uebersetzung der Karte
+  const saDe = (v, t, k) => {
+    if (!v) return v;
+    if (t && t[k]) return t[k];
+    if (P.names[v]) return P.names[v];
+    const m = /^(.+) (\d+)$/.exec(v);
+    return m && P.names[m[1]] ? P.names[m[1]] + ' ' + m[2] : v;
+  };
   P.apply = (cards) => {
-    for (const c of cards) { const t = P.cards[c.name]; if (t) { c.nameEn = c.name; c.effectEn = c.effect; c.effect = t.effect; c.displayName = t.name; } }
+    for (const c of cards) {
+      const t = P.cards[c.name];
+      if (c.startingAbility1 || c.startingAbility2) { c.sa1De = saDe(c.startingAbility1, t, 'startingAbility1'); c.sa2De = saDe(c.startingAbility2, t, 'startingAbility2');   // Anzeige; die Originalfelder bleiben (Logik) }
+      if (t) { c.nameEn = c.name; c.effectEn = c.effect; c.effect = t.effect; c.displayName = t.name; }
+    }
   };
   window.PP_I18N = P;
   document.documentElement.lang = lang;
