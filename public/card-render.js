@@ -1097,7 +1097,7 @@
     if (!version || typeof indexedDB === 'undefined') return false;
     try {
       const db = await new Promise((res, rej) => {
-        const r = indexedDB.open('pp-render-cache', 1);
+        const r = indexedDB.open('pp-render-cache' + (window.PP_I18N && window.PP_I18N.get() !== 'en' ? '-' + window.PP_I18N.get() : ''), 1);
         r.onupgradeneeded = () => r.result.createObjectStore('kv');
         r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error); r.onblocked = () => rej(new Error('blockiert'));
       });

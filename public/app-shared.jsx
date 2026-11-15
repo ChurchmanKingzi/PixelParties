@@ -6035,6 +6035,8 @@ function heroDisplayName(fullName) {
   if (!fullName || typeof fullName !== 'string') return fullName || '';
   const name = fullName.trim();
   if (HERO_NAME_OVERRIDES[name]) return HERO_NAME_OVERRIDES[name];
+  { const dn = window.PP_I18N && window.PP_I18N.get() === 'de' && window.CARDS_BY_NAME && window.CARDS_BY_NAME[name] && window.CARDS_BY_NAME[name].displayName;
+    if (dn) { const c = dn.indexOf(','); return c > 0 ? dn.slice(0, c).trim() || dn : dn; } }
   // Regel 1 — Komma trennt Name von Titel.
   const comma = name.indexOf(',');
   if (comma > 0) return name.slice(0, comma).trim() || name;
@@ -6319,7 +6321,7 @@ function spiceTable() {
   for (const n of namen) {
     const c = db[n];
     if (!c || c.cardType !== 'Artifact' || c.archetype !== SPICE_ARCHETYPE) continue;
-    const m = SPICE_TEXT_RE.exec(String(c.effect || '').replace(/\s+/g, ' '));
+    const m = SPICE_TEXT_RE.exec(String(c.effectEn || c.effect || '').replace(/\s+/g, ' '));
     if (!m) continue;
     const freigaben = (m[1].match(/"([^"]+)"/g) || [])
       .map(s => s.slice(1, -1))
@@ -6454,7 +6456,7 @@ const UNLIMITED_COPY_CARDS = new Set(['Infinitely Reproducing Slime']);
 const NON_STARTING_HERO_RE = /cannot be one of your starting heroes/i;
 function isNonStartingHero(cardName) {
   const card = window.CARDS_BY_NAME?.[cardName];
-  return !!card && card.cardType === 'Hero' && NON_STARTING_HERO_RE.test(String(card.effect || ''));
+  return !!card && card.cardType === 'Hero' && NON_STARTING_HERO_RE.test(String(card.effectEn || card.effect || ''));
 }
 
 function heroFirstName(cardName) {
@@ -8621,7 +8623,7 @@ function CardSideTooltip({ card, imgUrl: imgUrl0, inGallery }) {
         </div>
       )}
       <div className="card-tooltip-info" style={{ flex: 1, overflowY: 'auto', padding: 0 }}>
-        <TTHeader card={card} name={card.name} level={card.level} />
+        <TTHeader card={card} name={card.displayName || card.name} level={card.level} />
         <div className="tt-body">
           <TTStats hp={card.hp} atk={card.atk} cost={cardCostText(card)} />
           {/* Heroes zeigen KEINE Abilities im Tooltip (Als Vorgabe 12.10.); bei Ascended Heroes steht der Ascension Bonus als Satz. */}
@@ -8936,7 +8938,8 @@ window.effektTextPasst = effektTextPasst;
 function namePasst(name, suche) {
   const woerter = String(suche == null ? '' : suche).toLowerCase().split(/\s+/).filter(Boolean);
   if (woerter.length === 0) return true;
-  const text = String(name == null ? '' : name).toLowerCase();
+  const dn = window.CARDS_BY_NAME && window.CARDS_BY_NAME[name] && window.CARDS_BY_NAME[name].displayName;
+  const text = (String(name == null ? '' : name) + (dn ? ' ' + dn : '')).toLowerCase();
   return woerter.every(w => text.includes(w));
 }
 window.namePasst = namePasst;
@@ -9824,11 +9827,11 @@ function TTHeader({ card, name, level, levelBonus }) {
     <div className="tt-kopf" style={{ '--zier': color }}>
       <div className="tt-name" style={{ color }}>{name}{card.extraName ? <span style={{ color: '#3ddc57' }}> / {card.extraName}</span> : null}</div>
       <div className="tt-chips">
-        <TTChip color={color}>{card.cardType}</TTChip>
-        {card.subtype && <TTChip>{card.subtype}</TTChip>}
-        {card.archetype && <TTChip>{card.archetype}</TTChip>}
+        <TTChip color={color}>{window.ppT(card.cardType)}</TTChip>
+        {card.subtype && <TTChip>{window.ppT(card.subtype)}</TTChip>}
+        {card.archetype && <TTChip>{window.ppT(card.archetype)}</TTChip>}
         {level != null && <TTChip color={levelBonus > 0 ? '#d6b3f9' : undefined}>Lv {level}{levelBonus > 0 ? ` (+${levelBonus})` : ''}</TTChip>}
-        {schools.map(sc => <TTChip key={sc} color={TT_SCHOOL_COLORS[sc]}>{sc}</TTChip>)}
+        {schools.map(sc => <TTChip key={sc} color={TT_SCHOOL_COLORS[sc]}>{window.ppT(sc)}</TTChip>)}
       </div>
     </div>
   );
@@ -9973,7 +9976,7 @@ function ttTokenKarten() {
 }
 /** Die Token-Karten, die der Effekttext von `card` nennt, in der Reihenfolge ihres ersten Auftretens; Tokens selbst: keine. */
 function ttRelatedTokens(card) {
-  const text = String((card && card.effect) || '');
+  const text = String((card && (card.effectEn || card.effect)) || '');
   if (!text || ttIstToken(card)) return [];
   const treffer = [];
   for (const t of ttTokenKarten()) {

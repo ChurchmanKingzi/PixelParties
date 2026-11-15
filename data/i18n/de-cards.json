@@ -145,27 +145,27 @@
 "effect": "Helden mit mindestens Kampfkunst 2 dürfen diese Kreatur unabhängig von ihrer Stufe beschwören. Blutet derzeit kein Ziel auf dem Spielfeld, darfst du den Anwender für den Rest des Spiels bluten lassen, um diese Kreatur als zusätzliche Aktion zu beschwören. Du darfst einmal pro Zug ein Ziel wählen und es für den Rest des Spiels bluten lassen."
 },
 "Bomblebee": {
-"name": "Bombummel",
+"name": "Bombiene",
 "effect": "Einmal pro Zug darfst du, wenn ein Ziel, das dein Gegner kontrolliert, besiegt wird, ein Ziel wählen, das dein Gegner kontrolliert, und ihm 150 Schaden zufügen."
 },
 "Bomblebee Cluster": {
-"name": "Bombummel-Cluster",
-"effect": "Spiele diese Karte sofort, wenn du eine \"Bombummel\"-Kreatur beschwörst. Beschwöre bis zu 2 \"Bombummel\"-Kreaturen mit unterschiedlichen Namen aus deiner Hand mit demselben Helden als zusätzliche Aktionen. Danach kannst du für den Rest des Zuges keine Kreaturen beschwören."
+"name": "Bombiene-Cluster",
+"effect": "Spiele diese Karte sofort, wenn du eine \"Bombiene\"-Kreatur beschwörst. Beschwöre bis zu 2 \"Bombiene\"-Kreaturen mit unterschiedlichen Namen aus deiner Hand mit demselben Helden als zusätzliche Aktionen. Danach kannst du für den Rest des Zuges keine Kreaturen beschwören."
 },
 "Burning Fuse": {
 "name": "Brennende Zündschnur",
-"effect": "Du darfst diese Karte aktivieren, wenn dein Gegner seine Aktionsphase beginnt. Aktiviere die Effekte aller \"Bombummel\"-Kreaturen, die du kontrollierst und die in diesem Zug nicht beschworen wurden, als wäre ein Ziel, das dein Gegner kontrolliert, besiegt worden, auch wenn ihre Effekte in diesem Zug bereits aktiviert wurden. Besiege danach alle betroffenen \"Bombummel\"-Kreaturen. Du kannst diese Karte nur aktivieren, solange du mindestens 1 \"Bombummel\"-Kreatur kontrollierst."
+"effect": "Du darfst diese Karte aktivieren, wenn dein Gegner seine Aktionsphase beginnt. Aktiviere die Effekte aller \"Bombiene\"-Kreaturen, die du kontrollierst und die in diesem Zug nicht beschworen wurden, als wäre ein Ziel, das dein Gegner kontrolliert, besiegt worden, auch wenn ihre Effekte in diesem Zug bereits aktiviert wurden. Besiege danach alle betroffenen \"Bombiene\"-Kreaturen. Du kannst diese Karte nur aktivieren, solange du mindestens 1 \"Bombiene\"-Kreatur kontrollierst."
 },
 "Carpet Bomblebee": {
-"name": "Flächenbombummel",
+"name": "Flächenbombiene",
 "effect": "Einmal pro Zug: Wenn ein Ziel, das dein Gegner kontrolliert, besiegt wird, füge allen Helden, die dein Gegner kontrolliert, 80 Schaden zu."
 },
 "Dive Bomblebee": {
-"name": "Sturzflug-Bombummel",
+"name": "Sturzflug-Bombiene",
 "effect": "Einmal pro Zug: Wenn ein Ziel, das dein Gegner kontrolliert, besiegt wird, wähle eine Karte auf der Seite deines Gegners auf dem Spielfeld, die kein Held ist, und platziere sie unten in das Deck deines Gegners."
 },
 "Time Bomblebee": {
-"name": "Zeit-Bombummel",
+"name": "Zeit-Bombiene",
 "effect": "Jedes Mal, wenn ein Ziel, das dein Gegner kontrolliert, besiegt wird, platziere einen Bombenmarker auf diese Kreatur. Solange diese Kreatur Bombenmarker hat, kann sie weder Schaden erleiden noch besiegt werden. Zu Beginn des Zuges deines Gegners entferne alle Bombenmarker von dieser Kreatur, und wenn du mindestens 1 entfernt hast, wähle eine Kreatur und füge ihr 150 Schaden zu."
 },
 "Bonded Companion Humby": {
@@ -185,20 +185,20 @@
 "effect": "Du kannst nur 1 Exemplar dieser Karte in deinem Deck haben. Ein Held kann nur 1 \"Gebundener Gefährte\"-Kreatur in seinen Unterstützungszonen haben. Diese Kreatur kann nach dem Beschwören auf keine Weise in eine andere Unterstützungszone bewegt werden. Diese Kreatur und der zugehörige Held teilen sich 1 LP-Vorrat. Diese Kreatur ist unbetroffen von Karten und Effekten, die keine Helden betreffen können. Wenn diese Kreatur das Spielfeld verlässt, besiege den zugehörigen Helden. Einmal pro Zug darfst du, wenn du ein Ziel opferst, ein Ziel wählen und ihm 150 Schaden zufügen."
 },
 "Cardinal Beast Baihu": {
-"name": "Kardinalbestie Baihu",
-"effect": "Diese Kreatur ist unbetroffen von allen Karten und Effekten. Du darfst einmal pro Zug ein Ziel wählen, das dein Gegner kontrolliert, und es für 3 Züge betäuben. Ein durch diesen Effekt betäubtes Ziel erleidet von keiner Quelle Schaden. Wenn du 4 verschiedene \"Kardinalbestie\"-Kreaturen kontrollierst, gewinnst du das Spiel."
+"name": "Himmelsbestie Baihu",
+"effect": "Diese Kreatur ist unbetroffen von allen Karten und Effekten. Du darfst einmal pro Zug ein Ziel wählen, das dein Gegner kontrolliert, und es für 3 Züge betäuben. Ein durch diesen Effekt betäubtes Ziel erleidet von keiner Quelle Schaden. Wenn du 4 verschiedene \"Himmelsbestie\"-Kreaturen kontrollierst, gewinnst du das Spiel."
 },
 "Cardinal Beast Qinglong": {
-"name": "Kardinalbestie Qinglong",
-"effect": "Diese Kreatur ist unbetroffen von allen Karten und Effekten. Du darfst einmal pro Zug deinen Gegner nacheinander 3 Ziele wählen lassen, die er kontrolliert. Das erste erleidet 120 Schaden, das zweite 80 und das dritte 40. Wenn du 4 verschiedene \"Kardinalbestie\"-Kreaturen kontrollierst, gewinnst du das Spiel."
+"name": "Himmelsbestie Qinglong",
+"effect": "Diese Kreatur ist unbetroffen von allen Karten und Effekten. Du darfst einmal pro Zug deinen Gegner nacheinander 3 Ziele wählen lassen, die er kontrolliert. Das erste erleidet 120 Schaden, das zweite 80 und das dritte 40. Wenn du 4 verschiedene \"Himmelsbestie\"-Kreaturen kontrollierst, gewinnst du das Spiel."
 },
 "Cardinal Beast Xuanwu": {
-"name": "Kardinalbestie Xuanwu",
-"effect": "Diese Kreatur ist unbetroffen von allen Karten und Effekten. Du darfst einmal pro Zug eine Kreatur der Stufe 3 oder niedriger aus deinem Ablagestapel in eine freie Unterstützungszone eines deiner Helden platzieren, aber ihre aktuellen und maximalen LP werden zu 1. Wenn du 4 verschiedene \"Kardinalbestie\"-Kreaturen kontrollierst, gewinnst du das Spiel."
+"name": "Himmelsbestie Xuanwu",
+"effect": "Diese Kreatur ist unbetroffen von allen Karten und Effekten. Du darfst einmal pro Zug eine Kreatur der Stufe 3 oder niedriger aus deinem Ablagestapel in eine freie Unterstützungszone eines deiner Helden platzieren, aber ihre aktuellen und maximalen LP werden zu 1. Wenn du 4 verschiedene \"Himmelsbestie\"-Kreaturen kontrollierst, gewinnst du das Spiel."
 },
 "Cardinal Beast Zhuque": {
-"name": "Kardinalbestie Zhuque",
-"effect": "Diese Kreatur ist unbetroffen von allen Karten und Effekten. Du darfst einmal pro Zug ein Ziel wählen und es für den Rest des Spiels verbrennen. Ist das gewählte Ziel ein Held, verbrenne auch alle Kreaturen in seinen Unterstützungszonen. Wenn du 4 verschiedene \"Kardinalbestie\"-Kreaturen kontrollierst, gewinnst du das Spiel."
+"name": "Himmelsbestie Zhuque",
+"effect": "Diese Kreatur ist unbetroffen von allen Karten und Effekten. Du darfst einmal pro Zug ein Ziel wählen und es für den Rest des Spiels verbrennen. Ist das gewählte Ziel ein Held, verbrenne auch alle Kreaturen in seinen Unterstützungszonen. Wenn du 4 verschiedene \"Himmelsbestie\"-Kreaturen kontrollierst, gewinnst du das Spiel."
 },
 "Calamitusk, the Chaorc War Chief": {
 "name": "Calamitusk, der Chaork-Kriegshäuptling",
@@ -1554,7 +1554,7 @@
 },
 "Royal Corgi": {
 "name": "Königlicher Corgi",
-"effect": "Deine maximale Handkartenanzahl wird um 3 erhöht."
+"effect": "Deine maximale Handgröße wird um 3 erhöht."
 },
 "Spontaneous Reappearance": {
 "name": "Spontane Wiederkehr",
@@ -1566,7 +1566,7 @@
 },
 "The Great Clock Tower \"Big Gwen\"": {
 "name": "Der große Uhrturm \"Big Gwen\"",
-"effect": "Du musst keine Karten aus deiner Hand sofort löschen, wenn du deine maximale Handkartenanzahl überschreitest, während du Verschmutzungs-Token kontrollierst (aber deine maximale Handkartenanzahl ist trotzdem verringert)."
+"effect": "Du musst keine Karten aus deiner Hand sofort löschen, wenn du deine maximale Handgröße überschreitest, während du Verschmutzungs-Token kontrollierst (aber deine maximale Handgröße ist trotzdem verringert)."
 },
 "Victorica, the Eternal Empress": {
 "name": "Victorica, die ewige Kaiserin",
@@ -2781,7 +2781,7 @@
 },
 "Coreling": {
 "name": "Kernling",
-"effect": "Hast du seit Beginn dieses Zuges ein Ziel deines Gegners besiegt, wird die Stufe dieser Kreatur in deiner Hand zu 0 und du darfst diese Kreatur während deiner ersten Aufladephase als zusätzliche Aktion beschwören, wenn du in diesem Zug noch keinen \"Kernling\" beschworen hast. Du darfst einmal pro Zug ein Ziel wählen und ihm 50 Schaden zufügen. Ist ein Gebiet im Spiel, füge stattdessen 150 Schaden zu. Kontrollierst du \"Geist der ultimativen Feuerwaffe\", darf diese Kreatur diesen Effekt in dem Zug verwenden, in dem sie beschworen wurde."
+"effect": "Hast du seit Beginn dieses Zuges ein Ziel deines Gegners besiegt, wird die Stufe dieser Kreatur in deiner Hand zu 0 und du darfst diese Kreatur während deiner ersten Hauptphase als zusätzliche Aktion beschwören, wenn du in diesem Zug noch keinen \"Kernling\" beschworen hast. Du darfst einmal pro Zug ein Ziel wählen und ihm 50 Schaden zufügen. Ist ein Gebiet im Spiel, füge stattdessen 150 Schaden zu. Kontrollierst du \"Geist der ultimativen Feuerwaffe\", darf diese Kreatur diesen Effekt in dem Zug verwenden, in dem sie beschworen wurde."
 },
 "Corpse Explosion": {
 "name": "Leichenexplosion",
@@ -4347,7 +4347,7 @@
 },
 "Open Invitation": {
 "name": "Offene Einladung",
-"effect": "Du kannst diese Karte nur während deiner Hauptphase 1 spielen. Wähle einen Aufgestiegenen Helden aus deiner Hand und platziere ihn auf einen passenden Helden, den du kontrollierst, wobei du seine Aufstiegsbedingungen ignorierst, und beende deinen Zug. Dies zählt nicht als Aufstieg dieses Helden. Am Ende deines nächsten Zuges mische den Aufgestiegenen Helden zurück in dein Deck."
+"effect": "Du kannst diese Karte nur während deiner ersten Hauptphase spielen. Wähle einen Aufgestiegenen Helden aus deiner Hand und platziere ihn auf einen passenden Helden, den du kontrollierst, wobei du seine Aufstiegsbedingungen ignorierst, und beende deinen Zug. Dies zählt nicht als Aufstieg dieses Helden. Am Ende deines nächsten Zuges mische den Aufgestiegenen Helden zurück in dein Deck."
 },
 "Outbreak": {
 "name": "Ausbruch",
@@ -5712,9 +5712,9 @@
 "Arrows": "Pfeile",
 "Bad": "Böse",
 "Bleed": "Blutung",
-"Bomblebees": "Bombummeln",
+"Bomblebees": "Bombienen",
 "Bonded Companions": "Gebundene Gefährten",
-"Cardinal Beasts": "Kardinalbestien",
+"Cardinal Beasts": "Himmelsbestien",
 "Chaorcs": "Chaorks",
 "Chess": "Schach",
 "Cool": "Cool",

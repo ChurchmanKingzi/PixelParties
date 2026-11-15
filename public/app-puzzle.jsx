@@ -413,7 +413,7 @@ function schadensHistorieImPuzzle(players, hand, oppHand) {
 function funFunImPuzzle(players, hand, oppHand, getCard) {
   const istFunFun = (n) => {
     const c = typeof n === 'string' ? getCard(n) : null;
-    return !!c && (/^Fun-Fun/.test(c.archetype || '') || /Applause Counter/.test(c.effect || ''));
+    return !!c && (/^Fun-Fun/.test(c.archetype || '') || /Applause Counter/.test(c.effectEn || c.effect || ''));
   };
   if ((hand || []).some(istFunFun) || (oppHand || []).some(istFunFun)) return true;
   return (players || []).some(p => p && (p.supportZones || []).some(hz => (hz || []).some(slot => (slot || []).some(istFunFun))));
@@ -423,7 +423,7 @@ function funFunImPuzzle(players, hand, oppHand, getCard) {
 // nennt (Als Regel 16.8.: lieber Archetyp/Text als Kartenname, damit ein
 // spaeterer Verwandter — Great Vanguard Demon — ohne Editor-Umbau geht).
 function cardUsesDemonCounters(card) {
-  return !!card && typeof card.effect === 'string' && card.effect.includes('Demon Counter');
+  return !!card && typeof card.effect === 'string' && (card.effectEn || card.effect).includes('Demon Counter');
 }
 const PUZZLE_HERO_COUNTER_BADGES = [
   { key: '_changeCounters',    icon: '🌌', label: 'Change Counters' },
@@ -1296,9 +1296,9 @@ function PuzzleCreator() {
     const map = {};
     const allCards = window.AVAILABLE_CARDS || [];
     for (const c of allCards) {
-      if (c.cardType !== 'Ascended Hero' || !c.effect) continue;
+      if (c.cardType !== 'Ascended Hero' || !(c.effectEn || c.effect)) continue;
       // Pattern: on top of a/an "Base Hero Name"  OR  Ascend from "Base Hero Name"
-      const m = c.effect.match(/(?:on top of an? |Ascend from )"([^"]+)"/);
+      const m = (c.effectEn || c.effect).match(/(?:on top of an? |Ascend from )"([^"]+)"/);
       if (m) {
         const baseName = m[1];
         // Waflav variants reference just "Waflav" — resolve to the actual Hero card
@@ -4444,13 +4444,13 @@ function PuzzleCreator() {
               value={puzzleFilters.cardType}
               onChange={e => setPuzzleFilters(p => ({ ...p, cardType: e.target.value }))}>
               <option value="">All Types</option>
-              {(window.CARD_TYPES || []).map(t => <option key={t} value={t}>{t}</option>)}
+              {(window.CARD_TYPES || []).map(t => <option key={t} value={t}>{window.ppT(t)}</option>)}
             </PPSelect>
             <PPSelect className="db-filter-select"
               value={puzzleFilters.subtype}
               onChange={e => setPuzzleFilters(p => ({ ...p, subtype: e.target.value }))}>
               <option value="">All Subtypes</option>
-              {(window.SUBTYPES || []).map(t => <option key={t} value={t}>{t}</option>)}
+              {(window.SUBTYPES || []).map(t => <option key={t} value={t}>{window.ppT(t)}</option>)}
             </PPSelect>
             {/* ★ v1166: Doppelschulen — nur Attacks/Spells/Creatures mit zwei Spell Schools */}
             <PPSelect className="db-filter-select"
@@ -4468,31 +4468,31 @@ function PuzzleCreator() {
               value={puzzleFilters.archetype}
               onChange={e => setPuzzleFilters(p => ({ ...p, archetype: e.target.value }))}>
               <option value="">All Archetypes</option>
-              {(window.ARCHETYPES || []).map(t => <option key={t} value={t}>{t}</option>)}
+              {(window.ARCHETYPES || []).map(t => <option key={t} value={t}>{window.ppT(t)}</option>)}
             </PPSelect>
             <PPSelect className="db-filter-select"
               value={puzzleFilters.ss1}
               onChange={e => setPuzzleFilters(p => ({ ...p, ss1: e.target.value }))}>
               <option value="">Spell School 1</option>
-              {(window.SPELL_SCHOOLS || []).map(t => <option key={t} value={t}>{t}</option>)}
+              {(window.SPELL_SCHOOLS || []).map(t => <option key={t} value={t}>{window.ppT(t)}</option>)}
             </PPSelect>
             <PPSelect className="db-filter-select"
               value={puzzleFilters.ss2}
               onChange={e => setPuzzleFilters(p => ({ ...p, ss2: e.target.value }))}>
               <option value="">Spell School 2</option>
-              {(window.SPELL_SCHOOLS || []).map(t => <option key={t} value={t}>{t}</option>)}
+              {(window.SPELL_SCHOOLS || []).map(t => <option key={t} value={t}>{window.ppT(t)}</option>)}
             </PPSelect>
             <PPSelect className="db-filter-select"
               value={puzzleFilters.sa1}
               onChange={e => setPuzzleFilters(p => ({ ...p, sa1: e.target.value }))}>
               <option value="">Starting Ability 1</option>
-              {(window.STARTING_ABILITIES || []).map(t => <option key={t} value={t}>{t}</option>)}
+              {(window.STARTING_ABILITIES || []).map(t => <option key={t} value={t}>{window.ppT(t)}</option>)}
             </PPSelect>
             <PPSelect className="db-filter-select"
               value={puzzleFilters.sa2}
               onChange={e => setPuzzleFilters(p => ({ ...p, sa2: e.target.value }))}>
               <option value="">Starting Ability 2</option>
-              {(window.STARTING_ABILITIES || []).map(t => <option key={t} value={t}>{t}</option>)}
+              {(window.STARTING_ABILITIES || []).map(t => <option key={t} value={t}>{window.ppT(t)}</option>)}
             </PPSelect>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 5 }}>
               <input className="db-filter-input" type="number" placeholder="Level"

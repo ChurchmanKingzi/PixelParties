@@ -22,7 +22,7 @@ const DATEIEN = [
   'public/card-render.js', 'public/card-image-shim.js', 'public/rank-frames.js',   // rank-frames.js: Rang-Rahmen werden in die Karten eingebacken
   'public/cardgen/sprites.png', 'public/cardgen/sprites.json', 'public/cardgen/glyphs.json',
   'public/cardgen/art.json', 'public/cardgen/art.png',
-  'data/cards.json', 'data/card-render.json', 'data/skins.json',
+  'data/cards.json', 'data/card-render.json', 'data/skins.json', 'data/i18n/de-cards.json', 'public/i18n.js',
 ];
 const ORDNER = ['public/cardgen/art'];          // einzelne Kunstdateien in Vollaufloesung
 
