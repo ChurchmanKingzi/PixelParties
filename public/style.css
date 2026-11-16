@@ -16924,6 +16924,14 @@ body[data-rotate-gate] .pp-bg-particles * { animation: none !important; }
 .menu-nav-btn--half .menu-nav-label {
   white-space: normal;
   line-height: 1.15;
+  padding-top: 6px;   /* die Pixelschrift sitzt im Zeilenkasten oben: ohne den Ausgleich wirkt das Label ~3 px zu hoch (Kappenhoehe optisch zentrieren) */
+}
+/* Daily-Knopf: der deutsche Text („TÄGLICHE HERAUSFORDERUNG“) ist lang – umbrechen, etwas kleiner, optisch zentriert */
+.menu-nav-btn--daily .menu-nav-label {
+  white-space: normal;
+  line-height: 1.15;
+  font-size: 13px;
+  padding-top: 6px;
 }
 
 /* ═══ Daily challenge button ═══ */
@@ -21731,7 +21739,7 @@ body[data-tb-hl] .hero-idle-platz.hero-idle-hover { scale: none; }
 }
 /* Beschriftung UEBER dem Glanzband — der Streifen laeuft hinter den
    Buchstaben durch, die Schrift bleibt jederzeit lesbar. */
-.auth-gast-titel { position: relative; z-index: 2; }
+.auth-gast-titel { position: relative; z-index: 2; white-space: pre-line; }   /* deutsche Fassung: zwei Zeilen („ALS GAST SPIELEN“ / „GEGEN CPU“) */
 .auth-gast-hinweis { text-align: center; }
 .auth-or--konto { margin: 14px 0 12px; }
 /* Ohne Google-Anmeldung bleibt die rechte Spalte leer — dann ganz weg,
@@ -26729,3 +26737,10 @@ input[type="checkbox"]:focus-visible, input[type="radio"]:focus-visible { outlin
   .bp-hudbar .bp-hud-row { gap: 8px; }
 }
 @supports not selector(::-webkit-scrollbar) { .bp-scroll { scrollbar-color: #fad54a #12101f; } }
+
+/* Sprach-Flagge (Login + Hauptmenue), oben links; harter Pixelrahmen */
+.lang-flag-btn { position: fixed; top: 10px; left: 12px; z-index: 60; padding: 0; border: 0; background: none; cursor: pointer;
+  box-shadow: 0 0 0 2px #000, 0 0 0 4px #fff; line-height: 0; }
+/* Telefon quer: oben links liegen Avatar/Name/ELO/SC — die Flagge wandert rechts neben die Knoepfe */
+@media (max-height: 600px) { .lang-flag-btn--menu { left: auto; right: 292px; } }
+.lang-flag-btn:hover { box-shadow: 0 0 0 2px #000, 0 0 0 4px #fbc86a; }

@@ -3562,6 +3562,13 @@ function PpSeitenGrund() {
 
 function App() {
   const [user, setUser] = useState(null);
+  // Sprache des Kontos: gespeicherte Sprache uebernehmen (Neuladen); Konten ohne Eintrag bekommen die aktuelle Browsersprache
+  useEffect(() => {
+    if (!user || !window.PP_I18N) return;
+    const cur = window.PP_I18N.get();
+    if (user.lang && user.lang !== cur) window.PP_I18N.set(user.lang);
+    else if (!user.lang) api('/profile/lang', { method: 'POST', body: JSON.stringify({ lang: cur }) }).catch(() => {});
+  }, [user && user.id]);
   const [screen, setScreen] = useState('menu');
   // Der Kartenbild-Shim (card-image-shim.js) merkt sich je Bildschirm, welche Karten zuerst gezeigt wurden, und waermt sie im
   // Hauptmenue vor. Die Eltern rendern vor den Kindern, also steht der Name schon da, wenn deren <img> ihre Quelle setzen.
@@ -3808,7 +3815,8 @@ function App() {
 // they're focused. The boot splash (Segoe UI) covers this brief wait; a
 // timeout guarantees we mount even if the font load stalls or fails.
 (function mountApp() {
-  const mount = () => ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+  // Sprachdateien zuerst laden (ppTrans/Laufzeit-Uebersetzer brauchen das Woerterbuch schon beim ersten Zeichnen)
+  const mount = () => Promise.resolve(window.PP_I18N && window.PP_I18N.ready).catch(() => {}).then(() => ReactDOM.createRoot(document.getElementById('root')).render(<App />));
   try {
     if (document.fonts && document.fonts.load) {
       let done = false;

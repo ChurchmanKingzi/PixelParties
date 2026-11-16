@@ -5625,6 +5625,10 @@ ppFunnel.hit();
 async function api(path, opts = {}) {
   const headers = { 'Content-Type': 'application/json', ...ppFunnel.headers() };
   if (window.AUTH_TOKEN) headers['x-auth-token'] = window.AUTH_TOKEN;
+  // Sprache mitschicken, wo der Server E-Mails verschickt (Anmeldung, Code erneut senden, Passwort, E-Mail-Adresse): data/i18n, server.js normLang
+  if (typeof opts.body === 'string' && window.PP_I18N && /^\/(auth\/|profile\/email\/request)/.test(path)) {
+    try { const b = JSON.parse(opts.body); if (b && typeof b === 'object' && !Array.isArray(b) && b.lang === undefined) opts = { ...opts, body: JSON.stringify({ ...b, lang: window.PP_I18N.get() }) }; } catch (e) { /* kein JSON */ }
+  }
   const res = await fetch('/api' + path, { ...opts, headers: { ...headers, ...opts.headers } });
   const data = await res.json();
   if (!res.ok) throw new Error(data.error || 'Request failed');
@@ -5931,6 +5935,7 @@ async function loadCardDB() {
   // Load full card database (needed for rule lookups on existing decks)
   const res = await fetch('/data/cards.json');
   const cards = await res.json();
+  if (window.PP_I18N) { await window.PP_I18N.load(); window.PP_I18N.apply(cards); }
   // Mutate in-place so destructured references from other files stay valid
   window.ALL_CARDS.length = 0;
   window.ALL_CARDS.push(...cards.sort((a, b) => a.name.localeCompare(b.name)));
@@ -6034,6 +6039,8 @@ function heroDisplayName(fullName) {
   if (!fullName || typeof fullName !== 'string') return fullName || '';
   const name = fullName.trim();
   if (HERO_NAME_OVERRIDES[name]) return HERO_NAME_OVERRIDES[name];
+  { const dn = window.PP_I18N && window.PP_I18N.get() === 'de' && window.CARDS_BY_NAME && window.CARDS_BY_NAME[name] && window.CARDS_BY_NAME[name].displayName;
+    if (dn) { const c = dn.indexOf(','); return c > 0 ? dn.slice(0, c).trim() || dn : dn; } }
   // Regel 1 — Komma trennt Name von Titel.
   const comma = name.indexOf(',');
   if (comma > 0) return name.slice(0, comma).trim() || name;
@@ -6318,7 +6325,7 @@ function spiceTable() {
   for (const n of namen) {
     const c = db[n];
     if (!c || c.cardType !== 'Artifact' || c.archetype !== SPICE_ARCHETYPE) continue;
-    const m = SPICE_TEXT_RE.exec(String(c.effect || '').replace(/\s+/g, ' '));
+    const m = SPICE_TEXT_RE.exec(String(c.effectEn || c.effect || '').replace(/\s+/g, ' '));
     if (!m) continue;
     const freigaben = (m[1].match(/"([^"]+)"/g) || [])
       .map(s => s.slice(1, -1))
@@ -6453,7 +6460,7 @@ const UNLIMITED_COPY_CARDS = new Set(['Infinitely Reproducing Slime']);
 const NON_STARTING_HERO_RE = /cannot be one of your starting heroes/i;
 function isNonStartingHero(cardName) {
   const card = window.CARDS_BY_NAME?.[cardName];
-  return !!card && card.cardType === 'Hero' && NON_STARTING_HERO_RE.test(String(card.effect || ''));
+  return !!card && card.cardType === 'Hero' && NON_STARTING_HERO_RE.test(String(card.effectEn || card.effect || ''));
 }
 
 function heroFirstName(cardName) {
@@ -8615,7 +8622,7 @@ function CardSideTooltip({ card, imgUrl: imgUrl0, inGallery }) {
         </div>
       )}
       <div className="card-tooltip-info" style={{ flex: 1, overflowY: 'auto', padding: 0 }}>
-        <TTHeader card={card} name={card.name} level={card.level} />
+        <TTHeader card={card} name={card.displayName || card.name} level={card.level} />
         <div className="tt-body">
           <TTStats hp={card.hp} atk={card.atk} cost={cardCostText(card)} />
           {/* Heroes zeigen KEINE Abilities im Tooltip (Als Vorgabe 12.10.); bei Ascended Heroes steht der Ascension Bonus als Satz. */}
@@ -8930,7 +8937,8 @@ window.effektTextPasst = effektTextPasst;
 function namePasst(name, suche) {
   const woerter = String(suche == null ? '' : suche).toLowerCase().split(/\s+/).filter(Boolean);
   if (woerter.length === 0) return true;
-  const text = String(name == null ? '' : name).toLowerCase();
+  const dn = window.CARDS_BY_NAME && window.CARDS_BY_NAME[name] && window.CARDS_BY_NAME[name].displayName;
+  const text = (String(name == null ? '' : name) + (dn ? ' ' + dn : '')).toLowerCase();
   return woerter.every(w => text.includes(w));
 }
 window.namePasst = namePasst;
@@ -9818,11 +9826,11 @@ function TTHeader({ card, name, level, levelBonus }) {
     <div className="tt-kopf" style={{ '--zier': color }}>
       <div className="tt-name" style={{ color }}>{name}{card.extraName ? <span style={{ color: '#3ddc57' }}> / {card.extraName}</span> : null}</div>
       <div className="tt-chips">
-        <TTChip color={color}>{card.cardType}</TTChip>
-        {card.subtype && <TTChip>{card.subtype}</TTChip>}
-        {card.archetype && <TTChip>{card.archetype}</TTChip>}
+        <TTChip color={color}>{window.ppT(card.cardType)}</TTChip>
+        {card.subtype && <TTChip>{window.ppT(card.subtype)}</TTChip>}
+        {card.archetype && <TTChip>{window.ppT(card.archetype)}</TTChip>}
         {level != null && <TTChip color={levelBonus > 0 ? '#d6b3f9' : undefined}>Lv {level}{levelBonus > 0 ? ` (+${levelBonus})` : ''}</TTChip>}
-        {schools.map(sc => <TTChip key={sc} color={TT_SCHOOL_COLORS[sc]}>{sc}</TTChip>)}
+        {schools.map(sc => <TTChip key={sc} color={TT_SCHOOL_COLORS[sc]}>{window.ppT(sc)}</TTChip>)}
       </div>
     </div>
   );
@@ -9967,7 +9975,7 @@ function ttTokenKarten() {
 }
 /** Die Token-Karten, die der Effekttext von `card` nennt, in der Reihenfolge ihres ersten Auftretens; Tokens selbst: keine. */
 function ttRelatedTokens(card) {
-  const text = String((card && card.effect) || '');
+  const text = String((card && (card.effectEn || card.effect)) || '');
   if (!text || ttIstToken(card)) return [];
   const treffer = [];
   for (const t of ttTokenKarten()) {
@@ -10929,13 +10937,13 @@ function TextBox() {
     if (opts.speaker === ANTONIA_PORTRAIT) setAntoniaPresent(true);
 
     if (opts.pages && Array.isArray(opts.pages)) {
-      setPages(opts.pages);
+      setPages(window.ppTx ? opts.pages.map(pg => typeof pg === 'string' ? window.ppTx(pg) : (pg && typeof pg.text === 'string' ? { ...pg, text: window.ppTx(pg.text) } : pg)) : opts.pages);   // Sprachumschaltung
       setPageIdx(0);
       onShowFiredRef.current = new Set();
       return;
     }
 
-    const text = (opts.text || '').trim();
+    const text = (window.ppTx ? window.ppTx(opts.text || '') : (opts.text || '')).trim();   // Sprachumschaltung (data/i18n)
     if (!text) { setPages([]); return; }
     const body = bodyRef.current;
     if (!body) { setPages([{ text }]); return; }
@@ -12306,3 +12314,28 @@ window.doppelFilterAnwenden = doppelFilterAnwenden;
 function ppCamelSpaces(s) {
   return String(s == null ? '' : s).replace(/([a-z0-9])([A-Z])/g, '$1 $2').replace(/([A-Z]+)([A-Z][a-z])/g, '$1 $2').replace(/([A-Za-z])(\d)/g, '$1 $2');
 }
+
+
+// ═══ Sprach-Flagge (Login + Hauptmenü): Pixelart-Sprites, Klick wechselt EN <-> DE ═══
+function LangFlag({ menu }) {
+  const lang = (window.PP_I18N && window.PP_I18N.get()) || 'en';
+  const next = lang === 'en' ? 'de' : 'en';
+  const stripes = [];
+  if (lang === 'en') {
+    // US-Flagge 19×10 Zellen: 7 rote/6 weisse Streifen (vereinfacht auf 10 Reihen), blaues Feld oben links
+    for (let y = 0; y < 10; y++) stripes.push(<rect key={'s' + y} x="0" y={y} width="19" height="1" fill={y % 2 === 0 ? '#b21a29' : '#ffffff'} />);
+    stripes.push(<rect key="c" x="0" y="0" width="8" height="5" fill="#2b457e" />);
+    [[1,1],[3,1],[5,1],[2,3],[4,3],[6,3]].forEach(([x, y]) => stripes.push(<rect key={'t' + x + y} x={x} y={y} width="1" height="1" fill="#ffffff" />));
+  } else {
+    stripes.push(<rect key="a" x="0" y="0" width="19" height="3.34" fill="#000000" />);
+    stripes.push(<rect key="b" x="0" y="3.34" width="19" height="3.33" fill="#c80000" />);
+    stripes.push(<rect key="c" x="0" y="6.67" width="19" height="3.33" fill="#ffd61a" />);
+  }
+  return (
+    <button className={"lang-flag-btn" + (menu ? " lang-flag-btn--menu" : "")} data-pp-px="aus" onClick={() => { if (window.playSFX) window.playSFX('ui_click'); const next = lang === 'en' ? 'de' : 'en'; if (window.AUTH_TOKEN && window.api) { window.api('/profile/lang', { method: 'POST', body: JSON.stringify({ lang: next }) }).catch(() => {}).finally(() => window.PP_I18N.set(next)); } else window.PP_I18N.toggle(); }}
+      title={lang === 'en' ? 'Language: English (click for Deutsch)' : 'Sprache: Deutsch (Klick für English)'} aria-label={'Language ' + next}>
+      <svg viewBox="0 0 19 10" width="38" height="20" shapeRendering="crispEdges" style={{ imageRendering: 'pixelated', display: 'block' }}>{stripes}</svg>
+    </button>
+  );
+}
+window.LangFlag = LangFlag;

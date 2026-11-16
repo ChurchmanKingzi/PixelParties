@@ -814,6 +814,7 @@ function AuthScreen() {
   // erreichbar.
   const Header = (
     <div className="auth-header">
+      <LangFlag />
       {/* ★ W86u2 (Pixelart): die Glut hinter dem Logo als Dither-Pixelbild statt Radialverlauf mit Alpha (Ebene hinter dem Inhalt, `.auth-header` ist ein Stapelkontext) */}
       <PpVerlauf className="auth-header-glut" px={4} gradient="radial-gradient(ellipse 46% 58% at 50% 46%, rgba(251,200,106,.5), rgba(227,116,53,.2) 38%, rgba(240,50,50,.06) 64%, transparent 92%)"
         style={{ position: 'absolute', inset: 0, zIndex: -1, pointerEvents: 'none' }} />
@@ -2129,6 +2130,7 @@ function MainMenu() {
           halb aus dem Bild"). Alle Layout-Masse stehen in style.css unter
           `.menu-stats` / `.menu-profile-gutter` / `.menu-corner`; Inline
           bleibt nur, was vom Spieler abhaengt (Farbe, Bild, Messwerte). */}
+      <LangFlag menu />
       <div className="menu-topleft">
       <div className="menu-stats">
         <div className="menu-stats-row">
@@ -2209,7 +2211,7 @@ function MainMenu() {
           <button className="btn btn-big menu-nav-btn" onClick={() => setScreen('singleplayer')}>
             <span className="menu-nav-label">VS CPU</span>
             <PixelIcon name="pfeil" className="menu-nav-pfeil" /></button>
-          <button className="btn btn-big menu-nav-btn" onClick={openDaily} title="Daily Challenge">
+          <button className="btn btn-big menu-nav-btn menu-nav-btn--daily" onClick={openDaily} title="Daily Challenge">
             <span className="menu-nav-label">DAILY{daily?.active && daily?.claimedBig ? ' ✓' : ''}</span>
             <PixelIcon name="pfeil" className="menu-nav-pfeil" />
             {/* Heute noch nicht gestartet → kleines NEW-Schild an der Ecke. */}
@@ -2872,7 +2874,7 @@ function ProfileScreen() {
   const losses = user.losses || 0;
   const gamesPlayed = wins + losses;
   const winRate = gamesPlayed > 0 ? Math.round((wins / gamesPlayed) * 100) : 0;
-  const memberSince = user.created_at ? new Date(user.created_at * 1000).toLocaleDateString('en-US', { year: 'numeric', month: 'short' }) : '—';
+  const memberSince = user.created_at ? new Date(user.created_at * 1000).toLocaleDateString(window.ppLocale ? window.ppLocale() : 'en-US', { year: 'numeric', month: 'short' }) : '—';
 
   // Next rank progress
   const nextRank = RANK_TIERS.find(r => r.min > (user.elo || 1000));
