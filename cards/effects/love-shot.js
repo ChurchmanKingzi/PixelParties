@@ -80,6 +80,7 @@
 const CARD_NAME = 'Love Shot';
 
 const { zieheAusGegnerDeck } = require('./_opponent-deck-shared');
+const { ausgegrauteRestkarten } = require('./_target-dim-shared');
 
 module.exports = {
   // ★★ v1182 — ENTKOPPELTE BILDER (CARD_API): wird die Karte NEGIERT,
@@ -165,6 +166,9 @@ module.exports = {
       // (school/level/Wisdom/etc.) is checked later via
       // getHeroPlayableCards once a Hero is locked in.
       const heroTargets = [];
+      // CARD_API „Ziel-Picker graut alles Nicht-Wählbare aus": Gegnerhelden, die nicht handeln können (Frost, Betäubung, Netz, Fessel, Negation,
+      // Fähigkeitssperre, Aktionsdeckel, Aktionssperre), bleiben SICHTBAR, aber ausgegraut (`ineligible`) — wählbar ist weiterhin nur, wer vorher schon wählbar war.
+      const gedimmteHelden = [];
       // W16g (S02-15): „a Hero your opponent CONTROLS“ — Kontrolle statt Spalte (`heroesControlledBy`): ein Gegnerheld, den ich selbst
       // kontrolliere (Paraseed, Styx, Charme), ist kein Ziel mehr.
       // W17d (S02-15, Teil 2): ein vom Gegner kontrollierter Held MEINER Spalte (`physOwner === pi`) ist wählbar. „Held, den der Gegner
@@ -172,15 +176,18 @@ module.exports = {
       // eigener Guss (`playableMap.own`, `heroOwner` = Spalte; Hand, Wisdom-Abwurf und Aktion gehören ohnehin mir).
       for (const { physOwner, heroIdx: hi, hero: h } of engine.heroesControlledBy(oi)) {
         if (!h?.name || h.hp <= 0) continue;
-        if (h.statuses?.frozen || h.statuses?.stunned || h.statuses?.webbed
-            || h.statuses?.bound || h.statuses?.negated) continue;
-        if (engine.isHeroSkillLocked(physOwner, hi)) continue;
-        if (engine.heroActionCapReached(physOwner, hi)) continue;   // W8: ruht bei Frost/Betäubung/Negation
-        if (h._actionLockedTurn === gs.turn) continue;
-        heroTargets.push({
+        const eintrag = {
           id: `hero-${physOwner}-${hi}`, type: 'hero',
           owner: physOwner, heroIdx: hi, cardName: h.name,
-        });
+        };
+        // W8: `heroActionCapReached` ruht bei Frost/Betäubung/Negation
+        const nichtWaehlbar = !!(h.statuses?.frozen || h.statuses?.stunned || h.statuses?.webbed
+            || h.statuses?.bound || h.statuses?.negated)
+          || engine.isHeroSkillLocked(physOwner, hi)
+          || engine.heroActionCapReached(physOwner, hi)
+          || h._actionLockedTurn === gs.turn;
+        if (nichtWaehlbar) gedimmteHelden.push({ ...eintrag, ineligible: true });
+        else heroTargets.push(eintrag);
       }
 
       if (heroTargets.length === 0) {
@@ -193,7 +200,9 @@ module.exports = {
       // resolves to that step. The follow-up "pick a Spell/Attack"
       // handPick remains cancellable so the player can still bail
       // before committing a card from hand.
-      const picked = await engine.promptEffectTarget(pi, heroTargets, {
+      // Alles Übrige (nicht handlungsfähige Gegnerhelden, eigene Helden, Karten der Support Zones) ausgegraut mitgeben — nichts wird verschwiegen.
+      const alleHelden = [...heroTargets, ...gedimmteHelden];
+      const picked = await engine.promptEffectTarget(pi, [...alleHelden, ...ausgegrauteRestkarten(engine, alleHelden)], {
         title: CARD_NAME,
         description: "Choose an opponent's Hero. You will perform a Spell or Attack from your hand with it.",
         confirmLabel: '💘 Choose!',
