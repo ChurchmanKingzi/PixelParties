@@ -17656,7 +17656,8 @@ this._deathWatch = (this._deathWatchStack || []).length
       const _rcd = this._getCardDB()[cardName];
       if (_rcd && (_rcd.subtype || '') === 'Reaction' && hasCardType(_rcd, 'Creature')) {
         const _rBesitzer = rest.controller ?? playerIdx;
-        if (await this._reaktionGespielt(_rBesitzer, cardName, 'Creature')) {
+        // 16.11.2026: `ohneKette` — das Gegenreaktions-Fenster dieser Beschwörung öffnet NACH dem Landen (`_landungsFenster` unten: The Master's Plan, Off Duty …), kein zweites davor.
+        if (await this._reaktionGespielt(_rBesitzer, cardName, 'Creature', { ohneKette: true })) {
           if (await this._nimmOffenenRaub(cardName, _rBesitzer)) return { negated: true, inst: null };   // 24.10. Reverse Trap: gestohlen, kein Ablage-Flug
           this._broadcastEvent('play_pile_transfer', {
             owner: _rBesitzer, cardName, from: 'hand', to: 'discard', asPlay: true, fromHandIdx: rest.fromHandIdx,
@@ -40009,6 +40010,10 @@ this._deathWatch = (this._deathWatchStack || []).length
       await this._delay(300);
       this.log('creature_pre_defeat_reaction', { card: cardName, player: ps.username, target: creatureInst.name });
 
+      // ★ 16.11.2026: auch dieses Hand-Fenster meldet die Reaction als gespielt (Gegenreaktions-Fenster: Cute Camera, Front Soldier, Reverse Trap, zentrales Kettenfenster). Negiert: die Kreatur ist nicht gerettet,
+      // die Karte liegt in der Ablage (die Engine routet sie: `ort: 'limbo'`), Kosten bezahlt.
+      if (await this._reaktionGespielt(ownerIdx, cardName, cardData?.cardType, { sourceOwner: this._rxQuellBesitzer(source), ort: 'limbo', _q, goldCost: cost })) { this.sync(); return false; }
+
       let saved = false;
       this._inCreaturePreDefeatReaction = true;
       try {
@@ -40703,10 +40708,20 @@ this._deathWatch = (this._deathWatchStack || []).length
    * Hand-Reaktionsfenstern) und von `summonCreatureWithHooks` (Reaction-CREATURES aus der Hand: Doomed Town Guard, Explosive Drone, Enhanced Guard Dog,
    * Chaorc Rider Warg, Elven Rider). Kettenreaktionen laufen über ihr eigenes Kettenfenster. Loggt `reaction_negated` und meldet die Negation
    * (`ON_NEGATION_DEALT`).
+   *
+   * ★ Spielgestalter-Entscheidung 16.11.2026 — ZENTRALES KETTENFENSTER: Jede Hand-Reaction (Spell, Attack, Artifact, Creature), die ein Hand-Reaktionsfenster einsetzt, öffnet dem Gegner das REGULÄRE
+   * Gegenreaktions-Fenster (`_zentralesKettenfenster`): reine Kettenkarten (Silence, The Master's Plan, Misfire, Lunar Eclipse, Key …) kommen darin zum Zug. Reihenfolge: erst die Handfallen mit eigenem
+   * Hook (Cute Camera, Front Soldier: `onReactionPlayed`), dann die Surprise-Fallen (Reverse Trap), zuletzt das Kettenfenster — diese drei Karten werden in der Kette NICHT noch einmal an dasselbe Glied
+   * angeboten (kein Doppelangebot; tiefer in der Kette sind sie normale Kettenkarten). Cute Camera mit +3 Gold (`extra.ohneReaktion`) öffnet GAR KEIN Fenster („your opponent cannot react to this card's
+   * activation"). `extra.ohneKette` überspringt nur das Kettenfenster (Reaction-Creatures mit `summonWindow`: ihr Fenster öffnet nach dem Landen).
+   * `extra.ort` sagt, wo die Karte beim Aufruf liegt: 'ablage' (Standard: schon im Ablage-/Löschstapel — alle Fenster mit sofortigem Routing), 'hand' (noch in der Hand: Front Soldier) oder 'limbo'
+   * (schon aus der Hand, aber erst NACH der Auflösung abgelegt: die Fenster mit `spaetAblegen`; `extra._q` = Quelle für `_rxAblagePs`). Bei 'hand'/'limbo' legt die Engine eine NEGIERTE Karte selbst ab
+   * (Ablage, bzw. Hand des Diebes/Löschstapel) — der Aufrufer überspringt dann Auflösung UND eigenes Routing.
    * @returns {Promise<boolean>} true = negiert (die Wirkung der Reaction fällt aus)
    */
   async _reaktionGespielt(ownerIdx, cardName, cardType, extra = {}) {
     if (this._inMctsSim) return false;
+    if (extra.ohneReaktion) return false;   // Cute Camera +3: „your opponent cannot react to this card's activation" — weder Hand-Hooks noch Surprises noch Kettenfenster
     this._offenerRaub = null;   // 24.10. (Reverse Trap): ein Rest aus einem früheren Fenster gilt nicht für diese Reaction
     // N5-04: `extra.sourceOwner` = Besitzer der Karte/des Effekts, auf den die Reaction antwortet (Cute Camera: „in reaction to YOUR card or
     // effect"); fehlt er (ältere Fenster), kennt der Zuhörer die Quelle nicht und darf nicht danach filtern.
@@ -40724,6 +40739,16 @@ this._deathWatch = (this._deathWatchStack || []).length
         if (Number.isInteger(res.stolenTo)) { rxHook._reactionStolenTo = res.stolenTo; rxHook._stufeNull = !!res.stufeNull; }
       }
     }
+    // ★ 16.11.2026: das zentrale Kettenfenster (Silence, The Master's Plan & Co.) — nach den Hand-/Surprise-Fallen, nur wenn die Reaction noch steht.
+    let viaKette = null;
+    if (!rxHook._reactionNegated && !extra.ohneKette) {
+      viaKette = await this._zentralesKettenfenster(ownerIdx, cardName, cardType, extra);
+      if (viaKette?.negated) {
+        rxHook._reactionNegated = true;
+        rxHook._reactionNegatedBy = viaKette.negatedBy || 'a reaction';
+        if (Number.isInteger(viaKette.stolenTo)) { rxHook._reactionStolenTo = viaKette.stolenTo; rxHook._stufeNull = !!viaKette.stufeNull; }
+      }
+    }
     if (!rxHook._reactionNegated) return false;
     // Z7b: eine GANZ negierte Reaction verbraucht ihren Einmal-pro-Spiel-Stempel nicht (die Fenster stempeln beim Verlassen der Hand).
     {
@@ -40732,9 +40757,121 @@ this._deathWatch = (this._deathWatchStack || []).length
       if (_k) this.gs.players[ownerIdx]?._oncePerGameUsed?.delete(_k);
     }
     this.log('reaction_negated', { negator: rxHook._reactionNegatedBy || 'a reaction', negated: cardName, owner: ownerIdx });
-    await this._meldeNegation({ negatedOwner: ownerIdx, negatorOwner: undefined, cardName, kind: 'reaction' });
-    if (Number.isInteger(rxHook._reactionStolenTo)) await this._stiehlGespielteReaktion(ownerIdx, cardName, rxHook._reactionStolenTo, !!rxHook._stufeNull);
+    if (!viaKette?.negated) await this._meldeNegation({ negatedOwner: ownerIdx, negatorOwner: undefined, cardName, kind: 'reaction' });   // die Kette meldet ihre Negation beim Auflösen selbst
+    await this._reaktionNegiertUnterbringen(ownerIdx, cardName, cardType, extra, {
+      stolenTo: rxHook._reactionStolenTo, stufeNull: !!rxHook._stufeNull, geloescht: !!viaKette?.geloescht,
+      preisZurueck: viaKette?.negated ? viaKette.preis : 0,   // nur ein Diebstahl DURCH DIE KETTE (Key) erstattet den Preis; Reverse Trap im Hand-Fenster bleibt wie bisher
+    });
     return true;
+  }
+
+  /**
+   * ★ 16.11.2026 — ZENTRALES KETTENFENSTER für eine aus der Hand gespielte Reaction (siehe `_reaktionGespielt`). Die Reaction steht als Kettenglied (`_zentral`, kein Initialglied: sie ist selbst eine
+   * Reaction) vor dem regulären Reaktionsfenster; wer antwortet, bildet mit ihr eine echte Kette (LIFO, Kette auf Kette, Once-per-Spiel/Turn-Marken, Rückgabe bei Negation der Kettenkarte).
+   * Wird das Glied negiert, fällt die Wirkung der Reaction aus (Karte in der Ablage, Kosten bezahlt). Das Glied löst selbst nichts auf (`resolve: null`) — die Wirkung der Reaction läuft beim Aufrufer.
+   * Öffnet sich nirgends eine Antwort (der Normalfall), bleibt das Fenster lautlos (`_runReactionWindow` → `null`).
+   * @returns {Promise<{negated:boolean, negatedBy?:string, stolenTo?:number, stufeNull?:boolean, geloescht?:boolean}|null>}
+   */
+  async _zentralesKettenfenster(ownerIdx, cardName, cardType, extra = {}) {
+    if (this._inMctsSim) return null;
+    const cd = this._getCardDB()[cardName];
+    const link = {
+      id: uuidv4().substring(0, 12),
+      cardName, owner: ownerIdx, heroIdx: -1, casterHeroIdx: -1, casterOwner: ownerIdx, casterCheck: false,
+      cardType: cardType || cd?.cardType || 'Unknown',
+      fromBoard: false, isPlacement: false, isInherentAction: false, zaehltAlsArt: null,
+      goldCost: Number.isFinite(extra.goldCost) ? extra.goldCost : (cd?.cost || 0), wisdomCost: 0,
+      isInitialCard: false, negated: false, chainClosed: false, resolve: null,
+      _zentral: true,   // Platzhalter der schon eingesetzten Reaction: die Kettenauflösung fasst Stapel/Flug/Hooks dieses Glieds nicht an (`_resolveReactionChain`)
+    };
+    // Liegt die Karte noch in der Hand (Front Soldier, `ort: 'hand'`), ist genau diese Kopie im Spiel und kein Kettenkandidat gegen ihre eigene Gegenreaktion.
+    if (extra.ort === 'hand') {
+      const q = this._rxQuelleFuer(this.gs.players[ownerIdx], cardName);
+      if (q) link._imFlug = { ausVorrat: !!q.ausVorrat, idx: q.idx };
+    }
+    const vorherQuelle = this._currentEffectSource;
+    const vorherPruefung = this._inReactionCheck;
+    this._currentEffectSource = { cardName, owner: ownerIdx, cardType: link.cardType, heroIdx: -1, fromBoard: false, isPlacement: false, abilityZone: null };
+    this._inReactionCheck = true;
+    let kette = null;
+    try {
+      kette = await this._runReactionWindow(link, `${cardName} was played as a Reaction`);
+    } finally {
+      this._inReactionCheck = vorherPruefung;
+      this._currentEffectSource = vorherQuelle;
+    }
+    if (!kette) return null;
+    if (!link.negated) return { negated: false };
+    return {
+      negated: true,
+      negatedBy: link.negatedByCard || 'a reaction',
+      stolenTo: Number.isInteger(link._negatedToHandOf) ? link._negatedToHandOf : undefined,
+      stufeNull: !!link._negatedStufeNull,
+      geloescht: !!link._negatedToDeleted,
+      preis: link.goldCost || 0,
+    };
+  }
+
+  /**
+   * ★ 16.11.2026 — Wohin eine NEGIERTE Hand-Reaction geht (gemeinsamer Schluss von `_reaktionGespielt`). 'ablage': die Karte liegt schon im Ablage-/Löschstapel — nur Diebstahl (Reverse Trap, Key) oder
+   * Löschung (Lunar Eclipse) bewegen sie noch. 'hand'/'limbo': die Karte steht noch in keinem Stapel — die Engine legt sie hier ab (Ablage, Löschstapel bei Potion/`deleteOnUse`/Löschung) bzw. übergibt sie dem Dieb.
+   * Key: „your opponent doesn't have to pay" — wer eine Reaction stiehlt, bekommt sie samt Preis zurückerstattet (wie bei jedem gestohlenen Reaktions-Glied der Kette).
+   */
+  async _reaktionNegiertUnterbringen(ownerIdx, cardName, cardType, extra, k) {
+    const ps = this.gs.players[ownerIdx];
+    if (!ps) return;
+    const ort = extra.ort || 'ablage';
+    if (ort === 'ablage') {
+      if (Number.isInteger(k.stolenTo)) {
+        await this._stiehlGespielteReaktion(ownerIdx, cardName, k.stolenTo, !!k.stufeNull);
+        await this._reaktionPreisZurueck(ownerIdx, k.preisZurueck);
+      } else if (k.geloescht) {
+        const pilePs = this.handKartenBesitzerPs(ps, cardName) || ps;
+        const idx = Array.isArray(pilePs.discardPile) ? pilePs.discardPile.lastIndexOf(cardName) : -1;
+        if (idx >= 0) {
+          pilePs.discardPile.splice(idx, 1);
+          if (!pilePs.deletedPile) pilePs.deletedPile = [];
+          pilePs.deletedPile.push(cardName);
+          this.sync();
+        }
+      }
+      return;
+    }
+    let q = extra._q || null;
+    if (ort === 'hand') {
+      q = this._rxQuelleFuer(ps, cardName);
+      if (!q) return;
+      this._broadcastEvent('play_pile_transfer', {
+        owner: ownerIdx, cardName, from: q.ausVorrat ? 'creation' : 'hand', to: 'discard', asPlay: true, fromHandIdx: q.idx,
+        ...this._rxPileOwnerFlug(ownerIdx, cardName, q),
+      });
+      this._rxAbgang(ps, q);
+    }
+    if (Number.isInteger(k.stolenTo)) {
+      const besitzer = Math.max(0, this.gs.players.indexOf(this._rxAblagePs(ps, cardName, q)));
+      await this._reaktionInHandLegen(ownerIdx, cardName, k.stolenTo, besitzer, !!k.stufeNull, 'hand');
+      await this._reaktionPreisZurueck(ownerIdx, k.preisZurueck);
+      return;
+    }
+    const script = loadCardEffect(cardName);
+    const ablagePs = this._rxAblagePs(ps, cardName, q);
+    if (k.geloescht || cardType === 'Potion' || script?.deleteOnUse) {
+      if (!ablagePs.deletedPile) ablagePs.deletedPile = [];
+      ablagePs.deletedPile.push(cardName);
+    } else {
+      ablagePs.discardPile.push(cardName);
+    }
+    this.sync();
+  }
+
+  /** Key (`stealToHandOf`): die gestohlene Reaction kostet ihren Besitzer nichts — der bezahlte Preis geht zurück (wie `_resolveReactionChain` bei gestohlenen Reaktions-Gliedern). */
+  async _reaktionPreisZurueck(ownerIdx, preis) {
+    const ps = this.gs.players[ownerIdx];
+    if (!ps || !(preis > 0)) return;
+    ps.gold = (ps.gold || 0) + preis;
+    this.log('gold_refund', { player: ps.username, amount: preis, reason: 'stolen reaction' });
+    this._broadcastEvent('gold_change', { owner: ownerIdx, amount: preis });
+    this.sync();
   }
 
   /**
@@ -40825,7 +40962,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     // `_reaktionGespielt` fragt die Hand-Zuhörer des Gegners. Negiert: der Aufrufer sieht `false` und überspringt die Wirkung, die Karte
     // liegt in der Ablage, die Kosten sind bezahlt (wie bei jeder negierten Karte).
     // N5-04: `extra.ohneReaktion` = „your opponent cannot react to this card's activation" (Cute Camera mit +3 Gold).
-    if (!extra.ohneReaktion && await this._reaktionGespielt(ownerIdx, cardName, cardData?.cardType, { sourceOwner: extra.sourceOwner })) { this.sync(); return false; }
+    if (!extra.ohneReaktion && await this._reaktionGespielt(ownerIdx, cardName, cardData?.cardType, { sourceOwner: extra.sourceOwner, goldCost: cost + (extra.zusatzKosten || 0) })) { this.sync(); return false; }
     return true;
   }
 
@@ -41797,6 +41934,9 @@ this._deathWatch = (this._deathWatchStack || []).length
 
       this.log('resource_phase_reaction', { card: cardName, player: ps.username });
 
+      // ★ 16.11.2026: Gegenreaktions-Fenster (siehe `_reaktionGespielt`); negiert: keine Wirkung, die Karte liegt in der Ablage. Eine Reaction pro Phase gilt auch für die negierte.
+      if (await this._reaktionGespielt(playerIdx, cardName, cardData?.cardType, { goldCost: cost })) { this.sync(); return; }
+
       this._inResourcePhaseReaction = true;
       try {
         if (script.resourcePhaseResolve) {
@@ -41883,6 +42023,9 @@ this._deathWatch = (this._deathWatchStack || []).length
         this._broadcastEvent('card_reveal', { cardName, playerIdx });
         await this._delay(300);
         this.log('potion_draw_reaction', { card: cardName, player: ps.username });
+
+        // ★ 16.11.2026: Gegenreaktions-Fenster (siehe `_reaktionGespielt`); negiert: der Zug wird NICHT ersetzt (er läuft regulär), eine weitere Kopie darf noch gefragt werden.
+        if (await this._reaktionGespielt(playerIdx, cardName, cardData?.cardType, { goldCost: cost })) { this.sync(); gespielt = true; continue; }
 
         this._inPotionDrawReaction = true;
         try {
@@ -41998,6 +42141,9 @@ this._deathWatch = (this._deathWatchStack || []).length
           title: 'Wisdom Cost', source: 'Wisdom', selfInflicted: true,
         });
       }
+
+      // ★ 16.11.2026: Gegenreaktions-Fenster (siehe `_reaktionGespielt`, `ort: 'limbo'`: die Engine legt eine negierte Karte selbst ab). Der Wisdom-Abwurf ist bezahlt (Kosten bleiben bei Negation bezahlt); negiert: keine Wirkung.
+      if (await this._reaktionGespielt(summoningPi, cardName, cardData?.cardType, { ort: 'limbo', _q, goldCost: cost })) { this.sync(); return; }
 
       this._inPostSummonReaction = true;
       try {
@@ -42223,6 +42369,9 @@ this._deathWatch = (this._deathWatchStack || []).length
           affected: ownDmgEntries.length,
         });
 
+        // ★ 16.11.2026: Gegenreaktions-Fenster (siehe `_reaktionGespielt`); negiert: der Schaden wird nicht abgewehrt, die Karte liegt in der Ablage.
+        if (await this._reaktionGespielt(pi, cardName, cardData?.cardType, { sourceOwner: this._rxQuellBesitzer(source), goldCost: cost })) { this.sync(); break; }
+
         this._inCreatureDamageBatchReaction = true;
         try {
           if (script.creatureDamageBatchResolve) {
@@ -42388,6 +42537,9 @@ this._deathWatch = (this._deathWatchStack || []).length
         });
       }
 
+      // ★ 16.11.2026: Gegenreaktions-Fenster (siehe `_reaktionGespielt`, `ort: 'limbo'`). Wisdom ist bezahlt; negiert: der Effekt entfernt die Kreatur wie vorgesehen (kein Abbruch), die Karte liegt in der Ablage/Löschstapel.
+      if (await this._reaktionGespielt(victimOwner, cardName, cardData?.cardType, { sourceOwner: this._rxQuellBesitzer(source), ort: 'limbo', _q, goldCost: cost })) { this.sync(); return false; }
+
       this._inCdMovementReaction = true;
       let cancelOp = false;
       try {
@@ -42515,6 +42667,9 @@ this._deathWatch = (this._deathWatchStack || []).length
           title: 'Wisdom Cost', source: 'Wisdom', selfInflicted: true,
         });
       }
+
+      // ★ 16.11.2026: Gegenreaktions-Fenster (siehe `_reaktionGespielt`, `ort: 'limbo'`); Wisdom ist bezahlt; negiert: keine Wirkung, die Karte liegt in der Ablage. Eine Reaction pro Fenster gilt auch für die negierte.
+      if (await this._reaktionGespielt(reactorIdx, cardName, cardData?.cardType, { ort: 'limbo', _q, goldCost: cost })) { this.sync(); return; }
 
       this._inOppActionPhaseReaction = true;
       try {
@@ -46430,6 +46585,10 @@ this._deathWatch = (this._deathWatchStack || []).length
       // reactions can gate on the specific trigger (Sculpture Theft
       // → only fires on `onStatusApplied` for `frozen` on a Creature).
       const chainCtx = { chain, eventDesc, hookName, hookCtx };
+      // ★ 16.11.2026 (zentrales Kettenfenster, `_reaktionGespielt`): am BASISGLIED einer eingesetzten Hand-Reaction (`_zentral`) sind die Karten, die dieses Ereignis schon über ihren Hand-/Surprise-Hook
+      // bedient haben (Cute Camera, Front Soldier: `hooks.onReactionPlayed`; Reverse Trap: `surpriseReactionPlayedTrigger`), nicht noch einmal anzubieten — kein Doppelangebot. Tiefer in der Kette gelten sie normal.
+      const _zentralBasis = chain.length === 1 && chain[0]?._zentral === true;
+      if (_zentralBasis && chain[0].owner === pi) continue;   // 16.11.2026: auf die eigene eingesetzte Reaction antwortet nur der Gegner (kein Selbstangebot, z. B. Divine Gift of Edge)
       const eligibleByName = new Map();
       const countByName = new Map();
       for (const { cardName, ausVorrat: _av, idx: hi } of this._rxKandidaten(ps)) {
@@ -46444,6 +46603,8 @@ this._deathWatch = (this._deathWatchStack || []).length
         }
         const script = loadCardEffect(cardName);
         if (!script?.isReaction) continue;
+        if (_zentralBasis && script.hooks && typeof script.hooks.onReactionPlayed === 'function') continue;   // 16.11.2026: schon über `onReactionPlayed` gefragt
+        if (chain[0]?._imFlug && chain[0].owner === pi && cardName === chain[0].cardName && !!_av === chain[0]._imFlug.ausVorrat && hi === chain[0]._imFlug.idx) continue;   // 16.11.2026: die gerade gespielte Kopie (noch in der Hand)
 
         const cardData = allCards[cardName];
         // Boomerang's "no Artifacts for the rest of this turn" lockout —
@@ -46576,6 +46737,7 @@ this._deathWatch = (this._deathWatchStack || []).length
         if (eligibleByName.has(sName)) continue; // a hand copy already offered
         const sScript = loadCardEffect(sName);
         if (!sScript?.isSurprise || !sScript?.isReaction) continue;
+        if (_zentralBasis && typeof sScript.surpriseReactionPlayedTrigger === 'function') continue;   // 16.11.2026: schon über das Surprise-Fenster von `_reaktionGespielt` gefragt
         // ★ 25.10. (Reverse Trap, Lunar Eclipse): eine Surprise, die in DIESER Kette schon aktiviert wurde, bleibt aufgedeckt in ihrer Zone liegen (`skipPostResolveDiscard`, das Kettenende räumt
         // sie ab) — sie darf in derselben Kette nicht noch einmal antworten. Erkennbar am Aufräum-Eintrag bzw. an der aufgedeckten Instanz.
         if ((this._pendingSurpriseReactionCleanup || []).some(e => e.pi === sSeite && e.heroIdx === shi && e.cardName === sName)) continue;
@@ -47269,6 +47431,8 @@ this._deathWatch = (this._deathWatchStack || []).length
         // post-chain cleanup instead, so skip them here.
         if (link.fromHero || link.fromCreature) {
           // Helden-Effekt-Link (v691) / Board-Creature-Link: nichts abzulegen.
+        } else if (link._zentral) {
+          // 16.11.2026: Platzhalter einer schon eingesetzten Hand-Reaction (`_zentralesKettenfenster`): die Karte liegt bereits im Stapel; Diebstahl/Löschung/Ablage regelt `_reaktionGespielt` danach.
         } else if (!link.isInitialCard
             && Number.isInteger(link._negatedToHandOf)
             && this.gs.players[link._negatedToHandOf]) {
@@ -47429,7 +47593,7 @@ this._deathWatch = (this._deathWatchStack || []).length
         // — a negated Reaction Creature paid its cost but didn't
         // actually land, so the discard pile is its correct
         // destination there.
-        if (!link.isInitialCard && !link.fromHero && !link.fromCreature) {   // v691: Helden-Links (und Board-Creature-Links) haben keine Karte
+        if (!link.isInitialCard && !link.fromHero && !link.fromCreature && !link._zentral) {   // v691: Helden-Links (und Board-Creature-Links) haben keine Karte; 16.11.2026: `_zentral` liegt schon im Stapel
           const linkScript = loadCardEffect(link.cardName);
           // `gs._spellPlacedOnBoard` lets a hook fired during this
           // link's resolve (e.g. Card Game Player Inya turning the
