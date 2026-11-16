@@ -34701,10 +34701,17 @@ this._deathWatch = (this._deathWatchStack || []).length
       const _kreatSr = (validTargets || []).filter(t => t?.type === 'equip' && t.cardInstance && t.heroIdx >= 0 && _ids.has(t.id)
         && t.cardInstance.zone === ZONES.SUPPORT && this._istKreaturenInstanz?.(t.cardInstance));
       if (_qName && (_helden.length > 0 || _kreatSr.length > 0)) {
-        const _quelle = _spFenster ? _spFenster : (typeof config.sourceCard === 'object' && config.sourceCard)
+        // Ohne `sourceCard`/`chooserHeroIdx` (Love Shot, Cure, Divine Zeal, Dangerous Knowledge, Compulsory Body Swap …) kannte die Quelle den wirkenden Helden nicht (`heroIdx` -1): Surprises,
+        // die einen Angreifer brauchen (Frost Rune, Booby Trap, Toxic Trap: `sourceInfo.heroIdx < 0 → false`), bekamen nie ein Fenster, Flooding (braucht keinen) schon. Traegt die gerade
+        // wirkende Karte denselben Namen (`_umgebungsQuelle`, Instanz mit Wirker-Held und Besitzer des Wirkers — dieselbe Quelle, die `promptDamageTarget` den Fenstern gibt), ist SIE die Quelle.
+        let _quelle = _spFenster ? _spFenster : (typeof config.sourceCard === 'object' && config.sourceCard)
           ? config.sourceCard
           : { name: _qName, owner: playerIdx, controller: playerIdx,
               heroIdx: config.chooserHeroIdx ?? -1, zone: 'hand' };
+        if (!_spFenster && config.chooserHeroIdx == null && !(typeof config.sourceCard === 'object' && config.sourceCard)) {
+          const _wirkend = _umgebung || this._umgebungsQuelle(playerIdx, config);
+          if (_wirkend && _wirkend.name === _qName && _wirkend.heroIdx >= 0) _quelle = _wirkend;
+        }
         if (_helden.length > 0) {
           const _sr = await this._checkSurpriseWindow(_helden, _quelle, {
             damageType: config.damageType,
