@@ -75,9 +75,11 @@ module.exports = {
     return getEligibleRedirectHeroes(gs, pi, selected, validTargets, engine).length > 0;
   },
 
-  onRedirect: async (engine, pi, selected, validTargets, config, sourceCard) => {
+  // Spielgestalter-Entscheidung 16.11.2026: Umleiter sind kettbar. Die Engine ruft ZUERST `redirectWaehlen` (nur die Wahl des Martyrs — der Wirker, daran hängen die Wisdom-Kosten; keine Nebenwirkung),
+  // spielt dann die Karte (Ablage, Wisdom) und lässt den Gegner mit einer Reaktion antworten (Cute Camera, Front Soldier, Reverse Trap). Erst wenn die Karte nicht negiert wurde, läuft `onRedirect`
+  // (Bilder, Log, neues Ziel). Wird Martyry negiert, bleibt das Ziel, wie es war; die Karte ist verbraucht.
+  redirectWaehlen: async (engine, pi, selected, validTargets, config, sourceCard) => {
     const gs = engine.gs;
-    const ps = gs.players[pi];
     const eligible = getEligibleRedirectHeroes(gs, pi, selected, validTargets, engine);
     if (eligible.length === 0) return null;
 
@@ -114,6 +116,24 @@ module.exports = {
       heroSeite = target.owner;
     }
 
+    const martyrHero = gs.players[heroSeite]?.heroes?.[selectedHeroIdx];
+    if (!martyrHero?.name) return null;
+
+    // ── Build the redirect target ──
+    const redirectTarget = validTargets.find(t =>
+      t.type === 'hero' && t.owner === heroSeite && t.heroIdx === selectedHeroIdx
+    );
+    if (!redirectTarget) return null;
+
+    // `casterIdx`/`casterSeite`: der Martyr ist der Wirker — die Engine verbucht damit die Wisdom-Abwurfkosten (Held ohne Support Magic Lv1, nur dank Wisdom spielbar).
+    return { redirectTo: redirectTarget, casterIdx: selectedHeroIdx, casterSeite: heroSeite };
+  },
+
+  onRedirect: async (engine, pi, selected, validTargets, config, sourceCard, plan) => {
+    const gs = engine.gs;
+    const ps = gs.players[pi];
+    const heroSeite = plan.casterSeite;
+    const selectedHeroIdx = plan.casterIdx;
     const martyrHero = gs.players[heroSeite]?.heroes?.[selectedHeroIdx];
     if (!martyrHero?.name) return null;
 
@@ -169,13 +189,6 @@ module.exports = {
       zoneSlot: selected.type === 'hero' ? -1 : selected.slotIdx,
     });
 
-    // ── Build the redirect target ──
-    const redirectTarget = validTargets.find(t =>
-      t.type === 'hero' && t.owner === heroSeite && t.heroIdx === selectedHeroIdx
-    );
-
-    if (!redirectTarget) return null;
-
     engine.log('martyry', {
       player: ps.username,
       martyrHero: martyrHero.name,
@@ -184,7 +197,6 @@ module.exports = {
     });
     engine.sync();
 
-    // `casterIdx`/`casterSeite`: der Martyr ist der Wirker — die Engine verbucht damit die Wisdom-Abwurfkosten (Held ohne Support Magic Lv1, nur dank Wisdom spielbar).
-    return { redirectTo: redirectTarget, casterIdx: selectedHeroIdx, casterSeite: heroSeite };
+    return { redirectTo: plan.redirectTo };
   },
 };
