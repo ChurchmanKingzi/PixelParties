@@ -11887,8 +11887,9 @@ class GameEngine {
     // SC (v1381): Insta-Kill und Opfer zaehlen wie Schaden in Hoehe der
     // restlichen HP — ein eigenes Opfer ist „50%+ damage" (Als Ruling 24.9.).
     this._scNoteHeroHpLoss(target, _scHpVorher);
-    // W24a (N1-05): Besiegen OHNE Schaden durch Attack/Spell → Corpse Explosion (ueber das Hand-Fenster "Held besiegt"); nicht bei Opfer/Eigenabgang/HP-Kosten/unaufhaltsam.
-    await this._runHeroDefeatSequence(target, source, targetOwner, { ohneSchaden: !_u && !opts.isSacrifice && !opts.eigenerAbgang && !opts.hpKosten });
+    // W24a (N1-05): Besiegen OHNE Schaden durch Attack/Spell → Corpse Explosion (ueber das Hand-Fenster "Held besiegt"); nicht bei Eigenabgang/HP-Kosten/unaufhaltsam.
+    // Spielgestalter-Entscheidung 16.11.2026 („Opfern gilt als defeat"): auch ein Helden-Opfer (`isSacrifice`) zählt — die Karte prüft selbst, ob die Quelle eine Attack/ein Spell ist.
+    await this._runHeroDefeatSequence(target, source, targetOwner, { ohneSchaden: !_u && !opts.eigenerAbgang && !opts.hpKosten });
     // Welle 11 (Al, Q61: „Auch Heroes"): ein Helden-OPFER ist ein „sacrifice a target" — Hook NACH dem Todesablauf (Bonded Companion Thuly:
     // „when you sacrifice a target"). Opferer = `source.owner`; nicht mehr nach Spielende.
     // Welle 12 (Al, Rueckfrage 4, Foresta): „Der Hero stirbt ja nicht, weil er durch einen Effekt 'sacrificed' wird, sondern durch HP-Verlust!" —
