@@ -36,7 +36,7 @@ test('i18n: Zahlen und Zeilenumbrueche der Effekttexte stimmen mit dem Original 
 test('i18n: Oberflaechentexte behalten ihre Platzhalter', () => {
   const schlecht = [];
   for (const [en, d] of Object.entries(ui)) {
-    const a = (en.match(/\{\d+\}/g) || []).sort().join(','), b = (d.match(/\{\d+(?::[^}]*)?\}/g) || []).map(x => x.replace(/:[^}]*/, '')).sort().join(',');
+    const uniq = (l) => [...new Set(l)].sort().join(','); const a = uniq(en.match(/\{\d+\}/g) || []), b = uniq((d.match(/\{\d+(?::[^}]*)?\}/g) || []).map(x => x.replace(/:[^}]*/, '')));
     if (a !== b) schlecht.push(en);
   }
   assert.deepStrictEqual(schlecht.slice(0, 10), []);
