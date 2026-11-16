@@ -35946,7 +35946,17 @@ this._deathWatch = (this._deathWatchStack || []).length
       if (!this._confirmSaidYes(confirmed)) continue; // Declined — check next redirect card
 
       // Run the card's redirect logic (hero selection, chain UI, etc.)
-      const result = await script.onRedirect(this, targetOwnerIdx, selected, validTargets, config, sourceCard);
+      // Waehrend der Umleiter laeuft, oeffnet SEINE Ersatzzielwahl (Anti-Magnet: der Gegner waehlt per `promptEffectTarget`) kein weiteres Umleitungsfenster: die Karte stuende noch in der Hand,
+      // das Gold waere nicht abgebucht — sie wuerde fuer das Ersatzziel ein zweites Mal angeboten und aktiviert. Das Ersatzziel hat der Umleiter gewaehlt, nicht der urspruengliche Effekt;
+      // der Weiterleitungs-Fall (neuer Besitzer darf wieder umleiten) laeuft ueber die Kette in `_checkTargetRedirect`, nicht ueber diese Wahl.
+      const _fensterVorher = this._inRedirectWindow;
+      this._inRedirectWindow = true;
+      let result;
+      try {
+        result = await script.onRedirect(this, targetOwnerIdx, selected, validTargets, config, sourceCard);
+      } finally {
+        this._inRedirectWindow = _fensterVorher;
+      }
       if (!result?.redirectTo) continue; // Redirect was cancelled
 
       // Consume the card from hand (oder aus Crestinas Vorrat — 11.11.: alle Hand-Reaktionen auch aus der Extra-Hand)
