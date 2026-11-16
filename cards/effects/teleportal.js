@@ -213,8 +213,11 @@ module.exports = {
      */
     onTurnStart: async (ctx) => {
       const engine = ctx._engine;
-      const pi = ctx.cardOwner;
-      if (engine.gs.activePlayer !== pi) return;   // „YOUR next turn"
+      // „YOUR next turn": wem die wartende Karte gehört, entscheidet der Zug — nicht der Besitzer DIESER Teleportal-Karte. Eine gestohlene Teleportal (Charme, Diebstahl …) liegt
+      // nach dem Wirken in der Ablage ihres Besitzers (CARD_API: Besitzer-Stapel), ihr Hook liefe sonst nur für den Besitzer und die wartende Karte des Wirkers bliebe für immer liegen.
+      // Jede Teleportal-Kopie (Hand/Ablage/offen) liefert beim Zugbeginn des aktiven Spielers dessen fällige Karten; weitere Kopien finden nichts mehr.
+      const pi = engine.gs.activePlayer;
+      if (!Number.isInteger(pi) || pi < 0) return;
       await zustellenAlleFaelligen(engine, pi);
     },
   },
