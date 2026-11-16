@@ -111,6 +111,11 @@ module.exports = {
         if ((e.inst.controller ?? e.inst.owner) === ctx.cardOwner) continue;
         // Mark as un-negatable
         e.canBeNegated = false;
+        // Spielgestalter-Entscheidung 16.11.2026: „ignore any effects that make a target unaffected by them" — Ida durchschlägt ALLE
+        // „unaffected by (your opponent's) cards and effects" / „unaffected by [Typ]" (Black-Thorn Dragon, Golden Wings, Sparkfly Attendant,
+        // Rook/Board of Kings), NICHT aber „unaffected by ALL cards and effects" (Cardinal Beasts, Stowaway, Hot Skull Potato …).
+        // Die Engine liest den Stempel in `_markCreatureDamageImmunity` (Neubewertung nach dieser Hook-Runde).
+        e.ignoreUnaffected = true;
       }
     },
 

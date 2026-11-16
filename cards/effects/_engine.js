@@ -22621,6 +22621,10 @@ this._deathWatch = (this._deathWatchStack || []).length
   kreaturGegnerEffektImmun(inst, quelle, opts = {}) {
     if (this.cdMalfunctionSchutz(inst, quelle, opts)) return true;   // B2/E9: Cosmic Malfunction — alle Effekte der negierten Karte auf Cosmic-Depths-Kreaturen, bis Zugende
     if (this.kreaturSpellImmun(inst, quelle, opts)) return true;   // 23.10.: „unaffected by all Spells" (Black-Thorn Dragon) — dieselben Sperrstellen
+    // Spielgestalter-Entscheidung 16.11.2026 (Ida): „ignore any effects that make a target unaffected by them" gilt für alle „unaffected by (your opponent's) cards and effects"
+    // (Golden Wings, Sparkfly Attendant, Rook/Board of Kings) — nicht aber für „unaffected by ALL cards and effects" (Cardinal Beasts, Stowaway … `_cardinalImmune`, Namens-Rückfall).
+    // `opts.ignoreUnaffected` stempelt NUR Idas Schadenseintrag (`e.ignoreUnaffected`); anderer „nicht negierbarer" Schaden (`canBeNegated: false`) durchschlägt Golden Wings weiter nicht.
+    if (opts?.ignoreUnaffected) return false;
     if (!inst?.counters?._gwImmune) return false;
     let q;
     if (typeof opts?.gwSourceOwner === 'number') q = opts.gwSourceOwner;   // ausdrücklicher Hinweis des Aufrufers (String-Quellen ohne Besitzer)
@@ -22665,8 +22669,11 @@ this._deathWatch = (this._deathWatchStack || []).length
    * this so opp damage on protected Queens fizzles too; the inherited
    * gift does NOT, matching its "except damage" clause.
    */
-  isOppDamageImmuneFrom(inst, sourceOwner, source = null) {
+  isOppDamageImmuneFrom(inst, sourceOwner, source = null, opts = {}) {
     if (!inst) return false;
+    // Spielgestalter-Entscheidung 16.11.2026 (Ida): alle „unaffected by your opponent's cards and effects"-Schutzformen dieser Prüfung (Sparkfly-Aura, Fenster-Immunität von Rook of Kings/Castling,
+    // Board-of-Kings-Wächter) fallen für Idas Zauberschaden weg (`opts.ignoreUnaffected`, siehe `kreaturGegnerEffektImmun`).
+    if (opts?.ignoreUnaffected) return false;
     const targetController = inst.controller ?? inst.owner;
     if (inst.name === 'Sparkfly Queen' || inst.counters?._sparkflyAttendantAura) require('./_sparkfly-shared').refreshAttendantAura(this, targetController);   // W5b-Z3
     if (inst.counters?._oppDamageImmune && sourceOwner != null && sourceOwner !== targetController) return true;
@@ -57000,7 +57007,7 @@ this._deathWatch = (this._deathWatchStack || []).length
           || inst?.counters?._baihuPetrify
           || isCardinalBeastByName(inst?.name)) {
         e._immuneCreature = true;
-      } else if (this.kreaturGegnerEffektImmun(inst, e.source, { sourceOwner: e.sourceOwner, damageType: e.type, piercing: e.canBeNegated === false })) {
+      } else if (this.kreaturGegnerEffektImmun(inst, e.source, { sourceOwner: e.sourceOwner, damageType: e.type, piercing: e.canBeNegated === false, ignoreUnaffected: e.ignoreUnaffected === true })) {
         // ★ W17b (A01-25): Golden Wings – „unaffected by your opponent's cards and effects": nur Schaden mit
         // gegnerischer Quelle prallt ab; eigener Schaden trifft. Unbekannte Quelle (-1, Status-Tick) = geschützt.
         e._immuneCreature = true;
@@ -57027,7 +57034,7 @@ this._deathWatch = (this._deathWatchStack || []).length
       } else if (inst?.counters?._stealImmortal) {
         // Temporarily stolen (Deepsea Succubus): cannot take damage while stolen.
         e._immuneCreature = true;
-      } else if (this.isOppDamageImmuneFrom(inst, e.sourceOwner, e.source)) {
+      } else if (this.isOppDamageImmuneFrom(inst, e.sourceOwner, e.source, { ignoreUnaffected: e.ignoreUnaffected === true })) {
         // Source-aware opp-damage immunity (Sparkfly Attendant LIVE
         // aura). Only fizzles damage coming FROM THE OPPONENT — friendly
         // self-damage (Cluster's blast on own creatures, etc.) still
@@ -57409,9 +57416,14 @@ this._deathWatch = (this._deathWatchStack || []).length
     this._kreaturenSchadenSchilde(entries);   // W7a (A07-29): vergebene Schilde (Harpyformer Choir) hängen am Spieler, nicht an der Karte
     // 23.10. (Black-Thorn Dragon, Ida: „ignore any effects that make a target unaffected by them"): Idas Hook stempelt `canBeNegated = false` erst
     // in der Hook-Runde oben — die Markierung der Immunitäten lief davor. Ein Piercing-Eintrag bei einer Spell-immunen Kreatur wird deshalb neu bewertet.
+    // Spielgestalter-Entscheidung 16.11.2026: dasselbe für Idas Stempel `ignoreUnaffected` bei JEDER „unaffected by (opponent's) cards and effects"-Immunität (Golden Wings, Sparkfly Attendant,
+    // Rook/Board of Kings …) — die Neubewertung läuft die ganze Kette neu durch; Cardinal Beasts & Co. („unaffected by ALL cards and effects") bleiben dabei immun.
     for (const e of entries) {
-      if (!e?._immuneCreature || e.canBeNegated !== false || !e.inst) continue;
-      if (!loadCardEffect(e.inst.counters?._effectOverride || e.inst.name)?.unaffectedBySpells) continue;
+      if (!e?._immuneCreature || !e.inst) continue;
+      if (e.ignoreUnaffected !== true) {
+        if (e.canBeNegated !== false) continue;
+        if (!loadCardEffect(e.inst.counters?._effectOverride || e.inst.name)?.unaffectedBySpells) continue;
+      }
       e._immuneCreature = false;
       this._markCreatureDamageImmunity([e]);
     }
