@@ -425,7 +425,7 @@
 },
 "Modnir, Hammer of Coolness": {
 "name": "Modnir, Hammer der Coolness",
-"effect": "Diese Karte hat keinen Effekt, es sei denn, du spielst sie aus deinem Coolness-Stapel. Ist dies die oberste Karte deines Coolness-Stapels, darfst du sie von dort an einen deiner Helden ausrüsten. Der Angriffswert des ausgerüsteten Helden wird um 100 erhöht."
+"effect": "Diese Karte hat keinen Effekt, außer du spielst sie aus deinem Coolness-Stapel. Ist dies die oberste Karte deines Coolness-Stapels, darfst du sie von dort an einen deiner Helden ausrüsten. Der Angriffswert des ausgerüsteten Helden wird um 100 erhöht."
 },
 "Phatnir, Prototype of Coolness": {
 "name": "Phatnir, Prototyp der Coolness",
@@ -441,7 +441,7 @@
 },
 "String of Fine": {
 "name": "Feiner Faden",
-"effect": "Diese Karte hat keinen Effekt, es sei denn, du spielst sie aus deinem Coolness-Stapel. Ist dies die oberste Karte deines Coolness-Stapels, darfst du sie von dort als zusätzliche Aktion spielen, indem du sie löschst. Wähle ein Ziel, das du kontrollierst. Jeder Schaden, den dieses Ziel bis zum Beginn deines nächsten Zuges erleiden würde, wird zu 0. Ein Ziel kann nur einmal pro Spiel von diesem Effekt betroffen sein."
+"effect": "Diese Karte hat keinen Effekt, außer du spielst sie aus deinem Coolness-Stapel. Ist dies die oberste Karte deines Coolness-Stapels, darfst du sie von dort als zusätzliche Aktion spielen, indem du sie löschst. Wähle ein Ziel, das du kontrollierst. Jeder Schaden, den dieses Ziel bis zum Beginn deines nächsten Zuges erleiden würde, wird zu 0. Ein Ziel kann nur einmal pro Spiel von diesem Effekt betroffen sein."
 },
 "Swagdri, Forger of Coolness": {
 "name": "Swagdri, Schmied der Coolness",
@@ -1765,7 +1765,7 @@
 },
 "Rebelliokai Oblivious Oni": {
 "name": "Rebelliokai Ahnungsloser Oni",
-"effect": "Wenn diese Karte von irgendwo außer deiner Hand oder dem Spielfeld auf den Ablagestapel gelegt wird, lösche sie. Du kannst diese Kreatur nicht spielen, es sei denn, es befinden sich 5 oder mehr \"Rebelliokai\"-Kreaturen mit verschiedenen Namen in deinem Ablagestapel. Du darfst einmal pro Zug allen Zielen, die dein Gegner kontrolliert, 150 Schaden zufügen. Du kannst diesen Effekt von \"Rebelliokai Ahnungsloser Oni\" nur einmal pro Zug aktivieren."
+"effect": "Wenn diese Karte von irgendwo außer deiner Hand oder dem Spielfeld auf den Ablagestapel gelegt wird, lösche sie. Du kannst diese Kreatur nicht spielen, außer es befinden sich 5 oder mehr \"Rebelliokai\"-Kreaturen mit verschiedenen Namen in deinem Ablagestapel. Du darfst einmal pro Zug allen Zielen, die dein Gegner kontrolliert, 150 Schaden zufügen. Du kannst diesen Effekt von \"Rebelliokai Ahnungsloser Oni\" nur einmal pro Zug aktivieren."
 },
 "Rebelliokai Terror Tengu": {
 "name": "Rebelliokai Schrecken-Tengu",
@@ -2121,7 +2121,7 @@
 },
 "The Final Trial": {
 "name": "Die letzte Prüfung",
-"effect": "Diese Karte hat keinen Effekt, es sei denn, du hast in diesem Spiel mindestens 1 \"Prüfung der Dominanz\", 1 \"Prüfung der Treue\", 1 \"Prüfung des Wissens\", 1 \"Prüfung des Ärgernisses\" und 1 \"Prüfung der Coolness\" gespielt. Dies muss die erste Aktion sein, die du in diesem Zug ausführst. Du gewinnst das Spiel."
+"effect": "Diese Karte hat keinen Effekt, außer du hast in diesem Spiel mindestens 1 \"Prüfung der Dominanz\", 1 \"Prüfung der Treue\", 1 \"Prüfung des Wissens\", 1 \"Prüfung des Ärgernisses\" und 1 \"Prüfung der Coolness\" gespielt. Dies muss die erste Aktion sein, die du in diesem Zug ausführst. Du gewinnst das Spiel."
 },
 "Trial of Annoyance": {
 "name": "Prüfung des Ärgernisses",
@@ -3142,7 +3142,7 @@
 },
 "Divine Gift of Skill": {
 "name": "Göttliche Gabe der Fertigkeit",
-"effect": "Du kannst nur 1 \"Göttliche Gabe\"-Karte pro Spiel aktivieren.\nWähle einen Helden, den du kontrollierst. Du kannst in diesem Zug bis zu 4 zusätzliche Fähigkeiten an diesen Helden anlegen. Dieser Held kann für den Rest des Zuges keine Aktion ausführen, es sei denn, der Anwender hat mindestens Magiekunst 1. Dies zählt als zusätzliche Aktion."
+"effect": "Du kannst nur 1 \"Göttliche Gabe\"-Karte pro Spiel aktivieren.\nWähle einen Helden, den du kontrollierst. Du kannst in diesem Zug bis zu 4 zusätzliche Fähigkeiten an diesen Helden anlegen. Dieser Held kann für den Rest des Zuges keine Aktion ausführen, außer der Anwender hat mindestens Magiekunst 1. Dies zählt als zusätzliche Aktion."
 },
 "Divine Gift of The Light": {
 "name": "Göttliche Gabe des Lichts",
@@ -4470,7 +4470,7 @@
 },
 "Perfect Disguise": {
 "name": "Perfekte Verkleidung",
-"effect": "Wähle ein Ziel, das du kontrollierst. Dieses Ziel kann während des nächsten Zuges deines Gegners nicht von ihm gewählt werden, es sei denn, es ist dein einziges zulässiges Ziel. Du kannst nur 1 \"Perfekte Verkleidung\" pro Spiel spielen."
+"effect": "Wähle ein Ziel, das du kontrollierst. Dieses Ziel kann während des nächsten Zuges deines Gegners nicht von ihm gewählt werden, außer es ist dein einziges zulässiges Ziel. Du kannst nur 1 \"Perfekte Verkleidung\" pro Spiel spielen."
 },
 "Performance": {
 "name": "Aufführung",
@@ -5340,7 +5340,7 @@
 },
 "The Eye of Ren": {
 "name": "Das Auge von Ren",
-"effect": "Wähle eine Karte aus deinem Deck und lege sie auf deinen Ablagestapel. Du kannst für den Rest des Zuges keine Karten aus deinem Ablagestapel bewegen, es sei denn, du gibst zusätzlich 6 Gold aus."
+"effect": "Wähle eine Karte aus deinem Deck und lege sie auf deinen Ablagestapel. Du kannst für den Rest des Zuges keine Karten aus deinem Ablagestapel bewegen, außer du gibst zusätzlich 6 Gold aus."
 },
 "The Golden Abomination": {
 "name": "Die Goldene Abscheulichkeit",
