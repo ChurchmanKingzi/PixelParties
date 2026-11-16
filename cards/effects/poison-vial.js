@@ -21,15 +21,18 @@ module.exports = {
       const ps = gs.players[pi];
       for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
         const hero = ps.heroes[hi];
-        if (!hero?.name || hero.hp <= 0) continue;
-        if (hero.statuses?.poison_immune) continue;
-        targets.push({
-          id: `hero-${pi}-${hi}`,
-          type: 'hero',
-          owner: pi,
-          heroIdx: hi,
-          cardName: hero.name,
-        });
+        // Der HELD ist nur als Ziel waehlbar, solange er lebt und nicht gift-immun ist …
+        if (hero?.name && hero.hp > 0 && !hero.statuses?.poison_immune) {
+          targets.push({
+            id: `hero-${pi}-${hi}`,
+            type: 'hero',
+            owner: pi,
+            heroIdx: hi,
+            cardName: hero.name,
+          });
+        }
+        // … seine Kreaturen aber unabhaengig von ihm (Acid Vial, Healing Potion & Co.: Kreaturen bleiben nach dem Tod ihres Helden auf dem Brett
+        // und gelten weiter als Ziele) — vorher stand hier ein `continue` fuer den ganzen Helden, das auch seine Kreaturen aussperrte.
         // Creatures in support zones
         for (let si = 0; si < (ps.supportZones[hi] || []).length; si++) {
           const slot = (ps.supportZones[hi] || [])[si] || [];
