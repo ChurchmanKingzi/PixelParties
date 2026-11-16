@@ -169,11 +169,11 @@
 },
 "Assault Eagle": {
 "name": "Sturmadler",
-"effect": "Du darfst einmal pro Zug bis zu 3 verschiedene Ziele auf dem Spielfeld wählen und ihnen 100 Schaden zufügen. Danach darf dein Gegner bis zu dieselbe Anzahl an Zielen auf dem Spielfeld wählen und ihnen 50 Schaden zufügen."
+"effect": "Du darfst einmal pro Zug bis zu 3 verschiedene Ziele auf dem Spielfeld wählen und ihnen 100 Schaden zufügen. Danach darf dein Gegner bis zu ebenso viele Ziele auf dem Spielfeld wählen und ihnen 50 Schaden zufügen."
 },
 "\"Deadly Poison\"": {
 "name": "\"Tödliches Gift\"",
-"effect": "Wähle einen vergifteten Helden. Das Gift heilt diesen Helden, statt ihm Schaden zuzufügen, bis es geheilt ist. Es zählt weiterhin als negativer Statuseffekt. Dies zählt als zusätzliche Aktion."
+"effect": "Wähle einen Vergifteten Helden. Das Gift heilt diesen Helden, statt ihm Schaden zuzufügen, bis es geheilt ist. Es zählt weiterhin als negativer Statuseffekt. Dies zählt als zusätzliche Aktion."
 },
 "Aquatic Arrows": {
 "name": "Aquatische Pfeile",
@@ -209,7 +209,7 @@
 },
 "Golden Arrow": {
 "name": "Goldener Pfeil",
-"effect": "Spiele diese Karte, wenn ein Held, den du kontrollierst, mit einem Angriff genau 1 Ziel trifft. Du erhältst 1 Gold für je 10 Schaden, den dieser Angriff verursacht hat. Danach kannst du für den Rest des Zuges kein Gold erhalten oder ausgeben."
+"effect": "Spiele diese Karte, wenn ein Held, den du kontrollierst, mit einem Angriff genau 1 Ziel trifft. Du erhältst 1 Gold für je 10 Schaden, den dieser Angriff verursacht hat. Danach kannst du für den Rest des Zuges weder Gold erhalten noch ausgeben."
 },
 "Hydra Blood Arrow": {
 "name": "Hydrablut-Pfeil",
@@ -261,35 +261,35 @@
 },
 "Bonded Companion Humby": {
 "name": "Gebundener Gefährte Humby",
-"effect": "Du kannst nur 1 Exemplar dieser Karte in deinem Deck haben. Ein Held kann nur 1 \"Gebundener Gefährte\"-Kreatur in seinen Unterstützungszonen haben. Diese Kreatur kann nach dem Beschwören auf keine Weise in eine andere Unterstützungszone bewegt werden. Diese Kreatur und der zugehörige Held teilen sich 1 LP-Vorrat. Diese Kreatur ist unbetroffen von Karten und Effekten, die keine Helden betreffen können. Wenn diese Kreatur das Spielfeld verlässt, besiege den zugehörigen Helden. Einmal pro Zug darfst du, wenn du durch einen Effekt Gold erhältst, 15 zusätzliches Gold erhalten."
+"effect": "Du kannst nur 1 Exemplar dieser Karte in deinem Deck haben. Ein Held kann nur 1 \"Gebundener Gefährte\"-Kreatur in seinen Unterstützungszonen haben. Diese Kreatur kann nach dem Beschwören auf keine Weise in eine andere Unterstützungszone bewegt werden. Diese Kreatur und der zugehörige Held teilen sich 1 LP-Vorrat. Diese Kreatur ist unbeeinflusst von Karten und Effekten, die keine Helden betreffen können. Wenn diese Kreatur das Spielfeld verlässt, besiege den zugehörigen Helden. Einmal pro Zug darfst du, wenn du durch einen Effekt Gold erhältst, 15 zusätzliches Gold erhalten."
 },
 "Bonded Companion Mellvy": {
 "name": "Gebundener Gefährte Mellvy",
-"effect": "Du kannst nur 1 Exemplar dieser Karte in deinem Deck haben. Ein Held kann nur 1 \"Gebundener Gefährte\"-Kreatur in seinen Unterstützungszonen haben. Diese Kreatur kann nach dem Beschwören auf keine Weise in eine andere Unterstützungszone bewegt werden. Diese Kreatur und der zugehörige Held teilen sich 1 LP-Vorrat. Diese Kreatur ist unbetroffen von Karten und Effekten, die keine Helden betreffen können. Wenn diese Kreatur das Spielfeld verlässt, besiege den zugehörigen Helden. Einmal pro Zug ziehst du, wenn der zugehörige Held eine Aktion ausführt, eine Karte aus deinem Trankdeck."
+"effect": "Du kannst nur 1 Exemplar dieser Karte in deinem Deck haben. Ein Held kann nur 1 \"Gebundener Gefährte\"-Kreatur in seinen Unterstützungszonen haben. Diese Kreatur kann nach dem Beschwören auf keine Weise in eine andere Unterstützungszone bewegt werden. Diese Kreatur und der zugehörige Held teilen sich 1 LP-Vorrat. Diese Kreatur ist unbeeinflusst von Karten und Effekten, die keine Helden betreffen können. Wenn diese Kreatur das Spielfeld verlässt, besiege den zugehörigen Helden. Einmal pro Zug ziehst du, wenn der zugehörige Held eine Aktion ausführt, eine Karte aus deinem Trankdeck."
 },
 "Bonded Companion Orphy": {
 "name": "Gebundener Gefährte Orphy",
-"effect": "Du kannst nur 1 Exemplar dieser Karte in deinem Deck haben. Ein Held kann nur 1 \"Gebundener Gefährte\"-Kreatur in seinen Unterstützungszonen haben. Diese Kreatur kann nach dem Beschwören auf keine Weise in eine andere Unterstützungszone bewegt werden. Diese Kreatur und der zugehörige Held teilen sich 1 LP-Vorrat. Diese Kreatur ist unbetroffen von Karten und Effekten, die keine Helden betreffen können. Wenn diese Kreatur das Spielfeld verlässt, besiege den zugehörigen Helden. Einmal pro Zug ziehst du, wenn du dem zugehörigen Helden eine Fähigkeit anlegst, 3 Karten."
+"effect": "Du kannst nur 1 Exemplar dieser Karte in deinem Deck haben. Ein Held kann nur 1 \"Gebundener Gefährte\"-Kreatur in seinen Unterstützungszonen haben. Diese Kreatur kann nach dem Beschwören auf keine Weise in eine andere Unterstützungszone bewegt werden. Diese Kreatur und der zugehörige Held teilen sich 1 LP-Vorrat. Diese Kreatur ist unbeeinflusst von Karten und Effekten, die keine Helden betreffen können. Wenn diese Kreatur das Spielfeld verlässt, besiege den zugehörigen Helden. Einmal pro Zug ziehst du, wenn du an den zugehörigen Helden eine Fähigkeit anlegst, 3 Karten."
 },
 "Bonded Companion Thuly": {
 "name": "Gebundener Gefährte Thuly",
-"effect": "Du kannst nur 1 Exemplar dieser Karte in deinem Deck haben. Ein Held kann nur 1 \"Gebundener Gefährte\"-Kreatur in seinen Unterstützungszonen haben. Diese Kreatur kann nach dem Beschwören auf keine Weise in eine andere Unterstützungszone bewegt werden. Diese Kreatur und der zugehörige Held teilen sich 1 LP-Vorrat. Diese Kreatur ist unbetroffen von Karten und Effekten, die keine Helden betreffen können. Wenn diese Kreatur das Spielfeld verlässt, besiege den zugehörigen Helden. Einmal pro Zug darfst du, wenn du ein Ziel opferst, ein Ziel wählen und ihm 150 Schaden zufügen."
+"effect": "Du kannst nur 1 Exemplar dieser Karte in deinem Deck haben. Ein Held kann nur 1 \"Gebundener Gefährte\"-Kreatur in seinen Unterstützungszonen haben. Diese Kreatur kann nach dem Beschwören auf keine Weise in eine andere Unterstützungszone bewegt werden. Diese Kreatur und der zugehörige Held teilen sich 1 LP-Vorrat. Diese Kreatur ist unbeeinflusst von Karten und Effekten, die keine Helden betreffen können. Wenn diese Kreatur das Spielfeld verlässt, besiege den zugehörigen Helden. Einmal pro Zug darfst du, wenn du ein Ziel opferst, ein Ziel wählen und ihm 150 Schaden zufügen."
 },
 "Cardinal Beast Baihu": {
 "name": "Himmelsbestie Baihu",
-"effect": "Diese Kreatur ist unbetroffen von allen Karten und Effekten. Du darfst einmal pro Zug ein Ziel wählen, das dein Gegner kontrolliert, und es für 3 Züge betäuben. Ein durch diesen Effekt betäubtes Ziel erleidet von keiner Quelle Schaden. Wenn du 4 verschiedene \"Himmelsbestie\"-Kreaturen kontrollierst, gewinnst du das Spiel."
+"effect": "Diese Kreatur ist unbeeinflusst von allen Karten und Effekten. Du darfst einmal pro Zug ein Ziel wählen, das dein Gegner kontrolliert, und es für 3 Züge betäuben. Ein durch diesen Effekt Betäubtes Ziel erleidet von keiner Quelle Schaden. Wenn du 4 verschiedene \"Himmelsbestie\"-Kreaturen kontrollierst, gewinnst du das Spiel."
 },
 "Cardinal Beast Qinglong": {
 "name": "Himmelsbestie Qinglong",
-"effect": "Diese Kreatur ist unbetroffen von allen Karten und Effekten. Du darfst einmal pro Zug deinen Gegner nacheinander 3 Ziele wählen lassen, die er kontrolliert. Das erste erleidet 120 Schaden, das zweite 80 und das dritte 40. Wenn du 4 verschiedene \"Himmelsbestie\"-Kreaturen kontrollierst, gewinnst du das Spiel."
+"effect": "Diese Kreatur ist unbeeinflusst von allen Karten und Effekten. Du darfst einmal pro Zug deinen Gegner nacheinander 3 Ziele wählen lassen, die er kontrolliert. Das erste erleidet 120 Schaden, das zweite 80 und das dritte 40. Wenn du 4 verschiedene \"Himmelsbestie\"-Kreaturen kontrollierst, gewinnst du das Spiel."
 },
 "Cardinal Beast Xuanwu": {
 "name": "Himmelsbestie Xuanwu",
-"effect": "Diese Kreatur ist unbetroffen von allen Karten und Effekten. Du darfst einmal pro Zug eine Kreatur mit Level 3 oder niedriger aus deinem Ablagestapel in eine freie Unterstützungszone eines deiner Helden platzieren, aber ihre aktuellen und maximalen LP werden zu 1. Wenn du 4 verschiedene \"Himmelsbestie\"-Kreaturen kontrollierst, gewinnst du das Spiel."
+"effect": "Diese Kreatur ist unbeeinflusst von allen Karten und Effekten. Du darfst einmal pro Zug eine Kreatur mit Level 3 oder niedriger aus deinem Ablagestapel in eine freie Unterstützungszone eines deiner Helden platzieren, aber ihre aktuellen und maximalen LP werden zu 1. Wenn du 4 verschiedene \"Himmelsbestie\"-Kreaturen kontrollierst, gewinnst du das Spiel."
 },
 "Cardinal Beast Zhuque": {
 "name": "Himmelsbestie Zhuque",
-"effect": "Diese Kreatur ist unbetroffen von allen Karten und Effekten. Du darfst einmal pro Zug ein Ziel wählen und es für den Rest des Spiels verbrennen. Ist das gewählte Ziel ein Held, verbrenne auch alle Kreaturen in seinen Unterstützungszonen. Wenn du 4 verschiedene \"Himmelsbestie\"-Kreaturen kontrollierst, gewinnst du das Spiel."
+"effect": "Diese Kreatur ist unbeeinflusst von allen Karten und Effekten. Du darfst einmal pro Zug ein Ziel wählen und es für den Rest des Spiels verbrennen. Ist das gewählte Ziel ein Held, verbrenne auch alle Kreaturen in seinen Unterstützungszonen. Wenn du 4 verschiedene \"Himmelsbestie\"-Kreaturen kontrollierst, gewinnst du das Spiel."
 },
 "Calamitusk, the Chaorc War Chief": {
 "name": "Calamitusk, der Chaork-Kriegshäuptling",
@@ -333,7 +333,7 @@
 },
 "Board of Kings": {
 "name": "Brett der Könige",
-"effect": "Das Level dieses Zaubers in deiner Hand ist um die Anzahl der \"der Könige\"-Kreaturen verringert, die du kontrollierst. Du darfst eine \"der Könige\"-Kreatur opfern, die du kontrollierst und die in diesem Zug nicht beschworen wurde, damit das Spielen dieser Karte als zusätzliche Aktion zählt. Kreaturen, die du kontrollierst, können nicht gewählt werden und sind unbetroffen von den Karten und Effekten deines Gegners, solange in einer angrenzenden Unterstützungszone mindestens 1 Kreatur mit niedrigerem Level steht, die von dieser Karte oder diesem Effekt gewählt oder betroffen werden kann."
+"effect": "Das Level dieses Zaubers in deiner Hand ist um die Anzahl der \"der Könige\"-Kreaturen verringert, die du kontrollierst. Du darfst eine \"der Könige\"-Kreatur opfern, die du kontrollierst und die in diesem Zug nicht beschworen wurde, damit das Spielen dieser Karte als zusätzliche Aktion zählt. Kreaturen, die du kontrollierst, können nicht gewählt werden und sind unbeeinflusst von den Karten und Effekten deines Gegners, solange in einer angrenzenden Unterstützungszone mindestens 1 Kreatur mit niedrigerem Level steht, die von dieser Karte oder diesem Effekt gewählt oder betroffen werden kann."
 },
 "Castling": {
 "name": "Rochade",
@@ -361,7 +361,7 @@
 },
 "Pawn Sacrifice": {
 "name": "Bauernopfer",
-"effect": "Opfere einen \"Bauer der Könige\", um 3 Karten zu ziehen, ODER lösche einen \"Bauer der Könige\" aus deinem Ablagestapel, um 2 Karten zu ziehen. Kontrollierst du nach dem Abhandeln dieses Zaubers mindestens 1 \"der Könige\"-Kreatur, zählt dies als zusätzliche Aktion. Du kannst nur 1 \"Bauernopfer\" pro Zug spielen."
+"effect": "Opfere einen \"Bauer der Könige\", um 3 Karten zu ziehen, ODER lösche einen \"Bauer der Könige\" aus deinem Ablagestapel, um 2 Karten zu ziehen. Kontrollierst du, nachdem dieser Zauber abgehandelt wurde, mindestens 1 \"der Könige\"-Kreatur, zählt dies als zusätzliche Aktion. Du kannst nur 1 \"Bauernopfer\" pro Zug spielen."
 },
 "Pawn of Kings [B]": {
 "name": "Bauer der Könige [B]",
@@ -381,7 +381,7 @@
 },
 "Rook of Kings [B]": {
 "name": "Turm der Könige [B]",
-"effect": "Solange du mindestens 1 \"Läufer der Könige\" kontrollierst und \"Brett der Könige\" auf dem Spielfeld ist, sind Ziele, die du kontrollierst, unbetroffen von Karten und Effekten deines Gegners, die mehr als 1 Ziel, das du kontrollierst, betreffen würden."
+"effect": "Solange du mindestens 1 \"Läufer der Könige\" kontrollierst und \"Brett der Könige\" auf dem Spielfeld ist, sind Ziele, die du kontrollierst, unbeeinflusst von Karten und Effekten deines Gegners, die mehr als 1 Ziel, das du kontrollierst, betreffen würden."
 },
 "Rook of Kings [W]": {
 "name": "Turm der Könige [W]",
@@ -393,7 +393,7 @@
 },
 "Cool Birthday Girl Monia": {
 "name": "Cooles Geburtstagskind Monia",
-"effect": "Einmal pro Zug darfst du, wenn eine Karte in einer Unterstützungszone eines deiner Helden von der Karte oder dem Effekt eines Gegners betroffen würde, eine Kopie dieser Karte aus deinem Deck auf den Ablagestapel legen, damit deine Karte von dieser Karte bzw. diesem Effekt unbetroffen bleibt."
+"effect": "Einmal pro Zug darfst du, wenn eine Karte in einer Unterstützungszone eines deiner Helden von der Karte oder dem Effekt eines Gegners betroffen würde, eine Kopie dieser Karte aus deinem Deck auf den Ablagestapel legen, damit deine Karte von dieser Karte bzw. diesem Effekt unbeeinflusst bleibt."
 },
 "Cool Rescue": {
 "name": "Coole Rettung",
@@ -425,7 +425,7 @@
 },
 "Modnir, Hammer of Coolness": {
 "name": "Modnir, Hammer der Coolness",
-"effect": "Diese Karte hat keinen Effekt, außer du spielst sie aus deinem Coolness-Stapel. Ist dies die oberste Karte deines Coolness-Stapels, darfst du sie von dort an einen deiner Helden ausrüsten. Der Angriffswert des ausgerüsteten Helden wird um 100 erhöht."
+"effect": "Diese Karte hat keinen Effekt, es sei denn, du spielst sie aus deinem Coolness-Stapel. Ist dies die oberste Karte deines Coolness-Stapels, darfst du sie von dort an einen deiner Helden ausrüsten. Der Angriffswert des ausgerüsteten Helden wird um 100 erhöht."
 },
 "Phatnir, Prototype of Coolness": {
 "name": "Phatnir, Prototyp der Coolness",
@@ -441,7 +441,7 @@
 },
 "String of Fine": {
 "name": "Feiner Faden",
-"effect": "Diese Karte hat keinen Effekt, außer du spielst sie aus deinem Coolness-Stapel. Ist dies die oberste Karte deines Coolness-Stapels, darfst du sie von dort als zusätzliche Aktion spielen, indem du sie löschst. Wähle ein Ziel, das du kontrollierst. Jeder Schaden, den dieses Ziel bis zum Beginn deines nächsten Zuges erleiden würde, wird zu 0. Ein Ziel kann nur einmal pro Spiel von diesem Effekt betroffen sein."
+"effect": "Diese Karte hat keinen Effekt, es sei denn, du spielst sie aus deinem Coolness-Stapel. Ist dies die oberste Karte deines Coolness-Stapels, darfst du sie von dort als zusätzliche Aktion spielen, indem du sie löschst. Wähle ein Ziel, das du kontrollierst. Jeder Schaden, den dieses Ziel bis zum Beginn deines nächsten Zuges erleiden würde, wird zu 0. Ein Ziel kann nur einmal pro Spiel von diesem Effekt betroffen sein."
 },
 "Swagdri, Forger of Coolness": {
 "name": "Swagdri, Schmied der Coolness",
@@ -517,7 +517,7 @@
 },
 "The Cosmic Depths": {
 "name": "Die Kosmischen Tiefen",
-"effect": "Beide Spieler dürfen einmal pro Zug eine Karte aus ihrer Hand zurück in ihr Deck mischen, um ihr Deck nach einer Kreatur zu durchsuchen, deren Level sich von dem aller Kreaturen unterscheidet, die sie aktuell kontrollieren, und sie mit einem ihrer Helden als zusätzliche Aktion zu beschwören, aber ihre Effekte bis zum Ende des Zuges zu negieren."
+"effect": "Beide Spieler dürfen einmal pro Zug eine Karte aus ihrer Hand zurück in ihr Deck mischen, um ihr Deck nach einer Kreatur zu durchsuchen, deren Level sich von dem aller Kreaturen unterscheidet, die sie aktuell kontrollieren, und sie mit einem ihrer Helden als zusätzliche Aktion zu beschwören, wobei ihre Effekte bis zum Ende des Zuges negiert werden."
 },
 "Big Gwen Guard": {
 "name": "Großer Gwen-Wächter",
@@ -541,7 +541,7 @@
 },
 "Grinning Cat": {
 "name": "Grinsekatze",
-"effect": "Wenn du diese Karte ziehst oder deiner Hand hinzufügst, musst du sie sofort aufdecken. Solange sich diese Karte in deiner Hand befindet, kannst du keine Kreaturen beschwören außer \"Grinsekatze\"."
+"effect": "Wenn du diese Karte ziehst oder deiner Hand hinzufügst, musst du sie sofort aufdecken. Solange sich diese Karte in deiner Hand befindet, kannst du keine Kreaturen beschwören, außer \"Grinsekatze\"."
 },
 "Letter of Misinformations": {
 "name": "Brief der Falschinformationen",
@@ -589,7 +589,7 @@
 },
 "Cute Conversion": {
 "name": "Süße Bekehrung",
-"effect": "Übernimm für den Rest des Zuges die Kontrolle über alle Kreaturen, die dein Gegner kontrolliert. Kreaturen, die durch diesen Effekt kontrolliert werden, sind von allen Karten und Effekten unbetroffen, solange sie kontrolliert werden. Das Level dieses Zaubers in deiner Hand wird um die Anzahl der \"Süß\"-Kreaturen verringert, die du kontrollierst."
+"effect": "Übernimm für den Rest des Zuges die Kontrolle über alle Kreaturen, die dein Gegner kontrolliert. Kreaturen, die durch diesen Effekt kontrolliert werden, sind von allen Karten und Effekten unbeeinflusst, solange sie kontrolliert werden. Das Level dieses Zaubers in deiner Hand wird um die Anzahl der \"Süß\"-Kreaturen verringert, die du kontrollierst."
 },
 "Cute Crown": {
 "name": "Süße Krone",
@@ -685,7 +685,7 @@
 },
 "Troop Annihilation": {
 "name": "Truppenvernichtung",
-"effect": "Spiele diese Karte sofort, wenn eine Überraschungs-Kreatur, die du kontrollierst, besiegt wird. Besiege alle anderen Kreaturen, die du kontrollierst. Platziere dann bis zu dieselbe Anzahl Überraschungs-Kreaturen mit verschiedenen Namen aus deinem Deck verdeckt in die Überraschungszonen von Helden, die du kontrollierst, ohne sie deinem Gegner zu zeigen."
+"effect": "Spiele diese Karte sofort, wenn eine Überraschungs-Kreatur, die du kontrollierst, besiegt wird. Besiege alle anderen Kreaturen, die du kontrollierst. Platziere dann bis zu ebenso viele Überraschungs-Kreaturen mit verschiedenen Namen aus deinem Deck verdeckt in die Überraschungszonen von Helden, die du kontrollierst, ohne sie deinem Gegner zu zeigen."
 },
 "Bouldor Demon": {
 "name": "Bouldor-Dämon",
@@ -713,7 +713,7 @@
 },
 "Debt-O-Tron Model Backup Duplicator": {
 "name": "Debt-O-Tron Modell Backup-Duplikator",
-"effect": "Du kannst diese Karte nur spielen, während du weniger als 0 Gold hast, indem du 1 Karte aus deiner Hand löschst. Einmal pro Zug, wenn du nach dem Ausgeben von Gold negatives Gold hast, darfst du für je 10 Gold, die du über dein aktuelles Gold hinaus ausgegeben hast, dein Deck nach einem \"Debt-O-Tron\"-Artefakt durchsuchen, sie offen deiner Hand hinzufügen. Du kannst nur 1 \"Debt-O-Tron Modell Backup-Duplikator\" pro Zug beschwören."
+"effect": "Du kannst diese Karte nur spielen, während du weniger als 0 Gold hast, indem du 1 Karte aus deiner Hand löschst. Einmal pro Zug, wenn du nach dem Ausgeben von Gold negatives Gold hast, darfst du für je 10 Gold, die du über dein aktuelles Gold hinaus ausgegeben hast, dein Deck nach je einem \"Debt-O-Tron\"-Artefakt durchsuchen und es offen deiner Hand hinzufügen. Du kannst nur 1 \"Debt-O-Tron Modell Backup-Duplikator\" pro Zug beschwören."
 },
 "Debt-O-Tron Model Loan Shredder": {
 "name": "Debt-O-Tron Modell Kreditschredder",
@@ -753,7 +753,7 @@
 },
 "Deepsea Encounter": {
 "name": "Tiefsee-Begegnung",
-"effect": "Spiele diese Karte sofort, wenn dein Gegner mit einem Angriff, Zauber oder Kreatureneffekt eine Kreatur in einer der Unterstützungszonen deiner Helden wählt. Nimm die Kreatur zurück auf deine Hand und platziere eine Kreatur mit einem anderen Namen, deren Level bis zu 1 höher ist als die der zurückgenommenen Kreatur, aus deiner Hand in dieselbe Unterstützungszone. Diese Kreatur wird zum neuen Ziel deines Gegners."
+"effect": "Spiele diese Karte sofort, wenn dein Gegner mit einem Angriff, Zauber oder Kreatureneffekt eine Kreatur in einer der Unterstützungszonen deiner Helden wählt. Nimm die Kreatur zurück auf deine Hand und platziere eine Kreatur mit einem anderen Namen, deren Level bis zu 1 höher ist als das der zurückgenommenen Kreatur, aus deiner Hand in dieselbe Unterstützungszone. Diese Kreatur wird zum neuen Ziel deines Gegners."
 },
 "Deepsea Horror Clown": {
 "name": "Tiefsee-Horrorclown",
@@ -765,7 +765,7 @@
 },
 "Deepsea Monstrosity": {
 "name": "Tiefsee-Monstrosität",
-"effect": "Du darfst eine \"Tiefsee\"-Kreatur, die in diesem Zug nicht beschworen wurde, aus einer Unterstützungszone deiner Helden auf deine Hand nehmen, um diese Kreatur in dieselbe Unterstützungszone zu platzieren. Wenn du diese Kreatur beschwörst, darfst du eine deiner anderen \"Tiefsee\"-Kreaturen im Spiel wählen. Nimm sie zurück auf deine Hand. Dann aktiviert diese Kreatur den Beschwörungseffekt jener Kreatur, als wäre es ihr eigener.\nDu kannst nur 1 \"Tiefsee-Monstrosität\" pro Zug beschwören."
+"effect": "Du darfst eine \"Tiefsee\"-Kreatur, die in diesem Zug nicht beschworen wurde, aus einer Unterstützungszone deiner Helden auf deine Hand nehmen, um diese Kreatur in dieselbe Unterstützungszone zu platzieren. Wenn du diese Kreatur beschwörst, darfst du eine deiner anderen \"Tiefsee\"-Kreaturen im Spiel wählen. Nimm sie zurück auf deine Hand. Dann aktiviert diese Kreatur den Beschwörungseffekt jener Kreatur, als wäre er ihr eigener.\nDu kannst nur 1 \"Tiefsee-Monstrosität\" pro Zug beschwören."
 },
 "Deepsea Mummy": {
 "name": "Tiefsee-Mumie",
@@ -825,7 +825,7 @@
 },
 "Shapeshift": {
 "name": "Gestaltwandlung",
-"effect": "Wähle eine Kreatur in der Unterstützungszone eines deiner Helden und nimm sie auf deine Hand. Wähle dann eine Kreatur mit demselben oder einem niedrigeren Level, aber einem anderen Namen, aus deiner Hand und platziere sie in dieselbe Unterstützungszone. Wurde die Kreatur, die du auf deine Hand zurückgenommen hast, in diesem Zug nicht beschworen, zählt dies als zusätzliche Aktion."
+"effect": "Wähle eine Kreatur in der Unterstützungszone eines deiner Helden und füge sie deiner Hand hinzu. Wähle dann eine Kreatur mit demselben oder einem niedrigeren Level, aber einem anderen Namen, aus deiner Hand und platziere sie in dieselbe Unterstützungszone. Wurde die Kreatur, die du deiner Hand hinzugefügt hast, in diesem Zug nicht beschworen, zählt dies als zusätzliche Aktion."
 },
 "Shu'Chaku, the Blood Moon Projection": {
 "name": "Shu'Chaku, die Blutmond-Projektion",
@@ -837,7 +837,7 @@
 },
 "Teppes, the Deepsea Vampire": {
 "name": "Teppes, der Tiefsee-Vampir",
-"effect": "Bis zu 5-mal pro Zug ziehst du 1 Karte, wenn 1 oder mehr Karten aus den Unterstützungszonen deiner Helden auf deine Hand gelegt werden."
+"effect": "Bis zu 5-mal pro Zug ziehst du 1 Karte, wenn 1 oder mehr Karten aus den Unterstützungszonen deiner Helden deiner Hand hinzugefügt werden."
 },
 "Archer of Teocuilatl": {
 "name": "Bogenschütze von Teocuilatl",
@@ -849,7 +849,7 @@
 },
 "Doom Clock": {
 "name": "Unheilsuhr",
-"effect": "Am Ende jedes Zuges muss der Spieler am Zug 1 Unheilsmarker auf diese Karte legen. Die ersten 4-mal in jedem Zug, in denen 1 oder mehr Ziele besiegt werden, muss ihr Kontrolleur 1 Unheilsmarker auf diese Karte legen. Der Spieler, der die 20. Unheilsmarker auf diese Karte legt, verliert das Spiel."
+"effect": "Am Ende jedes Zuges muss der Spieler am Zug 1 Unheilsmarker auf diese Karte legen. Die ersten 4 Mal in jedem Zug, in denen 1 oder mehr Ziele besiegt werden, muss ihr Kontrolleur 1 Unheilsmarker auf diese Karte legen. Der Spieler, der den 20. Unheilsmarker auf diese Karte legt, verliert das Spiel."
 },
 "Doom Prophecy": {
 "name": "Unheilsprophezeiung",
@@ -865,7 +865,7 @@
 },
 "Swift Eagle Warrior": {
 "name": "Flinker Adlerkrieger",
-"effect": "Du darfst 1 Unheilsmarker von einer \"Unheilsuhr\" auf dem Spielfeld entfernen, um diese Kreatur aus deiner Hand als zusätzliche Aktion zu beschwören. Du kannst auf diese Weise nur 1 \"Flinker Adlerkrieger\" pro Zug beschwören. Du darfst einmal pro Zug einen Unheilsmarker auf eine \"Unheilsuhr\" auf dem Spielfeld legen. Einmal pro Zug ziehst du 1 Karte, wenn einen Unheilsmarker auf eine \"Unheilsuhr\" gelegt wird."
+"effect": "Du darfst 1 Unheilsmarker von einer \"Unheilsuhr\" auf dem Spielfeld entfernen, um diese Kreatur aus deiner Hand als zusätzliche Aktion zu beschwören. Du kannst auf diese Weise nur 1 \"Flinker Adlerkrieger\" pro Zug beschwören. Du darfst einmal pro Zug einen Unheilsmarker auf eine \"Unheilsuhr\" auf dem Spielfeld legen. Einmal pro Zug ziehst du 1 Karte, wenn ein Unheilsmarker auf eine \"Unheilsuhr\" gelegt wird."
 },
 "Warrior of Teocuilatl": {
 "name": "Krieger von Teocuilatl",
@@ -941,11 +941,11 @@
 },
 "Smug Mastermind Antonia": {
 "name": "Smug-Drahtzieherin Antonia",
-"effect": "Du darfst einmal pro Zug einen \"Coole Retterin Monia\" aus deiner Hand oder aus deinem Deck unter diese Kreatur legen. Solange an dieser Kreatur \"Coole Retterin Monia\" angelegt ist, erhält sie 200 LP und diesen Effekt: Bis zu 2-mal pro Zug darfst du, wenn eine Kreatur, die du kontrollierst, Schaden erleidet, eine Karte abwerfen, um eine beliebige Karte auf dem Spielfeld, die kein Held ist, zu wählen und auf den Ablagestapel zu legen."
+"effect": "Du darfst einmal pro Zug eine \"Coole Retterin Monia\" aus deiner Hand oder aus deinem Deck unter diese Kreatur legen. Solange an dieser Kreatur \"Coole Retterin Monia\" angelegt ist, erhält sie 200 LP und diesen Effekt: Bis zu 2-mal pro Zug darfst du, wenn eine Kreatur, die du kontrollierst, Schaden erleidet, eine Karte abwerfen, um eine beliebige Karte auf dem Spielfeld, die kein Held ist, zu wählen und auf den Ablagestapel zu legen."
 },
 "Smugbeth, the Rebel of no Rules": {
 "name": "Smugbeth, die Rebellin ohne Regeln",
-"effect": "Du darfst einmal pro Zug einen \"Lizbeth, die Schnitterin des Lichts\" aus deiner Hand oder aus deinem Deck unter diese Kreatur legen. Solange an dieser Kreatur \"Lizbeth, die Schnitterin des Lichts\" angelegt ist, erhält sie 250 LP und diesen Effekt: Du darfst die aktiven Effekte der Fähigkeiten der Helden deines Gegners verwenden, als wären sie an den zugehörigen Helden angelegt."
+"effect": "Du darfst einmal pro Zug eine \"Lizbeth, die Schnitterin des Lichts\" aus deiner Hand oder aus deinem Deck unter diese Kreatur legen. Solange an dieser Kreatur \"Lizbeth, die Schnitterin des Lichts\" angelegt ist, erhält sie 250 LP und diesen Effekt: Du darfst die aktiven Effekte der Fähigkeiten der Helden deines Gegners verwenden, als wären sie an den zugehörigen Helden angelegt."
 },
 "Stellin, the Calm Dictator": {
 "name": "Stellin, der ruhige Diktator",
@@ -953,11 +953,11 @@
 },
 "Unsettling Opportunist Vullary": {
 "name": "Beunruhigender Opportunist Vullary",
-"effect": "Du darfst einmal pro Zug einen \"Süße Prinzessin Mary\" aus deiner Hand oder aus deinem Deck unter diese Kreatur legen. Solange an dieser Kreatur \"Süße Prinzessin Mary\" angelegt ist, erhält sie 170 LP und diesen Effekt: Du darfst einmal pro Zug eine Kreatur mit Level 3 oder niedriger unabhängig von ihrem Level als zusätzliche Aktion mit dem zugehörigen Helden beschwören, aber ihre Effekte werden bis zu Beginn deines nächsten Zuges negiert."
+"effect": "Du darfst einmal pro Zug eine \"Süße Prinzessin Mary\" aus deiner Hand oder aus deinem Deck unter diese Kreatur legen. Solange an dieser Kreatur \"Süße Prinzessin Mary\" angelegt ist, erhält sie 170 LP und diesen Effekt: Du darfst einmal pro Zug eine Kreatur mit Level 3 oder niedriger unabhängig von ihrem Level als zusätzliche Aktion mit dem zugehörigen Helden beschwören, aber ihre Effekte werden bis zu Beginn deines nächsten Zuges negiert."
 },
 "Wolflesia, the Canine Flower": {
 "name": "Wolflesia, die Hundeblume",
-"effect": "Du darfst einmal pro Zug einen \"Rafflesia, die Giftprinzessin\" aus deiner Hand oder aus deinem Deck unter diese Kreatur legen. Solange an dieser Kreatur \"Rafflesia, die Giftprinzessin\" angelegt ist, erhält sie 200 LP und diesen Effekt: Du darfst einmal pro Zug einen Verfalls- oder Unterstützungsmagie-Zauber mit Level 3 oder niedriger mit dieser Kreatur als zusätzliche Aktion verwenden."
+"effect": "Du darfst einmal pro Zug eine \"Rafflesia, die Giftprinzessin\" aus deiner Hand oder aus deinem Deck unter diese Kreatur legen. Solange an dieser Kreatur \"Rafflesia, die Giftprinzessin\" angelegt ist, erhält sie 200 LP und diesen Effekt: Du darfst einmal pro Zug einen Verfalls- oder Unterstützungsmagie-Zauber mit Level 3 oder niedriger mit dieser Kreatur als zusätzliche Aktion verwenden."
 },
 "Elven Archer": {
 "name": "Elfen-Bogenschütze",
@@ -977,15 +977,15 @@
 },
 "Elven Rider": {
 "name": "Elfen-Reiter",
-"effect": "Du kannst diese Kreatur nur durch ihren eigenen Effekt beschwören. Du darfst diese Kreatur sofort aus deiner Hand als zusätzliche Aktion beschwören, wenn eine \"Elfen\"-Kreatur, die du kontrollierst, das Spielfeld verlässt, musst sie aber in dieselbe Unterstützungszone beschwören, die diese Kreatur belegt hat. Wenn du diese Kreatur beschwörst, durchsuche dein Deck nach einer beliebigen \"Elfen\"-Kreatur außer \"Elfen-Reiter\" und füge sie offen deiner Hand hinzu."
+"effect": "Du kannst diese Kreatur nur durch ihren eigenen Effekt beschwören. Du darfst diese Kreatur sofort aus deiner Hand als zusätzliche Aktion beschwören, wenn eine \"Elfen\"-Kreatur, die du kontrollierst, das Spielfeld verlässt, musst sie aber in dieselbe Unterstützungszone beschwören, die die verlassende \"Elfen\"-Kreatur belegt hat. Wenn du diese Kreatur beschwörst, durchsuche dein Deck nach einer beliebigen \"Elfen\"-Kreatur außer \"Elfen-Reiter\" und füge sie offen deiner Hand hinzu."
 },
 "Fun-Fun Circus Clown": {
 "name": "Spaß-Spaß-Zirkus Clown",
-"effect": "Am Ende des Zuges deines Gegners darfst du 1 Applaus-Marker von einer beliebigen Karte auf deiner Seite des Spielfelds entfernen, um diese Kreatur sofort als zusätzliche Aktion zu beschwören. Du darfst einmal pro Zug 1 Applaus-Marker auf diese Kreatur legen für jede andere \"Spaß-Spaß-Zirkus\"-Kreatur auf dem Spielfeld ODER 1 Applaus-Marker auf jede andere \"Spaß-Spaß-Zirkus\"-Kreatur auf dem Spielfeld legen."
+"effect": "Am Ende des Zuges deines Gegners darfst du 1 Applaus-Marker von einer beliebigen Karte auf deiner Seite des Spielfelds entfernen, um diese Kreatur sofort als zusätzliche Aktion zu beschwören. Du darfst einmal pro Zug entweder für jede andere \"Spaß-Spaß-Zirkus\"-Kreatur auf dem Spielfeld 1 Applaus-Marker auf diese Kreatur legen ODER 1 Applaus-Marker auf jede andere \"Spaß-Spaß-Zirkus\"-Kreatur auf dem Spielfeld legen."
 },
 "Fun-Fun Circus Director": {
 "name": "Spaß-Spaß-Zirkus Direktor",
-"effect": "Für je 15 Applaus-Marker auf dem Spielfeld wiederholt sich deine Ressourcenphase einmal zusätzlich. Immer wenn eine andere \"Spaß-Spaß-Zirkus\"-Kreatur besiegt wird, darfst du 1 Karte abwerfen, um alle ihre Applaus-Marker auf diese Kreatur zu verschieben, und dann eine zweite Karte abwerfen, um sie stattdessen wieder auf deine Hand zu nehmen, statt sie auf den Ablagestapel zu legen. "
+"effect": "Für je 15 Applaus-Marker auf dem Spielfeld wiederholt sich deine Ressourcenphase einmal zusätzlich. Immer wenn eine andere \"Spaß-Spaß-Zirkus\"-Kreatur besiegt wird, darfst du 1 Karte abwerfen, um alle ihre Applaus-Marker auf diese Kreatur zu verschieben, und dann eine zweite Karte abwerfen, um die besiegte Kreatur wieder auf deine Hand zu nehmen, statt sie auf den Ablagestapel zu legen. "
 },
 "Fun-Fun Circus Elephant": {
 "name": "Spaß-Spaß-Zirkus Elefant",
@@ -1013,7 +1013,7 @@
 },
 "Future Tech Bomb": {
 "name": "Zukunftstech-Bombe",
-"effect": "Füge allen Zielen, die dein Gegner kontrolliert, 20 Schaden mal der Anzahl verschiedener \"Zukunftstech\"-Karten in deinem Ablagestapel zu. \nDieser Schaden kann 100 nicht übersteigen. Du kannst nur 1 \"Zukunftstech-Bombe\" pro Zug spielen."
+"effect": "Füge allen Zielen, die dein Gegner kontrolliert, 20 Schaden mal die Anzahl verschiedener \"Zukunftstech\"-Karten in deinem Ablagestapel zu. \nDieser Schaden kann 100 nicht übersteigen. Du kannst nur 1 \"Zukunftstech-Bombe\" pro Zug spielen."
 },
 "Future Tech Control Device": {
 "name": "Zukunftstech-Steuergerät",
@@ -1049,7 +1049,7 @@
 },
 "Future Tech Gear": {
 "name": "Zukunftstech-Ausrüstung",
-"effect": "Rüste diese Karte an einen Helden aus, den du kontrollierst. Das erste Mal in jedem Zug, wenn dein Gegner durch einen Effekt eine Karte zieht oder aus seinem Deck seiner Hand hinzufügt, muss er Karten in Höhe der doppelten Anzahl der \"Zukunftstech-Ausrüstung\"-Karten in deinem Ablagestapel von oben von seinem Deck auf den Ablagestapel legen. Du kannst jederzeit nur 1 \"Zukunftstech-Ausrüstung\" an deine Helden ausgerüstet haben."
+"effect": "Rüste diese Karte an einen Helden aus, den du kontrollierst. Das erste Mal in jedem Zug, wenn dein Gegner durch einen Effekt eine Karte zieht oder aus seinem Deck seiner Hand hinzufügt, muss er von oben von seinem Deck so viele Karten auf den Ablagestapel legen, wie das Doppelte der Anzahl der \"Zukunftstech-Ausrüstung\"-Karten in deinem Ablagestapel beträgt. Du kannst jederzeit nur 1 \"Zukunftstech-Ausrüstung\" an deine Helden ausgerüstet haben."
 },
 "Future Tech Gun": {
 "name": "Zukunftstech-Pistole",
@@ -1065,7 +1065,7 @@
 },
 "Future Tech Lamp": {
 "name": "Zukunftstech-Lampe",
-"effect": "Sieh dir so viele der obersten Karten deines Decks an, wie sich \"Zukunftstech-Lampe\"-Karten in deinem Ablagestapel befinden +1. Füge alle Artefakte, die du unter diesen Karten findest, deiner Hand hinzu und mische die übrigen Karten zurück in dein Deck. Du kannst nur 1 \"Zukunftstech-Lampe\" pro Zug spielen."
+"effect": "Sieh dir so viele der obersten Karten deines Decks an, wie sich \"Zukunftstech-Lampe\"-Karten in deinem Ablagestapel befinden, plus 1. Füge alle Artefakte, die du unter diesen Karten findest, deiner Hand hinzu und mische die übrigen Karten zurück in dein Deck. Du kannst nur 1 \"Zukunftstech-Lampe\" pro Zug spielen."
 },
 "Future Tech Laser Cannon": {
 "name": "Zukunftstech-Laserkanone",
@@ -1133,7 +1133,7 @@
 },
 "Gigantisaur Raptoren": {
 "name": "Gigantisaurier Raptoren",
-"effect": "Ein Held kann jeweils nur 1 \"Gigantisaurier\"-Kreatur in seinen Unterstützungszonen haben. Wenn du diese Kreatur beschwörst, darfst du sofort eine \"Gigantisaurier\"-Kreatur aus deiner Hand als zusätzliche Aktion beschwören. Du darfst einmal pro Zug Karten in Höhe der Anzahl der \"Gigantisaurier\"-Kreaturen ziehen, die du kontrollierst."
+"effect": "Ein Held kann jeweils nur 1 \"Gigantisaurier\"-Kreatur in seinen Unterstützungszonen haben. Wenn du diese Kreatur beschwörst, darfst du sofort eine \"Gigantisaurier\"-Kreatur aus deiner Hand als zusätzliche Aktion beschwören. Du darfst einmal pro Zug so viele Karten ziehen, wie du \"Gigantisaurier\"-Kreaturen kontrollierst."
 },
 "Gigantisaur Spinor": {
 "name": "Gigantisaurier Spinor",
@@ -1165,7 +1165,7 @@
 },
 "Greatmaw Siren": {
 "name": "Großmaul-Sirene",
-"effect": "Du darfst Kreaturen, die du kontrollierst, in dem Zug, in dem sie beschworen werden, für die Effekte von \"Großmaul\"-Kreaturen opfern. Auf diese Weise geopferte Kreaturen, außer \"Großmaul\"-Kreaturen, werden in ihren Effekten negiert."
+"effect": "Du darfst Kreaturen, die du kontrollierst, in dem Zug, in dem sie beschworen werden, für die Effekte von \"Großmaul\"-Kreaturen opfern. Auf diese Weise geopferte Kreaturen, außer \"Großmaul\"-Kreaturen, haben ihre Effekte negiert."
 },
 "Infected Greatmaw": {
 "name": "Infiziertes Großmaul",
@@ -1193,7 +1193,7 @@
 },
 "Guardian Beast Long": {
 "name": "Wächterbestie Long",
-"effect": "Du kannst diese Kreatur nur beschwören, solange du keine Karten in deinem Ablagestapel hast. Hast du in diesem Zug noch keine \"Wächterbestie\"-Kreatur beschworen, zählt das Beschwören dieser Kreatur als zusätzliche Aktion. Du darfst einmal pro Zug insgesamt bis zu 3 Karten aus beiden Ablagestapeln löschen, um ebenso viele Ziele auf dem Spielfeld zu wählen und sie für den Rest des Spiels zu verbrennen. Nachdem dieser Effekt aufgelöst wurde, können nicht mehr als 3 Ziele verbrannt sein."
+"effect": "Du kannst diese Kreatur nur beschwören, solange du keine Karten in deinem Ablagestapel hast. Hast du in diesem Zug noch keine \"Wächterbestie\"-Kreatur beschworen, zählt das Beschwören dieser Kreatur als zusätzliche Aktion. Du darfst einmal pro Zug insgesamt bis zu 3 Karten aus beiden Ablagestapeln löschen, um ebenso viele Ziele auf dem Spielfeld zu wählen und sie für den Rest des Spiels zu verbrennen. Nachdem dieser Effekt aufgelöst wurde, können nicht mehr als 3 Ziele Verbrannt sein."
 },
 "Guardian Beast Ma": {
 "name": "Wächterbestie Ma",
@@ -1209,7 +1209,7 @@
 },
 "Guardian Beast Shu": {
 "name": "Wächterbestie Shu",
-"effect": "Du kannst diese Kreatur nur beschwören, solange du keine Karten in deinem Ablagestapel hast. Hast du in diesem Zug noch keine \"Wächterbestie\"-Kreatur beschworen, zählt das Beschwören dieser Kreatur als zusätzliche Aktion. Du darfst einmal pro Zug insgesamt ein Vielfaches von 4 Karten aus beiden Ablagestapeln löschen, um eine Kreatur auf deiner Seite des Spielfelds zu wählen. Wähle aus deinem Deck und/oder Ablagestapel so viele Exemplare dieser Kreatur, wie du Vielfache von 4 Karten gelöscht hast, und füge sie deiner Hand hinzu."
+"effect": "Du kannst diese Kreatur nur beschwören, solange du keine Karten in deinem Ablagestapel hast. Hast du in diesem Zug noch keine \"Wächterbestie\"-Kreatur beschworen, zählt das Beschwören dieser Kreatur als zusätzliche Aktion. Du darfst einmal pro Zug insgesamt ein Vielfaches von 4 Karten aus beiden Ablagestapeln löschen, um eine Kreatur auf deiner Seite des Spielfelds zu wählen. Wähle aus deinem Deck und/oder Ablagestapel für je 4 auf diese Weise gelöschte Karten 1 Exemplar dieser Kreatur und füge sie deiner Hand hinzu."
 },
 "Guardian Beast Tu": {
 "name": "Wächterbestie Tu",
@@ -1301,7 +1301,7 @@
 },
 "The Sixth Circle of Hell": {
 "name": "Der sechste Kreis der Hölle",
-"effect": "Wenn diese Karte durch einen Effekt gelöscht wird und du in diesem Zug noch kein gelöschtes Gebiet gespielt hast, darfst du sofort alle Gebiete löschen, die du kontrollierst, und diesen gelöschten Zauber als zusätzliche Aktion spielen. Wenn diese Karte auf deiner Seite des Spielfelds auf den Ablagestapel gelegt oder gelöscht wird, darfst du einen Helden wählen, den dein Gegner kontrolliert, und die Kontrolle über ihn für den Rest des Zuges übernehmen. Tust du das, ist dieser Held bis zum Ende des Zuges von deinen anderen Karten und Effekten nicht betroffen."
+"effect": "Wenn diese Karte durch einen Effekt gelöscht wird und du in diesem Zug noch kein gelöschtes Gebiet gespielt hast, darfst du sofort alle Gebiete löschen, die du kontrollierst, und diesen gelöschten Zauber als zusätzliche Aktion spielen. Wenn diese Karte auf deiner Seite des Spielfelds auf den Ablagestapel gelegt oder gelöscht wird, darfst du einen Helden wählen, den dein Gegner kontrolliert, und die Kontrolle über ihn für den Rest des Zuges übernehmen. Tust du das, ist dieser Held bis zum Ende des Zuges von deinen anderen Karten und Effekten unbeeinflusst."
 },
 "The Third Circle of Hell": {
 "name": "Der dritte Kreis der Hölle",
@@ -1345,7 +1345,7 @@
 },
 "Idej Sword - Kogarasu": {
 "name": "Idej-Schwert - Kogarasu",
-"effect": "Du kannst dieses Artefakt nur an einen \"Idej\"-Helden ausrüsten, den du kontrollierst. Rüstest du dieses Artefakt an \"Idej-Fürst Daiyo\" aus, werden seine Kosten zu 0. Ein Held kann nur mit 1 \"Idej-Schwert\"-Artefakt ausgerüstet sein. Alle Zauber, die der ausgerüstete Held verwendet, haben ihr Level um die Kampfkunst-Level des Helden verringert, aber der ausgerüstete Held kann pro Zug nur 1 Zauber verwenden."
+"effect": "Du kannst dieses Artefakt nur an einen \"Idej\"-Helden ausrüsten, den du kontrollierst. Rüstest du dieses Artefakt an \"Idej-Fürst Daiyo\" aus, werden seine Kosten zu 0. Ein Held kann nur mit 1 \"Idej-Schwert\"-Artefakt ausgerüstet sein. Alle Zauber, die der ausgerüstete Held verwendet, haben ihr Level um das Kampfkunst-Level des Helden verringert, aber der ausgerüstete Held kann pro Zug nur 1 Zauber verwenden."
 },
 "Idej Sword - Kunagi": {
 "name": "Idej-Schwert - Kunagi",
@@ -1361,11 +1361,11 @@
 },
 "Loyal Beagle": {
 "name": "Treuer Beagle",
-"effect": "Wenn du diese Kreatur beschwörst: Erhalte Gold in Höhe des Doppelten der Anzahl der \"Treuer\"-Kreaturen, die du kontrollierst."
+"effect": "Wenn du diese Kreatur beschwörst: Erhalte doppelt so viel Gold, wie du \"Treuer\"-Kreaturen kontrollierst."
 },
 "Loyal Bone Dog": {
 "name": "Treuer Knochenhund",
-"effect": "Wenn eine \"Treuer\"- oder \"Skelett\"-Kreatur, die du kontrollierst, besiegt wird, darfst du diese Karte aus deiner Hand abwerfen, um diese Kreatur sofort in die Unterstützungszone, in der sie sich befand, wiederzubeleben. \nDiese Kreatur gilt auch als \"Skelett\"-Kreatur."
+"effect": "Wenn eine \"Treuer\"- oder \"Skelett\"-Kreatur, die du kontrollierst, besiegt wird, darfst du diese Karte aus deiner Hand abwerfen, um diese Kreatur sofort in derselben Unterstützungszone wiederzubeleben, in der sie sich befand. \nDiese Kreatur gilt auch als \"Skelett\"-Kreatur."
 },
 "Loyal Hountriever": {
 "name": "Treuer Hountriever",
@@ -1429,11 +1429,11 @@
 },
 "Ice Sculpture Garden": {
 "name": "Eisskulpturengarten",
-"effect": "Ziehe so viele Karten, wie es gefrorene Ziele auf dem Spielfeld gibt. Gibt es mindestens 2 gefrorene Ziele auf dem Spielfeld, zählt dies als zusätzliche Aktion. Danach kannst du für den Rest des Zuges keine Karten ziehen oder deiner Hand hinzufügen."
+"effect": "Ziehe so viele Karten, wie es Gefrorene Ziele auf dem Spielfeld gibt. Gibt es mindestens 2 Gefrorene Ziele auf dem Spielfeld, zählt dies als zusätzliche Aktion. Danach kannst du für den Rest des Zuges keine Karten ziehen oder deiner Hand hinzufügen."
 },
 "Mischief Invasion": {
 "name": "Unfug-Invasion",
-"effect": "Wähle bis zu so viele \"Unfug-Miliz\"-Kreaturen aus deiner Hand, wie es gefrorene Ziele auf dem Spielfeld gibt, und beschwöre sie als zusätzliche Aktionen. Wähle dann dieselbe Anzahl Ziele auf dem Spielfeld, die nicht gefroren sind, und friere sie für 1 Zug ein. Du kannst nur 1 \"Unfug-Invasion\" pro Zug spielen."
+"effect": "Wähle bis zu so viele \"Unfug-Miliz\"-Kreaturen aus deiner Hand, wie es Gefrorene Ziele auf dem Spielfeld gibt, und beschwöre sie als zusätzliche Aktionen. Wähle dann dieselbe Anzahl Ziele auf dem Spielfeld, die nicht Gefroren sind, und friere sie für 1 Zug ein. Du kannst nur 1 \"Unfug-Invasion\" pro Zug spielen."
 },
 "Mischief Militia - Banner Bearer": {
 "name": "Unfug-Miliz - Bannerträger",
@@ -1441,11 +1441,11 @@
 },
 "Mischief Militia - Bear Rider": {
 "name": "Unfug-Miliz - Bärenreiter",
-"effect": "Das Level dieser Karte in deiner Hand wird für jedes gefrorene Ziel auf dem Spielfeld um 1 verringert. Solange das Level dieser Kreatur 0 beträgt, darfst du sie als zusätzliche Aktion beschwören. Du darfst einmal pro Zug ein gefrorenes Ziel wählen und ihm 150 Schaden zufügen."
+"effect": "Das Level dieser Karte in deiner Hand wird für jedes Gefrorene Ziel auf dem Spielfeld um 1 verringert. Solange das Level dieser Kreatur 0 beträgt, darfst du sie als zusätzliche Aktion beschwören. Du darfst einmal pro Zug ein Gefrorenes Ziel wählen und ihm 150 Schaden zufügen."
 },
 "Mischief Militia - Chilly Dog": {
 "name": "Unfug-Miliz - Frostiger Hund",
-"effect": "Die Effekte und Fähigkeiten von gefrorenen Zielen, die du kontrollierst (einschließlich dieses Ziels), werden nicht negiert (aber gefrorene Helden können weiterhin keine Aktionen ausführen). Gefrorene Kreaturen, die du kontrollierst, können ihre aktiven Effekte in dem Zug einsetzen, in dem sie beschworen wurden."
+"effect": "Die Effekte und Fähigkeiten von Gefrorenen Zielen, die du kontrollierst (einschließlich dieses Ziels), werden nicht negiert (aber Gefrorene Helden können weiterhin keine Aktionen ausführen). Gefrorene Kreaturen, die du kontrollierst, können ihre aktiven Effekte in dem Zug verwenden, in dem sie beschworen wurden."
 },
 "Mischief Militia - Chilly Wizard": {
 "name": "Unfug-Miliz - Frostiger Zauberer",
@@ -1453,7 +1453,7 @@
 },
 "Mischief Militia - Colored Snow": {
 "name": "Unfug-Miliz - Bunter Schnee",
-"effect": "Einmal pro Zug darfst du, wenn ein Ziel, das dein Gegner kontrolliert, gefroren wird, sofort die oberste Karte deines Trankdecks auflösen, als hättest du sie aus deiner Hand gespielt."
+"effect": "Einmal pro Zug darfst du, wenn ein Ziel, das dein Gegner kontrolliert, Gefroren wird, sofort die oberste Karte deines Trankdecks abhandeln, als hättest du sie aus deiner Hand gespielt."
 },
 "Mischief Militia - Heli Troopers": {
 "name": "Unfug-Miliz - Heli-Truppen",
@@ -1461,19 +1461,19 @@
 },
 "Mischief Militia - SnowItAll": {
 "name": "Unfug-Miliz - SnowItAll",
-"effect": "Diese Kreatur kann nicht eingefroren werden. Du darfst einmal pro Zug eine Kreatur mit Level 1 oder niedriger aus deiner Hand als zusätzliche Aktion beschwören, aber wenn du das tust, friere sie für 2 Züge ein. Befindet sich mindestens 1 gefrorenes Ziel auf dem Spielfeld, darfst du diesen Effekt in dem Zug aktivieren, in dem diese Kreatur beschworen wurde."
+"effect": "Diese Kreatur kann nicht Gefroren werden. Du darfst einmal pro Zug eine Kreatur mit Level 1 oder niedriger aus deiner Hand als zusätzliche Aktion beschwören, aber wenn du das tust, friere sie für 2 Züge ein. Befindet sich mindestens 1 Gefrorenes Ziel auf dem Spielfeld, darfst du diesen Effekt in dem Zug aktivieren, in dem diese Kreatur beschworen wurde."
 },
 "Mischief Militia - Thaw Blader": {
 "name": "Unfug-Miliz - Auftau-Klinge",
-"effect": "Du darfst einmal pro Zug ein gefrorenes Ziel wählen und ihm 200 Schaden zufügen. Wenn du das tust, heile es von seinem Einfrieren. Du darfst diesen Effekt in dem Zug aktivieren, in dem diese Kreatur beschworen wurde."
+"effect": "Du darfst einmal pro Zug ein Gefrorenes Ziel wählen und ihm 200 Schaden zufügen. Wenn du das tust, heile es von seinem Einfrieren. Du darfst diesen Effekt in dem Zug aktivieren, in dem diese Kreatur beschworen wurde."
 },
 "Sculpture Guards": {
 "name": "Skulpturenwächter",
-"effect": "Spiele diese Karte sofort, wenn ein gefrorenes Ziel, das du kontrollierst, Schaden erleiden würde. Negiere diesen Schaden und alle damit verbundenen Effekte auf dieses Ziel."
+"effect": "Spiele diese Karte sofort, wenn ein Gefrorenes Ziel, das du kontrollierst, Schaden erleiden würde. Negiere diesen Schaden und alle damit verbundenen Effekte auf dieses Ziel."
 },
 "Sculpture Theft": {
 "name": "Skulpturendiebstahl",
-"effect": "Spiele diese Karte sofort, wenn eine oder mehrere Kreaturen gefroren werden. Wähle eine dieser Kreaturen und füge sie deiner Hand hinzu."
+"effect": "Spiele diese Karte sofort, wenn eine oder mehrere Kreaturen Gefroren werden. Wähle eine dieser Kreaturen und füge sie deiner Hand hinzu."
 },
 "Snowstorm Mischief": {
 "name": "Schneesturm-Unfug",
@@ -1557,7 +1557,7 @@
 },
 "Paraseed": {
 "name": "Parasaat",
-"effect": "Wenn diese Kreatur von einem Helden oder einer Kreatur besiegt wird, platziere sie in eine der freien Unterstützungszonen des angreifenden oder zugehörigen Helden, statt sie auf den Ablagestapel zu legen. Solange sich diese Kreatur in der Unterstützungszone eines Helden befindet, ist dieser Held vergiftet. Schaden, den dieser Held durch Gift erleidet, verringert seine aktuellen und maximalen LP. Das Gift dieses Helden kann nicht geheilt werden, wird aber entfernt, wenn diese Kreatur die Unterstützungszone des Helden verlässt."
+"effect": "Wenn diese Kreatur von einem Helden oder einer Kreatur besiegt wird, platziere sie in eine der freien Unterstützungszonen des angreifenden oder zugehörigen Helden, statt sie auf den Ablagestapel zu legen. Solange sich diese Kreatur in der Unterstützungszone eines Helden befindet, ist dieser Held Vergiftet. Schaden, den dieser Held durch Gift erleidet, verringert seine aktuellen und maximalen LP. Das Gift dieses Helden kann nicht geheilt werden, wird aber entfernt, wenn diese Kreatur die Unterstützungszone des Helden verlässt."
 },
 "Paraseed Control": {
 "name": "Parasaat-Kontrolle",
@@ -1573,7 +1573,7 @@
 },
 "Pet Snake": {
 "name": "Haustier-Schlange",
-"effect": "Du darfst einen vergifteten Helden von seinem Gift heilen, um diese Kreatur als zusätzliche Aktion zu beschwören. Du kannst auf diese Weise nur 1 \"Haustier-Schlange\" pro Zug beschwören. Du darfst einmal pro Zug ein vergiftetes Ziel wählen und ihm 1 Giftstapel zufügen."
+"effect": "Du darfst einen Vergifteten Helden von seinem Gift heilen, um diese Kreatur als zusätzliche Aktion zu beschwören. Du kannst auf diese Weise nur 1 \"Haustier-Schlange\" pro Zug beschwören. Du darfst einmal pro Zug ein Vergiftetes Ziel wählen und ihm 1 Giftstapel zufügen."
 },
 "Acid Rain": {
 "name": "Saurer Regen",
@@ -1613,7 +1613,7 @@
 },
 "Medusa's Curse": {
 "name": "Fluch der Medusa",
-"effect": "Platziere 2 Verschmutzungs-Token in deine freien Unterstützungszonen, um diesen Zauber zu verwenden. Betäube alle Ziele, die dein Gegner kontrolliert und die in diesem Zug noch keinen Schaden erlitten haben, für 1 Zug. Schaden, den durch diesen Effekt betäubte Ziele erleiden würden, wird zu 0."
+"effect": "Platziere 2 Verschmutzungs-Token in deine freien Unterstützungszonen, um diesen Zauber zu verwenden. Betäube alle Ziele, die dein Gegner kontrolliert und die in diesem Zug noch keinen Schaden erlitten haben, für 1 Zug. Schaden, den durch diesen Effekt Betäubte Ziele erleiden würden, wird zu 0."
 },
 "Null Zone": {
 "name": "Nullzone",
@@ -1677,7 +1677,7 @@
 },
 "Creative Puppet Brammi": {
 "name": "Kreative Puppe Brammi",
-"effect": "Dies zählt nicht als Kreatur, kann aber wie eine solche gewählt werden. Kann nicht in eine andere Unterstützungszone bewegt werden. Du darfst einmal pro Zug dein Deck nach einer Karte durchsuchen, sie offen deiner Hand hinzufügen. Kein anderer Token in den Unterstützungszonen des zugehörigen Helden kann danach für den Rest des Zuges seinen aktiven Effekt verwenden. Lautet der Name des zugehörigen Helden \"Tri Ad, die Puppenmeisterin\", ersetze diesen Token sofort durch einen \"Kluge Puppe Saras\"-Token."
+"effect": "Dies zählt nicht als Kreatur, kann aber wie eine solche gewählt werden. Kann nicht in eine andere Unterstützungszone bewegt werden. Du darfst einmal pro Zug dein Deck nach einer Karte durchsuchen und sie offen deiner Hand hinzufügen. Kein anderer Token in den Unterstützungszonen des zugehörigen Helden kann danach für den Rest des Zuges seinen aktiven Effekt verwenden. Lautet der Name des zugehörigen Helden \"Tri Ad, die Puppenmeisterin\", ersetze diesen Token sofort durch einen \"Kluge Puppe Saras\"-Token."
 },
 "Destructive Puppet Shishi": {
 "name": "Zerstörerische Puppe Shishi",
@@ -1745,7 +1745,7 @@
 },
 "Kitsune Transformation": {
 "name": "Kitsune-Verwandlung",
-"effect": "Wähle bis zu 3 Kreaturen mit verschiedenen Namen aus deinem Ablagestapel, einschließlich \"Rebelliokai Gütiger Kitsune\", und mische sie zurück in dein Deck. Wähle dann dieselbe Anzahl Kreaturen mit voneinander und von den zurückgemischten Kreaturen verschiedenen Namen aus deinem Deck, füge sie offen deiner Hand hinzu. Wirf danach dieselbe Anzahl Karten ab. Ist dies der erste Magiekunst-Zauber, den du in diesem Zug verwendest, zählt dies als zusätzliche Aktion."
+"effect": "Wähle bis zu 3 Kreaturen mit verschiedenen Namen aus deinem Ablagestapel, einschließlich \"Rebelliokai Gütiger Kitsune\", und mische sie zurück in dein Deck. Wähle dann dieselbe Anzahl Kreaturen mit voneinander und von den zurückgemischten Kreaturen verschiedenen Namen aus deinem Deck und füge sie offen deiner Hand hinzu. Wirf danach dieselbe Anzahl Karten ab. Ist dies der erste Magiekunst-Zauber, den du in diesem Zug verwendest, zählt dies als zusätzliche Aktion."
 },
 "Rebelliokai Backup Bakus": {
 "name": "Rebelliokai Ersatz-Bakus",
@@ -1765,7 +1765,7 @@
 },
 "Rebelliokai Oblivious Oni": {
 "name": "Rebelliokai Ahnungsloser Oni",
-"effect": "Wenn diese Karte von irgendwo außer deiner Hand oder dem Spielfeld auf den Ablagestapel gelegt wird, lösche sie. Du kannst diese Kreatur nicht spielen, außer es befinden sich 5 oder mehr \"Rebelliokai\"-Kreaturen mit verschiedenen Namen in deinem Ablagestapel. Du darfst einmal pro Zug allen Zielen, die dein Gegner kontrolliert, 150 Schaden zufügen. Du kannst diesen Effekt von \"Rebelliokai Ahnungsloser Oni\" nur einmal pro Zug aktivieren."
+"effect": "Wenn diese Karte von irgendwo außer deiner Hand oder dem Spielfeld auf den Ablagestapel gelegt wird, lösche sie. Du kannst diese Kreatur nicht spielen, es sei denn, es befinden sich 5 oder mehr \"Rebelliokai\"-Kreaturen mit verschiedenen Namen in deinem Ablagestapel. Du darfst einmal pro Zug allen Zielen, die dein Gegner kontrolliert, 150 Schaden zufügen. Du kannst diesen Effekt von \"Rebelliokai Ahnungsloser Oni\" nur einmal pro Zug aktivieren."
 },
 "Rebelliokai Terror Tengu": {
 "name": "Rebelliokai Schrecken-Tengu",
@@ -1777,7 +1777,7 @@
 },
 "Tanuki Escape": {
 "name": "Tanuki-Flucht",
-"effect": "Lösche 1 \"Rebelliokai Scheuer Tanuki\" aus deinem Ablagestapel, um diese Karte zu spielen. Mische bis zu so viele Karten aus deiner Hand zurück in dein Deck, wie du \"Rebelliokai\"-Kreaturen mit verschiedenen Namen in deinem Ablagestapel hast (max. 3). Durchsuche dann dein Deck nach bis zu so vielen Karten mit voneinander und von den so zurückgemischten Karten verschiedenen Namen, füge sie offen deiner Hand hinzu. Beende danach sofort deinen Zug."
+"effect": "Lösche 1 \"Rebelliokai Scheuer Tanuki\" aus deinem Ablagestapel, um diese Karte zu spielen. Mische bis zu so viele Karten aus deiner Hand zurück in dein Deck, wie du \"Rebelliokai\"-Kreaturen mit verschiedenen Namen in deinem Ablagestapel hast (max. 3). Durchsuche dann dein Deck nach bis zu so vielen Karten mit voneinander und von den so zurückgemischten Karten verschiedenen Namen und füge sie offen deiner Hand hinzu. Beende danach sofort deinen Zug."
 },
 "Tengu Windstorm": {
 "name": "Tengu-Windsturm",
@@ -1845,7 +1845,7 @@
 },
 "Skeleton Wizard": {
 "name": "Skelett-Zauberer",
-"effect": "Du darfst einmal pro Zug diese Kreatur einen Magiekunst-Zauber mit Level 1 oder niedriger aus deiner Hand als zusätzliche Aktion ausführen lassen."
+"effect": "Du darfst einmal pro Zug diese Kreatur einen Magiekunst-Zauber mit Level 1 oder niedriger aus deiner Hand als zusätzliche Aktion verwenden lassen."
 },
 "The Bonegrinder": {
 "name": "Der Knochenmahler",
@@ -1901,7 +1901,7 @@
 },
 "Slime Rancher": {
 "name": "Schleimzüchter",
-"effect": "Solange du diese Kreatur kontrollierst, werden die Effekte von \"Schleime\"-Kreaturen, die bei ihrer Beschwörung aktiviert werden, ein zusätzliches Mal aktiviert."
+"effect": "Solange du diese Kreatur kontrollierst, werden die Effekte von \"Schleim\"-Kreaturen, die bei ihrer Beschwörung aktiviert werden, ein zusätzliches Mal aktiviert."
 },
 "Slimy Slime": {
 "name": "Schleimiger Schleim",
@@ -1913,7 +1913,7 @@
 },
 "Splashy Slime": {
 "name": "Plätschernder Schleim",
-"effect": "Wenn du diese Kreatur beschwörst, erhalte 4 Gold für jede Kreatur mit einem anderen Namen und einem ursprünglichen Level von 0, die du kontrollierst (diese eingeschlossen). Zu Beginn jedes deiner Züge darfst du das Level dieser Kreatur auf deiner Seite des Spielfelds um 1 erhöhen."
+"effect": "Wenn du diese Kreatur beschwörst, erhalte 4 Gold für jede Kreatur mit verschiedenem Namen und einem ursprünglichen Level von 0, die du kontrollierst (diese eingeschlossen). Zu Beginn jedes deiner Züge darfst du das Level dieser Kreatur auf deiner Seite des Spielfelds um 1 erhöhen."
 },
 "Slippery Ice": {
 "name": "Glitschiges Eis",
@@ -2001,7 +2001,7 @@
 },
 "Sparkfly Attendant": {
 "name": "Funkenfliegen-Begleiter",
-"effect": "Solange du diese Kreatur kontrollierst, sind \"Funkenfliegen-Königin\"-Kreaturen, die du kontrollierst, von den Karten und Effekten deines Gegners nicht betroffen. Wird diese Kreatur geopfert, um \"Funkenfliegen-Königin\" zu beschwören, erhält sie diesen Effekt:\n\"*Diese Kreatur ist von den Karten und Effekten deines Gegners nicht betroffen, außer von Schaden.\""
+"effect": "Solange du diese Kreatur kontrollierst, sind \"Funkenfliegen-Königin\"-Kreaturen, die du kontrollierst, von den Karten und Effekten deines Gegners unbeeinflusst. Wird diese Kreatur geopfert, um \"Funkenfliegen-Königin\" zu beschwören, erhält sie diesen Effekt:\n\"*Diese Kreatur ist von den Karten und Effekten deines Gegners unbeeinflusst, außer von Schaden.\""
 },
 "Sparkfly Queen": {
 "name": "Funkenfliegen-Königin",
@@ -2097,7 +2097,7 @@
 },
 "Steam Dwarf Dragon Pilot": {
 "name": "Dampfzwerg-Drachenpilot",
-"effect": "Du kannst diese Kreatur nur beschwören, indem du 2 oder mehr Kreaturen opferst, die du kontrollierst, die nicht in diesem Zug beschworen wurden und deren maximale LP zusammen 300 oder mehr betragen. Opferst du nur Kreaturen mit Level 1 oder niedriger, zählt das Beschwören dieser Kreatur als zusätzliche Aktion. Bis zu 3-mal pro Zug darfst du, wenn du 1 oder mehr Karten aus deiner Hand abwirfst, ein Ziel wählen und ihm 100 Schaden zufügen."
+"effect": "Du kannst diese Kreatur nur beschwören, indem du 2 oder mehr Kreaturen opferst, die du kontrollierst und die nicht in diesem Zug beschworen wurden und deren maximale LP zusammen 300 oder mehr betragen. Opferst du nur Kreaturen mit Level 1 oder niedriger, zählt das Beschwören dieser Kreatur als zusätzliche Aktion. Bis zu 3-mal pro Zug darfst du, wenn du 1 oder mehr Karten aus deiner Hand abwirfst, ein Ziel wählen und ihm 100 Schaden zufügen."
 },
 "Steam Dwarf Engineer": {
 "name": "Dampfzwerg-Ingenieur",
@@ -2157,7 +2157,7 @@
 },
 "Tuscan Mystic": {
 "name": "Toskanischer Mystiker",
-"effect": "Solange du diese Kreatur kontrollierst, kann dein Gegner keine Tränke aktivieren. \nImmer wenn du eine Karte aus deinem Trankdeck ziehen würdest, darfst du stattdessen die obersten 2 Karten deines Trankdecks aufdecken und sofort eine davon auflösen. \nLösche danach beide aufgedeckten Karten."
+"effect": "Solange du diese Kreatur kontrollierst, kann dein Gegner keine Tränke aktivieren. \nImmer wenn du eine Karte aus deinem Trankdeck ziehen würdest, darfst du stattdessen die obersten 2 Karten deines Trankdecks aufdecken und sofort eine davon abhandeln. \nLösche danach beide aufgedeckten Karten."
 },
 "Tuscan Prisoner": {
 "name": "Toskanischer Gefangener",
@@ -2169,7 +2169,7 @@
 },
 "Flamebathed Waflav": {
 "name": "Flammengebadeter Waflav",
-"effect": "Du musst diesen Helden aus deiner Hand auf einen \"Waflav\"-Helden, den du kontrollierst, spielen, indem du 2 Evolutionsmarker von ihm entfernst. Das Aufsteigen dieses Helden beendet deinen Zug nicht. Beim Aufstieg: Wähle ein beliebiges Ziel auf dem Spielfeld und verbrenne es. Immer wenn ein Ziel verbrannt wird, lege 1 Evolutionsmarker auf diesen Helden. Du darfst einmal pro Zug diesen Helden absteigen lassen, um 1 Evolutionsmarker auf ihn zu legen."
+"effect": "Du musst diesen Helden aus deiner Hand auf einen \"Waflav\"-Helden, den du kontrollierst, spielen, indem du 2 Evolutionsmarker von ihm entfernst. Das Aufsteigen dieses Helden beendet deinen Zug nicht. Beim Aufstieg: Wähle ein beliebiges Ziel auf dem Spielfeld und verbrenne es. Immer wenn ein Ziel Verbrannt wird, lege 1 Evolutionsmarker auf diesen Helden. Du darfst einmal pro Zug diesen Helden absteigen lassen, um 1 Evolutionsmarker auf ihn zu legen."
 },
 "Stormkissed Waflav": {
 "name": "Sturmgeküsster Waflav",
@@ -2177,7 +2177,7 @@
 },
 "Swampborne Waflav": {
 "name": "Sumpfgeborener Waflav",
-"effect": "Du musst diesen Helden aus deiner Hand auf einen \"Waflav\"-Helden, den du kontrollierst, spielen, indem du 2 Evolutionsmarker von ihm entfernst. Das Aufsteigen dieses Helden beendet deinen Zug nicht. Beim Aufstieg: Wähle ein beliebiges Ziel auf dem Spielfeld und wende 1 Giftstapel darauf an. Immer wenn ein Ziel vergiftet wird, lege 1 Evolutionsmarker auf diesen Helden. Du darfst einmal pro Zug diesen Helden absteigen lassen, um 1 Evolutionsmarker auf ihn zu legen."
+"effect": "Du musst diesen Helden aus deiner Hand auf einen \"Waflav\"-Helden, den du kontrollierst, spielen, indem du 2 Evolutionsmarker von ihm entfernst. Das Aufsteigen dieses Helden beendet deinen Zug nicht. Beim Aufstieg: Wähle ein beliebiges Ziel auf dem Spielfeld und wende 1 Giftstapel darauf an. Immer wenn ein Ziel Vergiftet wird, lege 1 Evolutionsmarker auf diesen Helden. Du darfst einmal pro Zug diesen Helden absteigen lassen, um 1 Evolutionsmarker auf ihn zu legen."
 },
 "Thunderstruck Waflav": {
 "name": "Donnergeschlagener Waflav",
@@ -2197,7 +2197,7 @@
 },
 "Gorinthian War Counselor": {
 "name": "Gorinthischer Kriegsberater",
-"effect": "Du kannst nur 1 \"Gorinthischer Kriegsberater\" kontrollieren.\nSolange du mindestens 2 verschiedene \"Kriegsberater\"-Kreaturen kontrollierst, darfst du einmal pro Zug ein Ziel wählen, außer dieser Kreatur, und es für 2 Züge betäuben. Jeglicher Schaden, den durch diesen Effekt betäubte Ziele erleiden würden, wird zu 0."
+"effect": "Du kannst nur 1 \"Gorinthischer Kriegsberater\" kontrollieren.\nSolange du mindestens 2 verschiedene \"Kriegsberater\"-Kreaturen kontrollierst, darfst du einmal pro Zug ein Ziel wählen, außer dieser Kreatur, und es für 2 Züge betäuben. Jeglicher Schaden, den durch diesen Effekt Betäubte Ziele erleiden würden, wird zu 0."
 },
 "Harpthenean War Counselor": {
 "name": "Harpthenischer Kriegsberater",
@@ -2217,7 +2217,7 @@
 },
 "War Council Gathering Place": {
 "name": "Treffpunkt des Kriegsrats",
-"effect": "Immer wenn ein Spieler eine \"Kriegsberater\"-Kreatur beschwört, darf er 8 Gold bezahlen, damit sie sofort ihren aktiven Effekt verwendet."
+"effect": "Immer wenn ein Spieler eine \"Kriegsberater\"-Kreatur beschwört, darf er 8 Gold ausgeben, damit sie sofort ihren aktiven Effekt verwendet."
 },
 "3-Headed Giant": {
 "name": "Dreiköpfiger Riese",
@@ -2446,7 +2446,7 @@
 },
 "Balloons": {
 "name": "Luftballons",
-"effect": "Spiele diese Karte sofort, wenn 1 oder mehr Ziele, die du kontrollierst, oder du selbst von einer Überraschung oder Fähigkeit deines Gegners betroffen würden. Wähle ein Ziel oder dich selbst. Dieses Ziel bleibt von dieser Überraschung oder Fähigkeit unbetroffen."
+"effect": "Spiele diese Karte sofort, wenn 1 oder mehr Ziele, die du kontrollierst, oder du selbst von einer Überraschung oder Fähigkeit deines Gegners betroffen würden. Wähle ein Ziel oder dich selbst. Dieses Ziel bleibt von dieser Überraschung oder Fähigkeit unbeeinflusst."
 },
 "Bamboo Shield": {
 "name": "Bambusschild",
@@ -2527,11 +2527,11 @@
 },
 "Blackport Soldier #55": {
 "name": "Blackport-Soldat #55",
-"effect": "Solange du diese Kreatur kontrollierst, sind Kreaturen, die du kontrollierst, von deinen Karten und Effekten unbetroffen (außer von ihren eigenen Effekten)."
+"effect": "Solange du diese Kreatur kontrollierst, sind Kreaturen, die du kontrollierst, von deinen Karten und Effekten unbeeinflusst (außer von ihren eigenen Effekten)."
 },
 "Blackstache, Scourge of the Pixel Seas": {
 "name": "Blackstache, Geißel der Pixelmeere",
-"effect": "Du bist vom Effekt von \"Schrecken\" unbetroffen, und dein Gegner kann deinen Zug nicht mit Karteneffekten beenden."
+"effect": "Du bist vom Effekt von \"Schrecken\" unbeeinflusst, und dein Gegner kann deinen Zug nicht mit Karteneffekten beenden."
 },
 "Blade of the Frostbringer": {
 "name": "Klinge des Frostbringers",
@@ -2559,7 +2559,7 @@
 },
 "Blow of the Venom Snake": {
 "name": "Hieb der Giftschlange",
-"effect": "Wähle ein Ziel und füge ihm Schaden in Höhe des Basis-Angriffswerts des Anwenders zu. Ist das Ziel nicht vergiftet, füge ihm 1 Giftstapel zu. Ist dies der zweite Angriff, den du in diesem Zug verwendet hast, füge stattdessen 2 Stapel zu. Ist es der dritte Angriff, füge stattdessen 3 Stapel zu."
+"effect": "Wähle ein Ziel und füge ihm Schaden in Höhe des Basis-Angriffswerts des Anwenders zu. Ist das Ziel nicht Vergiftet, füge ihm 1 Giftstapel zu. Ist dies der zweite Angriff, den du in diesem Zug verwendet hast, füge stattdessen 2 Stapel zu. Ist es der dritte Angriff, füge stattdessen 3 Stapel zu."
 },
 "Bluff": {
 "name": "Bluff",
@@ -2599,7 +2599,7 @@
 },
 "Bottled Flame": {
 "name": "Flaschenflamme",
-"effect": "Du und dein Gegner werft abwechselnd Karten aus eurer Hand ab, bis ein Spieler sich entscheidet, keine Karte mehr abzuwerfen, oder keine mehr abwerfen kann. Alle Ziele, die dieser Spieler kontrolliert, sind für den Rest des Spiels verbrannt. Dein Gegner muss zuerst abwerfen."
+"effect": "Du und dein Gegner werft abwechselnd Karten aus eurer Hand ab, bis ein Spieler sich entscheidet, keine Karte mehr abzuwerfen, oder keine mehr abwerfen kann. Alle Ziele, die dieser Spieler kontrolliert, sind für den Rest des Spiels Verbrannt. Dein Gegner muss zuerst abwerfen."
 },
 "Bottled Lightning": {
 "name": "Flaschenblitz",
@@ -2615,7 +2615,7 @@
 },
 "Bounce Trap": {
 "name": "Rückprallfalle",
-"effect": "Aktiviere diese Überraschung, wenn eine Kreatur in die Unterstützungszone eines Gegners platziert wird. Diese Kreatur wird auf die Hand ihres Besitzers zurückgeführt. Wurde die Kreatur in die Unterstützungszone des Helden an derselben Position wie der Anwender dieser Überraschung platziert, wird das Level dieser Überraschung 0."
+"effect": "Aktiviere diese Überraschung, wenn eine Kreatur in die Unterstützungszone eines Gegners platziert wird. Diese Kreatur wird auf die Hand ihres Besitzers zurückgegeben. Wurde die Kreatur in die Unterstützungszone des Helden an derselben Position wie der Anwender dieser Überraschung platziert, wird das Level dieser Überraschung 0."
 },
 "Bow Sniper Darge": {
 "name": "Bogenscharfschütze Darge",
@@ -2647,7 +2647,7 @@
 },
 "Broghan, the Frozen Guardian of the North": {
 "name": "Broghan, der gefrorene Wächter des Nordens",
-"effect": "Dieser Held kann nicht eingefroren werden. Du darfst einmal pro Zug ein Ziel wählen und ihm 500 Schaden zufügen. Dieser Schaden wird um das 10-Fache der Anzahl der Karten in deinem Deck verringert, mindestens auf 10. Dies gilt als Angriff. Diese Schadensverringerung kann nicht durch andere Effekte verhindert werden."
+"effect": "Dieser Held kann nicht Gefroren werden. Du darfst einmal pro Zug ein Ziel wählen und ihm 500 Schaden zufügen. Dieser Schaden wird um das 10-Fache der Anzahl der Karten in deinem Deck verringert, auf mindestens 10. Dies gilt als Angriff. Diese Schadensverringerung kann nicht durch andere Effekte verhindert werden."
 },
 "Bubbles, the Bouncy Bunny": {
 "name": "Bubbles, das hüpfende Häschen",
@@ -2679,7 +2679,7 @@
 },
 "Call of the Deepsea": {
 "name": "Ruf der Tiefsee",
-"effect": "Lege diese Karte an einen Helden an, den du kontrollierst. Wird eine Kreatur in einer der Unterstützungszonen deiner Helden besiegt, darfst du einmal pro Zug sie löschen und als zusätzliche Aktion eine Kreatur mit anderem Namen aus deiner Hand oder deinem Ablagestapel in dieselbe Unterstützungszone beschwören."
+"effect": "Lege diese Karte an einen Helden an, den du kontrollierst. Wird eine Kreatur in einer der Unterstützungszonen deiner Helden besiegt, darfst du sie einmal pro Zug löschen und als zusätzliche Aktion eine Kreatur mit anderem Namen aus deiner Hand oder deinem Ablagestapel in dieselbe Unterstützungszone beschwören."
 },
 "Calm Diatribe": {
 "name": "Ruhige Schimpftirade",
@@ -2687,7 +2687,7 @@
 },
 "Candlestick Squire": {
 "name": "Kerzenständer-Knappe",
-"effect": "Du darfst ein verbranntes Ziel wählen, das ein beliebiger Spieler kontrolliert, und es von seiner Verbrennung heilen, um diese Kreatur als zusätzliche Aktion zu beschwören. Du darfst einmal pro Zug so viele Karten ziehen, wie es verbrannte Ziele auf dem Spielfeld gibt (höchstens 4)."
+"effect": "Du darfst ein Verbranntes Ziel wählen, das ein beliebiger Spieler kontrolliert, und es von seiner Verbrennung heilen, um diese Kreatur als zusätzliche Aktion zu beschwören. Du darfst einmal pro Zug so viele Karten ziehen, wie es Verbrannte Ziele auf dem Spielfeld gibt (höchstens 4)."
 },
 "Cannibalism": {
 "name": "Kannibalismus",
@@ -2735,7 +2735,7 @@
 },
 "Cell Escape": {
 "name": "Zellflucht",
-"effect": "Ziehe 2 Karten aus dem Deck deines Gegners. Ist danach mindestens 1 deiner Helden gefroren oder betäubt, ziehe 2 weitere Karten aus dem Deck deines Gegners. Dies zählt als zusätzliche Aktion. Du kannst nur 1 \"Zellflucht\" pro Spiel spielen."
+"effect": "Ziehe 2 Karten aus dem Deck deines Gegners. Ist danach mindestens 1 deiner Helden Gefroren oder Betäubt, ziehe 2 weitere Karten aus dem Deck deines Gegners. Dies zählt als zusätzliche Aktion. Du kannst nur 1 \"Zellflucht\" pro Spiel spielen."
 },
 "Chain Lightning": {
 "name": "Kettenblitz",
@@ -2832,7 +2832,7 @@
 },
 "Cold-Hearted Yuki-Onna": {
 "name": "Kaltherzige Yuki-Onna",
-"effect": "Wenn du diese Kreatur beschwörst, lege beliebig viele \"Herz aus Eis\"-Artefakte, die an Helden ausgerüstet sind, die du kontrollierst, auf deinen Ablagestapel, um je nach Anzahl die folgenden Effekte der Reihe nach auszulösen.\n1+: Friere alle Ziele, die dein Gegner kontrolliert, für 1 Zug ein.\n2+: Füge allen Zielen, die dein Gegner kontrolliert, 100 Schaden zu.\n4+: Alle gefrorenen Ziele, die dein Gegner kontrolliert, bleiben 2 weitere Züge gefroren."
+"effect": "Wenn du diese Kreatur beschwörst, lege beliebig viele \"Herz aus Eis\"-Artefakte, die an Helden ausgerüstet sind, die du kontrollierst, auf deinen Ablagestapel, um je nach Anzahl die folgenden Effekte der Reihe nach auszulösen.\n1+: Friere alle Ziele, die dein Gegner kontrolliert, für 1 Zug ein.\n2+: Füge allen Zielen, die dein Gegner kontrolliert, 100 Schaden zu.\n4+: Alle Gefrorenen Ziele, die dein Gegner kontrolliert, bleiben 2 weitere Züge Gefroren."
 },
 "Communication Device": {
 "name": "Kommunikationsgerät",
@@ -2856,7 +2856,7 @@
 },
 "Cool Repair": {
 "name": "Coole Reparatur",
-"effect": "Wähle ein ausrüstbares Artefakt aus deinem Ablagestapel und rüste es an einen Helden aus, den du kontrollierst, ohne seine Kosten zu bezahlen. Die Kosten dieses Artefakts werden zur Hälfte der Kosten des ausgerüsteten Artefakts (aufgerundet)."
+"effect": "Wähle ein ausrüstbares Artefakt aus deinem Ablagestapel und rüste es an einen Helden aus, den du kontrollierst, ohne seine Kosten zu bezahlen. Die Kosten dieses Artefakts betragen die Hälfte der Kosten des ausgerüsteten Artefakts (aufgerundet)."
 },
 "Cool Rescuer Monia": {
 "name": "Coole Retterin Monia",
@@ -2908,7 +2908,7 @@
 },
 "Creepy Villager": {
 "name": "Gruseliger Dorfbewohner",
-"effect": "Die Kontrolle über diese Kreatur kann nicht wechseln. Du darfst einmal pro Zug diese Kreatur, die in diesem Zug nicht beschworen wurde, von deiner Seite des Spielfelds auf deine Hand nehmen, um einen \"Dunkler Tiefseegott\" aus deiner Hand in die Unterstützungszone zu platzieren, die sie belegt hat, unter Missachtung seiner Beschwörungsbedingung. Wird diese Kreatur, die du kontrollierst, besiegt, wirf 2 Karten ab (oder deine ganze Hand, wenn du weniger Karten hast)."
+"effect": "Die Kontrolle über diese Kreatur kann nicht wechseln. Du darfst einmal pro Zug diese Kreatur, die in diesem Zug nicht beschworen wurde, von deiner Seite des Spielfelds auf deine Hand nehmen, um einen \"Dunkler Tiefseegott\" aus deiner Hand in die Unterstützungszone zu platzieren, die sie belegt hat, ohne seine Beschwörungsbedingung zu beachten. Wird diese Kreatur, die du kontrollierst, besiegt, wirf 2 Karten ab (oder deine ganze Hand, wenn du weniger Karten hast)."
 },
 "Crum, the Class Pet": {
 "name": "Crum, das Klassentier",
@@ -3005,7 +3005,7 @@
 },
 "Decay Magic": {
 "name": "Verfallsmagie",
-"effect": "1) Erlaubt die Verwendung von Verfallszaubern bis Level 1.\n2) Erlaubt die Verwendung von Verfallszaubern bis Level 2.\n3) Erlaubt die Verwendung von Verfallszaubern bis Level 3."
+"effect": "1) Erlaubt die Verwendung von Verfallsmagie-Zaubern bis Level 1.\n2) Erlaubt die Verwendung von Verfallsmagie-Zaubern bis Level 2.\n3) Erlaubt die Verwendung von Verfallsmagie-Zaubern bis Level 3."
 },
 "Decisive Defeat": {
 "name": "Entscheidende Niederlage",
@@ -3033,7 +3033,7 @@
 },
 "Demonic Invasion": {
 "name": "Dämonische Invasion",
-"effect": "Spiele diese Karte sofort, wenn ein Spieler eine Kreatur beschwört. Wähle ein Ziel und füge ihm Schaden in Höhe von 50 mal der Anzahl der Kreaturen zu, die in diesem Zug vor ihr beschworen wurden, höchstens jedoch 150. Du kannst nur 1 \"Dämonische Invasion\" pro Zug spielen."
+"effect": "Spiele diese Karte sofort, wenn ein Spieler eine Kreatur beschwört. Wähle ein Ziel und füge ihm Schaden in Höhe des 50-Fachen der Anzahl der Kreaturen zu, die in diesem Zug vor ihr beschworen wurden, höchstens jedoch 150. Du kannst nur 1 \"Dämonische Invasion\" pro Zug spielen."
 },
 "Destruction Magic": {
 "name": "Zerstörungsmagie",
@@ -3049,16 +3049,16 @@
 },
 "Diamond, the Bulwark of Peace": {
 "name": "Diamond, das Bollwerk des Friedens",
-"effect": "Du musst diesen Helden aus deiner Hand auf einen \"Diamond, der Hüter des Friedens\" spielen, den du kontrollierst und der durch seinen eigenen Effekt mindestens 150 LP verloren hat. Kreaturen, die du kontrollierst und deren ursprüngliche Level 0 ist, erleiden keinen Schaden durch Statuseffekte. Einmal pro Zug, wenn eine Kreatur, die du kontrollierst, besiegt wird, darfst du sie löschen, um eine deiner gelöschten Kreaturen mit Level 0 mit einem anderen Namen in dieselbe Unterstützungszone zu platzieren, die sie belegt hat.",
+"effect": "Du musst diesen Helden aus deiner Hand auf einen \"Diamond, der Hüter des Friedens\" spielen, den du kontrollierst und der durch seinen eigenen Effekt mindestens 150 LP verloren hat. Kreaturen, die du kontrollierst und deren ursprüngliches Level 0 ist, erleiden keinen Schaden durch Statuseffekte. Einmal pro Zug, wenn eine Kreatur, die du kontrollierst, besiegt wird, darfst du sie löschen, um eine deiner gelöschten Kreaturen mit Level 0 mit einem anderen Namen in dieselbe Unterstützungszone zu platzieren, die sie belegt hat.",
 "startingAbility1": "Lösche bis zu 3 Kreaturen \naus Hand, Deck, Ablagestapel"
 },
 "Diamond, the Keeper of Peace": {
 "name": "Diamond, der Hüter des Friedens",
-"effect": "Kreaturen, die du kontrollierst und deren ursprüngliche Level 0 ist, erleiden keinen Schaden durch negative Statuseffekte. Einmal pro Zug, wenn 1 oder mehr Kreaturen, die du kontrollierst und deren ursprüngliche Level 0 ist, Schaden durch die Karte oder den Effekt eines Gegners erleiden würden, darfst du diesem Helden 30 Schaden pro Kreatur zufügen, um diesen Schaden an diesen Kreaturen zu negieren."
+"effect": "Kreaturen, die du kontrollierst und deren ursprüngliches Level 0 ist, erleiden keinen Schaden durch negative Statuseffekte. Einmal pro Zug, wenn 1 oder mehr Kreaturen, die du kontrollierst und deren ursprüngliches Level 0 ist, Schaden durch die Karte oder den Effekt eines Gegners erleiden würden, darfst du diesem Helden 30 Schaden pro Kreatur zufügen, um diesen Schaden an diesen Kreaturen zu negieren."
 },
 "Dichotomy of Luna and Tempeste": {
 "name": "Dichotomie von Luna und Tempeste",
-"effect": "Solange diese Karte an einem Helden angelegt ist, den du kontrollierst, erleiden verbrannte Ziele, die du kontrollierst, nur halben Schaden aus allen Quellen, außer ihrem Verbrennungsschaden (aufgerundet), aber Schaden, den sie erleiden, kann nicht weiter verringert werden."
+"effect": "Solange diese Karte an einem Helden angelegt ist, den du kontrollierst, erleiden Verbrannte Ziele, die du kontrollierst, nur halben Schaden aus allen Quellen, außer ihrem Verbrennungsschaden (aufgerundet), aber Schaden, den sie erleiden, kann nicht weiter verringert werden."
 },
 "Difficulty Lever": {
 "name": "Schwierigkeitshebel",
@@ -3126,7 +3126,7 @@
 },
 "Divine Gift of Fire": {
 "name": "Göttliche Gabe des Feuers",
-"effect": "Du kannst nur 1 \"Göttliche Gabe\"-Karte pro Spiel aktivieren.\nWähle einen Spieler. Alle Ziele, die dieser Spieler kontrolliert, sind für den Rest des Spiels verbrannt. Dies zählt als zusätzliche Aktion."
+"effect": "Du kannst nur 1 \"Göttliche Gabe\"-Karte pro Spiel aktivieren.\nWähle einen Spieler. Alle Ziele, die dieser Spieler kontrolliert, sind für den Rest des Spiels Verbrannt. Dies zählt als zusätzliche Aktion."
 },
 "Divine Gift of Forgetting": {
 "name": "Göttliche Gabe des Vergessens",
@@ -3194,7 +3194,7 @@
 },
 "Drowned Remains": {
 "name": "Ertrunkene Überreste",
-"effect": "Spiele diese Karte sofort, wenn dein Gegner einen Zauber mit ursprünglicher Level 4 oder höher spielt. Negiere diesen Zauber. War dieser Zauber die Aktion deines Gegners, darf er sofort stattdessen eine andere Aktion ausführen."
+"effect": "Spiele diese Karte sofort, wenn dein Gegner einen Zauber mit ursprünglichem Level 4 oder höher spielt. Negiere diesen Zauber. War dieser Zauber die Aktion deines Gegners, darf er sofort stattdessen eine andere Aktion ausführen."
 },
 "Duel": {
 "name": "Duell",
@@ -3214,7 +3214,7 @@
 },
 "Elixir of Cold": {
 "name": "Elixier der Kälte",
-"effect": "Wähle einen Helden, den du kontrollierst. Jedes Ziel, das in diesem Zug von den Angriffen und Zaubern dieses Helden getroffen wird, ist für 1 Zug gefroren."
+"effect": "Wähle einen Helden, den du kontrollierst. Jedes Ziel, das in diesem Zug von den Angriffen und Zaubern dieses Helden getroffen wird, ist für 1 Zug Gefroren."
 },
 "Elixir of Immortality": {
 "name": "Elixier der Unsterblichkeit",
@@ -3254,7 +3254,7 @@
 },
 "Embodiment of Biseria": {
 "name": "Verkörperung von Biseria",
-"effect": "Das Level dieser Kreatur auf deiner Hand wird um die zusammengerechneten ursprünglichen Level aller Kreaturen auf dem Spielfeld verringert, außer \"Verkörperung von Biseria\", jedoch auf mindestens 1. Diese Kreatur kann nicht gefroren werden. Du darfst einmal pro Zug ein Ziel wählen und ihm 300 Schaden zufügen ODER alle Kreaturen, die dein Gegner kontrolliert, für 1 Zug einfrieren."
+"effect": "Das Level dieser Kreatur auf deiner Hand wird um die zusammengerechneten ursprünglichen Level aller Kreaturen auf dem Spielfeld verringert, außer \"Verkörperung von Biseria\", jedoch auf mindestens 1. Diese Kreatur kann nicht Gefroren werden. Du darfst einmal pro Zug ein Ziel wählen und ihm 300 Schaden zufügen ODER alle Kreaturen, die dein Gegner kontrolliert, für 1 Zug einfrieren."
 },
 "Emergency Spell Armor": {
 "name": "Notfall-Zauberrüstung",
@@ -3354,11 +3354,11 @@
 },
 "Fern, the Liberated Fairy": {
 "name": "Fern, die befreite Fee",
-"effect": "Du musst diesen Helden aus deiner Hand auf einen \"Fern, die Schiffssklavin\" spielen, den du kontrollierst, indem du 3 Artefakte, die an deine anderen Helden ausgerüstet sind, auf den Ablagestapel legst. Du darfst einmal pro Zug diesen Helden als Artefakt an einen anderen Helden, den du kontrollierst, ausrüsten ODER ihn abrüsten und zurück in seine ursprüngliche Heldenzone platzieren. Solange dieser Held an einem anderen Helden ausgerüstet ist, ist dieser Held immun gegen negative Statuseffekte, erleidet halben Schaden durch Angriffe und Zauber und darf einmal pro Zug eine zusätzliche Aktion ausführen. Wenn dieses ausgerüstete Artefakt auf den Ablagestapel gelegt würde, platziere diesen Helden zurück in seine ursprüngliche Heldenzone."
+"effect": "Du musst diesen Helden aus deiner Hand auf einen \"Fern, die Schiffssklavin\" spielen, den du kontrollierst, indem du 3 Artefakte, die an deine anderen Helden ausgerüstet sind, auf den Ablagestapel legst. Du darfst einmal pro Zug diesen Helden als Artefakt an einen anderen Helden, den du kontrollierst, ausrüsten ODER ihn abrüsten und zurück in seine ursprüngliche Heldenzone platzieren. Solange dieser Held an einem anderen Helden ausgerüstet ist, ist er immun gegen negative Statuseffekte, erleidet halben Schaden durch Angriffe und Zauber und darf einmal pro Zug eine zusätzliche Aktion ausführen. Wenn dieses ausgerüstete Artefakt auf den Ablagestapel gelegt würde, platziere diesen Helden zurück in seine ursprüngliche Heldenzone."
 },
 "Fern, the Ship Slave": {
 "name": "Fern, die Schiffssklavin",
-"effect": "Artefakte, die du an deine Helden ausrüstest (einschließlich diesen), haben halbierte Kosten (aufgerundet). Dies betrifft nur Artefakte mit festen Kosten."
+"effect": "Artefakte, die du an deine Helden ausrüstest (einschließlich dieses Helden), haben halbierte Kosten (aufgerundet). Dies betrifft nur Artefakte mit festen Kosten."
 },
 "Ferocious Tiger Kick": {
 "name": "Wilder Tigertritt",
@@ -3470,7 +3470,7 @@
 },
 "Frost Breaker": {
 "name": "Frostbrecher",
-"effect": "Wähle ein gefrorenes Ziel. Heile es von seinem Einfrieren und füge ihm 100/200/300 Schaden zu. War das Ziel bereits während deines letzten Zuges gefroren, zählt dies als zusätzliche Aktion."
+"effect": "Wähle ein Gefrorenes Ziel. Heile es von seinem Einfrieren und füge ihm 100/200/300 Schaden zu. War das Ziel bereits während deines letzten Zuges Gefroren, zählt dies als zusätzliche Aktion."
 },
 "Frost Rune": {
 "name": "Frostrune",
@@ -3554,7 +3554,7 @@
 },
 "Glasowt": {
 "name": "Glasowt",
-"effect": "Du darfst einmal pro Zug ein verbranntes Ziel wählen und ihm 200 Schaden zufügen. Dieser Schaden kann nicht verringert, negiert oder umgeleitet werden."
+"effect": "Du darfst einmal pro Zug ein Verbranntes Ziel wählen und ihm 200 Schaden zufügen. Dieser Schaden kann nicht verringert, negiert oder umgeleitet werden."
 },
 "Glass Sword": {
 "name": "Glasschwert",
@@ -3606,7 +3606,7 @@
 },
 "Golem Smash": {
 "name": "Golem-Schlag",
-"effect": "Du darfst beim Spielen dieser Karte bis zu 10 der obersten Karten deines Decks löschen. Wähle ein Ziel und füge ihm Schaden in Höhe des Angriffswerts des Angreifers + 10-mal die Anzahl der Karten zu, die du durch diesen Effekt löschst. Dieser Angriff kann nie mehr als 1 Ziel gleichzeitig treffen."
+"effect": "Du darfst beim Spielen dieser Karte bis zu 10 der obersten Karten deines Decks löschen. Wähle ein Ziel und füge ihm Schaden in Höhe des Angriffswerts des Angreifers plus 10 pro Karte zu, die du durch diesen Effekt löschst. Dieser Angriff kann nie mehr als 1 Ziel gleichzeitig treffen."
 },
 "Gon, the Frostbringer": {
 "name": "Gon, der Frostbringer",
@@ -3618,7 +3618,7 @@
 },
 "Grand Inquisitor Karian": {
 "name": "Großinquisitor Karian",
-"effect": "Jeglicher Schaden, den dieser Held durch negative Statuseffekte erleiden würde, wird stattdessen als Heilung angewendet. Solange dieser Held betäubt oder gefroren ist, darfst du in deiner Aktionsphase eine zweite Aktion mit ihm ausführen, und er ist von diesen Effekten sonst nicht betroffen. Andere negative Statuseffekte beeinflussen diesen Helden nicht."
+"effect": "Jeglicher Schaden, den dieser Held durch negative Statuseffekte erleiden würde, wird stattdessen als Heilung angewendet. Solange dieser Held Betäubt oder Gefroren ist, darfst du in deiner Aktionsphase eine zweite Aktion mit ihm ausführen, und er ist von diesen Effekten sonst nicht betroffen. Andere negative Statuseffekte beeinflussen diesen Helden nicht."
 },
 "Grasp the Future": {
 "name": "Die Zukunft ergreifen",
@@ -3662,7 +3662,7 @@
 },
 "Great Vanguard Demon": {
 "name": "Großer Vorhutdämon",
-"effect": "Decke diese Karte auf, solange sie sich in deiner Hand befindet. Immer wenn du einen Reaktions-Angriff, -Zauber oder -Kreatur spielst, verringere das Level dieser Karte in deiner Hand um 1. Wenn du diese Kreatur beschwörst, platziere einen Dämonenmarker auf allen Kreaturen, die du kontrollierst. Du darfst einmal pro Zug ein Ziel wählen und ihm Schaden in Höhe des 50-Fachen der Gesamtzahl der Dämonenmarker auf allen Karten auf dem Spielfeld zufügen."
+"effect": "Decke diese Karte auf, solange sie sich in deiner Hand befindet. Immer wenn du einen Reaktions-Angriff, einen Reaktions-Zauber oder eine Reaktions-Kreatur spielst, verringere das Level dieser Karte in deiner Hand um 1. Wenn du diese Kreatur beschwörst, platziere einen Dämonenmarker auf allen Kreaturen, die du kontrollierst. Du darfst einmal pro Zug ein Ziel wählen und ihm Schaden in Höhe des 50-Fachen der Gesamtzahl der Dämonenmarker auf allen Karten auf dem Spielfeld zufügen."
 },
 "Grisgar, Emissary of the Demon Lord": {
 "name": "Grisgar, Gesandter des Dämonenlords",
@@ -3690,7 +3690,7 @@
 },
 "Hand of Death": {
 "name": "Hand des Todes",
-"effect": "Ist der Anwender am Ende des nächsten Zuges deines Gegners nicht besiegt, gefroren oder betäubt, darfst du ein beliebiges Ziel wählen und es besiegen. Dieser Effekt kann nie mehr als 1 Ziel betreffen. Wird ein Ziel durch diesen Effekt besiegt, überspringe deinen nächsten Zug. Du kannst nur 1 \"Hand des Todes\" pro Zug spielen."
+"effect": "Ist der Anwender am Ende des nächsten Zuges deines Gegners nicht besiegt, Gefroren oder Betäubt, darfst du ein beliebiges Ziel wählen und es besiegen. Dieser Effekt kann nie mehr als 1 Ziel betreffen. Wird ein Ziel durch diesen Effekt besiegt, überspringe deinen nächsten Zug. Du kannst nur 1 \"Hand des Todes\" pro Zug spielen."
 },
 "Haressassin": {
 "name": "Haressassin",
@@ -3722,11 +3722,11 @@
 },
 "Heart of Ice": {
 "name": "Herz aus Eis",
-"effect": "Rüste diese Karte an einen Helden aus, den du kontrollierst. Der ausgerüstete Held kann nicht eingefroren werden. Außerdem wird jeder Held, der den ausgerüsteten Helden mit einem Angriff trifft, und jede Kreatur, die ihn mit ihrem Effekt trifft, für 1 Zug eingefroren."
+"effect": "Rüste diese Karte an einen Helden aus, den du kontrollierst. Der ausgerüstete Held kann nicht Gefroren werden. Außerdem wird jeder Held, der den ausgerüsteten Helden mit einem Angriff trifft, und jede Kreatur, die ihn mit ihrem Effekt trifft, für 1 Zug Gefroren."
 },
 "Heart of the Mountain": {
 "name": "Herz des Berges",
-"effect": "Ziehe so viele Karten, wie es verbrannte Ziele auf dem Spielfeld gibt (höchstens 4). Du kannst nur 1 \"Herz des Berges\" pro Zug spielen."
+"effect": "Ziehe so viele Karten, wie es Verbrannte Ziele auf dem Spielfeld gibt (höchstens 4). Du kannst nur 1 \"Herz des Berges\" pro Zug spielen."
 },
 "Heart-Shaped Bow, the Final Proof of Cuteness": {
 "name": "Herzbogen, der letzte Beweis der Süße",
@@ -3734,7 +3734,7 @@
 },
 "Heat Wave": {
 "name": "Hitzewelle",
-"effect": "Verbrenne alle Ziele auf dem Spielfeld außer dem Anwender für den Rest des Spiels. Ziele, die bereits verbrannt sind, erleiden stattdessen 150 Schaden."
+"effect": "Verbrenne alle Ziele auf dem Spielfeld außer dem Anwender für den Rest des Spiels. Ziele, die bereits Verbrannt sind, erleiden stattdessen 150 Schaden."
 },
 "Heavy Hit": {
 "name": "Schwerer Treffer",
@@ -3786,7 +3786,7 @@
 },
 "Hot Skull Potato": {
 "name": "Heiße Schädelkartoffel",
-"effect": "Beschwöre diese Karte in die freie Unterstützungszone eines beliebigen Helden, den dein Gegner kontrolliert, und lege einen Schädel-Marker auf sie. Diese Kreatur ist von allen anderen Karten und Effekten nicht betroffen. Am Ende deines Zuges darfst du, wenn sich diese Kreatur in der Unterstützungszone eines deiner Helden befindet, Karten aus deiner Hand abwerfen, deren Anzahl der Anzahl der Schädel-Marker auf dieser Kreatur entspricht, um sie in die freie Unterstützungszone eines beliebigen Helden zu platzieren, den dein Gegner kontrolliert, und einen Schädel-Marker auf sie zu legen. Andernfalls wird diese Kreatur besiegt und alle Ziele, die du kontrollierst, erleiden 50 Schaden +50 mal die Anzahl der Schädel-Marker auf dieser Karte."
+"effect": "Beschwöre diese Karte in die freie Unterstützungszone eines beliebigen Helden, den dein Gegner kontrolliert, und platziere 1 Schädelmarker auf sie. Diese Kreatur ist von allen anderen Karten und Effekten unbeeinflusst. Am Ende deines Zuges darfst du, wenn sich diese Kreatur in der Unterstützungszone eines deiner Helden befindet, so viele Karten aus deiner Hand abwerfen, wie Schädelmarker auf dieser Kreatur liegen, um sie in die freie Unterstützungszone eines beliebigen Helden zu platzieren, den dein Gegner kontrolliert, und 1 Schädelmarker auf sie zu platzieren. Andernfalls wird diese Kreatur besiegt und alle Ziele, die du kontrollierst, erleiden 50 Schaden plus das 50-Fache der Anzahl der Schädelmarker auf dieser Karte."
 },
 "Howling in the Night": {
 "name": "Heulen in der Nacht",
@@ -3798,7 +3798,7 @@
 },
 "Hunting": {
 "name": "Jagd",
-"effect": "1) Wenn dieser Held einmal pro Zug eine Kreatur deines Gegners besiegt, darfst du sie deiner Hand hinzufügen, statt sie auf den Ablagestapel zu legen.\n2) Wenn dieser Held einmal pro Zug eine Kreatur deines Gegners besiegt, darfst du ihre LP vollständig heilen und die dauerhafte Kontrolle über sie übernehmen, indem du sie in die freie Unterstützungszone dieses Helden platzierst. Negiere ihren Effekt für den Rest des Zuges.\n3) Wenn dieser Held einmal pro Zug eine Kreatur deines Gegners besiegt, darfst du ihre LP vollständig heilen und die dauerhafte Kontrolle über sie übernehmen, indem du sie in die freie Unterstützungszone dieses Helden platzierst."
+"effect": "1) Einmal pro Zug darfst du, wenn dieser Held eine Kreatur deines Gegners besiegt, sie deiner Hand hinzufügen, statt sie auf den Ablagestapel zu legen.\n2) Einmal pro Zug darfst du, wenn dieser Held eine Kreatur deines Gegners besiegt, ihre LP vollständig heilen und die dauerhafte Kontrolle über sie übernehmen, indem du sie in die freie Unterstützungszone dieses Helden platzierst. Negiere ihren Effekt für den Rest des Zuges.\n3) Einmal pro Zug darfst du, wenn dieser Held eine Kreatur deines Gegners besiegt, ihre LP vollständig heilen und die dauerhafte Kontrolle über sie übernehmen, indem du sie in die freie Unterstützungszone dieses Helden platzierst."
 },
 "Hymn of Rebirth": {
 "name": "Hymne der Wiedergeburt",
@@ -3842,7 +3842,7 @@
 },
 "Infallible Oracle Pythia": {
 "name": "Unfehlbares Orakel Pythia",
-"effect": "Wenn du diese Kreatur beschwörst, wähle ein beliebiges Ziel auf dem Spielfeld. Lege zu Beginn jedes deiner Züge 1 Pythia-Marker auf diese Karte. Wenn der dritte Pythia-Marker auf diese Karte gelegt wird, besiege sofort das gewählte Ziel. Wenn diese Kreatur besiegt würde, darfst du stattdessen ein anderes Ziel, das du kontrollierst, opfern, um ihre LP vollständig zu heilen."
+"effect": "Wenn du diese Kreatur beschwörst, wähle ein beliebiges Ziel auf dem Spielfeld. Platziere zu Beginn jedes deiner Züge 1 Pythiamarker auf diese Karte. Wenn der dritte Pythiamarker auf diese Karte platziert wird, besiege sofort das gewählte Ziel. Wenn diese Kreatur besiegt würde, darfst du stattdessen ein anderes Ziel, das du kontrollierst, opfern, um ihre LP vollständig zu heilen."
 },
 "Infighting": {
 "name": "Zwietracht",
@@ -3902,7 +3902,7 @@
 },
 "Javelin Throw": {
 "name": "Speerwurf",
-"effect": "Wähle einen Helden, den du kontrollierst und der in diesem Zug eine Aktion verwenden kann. Wähle ein Artefakt, das an diesem Helden ausgerüstet ist, und lege es auf den Ablagestapel. Wähle dann ein Ziel, das dein Gegner kontrolliert, und füge ihm Schaden in Höhe des Basis-Angriffs deines gewählten Helden zu. Dies gilt als Angriff. Du kannst nur 1 \"Speerwurf\" pro Zug spielen."
+"effect": "Wähle einen Helden, den du kontrollierst und der in diesem Zug eine Aktion verwenden kann. Wähle ein Artefakt, das an diesem Helden ausgerüstet ist, und lege es auf den Ablagestapel. Wähle dann ein Ziel, das dein Gegner kontrolliert, und füge ihm Schaden in Höhe des Basis-Angriffswerts deines gewählten Helden zu. Dies gilt als Angriff. Du kannst nur 1 \"Speerwurf\" pro Zug spielen."
 },
 "Jean, the Pillaging Knight": {
 "name": "Jean, der plündernde Ritter",
@@ -3922,7 +3922,7 @@
 },
 "Jump in the River": {
 "name": "Sprung in den Fluss",
-"effect": "Spiele diese Karte zu Beginn des Zuges deines Gegners. Bis zum Ende dieses Zuges ist der Held, der diesen Angriff verwendet, von allen Karten und Effekten nicht betroffen, solange du andere Ziele kontrollierst, die von ihnen betroffen sein können. Ein Held kann \"Sprung in den Fluss\" nicht in 2 aufeinanderfolgenden Zügen verwenden."
+"effect": "Spiele diese Karte zu Beginn des Zuges deines Gegners. Bis zum Ende dieses Zuges ist der Held, der diesen Angriff verwendet, von allen Karten und Effekten unbeeinflusst, solange du andere Ziele kontrollierst, die von ihnen betroffen sein können. Ein Held kann \"Sprung in den Fluss\" nicht in 2 aufeinanderfolgenden Zügen verwenden."
 },
 "Jumpscare": {
 "name": "Schreckmoment",
@@ -3938,7 +3938,7 @@
 },
 "Junshi, the Tactical Genius": {
 "name": "Junshi, das taktische Genie",
-"effect": "Die Level von Magiekunst-Zaubern auf deiner Hand werden um die Anzahl der Kreaturen, die du kontrollierst, verringert. Wenn eine Kreatur, die du kontrollierst, besiegt wird, darfst du einmal pro Zug, während des Zuges deines Gegners, sofort einen Magiekunst-Zauber aus deiner Hand als zusätzliche Aktion mit diesem Helden ausführen."
+"effect": "Die Level von Magiekunst-Zaubern in deiner Hand werden um die Anzahl der Kreaturen, die du kontrollierst, verringert. Wenn eine Kreatur, die du kontrollierst, besiegt wird, darfst du einmal pro Zug, während des Zuges deines Gegners, sofort einen Magiekunst-Zauber aus deiner Hand als zusätzliche Aktion mit diesem Helden ausführen."
 },
 "Kai, the Rowdy": {
 "name": "Kai, der Rabauke",
@@ -3958,7 +3958,7 @@
 },
 "Key, the Cursed Thief": {
 "name": "Key, der verfluchte Dieb",
-"effect": "Wenn dein Gegner einmal pro Zug ein Artefakt aus seiner Hand spielt, darfst du Gold in Höhe seiner Kosten ausgeben, um dieses Artefakt zu negieren und stattdessen deiner Hand hinzuzufügen. Tust du das, muss dein Gegner das Artefakt nicht bezahlen."
+"effect": "Einmal pro Zug darfst du, wenn dein Gegner ein Artefakt aus seiner Hand spielt, Gold in Höhe seiner Kosten ausgeben, um dieses Artefakt zu negieren und stattdessen deiner Hand hinzuzufügen. Tust du das, muss dein Gegner das Artefakt nicht bezahlen."
 },
 "Kidnapping": {
 "name": "Entführung",
@@ -3982,7 +3982,7 @@
 },
 "Kohta, Master of Super-Killing": {
 "name": "Kohta, Meister des Super-Tötens",
-"effect": "Du musst diesen Helden aus deiner Hand auf einen \"Kohta, der stille Beobachter\" spielen, den du kontrollierst und der mit dem \"Super-Tötungsmesser, das Werkzeug der Liquidation\" und der \"Beschwörungsanleitung\" ausgerüstet ist. Du darfst einmal pro Zug deine Aktion aufwenden, um ein beliebiges Ziel auf dem Spielfeld zu wählen und es zu besiegen. Dies gilt als Treffer dieses Helden auf das Ziel mit einem Angriff, der nie mehr als 1 Ziel treffen kann. Du kannst diesen Effekt nur einmal pro Zug aktivieren."
+"effect": "Du musst diesen Helden aus deiner Hand auf einen \"Kohta, der stille Beobachter\" spielen, den du kontrollierst und der mit dem \"Super-Tötungsmesser, das Werkzeug der Liquidation\" und der \"Beschwörungsanleitung\" ausgerüstet ist. Du darfst einmal pro Zug deine Aktion aufwenden, um ein beliebiges Ziel auf dem Spielfeld zu wählen und es zu besiegen. Dies gilt so, als würde dieser Held das Ziel mit einem Angriff treffen, der nie mehr als 1 Ziel treffen kann. Du kannst diesen Effekt nur einmal pro Zug aktivieren."
 },
 "Kohta, the Silent Observer": {
 "name": "Kohta, der stille Beobachter",
@@ -4154,11 +4154,11 @@
 },
 "Luna Kiai": {
 "name": "Luna Kiai",
-"effect": "Du darfst diese Karte in deiner Hand für den Rest des Zuges aufdecken, um einen Helden zu wählen, den du kontrollierst, und ihn für den Rest des Spiels zu verbrennen. Sind alle Helden, die du kontrollierst, verbrannt, zählt das Beschwören dieser Kreatur als zusätzliche Aktion. Solange du diese Kreatur kontrollierst, werden die maximalen LP von Helden, die du kontrollierst, jedes Mal um 60 erhöht, wenn sie Verbrennungsschaden erleiden."
+"effect": "Du darfst diese Karte in deiner Hand für den Rest des Zuges aufdecken, um einen Helden zu wählen, den du kontrollierst, und ihn für den Rest des Spiels zu verbrennen. Sind alle Helden, die du kontrollierst, Verbrannt, zählt das Beschwören dieser Kreatur als zusätzliche Aktion. Solange du diese Kreatur kontrollierst, werden die maximalen LP von Helden, die du kontrollierst, jedes Mal um 60 erhöht, wenn sie Verbrennungsschaden erleiden."
 },
 "Luna Pele, the Flame Dancer": {
 "name": "Luna Pele, die Flammentänzerin",
-"effect": "Immer wenn ein Ziel vergiftet wird, wird es auch für den Rest des Spiels verbrannt. Bis zu 4-mal pro Zug ziehst du 1 Karte, wenn ein Ziel verbrannt wird."
+"effect": "Immer wenn ein Ziel Vergiftet wird, wird es auch für den Rest des Spiels Verbrannt. Bis zu 4-mal pro Zug ziehst du 1 Karte, wenn ein Ziel Verbrannt wird."
 },
 "Luna, the Flame Fairy": {
 "name": "Luna, die Flammenfee",
@@ -4242,7 +4242,7 @@
 },
 "Marianne, the Cocky Caretaker": {
 "name": "Marianne, die freche Pflegerin",
-"effect": "Du darfst einmal pro Zug eine Kreatur mit Level 3 oder niedriger aus deiner Hand in die freie Unterstützungszone eines Helden platzieren, den dein Gegner kontrolliert. Du darfst einmal pro Zug bis zu 3 vergiftete Kreaturen wählen, die dein Gegner kontrolliert, und dauerhaft die Kontrolle über sie übernehmen. Platziere sie in die freien Unterstützungszonen dieses Helden."
+"effect": "Du darfst einmal pro Zug eine Kreatur mit Level 3 oder niedriger aus deiner Hand in die freie Unterstützungszone eines Helden platzieren, den dein Gegner kontrolliert. Du darfst einmal pro Zug bis zu 3 Vergiftete Kreaturen wählen, die dein Gegner kontrolliert, und dauerhaft die Kontrolle über sie übernehmen. Platziere sie in die freien Unterstützungszonen dieses Helden."
 },
 "Market Crash": {
 "name": "Börsencrash",
@@ -4254,7 +4254,7 @@
 },
 "Mass Routing": {
 "name": "Massenumleitung",
-"effect": "Mische alle Kreaturen auf dem Spielfeld bis Level 1/2/3 zurück in die Decks ihrer ursprünglichen Besitzer. Danach ziehen beide Spieler 1 Karte für jede ihrer Kreaturen, die durch diesen Effekt zurückgemischt wurde."
+"effect": "Mische alle Kreaturen auf dem Spielfeld bis Level 1/2/3 zurück in die Decks ihrer ursprünglichen Besitzer. Danach ziehen beide Spieler 1 Karte für jede ihrer Kreaturen, die durch diesen Effekt zurückgemischt wurden."
 },
 "Massacre": {
 "name": "Massaker",
@@ -4290,7 +4290,7 @@
 },
 "Metamorphosis of Serket": {
 "name": "Metamorphose von Serket",
-"effect": "Dieser Zauber kann nur von einem Helden verwendet werden, der ursprünglich von dir kontrolliert wurde. Opfere den Anwender und alle Kreaturen in seinen Unterstützungszonen. Wähle dann eine beliebige Kreatur aus deiner Hand oder deinem Deck, deren Level niedriger oder gleich 1 Prozent der aktuellen LP des Anwenders vor seinem Opfer ist, und platziere sie in eine freie Unterstützungszone des Anwenders. Solange die Kreatur auf dem Spielfeld bleibt, kann der Anwender durch keinen Effekt wiederbelebt werden."
+"effect": "Dieser Zauber kann nur von einem Helden verwendet werden, der ursprünglich von dir kontrolliert wurde. Opfere den Anwender und alle Kreaturen in seinen Unterstützungszonen. Wähle dann eine beliebige Kreatur aus deiner Hand oder deinem Deck, deren Level höchstens 1 Prozent der aktuellen LP des Anwenders beträgt, bevor er geopfert wurde, und platziere sie in eine freie Unterstützungszone des Anwenders. Solange die Kreatur auf dem Spielfeld bleibt, kann der Anwender durch keinen Effekt wiederbelebt werden."
 },
 "Meteor Crash": {
 "name": "Meteoreinschlag",
@@ -4298,7 +4298,7 @@
 },
 "Midnight Assault": {
 "name": "Mitternachtsangriff",
-"effect": "Wähle eine beliebige Kreatur oder einen Helden mit 150 oder weniger LP und besiege ihn. Das Level dieses Angriffs wird um das Level der Kreatur mit dem höchsten Level, die du kontrollierst, verringert. Dein Gegner kann nicht auf diesen Angriff reagieren, und er ignoriert jeden Effekt, der ihn negieren oder verhindern würde, dass das Ziel besiegt wird."
+"effect": "Wähle eine beliebige Kreatur oder einen Helden mit 150 oder weniger LP und besiege das Ziel. Das Level dieses Angriffs wird um das Level der Kreatur mit dem höchsten Level, die du kontrollierst, verringert. Dein Gegner kann nicht auf diesen Angriff reagieren, und dieser ignoriert jeden Effekt, der ihn negieren oder verhindern würde, dass das Ziel besiegt wird."
 },
 "Mimic": {
 "name": "Mimic",
@@ -4434,7 +4434,7 @@
 },
 "Omikron, the Faceless Illusionist": {
 "name": "Omikron, der gesichtslose Illusionist",
-"effect": "Du darfst einmal pro Zug eine Kopie einer beliebigen Kreatur in eine freie Unterstützungszone dieses Helden platzieren, aber ihre Effekte werden bis zum Beginn deines nächsten Zuges negiert und ihre aktuellen und maximalen LP werden 1. Dieser Held kann eine Kreatur mit einem bestimmten Namen nur einmal pro Spiel beschwören."
+"effect": "Du darfst einmal pro Zug eine Kopie einer beliebigen Kreatur in eine freie Unterstützungszone dieses Helden platzieren, aber ihre Effekte werden bis zum Beginn deines nächsten Zuges negiert und ihre aktuellen und maximalen LP werden zu 1. Dieser Held kann eine Kreatur mit einem bestimmten Namen nur einmal pro Spiel beschwören."
 },
 "Open Invitation": {
 "name": "Offene Einladung",
@@ -4470,7 +4470,7 @@
 },
 "Perfect Disguise": {
 "name": "Perfekte Verkleidung",
-"effect": "Wähle ein Ziel, das du kontrollierst. Dieses Ziel kann während des nächsten Zuges deines Gegners nicht von ihm gewählt werden, außer es ist dein einziges zulässiges Ziel. Du kannst nur 1 \"Perfekte Verkleidung\" pro Spiel spielen."
+"effect": "Wähle ein Ziel, das du kontrollierst. Dieses Ziel kann während des nächsten Zuges deines Gegners nicht von ihm gewählt werden, es sei denn, es ist dein einziges zulässiges Ziel. Du kannst nur 1 \"Perfekte Verkleidung\" pro Spiel spielen."
 },
 "Performance": {
 "name": "Aufführung",
@@ -4478,7 +4478,7 @@
 },
 "Perilous Journey": {
 "name": "Gefährliche Reise",
-"effect": "Durchsuche dein Deck nach einem Aufgestiegenen Helden, decke ihn auf und füge ihn offen deiner Hand hinzu. Während deines nächsten Zuges darfst du einen passenden Helden zu diesem Aufgestiegenen Helden aufsteigen lassen, ohne seine Aufstiegsbedingung zu beachten. Tust du das, sind alle Ziele, die du kontrollierst, für den Rest des Spiels verbrannt. Diese Verbrennung kann nicht geheilt werden."
+"effect": "Durchsuche dein Deck nach einem Aufgestiegenen Helden, füge ihn offen deiner Hand hinzu. Während deines nächsten Zuges darfst du einen passenden Helden zu diesem Aufgestiegenen Helden aufsteigen lassen, ohne seine Aufstiegsbedingung zu beachten. Tust du das, sind alle Ziele, die du kontrollierst, für den Rest des Spiels Verbrannt. Diese Verbrennung kann nicht geheilt werden."
 },
 "Pes'zet, the Plague Bringer": {
 "name": "Pes'zet, der Seuchenbringer",
@@ -4490,15 +4490,15 @@
 },
 "Petrification Break": {
 "name": "Versteinerungsbruch",
-"effect": "Dieser Zauber kann nur von einem betäubten Helden verwendet werden. Heile den Anwender von der Betäubung und lege diese Karte an ihn an. Solange diese Karte an einem Helden angelegt ist, kann er nicht von negativen Statuseffekten betroffen werden, und jeder Schaden, den er erleiden würde, wird halbiert (aufgerundet)."
+"effect": "Dieser Zauber kann nur von einem Betäubten Helden verwendet werden. Heile den Anwender von der Betäubung und lege diese Karte an ihn an. Solange diese Karte an einem Helden angelegt ist, kann er nicht von negativen Statuseffekten betroffen werden, und jeder Schaden, den er erleiden würde, wird halbiert (aufgerundet)."
 },
 "Petrifier": {
 "name": "Versteinerer",
-"effect": "Wähle ein Ziel außer dem Anwender und betäube es für 3 Züge. Schaden, den ein durch diesen Effekt betäubtes Ziel erleiden würde, wird zu 0."
+"effect": "Wähle ein Ziel außer dem Anwender und betäube es für 3 Züge. Schaden, den ein durch diesen Effekt Betäubtes Ziel erleiden würde, wird zu 0."
 },
 "Petrifying Potion": {
 "name": "Versteinerungstrank",
-"effect": "Wähle einen beliebigen Helden und betäube ihn für 3 Züge. Schaden, den ein durch diesen Effekt betäubter Held erleiden würde, wird zu 0. Du darfst einen durch diesen Effekt betäubten Helden jederzeit während deines Zuges von dieser Betäubung heilen."
+"effect": "Wähle einen beliebigen Helden und betäube ihn für 3 Züge. Schaden, den ein durch diesen Effekt Betäubter Held erleiden würde, wird zu 0. Du darfst einen durch diesen Effekt Betäubten Helden jederzeit während deines Zuges von dieser Betäubung heilen."
 },
 "Phalanx Pike": {
 "name": "Phalanx-Spieß",
@@ -4518,7 +4518,7 @@
 },
 "Phoenix Tackle": {
 "name": "Phönix-Rammstoß",
-"effect": "Wähle ein Ziel und füge ihm 100/200/300 Schaden zu. Dann erleidet der Anwender 50/100/150 Rückstoßschaden. Sind nach dem Abhandeln dieses Zaubers alle Helden beider Spieler besiegt, verlierst du das Spiel."
+"effect": "Wähle ein Ziel und füge ihm 100/200/300 Schaden zu. Dann erleidet der Anwender 50/100/150 Rückstoßschaden. Sind, nachdem dieser Zauber abgehandelt wurde, alle Helden beider Spieler besiegt, verlierst du das Spiel."
 },
 "Piercer of Heavens": {
 "name": "Himmelsdurchbohrer",
@@ -4566,7 +4566,7 @@
 },
 "Poison Pollen": {
 "name": "Giftpollen",
-"effect": "Betäube alle vergifteten Ziele auf dem Spielfeld für 1 Zug und füge allen betäubten Zielen auf dem Spielfeld 1 Giftstapel zu."
+"effect": "Betäube alle Vergifteten Ziele auf dem Spielfeld für 1 Zug und füge allen Betäubten Zielen auf dem Spielfeld 1 Giftstapel zu."
 },
 "Poison Vial": {
 "name": "Giftfläschchen",
@@ -4658,7 +4658,7 @@
 },
 "Quetzahuitl, Receiver of Sacrifices": {
 "name": "Quetzahuitl, Empfänger der Opfer",
-"effect": "Dieser Held kann nicht einer deiner Starthelden sein. Spiele diese Karte in deinem Hauptdeck. Wenn der letzte Held, den du kontrollierst, während des Zuges deines Gegners besiegt wird, während sich diese Karte in deiner Hand befindet, lösche alle deine Helden und alle Karten in ihren Unterstützungs- und Fähigkeitszonen, um diese Karte stattdessen in eine deiner Heldenzonen zu platzieren, statt das Spiel zu verlieren. Lege dann bis zu 3 Exemplare von \"Göttlichkeit\" aus deinem Deck, deiner Hand oder deinem Ablagestapel an diesen Helden an. Wird dieser Held besiegt, verlierst du sofort das Spiel."
+"effect": "Dieser Held kann nicht zu deinen Starthelden gehören. Spiele diese Karte in deinem Hauptdeck. Wenn der letzte Held, den du kontrollierst, während des Zuges deines Gegners besiegt wird, während sich diese Karte in deiner Hand befindet, lösche alle deine Helden und alle Karten in ihren Unterstützungs- und Fähigkeitszonen, um diese Karte stattdessen in eine deiner Heldenzonen zu platzieren, statt das Spiel zu verlieren. Lege dann bis zu 3 Exemplare von \"Göttlichkeit\" aus deinem Deck, deiner Hand oder deinem Ablagestapel an diesen Helden an. Wird dieser Held besiegt, verlierst du sofort das Spiel."
 },
 "Quick Attack": {
 "name": "Schneller Angriff",
@@ -4710,7 +4710,7 @@
 },
 "Reiza, the Chief Tormentor": {
 "name": "Reiza, die Oberfolterin",
-"effect": "Immer wenn dieser Held mit einem Angriff genau 1 Ziel trifft, wird dieses Ziel für 1 Zug betäubt und erhält 1 Giftstapel. Sind alle Ziele, die dein Gegner kontrolliert, vergiftet, darfst du in jedem Zug während deiner Aktionsphase mit diesem Helden eine zweite Aktion ausführen."
+"effect": "Immer wenn dieser Held mit einem Angriff genau 1 Ziel trifft, wird dieses Ziel für 1 Zug Betäubt und erhält 1 Giftstapel. Sind alle Ziele, die dein Gegner kontrolliert, Vergiftet, darfst du in jedem Zug während deiner Aktionsphase mit diesem Helden eine zweite Aktion ausführen."
 },
 "Relic in the Sky": {
 "name": "Relikt am Himmel",
@@ -4786,7 +4786,7 @@
 },
 "Rocket Fist": {
 "name": "Raketenfaust",
-"effect": "Wähle ein Ziel und füge ihm Schaden in Höhe des Angriffswerts des Angreifers zu. Besiegt dieser Schaden das Ziel, füge diese Karte stattdessen wieder deiner Hand hinzu, statt sie auf deinen Ablagestapel zu legen."
+"effect": "Wähle ein Ziel und füge ihm Schaden in Höhe des Angriffswerts des Angreifers zu. Besiegt dieser Schaden das Ziel, füge diese Karte wieder deiner Hand hinzu, statt sie auf deinen Ablagestapel zu legen."
 },
 "Rocket Sneeze": {
 "name": "Raketen-Nieser",
@@ -4806,7 +4806,7 @@
 },
 "Rosie, the School Idol": {
 "name": "Rosie, das Schulidol",
-"effect": "Du darfst diese Kreatur als zusätzliche Aktion mit einem Helden beschwören, der mindestens Charme 2 hat. Für jedes Level Charme, die der zugehörige Held hat, darf er Zauber verwenden, die 1 Level höher sind, als er es sonst könnte. Du kannst nur 1 \"Rosie, das Schulidol\" kontrollieren."
+"effect": "Du darfst diese Kreatur als zusätzliche Aktion mit einem Helden beschwören, der mindestens Charme 2 hat. Für jedes Level Charme, das der zugehörige Held hat, darf er Zauber verwenden, die 1 Level höher sind, als er es sonst könnte. Du kannst nur 1 \"Rosie, das Schulidol\" kontrollieren."
 },
 "Royal Treasury": {
 "name": "Königliche Schatzkammer",
@@ -4826,7 +4826,7 @@
 },
 "Sacred Hammer of the Volcano": {
 "name": "Heiliger Hammer des Vulkans",
-"effect": "Der Angriffswert des ausgerüsteten Helden wird um 30 erhöht. Außerdem wird der Schaden eines Angriffs um den Angriffswert des Angreifers erhöht, wenn der ausgerüstete Held mit diesem Angriff ein verbranntes Ziel trifft."
+"effect": "Der Angriffswert des ausgerüsteten Helden wird um 30 erhöht. Außerdem wird der Schaden eines Angriffs um den Angriffswert des Angreifers erhöht, wenn der ausgerüstete Held mit diesem Angriff ein Verbranntes Ziel trifft."
 },
 "Sacrifice to Divinity": {
 "name": "Opfer für die Göttlichkeit",
@@ -4834,7 +4834,7 @@
 },
 "Sacrificial Dagger": {
 "name": "Opferdolch",
-"effect": "Rüste diese Karte an einen Helden aus, den du kontrollierst. Einmal pro Zug darfst du, wenn du ein Ziel opferst, das du kontrollierst, ein Ziel wählen und ihm Schaden in Höhe des Angriffswerts des ausgerüsteten Helden zufügen. Dies zählt als Treffer des ausgerüsteten Helden gegen dieses Ziel mit einem Angriff."
+"effect": "Rüste diese Karte an einen Helden aus, den du kontrollierst. Einmal pro Zug darfst du, wenn du ein Ziel opferst, das du kontrollierst, ein Ziel wählen und ihm Schaden in Höhe des Angriffswerts des ausgerüsteten Helden zufügen. Dies zählt so, als würde der ausgerüstete Held dieses Ziel mit einem Angriff treffen."
 },
 "Saint Nicolas": {
 "name": "Sankt Nikolaus",
@@ -4850,7 +4850,7 @@
 },
 "Sarcophagus of Sealed Magic": {
 "name": "Sarkophag der versiegelten Magie",
-"effect": "Du darfst einmal pro Zug ein Ziel wählen und ihm Schaden in Höhe von 60 mal der Anzahl der Zauberschulen-Fähigkeiten mit unterschiedlichen Namen zufügen, die an deinen unbesiegten Helden angelegt sind."
+"effect": "Du darfst einmal pro Zug ein Ziel wählen und ihm Schaden in Höhe des 60-Fachen der Anzahl der Zauberschulen-Fähigkeiten mit unterschiedlichen Namen zufügen, die an deinen unbesiegten Helden angelegt sind."
 },
 "Sas'Za, the Snaka Adventurer": {
 "name": "Sas'Za, der Snaka-Abenteurer",
@@ -4886,11 +4886,11 @@
 },
 "Serket, Dread of the Desert": {
 "name": "Serket, Schrecken der Wüste",
-"effect": "Immer wenn du 1 oder mehr Ziele opferst, die du kontrollierst, lege so viele Beutemarker auf diesen Helden. Opferst du einen Helden, lege 2 zusätzliche Beutemarker auf diesen Helden. Du darfst einmal pro Zug ein Ziel wählen und ihm Schaden in Höhe von 20 mal der Anzahl der Beutemarker auf diesem Helden zufügen."
+"effect": "Immer wenn du 1 oder mehr Ziele opferst, die du kontrollierst, lege so viele Beutemarker auf diesen Helden. Opferst du einen Helden, lege 2 zusätzliche Beutemarker auf diesen Helden. Du darfst einmal pro Zug ein Ziel wählen und ihm Schaden in Höhe des 20-Fachen der Anzahl der Beutemarker auf diesem Helden zufügen."
 },
 "Sett, the Adept of Necromancy": {
 "name": "Sett, der Adept der Nekromantie",
-"effect": "Am Ende deines Zuges lege alle Kreaturen in den Unterstützungszonen dieses Helden, die nicht in diesem Zug beschworen wurden, auf den Ablagestapel. Du darfst Kreaturen, die durch den Effekt der Nekromantie dieses Helden beschworen wurden, jederzeit während deines Zuges auf den Ablagestapel legen. Das Ablegen von Kreaturen mit einem dieser Effekte zählt als Besiegen der Kreatur."
+"effect": "Am Ende deines Zuges lege alle Kreaturen in den Unterstützungszonen dieses Helden, die nicht in diesem Zug beschworen wurden, auf den Ablagestapel. Du darfst Kreaturen, die durch den Effekt der Nekromantie dieses Helden beschworen wurden, jederzeit während deines Zuges auf den Ablagestapel legen. Das Auf-den-Ablagestapel-Legen von Kreaturen mit einem dieser Effekte zählt als Besiegen der Kreatur."
 },
 "Shamanic Curse": {
 "name": "Schamanenfluch",
@@ -4902,7 +4902,7 @@
 },
 "Shared Blood Tanks": {
 "name": "Geteilte Bluttanks",
-"effect": "Ein blutender Held darf diesen Zauber unabhängig von dessen Level ausführen.\nImmer wenn ein Ziel Blutungsschaden erleidet, außer durch diesen Effekt, erleiden auch alle anderen blutenden Ziele, die sein Besitzer kontrolliert, Blutungsschaden."
+"effect": "Ein Blutender Held darf diesen Zauber unabhängig von dessen Level ausführen.\nImmer wenn ein Ziel Blutungsschaden erleidet, außer durch diesen Effekt, erleiden auch alle anderen Blutenden Ziele, die sein Besitzer kontrolliert, Blutungsschaden."
 },
 "Shattered Trident, Treasure of the Deepsea": {
 "name": "Zerschmetterter Dreizack, Schatz der Tiefsee",
@@ -5006,7 +5006,7 @@
 },
 "Smoke Vial": {
 "name": "Rauchfläschchen",
-"effect": "Alle Helden, die dein Gegner kontrolliert, sind bis zum Ende deines nächsten Zuges geblendet."
+"effect": "Alle Helden, die dein Gegner kontrolliert, sind bis zum Ende deines nächsten Zuges Geblendet."
 },
 "Smug Coin": {
 "name": "Smug-Münze",
@@ -5038,12 +5038,12 @@
 },
 "Sparrow, the Buffoon of the Treasure Cave": {
 "name": "Sparrow, der Possenreißer der Schatzhöhle",
-"effect": "Du musst diesen Helden aus deiner Hand auf einen \"Sparrow, der tollpatschige Possenreißer\" spielen, den du kontrollierst und an den \"Skullmaels Großschwert\" ausgerüstet und \"Elixier der Unsterblichkeit\" als Fähigkeit angelegt ist. Diese Bedingung kann nicht negiert oder ersetzt werden. Immer wenn ein Trank aufgelöst wird (egal, wer ihn gespielt hat), darfst du ihn als Kreatur ohne Level in die freie Unterstützungszone dieses Helden beschwören. Auf diese Weise beschworene Tränke haben 50 LP und dürfen einmal pro Zug ihren Effekt verwenden.",
+"effect": "Du musst diesen Helden aus deiner Hand auf einen \"Sparrow, der tollpatschige Possenreißer\" spielen, den du kontrollierst und an dem \"Skullmaels Großschwert\" ausgerüstet und \"Elixier der Unsterblichkeit\" als Fähigkeit angelegt ist. Diese Bedingung kann nicht negiert oder ersetzt werden. Immer wenn ein Trank abgehandelt wird (egal, wer ihn gespielt hat), darfst du ihn als Kreatur ohne Level in die freie Unterstützungszone dieses Helden beschwören. Auf diese Weise beschworene Tränke haben 50 LP und dürfen einmal pro Zug ihren Effekt verwenden.",
 "startingAbility1": "Spiele die obersten 3 Karten deines Trankdecks, falls möglich"
 },
 "Sparrow, the Bumbling Buffoon": {
 "name": "Sparrow, der tollpatschige Possenreißer",
-"effect": "Du kannst die Fähigkeiten dieses Helden nicht aufwerten, indem du Exemplare davon an ihn anlegst. Bis zu 2-mal pro Zug, wenn du einen Trank spielst, darfst du ihn, nachdem er aufgelöst wurde, als zusätzliche Anlage auf eine beliebige Fähigkeit dieses Helden platzieren. Auf diese Weise platzierte Tränke werden zu Exemplaren der Fähigkeit, auf die sie platziert wurden, solange sie auf dem Spielfeld bleiben. Wenn ein durch diesen Effekt angelegter Trank das Spielfeld verlässt, egal wohin, lösche ihn."
+"effect": "Du kannst die Fähigkeiten dieses Helden nicht aufwerten, indem du Exemplare davon an ihn anlegst. Bis zu 2-mal pro Zug, wenn du einen Trank spielst, darfst du ihn, nachdem er abgehandelt wurde, als zusätzliche Anlage auf eine beliebige Fähigkeit dieses Helden platzieren. Auf diese Weise platzierte Tränke werden zu Exemplaren der Fähigkeit, auf die sie platziert wurden, solange sie auf dem Spielfeld bleiben. Wenn ein durch diesen Effekt angelegter Trank das Spielfeld verlässt, egal wohin, lösche ihn."
 },
 "Spatial Crevice": {
 "name": "Raumspalte",
@@ -5075,7 +5075,7 @@
 },
 "Spirit of the Barbarian Sword": {
 "name": "Geist des Barbarenschwerts",
-"effect": "Diese Kreatur kann nur von einem Helden beschworen werden, an den \"Legendäres Schwert eines Barbarenkönigs\" ausgerüstet ist. Wenn du diese Kreatur beschwörst, lege alle Gebiete auf dem Spielfeld auf den Ablagestapel. Hast du danach mindestens 1 Gebiet abgelegt, füge allen Zielen, die dein Gegner kontrolliert, 100 Schaden zu. Du darfst einmal pro Zug alle Gebiete auf dem Spielfeld auf den Ablagestapel legen (mind. 1), um ein Gebiet mit Level 3 oder niedriger aus deinem Deck direkt ins Spiel zu bringen."
+"effect": "Diese Kreatur kann nur von einem Helden beschworen werden, an den \"Legendäres Schwert eines Barbarenkönigs\" ausgerüstet ist. Wenn du diese Kreatur beschwörst, lege alle Gebiete auf dem Spielfeld auf den Ablagestapel. Hast du danach mindestens 1 Gebiet auf den Ablagestapel gelegt, füge allen Zielen, die dein Gegner kontrolliert, 100 Schaden zu. Du darfst einmal pro Zug alle Gebiete auf dem Spielfeld auf den Ablagestapel legen (mind. 1), um ein Gebiet mit Level 3 oder niedriger aus deinem Deck direkt ins Spiel zu bringen."
 },
 "Spirit of the Forbidden Grimoire": {
 "name": "Geist des verbotenen Grimoires",
@@ -5131,15 +5131,15 @@
 },
 "Sticky Wand": {
 "name": "Klebriger Zauberstab",
-"effect": "Wähle einen Helden, den du kontrollierst, und lasse ihn sofort einen Anlage-Angriff/-Zauber aus deiner Hand als zusätzliche Aktion verwenden. Du kannst nur 1 \"Klebriger Zauberstab\" pro Zug spielen."
+"effect": "Wähle einen Helden, den du kontrollierst, und lass ihn sofort einen Anlage-Angriff/-Zauber aus deiner Hand als zusätzliche Aktion verwenden. Du kannst nur 1 \"Klebriger Zauberstab\" pro Zug spielen."
 },
 "Stinky Stables": {
 "name": "Stinkende Ställe",
-"effect": "Solange dieses Gebiet im Spiel bleibt, können vergiftete Ziele nicht geheilt werden (weder ihre LP noch von der Vergiftung)."
+"effect": "Solange dieses Gebiet im Spiel bleibt, können Vergiftete Ziele nicht geheilt werden (weder ihre LP noch ihre Vergiftung)."
 },
 "Stoneskin": {
 "name": "Steinhaut",
-"effect": "Aller Schaden, den der Held, an den diese Karte angelegt ist, durch Angriffe erleidet, wird um 100 verringert, und er kann nicht vergiftet, verbrannt oder betäubt werden."
+"effect": "Aller Schaden, den der Held, an den diese Karte angelegt ist, durch Angriffe erleidet, wird um 100 verringert, und er kann nicht Vergiftet, Verbrannt oder Betäubt werden."
 },
 "Storm Piano": {
 "name": "Sturmklavier",
@@ -5155,7 +5155,7 @@
 },
 "Stranglehold": {
 "name": "Würgegriff",
-"effect": "Wähle ein Ziel und füge ihm 50 Schaden mal der Anzahl der negativen Statuseffekte zu, mit denen es belegt ist. Hat der Anwender Kampfkunst 3, wird dieser Schaden um den Basis-Angriffswert des Angreifers erhöht."
+"effect": "Wähle ein Ziel und füge ihm 50 Schaden mal die Anzahl der negativen Statuseffekte zu, mit denen es belegt ist. Hat der Anwender Kampfkunst 3, wird dieser Schaden um den Basis-Angriffswert des Angreifers erhöht."
 },
 "Strong Ox Headbutt": {
 "name": "Starker Ochsen-Kopfstoß",
@@ -5231,7 +5231,7 @@
 },
 "Taio, Absorber of the Mountain's Heart": {
 "name": "Taio, Absorber des Herzens des Berges",
-"effect": "Du musst diesen Helden aus deiner Hand auf einen \"Taio, der Sonnenfechter\" spielen, den du kontrollierst, der mit \"Das Sonnenschwert\" ausgerüstet ist und in diesem Spiel einen Helden, den dein Gegner kontrolliert, mit einem Angriff oder Zerstörungsmagie-Zauber besiegt hat. Wenn dieser Held während deines Zuges einmal pro Zug einen Angriff oder Zerstörungsmagie-Zauber ausführt, darf er sofort als zusätzliche Aktion einen Zerstörungsmagie-Zauber oder Angriff (je nachdem, was er nicht verwendet hat) aus deinem Deck oder deiner Hand ausführen."
+"effect": "Du musst diesen Helden aus deiner Hand auf einen \"Taio, der Sonnenfechter\" spielen, den du kontrollierst, der mit \"Das Sonnenschwert\" ausgerüstet ist und in diesem Spiel einen Helden, den dein Gegner kontrolliert, mit einem Angriff oder Zerstörungsmagie-Zauber besiegt hat. Einmal pro Zug darf dieser Held, wenn er während deines Zuges einen Angriff oder Zerstörungsmagie-Zauber ausführt, sofort als zusätzliche Aktion einen Zerstörungsmagie-Zauber oder Angriff (je nachdem, was er nicht verwendet hat) aus deinem Deck oder deiner Hand ausführen."
 },
 "Taio, the Sun Fencer": {
 "name": "Taio, der Sonnenfechter",
@@ -5247,7 +5247,7 @@
 },
 "Taunting Elephant": {
 "name": "Spöttischer Elefant",
-"effect": "Zu Beginn jedes deiner Züge wählst du ein Ziel und fügst ihm Schaden in Höhe von 40 mal der Anzahl der Kreaturen auf dem Spielfeld zu, die keinen aktiven Effekt haben."
+"effect": "Zu Beginn jedes deiner Züge wählst du ein Ziel und fügst ihm Schaden in Höhe des 40-Fachen der Anzahl der Kreaturen auf dem Spielfeld zu, die keinen aktiven Effekt haben."
 },
 "Tazune, the Angry Hot-Blood": {
 "name": "Tazune, der zornige Hitzkopf",
@@ -5263,7 +5263,7 @@
 },
 "Tearing Mountain": {
 "name": "Reißender Berg",
-"effect": "Solange dieses Gebiet im Spiel bleibt, werden alle Effekte negiert, die verhindern würden, dass Ziele verbrannt werden. Zu Beginn des Zuges eines Spielers muss dieser Spieler ein Ziel wählen, das er kontrolliert, und es für den Rest des Spiels verbrennen."
+"effect": "Solange dieses Gebiet im Spiel bleibt, werden alle Effekte negiert, die verhindern würden, dass Ziele Verbrannt werden. Zu Beginn des Zuges eines Spielers muss dieser Spieler ein Ziel wählen, das er kontrolliert, und es für den Rest des Spiels verbrennen."
 },
 "Tears of Creation": {
 "name": "Tränen der Schöpfung",
@@ -5288,7 +5288,7 @@
 },
 "Tempeste Moana, the Rain Singer": {
 "name": "Tempeste Moana, die Regensängerin",
-"effect": "Die ersten 2 Artefakte, die in jedem Zug an einen Helden ausgerüstet werden, und Zauber, die angelegt werden, zählen auch als Kreaturen mit 50 LP. Werden die LP eines Artefakts oder Zaubers auf 0 verringert, wird er auf den Ablagestapel gelegt. Das Ausrüsten eines Artefakts oder das Anlegen eines Zaubers zählt auch als Beschwören als Kreatur. Du darfst einmal pro Zug einem beliebigen Ziel Schaden in Höhe von 50 mal der Anzahl der Kreaturen auf dem Spielfeld zufügen, die ursprünglich Ausrüstungen oder Anlagen sind."
+"effect": "Die ersten 2 Artefakte, die in jedem Zug an einen Helden ausgerüstet werden, und Zauber, die angelegt werden, zählen auch als Kreaturen mit 50 LP. Werden die LP eines Artefakts oder Zaubers auf 0 verringert, wird er auf den Ablagestapel gelegt. Das Ausrüsten eines Artefakts oder das Anlegen eines Zaubers zählt auch als Beschwörung als Kreatur. Du darfst einmal pro Zug einem beliebigen Ziel Schaden in Höhe des 50-Fachen der Anzahl der Kreaturen auf dem Spielfeld zufügen, die ursprünglich Ausrüstungen oder Anlagen sind."
 },
 "Tempeste, the Weather Fairy": {
 "name": "Tempeste, die Wetterfee",
@@ -5300,7 +5300,7 @@
 },
 "Teocuilatl, the Embodiment of Gods": {
 "name": "Teocuilatl, die Verkörperung der Götter",
-"effect": "Du darfst einmal pro Zug eine Kreatur, die du kontrollierst und die in diesem Zug nicht beschworen wurde, opfern, um 10 Gold zu erhalten, ODER einen Helden, den du kontrollierst und der nicht dieser ist, um 30 Gold zu erhalten. Hast du mit diesem Effekt einen Helden geopfert, beende sofort deinen Zug. Du kannst mit diesem Effekt nur 1 Helden pro Spiel opfern."
+"effect": "Du darfst einmal pro Zug eine Kreatur, die du kontrollierst und die in diesem Zug nicht beschworen wurde, opfern, um 10 Gold zu erhalten, ODER einen anderen Helden, den du kontrollierst, opfern, um 30 Gold zu erhalten. Hast du mit diesem Effekt einen Helden geopfert, beende sofort deinen Zug. Du kannst mit diesem Effekt nur 1 Helden pro Spiel opfern."
 },
 "Terror": {
 "name": "Schrecken",
@@ -5324,7 +5324,7 @@
 },
 "Tharxian Horse": {
 "name": "Tharxianisches Pferd",
-"effect": "Aktiviere diese Überraschung, wenn der Anwender von einem Angriff oder Zauber gewählt wird. Negiere den Angriff/Zauber und füge dem Angreifer 50 Schaden mal der Anzahl der Ziele zu, die du kontrollierst. Wenn dieser Schaden den Angreifer besiegt hat, darfst du dann sofort eine Kreatur aus deinem Ablagestapel wählen und sie als zusätzliche Aktion beschwören. Du kannst nur 1 \"Tharxianisches Pferd\" pro Spiel spielen."
+"effect": "Aktiviere diese Überraschung, wenn der Anwender von einem Angriff oder Zauber gewählt wird. Negiere den Angriff/Zauber und füge dem Angreifer 50 Schaden mal die Anzahl der Ziele zu, die du kontrollierst. Wenn dieser Schaden den Angreifer besiegt hat, darfst du dann sofort eine Kreatur aus deinem Ablagestapel wählen und sie als zusätzliche Aktion beschwören. Du kannst nur 1 \"Tharxianisches Pferd\" pro Spiel spielen."
 },
 "The Brewer's Blade": {
 "name": "Klinge des Brauers",
@@ -5384,7 +5384,7 @@
 },
 "The Melting": {
 "name": "Das Schmelzen",
-"effect": "Spiele diese Karte sofort, wenn ein oder mehrere Ziele gefroren sind. Heile alle gefrorenen Ziele auf dem Spielfeld von ihrem Einfrieren. Hat der Anwender mindestens Zerstörungsmagie 1 und war der Einfrier-Effekt ein Effekt deines Gegners während seines Zuges, beende seinen Zug sofort."
+"effect": "Spiele diese Karte sofort, wenn ein oder mehrere Ziele Gefroren sind. Heile alle Gefrorenen Ziele auf dem Spielfeld von ihrem Einfrieren. Hat der Anwender mindestens Zerstörungsmagie 1 und war der Einfrier-Effekt ein Effekt deines Gegners während seines Zuges, beende seinen Zug sofort."
 },
 "The Oracle of Heaven": {
 "name": "Das Orakel des Himmels",
@@ -5420,7 +5420,7 @@
 },
 "The Sun Sword": {
 "name": "Das Sonnenschwert",
-"effect": "Rüste diese Karte an einen Helden aus, den du kontrollierst. Der Angriffswert des ausgerüsteten Helden wird um 20 erhöht. Außerdem können Ziele, die du kontrollierst, nicht eingefroren werden, und jedes Ziel, das \nvon einem Angriff des ausgerüsteten Helden getroffen wird, wird für den Rest des Spiels verbrannt. Taue alle gefrorenen Ziele auf, die du kontrollierst."
+"effect": "Rüste diese Karte an einen Helden aus, den du kontrollierst. Der Angriffswert des ausgerüsteten Helden wird um 20 erhöht. Außerdem können Ziele, die du kontrollierst, nicht Gefroren werden, und jedes Ziel, das \nvon einem Angriff des ausgerüsteten Helden getroffen wird, wird für den Rest des Spiels Verbrannt. Taue alle Gefrorenen Ziele auf, die du kontrollierst."
 },
 "The Thing in the Ship": {
 "name": "Das Ding im Schiff",
@@ -5428,7 +5428,7 @@
 },
 "The Warlord's Bite": {
 "name": "Der Biss des Kriegsherrn",
-"effect": "Wähle ein Ziel, das noch nicht vergiftet ist, und füge ihm 1/2/4 Giftstapel zu."
+"effect": "Wähle ein Ziel, das noch nicht Vergiftet ist, und füge ihm 1/2/4 Giftstapel zu."
 },
 "The Weather Orchestra": {
 "name": "Das Wetterorchester",
@@ -5480,7 +5480,7 @@
 },
 "Torchure": {
 "name": "Fackelqual",
-"effect": "Füge einem nicht vergifteten Helden, den du kontrollierst, 4 Giftstapel zu, um diese Karte zu spielen. Ist dieser Held während deines nächsten Zuges noch durch diesen Effekt vergiftet, darfst du während deiner Aktionsphase eine zusätzliche Aktion ausführen. Dies zählt als zusätzliche Aktion."
+"effect": "Füge einem nicht Vergifteten Helden, den du kontrollierst, 4 Giftstapel zu, um diese Karte zu spielen. Ist dieser Held während deines nächsten Zuges noch durch diesen Effekt Vergiftet, darfst du während deiner Aktionsphase eine zusätzliche Aktion ausführen. Dies zählt als zusätzliche Aktion."
 },
 "Toughness": {
 "name": "Zähigkeit",
@@ -5664,7 +5664,7 @@
 },
 "Von Pixmarck, the Iron Chancellor": {
 "name": "Von Pixmarck, der Eiserne Kanzler",
-"effect": "Am Ende deines Zuges wählen beide Spieler, falls beide Spieler mindestens 1 Kreatur kontrollieren, je 1 ihrer Kreaturen und tauschen die Kontrolle darüber, wobei sie ihre Unterstützungszonen tauschen."
+"effect": "Haben beide Spieler am Ende deines Zuges mindestens 1 Kreatur unter ihrer Kontrolle, wählt jeder 1 seiner Kreaturen, und die Spieler tauschen die Kontrolle darüber und vertauschen dabei deren Unterstützungszonen."
 },
 "Voodoo Curse": {
 "name": "Voodoo-Fluch",
@@ -5700,7 +5700,7 @@
 },
 "Weapon Absorption": {
 "name": "Waffenabsorption",
-"effect": "Spiele diese Karte sofort, wenn der Anwender Schaden erleiden würde. Wähle beliebig viele Artefakte, die an den Anwender ausgerüstet sind, und Fähigkeiten, die an ihn angelegt sind, und lege sie auf den Ablagestapel. Der Anwender heilt 80 LP mal die Anzahl der gewählten Karten. Das Level dieses Zaubers wird um die Anzahl der Fähigkeiten verringert, die du mit diesem Effekt auf den Ablagestapel legst."
+"effect": "Spiele diese Karte sofort, wenn der Anwender Schaden erleiden würde. Wähle beliebig viele Artefakte, die am Anwender ausgerüstet sind, und Fähigkeiten, die an ihn angelegt sind, und lege sie auf den Ablagestapel. Der Anwender wird um das 80-Fache der Anzahl der gewählten Karten in LP geheilt. Das Level dieses Zaubers wird um die Anzahl der Fähigkeiten verringert, die du mit diesem Effekt auf den Ablagestapel legst."
 },
 "Weapon Collecting Wight": {
 "name": "Waffensammelnder Wiedergänger",
@@ -5708,7 +5708,7 @@
 },
 "Weapon Storm": {
 "name": "Waffensturm",
-"effect": "Wähle beliebig viele Artefakte, die an den Anwender ausgerüstet sind, und Fähigkeiten, die an ihn angelegt sind, und lege sie auf den Ablagestapel. Wähle dann ein Ziel und füge ihm Schaden in Höhe von 40/50/60 mal der Anzahl der gewählten Karten zu."
+"effect": "Wähle beliebig viele Artefakte, die an den Anwender ausgerüstet sind, und Fähigkeiten, die an ihn angelegt sind, und lege sie auf den Ablagestapel. Wähle dann ein Ziel und füge ihm Schaden in Höhe des 40/50/60-Fachen der Anzahl der gewählten Karten zu."
 },
 "Weapon Unleashing": {
 "name": "Waffenentfesselung",
@@ -5736,11 +5736,11 @@
 },
 "Willy, the Valiant Leprechaun": {
 "name": "Willy, der tapfere Leprechaun",
-"effect": "Am Ende deines ersten Zuges ziehe 5 Karten oder erhalte 30 Gold. Du hast kein Handkartenlimit bis zum Beginn deines zweiten Zuges."
+"effect": "Am Ende deines ersten Zuges ziehe 5 Karten oder erhalte 30 Gold. Du hast bis zum Beginn deines zweiten Zuges keine maximale Handgröße."
 },
 "Winged Haressassin": {
 "name": "Geflügelter Haressassin",
-"effect": "Einmal pro Zug darfst du, wenn die Karte oder der Effekt eines Gegners genau ein anderes Ziel wählt, das du kontrollierst, eine Karte abwerfen, um sie auf diese Kreatur umzulenken. Wird diese Kreatur durch eine Karte oder einen Effekt besiegt, die durch diesen Effekt umgelenkt wurden, füge einem beliebigen Ziel 150 Schaden zu."
+"effect": "Einmal pro Zug darfst du, wenn die Karte oder der Effekt eines Gegners genau ein anderes Ziel wählt, das du kontrollierst, eine Karte abwerfen, um sie auf diese Kreatur umzulenken. Wird diese Kreatur durch eine Karte oder einen Effekt besiegt, der durch diesen Effekt umgelenkt wurde, füge einem beliebigen Ziel 150 Schaden zu."
 },
 "Wire Hatchling": {
 "name": "Draht-Küken",
@@ -5784,15 +5784,15 @@
 },
 "Zira Racer": {
 "name": "Zira-Rennfahrer",
-"effect": "Du darfst einmal pro Zug eine Kreatur mit Level 3 oder niedriger abwerfen, um ein Ziel zu wählen und ihm Schaden in Höhe von 70 mal dem Level der abgeworfenen Karte zuzufügen."
+"effect": "Du darfst einmal pro Zug eine Kreatur mit Level 3 oder niedriger abwerfen, um ein Ziel zu wählen und ihm Schaden in Höhe des 70-Fachen des Levels der abgeworfenen Karte zuzufügen."
 },
 "Zombified Assault": {
 "name": "Zombifizierter Angriff",
-"effect": "Spiele diese Karte sofort, wenn eine oder mehrere deiner Kreaturen durch den Angriff oder Zauber deines Gegners besiegt werden. Wähle eine dieser Kreaturen und belebe sie mit vollen LP wieder. Dies zählt weiterhin als Besiegen der Kreatur, aber nicht als erneutes Beschwören. Danach füge dem angreifenden Helden Schaden in Höhe von 50 mal dem Level der wiederbelebten Kreatur zu."
+"effect": "Spiele diese Karte sofort, wenn eine oder mehrere deiner Kreaturen durch den Angriff oder Zauber deines Gegners besiegt werden. Wähle eine dieser Kreaturen und belebe sie mit vollen LP wieder. Dies zählt weiterhin als Besiegen der Kreatur, aber nicht als erneutes Beschwören. Danach füge dem angreifenden Helden Schaden in Höhe des 50-Fachen des Levels der wiederbelebten Kreatur zu."
 },
 "Zsos'Ssar, the Serpent Warlord": {
 "name": "Zsos'Ssar, der Schlangenkriegsherr",
-"effect": "Wenn dieser Held einen Verfallsmagie-Zauber ausführt, musst du einem Helden, den du kontrollierst, 2 Giftstapel zufügen. Jeder direkte Schaden, den dieser Held mit Angriffen und Zaubern gegen ein einzelnes Ziel verursacht, wird um 40 mal die Anzahl der vergifteten Ziele auf dem Spielfeld erhöht."
+"effect": "Wenn dieser Held einen Verfallsmagie-Zauber ausführt, musst du einem Helden, den du kontrollierst, 2 Giftstapel zufügen. Jeder direkte Schaden, den dieser Held mit Angriffen und Zaubern gegen ein einzelnes Ziel verursacht, wird um 40 mal die Anzahl der Vergifteten Ziele auf dem Spielfeld erhöht."
 },
 "Zwei, the Lucky Thief": {
 "name": "Zwei, der glückliche Dieb",
