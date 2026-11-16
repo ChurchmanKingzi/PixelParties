@@ -60043,7 +60043,12 @@ this._deathWatch = (this._deathWatchStack || []).length
         const script = loadCardEffect(p.name);
         const s = script?.preventsAllHeroesDeadLoss;
         return typeof s === 'function' ? s(this, pi, p) : s;
-      });
+      }) || (this.gs.players || []).some((qs, qi) => qi !== pi && (qs?.permanents || []).some(p => {
+        // Spielgestalter-Entscheidung 16.11.2026 (Elixir of Immortality): ein Permanent des KONTROLLEURS eines uebernommenen Helden dieser Seite kann
+        // dessen Wiederbelebung vorgemerkt haben — `preventsAllHeroesDeadLossForSide(engine, besitzerIdx, perm, seite)`.
+        const f = loadCardEffect(p.name)?.preventsAllHeroesDeadLossForSide;
+        return typeof f === 'function' && f(this, qi, p, pi);
+      }));
       // v867: Ein Held, der VORUEBERGEHEND aus dem Spiel entfernt ist
       // (Teleportation Powder), haelt seine Seite am Leben — „A player
       // does not lose the game, even if all their other Heroes are
