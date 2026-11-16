@@ -3827,6 +3827,10 @@ class GameEngine {
             && !loadCardEffect(c.name)?.bypassStatusFilter
             && !(hookName === 'onCardLeaveZone' && hookCtx.leavingCard && hookCtx.leavingCard.id === c.id
                  && loadCardEffect(c.name)?.bypassStatusFilterOnLeave)
+            // Gegenstück zum Anlegen: Skript-Flag `bypassStatusFilterOnPlay` - die Vergabe eines Stempel-Bonus (Fighting-ATK) beim Anlegen der EIGENEN Karte
+            // läuft in jedem Heldenzustand (sonst blieb der Bonus an einem gefrorenen/betäubten/negierten Träger dauerhaft aus, auch nach dem Auftauen).
+            && !(hookName === 'onPlay' && (hookCtx.playedCard || hookCtx._onlyCard)?.id === c.id
+                 && loadCardEffect(c.name)?.bypassStatusFilterOnPlay)
             && this._isHeroAbilityPassiveSilenced(c.controller ?? c.owner, c.heroIdx)) return false;
       }
       // Creature-level negation/freeze/stun (Dark Gear, Necromancy, Slimes, Null Zone, etc.)
