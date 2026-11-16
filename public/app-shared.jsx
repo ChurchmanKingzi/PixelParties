@@ -4094,6 +4094,17 @@ const ZONE_ANIM_SFX = {
   ],
   // Acid / poison (poison has its own sound per user)
   acid_splash:             { name: 'elem_acid' },
+  // Acid Vial / Life Serum als Projektil (app-fx-70): animationsrelativ — Laden bis 0,7 s / 0,6 s, Abschuss (`projectile`), Einschlag bei 1,4 s / 1,5 s (der Mount-Vorlauf kommt von `playSFXForZoneAnim` dazu).
+  // Der Heilklang des Life Serum kommt wie bisher von der HP-Änderung selbst (`healing_hearts` ist stumm).
+  acid_spit: [
+    { name: 'elem_acid',  opts: { rate: 1.6, volume: 0.25, delay: 1, category: null, dedupe: 0 } },
+    { name: 'projectile', opts: { rate: 0.75, volume: 0.55, delay: 700, category: null, dedupe: 0 } },
+    { name: 'elem_acid',  opts: { rate: 1.0, volume: 1.0, delay: 1400, category: null, dedupe: 0 } },
+  ],
+  life_serum_shot: [
+    { name: 'elem_holy',  opts: { rate: 1.5, volume: 0.22, delay: 1, category: null, dedupe: 0 } },
+    { name: 'projectile', opts: { rate: 1.1, volume: 0.5, delay: 600, category: null, dedupe: 0 } },
+  ],
   plague_smoke:            { name: 'poison' },
   poison_vial:             { name: 'poison' },
   poison_tick:             { name: 'poison' },
@@ -7052,11 +7063,12 @@ function ppRarityOf(card, rarity) {
   return t != null ? t : (rarity || (card && card.rarity) || 'common');
 }
 /** Kartenbild-URL der Basiskarte dieser Rarity (`?rar=<id>`; Common = unverändert). Skin-Bilder teilen die Rarity ihrer Base-Karte (der Karten-Shim backt auch für Skins die Basiskarte der Stufe). */
-function ppRarityUrl(url, rarity) {
+function ppRarityUrl(url, rarity, mitStempel) {
   const fx = window.PpRarityFx;
   if (!url || typeof url !== 'string' || !fx || !rarity || rarity === 'common' || /[?&]rar=/.test(url)) return url;
   const q = fx.imageRarity(rarity);
-  return q ? url + (url.includes('?') ? '&' : '?') + 'rar=' + q : url;
+  // Die Basiskarte mit `?rar=` druckt den Rarity-Stempel NICHT mit (die Rarity-Ebene malt ihn); `mitStempel` für Bilder ganz ohne Ebene (Kartenwurf).
+  return q ? url + (url.includes('?') ? '&' : '?') + 'rar=' + q + (mitStempel ? '&stempel=1' : '') : url;
 }
 window.ppRarityOf = ppRarityOf;
 window.ppRarityUrl = ppRarityUrl;
@@ -7150,9 +7162,9 @@ function ppFlugRarity(img, cardName, rarity, owner, lebenMs) {
 window.ppFlugRarity = ppFlugRarity;
 
 /**
- * Alles über dem Kartenbild: Rarity-Effekt (`RarityLayer`), Skin-Holo (Skin-Karten), Schraffur und Rahmenglanz der Vollbild-Helden.
- * Aufrufer schreiben `<CardFoil card={card} skin={…} werte={…} rarity={…} animated />`; ohne Rarity/Skin/Vollbild rendert sie nichts.
- * Ein Skin ersetzt den Rarity-Effekt (zwei Effekte übereinander wären unruhig); Kleinansichten und das Brett zeigen nur Standbilder.
+ * Alles über dem Kartenbild: der Rarity-Effekt (`RarityLayer`) — mehr nicht (kein Skin-Holo, kein Fullart-Foil).
+ * Aufrufer schreiben `<CardFoil card={card} skin={…} werte={…} rarity={…} animated />`; ohne Rarity rendert sie nichts.
+ * Skins teilen die Rarity ihrer Base-Karte; Kleinansichten und das Brett zeigen nur Standbilder (im Deck-Editor reduziert animiert).
  */
 function CardFoil({ card, skin, werte, rarity, animated }) {
   const klein = useContext(FoilKleinContext);
@@ -7162,20 +7174,14 @@ function CardFoil({ card, skin, werte, rarity, animated }) {
   const r = ppRarityOf(card, rarity);
   const fxA = window.PpRarityFx;
   // Skins teilen die Rarity-Effekte ihrer Base-Karte: auf dem Skin-Bild läuft derselbe Effekt wie auf der Base-Karte. Ausnahme: Stufen mit Motiv-Maske (Umbra, Stained, Storm) —
-  // für Skin-Sprites gibt es noch keine Masken; dort bleibt das Skin-Holo (wie bisher).
+  // für Skin-Sprites gibt es noch keine Masken; dort zeigt der Skin das Standbild ohne Effekt.
   const effektMoeglich = !!card && r !== 'common' && !!fxA && fxA.available(r);
   const effekt = effektMoeglich && !(holoSkin0 && fxA.SPEC && fxA.SPEC[r] && fxA.SPEC[r].mask);
-  const holoSkin = holoSkin0 && !effekt;   // ein Foil je Karte: der Rarity-Effekt ersetzt das Skin-Holo
-  const fkey = holoSkin ? 'skin:' + skin : 'card:' + (card?.name || '');
-  const schraffur = !holoSkin && !effekt && !klein && skinHoloAktiv() && window.CardRender.hatchEligible(card);
-  const rahmen = !effekt && !klein && skinHoloAktiv() ? window.CardRender.rimKind(card, holoSkin ? skin : null) : null;
-  if (!holoSkin && !schraffur && !rahmen && !effekt) return null;
+  // Foils kommen nur noch von der Rarity der Karteninstanz: kein eigenes Skin-Holo und auch kein altes Fullart-Foil (Schraffur, Glanzband, glänzender Goldrahmen) mehr.
+  if (!effekt) return null;
   return (
     <>
       {effekt && <RarityLayer card={card} rarity={r} animated={!!animated && !klein && !brett} reduced={reduziert && klein && !brett} werte={werte} />}
-      {holoSkin && <SkinHolo skin={skin} fkey={fkey} />}
-      {schraffur && <FoilHatch card={card} fkey={fkey} />}
-      {rahmen && <FoilRim rim={rahmen} fkey={fkey} />}
     </>
   );
 }
@@ -7658,6 +7664,8 @@ function spawnZoneLandFx(el, opts) {
   if (window.ppBattleCamFocus) window.ppBattleCamFocus(el);
   if (r.bottom < 0 || r.right < 0
       || r.top > window.innerHeight || r.left > window.innerWidth) return;   // ausserhalb des Bildes
+  // ★ Trailer-Look (app-fx-67.jsx): Bildschirmwackeln bei der Landung (Kreatur 10/0,4 s, sonst 6/0,22 s; aus bei Retro, reduzierter Bewegung und per Profil-Schalter)
+  if (window.ppFx67Landung) window.ppFx67Landung(el, opts.variant);
 
   // Auf Telefonen die halbe Funkenzahl — dieselbe Schwelle wie der
   // Lite-Modus in style.css.
@@ -7717,7 +7725,12 @@ function spawnZoneLandFx(el, opts) {
   //   OBEN   — Saeule, Schein, Glanzstreifen, Irrlichter und Funken auf
   //            der festen Schicht. Die highlighten die ganze Karte,
   //            statt nur unten herum zu leuchten.
+  // ★ app-fx-69: Biomancy-Token (steht als Potion-Name im Spielzustand, also ohne Variante 'summon'): das Kraftstrom-Ereignis hat die Zone gemerkt → Token-Look
+  if (opts.variant !== 'summon' && window.ppFx69BioLandung && window.ppFx69BioLandung(el)) return;
   if (opts.variant === 'summon') {
+    // ★ app-fx-69 (Trailer-Look): Beschwörungskreis in der Brettebene, gedithertes Kartenerscheinen, Lichtsäule, Kraftstrom vom Helden — Pixelart-Leinwand. Läuft der Look, entfällt der CSS-Kreis unten;
+    // Rückfall (Retro, reduzierte Bewegung, Schalter `__ppFx69Aus`, Zone nicht messbar): false → der alte Kreis.
+    if (window.ppFx69Beschwoerung && window.ppFx69Beschwoerung(el, { color: farbe })) return;
     const wirt = el.closest('.board-plane-clip') || el.closest('.pz-plane-clip');
     const ebene = wirt && wirt.querySelector(':scope > .board-plane, :scope > .pz-board-plane');
 

@@ -582,8 +582,12 @@ function BoardCard({ cardName, faceDown, flipped, label, hp, maxHp, atk, hpPosit
   );
 }
 
-function BoardZone({ type, cards, label, faceDown, flipped, stackLabel, children, onClick, onHoverCard, style, className, dataAttrs, ownerLetheStamps, badge, pileIdentities, renderStack, rarities }) {
+function BoardZone({ type, cards, label, faceDown, flipped, stackLabel, children, onClick, onHoverCard, style, className, dataAttrs, ownerLetheStamps, badge, pileIdentities, renderStack, rarities, stapelN }) {
   const cls = 'board-zone board-zone-' + type + (className ? ' ' + className : '') + ((cards?.length > 0) ? ' zone-has-card' : '');
+  // ★ Trailer-Look (app-fx-67.jsx): Deck, Potion-Deck und Ablage mit sichtbarer Dicke (Kanten unter der Karte) und Zähler-Pop der Ablage. `stapelN` = Kartenzahl (Deck/Potion-Deck; Ablage: aus `cards`).
+  const K67 = (type === 'deck' || type === 'potion' || type === 'discard') ? window.PpStapelKanten : null;
+  const kantenN = !K67 ? 0 : (stapelN != null ? stapelN : (type === 'discard' ? (cards ? cards.length : 0) : 0));
+  const kantenStil = kantenN > 0 && !window.__ppFx67KantenAus && !window.__ppFx67Aus && !window.PP_RETRO ? { ...(style || {}), overflow: 'visible' } : style;   // die Kanten ragen in die Lücke unter der Zone
   const topCardName = cards && cards.length > 0 && !faceDown ? cards[cards.length - 1] : null;
   const suppressChildTooltip = !!onClick && !!onHoverCard;
   // For discard/deleted zones, the top card's effective level is the
@@ -633,7 +637,7 @@ function BoardZone({ type, cards, label, faceDown, flipped, stackLabel, children
     : topCardName);
   return (
     <div className={cls + (onClick && cards?.length > 0 ? ' board-zone-clickable' : '')}
-      style={style}
+      style={kantenStil}
       {...(dataAttrs || {})}
       onClick={onClick && cards?.length > 0 ? onClick : undefined}
       onMouseEnter={() => hoverPayload && onHoverCard && !window.activeDragData && !window.deckDragState && onHoverCard(hoverPayload)}
@@ -667,6 +671,7 @@ function BoardZone({ type, cards, label, faceDown, flipped, stackLabel, children
       ) : children || (
         <div className="board-zone-empty">{label || ''}</div>
       )}
+      {kantenN > 0 ? <K67 n={kantenN} art={type} /> : null}
     </div>
   );
 }
@@ -772,13 +777,16 @@ function DamageNumber({ amount, ownerLabel, heroIdx }) {
       // ★ v1257: Mobile-Kamera auf die getroffene Zone (no-op am Desktop
       // und im eigenen Zug — siehe ppBattleCamFocus).
       if (window.ppBattleCamFocus) window.ppBattleCamFocus(el);
+      // ★ Trailer-Look (app-fx-67.jsx): aufrechte Pixelziffern statt Textschrift; läuft sie, zeichnet diese Komponente nichts.
+      const px67 = window.ppFx67Zahl && window.ppFx67Zahl({ el, amount, art: 'schaden' });
+      if (px67) { setPos({ pixel: true }); return () => { try { px67.stopp(); } catch (e) { /* weg */ } }; }
       const r = el.getBoundingClientRect();
       const _wo = window.ppFxWeltAnker ? window.ppFxWeltAnker(el) : { dx: 0, dy: 0 };  // ★ v1258 Weltverankerung
       setPos({ x: r.left + r.width / 2 + _wo.dx, y: r.top + r.height * 0.3 + _wo.dy });
     }
   }, [ownerLabel, heroIdx]);
 
-  if (!pos) return null;
+  if (!pos || pos.pixel) return null;
   // Damage absorbed to 0 → render the bare "0" (no minus sign), so
   // the player sees that the hit was absorbed rather than blocked
   // entirely. Matches the CreatureDamageNumber and HealNumber forms.
@@ -799,13 +807,15 @@ function HealNumber({ amount, ownerLabel, heroIdx }) {
       // ★ v1257: Mobile-Kamera auf die getroffene Zone (no-op am Desktop
       // und im eigenen Zug — siehe ppBattleCamFocus).
       if (window.ppBattleCamFocus) window.ppBattleCamFocus(el);
+      const px67 = window.ppFx67Zahl && window.ppFx67Zahl({ el, amount, art: 'heilung' });   // ★ Trailer-Look (app-fx-67.jsx), siehe DamageNumber
+      if (px67) { setPos({ pixel: true }); return () => { try { px67.stopp(); } catch (e) { /* weg */ } }; }
       const r = el.getBoundingClientRect();
       const _wo = window.ppFxWeltAnker ? window.ppFxWeltAnker(el) : { dx: 0, dy: 0 };  // ★ v1258 Weltverankerung
       setPos({ x: r.left + r.width / 2 + _wo.dx, y: r.top + r.height * 0.3 + _wo.dy });
     }
   }, [ownerLabel, heroIdx]);
 
-  if (!pos) return null;
+  if (!pos || pos.pixel) return null;
   // Heal-for-0 (full-HP target, or Nao's overheal blocked because the
   // target is already > maxHp) → plain "0", no plus sign. Mirrors the
   // CreatureDamageNumber's "0 damage absorbed" rendering.
@@ -829,13 +839,17 @@ function CreatureHealNumber({ amount, ownerLabel, heroIdx, zoneSlot, pixel }) {
     if (el) {
       // ★ v1257: Mobile-Kamera auf die getroffene Zone.
       if (window.ppBattleCamFocus) window.ppBattleCamFocus(el);
+      if (!pixel) {   // ★ Trailer-Look (app-fx-67.jsx); die grüne Steam-Zahl (`pixel`) bleibt wie sie ist
+        const px67 = window.ppFx67Zahl && window.ppFx67Zahl({ el, amount, art: 'heilung' });
+        if (px67) { setPos({ pixel67: true }); return () => { try { px67.stopp(); } catch (e) { /* weg */ } }; }
+      }
       const r = el.getBoundingClientRect();
       const _wo = window.ppFxWeltAnker ? window.ppFxWeltAnker(el) : { dx: 0, dy: 0 };  // ★ v1258 Weltverankerung
       setPos({ x: r.left + r.width / 2 + _wo.dx, y: r.top + r.height * 0.3 + _wo.dy });
     }
   }, [ownerLabel, heroIdx, zoneSlot]);
 
-  if (!pos) return null;
+  if (!pos || pos.pixel67) return null;
   const label = amount > 0 ? `+${amount}` : '0';
   // `pixel` = gruene Pixel-Zahl der Steam Dwarfs (Steam Engine, +10 HP je Karte).
   return (
@@ -853,13 +867,15 @@ function CreatureDamageNumber({ amount, ownerLabel, heroIdx, zoneSlot }) {
     if (el) {
       // ★ v1257: Mobile-Kamera auf die getroffene Zone.
       if (window.ppBattleCamFocus) window.ppBattleCamFocus(el);
+      const px67 = window.ppFx67Zahl && window.ppFx67Zahl({ el, amount, art: 'schaden' });   // ★ Trailer-Look (app-fx-67.jsx), siehe DamageNumber
+      if (px67) { setPos({ pixel: true }); return () => { try { px67.stopp(); } catch (e) { /* weg */ } }; }
       const r = el.getBoundingClientRect();
       const _wo = window.ppFxWeltAnker ? window.ppFxWeltAnker(el) : { dx: 0, dy: 0 };  // ★ v1258 Weltverankerung
       setPos({ x: r.left + r.width / 2 + _wo.dx, y: r.top + r.height * 0.3 + _wo.dy });
     }
   }, [ownerLabel, heroIdx, zoneSlot]);
 
-  if (!pos) return null;
+  if (!pos || pos.pixel) return null;
   // Damage absorbed to 0 → render the bare "0" (no minus sign), so
   // the player sees that the hit was absorbed rather than blocked
   // entirely. Anything > 0 keeps the standard `-N` form.
@@ -4068,6 +4084,7 @@ function HeroIdleSprite({ cardName, kreatur, ohnePartikel, angehalten, versteine
     platz._ppEintrag = eintrag;   // Sheet + aktueller Frame (`platz._ppFrame`, s. `male`) für die Nachbilder beim Rammen (app-fx-27.jsx)
     const inSupport = zone.hasAttribute('data-support-zone');
     platz._ppZone = zone;         // Heldentod (app-fx-32.jsx): der Beobachter der Sprite-Ebene findet zum entfernten Platz seine Zone
+    platz._ppSchluessel = key;    // Slug des Helden (Todesstil „sturz“/„shatter“, app-fx-71.jsx)
     const ctx = cv.getContext('2d');
     const { meta, img } = eintrag;
     const fw = meta.frameWidth, fh = meta.frameHeight;
@@ -44587,6 +44604,35 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
   // kippen behauptet einen Zusammenhang, den es nicht gibt.
   const handZieh = handDrag || playDrag || abilityDrag || null;
 
+  // ★ Beschwörung (app-fx-69, Bug „Kreatur springt nach dem Drop kurz wieder in die Hand"): Ab dem Drop (`play_creature`) bis der Server die Hand aktualisiert (je nach Engine-Vorlauf
+  // 0,3–0,6 s) war `playDrag` schon null, die Handkarte also wieder sichtbar, obwohl die Zone noch leer war. Jetzt bleibt SIE verborgen (Klasse `hand-dragging`, Platz eingeklappt wie beim Ziehen), bis sich
+  // die Hand ändert (Karte weg) oder `HAND_PLAY_WARTE_MS` um sind (Server lehnt ab / Frage abbricht: sie erscheint wieder). Zentral am Emit, damit Drop, Klick-Beschwörung und Touch-Drag gleich laufen.
+  const handPlayWartet = useRef(null), handLaengeRef = useRef(0);
+  handLaengeRef.current = hand.length;
+  const [, setHandPlayTick] = useState(0);
+  useEffect(() => {
+    if (!socket || typeof socket.emit !== 'function') return undefined;
+    const orig = socket.emit;
+    socket.emit = function (ev, d) {
+      try {
+        if (ev === 'play_creature' && d && Number.isInteger(d.handIndex) && !d.fromCreation && !window.__ppFx69HandAus) {
+          const alt = handPlayWartet.current;
+          if (alt && alt.timer) clearTimeout(alt.timer);
+          const w = { idx: d.handIndex, name: d.cardName, laenge: handLaengeRef.current, timer: setTimeout(() => { if (handPlayWartet.current === w) { handPlayWartet.current = null; setHandPlayTick(t => t + 1); } }, 1600) };
+          handPlayWartet.current = w;
+          Promise.resolve().then(() => setHandPlayTick(t => t + 1));
+        }
+      } catch (e) { /* ohne */ }
+      return orig.apply(this, arguments);
+    };
+    return () => { socket.emit = orig; if (handPlayWartet.current && handPlayWartet.current.timer) clearTimeout(handPlayWartet.current.timer); handPlayWartet.current = null; };
+  }, [socket]);
+  useEffect(() => {
+    const w = handPlayWartet.current;
+    if (!w) return;
+    if (hand[w.idx] !== w.name || hand.length !== w.laenge) { clearTimeout(w.timer); handPlayWartet.current = null; setHandPlayTick(t => t + 1); }
+  }, [hand]);
+
   // ★ v999: „Ist das eine der gerade erschienenen Karten?" — die
   // letzten `handFxPending` Plaetze der AKTUELLEN Hand. Neue Karten
   // werden hinten angehaengt, ihre `origIdx` sind also die hoechsten.
@@ -45207,6 +45253,12 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       // ENTIRE rendering side here — including the SFX-for-anim cue,
       // since it's gated on the visual.
       if (window._playAnimations === false) return;
+      // ★ Kraftstrom-Kugeln (app-fx-69): Biomancy-Token (`biomancy_bloom` mit `kraftstrom`) und Alchemy (`alchemy_kraftstrom`); true = erledigt, false = der normale Verteiler (Blumen) spielt.
+      if ((type === 'alchemy_kraftstrom' || (type === 'biomancy_bloom' && rest.kraftstrom === true)) && window.ppFx69Zone && window.ppFx69Zone({ type, owner, heroIdx, zoneSlot, ...rest }, myIdx)) {
+        if (type === 'biomancy_bloom' && window.playSFXForZoneAnim) window.playSFXForZoneAnim(type, rest);
+        return;
+      }
+      if (type === 'alchemy_kraftstrom') return;   // nur ein Kraftstrom-Ereignis, kein eigener Animationstyp
       // ★ Strong Ox Headbutt (app-fx-62): der Client entscheidet über den Rückfall. Geht der neue Sprung-Kopfstoß nicht (Retro, reduzierte Bewegung, Quelle ohne Figur …), spielt er die alte Kombination
       // (Ramm-Anlauf + Explosion + Ochsen-Symbol) selbst — so, dass der Einschlag auf den Schadenszeitpunkt der Engine fällt (SCHADEN_MS 825 ms nach dem Ereignis: Anlauf 470 ms vorher + 150 ms Kontakt + 200 ms).
       if (type === 'ox_headbutt' && window.ppFx62Pruefe && rest.von && (rest.von.owner === 0 || rest.von.owner === 1)) {
@@ -45215,6 +45267,8 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         const tEl = zoneSlot >= 0 ? document.querySelector(`[data-support-zone][data-support-owner="${ownerLbl(owner, myIdx)}"][data-support-hero="${heroIdx}"][data-support-slot="${zoneSlot}"]`) : hz(owner, heroIdx);
         const grund = window.ppFx62Pruefe(vEl, tEl);
         window.__ppFx62Grund = grund || 'neu';
+        // Aufladen vor dem Dash (app-fx-68): die Hocke des Kopfstoßes (Bild −19…−16, dazu der Absprung: 5 Bilder) bekommt Bodenringe — innerhalb des vorhandenen Anlaufs (125 ms Vorlauf), KEINE zusätzliche Zeit; Engine-Zeiten unverändert.
+        if (!grund && window.ppFx68Laden && vEl) setTimeout(() => { try { window.ppFx68Laden({ srcEl: vEl, ms: 150, nurRinge: true }); } catch (e) { /* ohne */ } }, 125);
         if (grund) {
           const ram = { sourceOwner: rest.von.owner, sourceHeroIdx: rest.von.heroIdx, targetOwner: owner, targetHeroIdx: heroIdx, cardName: rest.cardName, duration: 1200, ...(zoneSlot >= 0 ? { targetZoneSlot: zoneSlot } : null) };
           setTimeout(() => onRamAnimation(ram), 470);
@@ -45458,12 +45512,19 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         const v = rest.von;
         if (!v || !ankerEl || (v.owner !== 0 && v.owner !== 1)) return null;
         const lbl = ownerLbl(v.owner, myIdx);
-        const vSel = v.zoneType === 'surprise'
+        // `pile` ('deleted' | 'discard' | 'deck' | 'potion-deck'): ein Stapel des Besitzers als Quelle (Life Serum / Acid Vial, app-fx-70); Rückfall auf den Ablagestapel
+        // `handIdx`: die Handkarte des Besitzers an diesem Platz als Quelle (Potions, app-fx-70: der Effekt beginnt ÜBER der gespielten Karte); fehlt der Platz im DOM → Rückfall auf die Hand (Mitte)
+        const handEl = (v.handIdx != null && v.handIdx >= 0)
+          ? (document.querySelector(`.game-hand-${lbl === 'me' ? 'me' : 'opp'} .hand-slot[data-hand-idx="${v.handIdx}"]`) || document.querySelector(`.game-hand-${lbl === 'me' ? 'me' : 'opp'} [data-hand-idx="${v.handIdx}"]`))
+          : null;
+        const vSel = handEl ? null : v.pile
+          ? `[data-${lbl === 'me' ? 'my' : 'opp'}-${/^(deleted|discard|deck|potion-deck)$/.test(v.pile) ? v.pile : 'discard'}]`
+          : v.zoneType === 'surprise'
           ? `[data-surprise-zone][data-surprise-owner="${lbl}"][data-surprise-hero="${v.heroIdx}"]`
           : (v.zoneSlot != null && v.zoneSlot >= 0)
             ? `[data-support-zone][data-support-owner="${lbl}"][data-support-hero="${v.heroIdx}"][data-support-slot="${v.zoneSlot}"]`
             : `[data-hero-zone][data-hero-owner="${lbl}"][data-hero-idx="${v.heroIdx}"]`;
-        const vEl = document.querySelector(vSel);
+        const vEl = handEl || document.querySelector(vSel);
         if (!vEl) return null;
         const a = ankerEl.getBoundingClientRect(), b = vEl.getBoundingClientRect();
         if (!b.width) return null;
@@ -45472,6 +45533,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           vonDx: (b.left + b.width / 2) - (a.left + a.width / 2),
           vonDy: (b.top + b.height / 2) - (a.top + a.height / 2),
           vonW: b.width, vonH: b.height,
+          ...(handEl ? { vonHand: true } : null),   // Quelle ist eine Handkarte (app-fx-70: Effekt beginnt über der Karte)
           ...(v.el === true ? { vonEl: vEl } : null),   // `von.el`: das Quell-Element selbst (Hammer Throw, app-fx-59: Fußlinie/Höhe der Figur des Werfers, Rückstoß)
         };
       };
@@ -45551,6 +45613,8 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     // zu — das Ereignis verpuffte still. Jetzt wackelt die Spielflaeche
     // (`.game-layout`) kurz; die Klasse wird per Reflow neu gestartet.
     const onScreenShake = ({ intensity }) => {
+      // ★ Trailer-Look (app-fx-67.jsx): Wackeln in ganzen Pixeln auf Brett und Effektschichten statt der weichen CSS-Fassung auf dem ganzen Spielfeld (samt Hand); aus → alte Fassung unten
+      if (window.ppFx67EngineWackeln && window.ppFx67EngineWackeln(intensity)) return;
       const el = document.querySelector('.game-layout');
       if (!el) return;
       const klasse = intensity === 'heavy' ? 'pp-wackeln-stark' : 'pp-wackeln';
@@ -47027,7 +47091,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         sm.set(suppressKey, (sm.get(suppressKey) || 0) + 1);
       }
       const stop = ppKartenWurf({
-        mode, cardUrl: window.cardImageUrl ? ppRarityUrl(window.cardImageUrl(cardName), ppRarityOf(CARDS_BY_NAME[cardName], rarity || ppRarityLookup(cardName, fromOwner))) : null, dauer,   // Basiskarte der Rarity (Rahmen/Stempel); der Wurf ist Pixelwerk ohne Funkenebene
+        mode, cardUrl: window.cardImageUrl ? ppRarityUrl(window.cardImageUrl(cardName), ppRarityOf(CARDS_BY_NAME[cardName], rarity || ppRarityLookup(cardName, fromOwner)), true) : null, dauer,   // Basiskarte der Rarity (Rahmen/Stempel); der Wurf ist Pixelwerk ohne Funkenebene
         A: { x: sr.left + sr.width / 2, y: sr.top + sr.height / 2, w: sr.width, h: sr.height },
         B: { x: dr.left + dr.width / 2, y: dr.top + dr.height / 2, w: dr.width, h: dr.height },
       });
@@ -48994,8 +49058,10 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       }, 500);
     };
     socket.on('ability_zone_to_discard', onAbilityZoneToDiscard);
-    const onRamAnimation = ({ sourceOwner, sourceHeroIdx, sourceZoneSlot, targetOwner, targetHeroIdx, targetZoneSlot, targetZoneType, targetPermId, cardName, duration, trailType, rueckwaerts, durch }) => {
-      if (window.playSFX) window.playSFX('attack_ram', { category: 'effect' });
+    const onRamAnimation = ({ sourceOwner, sourceHeroIdx, sourceZoneSlot, targetOwner, targetHeroIdx, targetZoneSlot, targetZoneType, targetPermId, cardName, duration, trailType, rueckwaerts, durch, lade }) => {
+      // `lade` (ms): Aufladen vor dem Dash (app-fx-68, Server `_rammLadenAnmelden`) — der Dash beginnt erst nach dieser Zeit, der Server wartet entsprechend länger. Der Ton gehört zum Dash-Start.
+      const ladeMs = (lade > 0 && lade <= 600 && !rueckwaerts && trailType !== 'fire') ? lade : 0;   // (auch bei Kill-Switch/Retro/reduzierter Bewegung: die Wartezeit bleibt, nur Ringe und Flackern entfallen)
+      if (window.playSFX) { if (ladeMs) setTimeout(() => window.playSFX('attack_ram', { category: 'effect' }), ladeMs); else window.playSFX('attack_ram', { category: 'effect' }); }
       const srcLabel = ownerLbl(sourceOwner, myIdx);
       const tgtLabel = ownerLbl(targetOwner, myIdx);
       // If sourceZoneSlot is provided, originate from that support zone; otherwise from the hero zone.
@@ -49043,8 +49109,10 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       const _fo = window.ppFxScrollOffset ? window.ppFxScrollOffset() : { dx: 0, dy: 0 };
       // ★ Trailer-Look (app-fx-27.jsx): rammt ein HELD mit animierter Figur, fährt die FIGUR (Streckung, Nachbilder, Federung), und die Karte bleibt stehen. Dieselbe Dauer und dieselben
       // Aufprallanteile wie die Keyframes (`rammeBisKontakt` im Server wartet darauf). Ohne fahrbereite Figur (Kreatur, Held ohne Sheet, versteinert/gelähmt/unsichtbar, tot) → alter Kartenpfad.
-      if (!(sourceZoneSlot != null && sourceZoneSlot >= 0) && window.ppFx27RammFigur) {
-        const fahrt = window.ppFx27RammFigur({ srcEl, tgtEl, dur, trailType, rueckwaerts: !!rueckwaerts, cardName, durch });
+      const heldDash = !(sourceZoneSlot != null && sourceZoneSlot >= 0);
+      if (ladeMs && heldDash && window.ppFx68Laden) { try { window.ppFx68Laden({ srcEl, tgtEl, ms: ladeMs }); } catch (e) { /* ohne Aufladen */ } }
+      if (heldDash && window.ppFx27RammFigur) {
+        const fahrt = window.ppFx27RammFigur({ srcEl, tgtEl, dur, trailType, rueckwaerts: !!rueckwaerts, cardName, durch, lade: heldDash ? ladeMs : 0 });
         if (fahrt) {
           // Nur der Jetpack-Schweif (`MoniaJetTrail`) braucht einen Eintrag: auf Körperhöhe der Figur statt an den Füßen, bis dorthin, wo die Figur landet. `figur: true` → die Zone
           // blendet dabei NICHTS aus (`isRamming` ignoriert diese Einträge).
@@ -49060,6 +49128,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           return;
         }
       }
+      const _kartenFahrt = () => {
       // Rarity der rammenden Karte: die der Karte auf dem Quellplatz im jetzigen Zustand (Held: die des Helden), sonst aus dem Gedächtnis.
       const _ramRar = (() => {
         const pr = spielerLiveRef.current?.[sourceOwner]?.rarity;
@@ -49085,8 +49154,19 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       // deshalb unsichtbar, er hält nur die Ebene am Leben.
       setTimeout(() => setRamAnims(prev => prev.filter(a => a.id !== id)),
         dur + (trailType === 'fire' ? JET_TAIL_MS : 0));
+      };
+      if (ladeMs && heldDash) setTimeout(_kartenFahrt, ladeMs); else _kartenFahrt();   // Kartenpfad (Held ohne Figur): Aufladen = Wartezeit (die Ringe zeichnet ppFx68Laden)
     };
     socket.on('play_ram_animation', onRamAnimation);
+    // Der Held wirkt (Spell/Attack aus der Hand, Fähigkeit): Hüpfer + Silhouetten-Flackern (app-fx-68). Nur Optik; der Server sendet es beim Commit der Karte.
+    const onHeroCast = ({ owner, heroIdx, art }) => {
+      try {
+        if (!window.ppFx68Wirkt) return;
+        const el = document.querySelector(`[data-hero-zone][data-hero-owner="${ownerLbl(owner, myIdx)}"][data-hero-idx="${heroIdx}"]`);
+        if (el) window.ppFx68Wirkt(el, art);
+      } catch (e) { /* nur Optik */ }
+    };
+    socket.on('hero_cast', onHeroCast);
 
     // ★ 12.10. (Duel, Als Vorgabe): ZWEI HELDEN RAMMEN EINANDER — eine durchgehende Choreografie über alle Hits (Schlag auf Schlag): die Heldenkarten rasen aus ihren Zonen in
     // die Mitte, krachen ineinander (Hit 1), prallen zurück, krachen wieder (Hit 2, 3), und gehen erst nach dem letzten Hit heim. Jedes `play_hero_clash` mit Phase `hit` hängt der
@@ -50969,14 +51049,18 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       }
       const sr = srcEl.getBoundingClientRect();
       const tr = tgtEl.getBoundingClientRect();
-      if (halten && from === 'hand' && fromHandIdx != null && fromHandIdx >= 0) {
+      // ★ app-fx-70 (Nutzer 14.11.: „die anderen Handkarten rücken noch nicht auf"): auch der Abflug einer Potion Hand → Gelöscht lässt ihren Platz sofort aus dem Hand-Layout fallen (kein unsichtbarer
+      // Platzhalter, die übrigen Karten rücken mit dem Hand-Übergang nach), solange der Zustand die Karte noch in der Hand führt (früher Flug von Life Serum / Acid Vial: erst das Ende der Auflösung
+      // nimmt sie heraus). Kommt der Zustand, passt `len` nicht mehr → kein zweites Springen. Notnagel 6 s (bleibt die Karte aus irgendeinem Grund in der Hand, klappt der Platz wieder auf).
+      const _potionAbflug = !halten && from === 'hand' && to === 'deleted' && !chainLinkId && !window.__ppFx70FlugAus && !window.__ppFx70HandAus;
+      if ((halten || _potionAbflug) && from === 'hand' && fromHandIdx != null && fromHandIdx >= 0) {
         const _lp = spielerLiveRef.current?.[srcOwner];
         const _len = srcIsMe ? (_lp?.hand?.length ?? null) : (_lp?.handCount ?? null);
         if (_len != null) {
           const rec = { owner: srcOwner, idx: fromHandIdx, card: cardName, len: _len };
           handFlipRef.current = performance.now();
           setHandFrueh(prev => [...prev, rec]);
-          setTimeout(() => setHandFrueh(prev => prev.filter(r => r !== rec)), 60000);
+          setTimeout(() => setHandFrueh(prev => prev.filter(r => r !== rec)), halten ? 60000 : 6000);
         }
       }
       if (chainLinkId) geisterFreigeben(chainLinkId);   // Maße sind genommen: der Geist darf aus der Hand (die Kopie fliegt von seinem Platz los)
@@ -51279,6 +51363,26 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       const mZiel = STAPEL_ORTE[to] ? kartenMassAmBildschirm(tgtEl, 'stapel')
         : BRETT_ZIELE[to] ? kartenMassInZone(tgtEl)
         : massFuer(to);
+      // ★ app-fx-70 (Nutzer 13.11.: „die Potion wird weg TELEPORTIERT"): Handkarten, die in den GELÖSCHT-Stapel gehen (Potions), fliegen über den Kartenflug-Baustein (app-fx-65): Bogen, Abhebe-Funken,
+      // Pixel-Schatten, Schweif, Landeringe in Rot — offen (kein Umdrehen), ca. 0,56 s, 30 Bilder/s auf dem globalen Takt (der alte CSS-Flug hing an der Dokumentuhr). Der Stapel wächst bei 560 ms
+      // (die `setHidden`-Zähler oben rechnen mit 0,8 · 700 ms). Quelle gemessen im selben Augenblick (der Handplatz klappt erst danach zusammen). Rückfall (`null`): Retro, reduzierte Bewegung,
+      // `__ppFx65Aus`, `window.__ppFx70FlugAus`, Reihe (laneDelay > 0) → der CSS-Flug darunter.
+      if (from === 'hand' && to === 'deleted' && cardName && !faceDown && !chainLinkId && !halten && !flightStyle && !laneDelay && !window.__ppFx70FlugAus && window.PpFx65 && window.PpFx65.kartenFlug) {
+        const kf = window.PpFx65.kartenFlug({
+          von: srcEl, nach: tgtEl, owner: tgtOwner, karten: [{ name: cardName, rarity }], versatz: 0, reise: 560, akzent: 'rot', umdrehen: false,
+          start: { b: mQuelle.b, h: mQuelle.h }, masse: { b: mZiel.b, h: mZiel.h },
+        });
+        if (kf) return;
+      }
+      // ★ app-fx-70 (Nutzer 14.11., Biomancy): die Potion wird VOM GELÖSCHT-STAPEL als Token in die Support Zone bewegt (`flightStyle: 'biomancy'`): derselbe Kartenflug in Grün, 700 ms (die Zone ist bis 720 ms
+      // verborgen, der Token erscheint mit der Landung; seine Landung zeigt `ppFx69BioLandung`, das `biomancy_bloom`-Ereignis hat die Zone gemerkt). Rückfall: der CSS-Flug darunter.
+      if (from === 'deleted' && to === 'support' && flightStyle === 'biomancy' && cardName && !faceDown && !laneDelay && !window.__ppFx70FlugAus && window.PpFx65 && window.PpFx65.kartenFlug) {
+        const kf = window.PpFx65.kartenFlug({
+          von: srcEl, nach: tgtEl, owner: tgtOwner, karten: [{ name: cardName, rarity }], versatz: 0, reise: 700, akzent: 'gruen', umdrehen: false,
+          start: { b: mQuelle.b, h: mQuelle.h }, masse: { b: mZiel.b, h: mZiel.h },
+        });
+        if (kf) return;
+      }
       // Zickzack-Flug: die Karte hebt gleich im Mass ihres Ziels ab (keine stufenlose Skalierung eines Kartenbildes).
       const flugB = (isZickzack || isSchleuder) ? mZiel.b : mQuelle.b, flugH = (isZickzack || isSchleuder) ? mZiel.h : mQuelle.h;
       const ptScale = (!isZickzack && !isSchleuder && mQuelle.b > 0) ? (mZiel.b / mQuelle.b) : 1;
@@ -54005,6 +54109,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       socket.off('surprise_flip', onSurpriseFlip);
       socket.off('surprise_reset', onSurpriseReset);
       socket.off('play_ram_animation', onRamAnimation);
+      socket.off('hero_cast', onHeroCast);
       socket.off('play_hero_clash', onHeroClash);
       socket.off('play_tharxian_charge', onTharxianCharge);
       socket.off('play_card_transfer', onCardTransfer);
@@ -60810,7 +60915,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
 
           <div className="board-util board-util-right">
             <div className="board-util-side">
-              <BoardZone type="deck" label="Deck" faceDown style={oppBoardZone('deck')}>
+              <BoardZone type="deck" label="Deck" faceDown style={oppBoardZone('deck')} stapelN={opp.deckCount}>
                 {opp.deckCount > 0 ? <div className="board-card face-down" data-opp-deck="1"
                   onMouseEnter={(e) => {
                     const top = opp.deckTopVisible?.[0];
@@ -60844,7 +60949,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                   <div className="board-card-label">{opp.deckCount}</div></div>
                 : <div className="board-card" data-opp-deck="1"><div className="deck-empty-label">0</div></div>}
               </BoardZone>
-              <BoardZone type="potion" label="Potions" faceDown style={oppBoardZone('potion')}>
+              <BoardZone type="potion" label="Potions" faceDown style={oppBoardZone('potion')} stapelN={opp.potionDeckCount}>
                 {opp.potionDeckCount > 0 ? <div className="board-card face-down" data-opp-potion-deck="1"><img src={opp.cardback || "/cardback.png"} style={{width:'100%',height:'100%',objectFit:'cover'}} draggable={false} /><div className="board-card-label">{opp.potionDeckCount}</div></div>
                 : <div className="board-card" data-opp-potion-deck="1"><div className="deck-empty-label">0</div></div>}
               </BoardZone>
@@ -60854,13 +60959,13 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
             <div className="board-util-side">
               <div className="board-util-spacer" />
               <div onClick={() => !isSpectator && me.potionDeckCount > 0 && setDeckViewer('potion')} style={{ cursor: !isSpectator && me.potionDeckCount > 0 ? 'pointer' : 'default' }} data-my-potion-deck="1">
-              <BoardZone type="potion" label="Potions" faceDown style={myBoardZone('potion')}>
+              <BoardZone type="potion" label="Potions" faceDown style={myBoardZone('potion')} stapelN={me.potionDeckCount}>
                 {me.potionDeckCount > 0 ? <div className="board-card face-down"><img src={me.cardback || "/cardback.png"} style={{width:'100%',height:'100%',objectFit:'cover'}} draggable={false} /><div className="board-card-label">{me.potionDeckCount}</div></div>
                 : <div className="board-card"><div className="deck-empty-label">0</div></div>}
               </BoardZone>
               </div>
               <div onClick={() => !isSpectator && me.deckCount > 0 && setDeckViewer('deck')} style={{ cursor: !isSpectator && me.deckCount > 0 ? 'pointer' : 'default' }} data-my-deck="1">
-              <BoardZone type="deck" label="Deck" faceDown style={myBoardZone('deck')}>
+              <BoardZone type="deck" label="Deck" faceDown style={myBoardZone('deck')} stapelN={me.deckCount}>
                 {me.deckCount > 0 ? <div className="board-card face-down"
                   onMouseEnter={(e) => {
                     const top = me.deckTopVisible?.[0];
@@ -60936,7 +61041,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                 // einen VORRATS-Index — der darf hier keine Handkarte
                 // treffen. `handDragEigen`/`playDragEigen` sind bereits
                 // auf die eigene Quelle gefiltert.
-                const isBeingDragged = (handDragEigen && handDragEigen.idx === item.origIdx) || (playDragEigen && playDragEigen.idx === item.origIdx) || (abilityDrag && abilityDrag.idx === item.origIdx);
+                const isBeingDragged = (handDragEigen && handDragEigen.idx === item.origIdx) || (playDragEigen && playDragEigen.idx === item.origIdx) || (abilityDrag && abilityDrag.idx === item.origIdx) || (handPlayWartet.current && handPlayWartet.current.idx === item.origIdx && handPlayWartet.current.name === item.card);
                 const dimmed = getCardDimmed(item.card, item.origIdx);
                 const isHandLockBlocked = dimmed && me.handLocked && (me.handLockBlockedCards || []).includes(item.card);
                 const isDrawAnim = drawAnimCards.some(a => a.origIdx === item.origIdx);

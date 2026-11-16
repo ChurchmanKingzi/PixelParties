@@ -855,6 +855,14 @@ function serveIndexHtml(req, res) {
     // Expose the public Google OAuth client id to the front-end. Empty string
     // when unset, which hides the "Sign in with Google" button client-side.
     html = html.split('__GOOGLE_CLIENT_ID__').join(process.env.GOOGLE_CLIENT_ID || '');
+    // Google Search Console: Bestaetigung per Meta-Tag (Umgebungsvariable GOOGLE_SITE_VERIFICATION = nur der Inhalt/„content"-Wert).
+    const gsv = String(process.env.GOOGLE_SITE_VERIFICATION || '').replace(/[^A-Za-z0-9_\-]/g, '');
+    if (gsv) html = html.replace('</title>', `</title>\n  <meta name="google-site-verification" content="${gsv}">`);
+    if (!isCanonicalHost(req)) {
+      // Test-/Vorschau-Host: nicht indexieren, und der Canonical zeigt auf die Produktionsseite (keine Dubletten).
+      res.setHeader('X-Robots-Tag', 'noindex, nofollow');
+      html = html.replace(/<link rel="canonical" href="[^"]*">/, `<link rel="canonical" href="${canonicalOrigin()}/">`);
+    }
     res.setHeader('Content-Type', 'text/html; charset=UTF-8');
     res.setHeader('Cache-Control', 'no-cache');
     // 12.8.: index.html ging als einzige Seite ungepackt raus (die
@@ -877,60 +885,30 @@ function serveIndexHtml(req, res) {
 app.get(['/', '/index.html'], serveIndexHtml);
 
 // ───────────────────────────────────────────────────────────────
-//  SUCHMASCHINEN: robots.txt + sitemap.xml
+//  SUCHMASCHINEN (SEO): robots.txt, sitemap.xml, Kartenliste, Kartenseiten
 //
-//  Beide fehlten bis v485 — und weil der SPA-Auffangpfad ganz unten
-//  (`app.get('*')`) JEDEN Pfad mit der index.html beantwortet, kam
-//  auf `/robots.txt` bisher HTML mit Status 200 zurueck statt einer
-//  Robots-Datei. Googles Crawler behandelt Unlesbares zwar als
-//  „alles erlaubt", aber eine HTML-Seite unter /robots.txt ist ein
-//  Fehlsignal, und /sitemap.xml war gar nicht erst zu finden.
+//  Die App selbst hat nur EINE URL ("/") und darunter nur einen Ladebildschirm –
+//  fuer Google gab es also nichts zu finden. Darum rendert seo.js oeffentliche,
+//  ohne JavaScript lesbare Seiten (`/cards`, `/card/<name>`) samt Sitemap.
+//  Details und Regeln: seo.js. Die Routen stehen VOR `express.static`, damit sie
+//  auch dann gewinnen, wenn spaeter eine gleichnamige Datei in `public/` landet.
 //
-//  Beide Routen stehen VOR `express.static`, damit sie auch dann
-//  gewinnen, wenn spaeter einmal eine gleichnamige Datei in
-//  `public/` landet — und sie bauen ihre URLs aus `resolveOrigin`,
-//  genau wie die Share-Vorschau. Damit stimmt der Host automatisch,
-//  egal ob die Seite unter der eigenen Domain oder unter der
-//  Render-Adresse ausgeliefert wird.
-//
-//  Die Sitemap fuehrt heute genau EINEN Eintrag, weil die App genau
-//  eine URL hat („/"). Das ist kein Versehen: Client-Routen gibt es
-//  nicht (kein pushState im ganzen Frontend). Kommen oeffentliche
-//  Seiten dazu (Kartenliste, Regeln), gehoeren sie hier hinein.
+//  Nur der Produktionshost darf in den Index (siehe isCanonicalHost): `neu.…`,
+//  Vorschau- und Testadressen liefern `X-Robots-Tag: noindex` und zeigen mit ihrem
+//  Canonical auf die echte Seite, damit keine Dubletten entstehen.
 // ───────────────────────────────────────────────────────────────
-app.get('/robots.txt', (req, res) => {
-  const origin = resolveOrigin(req);
-  res.setHeader('Content-Type', 'text/plain; charset=UTF-8');
-  res.setHeader('Cache-Control', 'public, max-age=3600');
-  res.send([
-    'User-agent: *',
-    'Allow: /',
-    // Nichts von Wert fuer den Index, aber viel Crawl-Budget:
-    // Kartenkunst und Klaenge sind ~800 Dateien.
-    'Disallow: /api/',
-    'Disallow: /sounds/',
-    'Disallow: /music/',
-    '',
-    `Sitemap: ${origin}/sitemap.xml`,
-    '',
-  ].join('\n'));
-});
-
-app.get('/sitemap.xml', (req, res) => {
-  const origin = resolveOrigin(req);
-  res.setHeader('Content-Type', 'application/xml; charset=UTF-8');
-  res.setHeader('Cache-Control', 'public, max-age=3600');
-  res.send([
-    '<?xml version="1.0" encoding="UTF-8"?>',
-    '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">',
-    '  <url>',
-    `    <loc>${origin}/</loc>`,
-    '    <changefreq>weekly</changefreq>',
-    '    <priority>1.0</priority>',
-    '  </url>',
-    '</urlset>',
-    '',
-  ].join('\n'));
+function canonicalOrigin() { return (process.env.PUBLIC_BASE_URL || SHARE_BASE_DEFAULT).replace(/\/+$/, ''); }
+function hostOf(u) { try { return new URL(u).host.toLowerCase(); } catch { return ''; } }
+/** true, wenn die Anfrage ueber den Produktionshost kam (Schema egal: hinter Caddy kann `http` ankommen). */
+function isCanonicalHost(req) { return hostOf(resolveOrigin(req)) === hostOf(canonicalOrigin()); }
+require('./seo').registerSeoRoutes(app, {
+  resolveOrigin,
+  isIndexable: isCanonicalHost,
+  canonicalOrigin,
+  getCardArray,
+  hasCardEffect,
+  cardNamesWithImage: (cards) => require('./card-images').cardNamesWithImage(cards),
+  cardsJsonMtime: () => fs.statSync(path.join(__dirname, 'data', 'cards.json')).mtimeMs,
 });
 
 // ── AUSGEHENDE BANDBREITE / AKTUALITAET (v350, angepasst v351) ──────
@@ -9352,7 +9330,7 @@ async function doPlaySpell(room, pi, { cardName, handIndex, heroIdx, charmedOwne
     // ★ W63d (Al, 22.10.2026): der Auftritt (Bild, Protokollzeile, Flug) wird SCHON JETZT vorgemerkt — Kostenwahl (`payActivationCost`), Reaktionsfenster und Zielwahl kommen danach,
     // und alles davon ist noch abbrechbar. Der Auftritts-Puffer der Engine hält zurück, was an Gegner/Zuschauer gehen würde, bis die Karte committed ist.
     if (gs._pendingCardReveal) room.engine._firePendingCardReveal();   // eine noch offene Vormerkung der AUSLOESENDEN Karte (Kreatur-Effekt, der einen Zauber wirkt) ist längst committed
-    gs._pendingCardReveal = { cardName, ownerIdx: pi };
+    gs._pendingCardReveal = { cardName, ownerIdx: pi, wirker: (heroless || _viaCreature) ? null : { owner: heroOwner, heroIdx: heroIdxPub, art: String(cardData.cardType || 'spell').toLowerCase() } };   // `wirker`: der Held, der wirkt (hero_cast, app-fx-68: Hüpfer + Flackern beim Commit)
     if ((cardData.subtype || '').toLowerCase() === 'attachment') {
       broadcastHandToBoard(room, pi, { cardName, handIndex, zoneType: 'hero', heroIdx });
     }
@@ -10895,7 +10873,7 @@ async function doActivateFreeAbility(room, pi, { heroIdx, zoneIdx, zoneKind, cha
       inst.heroOwner = borrowerOwner;
     }
 
-    gs._pendingCardReveal = { cardName: abilityName, ownerIdx: pi };
+    gs._pendingCardReveal = { cardName: abilityName, ownerIdx: pi, wirker: { owner: heroOwner, heroIdx, art: 'ability' } };
     room.engine._setPendingPlayLog('ability_activated', { player: gs.players[pi].username, card: abilityName, hero: hero.name, level });
 
     // Live CPU: stream the Ability AND play its activation flash BEFORE
@@ -11827,7 +11805,7 @@ async function doActivateAbility(room, pi, { heroIdx, zoneIdx, zoneKind, charmed
     // ★ W63d: der Auftritt wird VOR Reaktionsfenster und Handler vorgemerkt (die Aktivierung kann in ihren Fragen noch abbrechen); die Aktivierungs-Animation
     // (`ability_activated`) und alle Protokollzeilen halten sich im Auftritts-Puffer, bis die Fähigkeit committed ist. Das Reaktionsfenster des Gegners committet.
     if (gs._pendingCardReveal) room.engine._firePendingCardReveal();
-    gs._pendingCardReveal = { cardName: abilityName, ownerIdx: pi };
+    gs._pendingCardReveal = { cardName: abilityName, ownerIdx: pi, wirker: { owner: heroOwner, heroIdx, art: 'ability' } };
     // v353: Auftritt auch fuer Abilities MIT Aktionskosten. Bisher hatte
     // nur `doActivateFreeAbility` einen — dass eine Trade-Aktivierung die
     // Karte zeigt und eine Leadership-Aktivierung nicht, war eine
@@ -12777,6 +12755,7 @@ async function doConfirmPotion(room, pi, { selectedIds }) {
     return true;
   }
   let chainResult;
+  let _effektT0 = 0;
   try {
     chainResult = await room.engine.executeCardWithChain({
       cardName: potionName, owner: pi, cardType, goldCost: goldCost || 0,
@@ -12788,6 +12767,7 @@ async function doConfirmPotion(room, pi, { selectedIds }) {
         return (t && t.type === 'hero' && Number.isInteger(t.heroIdx)) ? { owner: t.owner, heroIdx: t.heroIdx } : null;
       })(),
       resolve: script.resolve ? async () => {
+        _effektT0 = Date.now();   // Beginn der sichtbaren Wirkung: die Handkarte bleibt danach mindestens HAND_MIN_MS in der Hand (cards/effects/_potion-hand-flight.js)
         if (broadcastPotionAnim) broadcastPotionAnim();
         // v353: `'hand'` — der Spieler setzt die Karte gerade selbst aus
         // der Hand ein (Book of Doom & Co). Nur der GEGNER sieht sie.
@@ -12914,7 +12894,10 @@ async function doConfirmPotion(room, pi, { selectedIds }) {
     room.engine._firePendingCardReveal();
   }
 
+  // Hand-Verweildauer (Nutzer 13.11.): die Karte fliegt erst, wenn ihre Wirkung schon sichtbar war (Mount-Vorlauf 120 ms + 350 ms); Karten mit frühem Abflug (Life Serum, Acid Vial) haben das schon.
+  if (_effektT0 && !(ps._resolvingCard && ps._resolvingCard.fruehFlug != null)) await require('./cards/effects/_potion-hand-flight').haltBisSichtbar(room.engine, _effektT0);
   const hi = getResolvingHandIndex(ps);
+  const fruehFlug = ps._resolvingCard ? ps._resolvingCard.fruehFlug : undefined;   // Potion-Projektil (cards/effects/_potion-hand-flight.js): der Flug Hand → Gelöscht ging schon beim Laden raus
   ps._resolvingCard = null;
   // Magic Gems' "discard another card to keep this in hand" rule —
   // mirrors the same flag in doUseArtifactEffect. Skip the splice +
@@ -12950,9 +12933,9 @@ async function doConfirmPotion(room, pi, { selectedIds }) {
     // der Flug nicht: er trug EINEN `owner` fuer beide Enden. Jetzt
     // wird die Herkunft VOR dem Flug gelesen und der Flug endet dort,
     // wo die Karte auch landet.
-    const pileOwner = room.engine._consumeHandCardOrigin(pi, potionName, fromCreation ? undefined : hi);
+    const pileOwner = fruehFlug != null ? fruehFlug : room.engine._consumeHandCardOrigin(pi, potionName, fromCreation ? undefined : hi);
     const pilePs = gs.players[pileOwner];
-    if (!_gestohlen) room.engine._broadcastEvent('play_pile_transfer', {
+    if (!_gestohlen && fruehFlug == null) room.engine._broadcastEvent('play_pile_transfer', {
       fromOwner: pi, toOwner: pileOwner, cardName: potionName,
       // ★ 28.8.: Fluganker folgt der HERKUNFT. Ohne das startete der
       // Flug einer Vorratskarte am gleichnamigen Platz der HAND.
@@ -12977,10 +12960,13 @@ async function doConfirmPotion(room, pi, { selectedIds }) {
       // the next card play.
       delete gs._spellPlacedOnBoard;
     } else if (cardType === 'Potion') {
-      const potionHookCtx = { potionName, potionOwner: pi, placed: false, _skipReactionCheck: true };
+      const potionHookCtx = { potionName, potionOwner: pi, placed: false, _skipReactionCheck: true, flugMs: (fruehFlug == null && !_gestohlen) ? 560 : 0, pileOwner };   // flugMs: der Handflug nach Gelöscht läuft gerade (Biomancy wartet ihn ab, bevor ihr Fenster/Reveal aufgeht); pileOwner/imStapel: Biomancy legt die Potion schon VOR der Rückfrage sichtbar in den Gelöscht-Stapel (biomancy.js)
       await room.engine.runHooks('afterPotionUsed', potionHookCtx);
       _markOncePerGamePotion(ps, loadCardEffect(potionName), potionName);   // ★ v1028
-      if (!potionHookCtx.placed) pilePs.deletedPile.push(potionName);
+      if (potionHookCtx.imStapel) {
+        // Biomancy hat die Potion schon in den Stapel gelegt (und NICHT zum Token gemacht): übernimmt danach ein späterer Listener die Potion (`placed`, z. B. Saint Nicolas), nimmt sie hier wieder heraus
+        if (potionHookCtx.placed) room.engine.takeFromPileSync(pileOwner, 'deleted', potionName, { last: true, _verwahrungFreigabe: true, source: 'afterPotionUsed' });
+      } else if (!potionHookCtx.placed) pilePs.deletedPile.push(potionName);
       checkPotionLock(ps, gs, pi);
     } else {
       // ── ★ 28.8., Als Befund: FLUG UND STAPEL WAREN UNEINIG ────────
@@ -13500,10 +13486,14 @@ async function doUsePotion(room, pi, { cardName, handIndex, fromCreation }) {
           potionName: cardName, potionOwner: pi,
           fromHandIndex: currentIdx,
           placed: false, _skipReactionCheck: true,
+          pileOwner,   // Biomancy legt die Potion schon VOR der Rückfrage sichtbar in den Gelöscht-Stapel (`imStapel`, biomancy.js)
         };
         await room.engine.runHooks('afterPotionUsed', potionHookCtx);
         _markOncePerGamePotion(ps, script, cardName);      // ★ v1028
-        if (potionHookCtx.placed) {
+        if (potionHookCtx.imStapel) {
+          if (potionHookCtx.placed) room.engine.takeFromPileSync(pileOwner, 'deleted', cardName, { last: true, _verwahrungFreigabe: true, source: 'afterPotionUsed' });
+          checkPotionLock(ps, gs, pi);
+        } else if (potionHookCtx.placed) {
           checkPotionLock(ps, gs, pi);
         } else {
           pilePs.deletedPile.push(cardName);
