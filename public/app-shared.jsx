@@ -9441,7 +9441,7 @@ function StatusBadges({ statuses, counters, buffs, isHero, player, cardName, isO
   // getrennte Abzeichen. Vorher trug die „bis zum naechsten Schaden"-
   // Blendung den Text der Rundenende-Variante und behauptete eine
   // Dauer, die es bei ihr gar nicht gibt.
-  const BLIND_TEXT = 'Blinded: Cannot use Attacks, Spells, or activated effects that need to pick a target. Full AoE effects still work.';
+  const BLIND_TEXT = 'Blinded: Cannot choose a target the opponent controls with Attacks, Spells or effects.';
   if (s.blinded || c.blinded) {
     const bl = s.blinded || c.blinded;
     badges.push({
@@ -9893,7 +9893,7 @@ const TT_STATUS_REMINDER = {
   negate: 'To negate an Attack, Spell, summoning or effect is to cancel it: it has no effect. A target whose effects are negated cannot use or trigger them; if it is a Hero, its Abilities are negated as well.',
   bleed:  'The target takes 50 damage whenever it performs an Action, activates its active effect or activates the active effect of one of its Abilities.',
   freeze: 'The target cannot perform Actions. Its effects and Abilities (if it is a Hero) are negated. Additionally, it cannot be equipped with Artifacts.',
-  blind:  'The target cannot choose anything the opponent controls as a target for Attacks, Spells, or effects.',
+  blind:  'Cannot choose a target the opponent controls with Attacks, Spells or effects.',
 };
 // Regel unter der Statusliste: gilt fuer alles, was Aktionen oder Effekte verhindert (hier: Stun, Freeze, Blind)
 const TT_STATUS_RECOVERY = 'After recovering from a Freeze, Stun, Blind or any other status effect that includes negating a target\'s effect or preventing it from performing Actions, that target becomes completely immune to the opponent\'s incapacitating effects for 1 turn (until the beginning of its owner\'s next turn)!';
