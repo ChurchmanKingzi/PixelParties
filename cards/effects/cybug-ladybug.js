@@ -129,7 +129,9 @@ module.exports = {
       // arbeitet auf Slot-Indizes.
       const eintrag = id ? alleAbilities(engine).find(z => z.id === id) : null;
       if (eintrag) {
-        const abgeworfen = await engine.discardAbilityTopCopy(eintrag, { source: CARD_NAME, sourceOwner: pi, effectOnHero: true });   // W13 (Q144): Effekt auf den Helden → Resistance fragt
+        // Spielgestalter-Entscheidung 16.11.2026: „choose any Ability on the board“ — die Karte WÄHLT eine Ability (zielt auf die Ability, nicht auf den Helden) → Resistance blockt NICHT
+        // (kein `effectOnHero`; frühere Regel W13/Q144 ersetzt). Leafagami Snake schützt weiter (`discardAbilityTopCopy`).
+        const abgeworfen = await engine.discardAbilityTopCopy(eintrag, { source: CARD_NAME, sourceOwner: pi });
         if (abgeworfen) {
           engine.log('cybug_ladybug_discard', {
             player: ps.username,
