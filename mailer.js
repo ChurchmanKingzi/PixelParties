@@ -111,7 +111,7 @@ function buildMessage({ from, to, subject, text, html }) {
   const headers = [
     `From: ${from}`,
     `To: ${to}`,
-    `Subject: ${subject}`,
+    `Subject: ${/[^\x20-\x7e]/.test(subject) ? '=?UTF-8?B?' + Buffer.from(subject, 'utf8').toString('base64') + '?=' : subject}`,
     `Date: ${new Date().toUTCString()}`,
     `Message-ID: <${crypto.randomBytes(16).toString('hex')}@pixelparties>`,
     'MIME-Version: 1.0',

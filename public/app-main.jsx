@@ -3562,6 +3562,13 @@ function PpSeitenGrund() {
 
 function App() {
   const [user, setUser] = useState(null);
+  // Sprache des Kontos: gespeicherte Sprache uebernehmen (Neuladen); Konten ohne Eintrag bekommen die aktuelle Browsersprache
+  useEffect(() => {
+    if (!user || !window.PP_I18N) return;
+    const cur = window.PP_I18N.get();
+    if (user.lang && user.lang !== cur) window.PP_I18N.set(user.lang);
+    else if (!user.lang) api('/profile/lang', { method: 'POST', body: JSON.stringify({ lang: cur }) }).catch(() => {});
+  }, [user && user.id]);
   const [screen, setScreen] = useState('menu');
   // Der Kartenbild-Shim (card-image-shim.js) merkt sich je Bildschirm, welche Karten zuerst gezeigt wurden, und waermt sie im
   // Hauptmenue vor. Die Eltern rendern vor den Kindern, also steht der Name schon da, wenn deren <img> ihre Quelle setzen.
