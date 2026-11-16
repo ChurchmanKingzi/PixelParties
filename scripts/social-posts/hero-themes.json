@@ -1126,7 +1126,11 @@
     "gold",
     20
    ]
-  ]
+  ],
+  "px": 16,
+  "timeshow": true,
+  "opener": "wind",
+  "showLoops": 5
  },
  "Tarleinn the Traveler": {
   "name": "Tarleinn",

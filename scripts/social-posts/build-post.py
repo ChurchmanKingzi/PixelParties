@@ -573,6 +573,7 @@ def main():
     args_opener = opener
     opener_on = opener in ('heart', 'storm', 'shift', 'wind')
     aliceshow_on = bool(hero_cfg.get('aliceshow'))                            # Alice-Show (alicefx.AliceShow): nutzt dieselbe Schnittstelle wie die Wind-Show
+    timeshow_on = bool(hero_cfg.get('timeshow'))                              # Zeit-Show (timefx.TimeShow, Zi)
     thiefshow_on = bool(hero_cfg.get('thiefshow'))                            # Diebes-Show (thieffx.ThiefShow, Key)
     bootshow_on = bool(hero_cfg.get('bootshow'))                              # Boot-Show (nerofx.BootShow, Nero Zira)
     stormshow_on = bool(hero_cfg.get('stormshow'))                            # Sturm-Show (stormfx.StormShow, Kazena)
@@ -586,7 +587,7 @@ def main():
     rockshow_on = bool(hero_cfg.get('rockshow'))                              # Konzert-Show (rockfx.ConcertShow, Elana)
     rootshow_on = bool(hero_cfg.get('rootshow'))                              # Wurzel-Show (rootfx.RootShow, Kyli)
     iceshow_on = bool(hero_cfg.get('iceshow'))                                # Eis-Show (icefx.IceShow, Broghan)
-    windshow_on = bool(hero_cfg.get('windshow')) or aliceshow_on or iceshow_on or rootshow_on or rockshow_on or hopshow_on or cosmosshow_on or webshow_on or armsshow_on or coolshow_on or ghostshow_on or voidshow_on or stormshow_on or bootshow_on or thiefshow_on              # Show mit Zeitleiste (windfx.WindShow / alicefx.AliceShow) statt Schleife
+    windshow_on = bool(hero_cfg.get('windshow')) or aliceshow_on or iceshow_on or rootshow_on or rockshow_on or hopshow_on or cosmosshow_on or webshow_on or armsshow_on or coolshow_on or ghostshow_on or voidshow_on or stormshow_on or bootshow_on or thiefshow_on or timeshow_on              # Show mit Zeitleiste (windfx.WindShow / alicefx.AliceShow) statt Schleife
     wind_on = args.wind or bool(hero_cfg.get('wind')) or windshow_on
     horror_on = args.horror or bool(hero_cfg.get('horror'))
     show_on = (args.show or hero_cfg.get('show') or 'none') == 'mini'
@@ -732,6 +733,11 @@ def main():
             ag = dict(logo_rect=wgeom['logo_rect'], logo_img=logo, badge_rect=badge_rect, badge_img=badge_img, plate_rect=(plate_x, plate_y, plate.width, plate.height),
                       grid=(sx, sy, spr.px), draw_text=draw_text, home=(sx + spr.center_x * spr.px, sy + spr.foot * spr.px), actor_fn=actor_fn, assets_dir=str(AD))
             wind = armsfx.ArmsShow(W, H, U, float(fps), loop, ag, loop * WIND_LOOPS / float(fps))
+        elif timeshow_on:
+            import timefx
+            zg = dict(logo_rect=wgeom['logo_rect'], logo_img=logo, badge_rect=badge_rect, badge_img=badge_img, plate_rect=(plate_x, plate_y, plate.width, plate.height),
+                      grid=(sx, sy, spr.px), draw_text=draw_text, assets_dir=str(HERE / 'assets' / 'zi'), cardback_path=str(ROOT / 'public' / 'cardback.png'))
+            wind = timefx.TimeShow(W, H, U, float(fps), loop, zg, loop * WIND_LOOPS / float(fps))
         elif thiefshow_on:
             import thieffx
             tg = dict(logo_rect=wgeom['logo_rect'], logo_img=logo, badge_rect=badge_rect, badge_img=badge_img, plate_rect=(plate_x, plate_y, plate.width, plate.height),
@@ -1592,7 +1598,7 @@ def main():
     if first_on:
         for f in range(loop * first_loops):
             render(f, intro_on, punch_on, opener_on).save(fdir / f'i{f:03d}.png')
-    cover = Image.open(fdir / ('i%03d.png' % int((17.4 if show_on else 17.3 if iceshow_on else 14.6 if rootshow_on else 15.0 if rockshow_on else 11.0 if hopshow_on else 14.6 if webshow_on else 16.2 if armsshow_on else 16.6 if coolshow_on else 18.5 if ghostshow_on else 17.0 if voidshow_on else 8.6 if stormshow_on else 2.3 if bootshow_on else 2.3 if thiefshow_on else 17.6 if cosmosshow_on else 16.8) * float(fps)))) if (show_on or windshow_on) else Image.open(fdir / ('f%03d.png' % (min(loop - 1, per * 3))) if reel else fdir / 'f000.png')
+    cover = Image.open(fdir / ('i%03d.png' % int((17.4 if show_on else 17.3 if iceshow_on else 14.6 if rootshow_on else 15.0 if rockshow_on else 11.0 if hopshow_on else 14.6 if webshow_on else 16.2 if armsshow_on else 16.6 if coolshow_on else 18.5 if ghostshow_on else 17.0 if voidshow_on else 8.6 if stormshow_on else 2.3 if bootshow_on else 2.3 if thiefshow_on else 2.3 if timeshow_on else 17.6 if cosmosshow_on else 16.8) * float(fps)))) if (show_on or windshow_on) else Image.open(fdir / ('f%03d.png' % (min(loop - 1, per * 3))) if reel else fdir / 'f000.png')
     cover_path = out / ('reel-cover.png' if reel else 'post.png')
     cover.save(cover_path)
     print('Standbild', cover_path)
