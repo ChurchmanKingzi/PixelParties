@@ -230,6 +230,10 @@ async function nachholenOhneKarte(engine) {
 }
 
 module.exports = {
+  // Spielgestalter-Entscheidung 16.11.2026 (Blinded): ein geblendeter Held (Smoke Vial, Trunk Sand) kann keine Attacks/Spells spielen, die Ziele waehlen — auch „up to N".
+  // Die Blendungs-Sperre der Engine liest dieses Kennzeichen. Hier: „you may choose any target and defeat it" (Wahl beim späteren Auflösen).
+  requiresTarget: true,
+
   nachholenOhneKarte,
   neverMultiTarget: true,   // W75b: „This effect can never affect more than 1 target." — Bartas bietet keinen Zweitwurf an (Text-Waechter `scripts/check-never-multi-target.js`)
   // ★ Z7b: FIZZELT die Karte (Wirker beim Auflösen handlungsunfähig, v1328), war sie GESPIELT → Stempel (Engine: `_noteFizzledPlay`).

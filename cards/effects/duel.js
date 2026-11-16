@@ -103,6 +103,10 @@ async function waehle(engine, chooser, liste, beschreibung, markierung) {
 }
 
 module.exports = {
+  // Spielgestalter-Entscheidung 16.11.2026 (Blinded): ein geblendeter Held (Smoke Vial, Trunk Sand) kann keine Attacks/Spells spielen, die Ziele waehlen — auch „up to N".
+  // Die Blendungs-Sperre der Engine liest dieses Kennzeichen. Hier: „Both players choose a Hero they control".
+  requiresTarget: true,
+
   // ★ W76a: die Zahl der Beteiligten legt der Kartentext fest („Both players choose a Hero …", ein Zweikampf zweier Duellanten) — Zusatzziel-Helden (Andras mit Fighting 4) bieten keinen
   // Zweitschlag an: eine Wiederholung ließe dieselben Duellanten ein zweites Mal gegeneinander antreten (statt „ein zweites Ziel zu treffen").
   fixedTargetCount: true,
