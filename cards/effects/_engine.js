@@ -30033,6 +30033,10 @@ this._deathWatch = (this._deathWatchStack || []).length
    * Steal up to `requested` Gold from the activator's opponent.
    * Fizzles on Turn-1 protection or when the opponent is at 0 Gold.
    * Broadcasts the coin-burst animation on both gold counters.
+   *
+   * `opts.verlustBleibtBeiSperre` (Thieving, Spielgestalter-Entscheidung 16.11.2026): Ist der GEWINN des Diebes gesperrt (Golden Arrow `goldLocked`,
+   * Tuscan Aristocrat), verliert der Gegner das Gold trotzdem — der Dieb bekommt nichts, das Gold „ist dann weg". Ohne die Option bleibt es beim
+   * alten Verhalten (Z6/A09-12: der Diebstahl fizzelt, das Opfer behaelt sein Gold). Rueckgabe dann `{ stolen: 0, lost: <Menge>, fizzled: false }`.
    */
   async actionStealGold(pi, requested, opts = {}) {
     const gs = this.gs;
@@ -30048,7 +30052,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     }
 
     // Z6 (A09-12): wer kein Gold gewinnen darf (Golden Arrow), kann auch nichts stehlen.
-    if (ps.goldLocked) {
+    if (ps.goldLocked && !opts.verlustBleibtBeiSperre) {
       this.log('gold_steal_fizzle', { by: source, reason: 'goldLocked' });
       return { stolen: 0, fizzled: true };
     }
@@ -30063,11 +30067,24 @@ this._deathWatch = (this._deathWatchStack || []).length
 
     ops.gold = Math.max(0, (ops.gold || 0) - clamped);
     this._checkGoldStateRules(oi);   // der BESTOHLENE kann auf 0 gefallen sein
+    // Spielgestalter-Entscheidung 16.11.2026 (Thieving, `verlustBleibtBeiSperre`): der Dieb darf kein Gold gewinnen (Golden Arrow) — der Gegner hat es verloren, der Dieb bekommt nichts.
+    if (ps.goldLocked) {
+      this.log('gold_gain_blocked', { player: ps.username, amount: clamped, reason: 'goldLocked' });
+      this.log('gold_steal_lost', { by: source, player: ps.username, from: ops.username, amount: clamped, fromRemaining: ops.gold, reason: 'goldLocked' });
+      this.sync();
+      return { stolen: 0, lost: clamped, fizzled: false };
+    }
     const _gainState = {};
     await this.actionGainGold(pi, clamped, { _gainState });
     // Z6 (A09-12): ein gesperrter Gewinn (Tuscan Aristocrat: ausserhalb der eigenen Resource Phase) macht den
     // Diebstahl wirkungslos - das Opfer bekommt sein Gold zurueck, statt dass es aus dem Spiel faellt.
     if (_gainState.blocked) {
+      // Spielgestalter-Entscheidung 16.11.2026 (Thieving, `verlustBleibtBeiSperre`): das Gold bleibt verloren, der Dieb bekommt es nicht.
+      if (opts.verlustBleibtBeiSperre) {
+        this.log('gold_steal_lost', { by: source, player: ps.username, from: ops.username, amount: clamped, fromRemaining: ops.gold, reason: 'gain blocked' });
+        this.sync();
+        return { stolen: 0, lost: clamped, fizzled: false };
+      }
       ops.gold = (ops.gold || 0) + clamped;
       this._checkGoldStateRules(oi);
       this.log('gold_steal_fizzle', { by: source, reason: 'gain blocked' });
@@ -32055,6 +32072,21 @@ this._deathWatch = (this._deathWatchStack || []).length
       // ★ Held als Kreatur (Hulijing): die aufgelegte Kreatur teilt ihre HP mit dem Wirt — ihr Schaden IST Heldenschaden (ruht NICHT mit dem Wirt: sie hat keine eigenen HP).
       const _ueber = !!inst?.counters?._heldKreatur;
       if (!_ueber && (!script?.sharesHpWithHero || this.isCardPassiveDormant(inst))) { keep.push(e); continue; }   // W8: der Pool ruht bei Frost/Betäubung/Negation
+      // ★ Spielgestalter-Entscheidung 16.11.2026 (Cute Angel Molinda × Bonded Companion): „Es kommt nur auf das primäre Ziel an." Ist die Kreatur das Ziel, gilt, was für Kreaturen gilt —
+      // sagt die Quelle „Creatures take no damage from this Hero's Attacks and Spells", entsteht KEIN Schaden, auch nicht über den geteilten Pool am Helden (die Umbuchung findet gar nicht erst statt).
+      // Ist der Held das Ziel, läuft der Heldenpfad ganz normal (er kommt hier nicht vorbei). Der Eintrag bleibt als abgewehrter im Stapel (Bild, „0"), wie bei jeder anderen immunen Kreatur;
+      // die Kreatur hat keine eigenen HP und ihr Stempel `_immuneCreature` hält den Heldenschaden und (Molinda: `_immuneCreature` wird übersprungen) die Übernahme der Companion-Kreatur fern.
+      if (!_ueber && e.source && typeof e.source === 'object' && !e.isStatusDamage) {
+        const probe = { ...e, source: this._klonSicht(e.source), _quelleNegiert: false };
+        await this.runHooks(HOOKS.BEFORE_POOLED_CREATURE_DAMAGE, { entry: probe });
+        if (probe._quelleNegiert) {
+          e.amount = 0;
+          e._immuneCreature = true;
+          this.log('pooled_damage_negated_by_source', { token: inst.name, source: e.source?.name || null, type: e.type });
+          keep.push(e);
+          continue;
+        }
+      }
       const owner = _ueber ? (inst.counters?._heldKreatur?.seite ?? inst.heroOwner) : (inst.controller ?? inst.owner);
       const hero = this.gs.players[owner]?.heroes?.[inst.heroIdx];
       e._pooledToHero = true;

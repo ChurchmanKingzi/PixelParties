@@ -169,6 +169,20 @@ module.exports = {
     },
 
     /**
+     * Spielgestalter-Entscheidung 16.11.2026 (Bonded Companion Orphy & Co.): „Greift Molinda den Companion selbst an, entsteht kein Schaden. Greift sie den gebundenen Hero an, entsteht
+     * Schaden, obwohl die Creature damit verbunden ist. Es kommt nur auf das primäre Ziel an." Kreaturen mit geteiltem HP-Pool (`sharesHpWithHero`) buchen Schaden sonst auf den Helden um,
+     * BEVOR `beforeCreatureDamageBatch` laeuft — Effekt 1 oben saehe den Eintrag nie. Die Engine fragt deshalb vor der Umbuchung (`_reroutePooledCreatureDamage`); dieselbe Quellen-Pruefung
+     * wie Effekt 1: Attack/Spell dieser Molinda. Der Heldenpfad (Held als Ziel) ist davon nicht beruehrt.
+     */
+    beforePooledCreatureDamage: (ctx) => {
+      const e = ctx.entry;
+      if (!e || e.cancelled) return;
+      if (!_isAttackOrSpellType(e.type)) return;
+      if (!_isFromMolinda(e.source, ctx)) return;
+      e._quelleNegiert = true;
+    },
+
+    /**
      * Effect 2 — after the batch resolves, prompt the controller
      * (per Creature) to take permanent control. Permanent steal
      * goes through `actionTransferCreature`, which updates

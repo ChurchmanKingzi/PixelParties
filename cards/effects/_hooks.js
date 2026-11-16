@@ -192,6 +192,9 @@ const HOOKS = {
   // ── Creature damage (batched) ──
   BEFORE_CREATURE_DAMAGE_BATCH: 'beforeCreatureDamageBatch',
   BEFORE_CREATURE_AFFECTED: 'beforeCreatureAffected',
+  // Quellen-Immunitaet VOR der Pool-Umbuchung (Molinda: "Creatures take no damage from this Hero's Attacks and Spells").
+  // ctx: { entry } — Kopie des Schadenseintrags (Quelle in Klon-Sicht); ein Zuhoerer, dessen Effekt der Kreatur diesen Schaden nimmt, setzt `entry._quelleNegiert = true`.
+  BEFORE_POOLED_CREATURE_DAMAGE: 'beforePooledCreatureDamage',
   AFTER_CREATURE_DAMAGE_BATCH:  'afterCreatureDamageBatch',
   AFTER_ALL_STATUS_DAMAGE:      'afterAllStatusDamage',
 
