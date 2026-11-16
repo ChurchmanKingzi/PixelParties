@@ -124,4 +124,13 @@ async function maybeKeepGemInHand(engine, pi, gemName) {
   return { keepInHand: true };
 }
 
-module.exports = { canPlayMagicGem, maybeKeepGemInHand };
+/**
+ * Spielgestalter-Entscheidung 16.11.2026: das Einmal-pro-Zug-Limit eines Magic Gems ist mit dem Beginn der Aktivierung verbraucht — auch wenn der Edelstein danach
+ * negiert wird und sein `resolve` nie läuft. Die Gems melden das über `onFizzledPlay` (negierte Initialkarte, Engine: `_noteFizzledPlay`) bzw. `stempelBeiAktivierung`
+ * (Magic Topaz, Reaktion in der Kette).
+ */
+function stempelGem(engine, pi, gemName) {
+  engine.claimHOPT(gemName, pi);
+}
+
+module.exports = { canPlayMagicGem, maybeKeepGemInHand, stempelGem };

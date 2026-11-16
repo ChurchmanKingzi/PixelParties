@@ -11,11 +11,14 @@
 //  this card in your hand. Once per turn.
 // ═══════════════════════════════════════════
 
-const { canPlayMagicGem, maybeKeepGemInHand } = require('./_magic-gem-shared');
+const { canPlayMagicGem, maybeKeepGemInHand, stempelGem } = require('./_magic-gem-shared');
 
 const CARD_NAME = 'Magic Amber';
 
 module.exports = {
+  // Spielgestalter-Entscheidung 16.11.2026: wird die gespielte Karte in der Kette NEGIERT, läuft ihr `resolve` nie — das „1 pro Zug"-Limit ist trotzdem verbraucht (Engine: `_noteFizzledPlay`).
+  onFizzledPlay: ({ engine, pi }) => { stempelGem(engine, pi, CARD_NAME); },
+
   // ★ Welle 12 (B-06, Al: „Eine Karte, deren Effekt komplett nutzlos wäre, ist nicht spielbar."): trifft NUR den Gegner — gegen den durch die
   // Erste-Runden-Immunität geschützten Spieler unspielbar (Karte bleibt auf der Hand, keine Aktion/Kosten/Einmal-Stempel; `engine.ersterZugGeschuetzt`).
   blockedByFirstTurnProtection: true,

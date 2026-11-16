@@ -11,12 +11,15 @@
 //  this card in your hand. Once per turn.
 // ═══════════════════════════════════════════
 
-const { canPlayMagicGem, maybeKeepGemInHand } = require('./_magic-gem-shared');
+const { canPlayMagicGem, maybeKeepGemInHand, stempelGem } = require('./_magic-gem-shared');
 
 const CARD_NAME = 'Magic Cobalt';
 const HEAL_AMOUNT = 50;
 
 module.exports = {
+  // Spielgestalter-Entscheidung 16.11.2026: wird die gespielte Karte in der Kette NEGIERT, läuft ihr `resolve` nie — das „1 pro Zug"-Limit ist trotzdem verbraucht (Engine: `_noteFizzledPlay`).
+  onFizzledPlay: ({ engine, pi }) => { stempelGem(engine, pi, CARD_NAME); },
+
   isTargetingArtifact: true,
   activeIn: ['hand'],
 

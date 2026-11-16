@@ -16,10 +16,10 @@
 //  (wie bei Topaz/Amethyst). Die Sperre selbst gab es schon: `canActivate`
 //  fragt `canPlayMagicGem` (HOPT `Magic Ruby:<Spieler>`), der Stempel wird
 //  erst am Ende des Effekts in `maybeKeepGemInHand` gesetzt (gespielt und
-//  verpufft stempelt, ganz negiert nicht — Z7b).
+//  verpufft stempelt, ganz negiert ebenfalls über `onFizzledPlay` — Spielgestalter-Entscheidung 16.11.2026).
 // ═══════════════════════════════════════════
 
-const { canPlayMagicGem, maybeKeepGemInHand } = require('./_magic-gem-shared');
+const { canPlayMagicGem, maybeKeepGemInHand, stempelGem } = require('./_magic-gem-shared');
 const { opponentOfGs } = require('./_opp');
 
 const CARD_NAME = 'Magic Ruby';
@@ -33,6 +33,9 @@ function gegnerHelden(gs, pi, engine) {
 }
 
 module.exports = {
+  // Spielgestalter-Entscheidung 16.11.2026: wird die gespielte Karte in der Kette NEGIERT, läuft ihr `resolve` nie — das „1 pro Zug"-Limit ist trotzdem verbraucht (Engine: `_noteFizzledPlay`).
+  onFizzledPlay: ({ engine, pi }) => { stempelGem(engine, pi, CARD_NAME); },
+
   // ★ Welle 12 (B-06, Al: „Eine Karte, deren Effekt komplett nutzlos wäre, ist nicht spielbar."): trifft NUR den Gegner — gegen den durch die
   // Erste-Runden-Immunität geschützten Spieler unspielbar (Karte bleibt auf der Hand, keine Aktion/Kosten/Einmal-Stempel; `engine.ersterZugGeschuetzt`).
   blockedByFirstTurnProtection: true,

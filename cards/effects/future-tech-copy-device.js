@@ -384,6 +384,9 @@ async function legeAlsAusruestungAn(engine, pi, name, sk) {
 }
 
 module.exports = {
+  // Spielgestalter-Entscheidung 16.11.2026: wird die gespielte Karte in der Kette NEGIERT, läuft ihr `resolve` nie — das „1 pro Zug"-Limit ist trotzdem verbraucht (Engine: `_noteFizzledPlay`).
+  onFizzledPlay: ({ engine, pi }) => { engine.claimHOPT(HOPT_KEY, pi); },
+
   isTargetingArtifact: false,
 
   // Mischt aus der ABLAGE ins eigene Deck zurück — damit greift
