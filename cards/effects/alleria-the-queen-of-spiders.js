@@ -7,6 +7,9 @@
 //     single-target Attack/Spell/Creature effect
 //     to a Hero with a Surprise. Redirected damage
 //     cannot be reduced except by Surprises.
+//     ★ Spielgestalter-Entscheidung 16.11.2026: das Once-per-turn
+//     ist mit der Aktivierung verbraucht (`payHeroRedirectCost`,
+//     vor dem Kettenfenster), auch wenn sie danach negiert wird.
 // ═══════════════════════════════════════════
 
 const { heldenSperreKey } = require('./_hero-hopt-shared');   // v1275: Heldensperre pro Spieler (Ruling 22.9.)
@@ -97,7 +100,7 @@ module.exports = {
    * Conditions:
    *  - Exactly 1 target on Alleria's side was selected
    *  - At least 1 OTHER hero (not the target) has a Surprise in its Surprise Zone
-   *  - Soft HOPT not yet consumed this turn
+   *  - Soft HOPT not yet consumed this turn (verbraucht bei der Aktivierung, s. `payHeroRedirectCost`)
    */
   canHeroRedirect(gs, ownerIdx, heroIdx, selected, validTargets, config, engine, sourceCard) {
     // HOPT check
@@ -125,16 +128,18 @@ module.exports = {
   },
 
   /**
-   * Execute the redirect: prompt player to choose a hero with a Surprise.
-   * Returns { redirectTo } or null if cancelled.
+   * ★ Spielgestalter-Entscheidung 16.11.2026: das „Once per turn" wird mit der AKTIVIERUNG verbraucht (Hub `_checkTargetRedirectOnce`: Bestätigung → `payHeroRedirectCost` → Kettenfenster →
+   * `onHeroRedirect`) — auch wenn die Auslösung danach im Kettenfenster negiert wird; ein zweiter Versuch im selben Zug ist dann gesperrt, im nächsten Zug ist Alleria wieder frei.
+   * Wer „No" sagt (oder die Heldenwahl abbricht), verbraucht nichts. Die Wahl des Umleitungsziels (abbrechbar, gehört zur Aktivierung) steht deshalb HIER, vor dem Fenster; das Ergebnis
+   * `{ redirectTarget }` geht als letztes Argument an `onHeroRedirect`. `false` = nicht zahlbar/abgebrochen → keine Aktivierung, nichts verbraucht.
    */
-  async onHeroRedirect(engine, ownerIdx, heroIdx, selected, validTargets, config, sourceCard, physOwner = ownerIdx) {
+  async payHeroRedirectCost(engine, ownerIdx, heroIdx, selected, validTargets, config, sourceCard, physOwner = ownerIdx) {
     const gs = engine.gs;
 
     // Build list of eligible redirect targets (controlled heroes with Surprises, not original target)
     const eligible = umleitungsZiele(gs, ownerIdx, selected, engine, istKreaturZiel(engine, selected) ? validTargets : null);
 
-    if (eligible.length === 0) return null;
+    if (eligible.length === 0) return false;
 
     // If only one option, auto-select
     let redirectTarget;
@@ -152,16 +157,34 @@ module.exports = {
         cancellable: true,
       });
 
-      if (!result || result.cancelled) return null;
+      if (!result || result.cancelled) return false;
       // Treffer ueber Seite + Index (Ziel-ID in `source`), Name als Rueckfall.
       redirectTarget = eligible.find(t => t.id === result.source)
         || eligible.find(t => t.cardName === result.cardName) || eligible[0];
     }
 
-    // Claim HOPT
+    // Claim HOPT (Aktivierung, vor dem Kettenfenster)
     if (!gs.hoptUsed) gs.hoptUsed = {};
     const hoptKey = heldenSperreKey('alleria_redirect', ownerIdx);
     gs.hoptUsed[hoptKey] = gs.turn;
+    return { redirectTarget };
+  },
+
+  /**
+   * Execute the redirect (nach dem Kettenfenster): `bezahlt.redirectTarget` ist das in `payHeroRedirectCost` gewählte Ziel.
+   * Returns { redirectTo } or null if it no longer works (Brett hat sich im Fenster geändert — das Once-per-turn bleibt verbraucht).
+   */
+  async onHeroRedirect(engine, ownerIdx, heroIdx, selected, validTargets, config, sourceCard, physOwner = ownerIdx, bezahlt) {
+    const gs = engine.gs;
+    // Aufruf ohne Hub: wie bisher erst hier wählen und stempeln.
+    if (!bezahlt) {
+      bezahlt = await module.exports.payHeroRedirectCost(engine, ownerIdx, heroIdx, selected, validTargets, config, sourceCard, physOwner);
+      if (!bezahlt) return null;
+    }
+    // Zwischen Wahl und Wirkung (Kettenfenster) kann sich das Brett geändert haben: das Ziel muss noch ein Held mit Surprise sein.
+    const eligible = umleitungsZiele(gs, ownerIdx, selected, engine, istKreaturZiel(engine, selected) ? validTargets : null);
+    const redirectTarget = eligible.find(t => t.id === bezahlt.redirectTarget?.id);
+    if (!redirectTarget) return null;
 
     // Spider animation: thread from original target to new target
     const srcOwnerLabel = selected.owner;
