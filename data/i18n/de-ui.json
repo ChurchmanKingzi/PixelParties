@@ -7515,5 +7515,11 @@
 "a Hero": "ein Held",
 "a target": "ein Ziel",
 "the effect": "der Effekt",
-"discard pile": "Ablagestapel"
+"discard pile": "Ablagestapel",
+"Opponent's starting debuffs": "Start-Debuffs des Gegners",
+"Your starting debuffs": "Deine Start-Debuffs",
+"ILLEGAL": "UNZULÄSSIG",
+"EASY": "LEICHT",
+"MEDIUM": "MITTEL",
+"HARD": "SCHWER"
 }

@@ -258,7 +258,7 @@ function DebuffSelector({ side, selected, onChange, isOpen, onToggle, onClose, k
           boxShadow: '0 4px 16px rgba(0,0,0,0.6)',
         }}>
           <div style={{ padding: '4px 8px 6px', fontSize: 10, color: accent, opacity: 0.85, borderBottom: `1px solid ${accent}33`, marginBottom: 4 }}>
-            {isOpp ? "Opponent's" : "Your"} starting debuffs
+            {isOpp ? "Opponent's starting debuffs" : "Your starting debuffs"}
           </div>
           {PLAYER_DEBUFF_REGISTRY.map(d => {
             const checked = selected.includes(d.key);
