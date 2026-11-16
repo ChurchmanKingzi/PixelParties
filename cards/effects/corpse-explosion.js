@@ -139,9 +139,8 @@ module.exports = {
 
   creatureDefeatedCondition(gs, pi, engine, deathInfo, source, type) {
     if (type || !deathInfo) return false;                       // Schadenstod: Nach-Schaden-Fenster
-    // Ein Opfer (Pawn Sacrifice & Co.: `_sacrificedTurn`-Stempel) ist kein „Besiegen durch einen Spell".
-    const inst = engine.cardInstances.find(c => c.id === deathInfo.instId);
-    if (inst?.counters?._sacrificedTurn === gs.turn) return false;
+    // ★ Spielgestalter-Entscheidung 16.11.2026 („Opfern gilt als defeat"): auch ein Opfer (Pawn Sacrifice & Co., `_sacrificedTurn`-Stempel) ist ein „Besiegen" — es zählt, wenn die
+    // Quelle des Opfers (die Karte, die es verlangt) eine Attack oder ein Spell ist („defeated by an Attack or Spell"); Opfer durch Kreaturen/Fähigkeiten/Helden tun es nicht.
     return quelleIstAttackOderSpell(engine, source);
   },
 

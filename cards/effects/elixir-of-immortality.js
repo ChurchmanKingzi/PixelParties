@@ -30,7 +30,9 @@
 //  also NACHDEM die Kosten bezahlt sind und der Effekt der Karte gelaufen ist. Mehrere zugleich Geopferte: EINE Kreatur kehrt zurück (Galerie-Wahl).
 //  Ein von Barrier of Undying gerettetes Opfer stirbt nie (kein Todes-Hook) und löst nichts aus; die Lebensfähigkeitsprüfung unten gilt unverändert
 //  (Bonded Companion bei totem Helden, fehlender Landeplatz, Karte nicht mehr im Stapel: kein Auslösen, Elixir bleibt liegen). Der frühere
-//  Ausschluss („ein Opfer ist kein defeated", Auslegung nach Extra Life, W16d) gilt nur noch für Extra Life, nicht mehr für das Elixir.
+//  Ausschluss („ein Opfer ist kein defeated", Auslegung nach Extra Life, W16d) gilt nirgends mehr: auch Extra Life, Loyal Bone Dog, Great Immortal Hydra, Infallible Oracle Pythia und
+//  Corpse Explosion zählen ein Opfer als „defeated" (Spielgestalter-Entscheidung 16.11.2026, „Opfern gilt als defeat"). Trägt das Opfer ein Extra Life, kehrt es über
+//  `_loeseOpferWiederbelebungen` (Engine) an demselben Haltepunkt zurück — VOR den Zuhörern, also vor diesem Elixir, das dann liegen bleibt (die Karte liegt nicht mehr im Stapel).
 //
 //  ★ Spielgestalter-Entscheidung 16.11.2026 („Insel-Zonenentfernung"): stirbt eine Kreatur, WEIL IHRE ZONE ENTFERNT WIRD (Flying Island in the Sky
 //  verlässt das Brett → `removeIslandZones`; `engine._inselEntfernung` markiert die Entfernung, solange die Todes-Hooks laufen), greift das Elixir NUR,

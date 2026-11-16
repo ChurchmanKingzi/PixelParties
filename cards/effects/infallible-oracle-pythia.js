@@ -26,8 +26,8 @@
 //     HELDEN behalten Plan und Marke über Tod und Wiederbelebung (Al): beim dritten Zähler stirbt der Held, falls er dann nicht gerade tot ist; war er zwischendurch tot und
 //     wurde wiederbelebt, trifft es ihn trotzdem. Ist er beim dritten Zähler tot, passiert nichts (der Plan ist verbraucht).
 //  ④ „When this Creature would be defeated, you may sacrifice another target you control to fully heal its HP instead": Engine-Vertrag `selfPreDefeat` (siehe
-//     `_checkCreaturePreDefeatHandReactions`), gilt für Schaden, Zerstörung und Insta-Kill-Effekte; NICHT für ein Opfer als Kosten (dort entscheidet der Spieler selbst) und
-//     nicht für das unaufhaltsame Besiegen. „Target" wörtlich: Helden UND Kreaturen, die man kontrolliert, außer Pythia selbst (Annahme, Al entscheidet). Das Opfer wird WIRKLICH
+//     `_checkCreaturePreDefeatHandReactions`), gilt für Schaden, Zerstörung und Insta-Kill-Effekte; AUCH für ein Opfer (Kosten oder Effekt; Spielgestalter-Entscheidung 16.11.2026: „Opfern gilt als defeat" — wird Pythia geopfert und rettet sich, ist das Opfer NICHT bezahlt und der Effekt
+//     fizzelt wie bei Barrier of Undying; Opfer als Beschwörungskosten öffnen kein Fenster), NICHT für das unaufhaltsame Besiegen. „Target" wörtlich: Helden UND Kreaturen, die man kontrolliert, außer Pythia selbst (Annahme, Al entscheidet). Das Opfer wird WIRKLICH
 //     besiegt (volle Pipeline, seine On-Death-/On-Sacrifice-Trigger feuern, Hero: `isSacrifice`), Pythia heilt auf volle Max-HP OHNE Todes-Pipeline (Counter, Plan, Statuswerte
 //     bleiben). Abbruch („may") = Pythia wird normal besiegt. Wird das Opfer selbst gerettet (Barrier of Undying, Guardian Angel …), heilt Pythia nicht und stirbt.
 //     Gibt es kein anderes Ziel, entfällt die Frage. Ruht der Effekt (Frost/Betäubung/Negation), greift der Ersatz nicht.
@@ -154,7 +154,6 @@ module.exports = {
    * @param {object} source  was sie besiegen würde · @param {string} type  'damage'-Typ bzw. 'destroy'
    */
   async selfPreDefeat(engine, inst, source, amount, type, info = {}) {
-    if (info.isSacrifice) return false;            // ein Opfer als Kosten ist die eigene Entscheidung des Spielers
     if (!inst || inst.zone !== 'support' || inst._pythiaRettet) return false;
     const pi = inst.controller ?? inst.owner;
     const ziele = opferZiele(engine, pi, inst);
