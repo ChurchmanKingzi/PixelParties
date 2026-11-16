@@ -129,6 +129,31 @@ module.exports = {
 
   cpuResponse() { return undefined; },
 
+  /**
+   * Teleport (Vertrag in `teleport.js`): die Heldenkarten tauschen die Spalten, der Stowaway bleibt in seiner Support Zone liegen
+   * („Any cards in their Support Zones remain where they were"). „The corresponding Hero" ist damit der Held, der NACH dem Tausch in seiner
+   * Spalte steht: die Negation gehört ihm (wie bei Anhängseln mit Status, deren Wirt wechselt) und fällt am Helden ab, der die Spalte verlässt
+   * (eine darunterliegende fremde Negierung bleibt dort). Sonst bliebe die Negation ohne Quelle am falschen Helden hängen.
+   */
+  async teleportSpaltenAbgleich(engine, { seite, cols }) {
+    const ps = engine.gs.players[seite];
+    if (!ps) return;
+    for (const col of cols) {   // Stowaway-Schicht von beiden Helden nehmen (Austritts-Hook-Form: `_fremd` bleibt)
+      const wirt = ps.heroes?.[col];
+      const st = wirt?.statuses?.negated;
+      if (!st || st._fromAttachment !== CARD_NAME) continue;
+      if (st._fremd) wirt.statuses.negated = st._fremd; else delete wirt.statuses.negated;
+    }
+    for (const col of cols) {   // und dem Helden anlegen, der jetzt in der Spalte mit Stowaway steht
+      const hier = engine.cardInstances.filter(c => c.name === CARD_NAME && c.zone === 'support' && !c.faceDown
+        && c.owner === seite && c.heroIdx === col);
+      if (hier.length === 0) continue;
+      if (setzeAnhaengselStatus(engine, seite, col, CARD_NAME, 'negated', HARTE_NEGIERUNG)) continue;
+      for (const inst of hier) await loeschen(engine, inst, 'no_host');   // Hero Zone ohne negierbaren Helden: nichts zu negieren (wie beim Beschwören)
+    }
+    engine.sync();
+  },
+
   hooks: {
     // Austritt: der Status faellt mit — Heilen: der Stowaway wird geloescht (geteilter Helfer).
     onCardLeaveZone: geteilt.onCardLeaveZone,

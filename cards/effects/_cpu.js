@@ -2228,6 +2228,7 @@ async function activatePermanents(engine, helpers) {
       for (const perm of (gs.players[owner]?.permanents || [])) {
         const key = `${owner}|${perm.id}`;
         if (tried.has(key)) continue;
+        if (perm.teleportalUntil != null) continue;   // Teleportal: wartende Karte ist inert
         const script = loadCardEffect(perm.name);
         if (!script?.onActivatePermanent || !script?.canActivatePermanent) continue;
         try {

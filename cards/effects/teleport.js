@@ -192,14 +192,26 @@ async function tauscheHeldenplaetze(engine, seite, a, b, wirker) {
     }
   }
   for (const inst of engine.cardInstances) {
-    if ((inst.zone !== 'hero' && inst.zone !== 'ability') || engine.physicalSide(inst) !== seite) continue;
+    // `heroOverlay`: die Kreatur, die ein Held trägt (Hulijing, „Held als Kreatur") — sie liegt auf dem HELDEN und zieht mit ihm; Schaden an ihr wird über den Wirt-Index (`_heldKreatur.heroIdx`) gebucht.
+    if ((inst.zone !== 'hero' && inst.zone !== 'ability' && inst.zone !== 'heroOverlay') || engine.physicalSide(inst) !== seite) continue;
     if (inst.heroIdx === a) inst.heroIdx = b; else if (inst.heroIdx === b) inst.heroIdx = a;
+    if (inst.zone === 'heroOverlay' && inst.counters?._heldKreatur) inst.counters._heldKreatur.heroIdx = inst.heroIdx;
   }
   // Puppet-Tokens und Support-Zonen-Abilities ziehen in die Spalte ihres Helden (stiller Umzug wie beim Tri-Ad-Tausch: keine Abgangs-Hooks, keine
   // Niederlage-Prüfung dazwischen; die Boni der Abilities hängen am Helden und wandern mit ihm).
   const verlagert = SM.fuehreVerlagerungAus(engine, plan);
   if (plan.moves.some(m => m.mover.art === 'puppet')) tauscheSchluessel(gs._puppetActiveLock, `${seite}-${a}`, `${seite}-${b}`);   // „No other Token in the corresponding Hero's Support Zones …" hängt am Helden
   engine.sync();
+
+  // Kreaturen, die der Held ihrer Spalte als Status tragen (Stowaway: `teleportSpaltenAbgleich`): sie bleiben liegen, ihr Status gehört nach dem Tausch dem NEUEN Helden der Spalte.
+  const abgeglichen = new Set();
+  for (const c of engine.cardInstances) {
+    if (c.zone !== 'support' || engine.physicalSide(c) !== seite || (c.heroIdx !== a && c.heroIdx !== b) || abgeglichen.has(c.name)) continue;
+    const skript = require('./_loader').loadCardEffect(c.name);
+    if (typeof skript?.teleportSpaltenAbgleich !== 'function') continue;
+    abgeglichen.add(c.name);
+    try { await skript.teleportSpaltenAbgleich(engine, { seite, cols: [a, b] }); } catch (err) { console.error(`[teleportSpaltenAbgleich] ${c.name} threw:`, err.message); }
+  }
 
   // ── ③ Eintritt der Ausrüstung/Anhängsel am NEUEN Wirt (Boni neu anlegen) ──
   for (const inst of traeger) {

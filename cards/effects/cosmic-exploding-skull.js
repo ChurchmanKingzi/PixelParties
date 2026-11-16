@@ -100,7 +100,9 @@ module.exports = {
         engine.beginDestroyScope(opfer.length);
         try {
           for (const c of opfer) {
-            if (c.zone !== 'support') continue;                                // fiel inzwischen (anderer Schädel)
+            // Fiel inzwischen (anderer Schädel): auch durch Schaden (z. B. der Blast eines Exploding Skull) ist die Kreatur nur aus `cardInstances` ausgetragen, ihre `zone` bleibt 'support'
+            // — ohne die zweite Prüfung käme sie ein zweites Mal in die Ablage.
+            if (c.zone !== 'support' || !engine.cardInstances.includes(c)) continue;
             await engine.actionDestroyCard(quelle, c, { sourceOwner: pi, sourceName: CARD_NAME, fireCreatureDeath: true });
           }
         } finally { engine.endDestroyScope(); }

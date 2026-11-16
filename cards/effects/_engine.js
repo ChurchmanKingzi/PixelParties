@@ -495,6 +495,9 @@ class CardInstance {
     const override = this.counters?._effectOverride;
     const script = override ? loadCardEffect(override) : this.loadScript();
     if (!script) return false;
+    // ★ TELEPORTAL: die offen WARTENDE Karte („place it openly in front of you", Stempel `counters._teleportalUntil`) ist inert — keine Permanent-Hooks (Divine Gift of The Light …), bis sie auf die Hand kommt.
+    // Ausnahme: Skripte mit `listensWhileWaiting` (Teleportal selbst, wenn sie sich suchte: die wartende Kopie holt die wartenden Karten ab).
+    if ((zone || this.zone) === ZONES.PERMANENT && this.counters?._teleportalUntil != null && !script.listensWhileWaiting) return false;
     if (!script.activeIn) return true; // No restriction = always active
     // ★ HELD ALS KREATUR (Hulijing, 24.10.): die Überlagerung eines Helden (`heroOverlay`) feuert die Hooks ihrer Kreatur wie in einer Support Zone.
     const z = ((zone || this.zone) === ZONES.HERO_OVERLAY) ? ZONES.SUPPORT : (zone || this.zone);
@@ -13943,7 +13946,13 @@ class GameEngine {
   //  • `revealedHandIndices(pi)` / `anyHandCardRevealed()`  welche Handkarten gelten als aufgedeckt (alle Wege: Luna Kiai, Bamboo Shield, Crystals, Madaga, Arcane Eyes).
   arcaneEyesFor(ctrlIdx) {
     if (ctrlIdx == null || ctrlIdx < 0) return null;
-    return (this.cardInstances || []).find(c => c.name === 'Arcane Eyes' && c.zone === ZONES.SUPPORT && !c.faceDown
+    // Held als Kreatur (Hulijing, „This Hero becomes that Creature"): die Überlagerung (`heroOverlay`) ist die Kreatur — sie zählt wie eine Karte in einer Support Zone, solange ihr Wirt lebt (fällt er, gilt sie als besiegt).
+    const ueberlagerungLebt = (c) => {
+      if (c.zone !== ZONES.HERO_OVERLAY || !c.counters?._heldKreatur) return false;
+      const w = require('./_hero-creature-shared').wirtVon(this, c);
+      return !!w?.hero && w.hero.hp > 0 && !w.hero.heldKreatur?._tot;
+    };
+    return (this.cardInstances || []).find(c => c.name === 'Arcane Eyes' && (c.zone === ZONES.SUPPORT || ueberlagerungLebt(c)) && !c.faceDown
       && this.kontrolleurVon(c) === ctrlIdx && !this.isCardPassiveDormant(c)) || null;
   }
 
@@ -52096,6 +52105,7 @@ this._deathWatch = (this._deathWatchStack || []).length
       const ps = this.gs.players[pOwner];
       if (!ps) continue;
       for (const perm of (ps.permanents || [])) {
+        if (perm.teleportalUntil != null) continue;   // Teleportal: die wartende Karte ist noch nicht gespielt, nur „openly in front of you" — nicht aktivierbar
         const script = loadCardEffect(perm.name);
         if (!script?.canActivatePermanent) continue;
         if (script.canActivatePermanent(this.gs, playerIdx, pOwner, this)) {

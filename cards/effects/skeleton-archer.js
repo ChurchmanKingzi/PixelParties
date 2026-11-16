@@ -170,6 +170,7 @@ module.exports = {
     const picked = await engine.promptEffectTarget(pi, targets, {
       maxTotal: 1,   // Einfachauswahl: ein Klick TAUSCHT das Ziel
       title: CARD_NAME,
+      sourceCard: ctx.card,   // Quelle der Zielwahl = die Creature selbst: nur so öffnet das Surprise-Fenster „chosen by a Creature effect" (Rolling Boulder, Shield of Wisdom …) wie bei Haressassin/Mr. Jiggles
       description: `Pick a target: deal ${DAMAGE} damage to a Hero / Creature, or destroy a face-down Surprise.`,
       confirmLabel: '🏹 Shoot!',
       confirmClass: 'btn-danger',
