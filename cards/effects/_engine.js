@@ -57100,11 +57100,13 @@ this._deathWatch = (this._deathWatchStack || []).length
         // ★ W17b (A01-25): Golden Wings – „unaffected by your opponent's cards and effects": nur Schaden mit
         // gegnerischer Quelle prallt ab; eigener Schaden trifft. Unbekannte Quelle (-1, Status-Tick) = geschützt.
         e._immuneCreature = true;
-      } else if (inst?.counters?._damageDestroyImmune && !this.isCardPassiveDormant(inst)) {   // W7a (A05-04): stillgelegt -> nicht immun
+      } else if (inst?.counters?._damageDestroyImmune && !e.ignoreUnaffected && !this.isCardPassiveDormant(inst)) {   // W7a (A05-04): stillgelegt -> nicht immun
         // Generic "fully damage- and destroy-immune" flag. Time Bomblebee
         // stamps this while it has Bomb Counters; cleared when counters
         // are removed. Distinct from `_cardinalImmune` so the Cardinal
         // Beast name fallback and identity stay clean.
+        // Spielgestalter-Entscheidung 16.11.2026 (Ida): „cannot take damage or be defeated" (Time Bomblebee) hält Idas Zauberschaden NICHT ab
+        // (`e.ignoreUnaffected`, siehe Ida) — nur „unaffected by ALL cards and effects" (Cardinal Beasts …) bleibt immun.
         e._immuneCreature = true;
       } else if (inst?.counters?._monkeeShieldUntilTurn != null
                  && this.gs.turn < inst.counters._monkeeShieldUntilTurn
@@ -57120,8 +57122,9 @@ this._deathWatch = (this._deathWatchStack || []).length
         e._immuneCreature = true;
       } else if (this._guardianSchutzFuer(inst) && e.canBeNegated !== false) {   // W25b (N2-05): Spieler-Marke, nicht Momentaufnahme
         e._immuneCreature = true;
-      } else if (inst?.counters?._stealImmortal) {
+      } else if (inst?.counters?._stealImmortal && !e.ignoreUnaffected) {
         // Temporarily stolen (Deepsea Succubus): cannot take damage while stolen.
+        // Spielgestalter-Entscheidung 16.11.2026 (Ida): Idas Zauberschaden ignoriert auch diesen Schutz (`e.ignoreUnaffected`).
         e._immuneCreature = true;
       } else if (this.isOppDamageImmuneFrom(inst, e.sourceOwner, e.source, { ignoreUnaffected: e.ignoreUnaffected === true })) {
         // Source-aware opp-damage immunity (Sparkfly Attendant LIVE
