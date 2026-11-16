@@ -47,32 +47,44 @@ module.exports = {
     // pattern: explicit broadcast + state mutation + sync/delay BEFORE
     // any hand-grow operation.
     const resolving = ps._resolvingCard;
+    // ★ Aus Crestinas Vorrat (`fromCreation`) gespielt: die Karte liegt in `ps.creationZone`, nicht in der Hand. Vorher wurde immer in der
+    //   HAND gesucht — eine gleichnamige Handkopie wurde geloescht, die Vorratskopie blieb liegen (und war doppelt spielbar).
+    const ausVorrat = !!(resolving && resolving.name === CARD_NAME && resolving.fromCreation);
+    const quelle = (ausVorrat ? ps.creationZone : ps.hand) || [];
     let handIdx = -1;
     if (resolving && resolving.name === CARD_NAME) {
       let count = 0;
-      for (let i = 0; i < (ps.hand || []).length; i++) {
-        if (ps.hand[i] === CARD_NAME) {
+      for (let i = 0; i < quelle.length; i++) {
+        if (quelle[i] === CARD_NAME) {
           count++;
           if (count === resolving.nth) { handIdx = i; break; }
         }
       }
     }
-    if (handIdx < 0) handIdx = (ps.hand || []).lastIndexOf(CARD_NAME);
+    if (handIdx < 0) handIdx = quelle.lastIndexOf(CARD_NAME);
 
     if (handIdx >= 0) {
       engine._broadcastEvent('play_pile_transfer', {
         owner: pi, cardName: CARD_NAME,
-        from: 'hand', to: 'deleted',
+        from: ausVorrat ? 'creation' : 'hand', to: 'deleted',
         fromHandIdx: handIdx,
       });
-      engine.takeFromPileSync(ps, 'hand', handIdx);
-      // Untrack the hand inst so post-splice scans don't re-find it.
-      const inst = engine.cardInstances.find(c =>
-        c.owner === pi && c.zone === 'hand' && c.name === CARD_NAME
-      );
-      if (inst) engine._untrackCard(inst.id);
       if (!ps.deletedPile) ps.deletedPile = [];
-      engine.handKartenBesitzerPs(ps, CARD_NAME).deletedPile.push(CARD_NAME);   // W3/W5a: Stapel des permanenten Besitzers
+      if (ausVorrat) {
+        // Vorratskarte: eine Karte des Spielers selbst (nie gestohlen, keine Herkunftsmarke); Instanz = Zone `creationZone` (wie Mana Absorbing Crystal).
+        const inst = engine._findHandInstanceAt(pi, handIdx, true);
+        quelle.splice(handIdx, 1);
+        if (inst) engine._untrackCard(inst.id);
+        ps.deletedPile.push(CARD_NAME);
+      } else {
+        engine.takeFromPileSync(ps, 'hand', handIdx);
+        // Untrack the hand inst so post-splice scans don't re-find it.
+        const inst = engine.cardInstances.find(c =>
+          c.owner === pi && c.zone === 'hand' && c.name === CARD_NAME
+        );
+        if (inst) engine._untrackCard(inst.id);
+        engine.handKartenBesitzerPs(ps, CARD_NAME).deletedPile.push(CARD_NAME);   // W3/W5a: Stapel des permanenten Besitzers
+      }
       // Clear the resolver pointer so the server's post-resolve splice
       // logic doesn't try to re-find / re-splice the (now-deleted) card.
       ps._resolvingCard = null;
