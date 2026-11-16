@@ -127,8 +127,9 @@ module.exports = {
       if (gaInst) {
         // W52a: der Engel loest sich selbst auf (ohne `onCardLeaveZone`) — der Anhaengsel-Verlust wird trotzdem gemeldet (`onEquipLost`).
         await engine.fireEquipLost(gaInst, { reason: 'deleted', toZone: 'deleted', fromOwner: heroPi, fromHeroIdx: heroHi, fromZoneSlot: gaSlot, source: 'Guardian Angel', bypassDeadHeroFilter: true });
+        // Spielgestalter-Entscheidung 16.11.2026 (Magic Mirror): die Kopie eines gespiegelten Guardian Angel ist keine Karte — sie verschwindet (kein Gelöscht-Stapel).
+        if (!engine.tokenAbgang(gaInst)) gs.players[gaInst.originalOwner].deletedPile.push('Guardian Angel');
         engine._untrackCard(gaInst.id);
-        gs.players[gaInst.originalOwner].deletedPile.push('Guardian Angel');
       }
 
       // Set HP to 1 (prevent death)

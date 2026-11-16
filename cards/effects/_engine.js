@@ -2611,6 +2611,9 @@ class GameEngine {
     this.cardInstances.push(inst);
     // W63c: eine fremde Handkarte (Charme Lv 2, Diebstahl, Geschenk …) betritt das Brett — die Instanz gehoert weiter ihrem BESITZER.
     if (zone === ZONES.SUPPORT || zone === ZONES.ABILITY || zone === ZONES.SURPRISE || zone === ZONES.AREA || zone === ZONES.HERO) this._stempelFremdHerkunft(inst);
+    // Spielgestalter-Entscheidung 16.11.2026 (Magic Mirror): waehrend die Kopie wirkt (`_spiegelKopieName`), ist jede Brettinstanz desselben Namens, die dabei entsteht
+    // (Anhaengsel am Helden …), selbst eine Kopie — Marke `_spiegelKopie` (siehe `isTokenCard`).
+    if (this._spiegelKopieName && name === this._spiegelKopieName && zone !== ZONES.HAND) inst.counters._spiegelKopie = true;
     return inst;
   }
 
@@ -16129,7 +16132,7 @@ class GameEngine {
     // Z5: gleiche Konvention fuer „zurueck auf die Hand" (Chasing the Legend, Surprising Opportunity …): ein Token ist keine Karte.
     if ((toZone === ZONES.DISCARD || toZone === ZONES.HAND) && fromZone === 'support') {
       const _tokenCd = this.getEffectiveCardData(cardInstance);
-      if (_tokenCd && hasCardType(_tokenCd, 'Token')) {
+      if ((_tokenCd && hasCardType(_tokenCd, 'Token')) || cardInstance.counters?._spiegelKopie) {   // Magic-Mirror-Kopie: wie ein Token ohne Karte darunter (verschwindet, `tokenAbgang`)
         // W64a (Al, 23.10.2026): Inyas Fantasy Buddy — die Spell-Karte darunter geht in die ABLAGE ihres Besitzers (auch bei „zurück auf die Hand").
         toZone    = this.tokenStapelZiel(cardInstance) === 'discard' ? ZONES.DISCARD : ZONES.DELETED;
         toHeroIdx = -1;
@@ -49661,6 +49664,9 @@ this._deathWatch = (this._deathWatchStack || []).length
    * @returns {boolean}
    */
   isTokenCard(inst) {
+    // Spielgestalter-Entscheidung 16.11.2026 (Magic Mirror): die Kopie, die der Spiegel wirkt, ist KEINE permanente Karte — sie verhaelt sich wie ein Token ohne echte Karte darunter
+    // (`counters._spiegelKopie`): sie wirkt/liegt als Anhaengsel auf dem Brett, geht beim Abgang aber nie in Ablage, Gelöscht-Stapel, Deck oder Hand (`tokenAbgang`).
+    if (inst?.counters?._spiegelKopie) return true;
     const cd = this.getEffectiveCardData(inst) || this._getCardDB()[inst?.name];
     return !!(cd && hasCardType(cd, 'Token'));
   }
@@ -49712,6 +49718,7 @@ this._deathWatch = (this._deathWatchStack || []).length
 
   tokenUnterkarte(inst) {
     if (!inst || !this.isTokenCard(inst)) return null;
+    if (inst.counters?._spiegelKopie) return null;   // Magic-Mirror-Kopie: es liegt keine echte Karte darunter
     const roh = this._getCardDB()[inst.name];
     return (roh && !hasCardType(roh, 'Token')) ? inst.name : null;
   }
@@ -58807,7 +58814,7 @@ this._deathWatch = (this._deathWatchStack || []).length
           if ((supZones[zi] || []).indexOf(inst.name) >= 0) { slotIdx = zi; break; }
         }
         const effectiveCd = this.getEffectiveCardData(inst);
-        const isToken = !!(effectiveCd && hasCardType(effectiveCd, 'Token'));
+        const isToken = !!(effectiveCd && hasCardType(effectiveCd, 'Token')) || !!inst.counters?._spiegelKopie;   // Magic-Mirror-Kopie (Spielgestalter-Entscheidung 16.11.2026): kein Stapel
         // Zone-anchored fly-out so the client animates this equip from THIS
         // hero's exact slot, not the leftmost same-named one — e.g. two
         // Lifeforce Howitzers on different heroes. The client's name-keyed
