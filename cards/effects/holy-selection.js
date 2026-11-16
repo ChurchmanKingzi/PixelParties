@@ -270,6 +270,22 @@ module.exports = {
         }
       }
 
+      // ── Umleitung (Redirecting Aura) ──
+      // Die Karte hat eine eigene Trefferschleife (kein `dealDamageToTargets`), also fragt sie den zentralen Umleitungsschritt selbst: eine Brettkarte mit `onAoeRedirect` darf
+      // einen Treffer auf ein anderes Ziel der Trefferliste umlenken (der Treffer behält seinen Betrag). Danach gelten die geänderten Listen; die Animation bleibt bei den ursprünglichen Zielen.
+      const hitHeroes = heroTargets.map(t => ({ hero: t.hero, heroIdx: t.heroIdx, owner: t.owner, amount: DAMAGE }));
+      const creatureEntries = creatureTargets.map(t => ({
+        inst: t.inst, owner: t.owner, heroIdx: t.heroIdx, slotIdx: t.slotIdx, amount: DAMAGE, type: 'destruction_spell',
+      }));
+      if (hitHeroes.length > 0) {
+        engine._markCreatureDamageImmunity(creatureEntries);
+        await engine._aoeUmleitungen(source, hitHeroes, creatureEntries, {
+          reagierHelden: hitHeroes.filter(h => !engine._aoeHeldImmun(h.owner, h.heroIdx, h.hero, source, {})),
+          reagierKreaturen: creatureEntries.filter(e => !e._immuneCreature),
+          damageType: 'destruction_spell', damage: DAMAGE, opts: {},
+        });
+      }
+
       // ── Animation — staggered sun-beam on every target ──
       // Beams stagger ~70 ms each so the volley reads as a sequence
       // rather than one flash. Wait out the tail before damage so the
@@ -305,25 +321,25 @@ module.exports = {
       // ★★ v1185: Klammer meldet zusaetzlich die Kreaturen an das
       // Anti-AoE-Fenster (Deepsea Idol).
       {
-        const lebendeKreaturen = creatureTargets.filter(t => t.inst.zone === 'support');
+        const lebendeKreaturen = creatureEntries.filter(t => t.inst.zone === 'support');
         await engine.beginAoeStrike(
-          heroTargets.filter(t => (gs.players[t.owner]?.heroes?.[t.heroIdx]?.hp || 0) > 0).length
+          hitHeroes.filter(t => (gs.players[t.owner]?.heroes?.[t.heroIdx]?.hp || 0) > 0).length
           + lebendeKreaturen.length,
           {
             creatures: lebendeKreaturen.map(t => t.inst),
-            heroes: heroTargets,   // W78 (Pythia): Helden, die dieser Schlag faellt, sind todgeweiht
+            heroes: hitHeroes,   // W78 (Pythia): Helden, die dieser Schlag faellt, sind todgeweiht
             source, amount: DAMAGE, type: 'destruction_spell', sourceOwner: pi,
           });
       }
       try {
-      for (const t of heroTargets) {
+      for (const t of hitHeroes) {
         const hero = gs.players[t.owner]?.heroes?.[t.heroIdx];
         if (!hero?.name || hero.hp <= 0) continue;
         await engine.actionDealDamage(source, hero, DAMAGE, 'destruction_spell', {
           _skipReactionCheck: true,
         });
       }
-      for (const t of creatureTargets) {
+      for (const t of creatureEntries) {
         if (t.inst.zone !== 'support') continue;
         await engine.actionDealCreatureDamage(
           source, t.inst, DAMAGE, 'destruction_spell',
