@@ -21693,6 +21693,13 @@ this._deathWatch = (this._deathWatchStack || []).length
     if (this.isOppEffectImmuneFrom(inst, source)) return;
     const { CARDINAL_NAMES } = require('./_cardinal-shared');
     if (CARDINAL_NAMES.includes(inst.name)) return;
+    // ATT-04: Negationen mit „This counts as a negative status effect" (`opts.cleansable`: Anti Magic Zone, Pink Sky, Forbidden Zone, Locke, Null …) sind negative Status —
+    // Light Ball („all other targets you control are immune to all negative status effects") schuetzt die Kreaturen seiner Seite davor, wie `canApplyCreatureStatus` es fuer
+    // Frozen & Co. tut (diese Funktion ruft jene nicht auf). Unverhinderbare Negationen (Dark Gear, Diplomacy) sind kein Statuseffekt, Eigenkosten ohne `cleansable` auch nicht.
+    if (opts.cleansable && !hart && inst.zone === 'support' && this._lightBallProtects(inst.controller ?? inst.owner, 'creature')) {
+      this.log('negation_blocked', { creature: inst.name, source: (typeof source === 'string' ? source : source?.name) || 'effect', reason: 'light_ball' });
+      return;
+    }
     // v818 (Queen of Kings [B], Als Ruling): solange ein Negations-
     // Waechter steht, wird `negated`/`nulled` durch den Gegner gar nicht
     // erst angelegt. Eigene Negationen (Platzierungen) bleiben moeglich.
