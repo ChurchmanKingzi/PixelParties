@@ -252,7 +252,7 @@
 "effect": "Einmal pro Zug: Wenn ein Ziel, das dein Gegner kontrolliert, besiegt wird, füge allen Helden, die dein Gegner kontrolliert, 80 Schaden zu."
 },
 "Dive Bomblebee": {
-"name": "Sturzflug-Bombiene",
+"name": "Tauch-Bombiene",
 "effect": "Einmal pro Zug: Wenn ein Ziel, das dein Gegner kontrolliert, besiegt wird, wähle eine Karte auf der Seite deines Gegners auf dem Spielfeld, die kein Held ist, und platziere sie unten in das Deck deines Gegners."
 },
 "Time Bomblebee": {
@@ -316,7 +316,7 @@
 "effect": "Hast du in diesem Zug bisher mehr Kreaturen geopfert als beschworen, zählt das Beschwören dieser Kreatur als zusätzliche Aktion. Du darfst einmal pro Zug eine Kreatur opfern, die du kontrollierst und die in diesem Zug nicht beschworen wurde, um die Angriffswerte aller Helden beider Spieler dauerhaft um 40 ODER ihre aktuellen und maximalen LP um je 80 zu erhöhen."
 },
 "Chaorc Rider Warg": {
-"name": "Chaork-Reiter Warg",
+"name": "Chaork-Reiter-Warg",
 "effect": "Beschwöre diese Kreatur sofort aus deiner Hand als zusätzliche Aktion, wenn eine Kreatur, die du kontrollierst, durch die Karte oder den Effekt eines Gegners besiegt wird. Diese Kreatur gilt als geopfert. Wenn diese Kreatur auf irgendeine Weise vom Spielfeld entfernt wird, darfst du 1 Karte abwerfen, damit sie als geopfert gilt."
 },
 "Chaorc Ruin Mourner": {
@@ -520,11 +520,11 @@
 "effect": "Beide Spieler dürfen einmal pro Zug eine Karte aus ihrer Hand zurück in ihr Deck mischen, um ihr Deck nach einer Kreatur zu durchsuchen, deren Level sich von dem aller Kreaturen unterscheidet, die sie aktuell kontrollieren, und sie mit einem ihrer Helden als zusätzliche Aktion zu beschwören, wobei ihre Effekte bis zum Ende des Zuges negiert werden."
 },
 "Big Gwen Guard": {
-"name": "Großer Gwen-Wächter",
+"name": "Wächter von Big Gwen",
 "effect": "Solange du keine Kreaturen kontrollierst, darfst du 1 Karte aus deiner Hand abwerfen, die aufgrund ihres eigenen Effekts aufgedeckt ist, um diese Kreatur als zusätzliche Aktion zu beschwören. Solange du diese Kreatur kontrollierst, ignoriere die Effekte aller Karten, die in deiner Hand durch ihre eigenen Effekte aufgedeckt sind."
 },
 "Chatty Town Guard": {
-"name": "Schwatzhafter Stadtwächter",
+"name": "Schwatzende Stadtwache",
 "effect": "Solange du diese Kreatur kontrollierst, darfst du einmal pro Zug eine Karte aus deiner Hand wählen und sie der Hand deines Gegners hinzufügen."
 },
 "Cool Presents": {
@@ -908,7 +908,7 @@
 "effect": "Kontrollierst du keine Kreaturen, zählt das Beschwören dieser Kreatur als zusätzliche Aktion. Wenn diese Kreatur während deines Zuges besiegt wird, erhältst du 8 Gold."
 },
 "Sorbereus, the Adapting Dragon": {
-"name": "Sorbereus, der anpassungsfähige Drache",
+"name": "Sorbereus, der Anpassungs-Drache",
 "effect": "Du darfst einmal pro Zug einen Helden wählen und ihm Schaden in Höhe seines Angriffswerts zufügen."
 },
 "Clausss, the No-Nonsense Cultist": {
@@ -940,7 +940,7 @@
 "effect": "Während deines Zuges darf dieser Held die Fähigkeiten aller Helden, die dein Gegner kontrolliert, verwenden, sowohl aktive Effekte als auch passive Vorteile, als wären sie an ihn angelegt. Zähigkeit ist ausgenommen. Bei Kampfkunst trägt nur die Kampfkunst des gegnerischen Helden mit dem höchsten Level zum Angriffswert bei und ersetzt den Angriffswert aus der eigenen Kampfkunst dieses Helden, falls er größer ist."
 },
 "Smug Mastermind Antonia": {
-"name": "Smug-Drahtzieherin Antonia",
+"name": "Smugness-Drahtzieherin Antonia",
 "effect": "Du darfst einmal pro Zug eine \"Coole Retterin Monia\" aus deiner Hand oder aus deinem Deck unter diese Kreatur legen. Solange an dieser Kreatur \"Coole Retterin Monia\" angelegt ist, erhält sie 200 LP und diesen Effekt: Bis zu 2-mal pro Zug darfst du, wenn eine Kreatur, die du kontrollierst, Schaden erleidet, eine Karte abwerfen, um eine beliebige Karte auf dem Spielfeld, die kein Held ist, zu wählen und auf den Ablagestapel zu legen."
 },
 "Smugbeth, the Rebel of no Rules": {
@@ -992,7 +992,7 @@
 "effect": "Wenn du diese Karte ziehst oder deiner Hand hinzufügst, decke sie dauerhaft auf. Solange diese Karte auf deiner Hand aufgedeckt ist, lege einen Applaus-Marker darauf, immer wenn einen Applaus-Marker auf eine beliebige Kreatur auf dem Spielfeld gelegt wird. Wenn du diese Kreatur beschwörst, füge einem beliebigen Ziel auf dem Spielfeld Schaden in Höhe des 10-Fachen der Anzahl der Applaus-Marker zu, die beim Beschwören auf dieser Kreatur liegen."
 },
 "Fun-Fun Circus Strongman": {
-"name": "Spaß-Spaß-Zirkus Kraftprotz",
+"name": "Spaß-Spaß-Zirkus Strongman",
 "effect": "Wenn diese Kreatur beschworen wird, erhält sie aktuelle und maximale LP in Höhe des 10-Fachen der Gesamtzahl der Applaus-Marker auf dem Spielfeld. Immer wenn ein Ziel besiegt wird, lege 1 Applaus-Marker auf diese Kreatur. Du darfst einmal pro Zug einem beliebigen Ziel auf dem Spielfeld Schaden in Höhe des 10-Fachen der Anzahl der Applaus-Marker auf dem Spielfeld zufügen."
 },
 "Blueprints": {
@@ -1156,8 +1156,8 @@
 "effect": "Die aktuellen und maximalen LP aller Kreaturen mit Level 3 oder höher, die einer der beiden Spieler beschwört, werden um 200 erhöht."
 },
 "Greatmaw Remora": {
-"name": "Großmaul-Remora",
-"effect": "Kontrollierst du mindestens 1 \"Großmaul\"-Kreatur, außer \"Großmaul-Remora\", darfst du diese Kreatur aus deiner Hand als zusätzliche Aktion beschwören. Wenn du das tust, kannst du danach für den Rest des Zuges keine Kreaturen mehr beschwören, außer \"Großmaul\"-Kreaturen. Diese Kreatur kann in dem Zug, in dem sie beschworen wurde, für die Effekte einer \"Großmaul\"-Kreatur geopfert werden. Wenn diese Kreatur geopfert wird, lösche sie."
+"name": "Großmaul-Schiffshalter",
+"effect": "Kontrollierst du mindestens 1 \"Großmaul\"-Kreatur, außer \"Großmaul-Schiffshalter\", darfst du diese Kreatur aus deiner Hand als zusätzliche Aktion beschwören. Wenn du das tust, kannst du danach für den Rest des Zuges keine Kreaturen mehr beschwören, außer \"Großmaul\"-Kreaturen. Diese Kreatur kann in dem Zug, in dem sie beschworen wurde, für die Effekte einer \"Großmaul\"-Kreatur geopfert werden. Wenn diese Kreatur geopfert wird, lösche sie."
 },
 "Greatmaw Shark": {
 "name": "Großmaul-Hai",
@@ -1444,7 +1444,7 @@
 "effect": "Das Level dieser Karte in deiner Hand wird für jedes Gefrorene Ziel auf dem Spielfeld um 1 verringert. Solange das Level dieser Kreatur 0 beträgt, darfst du sie als zusätzliche Aktion beschwören. Du darfst einmal pro Zug ein Gefrorenes Ziel wählen und ihm 150 Schaden zufügen."
 },
 "Mischief Militia - Chilly Dog": {
-"name": "Unfug-Miliz - Frostiger Hund",
+"name": "Unfug-Miliz - Chilly Dog",
 "effect": "Die Effekte und Fähigkeiten von Gefrorenen Zielen, die du kontrollierst (einschließlich dieses Ziels), werden nicht negiert (aber Gefrorene Helden können weiterhin keine Aktionen ausführen). Gefrorene Kreaturen, die du kontrollierst, können ihre aktiven Effekte in dem Zug verwenden, in dem sie beschworen wurden."
 },
 "Mischief Militia - Chilly Wizard": {
@@ -1484,7 +1484,7 @@
 "effect": "Wähle bis zu halb so viele Ziele auf dem Spielfeld, wie du Kreaturen kontrollierst (abgerundet), und friere sie für 1 Zug ein. Kontrollierst du mindestens 2 Kreaturen mit Level 0, zählt dies als zusätzliche Aktion. Du kannst nur 1 \"Die Weiße Armee\" pro Zug aktivieren."
 },
 "Cheeky Monkee": {
-"name": "Freche Monkee",
+"name": "Frecher Monkee",
 "effect": "Einmal pro Zug darfst du, wenn du durch einen Effekt 4 oder mehr Gold erhältst, dieses Gold sofort ausgeben, um ein Ziel zu wählen und ihm 80 Schaden zuzufügen. Du darfst einmal pro Zug 4 Investitionsmarker von einem Helden entfernen, den du kontrollierst, um einem beliebigen Ziel auf dem Spielfeld 80 Schaden zuzufügen."
 },
 "Criminal Monkee": {
@@ -1508,19 +1508,19 @@
 "effect": "Immer wenn eine \"Monkee\"-Kreatur in eine Unterstützungszone eines deiner Helden platziert wird oder das Spielfeld verlässt, erhältst du 4 Gold."
 },
 "Resilient Monkee": {
-"name": "Widerstandsfähiger Monkee",
-"effect": "Wenn du durch einen Effekt 4 oder mehr Gold erhältst, darfst du diese Kreatur sofort als zusätzliche Aktion aus deinem Ablagestapel beschwören, indem du dieses Gold ausgibst. Du kannst nur 1 \"Widerstandsfähiger Monkee\" pro Zug beschwören. Du darfst einmal pro Zug 10 Investitionsmarker von einem Helden entfernen, den du kontrollierst, um eine \"Monkee\"-Kreatur zu wählen, die du kontrollierst. Jeder Schaden, den diese Kreatur bis zum Beginn deines nächsten Zuges erleiden würde, wird negiert."
+"name": "Abgehärteter Monkee",
+"effect": "Wenn du durch einen Effekt 4 oder mehr Gold erhältst, darfst du diese Kreatur sofort als zusätzliche Aktion aus deinem Ablagestapel beschwören, indem du dieses Gold ausgibst. Du kannst nur 1 \"Abgehärteter Monkee\" pro Zug beschwören. Du darfst einmal pro Zug 10 Investitionsmarker von einem Helden entfernen, den du kontrollierst, um eine \"Monkee\"-Kreatur zu wählen, die du kontrollierst. Jeder Schaden, den diese Kreatur bis zum Beginn deines nächsten Zuges erleiden würde, wird negiert."
 },
 "Motharch Squire": {
 "name": "Mottarch-Knappe",
 "effect": "Wenn du diese Kreatur beschwörst, wähle bis zu 2 Artefakte mit verschiedenen Namen aus deinem Ablagestapel und mische sie zurück in dein Deck. Wenn diese Kreatur besiegt wird, darfst du in deinem Deck nach einem Artefakt suchen, es aufdecken und offen deiner Hand hinzufügen. Du kannst diesen Effekt von \"Mottarch-Knappe\" nur einmal pro Zug aktivieren."
 },
 "Afflicted Pests": {
-"name": "Geplagte Schädlinge",
+"name": "Befallene Schädlinge",
 "effect": "Aktiviere diese Überraschung, wenn dein Gegner eine Karte in die Unterstützungszone eines Helden ausrüstet oder anlegt. Wähle eine Karte in der Unterstützungszone eines beliebigen Helden und lege sie auf den Ablagestapel, dann platziere diese Kreatur in eine der freien Unterstützungszonen des Anwenders. Du darfst einmal pro Zug diese Kreatur, die du kontrollierst, verdeckt in die Überraschungszone des zugehörigen Helden bewegen."
 },
 "Afflicted Vermin": {
-"name": "Geplagtes Ungeziefer",
+"name": "Befallenes Ungeziefer",
 "effect": "Aktiviere diese Überraschung, wenn ein Spieler eine Kreatur beschwört. Wähle eine andere Kreatur und besiege sie, dann platziere diese Kreatur in eine der freien Unterstützungszonen des Anwenders. Du darfst einmal pro Zug diese Kreatur, die du kontrollierst, verdeckt in die Überraschungszone des zugehörigen Helden bewegen."
 },
 "Bakhm, the Desert Digger": {
@@ -1540,7 +1540,7 @@
 "effect": "Aktiviere diese Überraschung, wenn dein Gegner eine Fähigkeit an einen Helden anlegt. Wähle eine andere Fähigkeit, die an denselben Helden angelegt ist, und gib sie auf die Hand ihres ursprünglichen Besitzers zurück, dann platziere diese Kreatur in eine der freien Unterstützungszonen des Anwenders. Du darfst einmal pro Zug diese Kreatur, die du kontrollierst, verdeckt in die Überraschungszone des zugehörigen Helden bewegen."
 },
 "Pure Advantage Camel": {
-"name": "Kamel des reinen Vorteils",
+"name": "Pure Advantage Camel",
 "effect": "Aktiviere diese Überraschung, wenn dein Gegner außerhalb seiner Ressourcenphase eine oder mehrere Karten zieht. Ziehe eine Karte und platziere diese Kreatur in eine der freien Unterstützungszonen des Anwenders. Du darfst einmal pro Zug diese Kreatur, die du kontrollierst, verdeckt in die Überraschungszone des zugehörigen Helden bewegen."
 },
 "Ushabti of the Great Pharaoh": {
@@ -1737,26 +1737,26 @@
 },
 "Kappa Sword Slash": {
 "name": "Kappa-Schwerthieb",
-"effect": "Das Level dieses Angriffs in deiner Hand verringert sich um die Anzahl verschiedener \"Rebelliokai\"-Kreaturen in deinem Ablagestapel. Lösche 1 \"Rebelliokai Getarnter Kappa\" aus deinem Ablagestapel, um diese Karte zu spielen. Wähle ein Ziel und füge ihm 300 Schaden zu. Danach darfst du beliebig viele Gebiete vom Spielfeld entfernen."
+"effect": "Das Level dieses Angriffs in deiner Hand verringert sich um die Anzahl verschiedener \"Rebelliokai\"-Kreaturen in deinem Ablagestapel. Lösche 1 \"Rebelliokai Kamouflierter Kappa\" aus deinem Ablagestapel, um diese Karte zu spielen. Wähle ein Ziel und füge ihm 300 Schaden zu. Danach darfst du beliebig viele Gebiete vom Spielfeld entfernen."
 },
 "Kirin Firebreath": {
 "name": "Kirin-Feueratem",
-"effect": "Lösche 1 \"Rebelliokai Höfisches Kirin\" aus deinem Ablagestapel, um diese Karte zu spielen. Wähle ein Ziel und füge ihm 50 Schaden zu, und zwar so oft, wie du \"Rebelliokai\"-Kreaturen mit verschiedenen Namen in deinem Ablagestapel hast."
+"effect": "Lösche 1 \"Rebelliokai Kultiviertes Kirin\" aus deinem Ablagestapel, um diese Karte zu spielen. Wähle ein Ziel und füge ihm 50 Schaden zu, und zwar so oft, wie du \"Rebelliokai\"-Kreaturen mit verschiedenen Namen in deinem Ablagestapel hast."
 },
 "Kitsune Transformation": {
 "name": "Kitsune-Verwandlung",
 "effect": "Wähle bis zu 3 Kreaturen mit verschiedenen Namen aus deinem Ablagestapel, einschließlich \"Rebelliokai Gütiger Kitsune\", und mische sie zurück in dein Deck. Wähle dann dieselbe Anzahl Kreaturen mit voneinander und von den zurückgemischten Kreaturen verschiedenen Namen aus deinem Deck und füge sie offen deiner Hand hinzu. Wirf danach dieselbe Anzahl Karten ab. Ist dies der erste Magiekunst-Zauber, den du in diesem Zug verwendest, zählt dies als zusätzliche Aktion."
 },
 "Rebelliokai Backup Bakus": {
-"name": "Rebelliokai Ersatz-Bakus",
-"effect": "Wenn diese Karte von irgendwo außer deiner Hand oder dem Spielfeld auf den Ablagestapel gelegt wird, lösche sie. Einmal pro Zug, wenn du eine \"Rebelliokai\"-Kreatur außer \"Rebelliokai Ersatz-Bakus\" abwirfst, darfst du diese Karte aus deinem Ablagestapel deiner Hand hinzufügen, und wenn du das tust, ziehe 1 Karte. Du kannst mit diesem Effekt nur 1 \"Rebelliokai Ersatz-Bakus\" pro Zug zurückholen."
+"name": "Rebelliokai Backup-Bakus",
+"effect": "Wenn diese Karte von irgendwo außer deiner Hand oder dem Spielfeld auf den Ablagestapel gelegt wird, lösche sie. Einmal pro Zug, wenn du eine \"Rebelliokai\"-Kreatur außer \"Rebelliokai Backup-Bakus\" abwirfst, darfst du diese Karte aus deinem Ablagestapel deiner Hand hinzufügen, und wenn du das tust, ziehe 1 Karte. Du kannst mit diesem Effekt nur 1 \"Rebelliokai Backup-Bakus\" pro Zug zurückholen."
 },
 "Rebelliokai Camouflaged Kappa": {
-"name": "Rebelliokai Getarnter Kappa",
+"name": "Rebelliokai Kamouflierter Kappa",
 "effect": "Wenn diese Karte von irgendwo außer deiner Hand oder dem Spielfeld auf den Ablagestapel gelegt wird, lösche sie. Du darfst einmal pro Zug diese Kreatur, die du kontrollierst, opfern, um dein Deck nach einer Karte zu durchsuchen, sie offen deiner Hand hinzuzufügen und sie danach sofort abzuwerfen."
 },
 "Rebelliokai Courtly Kirin": {
-"name": "Rebelliokai Höfisches Kirin",
+"name": "Rebelliokai Kultiviertes Kirin",
 "effect": "Wenn diese Karte von irgendwo außer deiner Hand oder dem Spielfeld auf den Ablagestapel gelegt wird, lösche sie. Beschwöre diese Kreatur sofort, wenn dein Gegner den aktiven Effekt eines seiner Helden aktiviert, indem er eine andere \"Rebelliokai\"-Kreatur aus deiner Hand abwirft. Wenn du das tust, negiere den Effekt deines Gegners."
 },
 "Rebelliokai Kind Kitsune": {
@@ -1768,7 +1768,7 @@
 "effect": "Wenn diese Karte von irgendwo außer deiner Hand oder dem Spielfeld auf den Ablagestapel gelegt wird, lösche sie. Du kannst diese Kreatur nicht spielen, außer es befinden sich 5 oder mehr \"Rebelliokai\"-Kreaturen mit verschiedenen Namen in deinem Ablagestapel. Du darfst einmal pro Zug allen Zielen, die dein Gegner kontrolliert, 150 Schaden zufügen. Du kannst diesen Effekt von \"Rebelliokai Ahnungsloser Oni\" nur einmal pro Zug aktivieren."
 },
 "Rebelliokai Terror Tengu": {
-"name": "Rebelliokai Schrecken-Tengu",
+"name": "Rebelliokai Terror-Tengu",
 "effect": "Wenn diese Karte von irgendwo außer deiner Hand oder dem Spielfeld auf den Ablagestapel gelegt wird, lösche sie. Wenn du diese Kreatur beschwörst, darfst du sofort bis zu 3 \"Rebelliokai\"-Kreaturen mit verschiedenen Namen aus deinem Ablagestapel als zusätzliche Aktionen beschwören. Beende danach sofort deinen Zug."
 },
 "Rebelliokai Timid Tanuki": {
@@ -1781,7 +1781,7 @@
 },
 "Tengu Windstorm": {
 "name": "Tengu-Windsturm",
-"effect": "Lösche 1 \"Rebelliokai Schrecken-Tengu\" aus deinem Ablagestapel, um diese Karte zu spielen. Wähle eine beliebige Karte auf dem Spielfeld, die kein Held ist, und lege sie oben oder unten auf das Deck ihres Kontrolleurs. Ist dies die erste Aktion, die du in diesem Zug ausführst, zählt dies als zusätzliche Aktion."
+"effect": "Lösche 1 \"Rebelliokai Terror-Tengu\" aus deinem Ablagestapel, um diese Karte zu spielen. Wähle eine beliebige Karte auf dem Spielfeld, die kein Held ist, und lege sie oben oder unten auf das Deck ihres Kontrolleurs. Ist dies die erste Aktion, die du in diesem Zug ausführst, zählt dies als zusätzliche Aktion."
 },
 "Burning Skeleton": {
 "name": "Brennendes Skelett",
@@ -1864,7 +1864,7 @@
 "effect": "Einmal pro Zug, wenn eine \"Skelett\"-Kreatur, die du kontrollierst, von der Karte oder dem Effekt eines Gegners gewählt wird, darfst du diese Kreatur zurück auf deine Hand nehmen, um die Karte oder den Effekt zu negieren."
 },
 "Cloudy Slime": {
-"name": "Bewölkter Schleim",
+"name": "Wolkiger Schleim",
 "effect": "Wenn du diese Kreatur beschwörst, darfst du sofort eine Kreatur mit Level 0 aus deiner Hand in die freie Unterstützungszone eines beliebigen Helden platzieren, den du kontrollierst. Du kannst diesen Effekt nur einmal pro Zug aktivieren. Zu Beginn jedes deiner Züge darfst du das Level dieser Kreatur auf deiner Seite des Spielfelds um 1 erhöhen."
 },
 "Fiery Slime": {
@@ -1880,19 +1880,19 @@
 "effect": "Wenn du diese Kreatur beschwörst, wähle ein beliebiges Ziel auf dem Spielfeld und friere es bis zum Ende deines nächsten Zuges ein. Zu Beginn jedes deiner Züge darfst du das Level dieser Kreatur auf deiner Seite des Spielfelds um 1 erhöhen."
 },
 "Infinitely Reproducing Slime": {
-"name": "Sich unendlich vermehrender Schleim",
-"effect": "Dein Deck darf beliebig viele \"Sich unendlich vermehrender Schleim\" enthalten. Zu Beginn deines Zuges darfst du einen \"Sich unendlich vermehrender Schleim\" aus deiner Hand oder deinem Deck wählen und ihn in die Unterstützungszone eines beliebigen Helden platzieren, den du kontrollierst, aber negiere seinen Effekt bis zum Beginn deines nächsten Zuges."
+"name": "Endlos vermehrender Schleim",
+"effect": "Dein Deck darf beliebig viele \"Endlos vermehrender Schleim\" enthalten. Zu Beginn deines Zuges darfst du einen \"Endlos vermehrender Schleim\" aus deiner Hand oder deinem Deck wählen und ihn in die Unterstützungszone eines beliebigen Helden platzieren, den du kontrollierst, aber negiere seinen Effekt bis zum Beginn deines nächsten Zuges."
 },
 "Rocky Slime": {
 "name": "Felsiger Schleim",
 "effect": "Wenn du diese Kreatur beschwörst, wähle eine beliebige Kreatur in deiner Hand oder auf dem Spielfeld und verringere ihr Level dauerhaft um 1. Zu Beginn jedes deiner Züge darfst du das Level dieser Kreatur auf deiner Seite des Spielfelds um 1 erhöhen."
 },
 "Sandy Blob": {
-"name": "Sandiger Klecks",
+"name": "Sandiger Blob",
 "effect": "Bis zu 3-mal pro Zug darfst du, wenn der Beschwörungseffekt einer Kreatur, die du kontrollierst, aktiviert wird, ein Ziel wählen, das dein Gegner kontrolliert, und ihm 50 Schaden zufügen."
 },
 "Shadowy Slime": {
-"name": "Schattiger Schleim",
+"name": "Dunkler Schleim",
 "effect": "Wenn du diese Kreatur beschwörst, darfst du eine Kreatur mit Level 0 aus deinem Ablagestapel wählen und sie in eine freie Unterstützungszone des zugehörigen Helden platzieren. Tust du das, kannst du für den Rest des Zuges keine weiteren Kreaturen beschwören. Zu Beginn jedes deiner Züge darfst du das Level dieser Kreatur auf deiner Seite des Spielfelds um 1 erhöhen."
 },
 "Shiny Slime": {
@@ -1908,7 +1908,7 @@
 "effect": "Wenn du diese Kreatur beschwörst, wähle ein beliebiges Ziel auf dem Spielfeld und heile seine LP um 80. Zu Beginn jedes deiner Züge darfst du das Level dieser Kreatur auf deiner Seite des Spielfelds um 1 erhöhen."
 },
 "Sparky Slime": {
-"name": "Funkiger Schleim",
+"name": "Britzelnder Schleim",
 "effect": "Wenn du diese Kreatur beschwörst, wähle ein beliebiges Ziel auf dem Spielfeld und negiere seine Effekte und Fähigkeiten bis zu deinem nächsten Zug. Dies zählt als negativer Statuseffekt. Zu Beginn jedes deiner Züge darfst du das Level dieser Kreatur auf deiner Seite des Spielfelds um 1 erhöhen."
 },
 "Splashy Slime": {
@@ -1948,7 +1948,7 @@
 "effect": "Befindet sich in einer Unterstützungszone jedes deiner Helden mindestens 1 Kreatur, wird das Level dieser Kreatur in deiner Hand zu 0. Zu Beginn jedes deiner Züge platzierst du diese Kreatur, wenn möglich, in die freie Unterstützungszone eines benachbarten Helden. Wenn diese Kreatur in die Unterstützungszone eines anderen Helden bewegt wird, wähle entweder den Helden deines Gegners an derselben Position oder eine Kreatur in einer der Unterstützungszonen dieses Helden und füge ihr 120 Schaden zu."
 },
 "Dirty Smuggler": {
-"name": "Schmutziger Schmuggler",
+"name": "Dreckiger Schmuggler",
 "effect": "Immer wenn dein Gegner durch einen Effekt 1 oder mehr Karten zieht, darfst du das Vierfache an Gold stehlen. Hat dein Gegner kein Gold, ziehst du stattdessen doppelt so viele Karten und negierst danach den Effekt dieser Kreatur für den Rest des Zuges."
 },
 "Smuggler's Pier": {
@@ -2044,7 +2044,7 @@
 "effect": "Solange du eine andere \"Spinnen\"-Kreatur kontrollierst, zählt die Beschwörung dieser Kreatur als zusätzliche Aktion. Du kannst pro Zug nur 1 \"Baby-Spinne\" mit diesem Effekt beschwören. Du darfst diese Kreatur opfern, um sofort eine Überraschung in der Überraschungszone eines deiner Helden zu aktivieren, als hätte ein beliebiges Ziel ihre Aktivierungsbedingung erfüllt."
 },
 "Box Spider": {
-"name": "Kastenspinne",
+"name": "Kistenspinne",
 "effect": "Du darfst 3 Überraschungen, die du kontrollierst, auf den Ablagestapel legen, um diese Kreatur als zusätzliche Aktion zu beschwören. Am Ende jedes deiner Züge darfst du, wenn der zugehörige Held keine Überraschung in seiner Überraschungszone hat, in deinem Deck nach einer Überraschung suchen und sie verdeckt in seine Überraschungszone platzieren, ohne sie deinem Gegner zu zeigen."
 },
 "Brain Spider": {
@@ -2104,7 +2104,7 @@
 "effect": "Immer wenn du 1 oder mehr Karten abwirfst, werden die aktuellen und maximalen LP dieser Kreatur um das 10-Fache der Anzahl der abgeworfenen Karten erhöht. Du darfst einmal pro Zug diese Kreatur, die du kontrollierst und die nicht in diesem Zug beschworen wurde, opfern, um eine beliebige Kreatur aus deinem Deck, deren maximale LP kleiner oder gleich den aktuellen LP dieser Kreatur sind, in ihre Unterstützungszone zu platzieren. Würde diese Kreatur zusätzliche Opfer erfordern, werden diese Opfer negiert."
 },
 "Steam Dwarf Exterminator": {
-"name": "Dampfzwerg-Vernichter",
+"name": "Dampfzwerg-Kammerjäger",
 "effect": "Immer wenn du 1 oder mehr Karten abwirfst, werden die aktuellen und maximalen LP dieser Kreatur um das 10-Fache der Anzahl der abgeworfenen Karten erhöht. Du darfst einmal pro Zug ein Ziel wählen und ihm Schaden in Höhe der aktuellen LP dieser Kreatur zufügen. Dieser Schaden kann nicht höher als 200 sein."
 },
 "Steam Dwarf Miner": {
@@ -2148,19 +2148,19 @@
 "effect": "Dein Gegner kann mit Karteneffekten keine Karten zurück in sein Deck mischen. Immer wenn du mit einem Effekt 2 oder mehr Karten zurück in dein Deck mischst, ziehst du 1 Karte, nachdem der Effekt aufgelöst wurde."
 },
 "Tuscan Aristocrat": {
-"name": "Toskanischer Aristokrat",
+"name": "Tuskanischer Aristokrat",
 "effect": "Solange du diese Kreatur kontrollierst, kann dein Gegner außerhalb seiner Ressourcenphase kein Gold erhalten."
 },
 "Tuscan Artist": {
-"name": "Toskanischer Künstler",
+"name": "Tuskanischer Künstler",
 "effect": "Solange du diese Kreatur kontrollierst, wird jeder Effekt, der es deinem Gegner erlauben würde, 2 oder 3 Karten zu ziehen, negiert."
 },
 "Tuscan Mystic": {
-"name": "Toskanischer Mystiker",
+"name": "Tuskanischer Mystiker",
 "effect": "Solange du diese Kreatur kontrollierst, kann dein Gegner keine Tränke aktivieren. \nImmer wenn du eine Karte aus deinem Trankdeck ziehen würdest, darfst du stattdessen die obersten 2 Karten deines Trankdecks aufdecken und sofort eine davon abhandeln. \nLösche danach beide aufgedeckten Karten."
 },
 "Tuscan Prisoner": {
-"name": "Toskanischer Gefangener",
+"name": "Tuskanischer Gefangener",
 "effect": "Solange du diese Kreatur kontrollierst, bist du von allen Effekten, die deinen Zug beenden würden, nicht betroffen."
 },
 "Deep-Drowned Waflav": {
@@ -2253,7 +2253,7 @@
 "effect": "1) Du darfst einmal pro Zug deine Aktion verwenden, um 10 Gold zu erhalten.\n2) Du darfst einmal pro Zug deine Aktion verwenden, um 20 Gold zu erhalten.\n3) Du darfst einmal pro Zug deine Aktion verwenden, um 30 Gold zu erhalten."
 },
 "Aggressive Town Guard": {
-"name": "Aggressiver Stadtwächter",
+"name": "Aggressive Stadtwache",
 "effect": "Ist dies die erste Kreatur, die du in diesem Zug beschwörst, zählt das Beschwören dieser Kreatur als zusätzliche Aktion. Solange du diese Kreatur kontrollierst, darfst du einmal pro Zug ein Ziel wählen und ihm 50 Schaden zufügen."
 },
 "Albrecht, the Nerd": {
@@ -2730,8 +2730,8 @@
 "effect": "Du darfst einmal pro Zug einen Helden wählen, den dein Gegner kontrolliert, und ihm sowie allen Kreaturen in seinen Unterstützungszonen 50 Schaden zufügen."
 },
 "Celia, the Class Clown": {
-"name": "Celia, die Klassenclownin",
-"effect": "Wenn dein Gegner während seines Zuges einen Zauber aktiviert, darfst du einmal pro Zug das Level dieses Zaubers um 1 erhöhen. Ist das Level dieses Zaubers dann zu hoch für seinen Anwender, negiere ihn und lege ihn auf den Ablagestapel. War dies die Aktion deines Gegners, darf er sofort eine zusätzliche Aktion ausführen. Du kannst nur 1 \"Celia, die Klassenclownin\" kontrollieren."
+"name": "Celia, der Klassenclown",
+"effect": "Wenn dein Gegner während seines Zuges einen Zauber aktiviert, darfst du einmal pro Zug das Level dieses Zaubers um 1 erhöhen. Ist das Level dieses Zaubers dann zu hoch für seinen Anwender, negiere ihn und lege ihn auf den Ablagestapel. War dies die Aktion deines Gegners, darf er sofort eine zusätzliche Aktion ausführen. Du kannst nur 1 \"Celia, der Klassenclown\" kontrollieren."
 },
 "Cell Escape": {
 "name": "Zellflucht",
@@ -2872,7 +2872,7 @@
 },
 "Coreling": {
 "name": "Kernling",
-"effect": "Hast du seit Beginn dieses Zuges ein Ziel deines Gegners besiegt, wird das Level dieser Kreatur in deiner Hand zu 0 und du darfst diese Kreatur während deiner ersten Hauptphase als zusätzliche Aktion beschwören, wenn du in diesem Zug noch keinen \"Kernling\" beschworen hast. Du darfst einmal pro Zug ein Ziel wählen und ihm 50 Schaden zufügen. Ist ein Gebiet im Spiel, füge stattdessen 150 Schaden zu. Kontrollierst du \"Geist der ultimativen Feuerwaffe\", darf diese Kreatur diesen Effekt in dem Zug verwenden, in dem sie beschworen wurde."
+"effect": "Hast du seit Beginn dieses Zuges ein Ziel deines Gegners besiegt, wird das Level dieser Kreatur in deiner Hand zu 0 und du darfst diese Kreatur während deiner ersten Hauptphase als zusätzliche Aktion beschwören, wenn du in diesem Zug noch keinen \"Kernling\" beschworen hast. Du darfst einmal pro Zug ein Ziel wählen und ihm 50 Schaden zufügen. Ist ein Gebiet im Spiel, füge stattdessen 150 Schaden zu. Kontrollierst du \"Geist der ultimativen Knarre\", darf diese Kreatur diesen Effekt in dem Zug verwenden, in dem sie beschworen wurde."
 },
 "Corpse Explosion": {
 "name": "Leichenexplosion",
@@ -3181,7 +3181,7 @@
 "effect": "Wenn du diese Kreatur beschwörst, wähle einen beliebigen Helden auf dem Spielfeld. Solange diese Kreatur auf dem Spielfeld bleibt, wird der Angriffswert dieses Helden zu 0 und kann auf keine Weise \nerhöht werden."
 },
 "Doomed Town Guard": {
-"name": "Verdammter Stadtwächter",
+"name": "Verdammte Stadtwache",
 "effect": "Beschwöre diese Kreatur sofort, wenn ein oder mehrere Ziele, die du kontrollierst, durch die Karte oder den Effekt eines Gegners besiegt werden. Dein Gegner kann keine anderen Kreaturen wählen, die du kontrollierst. Am Ende deines Zuges wird diese Kreatur besiegt."
 },
 "Draw": {
@@ -3281,7 +3281,7 @@
 "effect": "Heile den Anwender um 100 LP. Füge dann allen Zielen, die dein Gegner kontrolliert, Schaden in Höhe der Hälfte der geheilten LP zu (aufgerundet)."
 },
 "Enhanced Guard Dog": {
-"name": "Verbesserter Wachhund",
+"name": "Verstärkter Wachhund",
 "effect": "Beschwöre diese Kreatur sofort als zusätzliche Aktion, wenn genau 1 Karte auf deiner Seite des Spielfelds durch die Karte oder den Effekt eines Gegners auf den Ablagestapel gelegt würde. Negiere diese Karte oder diesen Effekt."
 },
 "Enigma, the Seller of Secrets": {
@@ -3365,7 +3365,7 @@
 "effect": "Wähle ein Ziel, füge ihm Schaden in Höhe des Basis-Angriffswerts des Anwenders zu und betäube es für 1 Zug. Ist dies der zweite Angriff, den du in diesem Zug verwendet hast, wird der Anwender um den von diesem Angriff verursachten Schaden geheilt. Ist dies der dritte Angriff, kann dieser Angriff ein Ziel betäuben, das im letzten Zug bereits von einem lähmenden Statuseffekt betroffen war."
 },
 "Festive Werz": {
-"name": "Festlicher Werz",
+"name": "Festliche Werz",
 "effect": "Wenn du diese Kreatur beschwörst, zahle deinem Gegner eine beliebige Menge Gold. Ziehe dann für je 5 so gezahlte Gold eine Karte, höchstens jedoch 4. Du kannst diesen Effekt nur einmal pro Zug aktivieren."
 },
 "Fiedel, the Mercenary Mage": {
@@ -3837,7 +3837,7 @@
 "effect": "Diese Kreatur kann von nirgendwo außer aus deiner Hand beschworen werden. Der Schaden aller \"Armageddon\"-Zauber, die ein beliebiger Spieler aktiviert, wird um 100 erhöht. Diese Kreatur ist von \"Armageddon\" nicht betroffen."
 },
 "Inconspicuous Lawn Gnome": {
-"name": "Unauffälliger Gartenzwerg",
+"name": "Unverdächtiger Gartenzwerg",
 "effect": "Du darfst einmal pro Zug das Level dieser Karte in deiner Hand oder auf dem Spielfeld, solange du sie kontrollierst, auf ein beliebiges Level von 0 bis 3 ändern."
 },
 "Infallible Oracle Pythia": {
@@ -3941,8 +3941,8 @@
 "effect": "Die Level von Magiekunst-Zaubern in deiner Hand werden um die Anzahl der Kreaturen, die du kontrollierst, verringert. Wenn eine Kreatur, die du kontrollierst, besiegt wird, darfst du einmal pro Zug, während des Zuges deines Gegners, sofort einen Magiekunst-Zauber aus deiner Hand als zusätzliche Aktion mit diesem Helden ausführen."
 },
 "Kai, the Rowdy": {
-"name": "Kai, der Rabauke",
-"effect": "Du darfst diese Kreatur als zusätzliche Aktion mit einem Helden beschwören, der mindestens Kampfkunst 2 hat. Für jedes Level Kampfkunst, die der zugehörige Held hat, darf er Zauber verwenden, die 1 Level höher sind, als er sonst könnte. Du kannst nur 1 \"Kai, der Rabauke\" kontrollieren."
+"name": "Kai, der Schläger",
+"effect": "Du darfst diese Kreatur als zusätzliche Aktion mit einem Helden beschwören, der mindestens Kampfkunst 2 hat. Für jedes Level Kampfkunst, die der zugehörige Held hat, darf er Zauber verwenden, die 1 Level höher sind, als er sonst könnte. Du kannst nur 1 \"Kai, der Schläger\" kontrollieren."
 },
 "Kassaran, Seer of Everything": {
 "name": "Kassaran, Seher von Allem",
@@ -4301,7 +4301,7 @@
 "effect": "Wähle eine beliebige Kreatur oder einen Helden mit 150 oder weniger LP und besiege das Ziel. Das Level dieses Angriffs wird um das Level der Kreatur mit dem höchsten Level, die du kontrollierst, verringert. Dein Gegner kann nicht auf diesen Angriff reagieren, und dieser ignoriert jeden Effekt, der ihn negieren oder verhindern würde, dass das Ziel besiegt wird."
 },
 "Mimic": {
-"name": "Mimic",
+"name": "Mimik",
 "effect": "Stiehl zu Beginn jedes deiner Züge 10 Gold von deinem Gegner."
 },
 "Mind Control": {
@@ -4769,7 +4769,7 @@
 "effect": "Beide Spieler wählen abwechselnd Ziele, die ihr Gegner kontrolliert und die noch nicht mit diesem Effekt gewählt wurden, bis ein Spieler kein neues Ziel wählen kann. Du beginnst. Das erste Ziel erleidet Schaden in Höhe des Angriffswerts des Angreifers. Jedes weitere Ziel erleidet halb so viel Schaden wie das vorherige (aufgerundet)."
 },
 "Riffel, Master of the Ultimate Gun": {
-"name": "Riffel, Meisterin der ultimativen Feuerwaffe",
+"name": "Riffel, Meisterin der ultimativen Knarre",
 "effect": "Du musst diesen Helden aus deiner Hand auf einen \"Zukunftstech-Revolverheldin Riffel\" spielen, den du kontrollierst und der mit \"Unendlicher Alttech-Energiekern\" und \"Zukunftstech-Pistole\" ausgerüstet ist. Du darfst einmal pro Zug eine Karte aus deinem Deck wählen, sie offen deiner Hand hinzufügen. Lege dann so viele Exemplare dieser Karte wie möglich aus deinem Deck auf den Ablagestapel."
 },
 "Rioting Village": {
@@ -4861,7 +4861,7 @@
 "effect": "Wenn dieser Held einen normalen Unterstützungsmagie-Zauber verwendet, dessen Level niedriger als sein Unterstützungsmagie-Level ist, darf er ihn danach sofort ein zweites Mal wirken."
 },
 "Scavenging Crane": {
-"name": "Aasfressender Kranich",
+"name": "Futtersuchender Kranich",
 "effect": "Wenn du diese Kreatur beschwörst, sieh dir die obersten 5 Karten deines Decks an und lege sie in beliebiger Reihenfolge zurück. Danach darfst du dein Deck mischen. Ziehe dann 1 Karte."
 },
 "Secret Entrance": {
@@ -5098,7 +5098,7 @@
 "effect": "Diese Kreatur kann nur von einem Helden beschworen werden, an den \"Super-Tötungsmesser, das Werkzeug der Liquidation\" ausgerüstet ist. Wenn du diese Kreatur beschwörst, darfst du eine beliebige andere Kreatur auf dem Spielfeld wählen und sie besiegen. Solange diese Kreatur auf dem Spielfeld bleibt, wird jeder Held und jede Kreatur, der oder die besiegt wird, gelöscht. Wird ein Held durch diesen Effekt gelöscht, lösche alle Karten in seinen Fähigkeitszonen."
 },
 "Spirit of the Ultimate Gun": {
-"name": "Geist der ultimativen Feuerwaffe",
+"name": "Geist der ultimativen Knarre",
 "effect": "Diese Kreatur kann nur von einem Helden beschworen werden, an den \"Unendlicher Alttech-Energiekern\" ausgerüstet ist. Solange du diese Kreatur kontrollierst, wird der gesamte Schaden, den andere Kreaturen (deine und die deines Gegners) mit ihren aktiven Effekten verursachen, verdoppelt, kann aber nicht durch andere Effekte erhöht werden."
 },
 "Spreading Rumor": {
@@ -5743,7 +5743,7 @@
 "effect": "Einmal pro Zug darfst du, wenn die Karte oder der Effekt eines Gegners genau ein anderes Ziel wählt, das du kontrollierst, eine Karte abwerfen, um sie auf diese Kreatur umzulenken. Wird diese Kreatur durch eine Karte oder einen Effekt besiegt, der durch diesen Effekt umgelenkt wurde, füge einem beliebigen Ziel 150 Schaden zu."
 },
 "Wire Hatchling": {
-"name": "Draht-Küken",
+"name": "Kabel-Küken",
 "effect": "Wenn du diese Kreatur beschwörst, wähle ein beliebiges Ziel auf dem Spielfeld und füge ihm Schaden in Höhe der Hälfte seiner aktuellen LP zu (aufgerundet)."
 },
 "Wisdom": {
@@ -5852,112 +5852,335 @@
 "Steam Dwarfs": "Dampfzwerge",
 "Tamed": "Gezähmt",
 "Trials": "Prüfungen",
-"Tuscan": "Toskanisch",
+"Tuscan": "Tuskanisch",
 "Waflav": "Waflav",
 "War Counselors": "Kriegsberater"
 },
 "_gender": {
 "\"Bloom\", the Continent Corruptor": "n",
+"3-Headed Giant": "m",
+"500 Piranhas in a Monster Suit": "p",
 "???, the Shapeshifter": "m",
 "???, the Throne Robber": "m",
+"Afflicted Pests": "p",
+"Afflicted Vermin": "n",
+"Aggressive Town Guard": "w",
+"Albrecht, the Nerd": "m",
 "Alex, Trainer of Heroes": "m",
 "Alice, the Puppeteer Girl": "w",
 "Alice, the Transfer Student": "w",
 "Alleria, the Queen of Spiders": "w",
+"Analyzer from the Cosmic Depths": "m",
+"Ancient Guardian Statue": "w",
 "Andras, the Human Weapon": "m",
+"Angler Angel": "m",
+"Ankhota, the Burier": "m",
+"Aquanian Orkallion": "m",
+"Arcane Eyes": "p",
+"Archer": "m",
+"Archer of Teocuilatl": "m",
 "Archibald, the Archmage": "m",
 "Argos, the Eye of the Cosmos": "n",
 "Arnold, the Maximum Lotl": "m",
 "Arthor, Inheritor of the Barbarian Sword": "m",
 "Arthor, the King of Blackport": "m",
+"Ash Worms": "p",
 "Asriel, the Sapling Sacrificer": "m",
+"Assault Eagle": "m",
 "Atta, Speaker of Desires": "w",
 "Baaliel, the Demon General": "m",
+"Baby Spider": "w",
 "Bad Birthday Girl Cecilia": "w",
 "Bakhm, the Desert Digger": "m",
+"Ballad Harpyformer": "m",
+"Barkeeper": "m",
 "Barker, the Monster Tamer": "m",
 "Beato, the Butterfly Witch": "w",
 "Beato, the Eternal Butterfly": "w",
+"Big Gwen Guard": "m",
 "Bill, the Angry Auctioneer": "m",
+"Biomancy Token": "m",
+"Bird": "m",
+"Bishop of Kings [B]": "m",
+"Bishop of Kings [W]": "m",
+"Black Marketeer": "m",
+"Black-Thorn Dragon": "m",
+"Blackport Soldier #55": "m",
 "Blackstache, Scourge of the Pixel Seas": "m",
 "Bloom, the Maniacal Botanist": "n",
+"Blue-Ice Dragon": "m",
 "Bomb Berserker Bartas": "m",
+"Bomb Mite": "w",
+"Bomblebee": "w",
+"Bonded Companion Humby": "m",
+"Bonded Companion Mellvy": "m",
+"Bonded Companion Orphy": "m",
+"Bonded Companion Thuly": "m",
 "Boris, the Guardian of Blackport": "m",
+"Bouldor Demon": "m",
 "Bow Sniper Darge": "m",
+"Box Spider": "w",
 "Brackle, the Catapulting Turtle": "m",
+"Brain Spider": "w",
 "Broghan, the Frozen Guardian of the North": "m",
 "Bubbles, the Bouncy Bunny": "m",
+"Bunny Bombs": "p",
+"Burning Skeleton": "n",
+"Buttap": "m",
+"Cactus Creature": "w",
 "Calamitusk, the Chaorc War Chief": "m",
+"Candlestick Squire": "m",
+"Cannon Tower": "m",
 "Card Game Player Inya": "w",
+"Cardinal Beast Baihu": "w",
+"Cardinal Beast Qinglong": "w",
+"Cardinal Beast Xuanwu": "w",
+"Cardinal Beast Zhuque": "w",
+"Carpet Bomblebee": "w",
 "Carris, the Time Keeper": "m",
+"Cats of the Pharaoh": "p",
+"Cavalry": "w",
 "Cecilia, the Harrowing Crusader": "w",
+"Celia, the Class Clown": "w",
+"Censpartan War Counselor": "m",
 "Champion, the Eye of the Storm": "m",
 "Champion, the Stormbringer": "m",
+"Chaorc Cannon Fodder": "n",
+"Chaorc Corpse Cannibal": "m",
+"Chaorc Friendly Fireballer": "m",
+"Chaorc Pyre Grill Master": "m",
+"Chaorc Rider Warg": "m",
+"Chaorc Ruin Mourner": "m",
 "Chaos-Diamond, the Cracked Keeper": "m",
+"Chatty Town Guard": "w",
+"Cheeky Monkee": "m",
+"Cheering Rabbit": "n",
+"Chosen Sacrifice": "n",
 "Chuck, the Crazy Veteran": "m",
 "Chuck, the Storyteller": "m",
+"Classical Harpyformer": "m",
+"Clausss, the No-Nonsense Cultist": "m",
+"Clone": "m",
+"Cloudy Slime": "m",
 "Codumbus, the Clueless Voyager": "m",
+"Cold-Hearted Yuki-Onna": "w",
 "Cool Birthday Girl Monia": "w",
 "Cool Rescuer Monia": "w",
 "Cooldin, King of Coolness": "m",
+"Coreling": "m",
+"Cosmic Exploding Skull": "m",
+"Cosmic Skeleton": "n",
+"Country Harpyformer": "m",
+"Creepy Villager": "m",
+"Criminal Monkee": "m",
+"Crimson Skull Spider": "w",
+"Crum, the Class Pet": "n",
+"Crying Seagulls": "p",
 "Cuberto, Supreme Lord of Edges": "m",
 "Cute Angel Molinda": "w",
 "Cute Annoyance Mini": "w",
+"Cute Bird": "m",
+"Cute Bunny": "n",
+"Cute Cat": "w",
 "Cute Ditz Monami": "w",
+"Cute Dog": "m",
+"Cute Familiar": "m",
+"Cute Hydra": "w",
 "Cute Meanie Melissa": "w",
 "Cute Nerd Magenta": "w",
+"Cute Phoenix": "m",
 "Cute Princess Mary": "w",
+"Cute Spider": "w",
 "Cute Starlet Megu": "w",
+"Cybug ANTS": "p",
+"Cybug BEE": "w",
+"Cybug CENTIPEDE": "m",
+"Cybug LADYBUG": "m",
+"Cybug LOCUST": "w",
+"Cybug RHINOCEROS": "m",
+"Cybug SCARAB": "m",
+"Cyclson": "m",
+"Cykyran War Counselor": "m",
 "Dajan, Conqueror of the Treasure Cave": "m",
 "Damus, the Prophet of Apocalypse": "m",
 "Dante, the Wanderer of Hell": "m",
 "Darion, the Blood-Crazy Groundskeeper": "m",
+"Dark Deepsea God": "m",
 "Deep-Drowned Waflav": "m",
+"Deepsea Bats": "p",
+"Deepsea Horror Clown": "m",
+"Deepsea Jack O' Lantern": "w",
+"Deepsea Monstrosity": "w",
+"Deepsea Mummy": "w",
+"Deepsea Pirate": "m",
+"Deepsea Poltergeister": "p",
+"Deepsea Primordium": "n",
+"Deepsea Reaper": "m",
+"Deepsea Siren": "w",
+"Deepsea Skeleton": "n",
+"Deepsea Stein": "m",
+"Deepsea Succubus": "m",
+"Deepsea Werewolf": "m",
+"Deepsea Witch": "w",
+"Deepsea Zombie": "m",
 "Definitely not Andras, the Human Weapon": "m",
+"Demon's Gate": "n",
 "Devlin, the Masked Butcher": "m",
+"Diamond Spider": "w",
 "Diamond, the Bulwark of Peace": "m",
 "Diamond, the Keeper of Peace": "m",
+"Dirty Smuggler": "m",
+"Disease Fairy Leprochaun": "w",
+"Disgruntled Forest Warden": "m",
+"Dive Bomblebee": "w",
+"Doctor Fester": "m",
 "Don Quisto, the Gold Seeker": "m",
+"Doomed Pirate": "m",
+"Doomed Town Guard": "w",
+"Dragolfin": "m",
+"Dragsparov, the King of Dragons": "m",
+"Drill Sergeant": "m",
+"Duigno, the Flaming Phoenix": "m",
+"Eager Oarsman": "m",
 "Elana, the Rocky Rebel": "w",
+"Ellie, the Class President": "w",
+"Elusive Hind": "w",
+"Elven Archer": "m",
+"Elven Druid": "m",
+"Elven Forager": "m",
+"Elven Leader": "m",
+"Elven Rider": "m",
+"Embodiment of Aeterna": "w",
+"Embodiment of Biseria": "w",
+"Empty Armor": "w",
+"Enhanced Guard Dog": "m",
 "Enigma, the Seller of Secrets": "w",
+"Ethan, the Prodigy": "n",
+"Exploding Skull": "m",
+"Explosive Drone": "w",
 "Fairy Queen Crestina, the Creation Fairy": "w",
 "Feral, the Fortress Breaker": "m",
 "Fern, the Liberated Fairy": "m",
 "Fern, the Ship Slave": "m",
+"Ferocious Jaguar Warrior": "m",
+"Festive Werz": "w",
 "Fiedel, the Mercenary Mage": "m",
+"Field Cannon": "w",
+"Fiery Slime": "m",
 "Fiona, the Empty Vessel of a Forgotten Sorceress": "w",
 "Fiona, the Princess of Blackport": "w",
 "Flamebathed Waflav": "m",
+"Flaming Dragonegg": "n",
+"Foresta, the Guard": "m",
 "Freshya, Beauty of Coolness": "w",
 "Friedhelm, the Misled Avenger": "m",
+"Frolake": "w",
+"Front Soldier": "m",
+"Fruit Bat, Nosferapple": "m",
+"Fun-Fun Circus Clown": "m",
+"Fun-Fun Circus Director": "m",
+"Fun-Fun Circus Elephant": "m",
+"Fun-Fun Circus Strongman": "m",
+"Future Tech Drone": "w",
 "Future Tech Gunslinger Riffel": "w",
+"Future Tech Mech": "m",
 "Gabby, the Boarding Broad": "w",
 "Gabby, the Pirate Zombie": "w",
+"Gangster Angel": "m",
 "Garius, the Great Reformer": "m",
+"Gatherer from the Cosmic Depths": "m",
 "George, the Mad Tyrant King": "m",
+"Gerrymander": "m",
 "Ghazma, the Worm Feeder": "m",
+"Ghoul Guard": "m",
 "Ghuanjun, the Undead Martial Artist": "m",
+"Giant Exploding Skull": "m",
+"Gigantisaur Ankylos": "m",
+"Gigantisaur Brachion": "m",
+"Gigantisaur Chimera": "m",
+"Gigantisaur King Trex": "m",
+"Gigantisaur Pteranos": "m",
+"Gigantisaur Raptoren": "p",
+"Gigantisaur Spinor": "m",
+"Gigantisaur Stegon": "m",
+"Gigantisaur Triceras": "m",
+"Glasowt": "m",
 "Gobbo, Chief of Goblin": "m",
+"Goff, the Burnbringer": "m",
+"Golden Exploding Skull": "m",
+"Golden Ladybug": "m",
+"Golden Vermin": "n",
 "Gon, the Frostbringer": "m",
+"Gorinthian War Counselor": "m",
 "Grand Inquisitor Karian": "m",
+"Grave Worm": "m",
+"Gravedigger": "m",
 "Great Detective Doq": "m",
+"Great Immortal Hydra": "w",
+"Great Vanguard Demon": "m",
+"Greatmaw Remora": "w",
+"Greatmaw Shark": "m",
+"Greatmaw Siren": "w",
+"Green Dragoneer": "m",
+"Grinning Cat": "w",
 "Grisgar, Emissary of the Demon Lord": "m",
+"Grunge Harpyformer": "m",
+"Guardian Beast Gou": "w",
+"Guardian Beast Hou": "w",
+"Guardian Beast Hu": "w",
+"Guardian Beast Ji": "w",
+"Guardian Beast Long": "w",
+"Guardian Beast Ma": "w",
+"Guardian Beast Niu": "w",
+"Guardian Beast She": "w",
+"Guardian Beast Shu": "w",
+"Guardian Beast Tu": "w",
+"Guardian Beast Yang": "w",
+"Guardian Beast Zhu": "w",
+"Guardian of Teocuilatl": "m",
 "Güldefaber, the King of Dwarfs": "m",
+"Hammer Horse": "n",
+"Hammer Skeleton": "n",
+"Hardy Slime": "m",
+"Haressassin": "m",
+"Harpthenean War Counselor": "m",
+"Harpyformer Choir": "m",
 "Hatusbal, the Leader of Tusca": "m",
 "Hel, the Bound Specter": "w",
+"Hell Fox": "m",
 "Heragas, the Monster Slayer": "m",
+"Herbithorn Demon": "m",
+"Hipdall, Protector of Coolness": "m",
+"Hockey Genie": "m",
+"Horned Demon": "m",
+"Hot Skull Potato": "w",
 "Hulijing, the Foxdemon": "w",
+"Hydrogen Demon": "m",
+"Icy Dragonegg": "n",
+"Icy Slime": "m",
 "Ida, the Adept of Destruction": "w",
 "Idej Lord Daiyo": "m",
 "Idej Lord Nobunakin": "m",
 "Idej Lord Shoguwana": "m",
 "Idej Lord Todugawin": "w",
+"Ifrit": "m",
+"Inconspicuous Lawn Gnome": "m",
+"Infallible Oracle Pythia": "n",
+"Infected Greatmaw": "n",
+"Infected Squirrel": "n",
+"Infernous Demon": "m",
+"Infinitely Reproducing Slime": "m",
+"Informant": "m",
 "Ingo, Investor of Evil": "m",
+"Invader from the Cosmic Depths": "m",
+"Inverted Centaur": "m",
 "Jack, the Crooked Killer": "m",
 "Jean, the Pillaging Knight": "m",
 "Jenny, the Class Fairy": "w",
 "Johanna, Crusader of Light": "w",
+"Jumper Spider": "w",
 "Junshi, the Tactical Genius": "m",
+"Kai, the Rowdy": "m",
 "Kasperov, the King of Kings [B]": "m",
 "Kasperov, the King of Kings [W]": "m",
 "Kassaran, Seer of Everything": "m",
@@ -5966,16 +6189,23 @@
 "Kerthwack, the Reality Breaker": "m",
 "Key, the Cursed Thief": "w",
 "Kit, the Shark Researcher": "m",
+"Klaus' Mom": "w",
 "Klaus, the Cult Leader": "m",
+"Knight of Kings [B]": "m",
+"Knight of Kings [W]": "m",
 "Kohta, Master of Super-Killing": "m",
 "Kohta, the Silent Observer": "m",
 "Koperniko, the Stargazer": "m",
 "Krates, the Smartass": "m",
 "Kyli, the Deceptive Sapling": "w",
+"Lamenting Knight": "m",
+"Land Sharks": "p",
 "Layn, Defender of Deri": "w",
 "Layn, Master of Deri's Relic": "w",
+"Leafagami Snake": "w",
 "Legendary Explorer Dajan": "m",
 "Lethe, the Forgetful Fixer": "w",
+"Life-Searcher from the Cosmic Depths": "m",
 "Lilly, the Charming Infiltrator": "w",
 "Little Lyta, the Amazon Princess": "w",
 "Lizbeth, the Reaper of the Light": "w",
@@ -5985,102 +6215,295 @@
 "Lolek, the Shard Knight": "m",
 "Lolki, Trickstar of Coolness": "m",
 "Lord Mithuru, the Rotten Mastermind": "m",
+"Lovely Teddy": "m",
+"Loyal Beagle": "m",
+"Loyal Bone Dog": "m",
+"Loyal Hountriever": "m",
+"Loyal Labradoodle": "m",
+"Loyal Pinpom": "m",
+"Loyal Rottweiler": "m",
+"Loyal Shepherd": "m",
+"Loyal Terrier": "m",
+"Luna Kiai": "w",
 "Luna Pele, the Flame Dancer": "w",
 "Luna, the Flame Fairy": "w",
+"Lunatic Golem": "m",
+"Lunatic Hawk": "m",
 "Madaga, the Forsaken Seafarer": "m",
 "Madame Guillotine, the Great Equalizer": "w",
 "Maho, the Cute Magical Girl": "w",
+"Man-Eater Birds": "p",
 "Mao, the Vengeful Guardian": "m",
 "Marianne, the Cocky Caretaker": "w",
 "Mary Crestmas": "w",
+"Mausoleum Worm": "m",
 "Maya, the Nature Fairy": "w",
+"Mean Cute Cat": "w",
 "Medea, the Swamp Witch": "w",
+"Metal Harpyformer": "m",
+"Mimic": "w",
+"Minocrete War Counselor": "m",
 "Mirjam, the Fallen Cute Angel": "w",
+"Mischief Militia - Banner Bearer": "m",
+"Mischief Militia - Bear Rider": "m",
+"Mischief Militia - Chilly Dog": "m",
+"Mischief Militia - Chilly Wizard": "m",
+"Mischief Militia - Colored Snow": "m",
+"Mischief Militia - Heli Troopers": "p",
+"Mischief Militia - SnowItAll": "m",
+"Mischief Militia - Thaw Blader": "w",
 "Molinda, the Cutest Being in the Sky": "w",
 "Monia Bot, the Foretold Rescuer of Coolness": "w",
 "Monsieur Pete, the Booty Raider": "m",
+"Monster Nest": "n",
+"Moonlight Butterfly": "m",
+"Motharch Squire": "m",
+"Mountain Boars": "p",
+"Mr. Jiggles": "m",
+"Mummy Maker Machine": "w",
 "Nao, the Barrier Priestess": "w",
 "Natas, the Master of Hell": "m",
 "Nero Zira, the Mastermind": "m",
 "Nicolas, the Hidden Alchemist": "m",
 "Nieht, the Blitz Blade": "m",
+"Night Mare": "w",
 "Night, the Herald of Chess": "m",
+"Nimble Monkee": "m",
+"Noble Mummy Guards": "p",
 "Nomu, Wanderer of Worlds": "m",
+"Non-Fungible Monkee": "m",
 "Null, the Mage Slayer": "m",
 "Omikron, the Faceless Illusionist": "m",
 "Orthos, the Loyal Guard Dog": "m",
+"Paraseed": "w",
 "Patty, the Ninja of Revenge": "w",
+"Pawn of Kings [B]": "m",
+"Pawn of Kings [W]": "m",
 "Pes'zet, the Plague Bringer": "m",
+"Pet Snake": "w",
 "Peter Röll, the Protagonist": "m",
 "Pharaoh, the Lone Living Being": "m",
+"Phatnir, Prototype of Coolness": "m",
+"Piggyfied Hero": "m",
+"Pinaxolotl": "m",
 "Pinta, the Singing Ship": "w",
+"Plant Golem": "m",
+"Pollution Piranha": "m",
+"Populated Island Turtle": "w",
+"Potion Juggler": "m",
+"Priest of Luna": "m",
+"Priest of Tempeste": "m",
 "Pseudonia, the Skill Devourer": "w",
+"Psychic Scout": "m",
+"Pure Advantage Camel": "n",
+"Pyraga": "m",
+"Queen of Kings [B]": "w",
+"Queen of Kings [W]": "w",
 "Quetzahuitl, Receiver of Sacrifices": "m",
+"Race Boat Captain": "m",
 "Rafflesia, the Poison Princess": "w",
 "Rakah, the Loan Shark": "m",
+"Rap Harpyformer": "m",
+"Realmniversal Emperor": "m",
+"Rebelliokai Backup Bakus": "p",
+"Rebelliokai Camouflaged Kappa": "m",
+"Rebelliokai Courtly Kirin": "n",
+"Rebelliokai Kind Kitsune": "m",
+"Rebelliokai Oblivious Oni": "m",
+"Rebelliokai Terror Tengu": "m",
+"Rebelliokai Timid Tanuki": "m",
+"Red Dragoneer": "m",
 "Reiza, the Chief Tormentor": "w",
 "Rescued Damsel Cecilia": "w",
+"Resilient Monkee": "m",
 "Rha'Bi, the Living Skeleton": "m",
 "Rick, the Trigger Happy Undertaker": "m",
 "Riffel, Master of the Ultimate Gun": "w",
+"Rocky Slime": "m",
+"Rook of Kings [B]": "m",
+"Rook of Kings [W]": "m",
 "Rool, the Troll Guard": "m",
+"Rosie, the School Idol": "n",
+"Royal Corgi": "m",
 "Rubin, the Dragoneer Champion": "m",
 "Sabrina, the Psychic Witch": "w",
+"Sacred Cattle": "n",
 "Saint Nicolas": "m",
+"Sandy Blob": "m",
 "Santa Klaus": "m",
+"Sarcophagus of Sealed Magic": "m",
 "Sas'Za, the Snaka Adventurer": "w",
 "Saya, the Plant Princess": "w",
+"Scavenging Crane": "m",
+"Sentient Bomb Golems": "p",
 "Serket, Dread of the Desert": "w",
+"Serpentous Demon": "m",
 "Sett, the Adept of Necromancy": "m",
+"Shadowy Slime": "m",
+"Shanty Harpyformer": "m",
+"Shimmering Dragonegg": "n",
+"Shiny Slime": "m",
+"Shroomasaur": "m",
 "Shu'Chaku, the Blood Moon Projection": "w",
 "Sid, the King of Thieves": "m",
 "Silent Water Mizune": "m",
 "Siphem, the Deepsea Demon": "m",
+"Ska Harpyformer": "m",
+"Skeleton Archer": "m",
+"Skeleton Bard": "m",
+"Skeleton Death Knight": "m",
+"Skeleton Demon": "m",
+"Skeleton Healer": "m",
+"Skeleton King Skullmael": "m",
+"Skeleton Mage": "m",
+"Skeleton Necromancer": "m",
+"Skeleton Priest": "m",
+"Skeleton Reaper": "m",
+"Skeleton Skull Bat": "w",
+"Skeleton Wizard": "m",
+"Sky Archeologist": "m",
+"Sky Shaman": "m",
+"Slave Trader": "m",
+"Sleeping Beauty": "n",
+"Slime Rancher": "m",
+"Slimy Slime": "m",
+"Slippery Narw": "m",
+"Slippery Pengu": "m",
+"Slippery Polar": "m",
+"Slippery Snobbit": "m",
+"Slippery Snowman": "m",
+"Slippery Spikeblock": "m",
+"Slippery Whoolmoth": "n",
+"Smug Mastermind Antonia": "w",
+"Smugbeth, the Rebel of no Rules": "w",
 "Sol Rym, the Thunder Djinn": "m",
+"Sorbereus, the Adapting Dragon": "m",
 "Sorin, the Warden of Blood Rock": "m",
+"Soul Shard Ba": "m",
+"Soul Shard Ib": "m",
+"Soul Shard Ka": "m",
+"Soul Shard Khet": "m",
+"Soul Shard Ren": "m",
+"Soul Shard Sah": "m",
+"Soul Shard Sekhem": "m",
+"Soul Shard Shut": "m",
+"Sparkfly Architect": "m",
+"Sparkfly Attendant": "m",
+"Sparkfly Queen": "w",
+"Sparkfly Worker": "m",
+"Sparky Slime": "m",
 "Sparrow, the Buffoon of the Treasure Cave": "m",
 "Sparrow, the Bumbling Buffoon": "m",
+"Spearman": "m",
+"Spirit of the Barbarian Sword": "m",
+"Spirit of the Forbidden Grimoire": "m",
+"Spirit of the Heart Bow": "m",
+"Spirit of the Relic Hammer": "m",
+"Spirit of the Shattered Trident": "m",
+"Spirit of the Super-Killing Knife": "m",
+"Spirit of the Ultimate Gun": "m",
+"Splashy Slime": "m",
+"Steam Dwarf Brewer": "m",
+"Steam Dwarf Diver": "m",
+"Steam Dwarf Dragon Pilot": "m",
+"Steam Dwarf Engineer": "m",
+"Steam Dwarf Exterminator": "m",
+"Steam Dwarf Miner": "m",
 "Stellan, the Calm Cat": "m",
+"Stellin, the Calm Dictator": "m",
 "Stormkissed Waflav": "m",
+"Stowaway": "m",
 "Styx, the Gate to the Spirit World": "n",
 "Styx, the Opened Gate": "n",
+"Super Fan": "m",
+"Suspicious Monster": "n",
+"Swagdri, Forger of Coolness": "m",
 "Swampborne Waflav": "m",
+"Swift Eagle Warrior": "m",
 "Taio, Absorber of the Mountain's Heart": "m",
 "Taio, the Sun Fencer": "m",
+"Tamed Hell Fox": "m",
+"Tamed Primordium": "n",
 "Tarleinn the Traveler": "w",
+"Taunting Elephant": "m",
 "Tazune, the Angry Hot-Blood": "m",
+"Techno Harpyformer": "m",
 "Tempeluna, the Convergence Fairy": "w",
 "Tempeste Moana, the Rain Singer": "w",
 "Tempeste, the Weather Fairy": "w",
 "Teocuilatl, the Embodiment of Gods": "m",
 "Teppes, the Deepsea Vampire": "m",
+"Test Dummy": "w",
 "Thalia, the Fun Fairy": "w",
 "Tharx, the Never-Losing General": "m",
+"The Creepy Clown of Heaven": "m",
+"The Egg of God": "n",
+"The Golden Abomination": "w",
+"The Master's Spy": "m",
+"The Nornstellar, Foretellers of Coolness": "p",
+"The Oracle of Heaven": "n",
+"The Root of all Evil": "w",
+"The Root of all Presents": "w",
+"The Spawn Mother": "w",
+"The Thing in the Ship": "n",
+"The Weather Orchestra": "n",
+"Thebinxan War Counselor": "m",
 "Thep, the Court Scribe": "m",
 "Thorad, Strength of Coolness": "m",
+"Thrysh, Robber of Coolness": "m",
 "Thunderstruck Waflav": "m",
+"Time Bomblebee": "w",
+"Time Tyrant": "m",
 "Timeless King Zi": "m",
+"Tobi, the Average Student": "m",
 "Toras, Master of all Weapons": "m",
+"Traveler from the Future": "m",
 "Treasure Huntress Semi": "w",
+"Treasure Skeleton": "n",
 "Tri Ad, the Puppet Mistress": "w",
 "Tri Fecta, the Puppet Master": "m",
+"Trident Spirit - Hammer Absorbed": "m",
 "True Fairy Crestina, the Primordial Goddess": "w",
 "Tryse, the Shadow Slayer": "m",
 "Tsu'Ki, the Lunatic Princess": "w",
+"Tuscan Aristocrat": "m",
+"Tuscan Artist": "m",
+"Tuscan Mystic": "m",
+"Tuscan Prisoner": "m",
 "Tushu, the Knowledge Keeper": "m",
+"Undead Guardian Angel": "m",
+"Undurdle": "w",
+"Unsettling Opportunist Vullary": "m",
 "Vacarn, the Dark Goblin Necromancer": "m",
 "Vena, the Bounty Huntress": "w",
 "Victorica, the Eternal Empress": "w",
+"Vinepire": "m",
 "Visionary Genius Heinz": "m",
 "Von Pixmarck, the Iron Chancellor": "m",
 "Waflav, the Metamorphing Monstrosity": "m",
+"Waitress": "w",
 "Wall Breaker General Ralzish": "m",
+"Warrior of Teocuilatl": "m",
+"Water Golem": "m",
+"Wavilion": "m",
+"Weapon Collecting Wight": "m",
+"Wendy, the Shy Girl": "n",
+"White Sacrificial Bull": "m",
+"Wildur, the Shining Coolness": "w",
 "Willy, the Valiant Leprechaun": "m",
+"Winged Haressassin": "m",
+"Winged Skeleton": "n",
+"Wire Hatchling": "n",
+"Wise Village Elder": "m",
+"Wolflesia, the Canine Flower": "w",
+"Wowkyrie, Bringer of Coolness": "w",
 "Xal, the Animated Armor": "m",
 "Xiong, the Bamboo Guardian": "m",
+"Yolomungandr, Ender of Coolness": "m",
 "Yukana, the Scholar on the Run": "w",
 "Zamorin, the Spice Rajah": "m",
 "Zhigao, the Heavenly Emperor": "m",
+"Zira Racer": "m",
 "Zsos'Ssar, the Serpent Warlord": "m",
 "Zwei, the Lucky Thief": "m"
 }
