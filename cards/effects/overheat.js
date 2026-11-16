@@ -117,6 +117,13 @@ module.exports = {
         hitsBearer: true,       // die Wahl des Artefakts trifft seinen Träger (Redirecting Aura: Umleitung nur auf ein Artefakt eines anderen Helden)
         cancellable: true,
       });
+      // ── In der Zielwahl NEGIERT (Frost Rune, Magic Mirror …) oder der Wirker dort besiegt (Booby Trap): der Zauber tut nichts — das Artefakt bleibt ausgerüstet, kein Schaden.
+      // Beides geprüft (Negations-Marke UND Wirkerzustand), damit es nicht davon abhängt, welches Fenster die Marke setzt. Kein Abbruch (`_spellCancelled`): die Karte ist verbraucht.
+      if (gs._spellNegatedByEffect || hero.hp <= 0) {
+        engine.log('overheat_negated', { player: ps.username });
+        engine.sync();
+        return;
+      }
       const id = Array.isArray(gewaehlt) ? gewaehlt[0] : gewaehlt;
       // Nach der Abfrage neu einsammeln — das Brett kann sich bewegt haben (Umleitung auf ein anderes Artefakt eingeschlossen).
       const treffer = id && ausruestung(engine).map(i => artefaktZiel(engine, i)).find(z => z.id === id);
@@ -127,6 +134,24 @@ module.exports = {
       const tHeroIdx = treffer.heroIdx;
       const tHero = gs.players[tSeite]?.heroes?.[tHeroIdx];
       const quelle = { name: CARD_NAME, owner: pi, heroIdx, controller: pi, heroOwner: heroSeite };
+
+      // ── Treffer-Fenster des Trägers VOR der Ablage ──
+      // „Die Artefakt-Wahl IST der Treffer des Trägers": Surprises, die den Zauber abwehren (Frost Rune, Booby Trap …), öffneten sonst erst beim Schaden in Schritt 3 — da wäre das Artefakt
+      // schon in der Ablage, obwohl der Zauber negiert wurde. Wie `actionDealDamage` (Heldenfenster), nur früher; der Träger ist danach vorgemerkt, der Schaden fragt nicht noch einmal.
+      if (tHero?.name && tHero.hp > 0 && (gs.players[tSeite]?.surpriseZones?.[tHeroIdx] || []).length > 0 && !engine.hasEffectImmunity(tSeite, tHeroIdx, ctx.card)) {
+        const quelleFenster = engine._rewriteSourceForCreatureCaster ? engine._rewriteSourceForCreatureCaster(ctx.card) : ctx.card;
+        const sr = await engine._checkSurpriseWindow(
+          [{ type: 'hero', owner: tSeite, heroIdx: tHeroIdx, cardName: tHero.name }], quelleFenster, { damageType: 'destruction_spell' });
+        if (sr?.effectNegated) {
+          if ((gs._spellResolutionDepth || 0) > 0) gs._spellNegatedByEffect = true;
+          engine.log('overheat_negated', { player: ps.username, artifact: treffer.cardName });
+          engine.sync();
+          return;
+        }
+        if (!gs._surpriseCheckedHeroes) gs._surpriseCheckedHeroes = new Set();
+        gs._surpriseCheckedHeroes.add(`${tSeite}-${tHeroIdx}`);
+      }
+      if (gs._spellNegatedByEffect || hero.hp <= 0) { engine.sync(); return; }   // negiert oder der Wirker fiel dabei (Booby Trap): nichts passiert
 
       // ── Bild: das Artefakt glüht und platzt ──
       engine._broadcastEvent('play_zone_animation', {
